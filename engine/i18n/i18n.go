@@ -1,0 +1,313 @@
+package i18n
+
+import (
+	"bufio"
+	"fmt"
+	"io/fs"
+	"os"
+	"path"
+	"sort"
+	"strconv"
+	"strings"
+	"sync"
+
+	"github.com/pawal/gonemaster/share"
+)
+
+var (
+	loadOnce sync.Once
+
+	catalogs  map[string]map[string]string
+	english   map[string]string
+	localeIDs []string
+)
+
+// AvailableLocales returns the list of embedded locales, plus "en".
+func AvailableLocales() []string {
+	loadCatalogs()
+	locales := append([]string{}, localeIDs...)
+	locales = append(locales, "en")
+	sort.Strings(locales)
+	return locales
+}
+
+// DefaultLocale returns the best-effort locale name from the environment.
+func DefaultLocale() string {
+	if value := os.Getenv("LANGUAGE"); value != "" {
+		if parts := strings.Split(value, ":"); len(parts) > 0 && parts[0] != "" {
+			return parts[0]
+		}
+	}
+	for _, key := range []string{"LC_ALL", "LC_MESSAGES", "LANG"} {
+		if value := os.Getenv(key); value != "" {
+			return value
+		}
+	}
+	return "en"
+}
+
+// Translate returns a translated message for the module/tag/args tuple.
+func Translate(locale string, module string, tag string, args map[string]any) string {
+	msg, _ := TranslateWithStatus(locale, module, tag, args)
+	return msg
+}
+
+// TranslateWithStatus returns a translated message and whether a translation was found.
+func TranslateWithStatus(locale string, module string, tag string, args map[string]any) (string, bool) {
+	loadCatalogs()
+
+	key := strings.ToUpper(strings.TrimSpace(module)) + ":" + strings.ToUpper(strings.TrimSpace(tag))
+	if key == ":" {
+		return "", false
+	}
+
+	if locale == "" {
+		locale = DefaultLocale()
+	}
+
+	for _, candidate := range localeCandidates(locale) {
+		if msg := lookupCatalog(candidate, key); msg != "" {
+			return interpolate(msg, args), true
+		}
+	}
+
+	if msg := english[key]; msg != "" {
+		return interpolate(msg, args), true
+	}
+
+	return interpolate(key, args), false
+}
+
+func lookupCatalog(locale string, key string) string {
+	if catalogs == nil {
+		return ""
+	}
+	msgs := catalogs[locale]
+	if msgs == nil {
+		return ""
+	}
+	return msgs[key]
+}
+
+func localeCandidates(locale string) []string {
+	locale = normalizeLocale(locale)
+	if locale == "" || locale == "c" {
+		return nil
+	}
+	parts := strings.Split(locale, "_")
+	if len(parts) > 1 {
+		return []string{locale, parts[0]}
+	}
+	return []string{locale}
+}
+
+func normalizeLocale(locale string) string {
+	locale = strings.TrimSpace(locale)
+	if locale == "" {
+		return ""
+	}
+	locale = strings.ReplaceAll(locale, "-", "_")
+	locale = strings.ToLower(locale)
+	if idx := strings.IndexAny(locale, ".@"); idx >= 0 {
+		locale = locale[:idx]
+	}
+	return locale
+}
+
+func loadCatalogs() {
+	loadOnce.Do(func() {
+		catalogs = map[string]map[string]string{}
+		english = map[string]string{}
+		localeIDs = []string{}
+
+		paths, err := fs.Glob(share.POFiles, "lang/*.po")
+		if err != nil {
+			return
+		}
+
+		for _, poPath := range paths {
+			data, err := share.POFiles.ReadFile(poPath)
+			if err != nil {
+				continue
+			}
+			locale := strings.ToLower(strings.TrimSuffix(path.Base(poPath), ".po"))
+			if locale == "" {
+				continue
+			}
+			msgs, ids := parsePO(string(data))
+			if len(msgs) > 0 {
+				catalogs[locale] = msgs
+				localeIDs = append(localeIDs, locale)
+			}
+			for key, msgid := range ids {
+				if _, ok := english[key]; !ok {
+					english[key] = msgid
+				}
+			}
+		}
+
+		sort.Strings(localeIDs)
+	})
+}
+
+func parsePO(data string) (map[string]string, map[string]string) {
+	translations := map[string]string{}
+	msgids := map[string]string{}
+
+	var pendingKeys []string
+	var msgid strings.Builder
+	var msgstr strings.Builder
+	inMsgid := false
+	inMsgstr := false
+
+	flush := func() {
+		if len(pendingKeys) > 0 && msgid.Len() > 0 {
+			idText := msgid.String()
+			if msgstr.Len() > 0 {
+				for _, key := range pendingKeys {
+					msgids[key] = idText
+					translations[key] = msgstr.String()
+				}
+			} else {
+				for _, key := range pendingKeys {
+					msgids[key] = idText
+				}
+			}
+		}
+		pendingKeys = nil
+		msgid.Reset()
+		msgstr.Reset()
+		inMsgid = false
+		inMsgstr = false
+	}
+
+	scanner := bufio.NewScanner(strings.NewReader(data))
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			if msgid.Len() > 0 || msgstr.Len() > 0 {
+				flush()
+			} else {
+				pendingKeys = nil
+			}
+			continue
+		}
+		if strings.HasPrefix(line, "#.") {
+			tag := strings.TrimSpace(strings.TrimPrefix(line, "#."))
+			if tag != "" {
+				if idx := strings.IndexAny(tag, " \t"); idx >= 0 {
+					tag = tag[:idx]
+				}
+				if parts := strings.SplitN(tag, ":", 2); len(parts) == 2 {
+					module := strings.ToUpper(strings.TrimSpace(parts[0]))
+					msgTag := strings.ToUpper(strings.TrimSpace(parts[1]))
+					if module != "" && msgTag != "" {
+						pendingKeys = append(pendingKeys, module+":"+msgTag)
+					}
+				}
+			}
+			continue
+		}
+		if strings.HasPrefix(line, "msgid ") {
+			if msgid.Len() > 0 || msgstr.Len() > 0 {
+				flush()
+			}
+			inMsgid = true
+			inMsgstr = false
+			if value, ok := parseQuoted(line); ok {
+				msgid.WriteString(value)
+			}
+			continue
+		}
+		if strings.HasPrefix(line, "msgstr ") {
+			inMsgid = false
+			inMsgstr = true
+			if value, ok := parseQuoted(line); ok {
+				msgstr.WriteString(value)
+			}
+			continue
+		}
+		if strings.HasPrefix(line, "\"") {
+			if inMsgid {
+				if value, ok := parseQuoted(line); ok {
+					msgid.WriteString(value)
+				}
+			} else if inMsgstr {
+				if value, ok := parseQuoted(line); ok {
+					msgstr.WriteString(value)
+				}
+			}
+		}
+	}
+	flush()
+
+	return translations, msgids
+}
+
+func parseQuoted(line string) (string, bool) {
+	idx := strings.Index(line, "\"")
+	if idx < 0 {
+		return "", false
+	}
+	value, err := strconv.Unquote(line[idx:])
+	if err != nil {
+		return "", false
+	}
+	return value, true
+}
+
+func interpolate(template string, args map[string]any) string {
+	if template == "" || args == nil || !strings.Contains(template, "{") {
+		return template
+	}
+	var out strings.Builder
+	out.Grow(len(template))
+
+	for i := 0; i < len(template); {
+		if template[i] != '{' {
+			out.WriteByte(template[i])
+			i++
+			continue
+		}
+		end := strings.IndexByte(template[i+1:], '}')
+		if end < 0 {
+			out.WriteByte(template[i])
+			i++
+			continue
+		}
+		key := template[i+1 : i+1+end]
+		if value, ok := args[key]; ok {
+			out.WriteString(formatValue(value))
+			i += end + 2
+			continue
+		}
+		out.WriteByte(template[i])
+		i++
+	}
+
+	return out.String()
+}
+
+func formatValue(value any) string {
+	switch v := value.(type) {
+	case nil:
+		return ""
+	case []string:
+		return strings.Join(v, ",")
+	case []int:
+		parts := make([]string, len(v))
+		for i, item := range v {
+			parts[i] = fmt.Sprint(item)
+		}
+		return strings.Join(parts, ",")
+	case []any:
+		parts := make([]string, len(v))
+		for i, item := range v {
+			parts[i] = fmt.Sprint(item)
+		}
+		return strings.Join(parts, ",")
+	default:
+		return fmt.Sprint(value)
+	}
+}

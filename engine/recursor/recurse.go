@@ -1,0 +1,284 @@
+package recursor
+
+import (
+	"context"
+	"net/netip"
+	"strconv"
+	"strings"
+
+	"github.com/miekg/dns"
+
+	"github.com/pawal/gonemaster/engine/constants"
+	"github.com/pawal/gonemaster/engine/dnsname"
+	"github.com/pawal/gonemaster/engine/packet"
+)
+
+type queryer interface {
+	QueryWithClass(ctx context.Context, qname string, qtype string, qclass string) (packet.Packet, error)
+}
+
+type recurseState struct {
+	ns         []queryer
+	count      int
+	common     int
+	seen       map[string]bool
+	inProgress map[string]map[string]bool
+	tseen      map[string]bool
+	tcount     int
+	qname      dnsname.Name
+	qnameSet   bool
+	candidate  packet.Packet
+	nsFrom     func(packet.Packet, *recurseState) ([]queryer, error)
+	trace      []traceEntry
+	glue       map[string]map[netip.Addr]bool
+}
+
+type traceEntry struct {
+	zoneName   string
+	source     queryer
+	answerFrom string
+}
+
+func (r *Recursor) recurse(ctx context.Context, name string, qtype string, qclass string, state *recurseState) (packet.Packet, *recurseState, error) {
+	if state == nil {
+		state = &recurseState{}
+	}
+	if !state.qnameSet {
+		state.qname = dnsname.New(name)
+		state.qnameSet = true
+	}
+	if state.nsFrom == nil {
+		state.nsFrom = r.getNSFrom
+	}
+	if state.seen == nil {
+		state.seen = map[string]bool{}
+	}
+	if state.trace == nil {
+		state.trace = []traceEntry{}
+	}
+	if state.inProgress == nil {
+		state.inProgress = map[string]map[string]bool{}
+	}
+	if state.tseen == nil {
+		state.tseen = map[string]bool{}
+	}
+	if state.glue == nil {
+		state.glue = map[string]map[netip.Addr]bool{}
+	}
+
+	if qtype == "" {
+		qtype = "A"
+	}
+	if qclass == "" {
+		qclass = "IN"
+	}
+	qtype = strings.ToUpper(qtype)
+	qclass = strings.ToUpper(qclass)
+
+	nameObj := dnsname.New(name)
+	nameKey := strings.ToLower(nameObj.String())
+	if state.inProgress[nameKey] == nil {
+		state.inProgress[nameKey] = map[string]bool{}
+	}
+	if state.inProgress[nameKey][qtype] {
+		return packet.Packet{}, state, nil
+	}
+	state.inProgress[nameKey][qtype] = true
+
+	for len(state.ns) > 0 {
+		idx := len(state.ns) - 1
+		ns := state.ns[idx]
+		state.ns = state.ns[:idx]
+
+		resp, err := ns.QueryWithClass(ctx, name, qtype, qclass)
+		if err != nil || resp.Msg == nil {
+			continue
+		}
+
+		if resp.Rcode() == "REFUSED" || resp.Rcode() == "SERVFAIL" {
+			state.candidate = resp
+			continue
+		}
+
+		if resp.NoSuchRecord() || resp.NoSuchName() {
+			return resp, state, nil
+		}
+
+		if resp.Type() == "answer" {
+			if !resp.HasRRsOfTypeForName(qtype, nameObj, "answer") && len(resp.GetRecordsForName("CNAME", nameObj, "answer")) > 0 {
+				cnameResp, state, err := r.resolveCNAME(ctx, nameObj, qtype, qclass, resp, state)
+				return cnameResp, state, err
+			}
+			return resp, state, nil
+		}
+
+		if resp.IsRedirect() {
+			zname, ok := redirectName(resp)
+			if !ok {
+				continue
+			}
+			if zname == "." {
+				continue
+			}
+			zkey := strings.ToLower(zname)
+			if state.seen[zkey] {
+				continue
+			}
+			state.seen[zkey] = true
+
+			common := dnsname.New(zname).Common(state.qname)
+			if common < state.common {
+				continue
+			}
+			state.common = common
+
+			next, err := state.nsFrom(resp, state)
+			if err != nil {
+				return packet.Packet{}, state, err
+			}
+			state.ns = next
+			state.count++
+			if state.count > 20 {
+				return packet.Packet{}, state, nil
+			}
+			state.trace = append([]traceEntry{{
+				zoneName:   zname,
+				source:     ns,
+				answerFrom: resp.AnswerFrom,
+			}}, state.trace...)
+		}
+	}
+
+	if state.candidate.Msg != nil {
+		return state.candidate, state, nil
+	}
+	return packet.Packet{}, state, nil
+}
+
+func redirectName(resp packet.Packet) (string, bool) {
+	records := resp.GetRecords("NS")
+	if len(records) == 0 {
+		return "", false
+	}
+	owner := records[0].Header().Name
+	ownerName := dnsname.New(owner)
+	return ownerName.String(), true
+}
+
+func (r *Recursor) resolveCNAME(ctx context.Context, name dnsname.Name, qtype string, qclass string, resp packet.Packet, state *recurseState) (packet.Packet, *recurseState, error) {
+	cnameRRs := resp.GetRecords("CNAME", "answer")
+	if len(cnameRRs) == 0 {
+		return resp, state, nil
+	}
+
+	unique := make([]*dns.CNAME, 0, len(cnameRRs))
+	seen := map[string]bool{}
+	for _, rr := range cnameRRs {
+		cname, ok := rr.(*dns.CNAME)
+		if !ok {
+			continue
+		}
+		key := strconv.Itoa(int(cname.Hdr.Class)) + "/CNAME/" + strings.ToLower(cname.Hdr.Name) + "/" + strings.ToLower(cname.Target)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		unique = append(unique, cname)
+	}
+
+	if len(unique) > constants.CNAMEMaxRecords {
+		return packet.Packet{}, state, nil
+	}
+
+	cnames := map[string]string{}
+	seenTargets := map[string]bool{}
+	forbiddenTargets := map[string]bool{}
+	for _, rr := range unique {
+		ownerName := dnsname.New(rr.Hdr.Name)
+		targetName := dnsname.New(rr.Target)
+		ownerKey := strings.ToLower(ownerName.String())
+		targetKey := strings.ToLower(targetName.String())
+
+		if forbiddenTargets[ownerKey] {
+			return packet.Packet{}, state, nil
+		}
+		if ownerKey == targetKey || seenTargets[targetKey] || forbiddenTargets[targetKey] {
+			return packet.Packet{}, state, nil
+		}
+
+		seenTargets[targetKey] = true
+		forbiddenTargets[ownerKey] = true
+		cnames[ownerKey] = targetKey
+	}
+
+	targetKey := strings.ToLower(name.String())
+	counter := 0
+	for {
+		next, ok := cnames[targetKey]
+		if !ok {
+			break
+		}
+		if counter > constants.CNAMEMaxRecords {
+			return packet.Packet{}, state, nil
+		}
+		targetKey = next
+		counter++
+	}
+
+	if counter != len(unique) {
+		return packet.Packet{}, state, nil
+	}
+
+	if len(resp.GetRecords(qtype, "answer")) > 0 {
+		targetName := dnsname.New(targetKey)
+		if resp.HasRRsOfTypeForName(qtype, targetName, "answer") {
+			return resp, state, nil
+		}
+		return packet.Packet{}, state, nil
+	}
+
+	if state == nil {
+		state = &recurseState{}
+	}
+	if state.inProgress == nil {
+		state.inProgress = map[string]map[string]bool{}
+	}
+	if state.tseen == nil {
+		state.tseen = map[string]bool{}
+	}
+
+	if state.inProgress[targetKey] != nil && state.inProgress[targetKey][qtype] {
+		return packet.Packet{}, state, nil
+	}
+
+	state.tseen[targetKey] = true
+	state.tcount++
+	if state.tcount > constants.CNAMEMaxChainLength {
+		return packet.Packet{}, state, nil
+	}
+
+	targetName := dnsname.New(targetKey)
+	if !name.IsInBailiwick(targetName) {
+		root, err := r.RootServers()
+		if err != nil {
+			return packet.Packet{}, state, err
+		}
+		queryers := make([]queryer, 0, len(root))
+		for _, server := range root {
+			queryers = append(queryers, server)
+		}
+
+		nextState := &recurseState{
+			ns:         queryers,
+			count:      0,
+			common:     0,
+			seen:       map[string]bool{},
+			inProgress: state.inProgress,
+			tseen:      state.tseen,
+			tcount:     state.tcount,
+		}
+		return r.recurse(ctx, targetName.String(), qtype, qclass, nextState)
+	}
+
+	return resp, state, nil
+}

@@ -1,0 +1,915 @@
+package syntax
+
+import (
+	"context"
+	"fmt"
+	"net"
+	"net/mail"
+	"sort"
+	"strings"
+
+	"github.com/miekg/dns"
+
+	"github.com/pawal/gonemaster/engine/dnsname"
+	"github.com/pawal/gonemaster/engine/logger"
+	"github.com/pawal/gonemaster/engine/methods"
+	"github.com/pawal/gonemaster/engine/nameserver"
+	"github.com/pawal/gonemaster/engine/packet"
+	"github.com/pawal/gonemaster/engine/profile"
+	"github.com/pawal/gonemaster/engine/util"
+	"github.com/pawal/gonemaster/engine/zone"
+)
+
+const moduleName = "Syntax"
+
+// All runs the Syntax test cases in order, mirroring the Perl implementation.
+func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
+	var results []*logger.Entry
+
+	onlyAllowedChars := true
+	if util.ShouldRunTest("syntax01") {
+		entries, err := Syntax01(ctx, z)
+		results = append(results, entries...)
+		if err != nil {
+			return results, err
+		}
+		onlyAllowedChars = hasTag(results, "ONLY_ALLOWED_CHARS")
+	}
+
+	if util.ShouldRunTest("syntax02") {
+		entries, err := Syntax02(ctx, z)
+		results = append(results, entries...)
+		if err != nil {
+			return results, err
+		}
+	}
+
+	if util.ShouldRunTest("syntax03") {
+		entries, err := Syntax03(ctx, z)
+		results = append(results, entries...)
+		if err != nil {
+			return results, err
+		}
+	}
+
+	if !onlyAllowedChars {
+		return results, nil
+	}
+
+	if util.ShouldRunTest("syntax04") {
+		entries, err := Syntax04(ctx, z)
+		results = append(results, entries...)
+		if err != nil {
+			return results, err
+		}
+	}
+
+	allSOAResponses := true
+	if util.ShouldRunTest("syntax05") {
+		entries, err := Syntax05(ctx, z)
+		results = append(results, entries...)
+		if err != nil {
+			return results, err
+		}
+		allSOAResponses = !hasTag(results, "NO_RESPONSE_SOA_QUERY")
+	}
+
+	if allSOAResponses {
+		if util.ShouldRunTest("syntax06") {
+			entries, err := Syntax06(ctx, z)
+			results = append(results, entries...)
+			if err != nil {
+				return results, err
+			}
+		}
+
+		if util.ShouldRunTest("syntax07") {
+			entries, err := Syntax07(ctx, z)
+			results = append(results, entries...)
+			if err != nil {
+				return results, err
+			}
+		}
+	}
+
+	if util.ShouldRunTest("syntax08") {
+		entries, err := Syntax08(ctx, z)
+		results = append(results, entries...)
+		if err != nil {
+			return results, err
+		}
+	}
+
+	return results, nil
+}
+
+// Metadata returns tags emitted by Syntax test cases.
+func Metadata() map[string][]string {
+	return map[string][]string{
+		"syntax01": {
+			"ONLY_ALLOWED_CHARS",
+			"NON_ALLOWED_CHARS",
+			"TEST_CASE_END",
+			"TEST_CASE_START",
+		},
+		"syntax02": {
+			"INITIAL_HYPHEN",
+			"TERMINAL_HYPHEN",
+			"NO_ENDING_HYPHENS",
+			"TEST_CASE_END",
+			"TEST_CASE_START",
+		},
+		"syntax03": {
+			"DISCOURAGED_DOUBLE_DASH",
+			"NO_DOUBLE_DASH",
+			"TEST_CASE_END",
+			"TEST_CASE_START",
+		},
+		"syntax04": {
+			"NAMESERVER_DISCOURAGED_DOUBLE_DASH",
+			"NAMESERVER_NON_ALLOWED_CHARS",
+			"NAMESERVER_NUMERIC_TLD",
+			"NAMESERVER_SYNTAX_OK",
+			"TEST_CASE_END",
+			"TEST_CASE_START",
+		},
+		"syntax05": {
+			"RNAME_MISUSED_AT_SIGN",
+			"RNAME_NO_AT_SIGN",
+			"NO_RESPONSE_SOA_QUERY",
+			"TEST_CASE_END",
+			"TEST_CASE_START",
+		},
+		"syntax06": {
+			"NO_RESPONSE",
+			"NO_RESPONSE_SOA_QUERY",
+			"RNAME_MAIL_DOMAIN_INVALID",
+			"RNAME_MAIL_DOMAIN_LOCALHOST",
+			"RNAME_MAIL_ILLEGAL_CNAME",
+			"RNAME_RFC822_INVALID",
+			"RNAME_RFC822_VALID",
+			"TEST_CASE_END",
+			"TEST_CASE_START",
+		},
+		"syntax07": {
+			"MNAME_DISCOURAGED_DOUBLE_DASH",
+			"MNAME_NON_ALLOWED_CHARS",
+			"MNAME_NUMERIC_TLD",
+			"MNAME_SYNTAX_OK",
+			"NO_RESPONSE_SOA_QUERY",
+			"TEST_CASE_END",
+			"TEST_CASE_START",
+		},
+		"syntax08": {
+			"MX_DISCOURAGED_DOUBLE_DASH",
+			"MX_NON_ALLOWED_CHARS",
+			"MX_NUMERIC_TLD",
+			"MX_SYNTAX_OK",
+			"NO_RESPONSE_MX_QUERY",
+			"TEST_CASE_END",
+			"TEST_CASE_START",
+		},
+	}
+}
+
+// Syntax01 runs the SYNTAX01 test case.
+func Syntax01(_ context.Context, z *zone.Zone) ([]*logger.Entry, error) {
+	const testcase = "Syntax01"
+	var results []*logger.Entry
+
+	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+		return results, err
+	}
+
+	name := z.Name
+	if nameHasOnlyLegalCharacters(name) {
+		if err := appendLog(&results, testcase, "ONLY_ALLOWED_CHARS", map[string]any{"domain": name.String()}); err != nil {
+			return results, err
+		}
+	} else {
+		if err := appendLog(&results, testcase, "NON_ALLOWED_CHARS", map[string]any{"domain": name.String()}); err != nil {
+			return results, err
+		}
+	}
+
+	return appendTestCaseEnd(results, testcase)
+}
+
+// Syntax02 runs the SYNTAX02 test case.
+func Syntax02(_ context.Context, z *zone.Zone) ([]*logger.Entry, error) {
+	const testcase = "Syntax02"
+	var results []*logger.Entry
+
+	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+		return results, err
+	}
+
+	name := z.Name
+	hadIssue := false
+	for _, label := range name.Labels() {
+		if labelStartsWithHyphen(label) {
+			if err := appendLog(&results, testcase, "INITIAL_HYPHEN", map[string]any{
+				"label":  label,
+				"domain": name.String(),
+			}); err != nil {
+				return results, err
+			}
+			hadIssue = true
+		}
+		if labelEndsWithHyphen(label) {
+			if err := appendLog(&results, testcase, "TERMINAL_HYPHEN", map[string]any{
+				"label":  label,
+				"domain": name.String(),
+			}); err != nil {
+				return results, err
+			}
+			hadIssue = true
+		}
+	}
+
+	if len(name.Labels()) > 0 && !hadIssue {
+		if err := appendLog(&results, testcase, "NO_ENDING_HYPHENS", map[string]any{"domain": name.String()}); err != nil {
+			return results, err
+		}
+	}
+
+	return appendTestCaseEnd(results, testcase)
+}
+
+// Syntax03 runs the SYNTAX03 test case.
+func Syntax03(_ context.Context, z *zone.Zone) ([]*logger.Entry, error) {
+	const testcase = "Syntax03"
+	var results []*logger.Entry
+
+	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+		return results, err
+	}
+
+	name := z.Name
+	hadIssue := false
+	for _, label := range name.Labels() {
+		if labelNotACEHasDoubleHyphen(label) {
+			if err := appendLog(&results, testcase, "DISCOURAGED_DOUBLE_DASH", map[string]any{
+				"label":  label,
+				"domain": name.String(),
+			}); err != nil {
+				return results, err
+			}
+			hadIssue = true
+		}
+	}
+
+	if len(name.Labels()) > 0 && !hadIssue {
+		if err := appendLog(&results, testcase, "NO_DOUBLE_DASH", map[string]any{"domain": name.String()}); err != nil {
+			return results, err
+		}
+	}
+
+	return appendTestCaseEnd(results, testcase)
+}
+
+// Syntax04 runs the SYNTAX04 test case.
+func Syntax04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
+	const testcase = "Syntax04"
+	var results []*logger.Entry
+
+	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+		return results, err
+	}
+
+	glueNames, err := methods.Method2(ctx, z)
+	if err != nil {
+		return results, err
+	}
+	nsNames, err := methods.Method3(ctx, z)
+	if err != nil {
+		return results, err
+	}
+
+	seen := map[string]dnsname.Name{}
+	for _, name := range glueNames {
+		seen[strings.ToLower(name.String())] = name
+	}
+	for _, name := range nsNames {
+		seen[strings.ToLower(name.String())] = name
+	}
+
+	keys := make([]string, 0, len(seen))
+	for key := range seen {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		entries, err := checkNameSyntax("NAMESERVER", seen[key], testcase)
+		if err != nil {
+			return results, err
+		}
+		results = append(results, entries...)
+	}
+
+	return appendTestCaseEnd(results, testcase)
+}
+
+// Syntax05 runs the SYNTAX05 test case.
+func Syntax05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
+	const testcase = "Syntax05"
+	var results []*logger.Entry
+
+	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+		return results, err
+	}
+
+	resp, err := z.QueryOne(ctx, z.Name.String(), "SOA", nil)
+	if err != nil {
+		return results, err
+	}
+
+	if resp.Msg != nil {
+		for _, rr := range resp.GetRecords("SOA", "answer") {
+			soa, ok := rr.(*dns.SOA)
+			if !ok {
+				continue
+			}
+			rname := soa.Mbox
+			check := strings.ReplaceAll(rname, `\.`, ".")
+			if strings.Contains(check, "@") {
+				if err := appendLog(&results, testcase, "RNAME_MISUSED_AT_SIGN", map[string]any{"rname": rname}); err != nil {
+					return results, err
+				}
+			} else {
+				if err := appendLog(&results, testcase, "RNAME_NO_AT_SIGN", map[string]any{"rname": rname}); err != nil {
+					return results, err
+				}
+			}
+			return appendTestCaseEnd(results, testcase)
+		}
+	}
+
+	if err := appendLog(&results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{}); err != nil {
+		return results, err
+	}
+	return appendTestCaseEnd(results, testcase)
+}
+
+// Syntax06 runs the SYNTAX06 test case.
+func Syntax06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
+	const testcase = "Syntax06"
+	var results []*logger.Entry
+
+	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+		return results, err
+	}
+
+	rec := z.Recursor()
+	if rec == nil {
+		return results, fmt.Errorf("missing recursor")
+	}
+
+	glueNS, err := methods.Method4(ctx, z)
+	if err != nil {
+		return results, err
+	}
+	authNS, err := methods.Method5(ctx, z)
+	if err != nil {
+		return results, err
+	}
+
+	uniqueNS := map[string]nameserver.Nameserver{}
+	for _, ns := range glueNS {
+		uniqueNS[ns.String()] = ns
+	}
+	for _, ns := range authNS {
+		uniqueNS[ns.String()] = ns
+	}
+
+	keys := make([]string, 0, len(uniqueNS))
+	for key := range uniqueNS {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	var nss []nameserver.Nameserver
+	for _, key := range keys {
+		nss = append(nss, uniqueNS[key])
+	}
+
+	rnameCandidates := map[string]bool{}
+	seenMailServers := map[string]bool{}
+	invalidExchanges := -1
+
+	for _, ns := range nss {
+		disabled, err := ipDisabledMessage(&results, testcase, ns, "SOA")
+		if err != nil {
+			return results, err
+		}
+		if disabled {
+			continue
+		}
+
+		recurse := false
+		usevc := false
+		resp, err := ns.QueryWithOptions(ctx, z.Name.String(), "SOA", &nameserver.QueryOptions{
+			Recurse: &recurse,
+			UseVC:   &usevc,
+		})
+		if err != nil || resp.Msg == nil {
+			if err := appendLog(&results, testcase, "NO_RESPONSE", map[string]any{
+				"ns":     ns.String(),
+				"domain": z.Name.String(),
+			}); err != nil {
+				return results, err
+			}
+			continue
+		}
+
+		var soa *dns.SOA
+		for _, rr := range resp.GetRecords("SOA", "answer") {
+			if item, ok := rr.(*dns.SOA); ok {
+				soa = item
+				break
+			}
+		}
+		if soa == nil {
+			if err := appendLog(&results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{}); err != nil {
+				return results, err
+			}
+			continue
+		}
+
+		rawRname := soa.Mbox
+		rname := rnameToEmail(rawRname)
+		if !validEmailAddress(rname) {
+			if err := appendLog(&results, testcase, "RNAME_RFC822_INVALID", map[string]any{"rname": rname}); err != nil {
+				return results, err
+			}
+			continue
+		}
+
+		parts := strings.SplitN(rname, "@", 2)
+		if len(parts) != 2 || parts[1] == "" {
+			if err := appendLog(&results, testcase, "RNAME_RFC822_INVALID", map[string]any{"rname": rname}); err != nil {
+				return results, err
+			}
+			continue
+		}
+
+		domain := dnsname.New(parts[1])
+		pMX, err := rec.Recurse(ctx, domain.String(), "MX", "IN")
+		if err != nil {
+			return results, err
+		}
+		if pMX.Msg == nil || pMX.Rcode() != "NOERROR" {
+			if err := appendLog(&results, testcase, "RNAME_MAIL_DOMAIN_INVALID", map[string]any{"domain": domain.String()}); err != nil {
+				return results, err
+			}
+			continue
+		}
+
+		if q := pMX.Question(); len(q) > 0 {
+			qname := dnsname.New(q[0].Name)
+			if !strings.EqualFold(qname.String(), domain.String()) {
+				domain = qname
+			} else if len(pMX.GetRecords("CNAME", "answer")) > 0 {
+				cnames := map[string]string{}
+				for _, rr := range pMX.GetRecords("CNAME", "answer") {
+					if cname, ok := rr.(*dns.CNAME); ok {
+						owner := dnsname.New(cname.Hdr.Name)
+						target := dnsname.New(cname.Target)
+						cnames[strings.ToLower(owner.String())] = strings.ToLower(target.String())
+					}
+				}
+				for {
+					next, ok := cnames[strings.ToLower(domain.String())]
+					if !ok {
+						break
+					}
+					domain = dnsname.New(next)
+				}
+			}
+		}
+
+		var mailServers []string
+		mxRecords := pMX.GetRecordsForName("MX", domain)
+		if len(mxRecords) > 0 {
+			seenMX := map[string]bool{}
+			for _, rr := range mxRecords {
+				if mx, ok := rr.(*dns.MX); ok {
+					mxName := dnsname.New(mx.Mx)
+					name := mxName.String()
+					if !seenMX[name] {
+						seenMX[name] = true
+						mailServers = append(mailServers, name)
+					}
+				}
+			}
+		} else {
+			mailServers = []string{domain.String()}
+		}
+
+		for _, mailServer := range mailServers {
+			if seenMailServers[mailServer] {
+				continue
+			}
+			seenMailServers[mailServer] = true
+			exchangeValid := false
+			if invalidExchanges < 0 {
+				invalidExchanges = 0
+			}
+
+			pA, err := rec.Recurse(ctx, mailServer, "A", "IN")
+			if err != nil {
+				return results, err
+			}
+			if pA.Msg != nil {
+				if len(pA.GetRecords("CNAME", "answer")) > 0 {
+					if err := appendLog(&results, testcase, "RNAME_MAIL_ILLEGAL_CNAME", map[string]any{"domain": mailServer}); err != nil {
+						return results, err
+					}
+				} else {
+					records := matchingARecords(pA, mailServer)
+					if hasIPv4Loopback(records) {
+						if err := appendLog(&results, testcase, "RNAME_MAIL_DOMAIN_LOCALHOST", map[string]any{
+							"domain":    mailServer,
+							"localhost": "127.0.0.1",
+						}); err != nil {
+							return results, err
+						}
+					} else if len(records) > 0 {
+						exchangeValid = true
+					}
+				}
+			}
+
+			pAAAA, err := rec.Recurse(ctx, mailServer, "AAAA", "IN")
+			if err != nil {
+				return results, err
+			}
+			if pAAAA.Msg != nil {
+				if len(pAAAA.GetRecords("CNAME", "answer")) > 0 {
+					if err := appendLog(&results, testcase, "RNAME_MAIL_ILLEGAL_CNAME", map[string]any{"domain": mailServer}); err != nil {
+						return results, err
+					}
+				} else {
+					records := matchingAAAARecords(pAAAA, mailServer)
+					if hasIPv6Loopback(records) {
+						if err := appendLog(&results, testcase, "RNAME_MAIL_DOMAIN_LOCALHOST", map[string]any{
+							"domain":    mailServer,
+							"localhost": "::1",
+						}); err != nil {
+							return results, err
+						}
+					} else if len(records) > 0 {
+						exchangeValid = true
+					}
+				}
+			}
+
+			if exchangeValid {
+				rnameCandidates[rname] = true
+			} else {
+				if err := appendLog(&results, testcase, "RNAME_MAIL_DOMAIN_INVALID", map[string]any{"domain": mailServer}); err != nil {
+					return results, err
+				}
+				delete(rnameCandidates, rname)
+				invalidExchanges++
+			}
+		}
+	}
+
+	if invalidExchanges == 0 {
+		keys := make([]string, 0, len(rnameCandidates))
+		for key := range rnameCandidates {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, rname := range keys {
+			if err := appendLog(&results, testcase, "RNAME_RFC822_VALID", map[string]any{"rname": rname}); err != nil {
+				return results, err
+			}
+		}
+	}
+
+	return appendTestCaseEnd(results, testcase)
+}
+
+// Syntax07 runs the SYNTAX07 test case.
+func Syntax07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
+	const testcase = "Syntax07"
+	var results []*logger.Entry
+
+	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+		return results, err
+	}
+
+	resp, err := z.QueryOne(ctx, z.Name.String(), "SOA", nil)
+	if err != nil {
+		return results, err
+	}
+	if resp.Msg != nil {
+		for _, rr := range resp.GetRecords("SOA", "answer") {
+			if soa, ok := rr.(*dns.SOA); ok {
+				entries, err := checkNameSyntax("MNAME", dnsname.New(soa.Ns), testcase)
+				if err != nil {
+					return results, err
+				}
+				results = append(results, entries...)
+				return appendTestCaseEnd(results, testcase)
+			}
+		}
+	}
+
+	if err := appendLog(&results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{}); err != nil {
+		return results, err
+	}
+	return appendTestCaseEnd(results, testcase)
+}
+
+// Syntax08 runs the SYNTAX08 test case.
+func Syntax08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
+	const testcase = "Syntax08"
+	var results []*logger.Entry
+
+	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+		return results, err
+	}
+
+	resp, err := z.QueryOne(ctx, z.Name.String(), "MX", nil)
+	if err != nil {
+		return results, err
+	}
+	if resp.Msg != nil {
+		seen := map[string]bool{}
+		for _, rr := range resp.GetRecords("MX", "answer") {
+			if mx, ok := rr.(*dns.MX); ok {
+				target := dnsname.New(mx.Mx)
+				key := strings.ToLower(target.String())
+				if seen[key] {
+					continue
+				}
+				seen[key] = true
+				entries, err := checkNameSyntax("MX", target, testcase)
+				if err != nil {
+					return results, err
+				}
+				results = append(results, entries...)
+			}
+		}
+		return appendTestCaseEnd(results, testcase)
+	}
+
+	if err := appendLog(&results, testcase, "NO_RESPONSE_MX_QUERY", map[string]any{}); err != nil {
+		return results, err
+	}
+	return appendTestCaseEnd(results, testcase)
+}
+
+func appendTestCaseEnd(results []*logger.Entry, testcase string) ([]*logger.Entry, error) {
+	if err := appendLog(&results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
+		return results, err
+	}
+	return results, nil
+}
+
+func appendLog(results *[]*logger.Entry, testcase string, tag string, args map[string]any) error {
+	entry, err := util.Logger().Add(tag, args, moduleName, testcase)
+	if err != nil {
+		return err
+	}
+	*results = append(*results, entry)
+	return nil
+}
+
+func ipDisabledMessage(results *[]*logger.Entry, testcase string, ns nameserver.Nameserver, rrtype string) (bool, error) {
+	if ns.Address.Is4() && !profile.Effective().Net.IPv4 {
+		if err := appendLog(results, testcase, "IPV4_DISABLED", map[string]any{
+			"ns":     ns.String(),
+			"rrtype": rrtype,
+		}); err != nil {
+			return true, err
+		}
+		return true, nil
+	}
+	if ns.Address.Is6() && !profile.Effective().Net.IPv6 {
+		if err := appendLog(results, testcase, "IPV6_DISABLED", map[string]any{
+			"ns":     ns.String(),
+			"rrtype": rrtype,
+		}); err != nil {
+			return true, err
+		}
+		return true, nil
+	}
+	return false, nil
+}
+
+func nameHasOnlyLegalCharacters(name dnsname.Name) bool {
+	for _, label := range name.Labels() {
+		if !labelHasOnlyLegalCharacters(label) {
+			return false
+		}
+	}
+	return true
+}
+
+func labelHasOnlyLegalCharacters(label string) bool {
+	if label == "" {
+		return false
+	}
+	for i := 0; i < len(label); i++ {
+		ch := label[i]
+		if ch >= 'A' && ch <= 'Z' {
+			continue
+		}
+		if ch >= 'a' && ch <= 'z' {
+			continue
+		}
+		if ch >= '0' && ch <= '9' {
+			continue
+		}
+		if ch == '-' {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func labelStartsWithHyphen(label string) bool {
+	return len(label) > 0 && label[0] == '-'
+}
+
+func labelEndsWithHyphen(label string) bool {
+	return len(label) > 0 && label[len(label)-1] == '-'
+}
+
+func labelNotACEHasDoubleHyphen(label string) bool {
+	if len(label) < 4 {
+		return false
+	}
+	if strings.HasPrefix(strings.ToLower(label), "xn") {
+		return false
+	}
+	return label[2:4] == "--"
+}
+
+func checkNameSyntax(prefix string, name dnsname.Name, testcase string) ([]*logger.Entry, error) {
+	var results []*logger.Entry
+	domain := name.String()
+
+	if !nameHasOnlyLegalCharacters(name) {
+		if err := appendLog(&results, testcase, prefix+"_NON_ALLOWED_CHARS", map[string]any{"domain": domain}); err != nil {
+			return results, err
+		}
+	}
+
+	if domain != "." {
+		for _, label := range name.Labels() {
+			if labelNotACEHasDoubleHyphen(label) {
+				if err := appendLog(&results, testcase, prefix+"_DISCOURAGED_DOUBLE_DASH", map[string]any{
+					"label":  label,
+					"domain": domain,
+				}); err != nil {
+					return results, err
+				}
+			}
+		}
+
+		labels := name.Labels()
+		if len(labels) > 0 {
+			tld := labels[len(labels)-1]
+			if isNumericLabel(tld) {
+				if err := appendLog(&results, testcase, prefix+"_NUMERIC_TLD", map[string]any{
+					"domain": domain,
+					"tld":    tld,
+				}); err != nil {
+					return results, err
+				}
+			}
+		}
+	}
+
+	if len(results) == 0 {
+		if err := appendLog(&results, testcase, prefix+"_SYNTAX_OK", map[string]any{"domain": domain}); err != nil {
+			return results, err
+		}
+	}
+
+	return results, nil
+}
+
+func isNumericLabel(label string) bool {
+	if label == "" {
+		return false
+	}
+	for i := 0; i < len(label); i++ {
+		if label[i] < '0' || label[i] > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func rnameToEmail(rname string) string {
+	var b strings.Builder
+	replaced := false
+	prevBackslash := false
+	for i := 0; i < len(rname); i++ {
+		ch := rname[i]
+		if !replaced && ch == '.' && !prevBackslash {
+			b.WriteByte('@')
+			replaced = true
+			prevBackslash = false
+			continue
+		}
+		if ch == '\\' {
+			prevBackslash = true
+		} else {
+			prevBackslash = false
+		}
+		b.WriteByte(ch)
+	}
+	out := b.String()
+	out = strings.ReplaceAll(out, `\.`, ".")
+	out = strings.TrimSuffix(out, ".")
+	return out
+}
+
+func validEmailAddress(addr string) bool {
+	parsed, err := mail.ParseAddress(addr)
+	if err != nil {
+		return false
+	}
+	return parsed.Address == addr
+}
+
+func matchingARecords(resp packet.Packet, owner string) []*dns.A {
+	if resp.Msg == nil {
+		return nil
+	}
+	ownerName := dnsname.New(owner)
+	var out []*dns.A
+	for _, rr := range resp.GetRecords("A", "answer") {
+		if a, ok := rr.(*dns.A); ok {
+			name := dnsname.New(a.Header().Name)
+			if strings.EqualFold(name.String(), ownerName.String()) {
+				out = append(out, a)
+			}
+		}
+	}
+	return out
+}
+
+func matchingAAAARecords(resp packet.Packet, owner string) []*dns.AAAA {
+	if resp.Msg == nil {
+		return nil
+	}
+	ownerName := dnsname.New(owner)
+	var out []*dns.AAAA
+	for _, rr := range resp.GetRecords("AAAA", "answer") {
+		if aaaa, ok := rr.(*dns.AAAA); ok {
+			name := dnsname.New(aaaa.Header().Name)
+			if strings.EqualFold(name.String(), ownerName.String()) {
+				out = append(out, aaaa)
+			}
+		}
+	}
+	return out
+}
+
+func hasIPv4Loopback(records []*dns.A) bool {
+	loopback := net.IPv4(127, 0, 0, 1)
+	for _, rr := range records {
+		if rr == nil {
+			continue
+		}
+		if rr.A.Equal(loopback) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasIPv6Loopback(records []*dns.AAAA) bool {
+	loopback := net.ParseIP("::1")
+	for _, rr := range records {
+		if rr == nil {
+			continue
+		}
+		if rr.AAAA.Equal(loopback) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasTag(entries []*logger.Entry, tag string) bool {
+	for _, entry := range entries {
+		if entry == nil {
+			continue
+		}
+		if entry.Tag == tag {
+			return true
+		}
+	}
+	return false
+}

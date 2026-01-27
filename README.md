@@ -58,42 +58,12 @@ gonemaster --json --domain example.com | jq
 Locale defaults to the first available in `LANGUAGE`, then `LC_ALL`, `LC_MESSAGES`,
 `LANG`, and finally `en`.
 
-<<<<<<< HEAD
 ### Exit codes
 
 - `0` Success
 - `2` Usage or runtime error (invalid args, output file errors, engine errors)
 - `130` Interrupted (SIGINT/SIGTERM)
 
-### Examples
-
-Translated output (default):
-```
-go run ./cmd/gonemaster --locale fr --domain example.com
-```
-
-JSON output:
-```
-go run ./cmd/gonemaster --json --domain example.com | jq
-```
-
-Dump effective profile:
-```
-go run ./cmd/gonemaster --dump-profile | jq
-```
-
-Raw streaming output:
-```
-go run ./cmd/gonemaster --raw --min-level INFO --domain example.com
-```
-
-Write JSON to file:
-```
-go run ./cmd/gonemaster --json --domain example.com --output /tmp/zonemaster.json
-```
-
-=======
->>>>>>> c754b25 (Updated README)
 ## Engine usage from Go
 
 ```

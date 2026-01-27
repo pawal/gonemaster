@@ -7,11 +7,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/pawal/gonemaster/engine/hints"
-	"github.com/pawal/gonemaster/engine/nameserver"
-	"github.com/pawal/gonemaster/engine/packet"
-	"github.com/pawal/gonemaster/engine/transport"
-	"github.com/pawal/gonemaster/share"
+	"codeberg.org/pawal/gonemaster/engine/hints"
+	"codeberg.org/pawal/gonemaster/engine/nameserver"
+	"codeberg.org/pawal/gonemaster/engine/packet"
+	"codeberg.org/pawal/gonemaster/engine/transport"
+	"codeberg.org/pawal/gonemaster/share"
 )
 
 var namedRoot = share.NamedRoot

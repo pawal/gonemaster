@@ -8,13 +8,13 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/pawal/gonemaster/engine/constants"
-	"github.com/pawal/gonemaster/engine/dnsname"
-	"github.com/pawal/gonemaster/engine/logger"
-	"github.com/pawal/gonemaster/engine/methods"
-	methodsv2 "github.com/pawal/gonemaster/engine/methodsv2"
-	"github.com/pawal/gonemaster/engine/util"
-	"github.com/pawal/gonemaster/engine/zone"
+	"codeberg.org/pawal/gonemaster/engine/constants"
+	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/logger"
+	"codeberg.org/pawal/gonemaster/engine/methods"
+	methodsv2 "codeberg.org/pawal/gonemaster/engine/methodsv2"
+	"codeberg.org/pawal/gonemaster/engine/util"
+	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
 const addressModuleName = "Address"

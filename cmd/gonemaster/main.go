@@ -12,7 +12,7 @@ import (
 	"runtime/debug"
 	"syscall"
 
-	"github.com/pawal/gonemaster/engine"
+	"codeberg.org/pawal/gonemaster/engine"
 )
 
 func main() {

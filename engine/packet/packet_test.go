@@ -6,7 +6,7 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/dnsname"
 )
 
 func TestUniquePush(t *testing.T) {

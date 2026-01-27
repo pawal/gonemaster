@@ -1,4 +1,4 @@
-module github.com/pawal/gonemaster
+module codeberg.org/pawal/gonemaster
 
 go 1.24.0
 

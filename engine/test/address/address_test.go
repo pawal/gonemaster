@@ -7,13 +7,13 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/pawal/gonemaster/engine/logger"
-	"github.com/pawal/gonemaster/engine/nameserver"
-	"github.com/pawal/gonemaster/engine/packet"
-	"github.com/pawal/gonemaster/engine/profile"
-	"github.com/pawal/gonemaster/engine/recursor"
-	"github.com/pawal/gonemaster/engine/util"
-	"github.com/pawal/gonemaster/engine/zone"
+	"codeberg.org/pawal/gonemaster/engine/logger"
+	"codeberg.org/pawal/gonemaster/engine/nameserver"
+	"codeberg.org/pawal/gonemaster/engine/packet"
+	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/recursor"
+	"codeberg.org/pawal/gonemaster/engine/util"
+	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
 func TestAddress01DocumentationAddr(t *testing.T) {

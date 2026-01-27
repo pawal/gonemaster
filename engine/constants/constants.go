@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/pawal/gonemaster/share"
+	"codeberg.org/pawal/gonemaster/share"
 )
 
 const (

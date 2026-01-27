@@ -8,9 +8,9 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/pawal/gonemaster/engine/dnsname"
-	"github.com/pawal/gonemaster/engine/nameserver"
-	"github.com/pawal/gonemaster/engine/zone"
+	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/nameserver"
+	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
 // Method1 returns the parent zone.

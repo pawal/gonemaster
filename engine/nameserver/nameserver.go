@@ -9,11 +9,11 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/pawal/gonemaster/engine/constants"
-	"github.com/pawal/gonemaster/engine/dnsname"
-	"github.com/pawal/gonemaster/engine/packet"
-	"github.com/pawal/gonemaster/engine/profile"
-	"github.com/pawal/gonemaster/engine/transport"
+	"codeberg.org/pawal/gonemaster/engine/constants"
+	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/packet"
+	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/transport"
 )
 
 // Nameserver represents a DNS server endpoint.

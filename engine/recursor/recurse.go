@@ -8,9 +8,9 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/pawal/gonemaster/engine/constants"
-	"github.com/pawal/gonemaster/engine/dnsname"
-	"github.com/pawal/gonemaster/engine/packet"
+	"codeberg.org/pawal/gonemaster/engine/constants"
+	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/packet"
 )
 
 type queryer interface {

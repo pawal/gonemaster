@@ -74,7 +74,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/pawal/gonemaster/engine"
+	"codeberg.org/pawal/gonemaster/engine"
 )
 
 func main() {
@@ -103,8 +103,8 @@ package main
 import (
 	"fmt"
 
-	"github.com/pawal/gonemaster/engine"
-	"github.com/pawal/gonemaster/engine/i18n"
+	"codeberg.org/pawal/gonemaster/engine"
+	"codeberg.org/pawal/gonemaster/engine/i18n"
 )
 
 func main() {

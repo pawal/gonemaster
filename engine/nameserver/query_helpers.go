@@ -9,8 +9,8 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/pawal/gonemaster/engine/dnsname"
-	"github.com/pawal/gonemaster/engine/packet"
+	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/packet"
 )
 
 // String returns the nameserver name and IP address.

@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pawal/gonemaster/engine"
-	"github.com/pawal/gonemaster/engine/i18n"
-	"github.com/pawal/gonemaster/engine/logger"
+	"codeberg.org/pawal/gonemaster/engine"
+	"codeberg.org/pawal/gonemaster/engine/i18n"
+	"codeberg.org/pawal/gonemaster/engine/logger"
 )
 
 func writeHuman(entries []engine.LogEntry, locale string, out io.Writer) error {

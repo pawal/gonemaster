@@ -4,7 +4,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/profile"
 )
 
 var moduleTestcases = map[string][]string{

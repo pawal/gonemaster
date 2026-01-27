@@ -6,7 +6,7 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/pawal/gonemaster/engine/packet"
+	"codeberg.org/pawal/gonemaster/engine/packet"
 )
 
 type queryCache struct {

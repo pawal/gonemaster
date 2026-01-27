@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pawal/gonemaster/engine/constants"
-	"github.com/pawal/gonemaster/engine/logger"
-	"github.com/pawal/gonemaster/engine/nameserver"
-	"github.com/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/constants"
+	"codeberg.org/pawal/gonemaster/engine/logger"
+	"codeberg.org/pawal/gonemaster/engine/nameserver"
+	"codeberg.org/pawal/gonemaster/engine/profile"
 )
 
 func TestParseHints(t *testing.T) {

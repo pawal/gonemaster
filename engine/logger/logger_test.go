@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/profile"
 )
 
 func TestAddDefaultsAndString(t *testing.T) {

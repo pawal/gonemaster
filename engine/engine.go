@@ -9,19 +9,19 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pawal/gonemaster/engine/logger"
-	"github.com/pawal/gonemaster/engine/profile"
-	address "github.com/pawal/gonemaster/engine/test/address"
-	"github.com/pawal/gonemaster/engine/test/basic"
-	"github.com/pawal/gonemaster/engine/test/connectivity"
-	consistency "github.com/pawal/gonemaster/engine/test/consistency"
-	delegation "github.com/pawal/gonemaster/engine/test/delegation"
-	"github.com/pawal/gonemaster/engine/test/dnssec"
-	nameserver "github.com/pawal/gonemaster/engine/test/nameserver"
-	syntax "github.com/pawal/gonemaster/engine/test/syntax"
-	zonetest "github.com/pawal/gonemaster/engine/test/zone"
-	"github.com/pawal/gonemaster/engine/util"
-	"github.com/pawal/gonemaster/engine/zone"
+	"codeberg.org/pawal/gonemaster/engine/logger"
+	"codeberg.org/pawal/gonemaster/engine/profile"
+	address "codeberg.org/pawal/gonemaster/engine/test/address"
+	"codeberg.org/pawal/gonemaster/engine/test/basic"
+	"codeberg.org/pawal/gonemaster/engine/test/connectivity"
+	consistency "codeberg.org/pawal/gonemaster/engine/test/consistency"
+	delegation "codeberg.org/pawal/gonemaster/engine/test/delegation"
+	"codeberg.org/pawal/gonemaster/engine/test/dnssec"
+	nameserver "codeberg.org/pawal/gonemaster/engine/test/nameserver"
+	syntax "codeberg.org/pawal/gonemaster/engine/test/syntax"
+	zonetest "codeberg.org/pawal/gonemaster/engine/test/zone"
+	"codeberg.org/pawal/gonemaster/engine/util"
+	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
 // RunRequest defines a single test execution request.
@@ -50,7 +50,7 @@ type LogEntry struct {
 var ErrNotImplemented = errors.New("engine not implemented")
 
 // Version is the semantic version for this build.
-var Version = "0.9.5"
+var Version = "0.9.6"
 
 // Commit is optionally set at build time using -ldflags.
 var Commit = ""

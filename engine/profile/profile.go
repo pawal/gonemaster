@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/pawal/gonemaster/share"
+	"codeberg.org/pawal/gonemaster/share"
 )
 
 var defaultProfileJSON = share.ProfileJSON

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/pawal/gonemaster/share"
+	"codeberg.org/pawal/gonemaster/share"
 )
 
 var (

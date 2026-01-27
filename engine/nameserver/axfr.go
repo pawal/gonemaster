@@ -8,8 +8,8 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/pawal/gonemaster/engine/profile"
-	"github.com/pawal/gonemaster/engine/transport"
+	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/transport"
 )
 
 // AXFR performs a zone transfer and streams RRs to the callback.

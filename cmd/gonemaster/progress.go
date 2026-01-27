@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/pawal/gonemaster/engine/logger"
+	"codeberg.org/pawal/gonemaster/engine/logger"
 )
 
 type progressReporter struct {

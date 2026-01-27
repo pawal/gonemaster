@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/profile"
 )
 
 // ModuleName is the default module name for log entries.

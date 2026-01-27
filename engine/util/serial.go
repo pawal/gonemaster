@@ -1,6 +1,6 @@
 package util
 
-import "github.com/pawal/gonemaster/engine/constants"
+import "codeberg.org/pawal/gonemaster/engine/constants"
 
 // SerialGT implements RFC1982-style serial comparison.
 func SerialGT(sa, sb uint32) bool {

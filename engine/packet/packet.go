@@ -6,7 +6,7 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/dnsname"
 )
 
 // Packet wraps a DNS message and exposes helpers mirroring the Perl engine API.

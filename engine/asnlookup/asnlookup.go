@@ -13,10 +13,10 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/pawal/gonemaster/engine/dnsname"
-	"github.com/pawal/gonemaster/engine/packet"
-	"github.com/pawal/gonemaster/engine/profile"
-	"github.com/pawal/gonemaster/engine/util"
+	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/packet"
+	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/util"
 )
 
 // Resolver defines the DNS recursion interface used by ASN lookup.

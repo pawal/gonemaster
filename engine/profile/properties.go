@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pawal/gonemaster/engine/validation"
+	"codeberg.org/pawal/gonemaster/engine/validation"
 )
 
 type propertyType int

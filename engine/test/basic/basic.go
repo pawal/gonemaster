@@ -9,13 +9,13 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/pawal/gonemaster/engine/dnsname"
-	"github.com/pawal/gonemaster/engine/logger"
-	"github.com/pawal/gonemaster/engine/methods"
-	"github.com/pawal/gonemaster/engine/nameserver"
-	"github.com/pawal/gonemaster/engine/profile"
-	"github.com/pawal/gonemaster/engine/util"
-	"github.com/pawal/gonemaster/engine/zone"
+	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/logger"
+	"codeberg.org/pawal/gonemaster/engine/methods"
+	"codeberg.org/pawal/gonemaster/engine/nameserver"
+	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/util"
+	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
 const moduleName = "Basic"

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/profile"
 )
 
 var numericLevels = map[string]int{

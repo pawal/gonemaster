@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pawal/gonemaster/engine"
+	"codeberg.org/pawal/gonemaster/engine"
 )
 
 func TestRunRequiresDomain(t *testing.T) {

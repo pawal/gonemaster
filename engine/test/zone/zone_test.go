@@ -7,14 +7,14 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/pawal/gonemaster/engine/dnsname"
-	"github.com/pawal/gonemaster/engine/logger"
-	methodsv2 "github.com/pawal/gonemaster/engine/methodsv2"
-	ens "github.com/pawal/gonemaster/engine/nameserver"
-	"github.com/pawal/gonemaster/engine/packet"
-	"github.com/pawal/gonemaster/engine/profile"
-	"github.com/pawal/gonemaster/engine/util"
-	zonepkg "github.com/pawal/gonemaster/engine/zone"
+	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/logger"
+	methodsv2 "codeberg.org/pawal/gonemaster/engine/methodsv2"
+	ens "codeberg.org/pawal/gonemaster/engine/nameserver"
+	"codeberg.org/pawal/gonemaster/engine/packet"
+	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/util"
+	zonepkg "codeberg.org/pawal/gonemaster/engine/zone"
 )
 
 func TestZone02RefreshBelowMinimum(t *testing.T) {

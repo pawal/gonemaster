@@ -212,7 +212,7 @@ func (ns Nameserver) queryNetwork(ctx context.Context, qname string, qtype strin
 			"ip":    ns.Address.String(),
 			"flags": fmt.Sprintf(`{"class":%q}`, qclass),
 		}
-		_, _ = logFunc("EXTERNAL_QUERY", args, "", "")
+		_, _ = logFunc("EXTERNAL_QUERY", args, "System", "")
 	}
 	logFuncMu.RUnlock()
 
@@ -227,20 +227,24 @@ func (ns Nameserver) queryNetwork(ctx context.Context, qname string, qtype strin
 			"flags": fmt.Sprintf(`{"class":%q}`, qclass),
 		}
 		if resp.Msg != nil {
+			args["rcode"] = dns.RcodeToString[resp.Msg.Rcode]
 			args["answers"] = len(resp.Msg.Answer)
-			// Maybe include RCODE?
-			// Length is safe. Content might be too big?
-			// Let's stick to simple metadata for now.
+			args["authority"] = len(resp.Msg.Ns)
+			args["additional"] = len(resp.Msg.Extra)
+			args["aa"] = resp.Msg.Authoritative
+			args["tc"] = resp.Msg.Truncated
+			args["rd"] = resp.Msg.RecursionDesired
+			args["ra"] = resp.Msg.RecursionAvailable
+			args["ad"] = resp.Msg.AuthenticatedData
+			args["cd"] = resp.Msg.CheckingDisabled
 		}
 		if err != nil {
 			args["exception"] = err.Error()
 		}
-		// If err != nil, should we log EXTERNAL_RESPONSE or something else?
-		// Profile has EMPTY_RETURN.
 		if resp.Msg == nil && err == nil {
-			_, _ = logFunc("EMPTY_RETURN", args, "", "")
+			_, _ = logFunc("EMPTY_RETURN", args, "System", "")
 		} else {
-			_, _ = logFunc("EXTERNAL_RESPONSE", args, "", "")
+			_, _ = logFunc("EXTERNAL_RESPONSE", args, "System", "")
 		}
 	}
 	logFuncMu.RUnlock()

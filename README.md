@@ -2,17 +2,9 @@
 
 Gonemaster is a Go implementation of the Zonemaster engine and CLI.
 
-<<<<<<< HEAD
-## CLI
-
-Translated output is the default. Use `--json` for JSON output.
-Use `--raw` to stream raw log entries as they are produced. `--json` and `--raw` cannot be combined.
-Use `--dump-profile` to print the effective profile JSON and exit.
-
 ### Usage
 =======
 ## Installation
->>>>>>> c754b25 (Updated README)
 
 ```
 go install codeberg.org/pawal/gonemaster/cmd/gonemaster@latest

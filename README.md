@@ -2,8 +2,6 @@
 
 Gonemaster is a Go implementation of the Zonemaster engine and CLI.
 
-### Usage
-=======
 ## Installation
 
 ```

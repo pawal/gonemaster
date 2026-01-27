@@ -2,6 +2,7 @@
 
 Gonemaster is a Go implementation of the Zonemaster engine and CLI.
 
+<<<<<<< HEAD
 ## CLI
 
 Translated output is the default. Use `--json` for JSON output.
@@ -9,9 +10,41 @@ Use `--raw` to stream raw log entries as they are produced. `--json` and `--raw`
 Use `--dump-profile` to print the effective profile JSON and exit.
 
 ### Usage
+=======
+## Installation
+>>>>>>> c754b25 (Updated README)
 
 ```
-go run ./cmd/gonemaster --domain example.com
+go install codeberg.org/pawal/gonemaster/cmd/gonemaster@latest
+```
+
+Or build from source:
+
+```
+git clone https://codeberg.org/pawal/gonemaster.git
+cd gonemaster
+go test ./...
+go build -o gonemaster ./cmd/gonemaster
+sudo install -m 0755 gonemaster /usr/local/bin/gonemaster
+```
+
+## CLI
+
+The CLI will output human readable log messages, JSON, or a raw untranskated log
+stream. Use `--raw` to stream raw log entries as they are produced.
+
+### Example usage
+
+The default output is human readable translated log messages:
+
+```
+gonemaster --domain example.com
+```
+
+With JSON output:
+
+```
+gonemaster --json --domain example.com | jq
 ```
 
 ### Options
@@ -35,6 +68,7 @@ go run ./cmd/gonemaster --domain example.com
 Locale defaults to the first available in `LANGUAGE`, then `LC_ALL`, `LC_MESSAGES`,
 `LANG`, and finally `en`.
 
+<<<<<<< HEAD
 ### Exit codes
 
 - `0` Success
@@ -68,6 +102,8 @@ Write JSON to file:
 go run ./cmd/gonemaster --json --domain example.com --output /tmp/zonemaster.json
 ```
 
+=======
+>>>>>>> c754b25 (Updated README)
 ## Engine usage from Go
 
 ```

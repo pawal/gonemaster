@@ -139,6 +139,8 @@ func Metadata() map[string][]string {
 func Connectivity01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Connectivity01"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -181,6 +183,8 @@ func Connectivity01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 func Connectivity02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Connectivity02"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -207,6 +211,8 @@ func Connectivity02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 func Connectivity03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Connectivity03"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -365,6 +371,8 @@ func Connectivity03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 func Connectivity04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Connectivity04"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err

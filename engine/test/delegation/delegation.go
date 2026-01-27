@@ -167,6 +167,8 @@ func Metadata() map[string][]string {
 func Delegation01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Delegation01"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -315,6 +317,8 @@ func Delegation01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Delegation02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Delegation02"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -356,6 +360,8 @@ func Delegation02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Delegation03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Delegation03"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -443,6 +449,8 @@ func Delegation03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Delegation04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Delegation04"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -510,6 +518,8 @@ func Delegation04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Delegation05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Delegation05"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -611,6 +621,8 @@ func Delegation05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Delegation06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Delegation06"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -664,6 +676,8 @@ func Delegation06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Delegation07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Delegation07"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err

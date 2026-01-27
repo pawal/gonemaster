@@ -6,6 +6,7 @@ import (
 	"net"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/miekg/dns"
 
@@ -281,5 +282,59 @@ func TestEmptyCache(t *testing.T) {
 	}
 	if _, ok := ns.state.cache.get(cacheKey); ok {
 		t.Fatalf("expected query cache cleared")
+	}
+}
+
+func TestQueryLogging(t *testing.T) {
+	// Reset log hook after test
+	defer SetLogFunc(nil)
+
+	ns, err := New("ns.example", "127.0.0.1", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+
+	var loggedEntries []struct {
+		tag  string
+		args map[string]any
+	}
+	SetLogFunc(func(tag string, args map[string]any, module, testcase string) (any, error) {
+		loggedEntries = append(loggedEntries, struct {
+			tag  string
+			args map[string]any
+		}{tag, args})
+		return nil, nil
+	})
+
+	// Use a very short timeout since we expect network failure
+	timeout := 10 * time.Millisecond
+	opts := &QueryOptions{Timeout: &timeout}
+
+	// This query will likely fail due to no server at 127.0.0.1:53, but logging happens before exchange
+	_, _ = ns.QueryWithOptions(context.Background(), "example.com", "SOA", opts)
+
+	var foundQuery bool
+	for _, entry := range loggedEntries {
+		if entry.tag == "EXTERNAL_QUERY" {
+			foundQuery = true
+			loggedArgs := entry.args
+			if name, ok := loggedArgs["name"]; !ok || name != "example.com" {
+				t.Errorf("expected name=example.com, got %v", name)
+			}
+			if qtype, ok := loggedArgs["type"]; !ok || qtype != "SOA" {
+				t.Errorf("expected type=SOA, got %v", qtype)
+			}
+			if ip, ok := loggedArgs["ip"]; !ok || ip != "127.0.0.1" {
+				t.Errorf("expected ip=127.0.0.1, got %v", ip)
+			}
+			if flags, ok := loggedArgs["flags"]; !ok || flags != "{\"class\":\"IN\"}" {
+				t.Errorf("expected flags={\"class\":\"IN\"}, got %v", flags)
+			}
+			break
+		}
+	}
+
+	if !foundQuery {
+		t.Errorf("expected EXTERNAL_QUERY tag, got %v", loggedEntries)
 	}
 }

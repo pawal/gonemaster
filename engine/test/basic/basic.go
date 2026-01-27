@@ -131,6 +131,8 @@ func Metadata() map[string][]string {
 func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Basic01"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -605,6 +607,8 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Basic02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Basic02"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -752,6 +756,8 @@ func Basic02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Basic03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Basic03"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err

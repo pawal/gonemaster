@@ -263,6 +263,8 @@ func Metadata() map[string][]string {
 func Nameserver01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Nameserver01"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -327,6 +329,8 @@ func Nameserver01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Nameserver02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Nameserver02"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -424,6 +428,8 @@ func Nameserver02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Nameserver03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Nameserver03"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -471,6 +477,8 @@ func Nameserver03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Nameserver04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Nameserver04"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -525,6 +533,8 @@ func Nameserver04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Nameserver05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Nameserver05"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -623,6 +633,8 @@ func Nameserver05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Nameserver06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Nameserver06"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -686,6 +698,8 @@ func Nameserver06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Nameserver07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Nameserver07"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -751,6 +765,8 @@ func Nameserver07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Nameserver08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Nameserver08"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -812,6 +828,8 @@ func Nameserver08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Nameserver09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Nameserver09"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -935,6 +953,8 @@ func Nameserver09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Nameserver10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Nameserver10"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -1017,6 +1037,8 @@ func Nameserver10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Nameserver11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Nameserver11"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -1144,6 +1166,8 @@ func Nameserver11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Nameserver12(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Nameserver12"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -1197,6 +1221,8 @@ func Nameserver12(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Nameserver13(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Nameserver13"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -1261,6 +1287,8 @@ func Nameserver13(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Nameserver15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Nameserver15"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err

@@ -443,6 +443,8 @@ func Metadata() map[string][]string {
 func DNSSEC01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "DNSSEC01"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -659,6 +661,8 @@ func DNSSEC01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "DNSSEC02"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -968,6 +972,8 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func DNSSEC03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "DNSSEC03"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -1280,6 +1286,8 @@ func DNSSEC03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func DNSSEC04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "DNSSEC04"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -1399,6 +1407,8 @@ func DNSSEC04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func DNSSEC05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "DNSSEC05"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -1539,6 +1549,8 @@ func DNSSEC05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func DNSSEC06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "DNSSEC06"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -1585,6 +1597,8 @@ func DNSSEC06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "DNSSEC07"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -1852,6 +1866,8 @@ func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "DNSSEC08"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -2054,6 +2070,8 @@ func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "DNSSEC09"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -2267,6 +2285,8 @@ func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "DNSSEC10"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -3043,6 +3063,8 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func DNSSEC11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "DNSSEC11"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -3246,6 +3268,8 @@ func DNSSEC11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func DNSSEC13(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "DNSSEC13"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -3380,6 +3404,8 @@ func DNSSEC13(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func DNSSEC14(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "DNSSEC14"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -3519,6 +3545,8 @@ func DNSSEC14(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func DNSSEC15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "DNSSEC15"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -3717,6 +3745,8 @@ func DNSSEC15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "DNSSEC16"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -4090,6 +4120,8 @@ func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func DNSSEC17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "DNSSEC17"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -4450,6 +4482,8 @@ func DNSSEC17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func DNSSEC18(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "DNSSEC18"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err

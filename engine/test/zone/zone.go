@@ -263,6 +263,8 @@ func Metadata() map[string][]string {
 func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	const testcase = "Zone01"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -490,6 +492,8 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 func Zone02(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	const testcase = "Zone02"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -540,6 +544,8 @@ func Zone02(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 func Zone03(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	const testcase = "Zone03"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -590,6 +596,8 @@ func Zone03(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 func Zone04(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	const testcase = "Zone04"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -640,6 +648,8 @@ func Zone04(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 func Zone05(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	const testcase = "Zone05"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -701,6 +711,8 @@ func Zone05(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 func Zone06(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	const testcase = "Zone06"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -760,6 +772,8 @@ func Zone06(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 func Zone07(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	const testcase = "Zone07"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -836,6 +850,8 @@ func Zone07(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 func Zone08(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	const testcase = "Zone08"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -881,6 +897,8 @@ func Zone08(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	const testcase = "Zone09"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -1096,6 +1114,8 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 func Zone10(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	const testcase = "Zone10"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -1167,6 +1187,8 @@ func Zone10(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 func Zone11(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	const testcase = "Zone11"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err

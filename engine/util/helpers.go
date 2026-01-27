@@ -31,6 +31,10 @@ func SetLogger(l *logger.Logger) {
 	defaultLoggerMu.Lock()
 	defaultLogger = l
 	defaultLoggerMu.Unlock()
+
+	nameserver.SetLogFunc(func(tag string, args map[string]any, module, testcase string) (any, error) {
+		return Logger().Add(tag, args, module, testcase)
+	})
 }
 
 // Info creates a log entry using the default logger.

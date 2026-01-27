@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/netip"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/miekg/dns"
@@ -22,6 +23,21 @@ type Nameserver struct {
 	Address netip.Addr
 	Client  *transport.Client
 	state   *nsState
+}
+
+// LogFunc is the function signature for logging callbacks.
+type LogFunc func(tag string, args map[string]any, module string, testcase string) (any, error)
+
+var (
+	logFuncMu sync.RWMutex
+	logFunc   LogFunc
+)
+
+// SetLogFunc sets the logging callback for the nameserver package.
+func SetLogFunc(f LogFunc) {
+	logFuncMu.Lock()
+	logFunc = f
+	logFuncMu.Unlock()
 }
 
 // QueryOptions configures per-query settings that mirror Perl flags.
@@ -186,7 +202,50 @@ func (ns Nameserver) queryNetwork(ctx context.Context, qname string, qtype strin
 
 	msg := transport.BuildQueryWithClass(qname, qtypeID, qclassID)
 	server := ns.Address.String()
-	return client.Exchange(ctx, server, msg)
+
+	// Emit EXTERNAL_QUERY log entry
+	logFuncMu.RLock()
+	if logFunc != nil {
+		args := map[string]any{
+			"name":  qname,
+			"type":  qtype,
+			"ip":    ns.Address.String(),
+			"flags": fmt.Sprintf(`{"class":%q}`, qclass),
+		}
+		_, _ = logFunc("EXTERNAL_QUERY", args, "", "")
+	}
+	logFuncMu.RUnlock()
+
+	resp, err := client.Exchange(ctx, server, msg)
+
+	logFuncMu.RLock()
+	if logFunc != nil {
+		args := map[string]any{
+			"name":  qname,
+			"type":  qtype,
+			"ip":    ns.Address.String(),
+			"flags": fmt.Sprintf(`{"class":%q}`, qclass),
+		}
+		if resp.Msg != nil {
+			args["answers"] = len(resp.Msg.Answer)
+			// Maybe include RCODE?
+			// Length is safe. Content might be too big?
+			// Let's stick to simple metadata for now.
+		}
+		if err != nil {
+			args["exception"] = err.Error()
+		}
+		// If err != nil, should we log EXTERNAL_RESPONSE or something else?
+		// Profile has EMPTY_RETURN.
+		if resp.Msg == nil && err == nil {
+			_, _ = logFunc("EMPTY_RETURN", args, "", "")
+		} else {
+			_, _ = logFunc("EXTERNAL_RESPONSE", args, "", "")
+		}
+	}
+	logFuncMu.RUnlock()
+
+	return resp, err
 }
 
 func (ns Nameserver) clientForOptions(opts *QueryOptions) (*transport.Client, error) {

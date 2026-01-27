@@ -176,6 +176,8 @@ func Metadata() map[string][]string {
 func Syntax01(_ context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Syntax01"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -199,6 +201,8 @@ func Syntax01(_ context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Syntax02(_ context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Syntax02"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -240,6 +244,8 @@ func Syntax02(_ context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Syntax03(_ context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Syntax03"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -272,6 +278,8 @@ func Syntax03(_ context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Syntax04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Syntax04"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -315,6 +323,8 @@ func Syntax04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Syntax05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Syntax05"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -356,6 +366,8 @@ func Syntax05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Syntax06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Syntax06"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -597,6 +609,8 @@ func Syntax06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Syntax07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Syntax07"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -629,6 +643,8 @@ func Syntax07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Syntax08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Syntax08"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err

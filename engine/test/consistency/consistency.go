@@ -156,6 +156,8 @@ func Metadata() map[string][]string {
 func Consistency01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Consistency01"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -268,6 +270,8 @@ func Consistency01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Consistency02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Consistency02"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -361,6 +365,8 @@ func Consistency02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Consistency03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Consistency03"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -472,6 +478,8 @@ func Consistency03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Consistency04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Consistency04"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -574,6 +582,8 @@ func Consistency04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Consistency05"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -811,6 +821,8 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Consistency06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Consistency06"
 	var results []*logger.Entry
+	logger.ModuleName = moduleName
+	logger.TestCaseName = testcase
 
 	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err

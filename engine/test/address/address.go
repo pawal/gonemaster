@@ -85,6 +85,8 @@ func AddressMetadata() map[string][]string {
 func Address01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Address01"
 	var results []*logger.Entry
+	logger.ModuleName = addressModuleName
+	logger.TestCaseName = testcase
 
 	if err := appendAddressLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -202,6 +204,8 @@ func Address01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Address02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Address02"
 	var results []*logger.Entry
+	logger.ModuleName = addressModuleName
+	logger.TestCaseName = testcase
 
 	if err := appendAddressLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
@@ -280,6 +284,8 @@ func Address02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 func Address03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Address03"
 	var results []*logger.Entry
+	logger.ModuleName = addressModuleName
+	logger.TestCaseName = testcase
 
 	if err := appendAddressLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err

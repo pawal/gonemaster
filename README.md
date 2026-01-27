@@ -1,6 +1,6 @@
 # Gonemaster
 
-Gonemaster is a Go implementation of the Zonemaster engine and CLI.
+Gonemaster is a Go implementation of the DNS test framework Zonemaster engine and CLI.
 
 ## Installation
 

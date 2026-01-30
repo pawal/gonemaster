@@ -4,13 +4,16 @@ import (
 	"context"
 	"net"
 	"net/netip"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
+	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/transport"
 )
 
@@ -163,6 +166,167 @@ func TestLazyNameserverMissingRecursor(t *testing.T) {
 	}
 }
 
+func TestGetAddressesForParallelAAndAAAA(t *testing.T) {
+	nameserver.EmptyCache()
+	defer nameserver.EmptyCache()
+	defer profile.ResetEffective()
+
+	if err := profile.Effective().Set("resolver.defaults.parallel", 2); err != nil {
+		t.Fatalf("set parallel: %v", err)
+	}
+
+	r := &Recursor{client: &transport.Client{}}
+	if err := r.AddFakeAddresses(".", map[string][]string{
+		"root.test": {"192.0.2.53"},
+	}); err != nil {
+		t.Fatalf("add fake root: %v", err)
+	}
+
+	aaaaStarted := make(chan struct{})
+	rootNS, err := nameserver.New("root.test", "192.0.2.53", r.client)
+	if err != nil {
+		t.Fatalf("new root nameserver: %v", err)
+	}
+	rootNS.SetQueryHook(func(ctx context.Context, name string, qtype string, qclass string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		switch strings.ToUpper(qtype) {
+		case "A":
+			select {
+			case <-aaaaStarted:
+			case <-ctx.Done():
+				return packet.Packet{}, ctx.Err()
+			}
+			return packetWithA(name, netip.MustParseAddr("192.0.2.10")), nil
+		case "AAAA":
+			select {
+			case <-aaaaStarted:
+			default:
+				close(aaaaStarted)
+			}
+			return packetWithAAAA(name, netip.MustParseAddr("2001:db8::1")), nil
+		default:
+			return packet.Packet{Msg: new(dns.Msg)}, nil
+		}
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	addrs, err := r.GetAddressesFor(ctx, "ns.example")
+	if err != nil {
+		t.Fatalf("get addresses: %v", err)
+	}
+	if len(addrs) != 2 {
+		t.Fatalf("expected 2 addresses, got %d", len(addrs))
+	}
+	if addrs[0].String() != "192.0.2.10" || addrs[1].String() != "2001:db8::1" {
+		t.Fatalf("unexpected address order: %#v", addrs)
+	}
+}
+
+func TestLazyNameserverParallelPrefersFirstAddress(t *testing.T) {
+	nameserver.EmptyCache()
+	defer nameserver.EmptyCache()
+	defer profile.ResetEffective()
+
+	if err := profile.Effective().Set("resolver.defaults.parallel", 2); err != nil {
+		t.Fatalf("set parallel: %v", err)
+	}
+
+	r := &Recursor{client: &transport.Client{}}
+	if err := r.AddFakeAddresses(".", map[string][]string{
+		"root.test": {"192.0.2.53"},
+	}); err != nil {
+		t.Fatalf("add fake root: %v", err)
+	}
+
+	rootNS, err := nameserver.New("root.test", "192.0.2.53", r.client)
+	if err != nil {
+		t.Fatalf("new root nameserver: %v", err)
+	}
+	rootNS.SetQueryHook(func(ctx context.Context, name string, qtype string, qclass string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		switch strings.ToUpper(qtype) {
+		case "A":
+			return packetWithARecords(name, []netip.Addr{
+				netip.MustParseAddr("192.0.2.10"),
+				netip.MustParseAddr("192.0.2.20"),
+			}), nil
+		case "AAAA":
+			return packet.Packet{Msg: new(dns.Msg)}, nil
+		default:
+			return packet.Packet{Msg: new(dns.Msg)}, nil
+		}
+	})
+
+	addr2Started := make(chan struct{})
+	allowAddr1 := make(chan struct{})
+	allowOnce := func() {
+		select {
+		case <-allowAddr1:
+		default:
+			close(allowAddr1)
+		}
+	}
+
+	ns1, err := nameserver.New("ns1.example", "192.0.2.10", r.client)
+	if err != nil {
+		t.Fatalf("new ns1: %v", err)
+	}
+	ns1.SetQueryHook(func(ctx context.Context, name string, qtype string, qclass string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		select {
+		case <-allowAddr1:
+		case <-ctx.Done():
+			return packet.Packet{}, ctx.Err()
+		}
+		resp := packetWithA(name, netip.MustParseAddr("192.0.2.10"))
+		resp.AnswerFrom = "192.0.2.10"
+		return resp, nil
+	})
+
+	ns2, err := nameserver.New("ns1.example", "192.0.2.20", r.client)
+	if err != nil {
+		t.Fatalf("new ns2: %v", err)
+	}
+	ns2.SetQueryHook(func(ctx context.Context, name string, qtype string, qclass string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		select {
+		case <-addr2Started:
+		default:
+			close(addr2Started)
+		}
+		resp := packetWithA(name, netip.MustParseAddr("192.0.2.20"))
+		resp.AnswerFrom = "192.0.2.20"
+		return resp, nil
+	})
+
+	lns := lazyNameserver{name: "ns1.example", recursor: r, state: &recurseState{glue: map[string]map[netip.Addr]bool{}}}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	resultCh := make(chan packet.Packet, 1)
+	errCh := make(chan error, 1)
+	go func() {
+		resp, err := lns.QueryWithClass(ctx, "example", "A", "IN")
+		resultCh <- resp
+		errCh <- err
+	}()
+
+	select {
+	case <-addr2Started:
+	case <-time.After(time.Second):
+		allowOnce()
+		t.Fatalf("expected second address to be queried")
+	}
+	allowOnce()
+
+	resp := <-resultCh
+	err = <-errCh
+	if err != nil {
+		t.Fatalf("query failed: %v", err)
+	}
+	if resp.AnswerFrom != "192.0.2.10" {
+		t.Fatalf("expected first address response, got %q", resp.AnswerFrom)
+	}
+}
+
 func TestCollectCNAMEsAndAddresses(t *testing.T) {
 	msg := new(dns.Msg)
 	msg.Answer = []dns.RR{
@@ -232,6 +396,54 @@ func TestFirstSOAOwner(t *testing.T) {
 	if owner := firstSOAOwner(packet.Packet{Msg: new(dns.Msg)}); owner != "" {
 		t.Fatalf("expected empty owner, got %q", owner)
 	}
+}
+
+func packetWithA(name string, addr netip.Addr) packet.Packet {
+	msg := new(dns.Msg)
+	msg.Answer = []dns.RR{
+		&dns.A{
+			Hdr: dns.RR_Header{
+				Name:   dns.Fqdn(name),
+				Rrtype: dns.TypeA,
+				Class:  dns.ClassINET,
+				Ttl:    0,
+			},
+			A: addr.AsSlice(),
+		},
+	}
+	return packet.Packet{Msg: msg}
+}
+
+func packetWithAAAA(name string, addr netip.Addr) packet.Packet {
+	msg := new(dns.Msg)
+	msg.Answer = []dns.RR{
+		&dns.AAAA{
+			Hdr: dns.RR_Header{
+				Name:   dns.Fqdn(name),
+				Rrtype: dns.TypeAAAA,
+				Class:  dns.ClassINET,
+				Ttl:    0,
+			},
+			AAAA: addr.AsSlice(),
+		},
+	}
+	return packet.Packet{Msg: msg}
+}
+
+func packetWithARecords(name string, addrs []netip.Addr) packet.Packet {
+	msg := new(dns.Msg)
+	for _, addr := range addrs {
+		msg.Answer = append(msg.Answer, &dns.A{
+			Hdr: dns.RR_Header{
+				Name:   dns.Fqdn(name),
+				Rrtype: dns.TypeA,
+				Class:  dns.ClassINET,
+				Ttl:    0,
+			},
+			A: addr.AsSlice(),
+		})
+	}
+	return packet.Packet{Msg: msg}
 }
 
 func TestRedirectNameNoNS(t *testing.T) {

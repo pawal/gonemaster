@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 
 	"codeberg.org/pawal/gonemaster/engine/profile"
 )
@@ -14,12 +15,18 @@ var ModuleName = "System"
 // TestCaseName is the default test case name for log entries.
 var TestCaseName = "Unspecified"
 
-var logFilter map[string]map[string][]profile.LogFilterRule
+var (
+	logFilter map[string]map[string][]profile.LogFilterRule
+	configMu  sync.Mutex
+)
 
 // Logger stores log entries and optional callbacks.
 type Logger struct {
-	entries  []*Entry
-	Callback func(*Entry) error
+	mu              sync.Mutex
+	entries         []*Entry
+	Callback        func(*Entry) error
+	callbackRunning bool
+	pending         []*Entry
 }
 
 // New creates a new Logger.
@@ -32,7 +39,11 @@ func (l *Logger) Entries() []*Entry {
 	if l == nil {
 		return nil
 	}
-	return l.entries
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	out := make([]*Entry, len(l.entries))
+	copy(out, l.entries)
+	return out
 }
 
 // Add creates and stores a new log entry.
@@ -52,11 +63,20 @@ func (l *Logger) Add(tag string, args map[string]any, module string, testcase st
 	}
 
 	l.checkFilter(entry)
+	l.mu.Lock()
 	l.entries = append(l.entries, entry)
-
-	if l.Callback != nil {
-		_ = callCallback(l, entry)
+	if l.Callback == nil {
+		l.mu.Unlock()
+		return entry, nil
 	}
+	if l.callbackRunning {
+		l.pending = append(l.pending, entry)
+		l.mu.Unlock()
+		return entry, nil
+	}
+	l.callbackRunning = true
+	l.mu.Unlock()
+	l.runCallbacks(entry)
 
 	return entry, nil
 }
@@ -66,7 +86,9 @@ func (l *Logger) ClearHistory() {
 	if l == nil {
 		return
 	}
+	l.mu.Lock()
 	l.entries = []*Entry{}
+	l.mu.Unlock()
 }
 
 // GetMaxLevel returns the maximum log level seen.
@@ -74,8 +96,9 @@ func (l *Logger) GetMaxLevel() string {
 	if l == nil {
 		return ""
 	}
+	entries := l.Entries()
 	maxLevel := 0
-	for _, entry := range l.entries {
+	for _, entry := range entries {
 		if entry == nil {
 			continue
 		}
@@ -105,7 +128,7 @@ func (l *Logger) JSON(minLevel string) (string, error) {
 	minLevelValue, hasMin := numericLevels[minLevel]
 
 	out := []map[string]any{}
-	for _, entry := range l.entries {
+	for _, entry := range l.Entries() {
 		if entry == nil {
 			continue
 		}
@@ -132,21 +155,48 @@ func (l *Logger) JSON(minLevel string) (string, error) {
 	return string(data), nil
 }
 
-func callCallback(l *Logger, entry *Entry) (err error) {
+func (l *Logger) runCallbacks(entry *Entry) {
+	for {
+		l.mu.Lock()
+		cb := l.Callback
+		l.mu.Unlock()
+		if cb == nil {
+			l.mu.Lock()
+			l.callbackRunning = false
+			l.pending = nil
+			l.mu.Unlock()
+			return
+		}
+		if err := safeCallback(cb, entry); err != nil {
+			l.mu.Lock()
+			l.callbackRunning = false
+			l.pending = nil
+			l.Callback = nil
+			l.mu.Unlock()
+			_, _ = l.Add("LOGGER_CALLBACK_ERROR", map[string]any{"exception": err.Error()}, ModuleName, TestCaseName)
+			return
+		}
+
+		l.mu.Lock()
+		if len(l.pending) == 0 {
+			l.callbackRunning = false
+			l.mu.Unlock()
+			return
+		}
+		entry = l.pending[0]
+		l.pending = l.pending[1:]
+		l.mu.Unlock()
+	}
+}
+
+func safeCallback(cb func(*Entry) error, entry *Entry) (err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			err = fmt.Errorf("logger callback panic: %v", recovered)
 		}
 	}()
-	if cbErr := l.Callback(entry); cbErr != nil {
+	if cbErr := cb(entry); cbErr != nil {
 		err = cbErr
-	}
-	if err != nil {
-		l.Callback = nil
-		_, addErr := l.Add("LOGGER_CALLBACK_ERROR", map[string]any{"exception": err.Error()}, ModuleName, TestCaseName)
-		if addErr != nil {
-			return addErr
-		}
 	}
 	return err
 }
@@ -155,14 +205,17 @@ func (l *Logger) checkFilter(entry *Entry) {
 	if entry == nil {
 		return
 	}
+	configMu.Lock()
 	if logFilter == nil {
 		logFilter = profile.Effective().LogFilter
 	}
-	if logFilter == nil {
+	filter := logFilter
+	configMu.Unlock()
+	if filter == nil {
 		return
 	}
 
-	moduleFilter := logFilter[strings.ToUpper(entry.Module)]
+	moduleFilter := filter[strings.ToUpper(entry.Module)]
 	if moduleFilter == nil {
 		return
 	}

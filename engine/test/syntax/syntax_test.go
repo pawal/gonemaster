@@ -2,8 +2,10 @@ package syntax
 
 import (
 	"context"
+	"net"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/miekg/dns"
 
@@ -149,6 +151,114 @@ func TestSyntax05NoResponseSOAQuery(t *testing.T) {
 	}
 	if !hasEntryTag(entries, "NO_RESPONSE_SOA_QUERY") {
 		t.Fatalf("expected NO_RESPONSE_SOA_QUERY")
+	}
+}
+
+func TestSyntax06ParallelMailServers(t *testing.T) {
+	nameserver.EmptyCache()
+	defer nameserver.EmptyCache()
+	defer profile.ResetEffective()
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	profile.Effective().Resolver.Defaults.Parallel = 2
+
+	r := &recursor.Recursor{}
+	if err := r.AddFakeAddresses(".", map[string][]string{
+		"a.root": {"192.0.2.1"},
+	}); err != nil {
+		t.Fatalf("add root hints: %v", err)
+	}
+
+	started := make(chan string, 2)
+	release := make(chan struct{})
+
+	root, err := nameserver.New("a.root", "192.0.2.1", r.Client())
+	if err != nil {
+		t.Fatalf("new root nameserver: %v", err)
+	}
+	root.SetQueryHook(func(ctx context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		name := strings.ToLower(qname)
+		kind := strings.ToUpper(qtype)
+		switch {
+		case name == "." && kind == "NS":
+			return nsPacket(".", "a.root"), nil
+		case name == "." && kind == "SOA":
+			return soaPacket(".", "a.root", "hostmaster.example."), nil
+		case name == "example" && kind == "MX":
+			return mxPacketMulti("example", "mail1.example.", "mail2.example."), nil
+		case name == "mail1.example" && kind == "A":
+			select {
+			case started <- "mail1":
+			default:
+			}
+			select {
+			case <-release:
+			case <-ctx.Done():
+				return packet.Packet{}, ctx.Err()
+			}
+			return aPacket("mail1.example", net.IPv4(192, 0, 2, 10)), nil
+		case name == "mail2.example" && kind == "A":
+			select {
+			case started <- "mail2":
+			default:
+			}
+			select {
+			case <-release:
+			case <-ctx.Done():
+				return packet.Packet{}, ctx.Err()
+			}
+			return aPacket("mail2.example", net.IPv4(192, 0, 2, 11)), nil
+		case name == "mail1.example" && kind == "AAAA":
+			return packet.Packet{}, nil
+		case name == "mail2.example" && kind == "AAAA":
+			return packet.Packet{}, nil
+		default:
+			return packet.Packet{}, nil
+		}
+	})
+
+	z, err := zone.NewWithRecursor(".", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	done := make(chan struct{})
+	var entries []*logger.Entry
+	var syntaxErr error
+	go func() {
+		entries, syntaxErr = Syntax06(ctx, &z)
+		close(done)
+	}()
+
+	got := map[string]bool{}
+	deadline := time.After(1 * time.Second)
+	for len(got) < 2 {
+		select {
+		case id := <-started:
+			got[id] = true
+		case <-deadline:
+			t.Fatalf("expected parallel mail queries to start, got %v", got)
+		}
+	}
+
+	close(release)
+
+	select {
+	case <-done:
+		if syntaxErr != nil {
+			t.Fatalf("syntax06: %v", syntaxErr)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("syntax06 did not finish")
+	}
+
+	if !hasEntryTag(entries, "RNAME_RFC822_VALID") {
+		t.Fatalf("expected RNAME_RFC822_VALID")
 	}
 }
 
@@ -312,6 +422,43 @@ func mxPacket(zoneName string, exchange string) packet.Packet {
 			},
 			Preference: 10,
 			Mx:         dns.Fqdn(exchange),
+		},
+	}
+	return packet.Packet{Msg: msg}
+}
+
+func mxPacketMulti(zoneName string, exchanges ...string) packet.Packet {
+	msg := new(dns.Msg)
+	msg.Rcode = dns.RcodeSuccess
+	msg.Authoritative = true
+	for i, exchange := range exchanges {
+		msg.Answer = append(msg.Answer, &dns.MX{
+			Hdr: dns.RR_Header{
+				Name:   dns.Fqdn(zoneName),
+				Rrtype: dns.TypeMX,
+				Class:  dns.ClassINET,
+				Ttl:    60,
+			},
+			Preference: uint16(10 + i),
+			Mx:         dns.Fqdn(exchange),
+		})
+	}
+	return packet.Packet{Msg: msg}
+}
+
+func aPacket(owner string, addr net.IP) packet.Packet {
+	msg := new(dns.Msg)
+	msg.Rcode = dns.RcodeSuccess
+	msg.Authoritative = true
+	msg.Answer = []dns.RR{
+		&dns.A{
+			Hdr: dns.RR_Header{
+				Name:   dns.Fqdn(owner),
+				Rrtype: dns.TypeA,
+				Class:  dns.ClassINET,
+				Ttl:    60,
+			},
+			A: addr,
 		},
 	}
 	return packet.Packet{Msg: msg}

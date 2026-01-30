@@ -121,6 +121,17 @@ var propertyDefs = map[string]propertyDef{
 			return p.Resolver.Defaults.Retry
 		},
 	},
+	"resolver.defaults.parallel": {
+		typ: propNum,
+		min: intPtr(1),
+		max: intPtr(255),
+		setter: func(p *Profile, value any) {
+			p.Resolver.Defaults.Parallel = value.(int)
+		},
+		getter: func(p *Profile) any {
+			return p.Resolver.Defaults.Parallel
+		},
+	},
 	"resolver.defaults.usevc": {
 		typ: propBool,
 		setter: func(p *Profile, value any) {

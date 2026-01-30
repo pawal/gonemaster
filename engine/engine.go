@@ -33,6 +33,7 @@ type RunRequest struct {
 	MinLevel string
 	IPv4     *bool
 	IPv6     *bool
+	Parallel *int
 	// LogCallback receives each log entry as it is created.
 	LogCallback func(*logger.Entry) error
 }
@@ -267,6 +268,11 @@ func EffectiveProfile(req RunRequest) (*profile.Profile, error) {
 			return nil, err
 		}
 	}
+	if req.Parallel != nil {
+		if err := p.Set("resolver.defaults.parallel", *req.Parallel); err != nil {
+			return nil, err
+		}
+	}
 
 	if testcase == "" {
 		switch module {
@@ -344,6 +350,11 @@ func Run(req RunRequest) ([]LogEntry, error) {
 	}
 	if req.IPv6 != nil {
 		if err := profile.Effective().Set("net.ipv6", *req.IPv6); err != nil {
+			return nil, err
+		}
+	}
+	if req.Parallel != nil {
+		if err := profile.Effective().Set("resolver.defaults.parallel", *req.Parallel); err != nil {
 			return nil, err
 		}
 	}

@@ -32,6 +32,8 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	var locale string
 	var noIPv4 bool
 	var noIPv6 bool
+	var parallel int
+	var parallelSet bool
 	var noProgress bool
 	var listTests bool
 	var showVersion bool
@@ -39,7 +41,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs := flag.NewFlagSet("gonemaster", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	fs.Usage = func() {
-		fmt.Fprintf(errOut, "Usage: %s --domain DOMAIN [--module MODULE] [--testcase TESTCASE] [--profile PATH] [--min-level LEVEL] [--output PATH] [--raw] [--json] [--dump-profile] [--locale LOCALE] [--no-ipv4] [--no-ipv6] [--no-progress] [--list-tests] [--version]\n", fs.Name())
+		fmt.Fprintf(errOut, "Usage: %s --domain DOMAIN [--module MODULE] [--testcase TESTCASE] [--profile PATH] [--min-level LEVEL] [--output PATH] [--raw] [--json] [--dump-profile] [--locale LOCALE] [--no-ipv4] [--no-ipv6] [--parallel N] [--no-progress] [--list-tests] [--version]\n", fs.Name())
 		fmt.Fprintln(errOut, "")
 		fmt.Fprintln(errOut, "Options:")
 		fmt.Fprintln(errOut, "  --domain     Zone name to test (required)")
@@ -54,6 +56,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		fmt.Fprintln(errOut, "  --locale     Locale for translated output (optional)")
 		fmt.Fprintln(errOut, "  --no-ipv4    Disable IPv4 queries (optional)")
 		fmt.Fprintln(errOut, "  --no-ipv6    Disable IPv6 queries (optional)")
+		fmt.Fprintln(errOut, "  --parallel   Override resolver.defaults.parallel (optional)")
 		fmt.Fprintln(errOut, "  --no-progress  Disable progress indicator (optional)")
 		fmt.Fprintln(errOut, "  --list-tests  List all available test cases (optional)")
 		fmt.Fprintln(errOut, "  --version    Print version and exit (optional)")
@@ -75,12 +78,18 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs.StringVar(&locale, "locale", "", "Locale for translated output (optional)")
 	fs.BoolVar(&noIPv4, "no-ipv4", false, "Disable IPv4 queries (optional)")
 	fs.BoolVar(&noIPv6, "no-ipv6", false, "Disable IPv6 queries (optional)")
+	fs.IntVar(&parallel, "parallel", 0, "Override resolver.defaults.parallel (optional)")
 	fs.BoolVar(&noProgress, "no-progress", false, "Disable progress indicator (optional)")
 	fs.BoolVar(&listTests, "list-tests", false, "List all available test cases (optional)")
 	fs.BoolVar(&showVersion, "version", false, "Print version and exit (optional)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "parallel" {
+			parallelSet = true
+		}
+	})
 
 	if showVersion {
 		fmt.Fprintf(out, "Gonemaster version %s\n", engine.VersionFull())
@@ -105,6 +114,15 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		value := false
 		ipv6Override = &value
 	}
+	var parallelOverride *int
+	if parallelSet {
+		if parallel < 1 {
+			fmt.Fprintln(errOut, "--parallel must be >= 1")
+			return 2
+		}
+		value := parallel
+		parallelOverride = &value
+	}
 
 	req := engine.RunRequest{
 		Domain:   domain,
@@ -114,6 +132,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		MinLevel: minLevel,
 		IPv4:     ipv4Override,
 		IPv6:     ipv6Override,
+		Parallel: parallelOverride,
 	}
 
 	if dumpProfile {

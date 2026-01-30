@@ -20,6 +20,7 @@ import (
 	nameserver "codeberg.org/pawal/gonemaster/engine/test/nameserver"
 	syntax "codeberg.org/pawal/gonemaster/engine/test/syntax"
 	zonetest "codeberg.org/pawal/gonemaster/engine/test/zone"
+	"codeberg.org/pawal/gonemaster/engine/transport"
 	"codeberg.org/pawal/gonemaster/engine/util"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
@@ -379,6 +380,8 @@ func Run(req RunRequest) ([]LogEntry, error) {
 			_ = profile.Effective().Set("test_cases", toAnySlice(moduleTestcases[module]))
 		}
 	}
+
+	transport.SetGlobalQueryLimit(profile.Effective().Resolver.Defaults.Parallel)
 	logger.ResetConfig()
 	if _, err := util.Info("GLOBAL_VERSION", map[string]any{"version": VersionString()}); err != nil {
 		return nil, err

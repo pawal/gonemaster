@@ -81,6 +81,37 @@ func (l *Logger) Add(tag string, args map[string]any, module string, testcase st
 	return entry, nil
 }
 
+// Append stores existing log entries and dispatches callbacks without re-filtering.
+func (l *Logger) Append(entries ...*Entry) error {
+	if l == nil {
+		return fmt.Errorf("logger is nil")
+	}
+	for _, entry := range entries {
+		if entry == nil {
+			continue
+		}
+		l.appendExisting(entry)
+	}
+	return nil
+}
+
+func (l *Logger) appendExisting(entry *Entry) {
+	l.mu.Lock()
+	l.entries = append(l.entries, entry)
+	if l.Callback == nil {
+		l.mu.Unlock()
+		return
+	}
+	if l.callbackRunning {
+		l.pending = append(l.pending, entry)
+		l.mu.Unlock()
+		return
+	}
+	l.callbackRunning = true
+	l.mu.Unlock()
+	l.runCallbacks(entry)
+}
+
 // ClearHistory clears all stored entries.
 func (l *Logger) ClearHistory() {
 	if l == nil {

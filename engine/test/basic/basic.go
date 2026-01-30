@@ -15,6 +15,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/runner"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/testcase"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/testlogger"
 	"codeberg.org/pawal/gonemaster/engine/util"
 	"codeberg.org/pawal/gonemaster/engine/zone"
@@ -27,7 +28,9 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var results []*logger.Entry
 
 	if util.ShouldRunTest("basic01") {
-		entries, err := Basic01(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Basic01(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
@@ -39,7 +42,9 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	var authResponseSOA bool
 	if util.ShouldRunTest("basic02") {
-		entries, err := Basic02(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Basic02(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
@@ -55,7 +60,9 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				return results, err
 			}
 		} else {
-			entries, err := Basic03(ctx, z)
+			entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+				return Basic03(ctx, z)
+			})
 			results = append(results, entries...)
 			if err != nil {
 				return results, err

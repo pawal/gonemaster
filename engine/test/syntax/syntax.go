@@ -18,6 +18,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/runner"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/testcase"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/testlogger"
 	"codeberg.org/pawal/gonemaster/engine/util"
 	"codeberg.org/pawal/gonemaster/engine/zone"
@@ -31,7 +32,9 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	onlyAllowedChars := true
 	if util.ShouldRunTest("syntax01") {
-		entries, err := Syntax01(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Syntax01(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
@@ -40,7 +43,9 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if util.ShouldRunTest("syntax02") {
-		entries, err := Syntax02(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Syntax02(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
@@ -48,7 +53,9 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if util.ShouldRunTest("syntax03") {
-		entries, err := Syntax03(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Syntax03(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
@@ -60,7 +67,9 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if util.ShouldRunTest("syntax04") {
-		entries, err := Syntax04(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Syntax04(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
@@ -69,7 +78,9 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	allSOAResponses := true
 	if util.ShouldRunTest("syntax05") {
-		entries, err := Syntax05(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Syntax05(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
@@ -79,7 +90,9 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	if allSOAResponses {
 		if util.ShouldRunTest("syntax06") {
-			entries, err := Syntax06(ctx, z)
+			entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+				return Syntax06(ctx, z)
+			})
 			results = append(results, entries...)
 			if err != nil {
 				return results, err
@@ -87,7 +100,9 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 
 		if util.ShouldRunTest("syntax07") {
-			entries, err := Syntax07(ctx, z)
+			entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+				return Syntax07(ctx, z)
+			})
 			results = append(results, entries...)
 			if err != nil {
 				return results, err
@@ -96,7 +111,9 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if util.ShouldRunTest("syntax08") {
-		entries, err := Syntax08(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Syntax08(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err

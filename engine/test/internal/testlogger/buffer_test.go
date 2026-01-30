@@ -33,3 +33,19 @@ func TestBufferAppendAddsToSlice(t *testing.T) {
 		t.Fatalf("unexpected tag %q", entries[0].Tag)
 	}
 }
+
+func TestBufferWrapUsesExistingLogger(t *testing.T) {
+	log := logger.New()
+	buf := Wrap(log, "Module", "Case")
+	entry, err := buf.Add("CUSTOM", nil)
+	if err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	if entry.Module != "Module" || entry.Testcase != "Case" {
+		t.Fatalf("expected module/testcase to match, got %q/%q", entry.Module, entry.Testcase)
+	}
+	entries := log.Entries()
+	if len(entries) != 1 || entries[0].Tag != "CUSTOM" {
+		t.Fatalf("expected entry in existing logger, got %v", entries)
+	}
+}

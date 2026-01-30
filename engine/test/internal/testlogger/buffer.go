@@ -22,6 +22,15 @@ func New(module string, testcase string) *Buffer {
 	}
 }
 
+// Wrap uses an existing logger instance with the given module/testcase context.
+func Wrap(log *logger.Logger, module string, testcase string) *Buffer {
+	return &Buffer{
+		log:      log,
+		module:   module,
+		testcase: testcase,
+	}
+}
+
 // Add records a log entry using the buffer's module/testcase.
 func (b *Buffer) Add(tag string, args map[string]any) (*logger.Entry, error) {
 	if b == nil || b.log == nil {

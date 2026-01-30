@@ -5,6 +5,7 @@ import (
 	"net"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/miekg/dns"
 
@@ -144,6 +145,123 @@ func TestBasic02AuthResponseSOA(t *testing.T) {
 	entries, err := Basic02(context.Background(), &z)
 	if err != nil {
 		t.Fatalf("basic02: %v", err)
+	}
+	if !hasEntryTag(entries, "B02_AUTH_RESPONSE_SOA") {
+		t.Fatalf("expected B02_AUTH_RESPONSE_SOA")
+	}
+}
+
+func TestBasic02ParallelQueries(t *testing.T) {
+	nameserver.EmptyCache()
+	defer nameserver.EmptyCache()
+	defer profile.ResetEffective()
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	profile.Effective().Resolver.Defaults.Parallel = 2
+
+	r := &recursor.Recursor{}
+	if err := r.AddFakeAddresses(".", map[string][]string{
+		"a.root": {"192.0.2.1"},
+		"b.root": {"192.0.2.2"},
+	}); err != nil {
+		t.Fatalf("add root hints: %v", err)
+	}
+
+	started := make(chan string, 2)
+	release := make(chan struct{})
+
+	hook := func(id string, block bool) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
+		return func(ctx context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+			name := strings.ToLower(qname)
+			kind := strings.ToUpper(qtype)
+			switch {
+			case name == "." && kind == "NS":
+				return nsPacketMulti(".", "a.root", "b.root"), nil
+			case name == "." && kind == "SOA":
+				select {
+				case started <- id:
+				default:
+				}
+				if block {
+					select {
+					case <-release:
+					case <-ctx.Done():
+						return packet.Packet{}, ctx.Err()
+					}
+				}
+				return soaPacket(".", id, "hostmaster.root"), nil
+			default:
+				return packet.Packet{}, nil
+			}
+		}
+	}
+
+	aroot, err := nameserver.New("a.root", "192.0.2.1", r.Client())
+	if err != nil {
+		t.Fatalf("new root nameserver: %v", err)
+	}
+	aroot.SetQueryHook(hook("a.root", true))
+
+	broot, err := nameserver.New("b.root", "192.0.2.2", r.Client())
+	if err != nil {
+		t.Fatalf("new root nameserver: %v", err)
+	}
+	broot.SetQueryHook(hook("b.root", false))
+
+	z, err := zone.NewWithRecursor(".", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	done := make(chan struct{})
+	var entries []*logger.Entry
+	var basicErr error
+	go func() {
+		entries, basicErr = Basic02(ctx, &z)
+		close(done)
+	}()
+
+	got := map[string]bool{}
+	deadline := time.After(1 * time.Second)
+	for len(got) < 2 {
+		select {
+		case id := <-started:
+			got[id] = true
+		case <-deadline:
+			t.Fatalf("expected parallel SOA queries to start, got %v", got)
+		}
+	}
+
+	close(release)
+
+	select {
+	case <-done:
+		if basicErr != nil {
+			t.Fatalf("basic02: %v", basicErr)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("basic02 did not finish")
+	}
+
+	var enabled []string
+	for _, entry := range entries {
+		if entry == nil || entry.Tag != "IPV4_ENABLED" {
+			continue
+		}
+		if ns, ok := entry.Args["ns"].(string); ok {
+			enabled = append(enabled, ns)
+		}
+	}
+	if len(enabled) < 2 {
+		t.Fatalf("expected IPV4_ENABLED entries for both nameservers, got %v", enabled)
+	}
+	if enabled[0] != "a.root/192.0.2.1" || enabled[1] != "b.root/192.0.2.2" {
+		t.Fatalf("expected deterministic log order, got %v", enabled)
 	}
 	if !hasEntryTag(entries, "B02_AUTH_RESPONSE_SOA") {
 		t.Fatalf("expected B02_AUTH_RESPONSE_SOA")
@@ -447,6 +565,146 @@ func TestBasic03NoResponses(t *testing.T) {
 	}
 }
 
+func TestBasic03ParallelQueries(t *testing.T) {
+	nameserver.EmptyCache()
+	defer nameserver.EmptyCache()
+	defer profile.ResetEffective()
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	profile.Effective().Resolver.Defaults.Parallel = 2
+
+	r := &recursor.Recursor{}
+	if err := r.AddFakeAddresses(".", map[string][]string{
+		"a.root": {"192.0.2.1"},
+	}); err != nil {
+		t.Fatalf("add root hints: %v", err)
+	}
+	if err := r.AddFakeAddresses("example", map[string][]string{
+		"ns1.example": {"192.0.2.53"},
+		"ns2.example": {"192.0.2.54"},
+	}); err != nil {
+		t.Fatalf("add fake addresses: %v", err)
+	}
+
+	root, err := nameserver.New("a.root", "192.0.2.1", r.Client())
+	if err != nil {
+		t.Fatalf("new root nameserver: %v", err)
+	}
+	root.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		name := strings.ToLower(qname)
+		kind := strings.ToUpper(qtype)
+		switch {
+		case name == "example" && (kind == "SOA" || kind == "NS"):
+			return referralPacketMulti("example", []nsEntry{
+				{name: "ns1.example", addr: net.IPv4(192, 0, 2, 53)},
+				{name: "ns2.example", addr: net.IPv4(192, 0, 2, 54)},
+			}), nil
+		case name == "." && kind == "SOA":
+			return soaPacket(".", "a.root", "hostmaster.root"), nil
+		default:
+			return packet.Packet{}, nil
+		}
+	})
+
+	started := make(chan string, 2)
+	release := make(chan struct{})
+	nsHook := func(id string, addr net.IP, block bool) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
+		return func(ctx context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+			name := strings.ToLower(qname)
+			kind := strings.ToUpper(qtype)
+			if name == "www.example" && kind == "A" {
+				select {
+				case started <- id:
+				default:
+				}
+				if block {
+					select {
+					case <-release:
+					case <-ctx.Done():
+						return packet.Packet{}, ctx.Err()
+					}
+				}
+				return aPacket("www.example", addr), nil
+			}
+			if name == "example" && kind == "SOA" {
+				return soaPacket("example", "ns1.example", "hostmaster.example"), nil
+			}
+			return packet.Packet{}, nil
+		}
+	}
+
+	ns1, err := nameserver.New("ns1.example", "192.0.2.53", r.Client())
+	if err != nil {
+		t.Fatalf("new ns1: %v", err)
+	}
+	ns1.SetQueryHook(nsHook("ns1.example", net.IPv4(192, 0, 2, 53), true))
+
+	ns2, err := nameserver.New("ns2.example", "192.0.2.54", r.Client())
+	if err != nil {
+		t.Fatalf("new ns2: %v", err)
+	}
+	ns2.SetQueryHook(nsHook("ns2.example", net.IPv4(192, 0, 2, 54), false))
+
+	z, err := zone.NewWithRecursor("example", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	done := make(chan struct{})
+	var entries []*logger.Entry
+	var basicErr error
+	go func() {
+		entries, basicErr = Basic03(ctx, &z)
+		close(done)
+	}()
+
+	got := map[string]bool{}
+	deadline := time.After(1 * time.Second)
+	for len(got) < 2 {
+		select {
+		case id := <-started:
+			got[id] = true
+		case <-deadline:
+			t.Fatalf("expected parallel A queries to start, got %v", got)
+		}
+	}
+
+	close(release)
+
+	select {
+	case <-done:
+		if basicErr != nil {
+			t.Fatalf("basic03: %v", basicErr)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("basic03 did not finish")
+	}
+
+	var enabled []string
+	for _, entry := range entries {
+		if entry == nil || entry.Tag != "IPV4_ENABLED" {
+			continue
+		}
+		if ns, ok := entry.Args["ns"].(string); ok {
+			enabled = append(enabled, ns)
+		}
+	}
+	if len(enabled) < 2 {
+		t.Fatalf("expected IPV4_ENABLED entries for both nameservers, got %v", enabled)
+	}
+	if enabled[0] != "ns1.example/192.0.2.53" || enabled[1] != "ns2.example/192.0.2.54" {
+		t.Fatalf("expected deterministic log order, got %v", enabled)
+	}
+	if !hasEntryTag(entries, "HAS_A_RECORDS") {
+		t.Fatalf("expected HAS_A_RECORDS")
+	}
+}
+
 func hasEntryTag(entries []*logger.Entry, tag string) bool {
 	for _, entry := range entries {
 		if entry == nil {
@@ -511,6 +769,37 @@ func referralPacket(zoneName string, nsName string, nsAddr net.IP) packet.Packet
 	return packet.Packet{Msg: msg}
 }
 
+type nsEntry struct {
+	name string
+	addr net.IP
+}
+
+func referralPacketMulti(zoneName string, entries []nsEntry) packet.Packet {
+	msg := new(dns.Msg)
+	msg.Rcode = dns.RcodeSuccess
+	for _, entry := range entries {
+		msg.Ns = append(msg.Ns, &dns.NS{
+			Hdr: dns.RR_Header{
+				Name:   dns.Fqdn(zoneName),
+				Rrtype: dns.TypeNS,
+				Class:  dns.ClassINET,
+				Ttl:    60,
+			},
+			Ns: dns.Fqdn(entry.name),
+		})
+		msg.Extra = append(msg.Extra, &dns.A{
+			Hdr: dns.RR_Header{
+				Name:   dns.Fqdn(entry.name),
+				Rrtype: dns.TypeA,
+				Class:  dns.ClassINET,
+				Ttl:    60,
+			},
+			A: entry.addr,
+		})
+	}
+	return packet.Packet{Msg: msg}
+}
+
 func aPacket(owner string, addr net.IP) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
@@ -543,6 +832,24 @@ func nsPacket(owner string, nsname string) packet.Packet {
 			},
 			Ns: dns.Fqdn(nsname),
 		},
+	}
+	return packet.Packet{Msg: msg}
+}
+
+func nsPacketMulti(owner string, nsnames ...string) packet.Packet {
+	msg := new(dns.Msg)
+	msg.Rcode = dns.RcodeSuccess
+	msg.Authoritative = true
+	for _, nsname := range nsnames {
+		msg.Answer = append(msg.Answer, &dns.NS{
+			Hdr: dns.RR_Header{
+				Name:   dns.Fqdn(owner),
+				Rrtype: dns.TypeNS,
+				Class:  dns.ClassINET,
+				Ttl:    60,
+			},
+			Ns: dns.Fqdn(nsname),
+		})
 	}
 	return packet.Packet{Msg: msg}
 }

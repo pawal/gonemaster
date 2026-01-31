@@ -4943,89 +4943,85 @@ func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(cdsRRsets) > 0 {
-		for nsIP, cdsRecords := range cdsRRsets {
+		orderedIPs := make([]string, 0, len(ordered))
+		seenIPs := map[string]bool{}
+		for _, ns := range ordered {
+			ip := ns.Address.String()
+			orderedIPs = append(orderedIPs, ip)
+			seenIPs[ip] = true
+		}
+		var extraIPs []string
+		for nsIP := range cdsRRsets {
+			if !seenIPs[nsIP] {
+				extraIPs = append(extraIPs, nsIP)
+			}
+		}
+		sort.Strings(extraIPs)
+		orderedIPs = append(orderedIPs, extraIPs...)
+
+		type validationOutcome struct {
+			nsIP                     string
+			noDNSKEYRRset            bool
+			mixedDeleteCDS           bool
+			deleteCDS                bool
+			cdsNotSigned             bool
+			noMatchCDSWithDNSKEY     map[uint16]bool
+			cdsPointsToNonZoneDNSKEY map[uint16]bool
+			cdsPointsToNonSEPDNSKEY  map[uint16]bool
+			dnskeyNotSignedByCDS     map[uint16]bool
+			cdsNotSignedByCDS        map[uint16]bool
+			cdsSignedByUnknownDNSKEY map[uint16]bool
+			cdsInvalidRRSIG          map[uint16]bool
+		}
+
+		var tasks []parallel.Task[validationOutcome]
+		for _, nsIP := range orderedIPs {
+			cdsRecords := cdsRRsets[nsIP]
 			if len(cdsRecords) == 0 {
 				continue
 			}
-
-			hasDelete := false
-			hasNonDelete := false
-			for _, cds := range cdsRecords {
-				if cds.Algorithm == 0 {
-					hasDelete = true
-				} else {
-					hasNonDelete = true
-				}
-			}
-			if hasDelete {
-				if hasNonDelete {
-					mixedDeleteCDS[nsIP] = true
-				} else {
-					deleteCDS[nsIP] = true
-				}
-				continue
-			}
-
-			dnskeys := dnskeyRRsets[nsIP]
-			if len(dnskeys) == 0 {
-				noDNSKEYRRset[nsIP] = true
-				continue
-			}
-
-			for _, cds := range cdsRecords {
-				if cds.Algorithm == 0 {
-					continue
-				}
-				keytag := cds.KeyTag
-				var matchingDNSKEYs []*dns.DNSKEY
-				for _, dnskey := range dnskeys {
-					if dnskey.KeyTag() == keytag {
-						matchingDNSKEYs = append(matchingDNSKEYs, dnskey)
-					}
-				}
-				if len(matchingDNSKEYs) == 0 {
-					noMatchCDSWithDNSKEY[keytag] = append(noMatchCDSWithDNSKEY[keytag], nsIP)
-					continue
-				}
-				hasNonZone := false
-				for _, dnskey := range matchingDNSKEYs {
-					if dnskey.Flags&dns.ZONE == 0 {
-						hasNonZone = true
-						break
-					}
-				}
-				if hasNonZone {
-					cdsPointsToNonZoneDNSKEY[keytag] = append(cdsPointsToNonZoneDNSKEY[keytag], nsIP)
-					continue
+			nsIP := nsIP
+			tasks = append(tasks, func(_ context.Context) (validationOutcome, error) {
+				outcome := validationOutcome{
+					nsIP:                     nsIP,
+					noMatchCDSWithDNSKEY:     map[uint16]bool{},
+					cdsPointsToNonZoneDNSKEY: map[uint16]bool{},
+					cdsPointsToNonSEPDNSKEY:  map[uint16]bool{},
+					dnskeyNotSignedByCDS:     map[uint16]bool{},
+					cdsNotSignedByCDS:        map[uint16]bool{},
+					cdsSignedByUnknownDNSKEY: map[uint16]bool{},
+					cdsInvalidRRSIG:          map[uint16]bool{},
 				}
 
-				if !rrsigHasKeytag(dnskeyRRSIG[nsIP], keytag) {
-					dnskeyNotSignedByCDS[keytag] = append(dnskeyNotSignedByCDS[keytag], nsIP)
-				}
-				if !rrsigHasKeytag(cdsRRSIG[nsIP], keytag) {
-					cdsNotSignedByCDS[keytag] = append(cdsNotSignedByCDS[keytag], nsIP)
-				}
-				hasNonSEP := false
-				for _, dnskey := range matchingDNSKEYs {
-					if dnskey.Flags&dns.SEP == 0 {
-						hasNonSEP = true
-						break
-					}
-				}
-				if hasNonSEP {
-					cdsPointsToNonSEPDNSKEY[keytag] = append(cdsPointsToNonSEPDNSKEY[keytag], nsIP)
-				}
-			}
-
-			if len(cdsRRSIG[nsIP]) == 0 {
-				cdsNotSigned[nsIP] = true
-			} else {
-				rrset := make([]dns.RR, 0, len(cdsRecords))
+				hasDelete := false
+				hasNonDelete := false
 				for _, cds := range cdsRecords {
-					rrset = append(rrset, cds)
+					if cds.Algorithm == 0 {
+						hasDelete = true
+					} else {
+						hasNonDelete = true
+					}
 				}
-				for _, sig := range cdsRRSIG[nsIP] {
-					keytag := sig.KeyTag
+				if hasDelete {
+					if hasNonDelete {
+						outcome.mixedDeleteCDS = true
+					} else {
+						outcome.deleteCDS = true
+					}
+					return outcome, nil
+				}
+
+				dnskeys := dnskeyRRsets[nsIP]
+				if len(dnskeys) == 0 {
+					outcome.noDNSKEYRRset = true
+					return outcome, nil
+				}
+
+				for _, cds := range cdsRecords {
+					if cds.Algorithm == 0 {
+						continue
+					}
+					keytag := cds.KeyTag
 					var matchingDNSKEYs []*dns.DNSKEY
 					for _, dnskey := range dnskeys {
 						if dnskey.KeyTag() == keytag {
@@ -5033,19 +5029,115 @@ func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						}
 					}
 					if len(matchingDNSKEYs) == 0 {
-						cdsSignedByUnknownDNSKEY[keytag] = append(cdsSignedByUnknownDNSKEY[keytag], nsIP)
+						outcome.noMatchCDSWithDNSKEY[keytag] = true
 						continue
 					}
-					valid := false
+					hasNonZone := false
 					for _, dnskey := range matchingDNSKEYs {
-						if verifyRRSIG(sig, rrset, dnskey, testingTime) == nil {
-							valid = true
+						if dnskey.Flags&dns.ZONE == 0 {
+							hasNonZone = true
 							break
 						}
 					}
-					if !valid {
-						cdsInvalidRRSIG[keytag] = append(cdsInvalidRRSIG[keytag], nsIP)
+					if hasNonZone {
+						outcome.cdsPointsToNonZoneDNSKEY[keytag] = true
+						continue
 					}
+
+					if !rrsigHasKeytag(dnskeyRRSIG[nsIP], keytag) {
+						outcome.dnskeyNotSignedByCDS[keytag] = true
+					}
+					if !rrsigHasKeytag(cdsRRSIG[nsIP], keytag) {
+						outcome.cdsNotSignedByCDS[keytag] = true
+					}
+					hasNonSEP := false
+					for _, dnskey := range matchingDNSKEYs {
+						if dnskey.Flags&dns.SEP == 0 {
+							hasNonSEP = true
+							break
+						}
+					}
+					if hasNonSEP {
+						outcome.cdsPointsToNonSEPDNSKEY[keytag] = true
+					}
+				}
+
+				if len(cdsRRSIG[nsIP]) == 0 {
+					outcome.cdsNotSigned = true
+				} else {
+					rrset := make([]dns.RR, 0, len(cdsRecords))
+					for _, cds := range cdsRecords {
+						rrset = append(rrset, cds)
+					}
+					for _, sig := range cdsRRSIG[nsIP] {
+						keytag := sig.KeyTag
+						var matchingDNSKEYs []*dns.DNSKEY
+						for _, dnskey := range dnskeys {
+							if dnskey.KeyTag() == keytag {
+								matchingDNSKEYs = append(matchingDNSKEYs, dnskey)
+							}
+						}
+						if len(matchingDNSKEYs) == 0 {
+							outcome.cdsSignedByUnknownDNSKEY[keytag] = true
+							continue
+						}
+						valid := false
+						for _, dnskey := range matchingDNSKEYs {
+							if verifyRRSIG(sig, rrset, dnskey, testingTime) == nil {
+								valid = true
+								break
+							}
+						}
+						if !valid {
+							outcome.cdsInvalidRRSIG[keytag] = true
+						}
+					}
+				}
+
+				return outcome, nil
+			})
+		}
+
+		if len(tasks) > 0 {
+			parallelism := profile.Effective().Resolver.Defaults.Parallel
+			validationResults := parallel.RunOrdered(ctx, tasks, parallel.Options{Limit: parallelism, CancelOnError: false})
+			for _, res := range validationResults {
+				if res.Err != nil {
+					return results, res.Err
+				}
+				outcome := res.Value
+				if outcome.noDNSKEYRRset {
+					noDNSKEYRRset[outcome.nsIP] = true
+				}
+				if outcome.mixedDeleteCDS {
+					mixedDeleteCDS[outcome.nsIP] = true
+				}
+				if outcome.deleteCDS {
+					deleteCDS[outcome.nsIP] = true
+				}
+				if outcome.cdsNotSigned {
+					cdsNotSigned[outcome.nsIP] = true
+				}
+				for keytag := range outcome.noMatchCDSWithDNSKEY {
+					noMatchCDSWithDNSKEY[keytag] = append(noMatchCDSWithDNSKEY[keytag], outcome.nsIP)
+				}
+				for keytag := range outcome.cdsPointsToNonZoneDNSKEY {
+					cdsPointsToNonZoneDNSKEY[keytag] = append(cdsPointsToNonZoneDNSKEY[keytag], outcome.nsIP)
+				}
+				for keytag := range outcome.cdsPointsToNonSEPDNSKEY {
+					cdsPointsToNonSEPDNSKEY[keytag] = append(cdsPointsToNonSEPDNSKEY[keytag], outcome.nsIP)
+				}
+				for keytag := range outcome.dnskeyNotSignedByCDS {
+					dnskeyNotSignedByCDS[keytag] = append(dnskeyNotSignedByCDS[keytag], outcome.nsIP)
+				}
+				for keytag := range outcome.cdsNotSignedByCDS {
+					cdsNotSignedByCDS[keytag] = append(cdsNotSignedByCDS[keytag], outcome.nsIP)
+				}
+				for keytag := range outcome.cdsSignedByUnknownDNSKEY {
+					cdsSignedByUnknownDNSKEY[keytag] = append(cdsSignedByUnknownDNSKEY[keytag], outcome.nsIP)
+				}
+				for keytag := range outcome.cdsInvalidRRSIG {
+					cdsInvalidRRSIG[keytag] = append(cdsInvalidRRSIG[keytag], outcome.nsIP)
 				}
 			}
 		}
@@ -5367,76 +5459,93 @@ func DNSSEC17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(cdnskeyRRsets) > 0 {
-		for nsIP, cdnskeyRecords := range cdnskeyRRsets {
+		orderedIPs := make([]string, 0, len(ordered))
+		seenIPs := map[string]bool{}
+		for _, ns := range ordered {
+			ip := ns.Address.String()
+			orderedIPs = append(orderedIPs, ip)
+			seenIPs[ip] = true
+		}
+		var extraIPs []string
+		for nsIP := range cdnskeyRRsets {
+			if !seenIPs[nsIP] {
+				extraIPs = append(extraIPs, nsIP)
+			}
+		}
+		sort.Strings(extraIPs)
+		orderedIPs = append(orderedIPs, extraIPs...)
+
+		type validationOutcome struct {
+			nsIP                         string
+			noDNSKEYRRset                bool
+			mixedDeleteCDNSKEY           bool
+			deleteCDNSKEY                bool
+			cdnskeyNotSigned             bool
+			noMatchCDNSKEYWithDNSKEY     map[uint16]bool
+			cdnskeyIsNonZone             map[uint16]bool
+			cdnskeyIsNonSEP              map[uint16]bool
+			dnskeyNotSignedByCDNSKEY     map[uint16]bool
+			cdnskeyNotSignedByCDNSKEY    map[uint16]bool
+			cdnskeySignedByUnknownDNSKEY map[uint16]bool
+			cdnskeyInvalidRRSIG          map[uint16]bool
+		}
+
+		var tasks []parallel.Task[validationOutcome]
+		for _, nsIP := range orderedIPs {
+			cdnskeyRecords := cdnskeyRRsets[nsIP]
 			if len(cdnskeyRecords) == 0 {
 				continue
 			}
-
-			hasDelete := false
-			hasNonDelete := false
-			for _, cdnskey := range cdnskeyRecords {
-				if cdnskey.Algorithm == 0 {
-					hasDelete = true
-				} else {
-					hasNonDelete = true
-				}
-			}
-			if hasDelete {
-				if hasNonDelete {
-					mixedDeleteCDNSKEY[nsIP] = true
-				} else {
-					deleteCDNSKEY[nsIP] = true
-				}
-				continue
-			}
-
-			dnskeys := dnskeyRRsets[nsIP]
-			if len(dnskeys) == 0 {
-				noDNSKEYRRset[nsIP] = true
-				continue
-			}
-
-			for _, cdnskey := range cdnskeyRecords {
-				if cdnskey.Algorithm == 0 {
-					continue
-				}
-				keytag := cdnskey.KeyTag()
-				if cdnskey.Flags&dns.ZONE == 0 {
-					cdnskeyIsNonZone[keytag] = append(cdnskeyIsNonZone[keytag], nsIP)
-					continue
-				}
-				if cdnskey.Flags&dns.SEP == 0 {
-					cdnskeyIsNonSEP[keytag] = append(cdnskeyIsNonSEP[keytag], nsIP)
+			nsIP := nsIP
+			tasks = append(tasks, func(_ context.Context) (validationOutcome, error) {
+				outcome := validationOutcome{
+					nsIP:                         nsIP,
+					noMatchCDNSKEYWithDNSKEY:     map[uint16]bool{},
+					cdnskeyIsNonZone:             map[uint16]bool{},
+					cdnskeyIsNonSEP:              map[uint16]bool{},
+					dnskeyNotSignedByCDNSKEY:     map[uint16]bool{},
+					cdnskeyNotSignedByCDNSKEY:    map[uint16]bool{},
+					cdnskeySignedByUnknownDNSKEY: map[uint16]bool{},
+					cdnskeyInvalidRRSIG:          map[uint16]bool{},
 				}
 
-				var matchingDNSKEYs []*dns.DNSKEY
-				for _, dnskey := range dnskeys {
-					if dnskey.KeyTag() == keytag {
-						matchingDNSKEYs = append(matchingDNSKEYs, dnskey)
+				hasDelete := false
+				hasNonDelete := false
+				for _, cdnskey := range cdnskeyRecords {
+					if cdnskey.Algorithm == 0 {
+						hasDelete = true
+					} else {
+						hasNonDelete = true
 					}
 				}
-				if len(matchingDNSKEYs) == 0 {
-					noMatchCDNSKEYWithDNSKEY[keytag] = append(noMatchCDNSKEYWithDNSKEY[keytag], nsIP)
-					continue
+				if hasDelete {
+					if hasNonDelete {
+						outcome.mixedDeleteCDNSKEY = true
+					} else {
+						outcome.deleteCDNSKEY = true
+					}
+					return outcome, nil
 				}
 
-				if !rrsigHasKeytag(dnskeyRRSIG[nsIP], keytag) {
-					dnskeyNotSignedByCDNSKEY[keytag] = append(dnskeyNotSignedByCDNSKEY[keytag], nsIP)
+				dnskeys := dnskeyRRsets[nsIP]
+				if len(dnskeys) == 0 {
+					outcome.noDNSKEYRRset = true
+					return outcome, nil
 				}
-				if !rrsigHasKeytag(cdnskeyRRSIG[nsIP], keytag) {
-					cdnskeyNotSignedByCDNSKEY[keytag] = append(cdnskeyNotSignedByCDNSKEY[keytag], nsIP)
-				}
-			}
 
-			if len(cdnskeyRRSIG[nsIP]) == 0 {
-				cdnskeyNotSigned[nsIP] = true
-			} else {
-				rrset := make([]dns.RR, 0, len(cdnskeyRecords))
 				for _, cdnskey := range cdnskeyRecords {
-					rrset = append(rrset, cdnskey)
-				}
-				for _, sig := range cdnskeyRRSIG[nsIP] {
-					keytag := sig.KeyTag
+					if cdnskey.Algorithm == 0 {
+						continue
+					}
+					keytag := cdnskey.KeyTag()
+					if cdnskey.Flags&dns.ZONE == 0 {
+						outcome.cdnskeyIsNonZone[keytag] = true
+						continue
+					}
+					if cdnskey.Flags&dns.SEP == 0 {
+						outcome.cdnskeyIsNonSEP[keytag] = true
+					}
+
 					var matchingDNSKEYs []*dns.DNSKEY
 					for _, dnskey := range dnskeys {
 						if dnskey.KeyTag() == keytag {
@@ -5444,19 +5553,94 @@ func DNSSEC17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						}
 					}
 					if len(matchingDNSKEYs) == 0 {
-						cdnskeySignedByUnknownDNSKEY[keytag] = append(cdnskeySignedByUnknownDNSKEY[keytag], nsIP)
+						outcome.noMatchCDNSKEYWithDNSKEY[keytag] = true
 						continue
 					}
-					valid := false
-					for _, dnskey := range matchingDNSKEYs {
-						if verifyRRSIG(sig, rrset, dnskey, testingTime) == nil {
-							valid = true
-							break
+
+					if !rrsigHasKeytag(dnskeyRRSIG[nsIP], keytag) {
+						outcome.dnskeyNotSignedByCDNSKEY[keytag] = true
+					}
+					if !rrsigHasKeytag(cdnskeyRRSIG[nsIP], keytag) {
+						outcome.cdnskeyNotSignedByCDNSKEY[keytag] = true
+					}
+				}
+
+				if len(cdnskeyRRSIG[nsIP]) == 0 {
+					outcome.cdnskeyNotSigned = true
+				} else {
+					rrset := make([]dns.RR, 0, len(cdnskeyRecords))
+					for _, cdnskey := range cdnskeyRecords {
+						rrset = append(rrset, cdnskey)
+					}
+					for _, sig := range cdnskeyRRSIG[nsIP] {
+						keytag := sig.KeyTag
+						var matchingDNSKEYs []*dns.DNSKEY
+						for _, dnskey := range dnskeys {
+							if dnskey.KeyTag() == keytag {
+								matchingDNSKEYs = append(matchingDNSKEYs, dnskey)
+							}
+						}
+						if len(matchingDNSKEYs) == 0 {
+							outcome.cdnskeySignedByUnknownDNSKEY[keytag] = true
+							continue
+						}
+						valid := false
+						for _, dnskey := range matchingDNSKEYs {
+							if verifyRRSIG(sig, rrset, dnskey, testingTime) == nil {
+								valid = true
+								break
+							}
+						}
+						if !valid {
+							outcome.cdnskeyInvalidRRSIG[keytag] = true
 						}
 					}
-					if !valid {
-						cdnskeyInvalidRRSIG[keytag] = append(cdnskeyInvalidRRSIG[keytag], nsIP)
-					}
+				}
+
+				return outcome, nil
+			})
+		}
+
+		if len(tasks) > 0 {
+			parallelism := profile.Effective().Resolver.Defaults.Parallel
+			validationResults := parallel.RunOrdered(ctx, tasks, parallel.Options{Limit: parallelism, CancelOnError: false})
+			for _, res := range validationResults {
+				if res.Err != nil {
+					return results, res.Err
+				}
+				outcome := res.Value
+				if outcome.noDNSKEYRRset {
+					noDNSKEYRRset[outcome.nsIP] = true
+				}
+				if outcome.mixedDeleteCDNSKEY {
+					mixedDeleteCDNSKEY[outcome.nsIP] = true
+				}
+				if outcome.deleteCDNSKEY {
+					deleteCDNSKEY[outcome.nsIP] = true
+				}
+				if outcome.cdnskeyNotSigned {
+					cdnskeyNotSigned[outcome.nsIP] = true
+				}
+				for keytag := range outcome.noMatchCDNSKEYWithDNSKEY {
+					noMatchCDNSKEYWithDNSKEY[keytag] = append(noMatchCDNSKEYWithDNSKEY[keytag], outcome.nsIP)
+				}
+				for keytag := range outcome.cdnskeyIsNonZone {
+					cdnskeyIsNonZone[keytag] = append(cdnskeyIsNonZone[keytag], outcome.nsIP)
+				}
+				for keytag := range outcome.cdnskeyIsNonSEP {
+					cdnskeyIsNonSEP[keytag] = append(cdnskeyIsNonSEP[keytag], outcome.nsIP)
+				}
+				for keytag := range outcome.dnskeyNotSignedByCDNSKEY {
+					dnskeyNotSignedByCDNSKEY[keytag] = append(dnskeyNotSignedByCDNSKEY[keytag], outcome.nsIP)
+				}
+				for keytag := range outcome.cdnskeyNotSignedByCDNSKEY {
+					cdnskeyNotSignedByCDNSKEY[keytag] = append(cdnskeyNotSignedByCDNSKEY[keytag], outcome.nsIP)
+				}
+				for keytag := range outcome.cdnskeySignedByUnknownDNSKEY {
+					cdnskeySignedByUnknownDNSKEY[keytag] = append(cdnskeySignedByUnknownDNSKEY[keytag], outcome.nsIP)
+				}
+				for keytag := range outcome.cdnskeyInvalidRRSIG {
+					cdnskeyInvalidRRSIG[keytag] = append(cdnskeyInvalidRRSIG[keytag], outcome.nsIP)
 				}
 			}
 		}
@@ -5860,39 +6044,112 @@ func DNSSEC18(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 
 		if (len(cdsRRsets) > 0 || len(cdnskeyRRsets) > 0) && len(dnskeyRRsets) > 0 {
+			orderedIPs := make([]string, 0, len(ordered))
+			seenIPs := map[string]bool{}
+			for _, ns := range ordered {
+				ip := ns.Address.String()
+				orderedIPs = append(orderedIPs, ip)
+				seenIPs[ip] = true
+			}
+			var extraIPs []string
 			for nsIP := range cdsRRsets {
-				rrsig := cdsRRSIG[nsIP]
-				dnskeys := dnskeyRRsets[nsIP]
-				match := false
-				for _, ds := range dsRecords {
-					if !dnskeyHasKeytag(dnskeys, ds.KeyTag) {
+				if !seenIPs[nsIP] {
+					extraIPs = append(extraIPs, nsIP)
+				}
+			}
+			for nsIP := range cdnskeyRRsets {
+				if !seenIPs[nsIP] {
+					extraIPs = append(extraIPs, nsIP)
+				}
+			}
+			if len(extraIPs) > 0 {
+				sort.Strings(extraIPs)
+				orderedIPs = append(orderedIPs, extraIPs...)
+			}
+
+			if len(cdsRRsets) > 0 {
+				type sigOutcome struct {
+					nsIP    string
+					noMatch bool
+				}
+
+				var tasks []parallel.Task[sigOutcome]
+				for _, nsIP := range orderedIPs {
+					if !cdsRRsets[nsIP] {
 						continue
 					}
-					if rrsigHasKeytag(rrsig, ds.KeyTag) {
-						match = true
-						break
-					}
+					nsIP := nsIP
+					tasks = append(tasks, func(_ context.Context) (sigOutcome, error) {
+						rrsig := cdsRRSIG[nsIP]
+						dnskeys := dnskeyRRsets[nsIP]
+						match := false
+						for _, ds := range dsRecords {
+							if !dnskeyHasKeytag(dnskeys, ds.KeyTag) {
+								continue
+							}
+							if rrsigHasKeytag(rrsig, ds.KeyTag) {
+								match = true
+								break
+							}
+						}
+						return sigOutcome{nsIP: nsIP, noMatch: !match}, nil
+					})
 				}
-				if !match {
-					dsNoMatchCDSRRSIG[nsIP] = true
+
+				if len(tasks) > 0 {
+					parallelism := profile.Effective().Resolver.Defaults.Parallel
+					validationResults := parallel.RunOrdered(ctx, tasks, parallel.Options{Limit: parallelism, CancelOnError: false})
+					for _, res := range validationResults {
+						if res.Err != nil {
+							return results, res.Err
+						}
+						if res.Value.noMatch {
+							dsNoMatchCDSRRSIG[res.Value.nsIP] = true
+						}
+					}
 				}
 			}
 
-			for nsIP := range cdnskeyRRsets {
-				rrsig := cdnskeyRRSIG[nsIP]
-				dnskeys := dnskeyRRsets[nsIP]
-				match := false
-				for _, ds := range dsRecords {
-					if !dnskeyHasKeytag(dnskeys, ds.KeyTag) {
+			if len(cdnskeyRRsets) > 0 {
+				type sigOutcome struct {
+					nsIP    string
+					noMatch bool
+				}
+
+				var tasks []parallel.Task[sigOutcome]
+				for _, nsIP := range orderedIPs {
+					if !cdnskeyRRsets[nsIP] {
 						continue
 					}
-					if rrsigHasKeytag(rrsig, ds.KeyTag) {
-						match = true
-						break
-					}
+					nsIP := nsIP
+					tasks = append(tasks, func(_ context.Context) (sigOutcome, error) {
+						rrsig := cdnskeyRRSIG[nsIP]
+						dnskeys := dnskeyRRsets[nsIP]
+						match := false
+						for _, ds := range dsRecords {
+							if !dnskeyHasKeytag(dnskeys, ds.KeyTag) {
+								continue
+							}
+							if rrsigHasKeytag(rrsig, ds.KeyTag) {
+								match = true
+								break
+							}
+						}
+						return sigOutcome{nsIP: nsIP, noMatch: !match}, nil
+					})
 				}
-				if !match {
-					dsNoMatchCDNSKEYRRSIG[nsIP] = true
+
+				if len(tasks) > 0 {
+					parallelism := profile.Effective().Resolver.Defaults.Parallel
+					validationResults := parallel.RunOrdered(ctx, tasks, parallel.Options{Limit: parallelism, CancelOnError: false})
+					for _, res := range validationResults {
+						if res.Err != nil {
+							return results, res.Err
+						}
+						if res.Value.noMatch {
+							dsNoMatchCDNSKEYRRSIG[res.Value.nsIP] = true
+						}
+					}
 				}
 			}
 

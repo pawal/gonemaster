@@ -842,6 +842,164 @@ func TestDNSSEC07SignedZone(t *testing.T) {
 	}
 }
 
+func TestDNSSEC07ParallelChildQueries(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origDel := getDelNSNamesAndIPs
+	origZone := getZoneNSNamesAndIPs
+	origParent := getParentNSNamesAndIPs
+	origZoneParent := zoneParent
+	t.Cleanup(func() {
+		getDelNSNamesAndIPs = origDel
+		getZoneNSNamesAndIPs = origZone
+		getParentNSNamesAndIPs = origParent
+		zoneParent = origZoneParent
+	})
+
+	profile.Effective().Resolver.Defaults.Parallel = 2
+
+	zoneParent = func(_ context.Context, _ *zone.Zone) (*zone.Zone, error) {
+		return nil, nil
+	}
+	getParentNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	}
+
+	key := &dns.DNSKEY{
+		Hdr: dns.RR_Header{
+			Name:   dns.Fqdn("example"),
+			Rrtype: dns.TypeDNSKEY,
+			Class:  dns.ClassINET,
+			Ttl:    60,
+		},
+		Flags:     dns.ZONE,
+		Protocol:  3,
+		Algorithm: 8,
+		PublicKey: "AwEAAc==",
+	}
+
+	started := make(chan string, 2)
+	release := make(chan struct{})
+
+	hook := func(id string) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
+		return func(ctx context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+			switch qtype {
+			case "SOA":
+				select {
+				case started <- id:
+				default:
+				}
+				select {
+				case <-release:
+				case <-ctx.Done():
+					return packet.Packet{}, ctx.Err()
+				}
+				return answerPacket(qname, dns.TypeSOA, soaRecord(qname)), nil
+			case "DNSKEY":
+				return dnskeyPacket(qname, key), nil
+			default:
+				return packet.Packet{}, nil
+			}
+		}
+	}
+
+	ns1, err := nameserver.New("ns1.example", "192.0.2.60", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	ns1.SetQueryHook(hook("ns1"))
+
+	ns2, err := nameserver.New("ns2.example", "192.0.2.61", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	ns2.SetQueryHook(hook("ns2"))
+
+	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+		return []methodsv2.NSItem{
+			{
+				Name:       dnsname.New("ns1.example"),
+				Address:    netip.MustParseAddr("192.0.2.60"),
+				HasAddress: true,
+			},
+			{
+				Name:       dnsname.New("ns2.example"),
+				Address:    netip.MustParseAddr("192.0.2.61"),
+				HasAddress: true,
+			},
+		}, nil
+	}
+	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+		return []methodsv2.NSItem{}, nil
+	}
+
+	z, err := zone.New("example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	done := make(chan struct{})
+	var entries []*logger.Entry
+	var dsErr error
+	go func() {
+		entries, dsErr = DNSSEC07(ctx, &z)
+		close(done)
+	}()
+
+	got := map[string]bool{}
+	deadline := time.After(1 * time.Second)
+	for len(got) < 2 {
+		select {
+		case name := <-started:
+			got[name] = true
+		case <-deadline:
+			t.Fatalf("expected parallel SOA queries to start, got %v", got)
+		}
+	}
+
+	close(release)
+
+	select {
+	case <-done:
+		if dsErr != nil {
+			t.Fatalf("dnssec07: %v", dsErr)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("dnssec07 did not finish")
+	}
+
+	if !hasEntryTag(entries, "DS07_NOT_SIGNED_ON_SERVER") {
+		t.Fatalf("expected DS07_NOT_SIGNED_ON_SERVER")
+	}
+	if !hasEntryTag(entries, "DS07_NOT_SIGNED") {
+		t.Fatalf("expected DS07_NOT_SIGNED")
+	}
+
+	var nsList string
+	for _, entry := range entries {
+		if entry == nil || entry.Tag != "DS07_NOT_SIGNED_ON_SERVER" {
+			continue
+		}
+		if list, ok := entry.Args["ns_list"].(string); ok {
+			nsList = list
+			break
+		}
+	}
+	if nsList == "" {
+		t.Fatalf("expected ns_list for DS07_NOT_SIGNED_ON_SERVER")
+	}
+	if nsList != "ns1.example/192.0.2.60;ns2.example/192.0.2.61" {
+		t.Fatalf("expected deterministic ns_list order, got %q", nsList)
+	}
+}
+
 func TestDNSSEC07NotSigned(t *testing.T) {
 	nameserver.EmptyCache()
 	t.Cleanup(nameserver.EmptyCache)

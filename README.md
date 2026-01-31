@@ -44,6 +44,7 @@ gonemaster --json --domain example.com | jq
 - `--testcase` Run a single testcase (optional)
 - `--profile` Profile JSON/YAML path (optional)
 - `--parallel` Override resolver.defaults.parallel (optional)
+- `--unordered` Allow unordered resolver behavior (optional, default off)
 - `--min-level` Minimum log level (optional, default NOTICE)
 - `--output` Write output to file (optional)
 - `--raw` Stream raw log entries as they are produced (optional)
@@ -59,6 +60,9 @@ gonemaster --json --domain example.com | jq
 
 Locale defaults to the first available in `LANGUAGE`, then `LC_ALL`, `LC_MESSAGES`,
 `LANG`, and finally `en`.
+
+Ordered output remains the default. `--unordered` toggles the profile setting
+`resolver.defaults.unordered` (reserved for the upcoming unordered fast path).
 
 ### Exit codes
 

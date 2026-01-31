@@ -35,15 +35,16 @@ type ResolverSettings struct {
 
 // ResolverDefaults mirrors resolver defaults from the profile.
 type ResolverDefaults struct {
-	Debug    bool `json:"debug"`
-	IgnTC    bool `json:"igntc"`
-	Fallback bool `json:"fallback"`
-	Recurse  bool `json:"recurse"`
-	Retrans  int  `json:"retrans"`
-	Retry    int  `json:"retry"`
-	Parallel int  `json:"parallel"`
-	UseVC    bool `json:"usevc"`
-	Timeout  int  `json:"timeout"`
+	Debug     bool `json:"debug"`
+	IgnTC     bool `json:"igntc"`
+	Fallback  bool `json:"fallback"`
+	Recurse   bool `json:"recurse"`
+	Retrans   int  `json:"retrans"`
+	Retry     int  `json:"retry"`
+	Parallel  int  `json:"parallel"`
+	Unordered bool `json:"unordered"`
+	UseVC     bool `json:"usevc"`
+	Timeout   int  `json:"timeout"`
 }
 
 // NetSettings holds IP stack enablement flags.

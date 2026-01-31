@@ -43,6 +43,7 @@ gonemaster --json --domain example.com | jq
 - `--module` Run a single module (optional)
 - `--testcase` Run a single testcase (optional)
 - `--profile` Profile JSON/YAML path (optional)
+- `--parallel` Override resolver.defaults.parallel (optional)
 - `--min-level` Minimum log level (optional, default NOTICE)
 - `--output` Write output to file (optional)
 - `--raw` Stream raw log entries as they are produced (optional)

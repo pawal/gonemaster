@@ -362,6 +362,11 @@ msgstr "Activado IPv4, se puede enviar la consulta \"{rrtype}\" hacia {ns}."
 msgid "IPv6 is disabled, not sending \"{rrtype}\" query to {ns}."
 msgstr "Desactivado IPv6, no se enviará la consulta \"{rrtype}\" hacia {ns}."
 
+#. SYSTEM:ERROR_CACHE_SKIP
+#, perl-brace-format
+msgid "Skipping {query_type} query to {query_name} ({query_class}) at {ip} over {protocol} for {ttl_seconds}s after network error."
+msgstr "Skipping {query_type} query to {query_name} ({query_class}) at {ip} over {protocol} for {ttl_seconds}s after network error."
+
 #. BASIC:IPV6_ENABLED
 #, perl-brace-format
 msgid "IPv6 is enabled, can send \"{rrtype}\" query to {ns}."

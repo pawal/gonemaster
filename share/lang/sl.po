@@ -330,6 +330,11 @@ msgstr "IPv4 je omogočen, lahko pošljemo \"{rrtype}\" poizvedbo na {ns}."
 msgid "IPv6 is disabled, not sending \"{rrtype}\" query to {ns}."
 msgstr "IPv6 je onemogočen, \"{rrtype}\" ni bila poslana na {ns}."
 
+#. SYSTEM:ERROR_CACHE_SKIP
+#, perl-brace-format
+msgid "Skipping {query_type} query to {query_name} ({query_class}) at {ip} over {protocol} for {ttl_seconds}s after network error."
+msgstr "Skipping {query_type} query to {query_name} ({query_class}) at {ip} over {protocol} for {ttl_seconds}s after network error."
+
 #. BASIC:IPV6_ENABLED
 #, perl-brace-format
 msgid "IPv6 is enabled, can send \"{rrtype}\" query to {ns}."

@@ -385,6 +385,11 @@ msgstr ""
 "IPv6 a été désactivé, la requête de type \"{rrtype}\" sur le serveur {ns} "
 "est annulée."
 
+#. SYSTEM:ERROR_CACHE_SKIP
+#, perl-brace-format
+msgid "Skipping {query_type} query to {query_name} ({query_class}) at {ip} over {protocol} for {ttl_seconds}s after network error."
+msgstr "Skipping {query_type} query to {query_name} ({query_class}) at {ip} over {protocol} for {ttl_seconds}s after network error."
+
 #. BASIC:IPV6_ENABLED
 #, perl-brace-format
 msgid "IPv6 is enabled, can send \"{rrtype}\" query to {ns}."

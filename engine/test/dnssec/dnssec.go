@@ -19,6 +19,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/testcase"
 	"codeberg.org/pawal/gonemaster/engine/util"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
@@ -89,7 +90,9 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var results []*logger.Entry
 
 	if util.ShouldRunTest("dnssec07") {
-		entries, err := DNSSEC07(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC07(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
@@ -101,42 +104,54 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if util.ShouldRunTest("dnssec01") {
-		entries, err := DNSSEC01(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC01(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("dnssec02") {
-		entries, err := DNSSEC02(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC02(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("dnssec03") {
-		entries, err := DNSSEC03(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC03(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("dnssec04") {
-		entries, err := DNSSEC04(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC04(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("dnssec05") {
-		entries, err := DNSSEC05(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC05(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("dnssec06") {
-		entries, err := DNSSEC06(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC06(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
@@ -144,7 +159,9 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if util.ShouldRunTest("dnssec08") {
-		entries, err := DNSSEC08(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC08(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
@@ -152,7 +169,9 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if util.ShouldRunTest("dnssec09") {
-		entries, err := DNSSEC09(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC09(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
@@ -160,56 +179,72 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if util.ShouldRunTest("dnssec10") {
-		entries, err := DNSSEC10(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC10(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("dnssec11") {
-		entries, err := DNSSEC11(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC11(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("dnssec13") {
-		entries, err := DNSSEC13(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC13(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("dnssec14") {
-		entries, err := DNSSEC14(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC14(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("dnssec15") {
-		entries, err := DNSSEC15(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC15(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("dnssec16") {
-		entries, err := DNSSEC16(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC16(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("dnssec17") {
-		entries, err := DNSSEC17(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC17(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("dnssec18") {
-		entries, err := DNSSEC18(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC18(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err

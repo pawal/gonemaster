@@ -573,6 +573,9 @@ func TestRecurseUnorderedWaitsForRedirectBatchCleanup(t *testing.T) {
 
 func TestGetAddressesForUnorderedSequential(t *testing.T) {
 	defer profile.ResetEffective()
+	if err := profile.Effective().Set("resolver.defaults.unordered", true); err != nil {
+		t.Fatalf("set unordered: %v", err)
+	}
 	if err := profile.Effective().Set("resolver.defaults.parallel", 2); err != nil {
 		t.Fatalf("set parallel: %v", err)
 	}
@@ -615,7 +618,7 @@ func TestGetAddressesForUnorderedSequential(t *testing.T) {
 		}
 	})
 
-	ctx := withUnorderedContext(context.Background())
+	ctx := context.Background()
 	done := make(chan struct{})
 	var addrs []netip.Addr
 	var addrErr error

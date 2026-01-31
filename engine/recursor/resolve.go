@@ -114,7 +114,7 @@ func (r *Recursor) getAddressesFor(ctx context.Context, name string, state *recu
 	if parallelism < 1 {
 		parallelism = 1
 	}
-	if isUnorderedContext(ctx) {
+	if profile.Effective().Resolver.Defaults.Unordered || isUnorderedContext(ctx) {
 		parallelism = 1
 	}
 	if parallelism == 1 {
@@ -465,7 +465,7 @@ func (l lazyNameserver) QueryWithClass(ctx context.Context, qname string, qtype 
 	if parallelism < 1 {
 		parallelism = 1
 	}
-	if isUnorderedContext(ctx) {
+	if profile.Effective().Resolver.Defaults.Unordered || isUnorderedContext(ctx) {
 		parallelism = 1
 	}
 	queryAddresses := func(addrs []netip.Addr) (packet.Packet, error) {

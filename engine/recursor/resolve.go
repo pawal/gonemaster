@@ -88,12 +88,15 @@ func (r *Recursor) getAddressesFor(ctx context.Context, name string, state *recu
 	if state == nil {
 		state = &recurseState{}
 	}
+	state.ensureLock()
+	state.lock()
 	if state.inProgress == nil {
 		state.inProgress = map[string]map[string]bool{}
 	}
 	if state.glue == nil {
 		state.glue = map[string]map[netip.Addr]bool{}
 	}
+	state.unlock()
 
 	root, err := r.RootServers()
 	if err != nil {
@@ -125,6 +128,7 @@ func (r *Recursor) getAddressesFor(ctx context.Context, name string, state *recu
 			seen:       map[string]bool{},
 			inProgress: state.inProgress,
 			glue:       state.glue,
+			mu:         state.mu,
 		})
 		if err != nil {
 			return nil, err
@@ -139,6 +143,7 @@ func (r *Recursor) getAddressesFor(ctx context.Context, name string, state *recu
 			seen:       map[string]bool{},
 			inProgress: state.inProgress,
 			glue:       state.glue,
+			mu:         state.mu,
 		})
 		if err != nil {
 			return nil, err
@@ -204,8 +209,10 @@ func (r *Recursor) getAddressesFor(ctx context.Context, name string, state *recu
 			}
 		}
 
+		state.lock()
 		baseInProgress := cloneInProgress(state.inProgress)
 		baseGlue := cloneGlue(state.glue)
+		state.unlock()
 
 		tasks := []parallel.Task[addrResult]{
 			func(ctx context.Context) (addrResult, error) {
@@ -235,8 +242,10 @@ func (r *Recursor) getAddressesFor(ctx context.Context, name string, state *recu
 		results := parallel.RunOrdered(ctx, tasks, parallel.Options{Limit: 2, CancelOnError: false})
 
 		if results[0].Value.state != nil {
+			state.lock()
 			mergeInProgress(state.inProgress, results[0].Value.state.inProgress)
 			mergeGlue(state.glue, results[0].Value.state.glue)
+			state.unlock()
 		}
 		if results[0].Err != nil {
 			return nil, results[0].Err
@@ -247,8 +256,10 @@ func (r *Recursor) getAddressesFor(ctx context.Context, name string, state *recu
 		}
 
 		if results[1].Value.state != nil {
+			state.lock()
 			mergeInProgress(state.inProgress, results[1].Value.state.inProgress)
 			mergeGlue(state.glue, results[1].Value.state.glue)
+			state.unlock()
 		}
 		if results[1].Err != nil {
 			return nil, results[1].Err
@@ -371,9 +382,12 @@ func (r *Recursor) getNSFrom(resp packet.Packet, state *recurseState) ([]queryer
 	if state == nil {
 		state = &recurseState{}
 	}
+	state.ensureLock()
+	state.lock()
 	if state.glue == nil {
 		state.glue = map[string]map[netip.Addr]bool{}
 	}
+	state.unlock()
 
 	var names []string
 	for _, rr := range nsRecords {
@@ -385,6 +399,7 @@ func (r *Recursor) getNSFrom(resp packet.Packet, state *recurseState) ([]queryer
 		names = append(names, nsName.String())
 	}
 
+	state.lock()
 	for _, rr := range resp.GetRecords("A") {
 		if a, ok := rr.(*dns.A); ok {
 			ownerName := dnsname.New(rr.Header().Name)
@@ -409,14 +424,30 @@ func (r *Recursor) getNSFrom(resp packet.Packet, state *recurseState) ([]queryer
 			}
 		}
 	}
+	state.unlock()
 
 	var withGlue []nameserver.Nameserver
 	var extra []string
+	glueSnapshot := make(map[string][]netip.Addr, len(names))
+	state.lock()
 	for _, name := range names {
 		nameObj := dnsname.New(name)
 		key := strings.ToLower(nameObj.String())
-		if addrs, ok := state.glue[key]; ok {
+		if addrs, ok := state.glue[key]; ok && len(addrs) > 0 {
+			ordered := make([]netip.Addr, 0, len(addrs))
 			for addr := range addrs {
+				ordered = append(ordered, addr)
+			}
+			glueSnapshot[key] = ordered
+		}
+	}
+	state.unlock()
+
+	for _, name := range names {
+		nameObj := dnsname.New(name)
+		key := strings.ToLower(nameObj.String())
+		if addrs, ok := glueSnapshot[key]; ok && len(addrs) > 0 {
+			for _, addr := range addrs {
 				ns, err := nameserver.New(name, addr.String(), r.client)
 				if err != nil {
 					return nil, fmt.Errorf("create nameserver for %s: %w", name, err)
@@ -507,31 +538,46 @@ func (l lazyNameserver) QueryWithClass(ctx context.Context, qname string, qtype 
 		return packet.Packet{}, nil
 	}
 
-	if l.state != nil && l.state.glue != nil {
+	var cachedAddrs []netip.Addr
+	if l.state != nil {
+		l.state.ensureLock()
+		l.state.lock()
+		if l.state.glue == nil {
+			l.state.glue = map[string]map[netip.Addr]bool{}
+		}
 		if addrs, ok := l.state.glue[nameKey]; ok {
 			if len(addrs) > 0 {
-				ordered := make([]netip.Addr, 0, len(addrs))
+				cachedAddrs = make([]netip.Addr, 0, len(addrs))
 				for addr := range addrs {
-					ordered = append(ordered, addr)
+					cachedAddrs = append(cachedAddrs, addr)
 				}
-				return queryAddresses(ordered)
 			}
 		} else {
 			l.state.glue[nameKey] = map[netip.Addr]bool{}
 		}
+		l.state.unlock()
+	}
+	if len(cachedAddrs) > 0 {
+		return queryAddresses(cachedAddrs)
 	}
 
 	addrs, err := l.recursor.getAddressesFor(ctx, l.name, l.state)
 	if err != nil {
 		return packet.Packet{}, err
 	}
-	if l.state != nil && l.state.glue != nil {
+	if l.state != nil {
+		l.state.ensureLock()
+		l.state.lock()
+		if l.state.glue == nil {
+			l.state.glue = map[string]map[netip.Addr]bool{}
+		}
 		if l.state.glue[nameKey] == nil {
 			l.state.glue[nameKey] = map[netip.Addr]bool{}
 		}
 		for _, addr := range addrs {
 			l.state.glue[nameKey][addr] = true
 		}
+		l.state.unlock()
 	}
 	return queryAddresses(addrs)
 }

@@ -21,6 +21,7 @@ type queryer interface {
 }
 
 type recurseState struct {
+	mu         *sync.Mutex
 	ns         []queryer
 	count      int
 	common     int
@@ -42,10 +43,34 @@ type traceEntry struct {
 	answerFrom string
 }
 
+func (state *recurseState) ensureLock() {
+	if state == nil {
+		return
+	}
+	if state.mu == nil {
+		state.mu = &sync.Mutex{}
+	}
+}
+
+func (state *recurseState) lock() {
+	if state == nil || state.mu == nil {
+		return
+	}
+	state.mu.Lock()
+}
+
+func (state *recurseState) unlock() {
+	if state == nil || state.mu == nil {
+		return
+	}
+	state.mu.Unlock()
+}
+
 func (r *Recursor) recurse(ctx context.Context, name string, qtype string, qclass string, state *recurseState) (packet.Packet, *recurseState, error) {
 	if state == nil {
 		state = &recurseState{}
 	}
+	state.ensureLock()
 	if !state.qnameSet {
 		state.qname = dnsname.New(name)
 		state.qnameSet = true
@@ -59,6 +84,7 @@ func (r *Recursor) recurse(ctx context.Context, name string, qtype string, qclas
 	if state.trace == nil {
 		state.trace = []traceEntry{}
 	}
+	state.lock()
 	if state.inProgress == nil {
 		state.inProgress = map[string]map[string]bool{}
 	}
@@ -68,6 +94,7 @@ func (r *Recursor) recurse(ctx context.Context, name string, qtype string, qclas
 	if state.glue == nil {
 		state.glue = map[string]map[netip.Addr]bool{}
 	}
+	state.unlock()
 
 	if qtype == "" {
 		qtype = "A"
@@ -80,13 +107,16 @@ func (r *Recursor) recurse(ctx context.Context, name string, qtype string, qclas
 
 	nameObj := dnsname.New(name)
 	nameKey := strings.ToLower(nameObj.String())
+	state.lock()
 	if state.inProgress[nameKey] == nil {
 		state.inProgress[nameKey] = map[string]bool{}
 	}
 	if state.inProgress[nameKey][qtype] {
+		state.unlock()
 		return packet.Packet{}, state, nil
 	}
 	state.inProgress[nameKey][qtype] = true
+	state.unlock()
 
 	if profile.Effective().Resolver.Defaults.Unordered {
 		return r.recurseUnordered(ctx, name, qtype, qclass, state)
@@ -455,20 +485,23 @@ func (r *Recursor) resolveCNAME(ctx context.Context, name dnsname.Name, qtype st
 	if state == nil {
 		state = &recurseState{}
 	}
+	state.ensureLock()
+	state.lock()
 	if state.inProgress == nil {
 		state.inProgress = map[string]map[string]bool{}
 	}
 	if state.tseen == nil {
 		state.tseen = map[string]bool{}
 	}
-
 	if state.inProgress[targetKey] != nil && state.inProgress[targetKey][qtype] {
+		state.unlock()
 		return packet.Packet{}, state, nil
 	}
-
 	state.tseen[targetKey] = true
 	state.tcount++
-	if state.tcount > constants.CNAMEMaxChainLength {
+	tcount := state.tcount
+	state.unlock()
+	if tcount > constants.CNAMEMaxChainLength {
 		return packet.Packet{}, state, nil
 	}
 
@@ -490,7 +523,8 @@ func (r *Recursor) resolveCNAME(ctx context.Context, name dnsname.Name, qtype st
 			seen:       map[string]bool{},
 			inProgress: state.inProgress,
 			tseen:      state.tseen,
-			tcount:     state.tcount,
+			tcount:     tcount,
+			mu:         state.mu,
 		}
 		return r.recurse(ctx, targetName.String(), qtype, qclass, nextState)
 	}

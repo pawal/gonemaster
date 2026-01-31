@@ -29,6 +29,7 @@ func Run(ctx context.Context, fn Case) ([]*logger.Entry, error) {
 	util.SetLogger(parent)
 
 	bufEntries := buf.Entries()
+	var extras []*logger.Entry
 	if entries == nil {
 		entries = bufEntries
 	} else if len(bufEntries) > 0 {
@@ -39,7 +40,6 @@ func Run(ctx context.Context, fn Case) ([]*logger.Entry, error) {
 			}
 			seen[entry] = true
 		}
-		var extras []*logger.Entry
 		for _, entry := range bufEntries {
 			if entry == nil {
 				continue
@@ -87,10 +87,28 @@ func Run(ctx context.Context, fn Case) ([]*logger.Entry, error) {
 		}
 	}
 	if parent != nil && len(entries) > 0 {
-		if useSilentAppend {
-			_ = parent.AppendWithoutCallback(entries...)
-		} else {
+		if !useSilentAppend {
 			_ = parent.Append(entries...)
+		} else if len(bufEntries) == 0 {
+			_ = parent.Append(entries...)
+		} else {
+			bufSeen := map[*logger.Entry]bool{}
+			for _, entry := range bufEntries {
+				if entry == nil {
+					continue
+				}
+				bufSeen[entry] = true
+			}
+			for _, entry := range entries {
+				if entry == nil {
+					continue
+				}
+				if bufSeen[entry] {
+					_ = parent.AppendWithoutCallback(entry)
+				} else {
+					_ = parent.Append(entry)
+				}
+			}
 		}
 	}
 

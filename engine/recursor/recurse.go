@@ -5,12 +5,15 @@ import (
 	"net/netip"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/packet"
+	"codeberg.org/pawal/gonemaster/engine/profile"
 )
 
 type queryer interface {
@@ -18,6 +21,7 @@ type queryer interface {
 }
 
 type recurseState struct {
+	mu         *sync.Mutex
 	ns         []queryer
 	count      int
 	common     int
@@ -39,10 +43,34 @@ type traceEntry struct {
 	answerFrom string
 }
 
+func (state *recurseState) ensureLock() {
+	if state == nil {
+		return
+	}
+	if state.mu == nil {
+		state.mu = &sync.Mutex{}
+	}
+}
+
+func (state *recurseState) lock() {
+	if state == nil || state.mu == nil {
+		return
+	}
+	state.mu.Lock()
+}
+
+func (state *recurseState) unlock() {
+	if state == nil || state.mu == nil {
+		return
+	}
+	state.mu.Unlock()
+}
+
 func (r *Recursor) recurse(ctx context.Context, name string, qtype string, qclass string, state *recurseState) (packet.Packet, *recurseState, error) {
 	if state == nil {
 		state = &recurseState{}
 	}
+	state.ensureLock()
 	if !state.qnameSet {
 		state.qname = dnsname.New(name)
 		state.qnameSet = true
@@ -56,6 +84,7 @@ func (r *Recursor) recurse(ctx context.Context, name string, qtype string, qclas
 	if state.trace == nil {
 		state.trace = []traceEntry{}
 	}
+	state.lock()
 	if state.inProgress == nil {
 		state.inProgress = map[string]map[string]bool{}
 	}
@@ -65,6 +94,7 @@ func (r *Recursor) recurse(ctx context.Context, name string, qtype string, qclas
 	if state.glue == nil {
 		state.glue = map[string]map[netip.Addr]bool{}
 	}
+	state.unlock()
 
 	if qtype == "" {
 		qtype = "A"
@@ -77,14 +107,25 @@ func (r *Recursor) recurse(ctx context.Context, name string, qtype string, qclas
 
 	nameObj := dnsname.New(name)
 	nameKey := strings.ToLower(nameObj.String())
+	state.lock()
 	if state.inProgress[nameKey] == nil {
 		state.inProgress[nameKey] = map[string]bool{}
 	}
 	if state.inProgress[nameKey][qtype] {
+		state.unlock()
 		return packet.Packet{}, state, nil
 	}
 	state.inProgress[nameKey][qtype] = true
+	state.unlock()
 
+	if profile.Effective().Resolver.Defaults.Unordered {
+		return r.recurseUnordered(ctx, name, qtype, qclass, state)
+	}
+	return r.recurseOrdered(ctx, name, qtype, qclass, state)
+}
+
+func (r *Recursor) recurseOrdered(ctx context.Context, name string, qtype string, qclass string, state *recurseState) (packet.Packet, *recurseState, error) {
+	nameObj := dnsname.New(name)
 	for len(state.ns) > 0 {
 		idx := len(state.ns) - 1
 		ns := state.ns[idx]
@@ -146,6 +187,210 @@ func (r *Recursor) recurse(ctx context.Context, name string, qtype string, qclas
 				source:     ns,
 				answerFrom: resp.AnswerFrom,
 			}}, state.trace...)
+		}
+	}
+
+	if state.candidate.Msg != nil {
+		return state.candidate, state, nil
+	}
+	return packet.Packet{}, state, nil
+}
+
+type unorderedResult struct {
+	ns   queryer
+	resp packet.Packet
+	err  error
+}
+
+func (r *Recursor) recurseUnordered(ctx context.Context, name string, qtype string, qclass string, state *recurseState) (packet.Packet, *recurseState, error) {
+	depth := unorderedDepth(ctx)
+	nameObj := dnsname.New(name)
+	for len(state.ns) > 0 {
+		nss := state.ns
+		state.ns = nil
+
+		if len(nss) == 0 {
+			break
+		}
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		if parallelism < 1 {
+			parallelism = 1
+		}
+		if depth > 0 {
+			parallelism = 1
+		}
+		workers := parallelism
+		if workers > len(nss) {
+			workers = len(nss)
+		}
+		if workers < 1 {
+			workers = 1
+		}
+		jobs := make(chan queryer)
+		results := make(chan unorderedResult, len(nss))
+
+		defaults := profile.Effective().Resolver.Defaults
+		batchTimeout := time.Duration(defaults.Timeout) * time.Second
+		if defaults.Retry > 0 {
+			batchTimeout = batchTimeout * time.Duration(defaults.Retry+1)
+		}
+		var ctxBatch context.Context
+		var cancel context.CancelFunc
+		if batchTimeout > 0 {
+			ctxBatch, cancel = context.WithTimeout(ctx, batchTimeout)
+		} else {
+			ctxBatch, cancel = context.WithCancel(ctx)
+		}
+		ctxBatch = withUnorderedContext(ctxBatch)
+		ctxBatch = withUnorderedDepth(ctxBatch, depth+1)
+		ctxBatch = withUnorderedContext(ctxBatch)
+		var wg sync.WaitGroup
+		wg.Add(workers)
+		for i := 0; i < workers; i++ {
+			go func() {
+				defer wg.Done()
+				for ns := range jobs {
+					if ctxBatch.Err() != nil {
+						return
+					}
+					resp, err := ns.QueryWithClass(ctxBatch, name, qtype, qclass)
+					select {
+					case results <- unorderedResult{ns: ns, resp: resp, err: err}:
+					case <-ctxBatch.Done():
+						return
+					}
+				}
+			}()
+		}
+
+		done := make(chan struct{})
+		go func() {
+			wg.Wait()
+			close(results)
+			close(done)
+		}()
+		go func() {
+			defer close(jobs)
+			for _, ns := range nss {
+				select {
+				case <-ctxBatch.Done():
+					return
+				case jobs <- ns:
+				}
+			}
+		}()
+
+		redirected := false
+		var redirectResp packet.Packet
+		var redirectNS queryer
+		var redirectZName string
+		var redirectCommon int
+		decided := false
+		needsCNAME := false
+		var decidedResp packet.Packet
+	loop:
+		for {
+			select {
+			case <-ctxBatch.Done():
+				break loop
+			case res, ok := <-results:
+				if !ok {
+					break loop
+				}
+				if res.err != nil || res.resp.Msg == nil {
+					continue
+				}
+
+				resp := res.resp
+				if resp.Rcode() == "REFUSED" || resp.Rcode() == "SERVFAIL" {
+					if state.candidate.Msg == nil {
+						state.candidate = resp
+					}
+					continue
+				}
+
+				if resp.NoSuchRecord() || resp.NoSuchName() {
+					decided = true
+					decidedResp = resp
+					cancel()
+					break loop
+				}
+
+				if resp.Type() == "answer" {
+					if !resp.HasRRsOfTypeForName(qtype, nameObj, "answer") && len(resp.GetRecordsForName("CNAME", nameObj, "answer")) > 0 {
+						decided = true
+						needsCNAME = true
+						decidedResp = resp
+						cancel()
+						break loop
+					}
+					decided = true
+					decidedResp = resp
+					cancel()
+					break loop
+				}
+
+				if resp.IsRedirect() {
+					zname, ok := redirectName(resp)
+					if !ok || zname == "." {
+						continue
+					}
+					zkey := strings.ToLower(zname)
+					if state.seen[zkey] {
+						continue
+					}
+
+					common := dnsname.New(zname).Common(state.qname)
+					if common < state.common {
+						continue
+					}
+
+					redirected = true
+					redirectResp = resp
+					redirectNS = res.ns
+					redirectZName = zname
+					redirectCommon = common
+					cancel()
+					break loop
+				}
+			}
+		}
+
+		cancel()
+		<-done
+
+		if decided {
+			if needsCNAME {
+				cnameCtx := ctx
+				if profile.Effective().Resolver.Defaults.Unordered {
+					cnameCtx = withUnorderedContext(cnameCtx)
+					cnameCtx = withUnorderedDepth(cnameCtx, depth+1)
+				}
+				cnameResp, nextState, err := r.resolveCNAME(cnameCtx, nameObj, qtype, qclass, decidedResp, state)
+				return cnameResp, nextState, err
+			}
+			return decidedResp, state, nil
+		}
+		if redirected {
+			zkey := strings.ToLower(redirectZName)
+			state.seen[zkey] = true
+			state.common = redirectCommon
+
+			next, err := state.nsFrom(redirectResp, state)
+			if err != nil {
+				return packet.Packet{}, state, err
+			}
+			state.ns = next
+			state.count++
+			if state.count > 20 {
+				return packet.Packet{}, state, nil
+			}
+			state.trace = append([]traceEntry{{
+				zoneName:   redirectZName,
+				source:     redirectNS,
+				answerFrom: redirectResp.AnswerFrom,
+			}}, state.trace...)
+			continue
 		}
 	}
 
@@ -240,20 +485,23 @@ func (r *Recursor) resolveCNAME(ctx context.Context, name dnsname.Name, qtype st
 	if state == nil {
 		state = &recurseState{}
 	}
+	state.ensureLock()
+	state.lock()
 	if state.inProgress == nil {
 		state.inProgress = map[string]map[string]bool{}
 	}
 	if state.tseen == nil {
 		state.tseen = map[string]bool{}
 	}
-
 	if state.inProgress[targetKey] != nil && state.inProgress[targetKey][qtype] {
+		state.unlock()
 		return packet.Packet{}, state, nil
 	}
-
 	state.tseen[targetKey] = true
 	state.tcount++
-	if state.tcount > constants.CNAMEMaxChainLength {
+	tcount := state.tcount
+	state.unlock()
+	if tcount > constants.CNAMEMaxChainLength {
 		return packet.Packet{}, state, nil
 	}
 
@@ -275,7 +523,8 @@ func (r *Recursor) resolveCNAME(ctx context.Context, name dnsname.Name, qtype st
 			seen:       map[string]bool{},
 			inProgress: state.inProgress,
 			tseen:      state.tseen,
-			tcount:     state.tcount,
+			tcount:     tcount,
+			mu:         state.mu,
 		}
 		return r.recurse(ctx, targetName.String(), qtype, qclass, nextState)
 	}

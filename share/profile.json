@@ -25,6 +25,7 @@
             "retrans": 3,
             "retry": 2,
             "parallel": 1,
+            "unordered": false,
             "usevc": false,
             "timeout": 5
         }

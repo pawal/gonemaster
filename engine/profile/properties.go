@@ -132,6 +132,15 @@ var propertyDefs = map[string]propertyDef{
 			return p.Resolver.Defaults.Parallel
 		},
 	},
+	"resolver.defaults.unordered": {
+		typ: propBool,
+		setter: func(p *Profile, value any) {
+			p.Resolver.Defaults.Unordered = value.(bool)
+		},
+		getter: func(p *Profile) any {
+			return p.Resolver.Defaults.Unordered
+		},
+	},
 	"resolver.defaults.usevc": {
 		typ: propBool,
 		setter: func(p *Profile, value any) {

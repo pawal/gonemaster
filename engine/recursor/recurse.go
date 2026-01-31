@@ -195,6 +195,7 @@ func (r *Recursor) recurseUnordered(ctx context.Context, name string, qtype stri
 		results := make(chan unorderedResult, len(nss))
 
 		ctxBatch, cancel := context.WithCancel(ctx)
+		ctxBatch = withUnorderedContext(ctxBatch)
 		var wg sync.WaitGroup
 		wg.Add(workers)
 		for i := 0; i < workers; i++ {

@@ -571,6 +571,99 @@ func TestRecurseUnorderedWaitsForRedirectBatchCleanup(t *testing.T) {
 	}
 }
 
+func TestGetAddressesForUnorderedSequential(t *testing.T) {
+	defer profile.ResetEffective()
+	if err := profile.Effective().Set("resolver.defaults.parallel", 2); err != nil {
+		t.Fatalf("set parallel: %v", err)
+	}
+
+	nameserver.EmptyCache()
+	defer nameserver.EmptyCache()
+
+	r, err := New()
+	if err != nil {
+		t.Fatalf("new recursor: %v", err)
+	}
+	r.RemoveFakeAddresses(".")
+	if err := r.AddFakeAddresses(".", map[string][]string{
+		"root.test": {"192.0.2.53"},
+	}); err != nil {
+		t.Fatalf("add root: %v", err)
+	}
+
+	ns, err := nameserver.New("root.test", "192.0.2.53", r.client)
+	if err != nil {
+		t.Fatalf("nameserver: %v", err)
+	}
+
+	started := make(chan string, 2)
+	blockA := make(chan struct{})
+	blockAAAA := make(chan struct{})
+
+	ns.SetQueryHook(func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		switch strings.ToUpper(qtype) {
+		case "A":
+			started <- "A"
+			<-blockA
+			return packetWithA(name, netip.MustParseAddr("192.0.2.44")), nil
+		case "AAAA":
+			started <- "AAAA"
+			<-blockAAAA
+			return packetWithAAAA(name, netip.MustParseAddr("2001:db8::44")), nil
+		default:
+			return packet.Packet{}, nil
+		}
+	})
+
+	ctx := withUnorderedContext(context.Background())
+	done := make(chan struct{})
+	var addrs []netip.Addr
+	var addrErr error
+	go func() {
+		addrs, addrErr = r.getAddressesFor(ctx, "ns.example", nil)
+		close(done)
+	}()
+
+	first := <-started
+	select {
+	case second := <-started:
+		t.Fatalf("expected sequential A/AAAA recursion, got %s and %s", first, second)
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	if first == "A" {
+		close(blockA)
+	} else {
+		close(blockAAAA)
+	}
+
+	var second string
+	select {
+	case second = <-started:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatalf("expected second recursion to start")
+	}
+
+	if second == "A" {
+		close(blockA)
+	} else {
+		close(blockAAAA)
+	}
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatalf("getAddressesFor timed out")
+	}
+
+	if addrErr != nil {
+		t.Fatalf("getAddressesFor: %v", addrErr)
+	}
+	if len(addrs) != 2 {
+		t.Fatalf("expected 2 addresses, got %d", len(addrs))
+	}
+}
+
 func packetWithA(name string, addr netip.Addr) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Answer = []dns.RR{

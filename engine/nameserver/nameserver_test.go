@@ -111,6 +111,36 @@ func TestQueryCacheHit(t *testing.T) {
 	}
 }
 
+func TestErrorCacheSkipsQueries(t *testing.T) {
+	ns, err := New("ns.example", "192.0.2.15", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+
+	defer profile.ResetEffective()
+	defer EmptyCache()
+
+	profile.Effective().Resolver.Defaults.ErrorCacheTTL = 60
+
+	var calls int
+	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		calls++
+		return packet.Packet{}, fmt.Errorf("network error")
+	})
+
+	_, err = ns.QueryWithOptions(context.Background(), "example1", "A", nil)
+	if err == nil {
+		t.Fatalf("expected error on first query")
+	}
+	_, err = ns.QueryWithOptions(context.Background(), "example2", "A", nil)
+	if err != nil {
+		t.Fatalf("expected error cache to suppress second query error, got %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("expected 1 call due to error cache, got %d", calls)
+	}
+}
+
 func TestQueryIPv4Disabled(t *testing.T) {
 	ns, err := New("ns.example", "192.0.2.11", nil)
 	if err != nil {

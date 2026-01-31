@@ -27,7 +27,8 @@
             "parallel": 1,
             "unordered": false,
             "usevc": false,
-            "timeout": 5
+            "timeout": 5,
+            "error_cache_ttl": 0
         }
     },
     "test_levels": {

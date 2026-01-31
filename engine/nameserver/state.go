@@ -3,6 +3,7 @@ package nameserver
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/miekg/dns"
 
@@ -12,6 +13,53 @@ import (
 type queryCache struct {
 	mu   sync.Mutex
 	data map[string]*packet.Packet
+}
+
+type errorCache struct {
+	mu   sync.Mutex
+	data map[string]time.Time
+}
+
+func (c *errorCache) shouldSkip(key string) bool {
+	if c == nil {
+		return false
+	}
+	now := time.Now()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.data == nil {
+		return false
+	}
+	expiry, ok := c.data[key]
+	if !ok {
+		return false
+	}
+	if now.After(expiry) {
+		delete(c.data, key)
+		return false
+	}
+	return true
+}
+
+func (c *errorCache) set(key string, ttl time.Duration) {
+	if c == nil || ttl <= 0 {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.data == nil {
+		c.data = map[string]time.Time{}
+	}
+	c.data[key] = time.Now().Add(ttl)
+}
+
+func (c *errorCache) clear() {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	c.data = map[string]time.Time{}
+	c.mu.Unlock()
 }
 
 func (c *queryCache) get(key string) (*packet.Packet, bool) {
@@ -63,6 +111,7 @@ type DSData struct {
 
 type nsState struct {
 	cache           *queryCache
+	errorCache      *errorCache
 	fakeDelegations map[string]delegation
 	fakeDS          map[string][]dns.RR
 	blacklisted     map[bool]bool
@@ -71,9 +120,10 @@ type nsState struct {
 }
 
 var (
-	cacheMu        sync.Mutex
-	objectCache    = map[string]map[string]*Nameserver{}
-	cacheByAddress = map[string]*queryCache{}
+	cacheMu             sync.Mutex
+	objectCache         = map[string]map[string]*Nameserver{}
+	cacheByAddress      = map[string]*queryCache{}
+	errorCacheByAddress = map[string]*errorCache{}
 )
 
 func cacheForAddress(addr string) *queryCache {
@@ -83,6 +133,15 @@ func cacheForAddress(addr string) *queryCache {
 		cacheByAddress[addr] = &queryCache{data: map[string]*packet.Packet{}}
 	}
 	return cacheByAddress[addr]
+}
+
+func errorCacheForAddress(addr string) *errorCache {
+	cacheMu.Lock()
+	defer cacheMu.Unlock()
+	if errorCacheByAddress[addr] == nil {
+		errorCacheByAddress[addr] = &errorCache{data: map[string]time.Time{}}
+	}
+	return errorCacheByAddress[addr]
 }
 
 func cachedNameserver(nameKey string, addr string) *Nameserver {
@@ -110,7 +169,11 @@ func EmptyCache() {
 	for _, cache := range cacheByAddress {
 		cache.clear()
 	}
+	for _, cache := range errorCacheByAddress {
+		cache.clear()
+	}
 	cacheByAddress = map[string]*queryCache{}
+	errorCacheByAddress = map[string]*errorCache{}
 	objectCache = map[string]map[string]*Nameserver{}
 	cacheMu.Unlock()
 }

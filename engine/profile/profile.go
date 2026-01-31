@@ -45,6 +45,8 @@ type ResolverDefaults struct {
 	Unordered bool `json:"unordered"`
 	UseVC     bool `json:"usevc"`
 	Timeout   int  `json:"timeout"`
+	// ErrorCacheTTL sets the duration (seconds) to skip queries after network errors.
+	ErrorCacheTTL int `json:"error_cache_ttl"`
 }
 
 // NetSettings holds IP stack enablement flags.

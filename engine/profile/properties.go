@@ -159,6 +159,17 @@ var propertyDefs = map[string]propertyDef{
 			return p.Resolver.Defaults.Timeout
 		},
 	},
+	"resolver.defaults.error_cache_ttl": {
+		typ: propNum,
+		min: intPtr(0),
+		max: intPtr(86400),
+		setter: func(p *Profile, value any) {
+			p.Resolver.Defaults.ErrorCacheTTL = value.(int)
+		},
+		getter: func(p *Profile) any {
+			return p.Resolver.Defaults.ErrorCacheTTL
+		},
+	},
 	"resolver.source4": {
 		typ:          propStr,
 		defaultValue: "",

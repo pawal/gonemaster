@@ -45,6 +45,7 @@ gonemaster --json --domain example.com | jq
 - `--profile` Profile JSON/YAML path (optional)
 - `--parallel` Override resolver.defaults.parallel (optional)
 - `--unordered` Allow unordered resolver behavior (optional, default off)
+- `--error-cache-ttl` Seconds to skip queries after network errors (optional)
 - `--min-level` Minimum log level (optional, default NOTICE)
 - `--output` Write output to file (optional)
 - `--raw` Stream raw log entries as they are produced (optional)

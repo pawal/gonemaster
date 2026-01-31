@@ -36,6 +36,8 @@ type RunRequest struct {
 	IPv6      *bool
 	Parallel  *int
 	Unordered *bool
+	// ErrorCacheTTL sets resolver.defaults.error_cache_ttl in seconds.
+	ErrorCacheTTL *int
 	// LogCallback receives each log entry as it is created.
 	LogCallback func(*logger.Entry) error
 }
@@ -280,6 +282,11 @@ func EffectiveProfile(req RunRequest) (*profile.Profile, error) {
 			return nil, err
 		}
 	}
+	if req.ErrorCacheTTL != nil {
+		if err := p.Set("resolver.defaults.error_cache_ttl", *req.ErrorCacheTTL); err != nil {
+			return nil, err
+		}
+	}
 
 	if testcase == "" {
 		switch module {
@@ -367,6 +374,11 @@ func Run(req RunRequest) ([]LogEntry, error) {
 	}
 	if req.Unordered != nil {
 		if err := profile.Effective().Set("resolver.defaults.unordered", *req.Unordered); err != nil {
+			return nil, err
+		}
+	}
+	if req.ErrorCacheTTL != nil {
+		if err := profile.Effective().Set("resolver.defaults.error_cache_ttl", *req.ErrorCacheTTL); err != nil {
 			return nil, err
 		}
 	}

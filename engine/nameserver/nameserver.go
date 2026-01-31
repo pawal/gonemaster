@@ -80,6 +80,7 @@ func New(name string, address string, client *transport.Client) (Nameserver, err
 
 	state := &nsState{
 		cache:           cacheForAddress(addrKey),
+		errorCache:      errorCacheForAddress(addrKey),
 		fakeDelegations: map[string]delegation{},
 		fakeDS:          map[string][]dns.RR{},
 		blacklisted:     map[bool]bool{},
@@ -156,6 +157,11 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	}
 
 	usevc := resolveUseVC(opts)
+	if errorCacheTTL := prof.Resolver.Defaults.ErrorCacheTTL; errorCacheTTL > 0 && ns.state != nil && ns.state.errorCache != nil {
+		if ns.state.errorCache.shouldSkip(errorCacheKey(usevc)) {
+			return packet.Packet{}, nil
+		}
+	}
 	if constants.BlacklistingEnabled && ns.state != nil && ns.state.blacklisted[usevc] {
 		return packet.Packet{}, nil
 	}
@@ -168,6 +174,11 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 			ns.state.blacklisted[usevc] = true
 		}
 	}
+	if err != nil && (ctx == nil || ctx.Err() == nil) && ns.state != nil && ns.state.errorCache != nil {
+		if errorCacheTTL := prof.Resolver.Defaults.ErrorCacheTTL; errorCacheTTL > 0 {
+			ns.state.errorCache.set(errorCacheKey(usevc), time.Duration(errorCacheTTL)*time.Second)
+		}
+	}
 
 	if ns.state != nil {
 		if resp.Msg == nil {
@@ -178,6 +189,13 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 		}
 	}
 	return resp, err
+}
+
+func errorCacheKey(usevc bool) string {
+	if usevc {
+		return "tcp"
+	}
+	return "udp"
 }
 
 func (ns Nameserver) queryNetwork(ctx context.Context, qname string, qtype string, qclass string, opts *QueryOptions) (packet.Packet, error) {

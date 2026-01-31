@@ -70,6 +70,54 @@ Ordered output remains the default. `--unordered` toggles the profile setting
 - `2` Usage or runtime error (invalid args, output file errors, engine errors)
 - `130` Interrupted (SIGINT/SIGTERM)
 
+## Nagios plugin
+
+`gonemaster-nagios` is a Nagios-compatible wrapper that reports the highest
+severity found in a full run.
+
+Build/install:
+
+```
+go install codeberg.org/pawal/gonemaster/cmd/gonemaster-nagios@latest
+# or from source:
+go build -o gonemaster-nagios ./cmd/gonemaster-nagios
+```
+
+Usage:
+
+```
+gonemaster-nagios -d example.com
+gonemaster-nagios -vv -d example.com
+gonemaster-nagios -d example.com --module address
+gonemaster-nagios -d example.com --testcase zone09
+gonemaster-nagios -d example.com --profile ./profile.json
+```
+
+Verbosity (`-v` repeatable):
+
+- `-v` prints WARNING/ERROR/CRITICAL messages
+- `-vv` adds NOTICE messages
+- `-vvv` adds INFO messages
+
+Additional options (Nagios-friendly):
+
+- `--module` Run a single module
+- `--testcase` Run a single testcase
+- `--profile` Profile JSON/YAML path
+- `--no-ipv4` / `--disable-ipv4` Disable IPv4 queries
+- `--no-ipv6` / `--disable-ipv6` Disable IPv6 queries
+
+Exit codes:
+
+- `0` OK
+- `1` WARNING
+- `2` CRITICAL
+- `3` UNKNOWN
+
+Note that the Nagios wrapper uses the same profile settings as gonemaster
+does, so to tweak warning levels and the performance settings, change
+the profile and use the ```--profile``` option.
+
 ## Engine usage from Go
 
 ```

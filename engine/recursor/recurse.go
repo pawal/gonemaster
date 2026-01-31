@@ -5,12 +5,14 @@ import (
 	"net/netip"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/packet"
+	"codeberg.org/pawal/gonemaster/engine/profile"
 )
 
 type queryer interface {
@@ -85,6 +87,14 @@ func (r *Recursor) recurse(ctx context.Context, name string, qtype string, qclas
 	}
 	state.inProgress[nameKey][qtype] = true
 
+	if profile.Effective().Resolver.Defaults.Unordered {
+		return r.recurseUnordered(ctx, name, qtype, qclass, state)
+	}
+	return r.recurseOrdered(ctx, name, qtype, qclass, state)
+}
+
+func (r *Recursor) recurseOrdered(ctx context.Context, name string, qtype string, qclass string, state *recurseState) (packet.Packet, *recurseState, error) {
+	nameObj := dnsname.New(name)
 	for len(state.ns) > 0 {
 		idx := len(state.ns) - 1
 		ns := state.ns[idx]
@@ -146,6 +156,129 @@ func (r *Recursor) recurse(ctx context.Context, name string, qtype string, qclas
 				source:     ns,
 				answerFrom: resp.AnswerFrom,
 			}}, state.trace...)
+		}
+	}
+
+	if state.candidate.Msg != nil {
+		return state.candidate, state, nil
+	}
+	return packet.Packet{}, state, nil
+}
+
+type unorderedResult struct {
+	ns   queryer
+	resp packet.Packet
+	err  error
+}
+
+func (r *Recursor) recurseUnordered(ctx context.Context, name string, qtype string, qclass string, state *recurseState) (packet.Packet, *recurseState, error) {
+	nameObj := dnsname.New(name)
+	for len(state.ns) > 0 {
+		nss := state.ns
+		state.ns = nil
+
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		if parallelism < 1 {
+			parallelism = 1
+		}
+		sem := make(chan struct{}, parallelism)
+		results := make(chan unorderedResult, len(nss))
+
+		ctxBatch, cancel := context.WithCancel(ctx)
+		var wg sync.WaitGroup
+		for _, ns := range nss {
+			ns := ns
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				select {
+				case sem <- struct{}{}:
+				case <-ctxBatch.Done():
+					return
+				}
+				resp, err := ns.QueryWithClass(ctxBatch, name, qtype, qclass)
+				<-sem
+				results <- unorderedResult{ns: ns, resp: resp, err: err}
+			}()
+		}
+
+		go func() {
+			wg.Wait()
+			close(results)
+		}()
+
+		redirected := false
+		for res := range results {
+			if res.err != nil || res.resp.Msg == nil {
+				continue
+			}
+
+			resp := res.resp
+			if resp.Rcode() == "REFUSED" || resp.Rcode() == "SERVFAIL" {
+				if state.candidate.Msg == nil {
+					state.candidate = resp
+				}
+				continue
+			}
+
+			if resp.NoSuchRecord() || resp.NoSuchName() {
+				cancel()
+				return resp, state, nil
+			}
+
+			if resp.Type() == "answer" {
+				if !resp.HasRRsOfTypeForName(qtype, nameObj, "answer") && len(resp.GetRecordsForName("CNAME", nameObj, "answer")) > 0 {
+					cancel()
+					cnameResp, state, err := r.resolveCNAME(ctxBatch, nameObj, qtype, qclass, resp, state)
+					return cnameResp, state, err
+				}
+				cancel()
+				return resp, state, nil
+			}
+
+			if resp.IsRedirect() {
+				zname, ok := redirectName(resp)
+				if !ok || zname == "." {
+					continue
+				}
+				zkey := strings.ToLower(zname)
+				if state.seen[zkey] {
+					continue
+				}
+
+				common := dnsname.New(zname).Common(state.qname)
+				if common < state.common {
+					continue
+				}
+
+				state.seen[zkey] = true
+				state.common = common
+
+				next, err := state.nsFrom(resp, state)
+				if err != nil {
+					cancel()
+					return packet.Packet{}, state, err
+				}
+				state.ns = next
+				state.count++
+				if state.count > 20 {
+					cancel()
+					return packet.Packet{}, state, nil
+				}
+				state.trace = append([]traceEntry{{
+					zoneName:   zname,
+					source:     res.ns,
+					answerFrom: resp.AnswerFrom,
+				}}, state.trace...)
+				redirected = true
+				cancel()
+				break
+			}
+		}
+
+		cancel()
+		if redirected {
+			continue
 		}
 	}
 

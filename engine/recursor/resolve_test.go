@@ -398,6 +398,75 @@ func TestFirstSOAOwner(t *testing.T) {
 	}
 }
 
+func TestRecurseOrderedUsesLIFO(t *testing.T) {
+	defer profile.ResetEffective()
+	if err := profile.Effective().Set("resolver.defaults.unordered", false); err != nil {
+		t.Fatalf("set unordered: %v", err)
+	}
+
+	r := &Recursor{}
+	called := make(chan string, 2)
+
+	slowResp := packetWithA("example", netip.MustParseAddr("192.0.2.10"))
+	slowResp.AnswerFrom = "slow"
+	fastResp := packetWithA("example", netip.MustParseAddr("192.0.2.11"))
+	fastResp.AnswerFrom = "fast"
+
+	slow := testQueryer{id: "slow", resp: slowResp, called: called}
+	fast := testQueryer{id: "fast", resp: fastResp, called: called}
+
+	state := &recurseState{ns: []queryer{fast, slow}}
+	resp, _, err := r.recurse(context.Background(), "example", "A", "IN", state)
+	if err != nil {
+		t.Fatalf("recurse: %v", err)
+	}
+	if resp.AnswerFrom != "slow" {
+		t.Fatalf("expected LIFO response from slow, got %q", resp.AnswerFrom)
+	}
+
+	first := <-called
+	if first != "slow" {
+		t.Fatalf("expected slow queried first, got %q", first)
+	}
+	select {
+	case next := <-called:
+		t.Fatalf("expected only one query, got %q", next)
+	default:
+	}
+}
+
+func TestRecurseUnorderedReturnsFastest(t *testing.T) {
+	defer profile.ResetEffective()
+	if err := profile.Effective().Set("resolver.defaults.unordered", true); err != nil {
+		t.Fatalf("set unordered: %v", err)
+	}
+	if err := profile.Effective().Set("resolver.defaults.parallel", 2); err != nil {
+		t.Fatalf("set parallel: %v", err)
+	}
+
+	r := &Recursor{}
+
+	slowResp := packetWithA("example", netip.MustParseAddr("192.0.2.20"))
+	slowResp.AnswerFrom = "slow"
+	fastResp := packetWithA("example", netip.MustParseAddr("192.0.2.21"))
+	fastResp.AnswerFrom = "fast"
+
+	slow := testQueryer{id: "slow", resp: slowResp, delay: 80 * time.Millisecond}
+	fast := testQueryer{id: "fast", resp: fastResp}
+
+	state := &recurseState{ns: []queryer{fast, slow}}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	resp, _, err := r.recurse(ctx, "example", "A", "IN", state)
+	if err != nil {
+		t.Fatalf("recurse: %v", err)
+	}
+	if resp.AnswerFrom != "fast" {
+		t.Fatalf("expected fastest response from fast, got %q", resp.AnswerFrom)
+	}
+}
+
 func packetWithA(name string, addr netip.Addr) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Answer = []dns.RR{
@@ -412,6 +481,27 @@ func packetWithA(name string, addr netip.Addr) packet.Packet {
 		},
 	}
 	return packet.Packet{Msg: msg}
+}
+
+type testQueryer struct {
+	id     string
+	delay  time.Duration
+	resp   packet.Packet
+	called chan string
+}
+
+func (t testQueryer) QueryWithClass(ctx context.Context, _ string, _ string, _ string) (packet.Packet, error) {
+	if t.called != nil {
+		t.called <- t.id
+	}
+	if t.delay > 0 {
+		select {
+		case <-time.After(t.delay):
+		case <-ctx.Done():
+			return packet.Packet{}, ctx.Err()
+		}
+	}
+	return t.resp, nil
 }
 
 func packetWithAAAA(name string, addr netip.Addr) packet.Packet {

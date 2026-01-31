@@ -62,7 +62,7 @@ Locale defaults to the first available in `LANGUAGE`, then `LC_ALL`, `LC_MESSAGE
 `LANG`, and finally `en`.
 
 Ordered output remains the default. `--unordered` toggles the profile setting
-`resolver.defaults.unordered` (reserved for the upcoming unordered fast path).
+`resolver.defaults.unordered` and enables the unordered recursor fast path.
 
 ### Exit codes
 

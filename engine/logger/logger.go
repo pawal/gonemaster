@@ -95,6 +95,22 @@ func (l *Logger) Append(entries ...*Entry) error {
 	return nil
 }
 
+// AppendWithoutCallback stores existing log entries without invoking callbacks.
+func (l *Logger) AppendWithoutCallback(entries ...*Entry) error {
+	if l == nil {
+		return fmt.Errorf("logger is nil")
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	for _, entry := range entries {
+		if entry == nil {
+			continue
+		}
+		l.entries = append(l.entries, entry)
+	}
+	return nil
+}
+
 func (l *Logger) appendExisting(entry *Entry) {
 	l.mu.Lock()
 	l.entries = append(l.entries, entry)

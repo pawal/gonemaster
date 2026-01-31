@@ -2,6 +2,7 @@ package testcase
 
 import (
 	"context"
+	"sort"
 
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/util"
@@ -18,16 +19,79 @@ func Run(ctx context.Context, fn Case) ([]*logger.Entry, error) {
 
 	parent := util.Logger()
 	buf := logger.New()
+	useSilentAppend := parent != nil && parent.Callback != nil
+	if useSilentAppend {
+		buf.Callback = parent.Callback
+	}
 
 	util.SetLogger(buf)
 	entries, err := fn(ctx)
 	util.SetLogger(parent)
 
+	bufEntries := buf.Entries()
 	if entries == nil {
-		entries = buf.Entries()
+		entries = bufEntries
+	} else if len(bufEntries) > 0 {
+		seen := map[*logger.Entry]bool{}
+		for _, entry := range entries {
+			if entry == nil {
+				continue
+			}
+			seen[entry] = true
+		}
+		var extras []*logger.Entry
+		for _, entry := range bufEntries {
+			if entry == nil {
+				continue
+			}
+			if !seen[entry] {
+				extras = append(extras, entry)
+			}
+		}
+		if len(extras) > 0 {
+			sort.SliceStable(extras, func(i, j int) bool {
+				left := extras[i]
+				right := extras[j]
+				if left == nil {
+					return false
+				}
+				if right == nil {
+					return true
+				}
+				return left.Timestamp < right.Timestamp
+			})
+
+			merged := make([]*logger.Entry, 0, len(entries)+len(extras))
+			extraIdx := 0
+			for _, entry := range entries {
+				for extraIdx < len(extras) {
+					extra := extras[extraIdx]
+					if extra == nil {
+						extraIdx++
+						continue
+					}
+					if entry != nil && extra.Timestamp < entry.Timestamp {
+						merged = append(merged, extra)
+						extraIdx++
+						continue
+					}
+					break
+				}
+				merged = append(merged, entry)
+			}
+			for extraIdx < len(extras) {
+				merged = append(merged, extras[extraIdx])
+				extraIdx++
+			}
+			entries = merged
+		}
 	}
 	if parent != nil && len(entries) > 0 {
-		_ = parent.Append(entries...)
+		if useSilentAppend {
+			_ = parent.AppendWithoutCallback(entries...)
+		} else {
+			_ = parent.Append(entries...)
+		}
 	}
 
 	return entries, err

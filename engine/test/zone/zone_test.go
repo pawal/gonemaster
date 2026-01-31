@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/netip"
 	"testing"
+	"time"
 
 	"github.com/miekg/dns"
 
@@ -67,6 +68,101 @@ func TestZone05ExpireLowerThanRefreshAndMinimum(t *testing.T) {
 	}
 	if !hasEntryTag(entries, "EXPIRE_LOWER_THAN_REFRESH") {
 		t.Fatalf("expected EXPIRE_LOWER_THAN_REFRESH")
+	}
+}
+
+func TestZone10ParallelQueries(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	profile.Effective().Resolver.Defaults.Parallel = 2
+
+	started := make(chan string, 2)
+	release := make(chan struct{})
+
+	hook := func(id string) func(context.Context, string, string, string, *ens.QueryOptions) (packet.Packet, error) {
+		return func(ctx context.Context, _ string, qtype string, _ string, _ *ens.QueryOptions) (packet.Packet, error) {
+			if qtype == "SOA" {
+				select {
+				case started <- id:
+				default:
+				}
+				select {
+				case <-release:
+				case <-ctx.Done():
+					return packet.Packet{}, ctx.Err()
+				}
+			}
+			return packet.Packet{}, nil
+		}
+	}
+
+	ns1, err := ens.New("ns1.example", "192.0.2.1", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	ns1.SetQueryHook(hook("ns1"))
+
+	ns2, err := ens.New("ns2.example", "192.0.2.2", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	ns2.SetQueryHook(hook("ns2"))
+
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1, ns2}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example")}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	done := make(chan struct{})
+	var entries []*logger.Entry
+	var zoneErr error
+	go func() {
+		entries, zoneErr = Zone10(ctx, &z)
+		close(done)
+	}()
+
+	got := map[string]bool{}
+	deadline := time.After(1 * time.Second)
+	for len(got) < 2 {
+		select {
+		case name := <-started:
+			got[name] = true
+		case <-deadline:
+			t.Fatalf("expected parallel SOA queries to start, got %v", got)
+		}
+	}
+
+	close(release)
+
+	select {
+	case <-done:
+		if zoneErr != nil {
+			t.Fatalf("zone10: %v", zoneErr)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("zone10 did not finish")
+	}
+
+	var order []string
+	for _, entry := range entries {
+		if entry == nil || entry.Tag != "NO_RESPONSE" {
+			continue
+		}
+		if ns, ok := entry.Args["ns"].(string); ok {
+			order = append(order, ns)
+		}
+	}
+	if len(order) != 2 {
+		t.Fatalf("expected 2 no-response entries, got %v", order)
+	}
+	if order[0] != "ns1.example/192.0.2.1" || order[1] != "ns2.example/192.0.2.2" {
+		t.Fatalf("expected deterministic log order, got %v", order)
 	}
 }
 

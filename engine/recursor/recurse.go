@@ -172,6 +172,7 @@ type unorderedResult struct {
 }
 
 func (r *Recursor) recurseUnordered(ctx context.Context, name string, qtype string, qclass string, state *recurseState) (packet.Packet, *recurseState, error) {
+	depth := unorderedDepth(ctx)
 	nameObj := dnsname.New(name)
 	for len(state.ns) > 0 {
 		nss := state.ns
@@ -182,6 +183,9 @@ func (r *Recursor) recurseUnordered(ctx context.Context, name string, qtype stri
 		}
 		parallelism := profile.Effective().Resolver.Defaults.Parallel
 		if parallelism < 1 {
+			parallelism = 1
+		}
+		if depth > 0 {
 			parallelism = 1
 		}
 		workers := parallelism
@@ -195,6 +199,8 @@ func (r *Recursor) recurseUnordered(ctx context.Context, name string, qtype stri
 		results := make(chan unorderedResult, len(nss))
 
 		ctxBatch, cancel := context.WithCancel(ctx)
+		ctxBatch = withUnorderedContext(ctxBatch)
+		ctxBatch = withUnorderedDepth(ctxBatch, depth+1)
 		ctxBatch = withUnorderedContext(ctxBatch)
 		var wg sync.WaitGroup
 		wg.Add(workers)
@@ -304,7 +310,12 @@ func (r *Recursor) recurseUnordered(ctx context.Context, name string, qtype stri
 
 		if decided {
 			if needsCNAME {
-				cnameResp, nextState, err := r.resolveCNAME(ctx, nameObj, qtype, qclass, decidedResp, state)
+				cnameCtx := ctx
+				if profile.Effective().Resolver.Defaults.Unordered {
+					cnameCtx = withUnorderedContext(cnameCtx)
+					cnameCtx = withUnorderedDepth(cnameCtx, depth+1)
+				}
+				cnameResp, nextState, err := r.resolveCNAME(cnameCtx, nameObj, qtype, qclass, decidedResp, state)
 				return cnameResp, nextState, err
 			}
 			return decidedResp, state, nil

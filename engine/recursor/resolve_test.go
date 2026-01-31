@@ -667,6 +667,59 @@ func TestGetAddressesForUnorderedSequential(t *testing.T) {
 	}
 }
 
+func TestRecurseUnorderedDepthLimitsWorkers(t *testing.T) {
+	defer profile.ResetEffective()
+	if err := profile.Effective().Set("resolver.defaults.unordered", true); err != nil {
+		t.Fatalf("set unordered: %v", err)
+	}
+	if err := profile.Effective().Set("resolver.defaults.parallel", 2); err != nil {
+		t.Fatalf("set parallel: %v", err)
+	}
+
+	r := &Recursor{}
+
+	slowStarted := make(chan struct{})
+	fastStarted := make(chan struct{})
+	blockSlow := make(chan struct{})
+
+	slowResp := packetWithA("example", netip.MustParseAddr("192.0.2.60"))
+	slowResp.AnswerFrom = "slow"
+	fastResp := packetWithA("example", netip.MustParseAddr("192.0.2.61"))
+	fastResp.AnswerFrom = "fast"
+
+	slow := testQueryer{id: "slow", resp: slowResp, startCh: slowStarted, waitCh: blockSlow}
+	fast := testQueryer{id: "fast", resp: fastResp, startCh: fastStarted}
+
+	state := &recurseState{ns: []queryer{slow, fast}}
+	ctx := withUnorderedDepth(withUnorderedContext(context.Background()), 1)
+
+	done := make(chan struct{})
+	go func() {
+		_, _, _ = r.recurse(ctx, "example", "A", "IN", state)
+		close(done)
+	}()
+
+	select {
+	case <-slowStarted:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatalf("expected slow query to start")
+	}
+
+	select {
+	case <-fastStarted:
+		t.Fatalf("expected fast query to wait for slow in nested unordered context")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	close(blockSlow)
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatalf("expected recurse to finish")
+	}
+}
+
 func packetWithA(name string, addr netip.Addr) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Answer = []dns.RR{

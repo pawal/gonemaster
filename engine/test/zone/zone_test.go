@@ -3,6 +3,7 @@ package zone
 import (
 	"context"
 	"net/netip"
+	"sync"
 	"testing"
 	"time"
 
@@ -163,6 +164,73 @@ func TestZone10ParallelQueries(t *testing.T) {
 	}
 	if order[0] != "ns1.example/192.0.2.1" || order[1] != "ns2.example/192.0.2.2" {
 		t.Fatalf("expected deterministic log order, got %v", order)
+	}
+}
+
+func TestZone09MXQueryDoesNotForceFallback(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	profile.Effective().Resolver.Defaults.Parallel = 1
+
+	var mu sync.Mutex
+	var fallbackSet []bool
+	var useVCValues []bool
+	mxCalls := 0
+
+	ns := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, opts *ens.QueryOptions) packet.Packet {
+		switch qtype {
+		case "SOA":
+			return soaPacket("example", 1, 1, 1, 1, 1)
+		case "MX":
+			mu.Lock()
+			mxCalls++
+			call := mxCalls
+			fallbackSet = append(fallbackSet, opts != nil && opts.Fallback != nil)
+			if opts != nil && opts.UseVC != nil {
+				useVCValues = append(useVCValues, *opts.UseVC)
+			} else {
+				useVCValues = append(useVCValues, false)
+			}
+			mu.Unlock()
+
+			msg := new(dns.Msg)
+			msg.SetQuestion(dns.Fqdn("example"), dns.TypeMX)
+			msg.Authoritative = true
+			msg.Rcode = dns.RcodeSuccess
+			if call == 1 {
+				msg.Truncated = true
+			}
+			return packet.Packet{Msg: msg}
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example")}
+	if _, err := Zone09(context.Background(), &z); err != nil {
+		t.Fatalf("zone09: %v", err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	if len(fallbackSet) == 0 {
+		t.Fatalf("expected MX query to be issued")
+	}
+	for _, forced := range fallbackSet {
+		if forced {
+			t.Fatalf("expected MX query to not force fallback")
+		}
+	}
+	if len(useVCValues) < 2 || useVCValues[0] || !useVCValues[1] {
+		t.Fatalf("expected MX query to retry with UseVC after truncation, got %v", useVCValues)
 	}
 }
 

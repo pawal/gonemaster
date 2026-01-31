@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/miekg/dns"
 
@@ -198,7 +199,18 @@ func (r *Recursor) recurseUnordered(ctx context.Context, name string, qtype stri
 		jobs := make(chan queryer)
 		results := make(chan unorderedResult, len(nss))
 
-		ctxBatch, cancel := context.WithCancel(ctx)
+		defaults := profile.Effective().Resolver.Defaults
+		batchTimeout := time.Duration(defaults.Timeout) * time.Second
+		if defaults.Retry > 0 {
+			batchTimeout = batchTimeout * time.Duration(defaults.Retry+1)
+		}
+		var ctxBatch context.Context
+		var cancel context.CancelFunc
+		if batchTimeout > 0 {
+			ctxBatch, cancel = context.WithTimeout(ctx, batchTimeout)
+		} else {
+			ctxBatch, cancel = context.WithCancel(ctx)
+		}
 		ctxBatch = withUnorderedContext(ctxBatch)
 		ctxBatch = withUnorderedDepth(ctxBatch, depth+1)
 		ctxBatch = withUnorderedContext(ctxBatch)
@@ -246,62 +258,71 @@ func (r *Recursor) recurseUnordered(ctx context.Context, name string, qtype stri
 		decided := false
 		needsCNAME := false
 		var decidedResp packet.Packet
-		for res := range results {
-			if res.err != nil || res.resp.Msg == nil {
-				continue
-			}
-
-			resp := res.resp
-			if resp.Rcode() == "REFUSED" || resp.Rcode() == "SERVFAIL" {
-				if state.candidate.Msg == nil {
-					state.candidate = resp
+	loop:
+		for {
+			select {
+			case <-ctxBatch.Done():
+				break loop
+			case res, ok := <-results:
+				if !ok {
+					break loop
 				}
-				continue
-			}
+				if res.err != nil || res.resp.Msg == nil {
+					continue
+				}
 
-			if resp.NoSuchRecord() || resp.NoSuchName() {
-				decided = true
-				decidedResp = resp
-				cancel()
-				break
-			}
+				resp := res.resp
+				if resp.Rcode() == "REFUSED" || resp.Rcode() == "SERVFAIL" {
+					if state.candidate.Msg == nil {
+						state.candidate = resp
+					}
+					continue
+				}
 
-			if resp.Type() == "answer" {
-				if !resp.HasRRsOfTypeForName(qtype, nameObj, "answer") && len(resp.GetRecordsForName("CNAME", nameObj, "answer")) > 0 {
+				if resp.NoSuchRecord() || resp.NoSuchName() {
 					decided = true
-					needsCNAME = true
 					decidedResp = resp
 					cancel()
-					break
-				}
-				decided = true
-				decidedResp = resp
-				cancel()
-				break
-			}
-
-			if resp.IsRedirect() {
-				zname, ok := redirectName(resp)
-				if !ok || zname == "." {
-					continue
-				}
-				zkey := strings.ToLower(zname)
-				if state.seen[zkey] {
-					continue
+					break loop
 				}
 
-				common := dnsname.New(zname).Common(state.qname)
-				if common < state.common {
-					continue
+				if resp.Type() == "answer" {
+					if !resp.HasRRsOfTypeForName(qtype, nameObj, "answer") && len(resp.GetRecordsForName("CNAME", nameObj, "answer")) > 0 {
+						decided = true
+						needsCNAME = true
+						decidedResp = resp
+						cancel()
+						break loop
+					}
+					decided = true
+					decidedResp = resp
+					cancel()
+					break loop
 				}
 
-				redirected = true
-				redirectResp = resp
-				redirectNS = res.ns
-				redirectZName = zname
-				redirectCommon = common
-				cancel()
-				break
+				if resp.IsRedirect() {
+					zname, ok := redirectName(resp)
+					if !ok || zname == "." {
+						continue
+					}
+					zkey := strings.ToLower(zname)
+					if state.seen[zkey] {
+						continue
+					}
+
+					common := dnsname.New(zname).Common(state.qname)
+					if common < state.common {
+						continue
+					}
+
+					redirected = true
+					redirectResp = resp
+					redirectNS = res.ns
+					redirectZName = zname
+					redirectCommon = common
+					cancel()
+					break loop
+				}
 			}
 		}
 

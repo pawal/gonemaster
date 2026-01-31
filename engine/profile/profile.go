@@ -41,6 +41,7 @@ type ResolverDefaults struct {
 	Recurse  bool `json:"recurse"`
 	Retrans  int  `json:"retrans"`
 	Retry    int  `json:"retry"`
+	Parallel int  `json:"parallel"`
 	UseVC    bool `json:"usevc"`
 	Timeout  int  `json:"timeout"`
 }

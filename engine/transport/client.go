@@ -146,6 +146,11 @@ func (c *Client) Exchange(ctx context.Context, server string, msg *dns.Msg) (pac
 		return packet.Packet{}, fmt.Errorf("nil DNS message")
 	}
 
+	if err := acquireQuerySlot(ctx); err != nil {
+		return packet.Packet{}, err
+	}
+	defer releaseQuerySlot()
+
 	c.ApplyProfileDefaults(nil)
 	prepared := c.prepareMessage(msg)
 	attempts := 1

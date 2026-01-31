@@ -68,13 +68,16 @@ func (e *Entry) Level() string {
 		return e.level
 	}
 
+	configMu.Lock()
 	if testLevelsConfig == nil {
 		testLevelsConfig = profile.Effective().TestLevels
 	}
+	levelConfig := testLevelsConfig
+	configMu.Unlock()
 
 	level := "DEBUG"
-	if testLevelsConfig != nil {
-		moduleLevels := testLevelsConfig[strings.ToUpper(e.Module)]
+	if levelConfig != nil {
+		moduleLevels := levelConfig[strings.ToUpper(e.Module)]
 		if moduleLevels != nil {
 			if value, ok := moduleLevels[strings.ToUpper(e.Tag)]; ok {
 				level = strings.ToUpper(value)
@@ -123,8 +126,10 @@ func StartTimeNow() {
 
 // ResetConfig clears cached config for log levels.
 func ResetConfig() {
+	configMu.Lock()
 	testLevelsConfig = nil
 	logFilter = nil
+	configMu.Unlock()
 }
 
 func (e *Entry) String() string {

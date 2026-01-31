@@ -16,6 +16,9 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/runner"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/testcase"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/testlogger"
 	"codeberg.org/pawal/gonemaster/engine/util"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
@@ -37,49 +40,63 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var results []*logger.Entry
 
 	if util.ShouldRunTest("delegation01") {
-		entries, err := Delegation01(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Delegation01(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("delegation02") {
-		entries, err := Delegation02(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Delegation02(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("delegation03") {
-		entries, err := Delegation03(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Delegation03(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("delegation04") {
-		entries, err := Delegation04(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Delegation04(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("delegation05") {
-		entries, err := Delegation05(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Delegation05(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("delegation06") {
-		entries, err := Delegation06(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Delegation06(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("delegation07") {
-		entries, err := Delegation07(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Delegation07(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
@@ -465,40 +482,85 @@ func Delegation04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	seen := map[string]bool{}
 	var authoritatives []string
 	queryType := "SOA"
 
+	type nsAction int
+	const (
+		actionSkip nsAction = iota
+		actionDisabled
+		actionQuery
+	)
+	type nsTask struct {
+		ns      nameserver.Nameserver
+		action  nsAction
+		nameKey string
+	}
+
+	seen := map[string]bool{}
+	ordered := make([]nsTask, 0, len(list4)+len(list5))
 	for _, ns := range append(list4, list5...) {
-		disabled, err := ipDisabledMessage(&results, testcase, ns, queryType)
+		nameKey := ns.Name.String()
+		action := actionQuery
+		if (ns.Address.Is6() && !profile.Effective().Net.IPv6) || (ns.Address.Is4() && !profile.Effective().Net.IPv4) {
+			action = actionDisabled
+		} else if seen[nameKey] {
+			action = actionSkip
+		} else {
+			seen[nameKey] = true
+		}
+		ordered = append(ordered, nsTask{ns: ns, action: action, nameKey: nameKey})
+	}
+
+	if len(ordered) > 0 {
+		outcomes := make([]bool, len(ordered))
+		tasks := make([]runner.Task, len(ordered))
+		for i, task := range ordered {
+			i, task := i, task
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				if task.action == actionSkip {
+					return nil
+				}
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				if task.action == actionDisabled {
+					_, err := ipDisabledMessageWithLogger(buf, task.ns, queryType)
+					return err
+				}
+				authoritative := false
+				for _, useVC := range []bool{false, true} {
+					useVC := useVC
+					resp, err := task.ns.QueryWithOptions(ctx, z.Name.String(), queryType, &nameserver.QueryOptions{UseVC: &useVC})
+					if err != nil || resp.Msg == nil {
+						continue
+					}
+					if !resp.AA() {
+						if _, err := buf.Add("IS_NOT_AUTHORITATIVE", map[string]any{
+							"ns":    task.ns.String(),
+							"proto": protoLabel(useVC),
+						}); err != nil {
+							return err
+						}
+					} else {
+						authoritative = true
+					}
+				}
+				outcomes[i] = authoritative
+				return nil
+			}
+		}
+
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
 		}
-		if disabled {
-			continue
-		}
-		nameKey := ns.Name.String()
-		if seen[nameKey] {
-			continue
-		}
-		for _, useVC := range []bool{false, true} {
-			useVC := useVC
-			resp, err := ns.QueryWithOptions(ctx, z.Name.String(), queryType, &nameserver.QueryOptions{UseVC: &useVC})
-			if err != nil || resp.Msg == nil {
-				continue
-			}
-			if !resp.AA() {
-				if err := appendLog(&results, testcase, "IS_NOT_AUTHORITATIVE", map[string]any{
-					"ns":    ns.String(),
-					"proto": protoLabel(useVC),
-				}); err != nil {
-					return results, err
-				}
-			} else {
-				authoritatives = append(authoritatives, nameKey)
+		results = append(results, entries...)
+
+		for i, ok := range outcomes {
+			if ok {
+				authoritatives = append(authoritatives, ordered[i].nameKey)
 			}
 		}
-		seen[nameKey] = true
 	}
 
 	if (len(list4) > 0 || len(list5) > 0) && onlyTestCaseStart(results) && len(authoritatives) > 0 {
@@ -551,52 +613,60 @@ func Delegation05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	for _, nsName := range nsNames {
 		if z.Name.IsInBailiwick(nsName) {
-			for _, key := range keys {
-				ns := allNS[key]
-				args := map[string]any{
-					"ns":         ns.String(),
-					"query_name": nsName.String(),
-					"rrtype":     "A",
+			if len(keys) > 0 {
+				tasks := make([]runner.Task, len(keys))
+				for i, key := range keys {
+					i, key := i, key
+					ns := allNS[key]
+					tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+						buf := testlogger.Wrap(log, moduleName, testcase)
+						args := map[string]any{
+							"ns":         ns.String(),
+							"query_name": nsName.String(),
+							"rrtype":     "A",
+						}
+
+						disabled, err := ipDisabledMessageWithLogger(buf, ns, "A")
+						if err != nil {
+							return err
+						}
+						if disabled {
+							return nil
+						}
+
+						recurseOff := false
+						resp, err := ns.QueryWithOptions(ctx, nsName.String(), "A", &nameserver.QueryOptions{Recurse: &recurseOff})
+						if err != nil || resp.Msg == nil {
+							_, err := buf.Add("NO_RESPONSE", args)
+							return err
+						}
+						if resp.Rcode() != "NOERROR" {
+							args["rcode"] = resp.Rcode()
+							_, err := buf.Add("UNEXPECTED_RCODE", args)
+							return err
+						}
+						if len(resp.GetRecords("CNAME", "answer")) > 0 {
+							_, err := buf.Add("NS_IS_CNAME", map[string]any{"nsname": nsName.String()})
+							return err
+						}
+						if resp.IsRedirect() {
+							recurseOn := true
+							recResp, err := ns.QueryWithOptions(ctx, nsName.String(), "A", &nameserver.QueryOptions{Recurse: &recurseOn})
+							if err == nil && recResp.Msg != nil && len(recResp.GetRecords("CNAME", "answer")) > 0 {
+								_, err := buf.Add("NS_IS_CNAME", map[string]any{"nsname": nsName.String()})
+								return err
+							}
+						}
+						return nil
+					}
 				}
 
-				disabled, err := ipDisabledMessage(&results, testcase, ns, "A")
+				parallelism := profile.Effective().Resolver.Defaults.Parallel
+				entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 				if err != nil {
 					return results, err
 				}
-				if disabled {
-					continue
-				}
-
-				recurseOff := false
-				resp, err := ns.QueryWithOptions(ctx, nsName.String(), "A", &nameserver.QueryOptions{Recurse: &recurseOff})
-				if err != nil || resp.Msg == nil {
-					if err := appendLog(&results, testcase, "NO_RESPONSE", args); err != nil {
-						return results, err
-					}
-					continue
-				}
-				if resp.Rcode() != "NOERROR" {
-					args["rcode"] = resp.Rcode()
-					if err := appendLog(&results, testcase, "UNEXPECTED_RCODE", args); err != nil {
-						return results, err
-					}
-					continue
-				}
-				if len(resp.GetRecords("CNAME", "answer")) > 0 {
-					if err := appendLog(&results, testcase, "NS_IS_CNAME", map[string]any{"nsname": nsName.String()}); err != nil {
-						return results, err
-					}
-					continue
-				}
-				if resp.IsRedirect() {
-					recurseOn := true
-					recResp, err := ns.QueryWithOptions(ctx, nsName.String(), "A", &nameserver.QueryOptions{Recurse: &recurseOn})
-					if err == nil && recResp.Msg != nil && len(recResp.GetRecords("CNAME", "answer")) > 0 {
-						if err := appendLog(&results, testcase, "NS_IS_CNAME", map[string]any{"nsname": nsName.String()}); err != nil {
-							return results, err
-						}
-					}
-				}
+				results = append(results, entries...)
 			}
 		} else {
 			resp, err := recurse(ctx, z, nsName.String(), "A")
@@ -637,30 +707,65 @@ func Delegation06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	seen := map[string]bool{}
 	queryType := "SOA"
 
+	type nsAction int
+	const (
+		actionSkip nsAction = iota
+		actionDisabled
+		actionQuery
+	)
+	type nsTask struct {
+		ns      nameserver.Nameserver
+		action  nsAction
+		nameKey string
+	}
+
+	seen := map[string]bool{}
+	ordered := make([]nsTask, 0, len(list4)+len(list5))
 	for _, ns := range append(list4, list5...) {
-		disabled, err := ipDisabledMessage(&results, testcase, ns, queryType)
+		nameKey := ns.Name.String()
+		action := actionQuery
+		if (ns.Address.Is6() && !profile.Effective().Net.IPv6) || (ns.Address.Is4() && !profile.Effective().Net.IPv4) {
+			action = actionDisabled
+		} else if seen[nameKey] {
+			action = actionSkip
+		} else {
+			seen[nameKey] = true
+		}
+		ordered = append(ordered, nsTask{ns: ns, action: action, nameKey: nameKey})
+	}
+
+	if len(ordered) > 0 {
+		tasks := make([]runner.Task, len(ordered))
+		for i, task := range ordered {
+			task := task
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				if task.action == actionSkip {
+					return nil
+				}
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				if task.action == actionDisabled {
+					_, err := ipDisabledMessageWithLogger(buf, task.ns, queryType)
+					return err
+				}
+				resp, err := task.ns.QueryWithOptions(ctx, z.Name.String(), queryType, nil)
+				if err == nil && resp.Msg != nil && resp.Rcode() == "NOERROR" {
+					if len(resp.GetRecords(queryType, "answer")) == 0 {
+						_, err := buf.Add("SOA_NOT_EXISTS", map[string]any{"ns": task.ns.String()})
+						return err
+					}
+				}
+				return nil
+			}
+		}
+
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
 		}
-		if disabled {
-			continue
-		}
-		nameKey := ns.Name.String()
-		if seen[nameKey] {
-			continue
-		}
-		resp, err := ns.QueryWithOptions(ctx, z.Name.String(), queryType, nil)
-		if err == nil && resp.Msg != nil && resp.Rcode() == "NOERROR" {
-			if len(resp.GetRecords(queryType, "answer")) == 0 {
-				if err := appendLog(&results, testcase, "SOA_NOT_EXISTS", map[string]any{"ns": ns.String()}); err != nil {
-					return results, err
-				}
-			}
-		}
-		seen[nameKey] = true
+		results = append(results, entries...)
 	}
 
 	if (len(list4) > 0 || len(list5) > 0) && onlyTestCaseStart(results) {
@@ -919,10 +1024,10 @@ func appendLog(results *[]*logger.Entry, testcase string, tag string, args map[s
 	return nil
 }
 
-func ipDisabledMessage(results *[]*logger.Entry, testcase string, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
-	if !profile.Effective().Net.IPv6 && ns.Address.Is6() {
+func ipDisabledMessageWithLogger(buf *testlogger.Buffer, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
+	if ns.Address.Is6() && !profile.Effective().Net.IPv6 {
 		for _, rrtype := range rrtypes {
-			if err := appendLog(results, testcase, "IPV6_DISABLED", map[string]any{
+			if _, err := buf.Add("IPV6_DISABLED", map[string]any{
 				"ns":     ns.String(),
 				"rrtype": rrtype,
 			}); err != nil {
@@ -931,9 +1036,9 @@ func ipDisabledMessage(results *[]*logger.Entry, testcase string, ns nameserver.
 		}
 		return true, nil
 	}
-	if !profile.Effective().Net.IPv4 && ns.Address.Is4() {
+	if ns.Address.Is4() && !profile.Effective().Net.IPv4 {
 		for _, rrtype := range rrtypes {
-			if err := appendLog(results, testcase, "IPV4_DISABLED", map[string]any{
+			if _, err := buf.Add("IPV4_DISABLED", map[string]any{
 				"ns":     ns.String(),
 				"rrtype": rrtype,
 			}); err != nil {

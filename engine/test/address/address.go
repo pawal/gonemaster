@@ -13,6 +13,10 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/methods"
 	methodsv2 "codeberg.org/pawal/gonemaster/engine/methodsv2"
+	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/runner"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/testcase"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/testlogger"
 	"codeberg.org/pawal/gonemaster/engine/util"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
@@ -24,7 +28,9 @@ func AddressAll(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var results []*logger.Entry
 
 	if util.ShouldRunTest("address01") {
-		entries, err := Address01(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Address01(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
@@ -33,7 +39,9 @@ func AddressAll(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	nsWithReverse := true
 	if util.ShouldRunTest("address02") {
-		entries, err := Address02(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Address02(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
@@ -42,7 +50,9 @@ func AddressAll(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if nsWithReverse && util.ShouldRunTest("address03") {
-		entries, err := Address03(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Address03(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
@@ -225,6 +235,12 @@ func Address02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
+	type nsIP struct {
+		name string
+		ip   string
+	}
+
+	ordered := make([]nsIP, 0, len(method4)+len(method5))
 	ips := map[string]bool{}
 	for _, ns := range append(method4, method5...) {
 		ip := ns.Address.String()
@@ -232,43 +248,63 @@ func Address02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			continue
 		}
 		ips[ip] = true
+		ordered = append(ordered, nsIP{name: ns.Name.String(), ip: ip})
+	}
 
-		ptrQuery, err := dns.ReverseAddr(ip)
-		if err != nil {
-			return results, err
-		}
+	if len(ordered) > 0 {
+		tasks := make([]runner.Task, len(ordered))
+		for i, item := range ordered {
+			item := item
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, addressModuleName, testcase)
 
-		resp, err := rec.Recurse(ctx, ptrQuery, "PTR", "IN")
-		if err != nil {
-			return results, err
-		}
-
-		if resp.Msg != nil && resp.Rcode() == "NOERROR" && len(resp.GetRecords("CNAME", "answer")) > 0 {
-			if cname, ok := resp.GetRecords("CNAME", "answer")[0].(*dns.CNAME); ok {
-				ptrQuery = cname.Target
-				resp, err = rec.Recurse(ctx, ptrQuery, "PTR", "IN")
+				ptrQuery, err := dns.ReverseAddr(item.ip)
 				if err != nil {
-					return results, err
+					return err
 				}
+
+				resp, err := rec.Recurse(ctx, ptrQuery, "PTR", "IN")
+				if err != nil {
+					return err
+				}
+
+				if resp.Msg != nil && resp.Rcode() == "NOERROR" && len(resp.GetRecords("CNAME", "answer")) > 0 {
+					if cname, ok := resp.GetRecords("CNAME", "answer")[0].(*dns.CNAME); ok {
+						ptrQuery = cname.Target
+						resp, err = rec.Recurse(ctx, ptrQuery, "PTR", "IN")
+						if err != nil {
+							return err
+						}
+					}
+				}
+
+				if resp.Msg != nil {
+					if resp.Rcode() != "NOERROR" || len(resp.GetRecords("PTR", "answer")) == 0 {
+						if _, err := buf.Add("NAMESERVER_IP_WITHOUT_REVERSE", map[string]any{
+							"nsname": item.name,
+							"ns_ip":  item.ip,
+						}); err != nil {
+							return err
+						}
+					}
+				} else {
+					if _, err := buf.Add("NO_RESPONSE_PTR_QUERY", map[string]any{
+						"domain": ptrQuery,
+					}); err != nil {
+						return err
+					}
+				}
+
+				return nil
 			}
 		}
 
-		if resp.Msg != nil {
-			if resp.Rcode() != "NOERROR" || len(resp.GetRecords("PTR", "answer")) == 0 {
-				if err := appendAddressLog(&results, testcase, "NAMESERVER_IP_WITHOUT_REVERSE", map[string]any{
-					"nsname": ns.Name.String(),
-					"ns_ip":  ip,
-				}); err != nil {
-					return results, err
-				}
-			}
-		} else {
-			if err := appendAddressLog(&results, testcase, "NO_RESPONSE_PTR_QUERY", map[string]any{
-				"domain": ptrQuery,
-			}); err != nil {
-				return results, err
-			}
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+		if err != nil {
+			return results, err
 		}
+		results = append(results, entries...)
 	}
 
 	if len(ips) > 0 && onlyTestCaseStart(results) {
@@ -301,6 +337,12 @@ func Address03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
+	type nsIP struct {
+		name string
+		ip   string
+	}
+
+	ordered := make([]nsIP, 0, len(method5))
 	ips := map[string]bool{}
 	for _, ns := range method5 {
 		ip := ns.Address.String()
@@ -308,58 +350,78 @@ func Address03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			continue
 		}
 		ips[ip] = true
+		ordered = append(ordered, nsIP{name: ns.Name.String(), ip: ip})
+	}
 
-		ptrQuery, err := dns.ReverseAddr(ip)
-		if err != nil {
-			return results, err
-		}
+	if len(ordered) > 0 {
+		tasks := make([]runner.Task, len(ordered))
+		for i, item := range ordered {
+			item := item
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, addressModuleName, testcase)
 
-		resp, err := rec.Recurse(ctx, ptrQuery, "PTR", "IN")
-		if err != nil {
-			return results, err
-		}
-
-		if resp.Msg != nil {
-			ptrRecords := resp.GetRecords("PTR", "answer")
-			if resp.Rcode() == "NOERROR" && len(ptrRecords) > 0 {
-				names := make([]string, 0, len(ptrRecords))
-				matched := false
-				for _, rr := range ptrRecords {
-					ptr, ok := rr.(*dns.PTR)
-					if !ok {
-						continue
-					}
-					names = append(names, ptr.Ptr)
-					ptrName := dnsname.New(ptr.Ptr)
-					if strings.EqualFold(ptrName.String(), ns.Name.String()) {
-						matched = true
-					}
+				ptrQuery, err := dns.ReverseAddr(item.ip)
+				if err != nil {
+					return err
 				}
 
-				if !matched {
-					if err := appendAddressLog(&results, testcase, "NAMESERVER_IP_PTR_MISMATCH", map[string]any{
-						"nsname": ns.Name.String(),
-						"ns_ip":  ip,
-						"names":  strings.Join(names, "/"),
+				resp, err := rec.Recurse(ctx, ptrQuery, "PTR", "IN")
+				if err != nil {
+					return err
+				}
+
+				if resp.Msg != nil {
+					ptrRecords := resp.GetRecords("PTR", "answer")
+					if resp.Rcode() == "NOERROR" && len(ptrRecords) > 0 {
+						names := make([]string, 0, len(ptrRecords))
+						matched := false
+						for _, rr := range ptrRecords {
+							ptr, ok := rr.(*dns.PTR)
+							if !ok {
+								continue
+							}
+							names = append(names, ptr.Ptr)
+							ptrName := dnsname.New(ptr.Ptr)
+							if strings.EqualFold(ptrName.String(), item.name) {
+								matched = true
+							}
+						}
+
+						if !matched {
+							if _, err := buf.Add("NAMESERVER_IP_PTR_MISMATCH", map[string]any{
+								"nsname": item.name,
+								"ns_ip":  item.ip,
+								"names":  strings.Join(names, "/"),
+							}); err != nil {
+								return err
+							}
+						}
+					} else {
+						if _, err := buf.Add("NAMESERVER_IP_WITHOUT_REVERSE", map[string]any{
+							"nsname": item.name,
+							"ns_ip":  item.ip,
+						}); err != nil {
+							return err
+						}
+					}
+				} else {
+					if _, err := buf.Add("NO_RESPONSE_PTR_QUERY", map[string]any{
+						"domain": ptrQuery,
 					}); err != nil {
-						return results, err
+						return err
 					}
 				}
-			} else {
-				if err := appendAddressLog(&results, testcase, "NAMESERVER_IP_WITHOUT_REVERSE", map[string]any{
-					"nsname": ns.Name.String(),
-					"ns_ip":  ip,
-				}); err != nil {
-					return results, err
-				}
-			}
-		} else {
-			if err := appendAddressLog(&results, testcase, "NO_RESPONSE_PTR_QUERY", map[string]any{
-				"domain": ptrQuery,
-			}); err != nil {
-				return results, err
+
+				return nil
 			}
 		}
+
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+		if err != nil {
+			return results, err
+		}
+		results = append(results, entries...)
 	}
 
 	if len(ips) > 0 && onlyTestCaseStart(results) {

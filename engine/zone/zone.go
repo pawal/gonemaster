@@ -10,6 +10,7 @@ import (
 	"github.com/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/internal/parallel"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -365,13 +366,44 @@ func (z *Zone) QueryAll(ctx context.Context, name string, qtype string, opts *na
 	if err != nil {
 		return nil, err
 	}
-	var res []packet.Packet
+
+	parallelism := profile.Effective().Resolver.Defaults.Parallel
+	if parallelism <= 1 {
+		var res []packet.Packet
+		for _, ns := range servers {
+			if ipDisabled(ns.Address) {
+				continue
+			}
+			resp, _ := ns.QueryWithOptions(ctx, name, qtype, opts)
+			res = append(res, resp)
+		}
+		return res, nil
+	}
+
+	targets := make([]nameserver.Nameserver, 0, len(servers))
 	for _, ns := range servers {
 		if ipDisabled(ns.Address) {
 			continue
 		}
-		resp, _ := ns.QueryWithOptions(ctx, name, qtype, opts)
-		res = append(res, resp)
+		targets = append(targets, ns)
+	}
+	if len(targets) == 0 {
+		return nil, nil
+	}
+
+	tasks := make([]parallel.Task[packet.Packet], len(targets))
+	for i, ns := range targets {
+		ns := ns
+		tasks[i] = func(ctx context.Context) (packet.Packet, error) {
+			resp, _ := ns.QueryWithOptions(ctx, name, qtype, opts)
+			return resp, nil
+		}
+	}
+
+	results := parallel.RunOrdered(ctx, tasks, parallel.Options{Limit: parallelism, CancelOnError: false})
+	res := make([]packet.Packet, 0, len(results))
+	for _, result := range results {
+		res = append(res, result.Value)
 	}
 	return res, nil
 }

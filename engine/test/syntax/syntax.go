@@ -11,11 +11,15 @@ import (
 	"github.com/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/internal/parallel"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/methods"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/runner"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/testcase"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/testlogger"
 	"codeberg.org/pawal/gonemaster/engine/util"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
@@ -28,7 +32,9 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	onlyAllowedChars := true
 	if util.ShouldRunTest("syntax01") {
-		entries, err := Syntax01(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Syntax01(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
@@ -37,7 +43,9 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if util.ShouldRunTest("syntax02") {
-		entries, err := Syntax02(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Syntax02(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
@@ -45,7 +53,9 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if util.ShouldRunTest("syntax03") {
-		entries, err := Syntax03(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Syntax03(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
@@ -57,7 +67,9 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if util.ShouldRunTest("syntax04") {
-		entries, err := Syntax04(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Syntax04(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
@@ -66,7 +78,9 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	allSOAResponses := true
 	if util.ShouldRunTest("syntax05") {
-		entries, err := Syntax05(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Syntax05(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
@@ -76,7 +90,9 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	if allSOAResponses {
 		if util.ShouldRunTest("syntax06") {
-			entries, err := Syntax06(ctx, z)
+			entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+				return Syntax06(ctx, z)
+			})
 			results = append(results, entries...)
 			if err != nil {
 				return results, err
@@ -84,7 +100,9 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 
 		if util.ShouldRunTest("syntax07") {
-			entries, err := Syntax07(ctx, z)
+			entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+				return Syntax07(ctx, z)
+			})
 			results = append(results, entries...)
 			if err != nil {
 				return results, err
@@ -93,7 +111,9 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if util.ShouldRunTest("syntax08") {
-		entries, err := Syntax08(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Syntax08(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
@@ -308,8 +328,17 @@ func Syntax04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 	sort.Strings(keys)
 
-	for _, key := range keys {
-		entries, err := checkNameSyntax("NAMESERVER", seen[key], testcase)
+	if len(keys) > 0 {
+		tasks := make([]runner.Task, len(keys))
+		for i, key := range keys {
+			name := seen[key]
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				return checkNameSyntaxWithLogger(buf, "NAMESERVER", name)
+			}
+		}
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
 		}
@@ -409,6 +438,73 @@ func Syntax06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	rnameCandidates := map[string]bool{}
 	seenMailServers := map[string]bool{}
 	invalidExchanges := -1
+
+	type mailOutcome struct {
+		entries       []*logger.Entry
+		exchangeValid bool
+	}
+
+	processMailServer := func(ctx context.Context, mailServer string) (mailOutcome, error) {
+		buf := logger.New()
+		tlog := testlogger.Wrap(buf, moduleName, testcase)
+		exchangeValid := false
+
+		pA, err := rec.Recurse(ctx, mailServer, "A", "IN")
+		if err != nil {
+			return mailOutcome{entries: buf.Entries()}, err
+		}
+		if pA.Msg != nil {
+			if len(pA.GetRecords("CNAME", "answer")) > 0 {
+				if _, err := tlog.Add("RNAME_MAIL_ILLEGAL_CNAME", map[string]any{"domain": mailServer}); err != nil {
+					return mailOutcome{entries: buf.Entries()}, err
+				}
+			} else {
+				records := matchingARecords(pA, mailServer)
+				if hasIPv4Loopback(records) {
+					if _, err := tlog.Add("RNAME_MAIL_DOMAIN_LOCALHOST", map[string]any{
+						"domain":    mailServer,
+						"localhost": "127.0.0.1",
+					}); err != nil {
+						return mailOutcome{entries: buf.Entries()}, err
+					}
+				} else if len(records) > 0 {
+					exchangeValid = true
+				}
+			}
+		}
+
+		pAAAA, err := rec.Recurse(ctx, mailServer, "AAAA", "IN")
+		if err != nil {
+			return mailOutcome{entries: buf.Entries()}, err
+		}
+		if pAAAA.Msg != nil {
+			if len(pAAAA.GetRecords("CNAME", "answer")) > 0 {
+				if _, err := tlog.Add("RNAME_MAIL_ILLEGAL_CNAME", map[string]any{"domain": mailServer}); err != nil {
+					return mailOutcome{entries: buf.Entries()}, err
+				}
+			} else {
+				records := matchingAAAARecords(pAAAA, mailServer)
+				if hasIPv6Loopback(records) {
+					if _, err := tlog.Add("RNAME_MAIL_DOMAIN_LOCALHOST", map[string]any{
+						"domain":    mailServer,
+						"localhost": "::1",
+					}); err != nil {
+						return mailOutcome{entries: buf.Entries()}, err
+					}
+				} else if len(records) > 0 {
+					exchangeValid = true
+				}
+			}
+		}
+
+		if !exchangeValid {
+			if _, err := tlog.Add("RNAME_MAIL_DOMAIN_INVALID", map[string]any{"domain": mailServer}); err != nil {
+				return mailOutcome{entries: buf.Entries()}, err
+			}
+		}
+
+		return mailOutcome{entries: buf.Entries(), exchangeValid: exchangeValid}, nil
+	}
 
 	for _, ns := range nss {
 		disabled, err := ipDisabledMessage(&results, testcase, ns, "SOA")
@@ -519,70 +615,41 @@ func Syntax06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			mailServers = []string{domain.String()}
 		}
 
+		mailServersToCheck := make([]string, 0, len(mailServers))
 		for _, mailServer := range mailServers {
 			if seenMailServers[mailServer] {
 				continue
 			}
 			seenMailServers[mailServer] = true
-			exchangeValid := false
-			if invalidExchanges < 0 {
-				invalidExchanges = 0
-			}
+			mailServersToCheck = append(mailServersToCheck, mailServer)
+		}
+		if len(mailServersToCheck) == 0 {
+			continue
+		}
+		if invalidExchanges < 0 {
+			invalidExchanges = 0
+		}
 
-			pA, err := rec.Recurse(ctx, mailServer, "A", "IN")
-			if err != nil {
-				return results, err
+		tasks := make([]parallel.Task[mailOutcome], len(mailServersToCheck))
+		for i, mailServer := range mailServersToCheck {
+			mailServer := mailServer
+			tasks[i] = func(ctx context.Context) (mailOutcome, error) {
+				return processMailServer(ctx, mailServer)
 			}
-			if pA.Msg != nil {
-				if len(pA.GetRecords("CNAME", "answer")) > 0 {
-					if err := appendLog(&results, testcase, "RNAME_MAIL_ILLEGAL_CNAME", map[string]any{"domain": mailServer}); err != nil {
-						return results, err
-					}
-				} else {
-					records := matchingARecords(pA, mailServer)
-					if hasIPv4Loopback(records) {
-						if err := appendLog(&results, testcase, "RNAME_MAIL_DOMAIN_LOCALHOST", map[string]any{
-							"domain":    mailServer,
-							"localhost": "127.0.0.1",
-						}); err != nil {
-							return results, err
-						}
-					} else if len(records) > 0 {
-						exchangeValid = true
-					}
-				}
+		}
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		if parallelism < 1 {
+			parallelism = 1
+		}
+		mailResults := parallel.RunOrdered(ctx, tasks, parallel.Options{Limit: parallelism, CancelOnError: false})
+		for _, res := range mailResults {
+			results = append(results, res.Value.entries...)
+			if res.Err != nil {
+				return results, res.Err
 			}
-
-			pAAAA, err := rec.Recurse(ctx, mailServer, "AAAA", "IN")
-			if err != nil {
-				return results, err
-			}
-			if pAAAA.Msg != nil {
-				if len(pAAAA.GetRecords("CNAME", "answer")) > 0 {
-					if err := appendLog(&results, testcase, "RNAME_MAIL_ILLEGAL_CNAME", map[string]any{"domain": mailServer}); err != nil {
-						return results, err
-					}
-				} else {
-					records := matchingAAAARecords(pAAAA, mailServer)
-					if hasIPv6Loopback(records) {
-						if err := appendLog(&results, testcase, "RNAME_MAIL_DOMAIN_LOCALHOST", map[string]any{
-							"domain":    mailServer,
-							"localhost": "::1",
-						}); err != nil {
-							return results, err
-						}
-					} else if len(records) > 0 {
-						exchangeValid = true
-					}
-				}
-			}
-
-			if exchangeValid {
+			if res.Value.exchangeValid {
 				rnameCandidates[rname] = true
 			} else {
-				if err := appendLog(&results, testcase, "RNAME_MAIL_DOMAIN_INVALID", map[string]any{"domain": mailServer}); err != nil {
-					return results, err
-				}
 				delete(rnameCandidates, rname)
 				invalidExchanges++
 			}
@@ -656,6 +723,7 @@ func Syntax08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 	if resp.Msg != nil {
 		seen := map[string]bool{}
+		var targets []dnsname.Name
 		for _, rr := range resp.GetRecords("MX", "answer") {
 			if mx, ok := rr.(*dns.MX); ok {
 				target := dnsname.New(mx.Mx)
@@ -664,12 +732,24 @@ func Syntax08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					continue
 				}
 				seen[key] = true
-				entries, err := checkNameSyntax("MX", target, testcase)
-				if err != nil {
-					return results, err
-				}
-				results = append(results, entries...)
+				targets = append(targets, target)
 			}
+		}
+		if len(targets) > 0 {
+			tasks := make([]runner.Task, len(targets))
+			for i, target := range targets {
+				target := target
+				tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+					buf := testlogger.Wrap(log, moduleName, testcase)
+					return checkNameSyntaxWithLogger(buf, "MX", target)
+				}
+			}
+			parallelism := profile.Effective().Resolver.Defaults.Parallel
+			entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+			if err != nil {
+				return results, err
+			}
+			results = append(results, entries...)
 		}
 		return appendTestCaseEnd(results, testcase)
 	}
@@ -769,24 +849,34 @@ func labelNotACEHasDoubleHyphen(label string) bool {
 }
 
 func checkNameSyntax(prefix string, name dnsname.Name, testcase string) ([]*logger.Entry, error) {
-	var results []*logger.Entry
+	buf := testlogger.New(moduleName, testcase)
+	if err := checkNameSyntaxWithLogger(buf, prefix, name); err != nil {
+		return buf.Entries(), err
+	}
+	return buf.Entries(), nil
+}
+
+func checkNameSyntaxWithLogger(buf *testlogger.Buffer, prefix string, name dnsname.Name) error {
 	domain := name.String()
+	hadIssue := false
 
 	if !nameHasOnlyLegalCharacters(name) {
-		if err := appendLog(&results, testcase, prefix+"_NON_ALLOWED_CHARS", map[string]any{"domain": domain}); err != nil {
-			return results, err
+		if _, err := buf.Add(prefix+"_NON_ALLOWED_CHARS", map[string]any{"domain": domain}); err != nil {
+			return err
 		}
+		hadIssue = true
 	}
 
 	if domain != "." {
 		for _, label := range name.Labels() {
 			if labelNotACEHasDoubleHyphen(label) {
-				if err := appendLog(&results, testcase, prefix+"_DISCOURAGED_DOUBLE_DASH", map[string]any{
+				if _, err := buf.Add(prefix+"_DISCOURAGED_DOUBLE_DASH", map[string]any{
 					"label":  label,
 					"domain": domain,
 				}); err != nil {
-					return results, err
+					return err
 				}
+				hadIssue = true
 			}
 		}
 
@@ -794,23 +884,24 @@ func checkNameSyntax(prefix string, name dnsname.Name, testcase string) ([]*logg
 		if len(labels) > 0 {
 			tld := labels[len(labels)-1]
 			if isNumericLabel(tld) {
-				if err := appendLog(&results, testcase, prefix+"_NUMERIC_TLD", map[string]any{
+				if _, err := buf.Add(prefix+"_NUMERIC_TLD", map[string]any{
 					"domain": domain,
 					"tld":    tld,
 				}); err != nil {
-					return results, err
+					return err
 				}
+				hadIssue = true
 			}
 		}
 	}
 
-	if len(results) == 0 {
-		if err := appendLog(&results, testcase, prefix+"_SYNTAX_OK", map[string]any{"domain": domain}); err != nil {
-			return results, err
+	if !hadIssue {
+		if _, err := buf.Add(prefix+"_SYNTAX_OK", map[string]any{"domain": domain}); err != nil {
+			return err
 		}
 	}
 
-	return results, nil
+	return nil
 }
 
 func isNumericLabel(label string) bool {

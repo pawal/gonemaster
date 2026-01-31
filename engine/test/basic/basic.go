@@ -14,6 +14,9 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/methods"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/runner"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/testcase"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/testlogger"
 	"codeberg.org/pawal/gonemaster/engine/util"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
@@ -25,7 +28,9 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var results []*logger.Entry
 
 	if util.ShouldRunTest("basic01") {
-		entries, err := Basic01(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Basic01(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
@@ -37,7 +42,9 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	var authResponseSOA bool
 	if util.ShouldRunTest("basic02") {
-		entries, err := Basic02(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Basic02(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
@@ -53,7 +60,9 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				return results, err
 			}
 		} else {
-			entries, err := Basic03(ctx, z)
+			entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+				return Basic03(ctx, z)
+			})
 			results = append(results, entries...)
 			if err != nil {
 				return results, err
@@ -673,35 +682,103 @@ func Basic02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	for _, ns := range nsServers {
-		disabled, err := ipDisabledMessage(&results, testcase, ns, "SOA")
+	type nsOutcome struct {
+		ns             nameserver.Nameserver
+		skipped        bool
+		noResponse     bool
+		notAuth        bool
+		broken         bool
+		authResponse   bool
+		unexpectedCode string
+	}
+
+	if len(nsServers) > 0 {
+		outcomes := make([]nsOutcome, len(nsServers))
+		tasks := make([]runner.Task, len(nsServers))
+		for i, ns := range nsServers {
+			i, ns := i, ns
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				outcome := nsOutcome{ns: ns}
+
+				if ns.Address.Is6() && !profile.Effective().Net.IPv6 {
+					if _, err := buf.Add("IPV6_DISABLED", map[string]any{"ns": ns.String(), "rrtype": "SOA"}); err != nil {
+						return err
+					}
+					outcome.skipped = true
+					outcomes[i] = outcome
+					return nil
+				}
+				if ns.Address.Is4() && !profile.Effective().Net.IPv4 {
+					if _, err := buf.Add("IPV4_DISABLED", map[string]any{"ns": ns.String(), "rrtype": "SOA"}); err != nil {
+						return err
+					}
+					outcome.skipped = true
+					outcomes[i] = outcome
+					return nil
+				}
+
+				if ns.Address.Is6() && profile.Effective().Net.IPv6 {
+					if _, err := buf.Add("IPV6_ENABLED", map[string]any{"ns": ns.String(), "rrtype": "SOA"}); err != nil {
+						return err
+					}
+				}
+				if ns.Address.Is4() && profile.Effective().Net.IPv4 {
+					if _, err := buf.Add("IPV4_ENABLED", map[string]any{"ns": ns.String(), "rrtype": "SOA"}); err != nil {
+						return err
+					}
+				}
+
+				resp, err := ns.Query(ctx, z.Name.String(), "SOA")
+				if err != nil || resp.Msg == nil {
+					outcome.noResponse = true
+					outcomes[i] = outcome
+					return nil
+				}
+				if resp.Rcode() != "NOERROR" {
+					outcome.unexpectedCode = resp.Rcode()
+					outcomes[i] = outcome
+					return nil
+				}
+				if !resp.AA() {
+					outcome.notAuth = true
+					outcomes[i] = outcome
+					return nil
+				}
+				if len(resp.GetRecordsForName("SOA", z.Name, "answer")) > 0 {
+					outcome.authResponse = true
+				} else {
+					outcome.broken = true
+				}
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
 		}
-		if disabled {
-			continue
-		}
-		if err := ipEnabledMessage(&results, testcase, ns, "SOA"); err != nil {
-			return results, err
-		}
+		results = append(results, entries...)
 
-		resp, err := ns.Query(ctx, z.Name.String(), "SOA")
-		if err != nil || resp.Msg == nil {
-			nsNoResponse[ns.String()] = true
-			continue
-		}
-		if resp.Rcode() != "NOERROR" {
-			unexpectedRcode[ns.String()] = resp.Rcode()
-			continue
-		}
-		if !resp.AA() {
-			nsNotAuth[ns.String()] = true
-			continue
-		}
-		if len(resp.GetRecordsForName("SOA", z.Name, "answer")) > 0 {
-			authResponseSOA[ns.String()] = true
-		} else {
-			nsBroken[ns.String()] = true
+		for _, outcome := range outcomes {
+			if outcome.skipped {
+				continue
+			}
+			key := outcome.ns.String()
+			switch {
+			case outcome.noResponse:
+				nsNoResponse[key] = true
+			case outcome.unexpectedCode != "":
+				unexpectedRcode[key] = outcome.unexpectedCode
+			case outcome.notAuth:
+				nsNotAuth[key] = true
+			case outcome.authResponse:
+				authResponseSOA[key] = true
+			case outcome.broken:
+				nsBroken[key] = true
+			}
 		}
 	}
 
@@ -764,50 +841,96 @@ func Basic03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	queryName := "www." + z.Name.String()
-	responseCount := 0
 
 	nsServers, err := methods.Method4(ctx, z)
 	if err != nil {
 		return results, err
 	}
 
-	for _, ns := range nsServers {
-		disabled, err := ipDisabledMessage(&results, testcase, ns, "A")
+	if len(nsServers) > 0 {
+		type nsOutcome struct {
+			responded bool
+		}
+
+		outcomes := make([]nsOutcome, len(nsServers))
+		tasks := make([]runner.Task, len(nsServers))
+		for i, ns := range nsServers {
+			i, ns := i, ns
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				outcome := nsOutcome{}
+
+				if ns.Address.Is6() && !profile.Effective().Net.IPv6 {
+					if _, err := buf.Add("IPV6_DISABLED", map[string]any{"ns": ns.String(), "rrtype": "A"}); err != nil {
+						return err
+					}
+					outcomes[i] = outcome
+					return nil
+				}
+				if ns.Address.Is4() && !profile.Effective().Net.IPv4 {
+					if _, err := buf.Add("IPV4_DISABLED", map[string]any{"ns": ns.String(), "rrtype": "A"}); err != nil {
+						return err
+					}
+					outcomes[i] = outcome
+					return nil
+				}
+
+				if ns.Address.Is6() && profile.Effective().Net.IPv6 {
+					if _, err := buf.Add("IPV6_ENABLED", map[string]any{"ns": ns.String(), "rrtype": "A"}); err != nil {
+						return err
+					}
+				}
+				if ns.Address.Is4() && profile.Effective().Net.IPv4 {
+					if _, err := buf.Add("IPV4_ENABLED", map[string]any{"ns": ns.String(), "rrtype": "A"}); err != nil {
+						return err
+					}
+				}
+
+				resp, err := ns.Query(ctx, queryName, "A")
+				if err != nil || resp.Msg == nil {
+					outcomes[i] = outcome
+					return nil
+				}
+				outcome.responded = true
+				target := dnsname.New(queryName)
+				if resp.HasRRsOfTypeForName("A", target) {
+					if _, err := buf.Add("HAS_A_RECORDS", map[string]any{
+						"ns":     ns.String(),
+						"domain": queryName,
+					}); err != nil {
+						return err
+					}
+				} else {
+					if _, err := buf.Add("NO_A_RECORDS", map[string]any{
+						"ns":     ns.String(),
+						"domain": queryName,
+					}); err != nil {
+						return err
+					}
+				}
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
 		}
-		if disabled {
-			continue
-		}
-		if err := ipEnabledMessage(&results, testcase, ns, "A"); err != nil {
-			return results, err
-		}
+		results = append(results, entries...)
 
-		resp, err := ns.Query(ctx, queryName, "A")
-		if err != nil || resp.Msg == nil {
-			continue
-		}
-		responseCount++
-		if resp.HasRRsOfTypeForName("A", dnsname.New(queryName)) {
-			if err := appendLog(&results, testcase, "HAS_A_RECORDS", map[string]any{
-				"ns":     ns.String(),
-				"domain": queryName,
-			}); err != nil {
-				return results, err
-			}
-		} else {
-			if err := appendLog(&results, testcase, "NO_A_RECORDS", map[string]any{
-				"ns":     ns.String(),
-				"domain": queryName,
-			}); err != nil {
-				return results, err
+		responseCount := 0
+		for _, outcome := range outcomes {
+			if outcome.responded {
+				responseCount++
 			}
 		}
-	}
 
-	if len(nsServers) > 0 && responseCount == 0 {
-		if err := appendLog(&results, testcase, "A_QUERY_NO_RESPONSES", map[string]any{}); err != nil {
-			return results, err
+		if responseCount == 0 {
+			if err := appendLog(&results, testcase, "A_QUERY_NO_RESPONSES", map[string]any{}); err != nil {
+				return results, err
+			}
 		}
 	}
 

@@ -5,6 +5,7 @@ import (
 	"net"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/miekg/dns"
 
@@ -76,6 +77,90 @@ func TestZoneQueryOneSkipsDisabledIP(t *testing.T) {
 	}
 	if calls4 != 0 {
 		t.Fatalf("expected IPv4 nameserver skipped, got %d calls", calls4)
+	}
+}
+
+func TestZoneQueryAllParallel(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	defer profile.ResetEffective()
+
+	profile.Effective().Resolver.Defaults.Parallel = 2
+	profile.Effective().Net.IPv4 = true
+	profile.Effective().Net.IPv6 = true
+
+	started := make(chan string, 2)
+	release := make(chan struct{})
+
+	hook := func(id string) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
+		return func(ctx context.Context, _ string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+			if qtype != "DNSKEY" {
+				return packet.Packet{}, nil
+			}
+			select {
+			case started <- id:
+			default:
+			}
+			select {
+			case <-release:
+			case <-ctx.Done():
+				return packet.Packet{}, ctx.Err()
+			}
+			msg := new(dns.Msg)
+			msg.SetQuestion("example.", dns.TypeDNSKEY)
+			msg.Response = true
+			msg.Rcode = dns.RcodeSuccess
+			return packet.Packet{Msg: msg, AnswerFrom: id}, nil
+		}
+	}
+
+	ns1 := newHookedNameserver(t, "ns1.example", "192.0.2.50", hook("ns1"))
+	ns2 := newHookedNameserver(t, "ns2.example", "192.0.2.51", hook("ns2"))
+
+	z := Zone{
+		Name:  dnsname.New("example"),
+		ns:    []nameserver.Nameserver{ns1, ns2},
+		nsSet: true,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	done := make(chan struct{})
+	var res []packet.Packet
+	var qerr error
+	go func() {
+		res, qerr = z.QueryAll(ctx, "example", "DNSKEY", nil)
+		close(done)
+	}()
+
+	got := map[string]bool{}
+	deadline := time.After(1 * time.Second)
+	for len(got) < 2 {
+		select {
+		case name := <-started:
+			got[name] = true
+		case <-deadline:
+			t.Fatalf("expected parallel DNSKEY queries to start, got %v", got)
+		}
+	}
+
+	close(release)
+
+	select {
+	case <-done:
+		if qerr != nil {
+			t.Fatalf("queryall: %v", qerr)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("queryall did not finish")
+	}
+
+	if len(res) != 2 {
+		t.Fatalf("expected 2 responses, got %d", len(res))
+	}
+	if res[0].AnswerFrom != "ns1" || res[1].AnswerFrom != "ns2" {
+		t.Fatalf("expected ordered responses, got %q and %q", res[0].AnswerFrom, res[1].AnswerFrom)
 	}
 }
 

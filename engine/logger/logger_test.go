@@ -4,7 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"codeberg.org/pawal/gonemaster/engine/profile"
 )
@@ -143,6 +146,65 @@ func TestCallbackErrorAddsEntry(t *testing.T) {
 	}
 	if log.Entries()[1].Tag != "LOGGER_CALLBACK_ERROR" {
 		t.Fatalf("unexpected error tag %q", log.Entries()[1].Tag)
+	}
+}
+
+func TestConcurrentAddStoresAllEntries(t *testing.T) {
+	log := New()
+
+	const count = 50
+	var wg sync.WaitGroup
+	wg.Add(count)
+	for i := 0; i < count; i++ {
+		i := i
+		go func() {
+			defer wg.Done()
+			_, _ = log.Add(fmt.Sprintf("TAG_%d", i), nil, "", "")
+		}()
+	}
+	wg.Wait()
+
+	if len(log.Entries()) != count {
+		t.Fatalf("expected %d entries, got %d", count, len(log.Entries()))
+	}
+}
+
+func TestCallbackRunsSerialized(t *testing.T) {
+	log := New()
+
+	const count = 30
+	var wg sync.WaitGroup
+	wg.Add(count)
+
+	var active int32
+	var maxActive int32
+	log.Callback = func(_ *Entry) error {
+		current := atomic.AddInt32(&active, 1)
+		for {
+			prev := atomic.LoadInt32(&maxActive)
+			if current <= prev || atomic.CompareAndSwapInt32(&maxActive, prev, current) {
+				break
+			}
+		}
+		time.Sleep(2 * time.Millisecond)
+		atomic.AddInt32(&active, -1)
+		wg.Done()
+		return nil
+	}
+
+	var addWG sync.WaitGroup
+	addWG.Add(count)
+	for i := 0; i < count; i++ {
+		go func() {
+			defer addWG.Done()
+			_, _ = log.Add("CALLBACK", nil, "", "")
+		}()
+	}
+	addWG.Wait()
+	wg.Wait()
+
+	if maxActive != 1 {
+		t.Fatalf("expected serialized callback execution, max concurrent=%d", maxActive)
 	}
 }
 

@@ -10,8 +10,10 @@ import (
 	"github.com/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/internal/parallel"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
+	"codeberg.org/pawal/gonemaster/engine/profile"
 )
 
 // Recurse performs a recursive lookup using root servers.
@@ -97,40 +99,158 @@ func (r *Recursor) getAddressesFor(ctx context.Context, name string, state *recu
 	if err != nil {
 		return nil, err
 	}
-	queryers := make([]queryer, 0, len(root))
-	for _, server := range root {
-		queryers = append(queryers, server)
+	buildQueryers := func() []queryer {
+		queryers := make([]queryer, 0, len(root))
+		for _, server := range root {
+			queryers = append(queryers, server)
+		}
+		return queryers
 	}
 
-	pa, _, err := r.recurse(ctx, name, "A", "IN", &recurseState{
-		ns:         queryers,
-		count:      state.count,
-		common:     0,
-		seen:       map[string]bool{},
-		inProgress: state.inProgress,
-		glue:       state.glue,
-	})
-	if err != nil {
-		return nil, err
-	}
-	if pa.NoSuchName() {
-		return nil, nil
-	}
+	pa := packet.Packet{}
+	paaaa := packet.Packet{}
 
-	queryers = make([]queryer, 0, len(root))
-	for _, server := range root {
-		queryers = append(queryers, server)
+	parallelism := profile.Effective().Resolver.Defaults.Parallel
+	if parallelism < 1 {
+		parallelism = 1
 	}
-	paaaa, _, err := r.recurse(ctx, name, "AAAA", "IN", &recurseState{
-		ns:         queryers,
-		count:      state.count,
-		common:     0,
-		seen:       map[string]bool{},
-		inProgress: state.inProgress,
-		glue:       state.glue,
-	})
-	if err != nil {
-		return nil, err
+	if parallelism == 1 {
+		pa, _, err = r.recurse(ctx, name, "A", "IN", &recurseState{
+			ns:         buildQueryers(),
+			count:      state.count,
+			common:     0,
+			seen:       map[string]bool{},
+			inProgress: state.inProgress,
+			glue:       state.glue,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if pa.NoSuchName() {
+			return nil, nil
+		}
+		paaaa, _, err = r.recurse(ctx, name, "AAAA", "IN", &recurseState{
+			ns:         buildQueryers(),
+			count:      state.count,
+			common:     0,
+			seen:       map[string]bool{},
+			inProgress: state.inProgress,
+			glue:       state.glue,
+		})
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		type addrResult struct {
+			resp  packet.Packet
+			state *recurseState
+		}
+
+		cloneInProgress := func(src map[string]map[string]bool) map[string]map[string]bool {
+			if src == nil {
+				return map[string]map[string]bool{}
+			}
+			dst := make(map[string]map[string]bool, len(src))
+			for key, inner := range src {
+				copied := make(map[string]bool, len(inner))
+				for innerKey, value := range inner {
+					copied[innerKey] = value
+				}
+				dst[key] = copied
+			}
+			return dst
+		}
+		cloneGlue := func(src map[string]map[netip.Addr]bool) map[string]map[netip.Addr]bool {
+			if src == nil {
+				return map[string]map[netip.Addr]bool{}
+			}
+			dst := make(map[string]map[netip.Addr]bool, len(src))
+			for key, inner := range src {
+				copied := make(map[netip.Addr]bool, len(inner))
+				for innerKey, value := range inner {
+					copied[innerKey] = value
+				}
+				dst[key] = copied
+			}
+			return dst
+		}
+		mergeInProgress := func(dst map[string]map[string]bool, src map[string]map[string]bool) {
+			if dst == nil || src == nil {
+				return
+			}
+			for key, inner := range src {
+				if dst[key] == nil {
+					dst[key] = map[string]bool{}
+				}
+				for innerKey := range inner {
+					dst[key][innerKey] = true
+				}
+			}
+		}
+		mergeGlue := func(dst map[string]map[netip.Addr]bool, src map[string]map[netip.Addr]bool) {
+			if dst == nil || src == nil {
+				return
+			}
+			for key, inner := range src {
+				if dst[key] == nil {
+					dst[key] = map[netip.Addr]bool{}
+				}
+				for innerKey := range inner {
+					dst[key][innerKey] = true
+				}
+			}
+		}
+
+		baseInProgress := cloneInProgress(state.inProgress)
+		baseGlue := cloneGlue(state.glue)
+
+		tasks := []parallel.Task[addrResult]{
+			func(ctx context.Context) (addrResult, error) {
+				resp, nextState, err := r.recurse(ctx, name, "A", "IN", &recurseState{
+					ns:         buildQueryers(),
+					count:      state.count,
+					common:     0,
+					seen:       map[string]bool{},
+					inProgress: cloneInProgress(baseInProgress),
+					glue:       cloneGlue(baseGlue),
+				})
+				return addrResult{resp: resp, state: nextState}, err
+			},
+			func(ctx context.Context) (addrResult, error) {
+				resp, nextState, err := r.recurse(ctx, name, "AAAA", "IN", &recurseState{
+					ns:         buildQueryers(),
+					count:      state.count,
+					common:     0,
+					seen:       map[string]bool{},
+					inProgress: cloneInProgress(baseInProgress),
+					glue:       cloneGlue(baseGlue),
+				})
+				return addrResult{resp: resp, state: nextState}, err
+			},
+		}
+
+		results := parallel.RunOrdered(ctx, tasks, parallel.Options{Limit: 2, CancelOnError: false})
+
+		if results[0].Value.state != nil {
+			mergeInProgress(state.inProgress, results[0].Value.state.inProgress)
+			mergeGlue(state.glue, results[0].Value.state.glue)
+		}
+		if results[0].Err != nil {
+			return nil, results[0].Err
+		}
+		pa = results[0].Value.resp
+		if pa.NoSuchName() {
+			return nil, nil
+		}
+
+		if results[1].Value.state != nil {
+			mergeInProgress(state.inProgress, results[1].Value.state.inProgress)
+			mergeGlue(state.glue, results[1].Value.state.glue)
+		}
+		if results[1].Err != nil {
+			return nil, results[1].Err
+		}
+		paaaa = results[1].Value.resp
 	}
 
 	var res []netip.Addr
@@ -337,20 +457,58 @@ func (l lazyNameserver) QueryWithClass(ctx context.Context, qname string, qtype 
 	}
 	nameObj := dnsname.New(l.name)
 	nameKey := strings.ToLower(nameObj.String())
+
+	parallelism := profile.Effective().Resolver.Defaults.Parallel
+	if parallelism < 1 {
+		parallelism = 1
+	}
+	queryAddresses := func(addrs []netip.Addr) (packet.Packet, error) {
+		if len(addrs) == 0 {
+			return packet.Packet{}, nil
+		}
+		if parallelism <= 1 || len(addrs) == 1 {
+			for _, addr := range addrs {
+				ns, err := nameserver.New(l.name, addr.String(), l.recursor.client)
+				if err != nil {
+					continue
+				}
+				resp, err := ns.QueryWithClass(ctx, qname, qtype, qclass)
+				if err == nil && resp.Msg != nil {
+					return resp, nil
+				}
+			}
+			return packet.Packet{}, nil
+		}
+
+		tasks := make([]parallel.Task[packet.Packet], len(addrs))
+		for i, addr := range addrs {
+			addr := addr
+			tasks[i] = func(ctx context.Context) (packet.Packet, error) {
+				ns, err := nameserver.New(l.name, addr.String(), l.recursor.client)
+				if err != nil {
+					return packet.Packet{}, err
+				}
+				return ns.QueryWithClass(ctx, qname, qtype, qclass)
+			}
+		}
+
+		results := parallel.RunOrdered(ctx, tasks, parallel.Options{Limit: parallelism, CancelOnError: false})
+		for _, res := range results {
+			if res.Err == nil && res.Value.Msg != nil {
+				return res.Value, nil
+			}
+		}
+		return packet.Packet{}, nil
+	}
+
 	if l.state != nil && l.state.glue != nil {
 		if addrs, ok := l.state.glue[nameKey]; ok {
 			if len(addrs) > 0 {
+				ordered := make([]netip.Addr, 0, len(addrs))
 				for addr := range addrs {
-					ns, err := nameserver.New(l.name, addr.String(), l.recursor.client)
-					if err != nil {
-						continue
-					}
-					resp, err := ns.QueryWithClass(ctx, qname, qtype, qclass)
-					if err == nil && resp.Msg != nil {
-						return resp, nil
-					}
+					ordered = append(ordered, addr)
 				}
-				return packet.Packet{}, nil
+				return queryAddresses(ordered)
 			}
 		} else {
 			l.state.glue[nameKey] = map[netip.Addr]bool{}
@@ -369,17 +527,7 @@ func (l lazyNameserver) QueryWithClass(ctx context.Context, qname string, qtype 
 			l.state.glue[nameKey][addr] = true
 		}
 	}
-	for _, addr := range addrs {
-		ns, err := nameserver.New(l.name, addr.String(), l.recursor.client)
-		if err != nil {
-			continue
-		}
-		resp, err := ns.QueryWithClass(ctx, qname, qtype, qclass)
-		if err == nil && resp.Msg != nil {
-			return resp, nil
-		}
-	}
-	return packet.Packet{}, nil
+	return queryAddresses(addrs)
 }
 
 func collectCNAMEs(resp packet.Packet, target dnsname.Name, out map[string]bool) {

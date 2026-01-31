@@ -13,12 +13,16 @@ import (
 	"github.com/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/internal/parallel"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/methods"
 	methodsv2 "codeberg.org/pawal/gonemaster/engine/methodsv2"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/runner"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/testcase"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/testlogger"
 	"codeberg.org/pawal/gonemaster/engine/util"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
@@ -89,7 +93,9 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var results []*logger.Entry
 
 	if util.ShouldRunTest("dnssec07") {
-		entries, err := DNSSEC07(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC07(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
@@ -101,42 +107,54 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if util.ShouldRunTest("dnssec01") {
-		entries, err := DNSSEC01(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC01(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("dnssec02") {
-		entries, err := DNSSEC02(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC02(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("dnssec03") {
-		entries, err := DNSSEC03(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC03(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("dnssec04") {
-		entries, err := DNSSEC04(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC04(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("dnssec05") {
-		entries, err := DNSSEC05(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC05(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("dnssec06") {
-		entries, err := DNSSEC06(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC06(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
@@ -144,7 +162,9 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if util.ShouldRunTest("dnssec08") {
-		entries, err := DNSSEC08(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC08(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
@@ -152,7 +172,9 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if util.ShouldRunTest("dnssec09") {
-		entries, err := DNSSEC09(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC09(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
@@ -160,56 +182,72 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if util.ShouldRunTest("dnssec10") {
-		entries, err := DNSSEC10(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC10(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("dnssec11") {
-		entries, err := DNSSEC11(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC11(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("dnssec13") {
-		entries, err := DNSSEC13(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC13(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("dnssec14") {
-		entries, err := DNSSEC14(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC14(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("dnssec15") {
-		entries, err := DNSSEC15(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC15(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("dnssec16") {
-		entries, err := DNSSEC16(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC16(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("dnssec17") {
-		entries, err := DNSSEC17(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC17(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("dnssec18") {
-		entries, err := DNSSEC18(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC18(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
@@ -511,62 +549,128 @@ func DNSSEC01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(parentNS) > 0 {
+		type parentOutcome struct {
+			ignoredParentNS      []string
+			respondsWithoutValid []string
+			respondsWith         []string
+			sets                 map[string]map[uint8]map[uint16][]string
+			algo2DS              map[uint16][]string
+			nonAlgo2DS           map[uint16][]string
+		}
+
 		nsByIP := nameserversByIP(parentNS)
-		for _, matchingNS := range nsByIP {
-			ns := matchingNS[0]
-			if disabled, err := ipDisabledMessage(&results, testcase, ns, "DS"); err != nil {
-				return results, err
-			} else if disabled {
-				continue
+		outcomes := make([]parentOutcome, len(nsByIP))
+		tasks := make([]runner.Task, len(nsByIP))
+		for i, matchingNS := range nsByIP {
+			i, matchingNS := i, matchingNS
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				if len(matchingNS) == 0 {
+					return nil
+				}
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				ns := matchingNS[0]
+				outcome := parentOutcome{
+					sets:       map[string]map[uint8]map[uint16][]string{},
+					algo2DS:    map[uint16][]string{},
+					nonAlgo2DS: map[uint16][]string{},
+				}
+
+				if disabled, err := ipDisabledMessageWithLogger(buf, ns, "DS"); err != nil {
+					return err
+				} else if disabled {
+					outcomes[i] = outcome
+					return nil
+				}
+
+				matchingStrings := nsStrings(matchingNS)
+
+				dnssecOn := true
+				resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DS", &nameserver.QueryOptions{DNSSEC: &dnssecOn})
+				if resp.Msg == nil || resp.Rcode() != "NOERROR" || !resp.HasEdns() || !resp.DO() || !resp.AA() {
+					outcome.ignoredParentNS = append(outcome.ignoredParentNS, matchingStrings...)
+					outcomes[i] = outcome
+					return nil
+				}
+
+				rrs := resp.GetRecords("DS", "answer")
+				validDS := false
+				for _, rr := range rrs {
+					ds, ok := rr.(*dns.DS)
+					if !ok {
+						continue
+					}
+					owner := dnsname.New(ds.Hdr.Name)
+					if owner.String() == z.Name.String() {
+						validDS = true
+						break
+					}
+				}
+
+				if !validDS {
+					outcome.respondsWithoutValid = append(outcome.respondsWithoutValid, matchingStrings...)
+					outcomes[i] = outcome
+					return nil
+				}
+
+				outcome.respondsWith = append(outcome.respondsWith, matchingStrings...)
+
+				for _, rr := range rrs {
+					ds, ok := rr.(*dns.DS)
+					if !ok {
+						continue
+					}
+					digest := ds.DigestType
+					keytag := ds.KeyTag
+					tag := dnssec01TagForDigest(digest)
+					if outcome.sets[tag] == nil {
+						outcome.sets[tag] = map[uint8]map[uint16][]string{}
+					}
+					if outcome.sets[tag][digest] == nil {
+						outcome.sets[tag][digest] = map[uint16][]string{}
+					}
+					outcome.sets[tag][digest][keytag] = append(outcome.sets[tag][digest][keytag], matchingStrings...)
+					if digest == 2 {
+						outcome.algo2DS[keytag] = append(outcome.algo2DS[keytag], matchingStrings...)
+					} else {
+						outcome.nonAlgo2DS[keytag] = append(outcome.nonAlgo2DS[keytag], matchingStrings...)
+					}
+				}
+
+				outcomes[i] = outcome
+				return nil
 			}
+		}
 
-			matchingStrings := nsStrings(matchingNS)
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+		if err != nil {
+			return results, err
+		}
+		results = append(results, entries...)
 
-			dnssecOn := true
-			resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DS", &nameserver.QueryOptions{DNSSEC: &dnssecOn})
-			if resp.Msg == nil || resp.Rcode() != "NOERROR" || !resp.HasEdns() || !resp.DO() || !resp.AA() {
-				ignoredParentNS = append(ignoredParentNS, matchingStrings...)
-				continue
+		for _, outcome := range outcomes {
+			ignoredParentNS = append(ignoredParentNS, outcome.ignoredParentNS...)
+			respondsWithoutValidDS = append(respondsWithoutValidDS, outcome.respondsWithoutValid...)
+			respondsWithDS = append(respondsWithDS, outcome.respondsWith...)
+
+			for tag, digestMap := range outcome.sets {
+				if sets[tag] == nil {
+					sets[tag] = map[uint8]map[uint16][]string{}
+				}
+				for digest, keytagMap := range digestMap {
+					if sets[tag][digest] == nil {
+						sets[tag][digest] = map[uint16][]string{}
+					}
+					for keytag, nsList := range keytagMap {
+						sets[tag][digest][keytag] = append(sets[tag][digest][keytag], nsList...)
+					}
+				}
 			}
-
-			rrs := resp.GetRecords("DS", "answer")
-			validDS := false
-			for _, rr := range rrs {
-				ds, ok := rr.(*dns.DS)
-				if !ok {
-					continue
-				}
-				owner := dnsname.New(ds.Hdr.Name)
-				if owner.String() == z.Name.String() {
-					validDS = true
-					break
-				}
+			for keytag, nsList := range outcome.algo2DS {
+				algo2DS[keytag] = append(algo2DS[keytag], nsList...)
 			}
-
-			if !validDS {
-				respondsWithoutValidDS = append(respondsWithoutValidDS, matchingStrings...)
-				continue
-			}
-
-			respondsWithDS = append(respondsWithDS, matchingStrings...)
-
-			for _, rr := range rrs {
-				ds, ok := rr.(*dns.DS)
-				if !ok {
-					continue
-				}
-				digest := ds.DigestType
-				keytag := ds.KeyTag
-				tag := dnssec01TagForDigest(digest)
-				if sets[tag][digest] == nil {
-					sets[tag][digest] = map[uint16][]string{}
-				}
-				sets[tag][digest][keytag] = append(sets[tag][digest][keytag], matchingStrings...)
-				if digest == 2 {
-					algo2DS[keytag] = append(algo2DS[keytag], matchingStrings...)
-				} else {
-					nonAlgo2DS[keytag] = append(nonAlgo2DS[keytag], matchingStrings...)
-				}
+			for keytag, nsList := range outcome.nonAlgo2DS {
+				nonAlgo2DS[keytag] = append(nonAlgo2DS[keytag], nsList...)
 			}
 		}
 	}
@@ -688,30 +792,63 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(parentNS) > 0 {
+		type parentOutcome struct {
+			dsRecords []*dns.DS
+		}
+
 		nsByIP := nameserversByIP(parentNS)
-		for _, matchingNS := range nsByIP {
-			ns := matchingNS[0]
-			if disabled, err := ipDisabledMessage(&results, testcase, ns, "DS"); err != nil {
-				return results, err
-			} else if disabled {
-				continue
-			}
-
-			dnssecOn := true
-			resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DS", &nameserver.QueryOptions{DNSSEC: &dnssecOn})
-			if resp.Msg == nil || resp.Rcode() != "NOERROR" || !resp.HasEdns() || !resp.DO() || !resp.AA() {
-				continue
-			}
-
-			tmpDSRecords := resp.GetRecordsForName("DS", z.Name, "answer")
-			if len(tmpDSRecords) == 0 {
-				continue
-			}
-			for _, rr := range tmpDSRecords {
-				ds, ok := rr.(*dns.DS)
-				if !ok {
-					continue
+		outcomes := make([]parentOutcome, len(nsByIP))
+		tasks := make([]runner.Task, len(nsByIP))
+		for i, matchingNS := range nsByIP {
+			i, matchingNS := i, matchingNS
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				if len(matchingNS) == 0 {
+					return nil
 				}
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				ns := matchingNS[0]
+				outcome := parentOutcome{}
+
+				if disabled, err := ipDisabledMessageWithLogger(buf, ns, "DS"); err != nil {
+					return err
+				} else if disabled {
+					outcomes[i] = outcome
+					return nil
+				}
+
+				dnssecOn := true
+				resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DS", &nameserver.QueryOptions{DNSSEC: &dnssecOn})
+				if resp.Msg == nil || resp.Rcode() != "NOERROR" || !resp.HasEdns() || !resp.DO() || !resp.AA() {
+					outcomes[i] = outcome
+					return nil
+				}
+
+				tmpDSRecords := resp.GetRecordsForName("DS", z.Name, "answer")
+				if len(tmpDSRecords) == 0 {
+					outcomes[i] = outcome
+					return nil
+				}
+				for _, rr := range tmpDSRecords {
+					ds, ok := rr.(*dns.DS)
+					if !ok {
+						continue
+					}
+					outcome.dsRecords = append(outcome.dsRecords, ds)
+				}
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+		if err != nil {
+			return results, err
+		}
+		results = append(results, entries...)
+
+		for _, outcome := range outcomes {
+			for _, ds := range outcome.dsRecords {
 				if !containsDS(dsRecords, ds) {
 					dsRecords = append(dsRecords, ds)
 				}
@@ -741,6 +878,21 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 		sort.Strings(keys)
 
+		type childOutcome struct {
+			nsIP                    string
+			responding              bool
+			hasDNSKEYMatchDS        bool
+			hasRRSIGMatchDS         bool
+			noDNSKEYForDS           map[uint16]bool
+			noMatchDSDNSKEY         map[uint16]bool
+			dnskeyNotForZoneSigning map[uint16]bool
+			dnskeyNotSEP            map[uint16]bool
+			noMatchingDNSKEYRRSIG   map[uint16]bool
+			algoNotSupportedByZM    map[uint16]map[uint8]bool
+			rrsigNotValidByDNSKEY   map[uint16]bool
+		}
+
+		var ordered []nameserver.Nameserver
 		ipAlreadyProcessed := map[string]bool{}
 		for _, key := range keys {
 			ns := nss[key]
@@ -749,130 +901,205 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				continue
 			}
 			ipAlreadyProcessed[nsIP] = true
+			ordered = append(ordered, ns)
+		}
 
-			if disabled, err := ipDisabledMessage(&results, testcase, ns, "DNSKEY"); err != nil {
-				return results, err
-			} else if disabled {
-				continue
-			}
-
-			dnssecOn := true
-			useVC := false
-			resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
-			if resp.Msg == nil || resp.Rcode() != "NOERROR" || !resp.HasEdns() || !resp.DO() || !resp.AA() {
-				continue
-			}
-
-			dnskeyRRs := resp.GetRecordsForName("DNSKEY", z.Name, "answer")
-			if len(dnskeyRRs) == 0 {
-				continue
-			}
-
-			var dnskeyRecords []*dns.DNSKEY
-			for _, rr := range dnskeyRRs {
-				if key, ok := rr.(*dns.DNSKEY); ok {
-					dnskeyRecords = append(dnskeyRecords, key)
+		outcomes := make([]childOutcome, len(ordered))
+		tasks := make([]runner.Task, len(ordered))
+		for i, ns := range ordered {
+			i, ns := i, ns
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				outcome := childOutcome{
+					nsIP:                    ns.Address.String(),
+					noDNSKEYForDS:           map[uint16]bool{},
+					noMatchDSDNSKEY:         map[uint16]bool{},
+					dnskeyNotForZoneSigning: map[uint16]bool{},
+					dnskeyNotSEP:            map[uint16]bool{},
+					noMatchingDNSKEYRRSIG:   map[uint16]bool{},
+					algoNotSupportedByZM:    map[uint16]map[uint8]bool{},
+					rrsigNotValidByDNSKEY:   map[uint16]bool{},
 				}
-			}
-			if len(dnskeyRecords) == 0 {
-				continue
-			}
 
-			respondingChildNS[nsIP] = true
-
-			rrsigRRs := resp.GetRecordsForName("RRSIG", z.Name, "answer")
-			var dnskeyRRSIG []*dns.RRSIG
-			for _, rr := range rrsigRRs {
-				if sig, ok := rr.(*dns.RRSIG); ok {
-					dnskeyRRSIG = append(dnskeyRRSIG, sig)
+				if disabled, err := ipDisabledMessageWithLogger(buf, ns, "DNSKEY"); err != nil {
+					return err
+				} else if disabled {
+					outcomes[i] = outcome
+					return nil
 				}
-			}
 
-			dnskeyMatchingDS := map[*dns.DNSKEY]uint16{}
+				dnssecOn := true
+				useVC := false
+				resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
+				if resp.Msg == nil || resp.Rcode() != "NOERROR" || !resp.HasEdns() || !resp.DO() || !resp.AA() {
+					outcomes[i] = outcome
+					return nil
+				}
 
-			for _, ds := range dsRecords {
-				var matchingDNSKEY *dns.DNSKEY
-				var matchingKeytagDNSKEYs []*dns.DNSKEY
-				matchDSDNSKEY := false
+				dnskeyRRs := resp.GetRecordsForName("DNSKEY", z.Name, "answer")
+				if len(dnskeyRRs) == 0 {
+					outcomes[i] = outcome
+					return nil
+				}
 
-				for _, key := range dnskeyRecords {
-					if ds.KeyTag == key.KeyTag() {
-						matchingKeytagDNSKEYs = append(matchingKeytagDNSKEYs, key)
+				var dnskeyRecords []*dns.DNSKEY
+				for _, rr := range dnskeyRRs {
+					if key, ok := rr.(*dns.DNSKEY); ok {
+						dnskeyRecords = append(dnskeyRecords, key)
+					}
+				}
+				if len(dnskeyRecords) == 0 {
+					outcomes[i] = outcome
+					return nil
+				}
+
+				outcome.responding = true
+
+				rrsigRRs := resp.GetRecordsForName("RRSIG", z.Name, "answer")
+				var dnskeyRRSIG []*dns.RRSIG
+				for _, rr := range rrsigRRs {
+					if sig, ok := rr.(*dns.RRSIG); ok {
+						dnskeyRRSIG = append(dnskeyRRSIG, sig)
 					}
 				}
 
-				for _, key := range matchingKeytagDNSKEYs {
-					if dsDigestSupported(ds.DigestType) {
-						tmpDS := key.ToDS(ds.DigestType)
-						if tmpDS == nil || strings.EqualFold(tmpDS.Digest, ds.Digest) {
+				dnskeyMatchingDS := map[*dns.DNSKEY]uint16{}
+
+				for _, ds := range dsRecords {
+					var matchingDNSKEY *dns.DNSKEY
+					var matchingKeytagDNSKEYs []*dns.DNSKEY
+					matchDSDNSKEY := false
+
+					for _, key := range dnskeyRecords {
+						if ds.KeyTag == key.KeyTag() {
+							matchingKeytagDNSKEYs = append(matchingKeytagDNSKEYs, key)
+						}
+					}
+
+					for _, key := range matchingKeytagDNSKEYs {
+						if dsDigestSupported(ds.DigestType) {
+							tmpDS := key.ToDS(ds.DigestType)
+							if tmpDS == nil || strings.EqualFold(tmpDS.Digest, ds.Digest) {
+								matchingDNSKEY = key
+								matchDSDNSKEY = true
+								break
+							}
+						} else {
 							matchingDNSKEY = key
 							matchDSDNSKEY = true
 							break
 						}
-					} else {
-						matchingDNSKEY = key
-						matchDSDNSKEY = true
-						break
-					}
-				}
-
-				if matchingDNSKEY == nil && len(matchingKeytagDNSKEYs) > 0 {
-					matchingDNSKEY = matchingKeytagDNSKEYs[0]
-				}
-
-				if matchingDNSKEY == nil {
-					noDNSKEYForDS[ds.KeyTag] = append(noDNSKEYForDS[ds.KeyTag], nsIP)
-					continue
-				}
-
-				if !matchDSDNSKEY {
-					noMatchDSDNSKEY[ds.KeyTag] = append(noMatchDSDNSKEY[ds.KeyTag], nsIP)
-				}
-
-				if matchingDNSKEY.Flags&dns.ZONE == 0 {
-					dnskeyNotForZoneSigning[ds.KeyTag] = append(dnskeyNotForZoneSigning[ds.KeyTag], nsIP)
-					continue
-				}
-				if matchingDNSKEY.Flags&dns.SEP == 0 {
-					dnskeyNotSEP[ds.KeyTag] = append(dnskeyNotSEP[ds.KeyTag], nsIP)
-				}
-
-				dnskeyMatchingDS[matchingDNSKEY] = matchingDNSKEY.KeyTag()
-				hasDNSKEYMatchDS[nsIP] = true
-
-				rrset := dnskeyRRset(dnskeyRecords)
-				testTime := packetTime(resp)
-
-				for dnskey, keytag := range dnskeyMatchingDS {
-					var matchingRRSIG []*dns.RRSIG
-					for _, sig := range dnskeyRRSIG {
-						if sig.KeyTag == keytag {
-							matchingRRSIG = append(matchingRRSIG, sig)
-						}
 					}
 
-					foundMatch := false
-					for _, sig := range matchingRRSIG {
-						if err := verifyRRSIG(sig, rrset, dnskey, testTime); err != nil {
-							if errors.Is(err, dns.ErrAlg) {
-								if algoNotSupportedByZM[keytag] == nil {
-									algoNotSupportedByZM[keytag] = map[uint8][]string{}
-								}
-								algoNotSupportedByZM[keytag][sig.Algorithm] = append(algoNotSupportedByZM[keytag][sig.Algorithm], nsIP)
-							} else {
-								rrsigNotValidByDNSKEY[keytag] = append(rrsigNotValidByDNSKEY[keytag], nsIP)
+					if matchingDNSKEY == nil && len(matchingKeytagDNSKEYs) > 0 {
+						matchingDNSKEY = matchingKeytagDNSKEYs[0]
+					}
+
+					if matchingDNSKEY == nil {
+						outcome.noDNSKEYForDS[ds.KeyTag] = true
+						continue
+					}
+
+					if !matchDSDNSKEY {
+						outcome.noMatchDSDNSKEY[ds.KeyTag] = true
+					}
+
+					if matchingDNSKEY.Flags&dns.ZONE == 0 {
+						outcome.dnskeyNotForZoneSigning[ds.KeyTag] = true
+						continue
+					}
+					if matchingDNSKEY.Flags&dns.SEP == 0 {
+						outcome.dnskeyNotSEP[ds.KeyTag] = true
+					}
+
+					dnskeyMatchingDS[matchingDNSKEY] = matchingDNSKEY.KeyTag()
+					outcome.hasDNSKEYMatchDS = true
+
+					rrset := dnskeyRRset(dnskeyRecords)
+					testTime := packetTime(resp)
+
+					for dnskey, keytag := range dnskeyMatchingDS {
+						var matchingRRSIG []*dns.RRSIG
+						for _, sig := range dnskeyRRSIG {
+							if sig.KeyTag == keytag {
+								matchingRRSIG = append(matchingRRSIG, sig)
 							}
+						}
+
+						foundMatch := false
+						for _, sig := range matchingRRSIG {
+							if err := verifyRRSIG(sig, rrset, dnskey, testTime); err != nil {
+								if errors.Is(err, dns.ErrAlg) {
+									if outcome.algoNotSupportedByZM[keytag] == nil {
+										outcome.algoNotSupportedByZM[keytag] = map[uint8]bool{}
+									}
+									outcome.algoNotSupportedByZM[keytag][sig.Algorithm] = true
+								} else {
+									outcome.rrsigNotValidByDNSKEY[keytag] = true
+								}
+							} else {
+								foundMatch = true
+							}
+						}
+
+						if len(matchingRRSIG) == 0 || !foundMatch {
+							outcome.noMatchingDNSKEYRRSIG[keytag] = true
 						} else {
-							foundMatch = true
+							outcome.hasRRSIGMatchDS = true
 						}
 					}
-
-					if len(matchingRRSIG) == 0 || !foundMatch {
-						noMatchingDNSKEYRRSIG[keytag] = append(noMatchingDNSKEYRRSIG[keytag], nsIP)
-					} else {
-						hasRRSIGMatchDS[nsIP] = true
-					}
 				}
+
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+		if err != nil {
+			return results, err
+		}
+		results = append(results, entries...)
+
+		for _, outcome := range outcomes {
+			if !outcome.responding {
+				continue
+			}
+
+			respondingChildNS[outcome.nsIP] = true
+			if outcome.hasDNSKEYMatchDS {
+				hasDNSKEYMatchDS[outcome.nsIP] = true
+			}
+			if outcome.hasRRSIGMatchDS {
+				hasRRSIGMatchDS[outcome.nsIP] = true
+			}
+
+			for keytag := range outcome.noDNSKEYForDS {
+				noDNSKEYForDS[keytag] = append(noDNSKEYForDS[keytag], outcome.nsIP)
+			}
+			for keytag := range outcome.noMatchDSDNSKEY {
+				noMatchDSDNSKEY[keytag] = append(noMatchDSDNSKEY[keytag], outcome.nsIP)
+			}
+			for keytag := range outcome.dnskeyNotForZoneSigning {
+				dnskeyNotForZoneSigning[keytag] = append(dnskeyNotForZoneSigning[keytag], outcome.nsIP)
+			}
+			for keytag := range outcome.dnskeyNotSEP {
+				dnskeyNotSEP[keytag] = append(dnskeyNotSEP[keytag], outcome.nsIP)
+			}
+			for keytag := range outcome.noMatchingDNSKEYRRSIG {
+				noMatchingDNSKEYRRSIG[keytag] = append(noMatchingDNSKEYRRSIG[keytag], outcome.nsIP)
+			}
+			for keytag, algoMap := range outcome.algoNotSupportedByZM {
+				if algoNotSupportedByZM[keytag] == nil {
+					algoNotSupportedByZM[keytag] = map[uint8][]string{}
+				}
+				for algo := range algoMap {
+					algoNotSupportedByZM[keytag][algo] = append(algoNotSupportedByZM[keytag][algo], outcome.nsIP)
+				}
+			}
+			for keytag := range outcome.rrsigNotValidByDNSKEY {
+				rrsigNotValidByDNSKEY[keytag] = append(rrsigNotValidByDNSKEY[keytag], outcome.nsIP)
 			}
 		}
 	}
@@ -996,6 +1223,23 @@ func DNSSEC03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
+	type nsOutcome struct {
+		ns                     string
+		respondsWithoutDNSKEY  bool
+		respondsWithDNSKEY     bool
+		respondsWithoutNSEC3   bool
+		respondsWithNSEC3      bool
+		multipleNSEC3          bool
+		hasNSEC3Details        bool
+		hashAlgorithm          uint8
+		nsec3Flags             uint8
+		nsec3Iterations        uint16
+		nsec3SaltLength        int
+		noResponseNSECQuery    bool
+		errorResponseNSECQuery bool
+	}
+
+	var ordered []nameserver.Nameserver
 	ipAlreadyProcessed := map[string]bool{}
 	for _, ns := range nss {
 		nsIP := ns.Address.String()
@@ -1003,61 +1247,120 @@ func DNSSEC03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			continue
 		}
 		ipAlreadyProcessed[nsIP] = true
+		ordered = append(ordered, ns)
+	}
 
-		if disabled, err := ipDisabledMessage(&results, testcase, ns, "DNSKEY", "NSEC"); err != nil {
-			return results, err
-		} else if disabled {
-			continue
+	outcomes := make([]nsOutcome, len(ordered))
+	tasks := make([]runner.Task, len(ordered))
+	for i, ns := range ordered {
+		i, ns := i, ns
+		tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+			buf := testlogger.Wrap(log, moduleName, testcase)
+			outcome := nsOutcome{ns: ns.String()}
+
+			if disabled, err := ipDisabledMessageWithLogger(buf, ns, "DNSKEY", "NSEC"); err != nil {
+				return err
+			} else if disabled {
+				outcomes[i] = outcome
+				return nil
+			}
+
+			dnssecOn := true
+			dnskeyResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn})
+			if dnskeyResp.Msg == nil || dnskeyResp.Rcode() != "NOERROR" || !dnskeyResp.AA() {
+				outcomes[i] = outcome
+				return nil
+			}
+
+			if len(dnskeyResp.GetRecordsForName("DNSKEY", z.Name, "answer")) == 0 {
+				outcome.respondsWithoutDNSKEY = true
+				outcomes[i] = outcome
+				return nil
+			}
+
+			outcome.respondsWithDNSKEY = true
+
+			nsecResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "NSEC", &nameserver.QueryOptions{DNSSEC: &dnssecOn})
+			if nsecResp.Msg == nil {
+				outcome.noResponseNSECQuery = true
+				outcomes[i] = outcome
+				return nil
+			}
+			if nsecResp.Rcode() != "NOERROR" || !nsecResp.AA() {
+				outcome.errorResponseNSECQuery = true
+				outcomes[i] = outcome
+				return nil
+			}
+
+			nsec3RRs := nsecResp.GetRecords("NSEC3", "authority")
+			if len(nsec3RRs) == 0 {
+				outcome.respondsWithoutNSEC3 = true
+				outcomes[i] = outcome
+				return nil
+			}
+
+			outcome.respondsWithNSEC3 = true
+			if len(nsec3RRs) > 1 {
+				outcome.multipleNSEC3 = true
+			}
+
+			rr, ok := nsec3RRs[0].(*dns.NSEC3)
+			if !ok {
+				outcomes[i] = outcome
+				return nil
+			}
+
+			outcome.hashAlgorithm = rr.Hash
+			outcome.nsec3Flags = rr.Flags
+			outcome.nsec3Iterations = rr.Iterations
+
+			saltLength := 0
+			if rr.Salt != "" {
+				saltLength = len(rr.Salt)
+			}
+			outcome.nsec3SaltLength = saltLength
+			outcome.hasNSEC3Details = true
+
+			outcomes[i] = outcome
+			return nil
 		}
+	}
 
-		dnssecOn := true
-		dnskeyResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn})
-		if dnskeyResp.Msg == nil || dnskeyResp.Rcode() != "NOERROR" || !dnskeyResp.AA() {
-			continue
+	parallelism := profile.Effective().Resolver.Defaults.Parallel
+	entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+	if err != nil {
+		return results, err
+	}
+	results = append(results, entries...)
+
+	for _, outcome := range outcomes {
+		if outcome.respondsWithoutDNSKEY {
+			respondsWithoutDNSKEY = append(respondsWithoutDNSKEY, outcome.ns)
 		}
-
-		if len(dnskeyResp.GetRecordsForName("DNSKEY", z.Name, "answer")) == 0 {
-			respondsWithoutDNSKEY = append(respondsWithoutDNSKEY, ns.String())
-			continue
+		if outcome.respondsWithDNSKEY {
+			respondsWithDNSKEY = append(respondsWithDNSKEY, outcome.ns)
 		}
-
-		respondsWithDNSKEY = append(respondsWithDNSKEY, ns.String())
-
-		nsecResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "NSEC", &nameserver.QueryOptions{DNSSEC: &dnssecOn})
-		if nsecResp.Msg == nil {
-			noResponseNSECQuery = append(noResponseNSECQuery, ns.String())
-			continue
+		if outcome.respondsWithoutNSEC3 {
+			respondsWithoutNSEC3 = append(respondsWithoutNSEC3, outcome.ns)
 		}
-		if nsecResp.Rcode() != "NOERROR" || !nsecResp.AA() {
-			errorResponseNSECQuery = append(errorResponseNSECQuery, ns.String())
-			continue
+		if outcome.respondsWithNSEC3 {
+			respondsWithNSEC3 = append(respondsWithNSEC3, outcome.ns)
 		}
-
-		nsec3RRs := nsecResp.GetRecords("NSEC3", "authority")
-		if len(nsec3RRs) == 0 {
-			respondsWithoutNSEC3 = append(respondsWithoutNSEC3, ns.String())
-			continue
+		if outcome.multipleNSEC3 {
+			multipleNSEC3 = append(multipleNSEC3, outcome.ns)
 		}
-
-		respondsWithNSEC3 = append(respondsWithNSEC3, ns.String())
-		if len(nsec3RRs) > 1 {
-			multipleNSEC3 = append(multipleNSEC3, ns.String())
+		if outcome.hasNSEC3Details {
+			hashAlgorithm[outcome.hashAlgorithm] = append(hashAlgorithm[outcome.hashAlgorithm], outcome.ns)
+			nsec3Flags[outcome.nsec3Flags] = append(nsec3Flags[outcome.nsec3Flags], outcome.ns)
+			nsec3Iterations[outcome.nsec3Iterations] = append(nsec3Iterations[outcome.nsec3Iterations], outcome.ns)
+			nsec3SaltLength[outcome.nsec3SaltLength] = append(nsec3SaltLength[outcome.nsec3SaltLength], outcome.ns)
 		}
-
-		rr, ok := nsec3RRs[0].(*dns.NSEC3)
-		if !ok {
-			continue
+		if outcome.noResponseNSECQuery {
+			noResponseNSECQuery = append(noResponseNSECQuery, outcome.ns)
 		}
-
-		hashAlgorithm[rr.Hash] = append(hashAlgorithm[rr.Hash], ns.String())
-		nsec3Flags[rr.Flags] = append(nsec3Flags[rr.Flags], ns.String())
-		nsec3Iterations[rr.Iterations] = append(nsec3Iterations[rr.Iterations], ns.String())
-
-		saltLength := 0
-		if rr.Salt != "" {
-			saltLength = len(rr.Salt)
+		if outcome.errorResponseNSECQuery {
+			errorResponseNSECQuery = append(errorResponseNSECQuery, outcome.ns)
 		}
-		nsec3SaltLength[saltLength] = append(nsec3SaltLength[saltLength], ns.String())
 	}
 
 	if len(respondsWithDNSKEY) == 0 && len(respondsWithoutDNSKEY) > 0 {
@@ -1294,26 +1597,66 @@ func DNSSEC04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	dnssecOn := true
-	dnskeyResp, err := zoneQueryOne(ctx, z, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn})
-	if err != nil {
-		return results, err
-	}
-	if dnskeyResp.Msg == nil {
-		if err := appendLog(&results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
-			return results, err
-		}
-		return results, nil
-	}
+	parallelism := profile.Effective().Resolver.Defaults.Parallel
 
-	soaResp, err := zoneQueryOne(ctx, z, z.Name.String(), "SOA", &nameserver.QueryOptions{DNSSEC: &dnssecOn})
-	if err != nil {
-		return results, err
-	}
-	if soaResp.Msg == nil {
-		if err := appendLog(&results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
+	var dnskeyResp packet.Packet
+	var soaResp packet.Packet
+
+	if parallelism <= 1 {
+		var err error
+		dnskeyResp, err = zoneQueryOne(ctx, z, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn})
+		if err != nil {
 			return results, err
 		}
-		return results, nil
+		if dnskeyResp.Msg == nil {
+			if err := appendLog(&results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
+				return results, err
+			}
+			return results, nil
+		}
+
+		soaResp, err = zoneQueryOne(ctx, z, z.Name.String(), "SOA", &nameserver.QueryOptions{DNSSEC: &dnssecOn})
+		if err != nil {
+			return results, err
+		}
+		if soaResp.Msg == nil {
+			if err := appendLog(&results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
+				return results, err
+			}
+			return results, nil
+		}
+	} else {
+		tasks := []parallel.Task[packet.Packet]{
+			func(ctx context.Context) (packet.Packet, error) {
+				return zoneQueryOne(ctx, z, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn})
+			},
+			func(ctx context.Context) (packet.Packet, error) {
+				return zoneQueryOne(ctx, z, z.Name.String(), "SOA", &nameserver.QueryOptions{DNSSEC: &dnssecOn})
+			},
+		}
+
+		queryResults := parallel.RunOrdered(ctx, tasks, parallel.Options{Limit: parallelism, CancelOnError: false})
+		dnskeyResp, soaResp = queryResults[0].Value, queryResults[1].Value
+		dnskeyErr, soaErr := queryResults[0].Err, queryResults[1].Err
+
+		if dnskeyErr != nil {
+			return results, dnskeyErr
+		}
+		if dnskeyResp.Msg == nil {
+			if err := appendLog(&results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
+				return results, err
+			}
+			return results, nil
+		}
+		if soaErr != nil {
+			return results, soaErr
+		}
+		if soaResp.Msg == nil {
+			if err := appendLog(&results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
+				return results, err
+			}
+			return results, nil
+		}
 	}
 
 	keySigs := dnskeyResp.GetRecords("RRSIG", "answer")
@@ -1438,48 +1781,103 @@ func DNSSEC05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	nss := nameserversFromNSItems(z, append(delItems, zoneItems...))
-	for _, group := range nameserversByIP(nss) {
-		if len(group) == 0 {
-			continue
+	groups := nameserversByIP(nss)
+	if len(groups) > 0 {
+		type nsOutcome struct {
+			ignoredNS             []string
+			respondsWithoutDNSKEY []string
+			respondsWithDNSKEY    []string
+			sets                  map[string]map[uint8]map[uint16][]string
 		}
-		ns := group[0]
-		if disabled, err := ipDisabledMessage(&results, testcase, ns, "DNSKEY"); err != nil {
+
+		outcomes := make([]nsOutcome, len(groups))
+		tasks := make([]runner.Task, len(groups))
+		for i, group := range groups {
+			i, group := i, group
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				if len(group) == 0 {
+					return nil
+				}
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				ns := group[0]
+				outcome := nsOutcome{
+					sets: map[string]map[uint8]map[uint16][]string{},
+				}
+
+				if disabled, err := ipDisabledMessageWithLogger(buf, ns, "DNSKEY"); err != nil {
+					return err
+				} else if disabled {
+					outcomes[i] = outcome
+					return nil
+				}
+
+				matchingStrings := nsStrings(group)
+
+				dnssecOn := true
+				resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn})
+				if resp.Msg == nil || resp.Rcode() != "NOERROR" || !resp.AA() {
+					outcome.ignoredNS = append(outcome.ignoredNS, matchingStrings...)
+					outcomes[i] = outcome
+					return nil
+				}
+
+				dnskeyRRs := resp.GetRecordsForName("DNSKEY", z.Name, "answer")
+				if len(dnskeyRRs) == 0 {
+					outcome.respondsWithoutDNSKEY = append(outcome.respondsWithoutDNSKEY, matchingStrings...)
+					outcomes[i] = outcome
+					return nil
+				}
+
+				outcome.respondsWithDNSKEY = append(outcome.respondsWithDNSKEY, matchingStrings...)
+				for _, rr := range dnskeyRRs {
+					key, ok := rr.(*dns.DNSKEY)
+					if !ok {
+						continue
+					}
+					algo := key.Algorithm
+					keytag := key.KeyTag()
+					tag := dnssec05TagForAlgorithm(algo)
+					if sets[tag] == nil {
+						continue
+					}
+					if outcome.sets[tag] == nil {
+						outcome.sets[tag] = map[uint8]map[uint16][]string{}
+					}
+					if outcome.sets[tag][algo] == nil {
+						outcome.sets[tag][algo] = map[uint16][]string{}
+					}
+					outcome.sets[tag][algo][keytag] = append(outcome.sets[tag][algo][keytag], matchingStrings...)
+				}
+
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+		if err != nil {
 			return results, err
-		} else if disabled {
-			continue
 		}
+		results = append(results, entries...)
 
-		matchingStrings := nsStrings(group)
-
-		dnssecOn := true
-		resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn})
-		if resp.Msg == nil || resp.Rcode() != "NOERROR" || !resp.AA() {
-			ignoredNS = append(ignoredNS, matchingStrings...)
-			continue
-		}
-
-		dnskeyRRs := resp.GetRecordsForName("DNSKEY", z.Name, "answer")
-		if len(dnskeyRRs) == 0 {
-			respondsWithoutDNSKEY = append(respondsWithoutDNSKEY, matchingStrings...)
-			continue
-		}
-
-		respondsWithDNSKEY = append(respondsWithDNSKEY, matchingStrings...)
-		for _, rr := range dnskeyRRs {
-			key, ok := rr.(*dns.DNSKEY)
-			if !ok {
-				continue
+		for _, outcome := range outcomes {
+			ignoredNS = append(ignoredNS, outcome.ignoredNS...)
+			respondsWithoutDNSKEY = append(respondsWithoutDNSKEY, outcome.respondsWithoutDNSKEY...)
+			respondsWithDNSKEY = append(respondsWithDNSKEY, outcome.respondsWithDNSKEY...)
+			for tag, algoMap := range outcome.sets {
+				if sets[tag] == nil {
+					sets[tag] = map[uint8]map[uint16][]string{}
+				}
+				for algo, keytagMap := range algoMap {
+					if sets[tag][algo] == nil {
+						sets[tag][algo] = map[uint16][]string{}
+					}
+					for keytag, nsList := range keytagMap {
+						sets[tag][algo][keytag] = append(sets[tag][algo][keytag], nsList...)
+					}
+				}
 			}
-			algo := key.Algorithm
-			keytag := key.KeyTag()
-			tag := dnssec05TagForAlgorithm(algo)
-			if sets[tag] == nil {
-				continue
-			}
-			if sets[tag][algo] == nil {
-				sets[tag][algo] = map[uint16][]string{}
-			}
-			sets[tag][algo][keytag] = append(sets[tag][algo][keytag], matchingStrings...)
 		}
 	}
 
@@ -1627,53 +2025,107 @@ func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	childNames := nsStrings(childNS)
 
 	queryTypes := []string{"SOA", "DNSKEY", "DS"}
-	for _, group := range nameserversByIP(childNS) {
-		if len(group) == 0 {
-			continue
-		}
-		ns := group[0]
-		if disabled, err := ipDisabledMessage(&results, testcase, ns, queryTypes...); err != nil {
-			return results, err
-		} else if disabled {
-			continue
-		}
+	type childOutcome struct {
+		matchingStrings []string
+		ignored         bool
+		noResponse      bool
+		noAuth          bool
+		errorRcode      string
+		signed          bool
+		noDNSKEY        bool
+	}
 
-		matchingStrings := nsStrings(group)
+	childGroups := nameserversByIP(childNS)
+	if len(childGroups) > 0 {
+		outcomes := make([]childOutcome, len(childGroups))
+		tasks := make([]runner.Task, len(childGroups))
+		for i, group := range childGroups {
+			i, group := i, group
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				if len(group) == 0 {
+					return nil
+				}
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				ns := group[0]
+				outcome := childOutcome{matchingStrings: nsStrings(group)}
 
-		soaResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "SOA", nil)
-		if soaResp.Msg == nil || soaResp.Rcode() != "NOERROR" || !soaResp.AA() || len(soaResp.GetRecords("SOA", "answer")) == 0 {
-			ignoredChildNS = append(ignoredChildNS, matchingStrings...)
-			continue
-		}
+				if disabled, err := ipDisabledMessageWithLogger(buf, ns, queryTypes...); err != nil {
+					return err
+				} else if disabled {
+					outcomes[i] = outcome
+					return nil
+				}
 
-		dnssecOn := true
-		dnskeyResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn})
-		if dnskeyResp.Msg == nil {
-			noResponseDNSKEY = append(noResponseDNSKEY, matchingStrings...)
-			continue
-		}
-		if !dnskeyResp.AA() {
-			noAuthDNSKEY = append(noAuthDNSKEY, matchingStrings...)
-			continue
-		}
-		if dnskeyResp.Rcode() != "NOERROR" {
-			errorRcodeDNSKEY[dnskeyResp.Rcode()] = append(errorRcodeDNSKEY[dnskeyResp.Rcode()], matchingStrings...)
-			continue
-		}
+				soaResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "SOA", nil)
+				if soaResp.Msg == nil || soaResp.Rcode() != "NOERROR" || !soaResp.AA() || len(soaResp.GetRecords("SOA", "answer")) == 0 {
+					outcome.ignored = true
+					outcomes[i] = outcome
+					return nil
+				}
 
-		rrsigRRs := dnskeyResp.GetRecords("RRSIG", "answer")
-		coveredDNSKEY := false
-		for _, rr := range rrsigRRs {
-			if sig, ok := rr.(*dns.RRSIG); ok && sig.TypeCovered == dns.TypeDNSKEY {
-				coveredDNSKEY = true
-				break
+				dnssecOn := true
+				dnskeyResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn})
+				if dnskeyResp.Msg == nil {
+					outcome.noResponse = true
+					outcomes[i] = outcome
+					return nil
+				}
+				if !dnskeyResp.AA() {
+					outcome.noAuth = true
+					outcomes[i] = outcome
+					return nil
+				}
+				if dnskeyResp.Rcode() != "NOERROR" {
+					outcome.errorRcode = dnskeyResp.Rcode()
+					outcomes[i] = outcome
+					return nil
+				}
+
+				rrsigRRs := dnskeyResp.GetRecords("RRSIG", "answer")
+				coveredDNSKEY := false
+				for _, rr := range rrsigRRs {
+					if sig, ok := rr.(*dns.RRSIG); ok && sig.TypeCovered == dns.TypeDNSKEY {
+						coveredDNSKEY = true
+						break
+					}
+				}
+
+				if coveredDNSKEY {
+					outcome.signed = true
+				} else {
+					outcome.noDNSKEY = true
+				}
+
+				outcomes[i] = outcome
+				return nil
 			}
 		}
 
-		if coveredDNSKEY {
-			signedResponse = append(signedResponse, matchingStrings...)
-		} else {
-			noDNSKEY = append(noDNSKEY, matchingStrings...)
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+		if err != nil {
+			return results, err
+		}
+		results = append(results, entries...)
+
+		for _, outcome := range outcomes {
+			if len(outcome.matchingStrings) == 0 {
+				continue
+			}
+			switch {
+			case outcome.ignored:
+				ignoredChildNS = append(ignoredChildNS, outcome.matchingStrings...)
+			case outcome.noResponse:
+				noResponseDNSKEY = append(noResponseDNSKEY, outcome.matchingStrings...)
+			case outcome.noAuth:
+				noAuthDNSKEY = append(noAuthDNSKEY, outcome.matchingStrings...)
+			case outcome.errorRcode != "":
+				errorRcodeDNSKEY[outcome.errorRcode] = append(errorRcodeDNSKEY[outcome.errorRcode], outcome.matchingStrings...)
+			case outcome.signed:
+				signedResponse = append(signedResponse, outcome.matchingStrings...)
+			case outcome.noDNSKEY:
+				noDNSKEY = append(noDNSKEY, outcome.matchingStrings...)
+			}
 		}
 	}
 
@@ -1706,39 +2158,80 @@ func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(parentNS) > 0 {
-		for _, group := range nameserversByIP(parentNS) {
-			if len(group) == 0 {
-				continue
-			}
-			ns := group[0]
-			if disabled, err := ipDisabledMessage(&results, testcase, ns, "DS"); err != nil {
-				return results, err
-			} else if disabled {
-				continue
-			}
+		type parentOutcome struct {
+			matchingStrings []string
+			ignored         bool
+			dsInResponse    bool
+			noDS            bool
+		}
 
-			matchingStrings := nsStrings(group)
-
-			dnssecOn := true
-			dsResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DS", &nameserver.QueryOptions{DNSSEC: &dnssecOn})
-			if dsResp.Msg == nil || dsResp.Rcode() != "NOERROR" || !dsResp.HasEdns() || !dsResp.DO() || !dsResp.AA() {
-				ignoredParentNS = append(ignoredParentNS, matchingStrings...)
-				continue
-			}
-
-			rrsigRRs := dsResp.GetRecordsForName("RRSIG", z.Name, "answer")
-			coveredDS := false
-			for _, rr := range rrsigRRs {
-				if sig, ok := rr.(*dns.RRSIG); ok && sig.TypeCovered == dns.TypeDS {
-					coveredDS = true
-					break
+		parentGroups := nameserversByIP(parentNS)
+		outcomes := make([]parentOutcome, len(parentGroups))
+		tasks := make([]runner.Task, len(parentGroups))
+		for i, group := range parentGroups {
+			i, group := i, group
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				if len(group) == 0 {
+					return nil
 				}
-			}
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				ns := group[0]
+				outcome := parentOutcome{matchingStrings: nsStrings(group)}
 
-			if coveredDS {
-				dsInResponse = append(dsInResponse, matchingStrings...)
-			} else {
-				noDS = append(noDS, matchingStrings...)
+				if disabled, err := ipDisabledMessageWithLogger(buf, ns, "DS"); err != nil {
+					return err
+				} else if disabled {
+					outcomes[i] = outcome
+					return nil
+				}
+
+				dnssecOn := true
+				dsResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DS", &nameserver.QueryOptions{DNSSEC: &dnssecOn})
+				if dsResp.Msg == nil || dsResp.Rcode() != "NOERROR" || !dsResp.HasEdns() || !dsResp.DO() || !dsResp.AA() {
+					outcome.ignored = true
+					outcomes[i] = outcome
+					return nil
+				}
+
+				rrsigRRs := dsResp.GetRecordsForName("RRSIG", z.Name, "answer")
+				coveredDS := false
+				for _, rr := range rrsigRRs {
+					if sig, ok := rr.(*dns.RRSIG); ok && sig.TypeCovered == dns.TypeDS {
+						coveredDS = true
+						break
+					}
+				}
+
+				if coveredDS {
+					outcome.dsInResponse = true
+				} else {
+					outcome.noDS = true
+				}
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+		if err != nil {
+			return results, err
+		}
+		results = append(results, entries...)
+
+		for _, outcome := range outcomes {
+			if len(outcome.matchingStrings) == 0 {
+				continue
+			}
+			if outcome.ignored {
+				ignoredParentNS = append(ignoredParentNS, outcome.matchingStrings...)
+				continue
+			}
+			if outcome.dsInResponse {
+				dsInResponse = append(dsInResponse, outcome.matchingStrings...)
+			}
+			if outcome.noDS {
+				noDS = append(noDS, outcome.matchingStrings...)
 			}
 		}
 	}
@@ -1900,6 +2393,7 @@ func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 	sort.Strings(keys)
 
+	var ordered []nameserver.Nameserver
 	ipAlreadyProcessed := map[string]bool{}
 	for _, key := range keys {
 		ns := nss[key]
@@ -1908,101 +2402,172 @@ func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			continue
 		}
 		ipAlreadyProcessed[nsIP] = true
+		ordered = append(ordered, ns)
+	}
 
-		if disabled, err := ipDisabledMessage(&results, testcase, ns, "DNSKEY"); err != nil {
-			return results, err
-		} else if disabled {
-			continue
+	if len(ordered) > 0 {
+		type nsOutcome struct {
+			nsIP                   string
+			dnskeyWithoutRRSIG     bool
+			dnskeyRRSIGNotYetValid map[uint16]bool
+			dnskeyRRSIGExpired     map[uint16]bool
+			noMatchingDNSKEY       map[uint16]bool
+			rrsigNotValidByDNSKEY  map[uint16]bool
+			algoNotSupportedByZM   map[uint16]map[uint8]bool
 		}
 
-		dnssecOn := true
-		resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn})
-		if resp.Msg == nil || resp.Rcode() != "NOERROR" || !resp.AA() {
-			continue
-		}
-
-		dnskeyRRs := resp.GetRecordsForName("DNSKEY", z.Name, "answer")
-		if len(dnskeyRRs) == 0 {
-			continue
-		}
-
-		var dnskeyRecords []*dns.DNSKEY
-		for _, rr := range resp.GetRecords("DNSKEY", "answer") {
-			if dnskey, ok := rr.(*dns.DNSKEY); ok {
-				dnskeyRecords = append(dnskeyRecords, dnskey)
-			}
-		}
-		if len(dnskeyRecords) == 0 {
-			continue
-		}
-
-		rrsigRRs := resp.GetRecords("RRSIG", "answer")
-		if len(rrsigRRs) == 0 {
-			dnskeyWithoutRRSIG = append(dnskeyWithoutRRSIG, nsIP)
-			continue
-		}
-
-		testTime := packetTime(resp)
-
-		for _, rr := range rrsigRRs {
-			sig, ok := rr.(*dns.RRSIG)
-			if !ok {
-				continue
-			}
-
-			if int64(sig.Inception) > testTime.Unix() {
-				dnskeyRRSIGNotYetValid[sig.KeyTag] = append(dnskeyRRSIGNotYetValid[sig.KeyTag], nsIP)
-				continue
-			}
-			if int64(sig.Expiration) < testTime.Unix() {
-				dnskeyRRSIGExpired[sig.KeyTag] = append(dnskeyRRSIGExpired[sig.KeyTag], nsIP)
-				continue
-			}
-
-			if !dnssecAlgorithmSupported(sig.Algorithm) {
-				if algoNotSupportedByZM[sig.KeyTag] == nil {
-					algoNotSupportedByZM[sig.KeyTag] = map[uint8][]string{}
+		outcomes := make([]nsOutcome, len(ordered))
+		tasks := make([]runner.Task, len(ordered))
+		for i, ns := range ordered {
+			i, ns := i, ns
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				outcome := nsOutcome{
+					nsIP:                   ns.Address.String(),
+					dnskeyRRSIGNotYetValid: map[uint16]bool{},
+					dnskeyRRSIGExpired:     map[uint16]bool{},
+					noMatchingDNSKEY:       map[uint16]bool{},
+					rrsigNotValidByDNSKEY:  map[uint16]bool{},
+					algoNotSupportedByZM:   map[uint16]map[uint8]bool{},
 				}
-				algoNotSupportedByZM[sig.KeyTag][sig.Algorithm] = append(algoNotSupportedByZM[sig.KeyTag][sig.Algorithm], nsIP)
-				continue
-			}
 
-			var matchingDNSKEYs []*dns.DNSKEY
-			for _, dnskey := range dnskeyRecords {
-				if dnskey.KeyTag() == sig.KeyTag {
-					matchingDNSKEYs = append(matchingDNSKEYs, dnskey)
+				if disabled, err := ipDisabledMessageWithLogger(buf, ns, "DNSKEY"); err != nil {
+					return err
+				} else if disabled {
+					outcomes[i] = outcome
+					return nil
 				}
-			}
 
-			if len(matchingDNSKEYs) == 0 {
-				noMatchingDNSKEY[sig.KeyTag] = append(noMatchingDNSKEY[sig.KeyTag], nsIP)
-				continue
-			}
+				dnssecOn := true
+				resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn})
+				if resp.Msg == nil || resp.Rcode() != "NOERROR" || !resp.AA() {
+					outcomes[i] = outcome
+					return nil
+				}
 
-			rrset := dnskeyRRset(dnskeyRecords)
-			valid := false
-			algoUnsupported := false
-			for _, dnskey := range matchingDNSKEYs {
-				if err := verifyRRSIG(sig, rrset, dnskey, testTime); err != nil {
-					if errors.Is(err, dns.ErrAlg) {
-						algoUnsupported = true
+				dnskeyRRs := resp.GetRecordsForName("DNSKEY", z.Name, "answer")
+				if len(dnskeyRRs) == 0 {
+					outcomes[i] = outcome
+					return nil
+				}
+
+				var dnskeyRecords []*dns.DNSKEY
+				for _, rr := range resp.GetRecords("DNSKEY", "answer") {
+					if dnskey, ok := rr.(*dns.DNSKEY); ok {
+						dnskeyRecords = append(dnskeyRecords, dnskey)
 					}
-					continue
 				}
-				valid = true
-				break
-			}
-
-			if algoUnsupported {
-				if algoNotSupportedByZM[sig.KeyTag] == nil {
-					algoNotSupportedByZM[sig.KeyTag] = map[uint8][]string{}
+				if len(dnskeyRecords) == 0 {
+					outcomes[i] = outcome
+					return nil
 				}
-				algoNotSupportedByZM[sig.KeyTag][sig.Algorithm] = append(algoNotSupportedByZM[sig.KeyTag][sig.Algorithm], nsIP)
-				continue
-			}
 
-			if !valid {
-				rrsigNotValidByDNSKEY[sig.KeyTag] = append(rrsigNotValidByDNSKEY[sig.KeyTag], nsIP)
+				rrsigRRs := resp.GetRecords("RRSIG", "answer")
+				if len(rrsigRRs) == 0 {
+					outcome.dnskeyWithoutRRSIG = true
+					outcomes[i] = outcome
+					return nil
+				}
+
+				testTime := packetTime(resp)
+
+				for _, rr := range rrsigRRs {
+					sig, ok := rr.(*dns.RRSIG)
+					if !ok {
+						continue
+					}
+
+					if int64(sig.Inception) > testTime.Unix() {
+						outcome.dnskeyRRSIGNotYetValid[sig.KeyTag] = true
+						continue
+					}
+					if int64(sig.Expiration) < testTime.Unix() {
+						outcome.dnskeyRRSIGExpired[sig.KeyTag] = true
+						continue
+					}
+
+					if !dnssecAlgorithmSupported(sig.Algorithm) {
+						if outcome.algoNotSupportedByZM[sig.KeyTag] == nil {
+							outcome.algoNotSupportedByZM[sig.KeyTag] = map[uint8]bool{}
+						}
+						outcome.algoNotSupportedByZM[sig.KeyTag][sig.Algorithm] = true
+						continue
+					}
+
+					var matchingDNSKEYs []*dns.DNSKEY
+					for _, dnskey := range dnskeyRecords {
+						if dnskey.KeyTag() == sig.KeyTag {
+							matchingDNSKEYs = append(matchingDNSKEYs, dnskey)
+						}
+					}
+
+					if len(matchingDNSKEYs) == 0 {
+						outcome.noMatchingDNSKEY[sig.KeyTag] = true
+						continue
+					}
+
+					rrset := dnskeyRRset(dnskeyRecords)
+					valid := false
+					algoUnsupported := false
+					for _, dnskey := range matchingDNSKEYs {
+						if err := verifyRRSIG(sig, rrset, dnskey, testTime); err != nil {
+							if errors.Is(err, dns.ErrAlg) {
+								algoUnsupported = true
+							}
+							continue
+						}
+						valid = true
+						break
+					}
+
+					if algoUnsupported {
+						if outcome.algoNotSupportedByZM[sig.KeyTag] == nil {
+							outcome.algoNotSupportedByZM[sig.KeyTag] = map[uint8]bool{}
+						}
+						outcome.algoNotSupportedByZM[sig.KeyTag][sig.Algorithm] = true
+						continue
+					}
+
+					if !valid {
+						outcome.rrsigNotValidByDNSKEY[sig.KeyTag] = true
+					}
+				}
+
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+		if err != nil {
+			return results, err
+		}
+		results = append(results, entries...)
+
+		for _, outcome := range outcomes {
+			if outcome.dnskeyWithoutRRSIG {
+				dnskeyWithoutRRSIG = append(dnskeyWithoutRRSIG, outcome.nsIP)
+			}
+			for keytag := range outcome.dnskeyRRSIGNotYetValid {
+				dnskeyRRSIGNotYetValid[keytag] = append(dnskeyRRSIGNotYetValid[keytag], outcome.nsIP)
+			}
+			for keytag := range outcome.dnskeyRRSIGExpired {
+				dnskeyRRSIGExpired[keytag] = append(dnskeyRRSIGExpired[keytag], outcome.nsIP)
+			}
+			for keytag := range outcome.noMatchingDNSKEY {
+				noMatchingDNSKEY[keytag] = append(noMatchingDNSKEY[keytag], outcome.nsIP)
+			}
+			for keytag := range outcome.rrsigNotValidByDNSKEY {
+				rrsigNotValidByDNSKEY[keytag] = append(rrsigNotValidByDNSKEY[keytag], outcome.nsIP)
+			}
+			for keytag, algoMap := range outcome.algoNotSupportedByZM {
+				if algoNotSupportedByZM[keytag] == nil {
+					algoNotSupportedByZM[keytag] = map[uint8][]string{}
+				}
+				for algo := range algoMap {
+					algoNotSupportedByZM[keytag][algo] = append(algoNotSupportedByZM[keytag][algo], outcome.nsIP)
+				}
 			}
 		}
 	}
@@ -2104,6 +2669,7 @@ func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 	sort.Strings(keys)
 
+	var ordered []nameserver.Nameserver
 	ipAlreadyProcessed := map[string]bool{}
 	for _, key := range keys {
 		ns := nss[key]
@@ -2112,112 +2678,185 @@ func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			continue
 		}
 		ipAlreadyProcessed[nsIP] = true
+		ordered = append(ordered, ns)
+	}
 
-		if disabled, err := ipDisabledMessage(&results, testcase, ns, "DNSKEY"); err != nil {
-			return results, err
-		} else if disabled {
-			continue
+	if len(ordered) > 0 {
+		type nsOutcome struct {
+			nsIP                  string
+			soaWithoutRRSIG       bool
+			soaRRSIGNotYetValid   map[uint16]bool
+			soaRRSIGExpired       map[uint16]bool
+			noMatchingDNSKEY      map[uint16]bool
+			rrsigNotValidByDNSKEY map[uint16]bool
+			algoNotSupportedByZM  map[uint16]map[uint8]bool
 		}
 
-		dnssecOn := true
-		dnskeyResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn})
-		if dnskeyResp.Msg == nil || dnskeyResp.Rcode() != "NOERROR" || !dnskeyResp.AA() {
-			continue
-		}
-
-		dnskeyRRs := dnskeyResp.GetRecordsForName("DNSKEY", z.Name, "answer")
-		if len(dnskeyRRs) == 0 {
-			continue
-		}
-
-		var dnskeyRecords []*dns.DNSKEY
-		for _, rr := range dnskeyRRs {
-			if dnskey, ok := rr.(*dns.DNSKEY); ok {
-				dnskeyRecords = append(dnskeyRecords, dnskey)
-			}
-		}
-		if len(dnskeyRecords) == 0 {
-			continue
-		}
-
-		useVC := false
-		soaResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "SOA", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
-		if soaResp.Msg == nil || soaResp.Rcode() != "NOERROR" || !soaResp.AA() {
-			continue
-		}
-
-		soaRRs := soaResp.GetRecordsForName("SOA", z.Name, "answer")
-		if len(soaRRs) == 0 {
-			continue
-		}
-
-		rrsigRRs := soaResp.GetRecords("RRSIG", "answer")
-		if len(rrsigRRs) == 0 {
-			soaWithoutRRSIG = append(soaWithoutRRSIG, nsIP)
-			continue
-		}
-
-		testTime := packetTime(dnskeyResp)
-
-		for _, rr := range rrsigRRs {
-			sig, ok := rr.(*dns.RRSIG)
-			if !ok {
-				continue
-			}
-
-			if int64(sig.Inception) > testTime.Unix() {
-				soaRRSIGNotYetValid[sig.KeyTag] = append(soaRRSIGNotYetValid[sig.KeyTag], nsIP)
-				continue
-			}
-			if int64(sig.Expiration) < testTime.Unix() {
-				soaRRSIGExpired[sig.KeyTag] = append(soaRRSIGExpired[sig.KeyTag], nsIP)
-				continue
-			}
-
-			if !dnssecAlgorithmSupported(sig.Algorithm) {
-				if algoNotSupportedByZM[sig.KeyTag] == nil {
-					algoNotSupportedByZM[sig.KeyTag] = map[uint8][]string{}
+		outcomes := make([]nsOutcome, len(ordered))
+		tasks := make([]runner.Task, len(ordered))
+		for i, ns := range ordered {
+			i, ns := i, ns
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				outcome := nsOutcome{
+					nsIP:                  ns.Address.String(),
+					soaRRSIGNotYetValid:   map[uint16]bool{},
+					soaRRSIGExpired:       map[uint16]bool{},
+					noMatchingDNSKEY:      map[uint16]bool{},
+					rrsigNotValidByDNSKEY: map[uint16]bool{},
+					algoNotSupportedByZM:  map[uint16]map[uint8]bool{},
 				}
-				algoNotSupportedByZM[sig.KeyTag][sig.Algorithm] = append(algoNotSupportedByZM[sig.KeyTag][sig.Algorithm], nsIP)
-				continue
-			}
 
-			var matchingDNSKEYs []*dns.DNSKEY
-			for _, dnskey := range dnskeyRecords {
-				if dnskey.KeyTag() == sig.KeyTag {
-					matchingDNSKEYs = append(matchingDNSKEYs, dnskey)
+				if disabled, err := ipDisabledMessageWithLogger(buf, ns, "DNSKEY"); err != nil {
+					return err
+				} else if disabled {
+					outcomes[i] = outcome
+					return nil
 				}
-			}
 
-			if len(matchingDNSKEYs) == 0 {
-				noMatchingDNSKEY[sig.KeyTag] = append(noMatchingDNSKEY[sig.KeyTag], nsIP)
-				continue
-			}
+				dnssecOn := true
+				dnskeyResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn})
+				if dnskeyResp.Msg == nil || dnskeyResp.Rcode() != "NOERROR" || !dnskeyResp.AA() {
+					outcomes[i] = outcome
+					return nil
+				}
 
-			rrset := append([]dns.RR{}, soaRRs...)
-			valid := false
-			algoUnsupported := false
-			for _, dnskey := range matchingDNSKEYs {
-				if err := verifyRRSIG(sig, rrset, dnskey, testTime); err != nil {
-					if errors.Is(err, dns.ErrAlg) {
-						algoUnsupported = true
+				dnskeyRRs := dnskeyResp.GetRecordsForName("DNSKEY", z.Name, "answer")
+				if len(dnskeyRRs) == 0 {
+					outcomes[i] = outcome
+					return nil
+				}
+
+				var dnskeyRecords []*dns.DNSKEY
+				for _, rr := range dnskeyRRs {
+					if dnskey, ok := rr.(*dns.DNSKEY); ok {
+						dnskeyRecords = append(dnskeyRecords, dnskey)
 					}
-					continue
 				}
-				valid = true
-				break
-			}
-
-			if algoUnsupported {
-				if algoNotSupportedByZM[sig.KeyTag] == nil {
-					algoNotSupportedByZM[sig.KeyTag] = map[uint8][]string{}
+				if len(dnskeyRecords) == 0 {
+					outcomes[i] = outcome
+					return nil
 				}
-				algoNotSupportedByZM[sig.KeyTag][sig.Algorithm] = append(algoNotSupportedByZM[sig.KeyTag][sig.Algorithm], nsIP)
-				continue
-			}
 
-			if !valid {
-				rrsigNotValidByDNSKEY[sig.KeyTag] = append(rrsigNotValidByDNSKEY[sig.KeyTag], nsIP)
+				useVC := false
+				soaResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "SOA", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
+				if soaResp.Msg == nil || soaResp.Rcode() != "NOERROR" || !soaResp.AA() {
+					outcomes[i] = outcome
+					return nil
+				}
+
+				soaRRs := soaResp.GetRecordsForName("SOA", z.Name, "answer")
+				if len(soaRRs) == 0 {
+					outcomes[i] = outcome
+					return nil
+				}
+
+				rrsigRRs := soaResp.GetRecords("RRSIG", "answer")
+				if len(rrsigRRs) == 0 {
+					outcome.soaWithoutRRSIG = true
+					outcomes[i] = outcome
+					return nil
+				}
+
+				testTime := packetTime(dnskeyResp)
+
+				for _, rr := range rrsigRRs {
+					sig, ok := rr.(*dns.RRSIG)
+					if !ok {
+						continue
+					}
+
+					if int64(sig.Inception) > testTime.Unix() {
+						outcome.soaRRSIGNotYetValid[sig.KeyTag] = true
+						continue
+					}
+					if int64(sig.Expiration) < testTime.Unix() {
+						outcome.soaRRSIGExpired[sig.KeyTag] = true
+						continue
+					}
+
+					if !dnssecAlgorithmSupported(sig.Algorithm) {
+						if outcome.algoNotSupportedByZM[sig.KeyTag] == nil {
+							outcome.algoNotSupportedByZM[sig.KeyTag] = map[uint8]bool{}
+						}
+						outcome.algoNotSupportedByZM[sig.KeyTag][sig.Algorithm] = true
+						continue
+					}
+
+					var matchingDNSKEYs []*dns.DNSKEY
+					for _, dnskey := range dnskeyRecords {
+						if dnskey.KeyTag() == sig.KeyTag {
+							matchingDNSKEYs = append(matchingDNSKEYs, dnskey)
+						}
+					}
+
+					if len(matchingDNSKEYs) == 0 {
+						outcome.noMatchingDNSKEY[sig.KeyTag] = true
+						continue
+					}
+
+					rrset := append([]dns.RR{}, soaRRs...)
+					valid := false
+					algoUnsupported := false
+					for _, dnskey := range matchingDNSKEYs {
+						if err := verifyRRSIG(sig, rrset, dnskey, testTime); err != nil {
+							if errors.Is(err, dns.ErrAlg) {
+								algoUnsupported = true
+							}
+							continue
+						}
+						valid = true
+						break
+					}
+
+					if algoUnsupported {
+						if outcome.algoNotSupportedByZM[sig.KeyTag] == nil {
+							outcome.algoNotSupportedByZM[sig.KeyTag] = map[uint8]bool{}
+						}
+						outcome.algoNotSupportedByZM[sig.KeyTag][sig.Algorithm] = true
+						continue
+					}
+
+					if !valid {
+						outcome.rrsigNotValidByDNSKEY[sig.KeyTag] = true
+					}
+				}
+
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+		if err != nil {
+			return results, err
+		}
+		results = append(results, entries...)
+
+		for _, outcome := range outcomes {
+			if outcome.soaWithoutRRSIG {
+				soaWithoutRRSIG = append(soaWithoutRRSIG, outcome.nsIP)
+			}
+			for keytag := range outcome.soaRRSIGNotYetValid {
+				soaRRSIGNotYetValid[keytag] = append(soaRRSIGNotYetValid[keytag], outcome.nsIP)
+			}
+			for keytag := range outcome.soaRRSIGExpired {
+				soaRRSIGExpired[keytag] = append(soaRRSIGExpired[keytag], outcome.nsIP)
+			}
+			for keytag := range outcome.noMatchingDNSKEY {
+				noMatchingDNSKEY[keytag] = append(noMatchingDNSKEY[keytag], outcome.nsIP)
+			}
+			for keytag := range outcome.rrsigNotValidByDNSKEY {
+				rrsigNotValidByDNSKEY[keytag] = append(rrsigNotValidByDNSKEY[keytag], outcome.nsIP)
+			}
+			for keytag, algoMap := range outcome.algoNotSupportedByZM {
+				if algoNotSupportedByZM[keytag] == nil {
+					algoNotSupportedByZM[keytag] = map[uint8][]string{}
+				}
+				for algo := range algoMap {
+					algoNotSupportedByZM[keytag][algo] = append(algoNotSupportedByZM[keytag][algo], outcome.nsIP)
+				}
 			}
 		}
 	}
@@ -2350,231 +2989,424 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	testingTime := time.Now().UTC()
 	testingTimeUnix := testingTime.Unix()
 
-	for _, group := range nameserversByIP(nss) {
-		if len(group) == 0 {
-			continue
+	groups := nameserversByIP(nss)
+	if len(groups) > 0 {
+		type nsOutcome struct {
+			groupList                   []string
+			ignoredNS                   bool
+			withDNSKEY                  bool
+			withoutDNSKEY               bool
+			erroneousMultipleNSEC       bool
+			erroneousMultipleNSEC3      bool
+			erroneousMultipleNSEC3PARAM bool
+			nsecInAnswer                bool
+			nsec3paramInAnswer          bool
+			nsecIncorrectTypeList       bool
+			nsec3IncorrectTypeList      bool
+			nsecMismatchesApex          bool
+			nsec3MismatchesApex         bool
+			nsec3paramMismatchesApex    bool
+			nsecMissingSignature        bool
+			nsec3MissingSignature       bool
+			nsecNodataWrongSOA          bool
+			nsec3NodataWrongSOA         bool
+			nsecNodataMissingSOA        bool
+			nsec3NodataMissingSOA       bool
+			nsecErroneousAnswer         bool
+			nsec3paramErroneousAnswer   bool
+			nsecNsec3Nodata             bool
+			nsec3paramNsecNodata        bool
+			nsecRRSIGVerifyError        map[uint16]bool
+			nsec3RRSIGVerifyError       map[uint16]bool
+			nsecRRSIGExpired            map[uint16]bool
+			nsec3RRSIGExpired           map[uint16]bool
+			nsecRRSIGNotYetValid        map[uint16]bool
+			nsec3RRSIGNotYetValid       map[uint16]bool
+			nsecRRSIGNoDNSKEY           map[uint16]bool
+			nsec3RRSIGNoDNSKEY          map[uint16]bool
+			nsecRRSIGVerified           bool
+			nsec3RRSIGVerified          bool
+			nsecResponseError           bool
+			nsec3paramResponseError     bool
+			algoNotSupportedByZM        map[uint16]map[uint8]bool
 		}
-		ns := group[0]
-		groupList := nsStrings(group)
 
-		if disabled, err := ipDisabledMessage(&results, testcase, ns, queryTypes...); err != nil {
+		outcomes := make([]nsOutcome, len(groups))
+		tasks := make([]runner.Task, len(groups))
+		for i, group := range groups {
+			i, group := i, group
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				if len(group) == 0 {
+					return nil
+				}
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				ns := group[0]
+				outcome := nsOutcome{
+					groupList:             nsStrings(group),
+					nsecRRSIGVerifyError:  map[uint16]bool{},
+					nsec3RRSIGVerifyError: map[uint16]bool{},
+					nsecRRSIGExpired:      map[uint16]bool{},
+					nsec3RRSIGExpired:     map[uint16]bool{},
+					nsecRRSIGNotYetValid:  map[uint16]bool{},
+					nsec3RRSIGNotYetValid: map[uint16]bool{},
+					nsecRRSIGNoDNSKEY:     map[uint16]bool{},
+					nsec3RRSIGNoDNSKEY:    map[uint16]bool{},
+					algoNotSupportedByZM:  map[uint16]map[uint8]bool{},
+				}
+
+				if disabled, err := ipDisabledMessageWithLogger(buf, ns, queryTypes...); err != nil {
+					return err
+				} else if disabled {
+					outcome.ignoredNS = true
+					outcomes[i] = outcome
+					return nil
+				}
+
+				dnssecOn := true
+				dnskeyResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), typeDNSKEY, &nameserver.QueryOptions{DNSSEC: &dnssecOn})
+				if dnskeyResp.Msg == nil || dnskeyResp.Rcode() != "NOERROR" || !dnskeyResp.AA() {
+					outcome.ignoredNS = true
+					outcomes[i] = outcome
+					return nil
+				}
+
+				dnskeyRRs := dnskeyResp.GetRecordsForName(typeDNSKEY, z.Name, "answer")
+				if len(dnskeyRRs) == 0 {
+					outcome.withoutDNSKEY = true
+					outcomes[i] = outcome
+					return nil
+				}
+
+				var dnskeyRecords []*dns.DNSKEY
+				for _, rr := range dnskeyRRs {
+					if dnskey, ok := rr.(*dns.DNSKEY); ok {
+						dnskeyRecords = append(dnskeyRecords, dnskey)
+					}
+				}
+				if len(dnskeyRecords) == 0 {
+					outcome.withoutDNSKEY = true
+					outcomes[i] = outcome
+					return nil
+				}
+				outcome.withDNSKEY = true
+
+				nsecResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), typeNSEC, &nameserver.QueryOptions{DNSSEC: &dnssecOn})
+				if nsecResp.Msg == nil || nsecResp.Rcode() != "NOERROR" || !nsecResp.AA() {
+					outcome.nsecResponseError = true
+				} else if len(nsecResp.Answer()) > 0 {
+					nsecRRs := nsecResp.GetRecords(typeNSEC, "answer")
+					if len(nsecRRs) > 0 {
+						outcome.nsecInAnswer = true
+						if len(nsecRRs) > 1 {
+							outcome.erroneousMultipleNSEC = true
+						} else if !rrOwnerMatchesZone(nsecRRs[0], z.Name) {
+							outcome.nsecMismatchesApex = true
+						}
+					} else {
+						outcome.nsecErroneousAnswer = true
+					}
+				} else if len(nsecResp.GetRecords(typeNSEC3, "authority")) > 0 {
+					outcome.nsecNsec3Nodata = true
+
+					soaRRs := nsecResp.GetRecords(typeSOA, "authority")
+					if len(soaRRs) == 0 {
+						outcome.nsec3NodataMissingSOA = true
+					} else if !rrOwnerMatchesZone(soaRRs[0], z.Name) {
+						outcome.nsec3NodataWrongSOA = true
+					}
+
+					nsec3RRsRaw := nsecResp.GetRecords(typeNSEC3, "authority")
+					var nsec3RRs []*dns.NSEC3
+					for _, rr := range nsec3RRsRaw {
+						if nsec3, ok := rr.(*dns.NSEC3); ok {
+							nsec3RRs = append(nsec3RRs, nsec3)
+						}
+					}
+
+					if len(nsec3RRs) > 1 {
+						outcome.erroneousMultipleNSEC3 = true
+					} else if len(nsec3RRs) == 1 {
+						nsec3RR := nsec3RRs[0]
+						if !nsec3OwnerMatchesApex(nsec3RR, z.Name) {
+							outcome.nsec3MismatchesApex = true
+						} else {
+							mandatory := []string{"SOA", "NS", "DNSKEY", "NSEC3PARAM", "RRSIG"}
+							forbidden := []string{"NSEC", "NSEC3"}
+							if typeListIncorrect(typeMapFromBitmap(nsec3RR.TypeBitMap), mandatory, forbidden) {
+								outcome.nsec3IncorrectTypeList = true
+							}
+						}
+
+						rrsigRRs := filterRRSIGByType(nsecResp.GetRecordsForName("RRSIG", dnsname.New(nsec3RR.Hdr.Name)), dns.TypeNSEC3)
+						if len(rrsigRRs) == 0 {
+							outcome.nsec3MissingSignature = true
+						} else {
+							rrset := rrsetForName(nsec3RRsRaw, nsec3RR.Hdr.Name)
+							for _, sig := range rrsigRRs {
+								keytag := sig.KeyTag
+								var matchingDNSKEYs []*dns.DNSKEY
+								for _, dnskey := range dnskeyRecords {
+									if dnskey.KeyTag() == keytag {
+										matchingDNSKEYs = append(matchingDNSKEYs, dnskey)
+									}
+								}
+								if len(matchingDNSKEYs) == 0 {
+									outcome.nsec3RRSIGNoDNSKEY[keytag] = true
+									continue
+								}
+								if int64(sig.Expiration) < testingTimeUnix {
+									outcome.nsec3RRSIGExpired[keytag] = true
+									continue
+								}
+								if int64(sig.Inception) > testingTimeUnix {
+									outcome.nsec3RRSIGNotYetValid[keytag] = true
+									continue
+								}
+
+								for idx, dnskey := range matchingDNSKEYs {
+									if err := verifyRRSIG(sig, rrset, dnskey, testingTime); err == nil {
+										outcome.nsec3RRSIGVerified = true
+										break
+									} else if idx == len(matchingDNSKEYs)-1 {
+										if errors.Is(err, dns.ErrAlg) {
+											key := dnskey.KeyTag()
+											if outcome.algoNotSupportedByZM[key] == nil {
+												outcome.algoNotSupportedByZM[key] = map[uint8]bool{}
+											}
+											outcome.algoNotSupportedByZM[key][dnskey.Algorithm] = true
+										} else {
+											outcome.nsec3RRSIGVerifyError[keytag] = true
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+
+				nsec3paramResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), typeNSEC3PARAM, &nameserver.QueryOptions{DNSSEC: &dnssecOn})
+				if nsec3paramResp.Msg == nil || nsec3paramResp.Rcode() != "NOERROR" || !nsec3paramResp.AA() {
+					outcome.nsec3paramResponseError = true
+				} else if len(nsec3paramResp.Answer()) > 0 {
+					nsec3paramRRs := nsec3paramResp.GetRecords(typeNSEC3PARAM, "answer")
+					if len(nsec3paramRRs) > 0 {
+						outcome.nsec3paramInAnswer = true
+						if len(nsec3paramRRs) > 1 {
+							outcome.erroneousMultipleNSEC3PARAM = true
+						} else if !rrOwnerMatchesZone(nsec3paramRRs[0], z.Name) {
+							outcome.nsec3paramMismatchesApex = true
+						}
+					} else {
+						outcome.nsec3paramErroneousAnswer = true
+					}
+				} else if len(nsec3paramResp.GetRecords(typeNSEC, "authority")) > 0 {
+					outcome.nsec3paramNsecNodata = true
+
+					soaRRs := nsec3paramResp.GetRecords(typeSOA, "authority")
+					if len(soaRRs) == 0 {
+						outcome.nsecNodataMissingSOA = true
+					} else if !rrOwnerMatchesZone(soaRRs[0], z.Name) {
+						outcome.nsecNodataWrongSOA = true
+					}
+
+					nsecRRsRaw := nsec3paramResp.GetRecords(typeNSEC, "authority")
+					var nsecRRs []*dns.NSEC
+					for _, rr := range nsecRRsRaw {
+						if nsec, ok := rr.(*dns.NSEC); ok {
+							nsecRRs = append(nsecRRs, nsec)
+						}
+					}
+
+					if len(nsecRRs) > 1 {
+						outcome.erroneousMultipleNSEC = true
+					} else if len(nsecRRs) == 1 {
+						nsecRR := nsecRRs[0]
+						if !rrOwnerMatchesZone(nsecRR, z.Name) {
+							outcome.nsecMismatchesApex = true
+						} else {
+							mandatory := []string{"SOA", "NS", "DNSKEY", "NSEC", "RRSIG"}
+							forbidden := []string{"NSEC3PARAM", "NSEC3"}
+							if typeListIncorrect(typeMapFromBitmap(nsecRR.TypeBitMap), mandatory, forbidden) {
+								outcome.nsecIncorrectTypeList = true
+							}
+						}
+
+						rrsigRRs := filterRRSIGByType(nsec3paramResp.GetRecordsForName("RRSIG", dnsname.New(nsecRR.Hdr.Name)), dns.TypeNSEC)
+						if len(rrsigRRs) == 0 {
+							outcome.nsecMissingSignature = true
+						} else {
+							rrset := rrsetForName(nsecRRsRaw, nsecRR.Hdr.Name)
+							for _, sig := range rrsigRRs {
+								keytag := sig.KeyTag
+								var matchingDNSKEYs []*dns.DNSKEY
+								for _, dnskey := range dnskeyRecords {
+									if dnskey.KeyTag() == keytag {
+										matchingDNSKEYs = append(matchingDNSKEYs, dnskey)
+									}
+								}
+								if len(matchingDNSKEYs) == 0 {
+									outcome.nsecRRSIGNoDNSKEY[keytag] = true
+									continue
+								}
+								if int64(sig.Expiration) < testingTimeUnix {
+									outcome.nsecRRSIGExpired[keytag] = true
+									continue
+								}
+								if int64(sig.Inception) > testingTimeUnix {
+									outcome.nsecRRSIGNotYetValid[keytag] = true
+									continue
+								}
+
+								for idx, dnskey := range matchingDNSKEYs {
+									if err := verifyRRSIG(sig, rrset, dnskey, testingTime); err == nil {
+										outcome.nsecRRSIGVerified = true
+										break
+									} else if idx == len(matchingDNSKEYs)-1 {
+										if errors.Is(err, dns.ErrAlg) {
+											key := dnskey.KeyTag()
+											if outcome.algoNotSupportedByZM[key] == nil {
+												outcome.algoNotSupportedByZM[key] = map[uint8]bool{}
+											}
+											outcome.algoNotSupportedByZM[key][dnskey.Algorithm] = true
+										} else {
+											outcome.nsecRRSIGVerifyError[keytag] = true
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+		if err != nil {
 			return results, err
-		} else if disabled {
-			ignoredNS = append(ignoredNS, groupList...)
-			continue
 		}
+		results = append(results, entries...)
 
-		dnssecOn := true
-		dnskeyResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), typeDNSKEY, &nameserver.QueryOptions{DNSSEC: &dnssecOn})
-		if dnskeyResp.Msg == nil || dnskeyResp.Rcode() != "NOERROR" || !dnskeyResp.AA() {
-			ignoredNS = append(ignoredNS, groupList...)
-			continue
-		}
-
-		dnskeyRRs := dnskeyResp.GetRecordsForName(typeDNSKEY, z.Name, "answer")
-		if len(dnskeyRRs) == 0 {
-			withoutDNSKEY = append(withoutDNSKEY, groupList...)
-			continue
-		}
-
-		var dnskeyRecords []*dns.DNSKEY
-		for _, rr := range dnskeyRRs {
-			if dnskey, ok := rr.(*dns.DNSKEY); ok {
-				dnskeyRecords = append(dnskeyRecords, dnskey)
+		for _, outcome := range outcomes {
+			if len(outcome.groupList) == 0 {
+				continue
 			}
-		}
-		if len(dnskeyRecords) == 0 {
-			withoutDNSKEY = append(withoutDNSKEY, groupList...)
-			continue
-		}
-		withDNSKEY = append(withDNSKEY, groupList...)
-
-		nsecResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), typeNSEC, &nameserver.QueryOptions{DNSSEC: &dnssecOn})
-		if nsecResp.Msg == nil || nsecResp.Rcode() != "NOERROR" || !nsecResp.AA() {
-			nsecResponseError = append(nsecResponseError, groupList...)
-		} else if len(nsecResp.Answer()) > 0 {
-			nsecRRs := nsecResp.GetRecords(typeNSEC, "answer")
-			if len(nsecRRs) > 0 {
-				nsecInAnswer = append(nsecInAnswer, groupList...)
-				if len(nsecRRs) > 1 {
-					erroneousMultipleNSEC = append(erroneousMultipleNSEC, groupList...)
-				} else if !rrOwnerMatchesZone(nsecRRs[0], z.Name) {
-					nsecMismatchesApex = append(nsecMismatchesApex, groupList...)
-				}
-			} else {
-				nsecErroneousAnswer = append(nsecErroneousAnswer, groupList...)
+			if outcome.ignoredNS {
+				ignoredNS = append(ignoredNS, outcome.groupList...)
 			}
-		} else if len(nsecResp.GetRecords(typeNSEC3, "authority")) > 0 {
-			nsecNsec3Nodata = append(nsecNsec3Nodata, groupList...)
-
-			soaRRs := nsecResp.GetRecords(typeSOA, "authority")
-			if len(soaRRs) == 0 {
-				nsec3NodataMissingSOA = append(nsec3NodataMissingSOA, groupList...)
-			} else if !rrOwnerMatchesZone(soaRRs[0], z.Name) {
+			if outcome.withoutDNSKEY {
+				withoutDNSKEY = append(withoutDNSKEY, outcome.groupList...)
+			}
+			if outcome.withDNSKEY {
+				withDNSKEY = append(withDNSKEY, outcome.groupList...)
+			}
+			if outcome.erroneousMultipleNSEC {
+				erroneousMultipleNSEC = append(erroneousMultipleNSEC, outcome.groupList...)
+			}
+			if outcome.erroneousMultipleNSEC3 {
+				erroneousMultipleNSEC3 = append(erroneousMultipleNSEC3, outcome.groupList...)
+			}
+			if outcome.erroneousMultipleNSEC3PARAM {
+				erroneousMultipleNSEC3PARAM = append(erroneousMultipleNSEC3PARAM, outcome.groupList...)
+			}
+			if outcome.nsecInAnswer {
+				nsecInAnswer = append(nsecInAnswer, outcome.groupList...)
+			}
+			if outcome.nsec3paramInAnswer {
+				nsec3paramInAnswer = append(nsec3paramInAnswer, outcome.groupList...)
+			}
+			if outcome.nsecIncorrectTypeList {
+				nsecIncorrectTypeList = append(nsecIncorrectTypeList, outcome.groupList...)
+			}
+			if outcome.nsec3IncorrectTypeList {
+				nsec3IncorrectTypeList = append(nsec3IncorrectTypeList, outcome.groupList...)
+			}
+			if outcome.nsecMismatchesApex {
+				nsecMismatchesApex = append(nsecMismatchesApex, outcome.groupList...)
+			}
+			if outcome.nsec3MismatchesApex {
+				nsec3MismatchesApex = append(nsec3MismatchesApex, outcome.groupList...)
+			}
+			if outcome.nsec3paramMismatchesApex {
+				nsec3paramMismatchesApex = append(nsec3paramMismatchesApex, outcome.groupList...)
+			}
+			if outcome.nsecMissingSignature {
+				nsecMissingSignature = append(nsecMissingSignature, outcome.groupList...)
+			}
+			if outcome.nsec3MissingSignature {
+				nsec3MissingSignature = append(nsec3MissingSignature, outcome.groupList...)
+			}
+			if outcome.nsecNodataWrongSOA {
 				key := z.Name.String()
-				nsec3NodataWrongSOA[key] = append(nsec3NodataWrongSOA[key], groupList...)
+				nsecNodataWrongSOA[key] = append(nsecNodataWrongSOA[key], outcome.groupList...)
 			}
-
-			nsec3RRsRaw := nsecResp.GetRecords(typeNSEC3, "authority")
-			var nsec3RRs []*dns.NSEC3
-			for _, rr := range nsec3RRsRaw {
-				if nsec3, ok := rr.(*dns.NSEC3); ok {
-					nsec3RRs = append(nsec3RRs, nsec3)
-				}
-			}
-
-			if len(nsec3RRs) > 1 {
-				erroneousMultipleNSEC3 = append(erroneousMultipleNSEC3, groupList...)
-			} else if len(nsec3RRs) == 1 {
-				nsec3RR := nsec3RRs[0]
-				if !nsec3OwnerMatchesApex(nsec3RR, z.Name) {
-					nsec3MismatchesApex = append(nsec3MismatchesApex, groupList...)
-				} else {
-					mandatory := []string{"SOA", "NS", "DNSKEY", "NSEC3PARAM", "RRSIG"}
-					forbidden := []string{"NSEC", "NSEC3"}
-					if typeListIncorrect(typeMapFromBitmap(nsec3RR.TypeBitMap), mandatory, forbidden) {
-						nsec3IncorrectTypeList = append(nsec3IncorrectTypeList, groupList...)
-					}
-				}
-
-				rrsigRRs := filterRRSIGByType(nsecResp.GetRecordsForName("RRSIG", dnsname.New(nsec3RR.Hdr.Name)), dns.TypeNSEC3)
-				if len(rrsigRRs) == 0 {
-					nsec3MissingSignature = append(nsec3MissingSignature, groupList...)
-				} else {
-					rrset := rrsetForName(nsec3RRsRaw, nsec3RR.Hdr.Name)
-					for _, sig := range rrsigRRs {
-						keytag := sig.KeyTag
-						var matchingDNSKEYs []*dns.DNSKEY
-						for _, dnskey := range dnskeyRecords {
-							if dnskey.KeyTag() == keytag {
-								matchingDNSKEYs = append(matchingDNSKEYs, dnskey)
-							}
-						}
-						if len(matchingDNSKEYs) == 0 {
-							nsec3RRSIGNoDNSKEY[keytag] = append(nsec3RRSIGNoDNSKEY[keytag], groupList...)
-							continue
-						}
-						if int64(sig.Expiration) < testingTimeUnix {
-							nsec3RRSIGExpired[keytag] = append(nsec3RRSIGExpired[keytag], groupList...)
-							continue
-						}
-						if int64(sig.Inception) > testingTimeUnix {
-							nsec3RRSIGNotYetValid[keytag] = append(nsec3RRSIGNotYetValid[keytag], groupList...)
-							continue
-						}
-
-						for idx, dnskey := range matchingDNSKEYs {
-							if err := verifyRRSIG(sig, rrset, dnskey, testingTime); err == nil {
-								nsec3RRSIGVerified = append(nsec3RRSIGVerified, groupList...)
-								break
-							} else if idx == len(matchingDNSKEYs)-1 {
-								if errors.Is(err, dns.ErrAlg) {
-									key := dnskey.KeyTag()
-									if algoNotSupportedByZM[key] == nil {
-										algoNotSupportedByZM[key] = map[uint8][]string{}
-									}
-									algoNotSupportedByZM[key][dnskey.Algorithm] = append(algoNotSupportedByZM[key][dnskey.Algorithm], groupList...)
-								} else {
-									nsec3RRSIGVerifyError[keytag] = append(nsec3RRSIGVerifyError[keytag], groupList...)
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-
-		nsec3paramResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), typeNSEC3PARAM, &nameserver.QueryOptions{DNSSEC: &dnssecOn})
-		if nsec3paramResp.Msg == nil || nsec3paramResp.Rcode() != "NOERROR" || !nsec3paramResp.AA() {
-			nsec3paramResponseError = append(nsec3paramResponseError, groupList...)
-		} else if len(nsec3paramResp.Answer()) > 0 {
-			nsec3paramRRs := nsec3paramResp.GetRecords(typeNSEC3PARAM, "answer")
-			if len(nsec3paramRRs) > 0 {
-				nsec3paramInAnswer = append(nsec3paramInAnswer, groupList...)
-				if len(nsec3paramRRs) > 1 {
-					erroneousMultipleNSEC3PARAM = append(erroneousMultipleNSEC3PARAM, groupList...)
-				} else if !rrOwnerMatchesZone(nsec3paramRRs[0], z.Name) {
-					nsec3paramMismatchesApex = append(nsec3paramMismatchesApex, groupList...)
-				}
-			} else {
-				nsec3paramErroneousAnswer = append(nsec3paramErroneousAnswer, groupList...)
-			}
-		} else if len(nsec3paramResp.GetRecords(typeNSEC, "authority")) > 0 {
-			nsec3paramNsecNodata = append(nsec3paramNsecNodata, groupList...)
-
-			soaRRs := nsec3paramResp.GetRecords(typeSOA, "authority")
-			if len(soaRRs) == 0 {
-				nsecNodataMissingSOA = append(nsecNodataMissingSOA, groupList...)
-			} else if !rrOwnerMatchesZone(soaRRs[0], z.Name) {
+			if outcome.nsec3NodataWrongSOA {
 				key := z.Name.String()
-				nsecNodataWrongSOA[key] = append(nsecNodataWrongSOA[key], groupList...)
+				nsec3NodataWrongSOA[key] = append(nsec3NodataWrongSOA[key], outcome.groupList...)
 			}
-
-			nsecRRsRaw := nsec3paramResp.GetRecords(typeNSEC, "authority")
-			var nsecRRs []*dns.NSEC
-			for _, rr := range nsecRRsRaw {
-				if nsec, ok := rr.(*dns.NSEC); ok {
-					nsecRRs = append(nsecRRs, nsec)
-				}
+			if outcome.nsecNodataMissingSOA {
+				nsecNodataMissingSOA = append(nsecNodataMissingSOA, outcome.groupList...)
 			}
-
-			if len(nsecRRs) > 1 {
-				erroneousMultipleNSEC = append(erroneousMultipleNSEC, groupList...)
-			} else if len(nsecRRs) == 1 {
-				nsecRR := nsecRRs[0]
-				if !rrOwnerMatchesZone(nsecRR, z.Name) {
-					nsecMismatchesApex = append(nsecMismatchesApex, groupList...)
-				} else {
-					mandatory := []string{"SOA", "NS", "DNSKEY", "NSEC", "RRSIG"}
-					forbidden := []string{"NSEC3PARAM", "NSEC3"}
-					if typeListIncorrect(typeMapFromBitmap(nsecRR.TypeBitMap), mandatory, forbidden) {
-						nsecIncorrectTypeList = append(nsecIncorrectTypeList, groupList...)
-					}
+			if outcome.nsec3NodataMissingSOA {
+				nsec3NodataMissingSOA = append(nsec3NodataMissingSOA, outcome.groupList...)
+			}
+			if outcome.nsecErroneousAnswer {
+				nsecErroneousAnswer = append(nsecErroneousAnswer, outcome.groupList...)
+			}
+			if outcome.nsec3paramErroneousAnswer {
+				nsec3paramErroneousAnswer = append(nsec3paramErroneousAnswer, outcome.groupList...)
+			}
+			if outcome.nsecNsec3Nodata {
+				nsecNsec3Nodata = append(nsecNsec3Nodata, outcome.groupList...)
+			}
+			if outcome.nsec3paramNsecNodata {
+				nsec3paramNsecNodata = append(nsec3paramNsecNodata, outcome.groupList...)
+			}
+			if outcome.nsecResponseError {
+				nsecResponseError = append(nsecResponseError, outcome.groupList...)
+			}
+			if outcome.nsec3paramResponseError {
+				nsec3paramResponseError = append(nsec3paramResponseError, outcome.groupList...)
+			}
+			if outcome.nsecRRSIGVerified {
+				nsecRRSIGVerified = append(nsecRRSIGVerified, outcome.groupList...)
+			}
+			if outcome.nsec3RRSIGVerified {
+				nsec3RRSIGVerified = append(nsec3RRSIGVerified, outcome.groupList...)
+			}
+			for keytag := range outcome.nsecRRSIGVerifyError {
+				nsecRRSIGVerifyError[keytag] = append(nsecRRSIGVerifyError[keytag], outcome.groupList...)
+			}
+			for keytag := range outcome.nsec3RRSIGVerifyError {
+				nsec3RRSIGVerifyError[keytag] = append(nsec3RRSIGVerifyError[keytag], outcome.groupList...)
+			}
+			for keytag := range outcome.nsecRRSIGExpired {
+				nsecRRSIGExpired[keytag] = append(nsecRRSIGExpired[keytag], outcome.groupList...)
+			}
+			for keytag := range outcome.nsec3RRSIGExpired {
+				nsec3RRSIGExpired[keytag] = append(nsec3RRSIGExpired[keytag], outcome.groupList...)
+			}
+			for keytag := range outcome.nsecRRSIGNotYetValid {
+				nsecRRSIGNotYetValid[keytag] = append(nsecRRSIGNotYetValid[keytag], outcome.groupList...)
+			}
+			for keytag := range outcome.nsec3RRSIGNotYetValid {
+				nsec3RRSIGNotYetValid[keytag] = append(nsec3RRSIGNotYetValid[keytag], outcome.groupList...)
+			}
+			for keytag := range outcome.nsecRRSIGNoDNSKEY {
+				nsecRRSIGNoDNSKEY[keytag] = append(nsecRRSIGNoDNSKEY[keytag], outcome.groupList...)
+			}
+			for keytag := range outcome.nsec3RRSIGNoDNSKEY {
+				nsec3RRSIGNoDNSKEY[keytag] = append(nsec3RRSIGNoDNSKEY[keytag], outcome.groupList...)
+			}
+			for keytag, algoMap := range outcome.algoNotSupportedByZM {
+				if algoNotSupportedByZM[keytag] == nil {
+					algoNotSupportedByZM[keytag] = map[uint8][]string{}
 				}
-
-				rrsigRRs := filterRRSIGByType(nsec3paramResp.GetRecordsForName("RRSIG", dnsname.New(nsecRR.Hdr.Name)), dns.TypeNSEC)
-				if len(rrsigRRs) == 0 {
-					nsecMissingSignature = append(nsecMissingSignature, groupList...)
-				} else {
-					rrset := rrsetForName(nsecRRsRaw, nsecRR.Hdr.Name)
-					for _, sig := range rrsigRRs {
-						keytag := sig.KeyTag
-						var matchingDNSKEYs []*dns.DNSKEY
-						for _, dnskey := range dnskeyRecords {
-							if dnskey.KeyTag() == keytag {
-								matchingDNSKEYs = append(matchingDNSKEYs, dnskey)
-							}
-						}
-						if len(matchingDNSKEYs) == 0 {
-							nsecRRSIGNoDNSKEY[keytag] = append(nsecRRSIGNoDNSKEY[keytag], groupList...)
-							continue
-						}
-						if int64(sig.Expiration) < testingTimeUnix {
-							nsecRRSIGExpired[keytag] = append(nsecRRSIGExpired[keytag], groupList...)
-							continue
-						}
-						if int64(sig.Inception) > testingTimeUnix {
-							nsecRRSIGNotYetValid[keytag] = append(nsecRRSIGNotYetValid[keytag], groupList...)
-							continue
-						}
-
-						for idx, dnskey := range matchingDNSKEYs {
-							if err := verifyRRSIG(sig, rrset, dnskey, testingTime); err == nil {
-								nsecRRSIGVerified = append(nsecRRSIGVerified, groupList...)
-								break
-							} else if idx == len(matchingDNSKEYs)-1 {
-								if errors.Is(err, dns.ErrAlg) {
-									key := dnskey.KeyTag()
-									if algoNotSupportedByZM[key] == nil {
-										algoNotSupportedByZM[key] = map[uint8][]string{}
-									}
-									algoNotSupportedByZM[key][dnskey.Algorithm] = append(algoNotSupportedByZM[key][dnskey.Algorithm], groupList...)
-								} else {
-									nsecRRSIGVerifyError[keytag] = append(nsecRRSIGVerifyError[keytag], groupList...)
-								}
-							}
-						}
-					}
+				for algo := range algoMap {
+					algoNotSupportedByZM[keytag][algo] = append(algoNotSupportedByZM[keytag][algo], outcome.groupList...)
 				}
 			}
 		}
@@ -3092,12 +3924,9 @@ func DNSSEC11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	sort.Strings(keys)
 
 	isUndelegated := hasFakeAddresses(z)
-	ipAlreadyProcessed := map[string]bool{}
-
-	for _, key := range keys {
-		ns := nss[key]
-
-		if isUndelegated {
+	if isUndelegated {
+		for _, key := range keys {
+			ns := nss[key]
 			if len(ns.FakeDSRecords(z.Name.String())) == 0 {
 				if err := appendLog(&results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
 					return results, err
@@ -3106,37 +3935,85 @@ func DNSSEC11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 			break
 		}
+	}
 
+	var ordered []nameserver.Nameserver
+	ipAlreadyProcessed := map[string]bool{}
+	for _, key := range keys {
+		ns := nss[key]
 		nsIP := ns.Address.String()
 		if ipAlreadyProcessed[nsIP] {
 			continue
 		}
 		ipAlreadyProcessed[nsIP] = true
+		ordered = append(ordered, ns)
+	}
 
-		if disabled, err := ipDisabledMessage(&results, testcase, ns, "DS"); err != nil {
+	if len(ordered) > 0 {
+		type parentOutcome struct {
+			nsIP         string
+			undetermined bool
+			noDS         bool
+			hasDS        bool
+		}
+
+		outcomes := make([]parentOutcome, len(ordered))
+		tasks := make([]runner.Task, len(ordered))
+		for i, ns := range ordered {
+			i, ns := i, ns
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				outcome := parentOutcome{nsIP: ns.Address.String()}
+
+				if disabled, err := ipDisabledMessageWithLogger(buf, ns, "DS"); err != nil {
+					return err
+				} else if disabled {
+					outcomes[i] = outcome
+					return nil
+				}
+
+				dnssecOn := true
+				useVC := false
+				dsResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DS", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
+				if dsResp.TC() {
+					useVC = true
+					dsResp, _ = ns.QueryWithOptions(ctx, z.Name.String(), "DS", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
+				}
+
+				if dsResp.Msg == nil || dsResp.Rcode() != "NOERROR" || !dsResp.AA() {
+					outcome.undetermined = true
+					outcomes[i] = outcome
+					return nil
+				}
+
+				dsRRs := dsResp.GetRecordsForName("DS", z.Name, "answer")
+				if len(dsRRs) == 0 {
+					outcome.noDS = true
+				} else {
+					outcome.hasDS = true
+				}
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+		if err != nil {
 			return results, err
-		} else if disabled {
-			continue
 		}
+		results = append(results, entries...)
 
-		dnssecOn := true
-		useVC := false
-		dsResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DS", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
-		if dsResp.TC() {
-			useVC = true
-			dsResp, _ = ns.QueryWithOptions(ctx, z.Name.String(), "DS", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
-		}
-
-		if dsResp.Msg == nil || dsResp.Rcode() != "NOERROR" || !dsResp.AA() {
-			undeterminedDS = append(undeterminedDS, nsIP)
-			continue
-		}
-
-		dsRRs := dsResp.GetRecordsForName("DS", z.Name, "answer")
-		if len(dsRRs) == 0 {
-			noDSRecord = append(noDSRecord, nsIP)
-		} else {
-			hasDSRecord = append(hasDSRecord, nsIP)
+		for _, outcome := range outcomes {
+			if outcome.undetermined {
+				undeterminedDS = append(undeterminedDS, outcome.nsIP)
+			}
+			if outcome.noDS {
+				noDSRecord = append(noDSRecord, outcome.nsIP)
+			}
+			if outcome.hasDS {
+				hasDSRecord = append(hasDSRecord, outcome.nsIP)
+			}
 		}
 	}
 
@@ -3189,6 +4066,7 @@ func DNSSEC11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 		sort.Strings(childKeys)
 
+		var ordered []nameserver.Nameserver
 		ipAlreadyProcessed = map[string]bool{}
 		for _, key := range childKeys {
 			ns := childNSS[key]
@@ -3197,39 +4075,84 @@ func DNSSEC11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				continue
 			}
 			ipAlreadyProcessed[nsIP] = true
+			ordered = append(ordered, ns)
+		}
 
-			if disabled, err := ipDisabledMessage(&results, testcase, ns, queryTypes...); err != nil {
+		if len(ordered) > 0 {
+			type childOutcome struct {
+				nsIP         string
+				undetermined bool
+				noDNSKEY     bool
+				hasDNSKEY    bool
+			}
+
+			outcomes := make([]childOutcome, len(ordered))
+			tasks := make([]runner.Task, len(ordered))
+			for i, ns := range ordered {
+				i, ns := i, ns
+				tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+					buf := testlogger.Wrap(log, moduleName, testcase)
+					outcome := childOutcome{nsIP: ns.Address.String()}
+
+					if disabled, err := ipDisabledMessageWithLogger(buf, ns, queryTypes...); err != nil {
+						return err
+					} else if disabled {
+						outcomes[i] = outcome
+						return nil
+					}
+
+					useVC := false
+					soaResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "SOA", &nameserver.QueryOptions{UseVC: &useVC})
+					if soaResp.Msg == nil || soaResp.Rcode() != "NOERROR" || !soaResp.AA() {
+						outcomes[i] = outcome
+						return nil
+					}
+					if len(soaResp.GetRecordsForName("SOA", z.Name, "answer")) == 0 {
+						outcomes[i] = outcome
+						return nil
+					}
+
+					useVC = false
+					dnskeyResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{UseVC: &useVC})
+					if dnskeyResp.TC() {
+						useVC = true
+						dnskeyResp, _ = ns.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{UseVC: &useVC})
+					}
+
+					if dnskeyResp.Msg == nil || dnskeyResp.Rcode() != "NOERROR" || !dnskeyResp.AA() {
+						outcome.undetermined = true
+						outcomes[i] = outcome
+						return nil
+					}
+
+					dnskeyRRs := dnskeyResp.GetRecordsForName("DNSKEY", z.Name, "answer")
+					if len(dnskeyRRs) == 0 {
+						outcome.noDNSKEY = true
+					} else {
+						outcome.hasDNSKEY = true
+					}
+					outcomes[i] = outcome
+					return nil
+				}
+			}
+
+			parallelism := profile.Effective().Resolver.Defaults.Parallel
+			entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+			if err != nil {
 				return results, err
-			} else if disabled {
-				continue
 			}
+			results = append(results, entries...)
 
-			useVC := false
-			soaResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "SOA", &nameserver.QueryOptions{UseVC: &useVC})
-			if soaResp.Msg == nil || soaResp.Rcode() != "NOERROR" || !soaResp.AA() {
-				continue
-			}
-			if len(soaResp.GetRecordsForName("SOA", z.Name, "answer")) == 0 {
-				continue
-			}
-
-			useVC = false
-			dnskeyResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{UseVC: &useVC})
-			if dnskeyResp.TC() {
-				useVC = true
-				dnskeyResp, _ = ns.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{UseVC: &useVC})
-			}
-
-			if dnskeyResp.Msg == nil || dnskeyResp.Rcode() != "NOERROR" || !dnskeyResp.AA() {
-				undeterminedDNSKEY = append(undeterminedDNSKEY, nsIP)
-				continue
-			}
-
-			dnskeyRRs := dnskeyResp.GetRecordsForName("DNSKEY", z.Name, "answer")
-			if len(dnskeyRRs) == 0 {
-				noDNSKEYRecord = append(noDNSKEYRecord, nsIP)
-			} else {
-				hasDNSKEYRecord = append(hasDNSKEYRecord, nsIP)
+			for _, outcome := range outcomes {
+				if outcome.undetermined {
+					undeterminedDNSKEY = append(undeterminedDNSKEY, outcome.nsIP)
+				}
+				if outcome.noDNSKEY {
+					noDNSKEYRecord = append(noDNSKEYRecord, outcome.nsIP)
+				}
+				if outcome.hasDNSKEY {
+					hasDNSKEYRecord = append(hasDNSKEYRecord, outcome.nsIP)
+				}
 			}
 		}
 
@@ -3298,6 +4221,7 @@ func DNSSEC13(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 	sort.Strings(keys)
 
+	var ordered []nameserver.Nameserver
 	ipAlreadyProcessed := map[string]bool{}
 	for _, key := range keys {
 		ns := nss[key]
@@ -3306,67 +4230,110 @@ func DNSSEC13(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			continue
 		}
 		ipAlreadyProcessed[nsIP] = true
+		ordered = append(ordered, ns)
+	}
 
-		if disabled, err := ipDisabledMessage(&results, testcase, ns, queryTypes...); err != nil {
-			return results, err
-		} else if disabled {
-			continue
+	if len(ordered) > 0 {
+		type nsOutcome struct {
+			nsIP          string
+			algoNotSigned map[string]map[uint8]bool
 		}
 
-		dnskeyAlgorithms := map[uint8]bool{}
-		for _, queryType := range queryTypes {
-			dnssecOn := true
-			useVC := false
-			resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), queryType, &nameserver.QueryOptions{
-				DNSSEC: &dnssecOn,
-				UseVC:  &useVC,
-			})
-			if resp.Msg == nil || resp.Rcode() != "NOERROR" || !resp.AA() {
-				continue
-			}
-
-			typeRecords := resp.GetRecords(queryType, "answer")
-			if len(typeRecords) == 0 {
-				continue
-			}
-
-			rrsigRecords := resp.GetRecords("RRSIG", "answer")
-			if len(rrsigRecords) == 0 {
-				continue
-			}
-
-			if queryType == "DNSKEY" {
-				for _, rr := range typeRecords {
-					if dnskey, ok := rr.(*dns.DNSKEY); ok {
-						dnskeyAlgorithms[dnskey.Algorithm] = true
-					}
+		outcomes := make([]nsOutcome, len(ordered))
+		tasks := make([]runner.Task, len(ordered))
+		for i, ns := range ordered {
+			i, ns := i, ns
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				outcome := nsOutcome{
+					nsIP:          ns.Address.String(),
+					algoNotSigned: map[string]map[uint8]bool{},
 				}
-			}
 
-			if len(dnskeyAlgorithms) == 0 {
-				continue
-			}
+				if disabled, err := ipDisabledMessageWithLogger(buf, ns, queryTypes...); err != nil {
+					return err
+				} else if disabled {
+					outcomes[i] = outcome
+					return nil
+				}
 
-			for algorithm := range dnskeyAlgorithms {
-				found := false
-				for _, rr := range rrsigRecords {
-					sig, ok := rr.(*dns.RRSIG)
-					if !ok {
+				dnskeyAlgorithms := map[uint8]bool{}
+				for _, queryType := range queryTypes {
+					dnssecOn := true
+					useVC := false
+					resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), queryType, &nameserver.QueryOptions{
+						DNSSEC: &dnssecOn,
+						UseVC:  &useVC,
+					})
+					if resp.Msg == nil || resp.Rcode() != "NOERROR" || !resp.AA() {
 						continue
 					}
-					if sig.Algorithm == algorithm {
-						found = true
-						break
+
+					typeRecords := resp.GetRecords(queryType, "answer")
+					if len(typeRecords) == 0 {
+						continue
+					}
+
+					rrsigRecords := resp.GetRecords("RRSIG", "answer")
+					if len(rrsigRecords) == 0 {
+						continue
+					}
+
+					if queryType == "DNSKEY" {
+						for _, rr := range typeRecords {
+							if dnskey, ok := rr.(*dns.DNSKEY); ok {
+								dnskeyAlgorithms[dnskey.Algorithm] = true
+							}
+						}
+					}
+
+					if len(dnskeyAlgorithms) == 0 {
+						continue
+					}
+
+					for algorithm := range dnskeyAlgorithms {
+						found := false
+						for _, rr := range rrsigRecords {
+							sig, ok := rr.(*dns.RRSIG)
+							if !ok {
+								continue
+							}
+							if sig.Algorithm == algorithm {
+								found = true
+								break
+							}
+						}
+						if found {
+							continue
+						}
+						key := strings.ToLower(queryType)
+						if outcome.algoNotSigned[key] == nil {
+							outcome.algoNotSigned[key] = map[uint8]bool{}
+						}
+						outcome.algoNotSigned[key][algorithm] = true
 					}
 				}
-				if found {
-					continue
-				}
-				key := strings.ToLower(queryType)
+
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+		if err != nil {
+			return results, err
+		}
+		results = append(results, entries...)
+
+		for _, outcome := range outcomes {
+			for key, algoMap := range outcome.algoNotSigned {
 				if algoNotSigned[key] == nil {
 					algoNotSigned[key] = map[uint8][]string{}
 				}
-				algoNotSigned[key][algorithm] = append(algoNotSigned[key][algorithm], nsIP)
+				for algo := range algoMap {
+					algoNotSigned[key][algo] = append(algoNotSigned[key][algo], outcome.nsIP)
+				}
 			}
 		}
 	}
@@ -3432,42 +4399,75 @@ func DNSSEC14(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
-
+	var ordered []nameserver.Nameserver
 	for _, key := range keys {
-		ns := nss[key]
+		ordered = append(ordered, nss[key])
+	}
 
-		if disabled, err := ipDisabledMessage(&results, testcase, ns, "DNSKEY"); err != nil {
+	if len(ordered) > 0 {
+		type nsOutcome struct {
+			dnskeyRRs []*dns.DNSKEY
+		}
+
+		outcomes := make([]nsOutcome, len(ordered))
+		tasks := make([]runner.Task, len(ordered))
+		for i, ns := range ordered {
+			i, ns := i, ns
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				outcome := nsOutcome{}
+
+				if disabled, err := ipDisabledMessageWithLogger(buf, ns, "DNSKEY"); err != nil {
+					return err
+				} else if disabled {
+					outcomes[i] = outcome
+					return nil
+				}
+
+				dnssecOn := true
+				useVC := false
+				resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
+				if resp.Msg == nil {
+					if _, err := buf.Add("NO_RESPONSE", map[string]any{
+						"ns": ns.String(),
+					}); err != nil {
+						return err
+					}
+					outcomes[i] = outcome
+					return nil
+				}
+
+				keyRecords := resp.GetRecords("DNSKEY", "answer")
+				if len(keyRecords) == 0 {
+					if _, err := buf.Add("NO_RESPONSE_DNSKEY", map[string]any{
+						"ns": ns.String(),
+					}); err != nil {
+						return err
+					}
+					outcomes[i] = outcome
+					return nil
+				}
+
+				for _, rr := range keyRecords {
+					if dnskey, ok := rr.(*dns.DNSKEY); ok {
+						outcome.dnskeyRRs = append(outcome.dnskeyRRs, dnskey)
+					}
+				}
+
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+		if err != nil {
 			return results, err
-		} else if disabled {
-			continue
 		}
+		results = append(results, entries...)
 
-		dnssecOn := true
-		useVC := false
-		resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
-		if resp.Msg == nil {
-			if err := appendLog(&results, testcase, "NO_RESPONSE", map[string]any{
-				"ns": ns.String(),
-			}); err != nil {
-				return results, err
-			}
-			continue
-		}
-
-		keyRecords := resp.GetRecords("DNSKEY", "answer")
-		if len(keyRecords) == 0 {
-			if err := appendLog(&results, testcase, "NO_RESPONSE_DNSKEY", map[string]any{
-				"ns": ns.String(),
-			}); err != nil {
-				return results, err
-			}
-			continue
-		}
-
-		for _, rr := range keyRecords {
-			if dnskey, ok := rr.(*dns.DNSKEY); ok {
-				dnskeyRRs = append(dnskeyRRs, dnskey)
-			}
+		for _, outcome := range outcomes {
+			dnskeyRRs = append(dnskeyRRs, outcome.dnskeyRRs...)
 		}
 	}
 
@@ -3579,7 +4579,7 @@ func DNSSEC15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
-
+	var ordered []nameserver.Nameserver
 	ipAlreadyProcessed := map[string]bool{}
 	for _, key := range keys {
 		ns := nss[key]
@@ -3588,24 +4588,67 @@ func DNSSEC15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			continue
 		}
 		ipAlreadyProcessed[nsIP] = true
+		ordered = append(ordered, ns)
+	}
 
-		if disabled, err := ipDisabledMessage(&results, testcase, ns, queryTypes...); err != nil {
+	if len(ordered) > 0 {
+		type nsOutcome struct {
+			nsIP       string
+			cdsRRs     []dns.RR
+			cdnskeyRRs []dns.RR
+			cdsOK      bool
+			cdnskeyOK  bool
+		}
+
+		outcomes := make([]nsOutcome, len(ordered))
+		tasks := make([]runner.Task, len(ordered))
+		for i, ns := range ordered {
+			i, ns := i, ns
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				outcome := nsOutcome{nsIP: ns.Address.String()}
+
+				if disabled, err := ipDisabledMessageWithLogger(buf, ns, queryTypes...); err != nil {
+					return err
+				} else if disabled {
+					outcomes[i] = outcome
+					return nil
+				}
+
+				dnssecOn := true
+				useVC := false
+				cdsResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "CDS", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
+				if cdsResp.Msg != nil && cdsResp.AA() && cdsResp.Rcode() == "NOERROR" {
+					outcome.cdsOK = true
+					outcome.cdsRRs = cdsResp.GetRecords("CDS", "answer")
+				}
+
+				useVC = false
+				cdnskeyResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "CDNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
+				if cdnskeyResp.Msg != nil && cdnskeyResp.AA() && cdnskeyResp.Rcode() == "NOERROR" {
+					outcome.cdnskeyOK = true
+					outcome.cdnskeyRRs = cdnskeyResp.GetRecords("CDNSKEY", "answer")
+				}
+
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+		if err != nil {
 			return results, err
-		} else if disabled {
-			continue
 		}
+		results = append(results, entries...)
 
-		dnssecOn := true
-		useVC := false
-		cdsResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "CDS", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
-		if cdsResp.Msg != nil && cdsResp.AA() && cdsResp.Rcode() == "NOERROR" {
-			cdsRRsets[nsIP] = cdsResp.GetRecords("CDS", "answer")
-		}
-
-		useVC = false
-		cdnskeyResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "CDNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
-		if cdnskeyResp.Msg != nil && cdnskeyResp.AA() && cdnskeyResp.Rcode() == "NOERROR" {
-			cdnskeyRRsets[nsIP] = cdnskeyResp.GetRecords("CDNSKEY", "answer")
+		for _, outcome := range outcomes {
+			if outcome.cdsOK {
+				cdsRRsets[outcome.nsIP] = outcome.cdsRRs
+			}
+			if outcome.cdnskeyOK {
+				cdnskeyRRsets[outcome.nsIP] = outcome.cdnskeyRRs
+			}
 		}
 	}
 
@@ -3790,6 +4833,7 @@ func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	sort.Strings(keys)
 
 	testingTime := time.Now().UTC()
+	var ordered []nameserver.Nameserver
 	ipAlreadyProcessed := map[string]bool{}
 	for _, key := range keys {
 		ns := nss[key]
@@ -3798,142 +4842,186 @@ func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			continue
 		}
 		ipAlreadyProcessed[nsIP] = true
+		ordered = append(ordered, ns)
+	}
 
-		if disabled, err := ipDisabledMessage(&results, testcase, ns, queryTypes...); err != nil {
+	if len(ordered) > 0 {
+		type nsOutcome struct {
+			nsIP           string
+			cdsRecords     []*dns.CDS
+			cdsRRSIG       []*dns.RRSIG
+			dnskeyRecords  []*dns.DNSKEY
+			dnskeyRRSIG    []*dns.RRSIG
+			testingTime    time.Time
+			hasTestingTime bool
+		}
+
+		outcomes := make([]nsOutcome, len(ordered))
+		tasks := make([]runner.Task, len(ordered))
+		for i, ns := range ordered {
+			i, ns := i, ns
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				outcome := nsOutcome{nsIP: ns.Address.String()}
+
+				if disabled, err := ipDisabledMessageWithLogger(buf, ns, queryTypes...); err != nil {
+					return err
+				} else if disabled {
+					outcomes[i] = outcome
+					return nil
+				}
+
+				dnssecOn := true
+				useVC := false
+				cdsResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "CDS", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
+				if cdsResp.Msg == nil || !cdsResp.AA() || cdsResp.Rcode() != "NOERROR" {
+					outcomes[i] = outcome
+					return nil
+				}
+				for _, rr := range cdsResp.GetRecords("CDS", "answer") {
+					if cds, ok := rr.(*dns.CDS); ok {
+						outcome.cdsRecords = append(outcome.cdsRecords, cds)
+					}
+				}
+				if len(outcome.cdsRecords) == 0 {
+					outcomes[i] = outcome
+					return nil
+				}
+				for _, rr := range cdsResp.GetRecords("RRSIG", "answer") {
+					if sig, ok := rr.(*dns.RRSIG); ok {
+						outcome.cdsRRSIG = append(outcome.cdsRRSIG, sig)
+					}
+				}
+
+				useVC = false
+				dnskeyResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
+				if dnskeyResp.Msg == nil || !dnskeyResp.AA() || dnskeyResp.Rcode() != "NOERROR" {
+					outcomes[i] = outcome
+					return nil
+				}
+				for _, rr := range dnskeyResp.GetRecords("DNSKEY", "answer") {
+					if dnskey, ok := rr.(*dns.DNSKEY); ok {
+						outcome.dnskeyRecords = append(outcome.dnskeyRecords, dnskey)
+					}
+				}
+				if len(outcome.dnskeyRecords) == 0 {
+					outcomes[i] = outcome
+					return nil
+				}
+				for _, rr := range dnskeyResp.GetRecords("RRSIG", "answer") {
+					if sig, ok := rr.(*dns.RRSIG); ok {
+						outcome.dnskeyRRSIG = append(outcome.dnskeyRRSIG, sig)
+					}
+				}
+				outcome.testingTime = packetTime(dnskeyResp)
+				outcome.hasTestingTime = true
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+		if err != nil {
 			return results, err
-		} else if disabled {
-			continue
 		}
+		results = append(results, entries...)
 
-		dnssecOn := true
-		useVC := false
-		cdsResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "CDS", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
-		if cdsResp.Msg == nil || !cdsResp.AA() || cdsResp.Rcode() != "NOERROR" {
-			continue
-		}
-		var cdsRecords []*dns.CDS
-		for _, rr := range cdsResp.GetRecords("CDS", "answer") {
-			if cds, ok := rr.(*dns.CDS); ok {
-				cdsRecords = append(cdsRecords, cds)
+		for _, outcome := range outcomes {
+			if len(outcome.cdsRecords) > 0 {
+				cdsRRsets[outcome.nsIP] = outcome.cdsRecords
+				cdsRRSIG[outcome.nsIP] = outcome.cdsRRSIG
+			}
+			if len(outcome.dnskeyRecords) > 0 {
+				dnskeyRRsets[outcome.nsIP] = outcome.dnskeyRecords
+				dnskeyRRSIG[outcome.nsIP] = outcome.dnskeyRRSIG
+				if outcome.hasTestingTime {
+					testingTime = outcome.testingTime
+				}
 			}
 		}
-		if len(cdsRecords) == 0 {
-			continue
-		}
-		cdsRRsets[nsIP] = cdsRecords
-		for _, rr := range cdsResp.GetRecords("RRSIG", "answer") {
-			if sig, ok := rr.(*dns.RRSIG); ok {
-				cdsRRSIG[nsIP] = append(cdsRRSIG[nsIP], sig)
-			}
-		}
-
-		useVC = false
-		dnskeyResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
-		if dnskeyResp.Msg == nil || !dnskeyResp.AA() || dnskeyResp.Rcode() != "NOERROR" {
-			continue
-		}
-		var dnskeyRecords []*dns.DNSKEY
-		for _, rr := range dnskeyResp.GetRecords("DNSKEY", "answer") {
-			if dnskey, ok := rr.(*dns.DNSKEY); ok {
-				dnskeyRecords = append(dnskeyRecords, dnskey)
-			}
-		}
-		if len(dnskeyRecords) == 0 {
-			continue
-		}
-		dnskeyRRsets[nsIP] = dnskeyRecords
-		for _, rr := range dnskeyResp.GetRecords("RRSIG", "answer") {
-			if sig, ok := rr.(*dns.RRSIG); ok {
-				dnskeyRRSIG[nsIP] = append(dnskeyRRSIG[nsIP], sig)
-			}
-		}
-		testingTime = packetTime(dnskeyResp)
 	}
 
 	if len(cdsRRsets) > 0 {
-		for nsIP, cdsRecords := range cdsRRsets {
+		orderedIPs := make([]string, 0, len(ordered))
+		seenIPs := map[string]bool{}
+		for _, ns := range ordered {
+			ip := ns.Address.String()
+			orderedIPs = append(orderedIPs, ip)
+			seenIPs[ip] = true
+		}
+		var extraIPs []string
+		for nsIP := range cdsRRsets {
+			if !seenIPs[nsIP] {
+				extraIPs = append(extraIPs, nsIP)
+			}
+		}
+		sort.Strings(extraIPs)
+		orderedIPs = append(orderedIPs, extraIPs...)
+
+		type validationOutcome struct {
+			nsIP                     string
+			noDNSKEYRRset            bool
+			mixedDeleteCDS           bool
+			deleteCDS                bool
+			cdsNotSigned             bool
+			noMatchCDSWithDNSKEY     map[uint16]bool
+			cdsPointsToNonZoneDNSKEY map[uint16]bool
+			cdsPointsToNonSEPDNSKEY  map[uint16]bool
+			dnskeyNotSignedByCDS     map[uint16]bool
+			cdsNotSignedByCDS        map[uint16]bool
+			cdsSignedByUnknownDNSKEY map[uint16]bool
+			cdsInvalidRRSIG          map[uint16]bool
+		}
+
+		var tasks []parallel.Task[validationOutcome]
+		for _, nsIP := range orderedIPs {
+			cdsRecords := cdsRRsets[nsIP]
 			if len(cdsRecords) == 0 {
 				continue
 			}
-
-			hasDelete := false
-			hasNonDelete := false
-			for _, cds := range cdsRecords {
-				if cds.Algorithm == 0 {
-					hasDelete = true
-				} else {
-					hasNonDelete = true
-				}
-			}
-			if hasDelete {
-				if hasNonDelete {
-					mixedDeleteCDS[nsIP] = true
-				} else {
-					deleteCDS[nsIP] = true
-				}
-				continue
-			}
-
-			dnskeys := dnskeyRRsets[nsIP]
-			if len(dnskeys) == 0 {
-				noDNSKEYRRset[nsIP] = true
-				continue
-			}
-
-			for _, cds := range cdsRecords {
-				if cds.Algorithm == 0 {
-					continue
-				}
-				keytag := cds.KeyTag
-				var matchingDNSKEYs []*dns.DNSKEY
-				for _, dnskey := range dnskeys {
-					if dnskey.KeyTag() == keytag {
-						matchingDNSKEYs = append(matchingDNSKEYs, dnskey)
-					}
-				}
-				if len(matchingDNSKEYs) == 0 {
-					noMatchCDSWithDNSKEY[keytag] = append(noMatchCDSWithDNSKEY[keytag], nsIP)
-					continue
-				}
-				hasNonZone := false
-				for _, dnskey := range matchingDNSKEYs {
-					if dnskey.Flags&dns.ZONE == 0 {
-						hasNonZone = true
-						break
-					}
-				}
-				if hasNonZone {
-					cdsPointsToNonZoneDNSKEY[keytag] = append(cdsPointsToNonZoneDNSKEY[keytag], nsIP)
-					continue
+			nsIP := nsIP
+			tasks = append(tasks, func(_ context.Context) (validationOutcome, error) {
+				outcome := validationOutcome{
+					nsIP:                     nsIP,
+					noMatchCDSWithDNSKEY:     map[uint16]bool{},
+					cdsPointsToNonZoneDNSKEY: map[uint16]bool{},
+					cdsPointsToNonSEPDNSKEY:  map[uint16]bool{},
+					dnskeyNotSignedByCDS:     map[uint16]bool{},
+					cdsNotSignedByCDS:        map[uint16]bool{},
+					cdsSignedByUnknownDNSKEY: map[uint16]bool{},
+					cdsInvalidRRSIG:          map[uint16]bool{},
 				}
 
-				if !rrsigHasKeytag(dnskeyRRSIG[nsIP], keytag) {
-					dnskeyNotSignedByCDS[keytag] = append(dnskeyNotSignedByCDS[keytag], nsIP)
-				}
-				if !rrsigHasKeytag(cdsRRSIG[nsIP], keytag) {
-					cdsNotSignedByCDS[keytag] = append(cdsNotSignedByCDS[keytag], nsIP)
-				}
-				hasNonSEP := false
-				for _, dnskey := range matchingDNSKEYs {
-					if dnskey.Flags&dns.SEP == 0 {
-						hasNonSEP = true
-						break
-					}
-				}
-				if hasNonSEP {
-					cdsPointsToNonSEPDNSKEY[keytag] = append(cdsPointsToNonSEPDNSKEY[keytag], nsIP)
-				}
-			}
-
-			if len(cdsRRSIG[nsIP]) == 0 {
-				cdsNotSigned[nsIP] = true
-			} else {
-				rrset := make([]dns.RR, 0, len(cdsRecords))
+				hasDelete := false
+				hasNonDelete := false
 				for _, cds := range cdsRecords {
-					rrset = append(rrset, cds)
+					if cds.Algorithm == 0 {
+						hasDelete = true
+					} else {
+						hasNonDelete = true
+					}
 				}
-				for _, sig := range cdsRRSIG[nsIP] {
-					keytag := sig.KeyTag
+				if hasDelete {
+					if hasNonDelete {
+						outcome.mixedDeleteCDS = true
+					} else {
+						outcome.deleteCDS = true
+					}
+					return outcome, nil
+				}
+
+				dnskeys := dnskeyRRsets[nsIP]
+				if len(dnskeys) == 0 {
+					outcome.noDNSKEYRRset = true
+					return outcome, nil
+				}
+
+				for _, cds := range cdsRecords {
+					if cds.Algorithm == 0 {
+						continue
+					}
+					keytag := cds.KeyTag
 					var matchingDNSKEYs []*dns.DNSKEY
 					for _, dnskey := range dnskeys {
 						if dnskey.KeyTag() == keytag {
@@ -3941,19 +5029,115 @@ func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						}
 					}
 					if len(matchingDNSKEYs) == 0 {
-						cdsSignedByUnknownDNSKEY[keytag] = append(cdsSignedByUnknownDNSKEY[keytag], nsIP)
+						outcome.noMatchCDSWithDNSKEY[keytag] = true
 						continue
 					}
-					valid := false
+					hasNonZone := false
 					for _, dnskey := range matchingDNSKEYs {
-						if verifyRRSIG(sig, rrset, dnskey, testingTime) == nil {
-							valid = true
+						if dnskey.Flags&dns.ZONE == 0 {
+							hasNonZone = true
 							break
 						}
 					}
-					if !valid {
-						cdsInvalidRRSIG[keytag] = append(cdsInvalidRRSIG[keytag], nsIP)
+					if hasNonZone {
+						outcome.cdsPointsToNonZoneDNSKEY[keytag] = true
+						continue
 					}
+
+					if !rrsigHasKeytag(dnskeyRRSIG[nsIP], keytag) {
+						outcome.dnskeyNotSignedByCDS[keytag] = true
+					}
+					if !rrsigHasKeytag(cdsRRSIG[nsIP], keytag) {
+						outcome.cdsNotSignedByCDS[keytag] = true
+					}
+					hasNonSEP := false
+					for _, dnskey := range matchingDNSKEYs {
+						if dnskey.Flags&dns.SEP == 0 {
+							hasNonSEP = true
+							break
+						}
+					}
+					if hasNonSEP {
+						outcome.cdsPointsToNonSEPDNSKEY[keytag] = true
+					}
+				}
+
+				if len(cdsRRSIG[nsIP]) == 0 {
+					outcome.cdsNotSigned = true
+				} else {
+					rrset := make([]dns.RR, 0, len(cdsRecords))
+					for _, cds := range cdsRecords {
+						rrset = append(rrset, cds)
+					}
+					for _, sig := range cdsRRSIG[nsIP] {
+						keytag := sig.KeyTag
+						var matchingDNSKEYs []*dns.DNSKEY
+						for _, dnskey := range dnskeys {
+							if dnskey.KeyTag() == keytag {
+								matchingDNSKEYs = append(matchingDNSKEYs, dnskey)
+							}
+						}
+						if len(matchingDNSKEYs) == 0 {
+							outcome.cdsSignedByUnknownDNSKEY[keytag] = true
+							continue
+						}
+						valid := false
+						for _, dnskey := range matchingDNSKEYs {
+							if verifyRRSIG(sig, rrset, dnskey, testingTime) == nil {
+								valid = true
+								break
+							}
+						}
+						if !valid {
+							outcome.cdsInvalidRRSIG[keytag] = true
+						}
+					}
+				}
+
+				return outcome, nil
+			})
+		}
+
+		if len(tasks) > 0 {
+			parallelism := profile.Effective().Resolver.Defaults.Parallel
+			validationResults := parallel.RunOrdered(ctx, tasks, parallel.Options{Limit: parallelism, CancelOnError: false})
+			for _, res := range validationResults {
+				if res.Err != nil {
+					return results, res.Err
+				}
+				outcome := res.Value
+				if outcome.noDNSKEYRRset {
+					noDNSKEYRRset[outcome.nsIP] = true
+				}
+				if outcome.mixedDeleteCDS {
+					mixedDeleteCDS[outcome.nsIP] = true
+				}
+				if outcome.deleteCDS {
+					deleteCDS[outcome.nsIP] = true
+				}
+				if outcome.cdsNotSigned {
+					cdsNotSigned[outcome.nsIP] = true
+				}
+				for keytag := range outcome.noMatchCDSWithDNSKEY {
+					noMatchCDSWithDNSKEY[keytag] = append(noMatchCDSWithDNSKEY[keytag], outcome.nsIP)
+				}
+				for keytag := range outcome.cdsPointsToNonZoneDNSKEY {
+					cdsPointsToNonZoneDNSKEY[keytag] = append(cdsPointsToNonZoneDNSKEY[keytag], outcome.nsIP)
+				}
+				for keytag := range outcome.cdsPointsToNonSEPDNSKEY {
+					cdsPointsToNonSEPDNSKEY[keytag] = append(cdsPointsToNonSEPDNSKEY[keytag], outcome.nsIP)
+				}
+				for keytag := range outcome.dnskeyNotSignedByCDS {
+					dnskeyNotSignedByCDS[keytag] = append(dnskeyNotSignedByCDS[keytag], outcome.nsIP)
+				}
+				for keytag := range outcome.cdsNotSignedByCDS {
+					cdsNotSignedByCDS[keytag] = append(cdsNotSignedByCDS[keytag], outcome.nsIP)
+				}
+				for keytag := range outcome.cdsSignedByUnknownDNSKEY {
+					cdsSignedByUnknownDNSKEY[keytag] = append(cdsSignedByUnknownDNSKEY[keytag], outcome.nsIP)
+				}
+				for keytag := range outcome.cdsInvalidRRSIG {
+					cdsInvalidRRSIG[keytag] = append(cdsInvalidRRSIG[keytag], outcome.nsIP)
 				}
 			}
 		}
@@ -4165,6 +5349,7 @@ func DNSSEC17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	sort.Strings(keys)
 
 	testingTime := time.Now().UTC()
+	var ordered []nameserver.Nameserver
 	ipAlreadyProcessed := map[string]bool{}
 	for _, key := range keys {
 		ns := nss[key]
@@ -4173,129 +5358,194 @@ func DNSSEC17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			continue
 		}
 		ipAlreadyProcessed[nsIP] = true
+		ordered = append(ordered, ns)
+	}
 
-		if disabled, err := ipDisabledMessage(&results, testcase, ns, queryTypes...); err != nil {
+	if len(ordered) > 0 {
+		type nsOutcome struct {
+			nsIP           string
+			cdnskeyRecords []*dns.CDNSKEY
+			cdnskeyRRSIG   []*dns.RRSIG
+			dnskeyRecords  []*dns.DNSKEY
+			dnskeyRRSIG    []*dns.RRSIG
+			testingTime    time.Time
+			hasTestingTime bool
+		}
+
+		outcomes := make([]nsOutcome, len(ordered))
+		tasks := make([]runner.Task, len(ordered))
+		for i, ns := range ordered {
+			i, ns := i, ns
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				outcome := nsOutcome{nsIP: ns.Address.String()}
+
+				if disabled, err := ipDisabledMessageWithLogger(buf, ns, queryTypes...); err != nil {
+					return err
+				} else if disabled {
+					outcomes[i] = outcome
+					return nil
+				}
+
+				dnssecOn := true
+				useVC := false
+				cdnskeyResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "CDNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
+				if cdnskeyResp.Msg == nil || !cdnskeyResp.AA() || cdnskeyResp.Rcode() != "NOERROR" {
+					outcomes[i] = outcome
+					return nil
+				}
+				for _, rr := range cdnskeyResp.GetRecords("CDNSKEY", "answer") {
+					if cdnskey, ok := rr.(*dns.CDNSKEY); ok {
+						outcome.cdnskeyRecords = append(outcome.cdnskeyRecords, cdnskey)
+					}
+				}
+				if len(outcome.cdnskeyRecords) == 0 {
+					outcomes[i] = outcome
+					return nil
+				}
+				for _, rr := range cdnskeyResp.GetRecords("RRSIG", "answer") {
+					if sig, ok := rr.(*dns.RRSIG); ok {
+						outcome.cdnskeyRRSIG = append(outcome.cdnskeyRRSIG, sig)
+					}
+				}
+
+				useVC = false
+				dnskeyResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
+				if dnskeyResp.Msg == nil || !dnskeyResp.AA() || dnskeyResp.Rcode() != "NOERROR" {
+					outcomes[i] = outcome
+					return nil
+				}
+				for _, rr := range dnskeyResp.GetRecords("DNSKEY", "answer") {
+					if dnskey, ok := rr.(*dns.DNSKEY); ok {
+						outcome.dnskeyRecords = append(outcome.dnskeyRecords, dnskey)
+					}
+				}
+				if len(outcome.dnskeyRecords) == 0 {
+					outcomes[i] = outcome
+					return nil
+				}
+				for _, rr := range dnskeyResp.GetRecords("RRSIG", "answer") {
+					if sig, ok := rr.(*dns.RRSIG); ok {
+						outcome.dnskeyRRSIG = append(outcome.dnskeyRRSIG, sig)
+					}
+				}
+				outcome.testingTime = packetTime(dnskeyResp)
+				outcome.hasTestingTime = true
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+		if err != nil {
 			return results, err
-		} else if disabled {
-			continue
 		}
+		results = append(results, entries...)
 
-		dnssecOn := true
-		useVC := false
-		cdnskeyResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "CDNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
-		if cdnskeyResp.Msg == nil || !cdnskeyResp.AA() || cdnskeyResp.Rcode() != "NOERROR" {
-			continue
-		}
-		var cdnskeyRecords []*dns.CDNSKEY
-		for _, rr := range cdnskeyResp.GetRecords("CDNSKEY", "answer") {
-			if cdnskey, ok := rr.(*dns.CDNSKEY); ok {
-				cdnskeyRecords = append(cdnskeyRecords, cdnskey)
+		for _, outcome := range outcomes {
+			if len(outcome.cdnskeyRecords) > 0 {
+				cdnskeyRRsets[outcome.nsIP] = outcome.cdnskeyRecords
+				cdnskeyRRSIG[outcome.nsIP] = outcome.cdnskeyRRSIG
+			}
+			if len(outcome.dnskeyRecords) > 0 {
+				dnskeyRRsets[outcome.nsIP] = outcome.dnskeyRecords
+				dnskeyRRSIG[outcome.nsIP] = outcome.dnskeyRRSIG
+				if outcome.hasTestingTime {
+					testingTime = outcome.testingTime
+				}
 			}
 		}
-		if len(cdnskeyRecords) == 0 {
-			continue
-		}
-		cdnskeyRRsets[nsIP] = cdnskeyRecords
-		for _, rr := range cdnskeyResp.GetRecords("RRSIG", "answer") {
-			if sig, ok := rr.(*dns.RRSIG); ok {
-				cdnskeyRRSIG[nsIP] = append(cdnskeyRRSIG[nsIP], sig)
-			}
-		}
-
-		useVC = false
-		dnskeyResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
-		if dnskeyResp.Msg == nil || !dnskeyResp.AA() || dnskeyResp.Rcode() != "NOERROR" {
-			continue
-		}
-		var dnskeyRecords []*dns.DNSKEY
-		for _, rr := range dnskeyResp.GetRecords("DNSKEY", "answer") {
-			if dnskey, ok := rr.(*dns.DNSKEY); ok {
-				dnskeyRecords = append(dnskeyRecords, dnskey)
-			}
-		}
-		if len(dnskeyRecords) == 0 {
-			continue
-		}
-		dnskeyRRsets[nsIP] = dnskeyRecords
-		for _, rr := range dnskeyResp.GetRecords("RRSIG", "answer") {
-			if sig, ok := rr.(*dns.RRSIG); ok {
-				dnskeyRRSIG[nsIP] = append(dnskeyRRSIG[nsIP], sig)
-			}
-		}
-		testingTime = packetTime(dnskeyResp)
 	}
 
 	if len(cdnskeyRRsets) > 0 {
-		for nsIP, cdnskeyRecords := range cdnskeyRRsets {
+		orderedIPs := make([]string, 0, len(ordered))
+		seenIPs := map[string]bool{}
+		for _, ns := range ordered {
+			ip := ns.Address.String()
+			orderedIPs = append(orderedIPs, ip)
+			seenIPs[ip] = true
+		}
+		var extraIPs []string
+		for nsIP := range cdnskeyRRsets {
+			if !seenIPs[nsIP] {
+				extraIPs = append(extraIPs, nsIP)
+			}
+		}
+		sort.Strings(extraIPs)
+		orderedIPs = append(orderedIPs, extraIPs...)
+
+		type validationOutcome struct {
+			nsIP                         string
+			noDNSKEYRRset                bool
+			mixedDeleteCDNSKEY           bool
+			deleteCDNSKEY                bool
+			cdnskeyNotSigned             bool
+			noMatchCDNSKEYWithDNSKEY     map[uint16]bool
+			cdnskeyIsNonZone             map[uint16]bool
+			cdnskeyIsNonSEP              map[uint16]bool
+			dnskeyNotSignedByCDNSKEY     map[uint16]bool
+			cdnskeyNotSignedByCDNSKEY    map[uint16]bool
+			cdnskeySignedByUnknownDNSKEY map[uint16]bool
+			cdnskeyInvalidRRSIG          map[uint16]bool
+		}
+
+		var tasks []parallel.Task[validationOutcome]
+		for _, nsIP := range orderedIPs {
+			cdnskeyRecords := cdnskeyRRsets[nsIP]
 			if len(cdnskeyRecords) == 0 {
 				continue
 			}
-
-			hasDelete := false
-			hasNonDelete := false
-			for _, cdnskey := range cdnskeyRecords {
-				if cdnskey.Algorithm == 0 {
-					hasDelete = true
-				} else {
-					hasNonDelete = true
-				}
-			}
-			if hasDelete {
-				if hasNonDelete {
-					mixedDeleteCDNSKEY[nsIP] = true
-				} else {
-					deleteCDNSKEY[nsIP] = true
-				}
-				continue
-			}
-
-			dnskeys := dnskeyRRsets[nsIP]
-			if len(dnskeys) == 0 {
-				noDNSKEYRRset[nsIP] = true
-				continue
-			}
-
-			for _, cdnskey := range cdnskeyRecords {
-				if cdnskey.Algorithm == 0 {
-					continue
-				}
-				keytag := cdnskey.KeyTag()
-				if cdnskey.Flags&dns.ZONE == 0 {
-					cdnskeyIsNonZone[keytag] = append(cdnskeyIsNonZone[keytag], nsIP)
-					continue
-				}
-				if cdnskey.Flags&dns.SEP == 0 {
-					cdnskeyIsNonSEP[keytag] = append(cdnskeyIsNonSEP[keytag], nsIP)
+			nsIP := nsIP
+			tasks = append(tasks, func(_ context.Context) (validationOutcome, error) {
+				outcome := validationOutcome{
+					nsIP:                         nsIP,
+					noMatchCDNSKEYWithDNSKEY:     map[uint16]bool{},
+					cdnskeyIsNonZone:             map[uint16]bool{},
+					cdnskeyIsNonSEP:              map[uint16]bool{},
+					dnskeyNotSignedByCDNSKEY:     map[uint16]bool{},
+					cdnskeyNotSignedByCDNSKEY:    map[uint16]bool{},
+					cdnskeySignedByUnknownDNSKEY: map[uint16]bool{},
+					cdnskeyInvalidRRSIG:          map[uint16]bool{},
 				}
 
-				var matchingDNSKEYs []*dns.DNSKEY
-				for _, dnskey := range dnskeys {
-					if dnskey.KeyTag() == keytag {
-						matchingDNSKEYs = append(matchingDNSKEYs, dnskey)
+				hasDelete := false
+				hasNonDelete := false
+				for _, cdnskey := range cdnskeyRecords {
+					if cdnskey.Algorithm == 0 {
+						hasDelete = true
+					} else {
+						hasNonDelete = true
 					}
 				}
-				if len(matchingDNSKEYs) == 0 {
-					noMatchCDNSKEYWithDNSKEY[keytag] = append(noMatchCDNSKEYWithDNSKEY[keytag], nsIP)
-					continue
+				if hasDelete {
+					if hasNonDelete {
+						outcome.mixedDeleteCDNSKEY = true
+					} else {
+						outcome.deleteCDNSKEY = true
+					}
+					return outcome, nil
 				}
 
-				if !rrsigHasKeytag(dnskeyRRSIG[nsIP], keytag) {
-					dnskeyNotSignedByCDNSKEY[keytag] = append(dnskeyNotSignedByCDNSKEY[keytag], nsIP)
+				dnskeys := dnskeyRRsets[nsIP]
+				if len(dnskeys) == 0 {
+					outcome.noDNSKEYRRset = true
+					return outcome, nil
 				}
-				if !rrsigHasKeytag(cdnskeyRRSIG[nsIP], keytag) {
-					cdnskeyNotSignedByCDNSKEY[keytag] = append(cdnskeyNotSignedByCDNSKEY[keytag], nsIP)
-				}
-			}
 
-			if len(cdnskeyRRSIG[nsIP]) == 0 {
-				cdnskeyNotSigned[nsIP] = true
-			} else {
-				rrset := make([]dns.RR, 0, len(cdnskeyRecords))
 				for _, cdnskey := range cdnskeyRecords {
-					rrset = append(rrset, cdnskey)
-				}
-				for _, sig := range cdnskeyRRSIG[nsIP] {
-					keytag := sig.KeyTag
+					if cdnskey.Algorithm == 0 {
+						continue
+					}
+					keytag := cdnskey.KeyTag()
+					if cdnskey.Flags&dns.ZONE == 0 {
+						outcome.cdnskeyIsNonZone[keytag] = true
+						continue
+					}
+					if cdnskey.Flags&dns.SEP == 0 {
+						outcome.cdnskeyIsNonSEP[keytag] = true
+					}
+
 					var matchingDNSKEYs []*dns.DNSKEY
 					for _, dnskey := range dnskeys {
 						if dnskey.KeyTag() == keytag {
@@ -4303,19 +5553,94 @@ func DNSSEC17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						}
 					}
 					if len(matchingDNSKEYs) == 0 {
-						cdnskeySignedByUnknownDNSKEY[keytag] = append(cdnskeySignedByUnknownDNSKEY[keytag], nsIP)
+						outcome.noMatchCDNSKEYWithDNSKEY[keytag] = true
 						continue
 					}
-					valid := false
-					for _, dnskey := range matchingDNSKEYs {
-						if verifyRRSIG(sig, rrset, dnskey, testingTime) == nil {
-							valid = true
-							break
+
+					if !rrsigHasKeytag(dnskeyRRSIG[nsIP], keytag) {
+						outcome.dnskeyNotSignedByCDNSKEY[keytag] = true
+					}
+					if !rrsigHasKeytag(cdnskeyRRSIG[nsIP], keytag) {
+						outcome.cdnskeyNotSignedByCDNSKEY[keytag] = true
+					}
+				}
+
+				if len(cdnskeyRRSIG[nsIP]) == 0 {
+					outcome.cdnskeyNotSigned = true
+				} else {
+					rrset := make([]dns.RR, 0, len(cdnskeyRecords))
+					for _, cdnskey := range cdnskeyRecords {
+						rrset = append(rrset, cdnskey)
+					}
+					for _, sig := range cdnskeyRRSIG[nsIP] {
+						keytag := sig.KeyTag
+						var matchingDNSKEYs []*dns.DNSKEY
+						for _, dnskey := range dnskeys {
+							if dnskey.KeyTag() == keytag {
+								matchingDNSKEYs = append(matchingDNSKEYs, dnskey)
+							}
+						}
+						if len(matchingDNSKEYs) == 0 {
+							outcome.cdnskeySignedByUnknownDNSKEY[keytag] = true
+							continue
+						}
+						valid := false
+						for _, dnskey := range matchingDNSKEYs {
+							if verifyRRSIG(sig, rrset, dnskey, testingTime) == nil {
+								valid = true
+								break
+							}
+						}
+						if !valid {
+							outcome.cdnskeyInvalidRRSIG[keytag] = true
 						}
 					}
-					if !valid {
-						cdnskeyInvalidRRSIG[keytag] = append(cdnskeyInvalidRRSIG[keytag], nsIP)
-					}
+				}
+
+				return outcome, nil
+			})
+		}
+
+		if len(tasks) > 0 {
+			parallelism := profile.Effective().Resolver.Defaults.Parallel
+			validationResults := parallel.RunOrdered(ctx, tasks, parallel.Options{Limit: parallelism, CancelOnError: false})
+			for _, res := range validationResults {
+				if res.Err != nil {
+					return results, res.Err
+				}
+				outcome := res.Value
+				if outcome.noDNSKEYRRset {
+					noDNSKEYRRset[outcome.nsIP] = true
+				}
+				if outcome.mixedDeleteCDNSKEY {
+					mixedDeleteCDNSKEY[outcome.nsIP] = true
+				}
+				if outcome.deleteCDNSKEY {
+					deleteCDNSKEY[outcome.nsIP] = true
+				}
+				if outcome.cdnskeyNotSigned {
+					cdnskeyNotSigned[outcome.nsIP] = true
+				}
+				for keytag := range outcome.noMatchCDNSKEYWithDNSKEY {
+					noMatchCDNSKEYWithDNSKEY[keytag] = append(noMatchCDNSKEYWithDNSKEY[keytag], outcome.nsIP)
+				}
+				for keytag := range outcome.cdnskeyIsNonZone {
+					cdnskeyIsNonZone[keytag] = append(cdnskeyIsNonZone[keytag], outcome.nsIP)
+				}
+				for keytag := range outcome.cdnskeyIsNonSEP {
+					cdnskeyIsNonSEP[keytag] = append(cdnskeyIsNonSEP[keytag], outcome.nsIP)
+				}
+				for keytag := range outcome.dnskeyNotSignedByCDNSKEY {
+					dnskeyNotSignedByCDNSKEY[keytag] = append(dnskeyNotSignedByCDNSKEY[keytag], outcome.nsIP)
+				}
+				for keytag := range outcome.cdnskeyNotSignedByCDNSKEY {
+					cdnskeyNotSignedByCDNSKEY[keytag] = append(cdnskeyNotSignedByCDNSKEY[keytag], outcome.nsIP)
+				}
+				for keytag := range outcome.cdnskeySignedByUnknownDNSKEY {
+					cdnskeySignedByUnknownDNSKEY[keytag] = append(cdnskeySignedByUnknownDNSKEY[keytag], outcome.nsIP)
+				}
+				for keytag := range outcome.cdnskeyInvalidRRSIG {
+					cdnskeyInvalidRRSIG[keytag] = append(cdnskeyInvalidRRSIG[keytag], outcome.nsIP)
 				}
 			}
 		}
@@ -4509,6 +5834,7 @@ func DNSSEC18(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 	sort.Strings(keys)
 
+	var ordered []nameserver.Nameserver
 	ipAlreadyProcessed := map[string]bool{}
 	for _, key := range keys {
 		ns := nss[key]
@@ -4517,26 +5843,64 @@ func DNSSEC18(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			continue
 		}
 		ipAlreadyProcessed[nsIP] = true
+		ordered = append(ordered, ns)
+	}
 
-		if disabled, err := ipDisabledMessage(&results, testcase, ns, "DS"); err != nil {
+	if len(ordered) > 0 {
+		type nsOutcome struct {
+			dsRecords []*dns.DS
+		}
+
+		outcomes := make([]nsOutcome, len(ordered))
+		tasks := make([]runner.Task, len(ordered))
+		for i, ns := range ordered {
+			i, ns := i, ns
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				outcome := nsOutcome{}
+
+				if disabled, err := ipDisabledMessageWithLogger(buf, ns, "DS"); err != nil {
+					return err
+				} else if disabled {
+					outcomes[i] = outcome
+					return nil
+				}
+
+				dnssecOn := true
+				useVC := false
+				dsResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DS", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
+				if dsResp.Msg == nil || dsResp.Rcode() != "NOERROR" || !dsResp.AA() {
+					outcomes[i] = outcome
+					return nil
+				}
+
+				dsRRs := dsResp.GetRecordsForName("DS", z.Name, "answer")
+				if len(dsRRs) == 0 {
+					outcomes[i] = outcome
+					return nil
+				}
+				for _, rr := range dsRRs {
+					if ds, ok := rr.(*dns.DS); ok {
+						if !containsDS(outcome.dsRecords, ds) {
+							outcome.dsRecords = append(outcome.dsRecords, ds)
+						}
+					}
+				}
+
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+		if err != nil {
 			return results, err
-		} else if disabled {
-			continue
 		}
+		results = append(results, entries...)
 
-		dnssecOn := true
-		useVC := false
-		dsResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DS", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
-		if dsResp.Msg == nil || dsResp.Rcode() != "NOERROR" || !dsResp.AA() {
-			continue
-		}
-
-		dsRRs := dsResp.GetRecordsForName("DS", z.Name, "answer")
-		if len(dsRRs) == 0 {
-			continue
-		}
-		for _, rr := range dsRRs {
-			if ds, ok := rr.(*dns.DS); ok {
+		for _, outcome := range outcomes {
+			for _, ds := range outcome.dsRecords {
 				if !containsDS(dsRecords, ds) {
 					dsRecords = append(dsRecords, ds)
 				}
@@ -4572,6 +5936,7 @@ func DNSSEC18(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 		sort.Strings(childKeys)
 
+		var ordered []nameserver.Nameserver
 		ipAlreadyProcessed = map[string]bool{}
 		for _, key := range childKeys {
 			ns := childNSS[key]
@@ -4580,92 +5945,211 @@ func DNSSEC18(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				continue
 			}
 			ipAlreadyProcessed[nsIP] = true
+			ordered = append(ordered, ns)
+		}
 
-			if disabled, err := ipDisabledMessage(&results, testcase, ns, queryTypes...); err != nil {
+		if len(ordered) > 0 {
+			type nsOutcome struct {
+				nsIP            string
+				cdsHasRRset     bool
+				cdnskeyHasRRset bool
+				cdsRRSIG        []*dns.RRSIG
+				cdnskeyRRSIG    []*dns.RRSIG
+				dnskeyRecords   []*dns.DNSKEY
+			}
+
+			outcomes := make([]nsOutcome, len(ordered))
+			tasks := make([]runner.Task, len(ordered))
+			for i, ns := range ordered {
+				i, ns := i, ns
+				tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+					buf := testlogger.Wrap(log, moduleName, testcase)
+					outcome := nsOutcome{nsIP: ns.Address.String()}
+
+					if disabled, err := ipDisabledMessageWithLogger(buf, ns, queryTypes...); err != nil {
+						return err
+					} else if disabled {
+						outcomes[i] = outcome
+						return nil
+					}
+
+					dnssecOn := true
+					useVC := false
+					cdsResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "CDS", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
+					if cdsResp.Msg == nil || !cdsResp.AA() || cdsResp.Rcode() != "NOERROR" {
+						outcomes[i] = outcome
+						return nil
+					}
+					if len(cdsResp.GetRecords("CDS", "answer")) > 0 {
+						outcome.cdsHasRRset = true
+						for _, rr := range cdsResp.GetRecords("RRSIG", "answer") {
+							if sig, ok := rr.(*dns.RRSIG); ok {
+								outcome.cdsRRSIG = append(outcome.cdsRRSIG, sig)
+							}
+						}
+					}
+
+					useVC = false
+					cdnskeyResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "CDNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
+					if cdnskeyResp.Msg == nil || !cdnskeyResp.AA() || cdnskeyResp.Rcode() != "NOERROR" {
+						outcomes[i] = outcome
+						return nil
+					}
+					if len(cdnskeyResp.GetRecords("CDNSKEY", "answer")) > 0 {
+						outcome.cdnskeyHasRRset = true
+						for _, rr := range cdnskeyResp.GetRecords("RRSIG", "answer") {
+							if sig, ok := rr.(*dns.RRSIG); ok {
+								outcome.cdnskeyRRSIG = append(outcome.cdnskeyRRSIG, sig)
+							}
+						}
+					}
+
+					useVC = false
+					dnskeyResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
+					if dnskeyResp.Msg == nil || dnskeyResp.Rcode() != "NOERROR" || !dnskeyResp.AA() {
+						outcomes[i] = outcome
+						return nil
+					}
+					for _, rr := range dnskeyResp.GetRecords("DNSKEY", "answer") {
+						if dnskey, ok := rr.(*dns.DNSKEY); ok {
+							outcome.dnskeyRecords = append(outcome.dnskeyRecords, dnskey)
+						}
+					}
+
+					outcomes[i] = outcome
+					return nil
+				}
+			}
+
+			parallelism := profile.Effective().Resolver.Defaults.Parallel
+			entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+			if err != nil {
 				return results, err
-			} else if disabled {
-				continue
 			}
+			results = append(results, entries...)
 
-			dnssecOn := true
-			useVC := false
-			cdsResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "CDS", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
-			if cdsResp.Msg == nil || !cdsResp.AA() || cdsResp.Rcode() != "NOERROR" {
-				continue
-			}
-			if len(cdsResp.GetRecords("CDS", "answer")) > 0 {
-				cdsRRsets[nsIP] = true
-				for _, rr := range cdsResp.GetRecords("RRSIG", "answer") {
-					if sig, ok := rr.(*dns.RRSIG); ok {
-						cdsRRSIG[nsIP] = append(cdsRRSIG[nsIP], sig)
-					}
+			for _, outcome := range outcomes {
+				if outcome.cdsHasRRset {
+					cdsRRsets[outcome.nsIP] = true
+					cdsRRSIG[outcome.nsIP] = outcome.cdsRRSIG
 				}
-			}
-
-			useVC = false
-			cdnskeyResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "CDNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
-			if cdnskeyResp.Msg == nil || !cdnskeyResp.AA() || cdnskeyResp.Rcode() != "NOERROR" {
-				continue
-			}
-			if len(cdnskeyResp.GetRecords("CDNSKEY", "answer")) > 0 {
-				cdnskeyRRsets[nsIP] = true
-				for _, rr := range cdnskeyResp.GetRecords("RRSIG", "answer") {
-					if sig, ok := rr.(*dns.RRSIG); ok {
-						cdnskeyRRSIG[nsIP] = append(cdnskeyRRSIG[nsIP], sig)
-					}
+				if outcome.cdnskeyHasRRset {
+					cdnskeyRRsets[outcome.nsIP] = true
+					cdnskeyRRSIG[outcome.nsIP] = outcome.cdnskeyRRSIG
 				}
-			}
-
-			useVC = false
-			dnskeyResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
-			if dnskeyResp.Msg == nil || dnskeyResp.Rcode() != "NOERROR" || !dnskeyResp.AA() {
-				continue
-			}
-			var dnskeyRecords []*dns.DNSKEY
-			for _, rr := range dnskeyResp.GetRecords("DNSKEY", "answer") {
-				if dnskey, ok := rr.(*dns.DNSKEY); ok {
-					dnskeyRecords = append(dnskeyRecords, dnskey)
+				if len(outcome.dnskeyRecords) > 0 {
+					dnskeyRRsets[outcome.nsIP] = outcome.dnskeyRecords
 				}
-			}
-			if len(dnskeyRecords) > 0 {
-				dnskeyRRsets[nsIP] = dnskeyRecords
 			}
 		}
 
 		if (len(cdsRRsets) > 0 || len(cdnskeyRRsets) > 0) && len(dnskeyRRsets) > 0 {
+			orderedIPs := make([]string, 0, len(ordered))
+			seenIPs := map[string]bool{}
+			for _, ns := range ordered {
+				ip := ns.Address.String()
+				orderedIPs = append(orderedIPs, ip)
+				seenIPs[ip] = true
+			}
+			var extraIPs []string
 			for nsIP := range cdsRRsets {
-				rrsig := cdsRRSIG[nsIP]
-				dnskeys := dnskeyRRsets[nsIP]
-				match := false
-				for _, ds := range dsRecords {
-					if !dnskeyHasKeytag(dnskeys, ds.KeyTag) {
+				if !seenIPs[nsIP] {
+					extraIPs = append(extraIPs, nsIP)
+				}
+			}
+			for nsIP := range cdnskeyRRsets {
+				if !seenIPs[nsIP] {
+					extraIPs = append(extraIPs, nsIP)
+				}
+			}
+			if len(extraIPs) > 0 {
+				sort.Strings(extraIPs)
+				orderedIPs = append(orderedIPs, extraIPs...)
+			}
+
+			if len(cdsRRsets) > 0 {
+				type sigOutcome struct {
+					nsIP    string
+					noMatch bool
+				}
+
+				var tasks []parallel.Task[sigOutcome]
+				for _, nsIP := range orderedIPs {
+					if !cdsRRsets[nsIP] {
 						continue
 					}
-					if rrsigHasKeytag(rrsig, ds.KeyTag) {
-						match = true
-						break
-					}
+					nsIP := nsIP
+					tasks = append(tasks, func(_ context.Context) (sigOutcome, error) {
+						rrsig := cdsRRSIG[nsIP]
+						dnskeys := dnskeyRRsets[nsIP]
+						match := false
+						for _, ds := range dsRecords {
+							if !dnskeyHasKeytag(dnskeys, ds.KeyTag) {
+								continue
+							}
+							if rrsigHasKeytag(rrsig, ds.KeyTag) {
+								match = true
+								break
+							}
+						}
+						return sigOutcome{nsIP: nsIP, noMatch: !match}, nil
+					})
 				}
-				if !match {
-					dsNoMatchCDSRRSIG[nsIP] = true
+
+				if len(tasks) > 0 {
+					parallelism := profile.Effective().Resolver.Defaults.Parallel
+					validationResults := parallel.RunOrdered(ctx, tasks, parallel.Options{Limit: parallelism, CancelOnError: false})
+					for _, res := range validationResults {
+						if res.Err != nil {
+							return results, res.Err
+						}
+						if res.Value.noMatch {
+							dsNoMatchCDSRRSIG[res.Value.nsIP] = true
+						}
+					}
 				}
 			}
 
-			for nsIP := range cdnskeyRRsets {
-				rrsig := cdnskeyRRSIG[nsIP]
-				dnskeys := dnskeyRRsets[nsIP]
-				match := false
-				for _, ds := range dsRecords {
-					if !dnskeyHasKeytag(dnskeys, ds.KeyTag) {
+			if len(cdnskeyRRsets) > 0 {
+				type sigOutcome struct {
+					nsIP    string
+					noMatch bool
+				}
+
+				var tasks []parallel.Task[sigOutcome]
+				for _, nsIP := range orderedIPs {
+					if !cdnskeyRRsets[nsIP] {
 						continue
 					}
-					if rrsigHasKeytag(rrsig, ds.KeyTag) {
-						match = true
-						break
-					}
+					nsIP := nsIP
+					tasks = append(tasks, func(_ context.Context) (sigOutcome, error) {
+						rrsig := cdnskeyRRSIG[nsIP]
+						dnskeys := dnskeyRRsets[nsIP]
+						match := false
+						for _, ds := range dsRecords {
+							if !dnskeyHasKeytag(dnskeys, ds.KeyTag) {
+								continue
+							}
+							if rrsigHasKeytag(rrsig, ds.KeyTag) {
+								match = true
+								break
+							}
+						}
+						return sigOutcome{nsIP: nsIP, noMatch: !match}, nil
+					})
 				}
-				if !match {
-					dsNoMatchCDNSKEYRRSIG[nsIP] = true
+
+				if len(tasks) > 0 {
+					parallelism := profile.Effective().Resolver.Defaults.Parallel
+					validationResults := parallel.RunOrdered(ctx, tasks, parallel.Options{Limit: parallelism, CancelOnError: false})
+					for _, res := range validationResults {
+						if res.Err != nil {
+							return results, res.Err
+						}
+						if res.Value.noMatch {
+							dsNoMatchCDNSKEYRRSIG[res.Value.nsIP] = true
+						}
+					}
 				}
 			}
 
@@ -4955,6 +6439,32 @@ func hasTag(entries []*logger.Entry, tag string) bool {
 		}
 	}
 	return false
+}
+
+func ipDisabledMessageWithLogger(buf *testlogger.Buffer, server nameserver.Nameserver, rrtypes ...string) (bool, error) {
+	if server.Address.Is6() && !profile.Effective().Net.IPv6 {
+		for _, rrtype := range rrtypes {
+			if _, err := buf.Add("IPV6_DISABLED", map[string]any{
+				"ns":     server.String(),
+				"rrtype": rrtype,
+			}); err != nil {
+				return true, err
+			}
+		}
+		return true, nil
+	}
+	if server.Address.Is4() && !profile.Effective().Net.IPv4 {
+		for _, rrtype := range rrtypes {
+			if _, err := buf.Add("IPV4_DISABLED", map[string]any{
+				"ns":     server.String(),
+				"rrtype": rrtype,
+			}); err != nil {
+				return true, err
+			}
+		}
+		return true, nil
+	}
+	return false, nil
 }
 
 func ipDisabledMessage(results *[]*logger.Entry, testcase string, server nameserver.Nameserver, rrtypes ...string) (bool, error) {

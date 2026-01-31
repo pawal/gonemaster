@@ -24,6 +24,7 @@
             "recurse": false,
             "retrans": 3,
             "retry": 2,
+            "parallel": 1,
             "usevc": false,
             "timeout": 5
         }

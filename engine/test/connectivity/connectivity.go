@@ -15,6 +15,9 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/methodsv2"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/runner"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/testcase"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/testlogger"
 	"codeberg.org/pawal/gonemaster/engine/util"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
@@ -33,28 +36,36 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var results []*logger.Entry
 
 	if util.ShouldRunTest("connectivity01") {
-		entries, err := Connectivity01(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Connectivity01(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("connectivity02") {
-		entries, err := Connectivity02(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Connectivity02(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("connectivity03") {
-		entries, err := Connectivity03(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Connectivity03(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("connectivity04") {
-		entries, err := Connectivity04(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Connectivity04(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
@@ -235,82 +246,144 @@ func Connectivity03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 	var v6asns []int
 	var v6asnsets []string
 
-	for _, ip := range v4ips {
-		res, err := lookupASN(ctx, z.Recursor(), ip)
+	type asnOutcome struct {
+		asns   []int
+		asnset string
+	}
+
+	parallelism := profile.Effective().Resolver.Defaults.Parallel
+	if parallelism < 1 {
+		parallelism = 1
+	}
+
+	if len(v4ips) > 0 {
+		outcomes := make([]asnOutcome, len(v4ips))
+		tasks := make([]runner.Task, len(v4ips))
+		for i, ip := range v4ips {
+			i, ip := i, ip
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+
+				res, err := lookupASN(ctx, z.Recursor(), ip)
+				if err != nil {
+					return err
+				}
+				if res.Code == asnlookup.CodeError || res.Code == asnlookup.CodeEmpty {
+					if _, err := buf.Add(res.Code, map[string]any{"ns_ip": ip.String()}); err != nil {
+						return err
+					}
+					return nil
+				}
+				if res.Raw != "" {
+					if _, err := buf.Add("ASN_INFOS_RAW", map[string]any{
+						"ns_ip": ip.String(),
+						"data":  res.Raw,
+					}); err != nil {
+						return err
+					}
+				}
+				if len(res.ASNs) > 0 {
+					asnStr := joinASNStrings(res.ASNs)
+					if _, err := buf.Add("ASN_INFOS_ANNOUNCE_BY", map[string]any{
+						"ns_ip": ip.String(),
+						"asn":   asnStr,
+					}); err != nil {
+						return err
+					}
+					outcomes[i] = asnOutcome{
+						asns:   append([]int{}, res.ASNs...),
+						asnset: joinASNNumeric(res.ASNs),
+					}
+				}
+				if res.Prefix != nil {
+					if _, err := buf.Add("ASN_INFOS_ANNOUNCE_IN", map[string]any{
+						"ns_ip":  ip.String(),
+						"prefix": res.Prefix.String(),
+					}); err != nil {
+						return err
+					}
+				}
+				return nil
+			}
+		}
+
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
 		}
-		if res.Code == asnlookup.CodeError || res.Code == asnlookup.CodeEmpty {
-			if err := appendLog(&results, testcase, res.Code, map[string]any{"ns_ip": ip.String()}); err != nil {
-				return results, err
+		results = append(results, entries...)
+		for _, outcome := range outcomes {
+			if len(outcome.asns) > 0 {
+				v4asns = append(v4asns, outcome.asns...)
 			}
-			continue
-		}
-		if res.Raw != "" {
-			if err := appendLog(&results, testcase, "ASN_INFOS_RAW", map[string]any{
-				"ns_ip": ip.String(),
-				"data":  res.Raw,
-			}); err != nil {
-				return results, err
-			}
-		}
-		if len(res.ASNs) > 0 {
-			asnStr := joinASNStrings(res.ASNs)
-			if err := appendLog(&results, testcase, "ASN_INFOS_ANNOUNCE_BY", map[string]any{
-				"ns_ip": ip.String(),
-				"asn":   asnStr,
-			}); err != nil {
-				return results, err
-			}
-			v4asns = append(v4asns, res.ASNs...)
-			v4asnsets = append(v4asnsets, joinASNNumeric(res.ASNs))
-		}
-		if res.Prefix != nil {
-			if err := appendLog(&results, testcase, "ASN_INFOS_ANNOUNCE_IN", map[string]any{
-				"ns_ip":  ip.String(),
-				"prefix": res.Prefix.String(),
-			}); err != nil {
-				return results, err
+			if outcome.asnset != "" {
+				v4asnsets = append(v4asnsets, outcome.asnset)
 			}
 		}
 	}
 
-	for _, ip := range v6ips {
-		res, err := lookupASN(ctx, z.Recursor(), ip)
+	if len(v6ips) > 0 {
+		outcomes := make([]asnOutcome, len(v6ips))
+		tasks := make([]runner.Task, len(v6ips))
+		for i, ip := range v6ips {
+			i, ip := i, ip
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+
+				res, err := lookupASN(ctx, z.Recursor(), ip)
+				if err != nil {
+					return err
+				}
+				if res.Code == asnlookup.CodeError || res.Code == asnlookup.CodeEmpty {
+					if _, err := buf.Add(res.Code, map[string]any{"ns_ip": ip.String()}); err != nil {
+						return err
+					}
+					return nil
+				}
+				if res.Raw != "" {
+					if _, err := buf.Add("ASN_INFOS_RAW", map[string]any{
+						"ns_ip": ip.String(),
+						"data":  res.Raw,
+					}); err != nil {
+						return err
+					}
+				}
+				if len(res.ASNs) > 0 {
+					asnStr := joinASNStrings(res.ASNs)
+					if _, err := buf.Add("ASN_INFOS_ANNOUNCE_BY", map[string]any{
+						"ns_ip": ip.String(),
+						"asn":   asnStr,
+					}); err != nil {
+						return err
+					}
+					outcomes[i] = asnOutcome{
+						asns:   append([]int{}, res.ASNs...),
+						asnset: joinASNNumeric(res.ASNs),
+					}
+				}
+				if res.Prefix != nil {
+					if _, err := buf.Add("ASN_INFOS_ANNOUNCE_IN", map[string]any{
+						"ns_ip":  ip.String(),
+						"prefix": res.Prefix.String(),
+					}); err != nil {
+						return err
+					}
+				}
+				return nil
+			}
+		}
+
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
 		}
-		if res.Code == asnlookup.CodeError || res.Code == asnlookup.CodeEmpty {
-			if err := appendLog(&results, testcase, res.Code, map[string]any{"ns_ip": ip.String()}); err != nil {
-				return results, err
+		results = append(results, entries...)
+		for _, outcome := range outcomes {
+			if len(outcome.asns) > 0 {
+				v6asns = append(v6asns, outcome.asns...)
 			}
-			continue
-		}
-		if res.Raw != "" {
-			if err := appendLog(&results, testcase, "ASN_INFOS_RAW", map[string]any{
-				"ns_ip": ip.String(),
-				"data":  res.Raw,
-			}); err != nil {
-				return results, err
-			}
-		}
-		if len(res.ASNs) > 0 {
-			asnStr := joinASNStrings(res.ASNs)
-			if err := appendLog(&results, testcase, "ASN_INFOS_ANNOUNCE_BY", map[string]any{
-				"ns_ip": ip.String(),
-				"asn":   asnStr,
-			}); err != nil {
-				return results, err
-			}
-			v6asns = append(v6asns, res.ASNs...)
-			v6asnsets = append(v6asnsets, joinASNNumeric(res.ASNs))
-		}
-		if res.Prefix != nil {
-			if err := appendLog(&results, testcase, "ASN_INFOS_ANNOUNCE_IN", map[string]any{
-				"ns_ip":  ip.String(),
-				"prefix": res.Prefix.String(),
-			}); err != nil {
-				return results, err
+			if outcome.asnset != "" {
+				v6asnsets = append(v6asnsets, outcome.asnset)
 			}
 		}
 	}
@@ -396,7 +469,13 @@ func Connectivity04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 	prefixes := map[int]map[string][]string{}
 	processed := map[int]map[string]bool{}
 
+	type prefixItem struct {
+		item    methodsv2.NSItem
+		version int
+	}
+
 	items := append(delItems, zoneItems...)
+	var ordered []prefixItem
 	for _, item := range items {
 		if !item.HasAddress {
 			continue
@@ -413,45 +492,83 @@ func Connectivity04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 			continue
 		}
 		processed[version][ip.String()] = true
+		ordered = append(ordered, prefixItem{item: item, version: version})
+	}
 
-		res, err := lookupASN(ctx, z.Recursor(), ip)
+	if len(ordered) > 0 {
+		type prefixOutcome struct {
+			version int
+			prefix  string
+			item    string
+		}
+
+		outcomes := make([]prefixOutcome, len(ordered))
+		tasks := make([]runner.Task, len(ordered))
+		for i, entry := range ordered {
+			i, entry := i, entry
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				ip := entry.item.Address
+
+				res, err := lookupASN(ctx, z.Recursor(), ip)
+				if err != nil {
+					return err
+				}
+				if res.Code == asnlookup.CodeError || res.Code == asnlookup.CodeEmpty {
+					tag := res.Code
+					if res.Code == asnlookup.CodeError {
+						tag = "CN04_ERROR_PREFIX_DATABASE"
+					} else if res.Code == asnlookup.CodeEmpty {
+						tag = "CN04_EMPTY_PREFIX_SET"
+					}
+					if _, err := buf.Add(tag, map[string]any{"ns_ip": ip.String()}); err != nil {
+						return err
+					}
+					return nil
+				}
+
+				if res.Raw != "" {
+					if _, err := buf.Add("CN04_ASN_INFOS_RAW", map[string]any{
+						"ns_ip": ip.String(),
+						"data":  res.Raw,
+					}); err != nil {
+						return err
+					}
+				}
+
+				if res.Prefix != nil {
+					prefixStr := res.Prefix.String()
+					if _, err := buf.Add("CN04_ASN_INFOS_ANNOUNCE_IN", map[string]any{
+						"ns_ip":  ip.String(),
+						"prefix": prefixStr,
+					}); err != nil {
+						return err
+					}
+					outcomes[i] = prefixOutcome{
+						version: entry.version,
+						prefix:  prefixStr,
+						item:    entry.item.String(),
+					}
+				}
+				return nil
+			}
+		}
+
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
 		}
-		if res.Code == asnlookup.CodeError || res.Code == asnlookup.CodeEmpty {
-			tag := res.Code
-			if res.Code == asnlookup.CodeError {
-				tag = "CN04_ERROR_PREFIX_DATABASE"
-			} else if res.Code == asnlookup.CodeEmpty {
-				tag = "CN04_EMPTY_PREFIX_SET"
-			}
-			if err := appendLog(&results, testcase, tag, map[string]any{"ns_ip": ip.String()}); err != nil {
-				return results, err
-			}
-			continue
-		}
+		results = append(results, entries...)
 
-		if res.Raw != "" {
-			if err := appendLog(&results, testcase, "CN04_ASN_INFOS_RAW", map[string]any{
-				"ns_ip": ip.String(),
-				"data":  res.Raw,
-			}); err != nil {
-				return results, err
+		for _, outcome := range outcomes {
+			if outcome.prefix == "" {
+				continue
 			}
-		}
-
-		if res.Prefix != nil {
-			prefixStr := res.Prefix.String()
-			if err := appendLog(&results, testcase, "CN04_ASN_INFOS_ANNOUNCE_IN", map[string]any{
-				"ns_ip":  ip.String(),
-				"prefix": prefixStr,
-			}); err != nil {
-				return results, err
+			if prefixes[outcome.version] == nil {
+				prefixes[outcome.version] = map[string][]string{}
 			}
-			if prefixes[version] == nil {
-				prefixes[version] = map[string][]string{}
-			}
-			prefixes[version][prefixStr] = append(prefixes[version][prefixStr], item.String())
+			prefixes[outcome.version][outcome.prefix] = append(prefixes[outcome.version][outcome.prefix], outcome.item)
 		}
 	}
 
@@ -537,86 +654,102 @@ func connectivityLoop(ctx context.Context, testcase string, name dnsname.Name, n
 
 	testcase = canonical
 
-	for _, ns := range nsList {
-		disabled, err := ipDisabledMessage(results, testcase, ns, "SOA", "NS")
+	if len(nsList) > 0 {
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		tasks := make([]runner.Task, len(nsList))
+		for i, ns := range nsList {
+			ns := ns
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				disabled, err := ipDisabledMessageWithLogger(buf, ns, "SOA", "NS")
+				if err != nil {
+					return err
+				}
+				if disabled {
+					return nil
+				}
+
+				useVC := useTCP
+				opts := &nameserver.QueryOptions{UseVC: &useVC}
+				soaResp, _ := ns.QueryWithOptions(ctx, name.String(), "SOA", opts)
+				nsResp, _ := ns.QueryWithOptions(ctx, name.String(), "NS", opts)
+
+				if soaResp.Msg == nil && nsResp.Msg == nil {
+					if _, err := buf.Add(fmt.Sprintf("%s_NO_RESPONSE_%s", prefix, protocol), map[string]any{
+						"ns": ns.String(),
+					}); err != nil {
+						return err
+					}
+					return nil
+				}
+
+				for _, qtype := range []string{"SOA", "NS"} {
+					resp := soaResp
+					if qtype == "NS" {
+						resp = nsResp
+					}
+
+					if resp.Msg == nil {
+						if _, err := buf.Add(fmt.Sprintf("%s_NO_RESPONSE_%s_QUERY_%s", prefix, qtype, protocol), map[string]any{
+							"ns": ns.String(),
+						}); err != nil {
+							return err
+						}
+						continue
+					}
+
+					if resp.Rcode() != "NOERROR" {
+						if _, err := buf.Add(fmt.Sprintf("%s_UNEXPECTED_RCODE_%s_QUERY_%s", prefix, qtype, protocol), map[string]any{
+							"ns":    ns.String(),
+							"rcode": resp.Rcode(),
+						}); err != nil {
+							return err
+						}
+						continue
+					}
+
+					rrs := resp.GetRecords(qtype, "answer")
+					if len(rrs) == 0 {
+						if _, err := buf.Add(fmt.Sprintf("%s_MISSING_%s_RECORD_%s", prefix, qtype, protocol), map[string]any{
+							"ns": ns.String(),
+						}); err != nil {
+							return err
+						}
+						continue
+					}
+
+					rrOwner := dnsname.New(rrs[0].Header().Name).FQDN()
+					expected := name.FQDN()
+					if !strings.EqualFold(rrOwner, expected) {
+						if _, err := buf.Add(fmt.Sprintf("%s_WRONG_%s_RECORD_%s", prefix, qtype, protocol), map[string]any{
+							"ns":              ns.String(),
+							"domain_found":    strings.ToLower(rrOwner),
+							"domain_expected": strings.ToLower(expected),
+						}); err != nil {
+							return err
+						}
+						continue
+					}
+
+					if !resp.AA() {
+						if _, err := buf.Add(fmt.Sprintf("%s_%s_RECORD_NOT_AA_%s", prefix, qtype, protocol), map[string]any{
+							"ns": ns.String(),
+						}); err != nil {
+							return err
+						}
+						continue
+					}
+				}
+
+				return nil
+			}
+		}
+
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return err
 		}
-		if disabled {
-			continue
-		}
-
-		useVC := useTCP
-		opts := &nameserver.QueryOptions{UseVC: &useVC}
-		soaResp, _ := ns.QueryWithOptions(ctx, name.String(), "SOA", opts)
-		nsResp, _ := ns.QueryWithOptions(ctx, name.String(), "NS", opts)
-
-		if soaResp.Msg == nil && nsResp.Msg == nil {
-			if err := appendLog(results, testcase, fmt.Sprintf("%s_NO_RESPONSE_%s", prefix, protocol), map[string]any{
-				"ns": ns.String(),
-			}); err != nil {
-				return err
-			}
-			continue
-		}
-
-		for _, qtype := range []string{"SOA", "NS"} {
-			resp := soaResp
-			if qtype == "NS" {
-				resp = nsResp
-			}
-
-			if resp.Msg == nil {
-				if err := appendLog(results, testcase, fmt.Sprintf("%s_NO_RESPONSE_%s_QUERY_%s", prefix, qtype, protocol), map[string]any{
-					"ns": ns.String(),
-				}); err != nil {
-					return err
-				}
-				continue
-			}
-
-			if resp.Rcode() != "NOERROR" {
-				if err := appendLog(results, testcase, fmt.Sprintf("%s_UNEXPECTED_RCODE_%s_QUERY_%s", prefix, qtype, protocol), map[string]any{
-					"ns":    ns.String(),
-					"rcode": resp.Rcode(),
-				}); err != nil {
-					return err
-				}
-				continue
-			}
-
-			rrs := resp.GetRecords(qtype, "answer")
-			if len(rrs) == 0 {
-				if err := appendLog(results, testcase, fmt.Sprintf("%s_MISSING_%s_RECORD_%s", prefix, qtype, protocol), map[string]any{
-					"ns": ns.String(),
-				}); err != nil {
-					return err
-				}
-				continue
-			}
-
-			rrOwner := dnsname.New(rrs[0].Header().Name).FQDN()
-			expected := name.FQDN()
-			if !strings.EqualFold(rrOwner, expected) {
-				if err := appendLog(results, testcase, fmt.Sprintf("%s_WRONG_%s_RECORD_%s", prefix, qtype, protocol), map[string]any{
-					"ns":              ns.String(),
-					"domain_found":    strings.ToLower(rrOwner),
-					"domain_expected": strings.ToLower(expected),
-				}); err != nil {
-					return err
-				}
-				continue
-			}
-
-			if !resp.AA() {
-				if err := appendLog(results, testcase, fmt.Sprintf("%s_%s_RECORD_NOT_AA_%s", prefix, qtype, protocol), map[string]any{
-					"ns": ns.String(),
-				}); err != nil {
-					return err
-				}
-				continue
-			}
-		}
+		*results = append(*results, entries...)
 	}
 
 	return nil
@@ -638,10 +771,10 @@ func appendLog(results *[]*logger.Entry, testcase string, tag string, args map[s
 	return nil
 }
 
-func ipDisabledMessage(results *[]*logger.Entry, testcase string, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
+func ipDisabledMessageWithLogger(buf *testlogger.Buffer, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
 	if ns.Address.Is6() && !profile.Effective().Net.IPv6 {
 		for _, rrtype := range rrtypes {
-			if err := appendLog(results, testcase, "IPV6_DISABLED", map[string]any{
+			if _, err := buf.Add("IPV6_DISABLED", map[string]any{
 				"ns":     ns.String(),
 				"rrtype": rrtype,
 			}); err != nil {
@@ -652,7 +785,7 @@ func ipDisabledMessage(results *[]*logger.Entry, testcase string, ns nameserver.
 	}
 	if ns.Address.Is4() && !profile.Effective().Net.IPv4 {
 		for _, rrtype := range rrtypes {
-			if err := appendLog(results, testcase, "IPV4_DISABLED", map[string]any{
+			if _, err := buf.Add("IPV4_DISABLED", map[string]any{
 				"ns":     ns.String(),
 				"rrtype": rrtype,
 			}); err != nil {

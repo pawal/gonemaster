@@ -19,6 +19,9 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/runner"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/testcase"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/testlogger"
 	"codeberg.org/pawal/gonemaster/engine/util"
 	zonepkg "codeberg.org/pawal/gonemaster/engine/zone"
 )
@@ -64,56 +67,72 @@ func All(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	var results []*logger.Entry
 
 	if util.ShouldRunTest("zone01") {
-		entries, err := Zone01(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Zone01(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("zone02") {
-		entries, err := Zone02(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Zone02(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("zone03") {
-		entries, err := Zone03(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Zone03(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("zone04") {
-		entries, err := Zone04(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Zone04(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("zone05") {
-		entries, err := Zone05(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Zone05(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("zone06") {
-		entries, err := Zone06(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Zone06(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("zone07") {
-		entries, err := Zone07(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Zone07(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("zone08") {
-		entries, err := Zone08(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Zone08(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
@@ -121,7 +140,9 @@ func All(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	}
 
 	if util.ShouldRunTest("zone09") && !hasEntryTag(results, "NO_RESPONSE_MX_QUERY") {
-		entries, err := Zone09(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Zone09(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
@@ -130,14 +151,18 @@ func All(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 
 	if !hasEntryTag(results, "NO_RESPONSE_SOA_QUERY") {
 		if util.ShouldRunTest("zone10") {
-			entries, err := Zone10(ctx, z)
+			entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+				return Zone10(ctx, z)
+			})
 			results = append(results, entries...)
 			if err != nil {
 				return results, err
 			}
 		}
 		if util.ShouldRunTest("zone11") {
-			entries, err := Zone11(ctx, z)
+			entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+				return Zone11(ctx, z)
+			})
 			results = append(results, entries...)
 			if err != nil {
 				return results, err
@@ -904,7 +929,6 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	ipProcessed := map[string]bool{}
 	var noResponseMX []string
 	unexpectedRcodeMX := map[string][]string{}
 	var nonAuthoritativeMX []string
@@ -920,58 +944,109 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	for _, ns := range nss {
-		ip := ns.Address.String()
-		if ipProcessed[ip] {
-			continue
-		}
-		ipProcessed[ip] = true
+	type mxOutcome struct {
+		ip               string
+		checked          bool
+		disabled         bool
+		noResponse       bool
+		unexpectedRcode  string
+		nonAuthoritative bool
+		noMX             bool
+		records          []dns.RR
+	}
 
-		if disabled, err := ipDisabledMessage(&results, testcase, ns, "SOA", "MX"); err != nil {
-			return results, err
-		} else if disabled {
-			continue
-		}
-
-		p1, _ := ns.QueryWithOptions(ctx, z.Name.String(), "SOA", nil)
-		if p1.Msg == nil || p1.Rcode() != "NOERROR" || !p1.AA() || !p1.HasRRsOfTypeForName("SOA", z.Name) {
-			continue
-		}
-
-		fallback := false
-		usevc := false
-		p2, _ := ns.QueryWithOptions(ctx, z.Name.String(), "MX", &nameserver.QueryOptions{
-			Fallback: &fallback,
-			UseVC:    &usevc,
-		})
-		if p2.Msg != nil && p2.TC() {
-			usevc = true
-			p2, _ = ns.QueryWithOptions(ctx, z.Name.String(), "MX", &nameserver.QueryOptions{
-				Fallback: &fallback,
-				UseVC:    &usevc,
-			})
-		}
-
-		if p2.Msg == nil {
-			noResponseMX = append(noResponseMX, ip)
-		} else if p2.Rcode() != "NOERROR" {
-			unexpectedRcodeMX[p2.Rcode()] = append(unexpectedRcodeMX[p2.Rcode()], ip)
-		} else if !p2.AA() {
-			nonAuthoritativeMX = append(nonAuthoritativeMX, ip)
-		} else if len(p2.GetRecordsForName("MX", z.Name, "answer")) == 0 {
-			noMXSet = append(noMXSet, ip)
-		} else {
-			if _, ok := mxSet[ip]; !ok {
-				mxSetOrder = append(mxSetOrder, ip)
-			}
-			mxSet[ip] = append(mxSet[ip], p2.GetRecordsForName("MX", z.Name, "answer")...)
-		}
-
+	unique := uniqueServersByIP(nss)
+	for _, ns := range unique {
 		nsName := ns.Name.String()
 		if _, ok := allNS[nsName]; !ok {
 			allNSOrder = append(allNSOrder, nsName)
 		}
-		allNS[nsName] = append(allNS[nsName], ip)
+		allNS[nsName] = append(allNS[nsName], ns.Address.String())
+	}
+
+	var outcomes []mxOutcome
+	if len(unique) > 0 {
+		outcomes = make([]mxOutcome, len(unique))
+		tasks := make([]runner.Task, len(unique))
+		for i, ns := range unique {
+			i, ns := i, ns
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				outcome := mxOutcome{ip: ns.Address.String()}
+
+				if disabled, err := ipDisabledMessageWithLogger(buf, ns, "SOA", "MX"); err != nil {
+					return err
+				} else if disabled {
+					outcome.disabled = true
+					outcomes[i] = outcome
+					return nil
+				}
+
+				p1, _ := ns.QueryWithOptions(ctx, z.Name.String(), "SOA", nil)
+				if p1.Msg == nil || p1.Rcode() != "NOERROR" || !p1.AA() || !p1.HasRRsOfTypeForName("SOA", z.Name) {
+					outcomes[i] = outcome
+					return nil
+				}
+
+				outcome.checked = true
+				fallback := false
+				usevc := false
+				p2, _ := ns.QueryWithOptions(ctx, z.Name.String(), "MX", &nameserver.QueryOptions{
+					Fallback: &fallback,
+					UseVC:    &usevc,
+				})
+				if p2.Msg != nil && p2.TC() {
+					usevc = true
+					p2, _ = ns.QueryWithOptions(ctx, z.Name.String(), "MX", &nameserver.QueryOptions{
+						Fallback: &fallback,
+						UseVC:    &usevc,
+					})
+				}
+
+				if p2.Msg == nil {
+					outcome.noResponse = true
+				} else if p2.Rcode() != "NOERROR" {
+					outcome.unexpectedRcode = p2.Rcode()
+				} else if !p2.AA() {
+					outcome.nonAuthoritative = true
+				} else if len(p2.GetRecordsForName("MX", z.Name, "answer")) == 0 {
+					outcome.noMX = true
+				} else {
+					outcome.records = append(outcome.records, p2.GetRecordsForName("MX", z.Name, "answer")...)
+				}
+
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+		if err != nil {
+			return results, err
+		}
+		results = append(results, entries...)
+	}
+
+	for _, outcome := range outcomes {
+		if outcome.disabled || !outcome.checked {
+			continue
+		}
+		switch {
+		case outcome.noResponse:
+			noResponseMX = append(noResponseMX, outcome.ip)
+		case outcome.unexpectedRcode != "":
+			unexpectedRcodeMX[outcome.unexpectedRcode] = append(unexpectedRcodeMX[outcome.unexpectedRcode], outcome.ip)
+		case outcome.nonAuthoritative:
+			nonAuthoritativeMX = append(nonAuthoritativeMX, outcome.ip)
+		case outcome.noMX:
+			noMXSet = append(noMXSet, outcome.ip)
+		case len(outcome.records) > 0:
+			if _, ok := mxSet[outcome.ip]; !ok {
+				mxSetOrder = append(mxSetOrder, outcome.ip)
+			}
+			mxSet[outcome.ip] = append(mxSet[outcome.ip], outcome.records...)
+		}
 	}
 
 	if len(noResponseMX) > 0 {
@@ -1126,52 +1201,67 @@ func Zone10(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	for _, ns := range nss {
-		if disabled, err := ipDisabledMessage(&results, testcase, ns, "SOA"); err != nil {
-			return results, err
-		} else if disabled {
-			continue
-		}
-
-		resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "SOA", nil)
-		if resp.Msg == nil {
-			if err := appendLog(&results, testcase, "NO_RESPONSE", map[string]any{
-				"ns": ns.String(),
-			}); err != nil {
-				return results, err
-			}
-			continue
-		}
-
-		records := resp.GetRecords("SOA", "answer")
-		if len(records) > 0 {
-			if len(records) > 1 {
-				if err := appendLog(&results, testcase, "MULTIPLE_SOA", map[string]any{
-					"ns":    ns.String(),
-					"count": len(records),
-				}); err != nil {
-					return results, err
+	if len(nss) > 0 {
+		tasks := make([]runner.Task, len(nss))
+		for i, ns := range nss {
+			i, ns := i, ns
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				if disabled, err := ipDisabledMessageWithLogger(buf, ns, "SOA"); err != nil {
+					return err
+				} else if disabled {
+					return nil
 				}
-			} else if soa, ok := records[0].(*dns.SOA); ok {
-				owner := strings.ToLower(soa.Hdr.Name)
-				expected := strings.ToLower(z.Name.FQDN())
-				if owner != expected {
-					if err := appendLog(&results, testcase, "WRONG_SOA", map[string]any{
-						"ns":    ns.String(),
-						"owner": owner,
-						"name":  expected,
+
+				resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "SOA", nil)
+				if resp.Msg == nil {
+					if _, err := buf.Add("NO_RESPONSE", map[string]any{
+						"ns": ns.String(),
 					}); err != nil {
-						return results, err
+						return err
+					}
+					return nil
+				}
+
+				records := resp.GetRecords("SOA", "answer")
+				if len(records) > 0 {
+					if len(records) > 1 {
+						if _, err := buf.Add("MULTIPLE_SOA", map[string]any{
+							"ns":    ns.String(),
+							"count": len(records),
+						}); err != nil {
+							return err
+						}
+					} else if soa, ok := records[0].(*dns.SOA); ok {
+						owner := strings.ToLower(soa.Hdr.Name)
+						expected := strings.ToLower(z.Name.FQDN())
+						if owner != expected {
+							if _, err := buf.Add("WRONG_SOA", map[string]any{
+								"ns":    ns.String(),
+								"owner": owner,
+								"name":  expected,
+							}); err != nil {
+								return err
+							}
+						}
+					}
+				} else {
+					if _, err := buf.Add("NO_SOA_IN_RESPONSE", map[string]any{
+						"ns": ns.String(),
+					}); err != nil {
+						return err
 					}
 				}
-			}
-		} else {
-			if err := appendLog(&results, testcase, "NO_SOA_IN_RESPONSE", map[string]any{
-				"ns": ns.String(),
-			}); err != nil {
-				return results, err
+				return nil
 			}
 		}
+
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+		if err != nil {
+			return results, err
+		}
+		results = append(results, entries...)
 	}
 
 	if !hasNonStartEntry(results) {
@@ -1209,38 +1299,78 @@ func Zone11(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	nsSpf := map[string][]string{}
 	ipToNS := map[string][]string{}
 
-	for _, group := range groups {
-		if len(group) == 0 {
-			continue
-		}
-		ip := group[0].Address.String()
-		ipToNS[ip] = nsStrings(group)
+	type spfOutcome struct {
+		ip       string
+		nsList   []string
+		checked  bool
+		policies []string
+	}
 
-		ns := group[0]
-		if disabled, err := ipDisabledMessage(&results, testcase, ns, "TXT"); err != nil {
+	var outcomes []spfOutcome
+	if len(groups) > 0 {
+		outcomes = make([]spfOutcome, len(groups))
+		tasks := make([]runner.Task, len(groups))
+		for i, group := range groups {
+			i, group := i, group
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				if len(group) == 0 {
+					return nil
+				}
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				ns := group[0]
+				outcome := spfOutcome{
+					ip:     ns.Address.String(),
+					nsList: nsStrings(group),
+				}
+
+				if disabled, err := ipDisabledMessageWithLogger(buf, ns, "TXT"); err != nil {
+					return err
+				} else if disabled {
+					outcomes[i] = outcome
+					return nil
+				}
+
+				resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "TXT", nil)
+				if resp.Msg != nil && resp.Rcode() == "NOERROR" && resp.AA() {
+					txtRecords := resp.GetRecordsForName("TXT", z.Name)
+					var txtData []string
+					for _, rr := range txtRecords {
+						txt, ok := rr.(*dns.TXT)
+						if !ok {
+							continue
+						}
+						txtData = append(txtData, strings.ToLower(strings.Join(txt.Txt, "")))
+					}
+					var spfPolicies []string
+					for _, txt := range txtData {
+						if strings.HasPrefix(txt, "v=spf1") && (len(txt) == len("v=spf1") || txt[len("v=spf1")] == ' ' || txt[len("v=spf1")] == '\t') {
+							spfPolicies = append(spfPolicies, txt)
+						}
+					}
+					outcome.checked = true
+					outcome.policies = spfPolicies
+				}
+
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+		if err != nil {
 			return results, err
-		} else if disabled {
+		}
+		results = append(results, entries...)
+	}
+
+	for _, outcome := range outcomes {
+		if outcome.ip == "" {
 			continue
 		}
-
-		resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "TXT", nil)
-		if resp.Msg != nil && resp.Rcode() == "NOERROR" && resp.AA() {
-			txtRecords := resp.GetRecordsForName("TXT", z.Name)
-			var txtData []string
-			for _, rr := range txtRecords {
-				txt, ok := rr.(*dns.TXT)
-				if !ok {
-					continue
-				}
-				txtData = append(txtData, strings.ToLower(strings.Join(txt.Txt, "")))
-			}
-			var spfPolicies []string
-			for _, txt := range txtData {
-				if strings.HasPrefix(txt, "v=spf1") && (len(txt) == len("v=spf1") || txt[len("v=spf1")] == ' ' || txt[len("v=spf1")] == '\t') {
-					spfPolicies = append(spfPolicies, txt)
-				}
-			}
-			nsSpf[ip] = spfPolicies
+		ipToNS[outcome.ip] = outcome.nsList
+		if outcome.checked {
+			nsSpf[outcome.ip] = outcome.policies
 		}
 	}
 
@@ -1354,6 +1484,32 @@ func appendLog(results *[]*logger.Entry, testcase string, tag string, args map[s
 	}
 	*results = append(*results, entry)
 	return nil
+}
+
+func ipDisabledMessageWithLogger(buf *testlogger.Buffer, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
+	if ns.Address.Is6() && !profile.Effective().Net.IPv6 {
+		for _, rrtype := range rrtypes {
+			if _, err := buf.Add("IPV6_DISABLED", map[string]any{
+				"ns":     ns.String(),
+				"rrtype": rrtype,
+			}); err != nil {
+				return true, err
+			}
+		}
+		return true, nil
+	}
+	if ns.Address.Is4() && !profile.Effective().Net.IPv4 {
+		for _, rrtype := range rrtypes {
+			if _, err := buf.Add("IPV4_DISABLED", map[string]any{
+				"ns":     ns.String(),
+				"rrtype": rrtype,
+			}); err != nil {
+				return true, err
+			}
+		}
+		return true, nil
+	}
+	return false, nil
 }
 
 func ipDisabledMessage(results *[]*logger.Entry, testcase string, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
@@ -1676,6 +1832,20 @@ func mapKeys(values map[string][]dns.RR) []string {
 		keys = append(keys, key)
 	}
 	return keys
+}
+
+func uniqueServersByIP(servers []nameserver.Nameserver) []nameserver.Nameserver {
+	seen := map[string]bool{}
+	unique := make([]nameserver.Nameserver, 0, len(servers))
+	for _, server := range servers {
+		ip := server.Address.String()
+		if seen[ip] {
+			continue
+		}
+		seen[ip] = true
+		unique = append(unique, server)
+	}
+	return unique
 }
 
 func uniqueUint32(values []uint32) []uint32 {

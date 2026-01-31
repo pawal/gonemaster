@@ -20,6 +20,7 @@ import (
 	nameserver "codeberg.org/pawal/gonemaster/engine/test/nameserver"
 	syntax "codeberg.org/pawal/gonemaster/engine/test/syntax"
 	zonetest "codeberg.org/pawal/gonemaster/engine/test/zone"
+	"codeberg.org/pawal/gonemaster/engine/transport"
 	"codeberg.org/pawal/gonemaster/engine/util"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
@@ -33,6 +34,7 @@ type RunRequest struct {
 	MinLevel string
 	IPv4     *bool
 	IPv6     *bool
+	Parallel *int
 	// LogCallback receives each log entry as it is created.
 	LogCallback func(*logger.Entry) error
 }
@@ -267,6 +269,11 @@ func EffectiveProfile(req RunRequest) (*profile.Profile, error) {
 			return nil, err
 		}
 	}
+	if req.Parallel != nil {
+		if err := p.Set("resolver.defaults.parallel", *req.Parallel); err != nil {
+			return nil, err
+		}
+	}
 
 	if testcase == "" {
 		switch module {
@@ -347,6 +354,11 @@ func Run(req RunRequest) ([]LogEntry, error) {
 			return nil, err
 		}
 	}
+	if req.Parallel != nil {
+		if err := profile.Effective().Set("resolver.defaults.parallel", *req.Parallel); err != nil {
+			return nil, err
+		}
+	}
 
 	if testcase == "" {
 		switch module {
@@ -368,6 +380,8 @@ func Run(req RunRequest) ([]LogEntry, error) {
 			_ = profile.Effective().Set("test_cases", toAnySlice(moduleTestcases[module]))
 		}
 	}
+
+	transport.SetGlobalQueryLimit(profile.Effective().Resolver.Defaults.Parallel)
 	logger.ResetConfig()
 	if _, err := util.Info("GLOBAL_VERSION", map[string]any{"version": VersionString()}); err != nil {
 		return nil, err

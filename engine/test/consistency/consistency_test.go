@@ -5,6 +5,7 @@ import (
 	"net"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/miekg/dns"
 
@@ -206,6 +207,114 @@ func TestConsistency04MultipleNSSets(t *testing.T) {
 	}
 	if !hasEntryTag(entries, "NS_SET") {
 		t.Fatalf("expected NS_SET")
+	}
+}
+
+func TestConsistency04ParallelNSQueries(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origM4 := method4
+	origM5 := method5
+	t.Cleanup(func() {
+		method4 = origM4
+		method5 = origM5
+	})
+
+	profile.Effective().Resolver.Defaults.Parallel = 2
+
+	started := make(chan string, 2)
+	release := make(chan struct{})
+
+	hook := func(id string, nsNames []string) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
+		return func(ctx context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+			if strings.EqualFold(qtype, "NS") {
+				select {
+				case started <- id:
+				default:
+				}
+				select {
+				case <-release:
+				case <-ctx.Done():
+					return packet.Packet{}, ctx.Err()
+				}
+				return nsPacket(qname, nsNames), nil
+			}
+			return packet.Packet{}, nil
+		}
+	}
+
+	ns1, err := nameserver.New("ns1.example", "192.0.2.1", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	ns1.SetQueryHook(hook("ns1", []string{"ns1.example"}))
+
+	ns2, err := nameserver.New("ns2.example", "192.0.2.2", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	ns2.SetQueryHook(hook("ns2", []string{"ns1.example", "ns2.example"}))
+
+	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns1}, nil
+	}
+	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns2}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	done := make(chan struct{})
+	var entries []*logger.Entry
+	var consErr error
+	go func() {
+		entries, consErr = Consistency04(ctx, &z)
+		close(done)
+	}()
+
+	got := map[string]bool{}
+	deadline := time.After(1 * time.Second)
+	for len(got) < 2 {
+		select {
+		case name := <-started:
+			got[name] = true
+		case <-deadline:
+			t.Fatalf("expected parallel NS queries to start, got %v", got)
+		}
+	}
+
+	close(release)
+
+	select {
+	case <-done:
+		if consErr != nil {
+			t.Fatalf("consistency04: %v", consErr)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("consistency04 did not finish")
+	}
+
+	var order []string
+	for _, entry := range entries {
+		if entry == nil || entry.Tag != "NS_SET" {
+			continue
+		}
+		if servers, ok := entry.Args["servers"].(string); ok {
+			order = append(order, servers)
+		}
+	}
+	if len(order) != 2 {
+		t.Fatalf("expected 2 NS_SET entries, got %v", order)
+	}
+	if order[0] != "ns1.example/192.0.2.1" || order[1] != "ns2.example/192.0.2.2" {
+		t.Fatalf("expected deterministic log order, got %v", order)
 	}
 }
 

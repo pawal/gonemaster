@@ -16,6 +16,9 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/runner"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/testcase"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/testlogger"
 	"codeberg.org/pawal/gonemaster/engine/util"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
@@ -36,42 +39,54 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var results []*logger.Entry
 
 	if util.ShouldRunTest("consistency01") {
-		entries, err := Consistency01(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Consistency01(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("consistency02") {
-		entries, err := Consistency02(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Consistency02(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("consistency03") {
-		entries, err := Consistency03(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Consistency03(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("consistency04") {
-		entries, err := Consistency04(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Consistency04(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("consistency05") {
-		entries, err := Consistency05(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Consistency05(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
 		}
 	}
 	if util.ShouldRunTest("consistency06") {
-		entries, err := Consistency06(ctx, z)
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Consistency06(ctx, z)
+		})
 		results = append(results, entries...)
 		if err != nil {
 			return results, err
@@ -176,46 +191,86 @@ func Consistency01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
+	type serialOutcome struct {
+		key    string
+		serial string
+		skip   bool
+	}
+
+	ordered := make([]nameserver.Nameserver, 0, len(list4)+len(list5))
 	for _, ns := range append(list4, list5...) {
 		key := ns.String()
 		if nsnamesAndIP[key] {
 			continue
 		}
+		nsnamesAndIP[key] = true
+		ordered = append(ordered, ns)
+	}
 
-		disabled, err := ipDisabledMessage(&results, testcase, ns, queryType)
+	if len(ordered) > 0 {
+		outcomes := make([]serialOutcome, len(ordered))
+		tasks := make([]runner.Task, len(ordered))
+		for i, ns := range ordered {
+			i, ns := i, ns
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				outcome := serialOutcome{key: ns.String()}
+
+				disabled, err := ipDisabledMessageWithLogger(buf, ns, queryType)
+				if err != nil {
+					return err
+				}
+				if disabled {
+					outcome.skip = true
+					outcomes[i] = outcome
+					return nil
+				}
+
+				resp, err := ns.QueryWithOptions(ctx, z.Name.String(), queryType, nil)
+				if err != nil || resp.Msg == nil {
+					if _, err := buf.Add("NO_RESPONSE", map[string]any{"ns": ns.String()}); err != nil {
+						return err
+					}
+					outcomes[i] = outcome
+					return nil
+				}
+
+				records := resp.GetRecordsForName(queryType, z.Name)
+				if len(records) == 0 {
+					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", map[string]any{"ns": ns.String()}); err != nil {
+						return err
+					}
+					outcomes[i] = outcome
+					return nil
+				}
+				soa, ok := records[0].(*dns.SOA)
+				if !ok {
+					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", map[string]any{"ns": ns.String()}); err != nil {
+						return err
+					}
+					outcomes[i] = outcome
+					return nil
+				}
+
+				outcome.serial = fmt.Sprintf("%d", soa.Serial)
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
 		}
-		if disabled {
-			continue
-		}
+		results = append(results, entries...)
 
-		resp, err := ns.QueryWithOptions(ctx, z.Name.String(), queryType, nil)
-		if err != nil || resp.Msg == nil {
-			if err := appendLog(&results, testcase, "NO_RESPONSE", map[string]any{"ns": ns.String()}); err != nil {
-				return results, err
+		for _, outcome := range outcomes {
+			if outcome.skip || outcome.serial == "" {
+				continue
 			}
-			continue
+			serials[outcome.serial] = append(serials[outcome.serial], outcome.key)
 		}
-
-		records := resp.GetRecordsForName(queryType, z.Name)
-		if len(records) == 0 {
-			if err := appendLog(&results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{"ns": ns.String()}); err != nil {
-				return results, err
-			}
-			continue
-		}
-		soa, ok := records[0].(*dns.SOA)
-		if !ok {
-			if err := appendLog(&results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{"ns": ns.String()}); err != nil {
-				return results, err
-			}
-			continue
-		}
-
-		serial := fmt.Sprintf("%d", soa.Serial)
-		serials[serial] = append(serials[serial], key)
-		nsnamesAndIP[key] = true
 	}
 
 	serialKeys := make([]string, 0, len(serials))
@@ -291,49 +346,89 @@ func Consistency02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
+	type rnameOutcome struct {
+		key   string
+		rname string
+		skip  bool
+	}
+
+	ordered := make([]nameserver.Nameserver, 0, len(list4)+len(list5))
 	for _, ns := range append(list4, list5...) {
 		key := ns.String()
 		if nsnamesAndIP[key] {
 			continue
 		}
+		nsnamesAndIP[key] = true
+		ordered = append(ordered, ns)
+	}
 
-		disabled, err := ipDisabledMessage(&results, testcase, ns, queryType)
+	if len(ordered) > 0 {
+		outcomes := make([]rnameOutcome, len(ordered))
+		tasks := make([]runner.Task, len(ordered))
+		for i, ns := range ordered {
+			i, ns := i, ns
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				outcome := rnameOutcome{key: ns.String()}
+
+				disabled, err := ipDisabledMessageWithLogger(buf, ns, queryType)
+				if err != nil {
+					return err
+				}
+				if disabled {
+					outcome.skip = true
+					outcomes[i] = outcome
+					return nil
+				}
+
+				resp, err := ns.QueryWithOptions(ctx, z.Name.String(), queryType, nil)
+				if err != nil || resp.Msg == nil {
+					if _, err := buf.Add("NO_RESPONSE", map[string]any{"ns": ns.String()}); err != nil {
+						return err
+					}
+					outcomes[i] = outcome
+					return nil
+				}
+
+				records := resp.GetRecordsForName(queryType, z.Name)
+				if len(records) == 0 {
+					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", map[string]any{"ns": ns.String()}); err != nil {
+						return err
+					}
+					outcomes[i] = outcome
+					return nil
+				}
+				soa, ok := records[0].(*dns.SOA)
+				if !ok {
+					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", map[string]any{"ns": ns.String()}); err != nil {
+						return err
+					}
+					outcomes[i] = outcome
+					return nil
+				}
+
+				outcome.rname = strings.ToLower(soa.Mbox)
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
 		}
-		if disabled {
-			continue
-		}
+		results = append(results, entries...)
 
-		resp, err := ns.QueryWithOptions(ctx, z.Name.String(), queryType, nil)
-		if err != nil || resp.Msg == nil {
-			if err := appendLog(&results, testcase, "NO_RESPONSE", map[string]any{"ns": ns.String()}); err != nil {
-				return results, err
+		for _, outcome := range outcomes {
+			if outcome.skip || outcome.rname == "" {
+				continue
 			}
-			continue
-		}
-
-		records := resp.GetRecordsForName(queryType, z.Name)
-		if len(records) == 0 {
-			if err := appendLog(&results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{"ns": ns.String()}); err != nil {
-				return results, err
+			if _, ok := rnames[outcome.rname]; !ok {
+				order = append(order, outcome.rname)
 			}
-			continue
+			rnames[outcome.rname] = append(rnames[outcome.rname], outcome.key)
 		}
-		soa, ok := records[0].(*dns.SOA)
-		if !ok {
-			if err := appendLog(&results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{"ns": ns.String()}); err != nil {
-				return results, err
-			}
-			continue
-		}
-
-		rname := strings.ToLower(soa.Mbox)
-		if _, ok := rnames[rname]; !ok {
-			order = append(order, rname)
-		}
-		rnames[rname] = append(rnames[rname], key)
-		nsnamesAndIP[key] = true
 	}
 
 	if len(order) == 1 {
@@ -387,56 +482,98 @@ func Consistency03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
+	type timeOutcome struct {
+		key    string
+		setKey string
+		params timeParams
+		skip   bool
+	}
+
+	ordered := make([]nameserver.Nameserver, 0, len(list4)+len(list5))
 	for _, ns := range append(list4, list5...) {
 		key := ns.String()
 		if nsnamesAndIP[key] {
 			continue
 		}
+		nsnamesAndIP[key] = true
+		ordered = append(ordered, ns)
+	}
 
-		disabled, err := ipDisabledMessage(&results, testcase, ns, queryType)
+	if len(ordered) > 0 {
+		outcomes := make([]timeOutcome, len(ordered))
+		tasks := make([]runner.Task, len(ordered))
+		for i, ns := range ordered {
+			i, ns := i, ns
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				outcome := timeOutcome{key: ns.String()}
+
+				disabled, err := ipDisabledMessageWithLogger(buf, ns, queryType)
+				if err != nil {
+					return err
+				}
+				if disabled {
+					outcome.skip = true
+					outcomes[i] = outcome
+					return nil
+				}
+
+				resp, err := ns.QueryWithOptions(ctx, z.Name.String(), queryType, nil)
+				if err != nil || resp.Msg == nil {
+					if _, err := buf.Add("NO_RESPONSE", map[string]any{"ns": ns.String()}); err != nil {
+						return err
+					}
+					outcomes[i] = outcome
+					return nil
+				}
+
+				records := resp.GetRecordsForName(queryType, z.Name)
+				if len(records) == 0 {
+					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", map[string]any{"ns": ns.String()}); err != nil {
+						return err
+					}
+					outcomes[i] = outcome
+					return nil
+				}
+				soa, ok := records[0].(*dns.SOA)
+				if !ok {
+					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", map[string]any{"ns": ns.String()}); err != nil {
+						return err
+					}
+					outcomes[i] = outcome
+					return nil
+				}
+
+				params := timeParams{
+					refresh: int(soa.Refresh),
+					retry:   int(soa.Retry),
+					expire:  int(soa.Expire),
+					minimum: int(soa.Minttl),
+				}
+				outcome.params = params
+				outcome.setKey = fmt.Sprintf("%d;%d;%d;%d", params.refresh, params.retry, params.expire, params.minimum)
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
 		}
-		if disabled {
-			continue
-		}
+		results = append(results, entries...)
 
-		resp, err := ns.QueryWithOptions(ctx, z.Name.String(), queryType, nil)
-		if err != nil || resp.Msg == nil {
-			if err := appendLog(&results, testcase, "NO_RESPONSE", map[string]any{"ns": ns.String()}); err != nil {
-				return results, err
+		for _, outcome := range outcomes {
+			if outcome.skip || outcome.setKey == "" {
+				continue
 			}
-			continue
-		}
-
-		records := resp.GetRecordsForName(queryType, z.Name)
-		if len(records) == 0 {
-			if err := appendLog(&results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{"ns": ns.String()}); err != nil {
-				return results, err
+			if _, ok := timeSets[outcome.setKey]; !ok {
+				order = append(order, outcome.setKey)
+				timeValues[outcome.setKey] = outcome.params
 			}
-			continue
+			timeSets[outcome.setKey] = append(timeSets[outcome.setKey], outcome.key)
 		}
-		soa, ok := records[0].(*dns.SOA)
-		if !ok {
-			if err := appendLog(&results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{"ns": ns.String()}); err != nil {
-				return results, err
-			}
-			continue
-		}
-
-		params := timeParams{
-			refresh: int(soa.Refresh),
-			retry:   int(soa.Retry),
-			expire:  int(soa.Expire),
-			minimum: int(soa.Minttl),
-		}
-		setKey := fmt.Sprintf("%d;%d;%d;%d", params.refresh, params.retry, params.expire, params.minimum)
-		if _, ok := timeSets[setKey]; !ok {
-			order = append(order, setKey)
-			timeValues[setKey] = params
-		}
-		timeSets[setKey] = append(timeSets[setKey], key)
-		nsnamesAndIP[key] = true
 	}
 
 	if len(order) == 1 {
@@ -499,58 +636,98 @@ func Consistency04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
+	type nsSetOutcome struct {
+		key    string
+		setKey string
+		skip   bool
+	}
+
+	ordered := make([]nameserver.Nameserver, 0, len(list4)+len(list5))
 	for _, ns := range append(list4, list5...) {
 		key := ns.String()
 		if nsnamesAndIP[key] {
 			continue
 		}
+		nsnamesAndIP[key] = true
+		ordered = append(ordered, ns)
+	}
 
-		disabled, err := ipDisabledMessage(&results, testcase, ns, queryType)
+	if len(ordered) > 0 {
+		outcomes := make([]nsSetOutcome, len(ordered))
+		tasks := make([]runner.Task, len(ordered))
+		for i, ns := range ordered {
+			i, ns := i, ns
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				outcome := nsSetOutcome{key: ns.String()}
+
+				disabled, err := ipDisabledMessageWithLogger(buf, ns, queryType)
+				if err != nil {
+					return err
+				}
+				if disabled {
+					outcome.skip = true
+					outcomes[i] = outcome
+					return nil
+				}
+
+				resp, err := ns.QueryWithOptions(ctx, z.Name.String(), queryType, nil)
+				if err != nil || resp.Msg == nil {
+					if _, err := buf.Add("NO_RESPONSE", map[string]any{"ns": ns.String()}); err != nil {
+						return err
+					}
+					outcomes[i] = outcome
+					return nil
+				}
+
+				records := resp.GetRecordsForName(queryType, z.Name)
+				if len(records) == 0 {
+					if _, err := buf.Add("NO_RESPONSE_NS_QUERY", map[string]any{"ns": ns.String()}); err != nil {
+						return err
+					}
+					outcomes[i] = outcome
+					return nil
+				}
+
+				var names []string
+				for _, rr := range records {
+					nsRR, ok := rr.(*dns.NS)
+					if !ok {
+						continue
+					}
+					names = append(names, strings.ToLower(nsRR.Ns))
+				}
+				if len(names) == 0 {
+					if _, err := buf.Add("NO_RESPONSE_NS_QUERY", map[string]any{"ns": ns.String()}); err != nil {
+						return err
+					}
+					outcomes[i] = outcome
+					return nil
+				}
+				sort.Strings(names)
+
+				outcome.setKey = strings.Join(names, ";")
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
 		}
-		if disabled {
-			continue
-		}
+		results = append(results, entries...)
 
-		resp, err := ns.QueryWithOptions(ctx, z.Name.String(), queryType, nil)
-		if err != nil || resp.Msg == nil {
-			if err := appendLog(&results, testcase, "NO_RESPONSE", map[string]any{"ns": ns.String()}); err != nil {
-				return results, err
-			}
-			continue
-		}
-
-		records := resp.GetRecordsForName(queryType, z.Name)
-		if len(records) == 0 {
-			if err := appendLog(&results, testcase, "NO_RESPONSE_NS_QUERY", map[string]any{"ns": ns.String()}); err != nil {
-				return results, err
-			}
-			continue
-		}
-
-		var names []string
-		for _, rr := range records {
-			nsRR, ok := rr.(*dns.NS)
-			if !ok {
+		for _, outcome := range outcomes {
+			if outcome.skip || outcome.setKey == "" {
 				continue
 			}
-			names = append(names, strings.ToLower(nsRR.Ns))
-		}
-		if len(names) == 0 {
-			if err := appendLog(&results, testcase, "NO_RESPONSE_NS_QUERY", map[string]any{"ns": ns.String()}); err != nil {
-				return results, err
+			if _, ok := nsSets[outcome.setKey]; !ok {
+				order = append(order, outcome.setKey)
 			}
-			continue
+			nsSets[outcome.setKey] = append(nsSets[outcome.setKey], outcome.key)
 		}
-		sort.Strings(names)
-
-		setKey := strings.Join(names, ";")
-		if _, ok := nsSets[setKey]; !ok {
-			order = append(order, setKey)
-		}
-		nsSets[setKey] = append(nsSets[setKey], ns.String())
-		nsnamesAndIP[key] = true
 	}
 
 	if len(order) == 1 {
@@ -842,49 +1019,89 @@ func Consistency06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
+	type mnameOutcome struct {
+		key   string
+		mname string
+		skip  bool
+	}
+
+	ordered := make([]nameserver.Nameserver, 0, len(list4)+len(list5))
 	for _, ns := range append(list4, list5...) {
 		key := ns.String()
 		if nsnamesAndIP[key] {
 			continue
 		}
+		nsnamesAndIP[key] = true
+		ordered = append(ordered, ns)
+	}
 
-		disabled, err := ipDisabledMessage(&results, testcase, ns, queryType)
+	if len(ordered) > 0 {
+		outcomes := make([]mnameOutcome, len(ordered))
+		tasks := make([]runner.Task, len(ordered))
+		for i, ns := range ordered {
+			i, ns := i, ns
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				outcome := mnameOutcome{key: ns.String()}
+
+				disabled, err := ipDisabledMessageWithLogger(buf, ns, queryType)
+				if err != nil {
+					return err
+				}
+				if disabled {
+					outcome.skip = true
+					outcomes[i] = outcome
+					return nil
+				}
+
+				resp, err := ns.QueryWithOptions(ctx, z.Name.String(), queryType, nil)
+				if err != nil || resp.Msg == nil {
+					if _, err := buf.Add("NO_RESPONSE", map[string]any{"ns": ns.String()}); err != nil {
+						return err
+					}
+					outcomes[i] = outcome
+					return nil
+				}
+
+				records := resp.GetRecordsForName(queryType, z.Name)
+				if len(records) == 0 {
+					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", map[string]any{"ns": ns.String()}); err != nil {
+						return err
+					}
+					outcomes[i] = outcome
+					return nil
+				}
+				soa, ok := records[0].(*dns.SOA)
+				if !ok {
+					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", map[string]any{"ns": ns.String()}); err != nil {
+						return err
+					}
+					outcomes[i] = outcome
+					return nil
+				}
+
+				outcome.mname = strings.ToLower(soa.Ns)
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
 		}
-		if disabled {
-			continue
-		}
+		results = append(results, entries...)
 
-		resp, err := ns.QueryWithOptions(ctx, z.Name.String(), queryType, nil)
-		if err != nil || resp.Msg == nil {
-			if err := appendLog(&results, testcase, "NO_RESPONSE", map[string]any{"ns": ns.String()}); err != nil {
-				return results, err
+		for _, outcome := range outcomes {
+			if outcome.skip || outcome.mname == "" {
+				continue
 			}
-			continue
-		}
-
-		records := resp.GetRecordsForName(queryType, z.Name)
-		if len(records) == 0 {
-			if err := appendLog(&results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{"ns": ns.String()}); err != nil {
-				return results, err
+			if _, ok := mnames[outcome.mname]; !ok {
+				order = append(order, outcome.mname)
 			}
-			continue
+			mnames[outcome.mname] = append(mnames[outcome.mname], outcome.key)
 		}
-		soa, ok := records[0].(*dns.SOA)
-		if !ok {
-			if err := appendLog(&results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{"ns": ns.String()}); err != nil {
-				return results, err
-			}
-			continue
-		}
-
-		mname := strings.ToLower(soa.Ns)
-		if _, ok := mnames[mname]; !ok {
-			order = append(order, mname)
-		}
-		mnames[mname] = append(mnames[mname], key)
-		nsnamesAndIP[key] = true
 	}
 
 	if len(order) == 1 {
@@ -988,10 +1205,10 @@ func appendLog(results *[]*logger.Entry, testcase string, tag string, args map[s
 	return nil
 }
 
-func ipDisabledMessage(results *[]*logger.Entry, testcase string, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
-	if !profile.Effective().Net.IPv6 && ns.Address.Is6() {
+func ipDisabledMessageWithLogger(buf *testlogger.Buffer, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
+	if ns.Address.Is6() && !profile.Effective().Net.IPv6 {
 		for _, rrtype := range rrtypes {
-			if err := appendLog(results, testcase, "IPV6_DISABLED", map[string]any{
+			if _, err := buf.Add("IPV6_DISABLED", map[string]any{
 				"ns":     ns.String(),
 				"rrtype": rrtype,
 			}); err != nil {
@@ -1000,9 +1217,9 @@ func ipDisabledMessage(results *[]*logger.Entry, testcase string, ns nameserver.
 		}
 		return true, nil
 	}
-	if !profile.Effective().Net.IPv4 && ns.Address.Is4() {
+	if ns.Address.Is4() && !profile.Effective().Net.IPv4 {
 		for _, rrtype := range rrtypes {
-			if err := appendLog(results, testcase, "IPV4_DISABLED", map[string]any{
+			if _, err := buf.Add("IPV4_DISABLED", map[string]any{
 				"ns":     ns.String(),
 				"rrtype": rrtype,
 			}); err != nil {

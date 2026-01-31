@@ -177,37 +177,64 @@ func (r *Recursor) recurseUnordered(ctx context.Context, name string, qtype stri
 		nss := state.ns
 		state.ns = nil
 
+		if len(nss) == 0 {
+			break
+		}
 		parallelism := profile.Effective().Resolver.Defaults.Parallel
 		if parallelism < 1 {
 			parallelism = 1
 		}
-		sem := make(chan struct{}, parallelism)
+		workers := parallelism
+		if workers > len(nss) {
+			workers = len(nss)
+		}
+		if workers < 1 {
+			workers = 1
+		}
+		jobs := make(chan queryer)
 		results := make(chan unorderedResult, len(nss))
 
 		ctxBatch, cancel := context.WithCancel(ctx)
 		var wg sync.WaitGroup
-		for _, ns := range nss {
-			ns := ns
-			wg.Add(1)
+		wg.Add(workers)
+		for i := 0; i < workers; i++ {
 			go func() {
 				defer wg.Done()
-				select {
-				case sem <- struct{}{}:
-				case <-ctxBatch.Done():
-					return
+				for ns := range jobs {
+					if ctxBatch.Err() != nil {
+						return
+					}
+					resp, err := ns.QueryWithClass(ctxBatch, name, qtype, qclass)
+					select {
+					case results <- unorderedResult{ns: ns, resp: resp, err: err}:
+					case <-ctxBatch.Done():
+						return
+					}
 				}
-				resp, err := ns.QueryWithClass(ctxBatch, name, qtype, qclass)
-				<-sem
-				results <- unorderedResult{ns: ns, resp: resp, err: err}
 			}()
 		}
 
+		done := make(chan struct{})
 		go func() {
 			wg.Wait()
 			close(results)
+			close(done)
+		}()
+		go func() {
+			defer close(jobs)
+			for _, ns := range nss {
+				select {
+				case <-ctxBatch.Done():
+					return
+				case jobs <- ns:
+				}
+			}
 		}()
 
 		redirected := false
+		decided := false
+		needsCNAME := false
+		var decidedResp packet.Packet
 		for res := range results {
 			if res.err != nil || res.resp.Msg == nil {
 				continue
@@ -222,18 +249,24 @@ func (r *Recursor) recurseUnordered(ctx context.Context, name string, qtype stri
 			}
 
 			if resp.NoSuchRecord() || resp.NoSuchName() {
+				decided = true
+				decidedResp = resp
 				cancel()
-				return resp, state, nil
+				break
 			}
 
 			if resp.Type() == "answer" {
 				if !resp.HasRRsOfTypeForName(qtype, nameObj, "answer") && len(resp.GetRecordsForName("CNAME", nameObj, "answer")) > 0 {
+					decided = true
+					needsCNAME = true
+					decidedResp = resp
 					cancel()
-					cnameResp, state, err := r.resolveCNAME(ctxBatch, nameObj, qtype, qclass, resp, state)
-					return cnameResp, state, err
+					break
 				}
+				decided = true
+				decidedResp = resp
 				cancel()
-				return resp, state, nil
+				break
 			}
 
 			if resp.IsRedirect() {
@@ -277,6 +310,15 @@ func (r *Recursor) recurseUnordered(ctx context.Context, name string, qtype stri
 		}
 
 		cancel()
+		<-done
+
+		if decided {
+			if needsCNAME {
+				cnameResp, nextState, err := r.resolveCNAME(ctx, nameObj, qtype, qclass, decidedResp, state)
+				return cnameResp, nextState, err
+			}
+			return decidedResp, state, nil
+		}
 		if redirected {
 			continue
 		}

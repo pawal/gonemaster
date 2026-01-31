@@ -467,6 +467,104 @@ func TestRecurseUnorderedReturnsFastest(t *testing.T) {
 	}
 }
 
+func TestRecurseUnorderedCancelsSlowQuery(t *testing.T) {
+	defer profile.ResetEffective()
+	if err := profile.Effective().Set("resolver.defaults.unordered", true); err != nil {
+		t.Fatalf("set unordered: %v", err)
+	}
+	if err := profile.Effective().Set("resolver.defaults.parallel", 2); err != nil {
+		t.Fatalf("set parallel: %v", err)
+	}
+
+	r := &Recursor{}
+
+	slowStarted := make(chan struct{})
+	slowCanceled := make(chan struct{})
+	slow := testQueryer{id: "slow", waitForCancel: true, cancelCh: slowCanceled, startCh: slowStarted}
+
+	fastResp := packetWithA("example", netip.MustParseAddr("192.0.2.22"))
+	fastResp.AnswerFrom = "fast"
+	fast := testQueryer{id: "fast", resp: fastResp, waitCh: slowStarted}
+
+	state := &recurseState{ns: []queryer{fast, slow}}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	resp, _, err := r.recurse(ctx, "example", "A", "IN", state)
+	if err != nil {
+		t.Fatalf("recurse: %v", err)
+	}
+	if resp.AnswerFrom != "fast" {
+		t.Fatalf("expected fastest response from fast, got %q", resp.AnswerFrom)
+	}
+
+	select {
+	case <-slowCanceled:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatalf("expected slow query to be canceled")
+	}
+}
+
+func TestRecurseUnorderedWaitsForRedirectBatchCleanup(t *testing.T) {
+	defer profile.ResetEffective()
+	if err := profile.Effective().Set("resolver.defaults.unordered", true); err != nil {
+		t.Fatalf("set unordered: %v", err)
+	}
+	if err := profile.Effective().Set("resolver.defaults.parallel", 2); err != nil {
+		t.Fatalf("set parallel: %v", err)
+	}
+
+	r := &Recursor{}
+
+	slowStarted := make(chan struct{})
+	slowCanceled := make(chan struct{})
+	cancelGate := make(chan struct{})
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		close(cancelGate)
+	}()
+	slow := testQueryer{
+		id:            "slow",
+		waitForCancel: true,
+		cancelCh:      slowCanceled,
+		cancelWaitCh:  cancelGate,
+		startCh:       slowStarted,
+	}
+
+	referral := packetWithReferral("example", "ns1.example")
+	referral.AnswerFrom = "redirect"
+	redirect := testQueryer{id: "redirect", resp: referral, waitCh: slowStarted}
+
+	failCh := make(chan string, 1)
+	nextResp := packetWithA("example", netip.MustParseAddr("192.0.2.23"))
+	nextResp.AnswerFrom = "next"
+	next := testQueryer{id: "next", resp: nextResp, requireClosed: slowCanceled, failCh: failCh}
+
+	state := &recurseState{
+		ns: []queryer{redirect, slow},
+		nsFrom: func(_ packet.Packet, _ *recurseState) ([]queryer, error) {
+			return []queryer{next}, nil
+		},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	resp, _, err := r.recurse(ctx, "example", "A", "IN", state)
+	if err != nil {
+		t.Fatalf("recurse: %v", err)
+	}
+	if resp.AnswerFrom != "next" {
+		t.Fatalf("expected next response, got %q", resp.AnswerFrom)
+	}
+
+	select {
+	case id := <-failCh:
+		t.Fatalf("expected redirect batch cleanup before %s started", id)
+	default:
+	}
+}
+
 func packetWithA(name string, addr netip.Addr) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Answer = []dns.RR{
@@ -484,15 +582,55 @@ func packetWithA(name string, addr netip.Addr) packet.Packet {
 }
 
 type testQueryer struct {
-	id     string
-	delay  time.Duration
-	resp   packet.Packet
-	called chan string
+	id            string
+	delay         time.Duration
+	resp          packet.Packet
+	called        chan string
+	waitForCancel bool
+	cancelCh      chan struct{}
+	cancelWaitCh  <-chan struct{}
+	startCh       chan struct{}
+	waitCh        <-chan struct{}
+	requireClosed <-chan struct{}
+	failCh        chan<- string
 }
 
 func (t testQueryer) QueryWithClass(ctx context.Context, _ string, _ string, _ string) (packet.Packet, error) {
 	if t.called != nil {
 		t.called <- t.id
+	}
+	if t.startCh != nil {
+		select {
+		case <-t.startCh:
+		default:
+			close(t.startCh)
+		}
+	}
+	if t.requireClosed != nil {
+		select {
+		case <-t.requireClosed:
+		default:
+			if t.failCh != nil {
+				t.failCh <- t.id
+			}
+		}
+	}
+	if t.waitCh != nil {
+		select {
+		case <-t.waitCh:
+		case <-ctx.Done():
+			return packet.Packet{}, ctx.Err()
+		}
+	}
+	if t.waitForCancel {
+		<-ctx.Done()
+		if t.cancelWaitCh != nil {
+			<-t.cancelWaitCh
+		}
+		if t.cancelCh != nil {
+			close(t.cancelCh)
+		}
+		return packet.Packet{}, ctx.Err()
 	}
 	if t.delay > 0 {
 		select {
@@ -502,6 +640,22 @@ func (t testQueryer) QueryWithClass(ctx context.Context, _ string, _ string, _ s
 		}
 	}
 	return t.resp, nil
+}
+
+func packetWithReferral(zone string, nsName string) packet.Packet {
+	msg := new(dns.Msg)
+	msg.Ns = []dns.RR{
+		&dns.NS{
+			Hdr: dns.RR_Header{
+				Name:   dns.Fqdn(zone),
+				Rrtype: dns.TypeNS,
+				Class:  dns.ClassINET,
+				Ttl:    0,
+			},
+			Ns: dns.Fqdn(nsName),
+		},
+	}
+	return packet.Packet{Msg: msg}
 }
 
 func packetWithAAAA(name string, addr netip.Addr) packet.Packet {

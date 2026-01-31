@@ -13,6 +13,7 @@ import (
 	"github.com/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/internal/parallel"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/methods"
 	methodsv2 "codeberg.org/pawal/gonemaster/engine/methodsv2"
@@ -1596,26 +1597,66 @@ func DNSSEC04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	dnssecOn := true
-	dnskeyResp, err := zoneQueryOne(ctx, z, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn})
-	if err != nil {
-		return results, err
-	}
-	if dnskeyResp.Msg == nil {
-		if err := appendLog(&results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
-			return results, err
-		}
-		return results, nil
-	}
+	parallelism := profile.Effective().Resolver.Defaults.Parallel
 
-	soaResp, err := zoneQueryOne(ctx, z, z.Name.String(), "SOA", &nameserver.QueryOptions{DNSSEC: &dnssecOn})
-	if err != nil {
-		return results, err
-	}
-	if soaResp.Msg == nil {
-		if err := appendLog(&results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
+	var dnskeyResp packet.Packet
+	var soaResp packet.Packet
+
+	if parallelism <= 1 {
+		var err error
+		dnskeyResp, err = zoneQueryOne(ctx, z, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn})
+		if err != nil {
 			return results, err
 		}
-		return results, nil
+		if dnskeyResp.Msg == nil {
+			if err := appendLog(&results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
+				return results, err
+			}
+			return results, nil
+		}
+
+		soaResp, err = zoneQueryOne(ctx, z, z.Name.String(), "SOA", &nameserver.QueryOptions{DNSSEC: &dnssecOn})
+		if err != nil {
+			return results, err
+		}
+		if soaResp.Msg == nil {
+			if err := appendLog(&results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
+				return results, err
+			}
+			return results, nil
+		}
+	} else {
+		tasks := []parallel.Task[packet.Packet]{
+			func(ctx context.Context) (packet.Packet, error) {
+				return zoneQueryOne(ctx, z, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn})
+			},
+			func(ctx context.Context) (packet.Packet, error) {
+				return zoneQueryOne(ctx, z, z.Name.String(), "SOA", &nameserver.QueryOptions{DNSSEC: &dnssecOn})
+			},
+		}
+
+		queryResults := parallel.RunOrdered(ctx, tasks, parallel.Options{Limit: parallelism, CancelOnError: false})
+		dnskeyResp, soaResp = queryResults[0].Value, queryResults[1].Value
+		dnskeyErr, soaErr := queryResults[0].Err, queryResults[1].Err
+
+		if dnskeyErr != nil {
+			return results, dnskeyErr
+		}
+		if dnskeyResp.Msg == nil {
+			if err := appendLog(&results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
+				return results, err
+			}
+			return results, nil
+		}
+		if soaErr != nil {
+			return results, soaErr
+		}
+		if soaResp.Msg == nil {
+			if err := appendLog(&results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
+				return results, err
+			}
+			return results, nil
+		}
 	}
 
 	keySigs := dnskeyResp.GetRecords("RRSIG", "answer")
@@ -1740,48 +1781,103 @@ func DNSSEC05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	nss := nameserversFromNSItems(z, append(delItems, zoneItems...))
-	for _, group := range nameserversByIP(nss) {
-		if len(group) == 0 {
-			continue
+	groups := nameserversByIP(nss)
+	if len(groups) > 0 {
+		type nsOutcome struct {
+			ignoredNS             []string
+			respondsWithoutDNSKEY []string
+			respondsWithDNSKEY    []string
+			sets                  map[string]map[uint8]map[uint16][]string
 		}
-		ns := group[0]
-		if disabled, err := ipDisabledMessage(&results, testcase, ns, "DNSKEY"); err != nil {
+
+		outcomes := make([]nsOutcome, len(groups))
+		tasks := make([]runner.Task, len(groups))
+		for i, group := range groups {
+			i, group := i, group
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				if len(group) == 0 {
+					return nil
+				}
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				ns := group[0]
+				outcome := nsOutcome{
+					sets: map[string]map[uint8]map[uint16][]string{},
+				}
+
+				if disabled, err := ipDisabledMessageWithLogger(buf, ns, "DNSKEY"); err != nil {
+					return err
+				} else if disabled {
+					outcomes[i] = outcome
+					return nil
+				}
+
+				matchingStrings := nsStrings(group)
+
+				dnssecOn := true
+				resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn})
+				if resp.Msg == nil || resp.Rcode() != "NOERROR" || !resp.AA() {
+					outcome.ignoredNS = append(outcome.ignoredNS, matchingStrings...)
+					outcomes[i] = outcome
+					return nil
+				}
+
+				dnskeyRRs := resp.GetRecordsForName("DNSKEY", z.Name, "answer")
+				if len(dnskeyRRs) == 0 {
+					outcome.respondsWithoutDNSKEY = append(outcome.respondsWithoutDNSKEY, matchingStrings...)
+					outcomes[i] = outcome
+					return nil
+				}
+
+				outcome.respondsWithDNSKEY = append(outcome.respondsWithDNSKEY, matchingStrings...)
+				for _, rr := range dnskeyRRs {
+					key, ok := rr.(*dns.DNSKEY)
+					if !ok {
+						continue
+					}
+					algo := key.Algorithm
+					keytag := key.KeyTag()
+					tag := dnssec05TagForAlgorithm(algo)
+					if sets[tag] == nil {
+						continue
+					}
+					if outcome.sets[tag] == nil {
+						outcome.sets[tag] = map[uint8]map[uint16][]string{}
+					}
+					if outcome.sets[tag][algo] == nil {
+						outcome.sets[tag][algo] = map[uint16][]string{}
+					}
+					outcome.sets[tag][algo][keytag] = append(outcome.sets[tag][algo][keytag], matchingStrings...)
+				}
+
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+		if err != nil {
 			return results, err
-		} else if disabled {
-			continue
 		}
+		results = append(results, entries...)
 
-		matchingStrings := nsStrings(group)
-
-		dnssecOn := true
-		resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn})
-		if resp.Msg == nil || resp.Rcode() != "NOERROR" || !resp.AA() {
-			ignoredNS = append(ignoredNS, matchingStrings...)
-			continue
-		}
-
-		dnskeyRRs := resp.GetRecordsForName("DNSKEY", z.Name, "answer")
-		if len(dnskeyRRs) == 0 {
-			respondsWithoutDNSKEY = append(respondsWithoutDNSKEY, matchingStrings...)
-			continue
-		}
-
-		respondsWithDNSKEY = append(respondsWithDNSKEY, matchingStrings...)
-		for _, rr := range dnskeyRRs {
-			key, ok := rr.(*dns.DNSKEY)
-			if !ok {
-				continue
+		for _, outcome := range outcomes {
+			ignoredNS = append(ignoredNS, outcome.ignoredNS...)
+			respondsWithoutDNSKEY = append(respondsWithoutDNSKEY, outcome.respondsWithoutDNSKEY...)
+			respondsWithDNSKEY = append(respondsWithDNSKEY, outcome.respondsWithDNSKEY...)
+			for tag, algoMap := range outcome.sets {
+				if sets[tag] == nil {
+					sets[tag] = map[uint8]map[uint16][]string{}
+				}
+				for algo, keytagMap := range algoMap {
+					if sets[tag][algo] == nil {
+						sets[tag][algo] = map[uint16][]string{}
+					}
+					for keytag, nsList := range keytagMap {
+						sets[tag][algo][keytag] = append(sets[tag][algo][keytag], nsList...)
+					}
+				}
 			}
-			algo := key.Algorithm
-			keytag := key.KeyTag()
-			tag := dnssec05TagForAlgorithm(algo)
-			if sets[tag] == nil {
-				continue
-			}
-			if sets[tag][algo] == nil {
-				sets[tag][algo] = map[uint16][]string{}
-			}
-			sets[tag][algo][keytag] = append(sets[tag][algo][keytag], matchingStrings...)
 		}
 	}
 

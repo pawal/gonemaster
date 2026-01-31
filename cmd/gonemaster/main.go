@@ -28,6 +28,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	var output string
 	var raw bool
 	var jsonOutput bool
+	var jsonStream bool
 	var dumpProfile bool
 	var locale string
 	var noIPv4 bool
@@ -41,7 +42,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs := flag.NewFlagSet("gonemaster", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	fs.Usage = func() {
-		fmt.Fprintf(errOut, "Usage: %s --domain DOMAIN [--module MODULE] [--testcase TESTCASE] [--profile PATH] [--min-level LEVEL] [--output PATH] [--raw] [--json] [--dump-profile] [--locale LOCALE] [--no-ipv4] [--no-ipv6] [--parallel N] [--no-progress] [--list-tests] [--version]\n", fs.Name())
+		fmt.Fprintf(errOut, "Usage: %s --domain DOMAIN [--module MODULE] [--testcase TESTCASE] [--profile PATH] [--min-level LEVEL] [--output PATH] [--raw] [--json] [--json-stream] [--dump-profile] [--locale LOCALE] [--no-ipv4] [--no-ipv6] [--parallel N] [--no-progress] [--list-tests] [--version]\n", fs.Name())
 		fmt.Fprintln(errOut, "")
 		fmt.Fprintln(errOut, "Options:")
 		fmt.Fprintln(errOut, "  --domain     Zone name to test (required)")
@@ -52,6 +53,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		fmt.Fprintln(errOut, "  --output     Write output to file (optional)")
 		fmt.Fprintln(errOut, "  --raw        Stream raw log entries as they are produced (optional)")
 		fmt.Fprintln(errOut, "  --json       Print JSON output instead of translated output (optional)")
+		fmt.Fprintln(errOut, "  --json-stream  Stream JSON log entries as they are produced (optional)")
 		fmt.Fprintln(errOut, "  --dump-profile  Print effective profile in JSON and exit (optional)")
 		fmt.Fprintln(errOut, "  --locale     Locale for translated output (optional)")
 		fmt.Fprintln(errOut, "  --no-ipv4    Disable IPv4 queries (optional)")
@@ -74,6 +76,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs.StringVar(&output, "output", "", "Write output to file (optional)")
 	fs.BoolVar(&raw, "raw", false, "Stream raw log entries as they are produced (optional)")
 	fs.BoolVar(&jsonOutput, "json", false, "Print JSON output instead of translated output (optional)")
+	fs.BoolVar(&jsonStream, "json-stream", false, "Stream JSON log entries as they are produced (optional)")
 	fs.BoolVar(&dumpProfile, "dump-profile", false, "Print effective profile in JSON and exit (optional)")
 	fs.StringVar(&locale, "locale", "", "Locale for translated output (optional)")
 	fs.BoolVar(&noIPv4, "no-ipv4", false, "Disable IPv4 queries (optional)")
@@ -136,8 +139,12 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	}
 
 	if dumpProfile {
-		if raw {
-			fmt.Fprintln(errOut, "--dump-profile cannot be combined with --raw")
+		if raw || jsonStream {
+			if raw {
+				fmt.Fprintln(errOut, "--dump-profile cannot be combined with --raw")
+			} else {
+				fmt.Fprintln(errOut, "--dump-profile cannot be combined with --json-stream")
+			}
 			return 2
 		}
 		effectiveProfile, err := engine.EffectiveProfile(req)
@@ -173,6 +180,14 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		fmt.Fprintln(errOut, "--json cannot be combined with --raw")
 		return 2
 	}
+	if raw && jsonStream {
+		fmt.Fprintln(errOut, "--json-stream cannot be combined with --raw")
+		return 2
+	}
+	if jsonOutput && jsonStream {
+		fmt.Fprintln(errOut, "--json-stream cannot be combined with --json")
+		return 2
+	}
 
 	if domain == "" {
 		fmt.Fprintln(errOut, "--domain is required")
@@ -197,6 +212,21 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		rawReporter := newRawReporter(rawWriter, minLevel)
 		if rawReporter != nil {
 			req.LogCallback = rawReporter.Callback
+		}
+	} else if jsonStream {
+		jsonWriter := out
+		if output != "" {
+			f, fileErr := os.Create(output)
+			if fileErr != nil {
+				fmt.Fprintln(errOut, fileErr.Error())
+				return 2
+			}
+			defer f.Close()
+			jsonWriter = f
+		}
+		jsonReporter := newJSONStreamReporter(jsonWriter, minLevel)
+		if jsonReporter != nil {
+			req.LogCallback = jsonReporter.Callback
 		}
 	} else if !jsonOutput {
 		w := out
@@ -246,6 +276,13 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	}
 
 	if raw {
+		if err != nil {
+			fmt.Fprintln(errOut, err.Error())
+			return 2
+		}
+		return 0
+	}
+	if jsonStream {
 		if err != nil {
 			fmt.Fprintln(errOut, err.Error())
 			return 2

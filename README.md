@@ -48,6 +48,7 @@ gonemaster --json --domain example.com | jq
 - `--output` Write output to file (optional)
 - `--raw` Stream raw log entries as they are produced (optional)
 - `--json` Print JSON output instead of translated output (optional)
+- `--json-stream` Print JSON stream output instead of translated output (optional)
 - `--dump-profile` Print effective profile in JSON and exit (optional)
 - `--locale` Locale for translated output (optional; defaults to env or `en`)
 - `--no-ipv4` Disable IPv4 queries (optional)

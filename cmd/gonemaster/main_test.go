@@ -99,6 +99,38 @@ func TestRunRawStreamsOutput(t *testing.T) {
 	}
 }
 
+func TestRunJSONStreamOutputs(t *testing.T) {
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := run([]string{"--domain", ".", "--testcase", "basic01", "--min-level", "INFO", "--json-stream"}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	lines := strings.Split(out.String(), "\n")
+	var first string
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		first = line
+		break
+	}
+	if first == "" {
+		t.Fatalf("expected json-stream output, got %q", out.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(first), &payload); err != nil {
+		t.Fatalf("expected JSON line, got %q (err=%v)", first, err)
+	}
+	if tag, ok := payload["Tag"].(string); !ok || !strings.Contains(tag, "B01_") {
+		t.Fatalf("expected Tag in JSON output, got %v", payload["Tag"])
+	}
+	if errOut.Len() != 0 {
+		t.Fatalf("expected no stderr output, got %q", errOut.String())
+	}
+}
+
 func TestRunRejectsRawAndJSON(t *testing.T) {
 	var out bytes.Buffer
 	var errOut bytes.Buffer
@@ -108,6 +140,38 @@ func TestRunRejectsRawAndJSON(t *testing.T) {
 		t.Fatalf("expected exit code 2, got %d", code)
 	}
 	if !strings.Contains(errOut.String(), "--json cannot be combined with --raw") {
+		t.Fatalf("expected error message, got %q", errOut.String())
+	}
+	if out.Len() != 0 {
+		t.Fatalf("expected no stdout output, got %q", out.String())
+	}
+}
+
+func TestRunRejectsJSONStreamAndRaw(t *testing.T) {
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := run([]string{"--domain", ".", "--json-stream", "--raw"}, &out, &errOut)
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d", code)
+	}
+	if !strings.Contains(errOut.String(), "--json-stream cannot be combined with --raw") {
+		t.Fatalf("expected error message, got %q", errOut.String())
+	}
+	if out.Len() != 0 {
+		t.Fatalf("expected no stdout output, got %q", out.String())
+	}
+}
+
+func TestRunRejectsJSONStreamAndJSON(t *testing.T) {
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := run([]string{"--domain", ".", "--json-stream", "--json"}, &out, &errOut)
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d", code)
+	}
+	if !strings.Contains(errOut.String(), "--json-stream cannot be combined with --json") {
 		t.Fatalf("expected error message, got %q", errOut.String())
 	}
 	if out.Len() != 0 {

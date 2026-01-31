@@ -3081,6 +3081,158 @@ func TestDNSSEC13AlgoNotSigned(t *testing.T) {
 	}
 }
 
+func TestDNSSEC13ParallelQueries(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origM4 := method4
+	origM5 := method5
+	t.Cleanup(func() {
+		method4 = origM4
+		method5 = origM5
+	})
+
+	profile.Effective().Resolver.Defaults.Parallel = 2
+
+	now := time.Now().UTC()
+	key := &dns.DNSKEY{
+		Hdr: dns.RR_Header{
+			Name:   dns.Fqdn("example"),
+			Rrtype: dns.TypeDNSKEY,
+			Class:  dns.ClassINET,
+			Ttl:    60,
+		},
+		Flags:     dns.ZONE,
+		Protocol:  3,
+		Algorithm: 8,
+		PublicKey: "AwEAAc==",
+	}
+	keySig := rrsigRecord("example", dns.TypeDNSKEY, key.KeyTag(), now.Add(-time.Hour).Unix(), now.Add(time.Hour).Unix())
+
+	soaSig := rrsigRecord("example", dns.TypeSOA, key.KeyTag(), now.Add(-time.Hour).Unix(), now.Add(time.Hour).Unix())
+	soaSig.Algorithm = 13
+	nsSig := rrsigRecord("example", dns.TypeNS, key.KeyTag(), now.Add(-time.Hour).Unix(), now.Add(time.Hour).Unix())
+	nsSig.Algorithm = 13
+
+	nsRR := &dns.NS{
+		Hdr: dns.RR_Header{
+			Name:   dns.Fqdn("example"),
+			Rrtype: dns.TypeNS,
+			Class:  dns.ClassINET,
+			Ttl:    60,
+		},
+		Ns: dns.Fqdn("ns.example"),
+	}
+
+	started := make(chan string, 2)
+	release := make(chan struct{})
+
+	hook := func(id string) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
+		return func(ctx context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+			switch qtype {
+			case "DNSKEY":
+				select {
+				case started <- id:
+				default:
+				}
+				select {
+				case <-release:
+				case <-ctx.Done():
+					return packet.Packet{}, ctx.Err()
+				}
+				return answerPacket(qname, dns.TypeDNSKEY, key, keySig), nil
+			case "SOA":
+				return answerPacket(qname, dns.TypeSOA, soaRecord(qname), soaSig), nil
+			case "NS":
+				return answerPacket(qname, dns.TypeNS, nsRR, nsSig), nil
+			default:
+				return packet.Packet{}, nil
+			}
+		}
+	}
+
+	ns1, err := nameserver.New("ns1.example", "192.0.2.121", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	ns1.SetQueryHook(hook("ns1"))
+
+	ns2, err := nameserver.New("ns2.example", "192.0.2.122", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	ns2.SetQueryHook(hook("ns2"))
+
+	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns1, ns2}, nil
+	}
+	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	done := make(chan struct{})
+	var entries []*logger.Entry
+	var dsErr error
+	go func() {
+		entries, dsErr = DNSSEC13(ctx, &z)
+		close(done)
+	}()
+
+	got := map[string]bool{}
+	deadline := time.After(1 * time.Second)
+	for len(got) < 2 {
+		select {
+		case name := <-started:
+			got[name] = true
+		case <-deadline:
+			t.Fatalf("expected parallel DNSKEY queries to start, got %v", got)
+		}
+	}
+
+	close(release)
+
+	select {
+	case <-done:
+		if dsErr != nil {
+			t.Fatalf("dnssec13: %v", dsErr)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("dnssec13 did not finish")
+	}
+
+	if !hasEntryTag(entries, "DS13_ALGO_NOT_SIGNED_SOA") {
+		t.Fatalf("expected DS13_ALGO_NOT_SIGNED_SOA")
+	}
+	if !hasEntryTag(entries, "DS13_ALGO_NOT_SIGNED_NS") {
+		t.Fatalf("expected DS13_ALGO_NOT_SIGNED_NS")
+	}
+
+	var nsList string
+	for _, entry := range entries {
+		if entry == nil || entry.Tag != "DS13_ALGO_NOT_SIGNED_SOA" {
+			continue
+		}
+		if list, ok := entry.Args["ns_ip_list"].(string); ok {
+			nsList = list
+			break
+		}
+	}
+	if nsList == "" {
+		t.Fatalf("expected ns_ip_list for DS13_ALGO_NOT_SIGNED_SOA")
+	}
+	if nsList != "192.0.2.121;192.0.2.122" {
+		t.Fatalf("expected deterministic ns_ip_list order, got %q", nsList)
+	}
+}
+
 func TestDNSSEC14KeySizeSmallerThanRec(t *testing.T) {
 	nameserver.EmptyCache()
 	t.Cleanup(nameserver.EmptyCache)
@@ -3135,6 +3287,117 @@ func TestDNSSEC14KeySizeSmallerThanRec(t *testing.T) {
 	}
 }
 
+func TestDNSSEC14ParallelDNSKEYQueries(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origM4 := method4
+	origM5 := method5
+	t.Cleanup(func() {
+		method4 = origM4
+		method5 = origM5
+	})
+
+	profile.Effective().Resolver.Defaults.Parallel = 2
+
+	key := &dns.DNSKEY{
+		Hdr: dns.RR_Header{
+			Name:   dns.Fqdn("example"),
+			Rrtype: dns.TypeDNSKEY,
+			Class:  dns.ClassINET,
+			Ttl:    60,
+		},
+		Flags:     dns.ZONE,
+		Protocol:  3,
+		Algorithm: 8,
+	}
+	if _, err := key.Generate(1024); err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+
+	started := make(chan string, 2)
+	release := make(chan struct{})
+
+	hook := func(id string) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
+		return func(ctx context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+			if qtype != "DNSKEY" {
+				return packet.Packet{}, nil
+			}
+			select {
+			case started <- id:
+			default:
+			}
+			select {
+			case <-release:
+			case <-ctx.Done():
+				return packet.Packet{}, ctx.Err()
+			}
+			return dnskeyPacket(qname, key), nil
+		}
+	}
+
+	ns1, err := nameserver.New("ns1.example", "192.0.2.131", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	ns1.SetQueryHook(hook("ns1"))
+
+	ns2, err := nameserver.New("ns2.example", "192.0.2.132", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	ns2.SetQueryHook(hook("ns2"))
+
+	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns1, ns2}, nil
+	}
+	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	done := make(chan struct{})
+	var entries []*logger.Entry
+	var dsErr error
+	go func() {
+		entries, dsErr = DNSSEC14(ctx, &z)
+		close(done)
+	}()
+
+	got := map[string]bool{}
+	deadline := time.After(1 * time.Second)
+	for len(got) < 2 {
+		select {
+		case name := <-started:
+			got[name] = true
+		case <-deadline:
+			t.Fatalf("expected parallel DNSKEY queries to start, got %v", got)
+		}
+	}
+
+	close(release)
+
+	select {
+	case <-done:
+		if dsErr != nil {
+			t.Fatalf("dnssec14: %v", dsErr)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("dnssec14 did not finish")
+	}
+
+	if !hasEntryTag(entries, "DNSKEY_SMALLER_THAN_REC") {
+		t.Fatalf("expected DNSKEY_SMALLER_THAN_REC")
+	}
+}
+
 func TestDNSSEC15NoCDSCDNSKEY(t *testing.T) {
 	nameserver.EmptyCache()
 	t.Cleanup(nameserver.EmptyCache)
@@ -3175,6 +3438,138 @@ func TestDNSSEC15NoCDSCDNSKEY(t *testing.T) {
 	}
 	if !hasEntryTag(entries, "DS15_NO_CDS_CDNSKEY") {
 		t.Fatalf("expected DS15_NO_CDS_CDNSKEY")
+	}
+}
+
+func TestDNSSEC15ParallelQueries(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origM4 := method4
+	origM5 := method5
+	t.Cleanup(func() {
+		method4 = origM4
+		method5 = origM5
+	})
+
+	profile.Effective().Resolver.Defaults.Parallel = 2
+
+	cds := &dns.CDS{
+		DS: dns.DS{
+			Hdr: dns.RR_Header{
+				Name:   dns.Fqdn("example"),
+				Rrtype: dns.TypeCDS,
+				Class:  dns.ClassINET,
+				Ttl:    60,
+			},
+			KeyTag:     12345,
+			Algorithm:  8,
+			DigestType: 2,
+			Digest:     "DEADBEEF",
+		},
+	}
+
+	started := make(chan string, 2)
+	release := make(chan struct{})
+
+	hook := func(id string) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
+		return func(ctx context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+			switch qtype {
+			case "CDS":
+				select {
+				case started <- id:
+				default:
+				}
+				select {
+				case <-release:
+				case <-ctx.Done():
+					return packet.Packet{}, ctx.Err()
+				}
+				return answerPacket(qname, dns.TypeCDS, cds), nil
+			case "CDNSKEY":
+				return answerPacket(qname, dns.TypeCDNSKEY), nil
+			default:
+				return packet.Packet{}, nil
+			}
+		}
+	}
+
+	ns1, err := nameserver.New("ns1.example", "192.0.2.231", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	ns1.SetQueryHook(hook("ns1"))
+
+	ns2, err := nameserver.New("ns2.example", "192.0.2.232", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	ns2.SetQueryHook(hook("ns2"))
+
+	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns1, ns2}, nil
+	}
+	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	done := make(chan struct{})
+	var entries []*logger.Entry
+	var dsErr error
+	go func() {
+		entries, dsErr = DNSSEC15(ctx, &z)
+		close(done)
+	}()
+
+	got := map[string]bool{}
+	deadline := time.After(1 * time.Second)
+	for len(got) < 2 {
+		select {
+		case name := <-started:
+			got[name] = true
+		case <-deadline:
+			t.Fatalf("expected parallel CDS queries to start, got %v", got)
+		}
+	}
+
+	close(release)
+
+	select {
+	case <-done:
+		if dsErr != nil {
+			t.Fatalf("dnssec15: %v", dsErr)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("dnssec15 did not finish")
+	}
+
+	if !hasEntryTag(entries, "DS15_HAS_CDS_NO_CDNSKEY") {
+		t.Fatalf("expected DS15_HAS_CDS_NO_CDNSKEY")
+	}
+
+	var nsList string
+	for _, entry := range entries {
+		if entry == nil || entry.Tag != "DS15_HAS_CDS_NO_CDNSKEY" {
+			continue
+		}
+		if list, ok := entry.Args["ns_ip_list"].(string); ok {
+			nsList = list
+			break
+		}
+	}
+	if nsList == "" {
+		t.Fatalf("expected ns_ip_list for DS15_HAS_CDS_NO_CDNSKEY")
+	}
+	if nsList != "192.0.2.231;192.0.2.232" {
+		t.Fatalf("expected deterministic ns_ip_list order, got %q", nsList)
 	}
 }
 

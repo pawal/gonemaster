@@ -4221,6 +4221,7 @@ func DNSSEC13(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 	sort.Strings(keys)
 
+	var ordered []nameserver.Nameserver
 	ipAlreadyProcessed := map[string]bool{}
 	for _, key := range keys {
 		ns := nss[key]
@@ -4229,67 +4230,110 @@ func DNSSEC13(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			continue
 		}
 		ipAlreadyProcessed[nsIP] = true
+		ordered = append(ordered, ns)
+	}
 
-		if disabled, err := ipDisabledMessage(&results, testcase, ns, queryTypes...); err != nil {
-			return results, err
-		} else if disabled {
-			continue
+	if len(ordered) > 0 {
+		type nsOutcome struct {
+			nsIP         string
+			algoNotSigned map[string]map[uint8]bool
 		}
 
-		dnskeyAlgorithms := map[uint8]bool{}
-		for _, queryType := range queryTypes {
-			dnssecOn := true
-			useVC := false
-			resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), queryType, &nameserver.QueryOptions{
-				DNSSEC: &dnssecOn,
-				UseVC:  &useVC,
-			})
-			if resp.Msg == nil || resp.Rcode() != "NOERROR" || !resp.AA() {
-				continue
-			}
-
-			typeRecords := resp.GetRecords(queryType, "answer")
-			if len(typeRecords) == 0 {
-				continue
-			}
-
-			rrsigRecords := resp.GetRecords("RRSIG", "answer")
-			if len(rrsigRecords) == 0 {
-				continue
-			}
-
-			if queryType == "DNSKEY" {
-				for _, rr := range typeRecords {
-					if dnskey, ok := rr.(*dns.DNSKEY); ok {
-						dnskeyAlgorithms[dnskey.Algorithm] = true
-					}
+		outcomes := make([]nsOutcome, len(ordered))
+		tasks := make([]runner.Task, len(ordered))
+		for i, ns := range ordered {
+			i, ns := i, ns
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				outcome := nsOutcome{
+					nsIP:         ns.Address.String(),
+					algoNotSigned: map[string]map[uint8]bool{},
 				}
-			}
 
-			if len(dnskeyAlgorithms) == 0 {
-				continue
-			}
+				if disabled, err := ipDisabledMessageWithLogger(buf, ns, queryTypes...); err != nil {
+					return err
+				} else if disabled {
+					outcomes[i] = outcome
+					return nil
+				}
 
-			for algorithm := range dnskeyAlgorithms {
-				found := false
-				for _, rr := range rrsigRecords {
-					sig, ok := rr.(*dns.RRSIG)
-					if !ok {
+				dnskeyAlgorithms := map[uint8]bool{}
+				for _, queryType := range queryTypes {
+					dnssecOn := true
+					useVC := false
+					resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), queryType, &nameserver.QueryOptions{
+						DNSSEC: &dnssecOn,
+						UseVC:  &useVC,
+					})
+					if resp.Msg == nil || resp.Rcode() != "NOERROR" || !resp.AA() {
 						continue
 					}
-					if sig.Algorithm == algorithm {
-						found = true
-						break
+
+					typeRecords := resp.GetRecords(queryType, "answer")
+					if len(typeRecords) == 0 {
+						continue
+					}
+
+					rrsigRecords := resp.GetRecords("RRSIG", "answer")
+					if len(rrsigRecords) == 0 {
+						continue
+					}
+
+					if queryType == "DNSKEY" {
+						for _, rr := range typeRecords {
+							if dnskey, ok := rr.(*dns.DNSKEY); ok {
+								dnskeyAlgorithms[dnskey.Algorithm] = true
+							}
+						}
+					}
+
+					if len(dnskeyAlgorithms) == 0 {
+						continue
+					}
+
+					for algorithm := range dnskeyAlgorithms {
+						found := false
+						for _, rr := range rrsigRecords {
+							sig, ok := rr.(*dns.RRSIG)
+							if !ok {
+								continue
+							}
+							if sig.Algorithm == algorithm {
+								found = true
+								break
+							}
+						}
+						if found {
+							continue
+						}
+						key := strings.ToLower(queryType)
+						if outcome.algoNotSigned[key] == nil {
+							outcome.algoNotSigned[key] = map[uint8]bool{}
+						}
+						outcome.algoNotSigned[key][algorithm] = true
 					}
 				}
-				if found {
-					continue
-				}
-				key := strings.ToLower(queryType)
+
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+		if err != nil {
+			return results, err
+		}
+		results = append(results, entries...)
+
+		for _, outcome := range outcomes {
+			for key, algoMap := range outcome.algoNotSigned {
 				if algoNotSigned[key] == nil {
 					algoNotSigned[key] = map[uint8][]string{}
 				}
-				algoNotSigned[key][algorithm] = append(algoNotSigned[key][algorithm], nsIP)
+				for algo := range algoMap {
+					algoNotSigned[key][algo] = append(algoNotSigned[key][algo], outcome.nsIP)
+				}
 			}
 		}
 	}
@@ -4355,42 +4399,75 @@ func DNSSEC14(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
-
+	var ordered []nameserver.Nameserver
 	for _, key := range keys {
-		ns := nss[key]
+		ordered = append(ordered, nss[key])
+	}
 
-		if disabled, err := ipDisabledMessage(&results, testcase, ns, "DNSKEY"); err != nil {
+	if len(ordered) > 0 {
+		type nsOutcome struct {
+			dnskeyRRs []*dns.DNSKEY
+		}
+
+		outcomes := make([]nsOutcome, len(ordered))
+		tasks := make([]runner.Task, len(ordered))
+		for i, ns := range ordered {
+			i, ns := i, ns
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				outcome := nsOutcome{}
+
+				if disabled, err := ipDisabledMessageWithLogger(buf, ns, "DNSKEY"); err != nil {
+					return err
+				} else if disabled {
+					outcomes[i] = outcome
+					return nil
+				}
+
+				dnssecOn := true
+				useVC := false
+				resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
+				if resp.Msg == nil {
+					if _, err := buf.Add("NO_RESPONSE", map[string]any{
+						"ns": ns.String(),
+					}); err != nil {
+						return err
+					}
+					outcomes[i] = outcome
+					return nil
+				}
+
+				keyRecords := resp.GetRecords("DNSKEY", "answer")
+				if len(keyRecords) == 0 {
+					if _, err := buf.Add("NO_RESPONSE_DNSKEY", map[string]any{
+						"ns": ns.String(),
+					}); err != nil {
+						return err
+					}
+					outcomes[i] = outcome
+					return nil
+				}
+
+				for _, rr := range keyRecords {
+					if dnskey, ok := rr.(*dns.DNSKEY); ok {
+						outcome.dnskeyRRs = append(outcome.dnskeyRRs, dnskey)
+					}
+				}
+
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+		if err != nil {
 			return results, err
-		} else if disabled {
-			continue
 		}
+		results = append(results, entries...)
 
-		dnssecOn := true
-		useVC := false
-		resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
-		if resp.Msg == nil {
-			if err := appendLog(&results, testcase, "NO_RESPONSE", map[string]any{
-				"ns": ns.String(),
-			}); err != nil {
-				return results, err
-			}
-			continue
-		}
-
-		keyRecords := resp.GetRecords("DNSKEY", "answer")
-		if len(keyRecords) == 0 {
-			if err := appendLog(&results, testcase, "NO_RESPONSE_DNSKEY", map[string]any{
-				"ns": ns.String(),
-			}); err != nil {
-				return results, err
-			}
-			continue
-		}
-
-		for _, rr := range keyRecords {
-			if dnskey, ok := rr.(*dns.DNSKEY); ok {
-				dnskeyRRs = append(dnskeyRRs, dnskey)
-			}
+		for _, outcome := range outcomes {
+			dnskeyRRs = append(dnskeyRRs, outcome.dnskeyRRs...)
 		}
 	}
 
@@ -4502,7 +4579,7 @@ func DNSSEC15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
-
+	var ordered []nameserver.Nameserver
 	ipAlreadyProcessed := map[string]bool{}
 	for _, key := range keys {
 		ns := nss[key]
@@ -4511,24 +4588,67 @@ func DNSSEC15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			continue
 		}
 		ipAlreadyProcessed[nsIP] = true
+		ordered = append(ordered, ns)
+	}
 
-		if disabled, err := ipDisabledMessage(&results, testcase, ns, queryTypes...); err != nil {
+	if len(ordered) > 0 {
+		type nsOutcome struct {
+			nsIP         string
+			cdsRRs       []dns.RR
+			cdnskeyRRs   []dns.RR
+			cdsOK        bool
+			cdnskeyOK    bool
+		}
+
+		outcomes := make([]nsOutcome, len(ordered))
+		tasks := make([]runner.Task, len(ordered))
+		for i, ns := range ordered {
+			i, ns := i, ns
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				outcome := nsOutcome{nsIP: ns.Address.String()}
+
+				if disabled, err := ipDisabledMessageWithLogger(buf, ns, queryTypes...); err != nil {
+					return err
+				} else if disabled {
+					outcomes[i] = outcome
+					return nil
+				}
+
+				dnssecOn := true
+				useVC := false
+				cdsResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "CDS", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
+				if cdsResp.Msg != nil && cdsResp.AA() && cdsResp.Rcode() == "NOERROR" {
+					outcome.cdsOK = true
+					outcome.cdsRRs = cdsResp.GetRecords("CDS", "answer")
+				}
+
+				useVC = false
+				cdnskeyResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "CDNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
+				if cdnskeyResp.Msg != nil && cdnskeyResp.AA() && cdnskeyResp.Rcode() == "NOERROR" {
+					outcome.cdnskeyOK = true
+					outcome.cdnskeyRRs = cdnskeyResp.GetRecords("CDNSKEY", "answer")
+				}
+
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+		if err != nil {
 			return results, err
-		} else if disabled {
-			continue
 		}
+		results = append(results, entries...)
 
-		dnssecOn := true
-		useVC := false
-		cdsResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "CDS", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
-		if cdsResp.Msg != nil && cdsResp.AA() && cdsResp.Rcode() == "NOERROR" {
-			cdsRRsets[nsIP] = cdsResp.GetRecords("CDS", "answer")
-		}
-
-		useVC = false
-		cdnskeyResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "CDNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
-		if cdnskeyResp.Msg != nil && cdnskeyResp.AA() && cdnskeyResp.Rcode() == "NOERROR" {
-			cdnskeyRRsets[nsIP] = cdnskeyResp.GetRecords("CDNSKEY", "answer")
+		for _, outcome := range outcomes {
+			if outcome.cdsOK {
+				cdsRRsets[outcome.nsIP] = outcome.cdsRRs
+			}
+			if outcome.cdnskeyOK {
+				cdnskeyRRsets[outcome.nsIP] = outcome.cdnskeyRRs
+			}
 		}
 	}
 

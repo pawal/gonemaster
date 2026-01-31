@@ -5,6 +5,7 @@ import (
 	"net"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/miekg/dns"
 
@@ -48,6 +49,103 @@ func TestNameserver01RecursorAndNoRecursor(t *testing.T) {
 	}
 	if !hasEntryTag(entries, "NO_RECURSOR") {
 		t.Fatalf("expected NO_RECURSOR")
+	}
+}
+
+func TestNameserver01ParallelQueries(t *testing.T) {
+	setupTest(t)
+
+	origM4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origM4and5 })
+
+	profile.Effective().Resolver.Defaults.Parallel = 2
+
+	started := make(chan string, 2)
+	release := make(chan struct{})
+
+	hook := func(id string) func(context.Context, string, string, string, *ens.QueryOptions) (packet.Packet, error) {
+		return func(ctx context.Context, qname string, qtype string, _ string, _ *ens.QueryOptions) (packet.Packet, error) {
+			if strings.EqualFold(qtype, "A") && strings.EqualFold(qname, nonExistentNames[0]) {
+				select {
+				case started <- id:
+				default:
+				}
+				select {
+				case <-release:
+				case <-ctx.Done():
+					return packet.Packet{}, ctx.Err()
+				}
+			}
+			msg := new(dns.Msg)
+			msg.Rcode = dns.RcodeNameError
+			return packet.Packet{Msg: msg}, nil
+		}
+	}
+
+	ns1, err := ens.New("ns1.example", "192.0.2.1", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	ns1.SetQueryHook(hook("ns1"))
+
+	ns2, err := ens.New("ns2.example", "192.0.2.2", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	ns2.SetQueryHook(hook("ns2"))
+
+	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1, ns2}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	done := make(chan struct{})
+	var entries []*logger.Entry
+	var nsErr error
+	go func() {
+		entries, nsErr = Nameserver01(ctx, &z)
+		close(done)
+	}()
+
+	got := map[string]bool{}
+	deadline := time.After(1 * time.Second)
+	for len(got) < 2 {
+		select {
+		case name := <-started:
+			got[name] = true
+		case <-deadline:
+			t.Fatalf("expected parallel A queries to start, got %v", got)
+		}
+	}
+
+	close(release)
+
+	select {
+	case <-done:
+		if nsErr != nil {
+			t.Fatalf("nameserver01: %v", nsErr)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("nameserver01 did not finish")
+	}
+
+	var order []string
+	for _, entry := range entries {
+		if entry == nil || entry.Tag != "IS_A_RECURSOR" {
+			continue
+		}
+		if ns, ok := entry.Args["ns"].(string); ok {
+			order = append(order, ns)
+		}
+	}
+	if len(order) != 2 {
+		t.Fatalf("expected 2 recursor entries, got %v", order)
+	}
+	if order[0] != "ns1.example/192.0.2.1" || order[1] != "ns2.example/192.0.2.2" {
+		t.Fatalf("expected deterministic log order, got %v", order)
 	}
 }
 
@@ -160,6 +258,101 @@ func TestNameserver05AAAAWellProcessed(t *testing.T) {
 	}
 	if !hasEntryTag(entries, "AAAA_WELL_PROCESSED") {
 		t.Fatalf("expected AAAA_WELL_PROCESSED")
+	}
+}
+
+func TestNameserver05ParallelQueries(t *testing.T) {
+	setupTest(t)
+
+	origM4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origM4and5 })
+
+	profile.Effective().Resolver.Defaults.Parallel = 2
+
+	started := make(chan string, 2)
+	release := make(chan struct{})
+
+	hook := func(id string) func(context.Context, string, string, string, *ens.QueryOptions) (packet.Packet, error) {
+		return func(ctx context.Context, qname string, qtype string, _ string, _ *ens.QueryOptions) (packet.Packet, error) {
+			if strings.EqualFold(qtype, "A") && strings.EqualFold(qname, "example") {
+				select {
+				case started <- id:
+				default:
+				}
+				select {
+				case <-release:
+				case <-ctx.Done():
+					return packet.Packet{}, ctx.Err()
+				}
+			}
+			return packet.Packet{}, nil
+		}
+	}
+
+	ns1, err := ens.New("ns1.example", "192.0.2.1", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	ns1.SetQueryHook(hook("ns1"))
+
+	ns2, err := ens.New("ns2.example", "192.0.2.2", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	ns2.SetQueryHook(hook("ns2"))
+
+	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1, ns2}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	done := make(chan struct{})
+	var entries []*logger.Entry
+	var nsErr error
+	go func() {
+		entries, nsErr = Nameserver05(ctx, &z)
+		close(done)
+	}()
+
+	got := map[string]bool{}
+	deadline := time.After(1 * time.Second)
+	for len(got) < 2 {
+		select {
+		case name := <-started:
+			got[name] = true
+		case <-deadline:
+			t.Fatalf("expected parallel A queries to start, got %v", got)
+		}
+	}
+
+	close(release)
+
+	select {
+	case <-done:
+		if nsErr != nil {
+			t.Fatalf("nameserver05: %v", nsErr)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("nameserver05 did not finish")
+	}
+
+	var order []string
+	for _, entry := range entries {
+		if entry == nil || entry.Tag != "NO_RESPONSE" {
+			continue
+		}
+		if ns, ok := entry.Args["ns"].(string); ok {
+			order = append(order, ns)
+		}
+	}
+	if len(order) != 2 {
+		t.Fatalf("expected 2 no-response entries, got %v", order)
+	}
+	if order[0] != "ns1.example/192.0.2.1" || order[1] != "ns2.example/192.0.2.2" {
+		t.Fatalf("expected deterministic log order, got %v", order)
 	}
 }
 

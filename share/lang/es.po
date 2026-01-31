@@ -365,7 +365,7 @@ msgstr "Desactivado IPv6, no se enviará la consulta \"{rrtype}\" hacia {ns}."
 #. SYSTEM:ERROR_CACHE_SKIP
 #, perl-brace-format
 msgid "Skipping {query_type} query to {query_name} ({query_class}) at {ip} over {protocol} for {ttl_seconds}s after network error."
-msgstr "Skipping {query_type} query to {query_name} ({query_class}) at {ip} over {protocol} for {ttl_seconds}s after network error."
+msgstr "Se omite la consulta {query_type} a {query_name} ({query_class}) en {ip} por {protocol} durante {ttl_seconds}s tras un error de red."
 
 #. BASIC:IPV6_ENABLED
 #, perl-brace-format

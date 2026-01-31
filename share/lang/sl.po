@@ -333,7 +333,7 @@ msgstr "IPv6 je onemogočen, \"{rrtype}\" ni bila poslana na {ns}."
 #. SYSTEM:ERROR_CACHE_SKIP
 #, perl-brace-format
 msgid "Skipping {query_type} query to {query_name} ({query_class}) at {ip} over {protocol} for {ttl_seconds}s after network error."
-msgstr "Skipping {query_type} query to {query_name} ({query_class}) at {ip} over {protocol} for {ttl_seconds}s after network error."
+msgstr "Preskočena poizvedba {query_type} na {query_name} ({query_class}) pri {ip} prek {protocol} za {ttl_seconds}s po omrežni napaki."
 
 #. BASIC:IPV6_ENABLED
 #, perl-brace-format

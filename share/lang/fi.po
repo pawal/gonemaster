@@ -348,7 +348,7 @@ msgstr "IPv6 ei ole käytössä, ei lähetä kyselyä \"{rrtype}\" kohteelle {ns
 #. SYSTEM:ERROR_CACHE_SKIP
 #, perl-brace-format
 msgid "Skipping {query_type} query to {query_name} ({query_class}) at {ip} over {protocol} for {ttl_seconds}s after network error."
-msgstr "Skipping {query_type} query to {query_name} ({query_class}) at {ip} over {protocol} for {ttl_seconds}s after network error."
+msgstr "Ohitetaan {query_type}-kysely kohteeseen {query_name} ({query_class}) osoitteessa {ip} protokollalla {protocol} {ttl_seconds}s ajan verkko-virheen jälkeen."
 
 #. BASIC:IPV6_ENABLED
 #, perl-brace-format

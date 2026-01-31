@@ -348,7 +348,7 @@ msgstr "IPv6 är inaktiverat. Skickar ingen fråga om '{rrtype}' till {ns}."
 #. SYSTEM:ERROR_CACHE_SKIP
 #, perl-brace-format
 msgid "Skipping {query_type} query to {query_name} ({query_class}) at {ip} over {protocol} for {ttl_seconds}s after network error."
-msgstr "Skipping {query_type} query to {query_name} ({query_class}) at {ip} over {protocol} for {ttl_seconds}s after network error."
+msgstr "Hoppar över {query_type}-fråga till {query_name} ({query_class}) på {ip} över {protocol} i {ttl_seconds}s efter nätverksfel."
 
 #. BASIC:IPV6_ENABLED
 #, perl-brace-format

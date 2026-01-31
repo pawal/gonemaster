@@ -388,7 +388,7 @@ msgstr ""
 #. SYSTEM:ERROR_CACHE_SKIP
 #, perl-brace-format
 msgid "Skipping {query_type} query to {query_name} ({query_class}) at {ip} over {protocol} for {ttl_seconds}s after network error."
-msgstr "Skipping {query_type} query to {query_name} ({query_class}) at {ip} over {protocol} for {ttl_seconds}s after network error."
+msgstr "Ignorer la requête {query_type} vers {query_name} ({query_class}) à {ip} via {protocol} pendant {ttl_seconds}s après une erreur réseau."
 
 #. BASIC:IPV6_ENABLED
 #, perl-brace-format

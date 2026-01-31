@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/netip"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -325,6 +326,207 @@ func TestLazyNameserverParallelPrefersFirstAddress(t *testing.T) {
 	}
 	if resp.AnswerFrom != "192.0.2.10" {
 		t.Fatalf("expected first address response, got %q", resp.AnswerFrom)
+	}
+}
+
+func TestLazyNameserverConcurrentQueriesShareGlue(t *testing.T) {
+	nameserver.EmptyCache()
+	defer nameserver.EmptyCache()
+
+	r := &Recursor{client: &transport.Client{}}
+	if err := r.AddFakeAddresses(".", map[string][]string{
+		"root.test": {"192.0.2.53"},
+	}); err != nil {
+		t.Fatalf("add fake root: %v", err)
+	}
+
+	rootNS, err := nameserver.New("root.test", "192.0.2.53", r.client)
+	if err != nil {
+		t.Fatalf("new root nameserver: %v", err)
+	}
+	rootNS.SetQueryHook(func(ctx context.Context, name string, qtype string, qclass string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		switch strings.ToUpper(qtype) {
+		case "A":
+			return packetWithA(name, netip.MustParseAddr("192.0.2.30")), nil
+		case "AAAA":
+			return packetWithAAAA(name, netip.MustParseAddr("2001:db8::30")), nil
+		default:
+			return packet.Packet{Msg: new(dns.Msg)}, nil
+		}
+	})
+
+	ns4, err := nameserver.New("ns.example", "192.0.2.30", r.client)
+	if err != nil {
+		t.Fatalf("new ns4: %v", err)
+	}
+	ns4.SetQueryHook(func(ctx context.Context, name string, qtype string, qclass string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		return packetWithA(name, netip.MustParseAddr("192.0.2.31")), nil
+	})
+
+	ns6, err := nameserver.New("ns.example", "2001:db8::30", r.client)
+	if err != nil {
+		t.Fatalf("new ns6: %v", err)
+	}
+	ns6.SetQueryHook(func(ctx context.Context, name string, qtype string, qclass string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		return packetWithA(name, netip.MustParseAddr("192.0.2.32")), nil
+	})
+
+	state := &recurseState{glue: map[string]map[netip.Addr]bool{}}
+	lns := lazyNameserver{name: "ns.example", recursor: r, state: state}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	start := make(chan struct{})
+	errCh := make(chan error, 64)
+	var wg sync.WaitGroup
+	for i := 0; i < 32; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			_, err := lns.QueryWithClass(ctx, "example", "A", "IN")
+			if err != nil && ctx.Err() == nil {
+				errCh <- err
+			}
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(errCh)
+
+	for err := range errCh {
+		t.Fatalf("query failed: %v", err)
+	}
+
+	state.ensureLock()
+	state.lock()
+	defer state.unlock()
+	nameObj := dnsname.New("ns.example")
+	nameKey := strings.ToLower(nameObj.String())
+	if len(state.glue[nameKey]) == 0 {
+		t.Fatalf("expected glue cached for ns.example")
+	}
+}
+
+func TestGetNSFromConcurrentWithLazyNameserver(t *testing.T) {
+	nameserver.EmptyCache()
+	defer nameserver.EmptyCache()
+
+	r := &Recursor{client: &transport.Client{}}
+	if err := r.AddFakeAddresses(".", map[string][]string{
+		"root.test": {"192.0.2.53"},
+	}); err != nil {
+		t.Fatalf("add fake root: %v", err)
+	}
+
+	rootNS, err := nameserver.New("root.test", "192.0.2.53", r.client)
+	if err != nil {
+		t.Fatalf("new root nameserver: %v", err)
+	}
+	rootNS.SetQueryHook(func(ctx context.Context, name string, qtype string, qclass string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		switch strings.ToUpper(qtype) {
+		case "A":
+			return packetWithA(name, netip.MustParseAddr("192.0.2.40")), nil
+		case "AAAA":
+			return packetWithAAAA(name, netip.MustParseAddr("2001:db8::40")), nil
+		default:
+			return packet.Packet{Msg: new(dns.Msg)}, nil
+		}
+	})
+
+	ns4, err := nameserver.New("ns.example", "192.0.2.40", r.client)
+	if err != nil {
+		t.Fatalf("new ns4: %v", err)
+	}
+	ns4.SetQueryHook(func(ctx context.Context, name string, qtype string, qclass string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		return packetWithA(name, netip.MustParseAddr("192.0.2.41")), nil
+	})
+
+	ns6, err := nameserver.New("ns.example", "2001:db8::40", r.client)
+	if err != nil {
+		t.Fatalf("new ns6: %v", err)
+	}
+	ns6.SetQueryHook(func(ctx context.Context, name string, qtype string, qclass string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		return packetWithA(name, netip.MustParseAddr("192.0.2.42")), nil
+	})
+
+	msg := new(dns.Msg)
+	msg.Ns = []dns.RR{
+		&dns.NS{
+			Hdr: dns.RR_Header{
+				Name:   "example.",
+				Rrtype: dns.TypeNS,
+				Class:  dns.ClassINET,
+			},
+			Ns: "ns.example.",
+		},
+	}
+	msg.Extra = []dns.RR{
+		&dns.A{
+			Hdr: dns.RR_Header{
+				Name:   "ns.example.",
+				Rrtype: dns.TypeA,
+				Class:  dns.ClassINET,
+			},
+			A: net.IPv4(192, 0, 2, 40),
+		},
+		&dns.AAAA{
+			Hdr: dns.RR_Header{
+				Name:   "ns.example.",
+				Rrtype: dns.TypeAAAA,
+				Class:  dns.ClassINET,
+			},
+			AAAA: net.ParseIP("2001:db8::40"),
+		},
+	}
+	resp := packet.Packet{Msg: msg}
+
+	state := &recurseState{glue: map[string]map[netip.Addr]bool{}}
+	lns := lazyNameserver{name: "ns.example", recursor: r, state: state}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	start := make(chan struct{})
+	errCh := make(chan error, 2)
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		<-start
+		for i := 0; i < 20; i++ {
+			if _, err := r.getNSFrom(resp, state); err != nil {
+				errCh <- err
+				return
+			}
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		<-start
+		for i := 0; i < 20; i++ {
+			if _, err := lns.QueryWithClass(ctx, "example", "A", "IN"); err != nil && ctx.Err() == nil {
+				errCh <- err
+				return
+			}
+		}
+	}()
+	close(start)
+	wg.Wait()
+	close(errCh)
+
+	for err := range errCh {
+		t.Fatalf("concurrent query failed: %v", err)
+	}
+
+	state.ensureLock()
+	state.lock()
+	defer state.unlock()
+	nameObj := dnsname.New("ns.example")
+	nameKey := strings.ToLower(nameObj.String())
+	if len(state.glue[nameKey]) == 0 {
+		t.Fatalf("expected glue cached for ns.example")
 	}
 }
 

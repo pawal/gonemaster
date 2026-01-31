@@ -392,7 +392,11 @@ func Run(req RunRequest) ([]LogEntry, error) {
 		}
 	}
 
-	transport.SetGlobalQueryLimit(profile.Effective().Resolver.Defaults.Parallel)
+	queryLimit := profile.Effective().Resolver.Defaults.Parallel
+	if profile.Effective().Resolver.Defaults.Unordered && queryLimit > 1 {
+		queryLimit = queryLimit * queryLimit
+	}
+	transport.SetGlobalQueryLimit(queryLimit)
 	logger.ResetConfig()
 	if _, err := util.Info("GLOBAL_VERSION", map[string]any{"version": VersionString()}); err != nil {
 		return nil, err

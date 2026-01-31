@@ -989,16 +989,13 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 				}
 
 				outcome.checked = true
-				fallback := false
 				usevc := false
 				p2, _ := ns.QueryWithOptions(ctx, z.Name.String(), "MX", &nameserver.QueryOptions{
-					Fallback: &fallback,
 					UseVC:    &usevc,
 				})
 				if p2.Msg != nil && p2.TC() {
 					usevc = true
 					p2, _ = ns.QueryWithOptions(ctx, z.Name.String(), "MX", &nameserver.QueryOptions{
-						Fallback: &fallback,
 						UseVC:    &usevc,
 					})
 				}

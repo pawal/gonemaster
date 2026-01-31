@@ -20,25 +20,25 @@ type errorCache struct {
 	data map[string]time.Time
 }
 
-func (c *errorCache) shouldSkip(key string) bool {
+func (c *errorCache) shouldSkip(key string) (bool, time.Duration) {
 	if c == nil {
-		return false
+		return false, 0
 	}
 	now := time.Now()
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.data == nil {
-		return false
+		return false, 0
 	}
 	expiry, ok := c.data[key]
 	if !ok {
-		return false
+		return false, 0
 	}
 	if now.After(expiry) {
 		delete(c.data, key)
-		return false
+		return false, 0
 	}
-	return true
+	return true, expiry.Sub(now)
 }
 
 func (c *errorCache) set(key string, ttl time.Duration) {

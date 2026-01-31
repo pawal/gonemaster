@@ -158,7 +158,20 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 
 	usevc := resolveUseVC(opts)
 	if errorCacheTTL := prof.Resolver.Defaults.ErrorCacheTTL; errorCacheTTL > 0 && ns.state != nil && ns.state.errorCache != nil {
-		if ns.state.errorCache.shouldSkip(errorCacheKey(usevc)) {
+		if skip, remaining := ns.state.errorCache.shouldSkip(errorCacheKey(usevc)); skip {
+			logFuncMu.RLock()
+			if logFunc != nil {
+				args := map[string]any{
+					"ip":          ns.Address.String(),
+					"protocol":    errorCacheProtocol(usevc),
+					"ttl_seconds": int(remaining.Seconds()),
+					"query_name":  qname,
+					"query_type":  qtype,
+					"query_class": qclass,
+				}
+				_, _ = logFunc("ERROR_CACHE_SKIP", args, "System", "")
+			}
+			logFuncMu.RUnlock()
 			return packet.Packet{}, nil
 		}
 	}
@@ -192,6 +205,13 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 }
 
 func errorCacheKey(usevc bool) string {
+	if usevc {
+		return "tcp"
+	}
+	return "udp"
+}
+
+func errorCacheProtocol(usevc bool) string {
 	if usevc {
 		return "tcp"
 	}

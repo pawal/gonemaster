@@ -494,6 +494,7 @@
             "EMPTY_RETURN": "DEBUG",
             "EXTERNAL_QUERY": "DEBUG",
             "EXTERNAL_RESPONSE": "DEBUG2",
+            "ERROR_CACHE_SKIP": "DEBUG2",
             "FAKE_DELEGATION_ADDED": "DEBUG2",
             "FAKE_DELEGATION_IN_ZONE_NO_IP": "ERROR",
             "FAKE_DELEGATION_NO_IP": "ERROR",

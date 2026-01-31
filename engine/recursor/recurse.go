@@ -232,6 +232,10 @@ func (r *Recursor) recurseUnordered(ctx context.Context, name string, qtype stri
 		}()
 
 		redirected := false
+		var redirectResp packet.Packet
+		var redirectNS queryer
+		var redirectZName string
+		var redirectCommon int
 		decided := false
 		needsCNAME := false
 		var decidedResp packet.Packet
@@ -284,26 +288,11 @@ func (r *Recursor) recurseUnordered(ctx context.Context, name string, qtype stri
 					continue
 				}
 
-				state.seen[zkey] = true
-				state.common = common
-
-				next, err := state.nsFrom(resp, state)
-				if err != nil {
-					cancel()
-					return packet.Packet{}, state, err
-				}
-				state.ns = next
-				state.count++
-				if state.count > 20 {
-					cancel()
-					return packet.Packet{}, state, nil
-				}
-				state.trace = append([]traceEntry{{
-					zoneName:   zname,
-					source:     res.ns,
-					answerFrom: resp.AnswerFrom,
-				}}, state.trace...)
 				redirected = true
+				redirectResp = resp
+				redirectNS = res.ns
+				redirectZName = zname
+				redirectCommon = common
 				cancel()
 				break
 			}
@@ -320,6 +309,24 @@ func (r *Recursor) recurseUnordered(ctx context.Context, name string, qtype stri
 			return decidedResp, state, nil
 		}
 		if redirected {
+			zkey := strings.ToLower(redirectZName)
+			state.seen[zkey] = true
+			state.common = redirectCommon
+
+			next, err := state.nsFrom(redirectResp, state)
+			if err != nil {
+				return packet.Packet{}, state, err
+			}
+			state.ns = next
+			state.count++
+			if state.count > 20 {
+				return packet.Packet{}, state, nil
+			}
+			state.trace = append([]traceEntry{{
+				zoneName:   redirectZName,
+				source:     redirectNS,
+				answerFrom: redirectResp.AnswerFrom,
+			}}, state.trace...)
 			continue
 		}
 	}

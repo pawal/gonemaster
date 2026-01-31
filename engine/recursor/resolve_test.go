@@ -2,6 +2,7 @@ package recursor
 
 import (
 	"context"
+	"errors"
 	"net"
 	"net/netip"
 	"strings"
@@ -543,6 +544,11 @@ func TestRecurseUnorderedWaitsForRedirectBatchCleanup(t *testing.T) {
 	state := &recurseState{
 		ns: []queryer{redirect, slow},
 		nsFrom: func(_ packet.Packet, _ *recurseState) ([]queryer, error) {
+			select {
+			case <-slowCanceled:
+			case <-time.After(200 * time.Millisecond):
+				return nil, errors.New("redirect nsFrom called before cancel")
+			}
 			return []queryer{next}, nil
 		},
 	}

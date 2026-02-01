@@ -194,11 +194,11 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	}
 
 	if ns.state != nil {
-		if resp.Msg == nil {
-			ns.state.cache.set(cacheKey, nil)
-		} else {
+		if resp.Msg != nil {
 			copyResp := resp
 			ns.state.cache.set(cacheKey, &copyResp)
+		} else if err == nil {
+			ns.state.cache.set(cacheKey, nil)
 		}
 	}
 	return resp, err

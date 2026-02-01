@@ -141,6 +141,33 @@ func TestErrorCacheSkipsQueries(t *testing.T) {
 	}
 }
 
+func TestQueryCacheDoesNotStoreErrors(t *testing.T) {
+	ns, err := New("ns.example", "192.0.2.250", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+
+	defer EmptyCache()
+
+	var calls int
+	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		calls++
+		return packet.Packet{}, fmt.Errorf("timeout")
+	})
+
+	_, err = ns.QueryWithOptions(context.Background(), "example", "SOA", nil)
+	if err == nil {
+		t.Fatalf("expected error on first query")
+	}
+	_, err = ns.QueryWithOptions(context.Background(), "example", "SOA", nil)
+	if err == nil {
+		t.Fatalf("expected error on second query")
+	}
+	if calls != 2 {
+		t.Fatalf("expected 2 calls without cached error, got %d", calls)
+	}
+}
+
 func TestContextCanceledDoesNotBlacklist(t *testing.T) {
 	ns, err := New("ns.example", "192.0.2.200", nil)
 	if err != nil {

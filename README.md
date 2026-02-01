@@ -37,6 +37,8 @@ With JSON output:
 gonemaster --json --domain example.com | jq
 ```
 
+[![asciicast](https://asciinema.org/a/YuDYWOkmAkw9edgl.svg)](https://asciinema.org/a/YuDYWOkmAkw9edgl)
+
 ### Options
 
 - `--domain` Zone name to test (required)

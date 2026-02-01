@@ -3,3 +3,7 @@ steps:
     image: golang:1.24
     commands:
       - go test ./...
+when:
+  event:
+    - push
+    - pull_request

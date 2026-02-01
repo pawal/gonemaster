@@ -147,7 +147,10 @@ func TestQueryCacheDoesNotStoreErrors(t *testing.T) {
 		t.Fatalf("new nameserver: %v", err)
 	}
 
+	defer profile.ResetEffective()
 	defer EmptyCache()
+
+	profile.Effective().Resolver.Defaults.ErrorCacheTTL = 0
 
 	var calls int
 	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
@@ -155,11 +158,12 @@ func TestQueryCacheDoesNotStoreErrors(t *testing.T) {
 		return packet.Packet{}, fmt.Errorf("timeout")
 	})
 
-	_, err = ns.QueryWithOptions(context.Background(), "example", "SOA", nil)
+	opts := &QueryOptions{BlacklistingDisabled: true}
+	_, err = ns.QueryWithOptions(context.Background(), "example", "SOA", opts)
 	if err == nil {
 		t.Fatalf("expected error on first query")
 	}
-	_, err = ns.QueryWithOptions(context.Background(), "example", "SOA", nil)
+	_, err = ns.QueryWithOptions(context.Background(), "example", "SOA", opts)
 	if err == nil {
 		t.Fatalf("expected error on second query")
 	}

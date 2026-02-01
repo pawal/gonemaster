@@ -1,0 +1,385 @@
+openapi: 3.0.3
+info:
+  title: Gonemaster API
+  version: 0.1.0
+  description: |
+    REST API for running Gonemaster engine tests with queueing, streaming, and cancellation.
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+tags:
+  - name: Jobs
+  - name: Queue
+  - name: Ops
+
+paths:
+  /jobs:
+    post:
+      tags: [Jobs]
+      summary: Submit a single test job
+      operationId: createJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobCreateRequest'
+      responses:
+        '201':
+          description: Job created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+    get:
+      tags: [Jobs]
+      summary: List jobs
+      operationId: listJobs
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/JobStatus'
+        - name: batch_id
+          in: query
+          schema:
+            type: string
+        - name: created_after
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Job list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobList'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /jobs/batch:
+    post:
+      tags: [Jobs]
+      summary: Submit a batch of test jobs
+      operationId: createJobBatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobBatchRequest'
+      responses:
+        '202':
+          description: Batch accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobBatchResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /jobs/{job_id}:
+    get:
+      tags: [Jobs]
+      summary: Get job status
+      operationId: getJob
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /jobs/{job_id}/result:
+    get:
+      tags: [Jobs]
+      summary: Get job result
+      operationId: getJobResult
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobResult'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /jobs/{job_id}/events:
+    get:
+      tags: [Jobs]
+      summary: Stream job events (SSE)
+      operationId: streamJobEvents
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Event stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /jobs/{job_id}/cancel:
+    post:
+      tags: [Jobs]
+      summary: Cancel a running or queued job
+      operationId: cancelJob
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job canceled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /queue/pause:
+    post:
+      tags: [Queue]
+      summary: Pause queue processing
+      operationId: pauseQueue
+      responses:
+        '200':
+          description: Queue paused
+
+  /queue/resume:
+    post:
+      tags: [Queue]
+      summary: Resume queue processing
+      operationId: resumeQueue
+      responses:
+        '200':
+          description: Queue resumed
+
+  /queue/reorder:
+    post:
+      tags: [Queue]
+      summary: Reorder queued jobs
+      operationId: reorderQueue
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueueReorderRequest'
+      responses:
+        '200':
+          description: Queue reordered
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /metrics:
+    get:
+      tags: [Ops]
+      summary: Metrics (Prometheus compatible)
+      operationId: metrics
+      responses:
+        '200':
+          description: Metrics
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /healthz:
+    get:
+      tags: [Ops]
+      summary: Health check
+      operationId: healthz
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+components:
+  schemas:
+    JobStatus:
+      type: string
+      enum: [queued, running, succeeded, failed, canceled, expired, paused]
+
+    Job:
+      type: object
+      required: [id, domain, status, created_at]
+      properties:
+        id:
+          type: string
+        batch_id:
+          type: string
+          description: Optional unique identifier for batch runs.
+        domain:
+          type: string
+        status:
+          $ref: '#/components/schemas/JobStatus'
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+        progress:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+        result_url:
+          type: string
+        error:
+          type: string
+
+    JobCreateRequest:
+      type: object
+      required: [domain]
+      properties:
+        domain:
+          type: string
+        tests:
+          type: array
+          items:
+            type: string
+        profile_overrides:
+          type: object
+          additionalProperties: true
+
+    JobBatchRequest:
+      type: object
+      required: [domains]
+      properties:
+        domains:
+          type: array
+          items:
+            type: string
+        tests:
+          type: array
+          items:
+            type: string
+        profile_overrides:
+          type: object
+          additionalProperties: true
+
+    JobBatchResponse:
+      type: object
+      required: [batch_id, job_ids]
+      properties:
+        batch_id:
+          type: string
+        job_ids:
+          type: array
+          items:
+            type: string
+
+    JobList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Job'
+        total:
+          type: integer
+
+    JobResult:
+      type: object
+      properties:
+        job_id:
+          type: string
+        batch_id:
+          type: string
+        status:
+          $ref: '#/components/schemas/JobStatus'
+        summary:
+          type: object
+          additionalProperties: true
+        raw:
+          type: object
+          additionalProperties: true
+
+    QueueReorderRequest:
+      type: object
+      required: [job_ids]
+      properties:
+        job_ids:
+          type: array
+          items:
+            type: string
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+              additionalProperties: true
+
+  responses:
+    ErrorResponse:
+      description: Error response
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

@@ -1,6 +1,8 @@
 steps:
   test:
     image: golang:1.24
+    environment:
+      GOMAXPROCS: 4
     commands:
       - go test -p 4 -parallel 4 ./...
 when:

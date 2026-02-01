@@ -37,7 +37,7 @@ With JSON output:
 gonemaster --json --domain example.com | jq
 ```
 
-[![asciicast](https://asciinema.org/a/YuDYWOkmAkw9edgl.svg)](https://asciinema.org/a/YuDYWOkmAkw9edgl)
+![ascii animation](./assets/demo.gif)
 
 ### Options
 

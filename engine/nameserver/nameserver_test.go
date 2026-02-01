@@ -141,6 +141,29 @@ func TestErrorCacheSkipsQueries(t *testing.T) {
 	}
 }
 
+func TestContextCanceledDoesNotBlacklist(t *testing.T) {
+	ns, err := New("ns.example", "192.0.2.200", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+
+	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		return packet.Packet{}, context.Canceled
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, _ = ns.QueryWithOptions(ctx, "example", "SOA", nil)
+
+	if ns.state == nil {
+		t.Fatalf("expected state to be initialized")
+	}
+	if ns.state.blacklisted[false] {
+		t.Fatalf("expected UDP not to be blacklisted on context cancellation")
+	}
+}
+
 func TestQueryIPv4Disabled(t *testing.T) {
 	ns, err := New("ns.example", "192.0.2.11", nil)
 	if err != nil {

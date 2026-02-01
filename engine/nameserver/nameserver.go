@@ -182,7 +182,7 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	resp, err := ns.queryNetwork(ctx, qname, qtype, qclass, opts)
 
 	blacklistingDisabled := opts != nil && opts.BlacklistingDisabled
-	if err != nil && qtype == "SOA" && ednsSize == 0 && !blacklistingDisabled {
+	if err != nil && (ctx == nil || ctx.Err() == nil) && qtype == "SOA" && ednsSize == 0 && !blacklistingDisabled {
 		if ns.state != nil {
 			ns.state.blacklisted[usevc] = true
 		}

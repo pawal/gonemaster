@@ -10,6 +10,7 @@ import (
 type Queue interface {
 	Enqueue(jobID string) error
 	Dequeue(ctx context.Context) (string, error)
+	Remove(jobID string) error
 	Pause() error
 	Resume() error
 	Reorder(jobIDs []string) error
@@ -62,6 +63,26 @@ func (q *InMemoryQueue) Dequeue(ctx context.Context) (string, error) {
 		case <-notify:
 		}
 	}
+}
+
+func (q *InMemoryQueue) Remove(jobID string) error {
+	if jobID == "" {
+		return errors.New("job id required")
+	}
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if q.closed {
+		return errors.New("queue closed")
+	}
+	for i, id := range q.jobs {
+		if id != jobID {
+			continue
+		}
+		q.jobs = append(q.jobs[:i], q.jobs[i+1:]...)
+		q.signalLocked()
+		return nil
+	}
+	return errors.New("job id not in queue")
 }
 
 func (q *InMemoryQueue) Pause() error {

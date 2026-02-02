@@ -79,6 +79,13 @@ func (s *Server) runJob(jobID string) error {
 		return nil
 	}
 
+	jobCtx, cancel := context.WithCancel(context.Background())
+	s.registerCancel(jobID, cancel)
+	defer func() {
+		s.unregisterCancel(jobID)
+		cancel()
+	}()
+
 	now := time.Now().UTC()
 	job.Status = JobRunning
 	job.StartedAt = now
@@ -87,7 +94,7 @@ func (s *Server) runJob(jobID string) error {
 		return err
 	}
 
-	entries, runErr := s.runEngineForJob(job)
+	entries, runErr := s.runEngineForJob(job, jobCtx)
 	finishedAt := time.Now().UTC()
 
 	result := JobResult{
@@ -100,7 +107,14 @@ func (s *Server) runJob(jobID string) error {
 		},
 	}
 
-	if runErr != nil {
+	if jobCtx.Err() != nil {
+		job.Status = JobCanceled
+		job.Error = "canceled"
+		result.Status = JobCanceled
+		result.Summary = map[string]any{
+			"error": "canceled",
+		}
+	} else if runErr != nil {
 		job.Status = JobFailed
 		job.Error = runErr.Error()
 		result.Status = JobFailed
@@ -128,7 +142,7 @@ func (s *Server) runJob(jobID string) error {
 	return runErr
 }
 
-func (s *Server) runEngineForJob(job Job) ([]engine.LogEntry, error) {
+func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntry, error) {
 	minLevel := s.cfg.MinLevel
 	if job.MinLevel != "" {
 		minLevel = job.MinLevel
@@ -136,6 +150,7 @@ func (s *Server) runEngineForJob(job Job) ([]engine.LogEntry, error) {
 	req := engine.RunRequest{
 		Domain:   job.Domain,
 		MinLevel: minLevel,
+		Context:  ctx,
 	}
 
 	cleanup, err := applyProfileOverrides(&req, job.Overrides, s.cfg.ProfilePath)

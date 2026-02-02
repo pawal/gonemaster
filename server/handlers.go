@@ -254,12 +254,25 @@ func (s *Server) handleCancelJob(w http.ResponseWriter, _ *http.Request, jobID s
 		writeError(w, http.StatusNotFound, "not_found", "job not found", nil)
 		return
 	}
+	if job.Status == JobRunning {
+		_ = s.cancelJob(jobID)
+	}
+	if job.Status == JobQueued {
+		_ = s.queue.Remove(jobID)
+	}
 	job.Status = JobCanceled
+	job.Error = "canceled"
 	job.FinishedAt = time.Now().UTC()
 	if err := s.store.Update(job); err != nil {
 		writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
 		return
 	}
+	_ = s.store.SetResult(job.ID, JobResult{
+		JobID:   job.ID,
+		BatchID: job.BatchID,
+		Status:  JobCanceled,
+		Summary: map[string]any{"error": "canceled"},
+	})
 	writeJSON(w, http.StatusOK, job)
 }
 

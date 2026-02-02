@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
+	"time"
 )
 
 func TestCreateAndGetJob(t *testing.T) {
@@ -182,6 +184,44 @@ func TestCancelJob(t *testing.T) {
 	_ = json.NewDecoder(resp.Body).Decode(&canceled)
 	if canceled.Status != JobCanceled {
 		t.Fatalf("expected status canceled, got %s", canceled.Status)
+	}
+}
+
+func TestCancelJobTriggersContextCancel(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	job := Job{
+		ID:        "job-running",
+		Domain:    "example.com",
+		Status:    JobRunning,
+		CreatedAt: time.Now().UTC(),
+		StartedAt: time.Now().UTC(),
+	}
+	if _, err := srv.store.Create(job); err != nil {
+		t.Fatalf("create job: %v", err)
+	}
+
+	canceled := make(chan struct{})
+	var once sync.Once
+	srv.registerCancel(job.ID, func() { once.Do(func() { close(canceled) }) })
+
+	resp := httptest.NewRecorder()
+	cancelReq := httptest.NewRequest(http.MethodPost, "/jobs/"+job.ID+"/cancel", nil)
+	srv.Handler().ServeHTTP(resp, cancelReq)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	select {
+	case <-canceled:
+	default:
+		t.Fatalf("expected cancel function to be called")
+	}
+	stored, ok := srv.store.Get(job.ID)
+	if !ok {
+		t.Fatalf("expected job in store")
+	}
+	if stored.Status != JobCanceled {
+		t.Fatalf("expected status canceled, got %s", stored.Status)
 	}
 }
 

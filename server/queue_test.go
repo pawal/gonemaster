@@ -72,6 +72,28 @@ func TestInMemoryQueueReorder(t *testing.T) {
 	}
 }
 
+func TestInMemoryQueueRemove(t *testing.T) {
+	q := NewInMemoryQueue()
+	_ = q.Enqueue("job1")
+	_ = q.Enqueue("job2")
+
+	if err := q.Remove("job1"); err != nil {
+		t.Fatalf("remove: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	jobID, err := q.Dequeue(ctx)
+	if err != nil {
+		t.Fatalf("dequeue: %v", err)
+	}
+	if jobID != "job2" {
+		t.Fatalf("expected job2, got %s", jobID)
+	}
+	if err := q.Remove("missing"); err == nil {
+		t.Fatalf("expected remove to fail for missing job")
+	}
+}
+
 func TestInMemoryQueueClose(t *testing.T) {
 	q := NewInMemoryQueue()
 	if err := q.Close(); err != nil {

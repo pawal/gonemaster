@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"net/http"
 	"sync"
 )
@@ -13,6 +14,8 @@ type Server struct {
 	queue    Queue
 	workers  workerPool
 	engineMu sync.Mutex
+	cancelMu sync.Mutex
+	cancels  map[string]context.CancelFunc
 }
 
 // New builds a server with in-memory components.
@@ -21,10 +24,11 @@ func New(cfg Config) *Server {
 		cfg = DefaultConfig()
 	}
 	s := &Server{
-		cfg:   cfg,
-		mux:   http.NewServeMux(),
-		store: NewInMemoryJobStore(),
-		queue: NewInMemoryQueue(),
+		cfg:     cfg,
+		mux:     http.NewServeMux(),
+		store:   NewInMemoryJobStore(),
+		queue:   NewInMemoryQueue(),
+		cancels: map[string]context.CancelFunc{},
 	}
 	s.routes()
 	return s

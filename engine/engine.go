@@ -40,6 +40,8 @@ type RunRequest struct {
 	ErrorCacheTTL *int
 	// LogCallback receives each log entry as it is created.
 	LogCallback func(*logger.Entry) error
+	// Context controls cancellation and timeouts for the run.
+	Context context.Context
 }
 
 // LogEntry mirrors the JSON output produced by the Perl logger.
@@ -419,7 +421,10 @@ func Run(req RunRequest) ([]LogEntry, error) {
 		return nil, err
 	}
 
-	ctx := context.Background()
+	ctx := req.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	var entries []*logger.Entry
 	switch {
 	case testcase != "":

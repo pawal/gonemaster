@@ -1,0 +1,46 @@
+package server
+
+import (
+	"net/http"
+)
+
+// Server holds the HTTP API and supporting services.
+type Server struct {
+	cfg   Config
+	mux   *http.ServeMux
+	store JobStore
+	queue Queue
+}
+
+// New builds a server with in-memory components.
+func New(cfg Config) *Server {
+	if cfg.ListenAddr == "" {
+		cfg = DefaultConfig()
+	}
+	s := &Server{
+		cfg:   cfg,
+		mux:   http.NewServeMux(),
+		store: NewInMemoryJobStore(),
+		queue: NewInMemoryQueue(),
+	}
+	s.routes()
+	return s
+}
+
+// Handler returns the root HTTP handler.
+func (s *Server) Handler() http.Handler {
+	return s.mux
+}
+
+func (s *Server) routes() {
+	s.mux.HandleFunc("/jobs/batch", s.handleJobsBatch)
+	s.mux.HandleFunc("/jobs/", s.handleJobByID)
+	s.mux.HandleFunc("/jobs", s.handleJobs)
+
+	s.mux.HandleFunc("/queue/pause", s.handleQueuePause)
+	s.mux.HandleFunc("/queue/resume", s.handleQueueResume)
+	s.mux.HandleFunc("/queue/reorder", s.handleQueueReorder)
+
+	s.mux.HandleFunc("/metrics", s.handleMetrics)
+	s.mux.HandleFunc("/healthz", s.handleHealth)
+}

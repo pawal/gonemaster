@@ -22,7 +22,8 @@ go build -o ./gonemaster-server ./cmd/gonemaster-server
 ```json
 {
   "listen_addr": ":8080",
-  "max_body_size": 1048576
+  "max_body_size": 1048576,
+  "debug": true
 }
 ```
 
@@ -30,4 +31,5 @@ go build -o ./gonemaster-server ./cmd/gonemaster-server
 - `--config` JSON config file path
 - `--listen` Address to listen on
 - `--max-body-size` Max request body size in bytes
+- `--debug` Enable request/response logging
 - `--shutdown-timeout` Graceful shutdown timeout

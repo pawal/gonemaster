@@ -29,6 +29,9 @@ func New(cfg Config) *Server {
 
 // Handler returns the root HTTP handler.
 func (s *Server) Handler() http.Handler {
+	if s.cfg.Debug {
+		return debugMiddleware(s.mux)
+	}
 	return s.mux
 }
 

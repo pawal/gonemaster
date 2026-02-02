@@ -130,7 +130,7 @@ func (s *Server) runJob(jobID string) error {
 		job.Status = JobSucceeded
 	}
 
-	job.Progress = 1
+	job.Progress = 100
 	job.FinishedAt = finishedAt
 	if err := s.store.Update(job); err != nil {
 		return err

@@ -45,6 +45,7 @@ func (s *Server) handleJobsBatch(w http.ResponseWriter, r *http.Request) {
 			MinLevel:  req.MinLevel,
 			Status:    JobQueued,
 			CreatedAt: time.Now().UTC(),
+			Progress:  0,
 		}
 		created, err := s.store.Create(job)
 		if err != nil {
@@ -186,6 +187,7 @@ func (s *Server) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 		MinLevel:  req.MinLevel,
 		Status:    JobQueued,
 		CreatedAt: time.Now().UTC(),
+		Progress:  0,
 	}
 	created, err := s.store.Create(job)
 	if err != nil {
@@ -263,6 +265,7 @@ func (s *Server) handleCancelJob(w http.ResponseWriter, _ *http.Request, jobID s
 	job.Status = JobCanceled
 	job.Error = "canceled"
 	job.FinishedAt = time.Now().UTC()
+	job.Progress = 100
 	if err := s.store.Update(job); err != nil {
 		writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
 		return

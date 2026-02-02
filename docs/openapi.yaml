@@ -296,10 +296,11 @@ components:
           type: string
           format: date-time
         progress:
-          type: number
-          format: float
+          type: integer
+          format: int32
           minimum: 0
-          maximum: 1
+          maximum: 100
+          description: Progress percentage (0-100).
         result_url:
           type: string
         error:

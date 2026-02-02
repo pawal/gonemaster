@@ -3,6 +3,7 @@
 ## Overview
 - `gonemaster-server` is a REST API wrapper around the Gonemaster engine.
 - API contract is defined in `docs/openapi.yaml`.
+- Job progress is reported as a percentage (0-100).
 
 ## Build
 ```

@@ -35,6 +35,31 @@ func TestCreateAndGetJob(t *testing.T) {
 	}
 }
 
+func TestCreateJobMinLevel(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	payload := `{"domain":"example.com","min_level":"WARNING"}`
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/jobs", bytes.NewBufferString(payload))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("expected status 201, got %d", resp.Code)
+	}
+	var created Job
+	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	stored, ok := srv.store.Get(created.ID)
+	if !ok {
+		t.Fatalf("expected job in store")
+	}
+	if stored.MinLevel != "WARNING" {
+		t.Fatalf("expected min_level WARNING, got %q", stored.MinLevel)
+	}
+}
+
 func TestCreateJobValidation(t *testing.T) {
 	srv := New(DefaultConfig())
 

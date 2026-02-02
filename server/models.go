@@ -22,6 +22,7 @@ type Job struct {
 	Domain     string         `json:"domain"`
 	Tests      []string       `json:"-"`
 	Overrides  map[string]any `json:"-"`
+	MinLevel   string         `json:"-"`
 	Status     JobStatus      `json:"status"`
 	CreatedAt  time.Time      `json:"created_at"`
 	StartedAt  time.Time      `json:"started_at,omitempty"`
@@ -36,6 +37,7 @@ type JobCreateRequest struct {
 	Domain           string         `json:"domain"`
 	Tests            []string       `json:"tests,omitempty"`
 	ProfileOverrides map[string]any `json:"profile_overrides,omitempty"`
+	MinLevel         string         `json:"min_level,omitempty"`
 }
 
 // JobBatchRequest is the payload for a batch submission.
@@ -43,6 +45,7 @@ type JobBatchRequest struct {
 	Domains          []string       `json:"domains"`
 	Tests            []string       `json:"tests,omitempty"`
 	ProfileOverrides map[string]any `json:"profile_overrides,omitempty"`
+	MinLevel         string         `json:"min_level,omitempty"`
 }
 
 // JobBatchResponse describes the batch submission result.

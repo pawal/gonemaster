@@ -42,6 +42,7 @@ func (s *Server) handleJobsBatch(w http.ResponseWriter, r *http.Request) {
 			Domain:    domain,
 			Tests:     req.Tests,
 			Overrides: req.ProfileOverrides,
+			MinLevel:  req.MinLevel,
 			Status:    JobQueued,
 			CreatedAt: time.Now().UTC(),
 		}
@@ -182,6 +183,7 @@ func (s *Server) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 		Domain:    req.Domain,
 		Tests:     req.Tests,
 		Overrides: req.ProfileOverrides,
+		MinLevel:  req.MinLevel,
 		Status:    JobQueued,
 		CreatedAt: time.Now().UTC(),
 	}

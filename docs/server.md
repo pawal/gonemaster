@@ -18,6 +18,9 @@ go build -o ./gonemaster-server ./cmd/gonemaster-server
 - Config file is optional JSON and loaded with `--config`.
 - Flags override config file values.
 
+## Per-job overrides
+- `min_level` can be set per request in `POST /jobs` and `POST /jobs/batch` to override the server default.
+
 ## Batch summary endpoint
 - `GET /batches/{batch_id}` returns batch metadata, job list, status counts, and timestamps (`created_at`, optional `started_at`, optional `finished_at`).
 

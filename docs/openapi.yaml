@@ -318,6 +318,8 @@ components:
         profile_overrides:
           type: object
           additionalProperties: true
+        min_level:
+          type: string
 
     JobBatchRequest:
       type: object
@@ -334,6 +336,8 @@ components:
         profile_overrides:
           type: object
           additionalProperties: true
+        min_level:
+          type: string
 
     JobBatchResponse:
       type: object

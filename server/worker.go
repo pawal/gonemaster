@@ -128,9 +128,13 @@ func (s *Server) runJob(jobID string) error {
 }
 
 func (s *Server) runEngineForJob(job Job) ([]engine.LogEntry, error) {
+	minLevel := s.cfg.MinLevel
+	if job.MinLevel != "" {
+		minLevel = job.MinLevel
+	}
 	req := engine.RunRequest{
 		Domain:   job.Domain,
-		MinLevel: s.cfg.MinLevel,
+		MinLevel: minLevel,
 	}
 
 	cleanup, err := applyProfileOverrides(&req, job.Overrides)

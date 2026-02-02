@@ -94,6 +94,46 @@ func TestBatchSubmit(t *testing.T) {
 	}
 }
 
+func TestBatchSummary(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	payload := `{"domains":["example.com","example.net"]}`
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/jobs/batch", bytes.NewBufferString(payload))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d", resp.Code)
+	}
+	var batch JobBatchResponse
+	if err := json.NewDecoder(resp.Body).Decode(&batch); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	resp = httptest.NewRecorder()
+	getReq := httptest.NewRequest(http.MethodGet, "/batches/"+batch.BatchID, nil)
+	srv.Handler().ServeHTTP(resp, getReq)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var summary BatchSummary
+	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if summary.BatchID != batch.BatchID {
+		t.Fatalf("expected batch id %s, got %s", batch.BatchID, summary.BatchID)
+	}
+	if summary.Total != 2 || len(summary.Items) != 2 {
+		t.Fatalf("expected 2 items in summary")
+	}
+	if summary.CreatedAt.IsZero() {
+		t.Fatalf("expected created_at to be set")
+	}
+	if summary.StatusCounts["queued"] != 2 {
+		t.Fatalf("expected queued count 2, got %d", summary.StatusCounts["queued"])
+	}
+}
+
 func TestCancelJob(t *testing.T) {
 	srv := New(DefaultConfig())
 

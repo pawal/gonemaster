@@ -103,6 +103,69 @@ func (s *Server) handleJobByID(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (s *Server) handleBatchByID(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
+		return
+	}
+	path := strings.TrimPrefix(r.URL.Path, "/batches/")
+	if path == "" || path == r.URL.Path {
+		writeError(w, http.StatusNotFound, "not_found", "not found", nil)
+		return
+	}
+	batchID := strings.TrimSpace(path)
+	if batchID == "" {
+		writeError(w, http.StatusNotFound, "not_found", "not found", nil)
+		return
+	}
+
+	list := s.store.List(JobFilter{BatchID: batchID, Limit: 1000})
+	if list.Total == 0 {
+		writeError(w, http.StatusNotFound, "not_found", "batch not found", nil)
+		return
+	}
+
+	statusCounts := map[string]int{}
+	var createdAt time.Time
+	var startedAt *time.Time
+	var finishedAtLatest time.Time
+	allFinished := true
+
+	for _, job := range list.Items {
+		statusCounts[string(job.Status)]++
+		if createdAt.IsZero() || job.CreatedAt.Before(createdAt) {
+			createdAt = job.CreatedAt
+		}
+		if !job.StartedAt.IsZero() {
+			if startedAt == nil || job.StartedAt.Before(*startedAt) {
+				t := job.StartedAt
+				startedAt = &t
+			}
+		}
+		if job.FinishedAt.IsZero() {
+			allFinished = false
+		} else if finishedAtLatest.IsZero() || job.FinishedAt.After(finishedAtLatest) {
+			finishedAtLatest = job.FinishedAt
+		}
+	}
+
+	var finishedAt *time.Time
+	if allFinished && !finishedAtLatest.IsZero() {
+		finishedAt = &finishedAtLatest
+	}
+
+	summary := BatchSummary{
+		BatchID:      batchID,
+		Total:        list.Total,
+		StatusCounts: statusCounts,
+		Items:        list.Items,
+		CreatedAt:    createdAt,
+		StartedAt:    startedAt,
+		FinishedAt:   finishedAt,
+	}
+	writeJSON(w, http.StatusOK, summary)
+}
+
 func (s *Server) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 	var req JobCreateRequest
 	if err := readJSON(r, s.cfg.MaxBodySize, &req); err != nil {

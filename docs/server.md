@@ -18,6 +18,14 @@ go build -o ./gonemaster-server ./cmd/gonemaster-server
 - Config file is optional JSON and loaded with `--config`.
 - Flags override config file values.
 
+## Batch summary endpoint
+- `GET /batches/{batch_id}` returns batch metadata, job list, status counts, and timestamps (`created_at`, optional `started_at`, optional `finished_at`).
+
+Example
+```
+curl -s http://localhost:8080/batches/batch_123 | jq .
+```
+
 ### Config example
 ```json
 {

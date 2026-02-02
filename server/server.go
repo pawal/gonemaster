@@ -42,6 +42,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/jobs/batch", s.handleJobsBatch)
 	s.mux.HandleFunc("/jobs/", s.handleJobByID)
 	s.mux.HandleFunc("/jobs", s.handleJobs)
+	s.mux.HandleFunc("/batches/", s.handleBatchByID)
 
 	s.mux.HandleFunc("/queue/pause", s.handleQueuePause)
 	s.mux.HandleFunc("/queue/resume", s.handleQueueResume)

@@ -10,6 +10,7 @@ servers:
 
 tags:
   - name: Jobs
+  - name: Batches
   - name: Queue
   - name: Ops
 
@@ -94,6 +95,27 @@ paths:
               schema:
                 $ref: '#/components/schemas/JobBatchResponse'
         '400':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /batches/{batch_id}:
+    get:
+      tags: [Batches]
+      summary: Get batch summary
+      operationId: getBatch
+      parameters:
+        - name: batch_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Batch summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchSummary'
+        '404':
           $ref: '#/components/responses/ErrorResponse'
 
   /jobs/{job_id}:
@@ -323,6 +345,32 @@ components:
           type: array
           items:
             type: string
+
+    BatchSummary:
+      type: object
+      required: [batch_id, total, status_counts, items, created_at]
+      properties:
+        batch_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+        total:
+          type: integer
+        status_counts:
+          type: object
+          additionalProperties:
+            type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Job'
 
     JobList:
       type: object

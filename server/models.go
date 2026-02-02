@@ -66,6 +66,17 @@ type JobResult struct {
 	Raw     map[string]any `json:"raw,omitempty"`
 }
 
+// BatchSummary aggregates jobs for a batch.
+type BatchSummary struct {
+	BatchID      string         `json:"batch_id"`
+	Total        int            `json:"total"`
+	StatusCounts map[string]int `json:"status_counts"`
+	Items        []Job          `json:"items"`
+	CreatedAt    time.Time      `json:"created_at"`
+	StartedAt    *time.Time     `json:"started_at,omitempty"`
+	FinishedAt   *time.Time     `json:"finished_at,omitempty"`
+}
+
 // QueueReorderRequest reorders queued jobs.
 type QueueReorderRequest struct {
 	JobIDs []string `json:"job_ids"`

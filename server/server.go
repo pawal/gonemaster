@@ -6,10 +6,11 @@ import (
 
 // Server holds the HTTP API and supporting services.
 type Server struct {
-	cfg   Config
-	mux   *http.ServeMux
-	store JobStore
-	queue Queue
+	cfg     Config
+	mux     *http.ServeMux
+	store   JobStore
+	queue   Queue
+	workers workerPool
 }
 
 // New builds a server with in-memory components.

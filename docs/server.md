@@ -23,7 +23,8 @@ go build -o ./gonemaster-server ./cmd/gonemaster-server
 {
   "listen_addr": ":8080",
   "max_body_size": 1048576,
-  "debug": true
+  "debug": true,
+  "worker_count": 4
 }
 ```
 
@@ -32,4 +33,5 @@ go build -o ./gonemaster-server ./cmd/gonemaster-server
 - `--listen` Address to listen on
 - `--max-body-size` Max request body size in bytes
 - `--debug` Enable request/response logging
+- `--workers` Number of worker goroutines
 - `--shutdown-timeout` Graceful shutdown timeout

@@ -11,6 +11,7 @@ type Config struct {
 	ListenAddr  string
 	MaxBodySize int64
 	Debug       bool
+	WorkerCount int
 }
 
 // FileConfig captures optional configuration fields from JSON.
@@ -18,6 +19,7 @@ type FileConfig struct {
 	ListenAddr  *string `json:"listen_addr"`
 	MaxBodySize *int64  `json:"max_body_size"`
 	Debug       *bool   `json:"debug"`
+	WorkerCount *int    `json:"worker_count"`
 }
 
 // DefaultConfig returns baseline config values.
@@ -26,6 +28,7 @@ func DefaultConfig() Config {
 		ListenAddr:  ":8080",
 		MaxBodySize: 1 << 20,
 		Debug:       false,
+		WorkerCount: 4,
 	}
 }
 
@@ -52,5 +55,8 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 	}
 	if file.Debug != nil {
 		c.Debug = *file.Debug
+	}
+	if file.WorkerCount != nil {
+		c.WorkerCount = *file.WorkerCount
 	}
 }

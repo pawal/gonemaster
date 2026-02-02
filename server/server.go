@@ -2,15 +2,17 @@ package server
 
 import (
 	"net/http"
+	"sync"
 )
 
 // Server holds the HTTP API and supporting services.
 type Server struct {
-	cfg     Config
-	mux     *http.ServeMux
-	store   JobStore
-	queue   Queue
-	workers workerPool
+	cfg      Config
+	mux      *http.ServeMux
+	store    JobStore
+	queue    Queue
+	workers  workerPool
+	engineMu sync.Mutex
 }
 
 // New builds a server with in-memory components.

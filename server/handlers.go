@@ -40,6 +40,8 @@ func (s *Server) handleJobsBatch(w http.ResponseWriter, r *http.Request) {
 			ID:        newID("job"),
 			BatchID:   batchID,
 			Domain:    domain,
+			Tests:     req.Tests,
+			Overrides: req.ProfileOverrides,
 			Status:    JobQueued,
 			CreatedAt: time.Now().UTC(),
 		}
@@ -115,6 +117,8 @@ func (s *Server) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 	job := Job{
 		ID:        newID("job"),
 		Domain:    req.Domain,
+		Tests:     req.Tests,
+		Overrides: req.ProfileOverrides,
 		Status:    JobQueued,
 		CreatedAt: time.Now().UTC(),
 	}

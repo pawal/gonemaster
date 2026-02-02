@@ -17,16 +17,18 @@ const (
 
 // Job represents a single test job.
 type Job struct {
-	ID         string    `json:"id"`
-	BatchID    string    `json:"batch_id,omitempty"`
-	Domain     string    `json:"domain"`
-	Status     JobStatus `json:"status"`
-	CreatedAt  time.Time `json:"created_at"`
-	StartedAt  time.Time `json:"started_at,omitempty"`
-	FinishedAt time.Time `json:"finished_at,omitempty"`
-	Progress   float64   `json:"progress,omitempty"`
-	ResultURL  string    `json:"result_url,omitempty"`
-	Error      string    `json:"error,omitempty"`
+	ID         string         `json:"id"`
+	BatchID    string         `json:"batch_id,omitempty"`
+	Domain     string         `json:"domain"`
+	Tests      []string       `json:"-"`
+	Overrides  map[string]any `json:"-"`
+	Status     JobStatus      `json:"status"`
+	CreatedAt  time.Time      `json:"created_at"`
+	StartedAt  time.Time      `json:"started_at,omitempty"`
+	FinishedAt time.Time      `json:"finished_at,omitempty"`
+	Progress   float64        `json:"progress,omitempty"`
+	ResultURL  string         `json:"result_url,omitempty"`
+	Error      string         `json:"error,omitempty"`
 }
 
 // JobCreateRequest is the payload for a single job.

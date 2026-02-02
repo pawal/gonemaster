@@ -17,9 +17,11 @@ go build -o ./gonemaster-server ./cmd/gonemaster-server
 ## Configuration
 - Config file is optional JSON and loaded with `--config`.
 - Flags override config file values.
+- `profile_path` sets the default profile used for all jobs (same as `gonemaster --profile`).
 
 ## Per-job overrides
 - `min_level` can be set per request in `POST /jobs` and `POST /jobs/batch` to override the server default.
+- `profile_overrides` are merged on top of `profile_path` when both are provided.
 
 ## Batch summary endpoint
 - `GET /batches/{batch_id}` returns batch metadata, job list, status counts, and timestamps (`created_at`, optional `started_at`, optional `finished_at`).
@@ -36,7 +38,8 @@ curl -s http://localhost:8080/batches/batch_123 | jq .
   "max_body_size": 1048576,
   "debug": true,
   "worker_count": 4,
-  "min_level": "INFO"
+  "min_level": "INFO",
+  "profile_path": "/path/to/profile.json"
 }
 ```
 
@@ -47,4 +50,5 @@ curl -s http://localhost:8080/batches/batch_123 | jq .
 - `--debug` Enable request/response logging
 - `--workers` Number of worker goroutines
 - `--min-level` Minimum log level for results
+- `--profile` Profile JSON/YAML path (default for all jobs)
 - `--shutdown-timeout` Graceful shutdown timeout

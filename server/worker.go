@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
+	"codeberg.org/pawal/gonemaster/engine/profile"
 )
 
 type workerPool struct {
@@ -137,7 +138,7 @@ func (s *Server) runEngineForJob(job Job) ([]engine.LogEntry, error) {
 		MinLevel: minLevel,
 	}
 
-	cleanup, err := applyProfileOverrides(&req, job.Overrides)
+	cleanup, err := applyProfileOverrides(&req, job.Overrides, s.cfg.ProfilePath)
 	if err != nil {
 		return nil, err
 	}
@@ -189,11 +190,36 @@ func summarizeEntries(entries []engine.LogEntry) map[string]any {
 	}
 }
 
-func applyProfileOverrides(req *engine.RunRequest, overrides map[string]any) (func(), error) {
+func applyProfileOverrides(req *engine.RunRequest, overrides map[string]any, baseProfile string) (func(), error) {
 	if req == nil || len(overrides) == 0 {
+		if req != nil && baseProfile != "" {
+			req.Profile = baseProfile
+		}
 		return nil, nil
 	}
 	payload, err := json.Marshal(overrides)
+	if err != nil {
+		return nil, err
+	}
+	base := profile.New()
+	if baseProfile != "" {
+		data, err := os.ReadFile(baseProfile)
+		if err != nil {
+			return nil, err
+		}
+		base, err = profile.FromYAML(string(data))
+		if err != nil {
+			return nil, err
+		}
+	}
+	overrideProfile, err := profile.FromJSON(string(payload))
+	if err != nil {
+		return nil, err
+	}
+	if err := base.Merge(overrideProfile); err != nil {
+		return nil, err
+	}
+	merged, err := base.ToJSON()
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +227,7 @@ func applyProfileOverrides(req *engine.RunRequest, overrides map[string]any) (fu
 	if err != nil {
 		return nil, err
 	}
-	if _, err := tmp.Write(payload); err != nil {
+	if _, err := tmp.Write([]byte(merged)); err != nil {
 		_ = tmp.Close()
 		_ = os.Remove(tmp.Name())
 		return nil, err

@@ -13,6 +13,7 @@ type Config struct {
 	Debug       bool
 	WorkerCount int
 	MinLevel    string
+	ProfilePath string
 }
 
 // FileConfig captures optional configuration fields from JSON.
@@ -22,6 +23,7 @@ type FileConfig struct {
 	Debug       *bool   `json:"debug"`
 	WorkerCount *int    `json:"worker_count"`
 	MinLevel    *string `json:"min_level"`
+	ProfilePath *string `json:"profile_path"`
 }
 
 // DefaultConfig returns baseline config values.
@@ -64,5 +66,8 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 	}
 	if file.MinLevel != nil {
 		c.MinLevel = *file.MinLevel
+	}
+	if file.ProfilePath != nil {
+		c.ProfilePath = *file.ProfilePath
 	}
 }

@@ -24,17 +24,19 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	var debug bool
 	var workerCount int
 	var minLevel string
+	var profilePath string
 	var shutdownTimeout time.Duration
 	var listenSet bool
 	var maxBodySizeSet bool
 	var debugSet bool
 	var workerCountSet bool
 	var minLevelSet bool
+	var profilePathSet bool
 
 	fs := flag.NewFlagSet("gonemaster-server", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	fs.Usage = func() {
-		fmt.Fprintf(errOut, "Usage: %s [--config PATH] [--listen ADDR] [--max-body-size BYTES] [--debug] [--workers N] [--min-level LEVEL] [--shutdown-timeout DURATION]\n", fs.Name())
+		fmt.Fprintf(errOut, "Usage: %s [--config PATH] [--listen ADDR] [--max-body-size BYTES] [--debug] [--workers N] [--min-level LEVEL] [--profile PATH] [--shutdown-timeout DURATION]\n", fs.Name())
 		fmt.Fprintln(errOut, "")
 		fmt.Fprintln(errOut, "Options:")
 		fmt.Fprintln(errOut, "  --config            JSON config file path (optional)")
@@ -43,6 +45,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 		fmt.Fprintln(errOut, "  --debug             Enable request/response logging")
 		fmt.Fprintln(errOut, "  --workers           Number of worker goroutines (default 4)")
 		fmt.Fprintln(errOut, "  --min-level         Minimum log level (default INFO)")
+		fmt.Fprintln(errOut, "  --profile           Profile JSON/YAML path (optional)")
 		fmt.Fprintln(errOut, "  --shutdown-timeout  Graceful shutdown timeout (default 10s)")
 	}
 	fs.StringVar(&configPath, "config", "", "JSON config file path (optional)")
@@ -51,6 +54,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	fs.BoolVar(&debug, "debug", false, "Enable request/response logging")
 	fs.IntVar(&workerCount, "workers", 0, "Number of worker goroutines (default 4)")
 	fs.StringVar(&minLevel, "min-level", "", "Minimum log level (default INFO)")
+	fs.StringVar(&profilePath, "profile", "", "Profile JSON/YAML path (optional)")
 	fs.DurationVar(&shutdownTimeout, "shutdown-timeout", 10*time.Second, "Graceful shutdown timeout (default 10s)")
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -67,6 +71,8 @@ func run(args []string, out *os.File, errOut *os.File) int {
 			workerCountSet = true
 		case "min-level":
 			minLevelSet = true
+		case "profile":
+			profilePathSet = true
 		}
 	})
 	if workerCountSet && workerCount < 1 {
@@ -97,6 +103,9 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	}
 	if minLevelSet {
 		cfg.MinLevel = minLevel
+	}
+	if profilePathSet {
+		cfg.ProfilePath = profilePath
 	}
 
 	srv := server.New(cfg)

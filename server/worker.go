@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"math"
 	"os"
 	"sync"
 	"time"
@@ -161,6 +162,12 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 		defer cleanup()
 	}
 
+	if len(job.Tests) == 0 {
+		if tracker := s.newProgressTracker(job.ID, req); tracker != nil {
+			req.LogCallback = tracker.Callback
+		}
+	}
+
 	if len(job.Tests) == 1 {
 		req.Testcase = job.Tests[0]
 		return s.runEngine(req)
@@ -170,10 +177,16 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 	}
 
 	var all []engine.LogEntry
-	for _, testcase := range job.Tests {
+	total := len(job.Tests)
+	for i, testcase := range job.Tests {
 		runReq := req
 		runReq.Testcase = testcase
 		entries, err := s.runEngine(runReq)
+		if total > 0 {
+			done := i + 1
+			progress := int(math.Round((float64(done) / float64(total)) * 100))
+			s.updateJobProgress(job.ID, progress)
+		}
 		if err != nil {
 			return all, err
 		}
@@ -185,7 +198,27 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 func (s *Server) runEngine(req engine.RunRequest) ([]engine.LogEntry, error) {
 	s.engineMu.Lock()
 	defer s.engineMu.Unlock()
+	if s.engineRunner != nil {
+		return s.engineRunner(req)
+	}
 	return engine.Run(req)
+}
+
+func (s *Server) updateJobProgress(jobID string, progress int) {
+	if progress < 0 {
+		progress = 0
+	} else if progress > 100 {
+		progress = 100
+	}
+	job, ok := s.store.Get(jobID)
+	if !ok {
+		return
+	}
+	if job.Progress >= progress {
+		return
+	}
+	job.Progress = progress
+	_ = s.store.Update(job)
 }
 
 func summarizeEntries(entries []engine.LogEntry) map[string]any {

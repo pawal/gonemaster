@@ -4,18 +4,21 @@ import (
 	"context"
 	"net/http"
 	"sync"
+
+	"codeberg.org/pawal/gonemaster/engine"
 )
 
 // Server holds the HTTP API and supporting services.
 type Server struct {
-	cfg      Config
-	mux      *http.ServeMux
-	store    JobStore
-	queue    Queue
-	workers  workerPool
-	engineMu sync.Mutex
-	cancelMu sync.Mutex
-	cancels  map[string]context.CancelFunc
+	cfg          Config
+	mux          *http.ServeMux
+	store        JobStore
+	queue        Queue
+	workers      workerPool
+	engineMu     sync.Mutex
+	engineRunner func(engine.RunRequest) ([]engine.LogEntry, error)
+	cancelMu     sync.Mutex
+	cancels      map[string]context.CancelFunc
 }
 
 // New builds a server with in-memory components.
@@ -24,11 +27,12 @@ func New(cfg Config) *Server {
 		cfg = DefaultConfig()
 	}
 	s := &Server{
-		cfg:     cfg,
-		mux:     http.NewServeMux(),
-		store:   NewInMemoryJobStore(),
-		queue:   NewInMemoryQueue(),
-		cancels: map[string]context.CancelFunc{},
+		cfg:          cfg,
+		mux:          http.NewServeMux(),
+		store:        NewInMemoryJobStore(),
+		queue:        NewInMemoryQueue(),
+		engineRunner: engine.Run,
+		cancels:      map[string]context.CancelFunc{},
 	}
 	s.routes()
 	return s

@@ -12,6 +12,7 @@ type Config struct {
 	MaxBodySize int64
 	Debug       bool
 	WorkerCount int
+	MinLevel    string
 }
 
 // FileConfig captures optional configuration fields from JSON.
@@ -20,6 +21,7 @@ type FileConfig struct {
 	MaxBodySize *int64  `json:"max_body_size"`
 	Debug       *bool   `json:"debug"`
 	WorkerCount *int    `json:"worker_count"`
+	MinLevel    *string `json:"min_level"`
 }
 
 // DefaultConfig returns baseline config values.
@@ -29,6 +31,7 @@ func DefaultConfig() Config {
 		MaxBodySize: 1 << 20,
 		Debug:       false,
 		WorkerCount: 4,
+		MinLevel:    "INFO",
 	}
 }
 
@@ -58,5 +61,8 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 	}
 	if file.WorkerCount != nil {
 		c.WorkerCount = *file.WorkerCount
+	}
+	if file.MinLevel != nil {
+		c.MinLevel = *file.MinLevel
 	}
 }

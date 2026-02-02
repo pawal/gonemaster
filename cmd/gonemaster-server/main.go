@@ -23,16 +23,18 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	var maxBodySize int64
 	var debug bool
 	var workerCount int
+	var minLevel string
 	var shutdownTimeout time.Duration
 	var listenSet bool
 	var maxBodySizeSet bool
 	var debugSet bool
 	var workerCountSet bool
+	var minLevelSet bool
 
 	fs := flag.NewFlagSet("gonemaster-server", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	fs.Usage = func() {
-		fmt.Fprintf(errOut, "Usage: %s [--config PATH] [--listen ADDR] [--max-body-size BYTES] [--debug] [--workers N] [--shutdown-timeout DURATION]\n", fs.Name())
+		fmt.Fprintf(errOut, "Usage: %s [--config PATH] [--listen ADDR] [--max-body-size BYTES] [--debug] [--workers N] [--min-level LEVEL] [--shutdown-timeout DURATION]\n", fs.Name())
 		fmt.Fprintln(errOut, "")
 		fmt.Fprintln(errOut, "Options:")
 		fmt.Fprintln(errOut, "  --config            JSON config file path (optional)")
@@ -40,6 +42,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 		fmt.Fprintln(errOut, "  --max-body-size     Max request body size in bytes (default 1048576)")
 		fmt.Fprintln(errOut, "  --debug             Enable request/response logging")
 		fmt.Fprintln(errOut, "  --workers           Number of worker goroutines (default 4)")
+		fmt.Fprintln(errOut, "  --min-level         Minimum log level (default INFO)")
 		fmt.Fprintln(errOut, "  --shutdown-timeout  Graceful shutdown timeout (default 10s)")
 	}
 	fs.StringVar(&configPath, "config", "", "JSON config file path (optional)")
@@ -47,6 +50,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	fs.Int64Var(&maxBodySize, "max-body-size", 0, "Max request body size in bytes (default 1048576)")
 	fs.BoolVar(&debug, "debug", false, "Enable request/response logging")
 	fs.IntVar(&workerCount, "workers", 0, "Number of worker goroutines (default 4)")
+	fs.StringVar(&minLevel, "min-level", "", "Minimum log level (default INFO)")
 	fs.DurationVar(&shutdownTimeout, "shutdown-timeout", 10*time.Second, "Graceful shutdown timeout (default 10s)")
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -61,6 +65,8 @@ func run(args []string, out *os.File, errOut *os.File) int {
 			debugSet = true
 		case "workers":
 			workerCountSet = true
+		case "min-level":
+			minLevelSet = true
 		}
 	})
 	if workerCountSet && workerCount < 1 {
@@ -88,6 +94,9 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	}
 	if workerCountSet {
 		cfg.WorkerCount = workerCount
+	}
+	if minLevelSet {
+		cfg.MinLevel = minLevel
 	}
 
 	srv := server.New(cfg)

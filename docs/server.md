@@ -14,6 +14,8 @@ server with the `--profile` option.
 
 The default profile is located in `share/profile.json`, but is built into the server binary.
 
+The current server lacks any sort of persistence, for example using SQLite or PostgreSQL.
+
 ## Build
 ```
 go build -o ./gonemaster-server ./cmd/gonemaster-server

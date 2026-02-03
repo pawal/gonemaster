@@ -195,6 +195,64 @@ func TestBatchesRemoveCallsQueueRemoveForQueued(t *testing.T) {
 	}
 }
 
+func TestBatchesRemoveCancelRunning(t *testing.T) {
+	var removed []string
+	var canceled []string
+	oldFactory := newHTTPClient
+	defer func() { newHTTPClient = oldFactory }()
+	newHTTPClient = func(_ time.Duration) *http.Client {
+		return &http.Client{
+			Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+				switch {
+				case r.Method == http.MethodGet && r.URL.Path == "/api/v1/batches/batch_3":
+					body := `{
+  "batch_id":"batch_3",
+  "total":3,
+  "status_counts":{"queued":1,"running":1,"succeeded":1},
+  "items":[
+    {"id":"job_q","domain":"example.com","status":"queued","created_at":"2026-02-03T00:00:00Z","progress":0},
+    {"id":"job_r","domain":"example.net","status":"running","created_at":"2026-02-03T00:00:00Z","progress":50},
+    {"id":"job_s","domain":"example.org","status":"succeeded","created_at":"2026-02-03T00:00:00Z","progress":100}
+  ],
+  "created_at":"2026-02-03T00:00:00Z"
+}`
+					return jsonResponse(http.StatusOK, body), nil
+				case r.Method == http.MethodPost && r.URL.Path == "/api/v1/queue/remove":
+					var req queueRemoveRequest
+					if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+						t.Fatalf("decode queue remove: %v", err)
+					}
+					removed = append(removed, req.JobIDs...)
+					body := `{"removed":["job_q"]}`
+					return jsonResponse(http.StatusOK, body), nil
+				case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/cancel"):
+					parts := strings.Split(r.URL.Path, "/")
+					jobID := parts[len(parts)-2]
+					canceled = append(canceled, jobID)
+					body := fmt.Sprintf(`{"id":"%s","domain":"example.com","status":"canceled","created_at":"2026-02-03T00:00:00Z","progress":100}`, jobID)
+					return jsonResponse(http.StatusOK, body), nil
+				default:
+					t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+				}
+				return nil, nil
+			}),
+		}
+	}
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+	code := run([]string{"--server", "http://example.test", "--format", "json", "batches", "remove", "--cancel-running", "batch_3"}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("run returned %d, stderr=%s", code, errOut.String())
+	}
+	if len(removed) != 1 || removed[0] != "job_q" {
+		t.Fatalf("expected queue remove for job_q, got %v", removed)
+	}
+	if len(canceled) != 1 || canceled[0] != "job_r" {
+		t.Fatalf("expected cancel for job_r, got %v", canceled)
+	}
+}
+
 type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (fn roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) {

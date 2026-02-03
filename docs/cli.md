@@ -252,10 +252,11 @@ Notes:
 #### batches remove
 Remove queued jobs from a batch (running jobs are skipped).
 ```
-gonemaster-client batches remove BATCH_ID
+gonemaster-client batches remove BATCH_ID [--cancel-running]
 ```
 Notes:
 - Uses the queue remove endpoint for queued jobs only.
+- With `--cancel-running`, running jobs are canceled via per-job cancel requests.
 
 #### queue pause
 Pause queue processing.

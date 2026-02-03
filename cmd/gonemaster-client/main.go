@@ -875,6 +875,14 @@ func runBatchesCancel(ctx context.Context, client *apiClient, opts globalOptions
 }
 
 func runBatchesRemove(ctx context.Context, client *apiClient, opts globalOptions, args []string, out io.Writer, errOut io.Writer) int {
+	var cancelRunning bool
+	fs := flag.NewFlagSet("batches remove", flag.ContinueOnError)
+	fs.SetOutput(errOut)
+	fs.BoolVar(&cancelRunning, "cancel-running", false, "Cancel running jobs in the batch")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	args = fs.Args()
 	if len(args) == 0 {
 		fmt.Fprintln(errOut, "batch id is required")
 		return 2
@@ -886,10 +894,21 @@ func runBatchesRemove(ctx context.Context, client *apiClient, opts globalOptions
 		return 2
 	}
 	queued := []string{}
+	canceled := []string{}
 	skipped := []string{}
 	for _, item := range summary.Items {
 		if item.Status == "queued" {
 			queued = append(queued, item.ID)
+			continue
+		}
+		if cancelRunning && item.Status == "running" {
+			var jobInfo job
+			if err := client.doJSON(ctx, http.MethodPost, "/jobs/"+item.ID+"/cancel", nil, &jobInfo); err != nil {
+				fmt.Fprintln(errOut, err.Error())
+				return 2
+			}
+			canceled = append(canceled, item.ID)
+			continue
 		} else {
 			skipped = append(skipped, item.ID)
 		}
@@ -905,16 +924,22 @@ func runBatchesRemove(ctx context.Context, client *apiClient, opts globalOptions
 		removed = resp.Removed
 	}
 	if opts.format == "pretty" {
-		if len(skipped) > 0 {
-			fmt.Fprintf(out, "Removed %d queued job(s) in batch %s (skipped %d).\n", len(removed), batchID, len(skipped))
-		} else {
-			fmt.Fprintf(out, "Removed %d queued job(s) in batch %s.\n", len(removed), batchID)
+		message := fmt.Sprintf("Removed %d queued job(s) in batch %s.", len(removed), batchID)
+		if cancelRunning {
+			message = fmt.Sprintf("%s Canceled %d running job(s).", message, len(canceled))
 		}
+		if len(skipped) > 0 {
+			message = fmt.Sprintf("%s Skipped %d job(s).", message, len(skipped))
+		}
+		fmt.Fprintln(out, message)
 		return 0
 	}
 	payload := map[string]any{
 		"batch_id": batchID,
 		"removed":  removed,
+	}
+	if cancelRunning {
+		payload["canceled"] = canceled
 	}
 	if len(skipped) > 0 {
 		payload["skipped"] = skipped

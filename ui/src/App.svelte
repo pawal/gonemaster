@@ -1,22 +1,14 @@
 <script>
   import { onMount, onDestroy } from "svelte";
 
-  const levels = ["", "DEBUG", "INFO", "WARN", "ERROR"]; // empty means server default
-  let apiBase = localStorage.getItem("gm_api_base") ?? "";
   let statusMessage = "";
   let statusTone = "";
 
   let singleDomain = "";
-  let singleTests = "";
-  let singleMinLevel = "";
-  let singleOverrides = "";
   let singleSubmitting = false;
   let createdJobId = "";
 
   let batchDomains = "";
-  let batchTests = "";
-  let batchMinLevel = "";
-  let batchOverrides = "";
   let batchSubmitting = false;
   let createdBatchId = "";
 
@@ -36,41 +28,17 @@
   let autoRefreshBatch = false;
   let batchPoller = null;
 
-  const saveApiBase = (value) => {
-    apiBase = value;
-    localStorage.setItem("gm_api_base", apiBase);
-  };
-
-  const normalizeBase = () => (apiBase || "").trim().replace(/\/$/, "");
-  const buildUrl = (path) => {
-    const base = normalizeBase();
-    if (!base) return path;
-    return `${base}${path}`;
-  };
-
   const setStatus = (message, tone = "") => {
     statusMessage = message;
     statusTone = tone;
   };
 
-  const parseTests = (value) =>
-    value
-      .split(/[,\n]/)
-      .map((entry) => entry.trim())
-      .filter(Boolean);
-
-  const parseOverrides = (value) => {
-    if (!value.trim()) return undefined;
-    return JSON.parse(value);
-  };
-
   const apiFetch = async (path, options = {}) => {
-    const url = buildUrl(path);
     const headers = { ...(options.headers || {}) };
     if (options.body && !headers["Content-Type"]) {
       headers["Content-Type"] = "application/json";
     }
-    const response = await fetch(url, { ...options, headers });
+    const response = await fetch(path, { ...options, headers });
     const contentType = response.headers.get("content-type") || "";
     const payload = contentType.includes("application/json")
       ? await response.json()
@@ -105,11 +73,6 @@
       const payload = {
         domain: singleDomain.trim()
       };
-      const tests = parseTests(singleTests);
-      if (tests.length) payload.tests = tests;
-      if (singleMinLevel) payload.min_level = singleMinLevel;
-      const overrides = parseOverrides(singleOverrides);
-      if (overrides) payload.profile_overrides = overrides;
 
       const job = await apiFetch("/jobs", {
         method: "POST",
@@ -140,11 +103,6 @@
     createdBatchId = "";
     try {
       const payload = { domains };
-      const tests = parseTests(batchTests);
-      if (tests.length) payload.tests = tests;
-      if (batchMinLevel) payload.min_level = batchMinLevel;
-      const overrides = parseOverrides(batchOverrides);
-      if (overrides) payload.profile_overrides = overrides;
 
       const response = await apiFetch("/jobs/batch", {
         method: "POST",
@@ -241,35 +199,17 @@
 
 <main>
   <header class="reveal" style="--d: 0.05s">
-    <h1>Gonemaster Control Room</h1>
+    <h1>Gonemaster</h1>
     <p class="subtitle">
       Launch single or batch domain jobs, watch progress, and inspect results from the embedded server UI.
     </p>
-    <div class="row">
-      <span class="badge">Embedded UI</span>
-      <span class="badge">Single &amp; Batch</span>
-      <span class="badge">Auto refresh</span>
-    </div>
   </header>
 
-  <section class="card reveal" style="--d: 0.12s">
-    <h2>API Connection</h2>
-    <p>Leave blank to use the current server host.</p>
-    <div class="row">
-      <input
-        type="text"
-        placeholder="https://gonemaster.example.com"
-        bind:value={apiBase}
-        on:change={(event) => saveApiBase(event.target.value)}
-      />
-      <button class="ghost" type="button" on:click={() => saveApiBase("")}>Use Local</button>
+  {#if statusMessage}
+    <div class="notice reveal" style="--d: 0.12s; margin-bottom: 22px;">
+      <strong>{statusTone === "ok" ? "OK" : "Heads up"}:</strong> {statusMessage}
     </div>
-    {#if statusMessage}
-      <div class="notice">
-        <strong>{statusTone === "ok" ? "OK" : "Heads up"}:</strong> {statusMessage}
-      </div>
-    {/if}
-  </section>
+  {/if}
 
   <section class="grid" style="margin-top: 22px;">
     <div class="card reveal" style="--d: 0.18s">
@@ -277,26 +217,6 @@
       <div class="stack">
         <label for="single-domain">Domain</label>
         <input id="single-domain" type="text" placeholder="example.com" bind:value={singleDomain} />
-      </div>
-      <div class="stack">
-        <label for="single-tests">Tests (comma or newline)</label>
-        <input id="single-tests" type="text" placeholder="dns, http, tls" bind:value={singleTests} />
-      </div>
-      <div class="stack">
-        <label for="single-min-level">Min Level</label>
-        <select id="single-min-level" bind:value={singleMinLevel}>
-          {#each levels as level}
-            <option value={level}>{level || "Server default"}</option>
-          {/each}
-        </select>
-      </div>
-      <div class="stack">
-        <label for="single-overrides">Profile overrides (JSON)</label>
-        <textarea
-          id="single-overrides"
-          placeholder={'{"timeout": 5}'}
-          bind:value={singleOverrides}
-        ></textarea>
       </div>
       <button on:click={submitSingle} disabled={singleSubmitting}>
         {singleSubmitting ? "Submitting..." : "Run Single Job"}
@@ -310,26 +230,11 @@
       <h2>Batch Jobs</h2>
       <div class="stack">
         <label for="batch-domains">Domains (one per line)</label>
-        <textarea id="batch-domains" placeholder="example.com\nexample.org" bind:value={batchDomains}></textarea>
-      </div>
-      <div class="stack">
-        <label for="batch-tests">Tests (comma or newline)</label>
-        <input id="batch-tests" type="text" placeholder="dns, http, tls" bind:value={batchTests} />
-      </div>
-      <div class="stack">
-        <label for="batch-min-level">Min Level</label>
-        <select id="batch-min-level" bind:value={batchMinLevel}>
-          {#each levels as level}
-            <option value={level}>{level || "Server default"}</option>
-          {/each}
-        </select>
-      </div>
-      <div class="stack">
-        <label for="batch-overrides">Profile overrides (JSON)</label>
         <textarea
-          id="batch-overrides"
-          placeholder={'{"timeout": 5}'}
-          bind:value={batchOverrides}
+          id="batch-domains"
+          placeholder={`example.com
+example.org`}
+          bind:value={batchDomains}
         ></textarea>
       </div>
       <button class="secondary" on:click={submitBatch} disabled={batchSubmitting}>

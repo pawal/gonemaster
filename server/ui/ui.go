@@ -1,12 +1,14 @@
 package ui
 
 import (
+	"bytes"
 	"embed"
 	"io/fs"
 	"net/http"
 	"path"
 	"strings"
 	"sync"
+	"time"
 )
 
 //go:embed dist
@@ -35,8 +37,9 @@ func Handler() http.Handler {
 		}
 
 		cleanPath := cleanRequestPath(r.URL.Path)
-		if cleanPath == "" {
-			cleanPath = "index.html"
+		if cleanPath == "" || cleanPath == "index.html" {
+			serveIndex(fsys, w, r)
+			return
 		}
 
 		if isFile(fsys, cleanPath) {
@@ -47,7 +50,7 @@ func Handler() http.Handler {
 			return
 		}
 
-		serveFile(fileServer, w, r, "index.html")
+		serveIndex(fsys, w, r)
 	})
 }
 
@@ -76,6 +79,19 @@ func isFile(fsys fs.FS, name string) bool {
 		return false
 	}
 	return !info.IsDir()
+}
+
+func serveIndex(fsys fs.FS, w http.ResponseWriter, r *http.Request) {
+	data, err := fs.ReadFile(fsys, "index.html")
+	if err != nil {
+		http.Error(w, "ui not available", http.StatusNotFound)
+		return
+	}
+	modTime := time.Time{}
+	if info, err := fs.Stat(fsys, "index.html"); err == nil {
+		modTime = info.ModTime()
+	}
+	http.ServeContent(w, r, "index.html", modTime, bytes.NewReader(data))
 }
 
 func serveFile(fileServer http.Handler, w http.ResponseWriter, r *http.Request, name string) {

@@ -24,7 +24,7 @@ describe("App", () => {
 
     const { unmount } = render(App);
 
-    expect(await screen.findByText("Gonemaster Control Room")).toBeInTheDocument();
+    expect(await screen.findByText("Gonemaster")).toBeInTheDocument();
     expect(screen.getByText("Single Job")).toBeInTheDocument();
     expect(screen.getByText("Batch Jobs")).toBeInTheDocument();
     expect(screen.getByText("Job Inspector")).toBeInTheDocument();

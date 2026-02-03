@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"codeberg.org/pawal/gonemaster/engine/normalization"
 )
 
 func (s *Server) handleJobs(w http.ResponseWriter, r *http.Request) {
@@ -36,10 +38,21 @@ func (s *Server) handleJobsBatch(w http.ResponseWriter, r *http.Request) {
 	batchID := newID("batch")
 	jobIDs := make([]string, 0, len(req.Domains))
 	for _, domain := range req.Domains {
+		trimmed := strings.TrimSpace(domain)
+		if trimmed == "" {
+			writeError(w, http.StatusBadRequest, "missing_domain", "domains is required", nil)
+			return
+		}
+		if errs, normalized := normalization.NormalizeName(trimmed); len(errs) > 0 {
+			writeError(w, http.StatusBadRequest, "invalid_domain", errs[0].Message(), nil)
+			return
+		} else {
+			trimmed = normalized
+		}
 		job := Job{
 			ID:        newID("job"),
 			BatchID:   batchID,
-			Domain:    domain,
+			Domain:    trimmed,
 			Tests:     req.Tests,
 			Overrides: req.ProfileOverrides,
 			MinLevel:  req.MinLevel,
@@ -178,10 +191,17 @@ func (s *Server) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "missing_domain", "domain is required", nil)
 		return
 	}
+	domain := strings.TrimSpace(req.Domain)
+	if errs, normalized := normalization.NormalizeName(domain); len(errs) > 0 {
+		writeError(w, http.StatusBadRequest, "invalid_domain", errs[0].Message(), nil)
+		return
+	} else {
+		domain = normalized
+	}
 
 	job := Job{
 		ID:        newID("job"),
-		Domain:    req.Domain,
+		Domain:    domain,
 		Tests:     req.Tests,
 		Overrides: req.ProfileOverrides,
 		MinLevel:  req.MinLevel,

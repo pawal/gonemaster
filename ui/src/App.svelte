@@ -66,6 +66,18 @@
       .filter((entry) => entry.count > 0);
   };
 
+  const normalizeDomainInput = (value) => {
+    const trimmed = (value || "").trim();
+    if (!trimmed) return "";
+    try {
+      const hasScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed);
+      const url = new URL(hasScheme ? trimmed : `http://${trimmed}`);
+      return url.hostname;
+    } catch (error) {
+      return trimmed;
+    }
+  };
+
   const moduleLevels = ["NOTICE", "WARNING", "ERROR", "CRITICAL"];
   const normalizeLevel = (value) => (value || "INFO").toUpperCase();
   const formatSeconds = (value) => {
@@ -119,7 +131,8 @@
   };
 
   const submitSingle = async () => {
-    if (!singleDomain.trim()) {
+    const normalizedDomain = normalizeDomainInput(singleDomain);
+    if (!normalizedDomain) {
       setStatus("Domain is required.", "warn");
       return;
     }
@@ -127,7 +140,7 @@
     createdJobId = "";
     try {
       const payload = {
-        domain: singleDomain.trim()
+        domain: normalizedDomain
       };
 
       const job = await apiFetch("/jobs", {
@@ -149,7 +162,7 @@
   const submitBatch = async () => {
     const domains = batchDomains
       .split(/\n/)
-      .map((entry) => entry.trim())
+      .map((entry) => normalizeDomainInput(entry))
       .filter(Boolean);
     if (!domains.length) {
       setStatus("Provide at least one domain for the batch.", "warn");
@@ -286,7 +299,18 @@
       <h2>Single Job</h2>
       <div class="stack">
         <label for="single-domain">Domain</label>
-        <input id="single-domain" type="text" placeholder="example.com" bind:value={singleDomain} />
+        <input
+          id="single-domain"
+          type="text"
+          placeholder="example.com"
+          bind:value={singleDomain}
+          on:keydown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              submitSingle();
+            }
+          }}
+        />
       </div>
       <button on:click={submitSingle} disabled={singleSubmitting}>
         {singleSubmitting ? "Submitting..." : "Run Single Job"}

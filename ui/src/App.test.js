@@ -99,6 +99,50 @@ describe("App", () => {
     unmount();
   });
 
+  it("converts IDN domains to punycode before submit", async () => {
+    const idn = "r\u00e4ksm\u00f6rg\u00e5s.se";
+    const puny = "xn--rksmrgs-5wao1o.se";
+    const job = {
+      id: "job_idn",
+      domain: puny,
+      status: "queued",
+      created_at: "2026-02-03T00:00:00Z",
+      progress: 0
+    };
+
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (url === "/jobs" && options.method === "POST") {
+        return jsonResponse(job);
+      }
+      if (url === `/jobs/${job.id}`) {
+        return jsonResponse(job);
+      }
+      if (typeof url === "string" && url.startsWith("/jobs?")) {
+        return jsonResponse({ items: [job] });
+      }
+      return jsonResponse({ items: [] });
+    });
+
+    const { unmount } = render(App);
+
+    const input = await screen.findByPlaceholderText("example.com");
+    await fireEvent.input(input, { target: { value: idn } });
+
+    const button = screen.getByText("Run Single Job");
+    await fireEvent.click(button);
+
+    await waitFor(() => {
+      const postCall = global.fetch.mock.calls.find(
+        ([url, options]) => url === "/jobs" && options?.method === "POST"
+      );
+      expect(postCall).toBeTruthy();
+      const body = JSON.parse(postCall[1].body);
+      expect(body.domain).toBe(puny);
+    });
+
+    unmount();
+  });
+
   it("submits a batch job and displays the created batch id", async () => {
     const batch = {
       batch_id: "batch_1",

@@ -13,6 +13,7 @@ import (
 	"syscall"
 
 	"codeberg.org/pawal/gonemaster/engine"
+	"codeberg.org/pawal/gonemaster/engine/normalization"
 )
 
 func main() {
@@ -222,6 +223,13 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	if domain == "" {
 		fmt.Fprintln(errOut, "--domain is required")
 		return 2
+	}
+	if errs, normalized := normalization.NormalizeName(domain); len(errs) > 0 {
+		fmt.Fprintln(errOut, errs[0].Message())
+		return 2
+	} else if normalized != "" {
+		domain = normalized
+		req.Domain = normalized
 	}
 
 	var rawWriter io.Writer

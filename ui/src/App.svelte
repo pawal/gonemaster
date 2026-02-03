@@ -18,6 +18,7 @@
   let selectedJobId = "";
   let selectedJob = null;
   let selectedJobResult = null;
+  let resultLocale = "en";
   let jobLoading = false;
   let autoRefreshJob = true;
   let jobPoller = null;
@@ -27,6 +28,10 @@
   let batchLoading = false;
   let autoRefreshBatch = false;
   let batchPoller = null;
+
+  let moduleGroups = [];
+  let moduleOpen = {};
+  let lastResultJobId = "";
 
   const setStatus = (message, tone = "") => {
     statusMessage = message;
@@ -59,6 +64,46 @@
         count: Number(levels[level] || 0)
       }))
       .filter((entry) => entry.count > 0);
+  };
+
+  const moduleLevels = ["NOTICE", "WARNING", "ERROR", "CRITICAL"];
+  const normalizeLevel = (value) => (value || "INFO").toUpperCase();
+  const formatSeconds = (value) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return "0.00";
+    return numeric.toFixed(2);
+  };
+  const entryMessage = (entry) => {
+    if (!entry) return "";
+    if (entry.message) return entry.message;
+    if (entry.raw) return entry.raw;
+    return [entry.module, entry.testcase, entry.tag].filter(Boolean).join(":");
+  };
+  const entryMeta = (entry) => [entry?.testcase, entry?.tag].filter(Boolean).join(" · ");
+  const moduleId = (key) => `module-${String(key).toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+  const groupRawEntries = (raw) => {
+    const entries = raw?.entries || [];
+    const modules = new Map();
+    entries.forEach((entry) => {
+      const name = entry.module || "Unspecified";
+      const key = name.toUpperCase();
+      if (!modules.has(key)) {
+        modules.set(key, {
+          key,
+          name,
+          entries: [],
+          counts: {}
+        });
+      }
+      const current = modules.get(key);
+      current.entries.push(entry);
+      const level = normalizeLevel(entry.level);
+      current.counts[level] = (current.counts[level] || 0) + 1;
+    });
+    return Array.from(modules.values());
+  };
+  const toggleModule = (key) => {
+    moduleOpen = { ...moduleOpen, [key]: !moduleOpen[key] };
   };
 
   const loadJobs = async () => {
@@ -153,7 +198,8 @@
   const loadJobResult = async (jobId = selectedJobId) => {
     if (!jobId) return;
     try {
-      selectedJobResult = await apiFetch(`/jobs/${jobId}/result`);
+      const locale = resultLocale ? `?locale=${encodeURIComponent(resultLocale)}` : "";
+      selectedJobResult = await apiFetch(`/jobs/${jobId}/result${locale}`);
     } catch (error) {
       setStatus(`Failed to load job result: ${error.message}`, "warn");
     }
@@ -196,6 +242,19 @@
     selectedBatchId;
     batchLoading;
     startBatchPolling();
+  }
+
+  $: if (autoRefreshJob && selectedJob && selectedJob.progress === 100) {
+    autoRefreshJob = false;
+  }
+
+  $: {
+    moduleGroups = groupRawEntries(selectedJobResult?.raw);
+  }
+
+  $: if (selectedJobResult?.job_id !== lastResultJobId) {
+    lastResultJobId = selectedJobResult?.job_id || "";
+    moduleOpen = {};
   }
 
   onMount(() => {
@@ -303,8 +362,57 @@ example.org`}
           {:else}
             <div class="summary-empty">No NOTICE/WARNING/ERROR entries.</div>
           {/if}
-          <div class="field-label">Raw payload</div>
-          <pre class="mono">{JSON.stringify(selectedJobResult.raw || {}, null, 2)}</pre>
+          <div class="field-label">Result details</div>
+          {#if moduleGroups.length === 0}
+            <div class="summary-empty">No raw entries available.</div>
+          {:else}
+            <div class="small">Grouped by module. Click a module to expand.</div>
+            <div class="module-list">
+              {#each moduleGroups as group}
+                <div class="module-card">
+                  <button
+                    class="module-toggle"
+                    type="button"
+                    aria-expanded={!!moduleOpen[group.key]}
+                    aria-controls={moduleId(group.key)}
+                    on:click={() => toggleModule(group.key)}
+                  >
+                    <div class="module-title">{group.name}</div>
+                    <div class="module-meta">{group.entries.length} entries</div>
+                    <div class="module-badges">
+                      {#each moduleLevels as level}
+                        {#if group.counts[level]}
+                          <span class={`level-pill ${level.toLowerCase()}`}>{level} {group.counts[level]}</span>
+                        {/if}
+                      {/each}
+                    </div>
+                    <span class={`module-chevron ${moduleOpen[group.key] ? "open" : ""}`}></span>
+                  </button>
+                  {#if moduleOpen[group.key]}
+                    <div class="module-body" id={moduleId(group.key)}>
+                      <div class="result-header">
+                        <span>Seconds</span>
+                        <span>Level</span>
+                        <span>Message</span>
+                      </div>
+                      {#each group.entries as entry}
+                        {@const level = normalizeLevel(entry.level)}
+                        {@const meta = entryMeta(entry)}
+                        <div class="result-row">
+                          <span class="entry-time">{formatSeconds(entry.timestamp)}</span>
+                          <span class={`entry-level ${level.toLowerCase()}`}>{level}</span>
+                          <span class="entry-message">{entryMessage(entry)}</span>
+                        </div>
+                        {#if meta}
+                          <div class="entry-meta">{meta}</div>
+                        {/if}
+                      {/each}
+                    </div>
+                  {/if}
+                </div>
+              {/each}
+            </div>
+          {/if}
         </div>
       {/if}
       {#if selectedJob && !selectedJobResult && ["succeeded", "failed", "canceled"].includes(selectedJob.status)}

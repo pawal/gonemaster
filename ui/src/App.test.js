@@ -225,7 +225,7 @@ describe("App", () => {
       if (url === `/jobs/${job.id}`) {
         return jsonResponse(job);
       }
-      if (url === `/jobs/${job.id}/result`) {
+      if (typeof url === "string" && url.startsWith(`/jobs/${job.id}/result`)) {
         return jsonResponse(result);
       }
       return jsonResponse({});
@@ -250,6 +250,74 @@ describe("App", () => {
 
     expect(screen.queryByText("WARNING")).toBeNull();
     expect(screen.queryByText("CRITICAL")).toBeNull();
+
+    unmount();
+  });
+
+  it("groups raw results by module and toggles entries", async () => {
+    const job = {
+      id: "job_raw",
+      domain: "example.com",
+      status: "succeeded",
+      created_at: "2026-02-03T00:00:00Z",
+      progress: 100
+    };
+    const result = {
+      summary: { levels: {} },
+      raw: {
+        locale: "en",
+        entries: [
+          {
+            timestamp: 0.12,
+            module: "BASIC",
+            testcase: "basic01",
+            tag: "BASIC01",
+            level: "NOTICE",
+            message: "All checks passed.",
+            raw: "BASIC:basic01:BASIC01"
+          },
+          {
+            timestamp: 0.33,
+            module: "DNSSEC",
+            testcase: "dnssec01",
+            tag: "DNSSEC01",
+            level: "ERROR",
+            message: "DNSSEC validation failed.",
+            raw: "DNSSEC:dnssec01:DNSSEC01"
+          }
+        ]
+      }
+    };
+
+    global.fetch.mockImplementation((url) => {
+      if (typeof url === "string" && url.startsWith("/jobs?")) {
+        return jsonResponse({ items: [] });
+      }
+      if (url === `/jobs/${job.id}`) {
+        return jsonResponse(job);
+      }
+      if (typeof url === "string" && url.startsWith(`/jobs/${job.id}/result`)) {
+        return jsonResponse(result);
+      }
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+
+    const input = await screen.findByLabelText("Job ID");
+    await fireEvent.input(input, { target: { value: job.id } });
+    await fireEvent.change(input);
+
+    const moduleButton = await screen.findByRole("button", { name: /basic/i });
+    expect(screen.queryByText("All checks passed.")).toBeNull();
+
+    await fireEvent.click(moduleButton);
+    expect(await screen.findByText("All checks passed.")).toBeInTheDocument();
+
+    await fireEvent.click(moduleButton);
+    await waitFor(() => {
+      expect(screen.queryByText("All checks passed.")).toBeNull();
+    });
 
     unmount();
   });

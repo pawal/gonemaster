@@ -150,6 +150,11 @@ paths:
           required: true
           schema:
             type: string
+        - name: locale
+          in: query
+          description: Locale for translated messages (default en)
+          schema:
+            type: string
       responses:
         '200':
           description: Job result
@@ -401,8 +406,41 @@ components:
           type: object
           additionalProperties: true
         raw:
+          $ref: '#/components/schemas/JobResultRaw'
+
+    JobResultRaw:
+      type: object
+      properties:
+        locale:
+          type: string
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/JobResultEntry'
+
+    JobResultEntry:
+      type: object
+      properties:
+        timestamp:
+          type: number
+          format: float
+        module:
+          type: string
+        testcase:
+          type: string
+        tag:
+          type: string
+        level:
+          type: string
+        args:
           type: object
           additionalProperties: true
+        message:
+          type: string
+          description: Translated message for the entry (default locale).
+        raw:
+          type: string
+          description: Raw entry string in CLI raw format.
 
     QueueReorderRequest:
       type: object

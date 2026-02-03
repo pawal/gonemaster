@@ -241,11 +241,21 @@ func (s *Server) handleGetJob(w http.ResponseWriter, _ *http.Request, jobID stri
 	writeJSON(w, http.StatusOK, job)
 }
 
-func (s *Server) handleGetJobResult(w http.ResponseWriter, _ *http.Request, jobID string) {
+func (s *Server) handleGetJobResult(w http.ResponseWriter, r *http.Request, jobID string) {
 	result, ok := s.store.GetResult(jobID)
 	if !ok {
 		writeError(w, http.StatusNotFound, "not_found", "job result not found", nil)
 		return
+	}
+	if result.Raw != nil && len(result.Raw.Entries) > 0 {
+		locale := strings.TrimSpace(r.URL.Query().Get("locale"))
+		if locale == "" {
+			locale = "en"
+		}
+		raw := *result.Raw
+		raw.Locale = locale
+		raw.Entries = localizeResultEntries(result.Raw.Entries, locale)
+		result.Raw = &raw
 	}
 	writeJSON(w, http.StatusOK, result)
 }

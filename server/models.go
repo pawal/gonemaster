@@ -66,7 +66,25 @@ type JobResult struct {
 	BatchID string         `json:"batch_id,omitempty"`
 	Status  JobStatus      `json:"status"`
 	Summary map[string]any `json:"summary,omitempty"`
-	Raw     map[string]any `json:"raw,omitempty"`
+	Raw     *JobResultRaw  `json:"raw,omitempty"`
+}
+
+// JobResultRaw contains the raw log entries for a job.
+type JobResultRaw struct {
+	Locale  string           `json:"locale,omitempty"`
+	Entries []JobResultEntry `json:"entries,omitempty"`
+}
+
+// JobResultEntry is a single log entry for API consumers.
+type JobResultEntry struct {
+	Timestamp float64        `json:"timestamp"`
+	Module    string         `json:"module"`
+	Testcase  string         `json:"testcase"`
+	Tag       string         `json:"tag"`
+	Level     string         `json:"level"`
+	Args      map[string]any `json:"args,omitempty"`
+	Message   string         `json:"message,omitempty"`
+	Raw       string         `json:"raw,omitempty"`
 }
 
 // BatchSummary aggregates jobs for a batch.

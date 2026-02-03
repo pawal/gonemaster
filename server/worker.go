@@ -103,8 +103,8 @@ func (s *Server) runJob(jobID string) error {
 		BatchID: job.BatchID,
 		Status:  JobSucceeded,
 		Summary: summarizeEntries(entries),
-		Raw: map[string]any{
-			"entries": entries,
+		Raw: &JobResultRaw{
+			Entries: buildResultEntries(entries),
 		},
 	}
 
@@ -123,8 +123,8 @@ func (s *Server) runJob(jobID string) error {
 			"error": runErr.Error(),
 		}
 		if len(entries) > 0 {
-			result.Raw = map[string]any{
-				"entries": entries,
+			result.Raw = &JobResultRaw{
+				Entries: buildResultEntries(entries),
 			}
 		}
 	} else {

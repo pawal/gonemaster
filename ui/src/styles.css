@@ -129,6 +129,11 @@ label {
   color: var(--muted);
 }
 
+.field-label {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
 input,
 textarea,
 select {

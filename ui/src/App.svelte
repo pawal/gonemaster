@@ -275,24 +275,28 @@
     <div class="card reveal" style="--d: 0.18s">
       <h2>Single Job</h2>
       <div class="stack">
-        <label>Domain</label>
-        <input type="text" placeholder="example.com" bind:value={singleDomain} />
+        <label for="single-domain">Domain</label>
+        <input id="single-domain" type="text" placeholder="example.com" bind:value={singleDomain} />
       </div>
       <div class="stack">
-        <label>Tests (comma or newline)</label>
-        <input type="text" placeholder="dns, http, tls" bind:value={singleTests} />
+        <label for="single-tests">Tests (comma or newline)</label>
+        <input id="single-tests" type="text" placeholder="dns, http, tls" bind:value={singleTests} />
       </div>
       <div class="stack">
-        <label>Min Level</label>
-        <select bind:value={singleMinLevel}>
+        <label for="single-min-level">Min Level</label>
+        <select id="single-min-level" bind:value={singleMinLevel}>
           {#each levels as level}
             <option value={level}>{level || "Server default"}</option>
           {/each}
         </select>
       </div>
       <div class="stack">
-        <label>Profile overrides (JSON)</label>
-        <textarea placeholder={'{"timeout": 5}'} bind:value={singleOverrides}></textarea>
+        <label for="single-overrides">Profile overrides (JSON)</label>
+        <textarea
+          id="single-overrides"
+          placeholder={'{"timeout": 5}'}
+          bind:value={singleOverrides}
+        ></textarea>
       </div>
       <button on:click={submitSingle} disabled={singleSubmitting}>
         {singleSubmitting ? "Submitting..." : "Run Single Job"}
@@ -305,24 +309,28 @@
     <div class="card reveal" style="--d: 0.22s">
       <h2>Batch Jobs</h2>
       <div class="stack">
-        <label>Domains (one per line)</label>
-        <textarea placeholder="example.com\nexample.org" bind:value={batchDomains}></textarea>
+        <label for="batch-domains">Domains (one per line)</label>
+        <textarea id="batch-domains" placeholder="example.com\nexample.org" bind:value={batchDomains}></textarea>
       </div>
       <div class="stack">
-        <label>Tests (comma or newline)</label>
-        <input type="text" placeholder="dns, http, tls" bind:value={batchTests} />
+        <label for="batch-tests">Tests (comma or newline)</label>
+        <input id="batch-tests" type="text" placeholder="dns, http, tls" bind:value={batchTests} />
       </div>
       <div class="stack">
-        <label>Min Level</label>
-        <select bind:value={batchMinLevel}>
+        <label for="batch-min-level">Min Level</label>
+        <select id="batch-min-level" bind:value={batchMinLevel}>
           {#each levels as level}
             <option value={level}>{level || "Server default"}</option>
           {/each}
         </select>
       </div>
       <div class="stack">
-        <label>Profile overrides (JSON)</label>
-        <textarea placeholder={'{"timeout": 5}'} bind:value={batchOverrides}></textarea>
+        <label for="batch-overrides">Profile overrides (JSON)</label>
+        <textarea
+          id="batch-overrides"
+          placeholder={'{"timeout": 5}'}
+          bind:value={batchOverrides}
+        ></textarea>
       </div>
       <button class="secondary" on:click={submitBatch} disabled={batchSubmitting}>
         {batchSubmitting ? "Submitting..." : "Run Batch"}
@@ -337,8 +345,8 @@
     <div class="card reveal" style="--d: 0.26s">
       <h2>Job Inspector</h2>
       <div class="stack">
-        <label>Job ID</label>
-        <input type="text" placeholder="job_123" bind:value={selectedJobId} on:change={() => loadJob()} />
+        <label for="job-id">Job ID</label>
+        <input id="job-id" type="text" placeholder="job_123" bind:value={selectedJobId} on:change={() => loadJob()} />
       </div>
       <div class="row">
         <button on:click={() => loadJob()} disabled={jobLoading}>{jobLoading ? "Loading..." : "Refresh"}</button>
@@ -363,9 +371,9 @@
       {/if}
       {#if selectedJobResult}
         <div class="stack">
-          <label>Result summary</label>
+          <div class="field-label">Result summary</div>
           <pre class="mono">{JSON.stringify(selectedJobResult.summary || {}, null, 2)}</pre>
-          <label>Raw payload</label>
+          <div class="field-label">Raw payload</div>
           <pre class="mono">{JSON.stringify(selectedJobResult.raw || {}, null, 2)}</pre>
         </div>
       {/if}
@@ -379,8 +387,8 @@
     <div class="card reveal" style="--d: 0.3s">
       <h2>Batch Inspector</h2>
       <div class="stack">
-        <label>Batch ID</label>
-        <input type="text" placeholder="batch_123" bind:value={selectedBatchId} on:change={() => loadBatch()} />
+        <label for="batch-id">Batch ID</label>
+        <input id="batch-id" type="text" placeholder="batch_123" bind:value={selectedBatchId} on:change={() => loadBatch()} />
       </div>
       <div class="row">
         <button on:click={() => loadBatch()} disabled={batchLoading}>
@@ -400,7 +408,7 @@
           <strong class="mono">{JSON.stringify(selectedBatch.status_counts)}</strong>
         </div>
         <div class="stack">
-          <label>Jobs</label>
+          <div class="field-label">Jobs</div>
           <div class="list">
             {#each selectedBatch.items as item}
               <div class="list-item">

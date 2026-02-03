@@ -8,12 +8,12 @@ UI_DIR := ui
 NODE_MIN ?= 18
 NPM_MIN ?= 9
 
-CMDS := gonemaster gonemaster-server
+CMDS := gonemaster gonemaster-server gonemaster-client
 CMD ?= all
 
 .PHONY: help build build-all test install ui-build ui-install ui-dev ui-test clean \
-	build-gonemaster build-gonemaster-server build-gonemaster-server-noui \
-	install-gonemaster install-gonemaster-server ui-check
+	build-gonemaster build-gonemaster-server build-gonemaster-server-noui build-gonemaster-client \
+	install-gonemaster install-gonemaster-server install-gonemaster-client ui-check
 
 help:
 	@echo "Targets:"
@@ -24,6 +24,7 @@ help:
 	@echo "  ui-dev           Run the UI dev server"
 	@echo "  ui-test          Run UI tests"
 	@echo "  build-gonemaster-server-noui  Build API-only server (no npm/UI embed)"
+	@echo "  build-gonemaster-client       Build the HTTP API client"
 	@echo "  clean            Remove build artifacts"
 
 $(BIN_DIR):
@@ -85,6 +86,9 @@ build-gonemaster-server: $(BIN_DIR) ui-build
 build-gonemaster-server-noui: $(BIN_DIR)
 	$(GO) build -tags nogui -o $(BIN_DIR)/gonemaster-server ./cmd/gonemaster-server
 
+build-gonemaster-client: $(BIN_DIR)
+	$(GO) build -o $(BIN_DIR)/gonemaster-client ./cmd/gonemaster-client
+
 test: ui-test
 	$(GO) test ./...
 
@@ -102,6 +106,9 @@ install-gonemaster:
 
 install-gonemaster-server: ui-build
 	$(GO) install ./cmd/gonemaster-server
+
+install-gonemaster-client:
+	$(GO) install ./cmd/gonemaster-client
 
 clean:
 	@rm -rf $(BIN_DIR)

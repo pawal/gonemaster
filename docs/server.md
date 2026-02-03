@@ -16,6 +16,7 @@ To rebuild the embedded UI:
 ```
 make ui-build
 ```
+Note: building the UI requires `npm` to be available in your PATH.
 
 ## Quick start
 Start the server:

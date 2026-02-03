@@ -50,6 +50,17 @@
     return payload;
   };
 
+  const summaryLevels = ["NOTICE", "WARNING", "ERROR", "CRITICAL"];
+  const summaryRows = (summary) => {
+    const levels = summary?.levels || {};
+    return summaryLevels
+      .map((level) => ({
+        level,
+        count: Number(levels[level] || 0)
+      }))
+      .filter((entry) => entry.count > 0);
+  };
+
   const loadJobs = async () => {
     jobsLoading = true;
     try {
@@ -280,7 +291,18 @@ example.org`}
       {#if selectedJobResult}
         <div class="stack">
           <div class="field-label">Result summary</div>
-          <pre class="mono">{JSON.stringify(selectedJobResult.summary || {}, null, 2)}</pre>
+          {#if summaryRows(selectedJobResult.summary).length}
+            <div class="summary-grid">
+              {#each summaryRows(selectedJobResult.summary) as row}
+                <div class={`summary-item ${row.level.toLowerCase()}`}>
+                  <span class="summary-label">{row.level}</span>
+                  <span class="summary-count">{row.count}</span>
+                </div>
+              {/each}
+            </div>
+          {:else}
+            <div class="summary-empty">No NOTICE/WARNING/ERROR entries.</div>
+          {/if}
           <div class="field-label">Raw payload</div>
           <pre class="mono">{JSON.stringify(selectedJobResult.raw || {}, null, 2)}</pre>
         </div>

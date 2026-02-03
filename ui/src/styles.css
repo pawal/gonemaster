@@ -186,6 +186,64 @@ button:hover:not(:disabled) {
   color: var(--muted);
 }
 
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+.summary-item {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.summary-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.summary-count {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.summary-item.notice {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.summary-item.warning {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.summary-item.error {
+  border-color: #f97316;
+  background: #fff7ed;
+}
+
+.summary-item.critical {
+  border-color: #dc2626;
+  background: #fef2f2;
+}
+
+.summary-empty {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px dashed var(--border);
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
 .progress {
   position: relative;
   height: 12px;

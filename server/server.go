@@ -48,16 +48,22 @@ func (s *Server) Handler() http.Handler {
 }
 
 func (s *Server) routes() {
-	s.mux.HandleFunc("/jobs/batch", s.handleJobsBatch)
-	s.mux.HandleFunc("/jobs/", s.handleJobByID)
-	s.mux.HandleFunc("/jobs", s.handleJobs)
-	s.mux.HandleFunc("/batches/", s.handleBatchByID)
+	apiMux := http.NewServeMux()
+	apiMux.HandleFunc("/jobs/batch", s.handleJobsBatch)
+	apiMux.HandleFunc("/jobs/", s.handleJobByID)
+	apiMux.HandleFunc("/jobs", s.handleJobs)
+	apiMux.HandleFunc("/batches/", s.handleBatchByID)
 
-	s.mux.HandleFunc("/queue/pause", s.handleQueuePause)
-	s.mux.HandleFunc("/queue/resume", s.handleQueueResume)
-	s.mux.HandleFunc("/queue/reorder", s.handleQueueReorder)
+	apiMux.HandleFunc("/queue/pause", s.handleQueuePause)
+	apiMux.HandleFunc("/queue/resume", s.handleQueueResume)
+	apiMux.HandleFunc("/queue/reorder", s.handleQueueReorder)
 
-	s.mux.HandleFunc("/metrics", s.handleMetrics)
-	s.mux.HandleFunc("/healthz", s.handleHealth)
+	apiMux.HandleFunc("/metrics", s.handleMetrics)
+	apiMux.HandleFunc("/healthz", s.handleHealth)
+
+	s.mux.Handle("/api/v1/", http.StripPrefix("/api/v1", apiMux))
+	s.mux.HandleFunc("/api/v1", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/api/v1/", http.StatusMovedPermanently)
+	})
 	s.mux.Handle("/", serverui.Handler())
 }

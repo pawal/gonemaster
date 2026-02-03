@@ -14,7 +14,7 @@ func TestCreateAndGetJob(t *testing.T) {
 	srv := New(DefaultConfig())
 
 	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/jobs", bytes.NewBufferString(`{"domain":"example.com"}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(`{"domain":"example.com"}`))
 	req.Header.Set("Content-Type", "application/json")
 	srv.Handler().ServeHTTP(resp, req)
 
@@ -30,7 +30,7 @@ func TestCreateAndGetJob(t *testing.T) {
 	}
 
 	resp = httptest.NewRecorder()
-	getReq := httptest.NewRequest(http.MethodGet, "/jobs/"+created.ID, nil)
+	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/jobs/"+created.ID, nil)
 	srv.Handler().ServeHTTP(resp, getReq)
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", resp.Code)
@@ -42,7 +42,7 @@ func TestCreateJobMinLevel(t *testing.T) {
 
 	payload := `{"domain":"example.com","min_level":"WARNING"}`
 	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/jobs", bytes.NewBufferString(payload))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(payload))
 	req.Header.Set("Content-Type", "application/json")
 	srv.Handler().ServeHTTP(resp, req)
 
@@ -66,7 +66,7 @@ func TestCreateJobValidation(t *testing.T) {
 	srv := New(DefaultConfig())
 
 	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/jobs", bytes.NewBufferString(`{"domain":""}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(`{"domain":""}`))
 	req.Header.Set("Content-Type", "application/json")
 	srv.Handler().ServeHTTP(resp, req)
 	if resp.Code != http.StatusBadRequest {
@@ -78,7 +78,7 @@ func TestListJobs(t *testing.T) {
 	srv := New(DefaultConfig())
 
 	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/jobs", bytes.NewBufferString(`{"domain":"example.com"}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(`{"domain":"example.com"}`))
 	req.Header.Set("Content-Type", "application/json")
 	srv.Handler().ServeHTTP(resp, req)
 	if resp.Code != http.StatusCreated {
@@ -86,7 +86,7 @@ func TestListJobs(t *testing.T) {
 	}
 
 	resp = httptest.NewRecorder()
-	listReq := httptest.NewRequest(http.MethodGet, "/jobs", nil)
+	listReq := httptest.NewRequest(http.MethodGet, "/api/v1/jobs", nil)
 	srv.Handler().ServeHTTP(resp, listReq)
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.Code)
@@ -105,7 +105,7 @@ func TestBatchSubmit(t *testing.T) {
 
 	payload := `{"domains":["example.com","example.net"]}`
 	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/jobs/batch", bytes.NewBufferString(payload))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/batch", bytes.NewBufferString(payload))
 	req.Header.Set("Content-Type", "application/json")
 	srv.Handler().ServeHTTP(resp, req)
 
@@ -126,7 +126,7 @@ func TestBatchSummary(t *testing.T) {
 
 	payload := `{"domains":["example.com","example.net"]}`
 	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/jobs/batch", bytes.NewBufferString(payload))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/batch", bytes.NewBufferString(payload))
 	req.Header.Set("Content-Type", "application/json")
 	srv.Handler().ServeHTTP(resp, req)
 	if resp.Code != http.StatusAccepted {
@@ -138,7 +138,7 @@ func TestBatchSummary(t *testing.T) {
 	}
 
 	resp = httptest.NewRecorder()
-	getReq := httptest.NewRequest(http.MethodGet, "/batches/"+batch.BatchID, nil)
+	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/batches/"+batch.BatchID, nil)
 	srv.Handler().ServeHTTP(resp, getReq)
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.Code)
@@ -165,7 +165,7 @@ func TestCancelJob(t *testing.T) {
 	srv := New(DefaultConfig())
 
 	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/jobs", bytes.NewBufferString(`{"domain":"example.com"}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(`{"domain":"example.com"}`))
 	req.Header.Set("Content-Type", "application/json")
 	srv.Handler().ServeHTTP(resp, req)
 	if resp.Code != http.StatusCreated {
@@ -175,7 +175,7 @@ func TestCancelJob(t *testing.T) {
 	_ = json.NewDecoder(resp.Body).Decode(&created)
 
 	resp = httptest.NewRecorder()
-	cancelReq := httptest.NewRequest(http.MethodPost, "/jobs/"+created.ID+"/cancel", nil)
+	cancelReq := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/"+created.ID+"/cancel", nil)
 	srv.Handler().ServeHTTP(resp, cancelReq)
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.Code)
@@ -206,7 +206,7 @@ func TestCancelJobTriggersContextCancel(t *testing.T) {
 	srv.registerCancel(job.ID, func() { once.Do(func() { close(canceled) }) })
 
 	resp := httptest.NewRecorder()
-	cancelReq := httptest.NewRequest(http.MethodPost, "/jobs/"+job.ID+"/cancel", nil)
+	cancelReq := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/"+job.ID+"/cancel", nil)
 	srv.Handler().ServeHTTP(resp, cancelReq)
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.Code)
@@ -229,14 +229,14 @@ func TestQueueEndpoints(t *testing.T) {
 	srv := New(DefaultConfig())
 
 	resp := httptest.NewRecorder()
-	pauseReq := httptest.NewRequest(http.MethodPost, "/queue/pause", nil)
+	pauseReq := httptest.NewRequest(http.MethodPost, "/api/v1/queue/pause", nil)
 	srv.Handler().ServeHTTP(resp, pauseReq)
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.Code)
 	}
 
 	resp = httptest.NewRecorder()
-	resumeReq := httptest.NewRequest(http.MethodPost, "/queue/resume", nil)
+	resumeReq := httptest.NewRequest(http.MethodPost, "/api/v1/queue/resume", nil)
 	srv.Handler().ServeHTTP(resp, resumeReq)
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.Code)
@@ -248,7 +248,7 @@ func TestQueueReorderValidation(t *testing.T) {
 
 	resp := httptest.NewRecorder()
 	payload := `{"job_ids":["job1"]}`
-	req := httptest.NewRequest(http.MethodPost, "/queue/reorder", bytes.NewBufferString(payload))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/queue/reorder", bytes.NewBufferString(payload))
 	req.Header.Set("Content-Type", "application/json")
 	srv.Handler().ServeHTTP(resp, req)
 	if resp.Code != http.StatusBadRequest {
@@ -260,14 +260,14 @@ func TestHealthAndMetrics(t *testing.T) {
 	srv := New(DefaultConfig())
 
 	resp := httptest.NewRecorder()
-	healthReq := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	healthReq := httptest.NewRequest(http.MethodGet, "/api/v1/healthz", nil)
 	srv.Handler().ServeHTTP(resp, healthReq)
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.Code)
 	}
 
 	resp = httptest.NewRecorder()
-	metricsReq := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	metricsReq := httptest.NewRequest(http.MethodGet, "/api/v1/metrics", nil)
 	srv.Handler().ServeHTTP(resp, metricsReq)
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.Code)

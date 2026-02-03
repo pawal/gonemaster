@@ -4,6 +4,7 @@
 - `gonemaster-server` is a REST API wrapper around the Gonemaster engine with an embedded web UI.
 - The API contract is defined in [openapi.yaml](openapi.yaml).
 - The UI is served at `/` from the embedded build output in `server/ui/dist`.
+- The API is served under `/api/v1`.
 - Job progress is reported as a percentage (0-100).
 
 ## Build
@@ -24,7 +25,7 @@ Start the server:
 
 Submit a single job and capture the job id:
 ```
-JOB_ID=$(curl -s http://localhost:8080/jobs \
+JOB_ID=$(curl -s http://localhost:8080/api/v1/jobs \
   -H 'Content-Type: application/json' \
   -d '{"domain":"example.com"}' | jq -r .id)
 ```
@@ -32,7 +33,7 @@ JOB_ID=$(curl -s http://localhost:8080/jobs \
 Wait for completion (poll status):
 ```
 while true; do
-  STATUS=$(curl -s http://localhost:8080/jobs/$JOB_ID | jq -r .status)
+  STATUS=$(curl -s http://localhost:8080/api/v1/jobs/$JOB_ID | jq -r .status)
   echo "status=$STATUS"
   if [ "$STATUS" = "succeeded" ] || [ "$STATUS" = "failed" ] || [ "$STATUS" = "canceled" ]; then
     break
@@ -43,7 +44,7 @@ done
 
 Fetch the result (localized messages, default English):
 ```
-curl -s "http://localhost:8080/jobs/$JOB_ID/result?locale=en" | jq .
+curl -s "http://localhost:8080/api/v1/jobs/$JOB_ID/result?locale=en" | jq .
 ```
 
 ## Run
@@ -84,7 +85,8 @@ Domains are normalized to IDNA A-labels (punycode). For example:
 Invalid domains return a `400` error with `code=invalid_domain`.
 
 ## API basics
-- Base URL: the server listen address (default `http://localhost:8080`).
+- Base URL: the server listen address plus `/api/v1` (default `http://localhost:8080/api/v1`).
+- All endpoint paths below are relative to the base URL.
 - Content-Type: JSON for requests and responses.
 - Errors: standard JSON envelope:
   ```json

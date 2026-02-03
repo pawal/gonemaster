@@ -63,13 +63,13 @@ describe("App", () => {
     };
 
     global.fetch.mockImplementation((url, options = {}) => {
-      if (url === "/jobs" && options.method === "POST") {
+      if (url === "/api/v1/jobs" && options.method === "POST") {
         return jsonResponse(job);
       }
-      if (url === `/jobs/${job.id}`) {
+      if (url === `/api/v1/jobs/${job.id}`) {
         return jsonResponse(job);
       }
-      if (typeof url === "string" && url.startsWith("/jobs?")) {
+      if (typeof url === "string" && url.startsWith("/api/v1/jobs?")) {
         return jsonResponse({ items: [job] });
       }
       return jsonResponse({ items: [] });
@@ -89,7 +89,7 @@ describe("App", () => {
     });
 
     expect(global.fetch).toHaveBeenCalledWith(
-      "/jobs",
+      "/api/v1/jobs",
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({ domain: "example.com" })
@@ -111,13 +111,13 @@ describe("App", () => {
     };
 
     global.fetch.mockImplementation((url, options = {}) => {
-      if (url === "/jobs" && options.method === "POST") {
+      if (url === "/api/v1/jobs" && options.method === "POST") {
         return jsonResponse(job);
       }
-      if (url === `/jobs/${job.id}`) {
+      if (url === `/api/v1/jobs/${job.id}`) {
         return jsonResponse(job);
       }
-      if (typeof url === "string" && url.startsWith("/jobs?")) {
+      if (typeof url === "string" && url.startsWith("/api/v1/jobs?")) {
         return jsonResponse({ items: [job] });
       }
       return jsonResponse({ items: [] });
@@ -133,7 +133,7 @@ describe("App", () => {
 
     await waitFor(() => {
       const postCall = global.fetch.mock.calls.find(
-        ([url, options]) => url === "/jobs" && options?.method === "POST"
+        ([url, options]) => url === "/api/v1/jobs" && options?.method === "POST"
       );
       expect(postCall).toBeTruthy();
       const body = JSON.parse(postCall[1].body);
@@ -157,13 +157,13 @@ describe("App", () => {
     };
 
     global.fetch.mockImplementation((url, options = {}) => {
-      if (url === "/jobs/batch" && options.method === "POST") {
+      if (url === "/api/v1/jobs/batch" && options.method === "POST") {
         return jsonResponse(batch);
       }
-      if (url === "/batches/batch_1") {
+      if (url === "/api/v1/batches/batch_1") {
         return jsonResponse(summary);
       }
-      if (typeof url === "string" && url.startsWith("/jobs?")) {
+      if (typeof url === "string" && url.startsWith("/api/v1/jobs?")) {
         return jsonResponse({ items: [] });
       }
       return jsonResponse({});
@@ -183,7 +183,7 @@ describe("App", () => {
     });
 
     expect(global.fetch).toHaveBeenCalledWith(
-      "/jobs/batch",
+      "/api/v1/jobs/batch",
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({ domains: ["example.com", "example.org"] })
@@ -203,10 +203,10 @@ describe("App", () => {
     };
 
     global.fetch.mockImplementation((url) => {
-      if (typeof url === "string" && url.startsWith("/jobs?")) {
+      if (typeof url === "string" && url.startsWith("/api/v1/jobs?")) {
         return jsonResponse({ items: [job] });
       }
-      if (url === `/jobs/${job.id}`) {
+      if (url === `/api/v1/jobs/${job.id}`) {
         return jsonResponse(job);
       }
       return jsonResponse({ items: [] });
@@ -263,13 +263,13 @@ describe("App", () => {
     };
 
     global.fetch.mockImplementation((url) => {
-      if (typeof url === "string" && url.startsWith("/jobs?")) {
+      if (typeof url === "string" && url.startsWith("/api/v1/jobs?")) {
         return jsonResponse({ items: [] });
       }
-      if (url === `/jobs/${job.id}`) {
+      if (url === `/api/v1/jobs/${job.id}`) {
         return jsonResponse(job);
       }
-      if (typeof url === "string" && url.startsWith(`/jobs/${job.id}/result`)) {
+      if (typeof url === "string" && url.startsWith(`/api/v1/jobs/${job.id}/result`)) {
         return jsonResponse(result);
       }
       return jsonResponse({});
@@ -334,13 +334,13 @@ describe("App", () => {
     };
 
     global.fetch.mockImplementation((url) => {
-      if (typeof url === "string" && url.startsWith("/jobs?")) {
+      if (typeof url === "string" && url.startsWith("/api/v1/jobs?")) {
         return jsonResponse({ items: [] });
       }
-      if (url === `/jobs/${job.id}`) {
+      if (url === `/api/v1/jobs/${job.id}`) {
         return jsonResponse(job);
       }
-      if (typeof url === "string" && url.startsWith(`/jobs/${job.id}/result`)) {
+      if (typeof url === "string" && url.startsWith(`/api/v1/jobs/${job.id}/result`)) {
         return jsonResponse(result);
       }
       return jsonResponse({});

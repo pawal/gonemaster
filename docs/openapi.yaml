@@ -5,8 +5,8 @@ info:
   description: |
     REST API for running Gonemaster engine tests with queueing, streaming, and cancellation.
 servers:
-  - url: http://localhost:8080
-    description: Local development
+  - url: http://localhost:8080/api/v1
+    description: Local development (API base)
 
 tags:
   - name: Jobs

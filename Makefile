@@ -12,7 +12,8 @@ CMDS := gonemaster gonemaster-server
 CMD ?= all
 
 .PHONY: help build build-all test install ui-build ui-install ui-dev ui-test clean \
-	build-gonemaster build-gonemaster-server install-gonemaster install-gonemaster-server ui-check
+	build-gonemaster build-gonemaster-server build-gonemaster-server-noui \
+	install-gonemaster install-gonemaster-server ui-check
 
 help:
 	@echo "Targets:"
@@ -22,6 +23,7 @@ help:
 	@echo "  ui-build         Build the embedded UI"
 	@echo "  ui-dev           Run the UI dev server"
 	@echo "  ui-test          Run UI tests"
+	@echo "  build-gonemaster-server-noui  Build API-only server (no npm/UI embed)"
 	@echo "  clean            Remove build artifacts"
 
 $(BIN_DIR):
@@ -79,6 +81,9 @@ build-gonemaster: $(BIN_DIR)
 
 build-gonemaster-server: $(BIN_DIR) ui-build
 	$(GO) build -o $(BIN_DIR)/gonemaster-server ./cmd/gonemaster-server
+
+build-gonemaster-server-noui: $(BIN_DIR)
+	$(GO) build -tags nogui -o $(BIN_DIR)/gonemaster-server ./cmd/gonemaster-server
 
 test: ui-test
 	$(GO) test ./...

@@ -27,6 +27,16 @@ make ui-build
 ```
 Note: building the UI requires `npm` to be available in your PATH.
 
+To build an API-only server (no UI embed, no npm required):
+```
+make build-gonemaster-server-noui
+```
+or:
+```
+go build -tags nogui -o ./gonemaster-server ./cmd/gonemaster-server
+```
+When built with `nogui`, the `/` UI route returns `404 ui not available`, while the API under `/api/v1` is unaffected.
+
 ## Quick start
 Start the server:
 ```

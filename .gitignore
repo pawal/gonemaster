@@ -1,0 +1,19 @@
+# Go build artifacts
+/bin/
+*.test
+*.out
+/gonemaster-server
+/gonemaster
+
+# UI artifacts
+/ui/node_modules/
+/ui/.vite/
+/server/ui/dist/assets/
+/server/ui/dist/*.map
+
+# OS/editor files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~

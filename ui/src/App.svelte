@@ -353,7 +353,7 @@ example.org`}
           {#if summaryRows(selectedJobResult.summary).length}
             <div class="summary-grid">
               {#each summaryRows(selectedJobResult.summary) as row}
-                <div class={`summary-item ${row.level.toLowerCase()}`}>
+                <div class={`summary-item severity-${row.level.toLowerCase()}`}>
                   <span class="summary-label">{row.level}</span>
                   <span class="summary-count">{row.count}</span>
                 </div>
@@ -382,7 +382,7 @@ example.org`}
                     <div class="module-badges">
                       {#each moduleLevels as level}
                         {#if group.counts[level]}
-                          <span class={`level-pill ${level.toLowerCase()}`}>{level} {group.counts[level]}</span>
+                          <span class={`level-pill severity-${level.toLowerCase()}`}>{level} {group.counts[level]}</span>
                         {/if}
                       {/each}
                     </div>
@@ -400,7 +400,7 @@ example.org`}
                         {@const meta = entryMeta(entry)}
                         <div class="result-row">
                           <span class="entry-time">{formatSeconds(entry.timestamp)}</span>
-                          <span class={`entry-level ${level.toLowerCase()}`}>{level}</span>
+                        <span class={`entry-level severity-${level.toLowerCase()}`}>{level}</span>
                           <span class="entry-message">{entryMessage(entry)}</span>
                         </div>
                         {#if meta}

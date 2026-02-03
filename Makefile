@@ -8,7 +8,7 @@ UI_DIR := ui
 CMDS := gonemaster gonemaster-server
 CMD ?= all
 
-.PHONY: help build build-all test install ui-build ui-install ui-dev clean \
+.PHONY: help build build-all test install ui-build ui-install ui-dev ui-test clean \
 	build-gonemaster build-gonemaster-server install-gonemaster install-gonemaster-server
 
 help:
@@ -18,6 +18,7 @@ help:
 	@echo "  install          Install all commands (override CMD=gonemaster-server)"
 	@echo "  ui-build         Build the embedded UI"
 	@echo "  ui-dev           Run the UI dev server"
+	@echo "  ui-test          Run UI tests"
 	@echo "  clean            Remove build artifacts"
 
 $(BIN_DIR):
@@ -31,6 +32,9 @@ ui-build: ui-install
 
 ui-dev: ui-install
 	$(NPM) --prefix $(UI_DIR) run dev
+
+ui-test: ui-install
+	$(NPM) --prefix $(UI_DIR) run test
 
 build: $(BIN_DIR)
 	@if [ "$(CMD)" = "all" ]; then \
@@ -47,7 +51,7 @@ build-gonemaster: $(BIN_DIR)
 build-gonemaster-server: $(BIN_DIR) ui-build
 	$(GO) build -o $(BIN_DIR)/gonemaster-server ./cmd/gonemaster-server
 
-test:
+test: ui-test
 	$(GO) test ./...
 
 install:

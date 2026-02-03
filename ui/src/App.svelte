@@ -292,7 +292,7 @@
       </div>
       <div class="stack">
         <label>Profile overrides (JSON)</label>
-        <textarea placeholder='{"timeout": 5}' bind:value={singleOverrides}></textarea>
+        <textarea placeholder={'{"timeout": 5}'} bind:value={singleOverrides}></textarea>
       </div>
       <button on:click={submitSingle} disabled={singleSubmitting}>
         {singleSubmitting ? "Submitting..." : "Run Single Job"}
@@ -322,7 +322,7 @@
       </div>
       <div class="stack">
         <label>Profile overrides (JSON)</label>
-        <textarea placeholder='{"timeout": 5}' bind:value={batchOverrides}></textarea>
+        <textarea placeholder={'{"timeout": 5}'} bind:value={batchOverrides}></textarea>
       </div>
       <button class="secondary" on:click={submitBatch} disabled={batchSubmitting}>
         {batchSubmitting ? "Submitting..." : "Run Batch"}

@@ -20,7 +20,7 @@ describe("App", () => {
   });
 
   it("renders the main sections", async () => {
-    global.fetch.mockResolvedValueOnce(jsonResponse({ items: [] }));
+    global.fetch.mockImplementation(() => jsonResponse({ items: [] }));
 
     const { unmount } = render(App);
 
@@ -35,7 +35,7 @@ describe("App", () => {
   });
 
   it("warns when submitting a single job without a domain", async () => {
-    global.fetch.mockResolvedValueOnce(jsonResponse({ items: [] }));
+    global.fetch.mockImplementation(() => jsonResponse({ items: [] }));
 
     const { unmount } = render(App);
 
@@ -58,11 +58,18 @@ describe("App", () => {
       progress: 0
     };
 
-    global.fetch
-      .mockResolvedValueOnce(jsonResponse({ items: [] }))
-      .mockResolvedValueOnce(jsonResponse(job))
-      .mockResolvedValueOnce(jsonResponse({ items: [job] }))
-      .mockResolvedValueOnce(jsonResponse(job));
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (url === "/jobs" && options.method === "POST") {
+        return jsonResponse(job);
+      }
+      if (url === `/jobs/${job.id}`) {
+        return jsonResponse(job);
+      }
+      if (typeof url === "string" && url.startsWith("/jobs?")) {
+        return jsonResponse({ items: [job] });
+      }
+      return jsonResponse({ items: [] });
+    });
 
     const { unmount } = render(App);
 
@@ -73,7 +80,7 @@ describe("App", () => {
     await fireEvent.click(button);
 
     await waitFor(() => {
-      expect(screen.getByText("Created job:")).toBeInTheDocument();
+      expect(screen.getByText(/Created job:/)).toBeInTheDocument();
       expect(screen.getByText("job_1")).toBeInTheDocument();
     });
 

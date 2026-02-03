@@ -7,6 +7,11 @@
 - The API is served under `/api/v1`.
 - Job progress is reported as a percentage (0-100).
 
+When running the API and the UI, please note that the default profile is set to also use IPv6.
+If you don't have access to IPv6 on your development machine, you must modify the profile.
+You can dump the profile using `--dump-profile` in the CLI, and assign the file to the
+server with the `--profile` option.
+
 ## Build
 ```
 go build -o ./gonemaster-server ./cmd/gonemaster-server

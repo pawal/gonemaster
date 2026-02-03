@@ -186,6 +186,40 @@ button:hover:not(:disabled) {
   color: var(--muted);
 }
 
+.progress {
+  position: relative;
+  height: 12px;
+  border-radius: 999px;
+  background: #e4e7ec;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #0b2d4d 0%, #0e7490 100%);
+  transition: width 0.3s ease;
+}
+
+.progress-value {
+  position: absolute;
+  right: 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #344054;
+}
+
+.progress.compact {
+  height: 8px;
+  margin-top: 6px;
+}
+
+.progress.compact .progress-value {
+  font-size: 0.68rem;
+  right: 6px;
+}
+
 .list {
   display: flex;
   flex-direction: column;

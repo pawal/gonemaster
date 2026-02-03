@@ -264,7 +264,10 @@ example.org`}
           <span>Status</span>
           <strong>{selectedJob.status}</strong>
           <span>Progress</span>
-          <strong>{selectedJob.progress}%</strong>
+          <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={selectedJob.progress || 0}>
+            <div class="progress-bar" style={`width: ${selectedJob.progress || 0}%`}></div>
+            <span class="progress-value">{selectedJob.progress || 0}%</span>
+          </div>
           <span>Domain</span>
           <strong class="mono">{selectedJob.domain}</strong>
           <span>Created</span>
@@ -348,7 +351,11 @@ example.org`}
           <div class="list-item">
             <div>
               <div class="mono">{job.id}</div>
-              <div class="small">{job.domain} - {job.status} - {job.progress}%</div>
+              <div class="small">{job.domain} - {job.status}</div>
+              <div class="progress compact" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={job.progress || 0}>
+                <div class="progress-bar" style={`width: ${job.progress || 0}%`}></div>
+                <span class="progress-value">{job.progress || 0}%</span>
+              </div>
             </div>
             <button class="ghost" type="button" on:click={() => {
               selectedJobId = job.id;

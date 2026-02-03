@@ -12,6 +12,8 @@ If you don't have access to IPv6 on your development machine, you must modify th
 You can dump the profile using `--dump-profile` in the CLI, and assign the file to the
 server with the `--profile` option.
 
+The default profile is located in `share/profile.json`, but is built into the server binary.
+
 ## Build
 ```
 go build -o ./gonemaster-server ./cmd/gonemaster-server

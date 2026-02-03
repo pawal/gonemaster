@@ -256,6 +256,51 @@ func TestQueueReorderValidation(t *testing.T) {
 	}
 }
 
+func TestQueueRemove(t *testing.T) {
+	srv := New(DefaultConfig())
+	now := time.Now().UTC()
+	job := Job{
+		ID:        "job1",
+		Domain:    "example.com",
+		Status:    JobQueued,
+		CreatedAt: now,
+	}
+	if _, err := srv.store.Create(job); err != nil {
+		t.Fatalf("create job: %v", err)
+	}
+	if err := srv.queue.Enqueue(job.ID); err != nil {
+		t.Fatalf("enqueue: %v", err)
+	}
+
+	resp := httptest.NewRecorder()
+	payload := `{"job_ids":["job1"]}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/queue/remove", bytes.NewBufferString(payload))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+
+	stored, ok := srv.store.Get(job.ID)
+	if !ok {
+		t.Fatalf("expected job in store")
+	}
+	if stored.Status != JobCanceled {
+		t.Fatalf("expected status canceled, got %s", stored.Status)
+	}
+	if stored.Error != "removed_from_queue" {
+		t.Fatalf("expected error removed_from_queue, got %q", stored.Error)
+	}
+
+	result, ok := srv.store.GetResult(job.ID)
+	if !ok {
+		t.Fatalf("expected job result")
+	}
+	if result.Status != JobCanceled {
+		t.Fatalf("expected result status canceled, got %s", result.Status)
+	}
+}
+
 func TestHealthAndMetrics(t *testing.T) {
 	srv := New(DefaultConfig())
 

@@ -242,6 +242,27 @@ paths:
         '400':
           $ref: '#/components/responses/ErrorResponse'
 
+  /queue/remove:
+    post:
+      tags: [Queue]
+      summary: Remove queued jobs
+      operationId: removeQueueJobs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueueRemoveRequest'
+      responses:
+        '200':
+          description: Jobs removed from queue
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueRemoveResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
   /metrics:
     get:
       tags: [Ops]
@@ -447,6 +468,24 @@ components:
       required: [job_ids]
       properties:
         job_ids:
+          type: array
+          items:
+            type: string
+
+    QueueRemoveRequest:
+      type: object
+      required: [job_ids]
+      properties:
+        job_ids:
+          type: array
+          items:
+            type: string
+
+    QueueRemoveResponse:
+      type: object
+      required: [removed]
+      properties:
+        removed:
           type: array
           items:
             type: string

@@ -370,6 +370,54 @@ func (s *Server) handleQueueReorder(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func (s *Server) handleQueueRemove(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
+		return
+	}
+	var req QueueRemoveRequest
+	if err := readJSON(r, s.cfg.MaxBodySize, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_json", err.Error(), nil)
+		return
+	}
+	if len(req.JobIDs) == 0 {
+		writeError(w, http.StatusBadRequest, "invalid_queue", "job_ids is required", nil)
+		return
+	}
+	removed := make([]string, 0, len(req.JobIDs))
+	for _, jobID := range req.JobIDs {
+		jobID = strings.TrimSpace(jobID)
+		if jobID == "" {
+			writeError(w, http.StatusBadRequest, "invalid_queue", "job_id is required", nil)
+			return
+		}
+		if err := s.queue.Remove(jobID); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_queue", err.Error(), nil)
+			return
+		}
+		if job, ok := s.store.Get(jobID); ok {
+			if job.Status == JobQueued {
+				job.Status = JobCanceled
+				job.Error = "removed_from_queue"
+				job.FinishedAt = time.Now().UTC()
+				job.Progress = 100
+				if err := s.store.Update(job); err != nil {
+					writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
+					return
+				}
+				_ = s.store.SetResult(job.ID, JobResult{
+					JobID:   job.ID,
+					BatchID: job.BatchID,
+					Status:  JobCanceled,
+					Summary: map[string]any{"error": "removed_from_queue"},
+				})
+			}
+		}
+		removed = append(removed, jobID)
+	}
+	writeJSON(w, http.StatusOK, QueueRemoveResponse{Removed: removed})
+}
+
 func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)

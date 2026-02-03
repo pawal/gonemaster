@@ -57,6 +57,7 @@ func (s *Server) routes() {
 	apiMux.HandleFunc("/queue/pause", s.handleQueuePause)
 	apiMux.HandleFunc("/queue/resume", s.handleQueueResume)
 	apiMux.HandleFunc("/queue/reorder", s.handleQueueReorder)
+	apiMux.HandleFunc("/queue/remove", s.handleQueueRemove)
 
 	apiMux.HandleFunc("/metrics", s.handleMetrics)
 	apiMux.HandleFunc("/healthz", s.handleHealth)

@@ -201,6 +201,12 @@ POST /queue/reorder
 { "job_ids": ["job_a", "job_b"] }
 ```
 
+Remove queued jobs:
+```
+POST /queue/remove
+{ "job_ids": ["job_a"] }
+```
+
 ### Ops
 ```
 GET /metrics

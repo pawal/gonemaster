@@ -103,6 +103,16 @@ type QueueReorderRequest struct {
 	JobIDs []string `json:"job_ids"`
 }
 
+// QueueRemoveRequest removes queued jobs by id.
+type QueueRemoveRequest struct {
+	JobIDs []string `json:"job_ids"`
+}
+
+// QueueRemoveResponse reports removed jobs.
+type QueueRemoveResponse struct {
+	Removed []string `json:"removed"`
+}
+
 // ErrorResponse is the standard error response body.
 type ErrorResponse struct {
 	Error ErrorBody `json:"error"`

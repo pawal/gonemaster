@@ -46,7 +46,8 @@ Use `--output PATH` to write the selected output to a file.
 | `--no-ipv4` | bool | Disable IPv4 queries (overrides profile setting). |
 | `--no-ipv6` | bool | Disable IPv6 queries (overrides profile setting). |
 | `--parallel N` | int | Override `resolver.defaults.parallel`. Must be `>= 1` when set. |
-| `--unordered` | bool | Allow unordered resolver behavior (default off; overrides `resolver.defaults.unordered`). |
+| `--unordered` | bool | Allow unordered resolver behavior (overrides `resolver.defaults.unordered`). |
+| `--ordered` | bool | Force ordered resolver behavior (overrides `resolver.defaults.unordered`). |
 | `--error-cache-ttl N` | int | Seconds to skip queries after network errors. Must be `>= 0` when set. |
 | `--no-progress` | bool | Disable progress indicator/spinner. |
 | `--list-tests` | bool | List available test cases and exit. |

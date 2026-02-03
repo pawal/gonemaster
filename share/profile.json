@@ -24,8 +24,8 @@
             "recurse": false,
             "retrans": 3,
             "retry": 2,
-            "parallel": 1,
-            "unordered": false,
+            "parallel": 8,
+            "unordered": true,
             "usevc": false,
             "timeout": 5,
             "error_cache_ttl": 0

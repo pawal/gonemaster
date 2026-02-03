@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"codeberg.org/pawal/gonemaster/engine"
+	serverui "codeberg.org/pawal/gonemaster/server/ui"
 )
 
 // Server holds the HTTP API and supporting services.
@@ -58,4 +59,5 @@ func (s *Server) routes() {
 
 	s.mux.HandleFunc("/metrics", s.handleMetrics)
 	s.mux.HandleFunc("/healthz", s.handleHealth)
+	s.mux.Handle("/", serverui.Handler())
 }

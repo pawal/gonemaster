@@ -1,13 +1,49 @@
 # Gonemaster Server
 
 ## Overview
-- `gonemaster-server` is a REST API wrapper around the Gonemaster engine.
-- API contract is defined in `docs/openapi.yaml`.
+- `gonemaster-server` is a REST API wrapper around the Gonemaster engine with an embedded web UI.
+- The API contract is defined in [openapi.yaml](openapi.yaml).
+- The UI is served at `/` from the embedded build output in `server/ui/dist`.
 - Job progress is reported as a percentage (0-100).
 
 ## Build
 ```
 go build -o ./gonemaster-server ./cmd/gonemaster-server
+```
+
+To rebuild the embedded UI:
+```
+make ui-build
+```
+
+## Quick start
+Start the server:
+```
+./gonemaster-server --listen :8080
+```
+
+Submit a single job and capture the job id:
+```
+JOB_ID=$(curl -s http://localhost:8080/jobs \
+  -H 'Content-Type: application/json' \
+  -d '{"domain":"example.com"}' | jq -r .id)
+```
+
+Wait for completion (poll status):
+```
+while true; do
+  STATUS=$(curl -s http://localhost:8080/jobs/$JOB_ID | jq -r .status)
+  echo "status=$STATUS"
+  if [ "$STATUS" = "succeeded" ] || [ "$STATUS" = "failed" ] || [ "$STATUS" = "canceled" ]; then
+    break
+  fi
+  sleep 2
+done
+```
+
+Fetch the result (localized messages, default English):
+```
+curl -s "http://localhost:8080/jobs/$JOB_ID/result?locale=en" | jq .
 ```
 
 ## Run
@@ -19,18 +55,6 @@ go build -o ./gonemaster-server ./cmd/gonemaster-server
 - Config file is optional JSON and loaded with `--config`.
 - Flags override config file values.
 - `profile_path` sets the default profile used for all jobs (same as `gonemaster --profile`).
-
-## Per-job overrides
-- `min_level` can be set per request in `POST /jobs` and `POST /jobs/batch` to override the server default.
-- `profile_overrides` are merged on top of `profile_path` when both are provided.
-
-## Batch summary endpoint
-- `GET /batches/{batch_id}` returns batch metadata, job list, status counts, and timestamps (`created_at`, optional `started_at`, optional `finished_at`).
-
-Example
-```
-curl -s http://localhost:8080/batches/batch_123 | jq .
-```
 
 ### Config example
 ```json
@@ -53,3 +77,145 @@ curl -s http://localhost:8080/batches/batch_123 | jq .
 - `--min-level` Minimum log level for results
 - `--profile` Profile JSON/YAML path (default for all jobs)
 - `--shutdown-timeout` Graceful shutdown timeout
+
+## Domain normalization (IDN)
+Domains are normalized to IDNA A-labels (punycode). For example:
+`räksmörgås.se` becomes `xn--rksmrgs-5wao1o.se`.
+Invalid domains return a `400` error with `code=invalid_domain`.
+
+## API basics
+- Base URL: the server listen address (default `http://localhost:8080`).
+- Content-Type: JSON for requests and responses.
+- Errors: standard JSON envelope:
+  ```json
+  { "error": { "code": "invalid_domain", "message": "..." } }
+  ```
+
+## Endpoints
+
+### Jobs
+Create a single job:
+```
+POST /jobs
+{
+  "domain": "example.com",
+  "tests": ["basic01"],
+  "min_level": "NOTICE",
+  "profile_overrides": { "timeout": 5 }
+}
+```
+
+List jobs:
+```
+GET /jobs?status=running&limit=100
+```
+
+Get a job:
+```
+GET /jobs/{job_id}
+```
+
+Get a job result (localized messages):
+```
+GET /jobs/{job_id}/result?locale=en
+```
+
+Result schema (relevant fields):
+```json
+{
+  "job_id": "job_123",
+  "status": "succeeded",
+  "summary": {
+    "total": 42,
+    "levels": { "NOTICE": 2, "WARNING": 1, "ERROR": 0 }
+  },
+  "raw": {
+    "locale": "en",
+    "entries": [
+      {
+        "timestamp": 0.12,
+        "module": "BASIC",
+        "testcase": "basic01",
+        "tag": "BASIC01",
+        "level": "NOTICE",
+        "args": { "domain": "example.com" },
+        "message": "Translated message (locale=en)",
+        "raw": "BASIC:basic01:BASIC01 domain=example.com"
+      }
+    ]
+  }
+}
+```
+
+Stream job events (SSE):
+```
+GET /jobs/{job_id}/events
+```
+Currently emits a basic `state` event; more event types can be added later.
+
+Cancel a job:
+```
+POST /jobs/{job_id}/cancel
+```
+
+### Batches
+Submit a batch:
+```
+POST /jobs/batch
+{
+  "domains": ["example.com", "example.org"]
+}
+```
+
+Get batch summary:
+```
+GET /batches/{batch_id}
+```
+
+### Queue controls
+Pause queue:
+```
+POST /queue/pause
+```
+
+Resume queue:
+```
+POST /queue/resume
+```
+
+Reorder queued jobs:
+```
+POST /queue/reorder
+{ "job_ids": ["job_a", "job_b"] }
+```
+
+### Ops
+```
+GET /metrics
+GET /healthz
+```
+
+## UI
+The embedded UI is served at `/` and calls the API on the same host.
+
+### Features
+- Single and batch job submission.
+- Job and batch inspectors with auto-refresh.
+- Auto-refresh for a job stops automatically when progress reaches 100%.
+- Progress displayed as a bar.
+- Summary view for NOTICE/WARNING/ERROR/CRITICAL.
+- Raw results grouped by module; click a module to expand/collapse.
+- Raw results show a CLI-style table (seconds, level, message) and use translated messages when available.
+
+### Build & dev
+Rebuild the embedded UI:
+```
+make ui-build
+```
+
+Run the UI dev server (Vite):
+```
+make ui-dev
+```
+
+The dev server runs on `http://localhost:5173` and uses the browser to talk to the API.

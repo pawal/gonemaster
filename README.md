@@ -36,6 +36,11 @@ gonemaster --json --domain example.com | jq
 
 ![ascii animation](docs/demo.gif)
 
+## API Server and UI
+
+Gonemaster includes an API server with an included Web User Interface.
+Please read the documentation in [docs/server.md](docs/server.md) to know more.
+
 ## Nagios plugin
 
 Nagios documentation has moved to [docs/nagios.md](docs/nagios.md).

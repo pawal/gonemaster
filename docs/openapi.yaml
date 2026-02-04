@@ -5,11 +5,12 @@ info:
   description: |
     REST API for running Gonemaster engine tests with queueing, streaming, and cancellation.
 servers:
-  - url: http://localhost:8080
-    description: Local development
+  - url: http://localhost:8080/api/v1
+    description: Local development (API base)
 
 tags:
   - name: Jobs
+  - name: Batches
   - name: Queue
   - name: Ops
 
@@ -96,6 +97,27 @@ paths:
         '400':
           $ref: '#/components/responses/ErrorResponse'
 
+  /batches/{batch_id}:
+    get:
+      tags: [Batches]
+      summary: Get batch summary
+      operationId: getBatch
+      parameters:
+        - name: batch_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Batch summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchSummary'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
   /jobs/{job_id}:
     get:
       tags: [Jobs]
@@ -126,6 +148,11 @@ paths:
         - name: job_id
           in: path
           required: true
+          schema:
+            type: string
+        - name: locale
+          in: query
+          description: Locale for translated messages (default en)
           schema:
             type: string
       responses:
@@ -215,6 +242,27 @@ paths:
         '400':
           $ref: '#/components/responses/ErrorResponse'
 
+  /queue/remove:
+    post:
+      tags: [Queue]
+      summary: Remove queued jobs
+      operationId: removeQueueJobs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueueRemoveRequest'
+      responses:
+        '200':
+          description: Jobs removed from queue
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueRemoveResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
   /metrics:
     get:
       tags: [Ops]
@@ -274,10 +322,11 @@ components:
           type: string
           format: date-time
         progress:
-          type: number
-          format: float
+          type: integer
+          format: int32
           minimum: 0
-          maximum: 1
+          maximum: 100
+          description: Progress percentage (0-100).
         result_url:
           type: string
         error:
@@ -296,6 +345,8 @@ components:
         profile_overrides:
           type: object
           additionalProperties: true
+        min_level:
+          type: string
 
     JobBatchRequest:
       type: object
@@ -312,6 +363,8 @@ components:
         profile_overrides:
           type: object
           additionalProperties: true
+        min_level:
+          type: string
 
     JobBatchResponse:
       type: object
@@ -323,6 +376,32 @@ components:
           type: array
           items:
             type: string
+
+    BatchSummary:
+      type: object
+      required: [batch_id, total, status_counts, items, created_at]
+      properties:
+        batch_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+        total:
+          type: integer
+        status_counts:
+          type: object
+          additionalProperties:
+            type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Job'
 
     JobList:
       type: object
@@ -348,14 +427,65 @@ components:
           type: object
           additionalProperties: true
         raw:
+          $ref: '#/components/schemas/JobResultRaw'
+
+    JobResultRaw:
+      type: object
+      properties:
+        locale:
+          type: string
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/JobResultEntry'
+
+    JobResultEntry:
+      type: object
+      properties:
+        timestamp:
+          type: number
+          format: float
+        module:
+          type: string
+        testcase:
+          type: string
+        tag:
+          type: string
+        level:
+          type: string
+        args:
           type: object
           additionalProperties: true
+        message:
+          type: string
+          description: Translated message for the entry (default locale).
+        raw:
+          type: string
+          description: Raw entry string in CLI raw format.
 
     QueueReorderRequest:
       type: object
       required: [job_ids]
       properties:
         job_ids:
+          type: array
+          items:
+            type: string
+
+    QueueRemoveRequest:
+      type: object
+      required: [job_ids]
+      properties:
+        job_ids:
+          type: array
+          items:
+            type: string
+
+    QueueRemoveResponse:
+      type: object
+      required: [removed]
+      properties:
+        removed:
           type: array
           items:
             type: string

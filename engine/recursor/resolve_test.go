@@ -176,6 +176,9 @@ func TestGetAddressesForParallelAAndAAAA(t *testing.T) {
 	if err := profile.Effective().Set("resolver.defaults.parallel", 2); err != nil {
 		t.Fatalf("set parallel: %v", err)
 	}
+	if err := profile.Effective().Set("resolver.defaults.unordered", false); err != nil {
+		t.Fatalf("set unordered: %v", err)
+	}
 
 	r := &Recursor{client: &transport.Client{}}
 	if err := r.AddFakeAddresses(".", map[string][]string{
@@ -232,6 +235,9 @@ func TestLazyNameserverParallelPrefersFirstAddress(t *testing.T) {
 
 	if err := profile.Effective().Set("resolver.defaults.parallel", 2); err != nil {
 		t.Fatalf("set parallel: %v", err)
+	}
+	if err := profile.Effective().Set("resolver.defaults.unordered", false); err != nil {
+		t.Fatalf("set unordered: %v", err)
 	}
 
 	r := &Recursor{client: &transport.Client{}}

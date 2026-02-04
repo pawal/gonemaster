@@ -30,6 +30,7 @@ func TestNormalizeNameCases(t *testing.T) {
 		{"ambiguous", "example\u0130.com", "AMBIGUOUS_DOWNCASING", ""},
 		{"root", ".", "", "."},
 		{"fullwidth-dot", "example\uFF0Ecom", "", "example.com"},
+		{"idn", "r\u00e4ksm\u00f6rg\u00e5s.se", "", "xn--rksmrgs-5wao1o.se"},
 	}
 
 	for _, tc := range tests {

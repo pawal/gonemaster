@@ -159,10 +159,8 @@ func TestErrorCacheSkipsQueries(t *testing.T) {
 		t.Fatalf("new nameserver: %v", err)
 	}
 
-	defer profile.ResetEffective()
-	defer EmptyCache()
-
-	profile.Effective().Resolver.Defaults.ErrorCacheTTL = 60
+	ctx, prof := testContext(t)
+	prof.Resolver.Defaults.ErrorCacheTTL = 60
 
 	var calls int
 	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
@@ -170,11 +168,11 @@ func TestErrorCacheSkipsQueries(t *testing.T) {
 		return packet.Packet{}, fmt.Errorf("network error")
 	})
 
-	_, err = ns.QueryWithOptions(context.Background(), "example1", "A", nil)
+	_, err = ns.QueryWithOptions(ctx, "example1", "A", nil)
 	if err == nil {
 		t.Fatalf("expected error on first query")
 	}
-	_, err = ns.QueryWithOptions(context.Background(), "example2", "A", nil)
+	_, err = ns.QueryWithOptions(ctx, "example2", "A", nil)
 	if err != nil {
 		t.Fatalf("expected error cache to suppress second query error, got %v", err)
 	}
@@ -189,10 +187,8 @@ func TestQueryCacheDoesNotStoreErrors(t *testing.T) {
 		t.Fatalf("new nameserver: %v", err)
 	}
 
-	defer profile.ResetEffective()
-	defer EmptyCache()
-
-	profile.Effective().Resolver.Defaults.ErrorCacheTTL = 0
+	ctx, prof := testContext(t)
+	prof.Resolver.Defaults.ErrorCacheTTL = 0
 
 	var calls int
 	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
@@ -201,11 +197,11 @@ func TestQueryCacheDoesNotStoreErrors(t *testing.T) {
 	})
 
 	opts := &QueryOptions{BlacklistingDisabled: true}
-	_, err = ns.QueryWithOptions(context.Background(), "example", "SOA", opts)
+	_, err = ns.QueryWithOptions(ctx, "example", "SOA", opts)
 	if err == nil {
 		t.Fatalf("expected error on first query")
 	}
-	_, err = ns.QueryWithOptions(context.Background(), "example", "SOA", opts)
+	_, err = ns.QueryWithOptions(ctx, "example", "SOA", opts)
 	if err == nil {
 		t.Fatalf("expected error on second query")
 	}
@@ -243,8 +239,8 @@ func TestQueryIPv4Disabled(t *testing.T) {
 		t.Fatalf("new nameserver: %v", err)
 	}
 
-	defer profile.ResetEffective()
-	profile.Effective().Net.IPv4 = false
+	ctx, prof := testContext(t)
+	prof.Net.IPv4 = false
 
 	var calls int
 	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
@@ -252,7 +248,7 @@ func TestQueryIPv4Disabled(t *testing.T) {
 		return packet.Packet{}, nil
 	})
 
-	resp, err := ns.QueryWithOptions(context.Background(), "example", "A", nil)
+	resp, err := ns.QueryWithOptions(ctx, "example", "A", nil)
 	if err != nil {
 		t.Fatalf("query: %v", err)
 	}
@@ -270,11 +266,11 @@ func TestClientForOptionsDefaults(t *testing.T) {
 		t.Fatalf("new nameserver: %v", err)
 	}
 
-	defer profile.ResetEffective()
-	profile.Effective().Resolver.Defaults.Recurse = true
-	profile.Effective().Resolver.Defaults.UseVC = true
+	ctx, prof := testContext(t)
+	prof.Resolver.Defaults.Recurse = true
+	prof.Resolver.Defaults.UseVC = true
 
-	client, err := ns.clientForOptions(context.Background(), nil)
+	client, err := ns.clientForOptions(ctx, nil)
 	if err != nil {
 		t.Fatalf("client for nil opts: %v", err)
 	}
@@ -286,7 +282,7 @@ func TestClientForOptionsDefaults(t *testing.T) {
 	}
 
 	on := true
-	client, err = ns.clientForOptions(context.Background(), &QueryOptions{Recurse: &on, UseVC: &on})
+	client, err = ns.clientForOptions(ctx, &QueryOptions{Recurse: &on, UseVC: &on})
 	if err != nil {
 		t.Fatalf("client for explicit opts: %v", err)
 	}
@@ -344,10 +340,10 @@ func TestAXFRNoNetwork(t *testing.T) {
 		t.Fatalf("new nameserver: %v", err)
 	}
 
-	defer profile.ResetEffective()
-	profile.Effective().NoNetwork = true
+	ctx, prof := testContext(t)
+	prof.NoNetwork = true
 
-	err = ns.AXFR(context.Background(), "example", nil, "")
+	err = ns.AXFR(ctx, "example", nil, "")
 	if err == nil {
 		t.Fatalf("expected error when no_network is set")
 	}
@@ -362,8 +358,8 @@ func TestAXFRIPv4Disabled(t *testing.T) {
 		t.Fatalf("new nameserver: %v", err)
 	}
 
-	defer profile.ResetEffective()
-	profile.Effective().Net.IPv4 = false
+	ctx, prof := testContext(t)
+	prof.Net.IPv4 = false
 
 	var called int
 	ns.SetAXFRHook(func(_ context.Context, _ string, _ func(dns.RR) bool, _ string) error {
@@ -371,7 +367,7 @@ func TestAXFRIPv4Disabled(t *testing.T) {
 		return nil
 	})
 
-	err = ns.AXFR(context.Background(), "example", nil, "")
+	err = ns.AXFR(ctx, "example", nil, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -455,4 +451,18 @@ func TestQueryLogging(t *testing.T) {
 	if !foundQuery {
 		t.Errorf("expected EXTERNAL_QUERY tag, got %v", log.Entries())
 	}
+}
+
+func testContext(t *testing.T) (context.Context, *profile.Profile) {
+	t.Helper()
+	prof, err := profile.Default()
+	if err != nil {
+		t.Fatalf("profile default: %v", err)
+	}
+	log := logger.New()
+	ctx := context.Background()
+	ctx = profile.WithContext(ctx, prof)
+	ctx = logger.WithContext(ctx, log)
+	ctx = WithCache(ctx, NewCacheStore())
+	return ctx, prof
 }

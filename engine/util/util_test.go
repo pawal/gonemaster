@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
+	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -123,9 +124,9 @@ func TestNSNameAndZoneHelpers(t *testing.T) {
 }
 
 func TestShouldRunTest(t *testing.T) {
-	defer profile.ResetEffective()
-	profile.Effective().TestCases = []any{"alpha", "beta"}
-	ctx := profile.WithContext(context.Background(), profile.Effective())
+	prof := testhelpers.DefaultProfile(t)
+	prof.TestCases = []any{"alpha", "beta"}
+	ctx := profile.WithContext(context.Background(), prof)
 
 	if !ShouldRunTest(ctx, "alpha") {
 		t.Fatalf("expected alpha to be enabled")
@@ -139,10 +140,10 @@ func TestShouldRunTest(t *testing.T) {
 }
 
 func TestIPVersionOK(t *testing.T) {
-	defer profile.ResetEffective()
-	profile.Effective().Net.IPv4 = false
-	profile.Effective().Net.IPv6 = true
-	ctx := profile.WithContext(context.Background(), profile.Effective())
+	prof := testhelpers.DefaultProfile(t)
+	prof.Net.IPv4 = false
+	prof.Net.IPv6 = true
+	ctx := profile.WithContext(context.Background(), prof)
 
 	if IPVersionOK(ctx, constants.IPVersion4) {
 		t.Fatalf("expected IPv4 to be disabled")
@@ -156,11 +157,11 @@ func TestIPVersionOK(t *testing.T) {
 }
 
 func TestTestLevelsReturnsCopy(t *testing.T) {
-	defer profile.ResetEffective()
-	profile.Effective().TestLevels = map[string]map[string]string{
+	prof := testhelpers.DefaultProfile(t)
+	prof.TestLevels = map[string]map[string]string{
 		"MODULE": {"TAG": "WARNING"},
 	}
-	ctx := profile.WithContext(context.Background(), profile.Effective())
+	ctx := profile.WithContext(context.Background(), prof)
 
 	levels := TestLevels(ctx)
 	if levels == nil || levels["MODULE"]["TAG"] != "WARNING" {
@@ -168,7 +169,7 @@ func TestTestLevelsReturnsCopy(t *testing.T) {
 	}
 
 	levels["MODULE"]["TAG"] = "INFO"
-	if profile.Effective().TestLevels["MODULE"]["TAG"] != "WARNING" {
+	if prof.TestLevels["MODULE"]["TAG"] != "WARNING" {
 		t.Fatalf("expected effective profile to remain unchanged")
 	}
 }

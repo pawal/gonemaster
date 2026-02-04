@@ -53,3 +53,25 @@ func TestLimiterHonorsContext(t *testing.T) {
 		t.Fatalf("expected context deadline error")
 	}
 }
+
+func TestLimiterIndependentLimits(t *testing.T) {
+	first := NewLimiter(1)
+	second := NewLimiter(2)
+
+	ctx1 := WithLimiter(context.Background(), first)
+	ctx2 := WithLimiter(context.Background(), second)
+
+	if err := acquireQuerySlot(ctx1); err != nil {
+		t.Fatalf("acquire ctx1: %v", err)
+	}
+	defer releaseQuerySlot(ctx1)
+
+	if cap(second.tokens) != 2 || len(second.tokens) != 2 {
+		t.Fatalf("expected second limiter capacity 2, got cap=%d len=%d", cap(second.tokens), len(second.tokens))
+	}
+
+	if err := acquireQuerySlot(ctx2); err != nil {
+		t.Fatalf("acquire ctx2: %v", err)
+	}
+	releaseQuerySlot(ctx2)
+}

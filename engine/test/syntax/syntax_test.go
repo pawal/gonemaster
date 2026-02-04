@@ -10,21 +10,19 @@ import (
 	"github.com/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
-	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/recursor"
-	"codeberg.org/pawal/gonemaster/engine/util"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
 func TestSyntax01AllowedChars(t *testing.T) {
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx := testContext(t)
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Syntax01(context.Background(), &z)
+	entries, err := Syntax01(ctx, &z)
 	if err != nil {
 		t.Fatalf("syntax01: %v", err)
 	}
@@ -34,11 +32,10 @@ func TestSyntax01AllowedChars(t *testing.T) {
 }
 
 func TestSyntax01NonAllowedChars(t *testing.T) {
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx := testContext(t)
 
 	z := zone.Zone{Name: dnsname.New("bad_.example")}
-	entries, err := Syntax01(context.Background(), &z)
+	entries, err := Syntax01(ctx, &z)
 	if err != nil {
 		t.Fatalf("syntax01: %v", err)
 	}
@@ -48,11 +45,10 @@ func TestSyntax01NonAllowedChars(t *testing.T) {
 }
 
 func TestSyntax02HyphenTags(t *testing.T) {
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx := testContext(t)
 
 	z := zone.Zone{Name: dnsname.New("-bad-.example")}
-	entries, err := Syntax02(context.Background(), &z)
+	entries, err := Syntax02(ctx, &z)
 	if err != nil {
 		t.Fatalf("syntax02: %v", err)
 	}
@@ -65,11 +61,10 @@ func TestSyntax02HyphenTags(t *testing.T) {
 }
 
 func TestSyntax02NoEndingHyphens(t *testing.T) {
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx := testContext(t)
 
 	z := zone.Zone{Name: dnsname.New("good.example")}
-	entries, err := Syntax02(context.Background(), &z)
+	entries, err := Syntax02(ctx, &z)
 	if err != nil {
 		t.Fatalf("syntax02: %v", err)
 	}
@@ -79,11 +74,10 @@ func TestSyntax02NoEndingHyphens(t *testing.T) {
 }
 
 func TestSyntax03DoubleDash(t *testing.T) {
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx := testContext(t)
 
 	z := zone.Zone{Name: dnsname.New("ab--cd.example")}
-	entries, err := Syntax03(context.Background(), &z)
+	entries, err := Syntax03(ctx, &z)
 	if err != nil {
 		t.Fatalf("syntax03: %v", err)
 	}
@@ -93,11 +87,10 @@ func TestSyntax03DoubleDash(t *testing.T) {
 }
 
 func TestSyntax03NoDoubleDash(t *testing.T) {
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx := testContext(t)
 
 	z := zone.Zone{Name: dnsname.New("good.example")}
-	entries, err := Syntax03(context.Background(), &z)
+	entries, err := Syntax03(ctx, &z)
 	if err != nil {
 		t.Fatalf("syntax03: %v", err)
 	}
@@ -107,14 +100,15 @@ func TestSyntax03NoDoubleDash(t *testing.T) {
 }
 
 func TestSyntax04NameserverSyntaxOK(t *testing.T) {
-	z := newRootZoneWithHook(t, func(qname string, qtype string) packet.Packet {
+	ctx := testContext(t)
+	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
 		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "NS") {
 			return nsPacket(".", "ns1.example.")
 		}
 		return packet.Packet{}
 	})
 
-	entries, err := Syntax04(context.Background(), z)
+	entries, err := Syntax04(ctx, z)
 	if err != nil {
 		t.Fatalf("syntax04: %v", err)
 	}
@@ -124,14 +118,15 @@ func TestSyntax04NameserverSyntaxOK(t *testing.T) {
 }
 
 func TestSyntax05MisusedAtSign(t *testing.T) {
-	z := newRootZoneWithHook(t, func(qname string, qtype string) packet.Packet {
+	ctx := testContext(t)
+	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
 		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "SOA") {
 			return soaPacket(".", "a.root.", "user@example.")
 		}
 		return packet.Packet{}
 	})
 
-	entries, err := Syntax05(context.Background(), z)
+	entries, err := Syntax05(ctx, z)
 	if err != nil {
 		t.Fatalf("syntax05: %v", err)
 	}
@@ -141,11 +136,12 @@ func TestSyntax05MisusedAtSign(t *testing.T) {
 }
 
 func TestSyntax05NoResponseSOAQuery(t *testing.T) {
-	z := newRootZoneWithHook(t, func(_ string, _ string) packet.Packet {
+	ctx := testContext(t)
+	z := newRootZoneWithHook(ctx, t, func(_ string, _ string) packet.Packet {
 		return packet.Packet{}
 	})
 
-	entries, err := Syntax05(context.Background(), z)
+	entries, err := Syntax05(ctx, z)
 	if err != nil {
 		t.Fatalf("syntax05: %v", err)
 	}
@@ -157,12 +153,8 @@ func TestSyntax05NoResponseSOAQuery(t *testing.T) {
 func TestSyntax06ParallelMailServers(t *testing.T) {
 	nameserver.EmptyCache()
 	defer nameserver.EmptyCache()
-	defer profile.ResetEffective()
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
-
-	profile.Effective().Resolver.Defaults.Parallel = 2
+	baseCtx, prof, _ := testhelpers.Context(t)
+	prof.Resolver.Defaults.Parallel = 2
 
 	r := &recursor.Recursor{}
 	if err := r.AddFakeAddresses(".", map[string][]string{
@@ -174,7 +166,7 @@ func TestSyntax06ParallelMailServers(t *testing.T) {
 	started := make(chan string, 2)
 	release := make(chan struct{})
 
-	root, err := nameserver.New("a.root", "192.0.2.1", r.Client())
+	root, err := nameserver.NewWithContext(baseCtx, "a.root", "192.0.2.1", r.Client())
 	if err != nil {
 		t.Fatalf("new root nameserver: %v", err)
 	}
@@ -224,7 +216,7 @@ func TestSyntax06ParallelMailServers(t *testing.T) {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(baseCtx, 2*time.Second)
 	defer cancel()
 
 	done := make(chan struct{})
@@ -263,14 +255,15 @@ func TestSyntax06ParallelMailServers(t *testing.T) {
 }
 
 func TestSyntax07MNameSyntaxOK(t *testing.T) {
-	z := newRootZoneWithHook(t, func(qname string, qtype string) packet.Packet {
+	ctx := testContext(t)
+	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
 		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "SOA") {
 			return soaPacket(".", "ns1.example.", "hostmaster.example.")
 		}
 		return packet.Packet{}
 	})
 
-	entries, err := Syntax07(context.Background(), z)
+	entries, err := Syntax07(ctx, z)
 	if err != nil {
 		t.Fatalf("syntax07: %v", err)
 	}
@@ -280,14 +273,15 @@ func TestSyntax07MNameSyntaxOK(t *testing.T) {
 }
 
 func TestSyntax08MxSyntaxOK(t *testing.T) {
-	z := newRootZoneWithHook(t, func(qname string, qtype string) packet.Packet {
+	ctx := testContext(t)
+	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
 		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "MX") {
 			return mxPacket(".", "mail.example.")
 		}
 		return packet.Packet{}
 	})
 
-	entries, err := Syntax08(context.Background(), z)
+	entries, err := Syntax08(ctx, z)
 	if err != nil {
 		t.Fatalf("syntax08: %v", err)
 	}
@@ -297,11 +291,12 @@ func TestSyntax08MxSyntaxOK(t *testing.T) {
 }
 
 func TestSyntax08NoResponseMXQuery(t *testing.T) {
-	z := newRootZoneWithHook(t, func(_ string, _ string) packet.Packet {
+	ctx := testContext(t)
+	z := newRootZoneWithHook(ctx, t, func(_ string, _ string) packet.Packet {
 		return packet.Packet{}
 	})
 
-	entries, err := Syntax08(context.Background(), z)
+	entries, err := Syntax08(ctx, z)
 	if err != nil {
 		t.Fatalf("syntax08: %v", err)
 	}
@@ -311,9 +306,6 @@ func TestSyntax08NoResponseMXQuery(t *testing.T) {
 }
 
 func TestCheckNameSyntaxNumericTLD(t *testing.T) {
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
-
 	entries, err := checkNameSyntax("NAMESERVER", dnsname.New("ns1.123"), "Syntax04")
 	if err != nil {
 		t.Fatalf("check name syntax: %v", err)
@@ -339,21 +331,23 @@ func TestLabelNotACEHasDoubleHyphen(t *testing.T) {
 	}
 }
 
-func newRootZoneWithHook(t *testing.T, handler func(qname string, qtype string) packet.Packet) *zone.Zone {
+func testContext(t *testing.T) context.Context {
+	t.Helper()
+	ctx, _, _ := testhelpers.Context(t)
+	return ctx
+}
+
+func newRootZoneWithHook(ctx context.Context, t *testing.T, handler func(qname string, qtype string) packet.Packet) *zone.Zone {
 	t.Helper()
 	nameserver.EmptyCache()
 	t.Cleanup(nameserver.EmptyCache)
-	t.Cleanup(profile.ResetEffective)
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
 
 	r := &recursor.Recursor{}
 	if err := r.AddFakeAddresses(".", map[string][]string{"a.root": {"192.0.2.1"}}); err != nil {
 		t.Fatalf("add root hints: %v", err)
 	}
 
-	ns, err := nameserver.New("a.root", "192.0.2.1", r.Client())
+	ns, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}

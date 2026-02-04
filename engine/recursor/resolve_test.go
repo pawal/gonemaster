@@ -13,9 +13,9 @@ import (
 	"github.com/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
-	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/transport"
 )
 
@@ -171,12 +171,12 @@ func TestLazyNameserverMissingRecursor(t *testing.T) {
 func TestGetAddressesForParallelAAndAAAA(t *testing.T) {
 	nameserver.EmptyCache()
 	defer nameserver.EmptyCache()
-	defer profile.ResetEffective()
+	baseCtx, prof, _ := testhelpers.Context(t)
 
-	if err := profile.Effective().Set("resolver.defaults.parallel", 2); err != nil {
+	if err := prof.Set("resolver.defaults.parallel", 2); err != nil {
 		t.Fatalf("set parallel: %v", err)
 	}
-	if err := profile.Effective().Set("resolver.defaults.unordered", false); err != nil {
+	if err := prof.Set("resolver.defaults.unordered", false); err != nil {
 		t.Fatalf("set unordered: %v", err)
 	}
 
@@ -188,7 +188,7 @@ func TestGetAddressesForParallelAAndAAAA(t *testing.T) {
 	}
 
 	aaaaStarted := make(chan struct{})
-	rootNS, err := nameserver.New("root.test", "192.0.2.53", r.client)
+	rootNS, err := nameserver.NewWithContext(baseCtx, "root.test", "192.0.2.53", r.client)
 	if err != nil {
 		t.Fatalf("new root nameserver: %v", err)
 	}
@@ -213,7 +213,7 @@ func TestGetAddressesForParallelAAndAAAA(t *testing.T) {
 		}
 	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(baseCtx, time.Second)
 	defer cancel()
 
 	addrs, err := r.GetAddressesFor(ctx, "ns.example")
@@ -231,12 +231,12 @@ func TestGetAddressesForParallelAAndAAAA(t *testing.T) {
 func TestLazyNameserverParallelPrefersFirstAddress(t *testing.T) {
 	nameserver.EmptyCache()
 	defer nameserver.EmptyCache()
-	defer profile.ResetEffective()
+	baseCtx, prof, _ := testhelpers.Context(t)
 
-	if err := profile.Effective().Set("resolver.defaults.parallel", 2); err != nil {
+	if err := prof.Set("resolver.defaults.parallel", 2); err != nil {
 		t.Fatalf("set parallel: %v", err)
 	}
-	if err := profile.Effective().Set("resolver.defaults.unordered", false); err != nil {
+	if err := prof.Set("resolver.defaults.unordered", false); err != nil {
 		t.Fatalf("set unordered: %v", err)
 	}
 
@@ -247,7 +247,7 @@ func TestLazyNameserverParallelPrefersFirstAddress(t *testing.T) {
 		t.Fatalf("add fake root: %v", err)
 	}
 
-	rootNS, err := nameserver.New("root.test", "192.0.2.53", r.client)
+	rootNS, err := nameserver.NewWithContext(baseCtx, "root.test", "192.0.2.53", r.client)
 	if err != nil {
 		t.Fatalf("new root nameserver: %v", err)
 	}
@@ -275,7 +275,7 @@ func TestLazyNameserverParallelPrefersFirstAddress(t *testing.T) {
 		}
 	}
 
-	ns1, err := nameserver.New("ns1.example", "192.0.2.10", r.client)
+	ns1, err := nameserver.NewWithContext(baseCtx, "ns1.example", "192.0.2.10", r.client)
 	if err != nil {
 		t.Fatalf("new ns1: %v", err)
 	}
@@ -290,7 +290,7 @@ func TestLazyNameserverParallelPrefersFirstAddress(t *testing.T) {
 		return resp, nil
 	})
 
-	ns2, err := nameserver.New("ns1.example", "192.0.2.20", r.client)
+	ns2, err := nameserver.NewWithContext(baseCtx, "ns1.example", "192.0.2.20", r.client)
 	if err != nil {
 		t.Fatalf("new ns2: %v", err)
 	}
@@ -306,7 +306,7 @@ func TestLazyNameserverParallelPrefersFirstAddress(t *testing.T) {
 	})
 
 	lns := lazyNameserver{name: "ns1.example", recursor: r, state: &recurseState{glue: map[string]map[netip.Addr]bool{}}}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(baseCtx, time.Second)
 	defer cancel()
 
 	resultCh := make(chan packet.Packet, 1)
@@ -608,8 +608,8 @@ func TestFirstSOAOwner(t *testing.T) {
 }
 
 func TestRecurseOrderedUsesLIFO(t *testing.T) {
-	defer profile.ResetEffective()
-	if err := profile.Effective().Set("resolver.defaults.unordered", false); err != nil {
+	ctx, prof, _ := testhelpers.Context(t)
+	if err := prof.Set("resolver.defaults.unordered", false); err != nil {
 		t.Fatalf("set unordered: %v", err)
 	}
 
@@ -625,7 +625,7 @@ func TestRecurseOrderedUsesLIFO(t *testing.T) {
 	fast := testQueryer{id: "fast", resp: fastResp, called: called}
 
 	state := &recurseState{ns: []queryer{fast, slow}}
-	resp, _, err := r.recurse(context.Background(), "example", "A", "IN", state)
+	resp, _, err := r.recurse(ctx, "example", "A", "IN", state)
 	if err != nil {
 		t.Fatalf("recurse: %v", err)
 	}
@@ -645,11 +645,11 @@ func TestRecurseOrderedUsesLIFO(t *testing.T) {
 }
 
 func TestRecurseUnorderedReturnsFastest(t *testing.T) {
-	defer profile.ResetEffective()
-	if err := profile.Effective().Set("resolver.defaults.unordered", true); err != nil {
+	baseCtx, prof, _ := testhelpers.Context(t)
+	if err := prof.Set("resolver.defaults.unordered", true); err != nil {
 		t.Fatalf("set unordered: %v", err)
 	}
-	if err := profile.Effective().Set("resolver.defaults.parallel", 2); err != nil {
+	if err := prof.Set("resolver.defaults.parallel", 2); err != nil {
 		t.Fatalf("set parallel: %v", err)
 	}
 
@@ -664,7 +664,7 @@ func TestRecurseUnorderedReturnsFastest(t *testing.T) {
 	fast := testQueryer{id: "fast", resp: fastResp}
 
 	state := &recurseState{ns: []queryer{fast, slow}}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(baseCtx, time.Second)
 	defer cancel()
 
 	resp, _, err := r.recurse(ctx, "example", "A", "IN", state)
@@ -677,11 +677,11 @@ func TestRecurseUnorderedReturnsFastest(t *testing.T) {
 }
 
 func TestRecurseUnorderedCancelsSlowQuery(t *testing.T) {
-	defer profile.ResetEffective()
-	if err := profile.Effective().Set("resolver.defaults.unordered", true); err != nil {
+	baseCtx, prof, _ := testhelpers.Context(t)
+	if err := prof.Set("resolver.defaults.unordered", true); err != nil {
 		t.Fatalf("set unordered: %v", err)
 	}
-	if err := profile.Effective().Set("resolver.defaults.parallel", 2); err != nil {
+	if err := prof.Set("resolver.defaults.parallel", 2); err != nil {
 		t.Fatalf("set parallel: %v", err)
 	}
 
@@ -696,7 +696,7 @@ func TestRecurseUnorderedCancelsSlowQuery(t *testing.T) {
 	fast := testQueryer{id: "fast", resp: fastResp, waitCh: slowStarted}
 
 	state := &recurseState{ns: []queryer{fast, slow}}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(baseCtx, time.Second)
 	defer cancel()
 
 	resp, _, err := r.recurse(ctx, "example", "A", "IN", state)
@@ -715,11 +715,11 @@ func TestRecurseUnorderedCancelsSlowQuery(t *testing.T) {
 }
 
 func TestRecurseUnorderedWaitsForRedirectBatchCleanup(t *testing.T) {
-	defer profile.ResetEffective()
-	if err := profile.Effective().Set("resolver.defaults.unordered", true); err != nil {
+	baseCtx, prof, _ := testhelpers.Context(t)
+	if err := prof.Set("resolver.defaults.unordered", true); err != nil {
 		t.Fatalf("set unordered: %v", err)
 	}
-	if err := profile.Effective().Set("resolver.defaults.parallel", 2); err != nil {
+	if err := prof.Set("resolver.defaults.parallel", 2); err != nil {
 		t.Fatalf("set parallel: %v", err)
 	}
 
@@ -761,7 +761,7 @@ func TestRecurseUnorderedWaitsForRedirectBatchCleanup(t *testing.T) {
 		},
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(baseCtx, time.Second)
 	defer cancel()
 
 	resp, _, err := r.recurse(ctx, "example", "A", "IN", state)
@@ -780,11 +780,11 @@ func TestRecurseUnorderedWaitsForRedirectBatchCleanup(t *testing.T) {
 }
 
 func TestGetAddressesForUnorderedSequential(t *testing.T) {
-	defer profile.ResetEffective()
-	if err := profile.Effective().Set("resolver.defaults.unordered", true); err != nil {
+	baseCtx, prof, _ := testhelpers.Context(t)
+	if err := prof.Set("resolver.defaults.unordered", true); err != nil {
 		t.Fatalf("set unordered: %v", err)
 	}
-	if err := profile.Effective().Set("resolver.defaults.parallel", 2); err != nil {
+	if err := prof.Set("resolver.defaults.parallel", 2); err != nil {
 		t.Fatalf("set parallel: %v", err)
 	}
 
@@ -802,7 +802,7 @@ func TestGetAddressesForUnorderedSequential(t *testing.T) {
 		t.Fatalf("add root: %v", err)
 	}
 
-	ns, err := nameserver.New("root.test", "192.0.2.53", r.client)
+	ns, err := nameserver.NewWithContext(baseCtx, "root.test", "192.0.2.53", r.client)
 	if err != nil {
 		t.Fatalf("nameserver: %v", err)
 	}
@@ -826,7 +826,7 @@ func TestGetAddressesForUnorderedSequential(t *testing.T) {
 		}
 	})
 
-	ctx := context.Background()
+	ctx := baseCtx
 	done := make(chan struct{})
 	var addrs []netip.Addr
 	var addrErr error
@@ -876,11 +876,11 @@ func TestGetAddressesForUnorderedSequential(t *testing.T) {
 }
 
 func TestRecurseUnorderedDepthLimitsWorkers(t *testing.T) {
-	defer profile.ResetEffective()
-	if err := profile.Effective().Set("resolver.defaults.unordered", true); err != nil {
+	baseCtx, prof, _ := testhelpers.Context(t)
+	if err := prof.Set("resolver.defaults.unordered", true); err != nil {
 		t.Fatalf("set unordered: %v", err)
 	}
-	if err := profile.Effective().Set("resolver.defaults.parallel", 2); err != nil {
+	if err := prof.Set("resolver.defaults.parallel", 2); err != nil {
 		t.Fatalf("set parallel: %v", err)
 	}
 
@@ -899,7 +899,7 @@ func TestRecurseUnorderedDepthLimitsWorkers(t *testing.T) {
 	fast := testQueryer{id: "fast", resp: fastResp, startCh: fastStarted}
 
 	state := &recurseState{ns: []queryer{slow, fast}}
-	ctx := withUnorderedDepth(withUnorderedContext(context.Background()), 1)
+	ctx := withUnorderedDepth(withUnorderedContext(baseCtx), 1)
 
 	done := make(chan struct{})
 	go func() {

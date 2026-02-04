@@ -10,23 +10,19 @@ import (
 	"github.com/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
-	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/recursor"
-	"codeberg.org/pawal/gonemaster/engine/util"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
 func TestBasic01Root(t *testing.T) {
-	defer profile.ResetEffective()
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx, _, _ := testhelpers.Context(t)
 
 	z := zone.Zone{Name: dnsname.New(".")}
-	entries, err := Basic01(context.Background(), &z)
+	entries, err := Basic01(ctx, &z)
 	if err != nil {
 		t.Fatalf("basic01: %v", err)
 	}
@@ -50,10 +46,7 @@ func TestBasic01Root(t *testing.T) {
 func TestBasic01Undelegated(t *testing.T) {
 	nameserver.EmptyCache()
 	defer nameserver.EmptyCache()
-	defer profile.ResetEffective()
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
 	if err := r.AddFakeAddresses("example", map[string][]string{
@@ -67,7 +60,7 @@ func TestBasic01Undelegated(t *testing.T) {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	entries, err := Basic01(context.Background(), &z)
+	entries, err := Basic01(ctx, &z)
 	if err != nil {
 		t.Fatalf("basic01: %v", err)
 	}
@@ -82,10 +75,7 @@ func TestBasic01Undelegated(t *testing.T) {
 func TestBasic02NoDelegation(t *testing.T) {
 	nameserver.EmptyCache()
 	defer nameserver.EmptyCache()
-	defer profile.ResetEffective()
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
 	z, err := zone.NewWithRecursor("example", r)
@@ -93,7 +83,7 @@ func TestBasic02NoDelegation(t *testing.T) {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	entries, err := Basic02(context.Background(), &z)
+	entries, err := Basic02(ctx, &z)
 	if err != nil {
 		t.Fatalf("basic02: %v", err)
 	}
@@ -108,10 +98,7 @@ func TestBasic02NoDelegation(t *testing.T) {
 func TestBasic02AuthResponseSOA(t *testing.T) {
 	nameserver.EmptyCache()
 	defer nameserver.EmptyCache()
-	defer profile.ResetEffective()
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
 	if err := r.AddFakeAddresses(".", map[string][]string{
@@ -120,7 +107,7 @@ func TestBasic02AuthResponseSOA(t *testing.T) {
 		t.Fatalf("add root hints: %v", err)
 	}
 
-	root, err := nameserver.New("a.root", "192.0.2.1", r.Client())
+	root, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
 	if err != nil {
 		t.Fatalf("new root nameserver: %v", err)
 	}
@@ -142,7 +129,7 @@ func TestBasic02AuthResponseSOA(t *testing.T) {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	entries, err := Basic02(context.Background(), &z)
+	entries, err := Basic02(ctx, &z)
 	if err != nil {
 		t.Fatalf("basic02: %v", err)
 	}
@@ -154,12 +141,8 @@ func TestBasic02AuthResponseSOA(t *testing.T) {
 func TestBasic02ParallelQueries(t *testing.T) {
 	nameserver.EmptyCache()
 	defer nameserver.EmptyCache()
-	defer profile.ResetEffective()
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
-
-	profile.Effective().Resolver.Defaults.Parallel = 2
+	baseCtx, prof, _ := testhelpers.Context(t)
+	prof.Resolver.Defaults.Parallel = 2
 
 	r := &recursor.Recursor{}
 	if err := r.AddFakeAddresses(".", map[string][]string{
@@ -198,13 +181,13 @@ func TestBasic02ParallelQueries(t *testing.T) {
 		}
 	}
 
-	aroot, err := nameserver.New("a.root", "192.0.2.1", r.Client())
+	aroot, err := nameserver.NewWithContext(baseCtx, "a.root", "192.0.2.1", r.Client())
 	if err != nil {
 		t.Fatalf("new root nameserver: %v", err)
 	}
 	aroot.SetQueryHook(hook("a.root", true))
 
-	broot, err := nameserver.New("b.root", "192.0.2.2", r.Client())
+	broot, err := nameserver.NewWithContext(baseCtx, "b.root", "192.0.2.2", r.Client())
 	if err != nil {
 		t.Fatalf("new root nameserver: %v", err)
 	}
@@ -215,7 +198,7 @@ func TestBasic02ParallelQueries(t *testing.T) {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(baseCtx, 2*time.Second)
 	defer cancel()
 
 	done := make(chan struct{})
@@ -271,10 +254,7 @@ func TestBasic02ParallelQueries(t *testing.T) {
 func TestBasic02UnexpectedRcode(t *testing.T) {
 	nameserver.EmptyCache()
 	defer nameserver.EmptyCache()
-	defer profile.ResetEffective()
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
 	if err := r.AddFakeAddresses(".", map[string][]string{
@@ -283,7 +263,7 @@ func TestBasic02UnexpectedRcode(t *testing.T) {
 		t.Fatalf("add root hints: %v", err)
 	}
 
-	root, err := nameserver.New("a.root", "192.0.2.1", r.Client())
+	root, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
 	if err != nil {
 		t.Fatalf("new root nameserver: %v", err)
 	}
@@ -305,7 +285,7 @@ func TestBasic02UnexpectedRcode(t *testing.T) {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	entries, err := Basic02(context.Background(), &z)
+	entries, err := Basic02(ctx, &z)
 	if err != nil {
 		t.Fatalf("basic02: %v", err)
 	}
@@ -320,10 +300,7 @@ func TestBasic02UnexpectedRcode(t *testing.T) {
 func TestBasic02NoIPAddress(t *testing.T) {
 	nameserver.EmptyCache()
 	defer nameserver.EmptyCache()
-	defer profile.ResetEffective()
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
 	if err := r.AddFakeAddresses(".", map[string][]string{
@@ -332,7 +309,7 @@ func TestBasic02NoIPAddress(t *testing.T) {
 		t.Fatalf("add root hints: %v", err)
 	}
 
-	root, err := nameserver.New("a.root", "192.0.2.1", r.Client())
+	root, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
 	if err != nil {
 		t.Fatalf("new root nameserver: %v", err)
 	}
@@ -350,7 +327,7 @@ func TestBasic02NoIPAddress(t *testing.T) {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	entries, err := Basic02(context.Background(), &z)
+	entries, err := Basic02(ctx, &z)
 	if err != nil {
 		t.Fatalf("basic02: %v", err)
 	}
@@ -362,10 +339,7 @@ func TestBasic02NoIPAddress(t *testing.T) {
 func TestBasic03HasARecords(t *testing.T) {
 	nameserver.EmptyCache()
 	defer nameserver.EmptyCache()
-	defer profile.ResetEffective()
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
 	if err := r.AddFakeAddresses(".", map[string][]string{
@@ -379,7 +353,7 @@ func TestBasic03HasARecords(t *testing.T) {
 		t.Fatalf("add fake addresses: %v", err)
 	}
 
-	root, err := nameserver.New("a.root", "192.0.2.1", r.Client())
+	root, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
 	if err != nil {
 		t.Fatalf("new root nameserver: %v", err)
 	}
@@ -396,7 +370,7 @@ func TestBasic03HasARecords(t *testing.T) {
 		}
 	})
 
-	ns1, err := nameserver.New("ns1.example", "192.0.2.53", r.Client())
+	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.53", r.Client())
 	if err != nil {
 		t.Fatalf("new ns1: %v", err)
 	}
@@ -418,7 +392,7 @@ func TestBasic03HasARecords(t *testing.T) {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	entries, err := Basic03(context.Background(), &z)
+	entries, err := Basic03(ctx, &z)
 	if err != nil {
 		t.Fatalf("basic03: %v", err)
 	}
@@ -433,10 +407,7 @@ func TestBasic03HasARecords(t *testing.T) {
 func TestBasic03NoARecords(t *testing.T) {
 	nameserver.EmptyCache()
 	defer nameserver.EmptyCache()
-	defer profile.ResetEffective()
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
 	if err := r.AddFakeAddresses(".", map[string][]string{
@@ -450,7 +421,7 @@ func TestBasic03NoARecords(t *testing.T) {
 		t.Fatalf("add fake addresses: %v", err)
 	}
 
-	root, err := nameserver.New("a.root", "192.0.2.1", r.Client())
+	root, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
 	if err != nil {
 		t.Fatalf("new root nameserver: %v", err)
 	}
@@ -467,7 +438,7 @@ func TestBasic03NoARecords(t *testing.T) {
 		}
 	})
 
-	ns1, err := nameserver.New("ns1.example", "192.0.2.53", r.Client())
+	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.53", r.Client())
 	if err != nil {
 		t.Fatalf("new ns1: %v", err)
 	}
@@ -489,7 +460,7 @@ func TestBasic03NoARecords(t *testing.T) {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	entries, err := Basic03(context.Background(), &z)
+	entries, err := Basic03(ctx, &z)
 	if err != nil {
 		t.Fatalf("basic03: %v", err)
 	}
@@ -504,10 +475,7 @@ func TestBasic03NoARecords(t *testing.T) {
 func TestBasic03NoResponses(t *testing.T) {
 	nameserver.EmptyCache()
 	defer nameserver.EmptyCache()
-	defer profile.ResetEffective()
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
 	if err := r.AddFakeAddresses(".", map[string][]string{
@@ -521,7 +489,7 @@ func TestBasic03NoResponses(t *testing.T) {
 		t.Fatalf("add fake addresses: %v", err)
 	}
 
-	root, err := nameserver.New("a.root", "192.0.2.1", r.Client())
+	root, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
 	if err != nil {
 		t.Fatalf("new root nameserver: %v", err)
 	}
@@ -538,7 +506,7 @@ func TestBasic03NoResponses(t *testing.T) {
 		}
 	})
 
-	ns1, err := nameserver.New("ns1.example", "192.0.2.53", r.Client())
+	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.53", r.Client())
 	if err != nil {
 		t.Fatalf("new ns1: %v", err)
 	}
@@ -556,7 +524,7 @@ func TestBasic03NoResponses(t *testing.T) {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	entries, err := Basic03(context.Background(), &z)
+	entries, err := Basic03(ctx, &z)
 	if err != nil {
 		t.Fatalf("basic03: %v", err)
 	}
@@ -568,12 +536,8 @@ func TestBasic03NoResponses(t *testing.T) {
 func TestBasic03ParallelQueries(t *testing.T) {
 	nameserver.EmptyCache()
 	defer nameserver.EmptyCache()
-	defer profile.ResetEffective()
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
-
-	profile.Effective().Resolver.Defaults.Parallel = 2
+	baseCtx, prof, _ := testhelpers.Context(t)
+	prof.Resolver.Defaults.Parallel = 2
 
 	r := &recursor.Recursor{}
 	if err := r.AddFakeAddresses(".", map[string][]string{
@@ -588,7 +552,7 @@ func TestBasic03ParallelQueries(t *testing.T) {
 		t.Fatalf("add fake addresses: %v", err)
 	}
 
-	root, err := nameserver.New("a.root", "192.0.2.1", r.Client())
+	root, err := nameserver.NewWithContext(baseCtx, "a.root", "192.0.2.1", r.Client())
 	if err != nil {
 		t.Fatalf("new root nameserver: %v", err)
 	}
@@ -635,13 +599,13 @@ func TestBasic03ParallelQueries(t *testing.T) {
 		}
 	}
 
-	ns1, err := nameserver.New("ns1.example", "192.0.2.53", r.Client())
+	ns1, err := nameserver.NewWithContext(baseCtx, "ns1.example", "192.0.2.53", r.Client())
 	if err != nil {
 		t.Fatalf("new ns1: %v", err)
 	}
 	ns1.SetQueryHook(nsHook("ns1.example", net.IPv4(192, 0, 2, 53), true))
 
-	ns2, err := nameserver.New("ns2.example", "192.0.2.54", r.Client())
+	ns2, err := nameserver.NewWithContext(baseCtx, "ns2.example", "192.0.2.54", r.Client())
 	if err != nil {
 		t.Fatalf("new ns2: %v", err)
 	}
@@ -652,7 +616,7 @@ func TestBasic03ParallelQueries(t *testing.T) {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(baseCtx, 2*time.Second)
 	defer cancel()
 
 	done := make(chan struct{})

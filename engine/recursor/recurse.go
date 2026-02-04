@@ -118,7 +118,7 @@ func (r *Recursor) recurse(ctx context.Context, name string, qtype string, qclas
 	state.inProgress[nameKey][qtype] = true
 	state.unlock()
 
-	if profile.Effective().Resolver.Defaults.Unordered {
+	if profile.FromContext(ctx).Resolver.Defaults.Unordered {
 		return r.recurseUnordered(ctx, name, qtype, qclass, state)
 	}
 	return r.recurseOrdered(ctx, name, qtype, qclass, state)
@@ -212,7 +212,7 @@ func (r *Recursor) recurseUnordered(ctx context.Context, name string, qtype stri
 		if len(nss) == 0 {
 			break
 		}
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		if parallelism < 1 {
 			parallelism = 1
 		}
@@ -229,7 +229,7 @@ func (r *Recursor) recurseUnordered(ctx context.Context, name string, qtype stri
 		jobs := make(chan queryer)
 		results := make(chan unorderedResult, len(nss))
 
-		defaults := profile.Effective().Resolver.Defaults
+		defaults := profile.FromContext(ctx).Resolver.Defaults
 		batchTimeout := time.Duration(defaults.Timeout) * time.Second
 		if defaults.Retry > 0 {
 			batchTimeout = batchTimeout * time.Duration(defaults.Retry+1)
@@ -362,7 +362,7 @@ func (r *Recursor) recurseUnordered(ctx context.Context, name string, qtype stri
 		if decided {
 			if needsCNAME {
 				cnameCtx := ctx
-				if profile.Effective().Resolver.Defaults.Unordered {
+				if profile.FromContext(ctx).Resolver.Defaults.Unordered {
 					cnameCtx = withUnorderedContext(cnameCtx)
 					cnameCtx = withUnorderedDepth(cnameCtx, depth+1)
 				}

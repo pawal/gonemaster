@@ -151,7 +151,7 @@ func (c *Client) Exchange(ctx context.Context, server string, msg *dns.Msg) (pac
 	}
 	defer releaseQuerySlot()
 
-	c.ApplyProfileDefaults(nil)
+	c.ApplyProfileDefaults(profile.FromContext(ctx))
 	prepared := c.prepareMessage(msg)
 	attempts := 1
 	if c.Retries > 0 {

@@ -66,7 +66,7 @@ func defaultQueryAuth(ctx context.Context, z *zonepkg.Zone, name string, qtype s
 func All(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	var results []*logger.Entry
 
-	if util.ShouldRunTest("zone01") {
+	if util.ShouldRunTest(ctx, "zone01") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Zone01(ctx, z)
 		})
@@ -75,7 +75,7 @@ func All(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("zone02") {
+	if util.ShouldRunTest(ctx, "zone02") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Zone02(ctx, z)
 		})
@@ -84,7 +84,7 @@ func All(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("zone03") {
+	if util.ShouldRunTest(ctx, "zone03") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Zone03(ctx, z)
 		})
@@ -93,7 +93,7 @@ func All(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("zone04") {
+	if util.ShouldRunTest(ctx, "zone04") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Zone04(ctx, z)
 		})
@@ -102,7 +102,7 @@ func All(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("zone05") {
+	if util.ShouldRunTest(ctx, "zone05") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Zone05(ctx, z)
 		})
@@ -111,7 +111,7 @@ func All(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("zone06") {
+	if util.ShouldRunTest(ctx, "zone06") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Zone06(ctx, z)
 		})
@@ -120,7 +120,7 @@ func All(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("zone07") {
+	if util.ShouldRunTest(ctx, "zone07") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Zone07(ctx, z)
 		})
@@ -129,7 +129,7 @@ func All(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("zone08") {
+	if util.ShouldRunTest(ctx, "zone08") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Zone08(ctx, z)
 		})
@@ -139,7 +139,7 @@ func All(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	if util.ShouldRunTest("zone09") && !hasEntryTag(results, "NO_RESPONSE_MX_QUERY") {
+	if util.ShouldRunTest(ctx, "zone09") && !hasEntryTag(results, "NO_RESPONSE_MX_QUERY") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Zone09(ctx, z)
 		})
@@ -150,7 +150,7 @@ func All(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	}
 
 	if !hasEntryTag(results, "NO_RESPONSE_SOA_QUERY") {
-		if util.ShouldRunTest("zone10") {
+		if util.ShouldRunTest(ctx, "zone10") {
 			entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 				return Zone10(ctx, z)
 			})
@@ -159,7 +159,7 @@ func All(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 				return results, err
 			}
 		}
-		if util.ShouldRunTest("zone11") {
+		if util.ShouldRunTest(ctx, "zone11") {
 			entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 				return Zone11(ctx, z)
 			})
@@ -529,7 +529,7 @@ func Zone02(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	threshold := profile.Effective().TestCasesVars.Zone02.SOARefreshMinimumValue
+	threshold := profile.FromContext(ctx).TestCasesVars.Zone02.SOARefreshMinimumValue
 	if resp.Msg != nil {
 		records := resp.GetRecords("SOA", "answer")
 		if len(records) > 0 {
@@ -633,7 +633,7 @@ func Zone04(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	threshold := profile.Effective().TestCasesVars.Zone04.SOARetryMinimumValue
+	threshold := profile.FromContext(ctx).TestCasesVars.Zone04.SOARetryMinimumValue
 	if resp.Msg != nil {
 		records := resp.GetRecords("SOA", "answer")
 		if len(records) > 0 {
@@ -685,7 +685,7 @@ func Zone05(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	threshold := profile.Effective().TestCasesVars.Zone05.SOAExpireMinimumValue
+	threshold := profile.FromContext(ctx).TestCasesVars.Zone05.SOAExpireMinimumValue
 	if resp.Msg != nil {
 		records := resp.GetRecords("SOA", "answer")
 		if len(records) > 0 {
@@ -748,8 +748,8 @@ func Zone06(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	maxValue := profile.Effective().TestCasesVars.Zone06.SOADefaultTTLMaximumValue
-	minValue := profile.Effective().TestCasesVars.Zone06.SOADefaultTTLMinimumValue
+	maxValue := profile.FromContext(ctx).TestCasesVars.Zone06.SOADefaultTTLMaximumValue
+	minValue := profile.FromContext(ctx).TestCasesVars.Zone06.SOADefaultTTLMinimumValue
 	if resp.Msg != nil {
 		records := resp.GetRecords("SOA", "answer")
 		if len(records) > 0 {
@@ -991,12 +991,12 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 				outcome.checked = true
 				usevc := false
 				p2, _ := ns.QueryWithOptions(ctx, z.Name.String(), "MX", &nameserver.QueryOptions{
-					UseVC:    &usevc,
+					UseVC: &usevc,
 				})
 				if p2.Msg != nil && p2.TC() {
 					usevc = true
 					p2, _ = ns.QueryWithOptions(ctx, z.Name.String(), "MX", &nameserver.QueryOptions{
-						UseVC:    &usevc,
+						UseVC: &usevc,
 					})
 				}
 
@@ -1017,7 +1017,7 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -1253,7 +1253,7 @@ func Zone10(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -1353,7 +1353,7 @@ func Zone11(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -1484,7 +1484,7 @@ func appendLog(results *[]*logger.Entry, testcase string, tag string, args map[s
 }
 
 func ipDisabledMessageWithLogger(buf *testlogger.Buffer, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
-	if ns.Address.Is6() && !profile.Effective().Net.IPv6 {
+	if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 		for _, rrtype := range rrtypes {
 			if _, err := buf.Add("IPV6_DISABLED", map[string]any{
 				"ns":     ns.String(),
@@ -1495,7 +1495,7 @@ func ipDisabledMessageWithLogger(buf *testlogger.Buffer, ns nameserver.Nameserve
 		}
 		return true, nil
 	}
-	if ns.Address.Is4() && !profile.Effective().Net.IPv4 {
+	if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
 		for _, rrtype := range rrtypes {
 			if _, err := buf.Add("IPV4_DISABLED", map[string]any{
 				"ns":     ns.String(),
@@ -1510,7 +1510,7 @@ func ipDisabledMessageWithLogger(buf *testlogger.Buffer, ns nameserver.Nameserve
 }
 
 func ipDisabledMessage(results *[]*logger.Entry, testcase string, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
-	if !profile.Effective().Net.IPv6 && ns.Address.Is6() {
+	if !profile.FromContext(ctx).Net.IPv6 && ns.Address.Is6() {
 		for _, rrtype := range rrtypes {
 			if err := appendLog(results, testcase, "IPV6_DISABLED", map[string]any{
 				"ns":     ns.String(),
@@ -1521,7 +1521,7 @@ func ipDisabledMessage(results *[]*logger.Entry, testcase string, ns nameserver.
 		}
 		return true, nil
 	}
-	if !profile.Effective().Net.IPv4 && ns.Address.Is4() {
+	if !profile.FromContext(ctx).Net.IPv4 && ns.Address.Is4() {
 		for _, rrtype := range rrtypes {
 			if err := appendLog(results, testcase, "IPV4_DISABLED", map[string]any{
 				"ns":     ns.String(),

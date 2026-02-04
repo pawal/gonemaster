@@ -152,6 +152,16 @@ func Effective() *Profile {
 	return effective
 }
 
+// SetEffective overrides the global effective profile.
+// Passing nil resets to defaults.
+func SetEffective(p *Profile) {
+	if p == nil {
+		effective = mustDefault()
+		return
+	}
+	effective = p
+}
+
 // ResetEffective resets the effective profile to defaults.
 func ResetEffective() {
 	effective = mustDefault()

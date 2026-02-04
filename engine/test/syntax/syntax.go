@@ -31,7 +31,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var results []*logger.Entry
 
 	onlyAllowedChars := true
-	if util.ShouldRunTest("syntax01") {
+	if util.ShouldRunTest(ctx, "syntax01") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Syntax01(ctx, z)
 		})
@@ -42,7 +42,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		onlyAllowedChars = hasTag(results, "ONLY_ALLOWED_CHARS")
 	}
 
-	if util.ShouldRunTest("syntax02") {
+	if util.ShouldRunTest(ctx, "syntax02") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Syntax02(ctx, z)
 		})
@@ -52,7 +52,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	if util.ShouldRunTest("syntax03") {
+	if util.ShouldRunTest(ctx, "syntax03") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Syntax03(ctx, z)
 		})
@@ -66,7 +66,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, nil
 	}
 
-	if util.ShouldRunTest("syntax04") {
+	if util.ShouldRunTest(ctx, "syntax04") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Syntax04(ctx, z)
 		})
@@ -77,7 +77,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	allSOAResponses := true
-	if util.ShouldRunTest("syntax05") {
+	if util.ShouldRunTest(ctx, "syntax05") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Syntax05(ctx, z)
 		})
@@ -89,7 +89,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if allSOAResponses {
-		if util.ShouldRunTest("syntax06") {
+		if util.ShouldRunTest(ctx, "syntax06") {
 			entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 				return Syntax06(ctx, z)
 			})
@@ -99,7 +99,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		if util.ShouldRunTest("syntax07") {
+		if util.ShouldRunTest(ctx, "syntax07") {
 			entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 				return Syntax07(ctx, z)
 			})
@@ -110,7 +110,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	if util.ShouldRunTest("syntax08") {
+	if util.ShouldRunTest(ctx, "syntax08") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Syntax08(ctx, z)
 		})
@@ -337,7 +337,7 @@ func Syntax04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				return checkNameSyntaxWithLogger(buf, "NAMESERVER", name)
 			}
 		}
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -637,7 +637,7 @@ func Syntax06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				return processMailServer(ctx, mailServer)
 			}
 		}
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		if parallelism < 1 {
 			parallelism = 1
 		}
@@ -744,7 +744,7 @@ func Syntax08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					return checkNameSyntaxWithLogger(buf, "MX", target)
 				}
 			}
-			parallelism := profile.Effective().Resolver.Defaults.Parallel
+			parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 			entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 			if err != nil {
 				return results, err
@@ -777,7 +777,7 @@ func appendLog(results *[]*logger.Entry, testcase string, tag string, args map[s
 }
 
 func ipDisabledMessage(results *[]*logger.Entry, testcase string, ns nameserver.Nameserver, rrtype string) (bool, error) {
-	if ns.Address.Is4() && !profile.Effective().Net.IPv4 {
+	if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
 		if err := appendLog(results, testcase, "IPV4_DISABLED", map[string]any{
 			"ns":     ns.String(),
 			"rrtype": rrtype,
@@ -786,7 +786,7 @@ func ipDisabledMessage(results *[]*logger.Entry, testcase string, ns nameserver.
 		}
 		return true, nil
 	}
-	if ns.Address.Is6() && !profile.Effective().Net.IPv6 {
+	if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 		if err := appendLog(results, testcase, "IPV6_DISABLED", map[string]any{
 			"ns":     ns.String(),
 			"rrtype": rrtype,

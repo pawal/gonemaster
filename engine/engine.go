@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -228,70 +229,73 @@ func splitTestcaseNumber(name string) (string, int, bool) {
 	return name[:idx], num, true
 }
 
-// EffectiveProfile returns the profile that would be used for the request.
-func EffectiveProfile(req RunRequest) (*profile.Profile, error) {
+func normalizeRequest(req RunRequest) (string, string, error) {
 	module := strings.ToLower(strings.TrimSpace(req.Module))
 	testcase := strings.ToLower(strings.TrimSpace(req.Testcase))
 
 	if module != "" && moduleTestcases[module] == nil {
-		return nil, ErrNotImplemented
+		return "", "", ErrNotImplemented
 	}
 	if testcase != "" {
 		testModule := testcaseModule(testcase)
 		if testModule == "" {
-			return nil, ErrNotImplemented
+			return "", "", ErrNotImplemented
 		}
 		if module != "" && module != testModule {
-			return nil, ErrNotImplemented
+			return "", "", ErrNotImplemented
 		}
 	}
+	return module, testcase, nil
+}
 
+func buildProfile(req RunRequest, module string, testcase string) (*profile.Profile, bool, error) {
 	p, err := profile.Default()
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	if req.Profile != "" {
 		data, err := os.ReadFile(req.Profile)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		override, err := profile.FromYAML(string(data))
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		if err := p.Merge(override); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 	}
 
 	if req.IPv4 != nil {
 		if err := p.Set("net.ipv4", *req.IPv4); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 	}
 	if req.IPv6 != nil {
 		if err := p.Set("net.ipv6", *req.IPv6); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 	}
 	if req.Parallel != nil {
 		if err := p.Set("resolver.defaults.parallel", *req.Parallel); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 	}
 	if req.Unordered != nil {
 		if err := p.Set("resolver.defaults.unordered", *req.Unordered); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 	}
 	if req.ErrorCacheTTL != nil {
 		if err := p.Set("resolver.defaults.error_cache_ttl", *req.ErrorCacheTTL); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 	}
-	if shouldAutoDisableIPv6(req, p.Net.IPv6) {
+	autoDisabledIPv6 := shouldAutoDisableIPv6(req, p.Net.IPv6)
+	if autoDisabledIPv6 {
 		if err := p.Set("net.ipv6", false); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 	}
 
@@ -316,7 +320,17 @@ func EffectiveProfile(req RunRequest) (*profile.Profile, error) {
 		}
 	}
 
-	return p, nil
+	return p, autoDisabledIPv6, nil
+}
+
+// EffectiveProfile returns the profile that would be used for the request.
+func EffectiveProfile(req RunRequest) (*profile.Profile, error) {
+	module, testcase, err := normalizeRequest(req)
+	if err != nil {
+		return nil, err
+	}
+	p, _, err := buildProfile(req, module, testcase)
+	return p, err
 }
 
 // Run executes a Zonemaster test run.
@@ -325,20 +339,9 @@ func Run(req RunRequest) ([]LogEntry, error) {
 		return nil, fmt.Errorf("domain is required")
 	}
 
-	module := strings.ToLower(strings.TrimSpace(req.Module))
-	testcase := strings.ToLower(strings.TrimSpace(req.Testcase))
-
-	if module != "" && moduleTestcases[module] == nil {
-		return nil, ErrNotImplemented
-	}
-	if testcase != "" {
-		testModule := testcaseModule(testcase)
-		if testModule == "" {
-			return nil, ErrNotImplemented
-		}
-		if module != "" && module != testModule {
-			return nil, ErrNotImplemented
-		}
+	module, testcase, err := normalizeRequest(req)
+	if err != nil {
+		return nil, err
 	}
 
 	log := logger.New()
@@ -349,76 +352,20 @@ func Run(req RunRequest) ([]LogEntry, error) {
 	defer util.SetLogger(nil)
 	logger.StartTimeNow()
 
-	profile.ResetEffective()
-	if req.Profile != "" {
-		data, err := os.ReadFile(req.Profile)
-		if err != nil {
-			return nil, err
-		}
-		override, err := profile.FromYAML(string(data))
-		if err != nil {
-			return nil, err
-		}
-		if err := profile.Effective().Merge(override); err != nil {
-			return nil, err
-		}
+	p, autoDisabledIPv6, err := buildProfile(req, module, testcase)
+	if err != nil {
+		return nil, err
 	}
+	profile.SetEffective(p)
 
-	if req.IPv4 != nil {
-		if err := profile.Effective().Set("net.ipv4", *req.IPv4); err != nil {
-			return nil, err
-		}
+	ctx := req.Context
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	if req.IPv6 != nil {
-		if err := profile.Effective().Set("net.ipv6", *req.IPv6); err != nil {
-			return nil, err
-		}
-	}
-	if req.Parallel != nil {
-		if err := profile.Effective().Set("resolver.defaults.parallel", *req.Parallel); err != nil {
-			return nil, err
-		}
-	}
-	if req.Unordered != nil {
-		if err := profile.Effective().Set("resolver.defaults.unordered", *req.Unordered); err != nil {
-			return nil, err
-		}
-	}
-	if req.ErrorCacheTTL != nil {
-		if err := profile.Effective().Set("resolver.defaults.error_cache_ttl", *req.ErrorCacheTTL); err != nil {
-			return nil, err
-		}
-	}
-	autoDisabledIPv6 := shouldAutoDisableIPv6(req, profile.Effective().Net.IPv6)
-	if autoDisabledIPv6 {
-		if err := profile.Effective().Set("net.ipv6", false); err != nil {
-			return nil, err
-		}
-	}
+	ctx = profile.WithContext(ctx, p)
 
-	if testcase == "" {
-		switch module {
-		case "basic":
-			_ = profile.Effective().Set("test_cases", toAnySlice(moduleTestcases[module]))
-		case "syntax":
-			_ = profile.Effective().Set("test_cases", toAnySlice(moduleTestcases[module]))
-		case "address":
-			_ = profile.Effective().Set("test_cases", toAnySlice(moduleTestcases[module]))
-		case "connectivity":
-			_ = profile.Effective().Set("test_cases", toAnySlice(moduleTestcases[module]))
-		case "dnssec":
-			_ = profile.Effective().Set("test_cases", toAnySlice(moduleTestcases[module]))
-		case "delegation":
-			_ = profile.Effective().Set("test_cases", toAnySlice(moduleTestcases[module]))
-		case "nameserver":
-			_ = profile.Effective().Set("test_cases", toAnySlice(moduleTestcases[module]))
-		case "zone":
-			_ = profile.Effective().Set("test_cases", toAnySlice(moduleTestcases[module]))
-		}
-	}
-
-	queryLimit := profile.Effective().Resolver.Defaults.Parallel
-	if profile.Effective().Resolver.Defaults.Unordered && queryLimit > 1 {
+	queryLimit := p.Resolver.Defaults.Parallel
+	if p.Resolver.Defaults.Unordered && queryLimit > 1 {
 		queryLimit = queryLimit * queryLimit
 	}
 	transport.SetGlobalQueryLimit(queryLimit)
@@ -432,14 +379,17 @@ func Run(req RunRequest) ([]LogEntry, error) {
 		return nil, err
 	}
 
+	runner := &Runner{
+		Profile:    p,
+		Logger:     log,
+		QueryLimit: queryLimit,
+		StartedAt:  time.Now(),
+	}
+	ctx = WithRunner(ctx, runner)
+
 	z, err := zone.New(req.Domain)
 	if err != nil {
 		return nil, err
-	}
-
-	ctx := req.Context
-	if ctx == nil {
-		ctx = context.Background()
 	}
 	var entries []*logger.Entry
 	switch {
@@ -484,7 +434,7 @@ func Run(req RunRequest) ([]LogEntry, error) {
 	case module == "":
 		entries, err = basic.All(ctx, &z)
 		if err == nil {
-			if !basic.CanContinue(&z, entries) {
+			if !basic.CanContinue(ctx, &z, entries) {
 				entry, addErr := util.Info("CANNOT_CONTINUE", map[string]any{"domain": z.Name.String()})
 				if addErr != nil {
 					return nil, addErr

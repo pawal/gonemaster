@@ -1,6 +1,7 @@
 package util
 
 import (
+	"context"
 	"sync"
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
@@ -62,11 +63,11 @@ func Zone(name string) (*zone.Zone, error) {
 }
 
 // ShouldRunTest reports whether a test case is enabled in the effective profile.
-func ShouldRunTest(testName string) bool {
+func ShouldRunTest(ctx context.Context, testName string) bool {
 	if testName == "" {
 		return false
 	}
-	value, err := profile.Effective().Get("test_cases")
+	value, err := profile.FromContext(ctx).Get("test_cases")
 	if err != nil || value == nil {
 		return false
 	}
@@ -88,20 +89,21 @@ func ShouldRunTest(testName string) bool {
 }
 
 // IPVersionOK reports whether the IP version is enabled in the effective profile.
-func IPVersionOK(version int) bool {
+func IPVersionOK(ctx context.Context, version int) bool {
+	prof := profile.FromContext(ctx)
 	switch version {
 	case constants.IPVersion4:
-		return profile.Effective().Net.IPv4
+		return prof.Net.IPv4
 	case constants.IPVersion6:
-		return profile.Effective().Net.IPv6
+		return prof.Net.IPv6
 	default:
 		return false
 	}
 }
 
 // TestLevels returns the configured test levels from the effective profile.
-func TestLevels() map[string]map[string]string {
-	value, err := profile.Effective().Get("test_levels")
+func TestLevels(ctx context.Context) map[string]map[string]string {
+	value, err := profile.FromContext(ctx).Get("test_levels")
 	if err != nil || value == nil {
 		return nil
 	}

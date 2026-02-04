@@ -35,7 +35,7 @@ var (
 func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var results []*logger.Entry
 
-	if util.ShouldRunTest("connectivity01") {
+	if util.ShouldRunTest(ctx, "connectivity01") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Connectivity01(ctx, z)
 		})
@@ -44,7 +44,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("connectivity02") {
+	if util.ShouldRunTest(ctx, "connectivity02") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Connectivity02(ctx, z)
 		})
@@ -53,7 +53,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("connectivity03") {
+	if util.ShouldRunTest(ctx, "connectivity03") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Connectivity03(ctx, z)
 		})
@@ -62,7 +62,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("connectivity04") {
+	if util.ShouldRunTest(ctx, "connectivity04") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Connectivity04(ctx, z)
 		})
@@ -251,7 +251,7 @@ func Connectivity03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 		asnset string
 	}
 
-	parallelism := profile.Effective().Resolver.Defaults.Parallel
+	parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 	if parallelism < 1 {
 		parallelism = 1
 	}
@@ -554,7 +554,7 @@ func Connectivity04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -655,7 +655,7 @@ func connectivityLoop(ctx context.Context, testcase string, name dnsname.Name, n
 	testcase = canonical
 
 	if len(nsList) > 0 {
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		tasks := make([]runner.Task, len(nsList))
 		for i, ns := range nsList {
 			ns := ns
@@ -772,7 +772,7 @@ func appendLog(results *[]*logger.Entry, testcase string, tag string, args map[s
 }
 
 func ipDisabledMessageWithLogger(buf *testlogger.Buffer, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
-	if ns.Address.Is6() && !profile.Effective().Net.IPv6 {
+	if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 		for _, rrtype := range rrtypes {
 			if _, err := buf.Add("IPV6_DISABLED", map[string]any{
 				"ns":     ns.String(),
@@ -783,7 +783,7 @@ func ipDisabledMessageWithLogger(buf *testlogger.Buffer, ns nameserver.Nameserve
 		}
 		return true, nil
 	}
-	if ns.Address.Is4() && !profile.Effective().Net.IPv4 {
+	if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
 		for _, rrtype := range rrtypes {
 			if _, err := buf.Add("IPV4_DISABLED", map[string]any{
 				"ns":     ns.String(),
@@ -801,11 +801,11 @@ func disabledNS(nsList []nameserver.Nameserver) ([]string, []string) {
 	var ipv4 []string
 	var ipv6 []string
 	for _, ns := range nsList {
-		if ns.Address.Is4() && !profile.Effective().Net.IPv4 {
+		if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
 			ipv4 = append(ipv4, ns.String())
 			continue
 		}
-		if ns.Address.Is6() && !profile.Effective().Net.IPv6 {
+		if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 			ipv6 = append(ipv6, ns.String())
 		}
 	}

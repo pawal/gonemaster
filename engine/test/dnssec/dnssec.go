@@ -92,7 +92,7 @@ var rsaKeySizeByAlgo = map[uint8]rsaKeySizeDetails{
 func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var results []*logger.Entry
 
-	if util.ShouldRunTest("dnssec07") {
+	if util.ShouldRunTest(ctx, "dnssec07") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return DNSSEC07(ctx, z)
 		})
@@ -106,7 +106,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, nil
 	}
 
-	if util.ShouldRunTest("dnssec01") {
+	if util.ShouldRunTest(ctx, "dnssec01") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return DNSSEC01(ctx, z)
 		})
@@ -115,7 +115,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("dnssec02") {
+	if util.ShouldRunTest(ctx, "dnssec02") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return DNSSEC02(ctx, z)
 		})
@@ -124,7 +124,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("dnssec03") {
+	if util.ShouldRunTest(ctx, "dnssec03") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return DNSSEC03(ctx, z)
 		})
@@ -133,7 +133,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("dnssec04") {
+	if util.ShouldRunTest(ctx, "dnssec04") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return DNSSEC04(ctx, z)
 		})
@@ -142,7 +142,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("dnssec05") {
+	if util.ShouldRunTest(ctx, "dnssec05") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return DNSSEC05(ctx, z)
 		})
@@ -151,7 +151,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("dnssec06") {
+	if util.ShouldRunTest(ctx, "dnssec06") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return DNSSEC06(ctx, z)
 		})
@@ -161,7 +161,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	if util.ShouldRunTest("dnssec08") {
+	if util.ShouldRunTest(ctx, "dnssec08") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return DNSSEC08(ctx, z)
 		})
@@ -171,7 +171,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	if util.ShouldRunTest("dnssec09") {
+	if util.ShouldRunTest(ctx, "dnssec09") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return DNSSEC09(ctx, z)
 		})
@@ -181,7 +181,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	if util.ShouldRunTest("dnssec10") {
+	if util.ShouldRunTest(ctx, "dnssec10") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return DNSSEC10(ctx, z)
 		})
@@ -190,7 +190,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("dnssec11") {
+	if util.ShouldRunTest(ctx, "dnssec11") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return DNSSEC11(ctx, z)
 		})
@@ -199,7 +199,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("dnssec13") {
+	if util.ShouldRunTest(ctx, "dnssec13") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return DNSSEC13(ctx, z)
 		})
@@ -208,7 +208,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("dnssec14") {
+	if util.ShouldRunTest(ctx, "dnssec14") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return DNSSEC14(ctx, z)
 		})
@@ -217,7 +217,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("dnssec15") {
+	if util.ShouldRunTest(ctx, "dnssec15") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return DNSSEC15(ctx, z)
 		})
@@ -226,7 +226,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("dnssec16") {
+	if util.ShouldRunTest(ctx, "dnssec16") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return DNSSEC16(ctx, z)
 		})
@@ -235,7 +235,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("dnssec17") {
+	if util.ShouldRunTest(ctx, "dnssec17") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return DNSSEC17(ctx, z)
 		})
@@ -244,7 +244,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("dnssec18") {
+	if util.ShouldRunTest(ctx, "dnssec18") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return DNSSEC18(ctx, z)
 		})
@@ -641,7 +641,7 @@ func DNSSEC01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -840,7 +840,7 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -1055,7 +1055,7 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -1326,7 +1326,7 @@ func DNSSEC03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	parallelism := profile.Effective().Resolver.Defaults.Parallel
+	parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 	entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 	if err != nil {
 		return results, err
@@ -1597,7 +1597,7 @@ func DNSSEC04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	dnssecOn := true
-	parallelism := profile.Effective().Resolver.Defaults.Parallel
+	parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 
 	var dnskeyResp packet.Packet
 	var soaResp packet.Packet
@@ -1663,9 +1663,9 @@ func DNSSEC04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	soaSigs := soaResp.GetRecords("RRSIG", "answer")
 
 	now := packetTime(dnskeyResp).Unix()
-	remainingShortLimit := int64(profile.Effective().TestCasesVars.DNSSEC04.RemainingShort)
-	remainingLongLimit := int64(profile.Effective().TestCasesVars.DNSSEC04.RemainingLong)
-	durationLongLimit := int64(profile.Effective().TestCasesVars.DNSSEC04.DurationLong)
+	remainingShortLimit := int64(profile.FromContext(ctx).TestCasesVars.DNSSEC04.RemainingShort)
+	remainingLongLimit := int64(profile.FromContext(ctx).TestCasesVars.DNSSEC04.RemainingLong)
+	durationLongLimit := int64(profile.FromContext(ctx).TestCasesVars.DNSSEC04.DurationLong)
 
 	for _, rr := range append(keySigs, soaSigs...) {
 		sig, ok := rr.(*dns.RRSIG)
@@ -1854,7 +1854,7 @@ func DNSSEC05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -2101,7 +2101,7 @@ func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -2212,7 +2212,7 @@ func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -2538,7 +2538,7 @@ func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -2827,7 +2827,7 @@ func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -3283,7 +3283,7 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -3997,7 +3997,7 @@ func DNSSEC11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -4136,7 +4136,7 @@ func DNSSEC11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				}
 			}
 
-			parallelism := profile.Effective().Resolver.Defaults.Parallel
+			parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 			entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 			if err != nil {
 				return results, err
@@ -4319,7 +4319,7 @@ func DNSSEC13(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -4459,7 +4459,7 @@ func DNSSEC14(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -4635,7 +4635,7 @@ func DNSSEC15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -4920,7 +4920,7 @@ func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -5099,7 +5099,7 @@ func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 
 		if len(tasks) > 0 {
-			parallelism := profile.Effective().Resolver.Defaults.Parallel
+			parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 			validationResults := parallel.RunOrdered(ctx, tasks, parallel.Options{Limit: parallelism, CancelOnError: false})
 			for _, res := range validationResults {
 				if res.Err != nil {
@@ -5436,7 +5436,7 @@ func DNSSEC17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -5602,7 +5602,7 @@ func DNSSEC17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 
 		if len(tasks) > 0 {
-			parallelism := profile.Effective().Resolver.Defaults.Parallel
+			parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 			validationResults := parallel.RunOrdered(ctx, tasks, parallel.Options{Limit: parallelism, CancelOnError: false})
 			for _, res := range validationResults {
 				if res.Err != nil {
@@ -5892,7 +5892,7 @@ func DNSSEC18(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -6021,7 +6021,7 @@ func DNSSEC18(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				}
 			}
 
-			parallelism := profile.Effective().Resolver.Defaults.Parallel
+			parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 			entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 			if err != nil {
 				return results, err
@@ -6097,7 +6097,7 @@ func DNSSEC18(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				}
 
 				if len(tasks) > 0 {
-					parallelism := profile.Effective().Resolver.Defaults.Parallel
+					parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 					validationResults := parallel.RunOrdered(ctx, tasks, parallel.Options{Limit: parallelism, CancelOnError: false})
 					for _, res := range validationResults {
 						if res.Err != nil {
@@ -6140,7 +6140,7 @@ func DNSSEC18(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				}
 
 				if len(tasks) > 0 {
-					parallelism := profile.Effective().Resolver.Defaults.Parallel
+					parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 					validationResults := parallel.RunOrdered(ctx, tasks, parallel.Options{Limit: parallelism, CancelOnError: false})
 					for _, res := range validationResults {
 						if res.Err != nil {
@@ -6442,7 +6442,7 @@ func hasTag(entries []*logger.Entry, tag string) bool {
 }
 
 func ipDisabledMessageWithLogger(buf *testlogger.Buffer, server nameserver.Nameserver, rrtypes ...string) (bool, error) {
-	if server.Address.Is6() && !profile.Effective().Net.IPv6 {
+	if server.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 		for _, rrtype := range rrtypes {
 			if _, err := buf.Add("IPV6_DISABLED", map[string]any{
 				"ns":     server.String(),
@@ -6453,7 +6453,7 @@ func ipDisabledMessageWithLogger(buf *testlogger.Buffer, server nameserver.Names
 		}
 		return true, nil
 	}
-	if server.Address.Is4() && !profile.Effective().Net.IPv4 {
+	if server.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
 		for _, rrtype := range rrtypes {
 			if _, err := buf.Add("IPV4_DISABLED", map[string]any{
 				"ns":     server.String(),
@@ -6468,7 +6468,7 @@ func ipDisabledMessageWithLogger(buf *testlogger.Buffer, server nameserver.Names
 }
 
 func ipDisabledMessage(results *[]*logger.Entry, testcase string, server nameserver.Nameserver, rrtypes ...string) (bool, error) {
-	if !profile.Effective().Net.IPv6 && server.Address.Is6() {
+	if !profile.FromContext(ctx).Net.IPv6 && server.Address.Is6() {
 		for _, rrtype := range rrtypes {
 			if err := appendLog(results, testcase, "IPV6_DISABLED", map[string]any{
 				"ns":     server.String(),
@@ -6479,7 +6479,7 @@ func ipDisabledMessage(results *[]*logger.Entry, testcase string, server nameser
 		}
 		return true, nil
 	}
-	if !profile.Effective().Net.IPv4 && server.Address.Is4() {
+	if !profile.FromContext(ctx).Net.IPv4 && server.Address.Is4() {
 		for _, rrtype := range rrtypes {
 			if err := appendLog(results, testcase, "IPV4_DISABLED", map[string]any{
 				"ns":     server.String(),

@@ -22,7 +22,7 @@ func (ns Nameserver) AXFR(ctx context.Context, domain string, callback func(dns.
 	}
 	class = strings.ToUpper(class)
 
-	prof := profile.Effective()
+	prof := profile.FromContext(ctx)
 	if prof.NoNetwork {
 		return fmt.Errorf("External AXFR query for %s attempted to %s while running with no_network", domain, ns.String())
 	}
@@ -48,7 +48,7 @@ func (ns Nameserver) AXFR(ctx context.Context, domain string, callback func(dns.
 	}
 	base.SetUseTCP(true)
 	base.SetRecursionDesired(false)
-	base.ApplyProfileDefaults(nil)
+	base.ApplyProfileDefaults(profile.FromContext(ctx))
 
 	msg := new(dns.Msg)
 	msg.SetAxfr(dns.Fqdn(domain))

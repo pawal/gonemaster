@@ -124,7 +124,7 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	}
 	qclass = strings.ToUpper(qclass)
 
-	prof := profile.Effective()
+	prof := profile.FromContext(ctx)
 	if ns.Address.Is4() && !prof.Net.IPv4 {
 		return packet.Packet{}, nil
 	}
@@ -223,7 +223,7 @@ func (ns Nameserver) queryNetwork(ctx context.Context, qname string, qtype strin
 		return ns.state.queryFunc(ctx, qname, qtype, qclass, opts)
 	}
 
-	client, err := ns.clientForOptions(opts)
+	client, err := ns.clientForOptions(ctx, opts)
 	if err != nil {
 		return packet.Packet{}, err
 	}
@@ -290,7 +290,7 @@ func (ns Nameserver) queryNetwork(ctx context.Context, qname string, qtype strin
 	return resp, err
 }
 
-func (ns Nameserver) clientForOptions(opts *QueryOptions) (*transport.Client, error) {
+func (ns Nameserver) clientForOptions(ctx context.Context, opts *QueryOptions) (*transport.Client, error) {
 	base := transport.Client{}
 	if ns.Client != nil {
 		base = *ns.Client
@@ -333,7 +333,7 @@ func (ns Nameserver) clientForOptions(opts *QueryOptions) (*transport.Client, er
 		base.SetEDNSSize(constants.EDNSUDPPayloadDNSSECDefault)
 	}
 
-	base.ApplyProfileDefaults(nil)
+	base.ApplyProfileDefaults(profile.FromContext(ctx))
 	return &base, nil
 }
 

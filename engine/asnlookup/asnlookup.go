@@ -62,11 +62,12 @@ func GetWithPrefix(ctx context.Context, resolver Resolver, ip netip.Addr) (Resul
 		return Result{}, fmt.Errorf("invalid IP address")
 	}
 
-	style := profile.Effective().ASNDB.Style
+	prof := profile.FromContext(ctx)
+	style := prof.ASNDB.Style
 	if style == "" {
 		return Result{}, fmt.Errorf("asn database style undefined")
 	}
-	sources := profile.Effective().ASNDB.Sources[style]
+	sources := prof.ASNDB.Sources[style]
 	if len(sources) == 0 {
 		return Result{}, fmt.Errorf("asn database sources undefined")
 	}

@@ -39,7 +39,7 @@ var (
 func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var results []*logger.Entry
 
-	if util.ShouldRunTest("delegation01") {
+	if util.ShouldRunTest(ctx, "delegation01") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Delegation01(ctx, z)
 		})
@@ -48,7 +48,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("delegation02") {
+	if util.ShouldRunTest(ctx, "delegation02") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Delegation02(ctx, z)
 		})
@@ -57,7 +57,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("delegation03") {
+	if util.ShouldRunTest(ctx, "delegation03") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Delegation03(ctx, z)
 		})
@@ -66,7 +66,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("delegation04") {
+	if util.ShouldRunTest(ctx, "delegation04") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Delegation04(ctx, z)
 		})
@@ -75,7 +75,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("delegation05") {
+	if util.ShouldRunTest(ctx, "delegation05") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Delegation05(ctx, z)
 		})
@@ -84,7 +84,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("delegation06") {
+	if util.ShouldRunTest(ctx, "delegation06") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Delegation06(ctx, z)
 		})
@@ -93,7 +93,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("delegation07") {
+	if util.ShouldRunTest(ctx, "delegation07") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Delegation07(ctx, z)
 		})
@@ -502,7 +502,7 @@ func Delegation04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	for _, ns := range append(list4, list5...) {
 		nameKey := ns.Name.String()
 		action := actionQuery
-		if (ns.Address.Is6() && !profile.Effective().Net.IPv6) || (ns.Address.Is4() && !profile.Effective().Net.IPv4) {
+		if (ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6) || (ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4) {
 			action = actionDisabled
 		} else if seen[nameKey] {
 			action = actionSkip
@@ -549,7 +549,7 @@ func Delegation04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -661,7 +661,7 @@ func Delegation05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					}
 				}
 
-				parallelism := profile.Effective().Resolver.Defaults.Parallel
+				parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 				entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 				if err != nil {
 					return results, err
@@ -726,7 +726,7 @@ func Delegation06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	for _, ns := range append(list4, list5...) {
 		nameKey := ns.Name.String()
 		action := actionQuery
-		if (ns.Address.Is6() && !profile.Effective().Net.IPv6) || (ns.Address.Is4() && !profile.Effective().Net.IPv4) {
+		if (ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6) || (ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4) {
 			action = actionDisabled
 		} else if seen[nameKey] {
 			action = actionSkip
@@ -760,7 +760,7 @@ func Delegation06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -1025,7 +1025,7 @@ func appendLog(results *[]*logger.Entry, testcase string, tag string, args map[s
 }
 
 func ipDisabledMessageWithLogger(buf *testlogger.Buffer, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
-	if ns.Address.Is6() && !profile.Effective().Net.IPv6 {
+	if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 		for _, rrtype := range rrtypes {
 			if _, err := buf.Add("IPV6_DISABLED", map[string]any{
 				"ns":     ns.String(),
@@ -1036,7 +1036,7 @@ func ipDisabledMessageWithLogger(buf *testlogger.Buffer, ns nameserver.Nameserve
 		}
 		return true, nil
 	}
-	if ns.Address.Is4() && !profile.Effective().Net.IPv4 {
+	if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
 		for _, rrtype := range rrtypes {
 			if _, err := buf.Add("IPV4_DISABLED", map[string]any{
 				"ns":     ns.String(),

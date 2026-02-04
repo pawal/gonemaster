@@ -60,6 +60,7 @@ func GetParentNSNamesAndIPs(ctx context.Context, z *zone.Zone) ([]nameserver.Nam
 	if r == nil {
 		return nil, fmt.Errorf("missing recursor")
 	}
+	prof := profile.FromContext(ctx)
 
 	if z.Name.String() == "." || r.HasFakeAddresses(z.Name.String()) {
 		return []nameserver.Nameserver{}, nil
@@ -130,10 +131,10 @@ func GetParentNSNamesAndIPs(ctx context.Context, z *zone.Zone) ([]nameserver.Nam
 			}
 			handled[zoneKey][nsKey] = true
 
-			if ns.Address.Is4() && !profile.Effective().Net.IPv4 {
+			if ns.Address.Is4() && !prof.Net.IPv4 {
 				continue
 			}
-			if ns.Address.Is6() && !profile.Effective().Net.IPv6 {
+			if ns.Address.Is6() && !prof.Net.IPv6 {
 				continue
 			}
 

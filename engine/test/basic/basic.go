@@ -27,7 +27,7 @@ const moduleName = "Basic"
 func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var results []*logger.Entry
 
-	if util.ShouldRunTest("basic01") {
+	if util.ShouldRunTest(ctx, "basic01") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Basic01(ctx, z)
 		})
@@ -41,7 +41,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	var authResponseSOA bool
-	if util.ShouldRunTest("basic02") {
+	if util.ShouldRunTest(ctx, "basic02") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Basic02(ctx, z)
 		})
@@ -52,7 +52,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		authResponseSOA = hasTag(results, "B02_AUTH_RESPONSE_SOA")
 	}
 
-	if util.ShouldRunTest("basic03") {
+	if util.ShouldRunTest(ctx, "basic03") {
 		if authResponseSOA {
 			if err := appendLog(&results, "Basic03", "HAS_NAMESERVER_NO_WWW_A_TEST", map[string]any{
 				"zname": z.Name.String(),
@@ -74,8 +74,8 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 }
 
 // CanContinue reports whether later test cases can proceed based on Basic02.
-func CanContinue(z *zone.Zone, results []*logger.Entry) bool {
-	if util.ShouldRunTest("basic02") {
+func CanContinue(ctx context.Context, z *zone.Zone, results []*logger.Entry) bool {
+	if util.ShouldRunTest(ctx, "basic02") {
 		tags := map[string]bool{}
 		for _, entry := range results {
 			if entry == nil {
@@ -701,7 +701,7 @@ func Basic02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := nsOutcome{ns: ns}
 
-				if ns.Address.Is6() && !profile.Effective().Net.IPv6 {
+				if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 					if _, err := buf.Add("IPV6_DISABLED", map[string]any{"ns": ns.String(), "rrtype": "SOA"}); err != nil {
 						return err
 					}
@@ -709,7 +709,7 @@ func Basic02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					outcomes[i] = outcome
 					return nil
 				}
-				if ns.Address.Is4() && !profile.Effective().Net.IPv4 {
+				if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
 					if _, err := buf.Add("IPV4_DISABLED", map[string]any{"ns": ns.String(), "rrtype": "SOA"}); err != nil {
 						return err
 					}
@@ -718,12 +718,12 @@ func Basic02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					return nil
 				}
 
-				if ns.Address.Is6() && profile.Effective().Net.IPv6 {
+				if ns.Address.Is6() && profile.FromContext(ctx).Net.IPv6 {
 					if _, err := buf.Add("IPV6_ENABLED", map[string]any{"ns": ns.String(), "rrtype": "SOA"}); err != nil {
 						return err
 					}
 				}
-				if ns.Address.Is4() && profile.Effective().Net.IPv4 {
+				if ns.Address.Is4() && profile.FromContext(ctx).Net.IPv4 {
 					if _, err := buf.Add("IPV4_ENABLED", map[string]any{"ns": ns.String(), "rrtype": "SOA"}); err != nil {
 						return err
 					}
@@ -755,7 +755,7 @@ func Basic02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -860,14 +860,14 @@ func Basic03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := nsOutcome{}
 
-				if ns.Address.Is6() && !profile.Effective().Net.IPv6 {
+				if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 					if _, err := buf.Add("IPV6_DISABLED", map[string]any{"ns": ns.String(), "rrtype": "A"}); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
 					return nil
 				}
-				if ns.Address.Is4() && !profile.Effective().Net.IPv4 {
+				if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
 					if _, err := buf.Add("IPV4_DISABLED", map[string]any{"ns": ns.String(), "rrtype": "A"}); err != nil {
 						return err
 					}
@@ -875,12 +875,12 @@ func Basic03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					return nil
 				}
 
-				if ns.Address.Is6() && profile.Effective().Net.IPv6 {
+				if ns.Address.Is6() && profile.FromContext(ctx).Net.IPv6 {
 					if _, err := buf.Add("IPV6_ENABLED", map[string]any{"ns": ns.String(), "rrtype": "A"}); err != nil {
 						return err
 					}
 				}
-				if ns.Address.Is4() && profile.Effective().Net.IPv4 {
+				if ns.Address.Is4() && profile.FromContext(ctx).Net.IPv4 {
 					if _, err := buf.Add("IPV4_ENABLED", map[string]any{"ns": ns.String(), "rrtype": "A"}); err != nil {
 						return err
 					}
@@ -913,7 +913,7 @@ func Basic03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -954,7 +954,7 @@ func appendLog(results *[]*logger.Entry, testcase string, tag string, args map[s
 }
 
 func ipDisabledMessage(results *[]*logger.Entry, testcase string, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
-	if ns.Address.Is4() && !profile.Effective().Net.IPv4 {
+	if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
 		for _, rrtype := range rrtypes {
 			if err := appendLog(results, testcase, "IPV4_DISABLED", map[string]any{
 				"ns":     ns.String(),
@@ -965,7 +965,7 @@ func ipDisabledMessage(results *[]*logger.Entry, testcase string, ns nameserver.
 		}
 		return true, nil
 	}
-	if ns.Address.Is6() && !profile.Effective().Net.IPv6 {
+	if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 		for _, rrtype := range rrtypes {
 			if err := appendLog(results, testcase, "IPV6_DISABLED", map[string]any{
 				"ns":     ns.String(),
@@ -980,7 +980,7 @@ func ipDisabledMessage(results *[]*logger.Entry, testcase string, ns nameserver.
 }
 
 func ipEnabledMessage(results *[]*logger.Entry, testcase string, ns nameserver.Nameserver, rrtypes ...string) error {
-	if ns.Address.Is4() && profile.Effective().Net.IPv4 {
+	if ns.Address.Is4() && profile.FromContext(ctx).Net.IPv4 {
 		for _, rrtype := range rrtypes {
 			if err := appendLog(results, testcase, "IPV4_ENABLED", map[string]any{
 				"ns":     ns.String(),
@@ -990,7 +990,7 @@ func ipEnabledMessage(results *[]*logger.Entry, testcase string, ns nameserver.N
 			}
 		}
 	}
-	if ns.Address.Is6() && profile.Effective().Net.IPv6 {
+	if ns.Address.Is6() && profile.FromContext(ctx).Net.IPv6 {
 		for _, rrtype := range rrtypes {
 			if err := appendLog(results, testcase, "IPV6_ENABLED", map[string]any{
 				"ns":     ns.String(),

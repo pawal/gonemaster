@@ -27,7 +27,7 @@ const addressModuleName = "Address"
 func AddressAll(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var results []*logger.Entry
 
-	if util.ShouldRunTest("address01") {
+	if util.ShouldRunTest(ctx, "address01") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Address01(ctx, z)
 		})
@@ -38,7 +38,7 @@ func AddressAll(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	nsWithReverse := true
-	if util.ShouldRunTest("address02") {
+	if util.ShouldRunTest(ctx, "address02") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Address02(ctx, z)
 		})
@@ -49,7 +49,7 @@ func AddressAll(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		nsWithReverse = hasTag(results, "NAMESERVERS_IP_WITH_REVERSE")
 	}
 
-	if nsWithReverse && util.ShouldRunTest("address03") {
+	if nsWithReverse && util.ShouldRunTest(ctx, "address03") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Address03(ctx, z)
 		})
@@ -299,7 +299,7 @@ func Address02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -416,7 +416,7 @@ func Address03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err

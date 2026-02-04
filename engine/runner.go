@@ -19,6 +19,8 @@ type Runner struct {
 	Logger    *logger.Logger
 	Limiter   *transport.Limiter
 	StartedAt time.Time
+	// AutoIPv6Disabled records whether IPv6 was disabled by the auto-detect heuristic.
+	AutoIPv6Disabled bool
 }
 
 type runnerKey struct{}

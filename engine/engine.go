@@ -43,6 +43,8 @@ type RunRequest struct {
 	LogCallback func(*logger.Entry) error
 	// Context controls cancellation and timeouts for the run.
 	Context context.Context
+	// Runner, when set, supplies the per-run container to Run.
+	Runner *Runner
 }
 
 // LogEntry mirrors the JSON output produced by the Perl logger.
@@ -325,6 +327,9 @@ func buildProfile(req RunRequest, module string, testcase string) (*profile.Prof
 
 // EffectiveProfile returns the profile that would be used for the request.
 func EffectiveProfile(req RunRequest) (*profile.Profile, error) {
+	if req.Runner != nil && req.Runner.Profile != nil {
+		return req.Runner.Profile, nil
+	}
 	module, testcase, err := normalizeRequest(req)
 	if err != nil {
 		return nil, err
@@ -333,10 +338,63 @@ func EffectiveProfile(req RunRequest) (*profile.Profile, error) {
 	return p, err
 }
 
-// Run executes a Zonemaster test run.
-func Run(req RunRequest) ([]LogEntry, error) {
+// RunWithRunner executes a Zonemaster test run using a provided runner.
+func RunWithRunner(req RunRequest, runner *Runner) ([]LogEntry, error) {
 	if strings.TrimSpace(req.Domain) == "" {
 		return nil, fmt.Errorf("domain is required")
+	}
+	if runner == nil {
+		return nil, fmt.Errorf("runner is required")
+	}
+	if runner.Profile == nil {
+		return nil, fmt.Errorf("runner profile is required")
+	}
+	if runner.Logger == nil {
+		return nil, fmt.Errorf("runner logger is required")
+	}
+
+	module, testcase, err := normalizeRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx := req.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx = profile.WithContext(ctx, runner.Profile)
+	ctx = logger.WithContext(ctx, runner.Logger)
+	if runner.Limiter != nil {
+		ctx = transport.WithLimiter(ctx, runner.Limiter)
+	}
+	if runner.StartedAt.IsZero() {
+		runner.StartedAt = time.Now()
+	}
+	if runner.Profile != nil {
+		runner.Logger.SetProfile(runner.Profile)
+	}
+	ctx = WithRunner(ctx, runner)
+
+	if runner.AutoIPv6Disabled {
+		if _, err := runner.Logger.AddWithoutCallback("IPV6_DISABLED", map[string]any{"reason": "auto_no_global_ipv6"}, "", ""); err != nil {
+			return nil, err
+		}
+	}
+	if _, err := runner.Logger.AddWithoutCallback("GLOBAL_VERSION", map[string]any{"version": VersionString()}, "", ""); err != nil {
+		return nil, err
+	}
+
+	entries, err := runWithContext(ctx, req, module, testcase)
+	if err != nil {
+		return nil, err
+	}
+	return convertEntries(entries, req.MinLevel)
+}
+
+// Run executes a Zonemaster test run.
+func Run(req RunRequest) ([]LogEntry, error) {
+	if req.Runner != nil {
+		return RunWithRunner(req, req.Runner)
 	}
 
 	module, testcase, err := normalizeRequest(req)
@@ -355,36 +413,24 @@ func Run(req RunRequest) ([]LogEntry, error) {
 	}
 	log.SetProfile(p)
 
-	ctx := req.Context
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	ctx = profile.WithContext(ctx, p)
-	ctx = logger.WithContext(ctx, log)
-
 	queryLimit := p.Resolver.Defaults.Parallel
 	if p.Resolver.Defaults.Unordered && queryLimit > 1 {
 		queryLimit = queryLimit * queryLimit
 	}
 	limiter := transport.NewLimiter(queryLimit)
-	ctx = transport.WithLimiter(ctx, limiter)
-	if autoDisabledIPv6 {
-		if _, err := log.AddWithoutCallback("IPV6_DISABLED", map[string]any{"reason": "auto_no_global_ipv6"}, "", ""); err != nil {
-			return nil, err
-		}
-	}
-	if _, err := log.AddWithoutCallback("GLOBAL_VERSION", map[string]any{"version": VersionString()}, "", ""); err != nil {
-		return nil, err
-	}
 
 	runner := &Runner{
-		Profile:   p,
-		Logger:    log,
-		Limiter:   limiter,
-		StartedAt: time.Now(),
+		Profile:          p,
+		Logger:           log,
+		Limiter:          limiter,
+		StartedAt:        time.Now(),
+		AutoIPv6Disabled: autoDisabledIPv6,
 	}
-	ctx = WithRunner(ctx, runner)
 
+	return RunWithRunner(req, runner)
+}
+
+func runWithContext(ctx context.Context, req RunRequest, module string, testcase string) ([]*logger.Entry, error) {
 	z, err := zone.New(req.Domain)
 	if err != nil {
 		return nil, err
@@ -440,7 +486,7 @@ func Run(req RunRequest) ([]LogEntry, error) {
 				if entry != nil {
 					entries = append(entries, entry)
 				}
-				return convertEntries(entries, req.MinLevel)
+				return entries, nil
 			}
 			more, err2 := address.AddressAll(ctx, &z)
 			if err2 != nil {
@@ -490,7 +536,7 @@ func Run(req RunRequest) ([]LogEntry, error) {
 		return nil, err
 	}
 
-	return convertEntries(entries, req.MinLevel)
+	return entries, nil
 }
 
 func convertEntries(entries []*logger.Entry, minLevel string) ([]LogEntry, error) {

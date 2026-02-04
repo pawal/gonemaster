@@ -289,6 +289,11 @@ func EffectiveProfile(req RunRequest) (*profile.Profile, error) {
 			return nil, err
 		}
 	}
+	if shouldAutoDisableIPv6(req, p.Net.IPv6) {
+		if err := p.Set("net.ipv6", false); err != nil {
+			return nil, err
+		}
+	}
 
 	if testcase == "" {
 		switch module {
@@ -384,6 +389,12 @@ func Run(req RunRequest) ([]LogEntry, error) {
 			return nil, err
 		}
 	}
+	autoDisabledIPv6 := shouldAutoDisableIPv6(req, profile.Effective().Net.IPv6)
+	if autoDisabledIPv6 {
+		if err := profile.Effective().Set("net.ipv6", false); err != nil {
+			return nil, err
+		}
+	}
 
 	if testcase == "" {
 		switch module {
@@ -412,6 +423,11 @@ func Run(req RunRequest) ([]LogEntry, error) {
 	}
 	transport.SetGlobalQueryLimit(queryLimit)
 	logger.ResetConfig()
+	if autoDisabledIPv6 {
+		if _, err := util.Info("IPV6_DISABLED", map[string]any{"reason": "auto_no_global_ipv6"}); err != nil {
+			return nil, err
+		}
+	}
 	if _, err := util.Info("GLOBAL_VERSION", map[string]any{"version": VersionString()}); err != nil {
 		return nil, err
 	}

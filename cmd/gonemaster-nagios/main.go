@@ -56,6 +56,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	var noIPv6 bool
 	var disableIPv4 bool
 	var disableIPv6 bool
+	var forceIPv6 bool
 	var showVersion bool
 	var showHelp bool
 	var verbose countFlag
@@ -63,7 +64,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs := flag.NewFlagSet("gonemaster-nagios", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	fs.Usage = func() {
-		fmt.Fprintf(errOut, "Usage: %s -d DOMAIN [-v|-vv|-vvv] [--module MODULE] [--testcase TESTCASE] [--profile PATH] [--no-ipv4|--disable-ipv4] [--no-ipv6|--disable-ipv6] [--version]\n", fs.Name())
+		fmt.Fprintf(errOut, "Usage: %s -d DOMAIN [-v|-vv|-vvv] [--module MODULE] [--testcase TESTCASE] [--profile PATH] [--no-ipv4|--disable-ipv4] [--no-ipv6|--disable-ipv6|--ipv6] [--version]\n", fs.Name())
 		fmt.Fprintln(errOut, "")
 		fmt.Fprintln(errOut, "Options:")
 		fmt.Fprintln(errOut, "  -d, --domain   Zone name to test (required)")
@@ -74,6 +75,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		fmt.Fprintln(errOut, "  --no-ipv6      Disable IPv6 queries (optional)")
 		fmt.Fprintln(errOut, "  --disable-ipv4 Disable IPv4 queries (optional)")
 		fmt.Fprintln(errOut, "  --disable-ipv6 Disable IPv6 queries (optional)")
+		fmt.Fprintln(errOut, "  --ipv6         Force IPv6 queries (optional)")
 		fmt.Fprintln(errOut, "  -v, --verbose  Increase verbosity (repeatable)")
 		fmt.Fprintln(errOut, "  -V, --version  Print version and exit")
 		fmt.Fprintln(errOut, "  -h, --help     Show help")
@@ -94,6 +96,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs.BoolVar(&noIPv6, "no-ipv6", false, "Disable IPv6 queries (optional)")
 	fs.BoolVar(&disableIPv4, "disable-ipv4", false, "Disable IPv4 queries (optional)")
 	fs.BoolVar(&disableIPv6, "disable-ipv6", false, "Disable IPv6 queries (optional)")
+	fs.BoolVar(&forceIPv6, "ipv6", false, "Force IPv6 queries (optional)")
 	fs.Var(&verbose, "verbose", "Increase verbosity (repeatable)")
 	fs.Var(&verbose, "v", "Increase verbosity (repeatable)")
 	fs.BoolVar(&showVersion, "version", false, "Print version and exit")
@@ -129,6 +132,14 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	if noIPv6 || disableIPv6 {
 		value := false
 		ipv6Override = &value
+	}
+	if forceIPv6 {
+		value := true
+		ipv6Override = &value
+	}
+	if (noIPv6 || disableIPv6) && forceIPv6 {
+		fmt.Fprintln(errOut, "--no-ipv6/--disable-ipv6 cannot be combined with --ipv6")
+		return 3
 	}
 
 	entries, err := engine.Run(engine.RunRequest{

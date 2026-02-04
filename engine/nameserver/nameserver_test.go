@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -264,6 +265,51 @@ func TestContextCanceledDoesNotBlacklist(t *testing.T) {
 	}
 	if ns.state.blacklisted[false] {
 		t.Fatalf("expected UDP not to be blacklisted on context cancellation")
+	}
+}
+
+func TestReachabilityCacheSkipsAcrossCaches(t *testing.T) {
+	clearReachabilityCache()
+	t.Cleanup(clearReachabilityCache)
+
+	nsA, err := NewWithCache(NewCacheStore(), "ns.example", "192.0.2.44", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	nsB, err := NewWithCache(NewCacheStore(), "ns.example", "192.0.2.44", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+
+	ctx, prof := testContext(t)
+	prof.Resolver.Defaults.NegativeCacheTTL = 60
+
+	var callsA int
+	nsA.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		callsA++
+		return packet.Packet{}, &net.OpError{Op: "dial", Net: "udp", Err: syscall.EHOSTUNREACH}
+	})
+
+	var callsB int
+	nsB.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		callsB++
+		return packet.Packet{}, nil
+	})
+
+	_, err = nsA.QueryWithOptions(ctx, "example", "A", nil)
+	if err == nil {
+		t.Fatalf("expected error on first query")
+	}
+
+	_, err = nsB.QueryWithOptions(ctx, "example", "A", nil)
+	if err != nil {
+		t.Fatalf("expected reachability cache to skip error, got %v", err)
+	}
+	if callsA != 1 {
+		t.Fatalf("expected first call to run, got %d", callsA)
+	}
+	if callsB != 0 {
+		t.Fatalf("expected second call to be skipped by reachability cache, got %d", callsB)
 	}
 }
 

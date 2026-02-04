@@ -159,6 +159,19 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	}
 
 	usevc := resolveUseVC(opts)
+	if ttl := resolveReachabilityTTL(prof, opts); ttl > 0 {
+		if skip, remaining := globalReachability.shouldSkip(ns.Address.String()); skip {
+			logSystem(ctx, "REACHABILITY_CACHE_SKIP", map[string]any{
+				"ip":          ns.Address.String(),
+				"protocol":    errorCacheProtocol(usevc),
+				"ttl_seconds": int(remaining.Seconds()),
+				"query_name":  qname,
+				"query_type":  qtype,
+				"query_class": qclass,
+			})
+			return packet.Packet{}, nil
+		}
+	}
 	if errorCacheTTL := resolveErrorCacheTTL(prof, opts); errorCacheTTL > 0 && ns.state != nil && ns.state.errorCache != nil {
 		if skip, remaining := ns.state.errorCache.shouldSkip(errorCacheKey(usevc)); skip {
 			logSystem(ctx, "ERROR_CACHE_SKIP", map[string]any{
@@ -187,6 +200,11 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	if err != nil && (ctx == nil || ctx.Err() == nil) && ns.state != nil && ns.state.errorCache != nil {
 		if errorCacheTTL := resolveErrorCacheTTL(prof, opts); errorCacheTTL > 0 {
 			ns.state.errorCache.set(errorCacheKey(usevc), errorCacheTTL)
+		}
+	}
+	if err != nil && (ctx == nil || ctx.Err() == nil) && isHardNetworkError(err) {
+		if ttl := resolveReachabilityTTL(prof, opts); ttl > 0 {
+			globalReachability.mark(ns.Address.String(), ttl)
 		}
 	}
 
@@ -223,12 +241,28 @@ func resolveErrorCacheTTL(prof *profile.Profile, opts *QueryOptions) time.Durati
 		return 0
 	}
 
-	baseSeconds := prof.Resolver.Defaults.ErrorCacheTTL
+	return resolveTTLWithBudget(prof.Resolver.Defaults.ErrorCacheTTL, prof, opts)
+}
+
+func resolveReachabilityTTL(prof *profile.Profile, opts *QueryOptions) time.Duration {
+	if prof == nil {
+		prof = profile.Effective()
+	}
+	if prof == nil {
+		return 0
+	}
+	baseSeconds := prof.Resolver.Defaults.NegativeCacheTTL
+	if baseSeconds <= 0 {
+		baseSeconds = prof.Resolver.Defaults.ErrorCacheTTL
+	}
+	return resolveTTLWithBudget(baseSeconds, prof, opts)
+}
+
+func resolveTTLWithBudget(baseSeconds int, prof *profile.Profile, opts *QueryOptions) time.Duration {
 	if baseSeconds <= 0 {
 		return 0
 	}
 	baseTTL := time.Duration(baseSeconds) * time.Second
-
 	timeout := time.Duration(prof.Resolver.Defaults.Timeout) * time.Second
 	retries := prof.Resolver.Defaults.Retry
 	retrans := time.Duration(prof.Resolver.Defaults.Retrans) * time.Second

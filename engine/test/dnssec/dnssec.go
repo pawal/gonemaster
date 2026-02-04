@@ -575,7 +575,7 @@ func DNSSEC01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					nonAlgo2DS: map[uint16][]string{},
 				}
 
-				if disabled, err := ipDisabledMessageWithLogger(buf, ns, "DS"); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "DS"); err != nil {
 					return err
 				} else if disabled {
 					outcomes[i] = outcome
@@ -809,7 +809,7 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				ns := matchingNS[0]
 				outcome := parentOutcome{}
 
-				if disabled, err := ipDisabledMessageWithLogger(buf, ns, "DS"); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "DS"); err != nil {
 					return err
 				} else if disabled {
 					outcomes[i] = outcome
@@ -921,7 +921,7 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					rrsigNotValidByDNSKEY:   map[uint16]bool{},
 				}
 
-				if disabled, err := ipDisabledMessageWithLogger(buf, ns, "DNSKEY"); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "DNSKEY"); err != nil {
 					return err
 				} else if disabled {
 					outcomes[i] = outcome
@@ -1258,7 +1258,7 @@ func DNSSEC03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			buf := testlogger.Wrap(log, moduleName, testcase)
 			outcome := nsOutcome{ns: ns.String()}
 
-			if disabled, err := ipDisabledMessageWithLogger(buf, ns, "DNSKEY", "NSEC"); err != nil {
+			if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "DNSKEY", "NSEC"); err != nil {
 				return err
 			} else if disabled {
 				outcomes[i] = outcome
@@ -1804,7 +1804,7 @@ func DNSSEC05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					sets: map[string]map[uint8]map[uint16][]string{},
 				}
 
-				if disabled, err := ipDisabledMessageWithLogger(buf, ns, "DNSKEY"); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "DNSKEY"); err != nil {
 					return err
 				} else if disabled {
 					outcomes[i] = outcome
@@ -2049,7 +2049,7 @@ func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				ns := group[0]
 				outcome := childOutcome{matchingStrings: nsStrings(group)}
 
-				if disabled, err := ipDisabledMessageWithLogger(buf, ns, queryTypes...); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, queryTypes...); err != nil {
 					return err
 				} else if disabled {
 					outcomes[i] = outcome
@@ -2178,7 +2178,7 @@ func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				ns := group[0]
 				outcome := parentOutcome{matchingStrings: nsStrings(group)}
 
-				if disabled, err := ipDisabledMessageWithLogger(buf, ns, "DS"); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "DS"); err != nil {
 					return err
 				} else if disabled {
 					outcomes[i] = outcome
@@ -2431,7 +2431,7 @@ func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					algoNotSupportedByZM:   map[uint16]map[uint8]bool{},
 				}
 
-				if disabled, err := ipDisabledMessageWithLogger(buf, ns, "DNSKEY"); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "DNSKEY"); err != nil {
 					return err
 				} else if disabled {
 					outcomes[i] = outcome
@@ -2707,7 +2707,7 @@ func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					algoNotSupportedByZM:  map[uint16]map[uint8]bool{},
 				}
 
-				if disabled, err := ipDisabledMessageWithLogger(buf, ns, "DNSKEY"); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "DNSKEY"); err != nil {
 					return err
 				} else if disabled {
 					outcomes[i] = outcome
@@ -3054,7 +3054,7 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					algoNotSupportedByZM:  map[uint16]map[uint8]bool{},
 				}
 
-				if disabled, err := ipDisabledMessageWithLogger(buf, ns, queryTypes...); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, queryTypes...); err != nil {
 					return err
 				} else if disabled {
 					outcome.ignoredNS = true
@@ -3965,7 +3965,7 @@ func DNSSEC11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := parentOutcome{nsIP: ns.Address.String()}
 
-				if disabled, err := ipDisabledMessageWithLogger(buf, ns, "DS"); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "DS"); err != nil {
 					return err
 				} else if disabled {
 					outcomes[i] = outcome
@@ -4094,7 +4094,7 @@ func DNSSEC11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					buf := testlogger.Wrap(log, moduleName, testcase)
 					outcome := childOutcome{nsIP: ns.Address.String()}
 
-					if disabled, err := ipDisabledMessageWithLogger(buf, ns, queryTypes...); err != nil {
+					if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, queryTypes...); err != nil {
 						return err
 					} else if disabled {
 						outcomes[i] = outcome
@@ -4250,7 +4250,7 @@ func DNSSEC13(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					algoNotSigned: map[string]map[uint8]bool{},
 				}
 
-				if disabled, err := ipDisabledMessageWithLogger(buf, ns, queryTypes...); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, queryTypes...); err != nil {
 					return err
 				} else if disabled {
 					outcomes[i] = outcome
@@ -4417,7 +4417,7 @@ func DNSSEC14(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := nsOutcome{}
 
-				if disabled, err := ipDisabledMessageWithLogger(buf, ns, "DNSKEY"); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "DNSKEY"); err != nil {
 					return err
 				} else if disabled {
 					outcomes[i] = outcome
@@ -4608,7 +4608,7 @@ func DNSSEC15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := nsOutcome{nsIP: ns.Address.String()}
 
-				if disabled, err := ipDisabledMessageWithLogger(buf, ns, queryTypes...); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, queryTypes...); err != nil {
 					return err
 				} else if disabled {
 					outcomes[i] = outcome
@@ -4864,7 +4864,7 @@ func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := nsOutcome{nsIP: ns.Address.String()}
 
-				if disabled, err := ipDisabledMessageWithLogger(buf, ns, queryTypes...); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, queryTypes...); err != nil {
 					return err
 				} else if disabled {
 					outcomes[i] = outcome
@@ -5380,7 +5380,7 @@ func DNSSEC17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := nsOutcome{nsIP: ns.Address.String()}
 
-				if disabled, err := ipDisabledMessageWithLogger(buf, ns, queryTypes...); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, queryTypes...); err != nil {
 					return err
 				} else if disabled {
 					outcomes[i] = outcome
@@ -5859,7 +5859,7 @@ func DNSSEC18(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := nsOutcome{}
 
-				if disabled, err := ipDisabledMessageWithLogger(buf, ns, "DS"); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "DS"); err != nil {
 					return err
 				} else if disabled {
 					outcomes[i] = outcome
@@ -5966,7 +5966,7 @@ func DNSSEC18(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					buf := testlogger.Wrap(log, moduleName, testcase)
 					outcome := nsOutcome{nsIP: ns.Address.String()}
 
-					if disabled, err := ipDisabledMessageWithLogger(buf, ns, queryTypes...); err != nil {
+					if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, queryTypes...); err != nil {
 						return err
 					} else if disabled {
 						outcomes[i] = outcome
@@ -6441,7 +6441,7 @@ func hasTag(entries []*logger.Entry, tag string) bool {
 	return false
 }
 
-func ipDisabledMessageWithLogger(buf *testlogger.Buffer, server nameserver.Nameserver, rrtypes ...string) (bool, error) {
+func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, server nameserver.Nameserver, rrtypes ...string) (bool, error) {
 	if server.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 		for _, rrtype := range rrtypes {
 			if _, err := buf.Add("IPV6_DISABLED", map[string]any{
@@ -6467,7 +6467,7 @@ func ipDisabledMessageWithLogger(buf *testlogger.Buffer, server nameserver.Names
 	return false, nil
 }
 
-func ipDisabledMessage(results *[]*logger.Entry, testcase string, server nameserver.Nameserver, rrtypes ...string) (bool, error) {
+func ipDisabledMessage(ctx context.Context, results *[]*logger.Entry, testcase string, server nameserver.Nameserver, rrtypes ...string) (bool, error) {
 	if !profile.FromContext(ctx).Net.IPv6 && server.Address.Is6() {
 		for _, rrtype := range rrtypes {
 			if err := appendLog(results, testcase, "IPV6_DISABLED", map[string]any{

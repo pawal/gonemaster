@@ -216,7 +216,7 @@ func Consistency01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := serialOutcome{key: ns.String()}
 
-				disabled, err := ipDisabledMessageWithLogger(buf, ns, queryType)
+				disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, queryType)
 				if err != nil {
 					return err
 				}
@@ -371,7 +371,7 @@ func Consistency02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := rnameOutcome{key: ns.String()}
 
-				disabled, err := ipDisabledMessageWithLogger(buf, ns, queryType)
+				disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, queryType)
 				if err != nil {
 					return err
 				}
@@ -508,7 +508,7 @@ func Consistency03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := timeOutcome{key: ns.String()}
 
-				disabled, err := ipDisabledMessageWithLogger(buf, ns, queryType)
+				disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, queryType)
 				if err != nil {
 					return err
 				}
@@ -661,7 +661,7 @@ func Consistency04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := nsSetOutcome{key: ns.String()}
 
-				disabled, err := ipDisabledMessageWithLogger(buf, ns, queryType)
+				disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, queryType)
 				if err != nil {
 					return err
 				}
@@ -1044,7 +1044,7 @@ func Consistency06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := mnameOutcome{key: ns.String()}
 
-				disabled, err := ipDisabledMessageWithLogger(buf, ns, queryType)
+				disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, queryType)
 				if err != nil {
 					return err
 				}
@@ -1205,7 +1205,7 @@ func appendLog(results *[]*logger.Entry, testcase string, tag string, args map[s
 	return nil
 }
 
-func ipDisabledMessageWithLogger(buf *testlogger.Buffer, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
+func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
 	if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 		for _, rrtype := range rrtypes {
 			if _, err := buf.Add("IPV6_DISABLED", map[string]any{

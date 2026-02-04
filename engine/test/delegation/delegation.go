@@ -523,7 +523,7 @@ func Delegation04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				}
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				if task.action == actionDisabled {
-					_, err := ipDisabledMessageWithLogger(buf, task.ns, queryType)
+					_, err := ipDisabledMessageWithLogger(ctx, buf, task.ns, queryType)
 					return err
 				}
 				authoritative := false
@@ -626,7 +626,7 @@ func Delegation05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 							"rrtype":     "A",
 						}
 
-						disabled, err := ipDisabledMessageWithLogger(buf, ns, "A")
+						disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "A")
 						if err != nil {
 							return err
 						}
@@ -746,7 +746,7 @@ func Delegation06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				}
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				if task.action == actionDisabled {
-					_, err := ipDisabledMessageWithLogger(buf, task.ns, queryType)
+					_, err := ipDisabledMessageWithLogger(ctx, buf, task.ns, queryType)
 					return err
 				}
 				resp, err := task.ns.QueryWithOptions(ctx, z.Name.String(), queryType, nil)
@@ -1024,7 +1024,7 @@ func appendLog(results *[]*logger.Entry, testcase string, tag string, args map[s
 	return nil
 }
 
-func ipDisabledMessageWithLogger(buf *testlogger.Buffer, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
+func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
 	if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 		for _, rrtype := range rrtypes {
 			if _, err := buf.Add("IPV6_DISABLED", map[string]any{

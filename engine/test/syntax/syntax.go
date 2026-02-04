@@ -507,7 +507,7 @@ func Syntax06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	for _, ns := range nss {
-		disabled, err := ipDisabledMessage(&results, testcase, ns, "SOA")
+		disabled, err := ipDisabledMessage(ctx, &results, testcase, ns, "SOA")
 		if err != nil {
 			return results, err
 		}
@@ -776,7 +776,7 @@ func appendLog(results *[]*logger.Entry, testcase string, tag string, args map[s
 	return nil
 }
 
-func ipDisabledMessage(results *[]*logger.Entry, testcase string, ns nameserver.Nameserver, rrtype string) (bool, error) {
+func ipDisabledMessage(ctx context.Context, results *[]*logger.Entry, testcase string, ns nameserver.Nameserver, rrtype string) (bool, error) {
 	if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
 		if err := appendLog(results, testcase, "IPV4_DISABLED", map[string]any{
 			"ns":     ns.String(),

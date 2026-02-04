@@ -312,7 +312,7 @@ func Nameserver01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			i, server := i, server
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
-				if disabled, err := ipDisabledMessageWithLogger(buf, server, "A"); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, server, "A"); err != nil {
 					return err
 				} else if disabled {
 					return nil
@@ -404,7 +404,7 @@ func Nameserver02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := ednsOutcome{key: server.String()}
 
-				if disabled, err := ipDisabledMessageWithLogger(buf, server, "SOA"); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, server, "SOA"); err != nil {
 					return err
 				} else if disabled {
 					outcomes[i] = outcome
@@ -526,7 +526,7 @@ func Nameserver03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			i, server := i, server
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
-				if disabled, err := ipDisabledMessageWithLogger(buf, server, "AXFR"); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, server, "AXFR"); err != nil {
 					return err
 				} else if disabled {
 					return nil
@@ -594,7 +594,7 @@ func Nameserver04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := sourceOutcome{key: server.String()}
 
-				if disabled, err := ipDisabledMessageWithLogger(buf, server, "SOA"); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, server, "SOA"); err != nil {
 					return err
 				} else if disabled {
 					outcomes[i] = outcome
@@ -684,7 +684,7 @@ func Nameserver05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := aaaaOutcome{key: server.String()}
 
-				if disabled, err := ipDisabledMessageWithLogger(buf, server, "A"); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, server, "A"); err != nil {
 					return err
 				} else if disabled {
 					outcomes[i] = outcome
@@ -894,7 +894,7 @@ func Nameserver07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := upwardOutcome{key: server.String(), name: server.Name.String()}
 
-				if disabled, err := ipDisabledMessageWithLogger(buf, server, "NS"); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, server, "NS"); err != nil {
 					return err
 				} else if disabled {
 					outcomes[i] = outcome
@@ -983,7 +983,7 @@ func Nameserver08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			i, server := i, server
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
-				if disabled, err := ipDisabledMessageWithLogger(buf, server, "SOA"); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, server, "SOA"); err != nil {
 					return err
 				} else if disabled {
 					return nil
@@ -1069,7 +1069,7 @@ func Nameserver09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := caseOutcome{}
 
-				if disabled, err := ipDisabledMessageWithLogger(buf, server, recordType); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, server, recordType); err != nil {
 					return err
 				} else if disabled {
 					outcomes[i] = outcome
@@ -1215,7 +1215,7 @@ func Nameserver10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := n10Outcome{ip: server.Address.String()}
 
-				if disabled, err := ipDisabledMessageWithLogger(buf, server, "SOA"); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, server, "SOA"); err != nil {
 					return err
 				} else if disabled {
 					outcomes[i] = outcome
@@ -1349,7 +1349,7 @@ func Nameserver11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := n11Outcome{ip: server.Address.String()}
 
-				if disabled, err := ipDisabledMessageWithLogger(buf, server, "SOA"); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, server, "SOA"); err != nil {
 					return err
 				} else if disabled {
 					outcomes[i] = outcome
@@ -1512,7 +1512,7 @@ func Nameserver12(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			i, server := i, server
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
-				if disabled, err := ipDisabledMessageWithLogger(buf, server, "SOA"); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, server, "SOA"); err != nil {
 					return err
 				} else if disabled {
 					return nil
@@ -1582,7 +1582,7 @@ func Nameserver13(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			i, server := i, server
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
-				if disabled, err := ipDisabledMessageWithLogger(buf, server, "SOA"); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, server, "SOA"); err != nil {
 					return err
 				} else if disabled {
 					return nil
@@ -1680,7 +1680,7 @@ func Nameserver15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := versionOutcome{server: server.String()}
 
-				if disabled, err := ipDisabledMessageWithLogger(buf, server, "SOA TXT"); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, server, "SOA TXT"); err != nil {
 					return err
 				} else if disabled {
 					outcomes[i] = outcome
@@ -1922,7 +1922,7 @@ func appendLog(results *[]*logger.Entry, testcase string, tag string, args map[s
 	return nil
 }
 
-func ipDisabledMessageWithLogger(buf *testlogger.Buffer, server ns.Nameserver, rrtypes ...string) (bool, error) {
+func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, server ns.Nameserver, rrtypes ...string) (bool, error) {
 	if server.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 		for _, rrtype := range rrtypes {
 			if _, err := buf.Add("IPV6_DISABLED", map[string]any{

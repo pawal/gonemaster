@@ -167,7 +167,7 @@ func Connectivity01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 		return results, err
 	}
 
-	ipv4Disabled, ipv6Disabled := disabledNS(nsList)
+	ipv4Disabled, ipv6Disabled := disabledNS(ctx, nsList)
 	if len(ipv4Disabled) > 0 {
 		if err := appendLog(&results, testcase, "CN01_IPV4_DISABLED", map[string]any{
 			"ns_list": strings.Join(ipv4Disabled, ";"),
@@ -661,7 +661,7 @@ func connectivityLoop(ctx context.Context, testcase string, name dnsname.Name, n
 			ns := ns
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
-				disabled, err := ipDisabledMessageWithLogger(buf, ns, "SOA", "NS")
+				disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "SOA", "NS")
 				if err != nil {
 					return err
 				}
@@ -771,7 +771,7 @@ func appendLog(results *[]*logger.Entry, testcase string, tag string, args map[s
 	return nil
 }
 
-func ipDisabledMessageWithLogger(buf *testlogger.Buffer, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
+func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
 	if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 		for _, rrtype := range rrtypes {
 			if _, err := buf.Add("IPV6_DISABLED", map[string]any{
@@ -797,7 +797,7 @@ func ipDisabledMessageWithLogger(buf *testlogger.Buffer, ns nameserver.Nameserve
 	return false, nil
 }
 
-func disabledNS(nsList []nameserver.Nameserver) ([]string, []string) {
+func disabledNS(ctx context.Context, nsList []nameserver.Nameserver) ([]string, []string) {
 	var ipv4 []string
 	var ipv6 []string
 	for _, ns := range nsList {

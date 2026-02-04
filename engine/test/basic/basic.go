@@ -209,14 +209,14 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				continue serverLoop
 			}
 
-			disabled, err := ipDisabledMessage(&results, testcase, ns, "SOA", "NS", "DNAME")
+			disabled, err := ipDisabledMessage(ctx, &results, testcase, ns, "SOA", "NS", "DNAME")
 			if err != nil {
 				return results, err
 			}
 			if disabled {
 				continue serverLoop
 			}
-			if err := ipEnabledMessage(&results, testcase, ns, "SOA", "NS", "DNAME"); err != nil {
+			if err := ipEnabledMessage(ctx, &results, testcase, ns, "SOA", "NS", "DNAME"); err != nil {
 				return results, err
 			}
 
@@ -953,7 +953,7 @@ func appendLog(results *[]*logger.Entry, testcase string, tag string, args map[s
 	return nil
 }
 
-func ipDisabledMessage(results *[]*logger.Entry, testcase string, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
+func ipDisabledMessage(ctx context.Context, results *[]*logger.Entry, testcase string, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
 	if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
 		for _, rrtype := range rrtypes {
 			if err := appendLog(results, testcase, "IPV4_DISABLED", map[string]any{
@@ -979,7 +979,7 @@ func ipDisabledMessage(results *[]*logger.Entry, testcase string, ns nameserver.
 	return false, nil
 }
 
-func ipEnabledMessage(results *[]*logger.Entry, testcase string, ns nameserver.Nameserver, rrtypes ...string) error {
+func ipEnabledMessage(ctx context.Context, results *[]*logger.Entry, testcase string, ns nameserver.Nameserver, rrtypes ...string) error {
 	if ns.Address.Is4() && profile.FromContext(ctx).Net.IPv4 {
 		for _, rrtype := range rrtypes {
 			if err := appendLog(results, testcase, "IPV4_ENABLED", map[string]any{

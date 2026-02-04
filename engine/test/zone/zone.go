@@ -308,7 +308,7 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	}
 
 	for _, ns := range nss {
-		disabled, err := ipDisabledMessage(&results, testcase, ns, "SOA")
+		disabled, err := ipDisabledMessage(ctx, &results, testcase, ns, "SOA")
 		if err != nil {
 			return results, err
 		}
@@ -403,7 +403,7 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 					continue
 				}
 
-				disabled, err := ipDisabledMessage(&results, testcase, ns, "SOA")
+				disabled, err := ipDisabledMessage(ctx, &results, testcase, ns, "SOA")
 				if err != nil {
 					return results, err
 				}
@@ -974,7 +974,7 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := mxOutcome{ip: ns.Address.String()}
 
-				if disabled, err := ipDisabledMessageWithLogger(buf, ns, "SOA", "MX"); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "SOA", "MX"); err != nil {
 					return err
 				} else if disabled {
 					outcome.disabled = true
@@ -1204,7 +1204,7 @@ func Zone10(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			i, ns := i, ns
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
-				if disabled, err := ipDisabledMessageWithLogger(buf, ns, "SOA"); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "SOA"); err != nil {
 					return err
 				} else if disabled {
 					return nil
@@ -1320,7 +1320,7 @@ func Zone11(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 					nsList: nsStrings(group),
 				}
 
-				if disabled, err := ipDisabledMessageWithLogger(buf, ns, "TXT"); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "TXT"); err != nil {
 					return err
 				} else if disabled {
 					outcomes[i] = outcome
@@ -1483,7 +1483,7 @@ func appendLog(results *[]*logger.Entry, testcase string, tag string, args map[s
 	return nil
 }
 
-func ipDisabledMessageWithLogger(buf *testlogger.Buffer, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
+func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
 	if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 		for _, rrtype := range rrtypes {
 			if _, err := buf.Add("IPV6_DISABLED", map[string]any{
@@ -1509,7 +1509,7 @@ func ipDisabledMessageWithLogger(buf *testlogger.Buffer, ns nameserver.Nameserve
 	return false, nil
 }
 
-func ipDisabledMessage(results *[]*logger.Entry, testcase string, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
+func ipDisabledMessage(ctx context.Context, results *[]*logger.Entry, testcase string, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
 	if !profile.FromContext(ctx).Net.IPv6 && ns.Address.Is6() {
 		for _, rrtype := range rrtypes {
 			if err := appendLog(results, testcase, "IPV6_DISABLED", map[string]any{
@@ -1542,7 +1542,7 @@ func retrieveRecordFromZone(ctx context.Context, results *[]*logger.Entry, testc
 	}
 
 	for _, ns := range nss {
-		if disabled, err := ipDisabledMessage(results, testcase, ns, qtype); err != nil {
+		if disabled, err := ipDisabledMessage(ctx, results, testcase, ns, qtype); err != nil {
 			return packet.Packet{}, err
 		} else if disabled {
 			continue

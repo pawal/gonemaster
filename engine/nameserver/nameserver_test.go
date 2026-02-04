@@ -232,7 +232,7 @@ func TestClientForOptionsDefaults(t *testing.T) {
 	profile.Effective().Resolver.Defaults.Recurse = true
 	profile.Effective().Resolver.Defaults.UseVC = true
 
-	client, err := ns.clientForOptions(nil)
+	client, err := ns.clientForOptions(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("client for nil opts: %v", err)
 	}
@@ -244,7 +244,7 @@ func TestClientForOptionsDefaults(t *testing.T) {
 	}
 
 	on := true
-	client, err = ns.clientForOptions(&QueryOptions{Recurse: &on, UseVC: &on})
+	client, err = ns.clientForOptions(context.Background(), &QueryOptions{Recurse: &on, UseVC: &on})
 	if err != nil {
 		t.Fatalf("client for explicit opts: %v", err)
 	}

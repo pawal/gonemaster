@@ -4,12 +4,15 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
+	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/server"
 )
 
@@ -116,6 +119,9 @@ func run(args []string, out *os.File, errOut *os.File) int {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
+	fmt.Fprintf(errOut, "Gonemaster version %s\n", engine.VersionFull())
+	fmt.Fprintf(errOut, "Started server at %s\n", formatListenURL(cfg.ListenAddr))
+
 	shutdownCh := make(chan os.Signal, 1)
 	signal.Notify(shutdownCh, syscall.SIGINT, syscall.SIGTERM)
 
@@ -133,4 +139,24 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	}
 
 	return 0
+}
+
+func formatListenURL(addr string) string {
+	if strings.TrimSpace(addr) == "" {
+		return "http://localhost"
+	}
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return "http://" + addr
+	}
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		host = "localhost"
+	}
+	if strings.Contains(host, ":") && !strings.HasPrefix(host, "[") {
+		host = "[" + host + "]"
+	}
+	if port == "" {
+		return "http://" + host
+	}
+	return "http://" + host + ":" + port
 }

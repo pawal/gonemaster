@@ -210,10 +210,15 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	if err := rejectSingleDashFlags(args); err != nil {
+		fmt.Fprintln(errOut, err.Error())
+		return 2
+	}
+
 	opts, rest, err := parseGlobalFlags(args, errOut)
 	if err != nil {
 		if errors.Is(err, flag.ErrHelp) {
-			return 2
+			return 0
 		}
 		fmt.Fprintln(errOut, err.Error())
 		return 2
@@ -257,11 +262,12 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 
 func parseGlobalFlags(args []string, errOut io.Writer) (globalOptions, []string, error) {
 	var opts globalOptions
-	var apiURL string
 	fs := flag.NewFlagSet("gonemaster-client", flag.ContinueOnError)
 	fs.SetOutput(errOut)
+	fs.Usage = func() {
+		printUsage(errOut)
+	}
 	fs.StringVar(&opts.server, "server", "", "Base server URL (default http://localhost:8080/api/v1)")
-	fs.StringVar(&apiURL, "api-url", "", "Deprecated alias for --server")
 	fs.DurationVar(&opts.timeout, "timeout", 30*time.Second, "HTTP timeout (default 30s)")
 	fs.StringVar(&opts.format, "format", defaultFormat, "Output format: pretty, json, jsonl")
 	fs.StringVar(&opts.output, "output", "", "Write output to file instead of stdout")
@@ -270,12 +276,6 @@ func parseGlobalFlags(args []string, errOut io.Writer) (globalOptions, []string,
 	fs.Var(&opts.headers, "header", "Extra HTTP header (repeatable, NAME:VALUE)")
 	if err := fs.Parse(args); err != nil {
 		return opts, nil, err
-	}
-	if opts.server == "" && apiURL != "" {
-		opts.server = apiURL
-	}
-	if opts.server != "" && apiURL != "" && opts.server != apiURL {
-		return opts, nil, fmt.Errorf("use either --server or --api-url, not both")
 	}
 	if opts.server == "" {
 		opts.server = defaultServer
@@ -294,11 +294,24 @@ func printUsage(out io.Writer) {
 	fmt.Fprintln(out, "  --locale LOCALE  Locale for translated messages (default en)")
 	fmt.Fprintln(out, "  --no-color       Disable ANSI colors in pretty output")
 	fmt.Fprintln(out, "  --header NAME:VALUE  Extra HTTP header (repeatable)")
+	fmt.Fprintln(out, "  (Options use double hyphens; short single-dash flags are not supported.)")
 	fmt.Fprintln(out, "")
 	fmt.Fprintln(out, "Commands:")
 	fmt.Fprintln(out, "  jobs create|batch|list|get|watch|cancel|results")
 	fmt.Fprintln(out, "  batches get|watch|results|cancel|remove")
 	fmt.Fprintln(out, "  queue pause|resume|reorder|remove")
+}
+
+func rejectSingleDashFlags(args []string) error {
+	for _, arg := range args {
+		if arg == "-" {
+			continue
+		}
+		if strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") {
+			return fmt.Errorf("use double-hyphen options (e.g. --server), not %q", arg)
+		}
+	}
+	return nil
 }
 
 func newClient(opts globalOptions) (*apiClient, error) {
@@ -370,6 +383,65 @@ func openOutput(path string, fallback io.Writer) (io.Writer, func(), error) {
 		return nil, func() {}, err
 	}
 	return file, func() { _ = file.Close() }, nil
+}
+
+func parseWithReorderedFlags(fs *flag.FlagSet, args []string) error {
+	return fs.Parse(reorderFlags(fs, args))
+}
+
+func reorderFlags(fs *flag.FlagSet, args []string) []string {
+	flags := make([]string, 0, len(args))
+	positionals := make([]string, 0, len(args))
+
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == "--" {
+			positionals = append(positionals, args[i+1:]...)
+			break
+		}
+		if !strings.HasPrefix(arg, "--") {
+			positionals = append(positionals, arg)
+			continue
+		}
+
+		name := strings.TrimPrefix(arg, "--")
+		if name == "" {
+			positionals = append(positionals, arg)
+			continue
+		}
+		hasValue := false
+		if eq := strings.Index(name, "="); eq >= 0 {
+			name = name[:eq]
+			hasValue = true
+		}
+
+		flags = append(flags, arg)
+		if hasValue {
+			continue
+		}
+		if flagExpectsValue(fs.Lookup(name)) {
+			if i+1 < len(args) {
+				flags = append(flags, args[i+1])
+				i++
+			}
+		}
+	}
+
+	return append(flags, positionals...)
+}
+
+type boolFlag interface {
+	IsBoolFlag() bool
+}
+
+func flagExpectsValue(f *flag.Flag) bool {
+	if f == nil || f.Value == nil {
+		return false
+	}
+	if bf, ok := f.Value.(boolFlag); ok && bf.IsBoolFlag() {
+		return false
+	}
+	return true
 }
 
 func (c *apiClient) doJSON(ctx context.Context, method string, path string, body any, out any) error {
@@ -512,8 +584,8 @@ func runJobsCreate(ctx context.Context, client *apiClient, opts globalOptions, a
 	fs.Var(&overridePairs, "profile-override", "Profile override KEY=VALUE (repeatable)")
 	fs.StringVar(&overrideFile, "profile-overrides-file", "", "Profile overrides JSON/YAML file")
 	fs.BoolVar(&wait, "wait", false, "Wait for completion and display results")
-	fs.StringVar(&view, "view", "", "Result view: summary, modules, raw, json")
-	if err := fs.Parse(args); err != nil {
+	fs.StringVar(&view, "view", "", "Result view: summary, modules, raw, json (aliases: translated, full)")
+	if err := parseWithReorderedFlags(fs, args); err != nil {
 		return 2
 	}
 	if strings.TrimSpace(domain) == "" {
@@ -590,9 +662,9 @@ func runJobsBatch(ctx context.Context, client *apiClient, opts globalOptions, ar
 	fs.Var(&overridePairs, "profile-override", "Profile override KEY=VALUE (repeatable)")
 	fs.StringVar(&overrideFile, "profile-overrides-file", "", "Profile overrides JSON/YAML file")
 	fs.BoolVar(&wait, "wait", false, "Wait for completion and display results")
-	fs.StringVar(&view, "view", "", "Result view: summary, modules, raw, json")
+	fs.StringVar(&view, "view", "", "Result view: summary, modules, raw, json (aliases: translated, full)")
 	fs.BoolVar(&perJob, "per-job", false, "Show per-job results when waiting")
-	if err := fs.Parse(args); err != nil {
+	if err := parseWithReorderedFlags(fs, args); err != nil {
 		return 2
 	}
 	entries, err := collectDomains(domains, files, useStdin, errOut)
@@ -665,7 +737,7 @@ func runJobsList(ctx context.Context, client *apiClient, opts globalOptions, arg
 	fs.StringVar(&createdAfter, "created-after", "", "Filter by created after timestamp (RFC3339)")
 	fs.IntVar(&limit, "limit", 100, "Limit (1-500)")
 	fs.IntVar(&offset, "offset", 0, "Offset")
-	if err := fs.Parse(args); err != nil {
+	if err := parseWithReorderedFlags(fs, args); err != nil {
 		return 2
 	}
 	if createdAfter != "" {
@@ -738,7 +810,7 @@ func runJobsWatch(ctx context.Context, client *apiClient, opts globalOptions, ar
 	fs := flag.NewFlagSet("jobs watch", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	fs.DurationVar(&poll, "poll", 3*time.Second, "Poll interval")
-	if err := fs.Parse(args); err != nil {
+	if err := parseWithReorderedFlags(fs, args); err != nil {
 		return 2
 	}
 	if fs.NArg() == 0 {
@@ -803,7 +875,7 @@ func runBatchesWatch(ctx context.Context, client *apiClient, opts globalOptions,
 	fs := flag.NewFlagSet("batches watch", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	fs.DurationVar(&poll, "poll", 4*time.Second, "Poll interval")
-	if err := fs.Parse(args); err != nil {
+	if err := parseWithReorderedFlags(fs, args); err != nil {
 		return 2
 	}
 	if fs.NArg() == 0 {
@@ -879,7 +951,7 @@ func runBatchesRemove(ctx context.Context, client *apiClient, opts globalOptions
 	fs := flag.NewFlagSet("batches remove", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	fs.BoolVar(&cancelRunning, "cancel-running", false, "Cancel running jobs in the batch")
-	if err := fs.Parse(args); err != nil {
+	if err := parseWithReorderedFlags(fs, args); err != nil {
 		return 2
 	}
 	args = fs.Args()
@@ -988,7 +1060,7 @@ func runQueueReorder(ctx context.Context, client *apiClient, opts globalOptions,
 	fs := flag.NewFlagSet("queue reorder", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	fs.Var(&jobIDs, "job-id", "Job id (repeatable)")
-	if err := fs.Parse(args); err != nil {
+	if err := parseWithReorderedFlags(fs, args); err != nil {
 		return 2
 	}
 	jobIDs = append(jobIDs, fs.Args()...)
@@ -1018,7 +1090,7 @@ func runQueueRemove(ctx context.Context, client *apiClient, opts globalOptions, 
 	fs := flag.NewFlagSet("queue remove", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	fs.Var(&jobIDs, "job-id", "Job id (repeatable)")
-	if err := fs.Parse(args); err != nil {
+	if err := parseWithReorderedFlags(fs, args); err != nil {
 		return 2
 	}
 	jobIDs = append(jobIDs, fs.Args()...)
@@ -1064,12 +1136,12 @@ func runResults(ctx context.Context, client *apiClient, opts globalOptions, args
 	fs.BoolVar(&all, "all", false, "Fetch results for all jobs")
 	fs.StringVar(&status, "status", "", "Filter status when using --all")
 	fs.StringVar(&createdAfter, "created-after", "", "Filter by created after timestamp (RFC3339)")
-	fs.StringVar(&view, "view", "", "View: summary, modules, raw, json")
+	fs.StringVar(&view, "view", "", "View: summary, modules, raw, json (aliases: translated, full)")
 	fs.StringVar(&levels, "levels", "", "Comma-separated levels to include")
 	fs.BoolVar(&aggregate, "aggregate", false, "Aggregate results across jobs")
 	fs.BoolVar(&perJob, "per-job", false, "Show per-job results")
 	fs.StringVar(&splitDir, "split-dir", "", "Write per-job results to files in this directory")
-	if err := fs.Parse(args); err != nil {
+	if err := parseWithReorderedFlags(fs, args); err != nil {
 		return 2
 	}
 
@@ -1163,12 +1235,8 @@ func renderJobResults(ctx context.Context, client *apiClient, opts globalOptions
 	}
 	results := make([]jobResult, 0, len(ids))
 	for _, jobID := range ids {
-		var result jobResult
-		path := "/jobs/" + jobID + "/result"
-		if client.locale != "" {
-			path += "?locale=" + url.QueryEscape(client.locale)
-		}
-		if err := client.doJSON(ctx, http.MethodGet, path, nil, &result); err != nil {
+		result, err := fetchJobResult(ctx, client, jobID)
+		if err != nil {
 			return err
 		}
 		results = append(results, result)
@@ -1199,6 +1267,60 @@ func renderJobResults(ctx context.Context, client *apiClient, opts globalOptions
 	}
 
 	return renderResultsToWriter(opts, view, levelSet, aggregate, perJob, results, out)
+}
+
+func fetchJobResult(ctx context.Context, client *apiClient, jobID string) (jobResult, error) {
+	result, err := fetchJobResultOnce(ctx, client, jobID)
+	if err == nil {
+		return result, nil
+	}
+	if !isNotFoundError(err) {
+		return jobResult{}, err
+	}
+	var info job
+	if err := client.doJSON(ctx, http.MethodGet, "/jobs/"+jobID, nil, &info); err != nil {
+		return jobResult{}, err
+	}
+	if !doneStatuses[info.Status] {
+		return jobResult{}, err
+	}
+	delay := 200 * time.Millisecond
+	for i := 0; i < 4; i++ {
+		select {
+		case <-ctx.Done():
+			return jobResult{}, ctx.Err()
+		case <-time.After(delay):
+		}
+		result, err = fetchJobResultOnce(ctx, client, jobID)
+		if err == nil {
+			return result, nil
+		}
+		if !isNotFoundError(err) {
+			return jobResult{}, err
+		}
+		delay *= 2
+	}
+	return jobResult{}, err
+}
+
+func fetchJobResultOnce(ctx context.Context, client *apiClient, jobID string) (jobResult, error) {
+	var result jobResult
+	path := "/jobs/" + jobID + "/result"
+	if client.locale != "" {
+		path += "?locale=" + url.QueryEscape(client.locale)
+	}
+	if err := client.doJSON(ctx, http.MethodGet, path, nil, &result); err != nil {
+		return jobResult{}, err
+	}
+	return result, nil
+}
+
+func isNotFoundError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "code=not_found") || strings.Contains(msg, "not found")
 }
 
 func renderResultsToWriter(opts globalOptions, view string, levelSet map[string]bool, aggregate bool, perJob bool, results []jobResult, out io.Writer) error {
@@ -1618,6 +1740,13 @@ func listAllJobIDs(ctx context.Context, client *apiClient, status string, create
 }
 
 func resolveView(format string, view string) (string, error) {
+	view = strings.ToLower(strings.TrimSpace(view))
+	switch view {
+	case "translated":
+		view = "modules"
+	case "full":
+		view = "json"
+	}
 	if view == "" {
 		if format == "json" || format == "jsonl" {
 			view = "json"

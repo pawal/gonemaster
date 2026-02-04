@@ -131,6 +131,8 @@ gonemaster-client [global options] <command> [command options] [args]
 | `--header NAME:VALUE` | string | Extra HTTP header (repeatable). |
 
 ### Commands
+Notes:
+- Subcommand flags may be placed before or after positional arguments (for example, `jobs results JOB_ID --view translated`).
 
 #### jobs create
 Submit a single job.
@@ -144,7 +146,7 @@ Options:
 - `--profile-override KEY=VALUE` (repeatable; merged into `profile_overrides`)
 - `--profile-overrides-file PATH` (JSON/YAML object to merge)
 - `--wait` (wait for completion and print results)
-- `--view summary|modules|raw|json` (when `--wait` is used)
+- `--view summary|modules|raw|json` (aliases: `translated`, `full`) (when `--wait` is used)
 
 #### jobs batch
 Submit a batch of jobs.
@@ -162,7 +164,7 @@ Options:
 - `--profile-override KEY=VALUE` (repeatable)
 - `--profile-overrides-file PATH`
 - `--wait` (wait for batch completion)
-- `--view summary|modules|raw|json` (when `--wait` is used)
+- `--view summary|modules|raw|json` (aliases: `translated`, `full`) (when `--wait` is used)
 - `--per-job` (when waiting, show per-job results instead of only batch summary)
 
 #### jobs list
@@ -209,7 +211,7 @@ Options:
 - `--all` (fetch results for all jobs)
 - `--status STATUS` (when using `--all`)
 - `--created-after RFC3339` (when using `--all`)
-- `--view summary|modules|raw|json` (default `summary` for `pretty`, `json` for `--format json`)
+- `--view summary|modules|raw|json` (aliases: `translated`, `full`; default `summary` for `pretty`, `json` for `--format json`)
 - `--levels NOTICE,WARNING,ERROR,CRITICAL` (filter)
 - `--aggregate` (print a combined summary across all selected jobs)
 - `--per-job` (print per-job summaries/results)
@@ -307,6 +309,16 @@ gonemaster-client jobs results --all --status succeeded --created-after 2026-02-
 Fetch full results for a batch and write per-job files:
 ```
 gonemaster-client batches results batch_123 --view json --split-dir /tmp/gonemaster-results
+```
+
+Fetch the full JSON result for a job:
+```
+gonemaster-client jobs results job_123 --view full --format json
+```
+
+Fetch translated, readable output (per module):
+```
+gonemaster-client jobs results job_123 --view translated --locale sv
 ```
 
 Cancel all queued/running jobs in a batch:

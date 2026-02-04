@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -250,6 +251,75 @@ func TestBatchesRemoveCancelRunning(t *testing.T) {
 	}
 	if len(canceled) != 1 || canceled[0] != "job_r" {
 		t.Fatalf("expected cancel for job_r, got %v", canceled)
+	}
+}
+
+func TestFetchJobResultRetriesOnNotFound(t *testing.T) {
+	var resultCalls int
+	oldFactory := newHTTPClient
+	defer func() { newHTTPClient = oldFactory }()
+	newHTTPClient = func(_ time.Duration) *http.Client {
+		return &http.Client{
+			Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+				switch {
+				case r.Method == http.MethodGet && r.URL.Path == "/api/v1/jobs/job_1":
+					body := `{"id":"job_1","domain":"example.com","status":"succeeded","created_at":"2026-02-03T00:00:00Z","progress":100}`
+					return jsonResponse(http.StatusOK, body), nil
+				case r.Method == http.MethodGet && r.URL.Path == "/api/v1/jobs/job_1/result":
+					resultCalls++
+					if resultCalls == 1 {
+						body := `{"error":{"code":"not_found","message":"job result not found"}}`
+						return jsonResponse(http.StatusNotFound, body), nil
+					}
+					body := `{"job_id":"job_1","status":"succeeded","summary":{"levels":{"NOTICE":1},"total":1}}`
+					return jsonResponse(http.StatusOK, body), nil
+				default:
+					t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+				}
+				return nil, nil
+			}),
+		}
+	}
+
+	client := &apiClient{
+		baseURL:    "http://example.test/api/v1",
+		httpClient: newHTTPClient(5 * time.Second),
+		headers:    http.Header{},
+		locale:     "en",
+	}
+
+	_, err := fetchJobResult(context.Background(), client, "job_1")
+	if err != nil {
+		t.Fatalf("expected retry success, got %v", err)
+	}
+	if resultCalls < 2 {
+		t.Fatalf("expected retries, got %d calls", resultCalls)
+	}
+}
+
+func TestJobsResultsFlagsAfterID(t *testing.T) {
+	oldFactory := newHTTPClient
+	defer func() { newHTTPClient = oldFactory }()
+	newHTTPClient = func(_ time.Duration) *http.Client {
+		return &http.Client{
+			Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+				switch {
+				case r.Method == http.MethodGet && r.URL.Path == "/api/v1/jobs/job_1/result":
+					body := `{"job_id":"job_1","status":"succeeded","summary":{"levels":{"NOTICE":1},"total":1}}`
+					return jsonResponse(http.StatusOK, body), nil
+				default:
+					t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+				}
+				return nil, nil
+			}),
+		}
+	}
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+	code := run([]string{"--server", "http://example.test", "--format", "json", "jobs", "results", "job_1", "--view", "translated"}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("run returned %d, stderr=%s", code, errOut.String())
 	}
 }
 

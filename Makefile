@@ -5,26 +5,34 @@ NPM ?= npm
 NODE ?= node
 BIN_DIR ?= bin
 UI_DIR := ui
+UI_BUILD_DIR := $(UI_DIR)/dist
 NODE_MIN ?= 18
 NPM_MIN ?= 9
 
-CMDS := gonemaster gonemaster-server gonemaster-client
+CMDS := gonemaster gonemaster-server gonemaster-client gonemaster-nagios
 CMD ?= all
 
 .PHONY: help build build-all test install ui-build ui-install ui-dev ui-test clean \
 	build-gonemaster build-gonemaster-server build-gonemaster-server-noui build-gonemaster-client \
-	install-gonemaster install-gonemaster-server install-gonemaster-client ui-check
+	build-gonemaster-nagios install-gonemaster install-gonemaster-server install-gonemaster-client \
+	install-gonemaster-nagios ui-check test-go vet race
 
 help:
 	@echo "Targets:"
 	@echo "  build            Build all commands (override CMD=gonemaster-server)"
 	@echo "  test             Run Go tests"
+	@echo "  test-go          Run Go tests (no UI)"
+	@echo "  vet              Run go vet"
+	@echo "  race             Run Go tests with -race"
 	@echo "  install          Install all commands (override CMD=gonemaster-server)"
+	@echo "  ui-check         Verify node/npm availability"
+	@echo "  ui-install       Install UI dependencies"
 	@echo "  ui-build         Build the embedded UI"
 	@echo "  ui-dev           Run the UI dev server"
 	@echo "  ui-test          Run UI tests"
 	@echo "  build-gonemaster-server-noui  Build API-only server (no npm/UI embed)"
 	@echo "  build-gonemaster-client       Build the HTTP API client"
+	@echo "  build-gonemaster-nagios       Build the Nagios plugin"
 	@echo "  clean            Remove build artifacts"
 
 $(BIN_DIR):
@@ -89,8 +97,13 @@ build-gonemaster-server-noui: $(BIN_DIR)
 build-gonemaster-client: $(BIN_DIR)
 	$(GO) build -o $(BIN_DIR)/gonemaster-client ./cmd/gonemaster-client
 
-test: ui-test
+build-gonemaster-nagios: $(BIN_DIR)
+	$(GO) build -o $(BIN_DIR)/gonemaster-nagios ./cmd/gonemaster-nagios
+
+test-go:
 	$(GO) test ./...
+
+test: ui-test test-go
 
 install:
 	@if [ "$(CMD)" = "all" ]; then \
@@ -110,5 +123,14 @@ install-gonemaster-server: ui-build
 install-gonemaster-client:
 	$(GO) install ./cmd/gonemaster-client
 
+install-gonemaster-nagios:
+	$(GO) install ./cmd/gonemaster-nagios
+
+vet:
+	$(GO) vet ./...
+
+race:
+	$(GO) test -race ./...
+
 clean:
-	@rm -rf $(BIN_DIR)
+	@rm -rf $(BIN_DIR) $(UI_BUILD_DIR) $(UI_DIR)/node_modules

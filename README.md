@@ -2,6 +2,13 @@
 
 Gonemaster is a Go implementation of the DNS test framework Zonemaster engine and CLI.
 
+Key features:
+1. Parallel-safe engine runs with per-run state isolation
+2. Streaming output with JSON, JSONL, and raw log modes
+3. Built-in API server with job queueing, batches, and progress tracking
+4. Tunable resolver behavior (timeouts, retries, fallback, caching)
+5. Minimal external dependencies (focused, standard Go libraries)
+
 ## Installation
 
 ```

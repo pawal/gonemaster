@@ -40,6 +40,27 @@ func RunnerFromContext(ctx context.Context) *Runner {
 	return runner
 }
 
+// RunnerFromContextOrDefault returns the runner stored in ctx, or a default runner
+// built from other per-run context values.
+func RunnerFromContextOrDefault(ctx context.Context) *Runner {
+	if runner := RunnerFromContext(ctx); runner != nil {
+		return runner
+	}
+	prof := profile.FromContext(ctx)
+	log := logger.FromContext(ctx)
+	if log == nil {
+		log = logger.New()
+		log.SetProfile(prof)
+	}
+	limiter := transport.LimiterFromContext(ctx)
+	return &Runner{
+		Profile:   prof,
+		Logger:    log,
+		Limiter:   limiter,
+		StartedAt: time.Now(),
+	}
+}
+
 // MustRunnerFromContext returns the runner stored in ctx or panics.
 func MustRunnerFromContext(ctx context.Context) *Runner {
 	runner := RunnerFromContext(ctx)

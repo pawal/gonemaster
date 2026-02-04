@@ -159,7 +159,7 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	}
 
 	usevc := resolveUseVC(opts)
-	if errorCacheTTL := prof.Resolver.Defaults.ErrorCacheTTL; errorCacheTTL > 0 && ns.state != nil && ns.state.errorCache != nil {
+	if errorCacheTTL := resolveErrorCacheTTL(prof, opts); errorCacheTTL > 0 && ns.state != nil && ns.state.errorCache != nil {
 		if skip, remaining := ns.state.errorCache.shouldSkip(errorCacheKey(usevc)); skip {
 			logSystem(ctx, "ERROR_CACHE_SKIP", map[string]any{
 				"ip":          ns.Address.String(),
@@ -185,8 +185,8 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 		}
 	}
 	if err != nil && (ctx == nil || ctx.Err() == nil) && ns.state != nil && ns.state.errorCache != nil {
-		if errorCacheTTL := prof.Resolver.Defaults.ErrorCacheTTL; errorCacheTTL > 0 {
-			ns.state.errorCache.set(errorCacheKey(usevc), time.Duration(errorCacheTTL)*time.Second)
+		if errorCacheTTL := resolveErrorCacheTTL(prof, opts); errorCacheTTL > 0 {
+			ns.state.errorCache.set(errorCacheKey(usevc), errorCacheTTL)
 		}
 	}
 
@@ -213,6 +213,63 @@ func errorCacheProtocol(usevc bool) string {
 		return "tcp"
 	}
 	return "udp"
+}
+
+func resolveErrorCacheTTL(prof *profile.Profile, opts *QueryOptions) time.Duration {
+	if prof == nil {
+		prof = profile.Effective()
+	}
+	if prof == nil {
+		return 0
+	}
+
+	baseSeconds := prof.Resolver.Defaults.ErrorCacheTTL
+	if baseSeconds <= 0 {
+		return 0
+	}
+	baseTTL := time.Duration(baseSeconds) * time.Second
+
+	timeout := time.Duration(prof.Resolver.Defaults.Timeout) * time.Second
+	retries := prof.Resolver.Defaults.Retry
+	retrans := time.Duration(prof.Resolver.Defaults.Retrans) * time.Second
+
+	if opts != nil {
+		if opts.Timeout != nil {
+			timeout = *opts.Timeout
+		}
+		if opts.Retry != nil {
+			retries = *opts.Retry
+		}
+		if opts.Retrans != nil {
+			retrans = *opts.Retrans
+		}
+	}
+
+	if retries < 0 {
+		retries = 0
+	}
+
+	perAttempt := timeout
+	if perAttempt <= 0 && retrans > 0 {
+		perAttempt = retrans
+	}
+
+	if perAttempt <= 0 {
+		return baseTTL
+	}
+
+	attempts := retries + 1
+	if attempts < 1 {
+		attempts = 1
+	}
+	budget := perAttempt * time.Duration(attempts)
+	if budget <= 0 {
+		return baseTTL
+	}
+	if budget < baseTTL {
+		return budget
+	}
+	return baseTTL
 }
 
 func (ns Nameserver) queryNetwork(ctx context.Context, qname string, qtype string, qclass string, opts *QueryOptions) (packet.Packet, error) {

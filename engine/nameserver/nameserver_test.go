@@ -181,6 +181,40 @@ func TestErrorCacheSkipsQueries(t *testing.T) {
 	}
 }
 
+func TestErrorCacheTTLRespectsTimeoutBudget(t *testing.T) {
+	ns, err := New("ns.example", "192.0.2.31", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+
+	ctx, prof := testContext(t)
+	prof.Resolver.Defaults.ErrorCacheTTL = 60
+
+	var calls int
+	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		calls++
+		return packet.Packet{}, fmt.Errorf("network error")
+	})
+
+	timeout := 20 * time.Millisecond
+	retry := 1
+	opts := &QueryOptions{Timeout: &timeout, Retry: &retry}
+
+	_, err = ns.QueryWithOptions(ctx, "example1", "A", opts)
+	if err == nil {
+		t.Fatalf("expected error on first query")
+	}
+	time.Sleep(60 * time.Millisecond)
+
+	_, err = ns.QueryWithOptions(ctx, "example2", "A", opts)
+	if err == nil {
+		t.Fatalf("expected error on second query")
+	}
+	if calls != 2 {
+		t.Fatalf("expected cache to expire based on timeout budget, got %d calls", calls)
+	}
+}
+
 func TestQueryCacheDoesNotStoreErrors(t *testing.T) {
 	ns, err := New("ns.example", "192.0.2.250", nil)
 	if err != nil {

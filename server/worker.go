@@ -166,6 +166,18 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 	if s.cfg.NegativeCacheTTL != nil {
 		req.NegativeCacheTTL = s.cfg.NegativeCacheTTL
 	}
+	if s.cfg.Timeout != nil {
+		req.Timeout = s.cfg.Timeout
+	}
+	if s.cfg.Retry != nil {
+		req.Retry = s.cfg.Retry
+	}
+	if s.cfg.Retrans != nil {
+		req.Retrans = s.cfg.Retrans
+	}
+	if s.cfg.Fallback != nil {
+		req.Fallback = s.cfg.Fallback
+	}
 
 	cleanup, err := applyProfileOverrides(&req, job.Overrides, s.cfg.ProfilePath)
 	if err != nil {

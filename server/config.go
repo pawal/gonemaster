@@ -18,8 +18,16 @@ type Config struct {
 	PositiveCacheTTL *int
 	// NegativeCacheTTL overrides resolver.defaults.negative_cache_ttl when set.
 	NegativeCacheTTL *int
-	MinLevel         string
-	ProfilePath      string
+	// Timeout overrides resolver.defaults.timeout when set (seconds).
+	Timeout *int
+	// Retry overrides resolver.defaults.retry when set.
+	Retry *int
+	// Retrans overrides resolver.defaults.retrans when set (seconds).
+	Retrans *int
+	// Fallback overrides resolver.defaults.fallback when set.
+	Fallback    *bool
+	MinLevel    string
+	ProfilePath string
 }
 
 // FileConfig captures optional configuration fields from JSON.
@@ -31,6 +39,10 @@ type FileConfig struct {
 	MaxConcurrentJobs *int    `json:"max_concurrent_jobs"`
 	PositiveCacheTTL  *int    `json:"positive_cache_ttl"`
 	NegativeCacheTTL  *int    `json:"negative_cache_ttl"`
+	Timeout           *int    `json:"timeout"`
+	Retry             *int    `json:"retry"`
+	Retrans           *int    `json:"retrans"`
+	Fallback          *bool   `json:"fallback"`
 	MinLevel          *string `json:"min_level"`
 	ProfilePath       *string `json:"profile_path"`
 }
@@ -82,6 +94,18 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 	}
 	if file.NegativeCacheTTL != nil {
 		c.NegativeCacheTTL = file.NegativeCacheTTL
+	}
+	if file.Timeout != nil {
+		c.Timeout = file.Timeout
+	}
+	if file.Retry != nil {
+		c.Retry = file.Retry
+	}
+	if file.Retrans != nil {
+		c.Retrans = file.Retrans
+	}
+	if file.Fallback != nil {
+		c.Fallback = file.Fallback
 	}
 	if file.MinLevel != nil {
 		c.MinLevel = *file.MinLevel

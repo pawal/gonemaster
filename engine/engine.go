@@ -40,6 +40,14 @@ type RunRequest struct {
 	Unordered *bool
 	// ErrorCacheTTL sets resolver.defaults.error_cache_ttl in seconds.
 	ErrorCacheTTL *int
+	// Timeout sets resolver.defaults.timeout in seconds.
+	Timeout *int
+	// Retry sets resolver.defaults.retry (number of retries).
+	Retry *int
+	// Retrans sets resolver.defaults.retrans in seconds.
+	Retrans *int
+	// Fallback sets resolver.defaults.fallback.
+	Fallback *bool
 	// PositiveCacheTTL sets resolver.defaults.positive_cache_ttl in seconds.
 	PositiveCacheTTL *int
 	// NegativeCacheTTL sets resolver.defaults.negative_cache_ttl in seconds.
@@ -65,7 +73,7 @@ type LogEntry struct {
 var ErrNotImplemented = errors.New("engine not implemented")
 
 // Version is the semantic version for this build.
-var Version = "0.9.13"
+var Version = "0.9.14"
 
 // Commit is optionally set at build time using -ldflags.
 var Commit = ""
@@ -296,6 +304,26 @@ func buildProfile(req RunRequest, module string, testcase string) (*profile.Prof
 	}
 	if req.ErrorCacheTTL != nil {
 		if err := p.Set("resolver.defaults.error_cache_ttl", *req.ErrorCacheTTL); err != nil {
+			return nil, false, err
+		}
+	}
+	if req.Timeout != nil {
+		if err := p.Set("resolver.defaults.timeout", *req.Timeout); err != nil {
+			return nil, false, err
+		}
+	}
+	if req.Retry != nil {
+		if err := p.Set("resolver.defaults.retry", *req.Retry); err != nil {
+			return nil, false, err
+		}
+	}
+	if req.Retrans != nil {
+		if err := p.Set("resolver.defaults.retrans", *req.Retrans); err != nil {
+			return nil, false, err
+		}
+	}
+	if req.Fallback != nil {
+		if err := p.Set("resolver.defaults.fallback", *req.Fallback); err != nil {
 			return nil, false, err
 		}
 	}

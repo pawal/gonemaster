@@ -206,3 +206,8 @@ func main() {
   `resolver.defaults.negative_cache_ttl` (CLI flags `--positive-cache-ttl` and
   `--negative-cache-ttl`). These settings are intended for global response
   caching and reuse across runs.
+- Query timing and fallback behavior can be tuned with:
+  - `resolver.defaults.timeout` (`--timeout`, seconds per attempt)
+  - `resolver.defaults.retry` (`--retry`, retry count)
+  - `resolver.defaults.retrans` (`--retrans`, seconds between retries)
+  - `resolver.defaults.fallback` (`--fallback` / `--no-fallback`, TCP fallback)

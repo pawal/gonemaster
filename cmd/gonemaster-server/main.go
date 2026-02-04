@@ -29,6 +29,11 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	var maxConcurrentJobs int
 	var positiveCacheTTL int
 	var negativeCacheTTL int
+	var timeoutSeconds int
+	var retryCount int
+	var retransSeconds int
+	var fallback bool
+	var noFallback bool
 	var minLevel string
 	var profilePath string
 	var shutdownTimeout time.Duration
@@ -39,13 +44,18 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	var maxConcurrentJobsSet bool
 	var positiveCacheTTLSet bool
 	var negativeCacheTTLSet bool
+	var timeoutSet bool
+	var retrySet bool
+	var retransSet bool
+	var fallbackSet bool
+	var noFallbackSet bool
 	var minLevelSet bool
 	var profilePathSet bool
 
 	fs := flag.NewFlagSet("gonemaster-server", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	fs.Usage = func() {
-		fmt.Fprintf(errOut, "Usage: %s [--config PATH] [--listen ADDR] [--max-body-size BYTES] [--debug] [--workers N] [--max-concurrent-jobs N] [--positive-cache-ttl N] [--negative-cache-ttl N] [--min-level LEVEL] [--profile PATH] [--shutdown-timeout DURATION]\n", fs.Name())
+		fmt.Fprintf(errOut, "Usage: %s [--config PATH] [--listen ADDR] [--max-body-size BYTES] [--debug] [--workers N] [--max-concurrent-jobs N] [--positive-cache-ttl N] [--negative-cache-ttl N] [--timeout N] [--retry N] [--retrans N] [--fallback|--no-fallback] [--min-level LEVEL] [--profile PATH] [--shutdown-timeout DURATION]\n", fs.Name())
 		fmt.Fprintln(errOut, "")
 		fmt.Fprintln(errOut, "Options:")
 		fmt.Fprintln(errOut, "  --config            JSON config file path (optional)")
@@ -56,6 +66,11 @@ func run(args []string, out *os.File, errOut *os.File) int {
 		fmt.Fprintln(errOut, "  --max-concurrent-jobs  Max concurrent engine runs (0 = unlimited)")
 		fmt.Fprintln(errOut, "  --positive-cache-ttl  Seconds to cache positive DNS responses (optional)")
 		fmt.Fprintln(errOut, "  --negative-cache-ttl  Seconds to cache negative DNS responses (optional)")
+		fmt.Fprintln(errOut, "  --timeout           Override resolver.defaults.timeout in seconds (optional)")
+		fmt.Fprintln(errOut, "  --retry             Override resolver.defaults.retry (optional)")
+		fmt.Fprintln(errOut, "  --retrans           Override resolver.defaults.retrans in seconds (optional)")
+		fmt.Fprintln(errOut, "  --fallback          Enable TCP fallback on UDP failure (optional)")
+		fmt.Fprintln(errOut, "  --no-fallback       Disable TCP fallback on UDP failure (optional)")
 		fmt.Fprintln(errOut, "  --min-level         Minimum log level (default INFO)")
 		fmt.Fprintln(errOut, "  --profile           Profile JSON/YAML path (optional)")
 		fmt.Fprintln(errOut, "  --shutdown-timeout  Graceful shutdown timeout (default 10s)")
@@ -68,6 +83,11 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	fs.IntVar(&maxConcurrentJobs, "max-concurrent-jobs", 0, "Max concurrent engine runs (0 = unlimited)")
 	fs.IntVar(&positiveCacheTTL, "positive-cache-ttl", 0, "Seconds to cache positive DNS responses (optional)")
 	fs.IntVar(&negativeCacheTTL, "negative-cache-ttl", 0, "Seconds to cache negative DNS responses (optional)")
+	fs.IntVar(&timeoutSeconds, "timeout", 0, "Override resolver.defaults.timeout in seconds (optional)")
+	fs.IntVar(&retryCount, "retry", 0, "Override resolver.defaults.retry (optional)")
+	fs.IntVar(&retransSeconds, "retrans", 0, "Override resolver.defaults.retrans in seconds (optional)")
+	fs.BoolVar(&fallback, "fallback", false, "Enable TCP fallback on UDP failure (optional)")
+	fs.BoolVar(&noFallback, "no-fallback", false, "Disable TCP fallback on UDP failure (optional)")
 	fs.StringVar(&minLevel, "min-level", "", "Minimum log level (default INFO)")
 	fs.StringVar(&profilePath, "profile", "", "Profile JSON/YAML path (optional)")
 	fs.DurationVar(&shutdownTimeout, "shutdown-timeout", 10*time.Second, "Graceful shutdown timeout (default 10s)")
@@ -90,6 +110,16 @@ func run(args []string, out *os.File, errOut *os.File) int {
 			positiveCacheTTLSet = true
 		case "negative-cache-ttl":
 			negativeCacheTTLSet = true
+		case "timeout":
+			timeoutSet = true
+		case "retry":
+			retrySet = true
+		case "retrans":
+			retransSet = true
+		case "fallback":
+			fallbackSet = true
+		case "no-fallback":
+			noFallbackSet = true
 		case "min-level":
 			minLevelSet = true
 		case "profile":
@@ -110,6 +140,22 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	}
 	if negativeCacheTTLSet && negativeCacheTTL < 0 {
 		fmt.Fprintln(errOut, "--negative-cache-ttl must be >= 0")
+		return 2
+	}
+	if timeoutSet && timeoutSeconds < 0 {
+		fmt.Fprintln(errOut, "--timeout must be >= 0")
+		return 2
+	}
+	if retrySet && retryCount < 0 {
+		fmt.Fprintln(errOut, "--retry must be >= 0")
+		return 2
+	}
+	if retransSet && retransSeconds < 0 {
+		fmt.Fprintln(errOut, "--retrans must be >= 0")
+		return 2
+	}
+	if fallbackSet && noFallbackSet {
+		fmt.Fprintln(errOut, "--fallback cannot be combined with --no-fallback")
 		return 2
 	}
 
@@ -144,6 +190,26 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	if negativeCacheTTLSet {
 		value := negativeCacheTTL
 		cfg.NegativeCacheTTL = &value
+	}
+	if timeoutSet {
+		value := timeoutSeconds
+		cfg.Timeout = &value
+	}
+	if retrySet {
+		value := retryCount
+		cfg.Retry = &value
+	}
+	if retransSet {
+		value := retransSeconds
+		cfg.Retrans = &value
+	}
+	if fallbackSet {
+		value := true
+		cfg.Fallback = &value
+	}
+	if noFallbackSet {
+		value := false
+		cfg.Fallback = &value
 	}
 	if minLevelSet {
 		cfg.MinLevel = minLevel

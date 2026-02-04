@@ -77,6 +77,19 @@ curl -s "http://localhost:8080/api/v1/jobs/$JOB_ID/result?locale=en" | jq .
 - Flags override config file values.
 - `profile_path` sets the default profile used for all jobs (same as `gonemaster --profile`).
 
+### Tuning timeouts and retries
+`gonemaster-server` uses the profile defaults for query timing. To tune these,
+set them in the profile referenced by `profile_path`, or override with flags:
+```yaml
+resolver:
+  defaults:
+    timeout: 2     # seconds per attempt
+    retry: 0       # retry count
+    retrans: 1     # seconds between retries
+    fallback: false
+```
+These settings apply to all jobs unless a job overrides the profile.
+
 ### Config example
 ```json
 {
@@ -87,6 +100,10 @@ curl -s "http://localhost:8080/api/v1/jobs/$JOB_ID/result?locale=en" | jq .
   "max_concurrent_jobs": 0,
   "positive_cache_ttl": 0,
   "negative_cache_ttl": 0,
+  "timeout": 5,
+  "retry": 2,
+  "retrans": 3,
+  "fallback": true,
   "min_level": "INFO",
   "profile_path": "/path/to/profile.json"
 }
@@ -101,6 +118,11 @@ curl -s "http://localhost:8080/api/v1/jobs/$JOB_ID/result?locale=en" | jq .
 - `--max-concurrent-jobs` Max concurrent engine runs (0 = unlimited)
 - `--positive-cache-ttl` Seconds to cache positive DNS responses (optional)
 - `--negative-cache-ttl` Seconds to cache negative DNS responses (optional)
+- `--timeout` Override resolver.defaults.timeout in seconds (optional)
+- `--retry` Override resolver.defaults.retry (optional)
+- `--retrans` Override resolver.defaults.retrans in seconds (optional)
+- `--fallback` Enable TCP fallback on UDP failure (optional)
+- `--no-fallback` Disable TCP fallback on UDP failure (optional)
 - `--min-level` Minimum log level for results
 - `--profile` Profile JSON/YAML path (default for all jobs)
 - `--shutdown-timeout` Graceful shutdown timeout

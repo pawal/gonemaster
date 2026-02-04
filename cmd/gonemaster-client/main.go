@@ -169,6 +169,7 @@ type queueRemoveResponse struct {
 
 type summaryView struct {
 	JobID  string         `json:"job_id"`
+	Domain string         `json:"domain,omitempty"`
 	Status string         `json:"status"`
 	Total  int            `json:"total"`
 	Levels map[string]int `json:"levels"`
@@ -183,6 +184,7 @@ type moduleGroup struct {
 
 type modulesView struct {
 	JobID   string        `json:"job_id"`
+	Domain  string        `json:"domain,omitempty"`
 	Status  string        `json:"status"`
 	Modules []moduleGroup `json:"modules"`
 	Error   string        `json:"error,omitempty"`
@@ -190,6 +192,7 @@ type modulesView struct {
 
 type rawView struct {
 	JobID   string           `json:"job_id"`
+	Domain  string           `json:"domain,omitempty"`
 	Status  string           `json:"status"`
 	Entries []jobResultEntry `json:"entries"`
 	Error   string           `json:"error,omitempty"`
@@ -1233,6 +1236,14 @@ func renderJobResults(ctx context.Context, client *apiClient, opts globalOptions
 	if err != nil {
 		return err
 	}
+	domains := map[string]string{}
+	for _, jobID := range ids {
+		info, err := fetchJobInfo(ctx, client, jobID)
+		if err != nil {
+			return err
+		}
+		domains[jobID] = info.Domain
+	}
 	results := make([]jobResult, 0, len(ids))
 	for _, jobID := range ids {
 		result, err := fetchJobResult(ctx, client, jobID)
@@ -1253,7 +1264,7 @@ func renderJobResults(ctx context.Context, client *apiClient, opts globalOptions
 			if err != nil {
 				return err
 			}
-			if err := renderResultsToWriter(opts, view, levelSet, false, true, []jobResult{result}, file); err != nil {
+			if err := renderResultsToWriter(opts, view, levelSet, false, true, []jobResult{result}, domains, file); err != nil {
 				_ = file.Close()
 				return err
 			}
@@ -1261,12 +1272,12 @@ func renderJobResults(ctx context.Context, client *apiClient, opts globalOptions
 			fmt.Fprintf(out, "Wrote %s\n", path)
 		}
 		if aggregate {
-			return renderResultsToWriter(opts, view, levelSet, true, false, results, out)
+			return renderResultsToWriter(opts, view, levelSet, true, false, results, domains, out)
 		}
 		return nil
 	}
 
-	return renderResultsToWriter(opts, view, levelSet, aggregate, perJob, results, out)
+	return renderResultsToWriter(opts, view, levelSet, aggregate, perJob, results, domains, out)
 }
 
 func fetchJobResult(ctx context.Context, client *apiClient, jobID string) (jobResult, error) {
@@ -1277,8 +1288,8 @@ func fetchJobResult(ctx context.Context, client *apiClient, jobID string) (jobRe
 	if !isNotFoundError(err) {
 		return jobResult{}, err
 	}
-	var info job
-	if err := client.doJSON(ctx, http.MethodGet, "/jobs/"+jobID, nil, &info); err != nil {
+	info, err := fetchJobInfo(ctx, client, jobID)
+	if err != nil {
 		return jobResult{}, err
 	}
 	if !doneStatuses[info.Status] {
@@ -1303,6 +1314,14 @@ func fetchJobResult(ctx context.Context, client *apiClient, jobID string) (jobRe
 	return jobResult{}, err
 }
 
+func fetchJobInfo(ctx context.Context, client *apiClient, jobID string) (job, error) {
+	var info job
+	if err := client.doJSON(ctx, http.MethodGet, "/jobs/"+jobID, nil, &info); err != nil {
+		return job{}, err
+	}
+	return info, nil
+}
+
 func fetchJobResultOnce(ctx context.Context, client *apiClient, jobID string) (jobResult, error) {
 	var result jobResult
 	path := "/jobs/" + jobID + "/result"
@@ -1323,7 +1342,7 @@ func isNotFoundError(err error) bool {
 	return strings.Contains(msg, "code=not_found") || strings.Contains(msg, "not found")
 }
 
-func renderResultsToWriter(opts globalOptions, view string, levelSet map[string]bool, aggregate bool, perJob bool, results []jobResult, out io.Writer) error {
+func renderResultsToWriter(opts globalOptions, view string, levelSet map[string]bool, aggregate bool, perJob bool, results []jobResult, domains map[string]string, out io.Writer) error {
 	switch view {
 	case "json":
 		if opts.format == "jsonl" {
@@ -1339,7 +1358,7 @@ func renderResultsToWriter(opts globalOptions, view string, levelSet map[string]
 		}
 		return writeJSON(out, results)
 	case "summary":
-		views := buildSummaryViews(results, levelSet)
+		views := buildSummaryViews(results, levelSet, domains)
 		if opts.format == "json" {
 			if aggregate {
 				payload := map[string]any{
@@ -1371,7 +1390,7 @@ func renderResultsToWriter(opts globalOptions, view string, levelSet map[string]
 		}
 		return nil
 	case "modules":
-		views := buildModulesViews(results, levelSet)
+		views := buildModulesViews(results, levelSet, domains)
 		if opts.format == "json" {
 			if aggregate {
 				payload := map[string]any{
@@ -1403,7 +1422,7 @@ func renderResultsToWriter(opts globalOptions, view string, levelSet map[string]
 		}
 		return nil
 	case "raw":
-		views := buildRawViews(results, levelSet)
+		views := buildRawViews(results, levelSet, domains)
 		if opts.format == "json" {
 			if aggregate {
 				payload := map[string]any{
@@ -1464,6 +1483,9 @@ func writePretty(out io.Writer, payload any) error {
 	switch value := payload.(type) {
 	case job:
 		fmt.Fprintf(out, "Job %s\n", value.ID)
+		if value.Domain != "" {
+			fmt.Fprintf(out, "  Domain: %s\n", value.Domain)
+		}
 		fmt.Fprintf(out, "  Status: %s\n", value.Status)
 		fmt.Fprintf(out, "  Progress: %d%%\n", value.Progress)
 		if value.BatchID != "" {
@@ -1476,7 +1498,12 @@ func writePretty(out io.Writer, payload any) error {
 	case jobList:
 		fmt.Fprintf(out, "Jobs: %d\n", value.Total)
 		for _, item := range value.Items {
-			fmt.Fprintf(out, "- %s %s %d%%\n", item.ID, item.Status, item.Progress)
+			line := fmt.Sprintf("- %s", item.ID)
+			if item.Domain != "" {
+				line = fmt.Sprintf("%s (%s)", line, item.Domain)
+			}
+			line = fmt.Sprintf("%s %s %d%%", line, item.Status, item.Progress)
+			fmt.Fprintln(out, line)
 		}
 		return nil
 	case batchSummary:
@@ -1786,18 +1813,19 @@ func parseLevels(value string) (map[string]bool, error) {
 	return levels, nil
 }
 
-func buildSummaryViews(results []jobResult, levels map[string]bool) []summaryView {
+func buildSummaryViews(results []jobResult, levels map[string]bool, domains map[string]string) []summaryView {
 	views := make([]summaryView, 0, len(results))
 	for _, result := range results {
-		views = append(views, buildSummaryView(result, levels))
+		views = append(views, buildSummaryView(result, levels, domains[result.JobID]))
 	}
 	return views
 }
 
-func buildSummaryView(result jobResult, levels map[string]bool) summaryView {
+func buildSummaryView(result jobResult, levels map[string]bool, domain string) summaryView {
 	total, counts, errMsg := extractSummaryCounts(result, levels)
 	return summaryView{
 		JobID:  result.JobID,
+		Domain: domain,
 		Status: result.Status,
 		Total:  total,
 		Levels: counts,
@@ -1805,34 +1833,36 @@ func buildSummaryView(result jobResult, levels map[string]bool) summaryView {
 	}
 }
 
-func buildModulesViews(results []jobResult, levels map[string]bool) []modulesView {
+func buildModulesViews(results []jobResult, levels map[string]bool, domains map[string]string) []modulesView {
 	views := make([]modulesView, 0, len(results))
 	for _, result := range results {
-		views = append(views, buildModulesView(result, levels))
+		views = append(views, buildModulesView(result, levels, domains[result.JobID]))
 	}
 	return views
 }
 
-func buildModulesView(result jobResult, levels map[string]bool) modulesView {
+func buildModulesView(result jobResult, levels map[string]bool, domain string) modulesView {
 	return modulesView{
 		JobID:   result.JobID,
+		Domain:  domain,
 		Status:  result.Status,
 		Modules: groupEntriesByModule(result.Raw, levels),
 		Error:   extractError(result),
 	}
 }
 
-func buildRawViews(results []jobResult, levels map[string]bool) []rawView {
+func buildRawViews(results []jobResult, levels map[string]bool, domains map[string]string) []rawView {
 	views := make([]rawView, 0, len(results))
 	for _, result := range results {
-		views = append(views, buildRawView(result, levels))
+		views = append(views, buildRawView(result, levels, domains[result.JobID]))
 	}
 	return views
 }
 
-func buildRawView(result jobResult, levels map[string]bool) rawView {
+func buildRawView(result jobResult, levels map[string]bool, domain string) rawView {
 	return rawView{
 		JobID:   result.JobID,
+		Domain:  domain,
 		Status:  result.Status,
 		Entries: filterEntries(result.Raw, levels),
 		Error:   extractError(result),
@@ -1985,6 +2015,9 @@ func filterEntries(raw *jobResultRaw, levels map[string]bool) []jobResultEntry {
 
 func printSummaryPretty(out io.Writer, view summaryView) {
 	fmt.Fprintf(out, "Job %s (%s)\n", view.JobID, view.Status)
+	if view.Domain != "" {
+		fmt.Fprintf(out, "  Domain: %s\n", view.Domain)
+	}
 	if view.Error != "" {
 		fmt.Fprintf(out, "  Error: %s\n", view.Error)
 	}
@@ -2017,6 +2050,9 @@ func printAggregateSummaryPretty(out io.Writer, agg aggregateView) {
 
 func printModulesPretty(out io.Writer, view modulesView) {
 	fmt.Fprintf(out, "Job %s (%s)\n", view.JobID, view.Status)
+	if view.Domain != "" {
+		fmt.Fprintf(out, "  Domain: %s\n", view.Domain)
+	}
 	if view.Error != "" {
 		fmt.Fprintf(out, "  Error: %s\n", view.Error)
 	}
@@ -2050,6 +2086,9 @@ func printAggregateModulesPretty(out io.Writer, agg aggregateView) {
 
 func printRawPretty(out io.Writer, view rawView) {
 	fmt.Fprintf(out, "Job %s (%s)\n", view.JobID, view.Status)
+	if view.Domain != "" {
+		fmt.Fprintf(out, "  Domain: %s\n", view.Domain)
+	}
 	if view.Error != "" {
 		fmt.Fprintf(out, "  Error: %s\n", view.Error)
 	}

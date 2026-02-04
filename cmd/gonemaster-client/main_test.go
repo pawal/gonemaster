@@ -304,6 +304,9 @@ func TestJobsResultsFlagsAfterID(t *testing.T) {
 		return &http.Client{
 			Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 				switch {
+				case r.Method == http.MethodGet && r.URL.Path == "/api/v1/jobs/job_1":
+					body := `{"id":"job_1","domain":"example.com","status":"succeeded","created_at":"2026-02-03T00:00:00Z","progress":100}`
+					return jsonResponse(http.StatusOK, body), nil
 				case r.Method == http.MethodGet && r.URL.Path == "/api/v1/jobs/job_1/result":
 					body := `{"job_id":"job_1","status":"succeeded","summary":{"levels":{"NOTICE":1},"total":1}}`
 					return jsonResponse(http.StatusOK, body), nil

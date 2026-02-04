@@ -389,6 +389,44 @@ func TestReachabilityCacheSkipsAcrossCaches(t *testing.T) {
 	}
 }
 
+func TestReachabilityCacheExpiresByBudget(t *testing.T) {
+	clearReachabilityCache()
+	t.Cleanup(clearReachabilityCache)
+
+	ns, err := NewWithCache(NewCacheStore(), "ns.example", "192.0.2.55", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+
+	ctx, prof := testContext(t)
+	prof.Resolver.Defaults.NegativeCacheTTL = 60
+
+	timeout := 15 * time.Millisecond
+	retry := 0
+	opts := &QueryOptions{Timeout: &timeout, Retry: &retry}
+
+	var calls int
+	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		calls++
+		return packet.Packet{}, &net.OpError{Op: "dial", Net: "udp", Err: syscall.EHOSTUNREACH}
+	})
+
+	_, err = ns.QueryWithOptions(ctx, "example", "A", opts)
+	if err == nil {
+		t.Fatalf("expected error on first query")
+	}
+
+	time.Sleep(40 * time.Millisecond)
+
+	_, err = ns.QueryWithOptions(ctx, "example", "A", opts)
+	if err == nil {
+		t.Fatalf("expected error after reachability cache expiry")
+	}
+	if calls != 2 {
+		t.Fatalf("expected reachability cache to expire and re-query, got %d calls", calls)
+	}
+}
+
 func TestQueryIPv4Disabled(t *testing.T) {
 	ns, err := New("ns.example", "192.0.2.11", nil)
 	if err != nil {

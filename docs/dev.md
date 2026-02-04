@@ -148,6 +148,45 @@ func main() {
 }
 ```
 
+## Example: run simultaneous tests safely
+The engine is re-entrant and safe to run in parallel. The simplest option is to
+call `engine.Run` in separate goroutines; each call builds its own per-run
+state internally. If you need to reuse or customize per-run state explicitly,
+use `engine.NewRunner` and `engine.RunWithRunner`.
+
+```go
+package main
+
+import (
+	"context"
+	"log"
+	"sync"
+
+	"codeberg.org/pawal/gonemaster/engine"
+)
+
+func main() {
+	domains := []string{"example.com", "example.net"}
+	var wg sync.WaitGroup
+
+	for _, domain := range domains {
+		wg.Add(1)
+		go func(domain string) {
+			defer wg.Done()
+			req := engine.RunRequest{
+				Domain:  domain,
+				Context: context.Background(),
+			}
+			if _, err := engine.Run(req); err != nil {
+				log.Printf("run %s: %v", domain, err)
+			}
+		}(domain)
+	}
+
+	wg.Wait()
+}
+```
+
 ## Notes
 - `engine.Run` does not normalize IDNs; normalize with
   `engine/normalization.NormalizeName` before running.

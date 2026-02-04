@@ -12,9 +12,10 @@ import (
 )
 
 type queryCache struct {
-	mu   sync.Mutex
-	data map[string]*packet.Packet
-	met  *cacheMetrics
+	mu       sync.Mutex
+	data     map[string]*packet.Packet
+	met      *cacheMetrics
+	inflight map[string]*inflightQuery
 }
 
 type errorCache struct {
@@ -169,6 +170,45 @@ func (c *queryCache) clear() {
 		c.met.evict(len(c.data))
 	}
 	c.data = map[string]*packet.Packet{}
+	c.inflight = map[string]*inflightQuery{}
+	c.mu.Unlock()
+}
+
+type inflightQuery struct {
+	done chan struct{}
+	resp *packet.Packet
+	err  error
+}
+
+func (c *queryCache) waitOrRegister(key string) (*inflightQuery, bool) {
+	if c == nil {
+		return nil, false
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.inflight == nil {
+		c.inflight = map[string]*inflightQuery{}
+	}
+	if inflight, ok := c.inflight[key]; ok {
+		return inflight, true
+	}
+	inflight := &inflightQuery{done: make(chan struct{})}
+	c.inflight[key] = inflight
+	return inflight, false
+}
+
+func (c *queryCache) finish(key string, resp *packet.Packet, err error) {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	inflight := c.inflight[key]
+	if inflight != nil {
+		inflight.resp = resp
+		inflight.err = err
+		close(inflight.done)
+		delete(c.inflight, key)
+	}
 	c.mu.Unlock()
 }
 

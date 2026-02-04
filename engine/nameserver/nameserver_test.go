@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -116,6 +118,63 @@ func TestQueryCacheHit(t *testing.T) {
 	metrics := cache.QueryMetrics()
 	if metrics.Hits != 1 || metrics.Misses != 1 || metrics.Evictions != 0 {
 		t.Fatalf("unexpected query cache metrics: %+v", metrics)
+	}
+}
+
+func TestInflightQueryCoalescing(t *testing.T) {
+	cache := NewCacheStore()
+	ns, err := NewWithCache(cache, "ns.example", "192.0.2.51", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+
+	ctx, _ := testContext(t)
+
+	started := make(chan struct{})
+	release := make(chan struct{})
+	var startOnce sync.Once
+	var calls int32
+	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		atomic.AddInt32(&calls, 1)
+		startOnce.Do(func() { close(started) })
+		<-release
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeSuccess
+		return packet.Packet{Msg: msg}, nil
+	})
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	var err1, err2 error
+	go func() {
+		defer wg.Done()
+		_, err1 = ns.QueryWithOptions(ctx, "example", "A", nil)
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatalf("expected first query to start")
+	}
+
+	go func() {
+		defer wg.Done()
+		_, err2 = ns.QueryWithOptions(ctx, "example", "A", nil)
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+	if got := atomic.LoadInt32(&calls); got != 1 {
+		t.Fatalf("expected single inflight call, got %d", got)
+	}
+
+	close(release)
+	wg.Wait()
+
+	if err1 != nil || err2 != nil {
+		t.Fatalf("unexpected errors: %v %v", err1, err2)
+	}
+	if got := atomic.LoadInt32(&calls); got != 1 {
+		t.Fatalf("expected one query call total, got %d", got)
 	}
 }
 

@@ -189,6 +189,30 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 		return packet.Packet{}, nil
 	}
 
+	var inflight *inflightQuery
+	if ns.state != nil && ns.state.cache != nil {
+		if existing, wait := ns.state.cache.waitOrRegister(cacheKey); wait {
+			if ctx == nil {
+				<-existing.done
+				if existing.resp == nil {
+					return packet.Packet{}, existing.err
+				}
+				return *existing.resp, existing.err
+			}
+			select {
+			case <-existing.done:
+				if existing.resp == nil {
+					return packet.Packet{}, existing.err
+				}
+				return *existing.resp, existing.err
+			case <-ctx.Done():
+				return packet.Packet{}, ctx.Err()
+			}
+		} else {
+			inflight = existing
+		}
+	}
+
 	resp, err := ns.queryNetwork(ctx, qname, qtype, qclass, opts)
 
 	blacklistingDisabled := opts != nil && opts.BlacklistingDisabled
@@ -209,11 +233,16 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	}
 
 	if ns.state != nil {
+		var infResp *packet.Packet
 		if resp.Msg != nil {
 			copyResp := resp
 			ns.state.cache.set(cacheKey, &copyResp)
+			infResp = &copyResp
 		} else if err == nil {
 			ns.state.cache.set(cacheKey, nil)
+		}
+		if inflight != nil {
+			ns.state.cache.finish(cacheKey, infResp, err)
 		}
 	}
 	return resp, err

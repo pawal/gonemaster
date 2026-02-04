@@ -40,6 +40,10 @@ type RunRequest struct {
 	Unordered *bool
 	// ErrorCacheTTL sets resolver.defaults.error_cache_ttl in seconds.
 	ErrorCacheTTL *int
+	// PositiveCacheTTL sets resolver.defaults.positive_cache_ttl in seconds.
+	PositiveCacheTTL *int
+	// NegativeCacheTTL sets resolver.defaults.negative_cache_ttl in seconds.
+	NegativeCacheTTL *int
 	// LogCallback receives each log entry as it is created.
 	LogCallback func(*logger.Entry) error
 	// Context controls cancellation and timeouts for the run.
@@ -292,6 +296,16 @@ func buildProfile(req RunRequest, module string, testcase string) (*profile.Prof
 	}
 	if req.ErrorCacheTTL != nil {
 		if err := p.Set("resolver.defaults.error_cache_ttl", *req.ErrorCacheTTL); err != nil {
+			return nil, false, err
+		}
+	}
+	if req.PositiveCacheTTL != nil {
+		if err := p.Set("resolver.defaults.positive_cache_ttl", *req.PositiveCacheTTL); err != nil {
+			return nil, false, err
+		}
+	}
+	if req.NegativeCacheTTL != nil {
+		if err := p.Set("resolver.defaults.negative_cache_ttl", *req.NegativeCacheTTL); err != nil {
 			return nil, false, err
 		}
 	}

@@ -85,6 +85,8 @@ curl -s "http://localhost:8080/api/v1/jobs/$JOB_ID/result?locale=en" | jq .
   "debug": true,
   "worker_count": 4,
   "max_concurrent_jobs": 0,
+  "positive_cache_ttl": 0,
+  "negative_cache_ttl": 0,
   "min_level": "INFO",
   "profile_path": "/path/to/profile.json"
 }
@@ -97,6 +99,8 @@ curl -s "http://localhost:8080/api/v1/jobs/$JOB_ID/result?locale=en" | jq .
 - `--debug` Enable request/response logging
 - `--workers` Number of worker goroutines
 - `--max-concurrent-jobs` Max concurrent engine runs (0 = unlimited)
+- `--positive-cache-ttl` Seconds to cache positive DNS responses (optional)
+- `--negative-cache-ttl` Seconds to cache negative DNS responses (optional)
 - `--min-level` Minimum log level for results
 - `--profile` Profile JSON/YAML path (default for all jobs)
 - `--shutdown-timeout` Graceful shutdown timeout

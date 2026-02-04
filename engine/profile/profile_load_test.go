@@ -25,7 +25,9 @@ func TestFromJSONParsesValues(t *testing.T) {
 				"usevc": true,
 				"recurse": false,
 				"retry": 123,
-				"retrans": 234
+				"retrans": 234,
+				"positive_cache_ttl": 30,
+				"negative_cache_ttl": 45
 			},
 			"source4": "192.0.2.53",
 			"source6": "2001:db8::42"
@@ -71,6 +73,14 @@ func TestFromJSONParsesValues(t *testing.T) {
 	value, err = p.Get("resolver.source4")
 	if err != nil || value != "192.0.2.53" {
 		t.Fatalf("expected source4, got %#v (err=%v)", value, err)
+	}
+	value, err = p.Get("resolver.defaults.positive_cache_ttl")
+	if err != nil || value != 30 {
+		t.Fatalf("expected positive_cache_ttl 30, got %#v (err=%v)", value, err)
+	}
+	value, err = p.Get("resolver.defaults.negative_cache_ttl")
+	if err != nil || value != 45 {
+		t.Fatalf("expected negative_cache_ttl 45, got %#v (err=%v)", value, err)
 	}
 	value, err = p.Get("asn_db.style")
 	if err != nil || value != "ripe" {

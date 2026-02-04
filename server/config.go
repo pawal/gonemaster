@@ -14,8 +14,12 @@ type Config struct {
 	WorkerCount int
 	// MaxConcurrentJobs caps engine runs across workers when >0.
 	MaxConcurrentJobs int
-	MinLevel          string
-	ProfilePath       string
+	// PositiveCacheTTL overrides resolver.defaults.positive_cache_ttl when set.
+	PositiveCacheTTL *int
+	// NegativeCacheTTL overrides resolver.defaults.negative_cache_ttl when set.
+	NegativeCacheTTL *int
+	MinLevel         string
+	ProfilePath      string
 }
 
 // FileConfig captures optional configuration fields from JSON.
@@ -25,6 +29,8 @@ type FileConfig struct {
 	Debug             *bool   `json:"debug"`
 	WorkerCount       *int    `json:"worker_count"`
 	MaxConcurrentJobs *int    `json:"max_concurrent_jobs"`
+	PositiveCacheTTL  *int    `json:"positive_cache_ttl"`
+	NegativeCacheTTL  *int    `json:"negative_cache_ttl"`
 	MinLevel          *string `json:"min_level"`
 	ProfilePath       *string `json:"profile_path"`
 }
@@ -70,6 +76,12 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 	}
 	if file.MaxConcurrentJobs != nil {
 		c.MaxConcurrentJobs = *file.MaxConcurrentJobs
+	}
+	if file.PositiveCacheTTL != nil {
+		c.PositiveCacheTTL = file.PositiveCacheTTL
+	}
+	if file.NegativeCacheTTL != nil {
+		c.NegativeCacheTTL = file.NegativeCacheTTL
 	}
 	if file.MinLevel != nil {
 		c.MinLevel = *file.MinLevel

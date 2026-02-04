@@ -47,6 +47,10 @@ type ResolverDefaults struct {
 	Timeout   int  `json:"timeout"`
 	// ErrorCacheTTL sets the duration (seconds) to skip queries after network errors.
 	ErrorCacheTTL int `json:"error_cache_ttl"`
+	// PositiveCacheTTL sets the duration (seconds) to cache positive responses.
+	PositiveCacheTTL int `json:"positive_cache_ttl"`
+	// NegativeCacheTTL sets the duration (seconds) to cache negative responses.
+	NegativeCacheTTL int `json:"negative_cache_ttl"`
 }
 
 // NetSettings holds IP stack enablement flags.

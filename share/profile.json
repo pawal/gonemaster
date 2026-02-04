@@ -28,7 +28,9 @@
             "unordered": true,
             "usevc": false,
             "timeout": 5,
-            "error_cache_ttl": 0
+            "error_cache_ttl": 0,
+            "positive_cache_ttl": 0,
+            "negative_cache_ttl": 0
         }
     },
     "test_levels": {

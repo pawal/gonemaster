@@ -65,6 +65,8 @@ Use `--output PATH` to write the selected output to a file.
 | `--unordered` | bool | Allow unordered resolver behavior (overrides `resolver.defaults.unordered`). |
 | `--ordered` | bool | Force ordered resolver behavior (overrides `resolver.defaults.unordered`). |
 | `--error-cache-ttl N` | int | Seconds to skip queries after network errors. Must be `>= 0` when set. |
+| `--positive-cache-ttl N` | int | Seconds to cache positive DNS responses. Must be `>= 0` when set. |
+| `--negative-cache-ttl N` | int | Seconds to cache negative DNS responses. Must be `>= 0` when set. |
 | `--no-progress` | bool | Disable progress indicator/spinner. |
 | `--list-tests` | bool | List available test cases and exit. |
 | `--version` | bool | Print version information and exit. |

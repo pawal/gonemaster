@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"codeberg.org/pawal/gonemaster/engine/profile"
 )
@@ -15,11 +16,6 @@ var ModuleName = "System"
 // TestCaseName is the default test case name for log entries.
 var TestCaseName = "Unspecified"
 
-var (
-	logFilter map[string]map[string][]profile.LogFilterRule
-	configMu  sync.Mutex
-)
-
 // Logger stores log entries and optional callbacks.
 type Logger struct {
 	mu              sync.Mutex
@@ -27,11 +23,65 @@ type Logger struct {
 	Callback        func(*Entry) error
 	callbackRunning bool
 	pending         []*Entry
+	startTime       time.Time
+	defaultModule   string
+	defaultTestcase string
+	configMu        sync.RWMutex
+	logFilter       map[string]map[string][]profile.LogFilterRule
+	testLevels      map[string]map[string]string
 }
 
 // New creates a new Logger.
 func New() *Logger {
-	return &Logger{entries: []*Entry{}}
+	return &Logger{
+		entries:         []*Entry{},
+		startTime:       time.Now(),
+		defaultModule:   ModuleName,
+		defaultTestcase: TestCaseName,
+	}
+}
+
+// SetProfile configures log filtering and levels from the provided profile.
+func (l *Logger) SetProfile(p *profile.Profile) {
+	if l == nil || p == nil {
+		return
+	}
+	l.configMu.Lock()
+	l.logFilter = p.LogFilter
+	l.testLevels = p.TestLevels
+	l.configMu.Unlock()
+}
+
+// CopyConfigFrom copies log filtering and levels from another logger.
+func (l *Logger) CopyConfigFrom(other *Logger) {
+	if l == nil || other == nil {
+		return
+	}
+	other.configMu.RLock()
+	logFilter := other.logFilter
+	testLevels := other.testLevels
+	other.configMu.RUnlock()
+
+	l.configMu.Lock()
+	l.logFilter = logFilter
+	l.testLevels = testLevels
+	l.configMu.Unlock()
+}
+
+// CopyStartTimeFrom aligns the timestamp base with another logger.
+func (l *Logger) CopyStartTimeFrom(other *Logger) {
+	if l == nil || other == nil {
+		return
+	}
+	l.startTime = other.startTime
+}
+
+// ResetStartTime resets the timestamp base for this logger.
+func (l *Logger) ResetStartTime() {
+	if l == nil {
+		return
+	}
+	l.startTime = time.Now()
 }
 
 // Entries returns the current log entries.
@@ -52,17 +102,18 @@ func (l *Logger) Add(tag string, args map[string]any, module string, testcase st
 		return nil, fmt.Errorf("logger is nil")
 	}
 	if module == "" {
-		module = ModuleName
+		module = l.defaultModule
 	}
 	if testcase == "" {
-		testcase = TestCaseName
+		testcase = l.defaultTestcase
 	}
-	entry, err := NewEntry(strings.ToUpper(tag), args, testcase, module)
+	testLevels, logFilter := l.configSnapshot()
+	entry, err := newEntryWithTimestamp(strings.ToUpper(tag), args, testcase, module, time.Since(l.startTime).Seconds(), testLevels)
 	if err != nil {
 		return nil, err
 	}
 
-	l.checkFilter(entry)
+	l.checkFilter(entry, logFilter)
 	l.mu.Lock()
 	l.entries = append(l.entries, entry)
 	if l.Callback == nil {
@@ -78,6 +129,29 @@ func (l *Logger) Add(tag string, args map[string]any, module string, testcase st
 	l.mu.Unlock()
 	l.runCallbacks(entry)
 
+	return entry, nil
+}
+
+// AddWithoutCallback creates and stores a new log entry without invoking callbacks.
+func (l *Logger) AddWithoutCallback(tag string, args map[string]any, module string, testcase string) (*Entry, error) {
+	if l == nil {
+		return nil, fmt.Errorf("logger is nil")
+	}
+	if module == "" {
+		module = l.defaultModule
+	}
+	if testcase == "" {
+		testcase = l.defaultTestcase
+	}
+	testLevels, logFilter := l.configSnapshot()
+	entry, err := newEntryWithTimestamp(strings.ToUpper(tag), args, testcase, module, time.Since(l.startTime).Seconds(), testLevels)
+	if err != nil {
+		return nil, err
+	}
+	l.checkFilter(entry, logFilter)
+	l.mu.Lock()
+	l.entries = append(l.entries, entry)
+	l.mu.Unlock()
 	return entry, nil
 }
 
@@ -220,7 +294,7 @@ func (l *Logger) runCallbacks(entry *Entry) {
 			l.pending = nil
 			l.Callback = nil
 			l.mu.Unlock()
-			_, _ = l.Add("LOGGER_CALLBACK_ERROR", map[string]any{"exception": err.Error()}, ModuleName, TestCaseName)
+			_, _ = l.Add("LOGGER_CALLBACK_ERROR", map[string]any{"exception": err.Error()}, l.defaultModule, l.defaultTestcase)
 			return
 		}
 
@@ -248,16 +322,18 @@ func safeCallback(cb func(*Entry) error, entry *Entry) (err error) {
 	return err
 }
 
-func (l *Logger) checkFilter(entry *Entry) {
+func (l *Logger) configSnapshot() (map[string]map[string]string, map[string]map[string][]profile.LogFilterRule) {
+	l.configMu.RLock()
+	testLevels := l.testLevels
+	logFilter := l.logFilter
+	l.configMu.RUnlock()
+	return testLevels, logFilter
+}
+
+func (l *Logger) checkFilter(entry *Entry, filter map[string]map[string][]profile.LogFilterRule) {
 	if entry == nil {
 		return
 	}
-	configMu.Lock()
-	if logFilter == nil {
-		logFilter = profile.Effective().LogFilter
-	}
-	filter := logFilter
-	configMu.Unlock()
 	if filter == nil {
 		return
 	}

@@ -27,6 +27,16 @@ func Logger() *logger.Logger {
 	return defaultLogger
 }
 
+// LoggerFromContext returns the logger stored in ctx or the default logger.
+func LoggerFromContext(ctx context.Context) *logger.Logger {
+	if ctx != nil {
+		if l := logger.FromContext(ctx); l != nil {
+			return l
+		}
+	}
+	return Logger()
+}
+
 // SetLogger overrides the default logger instance.
 func SetLogger(l *logger.Logger) {
 	defaultLoggerMu.Lock()
@@ -38,9 +48,9 @@ func SetLogger(l *logger.Logger) {
 	})
 }
 
-// Info creates a log entry using the default logger.
-func Info(tag string, args map[string]any) (*logger.Entry, error) {
-	return Logger().Add(tag, args, "", "")
+// Info creates a log entry using the logger stored in ctx.
+func Info(ctx context.Context, tag string, args map[string]any) (*logger.Entry, error) {
+	return LoggerFromContext(ctx).Add(tag, args, "", "")
 }
 
 // NS creates a nameserver object for the given name and address.

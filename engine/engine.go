@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine/logger"
+	ens "codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 	address "codeberg.org/pawal/gonemaster/engine/test/address"
 	"codeberg.org/pawal/gonemaster/engine/test/basic"
@@ -348,34 +349,35 @@ func Run(req RunRequest) ([]LogEntry, error) {
 	if req.LogCallback != nil {
 		log.Callback = req.LogCallback
 	}
-	util.SetLogger(log)
-	defer util.SetLogger(nil)
-	logger.StartTimeNow()
 
 	p, autoDisabledIPv6, err := buildProfile(req, module, testcase)
 	if err != nil {
 		return nil, err
 	}
-	profile.SetEffective(p)
+	log.SetProfile(p)
+	ens.SetLogFunc(func(tag string, args map[string]any, module string, testcase string) (any, error) {
+		return log.Add(tag, args, module, testcase)
+	})
+	defer ens.SetLogFunc(nil)
 
 	ctx := req.Context
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	ctx = profile.WithContext(ctx, p)
+	ctx = logger.WithContext(ctx, log)
 
 	queryLimit := p.Resolver.Defaults.Parallel
 	if p.Resolver.Defaults.Unordered && queryLimit > 1 {
 		queryLimit = queryLimit * queryLimit
 	}
 	transport.SetGlobalQueryLimit(queryLimit)
-	logger.ResetConfig()
 	if autoDisabledIPv6 {
-		if _, err := util.Info("IPV6_DISABLED", map[string]any{"reason": "auto_no_global_ipv6"}); err != nil {
+		if _, err := log.AddWithoutCallback("IPV6_DISABLED", map[string]any{"reason": "auto_no_global_ipv6"}, "", ""); err != nil {
 			return nil, err
 		}
 	}
-	if _, err := util.Info("GLOBAL_VERSION", map[string]any{"version": VersionString()}); err != nil {
+	if _, err := log.AddWithoutCallback("GLOBAL_VERSION", map[string]any{"version": VersionString()}, "", ""); err != nil {
 		return nil, err
 	}
 
@@ -435,7 +437,7 @@ func Run(req RunRequest) ([]LogEntry, error) {
 		entries, err = basic.All(ctx, &z)
 		if err == nil {
 			if !basic.CanContinue(ctx, &z, entries) {
-				entry, addErr := util.Info("CANNOT_CONTINUE", map[string]any{"domain": z.Name.String()})
+				entry, addErr := util.Info(ctx, "CANNOT_CONTINUE", map[string]any{"domain": z.Name.String()})
 				if addErr != nil {
 					return nil, addErr
 				}

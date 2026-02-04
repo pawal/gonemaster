@@ -10,14 +10,13 @@ import (
 
 func TestRunBuffersAndFlushesEntries(t *testing.T) {
 	parent := logger.New()
-	util.SetLogger(parent)
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx := logger.WithContext(context.Background(), parent)
 
-	entries, err := Run(context.Background(), func(ctx context.Context) ([]*logger.Entry, error) {
-		if _, err := util.Logger().Add("TEST_CASE_START", map[string]any{"testcase": "Demo"}, "Demo", "Demo01"); err != nil {
+	entries, err := Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+		if _, err := util.LoggerFromContext(ctx).Add("TEST_CASE_START", map[string]any{"testcase": "Demo"}, "Demo", "Demo01"); err != nil {
 			return nil, err
 		}
-		return util.Logger().Entries(), nil
+		return util.LoggerFromContext(ctx).Entries(), nil
 	})
 	if err != nil {
 		t.Fatalf("run: %v", err)
@@ -34,8 +33,8 @@ func TestRunBuffersAndFlushesEntries(t *testing.T) {
 		t.Fatalf("unexpected parent tag %q", parentEntries[0].Tag)
 	}
 
-	if util.Logger() != parent {
-		t.Fatalf("expected logger to be restored to parent")
+	if logger.FromContext(ctx) != parent {
+		t.Fatalf("expected logger to remain as parent")
 	}
 }
 
@@ -48,11 +47,10 @@ func TestRunStreamsExtraEntriesWithCallback(t *testing.T) {
 		}
 		return nil
 	}
-	util.SetLogger(parent)
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx := logger.WithContext(context.Background(), parent)
 
-	entries, err := Run(context.Background(), func(ctx context.Context) ([]*logger.Entry, error) {
-		if _, err := util.Logger().Add("BUF_ENTRY", map[string]any{}, "Test", "Case"); err != nil {
+	entries, err := Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+		if _, err := util.LoggerFromContext(ctx).Add("BUF_ENTRY", map[string]any{}, "Test", "Case"); err != nil {
 			return nil, err
 		}
 		extraLogger := logger.New()

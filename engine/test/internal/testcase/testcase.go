@@ -17,16 +17,17 @@ func Run(ctx context.Context, fn Case) ([]*logger.Entry, error) {
 		return nil, nil
 	}
 
-	parent := util.Logger()
+	parent := util.LoggerFromContext(ctx)
 	buf := logger.New()
+	buf.CopyConfigFrom(parent)
+	buf.CopyStartTimeFrom(parent)
 	useSilentAppend := parent != nil && parent.Callback != nil
 	if useSilentAppend {
 		buf.Callback = parent.Callback
 	}
 
-	util.SetLogger(buf)
+	ctx = logger.WithContext(ctx, buf)
 	entries, err := fn(ctx)
-	util.SetLogger(parent)
 
 	bufEntries := buf.Entries()
 	var extras []*logger.Entry

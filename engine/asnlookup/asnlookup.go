@@ -99,7 +99,7 @@ func GetWithPrefix(ctx context.Context, resolver Resolver, ip netip.Addr) (Resul
 }
 
 func lookupCymru(ctx context.Context, resolver Resolver, ip netip.Addr, source string) (Result, error) {
-	if _, err := util.Logger().Add("ASN_LOOKUP_SOURCE", map[string]any{"name": source}, "", ""); err != nil {
+	if _, err := util.LoggerFromContext(ctx).Add("ASN_LOOKUP_SOURCE", map[string]any{"name": source}, "", ""); err != nil {
 		return Result{}, err
 	}
 

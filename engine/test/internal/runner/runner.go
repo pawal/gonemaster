@@ -28,12 +28,17 @@ func Run(ctx context.Context, tasks []Task, opts Options) ([]*logger.Entry, erro
 	if limit < 1 {
 		limit = 1
 	}
+	parent := logger.FromContext(ctx)
 
 	wrapped := make([]parallel.Task[[]*logger.Entry], len(tasks))
 	for i, task := range tasks {
 		task := task
 		wrapped[i] = func(ctx context.Context) ([]*logger.Entry, error) {
 			buf := logger.New()
+			if parent != nil {
+				buf.CopyConfigFrom(parent)
+				buf.CopyStartTimeFrom(parent)
+			}
 			if err := task(ctx, buf); err != nil {
 				return buf.Entries(), err
 			}

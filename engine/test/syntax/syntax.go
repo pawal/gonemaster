@@ -193,38 +193,34 @@ func Metadata() map[string][]string {
 }
 
 // Syntax01 runs the SYNTAX01 test case.
-func Syntax01(_ context.Context, z *zone.Zone) ([]*logger.Entry, error) {
+func Syntax01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Syntax01"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
 	name := z.Name
 	if nameHasOnlyLegalCharacters(name) {
-		if err := appendLog(&results, testcase, "ONLY_ALLOWED_CHARS", map[string]any{"domain": name.String()}); err != nil {
+		if err := appendLog(ctx, &results, testcase, "ONLY_ALLOWED_CHARS", map[string]any{"domain": name.String()}); err != nil {
 			return results, err
 		}
 	} else {
-		if err := appendLog(&results, testcase, "NON_ALLOWED_CHARS", map[string]any{"domain": name.String()}); err != nil {
+		if err := appendLog(ctx, &results, testcase, "NON_ALLOWED_CHARS", map[string]any{"domain": name.String()}); err != nil {
 			return results, err
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Syntax02 runs the SYNTAX02 test case.
-func Syntax02(_ context.Context, z *zone.Zone) ([]*logger.Entry, error) {
+func Syntax02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Syntax02"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -232,7 +228,7 @@ func Syntax02(_ context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	hadIssue := false
 	for _, label := range name.Labels() {
 		if labelStartsWithHyphen(label) {
-			if err := appendLog(&results, testcase, "INITIAL_HYPHEN", map[string]any{
+			if err := appendLog(ctx, &results, testcase, "INITIAL_HYPHEN", map[string]any{
 				"label":  label,
 				"domain": name.String(),
 			}); err != nil {
@@ -241,7 +237,7 @@ func Syntax02(_ context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			hadIssue = true
 		}
 		if labelEndsWithHyphen(label) {
-			if err := appendLog(&results, testcase, "TERMINAL_HYPHEN", map[string]any{
+			if err := appendLog(ctx, &results, testcase, "TERMINAL_HYPHEN", map[string]any{
 				"label":  label,
 				"domain": name.String(),
 			}); err != nil {
@@ -252,22 +248,20 @@ func Syntax02(_ context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(name.Labels()) > 0 && !hadIssue {
-		if err := appendLog(&results, testcase, "NO_ENDING_HYPHENS", map[string]any{"domain": name.String()}); err != nil {
+		if err := appendLog(ctx, &results, testcase, "NO_ENDING_HYPHENS", map[string]any{"domain": name.String()}); err != nil {
 			return results, err
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Syntax03 runs the SYNTAX03 test case.
-func Syntax03(_ context.Context, z *zone.Zone) ([]*logger.Entry, error) {
+func Syntax03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Syntax03"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -275,7 +269,7 @@ func Syntax03(_ context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	hadIssue := false
 	for _, label := range name.Labels() {
 		if labelNotACEHasDoubleHyphen(label) {
-			if err := appendLog(&results, testcase, "DISCOURAGED_DOUBLE_DASH", map[string]any{
+			if err := appendLog(ctx, &results, testcase, "DISCOURAGED_DOUBLE_DASH", map[string]any{
 				"label":  label,
 				"domain": name.String(),
 			}); err != nil {
@@ -286,22 +280,20 @@ func Syntax03(_ context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(name.Labels()) > 0 && !hadIssue {
-		if err := appendLog(&results, testcase, "NO_DOUBLE_DASH", map[string]any{"domain": name.String()}); err != nil {
+		if err := appendLog(ctx, &results, testcase, "NO_DOUBLE_DASH", map[string]any{"domain": name.String()}); err != nil {
 			return results, err
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Syntax04 runs the SYNTAX04 test case.
 func Syntax04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Syntax04"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -345,17 +337,15 @@ func Syntax04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		results = append(results, entries...)
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Syntax05 runs the SYNTAX05 test case.
 func Syntax05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Syntax05"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -373,32 +363,30 @@ func Syntax05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			rname := soa.Mbox
 			check := strings.ReplaceAll(rname, `\.`, ".")
 			if strings.Contains(check, "@") {
-				if err := appendLog(&results, testcase, "RNAME_MISUSED_AT_SIGN", map[string]any{"rname": rname}); err != nil {
+				if err := appendLog(ctx, &results, testcase, "RNAME_MISUSED_AT_SIGN", map[string]any{"rname": rname}); err != nil {
 					return results, err
 				}
 			} else {
-				if err := appendLog(&results, testcase, "RNAME_NO_AT_SIGN", map[string]any{"rname": rname}); err != nil {
+				if err := appendLog(ctx, &results, testcase, "RNAME_NO_AT_SIGN", map[string]any{"rname": rname}); err != nil {
 					return results, err
 				}
 			}
-			return appendTestCaseEnd(results, testcase)
+			return appendTestCaseEnd(ctx, results, testcase)
 		}
 	}
 
-	if err := appendLog(&results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{}); err != nil {
 		return results, err
 	}
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Syntax06 runs the SYNTAX06 test case.
 func Syntax06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Syntax06"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -522,7 +510,7 @@ func Syntax06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			UseVC:   &usevc,
 		})
 		if err != nil || resp.Msg == nil {
-			if err := appendLog(&results, testcase, "NO_RESPONSE", map[string]any{
+			if err := appendLog(ctx, &results, testcase, "NO_RESPONSE", map[string]any{
 				"ns":     ns.String(),
 				"domain": z.Name.String(),
 			}); err != nil {
@@ -539,7 +527,7 @@ func Syntax06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 		if soa == nil {
-			if err := appendLog(&results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{}); err != nil {
+			if err := appendLog(ctx, &results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{}); err != nil {
 				return results, err
 			}
 			continue
@@ -548,7 +536,7 @@ func Syntax06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		rawRname := soa.Mbox
 		rname := rnameToEmail(rawRname)
 		if !validEmailAddress(rname) {
-			if err := appendLog(&results, testcase, "RNAME_RFC822_INVALID", map[string]any{"rname": rname}); err != nil {
+			if err := appendLog(ctx, &results, testcase, "RNAME_RFC822_INVALID", map[string]any{"rname": rname}); err != nil {
 				return results, err
 			}
 			continue
@@ -556,7 +544,7 @@ func Syntax06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 		parts := strings.SplitN(rname, "@", 2)
 		if len(parts) != 2 || parts[1] == "" {
-			if err := appendLog(&results, testcase, "RNAME_RFC822_INVALID", map[string]any{"rname": rname}); err != nil {
+			if err := appendLog(ctx, &results, testcase, "RNAME_RFC822_INVALID", map[string]any{"rname": rname}); err != nil {
 				return results, err
 			}
 			continue
@@ -568,7 +556,7 @@ func Syntax06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 		if pMX.Msg == nil || pMX.Rcode() != "NOERROR" {
-			if err := appendLog(&results, testcase, "RNAME_MAIL_DOMAIN_INVALID", map[string]any{"domain": domain.String()}); err != nil {
+			if err := appendLog(ctx, &results, testcase, "RNAME_MAIL_DOMAIN_INVALID", map[string]any{"domain": domain.String()}); err != nil {
 				return results, err
 			}
 			continue
@@ -663,23 +651,21 @@ func Syntax06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 		sort.Strings(keys)
 		for _, rname := range keys {
-			if err := appendLog(&results, testcase, "RNAME_RFC822_VALID", map[string]any{"rname": rname}); err != nil {
+			if err := appendLog(ctx, &results, testcase, "RNAME_RFC822_VALID", map[string]any{"rname": rname}); err != nil {
 				return results, err
 			}
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Syntax07 runs the SYNTAX07 test case.
 func Syntax07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Syntax07"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -695,25 +681,23 @@ func Syntax07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					return results, err
 				}
 				results = append(results, entries...)
-				return appendTestCaseEnd(results, testcase)
+				return appendTestCaseEnd(ctx, results, testcase)
 			}
 		}
 	}
 
-	if err := appendLog(&results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{}); err != nil {
 		return results, err
 	}
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Syntax08 runs the SYNTAX08 test case.
 func Syntax08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Syntax08"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -751,24 +735,24 @@ func Syntax08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 			results = append(results, entries...)
 		}
-		return appendTestCaseEnd(results, testcase)
+		return appendTestCaseEnd(ctx, results, testcase)
 	}
 
-	if err := appendLog(&results, testcase, "NO_RESPONSE_MX_QUERY", map[string]any{}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "NO_RESPONSE_MX_QUERY", map[string]any{}); err != nil {
 		return results, err
 	}
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
-func appendTestCaseEnd(results []*logger.Entry, testcase string) ([]*logger.Entry, error) {
-	if err := appendLog(&results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
+func appendTestCaseEnd(ctx context.Context, results []*logger.Entry, testcase string) ([]*logger.Entry, error) {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 	return results, nil
 }
 
-func appendLog(results *[]*logger.Entry, testcase string, tag string, args map[string]any) error {
-	entry, err := util.Logger().Add(tag, args, moduleName, testcase)
+func appendLog(ctx context.Context, results *[]*logger.Entry, testcase string, tag string, args map[string]any) error {
+	entry, err := util.LoggerFromContext(ctx).Add(tag, args, moduleName, testcase)
 	if err != nil {
 		return err
 	}
@@ -778,7 +762,7 @@ func appendLog(results *[]*logger.Entry, testcase string, tag string, args map[s
 
 func ipDisabledMessage(ctx context.Context, results *[]*logger.Entry, testcase string, ns nameserver.Nameserver, rrtype string) (bool, error) {
 	if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
-		if err := appendLog(results, testcase, "IPV4_DISABLED", map[string]any{
+		if err := appendLog(ctx, results, testcase, "IPV4_DISABLED", map[string]any{
 			"ns":     ns.String(),
 			"rrtype": rrtype,
 		}); err != nil {
@@ -787,7 +771,7 @@ func ipDisabledMessage(ctx context.Context, results *[]*logger.Entry, testcase s
 		return true, nil
 	}
 	if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
-		if err := appendLog(results, testcase, "IPV6_DISABLED", map[string]any{
+		if err := appendLog(ctx, results, testcase, "IPV6_DISABLED", map[string]any{
 			"ns":     ns.String(),
 			"rrtype": rrtype,
 		}); err != nil {

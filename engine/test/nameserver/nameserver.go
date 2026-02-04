@@ -294,10 +294,8 @@ func Metadata() map[string][]string {
 func Nameserver01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Nameserver01"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -368,17 +366,15 @@ func Nameserver01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		results = append(results, entries...)
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Nameserver02 runs the NAMESERVER02 test case.
 func Nameserver02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Nameserver02"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -493,24 +489,22 @@ func Nameserver02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	if len(included) > 0 && nErrors == 0 {
 		keys := sortedKeys(included)
-		if err := appendLog(&results, testcase, "EDNS0_SUPPORT", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "EDNS0_SUPPORT", map[string]any{
 			"ns_list": strings.Join(keys, ";"),
 		}); err != nil {
 			return results, err
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Nameserver03 runs the NAMESERVER03 test case.
 func Nameserver03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Nameserver03"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -558,17 +552,15 @@ func Nameserver03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		results = append(results, entries...)
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Nameserver04 runs the NAMESERVER04 test case.
 func Nameserver04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Nameserver04"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -640,24 +632,22 @@ func Nameserver04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(included) > 0 && nErrors == 0 {
-		if err := appendLog(&results, testcase, "SAME_SOURCE_IP", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "SAME_SOURCE_IP", map[string]any{
 			"names": strings.Join(sortedKeys(included), ","),
 		}); err != nil {
 			return results, err
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Nameserver05 runs the NAMESERVER05 test case.
 func Nameserver05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Nameserver05"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -778,24 +768,22 @@ func Nameserver05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if aaaaOK > 0 && aaaaIssue == 0 {
-		if err := appendLog(&results, testcase, "AAAA_WELL_PROCESSED", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "AAAA_WELL_PROCESSED", map[string]any{
 			"ns_list": strings.Join(sortedKeys(included), ";"),
 		}); err != nil {
 			return results, err
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Nameserver06 runs the NAMESERVER06 test case.
 func Nameserver06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Nameserver06"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -833,42 +821,40 @@ func Nameserver06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	sort.Strings(withoutIP)
 
 	if len(withoutIP) > 0 && len(withIP) > 0 {
-		if err := appendLog(&results, testcase, "CAN_NOT_BE_RESOLVED", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "CAN_NOT_BE_RESOLVED", map[string]any{
 			"nsname_list": strings.Join(withoutIP, ";"),
 		}); err != nil {
 			return results, err
 		}
 	} else if len(withIP) == 0 {
-		if err := appendLog(&results, testcase, "NO_RESOLUTION", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "NO_RESOLUTION", map[string]any{
 			"names": strings.Join(withoutIP, ","),
 		}); err != nil {
 			return results, err
 		}
 	} else {
-		if err := appendLog(&results, testcase, "CAN_BE_RESOLVED", map[string]any{}); err != nil {
+		if err := appendLog(ctx, &results, testcase, "CAN_BE_RESOLVED", map[string]any{}); err != nil {
 			return results, err
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Nameserver07 runs the NAMESERVER07 test case.
 func Nameserver07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Nameserver07"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
 	if z != nil && z.Name.String() == "." {
-		if err := appendLog(&results, testcase, "UPWARD_REFERRAL_IRRELEVANT", map[string]any{}); err != nil {
+		if err := appendLog(ctx, &results, testcase, "UPWARD_REFERRAL_IRRELEVANT", map[string]any{}); err != nil {
 			return results, err
 		}
-		return appendTestCaseEnd(results, testcase)
+		return appendTestCaseEnd(ctx, results, testcase)
 	}
 
 	nss, err := method4and5(ctx, z)
@@ -944,24 +930,22 @@ func Nameserver07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			keys = append(keys, name)
 		}
 		sort.Strings(keys)
-		if err := appendLog(&results, testcase, "NO_UPWARD_REFERRAL", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "NO_UPWARD_REFERRAL", map[string]any{
 			"nsname_list": strings.Join(keys, ";"),
 		}); err != nil {
 			return results, err
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Nameserver08 runs the NAMESERVER08 test case.
 func Nameserver08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Nameserver08"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -1023,17 +1007,15 @@ func Nameserver08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		results = append(results, entries...)
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Nameserver09 runs the NAMESERVER09 test case.
 func Nameserver09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Nameserver09"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -1160,14 +1142,14 @@ func Nameserver09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if allResultsMatch {
-		if err := appendLog(&results, testcase, "CASE_QUERIES_RESULTS_OK", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "CASE_QUERIES_RESULTS_OK", map[string]any{
 			"type":   recordType,
 			"domain": original,
 		}); err != nil {
 			return results, err
 		}
 	} else {
-		if err := appendLog(&results, testcase, "CASE_QUERIES_RESULTS_DIFFER", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "CASE_QUERIES_RESULTS_DIFFER", map[string]any{
 			"type":   recordType,
 			"domain": original,
 		}); err != nil {
@@ -1175,17 +1157,15 @@ func Nameserver09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Nameserver10 runs the NAMESERVER10 test case.
 func Nameserver10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Nameserver10"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -1268,7 +1248,7 @@ func Nameserver10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(noResponseEDNS1) > 0 {
-		if err := appendLog(&results, testcase, "N10_NO_RESPONSE_EDNS1_QUERY", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "N10_NO_RESPONSE_EDNS1_QUERY", map[string]any{
 			"ns_ip_list": strings.Join(sortedStrings(noResponseEDNS1), ";"),
 		}); err != nil {
 			return results, err
@@ -1283,7 +1263,7 @@ func Nameserver10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		sort.Strings(keys)
 		for _, rcode := range keys {
 			list := sortedStrings(unexpectedRcode[rcode])
-			if err := appendLog(&results, testcase, "N10_UNEXPECTED_RCODE", map[string]any{
+			if err := appendLog(ctx, &results, testcase, "N10_UNEXPECTED_RCODE", map[string]any{
 				"rcode":      rcode,
 				"ns_ip_list": strings.Join(list, ";"),
 			}); err != nil {
@@ -1293,24 +1273,22 @@ func Nameserver10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(ednsResponseError) > 0 {
-		if err := appendLog(&results, testcase, "N10_EDNS_RESPONSE_ERROR", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "N10_EDNS_RESPONSE_ERROR", map[string]any{
 			"ns_ip_list": strings.Join(sortedStrings(ednsResponseError), ";"),
 		}); err != nil {
 			return results, err
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Nameserver11 runs the NAMESERVER11 test case.
 func Nameserver11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Nameserver11"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -1431,7 +1409,7 @@ func Nameserver11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(noResponse) > 0 {
-		if err := appendLog(&results, testcase, "N11_NO_RESPONSE", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "N11_NO_RESPONSE", map[string]any{
 			"ns_ip_list": strings.Join(sortedStrings(noResponse), ";"),
 		}); err != nil {
 			return results, err
@@ -1446,7 +1424,7 @@ func Nameserver11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		sort.Strings(keys)
 		for _, rcode := range keys {
 			list := sortedStrings(unexpectedRcode[rcode])
-			if err := appendLog(&results, testcase, "N11_UNEXPECTED_RCODE", map[string]any{
+			if err := appendLog(ctx, &results, testcase, "N11_UNEXPECTED_RCODE", map[string]any{
 				"rcode":      rcode,
 				"ns_ip_list": strings.Join(list, ";"),
 			}); err != nil {
@@ -1456,7 +1434,7 @@ func Nameserver11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(noEdns) > 0 {
-		if err := appendLog(&results, testcase, "N11_NO_EDNS", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "N11_NO_EDNS", map[string]any{
 			"ns_ip_list": strings.Join(sortedStrings(noEdns), ";"),
 		}); err != nil {
 			return results, err
@@ -1464,7 +1442,7 @@ func Nameserver11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(unexpectedAnswer) > 0 {
-		if err := appendLog(&results, testcase, "N11_UNEXPECTED_ANSWER_SECTION", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "N11_UNEXPECTED_ANSWER_SECTION", map[string]any{
 			"ns_ip_list": strings.Join(sortedStrings(unexpectedAnswer), ";"),
 		}); err != nil {
 			return results, err
@@ -1472,7 +1450,7 @@ func Nameserver11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(unsetAA) > 0 {
-		if err := appendLog(&results, testcase, "N11_UNSET_AA", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "N11_UNSET_AA", map[string]any{
 			"ns_ip_list": strings.Join(sortedStrings(unsetAA), ";"),
 		}); err != nil {
 			return results, err
@@ -1480,24 +1458,22 @@ func Nameserver11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(unknownOpt) > 0 {
-		if err := appendLog(&results, testcase, "N11_RETURNS_UNKNOWN_OPTION_CODE", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "N11_RETURNS_UNKNOWN_OPTION_CODE", map[string]any{
 			"ns_ip_list": strings.Join(sortedStrings(unknownOpt), ";"),
 		}); err != nil {
 			return results, err
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Nameserver12 runs the NAMESERVER12 test case.
 func Nameserver12(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Nameserver12"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -1557,17 +1533,15 @@ func Nameserver12(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		results = append(results, entries...)
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Nameserver13 runs the NAMESERVER13 test case.
 func Nameserver13(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Nameserver13"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -1638,17 +1612,15 @@ func Nameserver13(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		results = append(results, entries...)
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Nameserver15 runs the NAMESERVER15 test case.
 func Nameserver15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Nameserver15"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -1784,7 +1756,7 @@ func Nameserver15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			sort.Strings(queryNames)
 			for _, queryName := range queryNames {
 				list := sortedStrings(queries[queryName])
-				if err := appendLog(&results, testcase, "N15_SOFTWARE_VERSION", map[string]any{
+				if err := appendLog(ctx, &results, testcase, "N15_SOFTWARE_VERSION", map[string]any{
 					"string":     value,
 					"query_name": queryName,
 					"ns_list":    strings.Join(list, ";"),
@@ -1803,7 +1775,7 @@ func Nameserver15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		sort.Strings(queryNames)
 		for _, queryName := range queryNames {
 			list := sortedStrings(errorOnVersionQuery[queryName])
-			if err := appendLog(&results, testcase, "N15_ERROR_ON_VERSION_QUERY", map[string]any{
+			if err := appendLog(ctx, &results, testcase, "N15_ERROR_ON_VERSION_QUERY", map[string]any{
 				"query_name": queryName,
 				"ns_list":    strings.Join(list, ";"),
 			}); err != nil {
@@ -1813,7 +1785,7 @@ func Nameserver15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(sendingVersionQuery) > 0 {
-		if err := appendLog(&results, testcase, "N15_NO_VERSION_REVEALED", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "N15_NO_VERSION_REVEALED", map[string]any{
 			"ns_list": strings.Join(sortedKeys(sendingVersionQuery), ";"),
 		}); err != nil {
 			return results, err
@@ -1821,14 +1793,14 @@ func Nameserver15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(wrongRecordClass) > 0 {
-		if err := appendLog(&results, testcase, "N15_WRONG_CLASS", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "N15_WRONG_CLASS", map[string]any{
 			"ns_list": strings.Join(sortedKeys(wrongRecordClass), ";"),
 		}); err != nil {
 			return results, err
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 func normalizedAnswer(resp packet.Packet) string {
@@ -1906,15 +1878,15 @@ func uniqueServersByKey(nss []ns.Nameserver) []ns.Nameserver {
 	return unique
 }
 
-func appendTestCaseEnd(results []*logger.Entry, testcase string) ([]*logger.Entry, error) {
-	if err := appendLog(&results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
+func appendTestCaseEnd(ctx context.Context, results []*logger.Entry, testcase string) ([]*logger.Entry, error) {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 	return results, nil
 }
 
-func appendLog(results *[]*logger.Entry, testcase string, tag string, args map[string]any) error {
-	entry, err := util.Logger().Add(tag, args, moduleName, testcase)
+func appendLog(ctx context.Context, results *[]*logger.Entry, testcase string, tag string, args map[string]any) error {
+	entry, err := util.LoggerFromContext(ctx).Add(tag, args, moduleName, testcase)
 	if err != nil {
 		return err
 	}

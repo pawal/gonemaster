@@ -7,8 +7,6 @@ import (
 	"sort"
 	"strings"
 	"time"
-
-	"codeberg.org/pawal/gonemaster/engine/profile"
 )
 
 var numericLevels = map[string]int{
@@ -22,9 +20,7 @@ var numericLevels = map[string]int{
 	"CRITICAL": 5,
 }
 
-var startTime = time.Now()
-
-var testLevelsConfig map[string]map[string]string
+var defaultStartTime = time.Now()
 
 // Entry represents a single log entry.
 type Entry struct {
@@ -34,12 +30,17 @@ type Entry struct {
 	Testcase  string
 	Module    string
 
-	level    string
-	levelSet bool
+	level       string
+	levelSet    bool
+	levelConfig map[string]map[string]string
 }
 
 // NewEntry constructs a log entry with timestamp and metadata.
 func NewEntry(tag string, args map[string]any, testcase string, module string) (*Entry, error) {
+	return newEntryWithTimestamp(tag, args, testcase, module, time.Since(defaultStartTime).Seconds(), nil)
+}
+
+func newEntryWithTimestamp(tag string, args map[string]any, testcase string, module string, timestamp float64, levelConfig map[string]map[string]string) (*Entry, error) {
 	if tag == "" {
 		return nil, fmt.Errorf("tag is required")
 	}
@@ -50,11 +51,12 @@ func NewEntry(tag string, args map[string]any, testcase string, module string) (
 		return nil, fmt.Errorf("module is required")
 	}
 	entry := &Entry{
-		Tag:       strings.ToUpper(tag),
-		Args:      args,
-		Timestamp: time.Since(startTime).Seconds(),
-		Testcase:  testcase,
-		Module:    module,
+		Tag:         strings.ToUpper(tag),
+		Args:        args,
+		Timestamp:   timestamp,
+		Testcase:    testcase,
+		Module:      module,
+		levelConfig: levelConfig,
 	}
 	return entry, nil
 }
@@ -68,16 +70,9 @@ func (e *Entry) Level() string {
 		return e.level
 	}
 
-	configMu.Lock()
-	if testLevelsConfig == nil {
-		testLevelsConfig = profile.Effective().TestLevels
-	}
-	levelConfig := testLevelsConfig
-	configMu.Unlock()
-
 	level := "DEBUG"
-	if levelConfig != nil {
-		moduleLevels := levelConfig[strings.ToUpper(e.Module)]
+	if e.levelConfig != nil {
+		moduleLevels := e.levelConfig[strings.ToUpper(e.Module)]
 		if moduleLevels != nil {
 			if value, ok := moduleLevels[strings.ToUpper(e.Tag)]; ok {
 				level = strings.ToUpper(value)
@@ -121,15 +116,11 @@ func Levels() map[string]int {
 
 // StartTimeNow resets the log start timestamp.
 func StartTimeNow() {
-	startTime = time.Now()
+	defaultStartTime = time.Now()
 }
 
-// ResetConfig clears cached config for log levels.
+// ResetConfig is kept for compatibility; per-run loggers hold their own config.
 func ResetConfig() {
-	configMu.Lock()
-	testLevelsConfig = nil
-	logFilter = nil
-	configMu.Unlock()
 }
 
 func (e *Entry) String() string {

@@ -13,8 +13,6 @@ import (
 )
 
 func TestAddDefaultsAndString(t *testing.T) {
-	StartTimeNow()
-
 	log := New()
 	entry, err := log.Add("custom", map[string]any{
 		"asn": []int{64500, 64501},
@@ -49,9 +47,9 @@ func TestAddDefaultsAndString(t *testing.T) {
 
 func TestLevelFromProfile(t *testing.T) {
 	defer profile.ResetEffective()
-	ResetConfig()
 
 	log := New()
+	log.SetProfile(profile.Effective())
 	entry, err := log.Add("TEST_CASE_START", nil, "Basic", "Basic01")
 	if err != nil {
 		t.Fatalf("add entry: %v", err)
@@ -62,8 +60,6 @@ func TestLevelFromProfile(t *testing.T) {
 }
 
 func TestJSONMinLevel(t *testing.T) {
-	ResetConfig()
-
 	log := New()
 	first, err := log.Add("FIRST", nil, "System", "Unspecified")
 	if err != nil {
@@ -103,7 +99,6 @@ func TestLevelsReturnsCopy(t *testing.T) {
 
 func TestLogFilterOverridesLevel(t *testing.T) {
 	defer profile.ResetEffective()
-	ResetConfig()
 
 	profile.Effective().LogFilter = map[string]map[string][]profile.LogFilterRule{
 		"SYSTEM": {
@@ -119,6 +114,7 @@ func TestLogFilterOverridesLevel(t *testing.T) {
 	}
 
 	log := New()
+	log.SetProfile(profile.Effective())
 	entry, err := log.Add("alert", map[string]any{"asn": 64501}, "", "")
 	if err != nil {
 		t.Fatalf("add entry: %v", err)
@@ -129,8 +125,6 @@ func TestLogFilterOverridesLevel(t *testing.T) {
 }
 
 func TestCallbackErrorAddsEntry(t *testing.T) {
-	ResetConfig()
-
 	log := New()
 	log.Callback = func(_ *Entry) error {
 		return fmt.Errorf("boom")
@@ -210,7 +204,6 @@ func TestCallbackRunsSerialized(t *testing.T) {
 
 func TestLevelUnknownPanics(t *testing.T) {
 	defer profile.ResetEffective()
-	ResetConfig()
 
 	profile.Effective().TestLevels = map[string]map[string]string{
 		"SYSTEM": {
@@ -218,7 +211,9 @@ func TestLevelUnknownPanics(t *testing.T) {
 		},
 	}
 
-	entry, err := NewEntry("ALERT", nil, "Case", "System")
+	log := New()
+	log.SetProfile(profile.Effective())
+	entry, err := log.Add("ALERT", nil, "System", "Case")
 	if err != nil {
 		t.Fatalf("new entry: %v", err)
 	}

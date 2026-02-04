@@ -75,10 +75,9 @@ func TestScrambleCasePreservesLetters(t *testing.T) {
 
 func TestInfoAddsEntry(t *testing.T) {
 	log := logger.New()
-	SetLogger(log)
-	t.Cleanup(func() { SetLogger(nil) })
+	ctx := logger.WithContext(context.Background(), log)
 
-	entry, err := Info("TEST_TAG", map[string]any{"value": "ok"})
+	entry, err := Info(ctx, "TEST_TAG", map[string]any{"value": "ok"})
 	if err != nil {
 		t.Fatalf("info: %v", err)
 	}

@@ -5,25 +5,45 @@ import (
 	"sync"
 )
 
-var globalQueryLimiter = &queryLimiter{}
+type limiterKey struct{}
 
-type queryLimiter struct {
+// Limiter caps the number of concurrent DNS queries.
+type Limiter struct {
 	mu     sync.Mutex
 	limit  int
 	tokens chan struct{}
 }
 
-// SetGlobalQueryLimit configures a process-wide limit for concurrent DNS queries.
+// NewLimiter returns a limiter configured with the given limit.
 // A limit <= 0 disables the limiter.
-func SetGlobalQueryLimit(limit int) {
-	globalQueryLimiter.set(limit)
+func NewLimiter(limit int) *Limiter {
+	l := &Limiter{}
+	l.SetLimit(limit)
+	return l
 }
 
-func resetGlobalQueryLimit() {
-	globalQueryLimiter.set(0)
+// WithLimiter stores l in ctx for downstream access.
+func WithLimiter(ctx context.Context, l *Limiter) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, limiterKey{}, l)
 }
 
-func (l *queryLimiter) set(limit int) {
+// LimiterFromContext returns the limiter stored in ctx, or nil.
+func LimiterFromContext(ctx context.Context) *Limiter {
+	if ctx == nil {
+		return nil
+	}
+	limiter, _ := ctx.Value(limiterKey{}).(*Limiter)
+	return limiter
+}
+
+// SetLimit configures the limiter.
+func (l *Limiter) SetLimit(limit int) {
+	if l == nil {
+		return
+	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -45,14 +65,22 @@ func (l *queryLimiter) set(limit int) {
 }
 
 func acquireQuerySlot(ctx context.Context) error {
-	return globalQueryLimiter.acquire(ctx)
+	limiter := LimiterFromContext(ctx)
+	if limiter == nil {
+		return nil
+	}
+	return limiter.acquire(ctx)
 }
 
-func releaseQuerySlot() {
-	globalQueryLimiter.release()
+func releaseQuerySlot(ctx context.Context) {
+	limiter := LimiterFromContext(ctx)
+	if limiter == nil {
+		return
+	}
+	limiter.release()
 }
 
-func (l *queryLimiter) acquire(ctx context.Context) error {
+func (l *Limiter) acquire(ctx context.Context) error {
 	l.mu.Lock()
 	tokens := l.tokens
 	l.mu.Unlock()
@@ -69,7 +97,7 @@ func (l *queryLimiter) acquire(ctx context.Context) error {
 	}
 }
 
-func (l *queryLimiter) release() {
+func (l *Limiter) release() {
 	l.mu.Lock()
 	tokens := l.tokens
 	l.mu.Unlock()

@@ -149,7 +149,7 @@ func (c *Client) Exchange(ctx context.Context, server string, msg *dns.Msg) (pac
 	if err := acquireQuerySlot(ctx); err != nil {
 		return packet.Packet{}, err
 	}
-	defer releaseQuerySlot()
+	defer releaseQuerySlot(ctx)
 
 	c.ApplyProfileDefaults(profile.FromContext(ctx))
 	prepared := c.prepareMessage(msg)

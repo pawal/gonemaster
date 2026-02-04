@@ -6,19 +6,18 @@ import (
 	"time"
 )
 
-func TestGlobalQueryLimiterBlocksUntilRelease(t *testing.T) {
-	resetGlobalQueryLimit()
-	SetGlobalQueryLimit(1)
-	t.Cleanup(resetGlobalQueryLimit)
+func TestLimiterBlocksUntilRelease(t *testing.T) {
+	limiter := NewLimiter(1)
+	ctx := WithLimiter(context.Background(), limiter)
 
-	if err := acquireQuerySlot(context.Background()); err != nil {
+	if err := acquireQuerySlot(ctx); err != nil {
 		t.Fatalf("acquire: %v", err)
 	}
 
 	done := make(chan struct{})
 	go func() {
-		if err := acquireQuerySlot(context.Background()); err == nil {
-			releaseQuerySlot()
+		if err := acquireQuerySlot(ctx); err == nil {
+			releaseQuerySlot(ctx)
 		}
 		close(done)
 	}()
@@ -29,7 +28,7 @@ func TestGlobalQueryLimiterBlocksUntilRelease(t *testing.T) {
 	case <-time.After(50 * time.Millisecond):
 	}
 
-	releaseQuerySlot()
+	releaseQuerySlot(ctx)
 
 	select {
 	case <-done:
@@ -38,17 +37,16 @@ func TestGlobalQueryLimiterBlocksUntilRelease(t *testing.T) {
 	}
 }
 
-func TestGlobalQueryLimiterHonorsContext(t *testing.T) {
-	resetGlobalQueryLimit()
-	SetGlobalQueryLimit(1)
-	t.Cleanup(resetGlobalQueryLimit)
+func TestLimiterHonorsContext(t *testing.T) {
+	limiter := NewLimiter(1)
+	ctx := WithLimiter(context.Background(), limiter)
 
-	if err := acquireQuerySlot(context.Background()); err != nil {
+	if err := acquireQuerySlot(ctx); err != nil {
 		t.Fatalf("acquire: %v", err)
 	}
-	defer releaseQuerySlot()
+	defer releaseQuerySlot(ctx)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Millisecond)
 	defer cancel()
 
 	if err := acquireQuerySlot(ctx); err == nil {

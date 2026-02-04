@@ -366,7 +366,8 @@ func Run(req RunRequest) ([]LogEntry, error) {
 	if p.Resolver.Defaults.Unordered && queryLimit > 1 {
 		queryLimit = queryLimit * queryLimit
 	}
-	transport.SetGlobalQueryLimit(queryLimit)
+	limiter := transport.NewLimiter(queryLimit)
+	ctx = transport.WithLimiter(ctx, limiter)
 	if autoDisabledIPv6 {
 		if _, err := log.AddWithoutCallback("IPV6_DISABLED", map[string]any{"reason": "auto_no_global_ipv6"}, "", ""); err != nil {
 			return nil, err
@@ -377,10 +378,10 @@ func Run(req RunRequest) ([]LogEntry, error) {
 	}
 
 	runner := &Runner{
-		Profile:    p,
-		Logger:     log,
-		QueryLimit: queryLimit,
-		StartedAt:  time.Now(),
+		Profile:   p,
+		Logger:    log,
+		Limiter:   limiter,
+		StartedAt: time.Now(),
 	}
 	ctx = WithRunner(ctx, runner)
 

@@ -6,18 +6,19 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/transport"
 )
 
 // Runner holds per-run state. Minimal contract used by modules/tests:
 // - Profile: effective profile for the run
 // - Logger: per-run logger instance
-// - QueryLimit: effective query limiter for DNS calls
+// - Limiter: effective query limiter for DNS calls
 // - StartedAt: run start time
 type Runner struct {
-	Profile    *profile.Profile
-	Logger     *logger.Logger
-	QueryLimit int
-	StartedAt  time.Time
+	Profile   *profile.Profile
+	Logger    *logger.Logger
+	Limiter   *transport.Limiter
+	StartedAt time.Time
 }
 
 type runnerKey struct{}

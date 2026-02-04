@@ -10,6 +10,7 @@ import (
 
 	"github.com/miekg/dns"
 
+	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 )
@@ -370,38 +371,29 @@ func TestEmptyCache(t *testing.T) {
 }
 
 func TestQueryLogging(t *testing.T) {
-	// Reset log hook after test
-	defer SetLogFunc(nil)
-
 	ns, err := New("ns.example", "127.0.0.1", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
 
-	var loggedEntries []struct {
-		tag  string
-		args map[string]any
-	}
-	SetLogFunc(func(tag string, args map[string]any, module, testcase string) (any, error) {
-		loggedEntries = append(loggedEntries, struct {
-			tag  string
-			args map[string]any
-		}{tag, args})
-		return nil, nil
-	})
+	log := logger.New()
+	ctx := logger.WithContext(context.Background(), log)
 
 	// Use a very short timeout since we expect network failure
 	timeout := 10 * time.Millisecond
 	opts := &QueryOptions{Timeout: &timeout}
 
 	// This query will likely fail due to no server at 127.0.0.1:53, but logging happens before exchange
-	_, _ = ns.QueryWithOptions(context.Background(), "example.com", "SOA", opts)
+	_, _ = ns.QueryWithOptions(ctx, "example.com", "SOA", opts)
 
 	var foundQuery bool
-	for _, entry := range loggedEntries {
-		if entry.tag == "EXTERNAL_QUERY" {
+	for _, entry := range log.Entries() {
+		if entry == nil {
+			continue
+		}
+		if entry.Tag == "EXTERNAL_QUERY" {
 			foundQuery = true
-			loggedArgs := entry.args
+			loggedArgs := entry.Args
 			if name, ok := loggedArgs["name"]; !ok || name != "example.com" {
 				t.Errorf("expected name=example.com, got %v", name)
 			}
@@ -419,6 +411,6 @@ func TestQueryLogging(t *testing.T) {
 	}
 
 	if !foundQuery {
-		t.Errorf("expected EXTERNAL_QUERY tag, got %v", loggedEntries)
+		t.Errorf("expected EXTERNAL_QUERY tag, got %v", log.Entries())
 	}
 }

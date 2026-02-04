@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"net/netip"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/transport"
@@ -25,20 +25,7 @@ type Nameserver struct {
 	state   *nsState
 }
 
-// LogFunc is the function signature for logging callbacks.
-type LogFunc func(tag string, args map[string]any, module string, testcase string) (any, error)
-
-var (
-	logFuncMu sync.RWMutex
-	logFunc   LogFunc
-)
-
-// SetLogFunc sets the logging callback for the nameserver package.
-func SetLogFunc(f LogFunc) {
-	logFuncMu.Lock()
-	logFunc = f
-	logFuncMu.Unlock()
-}
+const systemModuleName = "System"
 
 // QueryOptions configures per-query settings that mirror Perl flags.
 type QueryOptions struct {
@@ -159,19 +146,14 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	usevc := resolveUseVC(opts)
 	if errorCacheTTL := prof.Resolver.Defaults.ErrorCacheTTL; errorCacheTTL > 0 && ns.state != nil && ns.state.errorCache != nil {
 		if skip, remaining := ns.state.errorCache.shouldSkip(errorCacheKey(usevc)); skip {
-			logFuncMu.RLock()
-			if logFunc != nil {
-				args := map[string]any{
-					"ip":          ns.Address.String(),
-					"protocol":    errorCacheProtocol(usevc),
-					"ttl_seconds": int(remaining.Seconds()),
-					"query_name":  qname,
-					"query_type":  qtype,
-					"query_class": qclass,
-				}
-				_, _ = logFunc("ERROR_CACHE_SKIP", args, "System", "")
-			}
-			logFuncMu.RUnlock()
+			logSystem(ctx, "ERROR_CACHE_SKIP", map[string]any{
+				"ip":          ns.Address.String(),
+				"protocol":    errorCacheProtocol(usevc),
+				"ttl_seconds": int(remaining.Seconds()),
+				"query_name":  qname,
+				"query_type":  qtype,
+				"query_class": qclass,
+			})
 			return packet.Packet{}, nil
 		}
 	}
@@ -242,52 +224,51 @@ func (ns Nameserver) queryNetwork(ctx context.Context, qname string, qtype strin
 	server := ns.Address.String()
 
 	// Emit EXTERNAL_QUERY log entry
-	logFuncMu.RLock()
-	if logFunc != nil {
-		args := map[string]any{
-			"name":  qname,
-			"type":  qtype,
-			"ip":    ns.Address.String(),
-			"flags": fmt.Sprintf(`{"class":%q}`, qclass),
-		}
-		_, _ = logFunc("EXTERNAL_QUERY", args, "System", "")
-	}
-	logFuncMu.RUnlock()
+	logSystem(ctx, "EXTERNAL_QUERY", map[string]any{
+		"name":  qname,
+		"type":  qtype,
+		"ip":    ns.Address.String(),
+		"flags": fmt.Sprintf(`{"class":%q}`, qclass),
+	})
 
 	resp, err := client.Exchange(ctx, server, msg)
 
-	logFuncMu.RLock()
-	if logFunc != nil {
-		args := map[string]any{
-			"name":  qname,
-			"type":  qtype,
-			"ip":    ns.Address.String(),
-			"flags": fmt.Sprintf(`{"class":%q}`, qclass),
-		}
-		if resp.Msg != nil {
-			args["rcode"] = dns.RcodeToString[resp.Msg.Rcode]
-			args["answers"] = len(resp.Msg.Answer)
-			args["authority"] = len(resp.Msg.Ns)
-			args["additional"] = len(resp.Msg.Extra)
-			args["aa"] = resp.Msg.Authoritative
-			args["tc"] = resp.Msg.Truncated
-			args["rd"] = resp.Msg.RecursionDesired
-			args["ra"] = resp.Msg.RecursionAvailable
-			args["ad"] = resp.Msg.AuthenticatedData
-			args["cd"] = resp.Msg.CheckingDisabled
-		}
-		if err != nil {
-			args["exception"] = err.Error()
-		}
-		if resp.Msg == nil && err == nil {
-			_, _ = logFunc("EMPTY_RETURN", args, "System", "")
-		} else {
-			_, _ = logFunc("EXTERNAL_RESPONSE", args, "System", "")
-		}
+	args := map[string]any{
+		"name":  qname,
+		"type":  qtype,
+		"ip":    ns.Address.String(),
+		"flags": fmt.Sprintf(`{"class":%q}`, qclass),
 	}
-	logFuncMu.RUnlock()
+	if resp.Msg != nil {
+		args["rcode"] = dns.RcodeToString[resp.Msg.Rcode]
+		args["answers"] = len(resp.Msg.Answer)
+		args["authority"] = len(resp.Msg.Ns)
+		args["additional"] = len(resp.Msg.Extra)
+		args["aa"] = resp.Msg.Authoritative
+		args["tc"] = resp.Msg.Truncated
+		args["rd"] = resp.Msg.RecursionDesired
+		args["ra"] = resp.Msg.RecursionAvailable
+		args["ad"] = resp.Msg.AuthenticatedData
+		args["cd"] = resp.Msg.CheckingDisabled
+	}
+	if err != nil {
+		args["exception"] = err.Error()
+	}
+	if resp.Msg == nil && err == nil {
+		logSystem(ctx, "EMPTY_RETURN", args)
+	} else {
+		logSystem(ctx, "EXTERNAL_RESPONSE", args)
+	}
 
 	return resp, err
+}
+
+func logSystem(ctx context.Context, tag string, args map[string]any) {
+	log := logger.FromContext(ctx)
+	if log == nil {
+		return
+	}
+	_, _ = log.Add(tag, args, systemModuleName, "")
 }
 
 func (ns Nameserver) clientForOptions(ctx context.Context, opts *QueryOptions) (*transport.Client, error) {

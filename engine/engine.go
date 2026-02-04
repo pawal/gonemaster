@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine/logger"
-	ens "codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 	address "codeberg.org/pawal/gonemaster/engine/test/address"
 	"codeberg.org/pawal/gonemaster/engine/test/basic"
@@ -355,10 +354,6 @@ func Run(req RunRequest) ([]LogEntry, error) {
 		return nil, err
 	}
 	log.SetProfile(p)
-	ens.SetLogFunc(func(tag string, args map[string]any, module string, testcase string) (any, error) {
-		return log.Add(tag, args, module, testcase)
-	})
-	defer ens.SetLogFunc(nil)
 
 	ctx := req.Context
 	if ctx == nil {

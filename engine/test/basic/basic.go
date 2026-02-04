@@ -27,7 +27,7 @@ const moduleName = "Basic"
 func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var results []*logger.Entry
 
-	if util.ShouldRunTest("basic01") {
+	if util.ShouldRunTest(ctx, "basic01") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Basic01(ctx, z)
 		})
@@ -41,7 +41,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	var authResponseSOA bool
-	if util.ShouldRunTest("basic02") {
+	if util.ShouldRunTest(ctx, "basic02") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Basic02(ctx, z)
 		})
@@ -52,9 +52,9 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		authResponseSOA = hasTag(results, "B02_AUTH_RESPONSE_SOA")
 	}
 
-	if util.ShouldRunTest("basic03") {
+	if util.ShouldRunTest(ctx, "basic03") {
 		if authResponseSOA {
-			if err := appendLog(&results, "Basic03", "HAS_NAMESERVER_NO_WWW_A_TEST", map[string]any{
+			if err := appendLog(ctx, &results, "Basic03", "HAS_NAMESERVER_NO_WWW_A_TEST", map[string]any{
 				"zname": z.Name.String(),
 			}); err != nil {
 				return results, err
@@ -74,8 +74,8 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 }
 
 // CanContinue reports whether later test cases can proceed based on Basic02.
-func CanContinue(z *zone.Zone, results []*logger.Entry) bool {
-	if util.ShouldRunTest("basic02") {
+func CanContinue(ctx context.Context, z *zone.Zone, results []*logger.Entry) bool {
+	if util.ShouldRunTest(ctx, "basic02") {
 		tags := map[string]bool{}
 		for _, entry := range results {
 			if entry == nil {
@@ -140,21 +140,19 @@ func Metadata() map[string][]string {
 func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Basic01"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
 	if z.Name.String() == "." {
-		if err := appendLog(&results, testcase, "B01_CHILD_FOUND", map[string]any{"domain": z.Name.String()}); err != nil {
+		if err := appendLog(ctx, &results, testcase, "B01_CHILD_FOUND", map[string]any{"domain": z.Name.String()}); err != nil {
 			return results, err
 		}
-		if err := appendLog(&results, testcase, "B01_ROOT_HAS_NO_PARENT", map[string]any{}); err != nil {
+		if err := appendLog(ctx, &results, testcase, "B01_ROOT_HAS_NO_PARENT", map[string]any{}); err != nil {
 			return results, err
 		}
-		return appendTestCaseEnd(results, testcase)
+		return appendTestCaseEnd(ctx, results, testcase)
 	}
 
 	rec := z.Recursor()
@@ -163,13 +161,13 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if rec.HasFakeAddresses(z.Name.String()) {
-		if err := appendLog(&results, testcase, "B01_CHILD_FOUND", map[string]any{"domain": z.Name.String()}); err != nil {
+		if err := appendLog(ctx, &results, testcase, "B01_CHILD_FOUND", map[string]any{"domain": z.Name.String()}); err != nil {
 			return results, err
 		}
-		if err := appendLog(&results, testcase, "B01_PARENT_DISREGARDED", map[string]any{}); err != nil {
+		if err := appendLog(ctx, &results, testcase, "B01_PARENT_DISREGARDED", map[string]any{}); err != nil {
 			return results, err
 		}
-		return appendTestCaseEnd(results, testcase)
+		return appendTestCaseEnd(ctx, results, testcase)
 	}
 
 	handledServers := map[string]map[string]bool{}
@@ -182,7 +180,7 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	aaDname := map[string]map[string]map[string]bool{}
 	aaNodata := map[string]map[string]bool{}
 
-	root, err := rec.RootServers()
+	root, err := rec.RootServers(ctx)
 	if err != nil {
 		return results, err
 	}
@@ -209,20 +207,20 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				continue serverLoop
 			}
 
-			disabled, err := ipDisabledMessage(&results, testcase, ns, "SOA", "NS", "DNAME")
+			disabled, err := ipDisabledMessage(ctx, &results, testcase, ns, "SOA", "NS", "DNAME")
 			if err != nil {
 				return results, err
 			}
 			if disabled {
 				continue serverLoop
 			}
-			if err := ipEnabledMessage(&results, testcase, ns, "SOA", "NS", "DNAME"); err != nil {
+			if err := ipEnabledMessage(ctx, &results, testcase, ns, "SOA", "NS", "DNAME"); err != nil {
 				return results, err
 			}
 
 			pSOA, err := ns.Query(ctx, zoneName, "SOA")
 			if err != nil || pSOA.Msg == nil || pSOA.Rcode() != "NOERROR" || !pSOA.AA() || len(pSOA.GetRecordsForName("SOA", dnsname.New(zoneName), "answer")) != 1 {
-				if err := appendLog(&results, testcase, "B01_SERVER_ZONE_ERROR", map[string]any{
+				if err := appendLog(ctx, &results, testcase, "B01_SERVER_ZONE_ERROR", map[string]any{
 					"query_name": zoneName,
 					"rrtype":     "SOA",
 					"ns":         ns.String(),
@@ -234,7 +232,7 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 			pNS, err := ns.Query(ctx, zoneName, "NS")
 			if err != nil || pNS.Msg == nil || pNS.Rcode() != "NOERROR" || !pNS.AA() || len(pNS.GetRecords("NS", "answer")) == 0 || len(pNS.GetRecords("NS", "answer")) != len(pNS.GetRecordsForName("NS", dnsname.New(zoneName), "answer")) {
-				if err := appendLog(&results, testcase, "B01_SERVER_ZONE_ERROR", map[string]any{
+				if err := appendLog(ctx, &results, testcase, "B01_SERVER_ZONE_ERROR", map[string]any{
 					"query_name": zoneName,
 					"rrtype":     "NS",
 					"ns":         ns.String(),
@@ -283,7 +281,7 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					if handledServers[zoneName] != nil && handledServers[zoneName][addr.String()] {
 						continue
 					}
-					nsObj, err := nameserver.New(nsName, addr.String(), rec.Client())
+					nsObj, err := nameserver.NewWithContext(ctx, nsName, addr.String(), rec.Client())
 					if err != nil {
 						continue
 					}
@@ -302,13 +300,13 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			for {
 				loopCount++
 				if loopCount >= 1000 {
-					_, _ = util.Logger().Add("LOOP_PROTECTION", map[string]any{
+					_, _ = util.LoggerFromContext(ctx).Add("LOOP_PROTECTION", map[string]any{
 						"caller":                  "basic.Basic01",
 						"child_zone_name":         z.Name.String(),
 						"name":                    loopZoneName,
 						"intermediate_query_name": intermediate.String(),
-					}, "", testcase)
-					return appendTestCaseEnd(results, testcase)
+					}, moduleName, testcase)
+					return appendTestCaseEnd(ctx, results, testcase)
 				}
 
 				if len(intermediate.Labels()) >= len(zoneLabels) {
@@ -319,7 +317,7 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 				pSOA, err = ns.Query(ctx, intermediate.String(), "SOA")
 				if err != nil || pSOA.Msg == nil {
-					if err := appendLog(&results, testcase, "B01_SERVER_ZONE_ERROR", map[string]any{
+					if err := appendLog(ctx, &results, testcase, "B01_SERVER_ZONE_ERROR", map[string]any{
 						"query_name": intermediate.String(),
 						"rrtype":     "SOA",
 						"ns":         ns.String(),
@@ -336,7 +334,7 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					} else {
 						pNS, err = ns.Query(ctx, intermediate.String(), "NS")
 						if err != nil || pNS.Msg == nil || pNS.Rcode() != "NOERROR" || !pNS.AA() || len(pNS.GetRecords("NS", "answer")) == 0 || len(pNS.GetRecords("NS", "answer")) != len(pNS.GetRecordsForName("NS", intermediate, "answer")) {
-							if err := appendLog(&results, testcase, "B01_SERVER_ZONE_ERROR", map[string]any{
+							if err := appendLog(ctx, &results, testcase, "B01_SERVER_ZONE_ERROR", map[string]any{
 								"query_name": intermediate.String(),
 								"rrtype":     "NS",
 								"ns":         ns.String(),
@@ -385,7 +383,7 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 								if handledServers[intermediate.String()] != nil && handledServers[intermediate.String()][addr.String()] {
 									continue
 								}
-								nsObj, err := nameserver.New(nsName, addr.String(), rec.Client())
+								nsObj, err := nameserver.NewWithContext(ctx, nsName, addr.String(), rec.Client())
 								if err != nil {
 									continue
 								}
@@ -448,7 +446,7 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 								if handledServers[intermediate.String()] != nil && handledServers[intermediate.String()][addr.String()] {
 									continue
 								}
-								nsObj, err := nameserver.New(nsName, addr.String(), rec.Client())
+								nsObj, err := nameserver.NewWithContext(ctx, nsName, addr.String(), rec.Client())
 								if err != nil {
 									continue
 								}
@@ -491,7 +489,7 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					addNS(parentFound, loopZoneName, ns.String())
 					addNS(cnameWithReferral, loopZoneName, ns.String())
 				} else {
-					if err := appendLog(&results, testcase, "B01_SERVER_ZONE_ERROR", map[string]any{
+					if err := appendLog(ctx, &results, testcase, "B01_SERVER_ZONE_ERROR", map[string]any{
 						"query_name": intermediate.String(),
 						"rrtype":     "SOA",
 						"ns":         ns.String(),
@@ -507,7 +505,7 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	if len(parentFound) > 0 {
 		for domain, nsMap := range parentFound {
-			if err := appendLog(&results, testcase, "B01_PARENT_FOUND", map[string]any{
+			if err := appendLog(ctx, &results, testcase, "B01_PARENT_FOUND", map[string]any{
 				"domain":  domain,
 				"ns_list": joinSorted(nsMap),
 			}); err != nil {
@@ -519,20 +517,20 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			for _, nsMap := range parentFound {
 				mergeSet(nsSet, nsMap)
 			}
-			if err := appendLog(&results, testcase, "B01_PARENT_UNDETERMINED", map[string]any{
+			if err := appendLog(ctx, &results, testcase, "B01_PARENT_UNDETERMINED", map[string]any{
 				"ns_list": joinSorted(nsSet),
 			}); err != nil {
 				return results, err
 			}
 		}
 	} else {
-		if err := appendLog(&results, testcase, "B01_PARENT_NOT_FOUND", map[string]any{}); err != nil {
+		if err := appendLog(ctx, &results, testcase, "B01_PARENT_NOT_FOUND", map[string]any{}); err != nil {
 			return results, err
 		}
 	}
 
 	if len(delegationFound) > 0 || len(aaSOA) > 0 {
-		if err := appendLog(&results, testcase, "B01_CHILD_FOUND", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "B01_CHILD_FOUND", map[string]any{
 			"domain": z.Name.String(),
 		}); err != nil {
 			return results, err
@@ -557,7 +555,7 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				for _, perTarget := range aaDname {
 					mergeSet(nsSet, perTarget[parent])
 				}
-				if err := appendLog(&results, testcase, "B01_INCONSISTENT_DELEGATION", map[string]any{
+				if err := appendLog(ctx, &results, testcase, "B01_INCONSISTENT_DELEGATION", map[string]any{
 					"domain_parent": parent,
 					"domain_child":  z.Name.String(),
 					"ns_list":       joinSorted(nsSet),
@@ -570,14 +568,14 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	if len(delegationFound) == 0 && len(aaSOA) == 0 {
 		if rec.HasFakeAddresses(z.Name.String()) {
-			if err := appendLog(&results, testcase, "B01_CHILD_NOT_EXIST", map[string]any{
+			if err := appendLog(ctx, &results, testcase, "B01_CHILD_NOT_EXIST", map[string]any{
 				"domain": z.Name.String(),
 			}); err != nil {
 				return results, err
 			}
 		} else {
 			parent, _ := z.Name.NextHigher()
-			if err := appendLog(&results, testcase, "B01_NO_CHILD", map[string]any{
+			if err := appendLog(ctx, &results, testcase, "B01_NO_CHILD", map[string]any{
 				"domain_child": z.Name.String(),
 				"domain_super": parent.String(),
 			}); err != nil {
@@ -592,7 +590,7 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			for _, nsMap := range perParent {
 				mergeSet(nsSet, nsMap)
 			}
-			if err := appendLog(&results, testcase, "B01_CHILD_IS_ALIAS", map[string]any{
+			if err := appendLog(ctx, &results, testcase, "B01_CHILD_IS_ALIAS", map[string]any{
 				"domain_child":  z.Name.String(),
 				"domain_target": target,
 				"ns_list":       joinSorted(nsSet),
@@ -601,7 +599,7 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 		if len(aaDname) > 1 {
-			if err := appendLog(&results, testcase, "B01_INCONSISTENT_ALIAS", map[string]any{
+			if err := appendLog(ctx, &results, testcase, "B01_INCONSISTENT_ALIAS", map[string]any{
 				"domain": z.Name.String(),
 			}); err != nil {
 				return results, err
@@ -609,17 +607,15 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Basic02 runs the BASIC02 test case.
 func Basic02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Basic02"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -633,12 +629,12 @@ func Basic02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(nsNames) == 0 {
-		if err := appendLog(&results, testcase, "B02_NO_DELEGATION", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "B02_NO_DELEGATION", map[string]any{
 			"domain": z.Name.String(),
 		}); err != nil {
 			return results, err
 		}
-		return appendTestCaseEnd(results, testcase)
+		return appendTestCaseEnd(ctx, results, testcase)
 	}
 
 	nsBroken := map[string]bool{}
@@ -665,7 +661,7 @@ func Basic02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					continue
 				}
 				if addr, ok := addrFromRR(rr); ok {
-					nsObj, err := nameserver.New(nsName.String(), addr.String(), z.Recursor().Client())
+					nsObj, err := nameserver.NewWithContext(ctx, nsName.String(), addr.String(), z.Recursor().Client())
 					if err != nil {
 						continue
 					}
@@ -701,7 +697,7 @@ func Basic02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := nsOutcome{ns: ns}
 
-				if ns.Address.Is6() && !profile.Effective().Net.IPv6 {
+				if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 					if _, err := buf.Add("IPV6_DISABLED", map[string]any{"ns": ns.String(), "rrtype": "SOA"}); err != nil {
 						return err
 					}
@@ -709,7 +705,7 @@ func Basic02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					outcomes[i] = outcome
 					return nil
 				}
-				if ns.Address.Is4() && !profile.Effective().Net.IPv4 {
+				if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
 					if _, err := buf.Add("IPV4_DISABLED", map[string]any{"ns": ns.String(), "rrtype": "SOA"}); err != nil {
 						return err
 					}
@@ -718,12 +714,12 @@ func Basic02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					return nil
 				}
 
-				if ns.Address.Is6() && profile.Effective().Net.IPv6 {
+				if ns.Address.Is6() && profile.FromContext(ctx).Net.IPv6 {
 					if _, err := buf.Add("IPV6_ENABLED", map[string]any{"ns": ns.String(), "rrtype": "SOA"}); err != nil {
 						return err
 					}
 				}
-				if ns.Address.Is4() && profile.Effective().Net.IPv4 {
+				if ns.Address.Is4() && profile.FromContext(ctx).Net.IPv4 {
 					if _, err := buf.Add("IPV4_ENABLED", map[string]any{"ns": ns.String(), "rrtype": "SOA"}); err != nil {
 						return err
 					}
@@ -755,7 +751,7 @@ func Basic02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -783,41 +779,41 @@ func Basic02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(authResponseSOA) > 0 {
-		if err := appendLog(&results, testcase, "B02_AUTH_RESPONSE_SOA", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "B02_AUTH_RESPONSE_SOA", map[string]any{
 			"domain":  z.Name.String(),
 			"ns_list": joinSorted(authResponseSOA),
 		}); err != nil {
 			return results, err
 		}
 	} else {
-		if err := appendLog(&results, testcase, "B02_NO_WORKING_NS", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "B02_NO_WORKING_NS", map[string]any{
 			"domain": z.Name.String(),
 		}); err != nil {
 			return results, err
 		}
 
 		for ns := range nsBroken {
-			if err := appendLog(&results, testcase, "B02_NS_BROKEN", map[string]any{"ns": ns}); err != nil {
+			if err := appendLog(ctx, &results, testcase, "B02_NS_BROKEN", map[string]any{"ns": ns}); err != nil {
 				return results, err
 			}
 		}
 		for ns := range nsNotAuth {
-			if err := appendLog(&results, testcase, "B02_NS_NOT_AUTH", map[string]any{"ns": ns}); err != nil {
+			if err := appendLog(ctx, &results, testcase, "B02_NS_NOT_AUTH", map[string]any{"ns": ns}); err != nil {
 				return results, err
 			}
 		}
 		for nsName := range nsCantResolve {
-			if err := appendLog(&results, testcase, "B02_NS_NO_IP_ADDR", map[string]any{"nsname": nsName}); err != nil {
+			if err := appendLog(ctx, &results, testcase, "B02_NS_NO_IP_ADDR", map[string]any{"nsname": nsName}); err != nil {
 				return results, err
 			}
 		}
 		for ns := range nsNoResponse {
-			if err := appendLog(&results, testcase, "B02_NS_NO_RESPONSE", map[string]any{"ns": ns}); err != nil {
+			if err := appendLog(ctx, &results, testcase, "B02_NS_NO_RESPONSE", map[string]any{"ns": ns}); err != nil {
 				return results, err
 			}
 		}
 		for ns, rcode := range unexpectedRcode {
-			if err := appendLog(&results, testcase, "B02_UNEXPECTED_RCODE", map[string]any{
+			if err := appendLog(ctx, &results, testcase, "B02_UNEXPECTED_RCODE", map[string]any{
 				"rcode": rcode,
 				"ns":    ns,
 			}); err != nil {
@@ -826,17 +822,15 @@ func Basic02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Basic03 runs the BASIC03 test case.
 func Basic03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Basic03"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -860,14 +854,14 @@ func Basic03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := nsOutcome{}
 
-				if ns.Address.Is6() && !profile.Effective().Net.IPv6 {
+				if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 					if _, err := buf.Add("IPV6_DISABLED", map[string]any{"ns": ns.String(), "rrtype": "A"}); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
 					return nil
 				}
-				if ns.Address.Is4() && !profile.Effective().Net.IPv4 {
+				if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
 					if _, err := buf.Add("IPV4_DISABLED", map[string]any{"ns": ns.String(), "rrtype": "A"}); err != nil {
 						return err
 					}
@@ -875,12 +869,12 @@ func Basic03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					return nil
 				}
 
-				if ns.Address.Is6() && profile.Effective().Net.IPv6 {
+				if ns.Address.Is6() && profile.FromContext(ctx).Net.IPv6 {
 					if _, err := buf.Add("IPV6_ENABLED", map[string]any{"ns": ns.String(), "rrtype": "A"}); err != nil {
 						return err
 					}
 				}
-				if ns.Address.Is4() && profile.Effective().Net.IPv4 {
+				if ns.Address.Is4() && profile.FromContext(ctx).Net.IPv4 {
 					if _, err := buf.Add("IPV4_ENABLED", map[string]any{"ns": ns.String(), "rrtype": "A"}); err != nil {
 						return err
 					}
@@ -913,7 +907,7 @@ func Basic03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -928,24 +922,24 @@ func Basic03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 
 		if responseCount == 0 {
-			if err := appendLog(&results, testcase, "A_QUERY_NO_RESPONSES", map[string]any{}); err != nil {
+			if err := appendLog(ctx, &results, testcase, "A_QUERY_NO_RESPONSES", map[string]any{}); err != nil {
 				return results, err
 			}
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
-func appendTestCaseEnd(results []*logger.Entry, testcase string) ([]*logger.Entry, error) {
-	if err := appendLog(&results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
+func appendTestCaseEnd(ctx context.Context, results []*logger.Entry, testcase string) ([]*logger.Entry, error) {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 	return results, nil
 }
 
-func appendLog(results *[]*logger.Entry, testcase string, tag string, args map[string]any) error {
-	entry, err := util.Logger().Add(tag, args, moduleName, testcase)
+func appendLog(ctx context.Context, results *[]*logger.Entry, testcase string, tag string, args map[string]any) error {
+	entry, err := util.LoggerFromContext(ctx).Add(tag, args, moduleName, testcase)
 	if err != nil {
 		return err
 	}
@@ -953,10 +947,10 @@ func appendLog(results *[]*logger.Entry, testcase string, tag string, args map[s
 	return nil
 }
 
-func ipDisabledMessage(results *[]*logger.Entry, testcase string, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
-	if ns.Address.Is4() && !profile.Effective().Net.IPv4 {
+func ipDisabledMessage(ctx context.Context, results *[]*logger.Entry, testcase string, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
+	if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
 		for _, rrtype := range rrtypes {
-			if err := appendLog(results, testcase, "IPV4_DISABLED", map[string]any{
+			if err := appendLog(ctx, results, testcase, "IPV4_DISABLED", map[string]any{
 				"ns":     ns.String(),
 				"rrtype": rrtype,
 			}); err != nil {
@@ -965,9 +959,9 @@ func ipDisabledMessage(results *[]*logger.Entry, testcase string, ns nameserver.
 		}
 		return true, nil
 	}
-	if ns.Address.Is6() && !profile.Effective().Net.IPv6 {
+	if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 		for _, rrtype := range rrtypes {
-			if err := appendLog(results, testcase, "IPV6_DISABLED", map[string]any{
+			if err := appendLog(ctx, results, testcase, "IPV6_DISABLED", map[string]any{
 				"ns":     ns.String(),
 				"rrtype": rrtype,
 			}); err != nil {
@@ -979,10 +973,10 @@ func ipDisabledMessage(results *[]*logger.Entry, testcase string, ns nameserver.
 	return false, nil
 }
 
-func ipEnabledMessage(results *[]*logger.Entry, testcase string, ns nameserver.Nameserver, rrtypes ...string) error {
-	if ns.Address.Is4() && profile.Effective().Net.IPv4 {
+func ipEnabledMessage(ctx context.Context, results *[]*logger.Entry, testcase string, ns nameserver.Nameserver, rrtypes ...string) error {
+	if ns.Address.Is4() && profile.FromContext(ctx).Net.IPv4 {
 		for _, rrtype := range rrtypes {
-			if err := appendLog(results, testcase, "IPV4_ENABLED", map[string]any{
+			if err := appendLog(ctx, results, testcase, "IPV4_ENABLED", map[string]any{
 				"ns":     ns.String(),
 				"rrtype": rrtype,
 			}); err != nil {
@@ -990,9 +984,9 @@ func ipEnabledMessage(results *[]*logger.Entry, testcase string, ns nameserver.N
 			}
 		}
 	}
-	if ns.Address.Is6() && profile.Effective().Net.IPv6 {
+	if ns.Address.Is6() && profile.FromContext(ctx).Net.IPv6 {
 		for _, rrtype := range rrtypes {
-			if err := appendLog(results, testcase, "IPV6_ENABLED", map[string]any{
+			if err := appendLog(ctx, results, testcase, "IPV6_ENABLED", map[string]any{
 				"ns":     ns.String(),
 				"rrtype": rrtype,
 			}); err != nil {

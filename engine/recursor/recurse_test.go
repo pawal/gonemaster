@@ -34,7 +34,7 @@ func TestRecurseSkipsUpwardReferral(t *testing.T) {
 
 	state := &recurseState{
 		ns: []queryer{root},
-		nsFrom: func(resp packet.Packet, _ *recurseState) ([]queryer, error) {
+		nsFrom: func(_ context.Context, resp packet.Packet, _ *recurseState) ([]queryer, error) {
 			return next[resp.AnswerFrom], nil
 		},
 	}
@@ -67,7 +67,7 @@ func TestRecurseFollowsDownwardReferral(t *testing.T) {
 
 	state := &recurseState{
 		ns: []queryer{root},
-		nsFrom: func(resp packet.Packet, _ *recurseState) ([]queryer, error) {
+		nsFrom: func(_ context.Context, resp packet.Packet, _ *recurseState) ([]queryer, error) {
 			return next[resp.AnswerFrom], nil
 		},
 	}

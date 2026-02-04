@@ -25,12 +25,15 @@ func TestBuildQueryWithClass(t *testing.T) {
 }
 
 func TestApplyProfileDefaultsRecurse(t *testing.T) {
-	defer profile.ResetEffective()
-	profile.Effective().Resolver.Defaults.Recurse = true
-	profile.Effective().Resolver.Defaults.UseVC = true
+	prof, err := profile.Default()
+	if err != nil {
+		t.Fatalf("profile default: %v", err)
+	}
+	prof.Resolver.Defaults.Recurse = true
+	prof.Resolver.Defaults.UseVC = true
 
 	client := &Client{}
-	client.ApplyProfileDefaults(nil)
+	client.ApplyProfileDefaults(prof)
 
 	if !client.RecursionDesired {
 		t.Fatalf("expected recursion enabled from defaults")
@@ -41,12 +44,15 @@ func TestApplyProfileDefaultsRecurse(t *testing.T) {
 }
 
 func TestApplyProfileDefaultsDoesNotOverrideExplicit(t *testing.T) {
-	defer profile.ResetEffective()
-	profile.Effective().Resolver.Defaults.Recurse = false
+	prof, err := profile.Default()
+	if err != nil {
+		t.Fatalf("profile default: %v", err)
+	}
+	prof.Resolver.Defaults.Recurse = false
 
 	client := &Client{}
 	client.SetRecursionDesired(true)
-	client.ApplyProfileDefaults(nil)
+	client.ApplyProfileDefaults(prof)
 
 	if !client.RecursionDesired {
 		t.Fatalf("expected explicit recursion setting to remain true")

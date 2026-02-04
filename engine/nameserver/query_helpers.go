@@ -23,13 +23,15 @@ func (ns *Nameserver) AddFakeDelegation(domain string, data map[string][]string)
 	if ns == nil {
 		return fmt.Errorf("nameserver is nil")
 	}
-	if ns.state == nil {
-		ns.state = &nsState{
-			cache:           cacheForAddress(ns.Address.String()),
-			fakeDelegations: map[string]delegation{},
-			fakeDS:          map[string][]dns.RR{},
-			blacklisted:     map[bool]bool{},
-		}
+	ns.ensureState()
+	if ns.state.fakeDelegations == nil {
+		ns.state.fakeDelegations = map[string]delegation{}
+	}
+	if ns.state.fakeDS == nil {
+		ns.state.fakeDS = map[string][]dns.RR{}
+	}
+	if ns.state.blacklisted == nil {
+		ns.state.blacklisted = map[bool]bool{}
 	}
 
 	domainName := dnsname.New(domain)
@@ -97,13 +99,15 @@ func (ns *Nameserver) AddFakeDS(domain string, data []DSData) error {
 	if ns == nil {
 		return fmt.Errorf("nameserver is nil")
 	}
-	if ns.state == nil {
-		ns.state = &nsState{
-			cache:           cacheForAddress(ns.Address.String()),
-			fakeDelegations: map[string]delegation{},
-			fakeDS:          map[string][]dns.RR{},
-			blacklisted:     map[bool]bool{},
-		}
+	ns.ensureState()
+	if ns.state.fakeDelegations == nil {
+		ns.state.fakeDelegations = map[string]delegation{}
+	}
+	if ns.state.fakeDS == nil {
+		ns.state.fakeDS = map[string][]dns.RR{}
+	}
+	if ns.state.blacklisted == nil {
+		ns.state.blacklisted = map[bool]bool{}
 	}
 
 	domainName := dnsname.New(domain)

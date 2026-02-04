@@ -144,6 +144,13 @@ func (s *Server) runJob(jobID string) error {
 }
 
 func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntry, error) {
+	if s.engineLimiter != nil {
+		if err := s.engineLimiter.Acquire(ctx); err != nil {
+			return nil, err
+		}
+		defer s.engineLimiter.Release()
+	}
+
 	minLevel := s.cfg.MinLevel
 	if job.MinLevel != "" {
 		minLevel = job.MinLevel
@@ -152,6 +159,24 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 		Domain:   job.Domain,
 		MinLevel: minLevel,
 		Context:  ctx,
+	}
+	if s.cfg.PositiveCacheTTL != nil {
+		req.PositiveCacheTTL = s.cfg.PositiveCacheTTL
+	}
+	if s.cfg.NegativeCacheTTL != nil {
+		req.NegativeCacheTTL = s.cfg.NegativeCacheTTL
+	}
+	if s.cfg.Timeout != nil {
+		req.Timeout = s.cfg.Timeout
+	}
+	if s.cfg.Retry != nil {
+		req.Retry = s.cfg.Retry
+	}
+	if s.cfg.Retrans != nil {
+		req.Retrans = s.cfg.Retrans
+	}
+	if s.cfg.Fallback != nil {
+		req.Fallback = s.cfg.Fallback
 	}
 
 	cleanup, err := applyProfileOverrides(&req, job.Overrides, s.cfg.ProfilePath)
@@ -196,8 +221,6 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 }
 
 func (s *Server) runEngine(req engine.RunRequest) ([]engine.LogEntry, error) {
-	s.engineMu.Lock()
-	defer s.engineMu.Unlock()
 	if s.engineRunner != nil {
 		return s.engineRunner(req)
 	}

@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"net/netip"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/transport"
@@ -23,22 +23,10 @@ type Nameserver struct {
 	Address netip.Addr
 	Client  *transport.Client
 	state   *nsState
+	cache   *CacheStore
 }
 
-// LogFunc is the function signature for logging callbacks.
-type LogFunc func(tag string, args map[string]any, module string, testcase string) (any, error)
-
-var (
-	logFuncMu sync.RWMutex
-	logFunc   LogFunc
-)
-
-// SetLogFunc sets the logging callback for the nameserver package.
-func SetLogFunc(f LogFunc) {
-	logFuncMu.Lock()
-	logFunc = f
-	logFuncMu.Unlock()
-}
+const systemModuleName = "System"
 
 // QueryOptions configures per-query settings that mirror Perl flags.
 type QueryOptions struct {
@@ -57,6 +45,19 @@ type QueryOptions struct {
 
 // New creates a Nameserver from a name and IP address.
 func New(name string, address string, client *transport.Client) (Nameserver, error) {
+	return NewWithCache(defaultCache, name, address, client)
+}
+
+// NewWithContext creates a Nameserver using a cache store from ctx.
+func NewWithContext(ctx context.Context, name string, address string, client *transport.Client) (Nameserver, error) {
+	return NewWithCache(CacheFromContextOrDefault(ctx), name, address, client)
+}
+
+// NewWithCache creates a Nameserver using the supplied cache store.
+func NewWithCache(cache *CacheStore, name string, address string, client *transport.Client) (Nameserver, error) {
+	if cache == nil {
+		cache = defaultCache
+	}
 	addr, err := netip.ParseAddr(address)
 	if err != nil {
 		return Nameserver{}, fmt.Errorf("invalid nameserver address %q: %w", address, err)
@@ -74,13 +75,13 @@ func New(name string, address string, client *transport.Client) (Nameserver, err
 	nameKey = strings.ToLower(nameObj.String())
 
 	addrKey := addr.String()
-	if cached := cachedNameserver(nameKey, addrKey); cached != nil {
+	if cached := cache.cachedNameserver(nameKey, addrKey); cached != nil {
 		return *cached, nil
 	}
 
 	state := &nsState{
-		cache:           cacheForAddress(addrKey),
-		errorCache:      errorCacheForAddress(addrKey),
+		cache:           cache.cacheForAddress(addrKey),
+		errorCache:      cache.errorCacheForAddress(addrKey),
 		fakeDelegations: map[string]delegation{},
 		fakeDS:          map[string][]dns.RR{},
 		blacklisted:     map[bool]bool{},
@@ -91,8 +92,9 @@ func New(name string, address string, client *transport.Client) (Nameserver, err
 		Address: addr,
 		Client:  client,
 		state:   state,
+		cache:   cache,
 	}
-	storeNameserver(nameKey, addrKey, ns)
+	cache.storeNameserver(nameKey, addrKey, ns)
 	return *ns, nil
 }
 
@@ -124,7 +126,7 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	}
 	qclass = strings.ToUpper(qclass)
 
-	prof := profile.Effective()
+	prof := profile.FromContext(ctx)
 	if ns.Address.Is4() && !prof.Net.IPv4 {
 		return packet.Packet{}, nil
 	}
@@ -157,26 +159,58 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	}
 
 	usevc := resolveUseVC(opts)
-	if errorCacheTTL := prof.Resolver.Defaults.ErrorCacheTTL; errorCacheTTL > 0 && ns.state != nil && ns.state.errorCache != nil {
+	if ttl := resolveReachabilityTTL(prof, opts); ttl > 0 {
+		if skip, remaining := globalReachability.shouldSkip(ns.Address.String()); skip {
+			logSystem(ctx, "REACHABILITY_CACHE_SKIP", map[string]any{
+				"ip":          ns.Address.String(),
+				"protocol":    errorCacheProtocol(usevc),
+				"ttl_seconds": int(remaining.Seconds()),
+				"query_name":  qname,
+				"query_type":  qtype,
+				"query_class": qclass,
+			})
+			return packet.Packet{}, nil
+		}
+	}
+	if errorCacheTTL := resolveErrorCacheTTL(prof, opts); errorCacheTTL > 0 && ns.state != nil && ns.state.errorCache != nil {
 		if skip, remaining := ns.state.errorCache.shouldSkip(errorCacheKey(usevc)); skip {
-			logFuncMu.RLock()
-			if logFunc != nil {
-				args := map[string]any{
-					"ip":          ns.Address.String(),
-					"protocol":    errorCacheProtocol(usevc),
-					"ttl_seconds": int(remaining.Seconds()),
-					"query_name":  qname,
-					"query_type":  qtype,
-					"query_class": qclass,
-				}
-				_, _ = logFunc("ERROR_CACHE_SKIP", args, "System", "")
-			}
-			logFuncMu.RUnlock()
+			logSystem(ctx, "ERROR_CACHE_SKIP", map[string]any{
+				"ip":          ns.Address.String(),
+				"protocol":    errorCacheProtocol(usevc),
+				"ttl_seconds": int(remaining.Seconds()),
+				"query_name":  qname,
+				"query_type":  qtype,
+				"query_class": qclass,
+			})
 			return packet.Packet{}, nil
 		}
 	}
 	if constants.BlacklistingEnabled && ns.state != nil && ns.state.blacklisted[usevc] {
 		return packet.Packet{}, nil
+	}
+
+	var inflight *inflightQuery
+	if ns.state != nil && ns.state.cache != nil {
+		if existing, wait := ns.state.cache.waitOrRegister(cacheKey); wait {
+			if ctx == nil {
+				<-existing.done
+				if existing.resp == nil {
+					return packet.Packet{}, existing.err
+				}
+				return *existing.resp, existing.err
+			}
+			select {
+			case <-existing.done:
+				if existing.resp == nil {
+					return packet.Packet{}, existing.err
+				}
+				return *existing.resp, existing.err
+			case <-ctx.Done():
+				return packet.Packet{}, ctx.Err()
+			}
+		} else {
+			inflight = existing
+		}
 	}
 
 	resp, err := ns.queryNetwork(ctx, qname, qtype, qclass, opts)
@@ -188,17 +222,27 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 		}
 	}
 	if err != nil && (ctx == nil || ctx.Err() == nil) && ns.state != nil && ns.state.errorCache != nil {
-		if errorCacheTTL := prof.Resolver.Defaults.ErrorCacheTTL; errorCacheTTL > 0 {
-			ns.state.errorCache.set(errorCacheKey(usevc), time.Duration(errorCacheTTL)*time.Second)
+		if errorCacheTTL := resolveErrorCacheTTL(prof, opts); errorCacheTTL > 0 {
+			ns.state.errorCache.set(errorCacheKey(usevc), errorCacheTTL)
+		}
+	}
+	if err != nil && (ctx == nil || ctx.Err() == nil) && isHardNetworkError(err) {
+		if ttl := resolveReachabilityTTL(prof, opts); ttl > 0 {
+			globalReachability.mark(ns.Address.String(), ttl)
 		}
 	}
 
 	if ns.state != nil {
+		var infResp *packet.Packet
 		if resp.Msg != nil {
 			copyResp := resp
 			ns.state.cache.set(cacheKey, &copyResp)
+			infResp = &copyResp
 		} else if err == nil {
 			ns.state.cache.set(cacheKey, nil)
+		}
+		if inflight != nil {
+			ns.state.cache.finish(cacheKey, infResp, err)
 		}
 	}
 	return resp, err
@@ -218,12 +262,85 @@ func errorCacheProtocol(usevc bool) string {
 	return "udp"
 }
 
+func resolveErrorCacheTTL(prof *profile.Profile, opts *QueryOptions) time.Duration {
+	if prof == nil {
+		prof = profile.Effective()
+	}
+	if prof == nil {
+		return 0
+	}
+
+	return resolveTTLWithBudget(prof.Resolver.Defaults.ErrorCacheTTL, prof, opts)
+}
+
+func resolveReachabilityTTL(prof *profile.Profile, opts *QueryOptions) time.Duration {
+	if prof == nil {
+		prof = profile.Effective()
+	}
+	if prof == nil {
+		return 0
+	}
+	baseSeconds := prof.Resolver.Defaults.NegativeCacheTTL
+	if baseSeconds <= 0 {
+		baseSeconds = prof.Resolver.Defaults.ErrorCacheTTL
+	}
+	return resolveTTLWithBudget(baseSeconds, prof, opts)
+}
+
+func resolveTTLWithBudget(baseSeconds int, prof *profile.Profile, opts *QueryOptions) time.Duration {
+	if baseSeconds <= 0 {
+		return 0
+	}
+	baseTTL := time.Duration(baseSeconds) * time.Second
+	timeout := time.Duration(prof.Resolver.Defaults.Timeout) * time.Second
+	retries := prof.Resolver.Defaults.Retry
+	retrans := time.Duration(prof.Resolver.Defaults.Retrans) * time.Second
+
+	if opts != nil {
+		if opts.Timeout != nil {
+			timeout = *opts.Timeout
+		}
+		if opts.Retry != nil {
+			retries = *opts.Retry
+		}
+		if opts.Retrans != nil {
+			retrans = *opts.Retrans
+		}
+	}
+
+	if retries < 0 {
+		retries = 0
+	}
+
+	perAttempt := timeout
+	if perAttempt <= 0 && retrans > 0 {
+		perAttempt = retrans
+	}
+
+	if perAttempt <= 0 {
+		return baseTTL
+	}
+
+	attempts := retries + 1
+	if attempts < 1 {
+		attempts = 1
+	}
+	budget := perAttempt * time.Duration(attempts)
+	if budget <= 0 {
+		return baseTTL
+	}
+	if budget < baseTTL {
+		return budget
+	}
+	return baseTTL
+}
+
 func (ns Nameserver) queryNetwork(ctx context.Context, qname string, qtype string, qclass string, opts *QueryOptions) (packet.Packet, error) {
 	if ns.state != nil && ns.state.queryFunc != nil {
 		return ns.state.queryFunc(ctx, qname, qtype, qclass, opts)
 	}
 
-	client, err := ns.clientForOptions(opts)
+	client, err := ns.clientForOptions(ctx, opts)
 	if err != nil {
 		return packet.Packet{}, err
 	}
@@ -242,55 +359,54 @@ func (ns Nameserver) queryNetwork(ctx context.Context, qname string, qtype strin
 	server := ns.Address.String()
 
 	// Emit EXTERNAL_QUERY log entry
-	logFuncMu.RLock()
-	if logFunc != nil {
-		args := map[string]any{
-			"name":  qname,
-			"type":  qtype,
-			"ip":    ns.Address.String(),
-			"flags": fmt.Sprintf(`{"class":%q}`, qclass),
-		}
-		_, _ = logFunc("EXTERNAL_QUERY", args, "System", "")
-	}
-	logFuncMu.RUnlock()
+	logSystem(ctx, "EXTERNAL_QUERY", map[string]any{
+		"name":  qname,
+		"type":  qtype,
+		"ip":    ns.Address.String(),
+		"flags": fmt.Sprintf(`{"class":%q}`, qclass),
+	})
 
 	resp, err := client.Exchange(ctx, server, msg)
 
-	logFuncMu.RLock()
-	if logFunc != nil {
-		args := map[string]any{
-			"name":  qname,
-			"type":  qtype,
-			"ip":    ns.Address.String(),
-			"flags": fmt.Sprintf(`{"class":%q}`, qclass),
-		}
-		if resp.Msg != nil {
-			args["rcode"] = dns.RcodeToString[resp.Msg.Rcode]
-			args["answers"] = len(resp.Msg.Answer)
-			args["authority"] = len(resp.Msg.Ns)
-			args["additional"] = len(resp.Msg.Extra)
-			args["aa"] = resp.Msg.Authoritative
-			args["tc"] = resp.Msg.Truncated
-			args["rd"] = resp.Msg.RecursionDesired
-			args["ra"] = resp.Msg.RecursionAvailable
-			args["ad"] = resp.Msg.AuthenticatedData
-			args["cd"] = resp.Msg.CheckingDisabled
-		}
-		if err != nil {
-			args["exception"] = err.Error()
-		}
-		if resp.Msg == nil && err == nil {
-			_, _ = logFunc("EMPTY_RETURN", args, "System", "")
-		} else {
-			_, _ = logFunc("EXTERNAL_RESPONSE", args, "System", "")
-		}
+	args := map[string]any{
+		"name":  qname,
+		"type":  qtype,
+		"ip":    ns.Address.String(),
+		"flags": fmt.Sprintf(`{"class":%q}`, qclass),
 	}
-	logFuncMu.RUnlock()
+	if resp.Msg != nil {
+		args["rcode"] = dns.RcodeToString[resp.Msg.Rcode]
+		args["answers"] = len(resp.Msg.Answer)
+		args["authority"] = len(resp.Msg.Ns)
+		args["additional"] = len(resp.Msg.Extra)
+		args["aa"] = resp.Msg.Authoritative
+		args["tc"] = resp.Msg.Truncated
+		args["rd"] = resp.Msg.RecursionDesired
+		args["ra"] = resp.Msg.RecursionAvailable
+		args["ad"] = resp.Msg.AuthenticatedData
+		args["cd"] = resp.Msg.CheckingDisabled
+	}
+	if err != nil {
+		args["exception"] = err.Error()
+	}
+	if resp.Msg == nil && err == nil {
+		logSystem(ctx, "EMPTY_RETURN", args)
+	} else {
+		logSystem(ctx, "EXTERNAL_RESPONSE", args)
+	}
 
 	return resp, err
 }
 
-func (ns Nameserver) clientForOptions(opts *QueryOptions) (*transport.Client, error) {
+func logSystem(ctx context.Context, tag string, args map[string]any) {
+	log := logger.FromContext(ctx)
+	if log == nil {
+		return
+	}
+	_, _ = log.Add(tag, args, systemModuleName, "")
+}
+
+func (ns Nameserver) clientForOptions(ctx context.Context, opts *QueryOptions) (*transport.Client, error) {
 	base := transport.Client{}
 	if ns.Client != nil {
 		base = *ns.Client
@@ -333,7 +449,7 @@ func (ns Nameserver) clientForOptions(opts *QueryOptions) (*transport.Client, er
 		base.SetEDNSSize(constants.EDNSUDPPayloadDNSSECDefault)
 	}
 
-	base.ApplyProfileDefaults(nil)
+	base.ApplyProfileDefaults(profile.FromContext(ctx))
 	return &base, nil
 }
 

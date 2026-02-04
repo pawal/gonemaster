@@ -1,12 +1,14 @@
 package util
 
 import (
+	"context"
 	"math/rand"
 	"net/netip"
 	"strings"
 	"testing"
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
+	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -74,10 +76,9 @@ func TestScrambleCasePreservesLetters(t *testing.T) {
 
 func TestInfoAddsEntry(t *testing.T) {
 	log := logger.New()
-	SetLogger(log)
-	t.Cleanup(func() { SetLogger(nil) })
+	ctx := logger.WithContext(context.Background(), log)
 
-	entry, err := Info("TEST_TAG", map[string]any{"value": "ok"})
+	entry, err := Info(ctx, "TEST_TAG", map[string]any{"value": "ok"})
 	if err != nil {
 		t.Fatalf("info: %v", err)
 	}
@@ -123,49 +124,52 @@ func TestNSNameAndZoneHelpers(t *testing.T) {
 }
 
 func TestShouldRunTest(t *testing.T) {
-	defer profile.ResetEffective()
-	profile.Effective().TestCases = []any{"alpha", "beta"}
+	prof := testhelpers.DefaultProfile(t)
+	prof.TestCases = []any{"alpha", "beta"}
+	ctx := profile.WithContext(context.Background(), prof)
 
-	if !ShouldRunTest("alpha") {
+	if !ShouldRunTest(ctx, "alpha") {
 		t.Fatalf("expected alpha to be enabled")
 	}
-	if ShouldRunTest("gamma") {
+	if ShouldRunTest(ctx, "gamma") {
 		t.Fatalf("expected gamma to be disabled")
 	}
-	if ShouldRunTest("") {
+	if ShouldRunTest(ctx, "") {
 		t.Fatalf("expected empty test name to be disabled")
 	}
 }
 
 func TestIPVersionOK(t *testing.T) {
-	defer profile.ResetEffective()
-	profile.Effective().Net.IPv4 = false
-	profile.Effective().Net.IPv6 = true
+	prof := testhelpers.DefaultProfile(t)
+	prof.Net.IPv4 = false
+	prof.Net.IPv6 = true
+	ctx := profile.WithContext(context.Background(), prof)
 
-	if IPVersionOK(constants.IPVersion4) {
+	if IPVersionOK(ctx, constants.IPVersion4) {
 		t.Fatalf("expected IPv4 to be disabled")
 	}
-	if !IPVersionOK(constants.IPVersion6) {
+	if !IPVersionOK(ctx, constants.IPVersion6) {
 		t.Fatalf("expected IPv6 to be enabled")
 	}
-	if IPVersionOK(0) {
+	if IPVersionOK(ctx, 0) {
 		t.Fatalf("expected unknown version to be disabled")
 	}
 }
 
 func TestTestLevelsReturnsCopy(t *testing.T) {
-	defer profile.ResetEffective()
-	profile.Effective().TestLevels = map[string]map[string]string{
+	prof := testhelpers.DefaultProfile(t)
+	prof.TestLevels = map[string]map[string]string{
 		"MODULE": {"TAG": "WARNING"},
 	}
+	ctx := profile.WithContext(context.Background(), prof)
 
-	levels := TestLevels()
+	levels := TestLevels(ctx)
 	if levels == nil || levels["MODULE"]["TAG"] != "WARNING" {
 		t.Fatalf("unexpected test levels: %#v", levels)
 	}
 
 	levels["MODULE"]["TAG"] = "INFO"
-	if profile.Effective().TestLevels["MODULE"]["TAG"] != "WARNING" {
+	if prof.TestLevels["MODULE"]["TAG"] != "WARNING" {
 		t.Fatalf("expected effective profile to remain unchanged")
 	}
 }

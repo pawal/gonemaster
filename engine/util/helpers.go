@@ -1,6 +1,7 @@
 package util
 
 import (
+	"context"
 	"sync"
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
@@ -26,25 +27,31 @@ func Logger() *logger.Logger {
 	return defaultLogger
 }
 
+// LoggerFromContext returns the logger stored in ctx or the default logger.
+func LoggerFromContext(ctx context.Context) *logger.Logger {
+	if ctx != nil {
+		if l := logger.FromContext(ctx); l != nil {
+			return l
+		}
+	}
+	return Logger()
+}
+
 // SetLogger overrides the default logger instance.
 func SetLogger(l *logger.Logger) {
 	defaultLoggerMu.Lock()
 	defaultLogger = l
 	defaultLoggerMu.Unlock()
-
-	nameserver.SetLogFunc(func(tag string, args map[string]any, module, testcase string) (any, error) {
-		return Logger().Add(tag, args, module, testcase)
-	})
 }
 
-// Info creates a log entry using the default logger.
-func Info(tag string, args map[string]any) (*logger.Entry, error) {
-	return Logger().Add(tag, args, "", "")
+// Info creates a log entry using the logger stored in ctx.
+func Info(ctx context.Context, tag string, args map[string]any) (*logger.Entry, error) {
+	return LoggerFromContext(ctx).Add(tag, args, "", "")
 }
 
 // NS creates a nameserver object for the given name and address.
 func NS(name string, address string) (nameserver.Nameserver, error) {
-	return nameserver.New(name, address, nil)
+	return nameserver.NewWithContext(context.Background(), name, address, nil)
 }
 
 // Name creates a DNSName object for the given domain.
@@ -62,11 +69,11 @@ func Zone(name string) (*zone.Zone, error) {
 }
 
 // ShouldRunTest reports whether a test case is enabled in the effective profile.
-func ShouldRunTest(testName string) bool {
+func ShouldRunTest(ctx context.Context, testName string) bool {
 	if testName == "" {
 		return false
 	}
-	value, err := profile.Effective().Get("test_cases")
+	value, err := profile.FromContext(ctx).Get("test_cases")
 	if err != nil || value == nil {
 		return false
 	}
@@ -88,20 +95,21 @@ func ShouldRunTest(testName string) bool {
 }
 
 // IPVersionOK reports whether the IP version is enabled in the effective profile.
-func IPVersionOK(version int) bool {
+func IPVersionOK(ctx context.Context, version int) bool {
+	prof := profile.FromContext(ctx)
 	switch version {
 	case constants.IPVersion4:
-		return profile.Effective().Net.IPv4
+		return prof.Net.IPv4
 	case constants.IPVersion6:
-		return profile.Effective().Net.IPv6
+		return prof.Net.IPv6
 	default:
 		return false
 	}
 }
 
 // TestLevels returns the configured test levels from the effective profile.
-func TestLevels() map[string]map[string]string {
-	value, err := profile.Effective().Get("test_levels")
+func TestLevels(ctx context.Context) map[string]map[string]string {
+	value, err := profile.FromContext(ctx).Get("test_levels")
 	if err != nil || value == nil {
 		return nil
 	}

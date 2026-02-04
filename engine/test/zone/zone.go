@@ -66,7 +66,7 @@ func defaultQueryAuth(ctx context.Context, z *zonepkg.Zone, name string, qtype s
 func All(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	var results []*logger.Entry
 
-	if util.ShouldRunTest("zone01") {
+	if util.ShouldRunTest(ctx, "zone01") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Zone01(ctx, z)
 		})
@@ -75,7 +75,7 @@ func All(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("zone02") {
+	if util.ShouldRunTest(ctx, "zone02") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Zone02(ctx, z)
 		})
@@ -84,7 +84,7 @@ func All(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("zone03") {
+	if util.ShouldRunTest(ctx, "zone03") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Zone03(ctx, z)
 		})
@@ -93,7 +93,7 @@ func All(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("zone04") {
+	if util.ShouldRunTest(ctx, "zone04") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Zone04(ctx, z)
 		})
@@ -102,7 +102,7 @@ func All(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("zone05") {
+	if util.ShouldRunTest(ctx, "zone05") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Zone05(ctx, z)
 		})
@@ -111,7 +111,7 @@ func All(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("zone06") {
+	if util.ShouldRunTest(ctx, "zone06") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Zone06(ctx, z)
 		})
@@ -120,7 +120,7 @@ func All(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("zone07") {
+	if util.ShouldRunTest(ctx, "zone07") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Zone07(ctx, z)
 		})
@@ -129,7 +129,7 @@ func All(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("zone08") {
+	if util.ShouldRunTest(ctx, "zone08") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Zone08(ctx, z)
 		})
@@ -139,7 +139,7 @@ func All(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	if util.ShouldRunTest("zone09") && !hasEntryTag(results, "NO_RESPONSE_MX_QUERY") {
+	if util.ShouldRunTest(ctx, "zone09") && !hasEntryTag(results, "NO_RESPONSE_MX_QUERY") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Zone09(ctx, z)
 		})
@@ -150,7 +150,7 @@ func All(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	}
 
 	if !hasEntryTag(results, "NO_RESPONSE_SOA_QUERY") {
-		if util.ShouldRunTest("zone10") {
+		if util.ShouldRunTest(ctx, "zone10") {
 			entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 				return Zone10(ctx, z)
 			})
@@ -159,7 +159,7 @@ func All(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 				return results, err
 			}
 		}
-		if util.ShouldRunTest("zone11") {
+		if util.ShouldRunTest(ctx, "zone11") {
 			entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 				return Zone11(ctx, z)
 			})
@@ -288,10 +288,8 @@ func Metadata() map[string][]string {
 func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	const testcase = "Zone01"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -308,7 +306,7 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	}
 
 	for _, ns := range nss {
-		disabled, err := ipDisabledMessage(&results, testcase, ns, "SOA")
+		disabled, err := ipDisabledMessage(ctx, &results, testcase, ns, "SOA")
 		if err != nil {
 			return results, err
 		}
@@ -341,7 +339,7 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(mnameLocalhost) > 0 {
-		if err := appendLog(&results, testcase, "Z01_MNAME_IS_LOCALHOST", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "Z01_MNAME_IS_LOCALHOST", map[string]any{
 			"ns_ip_list": strings.Join(mnameLocalhost, ";"),
 		}); err != nil {
 			return results, err
@@ -349,7 +347,7 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(mnameDot) > 0 {
-		if err := appendLog(&results, testcase, "Z01_MNAME_IS_DOT", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "Z01_MNAME_IS_DOT", map[string]any{
 			"ns_ip_list": strings.Join(mnameDot, ";"),
 		}); err != nil {
 			return results, err
@@ -370,7 +368,7 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 
 	for mname := range mnameNS {
 		if !method3Set[strings.ToLower(mname)] {
-			if err := appendLog(&results, testcase, "Z01_MNAME_NOT_IN_NS_LIST", map[string]any{
+			if err := appendLog(ctx, &results, testcase, "Z01_MNAME_NOT_IN_NS_LIST", map[string]any{
 				"nsname": mname,
 			}); err != nil {
 				return results, err
@@ -389,7 +387,7 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		if foundIP > 0 {
 			for ip := range mnameNS[mname] {
 				if ip == "127.0.0.1" || ip == "::1" {
-					if err := appendLog(&results, testcase, "Z01_MNAME_HAS_LOCALHOST_ADDR", map[string]any{
+					if err := appendLog(ctx, &results, testcase, "Z01_MNAME_HAS_LOCALHOST_ADDR", map[string]any{
 						"nsname": mname,
 						"ns_ip":  ip,
 					}); err != nil {
@@ -398,12 +396,12 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 					continue
 				}
 
-				ns, err := nameserver.New(mname, ip, z.Recursor().Client())
+				ns, err := nameserver.NewWithContext(ctx, mname, ip, z.Recursor().Client())
 				if err != nil {
 					continue
 				}
 
-				disabled, err := ipDisabledMessage(&results, testcase, ns, "SOA")
+				disabled, err := ipDisabledMessage(ctx, &results, testcase, ns, "SOA")
 				if err != nil {
 					return results, err
 				}
@@ -413,7 +411,7 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 
 				resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "SOA", nil)
 				if resp.Msg == nil {
-					if err := appendLog(&results, testcase, "Z01_MNAME_NO_RESPONSE", map[string]any{
+					if err := appendLog(ctx, &results, testcase, "Z01_MNAME_NO_RESPONSE", map[string]any{
 						"ns": ns.String(),
 					}); err != nil {
 						return results, err
@@ -424,7 +422,7 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 				soaRecords := resp.GetRecordsForName("SOA", z.Name, "answer")
 				if resp.Rcode() == "NOERROR" && len(soaRecords) > 0 {
 					if !resp.AA() {
-						if err := appendLog(&results, testcase, "Z01_MNAME_NOT_AUTHORITATIVE", map[string]any{
+						if err := appendLog(ctx, &results, testcase, "Z01_MNAME_NOT_AUTHORITATIVE", map[string]any{
 							"ns": ns.String(),
 						}); err != nil {
 							return results, err
@@ -437,14 +435,14 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 						}
 					}
 				} else if resp.Rcode() != "NOERROR" {
-					if err := appendLog(&results, testcase, "Z01_MNAME_UNEXPECTED_RCODE", map[string]any{
+					if err := appendLog(ctx, &results, testcase, "Z01_MNAME_UNEXPECTED_RCODE", map[string]any{
 						"ns":    ns.String(),
 						"rcode": resp.Rcode(),
 					}); err != nil {
 						return results, err
 					}
 				} else if len(soaRecords) == 0 {
-					if err := appendLog(&results, testcase, "Z01_MNAME_MISSING_SOA_RECORD", map[string]any{
+					if err := appendLog(ctx, &results, testcase, "Z01_MNAME_MISSING_SOA_RECORD", map[string]any{
 						"ns": ns.String(),
 					}); err != nil {
 						return results, err
@@ -452,7 +450,7 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 				}
 			}
 		} else {
-			if err := appendLog(&results, testcase, "Z01_MNAME_NOT_RESOLVE", map[string]any{
+			if err := appendLog(ctx, &results, testcase, "Z01_MNAME_NOT_RESOLVE", map[string]any{
 				"nsname": mname,
 			}); err != nil {
 				return results, err
@@ -491,7 +489,7 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 				}
 			}
 			sort.Strings(nsList)
-			if err := appendLog(&results, testcase, "Z01_MNAME_NOT_MASTER", map[string]any{
+			if err := appendLog(ctx, &results, testcase, "Z01_MNAME_NOT_MASTER", map[string]any{
 				"ns_list":        strings.Join(nsList, ";"),
 				"soaserial":      maxUint32(uniqueUint32(soaserials)),
 				"soaserial_list": joinUint32(serials, ";"),
@@ -502,7 +500,7 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 
 		if len(mnameMaster) > 0 {
 			sort.Strings(mnameMaster)
-			if err := appendLog(&results, testcase, "Z01_MNAME_IS_MASTER", map[string]any{
+			if err := appendLog(ctx, &results, testcase, "Z01_MNAME_IS_MASTER", map[string]any{
 				"ns_list": strings.Join(mnameMaster, ";"),
 			}); err != nil {
 				return results, err
@@ -510,17 +508,15 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Zone02 runs the Zone02 test case.
 func Zone02(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	const testcase = "Zone02"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -529,21 +525,21 @@ func Zone02(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	threshold := profile.Effective().TestCasesVars.Zone02.SOARefreshMinimumValue
+	threshold := profile.FromContext(ctx).TestCasesVars.Zone02.SOARefreshMinimumValue
 	if resp.Msg != nil {
 		records := resp.GetRecords("SOA", "answer")
 		if len(records) > 0 {
 			if soa, ok := records[0].(*dns.SOA); ok {
 				refresh := int(soa.Refresh)
 				if refresh < threshold {
-					if err := appendLog(&results, testcase, "REFRESH_MINIMUM_VALUE_LOWER", map[string]any{
+					if err := appendLog(ctx, &results, testcase, "REFRESH_MINIMUM_VALUE_LOWER", map[string]any{
 						"refresh":          refresh,
 						"required_refresh": threshold,
 					}); err != nil {
 						return results, err
 					}
 				} else {
-					if err := appendLog(&results, testcase, "REFRESH_MINIMUM_VALUE_OK", map[string]any{
+					if err := appendLog(ctx, &results, testcase, "REFRESH_MINIMUM_VALUE_OK", map[string]any{
 						"refresh":          refresh,
 						"required_refresh": threshold,
 					}); err != nil {
@@ -552,27 +548,25 @@ func Zone02(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 				}
 			}
 		} else {
-			if err := appendLog(&results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{}); err != nil {
+			if err := appendLog(ctx, &results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{}); err != nil {
 				return results, err
 			}
 		}
 	} else {
-		if err := appendLog(&results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{}); err != nil {
+		if err := appendLog(ctx, &results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{}); err != nil {
 			return results, err
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Zone03 runs the Zone03 test case.
 func Zone03(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	const testcase = "Zone03"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -588,14 +582,14 @@ func Zone03(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 				refresh := int(soa.Refresh)
 				retry := int(soa.Retry)
 				if retry >= refresh {
-					if err := appendLog(&results, testcase, "REFRESH_LOWER_THAN_RETRY", map[string]any{
+					if err := appendLog(ctx, &results, testcase, "REFRESH_LOWER_THAN_RETRY", map[string]any{
 						"retry":   retry,
 						"refresh": refresh,
 					}); err != nil {
 						return results, err
 					}
 				} else {
-					if err := appendLog(&results, testcase, "REFRESH_HIGHER_THAN_RETRY", map[string]any{
+					if err := appendLog(ctx, &results, testcase, "REFRESH_HIGHER_THAN_RETRY", map[string]any{
 						"retry":   retry,
 						"refresh": refresh,
 					}); err != nil {
@@ -604,27 +598,25 @@ func Zone03(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 				}
 			}
 		} else {
-			if err := appendLog(&results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{}); err != nil {
+			if err := appendLog(ctx, &results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{}); err != nil {
 				return results, err
 			}
 		}
 	} else {
-		if err := appendLog(&results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{}); err != nil {
+		if err := appendLog(ctx, &results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{}); err != nil {
 			return results, err
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Zone04 runs the Zone04 test case.
 func Zone04(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	const testcase = "Zone04"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -633,21 +625,21 @@ func Zone04(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	threshold := profile.Effective().TestCasesVars.Zone04.SOARetryMinimumValue
+	threshold := profile.FromContext(ctx).TestCasesVars.Zone04.SOARetryMinimumValue
 	if resp.Msg != nil {
 		records := resp.GetRecords("SOA", "answer")
 		if len(records) > 0 {
 			if soa, ok := records[0].(*dns.SOA); ok {
 				retry := int(soa.Retry)
 				if retry < threshold {
-					if err := appendLog(&results, testcase, "RETRY_MINIMUM_VALUE_LOWER", map[string]any{
+					if err := appendLog(ctx, &results, testcase, "RETRY_MINIMUM_VALUE_LOWER", map[string]any{
 						"retry":          retry,
 						"required_retry": threshold,
 					}); err != nil {
 						return results, err
 					}
 				} else {
-					if err := appendLog(&results, testcase, "RETRY_MINIMUM_VALUE_OK", map[string]any{
+					if err := appendLog(ctx, &results, testcase, "RETRY_MINIMUM_VALUE_OK", map[string]any{
 						"retry":          retry,
 						"required_retry": threshold,
 					}); err != nil {
@@ -656,27 +648,25 @@ func Zone04(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 				}
 			}
 		} else {
-			if err := appendLog(&results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{}); err != nil {
+			if err := appendLog(ctx, &results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{}); err != nil {
 				return results, err
 			}
 		}
 	} else {
-		if err := appendLog(&results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{}); err != nil {
+		if err := appendLog(ctx, &results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{}); err != nil {
 			return results, err
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Zone05 runs the Zone05 test case.
 func Zone05(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	const testcase = "Zone05"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -685,7 +675,7 @@ func Zone05(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	threshold := profile.Effective().TestCasesVars.Zone05.SOAExpireMinimumValue
+	threshold := profile.FromContext(ctx).TestCasesVars.Zone05.SOAExpireMinimumValue
 	if resp.Msg != nil {
 		records := resp.GetRecords("SOA", "answer")
 		if len(records) > 0 {
@@ -693,7 +683,7 @@ func Zone05(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 				expire := int(soa.Expire)
 				refresh := int(soa.Refresh)
 				if expire < threshold {
-					if err := appendLog(&results, testcase, "EXPIRE_MINIMUM_VALUE_LOWER", map[string]any{
+					if err := appendLog(ctx, &results, testcase, "EXPIRE_MINIMUM_VALUE_LOWER", map[string]any{
 						"expire":          expire,
 						"required_expire": threshold,
 					}); err != nil {
@@ -701,7 +691,7 @@ func Zone05(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 					}
 				}
 				if expire < refresh {
-					if err := appendLog(&results, testcase, "EXPIRE_LOWER_THAN_REFRESH", map[string]any{
+					if err := appendLog(ctx, &results, testcase, "EXPIRE_LOWER_THAN_REFRESH", map[string]any{
 						"expire":  expire,
 						"refresh": refresh,
 					}); err != nil {
@@ -709,7 +699,7 @@ func Zone05(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 					}
 				}
 				if !hasNonStartEntry(results) {
-					if err := appendLog(&results, testcase, "EXPIRE_MINIMUM_VALUE_OK", map[string]any{
+					if err := appendLog(ctx, &results, testcase, "EXPIRE_MINIMUM_VALUE_OK", map[string]any{
 						"expire":          expire,
 						"refresh":         refresh,
 						"required_expire": threshold,
@@ -719,27 +709,25 @@ func Zone05(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 				}
 			}
 		} else {
-			if err := appendLog(&results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{}); err != nil {
+			if err := appendLog(ctx, &results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{}); err != nil {
 				return results, err
 			}
 		}
 	} else {
-		if err := appendLog(&results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{}); err != nil {
+		if err := appendLog(ctx, &results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{}); err != nil {
 			return results, err
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Zone06 runs the Zone06 test case.
 func Zone06(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	const testcase = "Zone06"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -748,29 +736,29 @@ func Zone06(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	maxValue := profile.Effective().TestCasesVars.Zone06.SOADefaultTTLMaximumValue
-	minValue := profile.Effective().TestCasesVars.Zone06.SOADefaultTTLMinimumValue
+	maxValue := profile.FromContext(ctx).TestCasesVars.Zone06.SOADefaultTTLMaximumValue
+	minValue := profile.FromContext(ctx).TestCasesVars.Zone06.SOADefaultTTLMinimumValue
 	if resp.Msg != nil {
 		records := resp.GetRecords("SOA", "answer")
 		if len(records) > 0 {
 			if soa, ok := records[0].(*dns.SOA); ok {
 				minimum := int(soa.Minttl)
 				if minimum > maxValue {
-					if err := appendLog(&results, testcase, "SOA_DEFAULT_TTL_MAXIMUM_VALUE_HIGHER", map[string]any{
+					if err := appendLog(ctx, &results, testcase, "SOA_DEFAULT_TTL_MAXIMUM_VALUE_HIGHER", map[string]any{
 						"minimum":         minimum,
 						"highest_minimum": maxValue,
 					}); err != nil {
 						return results, err
 					}
 				} else if minimum < minValue {
-					if err := appendLog(&results, testcase, "SOA_DEFAULT_TTL_MAXIMUM_VALUE_LOWER", map[string]any{
+					if err := appendLog(ctx, &results, testcase, "SOA_DEFAULT_TTL_MAXIMUM_VALUE_LOWER", map[string]any{
 						"minimum":        minimum,
 						"lowest_minimum": minValue,
 					}); err != nil {
 						return results, err
 					}
 				} else {
-					if err := appendLog(&results, testcase, "SOA_DEFAULT_TTL_MAXIMUM_VALUE_OK", map[string]any{
+					if err := appendLog(ctx, &results, testcase, "SOA_DEFAULT_TTL_MAXIMUM_VALUE_OK", map[string]any{
 						"minimum":         minimum,
 						"highest_minimum": maxValue,
 						"lowest_minimum":  minValue,
@@ -780,27 +768,25 @@ func Zone06(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 				}
 			}
 		} else {
-			if err := appendLog(&results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{}); err != nil {
+			if err := appendLog(ctx, &results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{}); err != nil {
 				return results, err
 			}
 		}
 	} else {
-		if err := appendLog(&results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{}); err != nil {
+		if err := appendLog(ctx, &results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{}); err != nil {
 			return results, err
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Zone07 runs the Zone07 test case.
 func Zone07(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	const testcase = "Zone07"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -835,13 +821,13 @@ func Zone07(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 
 					if pMname.HasRRsOfTypeForName("CNAME", dnsname.New(soaMname), "answer") ||
 						!strings.EqualFold(finalName, soaMname) {
-						if err := appendLog(&results, testcase, "MNAME_IS_CNAME", map[string]any{
+						if err := appendLog(ctx, &results, testcase, "MNAME_IS_CNAME", map[string]any{
 							"mname": soaMname,
 						}); err != nil {
 							return results, err
 						}
 					} else {
-						if err := appendLog(&results, testcase, "MNAME_IS_NOT_CNAME", map[string]any{
+						if err := appendLog(ctx, &results, testcase, "MNAME_IS_NOT_CNAME", map[string]any{
 							"mname": soaMname,
 						}); err != nil {
 							return results, err
@@ -850,7 +836,7 @@ func Zone07(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 				}
 
 				if addresses == 0 {
-					if err := appendLog(&results, testcase, "MNAME_HAS_NO_ADDRESS", map[string]any{
+					if err := appendLog(ctx, &results, testcase, "MNAME_HAS_NO_ADDRESS", map[string]any{
 						"mname": soaMname,
 					}); err != nil {
 						return results, err
@@ -858,27 +844,25 @@ func Zone07(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 				}
 			}
 		} else {
-			if err := appendLog(&results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{}); err != nil {
+			if err := appendLog(ctx, &results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{}); err != nil {
 				return results, err
 			}
 		}
 	} else {
-		if err := appendLog(&results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{}); err != nil {
+		if err := appendLog(ctx, &results, testcase, "NO_RESPONSE_SOA_QUERY", map[string]any{}); err != nil {
 			return results, err
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Zone08 runs the Zone08 test case.
 func Zone08(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	const testcase = "Zone08"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -899,33 +883,31 @@ func Zone08(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			}
 			if p2.Msg != nil {
 				if p2.HasRRsOfTypeForName("CNAME", dnsname.New(mx.Mx), "answer") {
-					if err := appendLog(&results, testcase, "MX_RECORD_IS_CNAME", map[string]any{}); err != nil {
+					if err := appendLog(ctx, &results, testcase, "MX_RECORD_IS_CNAME", map[string]any{}); err != nil {
 						return results, err
 					}
 				} else {
-					if err := appendLog(&results, testcase, "MX_RECORD_IS_NOT_CNAME", map[string]any{}); err != nil {
+					if err := appendLog(ctx, &results, testcase, "MX_RECORD_IS_NOT_CNAME", map[string]any{}); err != nil {
 						return results, err
 					}
 				}
 			}
 		}
 	} else {
-		if err := appendLog(&results, testcase, "NO_RESPONSE_MX_QUERY", map[string]any{}); err != nil {
+		if err := appendLog(ctx, &results, testcase, "NO_RESPONSE_MX_QUERY", map[string]any{}); err != nil {
 			return results, err
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Zone09 runs the Zone09 test case.
 func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	const testcase = "Zone09"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -974,7 +956,7 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := mxOutcome{ip: ns.Address.String()}
 
-				if disabled, err := ipDisabledMessageWithLogger(buf, ns, "SOA", "MX"); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "SOA", "MX"); err != nil {
 					return err
 				} else if disabled {
 					outcome.disabled = true
@@ -991,12 +973,12 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 				outcome.checked = true
 				usevc := false
 				p2, _ := ns.QueryWithOptions(ctx, z.Name.String(), "MX", &nameserver.QueryOptions{
-					UseVC:    &usevc,
+					UseVC: &usevc,
 				})
 				if p2.Msg != nil && p2.TC() {
 					usevc = true
 					p2, _ = ns.QueryWithOptions(ctx, z.Name.String(), "MX", &nameserver.QueryOptions{
-						UseVC:    &usevc,
+						UseVC: &usevc,
 					})
 				}
 
@@ -1017,7 +999,7 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -1047,7 +1029,7 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(noResponseMX) > 0 {
-		if err := appendLog(&results, testcase, "Z09_NO_RESPONSE_MX_QUERY", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "Z09_NO_RESPONSE_MX_QUERY", map[string]any{
 			"ns_ip_list": strings.Join(sortedStrings(noResponseMX), ";"),
 		}); err != nil {
 			return results, err
@@ -1056,7 +1038,7 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 
 	if len(unexpectedRcodeMX) > 0 {
 		for _, rcode := range sortedKeys(unexpectedRcodeMX) {
-			if err := appendLog(&results, testcase, "Z09_UNEXPECTED_RCODE_MX", map[string]any{
+			if err := appendLog(ctx, &results, testcase, "Z09_UNEXPECTED_RCODE_MX", map[string]any{
 				"rcode":      rcode,
 				"ns_ip_list": strings.Join(sortedStrings(unexpectedRcodeMX[rcode]), ";"),
 			}); err != nil {
@@ -1066,7 +1048,7 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(nonAuthoritativeMX) > 0 {
-		if err := appendLog(&results, testcase, "Z09_NON_AUTH_MX_RESPONSE", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "Z09_NON_AUTH_MX_RESPONSE", map[string]any{
 			"ns_ip_list": strings.Join(sortedStrings(noResponseMX), ";"),
 		}); err != nil {
 			return results, err
@@ -1074,15 +1056,15 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(noMXSet) > 0 && len(mxSet) > 0 {
-		if err := appendLog(&results, testcase, "Z09_INCONSISTENT_MX", map[string]any{}); err != nil {
+		if err := appendLog(ctx, &results, testcase, "Z09_INCONSISTENT_MX", map[string]any{}); err != nil {
 			return results, err
 		}
-		if err := appendLog(&results, testcase, "Z09_NO_MX_FOUND", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "Z09_NO_MX_FOUND", map[string]any{
 			"ns_ip_list": strings.Join(sortedStrings(noMXSet), ";"),
 		}); err != nil {
 			return results, err
 		}
-		if err := appendLog(&results, testcase, "Z09_MX_FOUND", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "Z09_MX_FOUND", map[string]any{
 			"ns_ip_list": strings.Join(sortedStrings(mapKeys(mxSet)), ";"),
 		}); err != nil {
 			return results, err
@@ -1101,7 +1083,7 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			} else {
 				nextData := encodeLowercaseRRSet(records)
 				if nextData != dataJSON {
-					if err := appendLog(&results, testcase, "Z09_INCONSISTENT_MX_DATA", map[string]any{}); err != nil {
+					if err := appendLog(ctx, &results, testcase, "Z09_INCONSISTENT_MX_DATA", map[string]any{}); err != nil {
 						return results, err
 					}
 					for _, nsName := range allNSOrder {
@@ -1113,7 +1095,7 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 						if len(records) == 0 {
 							continue
 						}
-						if err := appendLog(&results, testcase, "Z09_MX_DATA", map[string]any{
+						if err := appendLog(ctx, &results, testcase, "Z09_MX_DATA", map[string]any{
 							"mailtarget_list": strings.Join(mxExchangeList(records), ";"),
 							"ns_ip_list":      strings.Join(ips, ";"),
 						}); err != nil {
@@ -1138,12 +1120,12 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 				}
 				if mx.Mx == "." {
 					if len(mxSet[firstIP]) > 1 && !hasEntryTag(results, "Z09_NULL_MX_WITH_OTHER_MX") {
-						if err := appendLog(&results, testcase, "Z09_NULL_MX_WITH_OTHER_MX", map[string]any{}); err != nil {
+						if err := appendLog(ctx, &results, testcase, "Z09_NULL_MX_WITH_OTHER_MX", map[string]any{}); err != nil {
 							return results, err
 						}
 					}
 					if mx.Preference > 0 && !hasEntryTag(results, "Z09_NULL_MX_NON_ZERO_PREF") {
-						if err := appendLog(&results, testcase, "Z09_NULL_MX_NON_ZERO_PREF", map[string]any{}); err != nil {
+						if err := appendLog(ctx, &results, testcase, "Z09_NULL_MX_NON_ZERO_PREF", map[string]any{}); err != nil {
 							return results, err
 						}
 					}
@@ -1153,15 +1135,15 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 
 			if !hasNullMX {
 				if z.Name.String() == "." {
-					if err := appendLog(&results, testcase, "Z09_ROOT_EMAIL_DOMAIN", map[string]any{}); err != nil {
+					if err := appendLog(ctx, &results, testcase, "Z09_ROOT_EMAIL_DOMAIN", map[string]any{}); err != nil {
 						return results, err
 					}
 				} else if nextHigherIsRoot(z.Name) {
-					if err := appendLog(&results, testcase, "Z09_TLD_EMAIL_DOMAIN", map[string]any{}); err != nil {
+					if err := appendLog(ctx, &results, testcase, "Z09_TLD_EMAIL_DOMAIN", map[string]any{}); err != nil {
 						return results, err
 					}
 				} else {
-					if err := appendLog(&results, testcase, "Z09_MX_DATA", map[string]any{
+					if err := appendLog(ctx, &results, testcase, "Z09_MX_DATA", map[string]any{
 						"ns_ip_list":      strings.Join(mxSetOrder, ";"),
 						"mailtarget_list": strings.Join(mxExchangeList(mxSet[firstIP]), ";"),
 					}); err != nil {
@@ -1173,23 +1155,21 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	} else if len(noMXSet) > 0 {
 		name := strings.ToLower(z.Name.String())
 		if z.Name.String() != "." && !nextHigherIsRoot(z.Name) && !strings.HasSuffix(name, ".arpa") {
-			if err := appendLog(&results, testcase, "Z09_MISSING_MAIL_TARGET", map[string]any{}); err != nil {
+			if err := appendLog(ctx, &results, testcase, "Z09_MISSING_MAIL_TARGET", map[string]any{}); err != nil {
 				return results, err
 			}
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Zone10 runs the Zone10 test case.
 func Zone10(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	const testcase = "Zone10"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -1204,7 +1184,7 @@ func Zone10(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			i, ns := i, ns
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
-				if disabled, err := ipDisabledMessageWithLogger(buf, ns, "SOA"); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "SOA"); err != nil {
 					return err
 				} else if disabled {
 					return nil
@@ -1253,7 +1233,7 @@ func Zone10(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -1262,22 +1242,20 @@ func Zone10(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	}
 
 	if !hasNonStartEntry(results) {
-		if err := appendLog(&results, testcase, "ONE_SOA", map[string]any{}); err != nil {
+		if err := appendLog(ctx, &results, testcase, "ONE_SOA", map[string]any{}); err != nil {
 			return results, err
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Zone11 runs the Zone11 test case.
 func Zone11(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	const testcase = "Zone11"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -1290,7 +1268,7 @@ func Zone11(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	allNS := nameserversFromNSItems(z, append(nsItems, zoneItems...))
+	allNS := nameserversFromNSItems(ctx, z, append(nsItems, zoneItems...))
 	groups := nameserversByIP(allNS)
 
 	nsSpf := map[string][]string{}
@@ -1320,7 +1298,7 @@ func Zone11(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 					nsList: nsStrings(group),
 				}
 
-				if disabled, err := ipDisabledMessageWithLogger(buf, ns, "TXT"); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "TXT"); err != nil {
 					return err
 				} else if disabled {
 					outcomes[i] = outcome
@@ -1353,7 +1331,7 @@ func Zone11(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -1383,27 +1361,27 @@ func Zone11(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(nsSpf) == 0 {
-		if err := appendLog(&results, testcase, "Z11_UNABLE_TO_CHECK_FOR_SPF", map[string]any{}); err != nil {
+		if err := appendLog(ctx, &results, testcase, "Z11_UNABLE_TO_CHECK_FOR_SPF", map[string]any{}); err != nil {
 			return results, err
 		}
 	} else if allEmptyKeys(spfNS) {
 		if z.Name.String() == "." || nextHigherIsRoot(z.Name) || strings.HasSuffix(strings.ToLower(z.Name.String()), ".arpa") {
-			if err := appendLog(&results, testcase, "Z11_NO_SPF_NON_MAIL_DOMAIN", map[string]any{}); err != nil {
+			if err := appendLog(ctx, &results, testcase, "Z11_NO_SPF_NON_MAIL_DOMAIN", map[string]any{}); err != nil {
 				return results, err
 			}
 		} else {
-			if err := appendLog(&results, testcase, "Z11_NO_SPF_FOUND", map[string]any{
+			if err := appendLog(ctx, &results, testcase, "Z11_NO_SPF_FOUND", map[string]any{
 				"domain": z.Name.String(),
 			}); err != nil {
 				return results, err
 			}
 		}
 	} else if len(spfNS) > 1 {
-		if err := appendLog(&results, testcase, "Z11_INCONSISTENT_SPF_POLICIES", map[string]any{}); err != nil {
+		if err := appendLog(ctx, &results, testcase, "Z11_INCONSISTENT_SPF_POLICIES", map[string]any{}); err != nil {
 			return results, err
 		}
 		for _, nsList := range spfNS {
-			if err := appendLog(&results, testcase, "Z11_DIFFERENT_SPF_POLICIES_FOUND", map[string]any{
+			if err := appendLog(ctx, &results, testcase, "Z11_DIFFERENT_SPF_POLICIES_FOUND", map[string]any{
 				"ns_list": strings.Join(sortedStrings(nsList), ";"),
 			}); err != nil {
 				return results, err
@@ -1414,7 +1392,7 @@ func Zone11(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		for _, ip := range badSpfIPs(nsSpf) {
 			nsList = append(nsList, ipToNS[ip]...)
 		}
-		if err := appendLog(&results, testcase, "Z11_SPF_MULTIPLE_RECORDS", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "Z11_SPF_MULTIPLE_RECORDS", map[string]any{
 			"ns_list": strings.Join(sortedStrings(nsList), ";"),
 		}); err != nil {
 			return results, err
@@ -1431,20 +1409,20 @@ func Zone11(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		if spfSyntaxOk(spfText) {
 			if z.Name.String() == "." || nextHigherIsRoot(z.Name) || strings.HasSuffix(strings.ToLower(z.Name.String()), ".arpa") {
 				if nullSpfRegex.MatchString(spfText) {
-					if err := appendLog(&results, testcase, "Z11_NULL_SPF_NON_MAIL_DOMAIN", map[string]any{
+					if err := appendLog(ctx, &results, testcase, "Z11_NULL_SPF_NON_MAIL_DOMAIN", map[string]any{
 						"domain": z.Name.String(),
 					}); err != nil {
 						return results, err
 					}
 				} else {
-					if err := appendLog(&results, testcase, "Z11_NON_NULL_SPF_NON_MAIL_DOMAIN", map[string]any{
+					if err := appendLog(ctx, &results, testcase, "Z11_NON_NULL_SPF_NON_MAIL_DOMAIN", map[string]any{
 						"domain": z.Name.String(),
 					}); err != nil {
 						return results, err
 					}
 				}
 			} else {
-				if err := appendLog(&results, testcase, "Z11_SPF_SYNTAX_OK", map[string]any{
+				if err := appendLog(ctx, &results, testcase, "Z11_SPF_SYNTAX_OK", map[string]any{
 					"domain": z.Name.String(),
 				}); err != nil {
 					return results, err
@@ -1455,7 +1433,7 @@ func Zone11(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			for ip := range nsSpf {
 				nsList = append(nsList, ipToNS[ip]...)
 			}
-			if err := appendLog(&results, testcase, "Z11_SPF_SYNTAX_ERROR", map[string]any{
+			if err := appendLog(ctx, &results, testcase, "Z11_SPF_SYNTAX_ERROR", map[string]any{
 				"ns_list": strings.Join(sortedStrings(nsList), ";"),
 				"domain":  z.Name.String(),
 			}); err != nil {
@@ -1464,18 +1442,18 @@ func Zone11(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
-func appendTestCaseEnd(results []*logger.Entry, testcase string) ([]*logger.Entry, error) {
-	if err := appendLog(&results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
+func appendTestCaseEnd(ctx context.Context, results []*logger.Entry, testcase string) ([]*logger.Entry, error) {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 	return results, nil
 }
 
-func appendLog(results *[]*logger.Entry, testcase string, tag string, args map[string]any) error {
-	entry, err := util.Logger().Add(tag, args, moduleName, testcase)
+func appendLog(ctx context.Context, results *[]*logger.Entry, testcase string, tag string, args map[string]any) error {
+	entry, err := util.LoggerFromContext(ctx).Add(tag, args, moduleName, testcase)
 	if err != nil {
 		return err
 	}
@@ -1483,8 +1461,8 @@ func appendLog(results *[]*logger.Entry, testcase string, tag string, args map[s
 	return nil
 }
 
-func ipDisabledMessageWithLogger(buf *testlogger.Buffer, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
-	if ns.Address.Is6() && !profile.Effective().Net.IPv6 {
+func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
+	if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 		for _, rrtype := range rrtypes {
 			if _, err := buf.Add("IPV6_DISABLED", map[string]any{
 				"ns":     ns.String(),
@@ -1495,7 +1473,7 @@ func ipDisabledMessageWithLogger(buf *testlogger.Buffer, ns nameserver.Nameserve
 		}
 		return true, nil
 	}
-	if ns.Address.Is4() && !profile.Effective().Net.IPv4 {
+	if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
 		for _, rrtype := range rrtypes {
 			if _, err := buf.Add("IPV4_DISABLED", map[string]any{
 				"ns":     ns.String(),
@@ -1509,10 +1487,10 @@ func ipDisabledMessageWithLogger(buf *testlogger.Buffer, ns nameserver.Nameserve
 	return false, nil
 }
 
-func ipDisabledMessage(results *[]*logger.Entry, testcase string, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
-	if !profile.Effective().Net.IPv6 && ns.Address.Is6() {
+func ipDisabledMessage(ctx context.Context, results *[]*logger.Entry, testcase string, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
+	if !profile.FromContext(ctx).Net.IPv6 && ns.Address.Is6() {
 		for _, rrtype := range rrtypes {
-			if err := appendLog(results, testcase, "IPV6_DISABLED", map[string]any{
+			if err := appendLog(ctx, results, testcase, "IPV6_DISABLED", map[string]any{
 				"ns":     ns.String(),
 				"rrtype": rrtype,
 			}); err != nil {
@@ -1521,9 +1499,9 @@ func ipDisabledMessage(results *[]*logger.Entry, testcase string, ns nameserver.
 		}
 		return true, nil
 	}
-	if !profile.Effective().Net.IPv4 && ns.Address.Is4() {
+	if !profile.FromContext(ctx).Net.IPv4 && ns.Address.Is4() {
 		for _, rrtype := range rrtypes {
-			if err := appendLog(results, testcase, "IPV4_DISABLED", map[string]any{
+			if err := appendLog(ctx, results, testcase, "IPV4_DISABLED", map[string]any{
 				"ns":     ns.String(),
 				"rrtype": rrtype,
 			}); err != nil {
@@ -1542,7 +1520,7 @@ func retrieveRecordFromZone(ctx context.Context, results *[]*logger.Entry, testc
 	}
 
 	for _, ns := range nss {
-		if disabled, err := ipDisabledMessage(results, testcase, ns, qtype); err != nil {
+		if disabled, err := ipDisabledMessage(ctx, results, testcase, ns, qtype); err != nil {
 			return packet.Packet{}, err
 		} else if disabled {
 			continue
@@ -1729,7 +1707,7 @@ func validDomain(value string) bool {
 	return ok
 }
 
-func nameserversFromNSItems(z *zonepkg.Zone, items []methodsv2.NSItem) []nameserver.Nameserver {
+func nameserversFromNSItems(ctx context.Context, z *zonepkg.Zone, items []methodsv2.NSItem) []nameserver.Nameserver {
 	if z == nil || z.Recursor() == nil {
 		return nil
 	}
@@ -1739,7 +1717,7 @@ func nameserversFromNSItems(z *zonepkg.Zone, items []methodsv2.NSItem) []nameser
 		if !item.HasAddress {
 			continue
 		}
-		ns, err := nameserver.New(item.Name.String(), item.Address.String(), z.Recursor().Client())
+		ns, err := nameserver.NewWithContext(ctx, item.Name.String(), item.Address.String(), z.Recursor().Client())
 		if err != nil {
 			continue
 		}

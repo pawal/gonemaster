@@ -7,9 +7,9 @@ import (
 	"github.com/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
-	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
@@ -40,9 +40,9 @@ func newRootRecursor(t *testing.T, data map[string][]string) *recursor.Recursor 
 	return r
 }
 
-func setNSHook(t *testing.T, r *recursor.Recursor, name string, addr string, zoneName string, nsNames ...string) {
+func setNSHook(ctx context.Context, t *testing.T, r *recursor.Recursor, name string, addr string, zoneName string, nsNames ...string) {
 	t.Helper()
-	ns, err := nameserver.New(name, addr, r.Client())
+	ns, err := nameserver.NewWithContext(ctx, name, addr, r.Client())
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -66,25 +66,23 @@ func TestMethod1ParentRoot(t *testing.T) {
 }
 
 func TestMethod3DedupAndSort(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
-	defer profile.ResetEffective()
-	profile.Effective().Net.IPv4 = true
-	profile.Effective().Net.IPv6 = true
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.Net.IPv4 = true
+	prof.Net.IPv6 = true
 
 	r := newRootRecursor(t, map[string][]string{
 		"a.root": {"192.0.2.1"},
 		"b.root": {"192.0.2.2"},
 	})
-	setNSHook(t, r, "a.root", "192.0.2.1", ".", "a.root", "b.root")
-	setNSHook(t, r, "b.root", "192.0.2.2", ".", "B.ROOT", "c.root")
+	setNSHook(ctx, t, r, "a.root", "192.0.2.1", ".", "a.root", "b.root")
+	setNSHook(ctx, t, r, "b.root", "192.0.2.2", ".", "B.ROOT", "c.root")
 
 	z, err := zone.NewWithRecursor(".", r)
 	if err != nil {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	names, err := Method3(context.Background(), &z)
+	names, err := Method3(ctx, &z)
 	if err != nil {
 		t.Fatalf("method3: %v", err)
 	}
@@ -100,25 +98,23 @@ func TestMethod3DedupAndSort(t *testing.T) {
 }
 
 func TestMethod2and3UnionSorted(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
-	defer profile.ResetEffective()
-	profile.Effective().Net.IPv4 = true
-	profile.Effective().Net.IPv6 = true
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.Net.IPv4 = true
+	prof.Net.IPv6 = true
 
 	r := newRootRecursor(t, map[string][]string{
 		"a.root": {"192.0.2.3"},
 		"b.root": {"192.0.2.4"},
 	})
-	setNSHook(t, r, "a.root", "192.0.2.3", ".", "a.root", "b.root")
-	setNSHook(t, r, "b.root", "192.0.2.4", ".", "c.root")
+	setNSHook(ctx, t, r, "a.root", "192.0.2.3", ".", "a.root", "b.root")
+	setNSHook(ctx, t, r, "b.root", "192.0.2.4", ".", "c.root")
 
 	z, err := zone.NewWithRecursor(".", r)
 	if err != nil {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	names, err := Method2and3(context.Background(), &z)
+	names, err := Method2and3(ctx, &z)
 	if err != nil {
 		t.Fatalf("method2and3: %v", err)
 	}
@@ -136,25 +132,25 @@ func TestMethod2and3UnionSorted(t *testing.T) {
 func TestMethod4and5UnionSorted(t *testing.T) {
 	nameserver.EmptyCache()
 	defer nameserver.EmptyCache()
-	defer profile.ResetEffective()
-	profile.Effective().Net.IPv4 = true
-	profile.Effective().Net.IPv6 = true
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.Net.IPv4 = true
+	prof.Net.IPv6 = true
 
 	r := newRootRecursor(t, map[string][]string{
 		"a.root": {"192.0.2.5"},
 		"b.root": {"192.0.2.6"},
 		"c.root": {"192.0.2.7"},
 	})
-	setNSHook(t, r, "a.root", "192.0.2.5", ".", "a.root", "b.root")
-	setNSHook(t, r, "b.root", "192.0.2.6", ".", "a.root", "b.root")
-	setNSHook(t, r, "c.root", "192.0.2.7", ".", "a.root", "b.root")
+	setNSHook(ctx, t, r, "a.root", "192.0.2.5", ".", "a.root", "b.root")
+	setNSHook(ctx, t, r, "b.root", "192.0.2.6", ".", "a.root", "b.root")
+	setNSHook(ctx, t, r, "c.root", "192.0.2.7", ".", "a.root", "b.root")
 
 	z, err := zone.NewWithRecursor(".", r)
 	if err != nil {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	out, err := Method4and5(context.Background(), &z)
+	out, err := Method4and5(ctx, &z)
 	if err != nil {
 		t.Fatalf("method4and5: %v", err)
 	}

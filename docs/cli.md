@@ -64,7 +64,14 @@ Use `--output PATH` to write the selected output to a file.
 | `--parallel N` | int | Override `resolver.defaults.parallel`. Must be `>= 1` when set. |
 | `--unordered` | bool | Allow unordered resolver behavior (overrides `resolver.defaults.unordered`). |
 | `--ordered` | bool | Force ordered resolver behavior (overrides `resolver.defaults.unordered`). |
+| `--timeout N` | int | Override `resolver.defaults.timeout` in seconds. Must be `>= 0` when set. |
+| `--retry N` | int | Override `resolver.defaults.retry`. Must be `>= 0` when set. |
+| `--retrans N` | int | Override `resolver.defaults.retrans` in seconds. Must be `>= 0` when set. |
+| `--fallback` | bool | Enable TCP fallback on UDP failure (overrides `resolver.defaults.fallback`). |
+| `--no-fallback` | bool | Disable TCP fallback on UDP failure (overrides `resolver.defaults.fallback`). |
 | `--error-cache-ttl N` | int | Seconds to skip queries after network errors. Must be `>= 0` when set. |
+| `--positive-cache-ttl N` | int | Seconds to cache positive DNS responses. Must be `>= 0` when set. |
+| `--negative-cache-ttl N` | int | Seconds to cache negative DNS responses. Must be `>= 0` when set. |
 | `--no-progress` | bool | Disable progress indicator/spinner. |
 | `--list-tests` | bool | List available test cases and exit. |
 | `--version` | bool | Print version information and exit. |

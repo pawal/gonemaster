@@ -170,6 +170,28 @@ var propertyDefs = map[string]propertyDef{
 			return p.Resolver.Defaults.ErrorCacheTTL
 		},
 	},
+	"resolver.defaults.positive_cache_ttl": {
+		typ: propNum,
+		min: intPtr(0),
+		max: intPtr(86400),
+		setter: func(p *Profile, value any) {
+			p.Resolver.Defaults.PositiveCacheTTL = value.(int)
+		},
+		getter: func(p *Profile) any {
+			return p.Resolver.Defaults.PositiveCacheTTL
+		},
+	},
+	"resolver.defaults.negative_cache_ttl": {
+		typ: propNum,
+		min: intPtr(0),
+		max: intPtr(86400),
+		setter: func(p *Profile, value any) {
+			p.Resolver.Defaults.NegativeCacheTTL = value.(int)
+		},
+		getter: func(p *Profile) any {
+			return p.Resolver.Defaults.NegativeCacheTTL
+		},
+	},
 	"resolver.source4": {
 		typ:          propStr,
 		defaultValue: "",

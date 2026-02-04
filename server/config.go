@@ -12,28 +12,50 @@ type Config struct {
 	MaxBodySize int64
 	Debug       bool
 	WorkerCount int
+	// MaxConcurrentJobs caps engine runs across workers when >0.
+	MaxConcurrentJobs int
+	// PositiveCacheTTL overrides resolver.defaults.positive_cache_ttl when set.
+	PositiveCacheTTL *int
+	// NegativeCacheTTL overrides resolver.defaults.negative_cache_ttl when set.
+	NegativeCacheTTL *int
+	// Timeout overrides resolver.defaults.timeout when set (seconds).
+	Timeout *int
+	// Retry overrides resolver.defaults.retry when set.
+	Retry *int
+	// Retrans overrides resolver.defaults.retrans when set (seconds).
+	Retrans *int
+	// Fallback overrides resolver.defaults.fallback when set.
+	Fallback    *bool
 	MinLevel    string
 	ProfilePath string
 }
 
 // FileConfig captures optional configuration fields from JSON.
 type FileConfig struct {
-	ListenAddr  *string `json:"listen_addr"`
-	MaxBodySize *int64  `json:"max_body_size"`
-	Debug       *bool   `json:"debug"`
-	WorkerCount *int    `json:"worker_count"`
-	MinLevel    *string `json:"min_level"`
-	ProfilePath *string `json:"profile_path"`
+	ListenAddr        *string `json:"listen_addr"`
+	MaxBodySize       *int64  `json:"max_body_size"`
+	Debug             *bool   `json:"debug"`
+	WorkerCount       *int    `json:"worker_count"`
+	MaxConcurrentJobs *int    `json:"max_concurrent_jobs"`
+	PositiveCacheTTL  *int    `json:"positive_cache_ttl"`
+	NegativeCacheTTL  *int    `json:"negative_cache_ttl"`
+	Timeout           *int    `json:"timeout"`
+	Retry             *int    `json:"retry"`
+	Retrans           *int    `json:"retrans"`
+	Fallback          *bool   `json:"fallback"`
+	MinLevel          *string `json:"min_level"`
+	ProfilePath       *string `json:"profile_path"`
 }
 
 // DefaultConfig returns baseline config values.
 func DefaultConfig() Config {
 	return Config{
-		ListenAddr:  ":8080",
-		MaxBodySize: 1 << 20,
-		Debug:       false,
-		WorkerCount: 4,
-		MinLevel:    "INFO",
+		ListenAddr:        ":8080",
+		MaxBodySize:       1 << 20,
+		Debug:             false,
+		WorkerCount:       4,
+		MaxConcurrentJobs: 0,
+		MinLevel:          "INFO",
 	}
 }
 
@@ -63,6 +85,27 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 	}
 	if file.WorkerCount != nil {
 		c.WorkerCount = *file.WorkerCount
+	}
+	if file.MaxConcurrentJobs != nil {
+		c.MaxConcurrentJobs = *file.MaxConcurrentJobs
+	}
+	if file.PositiveCacheTTL != nil {
+		c.PositiveCacheTTL = file.PositiveCacheTTL
+	}
+	if file.NegativeCacheTTL != nil {
+		c.NegativeCacheTTL = file.NegativeCacheTTL
+	}
+	if file.Timeout != nil {
+		c.Timeout = file.Timeout
+	}
+	if file.Retry != nil {
+		c.Retry = file.Retry
+	}
+	if file.Retrans != nil {
+		c.Retrans = file.Retrans
+	}
+	if file.Fallback != nil {
+		c.Fallback = file.Fallback
 	}
 	if file.MinLevel != nil {
 		c.MinLevel = *file.MinLevel

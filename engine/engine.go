@@ -8,8 +8,10 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"codeberg.org/pawal/gonemaster/engine/logger"
+	ns "codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 	address "codeberg.org/pawal/gonemaster/engine/test/address"
 	"codeberg.org/pawal/gonemaster/engine/test/basic"
@@ -38,10 +40,24 @@ type RunRequest struct {
 	Unordered *bool
 	// ErrorCacheTTL sets resolver.defaults.error_cache_ttl in seconds.
 	ErrorCacheTTL *int
+	// Timeout sets resolver.defaults.timeout in seconds.
+	Timeout *int
+	// Retry sets resolver.defaults.retry (number of retries).
+	Retry *int
+	// Retrans sets resolver.defaults.retrans in seconds.
+	Retrans *int
+	// Fallback sets resolver.defaults.fallback.
+	Fallback *bool
+	// PositiveCacheTTL sets resolver.defaults.positive_cache_ttl in seconds.
+	PositiveCacheTTL *int
+	// NegativeCacheTTL sets resolver.defaults.negative_cache_ttl in seconds.
+	NegativeCacheTTL *int
 	// LogCallback receives each log entry as it is created.
 	LogCallback func(*logger.Entry) error
 	// Context controls cancellation and timeouts for the run.
 	Context context.Context
+	// Runner, when set, supplies the per-run container to Run.
+	Runner *Runner
 }
 
 // LogEntry mirrors the JSON output produced by the Perl logger.
@@ -57,7 +73,7 @@ type LogEntry struct {
 var ErrNotImplemented = errors.New("engine not implemented")
 
 // Version is the semantic version for this build.
-var Version = "0.9.13"
+var Version = "0.9.14"
 
 // Commit is optionally set at build time using -ldflags.
 var Commit = ""
@@ -228,70 +244,103 @@ func splitTestcaseNumber(name string) (string, int, bool) {
 	return name[:idx], num, true
 }
 
-// EffectiveProfile returns the profile that would be used for the request.
-func EffectiveProfile(req RunRequest) (*profile.Profile, error) {
+func normalizeRequest(req RunRequest) (string, string, error) {
 	module := strings.ToLower(strings.TrimSpace(req.Module))
 	testcase := strings.ToLower(strings.TrimSpace(req.Testcase))
 
 	if module != "" && moduleTestcases[module] == nil {
-		return nil, ErrNotImplemented
+		return "", "", ErrNotImplemented
 	}
 	if testcase != "" {
 		testModule := testcaseModule(testcase)
 		if testModule == "" {
-			return nil, ErrNotImplemented
+			return "", "", ErrNotImplemented
 		}
 		if module != "" && module != testModule {
-			return nil, ErrNotImplemented
+			return "", "", ErrNotImplemented
 		}
 	}
+	return module, testcase, nil
+}
 
+func buildProfile(req RunRequest, module string, testcase string) (*profile.Profile, bool, error) {
 	p, err := profile.Default()
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	if req.Profile != "" {
 		data, err := os.ReadFile(req.Profile)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		override, err := profile.FromYAML(string(data))
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		if err := p.Merge(override); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 	}
 
 	if req.IPv4 != nil {
 		if err := p.Set("net.ipv4", *req.IPv4); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 	}
 	if req.IPv6 != nil {
 		if err := p.Set("net.ipv6", *req.IPv6); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 	}
 	if req.Parallel != nil {
 		if err := p.Set("resolver.defaults.parallel", *req.Parallel); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 	}
 	if req.Unordered != nil {
 		if err := p.Set("resolver.defaults.unordered", *req.Unordered); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 	}
 	if req.ErrorCacheTTL != nil {
 		if err := p.Set("resolver.defaults.error_cache_ttl", *req.ErrorCacheTTL); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 	}
-	if shouldAutoDisableIPv6(req, p.Net.IPv6) {
+	if req.Timeout != nil {
+		if err := p.Set("resolver.defaults.timeout", *req.Timeout); err != nil {
+			return nil, false, err
+		}
+	}
+	if req.Retry != nil {
+		if err := p.Set("resolver.defaults.retry", *req.Retry); err != nil {
+			return nil, false, err
+		}
+	}
+	if req.Retrans != nil {
+		if err := p.Set("resolver.defaults.retrans", *req.Retrans); err != nil {
+			return nil, false, err
+		}
+	}
+	if req.Fallback != nil {
+		if err := p.Set("resolver.defaults.fallback", *req.Fallback); err != nil {
+			return nil, false, err
+		}
+	}
+	if req.PositiveCacheTTL != nil {
+		if err := p.Set("resolver.defaults.positive_cache_ttl", *req.PositiveCacheTTL); err != nil {
+			return nil, false, err
+		}
+	}
+	if req.NegativeCacheTTL != nil {
+		if err := p.Set("resolver.defaults.negative_cache_ttl", *req.NegativeCacheTTL); err != nil {
+			return nil, false, err
+		}
+	}
+	autoDisabledIPv6 := shouldAutoDisableIPv6(req, p.Net.IPv6)
+	if autoDisabledIPv6 {
 		if err := p.Set("net.ipv6", false); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 	}
 
@@ -316,123 +365,41 @@ func EffectiveProfile(req RunRequest) (*profile.Profile, error) {
 		}
 	}
 
-	return p, nil
+	return p, autoDisabledIPv6, nil
 }
 
-// Run executes a Zonemaster test run.
-func Run(req RunRequest) ([]LogEntry, error) {
+// EffectiveProfile returns the profile that would be used for the request.
+func EffectiveProfile(req RunRequest) (*profile.Profile, error) {
+	if req.Runner != nil && req.Runner.Profile != nil {
+		return req.Runner.Profile, nil
+	}
+	module, testcase, err := normalizeRequest(req)
+	if err != nil {
+		return nil, err
+	}
+	p, _, err := buildProfile(req, module, testcase)
+	return p, err
+}
+
+// RunWithRunner executes a Zonemaster test run using a provided runner.
+func RunWithRunner(req RunRequest, runner *Runner) ([]LogEntry, error) {
 	if strings.TrimSpace(req.Domain) == "" {
 		return nil, fmt.Errorf("domain is required")
 	}
-
-	module := strings.ToLower(strings.TrimSpace(req.Module))
-	testcase := strings.ToLower(strings.TrimSpace(req.Testcase))
-
-	if module != "" && moduleTestcases[module] == nil {
-		return nil, ErrNotImplemented
+	if runner == nil {
+		return nil, fmt.Errorf("runner is required")
 	}
-	if testcase != "" {
-		testModule := testcaseModule(testcase)
-		if testModule == "" {
-			return nil, ErrNotImplemented
-		}
-		if module != "" && module != testModule {
-			return nil, ErrNotImplemented
-		}
+	if runner.Profile == nil {
+		return nil, fmt.Errorf("runner profile is required")
+	}
+	if runner.Logger == nil {
+		return nil, fmt.Errorf("runner logger is required")
+	}
+	if runner.NameserverCache == nil {
+		runner.NameserverCache = ns.NewCacheStore()
 	}
 
-	log := logger.New()
-	if req.LogCallback != nil {
-		log.Callback = req.LogCallback
-	}
-	util.SetLogger(log)
-	defer util.SetLogger(nil)
-	logger.StartTimeNow()
-
-	profile.ResetEffective()
-	if req.Profile != "" {
-		data, err := os.ReadFile(req.Profile)
-		if err != nil {
-			return nil, err
-		}
-		override, err := profile.FromYAML(string(data))
-		if err != nil {
-			return nil, err
-		}
-		if err := profile.Effective().Merge(override); err != nil {
-			return nil, err
-		}
-	}
-
-	if req.IPv4 != nil {
-		if err := profile.Effective().Set("net.ipv4", *req.IPv4); err != nil {
-			return nil, err
-		}
-	}
-	if req.IPv6 != nil {
-		if err := profile.Effective().Set("net.ipv6", *req.IPv6); err != nil {
-			return nil, err
-		}
-	}
-	if req.Parallel != nil {
-		if err := profile.Effective().Set("resolver.defaults.parallel", *req.Parallel); err != nil {
-			return nil, err
-		}
-	}
-	if req.Unordered != nil {
-		if err := profile.Effective().Set("resolver.defaults.unordered", *req.Unordered); err != nil {
-			return nil, err
-		}
-	}
-	if req.ErrorCacheTTL != nil {
-		if err := profile.Effective().Set("resolver.defaults.error_cache_ttl", *req.ErrorCacheTTL); err != nil {
-			return nil, err
-		}
-	}
-	autoDisabledIPv6 := shouldAutoDisableIPv6(req, profile.Effective().Net.IPv6)
-	if autoDisabledIPv6 {
-		if err := profile.Effective().Set("net.ipv6", false); err != nil {
-			return nil, err
-		}
-	}
-
-	if testcase == "" {
-		switch module {
-		case "basic":
-			_ = profile.Effective().Set("test_cases", toAnySlice(moduleTestcases[module]))
-		case "syntax":
-			_ = profile.Effective().Set("test_cases", toAnySlice(moduleTestcases[module]))
-		case "address":
-			_ = profile.Effective().Set("test_cases", toAnySlice(moduleTestcases[module]))
-		case "connectivity":
-			_ = profile.Effective().Set("test_cases", toAnySlice(moduleTestcases[module]))
-		case "dnssec":
-			_ = profile.Effective().Set("test_cases", toAnySlice(moduleTestcases[module]))
-		case "delegation":
-			_ = profile.Effective().Set("test_cases", toAnySlice(moduleTestcases[module]))
-		case "nameserver":
-			_ = profile.Effective().Set("test_cases", toAnySlice(moduleTestcases[module]))
-		case "zone":
-			_ = profile.Effective().Set("test_cases", toAnySlice(moduleTestcases[module]))
-		}
-	}
-
-	queryLimit := profile.Effective().Resolver.Defaults.Parallel
-	if profile.Effective().Resolver.Defaults.Unordered && queryLimit > 1 {
-		queryLimit = queryLimit * queryLimit
-	}
-	transport.SetGlobalQueryLimit(queryLimit)
-	logger.ResetConfig()
-	if autoDisabledIPv6 {
-		if _, err := util.Info("IPV6_DISABLED", map[string]any{"reason": "auto_no_global_ipv6"}); err != nil {
-			return nil, err
-		}
-	}
-	if _, err := util.Info("GLOBAL_VERSION", map[string]any{"version": VersionString()}); err != nil {
-		return nil, err
-	}
-
-	z, err := zone.New(req.Domain)
+	module, testcase, err := normalizeRequest(req)
 	if err != nil {
 		return nil, err
 	}
@@ -440,6 +407,81 @@ func Run(req RunRequest) ([]LogEntry, error) {
 	ctx := req.Context
 	if ctx == nil {
 		ctx = context.Background()
+	}
+	ctx = profile.WithContext(ctx, runner.Profile)
+	ctx = logger.WithContext(ctx, runner.Logger)
+	if runner.Limiter != nil {
+		ctx = transport.WithLimiter(ctx, runner.Limiter)
+	}
+	ctx = ns.WithCache(ctx, runner.NameserverCache)
+	if runner.StartedAt.IsZero() {
+		runner.StartedAt = time.Now()
+	}
+	if runner.Profile != nil {
+		runner.Logger.SetProfile(runner.Profile)
+	}
+	ctx = WithRunner(ctx, runner)
+
+	if runner.AutoIPv6Disabled {
+		if _, err := runner.Logger.AddWithoutCallback("IPV6_DISABLED", map[string]any{"reason": "auto_no_global_ipv6"}, "", ""); err != nil {
+			return nil, err
+		}
+	}
+	if _, err := runner.Logger.AddWithoutCallback("GLOBAL_VERSION", map[string]any{"version": VersionString()}, "", ""); err != nil {
+		return nil, err
+	}
+
+	entries, err := runWithContext(ctx, req, module, testcase)
+	if err != nil {
+		return nil, err
+	}
+	return convertEntries(entries, req.MinLevel)
+}
+
+// Run executes a Zonemaster test run.
+func Run(req RunRequest) ([]LogEntry, error) {
+	if req.Runner != nil {
+		return RunWithRunner(req, req.Runner)
+	}
+
+	module, testcase, err := normalizeRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	log := logger.New()
+	if req.LogCallback != nil {
+		log.Callback = req.LogCallback
+	}
+
+	p, autoDisabledIPv6, err := buildProfile(req, module, testcase)
+	if err != nil {
+		return nil, err
+	}
+	log.SetProfile(p)
+
+	queryLimit := p.Resolver.Defaults.Parallel
+	if p.Resolver.Defaults.Unordered && queryLimit > 1 {
+		queryLimit = queryLimit * queryLimit
+	}
+	limiter := transport.NewLimiter(queryLimit)
+
+	runner := &Runner{
+		Profile:          p,
+		Logger:           log,
+		Limiter:          limiter,
+		NameserverCache:  ns.NewCacheStore(),
+		StartedAt:        time.Now(),
+		AutoIPv6Disabled: autoDisabledIPv6,
+	}
+
+	return RunWithRunner(req, runner)
+}
+
+func runWithContext(ctx context.Context, req RunRequest, module string, testcase string) ([]*logger.Entry, error) {
+	z, err := zone.New(req.Domain)
+	if err != nil {
+		return nil, err
 	}
 	var entries []*logger.Entry
 	switch {
@@ -484,15 +526,15 @@ func Run(req RunRequest) ([]LogEntry, error) {
 	case module == "":
 		entries, err = basic.All(ctx, &z)
 		if err == nil {
-			if !basic.CanContinue(&z, entries) {
-				entry, addErr := util.Info("CANNOT_CONTINUE", map[string]any{"domain": z.Name.String()})
+			if !basic.CanContinue(ctx, &z, entries) {
+				entry, addErr := util.Info(ctx, "CANNOT_CONTINUE", map[string]any{"domain": z.Name.String()})
 				if addErr != nil {
 					return nil, addErr
 				}
 				if entry != nil {
 					entries = append(entries, entry)
 				}
-				return convertEntries(entries, req.MinLevel)
+				return entries, nil
 			}
 			more, err2 := address.AddressAll(ctx, &z)
 			if err2 != nil {
@@ -542,7 +584,7 @@ func Run(req RunRequest) ([]LogEntry, error) {
 		return nil, err
 	}
 
-	return convertEntries(entries, req.MinLevel)
+	return entries, nil
 }
 
 func convertEntries(entries []*logger.Entry, minLevel string) ([]LogEntry, error) {

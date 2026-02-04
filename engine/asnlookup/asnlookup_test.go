@@ -9,10 +9,8 @@ import (
 
 	"github.com/miekg/dns"
 
-	"codeberg.org/pawal/gonemaster/engine/logger"
+	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/packet"
-	"codeberg.org/pawal/gonemaster/engine/profile"
-	"codeberg.org/pawal/gonemaster/engine/util"
 )
 
 type fakeResolver struct {
@@ -55,7 +53,7 @@ func soaRR(name string, mname string, rname string) *dns.SOA {
 }
 
 func TestGetWithPrefixValidationErrors(t *testing.T) {
-	ctx := context.Background()
+	ctx, prof, _ := testhelpers.Context(t)
 	ip := netip.MustParseAddr("192.0.2.1")
 
 	if _, err := GetWithPrefix(ctx, nil, ip); err == nil || !strings.Contains(err.Error(), "missing resolver") {
@@ -68,37 +66,29 @@ func TestGetWithPrefixValidationErrors(t *testing.T) {
 		t.Fatalf("expected invalid IP address error, got %v", err)
 	}
 
-	profile.ResetEffective()
-	t.Cleanup(profile.ResetEffective)
-
-	profile.Effective().ASNDB.Style = ""
-	profile.Effective().ASNDB.Sources = map[string][]string{"cymru": {"asnlookup.zonemaster.net"}}
+	prof.ASNDB.Style = ""
+	prof.ASNDB.Sources = map[string][]string{"cymru": {"asnlookup.zonemaster.net"}}
 	if _, err := GetWithPrefix(ctx, resolver, ip); err == nil || !strings.Contains(err.Error(), "asn database style undefined") {
 		t.Fatalf("expected undefined style error, got %v", err)
 	}
 
-	profile.Effective().ASNDB.Style = "cymru"
-	profile.Effective().ASNDB.Sources = map[string][]string{}
+	prof.ASNDB.Style = "cymru"
+	prof.ASNDB.Sources = map[string][]string{}
 	if _, err := GetWithPrefix(ctx, resolver, ip); err == nil || !strings.Contains(err.Error(), "asn database sources undefined") {
 		t.Fatalf("expected undefined sources error, got %v", err)
 	}
 
-	profile.Effective().ASNDB.Style = "bogus"
-	profile.Effective().ASNDB.Sources = map[string][]string{"bogus": {"example.com"}}
+	prof.ASNDB.Style = "bogus"
+	prof.ASNDB.Sources = map[string][]string{"bogus": {"example.com"}}
 	if _, err := GetWithPrefix(ctx, resolver, ip); err == nil || !strings.Contains(err.Error(), "asn database style value") {
 		t.Fatalf("expected illegal style error, got %v", err)
 	}
 }
 
 func TestGetWithPrefixTryNextToCodeError(t *testing.T) {
-	profile.ResetEffective()
-	t.Cleanup(profile.ResetEffective)
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
-
-	profile.Effective().ASNDB.Style = "cymru"
-	profile.Effective().ASNDB.Sources = map[string][]string{"cymru": {"asnlookup.zonemaster.net"}}
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.ASNDB.Style = "cymru"
+	prof.ASNDB.Sources = map[string][]string{"cymru": {"asnlookup.zonemaster.net"}}
 
 	resolver := fakeResolver{
 		handler: func(ctx context.Context, name, qtype, qclass string) (packet.Packet, error) {
@@ -107,7 +97,7 @@ func TestGetWithPrefixTryNextToCodeError(t *testing.T) {
 	}
 
 	ip := netip.MustParseAddr("192.0.2.1")
-	result, err := GetWithPrefix(context.Background(), resolver, ip)
+	result, err := GetWithPrefix(ctx, resolver, ip)
 	if err != nil {
 		t.Fatalf("GetWithPrefix error: %v", err)
 	}
@@ -117,8 +107,7 @@ func TestGetWithPrefixTryNextToCodeError(t *testing.T) {
 }
 
 func TestLookupCymruNXDomainSOAEmpty(t *testing.T) {
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx, _, _ := testhelpers.Context(t)
 
 	ip := netip.MustParseAddr("192.0.2.1")
 	source := "asnlookup.zonemaster.net"
@@ -132,7 +121,7 @@ func TestLookupCymruNXDomainSOAEmpty(t *testing.T) {
 		},
 	}
 
-	result, err := lookupCymru(context.Background(), resolver, ip, source)
+	result, err := lookupCymru(ctx, resolver, ip, source)
 	if err != nil {
 		t.Fatalf("lookupCymru error: %v", err)
 	}
@@ -142,8 +131,7 @@ func TestLookupCymruNXDomainSOAEmpty(t *testing.T) {
 }
 
 func TestLookupCymruSelectsMostSpecificPrefix(t *testing.T) {
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx, _, _ := testhelpers.Context(t)
 
 	ip := netip.MustParseAddr("192.0.2.1")
 	source := "asnlookup.zonemaster.net"
@@ -159,7 +147,7 @@ func TestLookupCymruSelectsMostSpecificPrefix(t *testing.T) {
 		},
 	}
 
-	result, err := lookupCymru(context.Background(), resolver, ip, source)
+	result, err := lookupCymru(ctx, resolver, ip, source)
 	if err != nil {
 		t.Fatalf("lookupCymru error: %v", err)
 	}
@@ -175,14 +163,9 @@ func TestLookupCymruSelectsMostSpecificPrefix(t *testing.T) {
 }
 
 func TestGetReturnsNilOnEmpty(t *testing.T) {
-	profile.ResetEffective()
-	t.Cleanup(profile.ResetEffective)
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
-
-	profile.Effective().ASNDB.Style = "cymru"
-	profile.Effective().ASNDB.Sources = map[string][]string{"cymru": {"asnlookup.zonemaster.net"}}
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.ASNDB.Style = "cymru"
+	prof.ASNDB.Sources = map[string][]string{"cymru": {"asnlookup.zonemaster.net"}}
 
 	resolver := fakeResolver{
 		handler: func(ctx context.Context, name, qtype, qclass string) (packet.Packet, error) {
@@ -191,7 +174,7 @@ func TestGetReturnsNilOnEmpty(t *testing.T) {
 	}
 
 	ip := netip.MustParseAddr("192.0.2.1")
-	asns, err := Get(context.Background(), resolver, ip)
+	asns, err := Get(ctx, resolver, ip)
 	if err != nil {
 		t.Fatalf("Get error: %v", err)
 	}

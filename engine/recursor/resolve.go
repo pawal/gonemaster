@@ -33,7 +33,7 @@ func (r *Recursor) Parent(ctx context.Context, name string) (string, packet.Pack
 		return ".", packet.Packet{}, nil
 	}
 
-	root, err := r.RootServers()
+	root, err := r.RootServers(ctx)
 	if err != nil {
 		return "", packet.Packet{}, err
 	}
@@ -98,7 +98,7 @@ func (r *Recursor) getAddressesFor(ctx context.Context, name string, state *recu
 	}
 	state.unlock()
 
-	root, err := r.RootServers()
+	root, err := r.RootServers(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -113,11 +113,11 @@ func (r *Recursor) getAddressesFor(ctx context.Context, name string, state *recu
 	pa := packet.Packet{}
 	paaaa := packet.Packet{}
 
-	parallelism := profile.Effective().Resolver.Defaults.Parallel
+	parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 	if parallelism < 1 {
 		parallelism = 1
 	}
-	if profile.Effective().Resolver.Defaults.Unordered || isUnorderedContext(ctx) {
+	if profile.FromContext(ctx).Resolver.Defaults.Unordered || isUnorderedContext(ctx) {
 		parallelism = 1
 	}
 	if parallelism == 1 {
@@ -306,7 +306,7 @@ func (r *Recursor) recurseWithNameservers(ctx context.Context, name string, qtyp
 	}
 
 	if ns == nil {
-		root, err := r.RootServers()
+		root, err := r.RootServers(ctx)
 		if err != nil {
 			return packet.Packet{}, err
 		}
@@ -373,7 +373,7 @@ func (r *Recursor) cacheStore(name string, qtype string, qclass string, resp pac
 	r.recurseCache[name][qtype][qclass] = &copyResp
 }
 
-func (r *Recursor) getNSFrom(resp packet.Packet, state *recurseState) ([]queryer, error) {
+func (r *Recursor) getNSFrom(ctx context.Context, resp packet.Packet, state *recurseState) ([]queryer, error) {
 	nsRecords := resp.GetRecords("NS")
 	if len(nsRecords) == 0 {
 		return nil, nil
@@ -448,7 +448,7 @@ func (r *Recursor) getNSFrom(resp packet.Packet, state *recurseState) ([]queryer
 		key := strings.ToLower(nameObj.String())
 		if addrs, ok := glueSnapshot[key]; ok && len(addrs) > 0 {
 			for _, addr := range addrs {
-				ns, err := nameserver.New(name, addr.String(), r.client)
+				ns, err := nameserver.NewWithContext(ctx, name, addr.String(), r.client)
 				if err != nil {
 					return nil, fmt.Errorf("create nameserver for %s: %w", name, err)
 				}
@@ -492,11 +492,11 @@ func (l lazyNameserver) QueryWithClass(ctx context.Context, qname string, qtype 
 	nameObj := dnsname.New(l.name)
 	nameKey := strings.ToLower(nameObj.String())
 
-	parallelism := profile.Effective().Resolver.Defaults.Parallel
+	parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 	if parallelism < 1 {
 		parallelism = 1
 	}
-	if profile.Effective().Resolver.Defaults.Unordered || isUnorderedContext(ctx) {
+	if profile.FromContext(ctx).Resolver.Defaults.Unordered || isUnorderedContext(ctx) {
 		parallelism = 1
 	}
 	queryAddresses := func(addrs []netip.Addr) (packet.Packet, error) {
@@ -505,7 +505,7 @@ func (l lazyNameserver) QueryWithClass(ctx context.Context, qname string, qtype 
 		}
 		if parallelism <= 1 || len(addrs) == 1 {
 			for _, addr := range addrs {
-				ns, err := nameserver.New(l.name, addr.String(), l.recursor.client)
+				ns, err := nameserver.NewWithContext(ctx, l.name, addr.String(), l.recursor.client)
 				if err != nil {
 					continue
 				}
@@ -521,7 +521,7 @@ func (l lazyNameserver) QueryWithClass(ctx context.Context, qname string, qtype 
 		for i, addr := range addrs {
 			addr := addr
 			tasks[i] = func(ctx context.Context) (packet.Packet, error) {
-				ns, err := nameserver.New(l.name, addr.String(), l.recursor.client)
+				ns, err := nameserver.NewWithContext(ctx, l.name, addr.String(), l.recursor.client)
 				if err != nil {
 					return packet.Packet{}, err
 				}

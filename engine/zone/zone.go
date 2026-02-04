@@ -165,7 +165,7 @@ func (z *Zone) Glue(ctx context.Context) ([]nameserver.Nameserver, error) {
 	if z.recursor.HasFakeAddresses(z.Name.String()) {
 		for _, nsName := range glueNames {
 			for _, addr := range z.recursor.GetFakeAddresses(z.Name.String(), nsName.String()) {
-				ns, err := nameserver.New(nsName.String(), addr.String(), z.recursor.Client())
+				ns, err := nameserver.NewWithContext(ctx, nsName.String(), addr.String(), z.recursor.Client())
 				if err != nil {
 					return nil, err
 				}
@@ -179,7 +179,7 @@ func (z *Zone) Glue(ctx context.Context) ([]nameserver.Nameserver, error) {
 				return nil, err
 			}
 			for _, addr := range addrs {
-				ns, err := nameserver.New(nsName.String(), addr.String(), z.recursor.Client())
+				ns, err := nameserver.NewWithContext(ctx, nsName.String(), addr.String(), z.recursor.Client())
 				if err != nil {
 					return nil, err
 				}
@@ -281,7 +281,7 @@ func (z *Zone) NS(ctx context.Context) ([]nameserver.Nameserver, error) {
 	}
 
 	if z.Name.String() == "." {
-		root, err := z.recursor.RootServers()
+		root, err := z.recursor.RootServers(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -301,7 +301,7 @@ func (z *Zone) NS(ctx context.Context) ([]nameserver.Nameserver, error) {
 			return nil, err
 		}
 		for _, addr := range addrs {
-			ns, err := nameserver.New(nsName.String(), addr.String(), z.recursor.Client())
+			ns, err := nameserver.NewWithContext(ctx, nsName.String(), addr.String(), z.recursor.Client())
 			if err != nil {
 				return nil, err
 			}
@@ -345,8 +345,9 @@ func (z *Zone) QueryOne(ctx context.Context, name string, qtype string, opts *na
 	if err != nil {
 		return packet.Packet{}, err
 	}
+	prof := profile.FromContext(ctx)
 	for _, ns := range servers {
-		if ipDisabled(ns.Address) {
+		if ipDisabled(prof, ns.Address) {
 			continue
 		}
 		resp, err := ns.QueryWithOptions(ctx, name, qtype, opts)
@@ -367,11 +368,12 @@ func (z *Zone) QueryAll(ctx context.Context, name string, qtype string, opts *na
 		return nil, err
 	}
 
-	parallelism := profile.Effective().Resolver.Defaults.Parallel
+	prof := profile.FromContext(ctx)
+	parallelism := prof.Resolver.Defaults.Parallel
 	if parallelism <= 1 {
 		var res []packet.Packet
 		for _, ns := range servers {
-			if ipDisabled(ns.Address) {
+			if ipDisabled(prof, ns.Address) {
 				continue
 			}
 			resp, _ := ns.QueryWithOptions(ctx, name, qtype, opts)
@@ -382,7 +384,7 @@ func (z *Zone) QueryAll(ctx context.Context, name string, qtype string, opts *na
 
 	targets := make([]nameserver.Nameserver, 0, len(servers))
 	for _, ns := range servers {
-		if ipDisabled(ns.Address) {
+		if ipDisabled(prof, ns.Address) {
 			continue
 		}
 		targets = append(targets, ns)
@@ -414,8 +416,9 @@ func (z *Zone) QueryAuth(ctx context.Context, name string, qtype string, opts *n
 	if err != nil {
 		return packet.Packet{}, err
 	}
+	prof := profile.FromContext(ctx)
 	for _, ns := range servers {
-		if ipDisabled(ns.Address) {
+		if ipDisabled(prof, ns.Address) {
 			continue
 		}
 		resp, err := ns.QueryWithOptions(ctx, name, qtype, opts)
@@ -436,8 +439,9 @@ func (z *Zone) QueryPersistent(ctx context.Context, name string, qtype string, o
 		return packet.Packet{}, err
 	}
 	target := dnsname.New(name)
+	prof := profile.FromContext(ctx)
 	for _, ns := range servers {
-		if ipDisabled(ns.Address) {
+		if ipDisabled(prof, ns.Address) {
 			continue
 		}
 		resp, err := ns.QueryWithOptions(ctx, name, qtype, opts)
@@ -474,8 +478,10 @@ func (z *Zone) IsInZone(ctx context.Context, name string) (bool, error) {
 	return strings.EqualFold(owner.String(), z.Name.String()), nil
 }
 
-func ipDisabled(addr netip.Addr) bool {
-	prof := profile.Effective()
+func ipDisabled(prof *profile.Profile, addr netip.Addr) bool {
+	if prof == nil {
+		return false
+	}
 	if addr.Is4() && !prof.Net.IPv4 {
 		return true
 	}

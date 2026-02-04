@@ -47,6 +47,10 @@ type ResolverDefaults struct {
 	Timeout   int  `json:"timeout"`
 	// ErrorCacheTTL sets the duration (seconds) to skip queries after network errors.
 	ErrorCacheTTL int `json:"error_cache_ttl"`
+	// PositiveCacheTTL sets the duration (seconds) to cache positive responses.
+	PositiveCacheTTL int `json:"positive_cache_ttl"`
+	// NegativeCacheTTL sets the duration (seconds) to cache negative responses.
+	NegativeCacheTTL int `json:"negative_cache_ttl"`
 }
 
 // NetSettings holds IP stack enablement flags.
@@ -150,6 +154,16 @@ func (p *Profile) ToJSON() (string, error) {
 // Effective returns the current effective profile.
 func Effective() *Profile {
 	return effective
+}
+
+// SetEffective overrides the global effective profile.
+// Passing nil resets to defaults.
+func SetEffective(p *Profile) {
+	if p == nil {
+		effective = mustDefault()
+		return
+	}
+	effective = p
 }
 
 // ResetEffective resets the effective profile to defaults.

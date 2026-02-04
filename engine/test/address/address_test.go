@@ -8,21 +8,21 @@ import (
 
 	"github.com/miekg/dns"
 
+	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
-	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/recursor"
-	"codeberg.org/pawal/gonemaster/engine/util"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
 func TestAddress01DocumentationAddr(t *testing.T) {
-	z := newZoneWithFakeAddresses(t, "example", map[string][]string{
+	ctx := testContext(t)
+	z := newZoneWithFakeAddresses(ctx, t, "example", map[string][]string{
 		"ns1.example": {"192.0.2.1"},
 	})
 
-	entries, err := Address01(context.Background(), z)
+	entries, err := Address01(ctx, z)
 	if err != nil {
 		t.Fatalf("address01: %v", err)
 	}
@@ -38,11 +38,12 @@ func TestAddress01DocumentationAddr(t *testing.T) {
 }
 
 func TestAddress01NoNameServersFound(t *testing.T) {
-	z := newZoneWithFakeAddresses(t, "example", map[string][]string{
+	ctx := testContext(t)
+	z := newZoneWithFakeAddresses(ctx, t, "example", map[string][]string{
 		"ns.other": {},
 	})
 
-	entries, err := Address01(context.Background(), z)
+	entries, err := Address01(ctx, z)
 	if err != nil {
 		t.Fatalf("address01: %v", err)
 	}
@@ -52,12 +53,13 @@ func TestAddress01NoNameServersFound(t *testing.T) {
 }
 
 func TestAddress02NameserversIPWithReverse(t *testing.T) {
+	ctx := testContext(t)
 	ptrName, err := dns.ReverseAddr("192.0.2.1")
 	if err != nil {
 		t.Fatalf("reverse addr: %v", err)
 	}
 
-	z := newRootZoneWithHook(t, func(qname string, qtype string) packet.Packet {
+	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
 		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "NS") {
 			return nsPacket(".", "a.root.")
 		}
@@ -67,7 +69,7 @@ func TestAddress02NameserversIPWithReverse(t *testing.T) {
 		return packet.Packet{}
 	})
 
-	entries, err := Address02(context.Background(), z)
+	entries, err := Address02(ctx, z)
 	if err != nil {
 		t.Fatalf("address02: %v", err)
 	}
@@ -77,12 +79,13 @@ func TestAddress02NameserversIPWithReverse(t *testing.T) {
 }
 
 func TestAddress02NameserverIPWithoutReverse(t *testing.T) {
+	ctx := testContext(t)
 	ptrName, err := dns.ReverseAddr("192.0.2.1")
 	if err != nil {
 		t.Fatalf("reverse addr: %v", err)
 	}
 
-	z := newRootZoneWithHook(t, func(qname string, qtype string) packet.Packet {
+	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
 		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "NS") {
 			return nsPacket(".", "a.root.")
 		}
@@ -92,7 +95,7 @@ func TestAddress02NameserverIPWithoutReverse(t *testing.T) {
 		return packet.Packet{}
 	})
 
-	entries, err := Address02(context.Background(), z)
+	entries, err := Address02(ctx, z)
 	if err != nil {
 		t.Fatalf("address02: %v", err)
 	}
@@ -102,12 +105,13 @@ func TestAddress02NameserverIPWithoutReverse(t *testing.T) {
 }
 
 func TestAddress03PTRMatch(t *testing.T) {
+	ctx := testContext(t)
 	ptrName, err := dns.ReverseAddr("192.0.2.1")
 	if err != nil {
 		t.Fatalf("reverse addr: %v", err)
 	}
 
-	z := newRootZoneWithHook(t, func(qname string, qtype string) packet.Packet {
+	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
 		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "NS") {
 			return nsPacket(".", "a.root.")
 		}
@@ -117,7 +121,7 @@ func TestAddress03PTRMatch(t *testing.T) {
 		return packet.Packet{}
 	})
 
-	entries, err := Address03(context.Background(), z)
+	entries, err := Address03(ctx, z)
 	if err != nil {
 		t.Fatalf("address03: %v", err)
 	}
@@ -127,12 +131,13 @@ func TestAddress03PTRMatch(t *testing.T) {
 }
 
 func TestAddress03PTRMismatch(t *testing.T) {
+	ctx := testContext(t)
 	ptrName, err := dns.ReverseAddr("192.0.2.1")
 	if err != nil {
 		t.Fatalf("reverse addr: %v", err)
 	}
 
-	z := newRootZoneWithHook(t, func(qname string, qtype string) packet.Packet {
+	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
 		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "NS") {
 			return nsPacket(".", "a.root.")
 		}
@@ -142,7 +147,7 @@ func TestAddress03PTRMismatch(t *testing.T) {
 		return packet.Packet{}
 	})
 
-	entries, err := Address03(context.Background(), z)
+	entries, err := Address03(ctx, z)
 	if err != nil {
 		t.Fatalf("address03: %v", err)
 	}
@@ -154,12 +159,8 @@ func TestAddress03PTRMismatch(t *testing.T) {
 func TestAddress02ParallelPTRQueries(t *testing.T) {
 	nameserver.EmptyCache()
 	defer nameserver.EmptyCache()
-	defer profile.ResetEffective()
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
-
-	profile.Effective().Resolver.Defaults.Parallel = 2
+	baseCtx, prof, _ := testhelpers.Context(t)
+	prof.Resolver.Defaults.Parallel = 2
 
 	r := &recursor.Recursor{}
 	if err := r.AddFakeAddresses(".", map[string][]string{
@@ -188,13 +189,13 @@ func TestAddress02ParallelPTRQueries(t *testing.T) {
 		return packet.Packet{}, nil
 	}
 
-	ns1, err := nameserver.New("a.root", "192.0.2.1", r.Client())
+	ns1, err := nameserver.NewWithContext(baseCtx, "a.root", "192.0.2.1", r.Client())
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
 	ns1.SetQueryHook(hook)
 
-	ns2, err := nameserver.New("b.root", "192.0.2.2", r.Client())
+	ns2, err := nameserver.NewWithContext(baseCtx, "b.root", "192.0.2.2", r.Client())
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -205,7 +206,7 @@ func TestAddress02ParallelPTRQueries(t *testing.T) {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(baseCtx, 2*time.Second)
 	defer cancel()
 
 	done := make(chan struct{})
@@ -276,12 +277,8 @@ func TestAddress02ParallelPTRQueries(t *testing.T) {
 func TestAddress03ParallelPTRQueries(t *testing.T) {
 	nameserver.EmptyCache()
 	defer nameserver.EmptyCache()
-	defer profile.ResetEffective()
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
-
-	profile.Effective().Resolver.Defaults.Parallel = 2
+	baseCtx, prof, _ := testhelpers.Context(t)
+	prof.Resolver.Defaults.Parallel = 2
 
 	r := &recursor.Recursor{}
 	if err := r.AddFakeAddresses(".", map[string][]string{
@@ -310,13 +307,13 @@ func TestAddress03ParallelPTRQueries(t *testing.T) {
 		return packet.Packet{}, nil
 	}
 
-	ns1, err := nameserver.New("a.root", "192.0.2.1", r.Client())
+	ns1, err := nameserver.NewWithContext(baseCtx, "a.root", "192.0.2.1", r.Client())
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
 	ns1.SetQueryHook(hook)
 
-	ns2, err := nameserver.New("b.root", "192.0.2.2", r.Client())
+	ns2, err := nameserver.NewWithContext(baseCtx, "b.root", "192.0.2.2", r.Client())
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -327,7 +324,7 @@ func TestAddress03ParallelPTRQueries(t *testing.T) {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(baseCtx, 2*time.Second)
 	defer cancel()
 
 	done := make(chan struct{})
@@ -377,21 +374,23 @@ func TestAddress03ParallelPTRQueries(t *testing.T) {
 	}
 }
 
-func newRootZoneWithHook(t *testing.T, handler func(qname string, qtype string) packet.Packet) *zone.Zone {
+func testContext(t *testing.T) context.Context {
+	t.Helper()
+	ctx, _, _ := testhelpers.Context(t)
+	return ctx
+}
+
+func newRootZoneWithHook(ctx context.Context, t *testing.T, handler func(qname string, qtype string) packet.Packet) *zone.Zone {
 	t.Helper()
 	nameserver.EmptyCache()
 	t.Cleanup(nameserver.EmptyCache)
-	t.Cleanup(profile.ResetEffective)
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
 
 	r := &recursor.Recursor{}
 	if err := r.AddFakeAddresses(".", map[string][]string{"a.root": {"192.0.2.1"}}); err != nil {
 		t.Fatalf("add root hints: %v", err)
 	}
 
-	ns, err := nameserver.New("a.root", "192.0.2.1", r.Client())
+	ns, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -406,14 +405,10 @@ func newRootZoneWithHook(t *testing.T, handler func(qname string, qtype string) 
 	return &z
 }
 
-func newZoneWithFakeAddresses(t *testing.T, zoneName string, data map[string][]string) *zone.Zone {
+func newZoneWithFakeAddresses(ctx context.Context, t *testing.T, zoneName string, data map[string][]string) *zone.Zone {
 	t.Helper()
 	nameserver.EmptyCache()
 	t.Cleanup(nameserver.EmptyCache)
-	t.Cleanup(profile.ResetEffective)
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
 
 	r := &recursor.Recursor{}
 	if err := r.AddFakeAddresses(zoneName, data); err != nil {

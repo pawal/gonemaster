@@ -148,9 +148,66 @@ func main() {
 }
 ```
 
+## Example: run simultaneous tests safely
+The engine is re-entrant and safe to run in parallel. The simplest option is to
+call `engine.Run` in separate goroutines; each call builds its own per-run
+state internally. If you need to reuse or customize per-run state explicitly,
+use `engine.NewRunner` and `engine.RunWithRunner`.
+
+```go
+package main
+
+import (
+	"context"
+	"log"
+	"sync"
+
+	"codeberg.org/pawal/gonemaster/engine"
+)
+
+func main() {
+	domains := []string{"example.com", "example.net"}
+	var wg sync.WaitGroup
+
+	for _, domain := range domains {
+		wg.Add(1)
+		go func(domain string) {
+			defer wg.Done()
+			req := engine.RunRequest{
+				Domain:  domain,
+				Context: context.Background(),
+			}
+			if _, err := engine.Run(req); err != nil {
+				log.Printf("run %s: %v", domain, err)
+			}
+		}(domain)
+	}
+
+	wg.Wait()
+}
+```
+
 ## Notes
 - `engine.Run` does not normalize IDNs; normalize with
   `engine/normalization.NormalizeName` before running.
 - `MinLevel` filters log entries at the engine output boundary.
 - `LogCallback` receives entries before min-level filtering, which is useful for
   live progress or streaming output.
+
+## Caching and tuning knobs
+- Per-run nameserver caches (query cache + error cache) isolate concurrent runs.
+- Hard network errors (host/network unreachable) are cached globally across runs
+  to avoid repeated failing dials.
+- Error cache TTL is controlled by `resolver.defaults.error_cache_ttl` (or the
+  `--error-cache-ttl` CLI flag). The effective TTL is capped by the per-query
+  timeout/retry budget.
+- Positive/negative response TTLs are configured via
+  `resolver.defaults.positive_cache_ttl` and
+  `resolver.defaults.negative_cache_ttl` (CLI flags `--positive-cache-ttl` and
+  `--negative-cache-ttl`). These settings are intended for global response
+  caching and reuse across runs.
+- Query timing and fallback behavior can be tuned with:
+  - `resolver.defaults.timeout` (`--timeout`, seconds per attempt)
+  - `resolver.defaults.retry` (`--retry`, retry count)
+  - `resolver.defaults.retrans` (`--retrans`, seconds between retries)
+  - `resolver.defaults.fallback` (`--fallback` / `--no-fallback`, TCP fallback)

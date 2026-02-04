@@ -35,7 +35,7 @@ var (
 func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var results []*logger.Entry
 
-	if util.ShouldRunTest("connectivity01") {
+	if util.ShouldRunTest(ctx, "connectivity01") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Connectivity01(ctx, z)
 		})
@@ -44,7 +44,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("connectivity02") {
+	if util.ShouldRunTest(ctx, "connectivity02") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Connectivity02(ctx, z)
 		})
@@ -53,7 +53,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("connectivity03") {
+	if util.ShouldRunTest(ctx, "connectivity03") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Connectivity03(ctx, z)
 		})
@@ -62,7 +62,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("connectivity04") {
+	if util.ShouldRunTest(ctx, "connectivity04") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Connectivity04(ctx, z)
 		})
@@ -150,10 +150,8 @@ func Metadata() map[string][]string {
 func Connectivity01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Connectivity01"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -167,16 +165,16 @@ func Connectivity01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 		return results, err
 	}
 
-	ipv4Disabled, ipv6Disabled := disabledNS(nsList)
+	ipv4Disabled, ipv6Disabled := disabledNS(ctx, nsList)
 	if len(ipv4Disabled) > 0 {
-		if err := appendLog(&results, testcase, "CN01_IPV4_DISABLED", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "CN01_IPV4_DISABLED", map[string]any{
 			"ns_list": strings.Join(ipv4Disabled, ";"),
 		}); err != nil {
 			return results, err
 		}
 	}
 	if len(ipv6Disabled) > 0 {
-		if err := appendLog(&results, testcase, "CN01_IPV6_DISABLED", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "CN01_IPV6_DISABLED", map[string]any{
 			"ns_list": strings.Join(ipv6Disabled, ";"),
 		}); err != nil {
 			return results, err
@@ -187,17 +185,15 @@ func Connectivity01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 		return results, err
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Connectivity02 runs the CONNECTIVITY02 test case.
 func Connectivity02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Connectivity02"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -215,17 +211,15 @@ func Connectivity02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 		return results, err
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Connectivity03 runs the CONNECTIVITY03 test case.
 func Connectivity03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Connectivity03"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 	if z == nil {
@@ -251,7 +245,7 @@ func Connectivity03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 		asnset string
 	}
 
-	parallelism := profile.Effective().Resolver.Defaults.Parallel
+	parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 	if parallelism < 1 {
 		parallelism = 1
 	}
@@ -395,19 +389,19 @@ func Connectivity03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 
 	if len(v4asns) > 0 {
 		if len(v4asns) == 1 {
-			if err := appendLog(&results, testcase, "IPV4_ONE_ASN", map[string]any{
+			if err := appendLog(ctx, &results, testcase, "IPV4_ONE_ASN", map[string]any{
 				"asn": v4asns[0],
 			}); err != nil {
 				return results, err
 			}
 		} else if len(v4asnsets) == 1 {
-			if err := appendLog(&results, testcase, "IPV4_SAME_ASN", map[string]any{
+			if err := appendLog(ctx, &results, testcase, "IPV4_SAME_ASN", map[string]any{
 				"asn_list": v4asnsets[0],
 			}); err != nil {
 				return results, err
 			}
 		} else {
-			if err := appendLog(&results, testcase, "IPV4_DIFFERENT_ASN", map[string]any{
+			if err := appendLog(ctx, &results, testcase, "IPV4_DIFFERENT_ASN", map[string]any{
 				"asn_list": joinInts(v4asns),
 			}); err != nil {
 				return results, err
@@ -417,19 +411,19 @@ func Connectivity03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 
 	if len(v6asns) > 0 {
 		if len(v6asns) == 1 {
-			if err := appendLog(&results, testcase, "IPV6_ONE_ASN", map[string]any{
+			if err := appendLog(ctx, &results, testcase, "IPV6_ONE_ASN", map[string]any{
 				"asn": v6asns[0],
 			}); err != nil {
 				return results, err
 			}
 		} else if len(v6asnsets) == 1 {
-			if err := appendLog(&results, testcase, "IPV6_SAME_ASN", map[string]any{
+			if err := appendLog(ctx, &results, testcase, "IPV6_SAME_ASN", map[string]any{
 				"asn_list": v6asnsets[0],
 			}); err != nil {
 				return results, err
 			}
 		} else {
-			if err := appendLog(&results, testcase, "IPV6_DIFFERENT_ASN", map[string]any{
+			if err := appendLog(ctx, &results, testcase, "IPV6_DIFFERENT_ASN", map[string]any{
 				"asn_list": joinInts(v6asns),
 			}); err != nil {
 				return results, err
@@ -437,17 +431,15 @@ func Connectivity03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Connectivity04 runs the CONNECTIVITY04 test case.
 func Connectivity04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Connectivity04"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 	if z == nil {
@@ -554,7 +546,7 @@ func Connectivity04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -599,7 +591,7 @@ func Connectivity04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 			}
 			if len(list) >= 2 {
 				tag := fmt.Sprintf("CN04_IPV%d_SAME_PREFIX", version)
-				if err := appendLog(&results, testcase, tag, map[string]any{
+				if err := appendLog(ctx, &results, testcase, tag, map[string]any{
 					"ip_prefix": prefix,
 					"ns_list":   joinSorted(list),
 				}); err != nil {
@@ -610,7 +602,7 @@ func Connectivity04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 
 		if len(combined) > 0 {
 			tag := fmt.Sprintf("CN04_IPV%d_DIFFERENT_PREFIX", version)
-			if err := appendLog(&results, testcase, tag, map[string]any{
+			if err := appendLog(ctx, &results, testcase, tag, map[string]any{
 				"ns_list": joinUniqueSorted(combined),
 			}); err != nil {
 				return results, err
@@ -621,14 +613,14 @@ func Connectivity04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 			list := prefixMap[prefixKeys[0]]
 			if processed[version] != nil && len(list) == len(processed[version]) {
 				tag := fmt.Sprintf("CN04_IPV%d_SINGLE_PREFIX", version)
-				if err := appendLog(&results, testcase, tag, map[string]any{}); err != nil {
+				if err := appendLog(ctx, &results, testcase, tag, map[string]any{}); err != nil {
 					return results, err
 				}
 			}
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 func connectivityLoop(ctx context.Context, testcase string, name dnsname.Name, nsList []nameserver.Nameserver, results *[]*logger.Entry) error {
@@ -655,13 +647,13 @@ func connectivityLoop(ctx context.Context, testcase string, name dnsname.Name, n
 	testcase = canonical
 
 	if len(nsList) > 0 {
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		tasks := make([]runner.Task, len(nsList))
 		for i, ns := range nsList {
 			ns := ns
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
-				disabled, err := ipDisabledMessageWithLogger(buf, ns, "SOA", "NS")
+				disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "SOA", "NS")
 				if err != nil {
 					return err
 				}
@@ -755,15 +747,15 @@ func connectivityLoop(ctx context.Context, testcase string, name dnsname.Name, n
 	return nil
 }
 
-func appendTestCaseEnd(results []*logger.Entry, testcase string) ([]*logger.Entry, error) {
-	if err := appendLog(&results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
+func appendTestCaseEnd(ctx context.Context, results []*logger.Entry, testcase string) ([]*logger.Entry, error) {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 	return results, nil
 }
 
-func appendLog(results *[]*logger.Entry, testcase string, tag string, args map[string]any) error {
-	entry, err := util.Logger().Add(tag, args, moduleName, testcase)
+func appendLog(ctx context.Context, results *[]*logger.Entry, testcase string, tag string, args map[string]any) error {
+	entry, err := util.LoggerFromContext(ctx).Add(tag, args, moduleName, testcase)
 	if err != nil {
 		return err
 	}
@@ -771,8 +763,8 @@ func appendLog(results *[]*logger.Entry, testcase string, tag string, args map[s
 	return nil
 }
 
-func ipDisabledMessageWithLogger(buf *testlogger.Buffer, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
-	if ns.Address.Is6() && !profile.Effective().Net.IPv6 {
+func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
+	if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 		for _, rrtype := range rrtypes {
 			if _, err := buf.Add("IPV6_DISABLED", map[string]any{
 				"ns":     ns.String(),
@@ -783,7 +775,7 @@ func ipDisabledMessageWithLogger(buf *testlogger.Buffer, ns nameserver.Nameserve
 		}
 		return true, nil
 	}
-	if ns.Address.Is4() && !profile.Effective().Net.IPv4 {
+	if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
 		for _, rrtype := range rrtypes {
 			if _, err := buf.Add("IPV4_DISABLED", map[string]any{
 				"ns":     ns.String(),
@@ -797,15 +789,15 @@ func ipDisabledMessageWithLogger(buf *testlogger.Buffer, ns nameserver.Nameserve
 	return false, nil
 }
 
-func disabledNS(nsList []nameserver.Nameserver) ([]string, []string) {
+func disabledNS(ctx context.Context, nsList []nameserver.Nameserver) ([]string, []string) {
 	var ipv4 []string
 	var ipv6 []string
 	for _, ns := range nsList {
-		if ns.Address.Is4() && !profile.Effective().Net.IPv4 {
+		if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
 			ipv4 = append(ipv4, ns.String())
 			continue
 		}
-		if ns.Address.Is6() && !profile.Effective().Net.IPv6 {
+		if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 			ipv6 = append(ipv6, ns.String())
 		}
 	}

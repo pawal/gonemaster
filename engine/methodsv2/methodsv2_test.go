@@ -7,9 +7,9 @@ import (
 
 	"github.com/miekg/dns"
 
+	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
-	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
@@ -32,9 +32,9 @@ func authoritativeNSPacket(zoneName string, nsNames ...string) packet.Packet {
 	return packet.Packet{Msg: msg}
 }
 
-func newAuthoritativeNameserver(t *testing.T, r *recursor.Recursor, name string, addr string, zoneName string, nsNames ...string) nameserver.Nameserver {
+func newAuthoritativeNameserver(ctx context.Context, t *testing.T, r *recursor.Recursor, name string, addr string, zoneName string, nsNames ...string) nameserver.Nameserver {
 	t.Helper()
-	ns, err := nameserver.New(name, addr, r.Client())
+	ns, err := nameserver.NewWithContext(ctx, name, addr, r.Client())
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -48,10 +48,9 @@ func newAuthoritativeNameserver(t *testing.T, r *recursor.Recursor, name string,
 }
 
 func TestGetParentNSNamesAndIPsUndelegated(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 	ClearCache()
 	defer ClearCache()
+	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
 	if err := r.AddFakeAddresses("example", map[string][]string{
@@ -64,7 +63,7 @@ func TestGetParentNSNamesAndIPsUndelegated(t *testing.T) {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	parent, err := GetParentNSNamesAndIPs(context.Background(), &z)
+	parent, err := GetParentNSNamesAndIPs(ctx, &z)
 	if err != nil {
 		t.Fatalf("get parent: %v", err)
 	}
@@ -74,10 +73,9 @@ func TestGetParentNSNamesAndIPsUndelegated(t *testing.T) {
 }
 
 func TestGetDelNSNamesAndIPsUndelegated(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 	ClearCache()
 	defer ClearCache()
+	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
 	if err := r.AddFakeAddresses("example", map[string][]string{
@@ -91,7 +89,7 @@ func TestGetDelNSNamesAndIPsUndelegated(t *testing.T) {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	items, err := GetDelNSNamesAndIPs(context.Background(), &z)
+	items, err := GetDelNSNamesAndIPs(ctx, &z)
 	if err != nil {
 		t.Fatalf("get delegation: %v", err)
 	}
@@ -114,13 +112,11 @@ func TestGetDelNSNamesAndIPsUndelegated(t *testing.T) {
 }
 
 func TestGetZoneNSNamesFromAuthoritative(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 	ClearCache()
 	defer ClearCache()
-	defer profile.ResetEffective()
-	profile.Effective().Net.IPv4 = true
-	profile.Effective().Net.IPv6 = true
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.Net.IPv4 = true
+	prof.Net.IPv6 = true
 
 	r := &recursor.Recursor{}
 	if err := r.AddFakeAddresses("example", map[string][]string{
@@ -133,9 +129,9 @@ func TestGetZoneNSNamesFromAuthoritative(t *testing.T) {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	_ = newAuthoritativeNameserver(t, r, "ns1.example.net", "192.0.2.53", "example", "NS1.EXAMPLE.NET", "ns2.example.net")
+	_ = newAuthoritativeNameserver(ctx, t, r, "ns1.example.net", "192.0.2.53", "example", "NS1.EXAMPLE.NET", "ns2.example.net")
 
-	names, err := GetZoneNSNames(context.Background(), &z)
+	names, err := GetZoneNSNames(ctx, &z)
 	if err != nil {
 		t.Fatalf("get zone NS names: %v", err)
 	}
@@ -151,13 +147,11 @@ func TestGetZoneNSNamesFromAuthoritative(t *testing.T) {
 }
 
 func TestGetZoneNSNamesAndIPsOutOfBailiwick(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 	ClearCache()
 	defer ClearCache()
-	defer profile.ResetEffective()
-	profile.Effective().Net.IPv4 = true
-	profile.Effective().Net.IPv6 = true
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.Net.IPv4 = true
+	prof.Net.IPv6 = true
 
 	r := &recursor.Recursor{}
 	if err := r.AddFakeAddresses("example", map[string][]string{
@@ -171,10 +165,10 @@ func TestGetZoneNSNamesAndIPsOutOfBailiwick(t *testing.T) {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	_ = newAuthoritativeNameserver(t, r, "ns1.example.net", "192.0.2.53", "example", "ns1.example.net", "ns2.example.net")
-	_ = newAuthoritativeNameserver(t, r, "ns2.example.net", "192.0.2.54", "example", "ns1.example.net", "ns2.example.net")
+	_ = newAuthoritativeNameserver(ctx, t, r, "ns1.example.net", "192.0.2.53", "example", "ns1.example.net", "ns2.example.net")
+	_ = newAuthoritativeNameserver(ctx, t, r, "ns2.example.net", "192.0.2.54", "example", "ns1.example.net", "ns2.example.net")
 
-	items, err := GetZoneNSNamesAndIPs(context.Background(), &z)
+	items, err := GetZoneNSNamesAndIPs(ctx, &z)
 	if err != nil {
 		t.Fatalf("get zone NS names and IPs: %v", err)
 	}
@@ -197,13 +191,11 @@ func TestGetZoneNSNamesAndIPsOutOfBailiwick(t *testing.T) {
 }
 
 func TestGetDelNSNamesAndIPsUndelegatedLookupWhenNoIP(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 	ClearCache()
 	defer ClearCache()
-	defer profile.ResetEffective()
-	profile.Effective().Net.IPv4 = true
-	profile.Effective().Net.IPv6 = true
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.Net.IPv4 = true
+	prof.Net.IPv6 = true
 
 	r := &recursor.Recursor{}
 	if err := r.AddFakeAddresses(".", map[string][]string{
@@ -217,7 +209,7 @@ func TestGetDelNSNamesAndIPsUndelegatedLookupWhenNoIP(t *testing.T) {
 		t.Fatalf("add fake addresses: %v", err)
 	}
 
-	rootNS, err := nameserver.New("root.test", "192.0.2.9", r.Client())
+	rootNS, err := nameserver.NewWithContext(ctx, "root.test", "192.0.2.9", r.Client())
 	if err != nil {
 		t.Fatalf("new root nameserver: %v", err)
 	}
@@ -245,7 +237,7 @@ func TestGetDelNSNamesAndIPsUndelegatedLookupWhenNoIP(t *testing.T) {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	items, err := GetDelNSNamesAndIPs(context.Background(), &z)
+	items, err := GetDelNSNamesAndIPs(ctx, &z)
 	if err != nil {
 		t.Fatalf("get delegation: %v", err)
 	}
@@ -261,13 +253,11 @@ func TestGetDelNSNamesAndIPsUndelegatedLookupWhenNoIP(t *testing.T) {
 }
 
 func TestGetParentNSNamesAndIPsSkipsOnIntermediateNoResponse(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 	ClearCache()
 	defer ClearCache()
-	defer profile.ResetEffective()
-	profile.Effective().Net.IPv4 = true
-	profile.Effective().Net.IPv6 = true
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.Net.IPv4 = true
+	prof.Net.IPv6 = true
 
 	r := &recursor.Recursor{}
 	if err := r.AddFakeAddresses(".", map[string][]string{
@@ -339,7 +329,7 @@ func TestGetParentNSNamesAndIPsSkipsOnIntermediateNoResponse(t *testing.T) {
 		return packet.Packet{Msg: msg}
 	}
 
-	ns1, err := nameserver.New("ns1.root", "192.0.2.1", r.Client())
+	ns1, err := nameserver.NewWithContext(ctx, "ns1.root", "192.0.2.1", r.Client())
 	if err != nil {
 		t.Fatalf("new ns1: %v", err)
 	}
@@ -356,7 +346,7 @@ func TestGetParentNSNamesAndIPsSkipsOnIntermediateNoResponse(t *testing.T) {
 		}
 	})
 
-	ns2, err := nameserver.New("ns2.root", "192.0.2.2", r.Client())
+	ns2, err := nameserver.NewWithContext(ctx, "ns2.root", "192.0.2.2", r.Client())
 	if err != nil {
 		t.Fatalf("new ns2: %v", err)
 	}
@@ -378,7 +368,7 @@ func TestGetParentNSNamesAndIPsSkipsOnIntermediateNoResponse(t *testing.T) {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	parent, err := GetParentNSNamesAndIPs(context.Background(), &z)
+	parent, err := GetParentNSNamesAndIPs(ctx, &z)
 	if err != nil {
 		t.Fatalf("get parent: %v", err)
 	}

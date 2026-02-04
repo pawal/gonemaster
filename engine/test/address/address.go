@@ -27,7 +27,7 @@ const addressModuleName = "Address"
 func AddressAll(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var results []*logger.Entry
 
-	if util.ShouldRunTest("address01") {
+	if util.ShouldRunTest(ctx, "address01") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Address01(ctx, z)
 		})
@@ -38,7 +38,7 @@ func AddressAll(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	nsWithReverse := true
-	if util.ShouldRunTest("address02") {
+	if util.ShouldRunTest(ctx, "address02") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Address02(ctx, z)
 		})
@@ -49,7 +49,7 @@ func AddressAll(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		nsWithReverse = hasTag(results, "NAMESERVERS_IP_WITH_REVERSE")
 	}
 
-	if nsWithReverse && util.ShouldRunTest("address03") {
+	if nsWithReverse && util.ShouldRunTest(ctx, "address03") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Address03(ctx, z)
 		})
@@ -95,10 +95,8 @@ func AddressMetadata() map[string][]string {
 func Address01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Address01"
 	var results []*logger.Entry
-	logger.ModuleName = addressModuleName
-	logger.TestCaseName = testcase
 
-	if err := appendAddressLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendAddressLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -123,10 +121,10 @@ func Address01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(seen) == 0 {
-		if err := appendAddressLog(&results, testcase, "A01_NO_NAME_SERVERS_FOUND", map[string]any{}); err != nil {
+		if err := appendAddressLog(ctx, &results, testcase, "A01_NO_NAME_SERVERS_FOUND", map[string]any{}); err != nil {
 			return results, err
 		}
-		return appendAddressTestCaseEnd(results, testcase)
+		return appendAddressTestCaseEnd(ctx, results, testcase)
 	}
 
 	ipGroups := map[string][]methodsv2.NSItem{}
@@ -172,19 +170,19 @@ func Address01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(globallyReachable) > 0 {
-		if err := appendAddressLog(&results, testcase, "A01_GLOBALLY_REACHABLE_ADDR", map[string]any{
+		if err := appendAddressLog(ctx, &results, testcase, "A01_GLOBALLY_REACHABLE_ADDR", map[string]any{
 			"ns_list": joinNSList(globallyReachable),
 		}); err != nil {
 			return results, err
 		}
 	} else {
-		if err := appendAddressLog(&results, testcase, "A01_NO_GLOBALLY_REACHABLE_ADDR", map[string]any{}); err != nil {
+		if err := appendAddressLog(ctx, &results, testcase, "A01_NO_GLOBALLY_REACHABLE_ADDR", map[string]any{}); err != nil {
 			return results, err
 		}
 	}
 
 	if len(documentationAddr) > 0 {
-		if err := appendAddressLog(&results, testcase, "A01_DOCUMENTATION_ADDR", map[string]any{
+		if err := appendAddressLog(ctx, &results, testcase, "A01_DOCUMENTATION_ADDR", map[string]any{
 			"ns_list": joinNSList(documentationAddr),
 		}); err != nil {
 			return results, err
@@ -192,7 +190,7 @@ func Address01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(localUseAddr) > 0 {
-		if err := appendAddressLog(&results, testcase, "A01_LOCAL_USE_ADDR", map[string]any{
+		if err := appendAddressLog(ctx, &results, testcase, "A01_LOCAL_USE_ADDR", map[string]any{
 			"ns_list": joinNSList(localUseAddr),
 		}); err != nil {
 			return results, err
@@ -200,24 +198,22 @@ func Address01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(notGloballyReachable) > 0 {
-		if err := appendAddressLog(&results, testcase, "A01_ADDR_NOT_GLOBALLY_REACHABLE", map[string]any{
+		if err := appendAddressLog(ctx, &results, testcase, "A01_ADDR_NOT_GLOBALLY_REACHABLE", map[string]any{
 			"ns_list": joinNSList(notGloballyReachable),
 		}); err != nil {
 			return results, err
 		}
 	}
 
-	return appendAddressTestCaseEnd(results, testcase)
+	return appendAddressTestCaseEnd(ctx, results, testcase)
 }
 
 // Address02 runs the ADDRESS02 test case.
 func Address02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Address02"
 	var results []*logger.Entry
-	logger.ModuleName = addressModuleName
-	logger.TestCaseName = testcase
 
-	if err := appendAddressLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendAddressLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -299,7 +295,7 @@ func Address02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -308,22 +304,20 @@ func Address02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(ips) > 0 && onlyTestCaseStart(results) {
-		if err := appendAddressLog(&results, testcase, "NAMESERVERS_IP_WITH_REVERSE", map[string]any{}); err != nil {
+		if err := appendAddressLog(ctx, &results, testcase, "NAMESERVERS_IP_WITH_REVERSE", map[string]any{}); err != nil {
 			return results, err
 		}
 	}
 
-	return appendAddressTestCaseEnd(results, testcase)
+	return appendAddressTestCaseEnd(ctx, results, testcase)
 }
 
 // Address03 runs the ADDRESS03 test case.
 func Address03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Address03"
 	var results []*logger.Entry
-	logger.ModuleName = addressModuleName
-	logger.TestCaseName = testcase
 
-	if err := appendAddressLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendAddressLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -416,7 +410,7 @@ func Address03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -425,23 +419,23 @@ func Address03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(ips) > 0 && onlyTestCaseStart(results) {
-		if err := appendAddressLog(&results, testcase, "NAMESERVER_IP_PTR_MATCH", map[string]any{}); err != nil {
+		if err := appendAddressLog(ctx, &results, testcase, "NAMESERVER_IP_PTR_MATCH", map[string]any{}); err != nil {
 			return results, err
 		}
 	}
 
-	return appendAddressTestCaseEnd(results, testcase)
+	return appendAddressTestCaseEnd(ctx, results, testcase)
 }
 
-func appendAddressTestCaseEnd(results []*logger.Entry, testcase string) ([]*logger.Entry, error) {
-	if err := appendAddressLog(&results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
+func appendAddressTestCaseEnd(ctx context.Context, results []*logger.Entry, testcase string) ([]*logger.Entry, error) {
+	if err := appendAddressLog(ctx, &results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 	return results, nil
 }
 
-func appendAddressLog(results *[]*logger.Entry, testcase string, tag string, args map[string]any) error {
-	entry, err := util.Logger().Add(tag, args, addressModuleName, testcase)
+func appendAddressLog(ctx context.Context, results *[]*logger.Entry, testcase string, tag string, args map[string]any) error {
+	entry, err := util.LoggerFromContext(ctx).Add(tag, args, addressModuleName, testcase)
 	if err != nil {
 		return err
 	}

@@ -38,7 +38,7 @@ var (
 func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var results []*logger.Entry
 
-	if util.ShouldRunTest("consistency01") {
+	if util.ShouldRunTest(ctx, "consistency01") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Consistency01(ctx, z)
 		})
@@ -47,7 +47,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("consistency02") {
+	if util.ShouldRunTest(ctx, "consistency02") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Consistency02(ctx, z)
 		})
@@ -56,7 +56,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("consistency03") {
+	if util.ShouldRunTest(ctx, "consistency03") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Consistency03(ctx, z)
 		})
@@ -65,7 +65,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("consistency04") {
+	if util.ShouldRunTest(ctx, "consistency04") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Consistency04(ctx, z)
 		})
@@ -74,7 +74,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("consistency05") {
+	if util.ShouldRunTest(ctx, "consistency05") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Consistency05(ctx, z)
 		})
@@ -83,7 +83,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("consistency06") {
+	if util.ShouldRunTest(ctx, "consistency06") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Consistency06(ctx, z)
 		})
@@ -171,10 +171,8 @@ func Metadata() map[string][]string {
 func Consistency01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Consistency01"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -216,7 +214,7 @@ func Consistency01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := serialOutcome{key: ns.String()}
 
-				disabled, err := ipDisabledMessageWithLogger(buf, ns, queryType)
+				disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, queryType)
 				if err != nil {
 					return err
 				}
@@ -258,7 +256,7 @@ func Consistency01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -282,7 +280,7 @@ func Consistency01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	for _, serial := range serialKeys {
 		nsList := append([]string{}, serials[serial]...)
 		sort.Strings(nsList)
-		if err := appendLog(&results, testcase, "SOA_SERIAL", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "SOA_SERIAL", map[string]any{
 			"serial":  serial,
 			"ns_list": strings.Join(nsList, ";"),
 		}); err != nil {
@@ -291,13 +289,13 @@ func Consistency01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(serialKeys) == 1 {
-		if err := appendLog(&results, testcase, "ONE_SOA_SERIAL", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "ONE_SOA_SERIAL", map[string]any{
 			"serial": serialKeys[0],
 		}); err != nil {
 			return results, err
 		}
 	} else if len(serialKeys) > 0 {
-		if err := appendLog(&results, testcase, "MULTIPLE_SOA_SERIALS", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "MULTIPLE_SOA_SERIALS", map[string]any{
 			"count": len(serialKeys),
 		}); err != nil {
 			return results, err
@@ -307,7 +305,7 @@ func Consistency01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		maxVal, errMax := strconv.ParseInt(serialKeys[len(serialKeys)-1], 10, 64)
 		if errMin == nil && errMax == nil {
 			if maxVal-minVal > int64(constants.SerialMaxVariation) {
-				if err := appendLog(&results, testcase, "SOA_SERIAL_VARIATION", map[string]any{
+				if err := appendLog(ctx, &results, testcase, "SOA_SERIAL_VARIATION", map[string]any{
 					"serial_min":    serialKeys[0],
 					"serial_max":    serialKeys[len(serialKeys)-1],
 					"max_variation": constants.SerialMaxVariation,
@@ -318,17 +316,15 @@ func Consistency01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Consistency02 runs the CONSISTENCY02 test case.
 func Consistency02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Consistency02"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -371,7 +367,7 @@ func Consistency02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := rnameOutcome{key: ns.String()}
 
-				disabled, err := ipDisabledMessageWithLogger(buf, ns, queryType)
+				disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, queryType)
 				if err != nil {
 					return err
 				}
@@ -413,7 +409,7 @@ func Consistency02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -432,19 +428,19 @@ func Consistency02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(order) == 1 {
-		if err := appendLog(&results, testcase, "ONE_SOA_RNAME", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "ONE_SOA_RNAME", map[string]any{
 			"rname": order[0],
 		}); err != nil {
 			return results, err
 		}
 	} else if len(order) > 0 {
-		if err := appendLog(&results, testcase, "MULTIPLE_SOA_RNAMES", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "MULTIPLE_SOA_RNAMES", map[string]any{
 			"count": len(order),
 		}); err != nil {
 			return results, err
 		}
 		for _, rname := range order {
-			if err := appendLog(&results, testcase, "SOA_RNAME", map[string]any{
+			if err := appendLog(ctx, &results, testcase, "SOA_RNAME", map[string]any{
 				"rname":   rname,
 				"ns_list": strings.Join(rnames[rname], ";"),
 			}); err != nil {
@@ -453,17 +449,15 @@ func Consistency02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Consistency03 runs the CONSISTENCY03 test case.
 func Consistency03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Consistency03"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -508,7 +502,7 @@ func Consistency03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := timeOutcome{key: ns.String()}
 
-				disabled, err := ipDisabledMessageWithLogger(buf, ns, queryType)
+				disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, queryType)
 				if err != nil {
 					return err
 				}
@@ -557,7 +551,7 @@ func Consistency03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -578,7 +572,7 @@ func Consistency03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	if len(order) == 1 {
 		params := timeValues[order[0]]
-		if err := appendLog(&results, testcase, "ONE_SOA_TIME_PARAMETER_SET", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "ONE_SOA_TIME_PARAMETER_SET", map[string]any{
 			"refresh": params.refresh,
 			"retry":   params.retry,
 			"expire":  params.expire,
@@ -587,7 +581,7 @@ func Consistency03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	} else if len(order) > 0 {
-		if err := appendLog(&results, testcase, "MULTIPLE_SOA_TIME_PARAMETER_SET", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "MULTIPLE_SOA_TIME_PARAMETER_SET", map[string]any{
 			"count": len(order),
 		}); err != nil {
 			return results, err
@@ -596,7 +590,7 @@ func Consistency03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			params := timeValues[setKey]
 			nsList := append([]string{}, timeSets[setKey]...)
 			sort.Strings(nsList)
-			if err := appendLog(&results, testcase, "SOA_TIME_PARAMETER_SET", map[string]any{
+			if err := appendLog(ctx, &results, testcase, "SOA_TIME_PARAMETER_SET", map[string]any{
 				"refresh": params.refresh,
 				"retry":   params.retry,
 				"expire":  params.expire,
@@ -608,17 +602,15 @@ func Consistency03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Consistency04 runs the CONSISTENCY04 test case.
 func Consistency04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Consistency04"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -661,7 +653,7 @@ func Consistency04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := nsSetOutcome{key: ns.String()}
 
-				disabled, err := ipDisabledMessageWithLogger(buf, ns, queryType)
+				disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, queryType)
 				if err != nil {
 					return err
 				}
@@ -712,7 +704,7 @@ func Consistency04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -731,19 +723,19 @@ func Consistency04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(order) == 1 {
-		if err := appendLog(&results, testcase, "ONE_NS_SET", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "ONE_NS_SET", map[string]any{
 			"nsname_list": order[0],
 		}); err != nil {
 			return results, err
 		}
 	} else if len(order) > 0 {
-		if err := appendLog(&results, testcase, "MULTIPLE_NS_SET", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "MULTIPLE_NS_SET", map[string]any{
 			"count": len(order),
 		}); err != nil {
 			return results, err
 		}
 		for _, setKey := range order {
-			if err := appendLog(&results, testcase, "NS_SET", map[string]any{
+			if err := appendLog(ctx, &results, testcase, "NS_SET", map[string]any{
 				"nsname_list": setKey,
 				"servers":     strings.Join(nsSets[setKey], ";"),
 			}); err != nil {
@@ -752,17 +744,15 @@ func Consistency04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Consistency05 runs the CONSISTENCY05 test case.
 func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Consistency05"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -864,11 +854,11 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 	var inBailiwickServers []nameserver.Nameserver
 	for _, ns := range ibNS {
-		if ns.Address.Is4() && util.IPVersionOK(constants.IPVersion4) {
+		if ns.Address.Is4() && util.IPVersionOK(ctx, constants.IPVersion4) {
 			inBailiwickServers = append(inBailiwickServers, ns)
 			continue
 		}
-		if ns.Address.Is6() && util.IPVersionOK(constants.IPVersion6) {
+		if ns.Address.Is6() && util.IPVersionOK(ctx, constants.IPVersion6) {
 			inBailiwickServers = append(inBailiwickServers, ns)
 		}
 	}
@@ -902,10 +892,10 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 
 		if isLame {
-			if err := appendLog(&results, testcase, "CHILD_ZONE_LAME", map[string]any{}); err != nil {
+			if err := appendLog(ctx, &results, testcase, "CHILD_ZONE_LAME", map[string]any{}); err != nil {
 				return results, err
 			}
-			return appendTestCaseEnd(results, testcase)
+			return appendTestCaseEnd(ctx, results, testcase)
 		}
 	}
 
@@ -923,7 +913,7 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(ibMismatch) > 0 {
-		if err := appendLog(&results, testcase, "IN_BAILIWICK_ADDR_MISMATCH", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "IN_BAILIWICK_ADDR_MISMATCH", map[string]any{
 			"parent_addresses": strings.Join(sortedKeys(strictGlue), ";"),
 			"zone_addresses":   strings.Join(sortedKeys(childIBStrings), ";"),
 		}); err != nil {
@@ -933,7 +923,7 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	if len(ibExtraChild) > 0 {
 		sort.Strings(ibExtraChild)
-		if err := appendLog(&results, testcase, "EXTRA_ADDRESS_CHILD", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "EXTRA_ADDRESS_CHILD", map[string]any{
 			"ns_ip_list": strings.Join(ibExtraChild, ";"),
 		}); err != nil {
 			return results, err
@@ -976,7 +966,7 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 		if len(mismatchForGlue) > 0 {
 			sort.Strings(glueStrings)
-			if err := appendLog(&results, testcase, "OUT_OF_BAILIWICK_ADDR_MISMATCH", map[string]any{
+			if err := appendLog(ctx, &results, testcase, "OUT_OF_BAILIWICK_ADDR_MISMATCH", map[string]any{
 				"parent_addresses": strings.Join(glueStrings, ";"),
 				"zone_addresses":   strings.Join(sortedKeys(childOOB), ";"),
 			}); err != nil {
@@ -986,22 +976,20 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(ibExtraChild) == 0 && len(ibMismatch) == 0 && len(oobMismatch) == 0 {
-		if err := appendLog(&results, testcase, "ADDRESSES_MATCH", map[string]any{}); err != nil {
+		if err := appendLog(ctx, &results, testcase, "ADDRESSES_MATCH", map[string]any{}); err != nil {
 			return results, err
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Consistency06 runs the CONSISTENCY06 test case.
 func Consistency06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Consistency06"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -1044,7 +1032,7 @@ func Consistency06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := mnameOutcome{key: ns.String()}
 
-				disabled, err := ipDisabledMessageWithLogger(buf, ns, queryType)
+				disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, queryType)
 				if err != nil {
 					return err
 				}
@@ -1086,7 +1074,7 @@ func Consistency06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -1105,19 +1093,19 @@ func Consistency06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(order) == 1 {
-		if err := appendLog(&results, testcase, "ONE_SOA_MNAME", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "ONE_SOA_MNAME", map[string]any{
 			"mname": order[0],
 		}); err != nil {
 			return results, err
 		}
 	} else if len(order) > 0 {
-		if err := appendLog(&results, testcase, "MULTIPLE_SOA_MNAMES", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "MULTIPLE_SOA_MNAMES", map[string]any{
 			"count": len(order),
 		}); err != nil {
 			return results, err
 		}
 		for _, mname := range order {
-			if err := appendLog(&results, testcase, "SOA_MNAME", map[string]any{
+			if err := appendLog(ctx, &results, testcase, "SOA_MNAME", map[string]any{
 				"mname":   mname,
 				"ns_list": strings.Join(mnames[mname], ";"),
 			}); err != nil {
@@ -1126,7 +1114,7 @@ func Consistency06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 type timeParams struct {
@@ -1159,7 +1147,7 @@ func getAddrRRs(ctx context.Context, ns nameserver.Nameserver, name dnsname.Name
 	opts := &nameserver.QueryOptions{Recurse: &recurseOff}
 	resp, err := ns.QueryWithOptions(ctx, name.String(), qtype, opts)
 	if err != nil || resp.Msg == nil {
-		entry, addErr := util.Logger().Add("NO_RESPONSE", map[string]any{"ns": ns.String()}, moduleName, testcase)
+		entry, addErr := util.LoggerFromContext(ctx).Add("NO_RESPONSE", map[string]any{"ns": ns.String()}, moduleName, testcase)
 		if addErr != nil {
 			return nil, nil, addErr
 		}
@@ -1179,7 +1167,7 @@ func getAddrRRs(ctx context.Context, ns nameserver.Nameserver, name dnsname.Name
 	}
 
 	if !(resp.AA() && resp.Rcode() == "NXDOMAIN") {
-		entry, addErr := util.Logger().Add("CHILD_NS_FAILED", map[string]any{"ns": ns.String()}, moduleName, testcase)
+		entry, addErr := util.LoggerFromContext(ctx).Add("CHILD_NS_FAILED", map[string]any{"ns": ns.String()}, moduleName, testcase)
 		if addErr != nil {
 			return nil, nil, addErr
 		}
@@ -1189,15 +1177,15 @@ func getAddrRRs(ctx context.Context, ns nameserver.Nameserver, name dnsname.Name
 	return nil, nil, nil
 }
 
-func appendTestCaseEnd(results []*logger.Entry, testcase string) ([]*logger.Entry, error) {
-	if err := appendLog(&results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
+func appendTestCaseEnd(ctx context.Context, results []*logger.Entry, testcase string) ([]*logger.Entry, error) {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 	return results, nil
 }
 
-func appendLog(results *[]*logger.Entry, testcase string, tag string, args map[string]any) error {
-	entry, err := util.Logger().Add(tag, args, moduleName, testcase)
+func appendLog(ctx context.Context, results *[]*logger.Entry, testcase string, tag string, args map[string]any) error {
+	entry, err := util.LoggerFromContext(ctx).Add(tag, args, moduleName, testcase)
 	if err != nil {
 		return err
 	}
@@ -1205,8 +1193,8 @@ func appendLog(results *[]*logger.Entry, testcase string, tag string, args map[s
 	return nil
 }
 
-func ipDisabledMessageWithLogger(buf *testlogger.Buffer, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
-	if ns.Address.Is6() && !profile.Effective().Net.IPv6 {
+func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
+	if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 		for _, rrtype := range rrtypes {
 			if _, err := buf.Add("IPV6_DISABLED", map[string]any{
 				"ns":     ns.String(),
@@ -1217,7 +1205,7 @@ func ipDisabledMessageWithLogger(buf *testlogger.Buffer, ns nameserver.Nameserve
 		}
 		return true, nil
 	}
-	if ns.Address.Is4() && !profile.Effective().Net.IPv4 {
+	if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
 		for _, rrtype := range rrtypes {
 			if _, err := buf.Add("IPV4_DISABLED", map[string]any{
 				"ns":     ns.String(),

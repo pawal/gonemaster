@@ -10,15 +10,15 @@ import (
 	"github.com/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
-	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/recursor"
 )
 
-func newHookedNameserver(t *testing.T, name string, addr string, hook func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error)) nameserver.Nameserver {
+func newHookedNameserver(ctx context.Context, t *testing.T, name string, addr string, hook func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error)) nameserver.Nameserver {
 	t.Helper()
-	ns, err := nameserver.New(name, addr, nil)
+	ns, err := nameserver.NewWithContext(ctx, name, addr, nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -27,18 +27,18 @@ func newHookedNameserver(t *testing.T, name string, addr string, hook func(conte
 }
 
 func TestZoneQueryOneSkipsDisabledIP(t *testing.T) {
-	ns4, err := nameserver.New("ns4.example", "192.0.2.1", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns6, err := nameserver.New("ns6.example", "2001:db8::1", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.Net.IPv4 = false
+	prof.Net.IPv6 = true
 
-	defer profile.ResetEffective()
-	profile.Effective().Net.IPv4 = false
-	profile.Effective().Net.IPv6 = true
+	ns4, err := nameserver.NewWithContext(ctx, "ns4.example", "192.0.2.1", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	ns6, err := nameserver.NewWithContext(ctx, "ns6.example", "2001:db8::1", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
 
 	var calls4 int
 	ns4.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
@@ -68,7 +68,7 @@ func TestZoneQueryOneSkipsDisabledIP(t *testing.T) {
 		nsSet: true,
 	}
 
-	resp, err := z.QueryOne(context.Background(), "example", "A", nil)
+	resp, err := z.QueryOne(ctx, "example", "A", nil)
 	if err != nil {
 		t.Fatalf("query: %v", err)
 	}
@@ -81,13 +81,10 @@ func TestZoneQueryOneSkipsDisabledIP(t *testing.T) {
 }
 
 func TestZoneQueryAllParallel(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
-	defer profile.ResetEffective()
-
-	profile.Effective().Resolver.Defaults.Parallel = 2
-	profile.Effective().Net.IPv4 = true
-	profile.Effective().Net.IPv6 = true
+	baseCtx, prof, _ := testhelpers.Context(t)
+	prof.Resolver.Defaults.Parallel = 2
+	prof.Net.IPv4 = true
+	prof.Net.IPv6 = true
 
 	started := make(chan string, 2)
 	release := make(chan struct{})
@@ -114,8 +111,8 @@ func TestZoneQueryAllParallel(t *testing.T) {
 		}
 	}
 
-	ns1 := newHookedNameserver(t, "ns1.example", "192.0.2.50", hook("ns1"))
-	ns2 := newHookedNameserver(t, "ns2.example", "192.0.2.51", hook("ns2"))
+	ns1 := newHookedNameserver(baseCtx, t, "ns1.example", "192.0.2.50", hook("ns1"))
+	ns2 := newHookedNameserver(baseCtx, t, "ns2.example", "192.0.2.51", hook("ns2"))
 
 	z := Zone{
 		Name:  dnsname.New("example"),
@@ -123,7 +120,7 @@ func TestZoneQueryAllParallel(t *testing.T) {
 		nsSet: true,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(baseCtx, 2*time.Second)
 	defer cancel()
 
 	done := make(chan struct{})
@@ -223,7 +220,7 @@ func TestZoneGlueNamesFromParent(t *testing.T) {
 	nameserver.EmptyCache()
 	defer nameserver.EmptyCache()
 
-	parentNS := newHookedNameserver(t, "ns.parent.example", "192.0.2.10", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	parentNS := newHookedNameserver(context.Background(), t, "ns.parent.example", "192.0.2.10", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
 		msg.Answer = []dns.RR{
@@ -285,7 +282,7 @@ func TestZoneGlueAddressesFromParent(t *testing.T) {
 	nameserver.EmptyCache()
 	defer nameserver.EmptyCache()
 
-	parentNS := newHookedNameserver(t, "ns.parent.example", "192.0.2.11", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	parentNS := newHookedNameserver(context.Background(), t, "ns.parent.example", "192.0.2.11", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
 		msg.Extra = []dns.RR{
@@ -356,7 +353,7 @@ func TestZoneQueryPersistentSelectsAnswer(t *testing.T) {
 	nameserver.EmptyCache()
 	defer nameserver.EmptyCache()
 
-	ns1 := newHookedNameserver(t, "ns1.example", "192.0.2.20", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	ns1 := newHookedNameserver(context.Background(), t, "ns1.example", "192.0.2.20", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
 		msg.Answer = []dns.RR{
@@ -371,7 +368,7 @@ func TestZoneQueryPersistentSelectsAnswer(t *testing.T) {
 		}
 		return packet.Packet{Msg: msg}, nil
 	})
-	ns2 := newHookedNameserver(t, "ns2.example", "192.0.2.21", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	ns2 := newHookedNameserver(context.Background(), t, "ns2.example", "192.0.2.21", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
 		msg.Answer = []dns.RR{
@@ -409,7 +406,7 @@ func TestZoneQueryPersistentAcceptsAuthority(t *testing.T) {
 	nameserver.EmptyCache()
 	defer nameserver.EmptyCache()
 
-	ns := newHookedNameserver(t, "ns1.example", "192.0.2.31", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	ns := newHookedNameserver(context.Background(), t, "ns1.example", "192.0.2.31", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
 		msg.Ns = []dns.RR{
@@ -447,7 +444,7 @@ func TestZoneIsInZone(t *testing.T) {
 	nameserver.EmptyCache()
 	defer nameserver.EmptyCache()
 
-	ns := newHookedNameserver(t, "ns1.example", "192.0.2.30", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	ns := newHookedNameserver(context.Background(), t, "ns1.example", "192.0.2.30", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
 		msg.Authoritative = true

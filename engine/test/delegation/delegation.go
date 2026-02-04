@@ -39,7 +39,7 @@ var (
 func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var results []*logger.Entry
 
-	if util.ShouldRunTest("delegation01") {
+	if util.ShouldRunTest(ctx, "delegation01") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Delegation01(ctx, z)
 		})
@@ -48,7 +48,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("delegation02") {
+	if util.ShouldRunTest(ctx, "delegation02") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Delegation02(ctx, z)
 		})
@@ -57,7 +57,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("delegation03") {
+	if util.ShouldRunTest(ctx, "delegation03") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Delegation03(ctx, z)
 		})
@@ -66,7 +66,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("delegation04") {
+	if util.ShouldRunTest(ctx, "delegation04") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Delegation04(ctx, z)
 		})
@@ -75,7 +75,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("delegation05") {
+	if util.ShouldRunTest(ctx, "delegation05") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Delegation05(ctx, z)
 		})
@@ -84,7 +84,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("delegation06") {
+	if util.ShouldRunTest(ctx, "delegation06") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Delegation06(ctx, z)
 		})
@@ -93,7 +93,7 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
-	if util.ShouldRunTest("delegation07") {
+	if util.ShouldRunTest(ctx, "delegation07") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Delegation07(ctx, z)
 		})
@@ -184,10 +184,8 @@ func Metadata() map[string][]string {
 func Delegation01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Delegation01"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -203,11 +201,11 @@ func Delegation01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		"nsname_list": strings.Join(delNameStrings, ";"),
 	}
 	if len(delNameStrings) >= constants.MinimumNumberOfNameservers {
-		if err := appendLog(&results, testcase, "ENOUGH_NS_DEL", delArgs); err != nil {
+		if err := appendLog(ctx, &results, testcase, "ENOUGH_NS_DEL", delArgs); err != nil {
 			return results, err
 		}
 	} else {
-		if err := appendLog(&results, testcase, "NOT_ENOUGH_NS_DEL", delArgs); err != nil {
+		if err := appendLog(ctx, &results, testcase, "NOT_ENOUGH_NS_DEL", delArgs); err != nil {
 			return results, err
 		}
 	}
@@ -224,11 +222,11 @@ func Delegation01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		"nsname_list": strings.Join(childNameStrings, ";"),
 	}
 	if len(childNameStrings) >= constants.MinimumNumberOfNameservers {
-		if err := appendLog(&results, testcase, "ENOUGH_NS_CHILD", childArgs); err != nil {
+		if err := appendLog(ctx, &results, testcase, "ENOUGH_NS_CHILD", childArgs); err != nil {
 			return results, err
 		}
 	} else {
-		if err := appendLog(&results, testcase, "NOT_ENOUGH_NS_CHILD", childArgs); err != nil {
+		if err := appendLog(ctx, &results, testcase, "NOT_ENOUGH_NS_CHILD", childArgs); err != nil {
 			return results, err
 		}
 	}
@@ -247,15 +245,15 @@ func Delegation01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		"ns_list": strings.Join(sortedNameserverStrings(childIPv4), ";"),
 	}
 	if childIPv4Count >= constants.MinimumNumberOfNameservers {
-		if err := appendLog(&results, testcase, "ENOUGH_IPV4_NS_CHILD", childIPv4Args); err != nil {
+		if err := appendLog(ctx, &results, testcase, "ENOUGH_IPV4_NS_CHILD", childIPv4Args); err != nil {
 			return results, err
 		}
 	} else if childIPv4Count > 0 {
-		if err := appendLog(&results, testcase, "NOT_ENOUGH_IPV4_NS_CHILD", childIPv4Args); err != nil {
+		if err := appendLog(ctx, &results, testcase, "NOT_ENOUGH_IPV4_NS_CHILD", childIPv4Args); err != nil {
 			return results, err
 		}
 	} else {
-		if err := appendLog(&results, testcase, "NO_IPV4_NS_CHILD", childIPv4Args); err != nil {
+		if err := appendLog(ctx, &results, testcase, "NO_IPV4_NS_CHILD", childIPv4Args); err != nil {
 			return results, err
 		}
 	}
@@ -267,15 +265,15 @@ func Delegation01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		"ns_list": strings.Join(sortedNameserverStrings(childIPv6), ";"),
 	}
 	if childIPv6Count >= constants.MinimumNumberOfNameservers {
-		if err := appendLog(&results, testcase, "ENOUGH_IPV6_NS_CHILD", childIPv6Args); err != nil {
+		if err := appendLog(ctx, &results, testcase, "ENOUGH_IPV6_NS_CHILD", childIPv6Args); err != nil {
 			return results, err
 		}
 	} else if childIPv6Count > 0 {
-		if err := appendLog(&results, testcase, "NOT_ENOUGH_IPV6_NS_CHILD", childIPv6Args); err != nil {
+		if err := appendLog(ctx, &results, testcase, "NOT_ENOUGH_IPV6_NS_CHILD", childIPv6Args); err != nil {
 			return results, err
 		}
 	} else {
-		if err := appendLog(&results, testcase, "NO_IPV6_NS_CHILD", childIPv6Args); err != nil {
+		if err := appendLog(ctx, &results, testcase, "NO_IPV6_NS_CHILD", childIPv6Args); err != nil {
 			return results, err
 		}
 	}
@@ -294,15 +292,15 @@ func Delegation01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		"ns_list": strings.Join(sortedNameserverStrings(delIPv4), ";"),
 	}
 	if delIPv4Count >= constants.MinimumNumberOfNameservers {
-		if err := appendLog(&results, testcase, "ENOUGH_IPV4_NS_DEL", delIPv4Args); err != nil {
+		if err := appendLog(ctx, &results, testcase, "ENOUGH_IPV4_NS_DEL", delIPv4Args); err != nil {
 			return results, err
 		}
 	} else if delIPv4Count > 0 {
-		if err := appendLog(&results, testcase, "NOT_ENOUGH_IPV4_NS_DEL", delIPv4Args); err != nil {
+		if err := appendLog(ctx, &results, testcase, "NOT_ENOUGH_IPV4_NS_DEL", delIPv4Args); err != nil {
 			return results, err
 		}
 	} else {
-		if err := appendLog(&results, testcase, "NO_IPV4_NS_DEL", delIPv4Args); err != nil {
+		if err := appendLog(ctx, &results, testcase, "NO_IPV4_NS_DEL", delIPv4Args); err != nil {
 			return results, err
 		}
 	}
@@ -314,30 +312,28 @@ func Delegation01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		"ns_list": strings.Join(sortedNameserverStrings(delIPv6), ";"),
 	}
 	if delIPv6Count >= constants.MinimumNumberOfNameservers {
-		if err := appendLog(&results, testcase, "ENOUGH_IPV6_NS_DEL", delIPv6Args); err != nil {
+		if err := appendLog(ctx, &results, testcase, "ENOUGH_IPV6_NS_DEL", delIPv6Args); err != nil {
 			return results, err
 		}
 	} else if delIPv6Count > 0 {
-		if err := appendLog(&results, testcase, "NOT_ENOUGH_IPV6_NS_DEL", delIPv6Args); err != nil {
+		if err := appendLog(ctx, &results, testcase, "NOT_ENOUGH_IPV6_NS_DEL", delIPv6Args); err != nil {
 			return results, err
 		}
 	} else {
-		if err := appendLog(&results, testcase, "NO_IPV6_NS_DEL", delIPv6Args); err != nil {
+		if err := appendLog(ctx, &results, testcase, "NO_IPV6_NS_DEL", delIPv6Args); err != nil {
 			return results, err
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Delegation02 runs the DELEGATION02 test case.
 func Delegation02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Delegation02"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -350,13 +346,13 @@ func Delegation02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	entries, err := findDupNS(testcase, "DEL_NS_SAME_IP", "DEL_DISTINCT_NS_IP", delNS)
+	entries, err := findDupNS(ctx, testcase, "DEL_NS_SAME_IP", "DEL_DISTINCT_NS_IP", delNS)
 	if err != nil {
 		return results, err
 	}
 	results = append(results, entries...)
 
-	entries, err = findDupNS(testcase, "CHILD_NS_SAME_IP", "CHILD_DISTINCT_NS_IP", childNS)
+	entries, err = findDupNS(ctx, testcase, "CHILD_NS_SAME_IP", "CHILD_DISTINCT_NS_IP", childNS)
 	if err != nil {
 		return results, err
 	}
@@ -364,23 +360,21 @@ func Delegation02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	combined := append([]nameserver.Nameserver{}, delNS...)
 	combined = append(combined, childNS...)
-	entries, err = findDupNS(testcase, "SAME_IP_ADDRESS", "DISTINCT_IP_ADDRESS", combined)
+	entries, err = findDupNS(ctx, testcase, "SAME_IP_ADDRESS", "DISTINCT_IP_ADDRESS", combined)
 	if err != nil {
 		return results, err
 	}
 	results = append(results, entries...)
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Delegation03 runs the DELEGATION03 test case.
 func Delegation03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Delegation03"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -450,26 +444,24 @@ func Delegation03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 	size := len(wire)
 	if size > constants.UDPPayloadLimit {
-		if err := appendLog(&results, testcase, "REFERRAL_SIZE_TOO_LARGE", map[string]any{"size": size}); err != nil {
+		if err := appendLog(ctx, &results, testcase, "REFERRAL_SIZE_TOO_LARGE", map[string]any{"size": size}); err != nil {
 			return results, err
 		}
 	} else {
-		if err := appendLog(&results, testcase, "REFERRAL_SIZE_OK", map[string]any{"size": size}); err != nil {
+		if err := appendLog(ctx, &results, testcase, "REFERRAL_SIZE_OK", map[string]any{"size": size}); err != nil {
 			return results, err
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Delegation04 runs the DELEGATION04 test case.
 func Delegation04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Delegation04"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -502,7 +494,7 @@ func Delegation04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	for _, ns := range append(list4, list5...) {
 		nameKey := ns.Name.String()
 		action := actionQuery
-		if (ns.Address.Is6() && !profile.Effective().Net.IPv6) || (ns.Address.Is4() && !profile.Effective().Net.IPv4) {
+		if (ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6) || (ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4) {
 			action = actionDisabled
 		} else if seen[nameKey] {
 			action = actionSkip
@@ -523,7 +515,7 @@ func Delegation04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				}
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				if task.action == actionDisabled {
-					_, err := ipDisabledMessageWithLogger(buf, task.ns, queryType)
+					_, err := ipDisabledMessageWithLogger(ctx, buf, task.ns, queryType)
 					return err
 				}
 				authoritative := false
@@ -549,7 +541,7 @@ func Delegation04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -566,24 +558,22 @@ func Delegation04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	if (len(list4) > 0 || len(list5) > 0) && onlyTestCaseStart(results) && len(authoritatives) > 0 {
 		uniq := uniqueStrings(authoritatives)
 		sort.Strings(uniq)
-		if err := appendLog(&results, testcase, "ARE_AUTHORITATIVE", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "ARE_AUTHORITATIVE", map[string]any{
 			"nsname_list": strings.Join(uniq, ";"),
 		}); err != nil {
 			return results, err
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Delegation05 runs the DELEGATION05 test case.
 func Delegation05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Delegation05"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -626,7 +616,7 @@ func Delegation05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 							"rrtype":     "A",
 						}
 
-						disabled, err := ipDisabledMessageWithLogger(buf, ns, "A")
+						disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "A")
 						if err != nil {
 							return err
 						}
@@ -661,7 +651,7 @@ func Delegation05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					}
 				}
 
-				parallelism := profile.Effective().Resolver.Defaults.Parallel
+				parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 				entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 				if err != nil {
 					return results, err
@@ -671,7 +661,7 @@ func Delegation05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		} else {
 			resp, err := recurse(ctx, z, nsName.String(), "A")
 			if err == nil && resp.Msg != nil && len(resp.GetRecords("CNAME", "answer")) > 0 {
-				if err := appendLog(&results, testcase, "NS_IS_CNAME", map[string]any{"nsname": nsName.String()}); err != nil {
+				if err := appendLog(ctx, &results, testcase, "NS_IS_CNAME", map[string]any{"nsname": nsName.String()}); err != nil {
 					return results, err
 				}
 			}
@@ -679,22 +669,20 @@ func Delegation05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if !hasTag(results, "NS_IS_CNAME") {
-		if err := appendLog(&results, testcase, "NO_NS_CNAME", map[string]any{}); err != nil {
+		if err := appendLog(ctx, &results, testcase, "NO_NS_CNAME", map[string]any{}); err != nil {
 			return results, err
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Delegation06 runs the DELEGATION06 test case.
 func Delegation06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Delegation06"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -726,7 +714,7 @@ func Delegation06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	for _, ns := range append(list4, list5...) {
 		nameKey := ns.Name.String()
 		action := actionQuery
-		if (ns.Address.Is6() && !profile.Effective().Net.IPv6) || (ns.Address.Is4() && !profile.Effective().Net.IPv4) {
+		if (ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6) || (ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4) {
 			action = actionDisabled
 		} else if seen[nameKey] {
 			action = actionSkip
@@ -746,7 +734,7 @@ func Delegation06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				}
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				if task.action == actionDisabled {
-					_, err := ipDisabledMessageWithLogger(buf, task.ns, queryType)
+					_, err := ipDisabledMessageWithLogger(ctx, buf, task.ns, queryType)
 					return err
 				}
 				resp, err := task.ns.QueryWithOptions(ctx, z.Name.String(), queryType, nil)
@@ -760,7 +748,7 @@ func Delegation06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		parallelism := profile.Effective().Resolver.Defaults.Parallel
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
 		if err != nil {
 			return results, err
@@ -769,22 +757,20 @@ func Delegation06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if (len(list4) > 0 || len(list5) > 0) && onlyTestCaseStart(results) {
-		if err := appendLog(&results, testcase, "SOA_EXISTS", map[string]any{}); err != nil {
+		if err := appendLog(ctx, &results, testcase, "SOA_EXISTS", map[string]any{}); err != nil {
 			return results, err
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 // Delegation07 runs the DELEGATION07 test case.
 func Delegation07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "Delegation07"
 	var results []*logger.Entry
-	logger.ModuleName = moduleName
-	logger.TestCaseName = testcase
 
-	if err := appendLog(&results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 
@@ -823,22 +809,22 @@ func Delegation07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	sort.Strings(extraChild)
 
 	if len(extraParent) > 0 {
-		if err := appendLog(&results, testcase, "EXTRA_NAME_PARENT", map[string]any{"extra": strings.Join(extraParent, ";")}); err != nil {
+		if err := appendLog(ctx, &results, testcase, "EXTRA_NAME_PARENT", map[string]any{"extra": strings.Join(extraParent, ";")}); err != nil {
 			return results, err
 		}
 	}
 	if len(extraChild) > 0 {
-		if err := appendLog(&results, testcase, "EXTRA_NAME_CHILD", map[string]any{"extra": strings.Join(extraChild, ";")}); err != nil {
+		if err := appendLog(ctx, &results, testcase, "EXTRA_NAME_CHILD", map[string]any{"extra": strings.Join(extraChild, ";")}); err != nil {
 			return results, err
 		}
 	}
 	if len(extraParent) == 0 && len(extraChild) == 0 {
-		if err := appendLog(&results, testcase, "NAMES_MATCH", map[string]any{"names": strings.Join(sameNames, ";")}); err != nil {
+		if err := appendLog(ctx, &results, testcase, "NAMES_MATCH", map[string]any{"names": strings.Join(sameNames, ";")}); err != nil {
 			return results, err
 		}
 	}
 	if len(sameNames) == 0 {
-		if err := appendLog(&results, testcase, "TOTAL_NAME_MISMATCH", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "TOTAL_NAME_MISMATCH", map[string]any{
 			"glue":  strings.Join(extraParent, ";"),
 			"child": strings.Join(extraChild, ";"),
 		}); err != nil {
@@ -846,7 +832,7 @@ func Delegation07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	return appendTestCaseEnd(results, testcase)
+	return appendTestCaseEnd(ctx, results, testcase)
 }
 
 func filterByIPVersion(nss []nameserver.Nameserver, version int) []nameserver.Nameserver {
@@ -887,7 +873,7 @@ func namesToStrings(names []dnsname.Name) []string {
 	return values
 }
 
-func findDupNS(testcase string, duplicateTag string, distinctTag string, nsList []nameserver.Nameserver) ([]*logger.Entry, error) {
+func findDupNS(ctx context.Context, testcase string, duplicateTag string, distinctTag string, nsList []nameserver.Nameserver) ([]*logger.Entry, error) {
 	nsnamesAndIP := map[string]bool{}
 	ips := map[string][]string{}
 	for _, ns := range nsList {
@@ -907,7 +893,7 @@ func findDupNS(testcase string, duplicateTag string, distinctTag string, nsList 
 	sort.Strings(keys)
 	for _, ip := range keys {
 		if len(ips[ip]) > 1 {
-			entry, err := util.Logger().Add(duplicateTag, map[string]any{
+			entry, err := util.LoggerFromContext(ctx).Add(duplicateTag, map[string]any{
 				"nsname_list": strings.Join(ips[ip], ";"),
 				"ns_ip":       ip,
 			}, moduleName, testcase)
@@ -919,7 +905,7 @@ func findDupNS(testcase string, duplicateTag string, distinctTag string, nsList 
 	}
 
 	if len(nsList) > 0 && len(results) == 0 {
-		entry, err := util.Logger().Add(distinctTag, map[string]any{}, moduleName, testcase)
+		entry, err := util.LoggerFromContext(ctx).Add(distinctTag, map[string]any{}, moduleName, testcase)
 		if err != nil {
 			return results, err
 		}
@@ -1008,15 +994,15 @@ func defaultRecurse(ctx context.Context, z *zone.Zone, name string, qtype string
 	return z.Recursor().Recurse(ctx, name, qtype, "IN")
 }
 
-func appendTestCaseEnd(results []*logger.Entry, testcase string) ([]*logger.Entry, error) {
-	if err := appendLog(&results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
+func appendTestCaseEnd(ctx context.Context, results []*logger.Entry, testcase string) ([]*logger.Entry, error) {
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
 	return results, nil
 }
 
-func appendLog(results *[]*logger.Entry, testcase string, tag string, args map[string]any) error {
-	entry, err := util.Logger().Add(tag, args, moduleName, testcase)
+func appendLog(ctx context.Context, results *[]*logger.Entry, testcase string, tag string, args map[string]any) error {
+	entry, err := util.LoggerFromContext(ctx).Add(tag, args, moduleName, testcase)
 	if err != nil {
 		return err
 	}
@@ -1024,8 +1010,8 @@ func appendLog(results *[]*logger.Entry, testcase string, tag string, args map[s
 	return nil
 }
 
-func ipDisabledMessageWithLogger(buf *testlogger.Buffer, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
-	if ns.Address.Is6() && !profile.Effective().Net.IPv6 {
+func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
+	if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 		for _, rrtype := range rrtypes {
 			if _, err := buf.Add("IPV6_DISABLED", map[string]any{
 				"ns":     ns.String(),
@@ -1036,7 +1022,7 @@ func ipDisabledMessageWithLogger(buf *testlogger.Buffer, ns nameserver.Nameserve
 		}
 		return true, nil
 	}
-	if ns.Address.Is4() && !profile.Effective().Net.IPv4 {
+	if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
 		for _, rrtype := range rrtypes {
 			if _, err := buf.Add("IPV4_DISABLED", map[string]any{
 				"ns":     ns.String(),

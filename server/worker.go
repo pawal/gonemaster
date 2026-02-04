@@ -144,6 +144,13 @@ func (s *Server) runJob(jobID string) error {
 }
 
 func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntry, error) {
+	if s.engineLimiter != nil {
+		if err := s.engineLimiter.Acquire(ctx); err != nil {
+			return nil, err
+		}
+		defer s.engineLimiter.Release()
+	}
+
 	minLevel := s.cfg.MinLevel
 	if job.MinLevel != "" {
 		minLevel = job.MinLevel
@@ -196,8 +203,6 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 }
 
 func (s *Server) runEngine(req engine.RunRequest) ([]engine.LogEntry, error) {
-	s.engineMu.Lock()
-	defer s.engineMu.Unlock()
 	if s.engineRunner != nil {
 		return s.engineRunner(req)
 	}

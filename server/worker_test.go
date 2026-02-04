@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -85,5 +86,92 @@ func TestProgressUpdatesForMultipleTests(t *testing.T) {
 	}
 	if !seen[33] || !seen[67] || !seen[100] {
 		t.Fatalf("expected progress updates including 33, 67, 100, got %v", progresses)
+	}
+}
+
+func TestRunEngineForJobParallel(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.MaxConcurrentJobs = 0
+	srv := New(cfg)
+
+	started := make(chan struct{}, 2)
+	release := make(chan struct{})
+	srv.engineRunner = func(_ engine.RunRequest) ([]engine.LogEntry, error) {
+		started <- struct{}{}
+		<-release
+		return nil, nil
+	}
+
+	job1 := Job{ID: "job-par-1", Domain: "example.com", Tests: []string{"basic01"}}
+	job2 := Job{ID: "job-par-2", Domain: "example.net", Tests: []string{"basic01"}}
+
+	errs := make(chan error, 2)
+	go func() {
+		_, err := srv.runEngineForJob(job1, context.Background())
+		errs <- err
+	}()
+	go func() {
+		_, err := srv.runEngineForJob(job2, context.Background())
+		errs <- err
+	}()
+
+	for i := 0; i < 2; i++ {
+		select {
+		case <-started:
+		case <-time.After(250 * time.Millisecond):
+			t.Fatalf("expected both runs to start in parallel, got %d", i)
+		}
+	}
+
+	close(release)
+	for i := 0; i < 2; i++ {
+		if err := <-errs; err != nil {
+			t.Fatalf("run %d: %v", i, err)
+		}
+	}
+}
+
+func TestRunEngineForJobLimiter(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.MaxConcurrentJobs = 1
+	srv := New(cfg)
+
+	started := make(chan struct{}, 2)
+	release := make(chan struct{})
+	srv.engineRunner = func(_ engine.RunRequest) ([]engine.LogEntry, error) {
+		started <- struct{}{}
+		<-release
+		return nil, nil
+	}
+
+	job1 := Job{ID: "job-cap-1", Domain: "example.com", Tests: []string{"basic01"}}
+	job2 := Job{ID: "job-cap-2", Domain: "example.net", Tests: []string{"basic01"}}
+
+	errs := make(chan error, 2)
+	go func() {
+		_, err := srv.runEngineForJob(job1, context.Background())
+		errs <- err
+	}()
+	go func() {
+		_, err := srv.runEngineForJob(job2, context.Background())
+		errs <- err
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(250 * time.Millisecond):
+		t.Fatalf("expected first run to start")
+	}
+	select {
+	case <-started:
+		t.Fatalf("expected second run to be blocked by limiter")
+	case <-time.After(200 * time.Millisecond):
+	}
+
+	close(release)
+	for i := 0; i < 2; i++ {
+		if err := <-errs; err != nil {
+			t.Fatalf("run %d: %v", i, err)
+		}
 	}
 }

@@ -76,7 +76,8 @@ func TestFakeDelegationNS(t *testing.T) {
 }
 
 func TestQueryCacheHit(t *testing.T) {
-	ns, err := New("ns.example", "192.0.2.10", nil)
+	cache := NewCacheStore()
+	ns, err := NewWithCache(cache, "ns.example", "192.0.2.10", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -110,6 +111,11 @@ func TestQueryCacheHit(t *testing.T) {
 	}
 	if calls != 1 {
 		t.Fatalf("expected 1 call, got %d", calls)
+	}
+
+	metrics := cache.QueryMetrics()
+	if metrics.Hits != 1 || metrics.Misses != 1 || metrics.Evictions != 0 {
+		t.Fatalf("unexpected query cache metrics: %+v", metrics)
 	}
 }
 
@@ -155,7 +161,8 @@ func TestCacheStoreIsolation(t *testing.T) {
 }
 
 func TestErrorCacheSkipsQueries(t *testing.T) {
-	ns, err := New("ns.example", "192.0.2.15", nil)
+	cache := NewCacheStore()
+	ns, err := NewWithCache(cache, "ns.example", "192.0.2.15", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -179,6 +186,11 @@ func TestErrorCacheSkipsQueries(t *testing.T) {
 	}
 	if calls != 1 {
 		t.Fatalf("expected 1 call due to error cache, got %d", calls)
+	}
+
+	metrics := cache.ErrorMetrics()
+	if metrics.Hits != 1 || metrics.Misses != 1 || metrics.Evictions != 0 {
+		t.Fatalf("unexpected error cache metrics: %+v", metrics)
 	}
 }
 
@@ -310,6 +322,11 @@ func TestReachabilityCacheSkipsAcrossCaches(t *testing.T) {
 	}
 	if callsB != 0 {
 		t.Fatalf("expected second call to be skipped by reachability cache, got %d", callsB)
+	}
+
+	metrics := reachabilityMetricsSnapshot()
+	if metrics.Hits != 1 || metrics.Misses != 1 || metrics.Evictions != 0 {
+		t.Fatalf("unexpected reachability metrics: %+v", metrics)
 	}
 }
 

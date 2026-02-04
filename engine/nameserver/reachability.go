@@ -13,6 +13,7 @@ import (
 type reachabilityCache struct {
 	mu   sync.Mutex
 	data map[string]time.Time
+	met  cacheMetrics
 }
 
 func newReachabilityCache() *reachabilityCache {
@@ -28,12 +29,16 @@ func (c *reachabilityCache) shouldSkip(addr string) (bool, time.Duration) {
 	defer c.mu.Unlock()
 	expiry, ok := c.data[addr]
 	if !ok {
+		c.met.miss()
 		return false, 0
 	}
 	if now.Before(expiry) {
+		c.met.hit()
 		return true, expiry.Sub(now)
 	}
 	delete(c.data, addr)
+	c.met.evict(1)
+	c.met.miss()
 	return false, 0
 }
 
@@ -51,7 +56,9 @@ func (c *reachabilityCache) clear() {
 		return
 	}
 	c.mu.Lock()
+	c.met.evict(len(c.data))
 	c.data = map[string]time.Time{}
+	c.met = cacheMetrics{}
 	c.mu.Unlock()
 }
 
@@ -59,6 +66,10 @@ var globalReachability = newReachabilityCache()
 
 func clearReachabilityCache() {
 	globalReachability.clear()
+}
+
+func reachabilityMetricsSnapshot() CacheMetrics {
+	return globalReachability.met.snapshot()
 }
 
 func isHardNetworkError(err error) bool {

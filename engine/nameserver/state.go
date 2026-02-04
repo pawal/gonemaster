@@ -3,6 +3,7 @@ package nameserver
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/miekg/dns"
@@ -13,11 +14,57 @@ import (
 type queryCache struct {
 	mu   sync.Mutex
 	data map[string]*packet.Packet
+	met  *cacheMetrics
 }
 
 type errorCache struct {
 	mu   sync.Mutex
 	data map[string]time.Time
+	met  *cacheMetrics
+}
+
+type cacheMetrics struct {
+	hits      uint64
+	misses    uint64
+	evictions uint64
+}
+
+type CacheMetrics struct {
+	Hits      uint64
+	Misses    uint64
+	Evictions uint64
+}
+
+func (m *cacheMetrics) hit() {
+	if m == nil {
+		return
+	}
+	atomic.AddUint64(&m.hits, 1)
+}
+
+func (m *cacheMetrics) miss() {
+	if m == nil {
+		return
+	}
+	atomic.AddUint64(&m.misses, 1)
+}
+
+func (m *cacheMetrics) evict(n int) {
+	if m == nil || n <= 0 {
+		return
+	}
+	atomic.AddUint64(&m.evictions, uint64(n))
+}
+
+func (m *cacheMetrics) snapshot() CacheMetrics {
+	if m == nil {
+		return CacheMetrics{}
+	}
+	return CacheMetrics{
+		Hits:      atomic.LoadUint64(&m.hits),
+		Misses:    atomic.LoadUint64(&m.misses),
+		Evictions: atomic.LoadUint64(&m.evictions),
+	}
 }
 
 func (c *errorCache) shouldSkip(key string) (bool, time.Duration) {
@@ -28,15 +75,28 @@ func (c *errorCache) shouldSkip(key string) (bool, time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.data == nil {
+		if c.met != nil {
+			c.met.miss()
+		}
 		return false, 0
 	}
 	expiry, ok := c.data[key]
 	if !ok {
+		if c.met != nil {
+			c.met.miss()
+		}
 		return false, 0
 	}
 	if now.After(expiry) {
 		delete(c.data, key)
+		if c.met != nil {
+			c.met.evict(1)
+			c.met.miss()
+		}
 		return false, 0
+	}
+	if c.met != nil {
+		c.met.hit()
 	}
 	return true, expiry.Sub(now)
 }
@@ -58,6 +118,9 @@ func (c *errorCache) clear() {
 		return
 	}
 	c.mu.Lock()
+	if c.met != nil {
+		c.met.evict(len(c.data))
+	}
 	c.data = map[string]time.Time{}
 	c.mu.Unlock()
 }
@@ -69,9 +132,19 @@ func (c *queryCache) get(key string) (*packet.Packet, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.data == nil {
+		if c.met != nil {
+			c.met.miss()
+		}
 		return nil, false
 	}
 	value, ok := c.data[key]
+	if c.met != nil {
+		if ok {
+			c.met.hit()
+		} else {
+			c.met.miss()
+		}
+	}
 	return value, ok
 }
 
@@ -92,6 +165,9 @@ func (c *queryCache) clear() {
 		return
 	}
 	c.mu.Lock()
+	if c.met != nil {
+		c.met.evict(len(c.data))
+	}
 	c.data = map[string]*packet.Packet{}
 	c.mu.Unlock()
 }
@@ -124,6 +200,8 @@ type CacheStore struct {
 	objectCache      map[string]map[string]*Nameserver
 	cacheByAddress   map[string]*queryCache
 	errorCacheByAddr map[string]*errorCache
+	queryMetrics     cacheMetrics
+	errorMetrics     cacheMetrics
 }
 
 func NewCacheStore() *CacheStore {
@@ -141,7 +219,7 @@ func (c *CacheStore) cacheForAddress(addr string) *queryCache {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.cacheByAddress[addr] == nil {
-		c.cacheByAddress[addr] = &queryCache{data: map[string]*packet.Packet{}}
+		c.cacheByAddress[addr] = &queryCache{data: map[string]*packet.Packet{}, met: &c.queryMetrics}
 	}
 	return c.cacheByAddress[addr]
 }
@@ -153,7 +231,7 @@ func (c *CacheStore) errorCacheForAddress(addr string) *errorCache {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.errorCacheByAddr[addr] == nil {
-		c.errorCacheByAddr[addr] = &errorCache{data: map[string]time.Time{}}
+		c.errorCacheByAddr[addr] = &errorCache{data: map[string]time.Time{}, met: &c.errorMetrics}
 	}
 	return c.errorCacheByAddr[addr]
 }
@@ -199,6 +277,22 @@ func (c *CacheStore) Empty() {
 	c.errorCacheByAddr = map[string]*errorCache{}
 	c.objectCache = map[string]map[string]*Nameserver{}
 	c.mu.Unlock()
+}
+
+// QueryMetrics returns aggregated metrics for query caches.
+func (c *CacheStore) QueryMetrics() CacheMetrics {
+	if c == nil {
+		return CacheMetrics{}
+	}
+	return c.queryMetrics.snapshot()
+}
+
+// ErrorMetrics returns aggregated metrics for error caches.
+func (c *CacheStore) ErrorMetrics() CacheMetrics {
+	if c == nil {
+		return CacheMetrics{}
+	}
+	return c.errorMetrics.snapshot()
 }
 
 var defaultCache = NewCacheStore()

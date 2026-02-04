@@ -77,7 +77,7 @@ func GetParentNSNamesAndIPs(ctx context.Context, z *zone.Zone) ([]nameserver.Nam
 	}
 	parentCache.mu.Unlock()
 
-	root, err := r.RootServers()
+	root, err := r.RootServers(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +160,7 @@ func GetParentNSNamesAndIPs(ctx context.Context, z *zone.Zone) ([]nameserver.Nam
 					}
 				}
 				for _, addr := range uniqueAddrs(rrsNS[nsName]) {
-					next, err := nameserver.New(nsName, addr.String(), r.Client())
+					next, err := nameserver.NewWithContext(ctx, nsName, addr.String(), r.Client())
 					if err != nil {
 						continue
 					}
@@ -211,7 +211,7 @@ func GetParentNSNamesAndIPs(ctx context.Context, z *zone.Zone) ([]nameserver.Nam
 								}
 							}
 							for _, addr := range uniqueAddrs(rrsNSBis[nsName]) {
-								next, err := nameserver.New(nsName, addr.String(), r.Client())
+								next, err := nameserver.NewWithContext(ctx, nsName, addr.String(), r.Client())
 								if err != nil {
 									continue
 								}
@@ -236,7 +236,7 @@ func GetParentNSNamesAndIPs(ctx context.Context, z *zone.Zone) ([]nameserver.Nam
 								}
 							}
 							for _, addr := range uniqueAddrs(rrsNSBis[nsName]) {
-								next, err := nameserver.New(nsName, addr.String(), r.Client())
+								next, err := nameserver.NewWithContext(ctx, nsName, addr.String(), r.Client())
 								if err != nil {
 									continue
 								}
@@ -377,7 +377,7 @@ func GetZoneNSNames(ctx context.Context, z *zone.Zone) ([]dnsname.Name, error) {
 		if !item.HasAddress {
 			continue
 		}
-		ns, ok := toNameserver(z, item)
+		ns, ok := toNameserver(ctx, z, item)
 		if !ok {
 			continue
 		}
@@ -496,7 +496,7 @@ func getDelegation(ctx context.Context, z *zone.Zone) ([]NSItem, error) {
 	}
 
 	if z.Name.String() == "." {
-		root, err := r.RootServers()
+		root, err := r.RootServers(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -720,7 +720,7 @@ func getIBAddrInZone(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver
 		if !item.HasAddress {
 			continue
 		}
-		ns, ok := toNameserver(z, item)
+		ns, ok := toNameserver(ctx, z, item)
 		if ok {
 			delServers = append(delServers, ns)
 		}
@@ -745,7 +745,7 @@ func getIBAddrInZone(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver
 	seen := map[string]nameserver.Nameserver{}
 	for nsName, addrs := range ibNS {
 		for _, addr := range uniqueAddrs(addrs) {
-			ns, err := nameserver.New(nsName, addr.String(), r.Client())
+			ns, err := nameserver.NewWithContext(ctx, nsName, addr.String(), r.Client())
 			if err != nil {
 				continue
 			}
@@ -766,7 +766,7 @@ func getIBAddrInZone(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver
 	return out, nil
 }
 
-func toNameserver(z *zone.Zone, item NSItem) (nameserver.Nameserver, bool) {
+func toNameserver(ctx context.Context, z *zone.Zone, item NSItem) (nameserver.Nameserver, bool) {
 	if !item.HasAddress {
 		return nameserver.Nameserver{}, false
 	}
@@ -774,7 +774,7 @@ func toNameserver(z *zone.Zone, item NSItem) (nameserver.Nameserver, bool) {
 	if r == nil {
 		return nameserver.Nameserver{}, false
 	}
-	ns, err := nameserver.New(item.Name.String(), item.Address.String(), r.Client())
+	ns, err := nameserver.NewWithContext(ctx, item.Name.String(), item.Address.String(), r.Client())
 	if err != nil {
 		return nameserver.Nameserver{}, false
 	}

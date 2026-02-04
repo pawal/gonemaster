@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine/logger"
+	ns "codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 	address "codeberg.org/pawal/gonemaster/engine/test/address"
 	"codeberg.org/pawal/gonemaster/engine/test/basic"
@@ -352,6 +353,9 @@ func RunWithRunner(req RunRequest, runner *Runner) ([]LogEntry, error) {
 	if runner.Logger == nil {
 		return nil, fmt.Errorf("runner logger is required")
 	}
+	if runner.NameserverCache == nil {
+		runner.NameserverCache = ns.NewCacheStore()
+	}
 
 	module, testcase, err := normalizeRequest(req)
 	if err != nil {
@@ -367,6 +371,7 @@ func RunWithRunner(req RunRequest, runner *Runner) ([]LogEntry, error) {
 	if runner.Limiter != nil {
 		ctx = transport.WithLimiter(ctx, runner.Limiter)
 	}
+	ctx = ns.WithCache(ctx, runner.NameserverCache)
 	if runner.StartedAt.IsZero() {
 		runner.StartedAt = time.Now()
 	}
@@ -423,6 +428,7 @@ func Run(req RunRequest) ([]LogEntry, error) {
 		Profile:          p,
 		Logger:           log,
 		Limiter:          limiter,
+		NameserverCache:  ns.NewCacheStore(),
 		StartedAt:        time.Now(),
 		AutoIPv6Disabled: autoDisabledIPv6,
 	}

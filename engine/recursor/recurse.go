@@ -32,7 +32,7 @@ type recurseState struct {
 	qname      dnsname.Name
 	qnameSet   bool
 	candidate  packet.Packet
-	nsFrom     func(packet.Packet, *recurseState) ([]queryer, error)
+	nsFrom     func(context.Context, packet.Packet, *recurseState) ([]queryer, error)
 	trace      []traceEntry
 	glue       map[string]map[netip.Addr]bool
 }
@@ -173,7 +173,7 @@ func (r *Recursor) recurseOrdered(ctx context.Context, name string, qtype string
 			}
 			state.common = common
 
-			next, err := state.nsFrom(resp, state)
+			next, err := state.nsFrom(ctx, resp, state)
 			if err != nil {
 				return packet.Packet{}, state, err
 			}
@@ -376,7 +376,7 @@ func (r *Recursor) recurseUnordered(ctx context.Context, name string, qtype stri
 			state.seen[zkey] = true
 			state.common = redirectCommon
 
-			next, err := state.nsFrom(redirectResp, state)
+			next, err := state.nsFrom(ctx, redirectResp, state)
 			if err != nil {
 				return packet.Packet{}, state, err
 			}
@@ -507,7 +507,7 @@ func (r *Recursor) resolveCNAME(ctx context.Context, name dnsname.Name, qtype st
 
 	targetName := dnsname.New(targetKey)
 	if !name.IsInBailiwick(targetName) {
-		root, err := r.RootServers()
+		root, err := r.RootServers(ctx)
 		if err != nil {
 			return packet.Packet{}, state, err
 		}

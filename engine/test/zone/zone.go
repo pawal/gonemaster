@@ -396,7 +396,7 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 					continue
 				}
 
-				ns, err := nameserver.New(mname, ip, z.Recursor().Client())
+				ns, err := nameserver.NewWithContext(ctx, mname, ip, z.Recursor().Client())
 				if err != nil {
 					continue
 				}
@@ -1268,7 +1268,7 @@ func Zone11(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	allNS := nameserversFromNSItems(z, append(nsItems, zoneItems...))
+	allNS := nameserversFromNSItems(ctx, z, append(nsItems, zoneItems...))
 	groups := nameserversByIP(allNS)
 
 	nsSpf := map[string][]string{}
@@ -1707,7 +1707,7 @@ func validDomain(value string) bool {
 	return ok
 }
 
-func nameserversFromNSItems(z *zonepkg.Zone, items []methodsv2.NSItem) []nameserver.Nameserver {
+func nameserversFromNSItems(ctx context.Context, z *zonepkg.Zone, items []methodsv2.NSItem) []nameserver.Nameserver {
 	if z == nil || z.Recursor() == nil {
 		return nil
 	}
@@ -1717,7 +1717,7 @@ func nameserversFromNSItems(z *zonepkg.Zone, items []methodsv2.NSItem) []nameser
 		if !item.HasAddress {
 			continue
 		}
-		ns, err := nameserver.New(item.Name.String(), item.Address.String(), z.Recursor().Client())
+		ns, err := nameserver.NewWithContext(ctx, item.Name.String(), item.Address.String(), z.Recursor().Client())
 		if err != nil {
 			continue
 		}

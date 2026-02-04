@@ -73,7 +73,7 @@ func TestRootServersSorted(t *testing.T) {
 		client: &transport.Client{},
 	}
 
-	servers, err := r.RootServers()
+	servers, err := r.RootServers(context.Background())
 	if err != nil {
 		t.Fatalf("root servers: %v", err)
 	}
@@ -144,7 +144,7 @@ func TestGetNSFromUsesGlueAndLazy(t *testing.T) {
 
 	resp := packet.Packet{Msg: msg}
 	r := &Recursor{client: &transport.Client{}}
-	queryers, err := r.getNSFrom(resp, nil)
+	queryers, err := r.getNSFrom(context.Background(), resp, nil)
 	if err != nil {
 		t.Fatalf("getNSFrom: %v", err)
 	}
@@ -502,7 +502,7 @@ func TestGetNSFromConcurrentWithLazyNameserver(t *testing.T) {
 		defer wg.Done()
 		<-start
 		for i := 0; i < 20; i++ {
-			if _, err := r.getNSFrom(resp, state); err != nil {
+			if _, err := r.getNSFrom(context.Background(), resp, state); err != nil {
 				errCh <- err
 				return
 			}
@@ -751,7 +751,7 @@ func TestRecurseUnorderedWaitsForRedirectBatchCleanup(t *testing.T) {
 
 	state := &recurseState{
 		ns: []queryer{redirect, slow},
-		nsFrom: func(_ packet.Packet, _ *recurseState) ([]queryer, error) {
+		nsFrom: func(_ context.Context, _ packet.Packet, _ *recurseState) ([]queryer, error) {
 			select {
 			case <-slowCanceled:
 			case <-time.After(200 * time.Millisecond):

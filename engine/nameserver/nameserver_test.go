@@ -112,6 +112,47 @@ func TestQueryCacheHit(t *testing.T) {
 	}
 }
 
+func TestCacheStoreIsolation(t *testing.T) {
+	cacheA := NewCacheStore()
+	cacheB := NewCacheStore()
+
+	nsA, err := NewWithCache(cacheA, "ns.example", "192.0.2.30", nil)
+	if err != nil {
+		t.Fatalf("new nameserver A: %v", err)
+	}
+	nsB, err := NewWithCache(cacheB, "ns.example", "192.0.2.30", nil)
+	if err != nil {
+		t.Fatalf("new nameserver B: %v", err)
+	}
+
+	var callsA int
+	nsA.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		callsA++
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeSuccess
+		return packet.Packet{Msg: msg}, nil
+	})
+
+	var callsB int
+	nsB.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		callsB++
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeSuccess
+		return packet.Packet{Msg: msg}, nil
+	})
+
+	_, _ = nsA.QueryWithOptions(context.Background(), "example", "A", nil)
+	_, _ = nsA.QueryWithOptions(context.Background(), "example", "A", nil)
+	if callsA != 1 {
+		t.Fatalf("expected cache hit in store A, got %d calls", callsA)
+	}
+
+	_, _ = nsB.QueryWithOptions(context.Background(), "example", "A", nil)
+	if callsB != 1 {
+		t.Fatalf("expected isolated cache store, got %d calls", callsB)
+	}
+}
+
 func TestErrorCacheSkipsQueries(t *testing.T) {
 	ns, err := New("ns.example", "192.0.2.15", nil)
 	if err != nil {
@@ -340,7 +381,8 @@ func TestAXFRIPv4Disabled(t *testing.T) {
 }
 
 func TestEmptyCache(t *testing.T) {
-	ns, err := New("ns.example", "192.0.2.25", nil)
+	cache := NewCacheStore()
+	ns, err := NewWithCache(cache, "ns.example", "192.0.2.25", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -356,13 +398,13 @@ func TestEmptyCache(t *testing.T) {
 
 	nameKey := strings.ToLower(ns.Name.String())
 	addrKey := ns.Address.String()
-	if cached := cachedNameserver(nameKey, addrKey); cached == nil {
+	if cached := cache.cachedNameserver(nameKey, addrKey); cached == nil {
 		t.Fatalf("expected nameserver cached")
 	}
 
-	EmptyCache()
+	cache.Empty()
 
-	if cached := cachedNameserver(nameKey, addrKey); cached != nil {
+	if cached := cache.cachedNameserver(nameKey, addrKey); cached != nil {
 		t.Fatalf("expected nameserver cache cleared")
 	}
 	if _, ok := ns.state.cache.get(cacheKey); ok {

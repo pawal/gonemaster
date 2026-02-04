@@ -119,63 +119,116 @@ type nsState struct {
 	axfrFunc        func(ctx context.Context, domain string, callback func(dns.RR) bool, class string) error
 }
 
-var (
-	cacheMu             sync.Mutex
-	objectCache         = map[string]map[string]*Nameserver{}
-	cacheByAddress      = map[string]*queryCache{}
-	errorCacheByAddress = map[string]*errorCache{}
-)
-
-func cacheForAddress(addr string) *queryCache {
-	cacheMu.Lock()
-	defer cacheMu.Unlock()
-	if cacheByAddress[addr] == nil {
-		cacheByAddress[addr] = &queryCache{data: map[string]*packet.Packet{}}
-	}
-	return cacheByAddress[addr]
+type CacheStore struct {
+	mu               sync.Mutex
+	objectCache      map[string]map[string]*Nameserver
+	cacheByAddress   map[string]*queryCache
+	errorCacheByAddr map[string]*errorCache
 }
 
-func errorCacheForAddress(addr string) *errorCache {
-	cacheMu.Lock()
-	defer cacheMu.Unlock()
-	if errorCacheByAddress[addr] == nil {
-		errorCacheByAddress[addr] = &errorCache{data: map[string]time.Time{}}
+func NewCacheStore() *CacheStore {
+	return &CacheStore{
+		objectCache:      map[string]map[string]*Nameserver{},
+		cacheByAddress:   map[string]*queryCache{},
+		errorCacheByAddr: map[string]*errorCache{},
 	}
-	return errorCacheByAddress[addr]
 }
 
-func cachedNameserver(nameKey string, addr string) *Nameserver {
-	cacheMu.Lock()
-	defer cacheMu.Unlock()
-	byName := objectCache[nameKey]
+func (c *CacheStore) cacheForAddress(addr string) *queryCache {
+	if c == nil {
+		return nil
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.cacheByAddress[addr] == nil {
+		c.cacheByAddress[addr] = &queryCache{data: map[string]*packet.Packet{}}
+	}
+	return c.cacheByAddress[addr]
+}
+
+func (c *CacheStore) errorCacheForAddress(addr string) *errorCache {
+	if c == nil {
+		return nil
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.errorCacheByAddr[addr] == nil {
+		c.errorCacheByAddr[addr] = &errorCache{data: map[string]time.Time{}}
+	}
+	return c.errorCacheByAddr[addr]
+}
+
+func (c *CacheStore) cachedNameserver(nameKey string, addr string) *Nameserver {
+	if c == nil {
+		return nil
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	byName := c.objectCache[nameKey]
 	if byName == nil {
 		return nil
 	}
 	return byName[addr]
 }
 
-func storeNameserver(nameKey string, addr string, ns *Nameserver) {
-	cacheMu.Lock()
-	defer cacheMu.Unlock()
-	if objectCache[nameKey] == nil {
-		objectCache[nameKey] = map[string]*Nameserver{}
+func (c *CacheStore) storeNameserver(nameKey string, addr string, ns *Nameserver) {
+	if c == nil {
+		return
 	}
-	objectCache[nameKey][addr] = ns
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.objectCache[nameKey] == nil {
+		c.objectCache[nameKey] = map[string]*Nameserver{}
+	}
+	c.objectCache[nameKey][addr] = ns
 }
 
-// EmptyCache clears nameserver object caches and query caches.
+// Empty clears nameserver object caches and query caches.
+func (c *CacheStore) Empty() {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	for _, cache := range c.cacheByAddress {
+		cache.clear()
+	}
+	for _, cache := range c.errorCacheByAddr {
+		cache.clear()
+	}
+	c.cacheByAddress = map[string]*queryCache{}
+	c.errorCacheByAddr = map[string]*errorCache{}
+	c.objectCache = map[string]map[string]*Nameserver{}
+	c.mu.Unlock()
+}
+
+var defaultCache = NewCacheStore()
+
+// DefaultCache returns the fallback cache store.
+func DefaultCache() *CacheStore {
+	return defaultCache
+}
+
+// EmptyCache clears the default nameserver cache store.
 func EmptyCache() {
-	cacheMu.Lock()
-	for _, cache := range cacheByAddress {
-		cache.clear()
+	defaultCache.Empty()
+}
+
+func (ns *Nameserver) ensureState() {
+	if ns == nil || ns.state != nil {
+		return
 	}
-	for _, cache := range errorCacheByAddress {
-		cache.clear()
+	cache := ns.cache
+	if cache == nil {
+		cache = defaultCache
+		ns.cache = cache
 	}
-	cacheByAddress = map[string]*queryCache{}
-	errorCacheByAddress = map[string]*errorCache{}
-	objectCache = map[string]map[string]*Nameserver{}
-	cacheMu.Unlock()
+	ns.state = &nsState{
+		cache:           cache.cacheForAddress(ns.Address.String()),
+		errorCache:      cache.errorCacheForAddress(ns.Address.String()),
+		fakeDelegations: map[string]delegation{},
+		fakeDS:          map[string][]dns.RR{},
+		blacklisted:     map[bool]bool{},
+	}
 }
 
 // SetQueryHook overrides the network query path (useful for tests).
@@ -183,9 +236,7 @@ func (ns *Nameserver) SetQueryHook(hook func(ctx context.Context, name string, q
 	if ns == nil {
 		return
 	}
-	if ns.state == nil {
-		ns.state = &nsState{}
-	}
+	ns.ensureState()
 	ns.state.queryFunc = hook
 }
 
@@ -194,8 +245,6 @@ func (ns *Nameserver) SetAXFRHook(hook func(ctx context.Context, domain string, 
 	if ns == nil {
 		return
 	}
-	if ns.state == nil {
-		ns.state = &nsState{}
-	}
+	ns.ensureState()
 	ns.state.axfrFunc = hook
 }

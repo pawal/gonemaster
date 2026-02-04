@@ -1,6 +1,7 @@
 package recursor
 
 import (
+	"context"
 	"fmt"
 	"net/netip"
 	"sort"
@@ -124,14 +125,14 @@ func (r *Recursor) RemoveFakeAddresses(domain string) {
 }
 
 // RootServers returns nameservers initialized from root hints.
-func (r *Recursor) RootServers() ([]nameserver.Nameserver, error) {
+func (r *Recursor) RootServers(ctx context.Context) ([]nameserver.Nameserver, error) {
 	var servers []nameserver.Nameserver
 	names := r.GetFakeNames(".")
 	sort.Strings(names)
 	for _, name := range names {
 		addrs := r.GetFakeAddresses(".", name)
 		for _, addr := range addrs {
-			ns, err := nameserver.New(name, addr.String(), r.client)
+			ns, err := nameserver.NewWithContext(ctx, name, addr.String(), r.client)
 			if err != nil {
 				return nil, err
 			}

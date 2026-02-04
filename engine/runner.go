@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine/logger"
+	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/transport"
 )
@@ -19,6 +20,8 @@ type Runner struct {
 	Logger    *logger.Logger
 	Limiter   *transport.Limiter
 	StartedAt time.Time
+	// NameserverCache holds per-run nameserver caches.
+	NameserverCache *nameserver.CacheStore
 	// AutoIPv6Disabled records whether IPv6 was disabled by the auto-detect heuristic.
 	AutoIPv6Disabled bool
 }
@@ -55,11 +58,16 @@ func RunnerFromContextOrDefault(ctx context.Context) *Runner {
 		log.SetProfile(prof)
 	}
 	limiter := transport.LimiterFromContext(ctx)
+	cache := nameserver.CacheFromContext(ctx)
+	if cache == nil {
+		cache = nameserver.NewCacheStore()
+	}
 	return &Runner{
-		Profile:   prof,
-		Logger:    log,
-		Limiter:   limiter,
-		StartedAt: time.Now(),
+		Profile:         prof,
+		Logger:          log,
+		Limiter:         limiter,
+		NameserverCache: cache,
+		StartedAt:       time.Now(),
 	}
 }
 

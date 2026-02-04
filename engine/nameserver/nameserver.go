@@ -23,6 +23,7 @@ type Nameserver struct {
 	Address netip.Addr
 	Client  *transport.Client
 	state   *nsState
+	cache   *CacheStore
 }
 
 const systemModuleName = "System"
@@ -44,6 +45,19 @@ type QueryOptions struct {
 
 // New creates a Nameserver from a name and IP address.
 func New(name string, address string, client *transport.Client) (Nameserver, error) {
+	return NewWithCache(defaultCache, name, address, client)
+}
+
+// NewWithContext creates a Nameserver using a cache store from ctx.
+func NewWithContext(ctx context.Context, name string, address string, client *transport.Client) (Nameserver, error) {
+	return NewWithCache(CacheFromContextOrDefault(ctx), name, address, client)
+}
+
+// NewWithCache creates a Nameserver using the supplied cache store.
+func NewWithCache(cache *CacheStore, name string, address string, client *transport.Client) (Nameserver, error) {
+	if cache == nil {
+		cache = defaultCache
+	}
 	addr, err := netip.ParseAddr(address)
 	if err != nil {
 		return Nameserver{}, fmt.Errorf("invalid nameserver address %q: %w", address, err)
@@ -61,13 +75,13 @@ func New(name string, address string, client *transport.Client) (Nameserver, err
 	nameKey = strings.ToLower(nameObj.String())
 
 	addrKey := addr.String()
-	if cached := cachedNameserver(nameKey, addrKey); cached != nil {
+	if cached := cache.cachedNameserver(nameKey, addrKey); cached != nil {
 		return *cached, nil
 	}
 
 	state := &nsState{
-		cache:           cacheForAddress(addrKey),
-		errorCache:      errorCacheForAddress(addrKey),
+		cache:           cache.cacheForAddress(addrKey),
+		errorCache:      cache.errorCacheForAddress(addrKey),
 		fakeDelegations: map[string]delegation{},
 		fakeDS:          map[string][]dns.RR{},
 		blacklisted:     map[bool]bool{},
@@ -78,8 +92,9 @@ func New(name string, address string, client *transport.Client) (Nameserver, err
 		Address: addr,
 		Client:  client,
 		state:   state,
+		cache:   cache,
 	}
-	storeNameserver(nameKey, addrKey, ns)
+	cache.storeNameserver(nameKey, addrKey, ns)
 	return *ns, nil
 }
 

@@ -165,7 +165,7 @@ func (z *Zone) Glue(ctx context.Context) ([]nameserver.Nameserver, error) {
 	if z.recursor.HasFakeAddresses(z.Name.String()) {
 		for _, nsName := range glueNames {
 			for _, addr := range z.recursor.GetFakeAddresses(z.Name.String(), nsName.String()) {
-				ns, err := nameserver.New(nsName.String(), addr.String(), z.recursor.Client())
+				ns, err := nameserver.NewWithContext(ctx, nsName.String(), addr.String(), z.recursor.Client())
 				if err != nil {
 					return nil, err
 				}
@@ -179,7 +179,7 @@ func (z *Zone) Glue(ctx context.Context) ([]nameserver.Nameserver, error) {
 				return nil, err
 			}
 			for _, addr := range addrs {
-				ns, err := nameserver.New(nsName.String(), addr.String(), z.recursor.Client())
+				ns, err := nameserver.NewWithContext(ctx, nsName.String(), addr.String(), z.recursor.Client())
 				if err != nil {
 					return nil, err
 				}
@@ -281,7 +281,7 @@ func (z *Zone) NS(ctx context.Context) ([]nameserver.Nameserver, error) {
 	}
 
 	if z.Name.String() == "." {
-		root, err := z.recursor.RootServers()
+		root, err := z.recursor.RootServers(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -301,7 +301,7 @@ func (z *Zone) NS(ctx context.Context) ([]nameserver.Nameserver, error) {
 			return nil, err
 		}
 		for _, addr := range addrs {
-			ns, err := nameserver.New(nsName.String(), addr.String(), z.recursor.Client())
+			ns, err := nameserver.NewWithContext(ctx, nsName.String(), addr.String(), z.recursor.Client())
 			if err != nil {
 				return nil, err
 			}

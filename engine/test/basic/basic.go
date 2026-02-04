@@ -180,7 +180,7 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	aaDname := map[string]map[string]map[string]bool{}
 	aaNodata := map[string]map[string]bool{}
 
-	root, err := rec.RootServers()
+	root, err := rec.RootServers(ctx)
 	if err != nil {
 		return results, err
 	}
@@ -281,7 +281,7 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					if handledServers[zoneName] != nil && handledServers[zoneName][addr.String()] {
 						continue
 					}
-					nsObj, err := nameserver.New(nsName, addr.String(), rec.Client())
+					nsObj, err := nameserver.NewWithContext(ctx, nsName, addr.String(), rec.Client())
 					if err != nil {
 						continue
 					}
@@ -383,7 +383,7 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 								if handledServers[intermediate.String()] != nil && handledServers[intermediate.String()][addr.String()] {
 									continue
 								}
-								nsObj, err := nameserver.New(nsName, addr.String(), rec.Client())
+								nsObj, err := nameserver.NewWithContext(ctx, nsName, addr.String(), rec.Client())
 								if err != nil {
 									continue
 								}
@@ -446,7 +446,7 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 								if handledServers[intermediate.String()] != nil && handledServers[intermediate.String()][addr.String()] {
 									continue
 								}
-								nsObj, err := nameserver.New(nsName, addr.String(), rec.Client())
+								nsObj, err := nameserver.NewWithContext(ctx, nsName, addr.String(), rec.Client())
 								if err != nil {
 									continue
 								}
@@ -661,7 +661,7 @@ func Basic02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					continue
 				}
 				if addr, ok := addrFromRR(rr); ok {
-					nsObj, err := nameserver.New(nsName.String(), addr.String(), z.Recursor().Client())
+					nsObj, err := nameserver.NewWithContext(ctx, nsName.String(), addr.String(), z.Recursor().Client())
 					if err != nil {
 						continue
 					}

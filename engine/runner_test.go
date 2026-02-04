@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"codeberg.org/pawal/gonemaster/engine/logger"
+	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/transport"
 )
@@ -27,9 +28,11 @@ func TestRunnerFromContextOrDefaultUsesContextValues(t *testing.T) {
 	log := logger.New()
 	prof := profile.Effective()
 	limiter := transport.NewLimiter(1)
+	cache := nameserver.NewCacheStore()
 	ctx := logger.WithContext(context.Background(), log)
 	ctx = profile.WithContext(ctx, prof)
 	ctx = transport.WithLimiter(ctx, limiter)
+	ctx = nameserver.WithCache(ctx, cache)
 
 	got := RunnerFromContextOrDefault(ctx)
 	if got == nil {
@@ -44,6 +47,9 @@ func TestRunnerFromContextOrDefaultUsesContextValues(t *testing.T) {
 	if got.Limiter != limiter {
 		t.Fatalf("expected limiter from context")
 	}
+	if got.NameserverCache != cache {
+		t.Fatalf("expected nameserver cache from context")
+	}
 }
 
 func TestRunnerFromContextOrDefaultCreatesLogger(t *testing.T) {
@@ -54,6 +60,9 @@ func TestRunnerFromContextOrDefaultCreatesLogger(t *testing.T) {
 	}
 	if got.Profile == nil {
 		t.Fatalf("expected default profile")
+	}
+	if got.NameserverCache == nil {
+		t.Fatalf("expected default nameserver cache")
 	}
 }
 

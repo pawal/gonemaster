@@ -1770,7 +1770,7 @@ func DNSSEC05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	nss := nameserversFromNSItems(z, append(delItems, zoneItems...))
+	nss := nameserversFromNSItems(ctx, z, append(delItems, zoneItems...))
 	groups := nameserversByIP(nss)
 	if len(groups) > 0 {
 		type nsOutcome struct {
@@ -2007,7 +2007,7 @@ func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	childNS := nameserversFromNSItems(z, append(delItems, zoneItems...))
+	childNS := nameserversFromNSItems(ctx, z, append(delItems, zoneItems...))
 	childNames := nsStrings(childNS)
 
 	queryTypes := []string{"SOA", "DNSKEY", "DS"}
@@ -2964,7 +2964,7 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	nss := nameserversFromNSItems(z, append(delItems, zoneItems...))
+	nss := nameserversFromNSItems(ctx, z, append(delItems, zoneItems...))
 	allNS := uniqueStrings(nsStrings(nss))
 	testingTime := time.Now().UTC()
 	testingTimeUnix := testingTime.Unix()
@@ -6713,7 +6713,7 @@ func dnskeyRRset(keys []*dns.DNSKEY) []dns.RR {
 	return rrs
 }
 
-func nameserversFromNSItems(z *zone.Zone, items []methodsv2.NSItem) []nameserver.Nameserver {
+func nameserversFromNSItems(ctx context.Context, z *zone.Zone, items []methodsv2.NSItem) []nameserver.Nameserver {
 	if z == nil {
 		return nil
 	}
@@ -6727,7 +6727,7 @@ func nameserversFromNSItems(z *zone.Zone, items []methodsv2.NSItem) []nameserver
 		if !item.HasAddress {
 			continue
 		}
-		ns, err := nameserver.New(item.Name.String(), item.Address.String(), rec.Client())
+		ns, err := nameserver.NewWithContext(ctx, item.Name.String(), item.Address.String(), rec.Client())
 		if err != nil {
 			continue
 		}

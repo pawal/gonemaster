@@ -51,7 +51,7 @@ func Info(ctx context.Context, tag string, args map[string]any) (*logger.Entry, 
 
 // NS creates a nameserver object for the given name and address.
 func NS(name string, address string) (nameserver.Nameserver, error) {
-	return nameserver.New(name, address, nil)
+	return nameserver.NewWithContext(context.Background(), name, address, nil)
 }
 
 // Name creates a DNSName object for the given domain.

@@ -36,6 +36,11 @@
   let moduleGroups = [];
   let moduleOpen = {};
   let lastResultJobId = "";
+  let activeTab = "recent";
+  const tabs = [
+    { id: "recent", label: "Recent Jobs" },
+    { id: "batches", label: "Batch Jobs" }
+  ];
 
   const setStatus = (message, tone = "") => {
     statusMessage = message;
@@ -121,6 +126,32 @@
   };
   const toggleModule = (key) => {
     moduleOpen = { ...moduleOpen, [key]: !moduleOpen[key] };
+  };
+
+  const normalizeTab = (value) => {
+    const tab = String(value || "").replace(/^\/+/, "").toLowerCase();
+    if (tab === "recent" || tab === "jobs") return "recent";
+    if (tab === "batches" || tab === "batch") return "batches";
+    return "";
+  };
+
+  const setTab = (tab) => {
+    const next = normalizeTab(tab) || "recent";
+    activeTab = next;
+    const nextHash = `#/${next}`;
+    if (window.location.hash !== nextHash) {
+      window.history.replaceState(null, "", nextHash);
+    }
+  };
+
+  const updateTabFromHash = () => {
+    const hash = window.location.hash || "";
+    const value = hash.replace(/^#\/?/, "");
+    const next = normalizeTab(value) || "recent";
+    activeTab = next;
+    if (!hash) {
+      window.history.replaceState(null, "", `#/${next}`);
+    }
   };
 
   const loadJobs = async () => {
@@ -295,6 +326,8 @@
   }
 
   onMount(() => {
+    updateTabFromHash();
+    window.addEventListener("hashchange", updateTabFromHash);
     loadJobs();
   });
 
@@ -302,6 +335,7 @@
     if (jobPoller) clearInterval(jobPoller);
     if (batchPoller) clearInterval(batchPoller);
     if (jobInspectorHighlightTimer) clearTimeout(jobInspectorHighlightTimer);
+    window.removeEventListener("hashchange", updateTabFromHash);
   });
 </script>
 
@@ -318,6 +352,22 @@
       <strong>{statusTone === "ok" ? "OK" : "Heads up"}:</strong> {statusMessage}
     </div>
   {/if}
+
+  <nav class="tabs" role="tablist" aria-label="Job views">
+    {#each tabs as tab}
+      <button
+        class={`tab ${activeTab === tab.id ? "active" : ""}`}
+        type="button"
+        role="tab"
+        id={`tab-${tab.id}`}
+        aria-selected={activeTab === tab.id}
+        aria-controls={`panel-${tab.id}`}
+        on:click={() => setTab(tab.id)}
+      >
+        {tab.label}
+      </button>
+    {/each}
+  </nav>
 
   <section class="grid" style="margin-top: 22px;">
     <div class="card reveal" style="--d: 0.18s">
@@ -365,184 +415,189 @@ example.org`}
     </div>
   </section>
 
-  <section class="grid" style="margin-top: 22px;">
-    <div class="card reveal" style="--d: 0.26s" class:highlight={jobInspectorHighlight}>
-      <h2>Job Inspector</h2>
-      <div class="stack">
-        <label for="job-id">Job ID</label>
-        <input id="job-id" type="text" placeholder="job_123" bind:value={selectedJobId} on:change={() => loadJob()} />
-      </div>
-      <div class="row">
-        <button on:click={() => loadJob()} disabled={jobLoading}>{jobLoading ? "Loading..." : "Refresh"}</button>
-        <button class="ghost" type="button" on:click={() => (autoRefreshJob = !autoRefreshJob)}>
-          {autoRefreshJob ? "Auto refresh: on" : "Auto refresh: off"}
-        </button>
-      </div>
-      {#if selectedJob}
-        <div class="kv">
-          <span>Status</span>
-          <strong>{selectedJob.status}</strong>
-          <span>Progress</span>
-          <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={selectedJob.progress || 0}>
-            <div class="progress-bar" style={`width: ${selectedJob.progress || 0}%`}></div>
-            <span class="progress-value">{selectedJob.progress || 0}%</span>
-          </div>
-          <span>Domain</span>
-          <strong class="mono">{selectedJob.domain}</strong>
-          <span>Created</span>
-          <strong>{new Date(selectedJob.created_at).toLocaleString()}</strong>
+  {#if activeTab === "recent"}
+    <section class="grid" id="panel-recent" role="tabpanel" aria-labelledby="tab-recent" style="margin-top: 22px;">
+      <div class="card reveal" style="--d: 0.26s" class:highlight={jobInspectorHighlight}>
+        <h2>Job Inspector</h2>
+        <div class="stack">
+          <label for="job-id">Job ID</label>
+          <input id="job-id" type="text" placeholder="job_123" bind:value={selectedJobId} on:change={() => loadJob()} />
         </div>
-        {#if selectedJob.error}
-          <div class="notice">Error: {selectedJob.error}</div>
+        <div class="row">
+          <button on:click={() => loadJob()} disabled={jobLoading}>{jobLoading ? "Loading..." : "Refresh"}</button>
+          <button class="ghost" type="button" on:click={() => (autoRefreshJob = !autoRefreshJob)}>
+            {autoRefreshJob ? "Auto refresh: on" : "Auto refresh: off"}
+          </button>
+        </div>
+        {#if selectedJob}
+          <div class="kv">
+            <span>Status</span>
+            <strong>{selectedJob.status}</strong>
+            <span>Progress</span>
+            <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={selectedJob.progress || 0}>
+              <div class="progress-bar" style={`width: ${selectedJob.progress || 0}%`}></div>
+              <span class="progress-value">{selectedJob.progress || 0}%</span>
+            </div>
+            <span>Domain</span>
+            <strong class="mono">{selectedJob.domain}</strong>
+            <span>Created</span>
+            <strong>{new Date(selectedJob.created_at).toLocaleString()}</strong>
+          </div>
+          {#if selectedJob.error}
+            <div class="notice">Error: {selectedJob.error}</div>
+          {/if}
         {/if}
-      {/if}
-      {#if selectedJobResult}
-        <div class="stack">
-          <div class="field-label">Result summary</div>
-          {#if summaryRows(selectedJobResult.summary).length}
-            <div class="summary-grid">
-              {#each summaryRows(selectedJobResult.summary) as row}
-                <div class={`summary-item severity-${row.level.toLowerCase()}`}>
-                  <span class="summary-label">{row.level}</span>
-                  <span class="summary-count">{row.count}</span>
-                </div>
-              {/each}
-            </div>
-          {:else}
-            <div class="summary-empty">No NOTICE/WARNING/ERROR entries.</div>
-          {/if}
-          <div class="field-label">Result details</div>
-          {#if moduleGroups.length === 0}
-            <div class="summary-empty">No raw entries available.</div>
-          {:else}
-            <div class="small">Grouped by module. Click a module to expand.</div>
-            <div class="module-list">
-              {#each moduleGroups as group}
-                <div class="module-card">
-                  <button
-                    class="module-toggle"
-                    type="button"
-                    aria-expanded={!!moduleOpen[group.key]}
-                    aria-controls={moduleId(group.key)}
-                    on:click={() => toggleModule(group.key)}
-                  >
-                    <div class="module-title">{group.name}</div>
-                    <div class="module-meta">{group.entries.length} entries</div>
-                    <div class="module-badges">
-                      {#each moduleLevels as level}
-                        {#if group.counts[level]}
-                          <span class={`level-pill severity-${level.toLowerCase()}`}>{level} {group.counts[level]}</span>
-                        {/if}
-                      {/each}
-                    </div>
-                    <span class={`module-chevron ${moduleOpen[group.key] ? "open" : ""}`}></span>
-                  </button>
-                  {#if moduleOpen[group.key]}
-                    <div class="module-body" id={moduleId(group.key)}>
-                      <div class="result-header">
-                        <span>Seconds</span>
-                        <span>Level</span>
-                        <span>Message</span>
+        {#if selectedJobResult}
+          <div class="stack">
+            <div class="field-label">Result summary</div>
+            {#if summaryRows(selectedJobResult.summary).length}
+              <div class="summary-grid">
+                {#each summaryRows(selectedJobResult.summary) as row}
+                  <div class={`summary-item severity-${row.level.toLowerCase()}`}>
+                    <span class="summary-label">{row.level}</span>
+                    <span class="summary-count">{row.count}</span>
+                  </div>
+                {/each}
+              </div>
+            {:else}
+              <div class="summary-empty">No NOTICE/WARNING/ERROR entries.</div>
+            {/if}
+            <div class="field-label">Result details</div>
+            {#if moduleGroups.length === 0}
+              <div class="summary-empty">No raw entries available.</div>
+            {:else}
+              <div class="small">Grouped by module. Click a module to expand.</div>
+              <div class="module-list">
+                {#each moduleGroups as group}
+                  <div class="module-card">
+                    <button
+                      class="module-toggle"
+                      type="button"
+                      aria-expanded={!!moduleOpen[group.key]}
+                      aria-controls={moduleId(group.key)}
+                      on:click={() => toggleModule(group.key)}
+                    >
+                      <div class="module-title">{group.name}</div>
+                      <div class="module-meta">{group.entries.length} entries</div>
+                      <div class="module-badges">
+                        {#each moduleLevels as level}
+                          {#if group.counts[level]}
+                            <span class={`level-pill severity-${level.toLowerCase()}`}>{level} {group.counts[level]}</span>
+                          {/if}
+                        {/each}
                       </div>
-                      {#each group.entries as entry}
-                        {@const level = normalizeLevel(entry.level)}
-                        {@const meta = entryMeta(entry)}
-                        <div class="result-row">
-                          <span class="entry-time">{formatSeconds(entry.timestamp)}</span>
-                        <span class={`entry-level severity-${level.toLowerCase()}`}>{level}</span>
-                          <span class="entry-message">{entryMessage(entry)}</span>
+                      <span class={`module-chevron ${moduleOpen[group.key] ? "open" : ""}`}></span>
+                    </button>
+                    {#if moduleOpen[group.key]}
+                      <div class="module-body" id={moduleId(group.key)}>
+                        <div class="result-header">
+                          <span>Seconds</span>
+                          <span>Level</span>
+                          <span>Message</span>
                         </div>
-                        {#if meta}
-                          <div class="entry-meta">{meta}</div>
-                        {/if}
-                      {/each}
-                    </div>
-                  {/if}
+                        {#each group.entries as entry}
+                          {@const level = normalizeLevel(entry.level)}
+                          {@const meta = entryMeta(entry)}
+                          <div class="result-row">
+                            <span class="entry-time">{formatSeconds(entry.timestamp)}</span>
+                          <span class={`entry-level severity-${level.toLowerCase()}`}>{level}</span>
+                            <span class="entry-message">{entryMessage(entry)}</span>
+                          </div>
+                          {#if meta}
+                            <div class="entry-meta">{meta}</div>
+                          {/if}
+                        {/each}
+                      </div>
+                    {/if}
+                  </div>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {/if}
+        {#if selectedJob && !selectedJobResult && ["succeeded", "failed", "canceled"].includes(selectedJob.status)}
+          <button class="ghost" type="button" on:click={() => loadJobResult()}>
+            Load result payload
+          </button>
+        {/if}
+      </div>
+    </section>
+
+    <section class="card reveal" style="--d: 0.34s; margin-top: 22px;">
+      <h2>Recent Jobs</h2>
+      <div class="row">
+        <button class="ghost" type="button" on:click={loadJobs} disabled={jobsLoading}>
+          {jobsLoading ? "Refreshing..." : "Refresh list"}
+        </button>
+      </div>
+      <div class="list">
+        {#if jobs.length === 0}
+          <div class="small">No jobs yet. Run a single or batch job above.</div>
+        {:else}
+          {#each jobs as job}
+            <div class="list-item">
+              <div>
+                <div class="mono">{job.id}</div>
+                <div class="small">{job.domain} - {job.status}</div>
+                <div class="progress compact" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={job.progress || 0}>
+                  <div class="progress-bar" style={`width: ${job.progress || 0}%`}></div>
+                  <span class="progress-value">{job.progress || 0}%</span>
+                </div>
+              </div>
+              <button class="ghost" type="button" on:click={() => {
+                selectedJobId = job.id;
+                loadJob(job.id);
+              }}>Inspect</button>
+            </div>
+          {/each}
+        {/if}
+      </div>
+    </section>
+  {:else if activeTab === "batches"}
+    <section class="grid" id="panel-batches" role="tabpanel" aria-labelledby="tab-batches" style="margin-top: 22px;">
+      <div class="card reveal" style="--d: 0.3s">
+        <h2>Batch Inspector</h2>
+        <div class="stack">
+          <label for="batch-id">Batch ID</label>
+          <input id="batch-id" type="text" placeholder="batch_123" bind:value={selectedBatchId} on:change={() => loadBatch()} />
+        </div>
+        <div class="row">
+          <button on:click={() => loadBatch()} disabled={batchLoading}>
+            {batchLoading ? "Loading..." : "Refresh"}
+          </button>
+          <button class="ghost" type="button" on:click={() => (autoRefreshBatch = !autoRefreshBatch)}>
+            {autoRefreshBatch ? "Auto refresh: on" : "Auto refresh: off"}
+          </button>
+        </div>
+        {#if selectedBatch}
+          <div class="kv">
+            <span>Total</span>
+            <strong>{selectedBatch.total}</strong>
+            <span>Created</span>
+            <strong>{new Date(selectedBatch.created_at).toLocaleString()}</strong>
+            <span>Status counts</span>
+            <strong class="mono">{JSON.stringify(selectedBatch.status_counts)}</strong>
+          </div>
+          <div class="stack">
+            <div class="field-label">Jobs</div>
+            <div class="list">
+              {#each selectedBatch.items as item}
+                <div class="list-item">
+                  <div>
+                    <div class="mono">{item.id}</div>
+                    <div class="small">{item.domain} - {item.status}</div>
+                  </div>
+                  <button class="ghost" type="button" on:click={() => {
+                    selectedJobId = item.id;
+                    loadJob(item.id);
+                    setTab("recent");
+                  }}>Inspect</button>
                 </div>
               {/each}
             </div>
-          {/if}
-        </div>
-      {/if}
-      {#if selectedJob && !selectedJobResult && ["succeeded", "failed", "canceled"].includes(selectedJob.status)}
-        <button class="ghost" type="button" on:click={() => loadJobResult()}>
-          Load result payload
-        </button>
-      {/if}
-    </div>
-
-    <div class="card reveal" style="--d: 0.3s">
-      <h2>Batch Inspector</h2>
-      <div class="stack">
-        <label for="batch-id">Batch ID</label>
-        <input id="batch-id" type="text" placeholder="batch_123" bind:value={selectedBatchId} on:change={() => loadBatch()} />
-      </div>
-      <div class="row">
-        <button on:click={() => loadBatch()} disabled={batchLoading}>
-          {batchLoading ? "Loading..." : "Refresh"}
-        </button>
-        <button class="ghost" type="button" on:click={() => (autoRefreshBatch = !autoRefreshBatch)}>
-          {autoRefreshBatch ? "Auto refresh: on" : "Auto refresh: off"}
-        </button>
-      </div>
-      {#if selectedBatch}
-        <div class="kv">
-          <span>Total</span>
-          <strong>{selectedBatch.total}</strong>
-          <span>Created</span>
-          <strong>{new Date(selectedBatch.created_at).toLocaleString()}</strong>
-          <span>Status counts</span>
-          <strong class="mono">{JSON.stringify(selectedBatch.status_counts)}</strong>
-        </div>
-        <div class="stack">
-          <div class="field-label">Jobs</div>
-          <div class="list">
-            {#each selectedBatch.items as item}
-              <div class="list-item">
-                <div>
-                  <div class="mono">{item.id}</div>
-                  <div class="small">{item.domain} - {item.status}</div>
-                </div>
-                <button class="ghost" type="button" on:click={() => {
-                  selectedJobId = item.id;
-                  loadJob(item.id);
-                }}>Inspect</button>
-              </div>
-            {/each}
           </div>
-        </div>
-      {/if}
-    </div>
-  </section>
-
-  <section class="card reveal" style="--d: 0.34s; margin-top: 22px;">
-    <h2>Recent Jobs</h2>
-    <div class="row">
-      <button class="ghost" type="button" on:click={loadJobs} disabled={jobsLoading}>
-        {jobsLoading ? "Refreshing..." : "Refresh list"}
-      </button>
-    </div>
-    <div class="list">
-      {#if jobs.length === 0}
-        <div class="small">No jobs yet. Run a single or batch job above.</div>
-      {:else}
-        {#each jobs as job}
-          <div class="list-item">
-            <div>
-              <div class="mono">{job.id}</div>
-              <div class="small">{job.domain} - {job.status}</div>
-              <div class="progress compact" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={job.progress || 0}>
-                <div class="progress-bar" style={`width: ${job.progress || 0}%`}></div>
-                <span class="progress-value">{job.progress || 0}%</span>
-              </div>
-            </div>
-            <button class="ghost" type="button" on:click={() => {
-              selectedJobId = job.id;
-              loadJob(job.id);
-            }}>Inspect</button>
-          </div>
-        {/each}
-      {/if}
-    </div>
-  </section>
+        {/if}
+      </div>
+    </section>
+  {/if}
 </main>

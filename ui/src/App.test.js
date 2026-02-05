@@ -30,10 +30,15 @@ describe("App", () => {
 
     expect(await screen.findByText("Gonemaster")).toBeInTheDocument();
     expect(screen.getByText("Single Job")).toBeInTheDocument();
-    expect(screen.getByText("Batch Jobs")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Batch Jobs" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Recent Jobs" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Batch Jobs" })).toBeInTheDocument();
     expect(screen.getByText("Job Inspector")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Recent Jobs" })).toBeInTheDocument();
+    expect(screen.queryByText("Batch Inspector")).not.toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole("tab", { name: "Batch Jobs" }));
     expect(screen.getByText("Batch Inspector")).toBeInTheDocument();
-    expect(screen.getByText("Recent Jobs")).toBeInTheDocument();
 
     unmount();
   });
@@ -221,7 +226,8 @@ describe("App", () => {
     await fireEvent.click(refresh);
     await screen.findByText("job_a");
 
-    const recentCard = screen.getByText("Recent Jobs").closest(".card");
+    const recentHeading = screen.getByRole("heading", { name: "Recent Jobs" });
+    const recentCard = recentHeading.closest(".card");
     expect(recentCard).not.toBeNull();
     const recentBars = within(recentCard).getAllByRole("progressbar");
     const hasRecentProgress = recentBars.some((bar) => bar.getAttribute("aria-valuenow") === "42");

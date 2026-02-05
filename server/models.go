@@ -15,6 +15,18 @@ const (
 	JobPaused    JobStatus = "paused"
 )
 
+// JobSort controls ordering in list responses.
+type JobSort string
+
+const (
+	JobSortCreatedAtDesc JobSort = "created_at_desc"
+	JobSortCreatedAtAsc  JobSort = "created_at_asc"
+	JobSortStartedAtDesc JobSort = "started_at_desc"
+	JobSortStartedAtAsc  JobSort = "started_at_asc"
+	JobSortDomainAsc     JobSort = "domain_asc"
+	JobSortDomainDesc    JobSort = "domain_desc"
+)
+
 // Job represents a single test job.
 type Job struct {
 	ID         string         `json:"id"`
@@ -56,8 +68,13 @@ type JobBatchResponse struct {
 
 // JobList represents list results.
 type JobList struct {
-	Items []Job `json:"items"`
-	Total int   `json:"total"`
+	Items      []Job  `json:"items"`
+	Total      int    `json:"total"`
+	Limit      int    `json:"limit,omitempty"`
+	Offset     int    `json:"offset,omitempty"`
+	NextCursor string `json:"next_cursor,omitempty"`
+	PrevCursor string `json:"prev_cursor,omitempty"`
+	Sort       string `json:"sort,omitempty"`
 }
 
 // JobResult holds output for a job.
@@ -93,6 +110,11 @@ type BatchSummary struct {
 	Total        int            `json:"total"`
 	StatusCounts map[string]int `json:"status_counts"`
 	Items        []Job          `json:"items"`
+	Limit        int            `json:"limit,omitempty"`
+	Offset       int            `json:"offset,omitempty"`
+	NextCursor   string         `json:"next_cursor,omitempty"`
+	PrevCursor   string         `json:"prev_cursor,omitempty"`
+	Sort         string         `json:"sort,omitempty"`
 	CreatedAt    time.Time      `json:"created_at"`
 	StartedAt    *time.Time     `json:"started_at,omitempty"`
 	FinishedAt   *time.Time     `json:"finished_at,omitempty"`
@@ -132,4 +154,5 @@ type JobFilter struct {
 	CreatedAfter time.Time
 	Limit        int
 	Offset       int
+	Sort         JobSort
 }

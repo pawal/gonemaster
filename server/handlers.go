@@ -3,11 +3,14 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine/normalization"
 )
+
+const maxListLimit = 500
 
 func (s *Server) handleJobs(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
@@ -134,11 +137,25 @@ func (s *Server) handleBatchByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	list := s.store.List(JobFilter{BatchID: batchID, Limit: 1000})
+	filter, code, message := parseListFilter(r, 100)
+	if code != "" {
+		writeError(w, http.StatusBadRequest, code, message, nil)
+		return
+	}
+	// Batch endpoint currently supports pagination + sorting only.
+	filter.Status = ""
+	filter.CreatedAfter = time.Time{}
+	filter.BatchID = batchID
+
+	list := s.store.List(filter)
 	if list.Total == 0 {
 		writeError(w, http.StatusNotFound, "not_found", "batch not found", nil)
 		return
 	}
+	fullFilter := filter
+	fullFilter.Offset = 0
+	fullFilter.Limit = list.Total
+	fullList := s.store.List(fullFilter)
 
 	statusCounts := map[string]int{}
 	var createdAt time.Time
@@ -146,7 +163,7 @@ func (s *Server) handleBatchByID(w http.ResponseWriter, r *http.Request) {
 	var finishedAtLatest time.Time
 	allFinished := true
 
-	for _, job := range list.Items {
+	for _, job := range fullList.Items {
 		statusCounts[string(job.Status)]++
 		if createdAt.IsZero() || job.CreatedAt.Before(createdAt) {
 			createdAt = job.CreatedAt
@@ -174,6 +191,11 @@ func (s *Server) handleBatchByID(w http.ResponseWriter, r *http.Request) {
 		Total:        list.Total,
 		StatusCounts: statusCounts,
 		Items:        list.Items,
+		Limit:        list.Limit,
+		Offset:       list.Offset,
+		NextCursor:   list.NextCursor,
+		PrevCursor:   list.PrevCursor,
+		Sort:         list.Sort,
 		CreatedAt:    createdAt,
 		StartedAt:    startedAt,
 		FinishedAt:   finishedAt,
@@ -220,36 +242,83 @@ func (s *Server) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleListJobs(w http.ResponseWriter, r *http.Request) {
-	filter := JobFilter{Limit: 100}
-	status := r.URL.Query().Get("status")
-	if status != "" {
+	filter, code, message := parseListFilter(r, 100)
+	if code != "" {
+		writeError(w, http.StatusBadRequest, code, message, nil)
+		return
+	}
+	writeJSON(w, http.StatusOK, s.store.List(filter))
+}
+
+func parseListFilter(r *http.Request, defaultLimit int) (JobFilter, string, string) {
+	filter := JobFilter{
+		Limit: defaultLimit,
+		Sort:  JobSortCreatedAtDesc,
+	}
+	query := r.URL.Query()
+
+	if status := strings.TrimSpace(query.Get("status")); status != "" {
 		filter.Status = JobStatus(status)
 	}
-	filter.BatchID = r.URL.Query().Get("batch_id")
-	if createdAfter := r.URL.Query().Get("created_after"); createdAfter != "" {
+	filter.BatchID = strings.TrimSpace(query.Get("batch_id"))
+
+	if createdAfter := strings.TrimSpace(query.Get("created_after")); createdAfter != "" {
 		timestamp, err := parseTime(createdAfter)
 		if err != nil {
-			writeError(w, http.StatusBadRequest, "invalid_created_after", "created_after must be RFC3339", nil)
-			return
+			return JobFilter{}, "invalid_created_after", "created_after must be RFC3339"
 		}
 		filter.CreatedAfter = timestamp
 	}
-	if limit := r.URL.Query().Get("limit"); limit != "" {
-		var parsed int
-		_, err := fmt.Sscanf(limit, "%d", &parsed)
-		if err == nil {
-			filter.Limit = parsed
+
+	if rawSort := strings.TrimSpace(query.Get("sort")); rawSort != "" {
+		sortValue := JobSort(rawSort)
+		if !isValidJobSort(sortValue) {
+			return JobFilter{}, "invalid_sort", "sort must be one of created_at_desc, created_at_asc, started_at_desc, started_at_asc, domain_asc, domain_desc"
 		}
-	}
-	if offset := r.URL.Query().Get("offset"); offset != "" {
-		var parsed int
-		_, err := fmt.Sscanf(offset, "%d", &parsed)
-		if err == nil {
-			filter.Offset = parsed
-		}
+		filter.Sort = sortValue
 	}
 
-	writeJSON(w, http.StatusOK, s.store.List(filter))
+	if limitRaw := strings.TrimSpace(query.Get("limit")); limitRaw != "" {
+		limitValue, err := strconv.Atoi(limitRaw)
+		if err != nil || limitValue <= 0 || limitValue > maxListLimit {
+			return JobFilter{}, "invalid_limit", "limit must be between 1 and 500"
+		}
+		filter.Limit = limitValue
+	} else if pageSizeRaw := strings.TrimSpace(query.Get("page_size")); pageSizeRaw != "" {
+		limitValue, err := strconv.Atoi(pageSizeRaw)
+		if err != nil || limitValue <= 0 || limitValue > maxListLimit {
+			return JobFilter{}, "invalid_page_size", "page_size must be between 1 and 500"
+		}
+		filter.Limit = limitValue
+	}
+
+	if cursorRaw := strings.TrimSpace(query.Get("cursor")); cursorRaw != "" {
+		offset, err := strconv.Atoi(cursorRaw)
+		if err != nil || offset < 0 {
+			return JobFilter{}, "invalid_cursor", "cursor must be a non-negative integer offset"
+		}
+		filter.Offset = offset
+		return filter, "", ""
+	}
+
+	if pageRaw := strings.TrimSpace(query.Get("page")); pageRaw != "" {
+		pageNumber, err := strconv.Atoi(pageRaw)
+		if err != nil || pageNumber <= 0 {
+			return JobFilter{}, "invalid_page", "page must be a positive integer"
+		}
+		filter.Offset = (pageNumber - 1) * filter.Limit
+		return filter, "", ""
+	}
+
+	if offsetRaw := strings.TrimSpace(query.Get("offset")); offsetRaw != "" {
+		offset, err := strconv.Atoi(offsetRaw)
+		if err != nil || offset < 0 {
+			return JobFilter{}, "invalid_offset", "offset must be a non-negative integer"
+		}
+		filter.Offset = offset
+	}
+
+	return filter, "", ""
 }
 
 func (s *Server) handleGetJob(w http.ResponseWriter, _ *http.Request, jobID string) {

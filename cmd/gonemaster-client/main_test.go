@@ -254,6 +254,140 @@ func TestBatchesRemoveCancelRunning(t *testing.T) {
 	}
 }
 
+func TestFetchBatchSummaryPaginatesItems(t *testing.T) {
+	var pageCalls int
+	oldFactory := newHTTPClient
+	defer func() { newHTTPClient = oldFactory }()
+	newHTTPClient = func(_ time.Duration) *http.Client {
+		return &http.Client{
+			Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+				switch {
+				case r.Method == http.MethodGet && r.URL.Path == "/api/v1/batches/batch_paginated" && r.URL.RawQuery == "":
+					body := `{
+  "batch_id":"batch_paginated",
+  "total":3,
+  "status_counts":{"queued":2,"running":1},
+  "items":[
+    {"id":"job_q1","domain":"example.com","status":"queued","created_at":"2026-02-03T00:00:00Z","progress":0},
+    {"id":"job_r1","domain":"example.net","status":"running","created_at":"2026-02-03T00:00:00Z","progress":50}
+  ],
+  "created_at":"2026-02-03T00:00:00Z",
+  "limit":2,
+  "offset":0,
+  "next_cursor":"2"
+}`
+					return jsonResponse(http.StatusOK, body), nil
+				case r.Method == http.MethodGet && r.URL.Path == "/api/v1/batches/batch_paginated":
+					if r.URL.Query().Get("offset") != "2" {
+						t.Fatalf("expected second request offset=2, got %q", r.URL.Query().Get("offset"))
+					}
+					pageCalls++
+					body := `{
+  "batch_id":"batch_paginated",
+  "total":3,
+  "status_counts":{"queued":2,"running":1},
+  "items":[
+    {"id":"job_q2","domain":"example.org","status":"queued","created_at":"2026-02-03T00:00:00Z","progress":0}
+  ],
+  "created_at":"2026-02-03T00:00:00Z",
+  "limit":500,
+  "offset":2
+}`
+					return jsonResponse(http.StatusOK, body), nil
+				default:
+					t.Fatalf("unexpected request %s %s?%s", r.Method, r.URL.Path, r.URL.RawQuery)
+				}
+				return nil, nil
+			}),
+		}
+	}
+
+	client := &apiClient{
+		baseURL:    "http://example.test/api/v1",
+		httpClient: newHTTPClient(5 * time.Second),
+		headers:    http.Header{},
+		locale:     "en",
+	}
+
+	summary, err := fetchBatchSummary(context.Background(), client, "batch_paginated")
+	if err != nil {
+		t.Fatalf("fetchBatchSummary returned error: %v", err)
+	}
+	if pageCalls != 1 {
+		t.Fatalf("expected one paginated follow-up request, got %d", pageCalls)
+	}
+	if len(summary.Items) != 3 {
+		t.Fatalf("expected 3 items after pagination, got %d", len(summary.Items))
+	}
+	if summary.Items[2].ID != "job_q2" {
+		t.Fatalf("expected final item job_q2, got %q", summary.Items[2].ID)
+	}
+}
+
+func TestBatchesCancelIncludesPaginatedBatchItems(t *testing.T) {
+	var canceled []string
+	oldFactory := newHTTPClient
+	defer func() { newHTTPClient = oldFactory }()
+	newHTTPClient = func(_ time.Duration) *http.Client {
+		return &http.Client{
+			Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+				switch {
+				case r.Method == http.MethodGet && r.URL.Path == "/api/v1/batches/batch_4" && r.URL.RawQuery == "":
+					body := `{
+  "batch_id":"batch_4",
+  "total":3,
+  "status_counts":{"queued":2,"running":1},
+  "items":[
+    {"id":"job_q1","domain":"example.com","status":"queued","created_at":"2026-02-03T00:00:00Z","progress":0},
+    {"id":"job_r1","domain":"example.net","status":"running","created_at":"2026-02-03T00:00:00Z","progress":50}
+  ],
+  "created_at":"2026-02-03T00:00:00Z",
+  "limit":2,
+  "offset":0,
+  "next_cursor":"2"
+}`
+					return jsonResponse(http.StatusOK, body), nil
+				case r.Method == http.MethodGet && r.URL.Path == "/api/v1/batches/batch_4":
+					if r.URL.Query().Get("offset") != "2" {
+						t.Fatalf("expected second request offset=2, got %q", r.URL.Query().Get("offset"))
+					}
+					body := `{
+  "batch_id":"batch_4",
+  "total":3,
+  "status_counts":{"queued":2,"running":1},
+  "items":[
+    {"id":"job_q2","domain":"example.org","status":"queued","created_at":"2026-02-03T00:00:00Z","progress":0}
+  ],
+  "created_at":"2026-02-03T00:00:00Z",
+  "limit":500,
+  "offset":2
+}`
+					return jsonResponse(http.StatusOK, body), nil
+				case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/cancel"):
+					parts := strings.Split(r.URL.Path, "/")
+					jobID := parts[len(parts)-2]
+					canceled = append(canceled, jobID)
+					body := fmt.Sprintf(`{"id":"%s","domain":"example.com","status":"canceled","created_at":"2026-02-03T00:00:00Z","progress":100}`, jobID)
+					return jsonResponse(http.StatusOK, body), nil
+				default:
+					t.Fatalf("unexpected request %s %s?%s", r.Method, r.URL.Path, r.URL.RawQuery)
+				}
+				return nil, nil
+			}),
+		}
+	}
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+	code := run([]string{"--server", "http://example.test", "--format", "json", "batches", "cancel", "batch_4"}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("run returned %d, stderr=%s", code, errOut.String())
+	}
+	if len(canceled) != 3 {
+		t.Fatalf("expected 3 canceled jobs from paginated batch, got %d (%v)", len(canceled), canceled)
+	}
+}
+
 func TestFetchJobResultRetriesOnNotFound(t *testing.T) {
 	var resultCalls int
 	oldFactory := newHTTPClient

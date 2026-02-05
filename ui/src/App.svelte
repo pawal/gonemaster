@@ -157,7 +157,7 @@
   const loadJobs = async () => {
     jobsLoading = true;
     try {
-      const list = await apiFetch("/jobs?limit=20");
+      const list = await apiFetch("/jobs?limit=20&sort=created_at_desc");
       jobs = list.items || [];
     } catch (error) {
       setStatus(`Failed to load jobs: ${error.message}`, "warn");
@@ -272,7 +272,7 @@
     if (!batchId) return;
     batchLoading = true;
     try {
-      selectedBatch = await apiFetch(`/batches/${batchId}`);
+      selectedBatch = await apiFetch(`/batches/${batchId}?limit=100&sort=created_at_desc`);
     } catch (error) {
       setStatus(`Failed to load batch: ${error.message}`, "warn");
       selectedBatch = null;

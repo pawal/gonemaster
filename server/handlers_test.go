@@ -100,6 +100,70 @@ func TestListJobs(t *testing.T) {
 	}
 }
 
+func TestListJobsPaginationAndSort(t *testing.T) {
+	srv := New(DefaultConfig())
+	base := time.Date(2026, 2, 3, 0, 0, 0, 0, time.UTC)
+
+	_, _ = srv.store.Create(Job{ID: "job1", Domain: "gamma.example", Status: JobQueued, CreatedAt: base})
+	_, _ = srv.store.Create(Job{ID: "job2", Domain: "alpha.example", Status: JobQueued, CreatedAt: base.Add(time.Second)})
+	_, _ = srv.store.Create(Job{ID: "job3", Domain: "beta.example", Status: JobQueued, CreatedAt: base.Add(2 * time.Second)})
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs?limit=2&sort=domain_asc&page=1", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var first JobList
+	if err := json.NewDecoder(resp.Body).Decode(&first); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if first.Total != 3 || len(first.Items) != 2 {
+		t.Fatalf("expected first page with 2 of 3 jobs")
+	}
+	if first.Items[0].ID != "job2" || first.Items[1].ID != "job3" {
+		t.Fatalf("unexpected sort order: got %s then %s", first.Items[0].ID, first.Items[1].ID)
+	}
+	if first.NextCursor != "2" || first.Sort != string(JobSortDomainAsc) {
+		t.Fatalf("expected next cursor and sort metadata")
+	}
+
+	resp = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/jobs?limit=2&sort=domain_asc&cursor=2", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var second JobList
+	if err := json.NewDecoder(resp.Body).Decode(&second); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(second.Items) != 1 || second.Items[0].ID != "job1" {
+		t.Fatalf("expected second page to contain only job1")
+	}
+	if second.PrevCursor != "0" || second.NextCursor != "" {
+		t.Fatalf("expected prev cursor 0 and no next cursor, got prev=%q next=%q", second.PrevCursor, second.NextCursor)
+	}
+}
+
+func TestListJobsRejectsInvalidCursor(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs?cursor=not-a-number", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", resp.Code)
+	}
+	var out ErrorResponse
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out.Error.Code != "invalid_cursor" {
+		t.Fatalf("expected invalid_cursor, got %q", out.Error.Code)
+	}
+}
+
 func TestBatchSubmit(t *testing.T) {
 	srv := New(DefaultConfig())
 
@@ -158,6 +222,58 @@ func TestBatchSummary(t *testing.T) {
 	}
 	if summary.StatusCounts["queued"] != 2 {
 		t.Fatalf("expected queued count 2, got %d", summary.StatusCounts["queued"])
+	}
+}
+
+func TestBatchSummaryPaginationAndSort(t *testing.T) {
+	srv := New(DefaultConfig())
+	base := time.Date(2026, 2, 3, 0, 0, 0, 0, time.UTC)
+	batchID := "batch_1"
+
+	_, _ = srv.store.Create(Job{
+		ID:        "job1",
+		BatchID:   batchID,
+		Domain:    "gamma.example",
+		Status:    JobQueued,
+		CreatedAt: base,
+	})
+	_, _ = srv.store.Create(Job{
+		ID:        "job2",
+		BatchID:   batchID,
+		Domain:    "alpha.example",
+		Status:    JobRunning,
+		CreatedAt: base.Add(time.Second),
+	})
+	_, _ = srv.store.Create(Job{
+		ID:         "job3",
+		BatchID:    batchID,
+		Domain:     "beta.example",
+		Status:     JobFailed,
+		CreatedAt:  base.Add(2 * time.Second),
+		FinishedAt: base.Add(3 * time.Second),
+	})
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/batches/"+batchID+"?limit=1&sort=created_at_asc&cursor=1", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var summary BatchSummary
+	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if summary.Total != 3 || len(summary.Items) != 1 || summary.Items[0].ID != "job2" {
+		t.Fatalf("expected paginated batch summary with one middle item")
+	}
+	if summary.Limit != 1 || summary.Offset != 1 || summary.NextCursor != "2" || summary.PrevCursor != "0" {
+		t.Fatalf("unexpected pagination metadata: limit=%d offset=%d next=%q prev=%q", summary.Limit, summary.Offset, summary.NextCursor, summary.PrevCursor)
+	}
+	if summary.Sort != string(JobSortCreatedAtAsc) {
+		t.Fatalf("expected sort metadata %q, got %q", JobSortCreatedAtAsc, summary.Sort)
+	}
+	if summary.StatusCounts["queued"] != 1 || summary.StatusCounts["running"] != 1 || summary.StatusCounts["failed"] != 1 {
+		t.Fatalf("expected status counts across full batch, got %+v", summary.StatusCounts)
 	}
 }
 

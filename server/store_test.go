@@ -72,6 +72,68 @@ func TestInMemoryJobStoreFilters(t *testing.T) {
 	}
 }
 
+func TestInMemoryJobStoreSorting(t *testing.T) {
+	store := NewInMemoryJobStore()
+	base := time.Now().UTC().Add(-time.Minute)
+
+	_, _ = store.Create(Job{
+		ID:        "job1",
+		Domain:    "zeta.example",
+		Status:    JobQueued,
+		CreatedAt: base,
+		StartedAt: base.Add(2 * time.Second),
+	})
+	_, _ = store.Create(Job{
+		ID:        "job2",
+		Domain:    "alpha.example",
+		Status:    JobQueued,
+		CreatedAt: base.Add(time.Second),
+		StartedAt: base.Add(3 * time.Second),
+	})
+
+	defaultList := store.List(JobFilter{Limit: 10})
+	if len(defaultList.Items) != 2 || defaultList.Items[0].ID != "job2" {
+		t.Fatalf("expected default created_at_desc sorting")
+	}
+
+	domainAsc := store.List(JobFilter{Limit: 10, Sort: JobSortDomainAsc})
+	if len(domainAsc.Items) != 2 || domainAsc.Items[0].ID != "job2" {
+		t.Fatalf("expected domain_asc sorting to return alpha first")
+	}
+
+	startedAsc := store.List(JobFilter{Limit: 10, Sort: JobSortStartedAtAsc})
+	if len(startedAsc.Items) != 2 || startedAsc.Items[0].ID != "job1" {
+		t.Fatalf("expected started_at_asc sorting to return earliest start first")
+	}
+}
+
+func TestInMemoryJobStorePaginationMetadata(t *testing.T) {
+	store := NewInMemoryJobStore()
+	base := time.Now().UTC().Add(-time.Minute)
+	_ = seedJob(store, "job1", "batch1", base, JobQueued)
+	_ = seedJob(store, "job2", "batch1", base.Add(time.Second), JobQueued)
+	_ = seedJob(store, "job3", "batch1", base.Add(2*time.Second), JobQueued)
+
+	first := store.List(JobFilter{Limit: 1, Sort: JobSortCreatedAtAsc})
+	if first.Total != 3 {
+		t.Fatalf("expected total 3, got %d", first.Total)
+	}
+	if len(first.Items) != 1 || first.Items[0].ID != "job1" {
+		t.Fatalf("expected first page to include job1")
+	}
+	if first.NextCursor != "1" || first.PrevCursor != "" {
+		t.Fatalf("expected next cursor 1 and no prev cursor, got next=%q prev=%q", first.NextCursor, first.PrevCursor)
+	}
+
+	second := store.List(JobFilter{Limit: 1, Sort: JobSortCreatedAtAsc, Offset: 1})
+	if len(second.Items) != 1 || second.Items[0].ID != "job2" {
+		t.Fatalf("expected second page to include job2")
+	}
+	if second.NextCursor != "2" || second.PrevCursor != "0" {
+		t.Fatalf("expected next cursor 2 and prev cursor 0, got next=%q prev=%q", second.NextCursor, second.PrevCursor)
+	}
+}
+
 func seedJob(store *InMemoryJobStore, id, batch string, created time.Time, status JobStatus) error {
 	job := Job{
 		ID:        id,

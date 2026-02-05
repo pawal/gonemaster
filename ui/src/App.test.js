@@ -165,7 +165,7 @@ describe("App", () => {
       if (url === "/api/v1/jobs/batch" && options.method === "POST") {
         return jsonResponse(batch);
       }
-      if (url === "/api/v1/batches/batch_1") {
+      if (typeof url === "string" && url.startsWith("/api/v1/batches/batch_1")) {
         return jsonResponse(summary);
       }
       if (typeof url === "string" && url.startsWith("/api/v1/jobs?")) {
@@ -185,6 +185,15 @@ describe("App", () => {
     await waitFor(() => {
       expect(screen.getByText(/Created batch:/)).toBeInTheDocument();
       expect(screen.getByText("batch_1")).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        "/api/v1/batches/batch_1?limit=100&sort=created_at_desc",
+        expect.objectContaining({
+          headers: {}
+        })
+      );
     });
 
     expect(global.fetch).toHaveBeenCalledWith(

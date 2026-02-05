@@ -250,7 +250,12 @@ describe("App", () => {
     const recentBars = within(recentCard).getAllByRole("progressbar");
     const hasRecentProgress = recentBars.some((bar) => bar.getAttribute("aria-valuenow") === "42");
     expect(hasRecentProgress).toBe(true);
-    expect(within(recentCard).getByText("NOTICE 2 · WARNING 1 · ERROR 3 · CRITICAL 0")).toBeInTheDocument();
+    const noticePill = within(recentCard).getByText("NOTICE 2");
+    expect(noticePill).toHaveClass("level-pill", "severity-notice");
+    expect(within(recentCard).getByText("WARNING 1")).toHaveClass("level-pill", "severity-warning");
+    expect(within(recentCard).getByText("ERROR 3")).toHaveClass("level-pill", "severity-error");
+    expect(within(recentCard).queryByText("CRITICAL 0")).toBeNull();
+    expect(within(recentCard).queryByText("NOTICE 2 · WARNING 1 · ERROR 3 · CRITICAL 0")).toBeNull();
 
     const jobInput = screen.getByLabelText("Job ID");
     await fireEvent.input(jobInput, { target: { value: job.id } });

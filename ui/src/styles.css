@@ -532,10 +532,11 @@ button:hover:not(:disabled) {
   color: var(--muted);
 }
 
-.job-severity-summary {
+.job-severity-tags {
   margin-top: 4px;
-  font-family: var(--mono);
-  font-size: 0.74rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .reveal {

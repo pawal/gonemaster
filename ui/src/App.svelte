@@ -33,6 +33,11 @@
   let batchLoading = false;
   let autoRefreshBatch = false;
   let batchPoller = null;
+  let batchSort = "started_at_desc";
+  let batchPageSize = 20;
+  let batchCursor = 0;
+  let batchStatusFilter = "";
+  let batchDomainFilter = "";
 
   const apiPrefix = "/api/v1";
 
@@ -82,6 +87,17 @@
     { id: "domain_asc", label: "Domain (A-Z)" },
     { id: "domain_desc", label: "Domain (Z-A)" }
   ];
+  const batchSortOptions = [
+    { id: "started_at_desc", label: "Start time (newest)" },
+    { id: "started_at_asc", label: "Start time (oldest)" },
+    { id: "error_desc", label: "Errors + critical (high-low)" },
+    { id: "critical_desc", label: "Critical (high-low)" },
+    { id: "domain_asc", label: "Domain (A-Z)" },
+    { id: "domain_desc", label: "Domain (Z-A)" },
+    { id: "created_at_desc", label: "Created (newest)" },
+    { id: "created_at_asc", label: "Created (oldest)" }
+  ];
+  const batchStatuses = ["", "queued", "running", "succeeded", "failed", "canceled", "expired", "paused"];
   const summaryRows = (summary) => {
     const levels = summary?.levels || {};
     return summaryLevels
@@ -267,7 +283,7 @@
       selectedBatchId = response.batch_id;
       setStatus(`Batch ${response.batch_id} accepted.`, "ok");
       await loadJobs();
-      await loadBatch(response.batch_id);
+      await loadBatch(response.batch_id, { resetCursor: true });
     } catch (error) {
       setStatus(`Failed to create batch: ${error.message}`, "warn");
     } finally {
@@ -309,17 +325,60 @@
     }
   };
 
-  const loadBatch = async (batchId = selectedBatchId) => {
+  const batchQueryParams = () => {
+    const params = new URLSearchParams({
+      limit: String(batchPageSize),
+      sort: batchSort
+    });
+    if (batchCursor > 0) {
+      params.set("cursor", String(batchCursor));
+    }
+    if (batchStatusFilter) {
+      params.set("status", batchStatusFilter);
+    }
+    const normalizedDomain = batchDomainFilter.trim();
+    if (normalizedDomain) {
+      params.set("domain", normalizedDomain);
+    }
+    return params;
+  };
+
+  const loadBatch = async (batchId = selectedBatchId, options = {}) => {
     if (!batchId) return;
+    const { resetCursor = false } = options;
+    if (resetCursor) {
+      batchCursor = 0;
+    }
     batchLoading = true;
     try {
-      selectedBatch = await apiFetch(`/batches/${batchId}?limit=100&sort=created_at_desc`);
+      const params = batchQueryParams();
+      selectedBatch = await apiFetch(`/batches/${batchId}?${params.toString()}`);
     } catch (error) {
       setStatus(`Failed to load batch: ${error.message}`, "warn");
       selectedBatch = null;
     } finally {
       batchLoading = false;
     }
+  };
+
+  const applyBatchFilters = async () => {
+    batchCursor = 0;
+    await loadBatch(selectedBatchId, { resetCursor: true });
+  };
+
+  const clearBatchFilters = async () => {
+    batchSort = "started_at_desc";
+    batchPageSize = 20;
+    batchStatusFilter = "";
+    batchDomainFilter = "";
+    batchCursor = 0;
+    await loadBatch(selectedBatchId, { resetCursor: true });
+  };
+
+  const goToBatchCursor = async (cursor) => {
+    const parsed = Number(cursor);
+    batchCursor = Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+    await loadBatch(selectedBatchId);
   };
 
   const startJobPolling = () => {
@@ -636,7 +695,13 @@ example.org`}
         <h2>Batch Inspector</h2>
         <div class="stack">
           <label for="batch-id">Batch ID</label>
-          <input id="batch-id" type="text" placeholder="batch_123" bind:value={selectedBatchId} on:change={() => loadBatch()} />
+          <input
+            id="batch-id"
+            type="text"
+            placeholder="batch_123"
+            bind:value={selectedBatchId}
+            on:change={() => loadBatch(selectedBatchId, { resetCursor: true })}
+          />
         </div>
         <div class="row">
           <button on:click={() => loadBatch()} disabled={batchLoading}>
@@ -645,6 +710,52 @@ example.org`}
           <button class="ghost" type="button" on:click={() => (autoRefreshBatch = !autoRefreshBatch)}>
             {autoRefreshBatch ? "Auto refresh: on" : "Auto refresh: off"}
           </button>
+        </div>
+        <div class="batch-controls">
+          <div class="sort-control">
+            <label for="batch-sort">Sort</label>
+            <select id="batch-sort" bind:value={batchSort} on:change={applyBatchFilters}>
+              {#each batchSortOptions as option}
+                <option value={option.id}>{option.label}</option>
+              {/each}
+            </select>
+          </div>
+          <div class="sort-control">
+            <label for="batch-page-size">Page size</label>
+            <select id="batch-page-size" bind:value={batchPageSize} on:change={applyBatchFilters}>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+          </div>
+          <div class="sort-control">
+            <label for="batch-status">Status</label>
+            <select id="batch-status" bind:value={batchStatusFilter} on:change={applyBatchFilters}>
+              {#each batchStatuses as status}
+                <option value={status}>{status || "all"}</option>
+              {/each}
+            </select>
+          </div>
+          <div class="sort-control grow">
+            <label for="batch-domain-filter">Domain contains</label>
+            <input
+              id="batch-domain-filter"
+              type="text"
+              placeholder="example"
+              bind:value={batchDomainFilter}
+              on:keydown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  applyBatchFilters();
+                }
+              }}
+            />
+          </div>
+          <div class="row">
+            <button class="ghost" type="button" on:click={applyBatchFilters} disabled={batchLoading}>Apply filters</button>
+            <button class="ghost" type="button" on:click={clearBatchFilters} disabled={batchLoading}>Clear</button>
+          </div>
         </div>
         {#if selectedBatch}
           <div class="kv">
@@ -657,20 +768,45 @@ example.org`}
           </div>
           <div class="stack">
             <div class="field-label">Jobs</div>
+            <div class="row batch-pagination">
+              <button
+                class="ghost"
+                type="button"
+                on:click={() => goToBatchCursor(selectedBatch.prev_cursor)}
+                disabled={!selectedBatch.prev_cursor || batchLoading}
+              >
+                Previous
+              </button>
+              <button
+                class="ghost"
+                type="button"
+                on:click={() => goToBatchCursor(selectedBatch.next_cursor)}
+                disabled={!selectedBatch.next_cursor || batchLoading}
+              >
+                Next
+              </button>
+              <span class="small">
+                Showing {selectedBatch.items.length} of {selectedBatch.total} matching jobs (offset {selectedBatch.offset || 0})
+              </span>
+            </div>
             <div class="list">
-              {#each selectedBatch.items as item}
-                <div class="list-item">
-                  <div>
-                    <div class="mono">{item.id}</div>
-                    <div class="small">{item.domain} - {item.status}</div>
+              {#if selectedBatch.items.length === 0}
+                <div class="small">No batch jobs match the current filters.</div>
+              {:else}
+                {#each selectedBatch.items as item}
+                  <div class="list-item">
+                    <div>
+                      <div class="mono">{item.id}</div>
+                      <div class="small">{item.domain} - {item.status}</div>
+                    </div>
+                    <button class="ghost" type="button" on:click={() => {
+                      selectedJobId = item.id;
+                      loadJob(item.id);
+                      setTab("recent");
+                    }}>Inspect</button>
                   </div>
-                  <button class="ghost" type="button" on:click={() => {
-                    selectedJobId = item.id;
-                    loadJob(item.id);
-                    setTab("recent");
-                  }}>Inspect</button>
-                </div>
-              {/each}
+                {/each}
+              {/if}
             </div>
           </div>
         {/if}

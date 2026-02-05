@@ -451,6 +451,64 @@ func TestBatchSummaryPaginationAndSort(t *testing.T) {
 	}
 }
 
+func TestBatchSummarySupportsFiltersAndEmptyMatches(t *testing.T) {
+	srv := New(DefaultConfig())
+	base := time.Date(2026, 2, 3, 0, 0, 0, 0, time.UTC)
+	batchID := "batch_filters"
+
+	_, _ = srv.store.Create(Job{
+		ID:        "job1",
+		BatchID:   batchID,
+		Domain:    "alpha.example",
+		Status:    JobQueued,
+		CreatedAt: base,
+	})
+	_, _ = srv.store.Create(Job{
+		ID:        "job2",
+		BatchID:   batchID,
+		Domain:    "beta.example",
+		Status:    JobFailed,
+		CreatedAt: base.Add(time.Second),
+	})
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/batches/"+batchID+"?status=failed&domain=beta&created_after=2026-02-03T00:00:00Z&sort=domain_asc",
+		nil,
+	)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var summary BatchSummary
+	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if summary.Total != 1 || len(summary.Items) != 1 || summary.Items[0].ID != "job2" {
+		t.Fatalf("expected filtered batch summary with job2 only, got %+v", summary.Items)
+	}
+	if summary.Sort != string(JobSortDomainAsc) {
+		t.Fatalf("expected sort metadata %q, got %q", JobSortDomainAsc, summary.Sort)
+	}
+	if summary.StatusCounts["queued"] != 1 || summary.StatusCounts["failed"] != 1 {
+		t.Fatalf("expected full-batch status counts, got %+v", summary.StatusCounts)
+	}
+
+	resp = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/batches/"+batchID+"?status=running", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200 for empty filtered result, got %d", resp.Code)
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if summary.Total != 0 || len(summary.Items) != 0 {
+		t.Fatalf("expected no matching items, got %+v", summary.Items)
+	}
+}
+
 func TestCancelJob(t *testing.T) {
 	srv := New(DefaultConfig())
 

@@ -233,6 +233,21 @@ button:hover:not(:disabled) {
   font-size: 0.78rem;
 }
 
+.sort-control.grow {
+  flex: 1 1 260px;
+}
+
+.batch-controls {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.batch-pagination {
+  justify-content: flex-start;
+}
+
 .kv {
   display: grid;
   grid-template-columns: 110px 1fr;

@@ -142,21 +142,25 @@ func (s *Server) handleBatchByID(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, code, message, nil)
 		return
 	}
-	// Batch endpoint currently supports pagination + sorting only.
-	filter.Status = ""
-	filter.Domain = ""
-	filter.CreatedAfter = time.Time{}
-	filter.CreatedBefore = time.Time{}
 	filter.BatchID = batchID
 
-	list := s.store.List(filter)
-	if list.Total == 0 {
+	batchProbe := s.store.List(JobFilter{
+		BatchID: batchID,
+		Limit:   1,
+		Sort:    JobSortCreatedAtAsc,
+	})
+	if batchProbe.Total == 0 {
 		writeError(w, http.StatusNotFound, "not_found", "batch not found", nil)
 		return
 	}
-	fullFilter := filter
-	fullFilter.Offset = 0
-	fullFilter.Limit = list.Total
+
+	list := s.store.List(filter)
+	fullFilter := JobFilter{
+		BatchID: batchID,
+		Offset:  0,
+		Limit:   batchProbe.Total,
+		Sort:    JobSortCreatedAtAsc,
+	}
 	fullList := s.store.List(fullFilter)
 
 	statusCounts := map[string]int{}

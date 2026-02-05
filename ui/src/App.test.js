@@ -192,7 +192,7 @@ describe("App", () => {
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
-        "/api/v1/batches/batch_1?limit=100&sort=created_at_desc",
+        "/api/v1/batches/batch_1?limit=20&sort=started_at_desc",
         expect.objectContaining({
           headers: {}
         })
@@ -206,6 +206,88 @@ describe("App", () => {
         body: JSON.stringify({ domains: ["example.com", "example.org"] })
       })
     );
+
+    unmount();
+  });
+
+  it("applies batch filters and pagination query params", async () => {
+    const calls = [];
+    const firstPage = {
+      batch_id: "batch_1",
+      total: 2,
+      status_counts: { failed: 2 },
+      items: [
+        {
+          id: "job_b1",
+          domain: "beta.example",
+          status: "failed",
+          created_at: "2026-02-03T00:00:00Z",
+          progress: 100
+        }
+      ],
+      created_at: "2026-02-03T00:00:00Z",
+      offset: 0,
+      next_cursor: "1",
+      prev_cursor: "",
+      sort: "started_at_desc"
+    };
+    const secondPage = {
+      ...firstPage,
+      items: [
+        {
+          id: "job_b2",
+          domain: "beta-2.example",
+          status: "failed",
+          created_at: "2026-02-03T00:00:01Z",
+          progress: 100
+        }
+      ],
+      offset: 1,
+      next_cursor: "",
+      prev_cursor: "0"
+    };
+
+    global.fetch.mockImplementation((url) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      calls.push(value);
+      if (value.includes("/api/v1/jobs?")) {
+        return jsonResponse({ items: [] });
+      }
+      if (value.includes("/api/v1/batches/batch_1")) {
+        if (value.includes("cursor=1")) {
+          return jsonResponse(secondPage);
+        }
+        return jsonResponse(firstPage);
+      }
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+
+    await fireEvent.click(await screen.findByRole("tab", { name: "Batch Jobs" }));
+    const batchId = screen.getByLabelText("Batch ID");
+    await fireEvent.input(batchId, { target: { value: "batch_1" } });
+    await fireEvent.change(batchId);
+
+    await waitFor(() => {
+      expect(calls.some((value) => value.includes("limit=20") && value.includes("sort=started_at_desc"))).toBe(true);
+    });
+
+    await fireEvent.change(screen.getByLabelText("Status"), { target: { value: "failed" } });
+    await waitFor(() => {
+      expect(calls.some((value) => value.includes("status=failed"))).toBe(true);
+    });
+
+    await fireEvent.input(screen.getByLabelText("Domain contains"), { target: { value: "beta" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Apply filters" }));
+    await waitFor(() => {
+      expect(calls.some((value) => value.includes("status=failed") && value.includes("domain=beta"))).toBe(true);
+    });
+
+    await fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await waitFor(() => {
+      expect(calls.some((value) => value.includes("cursor=1"))).toBe(true);
+    });
 
     unmount();
   });

@@ -203,9 +203,12 @@
     }
   };
 
-  const loadJob = async (jobId = selectedJobId) => {
+  const loadJob = async (jobId = selectedJobId, options = {}) => {
     if (!jobId) return;
-    jobLoading = true;
+    const { silent = false } = options;
+    if (!silent) {
+      jobLoading = true;
+    }
     try {
       const job = await apiFetch(`/jobs/${jobId}`);
       selectedJob = job;
@@ -218,7 +221,9 @@
       selectedJob = null;
       selectedJobResult = null;
     } finally {
-      jobLoading = false;
+      if (!silent) {
+        jobLoading = false;
+      }
     }
   };
 
@@ -248,7 +253,7 @@
   const startJobPolling = () => {
     if (jobPoller) clearInterval(jobPoller);
     if (!autoRefreshJob || !selectedJobId) return;
-    jobPoller = setInterval(() => loadJob(), 5000);
+    jobPoller = setInterval(() => loadJob(selectedJobId, { silent: true }), 5000);
   };
 
   const startBatchPolling = () => {
@@ -260,7 +265,6 @@
   $: {
     autoRefreshJob;
     selectedJobId;
-    jobLoading;
     startJobPolling();
   }
 

@@ -278,6 +278,7 @@
   $: if (
     autoRefreshJob &&
     selectedJob &&
+    selectedJob.id === selectedJobId &&
     (selectedJob.progress === 100 || ["succeeded", "failed", "canceled"].includes(selectedJob.status))
   ) {
     autoRefreshJob = false;

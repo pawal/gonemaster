@@ -343,6 +343,50 @@ describe("App", () => {
     unmount();
   });
 
+  it("requests recent jobs with selected sort mode", async () => {
+    const calls = [];
+    const jobs = [
+      {
+        id: "job_a",
+        domain: "a.example",
+        status: "queued",
+        created_at: "2026-02-03T00:00:00Z",
+        progress: 0,
+        severity_totals: { NOTICE: 0, WARNING: 0, ERROR: 0, CRITICAL: 0 }
+      }
+    ];
+
+    global.fetch.mockImplementation((url) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      calls.push(value);
+      if (value.includes("/api/v1/jobs?")) {
+        return jsonResponse({ items: jobs, total: jobs.length });
+      }
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+
+    const refresh = await screen.findByRole("button", { name: /refresh list/i });
+    if (refresh.disabled) {
+      await waitFor(() => expect(refresh).not.toBeDisabled());
+    }
+    await fireEvent.click(refresh);
+
+    await waitFor(() => {
+      expect(calls.some((value) => value.includes("sort=started_at_desc"))).toBe(true);
+    });
+
+    const select = screen.getByLabelText("Sort");
+    await fireEvent.change(select, { target: { value: "domain_asc" } });
+
+    await waitFor(() => {
+      expect(calls.some((value) => value.includes("sort=domain_asc"))).toBe(true);
+    });
+
+    unmount();
+  });
+
   it("summarizes only notice and above levels with non-zero counts", async () => {
     const job = {
       id: "job_summary",

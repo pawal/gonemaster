@@ -255,7 +255,7 @@ func (s *Server) handleListJobs(w http.ResponseWriter, r *http.Request) {
 func parseListFilter(r *http.Request, defaultLimit int) (JobFilter, string, string) {
 	filter := JobFilter{
 		Limit: defaultLimit,
-		Sort:  JobSortCreatedAtDesc,
+		Sort:  JobSortStartedAtDesc,
 	}
 	query := r.URL.Query()
 
@@ -286,7 +286,7 @@ func parseListFilter(r *http.Request, defaultLimit int) (JobFilter, string, stri
 	if rawSort := strings.TrimSpace(query.Get("sort")); rawSort != "" {
 		sortValue := JobSort(rawSort)
 		if !isValidJobSort(sortValue) {
-			return JobFilter{}, "invalid_sort", "sort must be one of created_at_desc, created_at_asc, started_at_desc, started_at_asc, domain_asc, domain_desc"
+			return JobFilter{}, "invalid_sort", "sort must be one of created_at_desc, created_at_asc, started_at_desc, started_at_asc, domain_asc, domain_desc, error_desc, critical_desc"
 		}
 		filter.Sort = sortValue
 	}

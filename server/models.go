@@ -25,6 +25,8 @@ const (
 	JobSortStartedAtAsc  JobSort = "started_at_asc"
 	JobSortDomainAsc     JobSort = "domain_asc"
 	JobSortDomainDesc    JobSort = "domain_desc"
+	JobSortErrorDesc     JobSort = "error_desc"
+	JobSortCriticalDesc  JobSort = "critical_desc"
 )
 
 // Job represents a single test job.

@@ -117,20 +117,55 @@ func TestInMemoryJobStoreSorting(t *testing.T) {
 		CreatedAt: base.Add(time.Second),
 		StartedAt: base.Add(3 * time.Second),
 	})
+	_, _ = store.Create(Job{
+		ID:        "job3",
+		Domain:    "beta.example",
+		Status:    JobQueued,
+		CreatedAt: base.Add(4 * time.Second),
+	})
+
+	_ = store.SetResult("job1", JobResult{
+		JobID:  "job1",
+		Status: JobSucceeded,
+		Summary: map[string]any{
+			"levels": map[string]int{
+				"ERROR": 1,
+			},
+		},
+	})
+	_ = store.SetResult("job2", JobResult{
+		JobID:  "job2",
+		Status: JobFailed,
+		Summary: map[string]any{
+			"levels": map[string]int{
+				"CRITICAL": 2,
+			},
+		},
+	})
 
 	defaultList := store.List(JobFilter{Limit: 10})
-	if len(defaultList.Items) != 2 || defaultList.Items[0].ID != "job2" {
-		t.Fatalf("expected default created_at_desc sorting")
+	if len(defaultList.Items) != 3 || defaultList.Items[0].ID != "job3" {
+		t.Fatalf("expected default started_at_desc sorting with created_at fallback")
 	}
 
 	domainAsc := store.List(JobFilter{Limit: 10, Sort: JobSortDomainAsc})
-	if len(domainAsc.Items) != 2 || domainAsc.Items[0].ID != "job2" {
+	if len(domainAsc.Items) != 3 || domainAsc.Items[0].ID != "job2" {
 		t.Fatalf("expected domain_asc sorting to return alpha first")
 	}
 
 	startedAsc := store.List(JobFilter{Limit: 10, Sort: JobSortStartedAtAsc})
-	if len(startedAsc.Items) != 2 || startedAsc.Items[0].ID != "job1" {
-		t.Fatalf("expected started_at_asc sorting to return earliest start first")
+	if len(startedAsc.Items) != 3 || startedAsc.Items[0].ID != "job1" {
+		t.Fatalf("expected started_at_asc sorting to return earliest effective start first")
+	}
+
+	errorDesc := store.List(JobFilter{Limit: 10, Sort: JobSortErrorDesc})
+	if len(errorDesc.Items) != 3 || errorDesc.Items[0].ID != "job2" || errorDesc.Items[1].ID != "job1" {
+		t.Fatalf("expected error_desc sorting to prioritize CRITICAL+ERROR totals")
+	}
+
+	criticalDesc := store.List(JobFilter{Limit: 10, Sort: JobSortCriticalDesc})
+	if len(criticalDesc.Items) != 3 || criticalDesc.Items[0].ID != "job2" {
+		t.Fatalf("expected critical_desc sorting to prioritize CRITICAL totals")
 	}
 }
 

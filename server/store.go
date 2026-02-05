@@ -87,6 +87,15 @@ func (s *InMemoryJobStore) List(filter JobFilter) JobList {
 	}
 
 	normalizedSort := normalizeJobSort(filter.Sort)
+	severityByJobID := make(map[string]map[string]int, len(items))
+	for _, job := range items {
+		totals := zeroSeverityTotals()
+		if result, ok := s.results[job.ID]; ok {
+			totals = severityTotalsFromSummary(result.Summary)
+		}
+		severityByJobID[job.ID] = totals
+	}
+
 	sort.Slice(items, func(i, j int) bool {
 		left := items[i]
 		right := items[j]
@@ -95,13 +104,21 @@ func (s *InMemoryJobStore) List(filter JobFilter) JobList {
 			if !left.CreatedAt.Equal(right.CreatedAt) {
 				return left.CreatedAt.Before(right.CreatedAt)
 			}
+		case JobSortCreatedAtDesc:
+			if !left.CreatedAt.Equal(right.CreatedAt) {
+				return left.CreatedAt.After(right.CreatedAt)
+			}
 		case JobSortStartedAtDesc:
-			if left.StartedAt.UnixNano() != right.StartedAt.UnixNano() {
-				return left.StartedAt.After(right.StartedAt)
+			leftStarted := effectiveStartTime(left)
+			rightStarted := effectiveStartTime(right)
+			if !leftStarted.Equal(rightStarted) {
+				return leftStarted.After(rightStarted)
 			}
 		case JobSortStartedAtAsc:
-			if left.StartedAt.UnixNano() != right.StartedAt.UnixNano() {
-				return left.StartedAt.Before(right.StartedAt)
+			leftStarted := effectiveStartTime(left)
+			rightStarted := effectiveStartTime(right)
+			if !leftStarted.Equal(rightStarted) {
+				return leftStarted.Before(rightStarted)
 			}
 		case JobSortDomainAsc:
 			leftDomain := strings.ToLower(left.Domain)
@@ -115,10 +132,37 @@ func (s *InMemoryJobStore) List(filter JobFilter) JobList {
 			if leftDomain != rightDomain {
 				return leftDomain > rightDomain
 			}
-		default:
-			if !left.CreatedAt.Equal(right.CreatedAt) {
-				return left.CreatedAt.After(right.CreatedAt)
+		case JobSortErrorDesc:
+			leftTotals := severityByJobID[left.ID]
+			rightTotals := severityByJobID[right.ID]
+			leftErrors := leftTotals["ERROR"] + leftTotals["CRITICAL"]
+			rightErrors := rightTotals["ERROR"] + rightTotals["CRITICAL"]
+			if leftErrors != rightErrors {
+				return leftErrors > rightErrors
 			}
+			if leftTotals["CRITICAL"] != rightTotals["CRITICAL"] {
+				return leftTotals["CRITICAL"] > rightTotals["CRITICAL"]
+			}
+		case JobSortCriticalDesc:
+			leftTotals := severityByJobID[left.ID]
+			rightTotals := severityByJobID[right.ID]
+			if leftTotals["CRITICAL"] != rightTotals["CRITICAL"] {
+				return leftTotals["CRITICAL"] > rightTotals["CRITICAL"]
+			}
+			leftErrors := leftTotals["ERROR"] + leftTotals["CRITICAL"]
+			rightErrors := rightTotals["ERROR"] + rightTotals["CRITICAL"]
+			if leftErrors != rightErrors {
+				return leftErrors > rightErrors
+			}
+		default:
+			leftStarted := effectiveStartTime(left)
+			rightStarted := effectiveStartTime(right)
+			if !leftStarted.Equal(rightStarted) {
+				return leftStarted.After(rightStarted)
+			}
+		}
+		if !left.CreatedAt.Equal(right.CreatedAt) {
+			return left.CreatedAt.After(right.CreatedAt)
 		}
 		return left.ID < right.ID
 	})
@@ -144,9 +188,10 @@ func (s *InMemoryJobStore) List(filter JobFilter) JobList {
 	pageItems := make([]Job, end-start)
 	copy(pageItems, items[start:end])
 	for i := range pageItems {
-		pageItems[i].SeverityTotals = zeroSeverityTotals()
-		if result, ok := s.results[pageItems[i].ID]; ok {
-			pageItems[i].SeverityTotals = severityTotalsFromSummary(result.Summary)
+		if totals, ok := severityByJobID[pageItems[i].ID]; ok {
+			pageItems[i].SeverityTotals = totals
+		} else {
+			pageItems[i].SeverityTotals = zeroSeverityTotals()
 		}
 	}
 
@@ -196,20 +241,27 @@ func parseTime(value string) (time.Time, error) {
 
 func normalizeJobSort(value JobSort) JobSort {
 	switch value {
-	case JobSortCreatedAtDesc, JobSortCreatedAtAsc, JobSortStartedAtDesc, JobSortStartedAtAsc, JobSortDomainAsc, JobSortDomainDesc:
+	case JobSortCreatedAtDesc, JobSortCreatedAtAsc, JobSortStartedAtDesc, JobSortStartedAtAsc, JobSortDomainAsc, JobSortDomainDesc, JobSortErrorDesc, JobSortCriticalDesc:
 		return value
 	default:
-		return JobSortCreatedAtDesc
+		return JobSortStartedAtDesc
 	}
 }
 
 func isValidJobSort(value JobSort) bool {
 	switch value {
-	case JobSortCreatedAtDesc, JobSortCreatedAtAsc, JobSortStartedAtDesc, JobSortStartedAtAsc, JobSortDomainAsc, JobSortDomainDesc:
+	case JobSortCreatedAtDesc, JobSortCreatedAtAsc, JobSortStartedAtDesc, JobSortStartedAtAsc, JobSortDomainAsc, JobSortDomainDesc, JobSortErrorDesc, JobSortCriticalDesc:
 		return true
 	default:
 		return false
 	}
+}
+
+func effectiveStartTime(job Job) time.Time {
+	if !job.StartedAt.IsZero() {
+		return job.StartedAt
+	}
+	return job.CreatedAt
 }
 
 func zeroSeverityTotals() map[string]int {

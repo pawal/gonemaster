@@ -16,6 +16,7 @@
   let jobsLoading = false;
   let filteredJobs = [];
   let severityFilter = "all";
+  let jobSort = "started_at_desc";
 
   let selectedJobId = "";
   let selectedJob = null;
@@ -72,6 +73,14 @@
     { id: "all", label: "All severities" },
     { id: "warnings_plus", label: "Warnings+" },
     { id: "errors_only", label: "Errors only" }
+  ];
+  const jobSortOptions = [
+    { id: "started_at_desc", label: "Start time (newest)" },
+    { id: "started_at_asc", label: "Start time (oldest)" },
+    { id: "error_desc", label: "Errors + critical (high-low)" },
+    { id: "critical_desc", label: "Critical (high-low)" },
+    { id: "domain_asc", label: "Domain (A-Z)" },
+    { id: "domain_desc", label: "Domain (Z-A)" }
   ];
   const summaryRows = (summary) => {
     const levels = summary?.levels || {};
@@ -185,7 +194,11 @@
   const loadJobs = async () => {
     jobsLoading = true;
     try {
-      const list = await apiFetch("/jobs?limit=20&sort=created_at_desc");
+      const params = new URLSearchParams({
+        limit: "20",
+        sort: jobSort
+      });
+      const list = await apiFetch(`/jobs?${params.toString()}`);
       jobs = list.items || [];
     } catch (error) {
       setStatus(`Failed to load jobs: ${error.message}`, "warn");
@@ -563,6 +576,14 @@ example.org`}
         <button class="ghost" type="button" on:click={loadJobs} disabled={jobsLoading}>
           {jobsLoading ? "Refreshing..." : "Refresh list"}
         </button>
+        <div class="sort-control">
+          <label for="recent-sort">Sort</label>
+          <select id="recent-sort" bind:value={jobSort} on:change={loadJobs}>
+            {#each jobSortOptions as option}
+              <option value={option.id}>{option.label}</option>
+            {/each}
+          </select>
+        </div>
       </div>
       <div class="severity-filter-bar" role="group" aria-label="Severity filters">
         {#each severityFilters as filter}

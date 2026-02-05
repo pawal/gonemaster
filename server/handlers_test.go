@@ -228,6 +228,81 @@ func TestListJobsIncludesSeverityTotals(t *testing.T) {
 	}
 }
 
+func TestListJobsSortBySeverityTotals(t *testing.T) {
+	srv := New(DefaultConfig())
+	base := time.Date(2026, 2, 3, 0, 0, 0, 0, time.UTC)
+
+	_, _ = srv.store.Create(Job{ID: "job1", Domain: "alpha.example", Status: JobSucceeded, CreatedAt: base})
+	_, _ = srv.store.Create(Job{ID: "job2", Domain: "beta.example", Status: JobFailed, CreatedAt: base.Add(time.Second)})
+	_, _ = srv.store.Create(Job{ID: "job3", Domain: "gamma.example", Status: JobFailed, CreatedAt: base.Add(2 * time.Second)})
+
+	_ = srv.store.SetResult("job1", JobResult{
+		JobID:  "job1",
+		Status: JobSucceeded,
+		Summary: map[string]any{
+			"levels": map[string]int{"ERROR": 1},
+		},
+	})
+	_ = srv.store.SetResult("job2", JobResult{
+		JobID:  "job2",
+		Status: JobFailed,
+		Summary: map[string]any{
+			"levels": map[string]int{"CRITICAL": 2},
+		},
+	})
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs?sort=error_desc", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var list JobList
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if list.Sort != string(JobSortErrorDesc) {
+		t.Fatalf("expected sort metadata %q, got %q", JobSortErrorDesc, list.Sort)
+	}
+	if len(list.Items) != 3 || list.Items[0].ID != "job2" || list.Items[1].ID != "job1" {
+		t.Fatalf("expected error_desc order job2, job1, ..., got %+v", list.Items)
+	}
+
+	resp = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/jobs?sort=critical_desc", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if list.Sort != string(JobSortCriticalDesc) {
+		t.Fatalf("expected sort metadata %q, got %q", JobSortCriticalDesc, list.Sort)
+	}
+	if len(list.Items) != 3 || list.Items[0].ID != "job2" {
+		t.Fatalf("expected critical_desc order to prioritize job2")
+	}
+}
+
+func TestListJobsRejectsInvalidSort(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs?sort=bad_sort", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", resp.Code)
+	}
+	var out ErrorResponse
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out.Error.Code != "invalid_sort" {
+		t.Fatalf("expected invalid_sort, got %q", out.Error.Code)
+	}
+}
+
 func TestListJobsRejectsInvalidCreatedBeforeAndRange(t *testing.T) {
 	srv := New(DefaultConfig())
 

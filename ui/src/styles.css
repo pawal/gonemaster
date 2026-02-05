@@ -219,6 +219,18 @@ button:hover:not(:disabled) {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.sort-control {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 220px;
+}
+
+.sort-control label {
+  font-size: 0.78rem;
 }
 
 .kv {

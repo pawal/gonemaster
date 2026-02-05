@@ -1,5 +1,5 @@
 <script>
-  import { onMount, onDestroy } from "svelte";
+  import { onDestroy } from "svelte";
 
   let statusMessage = "";
   let statusTone = "";
@@ -39,8 +39,23 @@
   let batchCursor = 0;
   let batchStatusFilter = "";
   let batchDomainFilter = "";
+  let persistenceReady = false;
+  let persistenceSignature = "";
+  let initialized = false;
 
   const apiPrefix = "/api/v1";
+  const persistedStateKey = "gonemaster.ui.state.v1";
+  const persistedQueryKeys = [
+    "r_sort",
+    "r_sev",
+    "r_batch",
+    "b_id",
+    "b_sort",
+    "b_limit",
+    "b_cursor",
+    "b_status",
+    "b_domain"
+  ];
 
   let moduleGroups = [];
   let moduleOpen = {};
@@ -101,6 +116,179 @@
     { id: "created_at_asc", label: "Created (oldest)" }
   ];
   const batchStatuses = ["", "queued", "running", "succeeded", "failed", "canceled", "expired", "paused"];
+  const batchPageSizes = [10, 20, 50, 100];
+
+  const isKnownSort = (value, options) => options.some((option) => option.id === value);
+  const isKnownSeverityFilter = (value) => severityFilters.some((option) => option.id === value);
+  const isKnownBatchStatus = (value) => batchStatuses.includes(value);
+  const normalizeBatchPageSize = (value) => {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && batchPageSizes.includes(parsed)) {
+      return parsed;
+    }
+    return 20;
+  };
+  const normalizeCursor = (value) => {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed >= 0) {
+      return Math.floor(parsed);
+    }
+    return 0;
+  };
+
+  const hasPersistedURLState = (params) => persistedQueryKeys.some((key) => params.has(key));
+
+  const readStateFromURL = () => {
+    const params = new URLSearchParams(window.location.search);
+    if (!hasPersistedURLState(params)) return null;
+
+    const next = {};
+    const recentSort = params.get("r_sort");
+    if (recentSort && isKnownSort(recentSort, jobSortOptions)) {
+      next.jobSort = recentSort;
+    }
+    const recentSeverity = params.get("r_sev");
+    if (recentSeverity && isKnownSeverityFilter(recentSeverity)) {
+      next.severityFilter = recentSeverity;
+    }
+    if (params.has("r_batch")) {
+      next.jobBatchFilter = (params.get("r_batch") || "").trim();
+    }
+    if (params.has("b_id")) {
+      next.selectedBatchId = (params.get("b_id") || "").trim();
+    }
+    const batchSortValue = params.get("b_sort");
+    if (batchSortValue && isKnownSort(batchSortValue, batchSortOptions)) {
+      next.batchSort = batchSortValue;
+    }
+    if (params.has("b_limit")) {
+      next.batchPageSize = normalizeBatchPageSize(params.get("b_limit"));
+    }
+    if (params.has("b_cursor")) {
+      next.batchCursor = normalizeCursor(params.get("b_cursor"));
+    }
+    const batchStatusValue = params.get("b_status");
+    if (batchStatusValue !== null && isKnownBatchStatus(batchStatusValue)) {
+      next.batchStatusFilter = batchStatusValue;
+    }
+    if (params.has("b_domain")) {
+      next.batchDomainFilter = (params.get("b_domain") || "").trim();
+    }
+    return next;
+  };
+
+  const readStateFromStorage = () => {
+    try {
+      const storage = typeof window === "undefined" ? null : window.localStorage;
+      if (!storage) return null;
+      const raw = storage.getItem(persistedStateKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") return null;
+
+      const next = {};
+      if (typeof parsed.jobSort === "string" && isKnownSort(parsed.jobSort, jobSortOptions)) {
+        next.jobSort = parsed.jobSort;
+      }
+      if (typeof parsed.severityFilter === "string" && isKnownSeverityFilter(parsed.severityFilter)) {
+        next.severityFilter = parsed.severityFilter;
+      }
+      if (typeof parsed.jobBatchFilter === "string") {
+        next.jobBatchFilter = parsed.jobBatchFilter.trim();
+      }
+      if (typeof parsed.selectedBatchId === "string") {
+        next.selectedBatchId = parsed.selectedBatchId.trim();
+      }
+      if (typeof parsed.batchSort === "string" && isKnownSort(parsed.batchSort, batchSortOptions)) {
+        next.batchSort = parsed.batchSort;
+      }
+      next.batchPageSize = normalizeBatchPageSize(parsed.batchPageSize);
+      next.batchCursor = normalizeCursor(parsed.batchCursor);
+      if (typeof parsed.batchStatusFilter === "string" && isKnownBatchStatus(parsed.batchStatusFilter)) {
+        next.batchStatusFilter = parsed.batchStatusFilter;
+      }
+      if (typeof parsed.batchDomainFilter === "string") {
+        next.batchDomainFilter = parsed.batchDomainFilter.trim();
+      }
+      return next;
+    } catch (error) {
+      return null;
+    }
+  };
+
+  const applyPersistedState = (state) => {
+    if (!state) return;
+    if (state.jobSort) jobSort = state.jobSort;
+    if (state.severityFilter) severityFilter = state.severityFilter;
+    if (typeof state.jobBatchFilter === "string") jobBatchFilter = state.jobBatchFilter;
+    if (typeof state.selectedBatchId === "string") selectedBatchId = state.selectedBatchId;
+    if (state.batchSort) batchSort = state.batchSort;
+    if (state.batchPageSize !== undefined) batchPageSize = normalizeBatchPageSize(state.batchPageSize);
+    if (state.batchCursor !== undefined) batchCursor = normalizeCursor(state.batchCursor);
+    if (state.batchStatusFilter !== undefined && isKnownBatchStatus(state.batchStatusFilter)) {
+      batchStatusFilter = state.batchStatusFilter;
+    }
+    if (typeof state.batchDomainFilter === "string") batchDomainFilter = state.batchDomainFilter;
+  };
+
+  const persistState = () => {
+    const params = new URLSearchParams(window.location.search);
+    persistedQueryKeys.forEach((key) => params.delete(key));
+
+    if (jobSort !== "started_at_desc") {
+      params.set("r_sort", jobSort);
+    }
+    if (severityFilter !== "all") {
+      params.set("r_sev", severityFilter);
+    }
+    const normalizedJobBatch = jobBatchFilter.trim();
+    if (normalizedJobBatch) {
+      params.set("r_batch", normalizedJobBatch);
+    }
+    const normalizedBatchID = selectedBatchId.trim();
+    if (normalizedBatchID) {
+      params.set("b_id", normalizedBatchID);
+    }
+    if (batchSort !== "started_at_desc") {
+      params.set("b_sort", batchSort);
+    }
+    if (normalizeBatchPageSize(batchPageSize) !== 20) {
+      params.set("b_limit", String(normalizeBatchPageSize(batchPageSize)));
+    }
+    if (normalizeCursor(batchCursor) > 0) {
+      params.set("b_cursor", String(normalizeCursor(batchCursor)));
+    }
+    if (batchStatusFilter) {
+      params.set("b_status", batchStatusFilter);
+    }
+    const normalizedBatchDomain = batchDomainFilter.trim();
+    if (normalizedBatchDomain) {
+      params.set("b_domain", normalizedBatchDomain);
+    }
+
+    const hash = window.location.hash || `#/${activeTab}`;
+    const search = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${search ? `?${search}` : ""}${hash}`);
+
+    try {
+      const storage = typeof window === "undefined" ? null : window.localStorage;
+      if (!storage) return;
+      const persisted = {
+        jobSort,
+        severityFilter,
+        jobBatchFilter: normalizedJobBatch,
+        selectedBatchId: normalizedBatchID,
+        batchSort,
+        batchPageSize: normalizeBatchPageSize(batchPageSize),
+        batchCursor: normalizeCursor(batchCursor),
+        batchStatusFilter,
+        batchDomainFilter: normalizedBatchDomain
+      };
+      storage.setItem(persistedStateKey, JSON.stringify(persisted));
+    } catch (error) {
+      // Ignore storage issues in restricted browser contexts.
+    }
+  };
   const summaryRows = (summary) => {
     const levels = summary?.levels || {};
     return summaryLevels
@@ -196,7 +384,11 @@
     activeTab = next;
     const nextHash = `#/${next}`;
     if (window.location.hash !== nextHash) {
-      window.history.replaceState(null, "", nextHash);
+      window.history.replaceState(
+        null,
+        "",
+        `${window.location.pathname}${window.location.search}${nextHash}`
+      );
     }
   };
 
@@ -206,7 +398,11 @@
     const next = normalizeTab(value) || "recent";
     activeTab = next;
     if (!hash) {
-      window.history.replaceState(null, "", `#/${next}`);
+      window.history.replaceState(
+        null,
+        "",
+        `${window.location.pathname}${window.location.search}#/${next}`
+      );
     }
   };
 
@@ -339,11 +535,12 @@
 
   const batchQueryParams = () => {
     const params = new URLSearchParams({
-      limit: String(batchPageSize),
+      limit: String(normalizeBatchPageSize(batchPageSize)),
       sort: batchSort
     });
-    if (batchCursor > 0) {
-      params.set("cursor", String(batchCursor));
+    const cursor = normalizeCursor(batchCursor);
+    if (cursor > 0) {
+      params.set("cursor", String(cursor));
     }
     if (batchStatusFilter) {
       params.set("status", batchStatusFilter);
@@ -443,11 +640,45 @@
     filteredJobs = jobs.filter((job) => matchesSeverityFilter(job));
   }
 
-  onMount(() => {
+  $: persistenceSignature = [
+    activeTab,
+    jobSort,
+    severityFilter,
+    jobBatchFilter,
+    selectedBatchId,
+    batchSort,
+    String(batchPageSize),
+    String(batchCursor),
+    batchStatusFilter,
+    batchDomainFilter
+  ].join("|");
+
+  $: if (persistenceReady && persistenceSignature) {
+    persistState();
+  }
+
+  const initializeApp = () => {
+    if (initialized || typeof window === "undefined") return;
+    initialized = true;
     updateTabFromHash();
+    const urlState = readStateFromURL();
+    if (urlState) {
+      applyPersistedState(urlState);
+    } else {
+      const storageState = readStateFromStorage();
+      applyPersistedState(storageState);
+    }
+    batchPageSize = normalizeBatchPageSize(batchPageSize);
+    batchCursor = normalizeCursor(batchCursor);
+    persistenceReady = true;
     window.addEventListener("hashchange", updateTabFromHash);
     loadJobs();
-  });
+    if (activeTab === "batches" && selectedBatchId) {
+      loadBatch(selectedBatchId);
+    }
+  };
+
+  initializeApp();
 
   onDestroy(() => {
     if (jobPoller) clearInterval(jobPoller);

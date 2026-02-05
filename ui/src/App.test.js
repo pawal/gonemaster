@@ -15,6 +15,7 @@ const jsonResponse = (data, ok = true) => ({
 describe("App", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    window.history.replaceState(null, "", "/");
     localStorage.clear();
     global.fetch = vi.fn();
   });
@@ -93,7 +94,7 @@ describe("App", () => {
 
     await waitFor(() => {
       expect(screen.getByText(/Created job:/)).toBeInTheDocument();
-      expect(screen.getByText("job_1")).toBeInTheDocument();
+      expect(screen.getAllByText("job_1").length).toBeGreaterThan(0);
     });
 
     expect(global.fetch).toHaveBeenCalledWith(
@@ -292,6 +293,151 @@ describe("App", () => {
     unmount();
   });
 
+  it("persists view filters and sorts in URL query params", async () => {
+    global.fetch.mockImplementation((url) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      if (value.includes("/api/v1/jobs?")) {
+        return jsonResponse({ items: [], total: 0 });
+      }
+      if (value.includes("/api/v1/batches/")) {
+        return jsonResponse({
+          batch_id: "batch_1",
+          total: 0,
+          status_counts: {},
+          items: [],
+          created_at: "2026-02-03T00:00:00Z"
+        });
+      }
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+
+    await fireEvent.change(screen.getByLabelText("Sort"), { target: { value: "domain_desc" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Warnings+" }));
+    await fireEvent.input(screen.getByLabelText("Batch ID filter"), { target: { value: "batch_recent" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Apply filters" }));
+
+    await fireEvent.click(screen.getByRole("tab", { name: "Batch Jobs" }));
+    await fireEvent.input(screen.getByLabelText("Batch ID"), { target: { value: "batch_1" } });
+    await fireEvent.change(screen.getByLabelText("Batch ID"));
+    await fireEvent.change(screen.getByLabelText("Status"), { target: { value: "failed" } });
+    await fireEvent.input(screen.getByLabelText("Domain contains"), { target: { value: "beta" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Apply filters" }));
+
+    await waitFor(() => {
+      const params = new URLSearchParams(window.location.search);
+      expect(params.get("r_sort")).toBe("domain_desc");
+      expect(params.get("r_sev")).toBe("warnings_plus");
+      expect(params.get("r_batch")).toBe("batch_recent");
+      expect(params.get("b_id")).toBe("batch_1");
+      expect(params.get("b_status")).toBe("failed");
+      expect(params.get("b_domain")).toBe("beta");
+      expect(window.location.hash).toBe("#/batches");
+    });
+
+    unmount();
+  });
+
+  it("restores view state from URL params with precedence over localStorage", async () => {
+    localStorage.setItem(
+      "gonemaster.ui.state.v1",
+      JSON.stringify({
+        jobSort: "domain_asc",
+        severityFilter: "all",
+        jobBatchFilter: "batch_local",
+        selectedBatchId: "batch_local_1",
+        batchSort: "started_at_desc",
+        batchPageSize: 20,
+        batchCursor: 0,
+        batchStatusFilter: "",
+        batchDomainFilter: ""
+      })
+    );
+    window.history.replaceState(
+      null,
+      "",
+      "/?r_sort=domain_desc&r_sev=errors_only&r_batch=batch_url&b_id=batch_url_1&b_sort=created_at_asc&b_limit=50&b_cursor=2&b_status=failed&b_domain=beta#/batches"
+    );
+
+    const calls = [];
+    global.fetch.mockImplementation((url) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      calls.push(value);
+      if (value.includes("/api/v1/jobs?")) {
+        return jsonResponse({ items: [], total: 0 });
+      }
+      if (value.includes("/api/v1/batches/batch_url_1")) {
+        return jsonResponse({
+          batch_id: "batch_url_1",
+          total: 0,
+          status_counts: {},
+          items: [],
+          created_at: "2026-02-03T00:00:00Z"
+        });
+      }
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+
+    await waitFor(() => {
+      expect(calls.some((value) => value.includes("/api/v1/jobs?") && value.includes("sort=domain_desc") && value.includes("batch_id=batch_url"))).toBe(true);
+      expect(
+        calls.some(
+          (value) =>
+            value.includes("/api/v1/batches/batch_url_1?") &&
+            value.includes("sort=created_at_asc") &&
+            value.includes("limit=50") &&
+            value.includes("cursor=2") &&
+            value.includes("status=failed") &&
+            value.includes("domain=beta")
+        )
+      ).toBe(true);
+    });
+
+    expect(screen.getByLabelText("Batch ID")).toHaveValue("batch_url_1");
+    expect(screen.getByLabelText("Sort")).toHaveValue("created_at_asc");
+    expect(screen.getByLabelText("Page size")).toHaveValue("50");
+    expect(screen.getByLabelText("Status")).toHaveValue("failed");
+    expect(screen.getByLabelText("Domain contains")).toHaveValue("beta");
+
+    await fireEvent.click(screen.getByRole("tab", { name: "Recent Jobs" }));
+    expect(screen.getByLabelText("Sort")).toHaveValue("domain_desc");
+    expect(screen.getByLabelText("Batch ID filter")).toHaveValue("batch_url");
+
+    unmount();
+  });
+
+  it("uses localStorage view state when URL has no persisted params", async () => {
+    localStorage.setItem(
+      "gonemaster.ui.state.v1",
+      JSON.stringify({
+        jobSort: "domain_asc",
+        severityFilter: "errors_only",
+        jobBatchFilter: "batch_storage"
+      })
+    );
+    const calls = [];
+
+    global.fetch.mockImplementation((url) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      calls.push(value);
+      if (value.includes("/api/v1/jobs?")) {
+        return jsonResponse({ items: [], total: 0 });
+      }
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+
+    await waitFor(() => {
+      expect(calls.some((value) => value.includes("sort=domain_asc") && value.includes("batch_id=batch_storage"))).toBe(true);
+    });
+
+    unmount();
+  });
+
   it("renders progress bars for job inspector and recent jobs", async () => {
     const job = {
       id: "job_a",
@@ -425,6 +571,39 @@ describe("App", () => {
     unmount();
   });
 
+  it("shows an empty state when severity filters exclude all jobs", async () => {
+    const jobs = [
+      {
+        id: "job_clean_only",
+        domain: "clean-only.example",
+        status: "succeeded",
+        created_at: "2026-02-03T00:00:00Z",
+        progress: 100,
+        severity_totals: { NOTICE: 0, WARNING: 0, ERROR: 0, CRITICAL: 0 }
+      }
+    ];
+
+    global.fetch.mockImplementation((url) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      if (value.includes("/api/v1/jobs?")) {
+        return jsonResponse({ items: jobs, total: jobs.length });
+      }
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+
+    expect(await screen.findByText("job_clean_only")).toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Warnings+" }));
+    await waitFor(() => {
+      expect(screen.queryByText("job_clean_only")).toBeNull();
+      expect(screen.getByText("No jobs match the selected severity filter.")).toBeInTheDocument();
+    });
+
+    unmount();
+  });
+
   it("requests recent jobs with selected sort mode", async () => {
     const calls = [];
     const jobs = [
@@ -524,6 +703,139 @@ describe("App", () => {
       expect(screen.getByText("job_batch_a")).toBeInTheDocument();
       expect(screen.queryByText("job_batch_b")).toBeNull();
     });
+
+    unmount();
+  });
+
+  it("handles batch pagination edges on first and last pages", async () => {
+    const firstPage = {
+      batch_id: "batch_edge",
+      total: 2,
+      status_counts: { failed: 2 },
+      items: [
+        {
+          id: "job_edge_1",
+          domain: "edge-1.example",
+          status: "failed",
+          created_at: "2026-02-03T00:00:00Z",
+          progress: 100
+        }
+      ],
+      created_at: "2026-02-03T00:00:00Z",
+      offset: 0,
+      next_cursor: "1",
+      prev_cursor: "",
+      sort: "started_at_desc"
+    };
+    const lastPage = {
+      ...firstPage,
+      items: [
+        {
+          id: "job_edge_2",
+          domain: "edge-2.example",
+          status: "failed",
+          created_at: "2026-02-03T00:00:01Z",
+          progress: 100
+        }
+      ],
+      offset: 1,
+      next_cursor: "",
+      prev_cursor: "0"
+    };
+
+    global.fetch.mockImplementation((url) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      if (value.includes("/api/v1/jobs?")) {
+        return jsonResponse({ items: [] });
+      }
+      if (value.includes("/api/v1/batches/batch_edge")) {
+        if (value.includes("cursor=1")) {
+          return jsonResponse(lastPage);
+        }
+        return jsonResponse(firstPage);
+      }
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+
+    await fireEvent.click(await screen.findByRole("tab", { name: "Batch Jobs" }));
+    await fireEvent.input(screen.getByLabelText("Batch ID"), { target: { value: "batch_edge" } });
+    await fireEvent.change(screen.getByLabelText("Batch ID"));
+
+    expect(await screen.findByText("job_edge_1")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Next" })).not.toBeDisabled();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(await screen.findByText("job_edge_2")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Previous" })).not.toBeDisabled();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Previous" }));
+    expect(await screen.findByText("job_edge_1")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
+
+    unmount();
+  });
+
+  it("normalizes invalid persisted URL filters and pagination values", async () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/?r_sort=bad_sort&r_sev=bad_filter&r_batch=batch_from_url&b_id=batch_invalid&b_sort=bad_batch_sort&b_limit=13&b_cursor=-4&b_status=wat&b_domain=edge#/batches"
+    );
+
+    const calls = [];
+    global.fetch.mockImplementation((url) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      calls.push(value);
+      if (value.includes("/api/v1/jobs?")) {
+        return jsonResponse({ items: [], total: 0 });
+      }
+      if (value.includes("/api/v1/batches/batch_invalid")) {
+        return jsonResponse({
+          batch_id: "batch_invalid",
+          total: 0,
+          status_counts: {},
+          items: [],
+          created_at: "2026-02-03T00:00:00Z"
+        });
+      }
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+
+    await waitFor(() => {
+      expect(
+        calls.some(
+          (value) =>
+            value.includes("/api/v1/jobs?") &&
+            value.includes("sort=started_at_desc") &&
+            value.includes("batch_id=batch_from_url")
+        )
+      ).toBe(true);
+      expect(
+        calls.some(
+          (value) =>
+            value.includes("/api/v1/batches/batch_invalid?") &&
+            value.includes("sort=started_at_desc") &&
+            value.includes("limit=20") &&
+            value.includes("domain=edge") &&
+            !value.includes("status=wat") &&
+            !value.includes("cursor=")
+        )
+      ).toBe(true);
+    });
+
+    expect(screen.getByLabelText("Sort")).toHaveValue("started_at_desc");
+    expect(screen.getByLabelText("Page size")).toHaveValue("20");
+    expect(screen.getByLabelText("Status")).toHaveValue("");
+
+    await fireEvent.click(screen.getByRole("tab", { name: "Recent Jobs" }));
+    expect(screen.getByLabelText("Sort")).toHaveValue("started_at_desc");
+    expect(screen.getByLabelText("Batch ID filter")).toHaveValue("batch_from_url");
 
     unmount();
   });

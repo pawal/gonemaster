@@ -385,6 +385,7 @@
 
   const setTab = (tab) => {
     const next = normalizeTab(tab) || "single";
+    const changed = activeTab !== next;
     activeTab = next;
     const nextHash = `#/${next}`;
     if (window.location.hash !== nextHash) {
@@ -393,6 +394,10 @@
         "",
         `${window.location.pathname}${window.location.search}${nextHash}`
       );
+    }
+    if (changed && statusMessage) {
+      statusMessage = "";
+      statusTone = "";
     }
     if (next === "recent") {
       loadJobs();

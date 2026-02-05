@@ -97,6 +97,23 @@ describe("App", () => {
     unmount();
   });
 
+  it("clears status notice when switching tabs", async () => {
+    global.fetch.mockImplementation(() => jsonResponse({ items: [] }));
+
+    const { unmount } = render(App);
+
+    const button = await screen.findByText("Run Single Job");
+    await fireEvent.click(button);
+    expect(screen.getByText("Domain is required.")).toBeInTheDocument();
+
+    await openRecentTab();
+    await waitFor(() => {
+      expect(screen.queryByText("Domain is required.")).toBeNull();
+    });
+
+    unmount();
+  });
+
   it("submits a single job and displays the created id", async () => {
     const job = {
       id: "job_1",

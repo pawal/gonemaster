@@ -353,7 +353,7 @@
     </div>
   {/if}
 
-  <nav class="tabs" role="tablist" aria-label="Job views">
+  <div class="tabs" role="tablist" aria-label="Job views">
     {#each tabs as tab}
       <button
         class={`tab ${activeTab === tab.id ? "active" : ""}`}
@@ -367,7 +367,7 @@
         {tab.label}
       </button>
     {/each}
-  </nav>
+  </div>
 
   <section class="grid" style="margin-top: 22px;">
     <div class="card reveal" style="--d: 0.18s">
@@ -416,7 +416,7 @@ example.org`}
   </section>
 
   {#if activeTab === "recent"}
-    <section class="grid" id="panel-recent" role="tabpanel" aria-labelledby="tab-recent" style="margin-top: 22px;">
+    <div class="grid" id="panel-recent" role="tabpanel" aria-labelledby="tab-recent" style="margin-top: 22px;">
       <div class="card reveal" style="--d: 0.26s" class:highlight={jobInspectorHighlight}>
         <h2>Job Inspector</h2>
         <div class="stack">
@@ -521,7 +521,7 @@ example.org`}
           </button>
         {/if}
       </div>
-    </section>
+    </div>
 
     <section class="card reveal" style="--d: 0.34s; margin-top: 22px;">
       <h2>Recent Jobs</h2>
@@ -554,7 +554,7 @@ example.org`}
       </div>
     </section>
   {:else if activeTab === "batches"}
-    <section class="grid" id="panel-batches" role="tabpanel" aria-labelledby="tab-batches" style="margin-top: 22px;">
+    <div class="grid" id="panel-batches" role="tabpanel" aria-labelledby="tab-batches" style="margin-top: 22px;">
       <div class="card reveal" style="--d: 0.3s">
         <h2>Batch Inspector</h2>
         <div class="stack">
@@ -598,6 +598,6 @@ example.org`}
           </div>
         {/if}
       </div>
-    </section>
+    </div>
   {/if}
 </main>

@@ -26,16 +26,19 @@ describe("App", () => {
   it("renders the main sections", async () => {
     global.fetch.mockImplementation(() => jsonResponse({ items: [] }));
 
-    const { unmount } = render(App);
+    const { container, unmount } = render(App);
 
     expect(await screen.findByText("Gonemaster")).toBeInTheDocument();
     expect(screen.getByText("Single Job")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Batch Jobs" })).toBeInTheDocument();
+    expect(screen.getByRole("tablist", { name: "Job views" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Recent Jobs" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Batch Jobs" })).toBeInTheDocument();
     expect(screen.getByText("Job Inspector")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Recent Jobs" })).toBeInTheDocument();
     expect(screen.queryByText("Batch Inspector")).not.toBeInTheDocument();
+    expect(container.querySelector("nav[role='tablist']")).toBeNull();
+    expect(container.querySelector("section[role='tabpanel']")).toBeNull();
 
     await fireEvent.click(screen.getByRole("tab", { name: "Batch Jobs" }));
     expect(screen.getByText("Batch Inspector")).toBeInTheDocument();

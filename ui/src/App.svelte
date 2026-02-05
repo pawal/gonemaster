@@ -17,6 +17,7 @@
   let filteredJobs = [];
   let severityFilter = "all";
   let jobSort = "started_at_desc";
+  let jobBatchFilter = "";
 
   let selectedJobId = "";
   let selectedJob = null;
@@ -82,6 +83,8 @@
   const jobSortOptions = [
     { id: "started_at_desc", label: "Start time (newest)" },
     { id: "started_at_asc", label: "Start time (oldest)" },
+    { id: "batch_id_asc", label: "Batch ID (A-Z)" },
+    { id: "batch_id_desc", label: "Batch ID (Z-A)" },
     { id: "error_desc", label: "Errors + critical (high-low)" },
     { id: "critical_desc", label: "Critical (high-low)" },
     { id: "domain_asc", label: "Domain (A-Z)" },
@@ -214,6 +217,10 @@
         limit: "20",
         sort: jobSort
       });
+      const normalizedBatchID = jobBatchFilter.trim();
+      if (normalizedBatchID) {
+        params.set("batch_id", normalizedBatchID);
+      }
       const list = await apiFetch(`/jobs?${params.toString()}`);
       jobs = list.items || [];
     } catch (error) {
@@ -221,6 +228,11 @@
     } finally {
       jobsLoading = false;
     }
+  };
+
+  const clearRecentBatchFilter = async () => {
+    jobBatchFilter = "";
+    await loadJobs();
   };
 
   const submitSingle = async () => {
@@ -643,6 +655,25 @@ example.org`}
             {/each}
           </select>
         </div>
+        <div class="sort-control grow">
+          <label for="recent-batch-filter">Batch ID filter</label>
+          <input
+            id="recent-batch-filter"
+            type="text"
+            placeholder="batch_123"
+            bind:value={jobBatchFilter}
+            on:keydown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                loadJobs();
+              }
+            }}
+          />
+        </div>
+        <div class="row">
+          <button class="ghost" type="button" on:click={loadJobs} disabled={jobsLoading}>Apply filters</button>
+          <button class="ghost" type="button" on:click={clearRecentBatchFilter} disabled={jobsLoading}>Clear</button>
+        </div>
       </div>
       <div class="severity-filter-bar" role="group" aria-label="Severity filters">
         {#each severityFilters as filter}
@@ -666,6 +697,9 @@ example.org`}
               <div>
                 <div class="mono">{job.id}</div>
                 <div class="small">{job.domain} - {job.status}</div>
+                {#if job.batch_id}
+                  <div class="small mono">Batch: {job.batch_id}</div>
+                {/if}
                 <div class="job-severity-tags">
                   {#if jobSeverityRows(job).length}
                     {#each jobSeverityRows(job) as entry}

@@ -105,6 +105,7 @@ func TestInMemoryJobStoreSorting(t *testing.T) {
 
 	_, _ = store.Create(Job{
 		ID:        "job1",
+		BatchID:   "batch_b",
 		Domain:    "zeta.example",
 		Status:    JobQueued,
 		CreatedAt: base,
@@ -112,6 +113,7 @@ func TestInMemoryJobStoreSorting(t *testing.T) {
 	})
 	_, _ = store.Create(Job{
 		ID:        "job2",
+		BatchID:   "batch_a",
 		Domain:    "alpha.example",
 		Status:    JobQueued,
 		CreatedAt: base.Add(time.Second),
@@ -119,6 +121,7 @@ func TestInMemoryJobStoreSorting(t *testing.T) {
 	})
 	_, _ = store.Create(Job{
 		ID:        "job3",
+		BatchID:   "batch_c",
 		Domain:    "beta.example",
 		Status:    JobQueued,
 		CreatedAt: base.Add(4 * time.Second),
@@ -151,6 +154,16 @@ func TestInMemoryJobStoreSorting(t *testing.T) {
 	domainAsc := store.List(JobFilter{Limit: 10, Sort: JobSortDomainAsc})
 	if len(domainAsc.Items) != 3 || domainAsc.Items[0].ID != "job2" {
 		t.Fatalf("expected domain_asc sorting to return alpha first")
+	}
+
+	batchIDAsc := store.List(JobFilter{Limit: 10, Sort: JobSortBatchIDAsc})
+	if len(batchIDAsc.Items) != 3 || batchIDAsc.Items[0].ID != "job2" {
+		t.Fatalf("expected batch_id_asc sorting to return batch_a first")
+	}
+
+	batchIDDesc := store.List(JobFilter{Limit: 10, Sort: JobSortBatchIDDesc})
+	if len(batchIDDesc.Items) != 3 || batchIDDesc.Items[0].ID != "job3" {
+		t.Fatalf("expected batch_id_desc sorting to return batch_c first")
 	}
 
 	startedAsc := store.List(JobFilter{Limit: 10, Sort: JobSortStartedAtAsc})

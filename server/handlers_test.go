@@ -191,6 +191,50 @@ func TestListJobsFiltersByDomainAndTimeRange(t *testing.T) {
 	}
 }
 
+func TestListJobsFiltersByBatchIDAndSupportsBatchSort(t *testing.T) {
+	srv := New(DefaultConfig())
+	base := time.Date(2026, 2, 3, 0, 0, 0, 0, time.UTC)
+
+	_, _ = srv.store.Create(Job{ID: "job1", BatchID: "batch_b", Domain: "alpha.example", Status: JobQueued, CreatedAt: base})
+	_, _ = srv.store.Create(Job{ID: "job2", BatchID: "batch_a", Domain: "beta.example", Status: JobQueued, CreatedAt: base.Add(time.Second)})
+	_, _ = srv.store.Create(Job{ID: "job3", BatchID: "batch_b", Domain: "gamma.example", Status: JobQueued, CreatedAt: base.Add(2 * time.Second)})
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs?sort=batch_id_asc", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var list JobList
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if list.Sort != string(JobSortBatchIDAsc) {
+		t.Fatalf("expected sort metadata %q, got %q", JobSortBatchIDAsc, list.Sort)
+	}
+	if len(list.Items) != 3 || list.Items[0].ID != "job2" {
+		t.Fatalf("expected batch_id_asc to order batch_a before batch_b")
+	}
+
+	resp = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/jobs?batch_id=batch_b&sort=batch_id_desc", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if list.Total != 2 || len(list.Items) != 2 {
+		t.Fatalf("expected two jobs in batch_b, got %+v", list.Items)
+	}
+	for _, item := range list.Items {
+		if item.BatchID != "batch_b" {
+			t.Fatalf("expected all items in batch_b, got %q", item.BatchID)
+		}
+	}
+}
+
 func TestListJobsIncludesSeverityTotals(t *testing.T) {
 	srv := New(DefaultConfig())
 	base := time.Date(2026, 2, 3, 0, 0, 0, 0, time.UTC)

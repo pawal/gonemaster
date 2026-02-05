@@ -469,6 +469,65 @@ describe("App", () => {
     unmount();
   });
 
+  it("filters recent jobs by batch id", async () => {
+    const calls = [];
+    const allJobs = [
+      {
+        id: "job_batch_a",
+        batch_id: "batch_a",
+        domain: "a.example",
+        status: "queued",
+        created_at: "2026-02-03T00:00:00Z",
+        progress: 0,
+        severity_totals: { NOTICE: 0, WARNING: 0, ERROR: 0, CRITICAL: 0 }
+      },
+      {
+        id: "job_batch_b",
+        batch_id: "batch_b",
+        domain: "b.example",
+        status: "queued",
+        created_at: "2026-02-03T00:00:01Z",
+        progress: 0,
+        severity_totals: { NOTICE: 0, WARNING: 0, ERROR: 0, CRITICAL: 0 }
+      }
+    ];
+    const filtered = [allJobs[0]];
+
+    global.fetch.mockImplementation((url) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      calls.push(value);
+      if (value.includes("/api/v1/jobs?")) {
+        if (value.includes("batch_id=batch_a")) {
+          return jsonResponse({ items: filtered, total: filtered.length });
+        }
+        return jsonResponse({ items: allJobs, total: allJobs.length });
+      }
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+
+    const refresh = await screen.findByRole("button", { name: /refresh list/i });
+    if (refresh.disabled) {
+      await waitFor(() => expect(refresh).not.toBeDisabled());
+    }
+    await fireEvent.click(refresh);
+
+    expect(await screen.findByText("job_batch_a")).toBeInTheDocument();
+    expect(screen.getByText("job_batch_b")).toBeInTheDocument();
+
+    await fireEvent.input(screen.getByLabelText("Batch ID filter"), { target: { value: "batch_a" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Apply filters" }));
+
+    await waitFor(() => {
+      expect(calls.some((value) => value.includes("batch_id=batch_a"))).toBe(true);
+      expect(screen.getByText("job_batch_a")).toBeInTheDocument();
+      expect(screen.queryByText("job_batch_b")).toBeNull();
+    });
+
+    unmount();
+  });
+
   it("summarizes only notice and above levels with non-zero counts", async () => {
     const job = {
       id: "job_summary",

@@ -132,6 +132,18 @@ func (s *InMemoryJobStore) List(filter JobFilter) JobList {
 			if leftDomain != rightDomain {
 				return leftDomain > rightDomain
 			}
+		case JobSortBatchIDAsc:
+			leftBatchID := strings.ToLower(left.BatchID)
+			rightBatchID := strings.ToLower(right.BatchID)
+			if leftBatchID != rightBatchID {
+				return leftBatchID < rightBatchID
+			}
+		case JobSortBatchIDDesc:
+			leftBatchID := strings.ToLower(left.BatchID)
+			rightBatchID := strings.ToLower(right.BatchID)
+			if leftBatchID != rightBatchID {
+				return leftBatchID > rightBatchID
+			}
 		case JobSortErrorDesc:
 			leftTotals := severityByJobID[left.ID]
 			rightTotals := severityByJobID[right.ID]
@@ -241,7 +253,7 @@ func parseTime(value string) (time.Time, error) {
 
 func normalizeJobSort(value JobSort) JobSort {
 	switch value {
-	case JobSortCreatedAtDesc, JobSortCreatedAtAsc, JobSortStartedAtDesc, JobSortStartedAtAsc, JobSortDomainAsc, JobSortDomainDesc, JobSortErrorDesc, JobSortCriticalDesc:
+	case JobSortCreatedAtDesc, JobSortCreatedAtAsc, JobSortStartedAtDesc, JobSortStartedAtAsc, JobSortDomainAsc, JobSortDomainDesc, JobSortBatchIDAsc, JobSortBatchIDDesc, JobSortErrorDesc, JobSortCriticalDesc:
 		return value
 	default:
 		return JobSortStartedAtDesc
@@ -250,7 +262,7 @@ func normalizeJobSort(value JobSort) JobSort {
 
 func isValidJobSort(value JobSort) bool {
 	switch value {
-	case JobSortCreatedAtDesc, JobSortCreatedAtAsc, JobSortStartedAtDesc, JobSortStartedAtAsc, JobSortDomainAsc, JobSortDomainDesc, JobSortErrorDesc, JobSortCriticalDesc:
+	case JobSortCreatedAtDesc, JobSortCreatedAtAsc, JobSortStartedAtDesc, JobSortStartedAtAsc, JobSortDomainAsc, JobSortDomainDesc, JobSortBatchIDAsc, JobSortBatchIDDesc, JobSortErrorDesc, JobSortCriticalDesc:
 		return true
 	default:
 		return false

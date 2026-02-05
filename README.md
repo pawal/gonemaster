@@ -48,6 +48,8 @@ gonemaster --json --domain example.com | jq
 Gonemaster includes an API server with an included Web User Interface.
 Please read the documentation in [docs/server.md](docs/server.md) to know more.
 
+![UI screenshot](docs/ui-screenshot.png)
+
 There is also a CLI for testing domains through the API - [gonemaster-client](docs/cli.md)
 also has support for batch operations.
 

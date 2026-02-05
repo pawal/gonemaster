@@ -56,6 +56,32 @@ describe("App", () => {
     unmount();
   });
 
+  it("refreshes recent tests list when clicking the recent tests tab", async () => {
+    const calls = [];
+    global.fetch.mockImplementation((url) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      calls.push(value);
+      if (value.includes("/api/v1/jobs?")) {
+        return jsonResponse({ items: [], total: 0 });
+      }
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+
+    await waitFor(() => {
+      expect(calls.some((value) => value.includes("/api/v1/jobs?"))).toBe(true);
+    });
+    calls.length = 0;
+
+    await openRecentTab();
+    await waitFor(() => {
+      expect(calls.some((value) => value.includes("/api/v1/jobs?"))).toBe(true);
+    });
+
+    unmount();
+  });
+
   it("warns when submitting a single job without a domain", async () => {
     global.fetch.mockImplementation(() => jsonResponse({ items: [] }));
 

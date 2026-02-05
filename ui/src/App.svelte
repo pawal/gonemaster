@@ -394,6 +394,9 @@
         `${window.location.pathname}${window.location.search}${nextHash}`
       );
     }
+    if (next === "recent") {
+      loadJobs();
+    }
   };
 
   const updateTabFromHash = () => {

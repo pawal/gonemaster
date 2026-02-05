@@ -24,24 +24,33 @@ describe("App", () => {
     cleanup();
   });
 
+  const openRecentTab = async () => {
+    await fireEvent.click(screen.getByRole("tab", { name: "Recent Tests" }));
+  };
+
+  const openBatchTab = async () => {
+    await fireEvent.click(screen.getByRole("tab", { name: "Batch Jobs" }));
+  };
+
   it("renders the main sections", async () => {
     global.fetch.mockImplementation(() => jsonResponse({ items: [] }));
 
     const { container, unmount } = render(App);
 
     expect(await screen.findByText("Gonemaster")).toBeInTheDocument();
-    expect(screen.getByText("Single Job")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Batch Jobs" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Single Job" })).toBeInTheDocument();
     expect(screen.getByRole("tablist", { name: "Job views" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Recent Jobs" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Single Job" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Recent Tests" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Batch Jobs" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Metrics" })).toBeInTheDocument();
     expect(screen.getByText("Job Inspector")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Recent Jobs" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Recent Tests" })).toBeNull();
     expect(screen.queryByText("Batch Inspector")).not.toBeInTheDocument();
     expect(container.querySelector("nav[role='tablist']")).toBeNull();
     expect(container.querySelector("section[role='tabpanel']")).toBeNull();
 
-    await fireEvent.click(screen.getByRole("tab", { name: "Batch Jobs" }));
+    await openBatchTab();
     expect(screen.getByText("Batch Inspector")).toBeInTheDocument();
 
     unmount();
@@ -180,6 +189,7 @@ describe("App", () => {
 
     const { unmount } = render(App);
 
+    await openBatchTab();
     const textarea = await screen.findByLabelText("Domains (one per line)");
     await fireEvent.input(textarea, { target: { value: "example.com\nexample.org" } });
 
@@ -265,7 +275,7 @@ describe("App", () => {
 
     const { unmount } = render(App);
 
-    await fireEvent.click(await screen.findByRole("tab", { name: "Batch Jobs" }));
+    await openBatchTab();
     const batchId = screen.getByLabelText("Batch ID");
     await fireEvent.input(batchId, { target: { value: "batch_1" } });
     await fireEvent.change(batchId);
@@ -313,12 +323,13 @@ describe("App", () => {
 
     const { unmount } = render(App);
 
+    await openRecentTab();
     await fireEvent.change(screen.getByLabelText("Sort"), { target: { value: "domain_desc" } });
     await fireEvent.click(screen.getByRole("button", { name: "Warnings+" }));
     await fireEvent.input(screen.getByLabelText("Batch ID filter"), { target: { value: "batch_recent" } });
     await fireEvent.click(screen.getByRole("button", { name: "Apply filters" }));
 
-    await fireEvent.click(screen.getByRole("tab", { name: "Batch Jobs" }));
+    await openBatchTab();
     await fireEvent.input(screen.getByLabelText("Batch ID"), { target: { value: "batch_1" } });
     await fireEvent.change(screen.getByLabelText("Batch ID"));
     await fireEvent.change(screen.getByLabelText("Status"), { target: { value: "failed" } });
@@ -402,7 +413,7 @@ describe("App", () => {
     expect(screen.getByLabelText("Status")).toHaveValue("failed");
     expect(screen.getByLabelText("Domain contains")).toHaveValue("beta");
 
-    await fireEvent.click(screen.getByRole("tab", { name: "Recent Jobs" }));
+    await openRecentTab();
     expect(screen.getByLabelText("Sort")).toHaveValue("domain_desc");
     expect(screen.getByLabelText("Batch ID filter")).toHaveValue("batch_url");
 
@@ -465,6 +476,7 @@ describe("App", () => {
 
     const { unmount } = render(App);
 
+    await openRecentTab();
     const refresh = await screen.findByRole("button", { name: /refresh list/i });
     if (refresh.disabled) {
       await waitFor(() => expect(refresh).not.toBeDisabled());
@@ -472,7 +484,7 @@ describe("App", () => {
     await fireEvent.click(refresh);
     await screen.findByText("job_a");
 
-    const recentHeading = screen.getByRole("heading", { name: "Recent Jobs" });
+    const recentHeading = screen.getByRole("heading", { name: "Recent Tests" });
     const recentCard = recentHeading.closest(".card");
     expect(recentCard).not.toBeNull();
     const recentBars = within(recentCard).getAllByRole("progressbar");
@@ -485,6 +497,7 @@ describe("App", () => {
     expect(within(recentCard).queryByText("CRITICAL 0")).toBeNull();
     expect(within(recentCard).queryByText("NOTICE 2 · WARNING 1 · ERROR 3 · CRITICAL 0")).toBeNull();
 
+    await fireEvent.click(screen.getByRole("tab", { name: "Single Job" }));
     const jobInput = screen.getByLabelText("Job ID");
     await fireEvent.input(jobInput, { target: { value: job.id } });
     await fireEvent.change(jobInput);
@@ -537,6 +550,7 @@ describe("App", () => {
 
     const { unmount } = render(App);
 
+    await openRecentTab();
     const refresh = await screen.findByRole("button", { name: /refresh list/i });
     if (refresh.disabled) {
       await waitFor(() => expect(refresh).not.toBeDisabled());
@@ -593,6 +607,7 @@ describe("App", () => {
 
     const { unmount } = render(App);
 
+    await openRecentTab();
     expect(await screen.findByText("job_clean_only")).toBeInTheDocument();
 
     await fireEvent.click(screen.getByRole("button", { name: "Warnings+" }));
@@ -628,6 +643,7 @@ describe("App", () => {
 
     const { unmount } = render(App);
 
+    await openRecentTab();
     const refresh = await screen.findByRole("button", { name: /refresh list/i });
     if (refresh.disabled) {
       await waitFor(() => expect(refresh).not.toBeDisabled());
@@ -686,6 +702,7 @@ describe("App", () => {
 
     const { unmount } = render(App);
 
+    await openRecentTab();
     const refresh = await screen.findByRole("button", { name: /refresh list/i });
     if (refresh.disabled) {
       await waitFor(() => expect(refresh).not.toBeDisabled());
@@ -759,7 +776,7 @@ describe("App", () => {
 
     const { unmount } = render(App);
 
-    await fireEvent.click(await screen.findByRole("tab", { name: "Batch Jobs" }));
+    await openBatchTab();
     await fireEvent.input(screen.getByLabelText("Batch ID"), { target: { value: "batch_edge" } });
     await fireEvent.change(screen.getByLabelText("Batch ID"));
 
@@ -833,7 +850,7 @@ describe("App", () => {
     expect(screen.getByLabelText("Page size")).toHaveValue("20");
     expect(screen.getByLabelText("Status")).toHaveValue("");
 
-    await fireEvent.click(screen.getByRole("tab", { name: "Recent Jobs" }));
+    await openRecentTab();
     expect(screen.getByLabelText("Sort")).toHaveValue("started_at_desc");
     expect(screen.getByLabelText("Batch ID filter")).toHaveValue("batch_from_url");
 

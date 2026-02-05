@@ -60,10 +60,12 @@
   let moduleGroups = [];
   let moduleOpen = {};
   let lastResultJobId = "";
-  let activeTab = "recent";
+  let activeTab = "single";
   const tabs = [
-    { id: "recent", label: "Recent Jobs" },
-    { id: "batches", label: "Batch Jobs" }
+    { id: "single", label: "Single Job" },
+    { id: "recent", label: "Recent Tests" },
+    { id: "batches", label: "Batch Jobs" },
+    { id: "metrics", label: "Metrics" }
   ];
 
   const setStatus = (message, tone = "") => {
@@ -374,13 +376,15 @@
 
   const normalizeTab = (value) => {
     const tab = String(value || "").replace(/^\/+/, "").toLowerCase();
-    if (tab === "recent" || tab === "jobs") return "recent";
+    if (tab === "single" || tab === "job" || tab === "jobs" || tab === "home") return "single";
+    if (tab === "recent" || tab === "tests") return "recent";
     if (tab === "batches" || tab === "batch") return "batches";
+    if (tab === "metrics" || tab === "metric") return "metrics";
     return "";
   };
 
   const setTab = (tab) => {
-    const next = normalizeTab(tab) || "recent";
+    const next = normalizeTab(tab) || "single";
     activeTab = next;
     const nextHash = `#/${next}`;
     if (window.location.hash !== nextHash) {
@@ -395,7 +399,7 @@
   const updateTabFromHash = () => {
     const hash = window.location.hash || "";
     const value = hash.replace(/^#\/?/, "");
-    const next = normalizeTab(value) || "recent";
+    const next = normalizeTab(value) || "single";
     activeTab = next;
     if (!hash) {
       window.history.replaceState(
@@ -718,54 +722,33 @@
     {/each}
   </div>
 
-  <section class="grid" style="margin-top: 22px;">
-    <div class="card reveal" style="--d: 0.18s">
-      <h2>Single Job</h2>
-      <div class="stack">
-        <label for="single-domain">Domain</label>
-        <input
-          id="single-domain"
-          type="text"
-          placeholder="example.com"
-          bind:value={singleDomain}
-          on:keydown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              submitSingle();
-            }
-          }}
-        />
+  {#if activeTab === "single"}
+    <div class="grid" id="panel-single" role="tabpanel" aria-labelledby="tab-single" style="margin-top: 22px;">
+      <div class="card reveal" style="--d: 0.18s">
+        <h2>Single Job</h2>
+        <div class="stack">
+          <label for="single-domain">Domain</label>
+          <input
+            id="single-domain"
+            type="text"
+            placeholder="example.com"
+            bind:value={singleDomain}
+            on:keydown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                submitSingle();
+              }
+            }}
+          />
+        </div>
+        <button on:click={submitSingle} disabled={singleSubmitting}>
+          {singleSubmitting ? "Submitting..." : "Run Single Job"}
+        </button>
+        {#if createdJobId}
+          <div class="small">Created job: <span class="mono">{createdJobId}</span></div>
+        {/if}
       </div>
-      <button on:click={submitSingle} disabled={singleSubmitting}>
-        {singleSubmitting ? "Submitting..." : "Run Single Job"}
-      </button>
-      {#if createdJobId}
-        <div class="small">Created job: <span class="mono">{createdJobId}</span></div>
-      {/if}
-    </div>
 
-    <div class="card reveal" style="--d: 0.22s">
-      <h2>Batch Jobs</h2>
-      <div class="stack">
-        <label for="batch-domains">Domains (one per line)</label>
-        <textarea
-          id="batch-domains"
-          placeholder={`example.com
-example.org`}
-          bind:value={batchDomains}
-        ></textarea>
-      </div>
-      <button class="secondary" on:click={submitBatch} disabled={batchSubmitting}>
-        {batchSubmitting ? "Submitting..." : "Run Batch"}
-      </button>
-      {#if createdBatchId}
-        <div class="small">Created batch: <span class="mono">{createdBatchId}</span></div>
-      {/if}
-    </div>
-  </section>
-
-  {#if activeTab === "recent"}
-    <div class="grid" id="panel-recent" role="tabpanel" aria-labelledby="tab-recent" style="margin-top: 22px;">
       <div class="card reveal" style="--d: 0.26s" class:highlight={jobInspectorHighlight}>
         <h2>Job Inspector</h2>
         <div class="stack">
@@ -871,9 +854,9 @@ example.org`}
         {/if}
       </div>
     </div>
-
-    <section class="card reveal" style="--d: 0.34s; margin-top: 22px;">
-      <h2>Recent Jobs</h2>
+  {:else if activeTab === "recent"}
+    <div class="card reveal" id="panel-recent" role="tabpanel" aria-labelledby="tab-recent" style="--d: 0.34s; margin-top: 22px;">
+      <h2>Recent Tests</h2>
       <div class="row">
         <button class="ghost" type="button" on:click={loadJobs} disabled={jobsLoading}>
           {jobsLoading ? "Refreshing..." : "Refresh list"}
@@ -919,7 +902,7 @@ example.org`}
       </div>
       <div class="list">
         {#if jobs.length === 0}
-          <div class="small">No jobs yet. Run a single or batch job above.</div>
+          <div class="small">No jobs yet. Run a single or batch job from the tabs above.</div>
         {:else if filteredJobs.length === 0}
           <div class="small">No jobs match the selected severity filter.</div>
         {:else}
@@ -953,9 +936,28 @@ example.org`}
           {/each}
         {/if}
       </div>
-    </section>
+    </div>
   {:else if activeTab === "batches"}
     <div class="grid" id="panel-batches" role="tabpanel" aria-labelledby="tab-batches" style="margin-top: 22px;">
+      <div class="card reveal" style="--d: 0.22s">
+        <h2>Batch Jobs</h2>
+        <div class="stack">
+          <label for="batch-domains">Domains (one per line)</label>
+          <textarea
+            id="batch-domains"
+            placeholder={`example.com
+example.org`}
+            bind:value={batchDomains}
+          ></textarea>
+        </div>
+        <button class="secondary" on:click={submitBatch} disabled={batchSubmitting}>
+          {batchSubmitting ? "Submitting..." : "Run Batch"}
+        </button>
+        {#if createdBatchId}
+          <div class="small">Created batch: <span class="mono">{createdBatchId}</span></div>
+        {/if}
+      </div>
+
       <div class="card reveal" style="--d: 0.3s">
         <h2>Batch Inspector</h2>
         <div class="stack">
@@ -1067,7 +1069,7 @@ example.org`}
                     <button class="ghost" type="button" on:click={() => {
                       selectedJobId = item.id;
                       loadJob(item.id);
-                      setTab("recent");
+                      setTab("single");
                     }}>Inspect</button>
                   </div>
                 {/each}
@@ -1076,6 +1078,11 @@ example.org`}
           </div>
         {/if}
       </div>
+    </div>
+  {:else if activeTab === "metrics"}
+    <div class="card reveal" id="panel-metrics" role="tabpanel" aria-labelledby="tab-metrics" style="--d: 0.38s; margin-top: 22px;">
+      <h2>Metrics</h2>
+      <div class="small">Metrics endpoint support will be added in a future update.</div>
     </div>
   {/if}
 </main>

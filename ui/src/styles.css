@@ -73,6 +73,22 @@ h1 {
   gap: 14px;
 }
 
+.card.highlight {
+  border-color: var(--accent-2);
+  box-shadow: 0 0 0 2px rgba(14, 116, 144, 0.25), var(--shadow);
+  animation: highlightPulse 1.8s ease-in-out 3;
+}
+
+@keyframes highlightPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px rgba(14, 116, 144, 0.15), var(--shadow);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(14, 116, 144, 0.28), var(--shadow);
+  }
+}
+
 .card h2 {
   margin: 0;
   font-size: 1.15rem;

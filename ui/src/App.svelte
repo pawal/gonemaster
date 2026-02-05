@@ -22,6 +22,8 @@
   let jobLoading = false;
   let autoRefreshJob = true;
   let jobPoller = null;
+  let jobInspectorHighlight = false;
+  let jobInspectorHighlightTimer = null;
 
   let selectedBatchId = "";
   let selectedBatch = null;
@@ -152,6 +154,15 @@
       });
       createdJobId = job.id;
       selectedJobId = job.id;
+      autoRefreshJob = true;
+      jobInspectorHighlight = true;
+      if (jobInspectorHighlightTimer) {
+        clearTimeout(jobInspectorHighlightTimer);
+      }
+      jobInspectorHighlightTimer = setTimeout(() => {
+        jobInspectorHighlight = false;
+        jobInspectorHighlightTimer = null;
+      }, 6000);
       setStatus(`Job ${job.id} created.`, "ok");
       await loadJobs();
       await loadJob(job.id);
@@ -260,8 +271,13 @@
     startBatchPolling();
   }
 
-  $: if (autoRefreshJob && selectedJob && selectedJob.progress === 100) {
+  $: if (
+    autoRefreshJob &&
+    selectedJob &&
+    (selectedJob.progress === 100 || ["succeeded", "failed", "canceled"].includes(selectedJob.status))
+  ) {
     autoRefreshJob = false;
+    jobInspectorHighlight = false;
   }
 
   $: {
@@ -280,6 +296,7 @@
   onDestroy(() => {
     if (jobPoller) clearInterval(jobPoller);
     if (batchPoller) clearInterval(batchPoller);
+    if (jobInspectorHighlightTimer) clearTimeout(jobInspectorHighlightTimer);
   });
 </script>
 
@@ -344,7 +361,7 @@ example.org`}
   </section>
 
   <section class="grid" style="margin-top: 22px;">
-    <div class="card reveal" style="--d: 0.26s">
+    <div class="card reveal" style="--d: 0.26s" class:highlight={jobInspectorHighlight}>
       <h2>Job Inspector</h2>
       <div class="stack">
         <label for="job-id">Job ID</label>

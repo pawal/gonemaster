@@ -144,7 +144,9 @@ func (s *Server) handleBatchByID(w http.ResponseWriter, r *http.Request) {
 	}
 	// Batch endpoint currently supports pagination + sorting only.
 	filter.Status = ""
+	filter.Domain = ""
 	filter.CreatedAfter = time.Time{}
+	filter.CreatedBefore = time.Time{}
 	filter.BatchID = batchID
 
 	list := s.store.List(filter)
@@ -261,6 +263,7 @@ func parseListFilter(r *http.Request, defaultLimit int) (JobFilter, string, stri
 		filter.Status = JobStatus(status)
 	}
 	filter.BatchID = strings.TrimSpace(query.Get("batch_id"))
+	filter.Domain = strings.TrimSpace(query.Get("domain"))
 
 	if createdAfter := strings.TrimSpace(query.Get("created_after")); createdAfter != "" {
 		timestamp, err := parseTime(createdAfter)
@@ -268,6 +271,16 @@ func parseListFilter(r *http.Request, defaultLimit int) (JobFilter, string, stri
 			return JobFilter{}, "invalid_created_after", "created_after must be RFC3339"
 		}
 		filter.CreatedAfter = timestamp
+	}
+	if createdBefore := strings.TrimSpace(query.Get("created_before")); createdBefore != "" {
+		timestamp, err := parseTime(createdBefore)
+		if err != nil {
+			return JobFilter{}, "invalid_created_before", "created_before must be RFC3339"
+		}
+		filter.CreatedBefore = timestamp
+	}
+	if !filter.CreatedAfter.IsZero() && !filter.CreatedBefore.IsZero() && filter.CreatedBefore.Before(filter.CreatedAfter) {
+		return JobFilter{}, "invalid_time_range", "created_before must be greater than or equal to created_after"
 	}
 
 	if rawSort := strings.TrimSpace(query.Get("sort")); rawSort != "" {

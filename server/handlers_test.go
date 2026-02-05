@@ -164,6 +164,68 @@ func TestListJobsRejectsInvalidCursor(t *testing.T) {
 	}
 }
 
+func TestListJobsFiltersByDomainAndTimeRange(t *testing.T) {
+	srv := New(DefaultConfig())
+	base := time.Date(2026, 2, 3, 0, 0, 0, 0, time.UTC)
+
+	_, _ = srv.store.Create(Job{ID: "job1", Domain: "alpha.example", Status: JobQueued, CreatedAt: base})
+	_, _ = srv.store.Create(Job{ID: "job2", Domain: "beta.example", Status: JobQueued, CreatedAt: base.Add(time.Second)})
+	_, _ = srv.store.Create(Job{ID: "job3", Domain: "alpha.internal", Status: JobQueued, CreatedAt: base.Add(2 * time.Second)})
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/jobs?domain=alpha&created_after=2026-02-03T00:00:00Z&created_before=2026-02-03T00:00:01Z",
+		nil,
+	)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var list JobList
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if list.Total != 1 || len(list.Items) != 1 || list.Items[0].ID != "job1" {
+		t.Fatalf("expected only job1 to match filters, got %+v", list.Items)
+	}
+}
+
+func TestListJobsRejectsInvalidCreatedBeforeAndRange(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs?created_before=not-a-date", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", resp.Code)
+	}
+	var out ErrorResponse
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out.Error.Code != "invalid_created_before" {
+		t.Fatalf("expected invalid_created_before, got %q", out.Error.Code)
+	}
+
+	resp = httptest.NewRecorder()
+	req = httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/jobs?created_after=2026-02-03T00:00:02Z&created_before=2026-02-03T00:00:01Z",
+		nil,
+	)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", resp.Code)
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out.Error.Code != "invalid_time_range" {
+		t.Fatalf("expected invalid_time_range, got %q", out.Error.Code)
+	}
+}
+
 func TestBatchSubmit(t *testing.T) {
 	srv := New(DefaultConfig())
 

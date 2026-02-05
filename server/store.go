@@ -72,7 +72,13 @@ func (s *InMemoryJobStore) List(filter JobFilter) JobList {
 		if filter.BatchID != "" && job.BatchID != filter.BatchID {
 			continue
 		}
+		if filter.Domain != "" && !strings.Contains(strings.ToLower(job.Domain), strings.ToLower(filter.Domain)) {
+			continue
+		}
 		if !filter.CreatedAfter.IsZero() && job.CreatedAt.Before(filter.CreatedAfter) {
+			continue
+		}
+		if !filter.CreatedBefore.IsZero() && job.CreatedAt.After(filter.CreatedBefore) {
 			continue
 		}
 		items = append(items, job)

@@ -60,6 +60,13 @@ func TestInMemoryJobStoreFilters(t *testing.T) {
 	base := time.Now().UTC().Add(-time.Minute)
 	_ = seedJob(store, "job1", "batch1", base, JobQueued)
 	_ = seedJob(store, "job2", "batch2", base.Add(time.Second), JobRunning)
+	_, _ = store.Create(Job{
+		ID:        "job3",
+		BatchID:   "batch3",
+		Domain:    "alpha.example.org",
+		Status:    JobQueued,
+		CreatedAt: base.Add(2 * time.Second),
+	})
 
 	list := store.List(JobFilter{BatchID: "batch2", Limit: 10})
 	if list.Total != 1 || list.Items[0].ID != "job2" {
@@ -67,8 +74,18 @@ func TestInMemoryJobStoreFilters(t *testing.T) {
 	}
 
 	list = store.List(JobFilter{CreatedAfter: base.Add(500 * time.Millisecond), Limit: 10})
-	if list.Total != 1 || list.Items[0].ID != "job2" {
-		t.Fatalf("expected created_after filter to return job2")
+	if list.Total != 2 || list.Items[0].ID != "job3" || list.Items[1].ID != "job2" {
+		t.Fatalf("expected created_after filter to return job3 and job2")
+	}
+
+	list = store.List(JobFilter{CreatedBefore: base.Add(500 * time.Millisecond), Limit: 10})
+	if list.Total != 1 || list.Items[0].ID != "job1" {
+		t.Fatalf("expected created_before filter to return job1")
+	}
+
+	list = store.List(JobFilter{Domain: "alpha", Limit: 10})
+	if list.Total != 1 || list.Items[0].ID != "job3" {
+		t.Fatalf("expected domain filter to return job3")
 	}
 }
 

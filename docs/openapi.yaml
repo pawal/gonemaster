@@ -53,6 +53,15 @@ paths:
           schema:
             type: string
             format: date-time
+        - name: created_before
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: domain
+          in: query
+          schema:
+            type: string
         - name: limit
           in: query
           schema:

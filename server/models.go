@@ -149,10 +149,12 @@ type ErrorBody struct {
 
 // JobFilter controls listing behavior.
 type JobFilter struct {
-	Status       JobStatus
-	BatchID      string
-	CreatedAfter time.Time
-	Limit        int
-	Offset       int
-	Sort         JobSort
+	Status        JobStatus
+	BatchID       string
+	Domain        string
+	CreatedAfter  time.Time
+	CreatedBefore time.Time
+	Limit         int
+	Offset        int
+	Sort          JobSort
 }

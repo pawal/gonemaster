@@ -216,7 +216,13 @@ describe("App", () => {
       domain: "example.com",
       status: "running",
       created_at: "2026-02-03T00:00:00Z",
-      progress: 42
+      progress: 42,
+      severity_totals: {
+        NOTICE: 2,
+        WARNING: 1,
+        ERROR: 3,
+        CRITICAL: 0
+      }
     };
 
     global.fetch.mockImplementation((url) => {
@@ -244,6 +250,7 @@ describe("App", () => {
     const recentBars = within(recentCard).getAllByRole("progressbar");
     const hasRecentProgress = recentBars.some((bar) => bar.getAttribute("aria-valuenow") === "42");
     expect(hasRecentProgress).toBe(true);
+    expect(within(recentCard).getByText("NOTICE 2 · WARNING 1 · ERROR 3 · CRITICAL 0")).toBeInTheDocument();
 
     const jobInput = screen.getByLabelText("Job ID");
     await fireEvent.input(jobInput, { target: { value: job.id } });

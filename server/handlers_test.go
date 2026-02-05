@@ -191,6 +191,43 @@ func TestListJobsFiltersByDomainAndTimeRange(t *testing.T) {
 	}
 }
 
+func TestListJobsIncludesSeverityTotals(t *testing.T) {
+	srv := New(DefaultConfig())
+	base := time.Date(2026, 2, 3, 0, 0, 0, 0, time.UTC)
+
+	_, _ = srv.store.Create(Job{ID: "job1", Domain: "alpha.example", Status: JobSucceeded, CreatedAt: base})
+	_ = srv.store.SetResult("job1", JobResult{
+		JobID:  "job1",
+		Status: JobSucceeded,
+		Summary: map[string]any{
+			"levels": map[string]int{
+				"NOTICE":   2,
+				"WARNING":  1,
+				"ERROR":    3,
+				"CRITICAL": 0,
+			},
+		},
+	})
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var list JobList
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(list.Items) != 1 {
+		t.Fatalf("expected one item")
+	}
+	totals := list.Items[0].SeverityTotals
+	if totals["NOTICE"] != 2 || totals["WARNING"] != 1 || totals["ERROR"] != 3 || totals["CRITICAL"] != 0 {
+		t.Fatalf("unexpected severity_totals: %+v", totals)
+	}
+}
+
 func TestListJobsRejectsInvalidCreatedBeforeAndRange(t *testing.T) {
 	srv := New(DefaultConfig())
 

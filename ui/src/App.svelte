@@ -75,6 +75,7 @@
       }))
       .filter((entry) => entry.count > 0);
   };
+  const jobSeverityTotal = (job, level) => Number(job?.severity_totals?.[level] || 0);
 
   const normalizeDomainInput = (value) => {
     const trimmed = (value || "").trim();
@@ -539,6 +540,9 @@ example.org`}
               <div>
                 <div class="mono">{job.id}</div>
                 <div class="small">{job.domain} - {job.status}</div>
+                <div class="small job-severity-summary">
+                  NOTICE {jobSeverityTotal(job, "NOTICE")} · WARNING {jobSeverityTotal(job, "WARNING")} · ERROR {jobSeverityTotal(job, "ERROR")} · CRITICAL {jobSeverityTotal(job, "CRITICAL")}
+                </div>
                 <div class="progress compact" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={job.progress || 0}>
                   <div class="progress-bar" style={`width: ${job.progress || 0}%`}></div>
                   <span class="progress-value">{job.progress || 0}%</span>

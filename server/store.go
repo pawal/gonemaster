@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+var severityLevels = []string{"NOTICE", "WARNING", "ERROR", "CRITICAL"}
+
 // JobStore persists job metadata and results.
 type JobStore interface {
 	Create(job Job) (Job, error)
@@ -139,8 +141,17 @@ func (s *InMemoryJobStore) List(filter JobFilter) JobList {
 		end = len(items)
 	}
 
+	pageItems := make([]Job, end-start)
+	copy(pageItems, items[start:end])
+	for i := range pageItems {
+		pageItems[i].SeverityTotals = zeroSeverityTotals()
+		if result, ok := s.results[pageItems[i].ID]; ok {
+			pageItems[i].SeverityTotals = severityTotalsFromSummary(result.Summary)
+		}
+	}
+
 	list := JobList{
-		Items:  items[start:end],
+		Items:  pageItems,
 		Total:  total,
 		Limit:  limit,
 		Offset: offset,
@@ -198,5 +209,56 @@ func isValidJobSort(value JobSort) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+func zeroSeverityTotals() map[string]int {
+	return map[string]int{
+		"NOTICE":   0,
+		"WARNING":  0,
+		"ERROR":    0,
+		"CRITICAL": 0,
+	}
+}
+
+func severityTotalsFromSummary(summary map[string]any) map[string]int {
+	out := zeroSeverityTotals()
+	if summary == nil {
+		return out
+	}
+	levelsRaw, ok := summary["levels"]
+	if !ok {
+		return out
+	}
+
+	switch levels := levelsRaw.(type) {
+	case map[string]int:
+		for _, level := range severityLevels {
+			if levels[level] > 0 {
+				out[level] = levels[level]
+			}
+		}
+	case map[string]any:
+		for _, level := range severityLevels {
+			out[level] = intFromAny(levels[level])
+		}
+	}
+	return out
+}
+
+func intFromAny(value any) int {
+	switch numeric := value.(type) {
+	case int:
+		return numeric
+	case int32:
+		return int(numeric)
+	case int64:
+		return int(numeric)
+	case float32:
+		return int(numeric)
+	case float64:
+		return int(numeric)
+	default:
+		return 0
 	}
 }

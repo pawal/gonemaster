@@ -53,6 +53,16 @@ func TestInMemoryJobStoreCRUD(t *testing.T) {
 	if stored.Status != JobSucceeded {
 		t.Fatalf("expected status %s, got %s", JobSucceeded, stored.Status)
 	}
+
+	list = store.List(JobFilter{Limit: 10})
+	if len(list.Items) != 1 {
+		t.Fatalf("expected one listed item")
+	}
+	for _, level := range []string{"NOTICE", "WARNING", "ERROR", "CRITICAL"} {
+		if _, ok := list.Items[0].SeverityTotals[level]; !ok {
+			t.Fatalf("expected severity_totals to include %s", level)
+		}
+	}
 }
 
 func TestInMemoryJobStoreFilters(t *testing.T) {
@@ -148,6 +158,41 @@ func TestInMemoryJobStorePaginationMetadata(t *testing.T) {
 	}
 	if second.NextCursor != "2" || second.PrevCursor != "0" {
 		t.Fatalf("expected next cursor 2 and prev cursor 0, got next=%q prev=%q", second.NextCursor, second.PrevCursor)
+	}
+}
+
+func TestInMemoryJobStoreSeverityTotalsFromSummary(t *testing.T) {
+	store := NewInMemoryJobStore()
+	base := time.Now().UTC().Add(-time.Minute)
+	job := Job{
+		ID:        "job-sev",
+		Domain:    "example.com",
+		Status:    JobSucceeded,
+		CreatedAt: base,
+	}
+	if _, err := store.Create(job); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if err := store.SetResult(job.ID, JobResult{
+		JobID:  job.ID,
+		Status: JobSucceeded,
+		Summary: map[string]any{
+			"levels": map[string]int{
+				"NOTICE": 1,
+				"ERROR":  2,
+			},
+		},
+	}); err != nil {
+		t.Fatalf("set result: %v", err)
+	}
+
+	list := store.List(JobFilter{Limit: 10})
+	if len(list.Items) != 1 {
+		t.Fatalf("expected one listed item")
+	}
+	totals := list.Items[0].SeverityTotals
+	if totals["NOTICE"] != 1 || totals["ERROR"] != 2 || totals["WARNING"] != 0 || totals["CRITICAL"] != 0 {
+		t.Fatalf("unexpected severity_totals: %+v", totals)
 	}
 }
 

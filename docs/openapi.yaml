@@ -319,6 +319,10 @@ components:
           description: Optional unique identifier for batch runs.
         domain:
           type: string
+        severity_totals:
+          type: object
+          additionalProperties:
+            type: integer
         status:
           $ref: '#/components/schemas/JobStatus'
         created_at:

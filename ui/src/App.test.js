@@ -271,6 +271,78 @@ describe("App", () => {
     unmount();
   });
 
+  it("filters recent jobs by severity totals", async () => {
+    const jobs = [
+      {
+        id: "job_clean",
+        domain: "clean.example",
+        status: "succeeded",
+        created_at: "2026-02-03T00:00:00Z",
+        progress: 100,
+        severity_totals: { NOTICE: 0, WARNING: 0, ERROR: 0, CRITICAL: 0 }
+      },
+      {
+        id: "job_warn",
+        domain: "warn.example",
+        status: "failed",
+        created_at: "2026-02-03T00:00:01Z",
+        progress: 100,
+        severity_totals: { NOTICE: 0, WARNING: 2, ERROR: 0, CRITICAL: 0 }
+      },
+      {
+        id: "job_err",
+        domain: "error.example",
+        status: "failed",
+        created_at: "2026-02-03T00:00:02Z",
+        progress: 100,
+        severity_totals: { NOTICE: 0, WARNING: 0, ERROR: 1, CRITICAL: 0 }
+      }
+    ];
+
+    global.fetch.mockImplementation((url) => {
+      const value = typeof url === "string" ? url : String(url?.url || "");
+      if (value.includes("/api/v1/jobs?")) {
+        return jsonResponse({ items: jobs, total: jobs.length });
+      }
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+
+    const refresh = await screen.findByRole("button", { name: /refresh list/i });
+    if (refresh.disabled) {
+      await waitFor(() => expect(refresh).not.toBeDisabled());
+    }
+    await fireEvent.click(refresh);
+
+    expect(await screen.findByText("job_clean")).toBeInTheDocument();
+    expect(screen.getByText("job_warn")).toBeInTheDocument();
+    expect(screen.getByText("job_err")).toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Warnings+" }));
+    await waitFor(() => {
+      expect(screen.queryByText("job_clean")).toBeNull();
+      expect(screen.getByText("job_warn")).toBeInTheDocument();
+      expect(screen.getByText("job_err")).toBeInTheDocument();
+    });
+
+    await fireEvent.click(screen.getByRole("button", { name: "Errors only" }));
+    await waitFor(() => {
+      expect(screen.queryByText("job_clean")).toBeNull();
+      expect(screen.queryByText("job_warn")).toBeNull();
+      expect(screen.getByText("job_err")).toBeInTheDocument();
+    });
+
+    await fireEvent.click(screen.getByRole("button", { name: "All severities" }));
+    await waitFor(() => {
+      expect(screen.getByText("job_clean")).toBeInTheDocument();
+      expect(screen.getByText("job_warn")).toBeInTheDocument();
+      expect(screen.getByText("job_err")).toBeInTheDocument();
+    });
+
+    unmount();
+  });
+
   it("summarizes only notice and above levels with non-zero counts", async () => {
     const job = {
       id: "job_summary",

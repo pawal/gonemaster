@@ -519,6 +519,35 @@ button:hover:not(:disabled) {
   font-size: 0.8rem;
 }
 
+.severity-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.severity-filter {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: #ffffff;
+  color: var(--muted);
+  box-shadow: none;
+}
+
+.severity-filter:hover:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+  background: #f8fafc;
+}
+
+.severity-filter.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+
 .notice {
   padding: 10px 12px;
   border-radius: 10px;

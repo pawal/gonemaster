@@ -14,6 +14,8 @@
 
   let jobs = [];
   let jobsLoading = false;
+  let filteredJobs = [];
+  let severityFilter = "all";
 
   let selectedJobId = "";
   let selectedJob = null;
@@ -66,6 +68,11 @@
   };
 
   const summaryLevels = ["NOTICE", "WARNING", "ERROR", "CRITICAL"];
+  const severityFilters = [
+    { id: "all", label: "All severities" },
+    { id: "warnings_plus", label: "Warnings+" },
+    { id: "errors_only", label: "Errors only" }
+  ];
   const summaryRows = (summary) => {
     const levels = summary?.levels || {};
     return summaryLevels
@@ -82,6 +89,20 @@
         count: Number(job?.severity_totals?.[level] || 0)
       }))
       .filter((entry) => entry.count > 0);
+  const jobSeverityTotal = (job, level) => Number(job?.severity_totals?.[level] || 0);
+  const matchesSeverityFilter = (job) => {
+    if (severityFilter === "warnings_plus") {
+      return (
+        jobSeverityTotal(job, "WARNING") > 0 ||
+        jobSeverityTotal(job, "ERROR") > 0 ||
+        jobSeverityTotal(job, "CRITICAL") > 0
+      );
+    }
+    if (severityFilter === "errors_only") {
+      return jobSeverityTotal(job, "ERROR") > 0 || jobSeverityTotal(job, "CRITICAL") > 0;
+    }
+    return true;
+  };
 
   const normalizeDomainInput = (value) => {
     const trimmed = (value || "").trim();
@@ -332,6 +353,12 @@
     moduleOpen = {};
   }
 
+  $: {
+    jobs;
+    severityFilter;
+    filteredJobs = jobs.filter((job) => matchesSeverityFilter(job));
+  }
+
   onMount(() => {
     updateTabFromHash();
     window.addEventListener("hashchange", updateTabFromHash);
@@ -537,11 +564,24 @@ example.org`}
           {jobsLoading ? "Refreshing..." : "Refresh list"}
         </button>
       </div>
+      <div class="severity-filter-bar" role="group" aria-label="Severity filters">
+        {#each severityFilters as filter}
+          <button
+            type="button"
+            class={`severity-filter ${severityFilter === filter.id ? "active" : ""}`}
+            on:click={() => (severityFilter = filter.id)}
+          >
+            {filter.label}
+          </button>
+        {/each}
+      </div>
       <div class="list">
         {#if jobs.length === 0}
           <div class="small">No jobs yet. Run a single or batch job above.</div>
+        {:else if filteredJobs.length === 0}
+          <div class="small">No jobs match the selected severity filter.</div>
         {:else}
-          {#each jobs as job}
+          {#each filteredJobs as job}
             <div class="list-item">
               <div>
                 <div class="mono">{job.id}</div>

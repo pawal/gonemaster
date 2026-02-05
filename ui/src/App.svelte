@@ -931,6 +931,7 @@
               <button class="ghost" type="button" on:click={() => {
                 selectedJobId = job.id;
                 loadJob(job.id);
+                setTab("single");
               }}>Inspect</button>
             </div>
           {/each}

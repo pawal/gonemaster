@@ -724,6 +724,51 @@ describe("App", () => {
     unmount();
   });
 
+  it("opens single job inspector when inspecting from recent tests", async () => {
+    const calls = [];
+    const job = {
+      id: "job_recent_inspect",
+      domain: "inspect.example",
+      status: "running",
+      created_at: "2026-02-03T00:00:00Z",
+      progress: 25,
+      severity_totals: { NOTICE: 0, WARNING: 0, ERROR: 0, CRITICAL: 0 }
+    };
+
+    global.fetch.mockImplementation((url) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      calls.push(value);
+      if (value.includes("/api/v1/jobs?")) {
+        return jsonResponse({ items: [job], total: 1 });
+      }
+      if (value === `/api/v1/jobs/${job.id}`) {
+        return jsonResponse(job);
+      }
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+
+    await openRecentTab();
+    const refresh = await screen.findByRole("button", { name: /refresh list/i });
+    if (refresh.disabled) {
+      await waitFor(() => expect(refresh).not.toBeDisabled());
+    }
+    await fireEvent.click(refresh);
+
+    const row = (await screen.findByText(job.id)).closest(".list-item");
+    expect(row).not.toBeNull();
+    await fireEvent.click(within(row).getByRole("button", { name: "Inspect" }));
+
+    await waitFor(() => {
+      expect(calls.some((value) => value === `/api/v1/jobs/${job.id}`)).toBe(true);
+      expect(screen.getByRole("tab", { name: "Single Job" })).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByLabelText("Job ID")).toHaveValue(job.id);
+    });
+
+    unmount();
+  });
+
   it("handles batch pagination edges on first and last pages", async () => {
     const firstPage = {
       batch_id: "batch_edge",

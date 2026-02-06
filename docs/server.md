@@ -35,7 +35,7 @@ or:
 ```
 go build -tags nogui -o ./gonemaster-server ./cmd/gonemaster-server
 ```
-When built with `nogui`, the `/` UI route returns `404 ui not available`, while the API under `/api/v1` is unaffected.
+When built with `nogui`, the `/` UI route serves a short informational HTML page explaining that the UI is not embedded, while API routes under `/api/v1` are unaffected. Static UI asset routes still return `404 ui not available`.
 
 ## Quick start
 Start the server:

@@ -1,3 +1,6 @@
+//go:build !nogui
+// +build !nogui
+
 package ui
 
 import (

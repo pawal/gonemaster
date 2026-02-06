@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -964,6 +965,85 @@ func TestMetricsTracksAPIRequestsByRouteMethodStatusAndErrorCode(t *testing.T) {
 	cancel := findAPIRouteMetrics(t, snapshot, http.MethodPost, "/api/v1/jobs/{job_id}/cancel")
 	if cancel.RequestsTotal != 1 || cancel.StatusClassCounts["4xx"] != 1 {
 		t.Fatalf("unexpected cancel route metrics: %+v", cancel)
+	}
+}
+
+func TestMetricsTracksQualityAcrossMixedOutcomesAndLocaleRequests(t *testing.T) {
+	srv := New(DefaultConfig())
+	callCount := 0
+	srv.engineRunner = func(_ engine.RunRequest) ([]engine.LogEntry, error) {
+		callCount++
+		switch callCount {
+		case 1:
+			return []engine.LogEntry{
+				{Level: "NOTICE"},
+				{Level: "ERROR"},
+			}, nil
+		case 2:
+			return []engine.LogEntry{
+				{Level: "WARNING"},
+				{Level: "CRITICAL"},
+			}, errors.New("run failed")
+		default:
+			return nil, nil
+		}
+	}
+
+	now := time.Now().UTC()
+	jobSuccess := Job{ID: "job-success", Domain: "ok.example", Status: JobQueued, CreatedAt: now}
+	jobFailure := Job{ID: "job-failure", Domain: "fail.example", Status: JobQueued, CreatedAt: now.Add(time.Second)}
+	if _, err := srv.store.Create(jobSuccess); err != nil {
+		t.Fatalf("create success job: %v", err)
+	}
+	if _, err := srv.store.Create(jobFailure); err != nil {
+		t.Fatalf("create failure job: %v", err)
+	}
+
+	if err := srv.runJob(jobSuccess.ID); err != nil {
+		t.Fatalf("run success job: %v", err)
+	}
+	if err := srv.runJob(jobFailure.ID); err == nil {
+		t.Fatal("expected run error for failure job")
+	}
+
+	resp := httptest.NewRecorder()
+	createReq := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(`{"domain":"cancel.example"}`))
+	createReq.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, createReq)
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d", resp.Code)
+	}
+	var created Job
+	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
+		t.Fatalf("decode created job: %v", err)
+	}
+
+	resp = httptest.NewRecorder()
+	cancelReq := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/"+created.ID+"/cancel", nil)
+	srv.Handler().ServeHTTP(resp, cancelReq)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+
+	resp = httptest.NewRecorder()
+	resultReq := httptest.NewRequest(http.MethodGet, "/api/v1/jobs/"+jobSuccess.ID+"/result?locale=pt-BR", nil)
+	srv.Handler().ServeHTTP(resp, resultReq)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+
+	snapshot := srv.metrics.Snapshot()
+	if snapshot.Quality.Outcomes.SuccessTotal != 1 || snapshot.Quality.Outcomes.FailedTotal != 1 || snapshot.Quality.Outcomes.CanceledTotal != 1 {
+		t.Fatalf("unexpected quality outcomes: %+v", snapshot.Quality.Outcomes)
+	}
+	if snapshot.Quality.JobDurationMs.Count != 2 {
+		t.Fatalf("quality.job_duration_ms.count = %d, want 2", snapshot.Quality.JobDurationMs.Count)
+	}
+	if snapshot.Quality.Severity.Totals["NOTICE"] != 1 || snapshot.Quality.Severity.Totals["WARNING"] != 1 || snapshot.Quality.Severity.Totals["ERROR"] != 1 || snapshot.Quality.Severity.Totals["CRITICAL"] != 1 {
+		t.Fatalf("unexpected severity totals: %+v", snapshot.Quality.Severity.Totals)
+	}
+	if snapshot.Quality.LocaleUsage.Counts["pt_br"] != 1 {
+		t.Fatalf("quality.locale_usage.counts[pt_br] = %d, want 1", snapshot.Quality.LocaleUsage.Counts["pt_br"])
 	}
 }
 

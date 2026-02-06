@@ -1,6 +1,7 @@
 package server
 
 import (
+	"math"
 	"testing"
 	"time"
 )
@@ -86,6 +87,27 @@ func TestMetricsCollectorZeroStateSnapshot(t *testing.T) {
 	}
 	if len(snapshot.API.ErrorCodeCounts) != 0 {
 		t.Fatalf("api.error_code_counts size = %d, want 0", len(snapshot.API.ErrorCodeCounts))
+	}
+
+	if snapshot.Quality.JobDurationMs.Count != 0 {
+		t.Fatalf("quality.job_duration_ms.count = %d, want 0", snapshot.Quality.JobDurationMs.Count)
+	}
+	if snapshot.Quality.JobDurationMs.Avg != 0 {
+		t.Fatalf("quality.job_duration_ms.avg = %f, want 0", snapshot.Quality.JobDurationMs.Avg)
+	}
+	if snapshot.Quality.Outcomes.SuccessTotal != 0 || snapshot.Quality.Outcomes.FailedTotal != 0 || snapshot.Quality.Outcomes.CanceledTotal != 0 {
+		t.Fatalf("quality.outcomes totals = %+v, want all zero", snapshot.Quality.Outcomes)
+	}
+	if len(snapshot.Quality.LocaleUsage.Counts) != 0 {
+		t.Fatalf("quality.locale_usage.counts size = %d, want 0", len(snapshot.Quality.LocaleUsage.Counts))
+	}
+	for _, level := range metricsSeverityLevels {
+		if got := snapshot.Quality.Severity.Totals[level]; got != 0 {
+			t.Fatalf("quality.severity.totals[%q] = %d, want 0", level, got)
+		}
+		if got := snapshot.Quality.Severity.PerCompletedRates[level]; got != 0 {
+			t.Fatalf("quality.severity.per_completed_rates[%q] = %f, want 0", level, got)
+		}
 	}
 }
 
@@ -209,5 +231,98 @@ func TestMetricsCollectorTracksAPIRequests(t *testing.T) {
 	}
 	if second.LatencyMs.P50 != 25 || second.LatencyMs.P90 != 25 || second.LatencyMs.P99 != 25 {
 		t.Fatalf("second.latency_ms = %+v, want p50=25 p90=25 p99=25", second.LatencyMs)
+	}
+}
+
+func TestMetricsCollectorTracksQualityMetrics(t *testing.T) {
+	cfg := DefaultConfig()
+	startedAt := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+	collector := newMetricsCollector(cfg, startedAt)
+
+	collector.ObserveJobSubmitted(JobQueued)
+	collector.ObserveJobStatusTransition(JobQueued, JobRunning)
+	collector.ObserveJobStatusTransition(JobRunning, JobSucceeded)
+	collector.ObserveJobCompletion(JobSucceeded, 1200*time.Millisecond, map[string]int64{
+		"NOTICE": 2,
+		"ERROR":  1,
+	})
+
+	collector.ObserveJobSubmitted(JobQueued)
+	collector.ObserveJobStatusTransition(JobQueued, JobRunning)
+	collector.ObserveJobStatusTransition(JobRunning, JobFailed)
+	collector.ObserveJobCompletion(JobFailed, 3200*time.Millisecond, map[string]int64{
+		"WARNING":  3,
+		"CRITICAL": 1,
+	})
+
+	collector.ObserveJobSubmitted(JobQueued)
+	collector.ObserveJobStatusTransition(JobQueued, JobCanceled)
+	collector.ObserveResultLocale("en")
+	collector.ObserveResultLocale("SV-SE")
+	collector.ObserveResultLocale("sv_se")
+
+	snapshot := collector.snapshotAt(startedAt.Add(2 * time.Minute))
+
+	if snapshot.Quality.JobDurationMs.Count != 2 {
+		t.Fatalf("quality.job_duration_ms.count = %d, want 2", snapshot.Quality.JobDurationMs.Count)
+	}
+	if snapshot.Quality.JobDurationMs.Pctl.P50 != 2500 || snapshot.Quality.JobDurationMs.Pctl.P90 != 5000 || snapshot.Quality.JobDurationMs.Pctl.P99 != 5000 {
+		t.Fatalf("quality.job_duration_ms.percentiles = %+v, want p50=2500 p90=5000 p99=5000", snapshot.Quality.JobDurationMs.Pctl)
+	}
+	if math.Abs(snapshot.Quality.JobDurationMs.Avg-2200) > 0.001 {
+		t.Fatalf("quality.job_duration_ms.avg = %f, want 2200", snapshot.Quality.JobDurationMs.Avg)
+	}
+
+	if snapshot.Quality.Outcomes.SuccessTotal != 1 || snapshot.Quality.Outcomes.FailedTotal != 1 || snapshot.Quality.Outcomes.CanceledTotal != 1 {
+		t.Fatalf("quality.outcomes totals = %+v, want success=1 failed=1 canceled=1", snapshot.Quality.Outcomes)
+	}
+	if math.Abs(snapshot.Quality.Outcomes.SuccessRate-(1.0/3.0)) > 0.0001 {
+		t.Fatalf("quality.outcomes.success_rate = %f, want %f", snapshot.Quality.Outcomes.SuccessRate, 1.0/3.0)
+	}
+	if math.Abs(snapshot.Quality.Outcomes.FailedRate-(1.0/3.0)) > 0.0001 {
+		t.Fatalf("quality.outcomes.failed_rate = %f, want %f", snapshot.Quality.Outcomes.FailedRate, 1.0/3.0)
+	}
+	if math.Abs(snapshot.Quality.Outcomes.CanceledRate-(1.0/3.0)) > 0.0001 {
+		t.Fatalf("quality.outcomes.canceled_rate = %f, want %f", snapshot.Quality.Outcomes.CanceledRate, 1.0/3.0)
+	}
+
+	if snapshot.Quality.Severity.Totals["NOTICE"] != 2 || snapshot.Quality.Severity.Totals["WARNING"] != 3 || snapshot.Quality.Severity.Totals["ERROR"] != 1 || snapshot.Quality.Severity.Totals["CRITICAL"] != 1 {
+		t.Fatalf("quality.severity.totals = %+v", snapshot.Quality.Severity.Totals)
+	}
+	if math.Abs(snapshot.Quality.Severity.PerCompletedRates["NOTICE"]-(2.0/3.0)) > 0.0001 {
+		t.Fatalf("quality.severity.per_completed_rates[NOTICE] = %f, want %f", snapshot.Quality.Severity.PerCompletedRates["NOTICE"], 2.0/3.0)
+	}
+	if math.Abs(snapshot.Quality.Severity.PerCompletedRates["WARNING"]-1.0) > 0.0001 {
+		t.Fatalf("quality.severity.per_completed_rates[WARNING] = %f, want 1", snapshot.Quality.Severity.PerCompletedRates["WARNING"])
+	}
+	if math.Abs(snapshot.Quality.Severity.PerCompletedRates["ERROR"]-(1.0/3.0)) > 0.0001 {
+		t.Fatalf("quality.severity.per_completed_rates[ERROR] = %f, want %f", snapshot.Quality.Severity.PerCompletedRates["ERROR"], 1.0/3.0)
+	}
+	if math.Abs(snapshot.Quality.Severity.PerCompletedRates["CRITICAL"]-(1.0/3.0)) > 0.0001 {
+		t.Fatalf("quality.severity.per_completed_rates[CRITICAL] = %f, want %f", snapshot.Quality.Severity.PerCompletedRates["CRITICAL"], 1.0/3.0)
+	}
+
+	if snapshot.Quality.LocaleUsage.Counts["en"] != 1 {
+		t.Fatalf("quality.locale_usage.counts[en] = %d, want 1", snapshot.Quality.LocaleUsage.Counts["en"])
+	}
+	if snapshot.Quality.LocaleUsage.Counts["sv_se"] != 2 {
+		t.Fatalf("quality.locale_usage.counts[sv_se] = %d, want 2", snapshot.Quality.LocaleUsage.Counts["sv_se"])
+	}
+}
+
+func TestMetricsCollectorLocaleUsageIsBounded(t *testing.T) {
+	cfg := DefaultConfig()
+	collector := newMetricsCollector(cfg, time.Now().UTC())
+
+	for i := 0; i < metricsMaxLocaleBuckets+5; i++ {
+		collector.ObserveResultLocale("loc_" + string(rune('a'+i)))
+	}
+
+	snapshot := collector.Snapshot()
+	if len(snapshot.Quality.LocaleUsage.Counts) != metricsMaxLocaleBuckets+1 {
+		t.Fatalf("quality.locale_usage.counts size = %d, want %d", len(snapshot.Quality.LocaleUsage.Counts), metricsMaxLocaleBuckets+1)
+	}
+	if snapshot.Quality.LocaleUsage.Counts[metricsLocaleOtherKey] != 5 {
+		t.Fatalf("quality.locale_usage.counts[_other] = %d, want 5", snapshot.Quality.LocaleUsage.Counts[metricsLocaleOtherKey])
 	}
 }

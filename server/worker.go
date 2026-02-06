@@ -6,6 +6,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -139,6 +140,11 @@ func (s *Server) runJob(jobID string) error {
 	if err := s.store.SetResult(job.ID, result); err != nil {
 		return err
 	}
+	duration := time.Duration(-1)
+	if !job.StartedAt.IsZero() {
+		duration = finishedAt.Sub(job.StartedAt)
+	}
+	s.metrics.ObserveJobCompletion(job.Status, duration, severityTotalsFromEntries(entries))
 
 	return runErr
 }
@@ -259,6 +265,18 @@ func summarizeEntries(entries []engine.LogEntry) map[string]any {
 		"total":  len(entries),
 		"levels": levels,
 	}
+}
+
+func severityTotalsFromEntries(entries []engine.LogEntry) map[string]int64 {
+	totals := zeroMetricsSeverityTotals()
+	for _, entry := range entries {
+		level := strings.ToUpper(strings.TrimSpace(entry.Level))
+		if _, ok := totals[level]; !ok {
+			continue
+		}
+		totals[level]++
+	}
+	return totals
 }
 
 func applyProfileOverrides(req *engine.RunRequest, overrides map[string]any, baseProfile string) (func(), error) {

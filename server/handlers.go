@@ -369,6 +369,7 @@ func (s *Server) handleGetJobResult(w http.ResponseWriter, r *http.Request, jobI
 		if locale == "" {
 			locale = "en"
 		}
+		s.metrics.ObserveResultLocale(locale)
 		raw := *result.Raw
 		raw.Locale = locale
 		raw.Entries = localizeResultEntries(result.Raw.Entries, locale)

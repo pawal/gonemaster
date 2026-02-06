@@ -8,7 +8,24 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"codeberg.org/pawal/gonemaster/engine"
 )
+
+func getMetricsSnapshot(t *testing.T, srv *Server) MetricsSnapshot {
+	t.Helper()
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/metrics", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var snapshot MetricsSnapshot
+	if err := json.NewDecoder(resp.Body).Decode(&snapshot); err != nil {
+		t.Fatalf("decode metrics: %v", err)
+	}
+	return snapshot
+}
 
 func TestCreateAndGetJob(t *testing.T) {
 	srv := New(DefaultConfig())
@@ -762,6 +779,118 @@ func TestQueueRemove(t *testing.T) {
 	}
 	if result.Status != JobCanceled {
 		t.Fatalf("expected result status canceled, got %s", result.Status)
+	}
+}
+
+func TestMetricsTracksCreateAndRunLifecycle(t *testing.T) {
+	srv := New(DefaultConfig())
+	srv.engineRunner = func(_ engine.RunRequest) ([]engine.LogEntry, error) {
+		return nil, nil
+	}
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(`{"domain":"example.com"}`))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d", resp.Code)
+	}
+	var created Job
+	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	snapshot := getMetricsSnapshot(t, srv)
+	if snapshot.Jobs.SubmittedTotal != 1 {
+		t.Fatalf("submitted_total = %d, want 1", snapshot.Jobs.SubmittedTotal)
+	}
+	if snapshot.Health.QueueDepth != 1 {
+		t.Fatalf("queue_depth = %d, want 1", snapshot.Health.QueueDepth)
+	}
+	if snapshot.Jobs.StatusCounts[string(JobQueued)] != 1 {
+		t.Fatalf("status_counts[queued] = %d, want 1", snapshot.Jobs.StatusCounts[string(JobQueued)])
+	}
+
+	if err := srv.runJob(created.ID); err != nil {
+		t.Fatalf("run job: %v", err)
+	}
+
+	snapshot = getMetricsSnapshot(t, srv)
+	if snapshot.Health.QueueDepth != 0 {
+		t.Fatalf("queue_depth = %d, want 0", snapshot.Health.QueueDepth)
+	}
+	if snapshot.Health.InFlightJobs != 0 {
+		t.Fatalf("in_flight_jobs = %d, want 0", snapshot.Health.InFlightJobs)
+	}
+	if snapshot.Jobs.StartedTotal != 1 {
+		t.Fatalf("started_total = %d, want 1", snapshot.Jobs.StartedTotal)
+	}
+	if snapshot.Jobs.CompletedTotal != 1 {
+		t.Fatalf("completed_total = %d, want 1", snapshot.Jobs.CompletedTotal)
+	}
+	if snapshot.Jobs.CanceledTotal != 0 {
+		t.Fatalf("canceled_total = %d, want 0", snapshot.Jobs.CanceledTotal)
+	}
+	if snapshot.Jobs.StatusCounts[string(JobSucceeded)] != 1 {
+		t.Fatalf("status_counts[succeeded] = %d, want 1", snapshot.Jobs.StatusCounts[string(JobSucceeded)])
+	}
+}
+
+func TestMetricsTracksPauseResumeAndCancel(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(`{"domain":"example.com"}`))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d", resp.Code)
+	}
+	var created Job
+	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	resp = httptest.NewRecorder()
+	pauseReq := httptest.NewRequest(http.MethodPost, "/api/v1/queue/pause", nil)
+	srv.Handler().ServeHTTP(resp, pauseReq)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	snapshot := getMetricsSnapshot(t, srv)
+	if !snapshot.Health.QueuePaused {
+		t.Fatal("queue_paused = false, want true")
+	}
+
+	resp = httptest.NewRecorder()
+	cancelReq := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/"+created.ID+"/cancel", nil)
+	srv.Handler().ServeHTTP(resp, cancelReq)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	snapshot = getMetricsSnapshot(t, srv)
+	if snapshot.Jobs.CanceledTotal != 1 {
+		t.Fatalf("canceled_total = %d, want 1", snapshot.Jobs.CanceledTotal)
+	}
+	if snapshot.Jobs.CompletedTotal != 1 {
+		t.Fatalf("completed_total = %d, want 1", snapshot.Jobs.CompletedTotal)
+	}
+	if snapshot.Health.QueueDepth != 0 {
+		t.Fatalf("queue_depth = %d, want 0", snapshot.Health.QueueDepth)
+	}
+	if snapshot.Jobs.StatusCounts[string(JobCanceled)] != 1 {
+		t.Fatalf("status_counts[canceled] = %d, want 1", snapshot.Jobs.StatusCounts[string(JobCanceled)])
+	}
+
+	resp = httptest.NewRecorder()
+	resumeReq := httptest.NewRequest(http.MethodPost, "/api/v1/queue/resume", nil)
+	srv.Handler().ServeHTTP(resp, resumeReq)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	snapshot = getMetricsSnapshot(t, srv)
+	if snapshot.Health.QueuePaused {
+		t.Fatal("queue_paused = true, want false")
 	}
 }
 

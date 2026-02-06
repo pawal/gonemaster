@@ -1,7 +1,7 @@
 package server
 
 import (
-	"sync/atomic"
+	"sync"
 	"time"
 )
 
@@ -17,6 +17,13 @@ var metricsJobStatuses = [...]JobStatus{
 	JobPaused,
 }
 
+var metricsTerminalStatuses = [...]JobStatus{
+	JobSucceeded,
+	JobFailed,
+	JobCanceled,
+	JobExpired,
+}
+
 type MetricsSnapshot struct {
 	SchemaVersion string                `json:"schema_version"`
 	GeneratedAt   time.Time             `json:"generated_at"`
@@ -28,6 +35,7 @@ type MetricsHealthSnapshot struct {
 	StartedAt         time.Time `json:"started_at"`
 	UptimeSeconds     int64     `json:"uptime_seconds"`
 	WorkerCount       int       `json:"worker_count"`
+	ActiveWorkers     int       `json:"active_workers"`
 	MaxConcurrentJobs int       `json:"max_concurrent_jobs"`
 	QueuePaused       bool      `json:"queue_paused"`
 	QueueDepth        int64     `json:"queue_depth"`
@@ -44,18 +52,22 @@ type MetricsJobsSnapshot struct {
 
 // MetricsCollector stores low-overhead in-memory counters and gauges.
 type MetricsCollector struct {
+	mu sync.Mutex
+
 	startedAt         time.Time
 	workerCount       int
+	activeWorkers     int
 	maxConcurrentJobs int
 
-	queuePaused atomic.Bool
-	queueDepth  atomic.Int64
-	inFlight    atomic.Int64
+	queuePaused bool
+	queueDepth  int64
+	inFlight    int64
 
-	submittedTotal atomic.Int64
-	startedTotal   atomic.Int64
-	completedTotal atomic.Int64
-	canceledTotal  atomic.Int64
+	submittedTotal int64
+	startedTotal   int64
+	completedTotal int64
+	canceledTotal  int64
+	statusCounts   map[string]int64
 }
 
 func NewMetricsCollector(cfg Config) *MetricsCollector {
@@ -63,15 +75,78 @@ func NewMetricsCollector(cfg Config) *MetricsCollector {
 }
 
 func newMetricsCollector(cfg Config, startedAt time.Time) *MetricsCollector {
+	activeWorkers := cfg.WorkerCount
+	if activeWorkers < 1 {
+		activeWorkers = 1
+	}
 	return &MetricsCollector{
 		startedAt:         startedAt.UTC(),
 		workerCount:       cfg.WorkerCount,
+		activeWorkers:     activeWorkers,
 		maxConcurrentJobs: cfg.MaxConcurrentJobs,
+		statusCounts:      zeroStatusCounts(),
 	}
 }
 
 func (m *MetricsCollector) Snapshot() MetricsSnapshot {
 	return m.snapshotAt(time.Now().UTC())
+}
+
+func (m *MetricsCollector) ObserveQueuePaused(paused bool) {
+	m.mu.Lock()
+	m.queuePaused = paused
+	m.mu.Unlock()
+}
+
+func (m *MetricsCollector) ObserveJobSubmitted(initialStatus JobStatus) {
+	m.mu.Lock()
+	m.submittedTotal++
+	m.observeStatusTransitionLocked("", initialStatus)
+	m.mu.Unlock()
+}
+
+func (m *MetricsCollector) ObserveJobStatusTransition(fromStatus, toStatus JobStatus) {
+	m.mu.Lock()
+	m.observeStatusTransitionLocked(fromStatus, toStatus)
+	m.mu.Unlock()
+}
+
+func (m *MetricsCollector) observeStatusTransitionLocked(fromStatus, toStatus JobStatus) {
+	if fromStatus == toStatus {
+		return
+	}
+
+	if isKnownMetricsStatus(fromStatus) {
+		key := string(fromStatus)
+		if m.statusCounts[key] > 0 {
+			m.statusCounts[key]--
+		}
+	}
+	if isKnownMetricsStatus(toStatus) {
+		m.statusCounts[string(toStatus)]++
+	}
+
+	if fromStatus != JobRunning && toStatus == JobRunning {
+		m.startedTotal++
+		m.inFlight++
+	}
+	if fromStatus == JobRunning && toStatus != JobRunning && m.inFlight > 0 {
+		m.inFlight--
+	}
+
+	if fromStatus != JobQueued && toStatus == JobQueued {
+		m.queueDepth++
+	}
+	if fromStatus == JobQueued && toStatus != JobQueued && m.queueDepth > 0 {
+		m.queueDepth--
+	}
+
+	if !isTerminalMetricsStatus(fromStatus) && isTerminalMetricsStatus(toStatus) {
+		m.completedTotal++
+		if toStatus == JobCanceled {
+			m.canceledTotal++
+		}
+	}
 }
 
 func (m *MetricsCollector) snapshotAt(now time.Time) MetricsSnapshot {
@@ -81,10 +156,16 @@ func (m *MetricsCollector) snapshotAt(now time.Time) MetricsSnapshot {
 		uptime = 0
 	}
 
-	statusCounts := make(map[string]int64, len(metricsJobStatuses))
-	for _, status := range metricsJobStatuses {
-		statusCounts[string(status)] = 0
-	}
+	m.mu.Lock()
+	statusCounts := copyStatusCounts(m.statusCounts)
+	queuePaused := m.queuePaused
+	queueDepth := m.queueDepth
+	inFlight := m.inFlight
+	submittedTotal := m.submittedTotal
+	startedTotal := m.startedTotal
+	completedTotal := m.completedTotal
+	canceledTotal := m.canceledTotal
+	m.mu.Unlock()
 
 	return MetricsSnapshot{
 		SchemaVersion: metricsSchemaVersion,
@@ -93,17 +174,53 @@ func (m *MetricsCollector) snapshotAt(now time.Time) MetricsSnapshot {
 			StartedAt:         m.startedAt,
 			UptimeSeconds:     uptime,
 			WorkerCount:       m.workerCount,
+			ActiveWorkers:     m.activeWorkers,
 			MaxConcurrentJobs: m.maxConcurrentJobs,
-			QueuePaused:       m.queuePaused.Load(),
-			QueueDepth:        m.queueDepth.Load(),
-			InFlightJobs:      m.inFlight.Load(),
+			QueuePaused:       queuePaused,
+			QueueDepth:        queueDepth,
+			InFlightJobs:      inFlight,
 		},
 		Jobs: MetricsJobsSnapshot{
-			SubmittedTotal: m.submittedTotal.Load(),
-			StartedTotal:   m.startedTotal.Load(),
-			CompletedTotal: m.completedTotal.Load(),
-			CanceledTotal:  m.canceledTotal.Load(),
+			SubmittedTotal: submittedTotal,
+			StartedTotal:   startedTotal,
+			CompletedTotal: completedTotal,
+			CanceledTotal:  canceledTotal,
 			StatusCounts:   statusCounts,
 		},
 	}
+}
+
+func zeroStatusCounts() map[string]int64 {
+	counts := make(map[string]int64, len(metricsJobStatuses))
+	for _, status := range metricsJobStatuses {
+		counts[string(status)] = 0
+	}
+	return counts
+}
+
+func copyStatusCounts(in map[string]int64) map[string]int64 {
+	out := make(map[string]int64, len(metricsJobStatuses))
+	for _, status := range metricsJobStatuses {
+		key := string(status)
+		out[key] = in[key]
+	}
+	return out
+}
+
+func isKnownMetricsStatus(status JobStatus) bool {
+	for _, known := range metricsJobStatuses {
+		if status == known {
+			return true
+		}
+	}
+	return false
+}
+
+func isTerminalMetricsStatus(status JobStatus) bool {
+	for _, terminal := range metricsTerminalStatuses {
+		if status == terminal {
+			return true
+		}
+	}
+	return false
 }

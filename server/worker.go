@@ -91,7 +91,7 @@ func (s *Server) runJob(jobID string) error {
 	job.Status = JobRunning
 	job.StartedAt = now
 	job.Progress = 0
-	if err := s.store.Update(job); err != nil {
+	if err := s.updateJobWithMetrics(job); err != nil {
 		return err
 	}
 
@@ -133,7 +133,7 @@ func (s *Server) runJob(jobID string) error {
 
 	job.Progress = 100
 	job.FinishedAt = finishedAt
-	if err := s.store.Update(job); err != nil {
+	if err := s.updateJobWithMetrics(job); err != nil {
 		return err
 	}
 	if err := s.store.SetResult(job.ID, result); err != nil {

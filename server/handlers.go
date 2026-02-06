@@ -75,6 +75,7 @@ func (s *Server) handleJobsBatch(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		_ = s.queue.Enqueue(created.ID)
+		s.metrics.ObserveJobSubmitted(JobQueued)
 		jobIDs = append(jobIDs, created.ID)
 	}
 
@@ -252,6 +253,7 @@ func (s *Server) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = s.queue.Enqueue(created.ID)
+	s.metrics.ObserveJobSubmitted(JobQueued)
 
 	writeJSON(w, http.StatusCreated, created)
 }
@@ -391,7 +393,7 @@ func (s *Server) handleCancelJob(w http.ResponseWriter, _ *http.Request, jobID s
 	job.Error = "canceled"
 	job.FinishedAt = time.Now().UTC()
 	job.Progress = 100
-	if err := s.store.Update(job); err != nil {
+	if err := s.updateJobWithMetrics(job); err != nil {
 		writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
 		return
 	}
@@ -436,6 +438,7 @@ func (s *Server) handleQueuePause(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "queue_error", err.Error(), nil)
 		return
 	}
+	s.metrics.ObserveQueuePaused(true)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -451,6 +454,7 @@ func (s *Server) handleQueueResume(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "queue_error", err.Error(), nil)
 		return
 	}
+	s.metrics.ObserveQueuePaused(false)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -508,7 +512,7 @@ func (s *Server) handleQueueRemove(w http.ResponseWriter, r *http.Request) {
 				job.Error = "removed_from_queue"
 				job.FinishedAt = time.Now().UTC()
 				job.Progress = 100
-				if err := s.store.Update(job); err != nil {
+				if err := s.updateJobWithMetrics(job); err != nil {
 					writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
 					return
 				}

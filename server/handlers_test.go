@@ -37,6 +37,41 @@ func TestCreateAndGetJob(t *testing.T) {
 	}
 }
 
+func TestCreateJobCSRFRejectsMismatchedOrigin(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(`{"domain":"example.com"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Origin", "http://evil.example")
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusForbidden {
+		t.Fatalf("expected status 403, got %d", resp.Code)
+	}
+	var out ErrorResponse
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out.Error.Code != "csrf_origin_mismatch" {
+		t.Fatalf("expected csrf_origin_mismatch, got %q", out.Error.Code)
+	}
+}
+
+func TestCreateJobCSRFAcceptsMatchingOrigin(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(`{"domain":"example.com"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Origin", "http://example.com")
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("expected status 201, got %d", resp.Code)
+	}
+}
+
 func TestCreateJobMinLevel(t *testing.T) {
 	srv := New(DefaultConfig())
 
@@ -576,6 +611,43 @@ func TestCancelJob(t *testing.T) {
 	_ = json.NewDecoder(resp.Body).Decode(&canceled)
 	if canceled.Status != JobCanceled {
 		t.Fatalf("expected status canceled, got %s", canceled.Status)
+	}
+}
+
+func TestCancelJobCSRFRejectsMismatchedOrigin(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(`{"domain":"example.com"}`))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d", resp.Code)
+	}
+	var created Job
+	_ = json.NewDecoder(resp.Body).Decode(&created)
+
+	resp = httptest.NewRecorder()
+	cancelReq := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/"+created.ID+"/cancel", nil)
+	cancelReq.Header.Set("Origin", "https://attacker.example")
+	srv.Handler().ServeHTTP(resp, cancelReq)
+	if resp.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d", resp.Code)
+	}
+	var out ErrorResponse
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out.Error.Code != "csrf_origin_mismatch" {
+		t.Fatalf("expected csrf_origin_mismatch, got %q", out.Error.Code)
+	}
+
+	stored, ok := srv.store.Get(created.ID)
+	if !ok {
+		t.Fatalf("expected job in store")
+	}
+	if stored.Status == JobCanceled {
+		t.Fatalf("expected job to remain uncanceled")
 	}
 }
 

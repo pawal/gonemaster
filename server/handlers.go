@@ -15,6 +15,9 @@ const maxListLimit = 500
 func (s *Server) handleJobs(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
+		if !enforceCSRF(w, r) {
+			return
+		}
 		s.handleCreateJob(w, r)
 	case http.MethodGet:
 		s.handleListJobs(w, r)
@@ -26,6 +29,9 @@ func (s *Server) handleJobs(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleJobsBatch(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
+		return
+	}
+	if !enforceCSRF(w, r) {
 		return
 	}
 	var req JobBatchRequest
@@ -113,6 +119,9 @@ func (s *Server) handleJobByID(w http.ResponseWriter, r *http.Request) {
 	case "cancel":
 		if r.Method != http.MethodPost {
 			writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
+			return
+		}
+		if !enforceCSRF(w, r) {
 			return
 		}
 		s.handleCancelJob(w, r, jobID)
@@ -420,6 +429,9 @@ func (s *Server) handleQueuePause(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
 		return
 	}
+	if !enforceCSRF(w, r) {
+		return
+	}
 	if err := s.queue.Pause(); err != nil {
 		writeError(w, http.StatusInternalServerError, "queue_error", err.Error(), nil)
 		return
@@ -432,6 +444,9 @@ func (s *Server) handleQueueResume(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
 		return
 	}
+	if !enforceCSRF(w, r) {
+		return
+	}
 	if err := s.queue.Resume(); err != nil {
 		writeError(w, http.StatusInternalServerError, "queue_error", err.Error(), nil)
 		return
@@ -442,6 +457,9 @@ func (s *Server) handleQueueResume(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleQueueReorder(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
+		return
+	}
+	if !enforceCSRF(w, r) {
 		return
 	}
 	var req QueueReorderRequest
@@ -459,6 +477,9 @@ func (s *Server) handleQueueReorder(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleQueueRemove(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
+		return
+	}
+	if !enforceCSRF(w, r) {
 		return
 	}
 	var req QueueRemoveRequest

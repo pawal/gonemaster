@@ -40,7 +40,7 @@ When built with `nogui`, the `/` UI route returns `404 ui not available`, while 
 ## Quick start
 Start the server:
 ```
-./gonemaster-server --listen :8080
+./gonemaster-server
 ```
 
 Submit a single job and capture the job id:
@@ -69,7 +69,7 @@ curl -s "http://localhost:8080/api/v1/jobs/$JOB_ID/result?locale=en" | jq .
 
 ## Run
 ```
-./gonemaster-server --listen :8080
+./gonemaster-server
 ```
 
 ## Configuration
@@ -93,7 +93,7 @@ These settings apply to all jobs unless a job overrides the profile.
 ### Config example
 ```json
 {
-  "listen_addr": ":8080",
+  "listen_addr": "127.0.0.1:8080",
   "max_body_size": 1048576,
   "debug": true,
   "worker_count": 4,
@@ -133,9 +133,10 @@ Domains are normalized to IDNA A-labels (punycode). For example:
 Invalid domains return a `400` error with `code=invalid_domain`.
 
 ## API basics
-- Base URL: the server listen address plus `/api/v1` (default `http://localhost:8080/api/v1`).
+- Base URL: the server listen address plus `/api/v1` (default `http://127.0.0.1:8080/api/v1`).
 - All endpoint paths below are relative to the base URL.
 - Content-Type: JSON for requests and responses.
+- CSRF protection: mutating endpoints (`POST`) validate `Origin` when provided and require it to match the request host. Clients without an `Origin` header (for example `gonemaster-client`) continue to work unchanged.
 - Errors: standard JSON envelope:
   ```json
   { "error": { "code": "invalid_domain", "message": "..." } }

@@ -53,6 +53,15 @@ paths:
           schema:
             type: string
             format: date-time
+        - name: created_before
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: domain
+          in: query
+          schema:
+            type: string
         - name: limit
           in: query
           schema:
@@ -310,6 +319,10 @@ components:
           description: Optional unique identifier for batch runs.
         domain:
           type: string
+        severity_totals:
+          type: object
+          additionalProperties:
+            type: integer
         status:
           $ref: '#/components/schemas/JobStatus'
         created_at:

@@ -50,7 +50,7 @@ type FileConfig struct {
 // DefaultConfig returns baseline config values.
 func DefaultConfig() Config {
 	return Config{
-		ListenAddr:        ":8080",
+		ListenAddr:        "127.0.0.1:8080",
 		MaxBodySize:       1 << 20,
 		Debug:             false,
 		WorkerCount:       4,

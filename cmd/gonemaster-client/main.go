@@ -126,6 +126,11 @@ type batchSummary struct {
 	Total        int            `json:"total"`
 	StatusCounts map[string]int `json:"status_counts"`
 	Items        []job          `json:"items"`
+	Limit        int            `json:"limit,omitempty"`
+	Offset       int            `json:"offset,omitempty"`
+	NextCursor   string         `json:"next_cursor,omitempty"`
+	PrevCursor   string         `json:"prev_cursor,omitempty"`
+	Sort         string         `json:"sort,omitempty"`
 	CreatedAt    time.Time      `json:"created_at"`
 	StartedAt    *time.Time     `json:"started_at,omitempty"`
 	FinishedAt   *time.Time     `json:"finished_at,omitempty"`
@@ -861,8 +866,8 @@ func runBatchesGet(ctx context.Context, client *apiClient, opts globalOptions, a
 		return 2
 	}
 	batchID := strings.TrimSpace(args[0])
-	var summary batchSummary
-	if err := client.doJSON(ctx, http.MethodGet, "/batches/"+batchID, nil, &summary); err != nil {
+	summary, err := fetchBatchSummary(ctx, client, batchID)
+	if err != nil {
 		fmt.Fprintln(errOut, err.Error())
 		return 2
 	}
@@ -1704,8 +1709,8 @@ func waitForJob(ctx context.Context, client *apiClient, jobID string, poll time.
 
 func waitForBatch(ctx context.Context, client *apiClient, batchID string, poll time.Duration) (batchSummary, error) {
 	for {
-		var summary batchSummary
-		if err := client.doJSON(ctx, http.MethodGet, "/batches/"+batchID, nil, &summary); err != nil {
+		summary, err := fetchBatchSummary(ctx, client, batchID)
+		if err != nil {
 			return batchSummary{}, err
 		}
 		if batchFinished(summary) {
@@ -1733,6 +1738,33 @@ func fetchBatchSummary(ctx context.Context, client *apiClient, batchID string) (
 	if err := client.doJSON(ctx, http.MethodGet, "/batches/"+batchID, nil, &summary); err != nil {
 		return batchSummary{}, err
 	}
+	if summary.Total <= len(summary.Items) {
+		return summary, nil
+	}
+
+	const pageLimit = 500
+	items := make([]job, 0, summary.Total)
+	items = append(items, summary.Items...)
+	offset := len(summary.Items)
+
+	for offset < summary.Total {
+		query := url.Values{}
+		query.Set("limit", fmt.Sprintf("%d", pageLimit))
+		query.Set("offset", fmt.Sprintf("%d", offset))
+
+		var page batchSummary
+		path := "/batches/" + batchID + "?" + query.Encode()
+		if err := client.doJSON(ctx, http.MethodGet, path, nil, &page); err != nil {
+			return batchSummary{}, err
+		}
+		if len(page.Items) == 0 {
+			break
+		}
+		items = append(items, page.Items...)
+		offset += len(page.Items)
+	}
+
+	summary.Items = items
 	return summary, nil
 }
 

@@ -53,6 +53,16 @@ func TestInMemoryJobStoreCRUD(t *testing.T) {
 	if stored.Status != JobSucceeded {
 		t.Fatalf("expected status %s, got %s", JobSucceeded, stored.Status)
 	}
+
+	list = store.List(JobFilter{Limit: 10})
+	if len(list.Items) != 1 {
+		t.Fatalf("expected one listed item")
+	}
+	for _, level := range []string{"NOTICE", "WARNING", "ERROR", "CRITICAL"} {
+		if _, ok := list.Items[0].SeverityTotals[level]; !ok {
+			t.Fatalf("expected severity_totals to include %s", level)
+		}
+	}
 }
 
 func TestInMemoryJobStoreFilters(t *testing.T) {
@@ -60,6 +70,13 @@ func TestInMemoryJobStoreFilters(t *testing.T) {
 	base := time.Now().UTC().Add(-time.Minute)
 	_ = seedJob(store, "job1", "batch1", base, JobQueued)
 	_ = seedJob(store, "job2", "batch2", base.Add(time.Second), JobRunning)
+	_, _ = store.Create(Job{
+		ID:        "job3",
+		BatchID:   "batch3",
+		Domain:    "alpha.example.org",
+		Status:    JobQueued,
+		CreatedAt: base.Add(2 * time.Second),
+	})
 
 	list := store.List(JobFilter{BatchID: "batch2", Limit: 10})
 	if list.Total != 1 || list.Items[0].ID != "job2" {
@@ -67,8 +84,163 @@ func TestInMemoryJobStoreFilters(t *testing.T) {
 	}
 
 	list = store.List(JobFilter{CreatedAfter: base.Add(500 * time.Millisecond), Limit: 10})
-	if list.Total != 1 || list.Items[0].ID != "job2" {
-		t.Fatalf("expected created_after filter to return job2")
+	if list.Total != 2 || list.Items[0].ID != "job3" || list.Items[1].ID != "job2" {
+		t.Fatalf("expected created_after filter to return job3 and job2")
+	}
+
+	list = store.List(JobFilter{CreatedBefore: base.Add(500 * time.Millisecond), Limit: 10})
+	if list.Total != 1 || list.Items[0].ID != "job1" {
+		t.Fatalf("expected created_before filter to return job1")
+	}
+
+	list = store.List(JobFilter{Domain: "alpha", Limit: 10})
+	if list.Total != 1 || list.Items[0].ID != "job3" {
+		t.Fatalf("expected domain filter to return job3")
+	}
+}
+
+func TestInMemoryJobStoreSorting(t *testing.T) {
+	store := NewInMemoryJobStore()
+	base := time.Now().UTC().Add(-time.Minute)
+
+	_, _ = store.Create(Job{
+		ID:        "job1",
+		BatchID:   "batch_b",
+		Domain:    "zeta.example",
+		Status:    JobQueued,
+		CreatedAt: base,
+		StartedAt: base.Add(2 * time.Second),
+	})
+	_, _ = store.Create(Job{
+		ID:        "job2",
+		BatchID:   "batch_a",
+		Domain:    "alpha.example",
+		Status:    JobQueued,
+		CreatedAt: base.Add(time.Second),
+		StartedAt: base.Add(3 * time.Second),
+	})
+	_, _ = store.Create(Job{
+		ID:        "job3",
+		BatchID:   "batch_c",
+		Domain:    "beta.example",
+		Status:    JobQueued,
+		CreatedAt: base.Add(4 * time.Second),
+	})
+
+	_ = store.SetResult("job1", JobResult{
+		JobID:  "job1",
+		Status: JobSucceeded,
+		Summary: map[string]any{
+			"levels": map[string]int{
+				"ERROR": 1,
+			},
+		},
+	})
+	_ = store.SetResult("job2", JobResult{
+		JobID:  "job2",
+		Status: JobFailed,
+		Summary: map[string]any{
+			"levels": map[string]int{
+				"CRITICAL": 2,
+			},
+		},
+	})
+
+	defaultList := store.List(JobFilter{Limit: 10})
+	if len(defaultList.Items) != 3 || defaultList.Items[0].ID != "job3" {
+		t.Fatalf("expected default started_at_desc sorting with created_at fallback")
+	}
+
+	domainAsc := store.List(JobFilter{Limit: 10, Sort: JobSortDomainAsc})
+	if len(domainAsc.Items) != 3 || domainAsc.Items[0].ID != "job2" {
+		t.Fatalf("expected domain_asc sorting to return alpha first")
+	}
+
+	batchIDAsc := store.List(JobFilter{Limit: 10, Sort: JobSortBatchIDAsc})
+	if len(batchIDAsc.Items) != 3 || batchIDAsc.Items[0].ID != "job2" {
+		t.Fatalf("expected batch_id_asc sorting to return batch_a first")
+	}
+
+	batchIDDesc := store.List(JobFilter{Limit: 10, Sort: JobSortBatchIDDesc})
+	if len(batchIDDesc.Items) != 3 || batchIDDesc.Items[0].ID != "job3" {
+		t.Fatalf("expected batch_id_desc sorting to return batch_c first")
+	}
+
+	startedAsc := store.List(JobFilter{Limit: 10, Sort: JobSortStartedAtAsc})
+	if len(startedAsc.Items) != 3 || startedAsc.Items[0].ID != "job1" {
+		t.Fatalf("expected started_at_asc sorting to return earliest effective start first")
+	}
+
+	errorDesc := store.List(JobFilter{Limit: 10, Sort: JobSortErrorDesc})
+	if len(errorDesc.Items) != 3 || errorDesc.Items[0].ID != "job2" || errorDesc.Items[1].ID != "job1" {
+		t.Fatalf("expected error_desc sorting to prioritize CRITICAL+ERROR totals")
+	}
+
+	criticalDesc := store.List(JobFilter{Limit: 10, Sort: JobSortCriticalDesc})
+	if len(criticalDesc.Items) != 3 || criticalDesc.Items[0].ID != "job2" {
+		t.Fatalf("expected critical_desc sorting to prioritize CRITICAL totals")
+	}
+}
+
+func TestInMemoryJobStorePaginationMetadata(t *testing.T) {
+	store := NewInMemoryJobStore()
+	base := time.Now().UTC().Add(-time.Minute)
+	_ = seedJob(store, "job1", "batch1", base, JobQueued)
+	_ = seedJob(store, "job2", "batch1", base.Add(time.Second), JobQueued)
+	_ = seedJob(store, "job3", "batch1", base.Add(2*time.Second), JobQueued)
+
+	first := store.List(JobFilter{Limit: 1, Sort: JobSortCreatedAtAsc})
+	if first.Total != 3 {
+		t.Fatalf("expected total 3, got %d", first.Total)
+	}
+	if len(first.Items) != 1 || first.Items[0].ID != "job1" {
+		t.Fatalf("expected first page to include job1")
+	}
+	if first.NextCursor != "1" || first.PrevCursor != "" {
+		t.Fatalf("expected next cursor 1 and no prev cursor, got next=%q prev=%q", first.NextCursor, first.PrevCursor)
+	}
+
+	second := store.List(JobFilter{Limit: 1, Sort: JobSortCreatedAtAsc, Offset: 1})
+	if len(second.Items) != 1 || second.Items[0].ID != "job2" {
+		t.Fatalf("expected second page to include job2")
+	}
+	if second.NextCursor != "2" || second.PrevCursor != "0" {
+		t.Fatalf("expected next cursor 2 and prev cursor 0, got next=%q prev=%q", second.NextCursor, second.PrevCursor)
+	}
+}
+
+func TestInMemoryJobStoreSeverityTotalsFromSummary(t *testing.T) {
+	store := NewInMemoryJobStore()
+	base := time.Now().UTC().Add(-time.Minute)
+	job := Job{
+		ID:        "job-sev",
+		Domain:    "example.com",
+		Status:    JobSucceeded,
+		CreatedAt: base,
+	}
+	if _, err := store.Create(job); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if err := store.SetResult(job.ID, JobResult{
+		JobID:  job.ID,
+		Status: JobSucceeded,
+		Summary: map[string]any{
+			"levels": map[string]int{
+				"NOTICE": 1,
+				"ERROR":  2,
+			},
+		},
+	}); err != nil {
+		t.Fatalf("set result: %v", err)
+	}
+
+	list := store.List(JobFilter{Limit: 10})
+	if len(list.Items) != 1 {
+		t.Fatalf("expected one listed item")
+	}
+	totals := list.Items[0].SeverityTotals
+	if totals["NOTICE"] != 1 || totals["ERROR"] != 2 || totals["WARNING"] != 0 || totals["CRITICAL"] != 0 {
+		t.Fatalf("unexpected severity_totals: %+v", totals)
 	}
 }
 

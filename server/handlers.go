@@ -3,15 +3,21 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine/normalization"
 )
 
+const maxListLimit = 500
+
 func (s *Server) handleJobs(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
+		if !enforceCSRF(w, r) {
+			return
+		}
 		s.handleCreateJob(w, r)
 	case http.MethodGet:
 		s.handleListJobs(w, r)
@@ -23,6 +29,9 @@ func (s *Server) handleJobs(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleJobsBatch(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
+		return
+	}
+	if !enforceCSRF(w, r) {
 		return
 	}
 	var req JobBatchRequest
@@ -112,6 +121,9 @@ func (s *Server) handleJobByID(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
 			return
 		}
+		if !enforceCSRF(w, r) {
+			return
+		}
 		s.handleCancelJob(w, r, jobID)
 	default:
 		writeError(w, http.StatusNotFound, "not_found", "not found", nil)
@@ -134,11 +146,31 @@ func (s *Server) handleBatchByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	list := s.store.List(JobFilter{BatchID: batchID, Limit: 1000})
-	if list.Total == 0 {
+	filter, code, message := parseListFilter(r, 100)
+	if code != "" {
+		writeError(w, http.StatusBadRequest, code, message, nil)
+		return
+	}
+	filter.BatchID = batchID
+
+	batchProbe := s.store.List(JobFilter{
+		BatchID: batchID,
+		Limit:   1,
+		Sort:    JobSortCreatedAtAsc,
+	})
+	if batchProbe.Total == 0 {
 		writeError(w, http.StatusNotFound, "not_found", "batch not found", nil)
 		return
 	}
+
+	list := s.store.List(filter)
+	fullFilter := JobFilter{
+		BatchID: batchID,
+		Offset:  0,
+		Limit:   batchProbe.Total,
+		Sort:    JobSortCreatedAtAsc,
+	}
+	fullList := s.store.List(fullFilter)
 
 	statusCounts := map[string]int{}
 	var createdAt time.Time
@@ -146,7 +178,7 @@ func (s *Server) handleBatchByID(w http.ResponseWriter, r *http.Request) {
 	var finishedAtLatest time.Time
 	allFinished := true
 
-	for _, job := range list.Items {
+	for _, job := range fullList.Items {
 		statusCounts[string(job.Status)]++
 		if createdAt.IsZero() || job.CreatedAt.Before(createdAt) {
 			createdAt = job.CreatedAt
@@ -174,6 +206,11 @@ func (s *Server) handleBatchByID(w http.ResponseWriter, r *http.Request) {
 		Total:        list.Total,
 		StatusCounts: statusCounts,
 		Items:        list.Items,
+		Limit:        list.Limit,
+		Offset:       list.Offset,
+		NextCursor:   list.NextCursor,
+		PrevCursor:   list.PrevCursor,
+		Sort:         list.Sort,
 		CreatedAt:    createdAt,
 		StartedAt:    startedAt,
 		FinishedAt:   finishedAt,
@@ -220,36 +257,94 @@ func (s *Server) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleListJobs(w http.ResponseWriter, r *http.Request) {
-	filter := JobFilter{Limit: 100}
-	status := r.URL.Query().Get("status")
-	if status != "" {
+	filter, code, message := parseListFilter(r, 100)
+	if code != "" {
+		writeError(w, http.StatusBadRequest, code, message, nil)
+		return
+	}
+	writeJSON(w, http.StatusOK, s.store.List(filter))
+}
+
+func parseListFilter(r *http.Request, defaultLimit int) (JobFilter, string, string) {
+	filter := JobFilter{
+		Limit: defaultLimit,
+		Sort:  JobSortStartedAtDesc,
+	}
+	query := r.URL.Query()
+
+	if status := strings.TrimSpace(query.Get("status")); status != "" {
 		filter.Status = JobStatus(status)
 	}
-	filter.BatchID = r.URL.Query().Get("batch_id")
-	if createdAfter := r.URL.Query().Get("created_after"); createdAfter != "" {
+	filter.BatchID = strings.TrimSpace(query.Get("batch_id"))
+	filter.Domain = strings.TrimSpace(query.Get("domain"))
+
+	if createdAfter := strings.TrimSpace(query.Get("created_after")); createdAfter != "" {
 		timestamp, err := parseTime(createdAfter)
 		if err != nil {
-			writeError(w, http.StatusBadRequest, "invalid_created_after", "created_after must be RFC3339", nil)
-			return
+			return JobFilter{}, "invalid_created_after", "created_after must be RFC3339"
 		}
 		filter.CreatedAfter = timestamp
 	}
-	if limit := r.URL.Query().Get("limit"); limit != "" {
-		var parsed int
-		_, err := fmt.Sscanf(limit, "%d", &parsed)
-		if err == nil {
-			filter.Limit = parsed
+	if createdBefore := strings.TrimSpace(query.Get("created_before")); createdBefore != "" {
+		timestamp, err := parseTime(createdBefore)
+		if err != nil {
+			return JobFilter{}, "invalid_created_before", "created_before must be RFC3339"
 		}
+		filter.CreatedBefore = timestamp
 	}
-	if offset := r.URL.Query().Get("offset"); offset != "" {
-		var parsed int
-		_, err := fmt.Sscanf(offset, "%d", &parsed)
-		if err == nil {
-			filter.Offset = parsed
-		}
+	if !filter.CreatedAfter.IsZero() && !filter.CreatedBefore.IsZero() && filter.CreatedBefore.Before(filter.CreatedAfter) {
+		return JobFilter{}, "invalid_time_range", "created_before must be greater than or equal to created_after"
 	}
 
-	writeJSON(w, http.StatusOK, s.store.List(filter))
+	if rawSort := strings.TrimSpace(query.Get("sort")); rawSort != "" {
+		sortValue := JobSort(rawSort)
+		if !isValidJobSort(sortValue) {
+			return JobFilter{}, "invalid_sort", "sort must be one of created_at_desc, created_at_asc, started_at_desc, started_at_asc, domain_asc, domain_desc, batch_id_asc, batch_id_desc, error_desc, critical_desc"
+		}
+		filter.Sort = sortValue
+	}
+
+	if limitRaw := strings.TrimSpace(query.Get("limit")); limitRaw != "" {
+		limitValue, err := strconv.Atoi(limitRaw)
+		if err != nil || limitValue <= 0 || limitValue > maxListLimit {
+			return JobFilter{}, "invalid_limit", "limit must be between 1 and 500"
+		}
+		filter.Limit = limitValue
+	} else if pageSizeRaw := strings.TrimSpace(query.Get("page_size")); pageSizeRaw != "" {
+		limitValue, err := strconv.Atoi(pageSizeRaw)
+		if err != nil || limitValue <= 0 || limitValue > maxListLimit {
+			return JobFilter{}, "invalid_page_size", "page_size must be between 1 and 500"
+		}
+		filter.Limit = limitValue
+	}
+
+	if cursorRaw := strings.TrimSpace(query.Get("cursor")); cursorRaw != "" {
+		offset, err := strconv.Atoi(cursorRaw)
+		if err != nil || offset < 0 {
+			return JobFilter{}, "invalid_cursor", "cursor must be a non-negative integer offset"
+		}
+		filter.Offset = offset
+		return filter, "", ""
+	}
+
+	if pageRaw := strings.TrimSpace(query.Get("page")); pageRaw != "" {
+		pageNumber, err := strconv.Atoi(pageRaw)
+		if err != nil || pageNumber <= 0 {
+			return JobFilter{}, "invalid_page", "page must be a positive integer"
+		}
+		filter.Offset = (pageNumber - 1) * filter.Limit
+		return filter, "", ""
+	}
+
+	if offsetRaw := strings.TrimSpace(query.Get("offset")); offsetRaw != "" {
+		offset, err := strconv.Atoi(offsetRaw)
+		if err != nil || offset < 0 {
+			return JobFilter{}, "invalid_offset", "offset must be a non-negative integer"
+		}
+		filter.Offset = offset
+	}
+
+	return filter, "", ""
 }
 
 func (s *Server) handleGetJob(w http.ResponseWriter, _ *http.Request, jobID string) {
@@ -334,6 +429,9 @@ func (s *Server) handleQueuePause(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
 		return
 	}
+	if !enforceCSRF(w, r) {
+		return
+	}
 	if err := s.queue.Pause(); err != nil {
 		writeError(w, http.StatusInternalServerError, "queue_error", err.Error(), nil)
 		return
@@ -346,6 +444,9 @@ func (s *Server) handleQueueResume(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
 		return
 	}
+	if !enforceCSRF(w, r) {
+		return
+	}
 	if err := s.queue.Resume(); err != nil {
 		writeError(w, http.StatusInternalServerError, "queue_error", err.Error(), nil)
 		return
@@ -356,6 +457,9 @@ func (s *Server) handleQueueResume(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleQueueReorder(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
+		return
+	}
+	if !enforceCSRF(w, r) {
 		return
 	}
 	var req QueueReorderRequest
@@ -373,6 +477,9 @@ func (s *Server) handleQueueReorder(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleQueueRemove(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
+		return
+	}
+	if !enforceCSRF(w, r) {
 		return
 	}
 	var req QueueRemoveRequest

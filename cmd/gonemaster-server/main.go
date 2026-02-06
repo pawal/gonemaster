@@ -59,7 +59,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 		fmt.Fprintln(errOut, "")
 		fmt.Fprintln(errOut, "Options:")
 		fmt.Fprintln(errOut, "  --config            JSON config file path (optional)")
-		fmt.Fprintln(errOut, "  --listen            Address to listen on (default :8080)")
+		fmt.Fprintln(errOut, "  --listen            Address to listen on (default 127.0.0.1:8080)")
 		fmt.Fprintln(errOut, "  --max-body-size     Max request body size in bytes (default 1048576)")
 		fmt.Fprintln(errOut, "  --debug             Enable request/response logging")
 		fmt.Fprintln(errOut, "  --workers           Number of worker goroutines (default 4)")
@@ -76,7 +76,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 		fmt.Fprintln(errOut, "  --shutdown-timeout  Graceful shutdown timeout (default 10s)")
 	}
 	fs.StringVar(&configPath, "config", "", "JSON config file path (optional)")
-	fs.StringVar(&listen, "listen", ":8080", "Address to listen on (default :8080)")
+	fs.StringVar(&listen, "listen", "127.0.0.1:8080", "Address to listen on (default 127.0.0.1:8080)")
 	fs.Int64Var(&maxBodySize, "max-body-size", 0, "Max request body size in bytes (default 1048576)")
 	fs.BoolVar(&debug, "debug", false, "Enable request/response logging")
 	fs.IntVar(&workerCount, "workers", 0, "Number of worker goroutines (default 4)")

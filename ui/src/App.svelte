@@ -21,6 +21,7 @@
   let severityFilter = "all";
   let jobSort = "started_at_desc";
   let jobBatchFilter = "";
+  let recentDomainFilter = "";
   let recentPageSize = 20;
   let recentCursor = 0;
   let recentTotal = 0;
@@ -67,6 +68,7 @@
     "r_sort",
     "r_sev",
     "r_batch",
+    "r_domain",
     "r_limit",
     "r_cursor",
     "b_id",
@@ -200,6 +202,9 @@
     if (params.has("r_batch")) {
       next.jobBatchFilter = (params.get("r_batch") || "").trim();
     }
+    if (params.has("r_domain")) {
+      next.recentDomainFilter = (params.get("r_domain") || "").trim();
+    }
     if (params.has("r_limit")) {
       next.recentPageSize = normalizeRecentPageSize(params.get("r_limit"));
     }
@@ -248,6 +253,9 @@
       if (typeof parsed.jobBatchFilter === "string") {
         next.jobBatchFilter = parsed.jobBatchFilter.trim();
       }
+      if (typeof parsed.recentDomainFilter === "string") {
+        next.recentDomainFilter = parsed.recentDomainFilter.trim();
+      }
       next.recentPageSize = normalizeRecentPageSize(parsed.recentPageSize);
       next.recentCursor = normalizeCursor(parsed.recentCursor);
       if (typeof parsed.selectedBatchId === "string") {
@@ -275,6 +283,7 @@
     if (state.jobSort) jobSort = state.jobSort;
     if (state.severityFilter) severityFilter = state.severityFilter;
     if (typeof state.jobBatchFilter === "string") jobBatchFilter = state.jobBatchFilter;
+    if (typeof state.recentDomainFilter === "string") recentDomainFilter = state.recentDomainFilter;
     if (state.recentPageSize !== undefined) recentPageSize = normalizeRecentPageSize(state.recentPageSize);
     if (state.recentCursor !== undefined) recentCursor = normalizeCursor(state.recentCursor);
     if (typeof state.selectedBatchId === "string") selectedBatchId = state.selectedBatchId;
@@ -300,6 +309,10 @@
     const normalizedJobBatch = jobBatchFilter.trim();
     if (normalizedJobBatch) {
       params.set("r_batch", normalizedJobBatch);
+    }
+    const normalizedRecentDomain = recentDomainFilter.trim();
+    if (normalizedRecentDomain) {
+      params.set("r_domain", normalizedRecentDomain);
     }
     if (normalizeRecentPageSize(recentPageSize) !== 20) {
       params.set("r_limit", String(normalizeRecentPageSize(recentPageSize)));
@@ -339,6 +352,7 @@
         jobSort,
         severityFilter,
         jobBatchFilter: normalizedJobBatch,
+        recentDomainFilter: normalizedRecentDomain,
         recentPageSize: normalizeRecentPageSize(recentPageSize),
         recentCursor: normalizeCursor(recentCursor),
         selectedBatchId: normalizedBatchID,
@@ -564,6 +578,10 @@
       if (normalizedBatchID) {
         params.set("batch_id", normalizedBatchID);
       }
+      const normalizedDomain = recentDomainFilter.trim();
+      if (normalizedDomain) {
+        params.set("domain", normalizedDomain);
+      }
       const list = await apiFetch(`/jobs?${params.toString()}`);
       jobs = list.items || [];
       recentTotal = Number.isFinite(Number(list.total)) ? Number(list.total) : jobs.length;
@@ -585,8 +603,9 @@
     await loadJobs({ resetCursor: true });
   };
 
-  const clearRecentBatchFilter = async () => {
+  const clearRecentFilters = async () => {
     jobBatchFilter = "";
+    recentDomainFilter = "";
     await loadJobs({ resetCursor: true });
   };
 
@@ -873,6 +892,7 @@
     jobSort,
     severityFilter,
     jobBatchFilter,
+    recentDomainFilter,
     String(recentPageSize),
     String(recentCursor),
     selectedBatchId,
@@ -1114,6 +1134,21 @@
           </select>
         </div>
         <div class="sort-control grow">
+          <label for="recent-domain-filter">Domain contains</label>
+          <input
+            id="recent-domain-filter"
+            type="text"
+            placeholder="example.com"
+            bind:value={recentDomainFilter}
+            on:keydown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                applyRecentFilters();
+              }
+            }}
+          />
+        </div>
+        <div class="sort-control grow">
           <label for="recent-batch-filter">Batch ID filter</label>
           <input
             id="recent-batch-filter"
@@ -1130,7 +1165,7 @@
         </div>
         <div class="row">
           <button class="ghost" type="button" on:click={applyRecentFilters} disabled={jobsLoading}>Apply filters</button>
-          <button class="ghost" type="button" on:click={clearRecentBatchFilter} disabled={jobsLoading}>Clear</button>
+          <button class="ghost" type="button" on:click={clearRecentFilters} disabled={jobsLoading}>Clear</button>
         </div>
       </div>
       <div class="severity-filter-bar" role="group" aria-label="Severity filters">

@@ -88,6 +88,32 @@ describe("App", () => {
     unmount();
   });
 
+  it("applies recent domain filter to jobs query", async () => {
+    const calls = [];
+    global.fetch.mockImplementation((url) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      calls.push(value);
+      if (value.includes("/api/v1/jobs?")) {
+        return jsonResponse({ items: [], total: 0 });
+      }
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+    await openRecentTab();
+
+    calls.length = 0;
+    const domainInput = screen.getByLabelText("Domain contains");
+    await fireEvent.input(domainInput, { target: { value: "joburg" } });
+    await fireEvent.keyDown(domainInput, { key: "Enter", code: "Enter" });
+
+    await waitFor(() => {
+      expect(calls.some((value) => value.includes("domain=joburg"))).toBe(true);
+    });
+
+    unmount();
+  });
+
   it("auto-refreshes recent tests and stops when jobs are no longer queued or running", async () => {
     let jobsCallCount = 0;
     const runningJob = {

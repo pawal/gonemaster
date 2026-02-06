@@ -16,6 +16,7 @@ type Server struct {
 	store         JobStore
 	queue         Queue
 	workers       workerPool
+	metrics       *MetricsCollector
 	engineRunner  func(engine.RunRequest) ([]engine.LogEntry, error)
 	engineLimiter *engineLimiter
 	cancelMu      sync.Mutex
@@ -32,6 +33,7 @@ func New(cfg Config) *Server {
 		mux:           http.NewServeMux(),
 		store:         NewInMemoryJobStore(),
 		queue:         NewInMemoryQueue(),
+		metrics:       NewMetricsCollector(cfg),
 		engineRunner:  engine.Run,
 		engineLimiter: newEngineLimiter(cfg.MaxConcurrentJobs),
 		cancels:       map[string]context.CancelFunc{},

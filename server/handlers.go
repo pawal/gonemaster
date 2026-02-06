@@ -530,9 +530,7 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
 		return
 	}
-	w.Header().Set("Content-Type", "text/plain")
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte("# TODO: metrics\n"))
+	writeJSON(w, http.StatusOK, s.metrics.Snapshot())
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {

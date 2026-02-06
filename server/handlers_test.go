@@ -781,4 +781,17 @@ func TestHealthAndMetrics(t *testing.T) {
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.Code)
 	}
+	if got := resp.Header().Get("Content-Type"); got != "application/json" {
+		t.Fatalf("expected application/json content-type, got %q", got)
+	}
+	var metrics MetricsSnapshot
+	if err := json.NewDecoder(resp.Body).Decode(&metrics); err != nil {
+		t.Fatalf("decode metrics: %v", err)
+	}
+	if metrics.SchemaVersion == "" {
+		t.Fatal("expected schema_version in metrics response")
+	}
+	if metrics.GeneratedAt.IsZero() {
+		t.Fatal("expected generated_at in metrics response")
+	}
 }

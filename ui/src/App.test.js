@@ -139,6 +139,78 @@ describe("App", () => {
     unmount();
   });
 
+  it("auto-refreshes batch inspector and stops when no batch jobs are queued or running", async () => {
+    let batchCalls = 0;
+    const runningBatch = {
+      batch_id: "batch_live",
+      total: 1,
+      status_counts: { running: 1 },
+      items: [
+        {
+          id: "job_batch_live",
+          domain: "batch.example",
+          status: "running",
+          created_at: "2026-02-03T00:00:00Z",
+          progress: 55
+        }
+      ],
+      created_at: "2026-02-03T00:00:00Z"
+    };
+    const doneBatch = {
+      ...runningBatch,
+      status_counts: { succeeded: 1 },
+      items: [
+        {
+          ...runningBatch.items[0],
+          status: "succeeded",
+          progress: 100
+        }
+      ]
+    };
+
+    global.fetch.mockImplementation((url) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      if (value.includes("/api/v1/jobs?")) {
+        return jsonResponse({ items: [], total: 0 });
+      }
+      if (value.includes("/api/v1/batches/batch_live")) {
+        batchCalls += 1;
+        return jsonResponse(batchCalls >= 2 ? doneBatch : runningBatch);
+      }
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+
+    await openBatchTab();
+    await fireEvent.input(screen.getByLabelText("Batch ID"), { target: { value: "batch_live" } });
+    await fireEvent.change(screen.getByLabelText("Batch ID"));
+    expect(await screen.findByText("job_batch_live")).toBeInTheDocument();
+
+    const intervalCallbacks = [];
+    vi.spyOn(global, "setInterval").mockImplementation((callback) => {
+      intervalCallbacks.push(callback);
+      return intervalCallbacks.length;
+    });
+    vi.spyOn(global, "clearInterval").mockImplementation(() => {});
+
+    await fireEvent.click(screen.getByRole("button", { name: /auto refresh: off/i }));
+    expect(screen.getByRole("button", { name: /auto refresh: on/i })).toBeInTheDocument();
+    expect(intervalCallbacks.length).toBeGreaterThan(0);
+
+    const poll = intervalCallbacks[intervalCallbacks.length - 1];
+    expect(typeof poll).toBe("function");
+    await poll();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /auto refresh: off/i })).toBeInTheDocument();
+      expect(screen.getByText("batch.example - succeeded")).toBeInTheDocument();
+    });
+    expect(batchCalls).toBeGreaterThanOrEqual(2);
+
+    unmount();
+  });
+
   it("warns when submitting a single job without a domain", async () => {
     global.fetch.mockImplementation(() => jsonResponse({ items: [] }));
 
@@ -549,7 +621,7 @@ describe("App", () => {
     unmount();
   });
 
-  it("renders progress bars for job inspector and recent jobs", async () => {
+  it("renders progress bars for job inspector, recent jobs, and batch jobs", async () => {
     const job = {
       id: "job_a",
       domain: "example.com",
@@ -563,6 +635,21 @@ describe("App", () => {
         CRITICAL: 0
       }
     };
+    const batch = {
+      batch_id: "batch_progress",
+      total: 1,
+      status_counts: { running: 1 },
+      items: [
+        {
+          id: "job_batch_progress",
+          domain: "batch.example",
+          status: "running",
+          created_at: "2026-02-03T00:00:00Z",
+          progress: 73
+        }
+      ],
+      created_at: "2026-02-03T00:00:00Z"
+    };
 
     global.fetch.mockImplementation((url) => {
       if (typeof url === "string" && url.startsWith("/api/v1/jobs?")) {
@@ -570,6 +657,9 @@ describe("App", () => {
       }
       if (url === `/api/v1/jobs/${job.id}`) {
         return jsonResponse(job);
+      }
+      if (typeof url === "string" && url.startsWith("/api/v1/batches/batch_progress")) {
+        return jsonResponse(batch);
       }
       return jsonResponse({ items: [] });
     });
@@ -607,6 +697,18 @@ describe("App", () => {
     await waitFor(() => {
       const inspectorBar = within(inspectorCard).getByRole("progressbar");
       expect(inspectorBar).toHaveAttribute("aria-valuenow", "42");
+    });
+
+    await openBatchTab();
+    await fireEvent.input(screen.getByLabelText("Batch ID"), { target: { value: "batch_progress" } });
+    await fireEvent.change(screen.getByLabelText("Batch ID"));
+
+    const batchCard = screen.getByText("Batch Inspector").closest(".card");
+    expect(batchCard).not.toBeNull();
+    await waitFor(() => {
+      const batchBars = within(batchCard).getAllByRole("progressbar");
+      const hasBatchProgress = batchBars.some((bar) => bar.getAttribute("aria-valuenow") === "73");
+      expect(hasBatchProgress).toBe(true);
     });
 
     unmount();

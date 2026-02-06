@@ -121,10 +121,22 @@
   ];
   const batchStatuses = ["", "queued", "running", "succeeded", "failed", "canceled", "expired", "paused"];
   const batchPageSizes = [10, 20, 50, 100];
+  const activeJobStatuses = ["queued", "running"];
+  const resultReadyStatuses = ["succeeded", "failed", "canceled"];
 
   const isKnownSort = (value, options) => options.some((option) => option.id === value);
   const isKnownSeverityFilter = (value) => severityFilters.some((option) => option.id === value);
   const isKnownBatchStatus = (value) => batchStatuses.includes(value);
+  const normalizeStatus = (value) => String(value || "").toLowerCase();
+  const isActiveJobStatus = (status) => activeJobStatuses.includes(normalizeStatus(status));
+  const isResultReadyStatus = (status) => resultReadyStatuses.includes(normalizeStatus(status));
+  const progressPercent = (job) => {
+    const value = Number(job?.progress);
+    if (!Number.isFinite(value)) return 0;
+    return Math.max(0, Math.min(100, value));
+  };
+  const hasActiveBatchJobs = (batch) =>
+    activeJobStatuses.some((status) => Number(batch?.status_counts?.[status] || 0) > 0);
   const normalizeBatchPageSize = (value) => {
     const parsed = Number(value);
     if (Number.isFinite(parsed) && batchPageSizes.includes(parsed)) {
@@ -310,8 +322,7 @@
       }))
       .filter((entry) => entry.count > 0);
   const jobSeverityTotal = (job, level) => Number(job?.severity_totals?.[level] || 0);
-  const hasRunningOrQueuedJobs = (items = []) =>
-    items.some((job) => ["queued", "running"].includes(String(job?.status || "").toLowerCase()));
+  const hasRunningOrQueuedJobs = (items = []) => items.some((job) => isActiveJobStatus(job?.status));
   const matchesSeverityFilter = (job) => {
     if (severityFilter === "warnings_plus") {
       return (
@@ -528,7 +539,7 @@
       const job = await apiFetch(`/jobs/${jobId}`);
       selectedJob = job;
       selectedJobResult = null;
-      if (["succeeded", "failed", "canceled"].includes(job.status)) {
+      if (isResultReadyStatus(job.status)) {
         await loadJobResult(jobId);
       }
     } catch (error) {
@@ -580,7 +591,11 @@
     batchLoading = true;
     try {
       const params = batchQueryParams();
-      selectedBatch = await apiFetch(`/batches/${batchId}?${params.toString()}`);
+      const batch = await apiFetch(`/batches/${batchId}?${params.toString()}`);
+      selectedBatch = batch;
+      if (autoRefreshBatch && !hasActiveBatchJobs(batch)) {
+        autoRefreshBatch = false;
+      }
     } catch (error) {
       setStatus(`Failed to load batch: ${error.message}`, "warn");
       selectedBatch = null;
@@ -650,10 +665,14 @@
     autoRefreshJob &&
     selectedJob &&
     selectedJob.id === selectedJobId &&
-    (selectedJob.progress === 100 || ["succeeded", "failed", "canceled"].includes(selectedJob.status))
+    (progressPercent(selectedJob) === 100 || isResultReadyStatus(selectedJob.status))
   ) {
     autoRefreshJob = false;
     jobInspectorHighlight = false;
+  }
+
+  $: if (autoRefreshBatch && selectedBatch && !hasActiveBatchJobs(selectedBatch)) {
+    autoRefreshBatch = false;
   }
 
   $: {
@@ -794,9 +813,9 @@
             <span>Status</span>
             <strong>{selectedJob.status}</strong>
             <span>Progress</span>
-            <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={selectedJob.progress || 0}>
-              <div class="progress-bar" style={`width: ${selectedJob.progress || 0}%`}></div>
-              <span class="progress-value">{selectedJob.progress || 0}%</span>
+            <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={progressPercent(selectedJob)}>
+              <div class="progress-bar" style={`width: ${progressPercent(selectedJob)}%`}></div>
+              <span class="progress-value">{progressPercent(selectedJob)}%</span>
             </div>
             <span>Domain</span>
             <strong class="mono">{selectedJob.domain}</strong>
@@ -875,7 +894,7 @@
             {/if}
           </div>
         {/if}
-        {#if selectedJob && !selectedJobResult && ["succeeded", "failed", "canceled"].includes(selectedJob.status)}
+        {#if selectedJob && !selectedJobResult && isResultReadyStatus(selectedJob.status)}
           <button class="ghost" type="button" on:click={() => loadJobResult()}>
             Load result payload
           </button>
@@ -954,9 +973,9 @@
                     <span class="small">No severity entries.</span>
                   {/if}
                 </div>
-                <div class="progress compact" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={job.progress || 0}>
-                  <div class="progress-bar" style={`width: ${job.progress || 0}%`}></div>
-                  <span class="progress-value">{job.progress || 0}%</span>
+                <div class="progress compact" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={progressPercent(job)}>
+                  <div class="progress-bar" style={`width: ${progressPercent(job)}%`}></div>
+                  <span class="progress-value">{progressPercent(job)}%</span>
                 </div>
               </div>
               <button class="ghost" type="button" on:click={() => {
@@ -1097,6 +1116,10 @@ example.org`}
                     <div>
                       <div class="mono">{item.id}</div>
                       <div class="small">{item.domain} - {item.status}</div>
+                      <div class="progress compact" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={progressPercent(item)}>
+                        <div class="progress-bar" style={`width: ${progressPercent(item)}%`}></div>
+                        <span class="progress-value">{progressPercent(item)}%</span>
+                      </div>
                     </div>
                     <button class="ghost" type="button" on:click={() => {
                       selectedJobId = item.id;

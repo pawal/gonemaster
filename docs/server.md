@@ -252,6 +252,18 @@ GET /metrics
 GET /healthz
 ```
 
+`GET /metrics` returns a JSON snapshot. Optional query params:
+- `window=1h|6h|24h|48h` to restrict `trends.windows` to one window.
+- `include=` comma-separated sections: `all`, `health`, `jobs`, `api`, `quality`, `insights`, `trends`.
+- `limit_domains=1..100` to cap `insights.domains.items`.
+- `limit_batches=1..100` to cap `insights.batches.items`.
+
+Responses:
+- `200` JSON snapshot.
+- `400` structured error for invalid query params.
+
+The metrics endpoint caches rendered responses for 1 second per unique query option set.
+
 ## UI
 The embedded UI is served at `/` and calls the API on the same host.
 

@@ -4,19 +4,25 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
 )
 
+var metricsRequestNonce uint32
+
 func getMetricsSnapshot(t *testing.T, srv *Server) MetricsSnapshot {
 	t.Helper()
 	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/metrics", nil)
+	nonce := atomic.AddUint32(&metricsRequestNonce, 1)
+	limit := int((nonce % 100) + 1)
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/metrics?limit_domains=%d&limit_batches=%d", limit, limit), nil)
 	srv.Handler().ServeHTTP(resp, req)
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.Code)
@@ -1050,6 +1056,176 @@ func TestMetricsTracksQualityAcrossMixedOutcomesAndLocaleRequests(t *testing.T) 
 	}
 	if snapshot.Insights.Batches.Limit == 0 || snapshot.Insights.Batches.Cap == 0 {
 		t.Fatalf("expected batch insight limit/cap metadata, got %+v", snapshot.Insights.Batches)
+	}
+}
+
+func TestMetricsEndpointValidatesQueryParams(t *testing.T) {
+	srv := New(DefaultConfig())
+	tests := []struct {
+		path     string
+		wantCode string
+	}{
+		{path: "/api/v1/metrics?window=12h", wantCode: "invalid_window"},
+		{path: "/api/v1/metrics?include=unknown", wantCode: "invalid_include"},
+		{path: "/api/v1/metrics?limit_domains=0", wantCode: "invalid_limit_domains"},
+		{path: "/api/v1/metrics?limit_batches=999", wantCode: "invalid_limit_batches"},
+	}
+
+	for _, tc := range tests {
+		resp := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+		srv.Handler().ServeHTTP(resp, req)
+		if resp.Code != http.StatusBadRequest {
+			t.Fatalf("%s: expected 400, got %d", tc.path, resp.Code)
+		}
+		var out ErrorResponse
+		if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+			t.Fatalf("%s: decode error: %v", tc.path, err)
+		}
+		if out.Error.Code != tc.wantCode {
+			t.Fatalf("%s: error code = %q, want %q", tc.path, out.Error.Code, tc.wantCode)
+		}
+	}
+}
+
+func TestMetricsEndpointSupportsIncludeWindowAndLimits(t *testing.T) {
+	srv := New(DefaultConfig())
+	srv.metrics.ObserveJobSubmittedWithContext("batch-a", "alpha.example", JobQueued)
+	srv.metrics.ObserveJobStatusTransition(JobQueued, JobSucceeded)
+	srv.metrics.ObserveJobCompletionWithContext("batch-a", "alpha.example", JobSucceeded, 1200*time.Millisecond, map[string]int64{
+		"NOTICE": 1,
+	})
+	srv.metrics.ObserveJobSubmittedWithContext("batch-b", "beta.example", JobQueued)
+	srv.metrics.ObserveJobStatusTransition(JobQueued, JobFailed)
+	srv.metrics.ObserveJobCompletionWithContext("batch-b", "beta.example", JobFailed, 1800*time.Millisecond, map[string]int64{
+		"ERROR": 2,
+	})
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/metrics?include=health,insights,trends&window=1h&limit_domains=1&limit_batches=1", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+
+	var payload map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode metrics payload: %v", err)
+	}
+	if _, ok := payload["schema_version"]; !ok {
+		t.Fatal("missing schema_version")
+	}
+	if _, ok := payload["generated_at"]; !ok {
+		t.Fatal("missing generated_at")
+	}
+	if _, ok := payload["health"]; !ok {
+		t.Fatal("missing health")
+	}
+	if _, ok := payload["insights"]; !ok {
+		t.Fatal("missing insights")
+	}
+	if _, ok := payload["trends"]; !ok {
+		t.Fatal("missing trends")
+	}
+	if _, ok := payload["api"]; ok {
+		t.Fatal("api should not be included")
+	}
+	if _, ok := payload["jobs"]; ok {
+		t.Fatal("jobs should not be included")
+	}
+	if _, ok := payload["quality"]; ok {
+		t.Fatal("quality should not be included")
+	}
+
+	insights := payload["insights"].(map[string]any)
+	batches := insights["batches"].(map[string]any)
+	domains := insights["domains"].(map[string]any)
+	if intFromAny(batches["limit"]) != 1 {
+		t.Fatalf("batches.limit = %v, want 1", batches["limit"])
+	}
+	if intFromAny(domains["limit"]) != 1 {
+		t.Fatalf("domains.limit = %v, want 1", domains["limit"])
+	}
+	if got := len(batches["items"].([]any)); got != 1 {
+		t.Fatalf("batches.items size = %d, want 1", got)
+	}
+	if got := len(domains["items"].([]any)); got != 1 {
+		t.Fatalf("domains.items size = %d, want 1", got)
+	}
+
+	trends := payload["trends"].(map[string]any)
+	windows := trends["windows"].(map[string]any)
+	if len(windows) != 1 {
+		t.Fatalf("trends.windows size = %d, want 1", len(windows))
+	}
+	if _, ok := windows["1h"]; !ok {
+		t.Fatalf("expected trends window 1h, got %+v", windows)
+	}
+}
+
+func TestMetricsEndpointCachesByQueryForOneSecond(t *testing.T) {
+	srv := New(DefaultConfig())
+	base := time.Date(2026, 2, 9, 10, 0, 0, 0, time.UTC)
+	now := base
+	srv.metrics.nowFn = func() time.Time { return now }
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/metrics", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var first MetricsSnapshot
+	if err := json.NewDecoder(resp.Body).Decode(&first); err != nil {
+		t.Fatalf("decode first metrics: %v", err)
+	}
+	if first.Jobs.SubmittedTotal != 0 {
+		t.Fatalf("first submitted_total = %d, want 0", first.Jobs.SubmittedTotal)
+	}
+
+	now = base.Add(100 * time.Millisecond)
+	createResp := httptest.NewRecorder()
+	createReq := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(`{"domain":"cached.example"}`))
+	createReq.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(createResp, createReq)
+	if createResp.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d", createResp.Code)
+	}
+
+	now = base.Add(500 * time.Millisecond)
+	resp = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/metrics", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var second MetricsSnapshot
+	if err := json.NewDecoder(resp.Body).Decode(&second); err != nil {
+		t.Fatalf("decode second metrics: %v", err)
+	}
+	if !second.GeneratedAt.Equal(first.GeneratedAt) {
+		t.Fatalf("second generated_at = %s, want cached %s", second.GeneratedAt, first.GeneratedAt)
+	}
+	if second.Jobs.SubmittedTotal != first.Jobs.SubmittedTotal {
+		t.Fatalf("second submitted_total = %d, want cached %d", second.Jobs.SubmittedTotal, first.Jobs.SubmittedTotal)
+	}
+
+	now = base.Add(2 * time.Second)
+	resp = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/metrics", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var third MetricsSnapshot
+	if err := json.NewDecoder(resp.Body).Decode(&third); err != nil {
+		t.Fatalf("decode third metrics: %v", err)
+	}
+	if !third.GeneratedAt.After(second.GeneratedAt) {
+		t.Fatalf("third generated_at = %s, want after %s", third.GeneratedAt, second.GeneratedAt)
+	}
+	if third.Jobs.SubmittedTotal != 1 {
+		t.Fatalf("third submitted_total = %d, want 1", third.Jobs.SubmittedTotal)
 	}
 }
 

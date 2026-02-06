@@ -551,7 +551,26 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
 		return
 	}
-	writeJSON(w, http.StatusOK, s.metrics.Snapshot())
+	options, code, message := parseMetricsQueryOptions(r.URL.Query())
+	if code != "" {
+		writeError(w, http.StatusBadRequest, code, message, nil)
+		return
+	}
+
+	now := s.metricsNow()
+	cacheKey := options.cacheKey()
+	if payload, ok := s.getMetricsCache(cacheKey, now); ok {
+		writeRawJSON(w, http.StatusOK, payload)
+		return
+	}
+
+	payload, err := s.buildMetricsResponseBody(options)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "metrics_error", err.Error(), nil)
+		return
+	}
+	s.putMetricsCache(cacheKey, payload, now)
+	writeRawJSON(w, http.StatusOK, payload)
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {

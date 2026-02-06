@@ -125,6 +125,30 @@ func TestMetricsCollectorZeroStateSnapshot(t *testing.T) {
 	if got := len(snapshot.Trends.Windows["48h"].Points); got != 576 {
 		t.Fatalf("trends.windows[48h].points size = %d, want 576", got)
 	}
+	if snapshot.Insights.Batches.Limit != metricsDefaultBatchLimit {
+		t.Fatalf("insights.batches.limit = %d, want %d", snapshot.Insights.Batches.Limit, metricsDefaultBatchLimit)
+	}
+	if snapshot.Insights.Batches.Cap != metricsBatchInsightCap {
+		t.Fatalf("insights.batches.cap = %d, want %d", snapshot.Insights.Batches.Cap, metricsBatchInsightCap)
+	}
+	if len(snapshot.Insights.Batches.Items) != 0 {
+		t.Fatalf("insights.batches.items size = %d, want 0", len(snapshot.Insights.Batches.Items))
+	}
+	if snapshot.Insights.Batches.Other != nil {
+		t.Fatal("insights.batches.other expected nil")
+	}
+	if snapshot.Insights.Domains.Limit != metricsDefaultDomainLimit {
+		t.Fatalf("insights.domains.limit = %d, want %d", snapshot.Insights.Domains.Limit, metricsDefaultDomainLimit)
+	}
+	if snapshot.Insights.Domains.Cap != metricsDomainInsightCap {
+		t.Fatalf("insights.domains.cap = %d, want %d", snapshot.Insights.Domains.Cap, metricsDomainInsightCap)
+	}
+	if len(snapshot.Insights.Domains.Items) != 0 {
+		t.Fatalf("insights.domains.items size = %d, want 0", len(snapshot.Insights.Domains.Items))
+	}
+	if snapshot.Insights.Domains.Other != nil {
+		t.Fatal("insights.domains.other expected nil")
+	}
 }
 
 func TestMetricsCollectorUptimeDoesNotGoNegative(t *testing.T) {
@@ -340,5 +364,142 @@ func TestMetricsCollectorLocaleUsageIsBounded(t *testing.T) {
 	}
 	if snapshot.Quality.LocaleUsage.Counts[metricsLocaleOtherKey] != 5 {
 		t.Fatalf("quality.locale_usage.counts[_other] = %d, want 5", snapshot.Quality.LocaleUsage.Counts[metricsLocaleOtherKey])
+	}
+}
+
+func TestMetricsCollectorTracksBatchAndDomainInsights(t *testing.T) {
+	cfg := DefaultConfig()
+	startedAt := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+	collector := newMetricsCollector(cfg, startedAt)
+	now := startedAt
+	collector.nowFn = func() time.Time { return now }
+
+	collector.ObserveJobSubmittedWithContext("batch-a", "alpha.example", JobQueued)
+	collector.ObserveJobStatusTransition(JobQueued, JobRunning)
+	now = now.Add(time.Minute)
+	collector.ObserveJobStatusTransition(JobRunning, JobSucceeded)
+	collector.ObserveJobCompletionWithContext("batch-a", "alpha.example", JobSucceeded, 1200*time.Millisecond, map[string]int64{
+		"NOTICE": 1,
+	})
+
+	now = now.Add(time.Minute)
+	collector.ObserveJobSubmittedWithContext("batch-a", "beta.example", JobQueued)
+	collector.ObserveJobStatusTransition(JobQueued, JobRunning)
+	now = now.Add(time.Minute)
+	collector.ObserveJobStatusTransition(JobRunning, JobFailed)
+	collector.ObserveJobCompletionWithContext("batch-a", "beta.example", JobFailed, 2200*time.Millisecond, map[string]int64{
+		"ERROR": 2,
+	})
+
+	now = now.Add(time.Minute)
+	collector.ObserveJobSubmittedWithContext("batch-b", "alpha.example", JobQueued)
+	collector.ObserveJobStatusTransition(JobQueued, JobCanceled)
+	collector.ObserveJobCompletionWithContext("batch-b", "alpha.example", JobCanceled, -1, zeroMetricsSeverityTotals())
+
+	snapshot := collector.Snapshot()
+	if len(snapshot.Insights.Batches.Items) != 2 {
+		t.Fatalf("insights.batches.items size = %d, want 2", len(snapshot.Insights.Batches.Items))
+	}
+	firstBatch := snapshot.Insights.Batches.Items[0]
+	if firstBatch.BatchID != "batch-a" {
+		t.Fatalf("first batch id = %q, want batch-a", firstBatch.BatchID)
+	}
+	if firstBatch.SizeTotal != 2 || firstBatch.ProcessedTotal != 2 {
+		t.Fatalf("batch-a size/processed = %d/%d, want 2/2", firstBatch.SizeTotal, firstBatch.ProcessedTotal)
+	}
+	if firstBatch.Outcomes[string(JobSucceeded)] != 1 || firstBatch.Outcomes[string(JobFailed)] != 1 {
+		t.Fatalf("batch-a outcomes = %+v", firstBatch.Outcomes)
+	}
+	if firstBatch.SeverityTotals["NOTICE"] != 1 || firstBatch.SeverityTotals["ERROR"] != 2 {
+		t.Fatalf("batch-a severity totals = %+v", firstBatch.SeverityTotals)
+	}
+	secondBatch := snapshot.Insights.Batches.Items[1]
+	if secondBatch.BatchID != "batch-b" {
+		t.Fatalf("second batch id = %q, want batch-b", secondBatch.BatchID)
+	}
+	if secondBatch.SizeTotal != 1 || secondBatch.ProcessedTotal != 1 || secondBatch.Outcomes[string(JobCanceled)] != 1 {
+		t.Fatalf("batch-b aggregate = %+v", secondBatch)
+	}
+
+	if len(snapshot.Insights.Domains.Items) != 2 {
+		t.Fatalf("insights.domains.items size = %d, want 2", len(snapshot.Insights.Domains.Items))
+	}
+	firstDomain := snapshot.Insights.Domains.Items[0]
+	if firstDomain.Domain != "alpha.example" {
+		t.Fatalf("first domain = %q, want alpha.example", firstDomain.Domain)
+	}
+	if firstDomain.RunsTotal != 2 {
+		t.Fatalf("alpha.example runs_total = %d, want 2", firstDomain.RunsTotal)
+	}
+	if firstDomain.LastStatus != JobCanceled {
+		t.Fatalf("alpha.example last_status = %s, want canceled", firstDomain.LastStatus)
+	}
+	if math.Abs(firstDomain.AvgDurationMs-1200) > 0.001 {
+		t.Fatalf("alpha.example avg_duration_ms = %f, want 1200", firstDomain.AvgDurationMs)
+	}
+	if firstDomain.SeverityTotals["NOTICE"] != 1 {
+		t.Fatalf("alpha.example severity totals = %+v", firstDomain.SeverityTotals)
+	}
+	secondDomain := snapshot.Insights.Domains.Items[1]
+	if secondDomain.Domain != "beta.example" {
+		t.Fatalf("second domain = %q, want beta.example", secondDomain.Domain)
+	}
+	if secondDomain.RunsTotal != 1 || secondDomain.LastStatus != JobFailed {
+		t.Fatalf("beta.example aggregate = %+v", secondDomain)
+	}
+}
+
+func TestMetricsCollectorInsightsEvictionAndCaps(t *testing.T) {
+	cfg := DefaultConfig()
+	startedAt := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+	collector := newMetricsCollector(cfg, startedAt)
+	now := startedAt
+	collector.nowFn = func() time.Time { return now }
+	collector.batchInsightCap = 2
+	collector.domainInsightCap = 2
+	collector.maxBatchLimit = 2
+	collector.maxDomainLimit = 2
+
+	inputs := []struct {
+		batch  string
+		domain string
+	}{
+		{batch: "batch-a", domain: "a.example"},
+		{batch: "batch-b", domain: "b.example"},
+		{batch: "batch-c", domain: "c.example"},
+	}
+	for _, input := range inputs {
+		collector.ObserveJobSubmittedWithContext(input.batch, input.domain, JobQueued)
+		collector.ObserveJobStatusTransition(JobQueued, JobSucceeded)
+		collector.ObserveJobCompletionWithContext(input.batch, input.domain, JobSucceeded, 800*time.Millisecond, map[string]int64{
+			"WARNING": 1,
+		})
+		now = now.Add(time.Minute)
+	}
+
+	snapshot := collector.SnapshotWithLimits(50, 50)
+	if snapshot.Insights.Batches.Limit != 2 {
+		t.Fatalf("insights.batches.limit = %d, want 2", snapshot.Insights.Batches.Limit)
+	}
+	if snapshot.Insights.Domains.Limit != 2 {
+		t.Fatalf("insights.domains.limit = %d, want 2", snapshot.Insights.Domains.Limit)
+	}
+	if len(snapshot.Insights.Batches.Items) != 2 {
+		t.Fatalf("insights.batches.items size = %d, want 2", len(snapshot.Insights.Batches.Items))
+	}
+	if len(snapshot.Insights.Domains.Items) != 2 {
+		t.Fatalf("insights.domains.items size = %d, want 2", len(snapshot.Insights.Domains.Items))
+	}
+	if snapshot.Insights.Batches.Other == nil {
+		t.Fatal("insights.batches.other expected non-nil")
+	}
+	if snapshot.Insights.Batches.Other.SizeTotal < 1 || snapshot.Insights.Batches.Other.ProcessedTotal < 1 {
+		t.Fatalf("insights.batches.other = %+v, expected contribution from evicted entries", snapshot.Insights.Batches.Other)
+	}
+	if snapshot.Insights.Domains.Other == nil {
+		t.Fatal("insights.domains.other expected non-nil")
+	}
+	if snapshot.Insights.Domains.Other.RunsTotal < 1 {
+		t.Fatalf("insights.domains.other = %+v, expected contribution from evicted entries", snapshot.Insights.Domains.Other)
 	}
 }

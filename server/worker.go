@@ -92,7 +92,7 @@ func (s *Server) runJob(jobID string) error {
 	job.Status = JobRunning
 	job.StartedAt = now
 	job.Progress = 0
-	if err := s.updateJobWithMetrics(job); err != nil {
+	if _, _, _, err := s.updateJobWithMetricsTransition(job); err != nil {
 		return err
 	}
 
@@ -134,17 +134,20 @@ func (s *Server) runJob(jobID string) error {
 
 	job.Progress = 100
 	job.FinishedAt = finishedAt
-	if err := s.updateJobWithMetrics(job); err != nil {
+	_, _, becameTerminal, err := s.updateJobWithMetricsTransition(job)
+	if err != nil {
 		return err
 	}
 	if err := s.store.SetResult(job.ID, result); err != nil {
 		return err
 	}
-	duration := time.Duration(-1)
-	if !job.StartedAt.IsZero() {
-		duration = finishedAt.Sub(job.StartedAt)
+	if becameTerminal {
+		duration := time.Duration(-1)
+		if !job.StartedAt.IsZero() {
+			duration = finishedAt.Sub(job.StartedAt)
+		}
+		s.metrics.ObserveJobCompletionWithContext(job.BatchID, job.Domain, job.Status, duration, severityTotalsFromEntries(entries))
 	}
-	s.metrics.ObserveJobCompletion(job.Status, duration, severityTotalsFromEntries(entries))
 
 	return runErr
 }

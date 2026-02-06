@@ -72,18 +72,25 @@ var metricsSeverityLevels = [...]string{
 }
 
 const (
-	metricsMaxLocaleBuckets = 32
-	metricsLocaleOtherKey   = "_other"
+	metricsMaxLocaleBuckets   = 32
+	metricsLocaleOtherKey     = "_other"
+	metricsDefaultBatchLimit  = 20
+	metricsDefaultDomainLimit = 20
+	metricsMaxBatchLimit      = 100
+	metricsMaxDomainLimit     = 100
+	metricsBatchInsightCap    = 256
+	metricsDomainInsightCap   = 256
 )
 
 type MetricsSnapshot struct {
-	SchemaVersion string                 `json:"schema_version"`
-	GeneratedAt   time.Time              `json:"generated_at"`
-	Health        MetricsHealthSnapshot  `json:"health"`
-	Jobs          MetricsJobsSnapshot    `json:"jobs"`
-	API           MetricsAPISnapshot     `json:"api"`
-	Quality       MetricsQualitySnapshot `json:"quality"`
-	Trends        MetricsTrendsSnapshot  `json:"trends"`
+	SchemaVersion string                  `json:"schema_version"`
+	GeneratedAt   time.Time               `json:"generated_at"`
+	Health        MetricsHealthSnapshot   `json:"health"`
+	Jobs          MetricsJobsSnapshot     `json:"jobs"`
+	API           MetricsAPISnapshot      `json:"api"`
+	Quality       MetricsQualitySnapshot  `json:"quality"`
+	Insights      MetricsInsightsSnapshot `json:"insights"`
+	Trends        MetricsTrendsSnapshot   `json:"trends"`
 }
 
 type MetricsHealthSnapshot struct {
@@ -203,6 +210,17 @@ type MetricsCollector struct {
 	severityTotals     map[string]int64
 	localeCounts       map[string]int64
 
+	defaultBatchLimit  int
+	defaultDomainLimit int
+	maxBatchLimit      int
+	maxDomainLimit     int
+	batchInsightCap    int
+	domainInsightCap   int
+	batchInsights      map[string]*metricsBatchInsight
+	domainInsights     map[string]*metricsDomainInsight
+	batchOther         metricsBatchInsight
+	domainOther        metricsDomainInsight
+
 	trend1m trendRing
 	trend5m trendRing
 }
@@ -229,8 +247,24 @@ func newMetricsCollector(cfg Config, startedAt time.Time) *MetricsCollector {
 		jobDuration:          newBoundedHistogram(metricsJobDurationBucketsMs[:]),
 		severityTotals:       zeroMetricsSeverityTotals(),
 		localeCounts:         map[string]int64{},
-		trend1m:              newTrendRing(time.Minute, 6*time.Hour),
-		trend5m:              newTrendRing(5*time.Minute, 48*time.Hour),
+		defaultBatchLimit:    metricsDefaultBatchLimit,
+		defaultDomainLimit:   metricsDefaultDomainLimit,
+		maxBatchLimit:        metricsMaxBatchLimit,
+		maxDomainLimit:       metricsMaxDomainLimit,
+		batchInsightCap:      metricsBatchInsightCap,
+		domainInsightCap:     metricsDomainInsightCap,
+		batchInsights:        map[string]*metricsBatchInsight{},
+		domainInsights:       map[string]*metricsDomainInsight{},
+		batchOther: metricsBatchInsight{
+			BatchID:        metricsLocaleOtherKey,
+			SeverityTotals: zeroMetricsSeverityTotals(),
+		},
+		domainOther: metricsDomainInsight{
+			Domain:         metricsLocaleOtherKey,
+			SeverityTotals: zeroMetricsSeverityTotals(),
+		},
+		trend1m: newTrendRing(time.Minute, 6*time.Hour),
+		trend5m: newTrendRing(5*time.Minute, 48*time.Hour),
 	}
 }
 
@@ -239,7 +273,15 @@ func (m *MetricsCollector) Snapshot() MetricsSnapshot {
 	if m.nowFn != nil {
 		now = m.nowFn().UTC()
 	}
-	return m.snapshotAt(now)
+	return m.snapshotAtWithLimits(now, m.defaultDomainLimit, m.defaultBatchLimit)
+}
+
+func (m *MetricsCollector) SnapshotWithLimits(domainLimit int, batchLimit int) MetricsSnapshot {
+	now := time.Now().UTC()
+	if m.nowFn != nil {
+		now = m.nowFn().UTC()
+	}
+	return m.snapshotAtWithLimits(now, domainLimit, batchLimit)
 }
 
 func (m *MetricsCollector) ObserveQueuePaused(paused bool) {
@@ -249,9 +291,18 @@ func (m *MetricsCollector) ObserveQueuePaused(paused bool) {
 }
 
 func (m *MetricsCollector) ObserveJobSubmitted(initialStatus JobStatus) {
+	m.ObserveJobSubmittedWithContext("", "", initialStatus)
+}
+
+func (m *MetricsCollector) ObserveJobSubmittedWithContext(batchID string, domain string, initialStatus JobStatus) {
 	m.mu.Lock()
 	m.submittedTotal++
 	m.observeStatusTransitionLocked("", initialStatus)
+	now := time.Now().UTC()
+	if m.nowFn != nil {
+		now = m.nowFn().UTC()
+	}
+	m.observeBatchSubmissionLocked(now, batchID)
 	m.mu.Unlock()
 }
 
@@ -301,6 +352,10 @@ func (m *MetricsCollector) ObserveAPIRequest(route string, method string, status
 }
 
 func (m *MetricsCollector) ObserveJobCompletion(status JobStatus, duration time.Duration, severityTotals map[string]int64) {
+	m.ObserveJobCompletionWithContext("", "", status, duration, severityTotals)
+}
+
+func (m *MetricsCollector) ObserveJobCompletionWithContext(batchID string, domain string, status JobStatus, duration time.Duration, severityTotals map[string]int64) {
 	if !isTerminalMetricsStatus(status) {
 		return
 	}
@@ -323,6 +378,8 @@ func (m *MetricsCollector) ObserveJobCompletion(status JobStatus, duration time.
 		now = m.nowFn().UTC()
 	}
 	m.observeTrendSeverityLocked(now, severityTotals)
+	m.observeBatchCompletionLocked(now, batchID, status, severityTotals)
+	m.observeDomainCompletionLocked(now, domain, status, duration, severityTotals)
 	m.mu.Unlock()
 }
 
@@ -394,6 +451,10 @@ func (m *MetricsCollector) observeStatusTransitionLocked(fromStatus, toStatus Jo
 }
 
 func (m *MetricsCollector) snapshotAt(now time.Time) MetricsSnapshot {
+	return m.snapshotAtWithLimits(now, m.defaultDomainLimit, m.defaultBatchLimit)
+}
+
+func (m *MetricsCollector) snapshotAtWithLimits(now time.Time, domainLimit int, batchLimit int) MetricsSnapshot {
 	now = now.UTC()
 	uptime := int64(now.Sub(m.startedAt).Seconds())
 	if uptime < 0 {
@@ -424,6 +485,7 @@ func (m *MetricsCollector) snapshotAt(now time.Time) MetricsSnapshot {
 	}
 	severityTotals := copyStringCounts(m.severityTotals)
 	localeCounts := copyStringCounts(m.localeCounts)
+	insights := m.snapshotInsightsLocked(domainLimit, batchLimit)
 	trends := m.snapshotTrendsLocked(now)
 	m.mu.Unlock()
 
@@ -488,7 +550,8 @@ func (m *MetricsCollector) snapshotAt(now time.Time) MetricsSnapshot {
 				Counts: localeCounts,
 			},
 		},
-		Trends: trends,
+		Insights: insights,
+		Trends:   trends,
 	}
 }
 

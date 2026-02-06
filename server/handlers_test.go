@@ -1045,6 +1045,12 @@ func TestMetricsTracksQualityAcrossMixedOutcomesAndLocaleRequests(t *testing.T) 
 	if snapshot.Quality.LocaleUsage.Counts["pt_br"] != 1 {
 		t.Fatalf("quality.locale_usage.counts[pt_br] = %d, want 1", snapshot.Quality.LocaleUsage.Counts["pt_br"])
 	}
+	if len(snapshot.Insights.Domains.Items) == 0 {
+		t.Fatal("expected non-empty domain insights")
+	}
+	if snapshot.Insights.Batches.Limit == 0 || snapshot.Insights.Batches.Cap == 0 {
+		t.Fatalf("expected batch insight limit/cap metadata, got %+v", snapshot.Insights.Batches)
+	}
 }
 
 func TestHealthAndMetrics(t *testing.T) {

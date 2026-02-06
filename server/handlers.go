@@ -75,7 +75,7 @@ func (s *Server) handleJobsBatch(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		_ = s.queue.Enqueue(created.ID)
-		s.metrics.ObserveJobSubmitted(JobQueued)
+		s.metrics.ObserveJobSubmittedWithContext(created.BatchID, created.Domain, JobQueued)
 		jobIDs = append(jobIDs, created.ID)
 	}
 
@@ -253,7 +253,7 @@ func (s *Server) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = s.queue.Enqueue(created.ID)
-	s.metrics.ObserveJobSubmitted(JobQueued)
+	s.metrics.ObserveJobSubmittedWithContext(created.BatchID, created.Domain, JobQueued)
 
 	writeJSON(w, http.StatusCreated, created)
 }
@@ -394,7 +394,8 @@ func (s *Server) handleCancelJob(w http.ResponseWriter, _ *http.Request, jobID s
 	job.Error = "canceled"
 	job.FinishedAt = time.Now().UTC()
 	job.Progress = 100
-	if err := s.updateJobWithMetrics(job); err != nil {
+	_, _, becameTerminal, err := s.updateJobWithMetricsTransition(job)
+	if err != nil {
 		writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
 		return
 	}
@@ -404,6 +405,13 @@ func (s *Server) handleCancelJob(w http.ResponseWriter, _ *http.Request, jobID s
 		Status:  JobCanceled,
 		Summary: map[string]any{"error": "canceled"},
 	})
+	if becameTerminal {
+		duration := time.Duration(-1)
+		if !job.StartedAt.IsZero() && !job.FinishedAt.IsZero() {
+			duration = job.FinishedAt.Sub(job.StartedAt)
+		}
+		s.metrics.ObserveJobCompletionWithContext(job.BatchID, job.Domain, job.Status, duration, zeroMetricsSeverityTotals())
+	}
 	writeJSON(w, http.StatusOK, job)
 }
 
@@ -513,7 +521,8 @@ func (s *Server) handleQueueRemove(w http.ResponseWriter, r *http.Request) {
 				job.Error = "removed_from_queue"
 				job.FinishedAt = time.Now().UTC()
 				job.Progress = 100
-				if err := s.updateJobWithMetrics(job); err != nil {
+				_, _, becameTerminal, err := s.updateJobWithMetricsTransition(job)
+				if err != nil {
 					writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
 					return
 				}
@@ -523,6 +532,13 @@ func (s *Server) handleQueueRemove(w http.ResponseWriter, r *http.Request) {
 					Status:  JobCanceled,
 					Summary: map[string]any{"error": "removed_from_queue"},
 				})
+				if becameTerminal {
+					duration := time.Duration(-1)
+					if !job.StartedAt.IsZero() && !job.FinishedAt.IsZero() {
+						duration = job.FinishedAt.Sub(job.StartedAt)
+					}
+					s.metrics.ObserveJobCompletionWithContext(job.BatchID, job.Domain, job.Status, duration, zeroMetricsSeverityTotals())
+				}
 			}
 		}
 		removed = append(removed, jobID)

@@ -2,6 +2,7 @@ package server
 
 import (
 	"math"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -108,6 +109,21 @@ func TestMetricsCollectorZeroStateSnapshot(t *testing.T) {
 		if got := snapshot.Quality.Severity.PerCompletedRates[level]; got != 0 {
 			t.Fatalf("quality.severity.per_completed_rates[%q] = %f, want 0", level, got)
 		}
+	}
+	if len(snapshot.Trends.Windows) != len(metricsTrendWindowOrder) {
+		t.Fatalf("trends.windows size = %d, want %d", len(snapshot.Trends.Windows), len(metricsTrendWindowOrder))
+	}
+	if got := len(snapshot.Trends.Windows["1h"].Points); got != 60 {
+		t.Fatalf("trends.windows[1h].points size = %d, want 60", got)
+	}
+	if got := len(snapshot.Trends.Windows["6h"].Points); got != 360 {
+		t.Fatalf("trends.windows[6h].points size = %d, want 360", got)
+	}
+	if got := len(snapshot.Trends.Windows["24h"].Points); got != 288 {
+		t.Fatalf("trends.windows[24h].points size = %d, want 288", got)
+	}
+	if got := len(snapshot.Trends.Windows["48h"].Points); got != 576 {
+		t.Fatalf("trends.windows[48h].points size = %d, want 576", got)
 	}
 }
 
@@ -315,7 +331,7 @@ func TestMetricsCollectorLocaleUsageIsBounded(t *testing.T) {
 	collector := newMetricsCollector(cfg, time.Now().UTC())
 
 	for i := 0; i < metricsMaxLocaleBuckets+5; i++ {
-		collector.ObserveResultLocale("loc_" + string(rune('a'+i)))
+		collector.ObserveResultLocale("loc_" + strconv.Itoa(i))
 	}
 
 	snapshot := collector.Snapshot()

@@ -83,6 +83,7 @@ type MetricsSnapshot struct {
 	Jobs          MetricsJobsSnapshot    `json:"jobs"`
 	API           MetricsAPISnapshot     `json:"api"`
 	Quality       MetricsQualitySnapshot `json:"quality"`
+	Trends        MetricsTrendsSnapshot  `json:"trends"`
 }
 
 type MetricsHealthSnapshot struct {
@@ -177,6 +178,7 @@ type MetricsCollector struct {
 	workerCount       int
 	activeWorkers     int
 	maxConcurrentJobs int
+	nowFn             func() time.Time
 
 	queuePaused bool
 	queueDepth  int64
@@ -200,6 +202,9 @@ type MetricsCollector struct {
 	jobDurationTotalMs int64
 	severityTotals     map[string]int64
 	localeCounts       map[string]int64
+
+	trend1m trendRing
+	trend5m trendRing
 }
 
 func NewMetricsCollector(cfg Config) *MetricsCollector {
@@ -216,6 +221,7 @@ func newMetricsCollector(cfg Config, startedAt time.Time) *MetricsCollector {
 		workerCount:          cfg.WorkerCount,
 		activeWorkers:        activeWorkers,
 		maxConcurrentJobs:    cfg.MaxConcurrentJobs,
+		nowFn:                func() time.Time { return time.Now().UTC() },
 		statusCounts:         zeroStatusCounts(),
 		apiStatusClassCounts: zeroStatusClassCounts(),
 		apiErrorCodeCounts:   map[string]int64{},
@@ -223,11 +229,17 @@ func newMetricsCollector(cfg Config, startedAt time.Time) *MetricsCollector {
 		jobDuration:          newBoundedHistogram(metricsJobDurationBucketsMs[:]),
 		severityTotals:       zeroMetricsSeverityTotals(),
 		localeCounts:         map[string]int64{},
+		trend1m:              newTrendRing(time.Minute, 6*time.Hour),
+		trend5m:              newTrendRing(5*time.Minute, 48*time.Hour),
 	}
 }
 
 func (m *MetricsCollector) Snapshot() MetricsSnapshot {
-	return m.snapshotAt(time.Now().UTC())
+	now := time.Now().UTC()
+	if m.nowFn != nil {
+		now = m.nowFn().UTC()
+	}
+	return m.snapshotAt(now)
 }
 
 func (m *MetricsCollector) ObserveQueuePaused(paused bool) {
@@ -280,6 +292,11 @@ func (m *MetricsCollector) ObserveAPIRequest(route string, method string, status
 	routeMetrics.RequestsTotal++
 	routeMetrics.StatusClassCounts[statusClass]++
 	routeMetrics.Latency.Observe(duration)
+	now := time.Now().UTC()
+	if m.nowFn != nil {
+		now = m.nowFn().UTC()
+	}
+	m.observeTrendAPIRequestLocked(now, key, duration)
 	m.mu.Unlock()
 }
 
@@ -301,6 +318,11 @@ func (m *MetricsCollector) ObserveJobCompletion(status JobStatus, duration time.
 	for _, level := range metricsSeverityLevels {
 		m.severityTotals[level] += severityTotals[level]
 	}
+	now := time.Now().UTC()
+	if m.nowFn != nil {
+		now = m.nowFn().UTC()
+	}
+	m.observeTrendSeverityLocked(now, severityTotals)
 	m.mu.Unlock()
 }
 
@@ -324,6 +346,10 @@ func (m *MetricsCollector) observeStatusTransitionLocked(fromStatus, toStatus Jo
 	if fromStatus == toStatus {
 		return
 	}
+	now := time.Now().UTC()
+	if m.nowFn != nil {
+		now = m.nowFn().UTC()
+	}
 
 	if isKnownMetricsStatus(fromStatus) {
 		key := string(fromStatus)
@@ -345,9 +371,11 @@ func (m *MetricsCollector) observeStatusTransitionLocked(fromStatus, toStatus Jo
 
 	if fromStatus != JobQueued && toStatus == JobQueued {
 		m.queueDepth++
+		m.observeTrendQueueDepthLocked(now, m.queueDepth)
 	}
 	if fromStatus == JobQueued && toStatus != JobQueued && m.queueDepth > 0 {
 		m.queueDepth--
+		m.observeTrendQueueDepthLocked(now, m.queueDepth)
 	}
 
 	if !isTerminalMetricsStatus(fromStatus) && isTerminalMetricsStatus(toStatus) {
@@ -361,6 +389,7 @@ func (m *MetricsCollector) observeStatusTransitionLocked(fromStatus, toStatus Jo
 		if toStatus == JobCanceled {
 			m.canceledTotal++
 		}
+		m.observeTrendOutcomeLocked(now, toStatus)
 	}
 }
 
@@ -395,6 +424,7 @@ func (m *MetricsCollector) snapshotAt(now time.Time) MetricsSnapshot {
 	}
 	severityTotals := copyStringCounts(m.severityTotals)
 	localeCounts := copyStringCounts(m.localeCounts)
+	trends := m.snapshotTrendsLocked(now)
 	m.mu.Unlock()
 
 	completedForRates := succeededTotal + failedTotal + canceledTotal
@@ -458,6 +488,7 @@ func (m *MetricsCollector) snapshotAt(now time.Time) MetricsSnapshot {
 				Counts: localeCounts,
 			},
 		},
+		Trends: trends,
 	}
 }
 

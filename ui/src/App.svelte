@@ -15,6 +15,8 @@
   let jobs = [];
   let jobsLoading = false;
   let filteredJobs = [];
+  let autoRefreshRecent = false;
+  let recentPoller = null;
   let severityFilter = "all";
   let jobSort = "started_at_desc";
   let jobBatchFilter = "";
@@ -308,6 +310,8 @@
       }))
       .filter((entry) => entry.count > 0);
   const jobSeverityTotal = (job, level) => Number(job?.severity_totals?.[level] || 0);
+  const hasRunningOrQueuedJobs = (items = []) =>
+    items.some((job) => ["queued", "running"].includes(String(job?.status || "").toLowerCase()));
   const matchesSeverityFilter = (job) => {
     if (severityFilter === "warnings_plus") {
       return (
@@ -431,6 +435,9 @@
       }
       const list = await apiFetch(`/jobs?${params.toString()}`);
       jobs = list.items || [];
+      if (autoRefreshRecent && !hasRunningOrQueuedJobs(jobs)) {
+        autoRefreshRecent = false;
+      }
     } catch (error) {
       setStatus(`Failed to load jobs: ${error.message}`, "warn");
     } finally {
@@ -614,6 +621,12 @@
     batchPoller = setInterval(() => loadBatch(), 7000);
   };
 
+  const startRecentPolling = () => {
+    if (recentPoller) clearInterval(recentPoller);
+    if (!autoRefreshRecent || activeTab !== "recent") return;
+    recentPoller = setInterval(() => loadJobs(), 7000);
+  };
+
   $: {
     autoRefreshJob;
     selectedJobId;
@@ -625,6 +638,12 @@
     selectedBatchId;
     batchLoading;
     startBatchPolling();
+  }
+
+  $: {
+    autoRefreshRecent;
+    activeTab;
+    startRecentPolling();
   }
 
   $: if (
@@ -695,6 +714,7 @@
   onDestroy(() => {
     if (jobPoller) clearInterval(jobPoller);
     if (batchPoller) clearInterval(batchPoller);
+    if (recentPoller) clearInterval(recentPoller);
     if (jobInspectorHighlightTimer) clearTimeout(jobInspectorHighlightTimer);
     window.removeEventListener("hashchange", updateTabFromHash);
   });
@@ -868,6 +888,9 @@
       <div class="row">
         <button class="ghost" type="button" on:click={loadJobs} disabled={jobsLoading}>
           {jobsLoading ? "Refreshing..." : "Refresh list"}
+        </button>
+        <button class="ghost" type="button" on:click={() => (autoRefreshRecent = !autoRefreshRecent)}>
+          {autoRefreshRecent ? "Auto refresh: on" : "Auto refresh: off"}
         </button>
         <div class="sort-control">
           <label for="recent-sort">Sort</label>

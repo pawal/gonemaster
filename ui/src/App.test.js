@@ -82,6 +82,63 @@ describe("App", () => {
     unmount();
   });
 
+  it("auto-refreshes recent tests and stops when jobs are no longer queued or running", async () => {
+    let jobsCallCount = 0;
+    const runningJob = {
+      id: "job_live",
+      domain: "example.com",
+      status: "running",
+      created_at: "2026-02-03T00:00:00Z",
+      progress: 65
+    };
+    const doneJob = {
+      ...runningJob,
+      status: "succeeded",
+      progress: 100
+    };
+
+    global.fetch.mockImplementation((url) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      if (value.includes("/api/v1/jobs?")) {
+        jobsCallCount += 1;
+        if (jobsCallCount >= 3) {
+          return jsonResponse({ items: [doneJob], total: 1 });
+        }
+        return jsonResponse({ items: [runningJob], total: 1 });
+      }
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+
+    await openRecentTab();
+    expect(await screen.findByText("job_live")).toBeInTheDocument();
+
+    const intervalCallbacks = [];
+    vi.spyOn(global, "setInterval").mockImplementation((callback) => {
+      intervalCallbacks.push(callback);
+      return intervalCallbacks.length;
+    });
+    vi.spyOn(global, "clearInterval").mockImplementation(() => {});
+
+    await fireEvent.click(screen.getByRole("button", { name: /auto refresh: off/i }));
+    expect(screen.getByRole("button", { name: /auto refresh: on/i })).toBeInTheDocument();
+    expect(intervalCallbacks.length).toBeGreaterThan(0);
+
+    const poll = intervalCallbacks[intervalCallbacks.length - 1];
+    expect(typeof poll).toBe("function");
+    await poll();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /auto refresh: off/i })).toBeInTheDocument();
+      expect(screen.getByText("job_live")).toBeInTheDocument();
+      expect(screen.getByText("example.com - succeeded")).toBeInTheDocument();
+    });
+    expect(jobsCallCount).toBeGreaterThanOrEqual(3);
+
+    unmount();
+  });
+
   it("warns when submitting a single job without a domain", async () => {
     global.fetch.mockImplementation(() => jsonResponse({ items: [] }));
 

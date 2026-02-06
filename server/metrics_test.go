@@ -69,6 +69,24 @@ func TestMetricsCollectorZeroStateSnapshot(t *testing.T) {
 			t.Fatalf("jobs.status_counts[%q] = %d, want 0", status, count)
 		}
 	}
+
+	if snapshot.API.RequestsTotal != 0 {
+		t.Fatalf("api.requests_total = %d, want 0", snapshot.API.RequestsTotal)
+	}
+	if len(snapshot.API.Routes) != 0 {
+		t.Fatalf("api.routes size = %d, want 0", len(snapshot.API.Routes))
+	}
+	if len(snapshot.API.StatusClassCounts) != len(metricsStatusClasses) {
+		t.Fatalf("api.status_class_counts size = %d, want %d", len(snapshot.API.StatusClassCounts), len(metricsStatusClasses))
+	}
+	for _, statusClass := range metricsStatusClasses {
+		if count := snapshot.API.StatusClassCounts[statusClass]; count != 0 {
+			t.Fatalf("api.status_class_counts[%q] = %d, want 0", statusClass, count)
+		}
+	}
+	if len(snapshot.API.ErrorCodeCounts) != 0 {
+		t.Fatalf("api.error_code_counts size = %d, want 0", len(snapshot.API.ErrorCodeCounts))
+	}
 }
 
 func TestMetricsCollectorUptimeDoesNotGoNegative(t *testing.T) {
@@ -138,5 +156,58 @@ func TestMetricsCollectorTracksLifecycle(t *testing.T) {
 	}
 	if got := snapshot.Jobs.StatusCounts[string(JobCanceled)]; got != 1 {
 		t.Fatalf("jobs.status_counts[%q] = %d, want 1", JobCanceled, got)
+	}
+}
+
+func TestMetricsCollectorTracksAPIRequests(t *testing.T) {
+	cfg := DefaultConfig()
+	startedAt := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+	collector := newMetricsCollector(cfg, startedAt)
+
+	collector.ObserveAPIRequest("/api/v1/jobs", "GET", 200, 8*time.Millisecond, "")
+	collector.ObserveAPIRequest("/api/v1/jobs", "GET", 201, 120*time.Millisecond, "")
+	collector.ObserveAPIRequest("/api/v1/jobs", "GET", 503, 900*time.Millisecond, "queue_error")
+	collector.ObserveAPIRequest("/api/v1/jobs/{job_id}/cancel", "POST", 404, 20*time.Millisecond, "not_found")
+
+	snapshot := collector.snapshotAt(startedAt.Add(time.Minute))
+
+	if snapshot.API.RequestsTotal != 4 {
+		t.Fatalf("api.requests_total = %d, want 4", snapshot.API.RequestsTotal)
+	}
+	if snapshot.API.StatusClassCounts["2xx"] != 2 {
+		t.Fatalf("api.status_class_counts[2xx] = %d, want 2", snapshot.API.StatusClassCounts["2xx"])
+	}
+	if snapshot.API.StatusClassCounts["4xx"] != 1 {
+		t.Fatalf("api.status_class_counts[4xx] = %d, want 1", snapshot.API.StatusClassCounts["4xx"])
+	}
+	if snapshot.API.StatusClassCounts["5xx"] != 1 {
+		t.Fatalf("api.status_class_counts[5xx] = %d, want 1", snapshot.API.StatusClassCounts["5xx"])
+	}
+	if snapshot.API.ErrorCodeCounts["queue_error"] != 1 {
+		t.Fatalf("api.error_code_counts[queue_error] = %d, want 1", snapshot.API.ErrorCodeCounts["queue_error"])
+	}
+	if snapshot.API.ErrorCodeCounts["not_found"] != 1 {
+		t.Fatalf("api.error_code_counts[not_found] = %d, want 1", snapshot.API.ErrorCodeCounts["not_found"])
+	}
+
+	if len(snapshot.API.Routes) != 2 {
+		t.Fatalf("api.routes size = %d, want 2", len(snapshot.API.Routes))
+	}
+	first := snapshot.API.Routes[0]
+	if first.Route != "/api/v1/jobs" || first.Method != "GET" {
+		t.Fatalf("first route = %s %s, want GET /api/v1/jobs", first.Method, first.Route)
+	}
+	if first.RequestsTotal != 3 {
+		t.Fatalf("first.requests_total = %d, want 3", first.RequestsTotal)
+	}
+	if first.LatencyMs.P50 != 250 || first.LatencyMs.P90 != 1000 || first.LatencyMs.P99 != 1000 {
+		t.Fatalf("first.latency_ms = %+v, want p50=250 p90=1000 p99=1000", first.LatencyMs)
+	}
+	second := snapshot.API.Routes[1]
+	if second.Route != "/api/v1/jobs/{job_id}/cancel" || second.Method != "POST" {
+		t.Fatalf("second route = %s %s, want POST /api/v1/jobs/{job_id}/cancel", second.Method, second.Route)
+	}
+	if second.LatencyMs.P50 != 25 || second.LatencyMs.P90 != 25 || second.LatencyMs.P99 != 25 {
+		t.Fatalf("second.latency_ms = %+v, want p50=25 p90=25 p99=25", second.LatencyMs)
 	}
 }

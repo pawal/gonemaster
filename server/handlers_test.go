@@ -27,6 +27,17 @@ func getMetricsSnapshot(t *testing.T, srv *Server) MetricsSnapshot {
 	return snapshot
 }
 
+func findAPIRouteMetrics(t *testing.T, snapshot MetricsSnapshot, method string, route string) MetricsAPIRouteMetrics {
+	t.Helper()
+	for _, metrics := range snapshot.API.Routes {
+		if metrics.Method == method && metrics.Route == route {
+			return metrics
+		}
+	}
+	t.Fatalf("route metrics not found for %s %s", method, route)
+	return MetricsAPIRouteMetrics{}
+}
+
 func TestCreateAndGetJob(t *testing.T) {
 	srv := New(DefaultConfig())
 
@@ -891,6 +902,68 @@ func TestMetricsTracksPauseResumeAndCancel(t *testing.T) {
 	snapshot = getMetricsSnapshot(t, srv)
 	if snapshot.Health.QueuePaused {
 		t.Fatal("queue_paused = true, want false")
+	}
+}
+
+func TestMetricsTracksAPIRequestsByRouteMethodStatusAndErrorCode(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/healthz", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+
+	resp = httptest.NewRecorder()
+	payload := `{"job_ids":["missing"]}`
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/queue/reorder", bytes.NewBufferString(payload))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", resp.Code)
+	}
+
+	resp = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/jobs/job-missing/cancel", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", resp.Code)
+	}
+
+	snapshot := srv.metrics.Snapshot()
+	if snapshot.API.RequestsTotal != 3 {
+		t.Fatalf("api.requests_total = %d, want 3", snapshot.API.RequestsTotal)
+	}
+	if snapshot.API.StatusClassCounts["2xx"] != 1 {
+		t.Fatalf("api.status_class_counts[2xx] = %d, want 1", snapshot.API.StatusClassCounts["2xx"])
+	}
+	if snapshot.API.StatusClassCounts["4xx"] != 2 {
+		t.Fatalf("api.status_class_counts[4xx] = %d, want 2", snapshot.API.StatusClassCounts["4xx"])
+	}
+	if snapshot.API.ErrorCodeCounts["invalid_queue"] != 1 {
+		t.Fatalf("api.error_code_counts[invalid_queue] = %d, want 1", snapshot.API.ErrorCodeCounts["invalid_queue"])
+	}
+	if snapshot.API.ErrorCodeCounts["not_found"] != 1 {
+		t.Fatalf("api.error_code_counts[not_found] = %d, want 1", snapshot.API.ErrorCodeCounts["not_found"])
+	}
+
+	health := findAPIRouteMetrics(t, snapshot, http.MethodGet, "/api/v1/healthz")
+	if health.RequestsTotal != 1 || health.StatusClassCounts["2xx"] != 1 {
+		t.Fatalf("unexpected health route metrics: %+v", health)
+	}
+	if health.LatencyMs.P50 == 0 || health.LatencyMs.P90 == 0 || health.LatencyMs.P99 == 0 {
+		t.Fatalf("expected non-zero latency percentiles, got %+v", health.LatencyMs)
+	}
+
+	reorder := findAPIRouteMetrics(t, snapshot, http.MethodPost, "/api/v1/queue/reorder")
+	if reorder.RequestsTotal != 1 || reorder.StatusClassCounts["4xx"] != 1 {
+		t.Fatalf("unexpected reorder route metrics: %+v", reorder)
+	}
+
+	cancel := findAPIRouteMetrics(t, snapshot, http.MethodPost, "/api/v1/jobs/{job_id}/cancel")
+	if cancel.RequestsTotal != 1 || cancel.StatusClassCounts["4xx"] != 1 {
+		t.Fatalf("unexpected cancel route metrics: %+v", cancel)
 	}
 }
 

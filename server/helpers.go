@@ -30,6 +30,9 @@ func readJSON(r *http.Request, maxBodySize int64, dst any) error {
 }
 
 func writeError(w http.ResponseWriter, status int, code string, message string, details map[string]any) {
+	if metricsWriter, ok := w.(metricsAwareResponseWriter); ok {
+		metricsWriter.SetErrorCode(code)
+	}
 	resp := ErrorResponse{
 		Error: ErrorBody{
 			Code:    code,

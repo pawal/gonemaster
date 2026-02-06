@@ -32,6 +32,12 @@ describe("App", () => {
     await fireEvent.click(screen.getByRole("tab", { name: "Batch Jobs" }));
   };
 
+  const openMetricsTab = async () => {
+    await fireEvent.click(screen.getByRole("tab", { name: "Metrics" }));
+  };
+
+  const getMetricsPanel = () => screen.getByRole("tabpanel", { name: "Metrics" });
+
   it("renders the main sections", async () => {
     global.fetch.mockImplementation(() => jsonResponse({ items: [] }));
 
@@ -207,6 +213,206 @@ describe("App", () => {
       expect(screen.getByText("batch.example - succeeded")).toBeInTheDocument();
     });
     expect(batchCalls).toBeGreaterThanOrEqual(2);
+
+    unmount();
+  });
+
+  it("renders metrics cards, trends, and insight tables", async () => {
+    const metricsPayload = {
+      schema_version: "v1",
+      generated_at: "2026-02-10T12:00:00Z",
+      health: {
+        queue_depth: 3,
+        in_flight_jobs: 2
+      },
+      jobs: {
+        status_counts: {
+          queued: 1,
+          running: 1
+        }
+      },
+      api: {
+        routes: [
+          { latency_ms: { p90: 320 } }
+        ]
+      },
+      quality: {
+        outcomes: {
+          success_rate: 0.8,
+          failed_rate: 0.15
+        },
+        job_duration_ms: {
+          avg: 1450
+        },
+        severity: {
+          totals: {
+            NOTICE: 5,
+            WARNING: 2,
+            ERROR: 1,
+            CRITICAL: 0
+          }
+        }
+      },
+      insights: {
+        domains: {
+          items: [
+            {
+              domain: "alpha.example",
+              runs_total: 3,
+              last_status: "failed",
+              avg_duration_ms: 1777,
+              severity_totals: {
+                ERROR: 2,
+                CRITICAL: 1
+              }
+            }
+          ]
+        },
+        batches: {
+          items: [
+            {
+              batch_id: "batch_a",
+              processed_total: 4,
+              outcomes: {
+                failed: 2,
+                expired: 1,
+                canceled: 0
+              },
+              severity_totals: {
+                ERROR: 2,
+                CRITICAL: 1
+              }
+            }
+          ]
+        }
+      },
+      trends: {
+        windows: {
+          "1h": {
+            points: [
+              { throughput: 1, failed: 0, queue_depth: 2 },
+              { throughput: 3, failed: 1, queue_depth: 4 }
+            ]
+          }
+        }
+      }
+    };
+
+    global.fetch.mockImplementation((url) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      if (value.includes("/api/v1/jobs?")) {
+        return jsonResponse({ items: [], total: 0 });
+      }
+      if (value.startsWith("/api/v1/metrics?")) {
+        return jsonResponse(metricsPayload);
+      }
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+    await openMetricsTab();
+    const metricsPanel = getMetricsPanel();
+
+    expect(await within(metricsPanel).findByLabelText("Queue depth trend")).toBeInTheDocument();
+    expect(within(metricsPanel).getByText("In-flight jobs")).toBeInTheDocument();
+    expect(within(metricsPanel).getByText("80.0%")).toBeInTheDocument();
+    expect(within(metricsPanel).getByText("15.0%")).toBeInTheDocument();
+    expect(within(metricsPanel).getByText("320 ms")).toBeInTheDocument();
+    expect(within(metricsPanel).getByRole("heading", { name: "Top domains" })).toBeInTheDocument();
+    expect(within(metricsPanel).getByText("alpha.example")).toBeInTheDocument();
+    expect(within(metricsPanel).getByRole("heading", { name: "Error-heavy batches" })).toBeInTheDocument();
+    expect(within(metricsPanel).getByText("batch_a")).toBeInTheDocument();
+
+    unmount();
+  });
+
+  it("auto-refreshes metrics tab on polling interval", async () => {
+    const metricsCalls = [];
+    let metricsCount = 0;
+    global.fetch.mockImplementation((url) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      if (value.includes("/api/v1/jobs?")) {
+        return jsonResponse({ items: [], total: 0 });
+      }
+      if (value.startsWith("/api/v1/metrics?")) {
+        metricsCalls.push(value);
+        metricsCount += 1;
+        return jsonResponse({
+          schema_version: "v1",
+          generated_at: "2026-02-10T12:00:00Z",
+          health: { queue_depth: metricsCount, in_flight_jobs: 0 },
+          jobs: { status_counts: { queued: 0, running: 0 } },
+          api: { routes: [] },
+          quality: { outcomes: { success_rate: 1, failed_rate: 0 }, job_duration_ms: { avg: 0 }, severity: { totals: {} } },
+          insights: { domains: { items: [] }, batches: { items: [] } },
+          trends: { windows: { "1h": { points: [] } } }
+        });
+      }
+      return jsonResponse({});
+    });
+
+    const intervalCallbacks = [];
+    vi.spyOn(global, "setInterval").mockImplementation((callback) => {
+      intervalCallbacks.push(callback);
+      return intervalCallbacks.length;
+    });
+    vi.spyOn(global, "clearInterval").mockImplementation(() => {});
+
+    const { unmount } = render(App);
+    await openMetricsTab();
+    const metricsPanel = getMetricsPanel();
+    expect(await within(metricsPanel).findByLabelText("Queue depth trend")).toBeInTheDocument();
+    expect(intervalCallbacks.length).toBeGreaterThan(0);
+    const metricsCallsBeforePoll = metricsCalls.length;
+    for (const poll of intervalCallbacks) {
+      if (typeof poll === "function") {
+        await poll();
+      }
+    }
+
+    await waitFor(() => {
+      expect(metricsCalls.length).toBeGreaterThan(metricsCallsBeforePoll);
+    });
+
+    unmount();
+  });
+
+  it("shows metrics error state and supports retry", async () => {
+    let metricsCalls = 0;
+    global.fetch.mockImplementation((url) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      if (value.includes("/api/v1/jobs?")) {
+        return jsonResponse({ items: [], total: 0 });
+      }
+      if (value.startsWith("/api/v1/metrics?")) {
+        metricsCalls += 1;
+        if (metricsCalls === 1) {
+          return jsonResponse({ error: { message: "metrics unavailable" } }, false);
+        }
+        return jsonResponse({
+          schema_version: "v1",
+          generated_at: "2026-02-10T12:00:00Z",
+          health: { queue_depth: 0, in_flight_jobs: 0 },
+          jobs: { status_counts: { queued: 0, running: 0 } },
+          api: { routes: [] },
+          quality: { outcomes: { success_rate: 0, failed_rate: 0 }, job_duration_ms: { avg: 0 }, severity: { totals: {} } },
+          insights: { domains: { items: [] }, batches: { items: [] } },
+          trends: { windows: { "1h": { points: [] } } }
+        });
+      }
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+    await openMetricsTab();
+    const metricsPanel = getMetricsPanel();
+
+    expect(await within(metricsPanel).findByRole("button", { name: "Retry" })).toBeInTheDocument();
+    await fireEvent.click(within(metricsPanel).getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => {
+      expect(within(metricsPanel).getByLabelText("Queue depth trend")).toBeInTheDocument();
+    });
 
     unmount();
   });

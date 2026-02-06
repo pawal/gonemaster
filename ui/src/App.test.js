@@ -529,6 +529,8 @@ describe("App", () => {
         jobSort: "domain_asc",
         severityFilter: "all",
         jobBatchFilter: "batch_local",
+        recentPageSize: 20,
+        recentCursor: 0,
         selectedBatchId: "batch_local_1",
         batchSort: "started_at_desc",
         batchPageSize: 20,
@@ -540,7 +542,7 @@ describe("App", () => {
     window.history.replaceState(
       null,
       "",
-      "/?r_sort=domain_desc&r_sev=errors_only&r_batch=batch_url&b_id=batch_url_1&b_sort=created_at_asc&b_limit=50&b_cursor=2&b_status=failed&b_domain=beta#/batches"
+      "/?r_sort=domain_desc&r_sev=errors_only&r_batch=batch_url&r_limit=50&r_cursor=2&b_id=batch_url_1&b_sort=created_at_asc&b_limit=50&b_cursor=2&b_status=failed&b_domain=beta#/batches"
     );
 
     const calls = [];
@@ -566,6 +568,7 @@ describe("App", () => {
 
     await waitFor(() => {
       expect(calls.some((value) => value.includes("/api/v1/jobs?") && value.includes("sort=domain_desc") && value.includes("batch_id=batch_url"))).toBe(true);
+      expect(calls.some((value) => value.includes("/api/v1/jobs?") && value.includes("limit=50") && value.includes("cursor=2"))).toBe(true);
       expect(
         calls.some(
           (value) =>
@@ -587,6 +590,7 @@ describe("App", () => {
 
     await openRecentTab();
     expect(screen.getByLabelText("Sort")).toHaveValue("domain_desc");
+    expect(screen.getByLabelText("Page size")).toHaveValue("50");
     expect(screen.getByLabelText("Batch ID filter")).toHaveValue("batch_url");
 
     unmount();
@@ -598,7 +602,9 @@ describe("App", () => {
       JSON.stringify({
         jobSort: "domain_asc",
         severityFilter: "errors_only",
-        jobBatchFilter: "batch_storage"
+        jobBatchFilter: "batch_storage",
+        recentPageSize: 50,
+        recentCursor: 2
       })
     );
     const calls = [];
@@ -615,7 +621,15 @@ describe("App", () => {
     const { unmount } = render(App);
 
     await waitFor(() => {
-      expect(calls.some((value) => value.includes("sort=domain_asc") && value.includes("batch_id=batch_storage"))).toBe(true);
+      expect(
+        calls.some(
+          (value) =>
+            value.includes("sort=domain_asc") &&
+            value.includes("batch_id=batch_storage") &&
+            value.includes("limit=50") &&
+            value.includes("cursor=2")
+        )
+      ).toBe(true);
     });
 
     unmount();
@@ -866,6 +880,78 @@ describe("App", () => {
     unmount();
   });
 
+  it("applies recent tests pagination query params", async () => {
+    const calls = [];
+    const firstPage = {
+      items: [
+        {
+          id: "job_recent_1",
+          domain: "one.example",
+          status: "queued",
+          created_at: "2026-02-03T00:00:00Z",
+          progress: 10,
+          severity_totals: { NOTICE: 0, WARNING: 0, ERROR: 0, CRITICAL: 0 }
+        }
+      ],
+      total: 2,
+      limit: 20,
+      offset: 0,
+      next_cursor: "1",
+      prev_cursor: ""
+    };
+    const secondPage = {
+      ...firstPage,
+      items: [
+        {
+          id: "job_recent_2",
+          domain: "two.example",
+          status: "queued",
+          created_at: "2026-02-03T00:00:01Z",
+          progress: 20,
+          severity_totals: { NOTICE: 0, WARNING: 0, ERROR: 0, CRITICAL: 0 }
+        }
+      ],
+      offset: 1,
+      next_cursor: "",
+      prev_cursor: "0"
+    };
+
+    global.fetch.mockImplementation((url) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      calls.push(value);
+      if (value.includes("/api/v1/jobs?")) {
+        if (value.includes("cursor=1")) {
+          return jsonResponse(secondPage);
+        }
+        return jsonResponse(firstPage);
+      }
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+
+    await openRecentTab();
+    expect(await screen.findByText("job_recent_1")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Next" })).not.toBeDisabled();
+
+    await fireEvent.change(screen.getByLabelText("Page size"), { target: { value: "50" } });
+    await waitFor(() => {
+      expect(calls.some((value) => value.includes("/api/v1/jobs?") && value.includes("limit=50"))).toBe(true);
+    });
+
+    await fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await waitFor(() => {
+      expect(calls.some((value) => value.includes("/api/v1/jobs?") && value.includes("cursor=1"))).toBe(true);
+      expect(screen.getByText("job_recent_2")).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Previous" })).not.toBeDisabled();
+
+    unmount();
+  });
+
   it("filters recent jobs by batch id", async () => {
     const calls = [];
     const allJobs = [
@@ -1047,7 +1133,7 @@ describe("App", () => {
     window.history.replaceState(
       null,
       "",
-      "/?r_sort=bad_sort&r_sev=bad_filter&r_batch=batch_from_url&b_id=batch_invalid&b_sort=bad_batch_sort&b_limit=13&b_cursor=-4&b_status=wat&b_domain=edge#/batches"
+      "/?r_sort=bad_sort&r_sev=bad_filter&r_batch=batch_from_url&r_limit=13&r_cursor=-4&b_id=batch_invalid&b_sort=bad_batch_sort&b_limit=13&b_cursor=-4&b_status=wat&b_domain=edge#/batches"
     );
 
     const calls = [];
@@ -1077,7 +1163,9 @@ describe("App", () => {
           (value) =>
             value.includes("/api/v1/jobs?") &&
             value.includes("sort=started_at_desc") &&
-            value.includes("batch_id=batch_from_url")
+            value.includes("batch_id=batch_from_url") &&
+            value.includes("limit=20") &&
+            !value.includes("cursor=")
         )
       ).toBe(true);
       expect(
@@ -1099,6 +1187,7 @@ describe("App", () => {
 
     await openRecentTab();
     expect(screen.getByLabelText("Sort")).toHaveValue("started_at_desc");
+    expect(screen.getByLabelText("Page size")).toHaveValue("20");
     expect(screen.getByLabelText("Batch ID filter")).toHaveValue("batch_from_url");
 
     unmount();

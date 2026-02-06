@@ -20,6 +20,12 @@
   let severityFilter = "all";
   let jobSort = "started_at_desc";
   let jobBatchFilter = "";
+  let recentPageSize = 20;
+  let recentCursor = 0;
+  let recentTotal = 0;
+  let recentOffset = 0;
+  let recentNextCursor = "";
+  let recentPrevCursor = "";
 
   let selectedJobId = "";
   let selectedJob = null;
@@ -51,6 +57,8 @@
     "r_sort",
     "r_sev",
     "r_batch",
+    "r_limit",
+    "r_cursor",
     "b_id",
     "b_sort",
     "b_limit",
@@ -120,7 +128,9 @@
     { id: "created_at_asc", label: "Created (oldest)" }
   ];
   const batchStatuses = ["", "queued", "running", "succeeded", "failed", "canceled", "expired", "paused"];
-  const batchPageSizes = [10, 20, 50, 100];
+  const listPageSizes = [10, 20, 50, 100];
+  const batchPageSizes = listPageSizes;
+  const recentPageSizes = listPageSizes;
   const activeJobStatuses = ["queued", "running"];
   const resultReadyStatuses = ["succeeded", "failed", "canceled"];
 
@@ -137,13 +147,15 @@
   };
   const hasActiveBatchJobs = (batch) =>
     activeJobStatuses.some((status) => Number(batch?.status_counts?.[status] || 0) > 0);
-  const normalizeBatchPageSize = (value) => {
+  const normalizePageSize = (value) => {
     const parsed = Number(value);
-    if (Number.isFinite(parsed) && batchPageSizes.includes(parsed)) {
+    if (Number.isFinite(parsed) && listPageSizes.includes(parsed)) {
       return parsed;
     }
     return 20;
   };
+  const normalizeBatchPageSize = (value) => normalizePageSize(value);
+  const normalizeRecentPageSize = (value) => normalizePageSize(value);
   const normalizeCursor = (value) => {
     const parsed = Number(value);
     if (Number.isFinite(parsed) && parsed >= 0) {
@@ -169,6 +181,12 @@
     }
     if (params.has("r_batch")) {
       next.jobBatchFilter = (params.get("r_batch") || "").trim();
+    }
+    if (params.has("r_limit")) {
+      next.recentPageSize = normalizeRecentPageSize(params.get("r_limit"));
+    }
+    if (params.has("r_cursor")) {
+      next.recentCursor = normalizeCursor(params.get("r_cursor"));
     }
     if (params.has("b_id")) {
       next.selectedBatchId = (params.get("b_id") || "").trim();
@@ -212,6 +230,8 @@
       if (typeof parsed.jobBatchFilter === "string") {
         next.jobBatchFilter = parsed.jobBatchFilter.trim();
       }
+      next.recentPageSize = normalizeRecentPageSize(parsed.recentPageSize);
+      next.recentCursor = normalizeCursor(parsed.recentCursor);
       if (typeof parsed.selectedBatchId === "string") {
         next.selectedBatchId = parsed.selectedBatchId.trim();
       }
@@ -237,6 +257,8 @@
     if (state.jobSort) jobSort = state.jobSort;
     if (state.severityFilter) severityFilter = state.severityFilter;
     if (typeof state.jobBatchFilter === "string") jobBatchFilter = state.jobBatchFilter;
+    if (state.recentPageSize !== undefined) recentPageSize = normalizeRecentPageSize(state.recentPageSize);
+    if (state.recentCursor !== undefined) recentCursor = normalizeCursor(state.recentCursor);
     if (typeof state.selectedBatchId === "string") selectedBatchId = state.selectedBatchId;
     if (state.batchSort) batchSort = state.batchSort;
     if (state.batchPageSize !== undefined) batchPageSize = normalizeBatchPageSize(state.batchPageSize);
@@ -260,6 +282,12 @@
     const normalizedJobBatch = jobBatchFilter.trim();
     if (normalizedJobBatch) {
       params.set("r_batch", normalizedJobBatch);
+    }
+    if (normalizeRecentPageSize(recentPageSize) !== 20) {
+      params.set("r_limit", String(normalizeRecentPageSize(recentPageSize)));
+    }
+    if (normalizeCursor(recentCursor) > 0) {
+      params.set("r_cursor", String(normalizeCursor(recentCursor)));
     }
     const normalizedBatchID = selectedBatchId.trim();
     if (normalizedBatchID) {
@@ -293,6 +321,8 @@
         jobSort,
         severityFilter,
         jobBatchFilter: normalizedJobBatch,
+        recentPageSize: normalizeRecentPageSize(recentPageSize),
+        recentCursor: normalizeCursor(recentCursor),
         selectedBatchId: normalizedBatchID,
         batchSort,
         batchPageSize: normalizeBatchPageSize(batchPageSize),
@@ -433,19 +463,31 @@
     }
   };
 
-  const loadJobs = async () => {
+  const loadJobs = async (options = {}) => {
+    const { resetCursor = false } = options;
+    if (resetCursor) {
+      recentCursor = 0;
+    }
     jobsLoading = true;
     try {
       const params = new URLSearchParams({
-        limit: "20",
+        limit: String(normalizeRecentPageSize(recentPageSize)),
         sort: jobSort
       });
+      const cursor = normalizeCursor(recentCursor);
+      if (cursor > 0) {
+        params.set("cursor", String(cursor));
+      }
       const normalizedBatchID = jobBatchFilter.trim();
       if (normalizedBatchID) {
         params.set("batch_id", normalizedBatchID);
       }
       const list = await apiFetch(`/jobs?${params.toString()}`);
       jobs = list.items || [];
+      recentTotal = Number.isFinite(Number(list.total)) ? Number(list.total) : jobs.length;
+      recentOffset = normalizeCursor(list.offset);
+      recentNextCursor = String(list.next_cursor || "");
+      recentPrevCursor = String(list.prev_cursor || "");
       if (autoRefreshRecent && !hasRunningOrQueuedJobs(jobs)) {
         autoRefreshRecent = false;
       }
@@ -456,8 +498,19 @@
     }
   };
 
+  const applyRecentFilters = async () => {
+    recentCursor = 0;
+    await loadJobs({ resetCursor: true });
+  };
+
   const clearRecentBatchFilter = async () => {
     jobBatchFilter = "";
+    await loadJobs({ resetCursor: true });
+  };
+
+  const goToRecentCursor = async (cursor) => {
+    const parsed = Number(cursor);
+    recentCursor = Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
     await loadJobs();
   };
 
@@ -490,7 +543,8 @@
         jobInspectorHighlightTimer = null;
       }, 6000);
       setStatus(`Job ${job.id} created.`, "ok");
-      await loadJobs();
+      recentCursor = 0;
+      await loadJobs({ resetCursor: true });
       await loadJob(job.id);
     } catch (error) {
       setStatus(`Failed to create job: ${error.message}`, "warn");
@@ -520,7 +574,8 @@
       createdBatchId = response.batch_id;
       selectedBatchId = response.batch_id;
       setStatus(`Batch ${response.batch_id} accepted.`, "ok");
-      await loadJobs();
+      recentCursor = 0;
+      await loadJobs({ resetCursor: true });
       await loadBatch(response.batch_id, { resetCursor: true });
     } catch (error) {
       setStatus(`Failed to create batch: ${error.message}`, "warn");
@@ -695,6 +750,8 @@
     jobSort,
     severityFilter,
     jobBatchFilter,
+    String(recentPageSize),
+    String(recentCursor),
     selectedBatchId,
     batchSort,
     String(batchPageSize),
@@ -720,6 +777,8 @@
     }
     batchPageSize = normalizeBatchPageSize(batchPageSize);
     batchCursor = normalizeCursor(batchCursor);
+    recentPageSize = normalizeRecentPageSize(recentPageSize);
+    recentCursor = normalizeCursor(recentCursor);
     persistenceReady = true;
     window.addEventListener("hashchange", updateTabFromHash);
     loadJobs();
@@ -913,9 +972,17 @@
         </button>
         <div class="sort-control">
           <label for="recent-sort">Sort</label>
-          <select id="recent-sort" bind:value={jobSort} on:change={loadJobs}>
+          <select id="recent-sort" bind:value={jobSort} on:change={applyRecentFilters}>
             {#each jobSortOptions as option}
               <option value={option.id}>{option.label}</option>
+            {/each}
+          </select>
+        </div>
+        <div class="sort-control">
+          <label for="recent-page-size">Page size</label>
+          <select id="recent-page-size" bind:value={recentPageSize} on:change={applyRecentFilters}>
+            {#each recentPageSizes as pageSize}
+              <option value={pageSize}>{pageSize}</option>
             {/each}
           </select>
         </div>
@@ -929,13 +996,13 @@
             on:keydown={(event) => {
               if (event.key === "Enter") {
                 event.preventDefault();
-                loadJobs();
+                applyRecentFilters();
               }
             }}
           />
         </div>
         <div class="row">
-          <button class="ghost" type="button" on:click={loadJobs} disabled={jobsLoading}>Apply filters</button>
+          <button class="ghost" type="button" on:click={applyRecentFilters} disabled={jobsLoading}>Apply filters</button>
           <button class="ghost" type="button" on:click={clearRecentBatchFilter} disabled={jobsLoading}>Clear</button>
         </div>
       </div>
@@ -949,6 +1016,27 @@
             {filter.label}
           </button>
         {/each}
+      </div>
+      <div class="row batch-pagination">
+        <button
+          class="ghost"
+          type="button"
+          on:click={() => goToRecentCursor(recentPrevCursor)}
+          disabled={!recentPrevCursor || jobsLoading}
+        >
+          Previous
+        </button>
+        <button
+          class="ghost"
+          type="button"
+          on:click={() => goToRecentCursor(recentNextCursor)}
+          disabled={!recentNextCursor || jobsLoading}
+        >
+          Next
+        </button>
+        <span class="small">
+          Showing {jobs.length} of {recentTotal} matching jobs (offset {recentOffset || 0})
+        </span>
       </div>
       <div class="list">
         {#if jobs.length === 0}
@@ -1041,10 +1129,9 @@ example.org`}
           <div class="sort-control">
             <label for="batch-page-size">Page size</label>
             <select id="batch-page-size" bind:value={batchPageSize} on:change={applyBatchFilters}>
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
+              {#each batchPageSizes as pageSize}
+                <option value={pageSize}>{pageSize}</option>
+              {/each}
             </select>
           </div>
           <div class="sort-control">

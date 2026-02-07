@@ -52,6 +52,7 @@ const (
 	EDNSUDPPayloadDNSSECDefault = 1232
 )
 
+// SpecialIPBlock describes one IANA special-purpose IP prefix.
 type SpecialIPBlock struct {
 	Prefix            netip.Prefix
 	Name              string

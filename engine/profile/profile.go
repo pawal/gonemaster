@@ -74,24 +74,29 @@ type TestCasesVars struct {
 	Zone06   Zone06Vars   `json:"zone06"`
 }
 
+// DNSSEC04Vars holds profile tunables for DNSSEC04 checks.
 type DNSSEC04Vars struct {
 	RemainingShort int `json:"REMAINING_SHORT"`
 	RemainingLong  int `json:"REMAINING_LONG"`
 	DurationLong   int `json:"DURATION_LONG"`
 }
 
+// Zone02Vars holds profile tunables for Zone02 checks.
 type Zone02Vars struct {
 	SOARefreshMinimumValue int `json:"SOA_REFRESH_MINIMUM_VALUE"`
 }
 
+// Zone04Vars holds profile tunables for Zone04 checks.
 type Zone04Vars struct {
 	SOARetryMinimumValue int `json:"SOA_RETRY_MINIMUM_VALUE"`
 }
 
+// Zone05Vars holds profile tunables for Zone05 checks.
 type Zone05Vars struct {
 	SOAExpireMinimumValue int `json:"SOA_EXPIRE_MINIMUM_VALUE"`
 }
 
+// Zone06Vars holds profile tunables for Zone06 checks.
 type Zone06Vars struct {
 	SOADefaultTTLMaximumValue int `json:"SOA_DEFAULT_TTL_MAXIMUM_VALUE"`
 	SOADefaultTTLMinimumValue int `json:"SOA_DEFAULT_TTL_MINIMUM_VALUE"`

@@ -30,6 +30,7 @@ type cacheMetrics struct {
 	evictions uint64
 }
 
+// CacheMetrics exposes aggregate cache hit/miss/eviction counters.
 type CacheMetrics struct {
 	Hits      uint64
 	Misses    uint64
@@ -235,6 +236,7 @@ type nsState struct {
 	axfrFunc        func(ctx context.Context, domain string, callback func(dns.RR) bool, class string) error
 }
 
+// CacheStore keeps nameserver objects and per-address query/error caches.
 type CacheStore struct {
 	mu               sync.Mutex
 	objectCache      map[string]map[string]*Nameserver
@@ -244,6 +246,7 @@ type CacheStore struct {
 	errorMetrics     cacheMetrics
 }
 
+// NewCacheStore creates an empty nameserver cache store.
 func NewCacheStore() *CacheStore {
 	return &CacheStore{
 		objectCache:      map[string]map[string]*Nameserver{},

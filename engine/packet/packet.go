@@ -17,10 +17,12 @@ type Packet struct {
 	Timestamp  time.Time
 }
 
+// New wraps a dns.Msg into a Packet helper.
 func New(msg *dns.Msg) Packet {
 	return Packet{Msg: msg}
 }
 
+// ID returns the DNS message ID.
 func (p Packet) ID() uint16 {
 	if p.Msg == nil {
 		return 0
@@ -28,6 +30,7 @@ func (p Packet) ID() uint16 {
 	return p.Msg.Id
 }
 
+// Opcode returns the DNS opcode string.
 func (p Packet) Opcode() string {
 	if p.Msg == nil {
 		return ""
@@ -35,6 +38,7 @@ func (p Packet) Opcode() string {
 	return dns.OpcodeToString[p.Msg.Opcode]
 }
 
+// Rcode returns the DNS rcode string.
 func (p Packet) Rcode() string {
 	if p.Msg == nil {
 		return ""
@@ -42,6 +46,7 @@ func (p Packet) Rcode() string {
 	return dns.RcodeToString[p.Msg.Rcode]
 }
 
+// String returns the textual representation of the message.
 func (p Packet) String() string {
 	if p.Msg == nil {
 		return ""
@@ -49,6 +54,7 @@ func (p Packet) String() string {
 	return p.Msg.String()
 }
 
+// Data serializes the message to wire format.
 func (p Packet) Data() []byte {
 	if p.Msg == nil {
 		return nil
@@ -60,6 +66,7 @@ func (p Packet) Data() []byte {
 	return wire
 }
 
+// AA reports whether the authoritative answer flag is set.
 func (p Packet) AA() bool {
 	if p.Msg == nil {
 		return false
@@ -67,6 +74,7 @@ func (p Packet) AA() bool {
 	return p.Msg.Authoritative
 }
 
+// RA reports whether recursion available is set.
 func (p Packet) RA() bool {
 	if p.Msg == nil {
 		return false
@@ -74,6 +82,7 @@ func (p Packet) RA() bool {
 	return p.Msg.RecursionAvailable
 }
 
+// TC reports whether the response is truncated.
 func (p Packet) TC() bool {
 	if p.Msg == nil {
 		return false
@@ -81,6 +90,7 @@ func (p Packet) TC() bool {
 	return p.Msg.Truncated
 }
 
+// Question returns the DNS question section.
 func (p Packet) Question() []dns.Question {
 	if p.Msg == nil {
 		return nil
@@ -88,6 +98,7 @@ func (p Packet) Question() []dns.Question {
 	return p.Msg.Question
 }
 
+// Answer returns the DNS answer section.
 func (p Packet) Answer() []dns.RR {
 	if p.Msg == nil {
 		return nil
@@ -95,6 +106,7 @@ func (p Packet) Answer() []dns.RR {
 	return p.Msg.Answer
 }
 
+// Authority returns the DNS authority section.
 func (p Packet) Authority() []dns.RR {
 	if p.Msg == nil {
 		return nil
@@ -102,6 +114,7 @@ func (p Packet) Authority() []dns.RR {
 	return p.Msg.Ns
 }
 
+// Additional returns the DNS additional section.
 func (p Packet) Additional() []dns.RR {
 	if p.Msg == nil {
 		return nil
@@ -109,6 +122,7 @@ func (p Packet) Additional() []dns.RR {
 	return p.Msg.Extra
 }
 
+// HasEdns reports whether an OPT record is present.
 func (p Packet) HasEdns() bool {
 	if p.Msg == nil {
 		return false
@@ -116,6 +130,7 @@ func (p Packet) HasEdns() bool {
 	return p.Msg.IsEdns0() != nil
 }
 
+// EdnsSize returns the EDNS UDP payload size.
 func (p Packet) EdnsSize() uint16 {
 	if opt := p.Msg.IsEdns0(); opt != nil {
 		return opt.UDPSize()
@@ -123,6 +138,7 @@ func (p Packet) EdnsSize() uint16 {
 	return 0
 }
 
+// EdnsRcode returns the EDNS extended rcode.
 func (p Packet) EdnsRcode() int {
 	if opt := p.Msg.IsEdns0(); opt != nil {
 		return opt.ExtendedRcode() >> 4
@@ -130,6 +146,7 @@ func (p Packet) EdnsRcode() int {
 	return 0
 }
 
+// EdnsVersion returns the EDNS version.
 func (p Packet) EdnsVersion() uint8 {
 	if opt := p.Msg.IsEdns0(); opt != nil {
 		return opt.Version()
@@ -137,6 +154,7 @@ func (p Packet) EdnsVersion() uint8 {
 	return 0
 }
 
+// EdnsZ returns the raw EDNS Z bits.
 func (p Packet) EdnsZ() uint16 {
 	if opt := p.Msg.IsEdns0(); opt != nil {
 		return opt.Z()
@@ -144,6 +162,7 @@ func (p Packet) EdnsZ() uint16 {
 	return 0
 }
 
+// EdnsData returns EDNS option records.
 func (p Packet) EdnsData() []dns.EDNS0 {
 	if opt := p.Msg.IsEdns0(); opt != nil {
 		return opt.Option
@@ -151,6 +170,7 @@ func (p Packet) EdnsData() []dns.EDNS0 {
 	return nil
 }
 
+// DO reports whether the EDNS DO bit is set.
 func (p Packet) DO() bool {
 	if opt := p.Msg.IsEdns0(); opt != nil {
 		return opt.Do()

@@ -152,10 +152,12 @@ func reverseCopy(input []string) []string {
 	return out
 }
 
+// StringLower returns String() lowercased.
 func (n Name) StringLower() string {
 	return strings.ToLower(n.String())
 }
 
+// StringUpper returns String() uppercased.
 func (n Name) StringUpper() string {
 	return strings.ToUpper(n.String())
 }

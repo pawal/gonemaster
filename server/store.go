@@ -36,6 +36,7 @@ func NewInMemoryJobStore() *InMemoryJobStore {
 	}
 }
 
+// Create inserts a new job and fails if the id already exists.
 func (s *InMemoryJobStore) Create(job Job) (Job, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -46,6 +47,7 @@ func (s *InMemoryJobStore) Create(job Job) (Job, error) {
 	return job, nil
 }
 
+// Get returns a job by id.
 func (s *InMemoryJobStore) Get(id string) (Job, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -53,6 +55,7 @@ func (s *InMemoryJobStore) Get(id string) (Job, bool) {
 	return job, ok
 }
 
+// Update replaces an existing job by id.
 func (s *InMemoryJobStore) Update(job Job) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -63,6 +66,7 @@ func (s *InMemoryJobStore) Update(job Job) error {
 	return nil
 }
 
+// List returns jobs matching filter with sorting and pagination applied.
 func (s *InMemoryJobStore) List(filter JobFilter) JobList {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -238,6 +242,7 @@ func (s *InMemoryJobStore) List(filter JobFilter) JobList {
 	return list
 }
 
+// SetResult stores a result payload for an existing job.
 func (s *InMemoryJobStore) SetResult(jobID string, result JobResult) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -248,6 +253,7 @@ func (s *InMemoryJobStore) SetResult(jobID string, result JobResult) error {
 	return nil
 }
 
+// GetResult returns a stored result payload by job id.
 func (s *InMemoryJobStore) GetResult(jobID string) (JobResult, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

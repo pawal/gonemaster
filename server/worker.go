@@ -20,6 +20,7 @@ type workerPool struct {
 	wg     sync.WaitGroup
 }
 
+// Start launches background workers that consume queued jobs.
 func (s *Server) Start() {
 	if s.workers.ctx != nil {
 		return
@@ -38,6 +39,7 @@ func (s *Server) Start() {
 	}
 }
 
+// Stop requests worker shutdown and waits for completion.
 func (s *Server) Stop(ctx context.Context) error {
 	if s.workers.cancel == nil {
 		return nil

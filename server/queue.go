@@ -31,6 +31,7 @@ func NewInMemoryQueue() *InMemoryQueue {
 	return &InMemoryQueue{notify: make(chan struct{})}
 }
 
+// Enqueue adds a job id to the tail of the queue.
 func (q *InMemoryQueue) Enqueue(jobID string) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -42,6 +43,7 @@ func (q *InMemoryQueue) Enqueue(jobID string) error {
 	return nil
 }
 
+// Dequeue blocks until a job id is available or ctx is canceled.
 func (q *InMemoryQueue) Dequeue(ctx context.Context) (string, error) {
 	for {
 		q.mu.Lock()
@@ -66,6 +68,7 @@ func (q *InMemoryQueue) Dequeue(ctx context.Context) (string, error) {
 	}
 }
 
+// Remove deletes a queued job id.
 func (q *InMemoryQueue) Remove(jobID string) error {
 	if jobID == "" {
 		return errors.New("job id required")
@@ -86,6 +89,7 @@ func (q *InMemoryQueue) Remove(jobID string) error {
 	return errors.New("job id not in queue")
 }
 
+// Pause stops dequeuing while keeping queued jobs intact.
 func (q *InMemoryQueue) Pause() error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -97,6 +101,7 @@ func (q *InMemoryQueue) Pause() error {
 	return nil
 }
 
+// Resume re-enables dequeuing after Pause.
 func (q *InMemoryQueue) Resume() error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -108,6 +113,7 @@ func (q *InMemoryQueue) Resume() error {
 	return nil
 }
 
+// Reorder replaces queued job order with the provided ids.
 func (q *InMemoryQueue) Reorder(jobIDs []string) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -131,6 +137,7 @@ func (q *InMemoryQueue) Reorder(jobIDs []string) error {
 	return nil
 }
 
+// Close permanently closes the queue and wakes blocked dequeuers.
 func (q *InMemoryQueue) Close() error {
 	q.mu.Lock()
 	defer q.mu.Unlock()

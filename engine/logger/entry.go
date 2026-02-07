@@ -123,6 +123,7 @@ func StartTimeNow() {
 func ResetConfig() {
 }
 
+// String formats the entry in the raw logger textual style.
 func (e *Entry) String() string {
 	if e == nil {
 		return ""

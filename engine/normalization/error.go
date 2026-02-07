@@ -5,6 +5,7 @@ import (
 	"strings"
 )
 
+// Error represents one domain-normalization validation issue.
 type Error struct {
 	Tag    string
 	Params map[string]string
@@ -46,6 +47,7 @@ var errorSpecs = map[string]errorSpec{
 	},
 }
 
+// NewError builds an Error from a known tag and required parameters.
 func NewError(tag string, params map[string]string) (Error, error) {
 	spec, ok := errorSpecs[tag]
 	if !ok {
@@ -64,6 +66,7 @@ func NewError(tag string, params map[string]string) (Error, error) {
 	return Error{Tag: tag, Params: resolved}, nil
 }
 
+// Message returns the human-readable message for the normalization error.
 func (e Error) Message() string {
 	spec, ok := errorSpecs[e.Tag]
 	if !ok {
@@ -77,6 +80,7 @@ func (e Error) Message() string {
 	return msg
 }
 
+// String implements fmt.Stringer using Message().
 func (e Error) String() string {
 	return e.Message()
 }

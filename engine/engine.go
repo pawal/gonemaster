@@ -72,17 +72,17 @@ type RunRequest struct {
 // LogEntry mirrors the JSON output produced by the Perl logger.
 type LogEntry struct {
 	// Timestamp is seconds since run start.
-	Timestamp float64        `json:"timestamp"`
+	Timestamp float64 `json:"timestamp"`
 	// Module is the logical module name (for example "Basic").
-	Module    string         `json:"module"`
+	Module string `json:"module"`
 	// Testcase is the testcase identifier (for example "Basic02").
-	Testcase  string         `json:"testcase"`
+	Testcase string `json:"testcase"`
 	// Tag is the emitted event tag.
-	Tag       string         `json:"tag"`
+	Tag string `json:"tag"`
 	// Level is the normalized severity level.
-	Level     string         `json:"level"`
+	Level string `json:"level"`
 	// Args carries event-specific fields.
-	Args      map[string]any `json:"args,omitempty"`
+	Args map[string]any `json:"args,omitempty"`
 }
 
 // ErrNotImplemented indicates an unknown or unsupported module/testcase
@@ -90,7 +90,7 @@ type LogEntry struct {
 var ErrNotImplemented = errors.New("engine not implemented")
 
 // Version is the semantic version for this build.
-var Version = "0.9.15"
+var Version = "0.9.16"
 
 // Commit is optionally set at build time using -ldflags.
 var Commit = ""

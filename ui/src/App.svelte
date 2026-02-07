@@ -392,6 +392,18 @@
     return Math.round(numeric).toLocaleString();
   };
   const formatDurationMs = (value) => `${formatInteger(value)} ms`;
+  const metricsCardHelp = {
+    queue_depth: "Current number of jobs waiting in the queue.",
+    in_flight_jobs: "Jobs currently being processed by workers.",
+    success_rate: "Share of completed jobs that succeeded.",
+    failed_rate: "Share of completed jobs that failed.",
+    api_p90: "Worst route-level 90th percentile API latency.",
+    avg_job_duration: "Average runtime of completed jobs.",
+    completed_total: "Total number of jobs that reached a terminal state.",
+    failed_total: "Total number of completed jobs with failed status."
+  };
+  const severityCardHelp = (level) =>
+    `Total ${String(level || "").toUpperCase()} log entries aggregated across completed jobs.`;
   const lastLoadedLabel = (value) => {
     if (!value) return "never";
     const parsed = new Date(value);
@@ -1442,40 +1454,40 @@ example.org`}
         {/if}
 
         <div class="summary-grid metrics-summary-grid">
-          <div class="summary-item">
+          <div class="summary-item" title={metricsCardHelp.queue_depth}>
             <span class="summary-label">Queue depth</span>
             <span class="summary-count">{formatInteger(metricsSnapshot?.health?.queue_depth)}</span>
           </div>
-          <div class="summary-item">
+          <div class="summary-item" title={metricsCardHelp.in_flight_jobs}>
             <span class="summary-label">In-flight jobs</span>
             <span class="summary-count">{formatInteger(metricsSnapshot?.health?.in_flight_jobs)}</span>
           </div>
-          <div class="summary-item">
+          <div class="summary-item" title={metricsCardHelp.success_rate}>
             <span class="summary-label">Success rate</span>
             <span class="summary-count">{formatPercent(metricsSnapshot?.quality?.outcomes?.success_rate)}</span>
           </div>
-          <div class="summary-item">
+          <div class="summary-item" title={metricsCardHelp.failed_rate}>
             <span class="summary-label">Failure rate</span>
             <span class="summary-count">{formatPercent(metricsSnapshot?.quality?.outcomes?.failed_rate)}</span>
           </div>
-          <div class="summary-item">
+          <div class="summary-item" title={metricsCardHelp.api_p90}>
             <span class="summary-label">API p90</span>
             <span class="summary-count">{formatDurationMs(metricsTopAPIP90(metricsSnapshot))}</span>
           </div>
-          <div class="summary-item">
+          <div class="summary-item" title={metricsCardHelp.avg_job_duration}>
             <span class="summary-label">Avg job duration</span>
             <span class="summary-count">{formatDurationMs(metricsSnapshot?.quality?.job_duration_ms?.avg)}</span>
           </div>
-          <div class="summary-item jobs-finished">
+          <div class="summary-item jobs-finished" title={metricsCardHelp.completed_total}>
             <span class="summary-label">Total jobs finished</span>
             <span class="summary-count">{formatInteger(metricsSnapshot?.jobs?.completed_total)}</span>
           </div>
-          <div class="summary-item failed-jobs">
+          <div class="summary-item failed-jobs" title={metricsCardHelp.failed_total}>
             <span class="summary-label">Failed jobs</span>
             <span class="summary-count">{formatInteger(metricsSnapshot?.quality?.outcomes?.failed_total)}</span>
           </div>
           {#each summaryLevels as level}
-            <div class={`summary-item severity-${level.toLowerCase()}`}>
+            <div class={`summary-item severity-${level.toLowerCase()}`} title={severityCardHelp(level)}>
               <span class="summary-label">{level}</span>
               <span class="summary-count">{formatInteger(severityTotals[level])}</span>
             </div>

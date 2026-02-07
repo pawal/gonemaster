@@ -273,6 +273,7 @@ button:hover:not(:disabled) {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  cursor: help;
 }
 
 .summary-label {

@@ -6,6 +6,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"codeberg.org/pawal/gonemaster/engine"
 )
 
 const metricsSchemaVersion = "v1"
@@ -85,6 +87,7 @@ const (
 // MetricsSnapshot is the top-level payload returned by the metrics endpoint.
 type MetricsSnapshot struct {
 	SchemaVersion string                  `json:"schema_version"`
+	ServerVersion string                  `json:"server_version"`
 	GeneratedAt   time.Time               `json:"generated_at"`
 	Health        MetricsHealthSnapshot   `json:"health"`
 	Jobs          MetricsJobsSnapshot     `json:"jobs"`
@@ -560,6 +563,7 @@ func (m *MetricsCollector) snapshotAtWithLimits(now time.Time, domainLimit int, 
 
 	return MetricsSnapshot{
 		SchemaVersion: metricsSchemaVersion,
+		ServerVersion: engine.VersionFull(),
 		GeneratedAt:   now,
 		Health: MetricsHealthSnapshot{
 			StartedAt:         m.startedAt,

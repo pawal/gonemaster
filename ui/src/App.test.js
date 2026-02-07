@@ -349,6 +349,7 @@ describe("App", () => {
   it("renders metrics cards, trends, and insight tables", async () => {
     const metricsPayload = {
       schema_version: "v1",
+      server_version: "0.9.16",
       generated_at: "2026-02-10T12:00:00Z",
       health: {
         queue_depth: 3,
@@ -472,6 +473,7 @@ describe("App", () => {
     expect(within(metricsPanel).getByText("Total jobs finished")).toBeInTheDocument();
     expect(within(metricsPanel).getByText("Failed jobs")).toBeInTheDocument();
     expect(within(metricsPanel).getByText(/Server uptime:/)).toBeInTheDocument();
+    expect(within(metricsPanel).getByText(/Server version:/)).toBeInTheDocument();
     expect(within(metricsPanel).getByRole("heading", { name: "Top domains" })).toBeInTheDocument();
     expect(within(metricsPanel).getByText("alpha.example")).toBeInTheDocument();
     expect(within(metricsPanel).getByRole("heading", { name: "Error-heavy batches" })).toBeInTheDocument();
@@ -493,6 +495,7 @@ describe("App", () => {
         metricsCount += 1;
         return jsonResponse({
           schema_version: "v1",
+          server_version: "0.9.16",
           generated_at: "2026-02-10T12:00:00Z",
           health: { queue_depth: metricsCount, in_flight_jobs: 0, dns_queries_ipv4_total: 0, dns_queries_ipv6_total: 0 },
           jobs: { status_counts: { queued: 0, running: 0 } },
@@ -545,6 +548,7 @@ describe("App", () => {
         }
         return jsonResponse({
           schema_version: "v1",
+          server_version: "0.9.16",
           generated_at: "2026-02-10T12:00:00Z",
           health: { queue_depth: 0, in_flight_jobs: 0, dns_queries_ipv4_total: 0, dns_queries_ipv6_total: 0 },
           jobs: { status_counts: { queued: 0, running: 0 } },

@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"testing"
 	"time"
+
+	"codeberg.org/pawal/gonemaster/engine"
 )
 
 func TestMetricsCollectorZeroStateSnapshot(t *testing.T) {
@@ -20,6 +22,9 @@ func TestMetricsCollectorZeroStateSnapshot(t *testing.T) {
 
 	if snapshot.SchemaVersion != metricsSchemaVersion {
 		t.Fatalf("schema_version = %q, want %q", snapshot.SchemaVersion, metricsSchemaVersion)
+	}
+	if snapshot.ServerVersion != engine.VersionFull() {
+		t.Fatalf("server_version = %q, want %q", snapshot.ServerVersion, engine.VersionFull())
 	}
 	if !snapshot.GeneratedAt.Equal(now) {
 		t.Fatalf("generated_at = %s, want %s", snapshot.GeneratedAt, now)

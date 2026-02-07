@@ -1188,6 +1188,9 @@ func TestMetricsEndpointSupportsIncludeWindowAndLimits(t *testing.T) {
 	if _, ok := payload["schema_version"]; !ok {
 		t.Fatal("missing schema_version")
 	}
+	if _, ok := payload["server_version"]; !ok {
+		t.Fatal("missing server_version")
+	}
 	if _, ok := payload["generated_at"]; !ok {
 		t.Fatal("missing generated_at")
 	}
@@ -1327,6 +1330,9 @@ func TestHealthAndMetrics(t *testing.T) {
 	}
 	if metrics.SchemaVersion == "" {
 		t.Fatal("expected schema_version in metrics response")
+	}
+	if metrics.ServerVersion == "" {
+		t.Fatal("expected server_version in metrics response")
 	}
 	if metrics.GeneratedAt.IsZero() {
 		t.Fatal("expected generated_at in metrics response")

@@ -1628,7 +1628,7 @@ example.org`}
         </div>
       </div>
       <div class="small">
-        Last loaded: {lastLoadedLabel(metricsLoadedAt)} | Server uptime: {formatUptime(metricsSnapshot?.health?.uptime_seconds)}
+        Last loaded: {lastLoadedLabel(metricsLoadedAt)} | Server uptime: {formatUptime(metricsSnapshot?.health?.uptime_seconds)} | Server version: {metricsSnapshot?.server_version || "unknown"}
       </div>
 
       {#if metricsLoading && !hasMetricsData(metricsSnapshot)}

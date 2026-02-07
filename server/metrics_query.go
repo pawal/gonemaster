@@ -125,6 +125,7 @@ func (s *Server) buildMetricsResponseBody(options metricsQueryOptions) ([]byte, 
 
 	payload := map[string]any{
 		"schema_version": snapshot.SchemaVersion,
+		"server_version": snapshot.ServerVersion,
 		"generated_at":   snapshot.GeneratedAt,
 	}
 	for section := range options.include {

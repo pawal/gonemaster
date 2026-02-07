@@ -392,6 +392,25 @@
     return Math.round(numeric).toLocaleString();
   };
   const formatDurationMs = (value) => `${formatInteger(value)} ms`;
+  const formatUptime = (value) => {
+    const seconds = Number(value);
+    if (!Number.isFinite(seconds) || seconds < 0) return "unknown";
+    const total = Math.floor(seconds);
+    if (total < 60) return `${total}s`;
+    if (total < 3600) {
+      const minutes = Math.floor(total / 60);
+      const rem = total % 60;
+      return `${minutes}m ${rem}s`;
+    }
+    if (total < 86400) {
+      const hours = Math.floor(total / 3600);
+      const minutes = Math.floor((total % 3600) / 60);
+      return `${hours}h ${minutes}m`;
+    }
+    const days = Math.floor(total / 86400);
+    const hours = Math.floor((total % 86400) / 3600);
+    return `${days}d ${hours}h`;
+  };
   const metricsCardHelp = {
     queue_depth: "Current number of jobs waiting in the queue.",
     in_flight_jobs: "Jobs currently being processed by workers.",
@@ -1436,7 +1455,9 @@ example.org`}
           </select>
         </div>
       </div>
-      <div class="small">Last loaded: {lastLoadedLabel(metricsLoadedAt)}</div>
+      <div class="small">
+        Last loaded: {lastLoadedLabel(metricsLoadedAt)} | Server uptime: {formatUptime(metricsSnapshot?.health?.uptime_seconds)}
+      </div>
 
       {#if metricsLoading && !hasMetricsData(metricsSnapshot)}
         <div class="summary-empty">Loading metrics snapshot...</div>

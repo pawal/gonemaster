@@ -348,6 +348,7 @@ describe("App", () => {
     expect(within(metricsPanel).getByText("320 ms")).toBeInTheDocument();
     expect(within(metricsPanel).getByText("Total jobs finished")).toBeInTheDocument();
     expect(within(metricsPanel).getByText("Failed jobs")).toBeInTheDocument();
+    expect(within(metricsPanel).getByText(/Server uptime:/)).toBeInTheDocument();
     expect(within(metricsPanel).getByRole("heading", { name: "Top domains" })).toBeInTheDocument();
     expect(within(metricsPanel).getByText("alpha.example")).toBeInTheDocument();
     expect(within(metricsPanel).getByRole("heading", { name: "Error-heavy batches" })).toBeInTheDocument();

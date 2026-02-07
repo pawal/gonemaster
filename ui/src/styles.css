@@ -41,7 +41,7 @@ header {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-bottom: 28px;
+  margin-bottom: 16px;
 }
 
 h1 {
@@ -77,7 +77,7 @@ h1 {
   display: inline-flex;
   gap: 8px;
   flex-wrap: wrap;
-  margin-top: 8px;
+  margin-top: 0;
 }
 
 .tab {
@@ -603,6 +603,54 @@ button:hover:not(:disabled) {
   font-size: 0.85rem;
 }
 
+.status-toast {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 1200;
+  max-width: min(560px, calc(100vw - 28px));
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  box-shadow: 0 10px 20px rgba(16, 24, 40, 0.14);
+}
+
+.status-toast.status-ok {
+  background: #e7f8ee;
+  border-color: #a7f3d0;
+  color: #065f46;
+}
+
+.status-toast.status-warn {
+  background: #fef3c7;
+  border-color: #fcd34d;
+  color: #92400e;
+}
+
+.status-toast-close {
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  box-shadow: none;
+  padding: 2px 6px;
+  border-radius: 8px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.status-toast-close:hover:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+  background: rgba(255, 255, 255, 0.35);
+}
+
 .small {
   font-size: 0.82rem;
   color: var(--muted);
@@ -783,6 +831,12 @@ button:hover:not(:disabled) {
 @media (max-width: 720px) {
   main {
     padding: 32px 16px 60px;
+  }
+
+  .status-toast {
+    top: 10px;
+    right: 10px;
+    max-width: calc(100vw - 20px);
   }
 
   .kv {

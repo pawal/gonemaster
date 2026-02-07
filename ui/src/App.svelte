@@ -4,6 +4,7 @@
 
   let statusMessage = "";
   let statusTone = "";
+  let statusDismissTimer = null;
 
   let singleDomain = "";
   let singleSubmitting = false;
@@ -90,9 +91,29 @@
     { id: "metrics", label: "Metrics" }
   ];
 
+  const clearStatus = () => {
+    statusMessage = "";
+    statusTone = "";
+    if (statusDismissTimer) {
+      clearTimeout(statusDismissTimer);
+      statusDismissTimer = null;
+    }
+  };
+
   const setStatus = (message, tone = "") => {
     statusMessage = message;
     statusTone = tone;
+    if (statusDismissTimer) {
+      clearTimeout(statusDismissTimer);
+      statusDismissTimer = null;
+    }
+    if (!message) return;
+    const dismissDelayMs = tone === "ok" ? 5000 : 8000;
+    statusDismissTimer = setTimeout(() => {
+      statusMessage = "";
+      statusTone = "";
+      statusDismissTimer = null;
+    }, dismissDelayMs);
   };
 
   const apiFetch = async (path, options = {}) => {
@@ -612,8 +633,7 @@
       );
     }
     if (changed && statusMessage) {
-      statusMessage = "";
-      statusTone = "";
+      clearStatus();
     }
     if (next === "recent") {
       loadJobs();
@@ -1021,6 +1041,7 @@
     if (recentPoller) clearInterval(recentPoller);
     if (metricsPoller) clearInterval(metricsPoller);
     if (jobInspectorHighlightTimer) clearTimeout(jobInspectorHighlightTimer);
+    if (statusDismissTimer) clearTimeout(statusDismissTimer);
     window.removeEventListener("hashchange", updateTabFromHash);
   });
 </script>
@@ -1032,12 +1053,6 @@
       Launch single or batch domain jobs, watch progress, and inspect results from the embedded server UI.
     </p>
   </header>
-
-  {#if statusMessage}
-    <div class="notice reveal" style="--d: 0.12s; margin-bottom: 22px;">
-      <strong>{statusTone === "ok" ? "OK" : "Heads up"}:</strong> {statusMessage}
-    </div>
-  {/if}
 
   <div class="tabs" role="tablist" aria-label="Job views">
     {#each tabs as tab}
@@ -1683,6 +1698,13 @@ example.org`}
       {:else}
         <div class="summary-empty">No metrics data available yet.</div>
       {/if}
+    </div>
+  {/if}
+
+  {#if statusMessage}
+    <div class={`status-toast status-${statusTone === "ok" ? "ok" : "warn"} reveal`} role="status" aria-live="polite" style="--d: 0.12s;">
+      <div><strong>{statusTone === "ok" ? "OK" : "Heads up"}:</strong> {statusMessage}</div>
+      <button class="status-toast-close" type="button" aria-label="Dismiss notification" on:click={clearStatus}>Dismiss</button>
     </div>
   {/if}
 </main>

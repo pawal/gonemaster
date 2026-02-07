@@ -279,6 +279,13 @@ func parseListFilter(r *http.Request, defaultLimit int) (JobFilter, string, stri
 	}
 	filter.BatchID = strings.TrimSpace(query.Get("batch_id"))
 	filter.Domain = strings.TrimSpace(query.Get("domain"))
+	if rawSeverity := strings.TrimSpace(query.Get("severity")); rawSeverity != "" {
+		severity := JobSeverityFilter(rawSeverity)
+		if !isValidJobSeverityFilter(severity) {
+			return JobFilter{}, "invalid_severity", "severity must be one of warnings_plus, errors_only"
+		}
+		filter.Severity = severity
+	}
 
 	if createdAfter := strings.TrimSpace(query.Get("created_after")); createdAfter != "" {
 		timestamp, err := parseTime(createdAfter)

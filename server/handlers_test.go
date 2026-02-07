@@ -399,6 +399,61 @@ func TestListJobsSortBySeverityTotals(t *testing.T) {
 	}
 }
 
+func TestListJobsFiltersBySeverity(t *testing.T) {
+	srv := New(DefaultConfig())
+	base := time.Date(2026, 2, 3, 0, 0, 0, 0, time.UTC)
+
+	_, _ = srv.store.Create(Job{ID: "job_clean", Domain: "clean.example", Status: JobSucceeded, CreatedAt: base})
+	_, _ = srv.store.Create(Job{ID: "job_warn", Domain: "warn.example", Status: JobFailed, CreatedAt: base.Add(time.Second)})
+	_, _ = srv.store.Create(Job{ID: "job_err", Domain: "error.example", Status: JobFailed, CreatedAt: base.Add(2 * time.Second)})
+
+	_ = srv.store.SetResult("job_warn", JobResult{
+		JobID:  "job_warn",
+		Status: JobFailed,
+		Summary: map[string]any{
+			"levels": map[string]int{"WARNING": 2},
+		},
+	})
+	_ = srv.store.SetResult("job_err", JobResult{
+		JobID:  "job_err",
+		Status: JobFailed,
+		Summary: map[string]any{
+			"levels": map[string]int{"ERROR": 1},
+		},
+	})
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs?severity=errors_only&sort=started_at_desc", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var errorsOnly JobList
+	if err := json.NewDecoder(resp.Body).Decode(&errorsOnly); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if errorsOnly.Total != 1 || len(errorsOnly.Items) != 1 || errorsOnly.Items[0].ID != "job_err" {
+		t.Fatalf("expected only job_err for errors_only, got %+v", errorsOnly.Items)
+	}
+
+	resp = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/jobs?severity=warnings_plus&sort=started_at_desc", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var warningsPlus JobList
+	if err := json.NewDecoder(resp.Body).Decode(&warningsPlus); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if warningsPlus.Total != 2 || len(warningsPlus.Items) != 2 {
+		t.Fatalf("expected two jobs for warnings_plus, got %+v", warningsPlus.Items)
+	}
+	if warningsPlus.Items[0].ID != "job_err" || warningsPlus.Items[1].ID != "job_warn" {
+		t.Fatalf("unexpected warnings_plus order: %+v", warningsPlus.Items)
+	}
+}
+
 func TestListJobsRejectsInvalidSort(t *testing.T) {
 	srv := New(DefaultConfig())
 
@@ -414,6 +469,24 @@ func TestListJobsRejectsInvalidSort(t *testing.T) {
 	}
 	if out.Error.Code != "invalid_sort" {
 		t.Fatalf("expected invalid_sort, got %q", out.Error.Code)
+	}
+}
+
+func TestListJobsRejectsInvalidSeverity(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs?severity=bad_filter", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", resp.Code)
+	}
+	var out ErrorResponse
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out.Error.Code != "invalid_severity" {
+		t.Fatalf("expected invalid_severity, got %q", out.Error.Code)
 	}
 }
 

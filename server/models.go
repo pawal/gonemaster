@@ -31,6 +31,14 @@ const (
 	JobSortCriticalDesc  JobSort = "critical_desc"
 )
 
+// JobSeverityFilter controls severity-based list filtering.
+type JobSeverityFilter string
+
+const (
+	JobSeverityWarningsPlus JobSeverityFilter = "warnings_plus"
+	JobSeverityErrorsOnly   JobSeverityFilter = "errors_only"
+)
+
 // Job represents a single test job.
 type Job struct {
 	ID             string         `json:"id"`
@@ -157,6 +165,7 @@ type JobFilter struct {
 	Status        JobStatus
 	BatchID       string
 	Domain        string
+	Severity      JobSeverityFilter
 	CreatedAfter  time.Time
 	CreatedBefore time.Time
 	Limit         int

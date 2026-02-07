@@ -582,6 +582,9 @@
       if (normalizedDomain) {
         params.set("domain", normalizedDomain);
       }
+      if (severityFilter !== "all") {
+        params.set("severity", severityFilter);
+      }
       const list = await apiFetch(`/jobs?${params.toString()}`);
       jobs = list.items || [];
       recentTotal = Number.isFinite(Number(list.total)) ? Number(list.total) : jobs.length;
@@ -1173,7 +1176,10 @@
           <button
             type="button"
             class={`severity-filter ${severityFilter === filter.id ? "active" : ""}`}
-            on:click={() => (severityFilter = filter.id)}
+            on:click={async () => {
+              severityFilter = filter.id;
+              await applyRecentFilters();
+            }}
           >
             {filter.label}
           </button>

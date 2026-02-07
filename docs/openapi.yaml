@@ -62,6 +62,12 @@ paths:
           in: query
           schema:
             type: string
+        - name: severity
+          in: query
+          description: Filter by aggregated severity totals before pagination.
+          schema:
+            type: string
+            enum: [warnings_plus, errors_only]
         - name: limit
           in: query
           schema:

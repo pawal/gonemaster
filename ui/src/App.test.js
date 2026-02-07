@@ -965,6 +965,7 @@ describe("App", () => {
   });
 
   it("filters recent jobs by severity totals", async () => {
+    const calls = [];
     const jobs = [
       {
         id: "job_clean",
@@ -994,6 +995,7 @@ describe("App", () => {
 
     global.fetch.mockImplementation((url) => {
       const value = typeof url === "string" ? url : String(url?.url || "");
+      calls.push(value);
       if (value.includes("/api/v1/jobs?")) {
         return jsonResponse({ items: jobs, total: jobs.length });
       }
@@ -1015,6 +1017,7 @@ describe("App", () => {
 
     await fireEvent.click(screen.getByRole("button", { name: "Warnings+" }));
     await waitFor(() => {
+      expect(calls.some((value) => value.includes("/api/v1/jobs?") && value.includes("severity=warnings_plus"))).toBe(true);
       expect(screen.queryByText("job_clean")).toBeNull();
       expect(screen.getByText("job_warn")).toBeInTheDocument();
       expect(screen.getByText("job_err")).toBeInTheDocument();
@@ -1022,6 +1025,7 @@ describe("App", () => {
 
     await fireEvent.click(screen.getByRole("button", { name: "Errors only" }));
     await waitFor(() => {
+      expect(calls.some((value) => value.includes("/api/v1/jobs?") && value.includes("severity=errors_only"))).toBe(true);
       expect(screen.queryByText("job_clean")).toBeNull();
       expect(screen.queryByText("job_warn")).toBeNull();
       expect(screen.getByText("job_err")).toBeInTheDocument();

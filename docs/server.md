@@ -161,6 +161,11 @@ List jobs:
 GET /jobs?status=running&limit=100
 ```
 
+Useful list filters include:
+- `domain=<substring>` to match domain names.
+- `batch_id=<id>` to scope to one batch.
+- `severity=warnings_plus|errors_only` to filter by aggregated severity totals before pagination.
+
 Get a job:
 ```
 GET /jobs/{job_id}

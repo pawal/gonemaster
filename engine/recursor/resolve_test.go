@@ -108,6 +108,162 @@ func TestCacheStoreLookupAndClear(t *testing.T) {
 	}
 }
 
+func TestParentSingleLabelFallsBackToRoot(t *testing.T) {
+	nameserver.EmptyCache()
+	defer nameserver.EmptyCache()
+
+	r := &Recursor{
+		fakeAddresses: map[string]map[string][]netip.Addr{},
+		client:        &transport.Client{},
+	}
+	if err := r.AddFakeAddresses(".", map[string][]string{
+		"a.root.test": {"192.0.2.1"},
+	}); err != nil {
+		t.Fatalf("add fake root: %v", err)
+	}
+
+	rootNS, err := nameserver.NewWithContext(context.Background(), "a.root.test", "192.0.2.1", r.client)
+	if err != nil {
+		t.Fatalf("new root nameserver: %v", err)
+	}
+	rootNS.SetQueryHook(func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		nameObj := dnsname.New(name)
+		name = nameObj.String()
+		qtype = strings.ToUpper(qtype)
+		switch {
+		case name == "arpa" && qtype == "SOA":
+			msg := new(dns.Msg)
+			msg.Rcode = dns.RcodeSuccess
+			msg.Ns = []dns.RR{
+				&dns.NS{
+					Hdr: dns.RR_Header{
+						Name:   "arpa.",
+						Rrtype: dns.TypeNS,
+						Class:  dns.ClassINET,
+					},
+					Ns: "ns.arpa.test.",
+				},
+			}
+			msg.Extra = []dns.RR{
+				&dns.A{
+					Hdr: dns.RR_Header{
+						Name:   "ns.arpa.test.",
+						Rrtype: dns.TypeA,
+						Class:  dns.ClassINET,
+					},
+					A: net.IPv4(192, 0, 2, 2),
+				},
+			}
+			return packet.Packet{Msg: msg}, nil
+		case name == "." && qtype == "SOA":
+			// Simulate a transient parent-check failure. Parent() should still
+			// fall back to root for single-label zones.
+			return packet.Packet{}, errors.New("timeout")
+		default:
+			return packet.Packet{}, errors.New("unexpected query")
+		}
+	})
+
+	arpaNS, err := nameserver.NewWithContext(context.Background(), "ns.arpa.test", "192.0.2.2", r.client)
+	if err != nil {
+		t.Fatalf("new arpa nameserver: %v", err)
+	}
+	arpaNS.SetQueryHook(func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		nameObj := dnsname.New(name)
+		name = nameObj.String()
+		qtype = strings.ToUpper(qtype)
+		if name != "arpa" || qtype != "SOA" {
+			return packet.Packet{}, errors.New("unexpected query")
+		}
+
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeSuccess
+		msg.Answer = []dns.RR{
+			&dns.SOA{
+				Hdr: dns.RR_Header{
+					Name:   "arpa.",
+					Rrtype: dns.TypeSOA,
+					Class:  dns.ClassINET,
+				},
+				Ns:      "ns.arpa.test.",
+				Mbox:    "hostmaster.arpa.",
+				Serial:  1,
+				Refresh: 3600,
+				Retry:   600,
+				Expire:  1209600,
+				Minttl:  3600,
+			},
+		}
+		return packet.Packet{Msg: msg}, nil
+	})
+
+	parent, _, err := r.Parent(context.Background(), "arpa")
+	if err != nil {
+		t.Fatalf("parent: %v", err)
+	}
+	if parent != "." {
+		t.Fatalf("expected parent '.', got %q", parent)
+	}
+}
+
+func TestParentSingleLabelNoTraceFallsBackToRoot(t *testing.T) {
+	nameserver.EmptyCache()
+	defer nameserver.EmptyCache()
+
+	r := &Recursor{
+		fakeAddresses: map[string]map[string][]netip.Addr{},
+		client:        &transport.Client{},
+	}
+	if err := r.AddFakeAddresses(".", map[string][]string{
+		"a.root.test": {"192.0.2.1"},
+	}); err != nil {
+		t.Fatalf("add fake root: %v", err)
+	}
+
+	rootNS, err := nameserver.NewWithContext(context.Background(), "a.root.test", "192.0.2.1", r.client)
+	if err != nil {
+		t.Fatalf("new root nameserver: %v", err)
+	}
+	rootNS.SetQueryHook(func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		nameObj := dnsname.New(name)
+		name = nameObj.String()
+		qtype = strings.ToUpper(qtype)
+		if name != "arpa" || qtype != "SOA" {
+			return packet.Packet{}, errors.New("unexpected query")
+		}
+
+		// Authoritative answer directly from the current server produces no
+		// referral trace. Parent() must still resolve arpa -> .
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeSuccess
+		msg.Answer = []dns.RR{
+			&dns.SOA{
+				Hdr: dns.RR_Header{
+					Name:   "arpa.",
+					Rrtype: dns.TypeSOA,
+					Class:  dns.ClassINET,
+				},
+				Ns:      "ns.arpa.test.",
+				Mbox:    "hostmaster.arpa.",
+				Serial:  1,
+				Refresh: 3600,
+				Retry:   600,
+				Expire:  1209600,
+				Minttl:  3600,
+			},
+		}
+		return packet.Packet{Msg: msg}, nil
+	})
+
+	parent, _, err := r.Parent(context.Background(), "arpa")
+	if err != nil {
+		t.Fatalf("parent: %v", err)
+	}
+	if parent != "." {
+		t.Fatalf("expected parent '.', got %q", parent)
+	}
+}
+
 func TestGetNSFromUsesGlueAndLazy(t *testing.T) {
 	nameserver.EmptyCache()
 	defer nameserver.EmptyCache()

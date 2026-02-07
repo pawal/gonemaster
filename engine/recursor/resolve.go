@@ -52,14 +52,26 @@ func (r *Recursor) Parent(ctx context.Context, name string) (string, packet.Pack
 		return "", resp, err
 	}
 	if len(state.trace) == 0 {
+		if len(nameObj.Labels()) == 1 {
+			if nextHigher, ok := nameObj.NextHigher(); ok {
+				return nextHigher.String(), resp, nil
+			}
+		}
 		return "", resp, nil
 	}
 
 	pname := state.trace[0].zoneName
 	pnameObj := dnsname.New(pname)
-	if strings.EqualFold(pnameObj.String(), nameObj.String()) && len(state.trace) > 1 {
-		pname = state.trace[1].zoneName
-		pnameObj = dnsname.New(pname)
+	if strings.EqualFold(pnameObj.String(), nameObj.String()) {
+		if len(state.trace) > 1 {
+			pname = state.trace[1].zoneName
+			pnameObj = dnsname.New(pname)
+		} else if nextHigher, ok := nameObj.NextHigher(); ok {
+			// Keep parity with Zonemaster behavior: when the trace only
+			// contains the child zone itself, fall back to next higher.
+			pname = nextHigher.String()
+			pnameObj = nextHigher
+		}
 	}
 
 	if nextHigher, ok := nameObj.NextHigher(); ok {

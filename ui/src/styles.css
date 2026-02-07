@@ -273,6 +273,10 @@ button:hover:not(:disabled) {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  cursor: default;
+}
+
+.summary-item[title] {
   cursor: help;
 }
 

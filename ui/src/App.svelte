@@ -637,6 +637,10 @@
     }
     if (next === "recent") {
       loadJobs();
+    } else if (next === "batches") {
+      if (selectedBatchId) {
+        loadBatch(selectedBatchId);
+      }
     } else if (next === "metrics") {
       loadMetrics();
     }

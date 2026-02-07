@@ -243,6 +243,55 @@ describe("App", () => {
     unmount();
   });
 
+  it("refreshes batch inspector when opening batch tab with selected batch id", async () => {
+    let batchCalls = 0;
+    const batch = {
+      batch_id: "batch_refresh",
+      total: 1,
+      status_counts: { running: 1 },
+      items: [
+        {
+          id: "job_batch_refresh",
+          domain: "refresh.example",
+          status: "running",
+          created_at: "2026-02-03T00:00:00Z",
+          progress: 40
+        }
+      ],
+      created_at: "2026-02-03T00:00:00Z"
+    };
+
+    global.fetch.mockImplementation((url) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      if (value.includes("/api/v1/jobs?")) {
+        return jsonResponse({ items: [], total: 0 });
+      }
+      if (value.includes("/api/v1/batches/batch_refresh")) {
+        batchCalls += 1;
+        return jsonResponse(batch);
+      }
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+
+    await openBatchTab();
+    await fireEvent.input(screen.getByLabelText("Batch ID"), { target: { value: "batch_refresh" } });
+    await fireEvent.change(screen.getByLabelText("Batch ID"));
+    await screen.findByText("job_batch_refresh");
+
+    const callsAfterInitialLoad = batchCalls;
+    await openRecentTab();
+    await openBatchTab();
+
+    await waitFor(() => {
+      expect(batchCalls).toBeGreaterThan(callsAfterInitialLoad);
+    });
+
+    expect(screen.getByRole("button", { name: /auto refresh: off/i })).toBeInTheDocument();
+    unmount();
+  });
+
   it("renders metrics cards, trends, and insight tables", async () => {
     const metricsPayload = {
       schema_version: "v1",

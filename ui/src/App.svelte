@@ -1460,6 +1460,14 @@ example.org`}
             <span class="summary-label">Avg job duration</span>
             <span class="summary-count">{formatDurationMs(metricsSnapshot?.quality?.job_duration_ms?.avg)}</span>
           </div>
+          <div class="summary-item jobs-finished">
+            <span class="summary-label">Total jobs finished</span>
+            <span class="summary-count">{formatInteger(metricsSnapshot?.jobs?.completed_total)}</span>
+          </div>
+          <div class="summary-item failed-jobs">
+            <span class="summary-label">Failed jobs</span>
+            <span class="summary-count">{formatInteger(metricsSnapshot?.quality?.outcomes?.failed_total)}</span>
+          </div>
           {#each summaryLevels as level}
             <div class={`summary-item severity-${level.toLowerCase()}`}>
               <span class="summary-label">{level}</span>

@@ -289,8 +289,13 @@ button:hover:not(:disabled) {
 }
 
 .summary-item.severity-notice {
-  border-color: #cbd5e1;
-  background: #f8fafc;
+  border-color: #7dd3fc;
+  background: #e0f2fe;
+}
+
+.summary-item.severity-notice .summary-label,
+.summary-item.severity-notice .summary-count {
+  color: #075985;
 }
 
 .summary-item.severity-warning {
@@ -305,6 +310,16 @@ button:hover:not(:disabled) {
 
 .summary-item.severity-critical {
   border-color: #dc2626;
+  background: #fef2f2;
+}
+
+.summary-item.jobs-finished {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.summary-item.failed-jobs {
+  border-color: #fca5a5;
   background: #fef2f2;
 }
 

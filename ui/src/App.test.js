@@ -252,6 +252,7 @@ describe("App", () => {
         in_flight_jobs: 2
       },
       jobs: {
+        completed_total: 7,
         status_counts: {
           queued: 1,
           running: 1
@@ -264,6 +265,7 @@ describe("App", () => {
       },
       quality: {
         outcomes: {
+          failed_total: 2,
           success_rate: 0.8,
           failed_rate: 0.15
         },
@@ -344,6 +346,8 @@ describe("App", () => {
     expect(within(metricsPanel).getByText("80.0%")).toBeInTheDocument();
     expect(within(metricsPanel).getByText("15.0%")).toBeInTheDocument();
     expect(within(metricsPanel).getByText("320 ms")).toBeInTheDocument();
+    expect(within(metricsPanel).getByText("Total jobs finished")).toBeInTheDocument();
+    expect(within(metricsPanel).getByText("Failed jobs")).toBeInTheDocument();
     expect(within(metricsPanel).getByRole("heading", { name: "Top domains" })).toBeInTheDocument();
     expect(within(metricsPanel).getByText("alpha.example")).toBeInTheDocument();
     expect(within(metricsPanel).getByRole("heading", { name: "Error-heavy batches" })).toBeInTheDocument();

@@ -82,6 +82,7 @@ const (
 	metricsDomainInsightCap   = 256
 )
 
+// MetricsSnapshot is the top-level payload returned by the metrics endpoint.
 type MetricsSnapshot struct {
 	SchemaVersion string                  `json:"schema_version"`
 	GeneratedAt   time.Time               `json:"generated_at"`
@@ -93,6 +94,7 @@ type MetricsSnapshot struct {
 	Trends        MetricsTrendsSnapshot   `json:"trends"`
 }
 
+// MetricsHealthSnapshot captures queue/worker runtime health.
 type MetricsHealthSnapshot struct {
 	StartedAt         time.Time `json:"started_at"`
 	UptimeSeconds     int64     `json:"uptime_seconds"`
@@ -104,6 +106,7 @@ type MetricsHealthSnapshot struct {
 	InFlightJobs      int64     `json:"in_flight_jobs"`
 }
 
+// MetricsJobsSnapshot captures lifecycle counters for submitted jobs.
 type MetricsJobsSnapshot struct {
 	SubmittedTotal int64            `json:"submitted_total"`
 	StartedTotal   int64            `json:"started_total"`
@@ -112,6 +115,7 @@ type MetricsJobsSnapshot struct {
 	StatusCounts   map[string]int64 `json:"status_counts"`
 }
 
+// MetricsAPISnapshot captures aggregate API request statistics.
 type MetricsAPISnapshot struct {
 	RequestsTotal     int64                    `json:"requests_total"`
 	StatusClassCounts map[string]int64         `json:"status_class_counts"`
@@ -119,6 +123,7 @@ type MetricsAPISnapshot struct {
 	Routes            []MetricsAPIRouteMetrics `json:"routes"`
 }
 
+// MetricsAPIRouteMetrics captures per-route API request statistics.
 type MetricsAPIRouteMetrics struct {
 	Route             string            `json:"route"`
 	Method            string            `json:"method"`
@@ -127,12 +132,14 @@ type MetricsAPIRouteMetrics struct {
 	LatencyMs         MetricsPercentile `json:"latency_ms"`
 }
 
+// MetricsPercentile stores P50/P90/P99 values.
 type MetricsPercentile struct {
 	P50 int64 `json:"p50"`
 	P90 int64 `json:"p90"`
 	P99 int64 `json:"p99"`
 }
 
+// MetricsQualitySnapshot captures result-quality-oriented metrics.
 type MetricsQualitySnapshot struct {
 	JobDurationMs MetricsDurationSnapshot `json:"job_duration_ms"`
 	Outcomes      MetricsOutcomesSnapshot `json:"outcomes"`
@@ -140,12 +147,14 @@ type MetricsQualitySnapshot struct {
 	LocaleUsage   MetricsLocaleSnapshot   `json:"locale_usage"`
 }
 
+// MetricsDurationSnapshot captures latency histogram summaries.
 type MetricsDurationSnapshot struct {
 	Count int64             `json:"count"`
 	Avg   float64           `json:"avg"`
 	Pctl  MetricsPercentile `json:"percentiles"`
 }
 
+// MetricsOutcomesSnapshot captures terminal outcome counters and ratios.
 type MetricsOutcomesSnapshot struct {
 	SuccessTotal  int64   `json:"success_total"`
 	FailedTotal   int64   `json:"failed_total"`
@@ -155,11 +164,13 @@ type MetricsOutcomesSnapshot struct {
 	CanceledRate  float64 `json:"canceled_rate"`
 }
 
+// MetricsSeveritySnapshot captures severity totals and per-completed ratios.
 type MetricsSeveritySnapshot struct {
 	Totals            map[string]int64   `json:"totals"`
 	PerCompletedRates map[string]float64 `json:"per_completed_rates"`
 }
 
+// MetricsLocaleSnapshot captures requested result locales.
 type MetricsLocaleSnapshot struct {
 	Counts map[string]int64 `json:"counts"`
 }
@@ -225,6 +236,7 @@ type MetricsCollector struct {
 	trend5m trendRing
 }
 
+// NewMetricsCollector creates a metrics collector initialized from server config.
 func NewMetricsCollector(cfg Config) *MetricsCollector {
 	return newMetricsCollector(cfg, time.Now().UTC())
 }
@@ -268,6 +280,7 @@ func newMetricsCollector(cfg Config, startedAt time.Time) *MetricsCollector {
 	}
 }
 
+// Snapshot returns a metrics snapshot using default insight limits.
 func (m *MetricsCollector) Snapshot() MetricsSnapshot {
 	now := time.Now().UTC()
 	if m.nowFn != nil {
@@ -276,6 +289,7 @@ func (m *MetricsCollector) Snapshot() MetricsSnapshot {
 	return m.snapshotAtWithLimits(now, m.defaultDomainLimit, m.defaultBatchLimit)
 }
 
+// SnapshotWithLimits returns a metrics snapshot with explicit insight limits.
 func (m *MetricsCollector) SnapshotWithLimits(domainLimit int, batchLimit int) MetricsSnapshot {
 	now := time.Now().UTC()
 	if m.nowFn != nil {
@@ -284,16 +298,19 @@ func (m *MetricsCollector) SnapshotWithLimits(domainLimit int, batchLimit int) M
 	return m.snapshotAtWithLimits(now, domainLimit, batchLimit)
 }
 
+// ObserveQueuePaused records whether queue processing is paused.
 func (m *MetricsCollector) ObserveQueuePaused(paused bool) {
 	m.mu.Lock()
 	m.queuePaused = paused
 	m.mu.Unlock()
 }
 
+// ObserveJobSubmitted records a submitted job without batch/domain context.
 func (m *MetricsCollector) ObserveJobSubmitted(initialStatus JobStatus) {
 	m.ObserveJobSubmittedWithContext("", "", initialStatus)
 }
 
+// ObserveJobSubmittedWithContext records a submitted job with batch/domain context.
 func (m *MetricsCollector) ObserveJobSubmittedWithContext(batchID string, domain string, initialStatus JobStatus) {
 	m.mu.Lock()
 	m.submittedTotal++
@@ -306,12 +323,14 @@ func (m *MetricsCollector) ObserveJobSubmittedWithContext(batchID string, domain
 	m.mu.Unlock()
 }
 
+// ObserveJobStatusTransition records a job state transition.
 func (m *MetricsCollector) ObserveJobStatusTransition(fromStatus, toStatus JobStatus) {
 	m.mu.Lock()
 	m.observeStatusTransitionLocked(fromStatus, toStatus)
 	m.mu.Unlock()
 }
 
+// ObserveAPIRequest records one API request observation.
 func (m *MetricsCollector) ObserveAPIRequest(route string, method string, statusCode int, duration time.Duration, errorCode string) {
 	if route == "" {
 		route = "/api/v1/unknown"
@@ -351,10 +370,12 @@ func (m *MetricsCollector) ObserveAPIRequest(route string, method string, status
 	m.mu.Unlock()
 }
 
+// ObserveJobCompletion records completion data for a terminal job.
 func (m *MetricsCollector) ObserveJobCompletion(status JobStatus, duration time.Duration, severityTotals map[string]int64) {
 	m.ObserveJobCompletionWithContext("", "", status, duration, severityTotals)
 }
 
+// ObserveJobCompletionWithContext records completion data with batch/domain context.
 func (m *MetricsCollector) ObserveJobCompletionWithContext(batchID string, domain string, status JobStatus, duration time.Duration, severityTotals map[string]int64) {
 	if !isTerminalMetricsStatus(status) {
 		return
@@ -383,6 +404,7 @@ func (m *MetricsCollector) ObserveJobCompletionWithContext(batchID string, domai
 	m.mu.Unlock()
 }
 
+// ObserveResultLocale records locale usage when rendering results.
 func (m *MetricsCollector) ObserveResultLocale(locale string) {
 	normalized := normalizeMetricsLocale(locale)
 

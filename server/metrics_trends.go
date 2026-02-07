@@ -36,15 +36,18 @@ var metricsTrendWindowSpecs = map[string]metricsTrendWindowSpec{
 	},
 }
 
+// MetricsTrendsSnapshot contains windowed trend series keyed by window name.
 type MetricsTrendsSnapshot struct {
 	Windows map[string]MetricsTrendWindowSnapshot `json:"windows"`
 }
 
+// MetricsTrendWindowSnapshot contains sampled trend points for one window.
 type MetricsTrendWindowSnapshot struct {
 	ResolutionSeconds int64               `json:"resolution_seconds"`
 	Points            []MetricsTrendPoint `json:"points"`
 }
 
+// MetricsTrendPoint contains one sampled trend datapoint.
 type MetricsTrendPoint struct {
 	Timestamp  time.Time        `json:"timestamp"`
 	Throughput int64            `json:"throughput"`

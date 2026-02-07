@@ -13,11 +13,13 @@ var metricsBatchOutcomeStatuses = [...]JobStatus{
 	JobExpired,
 }
 
+// MetricsInsightsSnapshot groups derived batch/domain insight tables.
 type MetricsInsightsSnapshot struct {
 	Batches MetricsBatchInsightsSnapshot  `json:"batches"`
 	Domains MetricsDomainInsightsSnapshot `json:"domains"`
 }
 
+// MetricsBatchInsightsSnapshot summarizes batch-level quality outliers.
 type MetricsBatchInsightsSnapshot struct {
 	Limit int                   `json:"limit"`
 	Cap   int                   `json:"cap"`
@@ -25,6 +27,7 @@ type MetricsBatchInsightsSnapshot struct {
 	Other *MetricsBatchInsight  `json:"other,omitempty"`
 }
 
+// MetricsBatchInsight captures outcome/severity totals for one batch.
 type MetricsBatchInsight struct {
 	BatchID        string           `json:"batch_id"`
 	SizeTotal      int64            `json:"size_total"`
@@ -33,6 +36,7 @@ type MetricsBatchInsight struct {
 	SeverityTotals map[string]int64 `json:"severity_totals"`
 }
 
+// MetricsDomainInsightsSnapshot summarizes domain-level quality outliers.
 type MetricsDomainInsightsSnapshot struct {
 	Limit int                    `json:"limit"`
 	Cap   int                    `json:"cap"`
@@ -40,6 +44,7 @@ type MetricsDomainInsightsSnapshot struct {
 	Other *MetricsDomainInsight  `json:"other,omitempty"`
 }
 
+// MetricsDomainInsight captures aggregated outcomes for one domain.
 type MetricsDomainInsight struct {
 	Domain         string           `json:"domain"`
 	RunsTotal      int64            `json:"runs_total"`

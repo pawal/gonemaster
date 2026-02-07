@@ -26,6 +26,7 @@ type InMemoryQueue struct {
 	notify chan struct{}
 }
 
+// NewInMemoryQueue creates an empty in-memory queue.
 func NewInMemoryQueue() *InMemoryQueue {
 	return &InMemoryQueue{notify: make(chan struct{})}
 }

@@ -72,7 +72,7 @@ func LoadFileConfig(path string) (FileConfig, error) {
 	return cfg, nil
 }
 
-// ApplyFileConfig overwrites config fields when provided.
+// ApplyFileConfig overwrites config fields when provided by file.
 func (c *Config) ApplyFileConfig(file FileConfig) {
 	if file.ListenAddr != nil {
 		c.ListenAddr = *file.ListenAddr

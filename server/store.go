@@ -28,6 +28,7 @@ type InMemoryJobStore struct {
 	results map[string]JobResult
 }
 
+// NewInMemoryJobStore creates an empty in-memory job store.
 func NewInMemoryJobStore() *InMemoryJobStore {
 	return &InMemoryJobStore{
 		jobs:    map[string]Job{},

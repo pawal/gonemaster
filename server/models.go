@@ -6,6 +6,7 @@ import "time"
 type JobStatus string
 
 const (
+	// Job status values.
 	JobQueued    JobStatus = "queued"
 	JobRunning   JobStatus = "running"
 	JobSucceeded JobStatus = "succeeded"
@@ -19,6 +20,7 @@ const (
 type JobSort string
 
 const (
+	// Job sort values for list and batch endpoints.
 	JobSortCreatedAtDesc JobSort = "created_at_desc"
 	JobSortCreatedAtAsc  JobSort = "created_at_asc"
 	JobSortStartedAtDesc JobSort = "started_at_desc"
@@ -35,6 +37,7 @@ const (
 type JobSeverityFilter string
 
 const (
+	// Job severity filter values for list endpoints.
 	JobSeverityWarningsPlus JobSeverityFilter = "warnings_plus"
 	JobSeverityErrorsOnly   JobSeverityFilter = "errors_only"
 )

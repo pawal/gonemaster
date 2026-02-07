@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"log"
 	"math"
+	"net/netip"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
+	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 )
 
@@ -98,7 +100,8 @@ func (s *Server) runJob(jobID string) error {
 		return err
 	}
 
-	entries, runErr := s.runEngineForJob(job, jobCtx)
+	entries, ipv4Queries, ipv6Queries, runErr := s.runEngineForJob(job, jobCtx)
+	s.metrics.ObserveDNSQueries(ipv4Queries, ipv6Queries)
 	finishedAt := time.Now().UTC()
 
 	result := JobResult{
@@ -154,10 +157,10 @@ func (s *Server) runJob(jobID string) error {
 	return runErr
 }
 
-func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntry, error) {
+func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntry, int64, int64, error) {
 	if s.engineLimiter != nil {
 		if err := s.engineLimiter.Acquire(ctx); err != nil {
-			return nil, err
+			return nil, 0, 0, err
 		}
 		defer s.engineLimiter.Release()
 	}
@@ -190,9 +193,13 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 		req.Fallback = s.cfg.Fallback
 	}
 
+	queryCounter := &dnsQueryCounter{}
+	callbacks := []func(*logger.Entry) error{
+		queryCounter.Callback,
+	}
 	cleanup, err := applyProfileOverrides(&req, job.Overrides, s.cfg.ProfilePath)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, err
 	}
 	if cleanup != nil {
 		defer cleanup()
@@ -200,16 +207,21 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 
 	if len(job.Tests) == 0 {
 		if tracker := s.newProgressTracker(job.ID, req); tracker != nil {
-			req.LogCallback = tracker.Callback
+			callbacks = append(callbacks, tracker.Callback)
 		}
 	}
+	req.LogCallback = chainLogCallbacks(callbacks...)
 
 	if len(job.Tests) == 1 {
 		req.Testcase = job.Tests[0]
-		return s.runEngine(req)
+		entries, err := s.runEngine(req)
+		ipv4, ipv6 := queryCounter.Totals()
+		return entries, ipv4, ipv6, err
 	}
 	if len(job.Tests) == 0 {
-		return s.runEngine(req)
+		entries, err := s.runEngine(req)
+		ipv4, ipv6 := queryCounter.Totals()
+		return entries, ipv4, ipv6, err
 	}
 
 	var all []engine.LogEntry
@@ -224,11 +236,13 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 			s.updateJobProgress(job.ID, progress)
 		}
 		if err != nil {
-			return all, err
+			ipv4, ipv6 := queryCounter.Totals()
+			return all, ipv4, ipv6, err
 		}
 		all = append(all, entries...)
 	}
-	return all, nil
+	ipv4, ipv6 := queryCounter.Totals()
+	return all, ipv4, ipv6, nil
 }
 
 func (s *Server) runEngine(req engine.RunRequest) ([]engine.LogEntry, error) {
@@ -282,6 +296,81 @@ func severityTotalsFromEntries(entries []engine.LogEntry) map[string]int64 {
 		totals[level]++
 	}
 	return totals
+}
+
+type dnsQueryCounter struct {
+	ipv4 int64
+	ipv6 int64
+}
+
+func (c *dnsQueryCounter) Callback(entry *logger.Entry) error {
+	if c == nil || entry == nil {
+		return nil
+	}
+	if !strings.EqualFold(strings.TrimSpace(entry.Tag), "EXTERNAL_QUERY") {
+		return nil
+	}
+	addr, ok := dnsQueryAddrFromArgs(entry.Args)
+	if !ok {
+		return nil
+	}
+	if addr.Is4() {
+		c.ipv4++
+		return nil
+	}
+	if addr.Is6() {
+		c.ipv6++
+	}
+	return nil
+}
+
+func (c *dnsQueryCounter) Totals() (int64, int64) {
+	if c == nil {
+		return 0, 0
+	}
+	return c.ipv4, c.ipv6
+}
+
+func dnsQueryAddrFromArgs(args map[string]any) (netip.Addr, bool) {
+	if len(args) == 0 {
+		return netip.Addr{}, false
+	}
+	value, ok := args["ip"]
+	if !ok {
+		return netip.Addr{}, false
+	}
+	switch ipValue := value.(type) {
+	case string:
+		addr, err := netip.ParseAddr(strings.TrimSpace(ipValue))
+		if err != nil {
+			return netip.Addr{}, false
+		}
+		return addr, true
+	case netip.Addr:
+		return ipValue, true
+	default:
+		return netip.Addr{}, false
+	}
+}
+
+func chainLogCallbacks(callbacks ...func(*logger.Entry) error) func(*logger.Entry) error {
+	active := make([]func(*logger.Entry) error, 0, len(callbacks))
+	for _, callback := range callbacks {
+		if callback != nil {
+			active = append(active, callback)
+		}
+	}
+	if len(active) == 0 {
+		return nil
+	}
+	return func(entry *logger.Entry) error {
+		for _, callback := range active {
+			if err := callback(entry); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 }
 
 func applyProfileOverrides(req *engine.RunRequest, overrides map[string]any, baseProfile string) (func(), error) {

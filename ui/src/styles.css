@@ -664,8 +664,41 @@ button:hover:not(:disabled) {
   stroke: #dc2626;
 }
 
-.sparkline-queue polyline {
-  stroke: #0b2d4d;
+.sparkline-queries .sparkline-ipv4 {
+  stroke: #0284c7;
+}
+
+.sparkline-queries .sparkline-ipv6 {
+  stroke: #f97316;
+}
+
+.sparkline-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.sparkline-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sparkline-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.sparkline-legend-dot-ipv4 {
+  background: #0284c7;
+}
+
+.sparkline-legend-dot-ipv6 {
+  background: #f97316;
 }
 
 .metrics-tables {

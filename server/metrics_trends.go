@@ -49,12 +49,15 @@ type MetricsTrendWindowSnapshot struct {
 
 // MetricsTrendPoint contains one sampled trend datapoint.
 type MetricsTrendPoint struct {
-	Timestamp  time.Time        `json:"timestamp"`
-	Throughput int64            `json:"throughput"`
-	Failed     int64            `json:"failed"`
-	QueueDepth int64            `json:"queue_depth"`
-	Severity   map[string]int64 `json:"severity"`
-	APIP90Ms   map[string]int64 `json:"api_p90_ms,omitempty"`
+	Timestamp               time.Time        `json:"timestamp"`
+	Throughput              int64            `json:"throughput"`
+	Failed                  int64            `json:"failed"`
+	QueueDepth              int64            `json:"queue_depth"`
+	DNSQueriesPerSecond     float64          `json:"dns_queries_per_second"`
+	DNSQueriesIPv4PerSecond float64          `json:"dns_queries_ipv4_per_second"`
+	DNSQueriesIPv6PerSecond float64          `json:"dns_queries_ipv6_per_second"`
+	Severity                map[string]int64 `json:"severity"`
+	APIP90Ms                map[string]int64 `json:"api_p90_ms,omitempty"`
 }
 
 type trendBucket struct {
@@ -63,6 +66,9 @@ type trendBucket struct {
 	Failed        int64
 	QueueDepth    int64
 	QueueDepthSet bool
+	DNSQueries    int64
+	DNSQueries4   int64
+	DNSQueries6   int64
 	Severity      map[string]int64
 	APILatency    map[string]boundedHistogram
 }
@@ -101,6 +107,11 @@ func selectMetricsTrendWindow(window string) (metricsTrendWindowSpec, bool) {
 func (m *MetricsCollector) observeTrendQueueDepthLocked(now time.Time, queueDepth int64) {
 	m.trend1m.ObserveQueueDepth(now, queueDepth)
 	m.trend5m.ObserveQueueDepth(now, queueDepth)
+}
+
+func (m *MetricsCollector) observeTrendDNSQueriesLocked(now time.Time, ipv4Queries int64, ipv6Queries int64) {
+	m.trend1m.ObserveDNSQueries(now, ipv4Queries, ipv6Queries)
+	m.trend5m.ObserveDNSQueries(now, ipv4Queries, ipv6Queries)
 }
 
 func (m *MetricsCollector) observeTrendOutcomeLocked(now time.Time, status JobStatus) {
@@ -148,6 +159,26 @@ func (r *trendRing) ObserveQueueDepth(at time.Time, queueDepth int64) {
 	}
 	bucket.QueueDepth = queueDepth
 	bucket.QueueDepthSet = true
+}
+
+func (r *trendRing) ObserveDNSQueries(at time.Time, ipv4Queries int64, ipv6Queries int64) {
+	if ipv4Queries < 0 {
+		ipv4Queries = 0
+	}
+	if ipv6Queries < 0 {
+		ipv6Queries = 0
+	}
+	totalQueries := ipv4Queries + ipv6Queries
+	if totalQueries == 0 {
+		return
+	}
+	bucket := r.bucketForWrite(at)
+	if bucket == nil {
+		return
+	}
+	bucket.DNSQueries += totalQueries
+	bucket.DNSQueries4 += ipv4Queries
+	bucket.DNSQueries6 += ipv6Queries
 }
 
 func (r *trendRing) ObserveOutcome(at time.Time, status JobStatus) {
@@ -234,6 +265,12 @@ func (r *trendRing) Snapshot(now time.Time, window time.Duration) MetricsTrendWi
 		if bucket != nil {
 			point.Throughput = bucket.Throughput
 			point.Failed = bucket.Failed
+			if r.Resolution > 0 {
+				resolutionSeconds := float64(r.Resolution) / float64(time.Second)
+				point.DNSQueriesPerSecond = float64(bucket.DNSQueries) / resolutionSeconds
+				point.DNSQueriesIPv4PerSecond = float64(bucket.DNSQueries4) / resolutionSeconds
+				point.DNSQueriesIPv6PerSecond = float64(bucket.DNSQueries6) / resolutionSeconds
+			}
 			if bucket.Severity != nil {
 				point.Severity = copyStringCounts(bucket.Severity)
 			}
@@ -318,6 +355,9 @@ func resetTrendBucket(bucket *trendBucket, start time.Time) {
 	bucket.Failed = 0
 	bucket.QueueDepth = 0
 	bucket.QueueDepthSet = false
+	bucket.DNSQueries = 0
+	bucket.DNSQueries4 = 0
+	bucket.DNSQueries6 = 0
 	bucket.Severity = nil
 	bucket.APILatency = nil
 }

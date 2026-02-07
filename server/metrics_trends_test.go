@@ -50,6 +50,7 @@ func TestMetricsCollectorTrendRolloverAndWindowBounds(t *testing.T) {
 		collector.ObserveJobCompletion(JobSucceeded, 500*time.Millisecond, map[string]int64{
 			"NOTICE": 1,
 		})
+		collector.ObserveDNSQueries(3, 9)
 		collector.ObserveAPIRequest("/api/v1/jobs", "GET", 200, 120*time.Millisecond, "")
 	}
 
@@ -97,6 +98,15 @@ func TestMetricsCollectorTrendRolloverAndWindowBounds(t *testing.T) {
 	}
 	if got := window6h.Points[len(window6h.Points)-1].APIP90Ms["GET /api/v1/jobs"]; got == 0 {
 		t.Fatalf("expected api_p90_ms for GET /api/v1/jobs in latest 6h point")
+	}
+	if got := window6h.Points[len(window6h.Points)-1].DNSQueriesPerSecond; got <= 0 {
+		t.Fatalf("expected dns_queries_per_second in latest 6h point, got %f", got)
+	}
+	if got := window6h.Points[len(window6h.Points)-1].DNSQueriesIPv4PerSecond; got <= 0 {
+		t.Fatalf("expected dns_queries_ipv4_per_second in latest 6h point, got %f", got)
+	}
+	if got := window6h.Points[len(window6h.Points)-1].DNSQueriesIPv6PerSecond; got <= 0 {
+		t.Fatalf("expected dns_queries_ipv6_per_second in latest 6h point, got %f", got)
 	}
 
 	window24h := snapshot.Trends.Windows["24h"]

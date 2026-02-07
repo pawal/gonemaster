@@ -391,7 +391,36 @@
     if (!Number.isFinite(numeric)) return "0";
     return Math.round(numeric).toLocaleString();
   };
+  const formatCompactInteger = (value) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return "0";
+    const sign = numeric < 0 ? "-" : "";
+    const absolute = Math.abs(numeric);
+    if (absolute < 1000) return `${sign}${formatInteger(absolute)}`;
+
+    const units = [
+      { divisor: 1e12, suffix: "T" },
+      { divisor: 1e9, suffix: "B" },
+      { divisor: 1e6, suffix: "M" },
+      { divisor: 1e3, suffix: "K" }
+    ];
+    for (const unit of units) {
+      if (absolute < unit.divisor) continue;
+      const scaled = absolute / unit.divisor;
+      const rounded = Math.round(scaled * 10) / 10;
+      const raw = Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1);
+      return `${sign}${raw.replace(".", ",")}${unit.suffix}`;
+    }
+    return `${sign}${formatInteger(absolute)}`;
+  };
   const formatDurationMs = (value) => `${formatInteger(value)} ms`;
+  const formatRate = (value) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric <= 0) return "0/s";
+    const rounded = Math.round(numeric * 10) / 10;
+    const raw = Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1);
+    return `${raw.replace(".", ",")}/s`;
+  };
   const formatUptime = (value) => {
     const seconds = Number(value);
     if (!Number.isFinite(seconds) || seconds < 0) return "unknown";
@@ -414,6 +443,8 @@
   const metricsCardHelp = {
     queue_depth: "Current number of jobs waiting in the queue.",
     in_flight_jobs: "Jobs currently being processed by workers.",
+    dns_queries_ipv4_total: "Total DNS queries sent over IPv4 across all processed jobs.",
+    dns_queries_ipv6_total: "Total DNS queries sent over IPv6 across all processed jobs.",
     success_rate: "Share of completed jobs that succeeded.",
     failed_rate: "Share of completed jobs that failed.",
     api_p90: "Worst route-level 90th percentile API latency.",
@@ -439,14 +470,29 @@
   };
   const metricsSeriesValues = (snapshot, window, field) =>
     metricsSeriesPoints(snapshot, window).map((point) => Number(point?.[field] || 0));
-  const sparklinePoints = (values, width = 260, height = 66, padding = 6) => {
+  const sparklineBounds = (...seriesList) => {
+    const flattened = seriesList.flatMap((series) =>
+      Array.isArray(series)
+        ? series
+            .map((value) => Number(value))
+            .filter((value) => Number.isFinite(value))
+        : []
+    );
+    if (flattened.length === 0) {
+      return { min: 0, max: 1 };
+    }
+    const min = Math.min(...flattened);
+    const max = Math.max(...flattened);
+    return { min, max: max === min ? min + 1 : max };
+  };
+  const sparklinePoints = (values, width = 260, height = 66, padding = 6, bounds = null) => {
     if (!Array.isArray(values) || values.length === 0) return "";
     const usableValues = values.map((value) => {
       const numeric = Number(value);
       return Number.isFinite(numeric) ? numeric : 0;
     });
-    const max = Math.max(...usableValues);
-    const min = Math.min(...usableValues);
+    const max = Number.isFinite(bounds?.max) ? Number(bounds.max) : Math.max(...usableValues);
+    const min = Number.isFinite(bounds?.min) ? Number(bounds.min) : Math.min(...usableValues);
     const spread = max - min || 1;
     const spanX = Math.max(width - padding * 2, 1);
     const spanY = Math.max(height - padding * 2, 1);
@@ -1467,7 +1513,9 @@ example.org`}
       {:else if hasMetricsData(metricsSnapshot)}
         {@const throughputSeries = metricsSeriesValues(metricsSnapshot, metricsWindow, "throughput")}
         {@const failedSeries = metricsSeriesValues(metricsSnapshot, metricsWindow, "failed")}
-        {@const queueSeries = metricsSeriesValues(metricsSnapshot, metricsWindow, "queue_depth")}
+        {@const querySeriesIPv4 = metricsSeriesValues(metricsSnapshot, metricsWindow, "dns_queries_ipv4_per_second")}
+        {@const querySeriesIPv6 = metricsSeriesValues(metricsSnapshot, metricsWindow, "dns_queries_ipv6_per_second")}
+        {@const queryBounds = sparklineBounds(querySeriesIPv4, querySeriesIPv6)}
         {@const severityTotals = metricsSnapshot?.quality?.severity?.totals || {}}
 
         {#if metricsError}
@@ -1482,6 +1530,14 @@ example.org`}
           <div class="summary-item" title={metricsCardHelp.in_flight_jobs}>
             <span class="summary-label">In-flight jobs</span>
             <span class="summary-count">{formatInteger(metricsSnapshot?.health?.in_flight_jobs)}</span>
+          </div>
+          <div class="summary-item" title={metricsCardHelp.dns_queries_ipv4_total}>
+            <span class="summary-label">Total IPv4 queries</span>
+            <span class="summary-count">{formatCompactInteger(metricsSnapshot?.health?.dns_queries_ipv4_total)}</span>
+          </div>
+          <div class="summary-item" title={metricsCardHelp.dns_queries_ipv6_total}>
+            <span class="summary-label">Total IPv6 queries</span>
+            <span class="summary-count">{formatCompactInteger(metricsSnapshot?.health?.dns_queries_ipv6_total)}</span>
           </div>
           <div class="summary-item" title={metricsCardHelp.success_rate}>
             <span class="summary-label">Success rate</span>
@@ -1536,12 +1592,23 @@ example.org`}
           </div>
           <div class="metrics-trend-card">
             <div class="metrics-trend-head">
-              <strong>Queue depth</strong>
-              <span>{formatInteger(seriesLast(queueSeries))}</span>
+              <strong>DNS queries/s</strong>
+              <span>{formatRate(seriesLast(querySeriesIPv4) + seriesLast(querySeriesIPv6))}</span>
             </div>
-            <svg class="sparkline sparkline-queue" viewBox="0 0 260 66" role="img" aria-label="Queue depth trend">
-              <polyline points={sparklinePoints(queueSeries)} />
+            <svg class="sparkline sparkline-queries" viewBox="0 0 260 66" role="img" aria-label="DNS query rates trend">
+              <polyline class="sparkline-ipv4" points={sparklinePoints(querySeriesIPv4, 260, 66, 6, queryBounds)} />
+              <polyline class="sparkline-ipv6" points={sparklinePoints(querySeriesIPv6, 260, 66, 6, queryBounds)} />
             </svg>
+            <div class="sparkline-legend">
+              <span class="sparkline-legend-item">
+                <span class="sparkline-legend-dot sparkline-legend-dot-ipv4" aria-hidden="true"></span>
+                IPv4 {formatRate(seriesLast(querySeriesIPv4))}
+              </span>
+              <span class="sparkline-legend-item">
+                <span class="sparkline-legend-dot sparkline-legend-dot-ipv6" aria-hidden="true"></span>
+                IPv6 {formatRate(seriesLast(querySeriesIPv6))}
+              </span>
+            </div>
           </div>
         </div>
 

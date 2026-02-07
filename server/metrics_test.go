@@ -49,6 +49,15 @@ func TestMetricsCollectorZeroStateSnapshot(t *testing.T) {
 	if snapshot.Health.InFlightJobs != 0 {
 		t.Fatalf("health.in_flight_jobs = %d, want 0", snapshot.Health.InFlightJobs)
 	}
+	if snapshot.Health.DNSQueriesTotal != 0 {
+		t.Fatalf("health.dns_queries_total = %d, want 0", snapshot.Health.DNSQueriesTotal)
+	}
+	if snapshot.Health.DNSQueriesIPv4 != 0 {
+		t.Fatalf("health.dns_queries_ipv4_total = %d, want 0", snapshot.Health.DNSQueriesIPv4)
+	}
+	if snapshot.Health.DNSQueriesIPv6 != 0 {
+		t.Fatalf("health.dns_queries_ipv6_total = %d, want 0", snapshot.Health.DNSQueriesIPv6)
+	}
 
 	if snapshot.Jobs.SubmittedTotal != 0 {
 		t.Fatalf("jobs.submitted_total = %d, want 0", snapshot.Jobs.SubmittedTotal)
@@ -218,6 +227,52 @@ func TestMetricsCollectorTracksLifecycle(t *testing.T) {
 	}
 	if got := snapshot.Jobs.StatusCounts[string(JobCanceled)]; got != 1 {
 		t.Fatalf("jobs.status_counts[%q] = %d, want 1", JobCanceled, got)
+	}
+}
+
+func TestMetricsCollectorTracksDNSQueries(t *testing.T) {
+	cfg := DefaultConfig()
+	startedAt := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+	now := startedAt
+	collector := newMetricsCollector(cfg, startedAt)
+	collector.nowFn = func() time.Time { return now }
+
+	collector.ObserveDNSQueries(7, 3)
+	now = now.Add(30 * time.Second)
+	collector.ObserveDNSQueries(2, 8)
+
+	snapshot := collector.snapshotAt(startedAt.Add(time.Minute))
+	if snapshot.Health.DNSQueriesTotal != 20 {
+		t.Fatalf("health.dns_queries_total = %d, want 20", snapshot.Health.DNSQueriesTotal)
+	}
+	if snapshot.Health.DNSQueriesIPv4 != 9 {
+		t.Fatalf("health.dns_queries_ipv4_total = %d, want 9", snapshot.Health.DNSQueriesIPv4)
+	}
+	if snapshot.Health.DNSQueriesIPv6 != 11 {
+		t.Fatalf("health.dns_queries_ipv6_total = %d, want 11", snapshot.Health.DNSQueriesIPv6)
+	}
+	maxRate := 0.0
+	maxRateIPv4 := 0.0
+	maxRateIPv6 := 0.0
+	for _, point := range snapshot.Trends.Windows["1h"].Points {
+		if point.DNSQueriesPerSecond > maxRate {
+			maxRate = point.DNSQueriesPerSecond
+		}
+		if point.DNSQueriesIPv4PerSecond > maxRateIPv4 {
+			maxRateIPv4 = point.DNSQueriesIPv4PerSecond
+		}
+		if point.DNSQueriesIPv6PerSecond > maxRateIPv6 {
+			maxRateIPv6 = point.DNSQueriesIPv6PerSecond
+		}
+	}
+	if math.Abs(maxRate-(20.0/60.0)) > 0.0001 {
+		t.Fatalf("trends.windows[1h].max.dns_queries_per_second = %f, want %f", maxRate, 20.0/60.0)
+	}
+	if math.Abs(maxRateIPv4-(9.0/60.0)) > 0.0001 {
+		t.Fatalf("trends.windows[1h].max.dns_queries_ipv4_per_second = %f, want %f", maxRateIPv4, 9.0/60.0)
+	}
+	if math.Abs(maxRateIPv6-(11.0/60.0)) > 0.0001 {
+		t.Fatalf("trends.windows[1h].max.dns_queries_ipv6_per_second = %f, want %f", maxRateIPv6, 11.0/60.0)
 	}
 }
 

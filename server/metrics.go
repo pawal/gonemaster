@@ -104,6 +104,9 @@ type MetricsHealthSnapshot struct {
 	QueuePaused       bool      `json:"queue_paused"`
 	QueueDepth        int64     `json:"queue_depth"`
 	InFlightJobs      int64     `json:"in_flight_jobs"`
+	DNSQueriesTotal   int64     `json:"dns_queries_total"`
+	DNSQueriesIPv4    int64     `json:"dns_queries_ipv4_total"`
+	DNSQueriesIPv6    int64     `json:"dns_queries_ipv6_total"`
 }
 
 // MetricsJobsSnapshot captures lifecycle counters for submitted jobs.
@@ -201,6 +204,9 @@ type MetricsCollector struct {
 	queuePaused bool
 	queueDepth  int64
 	inFlight    int64
+	dnsQueries  int64
+	dnsQueries4 int64
+	dnsQueries6 int64
 
 	submittedTotal int64
 	startedTotal   int64
@@ -302,6 +308,31 @@ func (m *MetricsCollector) SnapshotWithLimits(domainLimit int, batchLimit int) M
 func (m *MetricsCollector) ObserveQueuePaused(paused bool) {
 	m.mu.Lock()
 	m.queuePaused = paused
+	m.mu.Unlock()
+}
+
+// ObserveDNSQueries records DNS query counters split by IP family.
+func (m *MetricsCollector) ObserveDNSQueries(ipv4Queries int64, ipv6Queries int64) {
+	if ipv4Queries < 0 {
+		ipv4Queries = 0
+	}
+	if ipv6Queries < 0 {
+		ipv6Queries = 0
+	}
+	total := ipv4Queries + ipv6Queries
+	if total == 0 {
+		return
+	}
+
+	m.mu.Lock()
+	m.dnsQueries += total
+	m.dnsQueries4 += ipv4Queries
+	m.dnsQueries6 += ipv6Queries
+	now := time.Now().UTC()
+	if m.nowFn != nil {
+		now = m.nowFn().UTC()
+	}
+	m.observeTrendDNSQueriesLocked(now, ipv4Queries, ipv6Queries)
 	m.mu.Unlock()
 }
 
@@ -488,6 +519,9 @@ func (m *MetricsCollector) snapshotAtWithLimits(now time.Time, domainLimit int, 
 	queuePaused := m.queuePaused
 	queueDepth := m.queueDepth
 	inFlight := m.inFlight
+	dnsQueries := m.dnsQueries
+	dnsQueries4 := m.dnsQueries4
+	dnsQueries6 := m.dnsQueries6
 	submittedTotal := m.submittedTotal
 	startedTotal := m.startedTotal
 	completedTotal := m.completedTotal
@@ -536,6 +570,9 @@ func (m *MetricsCollector) snapshotAtWithLimits(now time.Time, domainLimit int, 
 			QueuePaused:       queuePaused,
 			QueueDepth:        queueDepth,
 			InFlightJobs:      inFlight,
+			DNSQueriesTotal:   dnsQueries,
+			DNSQueriesIPv4:    dnsQueries4,
+			DNSQueriesIPv6:    dnsQueries6,
 		},
 		Jobs: MetricsJobsSnapshot{
 			SubmittedTotal: submittedTotal,

@@ -249,7 +249,9 @@ describe("App", () => {
       generated_at: "2026-02-10T12:00:00Z",
       health: {
         queue_depth: 3,
-        in_flight_jobs: 2
+        in_flight_jobs: 2,
+        dns_queries_ipv4_total: 11234,
+        dns_queries_ipv6_total: 22000000
       },
       jobs: {
         completed_total: 7,
@@ -318,8 +320,22 @@ describe("App", () => {
         windows: {
           "1h": {
             points: [
-              { throughput: 1, failed: 0, queue_depth: 2 },
-              { throughput: 3, failed: 1, queue_depth: 4 }
+              {
+                throughput: 1,
+                failed: 0,
+                queue_depth: 2,
+                dns_queries_per_second: 11.2,
+                dns_queries_ipv4_per_second: 7.1,
+                dns_queries_ipv6_per_second: 4.1
+              },
+              {
+                throughput: 3,
+                failed: 1,
+                queue_depth: 4,
+                dns_queries_per_second: 18.6,
+                dns_queries_ipv4_per_second: 11.8,
+                dns_queries_ipv6_per_second: 6.8
+              }
             ]
           }
         }
@@ -341,8 +357,12 @@ describe("App", () => {
     await openMetricsTab();
     const metricsPanel = getMetricsPanel();
 
-    expect(await within(metricsPanel).findByLabelText("Queue depth trend")).toBeInTheDocument();
+    expect(await within(metricsPanel).findByLabelText("DNS query rates trend")).toBeInTheDocument();
     expect(within(metricsPanel).getByText("In-flight jobs")).toBeInTheDocument();
+    expect(within(metricsPanel).getByText("Total IPv4 queries")).toBeInTheDocument();
+    expect(within(metricsPanel).getByText("Total IPv6 queries")).toBeInTheDocument();
+    expect(within(metricsPanel).getByText("11,2K")).toBeInTheDocument();
+    expect(within(metricsPanel).getByText("22M")).toBeInTheDocument();
     expect(within(metricsPanel).getByText("80.0%")).toBeInTheDocument();
     expect(within(metricsPanel).getByText("15.0%")).toBeInTheDocument();
     expect(within(metricsPanel).getByText("320 ms")).toBeInTheDocument();
@@ -371,7 +391,7 @@ describe("App", () => {
         return jsonResponse({
           schema_version: "v1",
           generated_at: "2026-02-10T12:00:00Z",
-          health: { queue_depth: metricsCount, in_flight_jobs: 0 },
+          health: { queue_depth: metricsCount, in_flight_jobs: 0, dns_queries_ipv4_total: 0, dns_queries_ipv6_total: 0 },
           jobs: { status_counts: { queued: 0, running: 0 } },
           api: { routes: [] },
           quality: { outcomes: { success_rate: 1, failed_rate: 0 }, job_duration_ms: { avg: 0 }, severity: { totals: {} } },
@@ -392,7 +412,7 @@ describe("App", () => {
     const { unmount } = render(App);
     await openMetricsTab();
     const metricsPanel = getMetricsPanel();
-    expect(await within(metricsPanel).findByLabelText("Queue depth trend")).toBeInTheDocument();
+    expect(await within(metricsPanel).findByLabelText("DNS query rates trend")).toBeInTheDocument();
     expect(intervalCallbacks.length).toBeGreaterThan(0);
     const metricsCallsBeforePoll = metricsCalls.length;
     for (const poll of intervalCallbacks) {
@@ -423,7 +443,7 @@ describe("App", () => {
         return jsonResponse({
           schema_version: "v1",
           generated_at: "2026-02-10T12:00:00Z",
-          health: { queue_depth: 0, in_flight_jobs: 0 },
+          health: { queue_depth: 0, in_flight_jobs: 0, dns_queries_ipv4_total: 0, dns_queries_ipv6_total: 0 },
           jobs: { status_counts: { queued: 0, running: 0 } },
           api: { routes: [] },
           quality: { outcomes: { success_rate: 0, failed_rate: 0 }, job_duration_ms: { avg: 0 }, severity: { totals: {} } },
@@ -442,7 +462,7 @@ describe("App", () => {
     await fireEvent.click(within(metricsPanel).getByRole("button", { name: "Retry" }));
 
     await waitFor(() => {
-      expect(within(metricsPanel).getByLabelText("Queue depth trend")).toBeInTheDocument();
+      expect(within(metricsPanel).getByLabelText("DNS query rates trend")).toBeInTheDocument();
     });
 
     unmount();

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
+	"codeberg.org/pawal/gonemaster/engine/logger"
 )
 
 type spyJobStore struct {
@@ -107,11 +108,11 @@ func TestRunEngineForJobParallel(t *testing.T) {
 
 	errs := make(chan error, 2)
 	go func() {
-		_, err := srv.runEngineForJob(job1, context.Background())
+		_, _, _, err := srv.runEngineForJob(job1, context.Background())
 		errs <- err
 	}()
 	go func() {
-		_, err := srv.runEngineForJob(job2, context.Background())
+		_, _, _, err := srv.runEngineForJob(job2, context.Background())
 		errs <- err
 	}()
 
@@ -149,11 +150,11 @@ func TestRunEngineForJobLimiter(t *testing.T) {
 
 	errs := make(chan error, 2)
 	go func() {
-		_, err := srv.runEngineForJob(job1, context.Background())
+		_, _, _, err := srv.runEngineForJob(job1, context.Background())
 		errs <- err
 	}()
 	go func() {
-		_, err := srv.runEngineForJob(job2, context.Background())
+		_, _, _, err := srv.runEngineForJob(job2, context.Background())
 		errs <- err
 	}()
 
@@ -173,5 +174,27 @@ func TestRunEngineForJobLimiter(t *testing.T) {
 		if err := <-errs; err != nil {
 			t.Fatalf("run %d: %v", i, err)
 		}
+	}
+}
+
+func TestDNSQueryCounterCallback(t *testing.T) {
+	counter := &dnsQueryCounter{}
+	entries := []*logger.Entry{
+		{Tag: "EXTERNAL_QUERY", Args: map[string]any{"ip": "192.0.2.10"}},
+		{Tag: "external_query", Args: map[string]any{"ip": "2001:db8::10"}},
+		{Tag: "EXTERNAL_QUERY", Args: map[string]any{"ip": "not-an-ip"}},
+		{Tag: "EXTERNAL_RESPONSE", Args: map[string]any{"ip": "198.51.100.20"}},
+	}
+	for _, entry := range entries {
+		if err := counter.Callback(entry); err != nil {
+			t.Fatalf("callback error: %v", err)
+		}
+	}
+	ipv4, ipv6 := counter.Totals()
+	if ipv4 != 1 {
+		t.Fatalf("ipv4 = %d, want 1", ipv4)
+	}
+	if ipv6 != 1 {
+		t.Fatalf("ipv6 = %d, want 1", ipv6)
 	}
 }

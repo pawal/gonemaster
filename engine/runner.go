@@ -16,9 +16,13 @@ import (
 // - Limiter: effective query limiter for DNS calls
 // - StartedAt: run start time
 type Runner struct {
-	Profile   *profile.Profile
-	Logger    *logger.Logger
-	Limiter   *transport.Limiter
+	// Profile is the effective profile for the run.
+	Profile *profile.Profile
+	// Logger collects all per-run log entries.
+	Logger *logger.Logger
+	// Limiter bounds concurrent DNS query work for the run.
+	Limiter *transport.Limiter
+	// StartedAt is the run start timestamp.
 	StartedAt time.Time
 	// NameserverCache holds per-run nameserver caches.
 	NameserverCache *nameserver.CacheStore

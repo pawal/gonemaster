@@ -29,14 +29,23 @@ import (
 
 // RunRequest defines a single test execution request.
 type RunRequest struct {
-	Domain    string
-	Module    string
-	Testcase  string
-	Profile   string
-	MinLevel  string
-	IPv4      *bool
-	IPv6      *bool
-	Parallel  *int
+	// Domain is the target zone name to test.
+	Domain string
+	// Module limits execution to a module (for example "basic").
+	Module string
+	// Testcase limits execution to a single testcase (for example "basic02").
+	Testcase string
+	// Profile is an optional path to a profile file that overrides defaults.
+	Profile string
+	// MinLevel controls minimum emitted output level (for example "INFO").
+	MinLevel string
+	// IPv4 overrides net.ipv4 when non-nil.
+	IPv4 *bool
+	// IPv6 overrides net.ipv6 when non-nil.
+	IPv6 *bool
+	// Parallel overrides resolver.defaults.parallel when non-nil.
+	Parallel *int
+	// Unordered overrides resolver.defaults.unordered when non-nil.
 	Unordered *bool
 	// ErrorCacheTTL sets resolver.defaults.error_cache_ttl in seconds.
 	ErrorCacheTTL *int
@@ -62,14 +71,22 @@ type RunRequest struct {
 
 // LogEntry mirrors the JSON output produced by the Perl logger.
 type LogEntry struct {
+	// Timestamp is seconds since run start.
 	Timestamp float64        `json:"timestamp"`
+	// Module is the logical module name (for example "Basic").
 	Module    string         `json:"module"`
+	// Testcase is the testcase identifier (for example "Basic02").
 	Testcase  string         `json:"testcase"`
+	// Tag is the emitted event tag.
 	Tag       string         `json:"tag"`
+	// Level is the normalized severity level.
 	Level     string         `json:"level"`
+	// Args carries event-specific fields.
 	Args      map[string]any `json:"args,omitempty"`
 }
 
+// ErrNotImplemented indicates an unknown or unsupported module/testcase
+// selection in a run request.
 var ErrNotImplemented = errors.New("engine not implemented")
 
 // Version is the semantic version for this build.

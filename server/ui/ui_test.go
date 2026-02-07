@@ -8,7 +8,9 @@ import (
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"testing/fstest"
 )
 
 func TestCleanRequestPath(t *testing.T) {
@@ -95,6 +97,24 @@ func TestHandlerServesAssetsWithCacheControl(t *testing.T) {
 	const wantCacheControl = "public, max-age=31536000, immutable"
 	if got := rr.Header().Get("Cache-Control"); got != wantCacheControl {
 		t.Fatalf("Cache-Control = %q, want %q", got, wantCacheControl)
+	}
+}
+
+func TestServeIndexFallsBackToUnavailablePageWhenIndexMissing(t *testing.T) {
+	fsys := fstest.MapFS{
+		"placeholder.txt": &fstest.MapFile{Data: []byte("placeholder")},
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rr := httptest.NewRecorder()
+
+	serveIndex(fsys, rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, "UI is not embedded in this binary") {
+		t.Fatalf("unexpected fallback body: %q", body)
 	}
 }
 

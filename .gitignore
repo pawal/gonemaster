@@ -8,8 +8,8 @@
 # UI artifacts
 /ui/node_modules/
 /ui/.vite/
-/server/ui/dist/assets/
-/server/ui/dist/*.map
+/server/ui/dist/*
+!/server/ui/dist/placeholder.txt
 
 # OS/editor files
 .DS_Store

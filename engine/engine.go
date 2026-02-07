@@ -90,7 +90,7 @@ type LogEntry struct {
 var ErrNotImplemented = errors.New("engine not implemented")
 
 // Version is the semantic version for this build.
-var Version = "0.9.16"
+var Version = "0.9.17"
 
 // Commit is optionally set at build time using -ldflags.
 var Commit = ""

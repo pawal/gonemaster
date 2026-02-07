@@ -69,6 +69,11 @@ ui-install: ui-check
 
 ui-build: ui-install
 	$(NPM) --prefix $(UI_DIR) run build
+	@mkdir -p server/ui/dist
+	@printf '%s\n' \
+		'This placeholder keeps the dist directory embeddable when built UI assets are not present.' \
+		'Run `make ui-build` before building the default server binary to embed the web UI.' \
+		> server/ui/dist/placeholder.txt
 
 ui-dev: ui-install
 	$(NPM) --prefix $(UI_DIR) run dev

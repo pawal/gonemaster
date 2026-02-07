@@ -269,6 +269,8 @@ Responses:
 
 The metrics endpoint caches rendered responses for 1 second per unique query option set.
 
+For full Metrics API details and Metrics tab notes, see `docs/metrics.md`.
+
 ## UI
 The embedded UI is served at `/` and calls the API on the same host.
 

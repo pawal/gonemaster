@@ -53,6 +53,11 @@ Please read the documentation in [docs/server.md](docs/server.md) to know more.
 There is also a CLI for testing domains through the API - [gonemaster-client](docs/cli.md)
 also has support for batch operations.
 
+The API also has extensive metrics endpoints that can be used for server and jobs monitoring,
+and the Web UI includes this in a separated tab.
+
+![Metrics screenshot](docs/metrics.png)
+
 ## Nagios plugin
 
 Nagios documentation has moved to [docs/nagios.md](docs/nagios.md).

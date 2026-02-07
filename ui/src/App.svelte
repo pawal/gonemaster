@@ -1306,7 +1306,7 @@
         {:else}
           {#each filteredJobs as job}
             <div class="list-item">
-              <div>
+              <div class="list-item-main">
                 <div class="mono">{job.id}</div>
                 <div class="small">{job.domain} - {job.status}</div>
                 {#if job.batch_id}
@@ -1321,7 +1321,7 @@
                     <span class="small">No severity entries.</span>
                   {/if}
                 </div>
-                <div class="progress compact" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={progressPercent(job)}>
+                <div class="progress compact list-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={progressPercent(job)}>
                   <div class="progress-bar" style={`width: ${progressPercent(job)}%`}></div>
                   <span class="progress-value">{progressPercent(job)}%</span>
                 </div>
@@ -1460,10 +1460,10 @@ example.org`}
               {:else}
                 {#each selectedBatch.items as item}
                   <div class="list-item">
-                    <div>
+                    <div class="list-item-main">
                       <div class="mono">{item.id}</div>
                       <div class="small">{item.domain} - {item.status}</div>
-                      <div class="progress compact" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={progressPercent(item)}>
+                      <div class="progress compact list-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={progressPercent(item)}>
                         <div class="progress-bar" style={`width: ${progressPercent(item)}%`}></div>
                         <span class="progress-value">{progressPercent(item)}%</span>
                       </div>

@@ -561,6 +561,15 @@ button:hover:not(:disabled) {
   gap: 10px;
 }
 
+.list-item-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.list-progress {
+  width: min(360px, 100%);
+}
+
 .list-item button {
   padding: 6px 12px;
   font-size: 0.8rem;

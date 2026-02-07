@@ -50,6 +50,9 @@
   let batchCursor = 0;
   let batchStatusFilter = "";
   let batchDomainFilter = "";
+  let recentBatchOptions = [];
+  let recentBatchLoading = false;
+  let selectedRecentBatch = "";
   let metricsSnapshot = null;
   let metricsLoading = false;
   let metricsError = "";
@@ -203,6 +206,21 @@
       return Math.floor(parsed);
     }
     return 0;
+  };
+  const syncSelectedRecentBatch = () => {
+    const normalized = selectedBatchId.trim();
+    if (!normalized) {
+      selectedRecentBatch = "";
+      return;
+    }
+    selectedRecentBatch = recentBatchOptions.some((option) => option.id === normalized) ? normalized : "";
+  };
+  const formatRecentBatchOption = (option) => {
+    if (!option || !option.id) return "";
+    if (!option.createdAt) return option.id;
+    const parsed = new Date(option.createdAt);
+    if (Number.isNaN(parsed.getTime())) return option.id;
+    return `${option.id} - ${parsed.toLocaleString()}`;
   };
 
   const hasPersistedURLState = (params) => persistedQueryKeys.some((key) => params.has(key));
@@ -638,6 +656,7 @@
     if (next === "recent") {
       loadJobs();
     } else if (next === "batches") {
+      loadRecentBatchOptions();
       if (selectedBatchId) {
         loadBatch(selectedBatchId);
       }
@@ -781,6 +800,7 @@
       setStatus(`Batch ${response.batch_id} accepted.`, "ok");
       recentCursor = 0;
       await loadJobs({ resetCursor: true });
+      await loadRecentBatchOptions();
       await loadBatch(response.batch_id, { resetCursor: true });
     } catch (error) {
       setStatus(`Failed to create batch: ${error.message}`, "warn");
@@ -840,6 +860,60 @@
       params.set("domain", normalizedDomain);
     }
     return params;
+  };
+
+  const loadRecentBatchOptions = async () => {
+    recentBatchLoading = true;
+    try {
+      const collected = [];
+      const seen = new Set();
+      let cursor = 0;
+      let pages = 0;
+      const maxItems = 20;
+      const maxPages = 5;
+
+      while (collected.length < maxItems && pages < maxPages) {
+        const params = new URLSearchParams({
+          limit: "100",
+          sort: "created_at_desc"
+        });
+        if (cursor > 0) {
+          params.set("cursor", String(cursor));
+        }
+        const list = await apiFetch(`/jobs?${params.toString()}`);
+        const items = list?.items || [];
+        for (const item of items) {
+          const batchID = String(item?.batch_id || "").trim();
+          if (!batchID || seen.has(batchID)) {
+            continue;
+          }
+          seen.add(batchID);
+          collected.push({
+            id: batchID,
+            createdAt: item?.created_at || ""
+          });
+          if (collected.length >= maxItems) {
+            break;
+          }
+        }
+
+        if (!list?.next_cursor) {
+          break;
+        }
+        const nextCursor = normalizeCursor(list.next_cursor);
+        if (nextCursor <= cursor) {
+          break;
+        }
+        cursor = nextCursor;
+        pages++;
+      }
+      recentBatchOptions = collected;
+      syncSelectedRecentBatch();
+    } catch (error) {
+      setStatus(`Failed to load recent batches: ${error.message}`, "warn");
+    } finally {
+      recentBatchLoading = false;
+    }
   };
 
   const loadBatch = async (batchId = selectedBatchId, options = {}) => {
@@ -948,6 +1022,12 @@
   }
 
   $: {
+    selectedBatchId;
+    recentBatchOptions;
+    syncSelectedRecentBatch();
+  }
+
+  $: {
     autoRefreshRecent;
     activeTab;
     startRecentPolling();
@@ -1029,8 +1109,11 @@
     persistenceReady = true;
     window.addEventListener("hashchange", updateTabFromHash);
     loadJobs();
-    if (activeTab === "batches" && selectedBatchId) {
-      loadBatch(selectedBatchId);
+    if (activeTab === "batches") {
+      loadRecentBatchOptions();
+      if (selectedBatchId) {
+        loadBatch(selectedBatchId);
+      }
     }
     if (activeTab === "metrics") {
       loadMetrics();
@@ -1364,6 +1447,24 @@ example.org`}
       <div class="card reveal" style="--d: 0.3s">
         <h2>Batch Inspector</h2>
         <div class="stack">
+          <label for="batch-recent">Recent batches</label>
+          <select
+            id="batch-recent"
+            bind:value={selectedRecentBatch}
+            disabled={recentBatchLoading}
+            on:change={async () => {
+              const nextBatchID = selectedRecentBatch.trim();
+              if (!nextBatchID) return;
+              selectedBatchId = nextBatchID;
+              await loadBatch(nextBatchID, { resetCursor: true });
+            }}
+          >
+            <option value="">{recentBatchLoading ? "Loading latest batches..." : "Select one of the latest 20 batches"}</option>
+            {#each recentBatchOptions as option}
+              <option value={option.id}>{formatRecentBatchOption(option)}</option>
+            {/each}
+          </select>
+          <div class="small">Latest 20 unique batch IDs, newest first.</div>
           <label for="batch-id">Batch ID</label>
           <input
             id="batch-id"
@@ -1374,7 +1475,13 @@ example.org`}
           />
         </div>
         <div class="row">
-          <button on:click={() => loadBatch()} disabled={batchLoading}>
+          <button
+            on:click={async () => {
+              await loadRecentBatchOptions();
+              await loadBatch();
+            }}
+            disabled={batchLoading}
+          >
             {batchLoading ? "Loading..." : "Refresh"}
           </button>
           <button class="ghost" type="button" on:click={() => (autoRefreshBatch = !autoRefreshBatch)}>

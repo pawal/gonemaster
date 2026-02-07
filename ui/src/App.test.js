@@ -292,6 +292,60 @@ describe("App", () => {
     unmount();
   });
 
+  it("lists latest batches in dropdown and loads selected batch", async () => {
+    const jobsPage = {
+      items: [
+        { id: "job_1", batch_id: "batch_new", created_at: "2026-02-04T10:00:00Z" },
+        { id: "job_2", batch_id: "batch_mid", created_at: "2026-02-04T09:00:00Z" },
+        { id: "job_3", batch_id: "batch_new", created_at: "2026-02-04T08:00:00Z" },
+        { id: "job_4", batch_id: "batch_old", created_at: "2026-02-04T07:00:00Z" }
+      ],
+      total: 4
+    };
+    const batchMid = {
+      batch_id: "batch_mid",
+      total: 1,
+      status_counts: { succeeded: 1 },
+      items: [
+        {
+          id: "job_mid",
+          domain: "mid.example",
+          status: "succeeded",
+          created_at: "2026-02-04T09:00:00Z",
+          progress: 100
+        }
+      ],
+      created_at: "2026-02-04T09:00:00Z"
+    };
+
+    global.fetch.mockImplementation((url) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      if (value.includes("/api/v1/jobs?")) {
+        return jsonResponse(jobsPage);
+      }
+      if (value.includes("/api/v1/batches/batch_mid")) {
+        return jsonResponse(batchMid);
+      }
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+
+    await openBatchTab();
+    const recentBatchesSelect = screen.getByLabelText("Recent batches");
+    await waitFor(() => {
+      const options = within(recentBatchesSelect).getAllByRole("option");
+      expect(options[1]).toHaveValue("batch_new");
+      expect(options[2]).toHaveValue("batch_mid");
+      expect(options[3]).toHaveValue("batch_old");
+    });
+
+    await fireEvent.change(recentBatchesSelect, { target: { value: "batch_mid" } });
+    expect(await screen.findByText("job_mid")).toBeInTheDocument();
+
+    unmount();
+  });
+
   it("renders metrics cards, trends, and insight tables", async () => {
     const metricsPayload = {
       schema_version: "v1",

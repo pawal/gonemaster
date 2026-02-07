@@ -3,12 +3,47 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
+
+	"codeberg.org/pawal/gonemaster/engine"
 )
+
+var metricsRequestNonce uint32
+
+func getMetricsSnapshot(t *testing.T, srv *Server) MetricsSnapshot {
+	t.Helper()
+	resp := httptest.NewRecorder()
+	nonce := atomic.AddUint32(&metricsRequestNonce, 1)
+	limit := int((nonce % 100) + 1)
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/metrics?limit_domains=%d&limit_batches=%d", limit, limit), nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var snapshot MetricsSnapshot
+	if err := json.NewDecoder(resp.Body).Decode(&snapshot); err != nil {
+		t.Fatalf("decode metrics: %v", err)
+	}
+	return snapshot
+}
+
+func findAPIRouteMetrics(t *testing.T, snapshot MetricsSnapshot, method string, route string) MetricsAPIRouteMetrics {
+	t.Helper()
+	for _, metrics := range snapshot.API.Routes {
+		if metrics.Method == method && metrics.Route == route {
+			return metrics
+		}
+	}
+	t.Fatalf("route metrics not found for %s %s", method, route)
+	return MetricsAPIRouteMetrics{}
+}
 
 func TestCreateAndGetJob(t *testing.T) {
 	srv := New(DefaultConfig())
@@ -364,6 +399,61 @@ func TestListJobsSortBySeverityTotals(t *testing.T) {
 	}
 }
 
+func TestListJobsFiltersBySeverity(t *testing.T) {
+	srv := New(DefaultConfig())
+	base := time.Date(2026, 2, 3, 0, 0, 0, 0, time.UTC)
+
+	_, _ = srv.store.Create(Job{ID: "job_clean", Domain: "clean.example", Status: JobSucceeded, CreatedAt: base})
+	_, _ = srv.store.Create(Job{ID: "job_warn", Domain: "warn.example", Status: JobFailed, CreatedAt: base.Add(time.Second)})
+	_, _ = srv.store.Create(Job{ID: "job_err", Domain: "error.example", Status: JobFailed, CreatedAt: base.Add(2 * time.Second)})
+
+	_ = srv.store.SetResult("job_warn", JobResult{
+		JobID:  "job_warn",
+		Status: JobFailed,
+		Summary: map[string]any{
+			"levels": map[string]int{"WARNING": 2},
+		},
+	})
+	_ = srv.store.SetResult("job_err", JobResult{
+		JobID:  "job_err",
+		Status: JobFailed,
+		Summary: map[string]any{
+			"levels": map[string]int{"ERROR": 1},
+		},
+	})
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs?severity=errors_only&sort=started_at_desc", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var errorsOnly JobList
+	if err := json.NewDecoder(resp.Body).Decode(&errorsOnly); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if errorsOnly.Total != 1 || len(errorsOnly.Items) != 1 || errorsOnly.Items[0].ID != "job_err" {
+		t.Fatalf("expected only job_err for errors_only, got %+v", errorsOnly.Items)
+	}
+
+	resp = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/jobs?severity=warnings_plus&sort=started_at_desc", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var warningsPlus JobList
+	if err := json.NewDecoder(resp.Body).Decode(&warningsPlus); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if warningsPlus.Total != 2 || len(warningsPlus.Items) != 2 {
+		t.Fatalf("expected two jobs for warnings_plus, got %+v", warningsPlus.Items)
+	}
+	if warningsPlus.Items[0].ID != "job_err" || warningsPlus.Items[1].ID != "job_warn" {
+		t.Fatalf("unexpected warnings_plus order: %+v", warningsPlus.Items)
+	}
+}
+
 func TestListJobsRejectsInvalidSort(t *testing.T) {
 	srv := New(DefaultConfig())
 
@@ -379,6 +469,24 @@ func TestListJobsRejectsInvalidSort(t *testing.T) {
 	}
 	if out.Error.Code != "invalid_sort" {
 		t.Fatalf("expected invalid_sort, got %q", out.Error.Code)
+	}
+}
+
+func TestListJobsRejectsInvalidSeverity(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs?severity=bad_filter", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", resp.Code)
+	}
+	var out ErrorResponse
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out.Error.Code != "invalid_severity" {
+		t.Fatalf("expected invalid_severity, got %q", out.Error.Code)
 	}
 }
 
@@ -765,6 +873,435 @@ func TestQueueRemove(t *testing.T) {
 	}
 }
 
+func TestMetricsTracksCreateAndRunLifecycle(t *testing.T) {
+	srv := New(DefaultConfig())
+	srv.engineRunner = func(_ engine.RunRequest) ([]engine.LogEntry, error) {
+		return nil, nil
+	}
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(`{"domain":"example.com"}`))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d", resp.Code)
+	}
+	var created Job
+	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	snapshot := getMetricsSnapshot(t, srv)
+	if snapshot.Jobs.SubmittedTotal != 1 {
+		t.Fatalf("submitted_total = %d, want 1", snapshot.Jobs.SubmittedTotal)
+	}
+	if snapshot.Health.QueueDepth != 1 {
+		t.Fatalf("queue_depth = %d, want 1", snapshot.Health.QueueDepth)
+	}
+	if snapshot.Jobs.StatusCounts[string(JobQueued)] != 1 {
+		t.Fatalf("status_counts[queued] = %d, want 1", snapshot.Jobs.StatusCounts[string(JobQueued)])
+	}
+
+	if err := srv.runJob(created.ID); err != nil {
+		t.Fatalf("run job: %v", err)
+	}
+
+	snapshot = getMetricsSnapshot(t, srv)
+	if snapshot.Health.QueueDepth != 0 {
+		t.Fatalf("queue_depth = %d, want 0", snapshot.Health.QueueDepth)
+	}
+	if snapshot.Health.InFlightJobs != 0 {
+		t.Fatalf("in_flight_jobs = %d, want 0", snapshot.Health.InFlightJobs)
+	}
+	if snapshot.Jobs.StartedTotal != 1 {
+		t.Fatalf("started_total = %d, want 1", snapshot.Jobs.StartedTotal)
+	}
+	if snapshot.Jobs.CompletedTotal != 1 {
+		t.Fatalf("completed_total = %d, want 1", snapshot.Jobs.CompletedTotal)
+	}
+	if snapshot.Jobs.CanceledTotal != 0 {
+		t.Fatalf("canceled_total = %d, want 0", snapshot.Jobs.CanceledTotal)
+	}
+	if snapshot.Jobs.StatusCounts[string(JobSucceeded)] != 1 {
+		t.Fatalf("status_counts[succeeded] = %d, want 1", snapshot.Jobs.StatusCounts[string(JobSucceeded)])
+	}
+}
+
+func TestMetricsTracksPauseResumeAndCancel(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(`{"domain":"example.com"}`))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d", resp.Code)
+	}
+	var created Job
+	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	resp = httptest.NewRecorder()
+	pauseReq := httptest.NewRequest(http.MethodPost, "/api/v1/queue/pause", nil)
+	srv.Handler().ServeHTTP(resp, pauseReq)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	snapshot := getMetricsSnapshot(t, srv)
+	if !snapshot.Health.QueuePaused {
+		t.Fatal("queue_paused = false, want true")
+	}
+
+	resp = httptest.NewRecorder()
+	cancelReq := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/"+created.ID+"/cancel", nil)
+	srv.Handler().ServeHTTP(resp, cancelReq)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	snapshot = getMetricsSnapshot(t, srv)
+	if snapshot.Jobs.CanceledTotal != 1 {
+		t.Fatalf("canceled_total = %d, want 1", snapshot.Jobs.CanceledTotal)
+	}
+	if snapshot.Jobs.CompletedTotal != 1 {
+		t.Fatalf("completed_total = %d, want 1", snapshot.Jobs.CompletedTotal)
+	}
+	if snapshot.Health.QueueDepth != 0 {
+		t.Fatalf("queue_depth = %d, want 0", snapshot.Health.QueueDepth)
+	}
+	if snapshot.Jobs.StatusCounts[string(JobCanceled)] != 1 {
+		t.Fatalf("status_counts[canceled] = %d, want 1", snapshot.Jobs.StatusCounts[string(JobCanceled)])
+	}
+
+	resp = httptest.NewRecorder()
+	resumeReq := httptest.NewRequest(http.MethodPost, "/api/v1/queue/resume", nil)
+	srv.Handler().ServeHTTP(resp, resumeReq)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	snapshot = getMetricsSnapshot(t, srv)
+	if snapshot.Health.QueuePaused {
+		t.Fatal("queue_paused = true, want false")
+	}
+}
+
+func TestMetricsTracksAPIRequestsByRouteMethodStatusAndErrorCode(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/healthz", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+
+	resp = httptest.NewRecorder()
+	payload := `{"job_ids":["missing"]}`
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/queue/reorder", bytes.NewBufferString(payload))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", resp.Code)
+	}
+
+	resp = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/jobs/job-missing/cancel", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", resp.Code)
+	}
+
+	snapshot := srv.metrics.Snapshot()
+	if snapshot.API.RequestsTotal != 3 {
+		t.Fatalf("api.requests_total = %d, want 3", snapshot.API.RequestsTotal)
+	}
+	if snapshot.API.StatusClassCounts["2xx"] != 1 {
+		t.Fatalf("api.status_class_counts[2xx] = %d, want 1", snapshot.API.StatusClassCounts["2xx"])
+	}
+	if snapshot.API.StatusClassCounts["4xx"] != 2 {
+		t.Fatalf("api.status_class_counts[4xx] = %d, want 2", snapshot.API.StatusClassCounts["4xx"])
+	}
+	if snapshot.API.ErrorCodeCounts["invalid_queue"] != 1 {
+		t.Fatalf("api.error_code_counts[invalid_queue] = %d, want 1", snapshot.API.ErrorCodeCounts["invalid_queue"])
+	}
+	if snapshot.API.ErrorCodeCounts["not_found"] != 1 {
+		t.Fatalf("api.error_code_counts[not_found] = %d, want 1", snapshot.API.ErrorCodeCounts["not_found"])
+	}
+
+	health := findAPIRouteMetrics(t, snapshot, http.MethodGet, "/api/v1/healthz")
+	if health.RequestsTotal != 1 || health.StatusClassCounts["2xx"] != 1 {
+		t.Fatalf("unexpected health route metrics: %+v", health)
+	}
+	if health.LatencyMs.P50 == 0 || health.LatencyMs.P90 == 0 || health.LatencyMs.P99 == 0 {
+		t.Fatalf("expected non-zero latency percentiles, got %+v", health.LatencyMs)
+	}
+
+	reorder := findAPIRouteMetrics(t, snapshot, http.MethodPost, "/api/v1/queue/reorder")
+	if reorder.RequestsTotal != 1 || reorder.StatusClassCounts["4xx"] != 1 {
+		t.Fatalf("unexpected reorder route metrics: %+v", reorder)
+	}
+
+	cancel := findAPIRouteMetrics(t, snapshot, http.MethodPost, "/api/v1/jobs/{job_id}/cancel")
+	if cancel.RequestsTotal != 1 || cancel.StatusClassCounts["4xx"] != 1 {
+		t.Fatalf("unexpected cancel route metrics: %+v", cancel)
+	}
+}
+
+func TestMetricsTracksQualityAcrossMixedOutcomesAndLocaleRequests(t *testing.T) {
+	srv := New(DefaultConfig())
+	callCount := 0
+	srv.engineRunner = func(_ engine.RunRequest) ([]engine.LogEntry, error) {
+		callCount++
+		switch callCount {
+		case 1:
+			return []engine.LogEntry{
+				{Level: "NOTICE"},
+				{Level: "ERROR"},
+			}, nil
+		case 2:
+			return []engine.LogEntry{
+				{Level: "WARNING"},
+				{Level: "CRITICAL"},
+			}, errors.New("run failed")
+		default:
+			return nil, nil
+		}
+	}
+
+	now := time.Now().UTC()
+	jobSuccess := Job{ID: "job-success", Domain: "ok.example", Status: JobQueued, CreatedAt: now}
+	jobFailure := Job{ID: "job-failure", Domain: "fail.example", Status: JobQueued, CreatedAt: now.Add(time.Second)}
+	if _, err := srv.store.Create(jobSuccess); err != nil {
+		t.Fatalf("create success job: %v", err)
+	}
+	if _, err := srv.store.Create(jobFailure); err != nil {
+		t.Fatalf("create failure job: %v", err)
+	}
+
+	if err := srv.runJob(jobSuccess.ID); err != nil {
+		t.Fatalf("run success job: %v", err)
+	}
+	if err := srv.runJob(jobFailure.ID); err == nil {
+		t.Fatal("expected run error for failure job")
+	}
+
+	resp := httptest.NewRecorder()
+	createReq := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(`{"domain":"cancel.example"}`))
+	createReq.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, createReq)
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d", resp.Code)
+	}
+	var created Job
+	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
+		t.Fatalf("decode created job: %v", err)
+	}
+
+	resp = httptest.NewRecorder()
+	cancelReq := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/"+created.ID+"/cancel", nil)
+	srv.Handler().ServeHTTP(resp, cancelReq)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+
+	resp = httptest.NewRecorder()
+	resultReq := httptest.NewRequest(http.MethodGet, "/api/v1/jobs/"+jobSuccess.ID+"/result?locale=pt-BR", nil)
+	srv.Handler().ServeHTTP(resp, resultReq)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+
+	snapshot := srv.metrics.Snapshot()
+	if snapshot.Quality.Outcomes.SuccessTotal != 1 || snapshot.Quality.Outcomes.FailedTotal != 1 || snapshot.Quality.Outcomes.CanceledTotal != 1 {
+		t.Fatalf("unexpected quality outcomes: %+v", snapshot.Quality.Outcomes)
+	}
+	if snapshot.Quality.JobDurationMs.Count != 2 {
+		t.Fatalf("quality.job_duration_ms.count = %d, want 2", snapshot.Quality.JobDurationMs.Count)
+	}
+	if snapshot.Quality.Severity.Totals["NOTICE"] != 1 || snapshot.Quality.Severity.Totals["WARNING"] != 1 || snapshot.Quality.Severity.Totals["ERROR"] != 1 || snapshot.Quality.Severity.Totals["CRITICAL"] != 1 {
+		t.Fatalf("unexpected severity totals: %+v", snapshot.Quality.Severity.Totals)
+	}
+	if snapshot.Quality.LocaleUsage.Counts["pt_br"] != 1 {
+		t.Fatalf("quality.locale_usage.counts[pt_br] = %d, want 1", snapshot.Quality.LocaleUsage.Counts["pt_br"])
+	}
+	if len(snapshot.Insights.Domains.Items) == 0 {
+		t.Fatal("expected non-empty domain insights")
+	}
+	if snapshot.Insights.Batches.Limit == 0 || snapshot.Insights.Batches.Cap == 0 {
+		t.Fatalf("expected batch insight limit/cap metadata, got %+v", snapshot.Insights.Batches)
+	}
+}
+
+func TestMetricsEndpointValidatesQueryParams(t *testing.T) {
+	srv := New(DefaultConfig())
+	tests := []struct {
+		path     string
+		wantCode string
+	}{
+		{path: "/api/v1/metrics?window=12h", wantCode: "invalid_window"},
+		{path: "/api/v1/metrics?include=unknown", wantCode: "invalid_include"},
+		{path: "/api/v1/metrics?limit_domains=0", wantCode: "invalid_limit_domains"},
+		{path: "/api/v1/metrics?limit_batches=999", wantCode: "invalid_limit_batches"},
+	}
+
+	for _, tc := range tests {
+		resp := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+		srv.Handler().ServeHTTP(resp, req)
+		if resp.Code != http.StatusBadRequest {
+			t.Fatalf("%s: expected 400, got %d", tc.path, resp.Code)
+		}
+		var out ErrorResponse
+		if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+			t.Fatalf("%s: decode error: %v", tc.path, err)
+		}
+		if out.Error.Code != tc.wantCode {
+			t.Fatalf("%s: error code = %q, want %q", tc.path, out.Error.Code, tc.wantCode)
+		}
+	}
+}
+
+func TestMetricsEndpointSupportsIncludeWindowAndLimits(t *testing.T) {
+	srv := New(DefaultConfig())
+	srv.metrics.ObserveJobSubmittedWithContext("batch-a", "alpha.example", JobQueued)
+	srv.metrics.ObserveJobStatusTransition(JobQueued, JobSucceeded)
+	srv.metrics.ObserveJobCompletionWithContext("batch-a", "alpha.example", JobSucceeded, 1200*time.Millisecond, map[string]int64{
+		"NOTICE": 1,
+	})
+	srv.metrics.ObserveJobSubmittedWithContext("batch-b", "beta.example", JobQueued)
+	srv.metrics.ObserveJobStatusTransition(JobQueued, JobFailed)
+	srv.metrics.ObserveJobCompletionWithContext("batch-b", "beta.example", JobFailed, 1800*time.Millisecond, map[string]int64{
+		"ERROR": 2,
+	})
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/metrics?include=health,insights,trends&window=1h&limit_domains=1&limit_batches=1", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+
+	var payload map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode metrics payload: %v", err)
+	}
+	if _, ok := payload["schema_version"]; !ok {
+		t.Fatal("missing schema_version")
+	}
+	if _, ok := payload["generated_at"]; !ok {
+		t.Fatal("missing generated_at")
+	}
+	if _, ok := payload["health"]; !ok {
+		t.Fatal("missing health")
+	}
+	if _, ok := payload["insights"]; !ok {
+		t.Fatal("missing insights")
+	}
+	if _, ok := payload["trends"]; !ok {
+		t.Fatal("missing trends")
+	}
+	if _, ok := payload["api"]; ok {
+		t.Fatal("api should not be included")
+	}
+	if _, ok := payload["jobs"]; ok {
+		t.Fatal("jobs should not be included")
+	}
+	if _, ok := payload["quality"]; ok {
+		t.Fatal("quality should not be included")
+	}
+
+	insights := payload["insights"].(map[string]any)
+	batches := insights["batches"].(map[string]any)
+	domains := insights["domains"].(map[string]any)
+	if intFromAny(batches["limit"]) != 1 {
+		t.Fatalf("batches.limit = %v, want 1", batches["limit"])
+	}
+	if intFromAny(domains["limit"]) != 1 {
+		t.Fatalf("domains.limit = %v, want 1", domains["limit"])
+	}
+	if got := len(batches["items"].([]any)); got != 1 {
+		t.Fatalf("batches.items size = %d, want 1", got)
+	}
+	if got := len(domains["items"].([]any)); got != 1 {
+		t.Fatalf("domains.items size = %d, want 1", got)
+	}
+
+	trends := payload["trends"].(map[string]any)
+	windows := trends["windows"].(map[string]any)
+	if len(windows) != 1 {
+		t.Fatalf("trends.windows size = %d, want 1", len(windows))
+	}
+	if _, ok := windows["1h"]; !ok {
+		t.Fatalf("expected trends window 1h, got %+v", windows)
+	}
+}
+
+func TestMetricsEndpointCachesByQueryForOneSecond(t *testing.T) {
+	srv := New(DefaultConfig())
+	base := time.Date(2026, 2, 9, 10, 0, 0, 0, time.UTC)
+	now := base
+	srv.metrics.nowFn = func() time.Time { return now }
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/metrics", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var first MetricsSnapshot
+	if err := json.NewDecoder(resp.Body).Decode(&first); err != nil {
+		t.Fatalf("decode first metrics: %v", err)
+	}
+	if first.Jobs.SubmittedTotal != 0 {
+		t.Fatalf("first submitted_total = %d, want 0", first.Jobs.SubmittedTotal)
+	}
+
+	now = base.Add(100 * time.Millisecond)
+	createResp := httptest.NewRecorder()
+	createReq := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(`{"domain":"cached.example"}`))
+	createReq.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(createResp, createReq)
+	if createResp.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d", createResp.Code)
+	}
+
+	now = base.Add(500 * time.Millisecond)
+	resp = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/metrics", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var second MetricsSnapshot
+	if err := json.NewDecoder(resp.Body).Decode(&second); err != nil {
+		t.Fatalf("decode second metrics: %v", err)
+	}
+	if !second.GeneratedAt.Equal(first.GeneratedAt) {
+		t.Fatalf("second generated_at = %s, want cached %s", second.GeneratedAt, first.GeneratedAt)
+	}
+	if second.Jobs.SubmittedTotal != first.Jobs.SubmittedTotal {
+		t.Fatalf("second submitted_total = %d, want cached %d", second.Jobs.SubmittedTotal, first.Jobs.SubmittedTotal)
+	}
+
+	now = base.Add(2 * time.Second)
+	resp = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/metrics", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var third MetricsSnapshot
+	if err := json.NewDecoder(resp.Body).Decode(&third); err != nil {
+		t.Fatalf("decode third metrics: %v", err)
+	}
+	if !third.GeneratedAt.After(second.GeneratedAt) {
+		t.Fatalf("third generated_at = %s, want after %s", third.GeneratedAt, second.GeneratedAt)
+	}
+	if third.Jobs.SubmittedTotal != 1 {
+		t.Fatalf("third submitted_total = %d, want 1", third.Jobs.SubmittedTotal)
+	}
+}
+
 func TestHealthAndMetrics(t *testing.T) {
 	srv := New(DefaultConfig())
 
@@ -780,5 +1317,18 @@ func TestHealthAndMetrics(t *testing.T) {
 	srv.Handler().ServeHTTP(resp, metricsReq)
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	if got := resp.Header().Get("Content-Type"); got != "application/json" {
+		t.Fatalf("expected application/json content-type, got %q", got)
+	}
+	var metrics MetricsSnapshot
+	if err := json.NewDecoder(resp.Body).Decode(&metrics); err != nil {
+		t.Fatalf("decode metrics: %v", err)
+	}
+	if metrics.SchemaVersion == "" {
+		t.Fatal("expected schema_version in metrics response")
+	}
+	if metrics.GeneratedAt.IsZero() {
+		t.Fatal("expected generated_at in metrics response")
 	}
 }

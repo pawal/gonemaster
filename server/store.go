@@ -87,6 +87,7 @@ func (s *InMemoryJobStore) List(filter JobFilter) JobList {
 	}
 
 	normalizedSort := normalizeJobSort(filter.Sort)
+	normalizedSeverity := normalizeJobSeverityFilter(filter.Severity)
 	severityByJobID := make(map[string]map[string]int, len(items))
 	for _, job := range items {
 		totals := zeroSeverityTotals()
@@ -94,6 +95,15 @@ func (s *InMemoryJobStore) List(filter JobFilter) JobList {
 			totals = severityTotalsFromSummary(result.Summary)
 		}
 		severityByJobID[job.ID] = totals
+	}
+	if normalizedSeverity != "" {
+		filteredBySeverity := make([]Job, 0, len(items))
+		for _, job := range items {
+			if matchesJobSeverityFilter(severityByJobID[job.ID], normalizedSeverity) {
+				filteredBySeverity = append(filteredBySeverity, job)
+			}
+		}
+		items = filteredBySeverity
 	}
 
 	sort.Slice(items, func(i, j int) bool {
@@ -266,6 +276,35 @@ func isValidJobSort(value JobSort) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+func isValidJobSeverityFilter(value JobSeverityFilter) bool {
+	switch value {
+	case JobSeverityWarningsPlus, JobSeverityErrorsOnly:
+		return true
+	default:
+		return false
+	}
+}
+
+func normalizeJobSeverityFilter(value JobSeverityFilter) JobSeverityFilter {
+	switch value {
+	case JobSeverityWarningsPlus, JobSeverityErrorsOnly:
+		return value
+	default:
+		return ""
+	}
+}
+
+func matchesJobSeverityFilter(totals map[string]int, filter JobSeverityFilter) bool {
+	switch filter {
+	case JobSeverityWarningsPlus:
+		return totals["WARNING"] > 0 || totals["ERROR"] > 0 || totals["CRITICAL"] > 0
+	case JobSeverityErrorsOnly:
+		return totals["ERROR"] > 0 || totals["CRITICAL"] > 0
+	default:
+		return true
 	}
 }
 

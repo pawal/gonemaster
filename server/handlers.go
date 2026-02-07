@@ -75,6 +75,7 @@ func (s *Server) handleJobsBatch(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		_ = s.queue.Enqueue(created.ID)
+		s.metrics.ObserveJobSubmittedWithContext(created.BatchID, created.Domain, JobQueued)
 		jobIDs = append(jobIDs, created.ID)
 	}
 
@@ -252,6 +253,7 @@ func (s *Server) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = s.queue.Enqueue(created.ID)
+	s.metrics.ObserveJobSubmittedWithContext(created.BatchID, created.Domain, JobQueued)
 
 	writeJSON(w, http.StatusCreated, created)
 }
@@ -277,6 +279,13 @@ func parseListFilter(r *http.Request, defaultLimit int) (JobFilter, string, stri
 	}
 	filter.BatchID = strings.TrimSpace(query.Get("batch_id"))
 	filter.Domain = strings.TrimSpace(query.Get("domain"))
+	if rawSeverity := strings.TrimSpace(query.Get("severity")); rawSeverity != "" {
+		severity := JobSeverityFilter(rawSeverity)
+		if !isValidJobSeverityFilter(severity) {
+			return JobFilter{}, "invalid_severity", "severity must be one of warnings_plus, errors_only"
+		}
+		filter.Severity = severity
+	}
 
 	if createdAfter := strings.TrimSpace(query.Get("created_after")); createdAfter != "" {
 		timestamp, err := parseTime(createdAfter)
@@ -367,6 +376,7 @@ func (s *Server) handleGetJobResult(w http.ResponseWriter, r *http.Request, jobI
 		if locale == "" {
 			locale = "en"
 		}
+		s.metrics.ObserveResultLocale(locale)
 		raw := *result.Raw
 		raw.Locale = locale
 		raw.Entries = localizeResultEntries(result.Raw.Entries, locale)
@@ -391,7 +401,8 @@ func (s *Server) handleCancelJob(w http.ResponseWriter, _ *http.Request, jobID s
 	job.Error = "canceled"
 	job.FinishedAt = time.Now().UTC()
 	job.Progress = 100
-	if err := s.store.Update(job); err != nil {
+	_, _, becameTerminal, err := s.updateJobWithMetricsTransition(job)
+	if err != nil {
 		writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
 		return
 	}
@@ -401,6 +412,13 @@ func (s *Server) handleCancelJob(w http.ResponseWriter, _ *http.Request, jobID s
 		Status:  JobCanceled,
 		Summary: map[string]any{"error": "canceled"},
 	})
+	if becameTerminal {
+		duration := time.Duration(-1)
+		if !job.StartedAt.IsZero() && !job.FinishedAt.IsZero() {
+			duration = job.FinishedAt.Sub(job.StartedAt)
+		}
+		s.metrics.ObserveJobCompletionWithContext(job.BatchID, job.Domain, job.Status, duration, zeroMetricsSeverityTotals())
+	}
 	writeJSON(w, http.StatusOK, job)
 }
 
@@ -436,6 +454,7 @@ func (s *Server) handleQueuePause(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "queue_error", err.Error(), nil)
 		return
 	}
+	s.metrics.ObserveQueuePaused(true)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -451,6 +470,7 @@ func (s *Server) handleQueueResume(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "queue_error", err.Error(), nil)
 		return
 	}
+	s.metrics.ObserveQueuePaused(false)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -508,7 +528,8 @@ func (s *Server) handleQueueRemove(w http.ResponseWriter, r *http.Request) {
 				job.Error = "removed_from_queue"
 				job.FinishedAt = time.Now().UTC()
 				job.Progress = 100
-				if err := s.store.Update(job); err != nil {
+				_, _, becameTerminal, err := s.updateJobWithMetricsTransition(job)
+				if err != nil {
 					writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
 					return
 				}
@@ -518,6 +539,13 @@ func (s *Server) handleQueueRemove(w http.ResponseWriter, r *http.Request) {
 					Status:  JobCanceled,
 					Summary: map[string]any{"error": "removed_from_queue"},
 				})
+				if becameTerminal {
+					duration := time.Duration(-1)
+					if !job.StartedAt.IsZero() && !job.FinishedAt.IsZero() {
+						duration = job.FinishedAt.Sub(job.StartedAt)
+					}
+					s.metrics.ObserveJobCompletionWithContext(job.BatchID, job.Domain, job.Status, duration, zeroMetricsSeverityTotals())
+				}
 			}
 		}
 		removed = append(removed, jobID)
@@ -530,9 +558,26 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
 		return
 	}
-	w.Header().Set("Content-Type", "text/plain")
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte("# TODO: metrics\n"))
+	options, code, message := parseMetricsQueryOptions(r.URL.Query())
+	if code != "" {
+		writeError(w, http.StatusBadRequest, code, message, nil)
+		return
+	}
+
+	now := s.metricsNow()
+	cacheKey := options.cacheKey()
+	if payload, ok := s.getMetricsCache(cacheKey, now); ok {
+		writeRawJSON(w, http.StatusOK, payload)
+		return
+	}
+
+	payload, err := s.buildMetricsResponseBody(options)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "metrics_error", err.Error(), nil)
+		return
+	}
+	s.putMetricsCache(cacheKey, payload, now)
+	writeRawJSON(w, http.StatusOK, payload)
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {

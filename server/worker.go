@@ -6,6 +6,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -91,7 +92,7 @@ func (s *Server) runJob(jobID string) error {
 	job.Status = JobRunning
 	job.StartedAt = now
 	job.Progress = 0
-	if err := s.store.Update(job); err != nil {
+	if _, _, _, err := s.updateJobWithMetricsTransition(job); err != nil {
 		return err
 	}
 
@@ -133,11 +134,19 @@ func (s *Server) runJob(jobID string) error {
 
 	job.Progress = 100
 	job.FinishedAt = finishedAt
-	if err := s.store.Update(job); err != nil {
+	_, _, becameTerminal, err := s.updateJobWithMetricsTransition(job)
+	if err != nil {
 		return err
 	}
 	if err := s.store.SetResult(job.ID, result); err != nil {
 		return err
+	}
+	if becameTerminal {
+		duration := time.Duration(-1)
+		if !job.StartedAt.IsZero() {
+			duration = finishedAt.Sub(job.StartedAt)
+		}
+		s.metrics.ObserveJobCompletionWithContext(job.BatchID, job.Domain, job.Status, duration, severityTotalsFromEntries(entries))
 	}
 
 	return runErr
@@ -259,6 +268,18 @@ func summarizeEntries(entries []engine.LogEntry) map[string]any {
 		"total":  len(entries),
 		"levels": levels,
 	}
+}
+
+func severityTotalsFromEntries(entries []engine.LogEntry) map[string]int64 {
+	totals := zeroMetricsSeverityTotals()
+	for _, entry := range entries {
+		level := strings.ToUpper(strings.TrimSpace(entry.Level))
+		if _, ok := totals[level]; !ok {
+			continue
+		}
+		totals[level]++
+	}
+	return totals
 }
 
 func applyProfileOverrides(req *engine.RunRequest, overrides map[string]any, baseProfile string) (func(), error) {

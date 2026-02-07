@@ -1,5 +1,6 @@
 <script>
   import { onDestroy } from "svelte";
+  import { fetchMetricsSnapshot, metricsWindowOptions } from "./metrics.js";
 
   let statusMessage = "";
   let statusTone = "";
@@ -20,6 +21,7 @@
   let severityFilter = "all";
   let jobSort = "started_at_desc";
   let jobBatchFilter = "";
+  let recentDomainFilter = "";
   let recentPageSize = 20;
   let recentCursor = 0;
   let recentTotal = 0;
@@ -47,6 +49,15 @@
   let batchCursor = 0;
   let batchStatusFilter = "";
   let batchDomainFilter = "";
+  let metricsSnapshot = null;
+  let metricsLoading = false;
+  let metricsError = "";
+  let autoRefreshMetrics = true;
+  let metricsPoller = null;
+  let metricsWindow = "1h";
+  let metricsDomainLimit = 10;
+  let metricsBatchLimit = 10;
+  let metricsLoadedAt = "";
   let persistenceReady = false;
   let persistenceSignature = "";
   let initialized = false;
@@ -57,6 +68,7 @@
     "r_sort",
     "r_sev",
     "r_batch",
+    "r_domain",
     "r_limit",
     "r_cursor",
     "b_id",
@@ -131,6 +143,7 @@
   const listPageSizes = [10, 20, 50, 100];
   const batchPageSizes = listPageSizes;
   const recentPageSizes = listPageSizes;
+  const metricsLimitOptions = [5, 10, 20, 50, 100];
   const activeJobStatuses = ["queued", "running"];
   const resultReadyStatuses = ["succeeded", "failed", "canceled"];
 
@@ -156,6 +169,13 @@
   };
   const normalizeBatchPageSize = (value) => normalizePageSize(value);
   const normalizeRecentPageSize = (value) => normalizePageSize(value);
+  const normalizeMetricsLimit = (value) => {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && metricsLimitOptions.includes(parsed)) {
+      return parsed;
+    }
+    return 10;
+  };
   const normalizeCursor = (value) => {
     const parsed = Number(value);
     if (Number.isFinite(parsed) && parsed >= 0) {
@@ -181,6 +201,9 @@
     }
     if (params.has("r_batch")) {
       next.jobBatchFilter = (params.get("r_batch") || "").trim();
+    }
+    if (params.has("r_domain")) {
+      next.recentDomainFilter = (params.get("r_domain") || "").trim();
     }
     if (params.has("r_limit")) {
       next.recentPageSize = normalizeRecentPageSize(params.get("r_limit"));
@@ -230,6 +253,9 @@
       if (typeof parsed.jobBatchFilter === "string") {
         next.jobBatchFilter = parsed.jobBatchFilter.trim();
       }
+      if (typeof parsed.recentDomainFilter === "string") {
+        next.recentDomainFilter = parsed.recentDomainFilter.trim();
+      }
       next.recentPageSize = normalizeRecentPageSize(parsed.recentPageSize);
       next.recentCursor = normalizeCursor(parsed.recentCursor);
       if (typeof parsed.selectedBatchId === "string") {
@@ -257,6 +283,7 @@
     if (state.jobSort) jobSort = state.jobSort;
     if (state.severityFilter) severityFilter = state.severityFilter;
     if (typeof state.jobBatchFilter === "string") jobBatchFilter = state.jobBatchFilter;
+    if (typeof state.recentDomainFilter === "string") recentDomainFilter = state.recentDomainFilter;
     if (state.recentPageSize !== undefined) recentPageSize = normalizeRecentPageSize(state.recentPageSize);
     if (state.recentCursor !== undefined) recentCursor = normalizeCursor(state.recentCursor);
     if (typeof state.selectedBatchId === "string") selectedBatchId = state.selectedBatchId;
@@ -282,6 +309,10 @@
     const normalizedJobBatch = jobBatchFilter.trim();
     if (normalizedJobBatch) {
       params.set("r_batch", normalizedJobBatch);
+    }
+    const normalizedRecentDomain = recentDomainFilter.trim();
+    if (normalizedRecentDomain) {
+      params.set("r_domain", normalizedRecentDomain);
     }
     if (normalizeRecentPageSize(recentPageSize) !== 20) {
       params.set("r_limit", String(normalizeRecentPageSize(recentPageSize)));
@@ -321,6 +352,7 @@
         jobSort,
         severityFilter,
         jobBatchFilter: normalizedJobBatch,
+        recentDomainFilter: normalizedRecentDomain,
         recentPageSize: normalizeRecentPageSize(recentPageSize),
         recentCursor: normalizeCursor(recentCursor),
         selectedBatchId: normalizedBatchID,
@@ -353,6 +385,99 @@
       .filter((entry) => entry.count > 0);
   const jobSeverityTotal = (job, level) => Number(job?.severity_totals?.[level] || 0);
   const hasRunningOrQueuedJobs = (items = []) => items.some((job) => isActiveJobStatus(job?.status));
+  const formatPercent = (value) => `${(Number(value || 0) * 100).toFixed(1)}%`;
+  const formatInteger = (value) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return "0";
+    return Math.round(numeric).toLocaleString();
+  };
+  const formatDurationMs = (value) => `${formatInteger(value)} ms`;
+  const formatUptime = (value) => {
+    const seconds = Number(value);
+    if (!Number.isFinite(seconds) || seconds < 0) return "unknown";
+    const total = Math.floor(seconds);
+    if (total < 60) return `${total}s`;
+    if (total < 3600) {
+      const minutes = Math.floor(total / 60);
+      const rem = total % 60;
+      return `${minutes}m ${rem}s`;
+    }
+    if (total < 86400) {
+      const hours = Math.floor(total / 3600);
+      const minutes = Math.floor((total % 3600) / 60);
+      return `${hours}h ${minutes}m`;
+    }
+    const days = Math.floor(total / 86400);
+    const hours = Math.floor((total % 86400) / 3600);
+    return `${days}d ${hours}h`;
+  };
+  const metricsCardHelp = {
+    queue_depth: "Current number of jobs waiting in the queue.",
+    in_flight_jobs: "Jobs currently being processed by workers.",
+    success_rate: "Share of completed jobs that succeeded.",
+    failed_rate: "Share of completed jobs that failed.",
+    api_p90: "Worst route-level 90th percentile API latency.",
+    avg_job_duration: "Average runtime of completed jobs.",
+    completed_total: "Total number of jobs that reached a terminal state.",
+    failed_total: "Total number of completed jobs with failed status."
+  };
+  const severityCardHelp = (level) =>
+    `Total ${String(level || "").toUpperCase()} log entries aggregated across completed jobs.`;
+  const lastLoadedLabel = (value) => {
+    if (!value) return "never";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return "never";
+    return parsed.toLocaleTimeString();
+  };
+  const metricsSeriesPoints = (snapshot, window) => {
+    const windows = snapshot?.trends?.windows || {};
+    if (windows[window]?.points) {
+      return windows[window].points;
+    }
+    const firstKey = Object.keys(windows)[0];
+    return firstKey ? windows[firstKey].points || [] : [];
+  };
+  const metricsSeriesValues = (snapshot, window, field) =>
+    metricsSeriesPoints(snapshot, window).map((point) => Number(point?.[field] || 0));
+  const sparklinePoints = (values, width = 260, height = 66, padding = 6) => {
+    if (!Array.isArray(values) || values.length === 0) return "";
+    const usableValues = values.map((value) => {
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? numeric : 0;
+    });
+    const max = Math.max(...usableValues);
+    const min = Math.min(...usableValues);
+    const spread = max - min || 1;
+    const spanX = Math.max(width - padding * 2, 1);
+    const spanY = Math.max(height - padding * 2, 1);
+    const denominator = usableValues.length > 1 ? usableValues.length - 1 : 1;
+    return usableValues
+      .map((value, index) => {
+        const x = padding + (spanX * index) / denominator;
+        const y = height - padding - ((value - min) / spread) * spanY;
+        return `${x.toFixed(2)},${y.toFixed(2)}`;
+      })
+      .join(" ");
+  };
+  const metricsDomainRows = (snapshot) => snapshot?.insights?.domains?.items || [];
+  const batchErrorScore = (batch) => Number(batch?.outcomes?.failed || 0) + Number(batch?.outcomes?.expired || 0);
+  const metricsBatchRows = (snapshot) => {
+    const items = [...(snapshot?.insights?.batches?.items || [])];
+    return items.sort((left, right) => {
+      const scoreDelta = batchErrorScore(right) - batchErrorScore(left);
+      if (scoreDelta !== 0) return scoreDelta;
+      const processedDelta = Number(right?.processed_total || 0) - Number(left?.processed_total || 0);
+      if (processedDelta !== 0) return processedDelta;
+      return String(left?.batch_id || "").localeCompare(String(right?.batch_id || ""));
+    });
+  };
+  const metricsTopAPIP90 = (snapshot) =>
+    (snapshot?.api?.routes || []).reduce((highest, route) => {
+      const value = Number(route?.latency_ms?.p90 || 0);
+      return value > highest ? value : highest;
+    }, 0);
+  const hasMetricsData = (snapshot) => Boolean(snapshot && snapshot.generated_at);
+  const seriesLast = (values = []) => (values.length ? Number(values[values.length - 1] || 0) : 0);
   const matchesSeverityFilter = (job) => {
     if (severityFilter === "warnings_plus") {
       return (
@@ -446,6 +571,8 @@
     }
     if (next === "recent") {
       loadJobs();
+    } else if (next === "metrics") {
+      loadMetrics();
     }
   };
 
@@ -482,6 +609,13 @@
       if (normalizedBatchID) {
         params.set("batch_id", normalizedBatchID);
       }
+      const normalizedDomain = recentDomainFilter.trim();
+      if (normalizedDomain) {
+        params.set("domain", normalizedDomain);
+      }
+      if (severityFilter !== "all") {
+        params.set("severity", severityFilter);
+      }
       const list = await apiFetch(`/jobs?${params.toString()}`);
       jobs = list.items || [];
       recentTotal = Number.isFinite(Number(list.total)) ? Number(list.total) : jobs.length;
@@ -503,8 +637,9 @@
     await loadJobs({ resetCursor: true });
   };
 
-  const clearRecentBatchFilter = async () => {
+  const clearRecentFilters = async () => {
     jobBatchFilter = "";
+    recentDomainFilter = "";
     await loadJobs({ resetCursor: true });
   };
 
@@ -679,6 +814,32 @@
     await loadBatch(selectedBatchId);
   };
 
+  const loadMetrics = async (options = {}) => {
+    const { silent = false } = options;
+    if (!silent) {
+      metricsLoading = true;
+    }
+    metricsError = "";
+    try {
+      metricsSnapshot = await fetchMetricsSnapshot(apiFetch, {
+        window: metricsWindow,
+        include: ["health", "jobs", "api", "quality", "insights", "trends"],
+        limitDomains: normalizeMetricsLimit(metricsDomainLimit),
+        limitBatches: normalizeMetricsLimit(metricsBatchLimit)
+      });
+      metricsLoadedAt = new Date().toISOString();
+    } catch (error) {
+      metricsError = error.message || "unknown error";
+      if (!metricsSnapshot) {
+        setStatus(`Failed to load metrics: ${metricsError}`, "warn");
+      }
+    } finally {
+      if (!silent) {
+        metricsLoading = false;
+      }
+    }
+  };
+
   const startJobPolling = () => {
     if (jobPoller) clearInterval(jobPoller);
     if (!autoRefreshJob || !selectedJobId) return;
@@ -695,6 +856,12 @@
     if (recentPoller) clearInterval(recentPoller);
     if (!autoRefreshRecent || activeTab !== "recent") return;
     recentPoller = setInterval(() => loadJobs(), 7000);
+  };
+
+  const startMetricsPolling = () => {
+    if (metricsPoller) clearInterval(metricsPoller);
+    if (!autoRefreshMetrics || activeTab !== "metrics") return;
+    metricsPoller = setInterval(() => loadMetrics({ silent: true }), 10000);
   };
 
   $: {
@@ -714,6 +881,15 @@
     autoRefreshRecent;
     activeTab;
     startRecentPolling();
+  }
+
+  $: {
+    autoRefreshMetrics;
+    activeTab;
+    metricsWindow;
+    metricsDomainLimit;
+    metricsBatchLimit;
+    startMetricsPolling();
   }
 
   $: if (
@@ -750,6 +926,7 @@
     jobSort,
     severityFilter,
     jobBatchFilter,
+    recentDomainFilter,
     String(recentPageSize),
     String(recentCursor),
     selectedBatchId,
@@ -785,6 +962,9 @@
     if (activeTab === "batches" && selectedBatchId) {
       loadBatch(selectedBatchId);
     }
+    if (activeTab === "metrics") {
+      loadMetrics();
+    }
   };
 
   initializeApp();
@@ -793,6 +973,7 @@
     if (jobPoller) clearInterval(jobPoller);
     if (batchPoller) clearInterval(batchPoller);
     if (recentPoller) clearInterval(recentPoller);
+    if (metricsPoller) clearInterval(metricsPoller);
     if (jobInspectorHighlightTimer) clearTimeout(jobInspectorHighlightTimer);
     window.removeEventListener("hashchange", updateTabFromHash);
   });
@@ -987,6 +1168,21 @@
           </select>
         </div>
         <div class="sort-control grow">
+          <label for="recent-domain-filter">Domain contains</label>
+          <input
+            id="recent-domain-filter"
+            type="text"
+            placeholder="example.com"
+            bind:value={recentDomainFilter}
+            on:keydown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                applyRecentFilters();
+              }
+            }}
+          />
+        </div>
+        <div class="sort-control grow">
           <label for="recent-batch-filter">Batch ID filter</label>
           <input
             id="recent-batch-filter"
@@ -1003,7 +1199,7 @@
         </div>
         <div class="row">
           <button class="ghost" type="button" on:click={applyRecentFilters} disabled={jobsLoading}>Apply filters</button>
-          <button class="ghost" type="button" on:click={clearRecentBatchFilter} disabled={jobsLoading}>Clear</button>
+          <button class="ghost" type="button" on:click={clearRecentFilters} disabled={jobsLoading}>Clear</button>
         </div>
       </div>
       <div class="severity-filter-bar" role="group" aria-label="Severity filters">
@@ -1011,7 +1207,10 @@
           <button
             type="button"
             class={`severity-filter ${severityFilter === filter.id ? "active" : ""}`}
-            on:click={() => (severityFilter = filter.id)}
+            on:click={async () => {
+              severityFilter = filter.id;
+              await applyRecentFilters();
+            }}
           >
             {filter.label}
           </button>
@@ -1224,7 +1423,199 @@ example.org`}
   {:else if activeTab === "metrics"}
     <div class="card reveal" id="panel-metrics" role="tabpanel" aria-labelledby="tab-metrics" style="--d: 0.38s; margin-top: 22px;">
       <h2>Metrics</h2>
-      <div class="small">Metrics endpoint support will be added in a future update.</div>
+      <div class="row">
+        <button class="ghost" type="button" on:click={() => loadMetrics()} disabled={metricsLoading}>
+          {metricsLoading ? "Refreshing..." : "Refresh metrics"}
+        </button>
+        <button class="ghost" type="button" on:click={() => (autoRefreshMetrics = !autoRefreshMetrics)}>
+          {autoRefreshMetrics ? "Auto refresh: on" : "Auto refresh: off"}
+        </button>
+        <div class="sort-control">
+          <label for="metrics-window">Trend window</label>
+          <select id="metrics-window" bind:value={metricsWindow} on:change={() => loadMetrics()}>
+            {#each metricsWindowOptions as option}
+              <option value={option.id}>{option.label}</option>
+            {/each}
+          </select>
+        </div>
+        <div class="sort-control">
+          <label for="metrics-domain-limit">Top domains</label>
+          <select id="metrics-domain-limit" bind:value={metricsDomainLimit} on:change={() => loadMetrics()}>
+            {#each metricsLimitOptions as value}
+              <option value={value}>{value}</option>
+            {/each}
+          </select>
+        </div>
+        <div class="sort-control">
+          <label for="metrics-batch-limit">Top batches</label>
+          <select id="metrics-batch-limit" bind:value={metricsBatchLimit} on:change={() => loadMetrics()}>
+            {#each metricsLimitOptions as value}
+              <option value={value}>{value}</option>
+            {/each}
+          </select>
+        </div>
+      </div>
+      <div class="small">
+        Last loaded: {lastLoadedLabel(metricsLoadedAt)} | Server uptime: {formatUptime(metricsSnapshot?.health?.uptime_seconds)}
+      </div>
+
+      {#if metricsLoading && !hasMetricsData(metricsSnapshot)}
+        <div class="summary-empty">Loading metrics snapshot...</div>
+      {:else if metricsError && !hasMetricsData(metricsSnapshot)}
+        <div class="notice">Failed to load metrics: {metricsError}</div>
+        <button type="button" on:click={() => loadMetrics()}>Retry</button>
+      {:else if hasMetricsData(metricsSnapshot)}
+        {@const throughputSeries = metricsSeriesValues(metricsSnapshot, metricsWindow, "throughput")}
+        {@const failedSeries = metricsSeriesValues(metricsSnapshot, metricsWindow, "failed")}
+        {@const queueSeries = metricsSeriesValues(metricsSnapshot, metricsWindow, "queue_depth")}
+        {@const severityTotals = metricsSnapshot?.quality?.severity?.totals || {}}
+
+        {#if metricsError}
+          <div class="notice">Showing last snapshot. Latest refresh failed: {metricsError}</div>
+        {/if}
+
+        <div class="summary-grid metrics-summary-grid">
+          <div class="summary-item" title={metricsCardHelp.queue_depth}>
+            <span class="summary-label">Queue depth</span>
+            <span class="summary-count">{formatInteger(metricsSnapshot?.health?.queue_depth)}</span>
+          </div>
+          <div class="summary-item" title={metricsCardHelp.in_flight_jobs}>
+            <span class="summary-label">In-flight jobs</span>
+            <span class="summary-count">{formatInteger(metricsSnapshot?.health?.in_flight_jobs)}</span>
+          </div>
+          <div class="summary-item" title={metricsCardHelp.success_rate}>
+            <span class="summary-label">Success rate</span>
+            <span class="summary-count">{formatPercent(metricsSnapshot?.quality?.outcomes?.success_rate)}</span>
+          </div>
+          <div class="summary-item" title={metricsCardHelp.failed_rate}>
+            <span class="summary-label">Failure rate</span>
+            <span class="summary-count">{formatPercent(metricsSnapshot?.quality?.outcomes?.failed_rate)}</span>
+          </div>
+          <div class="summary-item" title={metricsCardHelp.api_p90}>
+            <span class="summary-label">API p90</span>
+            <span class="summary-count">{formatDurationMs(metricsTopAPIP90(metricsSnapshot))}</span>
+          </div>
+          <div class="summary-item" title={metricsCardHelp.avg_job_duration}>
+            <span class="summary-label">Avg job duration</span>
+            <span class="summary-count">{formatDurationMs(metricsSnapshot?.quality?.job_duration_ms?.avg)}</span>
+          </div>
+          <div class="summary-item jobs-finished" title={metricsCardHelp.completed_total}>
+            <span class="summary-label">Total jobs finished</span>
+            <span class="summary-count">{formatInteger(metricsSnapshot?.jobs?.completed_total)}</span>
+          </div>
+          <div class="summary-item failed-jobs" title={metricsCardHelp.failed_total}>
+            <span class="summary-label">Failed jobs</span>
+            <span class="summary-count">{formatInteger(metricsSnapshot?.quality?.outcomes?.failed_total)}</span>
+          </div>
+          {#each summaryLevels as level}
+            <div class={`summary-item severity-${level.toLowerCase()}`} title={severityCardHelp(level)}>
+              <span class="summary-label">{level}</span>
+              <span class="summary-count">{formatInteger(severityTotals[level])}</span>
+            </div>
+          {/each}
+        </div>
+
+        <div class="metrics-trend-grid">
+          <div class="metrics-trend-card">
+            <div class="metrics-trend-head">
+              <strong>Throughput</strong>
+              <span>{formatInteger(seriesLast(throughputSeries))}/bucket</span>
+            </div>
+            <svg class="sparkline" viewBox="0 0 260 66" role="img" aria-label="Throughput trend">
+              <polyline points={sparklinePoints(throughputSeries)} />
+            </svg>
+          </div>
+          <div class="metrics-trend-card">
+            <div class="metrics-trend-head">
+              <strong>Failures</strong>
+              <span>{formatInteger(seriesLast(failedSeries))}/bucket</span>
+            </div>
+            <svg class="sparkline sparkline-warn" viewBox="0 0 260 66" role="img" aria-label="Failure trend">
+              <polyline points={sparklinePoints(failedSeries)} />
+            </svg>
+          </div>
+          <div class="metrics-trend-card">
+            <div class="metrics-trend-head">
+              <strong>Queue depth</strong>
+              <span>{formatInteger(seriesLast(queueSeries))}</span>
+            </div>
+            <svg class="sparkline sparkline-queue" viewBox="0 0 260 66" role="img" aria-label="Queue depth trend">
+              <polyline points={sparklinePoints(queueSeries)} />
+            </svg>
+          </div>
+        </div>
+
+        <div class="metrics-tables">
+          <div class="metrics-table-wrap">
+            <h3>Top domains</h3>
+            {#if metricsDomainRows(metricsSnapshot).length === 0}
+              <div class="summary-empty">No domain insight data yet.</div>
+            {:else}
+              <table class="metrics-table">
+                <thead>
+                  <tr>
+                    <th>Domain</th>
+                    <th>Runs</th>
+                    <th>Last status</th>
+                    <th>Avg duration</th>
+                    <th>Error+critical</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {#each metricsDomainRows(metricsSnapshot) as row}
+                    <tr>
+                      <td class="mono">{row.domain}</td>
+                      <td>{formatInteger(row.runs_total)}</td>
+                      <td>{row.last_status || "-"}</td>
+                      <td>{formatDurationMs(row.avg_duration_ms)}</td>
+                      <td>{formatInteger(Number(row?.severity_totals?.ERROR || 0) + Number(row?.severity_totals?.CRITICAL || 0))}</td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            {/if}
+          </div>
+
+          <div class="metrics-table-wrap">
+            <h3>Error-heavy batches</h3>
+            {#if metricsBatchRows(metricsSnapshot).length === 0}
+              <div class="summary-empty">No batch insight data yet.</div>
+            {:else}
+              <table class="metrics-table metrics-table-batches">
+                <colgroup>
+                  <col class="metrics-col-batch-id" />
+                  <col />
+                  <col />
+                  <col />
+                  <col />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>Batch ID</th>
+                    <th>Processed</th>
+                    <th>Failed+expired</th>
+                    <th>Canceled</th>
+                    <th>Error+critical</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {#each metricsBatchRows(metricsSnapshot) as row}
+                    <tr>
+                      <td class="mono metrics-batch-id" title={row.batch_id}>{row.batch_id}</td>
+                      <td>{formatInteger(row.processed_total)}</td>
+                      <td>{formatInteger(batchErrorScore(row))}</td>
+                      <td>{formatInteger(row?.outcomes?.canceled || 0)}</td>
+                      <td>{formatInteger(Number(row?.severity_totals?.ERROR || 0) + Number(row?.severity_totals?.CRITICAL || 0))}</td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            {/if}
+          </div>
+        </div>
+      {:else}
+        <div class="summary-empty">No metrics data available yet.</div>
+      {/if}
     </div>
   {/if}
 </main>

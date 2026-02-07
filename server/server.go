@@ -11,15 +11,18 @@ import (
 
 // Server holds the HTTP API and supporting services.
 type Server struct {
-	cfg           Config
-	mux           *http.ServeMux
-	store         JobStore
-	queue         Queue
-	workers       workerPool
-	engineRunner  func(engine.RunRequest) ([]engine.LogEntry, error)
-	engineLimiter *engineLimiter
-	cancelMu      sync.Mutex
-	cancels       map[string]context.CancelFunc
+	cfg            Config
+	mux            *http.ServeMux
+	store          JobStore
+	queue          Queue
+	workers        workerPool
+	metrics        *MetricsCollector
+	metricsCache   map[string]metricsCacheEntry
+	metricsCacheMu sync.Mutex
+	engineRunner   func(engine.RunRequest) ([]engine.LogEntry, error)
+	engineLimiter  *engineLimiter
+	cancelMu       sync.Mutex
+	cancels        map[string]context.CancelFunc
 }
 
 // New builds a server with in-memory components.
@@ -32,6 +35,8 @@ func New(cfg Config) *Server {
 		mux:           http.NewServeMux(),
 		store:         NewInMemoryJobStore(),
 		queue:         NewInMemoryQueue(),
+		metrics:       NewMetricsCollector(cfg),
+		metricsCache:  map[string]metricsCacheEntry{},
 		engineRunner:  engine.Run,
 		engineLimiter: newEngineLimiter(cfg.MaxConcurrentJobs),
 		cancels:       map[string]context.CancelFunc{},
@@ -63,9 +68,9 @@ func (s *Server) routes() {
 	apiMux.HandleFunc("/metrics", s.handleMetrics)
 	apiMux.HandleFunc("/healthz", s.handleHealth)
 
-	s.mux.Handle("/api/v1/", http.StripPrefix("/api/v1", apiMux))
-	s.mux.HandleFunc("/api/v1", func(w http.ResponseWriter, r *http.Request) {
+	s.mux.Handle("/api/v1/", s.apiMetricsMiddleware(http.StripPrefix("/api/v1", apiMux)))
+	s.mux.Handle("/api/v1", s.apiMetricsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/api/v1/", http.StatusMovedPermanently)
-	})
+	})))
 	s.mux.Handle("/", serverui.Handler())
 }

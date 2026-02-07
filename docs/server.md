@@ -161,6 +161,11 @@ List jobs:
 GET /jobs?status=running&limit=100
 ```
 
+Useful list filters include:
+- `domain=<substring>` to match domain names.
+- `batch_id=<id>` to scope to one batch.
+- `severity=warnings_plus|errors_only` to filter by aggregated severity totals before pagination.
+
 Get a job:
 ```
 GET /jobs/{job_id}
@@ -251,6 +256,20 @@ POST /queue/remove
 GET /metrics
 GET /healthz
 ```
+
+`GET /metrics` returns a JSON snapshot. Optional query params:
+- `window=1h|6h|24h|48h` to restrict `trends.windows` to one window.
+- `include=` comma-separated sections: `all`, `health`, `jobs`, `api`, `quality`, `insights`, `trends`.
+- `limit_domains=1..100` to cap `insights.domains.items`.
+- `limit_batches=1..100` to cap `insights.batches.items`.
+
+Responses:
+- `200` JSON snapshot.
+- `400` structured error for invalid query params.
+
+The metrics endpoint caches rendered responses for 1 second per unique query option set.
+
+For full Metrics API details and Metrics tab notes, see `docs/metrics.md`.
 
 ## UI
 The embedded UI is served at `/` and calls the API on the same host.

@@ -96,6 +96,76 @@ func (r *Recursor) GetAddressesFor(ctx context.Context, name string) ([]netip.Ad
 	return r.getAddressesFor(ctx, name, nil)
 }
 
+func cloneInProgressMap(src map[string]map[string]bool) map[string]map[string]bool {
+	if src == nil {
+		return map[string]map[string]bool{}
+	}
+	dst := make(map[string]map[string]bool, len(src))
+	for key, inner := range src {
+		copied := make(map[string]bool, len(inner))
+		for innerKey, value := range inner {
+			copied[innerKey] = value
+		}
+		dst[key] = copied
+	}
+	return dst
+}
+
+func cloneGlueMap(src map[string]map[netip.Addr]bool) map[string]map[netip.Addr]bool {
+	if src == nil {
+		return map[string]map[netip.Addr]bool{}
+	}
+	dst := make(map[string]map[netip.Addr]bool, len(src))
+	for key, inner := range src {
+		copied := make(map[netip.Addr]bool, len(inner))
+		for innerKey, value := range inner {
+			copied[innerKey] = value
+		}
+		dst[key] = copied
+	}
+	return dst
+}
+
+func mergeInProgressMaps(dst map[string]map[string]bool, src map[string]map[string]bool) {
+	if dst == nil || src == nil {
+		return
+	}
+	for key, inner := range src {
+		if dst[key] == nil {
+			dst[key] = map[string]bool{}
+		}
+		for innerKey := range inner {
+			dst[key][innerKey] = true
+		}
+	}
+}
+
+func mergeGlueMaps(dst map[string]map[netip.Addr]bool, src map[string]map[netip.Addr]bool) {
+	if dst == nil || src == nil {
+		return
+	}
+	for key, inner := range src {
+		if dst[key] == nil {
+			dst[key] = map[netip.Addr]bool{}
+		}
+		for innerKey := range inner {
+			dst[key][innerKey] = true
+		}
+	}
+}
+
+func snapshotStateMaps(state *recurseState) (map[string]map[string]bool, map[string]map[netip.Addr]bool) {
+	if state == nil {
+		return map[string]map[string]bool{}, map[string]map[netip.Addr]bool{}
+	}
+	state.ensureLock()
+	state.lock()
+	inProgress := cloneInProgressMap(state.inProgress)
+	glue := cloneGlueMap(state.glue)
+	state.unlock()
+	return inProgress, glue
+}
+
 func (r *Recursor) getAddressesFor(ctx context.Context, name string, state *recurseState) ([]netip.Addr, error) {
 	if state == nil {
 		state = &recurseState{}
@@ -165,66 +235,7 @@ func (r *Recursor) getAddressesFor(ctx context.Context, name string, state *recu
 			resp  packet.Packet
 			state *recurseState
 		}
-
-		cloneInProgress := func(src map[string]map[string]bool) map[string]map[string]bool {
-			if src == nil {
-				return map[string]map[string]bool{}
-			}
-			dst := make(map[string]map[string]bool, len(src))
-			for key, inner := range src {
-				copied := make(map[string]bool, len(inner))
-				for innerKey, value := range inner {
-					copied[innerKey] = value
-				}
-				dst[key] = copied
-			}
-			return dst
-		}
-		cloneGlue := func(src map[string]map[netip.Addr]bool) map[string]map[netip.Addr]bool {
-			if src == nil {
-				return map[string]map[netip.Addr]bool{}
-			}
-			dst := make(map[string]map[netip.Addr]bool, len(src))
-			for key, inner := range src {
-				copied := make(map[netip.Addr]bool, len(inner))
-				for innerKey, value := range inner {
-					copied[innerKey] = value
-				}
-				dst[key] = copied
-			}
-			return dst
-		}
-		mergeInProgress := func(dst map[string]map[string]bool, src map[string]map[string]bool) {
-			if dst == nil || src == nil {
-				return
-			}
-			for key, inner := range src {
-				if dst[key] == nil {
-					dst[key] = map[string]bool{}
-				}
-				for innerKey := range inner {
-					dst[key][innerKey] = true
-				}
-			}
-		}
-		mergeGlue := func(dst map[string]map[netip.Addr]bool, src map[string]map[netip.Addr]bool) {
-			if dst == nil || src == nil {
-				return
-			}
-			for key, inner := range src {
-				if dst[key] == nil {
-					dst[key] = map[netip.Addr]bool{}
-				}
-				for innerKey := range inner {
-					dst[key][innerKey] = true
-				}
-			}
-		}
-
-		state.lock()
-		baseInProgress := cloneInProgress(state.inProgress)
-		baseGlue := cloneGlue(state.glue)
-		state.unlock()
+		baseInProgress, baseGlue := snapshotStateMaps(state)
 
 		tasks := []parallel.Task[addrResult]{
 			func(ctx context.Context) (addrResult, error) {
@@ -233,8 +244,8 @@ func (r *Recursor) getAddressesFor(ctx context.Context, name string, state *recu
 					count:      state.count,
 					common:     0,
 					seen:       map[string]bool{},
-					inProgress: cloneInProgress(baseInProgress),
-					glue:       cloneGlue(baseGlue),
+					inProgress: cloneInProgressMap(baseInProgress),
+					glue:       cloneGlueMap(baseGlue),
 				})
 				return addrResult{resp: resp, state: nextState}, err
 			},
@@ -244,8 +255,8 @@ func (r *Recursor) getAddressesFor(ctx context.Context, name string, state *recu
 					count:      state.count,
 					common:     0,
 					seen:       map[string]bool{},
-					inProgress: cloneInProgress(baseInProgress),
-					glue:       cloneGlue(baseGlue),
+					inProgress: cloneInProgressMap(baseInProgress),
+					glue:       cloneGlueMap(baseGlue),
 				})
 				return addrResult{resp: resp, state: nextState}, err
 			},
@@ -254,9 +265,10 @@ func (r *Recursor) getAddressesFor(ctx context.Context, name string, state *recu
 		results := parallel.RunOrdered(ctx, tasks, parallel.Options{Limit: 2, CancelOnError: false})
 
 		if results[0].Value.state != nil {
+			srcInProgress, srcGlue := snapshotStateMaps(results[0].Value.state)
 			state.lock()
-			mergeInProgress(state.inProgress, results[0].Value.state.inProgress)
-			mergeGlue(state.glue, results[0].Value.state.glue)
+			mergeInProgressMaps(state.inProgress, srcInProgress)
+			mergeGlueMaps(state.glue, srcGlue)
 			state.unlock()
 		}
 		if results[0].Err != nil {
@@ -268,9 +280,10 @@ func (r *Recursor) getAddressesFor(ctx context.Context, name string, state *recu
 		}
 
 		if results[1].Value.state != nil {
+			srcInProgress, srcGlue := snapshotStateMaps(results[1].Value.state)
 			state.lock()
-			mergeInProgress(state.inProgress, results[1].Value.state.inProgress)
-			mergeGlue(state.glue, results[1].Value.state.glue)
+			mergeInProgressMaps(state.inProgress, srcInProgress)
+			mergeGlueMaps(state.glue, srcGlue)
 			state.unlock()
 		}
 		if results[1].Err != nil {

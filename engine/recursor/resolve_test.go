@@ -1437,6 +1437,75 @@ func TestRecurseUnorderedDepthLimitsWorkers(t *testing.T) {
 	}
 }
 
+func TestSnapshotStateMapsConcurrentMutation(t *testing.T) {
+	state := &recurseState{}
+	state.ensureLock()
+
+	nameKey := "ns.example"
+	baseAddr := netip.MustParseAddr("192.0.2.10")
+	flapAddr := netip.MustParseAddr("192.0.2.11")
+	snapshotAddr := netip.MustParseAddr("192.0.2.250")
+
+	state.lock()
+	state.inProgress = map[string]map[string]bool{
+		nameKey: {"A": true},
+	}
+	state.glue = map[string]map[netip.Addr]bool{
+		nameKey: {baseAddr: true},
+	}
+	state.unlock()
+
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		toggle := false
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+
+			state.lock()
+			state.inProgress[nameKey]["AAAA"] = toggle
+			if toggle {
+				state.glue[nameKey][flapAddr] = true
+			} else {
+				delete(state.glue[nameKey], flapAddr)
+			}
+			state.unlock()
+			toggle = !toggle
+		}
+	}()
+
+	deadline := time.After(200 * time.Millisecond)
+	for {
+		select {
+		case <-deadline:
+			close(stop)
+			<-done
+
+			state.lock()
+			_, hasSnapshotMarker := state.inProgress[nameKey]["SNAPSHOT_MARKER"]
+			_, hasSnapshotAddr := state.glue[nameKey][snapshotAddr]
+			state.unlock()
+
+			if hasSnapshotMarker {
+				t.Fatalf("snapshot mutation leaked into inProgress map")
+			}
+			if hasSnapshotAddr {
+				t.Fatalf("snapshot mutation leaked into glue map")
+			}
+			return
+		default:
+			inProgress, glue := snapshotStateMaps(state)
+			inProgress[nameKey]["SNAPSHOT_MARKER"] = true
+			glue[nameKey][snapshotAddr] = true
+		}
+	}
+}
+
 func packetWithA(name string, addr netip.Addr) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Answer = []dns.RR{

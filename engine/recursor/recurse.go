@@ -12,6 +12,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 )
@@ -21,6 +22,7 @@ type queryer interface {
 }
 
 type recurseState struct {
+	muInit     sync.Mutex
 	mu         *sync.Mutex
 	ns         []queryer
 	count      int
@@ -47,23 +49,32 @@ func (state *recurseState) ensureLock() {
 	if state == nil {
 		return
 	}
+	state.muInit.Lock()
 	if state.mu == nil {
 		state.mu = &sync.Mutex{}
 	}
+	state.muInit.Unlock()
 }
 
 func (state *recurseState) lock() {
-	if state == nil || state.mu == nil {
+	if state == nil {
 		return
 	}
+	state.ensureLock()
 	state.mu.Lock()
 }
 
 func (state *recurseState) unlock() {
-	if state == nil || state.mu == nil {
+	if state == nil {
 		return
 	}
-	state.mu.Unlock()
+	state.muInit.Lock()
+	mu := state.mu
+	state.muInit.Unlock()
+	if mu == nil {
+		return
+	}
+	mu.Unlock()
 }
 
 func (r *Recursor) recurse(ctx context.Context, name string, qtype string, qclass string, state *recurseState) (packet.Packet, *recurseState, error) {
@@ -126,67 +137,119 @@ func (r *Recursor) recurse(ctx context.Context, name string, qtype string, qclas
 
 func (r *Recursor) recurseOrdered(ctx context.Context, name string, qtype string, qclass string, state *recurseState) (packet.Packet, *recurseState, error) {
 	nameObj := dnsname.New(name)
+	parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
+	if parallelism < 1 {
+		parallelism = 1
+	}
+	parentLogger := logger.FromContext(ctx)
 	for len(state.ns) > 0 {
-		idx := len(state.ns) - 1
-		ns := state.ns[idx]
-		state.ns = state.ns[:idx]
+		batchSize := 1
+		if parallelism > 1 {
+			batchSize = parallelism
+			if batchSize > len(state.ns) {
+				batchSize = len(state.ns)
+			}
+		}
 
-		resp, err := ns.QueryWithClass(ctx, name, qtype, qclass)
-		if err != nil || resp.Msg == nil {
+		batch := make([]queryer, 0, batchSize)
+		for i := 0; i < batchSize; i++ {
+			idx := len(state.ns) - 1
+			batch = append(batch, state.ns[idx])
+			state.ns = state.ns[:idx]
+		}
+
+		if len(batch) == 1 {
+			resp, err := batch[0].QueryWithClass(ctx, name, qtype, qclass)
+			out, nextState, action, actionErr := r.processOrderedResponse(ctx, nameObj, qtype, qclass, state, batch[0], resp, err)
+			state = nextState
+			if actionErr != nil {
+				return packet.Packet{}, state, actionErr
+			}
+			if action == orderedActionReturn {
+				return out, state, nil
+			}
+			if action == orderedActionRedirect {
+				continue
+			}
 			continue
 		}
 
-		if resp.Rcode() == "REFUSED" || resp.Rcode() == "SERVFAIL" {
-			state.candidate = resp
+		results := make([]orderedQueryResult, len(batch))
+		done := make([]chan struct{}, len(batch))
+		ctxBatch, cancelBatch := context.WithCancel(ctx)
+		for i, ns := range batch {
+			done[i] = make(chan struct{})
+			go func(i int, ns queryer) {
+				defer close(done[i])
+				queryCtx := ctxBatch
+				var taskLogger *logger.Logger
+				if parentLogger != nil {
+					taskLogger = logger.New()
+					taskLogger.CopyConfigFrom(parentLogger)
+					taskLogger.CopyStartTimeFrom(parentLogger)
+					queryCtx = logger.WithContext(queryCtx, taskLogger)
+				}
+				resp, err := ns.QueryWithClass(queryCtx, name, qtype, qclass)
+				result := orderedQueryResult{
+					ns:   ns,
+					resp: resp,
+					err:  err,
+				}
+				if taskLogger != nil {
+					result.logs = taskLogger.Entries()
+				}
+				results[i] = result
+			}(i, ns)
+		}
+
+		processed := 0
+		redirected := false
+		var returnResp packet.Packet
+		var returnErr error
+		returnNow := false
+
+		for i := 0; i < len(batch); i++ {
+			<-done[i]
+			processed = i + 1
+
+			if parentLogger != nil && len(results[i].logs) > 0 {
+				_ = parentLogger.Append(results[i].logs...)
+			}
+
+			out, nextState, action, actionErr := r.processOrderedResponse(ctx, nameObj, qtype, qclass, state, results[i].ns, results[i].resp, results[i].err)
+			state = nextState
+			if actionErr != nil {
+				returnErr = actionErr
+				returnNow = true
+				cancelBatch()
+				break
+			}
+			if action == orderedActionReturn {
+				returnResp = out
+				returnNow = true
+				cancelBatch()
+				break
+			}
+			if action == orderedActionRedirect {
+				redirected = true
+				cancelBatch()
+				break
+			}
+		}
+
+		for i := processed; i < len(batch); i++ {
+			<-done[i]
+		}
+		cancelBatch()
+
+		if returnErr != nil {
+			return packet.Packet{}, state, returnErr
+		}
+		if returnNow {
+			return returnResp, state, nil
+		}
+		if redirected {
 			continue
-		}
-
-		if resp.NoSuchRecord() || resp.NoSuchName() {
-			return resp, state, nil
-		}
-
-		if resp.Type() == "answer" {
-			if !resp.HasRRsOfTypeForName(qtype, nameObj, "answer") && len(resp.GetRecordsForName("CNAME", nameObj, "answer")) > 0 {
-				cnameResp, state, err := r.resolveCNAME(ctx, nameObj, qtype, qclass, resp, state)
-				return cnameResp, state, err
-			}
-			return resp, state, nil
-		}
-
-		if resp.IsRedirect() {
-			zname, ok := redirectName(resp)
-			if !ok {
-				continue
-			}
-			if zname == "." {
-				continue
-			}
-			zkey := strings.ToLower(zname)
-			if state.seen[zkey] {
-				continue
-			}
-			state.seen[zkey] = true
-
-			common := dnsname.New(zname).Common(state.qname)
-			if common < state.common {
-				continue
-			}
-			state.common = common
-
-			next, err := state.nsFrom(ctx, resp, state)
-			if err != nil {
-				return packet.Packet{}, state, err
-			}
-			state.ns = next
-			state.count++
-			if state.count > 20 {
-				return packet.Packet{}, state, nil
-			}
-			state.trace = append([]traceEntry{{
-				zoneName:   zname,
-				source:     ns,
-				answerFrom: resp.AnswerFrom,
-			}}, state.trace...)
 		}
 	}
 
@@ -194,6 +257,83 @@ func (r *Recursor) recurseOrdered(ctx context.Context, name string, qtype string
 		return state.candidate, state, nil
 	}
 	return packet.Packet{}, state, nil
+}
+
+type orderedAction int
+
+const (
+	orderedActionContinue orderedAction = iota
+	orderedActionReturn
+	orderedActionRedirect
+)
+
+type orderedQueryResult struct {
+	ns   queryer
+	resp packet.Packet
+	err  error
+	logs []*logger.Entry
+}
+
+func (r *Recursor) processOrderedResponse(ctx context.Context, nameObj dnsname.Name, qtype string, qclass string, state *recurseState, ns queryer, resp packet.Packet, err error) (packet.Packet, *recurseState, orderedAction, error) {
+	if err != nil || resp.Msg == nil {
+		return packet.Packet{}, state, orderedActionContinue, nil
+	}
+
+	if resp.Rcode() == "REFUSED" || resp.Rcode() == "SERVFAIL" {
+		state.candidate = resp
+		return packet.Packet{}, state, orderedActionContinue, nil
+	}
+
+	if resp.NoSuchRecord() || resp.NoSuchName() {
+		return resp, state, orderedActionReturn, nil
+	}
+
+	if resp.Type() == "answer" {
+		if !resp.HasRRsOfTypeForName(qtype, nameObj, "answer") && len(resp.GetRecordsForName("CNAME", nameObj, "answer")) > 0 {
+			cnameResp, nextState, err := r.resolveCNAME(ctx, nameObj, qtype, qclass, resp, state)
+			return cnameResp, nextState, orderedActionReturn, err
+		}
+		return resp, state, orderedActionReturn, nil
+	}
+
+	if resp.IsRedirect() {
+		zname, ok := redirectName(resp)
+		if !ok {
+			return packet.Packet{}, state, orderedActionContinue, nil
+		}
+		if zname == "." {
+			return packet.Packet{}, state, orderedActionContinue, nil
+		}
+		zkey := strings.ToLower(zname)
+		if state.seen[zkey] {
+			return packet.Packet{}, state, orderedActionContinue, nil
+		}
+		state.seen[zkey] = true
+
+		common := dnsname.New(zname).Common(state.qname)
+		if common < state.common {
+			return packet.Packet{}, state, orderedActionContinue, nil
+		}
+		state.common = common
+
+		next, err := state.nsFrom(ctx, resp, state)
+		if err != nil {
+			return packet.Packet{}, state, orderedActionReturn, err
+		}
+		state.ns = next
+		state.count++
+		if state.count > 20 {
+			return packet.Packet{}, state, orderedActionReturn, nil
+		}
+		state.trace = append([]traceEntry{{
+			zoneName:   zname,
+			source:     ns,
+			answerFrom: resp.AnswerFrom,
+		}}, state.trace...)
+		return packet.Packet{}, state, orderedActionRedirect, nil
+	}
+
+	return packet.Packet{}, state, orderedActionContinue, nil
 }
 
 type unorderedResult struct {

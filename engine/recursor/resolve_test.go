@@ -14,6 +14,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
+	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/transport"
@@ -770,15 +771,14 @@ func TestRecurseOrderedUsesLIFO(t *testing.T) {
 	}
 
 	r := &Recursor{}
-	called := make(chan string, 2)
 
 	slowResp := packetWithA("example", netip.MustParseAddr("192.0.2.10"))
 	slowResp.AnswerFrom = "slow"
 	fastResp := packetWithA("example", netip.MustParseAddr("192.0.2.11"))
 	fastResp.AnswerFrom = "fast"
 
-	slow := testQueryer{id: "slow", resp: slowResp, called: called}
-	fast := testQueryer{id: "fast", resp: fastResp, called: called}
+	slow := testQueryer{id: "slow", resp: slowResp}
+	fast := testQueryer{id: "fast", resp: fastResp}
 
 	state := &recurseState{ns: []queryer{fast, slow}}
 	resp, _, err := r.recurse(ctx, "example", "A", "IN", state)
@@ -788,15 +788,208 @@ func TestRecurseOrderedUsesLIFO(t *testing.T) {
 	if resp.AnswerFrom != "slow" {
 		t.Fatalf("expected LIFO response from slow, got %q", resp.AnswerFrom)
 	}
+}
 
-	first := <-called
-	if first != "slow" {
-		t.Fatalf("expected slow queried first, got %q", first)
+func TestRecurseOrderedParallelStartsNextQuery(t *testing.T) {
+	baseCtx, prof, _ := testhelpers.Context(t)
+	if err := prof.Set("resolver.defaults.unordered", false); err != nil {
+		t.Fatalf("set unordered: %v", err)
+	}
+	if err := prof.Set("resolver.defaults.parallel", 2); err != nil {
+		t.Fatalf("set parallel: %v", err)
+	}
+
+	r := &Recursor{}
+	slowStarted := make(chan struct{})
+	fastStarted := make(chan struct{})
+	releaseSlow := make(chan struct{})
+
+	slow := testQueryer{id: "slow", startCh: slowStarted, waitCh: releaseSlow}
+	fastResp := packetWithA("example", netip.MustParseAddr("192.0.2.71"))
+	fastResp.AnswerFrom = "fast"
+	fast := testQueryer{id: "fast", startCh: fastStarted, resp: fastResp}
+
+	state := &recurseState{ns: []queryer{fast, slow}}
+	ctx, cancel := context.WithTimeout(baseCtx, time.Second)
+	defer cancel()
+
+	done := make(chan struct{})
+	var out packet.Packet
+	var recurseErr error
+	go func() {
+		out, _, recurseErr = r.recurse(ctx, "example", "A", "IN", state)
+		close(done)
+	}()
+
+	select {
+	case <-slowStarted:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatalf("expected slow query to start")
 	}
 	select {
-	case next := <-called:
-		t.Fatalf("expected only one query, got %q", next)
-	default:
+	case <-fastStarted:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatalf("expected fast query to start in parallel while slow is blocked")
+	}
+
+	close(releaseSlow)
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatalf("recurse did not finish")
+	}
+	if recurseErr != nil {
+		t.Fatalf("recurse: %v", recurseErr)
+	}
+	if out.AnswerFrom != "fast" {
+		t.Fatalf("expected fast response after slow miss, got %q", out.AnswerFrom)
+	}
+}
+
+func TestRecurseOrderedParallelPreservesRedirectPriority(t *testing.T) {
+	ctx, prof, _ := testhelpers.Context(t)
+	if err := prof.Set("resolver.defaults.unordered", false); err != nil {
+		t.Fatalf("set unordered: %v", err)
+	}
+	if err := prof.Set("resolver.defaults.parallel", 2); err != nil {
+		t.Fatalf("set parallel: %v", err)
+	}
+
+	r := &Recursor{}
+	redirectResp := packetWithReferral("child.example", "ns.child.example")
+	redirectResp.AnswerFrom = "redirect"
+	speculativeResp := packetWithA("example", netip.MustParseAddr("192.0.2.80"))
+	speculativeResp.AnswerFrom = "speculative"
+	childResp := packetWithA("example", netip.MustParseAddr("192.0.2.81"))
+	childResp.AnswerFrom = "child"
+
+	state := &recurseState{
+		ns: []queryer{
+			testQueryer{id: "speculative", resp: speculativeResp},
+			testQueryer{id: "redirect", resp: redirectResp},
+		},
+		nsFrom: func(_ context.Context, resp packet.Packet, _ *recurseState) ([]queryer, error) {
+			if resp.AnswerFrom != "redirect" {
+				t.Fatalf("expected redirect source, got %q", resp.AnswerFrom)
+			}
+			return []queryer{testQueryer{id: "child", resp: childResp}}, nil
+		},
+	}
+
+	out, nextState, err := r.recurse(ctx, "example", "A", "IN", state)
+	if err != nil {
+		t.Fatalf("recurse: %v", err)
+	}
+	if out.AnswerFrom != "child" {
+		t.Fatalf("expected child answer after redirect, got %q", out.AnswerFrom)
+	}
+	if len(nextState.trace) == 0 {
+		t.Fatalf("expected trace entry for redirect")
+	}
+	if nextState.trace[0].answerFrom != "redirect" {
+		t.Fatalf("expected redirect trace source, got %q", nextState.trace[0].answerFrom)
+	}
+	if nextState.trace[0].zoneName != "child.example" {
+		t.Fatalf("expected child.example trace, got %q", nextState.trace[0].zoneName)
+	}
+}
+
+func TestRecurseOrderedParallelCandidateSelection(t *testing.T) {
+	ctx, prof, _ := testhelpers.Context(t)
+	if err := prof.Set("resolver.defaults.unordered", false); err != nil {
+		t.Fatalf("set unordered: %v", err)
+	}
+	if err := prof.Set("resolver.defaults.parallel", 2); err != nil {
+		t.Fatalf("set parallel: %v", err)
+	}
+
+	r := &Recursor{}
+	servfail := new(dns.Msg)
+	servfail.Rcode = dns.RcodeServerFailure
+	refused := new(dns.Msg)
+	refused.Rcode = dns.RcodeRefused
+
+	state := &recurseState{
+		ns: []queryer{
+			testQueryer{id: "final-miss", resp: packet.Packet{}},
+			testQueryer{id: "refused", resp: packet.Packet{Msg: refused, AnswerFrom: "refused"}},
+			testQueryer{id: "servfail", resp: packet.Packet{Msg: servfail, AnswerFrom: "servfail"}},
+		},
+	}
+
+	out, _, err := r.recurse(ctx, "example", "A", "IN", state)
+	if err != nil {
+		t.Fatalf("recurse: %v", err)
+	}
+	if out.Msg == nil || out.Rcode() != "REFUSED" {
+		t.Fatalf("expected REFUSED candidate, got %#v", out.Msg)
+	}
+	if out.AnswerFrom != "refused" {
+		t.Fatalf("expected latest candidate from refused, got %q", out.AnswerFrom)
+	}
+}
+
+func TestRecurseOrderedParallelDropsSpeculativeLogs(t *testing.T) {
+	baseCtx, prof, log := testhelpers.Context(t)
+	if err := prof.Set("resolver.defaults.unordered", false); err != nil {
+		t.Fatalf("set unordered: %v", err)
+	}
+	if err := prof.Set("resolver.defaults.parallel", 2); err != nil {
+		t.Fatalf("set parallel: %v", err)
+	}
+
+	r := &Recursor{}
+	specStarted := make(chan struct{})
+	specBlocked := make(chan struct{})
+
+	redirectResp := packetWithReferral("child.example", "ns.child.example")
+	redirectResp.AnswerFrom = "redirect"
+	childResp := packetWithA("example", netip.MustParseAddr("192.0.2.91"))
+	childResp.AnswerFrom = "child"
+
+	state := &recurseState{
+		ns: []queryer{
+			loggingQueryer{
+				id:      "spec",
+				startCh: specStarted,
+				waitCh:  specBlocked,
+				resp:    packetWithA("example", netip.MustParseAddr("192.0.2.90")),
+			},
+			loggingQueryer{
+				id:        "redirect",
+				waitStart: specStarted,
+				resp:      redirectResp,
+			},
+		},
+		nsFrom: func(_ context.Context, _ packet.Packet, _ *recurseState) ([]queryer, error) {
+			return []queryer{loggingQueryer{id: "child", resp: childResp}}, nil
+		},
+	}
+
+	ctx, cancel := context.WithTimeout(baseCtx, time.Second)
+	defer cancel()
+
+	out, _, err := r.recurse(ctx, "example", "A", "IN", state)
+	if err != nil {
+		t.Fatalf("recurse: %v", err)
+	}
+	if out.AnswerFrom != "child" {
+		t.Fatalf("expected child answer after redirect, got %q", out.AnswerFrom)
+	}
+
+	tags := map[string]bool{}
+	for _, entry := range log.Entries() {
+		if entry == nil {
+			continue
+		}
+		tags[entry.Tag] = true
+	}
+	if !tags["TEST_QUERY_REDIRECT"] || !tags["TEST_QUERY_CHILD"] {
+		t.Fatalf("expected redirect and child logs, got %v", tags)
+	}
+	if tags["TEST_QUERY_SPEC"] {
+		t.Fatalf("expected speculative logs to be dropped, got %v", tags)
 	}
 }
 
@@ -1159,6 +1352,42 @@ func (t testQueryer) QueryWithClass(ctx context.Context, _ string, _ string, _ s
 		}
 	}
 	return t.resp, nil
+}
+
+type loggingQueryer struct {
+	id        string
+	resp      packet.Packet
+	startCh   chan struct{}
+	waitStart <-chan struct{}
+	waitCh    <-chan struct{}
+}
+
+func (q loggingQueryer) QueryWithClass(ctx context.Context, _ string, _ string, _ string) (packet.Packet, error) {
+	if q.waitStart != nil {
+		select {
+		case <-q.waitStart:
+		case <-ctx.Done():
+			return packet.Packet{}, ctx.Err()
+		}
+	}
+	if q.startCh != nil {
+		select {
+		case <-q.startCh:
+		default:
+			close(q.startCh)
+		}
+	}
+	if log := logger.FromContext(ctx); log != nil {
+		_, _ = log.Add("TEST_QUERY_"+strings.ToUpper(q.id), map[string]any{"id": q.id}, "System", "")
+	}
+	if q.waitCh != nil {
+		select {
+		case <-q.waitCh:
+		case <-ctx.Done():
+			return packet.Packet{}, ctx.Err()
+		}
+	}
+	return q.resp, nil
 }
 
 func packetWithReferral(zone string, nsName string) packet.Packet {

@@ -929,6 +929,9 @@ func TestRecurseOrderedUsesLIFO(t *testing.T) {
 	if err := prof.Set("resolver.defaults.unordered", false); err != nil {
 		t.Fatalf("set unordered: %v", err)
 	}
+	if err := prof.Set("resolver.defaults.parallel", 2); err != nil {
+		t.Fatalf("set parallel: %v", err)
+	}
 
 	r := &Recursor{}
 

@@ -1881,6 +1881,117 @@ func TestDNSSEC07NotSigned(t *testing.T) {
 	}
 }
 
+func TestDNSSECAllParallelOutputStable(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origDel := getDelNSNamesAndIPs
+	origZone := getZoneNSNamesAndIPs
+	origParent := getParentNSNamesAndIPs
+	origZoneParent := zoneParent
+	t.Cleanup(func() {
+		getDelNSNamesAndIPs = origDel
+		getZoneNSNamesAndIPs = origZone
+		getParentNSNamesAndIPs = origParent
+		zoneParent = origZoneParent
+	})
+
+	zoneParent = func(_ context.Context, _ *zone.Zone) (*zone.Zone, error) {
+		return nil, nil
+	}
+	getParentNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	}
+	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+		return []methodsv2.NSItem{
+			{
+				Name:       dnsname.New("ns1.example"),
+				Address:    netip.MustParseAddr("192.0.2.160"),
+				HasAddress: true,
+			},
+			{
+				Name:       dnsname.New("ns2.example"),
+				Address:    netip.MustParseAddr("192.0.2.161"),
+				HasAddress: true,
+			},
+		}, nil
+	}
+	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+		return []methodsv2.NSItem{}, nil
+	}
+
+	runAll := func(parallel int) []*logger.Entry {
+		profile.ResetEffective()
+		if err := profile.Effective().Set("resolver.defaults.parallel", parallel); err != nil {
+			t.Fatalf("set parallel: %v", err)
+		}
+		if err := profile.Effective().Set("test_cases", []any{"dnssec07"}); err != nil {
+			t.Fatalf("set test_cases: %v", err)
+		}
+
+		nameserver.EmptyCache()
+		key := &dns.DNSKEY{
+			Hdr: dns.RR_Header{
+				Name:   dns.Fqdn("example"),
+				Rrtype: dns.TypeDNSKEY,
+				Class:  dns.ClassINET,
+				Ttl:    60,
+			},
+			Flags:     dns.ZONE,
+			Protocol:  3,
+			Algorithm: 8,
+			PublicKey: "AwEAAc==",
+		}
+		handler := func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+			switch qtype {
+			case "SOA":
+				return answerPacket(qname, dns.TypeSOA, soaRecord(qname))
+			case "DNSKEY":
+				return dnskeyPacket(qname, key)
+			default:
+				return packet.Packet{}
+			}
+		}
+		newNameserver(t, "ns1.example", "192.0.2.160", handler)
+		newNameserver(t, "ns2.example", "192.0.2.161", handler)
+
+		z, err := zone.New("example")
+		if err != nil {
+			t.Fatalf("zone new: %v", err)
+		}
+		entries, err := All(context.Background(), &z)
+		if err != nil {
+			t.Fatalf("dnssec all: %v", err)
+		}
+		return entries
+	}
+
+	sequentialEntries := runAll(1)
+	parallelEntries := runAll(2)
+
+	if !hasEntryTag(sequentialEntries, "DS07_NOT_SIGNED_ON_SERVER") || !hasEntryTag(sequentialEntries, "DS07_NOT_SIGNED") {
+		t.Fatalf("expected unsigned DNSSEC07 tags in sequential run")
+	}
+	if !hasEntryTag(parallelEntries, "DS07_NOT_SIGNED_ON_SERVER") || !hasEntryTag(parallelEntries, "DS07_NOT_SIGNED") {
+		t.Fatalf("expected unsigned DNSSEC07 tags in parallel run")
+	}
+
+	sequentialNormalized := normalizeEntriesForComparison(sequentialEntries)
+	parallelNormalized := normalizeEntriesForComparison(parallelEntries)
+	if len(sequentialNormalized) != len(parallelNormalized) {
+		t.Fatalf("entry count changed with parallelism: sequential=%v parallel=%v", sequentialNormalized, parallelNormalized)
+	}
+	for i := range sequentialNormalized {
+		if sequentialNormalized[i] != parallelNormalized[i] {
+			t.Fatalf("entry[%d] changed with parallelism: %q != %q", i, sequentialNormalized[i], parallelNormalized[i])
+		}
+	}
+}
+
 func TestDNSSEC08MissingRRSIG(t *testing.T) {
 	nameserver.EmptyCache()
 	t.Cleanup(nameserver.EmptyCache)
@@ -4296,6 +4407,21 @@ func hasEntryTag(entries []*logger.Entry, tag string) bool {
 		}
 	}
 	return false
+}
+
+func normalizeEntriesForComparison(entries []*logger.Entry) []string {
+	normalized := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if entry == nil {
+			continue
+		}
+		item := entry.Module + ":" + entry.Testcase + ":" + entry.Tag
+		if args := entry.ArgString(); args != "" {
+			item += " " + args
+		}
+		normalized = append(normalized, item)
+	}
+	return normalized
 }
 
 func dsPacket(owner string, keytag uint16, algo uint8, digestType uint8) packet.Packet {

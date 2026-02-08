@@ -7,6 +7,7 @@ import (
 	"net/netip"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -106,6 +107,165 @@ func TestCacheStoreLookupAndClear(t *testing.T) {
 	r.ClearCache()
 	if _, ok := r.cacheLookup("example", "A", "IN"); ok {
 		t.Fatalf("expected cache cleared")
+	}
+}
+
+func TestRecurseInflightLookupCoalescing(t *testing.T) {
+	nameserver.EmptyCache()
+	defer nameserver.EmptyCache()
+
+	r := &Recursor{
+		fakeAddresses: map[string]map[string][]netip.Addr{},
+		client:        &transport.Client{},
+		recurseCache:  map[string]map[string]map[string]*packet.Packet{},
+		inflight:      map[string]*inflightLookup{},
+	}
+	if err := r.AddFakeAddresses(".", map[string][]string{
+		"a.root.test": {"192.0.2.1"},
+	}); err != nil {
+		t.Fatalf("add fake root: %v", err)
+	}
+
+	rootNS, err := nameserver.NewWithContext(context.Background(), "a.root.test", "192.0.2.1", r.client)
+	if err != nil {
+		t.Fatalf("new root nameserver: %v", err)
+	}
+
+	started := make(chan struct{})
+	release := make(chan struct{})
+	var startOnce sync.Once
+	var calls int32
+	rootNS.SetQueryHook(func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		if dnsname.New(name).String() != "example" || strings.ToUpper(qtype) != "A" {
+			return packet.Packet{}, errors.New("unexpected query")
+		}
+		atomic.AddInt32(&calls, 1)
+		startOnce.Do(func() { close(started) })
+		<-release
+		return packetWithA(name, netip.MustParseAddr("192.0.2.111")), nil
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	var resp1 packet.Packet
+	var resp2 packet.Packet
+	var err1 error
+	var err2 error
+
+	go func() {
+		defer wg.Done()
+		resp1, err1 = r.Recurse(ctx, "example", "A", "IN")
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatalf("expected first recurse query to start")
+	}
+
+	go func() {
+		defer wg.Done()
+		resp2, err2 = r.Recurse(ctx, "example", "A", "IN")
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+	if got := atomic.LoadInt32(&calls); got != 1 {
+		t.Fatalf("expected single in-flight recurse call, got %d", got)
+	}
+
+	close(release)
+	wg.Wait()
+
+	if err1 != nil || err2 != nil {
+		t.Fatalf("unexpected recurse errors: %v %v", err1, err2)
+	}
+	if resp1.Msg == nil || resp2.Msg == nil {
+		t.Fatalf("expected responses from both recurse calls")
+	}
+	if got := atomic.LoadInt32(&calls); got != 1 {
+		t.Fatalf("expected one network recurse call total, got %d", got)
+	}
+
+	if _, err := r.Recurse(ctx, "example", "A", "IN"); err != nil {
+		t.Fatalf("cached recurse: %v", err)
+	}
+	if got := atomic.LoadInt32(&calls); got != 1 {
+		t.Fatalf("expected cache hit after coalescing, got %d network calls", got)
+	}
+}
+
+func TestRecurseInflightLookupWaiterCancellation(t *testing.T) {
+	nameserver.EmptyCache()
+	defer nameserver.EmptyCache()
+
+	r := &Recursor{
+		fakeAddresses: map[string]map[string][]netip.Addr{},
+		client:        &transport.Client{},
+		recurseCache:  map[string]map[string]map[string]*packet.Packet{},
+		inflight:      map[string]*inflightLookup{},
+	}
+	if err := r.AddFakeAddresses(".", map[string][]string{
+		"a.root.test": {"192.0.2.1"},
+	}); err != nil {
+		t.Fatalf("add fake root: %v", err)
+	}
+
+	rootNS, err := nameserver.NewWithContext(context.Background(), "a.root.test", "192.0.2.1", r.client)
+	if err != nil {
+		t.Fatalf("new root nameserver: %v", err)
+	}
+
+	started := make(chan struct{})
+	release := make(chan struct{})
+	var startOnce sync.Once
+	var calls int32
+	rootNS.SetQueryHook(func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		if dnsname.New(name).String() != "example" || strings.ToUpper(qtype) != "A" {
+			return packet.Packet{}, errors.New("unexpected query")
+		}
+		atomic.AddInt32(&calls, 1)
+		startOnce.Do(func() { close(started) })
+		<-release
+		return packetWithA(name, netip.MustParseAddr("192.0.2.112")), nil
+	})
+
+	leaderCtx, leaderCancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer leaderCancel()
+
+	leaderDone := make(chan struct{})
+	var leaderErr error
+	go func() {
+		_, leaderErr = r.Recurse(leaderCtx, "example", "A", "IN")
+		close(leaderDone)
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatalf("expected leader recurse query to start")
+	}
+
+	waiterCtx, waiterCancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer waiterCancel()
+	_, waitErr := r.Recurse(waiterCtx, "example", "A", "IN")
+	if !errors.Is(waitErr, context.DeadlineExceeded) {
+		t.Fatalf("expected waiter deadline exceeded, got %v", waitErr)
+	}
+	if got := atomic.LoadInt32(&calls); got != 1 {
+		t.Fatalf("expected waiter to share in-flight lookup, got %d calls", got)
+	}
+
+	close(release)
+	select {
+	case <-leaderDone:
+	case <-time.After(time.Second):
+		t.Fatalf("leader recurse did not finish")
+	}
+	if leaderErr != nil {
+		t.Fatalf("leader recurse: %v", leaderErr)
 	}
 }
 

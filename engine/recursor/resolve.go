@@ -301,7 +301,7 @@ func (r *Recursor) ClearCache() {
 	r.cacheMu.Unlock()
 }
 
-func (r *Recursor) recurseWithNameservers(ctx context.Context, name string, qtype string, qclass string, ns []nameserver.Nameserver) (packet.Packet, error) {
+func (r *Recursor) recurseWithNameservers(ctx context.Context, name string, qtype string, qclass string, ns []nameserver.Nameserver) (resp packet.Packet, err error) {
 	if qtype == "" {
 		qtype = "A"
 	}
@@ -316,6 +316,34 @@ func (r *Recursor) recurseWithNameservers(ctx context.Context, name string, qtyp
 	if cached, ok := r.cacheLookup(key, qtype, qclass); ok {
 		return cached, nil
 	}
+	if cached, cachedOK, inflight, wait := r.cacheLookupOrWaitOrRegister(key, qtype, qclass); wait {
+		if ctx == nil {
+			<-inflight.done
+			if inflight.resp == nil {
+				return packet.Packet{}, inflight.err
+			}
+			return *inflight.resp, inflight.err
+		}
+		select {
+		case <-inflight.done:
+			if inflight.resp == nil {
+				return packet.Packet{}, inflight.err
+			}
+			return *inflight.resp, inflight.err
+		case <-ctx.Done():
+			return packet.Packet{}, ctx.Err()
+		}
+	} else if cachedOK {
+		return cached, nil
+	}
+	defer func() {
+		var infResp *packet.Packet
+		if err == nil {
+			copyResp := resp
+			infResp = &copyResp
+		}
+		r.finishInflightLookup(key, qtype, qclass, infResp, err)
+	}()
 
 	if ns == nil {
 		root, err := r.RootServers(ctx)
@@ -334,7 +362,7 @@ func (r *Recursor) recurseWithNameservers(ctx context.Context, name string, qtyp
 		ns: queryers,
 	}
 
-	resp, _, err := r.recurse(ctx, name, qtype, qclass, state)
+	resp, _, err = r.recurse(ctx, name, qtype, qclass, state)
 	if err != nil {
 		return packet.Packet{}, err
 	}
@@ -342,10 +370,17 @@ func (r *Recursor) recurseWithNameservers(ctx context.Context, name string, qtyp
 	return resp, nil
 }
 
-func (r *Recursor) cacheLookup(name string, qtype string, qclass string) (packet.Packet, bool) {
-	r.cacheMu.Lock()
-	defer r.cacheMu.Unlock()
+type inflightLookup struct {
+	done chan struct{}
+	resp *packet.Packet
+	err  error
+}
 
+func recurseLookupKey(name string, qtype string, qclass string) string {
+	return name + "|" + qtype + "|" + qclass
+}
+
+func (r *Recursor) cacheLookupLocked(name string, qtype string, qclass string) (packet.Packet, bool) {
 	if r.recurseCache == nil {
 		return packet.Packet{}, false
 	}
@@ -360,6 +395,45 @@ func (r *Recursor) cacheLookup(name string, qtype string, qclass string) (packet
 		}
 	}
 	return packet.Packet{}, false
+}
+
+func (r *Recursor) cacheLookupOrWaitOrRegister(name string, qtype string, qclass string) (packet.Packet, bool, *inflightLookup, bool) {
+	r.cacheMu.Lock()
+	defer r.cacheMu.Unlock()
+
+	if cached, ok := r.cacheLookupLocked(name, qtype, qclass); ok {
+		return cached, true, nil, false
+	}
+	if r.inflight == nil {
+		r.inflight = map[string]*inflightLookup{}
+	}
+	key := recurseLookupKey(name, qtype, qclass)
+	if inflight, ok := r.inflight[key]; ok {
+		return packet.Packet{}, false, inflight, true
+	}
+	r.inflight[key] = &inflightLookup{done: make(chan struct{})}
+	return packet.Packet{}, false, nil, false
+}
+
+func (r *Recursor) finishInflightLookup(name string, qtype string, qclass string, resp *packet.Packet, err error) {
+	r.cacheMu.Lock()
+	if r.inflight != nil {
+		key := recurseLookupKey(name, qtype, qclass)
+		if inflight := r.inflight[key]; inflight != nil {
+			inflight.resp = resp
+			inflight.err = err
+			close(inflight.done)
+			delete(r.inflight, key)
+		}
+	}
+	r.cacheMu.Unlock()
+}
+
+func (r *Recursor) cacheLookup(name string, qtype string, qclass string) (packet.Packet, bool) {
+	r.cacheMu.Lock()
+	defer r.cacheMu.Unlock()
+
+	return r.cacheLookupLocked(name, qtype, qclass)
 }
 
 func (r *Recursor) cacheStore(name string, qtype string, qclass string, resp packet.Packet) {

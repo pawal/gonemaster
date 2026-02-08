@@ -22,6 +22,7 @@ type Recursor struct {
 	fakeAddresses map[string]map[string][]netip.Addr
 	client        *transport.Client
 	recurseCache  map[string]map[string]map[string]*packet.Packet
+	inflight      map[string]*inflightLookup
 	cacheMu       sync.Mutex
 }
 
@@ -31,6 +32,7 @@ func New() (*Recursor, error) {
 		fakeAddresses: map[string]map[string][]netip.Addr{},
 		client:        &transport.Client{},
 		recurseCache:  map[string]map[string]map[string]*packet.Packet{},
+		inflight:      map[string]*inflightLookup{},
 	}
 
 	rootHints, err := hints.ParseHints(namedRoot)

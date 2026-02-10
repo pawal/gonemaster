@@ -4379,6 +4379,151 @@ func TestDNSSEC18ParallelQueries(t *testing.T) {
 	}
 }
 
+func TestDNSSEC18ParallelOutputStable(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origParentNS := parentNameservers
+	origM4 := method4
+	origM5 := method5
+	t.Cleanup(func() {
+		parentNameservers = origParentNS
+		method4 = origM4
+		method5 = origM5
+	})
+
+	runDNSSEC18 := func(parallel int) []*logger.Entry {
+		profile.ResetEffective()
+		if err := profile.Effective().Set("resolver.defaults.parallel", parallel); err != nil {
+			t.Fatalf("set parallel: %v", err)
+		}
+
+		nameserver.EmptyCache()
+
+		key := &dns.DNSKEY{
+			Hdr: dns.RR_Header{
+				Name:   dns.Fqdn("example"),
+				Rrtype: dns.TypeDNSKEY,
+				Class:  dns.ClassINET,
+				Ttl:    60,
+			},
+			Flags:     dns.ZONE,
+			Protocol:  3,
+			Algorithm: 8,
+			PublicKey: "AwEAAc==",
+		}
+		keytag := key.KeyTag()
+
+		ds := &dns.DS{
+			Hdr: dns.RR_Header{
+				Name:   dns.Fqdn("example"),
+				Rrtype: dns.TypeDS,
+				Class:  dns.ClassINET,
+				Ttl:    60,
+			},
+			KeyTag:     keytag,
+			Algorithm:  8,
+			DigestType: 1,
+			Digest:     "DEADBEEF",
+		}
+
+		cds := &dns.CDS{
+			DS: dns.DS{
+				Hdr: dns.RR_Header{
+					Name:   dns.Fqdn("example"),
+					Rrtype: dns.TypeCDS,
+					Class:  dns.ClassINET,
+					Ttl:    60,
+				},
+				KeyTag:     keytag,
+				Algorithm:  8,
+				DigestType: 1,
+				Digest:     "DEADBEEF",
+			},
+		}
+
+		cdnskey := &dns.CDNSKEY{
+			DNSKEY: dns.DNSKEY{
+				Hdr: dns.RR_Header{
+					Name:   dns.Fqdn("example"),
+					Rrtype: dns.TypeCDNSKEY,
+					Class:  dns.ClassINET,
+					Ttl:    60,
+				},
+				Flags:     dns.ZONE,
+				Protocol:  3,
+				Algorithm: 8,
+				PublicKey: "AwEAAc==",
+			},
+		}
+
+		badKeytag := keytag + 1
+		cdsSig := rrsigRecord("example", dns.TypeCDS, badKeytag, 1, 2)
+		cdnskeySig := rrsigRecord("example", dns.TypeCDNSKEY, badKeytag, 1, 2)
+
+		parentNS := newNameserver(t, "pns1.example", "192.0.2.253", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+			if qtype == "DS" {
+				return dsPacketFromDS(qname, ds)
+			}
+			return packet.Packet{}
+		})
+
+		childHook := func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+			switch qtype {
+			case "CDS":
+				return answerPacket(qname, dns.TypeCDS, cds, cdsSig)
+			case "CDNSKEY":
+				return answerPacket(qname, dns.TypeCDNSKEY, cdnskey, cdnskeySig)
+			case "DNSKEY":
+				return dnskeyPacket(qname, key)
+			default:
+				return packet.Packet{}
+			}
+		}
+
+		child1 := newNameserver(t, "ns1.example", "192.0.2.254", childHook)
+		child2 := newNameserver(t, "ns2.example", "192.0.2.255", childHook)
+
+		parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+			return []nameserver.Nameserver{parentNS}, nil
+		}
+		method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+			return []nameserver.Nameserver{child1, child2}, nil
+		}
+		method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+			return nil, nil
+		}
+
+		z := zone.Zone{Name: dnsname.New("example")}
+		entries, err := DNSSEC18(context.Background(), &z)
+		if err != nil {
+			t.Fatalf("dnssec18: %v", err)
+		}
+		if !hasEntryTag(entries, "DS18_NO_MATCH_CDS_RRSIG_DS") || !hasEntryTag(entries, "DS18_NO_MATCH_CDNSKEY_RRSIG_DS") {
+			t.Fatalf("expected no-match tags in dnssec18 output")
+		}
+		return entries
+	}
+
+	sequentialEntries := runDNSSEC18(1)
+	parallelEntries := runDNSSEC18(2)
+
+	sequentialNormalized := normalizeEntriesForComparison(sequentialEntries)
+	parallelNormalized := normalizeEntriesForComparison(parallelEntries)
+	if len(sequentialNormalized) != len(parallelNormalized) {
+		t.Fatalf("entry count changed with parallelism: sequential=%v parallel=%v", sequentialNormalized, parallelNormalized)
+	}
+	for i := range sequentialNormalized {
+		if sequentialNormalized[i] != parallelNormalized[i] {
+			t.Fatalf("entry[%d] changed with parallelism: %q != %q", i, sequentialNormalized[i], parallelNormalized[i])
+		}
+	}
+}
+
 func newNameserver(t *testing.T, name string, ip string, handler func(qname string, qtype string, opts *nameserver.QueryOptions) packet.Packet) nameserver.Nameserver {
 	t.Helper()
 

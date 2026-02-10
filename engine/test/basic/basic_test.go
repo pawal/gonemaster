@@ -669,6 +669,105 @@ func TestBasic03ParallelQueries(t *testing.T) {
 	}
 }
 
+func TestBasic03ParallelOutputStable(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+
+	runBasic03 := func(parallel int) []*logger.Entry {
+		ctx, prof, _ := testhelpers.Context(t)
+		prof.Resolver.Defaults.Parallel = parallel
+
+		r := &recursor.Recursor{}
+		if err := r.AddFakeAddresses(".", map[string][]string{
+			"a.root": {"192.0.2.1"},
+		}); err != nil {
+			t.Fatalf("add root hints: %v", err)
+		}
+		if err := r.AddFakeAddresses("example", map[string][]string{
+			"ns1.example": {"192.0.2.53"},
+			"ns2.example": {"192.0.2.54"},
+		}); err != nil {
+			t.Fatalf("add fake addresses: %v", err)
+		}
+
+		root, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
+		if err != nil {
+			t.Fatalf("new root nameserver: %v", err)
+		}
+		root.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+			name := strings.ToLower(qname)
+			kind := strings.ToUpper(qtype)
+			switch {
+			case name == "example" && (kind == "SOA" || kind == "NS"):
+				return referralPacketMulti("example", []nsEntry{
+					{name: "ns1.example", addr: net.IPv4(192, 0, 2, 53)},
+					{name: "ns2.example", addr: net.IPv4(192, 0, 2, 54)},
+				}), nil
+			case name == "." && kind == "SOA":
+				return soaPacket(".", "a.root", "hostmaster.root"), nil
+			default:
+				return packet.Packet{}, nil
+			}
+		})
+
+		nsHook := func(owner string, addr net.IP) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
+			return func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+				name := strings.ToLower(qname)
+				kind := strings.ToUpper(qtype)
+				switch {
+				case name == "example" && kind == "SOA":
+					return soaPacket("example", owner, "hostmaster.example"), nil
+				case name == "www.example" && kind == "A":
+					return aPacket("www.example", addr), nil
+				default:
+					return packet.Packet{}, nil
+				}
+			}
+		}
+
+		ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.53", r.Client())
+		if err != nil {
+			t.Fatalf("new ns1: %v", err)
+		}
+		ns1.SetQueryHook(nsHook("ns1.example", net.IPv4(192, 0, 2, 53)))
+
+		ns2, err := nameserver.NewWithContext(ctx, "ns2.example", "192.0.2.54", r.Client())
+		if err != nil {
+			t.Fatalf("new ns2: %v", err)
+		}
+		ns2.SetQueryHook(nsHook("ns2.example", net.IPv4(192, 0, 2, 54)))
+
+		z, err := zone.NewWithRecursor("example", r)
+		if err != nil {
+			t.Fatalf("new zone: %v", err)
+		}
+
+		entries, err := Basic03(ctx, &z)
+		if err != nil {
+			t.Fatalf("basic03: %v", err)
+		}
+		if !hasEntryTag(entries, "HAS_A_RECORDS") {
+			t.Fatalf("expected HAS_A_RECORDS")
+		}
+		return entries
+	}
+
+	sequentialEntries := runBasic03(1)
+	parallelEntries := runBasic03(2)
+
+	sequentialNormalized := normalizeEntriesForComparison(sequentialEntries)
+	parallelNormalized := normalizeEntriesForComparison(parallelEntries)
+
+	if len(sequentialNormalized) != len(parallelNormalized) {
+		t.Fatalf("entry count changed with parallelism: sequential=%v parallel=%v", sequentialNormalized, parallelNormalized)
+	}
+	for i := range sequentialNormalized {
+		if sequentialNormalized[i] != parallelNormalized[i] {
+			t.Fatalf("entry[%d] changed with parallelism: %q != %q", i, sequentialNormalized[i], parallelNormalized[i])
+		}
+	}
+}
+
 func hasEntryTag(entries []*logger.Entry, tag string) bool {
 	for _, entry := range entries {
 		if entry == nil {
@@ -679,6 +778,21 @@ func hasEntryTag(entries []*logger.Entry, tag string) bool {
 		}
 	}
 	return false
+}
+
+func normalizeEntriesForComparison(entries []*logger.Entry) []string {
+	normalized := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if entry == nil {
+			continue
+		}
+		item := entry.Module + ":" + entry.Testcase + ":" + entry.Tag
+		if args := entry.ArgString(); args != "" {
+			item += " " + args
+		}
+		normalized = append(normalized, item)
+	}
+	return normalized
 }
 
 func soaPacket(owner string, mname string, rname string) packet.Packet {

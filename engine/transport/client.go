@@ -14,6 +14,7 @@ import (
 )
 
 const defaultTimeout = 5 * time.Second
+const udpFallbackWaitCap = 400 * time.Millisecond
 
 // Client performs DNS exchanges with configurable behavior.
 type Client struct {
@@ -160,16 +161,35 @@ func (c *Client) Exchange(ctx context.Context, server string, msg *dns.Msg) (pac
 
 	var lastErr error
 	for i := 0; i < attempts; i++ {
-		response, rtt, err := c.exchangeOnce(ctx, server, prepared, c.UseTCP)
+		if ctx != nil {
+			if cerr := ctx.Err(); cerr != nil {
+				lastErr = cerr
+				break
+			}
+		}
+
+		response, rtt, err := c.exchangeOnce(ctx, server, prepared, c.UseTCP, false)
 		if err != nil {
+			if ctx != nil {
+				if cerr := ctx.Err(); cerr != nil {
+					lastErr = cerr
+					break
+				}
+			}
 			if !c.UseTCP && c.Fallback {
-				response, rtt, err = c.exchangeOnce(ctx, server, prepared, true)
+				response, rtt, err = c.exchangeOnce(ctx, server, prepared, true, true)
 				if err == nil {
 					pkt := packet.New(response)
 					pkt.QueryTime = rtt
 					pkt.Timestamp = time.Now()
 					pkt.AnswerFrom = server
 					return pkt, nil
+				}
+				if ctx != nil {
+					if cerr := ctx.Err(); cerr != nil {
+						lastErr = cerr
+						break
+					}
 				}
 				lastErr = err
 				continue
@@ -180,8 +200,14 @@ func (c *Client) Exchange(ctx context.Context, server string, msg *dns.Msg) (pac
 		}
 
 		if !c.UseTCP && response.Truncated && c.Fallback {
-			response, rtt, err = c.exchangeOnce(ctx, server, prepared, true)
+			response, rtt, err = c.exchangeOnce(ctx, server, prepared, true, true)
 			if err != nil {
+				if ctx != nil {
+					if cerr := ctx.Err(); cerr != nil {
+						lastErr = cerr
+						break
+					}
+				}
 				lastErr = err
 				continue
 			}
@@ -200,11 +226,8 @@ func (c *Client) Exchange(ctx context.Context, server string, msg *dns.Msg) (pac
 	return packet.Packet{}, lastErr
 }
 
-func (c *Client) exchangeOnce(ctx context.Context, server string, msg *dns.Msg, useTCP bool) (*dns.Msg, time.Duration, error) {
-	client := dns.Client{Net: "udp", Timeout: defaultTimeout}
-	if c.Timeout > 0 {
-		client.Timeout = c.Timeout
-	}
+func (c *Client) exchangeOnce(ctx context.Context, server string, msg *dns.Msg, useTCP bool, fromUDPFallback bool) (*dns.Msg, time.Duration, error) {
+	client := dns.Client{Net: "udp", Timeout: c.effectiveAttemptTimeout(ctx, useTCP, fromUDPFallback)}
 	if useTCP {
 		client.Net = "tcp"
 	}
@@ -216,11 +239,71 @@ func (c *Client) exchangeOnce(ctx context.Context, server string, msg *dns.Msg, 
 	client.Dialer = dialer
 
 	address := ensurePort(server)
-	response, rtt, err := client.ExchangeContext(ctx, msg.Copy(), address)
+	conn, err := client.DialContext(ctx, address)
 	if err != nil {
 		return nil, 0, err
 	}
-	return response, rtt, nil
+	defer conn.Close()
+	return c.exchangeWithConnCancelable(ctx, &client, msg, conn)
+}
+
+func (c *Client) exchangeWithConnCancelable(ctx context.Context, client *dns.Client, msg *dns.Msg, conn *dns.Conn) (*dns.Msg, time.Duration, error) {
+	if client == nil || conn == nil {
+		return nil, 0, fmt.Errorf("missing dns client or connection")
+	}
+
+	if ctx == nil || ctx.Done() == nil {
+		return client.ExchangeWithConnContext(ctx, msg.Copy(), conn)
+	}
+
+	done := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+			// Force socket interruption when cancellation happens without an
+			// earlier deadline applied to the underlying connection.
+			_ = conn.SetDeadline(time.Now())
+		case <-done:
+		}
+	}()
+
+	resp, rtt, err := client.ExchangeWithConnContext(ctx, msg.Copy(), conn)
+	close(done)
+	if cerr := ctx.Err(); cerr != nil {
+		return nil, 0, cerr
+	}
+	return resp, rtt, err
+}
+
+func (c *Client) effectiveAttemptTimeout(ctx context.Context, useTCP bool, fromUDPFallback bool) time.Duration {
+	attempt := c.Timeout
+	if attempt <= 0 {
+		if c.Retrans > 0 {
+			attempt = c.Retrans
+		} else {
+			attempt = defaultTimeout
+		}
+	} else if c.Retrans > 0 && c.Retrans < attempt && (!useTCP || fromUDPFallback) {
+		// UDP and fallback TCP attempts should use retrans pacing so a blocked
+		// path does not stall progression for the full timeout budget.
+		attempt = c.Retrans
+	}
+	if !useTCP && c.Fallback && attempt > udpFallbackWaitCap {
+		// Do not block on UDP for the full retrans budget before trying TCP.
+		attempt = udpFallbackWaitCap
+	}
+	if ctx != nil {
+		if deadline, ok := ctx.Deadline(); ok {
+			remaining := time.Until(deadline)
+			if remaining > 0 && remaining < attempt {
+				attempt = remaining
+			}
+		}
+	}
+	if attempt <= 0 {
+		return defaultTimeout
+	}
+	return attempt
 }
 
 func (c *Client) buildDialer(timeout time.Duration, network string) (*net.Dialer, error) {

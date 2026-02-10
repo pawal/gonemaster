@@ -49,7 +49,7 @@ func (n Name) Labels() []string {
 }
 
 // String returns the name without a trailing dot, or a single dot for root.
-func (n *Name) String() string {
+func (n Name) String() string {
 	if n.cached != nil {
 		return *n.cached
 	}
@@ -58,7 +58,6 @@ func (n *Name) String() string {
 	if joined == "" {
 		joined = "."
 	}
-	n.cached = &joined
 	return joined
 }
 

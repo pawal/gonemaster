@@ -30,6 +30,9 @@ Notes:
 - `--domain` is required for test runs.
 - `--version` and `--list-tests` do not require `--domain`.
 - `--dump-profile` can be used without `--domain`.
+- The built-in default profile currently uses `resolver.defaults.parallel=8` and
+  `resolver.defaults.unordered=true`.
+- For deterministic ordered behavior, use `--ordered --parallel 1`.
 
 ### Output modes
 By default, output is translated, human-readable text on stdout with a small
@@ -199,7 +202,7 @@ gonemaster-client jobs watch JOB_ID [--poll DURATION]
 ```
 Notes:
 - Uses SSE events if available; falls back to polling.
-- Stops when status is `succeeded`, `failed`, or `canceled`.
+- Stops when status is `succeeded`, `failed`, `canceled`, or `expired`.
 
 #### jobs cancel
 Cancel a queued or running job.

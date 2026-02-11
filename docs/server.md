@@ -7,12 +7,11 @@
 - The API is served under `/api/v1`.
 - Job progress is reported as a percentage (0-100).
 
-When running the API and the UI, please note that the default profile is set to also use IPv6.
-If you don't have access to IPv6 on your development machine, you must modify the profile.
-You can dump the profile using `--dump-profile` in the CLI, and assign the file to the
-server with the `--profile` option.
-
 The default profile is located in `share/profile.json`, but is built into the server binary.
+By default, it enables IPv4+IPv6 and currently sets `resolver.defaults.parallel=8` and
+`resolver.defaults.unordered=true`.
+If you don't have access to IPv6 on your development machine, or you need deterministic
+ordered behavior, use a custom profile via `--profile`.
 
 The current server lacks any sort of persistence, for example using SQLite or PostgreSQL.
 
@@ -55,7 +54,7 @@ Wait for completion (poll status):
 while true; do
   STATUS=$(curl -s http://localhost:8080/api/v1/jobs/$JOB_ID | jq -r .status)
   echo "status=$STATUS"
-  if [ "$STATUS" = "succeeded" ] || [ "$STATUS" = "failed" ] || [ "$STATUS" = "canceled" ]; then
+  if [ "$STATUS" = "succeeded" ] || [ "$STATUS" = "failed" ] || [ "$STATUS" = "canceled" ] || [ "$STATUS" = "expired" ]; then
     break
   fi
   sleep 2
@@ -76,6 +75,14 @@ curl -s "http://localhost:8080/api/v1/jobs/$JOB_ID/result?locale=en" | jq .
 - Config file is optional JSON and loaded with `--config`.
 - Flags override config file values.
 - `profile_path` sets the default profile used for all jobs (same as `gonemaster --profile`).
+
+### Deterministic mode
+If you want deterministic ordered resolver behavior on the server, set:
+- `resolver.defaults.unordered: false`
+- `resolver.defaults.parallel: 1`
+
+You can do this in the profile used by `profile_path` (or `--profile`), and/or via
+per-job `profile_overrides`.
 
 ### Tuning timeouts and retries
 `gonemaster-server` uses the profile defaults for query timing. To tune these,

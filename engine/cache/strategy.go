@@ -4,6 +4,7 @@ package cache
 type ErrorKind int
 
 const (
+	// ErrorNone indicates there was no query error.
 	ErrorNone ErrorKind = iota
 	// ErrorNetwork covers timeouts, temporary network failures, or unreachable hosts.
 	ErrorNetwork
@@ -17,8 +18,11 @@ const (
 type Decision int
 
 const (
+	// DecisionNone skips global caching for the query result.
 	DecisionNone Decision = iota
+	// DecisionPositive stores the result in the positive cache.
 	DecisionPositive
+	// DecisionNegative stores the result in the negative cache.
 	DecisionNegative
 )
 

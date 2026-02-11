@@ -584,6 +584,7 @@ type lazyNameserver struct {
 	state    *recurseState
 }
 
+// QueryWithClass resolves addresses for the lazy nameserver and forwards the query.
 func (l lazyNameserver) QueryWithClass(ctx context.Context, qname string, qtype string, qclass string) (packet.Packet, error) {
 	if l.recursor == nil {
 		return packet.Packet{}, fmt.Errorf("missing recursor for %s", l.name)

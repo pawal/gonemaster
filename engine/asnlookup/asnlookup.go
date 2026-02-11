@@ -33,8 +33,11 @@ type Result struct {
 }
 
 const (
+	// CodeFound indicates that one or more ASNs were found for the query IP.
 	CodeFound = "AS_FOUND"
+	// CodeEmpty indicates that the source returned no ASN mapping for the query IP.
 	CodeEmpty = "EMPTY_ASN_SET"
+	// CodeError indicates that ASN lookup failed across all configured sources.
 	CodeError = "ERROR_ASN_DATABASE"
 )
 

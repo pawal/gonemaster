@@ -303,6 +303,7 @@ type dnsQueryCounter struct {
 	ipv6 int64
 }
 
+// Callback counts EXTERNAL_QUERY events split by IP family.
 func (c *dnsQueryCounter) Callback(entry *logger.Entry) error {
 	if c == nil || entry == nil {
 		return nil
@@ -324,6 +325,7 @@ func (c *dnsQueryCounter) Callback(entry *logger.Entry) error {
 	return nil
 }
 
+// Totals returns accumulated IPv4 and IPv6 query counts.
 func (c *dnsQueryCounter) Totals() (int64, int64) {
 	if c == nil {
 		return 0, 0

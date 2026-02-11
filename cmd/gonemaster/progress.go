@@ -42,6 +42,7 @@ func newProgressReporter(out io.Writer, planned []string) *progressReporter {
 	}
 }
 
+// Callback updates progress state based on testcase lifecycle log entries.
 func (p *progressReporter) Callback(entry *logger.Entry) error {
 	if p == nil || entry == nil || p.total == 0 {
 		return nil
@@ -66,6 +67,7 @@ func (p *progressReporter) Callback(entry *logger.Entry) error {
 	return nil
 }
 
+// Finish forces a final progress line and terminates it with a newline.
 func (p *progressReporter) Finish() {
 	if p == nil || p.total == 0 {
 		return

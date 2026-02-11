@@ -31,11 +31,13 @@ func newResponseRecorder(w http.ResponseWriter, maxBody int) *responseRecorder {
 	}
 }
 
+// WriteHeader records and forwards the HTTP status code.
 func (r *responseRecorder) WriteHeader(status int) {
 	r.status = status
 	r.ResponseWriter.WriteHeader(status)
 }
 
+// Write records response size/body preview and forwards bytes to the client.
 func (r *responseRecorder) Write(p []byte) (int, error) {
 	if r.status == 0 {
 		r.status = http.StatusOK
@@ -60,6 +62,7 @@ func (r *responseRecorder) Write(p []byte) (int, error) {
 	return n, err
 }
 
+// Flush forwards flush requests when supported by the wrapped writer.
 func (r *responseRecorder) Flush() {
 	flusher, ok := r.ResponseWriter.(http.Flusher)
 	if !ok {
@@ -105,11 +108,13 @@ func newAPIMetricsResponseRecorder(w http.ResponseWriter) *apiMetricsResponseRec
 	return &apiMetricsResponseRecorder{ResponseWriter: w}
 }
 
+// WriteHeader records and forwards the HTTP status code.
 func (r *apiMetricsResponseRecorder) WriteHeader(status int) {
 	r.status = status
 	r.ResponseWriter.WriteHeader(status)
 }
 
+// Write ensures status tracking and forwards bytes to the client.
 func (r *apiMetricsResponseRecorder) Write(p []byte) (int, error) {
 	if r.status == 0 {
 		r.status = http.StatusOK
@@ -117,6 +122,7 @@ func (r *apiMetricsResponseRecorder) Write(p []byte) (int, error) {
 	return r.ResponseWriter.Write(p)
 }
 
+// Flush forwards flush requests when supported by the wrapped writer.
 func (r *apiMetricsResponseRecorder) Flush() {
 	flusher, ok := r.ResponseWriter.(http.Flusher)
 	if !ok {
@@ -125,10 +131,12 @@ func (r *apiMetricsResponseRecorder) Flush() {
 	flusher.Flush()
 }
 
+// SetErrorCode stores an API error code for metrics attribution.
 func (r *apiMetricsResponseRecorder) SetErrorCode(code string) {
 	r.errorCode = code
 }
 
+// Hijack forwards connection hijacking when supported by the wrapped writer.
 func (r *apiMetricsResponseRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	hijacker, ok := r.ResponseWriter.(http.Hijacker)
 	if !ok {
@@ -137,6 +145,7 @@ func (r *apiMetricsResponseRecorder) Hijack() (net.Conn, *bufio.ReadWriter, erro
 	return hijacker.Hijack()
 }
 
+// Push forwards HTTP/2 server push when supported by the wrapped writer.
 func (r *apiMetricsResponseRecorder) Push(target string, opts *http.PushOptions) error {
 	pusher, ok := r.ResponseWriter.(http.Pusher)
 	if !ok {
@@ -145,6 +154,7 @@ func (r *apiMetricsResponseRecorder) Push(target string, opts *http.PushOptions)
 	return pusher.Push(target, opts)
 }
 
+// ReadFrom optimizes streaming writes when the wrapped writer supports ReaderFrom.
 func (r *apiMetricsResponseRecorder) ReadFrom(reader io.Reader) (int64, error) {
 	if rf, ok := r.ResponseWriter.(io.ReaderFrom); ok {
 		if r.status == 0 {

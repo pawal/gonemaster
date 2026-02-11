@@ -45,10 +45,12 @@ type globalOptions struct {
 
 type headerList []string
 
+// String returns the header list in comma-separated form.
 func (h *headerList) String() string {
 	return strings.Join(*h, ", ")
 }
 
+// Set appends a header value to the list.
 func (h *headerList) Set(value string) error {
 	*h = append(*h, value)
 	return nil
@@ -56,10 +58,12 @@ func (h *headerList) Set(value string) error {
 
 type stringList []string
 
+// String returns the list in comma-separated form.
 func (s *stringList) String() string {
 	return strings.Join(*s, ", ")
 }
 
+// Set appends a value to the list.
 func (s *stringList) Set(value string) error {
 	*s = append(*s, value)
 	return nil

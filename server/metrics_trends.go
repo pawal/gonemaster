@@ -152,6 +152,7 @@ func (m *MetricsCollector) snapshotTrendWindowLocked(now time.Time, spec metrics
 	}
 }
 
+// ObserveQueueDepth stores queue depth for the bucket containing the timestamp.
 func (r *trendRing) ObserveQueueDepth(at time.Time, queueDepth int64) {
 	bucket := r.bucketForWrite(at)
 	if bucket == nil {
@@ -161,6 +162,7 @@ func (r *trendRing) ObserveQueueDepth(at time.Time, queueDepth int64) {
 	bucket.QueueDepthSet = true
 }
 
+// ObserveDNSQueries adds DNS query counters to the bucket containing the timestamp.
 func (r *trendRing) ObserveDNSQueries(at time.Time, ipv4Queries int64, ipv6Queries int64) {
 	if ipv4Queries < 0 {
 		ipv4Queries = 0
@@ -181,6 +183,7 @@ func (r *trendRing) ObserveDNSQueries(at time.Time, ipv4Queries int64, ipv6Queri
 	bucket.DNSQueries6 += ipv6Queries
 }
 
+// ObserveOutcome adds terminal job outcome counters to the current bucket.
 func (r *trendRing) ObserveOutcome(at time.Time, status JobStatus) {
 	if !isTerminalMetricsStatus(status) {
 		return
@@ -195,6 +198,7 @@ func (r *trendRing) ObserveOutcome(at time.Time, status JobStatus) {
 	}
 }
 
+// ObserveSeverity adds severity totals to the bucket containing the timestamp.
 func (r *trendRing) ObserveSeverity(at time.Time, severity map[string]int64) {
 	if len(severity) == 0 {
 		return
@@ -211,6 +215,7 @@ func (r *trendRing) ObserveSeverity(at time.Time, severity map[string]int64) {
 	}
 }
 
+// ObserveAPIRequest records API latency for a route in the current bucket.
 func (r *trendRing) ObserveAPIRequest(at time.Time, routeKey string, duration time.Duration) {
 	if strings.TrimSpace(routeKey) == "" {
 		return
@@ -230,6 +235,7 @@ func (r *trendRing) ObserveAPIRequest(at time.Time, routeKey string, duration ti
 	bucket.APILatency[routeKey] = histogram
 }
 
+// Snapshot builds an aggregated trend snapshot for the requested window.
 func (r *trendRing) Snapshot(now time.Time, window time.Duration) MetricsTrendWindowSnapshot {
 	if r == nil || len(r.Slots) == 0 || r.Resolution <= 0 {
 		return MetricsTrendWindowSnapshot{}

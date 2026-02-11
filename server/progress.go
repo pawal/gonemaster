@@ -44,6 +44,7 @@ func (s *Server) newProgressTracker(jobID string, req engine.RunRequest) *progre
 	}
 }
 
+// Callback updates job progress from testcase lifecycle log entries.
 func (p *progressTracker) Callback(entry *logger.Entry) error {
 	if p == nil || entry == nil || p.total == 0 {
 		return nil

@@ -14,15 +14,18 @@ import (
 
 type countFlag int
 
+// String returns the current verbosity count.
 func (c *countFlag) String() string {
 	return fmt.Sprintf("%d", *c)
 }
 
+// Set increments the verbosity count.
 func (c *countFlag) Set(_ string) error {
 	*c += 1
 	return nil
 }
 
+// IsBoolFlag makes the flag usable as a boolean-style repeated flag.
 func (c *countFlag) IsBoolFlag() bool {
 	return true
 }

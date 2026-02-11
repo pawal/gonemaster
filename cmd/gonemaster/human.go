@@ -71,6 +71,7 @@ func newHumanReporter(out io.Writer, locale string, minLevel string, showSpinner
 	return r
 }
 
+// Callback renders a translated log entry in human-readable format.
 func (r *humanReporter) Callback(entry *logger.Entry) error {
 	if r == nil || entry == nil {
 		return nil
@@ -86,6 +87,7 @@ func (r *humanReporter) Callback(entry *logger.Entry) error {
 	return r.printLine(line)
 }
 
+// Finish stops spinner output and leaves the terminal in a clean state.
 func (r *humanReporter) Finish() {
 	if r == nil {
 		return
@@ -224,6 +226,7 @@ func newSpinner() *spinner {
 	return &spinner{frames: []string{"|", "/", "-", "\\"}}
 }
 
+// Next returns the next spinner frame.
 func (s *spinner) Next() string {
 	if s == nil || len(s.frames) == 0 {
 		return ""

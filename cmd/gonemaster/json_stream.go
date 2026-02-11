@@ -31,6 +31,7 @@ func newJSONStreamReporter(out io.Writer, minLevel string) *jsonStreamReporter {
 	}
 }
 
+// Callback writes one log entry as a JSON object on its own line.
 func (r *jsonStreamReporter) Callback(entry *logger.Entry) error {
 	if r == nil || entry == nil {
 		return nil

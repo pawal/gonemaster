@@ -29,6 +29,7 @@ func newRawReporter(out io.Writer, minLevel string) *rawReporter {
 	}
 }
 
+// Callback writes one raw log entry line when it matches the level filter.
 func (r *rawReporter) Callback(entry *logger.Entry) error {
 	if r == nil || entry == nil {
 		return nil

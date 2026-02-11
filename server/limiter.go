@@ -13,6 +13,7 @@ func newEngineLimiter(max int) *engineLimiter {
 	return &engineLimiter{tokens: make(chan struct{}, max)}
 }
 
+// Acquire takes one limiter slot or returns when context is canceled.
 func (l *engineLimiter) Acquire(ctx context.Context) error {
 	if l == nil {
 		return nil
@@ -28,6 +29,7 @@ func (l *engineLimiter) Acquire(ctx context.Context) error {
 	}
 }
 
+// Release returns one limiter slot.
 func (l *engineLimiter) Release() {
 	if l == nil {
 		return

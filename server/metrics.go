@@ -743,6 +743,7 @@ func newBoundedHistogram(bounds []int64) boundedHistogram {
 	}
 }
 
+// Observe adds one duration sample to the histogram.
 func (h *boundedHistogram) Observe(duration time.Duration) {
 	if h == nil {
 		return
@@ -760,6 +761,7 @@ func (h *boundedHistogram) Observe(duration time.Duration) {
 	h.Counts[len(h.Counts)-1]++
 }
 
+// Quantile returns an approximate quantile in milliseconds from bucketed samples.
 func (h boundedHistogram) Quantile(quantile float64) int64 {
 	if len(h.BoundsMs) == 0 {
 		return 0

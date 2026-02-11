@@ -7,13 +7,19 @@ type JobStatus string
 
 const (
 	// Job status values.
-	JobQueued    JobStatus = "queued"
-	JobRunning   JobStatus = "running"
+	JobQueued JobStatus = "queued"
+	// JobRunning indicates a job currently executing.
+	JobRunning JobStatus = "running"
+	// JobSucceeded indicates a job completed successfully.
 	JobSucceeded JobStatus = "succeeded"
-	JobFailed    JobStatus = "failed"
-	JobCanceled  JobStatus = "canceled"
-	JobExpired   JobStatus = "expired"
-	JobPaused    JobStatus = "paused"
+	// JobFailed indicates a job completed with an error.
+	JobFailed JobStatus = "failed"
+	// JobCanceled indicates a job was canceled.
+	JobCanceled JobStatus = "canceled"
+	// JobExpired indicates a job expired before completion.
+	JobExpired JobStatus = "expired"
+	// JobPaused indicates a job is paused in the queue.
+	JobPaused JobStatus = "paused"
 )
 
 // JobSort controls ordering in list responses.
@@ -22,15 +28,24 @@ type JobSort string
 const (
 	// Job sort values for list and batch endpoints.
 	JobSortCreatedAtDesc JobSort = "created_at_desc"
-	JobSortCreatedAtAsc  JobSort = "created_at_asc"
+	// JobSortCreatedAtAsc sorts by creation time ascending.
+	JobSortCreatedAtAsc JobSort = "created_at_asc"
+	// JobSortStartedAtDesc sorts by start time descending.
 	JobSortStartedAtDesc JobSort = "started_at_desc"
-	JobSortStartedAtAsc  JobSort = "started_at_asc"
-	JobSortDomainAsc     JobSort = "domain_asc"
-	JobSortDomainDesc    JobSort = "domain_desc"
-	JobSortBatchIDAsc    JobSort = "batch_id_asc"
-	JobSortBatchIDDesc   JobSort = "batch_id_desc"
-	JobSortErrorDesc     JobSort = "error_desc"
-	JobSortCriticalDesc  JobSort = "critical_desc"
+	// JobSortStartedAtAsc sorts by start time ascending.
+	JobSortStartedAtAsc JobSort = "started_at_asc"
+	// JobSortDomainAsc sorts by domain ascending.
+	JobSortDomainAsc JobSort = "domain_asc"
+	// JobSortDomainDesc sorts by domain descending.
+	JobSortDomainDesc JobSort = "domain_desc"
+	// JobSortBatchIDAsc sorts by batch id ascending.
+	JobSortBatchIDAsc JobSort = "batch_id_asc"
+	// JobSortBatchIDDesc sorts by batch id descending.
+	JobSortBatchIDDesc JobSort = "batch_id_desc"
+	// JobSortErrorDesc sorts by error-heavy jobs first.
+	JobSortErrorDesc JobSort = "error_desc"
+	// JobSortCriticalDesc sorts by critical-heavy jobs first.
+	JobSortCriticalDesc JobSort = "critical_desc"
 )
 
 // JobSeverityFilter controls severity-based list filtering.
@@ -39,7 +54,8 @@ type JobSeverityFilter string
 const (
 	// Job severity filter values for list endpoints.
 	JobSeverityWarningsPlus JobSeverityFilter = "warnings_plus"
-	JobSeverityErrorsOnly   JobSeverityFilter = "errors_only"
+	// JobSeverityErrorsOnly filters to jobs with errors or criticals.
+	JobSeverityErrorsOnly JobSeverityFilter = "errors_only"
 )
 
 // Job represents a single test job.

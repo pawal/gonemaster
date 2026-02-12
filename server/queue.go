@@ -19,16 +19,21 @@ type Queue interface {
 
 // InMemoryQueue is a simple in-memory queue.
 type InMemoryQueue struct {
-	mu     sync.Mutex
-	jobs   []string
-	paused bool
-	closed bool
-	notify chan struct{}
+	mu      sync.Mutex
+	jobs    []string
+	paused  bool
+	closed  bool
+	waiters int
+	notify  chan struct{}
+	closeCh chan struct{}
 }
 
 // NewInMemoryQueue creates an empty in-memory queue.
 func NewInMemoryQueue() *InMemoryQueue {
-	return &InMemoryQueue{notify: make(chan struct{})}
+	return &InMemoryQueue{
+		notify:  make(chan struct{}, 1024),
+		closeCh: make(chan struct{}),
+	}
 }
 
 // Enqueue adds a job id to the tail of the queue.
@@ -39,7 +44,9 @@ func (q *InMemoryQueue) Enqueue(jobID string) error {
 		return errors.New("queue closed")
 	}
 	q.jobs = append(q.jobs, jobID)
-	q.signalLocked()
+	if !q.paused {
+		q.signalOneLocked()
+	}
 	return nil
 }
 
@@ -57,13 +64,31 @@ func (q *InMemoryQueue) Dequeue(ctx context.Context) (string, error) {
 			q.mu.Unlock()
 			return jobID, nil
 		}
+		q.waiters++
 		notify := q.notify
+		closeCh := q.closeCh
 		q.mu.Unlock()
 
 		select {
 		case <-ctx.Done():
+			q.mu.Lock()
+			if q.waiters > 0 {
+				q.waiters--
+			}
+			q.mu.Unlock()
 			return "", ctx.Err()
+		case <-closeCh:
+			q.mu.Lock()
+			if q.waiters > 0 {
+				q.waiters--
+			}
+			q.mu.Unlock()
 		case <-notify:
+			q.mu.Lock()
+			if q.waiters > 0 {
+				q.waiters--
+			}
+			q.mu.Unlock()
 		}
 	}
 }
@@ -83,7 +108,6 @@ func (q *InMemoryQueue) Remove(jobID string) error {
 			continue
 		}
 		q.jobs = append(q.jobs[:i], q.jobs[i+1:]...)
-		q.signalLocked()
 		return nil
 	}
 	return errors.New("job id not in queue")
@@ -97,7 +121,6 @@ func (q *InMemoryQueue) Pause() error {
 		return errors.New("queue closed")
 	}
 	q.paused = true
-	q.signalLocked()
 	return nil
 }
 
@@ -109,7 +132,7 @@ func (q *InMemoryQueue) Resume() error {
 		return errors.New("queue closed")
 	}
 	q.paused = false
-	q.signalLocked()
+	q.signalAvailableLocked()
 	return nil
 }
 
@@ -133,7 +156,9 @@ func (q *InMemoryQueue) Reorder(jobIDs []string) error {
 		}
 	}
 	q.jobs = append([]string(nil), jobIDs...)
-	q.signalLocked()
+	if !q.paused {
+		q.signalAvailableLocked()
+	}
 	return nil
 }
 
@@ -145,11 +170,33 @@ func (q *InMemoryQueue) Close() error {
 		return nil
 	}
 	q.closed = true
-	q.signalLocked()
+	close(q.closeCh)
 	return nil
 }
 
-func (q *InMemoryQueue) signalLocked() {
-	close(q.notify)
-	q.notify = make(chan struct{})
+func (q *InMemoryQueue) signalOneLocked() {
+	if q.waiters < 1 {
+		return
+	}
+	select {
+	case q.notify <- struct{}{}:
+	default:
+	}
+}
+
+func (q *InMemoryQueue) signalAvailableLocked() {
+	if q.waiters < 1 || len(q.jobs) < 1 {
+		return
+	}
+	remaining := len(q.jobs)
+	if q.waiters < remaining {
+		remaining = q.waiters
+	}
+	for i := 0; i < remaining; i++ {
+		select {
+		case q.notify <- struct{}{}:
+		default:
+			return
+		}
+	}
 }

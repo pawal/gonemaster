@@ -24,12 +24,13 @@ func TestFromJSONParsesValues(t *testing.T) {
 			"defaults": {
 				"usevc": true,
 				"recurse": false,
-				"retry": 123,
-				"retrans": 234,
-				"adaptive_timeout": true,
-				"positive_cache_ttl": 30,
-				"negative_cache_ttl": 45
-			},
+					"retry": 123,
+					"retrans": 234,
+					"adaptive_timeout": true,
+					"fast_fail_timeout_count": 7,
+					"positive_cache_ttl": 30,
+					"negative_cache_ttl": 45
+				},
 			"source4": "192.0.2.53",
 			"source6": "2001:db8::42"
 		},
@@ -74,6 +75,10 @@ func TestFromJSONParsesValues(t *testing.T) {
 	value, err = p.Get("resolver.defaults.adaptive_timeout")
 	if err != nil || value != true {
 		t.Fatalf("expected adaptive_timeout true, got %#v (err=%v)", value, err)
+	}
+	value, err = p.Get("resolver.defaults.fast_fail_timeout_count")
+	if err != nil || value != 7 {
+		t.Fatalf("expected fast_fail_timeout_count 7, got %#v (err=%v)", value, err)
 	}
 	value, err = p.Get("resolver.source4")
 	if err != nil || value != "192.0.2.53" {

@@ -158,6 +158,7 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	}
 
 	usevc := resolveUseVC(opts)
+	fastFailThreshold := resolveFastFailTimeoutCount(prof)
 	if ttl := resolveReachabilityTTL(prof, opts); ttl > 0 {
 		if skip, remaining := globalReachability.shouldSkip(ns.Address.String()); skip {
 			logSystem(ctx, "REACHABILITY_CACHE_SKIP", map[string]any{
@@ -188,6 +189,16 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	if constants.BlacklistingEnabled && ns.state != nil && ns.state.blacklist.isBlocked(usevc, now) {
 		return packet.Packet{}, nil
 	}
+	if ns.state != nil && ns.state.fastFail.shouldSkip(usevc, fastFailThreshold) {
+		logSystem(ctx, "FAST_FAIL_SKIP", map[string]any{
+			"ip":          ns.Address.String(),
+			"protocol":    errorCacheProtocol(usevc),
+			"query_name":  qname,
+			"query_type":  qtype,
+			"query_class": qclass,
+		})
+		return packet.Packet{}, nil
+	}
 
 	var inflight *inflightQuery
 	if ns.state != nil && ns.state.cache != nil {
@@ -215,6 +226,9 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 
 	queryOpts, trackAdaptive := ns.applyAdaptiveTimeoutOptions(prof, opts, usevc)
 	resp, err := ns.queryNetwork(ctx, qname, qtype, qclass, queryOpts)
+	if ns.state != nil {
+		ns.state.fastFail.observeResult(usevc, isTimeoutPatternError(err), fastFailThreshold)
+	}
 	if err == nil && ns.state != nil {
 		ns.state.blacklist.observeSuccess(usevc)
 	}
@@ -355,6 +369,19 @@ func resolveQueryTimeout(prof *profile.Profile, opts *QueryOptions) time.Duratio
 		timeout = *opts.Timeout
 	}
 	return timeout
+}
+
+func resolveFastFailTimeoutCount(prof *profile.Profile) int {
+	if prof == nil {
+		prof = profile.Effective()
+	}
+	if prof == nil {
+		return 0
+	}
+	if prof.Resolver.Defaults.FastFailTimeoutCount < 0 {
+		return 0
+	}
+	return prof.Resolver.Defaults.FastFailTimeoutCount
 }
 
 func cloneQueryOptions(opts *QueryOptions) *QueryOptions {

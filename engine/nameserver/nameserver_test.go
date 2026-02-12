@@ -402,6 +402,86 @@ func TestSOATemporaryBlacklistExpires(t *testing.T) {
 	}
 }
 
+func TestFastFailDisabledByDefault(t *testing.T) {
+	ns, err := New("ns.example", "192.0.2.203", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+
+	ctx, prof := testContext(t)
+	if prof.Resolver.Defaults.FastFailTimeoutCount != 0 {
+		t.Fatalf("expected default fast-fail timeout count to be 0")
+	}
+
+	var calls int
+	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		calls++
+		return packet.Packet{}, fmt.Errorf("timeout")
+	})
+
+	for i := 0; i < 4; i++ {
+		_, _ = ns.QueryWithOptions(ctx, fmt.Sprintf("example%d", i), "A", nil)
+	}
+	if calls != 4 {
+		t.Fatalf("expected no fast-fail skipping by default, got %d calls", calls)
+	}
+}
+
+func TestFastFailSkipsAfterConfiguredTimeoutThreshold(t *testing.T) {
+	ns, err := New("ns.example", "192.0.2.204", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+
+	ctx, prof := testContext(t)
+	prof.Resolver.Defaults.FastFailTimeoutCount = 2
+
+	var calls int
+	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		calls++
+		return packet.Packet{}, fmt.Errorf("timeout")
+	})
+
+	_, err = ns.QueryWithOptions(ctx, "example1", "A", nil)
+	if err == nil {
+		t.Fatalf("expected timeout error on first call")
+	}
+	_, err = ns.QueryWithOptions(ctx, "example2", "A", nil)
+	if err == nil {
+		t.Fatalf("expected timeout error on second call")
+	}
+	_, err = ns.QueryWithOptions(ctx, "example3", "A", nil)
+	if err != nil {
+		t.Fatalf("expected third call to be skipped by fast-fail, got %v", err)
+	}
+	if calls != 2 {
+		t.Fatalf("expected only 2 network calls before fast-fail skip, got %d", calls)
+	}
+}
+
+func TestFastFailDoesNotCountNonTimeoutErrors(t *testing.T) {
+	ns, err := New("ns.example", "192.0.2.205", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+
+	ctx, prof := testContext(t)
+	prof.Resolver.Defaults.FastFailTimeoutCount = 2
+
+	var calls int
+	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		calls++
+		return packet.Packet{}, fmt.Errorf("connection refused")
+	})
+
+	for i := 0; i < 4; i++ {
+		_, _ = ns.QueryWithOptions(ctx, fmt.Sprintf("example%d", i), "A", nil)
+	}
+	if calls != 4 {
+		t.Fatalf("expected non-timeout errors not to trigger fast-fail skip, got %d calls", calls)
+	}
+}
+
 func TestReachabilityCacheSkipsAcrossCaches(t *testing.T) {
 	clearReachabilityCache()
 	t.Cleanup(clearReachabilityCache)

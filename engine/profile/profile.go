@@ -47,6 +47,9 @@ type ResolverDefaults struct {
 	Timeout   int  `json:"timeout"`
 	// AdaptiveTimeout enables per-nameserver timeout adaptation after repeated timeout-pattern failures.
 	AdaptiveTimeout bool `json:"adaptive_timeout"`
+	// FastFailTimeoutCount enables opt-in fast-fail after N consecutive timeout-pattern failures.
+	// Zero disables fast-fail (default conservative behavior).
+	FastFailTimeoutCount int `json:"fast_fail_timeout_count"`
 	// ErrorCacheTTL sets the duration (seconds) to skip queries after network errors.
 	ErrorCacheTTL int `json:"error_cache_ttl"`
 	// PositiveCacheTTL sets the duration (seconds) to cache positive responses.

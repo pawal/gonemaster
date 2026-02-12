@@ -168,6 +168,17 @@ var propertyDefs = map[string]propertyDef{
 			return p.Resolver.Defaults.AdaptiveTimeout
 		},
 	},
+	"resolver.defaults.fast_fail_timeout_count": {
+		typ: propNum,
+		min: intPtr(0),
+		max: intPtr(255),
+		setter: func(p *Profile, value any) {
+			p.Resolver.Defaults.FastFailTimeoutCount = value.(int)
+		},
+		getter: func(p *Profile) any {
+			return p.Resolver.Defaults.FastFailTimeoutCount
+		},
+	},
 	"resolver.defaults.error_cache_ttl": {
 		typ: propNum,
 		min: intPtr(0),

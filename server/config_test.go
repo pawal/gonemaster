@@ -23,6 +23,17 @@ func TestApplyFileConfigJobTestParallelism(t *testing.T) {
 	}
 }
 
+func TestApplyFileConfigAutoClampConcurrency(t *testing.T) {
+	cfg := DefaultConfig()
+	value := true
+	cfg.ApplyFileConfig(FileConfig{
+		AutoClampConcurrency: &value,
+	})
+	if !cfg.AutoClampConcurrency {
+		t.Fatalf("expected auto_clamp_concurrency true")
+	}
+}
+
 func TestConfigEffectiveWorkerCount(t *testing.T) {
 	tests := []struct {
 		name string
@@ -114,6 +125,65 @@ func TestConfigEffectiveEngineConcurrency(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := tc.cfg.EffectiveEngineConcurrency(); got != tc.want {
 				t.Fatalf("EffectiveEngineConcurrency() = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestConfigAutoClampConcurrencyForHost(t *testing.T) {
+	tests := []struct {
+		name        string
+		cpuCount    int
+		cfg         Config
+		wantWorkers int
+		wantMaxJobs int
+		wantChanged bool
+	}{
+		{
+			name:        "clamp-low-and-negative",
+			cpuCount:    4,
+			cfg:         Config{WorkerCount: 0, MaxConcurrentJobs: -2},
+			wantWorkers: 1,
+			wantMaxJobs: 0,
+			wantChanged: true,
+		},
+		{
+			name:        "clamp-upper-bound",
+			cpuCount:    4,
+			cfg:         Config{WorkerCount: 64, MaxConcurrentJobs: 32},
+			wantWorkers: 8,
+			wantMaxJobs: 8,
+			wantChanged: true,
+		},
+		{
+			name:        "no-change-within-bounds",
+			cpuCount:    8,
+			cfg:         Config{WorkerCount: 12, MaxConcurrentJobs: 10},
+			wantWorkers: 12,
+			wantMaxJobs: 10,
+			wantChanged: false,
+		},
+		{
+			name:        "minimum-cpu-fallback",
+			cpuCount:    0,
+			cfg:         Config{WorkerCount: 20, MaxConcurrentJobs: 20},
+			wantWorkers: 4,
+			wantMaxJobs: 4,
+			wantChanged: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, changed := tc.cfg.AutoClampConcurrencyForHost(tc.cpuCount)
+			if changed != tc.wantChanged {
+				t.Fatalf("changed = %v, want %v", changed, tc.wantChanged)
+			}
+			if got.WorkerCount != tc.wantWorkers {
+				t.Fatalf("WorkerCount = %d, want %d", got.WorkerCount, tc.wantWorkers)
+			}
+			if got.MaxConcurrentJobs != tc.wantMaxJobs {
+				t.Fatalf("MaxConcurrentJobs = %d, want %d", got.MaxConcurrentJobs, tc.wantMaxJobs)
 			}
 		})
 	}

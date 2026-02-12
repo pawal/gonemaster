@@ -104,6 +104,7 @@ These settings apply to all jobs unless a job overrides the profile.
   "max_body_size": 1048576,
   "debug": true,
   "worker_count": 4,
+  "auto_clamp_concurrency": false,
   "job_test_parallelism": 1,
   "max_concurrent_jobs": 0,
   "positive_cache_ttl": 0,
@@ -131,6 +132,7 @@ How to interpret:
 - `worker_count` controls how many queued jobs can be processed in parallel.
 - `max_concurrent_jobs` controls concurrent engine runs; `0` means unlimited, but effective concurrency is still bounded by workers.
 - Effective in-flight engine runs are `min(effective worker_count, effective max_concurrent_jobs)` when `max_concurrent_jobs > 0`, otherwise `effective worker_count`.
+- Enable `auto_clamp_concurrency` (or `--auto-clamp-concurrency`) to cap pathological values using a CPU-based upper bound (`max(4, 2*logical_cpus)`).
 
 At startup, `gonemaster-server` prints an `Effective concurrency:` line so you can verify final runtime settings before a test run.
 
@@ -140,6 +142,7 @@ At startup, `gonemaster-server` prints an `Effective concurrency:` line so you c
 - `--max-body-size` Max request body size in bytes
 - `--debug` Enable request/response logging
 - `--workers` Number of worker goroutines
+- `--auto-clamp-concurrency` Clamp pathological concurrency values based on CPU count
 - `--job-test-parallelism` Testcase parallelism inside one job
 - `--max-concurrent-jobs` Max concurrent engine runs (0 = unlimited)
 - `--positive-cache-ttl` Seconds to cache positive DNS responses (optional)

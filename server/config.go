@@ -12,6 +12,8 @@ type Config struct {
 	MaxBodySize int64
 	Debug       bool
 	WorkerCount int
+	// AutoClampConcurrency enables safe clamping for pathological concurrency values.
+	AutoClampConcurrency bool
 	// JobTestParallelism controls parallel testcase execution inside one job.
 	// Values <1 are treated as 1.
 	JobTestParallelism int
@@ -70,32 +72,34 @@ func (c Config) EffectiveEngineConcurrency() int {
 
 // FileConfig captures optional configuration fields from JSON.
 type FileConfig struct {
-	ListenAddr         *string `json:"listen_addr"`
-	MaxBodySize        *int64  `json:"max_body_size"`
-	Debug              *bool   `json:"debug"`
-	WorkerCount        *int    `json:"worker_count"`
-	JobTestParallelism *int    `json:"job_test_parallelism"`
-	MaxConcurrentJobs  *int    `json:"max_concurrent_jobs"`
-	PositiveCacheTTL   *int    `json:"positive_cache_ttl"`
-	NegativeCacheTTL   *int    `json:"negative_cache_ttl"`
-	Timeout            *int    `json:"timeout"`
-	Retry              *int    `json:"retry"`
-	Retrans            *int    `json:"retrans"`
-	Fallback           *bool   `json:"fallback"`
-	MinLevel           *string `json:"min_level"`
-	ProfilePath        *string `json:"profile_path"`
+	ListenAddr           *string `json:"listen_addr"`
+	MaxBodySize          *int64  `json:"max_body_size"`
+	Debug                *bool   `json:"debug"`
+	WorkerCount          *int    `json:"worker_count"`
+	AutoClampConcurrency *bool   `json:"auto_clamp_concurrency"`
+	JobTestParallelism   *int    `json:"job_test_parallelism"`
+	MaxConcurrentJobs    *int    `json:"max_concurrent_jobs"`
+	PositiveCacheTTL     *int    `json:"positive_cache_ttl"`
+	NegativeCacheTTL     *int    `json:"negative_cache_ttl"`
+	Timeout              *int    `json:"timeout"`
+	Retry                *int    `json:"retry"`
+	Retrans              *int    `json:"retrans"`
+	Fallback             *bool   `json:"fallback"`
+	MinLevel             *string `json:"min_level"`
+	ProfilePath          *string `json:"profile_path"`
 }
 
 // DefaultConfig returns baseline config values.
 func DefaultConfig() Config {
 	return Config{
-		ListenAddr:         "127.0.0.1:8080",
-		MaxBodySize:        1 << 20,
-		Debug:              false,
-		WorkerCount:        4,
-		JobTestParallelism: 1,
-		MaxConcurrentJobs:  0,
-		MinLevel:           "INFO",
+		ListenAddr:           "127.0.0.1:8080",
+		MaxBodySize:          1 << 20,
+		Debug:                false,
+		WorkerCount:          4,
+		AutoClampConcurrency: false,
+		JobTestParallelism:   1,
+		MaxConcurrentJobs:    0,
+		MinLevel:             "INFO",
 	}
 }
 
@@ -125,6 +129,9 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 	}
 	if file.WorkerCount != nil {
 		c.WorkerCount = *file.WorkerCount
+	}
+	if file.AutoClampConcurrency != nil {
+		c.AutoClampConcurrency = *file.AutoClampConcurrency
 	}
 	if file.JobTestParallelism != nil {
 		c.JobTestParallelism = *file.JobTestParallelism
@@ -156,4 +163,39 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 	if file.ProfilePath != nil {
 		c.ProfilePath = *file.ProfilePath
 	}
+}
+
+// AutoClampConcurrencyForHost clamps pathological concurrency values to host-safe bounds.
+// The returned bool is true when one or more fields were adjusted.
+func (c Config) AutoClampConcurrencyForHost(cpuCount int) (Config, bool) {
+	if cpuCount < 1 {
+		cpuCount = 1
+	}
+	maxWorkers := cpuCount * 2
+	if maxWorkers < 4 {
+		maxWorkers = 4
+	}
+
+	out := c
+	changed := false
+
+	if out.WorkerCount < 1 {
+		out.WorkerCount = 1
+		changed = true
+	}
+	if out.WorkerCount > maxWorkers {
+		out.WorkerCount = maxWorkers
+		changed = true
+	}
+
+	if out.MaxConcurrentJobs < 0 {
+		out.MaxConcurrentJobs = 0
+		changed = true
+	}
+	if out.MaxConcurrentJobs > maxWorkers {
+		out.MaxConcurrentJobs = maxWorkers
+		changed = true
+	}
+
+	return out, changed
 }

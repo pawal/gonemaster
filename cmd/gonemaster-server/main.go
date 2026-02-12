@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -26,6 +27,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	var maxBodySize int64
 	var debug bool
 	var workerCount int
+	var autoClampConcurrency bool
 	var jobTestParallelism int
 	var maxConcurrentJobs int
 	var positiveCacheTTL int
@@ -42,6 +44,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	var maxBodySizeSet bool
 	var debugSet bool
 	var workerCountSet bool
+	var autoClampConcurrencySet bool
 	var jobTestParallelismSet bool
 	var maxConcurrentJobsSet bool
 	var positiveCacheTTLSet bool
@@ -57,7 +60,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	fs := flag.NewFlagSet("gonemaster-server", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	fs.Usage = func() {
-		fmt.Fprintf(errOut, "Usage: %s [--config PATH] [--listen ADDR] [--max-body-size BYTES] [--debug] [--workers N] [--job-test-parallelism N] [--max-concurrent-jobs N] [--positive-cache-ttl N] [--negative-cache-ttl N] [--timeout N] [--retry N] [--retrans N] [--fallback|--no-fallback] [--min-level LEVEL] [--profile PATH] [--shutdown-timeout DURATION]\n", fs.Name())
+		fmt.Fprintf(errOut, "Usage: %s [--config PATH] [--listen ADDR] [--max-body-size BYTES] [--debug] [--workers N] [--auto-clamp-concurrency] [--job-test-parallelism N] [--max-concurrent-jobs N] [--positive-cache-ttl N] [--negative-cache-ttl N] [--timeout N] [--retry N] [--retrans N] [--fallback|--no-fallback] [--min-level LEVEL] [--profile PATH] [--shutdown-timeout DURATION]\n", fs.Name())
 		fmt.Fprintln(errOut, "")
 		fmt.Fprintln(errOut, "Options:")
 		fmt.Fprintln(errOut, "  --config            JSON config file path (optional)")
@@ -65,6 +68,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 		fmt.Fprintln(errOut, "  --max-body-size     Max request body size in bytes (default 1048576)")
 		fmt.Fprintln(errOut, "  --debug             Enable request/response logging")
 		fmt.Fprintln(errOut, "  --workers           Number of worker goroutines (default 4)")
+		fmt.Fprintln(errOut, "  --auto-clamp-concurrency  Clamp pathological concurrency values based on CPU count")
 		fmt.Fprintln(errOut, "  --job-test-parallelism  Testcase parallelism inside one job (default 1)")
 		fmt.Fprintln(errOut, "  --max-concurrent-jobs  Max concurrent engine runs (0 = unlimited)")
 		fmt.Fprintln(errOut, "  --positive-cache-ttl  Seconds to cache positive DNS responses (optional)")
@@ -83,6 +87,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	fs.Int64Var(&maxBodySize, "max-body-size", 0, "Max request body size in bytes (default 1048576)")
 	fs.BoolVar(&debug, "debug", false, "Enable request/response logging")
 	fs.IntVar(&workerCount, "workers", 0, "Number of worker goroutines (default 4)")
+	fs.BoolVar(&autoClampConcurrency, "auto-clamp-concurrency", false, "Clamp pathological concurrency values based on CPU count")
 	fs.IntVar(&jobTestParallelism, "job-test-parallelism", 0, "Testcase parallelism inside one job (default 1)")
 	fs.IntVar(&maxConcurrentJobs, "max-concurrent-jobs", 0, "Max concurrent engine runs (0 = unlimited)")
 	fs.IntVar(&positiveCacheTTL, "positive-cache-ttl", 0, "Seconds to cache positive DNS responses (optional)")
@@ -108,6 +113,8 @@ func run(args []string, out *os.File, errOut *os.File) int {
 			debugSet = true
 		case "workers":
 			workerCountSet = true
+		case "auto-clamp-concurrency":
+			autoClampConcurrencySet = true
 		case "job-test-parallelism":
 			jobTestParallelismSet = true
 		case "max-concurrent-jobs":
@@ -190,6 +197,9 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	if workerCountSet {
 		cfg.WorkerCount = workerCount
 	}
+	if autoClampConcurrencySet {
+		cfg.AutoClampConcurrency = autoClampConcurrency
+	}
 	if jobTestParallelismSet {
 		cfg.JobTestParallelism = jobTestParallelism
 	}
@@ -229,6 +239,14 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	}
 	if profilePathSet {
 		cfg.ProfilePath = profilePath
+	}
+	if cfg.AutoClampConcurrency {
+		cpuCount := runtime.NumCPU()
+		clamped, changed := cfg.AutoClampConcurrencyForHost(cpuCount)
+		if changed {
+			fmt.Fprintf(errOut, "Applied concurrency auto-clamp (cpu=%d): %s\n", cpuCount, formatConcurrencySummary(clamped))
+		}
+		cfg = clamped
 	}
 
 	srv := server.New(cfg)

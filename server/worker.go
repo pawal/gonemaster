@@ -2,18 +2,15 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"log"
 	"math"
 	"net/netip"
-	"os"
 	"strings"
 	"sync"
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/logger"
-	"codeberg.org/pawal/gonemaster/engine/profile"
 )
 
 type workerPool struct {
@@ -44,6 +41,9 @@ func (s *Server) Start() {
 // Stop requests worker shutdown and waits for completion.
 func (s *Server) Stop(ctx context.Context) error {
 	if s.workers.cancel == nil {
+		if s.profileOverrideCache != nil {
+			s.profileOverrideCache.Close()
+		}
 		return nil
 	}
 	s.workers.cancel()
@@ -57,6 +57,9 @@ func (s *Server) Stop(ctx context.Context) error {
 
 	select {
 	case <-done:
+		if s.profileOverrideCache != nil {
+			s.profileOverrideCache.Close()
+		}
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
@@ -197,7 +200,7 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 	callbacks := []func(*logger.Entry) error{
 		queryCounter.Callback,
 	}
-	cleanup, err := applyProfileOverrides(&req, job.Overrides, s.cfg.ProfilePath)
+	cleanup, err := applyProfileOverridesWithCache(&req, job.Overrides, s.cfg.ProfilePath, s.profileOverrideCache)
 	if err != nil {
 		return nil, 0, 0, err
 	}
@@ -373,54 +376,4 @@ func chainLogCallbacks(callbacks ...func(*logger.Entry) error) func(*logger.Entr
 		}
 		return nil
 	}
-}
-
-func applyProfileOverrides(req *engine.RunRequest, overrides map[string]any, baseProfile string) (func(), error) {
-	if req == nil || len(overrides) == 0 {
-		if req != nil && baseProfile != "" {
-			req.Profile = baseProfile
-		}
-		return nil, nil
-	}
-	payload, err := json.Marshal(overrides)
-	if err != nil {
-		return nil, err
-	}
-	base := profile.New()
-	if baseProfile != "" {
-		data, err := os.ReadFile(baseProfile)
-		if err != nil {
-			return nil, err
-		}
-		base, err = profile.FromYAML(string(data))
-		if err != nil {
-			return nil, err
-		}
-	}
-	overrideProfile, err := profile.FromJSON(string(payload))
-	if err != nil {
-		return nil, err
-	}
-	if err := base.Merge(overrideProfile); err != nil {
-		return nil, err
-	}
-	merged, err := base.ToJSON()
-	if err != nil {
-		return nil, err
-	}
-	tmp, err := os.CreateTemp("", "gonemaster-profile-*.json")
-	if err != nil {
-		return nil, err
-	}
-	if _, err := tmp.Write([]byte(merged)); err != nil {
-		_ = tmp.Close()
-		_ = os.Remove(tmp.Name())
-		return nil, err
-	}
-	if err := tmp.Close(); err != nil {
-		_ = os.Remove(tmp.Name())
-		return nil, err
-	}
-	req.Profile = tmp.Name()
-	return func() { _ = os.Remove(tmp.Name()) }, nil
 }

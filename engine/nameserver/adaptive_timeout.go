@@ -11,6 +11,7 @@ import (
 
 const (
 	adaptiveTimeoutFailureThreshold = 2
+	adaptiveTimeoutSuccessThreshold = 3
 	adaptiveTimeoutReductionPct     = 25
 	adaptiveTimeoutMaxStep          = 3
 	adaptiveTimeoutMin              = 500 * time.Millisecond
@@ -24,6 +25,7 @@ type adaptiveTimeoutTracker struct {
 
 type adaptiveTimeoutState struct {
 	consecutiveTimeouts int
+	consecutiveSuccess  int
 	reductionStep       int
 }
 
@@ -45,10 +47,18 @@ func (t *adaptiveTimeoutTracker) observeResult(useTCP bool, timeoutPattern bool)
 	state := t.stateForProtocol(useTCP)
 	if !timeoutPattern {
 		state.consecutiveTimeouts = 0
+		state.consecutiveSuccess++
+		if state.consecutiveSuccess >= adaptiveTimeoutSuccessThreshold {
+			state.consecutiveSuccess = 0
+			if state.reductionStep > 0 {
+				state.reductionStep--
+			}
+		}
 		t.mu.Unlock()
 		return
 	}
 	state.consecutiveTimeouts++
+	state.consecutiveSuccess = 0
 	if state.consecutiveTimeouts >= adaptiveTimeoutFailureThreshold {
 		state.consecutiveTimeouts = 0
 		if state.reductionStep < adaptiveTimeoutMaxStep {

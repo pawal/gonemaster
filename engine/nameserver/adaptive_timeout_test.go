@@ -52,6 +52,36 @@ func TestAdaptiveTimeoutTrackerResetConsecutiveOnNonTimeout(t *testing.T) {
 	}
 }
 
+func TestAdaptiveTimeoutTrackerDecayAfterSustainedSuccess(t *testing.T) {
+	tracker := &adaptiveTimeoutTracker{}
+	base := 4 * time.Second
+
+	// Build reduction step 2 (4s -> 2s).
+	tracker.observeResult(false, true)
+	tracker.observeResult(false, true)
+	tracker.observeResult(false, true)
+	tracker.observeResult(false, true)
+	if got := tracker.timeoutFor(base, false); got != 2*time.Second {
+		t.Fatalf("timeout after reductions = %v, want 2s", got)
+	}
+
+	// First sustained success window decays to step 1.
+	for i := 0; i < adaptiveTimeoutSuccessThreshold; i++ {
+		tracker.observeResult(false, false)
+	}
+	if got := tracker.timeoutFor(base, false); got != 3*time.Second {
+		t.Fatalf("timeout after first success decay = %v, want 3s", got)
+	}
+
+	// Second sustained success window decays to step 0.
+	for i := 0; i < adaptiveTimeoutSuccessThreshold; i++ {
+		tracker.observeResult(false, false)
+	}
+	if got := tracker.timeoutFor(base, false); got != base {
+		t.Fatalf("timeout after full decay = %v, want %v", got, base)
+	}
+}
+
 func TestAdaptiveTimeoutTrackerProtocolIsolation(t *testing.T) {
 	tracker := &adaptiveTimeoutTracker{}
 	base := 4 * time.Second
@@ -256,5 +286,55 @@ func TestQueryWithOptionsAdaptiveTimeoutOnlyCountsTimeoutPattern(t *testing.T) {
 		if timeout != 0 {
 			t.Fatalf("call %d timeout override = %v, want none", i, timeout)
 		}
+	}
+}
+
+func TestQueryWithOptionsAdaptiveTimeoutDecaysAfterSustainedSuccess(t *testing.T) {
+	ns, err := New("ns.example", "192.0.2.65", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	ctx, prof := testContext(t)
+	prof.Resolver.Defaults.AdaptiveTimeout = true
+	prof.Resolver.Defaults.Timeout = 4
+
+	var observed []time.Duration
+	call := 0
+	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, opts *QueryOptions) (packet.Packet, error) {
+		call++
+		timeout := time.Duration(0)
+		if opts != nil && opts.Timeout != nil {
+			timeout = *opts.Timeout
+		}
+		observed = append(observed, timeout)
+
+		if call <= 2 {
+			return packet.Packet{}, &net.DNSError{Err: "i/o timeout", IsTimeout: true}
+		}
+		return packet.Packet{Msg: nil}, nil
+	})
+
+	// 2 timeout-pattern failures trigger one reduction step.
+	for i := 0; i < 2; i++ {
+		_, _ = ns.QueryWithOptions(ctx, fmt.Sprintf("to%d.example.com", i), "A", nil)
+	}
+	// 3 successes should decay one step back to default.
+	for i := 0; i < adaptiveTimeoutSuccessThreshold; i++ {
+		_, _ = ns.QueryWithOptions(ctx, fmt.Sprintf("ok%d.example.com", i), "A", nil)
+	}
+	// One extra success confirms timeout override is removed.
+	_, _ = ns.QueryWithOptions(ctx, "final.example.com", "A", nil)
+
+	if len(observed) != 6 {
+		t.Fatalf("expected 6 calls, got %d", len(observed))
+	}
+	if observed[0] != 0 || observed[1] != 0 {
+		t.Fatalf("expected initial timeout calls unmodified, got %v", observed[:2])
+	}
+	if observed[2] != 3*time.Second || observed[3] != 3*time.Second || observed[4] != 3*time.Second {
+		t.Fatalf("expected reduced timeout during recovery window, got %v", observed[2:5])
+	}
+	if observed[5] != 0 {
+		t.Fatalf("expected timeout to decay back to default (no explicit override), got %v", observed[5])
 	}
 }

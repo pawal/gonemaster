@@ -2,6 +2,10 @@ package server
 
 import (
 	"context"
+	"fmt"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -107,4 +111,269 @@ func TestInMemoryQueueClose(t *testing.T) {
 	if _, err := q.Dequeue(ctx); err == nil {
 		t.Fatalf("expected dequeue to fail after close")
 	}
+}
+
+func TestInMemoryQueueManyBlockedDequeuers(t *testing.T) {
+	t.Parallel()
+
+	const (
+		workers = 32
+		jobs    = 128
+	)
+
+	q := NewInMemoryQueue()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	results := make(chan string, jobs)
+	errs := make(chan error, workers)
+
+	var wg sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				jobID, err := q.Dequeue(ctx)
+				if err != nil {
+					if ctx.Err() != nil || isQueueClosedError(err) {
+						return
+					}
+					select {
+					case errs <- err:
+					default:
+					}
+					return
+				}
+				select {
+				case results <- jobID:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+	}
+
+	// Give workers a short moment to block in Dequeue.
+	time.Sleep(50 * time.Millisecond)
+
+	expected := make(map[string]bool, jobs)
+	for i := 0; i < jobs; i++ {
+		jobID := fmt.Sprintf("job-%03d", i)
+		expected[jobID] = true
+		if err := q.Enqueue(jobID); err != nil {
+			t.Fatalf("enqueue %s: %v", jobID, err)
+		}
+	}
+
+	received := make(map[string]bool, jobs)
+	for len(received) < jobs {
+		select {
+		case err := <-errs:
+			t.Fatalf("worker error: %v", err)
+		case jobID := <-results:
+			if !expected[jobID] {
+				t.Fatalf("unexpected job id %q", jobID)
+			}
+			if received[jobID] {
+				t.Fatalf("duplicate job id %q", jobID)
+			}
+			received[jobID] = true
+		case <-ctx.Done():
+			t.Fatalf("timed out waiting for dequeued jobs: got=%d want=%d", len(received), jobs)
+		}
+	}
+
+	cancel()
+	wg.Wait()
+}
+
+func TestInMemoryQueueBurstEnqueueDequeueConcurrent(t *testing.T) {
+	t.Parallel()
+
+	const (
+		producers       = 8
+		perProducerJobs = 150
+		consumers       = 16
+	)
+	totalJobs := producers * perProducerJobs
+
+	q := NewInMemoryQueue()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	var consumed atomic.Int64
+	var producerWG sync.WaitGroup
+	var consumerWG sync.WaitGroup
+	var seenMu sync.Mutex
+	seen := make(map[string]bool, totalJobs)
+	errs := make(chan error, 1)
+
+	for i := 0; i < consumers; i++ {
+		consumerWG.Add(1)
+		go func() {
+			defer consumerWG.Done()
+			for {
+				if int(consumed.Load()) >= totalJobs {
+					return
+				}
+				jobID, err := q.Dequeue(ctx)
+				if err != nil {
+					if ctx.Err() != nil || isQueueClosedError(err) {
+						return
+					}
+					select {
+					case errs <- err:
+					default:
+					}
+					return
+				}
+				seenMu.Lock()
+				if seen[jobID] {
+					seenMu.Unlock()
+					select {
+					case errs <- fmt.Errorf("duplicate job id %q", jobID):
+					default:
+					}
+					return
+				}
+				seen[jobID] = true
+				seenMu.Unlock()
+				consumed.Add(1)
+			}
+		}()
+	}
+
+	for p := 0; p < producers; p++ {
+		producerID := p
+		producerWG.Add(1)
+		go func() {
+			defer producerWG.Done()
+			for i := 0; i < perProducerJobs; i++ {
+				jobID := fmt.Sprintf("p%02d-job-%03d", producerID, i)
+				if err := q.Enqueue(jobID); err != nil {
+					select {
+					case errs <- err:
+					default:
+					}
+					return
+				}
+			}
+		}()
+	}
+
+	producerWG.Wait()
+
+	for int(consumed.Load()) < totalJobs {
+		select {
+		case err := <-errs:
+			t.Fatalf("concurrent queue error: %v", err)
+		case <-ctx.Done():
+			t.Fatalf("timed out waiting for jobs to drain: got=%d want=%d", consumed.Load(), totalJobs)
+		default:
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+
+	cancel()
+	consumerWG.Wait()
+
+	seenMu.Lock()
+	defer seenMu.Unlock()
+	if len(seen) != totalJobs {
+		t.Fatalf("unexpected unique dequeued jobs: got=%d want=%d", len(seen), totalJobs)
+	}
+}
+
+func TestInMemoryQueuePauseResumeUnderLoad(t *testing.T) {
+	t.Parallel()
+
+	const (
+		workers = 24
+		jobs    = 240
+	)
+
+	q := NewInMemoryQueue()
+	if err := q.Pause(); err != nil {
+		t.Fatalf("pause: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+
+	results := make(chan string, jobs)
+	errs := make(chan error, workers)
+	var wg sync.WaitGroup
+
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				jobID, err := q.Dequeue(ctx)
+				if err != nil {
+					if ctx.Err() != nil || isQueueClosedError(err) {
+						return
+					}
+					select {
+					case errs <- err:
+					default:
+					}
+					return
+				}
+				select {
+				case results <- jobID:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+	}
+
+	expected := make(map[string]bool, jobs)
+	for i := 0; i < jobs; i++ {
+		jobID := fmt.Sprintf("job-%03d", i)
+		expected[jobID] = true
+		if err := q.Enqueue(jobID); err != nil {
+			t.Fatalf("enqueue %s: %v", jobID, err)
+		}
+	}
+
+	// While paused, no worker should receive jobs.
+	select {
+	case jobID := <-results:
+		t.Fatalf("received job %q while queue paused", jobID)
+	case err := <-errs:
+		t.Fatalf("worker error while paused: %v", err)
+	case <-time.After(200 * time.Millisecond):
+	}
+
+	if err := q.Resume(); err != nil {
+		t.Fatalf("resume: %v", err)
+	}
+
+	received := make(map[string]bool, jobs)
+	for len(received) < jobs {
+		select {
+		case err := <-errs:
+			t.Fatalf("worker error: %v", err)
+		case jobID := <-results:
+			if !expected[jobID] {
+				t.Fatalf("unexpected job id %q", jobID)
+			}
+			if received[jobID] {
+				t.Fatalf("duplicate job id %q", jobID)
+			}
+			received[jobID] = true
+		case <-ctx.Done():
+			t.Fatalf("timed out waiting for resumed queue drain: got=%d want=%d", len(received), jobs)
+		}
+	}
+
+	cancel()
+	wg.Wait()
+}
+
+func isQueueClosedError(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "queue closed")
 }

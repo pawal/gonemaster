@@ -334,8 +334,71 @@ func TestContextCanceledDoesNotBlacklist(t *testing.T) {
 	if ns.state == nil {
 		t.Fatalf("expected state to be initialized")
 	}
-	if ns.state.blacklisted[false] {
+	if ns.state.blacklist.isBlocked(false, time.Now()) {
 		t.Fatalf("expected UDP not to be blacklisted on context cancellation")
+	}
+}
+
+func TestSOATimeoutBurstBlacklistsTemporarily(t *testing.T) {
+	ns, err := New("ns.example", "192.0.2.201", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+
+	ctx, _ := testContext(t)
+	timeout := 60 * time.Millisecond
+	opts := &QueryOptions{Timeout: &timeout}
+
+	var calls int
+	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		calls++
+		return packet.Packet{}, fmt.Errorf("timeout")
+	})
+
+	_, err = ns.QueryWithOptions(ctx, "example1", "SOA", opts)
+	if err == nil {
+		t.Fatalf("expected first timeout error")
+	}
+	_, err = ns.QueryWithOptions(ctx, "example2", "SOA", opts)
+	if err == nil {
+		t.Fatalf("expected second timeout error")
+	}
+	_, err = ns.QueryWithOptions(ctx, "example3", "SOA", opts)
+	if err != nil {
+		t.Fatalf("expected blacklisted query to be skipped without error, got %v", err)
+	}
+	if calls != 2 {
+		t.Fatalf("expected 2 network calls before temporary blacklist, got %d", calls)
+	}
+}
+
+func TestSOATemporaryBlacklistExpires(t *testing.T) {
+	ns, err := New("ns.example", "192.0.2.202", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+
+	ctx, _ := testContext(t)
+	timeout := 50 * time.Millisecond
+	opts := &QueryOptions{Timeout: &timeout}
+
+	var calls int
+	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		calls++
+		return packet.Packet{}, fmt.Errorf("timeout")
+	})
+
+	_, _ = ns.QueryWithOptions(ctx, "example1", "SOA", opts)
+	_, _ = ns.QueryWithOptions(ctx, "example2", "SOA", opts)
+	_, _ = ns.QueryWithOptions(ctx, "example3", "SOA", opts)
+	if calls != 2 {
+		t.Fatalf("expected immediate third query to be skipped while blacklisted, got %d calls", calls)
+	}
+
+	time.Sleep(blacklistMinTTL + 80*time.Millisecond)
+	_, _ = ns.QueryWithOptions(ctx, "example4", "SOA", opts)
+	if calls != 3 {
+		t.Fatalf("expected blacklist to expire and allow new network call, got %d calls", calls)
 	}
 }
 

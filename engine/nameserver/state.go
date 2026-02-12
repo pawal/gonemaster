@@ -231,7 +231,7 @@ type nsState struct {
 	errorCache      *errorCache
 	fakeDelegations map[string]delegation
 	fakeDS          map[string][]dns.RR
-	blacklisted     map[bool]bool
+	blacklist       blacklistTracker
 	adaptiveTimeout adaptiveTimeoutTracker
 	queryFunc       func(ctx context.Context, name string, qtype string, qclass string, opts *QueryOptions) (packet.Packet, error)
 	axfrFunc        func(ctx context.Context, domain string, callback func(dns.RR) bool, class string) error
@@ -365,7 +365,6 @@ func (ns *Nameserver) ensureState() {
 		errorCache:      cache.errorCacheForAddress(ns.Address.String()),
 		fakeDelegations: map[string]delegation{},
 		fakeDS:          map[string][]dns.RR{},
-		blacklisted:     map[bool]bool{},
 	}
 }
 

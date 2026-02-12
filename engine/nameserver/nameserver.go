@@ -84,7 +84,6 @@ func NewWithCache(cache *CacheStore, name string, address string, client *transp
 		errorCache:      cache.errorCacheForAddress(addrKey),
 		fakeDelegations: map[string]delegation{},
 		fakeDS:          map[string][]dns.RR{},
-		blacklisted:     map[bool]bool{},
 	}
 
 	ns := &Nameserver{
@@ -185,7 +184,8 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 			return packet.Packet{}, nil
 		}
 	}
-	if constants.BlacklistingEnabled && ns.state != nil && ns.state.blacklisted[usevc] {
+	now := time.Now()
+	if constants.BlacklistingEnabled && ns.state != nil && ns.state.blacklist.isBlocked(usevc, now) {
 		return packet.Packet{}, nil
 	}
 
@@ -215,6 +215,9 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 
 	queryOpts, trackAdaptive := ns.applyAdaptiveTimeoutOptions(prof, opts, usevc)
 	resp, err := ns.queryNetwork(ctx, qname, qtype, qclass, queryOpts)
+	if err == nil && ns.state != nil {
+		ns.state.blacklist.observeSuccess(usevc)
+	}
 	if trackAdaptive && ns.state != nil {
 		ns.state.adaptiveTimeout.observeResult(usevc, isTimeoutPatternError(err))
 	}
@@ -222,7 +225,8 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	blacklistingDisabled := opts != nil && opts.BlacklistingDisabled
 	if err != nil && (ctx == nil || ctx.Err() == nil) && qtype == "SOA" && ednsSize == 0 && !blacklistingDisabled {
 		if ns.state != nil {
-			ns.state.blacklisted[usevc] = true
+			baseTTL := resolveQueryTimeout(prof, opts)
+			ns.state.blacklist.observeFailure(usevc, isTimeoutPatternError(err), baseTTL, now)
 		}
 	}
 	if err != nil && (ctx == nil || ctx.Err() == nil) && ns.state != nil && ns.state.errorCache != nil {

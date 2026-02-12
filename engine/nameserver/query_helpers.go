@@ -30,9 +30,6 @@ func (ns *Nameserver) AddFakeDelegation(domain string, data map[string][]string)
 	if ns.state.fakeDS == nil {
 		ns.state.fakeDS = map[string][]dns.RR{}
 	}
-	if ns.state.blacklisted == nil {
-		ns.state.blacklisted = map[bool]bool{}
-	}
 
 	domainName := dnsname.New(domain)
 	domainKey := strings.ToLower(domainName.String())
@@ -105,9 +102,6 @@ func (ns *Nameserver) AddFakeDS(domain string, data []DSData) error {
 	}
 	if ns.state.fakeDS == nil {
 		ns.state.fakeDS = map[string][]dns.RR{}
-	}
-	if ns.state.blacklisted == nil {
-		ns.state.blacklisted = map[bool]bool{}
 	}
 
 	domainName := dnsname.New(domain)

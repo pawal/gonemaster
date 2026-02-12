@@ -251,10 +251,7 @@ func NewMetricsCollector(cfg Config) *MetricsCollector {
 }
 
 func newMetricsCollector(cfg Config, startedAt time.Time) *MetricsCollector {
-	activeWorkers := cfg.WorkerCount
-	if activeWorkers < 1 {
-		activeWorkers = 1
-	}
+	activeWorkers := cfg.EffectiveWorkerCount()
 	return &MetricsCollector{
 		startedAt:            startedAt.UTC(),
 		workerCount:          cfg.WorkerCount,

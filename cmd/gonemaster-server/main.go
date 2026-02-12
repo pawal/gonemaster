@@ -241,6 +241,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 
 	fmt.Fprintf(errOut, "Gonemaster version %s\n", engine.VersionFull())
 	fmt.Fprintf(errOut, "Started server at %s\n", formatListenURL(cfg.ListenAddr))
+	fmt.Fprintf(errOut, "Effective concurrency: %s\n", formatConcurrencySummary(cfg))
 
 	shutdownCh := make(chan os.Signal, 1)
 	signal.Notify(shutdownCh, syscall.SIGINT, syscall.SIGTERM)
@@ -279,4 +280,19 @@ func formatListenURL(addr string) string {
 		return "http://" + host
 	}
 	return "http://" + host + ":" + port
+}
+
+func formatConcurrencySummary(cfg server.Config) string {
+	maxConcurrentJobs := cfg.EffectiveMaxConcurrentJobs()
+	maxConcurrentJobsLabel := "unlimited"
+	if maxConcurrentJobs > 0 {
+		maxConcurrentJobsLabel = fmt.Sprintf("%d", maxConcurrentJobs)
+	}
+	return fmt.Sprintf(
+		"workers=%d, max-concurrent-jobs=%s, max-in-flight-engine-runs=%d, job-test-parallelism=%d",
+		cfg.EffectiveWorkerCount(),
+		maxConcurrentJobsLabel,
+		cfg.EffectiveEngineConcurrency(),
+		cfg.EffectiveJobTestParallelism(),
+	)
 }

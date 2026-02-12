@@ -4,6 +4,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"codeberg.org/pawal/gonemaster/server"
 )
 
 func TestRunWorkersValidation(t *testing.T) {
@@ -53,6 +55,46 @@ func TestRunInvalidConfig(t *testing.T) {
 	errText := readTempFile(t, errOut)
 	if strings.TrimSpace(errText) == "" {
 		t.Fatalf("expected error output for invalid config")
+	}
+}
+
+func TestFormatConcurrencySummary(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  server.Config
+		want string
+	}{
+		{
+			name: "defaults",
+			cfg:  server.DefaultConfig(),
+			want: "workers=4, max-concurrent-jobs=unlimited, max-in-flight-engine-runs=4, job-test-parallelism=1",
+		},
+		{
+			name: "engine limiter below worker count",
+			cfg: server.Config{
+				WorkerCount:        12,
+				MaxConcurrentJobs:  5,
+				JobTestParallelism: 4,
+			},
+			want: "workers=12, max-concurrent-jobs=5, max-in-flight-engine-runs=5, job-test-parallelism=4",
+		},
+		{
+			name: "clamped minimums",
+			cfg: server.Config{
+				WorkerCount:        0,
+				MaxConcurrentJobs:  0,
+				JobTestParallelism: 0,
+			},
+			want: "workers=1, max-concurrent-jobs=unlimited, max-in-flight-engine-runs=1, job-test-parallelism=1",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := formatConcurrencySummary(tc.cfg); got != tc.want {
+				t.Fatalf("formatConcurrencySummary() = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }
 

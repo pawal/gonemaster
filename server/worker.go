@@ -30,10 +30,7 @@ func (s *Server) Start() {
 	s.workers.ctx = ctx
 	s.workers.cancel = cancel
 
-	workerCount := s.cfg.WorkerCount
-	if workerCount < 1 {
-		workerCount = 1
-	}
+	workerCount := s.cfg.EffectiveWorkerCount()
 	for i := 0; i < workerCount; i++ {
 		s.workers.wg.Add(1)
 		go s.workerLoop(i)
@@ -237,10 +234,7 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 }
 
 func (s *Server) effectiveJobTestParallelism() int {
-	if s.cfg.JobTestParallelism < 1 {
-		return 1
-	}
-	return s.cfg.JobTestParallelism
+	return s.cfg.EffectiveJobTestParallelism()
 }
 
 func (s *Server) runJobTestcasesSequential(jobID string, req engine.RunRequest, testcases []string, queryCounter *dnsQueryCounter) ([]engine.LogEntry, int64, int64, error) {

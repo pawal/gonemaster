@@ -33,6 +33,41 @@ type Config struct {
 	ProfilePath string
 }
 
+// EffectiveWorkerCount returns the worker count the server will actually use.
+func (c Config) EffectiveWorkerCount() int {
+	if c.WorkerCount < 1 {
+		return 1
+	}
+	return c.WorkerCount
+}
+
+// EffectiveJobTestParallelism returns testcase parallelism used inside one job.
+func (c Config) EffectiveJobTestParallelism() int {
+	if c.JobTestParallelism < 1 {
+		return 1
+	}
+	return c.JobTestParallelism
+}
+
+// EffectiveMaxConcurrentJobs returns the active engine limiter size.
+// A return value of 0 means "unlimited".
+func (c Config) EffectiveMaxConcurrentJobs() int {
+	if c.MaxConcurrentJobs < 1 {
+		return 0
+	}
+	return c.MaxConcurrentJobs
+}
+
+// EffectiveEngineConcurrency returns the maximum number of in-flight engine runs.
+func (c Config) EffectiveEngineConcurrency() int {
+	workers := c.EffectiveWorkerCount()
+	maxConcurrentJobs := c.EffectiveMaxConcurrentJobs()
+	if maxConcurrentJobs == 0 || maxConcurrentJobs > workers {
+		return workers
+	}
+	return maxConcurrentJobs
+}
+
 // FileConfig captures optional configuration fields from JSON.
 type FileConfig struct {
 	ListenAddr         *string `json:"listen_addr"`

@@ -117,6 +117,23 @@ These settings apply to all jobs unless a job overrides the profile.
 }
 ```
 
+### Concurrency tuning guidance
+Use these as starting points for large scan workloads, then validate with your perf matrix:
+
+| Logical CPUs | `worker_count` | `max_concurrent_jobs` | Notes |
+| --- | --- | --- | --- |
+| 1-2 | 2-4 | 1-2 | Keep limiter conservative to avoid CPU saturation. |
+| 4 | 4-8 | 3-6 | Good default band for mixed short/full jobs. |
+| 8 | 8-16 | 6-12 | Raise gradually; watch timeout/error rates and p95 latency. |
+| 16+ | 16-32 | 12-24 | Prefer incremental increases with production-like workloads. |
+
+How to interpret:
+- `worker_count` controls how many queued jobs can be processed in parallel.
+- `max_concurrent_jobs` controls concurrent engine runs; `0` means unlimited, but effective concurrency is still bounded by workers.
+- Effective in-flight engine runs are `min(effective worker_count, effective max_concurrent_jobs)` when `max_concurrent_jobs > 0`, otherwise `effective worker_count`.
+
+At startup, `gonemaster-server` prints an `Effective concurrency:` line so you can verify final runtime settings before a test run.
+
 ## Flags
 - `--config` JSON config file path
 - `--listen` Address to listen on

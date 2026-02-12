@@ -45,6 +45,8 @@ type ResolverDefaults struct {
 	Unordered bool `json:"unordered"`
 	UseVC     bool `json:"usevc"`
 	Timeout   int  `json:"timeout"`
+	// AdaptiveTimeout enables per-nameserver timeout adaptation after repeated timeout-pattern failures.
+	AdaptiveTimeout bool `json:"adaptive_timeout"`
 	// ErrorCacheTTL sets the duration (seconds) to skip queries after network errors.
 	ErrorCacheTTL int `json:"error_cache_ttl"`
 	// PositiveCacheTTL sets the duration (seconds) to cache positive responses.

@@ -13,6 +13,9 @@ func TestDefaultProfileLoads(t *testing.T) {
 	if p.Resolver.Defaults.Timeout != 5 {
 		t.Fatalf("unexpected default timeout: %d", p.Resolver.Defaults.Timeout)
 	}
+	if p.Resolver.Defaults.AdaptiveTimeout {
+		t.Fatalf("expected adaptive timeout disabled by default")
+	}
 	if p.TestLevels == nil {
 		t.Fatalf("expected test levels to be loaded")
 	}

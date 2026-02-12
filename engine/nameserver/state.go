@@ -232,6 +232,7 @@ type nsState struct {
 	fakeDelegations map[string]delegation
 	fakeDS          map[string][]dns.RR
 	blacklisted     map[bool]bool
+	adaptiveTimeout adaptiveTimeoutTracker
 	queryFunc       func(ctx context.Context, name string, qtype string, qclass string, opts *QueryOptions) (packet.Packet, error)
 	axfrFunc        func(ctx context.Context, domain string, callback func(dns.RR) bool, class string) error
 }

@@ -213,7 +213,11 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 		}
 	}
 
-	resp, err := ns.queryNetwork(ctx, qname, qtype, qclass, opts)
+	queryOpts, trackAdaptive := ns.applyAdaptiveTimeoutOptions(prof, opts, usevc)
+	resp, err := ns.queryNetwork(ctx, qname, qtype, qclass, queryOpts)
+	if trackAdaptive && ns.state != nil {
+		ns.state.adaptiveTimeout.observeResult(usevc, isTimeoutPatternError(err))
+	}
 
 	blacklistingDisabled := opts != nil && opts.BlacklistingDisabled
 	if err != nil && (ctx == nil || ctx.Err() == nil) && qtype == "SOA" && ednsSize == 0 && !blacklistingDisabled {
@@ -333,6 +337,51 @@ func resolveTTLWithBudget(baseSeconds int, prof *profile.Profile, opts *QueryOpt
 		return budget
 	}
 	return baseTTL
+}
+
+func resolveQueryTimeout(prof *profile.Profile, opts *QueryOptions) time.Duration {
+	if prof == nil {
+		prof = profile.Effective()
+	}
+	if prof == nil {
+		return 0
+	}
+	timeout := time.Duration(prof.Resolver.Defaults.Timeout) * time.Second
+	if opts != nil && opts.Timeout != nil {
+		timeout = *opts.Timeout
+	}
+	return timeout
+}
+
+func cloneQueryOptions(opts *QueryOptions) *QueryOptions {
+	if opts == nil {
+		return &QueryOptions{}
+	}
+	copyOpts := *opts
+	return &copyOpts
+}
+
+func (ns Nameserver) applyAdaptiveTimeoutOptions(prof *profile.Profile, opts *QueryOptions, usevc bool) (*QueryOptions, bool) {
+	if ns.state == nil || prof == nil || !prof.Resolver.Defaults.AdaptiveTimeout {
+		return opts, false
+	}
+	if opts != nil && opts.Timeout != nil {
+		// Keep explicit timeout overrides untouched.
+		return opts, false
+	}
+
+	baseTimeout := resolveQueryTimeout(prof, opts)
+	if baseTimeout <= 0 {
+		return opts, false
+	}
+	reduced := ns.state.adaptiveTimeout.timeoutFor(baseTimeout, usevc)
+	if reduced <= 0 || reduced >= baseTimeout {
+		return opts, true
+	}
+
+	queryOpts := cloneQueryOptions(opts)
+	queryOpts.Timeout = &reduced
+	return queryOpts, true
 }
 
 func (ns Nameserver) queryNetwork(ctx context.Context, qname string, qtype string, qclass string, opts *QueryOptions) (packet.Packet, error) {

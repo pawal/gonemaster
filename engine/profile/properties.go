@@ -159,6 +159,15 @@ var propertyDefs = map[string]propertyDef{
 			return p.Resolver.Defaults.Timeout
 		},
 	},
+	"resolver.defaults.adaptive_timeout": {
+		typ: propBool,
+		setter: func(p *Profile, value any) {
+			p.Resolver.Defaults.AdaptiveTimeout = value.(bool)
+		},
+		getter: func(p *Profile) any {
+			return p.Resolver.Defaults.AdaptiveTimeout
+		},
+	},
 	"resolver.defaults.error_cache_ttl": {
 		typ: propNum,
 		min: intPtr(0),

@@ -2,11 +2,13 @@ package server
 
 import (
 	"context"
+	"errors"
 	"log"
 	"math"
 	"net/netip"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
@@ -226,17 +228,30 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 		ipv4, ipv6 := queryCounter.Totals()
 		return entries, ipv4, ipv6, err
 	}
+	if s.effectiveJobTestParallelism() <= 1 {
+		return s.runJobTestcasesSequential(job.ID, req, job.Tests, queryCounter)
+	}
+	return s.runJobTestcasesParallel(job.ID, req, job.Tests, s.effectiveJobTestParallelism(), queryCounter)
+}
 
+func (s *Server) effectiveJobTestParallelism() int {
+	if s.cfg.JobTestParallelism < 1 {
+		return 1
+	}
+	return s.cfg.JobTestParallelism
+}
+
+func (s *Server) runJobTestcasesSequential(jobID string, req engine.RunRequest, testcases []string, queryCounter *dnsQueryCounter) ([]engine.LogEntry, int64, int64, error) {
 	var all []engine.LogEntry
-	total := len(job.Tests)
-	for i, testcase := range job.Tests {
+	total := len(testcases)
+	for i, testcase := range testcases {
 		runReq := req
 		runReq.Testcase = testcase
 		entries, err := s.runEngine(runReq)
 		if total > 0 {
 			done := i + 1
 			progress := int(math.Round((float64(done) / float64(total)) * 100))
-			s.updateJobProgress(job.ID, progress)
+			s.updateJobProgress(jobID, progress)
 		}
 		if err != nil {
 			ipv4, ipv6 := queryCounter.Totals()
@@ -246,6 +261,131 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 	}
 	ipv4, ipv6 := queryCounter.Totals()
 	return all, ipv4, ipv6, nil
+}
+
+type testcaseWorkItem struct {
+	index    int
+	testcase string
+}
+
+type testcaseRunResult struct {
+	entries []engine.LogEntry
+	err     error
+}
+
+func (s *Server) runJobTestcasesParallel(jobID string, req engine.RunRequest, testcases []string, parallelism int, queryCounter *dnsQueryCounter) ([]engine.LogEntry, int64, int64, error) {
+	if len(testcases) == 0 {
+		ipv4, ipv6 := queryCounter.Totals()
+		return nil, ipv4, ipv6, nil
+	}
+	if parallelism < 1 {
+		parallelism = 1
+	}
+	if parallelism > len(testcases) {
+		parallelism = len(testcases)
+	}
+
+	parentCtx := req.Context
+	if parentCtx == nil {
+		parentCtx = context.Background()
+	}
+	runCtx, cancel := context.WithCancel(parentCtx)
+	defer cancel()
+
+	results := make([]testcaseRunResult, len(testcases))
+	workCh := make(chan testcaseWorkItem)
+	var completed atomic.Int32
+	var wg sync.WaitGroup
+
+	for i := 0; i < parallelism; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for item := range workCh {
+				runReq := req
+				runReq.Context = runCtx
+				runReq.Testcase = item.testcase
+				entries, err := s.runEngine(runReq)
+				results[item.index] = testcaseRunResult{
+					entries: entries,
+					err:     err,
+				}
+				done := int(completed.Add(1))
+				progress := int(math.Round((float64(done) / float64(len(testcases))) * 100))
+				s.updateJobProgress(jobID, progress)
+				if err != nil {
+					cancel()
+				}
+			}
+		}()
+	}
+
+enqueueLoop:
+	for idx, testcase := range testcases {
+		select {
+		case <-runCtx.Done():
+			break enqueueLoop
+		case workCh <- testcaseWorkItem{index: idx, testcase: testcase}:
+		}
+	}
+	close(workCh)
+	wg.Wait()
+
+	failIdx, failErr := firstTestcaseError(results, parentCtx.Err())
+	if failIdx >= 0 {
+		all := mergeOrderedResults(results, failIdx)
+		ipv4, ipv6 := queryCounter.Totals()
+		return all, ipv4, ipv6, failErr
+	}
+
+	all := mergeOrderedResults(results, len(results))
+	ipv4, ipv6 := queryCounter.Totals()
+	return all, ipv4, ipv6, nil
+}
+
+func firstTestcaseError(results []testcaseRunResult, parentCtxErr error) (int, error) {
+	cancelIdx := -1
+	for idx, result := range results {
+		if result.err == nil {
+			continue
+		}
+		if !errors.Is(result.err, context.Canceled) {
+			return idx, result.err
+		}
+		if cancelIdx < 0 {
+			cancelIdx = idx
+		}
+	}
+	if cancelIdx < 0 {
+		return -1, nil
+	}
+	if parentCtxErr != nil {
+		return cancelIdx, parentCtxErr
+	}
+	return cancelIdx, results[cancelIdx].err
+}
+
+func mergeOrderedResults(results []testcaseRunResult, limit int) []engine.LogEntry {
+	if limit < 0 {
+		limit = 0
+	}
+	if limit > len(results) {
+		limit = len(results)
+	}
+	totalEntries := 0
+	for idx := 0; idx < limit; idx++ {
+		if results[idx].err == nil {
+			totalEntries += len(results[idx].entries)
+		}
+	}
+	all := make([]engine.LogEntry, 0, totalEntries)
+	for idx := 0; idx < limit; idx++ {
+		if results[idx].err != nil {
+			continue
+		}
+		all = append(all, results[idx].entries...)
+	}
+	return all
 }
 
 func (s *Server) runEngine(req engine.RunRequest) ([]engine.LogEntry, error) {
@@ -302,8 +442,8 @@ func severityTotalsFromEntries(entries []engine.LogEntry) map[string]int64 {
 }
 
 type dnsQueryCounter struct {
-	ipv4 int64
-	ipv6 int64
+	ipv4 atomic.Int64
+	ipv6 atomic.Int64
 }
 
 // Callback counts EXTERNAL_QUERY events split by IP family.
@@ -319,11 +459,11 @@ func (c *dnsQueryCounter) Callback(entry *logger.Entry) error {
 		return nil
 	}
 	if addr.Is4() {
-		c.ipv4++
+		c.ipv4.Add(1)
 		return nil
 	}
 	if addr.Is6() {
-		c.ipv6++
+		c.ipv6.Add(1)
 	}
 	return nil
 }
@@ -333,7 +473,7 @@ func (c *dnsQueryCounter) Totals() (int64, int64) {
 	if c == nil {
 		return 0, 0
 	}
-	return c.ipv4, c.ipv6
+	return c.ipv4.Load(), c.ipv6.Load()
 }
 
 func dnsQueryAddrFromArgs(args map[string]any) (netip.Addr, bool) {

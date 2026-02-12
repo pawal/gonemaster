@@ -104,6 +104,7 @@ These settings apply to all jobs unless a job overrides the profile.
   "max_body_size": 1048576,
   "debug": true,
   "worker_count": 4,
+  "job_test_parallelism": 1,
   "max_concurrent_jobs": 0,
   "positive_cache_ttl": 0,
   "negative_cache_ttl": 0,
@@ -122,6 +123,7 @@ These settings apply to all jobs unless a job overrides the profile.
 - `--max-body-size` Max request body size in bytes
 - `--debug` Enable request/response logging
 - `--workers` Number of worker goroutines
+- `--job-test-parallelism` Testcase parallelism inside one job
 - `--max-concurrent-jobs` Max concurrent engine runs (0 = unlimited)
 - `--positive-cache-ttl` Seconds to cache positive DNS responses (optional)
 - `--negative-cache-ttl` Seconds to cache negative DNS responses (optional)

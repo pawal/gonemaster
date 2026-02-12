@@ -2,7 +2,9 @@ package server
 
 import (
 	"context"
+	"errors"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -174,6 +176,187 @@ func TestRunEngineForJobLimiter(t *testing.T) {
 		if err := <-errs; err != nil {
 			t.Fatalf("run %d: %v", i, err)
 		}
+	}
+}
+
+func TestRunEngineForJobTestcaseParallelismOrderedMerge(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.JobTestParallelism = 3
+	srv := New(cfg)
+
+	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		switch req.Testcase {
+		case "t1":
+			time.Sleep(30 * time.Millisecond)
+		case "t2":
+			time.Sleep(10 * time.Millisecond)
+		}
+		return []engine.LogEntry{
+			{Testcase: req.Testcase, Level: "NOTICE"},
+		}, nil
+	}
+
+	job := Job{
+		ID:     "job-ordered",
+		Domain: "example.com",
+		Tests:  []string{"t1", "t2", "t3"},
+	}
+	entries, _, _, err := srv.runEngineForJob(job, context.Background())
+	if err != nil {
+		t.Fatalf("run job: %v", err)
+	}
+	if len(entries) != 3 {
+		t.Fatalf("expected 3 entries, got %d", len(entries))
+	}
+	if entries[0].Testcase != "t1" || entries[1].Testcase != "t2" || entries[2].Testcase != "t3" {
+		t.Fatalf("expected ordered testcase merge [t1 t2 t3], got [%s %s %s]", entries[0].Testcase, entries[1].Testcase, entries[2].Testcase)
+	}
+}
+
+func TestRunEngineForJobTestcaseParallelismCap(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.JobTestParallelism = 2
+	srv := New(cfg)
+
+	var inFlight atomic.Int32
+	var maxInFlight atomic.Int32
+	started := make(chan struct{}, 8)
+	release := make(chan struct{})
+	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		current := inFlight.Add(1)
+		for {
+			previous := maxInFlight.Load()
+			if current <= previous {
+				break
+			}
+			if maxInFlight.CompareAndSwap(previous, current) {
+				break
+			}
+		}
+		started <- struct{}{}
+		<-release
+		inFlight.Add(-1)
+		return []engine.LogEntry{{Testcase: req.Testcase, Level: "NOTICE"}}, nil
+	}
+
+	job := Job{
+		ID:     "job-cap",
+		Domain: "example.com",
+		Tests:  []string{"t1", "t2", "t3", "t4"},
+	}
+	errs := make(chan error, 1)
+	go func() {
+		_, _, _, err := srv.runEngineForJob(job, context.Background())
+		errs <- err
+	}()
+
+	for i := 0; i < 2; i++ {
+		select {
+		case <-started:
+		case <-time.After(250 * time.Millisecond):
+			t.Fatalf("expected testcase run %d to start", i+1)
+		}
+	}
+	select {
+	case <-started:
+		t.Fatalf("expected no third concurrent testcase run with parallelism cap=2")
+	case <-time.After(150 * time.Millisecond):
+	}
+
+	close(release)
+	select {
+	case err := <-errs:
+		if err != nil {
+			t.Fatalf("run job: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("timed out waiting for parallel run completion")
+	}
+
+	if got := maxInFlight.Load(); got > 2 {
+		t.Fatalf("max in-flight testcase runs = %d, want <= 2", got)
+	}
+}
+
+func TestRunEngineForJobTestcaseParallelismFirstError(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.JobTestParallelism = 3
+	srv := New(cfg)
+
+	boom := errors.New("testcase boom")
+	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		switch req.Testcase {
+		case "t1":
+			return []engine.LogEntry{{Testcase: "t1", Level: "NOTICE"}}, nil
+		case "t2":
+			return nil, boom
+		case "t3":
+			<-req.Context.Done()
+			return nil, req.Context.Err()
+		default:
+			return nil, nil
+		}
+	}
+
+	job := Job{
+		ID:     "job-error",
+		Domain: "example.com",
+		Tests:  []string{"t1", "t2", "t3"},
+	}
+	entries, _, _, err := srv.runEngineForJob(job, context.Background())
+	if !errors.Is(err, boom) {
+		t.Fatalf("expected boom error, got %v", err)
+	}
+	if len(entries) != 1 || entries[0].Testcase != "t1" {
+		t.Fatalf("expected only successful entries before first failing testcase, got %+v", entries)
+	}
+}
+
+func TestProgressUpdatesForMultipleTestsParallel(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.JobTestParallelism = 3
+	srv := New(cfg)
+	spy := newSpyJobStore()
+	srv.store = spy
+
+	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		switch req.Testcase {
+		case "t1":
+			time.Sleep(20 * time.Millisecond)
+		case "t2":
+			time.Sleep(5 * time.Millisecond)
+		}
+		return nil, nil
+	}
+
+	job := Job{
+		ID:        "job-progress-par",
+		Domain:    "example.com",
+		Tests:     []string{"t1", "t2", "t3"},
+		Status:    JobQueued,
+		CreatedAt: time.Now().UTC(),
+		Progress:  0,
+	}
+	if _, err := srv.store.Create(job); err != nil {
+		t.Fatalf("create job: %v", err)
+	}
+	if err := srv.runJob(job.ID); err != nil {
+		t.Fatalf("run job: %v", err)
+	}
+
+	progresses := spy.Progresses()
+	if len(progresses) == 0 {
+		t.Fatalf("expected progress updates")
+	}
+	last := -1
+	for _, value := range progresses {
+		if value < last {
+			t.Fatalf("expected monotonic progress updates, got %v", progresses)
+		}
+		last = value
+	}
+	if last != 100 {
+		t.Fatalf("expected final progress 100, got %d (all: %v)", last, progresses)
 	}
 }
 

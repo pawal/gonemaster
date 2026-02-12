@@ -23,6 +23,23 @@ func TestRunWorkersValidation(t *testing.T) {
 	}
 }
 
+func TestRunJobTestParallelismValidation(t *testing.T) {
+	out := newTempFile(t)
+	errOut := newTempFile(t)
+	defer cleanupTempFile(t, out)
+	defer cleanupTempFile(t, errOut)
+
+	code := run([]string{"--job-test-parallelism", "0"}, out, errOut)
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d", code)
+	}
+
+	errText := readTempFile(t, errOut)
+	if !strings.Contains(errText, "--job-test-parallelism must be >= 1") {
+		t.Fatalf("expected job-test-parallelism validation error, got %q", errText)
+	}
+}
+
 func TestRunInvalidConfig(t *testing.T) {
 	out := newTempFile(t)
 	errOut := newTempFile(t)

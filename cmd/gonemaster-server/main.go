@@ -26,6 +26,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	var maxBodySize int64
 	var debug bool
 	var workerCount int
+	var jobTestParallelism int
 	var maxConcurrentJobs int
 	var positiveCacheTTL int
 	var negativeCacheTTL int
@@ -41,6 +42,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	var maxBodySizeSet bool
 	var debugSet bool
 	var workerCountSet bool
+	var jobTestParallelismSet bool
 	var maxConcurrentJobsSet bool
 	var positiveCacheTTLSet bool
 	var negativeCacheTTLSet bool
@@ -55,7 +57,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	fs := flag.NewFlagSet("gonemaster-server", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	fs.Usage = func() {
-		fmt.Fprintf(errOut, "Usage: %s [--config PATH] [--listen ADDR] [--max-body-size BYTES] [--debug] [--workers N] [--max-concurrent-jobs N] [--positive-cache-ttl N] [--negative-cache-ttl N] [--timeout N] [--retry N] [--retrans N] [--fallback|--no-fallback] [--min-level LEVEL] [--profile PATH] [--shutdown-timeout DURATION]\n", fs.Name())
+		fmt.Fprintf(errOut, "Usage: %s [--config PATH] [--listen ADDR] [--max-body-size BYTES] [--debug] [--workers N] [--job-test-parallelism N] [--max-concurrent-jobs N] [--positive-cache-ttl N] [--negative-cache-ttl N] [--timeout N] [--retry N] [--retrans N] [--fallback|--no-fallback] [--min-level LEVEL] [--profile PATH] [--shutdown-timeout DURATION]\n", fs.Name())
 		fmt.Fprintln(errOut, "")
 		fmt.Fprintln(errOut, "Options:")
 		fmt.Fprintln(errOut, "  --config            JSON config file path (optional)")
@@ -63,6 +65,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 		fmt.Fprintln(errOut, "  --max-body-size     Max request body size in bytes (default 1048576)")
 		fmt.Fprintln(errOut, "  --debug             Enable request/response logging")
 		fmt.Fprintln(errOut, "  --workers           Number of worker goroutines (default 4)")
+		fmt.Fprintln(errOut, "  --job-test-parallelism  Testcase parallelism inside one job (default 1)")
 		fmt.Fprintln(errOut, "  --max-concurrent-jobs  Max concurrent engine runs (0 = unlimited)")
 		fmt.Fprintln(errOut, "  --positive-cache-ttl  Seconds to cache positive DNS responses (optional)")
 		fmt.Fprintln(errOut, "  --negative-cache-ttl  Seconds to cache negative DNS responses (optional)")
@@ -80,6 +83,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	fs.Int64Var(&maxBodySize, "max-body-size", 0, "Max request body size in bytes (default 1048576)")
 	fs.BoolVar(&debug, "debug", false, "Enable request/response logging")
 	fs.IntVar(&workerCount, "workers", 0, "Number of worker goroutines (default 4)")
+	fs.IntVar(&jobTestParallelism, "job-test-parallelism", 0, "Testcase parallelism inside one job (default 1)")
 	fs.IntVar(&maxConcurrentJobs, "max-concurrent-jobs", 0, "Max concurrent engine runs (0 = unlimited)")
 	fs.IntVar(&positiveCacheTTL, "positive-cache-ttl", 0, "Seconds to cache positive DNS responses (optional)")
 	fs.IntVar(&negativeCacheTTL, "negative-cache-ttl", 0, "Seconds to cache negative DNS responses (optional)")
@@ -104,6 +108,8 @@ func run(args []string, out *os.File, errOut *os.File) int {
 			debugSet = true
 		case "workers":
 			workerCountSet = true
+		case "job-test-parallelism":
+			jobTestParallelismSet = true
 		case "max-concurrent-jobs":
 			maxConcurrentJobsSet = true
 		case "positive-cache-ttl":
@@ -128,6 +134,10 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	})
 	if workerCountSet && workerCount < 1 {
 		fmt.Fprintln(errOut, "--workers must be >= 1")
+		return 2
+	}
+	if jobTestParallelismSet && jobTestParallelism < 1 {
+		fmt.Fprintln(errOut, "--job-test-parallelism must be >= 1")
 		return 2
 	}
 	if maxConcurrentJobsSet && maxConcurrentJobs < 0 {
@@ -179,6 +189,9 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	}
 	if workerCountSet {
 		cfg.WorkerCount = workerCount
+	}
+	if jobTestParallelismSet {
+		cfg.JobTestParallelism = jobTestParallelism
 	}
 	if maxConcurrentJobsSet {
 		cfg.MaxConcurrentJobs = maxConcurrentJobs

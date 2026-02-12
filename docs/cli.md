@@ -64,7 +64,6 @@ Use `--output PATH` to write the selected output to a file.
 | `--locale LOCALE` | string | Locale for translated output (defaults to environment, then `en`). |
 | `--no-ipv4` | bool | Disable IPv4 queries (overrides profile setting). |
 | `--no-ipv6` | bool | Disable IPv6 queries (overrides profile setting). |
-| `--job-test-parallelism N` | int | Parallel testcase runs per domain. Must be `>= 1` when set. |
 | `--parallel N` | int | Override `resolver.defaults.parallel`. Must be `>= 1` when set. |
 | `--unordered` | bool | Allow unordered resolver behavior (overrides `resolver.defaults.unordered`). |
 | `--ordered` | bool | Force ordered resolver behavior (overrides `resolver.defaults.unordered`). |

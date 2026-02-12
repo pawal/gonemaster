@@ -7,7 +7,6 @@ import (
 	"os"
 	"strings"
 
-	"codeberg.org/pawal/gonemaster/cmd/internal/testrun"
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/i18n"
 	"codeberg.org/pawal/gonemaster/engine/logger"
@@ -61,8 +60,6 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	var disableIPv4 bool
 	var disableIPv6 bool
 	var forceIPv6 bool
-	var jobTestParallelism int
-	var jobTestParallelismSet bool
 	var showVersion bool
 	var showHelp bool
 	var verbose countFlag
@@ -70,7 +67,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs := flag.NewFlagSet("gonemaster-nagios", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	fs.Usage = func() {
-		fmt.Fprintf(errOut, "Usage: %s -d DOMAIN [-v|-vv|-vvv] [--module MODULE] [--testcase TESTCASE] [--profile PATH] [--no-ipv4|--disable-ipv4] [--no-ipv6|--disable-ipv6|--ipv6] [--job-test-parallelism N] [--version]\n", fs.Name())
+		fmt.Fprintf(errOut, "Usage: %s -d DOMAIN [-v|-vv|-vvv] [--module MODULE] [--testcase TESTCASE] [--profile PATH] [--no-ipv4|--disable-ipv4] [--no-ipv6|--disable-ipv6|--ipv6] [--version]\n", fs.Name())
 		fmt.Fprintln(errOut, "")
 		fmt.Fprintln(errOut, "Options:")
 		fmt.Fprintln(errOut, "  -d, --domain   Zone name to test (required)")
@@ -82,7 +79,6 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		fmt.Fprintln(errOut, "  --disable-ipv4 Disable IPv4 queries (optional)")
 		fmt.Fprintln(errOut, "  --disable-ipv6 Disable IPv6 queries (optional)")
 		fmt.Fprintln(errOut, "  --ipv6         Force IPv6 queries (optional)")
-		fmt.Fprintln(errOut, "  --job-test-parallelism  Parallel testcase runs per domain (optional)")
 		fmt.Fprintln(errOut, "  -v, --verbose  Increase verbosity (repeatable)")
 		fmt.Fprintln(errOut, "  -V, --version  Print version and exit")
 		fmt.Fprintln(errOut, "  -h, --help     Show help")
@@ -104,7 +100,6 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs.BoolVar(&disableIPv4, "disable-ipv4", false, "Disable IPv4 queries (optional)")
 	fs.BoolVar(&disableIPv6, "disable-ipv6", false, "Disable IPv6 queries (optional)")
 	fs.BoolVar(&forceIPv6, "ipv6", false, "Force IPv6 queries (optional)")
-	fs.IntVar(&jobTestParallelism, "job-test-parallelism", 0, "Parallel testcase runs per domain (optional)")
 	fs.Var(&verbose, "verbose", "Increase verbosity (repeatable)")
 	fs.Var(&verbose, "v", "Increase verbosity (repeatable)")
 	fs.BoolVar(&showVersion, "version", false, "Print version and exit")
@@ -115,11 +110,6 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	if err := fs.Parse(expandVerboseArgs(args)); err != nil {
 		return 3
 	}
-	fs.Visit(func(f *flag.Flag) {
-		if f.Name == "job-test-parallelism" {
-			jobTestParallelismSet = true
-		}
-	})
 
 	if showHelp {
 		fs.Usage()
@@ -154,10 +144,6 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		fmt.Fprintln(errOut, "--no-ipv6/--disable-ipv6 cannot be combined with --ipv6")
 		return 3
 	}
-	if jobTestParallelismSet && jobTestParallelism < 1 {
-		fmt.Fprintln(errOut, "--job-test-parallelism must be >= 1")
-		return 3
-	}
 
 	req := engine.RunRequest{
 		Domain:   domain,
@@ -167,11 +153,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		IPv4:     ipv4Override,
 		IPv6:     ipv6Override,
 	}
-	effectiveJobTestParallelism := 1
-	if jobTestParallelismSet {
-		effectiveJobTestParallelism = jobTestParallelism
-	}
-	entries, err := testrun.Run(req, effectiveJobTestParallelism, engine.PlannedTestcases, engine.Run)
+	entries, err := engine.Run(req)
 	if err != nil {
 		fmt.Fprintf(out, "ZONE UNKNOWN - %s\n", err.Error())
 		return 3

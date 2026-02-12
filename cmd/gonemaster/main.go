@@ -12,7 +12,6 @@ import (
 	"runtime/debug"
 	"syscall"
 
-	"codeberg.org/pawal/gonemaster/cmd/internal/testrun"
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/normalization"
 )
@@ -36,8 +35,6 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	var noIPv4 bool
 	var noIPv6 bool
 	var forceIPv6 bool
-	var jobTestParallelism int
-	var jobTestParallelismSet bool
 	var parallel int
 	var parallelSet bool
 	var unordered bool
@@ -67,7 +64,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs := flag.NewFlagSet("gonemaster", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	fs.Usage = func() {
-		fmt.Fprintf(errOut, "Usage: %s --domain DOMAIN [--module MODULE] [--testcase TESTCASE] [--profile PATH] [--min-level LEVEL] [--output PATH] [--raw] [--json] [--json-stream] [--dump-profile] [--locale LOCALE] [--no-ipv4] [--no-ipv6|--ipv6] [--job-test-parallelism N] [--parallel N] [--unordered] [--ordered] [--timeout N] [--retry N] [--retrans N] [--fallback|--no-fallback] [--error-cache-ttl N] [--positive-cache-ttl N] [--negative-cache-ttl N] [--no-progress] [--list-tests] [--version]\n", fs.Name())
+		fmt.Fprintf(errOut, "Usage: %s --domain DOMAIN [--module MODULE] [--testcase TESTCASE] [--profile PATH] [--min-level LEVEL] [--output PATH] [--raw] [--json] [--json-stream] [--dump-profile] [--locale LOCALE] [--no-ipv4] [--no-ipv6|--ipv6] [--parallel N] [--unordered] [--ordered] [--timeout N] [--retry N] [--retrans N] [--fallback|--no-fallback] [--error-cache-ttl N] [--positive-cache-ttl N] [--negative-cache-ttl N] [--no-progress] [--list-tests] [--version]\n", fs.Name())
 		fmt.Fprintln(errOut, "")
 		fmt.Fprintln(errOut, "Options:")
 		fmt.Fprintln(errOut, "  --domain     Zone name to test (required)")
@@ -84,7 +81,6 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		fmt.Fprintln(errOut, "  --no-ipv4    Disable IPv4 queries (optional)")
 		fmt.Fprintln(errOut, "  --no-ipv6    Disable IPv6 queries (optional)")
 		fmt.Fprintln(errOut, "  --ipv6       Force IPv6 queries (optional)")
-		fmt.Fprintln(errOut, "  --job-test-parallelism  Parallel testcase runs per domain (optional)")
 		fmt.Fprintln(errOut, "  --parallel   Override resolver.defaults.parallel (optional)")
 		fmt.Fprintln(errOut, "  --unordered  Allow unordered resolver behavior (optional, override profile)")
 		fmt.Fprintln(errOut, "  --ordered    Force ordered resolver behavior (optional, override profile)")
@@ -119,7 +115,6 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs.BoolVar(&noIPv4, "no-ipv4", false, "Disable IPv4 queries (optional)")
 	fs.BoolVar(&noIPv6, "no-ipv6", false, "Disable IPv6 queries (optional)")
 	fs.BoolVar(&forceIPv6, "ipv6", false, "Force IPv6 queries (optional)")
-	fs.IntVar(&jobTestParallelism, "job-test-parallelism", 0, "Parallel testcase runs per domain (optional)")
 	fs.IntVar(&parallel, "parallel", 0, "Override resolver.defaults.parallel (optional)")
 	fs.BoolVar(&unordered, "unordered", false, "Allow unordered resolver behavior (optional, override profile)")
 	fs.BoolVar(&ordered, "ordered", false, "Force ordered resolver behavior (optional, override profile)")
@@ -138,9 +133,6 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		return 2
 	}
 	fs.Visit(func(f *flag.Flag) {
-		if f.Name == "job-test-parallelism" {
-			jobTestParallelismSet = true
-		}
 		if f.Name == "parallel" {
 			parallelSet = true
 		}
@@ -294,10 +286,6 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	}
 	if noIPv6 && forceIPv6 {
 		fmt.Fprintln(errOut, "--no-ipv6 cannot be combined with --ipv6")
-		return 2
-	}
-	if jobTestParallelismSet && jobTestParallelism < 1 {
-		fmt.Fprintln(errOut, "--job-test-parallelism must be >= 1")
 		return 2
 	}
 
@@ -456,11 +444,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		}
 	}
 
-	effectiveJobTestParallelism := 1
-	if jobTestParallelismSet {
-		effectiveJobTestParallelism = jobTestParallelism
-	}
-	entries, err := testrun.Run(req, effectiveJobTestParallelism, engine.PlannedTestcases, engine.Run)
+	entries, err := engine.Run(req)
 	if progress != nil {
 		progress.Finish()
 	}

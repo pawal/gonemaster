@@ -33,6 +33,7 @@ gonemaster-nagios -d example.com --profile ./profile.json
 - `--profile` Profile JSON/YAML path
 - `--no-ipv4` / `--disable-ipv4` Disable IPv4 queries
 - `--no-ipv6` / `--disable-ipv6` Disable IPv6 queries
+- `--job-test-parallelism N` Parallel testcase runs per domain (`>= 1`)
 
 ## Exit codes
 - `0` OK

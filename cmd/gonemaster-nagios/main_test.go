@@ -47,6 +47,19 @@ func TestRunMissingDomain(t *testing.T) {
 	}
 }
 
+func TestRunRejectsInvalidJobTestParallelism(t *testing.T) {
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := run([]string{"--domain", "example.com", "--job-test-parallelism", "0"}, &out, &errOut)
+	if code != 3 {
+		t.Fatalf("expected exit code 3, got %d", code)
+	}
+	if !strings.Contains(errOut.String(), "--job-test-parallelism must be >= 1") {
+		t.Fatalf("expected validation output, got %q", errOut.String())
+	}
+}
+
 func TestExpandVerboseArgs(t *testing.T) {
 	args := expandVerboseArgs([]string{"-vvv", "--domain", "example.com"})
 	if len(args) != 5 {

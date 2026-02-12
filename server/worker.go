@@ -104,6 +104,8 @@ func (s *Server) runJob(jobID string) error {
 	if _, _, _, err := s.updateJobWithMetricsTransition(job); err != nil {
 		return err
 	}
+	s.initProgressWriteState(job.ID, 0, now)
+	defer s.clearProgressWriteState(job.ID)
 
 	entries, ipv4Queries, ipv6Queries, runErr := s.runEngineForJob(job, jobCtx)
 	s.metrics.ObserveDNSQueries(ipv4Queries, ipv6Queries)
@@ -401,6 +403,11 @@ func (s *Server) updateJobProgress(jobID string, progress int) {
 	} else if progress > 100 {
 		progress = 100
 	}
+	now := time.Now().UTC()
+	if !s.prepareProgressPersist(jobID, progress, now) {
+		return
+	}
+
 	job, ok := s.store.Get(jobID)
 	if !ok {
 		return

@@ -92,6 +92,79 @@ func TestProgressUpdatesForMultipleTests(t *testing.T) {
 	}
 }
 
+func TestUpdateJobProgressCoalescesSmallIncrements(t *testing.T) {
+	srv := New(DefaultConfig())
+	spy := newSpyJobStore()
+	srv.store = spy
+	srv.progressWriteMinStep = 10
+	srv.progressWriteMinInterval = time.Hour
+
+	job := Job{
+		ID:        "job-progress-coalesce",
+		Domain:    "example.com",
+		Status:    JobRunning,
+		CreatedAt: time.Now().UTC(),
+		Progress:  0,
+	}
+	if _, err := srv.store.Create(job); err != nil {
+		t.Fatalf("create job: %v", err)
+	}
+	srv.initProgressWriteState(job.ID, 0, time.Now().UTC())
+	defer srv.clearProgressWriteState(job.ID)
+
+	for progress := 1; progress < 10; progress++ {
+		srv.updateJobProgress(job.ID, progress)
+	}
+	if got := spy.Progresses(); len(got) != 0 {
+		t.Fatalf("expected no persisted progress before threshold, got %v", got)
+	}
+
+	srv.updateJobProgress(job.ID, 10)
+	progresses := spy.Progresses()
+	if len(progresses) != 1 || progresses[0] != 10 {
+		t.Fatalf("expected one persisted progress update [10], got %v", progresses)
+	}
+}
+
+func TestUpdateJobProgressAlwaysPersistsTerminal100(t *testing.T) {
+	srv := New(DefaultConfig())
+	spy := newSpyJobStore()
+	srv.store = spy
+	srv.progressWriteMinStep = 200
+	srv.progressWriteMinInterval = time.Hour
+
+	job := Job{
+		ID:        "job-progress-terminal",
+		Domain:    "example.com",
+		Status:    JobRunning,
+		CreatedAt: time.Now().UTC(),
+		Progress:  0,
+	}
+	if _, err := srv.store.Create(job); err != nil {
+		t.Fatalf("create job: %v", err)
+	}
+	srv.initProgressWriteState(job.ID, 0, time.Now().UTC())
+	defer srv.clearProgressWriteState(job.ID)
+
+	srv.updateJobProgress(job.ID, 99)
+	if got := spy.Progresses(); len(got) != 0 {
+		t.Fatalf("expected no persisted progress before terminal update, got %v", got)
+	}
+
+	srv.updateJobProgress(job.ID, 100)
+	progresses := spy.Progresses()
+	if len(progresses) != 1 || progresses[0] != 100 {
+		t.Fatalf("expected terminal progress update [100], got %v", progresses)
+	}
+	jobAfter, ok := srv.store.Get(job.ID)
+	if !ok {
+		t.Fatalf("expected stored job")
+	}
+	if jobAfter.Progress != 100 {
+		t.Fatalf("expected stored progress 100, got %d", jobAfter.Progress)
+	}
+}
+
 func TestRunEngineForJobParallel(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.MaxConcurrentJobs = 0

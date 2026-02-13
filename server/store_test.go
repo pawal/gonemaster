@@ -1,6 +1,9 @@
 package server
 
 import (
+	"fmt"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -241,6 +244,145 @@ func TestInMemoryJobStoreSeverityTotalsFromSummary(t *testing.T) {
 	totals := list.Items[0].SeverityTotals
 	if totals["NOTICE"] != 1 || totals["ERROR"] != 2 || totals["WARNING"] != 0 || totals["CRITICAL"] != 0 {
 		t.Fatalf("unexpected severity_totals: %+v", totals)
+	}
+}
+
+func TestInMemoryJobStoreSetResultMissingJob(t *testing.T) {
+	store := NewInMemoryJobStore()
+	err := store.SetResult("missing", JobResult{JobID: "missing"})
+	if err == nil {
+		t.Fatalf("expected error when setting result for missing job")
+	}
+}
+
+func TestInMemoryJobStoreConcurrentAccess(t *testing.T) {
+	store := NewInMemoryJobStore()
+	base := time.Now().UTC().Add(-time.Minute)
+	const totalJobs = 120
+	for i := 0; i < totalJobs; i++ {
+		id := fmt.Sprintf("job-%03d", i)
+		_, err := store.Create(Job{
+			ID:        id,
+			BatchID:   "batch-a",
+			Domain:    fmt.Sprintf("example-%03d.test", i),
+			Status:    JobQueued,
+			CreatedAt: base.Add(time.Duration(i) * time.Millisecond),
+		})
+		if err != nil {
+			t.Fatalf("seed create %s: %v", id, err)
+		}
+	}
+
+	done := make(chan struct{})
+	var wg sync.WaitGroup
+	var setResultErrors atomic.Int32
+
+	// Writers update job metadata.
+	for worker := 0; worker < 4; worker++ {
+		wg.Add(1)
+		go func(worker int) {
+			defer wg.Done()
+			idx := worker
+			for {
+				select {
+				case <-done:
+					return
+				default:
+				}
+				id := fmt.Sprintf("job-%03d", idx%totalJobs)
+				job, ok := store.Get(id)
+				if ok {
+					job.Status = JobRunning
+					job.StartedAt = time.Now().UTC()
+					if err := store.Update(job); err != nil {
+						t.Errorf("update %s: %v", id, err)
+						return
+					}
+				}
+				idx += 7
+			}
+		}(worker)
+	}
+
+	// Result writers continuously set synthetic summaries.
+	for worker := 0; worker < 4; worker++ {
+		wg.Add(1)
+		go func(worker int) {
+			defer wg.Done()
+			idx := worker
+			for {
+				select {
+				case <-done:
+					return
+				default:
+				}
+				id := fmt.Sprintf("job-%03d", idx%totalJobs)
+				err := store.SetResult(id, JobResult{
+					JobID:  id,
+					Status: JobSucceeded,
+					Summary: map[string]any{
+						"levels": map[string]int{
+							"WARNING":  idx % 3,
+							"ERROR":    idx % 2,
+							"CRITICAL": (idx / 2) % 2,
+						},
+					},
+				})
+				if err != nil {
+					setResultErrors.Add(1)
+					t.Errorf("set result %s: %v", id, err)
+					return
+				}
+				idx += 5
+			}
+		}(worker)
+	}
+
+	// Readers stress list paths that require severity totals and sorting.
+	for worker := 0; worker < 6; worker++ {
+		wg.Add(1)
+		go func(worker int) {
+			defer wg.Done()
+			sorts := []JobSort{JobSortStartedAtDesc, JobSortErrorDesc, JobSortCriticalDesc, JobSortDomainAsc}
+			for iteration := 0; ; iteration++ {
+				select {
+				case <-done:
+					return
+				default:
+				}
+				list := store.List(JobFilter{
+					Limit:    40,
+					Sort:     sorts[(worker+iteration)%len(sorts)],
+					Severity: JobSeverityWarningsPlus,
+				})
+				if list.Total < len(list.Items) {
+					t.Errorf("invalid list total/items: total=%d items=%d", list.Total, len(list.Items))
+					return
+				}
+				for _, job := range list.Items {
+					totals := job.SeverityTotals
+					for _, level := range []string{"NOTICE", "WARNING", "ERROR", "CRITICAL"} {
+						if _, ok := totals[level]; !ok {
+							t.Errorf("missing severity level %q for job %s", level, job.ID)
+							return
+						}
+					}
+				}
+			}
+		}(worker)
+	}
+
+	time.Sleep(500 * time.Millisecond)
+	close(done)
+	wg.Wait()
+
+	if got := setResultErrors.Load(); got != 0 {
+		t.Fatalf("set result errors = %d, want 0", got)
+	}
+
+	final := store.List(JobFilter{Limit: totalJobs, Sort: JobSortCreatedAtAsc})
+	if final.Total != totalJobs {
+		t.Fatalf("final total = %d, want %d", final.Total, totalJobs)
 	}
 }
 

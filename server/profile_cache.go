@@ -51,6 +51,8 @@ func newProfileOverrideCache(maxEntries int, ttl time.Duration) *profileOverride
 	}
 }
 
+// Get returns a cached merged-profile path for key when present and not expired.
+// Expired entries are removed and their temporary files are deleted.
 func (c *profileOverrideCache) Get(key string) (string, bool) {
 	if c == nil || key == "" {
 		return "", false
@@ -81,6 +83,8 @@ func (c *profileOverrideCache) Get(key string) (string, bool) {
 	return entry.path, true
 }
 
+// Put stores path for key and returns whether it was inserted, already existed,
+// or skipped due to cache limits.
 func (c *profileOverrideCache) Put(key string, path string) (profileCachePutState, string) {
 	if c == nil || key == "" || path == "" {
 		return profileCachePutNotCached, ""
@@ -150,6 +154,7 @@ func (c *profileOverrideCache) oldestEntryLocked() (string, profileOverrideCache
 	return victimKey, victim, found
 }
 
+// Close removes all cached entries and deletes their temporary files.
 func (c *profileOverrideCache) Close() {
 	if c == nil {
 		return

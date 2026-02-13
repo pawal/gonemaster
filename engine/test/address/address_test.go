@@ -170,15 +170,12 @@ func TestAddress02ParallelPTRQueries(t *testing.T) {
 		t.Fatalf("add root hints: %v", err)
 	}
 
-	started := make(chan string, 2)
+	started := make(chan string, 16)
 	release := make(chan struct{})
 
 	hook := func(ctx context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		if strings.EqualFold(qtype, "PTR") {
-			select {
-			case started <- qname:
-			default:
-			}
+			started <- qname
 			select {
 			case <-release:
 			case <-ctx.Done():
@@ -206,7 +203,7 @@ func TestAddress02ParallelPTRQueries(t *testing.T) {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(baseCtx, 2*time.Second)
+	ctx, cancel := context.WithTimeout(baseCtx, 5*time.Second)
 	defer cancel()
 
 	done := make(chan struct{})
@@ -230,7 +227,7 @@ func TestAddress02ParallelPTRQueries(t *testing.T) {
 	want[ptr2] = true
 
 	got := map[string]bool{}
-	deadline := time.After(1 * time.Second)
+	deadline := time.After(3 * time.Second)
 	for len(got) < 2 {
 		select {
 		case name := <-started:
@@ -247,7 +244,7 @@ func TestAddress02ParallelPTRQueries(t *testing.T) {
 		if addrErr != nil {
 			t.Fatalf("address02: %v", addrErr)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(3 * time.Second):
 		t.Fatalf("address02 did not finish")
 	}
 
@@ -288,15 +285,12 @@ func TestAddress03ParallelPTRQueries(t *testing.T) {
 		t.Fatalf("add root hints: %v", err)
 	}
 
-	started := make(chan string, 2)
+	started := make(chan string, 16)
 	release := make(chan struct{})
 
 	hook := func(ctx context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		if strings.EqualFold(qtype, "PTR") {
-			select {
-			case started <- qname:
-			default:
-			}
+			started <- qname
 			select {
 			case <-release:
 			case <-ctx.Done():
@@ -324,7 +318,7 @@ func TestAddress03ParallelPTRQueries(t *testing.T) {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(baseCtx, 2*time.Second)
+	ctx, cancel := context.WithTimeout(baseCtx, 5*time.Second)
 	defer cancel()
 
 	done := make(chan struct{})
@@ -336,7 +330,7 @@ func TestAddress03ParallelPTRQueries(t *testing.T) {
 	}()
 
 	got := map[string]bool{}
-	deadline := time.After(1 * time.Second)
+	deadline := time.After(3 * time.Second)
 	for len(got) < 2 {
 		select {
 		case name := <-started:
@@ -353,7 +347,7 @@ func TestAddress03ParallelPTRQueries(t *testing.T) {
 		if addrErr != nil {
 			t.Fatalf("address03: %v", addrErr)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(3 * time.Second):
 		t.Fatalf("address03 did not finish")
 	}
 

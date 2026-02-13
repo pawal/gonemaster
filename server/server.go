@@ -25,6 +25,7 @@ type Server struct {
 	progressWriteMinStep     int
 	progressWriteMinInterval time.Duration
 	profileOverrideCache     *profileOverrideCache
+	nameserverHotCache       *nameserverHotCache
 	engineRunner             func(engine.RunRequest) ([]engine.LogEntry, error)
 	engineLimiter            *engineLimiter
 	cancelMu                 sync.Mutex
@@ -50,6 +51,9 @@ func New(cfg Config) *Server {
 		engineRunner:             engine.Run,
 		engineLimiter:            newEngineLimiter(cfg.MaxConcurrentJobs),
 		cancels:                  map[string]context.CancelFunc{},
+	}
+	if cfg.CrossJobHotCache {
+		s.nameserverHotCache = newNameserverHotCache(defaultNameserverHotCacheMaxEntries, cfg.EffectiveCrossJobHotCacheTTL())
 	}
 	s.routes()
 	return s

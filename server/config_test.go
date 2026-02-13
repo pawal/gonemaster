@@ -10,6 +10,12 @@ func TestDefaultConfigListenAddr(t *testing.T) {
 	if cfg.JobTestParallelism != 1 {
 		t.Fatalf("expected default job_test_parallelism 1, got %d", cfg.JobTestParallelism)
 	}
+	if cfg.CrossJobHotCache {
+		t.Fatalf("expected default cross_job_hot_cache false")
+	}
+	if cfg.CrossJobHotCacheTTLSeconds != defaultCrossJobHotCacheTTLSeconds {
+		t.Fatalf("expected default cross_job_hot_cache_ttl_seconds %d, got %d", defaultCrossJobHotCacheTTLSeconds, cfg.CrossJobHotCacheTTLSeconds)
+	}
 }
 
 func TestApplyFileConfigJobTestParallelism(t *testing.T) {
@@ -31,6 +37,22 @@ func TestApplyFileConfigAutoClampConcurrency(t *testing.T) {
 	})
 	if !cfg.AutoClampConcurrency {
 		t.Fatalf("expected auto_clamp_concurrency true")
+	}
+}
+
+func TestApplyFileConfigCrossJobHotCache(t *testing.T) {
+	cfg := DefaultConfig()
+	enabled := true
+	ttl := 15
+	cfg.ApplyFileConfig(FileConfig{
+		CrossJobHotCache:    &enabled,
+		CrossJobHotCacheTTL: &ttl,
+	})
+	if !cfg.CrossJobHotCache {
+		t.Fatalf("expected cross_job_hot_cache true")
+	}
+	if cfg.CrossJobHotCacheTTLSeconds != 15 {
+		t.Fatalf("expected cross_job_hot_cache_ttl_seconds 15, got %d", cfg.CrossJobHotCacheTTLSeconds)
 	}
 }
 
@@ -125,6 +147,26 @@ func TestConfigEffectiveEngineConcurrency(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := tc.cfg.EffectiveEngineConcurrency(); got != tc.want {
 				t.Fatalf("EffectiveEngineConcurrency() = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestConfigEffectiveCrossJobHotCacheTTL(t *testing.T) {
+	tests := []struct {
+		name string
+		in   int
+		want int
+	}{
+		{name: "default-when-zero", in: 0, want: defaultCrossJobHotCacheTTLSeconds},
+		{name: "default-when-negative", in: -4, want: defaultCrossJobHotCacheTTLSeconds},
+		{name: "explicit", in: 45, want: 45},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := Config{CrossJobHotCacheTTLSeconds: tc.in}
+			if got := int(cfg.EffectiveCrossJobHotCacheTTL().Seconds()); got != tc.want {
+				t.Fatalf("EffectiveCrossJobHotCacheTTL() = %d, want %d", got, tc.want)
 			}
 		})
 	}

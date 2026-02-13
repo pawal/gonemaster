@@ -107,6 +107,8 @@ These settings apply to all jobs unless a job overrides the profile.
   "auto_clamp_concurrency": false,
   "job_test_parallelism": 1,
   "max_concurrent_jobs": 0,
+  "cross_job_hot_cache": false,
+  "cross_job_hot_cache_ttl_seconds": 60,
   "positive_cache_ttl": 0,
   "negative_cache_ttl": 0,
   "timeout": 5,
@@ -145,6 +147,8 @@ At startup, `gonemaster-server` prints an `Effective concurrency:` line so you c
 - `--auto-clamp-concurrency` Clamp pathological concurrency values based on CPU count
 - `--job-test-parallelism` Testcase parallelism inside one job
 - `--max-concurrent-jobs` Max concurrent engine runs (0 = unlimited)
+- `--cross-job-hot-cache` Enable short-lived warmed nameserver cache reuse across jobs
+- `--cross-job-hot-cache-ttl-seconds` TTL for cross-job hot cache entries (default 60)
 - `--positive-cache-ttl` Seconds to cache positive DNS responses (optional)
 - `--negative-cache-ttl` Seconds to cache negative DNS responses (optional)
 - `--timeout` Override resolver.defaults.timeout in seconds (optional)

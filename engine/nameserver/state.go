@@ -307,6 +307,115 @@ func (c *CacheStore) storeNameserver(nameKey string, addr string, ns *Nameserver
 	c.objectCache[nameKey][addr] = ns
 }
 
+// SnapshotForRun returns a run-local cache store that reuses warmed query/error
+// caches from c while starting with an empty nameserver object cache.
+//
+// This allows callers to reuse cached DNS answers across runs without sharing
+// mutable per-nameserver adaptation state.
+func (c *CacheStore) SnapshotForRun() *CacheStore {
+	if c == nil {
+		return NewCacheStore()
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	snapshot := &CacheStore{
+		objectCache:      map[string]map[string]*Nameserver{},
+		cacheByAddress:   make(map[string]*queryCache, len(c.cacheByAddress)),
+		errorCacheByAddr: make(map[string]*errorCache, len(c.errorCacheByAddr)),
+	}
+	for addr, cache := range c.cacheByAddress {
+		snapshot.cacheByAddress[addr] = cache
+	}
+	for addr, cache := range c.errorCacheByAddr {
+		snapshot.errorCacheByAddr[addr] = cache
+	}
+	return snapshot
+}
+
+// MergeWarmDataFrom merges warmed query/error caches from other into c.
+//
+// Nameserver object instances are intentionally not merged to avoid sharing
+// mutable adaptation state across runs.
+func (c *CacheStore) MergeWarmDataFrom(other *CacheStore) {
+	if c == nil || other == nil || c == other {
+		return
+	}
+
+	other.mu.Lock()
+	queryByAddress := make(map[string]*queryCache, len(other.cacheByAddress))
+	for addr, cache := range other.cacheByAddress {
+		queryByAddress[addr] = cache
+	}
+	errorByAddress := make(map[string]*errorCache, len(other.errorCacheByAddr))
+	for addr, cache := range other.errorCacheByAddr {
+		errorByAddress[addr] = cache
+	}
+	other.mu.Unlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	for addr, cache := range queryByAddress {
+		if cache == nil {
+			continue
+		}
+		if _, ok := c.cacheByAddress[addr]; ok {
+			continue
+		}
+		cache.mu.Lock()
+		cache.met = &c.queryMetrics
+		cache.mu.Unlock()
+		c.cacheByAddress[addr] = cache
+	}
+	for addr, cache := range errorByAddress {
+		if cache == nil {
+			continue
+		}
+		if _, ok := c.errorCacheByAddr[addr]; ok {
+			continue
+		}
+		cache.mu.Lock()
+		cache.met = &c.errorMetrics
+		cache.mu.Unlock()
+		c.errorCacheByAddr[addr] = cache
+	}
+}
+
+// AddressCacheCount returns the number of per-address query cache buckets.
+func (c *CacheStore) AddressCacheCount() int {
+	if c == nil {
+		return 0
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.cacheByAddress)
+}
+
+// ErrorCacheCount returns the number of per-address error cache buckets.
+func (c *CacheStore) ErrorCacheCount() int {
+	if c == nil {
+		return 0
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.errorCacheByAddr)
+}
+
+// NameserverObjectCount returns the number of cached nameserver objects.
+func (c *CacheStore) NameserverObjectCount() int {
+	if c == nil {
+		return 0
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	total := 0
+	for _, byAddress := range c.objectCache {
+		total += len(byAddress)
+	}
+	return total
+}
+
 // Empty clears nameserver object caches and query caches.
 func (c *CacheStore) Empty() {
 	if c == nil {

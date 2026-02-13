@@ -10,6 +10,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/logger"
+	"codeberg.org/pawal/gonemaster/engine/nameserver"
 )
 
 type spyJobStore struct {
@@ -283,6 +284,128 @@ func TestRunEngineForJobTestcaseParallelismOrderedMerge(t *testing.T) {
 	}
 	if entries[0].Testcase != "t1" || entries[1].Testcase != "t2" || entries[2].Testcase != "t3" {
 		t.Fatalf("expected ordered testcase merge [t1 t2 t3], got [%s %s %s]", entries[0].Testcase, entries[1].Testcase, entries[2].Testcase)
+	}
+}
+
+func TestRunEngineForJobSingleTestNoRunnerWithoutHotCache(t *testing.T) {
+	cfg := DefaultConfig()
+	srv := New(cfg)
+
+	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		if req.Runner != nil {
+			t.Fatalf("expected nil runner when hot cache is disabled and single testcase run is used")
+		}
+		return nil, nil
+	}
+
+	job := Job{
+		ID:     "job-single-no-hot-cache",
+		Domain: "example.com",
+		Tests:  []string{"t1"},
+	}
+	if _, _, _, err := srv.runEngineForJob(job, context.Background()); err != nil {
+		t.Fatalf("run job: %v", err)
+	}
+}
+
+func TestRunEngineForJobCrossJobHotCacheReuse(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.CrossJobHotCache = true
+	cfg.CrossJobHotCacheTTLSeconds = 60
+	srv := New(cfg)
+
+	var (
+		mu         sync.Mutex
+		runIndex   int
+		preWarmCnt []int
+	)
+	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		if req.Runner == nil || req.Runner.NameserverCache == nil {
+			return nil, errors.New("expected runner with nameserver cache")
+		}
+		mu.Lock()
+		runIndex++
+		current := runIndex
+		preWarmCnt = append(preWarmCnt, req.Runner.NameserverCache.AddressCacheCount())
+		mu.Unlock()
+
+		if current == 1 {
+			if _, err := nameserver.NewWithCache(req.Runner.NameserverCache, "ns1.example", "192.0.2.90", nil); err != nil {
+				return nil, err
+			}
+		}
+		return nil, nil
+	}
+
+	job1 := Job{ID: "job-hot-1", Domain: "example.com", Tests: []string{"t1"}}
+	job2 := Job{ID: "job-hot-2", Domain: "example.net", Tests: []string{"t1"}}
+
+	if _, _, _, err := srv.runEngineForJob(job1, context.Background()); err != nil {
+		t.Fatalf("run job1: %v", err)
+	}
+	if _, _, _, err := srv.runEngineForJob(job2, context.Background()); err != nil {
+		t.Fatalf("run job2: %v", err)
+	}
+
+	if len(preWarmCnt) != 2 {
+		t.Fatalf("expected two runs, got %d", len(preWarmCnt))
+	}
+	if preWarmCnt[0] != 0 {
+		t.Fatalf("first run should be cold, got %d", preWarmCnt[0])
+	}
+	if preWarmCnt[1] < 1 {
+		t.Fatalf("second run should see warmed cache, got %d", preWarmCnt[1])
+	}
+}
+
+func TestRunEngineForJobCrossJobHotCacheKeyIsolation(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.CrossJobHotCache = true
+	cfg.CrossJobHotCacheTTLSeconds = 60
+	srv := New(cfg)
+
+	var preWarmCnt []int
+	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		if req.Runner == nil || req.Runner.NameserverCache == nil {
+			return nil, errors.New("expected runner with nameserver cache")
+		}
+		preWarmCnt = append(preWarmCnt, req.Runner.NameserverCache.AddressCacheCount())
+		if len(preWarmCnt) == 1 {
+			if _, err := nameserver.NewWithCache(req.Runner.NameserverCache, "ns1.example", "192.0.2.91", nil); err != nil {
+				return nil, err
+			}
+		}
+		return nil, nil
+	}
+
+	job1 := Job{
+		ID:        "job-hot-key-1",
+		Domain:    "example.com",
+		Tests:     []string{"t1"},
+		Overrides: map[string]any{"resolver": map[string]any{"defaults": map[string]any{"retry": 1}}},
+	}
+	job2 := Job{
+		ID:        "job-hot-key-2",
+		Domain:    "example.net",
+		Tests:     []string{"t1"},
+		Overrides: map[string]any{"resolver": map[string]any{"defaults": map[string]any{"retry": 3}}},
+	}
+
+	if _, _, _, err := srv.runEngineForJob(job1, context.Background()); err != nil {
+		t.Fatalf("run job1: %v", err)
+	}
+	if _, _, _, err := srv.runEngineForJob(job2, context.Background()); err != nil {
+		t.Fatalf("run job2: %v", err)
+	}
+
+	if len(preWarmCnt) != 2 {
+		t.Fatalf("expected two runs, got %d", len(preWarmCnt))
+	}
+	if preWarmCnt[0] != 0 {
+		t.Fatalf("first run should be cold, got %d", preWarmCnt[0])
+	}
+	if preWarmCnt[1] != 0 {
+		t.Fatalf("second run should be cold due to different hot-cache key, got %d", preWarmCnt[1])
 	}
 }
 

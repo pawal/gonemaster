@@ -30,6 +30,8 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	var autoClampConcurrency bool
 	var jobTestParallelism int
 	var maxConcurrentJobs int
+	var crossJobHotCache bool
+	var crossJobHotCacheTTLSeconds int
 	var positiveCacheTTL int
 	var negativeCacheTTL int
 	var timeoutSeconds int
@@ -47,6 +49,8 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	var autoClampConcurrencySet bool
 	var jobTestParallelismSet bool
 	var maxConcurrentJobsSet bool
+	var crossJobHotCacheSet bool
+	var crossJobHotCacheTTLSet bool
 	var positiveCacheTTLSet bool
 	var negativeCacheTTLSet bool
 	var timeoutSet bool
@@ -60,7 +64,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	fs := flag.NewFlagSet("gonemaster-server", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	fs.Usage = func() {
-		fmt.Fprintf(errOut, "Usage: %s [--config PATH] [--listen ADDR] [--max-body-size BYTES] [--debug] [--workers N] [--auto-clamp-concurrency] [--job-test-parallelism N] [--max-concurrent-jobs N] [--positive-cache-ttl N] [--negative-cache-ttl N] [--timeout N] [--retry N] [--retrans N] [--fallback|--no-fallback] [--min-level LEVEL] [--profile PATH] [--shutdown-timeout DURATION]\n", fs.Name())
+		fmt.Fprintf(errOut, "Usage: %s [--config PATH] [--listen ADDR] [--max-body-size BYTES] [--debug] [--workers N] [--auto-clamp-concurrency] [--job-test-parallelism N] [--max-concurrent-jobs N] [--cross-job-hot-cache] [--cross-job-hot-cache-ttl-seconds N] [--positive-cache-ttl N] [--negative-cache-ttl N] [--timeout N] [--retry N] [--retrans N] [--fallback|--no-fallback] [--min-level LEVEL] [--profile PATH] [--shutdown-timeout DURATION]\n", fs.Name())
 		fmt.Fprintln(errOut, "")
 		fmt.Fprintln(errOut, "Options:")
 		fmt.Fprintln(errOut, "  --config            JSON config file path (optional)")
@@ -71,6 +75,8 @@ func run(args []string, out *os.File, errOut *os.File) int {
 		fmt.Fprintln(errOut, "  --auto-clamp-concurrency  Clamp pathological concurrency values based on CPU count")
 		fmt.Fprintln(errOut, "  --job-test-parallelism  Testcase parallelism inside one job (default 1)")
 		fmt.Fprintln(errOut, "  --max-concurrent-jobs  Max concurrent engine runs (0 = unlimited)")
+		fmt.Fprintln(errOut, "  --cross-job-hot-cache  Enable short-lived warmed nameserver cache reuse across jobs")
+		fmt.Fprintln(errOut, "  --cross-job-hot-cache-ttl-seconds  TTL for cross-job hot cache entries (default 60)")
 		fmt.Fprintln(errOut, "  --positive-cache-ttl  Seconds to cache positive DNS responses (optional)")
 		fmt.Fprintln(errOut, "  --negative-cache-ttl  Seconds to cache negative DNS responses (optional)")
 		fmt.Fprintln(errOut, "  --timeout           Override resolver.defaults.timeout in seconds (optional)")
@@ -90,6 +96,8 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	fs.BoolVar(&autoClampConcurrency, "auto-clamp-concurrency", false, "Clamp pathological concurrency values based on CPU count")
 	fs.IntVar(&jobTestParallelism, "job-test-parallelism", 0, "Testcase parallelism inside one job (default 1)")
 	fs.IntVar(&maxConcurrentJobs, "max-concurrent-jobs", 0, "Max concurrent engine runs (0 = unlimited)")
+	fs.BoolVar(&crossJobHotCache, "cross-job-hot-cache", false, "Enable short-lived warmed nameserver cache reuse across jobs")
+	fs.IntVar(&crossJobHotCacheTTLSeconds, "cross-job-hot-cache-ttl-seconds", 0, "TTL for cross-job hot cache entries in seconds (default 60)")
 	fs.IntVar(&positiveCacheTTL, "positive-cache-ttl", 0, "Seconds to cache positive DNS responses (optional)")
 	fs.IntVar(&negativeCacheTTL, "negative-cache-ttl", 0, "Seconds to cache negative DNS responses (optional)")
 	fs.IntVar(&timeoutSeconds, "timeout", 0, "Override resolver.defaults.timeout in seconds (optional)")
@@ -119,6 +127,10 @@ func run(args []string, out *os.File, errOut *os.File) int {
 			jobTestParallelismSet = true
 		case "max-concurrent-jobs":
 			maxConcurrentJobsSet = true
+		case "cross-job-hot-cache":
+			crossJobHotCacheSet = true
+		case "cross-job-hot-cache-ttl-seconds":
+			crossJobHotCacheTTLSet = true
 		case "positive-cache-ttl":
 			positiveCacheTTLSet = true
 		case "negative-cache-ttl":
@@ -149,6 +161,10 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	}
 	if maxConcurrentJobsSet && maxConcurrentJobs < 0 {
 		fmt.Fprintln(errOut, "--max-concurrent-jobs must be >= 0")
+		return 2
+	}
+	if crossJobHotCacheTTLSet && crossJobHotCacheTTLSeconds < 1 {
+		fmt.Fprintln(errOut, "--cross-job-hot-cache-ttl-seconds must be >= 1")
 		return 2
 	}
 	if positiveCacheTTLSet && positiveCacheTTL < 0 {
@@ -205,6 +221,12 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	}
 	if maxConcurrentJobsSet {
 		cfg.MaxConcurrentJobs = maxConcurrentJobs
+	}
+	if crossJobHotCacheSet {
+		cfg.CrossJobHotCache = crossJobHotCache
+	}
+	if crossJobHotCacheTTLSet {
+		cfg.CrossJobHotCacheTTLSeconds = crossJobHotCacheTTLSeconds
 	}
 	if positiveCacheTTLSet {
 		value := positiveCacheTTL

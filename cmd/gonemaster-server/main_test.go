@@ -42,6 +42,23 @@ func TestRunJobTestParallelismValidation(t *testing.T) {
 	}
 }
 
+func TestRunCrossJobHotCacheTTLValidation(t *testing.T) {
+	out := newTempFile(t)
+	errOut := newTempFile(t)
+	defer cleanupTempFile(t, out)
+	defer cleanupTempFile(t, errOut)
+
+	code := run([]string{"--cross-job-hot-cache-ttl-seconds", "0"}, out, errOut)
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d", code)
+	}
+
+	errText := readTempFile(t, errOut)
+	if !strings.Contains(errText, "--cross-job-hot-cache-ttl-seconds must be >= 1") {
+		t.Fatalf("expected cross-job-hot-cache-ttl-seconds validation error, got %q", errText)
+	}
+}
+
 func TestRunInvalidConfig(t *testing.T) {
 	out := newTempFile(t)
 	errOut := newTempFile(t)

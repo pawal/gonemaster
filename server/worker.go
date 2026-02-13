@@ -43,6 +43,9 @@ func (s *Server) Stop(ctx context.Context) error {
 		if s.profileOverrideCache != nil {
 			s.profileOverrideCache.Close()
 		}
+		if s.nameserverHotCache != nil {
+			s.nameserverHotCache.Close()
+		}
 		return nil
 	}
 	s.workers.cancel()
@@ -58,6 +61,9 @@ func (s *Server) Stop(ctx context.Context) error {
 	case <-done:
 		if s.profileOverrideCache != nil {
 			s.profileOverrideCache.Close()
+		}
+		if s.nameserverHotCache != nil {
+			s.nameserverHotCache.Close()
 		}
 		return nil
 	case <-ctx.Done():
@@ -215,10 +221,18 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 		}
 	}
 	req.LogCallback = chainLogCallbacks(callbacks...)
-	if len(job.Tests) > 1 {
+	useSharedRunner := len(job.Tests) > 1 || s.nameserverHotCache != nil
+	if useSharedRunner {
 		runner, err := engine.BuildRunner(req)
 		if err != nil {
 			return nil, 0, 0, err
+		}
+		if s.nameserverHotCache != nil {
+			cache, release := s.nameserverHotCache.Lease(nameserverHotCacheKey(req))
+			runner.NameserverCache = cache
+			if release != nil {
+				defer release()
+			}
 		}
 		req.Runner = runner
 	}

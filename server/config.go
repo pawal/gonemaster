@@ -4,7 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 )
+
+const defaultCrossJobHotCacheTTLSeconds = 60
 
 // Config controls HTTP server behavior.
 type Config struct {
@@ -19,6 +22,10 @@ type Config struct {
 	JobTestParallelism int
 	// MaxConcurrentJobs caps engine runs across workers when >0.
 	MaxConcurrentJobs int
+	// CrossJobHotCache enables short-lived warm cache reuse across jobs.
+	CrossJobHotCache bool
+	// CrossJobHotCacheTTLSeconds controls the hot-cache entry TTL.
+	CrossJobHotCacheTTLSeconds int
 	// PositiveCacheTTL overrides resolver.defaults.positive_cache_ttl when set.
 	PositiveCacheTTL *int
 	// NegativeCacheTTL overrides resolver.defaults.negative_cache_ttl when set.
@@ -70,6 +77,15 @@ func (c Config) EffectiveEngineConcurrency() int {
 	return maxConcurrentJobs
 }
 
+// EffectiveCrossJobHotCacheTTL returns the active TTL for hot-cache entries.
+func (c Config) EffectiveCrossJobHotCacheTTL() time.Duration {
+	seconds := c.CrossJobHotCacheTTLSeconds
+	if seconds < 1 {
+		seconds = defaultCrossJobHotCacheTTLSeconds
+	}
+	return time.Duration(seconds) * time.Second
+}
+
 // FileConfig captures optional configuration fields from JSON.
 type FileConfig struct {
 	ListenAddr           *string `json:"listen_addr"`
@@ -79,6 +95,8 @@ type FileConfig struct {
 	AutoClampConcurrency *bool   `json:"auto_clamp_concurrency"`
 	JobTestParallelism   *int    `json:"job_test_parallelism"`
 	MaxConcurrentJobs    *int    `json:"max_concurrent_jobs"`
+	CrossJobHotCache     *bool   `json:"cross_job_hot_cache"`
+	CrossJobHotCacheTTL  *int    `json:"cross_job_hot_cache_ttl_seconds"`
 	PositiveCacheTTL     *int    `json:"positive_cache_ttl"`
 	NegativeCacheTTL     *int    `json:"negative_cache_ttl"`
 	Timeout              *int    `json:"timeout"`
@@ -92,14 +110,16 @@ type FileConfig struct {
 // DefaultConfig returns baseline config values.
 func DefaultConfig() Config {
 	return Config{
-		ListenAddr:           "127.0.0.1:8080",
-		MaxBodySize:          1 << 20,
-		Debug:                false,
-		WorkerCount:          4,
-		AutoClampConcurrency: false,
-		JobTestParallelism:   1,
-		MaxConcurrentJobs:    0,
-		MinLevel:             "INFO",
+		ListenAddr:                 "127.0.0.1:8080",
+		MaxBodySize:                1 << 20,
+		Debug:                      false,
+		WorkerCount:                4,
+		AutoClampConcurrency:       false,
+		JobTestParallelism:         1,
+		MaxConcurrentJobs:          0,
+		CrossJobHotCache:           false,
+		CrossJobHotCacheTTLSeconds: defaultCrossJobHotCacheTTLSeconds,
+		MinLevel:                   "INFO",
 	}
 }
 
@@ -138,6 +158,12 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 	}
 	if file.MaxConcurrentJobs != nil {
 		c.MaxConcurrentJobs = *file.MaxConcurrentJobs
+	}
+	if file.CrossJobHotCache != nil {
+		c.CrossJobHotCache = *file.CrossJobHotCache
+	}
+	if file.CrossJobHotCacheTTL != nil {
+		c.CrossJobHotCacheTTLSeconds = *file.CrossJobHotCacheTTL
 	}
 	if file.PositiveCacheTTL != nil {
 		c.PositiveCacheTTL = file.PositiveCacheTTL

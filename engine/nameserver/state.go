@@ -245,6 +245,7 @@ type CacheStore struct {
 	objectCache      map[string]map[string]*Nameserver
 	cacheByAddress   map[string]*queryCache
 	errorCacheByAddr map[string]*errorCache
+	sharedParent     *CacheStore
 	queryMetrics     cacheMetrics
 	errorMetrics     cacheMetrics
 }
@@ -263,11 +264,30 @@ func (c *CacheStore) cacheForAddress(addr string) *queryCache {
 		return nil
 	}
 	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.cacheByAddress[addr] == nil {
-		c.cacheByAddress[addr] = &queryCache{data: map[string]*packet.Packet{}, met: &c.queryMetrics}
+	if cache := c.cacheByAddress[addr]; cache != nil {
+		c.mu.Unlock()
+		return cache
 	}
-	return c.cacheByAddress[addr]
+	parent := c.sharedParent
+	c.mu.Unlock()
+
+	var parentCache *queryCache
+	if parent != nil {
+		parentCache = parent.cacheForAddress(addr)
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if cache := c.cacheByAddress[addr]; cache != nil {
+		return cache
+	}
+	if parentCache != nil {
+		c.cacheByAddress[addr] = parentCache
+		return parentCache
+	}
+	cache := &queryCache{data: map[string]*packet.Packet{}, met: &c.queryMetrics}
+	c.cacheByAddress[addr] = cache
+	return cache
 }
 
 func (c *CacheStore) errorCacheForAddress(addr string) *errorCache {
@@ -275,11 +295,30 @@ func (c *CacheStore) errorCacheForAddress(addr string) *errorCache {
 		return nil
 	}
 	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.errorCacheByAddr[addr] == nil {
-		c.errorCacheByAddr[addr] = &errorCache{data: map[string]time.Time{}, met: &c.errorMetrics}
+	if cache := c.errorCacheByAddr[addr]; cache != nil {
+		c.mu.Unlock()
+		return cache
 	}
-	return c.errorCacheByAddr[addr]
+	parent := c.sharedParent
+	c.mu.Unlock()
+
+	var parentCache *errorCache
+	if parent != nil {
+		parentCache = parent.errorCacheForAddress(addr)
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if cache := c.errorCacheByAddr[addr]; cache != nil {
+		return cache
+	}
+	if parentCache != nil {
+		c.errorCacheByAddr[addr] = parentCache
+		return parentCache
+	}
+	cache := &errorCache{data: map[string]time.Time{}, met: &c.errorMetrics}
+	c.errorCacheByAddr[addr] = cache
+	return cache
 }
 
 func (c *CacheStore) cachedNameserver(nameKey string, addr string) *Nameserver {
@@ -323,6 +362,7 @@ func (c *CacheStore) SnapshotForRun() *CacheStore {
 		objectCache:      map[string]map[string]*Nameserver{},
 		cacheByAddress:   make(map[string]*queryCache, len(c.cacheByAddress)),
 		errorCacheByAddr: make(map[string]*errorCache, len(c.errorCacheByAddr)),
+		sharedParent:     c,
 	}
 	for addr, cache := range c.cacheByAddress {
 		snapshot.cacheByAddress[addr] = cache

@@ -1,11 +1,17 @@
 package server
 
 import (
+	"context"
+	"net"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/miekg/dns"
+
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
+	"codeberg.org/pawal/gonemaster/engine/packet"
 )
 
 func TestNameserverHotCacheLeaseMergesWarmData(t *testing.T) {
@@ -130,5 +136,84 @@ func TestNameserverHotCacheKeyUsesEffectiveProfileInputs(t *testing.T) {
 	}
 	if keyA == keyB {
 		t.Fatalf("expected different timeout override to produce a different key")
+	}
+}
+
+func TestNameserverHotCacheLeasesCoalesceInflightQueries(t *testing.T) {
+	cache := newNameserverHotCache(8, time.Minute)
+	runCacheA, releaseA := cache.Lease("alpha")
+	defer releaseA()
+	runCacheB, releaseB := cache.Lease("alpha")
+	defer releaseB()
+
+	nsA, err := nameserver.NewWithCache(runCacheA, "ns.example", "192.0.2.88", nil)
+	if err != nil {
+		t.Fatalf("new nameserver A: %v", err)
+	}
+	nsB, err := nameserver.NewWithCache(runCacheB, "ns.example", "192.0.2.88", nil)
+	if err != nil {
+		t.Fatalf("new nameserver B: %v", err)
+	}
+
+	var callsA atomic.Int32
+	var callsB atomic.Int32
+	started := make(chan struct{}, 1)
+	releaseNetwork := make(chan struct{})
+
+	queryHook := func(counter *atomic.Int32) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
+		return func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+			counter.Add(1)
+			select {
+			case started <- struct{}{}:
+			default:
+			}
+			<-releaseNetwork
+
+			msg := new(dns.Msg)
+			msg.Rcode = dns.RcodeSuccess
+			msg.Answer = []dns.RR{
+				&dns.A{
+					Hdr: dns.RR_Header{
+						Name:   "hot-cache.example.",
+						Rrtype: dns.TypeA,
+						Class:  dns.ClassINET,
+						Ttl:    60,
+					},
+					A: net.IPv4(192, 0, 2, 88),
+				},
+			}
+			return packet.Packet{Msg: msg}, nil
+		}
+	}
+
+	nsA.SetQueryHook(queryHook(&callsA))
+	nsB.SetQueryHook(queryHook(&callsB))
+
+	errCh := make(chan error, 2)
+	go func() {
+		_, err := nsA.QueryWithOptions(context.Background(), "hot-cache.example", "A", nil)
+		errCh <- err
+	}()
+	go func() {
+		_, err := nsB.QueryWithOptions(context.Background(), "hot-cache.example", "A", nil)
+		errCh <- err
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatalf("expected one network query to start")
+	}
+	close(releaseNetwork)
+
+	for i := 0; i < 2; i++ {
+		if err := <-errCh; err != nil {
+			t.Fatalf("query %d error: %v", i+1, err)
+		}
+	}
+
+	totalCalls := callsA.Load() + callsB.Load()
+	if totalCalls != 1 {
+		t.Fatalf("expected one deduplicated network call, got %d (A=%d B=%d)", totalCalls, callsA.Load(), callsB.Load())
 	}
 }

@@ -398,6 +398,41 @@ func EffectiveProfile(req RunRequest) (*profile.Profile, error) {
 	return p, err
 }
 
+// BuildRunner constructs a runner for req using the same defaults and profile
+// resolution logic that Run uses when no runner is supplied.
+func BuildRunner(req RunRequest) (*Runner, error) {
+	module, testcase, err := normalizeRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	log := logger.New()
+	if req.LogCallback != nil {
+		log.Callback = req.LogCallback
+	}
+
+	p, autoDisabledIPv6, err := buildProfile(req, module, testcase)
+	if err != nil {
+		return nil, err
+	}
+	log.SetProfile(p)
+
+	queryLimit := p.Resolver.Defaults.Parallel
+	if p.Resolver.Defaults.Unordered && queryLimit > 1 {
+		queryLimit = queryLimit * queryLimit
+	}
+	limiter := transport.NewLimiter(queryLimit)
+
+	return &Runner{
+		Profile:          p,
+		Logger:           log,
+		Limiter:          limiter,
+		NameserverCache:  ns.NewCacheStore(),
+		StartedAt:        time.Now(),
+		AutoIPv6Disabled: autoDisabledIPv6,
+	}, nil
+}
+
 // RunWithRunner executes a Zonemaster test run using a provided runner.
 func RunWithRunner(req RunRequest, runner *Runner) ([]LogEntry, error) {
 	if strings.TrimSpace(req.Domain) == "" {
@@ -461,35 +496,9 @@ func Run(req RunRequest) ([]LogEntry, error) {
 		return RunWithRunner(req, req.Runner)
 	}
 
-	module, testcase, err := normalizeRequest(req)
+	runner, err := BuildRunner(req)
 	if err != nil {
 		return nil, err
-	}
-
-	log := logger.New()
-	if req.LogCallback != nil {
-		log.Callback = req.LogCallback
-	}
-
-	p, autoDisabledIPv6, err := buildProfile(req, module, testcase)
-	if err != nil {
-		return nil, err
-	}
-	log.SetProfile(p)
-
-	queryLimit := p.Resolver.Defaults.Parallel
-	if p.Resolver.Defaults.Unordered && queryLimit > 1 {
-		queryLimit = queryLimit * queryLimit
-	}
-	limiter := transport.NewLimiter(queryLimit)
-
-	runner := &Runner{
-		Profile:          p,
-		Logger:           log,
-		Limiter:          limiter,
-		NameserverCache:  ns.NewCacheStore(),
-		StartedAt:        time.Now(),
-		AutoIPv6Disabled: autoDisabledIPv6,
 	}
 
 	return RunWithRunner(req, runner)

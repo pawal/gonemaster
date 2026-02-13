@@ -3,6 +3,7 @@ package engine
 import (
 	"errors"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"codeberg.org/pawal/gonemaster/engine/logger"
@@ -119,4 +120,56 @@ func logHasDomain(log *logger.Logger, domain string) bool {
 		}
 	}
 	return false
+}
+
+func TestBuildRunnerInitializesReusableState(t *testing.T) {
+	runner, err := BuildRunner(RunRequest{
+		Domain:   "example.com",
+		Testcase: "syntax01",
+	})
+	if err != nil {
+		t.Fatalf("build runner: %v", err)
+	}
+	if runner == nil {
+		t.Fatalf("expected runner")
+	}
+	if runner.Profile == nil {
+		t.Fatalf("expected runner profile")
+	}
+	if runner.Logger == nil {
+		t.Fatalf("expected runner logger")
+	}
+	if runner.Limiter == nil {
+		t.Fatalf("expected runner limiter")
+	}
+	if runner.NameserverCache == nil {
+		t.Fatalf("expected runner nameserver cache")
+	}
+	if runner.StartedAt.IsZero() {
+		t.Fatalf("expected runner started timestamp")
+	}
+}
+
+func TestBuildRunnerPreservesLogCallback(t *testing.T) {
+	var callbackCount atomic.Int32
+	runner, err := BuildRunner(RunRequest{
+		Domain:   "example.com",
+		Testcase: "syntax01",
+		LogCallback: func(_ *logger.Entry) error {
+			callbackCount.Add(1)
+			return nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("build runner: %v", err)
+	}
+	if runner.Logger == nil {
+		t.Fatalf("expected runner logger")
+	}
+	if _, err := runner.Logger.Add("GLOBAL_VERSION", map[string]any{"version": "v0.0.0"}, "", ""); err != nil {
+		t.Fatalf("logger add: %v", err)
+	}
+	if got := callbackCount.Load(); got != 1 {
+		t.Fatalf("expected callback count 1, got %d", got)
+	}
 }

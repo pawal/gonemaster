@@ -286,6 +286,85 @@ func TestRunEngineForJobTestcaseParallelismOrderedMerge(t *testing.T) {
 	}
 }
 
+func TestRunEngineForJobTestcaseSequentialReusesRunner(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.JobTestParallelism = 1
+	srv := New(cfg)
+
+	var runners []*engine.Runner
+	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		if req.Runner == nil {
+			return nil, errors.New("missing shared runner")
+		}
+		runners = append(runners, req.Runner)
+		return []engine.LogEntry{{Testcase: req.Testcase, Level: "NOTICE"}}, nil
+	}
+
+	job := Job{
+		ID:     "job-runner-seq",
+		Domain: "example.com",
+		Tests:  []string{"t1", "t2", "t3"},
+	}
+	_, _, _, err := srv.runEngineForJob(job, context.Background())
+	if err != nil {
+		t.Fatalf("run job: %v", err)
+	}
+	if len(runners) != len(job.Tests) {
+		t.Fatalf("expected %d runner captures, got %d", len(job.Tests), len(runners))
+	}
+	first := runners[0]
+	if first.Logger == nil || first.Profile == nil || first.NameserverCache == nil {
+		t.Fatalf("shared runner should include logger, profile, and nameserver cache")
+	}
+	for idx, runner := range runners[1:] {
+		if runner != first {
+			t.Fatalf("expected runner reuse at call %d", idx+2)
+		}
+	}
+}
+
+func TestRunEngineForJobTestcaseParallelReusesRunner(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.JobTestParallelism = 3
+	srv := New(cfg)
+
+	var (
+		mu      sync.Mutex
+		runners []*engine.Runner
+	)
+	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		if req.Runner == nil {
+			return nil, errors.New("missing shared runner")
+		}
+		mu.Lock()
+		runners = append(runners, req.Runner)
+		mu.Unlock()
+		return []engine.LogEntry{{Testcase: req.Testcase, Level: "NOTICE"}}, nil
+	}
+
+	job := Job{
+		ID:     "job-runner-par",
+		Domain: "example.com",
+		Tests:  []string{"t1", "t2", "t3", "t4"},
+	}
+	_, _, _, err := srv.runEngineForJob(job, context.Background())
+	if err != nil {
+		t.Fatalf("run job: %v", err)
+	}
+	if len(runners) != len(job.Tests) {
+		t.Fatalf("expected %d runner captures, got %d", len(job.Tests), len(runners))
+	}
+	first := runners[0]
+	if first.Logger == nil || first.Profile == nil || first.NameserverCache == nil {
+		t.Fatalf("shared runner should include logger, profile, and nameserver cache")
+	}
+	for idx, runner := range runners[1:] {
+		if runner != first {
+			t.Fatalf("expected runner reuse at call %d", idx+2)
+		}
+	}
+}
+
 func TestRunEngineForJobTestcaseParallelismCap(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.JobTestParallelism = 2

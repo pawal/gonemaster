@@ -215,6 +215,13 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 		}
 	}
 	req.LogCallback = chainLogCallbacks(callbacks...)
+	if len(job.Tests) > 1 {
+		runner, err := engine.BuildRunner(req)
+		if err != nil {
+			return nil, 0, 0, err
+		}
+		req.Runner = runner
+	}
 
 	if len(job.Tests) == 1 {
 		req.Testcase = job.Tests[0]

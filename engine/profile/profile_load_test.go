@@ -28,6 +28,11 @@ func TestFromJSONParsesValues(t *testing.T) {
 					"retrans": 234,
 					"adaptive_timeout": true,
 					"fast_fail_timeout_count": 7,
+					"rate_limit_pacing_enabled": true,
+					"rate_limit_pacing_min_ms": 120,
+					"rate_limit_pacing_max_ms": 3000,
+					"rate_limit_pacing_ewma_alpha_pct": 40,
+					"rate_limit_pacing_headroom_pct": 85,
 					"positive_cache_ttl": 30,
 					"negative_cache_ttl": 45
 				},
@@ -79,6 +84,26 @@ func TestFromJSONParsesValues(t *testing.T) {
 	value, err = p.Get("resolver.defaults.fast_fail_timeout_count")
 	if err != nil || value != 7 {
 		t.Fatalf("expected fast_fail_timeout_count 7, got %#v (err=%v)", value, err)
+	}
+	value, err = p.Get("resolver.defaults.rate_limit_pacing_enabled")
+	if err != nil || value != true {
+		t.Fatalf("expected rate_limit_pacing_enabled true, got %#v (err=%v)", value, err)
+	}
+	value, err = p.Get("resolver.defaults.rate_limit_pacing_min_ms")
+	if err != nil || value != 120 {
+		t.Fatalf("expected rate_limit_pacing_min_ms 120, got %#v (err=%v)", value, err)
+	}
+	value, err = p.Get("resolver.defaults.rate_limit_pacing_max_ms")
+	if err != nil || value != 3000 {
+		t.Fatalf("expected rate_limit_pacing_max_ms 3000, got %#v (err=%v)", value, err)
+	}
+	value, err = p.Get("resolver.defaults.rate_limit_pacing_ewma_alpha_pct")
+	if err != nil || value != 40 {
+		t.Fatalf("expected rate_limit_pacing_ewma_alpha_pct 40, got %#v (err=%v)", value, err)
+	}
+	value, err = p.Get("resolver.defaults.rate_limit_pacing_headroom_pct")
+	if err != nil || value != 85 {
+		t.Fatalf("expected rate_limit_pacing_headroom_pct 85, got %#v (err=%v)", value, err)
 	}
 	value, err = p.Get("resolver.source4")
 	if err != nil || value != "192.0.2.53" {

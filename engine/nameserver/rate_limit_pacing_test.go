@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"testing"
 	"time"
+
+	"codeberg.org/pawal/gonemaster/engine/profile"
 )
 
 func TestRateLimitPacingTrackerTimeoutBurstBackoff(t *testing.T) {
@@ -272,6 +274,150 @@ func TestRateLimitPacingSnapshotWindowErrors(t *testing.T) {
 	}
 	if got, want := snap.WindowSuccesses+snap.WindowErrors, snap.WindowTotal; got != want {
 		t.Fatalf("window accounting mismatch: successes+errors=%d total=%d", got, want)
+	}
+}
+
+func TestRateLimitPacingTrackerAdaptivePolicyEWMA(t *testing.T) {
+	t.Parallel()
+
+	tracker := &rateLimitPacingTracker{jitterFn: func() float64 { return 0.5 }}
+	tracker.setPolicy(rateLimitPacingPolicyConfig{
+		Enabled:   true,
+		MinDelay:  50 * time.Millisecond,
+		MaxDelay:  5 * time.Second,
+		EWMAAlpha: 0.5,
+		Headroom:  0.8,
+	})
+
+	now := time.Unix(1700000900, 0)
+	tracker.observeResult(false, rateLimitSignalNone, now)
+	tracker.observeResult(false, rateLimitSignalNone, now.Add(200*time.Millisecond))
+
+	snap := tracker.snapshot(false)
+	if snap.EstimatedInterval != 200*time.Millisecond {
+		t.Fatalf("estimated interval = %v, want %v", snap.EstimatedInterval, 200*time.Millisecond)
+	}
+	if snap.AdaptiveDelay != 250*time.Millisecond {
+		t.Fatalf("adaptive delay = %v, want %v", snap.AdaptiveDelay, 250*time.Millisecond)
+	}
+	if snap.EstimatedQPS != 5 {
+		t.Fatalf("estimated qps = %v, want 5", snap.EstimatedQPS)
+	}
+
+	shouldPace, remaining := tracker.shouldPace(false, now.Add(200*time.Millisecond))
+	if !shouldPace {
+		t.Fatalf("expected pacing after success-based adaptive update")
+	}
+	if remaining != 250*time.Millisecond {
+		t.Fatalf("remaining adaptive delay = %v, want %v", remaining, 250*time.Millisecond)
+	}
+
+	tracker.observeResult(false, rateLimitSignalNone, now.Add(800*time.Millisecond))
+	snap = tracker.snapshot(false)
+	if snap.EstimatedInterval != 400*time.Millisecond {
+		t.Fatalf("estimated interval after EWMA update = %v, want %v", snap.EstimatedInterval, 400*time.Millisecond)
+	}
+	if snap.AdaptiveDelay != 500*time.Millisecond {
+		t.Fatalf("adaptive delay after EWMA update = %v, want %v", snap.AdaptiveDelay, 500*time.Millisecond)
+	}
+}
+
+func TestRateLimitPacingTrackerAdaptivePolicyDisabledByDefault(t *testing.T) {
+	t.Parallel()
+
+	tracker := &rateLimitPacingTracker{}
+	now := time.Unix(1700001000, 0)
+	tracker.observeResult(false, rateLimitSignalNone, now)
+	tracker.observeResult(false, rateLimitSignalNone, now.Add(100*time.Millisecond))
+
+	snap := tracker.snapshot(false)
+	if snap.AdaptiveDelay != 0 {
+		t.Fatalf("adaptive delay with disabled policy = %v, want 0", snap.AdaptiveDelay)
+	}
+	if snap.EstimatedInterval != 0 {
+		t.Fatalf("estimated interval with disabled policy = %v, want 0", snap.EstimatedInterval)
+	}
+	if shouldPace, _ := tracker.shouldPace(false, now.Add(100*time.Millisecond)); shouldPace {
+		t.Fatalf("disabled policy should not create pacing on successes")
+	}
+}
+
+func TestRateLimitPacingTrackerAdaptivePolicyBounds(t *testing.T) {
+	t.Parallel()
+
+	tracker := &rateLimitPacingTracker{jitterFn: func() float64 { return 0.5 }}
+	tracker.setPolicy(rateLimitPacingPolicyConfig{
+		Enabled:   true,
+		MinDelay:  300 * time.Millisecond,
+		MaxDelay:  600 * time.Millisecond,
+		EWMAAlpha: 1,
+		Headroom:  0.5,
+	})
+
+	now := time.Unix(1700001100, 0)
+	tracker.observeResult(false, rateLimitSignalNone, now)
+
+	tracker.observeResult(false, rateLimitSignalNone, now.Add(50*time.Millisecond))
+	if snap := tracker.snapshot(false); snap.AdaptiveDelay != 300*time.Millisecond {
+		t.Fatalf("adaptive delay lower bound = %v, want %v", snap.AdaptiveDelay, 300*time.Millisecond)
+	}
+
+	tracker.observeResult(false, rateLimitSignalNone, now.Add(5*time.Second))
+	if snap := tracker.snapshot(false); snap.AdaptiveDelay != 600*time.Millisecond {
+		t.Fatalf("adaptive delay upper bound = %v, want %v", snap.AdaptiveDelay, 600*time.Millisecond)
+	}
+}
+
+func TestResolveRateLimitPacingPolicyConfig(t *testing.T) {
+	t.Parallel()
+
+	prof := profile.New()
+	prof.Resolver.Defaults.RateLimitPacingEnabled = true
+	prof.Resolver.Defaults.RateLimitPacingMinMS = 150
+	prof.Resolver.Defaults.RateLimitPacingMaxMS = 2500
+	prof.Resolver.Defaults.RateLimitPacingEWMAAlphaPct = 40
+	prof.Resolver.Defaults.RateLimitPacingHeadroomPct = 85
+
+	cfg := resolveRateLimitPacingPolicyConfig(prof)
+	if !cfg.Enabled {
+		t.Fatalf("expected resolved policy to be enabled")
+	}
+	if cfg.MinDelay != 150*time.Millisecond {
+		t.Fatalf("min delay = %v, want %v", cfg.MinDelay, 150*time.Millisecond)
+	}
+	if cfg.MaxDelay != 2500*time.Millisecond {
+		t.Fatalf("max delay = %v, want %v", cfg.MaxDelay, 2500*time.Millisecond)
+	}
+	if cfg.EWMAAlpha != 0.4 {
+		t.Fatalf("ewma alpha = %v, want 0.4", cfg.EWMAAlpha)
+	}
+	if cfg.Headroom != 0.85 {
+		t.Fatalf("headroom = %v, want 0.85", cfg.Headroom)
+	}
+}
+
+func TestSanitizeRateLimitPacingPolicyConfig(t *testing.T) {
+	t.Parallel()
+
+	cfg := sanitizeRateLimitPacingPolicyConfig(rateLimitPacingPolicyConfig{
+		Enabled:   true,
+		MinDelay:  2 * time.Second,
+		MaxDelay:  100 * time.Millisecond,
+		EWMAAlpha: 0,
+		Headroom:  2,
+	})
+
+	if cfg.MinDelay != 2*time.Second {
+		t.Fatalf("min delay = %v, want %v", cfg.MinDelay, 2*time.Second)
+	}
+	if cfg.MaxDelay != 2*time.Second {
+		t.Fatalf("max delay should clamp to min delay, got %v", cfg.MaxDelay)
+	}
+	if cfg.EWMAAlpha != rateLimitPacingDefaultEWMAAlpha {
+		t.Fatalf("ewma alpha fallback = %v, want %v", cfg.EWMAAlpha, rateLimitPacingDefaultEWMAAlpha)
+	}
+	if cfg.Headroom != rateLimitPacingDefaultHeadroom {
+		t.Fatalf("headroom fallback = %v, want %v", cfg.Headroom, rateLimitPacingDefaultHeadroom)
 	}
 }
 

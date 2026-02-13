@@ -212,6 +212,59 @@ var propertyDefs = map[string]propertyDef{
 			return p.Resolver.Defaults.NegativeCacheTTL
 		},
 	},
+	"resolver.defaults.rate_limit_pacing_enabled": {
+		typ: propBool,
+		setter: func(p *Profile, value any) {
+			p.Resolver.Defaults.RateLimitPacingEnabled = value.(bool)
+		},
+		getter: func(p *Profile) any {
+			return p.Resolver.Defaults.RateLimitPacingEnabled
+		},
+	},
+	"resolver.defaults.rate_limit_pacing_min_ms": {
+		typ: propNum,
+		min: intPtr(1),
+		max: intPtr(60000),
+		setter: func(p *Profile, value any) {
+			p.Resolver.Defaults.RateLimitPacingMinMS = value.(int)
+		},
+		getter: func(p *Profile) any {
+			return p.Resolver.Defaults.RateLimitPacingMinMS
+		},
+	},
+	"resolver.defaults.rate_limit_pacing_max_ms": {
+		typ: propNum,
+		min: intPtr(1),
+		max: intPtr(120000),
+		setter: func(p *Profile, value any) {
+			p.Resolver.Defaults.RateLimitPacingMaxMS = value.(int)
+		},
+		getter: func(p *Profile) any {
+			return p.Resolver.Defaults.RateLimitPacingMaxMS
+		},
+	},
+	"resolver.defaults.rate_limit_pacing_ewma_alpha_pct": {
+		typ: propNum,
+		min: intPtr(1),
+		max: intPtr(100),
+		setter: func(p *Profile, value any) {
+			p.Resolver.Defaults.RateLimitPacingEWMAAlphaPct = value.(int)
+		},
+		getter: func(p *Profile) any {
+			return p.Resolver.Defaults.RateLimitPacingEWMAAlphaPct
+		},
+	},
+	"resolver.defaults.rate_limit_pacing_headroom_pct": {
+		typ: propNum,
+		min: intPtr(1),
+		max: intPtr(100),
+		setter: func(p *Profile, value any) {
+			p.Resolver.Defaults.RateLimitPacingHeadroomPct = value.(int)
+		},
+		getter: func(p *Profile) any {
+			return p.Resolver.Defaults.RateLimitPacingHeadroomPct
+		},
+	},
 	"resolver.source4": {
 		typ:          propStr,
 		defaultValue: "",

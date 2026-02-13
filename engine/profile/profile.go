@@ -56,6 +56,16 @@ type ResolverDefaults struct {
 	PositiveCacheTTL int `json:"positive_cache_ttl"`
 	// NegativeCacheTTL sets the duration (seconds) to cache negative responses.
 	NegativeCacheTTL int `json:"negative_cache_ttl"`
+	// RateLimitPacingEnabled enables adaptive per-nameserver pacing.
+	RateLimitPacingEnabled bool `json:"rate_limit_pacing_enabled"`
+	// RateLimitPacingMinMS is the minimum pacing delay in milliseconds.
+	RateLimitPacingMinMS int `json:"rate_limit_pacing_min_ms"`
+	// RateLimitPacingMaxMS is the maximum pacing delay in milliseconds.
+	RateLimitPacingMaxMS int `json:"rate_limit_pacing_max_ms"`
+	// RateLimitPacingEWMAAlphaPct controls EWMA smoothing (1-100).
+	RateLimitPacingEWMAAlphaPct int `json:"rate_limit_pacing_ewma_alpha_pct"`
+	// RateLimitPacingHeadroomPct keeps pacing slightly below estimated sustainable rate (1-100).
+	RateLimitPacingHeadroomPct int `json:"rate_limit_pacing_headroom_pct"`
 }
 
 // NetSettings holds IP stack enablement flags.

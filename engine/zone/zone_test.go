@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -158,6 +159,76 @@ func TestZoneQueryAllParallel(t *testing.T) {
 	}
 	if res[0].AnswerFrom != "ns1" || res[1].AnswerFrom != "ns2" {
 		t.Fatalf("expected ordered responses, got %q and %q", res[0].AnswerFrom, res[1].AnswerFrom)
+	}
+}
+
+func TestZoneQueryOneFallsBackWhenFirstNameserverIsPaced(t *testing.T) {
+	baseCtx, prof, _ := testhelpers.Context(t)
+	prof.Resolver.Defaults.RateLimitPacingEnabled = true
+	prof.Resolver.Defaults.RateLimitPacingMinMS = 200
+	prof.Resolver.Defaults.RateLimitPacingMaxMS = 200
+	prof.Resolver.Defaults.ErrorCacheTTL = 0
+	prof.Resolver.Defaults.NegativeCacheTTL = 0
+
+	ns1 := newHookedNameserver(baseCtx, t, "ns1.example", "192.0.2.74", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		return packet.Packet{}, syscall.ECONNRESET
+	})
+	_, _ = ns1.QueryWithOptions(baseCtx, "seed.example", "A", nil)
+
+	var firstCalls int
+	ns1.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		firstCalls++
+		msg := new(dns.Msg)
+		msg.SetQuestion("example.", dns.TypeA)
+		msg.Response = true
+		msg.Rcode = dns.RcodeSuccess
+		msg.Answer = []dns.RR{
+			&dns.A{
+				Hdr: dns.RR_Header{Name: "example.", Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 60},
+				A:   net.IPv4(192, 0, 2, 200),
+			},
+		}
+		return packet.Packet{Msg: msg, AnswerFrom: "ns1"}, nil
+	})
+
+	var secondCalls int
+	ns2 := newHookedNameserver(baseCtx, t, "ns2.example", "192.0.2.75", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		secondCalls++
+		msg := new(dns.Msg)
+		msg.SetQuestion("example.", dns.TypeA)
+		msg.Response = true
+		msg.Rcode = dns.RcodeSuccess
+		msg.Answer = []dns.RR{
+			&dns.A{
+				Hdr: dns.RR_Header{Name: "example.", Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 60},
+				A:   net.IPv4(192, 0, 2, 201),
+			},
+		}
+		return packet.Packet{Msg: msg, AnswerFrom: "ns2"}, nil
+	})
+
+	z := Zone{
+		Name:  dnsname.New("example"),
+		ns:    []nameserver.Nameserver{ns1, ns2},
+		nsSet: true,
+	}
+
+	timeout := 20 * time.Millisecond
+	resp, err := z.QueryOne(baseCtx, "example", "A", &nameserver.QueryOptions{Timeout: &timeout})
+	if err != nil {
+		t.Fatalf("queryone with fallback: %v", err)
+	}
+	if resp.Msg == nil {
+		t.Fatalf("expected response from fallback nameserver")
+	}
+	if resp.AnswerFrom != "ns2" {
+		t.Fatalf("expected fallback response from ns2, got %q", resp.AnswerFrom)
+	}
+	if firstCalls != 0 {
+		t.Fatalf("expected first nameserver to be skipped by pacing, got %d calls", firstCalls)
+	}
+	if secondCalls != 1 {
+		t.Fatalf("expected one call to fallback nameserver, got %d", secondCalls)
 	}
 }
 

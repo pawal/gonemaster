@@ -159,6 +159,10 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 
 	usevc := resolveUseVC(opts)
 	fastFailThreshold := resolveFastFailTimeoutCount(prof)
+	pacingPolicy := resolveRateLimitPacingPolicyConfig(prof)
+	if ns.state != nil {
+		ns.state.rateLimitPacing.setPolicy(pacingPolicy)
+	}
 	if ttl := resolveReachabilityTTL(prof, opts); ttl > 0 {
 		if skip, remaining := globalReachability.shouldSkip(ns.Address.String()); skip {
 			logSystem(ctx, "REACHABILITY_CACHE_SKIP", map[string]any{
@@ -199,6 +203,18 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 		})
 		return packet.Packet{}, nil
 	}
+	if skip, err := ns.applyRateLimitPacing(ctx, usevc, prof, opts, pacingPolicy); err != nil {
+		return packet.Packet{}, err
+	} else if skip {
+		logSystem(ctx, "RATE_LIMIT_PACING_SKIP", map[string]any{
+			"ip":          ns.Address.String(),
+			"protocol":    errorCacheProtocol(usevc),
+			"query_name":  qname,
+			"query_type":  qtype,
+			"query_class": qclass,
+		})
+		return packet.Packet{}, nil
+	}
 
 	var inflight *inflightQuery
 	if ns.state != nil && ns.state.cache != nil {
@@ -226,6 +242,10 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 
 	queryOpts, trackAdaptive := ns.applyAdaptiveTimeoutOptions(prof, opts, usevc)
 	resp, err := ns.queryNetwork(ctx, qname, qtype, qclass, queryOpts)
+	if ns.state != nil && pacingPolicy.Enabled {
+		signal := classifyRateLimitSignal(resp, err)
+		ns.state.rateLimitPacing.observeResult(usevc, signal, time.Now())
+	}
 	if ns.state != nil {
 		ns.state.fastFail.observeResult(usevc, isTimeoutPatternError(err), fastFailThreshold)
 	}
@@ -382,6 +402,35 @@ func resolveFastFailTimeoutCount(prof *profile.Profile) int {
 		return 0
 	}
 	return prof.Resolver.Defaults.FastFailTimeoutCount
+}
+
+func (ns Nameserver) applyRateLimitPacing(ctx context.Context, usevc bool, prof *profile.Profile, opts *QueryOptions, policy rateLimitPacingPolicyConfig) (bool, error) {
+	if ns.state == nil || !policy.Enabled {
+		return false, nil
+	}
+	shouldPace, remaining := ns.state.rateLimitPacing.shouldPace(usevc, time.Now())
+	if !shouldPace || remaining <= 0 {
+		return false, nil
+	}
+
+	budget := resolveQueryTimeout(prof, opts)
+	if budget > 0 && remaining > budget {
+		// Skip this nameserver so callers can fall back to alternatives instead of stalling.
+		return true, nil
+	}
+
+	timer := time.NewTimer(remaining)
+	defer timer.Stop()
+	if ctx == nil {
+		<-timer.C
+		return false, nil
+	}
+	select {
+	case <-timer.C:
+		return false, nil
+	case <-ctx.Done():
+		return false, ctx.Err()
+	}
 }
 
 func cloneQueryOptions(opts *QueryOptions) *QueryOptions {

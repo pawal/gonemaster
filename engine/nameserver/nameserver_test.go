@@ -790,6 +790,148 @@ func TestQueryLogging(t *testing.T) {
 	}
 }
 
+func TestRateLimitPacingDelaysQueryDispatch(t *testing.T) {
+	ns, err := New("ns.example", "192.0.2.70", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+
+	ctx, prof := testContext(t)
+	prof.Resolver.Defaults.RateLimitPacingEnabled = true
+	prof.Resolver.Defaults.RateLimitPacingMinMS = 80
+	prof.Resolver.Defaults.RateLimitPacingMaxMS = 80
+
+	ns.state.rateLimitPacing.jitterFn = func() float64 { return 0.5 }
+	ns.state.rateLimitPacing.observeResult(false, rateLimitSignalConnectionError, time.Now())
+
+	var calls int
+	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		calls++
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeSuccess
+		return packet.Packet{Msg: msg}, nil
+	})
+
+	start := time.Now()
+	_, err = ns.QueryWithOptions(ctx, "example", "A", nil)
+	if err != nil {
+		t.Fatalf("query with pacing delay: %v", err)
+	}
+	elapsed := time.Since(start)
+	if elapsed < 65*time.Millisecond {
+		t.Fatalf("expected paced delay >=65ms, got %v", elapsed)
+	}
+	if calls != 1 {
+		t.Fatalf("expected one network call after delay, got %d", calls)
+	}
+}
+
+func TestRateLimitPacingSkipsWhenDelayExceedsTimeoutBudget(t *testing.T) {
+	ns, err := New("ns.example", "192.0.2.71", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+
+	ctx, prof := testContext(t)
+	prof.Resolver.Defaults.RateLimitPacingEnabled = true
+	prof.Resolver.Defaults.RateLimitPacingMinMS = 200
+	prof.Resolver.Defaults.RateLimitPacingMaxMS = 200
+
+	ns.state.rateLimitPacing.jitterFn = func() float64 { return 0.5 }
+	ns.state.rateLimitPacing.observeResult(false, rateLimitSignalConnectionError, time.Now())
+
+	var calls int
+	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		calls++
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeSuccess
+		return packet.Packet{Msg: msg}, nil
+	})
+
+	timeout := 20 * time.Millisecond
+	resp, err := ns.QueryWithOptions(ctx, "example", "A", &QueryOptions{Timeout: &timeout})
+	if err != nil {
+		t.Fatalf("query with paced skip: %v", err)
+	}
+	if resp.Msg != nil {
+		t.Fatalf("expected paced query skip to return empty response")
+	}
+	if calls != 0 {
+		t.Fatalf("expected paced query skip before network dispatch, got %d calls", calls)
+	}
+}
+
+func TestRateLimitPacingIsPerNameserver(t *testing.T) {
+	nsSlow, err := New("ns-slow.example", "192.0.2.72", nil)
+	if err != nil {
+		t.Fatalf("new slow nameserver: %v", err)
+	}
+	nsFast, err := New("ns-fast.example", "192.0.2.73", nil)
+	if err != nil {
+		t.Fatalf("new fast nameserver: %v", err)
+	}
+
+	ctx, prof := testContext(t)
+	prof.Resolver.Defaults.RateLimitPacingEnabled = true
+	prof.Resolver.Defaults.RateLimitPacingMinMS = 150
+	prof.Resolver.Defaults.RateLimitPacingMaxMS = 150
+
+	nsSlow.state.rateLimitPacing.jitterFn = func() float64 { return 0.5 }
+	nsSlow.state.rateLimitPacing.observeResult(false, rateLimitSignalConnectionError, time.Now())
+
+	nsSlow.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeSuccess
+		return packet.Packet{Msg: msg}, nil
+	})
+	nsFast.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeSuccess
+		return packet.Packet{Msg: msg}, nil
+	})
+
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	var slowElapsed time.Duration
+	var fastElapsed time.Duration
+	var slowErr error
+	var fastErr error
+
+	go func() {
+		defer wg.Done()
+		<-start
+		begin := time.Now()
+		_, slowErr = nsSlow.QueryWithOptions(ctx, "slow.example", "A", nil)
+		slowElapsed = time.Since(begin)
+	}()
+
+	go func() {
+		defer wg.Done()
+		<-start
+		begin := time.Now()
+		_, fastErr = nsFast.QueryWithOptions(ctx, "fast.example", "A", nil)
+		fastElapsed = time.Since(begin)
+	}()
+
+	close(start)
+	wg.Wait()
+
+	if slowErr != nil {
+		t.Fatalf("slow query error: %v", slowErr)
+	}
+	if fastErr != nil {
+		t.Fatalf("fast query error: %v", fastErr)
+	}
+	if slowElapsed < 120*time.Millisecond {
+		t.Fatalf("expected slow nameserver to be paced, got %v", slowElapsed)
+	}
+	if fastElapsed > 80*time.Millisecond {
+		t.Fatalf("expected fast nameserver to run without pacing delay, got %v", fastElapsed)
+	}
+}
+
 func testContext(t *testing.T) (context.Context, *profile.Profile) {
 	t.Helper()
 	prof, err := profile.Default()

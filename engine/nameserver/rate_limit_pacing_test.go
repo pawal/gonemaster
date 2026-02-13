@@ -277,6 +277,111 @@ func TestRateLimitPacingSnapshotWindowErrors(t *testing.T) {
 	}
 }
 
+func TestRateLimitPacingMetricsCounters(t *testing.T) {
+	t.Parallel()
+
+	tracker := &rateLimitPacingTracker{jitterFn: func() float64 { return 0.5 }}
+	now := time.Unix(1700000850, 0)
+
+	tracker.observeResult(false, rateLimitSignalTimeoutPattern, now)
+	tracker.observeResult(false, rateLimitSignalTimeoutPattern, now)
+	tracker.observeResult(false, rateLimitSignalConnectionError, now)
+	for i := 0; i < 3; i++ {
+		tracker.observeResult(false, rateLimitSignalServfailOrRefused, now)
+	}
+	for i := 0; i < 3; i++ {
+		tracker.observeResult(false, rateLimitSignalNone, now)
+	}
+
+	tracker.recordPacingDelay(false)
+	tracker.recordPacingSkip(false)
+
+	snap := tracker.snapshot(false)
+	if snap.DetectionTimeoutBurst != 1 {
+		t.Fatalf("timeout burst detections = %d, want 1", snap.DetectionTimeoutBurst)
+	}
+	if snap.DetectionConnError != 1 {
+		t.Fatalf("connection error detections = %d, want 1", snap.DetectionConnError)
+	}
+	if snap.DetectionServfail != 1 {
+		t.Fatalf("servfail/refused detections = %d, want 1", snap.DetectionServfail)
+	}
+	if snap.PacingDelayCount != 1 {
+		t.Fatalf("pacing delay count = %d, want 1", snap.PacingDelayCount)
+	}
+	if snap.PacingSkipCount != 1 {
+		t.Fatalf("pacing skip count = %d, want 1", snap.PacingSkipCount)
+	}
+}
+
+func TestRateLimitPacingSyntheticConvergence(t *testing.T) {
+	t.Parallel()
+
+	tracker := &rateLimitPacingTracker{jitterFn: func() float64 { return 0.5 }}
+	tracker.setPolicy(rateLimitPacingPolicyConfig{
+		Enabled:   true,
+		MinDelay:  20 * time.Millisecond,
+		MaxDelay:  2 * time.Second,
+		EWMAAlpha: 0.4,
+		Headroom:  0.85,
+	})
+
+	now := time.Unix(1700001200, 0)
+	for i := 0; i < 4; i++ {
+		tracker.observeResult(false, rateLimitSignalConnectionError, now.Add(time.Duration(i)*10*time.Millisecond))
+	}
+
+	start := now.Add(100 * time.Millisecond)
+	for i := 0; i < 30; i++ {
+		tracker.observeResult(false, rateLimitSignalNone, start.Add(time.Duration(i)*100*time.Millisecond))
+	}
+
+	snap := tracker.snapshot(false)
+	if snap.BackoffStep != 0 {
+		t.Fatalf("expected backoff to decay to zero, got %d", snap.BackoffStep)
+	}
+	if snap.EstimatedInterval < 90*time.Millisecond || snap.EstimatedInterval > 120*time.Millisecond {
+		t.Fatalf("estimated interval not converged near 100ms: %v", snap.EstimatedInterval)
+	}
+	if snap.AdaptiveDelay < 100*time.Millisecond || snap.AdaptiveDelay > 140*time.Millisecond {
+		t.Fatalf("adaptive delay not converged to bounded target, got %v", snap.AdaptiveDelay)
+	}
+}
+
+func TestRateLimitPacingSyntheticNoStarvation(t *testing.T) {
+	t.Parallel()
+
+	tracker := &rateLimitPacingTracker{jitterFn: func() float64 { return 0.5 }}
+	tracker.setPolicy(rateLimitPacingPolicyConfig{
+		Enabled:   true,
+		MinDelay:  150 * time.Millisecond,
+		MaxDelay:  150 * time.Millisecond,
+		EWMAAlpha: 0.5,
+		Headroom:  0.9,
+	})
+
+	start := time.Unix(1700001300, 0)
+	tracker.observeResult(false, rateLimitSignalConnectionError, start)
+
+	allowed := 0
+	for i := 1; i <= 12; i++ {
+		now := start.Add(time.Duration(i) * 50 * time.Millisecond)
+		shouldPace, _ := tracker.shouldPace(false, now)
+		if shouldPace {
+			continue
+		}
+		allowed++
+		tracker.observeResult(false, rateLimitSignalNone, now)
+	}
+
+	if allowed == 0 {
+		t.Fatalf("expected at least one non-paced slot over synthetic schedule")
+	}
+	if allowed >= 12 {
+		t.Fatalf("expected some paced intervals in synthetic schedule, got all allowed")
+	}
+}
+
 func TestRateLimitPacingTrackerAdaptivePolicyEWMA(t *testing.T) {
 	t.Parallel()
 

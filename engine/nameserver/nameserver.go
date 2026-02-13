@@ -203,17 +203,16 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 		})
 		return packet.Packet{}, nil
 	}
-	if skip, err := ns.applyRateLimitPacing(ctx, usevc, prof, opts, pacingPolicy); err != nil {
+	pacingDecision, err := ns.applyRateLimitPacing(ctx, usevc, prof, opts, pacingPolicy)
+	if err != nil {
 		return packet.Packet{}, err
-	} else if skip {
-		logSystem(ctx, "RATE_LIMIT_PACING_SKIP", map[string]any{
-			"ip":          ns.Address.String(),
-			"protocol":    errorCacheProtocol(usevc),
-			"query_name":  qname,
-			"query_type":  qtype,
-			"query_class": qclass,
-		})
+	}
+	switch pacingDecision.Action {
+	case "skip":
+		logSystem(ctx, "RATE_LIMIT_PACING_SKIP", rateLimitPacingLogArgs(ns, usevc, qname, qtype, qclass, pacingDecision, "delay_exceeds_budget"))
 		return packet.Packet{}, nil
+	case "delay":
+		logSystem(ctx, "RATE_LIMIT_PACING_DELAY", rateLimitPacingLogArgs(ns, usevc, qname, qtype, qclass, pacingDecision, "paced_wait"))
 	}
 
 	var inflight *inflightQuery
@@ -244,7 +243,17 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	resp, err := ns.queryNetwork(ctx, qname, qtype, qclass, queryOpts)
 	if ns.state != nil && pacingPolicy.Enabled {
 		signal := classifyRateLimitSignal(resp, err)
-		ns.state.rateLimitPacing.observeResult(usevc, signal, time.Now())
+		observation := ns.state.rateLimitPacing.observeResultWithObservation(usevc, signal, time.Now())
+		if observation.Detected {
+			args := rateLimitPacingLogArgs(ns, usevc, qname, qtype, qclass, rateLimitPacingDecision{
+				Action:    "observe",
+				Remaining: 0,
+				Budget:    0,
+				Snapshot:  observation.Snapshot,
+			}, observation.Reason)
+			args["signal"] = rateLimitSignalString(observation.Signal)
+			logSystem(ctx, "RATE_LIMIT_PACING_DETECTED", args)
+		}
 	}
 	if ns.state != nil {
 		ns.state.fastFail.observeResult(usevc, isTimeoutPatternError(err), fastFailThreshold)
@@ -404,33 +413,68 @@ func resolveFastFailTimeoutCount(prof *profile.Profile) int {
 	return prof.Resolver.Defaults.FastFailTimeoutCount
 }
 
-func (ns Nameserver) applyRateLimitPacing(ctx context.Context, usevc bool, prof *profile.Profile, opts *QueryOptions, policy rateLimitPacingPolicyConfig) (bool, error) {
+func (ns Nameserver) applyRateLimitPacing(ctx context.Context, usevc bool, prof *profile.Profile, opts *QueryOptions, policy rateLimitPacingPolicyConfig) (rateLimitPacingDecision, error) {
 	if ns.state == nil || !policy.Enabled {
-		return false, nil
+		return rateLimitPacingDecision{}, nil
 	}
 	shouldPace, remaining := ns.state.rateLimitPacing.shouldPace(usevc, time.Now())
 	if !shouldPace || remaining <= 0 {
-		return false, nil
+		return rateLimitPacingDecision{}, nil
 	}
 
 	budget := resolveQueryTimeout(prof, opts)
 	if budget > 0 && remaining > budget {
 		// Skip this nameserver so callers can fall back to alternatives instead of stalling.
-		return true, nil
+		ns.state.rateLimitPacing.recordPacingSkip(usevc)
+		return rateLimitPacingDecision{
+			Action:    "skip",
+			Remaining: remaining,
+			Budget:    budget,
+			Snapshot:  ns.state.rateLimitPacing.snapshot(usevc),
+		}, nil
+	}
+	ns.state.rateLimitPacing.recordPacingDelay(usevc)
+	decision := rateLimitPacingDecision{
+		Action:    "delay",
+		Remaining: remaining,
+		Budget:    budget,
+		Snapshot:  ns.state.rateLimitPacing.snapshot(usevc),
 	}
 
 	timer := time.NewTimer(remaining)
 	defer timer.Stop()
 	if ctx == nil {
 		<-timer.C
-		return false, nil
+		return decision, nil
 	}
 	select {
 	case <-timer.C:
-		return false, nil
+		return decision, nil
 	case <-ctx.Done():
-		return false, ctx.Err()
+		return decision, ctx.Err()
 	}
+}
+
+func rateLimitPacingLogArgs(ns Nameserver, usevc bool, qname string, qtype string, qclass string, decision rateLimitPacingDecision, reason string) map[string]any {
+	args := map[string]any{
+		"ip":                   ns.Address.String(),
+		"protocol":             errorCacheProtocol(usevc),
+		"query_name":           qname,
+		"query_type":           qtype,
+		"query_class":          qclass,
+		"reason":               reason,
+		"delay_ms":             decision.Remaining.Milliseconds(),
+		"budget_ms":            decision.Budget.Milliseconds(),
+		"backoff_ms":           decision.Snapshot.BackoffDelay.Milliseconds(),
+		"adaptive_ms":          decision.Snapshot.AdaptiveDelay.Milliseconds(),
+		"estimated_qps":        decision.Snapshot.EstimatedQPS,
+		"detection_timeout":    decision.Snapshot.DetectionTimeoutBurst,
+		"detection_servfail":   decision.Snapshot.DetectionServfail,
+		"detection_conn_error": decision.Snapshot.DetectionConnError,
+		"pacing_delays":        decision.Snapshot.PacingDelayCount,
+		"pacing_skips":         decision.Snapshot.PacingSkipCount,
+	}
+	return args
 }
 
 func cloneQueryOptions(opts *QueryOptions) *QueryOptions {

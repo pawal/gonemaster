@@ -26,6 +26,21 @@ const (
 	rateLimitServfailRefusedSpikePercent = 0.5
 )
 
+func rateLimitSignalString(signal rateLimitSignal) string {
+	switch signal {
+	case rateLimitSignalTimeoutPattern:
+		return "timeout_pattern"
+	case rateLimitSignalServfailOrRefused:
+		return "servfail_or_refused"
+	case rateLimitSignalConnectionError:
+		return "connection_error"
+	case rateLimitSignalHardUnreachable:
+		return "hard_unreachable"
+	default:
+		return "none"
+	}
+}
+
 func classifyRateLimitSignal(resp packet.Packet, err error) rateLimitSignal {
 	if err != nil {
 		switch {

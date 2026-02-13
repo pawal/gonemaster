@@ -932,6 +932,107 @@ func TestRateLimitPacingIsPerNameserver(t *testing.T) {
 	}
 }
 
+func TestRateLimitPacingStructuredLogsAndMetrics(t *testing.T) {
+	ns, err := New("ns-observe.example", "192.0.2.76", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+
+	ctx, prof := testContext(t)
+	prof.Resolver.Defaults.RateLimitPacingEnabled = true
+	prof.Resolver.Defaults.RateLimitPacingMinMS = 60
+	prof.Resolver.Defaults.RateLimitPacingMaxMS = 60
+
+	ns.state.rateLimitPacing.jitterFn = func() float64 { return 0.5 }
+
+	var calls int
+	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		calls++
+		if calls == 1 {
+			return packet.Packet{}, syscall.ECONNRESET
+		}
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeSuccess
+		return packet.Packet{Msg: msg}, nil
+	})
+
+	_, err = ns.QueryWithOptions(ctx, "observe-1.example", "A", nil)
+	if err == nil {
+		t.Fatalf("expected first query to return connection-reset error")
+	}
+
+	shortBudget := 10 * time.Millisecond
+	resp, err := ns.QueryWithOptions(ctx, "observe-2.example", "A", &QueryOptions{Timeout: &shortBudget})
+	if err != nil {
+		t.Fatalf("second query with skip budget: %v", err)
+	}
+	if resp.Msg != nil {
+		t.Fatalf("expected paced skip response to be empty")
+	}
+
+	longBudget := 300 * time.Millisecond
+	resp, err = ns.QueryWithOptions(ctx, "observe-3.example", "A", &QueryOptions{Timeout: &longBudget})
+	if err != nil {
+		t.Fatalf("third query with delay budget: %v", err)
+	}
+	if resp.Msg == nil {
+		t.Fatalf("expected delayed third query to reach network and return response")
+	}
+
+	log := logger.FromContext(ctx)
+	if log == nil {
+		t.Fatalf("expected logger in context")
+	}
+
+	var foundDetected bool
+	var foundSkip bool
+	var foundDelay bool
+	for _, entry := range log.Entries() {
+		if entry == nil {
+			continue
+		}
+		switch entry.Tag {
+		case "RATE_LIMIT_PACING_DETECTED":
+			foundDetected = true
+			if got := entry.Args["reason"]; got != "connection_error" {
+				t.Fatalf("detected reason = %v, want connection_error", got)
+			}
+			if got := entry.Args["signal"]; got != "connection_error" {
+				t.Fatalf("detected signal = %v, want connection_error", got)
+			}
+			if got, ok := entry.Args["detection_conn_error"].(int); !ok || got < 1 {
+				t.Fatalf("expected detection_conn_error >= 1, got %#v", entry.Args["detection_conn_error"])
+			}
+		case "RATE_LIMIT_PACING_SKIP":
+			foundSkip = true
+			if got := entry.Args["reason"]; got != "delay_exceeds_budget" {
+				t.Fatalf("skip reason = %v, want delay_exceeds_budget", got)
+			}
+			if got, ok := entry.Args["pacing_skips"].(int); !ok || got < 1 {
+				t.Fatalf("expected pacing_skips >= 1, got %#v", entry.Args["pacing_skips"])
+			}
+		case "RATE_LIMIT_PACING_DELAY":
+			foundDelay = true
+			if got := entry.Args["reason"]; got != "paced_wait" {
+				t.Fatalf("delay reason = %v, want paced_wait", got)
+			}
+			if got, ok := entry.Args["pacing_delays"].(int); !ok || got < 1 {
+				t.Fatalf("expected pacing_delays >= 1, got %#v", entry.Args["pacing_delays"])
+			}
+		}
+	}
+
+	if !foundDetected {
+		t.Fatalf("expected RATE_LIMIT_PACING_DETECTED log entry")
+	}
+	if !foundSkip {
+		t.Fatalf("expected RATE_LIMIT_PACING_SKIP log entry")
+	}
+	if !foundDelay {
+		t.Fatalf("expected RATE_LIMIT_PACING_DELAY log entry")
+	}
+}
+
 func testContext(t *testing.T) (context.Context, *profile.Profile) {
 	t.Helper()
 	prof, err := profile.Default()

@@ -45,12 +45,18 @@ type rateLimitPacingState struct {
 	windowSuccesses       int
 	windowServfailRefused int
 	consecutiveTimeouts   int
+	timeoutBurstCount     int
 	backoffStep           int
 	backoffDelay          time.Duration
 	nextAllowed           time.Time
 	lastSuccessAt         time.Time
 	ewmaInterval          time.Duration
 	adaptiveDelay         time.Duration
+	detectionTimeoutBurst int
+	detectionServfail     int
+	detectionConnError    int
+	pacingDelayCount      int
+	pacingSkipCount       int
 }
 
 type rateLimitPacingSnapshot struct {
@@ -65,6 +71,25 @@ type rateLimitPacingSnapshot struct {
 	EstimatedInterval     time.Duration
 	EstimatedQPS          float64
 	NextAllowed           time.Time
+	DetectionTimeoutBurst int
+	DetectionServfail     int
+	DetectionConnError    int
+	PacingDelayCount      int
+	PacingSkipCount       int
+}
+
+type rateLimitPacingObservation struct {
+	Detected bool
+	Reason   string
+	Signal   rateLimitSignal
+	Snapshot rateLimitPacingSnapshot
+}
+
+type rateLimitPacingDecision struct {
+	Action    string
+	Remaining time.Duration
+	Budget    time.Duration
+	Snapshot  rateLimitPacingSnapshot
 }
 
 func defaultRateLimitPacingPolicyConfig() rateLimitPacingPolicyConfig {
@@ -144,8 +169,12 @@ func (t *rateLimitPacingTracker) policyConfig() rateLimitPacingPolicyConfig {
 }
 
 func (t *rateLimitPacingTracker) observeResult(useTCP bool, signal rateLimitSignal, now time.Time) {
+	_ = t.observeResultWithObservation(useTCP, signal, now)
+}
+
+func (t *rateLimitPacingTracker) observeResultWithObservation(useTCP bool, signal rateLimitSignal, now time.Time) rateLimitPacingObservation {
 	if t == nil {
-		return
+		return rateLimitPacingObservation{}
 	}
 	if now.IsZero() {
 		now = time.Now()
@@ -153,33 +182,50 @@ func (t *rateLimitPacingTracker) observeResult(useTCP bool, signal rateLimitSign
 	cfg := t.policyConfig()
 
 	t.mu.Lock()
+	defer t.mu.Unlock()
 	state := t.stateForProtocol(useTCP)
 	state.observeSignal(signal)
 
 	likelyRateLimit := false
+	reason := ""
 	switch signal {
 	case rateLimitSignalTimeoutPattern:
-		if isTimeoutBurstSignal(state.consecutiveTimeouts) {
+		if isTimeoutBurstSignal(state.timeoutBurstCount) {
 			likelyRateLimit = true
+			reason = "timeout_burst"
+			state.detectionTimeoutBurst++
 		}
 	case rateLimitSignalConnectionError:
 		likelyRateLimit = true
+		reason = "connection_error"
+		state.detectionConnError++
 	case rateLimitSignalServfailOrRefused:
 		if isServfailRefusedRatioSpike(state.windowServfailRefused, state.windowLen) {
 			likelyRateLimit = true
+			reason = "servfail_refused_spike"
+			state.detectionServfail++
 		}
 	}
 
 	if signal == rateLimitSignalNone {
 		state.observeSuccess(now, cfg)
 		t.decayOnSuccess(state, now, cfg)
-		t.mu.Unlock()
-		return
+		return rateLimitPacingObservation{
+			Detected: false,
+			Reason:   "",
+			Signal:   signal,
+			Snapshot: snapshotFromPacingState(state),
+		}
 	}
 	if likelyRateLimit {
 		t.applyBackoff(state, now, cfg)
 	}
-	t.mu.Unlock()
+	return rateLimitPacingObservation{
+		Detected: likelyRateLimit,
+		Reason:   reason,
+		Signal:   signal,
+		Snapshot: snapshotFromPacingState(state),
+	}
 }
 
 func (t *rateLimitPacingTracker) shouldPace(useTCP bool, now time.Time) (bool, time.Duration) {
@@ -206,19 +252,7 @@ func (t *rateLimitPacingTracker) snapshot(useTCP bool) rateLimitPacingSnapshot {
 	t.mu.Lock()
 	state := *t.stateForProtocol(useTCP)
 	t.mu.Unlock()
-	return rateLimitPacingSnapshot{
-		WindowTotal:           state.windowLen,
-		WindowSuccesses:       state.windowSuccesses,
-		WindowErrors:          state.windowLen - state.windowSuccesses,
-		WindowServfailRefused: state.windowServfailRefused,
-		ConsecutiveTimeouts:   state.consecutiveTimeouts,
-		BackoffStep:           state.backoffStep,
-		BackoffDelay:          state.backoffDelay,
-		AdaptiveDelay:         state.adaptiveDelay,
-		EstimatedInterval:     state.ewmaInterval,
-		EstimatedQPS:          state.estimatedQPS(),
-		NextAllowed:           state.nextAllowed,
-	}
+	return snapshotFromPacingState(&state)
 }
 
 func (t *rateLimitPacingTracker) stateForProtocol(useTCP bool) *rateLimitPacingState {
@@ -226,6 +260,24 @@ func (t *rateLimitPacingTracker) stateForProtocol(useTCP bool) *rateLimitPacingS
 		return &t.tcp
 	}
 	return &t.udp
+}
+
+func (t *rateLimitPacingTracker) recordPacingDelay(useTCP bool) {
+	if t == nil {
+		return
+	}
+	t.mu.Lock()
+	t.stateForProtocol(useTCP).pacingDelayCount++
+	t.mu.Unlock()
+}
+
+func (t *rateLimitPacingTracker) recordPacingSkip(useTCP bool) {
+	if t == nil {
+		return
+	}
+	t.mu.Lock()
+	t.stateForProtocol(useTCP).pacingSkipCount++
+	t.mu.Unlock()
 }
 
 func (t *rateLimitPacingTracker) applyBackoff(state *rateLimitPacingState, now time.Time, cfg rateLimitPacingPolicyConfig) {
@@ -323,9 +375,11 @@ func (s *rateLimitPacingState) observeSignal(signal rateLimitSignal) {
 	s.pushWindowSignal(signal)
 	if signal == rateLimitSignalTimeoutPattern {
 		s.consecutiveTimeouts++
+		s.timeoutBurstCount++
 		return
 	}
 	s.consecutiveTimeouts = 0
+	s.timeoutBurstCount = 0
 }
 
 func (s *rateLimitPacingState) pushWindowSignal(signal rateLimitSignal) {
@@ -399,6 +453,30 @@ func (s *rateLimitPacingState) effectiveDelay(cfg rateLimitPacingPolicyConfig) t
 	}
 	cfg = sanitizeRateLimitPacingPolicyConfig(cfg)
 	return clampDelay(delay, cfg.MinDelay, cfg.MaxDelay)
+}
+
+func snapshotFromPacingState(state *rateLimitPacingState) rateLimitPacingSnapshot {
+	if state == nil {
+		return rateLimitPacingSnapshot{}
+	}
+	return rateLimitPacingSnapshot{
+		WindowTotal:           state.windowLen,
+		WindowSuccesses:       state.windowSuccesses,
+		WindowErrors:          state.windowLen - state.windowSuccesses,
+		WindowServfailRefused: state.windowServfailRefused,
+		ConsecutiveTimeouts:   state.consecutiveTimeouts,
+		BackoffStep:           state.backoffStep,
+		BackoffDelay:          state.backoffDelay,
+		AdaptiveDelay:         state.adaptiveDelay,
+		EstimatedInterval:     state.ewmaInterval,
+		EstimatedQPS:          state.estimatedQPS(),
+		NextAllowed:           state.nextAllowed,
+		DetectionTimeoutBurst: state.detectionTimeoutBurst,
+		DetectionServfail:     state.detectionServfail,
+		DetectionConnError:    state.detectionConnError,
+		PacingDelayCount:      state.pacingDelayCount,
+		PacingSkipCount:       state.pacingSkipCount,
+	}
 }
 
 func clampDelay(delay time.Duration, minDelay time.Duration, maxDelay time.Duration) time.Duration {

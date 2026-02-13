@@ -76,6 +76,24 @@ curl -s "http://localhost:8080/api/v1/jobs/$JOB_ID/result?locale=en" | jq .
 - Flags override config file values.
 - `profile_path` sets the default profile used for all jobs (same as `gonemaster --profile`).
 
+### Quick presets (casual usage)
+Use these as practical starting points:
+
+Small host / local testing:
+```sh
+gonemaster-server --workers 4 --max-concurrent-jobs 2
+```
+
+Balanced baseline on larger host:
+```sh
+gonemaster-server --workers 8 --max-concurrent-jobs 6 --auto-clamp-concurrency
+```
+
+Repeated large batches against overlapping NS sets:
+```sh
+gonemaster-server --workers 8 --max-concurrent-jobs 6 --cross-job-hot-cache --cross-job-hot-cache-ttl-seconds 60
+```
+
 ### Deterministic mode
 If you want deterministic ordered resolver behavior on the server, set:
 - `resolver.defaults.unordered: false`
@@ -139,26 +157,43 @@ How to interpret:
 At startup, `gonemaster-server` prints an `Effective concurrency:` line so you can verify final runtime settings before a test run.
 
 ## Flags
-- `--config` JSON config file path
-- `--listen` Address to listen on
-- `--max-body-size` Max request body size in bytes
-- `--debug` Enable request/response logging
-- `--workers` Number of worker goroutines
-- `--auto-clamp-concurrency` Clamp pathological concurrency values based on CPU count
-- `--job-test-parallelism` Testcase parallelism inside one job
-- `--max-concurrent-jobs` Max concurrent engine runs (0 = unlimited)
-- `--cross-job-hot-cache` Enable short-lived warmed nameserver cache reuse across jobs
-- `--cross-job-hot-cache-ttl-seconds` TTL for cross-job hot cache entries (default 60)
-- `--positive-cache-ttl` Seconds to cache positive DNS responses (optional)
-- `--negative-cache-ttl` Seconds to cache negative DNS responses (optional)
-- `--timeout` Override resolver.defaults.timeout in seconds (optional)
-- `--retry` Override resolver.defaults.retry (optional)
-- `--retrans` Override resolver.defaults.retrans in seconds (optional)
-- `--fallback` Enable TCP fallback on UDP failure (optional)
-- `--no-fallback` Disable TCP fallback on UDP failure (optional)
-- `--min-level` Minimum log level for results
-- `--profile` Profile JSON/YAML path (default for all jobs)
-- `--shutdown-timeout` Graceful shutdown timeout
+Flags are grouped below in the same way as `gonemaster-server --help`.
+
+### General
+| Flag | Default | Meaning |
+| --- | --- | --- |
+| `--config PATH` | empty | Load config from JSON file. |
+| `--listen ADDR` | `127.0.0.1:8080` | HTTP listen address. |
+| `--max-body-size BYTES` | `1048576` | Max API request body size. |
+| `--debug` | `false` | Enable request/response logging middleware. |
+| `--shutdown-timeout DURATION` | `10s` | Graceful shutdown wait time. |
+
+### Concurrency
+| Flag | Default | Meaning |
+| --- | --- | --- |
+| `--workers N` | `4` | Queue workers processing jobs. |
+| `--max-concurrent-jobs N` | `0` | Cap in-flight engine runs across workers; `0` means unlimited (still bounded by workers). |
+| `--job-test-parallelism N` | `1` | Parallel testcases within one job when `tests` list is provided. |
+| `--auto-clamp-concurrency` | `false` | Clamp extreme worker/concurrency values using host CPU count. |
+| `--cross-job-hot-cache` | `false` | Reuse short-lived warmed nameserver caches between jobs. |
+| `--cross-job-hot-cache-ttl-seconds N` | `60` | TTL for hot-cache entries. |
+
+### Resolver/Profile
+| Flag | Default | Meaning |
+| --- | --- | --- |
+| `--profile PATH` | empty | Default profile file for all jobs. |
+| `--positive-cache-ttl N` | unset | Override positive DNS cache TTL (seconds). |
+| `--negative-cache-ttl N` | unset | Override negative DNS cache TTL (seconds). |
+| `--timeout N` | unset | Override per-query timeout (seconds). |
+| `--retry N` | unset | Override retry count. |
+| `--retrans N` | unset | Override retransmit interval (seconds). |
+| `--fallback` | unset | Force TCP fallback on UDP failure. |
+| `--no-fallback` | unset | Disable TCP fallback on UDP failure. |
+
+### Output
+| Flag | Default | Meaning |
+| --- | --- | --- |
+| `--min-level LEVEL` | `INFO` | Minimum level in returned result entries. |
 
 ## Domain normalization (IDN)
 Domains are normalized to IDNA A-labels (punycode). For example:

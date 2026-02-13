@@ -6,12 +6,19 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 )
+
+var cacheKeyBufferPool = sync.Pool{
+	New: func() any {
+		return make([]byte, 0, 256)
+	},
+}
 
 // String returns the nameserver name and IP address.
 func (ns Nameserver) String() string {
@@ -287,39 +294,71 @@ func buildCacheKey(name string, qtype string, qclass string, opts *QueryOptions)
 	}
 
 	nameObj := dnsname.New(name)
-	parts := []string{
-		"NAME=" + strings.ToLower(nameObj.String()),
-		"TYPE=" + qtype,
-		"CLASS=" + qclass,
-		"DNSSEC=" + strconv.FormatBool(dnssec),
-		"USEVC=" + strconv.FormatBool(usevc),
-		"RECURSE=" + strconv.FormatBool(recurse),
-	}
+	buf := cacheKeyBufferPool.Get().([]byte)[:0]
+	defer putCacheKeyBuffer(buf)
+
+	buf = appendCacheKeyString(buf, "NAME", strings.ToLower(nameObj.String()))
+	buf = appendCacheKeyString(buf, "TYPE", qtype)
+	buf = appendCacheKeyString(buf, "CLASS", qclass)
+	buf = appendCacheKeyBool(buf, "DNSSEC", dnssec)
+	buf = appendCacheKeyBool(buf, "USEVC", usevc)
+	buf = appendCacheKeyBool(buf, "RECURSE", recurse)
 
 	if opts != nil && opts.EDNSDetails != nil {
-		parts = append(parts,
-			"EDNS_VERSION="+formatUint8(opts.EDNSDetails.Version),
-			"EDNS_Z="+formatUint16(opts.EDNSDetails.Z),
-			"EDNS_RCODE="+formatUint8(opts.EDNSDetails.Rcode),
-			"EDNS_DATA="+formatEDNSData(opts.EDNSDetails.Data),
-		)
+		buf = appendCacheKeyUint8Ptr(buf, "EDNS_VERSION", opts.EDNSDetails.Version)
+		buf = appendCacheKeyUint16Ptr(buf, "EDNS_Z", opts.EDNSDetails.Z)
+		buf = appendCacheKeyUint8Ptr(buf, "EDNS_RCODE", opts.EDNSDetails.Rcode)
+		buf = appendCacheKeyString(buf, "EDNS_DATA", formatEDNSData(opts.EDNSDetails.Data))
 	}
-	parts = append(parts, "EDNS_SIZE="+strconv.FormatUint(uint64(ednsSize), 10))
-	return strings.Join(parts, "|"), ednsSize, dnssec, nil
+	buf = appendCacheKeyUint(buf, "EDNS_SIZE", uint64(ednsSize))
+	return string(buf), ednsSize, dnssec, nil
 }
 
-func formatUint8(value *uint8) string {
-	if value == nil {
-		return "0"
+func putCacheKeyBuffer(buf []byte) {
+	if cap(buf) > 4096 {
+		cacheKeyBufferPool.Put(make([]byte, 0, 256))
+		return
 	}
-	return strconv.FormatUint(uint64(*value), 10)
+	cacheKeyBufferPool.Put(buf[:0])
 }
 
-func formatUint16(value *uint16) string {
-	if value == nil {
-		return "0"
+func appendCacheKeyPrefix(buf []byte, key string) []byte {
+	if len(buf) > 0 {
+		buf = append(buf, '|')
 	}
-	return strconv.FormatUint(uint64(*value), 10)
+	buf = append(buf, key...)
+	buf = append(buf, '=')
+	return buf
+}
+
+func appendCacheKeyString(buf []byte, key string, value string) []byte {
+	buf = appendCacheKeyPrefix(buf, key)
+	buf = append(buf, value...)
+	return buf
+}
+
+func appendCacheKeyBool(buf []byte, key string, value bool) []byte {
+	buf = appendCacheKeyPrefix(buf, key)
+	return strconv.AppendBool(buf, value)
+}
+
+func appendCacheKeyUint(buf []byte, key string, value uint64) []byte {
+	buf = appendCacheKeyPrefix(buf, key)
+	return strconv.AppendUint(buf, value, 10)
+}
+
+func appendCacheKeyUint8Ptr(buf []byte, key string, value *uint8) []byte {
+	if value == nil {
+		return appendCacheKeyUint(buf, key, 0)
+	}
+	return appendCacheKeyUint(buf, key, uint64(*value))
+}
+
+func appendCacheKeyUint16Ptr(buf []byte, key string, value *uint16) []byte {
+	if value == nil {
+		return appendCacheKeyUint(buf, key, 0)
+	}
+	return appendCacheKeyUint(buf, key, uint64(*value))
 }
 
 func formatEDNSData(data []dns.EDNS0) string {

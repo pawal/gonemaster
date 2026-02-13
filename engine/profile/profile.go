@@ -66,6 +66,9 @@ type ResolverDefaults struct {
 	RateLimitPacingEWMAAlphaPct int `json:"rate_limit_pacing_ewma_alpha_pct"`
 	// RateLimitPacingHeadroomPct keeps pacing slightly below estimated sustainable rate (1-100).
 	RateLimitPacingHeadroomPct int `json:"rate_limit_pacing_headroom_pct"`
+	// NameserverConcurrency caps concurrent in-flight queries per nameserver address.
+	// Zero keeps concurrency uncapped (default behavior).
+	NameserverConcurrency int `json:"nameserver_concurrency"`
 }
 
 // NetSettings holds IP stack enablement flags.

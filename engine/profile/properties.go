@@ -265,6 +265,17 @@ var propertyDefs = map[string]propertyDef{
 			return p.Resolver.Defaults.RateLimitPacingHeadroomPct
 		},
 	},
+	"resolver.defaults.nameserver_concurrency": {
+		typ: propNum,
+		min: intPtr(0),
+		max: intPtr(1024),
+		setter: func(p *Profile, value any) {
+			p.Resolver.Defaults.NameserverConcurrency = value.(int)
+		},
+		getter: func(p *Profile) any {
+			return p.Resolver.Defaults.NameserverConcurrency
+		},
+	},
 	"resolver.source4": {
 		typ:          propStr,
 		defaultValue: "",

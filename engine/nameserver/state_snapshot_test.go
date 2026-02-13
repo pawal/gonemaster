@@ -121,15 +121,21 @@ func TestCacheStoreSnapshotForRunCoalescesInflightAcrossSnapshots(t *testing.T) 
 		_, err := nsA.QueryWithOptions(context.Background(), "coalesce.example", "A", nil)
 		errCh <- err
 	}()
-	go func() {
-		_, err := nsB.QueryWithOptions(context.Background(), "coalesce.example", "A", nil)
-		errCh <- err
-	}()
 
 	select {
 	case <-started:
 	case <-time.After(500 * time.Millisecond):
 		t.Fatalf("expected one network query to start")
+	}
+
+	go func() {
+		_, err := nsB.QueryWithOptions(context.Background(), "coalesce.example", "A", nil)
+		errCh <- err
+	}()
+
+	time.Sleep(60 * time.Millisecond)
+	if total := callsA.Load() + callsB.Load(); total != 1 {
+		t.Fatalf("expected second query to wait on inflight owner, got %d calls before release", total)
 	}
 	close(release)
 

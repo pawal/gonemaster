@@ -33,6 +33,7 @@ func TestFromJSONParsesValues(t *testing.T) {
 					"rate_limit_pacing_max_ms": 3000,
 					"rate_limit_pacing_ewma_alpha_pct": 40,
 					"rate_limit_pacing_headroom_pct": 85,
+					"nameserver_concurrency": 6,
 					"positive_cache_ttl": 30,
 					"negative_cache_ttl": 45
 				},
@@ -104,6 +105,10 @@ func TestFromJSONParsesValues(t *testing.T) {
 	value, err = p.Get("resolver.defaults.rate_limit_pacing_headroom_pct")
 	if err != nil || value != 85 {
 		t.Fatalf("expected rate_limit_pacing_headroom_pct 85, got %#v (err=%v)", value, err)
+	}
+	value, err = p.Get("resolver.defaults.nameserver_concurrency")
+	if err != nil || value != 6 {
+		t.Fatalf("expected nameserver_concurrency 6, got %#v (err=%v)", value, err)
 	}
 	value, err = p.Get("resolver.source4")
 	if err != nil || value != "192.0.2.53" {

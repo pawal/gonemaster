@@ -82,6 +82,7 @@ func NewWithCache(cache *CacheStore, name string, address string, client *transp
 	state := &nsState{
 		cache:           cache.cacheForAddress(addrKey),
 		errorCache:      cache.errorCacheForAddress(addrKey),
+		concurrencyCap:  cache.concurrencyCapForAddress(addrKey),
 		fakeDelegations: map[string]delegation{},
 		fakeDS:          map[string][]dns.RR{},
 	}
@@ -159,6 +160,7 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 
 	usevc := resolveUseVC(opts)
 	fastFailThreshold := resolveFastFailTimeoutCount(prof)
+	nameserverConcurrencyLimit := resolveNameserverConcurrencyLimit(prof)
 	pacingPolicy := resolveRateLimitPacingPolicyConfig(prof)
 	if ns.state != nil {
 		ns.state.rateLimitPacing.setPolicy(pacingPolicy)
@@ -237,6 +239,15 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 		} else {
 			inflight = existing
 		}
+	}
+	if ns.state != nil && ns.state.concurrencyCap != nil && nameserverConcurrencyLimit > 0 {
+		if err := ns.state.concurrencyCap.acquire(ctx, nameserverConcurrencyLimit); err != nil {
+			if inflight != nil {
+				ns.state.cache.finish(cacheKey, nil, err)
+			}
+			return packet.Packet{}, err
+		}
+		defer ns.state.concurrencyCap.release()
 	}
 
 	queryOpts, trackAdaptive := ns.applyAdaptiveTimeoutOptions(prof, opts, usevc)
@@ -411,6 +422,19 @@ func resolveFastFailTimeoutCount(prof *profile.Profile) int {
 		return 0
 	}
 	return prof.Resolver.Defaults.FastFailTimeoutCount
+}
+
+func resolveNameserverConcurrencyLimit(prof *profile.Profile) int {
+	if prof == nil {
+		prof = profile.Effective()
+	}
+	if prof == nil {
+		return 0
+	}
+	if prof.Resolver.Defaults.NameserverConcurrency < 0 {
+		return 0
+	}
+	return prof.Resolver.Defaults.NameserverConcurrency
 }
 
 func (ns Nameserver) applyRateLimitPacing(ctx context.Context, usevc bool, prof *profile.Profile, opts *QueryOptions, policy rateLimitPacingPolicyConfig) (rateLimitPacingDecision, error) {

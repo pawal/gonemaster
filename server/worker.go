@@ -290,6 +290,11 @@ type testcaseRunResult struct {
 	err     error
 }
 
+type testcaseRunResultEvent struct {
+	index  int
+	result testcaseRunResult
+}
+
 func (s *Server) runJobTestcasesParallel(jobID string, req engine.RunRequest, testcases []string, parallelism int, queryCounter *dnsQueryCounter) ([]engine.LogEntry, int64, int64, error) {
 	if len(testcases) == 0 {
 		ipv4, ipv6 := queryCounter.Totals()
@@ -311,7 +316,11 @@ func (s *Server) runJobTestcasesParallel(jobID string, req engine.RunRequest, te
 
 	results := make([]testcaseRunResult, len(testcases))
 	workCh := make(chan testcaseWorkItem)
+	resultCh := make(chan testcaseRunResultEvent, len(testcases))
 	var completed atomic.Int32
+	completedByIndex := make([]bool, len(testcases))
+	firstConcreteErrIdx := -1
+	var stateMu sync.Mutex
 	var wg sync.WaitGroup
 
 	for i := 0; i < parallelism; i++ {
@@ -322,17 +331,20 @@ func (s *Server) runJobTestcasesParallel(jobID string, req engine.RunRequest, te
 				runReq := req
 				runReq.Context = runCtx
 				runReq.Testcase = item.testcase
+				if runReq.Runner != nil {
+					runReq.Runner = cloneRunnerForTestcase(runReq.Runner, req.LogCallback)
+				}
 				entries, err := s.runEngine(runReq)
-				results[item.index] = testcaseRunResult{
-					entries: entries,
-					err:     err,
+				resultCh <- testcaseRunResultEvent{
+					index: item.index,
+					result: testcaseRunResult{
+						entries: entries,
+						err:     err,
+					},
 				}
 				done := int(completed.Add(1))
 				progress := int(math.Round((float64(done) / float64(len(testcases))) * 100))
 				s.updateJobProgress(jobID, progress)
-				if err != nil {
-					cancel()
-				}
 			}
 		}()
 	}
@@ -346,7 +358,29 @@ enqueueLoop:
 		}
 	}
 	close(workCh)
-	wg.Wait()
+
+	go func() {
+		wg.Wait()
+		close(resultCh)
+	}()
+
+	for event := range resultCh {
+		results[event.index] = event.result
+
+		stateMu.Lock()
+		completedByIndex[event.index] = true
+		if isConcreteTestcaseError(event.result.err) {
+			if firstConcreteErrIdx < 0 || event.index < firstConcreteErrIdx {
+				firstConcreteErrIdx = event.index
+			}
+		}
+		shouldCancel := firstConcreteErrIdx >= 0 && allCompletedUpTo(completedByIndex, firstConcreteErrIdx)
+		stateMu.Unlock()
+
+		if shouldCancel {
+			cancel()
+		}
+	}
 
 	failIdx, failErr := firstTestcaseError(results, parentCtx.Err())
 	if failIdx >= 0 {
@@ -380,6 +414,57 @@ func firstTestcaseError(results []testcaseRunResult, parentCtxErr error) (int, e
 		return cancelIdx, parentCtxErr
 	}
 	return cancelIdx, results[cancelIdx].err
+}
+
+func isConcreteTestcaseError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.Canceled) {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	return true
+}
+
+func allCompletedUpTo(completed []bool, maxIndex int) bool {
+	if maxIndex < 0 {
+		return false
+	}
+	if maxIndex >= len(completed) {
+		maxIndex = len(completed) - 1
+	}
+	for i := 0; i <= maxIndex; i++ {
+		if !completed[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func cloneRunnerForTestcase(base *engine.Runner, callback func(*logger.Entry) error) *engine.Runner {
+	if base == nil {
+		return nil
+	}
+	log := logger.New()
+	if base.Logger != nil {
+		log.CopyConfigFrom(base.Logger)
+		log.CopyStartTimeFrom(base.Logger)
+	} else if base.Profile != nil {
+		log.SetProfile(base.Profile)
+	}
+	log.Callback = callback
+
+	return &engine.Runner{
+		Profile:          base.Profile,
+		Logger:           log,
+		Limiter:          base.Limiter,
+		StartedAt:        base.StartedAt,
+		NameserverCache:  base.NameserverCache,
+		AutoIPv6Disabled: base.AutoIPv6Disabled,
+	}
 }
 
 func mergeOrderedResults(results []testcaseRunResult, limit int) []engine.LogEntry {

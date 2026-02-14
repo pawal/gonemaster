@@ -2,6 +2,8 @@ package server
 
 import (
 	"os"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -257,5 +259,87 @@ func TestProfileOverrideCacheCloseRemovesCachedFile(t *testing.T) {
 
 	if _, err := os.Stat(req.Profile); !os.IsNotExist(err) {
 		t.Fatalf("expected profile file removed on cache close, got err=%v", err)
+	}
+}
+
+func TestApplyProfileOverridesWithCacheConcurrentSingleMaterialization(t *testing.T) {
+	baseFile, err := os.CreateTemp("", "gm-profile-*.json")
+	if err != nil {
+		t.Fatalf("temp file: %v", err)
+	}
+	if _, err := baseFile.WriteString(`{"net":{"ipv4":false}}`); err != nil {
+		_ = baseFile.Close()
+		_ = os.Remove(baseFile.Name())
+		t.Fatalf("write base: %v", err)
+	}
+	if err := baseFile.Close(); err != nil {
+		_ = os.Remove(baseFile.Name())
+		t.Fatalf("close base: %v", err)
+	}
+	defer os.Remove(baseFile.Name())
+
+	overrides := map[string]any{
+		"resolver": map[string]any{
+			"defaults": map[string]any{
+				"timeout": 3,
+			},
+		},
+	}
+	cache := newProfileOverrideCache(8, time.Hour)
+	defer cache.Close()
+
+	originalBuildFn := buildMergedProfileFileFunc
+	var builds atomic.Int32
+	buildMergedProfileFileFunc = func(payload []byte, baseProfile string) (string, error) {
+		builds.Add(1)
+		time.Sleep(15 * time.Millisecond)
+		return originalBuildFn(payload, baseProfile)
+	}
+	defer func() {
+		buildMergedProfileFileFunc = originalBuildFn
+	}()
+
+	const workers = 24
+	paths := make([]string, workers)
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(workers)
+
+	for i := 0; i < workers; i++ {
+		go func(i int) {
+			defer wg.Done()
+			<-start
+			req := engine.RunRequest{Domain: "example.com"}
+			cleanup, err := applyProfileOverridesWithCache(&req, overrides, baseFile.Name(), cache)
+			if err != nil {
+				t.Errorf("apply[%d]: %v", i, err)
+				return
+			}
+			if cleanup != nil {
+				cleanup()
+				t.Errorf("apply[%d]: expected nil cleanup on cached profile path", i)
+				return
+			}
+			paths[i] = req.Profile
+		}(i)
+	}
+
+	close(start)
+	wg.Wait()
+	if t.Failed() {
+		return
+	}
+
+	first := paths[0]
+	if first == "" {
+		t.Fatalf("expected first profile path")
+	}
+	for i, path := range paths {
+		if path != first {
+			t.Fatalf("expected all goroutines to reuse cached profile path; index %d=%q first=%q", i, path, first)
+		}
+	}
+	if got := builds.Load(); got != 1 {
+		t.Fatalf("expected exactly one profile materialization, got %d", got)
 	}
 }

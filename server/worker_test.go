@@ -446,7 +446,7 @@ func TestRunEngineForJobTestcaseSequentialReusesRunner(t *testing.T) {
 	}
 }
 
-func TestRunEngineForJobTestcaseParallelReusesRunner(t *testing.T) {
+func TestRunEngineForJobTestcaseParallelClonesRunnerWithSharedResources(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.JobTestParallelism = 3
 	srv := New(cfg)
@@ -482,8 +482,20 @@ func TestRunEngineForJobTestcaseParallelReusesRunner(t *testing.T) {
 		t.Fatalf("shared runner should include logger, profile, and nameserver cache")
 	}
 	for idx, runner := range runners[1:] {
-		if runner != first {
-			t.Fatalf("expected runner reuse at call %d", idx+2)
+		if runner == first {
+			t.Fatalf("expected per-testcase runner clone at call %d", idx+2)
+		}
+		if runner.Profile != first.Profile {
+			t.Fatalf("expected shared profile pointer at call %d", idx+2)
+		}
+		if runner.Limiter != first.Limiter {
+			t.Fatalf("expected shared limiter pointer at call %d", idx+2)
+		}
+		if runner.NameserverCache != first.NameserverCache {
+			t.Fatalf("expected shared nameserver cache pointer at call %d", idx+2)
+		}
+		if runner.Logger == first.Logger {
+			t.Fatalf("expected distinct logger pointer at call %d", idx+2)
 		}
 	}
 }
@@ -581,6 +593,45 @@ func TestRunEngineForJobTestcaseParallelismFirstError(t *testing.T) {
 	entries, _, _, err := srv.runEngineForJob(job, context.Background())
 	if !errors.Is(err, boom) {
 		t.Fatalf("expected boom error, got %v", err)
+	}
+	if len(entries) != 1 || entries[0].Testcase != "t1" {
+		t.Fatalf("expected only successful entries before first failing testcase, got %+v", entries)
+	}
+}
+
+func TestRunEngineForJobTestcaseParallelismFirstErrorPrefersLowerIndex(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.JobTestParallelism = 3
+	srv := New(cfg)
+
+	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		switch req.Testcase {
+		case "t1":
+			time.Sleep(20 * time.Millisecond)
+			return []engine.LogEntry{{Testcase: "t1", Level: "NOTICE"}}, nil
+		case "t2":
+			time.Sleep(40 * time.Millisecond)
+			return nil, errors.New("t2 boom")
+		case "t3":
+			time.Sleep(5 * time.Millisecond)
+			return nil, errors.New("t3 fast boom")
+		default:
+			<-req.Context.Done()
+			return nil, req.Context.Err()
+		}
+	}
+
+	job := Job{
+		ID:     "job-error-ordered",
+		Domain: "example.com",
+		Tests:  []string{"t1", "t2", "t3", "t4"},
+	}
+	entries, _, _, err := srv.runEngineForJob(job, context.Background())
+	if err == nil {
+		t.Fatalf("expected run error")
+	}
+	if err.Error() != "t2 boom" {
+		t.Fatalf("expected lower-index error, got %v", err)
 	}
 	if len(entries) != 1 || entries[0].Testcase != "t1" {
 		t.Fatalf("expected only successful entries before first failing testcase, got %+v", entries)

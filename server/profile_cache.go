@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"sync"
@@ -15,6 +16,8 @@ import (
 
 const defaultProfileOverrideCacheMaxEntries = 256
 const defaultProfileOverrideCacheTTL = 30 * time.Minute
+
+var errProfileOverrideCacheClosed = errors.New("profile override cache closed")
 
 type profileCachePutState int
 
@@ -30,9 +33,16 @@ type profileOverrideCacheEntry struct {
 	expiresAt time.Time
 }
 
+type profileCacheInflight struct {
+	done chan struct{}
+	path string
+	err  error
+}
+
 type profileOverrideCache struct {
 	mu         sync.Mutex
 	entries    map[string]profileOverrideCacheEntry
+	inflight   map[string]*profileCacheInflight
 	maxEntries int
 	ttl        time.Duration
 }
@@ -46,6 +56,7 @@ func newProfileOverrideCache(maxEntries int, ttl time.Duration) *profileOverride
 	}
 	return &profileOverrideCache{
 		entries:    map[string]profileOverrideCacheEntry{},
+		inflight:   map[string]*profileCacheInflight{},
 		maxEntries: maxEntries,
 		ttl:        ttl,
 	}
@@ -154,6 +165,36 @@ func (c *profileOverrideCache) oldestEntryLocked() (string, profileOverrideCache
 	return victimKey, victim, found
 }
 
+func (c *profileOverrideCache) startInflight(key string) (*profileCacheInflight, bool) {
+	if c == nil || key == "" {
+		return nil, false
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if pending, ok := c.inflight[key]; ok {
+		return pending, false
+	}
+	pending := &profileCacheInflight{done: make(chan struct{})}
+	c.inflight[key] = pending
+	return pending, true
+}
+
+func (c *profileOverrideCache) finishInflight(key string, path string, err error) {
+	if c == nil || key == "" {
+		return
+	}
+	c.mu.Lock()
+	pending, ok := c.inflight[key]
+	if ok {
+		delete(c.inflight, key)
+		pending.path = path
+		pending.err = err
+		close(pending.done)
+	}
+	c.mu.Unlock()
+}
+
 // Close removes all cached entries and deletes their temporary files.
 func (c *profileOverrideCache) Close() {
 	if c == nil {
@@ -164,10 +205,19 @@ func (c *profileOverrideCache) Close() {
 	for _, entry := range c.entries {
 		paths = append(paths, entry.path)
 	}
+	inflight := make([]*profileCacheInflight, 0, len(c.inflight))
+	for _, pending := range c.inflight {
+		inflight = append(inflight, pending)
+	}
 	c.entries = map[string]profileOverrideCacheEntry{}
+	c.inflight = map[string]*profileCacheInflight{}
 	c.mu.Unlock()
 	for _, path := range paths {
 		_ = os.Remove(path)
+	}
+	for _, pending := range inflight {
+		pending.err = errProfileOverrideCacheClosed
+		close(pending.done)
 	}
 }
 
@@ -175,7 +225,9 @@ func applyProfileOverrides(req *engine.RunRequest, overrides map[string]any, bas
 	return applyProfileOverridesWithCache(req, overrides, baseProfile, nil)
 }
 
-func applyProfileOverridesWithCache(req *engine.RunRequest, overrides map[string]any, baseProfile string, cache *profileOverrideCache) (func(), error) {
+var buildMergedProfileFileFunc = buildMergedProfileFile
+
+func applyProfileOverridesWithCache(req *engine.RunRequest, overrides map[string]any, baseProfile string, cache *profileOverrideCache) (cleanup func(), err error) {
 	if req == nil || len(overrides) == 0 {
 		if req != nil && baseProfile != "" {
 			req.Profile = baseProfile
@@ -188,67 +240,98 @@ func applyProfileOverridesWithCache(req *engine.RunRequest, overrides map[string
 		return nil, err
 	}
 
-	cacheKey, err := profileOverrideCacheKey(baseProfile, payload)
-	if err != nil {
-		return nil, err
-	}
+	var cacheKey string
+	sharedPath := ""
 	if cache != nil {
-		if cachedPath, ok := cache.Get(cacheKey); ok {
-			req.Profile = cachedPath
-			return nil, nil
+		cacheKey, err = profileOverrideCacheKey(baseProfile, payload)
+		if err != nil {
+			return nil, err
+		}
+		for {
+			if cachedPath, ok := cache.Get(cacheKey); ok {
+				req.Profile = cachedPath
+				return nil, nil
+			}
+
+			pending, owner := cache.startInflight(cacheKey)
+			if owner {
+				defer func() {
+					cache.finishInflight(cacheKey, sharedPath, err)
+				}()
+				break
+			}
+
+			<-pending.done
+			if pending.err != nil {
+				return nil, pending.err
+			}
+			if pending.path != "" {
+				req.Profile = pending.path
+				return nil, nil
+			}
 		}
 	}
 
+	path, err := buildMergedProfileFileFunc(payload, baseProfile)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Profile = path
+	if cache != nil {
+		state, cachedPath := cache.Put(cacheKey, path)
+		switch state {
+		case profileCachePutInserted:
+			// Cache owns this file and cleans it up when the server stops.
+			sharedPath = path
+			return nil, nil
+		case profileCachePutExists:
+			_ = os.Remove(path)
+			req.Profile = cachedPath
+			sharedPath = cachedPath
+			return nil, nil
+		}
+	}
+	return func() { _ = os.Remove(path) }, nil
+}
+
+func buildMergedProfileFile(overridePayload []byte, baseProfile string) (string, error) {
 	base := profile.New()
 	if baseProfile != "" {
 		data, err := os.ReadFile(baseProfile)
 		if err != nil {
-			return nil, err
+			return "", err
 		}
 		base, err = profile.FromYAML(string(data))
 		if err != nil {
-			return nil, err
+			return "", err
 		}
 	}
-	overrideProfile, err := profile.FromJSON(string(payload))
+	overrideProfile, err := profile.FromJSON(string(overridePayload))
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	if err := base.Merge(overrideProfile); err != nil {
-		return nil, err
+		return "", err
 	}
 	merged, err := base.ToJSON()
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	tmp, err := os.CreateTemp("", "gonemaster-profile-*.json")
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	if _, err := tmp.Write([]byte(merged)); err != nil {
 		_ = tmp.Close()
 		_ = os.Remove(tmp.Name())
-		return nil, err
+		return "", err
 	}
 	if err := tmp.Close(); err != nil {
 		_ = os.Remove(tmp.Name())
-		return nil, err
+		return "", err
 	}
-
-	req.Profile = tmp.Name()
-	if cache != nil {
-		state, cachedPath := cache.Put(cacheKey, tmp.Name())
-		switch state {
-		case profileCachePutInserted:
-			// Cache owns this file and cleans it up when the server stops.
-			return nil, nil
-		case profileCachePutExists:
-			_ = os.Remove(tmp.Name())
-			req.Profile = cachedPath
-			return nil, nil
-		}
-	}
-	return func() { _ = os.Remove(tmp.Name()) }, nil
+	return tmp.Name(), nil
 }
 
 func profileOverrideCacheKey(baseProfile string, overrideJSON []byte) (string, error) {

@@ -15,7 +15,10 @@ import (
 )
 
 const defaultProfileOverrideCacheMaxEntries = 256
-const defaultProfileOverrideCacheTTL = 30 * time.Minute
+
+// defaultProfileOverrideCacheTTL=0 disables time-based expiration and keeps
+// profile variants warm until LRU eviction by maxEntries.
+const defaultProfileOverrideCacheTTL = 0
 
 var errProfileOverrideCacheClosed = errors.New("profile override cache closed")
 
@@ -51,7 +54,7 @@ func newProfileOverrideCache(maxEntries int, ttl time.Duration) *profileOverride
 	if maxEntries < 1 {
 		maxEntries = defaultProfileOverrideCacheMaxEntries
 	}
-	if ttl <= 0 {
+	if ttl < 0 {
 		ttl = defaultProfileOverrideCacheTTL
 	}
 	return &profileOverrideCache{
@@ -77,7 +80,7 @@ func (c *profileOverrideCache) Get(key string) (string, bool) {
 		c.mu.Unlock()
 		return "", false
 	}
-	if !entry.expiresAt.IsZero() && now.After(entry.expiresAt) {
+	if c.ttl > 0 && !entry.expiresAt.IsZero() && now.After(entry.expiresAt) {
 		delete(c.entries, key)
 		stalePath = entry.path
 		c.mu.Unlock()
@@ -87,7 +90,7 @@ func (c *profileOverrideCache) Get(key string) (string, bool) {
 		return "", false
 	}
 	entry.lastUsed = now
-	entry.expiresAt = now.Add(c.ttl)
+	entry.expiresAt = expiryTimeForTTL(now, c.ttl)
 	c.entries[key] = entry
 	c.mu.Unlock()
 
@@ -106,9 +109,9 @@ func (c *profileOverrideCache) Put(key string, path string) (profileCachePutStat
 
 	c.mu.Lock()
 	if entry, ok := c.entries[key]; ok {
-		if entry.expiresAt.IsZero() || now.Before(entry.expiresAt) {
+		if c.ttl <= 0 || entry.expiresAt.IsZero() || now.Before(entry.expiresAt) {
 			entry.lastUsed = now
-			entry.expiresAt = now.Add(c.ttl)
+			entry.expiresAt = expiryTimeForTTL(now, c.ttl)
 			c.entries[key] = entry
 			c.mu.Unlock()
 			return profileCachePutExists, entry.path
@@ -138,7 +141,7 @@ func (c *profileOverrideCache) Put(key string, path string) (profileCachePutStat
 	c.entries[key] = profileOverrideCacheEntry{
 		path:      path,
 		lastUsed:  now,
-		expiresAt: now.Add(c.ttl),
+		expiresAt: expiryTimeForTTL(now, c.ttl),
 	}
 	c.mu.Unlock()
 
@@ -163,6 +166,13 @@ func (c *profileOverrideCache) oldestEntryLocked() (string, profileOverrideCache
 		}
 	}
 	return victimKey, victim, found
+}
+
+func expiryTimeForTTL(now time.Time, ttl time.Duration) time.Time {
+	if ttl <= 0 {
+		return time.Time{}
+	}
+	return now.Add(ttl)
 }
 
 func (c *profileOverrideCache) startInflight(key string) (*profileCacheInflight, bool) {

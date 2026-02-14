@@ -3,6 +3,7 @@ package nameserver
 import (
 	"math"
 	"math/rand"
+	"sync"
 	"time"
 )
 
@@ -16,6 +17,7 @@ const (
 )
 
 type protocolBlacklistState struct {
+	mu                  sync.Mutex
 	blockedUntil        time.Time
 	consecutiveTimeouts int
 	backoffStep         int
@@ -42,6 +44,8 @@ func (t *blacklistTracker) isBlocked(useTCP bool, now time.Time) bool {
 		now = time.Now()
 	}
 	state := t.stateForProtocol(useTCP)
+	state.mu.Lock()
+	defer state.mu.Unlock()
 	if state.blockedUntil.IsZero() {
 		return false
 	}
@@ -57,6 +61,8 @@ func (t *blacklistTracker) observeSuccess(useTCP bool) {
 		return
 	}
 	state := t.stateForProtocol(useTCP)
+	state.mu.Lock()
+	defer state.mu.Unlock()
 	state.consecutiveTimeouts = 0
 	if state.backoffStep > 0 {
 		state.backoffStep--
@@ -71,6 +77,8 @@ func (t *blacklistTracker) observeFailure(useTCP bool, timeoutPattern bool, base
 		now = time.Now()
 	}
 	state := t.stateForProtocol(useTCP)
+	state.mu.Lock()
+	defer state.mu.Unlock()
 	if timeoutPattern {
 		state.consecutiveTimeouts++
 		if state.consecutiveTimeouts < blacklistTimeoutFailureThreshold {

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -341,5 +342,68 @@ func TestApplyProfileOverridesWithCacheConcurrentSingleMaterialization(t *testin
 	}
 	if got := builds.Load(); got != 1 {
 		t.Fatalf("expected exactly one profile materialization, got %d", got)
+	}
+}
+
+func TestApplyProfileOverridesWithCacheNoTTLDoesNotExpireEntries(t *testing.T) {
+	baseFile, err := os.CreateTemp("", "gm-profile-*.json")
+	if err != nil {
+		t.Fatalf("temp file: %v", err)
+	}
+	if _, err := baseFile.WriteString(`{"net":{"ipv4":false}}`); err != nil {
+		_ = baseFile.Close()
+		_ = os.Remove(baseFile.Name())
+		t.Fatalf("write base: %v", err)
+	}
+	if err := baseFile.Close(); err != nil {
+		_ = os.Remove(baseFile.Name())
+		t.Fatalf("close base: %v", err)
+	}
+	defer os.Remove(baseFile.Name())
+
+	overrides := map[string]any{
+		"resolver": map[string]any{
+			"defaults": map[string]any{
+				"timeout": 3,
+			},
+		},
+	}
+	cache := newProfileOverrideCache(8, 0)
+	defer cache.Close()
+
+	req1 := engine.RunRequest{Domain: "example.com"}
+	cleanup1, err := applyProfileOverridesWithCache(&req1, overrides, baseFile.Name(), cache)
+	if err != nil {
+		t.Fatalf("first apply: %v", err)
+	}
+	if cleanup1 != nil {
+		t.Fatalf("expected nil cleanup for cached profile")
+	}
+
+	payload, err := json.Marshal(overrides)
+	if err != nil {
+		t.Fatalf("marshal overrides: %v", err)
+	}
+	key, err := profileOverrideCacheKey(baseFile.Name(), payload)
+	if err != nil {
+		t.Fatalf("cache key: %v", err)
+	}
+
+	cache.mu.Lock()
+	entry := cache.entries[key]
+	entry.expiresAt = time.Now().UTC().Add(-1 * time.Hour)
+	cache.entries[key] = entry
+	cache.mu.Unlock()
+
+	req2 := engine.RunRequest{Domain: "example.org"}
+	cleanup2, err := applyProfileOverridesWithCache(&req2, overrides, baseFile.Name(), cache)
+	if err != nil {
+		t.Fatalf("second apply: %v", err)
+	}
+	if cleanup2 != nil {
+		t.Fatalf("expected nil cleanup for cached profile")
+	}
+	if req2.Profile != req1.Profile {
+		t.Fatalf("expected cache hit without ttl expiration, got %q and %q", req1.Profile, req2.Profile)
 	}
 }

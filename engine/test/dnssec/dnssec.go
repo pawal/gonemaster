@@ -226,8 +226,13 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
+
+	skipCDSCDNSKEYFollowups := shouldSkipCDSCDNSKEYFollowups(ctx, results)
 	if util.ShouldRunTest(ctx, "dnssec16") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			if skipCDSCDNSKEYFollowups {
+				return skipWithTestcaseMarkers(ctx, "DNSSEC16")
+			}
 			return DNSSEC16(ctx, z)
 		})
 		results = append(results, entries...)
@@ -237,6 +242,9 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 	if util.ShouldRunTest(ctx, "dnssec17") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			if skipCDSCDNSKEYFollowups {
+				return skipWithTestcaseMarkers(ctx, "DNSSEC17")
+			}
 			return DNSSEC17(ctx, z)
 		})
 		results = append(results, entries...)
@@ -246,6 +254,9 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 	if util.ShouldRunTest(ctx, "dnssec18") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			if skipCDSCDNSKEYFollowups {
+				return skipWithTestcaseMarkers(ctx, "DNSSEC18")
+			}
 			return DNSSEC18(ctx, z)
 		})
 		results = append(results, entries...)
@@ -254,6 +265,26 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
+	return results, nil
+}
+
+func shouldSkipCDSCDNSKEYFollowups(ctx context.Context, results []*logger.Entry) bool {
+	if !hasTag(results, "DS15_NO_CDS_CDNSKEY") {
+		return false
+	}
+	effective := profile.FromContext(ctx)
+	// Keep semantics for disabled-family runs where DNSSEC16/17/18 emit IPVx_DISABLED tags.
+	return effective.Net.IPv4 && effective.Net.IPv6
+}
+
+func skipWithTestcaseMarkers(ctx context.Context, testcase string) ([]*logger.Entry, error) {
+	var results []*logger.Entry
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+		return results, err
+	}
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
+		return results, err
+	}
 	return results, nil
 }
 

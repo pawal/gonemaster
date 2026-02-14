@@ -1992,6 +1992,238 @@ func TestDNSSECAllParallelOutputStable(t *testing.T) {
 	}
 }
 
+func TestDNSSECAllSkipsCDSCDNSKEYFollowupsAfterDNSSEC15(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origDel := getDelNSNamesAndIPs
+	origZone := getZoneNSNamesAndIPs
+	origParent := getParentNSNamesAndIPs
+	origZoneParent := zoneParent
+	origM4 := method4
+	origM5 := method5
+	origParentNameservers := parentNameservers
+	t.Cleanup(func() {
+		getDelNSNamesAndIPs = origDel
+		getZoneNSNamesAndIPs = origZone
+		getParentNSNamesAndIPs = origParent
+		zoneParent = origZoneParent
+		method4 = origM4
+		method5 = origM5
+		parentNameservers = origParentNameservers
+	})
+
+	if err := profile.Effective().Set("test_cases", []any{"dnssec07", "dnssec15", "dnssec16", "dnssec17", "dnssec18"}); err != nil {
+		t.Fatalf("set test_cases: %v", err)
+	}
+	if err := profile.Effective().Set("net.ipv4", true); err != nil {
+		t.Fatalf("set net.ipv4: %v", err)
+	}
+	if err := profile.Effective().Set("net.ipv6", true); err != nil {
+		t.Fatalf("set net.ipv6: %v", err)
+	}
+
+	zoneParent = func(_ context.Context, _ *zone.Zone) (*zone.Zone, error) {
+		return nil, nil
+	}
+
+	var cdsQueries int
+	var cdnskeyQueries int
+	var dnskeyQueries int
+	var dsQueries int
+	var parentNameserverCalls int
+
+	key := &dns.DNSKEY{
+		Hdr: dns.RR_Header{
+			Name:   dns.Fqdn("example"),
+			Rrtype: dns.TypeDNSKEY,
+			Class:  dns.ClassINET,
+			Ttl:    60,
+		},
+		Flags:     dns.ZONE,
+		Protocol:  3,
+		Algorithm: 8,
+		PublicKey: "AwEAAc==",
+	}
+	keySig := rrsigRecord("example", dns.TypeDNSKEY, 11111, time.Now().Add(-time.Hour).Unix(), time.Now().Add(time.Hour).Unix())
+	ds := &dns.DS{
+		Hdr: dns.RR_Header{
+			Name:   dns.Fqdn("example"),
+			Rrtype: dns.TypeDS,
+			Class:  dns.ClassINET,
+			Ttl:    60,
+		},
+		KeyTag:     11111,
+		Algorithm:  8,
+		DigestType: 2,
+		Digest:     "DEADBEEF",
+	}
+	dsSig := rrsigRecord("example", dns.TypeDS, 11111, time.Now().Add(-time.Hour).Unix(), time.Now().Add(time.Hour).Unix())
+
+	child := newNameserver(t, "ns1.example", "192.0.2.170", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		switch qtype {
+		case "SOA":
+			return answerPacket(qname, dns.TypeSOA, soaRecord(qname))
+		case "DNSKEY":
+			dnskeyQueries++
+			return answerPacket(qname, dns.TypeDNSKEY, key, keySig)
+		case "CDS":
+			cdsQueries++
+			return answerPacket(qname, dns.TypeCDS)
+		case "CDNSKEY":
+			cdnskeyQueries++
+			return answerPacket(qname, dns.TypeCDNSKEY)
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	parent := newNameserver(t, "ns-parent.example", "192.0.2.171", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype == "DS" {
+			dsQueries++
+			return answerPacket(qname, dns.TypeDS, ds, dsSig)
+		}
+		return packet.Packet{}
+	})
+
+	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+		return []methodsv2.NSItem{
+			{
+				Name:       dnsname.New("ns1.example"),
+				Address:    netip.MustParseAddr("192.0.2.170"),
+				HasAddress: true,
+			},
+		}, nil
+	}
+	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+		return nil, nil
+	}
+	getParentNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{parent}, nil
+	}
+	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{child}, nil
+	}
+	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	}
+	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		parentNameserverCalls++
+		return []nameserver.Nameserver{parent}, nil
+	}
+
+	z, err := zone.New("example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := All(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("dnssec all: %v", err)
+	}
+
+	if !hasEntryTag(entries, "DS15_NO_CDS_CDNSKEY") {
+		t.Fatalf("expected DS15_NO_CDS_CDNSKEY")
+	}
+	for _, testcase := range []string{"DNSSEC16", "DNSSEC17", "DNSSEC18"} {
+		if !hasEntryTestcaseTag(entries, testcase, "TEST_CASE_START") {
+			t.Fatalf("expected %s TEST_CASE_START", testcase)
+		}
+		if !hasEntryTestcaseTag(entries, testcase, "TEST_CASE_END") {
+			t.Fatalf("expected %s TEST_CASE_END", testcase)
+		}
+	}
+
+	if parentNameserverCalls != 0 {
+		t.Fatalf("expected DNSSEC18 parent lookup to be skipped, got %d calls", parentNameserverCalls)
+	}
+	if cdsQueries != 1 {
+		t.Fatalf("expected one CDS query from DNSSEC15 only, got %d", cdsQueries)
+	}
+	if cdnskeyQueries != 1 {
+		t.Fatalf("expected one CDNSKEY query from DNSSEC15 only, got %d", cdnskeyQueries)
+	}
+	if dnskeyQueries != 1 {
+		t.Fatalf("expected one DNSKEY query from DNSSEC07 only, got %d", dnskeyQueries)
+	}
+	if dsQueries != 1 {
+		t.Fatalf("expected one DS query from DNSSEC07 only, got %d", dsQueries)
+	}
+}
+
+func TestDNSSECAllNoSkipWhenFamilyDisabled(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origM4 := method4
+	origM5 := method5
+	origParentNameservers := parentNameservers
+	t.Cleanup(func() {
+		method4 = origM4
+		method5 = origM5
+		parentNameservers = origParentNameservers
+	})
+
+	if err := profile.Effective().Set("test_cases", []any{"dnssec15", "dnssec16", "dnssec17", "dnssec18"}); err != nil {
+		t.Fatalf("set test_cases: %v", err)
+	}
+	if err := profile.Effective().Set("net.ipv4", true); err != nil {
+		t.Fatalf("set net.ipv4: %v", err)
+	}
+	if err := profile.Effective().Set("net.ipv6", false); err != nil {
+		t.Fatalf("set net.ipv6: %v", err)
+	}
+
+	child := newNameserver(t, "ns6.example", "2001:db8::53", func(_ string, _ string, _ *nameserver.QueryOptions) packet.Packet {
+		return packet.Packet{}
+	})
+	parent := newNameserver(t, "ns-parent6.example", "2001:db8::54", func(_ string, _ string, _ *nameserver.QueryOptions) packet.Packet {
+		return packet.Packet{}
+	})
+
+	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{child}, nil
+	}
+	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	}
+
+	var parentNameserverCalls int
+	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		parentNameserverCalls++
+		return []nameserver.Nameserver{parent}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := All(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("dnssec all: %v", err)
+	}
+
+	if !hasEntryTag(entries, "DS15_NO_CDS_CDNSKEY") {
+		t.Fatalf("expected DS15_NO_CDS_CDNSKEY")
+	}
+	if !hasEntryTestcaseTag(entries, "DNSSEC16", "IPV6_DISABLED") {
+		t.Fatalf("expected DNSSEC16 IPV6_DISABLED")
+	}
+	if !hasEntryTestcaseTag(entries, "DNSSEC17", "IPV6_DISABLED") {
+		t.Fatalf("expected DNSSEC17 IPV6_DISABLED")
+	}
+	if !hasEntryTestcaseTag(entries, "DNSSEC18", "IPV6_DISABLED") {
+		t.Fatalf("expected DNSSEC18 IPV6_DISABLED")
+	}
+	if parentNameserverCalls == 0 {
+		t.Fatalf("expected DNSSEC18 to run when skip gate is disabled")
+	}
+}
+
 func TestDNSSEC08MissingRRSIG(t *testing.T) {
 	nameserver.EmptyCache()
 	t.Cleanup(nameserver.EmptyCache)
@@ -4548,6 +4780,18 @@ func hasEntryTag(entries []*logger.Entry, tag string) bool {
 			continue
 		}
 		if entry.Tag == tag {
+			return true
+		}
+	}
+	return false
+}
+
+func hasEntryTestcaseTag(entries []*logger.Entry, testcase string, tag string) bool {
+	for _, entry := range entries {
+		if entry == nil {
+			continue
+		}
+		if entry.Testcase == testcase && entry.Tag == tag {
 			return true
 		}
 	}

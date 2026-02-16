@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"sync"
+	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
 	serverui "codeberg.org/pawal/gonemaster/server/ui"
@@ -11,18 +12,22 @@ import (
 
 // Server holds the HTTP API and supporting services.
 type Server struct {
-	cfg            Config
-	mux            *http.ServeMux
-	store          JobStore
-	queue          Queue
-	workers        workerPool
-	metrics        *MetricsCollector
-	metricsCache   map[string]metricsCacheEntry
-	metricsCacheMu sync.Mutex
-	engineRunner   func(engine.RunRequest) ([]engine.LogEntry, error)
-	engineLimiter  *engineLimiter
-	cancelMu       sync.Mutex
-	cancels        map[string]context.CancelFunc
+	cfg                      Config
+	mux                      *http.ServeMux
+	store                    JobStore
+	queue                    Queue
+	workers                  workerPool
+	metrics                  *MetricsCollector
+	metricsCache             map[string]metricsCacheEntry
+	metricsCacheMu           sync.Mutex
+	progressWriteMu          sync.Mutex
+	progressWrites           map[string]progressWriteState
+	progressWriteMinStep     int
+	progressWriteMinInterval time.Duration
+	engineRunner             func(engine.RunRequest) ([]engine.LogEntry, error)
+	engineLimiter            *engineLimiter
+	cancelMu                 sync.Mutex
+	cancels                  map[string]context.CancelFunc
 }
 
 // New builds a server with in-memory components.
@@ -31,15 +36,18 @@ func New(cfg Config) *Server {
 		cfg = DefaultConfig()
 	}
 	s := &Server{
-		cfg:           cfg,
-		mux:           http.NewServeMux(),
-		store:         NewInMemoryJobStore(),
-		queue:         NewInMemoryQueue(),
-		metrics:       NewMetricsCollector(cfg),
-		metricsCache:  map[string]metricsCacheEntry{},
-		engineRunner:  engine.Run,
-		engineLimiter: newEngineLimiter(cfg.MaxConcurrentJobs),
-		cancels:       map[string]context.CancelFunc{},
+		cfg:                      cfg,
+		mux:                      http.NewServeMux(),
+		store:                    NewInMemoryJobStore(),
+		queue:                    NewInMemoryQueue(),
+		metrics:                  NewMetricsCollector(cfg),
+		metricsCache:             map[string]metricsCacheEntry{},
+		progressWrites:           map[string]progressWriteState{},
+		progressWriteMinStep:     defaultProgressWriteMinStep,
+		progressWriteMinInterval: defaultProgressWriteMinInterval,
+		engineRunner:             engine.Run,
+		engineLimiter:            newEngineLimiter(cfg.MaxConcurrentJobs),
+		cancels:                  map[string]context.CancelFunc{},
 	}
 	s.routes()
 	return s

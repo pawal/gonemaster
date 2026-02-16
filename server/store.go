@@ -23,9 +23,10 @@ type JobStore interface {
 
 // InMemoryJobStore stores jobs in memory.
 type InMemoryJobStore struct {
-	mu      sync.Mutex
-	jobs    map[string]Job
-	results map[string]JobResult
+	jobsMu    sync.RWMutex
+	resultsMu sync.RWMutex
+	jobs      map[string]Job
+	results   map[string]JobResult
 }
 
 // NewInMemoryJobStore creates an empty in-memory job store.
@@ -38,8 +39,8 @@ func NewInMemoryJobStore() *InMemoryJobStore {
 
 // Create inserts a new job and fails if the id already exists.
 func (s *InMemoryJobStore) Create(job Job) (Job, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.jobsMu.Lock()
+	defer s.jobsMu.Unlock()
 	if _, exists := s.jobs[job.ID]; exists {
 		return Job{}, errors.New("job already exists")
 	}
@@ -49,16 +50,16 @@ func (s *InMemoryJobStore) Create(job Job) (Job, error) {
 
 // Get returns a job by id.
 func (s *InMemoryJobStore) Get(id string) (Job, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.jobsMu.RLock()
+	defer s.jobsMu.RUnlock()
 	job, ok := s.jobs[id]
 	return job, ok
 }
 
 // Update replaces an existing job by id.
 func (s *InMemoryJobStore) Update(job Job) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.jobsMu.Lock()
+	defer s.jobsMu.Unlock()
 	if _, exists := s.jobs[job.ID]; !exists {
 		return errors.New("job not found")
 	}
@@ -68,11 +69,15 @@ func (s *InMemoryJobStore) Update(job Job) error {
 
 // List returns jobs matching filter with sorting and pagination applied.
 func (s *InMemoryJobStore) List(filter JobFilter) JobList {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	items := make([]Job, 0, len(s.jobs))
+	s.jobsMu.RLock()
+	jobsSnapshot := make([]Job, 0, len(s.jobs))
 	for _, job := range s.jobs {
+		jobsSnapshot = append(jobsSnapshot, job)
+	}
+	s.jobsMu.RUnlock()
+
+	items := make([]Job, 0, len(jobsSnapshot))
+	for _, job := range jobsSnapshot {
 		if filter.Status != "" && job.Status != filter.Status {
 			continue
 		}
@@ -94,6 +99,7 @@ func (s *InMemoryJobStore) List(filter JobFilter) JobList {
 	normalizedSort := normalizeJobSort(filter.Sort)
 	normalizedSeverity := normalizeJobSeverityFilter(filter.Severity)
 	severityByJobID := make(map[string]map[string]int, len(items))
+	s.resultsMu.RLock()
 	for _, job := range items {
 		totals := zeroSeverityTotals()
 		if result, ok := s.results[job.ID]; ok {
@@ -101,6 +107,7 @@ func (s *InMemoryJobStore) List(filter JobFilter) JobList {
 		}
 		severityByJobID[job.ID] = totals
 	}
+	s.resultsMu.RUnlock()
 	if normalizedSeverity != "" {
 		filteredBySeverity := make([]Job, 0, len(items))
 		for _, job := range items {
@@ -244,19 +251,23 @@ func (s *InMemoryJobStore) List(filter JobFilter) JobList {
 
 // SetResult stores a result payload for an existing job.
 func (s *InMemoryJobStore) SetResult(jobID string, result JobResult) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.jobsMu.RLock()
 	if _, exists := s.jobs[jobID]; !exists {
+		s.jobsMu.RUnlock()
 		return errors.New("job not found")
 	}
+	s.jobsMu.RUnlock()
+
+	s.resultsMu.Lock()
 	s.results[jobID] = result
+	s.resultsMu.Unlock()
 	return nil
 }
 
 // GetResult returns a stored result payload by job id.
 func (s *InMemoryJobStore) GetResult(jobID string) (JobResult, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.resultsMu.RLock()
+	defer s.resultsMu.RUnlock()
 	result, ok := s.results[jobID]
 	return result, ok
 }

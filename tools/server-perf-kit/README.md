@@ -7,6 +7,7 @@ It supports:
 - public-suffix-aware registrable domain normalization (hostnames -> main domain)
 - parallel build of all variant binaries
 - sequential interleaved benchmark runs
+- one-command all-tracks workflow (quick screen + decision-grade reruns + outliers)
 - machine-readable report output
 - gate evaluation for keep/drop decisions
 
@@ -97,6 +98,41 @@ Defaults:
 - throughput target: `+10%`
 - p95 guardrail: `<= +5%`
 - p99 guardrail: `<= +5%`
+
+## 5) One-Command Track Workflow
+
+Use `run_all_tracks.sh` to execute:
+- quick matrix for all variants (600 domains)
+- gate evaluation for every candidate track
+- decision-grade A/B reruns (1000 domains) for survivors (or all)
+- per-domain outlier tables for decision runs
+- consolidated session summary
+
+Example variants file:
+```text
+main main
+track-a perf-track-a-profile-cache
+track-b perf-track-b-engine-hot-cache
+track-c perf-track-c-job-parallelism
+track-d perf-track-d-concurrency-clamp
+track-e perf-track-e-dnssec-skip
+```
+
+Run all:
+```bash
+./tools/server-perf-kit/run_all_tracks.sh \
+  --variants tools/server-perf-kit/variants-all.tsv \
+  --baseline main \
+  --workers 8 \
+  --max-concurrent-jobs 8
+```
+
+Output root:
+- `perf-runs/server/all-tracks-<utc>/`
+  - `quick/`
+  - `decision/<candidate>/`
+  - `gate-summary.csv`
+  - `SUMMARY.md`
 
 ## Recommended Run Strategy
 - Use one fixed 600-domain corpus for quick screening.

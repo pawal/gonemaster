@@ -17,3 +17,8 @@
 .vscode/
 *.swp
 *~
+
+# Perf benchmarking artifacts
+/majestic_million.csv
+/perf-runs/
+/server-perf-kit-*.tar.gz

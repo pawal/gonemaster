@@ -205,7 +205,11 @@ echo "workers,max_concurrent_jobs,domains_count,median_throughput_jobs_per_s,med
   echo "batch_timeout_seconds=$batch_timeout_seconds"
 } >"$session_dir/run-config.env"
 
-mapfile -t workers_arr < <(workers_tokens "$workers_list")
+workers_arr=()
+while IFS= read -r w; do
+  [ -n "$w" ] || continue
+  workers_arr+=("$w")
+done < <(workers_tokens "$workers_list")
 if [ "${#workers_arr[@]}" -eq 0 ]; then
   echo "workers list resolved to empty set" >&2
   exit 1

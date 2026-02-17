@@ -249,8 +249,8 @@ while IFS= read -r raw; do
 done <"$variants_file"
 
 variant_count="${#variant_names[@]}"
-if [ "$variant_count" -lt 2 ]; then
-  echo "need at least 2 variants" >&2
+if [ "$variant_count" -lt 1 ]; then
+  echo "need at least 1 variant" >&2
   exit 1
 fi
 

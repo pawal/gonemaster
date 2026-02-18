@@ -284,7 +284,7 @@ func TestEffectiveAttemptTimeoutUsesRetransBudgetForUDP(t *testing.T) {
 	}
 }
 
-func TestEffectiveAttemptTimeoutCapsUDPFallbackWait(t *testing.T) {
+func TestEffectiveAttemptTimeoutDoesNotCapUDPForFallback(t *testing.T) {
 	client := &Client{
 		Timeout: 5 * time.Second,
 		Retrans: 3 * time.Second,
@@ -292,8 +292,8 @@ func TestEffectiveAttemptTimeoutCapsUDPFallbackWait(t *testing.T) {
 	client.SetFallback(true)
 
 	got := client.effectiveAttemptTimeout(context.Background(), false, false)
-	if got != udpFallbackWaitCap {
-		t.Fatalf("expected UDP fallback cap %v, got %v", udpFallbackWaitCap, got)
+	if got != 3*time.Second {
+		t.Fatalf("expected UDP timeout budget to stay at retrans 3s, got %v", got)
 	}
 }
 
@@ -349,35 +349,57 @@ func TestExchangeTCPDoesNotClampTimeoutToRetrans(t *testing.T) {
 	}
 }
 
-func TestExchangeFallbackTCPUsesRetransBudget(t *testing.T) {
-	serverAddr, listener, shutdown := startTCPDNSServer(t, func(w dns.ResponseWriter, req *dns.Msg) {
-		time.Sleep(120 * time.Millisecond)
+func TestExchangeFallbackTCPOnTruncatedUDP(t *testing.T) {
+	serverAddr, listener, shutdownTCP := startTCPDNSServer(t, func(w dns.ResponseWriter, req *dns.Msg) {
 		writeSimpleAResponse(w, req)
 	}, nil)
-	defer shutdown()
+	defer shutdownTCP()
+
+	packetConn, err := net.ListenPacket("udp", serverAddr)
+	if err != nil {
+		t.Fatalf("listen udp on tcp addr: %v", err)
+	}
+	udpServer := &dns.Server{
+		PacketConn: packetConn,
+		Handler: dns.HandlerFunc(func(w dns.ResponseWriter, req *dns.Msg) {
+			resp := new(dns.Msg)
+			resp.SetReply(req)
+			resp.Truncated = true
+			_ = w.WriteMsg(resp)
+		}),
+	}
+	udpDone := make(chan struct{})
+	go func() {
+		_ = udpServer.ActivateAndServe()
+		close(udpDone)
+	}()
+	defer func() {
+		_ = udpServer.Shutdown()
+		_ = packetConn.Close()
+		select {
+		case <-udpDone:
+		case <-time.After(2 * time.Second):
+			t.Logf("udp dns server shutdown timed out")
+		}
+	}()
 
 	client := &Client{}
 	client.SetUseTCP(false)
 	client.SetFallback(true)
 	client.SetRetries(0)
-	client.SetTimeout(300 * time.Millisecond)
+	client.SetTimeout(1 * time.Second)
 	client.SetRetrans(40 * time.Millisecond)
 
-	start := time.Now()
-	_, err := client.Exchange(context.Background(), serverAddr, BuildQuery("tcp-fallback-retrans.example", dns.TypeA))
-	elapsed := time.Since(start)
-	if err == nil {
-		t.Fatalf("expected fallback TCP timeout")
+	_, err = client.Exchange(context.Background(), serverAddr, BuildQuery("tcp-fallback-truncated.example", dns.TypeA))
+	if err != nil {
+		t.Fatalf("expected TCP fallback success after truncated UDP response, got %v", err)
 	}
 	if got := listener.accepts.Load(); got < 1 {
 		t.Fatalf("expected TCP fallback attempt, got %d TCP accepts", got)
 	}
-	if elapsed < 20*time.Millisecond || elapsed > 250*time.Millisecond {
-		t.Fatalf("expected fallback timeout near retrans budget, took %v", elapsed)
-	}
 }
 
-func TestExchangeFallbackTCPDoesNotWaitFullRetransOnUDPFailure(t *testing.T) {
+func TestExchangeDoesNotFallbackTCPOnUDPFailure(t *testing.T) {
 	serverAddr, listener, shutdownTCP := startTCPDNSServer(t, func(w dns.ResponseWriter, req *dns.Msg) {
 		writeSimpleAResponse(w, req)
 	}, nil)
@@ -412,20 +434,20 @@ func TestExchangeFallbackTCPDoesNotWaitFullRetransOnUDPFailure(t *testing.T) {
 	client.SetUseTCP(false)
 	client.SetFallback(true)
 	client.SetRetries(0)
-	client.SetTimeout(5 * time.Second)
-	client.SetRetrans(3 * time.Second)
+	client.SetTimeout(300 * time.Millisecond)
+	client.SetRetrans(40 * time.Millisecond)
 
 	start := time.Now()
 	_, err = client.Exchange(context.Background(), serverAddr, BuildQuery("tcp-fallback-udp-cap.example", dns.TypeA))
 	elapsed := time.Since(start)
-	if err != nil {
-		t.Fatalf("expected fallback TCP success, got %v", err)
+	if err == nil {
+		t.Fatalf("expected UDP failure without TCP fallback")
 	}
-	if got := listener.accepts.Load(); got < 1 {
-		t.Fatalf("expected TCP fallback attempt, got %d TCP accepts", got)
+	if got := listener.accepts.Load(); got != 0 {
+		t.Fatalf("expected no TCP fallback on UDP error, got %d TCP accepts", got)
 	}
-	if elapsed > 2*time.Second {
-		t.Fatalf("expected fallback path to avoid full 3s UDP wait, took %v", elapsed)
+	if elapsed < 20*time.Millisecond || elapsed > 300*time.Millisecond {
+		t.Fatalf("expected exchange to fail within UDP timeout budget, took %v", elapsed)
 	}
 }
 

@@ -14,7 +14,6 @@ import (
 )
 
 const defaultTimeout = 5 * time.Second
-const udpFallbackWaitCap = 400 * time.Millisecond
 
 // Client performs DNS exchanges with configurable behavior.
 type Client struct {
@@ -176,25 +175,6 @@ func (c *Client) Exchange(ctx context.Context, server string, msg *dns.Msg) (pac
 					break
 				}
 			}
-			if !c.UseTCP && c.Fallback {
-				response, rtt, err = c.exchangeOnce(ctx, server, prepared, true, true)
-				if err == nil {
-					pkt := packet.New(response)
-					pkt.QueryTime = rtt
-					pkt.Timestamp = time.Now()
-					pkt.AnswerFrom = server
-					return pkt, nil
-				}
-				if ctx != nil {
-					if cerr := ctx.Err(); cerr != nil {
-						lastErr = cerr
-						break
-					}
-				}
-				lastErr = err
-				continue
-			}
-
 			lastErr = err
 			continue
 		}
@@ -287,10 +267,6 @@ func (c *Client) effectiveAttemptTimeout(ctx context.Context, useTCP bool, fromU
 		// UDP and fallback TCP attempts should use retrans pacing so a blocked
 		// path does not stall progression for the full timeout budget.
 		attempt = c.Retrans
-	}
-	if !useTCP && c.Fallback && attempt > udpFallbackWaitCap {
-		// Do not block on UDP for the full retrans budget before trying TCP.
-		attempt = udpFallbackWaitCap
 	}
 	if ctx != nil {
 		if deadline, ok := ctx.Deadline(); ok {

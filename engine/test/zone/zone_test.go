@@ -167,7 +167,7 @@ func TestZone10ParallelQueries(t *testing.T) {
 	}
 }
 
-func TestZone09MXQueryDoesNotForceFallback(t *testing.T) {
+func TestZone09MXQueryDisablesFallback(t *testing.T) {
 	setupTest(t)
 
 	origMethod4and5 := method4and5
@@ -176,7 +176,7 @@ func TestZone09MXQueryDoesNotForceFallback(t *testing.T) {
 	profile.Effective().Resolver.Defaults.Parallel = 1
 
 	var mu sync.Mutex
-	var fallbackSet []bool
+	var fallbackValues []bool
 	var useVCValues []bool
 	mxCalls := 0
 
@@ -188,7 +188,11 @@ func TestZone09MXQueryDoesNotForceFallback(t *testing.T) {
 			mu.Lock()
 			mxCalls++
 			call := mxCalls
-			fallbackSet = append(fallbackSet, opts != nil && opts.Fallback != nil)
+			fallback := false
+			if opts != nil && opts.Fallback != nil {
+				fallback = *opts.Fallback
+			}
+			fallbackValues = append(fallbackValues, fallback)
 			if opts != nil && opts.UseVC != nil {
 				useVCValues = append(useVCValues, *opts.UseVC)
 			} else {
@@ -221,12 +225,12 @@ func TestZone09MXQueryDoesNotForceFallback(t *testing.T) {
 	mu.Lock()
 	defer mu.Unlock()
 
-	if len(fallbackSet) == 0 {
+	if len(fallbackValues) == 0 {
 		t.Fatalf("expected MX query to be issued")
 	}
-	for _, forced := range fallbackSet {
-		if forced {
-			t.Fatalf("expected MX query to not force fallback")
+	for _, fallback := range fallbackValues {
+		if fallback {
+			t.Fatalf("expected MX query fallback to be disabled")
 		}
 	}
 	if len(useVCValues) < 2 || useVCValues[0] || !useVCValues[1] {

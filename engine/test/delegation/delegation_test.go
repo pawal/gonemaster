@@ -9,10 +9,13 @@ import (
 	"github.com/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/logger"
+	"codeberg.org/pawal/gonemaster/engine/methods"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/engine/util"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
@@ -682,6 +685,94 @@ func TestDelegation07NamesMatch(t *testing.T) {
 	}
 	if !hasEntryTag(entries, "NAMES_MATCH") {
 		t.Fatalf("expected NAMES_MATCH")
+	}
+}
+
+func TestDelegation07UndelegatedReportsExtraNameChild(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.Net.IPv4 = true
+	prof.Net.IPv6 = true
+
+	origM2 := method2
+	origM3 := method3
+	t.Cleanup(func() {
+		method2 = origM2
+		method3 = origM3
+	})
+	method2 = methods.Method2
+	method3 = methods.Method3
+
+	r, err := recursor.New()
+	if err != nil {
+		t.Fatalf("new recursor: %v", err)
+	}
+	if err := r.AddFakeAddresses("example.com", map[string][]string{
+		"ns1.example.com": {"192.0.2.11"},
+		"ns2.example.com": {"192.0.2.12"},
+		"ns3.example.com": {"192.0.2.13"},
+	}); err != nil {
+		t.Fatalf("add fake addresses: %v", err)
+	}
+
+	makeNSAnswer := func(nsNames ...string) packet.Packet {
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeSuccess
+		for _, nsName := range nsNames {
+			msg.Answer = append(msg.Answer, &dns.NS{
+				Hdr: dns.RR_Header{
+					Name:   dns.Fqdn("example.com"),
+					Rrtype: dns.TypeNS,
+					Class:  dns.ClassINET,
+					Ttl:    60,
+				},
+				Ns: dns.Fqdn(nsName),
+			})
+		}
+		return packet.Packet{Msg: msg}
+	}
+
+	setHook := func(name, ip string, nsNames ...string) {
+		t.Helper()
+		ns, err := nameserver.NewWithContext(ctx, name, ip, r.Client())
+		if err != nil {
+			t.Fatalf("new nameserver: %v", err)
+		}
+		ns.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+			if !strings.EqualFold(qname, "example.com") || !strings.EqualFold(qtype, "NS") {
+				return packet.Packet{}, nil
+			}
+			return makeNSAnswer(nsNames...), nil
+		})
+	}
+
+	setHook("ns1.example.com", "192.0.2.11", "ns1.example.com", "ns4.example.com")
+	setHook("ns2.example.com", "192.0.2.12", "ns1.example.com", "ns5.example.com")
+	setHook("ns3.example.com", "192.0.2.13", "ns4.example.com")
+
+	z, err := zone.NewWithRecursor("example.com", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	entries, err := Delegation07(ctx, &z)
+	if err != nil {
+		t.Fatalf("delegation07: %v", err)
+	}
+	if !hasEntryTag(entries, "EXTRA_NAME_PARENT") {
+		t.Fatalf("expected EXTRA_NAME_PARENT")
+	}
+	if !hasEntryTag(entries, "EXTRA_NAME_CHILD") {
+		t.Fatalf("expected EXTRA_NAME_CHILD")
+	}
+	if hasEntryTag(entries, "NAMES_MATCH") {
+		t.Fatalf("did not expect NAMES_MATCH")
 	}
 }
 

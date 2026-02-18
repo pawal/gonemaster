@@ -479,6 +479,56 @@
     const hours = Math.floor((total % 86400) / 3600);
     return `${days}d ${hours}h`;
   };
+  const parseTimestamp = (value) => {
+    if (!value) return null;
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed;
+  };
+  const formatTimestampLocal = (value) => {
+    const parsed = parseTimestamp(value);
+    if (!parsed) return "unknown";
+    return parsed.toLocaleString();
+  };
+  const formatBatchTotalRuntime = (batch) => {
+    const created = parseTimestamp(batch?.created_at);
+    if (!created) return "unknown";
+    const finished = parseTimestamp(batch?.finished_at);
+    const end = finished || new Date();
+    const elapsedSeconds = Math.max(0, Math.floor((end.getTime() - created.getTime()) / 1000));
+    return `${formatUptime(elapsedSeconds)}${finished ? "" : " (running)"}`;
+  };
+  const formatJobTotalRuntime = (job) => {
+    const created = parseTimestamp(job?.created_at);
+    if (!created) return "unknown";
+    const finished = parseTimestamp(job?.finished_at);
+    const end = finished || new Date();
+    const elapsedSeconds = Math.max(0, Math.floor((end.getTime() - created.getTime()) / 1000));
+    return formatUptime(elapsedSeconds);
+  };
+  const formatBatchStatusCounts = (statusCounts) => {
+    if (!statusCounts || typeof statusCounts !== "object") return "none";
+    const knownOrder = ["queued", "running", "succeeded", "failed", "canceled", "expired", "paused"];
+    const counts = new Map();
+    for (const [status, rawCount] of Object.entries(statusCounts)) {
+      const normalized = normalizeStatus(status);
+      if (!normalized) continue;
+      const numeric = Number(rawCount);
+      counts.set(normalized, Number.isFinite(numeric) ? numeric : 0);
+    }
+    if (counts.size === 0) return "none";
+
+    const orderedStatuses = [
+      ...knownOrder.filter((status) => counts.has(status)),
+      ...Array.from(counts.keys())
+        .filter((status) => !knownOrder.includes(status))
+        .sort()
+    ];
+    const orderedEntries = orderedStatuses.map((status) => [status, Number(counts.get(status) || 0)]);
+    const nonZeroEntries = orderedEntries.filter(([, count]) => count > 0);
+    const displayEntries = nonZeroEntries.length > 0 ? nonZeroEntries : orderedEntries;
+    return displayEntries.map(([status, count]) => `${status} ${formatInteger(count)}`).join(" · ");
+  };
   const metricsCardHelp = {
     queue_depth: "Current number of jobs waiting in the queue.",
     in_flight_jobs: "Jobs currently being processed by workers.",
@@ -1199,7 +1249,7 @@
         {#if selectedJob}
           <div class="kv">
             <span>Status</span>
-            <strong>{selectedJob.status}</strong>
+            <strong>{selectedJob.status} · {formatJobTotalRuntime(selectedJob)}</strong>
             <span>Progress</span>
             <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={progressPercent(selectedJob)}>
               <div class="progress-bar" style={`width: ${progressPercent(selectedJob)}%`}></div>
@@ -1208,7 +1258,7 @@
             <span>Domain</span>
             <strong class="mono">{selectedJob.domain}</strong>
             <span>Created</span>
-            <strong>{new Date(selectedJob.created_at).toLocaleString()}</strong>
+            <strong>{formatTimestampLocal(selectedJob.created_at)}</strong>
           </div>
           {#if selectedJob.error}
             <div class="notice">Error: {selectedJob.error}</div>
@@ -1538,9 +1588,11 @@ example.org`}
             <span>Total</span>
             <strong>{selectedBatch.total}</strong>
             <span>Created</span>
-            <strong>{new Date(selectedBatch.created_at).toLocaleString()}</strong>
+            <strong>{formatTimestampLocal(selectedBatch.created_at)}</strong>
+            <span>Total runtime</span>
+            <strong>{formatBatchTotalRuntime(selectedBatch)}</strong>
             <span>Status counts</span>
-            <strong class="mono">{JSON.stringify(selectedBatch.status_counts)}</strong>
+            <strong>{formatBatchStatusCounts(selectedBatch.status_counts)}</strong>
           </div>
           <div class="stack">
             <div class="field-label">Jobs</div>

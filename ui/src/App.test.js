@@ -611,9 +611,10 @@ describe("App", () => {
     const job = {
       id: "job_1",
       domain: "example.com",
-      status: "queued",
+      status: "succeeded",
       created_at: "2026-02-03T00:00:00Z",
-      progress: 0
+      finished_at: "2026-02-03T00:10:00Z",
+      progress: 100
     };
 
     global.fetch.mockImplementation((url, options = {}) => {
@@ -640,6 +641,7 @@ describe("App", () => {
     await waitFor(() => {
       expect(screen.getByText(/Created job:/)).toBeInTheDocument();
       expect(screen.getAllByText("job_1").length).toBeGreaterThan(0);
+      expect(screen.getByText("succeeded · 10m 0s")).toBeInTheDocument();
     });
 
     expect(global.fetch).toHaveBeenCalledWith(
@@ -707,7 +709,8 @@ describe("App", () => {
       total: 1,
       status_counts: { queued: 1 },
       items: [],
-      created_at: "2026-02-03T00:00:00Z"
+      created_at: "2026-02-03T00:00:00Z",
+      finished_at: "2026-02-03T00:10:00Z"
     };
 
     global.fetch.mockImplementation((url, options = {}) => {
@@ -735,6 +738,9 @@ describe("App", () => {
     await waitFor(() => {
       expect(screen.getByText(/Created batch:/)).toBeInTheDocument();
       expect(screen.getByText("batch_1")).toBeInTheDocument();
+      expect(screen.getByText("Total runtime")).toBeInTheDocument();
+      expect(screen.getByText("10m 0s")).toBeInTheDocument();
+      expect(screen.getByText("queued 1")).toBeInTheDocument();
     });
 
     await waitFor(() => {

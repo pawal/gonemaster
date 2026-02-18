@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/miekg/dns"
+
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 )
@@ -162,6 +164,77 @@ func TestNormalizeUndelegatedInputs(t *testing.T) {
 	}
 	if normalizedDS[0].Digest != strings.Repeat("A", 64) {
 		t.Fatalf("expected uppercase digest, got %q", normalizedDS[0].Digest)
+	}
+}
+
+func TestBuildUndelegatedDSData(t *testing.T) {
+	ds := []UndelegatedDSInfo{{
+		KeyTag:     12345,
+		Algorithm:  13,
+		DigestType: 2,
+		Digest:     strings.Repeat("A", 64),
+	}}
+
+	records := buildUndelegatedDSData(ds)
+	if len(records) != 1 {
+		t.Fatalf("expected one DS record, got %d", len(records))
+	}
+	if records[0].KeyTag != 12345 {
+		t.Fatalf("unexpected DS key tag: %d", records[0].KeyTag)
+	}
+	if records[0].Algorithm != 13 {
+		t.Fatalf("unexpected DS algorithm: %d", records[0].Algorithm)
+	}
+	if records[0].DigestType != 2 {
+		t.Fatalf("unexpected DS digest type: %d", records[0].DigestType)
+	}
+	if records[0].Digest != strings.Repeat("A", 64) {
+		t.Fatalf("unexpected DS digest: %q", records[0].Digest)
+	}
+}
+
+func TestApplyUndelegatedDS(t *testing.T) {
+	ctx := context.Background()
+	ns1, err := nameserver.NewWithContext(ctx, "a.gtld-servers.net", "192.5.6.30", nil)
+	if err != nil {
+		t.Fatalf("new nameserver 1: %v", err)
+	}
+	ns2, err := nameserver.NewWithContext(ctx, "b.gtld-servers.net", "192.33.14.30", nil)
+	if err != nil {
+		t.Fatalf("new nameserver 2: %v", err)
+	}
+
+	ds := []UndelegatedDSInfo{
+		{
+			KeyTag:     12345,
+			Algorithm:  13,
+			DigestType: 2,
+			Digest:     strings.Repeat("A", 64),
+		},
+		{
+			KeyTag:     54321,
+			Algorithm:  8,
+			DigestType: 2,
+			Digest:     strings.Repeat("B", 64),
+		},
+	}
+
+	if err := applyUndelegatedDS([]nameserver.Nameserver{ns1, ns2}, "example.com", ds); err != nil {
+		t.Fatalf("apply undelegated DS: %v", err)
+	}
+
+	for idx, ns := range []nameserver.Nameserver{ns1, ns2} {
+		records := ns.FakeDSRecords("example.com")
+		if len(records) != len(ds) {
+			t.Fatalf("nameserver %d: expected %d fake DS records, got %d", idx, len(ds), len(records))
+		}
+		first, ok := records[0].(*dns.DS)
+		if !ok {
+			t.Fatalf("nameserver %d: expected DS record, got %T", idx, records[0])
+		}
+		if first.KeyTag != uint16(ds[0].KeyTag) || first.Algorithm != uint8(ds[0].Algorithm) || first.DigestType != uint8(ds[0].DigestType) || first.Digest != ds[0].Digest {
+			t.Fatalf("nameserver %d: unexpected first fake DS record: %+v", idx, first)
+		}
 	}
 }
 

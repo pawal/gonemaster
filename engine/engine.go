@@ -516,7 +516,7 @@ func runWithContext(ctx context.Context, req RunRequest, module string, testcase
 	if err != nil {
 		return nil, err
 	}
-	if err := applyUndelegatedDelegation(ctx, r, &z, req.UndelegatedNameservers); err != nil {
+	if err := applyUndelegatedDelegation(ctx, r, &z, req.UndelegatedNameservers, req.UndelegatedDSInfo); err != nil {
 		return nil, err
 	}
 	var entries []*logger.Entry

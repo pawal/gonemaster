@@ -239,8 +239,8 @@ type undelegatedAddressLookup func(context.Context, string) ([]netip.Addr, error
 
 type undelegatedTagEmitter func(tag string, args map[string]any) error
 
-func applyUndelegatedDelegation(ctx context.Context, r *recursor.Recursor, z *zone.Zone, nameservers []UndelegatedNameserver) error {
-	if len(nameservers) == 0 {
+func applyUndelegatedDelegation(ctx context.Context, r *recursor.Recursor, z *zone.Zone, nameservers []UndelegatedNameserver, dsInfo []UndelegatedDSInfo) error {
+	if len(nameservers) == 0 && len(dsInfo) == 0 {
 		return nil
 	}
 	if r == nil {
@@ -254,46 +254,100 @@ func applyUndelegatedDelegation(ctx context.Context, r *recursor.Recursor, z *zo
 		_, err := util.Info(ctx, tag, args)
 		return err
 	}
-	delegation, err := buildUndelegatedFakeDelegation(ctx, z.Name, nameservers, r.GetAddressesFor, emit)
+	var delegation map[string][]string
+	if len(nameservers) > 0 {
+		var err error
+		delegation, err = buildUndelegatedFakeDelegation(ctx, z.Name, nameservers, r.GetAddressesFor, emit)
+		if err != nil {
+			return err
+		}
+		if err := r.AddFakeAddresses(z.Name.String(), delegation); err != nil {
+			return err
+		}
+	}
+
+	parentNS, err := undelegatedParentNameservers(ctx, r, z)
 	if err != nil {
 		return err
 	}
+	if len(parentNS) == 0 {
+		return nil
+	}
 
-	if err := r.AddFakeAddresses(z.Name.String(), delegation); err != nil {
+	if len(delegation) > 0 {
+		for _, ns := range parentNS {
+			if fakeDelegationToSelf(ns, delegation) {
+				if err := emit("FAKE_DELEGATION_TO_SELF", map[string]any{
+					"domain": z.Name.String(),
+					"ns":     ns.String(),
+				}); err != nil {
+					return err
+				}
+			}
+			if err := ns.AddFakeDelegation(z.Name.String(), delegation); err != nil {
+				return err
+			}
+		}
+	}
+
+	if err := applyUndelegatedDS(parentNS, z.Name.String(), dsInfo); err != nil {
 		return err
+	}
+	return nil
+}
+
+func undelegatedParentNameservers(ctx context.Context, r *recursor.Recursor, z *zone.Zone) ([]nameserver.Nameserver, error) {
+	if r == nil {
+		return nil, fmt.Errorf("undelegated: recursor is nil")
+	}
+	if z == nil {
+		return nil, fmt.Errorf("undelegated: zone is nil")
 	}
 
 	parentName, _, err := r.Parent(ctx, z.Name.String())
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if strings.TrimSpace(parentName) == "" {
-		return nil
+		return nil, nil
 	}
 
 	parentZone, err := zone.NewWithRecursor(parentName, r)
 	if err != nil {
-		return err
+		return nil, err
+	}
+	return parentZone.NS(ctx)
+}
+
+func applyUndelegatedDS(parentNS []nameserver.Nameserver, domain string, dsInfo []UndelegatedDSInfo) error {
+	if len(parentNS) == 0 || len(dsInfo) == 0 {
+		return nil
 	}
 
-	parentNS, err := parentZone.NS(ctx)
-	if err != nil {
-		return err
-	}
+	dsRecords := buildUndelegatedDSData(dsInfo)
 	for _, ns := range parentNS {
-		if fakeDelegationToSelf(ns, delegation) {
-			if err := emit("FAKE_DELEGATION_TO_SELF", map[string]any{
-				"domain": z.Name.String(),
-				"ns":     ns.String(),
-			}); err != nil {
-				return err
-			}
-		}
-		if err := ns.AddFakeDelegation(z.Name.String(), delegation); err != nil {
+		if err := ns.AddFakeDS(domain, dsRecords); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func buildUndelegatedDSData(dsInfo []UndelegatedDSInfo) []nameserver.DSData {
+	if len(dsInfo) == 0 {
+		return nil
+	}
+
+	out := make([]nameserver.DSData, 0, len(dsInfo))
+	for _, ds := range dsInfo {
+		out = append(out, nameserver.DSData{
+			KeyTag:     uint16(ds.KeyTag),
+			Algorithm:  uint8(ds.Algorithm),
+			DigestType: uint8(ds.DigestType),
+			Digest:     ds.Digest,
+		})
+	}
+	return out
 }
 
 func buildUndelegatedFakeDelegation(ctx context.Context, zoneName dnsname.Name, nameservers []UndelegatedNameserver, lookup undelegatedAddressLookup, emit undelegatedTagEmitter) (map[string][]string, error) {

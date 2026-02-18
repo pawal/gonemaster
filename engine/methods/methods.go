@@ -34,6 +34,9 @@ func Method3(ctx context.Context, z *zone.Zone) ([]dnsname.Name, error) {
 	if z == nil {
 		return nil, fmt.Errorf("zone is nil")
 	}
+	if r := z.Recursor(); r != nil && z.Name.String() != "." && r.HasFakeAddresses(z.Name.String()) {
+		return Method2(ctx, z)
+	}
 
 	responses, err := z.QueryAll(ctx, z.Name.String(), "NS", nil)
 	if err != nil {

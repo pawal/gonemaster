@@ -192,6 +192,60 @@ func TestZoneGlueUsesFakeAddresses(t *testing.T) {
 	}
 }
 
+func TestZoneNSNamesUndelegatedUsesFakeDelegation(t *testing.T) {
+	r := &recursor.Recursor{}
+	err := r.AddFakeAddresses("example", map[string][]string{
+		"ns2.example.net": {},
+		"ns1.example":     {"192.0.2.55"},
+	})
+	if err != nil {
+		t.Fatalf("add fake addresses: %v", err)
+	}
+
+	z, err := NewWithRecursor("example", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	names, err := z.NSNames(context.Background())
+	if err != nil {
+		t.Fatalf("ns names: %v", err)
+	}
+	if len(names) != 2 {
+		t.Fatalf("expected 2 names, got %d", len(names))
+	}
+	if names[0].String() != "ns1.example" || names[1].String() != "ns2.example.net" {
+		t.Fatalf("unexpected names: %q, %q", names[0].String(), names[1].String())
+	}
+}
+
+func TestZoneNSUndelegatedUsesProvidedGlueOnly(t *testing.T) {
+	r := &recursor.Recursor{}
+	err := r.AddFakeAddresses("example", map[string][]string{
+		"ns2.example.net": {},
+		"ns1.example":     {"192.0.2.55"},
+	})
+	if err != nil {
+		t.Fatalf("add fake addresses: %v", err)
+	}
+
+	z, err := NewWithRecursor("example", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	nss, err := z.NS(context.Background())
+	if err != nil {
+		t.Fatalf("ns: %v", err)
+	}
+	if len(nss) != 1 {
+		t.Fatalf("expected 1 nameserver with address, got %d", len(nss))
+	}
+	if nss[0].String() != "ns1.example/192.0.2.55" {
+		t.Fatalf("unexpected nameserver %q", nss[0].String())
+	}
+}
+
 func TestZoneNewWithRecursorEmptyName(t *testing.T) {
 	if _, err := NewWithRecursor("", nil); err == nil {
 		t.Fatalf("expected error for empty zone name")

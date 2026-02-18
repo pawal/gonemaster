@@ -41,6 +41,16 @@ type Zone struct {
 	glueAddressesSet bool
 }
 
+func (z *Zone) isUndelegated() bool {
+	if z == nil || z.recursor == nil {
+		return false
+	}
+	if z.Name.String() == "." {
+		return false
+	}
+	return z.recursor.HasFakeAddresses(z.Name.String())
+}
+
 // New creates a Zone from a domain name.
 func New(name string) (Zone, error) {
 	return NewWithRecursor(name, nil)
@@ -103,6 +113,17 @@ func (z *Zone) Parent(ctx context.Context) (*Zone, error) {
 // GlueNames returns glue NS names from the parent zone.
 func (z *Zone) GlueNames(ctx context.Context) ([]dnsname.Name, error) {
 	if z.glueNamesSet {
+		return append([]dnsname.Name{}, z.glueNames...), nil
+	}
+	if z.isUndelegated() {
+		fakeNames := z.recursor.GetFakeNames(z.Name.String())
+		sort.Strings(fakeNames)
+		names := make([]dnsname.Name, 0, len(fakeNames))
+		for _, name := range fakeNames {
+			names = append(names, dnsname.New(name))
+		}
+		z.glueNames = names
+		z.glueNamesSet = true
 		return append([]dnsname.Name{}, z.glueNames...), nil
 	}
 
@@ -201,6 +222,15 @@ func (z *Zone) NSNames(ctx context.Context) ([]dnsname.Name, error) {
 	if z.recursor == nil {
 		return nil, fmt.Errorf("missing recursor")
 	}
+	if z.isUndelegated() {
+		names, err := z.GlueNames(ctx)
+		if err != nil {
+			return nil, err
+		}
+		z.nsNames = names
+		z.nsNamesSet = true
+		return append([]dnsname.Name{}, z.nsNames...), nil
+	}
 
 	if z.Name.String() == "." {
 		servers, err := z.NS(ctx)
@@ -278,6 +308,15 @@ func (z *Zone) NS(ctx context.Context) ([]nameserver.Nameserver, error) {
 	}
 	if z.recursor == nil {
 		return nil, fmt.Errorf("missing recursor")
+	}
+	if z.isUndelegated() {
+		glue, err := z.Glue(ctx)
+		if err != nil {
+			return nil, err
+		}
+		z.ns = glue
+		z.nsSet = true
+		return append([]nameserver.Nameserver{}, z.ns...), nil
 	}
 
 	if z.Name.String() == "." {

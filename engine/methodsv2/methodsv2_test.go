@@ -111,7 +111,7 @@ func TestGetDelNSNamesAndIPsUndelegated(t *testing.T) {
 	}
 }
 
-func TestGetZoneNSNamesFromAuthoritative(t *testing.T) {
+func TestGetZoneNSNamesUndelegatedIgnoresAuthoritativeApexSet(t *testing.T) {
 	ClearCache()
 	defer ClearCache()
 	ctx, prof, _ := testhelpers.Context(t)
@@ -135,7 +135,7 @@ func TestGetZoneNSNamesFromAuthoritative(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get zone NS names: %v", err)
 	}
-	want := []string{"ns1.example.net", "ns2.example.net"}
+	want := []string{"ns1.example.net"}
 	if len(names) != len(want) {
 		t.Fatalf("expected %d names, got %d", len(want), len(names))
 	}
@@ -249,6 +249,104 @@ func TestGetDelNSNamesAndIPsUndelegatedLookupWhenNoIP(t *testing.T) {
 	}
 	if items[0].Name.String() != "ns1.example.net" || items[0].Address.String() != "192.0.2.99" {
 		t.Fatalf("unexpected item: %#v", items[0])
+	}
+}
+
+func TestGetDelNSNamesAndIPsUndelegatedKeepsInBailiwickNameWithoutIP(t *testing.T) {
+	ClearCache()
+	defer ClearCache()
+	ctx, _, _ := testhelpers.Context(t)
+
+	r := &recursor.Recursor{}
+	if err := r.AddFakeAddresses("example", map[string][]string{
+		"ns1.example": {},
+	}); err != nil {
+		t.Fatalf("add fake addresses: %v", err)
+	}
+	z, err := zone.NewWithRecursor("example", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	items, err := GetDelNSNamesAndIPs(ctx, &z)
+	if err != nil {
+		t.Fatalf("get delegation: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(items))
+	}
+	if items[0].Name.String() != "ns1.example" || items[0].HasAddress {
+		t.Fatalf("unexpected item: %#v", items[0])
+	}
+}
+
+func TestGetZoneNSNamesUndelegatedUsesDelegationNames(t *testing.T) {
+	ClearCache()
+	defer ClearCache()
+	ctx, _, _ := testhelpers.Context(t)
+
+	r := &recursor.Recursor{}
+	if err := r.AddFakeAddresses("example", map[string][]string{
+		"ns2.example.net": {"192.0.2.54"},
+		"ns1.example":     {"192.0.2.53"},
+	}); err != nil {
+		t.Fatalf("add fake addresses: %v", err)
+	}
+	z, err := zone.NewWithRecursor("example", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	names, err := GetZoneNSNames(ctx, &z)
+	if err != nil {
+		t.Fatalf("get zone ns names: %v", err)
+	}
+	if len(names) != 2 {
+		t.Fatalf("expected 2 names, got %d", len(names))
+	}
+	if names[0].String() != "ns1.example" || names[1].String() != "ns2.example.net" {
+		t.Fatalf("unexpected names: %q, %q", names[0].String(), names[1].String())
+	}
+}
+
+func TestGetZoneNSNamesAndIPsUndelegatedInBailiwickUsesProvidedGlue(t *testing.T) {
+	ClearCache()
+	defer ClearCache()
+	ctx, _, _ := testhelpers.Context(t)
+
+	r := &recursor.Recursor{}
+	if err := r.AddFakeAddresses("example", map[string][]string{
+		"ns1.example": {"192.0.2.53"},
+	}); err != nil {
+		t.Fatalf("add fake addresses: %v", err)
+	}
+	z, err := zone.NewWithRecursor("example", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	ns, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.53", r.Client())
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	queryCalls := 0
+	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		queryCalls++
+		return packet.Packet{}, nil
+	})
+
+	items, err := GetZoneNSNamesAndIPs(ctx, &z)
+	if err != nil {
+		t.Fatalf("get zone ns names and ips: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(items))
+	}
+	if !items[0].HasAddress || items[0].Name.String() != "ns1.example" || items[0].Address.String() != "192.0.2.53" {
+		t.Fatalf("unexpected item: %#v", items[0])
+	}
+	if queryCalls != 0 {
+		t.Fatalf("expected no A/AAAA lookup queries for provided glue, got %d", queryCalls)
 	}
 }
 

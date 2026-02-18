@@ -250,6 +250,51 @@ func TestRunEngineForJobLimiter(t *testing.T) {
 	}
 }
 
+func TestRunEngineForJobPassesUndelegatedInputs(t *testing.T) {
+	cfg := DefaultConfig()
+	srv := New(cfg)
+
+	var captured engine.RunRequest
+	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		captured = req
+		return nil, nil
+	}
+
+	job := Job{
+		ID:        "job-undel",
+		Domain:    "example.com",
+		Status:    JobQueued,
+		CreatedAt: time.Now().UTC(),
+		UndelegatedNS: []engine.UndelegatedNameserver{
+			{Name: "ns1.example.com", IP: "192.0.2.1"},
+			{Name: "ns1.example.com", IP: "2001:db8::1"},
+		},
+		UndelegatedDS: []engine.UndelegatedDSInfo{
+			{KeyTag: 12345, Algorithm: 13, DigestType: 2, Digest: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"},
+		},
+	}
+
+	_, _, _, err := srv.runEngineForJob(job, context.Background())
+	if err != nil {
+		t.Fatalf("runEngineForJob: %v", err)
+	}
+	if len(captured.UndelegatedNameservers) != 2 {
+		t.Fatalf("expected 2 undelegated nameservers, got %d", len(captured.UndelegatedNameservers))
+	}
+	if captured.UndelegatedNameservers[0].Name != "ns1.example.com" || captured.UndelegatedNameservers[0].IP != "192.0.2.1" {
+		t.Fatalf("unexpected first nameserver: %+v", captured.UndelegatedNameservers[0])
+	}
+	if captured.UndelegatedNameservers[1].Name != "ns1.example.com" || captured.UndelegatedNameservers[1].IP != "2001:db8::1" {
+		t.Fatalf("unexpected second nameserver: %+v", captured.UndelegatedNameservers[1])
+	}
+	if len(captured.UndelegatedDSInfo) != 1 {
+		t.Fatalf("expected 1 undelegated DS record, got %d", len(captured.UndelegatedDSInfo))
+	}
+	if captured.UndelegatedDSInfo[0].KeyTag != 12345 {
+		t.Fatalf("unexpected DS key tag: %d", captured.UndelegatedDSInfo[0].KeyTag)
+	}
+}
+
 func TestDNSQueryCounterCallback(t *testing.T) {
 	counter := &dnsQueryCounter{}
 	entries := []*logger.Entry{

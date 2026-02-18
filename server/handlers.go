@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/normalization"
 )
 
@@ -37,6 +38,10 @@ func (s *Server) handleJobsBatch(w http.ResponseWriter, r *http.Request) {
 	var req JobBatchRequest
 	if err := readJSON(r, s.cfg.MaxBodySize, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_json", err.Error(), nil)
+		return
+	}
+	if req.Nameservers != nil || req.DSInfo != nil {
+		writeError(w, http.StatusBadRequest, "undelegated_not_supported_for_batch", "undelegated input is only supported for POST /jobs", nil)
 		return
 	}
 	if len(req.Domains) == 0 {
@@ -236,16 +241,23 @@ func (s *Server) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 	} else {
 		domain = normalized
 	}
+	undelegatedNS, undelegatedDS, err := normalizeUndelegatedInputs(req.Nameservers, req.DSInfo)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_undelegated", err.Error(), nil)
+		return
+	}
 
 	job := Job{
-		ID:        newID("job"),
-		Domain:    domain,
-		Tests:     req.Tests,
-		Overrides: req.ProfileOverrides,
-		MinLevel:  req.MinLevel,
-		Status:    JobQueued,
-		CreatedAt: time.Now().UTC(),
-		Progress:  0,
+		ID:            newID("job"),
+		Domain:        domain,
+		Tests:         req.Tests,
+		Overrides:     req.ProfileOverrides,
+		UndelegatedNS: undelegatedNS,
+		UndelegatedDS: undelegatedDS,
+		MinLevel:      req.MinLevel,
+		Status:        JobQueued,
+		CreatedAt:     time.Now().UTC(),
+		Progress:      0,
 	}
 	created, err := s.store.Create(job)
 	if err != nil {
@@ -256,6 +268,32 @@ func (s *Server) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 	s.metrics.ObserveJobSubmittedWithContext(created.BatchID, created.Domain, JobQueued)
 
 	writeJSON(w, http.StatusCreated, created)
+}
+
+func normalizeUndelegatedInputs(nameservers []UndelegatedNameserverInput, dsInfo []UndelegatedDSInput) ([]engine.UndelegatedNameserver, []engine.UndelegatedDSInfo, error) {
+	normalizedNS := make([]engine.UndelegatedNameserver, 0, len(nameservers))
+	for i, item := range nameservers {
+		name := strings.TrimSpace(item.NS)
+		if name == "" {
+			return nil, nil, fmt.Errorf("undelegated nameserver[%d]: ns is required", i)
+		}
+		normalizedNS = append(normalizedNS, engine.UndelegatedNameserver{
+			Name: name,
+			IP:   strings.TrimSpace(item.IP),
+		})
+	}
+
+	normalizedDS := make([]engine.UndelegatedDSInfo, 0, len(dsInfo))
+	for _, item := range dsInfo {
+		normalizedDS = append(normalizedDS, engine.UndelegatedDSInfo{
+			KeyTag:     item.KeyTag,
+			Algorithm:  item.Algorithm,
+			DigestType: item.DigType,
+			Digest:     strings.TrimSpace(item.Digest),
+		})
+	}
+
+	return engine.NormalizeUndelegatedInputs(normalizedNS, normalizedDS)
 }
 
 func (s *Server) handleListJobs(w http.ResponseWriter, r *http.Request) {

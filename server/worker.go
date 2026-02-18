@@ -172,9 +172,11 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 		minLevel = job.MinLevel
 	}
 	req := engine.RunRequest{
-		Domain:   job.Domain,
-		MinLevel: minLevel,
-		Context:  ctx,
+		Domain:                 job.Domain,
+		UndelegatedNameservers: job.UndelegatedNS,
+		UndelegatedDSInfo:      job.UndelegatedDS,
+		MinLevel:               minLevel,
+		Context:                ctx,
 	}
 	if s.cfg.PositiveCacheTTL != nil {
 		req.PositiveCacheTTL = s.cfg.PositiveCacheTTL

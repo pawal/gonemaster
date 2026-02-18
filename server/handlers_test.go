@@ -144,6 +144,105 @@ func TestCreateJobValidation(t *testing.T) {
 	}
 }
 
+func TestCreateJobWithUndelegatedInput(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	payload := `{
+		"domain":"Example.COM",
+		"nameservers":[
+			{"ns":"NS1.Example.COM","ip":"192.0.2.1"},
+			{"ns":"ns1.example.com","ip":"2001:db8::1"},
+			{"ns":"ns2.example.net"}
+		],
+		"ds_info":[
+			{"keytag":12345,"algorithm":13,"digtype":2,"digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+		]
+	}`
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(payload))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d", resp.Code)
+	}
+	var created Job
+	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	stored, ok := srv.store.Get(created.ID)
+	if !ok {
+		t.Fatalf("expected job in store")
+	}
+	if stored.Domain != "example.com" {
+		t.Fatalf("expected normalized domain example.com, got %q", stored.Domain)
+	}
+	if len(stored.UndelegatedNS) != 3 {
+		t.Fatalf("expected 3 undelegated nameserver rows, got %d", len(stored.UndelegatedNS))
+	}
+	if stored.UndelegatedNS[0].Name != "ns1.example.com" || stored.UndelegatedNS[0].IP != "192.0.2.1" {
+		t.Fatalf("unexpected first nameserver row: %+v", stored.UndelegatedNS[0])
+	}
+	if stored.UndelegatedNS[1].Name != "ns1.example.com" || stored.UndelegatedNS[1].IP != "2001:db8::1" {
+		t.Fatalf("unexpected second nameserver row: %+v", stored.UndelegatedNS[1])
+	}
+	if stored.UndelegatedNS[2].Name != "ns2.example.net" || stored.UndelegatedNS[2].IP != "" {
+		t.Fatalf("unexpected third nameserver row: %+v", stored.UndelegatedNS[2])
+	}
+	if len(stored.UndelegatedDS) != 1 {
+		t.Fatalf("expected one undelegated DS row, got %d", len(stored.UndelegatedDS))
+	}
+	if stored.UndelegatedDS[0].Digest != "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" {
+		t.Fatalf("expected uppercase DS digest, got %q", stored.UndelegatedDS[0].Digest)
+	}
+}
+
+func TestCreateJobRejectsMalformedUndelegatedInput(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	payload := `{
+		"domain":"example.com",
+		"nameservers":[{"ns":"ns1.example.com","ip":"not-an-ip"}]
+	}`
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(payload))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", resp.Code)
+	}
+	var out ErrorResponse
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out.Error.Code != "invalid_undelegated" {
+		t.Fatalf("expected invalid_undelegated, got %q", out.Error.Code)
+	}
+}
+
+func TestCreateJobRejectsMalformedUndelegatedDSInput(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	payload := `{
+		"domain":"example.com",
+		"ds_info":[{"keytag":12345,"algorithm":13,"digtype":2,"digest":"not-hex"}]
+	}`
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(payload))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", resp.Code)
+	}
+	var out ErrorResponse
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out.Error.Code != "invalid_undelegated" {
+		t.Fatalf("expected invalid_undelegated, got %q", out.Error.Code)
+	}
+}
+
 func TestListJobs(t *testing.T) {
 	srv := New(DefaultConfig())
 
@@ -543,6 +642,27 @@ func TestBatchSubmit(t *testing.T) {
 	}
 	if out.BatchID == "" || len(out.JobIDs) != 2 {
 		t.Fatalf("expected batch id and 2 job ids")
+	}
+}
+
+func TestBatchSubmitRejectsUndelegatedFields(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	payload := `{"domains":["example.com"],"nameservers":[{"ns":"ns1.example.com","ip":"192.0.2.1"}]}`
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/batch", bytes.NewBufferString(payload))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", resp.Code)
+	}
+	var out ErrorResponse
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out.Error.Code != "undelegated_not_supported_for_batch" {
+		t.Fatalf("expected undelegated_not_supported_for_batch, got %q", out.Error.Code)
 	}
 }
 

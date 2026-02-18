@@ -30,6 +30,7 @@ Notes:
 - `--domain` is required for test runs.
 - `--version` and `--list-tests` do not require `--domain`.
 - `--dump-profile` can be used without `--domain`.
+- malformed undelegated inputs (`--ns`, `--ds`) return exit code `2`.
 - The built-in default profile currently uses `resolver.defaults.parallel=8` and
   `resolver.defaults.unordered=true`.
 - For deterministic ordered behavior, use `--ordered --parallel 1`.
@@ -75,6 +76,8 @@ Use `--output PATH` to write the selected output to a file.
 | `--error-cache-ttl N` | int | Seconds to skip queries after network errors. Must be `>= 0` when set. |
 | `--positive-cache-ttl N` | int | Seconds to cache positive DNS responses. Must be `>= 0` when set. |
 | `--negative-cache-ttl N` | int | Seconds to cache negative DNS responses. Must be `>= 0` when set. |
+| `--ns NAME[/IP]` | string (repeatable) | Undelegated nameserver input. `NAME` is required, `IP` is optional. May be repeated. |
+| `--ds KEYTAG,ALGORITHM,DIGTYPE,DIGEST` | string (repeatable) | Undelegated DS input. May be repeated. |
 | `--no-progress` | bool | Disable progress indicator/spinner. |
 | `--list-tests` | bool | List available test cases and exit. |
 | `--version` | bool | Print version information and exit. |
@@ -119,6 +122,19 @@ gonemaster --list-tests
 High performance test, translated to Swedish:
 ```
 gonemaster --unordered --parallel 8 --locale sv --domain example.com
+```
+
+Undelegated test with explicit nameservers and glue:
+```
+gonemaster --domain example.com \
+  --ns ns1.example.com/192.0.2.10 \
+  --ns ns2.example.net/2001:db8::10
+```
+
+Undelegated DS-only test:
+```
+gonemaster --domain example.com \
+  --ds 12345,13,2,0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF
 ```
 
 ## gonemaster-client (HTTP API client)

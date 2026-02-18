@@ -39,6 +39,7 @@ Quick examples:
 ```
 gonemaster --domain example.com
 gonemaster --json --domain example.com | jq
+gonemaster --domain example.com --ns ns1.example.com/192.0.2.10 --ns ns2.example.net
 ```
 
 ![ascii animation](docs/demo.gif)

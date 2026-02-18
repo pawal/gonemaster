@@ -798,6 +798,111 @@ describe("App", () => {
     unmount();
   });
 
+  it("includes undelegated nameservers and ds_info in single-job payload when configured", async () => {
+    const job = {
+      id: "job_undelegated",
+      domain: "example.com",
+      status: "queued",
+      created_at: "2026-02-03T00:00:00Z",
+      progress: 0
+    };
+
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (url === "/api/v1/jobs" && options.method === "POST") {
+        return jsonResponse(job);
+      }
+      if (url === `/api/v1/jobs/${job.id}`) {
+        return jsonResponse(job);
+      }
+      if (typeof url === "string" && url.startsWith("/api/v1/jobs?")) {
+        return jsonResponse({ items: [job] });
+      }
+      return jsonResponse({ items: [] });
+    });
+
+    const { unmount } = render(App);
+
+    await fireEvent.input(await screen.findByPlaceholderText("example.com"), {
+      target: { value: "example.com" }
+    });
+    await fireEvent.click(screen.getByText("Undelegated / Pre-delegation"));
+    await fireEvent.click(screen.getByRole("button", { name: "Add nameserver" }));
+    await fireEvent.input(screen.getByLabelText("Undelegated NS 1"), {
+      target: { value: "ns1.example.com" }
+    });
+    await fireEvent.input(screen.getByLabelText("Undelegated NS IP 1"), {
+      target: { value: "2001:db8::10" }
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "Add DS record" }));
+    await fireEvent.input(screen.getByLabelText("Undelegated DS keytag 1"), {
+      target: { value: "12345" }
+    });
+    await fireEvent.input(screen.getByLabelText("Undelegated DS algorithm 1"), {
+      target: { value: "13" }
+    });
+    await fireEvent.input(screen.getByLabelText("Undelegated DS digest type 1"), {
+      target: { value: "2" }
+    });
+    await fireEvent.input(screen.getByLabelText("Undelegated DS digest 1"), {
+      target: { value: "aabbccdd" }
+    });
+
+    await fireEvent.click(screen.getByText("Run Single Job"));
+
+    await waitFor(() => {
+      const postCall = global.fetch.mock.calls.find(
+        ([url, options]) => url === "/api/v1/jobs" && options?.method === "POST"
+      );
+      expect(postCall).toBeTruthy();
+      const body = JSON.parse(postCall[1].body);
+      expect(body).toEqual({
+        domain: "example.com",
+        nameservers: [{ ns: "ns1.example.com", ip: "2001:db8::10" }],
+        ds_info: [{ keytag: 12345, algorithm: 13, digtype: 2, digest: "AABBCCDD" }]
+      });
+    });
+
+    unmount();
+  });
+
+  it("blocks single-job submit when undelegated rows are invalid", async () => {
+    global.fetch.mockImplementation((url) => {
+      if (typeof url === "string" && url.startsWith("/api/v1/jobs?")) {
+        return jsonResponse({ items: [] });
+      }
+      return jsonResponse({ items: [] });
+    });
+
+    const { unmount } = render(App);
+
+    await fireEvent.input(await screen.findByPlaceholderText("example.com"), {
+      target: { value: "example.com" }
+    });
+    await fireEvent.click(screen.getByText("Undelegated / Pre-delegation"));
+    await fireEvent.click(screen.getByRole("button", { name: "Add nameserver" }));
+    await fireEvent.input(screen.getByLabelText("Undelegated NS 1"), {
+      target: { value: "ns1.example.com" }
+    });
+    await fireEvent.input(screen.getByLabelText("Undelegated NS IP 1"), {
+      target: { value: "not-an-ip" }
+    });
+
+    await fireEvent.click(screen.getByText("Run Single Job"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Undelegated nameserver row 1: IP must be a valid IPv4 or IPv6 address.")
+      ).toBeInTheDocument();
+    });
+
+    const postCalls = global.fetch.mock.calls.filter(
+      ([url, options]) => url === "/api/v1/jobs" && options?.method === "POST"
+    );
+    expect(postCalls).toHaveLength(0);
+
+    unmount();
+  });
+
   it("submits a batch job and displays the created batch id", async () => {
     const batch = {
       batch_id: "batch_1",
@@ -858,6 +963,63 @@ describe("App", () => {
         body: JSON.stringify({ domains: ["example.com", "example.org"] })
       })
     );
+
+    unmount();
+  });
+
+  it("keeps batch payload domains-only even when undelegated single-job fields are filled", async () => {
+    const batch = {
+      batch_id: "batch_domains_only",
+      job_ids: ["job_1"]
+    };
+    const summary = {
+      batch_id: "batch_domains_only",
+      total: 1,
+      status_counts: { queued: 1 },
+      items: [],
+      created_at: "2026-02-03T00:00:00Z"
+    };
+
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (url === "/api/v1/jobs/batch" && options.method === "POST") {
+        return jsonResponse(batch);
+      }
+      if (typeof url === "string" && url.startsWith("/api/v1/batches/batch_domains_only")) {
+        return jsonResponse(summary);
+      }
+      if (typeof url === "string" && url.startsWith("/api/v1/jobs?")) {
+        return jsonResponse({ items: [] });
+      }
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+
+    await fireEvent.click(screen.getByText("Undelegated / Pre-delegation"));
+    await fireEvent.click(screen.getByRole("button", { name: "Add nameserver" }));
+    await fireEvent.input(screen.getByLabelText("Undelegated NS 1"), {
+      target: { value: "ns1.example.com" }
+    });
+    await fireEvent.input(screen.getByLabelText("Undelegated NS IP 1"), {
+      target: { value: "192.0.2.10" }
+    });
+
+    await openBatchTab();
+    await fireEvent.input(await screen.findByLabelText("Domains (one per line)"), {
+      target: { value: "example.com\nexample.org" }
+    });
+    await fireEvent.click(screen.getByText("Run Batch"));
+
+    await waitFor(() => {
+      const postCall = global.fetch.mock.calls.find(
+        ([url, options]) => url === "/api/v1/jobs/batch" && options?.method === "POST"
+      );
+      expect(postCall).toBeTruthy();
+      const body = JSON.parse(postCall[1].body);
+      expect(body).toEqual({ domains: ["example.com", "example.org"] });
+      expect(body.nameservers).toBeUndefined();
+      expect(body.ds_info).toBeUndefined();
+    });
 
     unmount();
   });

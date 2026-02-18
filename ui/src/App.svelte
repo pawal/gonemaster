@@ -10,6 +10,8 @@
   let singleSubmitting = false;
   let createdJobId = "";
   let singleIPMode = "default";
+  let undelegatedNameservers = [];
+  let undelegatedDSInfo = [];
 
   let batchDomains = "";
   let batchSubmitting = false;
@@ -640,6 +642,111 @@
     }
   };
 
+  const emptyUndelegatedNameserverRow = () => ({ ns: "", ip: "" });
+  const emptyUndelegatedDSRow = () => ({ keytag: "", algorithm: "", digtype: "", digest: "" });
+  const trimUndelegatedNameserverRow = (row = {}) => ({
+    ns: String(row?.ns || "").trim(),
+    ip: String(row?.ip || "").trim()
+  });
+  const trimUndelegatedDSRow = (row = {}) => ({
+    keytag: String(row?.keytag || "").trim(),
+    algorithm: String(row?.algorithm || "").trim(),
+    digtype: String(row?.digtype || "").trim(),
+    digest: String(row?.digest || "").trim()
+  });
+  const isIPv4Address = (value) => {
+    const text = String(value || "").trim();
+    const parts = text.split(".");
+    if (parts.length !== 4) return false;
+    return parts.every((part) => /^\d{1,3}$/.test(part) && Number(part) >= 0 && Number(part) <= 255);
+  };
+  const isIPv6Address = (value) => {
+    const text = String(value || "").trim();
+    if (!text.includes(":")) return false;
+    try {
+      const parsed = new URL(`http://[${text}]`).hostname;
+      return parsed.startsWith("[") && parsed.endsWith("]");
+    } catch (error) {
+      return false;
+    }
+  };
+  const isIPAddress = (value) => isIPv4Address(value) || isIPv6Address(value);
+  const isUIntInRange = (value, min, max) => {
+    if (!/^\d+$/.test(value)) return false;
+    const numeric = Number(value);
+    return Number.isFinite(numeric) && numeric >= min && numeric <= max;
+  };
+  const isHexDigest = (value) => /^[0-9a-fA-F]+$/.test(value);
+
+  const addUndelegatedNameserverRow = () => {
+    undelegatedNameservers = [...undelegatedNameservers, emptyUndelegatedNameserverRow()];
+  };
+
+  const removeUndelegatedNameserverRow = (index) => {
+    undelegatedNameservers = undelegatedNameservers.filter((_, i) => i !== index);
+  };
+
+  const addUndelegatedDSRow = () => {
+    undelegatedDSInfo = [...undelegatedDSInfo, emptyUndelegatedDSRow()];
+  };
+
+  const removeUndelegatedDSRow = (index) => {
+    undelegatedDSInfo = undelegatedDSInfo.filter((_, i) => i !== index);
+  };
+
+  const buildUndelegatedPayload = () => {
+    const nameservers = [];
+    for (let i = 0; i < undelegatedNameservers.length; i += 1) {
+      const row = trimUndelegatedNameserverRow(undelegatedNameservers[i]);
+      if (!row.ns && !row.ip) continue;
+      if (!row.ns) {
+        return { error: `Undelegated nameserver row ${i + 1}: NS is required when IP is provided.` };
+      }
+      if (/\s/.test(row.ns)) {
+        return { error: `Undelegated nameserver row ${i + 1}: NS must not contain whitespace.` };
+      }
+      if (row.ip && !isIPAddress(row.ip)) {
+        return { error: `Undelegated nameserver row ${i + 1}: IP must be a valid IPv4 or IPv6 address.` };
+      }
+      const payloadRow = { ns: row.ns };
+      if (row.ip) payloadRow.ip = row.ip;
+      nameservers.push(payloadRow);
+    }
+
+    const dsInfo = [];
+    for (let i = 0; i < undelegatedDSInfo.length; i += 1) {
+      const row = trimUndelegatedDSRow(undelegatedDSInfo[i]);
+      const hasAny = row.keytag || row.algorithm || row.digtype || row.digest;
+      if (!hasAny) continue;
+      const hasAll = row.keytag && row.algorithm && row.digtype && row.digest;
+      if (!hasAll) {
+        return {
+          error: `Undelegated DS row ${i + 1}: keytag, algorithm, digest type, and digest are all required.`
+        };
+      }
+      if (!isUIntInRange(row.keytag, 0, 65535)) {
+        return { error: `Undelegated DS row ${i + 1}: keytag must be in range 0-65535.` };
+      }
+      if (!isUIntInRange(row.algorithm, 0, 255)) {
+        return { error: `Undelegated DS row ${i + 1}: algorithm must be in range 0-255.` };
+      }
+      if (!isUIntInRange(row.digtype, 0, 255)) {
+        return { error: `Undelegated DS row ${i + 1}: digest type must be in range 0-255.` };
+      }
+      if (!isHexDigest(row.digest)) {
+        return { error: `Undelegated DS row ${i + 1}: digest must be hex encoded.` };
+      }
+      dsInfo.push({
+        keytag: Number(row.keytag),
+        algorithm: Number(row.algorithm),
+        digtype: Number(row.digtype),
+        digest: row.digest.toUpperCase()
+      });
+    }
+
+    return { nameservers, dsInfo };
+  };
+
   const moduleLevels = ["NOTICE", "WARNING", "ERROR", "CRITICAL"];
   const normalizeLevel = (value) => (value || "INFO").toUpperCase();
   const formatSeconds = (value) => {
@@ -795,6 +902,11 @@
       setStatus("Domain is required.", "warn");
       return;
     }
+    const undelegatedPayload = buildUndelegatedPayload();
+    if (undelegatedPayload.error) {
+      setStatus(undelegatedPayload.error, "warn");
+      return;
+    }
     singleSubmitting = true;
     createdJobId = "";
     try {
@@ -815,6 +927,12 @@
             ipv6: false
           }
         };
+      }
+      if (undelegatedPayload.nameservers.length > 0) {
+        payload.nameservers = undelegatedPayload.nameservers;
+      }
+      if (undelegatedPayload.dsInfo.length > 0) {
+        payload.ds_info = undelegatedPayload.dsInfo;
       }
 
       const job = await apiFetch("/jobs", {
@@ -1252,6 +1370,68 @@
               <option value="disable_ipv6">Disable IPv6 (IPv4 only)</option>
             </select>
             <div class="small">Choose at most one protocol to disable.</div>
+          </div>
+        </details>
+        <details class="advanced-options">
+          <summary>Undelegated / Pre-delegation</summary>
+          <div class="stack advanced-stack">
+            <div class="field-label">Nameservers (NS + optional IP)</div>
+            {#if undelegatedNameservers.length === 0}
+              <div class="small">No undelegated nameservers configured.</div>
+            {:else}
+              <div class="undelegated-list">
+                {#each undelegatedNameservers as row, index (index)}
+                  <div class="undelegated-row">
+                    <input
+                      type="text"
+                      aria-label={`Undelegated NS ${index + 1}`}
+                      placeholder="ns1.example.com"
+                      bind:value={row.ns}
+                    />
+                    <input
+                      type="text"
+                      aria-label={`Undelegated NS IP ${index + 1}`}
+                      placeholder="192.0.2.10 or 2001:db8::10"
+                      bind:value={row.ip}
+                    />
+                    <button class="ghost mini-button" type="button" on:click={() => removeUndelegatedNameserverRow(index)}>
+                      Remove
+                    </button>
+                  </div>
+                {/each}
+              </div>
+            {/if}
+            <button class="ghost" type="button" on:click={addUndelegatedNameserverRow}>
+              Add nameserver
+            </button>
+
+            <div class="field-label">DS records</div>
+            {#if undelegatedDSInfo.length === 0}
+              <div class="small">No undelegated DS records configured.</div>
+            {:else}
+              <div class="undelegated-list">
+                {#each undelegatedDSInfo as row, index (index)}
+                  <div class="undelegated-ds-row">
+                    <input type="text" aria-label={`Undelegated DS keytag ${index + 1}`} placeholder="12345" bind:value={row.keytag} />
+                    <input type="text" aria-label={`Undelegated DS algorithm ${index + 1}`} placeholder="13" bind:value={row.algorithm} />
+                    <input type="text" aria-label={`Undelegated DS digest type ${index + 1}`} placeholder="2" bind:value={row.digtype} />
+                    <input
+                      type="text"
+                      aria-label={`Undelegated DS digest ${index + 1}`}
+                      placeholder="ABCD..."
+                      bind:value={row.digest}
+                    />
+                    <button class="ghost mini-button" type="button" on:click={() => removeUndelegatedDSRow(index)}>
+                      Remove
+                    </button>
+                  </div>
+                {/each}
+              </div>
+            {/if}
+            <button class="ghost" type="button" on:click={addUndelegatedDSRow}>
+              Add DS record
+            </button>
+            <div class="small">Validation: NS is required for nameserver rows; DS values must be numeric + hex digest.</div>
           </div>
         </details>
         <button on:click={submitSingle} disabled={singleSubmitting}>

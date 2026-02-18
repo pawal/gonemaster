@@ -10,7 +10,10 @@ import (
 	"github.com/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
+	"codeberg.org/pawal/gonemaster/engine/recursor"
+	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
 func TestParseUndelegatedNameserver(t *testing.T) {
@@ -341,5 +344,51 @@ func TestFakeDelegationToSelf(t *testing.T) {
 		"ns1.example.com": []string{"192.0.2.2"},
 	}) {
 		t.Fatalf("did not expect self match")
+	}
+}
+
+func TestApplyUndelegatedDelegationEmitsFakeDelegationToSelf(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+
+	ctx, _, log := testhelpers.Context(t)
+
+	r := recursor.Recursor{}
+	if err := r.AddFakeAddresses(".", map[string][]string{
+		"ns1.root": {"192.0.2.1"},
+	}); err != nil {
+		t.Fatalf("add fake root addresses: %v", err)
+	}
+
+	z, err := zone.NewWithRecursor("example", &r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	err = applyUndelegatedDelegation(
+		ctx,
+		&r,
+		&z,
+		[]UndelegatedNameserver{
+			{Name: "ns1.root", IP: "192.0.2.1"},
+		},
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("apply undelegated delegation: %v", err)
+	}
+
+	found := false
+	for _, entry := range log.Entries() {
+		if entry == nil {
+			continue
+		}
+		if entry.Tag == "FAKE_DELEGATION_TO_SELF" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected FAKE_DELEGATION_TO_SELF log entry")
 	}
 }

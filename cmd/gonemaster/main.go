@@ -16,6 +16,22 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/normalization"
 )
 
+var runEngine = engine.Run
+
+type repeatableStringFlag []string
+
+func (f *repeatableStringFlag) String() string {
+	if f == nil || len(*f) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%v", []string(*f))
+}
+
+func (f *repeatableStringFlag) Set(value string) error {
+	*f = append(*f, value)
+	return nil
+}
+
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 }
@@ -60,11 +76,13 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	var noProgress bool
 	var listTests bool
 	var showVersion bool
+	var undelegatedNSSpecs repeatableStringFlag
+	var undelegatedDSSpecs repeatableStringFlag
 
 	fs := flag.NewFlagSet("gonemaster", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	fs.Usage = func() {
-		fmt.Fprintf(errOut, "Usage: %s --domain DOMAIN [--module MODULE] [--testcase TESTCASE] [--profile PATH] [--min-level LEVEL] [--output PATH] [--raw] [--json] [--json-stream] [--dump-profile] [--locale LOCALE] [--no-ipv4] [--no-ipv6|--ipv6] [--parallel N] [--unordered] [--ordered] [--timeout N] [--retry N] [--retrans N] [--fallback|--no-fallback] [--error-cache-ttl N] [--positive-cache-ttl N] [--negative-cache-ttl N] [--no-progress] [--list-tests] [--version]\n", fs.Name())
+		fmt.Fprintf(errOut, "Usage: %s --domain DOMAIN [--module MODULE] [--testcase TESTCASE] [--profile PATH] [--min-level LEVEL] [--output PATH] [--raw] [--json] [--json-stream] [--dump-profile] [--locale LOCALE] [--no-ipv4] [--no-ipv6|--ipv6] [--parallel N] [--unordered] [--ordered] [--timeout N] [--retry N] [--retrans N] [--fallback|--no-fallback] [--error-cache-ttl N] [--positive-cache-ttl N] [--negative-cache-ttl N] [--ns NAME[/IP]] [--ds KEYTAG,ALGORITHM,DIGTYPE,DIGEST] [--no-progress] [--list-tests] [--version]\n", fs.Name())
 		fmt.Fprintln(errOut, "")
 		fmt.Fprintln(errOut, "Options:")
 		fmt.Fprintln(errOut, "  --domain     Zone name to test (required)")
@@ -92,9 +110,15 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		fmt.Fprintln(errOut, "  --error-cache-ttl  Seconds to skip queries after network errors (optional)")
 		fmt.Fprintln(errOut, "  --positive-cache-ttl  Seconds to cache positive DNS responses (optional)")
 		fmt.Fprintln(errOut, "  --negative-cache-ttl  Seconds to cache negative DNS responses (optional)")
+		fmt.Fprintln(errOut, "  --ns         Undelegated nameserver as name[/ip] (repeatable)")
+		fmt.Fprintln(errOut, "  --ds         Undelegated DS as keytag,algorithm,digtype,digest (repeatable)")
 		fmt.Fprintln(errOut, "  --no-progress  Disable progress indicator (optional)")
 		fmt.Fprintln(errOut, "  --list-tests  List all available test cases (optional)")
 		fmt.Fprintln(errOut, "  --version    Print version and exit (optional)")
+		fmt.Fprintln(errOut, "")
+		fmt.Fprintln(errOut, "Undelegated examples:")
+		fmt.Fprintln(errOut, "  --ns ns1.example.com/192.0.2.10 --ns ns2.example.com")
+		fmt.Fprintln(errOut, "  --ds 12345,13,2,0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF")
 		fmt.Fprintln(errOut, "")
 		fmt.Fprintln(errOut, "Exit codes:")
 		fmt.Fprintln(errOut, "  0   Success")
@@ -126,6 +150,8 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs.IntVar(&errorCacheTTL, "error-cache-ttl", 0, "Seconds to skip queries after network errors (optional)")
 	fs.IntVar(&positiveCacheTTL, "positive-cache-ttl", 0, "Seconds to cache positive DNS responses (optional)")
 	fs.IntVar(&negativeCacheTTL, "negative-cache-ttl", 0, "Seconds to cache negative DNS responses (optional)")
+	fs.Var(&undelegatedNSSpecs, "ns", "Undelegated nameserver as name[/ip] (repeatable)")
+	fs.Var(&undelegatedDSSpecs, "ds", "Undelegated DS as keytag,algorithm,digtype,digest (repeatable)")
 	fs.BoolVar(&noProgress, "no-progress", false, "Disable progress indicator (optional)")
 	fs.BoolVar(&listTests, "list-tests", false, "List all available test cases (optional)")
 	fs.BoolVar(&showVersion, "version", false, "Print version and exit (optional)")
@@ -307,6 +333,22 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		PositiveCacheTTL: positiveCacheOverride,
 		NegativeCacheTTL: negativeCacheOverride,
 	}
+	for _, spec := range undelegatedNSSpecs {
+		nsItem, parseErr := engine.ParseUndelegatedNameserver(spec)
+		if parseErr != nil {
+			fmt.Fprintln(errOut, parseErr.Error())
+			return 2
+		}
+		req.UndelegatedNameservers = append(req.UndelegatedNameservers, nsItem)
+	}
+	for _, spec := range undelegatedDSSpecs {
+		dsItem, parseErr := engine.ParseUndelegatedDS(spec)
+		if parseErr != nil {
+			fmt.Fprintln(errOut, parseErr.Error())
+			return 2
+		}
+		req.UndelegatedDSInfo = append(req.UndelegatedDSInfo, dsItem)
+	}
 
 	if dumpProfile {
 		if raw || jsonStream {
@@ -445,7 +487,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		}
 	}
 
-	entries, err := engine.Run(req)
+	entries, err := runEngine(req)
 	if progress != nil {
 		progress.Finish()
 	}

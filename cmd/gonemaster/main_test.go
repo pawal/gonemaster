@@ -11,6 +11,20 @@ import (
 	"codeberg.org/pawal/gonemaster/engine"
 )
 
+func stubRunEngine(t *testing.T, captured *engine.RunRequest) {
+	t.Helper()
+	previous := runEngine
+	runEngine = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		if captured != nil {
+			*captured = req
+		}
+		return nil, nil
+	}
+	t.Cleanup(func() {
+		runEngine = previous
+	})
+}
+
 func TestRunRequiresDomain(t *testing.T) {
 	var out bytes.Buffer
 	var errOut bytes.Buffer
@@ -176,6 +190,132 @@ func TestRunRejectsJSONStreamAndJSON(t *testing.T) {
 	}
 	if out.Len() != 0 {
 		t.Fatalf("expected no stdout output, got %q", out.String())
+	}
+}
+
+func TestRunParsesUndelegatedNameserverFlags(t *testing.T) {
+	var captured engine.RunRequest
+	stubRunEngine(t, &captured)
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := run([]string{
+		"--domain", "example.com",
+		"--json",
+		"--ns", "NS1.Example.com/192.0.2.1",
+		"--ns", "ns2.example.net",
+	}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
+	}
+	if len(captured.UndelegatedNameservers) != 2 {
+		t.Fatalf("expected 2 nameserver rows, got %d", len(captured.UndelegatedNameservers))
+	}
+	first := captured.UndelegatedNameservers[0]
+	second := captured.UndelegatedNameservers[1]
+	if first.Name != "ns1.example.com" || first.IP != "192.0.2.1" {
+		t.Fatalf("unexpected first nameserver: %+v", first)
+	}
+	if second.Name != "ns2.example.net" || second.IP != "" {
+		t.Fatalf("unexpected second nameserver: %+v", second)
+	}
+}
+
+func TestRunParsesUndelegatedDSFlags(t *testing.T) {
+	var captured engine.RunRequest
+	stubRunEngine(t, &captured)
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := run([]string{
+		"--domain", "example.com",
+		"--json",
+		"--ds", "12345,13,2," + strings.Repeat("a", 64),
+		"--ds", "23456,8,2," + strings.Repeat("B", 64),
+	}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
+	}
+	if len(captured.UndelegatedDSInfo) != 2 {
+		t.Fatalf("expected 2 DS rows, got %d", len(captured.UndelegatedDSInfo))
+	}
+	first := captured.UndelegatedDSInfo[0]
+	second := captured.UndelegatedDSInfo[1]
+	if first.KeyTag != 12345 || first.Algorithm != 13 || first.DigestType != 2 || first.Digest != strings.Repeat("A", 64) {
+		t.Fatalf("unexpected first DS row: %+v", first)
+	}
+	if second.KeyTag != 23456 || second.Algorithm != 8 || second.DigestType != 2 || second.Digest != strings.Repeat("B", 64) {
+		t.Fatalf("unexpected second DS row: %+v", second)
+	}
+}
+
+func TestRunRejectsMalformedUndelegatedNameserverFlag(t *testing.T) {
+	stubRunEngine(t, nil)
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := run([]string{
+		"--domain", "example.com",
+		"--json",
+		"--ns", "bad!name.example/192.0.2.1",
+	}, &out, &errOut)
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d", code)
+	}
+	if !strings.Contains(errOut.String(), "undelegated nameserver") {
+		t.Fatalf("expected undelegated nameserver parse error, got %q", errOut.String())
+	}
+}
+
+func TestRunRejectsMalformedUndelegatedDSFlag(t *testing.T) {
+	stubRunEngine(t, nil)
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := run([]string{
+		"--domain", "example.com",
+		"--json",
+		"--ds", "12345,13,2,NOT-HEX",
+	}, &out, &errOut)
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d", code)
+	}
+	if !strings.Contains(errOut.String(), "undelegated DS") {
+		t.Fatalf("expected undelegated DS parse error, got %q", errOut.String())
+	}
+}
+
+func TestRunCarriesUndelegatedInputsInRunRequest(t *testing.T) {
+	var captured engine.RunRequest
+	stubRunEngine(t, &captured)
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := run([]string{
+		"--domain", "example.com",
+		"--json",
+		"--ns", "ns1.example.com/192.0.2.10",
+		"--ds", "12345,13,2," + strings.Repeat("a", 64),
+	}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
+	}
+	if len(captured.UndelegatedNameservers) != 1 {
+		t.Fatalf("expected one undelegated nameserver row, got %d", len(captured.UndelegatedNameservers))
+	}
+	if len(captured.UndelegatedDSInfo) != 1 {
+		t.Fatalf("expected one undelegated DS row, got %d", len(captured.UndelegatedDSInfo))
+	}
+	if captured.UndelegatedNameservers[0].Name != "ns1.example.com" || captured.UndelegatedNameservers[0].IP != "192.0.2.10" {
+		t.Fatalf("unexpected undelegated nameserver in request: %+v", captured.UndelegatedNameservers[0])
+	}
+	if captured.UndelegatedDSInfo[0].KeyTag != 12345 {
+		t.Fatalf("unexpected undelegated DS in request: %+v", captured.UndelegatedDSInfo[0])
 	}
 }
 

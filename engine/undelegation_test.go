@@ -1,8 +1,14 @@
 package engine
 
 import (
+	"context"
+	"errors"
+	"net/netip"
 	"strings"
 	"testing"
+
+	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/nameserver"
 )
 
 func TestParseUndelegatedNameserver(t *testing.T) {
@@ -172,5 +178,95 @@ func TestRunRejectsInvalidUndelegatedInput(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "undelegated nameserver") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestBuildUndelegatedFakeDelegationInZoneMissingIP(t *testing.T) {
+	var tags []string
+	out, err := buildUndelegatedFakeDelegation(
+		context.Background(),
+		dnsname.New("example.com"),
+		[]UndelegatedNameserver{{Name: "ns1.example.com"}},
+		nil,
+		func(tag string, _ map[string]any) error {
+			tags = append(tags, tag)
+			return nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("build fake delegation: %v", err)
+	}
+	if len(out["ns1.example.com"]) != 0 {
+		t.Fatalf("expected empty in-zone glue list, got %v", out["ns1.example.com"])
+	}
+	if len(tags) != 1 || tags[0] != "FAKE_DELEGATION_IN_ZONE_NO_IP" {
+		t.Fatalf("unexpected tags: %v", tags)
+	}
+}
+
+func TestBuildUndelegatedFakeDelegationOutOfBailiwickFill(t *testing.T) {
+	var lookedUp []string
+	out, err := buildUndelegatedFakeDelegation(
+		context.Background(),
+		dnsname.New("example.com"),
+		[]UndelegatedNameserver{{Name: "ns.other.test"}},
+		func(_ context.Context, name string) ([]netip.Addr, error) {
+			lookedUp = append(lookedUp, name)
+			return []netip.Addr{netip.MustParseAddr("192.0.2.10"), netip.MustParseAddr("2001:db8::10")}, nil
+		},
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("build fake delegation: %v", err)
+	}
+	if len(lookedUp) != 1 || lookedUp[0] != "ns.other.test" {
+		t.Fatalf("unexpected lookup sequence: %v", lookedUp)
+	}
+	if len(out["ns.other.test"]) != 2 {
+		t.Fatalf("expected two filled addresses, got %v", out["ns.other.test"])
+	}
+}
+
+func TestBuildUndelegatedFakeDelegationOutOfBailiwickNoFillEmitsNoIP(t *testing.T) {
+	var tags []string
+	out, err := buildUndelegatedFakeDelegation(
+		context.Background(),
+		dnsname.New("example.com"),
+		[]UndelegatedNameserver{{Name: "ns.other.test"}},
+		func(_ context.Context, _ string) ([]netip.Addr, error) {
+			return nil, errors.New("lookup failed")
+		},
+		func(tag string, _ map[string]any) error {
+			tags = append(tags, tag)
+			return nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("build fake delegation: %v", err)
+	}
+	if len(out["ns.other.test"]) != 0 {
+		t.Fatalf("expected unresolved out-of-bailiwick glue, got %v", out["ns.other.test"])
+	}
+	if len(tags) != 1 || tags[0] != "FAKE_DELEGATION_NO_IP" {
+		t.Fatalf("unexpected tags: %v", tags)
+	}
+}
+
+func TestFakeDelegationToSelf(t *testing.T) {
+	ns, err := nameserver.NewWithContext(context.Background(), "ns1.example.com", "192.0.2.1", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+
+	if !fakeDelegationToSelf(ns, map[string][]string{
+		"ns1.example.com": []string{"192.0.2.1"},
+	}) {
+		t.Fatalf("expected self match")
+	}
+
+	if fakeDelegationToSelf(ns, map[string][]string{
+		"ns1.example.com": []string{"192.0.2.2"},
+	}) {
+		t.Fatalf("did not expect self match")
 	}
 }

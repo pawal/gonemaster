@@ -1,13 +1,20 @@
 package engine
 
 import (
+	"context"
 	"fmt"
 	"net/netip"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
+	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/normalization"
+	"codeberg.org/pawal/gonemaster/engine/recursor"
+	"codeberg.org/pawal/gonemaster/engine/util"
+	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
 var undelegatedDigestHexPattern = regexp.MustCompile(`^[0-9A-Fa-f]+$`)
@@ -226,4 +233,153 @@ func undelegatedDSScope(index int) string {
 		return fmt.Sprintf("undelegated DS[%d]", index)
 	}
 	return "undelegated DS"
+}
+
+type undelegatedAddressLookup func(context.Context, string) ([]netip.Addr, error)
+
+type undelegatedTagEmitter func(tag string, args map[string]any) error
+
+func applyUndelegatedDelegation(ctx context.Context, r *recursor.Recursor, z *zone.Zone, nameservers []UndelegatedNameserver) error {
+	if len(nameservers) == 0 {
+		return nil
+	}
+	if r == nil {
+		return fmt.Errorf("undelegated: recursor is nil")
+	}
+	if z == nil {
+		return fmt.Errorf("undelegated: zone is nil")
+	}
+
+	emit := func(tag string, args map[string]any) error {
+		_, err := util.Info(ctx, tag, args)
+		return err
+	}
+	delegation, err := buildUndelegatedFakeDelegation(ctx, z.Name, nameservers, r.GetAddressesFor, emit)
+	if err != nil {
+		return err
+	}
+
+	if err := r.AddFakeAddresses(z.Name.String(), delegation); err != nil {
+		return err
+	}
+
+	parentName, _, err := r.Parent(ctx, z.Name.String())
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(parentName) == "" {
+		return nil
+	}
+
+	parentZone, err := zone.NewWithRecursor(parentName, r)
+	if err != nil {
+		return err
+	}
+
+	parentNS, err := parentZone.NS(ctx)
+	if err != nil {
+		return err
+	}
+	for _, ns := range parentNS {
+		if fakeDelegationToSelf(ns, delegation) {
+			if err := emit("FAKE_DELEGATION_TO_SELF", map[string]any{
+				"domain": z.Name.String(),
+				"ns":     ns.String(),
+			}); err != nil {
+				return err
+			}
+		}
+		if err := ns.AddFakeDelegation(z.Name.String(), delegation); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func buildUndelegatedFakeDelegation(ctx context.Context, zoneName dnsname.Name, nameservers []UndelegatedNameserver, lookup undelegatedAddressLookup, emit undelegatedTagEmitter) (map[string][]string, error) {
+	out := map[string][]string{}
+	seen := map[string]map[string]bool{}
+
+	for _, item := range nameservers {
+		nameKey := strings.ToLower(item.Name)
+		if seen[nameKey] == nil {
+			seen[nameKey] = map[string]bool{}
+		}
+		if _, ok := out[nameKey]; !ok {
+			out[nameKey] = []string{}
+		}
+		if item.IP == "" {
+			continue
+		}
+		if seen[nameKey][item.IP] {
+			continue
+		}
+		seen[nameKey][item.IP] = true
+		out[nameKey] = append(out[nameKey], item.IP)
+	}
+
+	names := make([]string, 0, len(out))
+	for name := range out {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	for _, name := range names {
+		if len(out[name]) > 0 {
+			continue
+		}
+		nameObj := dnsname.New(name)
+		if zoneName.IsInBailiwick(nameObj) {
+			if emit != nil {
+				if err := emit("FAKE_DELEGATION_IN_ZONE_NO_IP", map[string]any{
+					"domain": zoneName.String(),
+					"nsname": name,
+				}); err != nil {
+					return nil, err
+				}
+			}
+			continue
+		}
+		if lookup != nil {
+			addrs, err := lookup(ctx, name)
+			if err == nil {
+				for _, addr := range addrs {
+					ip := addr.String()
+					if seen[name][ip] {
+						continue
+					}
+					seen[name][ip] = true
+					out[name] = append(out[name], ip)
+				}
+			}
+		}
+		if len(out[name]) == 0 && emit != nil {
+			if err := emit("FAKE_DELEGATION_NO_IP", map[string]any{
+				"domain": zoneName.String(),
+				"nsname": name,
+			}); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	return out, nil
+}
+
+func fakeDelegationToSelf(ns nameserver.Nameserver, delegation map[string][]string) bool {
+	nsName := strings.ToLower(ns.Name.String())
+	ips := delegation[nsName]
+	if len(ips) == 0 {
+		return false
+	}
+	for _, ip := range ips {
+		addr, err := netip.ParseAddr(ip)
+		if err != nil {
+			continue
+		}
+		if addr == ns.Address {
+			return true
+		}
+	}
+	return false
 }

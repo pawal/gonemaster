@@ -13,6 +13,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	ns "codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/recursor"
 	address "codeberg.org/pawal/gonemaster/engine/test/address"
 	"codeberg.org/pawal/gonemaster/engine/test/basic"
 	"codeberg.org/pawal/gonemaster/engine/test/connectivity"
@@ -507,8 +508,15 @@ func runWithContext(ctx context.Context, req RunRequest, module string, testcase
 	req.UndelegatedNameservers = normalizedNameservers
 	req.UndelegatedDSInfo = normalizedDSInfo
 
-	z, err := zone.New(req.Domain)
+	r, err := recursor.New()
 	if err != nil {
+		return nil, err
+	}
+	z, err := zone.NewWithRecursor(req.Domain, r)
+	if err != nil {
+		return nil, err
+	}
+	if err := applyUndelegatedDelegation(ctx, r, &z, req.UndelegatedNameservers); err != nil {
 		return nil, err
 	}
 	var entries []*logger.Entry

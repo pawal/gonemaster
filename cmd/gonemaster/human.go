@@ -22,6 +22,12 @@ func writeHuman(entries []engine.LogEntry, locale string, out io.Writer) error {
 	if _, err := fmt.Fprintln(out, "======= ======== ======="); err != nil {
 		return err
 	}
+	if len(entries) == 0 {
+		if _, err := fmt.Fprintln(out, "Looks OK."); err != nil {
+			return err
+		}
+		return nil
+	}
 	for _, entry := range entries {
 		message, found := i18n.TranslateWithStatus(locale, entry.Module, entry.Tag, entry.Args)
 		if !found {
@@ -93,6 +99,13 @@ func (r *humanReporter) Finish() {
 		return
 	}
 	r.stopSpinner()
+}
+
+func (r *humanReporter) PrintLooksOK() error {
+	if r == nil {
+		return nil
+	}
+	return r.printLine("Looks OK.")
 }
 
 func (r *humanReporter) writeHeader() error {

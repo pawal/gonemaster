@@ -374,6 +374,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	var rawWriter io.Writer
 	humanWriter := out
 	humanStreaming := false
+	var humanReport *humanReporter
 	var stopInterruptHandler func()
 	if raw {
 		rawWriter = out
@@ -418,13 +419,13 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		}
 		humanWriter = w
 		showSpinner := !noProgress && isTerminalWriter(w)
-		humanReporter := newHumanReporter(w, locale, minLevel, showSpinner)
-		if humanReporter != nil {
-			req.LogCallback = humanReporter.Callback
-			defer humanReporter.Finish()
+		humanReport = newHumanReporter(w, locale, minLevel, showSpinner)
+		if humanReport != nil {
+			req.LogCallback = humanReport.Callback
+			defer humanReport.Finish()
 			humanStreaming = true
 			if showSpinner {
-				stopInterruptHandler = installInterruptHandler(humanReporter.Finish)
+				stopInterruptHandler = installInterruptHandler(humanReport.Finish)
 			}
 		}
 	}
@@ -447,6 +448,12 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	entries, err := engine.Run(req)
 	if progress != nil {
 		progress.Finish()
+	}
+	if !jsonOutput && humanStreaming && err == nil && len(entries) == 0 && humanReport != nil {
+		if writeErr := humanReport.PrintLooksOK(); writeErr != nil {
+			fmt.Fprintln(errOut, writeErr.Error())
+			return 2
+		}
 	}
 	if err != nil && !errors.Is(err, engine.ErrNotImplemented) && !raw {
 		fmt.Fprintln(errOut, err.Error())

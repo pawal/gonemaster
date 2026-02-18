@@ -201,6 +201,76 @@ func TestRunOutputsTranslatedByDefault(t *testing.T) {
 	}
 }
 
+func TestRunOutputsLooksOKWhenNoEntriesAtLevel(t *testing.T) {
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := run([]string{"--domain", ".", "--testcase", "basic01", "--min-level", "CRITICAL", "--locale", "en"}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	if !strings.HasPrefix(out.String(), "Seconds Level    Message") {
+		t.Fatalf("expected translated header, got %q", out.String())
+	}
+	if !strings.Contains(out.String(), "Looks OK.") {
+		t.Fatalf("expected Looks OK when no entries match level, got %q", out.String())
+	}
+	if errOut.Len() != 0 {
+		t.Fatalf("expected no stderr output, got %q", errOut.String())
+	}
+}
+
+func TestRunJSONNoEntriesRemainsJSONArray(t *testing.T) {
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := run([]string{"--domain", ".", "--testcase", "basic01", "--min-level", "CRITICAL", "--json"}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	if strings.Contains(out.String(), "Looks OK.") {
+		t.Fatalf("expected JSON output without Looks OK marker, got %q", out.String())
+	}
+	if strings.TrimSpace(out.String()) != "[]" {
+		t.Fatalf("expected empty JSON array, got %q", out.String())
+	}
+	if errOut.Len() != 0 {
+		t.Fatalf("expected no stderr output, got %q", errOut.String())
+	}
+}
+
+func TestRunRawNoEntriesRemainsEmpty(t *testing.T) {
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := run([]string{"--domain", ".", "--testcase", "basic01", "--min-level", "CRITICAL", "--raw"}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	if strings.TrimSpace(out.String()) != "" {
+		t.Fatalf("expected empty raw stream, got %q", out.String())
+	}
+	if errOut.Len() != 0 {
+		t.Fatalf("expected no stderr output, got %q", errOut.String())
+	}
+}
+
+func TestRunJSONStreamNoEntriesRemainsEmpty(t *testing.T) {
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := run([]string{"--domain", ".", "--testcase", "basic01", "--min-level", "CRITICAL", "--json-stream"}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	if strings.TrimSpace(out.String()) != "" {
+		t.Fatalf("expected empty json-stream output, got %q", out.String())
+	}
+	if errOut.Len() != 0 {
+		t.Fatalf("expected no stderr output, got %q", errOut.String())
+	}
+}
+
 func TestRunListTests(t *testing.T) {
 	var out bytes.Buffer
 	var errOut bytes.Buffer

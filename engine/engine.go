@@ -31,6 +31,10 @@ import (
 type RunRequest struct {
 	// Domain is the target zone name to test.
 	Domain string
+	// UndelegatedNameservers contains optional pre-delegation NS/glue input.
+	UndelegatedNameservers []UndelegatedNameserver
+	// UndelegatedDSInfo contains optional pre-delegation DS input.
+	UndelegatedDSInfo []UndelegatedDSInfo
 	// Module limits execution to a module (for example "basic").
 	Module string
 	// Testcase limits execution to a single testcase (for example "basic02").
@@ -496,6 +500,13 @@ func Run(req RunRequest) ([]LogEntry, error) {
 }
 
 func runWithContext(ctx context.Context, req RunRequest, module string, testcase string) ([]*logger.Entry, error) {
+	normalizedNameservers, normalizedDSInfo, err := NormalizeUndelegatedInputs(req.UndelegatedNameservers, req.UndelegatedDSInfo)
+	if err != nil {
+		return nil, err
+	}
+	req.UndelegatedNameservers = normalizedNameservers
+	req.UndelegatedDSInfo = normalizedDSInfo
+
 	z, err := zone.New(req.Domain)
 	if err != nil {
 		return nil, err

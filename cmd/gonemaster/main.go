@@ -117,7 +117,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		fmt.Fprintln(errOut, "  --version    Print version and exit (optional)")
 		fmt.Fprintln(errOut, "")
 		fmt.Fprintln(errOut, "Undelegated examples:")
-		fmt.Fprintln(errOut, "  --ns ns1.example.com/192.0.2.10 --ns ns2.example.com")
+		fmt.Fprintln(errOut, "  --ns ns1.example.com/192.0.2.10 --ns ns1.example.com/2001:db8::10")
 		fmt.Fprintln(errOut, "  --ds 12345,13,2,0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF")
 		fmt.Fprintln(errOut, "")
 		fmt.Fprintln(errOut, "Exit codes:")

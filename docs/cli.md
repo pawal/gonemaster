@@ -76,7 +76,7 @@ Use `--output PATH` to write the selected output to a file.
 | `--error-cache-ttl N` | int | Seconds to skip queries after network errors. Must be `>= 0` when set. |
 | `--positive-cache-ttl N` | int | Seconds to cache positive DNS responses. Must be `>= 0` when set. |
 | `--negative-cache-ttl N` | int | Seconds to cache negative DNS responses. Must be `>= 0` when set. |
-| `--ns NAME[/IP]` | string (repeatable) | Undelegated nameserver input. `NAME` is required, `IP` is optional. May be repeated. |
+| `--ns NAME[/IP]` | string (repeatable) | Undelegated nameserver input. `NAME` is required, `IP` is optional. May be repeated. Repeat the same `NAME` with different IPs to supply multiple addresses. |
 | `--ds KEYTAG,ALGORITHM,DIGTYPE,DIGEST` | string (repeatable) | Undelegated DS input. May be repeated. |
 | `--no-progress` | bool | Disable progress indicator/spinner. |
 | `--list-tests` | bool | List available test cases and exit. |
@@ -129,6 +129,13 @@ Undelegated test with explicit nameservers and glue:
 gonemaster --domain example.com \
   --ns ns1.example.com/192.0.2.10 \
   --ns ns2.example.net/2001:db8::10
+```
+
+Undelegated test with one nameserver and both IPv4 + IPv6:
+```
+gonemaster --domain example.com \
+  --ns ns1.example.com/192.0.2.10 \
+  --ns ns1.example.com/2001:db8::10
 ```
 
 Undelegated DS-only test:

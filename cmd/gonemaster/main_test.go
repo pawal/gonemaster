@@ -222,6 +222,35 @@ func TestRunParsesUndelegatedNameserverFlags(t *testing.T) {
 	}
 }
 
+func TestRunParsesUndelegatedNameserverSameNameMultipleIPs(t *testing.T) {
+	var captured engine.RunRequest
+	stubRunEngine(t, &captured)
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := run([]string{
+		"--domain", "example.com",
+		"--json",
+		"--ns", "NS1.Example.com/192.0.2.1",
+		"--ns", "ns1.example.com/2001:db8::1",
+	}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
+	}
+	if len(captured.UndelegatedNameservers) != 2 {
+		t.Fatalf("expected 2 nameserver rows, got %d", len(captured.UndelegatedNameservers))
+	}
+	first := captured.UndelegatedNameservers[0]
+	second := captured.UndelegatedNameservers[1]
+	if first.Name != "ns1.example.com" || first.IP != "192.0.2.1" {
+		t.Fatalf("unexpected first nameserver: %+v", first)
+	}
+	if second.Name != "ns1.example.com" || second.IP != "2001:db8::1" {
+		t.Fatalf("unexpected second nameserver: %+v", second)
+	}
+}
+
 func TestRunParsesUndelegatedDSFlags(t *testing.T) {
 	var captured engine.RunRequest
 	stubRunEngine(t, &captured)

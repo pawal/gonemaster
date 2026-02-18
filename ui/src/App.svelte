@@ -9,6 +9,7 @@
   let singleDomain = "";
   let singleSubmitting = false;
   let createdJobId = "";
+  let singleIPMode = "default";
 
   let batchDomains = "";
   let batchSubmitting = false;
@@ -800,6 +801,21 @@
       const payload = {
         domain: normalizedDomain
       };
+      if (singleIPMode === "disable_ipv4") {
+        payload.profile_overrides = {
+          net: {
+            ipv4: false,
+            ipv6: true
+          }
+        };
+      } else if (singleIPMode === "disable_ipv6") {
+        payload.profile_overrides = {
+          net: {
+            ipv4: true,
+            ipv6: false
+          }
+        };
+      }
 
       const job = await apiFetch("/jobs", {
         method: "POST",
@@ -1226,6 +1242,18 @@
             }}
           />
         </div>
+        <details class="advanced-options">
+          <summary>Advanced profile</summary>
+          <div class="stack advanced-stack">
+            <label for="single-ip-mode">IP transport</label>
+            <select id="single-ip-mode" bind:value={singleIPMode}>
+              <option value="default">Profile default (IPv4 + IPv6)</option>
+              <option value="disable_ipv4">Disable IPv4 (IPv6 only)</option>
+              <option value="disable_ipv6">Disable IPv6 (IPv4 only)</option>
+            </select>
+            <div class="small">Choose at most one protocol to disable.</div>
+          </div>
+        </details>
         <button on:click={submitSingle} disabled={singleSubmitting}>
           {singleSubmitting ? "Submitting..." : "Run Single Job"}
         </button>

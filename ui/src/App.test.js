@@ -700,6 +700,104 @@ describe("App", () => {
     unmount();
   });
 
+  it("submits single job with IPv6-only profile override when IPv4 is disabled", async () => {
+    const job = {
+      id: "job_v6_only",
+      domain: "example.com",
+      status: "queued",
+      created_at: "2026-02-03T00:00:00Z",
+      progress: 0
+    };
+
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (url === "/api/v1/jobs" && options.method === "POST") {
+        return jsonResponse(job);
+      }
+      if (url === `/api/v1/jobs/${job.id}`) {
+        return jsonResponse(job);
+      }
+      if (typeof url === "string" && url.startsWith("/api/v1/jobs?")) {
+        return jsonResponse({ items: [job] });
+      }
+      return jsonResponse({ items: [] });
+    });
+
+    const { unmount } = render(App);
+
+    const input = await screen.findByPlaceholderText("example.com");
+    await fireEvent.input(input, { target: { value: "example.com" } });
+    await fireEvent.click(screen.getByText("Advanced profile"));
+    await fireEvent.change(screen.getByLabelText("IP transport"), { target: { value: "disable_ipv4" } });
+
+    await fireEvent.click(screen.getByText("Run Single Job"));
+
+    await waitFor(() => {
+      const postCall = global.fetch.mock.calls.find(
+        ([url, options]) => url === "/api/v1/jobs" && options?.method === "POST"
+      );
+      expect(postCall).toBeTruthy();
+      const body = JSON.parse(postCall[1].body);
+      expect(body.domain).toBe("example.com");
+      expect(body.profile_overrides).toEqual({
+        net: {
+          ipv4: false,
+          ipv6: true
+        }
+      });
+    });
+
+    unmount();
+  });
+
+  it("submits single job with IPv4-only profile override when IPv6 is disabled", async () => {
+    const job = {
+      id: "job_v4_only",
+      domain: "example.com",
+      status: "queued",
+      created_at: "2026-02-03T00:00:00Z",
+      progress: 0
+    };
+
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (url === "/api/v1/jobs" && options.method === "POST") {
+        return jsonResponse(job);
+      }
+      if (url === `/api/v1/jobs/${job.id}`) {
+        return jsonResponse(job);
+      }
+      if (typeof url === "string" && url.startsWith("/api/v1/jobs?")) {
+        return jsonResponse({ items: [job] });
+      }
+      return jsonResponse({ items: [] });
+    });
+
+    const { unmount } = render(App);
+
+    const input = await screen.findByPlaceholderText("example.com");
+    await fireEvent.input(input, { target: { value: "example.com" } });
+    await fireEvent.click(screen.getByText("Advanced profile"));
+    await fireEvent.change(screen.getByLabelText("IP transport"), { target: { value: "disable_ipv6" } });
+
+    await fireEvent.click(screen.getByText("Run Single Job"));
+
+    await waitFor(() => {
+      const postCall = global.fetch.mock.calls.find(
+        ([url, options]) => url === "/api/v1/jobs" && options?.method === "POST"
+      );
+      expect(postCall).toBeTruthy();
+      const body = JSON.parse(postCall[1].body);
+      expect(body.domain).toBe("example.com");
+      expect(body.profile_overrides).toEqual({
+        net: {
+          ipv4: true,
+          ipv6: false
+        }
+      });
+    });
+
+    unmount();
+  });
+
   it("submits a batch job and displays the created batch id", async () => {
     const batch = {
       batch_id: "batch_1",

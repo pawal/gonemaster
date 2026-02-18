@@ -136,6 +136,28 @@ h1 {
   gap: 10px;
 }
 
+.advanced-options {
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: #f8fafc;
+}
+
+.advanced-options summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.advanced-options[open] summary {
+  margin-bottom: 8px;
+}
+
+.advanced-stack {
+  gap: 8px;
+}
+
 label {
   font-size: 0.85rem;
   color: var(--muted);

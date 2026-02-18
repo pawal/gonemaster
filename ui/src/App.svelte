@@ -499,12 +499,12 @@
     return `${formatUptime(elapsedSeconds)}${finished ? "" : " (running)"}`;
   };
   const formatJobTotalRuntime = (job) => {
-    const created = parseTimestamp(job?.created_at);
-    if (!created) return "unknown";
+    const started = parseTimestamp(job?.started_at);
+    if (!started) return "not started";
     const finished = parseTimestamp(job?.finished_at);
     const end = finished || new Date();
-    const elapsedSeconds = Math.max(0, Math.floor((end.getTime() - created.getTime()) / 1000));
-    return formatUptime(elapsedSeconds);
+    const elapsedSeconds = Math.max(0, Math.floor((end.getTime() - started.getTime()) / 1000));
+    return `${formatUptime(elapsedSeconds)}${!finished && isActiveJobStatus(job?.status) ? " (running)" : ""}`;
   };
   const formatBatchStatusCounts = (statusCounts) => {
     if (!statusCounts || typeof statusCounts !== "object") return "none";

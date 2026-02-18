@@ -177,10 +177,10 @@ func TestSyntax06ParallelMailServers(t *testing.T) {
 		case name == "." && kind == "NS":
 			return nsPacket(".", "a.root"), nil
 		case name == "." && kind == "SOA":
-			return soaPacket(".", "a.root", "hostmaster.example."), nil
-		case name == "example" && kind == "MX":
-			return mxPacketMulti("example", "mail1.example.", "mail2.example."), nil
-		case name == "mail1.example" && kind == "A":
+			return soaPacket(".", "a.root", "hostmaster.example.com."), nil
+		case name == "example.com" && kind == "MX":
+			return mxPacketMulti("example.com", "mail1.example.com.", "mail2.example.com."), nil
+		case name == "mail1.example.com" && kind == "A":
 			select {
 			case started <- "mail1":
 			default:
@@ -190,8 +190,8 @@ func TestSyntax06ParallelMailServers(t *testing.T) {
 			case <-ctx.Done():
 				return packet.Packet{}, ctx.Err()
 			}
-			return aPacket("mail1.example", net.IPv4(192, 0, 2, 10)), nil
-		case name == "mail2.example" && kind == "A":
+			return aPacket("mail1.example.com", net.IPv4(192, 0, 2, 10)), nil
+		case name == "mail2.example.com" && kind == "A":
 			select {
 			case started <- "mail2":
 			default:
@@ -201,10 +201,10 @@ func TestSyntax06ParallelMailServers(t *testing.T) {
 			case <-ctx.Done():
 				return packet.Packet{}, ctx.Err()
 			}
-			return aPacket("mail2.example", net.IPv4(192, 0, 2, 11)), nil
-		case name == "mail1.example" && kind == "AAAA":
+			return aPacket("mail2.example.com", net.IPv4(192, 0, 2, 11)), nil
+		case name == "mail1.example.com" && kind == "AAAA":
 			return packet.Packet{}, nil
-		case name == "mail2.example" && kind == "AAAA":
+		case name == "mail2.example.com" && kind == "AAAA":
 			return packet.Packet{}, nil
 		default:
 			return packet.Packet{}, nil
@@ -251,6 +251,30 @@ func TestSyntax06ParallelMailServers(t *testing.T) {
 
 	if !hasEntryTag(entries, "RNAME_RFC822_VALID") {
 		t.Fatalf("expected RNAME_RFC822_VALID")
+	}
+}
+
+func TestSyntax06RnameSingleLabelDomainInvalid(t *testing.T) {
+	ctx := testContext(t)
+	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
+		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "NS") {
+			return nsPacket(".", "a.root.")
+		}
+		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "SOA") {
+			return soaPacket(".", "a.root.", "dnsadmin.mo.")
+		}
+		return packet.Packet{}
+	})
+
+	entries, err := Syntax06(ctx, z)
+	if err != nil {
+		t.Fatalf("syntax06: %v", err)
+	}
+	if !hasEntryTag(entries, "RNAME_RFC822_INVALID") {
+		t.Fatalf("expected RNAME_RFC822_INVALID")
+	}
+	if hasEntryTag(entries, "RNAME_RFC822_VALID") {
+		t.Fatalf("did not expect RNAME_RFC822_VALID")
 	}
 }
 
@@ -319,6 +343,15 @@ func TestRnameToEmailEscapedDots(t *testing.T) {
 	got := rnameToEmail("host\\.master.example.")
 	if got != "host.master@example" {
 		t.Fatalf("expected host.master@example, got %q", got)
+	}
+}
+
+func TestValidEmailAddress(t *testing.T) {
+	if !validEmailAddress("hostmaster@example.com") {
+		t.Fatalf("expected hostmaster@example.com to be valid")
+	}
+	if validEmailAddress("dnsadmin@mo") {
+		t.Fatalf("expected dnsadmin@mo to be invalid")
 	}
 }
 

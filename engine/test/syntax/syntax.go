@@ -930,7 +930,35 @@ func validEmailAddress(addr string) bool {
 	if err != nil {
 		return false
 	}
-	return parsed.Address == addr
+	if parsed.Address != addr {
+		return false
+	}
+
+	parts := strings.SplitN(addr, "@", 2)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return false
+	}
+	return validEmailDomain(parts[1])
+}
+
+func validEmailDomain(domain string) bool {
+	if strings.HasPrefix(domain, ".") || strings.HasSuffix(domain, ".") {
+		return false
+	}
+
+	labels := strings.Split(domain, ".")
+	if len(labels) < 2 {
+		return false
+	}
+	for _, label := range labels {
+		if !labelHasOnlyLegalCharacters(label) {
+			return false
+		}
+		if labelStartsWithHyphen(label) || labelEndsWithHyphen(label) {
+			return false
+		}
+	}
+	return true
 }
 
 func matchingARecords(resp packet.Packet, owner string) []*dns.A {

@@ -613,6 +613,7 @@ describe("App", () => {
       domain: "example.com",
       status: "succeeded",
       created_at: "2026-02-03T00:00:00Z",
+      started_at: "2026-02-03T00:00:00Z",
       finished_at: "2026-02-03T00:10:00Z",
       progress: 100
     };

@@ -139,3 +139,35 @@ Output root:
 - Use one fixed 1000-domain corpus for decision-grade reruns.
 - Keep host otherwise idle during runs.
 - Keep profile/settings fixed across all variants in one matrix.
+
+## 6) Workers Sweep (main only)
+
+Use this to tune server capacity parameters on one host without branch comparisons.
+
+Example (coupled mode, `max-concurrent-jobs = workers`):
+```bash
+./tools/server-perf-kit/run_workers_sweep.sh \
+  --main-ref main \
+  --domains tools/server-perf-kit/corpus/domains-fixed-600.txt \
+  --workers-list 4,8,12,16,24,32,48,64 \
+  --mode coupled \
+  --warmups 1 \
+  --repeats 3
+```
+
+Optional decoupled pass (fixed concurrency while varying workers):
+```bash
+./tools/server-perf-kit/run_workers_sweep.sh \
+  --main-ref main \
+  --domains tools/server-perf-kit/corpus/domains-fixed-600.txt \
+  --workers-list 4,8,12,16,24,32,48,64 \
+  --mode fixed \
+  --fixed-max-concurrent-jobs 16 \
+  --warmups 1 \
+  --repeats 3
+```
+
+Outputs:
+- `workers-sweep-summary.csv`
+- `SUMMARY.md`
+- one full `run_tracks_matrix` artifact per sweep point under `points/`

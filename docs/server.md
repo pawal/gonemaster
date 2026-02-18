@@ -84,6 +84,24 @@ If you want deterministic ordered resolver behavior on the server, set:
 You can do this in the profile used by `profile_path` (or `--profile`), and/or via
 per-job `profile_overrides`.
 
+### Batch throughput tuning (8-core reference)
+For high-volume batch runs, `--workers` and `--max-concurrent-jobs` have large impact.
+
+Measured on an 8-core host with the fixed 600-domain corpus:
+- `workers=24`, `max-concurrent-jobs=24`: strong throughput gain with moderate tails.
+- `workers=32`, `max-concurrent-jobs=32`: best throughput, but worse p95/p99 tails than 24.
+- `workers>32`: throughput regressed and tail latency worsened.
+
+Recommended starting points for new users on 8-core machines:
+1. Balanced profile:
+   - `--workers 24 --max-concurrent-jobs 24`
+2. Throughput-max profile:
+   - `--workers 32 --max-concurrent-jobs 32`
+
+If you are latency-sensitive, start at `24/24` and validate before increasing.
+If you are throughput-first, try `32/32` and monitor p95/p99.
+Always re-check on your own network/workload before finalizing defaults.
+
 ### Tuning timeouts and retries
 `gonemaster-server` uses the profile defaults for query timing. To tune these,
 set them in the profile referenced by `profile_path`, or override with flags:

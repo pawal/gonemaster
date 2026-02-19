@@ -2,12 +2,14 @@ package recursor
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"testing"
 
 	"github.com/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/transport"
@@ -252,6 +254,67 @@ func TestResolveCNAMELoopReturnsEmpty(t *testing.T) {
 	}
 }
 
+func TestRecurseEmitsRecurseDebugLogs(t *testing.T) {
+	ctx, _, log := testhelpers.Context(t)
+	state := &recurseState{
+		ns: []queryer{
+			fakeQueryer{resp: answerPacket("www.example", "203.0.113.50")},
+		},
+	}
+
+	r := &Recursor{}
+	resp, _, err := r.recurse(ctx, "www.example", "A", "IN", state)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.Msg == nil {
+		t.Fatalf("expected response")
+	}
+
+	var recurseTag, recurseQueryTag bool
+	for _, entry := range log.Entries() {
+		if entry == nil {
+			continue
+		}
+		switch entry.Tag {
+		case "RECURSE":
+			recurseTag = true
+		case "RECURSE_QUERY":
+			recurseQueryTag = true
+		}
+	}
+	if !recurseTag {
+		t.Fatalf("expected RECURSE tag")
+	}
+	if !recurseQueryTag {
+		t.Fatalf("expected RECURSE_QUERY tag")
+	}
+}
+
+func TestRecurseLogsLoopProtection(t *testing.T) {
+	ctx, _, log := testhelpers.Context(t)
+
+	referralQ := &incrementingReferralQueryer{}
+	state := &recurseState{
+		ns: []queryer{referralQ},
+		nsFrom: func(_ context.Context, _ packet.Packet, _ *recurseState) ([]queryer, error) {
+			return []queryer{referralQ}, nil
+		},
+	}
+
+	r := &Recursor{}
+	if _, _, err := r.recurse(ctx, "www.example", "A", "IN", state); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	for _, entry := range log.Entries() {
+		if entry != nil && entry.Tag == "LOOP_PROTECTION" {
+			return
+		}
+	}
+	t.Fatalf("expected LOOP_PROTECTION tag")
+}
+
 func referralPacket(zone string, answerFrom string) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
@@ -308,4 +371,14 @@ func cnamePacket(qname string, target string, answerFrom string) packet.Packet {
 		},
 	}
 	return packet.Packet{Msg: msg, AnswerFrom: answerFrom}
+}
+
+type incrementingReferralQueryer struct {
+	count int
+}
+
+func (q *incrementingReferralQueryer) QueryWithClass(_ context.Context, _ string, _ string, _ string) (packet.Packet, error) {
+	q.count++
+	zone := fmt.Sprintf("z%d.example", q.count)
+	return referralPacket(zone, fmt.Sprintf("203.0.113.%d", q.count)), nil
 }

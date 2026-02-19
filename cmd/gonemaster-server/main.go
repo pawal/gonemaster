@@ -4,8 +4,10 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"os/signal"
 	"strings"
@@ -15,6 +17,11 @@ import (
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/server"
 )
+
+type usageLine struct {
+	flag   string
+	detail string
+}
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
@@ -34,6 +41,8 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	var retransSeconds int
 	var fallback bool
 	var noFallback bool
+	var sourceAddr4 string
+	var sourceAddr6 string
 	var minLevel string
 	var profilePath string
 	var shutdownTimeout time.Duration
@@ -49,31 +58,42 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	var retransSet bool
 	var fallbackSet bool
 	var noFallbackSet bool
+	var sourceAddr4Set bool
+	var sourceAddr6Set bool
 	var minLevelSet bool
 	var profilePathSet bool
 
 	fs := flag.NewFlagSet("gonemaster-server", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	fs.Usage = func() {
-		fmt.Fprintf(errOut, "Usage: %s [--config PATH] [--listen ADDR] [--max-body-size BYTES] [--debug] [--workers N] [--max-concurrent-jobs N] [--positive-cache-ttl N] [--negative-cache-ttl N] [--timeout N] [--retry N] [--retrans N] [--fallback|--no-fallback] [--min-level LEVEL] [--profile PATH] [--shutdown-timeout DURATION]\n", fs.Name())
-		fmt.Fprintln(errOut, "")
-		fmt.Fprintln(errOut, "Options:")
-		fmt.Fprintln(errOut, "  --config            JSON config file path (optional)")
-		fmt.Fprintln(errOut, "  --listen            Address to listen on (default 127.0.0.1:8080)")
-		fmt.Fprintln(errOut, "  --max-body-size     Max request body size in bytes (default 1048576)")
-		fmt.Fprintln(errOut, "  --debug             Enable request/response logging")
-		fmt.Fprintln(errOut, "  --workers           Number of worker goroutines (default 4)")
-		fmt.Fprintln(errOut, "  --max-concurrent-jobs  Max concurrent engine runs (0 = unlimited)")
-		fmt.Fprintln(errOut, "  --positive-cache-ttl  Seconds to cache positive DNS responses (optional)")
-		fmt.Fprintln(errOut, "  --negative-cache-ttl  Seconds to cache negative DNS responses (optional)")
-		fmt.Fprintln(errOut, "  --timeout           Override resolver.defaults.timeout in seconds (optional)")
-		fmt.Fprintln(errOut, "  --retry             Override resolver.defaults.retry (optional)")
-		fmt.Fprintln(errOut, "  --retrans           Override resolver.defaults.retrans in seconds (optional)")
-		fmt.Fprintln(errOut, "  --fallback          Enable TCP fallback on UDP failure (optional)")
-		fmt.Fprintln(errOut, "  --no-fallback       Disable TCP fallback on UDP failure (optional)")
-		fmt.Fprintln(errOut, "  --min-level         Minimum log level (default INFO)")
-		fmt.Fprintln(errOut, "  --profile           Profile JSON/YAML path (optional)")
-		fmt.Fprintln(errOut, "  --shutdown-timeout  Graceful shutdown timeout (default 10s)")
+		fmt.Fprintf(errOut, "Usage: %s [flags]\n\n", fs.Name())
+		fmt.Fprintln(errOut, "Flags (CLI flags override --config values):")
+		printUsageGroup(errOut, "General", []usageLine{
+			{flag: "--config PATH", detail: "JSON config file path"},
+			{flag: "--listen ADDR", detail: "Address to listen on (default 127.0.0.1:8080)"},
+			{flag: "--max-body-size BYTES", detail: "Max request body size in bytes (default 1048576)"},
+			{flag: "--debug", detail: "Enable request/response logging"},
+			{flag: "--shutdown-timeout DURATION", detail: "Graceful shutdown timeout (default 10s)"},
+		})
+		printUsageGroup(errOut, "Concurrency", []usageLine{
+			{flag: "--workers N", detail: "Number of worker goroutines (default 4)"},
+			{flag: "--max-concurrent-jobs N", detail: "Max concurrent engine runs (0 = unlimited)"},
+		})
+		printUsageGroup(errOut, "Resolver/Profile", []usageLine{
+			{flag: "--profile PATH", detail: "Profile JSON/YAML path"},
+			{flag: "--positive-cache-ttl N", detail: "Cache positive DNS responses (seconds)"},
+			{flag: "--negative-cache-ttl N", detail: "Cache negative DNS responses (seconds)"},
+			{flag: "--timeout N", detail: "Override resolver.defaults.timeout (seconds)"},
+			{flag: "--retry N", detail: "Override resolver.defaults.retry"},
+			{flag: "--retrans N", detail: "Override resolver.defaults.retrans (seconds)"},
+			{flag: "--fallback", detail: "Enable TCP fallback on UDP failure"},
+			{flag: "--no-fallback", detail: "Disable TCP fallback on UDP failure"},
+			{flag: "--sourceaddr4 IPADDR", detail: "Override resolver.source4 (IPv4 source address)"},
+			{flag: "--sourceaddr6 IPADDR", detail: "Override resolver.source6 (IPv6 source address)"},
+		})
+		printUsageGroup(errOut, "Output", []usageLine{
+			{flag: "--min-level LEVEL", detail: "Minimum result log level (default INFO)"},
+		})
 	}
 	fs.StringVar(&configPath, "config", "", "JSON config file path (optional)")
 	fs.StringVar(&listen, "listen", "127.0.0.1:8080", "Address to listen on (default 127.0.0.1:8080)")
@@ -88,6 +108,8 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	fs.IntVar(&retransSeconds, "retrans", 0, "Override resolver.defaults.retrans in seconds (optional)")
 	fs.BoolVar(&fallback, "fallback", false, "Enable TCP fallback on UDP failure (optional)")
 	fs.BoolVar(&noFallback, "no-fallback", false, "Disable TCP fallback on UDP failure (optional)")
+	fs.StringVar(&sourceAddr4, "sourceaddr4", "", "Override resolver.source4 (IPv4 source address) (optional)")
+	fs.StringVar(&sourceAddr6, "sourceaddr6", "", "Override resolver.source6 (IPv6 source address) (optional)")
 	fs.StringVar(&minLevel, "min-level", "", "Minimum log level (default INFO)")
 	fs.StringVar(&profilePath, "profile", "", "Profile JSON/YAML path (optional)")
 	fs.DurationVar(&shutdownTimeout, "shutdown-timeout", 10*time.Second, "Graceful shutdown timeout (default 10s)")
@@ -120,6 +142,10 @@ func run(args []string, out *os.File, errOut *os.File) int {
 			fallbackSet = true
 		case "no-fallback":
 			noFallbackSet = true
+		case "sourceaddr4":
+			sourceAddr4Set = true
+		case "sourceaddr6":
+			sourceAddr6Set = true
 		case "min-level":
 			minLevelSet = true
 		case "profile":
@@ -157,6 +183,20 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	if fallbackSet && noFallbackSet {
 		fmt.Fprintln(errOut, "--fallback cannot be combined with --no-fallback")
 		return 2
+	}
+	if sourceAddr4Set {
+		addr, err := netip.ParseAddr(strings.TrimSpace(sourceAddr4))
+		if err != nil || !addr.Is4() {
+			fmt.Fprintln(errOut, "--sourceaddr4 must be a valid IPv4 address")
+			return 2
+		}
+	}
+	if sourceAddr6Set {
+		addr, err := netip.ParseAddr(strings.TrimSpace(sourceAddr6))
+		if err != nil || !addr.Is6() {
+			fmt.Fprintln(errOut, "--sourceaddr6 must be a valid IPv6 address")
+			return 2
+		}
 	}
 
 	cfg := server.DefaultConfig()
@@ -210,6 +250,14 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	if noFallbackSet {
 		value := false
 		cfg.Fallback = &value
+	}
+	if sourceAddr4Set {
+		value := strings.TrimSpace(sourceAddr4)
+		cfg.SourceAddr4 = &value
+	}
+	if sourceAddr6Set {
+		value := strings.TrimSpace(sourceAddr6)
+		cfg.SourceAddr6 = &value
 	}
 	if minLevelSet {
 		cfg.MinLevel = minLevel
@@ -266,4 +314,15 @@ func formatListenURL(addr string) string {
 		return "http://" + host
 	}
 	return "http://" + host + ":" + port
+}
+
+func printUsageGroup(out io.Writer, title string, lines []usageLine) {
+	if len(lines) == 0 {
+		return
+	}
+	fmt.Fprintf(out, "  %s:\n", title)
+	for _, line := range lines {
+		fmt.Fprintf(out, "    %-35s %s\n", line.flag, line.detail)
+	}
+	fmt.Fprintln(out, "")
 }

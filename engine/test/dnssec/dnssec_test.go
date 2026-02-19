@@ -3,6 +3,7 @@ package dnssec
 import (
 	"context"
 	"net/netip"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/engine/util"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
@@ -105,6 +107,95 @@ func TestDNSSEC01Algo2Missing(t *testing.T) {
 	}
 	if !hasEntryTag(entries, "DS01_DS_ALGO_2_MISSING") {
 		t.Fatalf("expected DS01_DS_ALGO_2_MISSING")
+	}
+}
+
+func TestDNSSEC01UndelegatedDSOnlyUsesFakeDS(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origGetParent := getParentNSNamesAndIPs
+	origZoneParent := zoneParent
+	origHasFake := hasFakeAddresses
+	t.Cleanup(func() {
+		getParentNSNamesAndIPs = origGetParent
+		zoneParent = origZoneParent
+		hasFakeAddresses = origHasFake
+	})
+
+	r := &recursor.Recursor{}
+	if err := r.AddFakeAddresses(".", map[string][]string{
+		"ns1.root": {"192.0.2.1"},
+	}); err != nil {
+		t.Fatalf("add fake root addresses: %v", err)
+	}
+	if err := r.AddFakeAddresses("example", map[string][]string{
+		"ns-child.example": {"192.0.2.53"},
+	}); err != nil {
+		t.Fatalf("add fake child addresses: %v", err)
+	}
+
+	parent, err := zone.NewWithRecursor(".", r)
+	if err != nil {
+		t.Fatalf("new parent zone: %v", err)
+	}
+	child, err := zone.NewWithRecursor("example", r)
+	if err != nil {
+		t.Fatalf("new child zone: %v", err)
+	}
+
+	parentNS, err := nameserver.NewWithContext(context.Background(), "ns1.root", "192.0.2.1", r.Client())
+	if err != nil {
+		t.Fatalf("new parent nameserver: %v", err)
+	}
+	if err := parentNS.AddFakeDS("example", []nameserver.DSData{
+		{
+			KeyTag:     12345,
+			Algorithm:  13,
+			DigestType: 2,
+			Digest:     "ABCD",
+		},
+	}); err != nil {
+		t.Fatalf("add fake DS: %v", err)
+	}
+
+	getParentNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	}
+	zoneParent = func(_ context.Context, _ *zone.Zone) (*zone.Zone, error) {
+		return &parent, nil
+	}
+	hasFakeAddresses = func(_ *zone.Zone) bool {
+		return true
+	}
+
+	entries, err := DNSSEC01(context.Background(), &child)
+	if err != nil {
+		t.Fatalf("dnssec01: %v", err)
+	}
+	if !hasEntryTag(entries, "DS01_DS_ALGO_OK") {
+		t.Fatalf("expected DS01_DS_ALGO_OK from fake DS in undelegated mode")
+	}
+	if hasEntryTag(entries, "DS01_UNDEL_N_NO_UNDEL_DS") {
+		t.Fatalf("did not expect DS01_UNDEL_N_NO_UNDEL_DS when fake DS is provided")
+	}
+
+	foundFakeSource := false
+	for _, entry := range entries {
+		if entry == nil || entry.Tag != "DS01_DS_ALGO_OK" {
+			continue
+		}
+		if nsList, ok := entry.Args["ns_list"].(string); ok && nsList == "-" {
+			foundFakeSource = true
+			break
+		}
+	}
+	if !foundFakeSource {
+		t.Fatalf("expected DS01_DS_ALGO_OK to be sourced from undelegated fake DS (ns_list='-')")
 	}
 }
 
@@ -4558,6 +4649,13 @@ func normalizeEntriesForComparison(entries []*logger.Entry) []string {
 	normalized := make([]string, 0, len(entries))
 	for _, entry := range entries {
 		if entry == nil {
+			continue
+		}
+		if strings.EqualFold(entry.Module, "System") &&
+			strings.EqualFold(entry.Testcase, "Unspecified") &&
+			strings.HasPrefix(strings.ToUpper(entry.Level()), "DEBUG") {
+			// System debug entries are intentionally verbose and their emission
+			// order can vary under parallel execution.
 			continue
 		}
 		item := entry.Module + ":" + entry.Testcase + ":" + entry.Tag

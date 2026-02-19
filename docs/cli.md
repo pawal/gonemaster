@@ -30,6 +30,7 @@ Notes:
 - `--domain` is required for test runs.
 - `--version` and `--list-tests` do not require `--domain`.
 - `--dump-profile` can be used without `--domain`.
+- malformed undelegated inputs (`--ns`, `--ds`) return exit code `2`.
 - The built-in default profile currently uses `resolver.defaults.parallel=8` and
   `resolver.defaults.unordered=true`.
 - For deterministic ordered behavior, use `--ordered --parallel 1`.
@@ -44,6 +45,9 @@ You can switch output modes:
 - `--json-stream` prints newline-delimited JSON objects (one per log entry).
 - `--raw` prints raw log lines (one per log entry).
 - `--dump-profile` prints the effective profile as pretty JSON and exits.
+- `--count` (human output only) appends count summaries by level and by message tag.
+- `--save PATH` writes the accumulated DNS packet cache after the run.
+- `--restore PATH` primes the DNS packet cache before the run.
 
 Use `--output PATH` to write the selected output to a file.
 
@@ -61,6 +65,9 @@ Use `--output PATH` to write the selected output to a file.
 | `--json` | bool | Print a single JSON array. Incompatible with `--raw` and `--json-stream`. |
 | `--json-stream` | bool | Stream newline-delimited JSON entries. Incompatible with `--raw` and `--json`. Also incompatible with `--dump-profile`. |
 | `--dump-profile` | bool | Print the effective profile as JSON and exit. Incompatible with `--raw` and `--json-stream`. |
+| `--count` | bool | Append count summaries (level totals and level/tag totals). Human output only; incompatible with `--json`, `--json-stream`, `--raw`, and `--dump-profile`. |
+| `--save PATH` | string | Write DNS packet cache to file after the run. Valid only for test runs (not with `--version`, `--list-tests`, or `--dump-profile`). |
+| `--restore PATH` | string | Prime DNS packet cache from a previously saved cache file before the run. Valid only for test runs (not with `--version`, `--list-tests`, or `--dump-profile`). |
 | `--locale LOCALE` | string | Locale for translated output (defaults to environment, then `en`). |
 | `--no-ipv4` | bool | Disable IPv4 queries (overrides profile setting). |
 | `--no-ipv6` | bool | Disable IPv6 queries (overrides profile setting). |
@@ -75,6 +82,8 @@ Use `--output PATH` to write the selected output to a file.
 | `--error-cache-ttl N` | int | Seconds to skip queries after network errors. Must be `>= 0` when set. |
 | `--positive-cache-ttl N` | int | Seconds to cache positive DNS responses. Must be `>= 0` when set. |
 | `--negative-cache-ttl N` | int | Seconds to cache negative DNS responses. Must be `>= 0` when set. |
+| `--ns NAME[/IP]` | string (repeatable) | Undelegated nameserver input. `NAME` is required, `IP` is optional. May be repeated. Repeat the same `NAME` with different IPs to supply multiple addresses. |
+| `--ds KEYTAG,ALGORITHM,DIGTYPE,DIGEST` | string (repeatable) | Undelegated DS input. May be repeated. |
 | `--no-progress` | bool | Disable progress indicator/spinner. |
 | `--list-tests` | bool | List available test cases and exit. |
 | `--version` | bool | Print version information and exit. |
@@ -101,6 +110,16 @@ Stream JSON entries to a file:
 gonemaster --json-stream --output /tmp/gonemaster.jsonl --domain example.com
 ```
 
+Save DNS packet cache for later replay:
+```
+gonemaster --domain example.com --save /tmp/gonemaster-cache.json
+```
+
+Replay saved DNS packet cache:
+```
+gonemaster --domain example.com --restore /tmp/gonemaster-cache.json
+```
+
 Disable IPv6 and raise parallelism:
 ```
 gonemaster --no-ipv6 --parallel 4 --domain example.com
@@ -119,6 +138,26 @@ gonemaster --list-tests
 High performance test, translated to Swedish:
 ```
 gonemaster --unordered --parallel 8 --locale sv --domain example.com
+```
+
+Undelegated test with explicit nameservers and glue:
+```
+gonemaster --domain example.com \
+  --ns ns1.example.com/192.0.2.10 \
+  --ns ns2.example.net/2001:db8::10
+```
+
+Undelegated test with one nameserver and both IPv4 + IPv6:
+```
+gonemaster --domain example.com \
+  --ns ns1.example.com/192.0.2.10 \
+  --ns ns1.example.com/2001:db8::10
+```
+
+Undelegated DS-only test:
+```
+gonemaster --domain example.com \
+  --ds 12345,13,2,0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF
 ```
 
 ## gonemaster-client (HTTP API client)

@@ -256,15 +256,22 @@ func NewCacheStore() *CacheStore {
 }
 
 func (c *CacheStore) cacheForAddress(addr string) *queryCache {
+	cache, _ := c.cacheForAddressWithStatus(addr)
+	return cache
+}
+
+func (c *CacheStore) cacheForAddressWithStatus(addr string) (*queryCache, bool) {
 	if c == nil {
-		return nil
+		return nil, false
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	created := false
 	if c.cacheByAddress[addr] == nil {
 		c.cacheByAddress[addr] = &queryCache{data: map[string]*packet.Packet{}, met: &c.queryMetrics}
+		created = true
 	}
-	return c.cacheByAddress[addr]
+	return c.cacheByAddress[addr], created
 }
 
 func (c *CacheStore) errorCacheForAddress(addr string) *errorCache {

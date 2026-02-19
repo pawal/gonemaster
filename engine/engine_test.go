@@ -46,6 +46,24 @@ func TestEffectiveProfileUsesRunner(t *testing.T) {
 	}
 }
 
+func TestEffectiveProfileAppliesSourceAddrOverrides(t *testing.T) {
+	source4 := "192.0.2.77"
+	source6 := "2001:db8::77"
+	got, err := EffectiveProfile(RunRequest{
+		SourceAddr4: &source4,
+		SourceAddr6: &source6,
+	})
+	if err != nil {
+		t.Fatalf("effective profile: %v", err)
+	}
+	if got.Resolver.Source4 != source4 {
+		t.Fatalf("resolver.source4 = %q, want %q", got.Resolver.Source4, source4)
+	}
+	if got.Resolver.Source6 != source6 {
+		t.Fatalf("resolver.source6 = %q, want %q", got.Resolver.Source6, source6)
+	}
+}
+
 func TestRunWithRunnerConcurrentIsolation(t *testing.T) {
 	p1, err := profile.Default()
 	if err != nil {

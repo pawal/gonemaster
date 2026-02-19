@@ -13,6 +13,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	ns "codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/recursor"
 	address "codeberg.org/pawal/gonemaster/engine/test/address"
 	"codeberg.org/pawal/gonemaster/engine/test/basic"
 	"codeberg.org/pawal/gonemaster/engine/test/connectivity"
@@ -31,6 +32,10 @@ import (
 type RunRequest struct {
 	// Domain is the target zone name to test.
 	Domain string
+	// UndelegatedNameservers contains optional pre-delegation NS/glue input.
+	UndelegatedNameservers []UndelegatedNameserver
+	// UndelegatedDSInfo contains optional pre-delegation DS input.
+	UndelegatedDSInfo []UndelegatedDSInfo
 	// Module limits execution to a module (for example "basic").
 	Module string
 	// Testcase limits execution to a single testcase (for example "basic02").
@@ -57,10 +62,16 @@ type RunRequest struct {
 	Retrans *int
 	// Fallback sets resolver.defaults.fallback.
 	Fallback *bool
+	// SourceAddr4 sets resolver.source4 (IPv4 source address).
+	SourceAddr4 *string
+	// SourceAddr6 sets resolver.source6 (IPv6 source address).
+	SourceAddr6 *string
 	// PositiveCacheTTL sets resolver.defaults.positive_cache_ttl in seconds.
 	PositiveCacheTTL *int
 	// NegativeCacheTTL sets resolver.defaults.negative_cache_ttl in seconds.
 	NegativeCacheTTL *int
+	// NameserverCache optionally provides the per-run nameserver cache store.
+	NameserverCache *ns.CacheStore
 	// LogCallback receives each log entry as it is created.
 	LogCallback func(*logger.Entry) error
 	// Context controls cancellation and timeouts for the run.
@@ -90,7 +101,7 @@ type LogEntry struct {
 var ErrNotImplemented = errors.New("engine not implemented")
 
 // Version is the semantic version for this build.
-var Version = "0.9.19"
+var Version = "1.0.0"
 
 // Commit is optionally set at build time using -ldflags.
 var Commit = ""
@@ -344,6 +355,16 @@ func buildProfile(req RunRequest, module string, testcase string) (*profile.Prof
 			return nil, false, err
 		}
 	}
+	if req.SourceAddr4 != nil {
+		if err := p.Set("resolver.source4", *req.SourceAddr4); err != nil {
+			return nil, false, err
+		}
+	}
+	if req.SourceAddr6 != nil {
+		if err := p.Set("resolver.source6", *req.SourceAddr6); err != nil {
+			return nil, false, err
+		}
+	}
 	if req.PositiveCacheTTL != nil {
 		if err := p.Set("resolver.defaults.positive_cache_ttl", *req.PositiveCacheTTL); err != nil {
 			return nil, false, err
@@ -413,7 +434,11 @@ func RunWithRunner(req RunRequest, runner *Runner) ([]LogEntry, error) {
 		return nil, fmt.Errorf("runner logger is required")
 	}
 	if runner.NameserverCache == nil {
-		runner.NameserverCache = ns.NewCacheStore()
+		if req.NameserverCache != nil {
+			runner.NameserverCache = req.NameserverCache
+		} else {
+			runner.NameserverCache = ns.NewCacheStore()
+		}
 	}
 
 	module, testcase, err := normalizeRequest(req)
@@ -483,11 +508,16 @@ func Run(req RunRequest) ([]LogEntry, error) {
 	}
 	limiter := transport.NewLimiter(queryLimit)
 
+	cacheStore := req.NameserverCache
+	if cacheStore == nil {
+		cacheStore = ns.NewCacheStore()
+	}
+
 	runner := &Runner{
 		Profile:          p,
 		Logger:           log,
 		Limiter:          limiter,
-		NameserverCache:  ns.NewCacheStore(),
+		NameserverCache:  cacheStore,
 		StartedAt:        time.Now(),
 		AutoIPv6Disabled: autoDisabledIPv6,
 	}
@@ -496,8 +526,22 @@ func Run(req RunRequest) ([]LogEntry, error) {
 }
 
 func runWithContext(ctx context.Context, req RunRequest, module string, testcase string) ([]*logger.Entry, error) {
-	z, err := zone.New(req.Domain)
+	normalizedNameservers, normalizedDSInfo, err := NormalizeUndelegatedInputs(req.UndelegatedNameservers, req.UndelegatedDSInfo)
 	if err != nil {
+		return nil, err
+	}
+	req.UndelegatedNameservers = normalizedNameservers
+	req.UndelegatedDSInfo = normalizedDSInfo
+
+	r, err := recursor.New()
+	if err != nil {
+		return nil, err
+	}
+	z, err := zone.NewWithRecursor(req.Domain, r)
+	if err != nil {
+		return nil, err
+	}
+	if err := applyUndelegatedDelegation(ctx, r, &z, req.UndelegatedNameservers, req.UndelegatedDSInfo); err != nil {
 		return nil, err
 	}
 	var entries []*logger.Entry

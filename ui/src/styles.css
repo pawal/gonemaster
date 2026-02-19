@@ -136,6 +136,53 @@ h1 {
   gap: 10px;
 }
 
+.advanced-options {
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: #f8fafc;
+}
+
+.advanced-options summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.advanced-options[open] summary {
+  margin-bottom: 8px;
+}
+
+.advanced-stack {
+  gap: 8px;
+}
+
+.undelegated-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.undelegated-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1.35fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.undelegated-ds-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 1.8fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.mini-button {
+  padding: 8px 10px;
+  font-size: 0.78rem;
+}
+
 label {
   font-size: 0.85rem;
   color: var(--muted);
@@ -859,6 +906,11 @@ button:hover:not(:disabled) {
 
   .entry-meta {
     grid-column: 1;
+  }
+
+  .undelegated-row,
+  .undelegated-ds-row {
+    grid-template-columns: 1fr;
   }
 }
 

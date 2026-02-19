@@ -95,6 +95,7 @@ paths:
     post:
       tags: [Jobs]
       summary: Submit a batch of test jobs
+      description: Undelegated input (`nameservers`, `ds_info`) is not supported for batch submission.
       operationId: createJobBatch
       requestBody:
         required: true
@@ -396,12 +397,23 @@ components:
         profile_overrides:
           type: object
           additionalProperties: true
+        nameservers:
+          type: array
+          description: Optional undelegated nameserver/glue input for single-job pre-delegation testing.
+          items:
+            $ref: '#/components/schemas/UndelegatedNameserverInput'
+        ds_info:
+          type: array
+          description: Optional undelegated DS input for single-job pre-delegation testing (DS-only mode allowed).
+          items:
+            $ref: '#/components/schemas/UndelegatedDSInput'
         min_level:
           type: string
 
     JobBatchRequest:
       type: object
       required: [domains]
+      description: Batch submission accepts only domain/test/profile/min-level fields; undelegated input is rejected.
       properties:
         domains:
           type: array
@@ -416,6 +428,37 @@ components:
           additionalProperties: true
         min_level:
           type: string
+
+    UndelegatedNameserverInput:
+      type: object
+      required: [ns]
+      properties:
+        ns:
+          type: string
+          description: Nameserver hostname (normalized/canonicalized server-side).
+        ip:
+          type: string
+          description: Optional IPv4 or IPv6 address for this nameserver row.
+
+    UndelegatedDSInput:
+      type: object
+      required: [keytag, algorithm, digtype, digest]
+      properties:
+        keytag:
+          type: integer
+          minimum: 0
+          maximum: 65535
+        algorithm:
+          type: integer
+          minimum: 0
+          maximum: 255
+        digtype:
+          type: integer
+          minimum: 0
+          maximum: 255
+        digest:
+          type: string
+          description: Hex-encoded DS digest.
 
     JobBatchResponse:
       type: object

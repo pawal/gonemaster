@@ -1,6 +1,10 @@
 package server
 
-import "time"
+import (
+	"time"
+
+	"codeberg.org/pawal/gonemaster/engine"
+)
 
 // JobStatus describes the current state of a job.
 type JobStatus string
@@ -60,36 +64,56 @@ const (
 
 // Job represents a single test job.
 type Job struct {
-	ID             string         `json:"id"`
-	BatchID        string         `json:"batch_id,omitempty"`
-	Domain         string         `json:"domain"`
-	SeverityTotals map[string]int `json:"severity_totals,omitempty"`
-	Tests          []string       `json:"-"`
-	Overrides      map[string]any `json:"-"`
-	MinLevel       string         `json:"-"`
-	Status         JobStatus      `json:"status"`
-	CreatedAt      time.Time      `json:"created_at"`
-	StartedAt      time.Time      `json:"started_at,omitempty"`
-	FinishedAt     time.Time      `json:"finished_at,omitempty"`
-	Progress       int            `json:"progress"`
-	ResultURL      string         `json:"result_url,omitempty"`
-	Error          string         `json:"error,omitempty"`
+	ID             string                         `json:"id"`
+	BatchID        string                         `json:"batch_id,omitempty"`
+	Domain         string                         `json:"domain"`
+	SeverityTotals map[string]int                 `json:"severity_totals,omitempty"`
+	Tests          []string                       `json:"-"`
+	Overrides      map[string]any                 `json:"-"`
+	UndelegatedNS  []engine.UndelegatedNameserver `json:"-"`
+	UndelegatedDS  []engine.UndelegatedDSInfo     `json:"-"`
+	MinLevel       string                         `json:"-"`
+	Status         JobStatus                      `json:"status"`
+	CreatedAt      time.Time                      `json:"created_at"`
+	StartedAt      time.Time                      `json:"started_at,omitempty"`
+	FinishedAt     time.Time                      `json:"finished_at,omitempty"`
+	Progress       int                            `json:"progress"`
+	ResultURL      string                         `json:"result_url,omitempty"`
+	Error          string                         `json:"error,omitempty"`
 }
 
 // JobCreateRequest is the payload for a single job.
 type JobCreateRequest struct {
-	Domain           string         `json:"domain"`
-	Tests            []string       `json:"tests,omitempty"`
-	ProfileOverrides map[string]any `json:"profile_overrides,omitempty"`
-	MinLevel         string         `json:"min_level,omitempty"`
+	Domain           string                       `json:"domain"`
+	Tests            []string                     `json:"tests,omitempty"`
+	ProfileOverrides map[string]any               `json:"profile_overrides,omitempty"`
+	Nameservers      []UndelegatedNameserverInput `json:"nameservers,omitempty"`
+	DSInfo           []UndelegatedDSInput         `json:"ds_info,omitempty"`
+	MinLevel         string                       `json:"min_level,omitempty"`
 }
 
 // JobBatchRequest is the payload for a batch submission.
 type JobBatchRequest struct {
-	Domains          []string       `json:"domains"`
-	Tests            []string       `json:"tests,omitempty"`
-	ProfileOverrides map[string]any `json:"profile_overrides,omitempty"`
-	MinLevel         string         `json:"min_level,omitempty"`
+	Domains          []string                      `json:"domains"`
+	Tests            []string                      `json:"tests,omitempty"`
+	ProfileOverrides map[string]any                `json:"profile_overrides,omitempty"`
+	Nameservers      *[]UndelegatedNameserverInput `json:"nameservers,omitempty"`
+	DSInfo           *[]UndelegatedDSInput         `json:"ds_info,omitempty"`
+	MinLevel         string                        `json:"min_level,omitempty"`
+}
+
+// UndelegatedNameserverInput represents one undelegated nameserver row.
+type UndelegatedNameserverInput struct {
+	NS string `json:"ns"`
+	IP string `json:"ip,omitempty"`
+}
+
+// UndelegatedDSInput represents one undelegated DS row.
+type UndelegatedDSInput struct {
+	KeyTag    int    `json:"keytag"`
+	Algorithm int    `json:"algorithm"`
+	DigType   int    `json:"digtype"`
+	Digest    string `json:"digest"`
 }
 
 // JobBatchResponse describes the batch submission result.

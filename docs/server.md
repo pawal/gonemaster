@@ -176,10 +176,20 @@ POST /jobs
 {
   "domain": "example.com",
   "tests": ["basic01"],
+  "nameservers": [
+    { "ns": "ns1.example.com", "ip": "192.0.2.10" },
+    { "ns": "ns1.example.com", "ip": "2001:db8::10" },
+    { "ns": "ns2.example.net" }
+  ],
+  "ds_info": [
+    { "keytag": 12345, "algorithm": 13, "digtype": 2, "digest": "ABCD..." }
+  ],
   "min_level": "NOTICE",
   "profile_overrides": { "timeout": 5 }
 }
 ```
+
+`nameservers` and `ds_info` are optional and only supported on single-job `POST /jobs`.
 
 List jobs:
 ```
@@ -247,6 +257,8 @@ POST /jobs/batch
   "domains": ["example.com", "example.org"]
 }
 ```
+
+Batch submission does not support undelegated input; if `nameservers` or `ds_info` is included, the API returns `400` with `error.code=undelegated_not_supported_for_batch`.
 
 Get batch summary:
 ```

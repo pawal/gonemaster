@@ -16,6 +16,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/transport"
 )
 
 func TestFakeDSResponse(t *testing.T) {
@@ -488,6 +489,49 @@ func TestClientForOptionsDefaults(t *testing.T) {
 	}
 }
 
+func TestClientForOptionsAppliesProfileSourceAddressByFamily(t *testing.T) {
+	ctx, prof := testContext(t)
+	prof.Resolver.Source4 = "192.0.2.88"
+	prof.Resolver.Source6 = "2001:db8::88"
+
+	ns4, err := New("ns4.example", "192.0.2.30", nil)
+	if err != nil {
+		t.Fatalf("new ipv4 nameserver: %v", err)
+	}
+	client4, err := ns4.clientForOptions(ctx, nil)
+	if err != nil {
+		t.Fatalf("client4: %v", err)
+	}
+	if client4.SourceIP != "192.0.2.88" {
+		t.Fatalf("client4.SourceIP = %q, want 192.0.2.88", client4.SourceIP)
+	}
+
+	ns6, err := New("ns6.example", "2001:db8::30", nil)
+	if err != nil {
+		t.Fatalf("new ipv6 nameserver: %v", err)
+	}
+	client6, err := ns6.clientForOptions(ctx, nil)
+	if err != nil {
+		t.Fatalf("client6: %v", err)
+	}
+	if client6.SourceIP != "2001:db8::88" {
+		t.Fatalf("client6.SourceIP = %q, want 2001:db8::88", client6.SourceIP)
+	}
+
+	explicit := &transport.Client{SourceIP: "192.0.2.199"}
+	nsExplicit, err := New("ns-explicit.example", "192.0.2.31", explicit)
+	if err != nil {
+		t.Fatalf("new explicit nameserver: %v", err)
+	}
+	clientExplicit, err := nsExplicit.clientForOptions(ctx, nil)
+	if err != nil {
+		t.Fatalf("clientExplicit: %v", err)
+	}
+	if clientExplicit.SourceIP != "192.0.2.199" {
+		t.Fatalf("expected explicit source ip to be preserved, got %q", clientExplicit.SourceIP)
+	}
+}
+
 func TestAXFRHook(t *testing.T) {
 	ns, err := New("ns.example", "192.0.2.22", nil)
 	if err != nil {
@@ -645,6 +689,111 @@ func TestQueryLogging(t *testing.T) {
 	if !foundQuery {
 		t.Errorf("expected EXTERNAL_QUERY tag, got %v", log.Entries())
 	}
+}
+
+func TestConstructorEmitsCreationLogs(t *testing.T) {
+	ctx, _ := testContext(t)
+	log := logger.FromContext(ctx)
+
+	if _, err := NewWithContext(ctx, "ns1.example", "192.0.2.77", nil); err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	if _, err := NewWithContext(ctx, "ns2.example", "192.0.2.77", nil); err != nil {
+		t.Fatalf("new nameserver with shared cache: %v", err)
+	}
+
+	var cacheCreated, cacheFetched, nsCreated int
+	for _, entry := range log.Entries() {
+		if entry == nil {
+			continue
+		}
+		switch entry.Tag {
+		case "CACHE_CREATED":
+			cacheCreated++
+		case "CACHE_FETCHED":
+			cacheFetched++
+		case "NS_CREATED":
+			nsCreated++
+		}
+	}
+	if cacheCreated != 1 {
+		t.Fatalf("expected 1 CACHE_CREATED, got %d", cacheCreated)
+	}
+	if cacheFetched != 1 {
+		t.Fatalf("expected 1 CACHE_FETCHED, got %d", cacheFetched)
+	}
+	if nsCreated != 2 {
+		t.Fatalf("expected 2 NS_CREATED, got %d", nsCreated)
+	}
+}
+
+func TestQueryEmitsQueryAndCachedReturn(t *testing.T) {
+	ctx, _ := testContext(t)
+	log := logger.FromContext(ctx)
+
+	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.80", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+
+	var calls int
+	ns.SetQueryHook(func(_ context.Context, qname string, qtype string, qclass string, _ *QueryOptions) (packet.Packet, error) {
+		calls++
+		msg := new(dns.Msg)
+		msg.SetQuestion(dns.Fqdn(qname), dns.StringToType[qtype])
+		msg.Rcode = dns.RcodeSuccess
+		return packet.Packet{Msg: msg}, nil
+	})
+
+	if _, err := ns.QueryWithOptions(ctx, "example", "A", nil); err != nil {
+		t.Fatalf("query 1: %v", err)
+	}
+	if _, err := ns.QueryWithOptions(ctx, "example", "A", nil); err != nil {
+		t.Fatalf("query 2: %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("expected 1 network call due to cache hit, got %d", calls)
+	}
+
+	var queryCount, cachedReturnCount int
+	for _, entry := range log.Entries() {
+		if entry == nil {
+			continue
+		}
+		switch entry.Tag {
+		case "QUERY":
+			queryCount++
+		case "CACHED_RETURN":
+			cachedReturnCount++
+		}
+	}
+	if queryCount != 2 {
+		t.Fatalf("expected 2 QUERY logs, got %d", queryCount)
+	}
+	if cachedReturnCount != 2 {
+		t.Fatalf("expected 2 CACHED_RETURN logs, got %d", cachedReturnCount)
+	}
+}
+
+func TestQueryLogsIPBlocked(t *testing.T) {
+	ctx, prof := testContext(t)
+	log := logger.FromContext(ctx)
+	prof.Net.IPv4 = false
+
+	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.81", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	if _, err := ns.QueryWithOptions(ctx, "example", "A", nil); err != nil {
+		t.Fatalf("query with ipv4 disabled: %v", err)
+	}
+
+	for _, entry := range log.Entries() {
+		if entry != nil && entry.Tag == "IPV4_BLOCKED" {
+			return
+		}
+	}
+	t.Fatalf("expected IPV4_BLOCKED log entry")
 }
 
 func testContext(t *testing.T) (context.Context, *profile.Profile) {

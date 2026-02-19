@@ -172,9 +172,11 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 		minLevel = job.MinLevel
 	}
 	req := engine.RunRequest{
-		Domain:   job.Domain,
-		MinLevel: minLevel,
-		Context:  ctx,
+		Domain:                 job.Domain,
+		UndelegatedNameservers: job.UndelegatedNS,
+		UndelegatedDSInfo:      job.UndelegatedDS,
+		MinLevel:               minLevel,
+		Context:                ctx,
 	}
 	if s.cfg.PositiveCacheTTL != nil {
 		req.PositiveCacheTTL = s.cfg.PositiveCacheTTL
@@ -193,6 +195,12 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 	}
 	if s.cfg.Fallback != nil {
 		req.Fallback = s.cfg.Fallback
+	}
+	if s.cfg.SourceAddr4 != nil {
+		req.SourceAddr4 = s.cfg.SourceAddr4
+	}
+	if s.cfg.SourceAddr6 != nil {
+		req.SourceAddr6 = s.cfg.SourceAddr6
 	}
 
 	queryCounter := &dnsQueryCounter{}

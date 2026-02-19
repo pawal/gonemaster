@@ -320,7 +320,7 @@ func GetDelNSNamesAndIPs(ctx context.Context, z *zone.Zone) ([]NSItem, error) {
 
 	var out []NSItem
 	for _, item := range items {
-		if item.HasAddress {
+		if item.HasAddress || z.Name.IsInBailiwick(item.Name) {
 			out = append(out, item)
 		}
 	}
@@ -367,6 +367,13 @@ func GetDelNSIPs(ctx context.Context, z *zone.Zone) ([]string, error) {
 
 // GetZoneNSNames returns authoritative nameserver names from the zone apex.
 func GetZoneNSNames(ctx context.Context, z *zone.Zone) ([]dnsname.Name, error) {
+	if z == nil {
+		return nil, fmt.Errorf("zone is nil")
+	}
+	if r := z.Recursor(); r != nil && z.Name.String() != "." && r.HasFakeAddresses(z.Name.String()) {
+		return GetDelNSNames(ctx, z)
+	}
+
 	items, err := GetDelNSNamesAndIPs(ctx, z)
 	if err != nil || items == nil {
 		return nil, err
@@ -484,12 +491,13 @@ func getDelegation(ctx context.Context, z *zone.Zone) ([]NSItem, error) {
 		var out []NSItem
 		for _, nsName := range r.GetFakeNames(z.Name.String()) {
 			nameObj := dnsname.New(nsName)
-			if z.Name.IsInBailiwick(nameObj) {
-				for _, addr := range r.GetFakeAddresses(z.Name.String(), nsName) {
-					out = append(out, NSItem{Name: nameObj, Address: addr, HasAddress: true})
-				}
-			} else {
+			addrs := r.GetFakeAddresses(z.Name.String(), nsName)
+			if len(addrs) == 0 {
 				out = append(out, NSItem{Name: nameObj})
+				continue
+			}
+			for _, addr := range addrs {
+				out = append(out, NSItem{Name: nameObj, Address: addr, HasAddress: true})
 			}
 		}
 		return uniqueSortedItems(out), nil
@@ -713,6 +721,30 @@ func getIBAddrInZone(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver
 	r := z.Recursor()
 	if r == nil {
 		return nil, fmt.Errorf("missing recursor")
+	}
+	if z.Name.String() != "." && r.HasFakeAddresses(z.Name.String()) {
+		seen := map[string]nameserver.Nameserver{}
+		for _, item := range delItems {
+			if !item.HasAddress || !z.Name.IsInBailiwick(item.Name) {
+				continue
+			}
+			ns, ok := toNameserver(ctx, z, item)
+			if !ok {
+				continue
+			}
+			seen[strings.ToLower(ns.String())] = ns
+		}
+
+		keys := make([]string, 0, len(seen))
+		for key := range seen {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		out := make([]nameserver.Nameserver, 0, len(keys))
+		for _, key := range keys {
+			out = append(out, seen[key])
+		}
+		return out, nil
 	}
 
 	var delServers []nameserver.Nameserver

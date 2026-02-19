@@ -7,6 +7,7 @@ import (
 	"github.com/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/logger"
 )
 
 func TestUniquePush(t *testing.T) {
@@ -83,6 +84,57 @@ func TestPacketTypeClassification(t *testing.T) {
 	answer := New(answerMsg)
 	if answer.Type() != "answer" {
 		t.Fatalf("unexpected answer classification")
+	}
+}
+
+func TestPacketClassificationEmitsSystemLogs(t *testing.T) {
+	log := logger.New()
+
+	nxdomainMsg := new(dns.Msg)
+	nxdomainMsg.SetQuestion("www.example.", dns.TypeA)
+	nxdomainMsg.Rcode = dns.RcodeNameError
+	nxdomain := Packet{Msg: nxdomainMsg, Log: log}
+	if !nxdomain.NoSuchName() {
+		t.Fatalf("expected nxdomain packet")
+	}
+
+	nodataMsg := new(dns.Msg)
+	nodataMsg.SetQuestion("www.example.", dns.TypeAAAA)
+	nodataMsg.Rcode = dns.RcodeSuccess
+	nodataMsg.Ns = []dns.RR{
+		&dns.SOA{Hdr: dns.RR_Header{Name: "example.", Rrtype: dns.TypeSOA, Class: dns.ClassINET}},
+	}
+	nodata := Packet{Msg: nodataMsg, Log: log}
+	if !nodata.NoSuchRecord() {
+		t.Fatalf("expected nodata packet")
+	}
+
+	referralMsg := new(dns.Msg)
+	referralMsg.SetQuestion("www.example.", dns.TypeA)
+	referralMsg.Rcode = dns.RcodeSuccess
+	referralMsg.Ns = []dns.RR{
+		&dns.NS{Hdr: dns.RR_Header{Name: "example.", Rrtype: dns.TypeNS, Class: dns.ClassINET}},
+	}
+	referral := Packet{Msg: referralMsg, Log: log}
+	if !referral.IsRedirect() {
+		t.Fatalf("expected referral packet")
+	}
+
+	tags := map[string]bool{}
+	for _, entry := range log.Entries() {
+		if entry == nil {
+			continue
+		}
+		tags[entry.Tag] = true
+	}
+	if !tags["NO_SUCH_NAME"] {
+		t.Fatalf("expected NO_SUCH_NAME log")
+	}
+	if !tags["NO_SUCH_RECORD"] {
+		t.Fatalf("expected NO_SUCH_RECORD log")
+	}
+	if !tags["IS_REDIRECT"] {
+		t.Fatalf("expected IS_REDIRECT log")
 	}
 }
 

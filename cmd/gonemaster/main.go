@@ -74,6 +74,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	var negativeCacheTTL int
 	var negativeCacheTTLSet bool
 	var noProgress bool
+	var count bool
 	var listTests bool
 	var showVersion bool
 	var undelegatedNSSpecs repeatableStringFlag
@@ -82,7 +83,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs := flag.NewFlagSet("gonemaster", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	fs.Usage = func() {
-		fmt.Fprintf(errOut, "Usage: %s --domain DOMAIN [--module MODULE] [--testcase TESTCASE] [--profile PATH] [--min-level LEVEL] [--output PATH] [--raw] [--json] [--json-stream] [--dump-profile] [--locale LOCALE] [--no-ipv4] [--no-ipv6|--ipv6] [--parallel N] [--unordered] [--ordered] [--timeout N] [--retry N] [--retrans N] [--fallback|--no-fallback] [--error-cache-ttl N] [--positive-cache-ttl N] [--negative-cache-ttl N] [--ns NAME[/IP]] [--ds KEYTAG,ALGORITHM,DIGTYPE,DIGEST] [--no-progress] [--list-tests] [--version]\n", fs.Name())
+		fmt.Fprintf(errOut, "Usage: %s --domain DOMAIN [--module MODULE] [--testcase TESTCASE] [--profile PATH] [--min-level LEVEL] [--output PATH] [--raw] [--json] [--json-stream] [--dump-profile] [--locale LOCALE] [--no-ipv4] [--no-ipv6|--ipv6] [--parallel N] [--unordered] [--ordered] [--timeout N] [--retry N] [--retrans N] [--fallback|--no-fallback] [--error-cache-ttl N] [--positive-cache-ttl N] [--negative-cache-ttl N] [--ns NAME[/IP]] [--ds KEYTAG,ALGORITHM,DIGTYPE,DIGEST] [--no-progress] [--count] [--list-tests] [--version]\n", fs.Name())
 		fmt.Fprintln(errOut, "")
 		fmt.Fprintln(errOut, "Options:")
 		fmt.Fprintln(errOut, "  --domain     Zone name to test (required)")
@@ -113,6 +114,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		fmt.Fprintln(errOut, "  --ns         Undelegated nameserver as name[/ip] (repeatable)")
 		fmt.Fprintln(errOut, "  --ds         Undelegated DS as keytag,algorithm,digtype,digest (repeatable)")
 		fmt.Fprintln(errOut, "  --no-progress  Disable progress indicator (optional)")
+		fmt.Fprintln(errOut, "  --count      Print count summary by level and message tag (optional)")
 		fmt.Fprintln(errOut, "  --list-tests  List all available test cases (optional)")
 		fmt.Fprintln(errOut, "  --version    Print version and exit (optional)")
 		fmt.Fprintln(errOut, "")
@@ -153,6 +155,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs.Var(&undelegatedNSSpecs, "ns", "Undelegated nameserver as name[/ip] (repeatable)")
 	fs.Var(&undelegatedDSSpecs, "ds", "Undelegated DS as keytag,algorithm,digtype,digest (repeatable)")
 	fs.BoolVar(&noProgress, "no-progress", false, "Disable progress indicator (optional)")
+	fs.BoolVar(&count, "count", false, "Print count summary by level and message tag (optional)")
 	fs.BoolVar(&listTests, "list-tests", false, "List all available test cases (optional)")
 	fs.BoolVar(&showVersion, "version", false, "Print version and exit (optional)")
 	if err := fs.Parse(args); err != nil {
@@ -351,11 +354,13 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	}
 
 	if dumpProfile {
-		if raw || jsonStream {
+		if raw || jsonStream || count {
 			if raw {
 				fmt.Fprintln(errOut, "--dump-profile cannot be combined with --raw")
-			} else {
+			} else if jsonStream {
 				fmt.Fprintln(errOut, "--dump-profile cannot be combined with --json-stream")
+			} else {
+				fmt.Fprintln(errOut, "--dump-profile cannot be combined with --count")
 			}
 			return 2
 		}
@@ -400,6 +405,18 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		fmt.Fprintln(errOut, "--json-stream cannot be combined with --json")
 		return 2
 	}
+	if count && raw {
+		fmt.Fprintln(errOut, "--count cannot be combined with --raw")
+		return 2
+	}
+	if count && jsonOutput {
+		fmt.Fprintln(errOut, "--count cannot be combined with --json")
+		return 2
+	}
+	if count && jsonStream {
+		fmt.Fprintln(errOut, "--count cannot be combined with --json-stream")
+		return 2
+	}
 
 	if domain == "" {
 		fmt.Fprintln(errOut, "--domain is required")
@@ -417,6 +434,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	humanWriter := out
 	humanStreaming := false
 	var humanReport *humanReporter
+	var countReport *countReporter
 	var stopInterruptHandler func()
 	if raw {
 		rawWriter = out
@@ -462,13 +480,21 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		humanWriter = w
 		showSpinner := !noProgress && isTerminalWriter(w)
 		humanReport = newHumanReporter(w, locale, minLevel, showSpinner)
+		if count {
+			countReport = newCountReporter()
+		}
 		if humanReport != nil {
 			req.LogCallback = humanReport.Callback
+			if countReport != nil {
+				req.LogCallback = composeCallbacks(req.LogCallback, countReport.Callback)
+			}
 			defer humanReport.Finish()
 			humanStreaming = true
 			if showSpinner {
 				stopInterruptHandler = installInterruptHandler(humanReport.Finish)
 			}
+		} else if countReport != nil {
+			req.LogCallback = countReport.Callback
 		}
 	}
 
@@ -519,6 +545,20 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	if !jsonOutput {
 		if !humanStreaming {
 			if writeErr := writeHuman(entries, locale, humanWriter); writeErr != nil {
+				fmt.Fprintln(errOut, writeErr.Error())
+				return 2
+			}
+		}
+		if countReport != nil {
+			countLines := countReport.SummaryLines()
+			if humanReport != nil {
+				for _, line := range countLines {
+					if writeErr := humanReport.printLine(line); writeErr != nil {
+						fmt.Fprintln(errOut, writeErr.Error())
+						return 2
+					}
+				}
+			} else if writeErr := writeLines(humanWriter, countLines); writeErr != nil {
 				fmt.Fprintln(errOut, writeErr.Error())
 				return 2
 			}
@@ -607,4 +647,13 @@ func normalizeVersion(version string) string {
 		return "unknown"
 	}
 	return version
+}
+
+func writeLines(out io.Writer, lines []string) error {
+	for _, line := range lines {
+		if _, err := fmt.Fprintln(out, line); err != nil {
+			return err
+		}
+	}
+	return nil
 }

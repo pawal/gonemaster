@@ -45,6 +45,7 @@ You can switch output modes:
 - `--json-stream` prints newline-delimited JSON objects (one per log entry).
 - `--raw` prints raw log lines (one per log entry).
 - `--dump-profile` prints the effective profile as pretty JSON and exits.
+- `--count` (human output only) appends count summaries by level and by message tag.
 
 Use `--output PATH` to write the selected output to a file.
 
@@ -62,6 +63,7 @@ Use `--output PATH` to write the selected output to a file.
 | `--json` | bool | Print a single JSON array. Incompatible with `--raw` and `--json-stream`. |
 | `--json-stream` | bool | Stream newline-delimited JSON entries. Incompatible with `--raw` and `--json`. Also incompatible with `--dump-profile`. |
 | `--dump-profile` | bool | Print the effective profile as JSON and exit. Incompatible with `--raw` and `--json-stream`. |
+| `--count` | bool | Append count summaries (level totals and level/tag totals). Human output only; incompatible with `--json`, `--json-stream`, `--raw`, and `--dump-profile`. |
 | `--locale LOCALE` | string | Locale for translated output (defaults to environment, then `en`). |
 | `--no-ipv4` | bool | Disable IPv4 queries (overrides profile setting). |
 | `--no-ipv6` | bool | Disable IPv6 queries (overrides profile setting). |

@@ -193,6 +193,70 @@ func TestRunRejectsJSONStreamAndJSON(t *testing.T) {
 	}
 }
 
+func TestRunRejectsCountAndRaw(t *testing.T) {
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := run([]string{"--domain", ".", "--count", "--raw"}, &out, &errOut)
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d", code)
+	}
+	if !strings.Contains(errOut.String(), "--count cannot be combined with --raw") {
+		t.Fatalf("expected error message, got %q", errOut.String())
+	}
+	if out.Len() != 0 {
+		t.Fatalf("expected no stdout output, got %q", out.String())
+	}
+}
+
+func TestRunRejectsCountAndJSON(t *testing.T) {
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := run([]string{"--domain", ".", "--count", "--json"}, &out, &errOut)
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d", code)
+	}
+	if !strings.Contains(errOut.String(), "--count cannot be combined with --json") {
+		t.Fatalf("expected error message, got %q", errOut.String())
+	}
+	if out.Len() != 0 {
+		t.Fatalf("expected no stdout output, got %q", out.String())
+	}
+}
+
+func TestRunRejectsCountAndJSONStream(t *testing.T) {
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := run([]string{"--domain", ".", "--count", "--json-stream"}, &out, &errOut)
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d", code)
+	}
+	if !strings.Contains(errOut.String(), "--count cannot be combined with --json-stream") {
+		t.Fatalf("expected error message, got %q", errOut.String())
+	}
+	if out.Len() != 0 {
+		t.Fatalf("expected no stdout output, got %q", out.String())
+	}
+}
+
+func TestRunRejectsCountAndDumpProfile(t *testing.T) {
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := run([]string{"--count", "--dump-profile"}, &out, &errOut)
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d", code)
+	}
+	if !strings.Contains(errOut.String(), "--dump-profile cannot be combined with --count") {
+		t.Fatalf("expected error message, got %q", errOut.String())
+	}
+	if out.Len() != 0 {
+		t.Fatalf("expected no stdout output, got %q", out.String())
+	}
+}
+
 func TestRunParsesUndelegatedNameserverFlags(t *testing.T) {
 	var captured engine.RunRequest
 	stubRunEngine(t, &captured)
@@ -383,6 +447,37 @@ func TestRunOutputsLooksOKWhenNoEntriesAtLevel(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "Looks OK.") {
 		t.Fatalf("expected Looks OK when no entries match level, got %q", out.String())
+	}
+	if errOut.Len() != 0 {
+		t.Fatalf("expected no stderr output, got %q", errOut.String())
+	}
+}
+
+func TestRunCountPrintsSummariesFromAllLevels(t *testing.T) {
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := run([]string{"--domain", ".", "--testcase", "basic01", "--count", "--locale", "en", "--no-progress"}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	if !strings.HasPrefix(out.String(), "Seconds Level    Message") {
+		t.Fatalf("expected translated header, got %q", out.String())
+	}
+	if !strings.Contains(out.String(), "Looks OK.") {
+		t.Fatalf("expected Looks OK marker when min-level hides entries, got %q", out.String())
+	}
+	if !strings.Contains(out.String(), "Number of log entries") {
+		t.Fatalf("expected level count summary, got %q", out.String())
+	}
+	if !strings.Contains(out.String(), "Message tag") {
+		t.Fatalf("expected tag count summary, got %q", out.String())
+	}
+	if !strings.Contains(out.String(), "INFO") {
+		t.Fatalf("expected INFO counts from entries below default min-level, got %q", out.String())
+	}
+	if !strings.Contains(out.String(), "B01_ROOT_HAS_NO_PARENT") {
+		t.Fatalf("expected B01 tag count in summary, got %q", out.String())
 	}
 	if errOut.Len() != 0 {
 		t.Fatalf("expected no stderr output, got %q", errOut.String())

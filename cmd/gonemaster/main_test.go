@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"os"
@@ -10,7 +11,9 @@ import (
 	"testing"
 
 	"codeberg.org/pawal/gonemaster/engine"
+	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
+	"codeberg.org/pawal/gonemaster/engine/profile"
 	"github.com/miekg/dns"
 )
 
@@ -86,6 +89,7 @@ func TestRunHelpShowsGroupedFlags(t *testing.T) {
 		"Utility:",
 		"DOMAIN",
 		"--domain DOMAIN",
+		"--stop-level LEVEL",
 		"--count",
 		"--save PATH",
 		"--sourceaddr4 IPADDR",
@@ -163,6 +167,91 @@ func TestRunRejectsDomainProvidedTwice(t *testing.T) {
 	}
 	if !strings.Contains(errOut.String(), "domain provided twice; use either --domain DOMAIN or positional DOMAIN") {
 		t.Fatalf("expected duplicate-domain validation error, got %q", errOut.String())
+	}
+}
+
+func TestRunRejectsInvalidStopLevel(t *testing.T) {
+	stubRunEngine(t, nil)
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := run([]string{"--domain", "example.com", "--stop-level", "BANANA"}, &out, &errOut)
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d", code)
+	}
+	if !strings.Contains(errOut.String(), "--stop-level must be one of") {
+		t.Fatalf("expected stop-level validation error, got %q", errOut.String())
+	}
+}
+
+func TestRunStopLevelTreatsContextCanceledAsSuccessForJSON(t *testing.T) {
+	previous := runEngine
+	runEngine = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		if req.LogCallback == nil {
+			t.Fatalf("expected log callback")
+		}
+		if req.Context == nil {
+			t.Fatalf("expected context when stop-level is configured")
+		}
+
+		p := profile.New()
+		if err := p.Set("test_levels", map[string]map[string]string{
+			"SYSTEM": {
+				"STOP_INFO": "INFO",
+				"STOP_WARN": "WARNING",
+			},
+		}); err != nil {
+			t.Fatalf("set test_levels: %v", err)
+		}
+		log := logger.New()
+		log.SetProfile(p)
+		infoEntry, err := log.Add("STOP_INFO", map[string]any{"phase": "before"}, "System", "Unspecified")
+		if err != nil {
+			t.Fatalf("add stop info: %v", err)
+		}
+		if cbErr := req.LogCallback(infoEntry); cbErr != nil {
+			t.Fatalf("callback stop info: %v", cbErr)
+		}
+		warnEntry, err := log.Add("STOP_WARN", map[string]any{"phase": "stop"}, "System", "Unspecified")
+		if err != nil {
+			t.Fatalf("add stop warn: %v", err)
+		}
+		if cbErr := req.LogCallback(warnEntry); cbErr != nil {
+			t.Fatalf("callback stop warn: %v", cbErr)
+		}
+		return nil, context.Canceled
+	}
+	t.Cleanup(func() {
+		runEngine = previous
+	})
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+	code := run([]string{
+		"--domain", "example.com",
+		"--json",
+		"--min-level", "INFO",
+		"--stop-level", "WARNING",
+	}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
+	}
+	var payload []map[string]any
+	if err := json.Unmarshal(out.Bytes(), &payload); err != nil {
+		t.Fatalf("expected JSON output, got %q (err=%v)", out.String(), err)
+	}
+	if len(payload) != 2 {
+		t.Fatalf("expected 2 captured entries, got %d (%q)", len(payload), out.String())
+	}
+	if payload[0]["tag"] != "STOP_INFO" {
+		t.Fatalf("unexpected first tag: %v", payload[0]["tag"])
+	}
+	if payload[1]["tag"] != "STOP_WARN" {
+		t.Fatalf("unexpected second tag: %v", payload[1]["tag"])
+	}
+	if strings.TrimSpace(errOut.String()) != "" {
+		t.Fatalf("expected no stderr output, got %q", errOut.String())
 	}
 }
 

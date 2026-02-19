@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -55,6 +56,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	var jsonStream bool
 	var dumpProfile bool
 	var locale string
+	var stopLevel string
 	var noIPv4 bool
 	var noIPv6 bool
 	var forceIPv6 bool
@@ -90,6 +92,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	var count bool
 	var listTests bool
 	var showVersion bool
+	var stopLevelSet bool
 	var undelegatedNSSpecs repeatableStringFlag
 	var undelegatedDSSpecs repeatableStringFlag
 
@@ -107,6 +110,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		})
 		printUsageGroup(errOut, "Output", []usageLine{
 			{flag: "--min-level LEVEL", detail: "Minimum log level (default NOTICE)"},
+			{flag: "--stop-level LEVEL", detail: "Stop the run after first log entry at LEVEL or higher"},
 			{flag: "--locale LOCALE", detail: "Locale for translated output"},
 			{flag: "--output PATH", detail: "Write output to file"},
 			{flag: "--raw", detail: "Stream raw log entries"},
@@ -165,6 +169,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs.BoolVar(&jsonOutput, "json", false, "Print JSON output instead of translated output (optional)")
 	fs.BoolVar(&jsonStream, "json-stream", false, "Stream JSON log entries as they are produced (optional)")
 	fs.BoolVar(&dumpProfile, "dump-profile", false, "Print effective profile in JSON and exit (optional)")
+	fs.StringVar(&stopLevel, "stop-level", "", "Stop the run after first log entry at this level or higher (optional)")
 	fs.StringVar(&locale, "locale", "", "Locale for translated output (optional)")
 	fs.BoolVar(&noIPv4, "no-ipv4", false, "Disable IPv4 queries (optional)")
 	fs.BoolVar(&noIPv6, "no-ipv6", false, "Disable IPv6 queries (optional)")
@@ -245,6 +250,9 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		if f.Name == "negative-cache-ttl" {
 			negativeCacheTTLSet = true
 		}
+		if f.Name == "stop-level" {
+			stopLevelSet = true
+		}
 	})
 
 	hasPacketCacheFlags := strings.TrimSpace(savePacketCachePath) != "" || strings.TrimSpace(restorePacketCachePath) != ""
@@ -268,6 +276,16 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 			fmt.Fprintln(out, testCase)
 		}
 		return 0
+	}
+
+	normalizedStopLevel := ""
+	if stopLevelSet {
+		normalized, levelErr := normalizeStopLevel(stopLevel)
+		if levelErr != nil {
+			fmt.Fprintln(errOut, levelErr.Error())
+			return 2
+		}
+		normalizedStopLevel = normalized
 	}
 
 	var ipv4Override *bool
@@ -417,6 +435,19 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		SourceAddr6:      sourceAddr6Override,
 		PositiveCacheTTL: positiveCacheOverride,
 		NegativeCacheTTL: negativeCacheOverride,
+	}
+	var stopController *stopLevelController
+	var stopCapture *entryCaptureReporter
+	if stopLevelSet {
+		baseCtx := req.Context
+		if baseCtx == nil {
+			baseCtx = context.Background()
+		}
+		runCtx, cancelStop := context.WithCancelCause(baseCtx)
+		defer cancelStop(nil)
+		req.Context = runCtx
+		stopController = newStopLevelController(normalizedStopLevel, cancelStop)
+		stopCapture = newEntryCaptureReporter()
 	}
 	for _, spec := range undelegatedNSSpecs {
 		nsItem, parseErr := engine.ParseUndelegatedNameserver(spec)
@@ -606,14 +637,30 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		if planErr == nil {
 			progress = newProgressReporter(errOut, planned)
 			if progress != nil {
-				req.LogCallback = progress.Callback
+				req.LogCallback = composeCallbacks(req.LogCallback, progress.Callback)
 			}
 		}
+	}
+	if stopController != nil && stopCapture != nil {
+		req.LogCallback = composeCallbacks(stopController.Callback, stopCapture.Callback, req.LogCallback)
 	}
 
 	entries, err := runEngine(req)
 	if progress != nil {
 		progress.Finish()
+	}
+	if stopController != nil && stopCapture != nil && stopController.Triggered() && req.Context != nil && errors.Is(context.Cause(req.Context), errStopLevelReached) {
+		if err != nil && errors.Is(err, context.Canceled) {
+			err = nil
+		}
+		if jsonOutput {
+			filteredEntries, filterErr := stopCapture.FilteredEntries(minLevel)
+			if filterErr != nil {
+				fmt.Fprintln(errOut, filterErr.Error())
+				return 2
+			}
+			entries = filteredEntries
+		}
 	}
 	if packetCacheStore != nil && strings.TrimSpace(savePacketCachePath) != "" {
 		if saveErr := packetCacheStore.SavePacketCache(savePacketCachePath); saveErr != nil {

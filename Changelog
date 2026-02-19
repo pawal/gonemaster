@@ -1,0 +1,61 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+## [Unreleased]
+
+### Added
+
+Initial release 1.0.0.
+
+- Added --sourceaddr and --sourceaddr6 options to CLI
+- Added CLI cache options to CLI
+- Added counters to CLI
+- Added undelegated testing to CLI and Web UI
+
+### Changed
+
+ - Added the option to use the CLI without "--domain" if it is the last argument
+
+## [0.9.19] - 2026-02-18
+
+### Added
+
+- Server throughput/contestion work
+- Engine performance optimization
+- Zonemaster parity/correctness improvements
+- New performance toolkit for repeatable benchmarking
+- Documentation and GoDoc improvements
+
+### Changed
+
+- Minor UI improvements
+
+## [0.9.18] - 2026-02-10
+
+### Added
+
+- Major performance improvements
+
+## [0.9.17] - 2026-02-07
+
+### Added
+
+ - Added separate IPv4 and IPv6 metrics
+ - Batch job dropdown added
+ - New notification method for UI
+
+### Changed
+
+ - Progress bars are the same length in Recent jobs
+
+## [0.9.16] - 2026-02-07
+
+### Added
+
+ - Added server metrics to UI and server API
+ - Added GoDocs
+
+### Changed
+
+ - Fixed ".arpa" delegation bug.

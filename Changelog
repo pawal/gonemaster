@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+## Changed
+
+ - Harmonized `--version` across programs
+
 ## [v1.0.0] - 2026-02-19
 
 ### Added

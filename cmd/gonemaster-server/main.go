@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -15,6 +16,11 @@ import (
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/server"
 )
+
+type usageLine struct {
+	flag   string
+	detail string
+}
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
@@ -55,25 +61,32 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	fs := flag.NewFlagSet("gonemaster-server", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	fs.Usage = func() {
-		fmt.Fprintf(errOut, "Usage: %s [--config PATH] [--listen ADDR] [--max-body-size BYTES] [--debug] [--workers N] [--max-concurrent-jobs N] [--positive-cache-ttl N] [--negative-cache-ttl N] [--timeout N] [--retry N] [--retrans N] [--fallback|--no-fallback] [--min-level LEVEL] [--profile PATH] [--shutdown-timeout DURATION]\n", fs.Name())
-		fmt.Fprintln(errOut, "")
-		fmt.Fprintln(errOut, "Options:")
-		fmt.Fprintln(errOut, "  --config            JSON config file path (optional)")
-		fmt.Fprintln(errOut, "  --listen            Address to listen on (default 127.0.0.1:8080)")
-		fmt.Fprintln(errOut, "  --max-body-size     Max request body size in bytes (default 1048576)")
-		fmt.Fprintln(errOut, "  --debug             Enable request/response logging")
-		fmt.Fprintln(errOut, "  --workers           Number of worker goroutines (default 4)")
-		fmt.Fprintln(errOut, "  --max-concurrent-jobs  Max concurrent engine runs (0 = unlimited)")
-		fmt.Fprintln(errOut, "  --positive-cache-ttl  Seconds to cache positive DNS responses (optional)")
-		fmt.Fprintln(errOut, "  --negative-cache-ttl  Seconds to cache negative DNS responses (optional)")
-		fmt.Fprintln(errOut, "  --timeout           Override resolver.defaults.timeout in seconds (optional)")
-		fmt.Fprintln(errOut, "  --retry             Override resolver.defaults.retry (optional)")
-		fmt.Fprintln(errOut, "  --retrans           Override resolver.defaults.retrans in seconds (optional)")
-		fmt.Fprintln(errOut, "  --fallback          Enable TCP fallback on UDP failure (optional)")
-		fmt.Fprintln(errOut, "  --no-fallback       Disable TCP fallback on UDP failure (optional)")
-		fmt.Fprintln(errOut, "  --min-level         Minimum log level (default INFO)")
-		fmt.Fprintln(errOut, "  --profile           Profile JSON/YAML path (optional)")
-		fmt.Fprintln(errOut, "  --shutdown-timeout  Graceful shutdown timeout (default 10s)")
+		fmt.Fprintf(errOut, "Usage: %s [flags]\n\n", fs.Name())
+		fmt.Fprintln(errOut, "Flags (CLI flags override --config values):")
+		printUsageGroup(errOut, "General", []usageLine{
+			{flag: "--config PATH", detail: "JSON config file path"},
+			{flag: "--listen ADDR", detail: "Address to listen on (default 127.0.0.1:8080)"},
+			{flag: "--max-body-size BYTES", detail: "Max request body size in bytes (default 1048576)"},
+			{flag: "--debug", detail: "Enable request/response logging"},
+			{flag: "--shutdown-timeout DURATION", detail: "Graceful shutdown timeout (default 10s)"},
+		})
+		printUsageGroup(errOut, "Concurrency", []usageLine{
+			{flag: "--workers N", detail: "Number of worker goroutines (default 4)"},
+			{flag: "--max-concurrent-jobs N", detail: "Max concurrent engine runs (0 = unlimited)"},
+		})
+		printUsageGroup(errOut, "Resolver/Profile", []usageLine{
+			{flag: "--profile PATH", detail: "Profile JSON/YAML path"},
+			{flag: "--positive-cache-ttl N", detail: "Cache positive DNS responses (seconds)"},
+			{flag: "--negative-cache-ttl N", detail: "Cache negative DNS responses (seconds)"},
+			{flag: "--timeout N", detail: "Override resolver.defaults.timeout (seconds)"},
+			{flag: "--retry N", detail: "Override resolver.defaults.retry"},
+			{flag: "--retrans N", detail: "Override resolver.defaults.retrans (seconds)"},
+			{flag: "--fallback", detail: "Enable TCP fallback on UDP failure"},
+			{flag: "--no-fallback", detail: "Disable TCP fallback on UDP failure"},
+		})
+		printUsageGroup(errOut, "Output", []usageLine{
+			{flag: "--min-level LEVEL", detail: "Minimum result log level (default INFO)"},
+		})
 	}
 	fs.StringVar(&configPath, "config", "", "JSON config file path (optional)")
 	fs.StringVar(&listen, "listen", "127.0.0.1:8080", "Address to listen on (default 127.0.0.1:8080)")
@@ -266,4 +279,15 @@ func formatListenURL(addr string) string {
 		return "http://" + host
 	}
 	return "http://" + host + ":" + port
+}
+
+func printUsageGroup(out io.Writer, title string, lines []usageLine) {
+	if len(lines) == 0 {
+		return
+	}
+	fmt.Fprintf(out, "  %s:\n", title)
+	for _, line := range lines {
+		fmt.Fprintf(out, "    %-35s %s\n", line.flag, line.detail)
+	}
+	fmt.Fprintln(out, "")
 }

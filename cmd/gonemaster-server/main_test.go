@@ -39,6 +39,35 @@ func TestRunInvalidConfig(t *testing.T) {
 	}
 }
 
+func TestRunHelpShowsGroupedFlags(t *testing.T) {
+	out := newTempFile(t)
+	errOut := newTempFile(t)
+	defer cleanupTempFile(t, out)
+	defer cleanupTempFile(t, errOut)
+
+	code := run([]string{"-h"}, out, errOut)
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d", code)
+	}
+
+	help := readTempFile(t, errOut)
+	expected := []string{
+		"Usage: gonemaster-server [flags]",
+		"Flags (CLI flags override --config values):",
+		"General:",
+		"Concurrency:",
+		"Resolver/Profile:",
+		"Output:",
+		"--workers N",
+		"--min-level LEVEL",
+	}
+	for _, fragment := range expected {
+		if !strings.Contains(help, fragment) {
+			t.Fatalf("expected %q in help output, got %q", fragment, help)
+		}
+	}
+}
+
 func newTempFile(t *testing.T) *os.File {
 	t.Helper()
 	f, err := os.CreateTemp("", "gm-server-*.log")

@@ -38,6 +38,36 @@ func TestRunRequiresDomain(t *testing.T) {
 	}
 }
 
+func TestRunHelpShowsGroupedFlags(t *testing.T) {
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := run([]string{"-h"}, &out, &errOut)
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d", code)
+	}
+	help := errOut.String()
+	expected := []string{
+		"Usage: gonemaster [flags]",
+		"Flags:",
+		"Target:",
+		"Output:",
+		"Resolver/Profile Overrides:",
+		"Undelegated:",
+		"Utility:",
+		"--domain DOMAIN",
+		"--count",
+	}
+	for _, fragment := range expected {
+		if !strings.Contains(help, fragment) {
+			t.Fatalf("expected %q in help output, got %q", fragment, help)
+		}
+	}
+	if out.Len() != 0 {
+		t.Fatalf("expected no stdout output, got %q", out.String())
+	}
+}
+
 func TestRunDumpProfileWithoutDomain(t *testing.T) {
 	var out bytes.Buffer
 	var errOut bytes.Buffer

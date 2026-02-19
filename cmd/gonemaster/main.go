@@ -19,6 +19,10 @@ import (
 var runEngine = engine.Run
 
 type repeatableStringFlag []string
+type usageLine struct {
+	flag   string
+	detail string
+}
 
 func (f *repeatableStringFlag) String() string {
 	if f == nil || len(*f) == 0 {
@@ -83,41 +87,49 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs := flag.NewFlagSet("gonemaster", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	fs.Usage = func() {
-		fmt.Fprintf(errOut, "Usage: %s --domain DOMAIN [--module MODULE] [--testcase TESTCASE] [--profile PATH] [--min-level LEVEL] [--output PATH] [--raw] [--json] [--json-stream] [--dump-profile] [--locale LOCALE] [--no-ipv4] [--no-ipv6|--ipv6] [--parallel N] [--unordered] [--ordered] [--timeout N] [--retry N] [--retrans N] [--fallback|--no-fallback] [--error-cache-ttl N] [--positive-cache-ttl N] [--negative-cache-ttl N] [--ns NAME[/IP]] [--ds KEYTAG,ALGORITHM,DIGTYPE,DIGEST] [--no-progress] [--count] [--list-tests] [--version]\n", fs.Name())
-		fmt.Fprintln(errOut, "")
-		fmt.Fprintln(errOut, "Options:")
-		fmt.Fprintln(errOut, "  --domain     Zone name to test (required)")
-		fmt.Fprintln(errOut, "  --module     Run a single module (optional)")
-		fmt.Fprintln(errOut, "  --testcase   Run a single testcase (optional)")
-		fmt.Fprintln(errOut, "  --profile    Profile JSON/YAML path (optional)")
-		fmt.Fprintln(errOut, "  --min-level  Minimum log level (optional, default NOTICE)")
-		fmt.Fprintln(errOut, "  --output     Write output to file (optional)")
-		fmt.Fprintln(errOut, "  --raw        Stream raw log entries as they are produced (optional)")
-		fmt.Fprintln(errOut, "  --json       Print JSON output instead of translated output (optional)")
-		fmt.Fprintln(errOut, "  --json-stream  Stream JSON log entries as they are produced (optional)")
-		fmt.Fprintln(errOut, "  --dump-profile  Print effective profile in JSON and exit (optional)")
-		fmt.Fprintln(errOut, "  --locale     Locale for translated output (optional)")
-		fmt.Fprintln(errOut, "  --no-ipv4    Disable IPv4 queries (optional)")
-		fmt.Fprintln(errOut, "  --no-ipv6    Disable IPv6 queries (optional)")
-		fmt.Fprintln(errOut, "  --ipv6       Force IPv6 queries (optional)")
-		fmt.Fprintln(errOut, "  --parallel   Override resolver.defaults.parallel (optional)")
-		fmt.Fprintln(errOut, "  --unordered  Allow unordered resolver behavior (optional, override profile)")
-		fmt.Fprintln(errOut, "  --ordered    Force ordered resolver behavior (optional, override profile)")
-		fmt.Fprintln(errOut, "  --timeout    Override resolver.defaults.timeout in seconds (optional)")
-		fmt.Fprintln(errOut, "  --retry      Override resolver.defaults.retry (optional)")
-		fmt.Fprintln(errOut, "  --retrans    Override resolver.defaults.retrans in seconds (optional)")
-		fmt.Fprintln(errOut, "  --fallback   Enable TCP fallback on UDP failure (optional)")
-		fmt.Fprintln(errOut, "  --no-fallback  Disable TCP fallback on UDP failure (optional)")
-		fmt.Fprintln(errOut, "  --error-cache-ttl  Seconds to skip queries after network errors (optional)")
-		fmt.Fprintln(errOut, "  --positive-cache-ttl  Seconds to cache positive DNS responses (optional)")
-		fmt.Fprintln(errOut, "  --negative-cache-ttl  Seconds to cache negative DNS responses (optional)")
-		fmt.Fprintln(errOut, "  --ns         Undelegated nameserver as name[/ip] (repeatable)")
-		fmt.Fprintln(errOut, "  --ds         Undelegated DS as keytag,algorithm,digtype,digest (repeatable)")
-		fmt.Fprintln(errOut, "  --no-progress  Disable progress indicator (optional)")
-		fmt.Fprintln(errOut, "  --count      Print count summary by level and message tag (optional)")
-		fmt.Fprintln(errOut, "  --list-tests  List all available test cases (optional)")
-		fmt.Fprintln(errOut, "  --version    Print version and exit (optional)")
-		fmt.Fprintln(errOut, "")
+		fmt.Fprintf(errOut, "Usage: %s [flags]\n\n", fs.Name())
+		fmt.Fprintln(errOut, "Flags:")
+		printUsageGroup(errOut, "Target", []usageLine{
+			{flag: "--domain DOMAIN", detail: "Zone name to test (required for runs)"},
+			{flag: "--module MODULE", detail: "Run a single module"},
+			{flag: "--testcase TESTCASE", detail: "Run a single testcase"},
+			{flag: "--profile PATH", detail: "Profile JSON/YAML path"},
+		})
+		printUsageGroup(errOut, "Output", []usageLine{
+			{flag: "--min-level LEVEL", detail: "Minimum log level (default NOTICE)"},
+			{flag: "--locale LOCALE", detail: "Locale for translated output"},
+			{flag: "--output PATH", detail: "Write output to file"},
+			{flag: "--raw", detail: "Stream raw log entries"},
+			{flag: "--json", detail: "Print a JSON array of log entries"},
+			{flag: "--json-stream", detail: "Stream JSON log entries"},
+			{flag: "--count", detail: "Print count summary by level and message tag"},
+			{flag: "--no-progress", detail: "Disable progress indicator"},
+		})
+		printUsageGroup(errOut, "Resolver/Profile Overrides", []usageLine{
+			{flag: "--no-ipv4", detail: "Disable IPv4 queries"},
+			{flag: "--no-ipv6", detail: "Disable IPv6 queries"},
+			{flag: "--ipv6", detail: "Force IPv6 queries"},
+			{flag: "--parallel N", detail: "Override resolver.defaults.parallel"},
+			{flag: "--unordered", detail: "Allow unordered resolver behavior"},
+			{flag: "--ordered", detail: "Force ordered resolver behavior"},
+			{flag: "--timeout N", detail: "Override resolver.defaults.timeout (seconds)"},
+			{flag: "--retry N", detail: "Override resolver.defaults.retry"},
+			{flag: "--retrans N", detail: "Override resolver.defaults.retrans (seconds)"},
+			{flag: "--fallback", detail: "Enable TCP fallback on UDP failure"},
+			{flag: "--no-fallback", detail: "Disable TCP fallback on UDP failure"},
+			{flag: "--error-cache-ttl N", detail: "Skip query retry after network errors (seconds)"},
+			{flag: "--positive-cache-ttl N", detail: "Cache positive DNS responses (seconds)"},
+			{flag: "--negative-cache-ttl N", detail: "Cache negative DNS responses (seconds)"},
+		})
+		printUsageGroup(errOut, "Undelegated", []usageLine{
+			{flag: "--ns NAME[/IP]", detail: "Undelegated nameserver (repeatable)"},
+			{flag: "--ds KEYTAG,ALGORITHM,DIGTYPE,DIGEST", detail: "Undelegated DS info (repeatable)"},
+		})
+		printUsageGroup(errOut, "Utility", []usageLine{
+			{flag: "--dump-profile", detail: "Print effective profile in JSON and exit"},
+			{flag: "--list-tests", detail: "List all available test cases and exit"},
+			{flag: "--version", detail: "Print version information and exit"},
+		})
 		fmt.Fprintln(errOut, "Undelegated examples:")
 		fmt.Fprintln(errOut, "  --ns ns1.example.com/192.0.2.10 --ns ns1.example.com/2001:db8::10")
 		fmt.Fprintln(errOut, "  --ds 12345,13,2,0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF")
@@ -656,4 +668,15 @@ func writeLines(out io.Writer, lines []string) error {
 		}
 	}
 	return nil
+}
+
+func printUsageGroup(out io.Writer, title string, lines []usageLine) {
+	if len(lines) == 0 {
+		return
+	}
+	fmt.Fprintf(out, "  %s:\n", title)
+	for _, line := range lines {
+		fmt.Fprintf(out, "    %-42s %s\n", line.flag, line.detail)
+	}
+	fmt.Fprintln(out, "")
 }

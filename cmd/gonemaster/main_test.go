@@ -76,7 +76,7 @@ func TestRunHelpShowsGroupedFlags(t *testing.T) {
 	}
 	help := errOut.String()
 	expected := []string{
-		"Usage: gonemaster [flags]",
+		"Usage: gonemaster [flags] [DOMAIN]",
 		"Flags:",
 		"Target:",
 		"Output:",
@@ -84,6 +84,7 @@ func TestRunHelpShowsGroupedFlags(t *testing.T) {
 		"Resolver/Profile Overrides:",
 		"Undelegated:",
 		"Utility:",
+		"DOMAIN",
 		"--domain DOMAIN",
 		"--count",
 		"--save PATH",
@@ -97,6 +98,71 @@ func TestRunHelpShowsGroupedFlags(t *testing.T) {
 	}
 	if out.Len() != 0 {
 		t.Fatalf("expected no stdout output, got %q", out.String())
+	}
+}
+
+func TestRunAcceptsPositionalDomain(t *testing.T) {
+	var captured engine.RunRequest
+	stubRunEngine(t, &captured)
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := run([]string{"example.com"}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
+	}
+	if captured.Domain != "example.com" {
+		t.Fatalf("expected positional domain example.com, got %q", captured.Domain)
+	}
+}
+
+func TestRunAcceptsPositionalDomainWithFlags(t *testing.T) {
+	var captured engine.RunRequest
+	stubRunEngine(t, &captured)
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := run([]string{"--min-level", "INFO", "--json", "example.com"}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
+	}
+	if captured.Domain != "example.com" {
+		t.Fatalf("expected positional domain example.com, got %q", captured.Domain)
+	}
+	if captured.MinLevel != "INFO" {
+		t.Fatalf("expected min-level INFO, got %q", captured.MinLevel)
+	}
+}
+
+func TestRunRejectsMultiplePositionalDomains(t *testing.T) {
+	stubRunEngine(t, nil)
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := run([]string{"example.com", "example.net"}, &out, &errOut)
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d", code)
+	}
+	if !strings.Contains(errOut.String(), "only one positional DOMAIN argument is allowed") {
+		t.Fatalf("expected positional-argument validation error, got %q", errOut.String())
+	}
+}
+
+func TestRunRejectsDomainProvidedTwice(t *testing.T) {
+	stubRunEngine(t, nil)
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := run([]string{"--domain", "example.com", "example.net"}, &out, &errOut)
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d", code)
+	}
+	if !strings.Contains(errOut.String(), "domain provided twice; use either --domain DOMAIN or positional DOMAIN") {
+		t.Fatalf("expected duplicate-domain validation error, got %q", errOut.String())
 	}
 }
 

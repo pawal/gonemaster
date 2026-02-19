@@ -96,10 +96,11 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs := flag.NewFlagSet("gonemaster", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	fs.Usage = func() {
-		fmt.Fprintf(errOut, "Usage: %s [flags]\n\n", fs.Name())
+		fmt.Fprintf(errOut, "Usage: %s [flags] [DOMAIN]\n\n", fs.Name())
 		fmt.Fprintln(errOut, "Flags:")
 		printUsageGroup(errOut, "Target", []usageLine{
-			{flag: "--domain DOMAIN", detail: "Zone name to test (required for runs)"},
+			{flag: "DOMAIN", detail: "Zone name to test (positional alternative to --domain)"},
+			{flag: "--domain DOMAIN", detail: "Zone name to test (required for runs if positional DOMAIN is not provided)"},
 			{flag: "--module MODULE", detail: "Run a single module"},
 			{flag: "--testcase TESTCASE", detail: "Run a single testcase"},
 			{flag: "--profile PATH", detail: "Profile JSON/YAML path"},
@@ -191,6 +192,18 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs.BoolVar(&showVersion, "version", false, "Print version and exit (optional)")
 	if err := fs.Parse(args); err != nil {
 		return 2
+	}
+	positional := fs.Args()
+	if len(positional) > 1 {
+		fmt.Fprintln(errOut, "only one positional DOMAIN argument is allowed")
+		return 2
+	}
+	if len(positional) == 1 {
+		if strings.TrimSpace(domain) != "" {
+			fmt.Fprintln(errOut, "domain provided twice; use either --domain DOMAIN or positional DOMAIN")
+			return 2
+		}
+		domain = strings.TrimSpace(positional[0])
 	}
 	fs.Visit(func(f *flag.Flag) {
 		if f.Name == "parallel" {
@@ -492,7 +505,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	}
 
 	if domain == "" {
-		fmt.Fprintln(errOut, "--domain is required")
+		fmt.Fprintln(errOut, "--domain is required (or pass DOMAIN as a positional argument)")
 		return 2
 	}
 	if errs, normalized := normalization.NormalizeName(domain); len(errs) > 0 {

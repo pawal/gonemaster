@@ -547,8 +547,29 @@ func (ns Nameserver) clientForOptions(ctx context.Context, opts *QueryOptions) (
 		base.SetEDNSSize(constants.EDNSUDPPayloadDNSSECDefault)
 	}
 
-	base.ApplyProfileDefaults(profile.FromContext(ctx))
+	prof := profile.FromContext(ctx)
+	base.ApplyProfileDefaults(prof)
+	applyProfileSourceAddress(&base, ns.Address, prof)
 	return &base, nil
+}
+
+func applyProfileSourceAddress(client *transport.Client, target netip.Addr, prof *profile.Profile) {
+	if client == nil || client.SourceIP != "" {
+		return
+	}
+	if !target.IsValid() {
+		return
+	}
+	if prof == nil {
+		prof = profile.Effective()
+	}
+	if target.Is4() && prof.Resolver.Source4 != "" {
+		client.SourceIP = prof.Resolver.Source4
+		return
+	}
+	if target.Is6() && prof.Resolver.Source6 != "" {
+		client.SourceIP = prof.Resolver.Source6
+	}
 }
 
 func resolveEDNSSize(opts *QueryOptions, dnssec bool) uint16 {

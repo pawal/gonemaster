@@ -48,7 +48,8 @@ func (ns Nameserver) AXFR(ctx context.Context, domain string, callback func(dns.
 	}
 	base.SetUseTCP(true)
 	base.SetRecursionDesired(false)
-	base.ApplyProfileDefaults(profile.FromContext(ctx))
+	base.ApplyProfileDefaults(prof)
+	applyProfileSourceAddress(&base, ns.Address, prof)
 
 	msg := new(dns.Msg)
 	msg.SetAxfr(dns.Fqdn(domain))

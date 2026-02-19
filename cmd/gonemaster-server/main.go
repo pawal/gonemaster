@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"os/signal"
 	"strings"
@@ -40,6 +41,8 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	var retransSeconds int
 	var fallback bool
 	var noFallback bool
+	var sourceAddr4 string
+	var sourceAddr6 string
 	var minLevel string
 	var profilePath string
 	var shutdownTimeout time.Duration
@@ -55,6 +58,8 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	var retransSet bool
 	var fallbackSet bool
 	var noFallbackSet bool
+	var sourceAddr4Set bool
+	var sourceAddr6Set bool
 	var minLevelSet bool
 	var profilePathSet bool
 
@@ -83,6 +88,8 @@ func run(args []string, out *os.File, errOut *os.File) int {
 			{flag: "--retrans N", detail: "Override resolver.defaults.retrans (seconds)"},
 			{flag: "--fallback", detail: "Enable TCP fallback on UDP failure"},
 			{flag: "--no-fallback", detail: "Disable TCP fallback on UDP failure"},
+			{flag: "--sourceaddr4 IPADDR", detail: "Override resolver.source4 (IPv4 source address)"},
+			{flag: "--sourceaddr6 IPADDR", detail: "Override resolver.source6 (IPv6 source address)"},
 		})
 		printUsageGroup(errOut, "Output", []usageLine{
 			{flag: "--min-level LEVEL", detail: "Minimum result log level (default INFO)"},
@@ -101,6 +108,8 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	fs.IntVar(&retransSeconds, "retrans", 0, "Override resolver.defaults.retrans in seconds (optional)")
 	fs.BoolVar(&fallback, "fallback", false, "Enable TCP fallback on UDP failure (optional)")
 	fs.BoolVar(&noFallback, "no-fallback", false, "Disable TCP fallback on UDP failure (optional)")
+	fs.StringVar(&sourceAddr4, "sourceaddr4", "", "Override resolver.source4 (IPv4 source address) (optional)")
+	fs.StringVar(&sourceAddr6, "sourceaddr6", "", "Override resolver.source6 (IPv6 source address) (optional)")
 	fs.StringVar(&minLevel, "min-level", "", "Minimum log level (default INFO)")
 	fs.StringVar(&profilePath, "profile", "", "Profile JSON/YAML path (optional)")
 	fs.DurationVar(&shutdownTimeout, "shutdown-timeout", 10*time.Second, "Graceful shutdown timeout (default 10s)")
@@ -133,6 +142,10 @@ func run(args []string, out *os.File, errOut *os.File) int {
 			fallbackSet = true
 		case "no-fallback":
 			noFallbackSet = true
+		case "sourceaddr4":
+			sourceAddr4Set = true
+		case "sourceaddr6":
+			sourceAddr6Set = true
 		case "min-level":
 			minLevelSet = true
 		case "profile":
@@ -170,6 +183,20 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	if fallbackSet && noFallbackSet {
 		fmt.Fprintln(errOut, "--fallback cannot be combined with --no-fallback")
 		return 2
+	}
+	if sourceAddr4Set {
+		addr, err := netip.ParseAddr(strings.TrimSpace(sourceAddr4))
+		if err != nil || !addr.Is4() {
+			fmt.Fprintln(errOut, "--sourceaddr4 must be a valid IPv4 address")
+			return 2
+		}
+	}
+	if sourceAddr6Set {
+		addr, err := netip.ParseAddr(strings.TrimSpace(sourceAddr6))
+		if err != nil || !addr.Is6() {
+			fmt.Fprintln(errOut, "--sourceaddr6 must be a valid IPv6 address")
+			return 2
+		}
 	}
 
 	cfg := server.DefaultConfig()
@@ -223,6 +250,14 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	if noFallbackSet {
 		value := false
 		cfg.Fallback = &value
+	}
+	if sourceAddr4Set {
+		value := strings.TrimSpace(sourceAddr4)
+		cfg.SourceAddr4 = &value
+	}
+	if sourceAddr6Set {
+		value := strings.TrimSpace(sourceAddr6)
+		cfg.SourceAddr6 = &value
 	}
 	if minLevelSet {
 		cfg.MinLevel = minLevel

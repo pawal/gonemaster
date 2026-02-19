@@ -62,6 +62,10 @@ type RunRequest struct {
 	Retrans *int
 	// Fallback sets resolver.defaults.fallback.
 	Fallback *bool
+	// SourceAddr4 sets resolver.source4 (IPv4 source address).
+	SourceAddr4 *string
+	// SourceAddr6 sets resolver.source6 (IPv6 source address).
+	SourceAddr6 *string
 	// PositiveCacheTTL sets resolver.defaults.positive_cache_ttl in seconds.
 	PositiveCacheTTL *int
 	// NegativeCacheTTL sets resolver.defaults.negative_cache_ttl in seconds.
@@ -348,6 +352,16 @@ func buildProfile(req RunRequest, module string, testcase string) (*profile.Prof
 	}
 	if req.Fallback != nil {
 		if err := p.Set("resolver.defaults.fallback", *req.Fallback); err != nil {
+			return nil, false, err
+		}
+	}
+	if req.SourceAddr4 != nil {
+		if err := p.Set("resolver.source4", *req.SourceAddr4); err != nil {
+			return nil, false, err
+		}
+	}
+	if req.SourceAddr6 != nil {
+		if err := p.Set("resolver.source6", *req.SourceAddr6); err != nil {
 			return nil, false, err
 		}
 	}

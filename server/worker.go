@@ -196,6 +196,12 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 	if s.cfg.Fallback != nil {
 		req.Fallback = s.cfg.Fallback
 	}
+	if s.cfg.SourceAddr4 != nil {
+		req.SourceAddr4 = s.cfg.SourceAddr4
+	}
+	if s.cfg.SourceAddr6 != nil {
+		req.SourceAddr6 = s.cfg.SourceAddr6
+	}
 
 	queryCounter := &dnsQueryCounter{}
 	callbacks := []func(*logger.Entry) error{

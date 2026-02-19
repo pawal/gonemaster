@@ -25,7 +25,11 @@ type Config struct {
 	// Retrans overrides resolver.defaults.retrans when set (seconds).
 	Retrans *int
 	// Fallback overrides resolver.defaults.fallback when set.
-	Fallback    *bool
+	Fallback *bool
+	// SourceAddr4 overrides resolver.source4 when set.
+	SourceAddr4 *string
+	// SourceAddr6 overrides resolver.source6 when set.
+	SourceAddr6 *string
 	MinLevel    string
 	ProfilePath string
 }
@@ -43,6 +47,8 @@ type FileConfig struct {
 	Retry             *int    `json:"retry"`
 	Retrans           *int    `json:"retrans"`
 	Fallback          *bool   `json:"fallback"`
+	SourceAddr4       *string `json:"source_addr4"`
+	SourceAddr6       *string `json:"source_addr6"`
 	MinLevel          *string `json:"min_level"`
 	ProfilePath       *string `json:"profile_path"`
 }
@@ -106,6 +112,12 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 	}
 	if file.Fallback != nil {
 		c.Fallback = file.Fallback
+	}
+	if file.SourceAddr4 != nil {
+		c.SourceAddr4 = file.SourceAddr4
+	}
+	if file.SourceAddr6 != nil {
+		c.SourceAddr6 = file.SourceAddr6
 	}
 	if file.MinLevel != nil {
 		c.MinLevel = *file.MinLevel

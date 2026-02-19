@@ -16,6 +16,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/transport"
 )
 
 func TestFakeDSResponse(t *testing.T) {
@@ -485,6 +486,49 @@ func TestClientForOptionsDefaults(t *testing.T) {
 	}
 	if !client.UseTCP {
 		t.Fatalf("expected TCP when requested")
+	}
+}
+
+func TestClientForOptionsAppliesProfileSourceAddressByFamily(t *testing.T) {
+	ctx, prof := testContext(t)
+	prof.Resolver.Source4 = "192.0.2.88"
+	prof.Resolver.Source6 = "2001:db8::88"
+
+	ns4, err := New("ns4.example", "192.0.2.30", nil)
+	if err != nil {
+		t.Fatalf("new ipv4 nameserver: %v", err)
+	}
+	client4, err := ns4.clientForOptions(ctx, nil)
+	if err != nil {
+		t.Fatalf("client4: %v", err)
+	}
+	if client4.SourceIP != "192.0.2.88" {
+		t.Fatalf("client4.SourceIP = %q, want 192.0.2.88", client4.SourceIP)
+	}
+
+	ns6, err := New("ns6.example", "2001:db8::30", nil)
+	if err != nil {
+		t.Fatalf("new ipv6 nameserver: %v", err)
+	}
+	client6, err := ns6.clientForOptions(ctx, nil)
+	if err != nil {
+		t.Fatalf("client6: %v", err)
+	}
+	if client6.SourceIP != "2001:db8::88" {
+		t.Fatalf("client6.SourceIP = %q, want 2001:db8::88", client6.SourceIP)
+	}
+
+	explicit := &transport.Client{SourceIP: "192.0.2.199"}
+	nsExplicit, err := New("ns-explicit.example", "192.0.2.31", explicit)
+	if err != nil {
+		t.Fatalf("new explicit nameserver: %v", err)
+	}
+	clientExplicit, err := nsExplicit.clientForOptions(ctx, nil)
+	if err != nil {
+		t.Fatalf("clientExplicit: %v", err)
+	}
+	if clientExplicit.SourceIP != "192.0.2.199" {
+		t.Fatalf("expected explicit source ip to be preserved, got %q", clientExplicit.SourceIP)
 	}
 }
 

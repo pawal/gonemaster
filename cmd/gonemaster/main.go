@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"os/signal"
 	"runtime/debug"
@@ -75,6 +76,10 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	var fallbackSet bool
 	var noFallback bool
 	var noFallbackSet bool
+	var sourceAddr4 string
+	var sourceAddr4Set bool
+	var sourceAddr6 string
+	var sourceAddr6Set bool
 	var positiveCacheTTL int
 	var positiveCacheTTLSet bool
 	var negativeCacheTTL int
@@ -125,6 +130,8 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 			{flag: "--retrans N", detail: "Override resolver.defaults.retrans (seconds)"},
 			{flag: "--fallback", detail: "Enable TCP fallback on UDP failure"},
 			{flag: "--no-fallback", detail: "Disable TCP fallback on UDP failure"},
+			{flag: "--sourceaddr4 IPADDR", detail: "Override resolver.source4 (IPv4 source address)"},
+			{flag: "--sourceaddr6 IPADDR", detail: "Override resolver.source6 (IPv6 source address)"},
 			{flag: "--error-cache-ttl N", detail: "Skip query retry after network errors (seconds)"},
 			{flag: "--positive-cache-ttl N", detail: "Cache positive DNS responses (seconds)"},
 			{flag: "--negative-cache-ttl N", detail: "Cache negative DNS responses (seconds)"},
@@ -169,6 +176,8 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs.IntVar(&retransSeconds, "retrans", 0, "Override resolver.defaults.retrans in seconds (optional)")
 	fs.BoolVar(&fallback, "fallback", false, "Enable TCP fallback on UDP failure (optional)")
 	fs.BoolVar(&noFallback, "no-fallback", false, "Disable TCP fallback on UDP failure (optional)")
+	fs.StringVar(&sourceAddr4, "sourceaddr4", "", "Override resolver.source4 (IPv4 source address) (optional)")
+	fs.StringVar(&sourceAddr6, "sourceaddr6", "", "Override resolver.source6 (IPv6 source address) (optional)")
 	fs.IntVar(&errorCacheTTL, "error-cache-ttl", 0, "Seconds to skip queries after network errors (optional)")
 	fs.IntVar(&positiveCacheTTL, "positive-cache-ttl", 0, "Seconds to cache positive DNS responses (optional)")
 	fs.IntVar(&negativeCacheTTL, "negative-cache-ttl", 0, "Seconds to cache negative DNS responses (optional)")
@@ -210,6 +219,12 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		}
 		if f.Name == "no-fallback" {
 			noFallbackSet = true
+		}
+		if f.Name == "sourceaddr4" {
+			sourceAddr4Set = true
+		}
+		if f.Name == "sourceaddr6" {
+			sourceAddr6Set = true
 		}
 		if f.Name == "positive-cache-ttl" {
 			positiveCacheTTLSet = true
@@ -319,6 +334,26 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		value := false
 		fallbackOverride = &value
 	}
+	var sourceAddr4Override *string
+	if sourceAddr4Set {
+		value := strings.TrimSpace(sourceAddr4)
+		parsed := net.ParseIP(value)
+		if parsed == nil || parsed.To4() == nil {
+			fmt.Fprintln(errOut, "--sourceaddr4 must be a valid IPv4 address")
+			return 2
+		}
+		sourceAddr4Override = &value
+	}
+	var sourceAddr6Override *string
+	if sourceAddr6Set {
+		value := strings.TrimSpace(sourceAddr6)
+		parsed := net.ParseIP(value)
+		if parsed == nil || parsed.To4() != nil {
+			fmt.Fprintln(errOut, "--sourceaddr6 must be a valid IPv6 address")
+			return 2
+		}
+		sourceAddr6Override = &value
+	}
 	var positiveCacheOverride *int
 	if positiveCacheTTLSet {
 		if positiveCacheTTL < 0 {
@@ -365,6 +400,8 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		Retry:            retryOverride,
 		Retrans:          retransOverride,
 		Fallback:         fallbackOverride,
+		SourceAddr4:      sourceAddr4Override,
+		SourceAddr6:      sourceAddr6Override,
 		PositiveCacheTTL: positiveCacheOverride,
 		NegativeCacheTTL: negativeCacheOverride,
 	}

@@ -87,6 +87,8 @@ func TestRunHelpShowsGroupedFlags(t *testing.T) {
 		"--domain DOMAIN",
 		"--count",
 		"--save PATH",
+		"--sourceaddr4 IPADDR",
+		"--sourceaddr6 IPADDR",
 	}
 	for _, fragment := range expected {
 		if !strings.Contains(help, fragment) {
@@ -610,6 +612,68 @@ func TestRunCarriesUndelegatedInputsInRunRequest(t *testing.T) {
 	}
 	if captured.UndelegatedDSInfo[0].KeyTag != 12345 {
 		t.Fatalf("unexpected undelegated DS in request: %+v", captured.UndelegatedDSInfo[0])
+	}
+}
+
+func TestRunParsesSourceAddrOverrides(t *testing.T) {
+	var captured engine.RunRequest
+	stubRunEngine(t, &captured)
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := run([]string{
+		"--domain", "example.com",
+		"--json",
+		"--sourceaddr4", "192.0.2.44",
+		"--sourceaddr6", "2001:db8::44",
+	}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
+	}
+	if captured.SourceAddr4 == nil || *captured.SourceAddr4 != "192.0.2.44" {
+		t.Fatalf("unexpected SourceAddr4 override: %#v", captured.SourceAddr4)
+	}
+	if captured.SourceAddr6 == nil || *captured.SourceAddr6 != "2001:db8::44" {
+		t.Fatalf("unexpected SourceAddr6 override: %#v", captured.SourceAddr6)
+	}
+}
+
+func TestRunRejectsInvalidSourceAddr4(t *testing.T) {
+	stubRunEngine(t, nil)
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := run([]string{
+		"--domain", "example.com",
+		"--json",
+		"--sourceaddr4", "not-an-ip",
+	}, &out, &errOut)
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d", code)
+	}
+	if !strings.Contains(errOut.String(), "--sourceaddr4 must be a valid IPv4 address") {
+		t.Fatalf("expected sourceaddr4 parse error, got %q", errOut.String())
+	}
+}
+
+func TestRunRejectsInvalidSourceAddr6(t *testing.T) {
+	stubRunEngine(t, nil)
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := run([]string{
+		"--domain", "example.com",
+		"--json",
+		"--sourceaddr6", "192.0.2.10",
+	}, &out, &errOut)
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d", code)
+	}
+	if !strings.Contains(errOut.String(), "--sourceaddr6 must be a valid IPv6 address") {
+		t.Fatalf("expected sourceaddr6 parse error, got %q", errOut.String())
 	}
 }
 

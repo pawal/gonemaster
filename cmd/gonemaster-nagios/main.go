@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"strings"
 
@@ -46,6 +47,8 @@ var nagiosCodes = map[string]nagiosStatus{
 	"CRITICAL": {text: "CRITICAL", code: 2},
 }
 
+var runEngine = engine.Run
+
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 }
@@ -60,6 +63,10 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	var disableIPv4 bool
 	var disableIPv6 bool
 	var forceIPv6 bool
+	var sourceAddr4 string
+	var sourceAddr6 string
+	var sourceAddr4Set bool
+	var sourceAddr6Set bool
 	var showVersion bool
 	var showHelp bool
 	var verbose countFlag
@@ -67,7 +74,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs := flag.NewFlagSet("gonemaster-nagios", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	fs.Usage = func() {
-		fmt.Fprintf(errOut, "Usage: %s -d DOMAIN [-v|-vv|-vvv] [--module MODULE] [--testcase TESTCASE] [--profile PATH] [--no-ipv4|--disable-ipv4] [--no-ipv6|--disable-ipv6|--ipv6] [--version]\n", fs.Name())
+		fmt.Fprintf(errOut, "Usage: %s -d DOMAIN [-v|-vv|-vvv] [--module MODULE] [--testcase TESTCASE] [--profile PATH] [--no-ipv4|--disable-ipv4] [--no-ipv6|--disable-ipv6|--ipv6] [--sourceaddr4 IPADDR] [--sourceaddr6 IPADDR] [--version]\n", fs.Name())
 		fmt.Fprintln(errOut, "")
 		fmt.Fprintln(errOut, "Options:")
 		fmt.Fprintln(errOut, "  -d, --domain   Zone name to test (required)")
@@ -79,6 +86,8 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		fmt.Fprintln(errOut, "  --disable-ipv4 Disable IPv4 queries (optional)")
 		fmt.Fprintln(errOut, "  --disable-ipv6 Disable IPv6 queries (optional)")
 		fmt.Fprintln(errOut, "  --ipv6         Force IPv6 queries (optional)")
+		fmt.Fprintln(errOut, "  --sourceaddr4  Override resolver.source4 (IPv4 source address) (optional)")
+		fmt.Fprintln(errOut, "  --sourceaddr6  Override resolver.source6 (IPv6 source address) (optional)")
 		fmt.Fprintln(errOut, "  -v, --verbose  Increase verbosity (repeatable)")
 		fmt.Fprintln(errOut, "  -V, --version  Print version and exit")
 		fmt.Fprintln(errOut, "  -h, --help     Show help")
@@ -100,6 +109,8 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs.BoolVar(&disableIPv4, "disable-ipv4", false, "Disable IPv4 queries (optional)")
 	fs.BoolVar(&disableIPv6, "disable-ipv6", false, "Disable IPv6 queries (optional)")
 	fs.BoolVar(&forceIPv6, "ipv6", false, "Force IPv6 queries (optional)")
+	fs.StringVar(&sourceAddr4, "sourceaddr4", "", "Override resolver.source4 (IPv4 source address) (optional)")
+	fs.StringVar(&sourceAddr6, "sourceaddr6", "", "Override resolver.source6 (IPv6 source address) (optional)")
 	fs.Var(&verbose, "verbose", "Increase verbosity (repeatable)")
 	fs.Var(&verbose, "v", "Increase verbosity (repeatable)")
 	fs.BoolVar(&showVersion, "version", false, "Print version and exit")
@@ -110,6 +121,14 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	if err := fs.Parse(expandVerboseArgs(args)); err != nil {
 		return 3
 	}
+	fs.Visit(func(f *flag.Flag) {
+		switch f.Name {
+		case "sourceaddr4":
+			sourceAddr4Set = true
+		case "sourceaddr6":
+			sourceAddr6Set = true
+		}
+	})
 
 	if showHelp {
 		fs.Usage()
@@ -144,14 +163,36 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		fmt.Fprintln(errOut, "--no-ipv6/--disable-ipv6 cannot be combined with --ipv6")
 		return 3
 	}
+	var sourceAddr4Override *string
+	if sourceAddr4Set {
+		value := strings.TrimSpace(sourceAddr4)
+		parsed := net.ParseIP(value)
+		if parsed == nil || parsed.To4() == nil {
+			fmt.Fprintln(errOut, "--sourceaddr4 must be a valid IPv4 address")
+			return 3
+		}
+		sourceAddr4Override = &value
+	}
+	var sourceAddr6Override *string
+	if sourceAddr6Set {
+		value := strings.TrimSpace(sourceAddr6)
+		parsed := net.ParseIP(value)
+		if parsed == nil || parsed.To4() != nil {
+			fmt.Fprintln(errOut, "--sourceaddr6 must be a valid IPv6 address")
+			return 3
+		}
+		sourceAddr6Override = &value
+	}
 
-	entries, err := engine.Run(engine.RunRequest{
-		Domain:   domain,
-		Module:   module,
-		Testcase: testcase,
-		Profile:  profilePath,
-		IPv4:     ipv4Override,
-		IPv6:     ipv6Override,
+	entries, err := runEngine(engine.RunRequest{
+		Domain:      domain,
+		Module:      module,
+		Testcase:    testcase,
+		Profile:     profilePath,
+		IPv4:        ipv4Override,
+		IPv6:        ipv6Override,
+		SourceAddr4: sourceAddr4Override,
+		SourceAddr6: sourceAddr6Override,
 	})
 	if err != nil {
 		fmt.Fprintf(out, "ZONE UNKNOWN - %s\n", err.Error())

@@ -295,6 +295,39 @@ func TestRunEngineForJobPassesUndelegatedInputs(t *testing.T) {
 	}
 }
 
+func TestRunEngineForJobPassesSourceAddrOverrides(t *testing.T) {
+	cfg := DefaultConfig()
+	source4 := "192.0.2.70"
+	source6 := "2001:db8::70"
+	cfg.SourceAddr4 = &source4
+	cfg.SourceAddr6 = &source6
+	srv := New(cfg)
+
+	var captured engine.RunRequest
+	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		captured = req
+		return nil, nil
+	}
+
+	job := Job{
+		ID:        "job-sourceaddr",
+		Domain:    "example.com",
+		Status:    JobQueued,
+		CreatedAt: time.Now().UTC(),
+	}
+
+	_, _, _, err := srv.runEngineForJob(job, context.Background())
+	if err != nil {
+		t.Fatalf("runEngineForJob: %v", err)
+	}
+	if captured.SourceAddr4 == nil || *captured.SourceAddr4 != source4 {
+		t.Fatalf("expected SourceAddr4 %q, got %#v", source4, captured.SourceAddr4)
+	}
+	if captured.SourceAddr6 == nil || *captured.SourceAddr6 != source6 {
+		t.Fatalf("expected SourceAddr6 %q, got %#v", source6, captured.SourceAddr6)
+	}
+}
+
 func TestDNSQueryCounterCallback(t *testing.T) {
 	counter := &dnsQueryCounter{}
 	entries := []*logger.Entry{

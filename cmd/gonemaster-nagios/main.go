@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"runtime/debug"
 	"strings"
 
 	"codeberg.org/pawal/gonemaster/engine"
@@ -137,6 +138,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 
 	if showVersion {
 		fmt.Fprintf(out, "Gonemaster version %s\n", engine.VersionFull())
+		fmt.Fprintf(out, "Miekg DNS version %s\n", moduleVersion("github.com/miekg/dns"))
 		return 0
 	}
 
@@ -285,4 +287,34 @@ func translatedMessage(entry engine.LogEntry) string {
 		return ""
 	}
 	return strings.TrimSpace(tmp.String())
+}
+
+func moduleVersion(path string) string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok || info == nil {
+		return "unknown"
+	}
+	if info.Main.Path == path {
+		return normalizeVersion(info.Main.Version)
+	}
+	for _, dep := range info.Deps {
+		if dep == nil || dep.Path != path {
+			continue
+		}
+		if dep.Replace != nil {
+			if dep.Replace.Version != "" {
+				return normalizeVersion(dep.Replace.Version)
+			}
+			return dep.Replace.Path
+		}
+		return normalizeVersion(dep.Version)
+	}
+	return "unknown"
+}
+
+func normalizeVersion(version string) string {
+	if version == "" {
+		return "unknown"
+	}
+	return version
 }

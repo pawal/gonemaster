@@ -10,6 +10,7 @@ import (
 	"net/netip"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"strings"
 	"syscall"
 	"time"
@@ -45,6 +46,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	var sourceAddr6 string
 	var minLevel string
 	var profilePath string
+	var showVersion bool
 	var shutdownTimeout time.Duration
 	var listenSet bool
 	var maxBodySizeSet bool
@@ -73,6 +75,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 			{flag: "--listen ADDR", detail: "Address to listen on (default 127.0.0.1:8080)"},
 			{flag: "--max-body-size BYTES", detail: "Max request body size in bytes (default 1048576)"},
 			{flag: "--debug", detail: "Enable request/response logging"},
+			{flag: "--version", detail: "Print version information and exit"},
 			{flag: "--shutdown-timeout DURATION", detail: "Graceful shutdown timeout (default 10s)"},
 		})
 		printUsageGroup(errOut, "Concurrency", []usageLine{
@@ -112,9 +115,15 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	fs.StringVar(&sourceAddr6, "sourceaddr6", "", "Override resolver.source6 (IPv6 source address) (optional)")
 	fs.StringVar(&minLevel, "min-level", "", "Minimum log level (default INFO)")
 	fs.StringVar(&profilePath, "profile", "", "Profile JSON/YAML path (optional)")
+	fs.BoolVar(&showVersion, "version", false, "Print version and exit (optional)")
 	fs.DurationVar(&shutdownTimeout, "shutdown-timeout", 10*time.Second, "Graceful shutdown timeout (default 10s)")
 	if err := fs.Parse(args); err != nil {
 		return 2
+	}
+	if showVersion {
+		fmt.Fprintf(out, "Gonemaster version %s\n", engine.VersionFull())
+		fmt.Fprintf(out, "Miekg DNS version %s\n", moduleVersion("github.com/miekg/dns"))
+		return 0
 	}
 	fs.Visit(func(f *flag.Flag) {
 		switch f.Name {
@@ -275,6 +284,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	}
 
 	fmt.Fprintf(errOut, "Gonemaster version %s\n", engine.VersionFull())
+	fmt.Fprintf(errOut, "Miekg DNS version %s\n", moduleVersion("github.com/miekg/dns"))
 	fmt.Fprintf(errOut, "Started server at %s\n", formatListenURL(cfg.ListenAddr))
 
 	shutdownCh := make(chan os.Signal, 1)
@@ -325,4 +335,34 @@ func printUsageGroup(out io.Writer, title string, lines []usageLine) {
 		fmt.Fprintf(out, "    %-35s %s\n", line.flag, line.detail)
 	}
 	fmt.Fprintln(out, "")
+}
+
+func moduleVersion(path string) string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok || info == nil {
+		return "unknown"
+	}
+	if info.Main.Path == path {
+		return normalizeVersion(info.Main.Version)
+	}
+	for _, dep := range info.Deps {
+		if dep == nil || dep.Path != path {
+			continue
+		}
+		if dep.Replace != nil {
+			if dep.Replace.Version != "" {
+				return normalizeVersion(dep.Replace.Version)
+			}
+			return dep.Replace.Path
+		}
+		return normalizeVersion(dep.Version)
+	}
+	return "unknown"
+}
+
+func normalizeVersion(version string) string {
+	if version == "" {
+		return "unknown"
+	}
+	return version
 }

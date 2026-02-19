@@ -52,6 +52,9 @@ func TestRunVersion(t *testing.T) {
 	if !strings.Contains(out.String(), "Gonemaster version") {
 		t.Fatalf("expected version output")
 	}
+	if !strings.Contains(out.String(), "Miekg DNS version") {
+		t.Fatalf("expected miekg version output")
+	}
 }
 
 func TestRunMissingDomain(t *testing.T) {

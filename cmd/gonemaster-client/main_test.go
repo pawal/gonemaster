@@ -46,6 +46,25 @@ func TestParseOverrideValue(t *testing.T) {
 	}
 }
 
+func TestRunVersion(t *testing.T) {
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := run([]string{"--version"}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	if !strings.Contains(out.String(), "Gonemaster version") {
+		t.Fatalf("expected gonemaster version output, got %q", out.String())
+	}
+	if !strings.Contains(out.String(), "Miekg DNS version") {
+		t.Fatalf("expected miekg version output, got %q", out.String())
+	}
+	if errOut.Len() != 0 {
+		t.Fatalf("expected no stderr output, got %q", errOut.String())
+	}
+}
+
 func TestJobsCreateSendsNormalizedDomain(t *testing.T) {
 	var gotDomain string
 	oldFactory := newHTTPClient

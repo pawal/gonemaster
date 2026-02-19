@@ -14,10 +14,12 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"syscall"
 	"time"
 
+	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/normalization"
 )
 
@@ -39,6 +41,7 @@ type globalOptions struct {
 	format  string
 	output  string
 	locale  string
+	version bool
 	noColor bool
 	headers headerList
 }
@@ -235,6 +238,11 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		fmt.Fprintln(errOut, err.Error())
 		return 2
 	}
+	if opts.version {
+		fmt.Fprintf(out, "Gonemaster version %s\n", engine.VersionFull())
+		fmt.Fprintf(out, "Miekg DNS version %s\n", moduleVersion("github.com/miekg/dns"))
+		return 0
+	}
 	if len(rest) == 0 {
 		printUsage(errOut)
 		return 2
@@ -284,6 +292,7 @@ func parseGlobalFlags(args []string, errOut io.Writer) (globalOptions, []string,
 	fs.StringVar(&opts.format, "format", defaultFormat, "Output format: pretty, json, jsonl")
 	fs.StringVar(&opts.output, "output", "", "Write output to file instead of stdout")
 	fs.StringVar(&opts.locale, "locale", "en", "Locale for translated messages")
+	fs.BoolVar(&opts.version, "version", false, "Print version and exit")
 	fs.BoolVar(&opts.noColor, "no-color", false, "Disable ANSI colors in pretty output")
 	fs.Var(&opts.headers, "header", "Extra HTTP header (repeatable, NAME:VALUE)")
 	if err := fs.Parse(args); err != nil {
@@ -304,6 +313,7 @@ func printUsage(out io.Writer) {
 	fmt.Fprintln(out, "  --format FORMAT  Output format: pretty, json, jsonl")
 	fmt.Fprintln(out, "  --output PATH    Write output to file instead of stdout")
 	fmt.Fprintln(out, "  --locale LOCALE  Locale for translated messages (default en)")
+	fmt.Fprintln(out, "  --version        Print version information and exit")
 	fmt.Fprintln(out, "  --no-color       Disable ANSI colors in pretty output")
 	fmt.Fprintln(out, "  --header NAME:VALUE  Extra HTTP header (repeatable)")
 	fmt.Fprintln(out, "  (Options use double hyphens; short single-dash flags are not supported.)")
@@ -2189,4 +2199,34 @@ func outputExt(format string) string {
 	default:
 		return ".txt"
 	}
+}
+
+func moduleVersion(path string) string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok || info == nil {
+		return "unknown"
+	}
+	if info.Main.Path == path {
+		return normalizeVersion(info.Main.Version)
+	}
+	for _, dep := range info.Deps {
+		if dep == nil || dep.Path != path {
+			continue
+		}
+		if dep.Replace != nil {
+			if dep.Replace.Version != "" {
+				return normalizeVersion(dep.Replace.Version)
+			}
+			return dep.Replace.Path
+		}
+		return normalizeVersion(dep.Version)
+	}
+	return "unknown"
+}
+
+func normalizeVersion(version string) string {
+	if version == "" {
+		return "unknown"
+	}
+	return version
 }

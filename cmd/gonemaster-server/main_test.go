@@ -59,6 +59,7 @@ func TestRunHelpShowsGroupedFlags(t *testing.T) {
 		"Resolver/Profile:",
 		"Output:",
 		"--workers N",
+		"--version",
 		"--min-level LEVEL",
 		"--sourceaddr4 IPADDR",
 		"--sourceaddr6 IPADDR",
@@ -83,6 +84,25 @@ func TestRunSourceAddr4Validation(t *testing.T) {
 	errText := readTempFile(t, errOut)
 	if !strings.Contains(errText, "--sourceaddr4 must be a valid IPv4 address") {
 		t.Fatalf("expected sourceaddr4 validation error, got %q", errText)
+	}
+}
+
+func TestRunVersion(t *testing.T) {
+	out := newTempFile(t)
+	errOut := newTempFile(t)
+	defer cleanupTempFile(t, out)
+	defer cleanupTempFile(t, errOut)
+
+	code := run([]string{"--version"}, out, errOut)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	outText := readTempFile(t, out)
+	if !strings.Contains(outText, "Gonemaster version") {
+		t.Fatalf("expected gonemaster version output, got %q", outText)
+	}
+	if !strings.Contains(outText, "Miekg DNS version") {
+		t.Fatalf("expected miekg version output, got %q", outText)
 	}
 }
 

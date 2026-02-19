@@ -11,6 +11,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/internal/parallel"
+	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -326,7 +327,9 @@ func (r *Recursor) recurseWithNameservers(ctx context.Context, name string, qtyp
 
 	nameObj := dnsname.New(name)
 	key := strings.ToLower(nameObj.String())
+	runLog := logger.FromContext(ctx)
 	if cached, ok := r.cacheLookup(key, qtype, qclass); ok {
+		cached.Log = runLog
 		return cached, nil
 	}
 	if cached, cachedOK, inflight, wait := r.cacheLookupOrWaitOrRegister(key, qtype, qclass); wait {
@@ -335,18 +338,23 @@ func (r *Recursor) recurseWithNameservers(ctx context.Context, name string, qtyp
 			if inflight.resp == nil {
 				return packet.Packet{}, inflight.err
 			}
-			return *inflight.resp, inflight.err
+			copyResp := *inflight.resp
+			copyResp.Log = runLog
+			return copyResp, inflight.err
 		}
 		select {
 		case <-inflight.done:
 			if inflight.resp == nil {
 				return packet.Packet{}, inflight.err
 			}
-			return *inflight.resp, inflight.err
+			copyResp := *inflight.resp
+			copyResp.Log = runLog
+			return copyResp, inflight.err
 		case <-ctx.Done():
 			return packet.Packet{}, ctx.Err()
 		}
 	} else if cachedOK {
+		cached.Log = runLog
 		return cached, nil
 	}
 	defer func() {
@@ -379,6 +387,7 @@ func (r *Recursor) recurseWithNameservers(ctx context.Context, name string, qtyp
 	if err != nil {
 		return packet.Packet{}, err
 	}
+	resp.Log = runLog
 	r.cacheStore(key, qtype, qclass, resp)
 	return resp, nil
 }

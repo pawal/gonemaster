@@ -3,6 +3,7 @@ package dnssec
 import (
 	"context"
 	"net/netip"
+	"strings"
 	"testing"
 	"time"
 
@@ -4648,6 +4649,13 @@ func normalizeEntriesForComparison(entries []*logger.Entry) []string {
 	normalized := make([]string, 0, len(entries))
 	for _, entry := range entries {
 		if entry == nil {
+			continue
+		}
+		if strings.EqualFold(entry.Module, "System") &&
+			strings.EqualFold(entry.Testcase, "Unspecified") &&
+			strings.HasPrefix(strings.ToUpper(entry.Level()), "DEBUG") {
+			// System debug entries are intentionally verbose and their emission
+			// order can vary under parallel execution.
 			continue
 		}
 		item := entry.Module + ":" + entry.Testcase + ":" + entry.Tag

@@ -1,12 +1,14 @@
 package packet
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/logger"
 )
 
 // Packet wraps a DNS message and exposes helpers mirroring the Perl engine API.
@@ -15,6 +17,7 @@ type Packet struct {
 	AnswerFrom string
 	QueryTime  time.Duration
 	Timestamp  time.Time
+	Log        *logger.Logger
 }
 
 // New wraps a dns.Msg into a Packet helper.
@@ -202,17 +205,47 @@ func (p Packet) Type() string {
 
 // NoSuchRecord reports a nodata response.
 func (p Packet) NoSuchRecord() bool {
-	return p.Type() == "nodata"
+	if p.Type() != "nodata" {
+		return false
+	}
+	args := map[string]any{}
+	if name, qtype, ok := packetQuestionInfo(p.Msg); ok {
+		args["name"] = name
+		args["type"] = qtype
+	}
+	p.logSystem("NO_SUCH_RECORD", args)
+	return true
 }
 
 // NoSuchName reports an NXDOMAIN response.
 func (p Packet) NoSuchName() bool {
-	return p.Type() == "nxdomain"
+	if p.Type() != "nxdomain" {
+		return false
+	}
+	args := map[string]any{}
+	if name, qtype, ok := packetQuestionInfo(p.Msg); ok {
+		args["name"] = name
+		args["type"] = qtype
+	}
+	p.logSystem("NO_SUCH_NAME", args)
+	return true
 }
 
 // IsRedirect reports a referral response.
 func (p Packet) IsRedirect() bool {
-	return p.Type() == "referral"
+	if p.Type() != "referral" {
+		return false
+	}
+	args := map[string]any{}
+	if name, qtype, ok := packetQuestionInfo(p.Msg); ok {
+		args["name"] = name
+		args["type"] = qtype
+	}
+	if p.Msg != nil && len(p.Msg.Ns) > 0 {
+		args["to"] = dnsname.New(p.Msg.Ns[0].Header().Name).String()
+	}
+	p.logSystem("IS_REDIRECT", args)
+	return true
 }
 
 // AnswerFromString returns the source address or "<unknown>" when missing.
@@ -221,6 +254,26 @@ func (p Packet) AnswerFromString() string {
 		return "<unknown>"
 	}
 	return p.AnswerFrom
+}
+
+func (p Packet) logSystem(tag string, args map[string]any) {
+	if p.Log == nil {
+		return
+	}
+	_, _ = p.Log.Add(tag, args, "System", "")
+}
+
+func packetQuestionInfo(msg *dns.Msg) (string, string, bool) {
+	if msg == nil || len(msg.Question) == 0 {
+		return "", "", false
+	}
+	q := msg.Question[0]
+	name := dnsname.New(q.Name).String()
+	qtype := dns.TypeToString[q.Qtype]
+	if qtype == "" {
+		qtype = fmt.Sprint(q.Qtype)
+	}
+	return name, qtype, true
 }
 
 // UniquePush adds an RR to a section if it is not already present.

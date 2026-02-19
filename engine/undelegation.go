@@ -276,14 +276,6 @@ func applyUndelegatedDelegation(ctx context.Context, r *recursor.Recursor, z *zo
 
 	if len(delegation) > 0 {
 		for _, ns := range parentNS {
-			if fakeDelegationToSelf(ns, delegation) {
-				if err := emit("FAKE_DELEGATION_TO_SELF", map[string]any{
-					"domain": z.Name.String(),
-					"ns":     ns.String(),
-				}); err != nil {
-					return err
-				}
-			}
 			if err := ns.AddFakeDelegation(z.Name.String(), delegation); err != nil {
 				return err
 			}

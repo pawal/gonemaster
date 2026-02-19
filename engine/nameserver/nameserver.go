@@ -24,6 +24,7 @@ type Nameserver struct {
 	Client  *transport.Client
 	state   *nsState
 	cache   *CacheStore
+	log     *logger.Logger
 }
 
 const systemModuleName = "System"
@@ -45,19 +46,24 @@ type QueryOptions struct {
 
 // New creates a Nameserver from a name and IP address.
 func New(name string, address string, client *transport.Client) (Nameserver, error) {
-	return NewWithCache(defaultCache, name, address, client)
+	return newWithCache(nil, defaultCache, name, address, client)
 }
 
 // NewWithContext creates a Nameserver using a cache store from ctx.
 func NewWithContext(ctx context.Context, name string, address string, client *transport.Client) (Nameserver, error) {
-	return NewWithCache(CacheFromContextOrDefault(ctx), name, address, client)
+	return newWithCache(ctx, CacheFromContextOrDefault(ctx), name, address, client)
 }
 
 // NewWithCache creates a Nameserver using the supplied cache store.
 func NewWithCache(cache *CacheStore, name string, address string, client *transport.Client) (Nameserver, error) {
+	return newWithCache(nil, cache, name, address, client)
+}
+
+func newWithCache(ctx context.Context, cache *CacheStore, name string, address string, client *transport.Client) (Nameserver, error) {
 	if cache == nil {
 		cache = defaultCache
 	}
+	runLog := logger.FromContext(ctx)
 	addr, err := netip.ParseAddr(address)
 	if err != nil {
 		return Nameserver{}, fmt.Errorf("invalid nameserver address %q: %w", address, err)
@@ -78,9 +84,15 @@ func NewWithCache(cache *CacheStore, name string, address string, client *transp
 	if cached := cache.cachedNameserver(nameKey, addrKey); cached != nil {
 		return *cached, nil
 	}
+	queryCache, cacheCreated := cache.cacheForAddressWithStatus(addrKey)
+	if cacheCreated {
+		logSystemWithLogger(runLog, "CACHE_CREATED", map[string]any{"ip": addrKey})
+	} else {
+		logSystemWithLogger(runLog, "CACHE_FETCHED", map[string]any{"ip": addrKey})
+	}
 
 	state := &nsState{
-		cache:           cache.cacheForAddress(addrKey),
+		cache:           queryCache,
 		errorCache:      cache.errorCacheForAddress(addrKey),
 		fakeDelegations: map[string]delegation{},
 		fakeDS:          map[string][]dns.RR{},
@@ -93,8 +105,13 @@ func NewWithCache(cache *CacheStore, name string, address string, client *transp
 		Client:  client,
 		state:   state,
 		cache:   cache,
+		log:     runLog,
 	}
 	cache.storeNameserver(nameKey, addrKey, ns)
+	logSystemWithLogger(runLog, "NS_CREATED", map[string]any{
+		"name": nameObj.String(),
+		"ip":   addrKey,
+	})
 	return *ns, nil
 }
 
@@ -114,6 +131,7 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	if ns.Client == nil {
 		return packet.Packet{}, fmt.Errorf("missing transport client")
 	}
+	runLog := loggerFromContextOrFallback(ctx, ns.log)
 
 	if qtype == "" {
 		qtype = "A"
@@ -128,16 +146,25 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 
 	prof := profile.FromContext(ctx)
 	if ns.Address.Is4() && !prof.Net.IPv4 {
+		logSystemWithLogger(runLog, "IPV4_BLOCKED", map[string]any{"ns": ns.String()})
 		return packet.Packet{}, nil
 	}
 	if ns.Address.Is6() && !prof.Net.IPv6 {
+		logSystemWithLogger(runLog, "IPV6_BLOCKED", map[string]any{"ns": ns.String()})
 		return packet.Packet{}, nil
 	}
+	queryArgs := map[string]any{
+		"name":  qname,
+		"type":  qtype,
+		"flags": queryFlags(qclass, opts),
+		"ip":    ns.Address.String(),
+	}
+	logSystemWithLogger(runLog, "QUERY", queryArgs)
 
-	if resp, ok := ns.fakeDSResponse(qname, qtype, qclass, opts); ok {
+	if resp, ok := ns.fakeDSResponse(qname, qtype, qclass, opts, runLog); ok {
 		return resp, nil
 	}
-	if resp, ok := ns.fakeDelegationResponse(qname, qtype, qclass, opts); ok {
+	if resp, ok := ns.fakeDelegationResponse(qname, qtype, qclass, opts, runLog); ok {
 		return resp, nil
 	}
 
@@ -148,9 +175,13 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	if ns.state != nil {
 		if cached, ok := ns.state.cache.get(cacheKey); ok {
 			if cached == nil {
+				logCachedReturnWithLogger(runLog, packet.Packet{})
 				return packet.Packet{}, nil
 			}
-			return *cached, nil
+			copyCached := *cached
+			copyCached.Log = runLog
+			logCachedReturnWithLogger(runLog, copyCached)
+			return copyCached, nil
 		}
 	}
 
@@ -195,16 +226,24 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 			if ctx == nil {
 				<-existing.done
 				if existing.resp == nil {
+					logCachedReturnWithLogger(runLog, packet.Packet{})
 					return packet.Packet{}, existing.err
 				}
-				return *existing.resp, existing.err
+				copyResp := *existing.resp
+				copyResp.Log = runLog
+				logCachedReturnWithLogger(runLog, copyResp)
+				return copyResp, existing.err
 			}
 			select {
 			case <-existing.done:
 				if existing.resp == nil {
+					logCachedReturnWithLogger(runLog, packet.Packet{})
 					return packet.Packet{}, existing.err
 				}
-				return *existing.resp, existing.err
+				copyResp := *existing.resp
+				copyResp.Log = runLog
+				logCachedReturnWithLogger(runLog, copyResp)
+				return copyResp, existing.err
 			case <-ctx.Done():
 				return packet.Packet{}, ctx.Err()
 			}
@@ -245,6 +284,7 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 			ns.state.cache.finish(cacheKey, infResp, err)
 		}
 	}
+	logCachedReturnWithLogger(runLog, resp)
 	return resp, err
 }
 
@@ -337,7 +377,9 @@ func resolveTTLWithBudget(baseSeconds int, prof *profile.Profile, opts *QueryOpt
 
 func (ns Nameserver) queryNetwork(ctx context.Context, qname string, qtype string, qclass string, opts *QueryOptions) (packet.Packet, error) {
 	if ns.state != nil && ns.state.queryFunc != nil {
-		return ns.state.queryFunc(ctx, qname, qtype, qclass, opts)
+		resp, err := ns.state.queryFunc(ctx, qname, qtype, qclass, opts)
+		resp.Log = loggerFromContextOrFallback(ctx, ns.log)
+		return resp, err
 	}
 
 	client, err := ns.clientForOptions(ctx, opts)
@@ -367,6 +409,7 @@ func (ns Nameserver) queryNetwork(ctx context.Context, qname string, qtype strin
 	})
 
 	resp, err := client.Exchange(ctx, server, msg)
+	resp.Log = loggerFromContextOrFallback(ctx, ns.log)
 
 	args := map[string]any{
 		"name":  qname,
@@ -399,11 +442,66 @@ func (ns Nameserver) queryNetwork(ctx context.Context, qname string, qtype strin
 }
 
 func logSystem(ctx context.Context, tag string, args map[string]any) {
-	log := logger.FromContext(ctx)
+	logSystemWithLogger(loggerFromContextOrFallback(ctx, nil), tag, args)
+}
+
+func logSystemWithLogger(log *logger.Logger, tag string, args map[string]any) {
 	if log == nil {
 		return
 	}
 	_, _ = log.Add(tag, args, systemModuleName, "")
+}
+
+func logCachedReturnWithLogger(log *logger.Logger, resp packet.Packet) {
+	if log == nil {
+		return
+	}
+	args := map[string]any{"packet": "undef"}
+	if resp.Msg != nil {
+		args["packet"] = packetStringForLog(resp)
+	}
+	_, _ = log.Add("CACHED_RETURN", args, systemModuleName, "")
+}
+
+func queryFlags(qclass string, opts *QueryOptions) map[string]any {
+	flags := map[string]any{
+		"class":   qclass,
+		"dnssec":  resolveDNSSEC(opts),
+		"usevc":   resolveUseVC(opts),
+		"recurse": resolveRecurse(opts),
+	}
+	if opts != nil {
+		if opts.Fallback != nil {
+			flags["fallback"] = *opts.Fallback
+		}
+		if opts.Retry != nil {
+			flags["retry"] = *opts.Retry
+		}
+		if opts.Retrans != nil {
+			flags["retrans"] = int(opts.Retrans.Seconds())
+		}
+		if opts.Timeout != nil {
+			flags["timeout"] = int(opts.Timeout.Seconds())
+		}
+	}
+	flags["edns_size"] = resolveEDNSSize(opts, flags["dnssec"].(bool))
+	return flags
+}
+
+func loggerFromContextOrFallback(ctx context.Context, fallback *logger.Logger) *logger.Logger {
+	if log := logger.FromContext(ctx); log != nil {
+		return log
+	}
+	return fallback
+}
+
+func packetStringForLog(resp packet.Packet) string {
+	if resp.Msg == nil {
+		return "undef"
+	}
+	clone := resp.Msg.Copy()
+	clone.Id = 0
+	return clone.String()
 }
 
 func (ns Nameserver) clientForOptions(ctx context.Context, opts *QueryOptions) (*transport.Client, error) {

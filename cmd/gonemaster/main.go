@@ -10,9 +10,11 @@ import (
 	"os"
 	"os/signal"
 	"runtime/debug"
+	"strings"
 	"syscall"
 
 	"codeberg.org/pawal/gonemaster/engine"
+	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/normalization"
 )
 
@@ -77,6 +79,8 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	var positiveCacheTTLSet bool
 	var negativeCacheTTL int
 	var negativeCacheTTLSet bool
+	var savePacketCachePath string
+	var restorePacketCachePath string
 	var noProgress bool
 	var count bool
 	var listTests bool
@@ -104,6 +108,10 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 			{flag: "--json-stream", detail: "Stream JSON log entries"},
 			{flag: "--count", detail: "Print count summary by level and message tag"},
 			{flag: "--no-progress", detail: "Disable progress indicator"},
+		})
+		printUsageGroup(errOut, "Cache", []usageLine{
+			{flag: "--save PATH", detail: "Write DNS packet cache to file after the run"},
+			{flag: "--restore PATH", detail: "Prime DNS packet cache from file before the run"},
 		})
 		printUsageGroup(errOut, "Resolver/Profile Overrides", []usageLine{
 			{flag: "--no-ipv4", detail: "Disable IPv4 queries"},
@@ -164,6 +172,8 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs.IntVar(&errorCacheTTL, "error-cache-ttl", 0, "Seconds to skip queries after network errors (optional)")
 	fs.IntVar(&positiveCacheTTL, "positive-cache-ttl", 0, "Seconds to cache positive DNS responses (optional)")
 	fs.IntVar(&negativeCacheTTL, "negative-cache-ttl", 0, "Seconds to cache negative DNS responses (optional)")
+	fs.StringVar(&savePacketCachePath, "save", "", "Write DNS packet cache to file after the run (optional)")
+	fs.StringVar(&restorePacketCachePath, "restore", "", "Prime DNS packet cache from file before the run (optional)")
 	fs.Var(&undelegatedNSSpecs, "ns", "Undelegated nameserver as name[/ip] (repeatable)")
 	fs.Var(&undelegatedDSSpecs, "ds", "Undelegated DS as keytag,algorithm,digtype,digest (repeatable)")
 	fs.BoolVar(&noProgress, "no-progress", false, "Disable progress indicator (optional)")
@@ -208,6 +218,16 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 			negativeCacheTTLSet = true
 		}
 	})
+
+	hasPacketCacheFlags := strings.TrimSpace(savePacketCachePath) != "" || strings.TrimSpace(restorePacketCachePath) != ""
+	if hasPacketCacheFlags && showVersion {
+		fmt.Fprintln(errOut, "--save/--restore cannot be combined with --version")
+		return 2
+	}
+	if hasPacketCacheFlags && listTests {
+		fmt.Fprintln(errOut, "--save/--restore cannot be combined with --list-tests")
+		return 2
+	}
 
 	if showVersion {
 		fmt.Fprintf(out, "Gonemaster version %s\n", engine.VersionFull())
@@ -366,11 +386,15 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	}
 
 	if dumpProfile {
-		if raw || jsonStream || count {
+		if raw || jsonStream || count || strings.TrimSpace(savePacketCachePath) != "" || strings.TrimSpace(restorePacketCachePath) != "" {
 			if raw {
 				fmt.Fprintln(errOut, "--dump-profile cannot be combined with --raw")
 			} else if jsonStream {
 				fmt.Fprintln(errOut, "--dump-profile cannot be combined with --json-stream")
+			} else if strings.TrimSpace(savePacketCachePath) != "" {
+				fmt.Fprintln(errOut, "--dump-profile cannot be combined with --save")
+			} else if strings.TrimSpace(restorePacketCachePath) != "" {
+				fmt.Fprintln(errOut, "--dump-profile cannot be combined with --restore")
 			} else {
 				fmt.Fprintln(errOut, "--dump-profile cannot be combined with --count")
 			}
@@ -440,6 +464,18 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	} else if normalized != "" {
 		domain = normalized
 		req.Domain = normalized
+	}
+
+	var packetCacheStore *nameserver.CacheStore
+	if strings.TrimSpace(savePacketCachePath) != "" || strings.TrimSpace(restorePacketCachePath) != "" {
+		packetCacheStore = nameserver.NewCacheStore()
+		if strings.TrimSpace(restorePacketCachePath) != "" {
+			if restoreErr := packetCacheStore.RestorePacketCache(restorePacketCachePath); restoreErr != nil {
+				fmt.Fprintln(errOut, restoreErr.Error())
+				return 2
+			}
+		}
+		req.NameserverCache = packetCacheStore
 	}
 
 	var rawWriter io.Writer
@@ -528,6 +564,12 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	entries, err := runEngine(req)
 	if progress != nil {
 		progress.Finish()
+	}
+	if packetCacheStore != nil && strings.TrimSpace(savePacketCachePath) != "" {
+		if saveErr := packetCacheStore.SavePacketCache(savePacketCachePath); saveErr != nil {
+			fmt.Fprintln(errOut, saveErr.Error())
+			return 2
+		}
 	}
 	if !jsonOutput && humanStreaming && err == nil && len(entries) == 0 && humanReport != nil {
 		if writeErr := humanReport.PrintLooksOK(); writeErr != nil {

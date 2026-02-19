@@ -46,6 +46,8 @@ You can switch output modes:
 - `--raw` prints raw log lines (one per log entry).
 - `--dump-profile` prints the effective profile as pretty JSON and exits.
 - `--count` (human output only) appends count summaries by level and by message tag.
+- `--save PATH` writes the accumulated DNS packet cache after the run.
+- `--restore PATH` primes the DNS packet cache before the run.
 
 Use `--output PATH` to write the selected output to a file.
 
@@ -64,6 +66,8 @@ Use `--output PATH` to write the selected output to a file.
 | `--json-stream` | bool | Stream newline-delimited JSON entries. Incompatible with `--raw` and `--json`. Also incompatible with `--dump-profile`. |
 | `--dump-profile` | bool | Print the effective profile as JSON and exit. Incompatible with `--raw` and `--json-stream`. |
 | `--count` | bool | Append count summaries (level totals and level/tag totals). Human output only; incompatible with `--json`, `--json-stream`, `--raw`, and `--dump-profile`. |
+| `--save PATH` | string | Write DNS packet cache to file after the run. Valid only for test runs (not with `--version`, `--list-tests`, or `--dump-profile`). |
+| `--restore PATH` | string | Prime DNS packet cache from a previously saved cache file before the run. Valid only for test runs (not with `--version`, `--list-tests`, or `--dump-profile`). |
 | `--locale LOCALE` | string | Locale for translated output (defaults to environment, then `en`). |
 | `--no-ipv4` | bool | Disable IPv4 queries (overrides profile setting). |
 | `--no-ipv6` | bool | Disable IPv6 queries (overrides profile setting). |
@@ -104,6 +108,16 @@ gonemaster --json --domain example.com | jq
 Stream JSON entries to a file:
 ```
 gonemaster --json-stream --output /tmp/gonemaster.jsonl --domain example.com
+```
+
+Save DNS packet cache for later replay:
+```
+gonemaster --domain example.com --save /tmp/gonemaster-cache.json
+```
+
+Replay saved DNS packet cache:
+```
+gonemaster --domain example.com --restore /tmp/gonemaster-cache.json
 ```
 
 Disable IPv6 and raise parallelism:

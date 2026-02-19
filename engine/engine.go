@@ -66,6 +66,8 @@ type RunRequest struct {
 	PositiveCacheTTL *int
 	// NegativeCacheTTL sets resolver.defaults.negative_cache_ttl in seconds.
 	NegativeCacheTTL *int
+	// NameserverCache optionally provides the per-run nameserver cache store.
+	NameserverCache *ns.CacheStore
 	// LogCallback receives each log entry as it is created.
 	LogCallback func(*logger.Entry) error
 	// Context controls cancellation and timeouts for the run.
@@ -418,7 +420,11 @@ func RunWithRunner(req RunRequest, runner *Runner) ([]LogEntry, error) {
 		return nil, fmt.Errorf("runner logger is required")
 	}
 	if runner.NameserverCache == nil {
-		runner.NameserverCache = ns.NewCacheStore()
+		if req.NameserverCache != nil {
+			runner.NameserverCache = req.NameserverCache
+		} else {
+			runner.NameserverCache = ns.NewCacheStore()
+		}
 	}
 
 	module, testcase, err := normalizeRequest(req)
@@ -488,11 +494,16 @@ func Run(req RunRequest) ([]LogEntry, error) {
 	}
 	limiter := transport.NewLimiter(queryLimit)
 
+	cacheStore := req.NameserverCache
+	if cacheStore == nil {
+		cacheStore = ns.NewCacheStore()
+	}
+
 	runner := &Runner{
 		Profile:          p,
 		Logger:           log,
 		Limiter:          limiter,
-		NameserverCache:  ns.NewCacheStore(),
+		NameserverCache:  cacheStore,
 		StartedAt:        time.Now(),
 		AutoIPv6Disabled: autoDisabledIPv6,
 	}

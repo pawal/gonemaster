@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -9,6 +10,8 @@ import (
 	"testing"
 
 	"codeberg.org/pawal/gonemaster/engine"
+	"codeberg.org/pawal/gonemaster/engine/nameserver"
+	"github.com/miekg/dns"
 )
 
 func stubRunEngine(t *testing.T, captured *engine.RunRequest) {
@@ -23,6 +26,31 @@ func stubRunEngine(t *testing.T, captured *engine.RunRequest) {
 	t.Cleanup(func() {
 		runEngine = previous
 	})
+}
+
+func samplePacketCacheFile(t *testing.T) nameserver.PacketCacheFile {
+	t.Helper()
+
+	msg := new(dns.Msg)
+	msg.SetQuestion("example.com.", dns.TypeA)
+	msg.Response = true
+	wire, err := msg.Pack()
+	if err != nil {
+		t.Fatalf("pack sample dns msg: %v", err)
+	}
+
+	return nameserver.PacketCacheFile{
+		Format:  nameserver.PacketCacheFileFormat,
+		Version: nameserver.PacketCacheFileVersion,
+		Entries: []nameserver.PacketCacheEntry{
+			{
+				Address:    "192.0.2.53",
+				Key:        "fixture.key",
+				Message:    base64.StdEncoding.EncodeToString(wire),
+				AnswerFrom: "192.0.2.53:53",
+			},
+		},
+	}
 }
 
 func TestRunRequiresDomain(t *testing.T) {
@@ -52,11 +80,13 @@ func TestRunHelpShowsGroupedFlags(t *testing.T) {
 		"Flags:",
 		"Target:",
 		"Output:",
+		"Cache:",
 		"Resolver/Profile Overrides:",
 		"Undelegated:",
 		"Utility:",
 		"--domain DOMAIN",
 		"--count",
+		"--save PATH",
 	}
 	for _, fragment := range expected {
 		if !strings.Contains(help, fragment) {
@@ -65,6 +95,58 @@ func TestRunHelpShowsGroupedFlags(t *testing.T) {
 	}
 	if out.Len() != 0 {
 		t.Fatalf("expected no stdout output, got %q", out.String())
+	}
+}
+
+func TestRunRejectsSaveAndVersion(t *testing.T) {
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := run([]string{"--version", "--save", "cache.json"}, &out, &errOut)
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d", code)
+	}
+	if !strings.Contains(errOut.String(), "--save/--restore cannot be combined with --version") {
+		t.Fatalf("expected cache/version conflict message, got %q", errOut.String())
+	}
+}
+
+func TestRunRejectsRestoreAndListTests(t *testing.T) {
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := run([]string{"--list-tests", "--restore", "cache.json"}, &out, &errOut)
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d", code)
+	}
+	if !strings.Contains(errOut.String(), "--save/--restore cannot be combined with --list-tests") {
+		t.Fatalf("expected cache/list-tests conflict message, got %q", errOut.String())
+	}
+}
+
+func TestRunRejectsSaveAndDumpProfile(t *testing.T) {
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := run([]string{"--save", "cache.json", "--dump-profile"}, &out, &errOut)
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d", code)
+	}
+	if !strings.Contains(errOut.String(), "--dump-profile cannot be combined with --save") {
+		t.Fatalf("expected cache/dump-profile conflict message, got %q", errOut.String())
+	}
+}
+
+func TestRunRejectsRestoreAndDumpProfile(t *testing.T) {
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := run([]string{"--restore", "cache.json", "--dump-profile"}, &out, &errOut)
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d", code)
+	}
+	if !strings.Contains(errOut.String(), "--dump-profile cannot be combined with --restore") {
+		t.Fatalf("expected cache/dump-profile conflict message, got %q", errOut.String())
 	}
 }
 
@@ -101,6 +183,95 @@ func TestRunWritesJSONAndError(t *testing.T) {
 	}
 	if errOut.Len() != 0 {
 		t.Fatalf("expected no stderr output, got %q", errOut.String())
+	}
+}
+
+func TestRunRestorePacketCacheLoadsRequestCache(t *testing.T) {
+	dir := t.TempDir()
+	restorePath := filepath.Join(dir, "restore-cache.json")
+	fixture := samplePacketCacheFile(t)
+	data, err := json.Marshal(fixture)
+	if err != nil {
+		t.Fatalf("marshal fixture: %v", err)
+	}
+	if err := os.WriteFile(restorePath, data, 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+
+	previous := runEngine
+	runEngine = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		if req.NameserverCache == nil {
+			t.Fatalf("expected nameserver cache in request")
+		}
+		exported, exportErr := req.NameserverCache.ExportPacketCache()
+		if exportErr != nil {
+			t.Fatalf("export request cache: %v", exportErr)
+		}
+		if len(exported.Entries) != 1 {
+			t.Fatalf("expected 1 restored cache entry, got %d", len(exported.Entries))
+		}
+		if exported.Entries[0].Address != "192.0.2.53" || exported.Entries[0].Key != "fixture.key" {
+			t.Fatalf("unexpected restored entry: %+v", exported.Entries[0])
+		}
+		return nil, nil
+	}
+	t.Cleanup(func() {
+		runEngine = previous
+	})
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+	code := run([]string{"--domain", "example.com", "--json", "--restore", restorePath}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
+	}
+	if errOut.Len() != 0 {
+		t.Fatalf("expected no stderr output, got %q", errOut.String())
+	}
+}
+
+func TestRunSavePacketCacheWritesFile(t *testing.T) {
+	dir := t.TempDir()
+	savePath := filepath.Join(dir, "saved-cache.json")
+	fixture := samplePacketCacheFile(t)
+
+	previous := runEngine
+	runEngine = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		if req.NameserverCache == nil {
+			t.Fatalf("expected nameserver cache in request")
+		}
+		if importErr := req.NameserverCache.ImportPacketCache(fixture); importErr != nil {
+			t.Fatalf("import fixture into run cache: %v", importErr)
+		}
+		return nil, nil
+	}
+	t.Cleanup(func() {
+		runEngine = previous
+	})
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+	code := run([]string{"--domain", "example.com", "--json", "--save", savePath}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
+	}
+
+	payloadBytes, err := os.ReadFile(savePath)
+	if err != nil {
+		t.Fatalf("read saved cache file: %v", err)
+	}
+	var payload nameserver.PacketCacheFile
+	if err := json.Unmarshal(payloadBytes, &payload); err != nil {
+		t.Fatalf("unmarshal saved cache: %v", err)
+	}
+	if payload.Format != nameserver.PacketCacheFileFormat || payload.Version != nameserver.PacketCacheFileVersion {
+		t.Fatalf("unexpected saved cache header: %+v", payload)
+	}
+	if len(payload.Entries) != 1 {
+		t.Fatalf("expected 1 saved entry, got %d", len(payload.Entries))
+	}
+	if payload.Entries[0].Key != "fixture.key" {
+		t.Fatalf("unexpected saved entry: %+v", payload.Entries[0])
 	}
 }
 

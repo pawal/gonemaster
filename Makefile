@@ -15,7 +15,8 @@ CMD ?= all
 .PHONY: help build build-all test install ui-build ui-install ui-dev ui-test clean \
 	build-gonemaster build-gonemaster-server build-gonemaster-server-noui build-gonemaster-client \
 	build-gonemaster-nagios install-gonemaster install-gonemaster-server install-gonemaster-client \
-	install-gonemaster-nagios ui-check test-go vet race
+	install-gonemaster-nagios ui-check test-go vet race \
+	spec-export-implemented spec-export-tags spec-export spec-validate spec-validate-scan spec-check
 
 help:
 	@echo "Targets:"
@@ -33,6 +34,10 @@ help:
 	@echo "  build-gonemaster-server-noui  Build API-only server (no npm/UI embed)"
 	@echo "  build-gonemaster-client       Build the HTTP API client"
 	@echo "  build-gonemaster-nagios       Build the Nagios plugin"
+	@echo "  spec-export        Refresh generated specification inventories (JSON)"
+	@echo "  spec-validate      Validate canonical testcase specs against implementation metadata"
+	@echo "  spec-validate-scan Validate specs + scan append*Log literals for metadata omissions"
+	@echo "  spec-check         Alias for spec-validate"
 	@echo "  clean            Remove build artifacts"
 
 $(BIN_DIR):
@@ -136,6 +141,22 @@ vet:
 
 race:
 	$(GO) test -race ./...
+
+spec-export-implemented:
+	GOCACHE=/tmp/go-build-cache $(GO) run ./tools/specifications/export-implemented > docs/specifications/implemented-testcases.json
+
+spec-export-tags:
+	GOCACHE=/tmp/go-build-cache $(GO) run ./tools/specifications/export-tags > docs/specifications/possible-tags-by-testcase.json
+
+spec-export: spec-export-implemented spec-export-tags
+
+spec-validate:
+	GOCACHE=/tmp/go-build-cache $(GO) run ./tools/specifications/validate
+
+spec-validate-scan:
+	GOCACHE=/tmp/go-build-cache $(GO) run ./tools/specifications/validate --scan-append-log
+
+spec-check: spec-validate
 
 clean:
 	@rm -rf $(BIN_DIR) $(UI_BUILD_DIR) $(UI_DIR)/node_modules

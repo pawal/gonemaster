@@ -43,6 +43,26 @@ The Zonemaster project may be used as an upstream reference during migration, bu
 5. Record progress in `migration-tracker.md`.
 6. Add follow-up issues for unresolved ambiguities.
 
+## Tooling
+
+Refresh generated inventories:
+
+```sh
+make spec-export
+```
+
+Validate canonical testcase specs against implementation metadata:
+
+```sh
+make spec-validate
+```
+
+Optional validation with append-log scanner (metadata omission hints):
+
+```sh
+make spec-validate-scan
+```
+
 ## Writing Principles
 - Use exact language and explicit conditions.
 - Prefer deterministic phrasing (`MUST`, `MUST NOT`, `MAY`) over vague wording.

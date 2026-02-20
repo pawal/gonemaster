@@ -14,6 +14,12 @@ Notes:
 - Modules: 9
 - Implemented testcases: 73
 
+## Regeneration
+
+```sh
+make spec-export-implemented
+```
+
 ## Module Inventory
 
 ### basic (3)

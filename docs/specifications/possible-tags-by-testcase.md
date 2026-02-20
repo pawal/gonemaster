@@ -38,7 +38,7 @@ Module testcase counts:
 Run:
 
 ```sh
-GOCACHE=/tmp/go-build-cache go run ./tools/specifications/export-tags > docs/specifications/possible-tags-by-testcase.json
+make spec-export-tags
 ```
 
 Generator source:

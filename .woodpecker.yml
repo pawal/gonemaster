@@ -8,6 +8,8 @@ steps:
 
   go_test:
     image: golang:1.24
+    depends_on:
+      - ui_checks
     environment:
       GOMAXPROCS: 4
     commands:

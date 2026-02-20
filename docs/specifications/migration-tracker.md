@@ -11,9 +11,9 @@ Completion criteria per testcase:
 - divergences from upstream captured
 
 ## Basic
-- [ ] basic01
-- [ ] basic02
-- [ ] basic03
+- [x] basic01
+- [x] basic02
+- [x] basic03
 
 ## Syntax
 - [ ] syntax01

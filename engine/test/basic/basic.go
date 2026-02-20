@@ -92,6 +92,7 @@ func CanContinue(ctx context.Context, z *zone.Zone, results []*logger.Entry) boo
 func Metadata() map[string][]string {
 	return map[string][]string{
 		"basic01": {
+			"B01_CHILD_NOT_EXIST",
 			"B01_CHILD_IS_ALIAS",
 			"B01_CHILD_FOUND",
 			"B01_INCONSISTENT_ALIAS",
@@ -103,6 +104,11 @@ func Metadata() map[string][]string {
 			"B01_PARENT_UNDETERMINED",
 			"B01_ROOT_HAS_NO_PARENT",
 			"B01_SERVER_ZONE_ERROR",
+			"IPV4_DISABLED",
+			"IPV4_ENABLED",
+			"IPV6_DISABLED",
+			"IPV6_ENABLED",
+			"LOOP_PROTECTION",
 			"TEST_CASE_END",
 			"TEST_CASE_START",
 		},
@@ -125,6 +131,7 @@ func Metadata() map[string][]string {
 		"basic03": {
 			"A_QUERY_NO_RESPONSES",
 			"HAS_A_RECORDS",
+			"HAS_NAMESERVER_NO_WWW_A_TEST",
 			"IPV4_DISABLED",
 			"IPV4_ENABLED",
 			"IPV6_DISABLED",

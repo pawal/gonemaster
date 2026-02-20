@@ -14,7 +14,7 @@
   "summary": {
     "module_count": 9,
     "testcase_count": 73,
-    "unique_tag_count": 442
+    "unique_tag_count": 445
   },
   "modules": {
     "address": {
@@ -46,6 +46,7 @@
       "basic01": [
         "B01_CHILD_FOUND",
         "B01_CHILD_IS_ALIAS",
+        "B01_CHILD_NOT_EXIST",
         "B01_INCONSISTENT_ALIAS",
         "B01_INCONSISTENT_DELEGATION",
         "B01_NO_CHILD",
@@ -55,6 +56,11 @@
         "B01_PARENT_UNDETERMINED",
         "B01_ROOT_HAS_NO_PARENT",
         "B01_SERVER_ZONE_ERROR",
+        "IPV4_DISABLED",
+        "IPV4_ENABLED",
+        "IPV6_DISABLED",
+        "IPV6_ENABLED",
+        "LOOP_PROTECTION",
         "TEST_CASE_END",
         "TEST_CASE_START"
       ],
@@ -77,6 +83,7 @@
       "basic03": [
         "A_QUERY_NO_RESPONSES",
         "HAS_A_RECORDS",
+        "HAS_NAMESERVER_NO_WWW_A_TEST",
         "IPV4_DISABLED",
         "IPV4_ENABLED",
         "IPV6_DISABLED",

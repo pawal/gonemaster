@@ -161,6 +161,8 @@ func Metadata() map[string][]string {
 			"TEST_CASE_START",
 		},
 		"syntax06": {
+			"IPV4_DISABLED",
+			"IPV6_DISABLED",
 			"NO_RESPONSE",
 			"NO_RESPONSE_SOA_QUERY",
 			"RNAME_MAIL_DOMAIN_INVALID",

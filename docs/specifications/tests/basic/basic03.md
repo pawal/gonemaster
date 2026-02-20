@@ -75,7 +75,7 @@ Status: Draft
 | `IPV4_ENABLED` | `DEBUG` | Default from `share/profile.json`. |
 | `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json`. |
 | `IPV6_ENABLED` | `DEBUG` | Default from `share/profile.json`. |
-| `NO_A_RECORDS` | `DEBUG` | Not explicitly mapped in `test_levels.BASIC`; defaults to `DEBUG`. |
+| `NO_A_RECORDS` | `DEBUG` | Default from `share/profile.json`. |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json`. |
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json`. |
 

@@ -16,14 +16,14 @@ Completion criteria per testcase:
 - [x] basic03
 
 ## Syntax
-- [ ] syntax01
-- [ ] syntax02
-- [ ] syntax03
-- [ ] syntax04
-- [ ] syntax05
-- [ ] syntax06
-- [ ] syntax07
-- [ ] syntax08
+- [x] syntax01
+- [x] syntax02
+- [x] syntax03
+- [x] syntax04
+- [x] syntax05
+- [x] syntax06
+- [x] syntax07
+- [x] syntax08
 
 ## Address
 - [ ] address01

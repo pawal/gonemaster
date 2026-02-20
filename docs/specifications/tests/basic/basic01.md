@@ -103,7 +103,7 @@ Status: Draft
 ## Severity Levels Per Tag
 | Tag | Level | Notes |
 | --- | --- | --- |
-| `B01_CHILD_NOT_EXIST` | `DEBUG` | Not explicitly mapped in `test_levels.BASIC`; defaults to `DEBUG`. |
+| `B01_CHILD_NOT_EXIST` | `INFO` | Default from `share/profile.json`. |
 | `B01_CHILD_IS_ALIAS` | `NOTICE` | Default from `share/profile.json`. |
 | `B01_CHILD_FOUND` | `INFO` | Default from `share/profile.json`. |
 | `B01_INCONSISTENT_ALIAS` | `ERROR` | Default from `share/profile.json`. |
@@ -119,7 +119,7 @@ Status: Draft
 | `IPV4_ENABLED` | `DEBUG` | Default from `share/profile.json`. |
 | `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json`. |
 | `IPV6_ENABLED` | `DEBUG` | Default from `share/profile.json`. |
-| `LOOP_PROTECTION` | `DEBUG` | Not mapped under `BASIC`; module-local fallback is `DEBUG`. |
+| `LOOP_PROTECTION` | `DEBUG2` | Default from `share/profile.json`. |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json`. |
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json`. |
 

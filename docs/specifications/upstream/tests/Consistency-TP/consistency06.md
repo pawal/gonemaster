@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/Consistency-TP/consistency06.md
+Upstream-Commit: 0fa8d4e090001cf66384acea18934982268b321c
+Upstream-Date: 2024-07-09T22:55:54-04:00
+-->
+
 # CONSISTENCY06: SOA MNAME consistency
 
 ## Test case identifier

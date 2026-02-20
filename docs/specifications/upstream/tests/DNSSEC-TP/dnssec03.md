@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/DNSSEC-TP/dnssec03.md
+Upstream-Commit: d072a509d83668e532245a30e37249facbdf54b0
+Upstream-Date: 2025-02-20T15:49:07+01:00
+-->
+
 ## DNSSEC03: Verify NSEC3 parameters
 
 

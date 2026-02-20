@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/Syntax-TP/syntax03.md
+Upstream-Commit: 73ab6f07f15ae0d7436846410653efef5d81ffe9
+Upstream-Date: 2023-06-15T18:44:45+02:00
+-->
+
 ## SYNTAX03: There must be no double hyphen ('--') in position 3 and 4 of the domain name
 
 ### Test case identifier

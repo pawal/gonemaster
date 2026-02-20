@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/Nameserver-TP/nameserver04.md
+Upstream-Commit: 31b4609de75bc74f65e14d59b96b3c827d5f53d1
+Upstream-Date: 2024-07-09T09:21:18-04:00
+-->
+
 ## NAMESERVER04: Same source address
 
 ### Test case identifier

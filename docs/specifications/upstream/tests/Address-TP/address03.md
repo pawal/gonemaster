@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/Address-TP/address03.md
+Upstream-Commit: 31b4609de75bc74f65e14d59b96b3c827d5f53d1
+Upstream-Date: 2024-07-09T09:21:18-04:00
+-->
+
 ## ADDRESS03: Reverse DNS entry matches name server name
 
 ### Test case identifier

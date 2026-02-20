@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/MethodsV2.md
+Upstream-Commit: 7684e2ec2474560215acba7a42ec288cecd94d98
+Upstream-Date: 2025-09-01T16:12:46+02:00
+-->
+
 # Methods common to Test Case Specifications (version 2)
 
 ## Table of contents

@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/DNSSEC-TP/dnssec10.md
+Upstream-Commit: 2ba7e85b881d57037e0e6f39890686f7e74d33ad
+Upstream-Date: 2024-12-17T16:50:04Z
+-->
+
 # DNSSEC10: Zone contains NSEC or NSEC3 records
 
 

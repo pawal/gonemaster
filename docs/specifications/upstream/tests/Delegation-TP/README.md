@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/Delegation-TP/README.md
+Upstream-Commit: c32e158d0a91f6d3b9c80f6341289fa97b269812
+Upstream-Date: 2023-04-27T12:02:13+02:00
+-->
+
 # Delegation Test Plan
 
 This document uses the terminology defined in the [Master Test Plan].

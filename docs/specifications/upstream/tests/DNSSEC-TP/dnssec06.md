@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/DNSSEC-TP/dnssec06.md
+Upstream-Commit: 73ab6f07f15ae0d7436846410653efef5d81ffe9
+Upstream-Date: 2023-06-15T18:44:45+02:00
+-->
+
 ## DNSSEC06: Verify DNSSEC additional processing
 
 ### Test case identifier

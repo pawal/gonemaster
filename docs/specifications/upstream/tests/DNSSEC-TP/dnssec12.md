@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/DNSSEC-TP/dnssec12.md
+Upstream-Commit: 5c6b79bce138d9a05fbf4a4dee24fc8ac845887d
+Upstream-Date: 2024-07-09T09:24:07-04:00
+-->
+
 ## DNSSEC12: Test for DNSSEC Algorithm Completeness
 
 ### Test case identifier

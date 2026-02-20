@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/DNSSEC-TP/dnssec11.md
+Upstream-Commit: 787285b6291005af6ccb490e570b928dc7f3f898
+Upstream-Date: 2023-07-30T18:49:44+02:00
+-->
+
 # DNSSEC11: DS in delegation requires signed zone
 
 

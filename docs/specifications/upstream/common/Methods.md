@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/Methods.md
+Upstream-Commit: 4d27dc51a5564c48de651226996cc6969d977c64
+Upstream-Date: 2024-07-09T09:21:18-04:00
+-->
+
 # Methods common to Test Case Specifications (version 1)
 
 This is a list of generic Methods used in many Test Case specifications. The

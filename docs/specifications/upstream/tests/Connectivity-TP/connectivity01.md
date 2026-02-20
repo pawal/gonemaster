@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/Connectivity-TP/connectivity01.md
+Upstream-Commit: a161bbf2947cf8cd39328af05fe60435b1a1cd83
+Upstream-Date: 2024-07-09T22:55:54-04:00
+-->
+
 # CONNECTIVITY01: UDP connectivity to name servers
 
 ## Test case identifier

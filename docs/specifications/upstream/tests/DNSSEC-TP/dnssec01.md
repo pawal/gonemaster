@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/DNSSEC-TP/dnssec01.md
+Upstream-Commit: 1664288fe9e59ce9902b0c710ace36ea6c270650
+Upstream-Date: 2025-10-30T11:16:51+01:00
+-->
+
 # DNSSEC01: Legal values for the DS hash digest algorithm
 
 

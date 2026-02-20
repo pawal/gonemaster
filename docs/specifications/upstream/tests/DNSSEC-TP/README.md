@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/DNSSEC-TP/README.md
+Upstream-Commit: 4277eb45415061c9f673ecc91ffa3fa3e4281693
+Upstream-Date: 2025-12-18T16:42:34Z
+-->
+
 # DNSSEC Test Plan
 
 These are the DNSSEC tests for a domain.

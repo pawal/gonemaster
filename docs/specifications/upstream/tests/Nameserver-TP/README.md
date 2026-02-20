@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/Nameserver-TP/README.md
+Upstream-Commit: 2a496dd31130dbc690585cf8df59e44f770fce99
+Upstream-Date: 2024-12-09T13:45:14Z
+-->
+
 # Name Server Test Plan
 
 These are tests of the properties of a name server.

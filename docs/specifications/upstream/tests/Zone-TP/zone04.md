@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/Zone-TP/zone04.md
+Upstream-Commit: 73ab6f07f15ae0d7436846410653efef5d81ffe9
+Upstream-Date: 2023-06-15T18:44:45+02:00
+-->
+
 ## ZONE04: SOA 'retry' at least 1 hour
 
 ### Test case identifier

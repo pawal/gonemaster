@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/Syntax-TP/README.md
+Upstream-Commit: c32e158d0a91f6d3b9c80f6341289fa97b269812
+Upstream-Date: 2023-04-27T12:02:13+02:00
+-->
+
 # Syntax Test Plan
 
 These are tests of the syntax of different labels in DNS, such as domain

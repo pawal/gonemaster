@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/Zone-TP/zone01.md
+Upstream-Commit: 798fa85062121cf685c95cece41f235728660b09
+Upstream-Date: 2025-05-22T11:12:57+02:00
+-->
+
 ## ZONE01: Fully qualified master nameserver in SOA
 
 ### Test case identifier

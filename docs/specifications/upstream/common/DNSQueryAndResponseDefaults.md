@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/DNSQueryAndResponseDefaults.md
+Upstream-Commit: bf6d62929a6fc4af1338f2435efe1207f7a9dc17
+Upstream-Date: 2024-11-21T20:13:45+01:00
+-->
+
 # DNS Query and Response Defaults
 
 **Table of contents**

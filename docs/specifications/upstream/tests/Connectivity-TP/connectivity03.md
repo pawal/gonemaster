@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/Connectivity-TP/connectivity03.md
+Upstream-Commit: 48ba655d0245b6a60d930339287082af157d1e66
+Upstream-Date: 2024-10-08T10:40:02+02:00
+-->
+
 # CONNECTIVITY03: AS Diversity
 
 ## Test case identifier

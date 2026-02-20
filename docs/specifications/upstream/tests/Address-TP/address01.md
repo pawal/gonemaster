@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/Address-TP/address01.md
+Upstream-Commit: 9d40a0a73b2418d5e77408a60d1e877f09689c95
+Upstream-Date: 2025-11-13T16:32:57Z
+-->
+
 # ADDRESS01: Name server address must be globally reachable
 
 ## Test case identifier

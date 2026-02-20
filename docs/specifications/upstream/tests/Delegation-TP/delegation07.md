@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/Delegation-TP/delegation07.md
+Upstream-Commit: 61e2ab199373a325dfdeb2841508d5f703766ba3
+Upstream-Date: 2024-07-09T09:24:07-04:00
+-->
+
 ## DELEGATION07: Parent glue name records present in child
 
 ### Test case identifier

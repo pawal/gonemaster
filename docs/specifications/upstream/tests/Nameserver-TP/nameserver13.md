@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/Nameserver-TP/nameserver13.md
+Upstream-Commit: cd28d35e552ddf537392747dbd58eeec61eb908d
+Upstream-Date: 2024-07-09T22:55:54-04:00
+-->
+
 # NAMESERVER13: Test for truncated response on EDNS query
 
 ## Test case identifier

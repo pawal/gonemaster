@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/Nameserver-TP/nameserver01.md
+Upstream-Commit: 6085dc1f1b8a10679dcf2fb1922ca6c3319f07e4
+Upstream-Date: 2024-07-09T22:55:54-04:00
+-->
+
 # NAMESERVER01: A name server should not be a recursor
 
 ## Test case identifier

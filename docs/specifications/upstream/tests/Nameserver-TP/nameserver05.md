@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/Nameserver-TP/nameserver05.md
+Upstream-Commit: d248742c023a26fadf35644bca2925048c8bc6f8
+Upstream-Date: 2024-07-09T09:24:07-04:00
+-->
+
 # NAMESERVER05: Behaviour against AAAA query
 
 ## Test case identifier

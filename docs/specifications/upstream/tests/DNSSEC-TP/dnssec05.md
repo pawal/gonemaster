@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/DNSSEC-TP/dnssec05.md
+Upstream-Commit: 4a36c181c103a98c38c810ada562df8f226a82ec
+Upstream-Date: 2025-12-09T14:59:33+01:00
+-->
+
 # DNSSEC05: Check for invalid DNSKEY algorithms
 
 ## Test case identifier

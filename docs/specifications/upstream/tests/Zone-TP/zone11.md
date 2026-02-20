@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/Zone-TP/zone11.md
+Upstream-Commit: 7c620ec6e5676fcd37dc00956a3486a337b067f3
+Upstream-Date: 2025-11-03T08:12:04+01:00
+-->
+
 # ZONE11: SPF policy validation
 
 ## Test case identifier

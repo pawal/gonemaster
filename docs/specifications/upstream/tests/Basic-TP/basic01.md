@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/Basic-TP/basic01.md
+Upstream-Commit: 243a3a65ed44496a30e0e13e943ba586b030428a
+Upstream-Date: 2025-09-01T16:12:46+02:00
+-->
+
 # BASIC01: Check for the parent zone and the zone itself
 
 ## Test case identifier

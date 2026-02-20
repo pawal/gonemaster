@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/MasterTestPlan.md
+Upstream-Commit: 156d0178e76e6dff8bcea0c4499e7a88c9e08bc4
+Upstream-Date: 2024-07-09T22:55:54-04:00
+-->
+
 Zonemaster Master Test Plan
 ===========================
 

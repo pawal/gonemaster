@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/Nameserver-TP/nameserver15.md
+Upstream-Commit: 7bfeaa364cad8609cc5167d64f87a3ab4d9b5a10
+Upstream-Date: 2024-04-04T16:11:48+02:00
+-->
+
 # NAMESERVER15: Checking for revealed software version
 
 ## Test case identifier

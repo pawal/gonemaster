@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/Connectivity-TP/connectivity04.md
+Upstream-Commit: 18a0045f100433e19d30e156906194b7781691d8
+Upstream-Date: 2024-11-18T17:20:25+01:00
+-->
+
 # CONNECTIVITY04: IP Prefix Diversity
 
 ## Test case identifier

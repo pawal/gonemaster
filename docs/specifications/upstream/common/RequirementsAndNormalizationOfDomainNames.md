@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/RequirementsAndNormalizationOfDomainNames.md
+Upstream-Commit: 10d9c62d39ec829b40da1f65d493d496a83d65e9
+Upstream-Date: 2025-06-02T09:58:15+02:00
+-->
+
 # Requirements and normalization of domain names in input
 
 

@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/Delegation-TP/delegation06.md
+Upstream-Commit: 69d10657d67703e6f071ac69743be39d4cfcf107
+Upstream-Date: 2024-07-09T22:55:54-04:00
+-->
+
 ## DELEGATION06: Existence of SOA
 
 ### Test case identifier

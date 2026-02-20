@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/Syntax-TP/syntax06.md
+Upstream-Commit: 19f88aa7ba1a22b45174c4ac827f523f3a597248
+Upstream-Date: 2024-07-09T09:21:18-04:00
+-->
+
 # SYNTAX06: No illegal characters in the SOA RNAME field
 
 ## Test case identifier

@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/Address-TP/address02.md
+Upstream-Commit: 7bfeaa364cad8609cc5167d64f87a3ab4d9b5a10
+Upstream-Date: 2024-04-04T16:11:48+02:00
+-->
+
 ## ADDRESS02: Reverse DNS entry exists for name server IP address
 
 ### Test case identifier

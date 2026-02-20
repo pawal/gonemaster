@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/Zone-TP/zone05.md
+Upstream-Commit: f7f140affbbe403bfb1619b4e2defc0019a309df
+Upstream-Date: 2024-07-09T09:21:18-04:00
+-->
+
 ## ZONE05: SOA 'expire' minimum value
 
 ### Test case identifier

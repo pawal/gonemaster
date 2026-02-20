@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/Nameserver-TP/nameserver07.md
+Upstream-Commit: ba94aaad755cbeb416c91f02115156f4d9c4f9b0
+Upstream-Date: 2023-04-05T15:16:57+02:00
+-->
+
 ## NAMESERVER07:  To check whether authoritative name servers return an upward referral
 
 ### Test case identifier

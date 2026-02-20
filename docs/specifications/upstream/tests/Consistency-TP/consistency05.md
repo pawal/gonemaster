@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/Consistency-TP/consistency05.md
+Upstream-Commit: d65071781cbad03f1e142d120ac5075914a0dd63
+Upstream-Date: 2024-07-09T22:55:54-04:00
+-->
+
 # CONSISTENCY05: Consistency between glue and authoritative data
 
 ## Test case identifier

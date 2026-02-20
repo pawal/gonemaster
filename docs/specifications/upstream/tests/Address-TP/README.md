@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/Address-TP/README.md
+Upstream-Commit: 4277eb45415061c9f673ecc91ffa3fa3e4281693
+Upstream-Date: 2025-12-18T16:42:34Z
+-->
+
 # Address Test Plan
 
 These tests focus on the Address specific test cases of the DNS tests.

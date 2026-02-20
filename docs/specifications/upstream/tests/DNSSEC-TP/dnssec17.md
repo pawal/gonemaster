@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/DNSSEC-TP/dnssec17.md
+Upstream-Commit: d65071781cbad03f1e142d120ac5075914a0dd63
+Upstream-Date: 2024-07-09T22:55:54-04:00
+-->
+
 # DNSSEC17: Validate CDNSKEY
 
 ## Test case identifier

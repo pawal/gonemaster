@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/Basic-TP/basic02.md
+Upstream-Commit: 787285b6291005af6ccb490e570b928dc7f3f898
+Upstream-Date: 2023-07-30T18:49:44+02:00
+-->
+
 # BASIC02: The domain must have at least one working name server
 
 ## Test case identifier

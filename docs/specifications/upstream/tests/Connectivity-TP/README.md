@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/Connectivity-TP/README.md
+Upstream-Commit: 45cf7405c3e85b52d7680c94b8f28ea67c278a86
+Upstream-Date: 2023-06-21T15:56:13Z
+-->
+
 # Connectivity Test Plan
 
 This document uses the terminology defined in the [Master Test Plan].

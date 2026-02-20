@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/Nameserver-TP/nameserver02.md
+Upstream-Commit: 73ab6f07f15ae0d7436846410653efef5d81ffe9
+Upstream-Date: 2023-06-15T18:44:45+02:00
+-->
+
 # NAMESERVER02: Test of EDNS0 support
 
 ## Test case identifier

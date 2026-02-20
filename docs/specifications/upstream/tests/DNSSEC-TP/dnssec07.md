@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/DNSSEC-TP/dnssec07.md
+Upstream-Commit: 8689dc7fa433d47223e41b0b36eafa69606238ef
+Upstream-Date: 2025-12-09T15:21:17+01:00
+-->
+
 # DNSSEC07: DNSSEC signed zone and DS in parent for signed zone
 
 ## Test case identifier

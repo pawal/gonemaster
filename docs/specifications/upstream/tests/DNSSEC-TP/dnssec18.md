@@ -1,3 +1,9 @@
+<!--
+Upstream-Source: docs/public/specifications/tests/DNSSEC-TP/dnssec18.md
+Upstream-Commit: 1a93fe0662d5bae543be11045fbac96bed7c8706
+Upstream-Date: 2025-09-01T16:12:46+02:00
+-->
+
 # DNSSEC18: Validate trust from DS to CDS and CDNSKEY
 
 ## Test case identifier

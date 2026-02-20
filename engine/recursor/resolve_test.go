@@ -110,6 +110,113 @@ func TestCacheStoreLookupAndClear(t *testing.T) {
 	}
 }
 
+func TestCacheStoreBoundsCacheSize(t *testing.T) {
+	oldMax := recurseCacheMaxEntries
+	recurseCacheMaxEntries = 2
+	defer func() {
+		recurseCacheMaxEntries = oldMax
+	}()
+
+	r := &Recursor{}
+	msg := new(dns.Msg)
+	msg.Rcode = dns.RcodeSuccess
+	resp := packet.Packet{Msg: msg}
+
+	r.cacheStore("a", "A", "IN", resp)
+	r.cacheStore("b", "A", "IN", resp)
+	r.cacheStore("c", "A", "IN", resp)
+
+	if _, ok := r.cacheLookup("a", "A", "IN"); ok {
+		t.Fatalf("expected oldest entry evicted after cache cap")
+	}
+	if _, ok := r.cacheLookup("b", "A", "IN"); ok {
+		t.Fatalf("expected cache to reset once cap exceeded")
+	}
+	if _, ok := r.cacheLookup("c", "A", "IN"); !ok {
+		t.Fatalf("expected latest entry to remain after reset")
+	}
+	if r.recurseCount != 1 {
+		t.Fatalf("unexpected cache count after reset: %d", r.recurseCount)
+	}
+}
+
+func TestRecurseWithNameserversDoesNotPoisonRootCache(t *testing.T) {
+	nameserver.EmptyCache()
+	defer nameserver.EmptyCache()
+
+	r := &Recursor{
+		fakeAddresses: map[string]map[string][]netip.Addr{},
+		client:        &transport.Client{},
+		recurseCache:  map[string]map[string]map[string]*packet.Packet{},
+		inflight:      map[string]*inflightLookup{},
+	}
+	if err := r.AddFakeAddresses(".", map[string][]string{
+		"a.root.test": {"192.0.2.1"},
+	}); err != nil {
+		t.Fatalf("add fake root: %v", err)
+	}
+
+	var rootCalls int32
+	rootNS, err := nameserver.NewWithContext(context.Background(), "a.root.test", "192.0.2.1", r.client)
+	if err != nil {
+		t.Fatalf("new root nameserver: %v", err)
+	}
+	rootNS.SetQueryHook(func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		if dnsname.New(name).String() != "example" || strings.ToUpper(qtype) != "A" {
+			return packet.Packet{}, nil
+		}
+		atomic.AddInt32(&rootCalls, 1)
+		return packetWithA(name, netip.MustParseAddr("192.0.2.1")), nil
+	})
+
+	var customCalls int32
+	customNS, err := nameserver.NewWithContext(context.Background(), "custom.test", "192.0.2.2", r.client)
+	if err != nil {
+		t.Fatalf("new custom nameserver: %v", err)
+	}
+	customNS.SetQueryHook(func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		if dnsname.New(name).String() != "example" || strings.ToUpper(qtype) != "A" {
+			return packet.Packet{}, nil
+		}
+		atomic.AddInt32(&customCalls, 1)
+		return packetWithA(name, netip.MustParseAddr("192.0.2.2")), nil
+	})
+
+	ctx := context.Background()
+	respCustom, err := r.RecurseWithNameservers(ctx, "example", "A", "IN", []nameserver.Nameserver{customNS})
+	if err != nil {
+		t.Fatalf("custom recurse: %v", err)
+	}
+	recordsCustom := respCustom.GetRecords("A", "answer")
+	if len(recordsCustom) != 1 {
+		t.Fatalf("expected one custom A record, got %d", len(recordsCustom))
+	}
+	customA, ok := recordsCustom[0].(*dns.A)
+	if !ok || customA.A.String() != "192.0.2.2" {
+		t.Fatalf("unexpected custom response: %#v", recordsCustom[0])
+	}
+
+	respRoot, err := r.Recurse(ctx, "example", "A", "IN")
+	if err != nil {
+		t.Fatalf("root recurse: %v", err)
+	}
+	recordsRoot := respRoot.GetRecords("A", "answer")
+	if len(recordsRoot) != 1 {
+		t.Fatalf("expected one root A record, got %d", len(recordsRoot))
+	}
+	rootA, ok := recordsRoot[0].(*dns.A)
+	if !ok || rootA.A.String() != "192.0.2.1" {
+		t.Fatalf("unexpected root response: %#v", recordsRoot[0])
+	}
+
+	if atomic.LoadInt32(&customCalls) == 0 {
+		t.Fatalf("expected custom nameserver to be queried")
+	}
+	if atomic.LoadInt32(&rootCalls) == 0 {
+		t.Fatalf("expected root nameserver query, cache should not reuse custom result")
+	}
+}
+
 func TestRecurseInflightLookupCoalescing(t *testing.T) {
 	nameserver.EmptyCache()
 	defer nameserver.EmptyCache()
@@ -475,6 +582,87 @@ func TestGetNSFromUsesGlueAndLazy(t *testing.T) {
 	}
 	if _, ok := queryers[1].(lazyNameserver); !ok {
 		t.Fatalf("expected lazy nameserver, got %#v", queryers[1])
+	}
+}
+
+func TestGetNSFromIgnoresOutOfBailiwickAndUnrelatedGlue(t *testing.T) {
+	nameserver.EmptyCache()
+	defer nameserver.EmptyCache()
+
+	msg := new(dns.Msg)
+	msg.Ns = []dns.RR{
+		&dns.NS{
+			Hdr: dns.RR_Header{
+				Name:   "example.",
+				Rrtype: dns.TypeNS,
+				Class:  dns.ClassINET,
+			},
+			Ns: "ns1.example.",
+		},
+		&dns.NS{
+			Hdr: dns.RR_Header{
+				Name:   "example.",
+				Rrtype: dns.TypeNS,
+				Class:  dns.ClassINET,
+			},
+			Ns: "ns.outside.net.",
+		},
+	}
+	msg.Extra = []dns.RR{
+		&dns.A{
+			Hdr: dns.RR_Header{
+				Name:   "ns1.example.",
+				Rrtype: dns.TypeA,
+				Class:  dns.ClassINET,
+			},
+			A: net.IPv4(192, 0, 2, 53),
+		},
+		&dns.A{
+			Hdr: dns.RR_Header{
+				Name:   "ns.outside.net.",
+				Rrtype: dns.TypeA,
+				Class:  dns.ClassINET,
+			},
+			A: net.IPv4(203, 0, 113, 9),
+		},
+		&dns.A{
+			Hdr: dns.RR_Header{
+				Name:   "attacker.example.",
+				Rrtype: dns.TypeA,
+				Class:  dns.ClassINET,
+			},
+			A: net.IPv4(198, 51, 100, 66),
+		},
+	}
+
+	resp := packet.Packet{Msg: msg}
+	r := &Recursor{client: &transport.Client{}}
+	state := &recurseState{}
+	queryers, err := r.getNSFrom(context.Background(), resp, state)
+	if err != nil {
+		t.Fatalf("getNSFrom: %v", err)
+	}
+	if len(queryers) != 2 {
+		t.Fatalf("expected 2 queryers, got %d", len(queryers))
+	}
+
+	first, ok := queryers[0].(nameserver.Nameserver)
+	if !ok || first.Name.String() != "ns1.example" || first.Address.String() != "192.0.2.53" {
+		t.Fatalf("unexpected first queryer: %#v", queryers[0])
+	}
+	second, ok := queryers[1].(lazyNameserver)
+	if !ok || second.name != "ns.outside.net" {
+		t.Fatalf("expected lazy queryer for out-of-bailiwick NS, got %#v", queryers[1])
+	}
+
+	state.ensureLock()
+	state.lock()
+	defer state.unlock()
+	if _, ok := state.glue["ns.outside.net"]; ok {
+		t.Fatalf("did not expect out-of-bailiwick glue to be trusted")
+	}
+	if _, ok := state.glue["attacker.example"]; ok {
+		t.Fatalf("did not expect unrelated additional address to be trusted")
 	}
 }
 

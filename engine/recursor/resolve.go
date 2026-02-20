@@ -17,6 +17,8 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/profile"
 )
 
+var recurseCacheMaxEntries = 10000
+
 // Recurse performs a recursive lookup using root servers.
 func (r *Recursor) Recurse(ctx context.Context, name string, qtype string, qclass string) (packet.Packet, error) {
 	return r.recurseWithNameservers(ctx, name, qtype, qclass, nil)
@@ -312,6 +314,7 @@ func (r *Recursor) getAddressesFor(ctx context.Context, name string, state *recu
 func (r *Recursor) ClearCache() {
 	r.cacheMu.Lock()
 	r.recurseCache = map[string]map[string]map[string]*packet.Packet{}
+	r.recurseCount = 0
 	r.cacheMu.Unlock()
 }
 
@@ -326,7 +329,7 @@ func (r *Recursor) recurseWithNameservers(ctx context.Context, name string, qtyp
 	qclass = strings.ToUpper(qclass)
 
 	nameObj := dnsname.New(name)
-	key := strings.ToLower(nameObj.String())
+	key := cacheNameKey(nameObj, ns)
 	runLog := logger.FromContext(ctx)
 	if cached, ok := r.cacheLookup(key, qtype, qclass); ok {
 		cached.Log = runLog
@@ -398,6 +401,18 @@ type inflightLookup struct {
 	err  error
 }
 
+func cacheNameKey(name dnsname.Name, ns []nameserver.Nameserver) string {
+	if len(ns) == 0 {
+		return "root|" + strings.ToLower(name.String())
+	}
+	parts := make([]string, 0, len(ns))
+	for _, server := range ns {
+		parts = append(parts, strings.ToLower(server.Name.String())+"@"+server.Address.String())
+	}
+	sort.Strings(parts)
+	return "ns|" + strings.Join(parts, ",") + "|" + strings.ToLower(name.String())
+}
+
 func recurseLookupKey(name string, qtype string, qclass string) string {
 	return name + "|" + qtype + "|" + qclass
 }
@@ -411,6 +426,9 @@ func (r *Recursor) cacheLookupLocked(name string, qtype string, qclass string) (
 			if cached, ok := byClass[qclass]; ok {
 				if cached == nil {
 					delete(byClass, qclass)
+					if r.recurseCount > 0 {
+						r.recurseCount--
+					}
 					if len(byClass) == 0 {
 						delete(byType, qtype)
 					}
@@ -484,8 +502,23 @@ func (r *Recursor) cacheStore(name string, qtype string, qclass string, resp pac
 	if r.recurseCache[name][qtype] == nil {
 		r.recurseCache[name][qtype] = map[string]*packet.Packet{}
 	}
-
 	copyResp := resp
+
+	if _, exists := r.recurseCache[name][qtype][qclass]; !exists {
+		r.recurseCount++
+	}
+	if recurseCacheMaxEntries > 0 && r.recurseCount > recurseCacheMaxEntries {
+		// Keep cache bounded for long-running processes.
+		r.recurseCache = map[string]map[string]map[string]*packet.Packet{}
+		r.recurseCount = 1
+		r.recurseCache[name] = map[string]map[string]*packet.Packet{
+			qtype: {
+				qclass: &copyResp,
+			},
+		}
+		return
+	}
+
 	r.recurseCache[name][qtype][qclass] = &copyResp
 }
 
@@ -506,6 +539,7 @@ func (r *Recursor) getNSFrom(ctx context.Context, resp packet.Packet, state *rec
 	state.unlock()
 
 	var names []string
+	glueAllowed := map[string]bool{}
 	for _, rr := range nsRecords {
 		nsRR, ok := rr.(*dns.NS)
 		if !ok {
@@ -513,6 +547,10 @@ func (r *Recursor) getNSFrom(ctx context.Context, resp packet.Packet, state *rec
 		}
 		nsName := dnsname.New(nsRR.Ns)
 		names = append(names, nsName.String())
+		zoneName := dnsname.New(nsRR.Hdr.Name)
+		if zoneName.IsInBailiwick(nsName) {
+			glueAllowed[strings.ToLower(nsName.String())] = true
+		}
 	}
 
 	state.lock()
@@ -520,6 +558,9 @@ func (r *Recursor) getNSFrom(ctx context.Context, resp packet.Packet, state *rec
 		if a, ok := rr.(*dns.A); ok {
 			ownerName := dnsname.New(rr.Header().Name)
 			owner := strings.ToLower(ownerName.String())
+			if !glueAllowed[owner] {
+				continue
+			}
 			if addr, err := netip.ParseAddr(a.A.String()); err == nil {
 				if state.glue[owner] == nil {
 					state.glue[owner] = map[netip.Addr]bool{}
@@ -532,6 +573,9 @@ func (r *Recursor) getNSFrom(ctx context.Context, resp packet.Packet, state *rec
 		if aaaa, ok := rr.(*dns.AAAA); ok {
 			ownerName := dnsname.New(rr.Header().Name)
 			owner := strings.ToLower(ownerName.String())
+			if !glueAllowed[owner] {
+				continue
+			}
 			if addr, err := netip.ParseAddr(aaaa.AAAA.String()); err == nil {
 				if state.glue[owner] == nil {
 					state.glue[owner] = map[netip.Addr]bool{}

@@ -6,9 +6,16 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+ - Recursor: Add bailiwick filtering for trusted glue addresses
+ - Recursor: Bound recurse cache growth to reduce long-run memory pressure
+ - Recursor: Scope recurse cache by resolver context (root vs custom NS set)
+ - Recursor: Add regression tests for cache isolation/limits and glue filtering
+
+
 ## Changed
 
  - Harmonized `--version` across programs
+ - Recursor: Do not cache empty recurse responses
 
 ## [v1.0.0] - 2026-02-19
 

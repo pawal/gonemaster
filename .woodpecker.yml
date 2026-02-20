@@ -1,13 +1,24 @@
 steps:
-  test:
-    image: golang:1.24-bookworm
+  ui_checks:
+    image: node:22-bookworm
+    commands:
+      - npm --prefix ui ci
+      - npm --prefix ui run test
+      - npm --prefix ui run build
+
+  go_test:
+    image: golang:1.24
     environment:
       GOMAXPROCS: 4
-      DEBIAN_FRONTEND: noninteractive
     commands:
-      - apt-get update
-      - apt-get install -y --no-install-recommends nodejs npm
-      - make test
+      - go test -p 4 -parallel 4 ./...
+
+  build_server_with_ui:
+    image: golang:1.24
+    depends_on:
+      - ui_checks
+    commands:
+      - go build -trimpath -o /tmp/gonemaster-server ./cmd/gonemaster-server
 when:
   event:
     - push
@@ -15,14 +26,17 @@ when:
 
 ---
 steps:
-  build_artifacts:
-    image: golang:1.24-bookworm
-    environment:
-      DEBIAN_FRONTEND: noninteractive
+  ui_build:
+    image: node:22-bookworm
     commands:
-      - apt-get update
-      - apt-get install -y --no-install-recommends nodejs npm
-      - make ui-build
+      - npm --prefix ui ci
+      - npm --prefix ui run build
+
+  build_artifacts:
+    image: golang:1.24
+    depends_on:
+      - ui_build
+    commands:
       - |
         set -eu
         mkdir -p dist

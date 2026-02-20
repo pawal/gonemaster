@@ -23,6 +23,8 @@ The Zonemaster project may be used as an upstream reference during migration, bu
   - Reusable templates for testcase specs and tag tables.
 - `migration-tracker.md`
   - Checklist-style tracker for migration status per testcase.
+- `known-intentional-gaps.md`
+  - Recorded implementation gaps against upstream testcase specs with rationale.
 
 ## Source-Of-Truth Rules
 - Gonemaster implementation is the runtime source of truth.

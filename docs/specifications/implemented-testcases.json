@@ -1,0 +1,116 @@
+{
+  "generated_by": "go run ./tools/specifications/export-implemented",
+  "source": [
+    "engine/plan.go:AvailableTestcases",
+    "engine/plan.go:moduleTestcases",
+    "engine/engine.go:*Tests maps"
+  ],
+  "summary": {
+    "module_count": 9,
+    "testcase_count": 73
+  },
+  "module_order": [
+    "basic",
+    "address",
+    "connectivity",
+    "consistency",
+    "delegation",
+    "dnssec",
+    "nameserver",
+    "syntax",
+    "zone"
+  ],
+  "modules": {
+    "address": [
+      "address01",
+      "address02",
+      "address03"
+    ],
+    "basic": [
+      "basic01",
+      "basic02",
+      "basic03"
+    ],
+    "connectivity": [
+      "connectivity01",
+      "connectivity02",
+      "connectivity03",
+      "connectivity04"
+    ],
+    "consistency": [
+      "consistency01",
+      "consistency02",
+      "consistency03",
+      "consistency04",
+      "consistency05",
+      "consistency06"
+    ],
+    "delegation": [
+      "delegation01",
+      "delegation02",
+      "delegation03",
+      "delegation04",
+      "delegation05",
+      "delegation06",
+      "delegation07"
+    ],
+    "dnssec": [
+      "dnssec01",
+      "dnssec02",
+      "dnssec03",
+      "dnssec04",
+      "dnssec05",
+      "dnssec06",
+      "dnssec07",
+      "dnssec08",
+      "dnssec09",
+      "dnssec10",
+      "dnssec11",
+      "dnssec13",
+      "dnssec14",
+      "dnssec15",
+      "dnssec16",
+      "dnssec17",
+      "dnssec18"
+    ],
+    "nameserver": [
+      "nameserver01",
+      "nameserver02",
+      "nameserver03",
+      "nameserver04",
+      "nameserver05",
+      "nameserver06",
+      "nameserver07",
+      "nameserver08",
+      "nameserver09",
+      "nameserver10",
+      "nameserver11",
+      "nameserver12",
+      "nameserver13",
+      "nameserver15"
+    ],
+    "syntax": [
+      "syntax01",
+      "syntax02",
+      "syntax03",
+      "syntax04",
+      "syntax05",
+      "syntax06",
+      "syntax07",
+      "syntax08"
+    ],
+    "zone": [
+      "zone01",
+      "zone02",
+      "zone03",
+      "zone04",
+      "zone05",
+      "zone06",
+      "zone07",
+      "zone08",
+      "zone09",
+      "zone10",
+      "zone11"
+    ]
+  }
+}

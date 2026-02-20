@@ -25,12 +25,15 @@ The Zonemaster project may be used as an upstream reference during migration, bu
   - Checklist-style tracker for migration status per testcase.
 - `known-intentional-gaps.md`
   - Recorded implementation gaps against upstream testcase specs with rationale.
+- `known-behavior-divergences.md`
+  - Review-tagged behavior/spec divergences found in prior investigations.
 
 ## Source-Of-Truth Rules
 - Gonemaster implementation is the runtime source of truth.
 - `docs/specifications/tests/` is the documentation source of truth for expected behavior.
 - `docs/specifications/upstream/` is reference-only and can differ from gonemaster.
 - Any intentional divergence from upstream must be documented in the gonemaster testcase spec.
+- Outside the `plans` directory tree, gonemaster docs must not reference files in `plans`.
 
 ## Update Workflow
 1. Identify testcase behavior from current gonemaster code.

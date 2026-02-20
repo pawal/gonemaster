@@ -85,7 +85,7 @@ Status meanings:
 | `zonemaster/docs/public/specifications/tests/Zone-TP/zone04.md` | `zone04` | `zone04` | implemented | Direct testcase ID mapping. |
 | `zonemaster/docs/public/specifications/tests/Zone-TP/zone05.md` | `zone05` | `zone05` | implemented | Direct testcase ID mapping. |
 | `zonemaster/docs/public/specifications/tests/Zone-TP/zone06.md` | `zone06` | `zone06` | implemented | Direct testcase ID mapping. |
-| `zonemaster/docs/public/specifications/tests/Zone-TP/zone07.md` | `zone07` | `zone07` | needs-review | Known upstream/spec behavior divergence tracked in `plans/zonemaster-zone07-bug-report.md`. |
+| `zonemaster/docs/public/specifications/tests/Zone-TP/zone07.md` | `zone07` | `zone07` | needs-review | Review tags: `DIV-ZONE07-UNDEF-CACHE`, `DIV-ZONE07-SPEC-TEXT`, `DIV-ZONE07-SPEC-OUTCOMES`, `DIV-ZONE07-INTERCASE`. See `docs/specifications/known-behavior-divergences.md`. |
 | `zonemaster/docs/public/specifications/tests/Zone-TP/zone08.md` | `zone08` | `zone08` | implemented | Direct testcase ID mapping. |
 | `zonemaster/docs/public/specifications/tests/Zone-TP/zone09.md` | `zone09` | `zone09` | implemented | Direct testcase ID mapping. |
 | `zonemaster/docs/public/specifications/tests/Zone-TP/zone10.md` | `zone10` | `zone10` | implemented | Direct testcase ID mapping. |

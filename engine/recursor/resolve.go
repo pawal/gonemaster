@@ -410,7 +410,14 @@ func (r *Recursor) cacheLookupLocked(name string, qtype string, qclass string) (
 		if byClass, ok := byType[qtype]; ok {
 			if cached, ok := byClass[qclass]; ok {
 				if cached == nil {
-					return packet.Packet{}, true
+					delete(byClass, qclass)
+					if len(byClass) == 0 {
+						delete(byType, qtype)
+					}
+					if len(byType) == 0 {
+						delete(r.recurseCache, name)
+					}
+					return packet.Packet{}, false
 				}
 				return *cached, true
 			}
@@ -462,6 +469,12 @@ func (r *Recursor) cacheStore(name string, qtype string, qclass string, resp pac
 	r.cacheMu.Lock()
 	defer r.cacheMu.Unlock()
 
+	// Do not cache indeterminate lookups (no packet). They are often transient
+	// cancellation/timeouts and should be retried on subsequent calls.
+	if resp.Msg == nil {
+		return
+	}
+
 	if r.recurseCache == nil {
 		r.recurseCache = map[string]map[string]map[string]*packet.Packet{}
 	}
@@ -470,11 +483,6 @@ func (r *Recursor) cacheStore(name string, qtype string, qclass string, resp pac
 	}
 	if r.recurseCache[name][qtype] == nil {
 		r.recurseCache[name][qtype] = map[string]*packet.Packet{}
-	}
-
-	if resp.Msg == nil {
-		r.recurseCache[name][qtype][qclass] = nil
-		return
 	}
 
 	copyResp := resp

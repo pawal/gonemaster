@@ -100,8 +100,8 @@ func TestCacheStoreLookupAndClear(t *testing.T) {
 	}
 
 	r.cacheStore("empty", "A", "IN", packet.Packet{})
-	if _, ok := r.cacheLookup("empty", "A", "IN"); !ok {
-		t.Fatalf("expected cached nil response")
+	if _, ok := r.cacheLookup("empty", "A", "IN"); ok {
+		t.Fatalf("expected empty response not to be cached")
 	}
 
 	r.ClearCache()

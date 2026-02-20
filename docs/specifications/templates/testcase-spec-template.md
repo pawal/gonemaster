@@ -32,6 +32,13 @@ Status: Draft | Reviewed | Final
 - Upstream reference: `<path or link>`
 - Differences:
   - `<difference>`
+- Potential upstream report:
+  - `yes|no`
+- If yes, include:
+  - upstream expected behavior: `<text>`
+  - observed gonemaster behavior: `<text>`
+  - evidence: `<code path or test>`
+  - report status: `<not filed|filed|fixed upstream>`
 
 ## Edge Cases And Limitations
 - `<edge case>`

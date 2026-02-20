@@ -5,11 +5,11 @@ Status: Draft | Reviewed | Final
 ## Purpose
 - Describe what this testcase verifies.
 
-## Inputs And Preconditions
-- Required inputs:
-  - `<input>`
+## Preconditions And Inputs
 - Preconditions:
   - `<condition>`
+- Required inputs:
+  - `<input>`
 - Profile/config knobs that affect behavior:
   - `<profile key>`
 
@@ -19,14 +19,19 @@ Status: Draft | Reviewed | Final
 3. <step>
 
 ## Emitted Tags (Possible Set)
-| Tag | Level | Emitted when |
-| --- | --- | --- |
-| `<TAG_NAME>` | `<INFO|NOTICE|WARNING|ERROR|CRITICAL|DEBUG...>` | `<condition>` |
+| Tag | Emitted when |
+| --- | --- |
+| `<TAG_NAME>` | `<condition>` |
 
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
 | `<TAG_NAME>` | `<arg>` | `<string|int|bool|...>` | `<description>` |
+
+## Severity Levels Per Tag
+| Tag | Level | Notes |
+| --- | --- | --- |
+| `<TAG_NAME>` | `<INFO|NOTICE|WARNING|ERROR|CRITICAL|DEBUG...>` | `<default/override behavior>` |
 
 ## Differences From Upstream
 - Upstream reference: `<path or link>`

@@ -72,6 +72,8 @@ func AddressMetadata() map[string][]string {
 			"A01_LOCAL_USE_ADDR",
 			"A01_NO_GLOBALLY_REACHABLE_ADDR",
 			"A01_NO_NAME_SERVERS_FOUND",
+			"TEST_CASE_END",
+			"TEST_CASE_START",
 		},
 		"address02": {
 			"NAMESERVER_IP_WITHOUT_REVERSE",

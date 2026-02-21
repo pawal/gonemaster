@@ -26,9 +26,9 @@ Completion criteria per testcase:
 - [x] syntax08
 
 ## Address
-- [ ] address01
-- [ ] address02
-- [ ] address03
+- [x] address01
+- [x] address02
+- [x] address03
 
 ## Connectivity
 - [ ] connectivity01

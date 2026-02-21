@@ -384,3 +384,9 @@ Cancel a job:
 ```
 gonemaster-client jobs cancel job_123
 ```
+
+## Further Reference
+
+- **Testcase specifications**: [`docs/specifications/tests/`](specifications/tests/) documents the algorithm, emitted tags, tag arguments, and severity levels for every implemented testcase.
+- **Tag catalogs**: [`docs/specifications/tags/`](specifications/tags/) lists all tags per module with default severity levels and i18n coverage status.
+- **`--list-tests`**: run `gonemaster --list-tests` to see available testcases and their IDs at runtime.

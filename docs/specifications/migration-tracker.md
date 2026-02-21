@@ -31,10 +31,10 @@ Completion criteria per testcase:
 - [x] address03
 
 ## Connectivity
-- [ ] connectivity01
-- [ ] connectivity02
-- [ ] connectivity03
-- [ ] connectivity04
+- [x] connectivity01
+- [x] connectivity02
+- [x] connectivity03
+- [x] connectivity04
 
 ## Consistency
 - [ ] consistency01

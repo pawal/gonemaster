@@ -14,7 +14,7 @@
   "summary": {
     "module_count": 9,
     "testcase_count": 73,
-    "unique_tag_count": 445
+    "unique_tag_count": 447
   },
   "modules": {
     "address": {
@@ -148,8 +148,8 @@
         "TEST_CASE_START"
       ],
       "connectivity04": [
-        "ASN_INFOS_ANNOUNCE_IN",
-        "ASN_INFOS_RAW",
+        "CN04_ASN_INFOS_ANNOUNCE_IN",
+        "CN04_ASN_INFOS_RAW",
         "CN04_EMPTY_PREFIX_SET",
         "CN04_ERROR_PREFIX_DATABASE",
         "CN04_IPV4_DIFFERENT_PREFIX",

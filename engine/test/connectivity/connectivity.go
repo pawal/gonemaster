@@ -130,8 +130,8 @@ func Metadata() map[string][]string {
 			"TEST_CASE_START",
 		},
 		"connectivity04": {
-			"ASN_INFOS_RAW",
-			"ASN_INFOS_ANNOUNCE_IN",
+			"CN04_ASN_INFOS_RAW",
+			"CN04_ASN_INFOS_ANNOUNCE_IN",
 			"CN04_EMPTY_PREFIX_SET",
 			"CN04_ERROR_PREFIX_DATABASE",
 			"CN04_IPV4_DIFFERENT_PREFIX",

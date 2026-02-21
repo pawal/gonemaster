@@ -9,8 +9,8 @@ steps:
   spec_check:
     image: golang:1.24
     commands:
-      - GOCACHE=/tmp/go-build-cache go run ./tools/specifications/validate
-      - GOCACHE=/tmp/go-build-cache go run ./tools/specifications/generate-tag-catalog --check
+      - go run ./tools/specifications/validate
+      - go run ./tools/specifications/generate-tag-catalog --check
 
   go_test:
     image: golang:1.24

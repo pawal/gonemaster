@@ -64,13 +64,13 @@ Completion criteria per testcase:
 - [x] dnssec18
 
 ## Delegation
-- [ ] delegation01
-- [ ] delegation02
-- [ ] delegation03
-- [ ] delegation04
-- [ ] delegation05
-- [ ] delegation06
-- [ ] delegation07
+- [x] delegation01
+- [x] delegation02
+- [x] delegation03
+- [x] delegation04
+- [x] delegation05
+- [x] delegation06
+- [x] delegation07
 
 ## Nameserver
 - [ ] nameserver01

@@ -158,6 +158,8 @@ func Metadata() map[string][]string {
 			"NO_RESPONSE",
 			"NS_IS_CNAME",
 			"UNEXPECTED_RCODE",
+			"IPV4_DISABLED",
+			"IPV6_DISABLED",
 			"TEST_CASE_END",
 			"TEST_CASE_START",
 		},

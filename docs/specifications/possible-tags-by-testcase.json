@@ -277,6 +277,8 @@
         "TEST_CASE_START"
       ],
       "delegation05": [
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
         "NO_NS_CNAME",
         "NO_RESPONSE",
         "NS_IS_CNAME",

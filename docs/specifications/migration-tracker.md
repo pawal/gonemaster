@@ -89,14 +89,14 @@ Completion criteria per testcase:
 - [x] nameserver15
 
 ## Zone
-- [ ] zone01
-- [ ] zone02
-- [ ] zone03
-- [ ] zone04
-- [ ] zone05
-- [ ] zone06
-- [ ] zone07
-- [ ] zone08
-- [ ] zone09
-- [ ] zone10
-- [ ] zone11
+- [x] zone01
+- [x] zone02
+- [x] zone03
+- [x] zone04
+- [x] zone05
+- [x] zone06
+- [x] zone07
+- [x] zone08
+- [x] zone09
+- [x] zone10
+- [x] zone11

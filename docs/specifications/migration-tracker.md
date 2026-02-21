@@ -45,23 +45,23 @@ Completion criteria per testcase:
 - [x] consistency06
 
 ## DNSSEC
-- [ ] dnssec01
-- [ ] dnssec02
-- [ ] dnssec03
-- [ ] dnssec04
-- [ ] dnssec05
-- [ ] dnssec06
-- [ ] dnssec07
-- [ ] dnssec08
-- [ ] dnssec09
-- [ ] dnssec10
-- [ ] dnssec11
-- [ ] dnssec13
-- [ ] dnssec14
-- [ ] dnssec15
-- [ ] dnssec16
-- [ ] dnssec17
-- [ ] dnssec18
+- [x] dnssec01
+- [x] dnssec02
+- [x] dnssec03
+- [x] dnssec04
+- [x] dnssec05
+- [x] dnssec06
+- [x] dnssec07
+- [x] dnssec08
+- [x] dnssec09
+- [x] dnssec10
+- [x] dnssec11
+- [x] dnssec13
+- [x] dnssec14
+- [x] dnssec15
+- [x] dnssec16
+- [x] dnssec17
+- [x] dnssec18
 
 ## Delegation
 - [ ] delegation01

@@ -314,7 +314,11 @@
         "DS01_PARENT_SERVER_NO_DS",
         "DS01_PARENT_ZONE_NO_DS",
         "DS01_ROOT_N_NO_UNDEL_DS",
-        "DS01_UNDEL_N_NO_UNDEL_DS"
+        "DS01_UNDEL_N_NO_UNDEL_DS",
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
+        "TEST_CASE_END",
+        "TEST_CASE_START"
       ],
       "dnssec02": [
         "DS02_ALGO_NOT_SUPPORTED_BY_ZM",
@@ -325,7 +329,11 @@
         "DS02_NO_MATCHING_DNSKEY_RRSIG",
         "DS02_NO_MATCH_DS_DNSKEY",
         "DS02_NO_VALID_DNSKEY_FOR_ANY_DS",
-        "DS02_RRSIG_NOT_VALID_BY_DNSKEY"
+        "DS02_RRSIG_NOT_VALID_BY_DNSKEY",
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
+        "TEST_CASE_END",
+        "TEST_CASE_START"
       ],
       "dnssec03": [
         "DS03_ERROR_RESPONSE_NSEC_QUERY",
@@ -348,7 +356,11 @@
         "DS03_NSEC3_OPT_OUT_ENABLED_TLD",
         "DS03_SERVER_NO_DNSSEC_SUPPORT",
         "DS03_SERVER_NO_NSEC3",
-        "DS03_UNASSIGNED_FLAG_USED"
+        "DS03_UNASSIGNED_FLAG_USED",
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
+        "TEST_CASE_END",
+        "TEST_CASE_START"
       ],
       "dnssec04": [
         "DURATION_LONG",
@@ -370,7 +382,11 @@
         "DS05_ALGO_UNASSIGNED",
         "DS05_NO_RESPONSE",
         "DS05_SERVER_NO_DNSSEC",
-        "DS05_ZONE_NO_DNSSEC"
+        "DS05_ZONE_NO_DNSSEC",
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
+        "TEST_CASE_END",
+        "TEST_CASE_START"
       ],
       "dnssec06": [
         "EXTRA_PROCESSING_BROKEN",
@@ -391,7 +407,11 @@
         "DS07_NO_RESPONSE_DNSKEY",
         "DS07_SIGNED",
         "DS07_SIGNED_ON_SERVER",
-        "DS07_UNEXP_RCODE_RESP_DNSKEY"
+        "DS07_UNEXP_RCODE_RESP_DNSKEY",
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
+        "TEST_CASE_END",
+        "TEST_CASE_START"
       ],
       "dnssec08": [
         "DS08_ALGO_NOT_SUPPORTED_BY_ZM",
@@ -399,7 +419,11 @@
         "DS08_DNSKEY_RRSIG_NOT_YET_VALID",
         "DS08_MISSING_RRSIG_IN_RESPONSE",
         "DS08_NO_MATCHING_DNSKEY",
-        "DS08_RRSIG_NOT_VALID_BY_DNSKEY"
+        "DS08_RRSIG_NOT_VALID_BY_DNSKEY",
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
+        "TEST_CASE_END",
+        "TEST_CASE_START"
       ],
       "dnssec09": [
         "DS09_ALGO_NOT_SUPPORTED_BY_ZM",
@@ -407,7 +431,11 @@
         "DS09_NO_MATCHING_DNSKEY",
         "DS09_RRSIG_NOT_VALID_BY_DNSKEY",
         "DS09_SOA_RRSIG_EXPIRED",
-        "DS09_SOA_RRSIG_NOT_YET_VALID"
+        "DS09_SOA_RRSIG_NOT_YET_VALID",
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
+        "TEST_CASE_END",
+        "TEST_CASE_START"
       ],
       "dnssec10": [
         "DS10_ALGO_NOT_SUPPORTED_BY_ZM",
@@ -447,7 +475,11 @@
         "DS10_NSEC_RRSIG_NO_DNSKEY",
         "DS10_NSEC_RRSIG_VERIFY_ERROR",
         "DS10_SERVER_NO_DNSSEC",
-        "DS10_ZONE_NO_DNSSEC"
+        "DS10_ZONE_NO_DNSSEC",
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
+        "TEST_CASE_END",
+        "TEST_CASE_START"
       ],
       "dnssec11": [
         "DS11_DS_BUT_UNSIGNED_ZONE",
@@ -458,12 +490,20 @@
         "DS11_PARENT_WITHOUT_DS",
         "DS11_PARENT_WITH_DS",
         "DS11_UNDETERMINED_DS",
-        "DS11_UNDETERMINED_SIGNED_ZONE"
+        "DS11_UNDETERMINED_SIGNED_ZONE",
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
+        "TEST_CASE_END",
+        "TEST_CASE_START"
       ],
       "dnssec13": [
         "DS13_ALGO_NOT_SIGNED_DNSKEY",
         "DS13_ALGO_NOT_SIGNED_NS",
-        "DS13_ALGO_NOT_SIGNED_SOA"
+        "DS13_ALGO_NOT_SIGNED_SOA",
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
+        "TEST_CASE_END",
+        "TEST_CASE_START"
       ],
       "dnssec14": [
         "DNSKEY_SMALLER_THAN_REC",
@@ -484,7 +524,11 @@
         "DS15_INCONSISTENT_CDNSKEY",
         "DS15_INCONSISTENT_CDS",
         "DS15_MISMATCH_CDS_CDNSKEY",
-        "DS15_NO_CDS_CDNSKEY"
+        "DS15_NO_CDS_CDNSKEY",
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
+        "TEST_CASE_END",
+        "TEST_CASE_START"
       ],
       "dnssec16": [
         "DS16_CDS_INVALID_RRSIG",
@@ -497,7 +541,11 @@
         "DS16_CDS_WITHOUT_DNSKEY",
         "DS16_DELETE_CDS",
         "DS16_DNSKEY_NOT_SIGNED_BY_CDS",
-        "DS16_MIXED_DELETE_CDS"
+        "DS16_MIXED_DELETE_CDS",
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
+        "TEST_CASE_END",
+        "TEST_CASE_START"
       ],
       "dnssec17": [
         "DS17_CDNSKEY_INVALID_RRSIG",
@@ -510,11 +558,19 @@
         "DS17_CDNSKEY_WITHOUT_DNSKEY",
         "DS17_DELETE_CDNSKEY",
         "DS17_DNSKEY_NOT_SIGNED_BY_CDNSKEY",
-        "DS17_MIXED_DELETE_CDNSKEY"
+        "DS17_MIXED_DELETE_CDNSKEY",
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
+        "TEST_CASE_END",
+        "TEST_CASE_START"
       ],
       "dnssec18": [
         "DS18_NO_MATCH_CDNSKEY_RRSIG_DS",
-        "DS18_NO_MATCH_CDS_RRSIG_DS"
+        "DS18_NO_MATCH_CDS_RRSIG_DS",
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
+        "TEST_CASE_END",
+        "TEST_CASE_START"
       ]
     },
     "nameserver": {

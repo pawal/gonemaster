@@ -16,7 +16,8 @@ CMD ?= all
 	build-gonemaster build-gonemaster-server build-gonemaster-server-noui build-gonemaster-client \
 	build-gonemaster-nagios install-gonemaster install-gonemaster-server install-gonemaster-client \
 	install-gonemaster-nagios ui-check test-go vet race \
-	spec-export-implemented spec-export-tags spec-export spec-validate spec-validate-scan spec-check
+	spec-export-implemented spec-export-tags spec-export spec-validate spec-validate-scan spec-check \
+	spec-generate-tags spec-check-tags
 
 help:
 	@echo "Targets:"
@@ -37,7 +38,9 @@ help:
 	@echo "  spec-export        Refresh generated specification inventories (JSON)"
 	@echo "  spec-validate      Validate canonical testcase specs against implementation metadata"
 	@echo "  spec-validate-scan Validate specs + scan append*Log literals for metadata omissions"
-	@echo "  spec-check         Alias for spec-validate"
+	@echo "  spec-generate-tags Regenerate per-module tag catalog markdown files"
+	@echo "  spec-check-tags    Check tag catalog files are up to date (drift detection)"
+	@echo "  spec-check         Run spec-validate + spec-check-tags"
 	@echo "  clean            Remove build artifacts"
 
 $(BIN_DIR):
@@ -156,7 +159,13 @@ spec-validate:
 spec-validate-scan:
 	GOCACHE=/tmp/go-build-cache $(GO) run ./tools/specifications/validate --scan-append-log
 
-spec-check: spec-validate
+spec-generate-tags:
+	GOCACHE=/tmp/go-build-cache $(GO) run ./tools/specifications/generate-tag-catalog
+
+spec-check-tags:
+	GOCACHE=/tmp/go-build-cache $(GO) run ./tools/specifications/generate-tag-catalog --check
+
+spec-check: spec-validate spec-check-tags
 
 clean:
 	@rm -rf $(BIN_DIR) $(UI_BUILD_DIR) $(UI_DIR)/node_modules

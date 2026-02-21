@@ -35,7 +35,7 @@ Status: Draft
 | --- | --- |
 | `EXPIRE_LOWER_THAN_REFRESH` | SOA `expire` is lower than SOA `refresh`. |
 | `EXPIRE_MINIMUM_VALUE_LOWER` | SOA `expire` is below configured minimum. |
-| `EXPIRE_MINIMUM_VALUE_OK` | SOA `expire` is not below configured minimum and not below `refresh`. |
+| `EXPIRE_MINIMUM_VALUE_OK` | No non-start tag was emitted during the testcase (gating condition): `expire` is not below the configured minimum, not below `refresh`, and no shared-helper debug tag was emitted. |
 | `NO_RESPONSE_SOA_QUERY` | No authoritative SOA response containing an SOA answer record was received from any queried nameserver. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |

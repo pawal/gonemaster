@@ -24,6 +24,7 @@ Status: Draft
    - Capture first RR returned by AXFR callback and stop callback immediately.
    - If AXFR call returns an error, emit `AXFR_FAILURE`.
    - Else if first RR is an `SOA`, emit `AXFR_AVAILABLE`.
+   - Else (AXFR succeeded but first RR is not `SOA`): emit no tag for this nameserver.
 4. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)

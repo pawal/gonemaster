@@ -48,7 +48,8 @@ Status: Draft
        - emit `Z09_TLD_EMAIL_DOMAIN` for TLD zone;
        - otherwise emit `Z09_MX_DATA`.
 7. If MX RRset bucket is empty and “no MX” bucket is non-empty:
-   - emit `Z09_MISSING_MAIL_TARGET` unless zone is root, TLD, or under `.arpa`.
+   - If zone is NOT root, TLD, or under `.arpa`: emit `Z09_MISSING_MAIL_TARGET`.
+   - Otherwise (zone is root, TLD, or under `.arpa`): emit no tag.
 8. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)

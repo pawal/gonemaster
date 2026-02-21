@@ -161,6 +161,8 @@ func Metadata() map[string][]string {
 			"ONE_SOA_MNAME",
 			"MULTIPLE_SOA_MNAMES",
 			"SOA_MNAME",
+			"IPV4_DISABLED",
+			"IPV6_DISABLED",
 			"TEST_CASE_END",
 			"TEST_CASE_START",
 		},

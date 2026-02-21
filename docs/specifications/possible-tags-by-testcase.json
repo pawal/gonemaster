@@ -220,6 +220,8 @@
         "TEST_CASE_START"
       ],
       "consistency06": [
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
         "MULTIPLE_SOA_MNAMES",
         "NO_RESPONSE",
         "NO_RESPONSE_SOA_QUERY",

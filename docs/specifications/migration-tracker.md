@@ -37,12 +37,12 @@ Completion criteria per testcase:
 - [x] connectivity04
 
 ## Consistency
-- [ ] consistency01
-- [ ] consistency02
-- [ ] consistency03
-- [ ] consistency04
-- [ ] consistency05
-- [ ] consistency06
+- [x] consistency01
+- [x] consistency02
+- [x] consistency03
+- [x] consistency04
+- [x] consistency05
+- [x] consistency06
 
 ## DNSSEC
 - [ ] dnssec01

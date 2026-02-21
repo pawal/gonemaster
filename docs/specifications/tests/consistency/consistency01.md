@@ -1,0 +1,96 @@
+# Consistency01 (consistency01)
+
+Status: Draft
+
+## Purpose
+- Check SOA serial consistency across nameservers for the tested zone.
+- Report serial distribution and detect serial variation above the configured threshold.
+
+## Preconditions And Inputs
+- Preconditions:
+  - A `zone.Zone` object is available.
+- Required inputs:
+  - Nameserver list from `methods.Method4` and `methods.Method5`.
+  - SOA answers from queried nameservers.
+- Profile/config knobs that affect behavior:
+  - `net.ipv4` and `net.ipv6`: disabled transports are skipped per nameserver.
+  - `resolver.defaults.parallel`: per-nameserver query task parallelism.
+  - `constants.SerialMaxVariation`: accepted numeric delta threshold (default `0`).
+
+## Algorithm And Decision Flow
+1. Emit `TEST_CASE_START`.
+2. Build deduplicated nameserver list from Method4+Method5 by `ns.String()` (`name/ip`).
+3. For each nameserver (parallelized):
+   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `SOA` and skip.
+   - Query SOA for zone apex.
+   - No response message -> emit `NO_RESPONSE`.
+   - Response without usable SOA record for zone apex -> emit `NO_RESPONSE_SOA_QUERY`.
+   - Otherwise store serial value for that nameserver.
+4. Group successful responses by serial value.
+5. Emit `SOA_SERIAL` once per serial with sorted `ns_list`.
+6. If exactly one serial exists, emit `ONE_SOA_SERIAL`.
+7. If multiple serials exist:
+   - Emit `MULTIPLE_SOA_SERIALS`.
+   - Compute numeric delta using first/last sorted serial keys and, when delta exceeds `SerialMaxVariation`, emit `SOA_SERIAL_VARIATION`.
+8. Emit `TEST_CASE_END`.
+
+## Emitted Tags (Possible Set)
+| Tag | Emitted when |
+| --- | --- |
+| `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver/rrtype. |
+| `IPV6_DISABLED` | IPv6 transport is disabled for a queried nameserver/rrtype. |
+| `MULTIPLE_SOA_SERIALS` | At least two distinct SOA serial values were observed. |
+| `NO_RESPONSE` | SOA query had no response message from a nameserver. |
+| `NO_RESPONSE_SOA_QUERY` | Response did not contain a usable SOA record for zone apex. |
+| `ONE_SOA_SERIAL` | Exactly one SOA serial value was observed. |
+| `SOA_SERIAL` | A specific SOA serial value and associated nameservers are reported. |
+| `SOA_SERIAL_VARIATION` | Serial delta exceeded `constants.SerialMaxVariation`. |
+| `TEST_CASE_END` | Testcase completion marker is emitted. |
+| `TEST_CASE_START` | Testcase start marker is emitted. |
+
+## Tag Arguments
+| Tag | Argument key | Type | Meaning |
+| --- | --- | --- | --- |
+| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv4. |
+| `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
+| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv6. |
+| `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
+| `MULTIPLE_SOA_SERIALS` | `count` | `int` | Number of distinct serial values observed. |
+| `NO_RESPONSE` | `ns` | `string` | Nameserver identity (`name/ip`) with no response. |
+| `NO_RESPONSE_SOA_QUERY` | `ns` | `string` | Nameserver identity (`name/ip`) without usable SOA answer. |
+| `ONE_SOA_SERIAL` | `serial` | `string` | The single observed SOA serial value. |
+| `SOA_SERIAL` | `serial` | `string` | One observed SOA serial value. |
+| `SOA_SERIAL` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) serving that serial. |
+| `SOA_SERIAL_VARIATION` | `serial_min` | `string` | Lowest serial key used in variation check. |
+| `SOA_SERIAL_VARIATION` | `serial_max` | `string` | Highest serial key used in variation check. |
+| `SOA_SERIAL_VARIATION` | `max_variation` | `int` | Allowed maximum variation threshold. |
+| `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Consistency01`). |
+| `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Consistency01`). |
+
+## Severity Levels Per Tag
+| Tag | Level | Notes |
+| --- | --- | --- |
+| `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
+| `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
+| `MULTIPLE_SOA_SERIALS` | `WARNING` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
+| `NO_RESPONSE` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
+| `NO_RESPONSE_SOA_QUERY` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
+| `ONE_SOA_SERIAL` | `INFO` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
+| `SOA_SERIAL` | `INFO` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
+| `SOA_SERIAL_VARIATION` | `NOTICE` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
+| `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
+| `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
+
+## Differences From Upstream
+- Upstream reference: [`consistency01.md`](../../upstream/tests/Consistency-TP/consistency01.md)
+- Differences:
+  - Upstream documents `MULTIPLE_SOA_SERIALS_OK`; implementation does not emit that tag.
+  - Serial variation evaluation uses simple integer delta from sorted string keys, not RFC 1982 serial arithmetic.
+- Potential upstream report:
+  - `no`
+
+## Edge Cases And Limitations
+- If no usable SOA serial is obtained from any nameserver, no serial-summary tag (`ONE_SOA_SERIAL`/`MULTIPLE_SOA_SERIALS`) is emitted.
+- Nameserver deduplication is by `name/ip`; same IP with different names is treated as separate sources.
+- Variation check behavior is sensitive to string-key ordering of serial values.
+

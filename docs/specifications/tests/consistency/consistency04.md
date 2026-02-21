@@ -1,0 +1,86 @@
+# Consistency04 (consistency04)
+
+Status: Draft
+
+## Purpose
+- Check NS RRset consistency across nameservers for the tested zone.
+
+## Preconditions And Inputs
+- Preconditions:
+  - A `zone.Zone` object is available.
+- Required inputs:
+  - Nameserver list from `methods.Method4` and `methods.Method5`.
+  - NS answers from queried nameservers.
+- Profile/config knobs that affect behavior:
+  - `net.ipv4` and `net.ipv6`: disabled transports are skipped per nameserver.
+  - `resolver.defaults.parallel`: per-nameserver query task parallelism.
+
+## Algorithm And Decision Flow
+1. Emit `TEST_CASE_START`.
+2. Build deduplicated nameserver list from Method4+Method5 by `ns.String()`.
+3. For each nameserver (parallelized):
+   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `NS` and skip.
+   - Query NS for zone apex.
+   - No response message -> emit `NO_RESPONSE`.
+   - Response without usable NS records for zone apex -> emit `NO_RESPONSE_NS_QUERY`.
+   - Otherwise extract lowercase NS targets, sort them, and store as one NS-set key for that nameserver.
+4. If exactly one NS-set key exists, emit `ONE_NS_SET`.
+5. If multiple NS-set keys exist:
+   - Emit `MULTIPLE_NS_SET`.
+   - Emit `NS_SET` once per NS-set key with contributing `servers`.
+6. Emit `TEST_CASE_END`.
+
+## Emitted Tags (Possible Set)
+| Tag | Emitted when |
+| --- | --- |
+| `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver/rrtype. |
+| `IPV6_DISABLED` | IPv6 transport is disabled for a queried nameserver/rrtype. |
+| `MULTIPLE_NS_SET` | At least two distinct NS target sets were observed. |
+| `NO_RESPONSE` | NS query had no response message from a nameserver. |
+| `NO_RESPONSE_NS_QUERY` | Response did not contain usable NS records for zone apex. |
+| `NS_SET` | A specific NS target set and associated nameservers are reported. |
+| `ONE_NS_SET` | Exactly one NS target set was observed. |
+| `TEST_CASE_END` | Testcase completion marker is emitted. |
+| `TEST_CASE_START` | Testcase start marker is emitted. |
+
+## Tag Arguments
+| Tag | Argument key | Type | Meaning |
+| --- | --- | --- | --- |
+| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv4. |
+| `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`NS`). |
+| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv6. |
+| `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`NS`). |
+| `MULTIPLE_NS_SET` | `count` | `int` | Number of distinct NS target sets observed. |
+| `NO_RESPONSE` | `ns` | `string` | Nameserver identity (`name/ip`) with no response. |
+| `NO_RESPONSE_NS_QUERY` | `ns` | `string` | Nameserver identity (`name/ip`) without usable NS answer. |
+| `NS_SET` | `nsname_list` | `string` | Semicolon-delimited sorted lowercase NS target names in this set. |
+| `NS_SET` | `servers` | `string` | Semicolon-delimited nameserver identities (`name/ip`) returning this set. |
+| `ONE_NS_SET` | `nsname_list` | `string` | The single observed semicolon-delimited NS target set. |
+| `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Consistency04`). |
+| `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Consistency04`). |
+
+## Severity Levels Per Tag
+| Tag | Level | Notes |
+| --- | --- | --- |
+| `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
+| `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
+| `MULTIPLE_NS_SET` | `NOTICE` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
+| `NO_RESPONSE` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
+| `NO_RESPONSE_NS_QUERY` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
+| `NS_SET` | `INFO` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
+| `ONE_NS_SET` | `INFO` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
+| `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
+| `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
+
+## Differences From Upstream
+- Upstream reference: [`consistency04.md`](../../upstream/tests/Consistency-TP/consistency04.md)
+- Differences:
+  - Equality is based on sorted NS target names only; TTL/class/owner equality is not compared as separate criteria.
+  - Per-query transport debug tags (`IPV4_DISABLED`, `IPV6_DISABLED`) are emitted when transport is disabled.
+- Potential upstream report:
+  - `no`
+
+## Edge Cases And Limitations
+- If no usable NS set is obtained, neither `ONE_NS_SET` nor `MULTIPLE_NS_SET` is emitted.
+- `servers` ordering in `NS_SET` follows nameserver processing order.
+

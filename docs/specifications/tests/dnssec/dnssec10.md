@@ -193,6 +193,14 @@ Status: Draft
 - Potential upstream report:
   - `no`
 
+## Implementation Notes
+
+The following behaviors are implementation choices, not mandated by RFC 4034/4035/5155:
+
+- **Reference time source**: RRSIG validity checks use wall-clock time (`time.Now().UTC()`) as the reference "now".  RFC 4034 requires checking whether signatures are currently valid; using wall-clock time rather than packet timestamps (as `dnssec04` does) is an implementation choice appropriate for aggregate multi-nameserver analysis where a single consistent reference point is preferred.
+- **Deduplication by IP**: The nameserver set is built by IP address; delegation and zone NS entries sharing the same IP are merged.  First-seen nameserver identity string (`name/ip`) is used in output arguments.  The protocol does not specify how to handle NS records for the same IP from different sources.
+- **`ns_list` vs `ns_ip_list` argument name**: Most DS10 tags use `ns_list` (nameserver identity strings) while `DS10_ALGO_NOT_SUPPORTED_BY_ZM` uses `ns_ip_list` (raw IPs from the signature verification path).  This asymmetry is an implementation-defined output format.
+
 ## Edge Cases And Limitations
 - Nameserver processing is deduplicated by IP; all DS10 output tags except `DS10_ALGO_NOT_SUPPORTED_BY_ZM` report `ns_list` as nameserver identity strings (`name/ip`) rather than raw IPs.
 - `DS10_NSEC_NO_VERIFIED_SIGNATURE` and `DS10_NSEC3_NO_VERIFIED_SIGNATURE` are suppressed per nameserver when at least one signature verifies for that nameserver.

@@ -67,6 +67,13 @@ Status: Draft
 - Potential upstream report:
   - `no`
 
+## Implementation Notes
+
+The following behaviors are implementation choices, not mandated by RFC 5936 (DNS Zone Transfer Protocol):
+
+- **First-RR-only inspection**: The testcase captures only the first RR from the AXFR response stream and immediately terminates the callback.  RFC 5936 specifies that a valid AXFR transfer begins and ends with the zone SOA record.  Inspecting only the first RR is a deliberate shortcut: if the server sends any RR before the leading SOA it is treated as an unusual response rather than an error.  A full conformance check would also verify the trailing SOA.
+- **Deduplication by `name/ip`**: Nameservers are deduplicated by their `name/ip` identity string, preserving first-seen order.  The protocol does not define deduplication rules for testcase purposes.
+
 ## Edge Cases And Limitations
 - Successful AXFR responses where first RR is not `SOA` emit no availability/failure tag.
 - Nameservers skipped due disabled transport do not contribute AXFR findings.

@@ -85,9 +85,17 @@ Status: Draft
 - Upstream reference: [`consistency01.md`](../../upstream/tests/Consistency-TP/consistency01.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream documents `MULTIPLE_SOA_SERIALS_OK`; Gonemaster does not emit that tag.
-  - Upstream: does not explicitly define this detail. Gonemaster: Serial variation evaluation uses simple integer delta from sorted string keys, not RFC 1982 serial arithmetic.
+  - Upstream: does not explicitly define this detail. Gonemaster: Serial variation delta uses integer subtraction on the first and last serial values after lexicographic string-key sorting.
 - Potential upstream report:
   - `no`
+
+## Implementation Notes
+
+The following behaviors are implementation choices, not mandated by protocol:
+
+- **String-key sort for variation delta**: When multiple distinct serials are observed, the variation delta is computed by sorting the serial values as strings (lexicographically) and subtracting the first from the last.  Lexicographic ordering differs from numeric ordering when serials have different digit counts (e.g., `"9"` sorts after `"10"` lexicographically, so the min/max assignment and resulting delta can differ from a numerically sorted result).  This only affects `SOA_SERIAL_VARIATION` emission when `SerialMaxVariation > 0`; with the default of `0` any difference between serials is flagged regardless of this sort order.
+- **Deduplication by `name/ip`**: Nameservers are deduplicated using their full `name/ip` identity string.  Two entries with the same IP but different names are treated as distinct sources.  The protocol defines no deduplication rule for testcase purposes; this choice is implementation-defined.
+- **Sorted `ns_list` in `SOA_SERIAL`**: Nameserver identities in `SOA_SERIAL` arguments are sorted before joining.  Deterministic ordering is an implementation choice for reproducible output.
 
 ## Edge Cases And Limitations
 - If no usable SOA serial is obtained from any nameserver, no serial-summary tag (`ONE_SOA_SERIAL`/`MULTIPLE_SOA_SERIALS`) is emitted.

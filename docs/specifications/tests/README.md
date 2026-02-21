@@ -85,6 +85,35 @@ Every testcase spec MUST contain all sections below.
 - Document known non-obvious behavior and boundary conditions.
 - Document known gaps, unsupported paths, and ambiguous areas.
 
+## Implementation-Defined vs Protocol-Defined Behaviors
+
+DNS testcase behavior falls into two distinct categories:
+
+- **Protocol-defined**: The behavior is mandated (or strongly implied) by an RFC
+  or DNS standard.  Deviating from it constitutes a conformance failure.
+- **Implementation-defined**: The behavior reflects a specific engineering choice
+  made in gonemaster that is not mandated by the protocol.  A compliant
+  alternative implementation could legitimately make different choices and still
+  be correct.
+
+Where the distinction is non-obvious, a testcase spec SHOULD include an
+`## Implementation Notes` section that explicitly lists the implementation-defined
+choices and, where helpful, contrasts them with the underlying protocol
+requirement.
+
+**Common categories of implementation-defined behavior in gonemaster:**
+
+| Category | Examples |
+| --- | --- |
+| Parallel execution | `resolver.defaults.parallel` controls whether per-nameserver queries run sequentially or concurrently |
+| Deduplication strategy | Group by `name/ip`, by IP only, or by composite key; first-seen-wins vs last-seen-wins |
+| List ordering | Sorting `ns_list` values before joining; lexicographic ordering of serial keys |
+| Argument formatting | Semicolon delimiter for `ns_list`, slash delimiter for PTR names |
+| Reference time source | DNSKEY packet timestamp vs wall-clock `time.Now()` for RRSIG validity checks |
+| OK-tag gating | Emitting a success tag only when no non-start diagnostic tag was emitted |
+| Module orchestration | Testcase A runs only if testcase B emitted a specific tag |
+| Loop protection | Fixed internal iteration limit with no protocol counterpart |
+
 ## Upstream Deviation Reporting
 
 If a difference looks like a clear upstream spec/code issue, mark it in the

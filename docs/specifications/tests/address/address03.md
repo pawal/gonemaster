@@ -75,6 +75,14 @@ Status: Draft
 - Potential upstream report:
   - `no`
 
+## Implementation Notes
+
+The following behaviors are implementation choices, not mandated by protocol:
+
+- **Module orchestration gating**: `Address03` runs only when `Address02` emitted `NAMESERVERS_IP_WITH_REVERSE`.  No DNS standard mandates this sequencing; it is a gonemaster-specific orchestration decision to skip PTR-match checks when no reverse data was found in the preceding testcase.
+- **First-seen-wins deduplication**: When multiple nameserver entries share the same IP, only the first-seen `(nsname, ip)` pair is retained for PTR checking.  The protocol does not define how to handle nameserver IP collisions; first-seen is an implementation choice.
+- **PTR name list delimiter**: Multiple PTR target names in the `names` argument of `NAMESERVER_IP_PTR_MISMATCH` are joined with `/` (slash).  This delimiter is an internal formatting choice with no protocol counterpart.
+
 ## Edge Cases And Limitations
 - If `Method5` yields no IP addresses, only `TEST_CASE_START` and `TEST_CASE_END` are emitted.
 - Duplicate IPs are checked once; if multiple nameservers share an IP, only the first-seen nameserver name is evaluated for PTR-name match.

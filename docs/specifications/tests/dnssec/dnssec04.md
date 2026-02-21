@@ -92,6 +92,14 @@ Status: Draft
 - Potential upstream report:
   - `no`
 
+## Implementation Notes
+
+The following behaviors are implementation choices, not mandated by RFC 4034/4035:
+
+- **Reference time source**: RRSIG remaining-validity checks use the DNSKEY response packet timestamp as the reference "now", not wall-clock time.  RFC 4034 requires checking whether a signature is currently valid; the specific reference clock is unspecified.  Using the packet timestamp avoids race conditions when queries take time but introduces a subtle inconsistency: if the DNSKEY and SOA responses arrive at different moments, the DNSKEY packet time applies uniformly to all RRSIG records from both responses.  Contrast with `dnssec10`, which uses wall-clock time.
+- **Parallel query execution**: When `resolver.defaults.parallel > 1`, DNSKEY and SOA queries run concurrently.  The protocol defines no query ordering requirement; sequential vs concurrent is an implementation choice controlled by `resolver.defaults.parallel`.
+- **`DURATION_OK` gating**: `DURATION_OK` is emitted per RRSIG only when no remaining-time or duration-long tag was emitted for that same RRSIG.  This "no prior finding" gating pattern is not protocol-defined.
+
 ## Edge Cases And Limitations
 - If either DNSKEY or SOA query returns no DNS message, testcase ends with only boundary tags and no RRSIG findings.
 - `DURATION_OK` is emitted only when no remaining-time tag and no `DURATION_LONG` tag were emitted for the same RRSIG.

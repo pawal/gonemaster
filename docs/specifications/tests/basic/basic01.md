@@ -136,6 +136,14 @@ Status: Draft
   - evidence: `engine/test/basic/basic.go` (`Basic01`, `ipDisabledMessage`, `ipEnabledMessage`).
   - report status: `not filed`
 
+## Implementation Notes
+
+The following behaviors are implementation choices, not mandated by RFC 1034/1035:
+
+- **Traversal strategy**: The testcase probes iteratively from root servers using SOA, NS, and DNAME queries, extending the intermediate name toward the child zone at each step.  The DNS protocol specifies the resolution model but does not define how a testcase tool should walk the hierarchy.
+- **Sorted `ns_list` arguments**: Nameserver lists passed in tag arguments are sorted before joining with `;`.  Deterministic ordering simplifies reproducible output but is not a protocol requirement.
+- **Loop protection threshold**: Traversal stops at a fixed internal limit and emits `LOOP_PROTECTION`.  No DNS standard defines a specific iteration bound; the limit is a defensive implementation choice.
+
 ## Edge Cases And Limitations
 - A missing recursor causes testcase execution error before completion.
 - Loop-protection fallback is defensive; when triggered it logs `LOOP_PROTECTION` and terminates the testcase early.

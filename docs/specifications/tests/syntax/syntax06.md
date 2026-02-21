@@ -88,14 +88,14 @@ Status: Draft
 
 ## Differences From Upstream
 - Upstream reference: [`syntax06.md`](../../upstream/tests/Syntax-TP/syntax06.md)
-- Differences:
-  - Upstream outcome table lists `RNAME_MAIL_DOMAIN_INVALID`, `RNAME_MAIL_DOMAIN_LOCALHOST`, and `RNAME_MAIL_ILLEGAL_CNAME` as `WARNING`; gonemaster profile still maps `RNAME_MAIL_DOMAIN_INVALID` to `NOTICE`.
-  - Transport skip tags (`IPV4_DISABLED`, `IPV6_DISABLED`) are emitted but not listed in upstream metadata summary.
+- Differences (Upstream vs Gonemaster):
+  - Upstream outcome table lists `RNAME_MAIL_DOMAIN_INVALID`, `RNAME_MAIL_DOMAIN_LOCALHOST`, and `RNAME_MAIL_ILLEGAL_CNAME` as `WARNING`; Gonemaster profile still maps `RNAME_MAIL_DOMAIN_INVALID` to `NOTICE`.
+  - Upstream: does not explicitly define this detail. Gonemaster: Transport skip tags (`IPV4_DISABLED`, `IPV6_DISABLED`) are emitted but not listed in upstream metadata summary.
 - Potential upstream report:
   - `yes`
 - If yes, include:
-  - upstream expected behavior: Warning-level outcomes for invalid/localhost/illegal-cname mail domain checks.
-  - observed gonemaster behavior: `NOTICE` for invalid domain and `WARNING` for localhost/illegal-cname.
+  - Upstream expected behavior: Warning-level outcomes for invalid/localhost/illegal-cname mail domain checks.
+  - Gonemaster observed behavior: `NOTICE` for invalid domain and `WARNING` for localhost/illegal-cname.
   - evidence: `docs/specifications/upstream/tests/Syntax-TP/syntax06.md`, `share/profile.json`, `engine/test/syntax/syntax.go`.
   - report status: `not filed`
 

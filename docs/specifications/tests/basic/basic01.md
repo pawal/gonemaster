@@ -125,14 +125,14 @@ Status: Draft
 
 ## Differences From Upstream
 - Upstream reference: [`basic01.md`](../../upstream/tests/Basic-TP/basic01.md)
-- Differences:
-  - Upstream testcase text documents `B01_NO_CHILD` for non-existing child, while implementation also emits `B01_CHILD_NOT_EXIST` in fake-address mode.
-  - Implementation emits transport debug tags (`IPV4_*`, `IPV6_*`) and `LOOP_PROTECTION`; these are not listed in upstream testcase summary.
+- Differences (Upstream vs Gonemaster):
+  - Upstream: documents `B01_NO_CHILD` for the non-existing-child outcome. Gonemaster: also emits `B01_CHILD_NOT_EXIST` in fake-address mode.
+  - Upstream: testcase summary does not list transport debug tags or `LOOP_PROTECTION`. Gonemaster: emits `IPV4_*`, `IPV6_*`, and `LOOP_PROTECTION`.
 - Potential upstream report:
   - `yes`
 - If yes, include:
-  - upstream expected behavior: Child-not-exist path is described with `B01_NO_CHILD` only, and summary does not include transport or loop-protection tags.
-  - observed gonemaster behavior: `B01_CHILD_NOT_EXIST`, transport tags, and `LOOP_PROTECTION` are possible emissions.
+  - Upstream expected behavior: Child-not-exist path is described with `B01_NO_CHILD` only, and summary does not include transport or loop-protection tags.
+  - Gonemaster observed behavior: `B01_CHILD_NOT_EXIST`, transport tags, and `LOOP_PROTECTION` are possible emissions.
   - evidence: `engine/test/basic/basic.go` (`Basic01`, `ipDisabledMessage`, `ipEnabledMessage`).
   - report status: `not filed`
 

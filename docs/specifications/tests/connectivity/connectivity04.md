@@ -87,14 +87,14 @@ Status: Draft
 
 ## Differences From Upstream
 - Upstream reference: [`connectivity04.md`](../../upstream/tests/Connectivity-TP/connectivity04.md)
-- Differences:
-  - Implementation emits additional debug observability tags (`CN04_ASN_INFOS_RAW`, `CN04_ASN_INFOS_ANNOUNCE_IN`).
-  - Multiple nameserver names sharing the same IP are collapsed to one first-seen `name/ip` item before prefix grouping.
+- Differences (Upstream vs Gonemaster):
+  - Upstream: does not explicitly define this detail. Gonemaster: emits additional debug observability tags (`CN04_ASN_INFOS_RAW`, `CN04_ASN_INFOS_ANNOUNCE_IN`).
+  - Upstream: does not explicitly define this detail. Gonemaster: Multiple nameserver names sharing the same IP are collapsed to one first-seen `name/ip` item before prefix grouping.
 - Potential upstream report:
   - `yes`
 - If yes, include:
-  - upstream expected behavior: Prefix grouping is described over nameserver name-and-IP members collected from Methodsv2 sets.
-  - observed gonemaster behavior: Prefix grouping deduplicates by IP before grouping, so alternate names sharing the same IP are not independently represented.
+  - Upstream expected behavior: Prefix grouping is described over nameserver name-and-IP members collected from Methodsv2 sets.
+  - Gonemaster observed behavior: Prefix grouping deduplicates by IP before grouping, so alternate names sharing the same IP are not independently represented.
   - evidence: `docs/specifications/upstream/tests/Connectivity-TP/connectivity04.md`, `engine/test/connectivity/connectivity.go` (`Connectivity04` dedup via `processed[version][ip.String()]`).
   - report status: `not filed`
 

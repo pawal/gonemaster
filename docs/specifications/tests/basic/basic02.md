@@ -98,9 +98,9 @@ Status: Draft
 
 ## Differences From Upstream
 - Upstream reference: [`basic02.md`](../../upstream/tests/Basic-TP/basic02.md)
-- Differences:
-  - Implementation emits explicit transport debug tags (`IPV4_*`, `IPV6_*`) during SOA probes; upstream summary focuses on B02-class tags.
-  - Gonemaster executes nameserver probes in deterministic parallel order controlled by profile parallelism.
+- Differences (Upstream vs Gonemaster):
+  - Upstream: summary focuses on B02-class outcome tags. Gonemaster: also emits explicit transport debug tags (`IPV4_*`, `IPV6_*`) during SOA probes.
+  - Upstream: does not describe probe execution ordering details. Gonemaster: executes probes in parallel but keeps deterministic result ordering by task index.
 - Potential upstream report:
   - `no`
 

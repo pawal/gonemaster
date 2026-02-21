@@ -81,14 +81,14 @@ Status: Draft
 
 ## Differences From Upstream
 - Upstream reference: [`basic03.md`](../../upstream/tests/Basic-TP/basic03.md)
-- Differences:
-  - Gonemaster emits `HAS_NAMESERVER_NO_WWW_A_TEST` when `Basic03` is skipped because `Basic02` succeeded.
-  - Upstream outcome text says testcase fails when no response contains an `A` record, but gonemaster default levels make `HAS_A_RECORDS` the error path and keep `NO_A_RECORDS` at default `DEBUG`.
+- Differences (Upstream vs Gonemaster):
+  - Upstream: does not define a skip marker for this path. Gonemaster: emits `HAS_NAMESERVER_NO_WWW_A_TEST` when `Basic03` is skipped because `Basic02` succeeded.
+  - Upstream: outcome text says testcase fails when no response contains an `A` record. Gonemaster: default levels make `HAS_A_RECORDS` the error path and keep `NO_A_RECORDS` at `DEBUG`.
 - Potential upstream report:
   - `yes`
 - If yes, include:
-  - upstream expected behavior: `Basic03` outcome text describes failure when no `A` evidence is found.
-  - observed gonemaster behavior: severity contract treats `HAS_A_RECORDS` as the strong signal (`ERROR`) and `NO_A_RECORDS` as non-failing (`DEBUG` default).
+  - Upstream expected behavior: `Basic03` outcome text describes failure when no `A` evidence is found.
+  - Gonemaster observed behavior: severity contract treats `HAS_A_RECORDS` as the strong signal (`ERROR`) and `NO_A_RECORDS` as non-failing (`DEBUG` default).
   - evidence: `engine/test/basic/basic.go` (`All`, `Basic03`), `share/profile.json` (`test_levels.BASIC`).
   - report status: `not filed`
 

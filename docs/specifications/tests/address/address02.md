@@ -62,9 +62,9 @@ Status: Draft
 
 ## Differences From Upstream
 - Upstream reference: [`address02.md`](../../upstream/tests/Address-TP/address02.md)
-- Differences:
-  - Upstream text describes success/failure outcome semantics only; implementation emits explicit diagnostic tags for pass/fail/no-response paths.
-  - Implementation follows one PTR CNAME hop before evaluating PTR availability.
+- Differences (Upstream vs Gonemaster):
+  - Upstream: describes overall success/failure semantics only. Gonemaster: emits explicit diagnostic tags for pass, fail, and no-response PTR paths.
+  - Upstream: does not specify PTR CNAME follow-up behavior. Gonemaster: follows one PTR CNAME hop before final PTR evaluation.
 - Potential upstream report:
   - `no`
 

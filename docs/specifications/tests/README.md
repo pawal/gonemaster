@@ -77,6 +77,8 @@ Every testcase spec MUST contain all sections below.
 ### Differences From Upstream
 - Link relevant upstream spec text.
 - Explicitly document behavioral mismatch and rationale.
+- Each difference bullet MUST label both sides explicitly using this pattern:
+  `Upstream: ... Gonemaster: ...`.
 - If mismatch appears report-worthy upstream, include tracking status/evidence.
 
 ### Edge Cases / Known Limitations

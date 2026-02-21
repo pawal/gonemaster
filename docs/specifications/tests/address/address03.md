@@ -69,9 +69,9 @@ Status: Draft
 
 ## Differences From Upstream
 - Upstream reference: [`address03.md`](../../upstream/tests/Address-TP/address03.md)
-- Differences:
-  - Upstream describes consuming `ADDRESS02` outcome data structure as input; implementation performs fresh PTR lookups inside `Address03`.
-  - Intercase gating is enforced in `AddressAll` by requiring `NAMESERVERS_IP_WITH_REVERSE` from `Address02`.
+- Differences (Upstream vs Gonemaster):
+  - Upstream: describes consuming `ADDRESS02` outcome data as input. Gonemaster: performs fresh PTR lookups inside `Address03`.
+  - Upstream: states `ADDRESS03` depends on `ADDRESS02` success. Gonemaster: enforces gating in `AddressAll` by requiring `NAMESERVERS_IP_WITH_REVERSE` from `Address02`.
 - Potential upstream report:
   - `no`
 

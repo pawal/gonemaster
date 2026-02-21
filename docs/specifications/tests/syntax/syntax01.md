@@ -45,8 +45,8 @@ Status: Draft
 
 ## Differences From Upstream
 - Upstream reference: [`syntax01.md`](../../upstream/tests/Syntax-TP/syntax01.md)
-- Differences:
-  - No material behavior difference identified.
+- Differences (Upstream vs Gonemaster):
+  - Upstream: No material behavioral difference identified. Gonemaster: Matches upstream behavior for this testcase.
 - Potential upstream report:
   - `no`
 

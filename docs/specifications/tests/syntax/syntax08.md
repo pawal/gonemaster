@@ -64,14 +64,14 @@ Status: Draft
 
 ## Differences From Upstream
 - Upstream reference: [`syntax08.md`](../../upstream/tests/Syntax-TP/syntax08.md)
-- Differences:
-  - Upstream text describes hostname length checks, but implementation only checks character set, numeric TLD, and discouraged double dash.
-  - Upstream describes dependency on de-escaped output from `syntax05`; implementation runs independently of `syntax05` output values.
+- Differences (Upstream vs Gonemaster):
+  - Upstream text describes hostname length checks, but Gonemaster only checks character set, numeric TLD, and discouraged double dash.
+  - Upstream describes dependency on de-escaped output from `syntax05`; Gonemaster runs independently of `syntax05` output values.
 - Potential upstream report:
   - `yes`
 - If yes, include:
-  - upstream expected behavior: Explicit length checks and syntax05-linked dependency.
-  - observed gonemaster behavior: No length checks and no syntax05 data dependency.
+  - Upstream expected behavior: Explicit length checks and syntax05-linked dependency.
+  - Gonemaster observed behavior: No length checks and no syntax05 data dependency.
   - evidence: `docs/specifications/upstream/tests/Syntax-TP/syntax08.md`, `engine/test/syntax/syntax.go` (`All`, `checkNameSyntaxWithLogger`, `Syntax08`).
   - report status: `not filed`
 

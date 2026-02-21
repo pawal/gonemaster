@@ -83,9 +83,9 @@ Status: Draft
 
 ## Differences From Upstream
 - Upstream reference: [`consistency01.md`](../../upstream/tests/Consistency-TP/consistency01.md)
-- Differences:
-  - Upstream documents `MULTIPLE_SOA_SERIALS_OK`; implementation does not emit that tag.
-  - Serial variation evaluation uses simple integer delta from sorted string keys, not RFC 1982 serial arithmetic.
+- Differences (Upstream vs Gonemaster):
+  - Upstream documents `MULTIPLE_SOA_SERIALS_OK`; Gonemaster does not emit that tag.
+  - Upstream: does not explicitly define this detail. Gonemaster: Serial variation evaluation uses simple integer delta from sorted string keys, not RFC 1982 serial arithmetic.
 - Potential upstream report:
   - `no`
 

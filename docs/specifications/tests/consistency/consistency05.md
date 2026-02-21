@@ -83,9 +83,9 @@ Status: Draft
 
 ## Differences From Upstream
 - Upstream reference: [`consistency05.md`](../../upstream/tests/Consistency-TP/consistency05.md)
-- Differences:
-  - In-bailiwick processing evaluates address records by querying all discovered in-bailiwick child servers and may emit multiple `NO_RESPONSE`/`CHILD_NS_FAILED` entries before final mismatch classification.
-  - Referral handling explicitly falls back to recursive lookup for the same qtype and owner.
+- Differences (Upstream vs Gonemaster):
+  - Upstream: does not explicitly define this detail. Gonemaster: In-bailiwick processing evaluates address records by querying all discovered in-bailiwick child servers and may emit multiple `NO_RESPONSE`/`CHILD_NS_FAILED` entries before final mismatch classification.
+  - Upstream: does not explicitly define this detail. Gonemaster: Referral handling explicitly falls back to recursive lookup for the same qtype and owner.
 - Potential upstream report:
   - `no`
 

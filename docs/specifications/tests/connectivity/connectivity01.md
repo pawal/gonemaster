@@ -108,9 +108,9 @@ Status: Draft
 
 ## Differences From Upstream
 - Upstream reference: [`connectivity01.md`](../../upstream/tests/Connectivity-TP/connectivity01.md)
-- Differences:
-  - Implementation emits additional per-query transport debug tags (`IPV4_DISABLED`, `IPV6_DISABLED`) in addition to summary tags (`CN01_IPV4_DISABLED`, `CN01_IPV6_DISABLED`).
-  - Owner-name validation checks the first answer record owner for the queried rrtype.
+- Differences (Upstream vs Gonemaster):
+  - Upstream: defines summary transport-disabled reporting (`CN01_IPV4_DISABLED`, `CN01_IPV6_DISABLED`). Gonemaster: also emits per-query transport debug tags (`IPV4_DISABLED`, `IPV6_DISABLED`).
+  - Upstream: does not explicitly define first-record owner comparison mechanics. Gonemaster: validates owner name using the first answer record for the queried rrtype.
 - Potential upstream report:
   - `no`
 

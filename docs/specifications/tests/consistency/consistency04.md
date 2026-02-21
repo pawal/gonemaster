@@ -74,9 +74,9 @@ Status: Draft
 
 ## Differences From Upstream
 - Upstream reference: [`consistency04.md`](../../upstream/tests/Consistency-TP/consistency04.md)
-- Differences:
-  - Equality is based on sorted NS target names only; TTL/class/owner equality is not compared as separate criteria.
-  - Per-query transport debug tags (`IPV4_DISABLED`, `IPV6_DISABLED`) are emitted when transport is disabled.
+- Differences (Upstream vs Gonemaster):
+  - Upstream: does not explicitly define this detail. Gonemaster: Equality is based on sorted NS target names only; TTL/class/owner equality is not compared as separate criteria.
+  - Upstream: does not explicitly define this detail. Gonemaster: Per-query transport debug tags (`IPV4_DISABLED`, `IPV6_DISABLED`) are emitted when transport is disabled.
 - Potential upstream report:
   - `no`
 

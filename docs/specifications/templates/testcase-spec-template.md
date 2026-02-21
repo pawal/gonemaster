@@ -35,13 +35,13 @@ Status: Draft | Reviewed | Final
 
 ## Differences From Upstream
 - Upstream reference: `<path or link>`
-- Differences:
-  - `<difference>`
+- Differences (Upstream vs Gonemaster):
+  - `Upstream: <what upstream spec text says>. Gonemaster: <what Gonemaster implementation does>.`
 - Potential upstream report:
   - `yes|no`
 - If yes, include:
-  - upstream expected behavior: `<text>`
-  - observed gonemaster behavior: `<text>`
+  - Upstream expected behavior: `<text>`
+  - Gonemaster observed behavior: `<text>`
   - evidence: `<code path or test>`
   - report status: `<not filed|filed|fixed upstream>`
 

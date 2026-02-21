@@ -54,14 +54,14 @@ Status: Draft
 
 ## Differences From Upstream
 - Upstream reference: [`syntax05.md`](../../upstream/tests/Syntax-TP/syntax05.md)
-- Differences:
-  - Upstream text describes iterating over Method4/Method5 nameserver sets directly; implementation uses `z.QueryOne` abstraction.
-  - Upstream text says de-escaped output from this testcase is used by `SYNTAX08`; implementation does not pass state from `Syntax05` to `Syntax08`.
+- Differences (Upstream vs Gonemaster):
+  - Upstream text describes iterating over Method4/Method5 nameserver sets directly; Gonemaster uses `z.QueryOne` abstraction.
+  - Upstream text says de-escaped output from this testcase is used by `SYNTAX08`; Gonemaster does not pass state from `Syntax05` to `Syntax08`.
 - Potential upstream report:
   - `yes`
 - If yes, include:
-  - upstream expected behavior: Explicit Syntax05->Syntax08 dependency.
-  - observed gonemaster behavior: `Syntax08` is independent and always runs when enabled.
+  - Upstream expected behavior: Explicit Syntax05->Syntax08 dependency.
+  - Gonemaster observed behavior: `Syntax08` is independent and always runs when enabled.
   - evidence: `docs/specifications/upstream/tests/Syntax-TP/syntax05.md`, `engine/test/syntax/syntax.go` (`All`, `Syntax05`, `Syntax08`).
   - report status: `not filed`
 

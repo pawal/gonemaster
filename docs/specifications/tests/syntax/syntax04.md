@@ -58,13 +58,13 @@ Status: Draft
 
 ## Differences From Upstream
 - Upstream reference: [`syntax04.md`](../../upstream/tests/Syntax-TP/syntax04.md)
-- Differences:
-  - Upstream text describes hostname-length checks (label <= 63, name <= 255), but implementation only checks character set, numeric TLD, and discouraged double dash.
+- Differences (Upstream vs Gonemaster):
+  - Upstream text describes hostname-length checks (label <= 63, name <= 255), but Gonemaster only checks character set, numeric TLD, and discouraged double dash.
 - Potential upstream report:
   - `yes`
 - If yes, include:
-  - upstream expected behavior: Explicit length validation in ordered steps.
-  - observed gonemaster behavior: No length checks in `checkNameSyntaxWithLogger`.
+  - Upstream expected behavior: Explicit length validation in ordered steps.
+  - Gonemaster observed behavior: No length checks in `checkNameSyntaxWithLogger`.
   - evidence: `engine/test/syntax/syntax.go` (`checkNameSyntaxWithLogger`).
   - report status: `not filed`
 

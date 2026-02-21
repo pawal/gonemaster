@@ -47,14 +47,14 @@ Status: Draft
 
 ## Differences From Upstream
 - Upstream reference: [`syntax03.md`](../../upstream/tests/Syntax-TP/syntax03.md)
-- Differences:
+- Differences (Upstream vs Gonemaster):
   - Upstream file has a textual typo in "Test case identifier" (`SYNTAX02` instead of `SYNTAX03`).
-  - Runtime behavior matches `SYNTAX03` semantics.
+  - Upstream: does not explicitly define this detail. Gonemaster: Runtime behavior matches `SYNTAX03` semantics.
 - Potential upstream report:
   - `yes`
 - If yes, include:
-  - upstream expected behavior: Identifier should match testcase ID `SYNTAX03`.
-  - observed gonemaster behavior: Testcase executes as `syntax03` and emits `Syntax03` markers.
+  - Upstream expected behavior: Identifier should match testcase ID `SYNTAX03`.
+  - Gonemaster observed behavior: Testcase executes as `syntax03` and emits `Syntax03` markers.
   - evidence: `docs/specifications/upstream/tests/Syntax-TP/syntax03.md`, `engine/test/syntax/syntax.go`.
   - report status: `not filed`
 

@@ -74,9 +74,9 @@ Status: Draft
 
 ## Differences From Upstream
 - Upstream reference: [`consistency02.md`](../../upstream/tests/Consistency-TP/consistency02.md)
-- Differences:
-  - Implementation emits `SOA_RNAME` detail entries for each observed RNAME value.
-  - Per-query transport debug tags (`IPV4_DISABLED`, `IPV6_DISABLED`) are emitted when transport is disabled.
+- Differences (Upstream vs Gonemaster):
+  - Upstream: does not explicitly define this detail. Gonemaster: emits `SOA_RNAME` detail entries for each observed RNAME value.
+  - Upstream: does not explicitly define this detail. Gonemaster: Per-query transport debug tags (`IPV4_DISABLED`, `IPV6_DISABLED`) are emitted when transport is disabled.
 - Potential upstream report:
   - `no`
 

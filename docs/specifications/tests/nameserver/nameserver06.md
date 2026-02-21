@@ -29,7 +29,7 @@ Status: Draft
 | Tag | Emitted when |
 | --- | --- |
 | `CAN_BE_RESOLVED` | All discovered names are resolved under current method outputs. |
-| `CAN_NOT_BE_RESOLVED` | Some discovered names are unresolved while others are resolved. |
+| `CAN_NOT_BE_RESOLVED` | At least one discovered nameserver name failed to resolve and at least one resolved successfully. |
 | `NO_RESOLUTION` | No resolved nameserver entries were available. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |

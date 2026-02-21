@@ -39,7 +39,7 @@ Status: Draft
 | `MNAME_HAS_NO_ADDRESS` | Neither `A` nor `AAAA` lookup produced an address answer for SOA MNAME. |
 | `MNAME_IS_CNAME` | SOA MNAME lookup shows alias behavior (CNAME RR or rewritten final query name). |
 | `MNAME_IS_NOT_CNAME` | SOA MNAME lookup did not show alias behavior for that query-type evaluation. |
-| `NO_RESPONSE_SOA_QUERY` | No qualifying authoritative SOA response with SOA answer could be obtained. |
+| `NO_RESPONSE_SOA_QUERY` | No authoritative SOA response containing an SOA answer record was received from any queried nameserver. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
 
@@ -78,6 +78,6 @@ Status: Draft
   - report status: `reported`
 
 ## Edge Cases And Limitations
-- `MNAME_IS_CNAME`/`MNAME_IS_NOT_CNAME` are evaluated per query type (`A` and `AAAA`) and may both be emitted in one testcase run.
+- `MNAME_IS_CNAME` and `MNAME_IS_NOT_CNAME` are evaluated independently for each of the `A` and `AAAA` query types; both tags are emitted in the same testcase run when MNAME resolves to a CNAME for one address family but not the other.
 - Address success counts by query type branch and does not require both families to resolve.
-- Shared retrieval helper may emit transport-disabled debug tags (`IPV4_DISABLED`/`IPV6_DISABLED`), but these are outside this testcase metadata contract.
+- The shared retrieval helper emits `IPV4_DISABLED` or `IPV6_DISABLED` when the corresponding transport is disabled; these tags are not declared in this testcase's `Metadata()` function.

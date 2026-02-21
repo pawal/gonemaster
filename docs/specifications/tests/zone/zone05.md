@@ -36,7 +36,7 @@ Status: Draft
 | `EXPIRE_LOWER_THAN_REFRESH` | SOA `expire` is lower than SOA `refresh`. |
 | `EXPIRE_MINIMUM_VALUE_LOWER` | SOA `expire` is below configured minimum. |
 | `EXPIRE_MINIMUM_VALUE_OK` | SOA `expire` is not below configured minimum and not below `refresh`. |
-| `NO_RESPONSE_SOA_QUERY` | No qualifying authoritative SOA response with SOA answer could be obtained. |
+| `NO_RESPONSE_SOA_QUERY` | No authoritative SOA response containing an SOA answer record was received from any queried nameserver. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
 
@@ -80,5 +80,5 @@ Status: Draft
   - report status: `not filed`
 
 ## Edge Cases And Limitations
-- Shared retrieval helper may emit transport-disabled debug tags (`IPV4_DISABLED`/`IPV6_DISABLED`), but these are outside this testcase metadata contract.
+- The shared retrieval helper emits `IPV4_DISABLED` or `IPV6_DISABLED` when the corresponding transport is disabled; these tags are not declared in this testcase's `Metadata()` function.
 - Because `EXPIRE_MINIMUM_VALUE_OK` uses a generic “no non-start entry yet” gate, helper-emitted non-metadata entries can suppress the OK tag even when numeric checks are satisfied.

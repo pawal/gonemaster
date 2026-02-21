@@ -41,7 +41,7 @@ Status: Draft
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
 | `DIFFERENT_SOURCE_IP` | `ns` | `string` | Queried nameserver identity (`name/ip`). |
-| `DIFFERENT_SOURCE_IP` | `source` | `string` | Observed response source value (typically `ip:port`). |
+| `DIFFERENT_SOURCE_IP` | `source` | `string` | Observed response source value in `ip:port` format. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv4. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv6. |

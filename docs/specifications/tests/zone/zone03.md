@@ -29,7 +29,7 @@ Status: Draft
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
-| `NO_RESPONSE_SOA_QUERY` | No qualifying authoritative SOA response with SOA answer could be obtained. |
+| `NO_RESPONSE_SOA_QUERY` | No authoritative SOA response containing an SOA answer record was received from any queried nameserver. |
 | `REFRESH_HIGHER_THAN_RETRY` | SOA `refresh` is greater than SOA `retry`. |
 | `REFRESH_LOWER_THAN_RETRY` | SOA `retry` is greater than or equal to SOA `refresh`. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
@@ -70,5 +70,5 @@ Status: Draft
   - report status: `not filed`
 
 ## Edge Cases And Limitations
-- Shared retrieval helper may emit transport-disabled debug tags (`IPV4_DISABLED`/`IPV6_DISABLED`), but these are outside this testcase metadata contract.
+- The shared retrieval helper emits `IPV4_DISABLED` or `IPV6_DISABLED` when the corresponding transport is disabled; these tags are not declared in this testcase's `Metadata()` function.
 - If helper cannot find an authoritative SOA answer, timer-order comparison is not attempted.

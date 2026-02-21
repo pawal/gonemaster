@@ -45,7 +45,7 @@ Status: Draft
 | `DS05_ALGO_RESERVED` | At least one DNSKEY algorithm maps to reserved class. |
 | `DS05_ALGO_UNASSIGNED` | At least one DNSKEY algorithm maps to unassigned class. |
 | `DS05_NO_RESPONSE` | No nameserver produced usable DNSKEY/no-DNSKEY outcome and at least one nameserver was ignored due to invalid/no response shape. |
-| `DS05_SERVER_NO_DNSSEC` | Mixed nameserver outcome: some returned DNSKEY and some returned no usable DNSKEY. |
+| `DS05_SERVER_NO_DNSSEC` | At least one nameserver returned a usable DNSKEY and at least one nameserver returned no usable DNSKEY. |
 | `DS05_ZONE_NO_DNSSEC` | No nameserver returned usable DNSKEY and at least one returned no usable DNSKEY. |
 | `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver (`DNSKEY`). |
 | `IPV6_DISABLED` | IPv6 transport is disabled for a queried nameserver (`DNSKEY`). |

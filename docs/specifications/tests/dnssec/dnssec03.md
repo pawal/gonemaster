@@ -53,9 +53,9 @@ Status: Draft
 10. Salt-length checks:
     - Emit `DS03_INCONSISTENT_SALT_LENGTH` when multiple lengths appear.
     - Emit `DS03_LEGAL_EMPTY_SALT` for length `0`; otherwise `DS03_ILLEGAL_SALT_LENGTH` with `int`.
-11. Emit query-error tags when applicable:
-    - `DS03_NO_RESPONSE_NSEC_QUERY`
-    - `DS03_ERROR_RESPONSE_NSEC_QUERY`
+11. Emit per-nameserver NSEC query-error tags:
+    - `DS03_NO_RESPONSE_NSEC_QUERY` for each nameserver that returned no NSEC query response.
+    - `DS03_ERROR_RESPONSE_NSEC_QUERY` for each nameserver that returned a non-`NOERROR` or non-`AA` NSEC response.
 12. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)

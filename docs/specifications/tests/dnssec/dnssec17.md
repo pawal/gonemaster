@@ -114,8 +114,8 @@ Status: Draft
 ## Differences From Upstream
 - Upstream reference: [`dnssec17.md`](../../upstream/tests/DNSSEC-TP/dnssec17.md)
 - Differences (Upstream vs Gonemaster):
-  - Upstream: describes this testcase as producing no output when no CDNSKEY is found. Gonemaster: emits only testcase boundary/debug tags in that case (`TEST_CASE_START`, `TEST_CASE_END`, and possibly transport-disabled tags).
-  - Upstream: signature checks are described at RRset/signature level. Gonemaster: several checks (`DS17_DNSKEY_NOT_SIGNED_BY_CDNSKEY`, `DS17_CDNSKEY_NOT_SIGNED_BY_CDNSKEY`) are implemented as keytag-presence checks in RRSIG sets, not full per-signature validation.
+  - Upstream: describes this testcase as producing no output when no CDNSKEY is found. Gonemaster: emits only `TEST_CASE_START`, `TEST_CASE_END`, and, if any transport is disabled, `IPV4_DISABLED` and/or `IPV6_DISABLED` in that case.
+  - Upstream: signature checks are described at RRset/signature level. Gonemaster: the checks for `DS17_DNSKEY_NOT_SIGNED_BY_CDNSKEY` and `DS17_CDNSKEY_NOT_SIGNED_BY_CDNSKEY` are implemented as keytag-presence checks in RRSIG sets, not full per-signature validation.
   - Upstream: does not explicitly specify testcase boundary and transport-disabled debug emissions in this testcase summary. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
 - Potential upstream report:
   - `no`

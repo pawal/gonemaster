@@ -20,8 +20,8 @@ Status: Draft
 2. Build child nameserver set from Method4+Method5 and deduplicate by IP.
 3. For each unique nameserver IP (parallelized):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtypes `CDS` and `CDNSKEY` and skip.
-   - Query `CDS` with DNSSEC enabled; when response is authoritative `NOERROR`, store CDS answer RRset (possibly empty).
-   - Query `CDNSKEY` with DNSSEC enabled; when response is authoritative `NOERROR`, store CDNSKEY answer RRset (possibly empty).
+   - Query `CDS` with DNSSEC enabled; when response is authoritative `NOERROR`, store CDS answer RRset (which may contain zero records).
+   - Query `CDNSKEY` with DNSSEC enabled; when response is authoritative `NOERROR`, store CDNSKEY answer RRset (which may contain zero records).
 4. If no non-empty CDS/CDNSKEY RRset exists anywhere, emit `DS15_NO_CDS_CDNSKEY`.
 5. Otherwise, per nameserver present in both RRset maps:
    - Classify nameserver into:

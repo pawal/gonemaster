@@ -58,7 +58,7 @@ Status: Draft
 | `DS10_HAS_NSEC3` | Zone behavior is consistently NSEC3-only for observed nameservers. |
 | `DS10_INCONSISTENT_NSEC` | NSEC evidence is inconsistent across nameservers. |
 | `DS10_INCONSISTENT_NSEC3` | NSEC3 evidence is inconsistent across nameservers. |
-| `DS10_INCONSISTENT_NSEC_NSEC3` | Some nameservers are non-mixed NSEC and others non-mixed NSEC3. |
+| `DS10_INCONSISTENT_NSEC_NSEC3` | At least one nameserver uses NSEC-only and at least one uses NSEC3-only, with no nameserver exhibiting both simultaneously. |
 | `DS10_MIXED_NSEC_NSEC3` | At least one nameserver shows both NSEC and NSEC3 behavior. |
 | `DS10_NSEC3PARAM_GIVES_ERR_ANSWER` | NSEC3PARAM query had unexpected non-empty answer content. |
 | `DS10_NSEC3PARAM_MISMATCHES_APEX` | NSEC3PARAM owner name did not match zone apex. |
@@ -85,7 +85,7 @@ Status: Draft
 | `DS10_NSEC_RRSIG_NOT_YET_VALID` | NSEC RRSIG not yet valid for given keytag. |
 | `DS10_NSEC_RRSIG_NO_DNSKEY` | NSEC RRSIG keytag had no matching DNSKEY. |
 | `DS10_NSEC_RRSIG_VERIFY_ERROR` | NSEC RRSIG verification failed for given keytag. |
-| `DS10_SERVER_NO_DNSSEC` | Some nameservers returned DNSKEY while others did not. |
+| `DS10_SERVER_NO_DNSSEC` | At least one nameserver returned a usable DNSKEY and at least one nameserver returned no usable DNSKEY. |
 | `DS10_ZONE_NO_DNSSEC` | No nameserver returned usable DNSKEY while at least one returned no DNSKEY. |
 | `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver/rrtype. |
 | `IPV6_DISABLED` | IPv6 transport is disabled for a queried nameserver/rrtype. |
@@ -194,6 +194,6 @@ Status: Draft
   - `no`
 
 ## Edge Cases And Limitations
-- Nameserver processing is deduplicated by IP, but many DS10 outputs report `ns_list` as nameserver identity strings (`name/ip`) rather than raw IPs.
+- Nameserver processing is deduplicated by IP; all DS10 output tags except `DS10_ALGO_NOT_SUPPORTED_BY_ZM` report `ns_list` as nameserver identity strings (`name/ip`) rather than raw IPs.
 - `DS10_NSEC_NO_VERIFIED_SIGNATURE` and `DS10_NSEC3_NO_VERIFIED_SIGNATURE` are suppressed per nameserver when at least one signature verifies for that nameserver.
 - Signature validity checks use testcase wall-clock time (`time.Now().UTC()`), not packet capture timestamps.

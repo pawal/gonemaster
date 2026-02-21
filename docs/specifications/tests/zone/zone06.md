@@ -32,7 +32,7 @@ Status: Draft
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
-| `NO_RESPONSE_SOA_QUERY` | No qualifying authoritative SOA response with SOA answer could be obtained. |
+| `NO_RESPONSE_SOA_QUERY` | No authoritative SOA response containing an SOA answer record was received from any queried nameserver. |
 | `SOA_DEFAULT_TTL_MAXIMUM_VALUE_HIGHER` | SOA `minimum` is above configured upper bound. |
 | `SOA_DEFAULT_TTL_MAXIMUM_VALUE_LOWER` | SOA `minimum` is below configured lower bound. |
 | `SOA_DEFAULT_TTL_MAXIMUM_VALUE_OK` | SOA `minimum` is within configured bounds (inclusive). |
@@ -78,5 +78,5 @@ Status: Draft
   - report status: `not filed`
 
 ## Edge Cases And Limitations
-- Shared retrieval helper may emit transport-disabled debug tags (`IPV4_DISABLED`/`IPV6_DISABLED`), but these are outside this testcase metadata contract.
+- The shared retrieval helper emits `IPV4_DISABLED` or `IPV6_DISABLED` when the corresponding transport is disabled; these tags are not declared in this testcase's `Metadata()` function.
 - If helper cannot find an authoritative SOA answer, bound checks are not attempted.

@@ -36,9 +36,9 @@ Status: Draft
 6. Emit DS classification tags (`DS01_DS_ALGO_*`) grouped by `(digest, keytag)` with merged `ns_list`.
 7. Emit `DS01_DS_ALGO_2_MISSING` for keytags that have non-2 DS but no digest-2 DS on the same source nameservers.
 8. If no valid/non-valid DS responders exist and ignored responders exist, emit `DS01_NO_RESPONSE`.
-9. Emit root/undelegated informational tags when applicable:
-   - `DS01_ROOT_N_NO_UNDEL_DS` for root zone without undelegated DS.
-   - `DS01_UNDEL_N_NO_UNDEL_DS` for undelegated non-root without undelegated DS.
+9. Emit informational tags based on zone type and undelegated DS status:
+   - If zone is root (`.`), emit `DS01_ROOT_N_NO_UNDEL_DS` when no undelegated DS records were provided.
+   - If zone is undelegated and non-root, emit `DS01_UNDEL_N_NO_UNDEL_DS` when no undelegated DS records were provided.
 10. If `Responds Without Valid DS` is non-empty:
     - Emit `DS01_PARENT_ZONE_NO_DS` when no nameserver responded with DS.
     - Otherwise emit `DS01_PARENT_SERVER_NO_DS`.
@@ -55,7 +55,7 @@ Status: Draft
 | `DS01_DS_ALGO_RESERVED` | A DS digest algorithm value maps to reserved class. |
 | `DS01_DS_ALGO_UNASSIGNED` | A DS digest algorithm value maps to unassigned class. |
 | `DS01_NO_RESPONSE` | All queried parent nameservers were ignored for invalid/no response shape and no DS/non-DS responder set was produced. |
-| `DS01_PARENT_SERVER_NO_DS` | Some parent nameservers returned no valid DS while others returned DS. |
+| `DS01_PARENT_SERVER_NO_DS` | At least one parent nameserver returned a valid DS and at least one returned no valid DS. |
 | `DS01_PARENT_ZONE_NO_DS` | Parent nameservers returned no valid DS and none returned DS. |
 | `DS01_ROOT_N_NO_UNDEL_DS` | Tested zone is root and no undelegated DS records were provided. |
 | `DS01_UNDEL_N_NO_UNDEL_DS` | Tested zone is undelegated and no undelegated DS records were provided. |
@@ -134,6 +134,6 @@ Status: Draft
   - `no`
 
 ## Edge Cases And Limitations
-- If no parent nameservers are available and no undelegated DS data exists, only conditional root/undelegated informational tags (and testcase boundary tags) may be emitted.
+- If no parent nameservers are available and no undelegated DS data exists, only the applicable root/undelegated informational tags and testcase boundary tags are emitted.
 - For undelegated DS input, `ns_list` uses the sentinel source value `-`.
 - DS answer processing requires at least one DS with owner matching child zone, but once accepted the testcase classifies all DS records in that answer section.

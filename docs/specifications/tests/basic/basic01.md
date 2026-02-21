@@ -50,7 +50,7 @@ Status: Draft
 | `B01_NO_CHILD` | No delegation/SOA evidence exists in normal mode (non-fake-address). |
 | `B01_PARENT_DISREGARDED` | Fake-address (undelegated) mode is active, so parent search is skipped. |
 | `B01_PARENT_FOUND` | At least one parent zone candidate is identified. |
-| `B01_PARENT_NOT_FOUND` | No parent zone candidate could be identified. |
+| `B01_PARENT_NOT_FOUND` | No parent zone candidate was identified from any probed nameserver response. |
 | `B01_PARENT_UNDETERMINED` | Multiple parent zone candidates were identified. |
 | `B01_ROOT_HAS_NO_PARENT` | Child zone is root (`.`). |
 | `B01_SERVER_ZONE_ERROR` | SOA/NS response validation fails for a probed server/query name. |

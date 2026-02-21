@@ -84,4 +84,4 @@ Status: Draft
 ## Edge Cases And Limitations
 - Missing/no-response cases emit no dedicated tag in this testcase.
 - `ARE_AUTHORITATIVE` is suppressed by any non-start tag, including transport-disabled debug tags.
-- If all SOA queries fail to return usable responses, testcase may emit only start/end (and optional disabled tags).
+- If all SOA queries fail to return usable responses, the testcase emits only `TEST_CASE_START`, `TEST_CASE_END`, and, if any transport is disabled, `IPV4_DISABLED` and/or `IPV6_DISABLED`.

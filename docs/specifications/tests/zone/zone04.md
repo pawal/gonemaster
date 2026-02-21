@@ -30,7 +30,7 @@ Status: Draft
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
-| `NO_RESPONSE_SOA_QUERY` | No qualifying authoritative SOA response with SOA answer could be obtained. |
+| `NO_RESPONSE_SOA_QUERY` | No authoritative SOA response containing an SOA answer record was received from any queried nameserver. |
 | `RETRY_MINIMUM_VALUE_LOWER` | SOA `retry` is below configured minimum. |
 | `RETRY_MINIMUM_VALUE_OK` | SOA `retry` is at or above configured minimum. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
@@ -71,5 +71,5 @@ Status: Draft
   - report status: `not filed`
 
 ## Edge Cases And Limitations
-- Shared retrieval helper may emit transport-disabled debug tags (`IPV4_DISABLED`/`IPV6_DISABLED`), but these are outside this testcase metadata contract.
+- The shared retrieval helper emits `IPV4_DISABLED` or `IPV6_DISABLED` when the corresponding transport is disabled; these tags are not declared in this testcase's `Metadata()` function.
 - If helper cannot find an authoritative SOA answer, threshold comparison is not attempted.

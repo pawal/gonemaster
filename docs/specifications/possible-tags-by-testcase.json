@@ -577,6 +577,8 @@
     },
     "nameserver": {
       "nameserver01": [
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
         "IS_A_RECURSOR",
         "NO_RECURSOR",
         "NO_RESPONSE",
@@ -588,6 +590,8 @@
         "EDNS0_SUPPORT",
         "EDNS_RESPONSE_WITHOUT_EDNS",
         "EDNS_VERSION_ERROR",
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
         "NO_EDNS_SUPPORT",
         "NO_RESPONSE",
         "NS_ERROR",
@@ -597,11 +601,15 @@
       "nameserver03": [
         "AXFR_AVAILABLE",
         "AXFR_FAILURE",
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
         "TEST_CASE_END",
         "TEST_CASE_START"
       ],
       "nameserver04": [
         "DIFFERENT_SOURCE_IP",
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
         "SAME_SOURCE_IP",
         "TEST_CASE_END",
         "TEST_CASE_START"
@@ -626,6 +634,8 @@
         "TEST_CASE_START"
       ],
       "nameserver07": [
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
         "NO_UPWARD_REFERRAL",
         "TEST_CASE_END",
         "TEST_CASE_START",
@@ -633,6 +643,8 @@
         "UPWARD_REFERRAL_IRRELEVANT"
       ],
       "nameserver08": [
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
         "QNAME_CASE_INSENSITIVE",
         "QNAME_CASE_SENSITIVE",
         "TEST_CASE_END",
@@ -646,10 +658,14 @@
         "CASE_QUERY_NO_ANSWER",
         "CASE_QUERY_SAME_ANSWER",
         "CASE_QUERY_SAME_RC",
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
         "TEST_CASE_END",
         "TEST_CASE_START"
       ],
       "nameserver10": [
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
         "N10_EDNS_RESPONSE_ERROR",
         "N10_NO_RESPONSE_EDNS1_QUERY",
         "N10_UNEXPECTED_RCODE",
@@ -657,6 +673,8 @@
         "TEST_CASE_START"
       ],
       "nameserver11": [
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
         "N11_NO_EDNS",
         "N11_NO_RESPONSE",
         "N11_RETURNS_UNKNOWN_OPTION_CODE",
@@ -667,6 +685,8 @@
         "TEST_CASE_START"
       ],
       "nameserver12": [
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
         "NO_EDNS_SUPPORT",
         "NO_RESPONSE",
         "NS_ERROR",
@@ -675,6 +695,8 @@
         "Z_FLAGS_NOTCLEAR"
       ],
       "nameserver13": [
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
         "MISSING_OPT_IN_TRUNCATED",
         "NO_EDNS_SUPPORT",
         "NO_RESPONSE",
@@ -683,10 +705,14 @@
         "TEST_CASE_START"
       ],
       "nameserver15": [
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
         "N15_ERROR_ON_VERSION_QUERY",
         "N15_NO_VERSION_REVEALED",
         "N15_SOFTWARE_VERSION",
-        "N15_WRONG_CLASS"
+        "N15_WRONG_CLASS",
+        "TEST_CASE_END",
+        "TEST_CASE_START"
       ]
     },
     "syntax": {

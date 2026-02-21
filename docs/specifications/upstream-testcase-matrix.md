@@ -9,8 +9,8 @@ Status meanings:
 
 ## Summary
 - upstream testcase specs: 74
-- implemented: 72
-- needs-review: 1
+- implemented: 71
+- needs-review: 2
 - not-implemented: 1
 
 ## Matrix
@@ -69,7 +69,7 @@ Status meanings:
 | `docs/specifications/upstream/tests/Nameserver-TP/nameserver10.md` | `nameserver10` | `nameserver10` | implemented | Direct testcase ID mapping. |
 | `docs/specifications/upstream/tests/Nameserver-TP/nameserver11.md` | `nameserver11` | `nameserver11` | implemented | Direct testcase ID mapping. |
 | `docs/specifications/upstream/tests/Nameserver-TP/nameserver12.md` | `nameserver12` | `nameserver12` | implemented | Direct testcase ID mapping. |
-| `docs/specifications/upstream/tests/Nameserver-TP/nameserver13.md` | `nameserver13` | `nameserver13` | implemented | Direct testcase ID mapping. |
+| `docs/specifications/upstream/tests/Nameserver-TP/nameserver13.md` | `nameserver13` | `nameserver13` | needs-review | Review tag: `DIV-NS13-SPEC-QUERYTYPE`. Reported as [zonemaster#1468](https://github.com/zonemaster/zonemaster/issues/1468). See `docs/specifications/known-behavior-divergences.md`. |
 | `docs/specifications/upstream/tests/Nameserver-TP/nameserver15.md` | `nameserver15` | `nameserver15` | implemented | Direct testcase ID mapping. |
 | `docs/specifications/upstream/tests/Syntax-TP/syntax01.md` | `syntax01` | `syntax01` | implemented | Direct testcase ID mapping. |
 | `docs/specifications/upstream/tests/Syntax-TP/syntax02.md` | `syntax02` | `syntax02` | implemented | Direct testcase ID mapping. |

@@ -73,20 +73,20 @@ Completion criteria per testcase:
 - [x] delegation07
 
 ## Nameserver
-- [ ] nameserver01
-- [ ] nameserver02
-- [ ] nameserver03
-- [ ] nameserver04
-- [ ] nameserver05
-- [ ] nameserver06
-- [ ] nameserver07
-- [ ] nameserver08
-- [ ] nameserver09
-- [ ] nameserver10
-- [ ] nameserver11
-- [ ] nameserver12
-- [ ] nameserver13
-- [ ] nameserver15
+- [x] nameserver01
+- [x] nameserver02
+- [x] nameserver03
+- [x] nameserver04
+- [x] nameserver05
+- [x] nameserver06
+- [x] nameserver07
+- [x] nameserver08
+- [x] nameserver09
+- [x] nameserver10
+- [x] nameserver11
+- [x] nameserver12
+- [x] nameserver13
+- [x] nameserver15
 
 ## Zone
 - [ ] zone01

@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+ - Server: Fix parent cache memory retention in methodsv2
  - Server: Added SQLite persistent job store, with configuration options
  - Server: Startup recovery — "running" jobs are failed and "queued" jobs are re-enqueued on restart
  - Server: Added versioned schema migration runner

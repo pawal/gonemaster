@@ -53,20 +53,24 @@ func TestRunHelpShowsGroupedFlags(t *testing.T) {
 	help := readTempFile(t, errOut)
 	expected := []string{
 		"Usage: gonemaster-server [flags]",
-		"Flags (CLI flags override --config values):",
 		"General:",
 		"Concurrency:",
 		"Resolver/Profile:",
+		"Database:",
 		"Output:",
 		"--workers N",
 		"--version",
 		"--min-level LEVEL",
 		"--sourceaddr4 IPADDR",
 		"--sourceaddr6 IPADDR",
+		"--db-driver DRIVER",
+		"--db-dsn DSN",
+		"GONEMASTER_DB_DRIVER",
+		"GONEMASTER_DB_DSN",
 	}
 	for _, fragment := range expected {
 		if !strings.Contains(help, fragment) {
-			t.Fatalf("expected %q in help output, got %q", fragment, help)
+			t.Fatalf("expected %q in help output, got:\n%s", fragment, help)
 		}
 	}
 }

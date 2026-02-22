@@ -6,9 +6,15 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
- - Canonical testcase specifications for all 73 implemented testcases under `docs/specifications/`
- - Per-module tag catalogs in `docs/specifications/tags/` generated from live code metadata
- - Spec validation tooling (`make spec-validate`, `make spec-check-tags`) for CI drift detection
+ - Server: Fix parent cache memory retention in methodsv2
+ - Server: Added SQLite persistent job store, with configuration options
+ - Server: Startup recovery — "running" jobs are failed and "queued" jobs are re-enqueued on restart
+ - Server: Added versioned schema migration runner
+ - Server: `GONEMASTER_*` environment variable support for all configuration fields (override by CLI flags)
+ - Server: `--config` JSON file support for persistent configuration
+ - Docs: Canonical testcase specifications for all 73 implemented testcases under `docs/specifications/`
+ - Docs: Per-module tag catalogs in `docs/specifications/tags/` generated from live code metadata
+ - Tools: Spec validation tooling (`make spec-validate`, `make spec-check-tags`) for CI drift detection
  - Recursor: Add bailiwick filtering for trusted glue addresses
  - Recursor: Bound recurse cache growth to reduce long-run memory pressure
  - Recursor: Scope recurse cache by resolver context (root vs custom NS set)

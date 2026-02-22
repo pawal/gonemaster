@@ -6,6 +6,16 @@ import (
 	"os"
 )
 
+// DatabaseConfig controls the persistence backend.
+type DatabaseConfig struct {
+	// Driver selects the storage backend: "memory" (default), "sqlite",
+	// "postgres", or "mariadb".
+	Driver string
+	// DSN is the data source name. For sqlite this is a file path.
+	// For postgres/mariadb this is a connection string. Empty for memory.
+	DSN string
+}
+
 // Config controls HTTP server behavior.
 type Config struct {
 	ListenAddr  string
@@ -32,25 +42,34 @@ type Config struct {
 	SourceAddr6 *string
 	MinLevel    string
 	ProfilePath string
+	Database    DatabaseConfig
+}
+
+// DatabaseFileConfig holds optional database configuration from JSON.
+// An empty string for Driver or DSN means "not set" (inherit from default).
+type DatabaseFileConfig struct {
+	Driver string `json:"driver,omitempty"`
+	DSN    string `json:"dsn,omitempty"`
 }
 
 // FileConfig captures optional configuration fields from JSON.
 type FileConfig struct {
-	ListenAddr        *string `json:"listen_addr"`
-	MaxBodySize       *int64  `json:"max_body_size"`
-	Debug             *bool   `json:"debug"`
-	WorkerCount       *int    `json:"worker_count"`
-	MaxConcurrentJobs *int    `json:"max_concurrent_jobs"`
-	PositiveCacheTTL  *int    `json:"positive_cache_ttl"`
-	NegativeCacheTTL  *int    `json:"negative_cache_ttl"`
-	Timeout           *int    `json:"timeout"`
-	Retry             *int    `json:"retry"`
-	Retrans           *int    `json:"retrans"`
-	Fallback          *bool   `json:"fallback"`
-	SourceAddr4       *string `json:"source_addr4"`
-	SourceAddr6       *string `json:"source_addr6"`
-	MinLevel          *string `json:"min_level"`
-	ProfilePath       *string `json:"profile_path"`
+	ListenAddr        *string             `json:"listen_addr"`
+	MaxBodySize       *int64              `json:"max_body_size"`
+	Debug             *bool               `json:"debug"`
+	WorkerCount       *int                `json:"worker_count"`
+	MaxConcurrentJobs *int                `json:"max_concurrent_jobs"`
+	PositiveCacheTTL  *int                `json:"positive_cache_ttl"`
+	NegativeCacheTTL  *int                `json:"negative_cache_ttl"`
+	Timeout           *int                `json:"timeout"`
+	Retry             *int                `json:"retry"`
+	Retrans           *int                `json:"retrans"`
+	Fallback          *bool               `json:"fallback"`
+	SourceAddr4       *string             `json:"source_addr4"`
+	SourceAddr6       *string             `json:"source_addr6"`
+	MinLevel          *string             `json:"min_level"`
+	ProfilePath       *string             `json:"profile_path"`
+	Database          *DatabaseFileConfig `json:"database,omitempty"`
 }
 
 // DefaultConfig returns baseline config values.
@@ -124,5 +143,13 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 	}
 	if file.ProfilePath != nil {
 		c.ProfilePath = *file.ProfilePath
+	}
+	if file.Database != nil {
+		if file.Database.Driver != "" {
+			c.Database.Driver = file.Database.Driver
+		}
+		if file.Database.DSN != "" {
+			c.Database.DSN = file.Database.DSN
+		}
 	}
 }

@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -35,11 +36,55 @@ func New(cfg Config) *Server {
 	if cfg.ListenAddr == "" {
 		cfg = DefaultConfig()
 	}
+	return newServer(cfg, NewInMemoryJobStore(), NewInMemoryQueue())
+}
+
+// NewWithOptions builds a server using the configured storage backend.
+// When cfg.Database.Driver is set, a SQL store is opened, schema migrations
+// are run, and any jobs from an unclean shutdown are recovered. An error is
+// returned if the database cannot be opened or migrated.
+func NewWithOptions(cfg Config) (*Server, error) {
+	if cfg.ListenAddr == "" {
+		cfg = DefaultConfig()
+	}
+
+	var store JobStore
+	if cfg.Database.Driver == "" {
+		store = NewInMemoryJobStore()
+	} else {
+		dialect, err := dialectFor(cfg.Database.Driver)
+		if err != nil {
+			return nil, err
+		}
+		db, err := openSQLDB(cfg.Database.Driver, cfg.Database.DSN)
+		if err != nil {
+			return nil, err
+		}
+		if err := runMigrations(db); err != nil {
+			_ = db.Close()
+			return nil, fmt.Errorf("run migrations: %w", err)
+		}
+		store = NewSQLJobStore(db, dialect)
+	}
+
+	queue := NewInMemoryQueue()
+	if err := RecoverJobs(store, queue); err != nil {
+		if sql, ok := store.(*SQLJobStore); ok {
+			_ = sql.db.Close()
+		}
+		return nil, fmt.Errorf("recover jobs: %w", err)
+	}
+
+	return newServer(cfg, store, queue), nil
+}
+
+// newServer constructs a Server with the given store and queue.
+func newServer(cfg Config, store JobStore, queue Queue) *Server {
 	s := &Server{
 		cfg:                      cfg,
 		mux:                      http.NewServeMux(),
-		store:                    NewInMemoryJobStore(),
-		queue:                    NewInMemoryQueue(),
+		store:                    store,
+		queue:                    queue,
 		metrics:                  NewMetricsCollector(cfg),
 		metricsCache:             map[string]metricsCacheEntry{},
 		progressWrites:           map[string]progressWriteState{},

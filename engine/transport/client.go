@@ -6,7 +6,9 @@ import (
 	"net"
 	"time"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
+	dnsv1 "github.com/miekg/dns" // TODO(phase3): remove once packet is migrated to v2
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/packet"
@@ -43,9 +45,11 @@ type EDNSDetails struct {
 	Do      *bool
 	Size    *uint16
 	Version *uint8
-	Z       *uint16
-	Rcode   *uint8
-	Data    []dns.EDNS0
+	// Z bits are not directly settable on a dns.Msg in v2; this field is kept for
+	// future use but has no effect on the outgoing message.
+	Z     *uint16
+	Rcode *uint8
+	Data  []dns.EDNS0 // pseudo-section EDNS0 sub-options to append (e.g. *dns.NSID)
 }
 
 // BuildQuery constructs a query message with common defaults.
@@ -56,11 +60,14 @@ func BuildQuery(name string, qtype uint16) *dns.Msg {
 // BuildQueryWithClass constructs a query message for the given class.
 func BuildQueryWithClass(name string, qtype, qclass uint16) *dns.Msg {
 	msg := new(dns.Msg)
-	msg.Question = []dns.Question{{
-		Name:   dns.Fqdn(name),
-		Qtype:  qtype,
-		Qclass: qclass,
-	}}
+	newFn, ok := dns.TypeToRR[qtype]
+	if !ok {
+		return msg
+	}
+	rr := newFn()
+	rr.Header().Name = dnsutil.Fqdn(name)
+	rr.Header().Class = qclass
+	msg.Question = []dns.RR{rr}
 	msg.RecursionDesired = false
 	return msg
 }
@@ -193,7 +200,17 @@ func (c *Client) Exchange(ctx context.Context, server string, msg *dns.Msg) (pac
 			}
 		}
 
-		pkt := packet.New(response)
+		// TODO(phase3): remove this wire-format bridge once packet is migrated to v2.
+		if err := response.Pack(); err != nil {
+			lastErr = err
+			continue
+		}
+		v1msg := new(dnsv1.Msg)
+		if err := v1msg.Unpack(response.Data); err != nil {
+			lastErr = err
+			continue
+		}
+		pkt := packet.New(v1msg)
 		pkt.QueryTime = rtt
 		pkt.Timestamp = time.Now()
 		pkt.AnswerFrom = server
@@ -207,33 +224,40 @@ func (c *Client) Exchange(ctx context.Context, server string, msg *dns.Msg) (pac
 }
 
 func (c *Client) exchangeOnce(ctx context.Context, server string, msg *dns.Msg, useTCP bool, fromUDPFallback bool) (*dns.Msg, time.Duration, error) {
-	client := dns.Client{Net: "udp", Timeout: c.effectiveAttemptTimeout(ctx, useTCP, fromUDPFallback)}
+	timeout := c.effectiveAttemptTimeout(ctx, useTCP, fromUDPFallback)
+	network := "udp"
 	if useTCP {
-		client.Net = "tcp"
+		network = "tcp"
 	}
 
-	dialer, err := c.buildDialer(client.Timeout, client.Net)
+	dialer, err := c.buildDialer(timeout, network)
 	if err != nil {
 		return nil, 0, err
 	}
-	client.Dialer = dialer
 
 	address := ensurePort(server)
-	conn, err := client.DialContext(ctx, address)
+	conn, err := dialer.DialContext(ctx, network, address)
 	if err != nil {
 		return nil, 0, err
 	}
 	defer conn.Close()
-	return c.exchangeWithConnCancelable(ctx, &client, msg, conn)
+
+	if timeout > 0 {
+		_ = conn.SetDeadline(time.Now().Add(timeout))
+	}
+
+	client := dns.NewClient()
+	client.Transport.ReadTimeout = timeout
+	return c.exchangeWithConnCancelable(ctx, client, msg, conn)
 }
 
-func (c *Client) exchangeWithConnCancelable(ctx context.Context, client *dns.Client, msg *dns.Msg, conn *dns.Conn) (*dns.Msg, time.Duration, error) {
+func (c *Client) exchangeWithConnCancelable(ctx context.Context, client *dns.Client, msg *dns.Msg, conn net.Conn) (*dns.Msg, time.Duration, error) {
 	if client == nil || conn == nil {
 		return nil, 0, fmt.Errorf("missing dns client or connection")
 	}
 
 	if ctx == nil || ctx.Done() == nil {
-		return client.ExchangeWithConnContext(ctx, msg.Copy(), conn)
+		return client.ExchangeWithConn(ctx, msg.Copy(), conn)
 	}
 
 	done := make(chan struct{})
@@ -247,7 +271,7 @@ func (c *Client) exchangeWithConnCancelable(ctx context.Context, client *dns.Cli
 		}
 	}()
 
-	resp, rtt, err := client.ExchangeWithConnContext(ctx, msg.Copy(), conn)
+	resp, rtt, err := client.ExchangeWithConn(ctx, msg.Copy(), conn)
 	close(done)
 	if cerr := ctx.Err(); cerr != nil {
 		return nil, 0, cerr
@@ -318,26 +342,28 @@ func (c *Client) prepareMessage(msg *dns.Msg) *dns.Msg {
 	}
 
 	if c.EDNSSize > 0 || c.EDNSDetails != nil {
-		prepared.SetEdns0(c.EDNSSize, c.DNSSEC)
-		opt := prepared.IsEdns0()
+		prepared.UDPSize = c.EDNSSize
+		prepared.Security = c.DNSSEC
+
 		if c.EDNSDetails != nil {
-			if opt == nil {
-				return prepared
-			}
 			if c.EDNSDetails.Do != nil {
-				opt.SetDo(*c.EDNSDetails.Do)
+				prepared.Security = *c.EDNSDetails.Do
+			}
+			if c.EDNSDetails.Size != nil {
+				prepared.UDPSize = *c.EDNSDetails.Size
 			}
 			if c.EDNSDetails.Version != nil {
-				opt.SetVersion(*c.EDNSDetails.Version)
-			}
-			if c.EDNSDetails.Z != nil {
-				opt.SetZ(*c.EDNSDetails.Z)
+				prepared.Version = *c.EDNSDetails.Version
 			}
 			if c.EDNSDetails.Rcode != nil {
-				opt.SetExtendedRcode(uint16(*c.EDNSDetails.Rcode))
+				// Extended rcode: lower 4 bits stay in header Rcode; upper 8 bits go in OPT.
+				// v2 encodes this transparently from m.Rcode (uint16).
+				prepared.Rcode = uint16(*c.EDNSDetails.Rcode)
 			}
 			if len(c.EDNSDetails.Data) > 0 {
-				opt.Option = append(opt.Option, c.EDNSDetails.Data...)
+				for _, opt := range c.EDNSDetails.Data {
+					prepared.Pseudo = append(prepared.Pseudo, opt)
+				}
 			}
 		}
 	}

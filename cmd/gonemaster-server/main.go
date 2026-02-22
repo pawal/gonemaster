@@ -246,7 +246,11 @@ func run(args []string, out *os.File, errOut *os.File) int {
 		cfg.Database.DSN = dbDSN
 	}
 
-	srv := server.New(cfg)
+	srv, err := server.NewWithOptions(cfg)
+	if err != nil {
+		fmt.Fprintln(errOut, err.Error())
+		return 2
+	}
 	srv.Start()
 	httpServer := &http.Server{
 		Addr:              cfg.ListenAddr,

@@ -3,7 +3,7 @@ package nameserver
 import (
 	"testing"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/transport"
 )
@@ -33,7 +33,7 @@ func BenchmarkBuildCacheKey(b *testing.B) {
 		version := uint8(1)
 		z := uint16(2)
 		rcode := uint8(3)
-		data := []dns.EDNS0{&dns.EDNS0_NSID{Code: dns.EDNS0NSID, Nsid: "beef"}}
+		data := []dns.EDNS0{&dns.NSID{Nsid: "beef"}}
 		opts := &QueryOptions{
 			DNSSEC:  &dnssec,
 			UseVC:   &usevc,

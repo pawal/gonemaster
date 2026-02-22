@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
@@ -54,7 +54,7 @@ func TestBuildCacheKeyWithEDNSDetailsLayout(t *testing.T) {
 	ednsVersion := uint8(1)
 	ednsZ := uint16(2)
 	ednsRcode := uint8(3)
-	data := []dns.EDNS0{&dns.EDNS0_NSID{Code: dns.EDNS0NSID, Nsid: "beef"}}
+	data := []dns.EDNS0{&dns.NSID{Nsid: "beef"}}
 
 	opts := &QueryOptions{
 		DNSSEC:  &dnssec,

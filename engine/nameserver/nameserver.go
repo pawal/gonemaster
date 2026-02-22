@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
@@ -500,7 +500,7 @@ func packetStringForLog(resp packet.Packet) string {
 		return "undef"
 	}
 	clone := resp.Msg.Copy()
-	clone.Id = 0
+	clone.ID = 0
 	return clone.String()
 }
 

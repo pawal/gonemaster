@@ -8,7 +8,6 @@ import (
 
 	dns "codeberg.org/miekg/dns"
 	"codeberg.org/miekg/dns/dnsutil"
-	dnsv1 "github.com/miekg/dns" // TODO(phase3): remove once packet is migrated to v2
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/packet"
@@ -200,17 +199,7 @@ func (c *Client) Exchange(ctx context.Context, server string, msg *dns.Msg) (pac
 			}
 		}
 
-		// TODO(phase3): remove this wire-format bridge once packet is migrated to v2.
-		if err := response.Pack(); err != nil {
-			lastErr = err
-			continue
-		}
-		v1msg := new(dnsv1.Msg)
-		if err := v1msg.Unpack(response.Data); err != nil {
-			lastErr = err
-			continue
-		}
-		pkt := packet.New(v1msg)
+		pkt := packet.New(response)
 		pkt.QueryTime = rtt
 		pkt.Timestamp = time.Now()
 		pkt.AnswerFrom = server

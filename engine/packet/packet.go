@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/logger"
@@ -30,7 +30,7 @@ func (p Packet) ID() uint16 {
 	if p.Msg == nil {
 		return 0
 	}
-	return p.Msg.Id
+	return p.Msg.ID
 }
 
 // Opcode returns the DNS opcode string.
@@ -62,11 +62,12 @@ func (p Packet) Data() []byte {
 	if p.Msg == nil {
 		return nil
 	}
-	wire, err := p.Msg.Pack()
-	if err != nil {
+	if err := p.Msg.Pack(); err != nil {
 		return nil
 	}
-	return wire
+	b := make([]byte, len(p.Msg.Data))
+	copy(b, p.Msg.Data)
+	return b
 }
 
 // AA reports whether the authoritative answer flag is set.
@@ -94,7 +95,7 @@ func (p Packet) TC() bool {
 }
 
 // Question returns the DNS question section.
-func (p Packet) Question() []dns.Question {
+func (p Packet) Question() []dns.RR {
 	if p.Msg == nil {
 		return nil
 	}
@@ -130,55 +131,53 @@ func (p Packet) HasEdns() bool {
 	if p.Msg == nil {
 		return false
 	}
-	return p.Msg.IsEdns0() != nil
+	return p.Msg.UDPSize > 0 || p.Msg.Security || len(p.Msg.Pseudo) > 0
 }
 
 // EdnsSize returns the EDNS UDP payload size.
 func (p Packet) EdnsSize() uint16 {
-	if opt := p.Msg.IsEdns0(); opt != nil {
-		return opt.UDPSize()
+	if p.Msg == nil {
+		return 0
 	}
-	return 0
+	return p.Msg.UDPSize
 }
 
-// EdnsRcode returns the EDNS extended rcode.
+// EdnsRcode returns the EDNS extended rcode upper byte (bits 4–11 of the 12-bit rcode).
 func (p Packet) EdnsRcode() int {
-	if opt := p.Msg.IsEdns0(); opt != nil {
-		return opt.ExtendedRcode() >> 4
+	if p.Msg == nil {
+		return 0
 	}
-	return 0
+	return int(p.Msg.Rcode >> 4)
 }
 
 // EdnsVersion returns the EDNS version.
 func (p Packet) EdnsVersion() uint8 {
-	if opt := p.Msg.IsEdns0(); opt != nil {
-		return opt.Version()
+	if p.Msg == nil {
+		return 0
 	}
-	return 0
+	return p.Msg.Version
 }
 
 // EdnsZ returns the raw EDNS Z bits.
+// Z bits are not directly exposed in v2's Msg; always returns 0.
 func (p Packet) EdnsZ() uint16 {
-	if opt := p.Msg.IsEdns0(); opt != nil {
-		return opt.Z()
-	}
 	return 0
 }
 
-// EdnsData returns EDNS option records.
-func (p Packet) EdnsData() []dns.EDNS0 {
-	if opt := p.Msg.IsEdns0(); opt != nil {
-		return opt.Option
+// EdnsData returns the EDNS pseudo-section option records (e.g. NSID, COOKIE).
+func (p Packet) EdnsData() []dns.RR {
+	if p.Msg == nil {
+		return nil
 	}
-	return nil
+	return p.Msg.Pseudo
 }
 
 // DO reports whether the EDNS DO bit is set.
 func (p Packet) DO() bool {
-	if opt := p.Msg.IsEdns0(); opt != nil {
-		return opt.Do()
+	if p.Msg == nil {
+		return false
 	}
-	return false
+	return p.Msg.Security
 }
 
 // Type approximates LDNS packet classification.
@@ -268,10 +267,10 @@ func packetQuestionInfo(msg *dns.Msg) (string, string, bool) {
 		return "", "", false
 	}
 	q := msg.Question[0]
-	name := dnsname.New(q.Name).String()
-	qtype := dns.TypeToString[q.Qtype]
+	name := dnsname.New(q.Header().Name).String()
+	qtype := dns.TypeToString[dns.RRToType(q)]
 	if qtype == "" {
-		qtype = fmt.Sprint(q.Qtype)
+		qtype = fmt.Sprint(dns.RRToType(q))
 	}
 	return name, qtype, true
 }
@@ -361,7 +360,7 @@ func normalizeSections(sections []string) []string {
 func filterRRs(rrs []dns.RR, wantType string) []dns.RR {
 	var out []dns.RR
 	for _, rr := range rrs {
-		if strings.EqualFold(dns.TypeToString[rr.Header().Rrtype], wantType) {
+		if strings.EqualFold(dns.TypeToString[dns.RRToType(rr)], wantType) {
 			out = append(out, rr)
 		}
 	}
@@ -370,7 +369,7 @@ func filterRRs(rrs []dns.RR, wantType string) []dns.RR {
 
 func hasType(rrs []dns.RR, want uint16) bool {
 	for _, rr := range rrs {
-		if rr.Header().Rrtype == want {
+		if dns.RRToType(rr) == want {
 			return true
 		}
 	}

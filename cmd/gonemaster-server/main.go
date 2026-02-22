@@ -83,8 +83,8 @@ func run(args []string, out *os.File, errOut *os.File) int {
 			{flag: "--sourceaddr6 IPADDR", detail: "Override resolver.source6 (IPv6 source address)"},
 		})
 		printUsageGroup(errOut, "Database", []usageLine{
-			{flag: "--db-driver DRIVER", detail: "Storage backend: memory (default), sqlite, postgres, mariadb (env: GONEMASTER_DB_DRIVER)"},
-			{flag: "--db-dsn DSN", detail: "Database file path or connection string (env: GONEMASTER_DB_DSN)"},
+			{flag: "--db-driver DRIVER", detail: "Storage backend: sqlite (or leave empty for in-memory) (env: GONEMASTER_DB_DRIVER)"},
+			{flag: "--db-dsn DSN", detail: "SQLite: file path e.g. /var/lib/gonemaster/jobs.db (env: GONEMASTER_DB_DSN)"},
 		})
 		printUsageGroup(errOut, "Output", []usageLine{
 			{flag: "--min-level LEVEL", detail: "Minimum result log level (default INFO)"},
@@ -107,7 +107,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	fs.StringVar(&sourceAddr6, "sourceaddr6", "", "Override resolver.source6 (IPv6 source address) (optional)")
 	fs.StringVar(&minLevel, "min-level", "", "Minimum log level (default INFO)")
 	fs.StringVar(&profilePath, "profile", "", "Profile JSON/YAML path (optional)")
-	fs.StringVar(&dbDriver, "db-driver", "", "Storage backend: memory (default), sqlite, postgres, mariadb")
+	fs.StringVar(&dbDriver, "db-driver", "", "Storage backend: sqlite (empty = in-memory)")
 	fs.StringVar(&dbDSN, "db-dsn", "", "Database file path or connection string (optional)")
 	fs.BoolVar(&showVersion, "version", false, "Print version and exit (optional)")
 	fs.DurationVar(&shutdownTimeout, "shutdown-timeout", 10*time.Second, "Graceful shutdown timeout (default 10s)")

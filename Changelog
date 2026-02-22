@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v1.0.1] - 2026-02-22
+
 ### Added
 
  - Server: Fix parent cache memory retention in methodsv2
@@ -20,7 +22,7 @@ All notable changes to this project will be documented in this file.
  - Recursor: Scope recurse cache by resolver context (root vs custom NS set)
  - Recursor: Add regression tests for cache isolation/limits and glue filtering
 
-## Changed
+### Changed
 
  - Harmonized `--version` across programs
  - Recursor: Do not cache empty recurse responses

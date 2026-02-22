@@ -47,6 +47,50 @@ func newAuthoritativeNameserver(ctx context.Context, t *testing.T, r *recursor.R
 	return ns
 }
 
+func TestParentCacheStoresSnapshotData(t *testing.T) {
+	ClearCache()
+	defer ClearCache()
+
+	ctx, _, _ := testhelpers.Context(t)
+	ns, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.53", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+
+	cacheParent("example", []nameserver.Nameserver{ns}, true)
+
+	parentCache.mu.Lock()
+	entry, ok := parentCache.items["example"]
+	parentCache.mu.Unlock()
+	if !ok {
+		t.Fatalf("expected parent cache entry")
+	}
+	if !entry.defined {
+		t.Fatalf("expected defined parent cache entry")
+	}
+	if len(entry.servers) != 1 {
+		t.Fatalf("expected 1 cached parent server, got %d", len(entry.servers))
+	}
+	if entry.servers[0].Name != "ns1.example" {
+		t.Fatalf("unexpected cached name %q", entry.servers[0].Name)
+	}
+	if entry.servers[0].Address != "192.0.2.53" {
+		t.Fatalf("unexpected cached address %q", entry.servers[0].Address)
+	}
+
+	ctx2, _, _ := testhelpers.Context(t)
+	servers := materializeParentServers(ctx2, nil, append(entry.servers, parentCacheServer{}))
+	if len(servers) != 1 {
+		t.Fatalf("expected malformed cached rows to be skipped, got %d materialized servers", len(servers))
+	}
+	if servers[0].Name.String() != "ns1.example" {
+		t.Fatalf("unexpected materialized name %q", servers[0].Name.String())
+	}
+	if servers[0].Address.String() != "192.0.2.53" {
+		t.Fatalf("unexpected materialized address %q", servers[0].Address.String())
+	}
+}
+
 func TestGetParentNSNamesAndIPsUndelegated(t *testing.T) {
 	ClearCache()
 	defer ClearCache()

@@ -14,6 +14,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/transport"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
@@ -34,7 +35,12 @@ func (n NSItem) String() string {
 
 type parentCacheEntry struct {
 	defined bool
-	servers []nameserver.Nameserver
+	servers []parentCacheServer
+}
+
+type parentCacheServer struct {
+	Name    string
+	Address string
 }
 
 var parentCache = struct {
@@ -73,7 +79,7 @@ func GetParentNSNamesAndIPs(ctx context.Context, z *zone.Zone) ([]nameserver.Nam
 		if !cached.defined {
 			return nil, nil
 		}
-		return copyNameservers(cached.servers), nil
+		return materializeParentServers(ctx, r.Client(), cached.servers), nil
 	}
 	parentCache.mu.Unlock()
 
@@ -261,7 +267,7 @@ func GetParentNSNamesAndIPs(ctx context.Context, z *zone.Zone) ([]nameserver.Nam
 
 	parentNS = uniqueSortedNameservers(parentNS)
 	cacheParent(key, parentNS, true)
-	return copyNameservers(parentNS), nil
+	return cloneNameservers(parentNS), nil
 }
 
 // GetParentNSIPs returns parent nameservers filtered to unique IPs.
@@ -1014,11 +1020,47 @@ func firstKey(m map[string][]nameserver.Nameserver) string {
 
 func cacheParent(key string, servers []nameserver.Nameserver, defined bool) {
 	parentCache.mu.Lock()
-	parentCache.items[key] = parentCacheEntry{defined: defined, servers: copyNameservers(servers)}
+	parentCache.items[key] = parentCacheEntry{defined: defined, servers: snapshotParentServers(servers)}
 	parentCache.mu.Unlock()
 }
 
-func copyNameservers(list []nameserver.Nameserver) []nameserver.Nameserver {
+func snapshotParentServers(list []nameserver.Nameserver) []parentCacheServer {
+	if list == nil {
+		return nil
+	}
+	out := make([]parentCacheServer, 0, len(list))
+	for _, item := range list {
+		addr := item.Address.String()
+		if addr == "" {
+			continue
+		}
+		out = append(out, parentCacheServer{
+			Name:    item.Name.String(),
+			Address: addr,
+		})
+	}
+	return out
+}
+
+func materializeParentServers(ctx context.Context, client *transport.Client, list []parentCacheServer) []nameserver.Nameserver {
+	if len(list) == 0 {
+		return nil
+	}
+	out := make([]nameserver.Nameserver, 0, len(list))
+	for _, item := range list {
+		if strings.TrimSpace(item.Name) == "" || strings.TrimSpace(item.Address) == "" {
+			continue
+		}
+		ns, err := nameserver.NewWithContext(ctx, item.Name, item.Address, client)
+		if err != nil {
+			continue
+		}
+		out = append(out, ns)
+	}
+	return out
+}
+
+func cloneNameservers(list []nameserver.Nameserver) []nameserver.Nameserver {
 	if list == nil {
 		return nil
 	}

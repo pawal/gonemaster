@@ -13,8 +13,6 @@ By default, it enables IPv4+IPv6 and currently sets `resolver.defaults.parallel=
 If you don't have access to IPv6 on your development machine, or you need deterministic
 ordered behavior, use a custom profile via `--profile`.
 
-The current server lacks any sort of persistence, for example using SQLite or PostgreSQL.
-
 ## Build
 ```
 go build -o ./gonemaster-server ./cmd/gonemaster-server
@@ -72,9 +70,29 @@ curl -s "http://localhost:8080/api/v1/jobs/$JOB_ID/result?locale=en" | jq .
 ```
 
 ## Configuration
-- Config file is optional JSON and loaded with `--config`.
-- Flags override config file values.
-- `profile_path` sets the default profile used for all jobs (same as `gonemaster --profile`).
+
+Configuration is applied in priority order (highest wins):
+1. **CLI flags** (e.g. `--listen`, `--db-driver`)
+2. **Environment variables** (`GONEMASTER_*`)
+3. **Config file** (`--config path/to/config.json`)
+4. **Built-in defaults**
+
+`profile_path` sets the default profile used for all jobs (same as `gonemaster --profile`).
+
+### Environment variables
+
+| Variable | Config field | Notes |
+|---|---|---|
+| `GONEMASTER_LISTEN` | `listen_addr` | |
+| `GONEMASTER_WORKER_COUNT` | `worker_count` | integer |
+| `GONEMASTER_MAX_CONCURRENT_JOBS` | `max_concurrent_jobs` | integer |
+| `GONEMASTER_MIN_LEVEL` | `min_level` | |
+| `GONEMASTER_PROFILE` | `profile_path` | |
+| `GONEMASTER_DEBUG` | `debug` | `true`/`false`/`1`/`0` |
+| `GONEMASTER_DB_DRIVER` | `database.driver` | |
+| `GONEMASTER_DB_DSN` | `database.dsn` | Use this for connection strings containing passwords |
+
+Invalid values for integer or boolean variables emit a warning and are ignored (the server continues with the lower-priority value).
 
 ### Deterministic mode
 If you want deterministic ordered resolver behavior on the server, set:
@@ -115,6 +133,33 @@ resolver:
 ```
 These settings apply to all jobs unless a job overrides the profile.
 
+### Database
+
+The server supports pluggable storage backends selected by `--db-driver`:
+
+| Driver | Description |
+|---|---|
+| `memory` | In-memory only (default). All data lost on restart. |
+| `sqlite` | Embedded SQLite database. Recommended for single-server production use. |
+| `postgres` | PostgreSQL. Phase 2 — not yet available. |
+| `mariadb` | MariaDB/MySQL. Phase 2 — not yet available. |
+
+For SQLite, `--db-dsn` is the file path:
+```
+gonemaster-server --db-driver sqlite --db-dsn /var/lib/gonemaster/gonemaster.db
+```
+
+Using environment variables (recommended for DSNs containing passwords):
+```
+GONEMASTER_DB_DRIVER=sqlite GONEMASTER_DB_DSN=/var/lib/gonemaster/gonemaster.db \
+  gonemaster-server
+```
+
+On startup with a persistent backend, the server automatically:
+- Runs any pending schema migrations.
+- Marks jobs that were `running` when the server last stopped as `failed`.
+- Re-enqueues jobs that were `queued` but not yet started.
+
 ### Config example
 ```json
 {
@@ -130,7 +175,11 @@ These settings apply to all jobs unless a job overrides the profile.
   "retrans": 3,
   "fallback": true,
   "min_level": "INFO",
-  "profile_path": "/path/to/profile.json"
+  "profile_path": "/path/to/profile.json",
+  "database": {
+    "driver": "sqlite",
+    "dsn": "/var/lib/gonemaster/gonemaster.db"
+  }
 }
 ```
 
@@ -151,6 +200,8 @@ These settings apply to all jobs unless a job overrides the profile.
 - `--min-level` Minimum log level for results
 - `--profile` Profile JSON/YAML path (default for all jobs)
 - `--shutdown-timeout` Graceful shutdown timeout
+- `--db-driver` Storage backend (`memory`, `sqlite`, `postgres`, `mariadb`; env: `GONEMASTER_DB_DRIVER`)
+- `--db-dsn` Database file path or connection string (env: `GONEMASTER_DB_DSN`)
 
 ## Domain normalization (IDN)
 Domains are normalized to IDNA A-labels (punycode). For example:

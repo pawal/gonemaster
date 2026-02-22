@@ -46,30 +46,18 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	var sourceAddr6 string
 	var minLevel string
 	var profilePath string
+	var dbDriver string
+	var dbDSN string
 	var showVersion bool
 	var shutdownTimeout time.Duration
-	var listenSet bool
-	var maxBodySizeSet bool
-	var debugSet bool
-	var workerCountSet bool
-	var maxConcurrentJobsSet bool
-	var positiveCacheTTLSet bool
-	var negativeCacheTTLSet bool
-	var timeoutSet bool
-	var retrySet bool
-	var retransSet bool
-	var fallbackSet bool
-	var noFallbackSet bool
-	var sourceAddr4Set bool
-	var sourceAddr6Set bool
-	var minLevelSet bool
-	var profilePathSet bool
+
+	flagsSet := make(map[string]bool)
 
 	fs := flag.NewFlagSet("gonemaster-server", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	fs.Usage = func() {
 		fmt.Fprintf(errOut, "Usage: %s [flags]\n\n", fs.Name())
-		fmt.Fprintln(errOut, "Flags (CLI flags override --config values):")
+		fmt.Fprintln(errOut, "Flags (CLI flags override environment variables and --config values):")
 		printUsageGroup(errOut, "General", []usageLine{
 			{flag: "--config PATH", detail: "JSON config file path"},
 			{flag: "--listen ADDR", detail: "Address to listen on (default 127.0.0.1:8080)"},
@@ -94,6 +82,10 @@ func run(args []string, out *os.File, errOut *os.File) int {
 			{flag: "--sourceaddr4 IPADDR", detail: "Override resolver.source4 (IPv4 source address)"},
 			{flag: "--sourceaddr6 IPADDR", detail: "Override resolver.source6 (IPv6 source address)"},
 		})
+		printUsageGroup(errOut, "Database", []usageLine{
+			{flag: "--db-driver DRIVER", detail: "Storage backend: memory (default), sqlite, postgres, mariadb (env: GONEMASTER_DB_DRIVER)"},
+			{flag: "--db-dsn DSN", detail: "Database file path or connection string (env: GONEMASTER_DB_DSN)"},
+		})
 		printUsageGroup(errOut, "Output", []usageLine{
 			{flag: "--min-level LEVEL", detail: "Minimum result log level (default INFO)"},
 		})
@@ -115,6 +107,8 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	fs.StringVar(&sourceAddr6, "sourceaddr6", "", "Override resolver.source6 (IPv6 source address) (optional)")
 	fs.StringVar(&minLevel, "min-level", "", "Minimum log level (default INFO)")
 	fs.StringVar(&profilePath, "profile", "", "Profile JSON/YAML path (optional)")
+	fs.StringVar(&dbDriver, "db-driver", "", "Storage backend: memory (default), sqlite, postgres, mariadb")
+	fs.StringVar(&dbDSN, "db-dsn", "", "Database file path or connection string (optional)")
 	fs.BoolVar(&showVersion, "version", false, "Print version and exit (optional)")
 	fs.DurationVar(&shutdownTimeout, "shutdown-timeout", 10*time.Second, "Graceful shutdown timeout (default 10s)")
 	if err := fs.Parse(args); err != nil {
@@ -126,81 +120,50 @@ func run(args []string, out *os.File, errOut *os.File) int {
 		return 0
 	}
 	fs.Visit(func(f *flag.Flag) {
-		switch f.Name {
-		case "listen":
-			listenSet = true
-		case "max-body-size":
-			maxBodySizeSet = true
-		case "debug":
-			debugSet = true
-		case "workers":
-			workerCountSet = true
-		case "max-concurrent-jobs":
-			maxConcurrentJobsSet = true
-		case "positive-cache-ttl":
-			positiveCacheTTLSet = true
-		case "negative-cache-ttl":
-			negativeCacheTTLSet = true
-		case "timeout":
-			timeoutSet = true
-		case "retry":
-			retrySet = true
-		case "retrans":
-			retransSet = true
-		case "fallback":
-			fallbackSet = true
-		case "no-fallback":
-			noFallbackSet = true
-		case "sourceaddr4":
-			sourceAddr4Set = true
-		case "sourceaddr6":
-			sourceAddr6Set = true
-		case "min-level":
-			minLevelSet = true
-		case "profile":
-			profilePathSet = true
-		}
+		flagsSet[f.Name] = true
 	})
-	if workerCountSet && workerCount < 1 {
+
+	// Validate flags that were explicitly set.
+	if flagsSet["workers"] && workerCount < 1 {
 		fmt.Fprintln(errOut, "--workers must be >= 1")
 		return 2
 	}
-	if maxConcurrentJobsSet && maxConcurrentJobs < 0 {
+	if flagsSet["max-concurrent-jobs"] && maxConcurrentJobs < 0 {
 		fmt.Fprintln(errOut, "--max-concurrent-jobs must be >= 0")
 		return 2
 	}
-	if positiveCacheTTLSet && positiveCacheTTL < 0 {
+	if flagsSet["positive-cache-ttl"] && positiveCacheTTL < 0 {
 		fmt.Fprintln(errOut, "--positive-cache-ttl must be >= 0")
 		return 2
 	}
-	if negativeCacheTTLSet && negativeCacheTTL < 0 {
+	if flagsSet["negative-cache-ttl"] && negativeCacheTTL < 0 {
 		fmt.Fprintln(errOut, "--negative-cache-ttl must be >= 0")
 		return 2
 	}
-	if timeoutSet && timeoutSeconds < 0 {
+	if flagsSet["timeout"] && timeoutSeconds < 0 {
 		fmt.Fprintln(errOut, "--timeout must be >= 0")
 		return 2
 	}
-	if retrySet && retryCount < 0 {
+	if flagsSet["retry"] && retryCount < 0 {
 		fmt.Fprintln(errOut, "--retry must be >= 0")
 		return 2
 	}
-	if retransSet && retransSeconds < 0 {
+	if flagsSet["retrans"] && retransSeconds < 0 {
 		fmt.Fprintln(errOut, "--retrans must be >= 0")
 		return 2
 	}
-	if fallbackSet && noFallbackSet {
+	if flagsSet["fallback"] && flagsSet["no-fallback"] {
 		fmt.Fprintln(errOut, "--fallback cannot be combined with --no-fallback")
 		return 2
 	}
-	if sourceAddr4Set {
+	if flagsSet["sourceaddr4"] {
 		addr, err := netip.ParseAddr(strings.TrimSpace(sourceAddr4))
 		if err != nil || !addr.Is4() {
 			fmt.Fprintln(errOut, "--sourceaddr4 must be a valid IPv4 address")
 			return 2
 		}
 	}
-	if sourceAddr6Set {
+	if flagsSet["sourceaddr6"] {
 		addr, err := netip.ParseAddr(strings.TrimSpace(sourceAddr6))
 		if err != nil || !addr.Is6() {
 			fmt.Fprintln(errOut, "--sourceaddr6 must be a valid IPv6 address")
@@ -208,6 +171,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 		}
 	}
 
+	// Build config: defaults → file → env vars → CLI flags.
 	cfg := server.DefaultConfig()
 	if configPath != "" {
 		fileCfg, err := server.LoadFileConfig(configPath)
@@ -217,62 +181,69 @@ func run(args []string, out *os.File, errOut *os.File) int {
 		}
 		cfg.ApplyFileConfig(fileCfg)
 	}
-	if listenSet {
+	applyEnvVars(&cfg, flagsSet, os.Getenv, errOut)
+	if flagsSet["listen"] {
 		cfg.ListenAddr = listen
 	}
-	if maxBodySizeSet {
+	if flagsSet["max-body-size"] {
 		cfg.MaxBodySize = maxBodySize
 	}
-	if debugSet {
+	if flagsSet["debug"] {
 		cfg.Debug = debug
 	}
-	if workerCountSet {
+	if flagsSet["workers"] {
 		cfg.WorkerCount = workerCount
 	}
-	if maxConcurrentJobsSet {
+	if flagsSet["max-concurrent-jobs"] {
 		cfg.MaxConcurrentJobs = maxConcurrentJobs
 	}
-	if positiveCacheTTLSet {
+	if flagsSet["positive-cache-ttl"] {
 		value := positiveCacheTTL
 		cfg.PositiveCacheTTL = &value
 	}
-	if negativeCacheTTLSet {
+	if flagsSet["negative-cache-ttl"] {
 		value := negativeCacheTTL
 		cfg.NegativeCacheTTL = &value
 	}
-	if timeoutSet {
+	if flagsSet["timeout"] {
 		value := timeoutSeconds
 		cfg.Timeout = &value
 	}
-	if retrySet {
+	if flagsSet["retry"] {
 		value := retryCount
 		cfg.Retry = &value
 	}
-	if retransSet {
+	if flagsSet["retrans"] {
 		value := retransSeconds
 		cfg.Retrans = &value
 	}
-	if fallbackSet {
+	if flagsSet["fallback"] {
 		value := true
 		cfg.Fallback = &value
 	}
-	if noFallbackSet {
+	if flagsSet["no-fallback"] {
 		value := false
 		cfg.Fallback = &value
 	}
-	if sourceAddr4Set {
+	if flagsSet["sourceaddr4"] {
 		value := strings.TrimSpace(sourceAddr4)
 		cfg.SourceAddr4 = &value
 	}
-	if sourceAddr6Set {
+	if flagsSet["sourceaddr6"] {
 		value := strings.TrimSpace(sourceAddr6)
 		cfg.SourceAddr6 = &value
 	}
-	if minLevelSet {
+	if flagsSet["min-level"] {
 		cfg.MinLevel = minLevel
 	}
-	if profilePathSet {
+	if flagsSet["profile"] {
 		cfg.ProfilePath = profilePath
+	}
+	if flagsSet["db-driver"] {
+		cfg.Database.Driver = dbDriver
+	}
+	if flagsSet["db-dsn"] {
+		cfg.Database.DSN = dbDSN
 	}
 
 	srv := server.New(cfg)
@@ -332,7 +303,7 @@ func printUsageGroup(out io.Writer, title string, lines []usageLine) {
 	}
 	fmt.Fprintf(out, "  %s:\n", title)
 	for _, line := range lines {
-		fmt.Fprintf(out, "    %-35s %s\n", line.flag, line.detail)
+		fmt.Fprintf(out, "    %-50s %s\n", line.flag, line.detail)
 	}
 	fmt.Fprintln(out, "")
 }

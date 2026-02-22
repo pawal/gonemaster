@@ -3,10 +3,11 @@ package recursor
 import (
 	"context"
 	"fmt"
-	"net"
+	"net/netip"
 	"testing"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
@@ -145,15 +146,9 @@ func TestRecurseFollowsOutOfBailiwickCNAME(t *testing.T) {
 
 func TestRecurseStopsOnCNAMEWithQtypeMismatch(t *testing.T) {
 	resp := cnamePacket("www.example.com", "alias.example.net", "203.0.113.6")
-	resp.Msg.Answer = append(resp.Msg.Answer, &dns.A{
-		Hdr: dns.RR_Header{
-			Name:   "other.example.net.",
-			Rrtype: dns.TypeA,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		A: net.IPv4(192, 0, 2, 55),
-	})
+	aRR := &dns.A{Hdr: dns.Header{Name: "other.example.net.", Class: dns.ClassINET, TTL: 60}}
+	aRR.Addr = netip.AddrFrom4([4]byte{192, 0, 2, 55})
+	resp.Msg.Answer = append(resp.Msg.Answer, aRR)
 
 	state := &recurseState{
 		ns: []queryer{
@@ -209,15 +204,9 @@ func TestRecurseStopsOnInProgress(t *testing.T) {
 
 func TestResolveCNAMEWithTargetAnswer(t *testing.T) {
 	resp := cnamePacket("www.example.com", "alias.example.net", "203.0.113.7")
-	resp.Msg.Answer = append(resp.Msg.Answer, &dns.A{
-		Hdr: dns.RR_Header{
-			Name:   "alias.example.net.",
-			Rrtype: dns.TypeA,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		A: net.IPv4(192, 0, 2, 200),
-	})
+	aRR2 := &dns.A{Hdr: dns.Header{Name: "alias.example.net.", Class: dns.ClassINET, TTL: 60}}
+	aRR2.Addr = netip.AddrFrom4([4]byte{192, 0, 2, 200})
+	resp.Msg.Answer = append(resp.Msg.Answer, aRR2)
 
 	r := &Recursor{}
 	out, _, err := r.resolveCNAME(context.Background(), dnsname.New("www.example.com"), "A", "IN", resp, nil)
@@ -234,15 +223,9 @@ func TestResolveCNAMEWithTargetAnswer(t *testing.T) {
 
 func TestResolveCNAMELoopReturnsEmpty(t *testing.T) {
 	resp := cnamePacket("www.example.com", "alias.example.com", "203.0.113.8")
-	resp.Msg.Answer = append(resp.Msg.Answer, &dns.CNAME{
-		Hdr: dns.RR_Header{
-			Name:   "alias.example.com.",
-			Rrtype: dns.TypeCNAME,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Target: "www.example.com.",
-	})
+	cnameRR2 := &dns.CNAME{Hdr: dns.Header{Name: "alias.example.com.", Class: dns.ClassINET, TTL: 60}}
+	cnameRR2.Target = "www.example.com."
+	resp.Msg.Answer = append(resp.Msg.Answer, cnameRR2)
 
 	r := &Recursor{}
 	out, _, err := r.resolveCNAME(context.Background(), dnsname.New("www.example.com"), "A", "IN", resp, nil)
@@ -318,18 +301,10 @@ func TestRecurseLogsLoopProtection(t *testing.T) {
 func referralPacket(zone string, answerFrom string) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
-	zone = dns.Fqdn(zone)
-	msg.Ns = []dns.RR{
-		&dns.NS{
-			Hdr: dns.RR_Header{
-				Name:   zone,
-				Rrtype: dns.TypeNS,
-				Class:  dns.ClassINET,
-				Ttl:    3600,
-			},
-			Ns: "ns1." + zone,
-		},
-	}
+	zone = dnsutil.Fqdn(zone)
+	nsRR := &dns.NS{Hdr: dns.Header{Name: zone, Class: dns.ClassINET, TTL: 3600}}
+	nsRR.Ns = "ns1." + zone
+	msg.Ns = []dns.RR{nsRR}
 	return packet.Packet{Msg: msg, AnswerFrom: answerFrom}
 }
 
@@ -342,34 +317,18 @@ func nxdomainPacket(answerFrom string) packet.Packet {
 func answerPacket(qname string, answerFrom string) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
-	msg.Answer = []dns.RR{
-		&dns.A{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(qname),
-				Rrtype: dns.TypeA,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			A: net.IPv4(192, 0, 2, 1),
-		},
-	}
+	aRR := &dns.A{Hdr: dns.Header{Name: dnsutil.Fqdn(qname), Class: dns.ClassINET, TTL: 60}}
+	aRR.Addr = netip.AddrFrom4([4]byte{192, 0, 2, 1})
+	msg.Answer = []dns.RR{aRR}
 	return packet.Packet{Msg: msg, AnswerFrom: answerFrom}
 }
 
 func cnamePacket(qname string, target string, answerFrom string) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
-	msg.Answer = []dns.RR{
-		&dns.CNAME{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(qname),
-				Rrtype: dns.TypeCNAME,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Target: dns.Fqdn(target),
-		},
-	}
+	cnameRR := &dns.CNAME{Hdr: dns.Header{Name: dnsutil.Fqdn(qname), Class: dns.ClassINET, TTL: 60}}
+	cnameRR.Target = dnsutil.Fqdn(target)
+	msg.Answer = []dns.RR{cnameRR}
 	return packet.Packet{Msg: msg, AnswerFrom: answerFrom}
 }
 

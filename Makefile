@@ -22,7 +22,7 @@ CMD ?= all
 help:
 	@echo "Targets:"
 	@echo "  build            Build all commands (override CMD=gonemaster-server)"
-	@echo "  test             Run Go tests"
+	@echo "  test             Run Go tests, UI tests, and spec checks"
 	@echo "  test-go          Run Go tests (no UI)"
 	@echo "  vet              Run go vet"
 	@echo "  race             Run Go tests with -race"
@@ -116,7 +116,7 @@ build-gonemaster-nagios: $(BIN_DIR)
 test-go:
 	$(GO) test ./...
 
-test: ui-test test-go
+test: ui-test test-go spec-check
 
 install:
 	@if [ "$(CMD)" = "all" ]; then \

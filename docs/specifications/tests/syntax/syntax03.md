@@ -61,14 +61,3 @@ Status: Draft
 ## Edge Cases And Limitations
 - ACE labels beginning with `xn` are excluded from this warning, including `xn--...` labels.
 - If the tested name has zero labels, `NO_DOUBLE_DASH` is not emitted.
-
----
-
-Copyright (c) Patrik Wallström  
-Copyright (c) The Swedish Internet Foundation (https://internetstiftelsen.se/en/)  
-Copyright (c) AFNIC (https://www.afnic.fr/en/)  
-All rights reserved.  
-
-Copyright belongs to external contributor where applicable.  
-
-Creative Commons Attribution 4.0 International License applies. See https://creativecommons.org/licenses/by/4.0/ for the license conditions.

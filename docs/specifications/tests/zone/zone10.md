@@ -76,14 +76,3 @@ Status: Draft
 ## Edge Cases And Limitations
 - Query-shape checks do not require authoritative flag or specific RCODE in this testcase path.
 - Shared helper transport-disabled debug tags can suppress `ONE_SOA` because they count as non-start entries.
-
----
-
-Copyright (c) Patrik Wallström  
-Copyright (c) The Swedish Internet Foundation (https://internetstiftelsen.se/en/)  
-Copyright (c) AFNIC (https://www.afnic.fr/en/)  
-All rights reserved.  
-
-Copyright belongs to external contributor where applicable.  
-
-Creative Commons Attribution 4.0 International License applies. See https://creativecommons.org/licenses/by/4.0/ for the license conditions.

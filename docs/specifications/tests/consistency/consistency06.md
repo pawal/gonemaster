@@ -83,14 +83,3 @@ Status: Draft
 ## Edge Cases And Limitations
 - If no usable SOA MNAME is obtained, neither `ONE_SOA_MNAME` nor `MULTIPLE_SOA_MNAMES` is emitted.
 - `SOA_MNAME` `ns_list` ordering follows nameserver processing order.
-
----
-
-Copyright (c) Patrik Wallström  
-Copyright (c) The Swedish Internet Foundation (https://internetstiftelsen.se/en/)  
-Copyright (c) AFNIC (https://www.afnic.fr/en/)  
-All rights reserved.  
-
-Copyright belongs to external contributor where applicable.  
-
-Creative Commons Attribution 4.0 International License applies. See https://creativecommons.org/licenses/by/4.0/ for the license conditions.

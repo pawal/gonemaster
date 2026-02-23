@@ -65,14 +65,3 @@ Status: Draft
 ## Edge Cases And Limitations
 - Multiple MX RRs can yield multiple CNAME verdict tags in one run.
 - A missing CNAME-query response for an MX exchange yields no dedicated per-exchange tag.
-
----
-
-Copyright (c) Patrik Wallström  
-Copyright (c) The Swedish Internet Foundation (https://internetstiftelsen.se/en/)  
-Copyright (c) AFNIC (https://www.afnic.fr/en/)  
-All rights reserved.  
-
-Copyright belongs to external contributor where applicable.  
-
-Creative Commons Attribution 4.0 International License applies. See https://creativecommons.org/licenses/by/4.0/ for the license conditions.

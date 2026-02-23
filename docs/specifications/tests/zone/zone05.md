@@ -82,14 +82,3 @@ Status: Draft
 ## Edge Cases And Limitations
 - The shared retrieval helper emits `IPV4_DISABLED` or `IPV6_DISABLED` when the corresponding transport is disabled; these tags are not declared in this testcase's `Metadata()` function.
 - Because `EXPIRE_MINIMUM_VALUE_OK` uses a generic “no non-start entry yet” gate, helper-emitted non-metadata entries can suppress the OK tag even when numeric checks are satisfied.
-
----
-
-Copyright (c) Patrik Wallström  
-Copyright (c) The Swedish Internet Foundation (https://internetstiftelsen.se/en/)  
-Copyright (c) AFNIC (https://www.afnic.fr/en/)  
-All rights reserved.  
-
-Copyright belongs to external contributor where applicable.  
-
-Creative Commons Attribution 4.0 International License applies. See https://creativecommons.org/licenses/by/4.0/ for the license conditions.

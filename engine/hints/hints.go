@@ -5,7 +5,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 )
 
 var forbiddenDirectiveRe = regexp.MustCompile(`(?m)^\$(TTL|INCLUDE|ORIGIN|GENERATE)\b`)
@@ -44,7 +45,7 @@ func ParseHints(text string) (map[string][]string, error) {
 			owner := strings.ToLower(hdr.Name)
 			glue[owner] = "AAAA"
 		default:
-			return nil, fmt.Errorf("Forbidden RR type %s", dns.TypeToString[hdr.Rrtype])
+			return nil, fmt.Errorf("Forbidden RR type %s", dnsutil.TypeToString(dns.RRToType(rr)))
 		}
 	}
 	if err := parser.Err(); err != nil {
@@ -74,10 +75,10 @@ func ParseHints(text string) (map[string][]string, error) {
 		switch typed := rr.(type) {
 		case *dns.A:
 			owner := rr.Header().Name
-			hints[owner] = append(hints[owner], typed.A.String())
+			hints[owner] = append(hints[owner], typed.Addr.String())
 		case *dns.AAAA:
 			owner := rr.Header().Name
-			hints[owner] = append(hints[owner], typed.AAAA.String())
+			hints[owner] = append(hints[owner], typed.Addr.String())
 		}
 	}
 

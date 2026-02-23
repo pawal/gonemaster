@@ -64,7 +64,7 @@ Status: Draft
 | `Z11_DIFFERENT_SPF_POLICIES_FOUND` | `ns_list` | `string` | Semicolon-delimited nameserver `name/ip` list for one policy-set group. |
 | `Z11_INCONSISTENT_SPF_POLICIES` | `-` | `-` | No arguments. |
 | `Z11_NO_SPF_FOUND` | `domain` | `string` | Tested zone name. |
-| `Z11_NO_SPF_NON_MAIL_DOMAIN` | `-` | `-` | No arguments (current implementation behavior). |
+| `Z11_NO_SPF_NON_MAIL_DOMAIN` | `domain` | `string` | Tested zone name. |
 | `Z11_NON_NULL_SPF_NON_MAIL_DOMAIN` | `domain` | `string` | Tested zone name. |
 | `Z11_NULL_SPF_NON_MAIL_DOMAIN` | `domain` | `string` | Tested zone name. |
 | `Z11_SPF_MULTIPLE_RECORDS` | `ns_list` | `string` | Semicolon-delimited nameserver `name/ip` list with multi-policy responses. |
@@ -90,7 +90,6 @@ Status: Draft
 ## Differences From Upstream
 - Upstream reference: [`zone11.md`](../../upstream/tests/Zone-TP/zone11.md)
 - Differences (Upstream vs Gonemaster):
-  - Upstream: summary defines `domain` argument for `Z11_NO_SPF_NON_MAIL_DOMAIN`. Gonemaster: currently emits `Z11_NO_SPF_NON_MAIL_DOMAIN` with no arguments.
   - Upstream: defines SPF syntax against RFC7208 ABNF semantics. Gonemaster: uses local `spfSyntaxOk`/`spfTermOk` checks, which are intentionally narrower and implementation-defined.
   - Upstream: does not explicitly define testcase boundary markers. Gonemaster: runtime emits shared `TEST_CASE_START`/`TEST_CASE_END`, but these markers are not part of current Zone11 metadata inventory.
 - Potential upstream report:

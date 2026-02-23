@@ -1370,7 +1370,9 @@ func Zone11(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		}
 	} else if allEmptyKeys(spfNS) {
 		if z.Name.String() == "." || nextHigherIsRoot(z.Name) || strings.HasSuffix(strings.ToLower(z.Name.String()), ".arpa") {
-			if err := appendLog(ctx, &results, testcase, "Z11_NO_SPF_NON_MAIL_DOMAIN", map[string]any{}); err != nil {
+			if err := appendLog(ctx, &results, testcase, "Z11_NO_SPF_NON_MAIL_DOMAIN", map[string]any{
+				"domain": z.Name.String(),
+			}); err != nil {
 				return results, err
 			}
 		} else {

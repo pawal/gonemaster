@@ -281,6 +281,59 @@ func TestZone11SpfSyntaxError(t *testing.T) {
 	}
 }
 
+func TestZone11NoSpfNonMailDomain(t *testing.T) {
+	setupTest(t)
+
+	origDel := getDelNSNamesAndIPs
+	origZone := getZoneNSNamesAndIPs
+	t.Cleanup(func() {
+		getDelNSNamesAndIPs = origDel
+		getZoneNSNamesAndIPs = origZone
+	})
+
+	z, err := zonepkg.New("se")
+	if err != nil {
+		t.Fatalf("zone11: %v", err)
+	}
+
+	newNameserver(t, "ns1.se", "192.0.2.10", func(qname string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		msg := new(dns.Msg)
+		msg.SetQuestion(dns.Fqdn(qname), dns.TypeTXT)
+		msg.Authoritative = true
+		msg.Rcode = dns.RcodeSuccess
+		return packet.Packet{Msg: msg}
+	})
+
+	getDelNSNamesAndIPs = func(_ context.Context, _ *zonepkg.Zone) ([]methodsv2.NSItem, error) {
+		return []methodsv2.NSItem{{
+			Name:       dnsname.New("ns1.se"),
+			Address:    netip.MustParseAddr("192.0.2.10"),
+			HasAddress: true,
+		}}, nil
+	}
+	getZoneNSNamesAndIPs = func(_ context.Context, _ *zonepkg.Zone) ([]methodsv2.NSItem, error) {
+		return nil, nil
+	}
+
+	entries, err := Zone11(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone11: %v", err)
+	}
+	var found *logger.Entry
+	for _, entry := range entries {
+		if entry != nil && entry.Tag == "Z11_NO_SPF_NON_MAIL_DOMAIN" {
+			found = entry
+			break
+		}
+	}
+	if found == nil {
+		t.Fatalf("expected Z11_NO_SPF_NON_MAIL_DOMAIN")
+	}
+	if domain, ok := found.Args["domain"].(string); !ok || domain != "se" {
+		t.Fatalf("expected domain=\"se\", got %v", found.Args["domain"])
+	}
+}
+
 func setupTest(t *testing.T) {
 	t.Helper()
 

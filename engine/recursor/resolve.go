@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/internal/parallel"
@@ -561,11 +561,11 @@ func (r *Recursor) getNSFrom(ctx context.Context, resp packet.Packet, state *rec
 			if !glueAllowed[owner] {
 				continue
 			}
-			if addr, err := netip.ParseAddr(a.A.String()); err == nil {
+			if a.Addr.IsValid() {
 				if state.glue[owner] == nil {
 					state.glue[owner] = map[netip.Addr]bool{}
 				}
-				state.glue[owner][addr] = true
+				state.glue[owner][a.Addr] = true
 			}
 		}
 	}
@@ -576,11 +576,11 @@ func (r *Recursor) getNSFrom(ctx context.Context, resp packet.Packet, state *rec
 			if !glueAllowed[owner] {
 				continue
 			}
-			if addr, err := netip.ParseAddr(aaaa.AAAA.String()); err == nil {
+			if aaaa.Addr.IsValid() {
 				if state.glue[owner] == nil {
 					state.glue[owner] = map[netip.Addr]bool{}
 				}
-				state.glue[owner][addr] = true
+				state.glue[owner][aaaa.Addr] = true
 			}
 		}
 	}
@@ -768,8 +768,8 @@ func collectAddresses(resp packet.Packet, target dnsname.Name, cnames map[string
 			ownerName := dnsname.New(rr.Header().Name)
 			owner := strings.ToLower(ownerName.String())
 			if owner == targetKey || cnames[owner] {
-				if addr, err := netip.ParseAddr(a.A.String()); err == nil {
-					out = append(out, addr)
+				if a.Addr.IsValid() {
+					out = append(out, a.Addr)
 				}
 			}
 		}
@@ -779,8 +779,8 @@ func collectAddresses(resp packet.Packet, target dnsname.Name, cnames map[string
 			ownerName := dnsname.New(rr.Header().Name)
 			owner := strings.ToLower(ownerName.String())
 			if owner == targetKey || cnames[owner] {
-				if addr, err := netip.ParseAddr(aaaa.AAAA.String()); err == nil {
-					out = append(out, addr)
+				if aaaa.Addr.IsValid() {
+					out = append(out, aaaa.Addr)
 				}
 			}
 		}

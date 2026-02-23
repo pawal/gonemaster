@@ -3,11 +3,13 @@ package nameserver
 import (
 	"encoding/base64"
 	"encoding/json"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/packet"
 )
@@ -16,19 +18,11 @@ func TestPacketCacheExportImportRoundTrip(t *testing.T) {
 	cache := NewCacheStore()
 
 	msg := new(dns.Msg)
-	msg.SetQuestion("example.com.", dns.TypeA)
+	dnsutil.SetQuestion(msg, "example.com.", dns.TypeA)
 	msg.Response = true
-	msg.Answer = []dns.RR{
-		&dns.A{
-			Hdr: dns.RR_Header{
-				Name:   "example.com.",
-				Rrtype: dns.TypeA,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			A: []byte{192, 0, 2, 10},
-		},
-	}
+	aRR := &dns.A{Hdr: dns.Header{Name: "example.com.", Class: dns.ClassINET, TTL: 60}}
+	aRR.Addr = netip.AddrFrom4([4]byte{192, 0, 2, 10})
+	msg.Answer = []dns.RR{aRR}
 
 	cache.cacheForAddress("192.0.2.53").set("k.response", &packet.Packet{
 		Msg:        msg,
@@ -79,12 +73,12 @@ func TestPacketCacheSaveAndRestoreFile(t *testing.T) {
 	cache := NewCacheStore()
 
 	msg := new(dns.Msg)
-	msg.SetQuestion("example.net.", dns.TypeAAAA)
+	dnsutil.SetQuestion(msg, "example.net.", dns.TypeAAAA)
 	msg.Response = true
-	wire, err := msg.Pack()
-	if err != nil {
+	if err := msg.Pack(); err != nil {
 		t.Fatalf("pack dns msg: %v", err)
 	}
+	wire := msg.Data
 
 	if err := cache.ImportPacketCache(PacketCacheFile{
 		Format:  PacketCacheFileFormat,
@@ -178,7 +172,7 @@ func TestPacketCacheFileJSONShape(t *testing.T) {
 	cache := NewCacheStore()
 
 	msg := new(dns.Msg)
-	msg.SetQuestion("example.org.", dns.TypeTXT)
+	dnsutil.SetQuestion(msg, "example.org.", dns.TypeTXT)
 	msg.Response = true
 	cache.cacheForAddress("192.0.2.99").set("k.shape", &packet.Packet{Msg: msg})
 

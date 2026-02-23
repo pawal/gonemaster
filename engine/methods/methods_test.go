@@ -4,7 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
@@ -18,15 +19,9 @@ func nsAnswerPacket(zoneName string, nsNames ...string) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
 	for _, nsName := range nsNames {
-		msg.Answer = append(msg.Answer, &dns.NS{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(zoneName),
-				Rrtype: dns.TypeNS,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Ns: dns.Fqdn(nsName),
-		})
+		nsRR := &dns.NS{Hdr: dns.Header{Name: dnsutil.Fqdn(zoneName), Class: dns.ClassINET, TTL: 60}}
+		nsRR.Ns = dnsutil.Fqdn(nsName)
+		msg.Answer = append(msg.Answer, nsRR)
 	}
 	return packet.Packet{Msg: msg}
 }

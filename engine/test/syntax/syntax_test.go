@@ -3,11 +3,13 @@ package syntax
 import (
 	"context"
 	"net"
+	"net/netip"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
@@ -398,17 +400,9 @@ func newRootZoneWithHook(ctx context.Context, t *testing.T, handler func(qname s
 func nsPacket(zoneName string, nsName string) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
-	msg.Answer = []dns.RR{
-		&dns.NS{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(zoneName),
-				Rrtype: dns.TypeNS,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Ns: dns.Fqdn(nsName),
-		},
-	}
+	nsRR := &dns.NS{Hdr: dns.Header{Name: dnsutil.Fqdn(zoneName), Class: dns.ClassINET, TTL: 60}}
+	nsRR.Ns = dnsutil.Fqdn(nsName)
+	msg.Answer = []dns.RR{nsRR}
 	return packet.Packet{Msg: msg}
 }
 
@@ -416,41 +410,25 @@ func soaPacket(zoneName string, mname string, rname string) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
 	msg.Authoritative = true
-	msg.Answer = []dns.RR{
-		&dns.SOA{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(zoneName),
-				Rrtype: dns.TypeSOA,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Ns:      dns.Fqdn(mname),
-			Mbox:    dns.Fqdn(rname),
-			Serial:  1,
-			Refresh: 3600,
-			Retry:   600,
-			Expire:  86400,
-			Minttl:  60,
-		},
-	}
+	soaRR := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn(zoneName), Class: dns.ClassINET, TTL: 60}}
+	soaRR.Ns = dnsutil.Fqdn(mname)
+	soaRR.Mbox = dnsutil.Fqdn(rname)
+	soaRR.Serial = 1
+	soaRR.Refresh = 3600
+	soaRR.Retry = 600
+	soaRR.Expire = 86400
+	soaRR.Minttl = 60
+	msg.Answer = []dns.RR{soaRR}
 	return packet.Packet{Msg: msg}
 }
 
 func mxPacket(zoneName string, exchange string) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
-	msg.Answer = []dns.RR{
-		&dns.MX{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(zoneName),
-				Rrtype: dns.TypeMX,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Preference: 10,
-			Mx:         dns.Fqdn(exchange),
-		},
-	}
+	mxRR := &dns.MX{Hdr: dns.Header{Name: dnsutil.Fqdn(zoneName), Class: dns.ClassINET, TTL: 60}}
+	mxRR.Preference = 10
+	mxRR.Mx = dnsutil.Fqdn(exchange)
+	msg.Answer = []dns.RR{mxRR}
 	return packet.Packet{Msg: msg}
 }
 
@@ -459,16 +437,10 @@ func mxPacketMulti(zoneName string, exchanges ...string) packet.Packet {
 	msg.Rcode = dns.RcodeSuccess
 	msg.Authoritative = true
 	for i, exchange := range exchanges {
-		msg.Answer = append(msg.Answer, &dns.MX{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(zoneName),
-				Rrtype: dns.TypeMX,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Preference: uint16(10 + i),
-			Mx:         dns.Fqdn(exchange),
-		})
+		mxRR := &dns.MX{Hdr: dns.Header{Name: dnsutil.Fqdn(zoneName), Class: dns.ClassINET, TTL: 60}}
+		mxRR.Preference = uint16(10 + i)
+		mxRR.Mx = dnsutil.Fqdn(exchange)
+		msg.Answer = append(msg.Answer, mxRR)
 	}
 	return packet.Packet{Msg: msg}
 }
@@ -477,17 +449,11 @@ func aPacket(owner string, addr net.IP) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
 	msg.Authoritative = true
-	msg.Answer = []dns.RR{
-		&dns.A{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(owner),
-				Rrtype: dns.TypeA,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			A: addr,
-		},
+	aRR := &dns.A{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
+	if ip4 := addr.To4(); ip4 != nil {
+		aRR.Addr = netip.AddrFrom4([4]byte(ip4))
 	}
+	msg.Answer = []dns.RR{aRR}
 	return packet.Packet{Msg: msg}
 }
 

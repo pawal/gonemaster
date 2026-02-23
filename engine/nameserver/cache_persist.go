@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/packet"
 )
@@ -83,12 +83,11 @@ func (c *CacheStore) ExportPacketCache() (PacketCacheFile, error) {
 				out.Entries = append(out.Entries, entry)
 				continue
 			}
-			wire, err := value.Msg.Pack()
-			if err != nil {
+			if err := value.Msg.Pack(); err != nil {
 				cache.mu.Unlock()
 				return PacketCacheFile{}, fmt.Errorf("pack packet cache entry (%s, %s): %w", address, key, err)
 			}
-			entry.Message = base64.StdEncoding.EncodeToString(wire)
+			entry.Message = base64.StdEncoding.EncodeToString(value.Msg.Data)
 			if value.AnswerFrom != "" {
 				entry.AnswerFrom = value.AnswerFrom
 			}
@@ -141,7 +140,8 @@ func (c *CacheStore) ImportPacketCache(input PacketCacheFile) error {
 			return fmt.Errorf("entry %d: decode message: %w", idx, err)
 		}
 		msg := new(dns.Msg)
-		if err := msg.Unpack(wire); err != nil {
+		msg.Data = wire
+		if err := msg.Unpack(); err != nil {
 			return fmt.Errorf("entry %d: unpack message: %w", idx, err)
 		}
 		cache.set(key, &packet.Packet{

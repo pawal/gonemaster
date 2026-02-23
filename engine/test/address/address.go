@@ -6,7 +6,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/miekg/dns"
+	"net/netip"
+
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
@@ -256,10 +259,11 @@ func Address02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, addressModuleName, testcase)
 
-				ptrQuery, err := dns.ReverseAddr(item.ip)
+				ipAddr, err := netip.ParseAddr(item.ip)
 				if err != nil {
 					return err
 				}
+				ptrQuery := dnsutil.ReverseAddr(ipAddr)
 
 				resp, err := rec.Recurse(ctx, ptrQuery, "PTR", "IN")
 				if err != nil {
@@ -356,10 +360,11 @@ func Address03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, addressModuleName, testcase)
 
-				ptrQuery, err := dns.ReverseAddr(item.ip)
+				ipAddr, err := netip.ParseAddr(item.ip)
 				if err != nil {
 					return err
 				}
+				ptrQuery := dnsutil.ReverseAddr(ipAddr)
 
 				resp, err := rec.Recurse(ctx, ptrQuery, "PTR", "IN")
 				if err != nil {

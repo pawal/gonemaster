@@ -10,11 +10,13 @@ import (
 	"strings"
 	"testing"
 
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
+
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/profile"
-	"github.com/miekg/dns"
 )
 
 func stubRunEngine(t *testing.T, captured *engine.RunRequest) {
@@ -35,12 +37,12 @@ func samplePacketCacheFile(t *testing.T) nameserver.PacketCacheFile {
 	t.Helper()
 
 	msg := new(dns.Msg)
-	msg.SetQuestion("example.com.", dns.TypeA)
+	dnsutil.SetQuestion(msg, "example.com.", dns.TypeA)
 	msg.Response = true
-	wire, err := msg.Pack()
-	if err != nil {
+	if err := msg.Pack(); err != nil {
 		t.Fatalf("pack sample dns msg: %v", err)
 	}
+	wire := msg.Data
 
 	return nameserver.PacketCacheFile{
 		Format:  nameserver.PacketCacheFileFormat,

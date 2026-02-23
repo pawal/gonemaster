@@ -116,7 +116,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	}
 	if showVersion {
 		fmt.Fprintf(out, "Gonemaster version %s\n", engine.VersionFull())
-		fmt.Fprintf(out, "Miekg DNS version %s\n", moduleVersion("github.com/miekg/dns"))
+		fmt.Fprintf(out, "Miekg DNS version %s\n", moduleVersion("codeberg.org/miekg/dns"))
 		return 0
 	}
 	fs.Visit(func(f *flag.Flag) {
@@ -259,7 +259,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	}
 
 	fmt.Fprintf(errOut, "Gonemaster version %s\n", engine.VersionFull())
-	fmt.Fprintf(errOut, "Miekg DNS version %s\n", moduleVersion("github.com/miekg/dns"))
+	fmt.Fprintf(errOut, "Miekg DNS version %s\n", moduleVersion("codeberg.org/miekg/dns"))
 	fmt.Fprintf(errOut, "Started server at %s\n", formatListenURL(cfg.ListenAddr))
 
 	shutdownCh := make(chan os.Signal, 1)

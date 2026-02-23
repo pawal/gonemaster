@@ -11,7 +11,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/packet"
@@ -106,11 +107,7 @@ func lookupCymru(ctx context.Context, resolver Resolver, ip netip.Addr, source s
 		return Result{}, err
 	}
 
-	reverse, err := dns.ReverseAddr(ip.String())
-	if err != nil {
-		return Result{}, err
-	}
-	reverse = strings.ToLower(reverse)
+	reverse := strings.ToLower(dnsutil.ReverseAddr(ip))
 
 	suffix := ""
 	replacement := ""

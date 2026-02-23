@@ -6,7 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/logger"
@@ -29,18 +30,11 @@ func BenchmarkDNSSEC18Parallel(b *testing.B) {
 	delay := 200 * time.Microsecond
 
 	benchCase := func(b *testing.B, parallel int) {
-		keyTemplate := &dns.DNSKEY{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn("template"),
-				Rrtype: dns.TypeDNSKEY,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Flags:     dns.ZONE,
-			Protocol:  3,
-			Algorithm: 8,
-			PublicKey: "AwEAAc==",
-		}
+		keyTemplate := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("template"), Class: dns.ClassINET, TTL: 60}}
+		keyTemplate.Flags = dns.FlagZONE
+		keyTemplate.Protocol = 3
+		keyTemplate.Algorithm = 8
+		keyTemplate.PublicKey = "AwEAAc=="
 		keytag := keyTemplate.KeyTag()
 		badKeytag := keytag + 1
 
@@ -61,54 +55,31 @@ func BenchmarkDNSSEC18Parallel(b *testing.B) {
 			switch qtype {
 			case "CDS":
 				time.Sleep(delay)
-				cds := &dns.CDS{
-					DS: dns.DS{
-						Hdr: dns.RR_Header{
-							Name:   dns.Fqdn(qname),
-							Rrtype: dns.TypeCDS,
-							Class:  dns.ClassINET,
-							Ttl:    60,
-						},
-						KeyTag:     keytag,
-						Algorithm:  8,
-						DigestType: 1,
-						Digest:     "DEADBEEF",
-					},
-				}
+				cds := &dns.CDS{}
+				cds.Hdr = dns.Header{Name: dnsutil.Fqdn(qname), Class: dns.ClassINET, TTL: 60}
+				cds.KeyTag = keytag
+				cds.Algorithm = 8
+				cds.DigestType = 1
+				cds.Digest = "DEADBEEF"
 				cdsSig := rrsigRecord(qname, dns.TypeCDS, badKeytag, 1, 2)
 				return answerPacket(qname, dns.TypeCDS, cds, cdsSig), nil
 			case "CDNSKEY":
 				time.Sleep(delay)
-				cdnskey := &dns.CDNSKEY{
-					DNSKEY: dns.DNSKEY{
-						Hdr: dns.RR_Header{
-							Name:   dns.Fqdn(qname),
-							Rrtype: dns.TypeCDNSKEY,
-							Class:  dns.ClassINET,
-							Ttl:    60,
-						},
-						Flags:     dns.ZONE,
-						Protocol:  3,
-						Algorithm: 8,
-						PublicKey: "AwEAAc==",
-					},
-				}
+				cdnskey := &dns.CDNSKEY{}
+				cdnskey.Hdr = dns.Header{Name: dnsutil.Fqdn(qname), Class: dns.ClassINET, TTL: 60}
+				cdnskey.Flags = dns.FlagZONE
+				cdnskey.Protocol = 3
+				cdnskey.Algorithm = 8
+				cdnskey.PublicKey = "AwEAAc=="
 				cdnskeySig := rrsigRecord(qname, dns.TypeCDNSKEY, badKeytag, 1, 2)
 				return answerPacket(qname, dns.TypeCDNSKEY, cdnskey, cdnskeySig), nil
 			case "DNSKEY":
 				time.Sleep(delay)
-				key := &dns.DNSKEY{
-					Hdr: dns.RR_Header{
-						Name:   dns.Fqdn(qname),
-						Rrtype: dns.TypeDNSKEY,
-						Class:  dns.ClassINET,
-						Ttl:    60,
-					},
-					Flags:     dns.ZONE,
-					Protocol:  3,
-					Algorithm: 8,
-					PublicKey: "AwEAAc==",
-				}
+				key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(qname), Class: dns.ClassINET, TTL: 60}}
+				key.Flags = dns.FlagZONE
+				key.Protocol = 3
+				key.Algorithm = 8
+				key.PublicKey = "AwEAAc=="
 				return dnskeyPacket(qname, key), nil
 			default:
 				return packet.Packet{}, nil

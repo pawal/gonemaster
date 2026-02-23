@@ -3,11 +3,13 @@ package basic
 import (
 	"context"
 	"net"
+	"net/netip"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
@@ -799,51 +801,29 @@ func soaPacket(owner string, mname string, rname string) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
 	msg.Authoritative = true
-	msg.Answer = []dns.RR{
-		&dns.SOA{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(owner),
-				Rrtype: dns.TypeSOA,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Ns:      dns.Fqdn(mname),
-			Mbox:    dns.Fqdn(rname),
-			Serial:  1,
-			Refresh: 3600,
-			Retry:   600,
-			Expire:  86400,
-			Minttl:  60,
-		},
-	}
+	soaRR := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
+	soaRR.Ns = dnsutil.Fqdn(mname)
+	soaRR.Mbox = dnsutil.Fqdn(rname)
+	soaRR.Serial = 1
+	soaRR.Refresh = 3600
+	soaRR.Retry = 600
+	soaRR.Expire = 86400
+	soaRR.Minttl = 60
+	msg.Answer = []dns.RR{soaRR}
 	return packet.Packet{Msg: msg}
 }
 
 func referralPacket(zoneName string, nsName string, nsAddr net.IP) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
-	msg.Ns = []dns.RR{
-		&dns.NS{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(zoneName),
-				Rrtype: dns.TypeNS,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Ns: dns.Fqdn(nsName),
-		},
-	}
-	msg.Extra = []dns.RR{
-		&dns.A{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(nsName),
-				Rrtype: dns.TypeA,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			A: nsAddr,
-		},
-	}
+	nsRR := &dns.NS{}
+	nsRR.Hdr = dns.Header{Name: dnsutil.Fqdn(zoneName), Class: dns.ClassINET, TTL: 60}
+	nsRR.Ns = dnsutil.Fqdn(nsName)
+	msg.Ns = []dns.RR{nsRR}
+	aRR := &dns.A{}
+	aRR.Hdr = dns.Header{Name: dnsutil.Fqdn(nsName), Class: dns.ClassINET, TTL: 60}
+	aRR.Addr = netip.AddrFrom4([4]byte(nsAddr.To4()))
+	msg.Extra = []dns.RR{aRR}
 	return packet.Packet{Msg: msg}
 }
 
@@ -856,24 +836,14 @@ func referralPacketMulti(zoneName string, entries []nsEntry) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
 	for _, entry := range entries {
-		msg.Ns = append(msg.Ns, &dns.NS{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(zoneName),
-				Rrtype: dns.TypeNS,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Ns: dns.Fqdn(entry.name),
-		})
-		msg.Extra = append(msg.Extra, &dns.A{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(entry.name),
-				Rrtype: dns.TypeA,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			A: entry.addr,
-		})
+		nsRR := &dns.NS{}
+		nsRR.Hdr = dns.Header{Name: dnsutil.Fqdn(zoneName), Class: dns.ClassINET, TTL: 60}
+		nsRR.Ns = dnsutil.Fqdn(entry.name)
+		msg.Ns = append(msg.Ns, nsRR)
+		aRR := &dns.A{}
+		aRR.Hdr = dns.Header{Name: dnsutil.Fqdn(entry.name), Class: dns.ClassINET, TTL: 60}
+		aRR.Addr = netip.AddrFrom4([4]byte(entry.addr.To4()))
+		msg.Extra = append(msg.Extra, aRR)
 	}
 	return packet.Packet{Msg: msg}
 }
@@ -882,17 +852,10 @@ func aPacket(owner string, addr net.IP) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
 	msg.Authoritative = true
-	msg.Answer = []dns.RR{
-		&dns.A{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(owner),
-				Rrtype: dns.TypeA,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			A: addr,
-		},
-	}
+	aRR := &dns.A{}
+	aRR.Hdr = dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}
+	aRR.Addr = netip.AddrFrom4([4]byte(addr.To4()))
+	msg.Answer = []dns.RR{aRR}
 	return packet.Packet{Msg: msg}
 }
 
@@ -900,17 +863,10 @@ func nsPacket(owner string, nsname string) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
 	msg.Authoritative = true
-	msg.Answer = []dns.RR{
-		&dns.NS{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(owner),
-				Rrtype: dns.TypeNS,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Ns: dns.Fqdn(nsname),
-		},
-	}
+	nsRR := &dns.NS{}
+	nsRR.Hdr = dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}
+	nsRR.Ns = dnsutil.Fqdn(nsname)
+	msg.Answer = []dns.RR{nsRR}
 	return packet.Packet{Msg: msg}
 }
 
@@ -919,20 +875,15 @@ func nsPacketMulti(owner string, nsnames ...string) packet.Packet {
 	msg.Rcode = dns.RcodeSuccess
 	msg.Authoritative = true
 	for _, nsname := range nsnames {
-		msg.Answer = append(msg.Answer, &dns.NS{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(owner),
-				Rrtype: dns.TypeNS,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Ns: dns.Fqdn(nsname),
-		})
+		nsRR := &dns.NS{}
+		nsRR.Hdr = dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}
+		nsRR.Ns = dnsutil.Fqdn(nsname)
+		msg.Answer = append(msg.Answer, nsRR)
 	}
 	return packet.Packet{Msg: msg}
 }
 
-func rcodePacket(rcode int) packet.Packet {
+func rcodePacket(rcode uint16) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = rcode
 	return packet.Packet{Msg: msg}

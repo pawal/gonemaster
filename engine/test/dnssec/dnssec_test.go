@@ -7,7 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/logger"
@@ -346,18 +347,11 @@ func TestDNSSEC02NoDNSKEYForDS(t *testing.T) {
 		if qtype != "DNSKEY" {
 			return packet.Packet{}
 		}
-		key := &dns.DNSKEY{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(qname),
-				Rrtype: dns.TypeDNSKEY,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Flags:     dns.ZONE,
-			Protocol:  3,
-			Algorithm: 8,
-			PublicKey: "AwEAAc==",
-		}
+		key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(qname), Class: dns.ClassINET, TTL: 60}}
+		key.Flags = dns.FlagZONE
+		key.Protocol = 3
+		key.Algorithm = 8
+		key.PublicKey = "AwEAAc=="
 		return dnskeyPacket(qname, key)
 	})
 
@@ -401,18 +395,11 @@ func TestDNSSEC02DNSKEYNotForZoneSigning(t *testing.T) {
 		method5 = origM5
 	})
 
-	key := &dns.DNSKEY{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDNSKEY,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Flags:     dns.SEP,
-		Protocol:  3,
-		Algorithm: 8,
-		PublicKey: "AwEAAc==",
-	}
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagSEP
+	key.Protocol = 3
+	key.Algorithm = 8
+	key.PublicKey = "AwEAAc=="
 	ds := key.ToDS(2)
 	if ds == nil {
 		t.Fatal("expected DS from DNSKEY")
@@ -471,18 +458,11 @@ func TestDNSSEC02ParallelChildDNSKEYQueries(t *testing.T) {
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
 
-	key := &dns.DNSKEY{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDNSKEY,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Flags:     dns.ZONE | dns.SEP,
-		Protocol:  3,
-		Algorithm: 8,
-		PublicKey: "AwEAAc==",
-	}
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE | dns.FlagSEP
+	key.Protocol = 3
+	key.Algorithm = 8
+	key.PublicKey = "AwEAAc=="
 	ds := key.ToDS(2)
 	if ds == nil {
 		t.Fatal("expected DS from DNSKEY")
@@ -610,18 +590,11 @@ func TestDNSSEC03NoNSEC3(t *testing.T) {
 	ns := newNameserver(t, "ns1.example", "192.0.2.4", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "DNSKEY":
-			key := &dns.DNSKEY{
-				Hdr: dns.RR_Header{
-					Name:   dns.Fqdn(qname),
-					Rrtype: dns.TypeDNSKEY,
-					Class:  dns.ClassINET,
-					Ttl:    60,
-				},
-				Flags:     dns.ZONE,
-				Protocol:  3,
-				Algorithm: 8,
-				PublicKey: "AwEAAc==",
-			}
+			key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(qname), Class: dns.ClassINET, TTL: 60}}
+			key.Flags = dns.FlagZONE
+			key.Protocol = 3
+			key.Algorithm = 8
+			key.PublicKey = "AwEAAc=="
 			return dnskeyPacket(qname, key)
 		case "NSEC":
 			return nsecPacket(qname)
@@ -660,35 +633,21 @@ func TestDNSSEC03IllegalHashAlgo(t *testing.T) {
 	ns := newNameserver(t, "ns1.example", "192.0.2.13", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "DNSKEY":
-			key := &dns.DNSKEY{
-				Hdr: dns.RR_Header{
-					Name:   dns.Fqdn(qname),
-					Rrtype: dns.TypeDNSKEY,
-					Class:  dns.ClassINET,
-					Ttl:    60,
-				},
-				Flags:     dns.ZONE,
-				Protocol:  3,
-				Algorithm: 8,
-				PublicKey: "AwEAAc==",
-			}
+			key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(qname), Class: dns.ClassINET, TTL: 60}}
+			key.Flags = dns.FlagZONE
+			key.Protocol = 3
+			key.Algorithm = 8
+			key.PublicKey = "AwEAAc=="
 			return dnskeyPacket(qname, key)
 		case "NSEC":
-			nsec3 := &dns.NSEC3{
-				Hdr: dns.RR_Header{
-					Name:   dns.Fqdn(qname),
-					Rrtype: dns.TypeNSEC3,
-					Class:  dns.ClassINET,
-					Ttl:    60,
-				},
-				Hash:       2,
-				Flags:      0,
-				Iterations: 0,
-				SaltLength: 0,
-				Salt:       "",
-				HashLength: 0,
-				NextDomain: "",
-			}
+			nsec3 := &dns.NSEC3{Hdr: dns.Header{Name: dnsutil.Fqdn(qname), Class: dns.ClassINET, TTL: 60}}
+			nsec3.Hash = 2
+			nsec3.Flags = 0
+			nsec3.Iterations = 0
+			nsec3.SaltLength = 0
+			nsec3.Salt = ""
+			nsec3.HashLength = 0
+			nsec3.NextDomain = ""
 			return nsec3Packet(qname, nsec3)
 		default:
 			return packet.Packet{}
@@ -724,18 +683,11 @@ func TestDNSSEC03ParallelDNSKEYQueries(t *testing.T) {
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
 
-	key := &dns.DNSKEY{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDNSKEY,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Flags:     dns.ZONE,
-		Protocol:  3,
-		Algorithm: 8,
-		PublicKey: "AwEAAc==",
-	}
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = 8
+	key.PublicKey = "AwEAAc=="
 
 	started := make(chan string, 2)
 	release := make(chan struct{})
@@ -846,33 +798,19 @@ func TestDNSSEC04ExpiredRRSIG(t *testing.T) {
 	})
 
 	now := time.Unix(1700000000, 0).UTC()
-	key := &dns.DNSKEY{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDNSKEY,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Flags:     dns.ZONE,
-		Protocol:  3,
-		Algorithm: 8,
-		PublicKey: "AwEAAc==",
-	}
-	soa := &dns.SOA{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeSOA,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Ns:      "ns1.example.",
-		Mbox:    "hostmaster.example.",
-		Serial:  1,
-		Refresh: 60,
-		Retry:   60,
-		Expire:  60,
-		Minttl:  60,
-	}
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = 8
+	key.PublicKey = "AwEAAc=="
+	soa := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	soa.Ns = "ns1.example."
+	soa.Mbox = "hostmaster.example."
+	soa.Serial = 1
+	soa.Refresh = 60
+	soa.Retry = 60
+	soa.Expire = 60
+	soa.Minttl = 60
 	expiredSig := rrsigRecord("example", dns.TypeDNSKEY, 12345, now.Unix()-600, now.Unix()-1)
 
 	dnskeyResp := answerPacket("example", dns.TypeDNSKEY, key, expiredSig)
@@ -913,33 +851,19 @@ func TestDNSSEC04DurationOK(t *testing.T) {
 	})
 
 	now := time.Unix(1700000000, 0).UTC()
-	key := &dns.DNSKEY{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDNSKEY,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Flags:     dns.ZONE,
-		Protocol:  3,
-		Algorithm: 8,
-		PublicKey: "AwEAAc==",
-	}
-	soa := &dns.SOA{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeSOA,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Ns:      "ns1.example.",
-		Mbox:    "hostmaster.example.",
-		Serial:  1,
-		Refresh: 60,
-		Retry:   60,
-		Expire:  60,
-		Minttl:  60,
-	}
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = 8
+	key.PublicKey = "AwEAAc=="
+	soa := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	soa.Ns = "ns1.example."
+	soa.Mbox = "hostmaster.example."
+	soa.Serial = 1
+	soa.Refresh = 60
+	soa.Retry = 60
+	soa.Expire = 60
+	soa.Minttl = 60
 	okSig := rrsigRecord("example", dns.TypeDNSKEY, 54321, now.Unix()-86400, now.Unix()+172800)
 
 	dnskeyResp := answerPacket("example", dns.TypeDNSKEY, key, okSig)
@@ -982,33 +906,19 @@ func TestDNSSEC04ParallelQueries(t *testing.T) {
 	profile.Effective().Resolver.Defaults.Parallel = 2
 
 	now := time.Unix(1700000000, 0).UTC()
-	key := &dns.DNSKEY{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDNSKEY,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Flags:     dns.ZONE,
-		Protocol:  3,
-		Algorithm: 8,
-		PublicKey: "AwEAAc==",
-	}
-	soa := &dns.SOA{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeSOA,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Ns:      "ns1.example.",
-		Mbox:    "hostmaster.example.",
-		Serial:  1,
-		Refresh: 60,
-		Retry:   60,
-		Expire:  60,
-		Minttl:  60,
-	}
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = 8
+	key.PublicKey = "AwEAAc=="
+	soa := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	soa.Ns = "ns1.example."
+	soa.Mbox = "hostmaster.example."
+	soa.Serial = 1
+	soa.Refresh = 60
+	soa.Retry = 60
+	soa.Expire = 60
+	soa.Minttl = 60
 	okSig := rrsigRecord("example", dns.TypeDNSKEY, 54321, now.Unix()-86400, now.Unix()+172800)
 
 	dnskeyResp := answerPacket("example", dns.TypeDNSKEY, key, okSig)
@@ -1106,18 +1016,11 @@ func TestDNSSEC05AlgoOK(t *testing.T) {
 		if qtype != "DNSKEY" {
 			return packet.Packet{}
 		}
-		key := &dns.DNSKEY{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(qname),
-				Rrtype: dns.TypeDNSKEY,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Flags:     dns.ZONE,
-			Protocol:  3,
-			Algorithm: 8,
-			PublicKey: "AwEAAc==",
-		}
+		key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(qname), Class: dns.ClassINET, TTL: 60}}
+		key.Flags = dns.FlagZONE
+		key.Protocol = 3
+		key.Algorithm = 8
+		key.PublicKey = "AwEAAc=="
 		return dnskeyPacket(qname, key)
 	})
 
@@ -1164,18 +1067,11 @@ func TestDNSSEC05ParallelDNSKEYQueries(t *testing.T) {
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
 
-	key := &dns.DNSKEY{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDNSKEY,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Flags:     dns.ZONE,
-		Protocol:  3,
-		Algorithm: 8,
-		PublicKey: "AwEAAc==",
-	}
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = 8
+	key.PublicKey = "AwEAAc=="
 
 	started := make(chan string, 2)
 	release := make(chan struct{})
@@ -1381,18 +1277,11 @@ func TestDNSSEC06ExtraProcessingOK(t *testing.T) {
 		zoneQueryAll = origQueryAll
 	})
 
-	key := &dns.DNSKEY{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDNSKEY,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Flags:     dns.ZONE,
-		Protocol:  3,
-		Algorithm: 8,
-		PublicKey: "AwEAAc==",
-	}
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = 8
+	key.PublicKey = "AwEAAc=="
 	sig := rrsigRecord("example", dns.TypeDNSKEY, 12345, time.Now().Add(-time.Hour).Unix(), time.Now().Add(time.Hour).Unix())
 	resp := answerPacket("example", dns.TypeDNSKEY, key, sig)
 	resp.AnswerFrom = "192.0.2.30"
@@ -1425,18 +1314,11 @@ func TestDNSSEC06ExtraProcessingBroken(t *testing.T) {
 		zoneQueryAll = origQueryAll
 	})
 
-	key := &dns.DNSKEY{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDNSKEY,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Flags:     dns.ZONE,
-		Protocol:  3,
-		Algorithm: 8,
-		PublicKey: "AwEAAc==",
-	}
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = 8
+	key.PublicKey = "AwEAAc=="
 	resp := answerPacket("example", dns.TypeDNSKEY, key)
 	resp.AnswerFrom = "192.0.2.31"
 
@@ -1480,18 +1362,11 @@ func TestDNSSEC07SignedZone(t *testing.T) {
 		return nil, nil
 	}
 
-	key := &dns.DNSKEY{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDNSKEY,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Flags:     dns.ZONE,
-		Protocol:  3,
-		Algorithm: 8,
-		PublicKey: "AwEAAc==",
-	}
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = 8
+	key.PublicKey = "AwEAAc=="
 	sig := rrsigRecord("example", dns.TypeDNSKEY, 11111, time.Now().Add(-time.Hour).Unix(), time.Now().Add(time.Hour).Unix())
 
 	newNameserver(t, "ns1.example", "192.0.2.40", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
@@ -1505,18 +1380,11 @@ func TestDNSSEC07SignedZone(t *testing.T) {
 		}
 	})
 
-	ds := &dns.DS{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDS,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		KeyTag:     11111,
-		Algorithm:  8,
-		DigestType: 2,
-		Digest:     "DEADBEEF",
-	}
+	ds := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	ds.KeyTag = 11111
+	ds.Algorithm = 8
+	ds.DigestType = 2
+	ds.Digest = "DEADBEEF"
 	dsSig := rrsigRecord("example", dns.TypeDS, 11111, time.Now().Add(-time.Hour).Unix(), time.Now().Add(time.Hour).Unix())
 
 	newNameserver(t, "ns-parent.example", "192.0.2.41", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
@@ -1593,18 +1461,11 @@ func TestDNSSEC07ParallelChildQueries(t *testing.T) {
 		return nil, nil
 	}
 
-	key := &dns.DNSKEY{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDNSKEY,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Flags:     dns.ZONE,
-		Protocol:  3,
-		Algorithm: 8,
-		PublicKey: "AwEAAc==",
-	}
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = 8
+	key.PublicKey = "AwEAAc=="
 
 	started := make(chan string, 2)
 	release := make(chan struct{})
@@ -1748,18 +1609,11 @@ func TestDNSSEC07ParallelParentQueries(t *testing.T) {
 		return nil, nil
 	}
 
-	key := &dns.DNSKEY{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDNSKEY,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Flags:     dns.ZONE,
-		Protocol:  3,
-		Algorithm: 8,
-		PublicKey: "AwEAAc==",
-	}
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = 8
+	key.PublicKey = "AwEAAc=="
 	sig := rrsigRecord("example", dns.TypeDNSKEY, 11111, time.Now().Add(-time.Hour).Unix(), time.Now().Add(time.Hour).Unix())
 
 	newNameserver(t, "ns-child.example", "192.0.2.62", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
@@ -1786,18 +1640,11 @@ func TestDNSSEC07ParallelParentQueries(t *testing.T) {
 		return []methodsv2.NSItem{}, nil
 	}
 
-	ds := &dns.DS{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDS,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		KeyTag:     11111,
-		Algorithm:  8,
-		DigestType: 2,
-		Digest:     "DEADBEEF",
-	}
+	ds := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	ds.KeyTag = 11111
+	ds.Algorithm = 8
+	ds.DigestType = 2
+	ds.Digest = "DEADBEEF"
 	dsSig := rrsigRecord("example", dns.TypeDS, 11111, time.Now().Add(-time.Hour).Unix(), time.Now().Add(time.Hour).Unix())
 
 	started := make(chan string, 2)
@@ -1916,18 +1763,11 @@ func TestDNSSEC07NotSigned(t *testing.T) {
 		return nil, nil
 	}
 
-	key := &dns.DNSKEY{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDNSKEY,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Flags:     dns.ZONE,
-		Protocol:  3,
-		Algorithm: 8,
-		PublicKey: "AwEAAc==",
-	}
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = 8
+	key.PublicKey = "AwEAAc=="
 
 	newNameserver(t, "ns2.example", "192.0.2.42", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
@@ -2025,18 +1865,11 @@ func TestDNSSECAllParallelOutputStable(t *testing.T) {
 		}
 
 		nameserver.EmptyCache()
-		key := &dns.DNSKEY{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn("example"),
-				Rrtype: dns.TypeDNSKEY,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Flags:     dns.ZONE,
-			Protocol:  3,
-			Algorithm: 8,
-			PublicKey: "AwEAAc==",
-		}
+		key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+		key.Flags = dns.FlagZONE
+		key.Protocol = 3
+		key.Algorithm = 8
+		key.PublicKey = "AwEAAc=="
 		handler := func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 			switch qtype {
 			case "SOA":
@@ -2098,18 +1931,11 @@ func TestDNSSEC08MissingRRSIG(t *testing.T) {
 		method5 = origM5
 	})
 
-	key := &dns.DNSKEY{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDNSKEY,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Flags:     dns.ZONE,
-		Protocol:  3,
-		Algorithm: 8,
-		PublicKey: "AwEAAc==",
-	}
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = 8
+	key.PublicKey = "AwEAAc=="
 
 	ns := newNameserver(t, "ns1.example", "192.0.2.50", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype != "DNSKEY" {
@@ -2151,18 +1977,11 @@ func TestDNSSEC08RRSIGNotYetValid(t *testing.T) {
 	})
 
 	now := time.Unix(1700000000, 0).UTC()
-	key := &dns.DNSKEY{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDNSKEY,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Flags:     dns.ZONE,
-		Protocol:  3,
-		Algorithm: 8,
-		PublicKey: "AwEAAc==",
-	}
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = 8
+	key.PublicKey = "AwEAAc=="
 	sig := rrsigRecord("example", dns.TypeDNSKEY, key.KeyTag(), now.Add(time.Hour).Unix(), now.Add(2*time.Hour).Unix())
 
 	ns := newNameserver(t, "ns2.example", "192.0.2.51", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
@@ -2207,18 +2026,11 @@ func TestDNSSEC08RRSIGNotValidByDNSKEY(t *testing.T) {
 	})
 
 	now := time.Unix(1700000000, 0).UTC()
-	key := &dns.DNSKEY{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDNSKEY,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Flags:     dns.ZONE,
-		Protocol:  3,
-		Algorithm: 8,
-		PublicKey: "AwEAAc==",
-	}
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = 8
+	key.PublicKey = "AwEAAc=="
 	sig := rrsigRecord("example", dns.TypeDNSKEY, key.KeyTag(), now.Add(-time.Hour).Unix(), now.Add(time.Hour).Unix())
 
 	ns := newNameserver(t, "ns3.example", "192.0.2.52", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
@@ -2264,18 +2076,11 @@ func TestDNSSEC08ParallelDNSKEYQueries(t *testing.T) {
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
 
-	key := &dns.DNSKEY{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDNSKEY,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Flags:     dns.ZONE,
-		Protocol:  3,
-		Algorithm: 8,
-		PublicKey: "AwEAAc==",
-	}
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = 8
+	key.PublicKey = "AwEAAc=="
 
 	started := make(chan string, 2)
 	release := make(chan struct{})
@@ -2388,18 +2193,11 @@ func TestDNSSEC09MissingRRSIG(t *testing.T) {
 		method5 = origM5
 	})
 
-	key := &dns.DNSKEY{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDNSKEY,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Flags:     dns.ZONE,
-		Protocol:  3,
-		Algorithm: 8,
-		PublicKey: "AwEAAc==",
-	}
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = 8
+	key.PublicKey = "AwEAAc=="
 
 	ns := newNameserver(t, "ns1.example", "192.0.2.60", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
@@ -2446,18 +2244,11 @@ func TestDNSSEC09ParallelQueries(t *testing.T) {
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
 
-	key := &dns.DNSKEY{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDNSKEY,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Flags:     dns.ZONE,
-		Protocol:  3,
-		Algorithm: 8,
-		PublicKey: "AwEAAc==",
-	}
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = 8
+	key.PublicKey = "AwEAAc=="
 
 	started := make(chan string, 2)
 	release := make(chan struct{})
@@ -2574,28 +2365,14 @@ func TestDNSSEC10MissingSignature(t *testing.T) {
 		getZoneNSNamesAndIPs = origZone
 	})
 
-	key := &dns.DNSKEY{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDNSKEY,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Flags:     dns.ZONE,
-		Protocol:  3,
-		Algorithm: 8,
-		PublicKey: "AwEAAc==",
-	}
-	nsec := &dns.NSEC{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeNSEC,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		NextDomain: dns.Fqdn("next.example"),
-		TypeBitMap: []uint16{dns.TypeSOA, dns.TypeNS, dns.TypeDNSKEY, dns.TypeNSEC, dns.TypeRRSIG},
-	}
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = 8
+	key.PublicKey = "AwEAAc=="
+	nsec := &dns.NSEC{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	nsec.NextDomain = dnsutil.Fqdn("next.example")
+	nsec.TypeBitMap = []uint16{dns.TypeSOA, dns.TypeNS, dns.TypeDNSKEY, dns.TypeNSEC, dns.TypeRRSIG}
 
 	newNameserver(t, "ns1.example", "192.0.2.70", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
@@ -2603,20 +2380,22 @@ func TestDNSSEC10MissingSignature(t *testing.T) {
 			return dnskeyPacket(qname, key)
 		case "NSEC":
 			msg := new(dns.Msg)
-			msg.SetQuestion(dns.Fqdn(qname), dns.TypeNSEC)
+			dnsutil.SetQuestion(msg, dnsutil.Fqdn(qname), dns.TypeNSEC)
 			msg.Response = true
 			msg.Authoritative = true
 			msg.Rcode = dns.RcodeSuccess
-			msg.SetEdns0(1232, true)
+			msg.UDPSize = 1232
+			msg.Security = true
 			return packet.Packet{Msg: msg}
 		case "NSEC3PARAM":
 			msg := new(dns.Msg)
-			msg.SetQuestion(dns.Fqdn(qname), dns.TypeNSEC3PARAM)
+			dnsutil.SetQuestion(msg, dnsutil.Fqdn(qname), dns.TypeNSEC3PARAM)
 			msg.Response = true
 			msg.Authoritative = true
 			msg.Rcode = dns.RcodeSuccess
 			msg.Ns = append(msg.Ns, nsec, soaRecord(qname))
-			msg.SetEdns0(1232, true)
+			msg.UDPSize = 1232
+			msg.Security = true
 			return packet.Packet{Msg: msg}
 		default:
 			return packet.Packet{}
@@ -2666,18 +2445,11 @@ func TestDNSSEC10ParallelQueries(t *testing.T) {
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
 
-	key := &dns.DNSKEY{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDNSKEY,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Flags:     dns.ZONE,
-		Protocol:  3,
-		Algorithm: 8,
-		PublicKey: "AwEAAc==",
-	}
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = 8
+	key.PublicKey = "AwEAAc=="
 
 	started := make(chan string, 2)
 	release := make(chan struct{})
@@ -2811,18 +2583,11 @@ func TestDNSSEC11ParallelParentQueries(t *testing.T) {
 	profile.Effective().Resolver.Defaults.Parallel = 2
 	hasFakeAddresses = func(_ *zone.Zone) bool { return false }
 
-	ds := &dns.DS{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDS,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		KeyTag:     12345,
-		Algorithm:  8,
-		DigestType: 2,
-		Digest:     "DEADBEEF",
-	}
+	ds := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	ds.KeyTag = 12345
+	ds.Algorithm = 8
+	ds.DigestType = 2
+	ds.Digest = "DEADBEEF"
 
 	started := make(chan string, 2)
 	release := make(chan struct{})
@@ -2940,18 +2705,11 @@ func TestDNSSEC11ParallelChildQueries(t *testing.T) {
 	profile.Effective().Resolver.Defaults.Parallel = 2
 	hasFakeAddresses = func(_ *zone.Zone) bool { return false }
 
-	key := &dns.DNSKEY{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDNSKEY,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Flags:     dns.ZONE,
-		Protocol:  3,
-		Algorithm: 8,
-		PublicKey: "AwEAAc==",
-	}
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = 8
+	key.PublicKey = "AwEAAc=="
 
 	started := make(chan string, 2)
 	release := make(chan struct{})
@@ -3068,18 +2826,11 @@ func TestDNSSEC11InconsistentDS(t *testing.T) {
 		method5 = origM5
 	})
 
-	ds := &dns.DS{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDS,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		KeyTag:     12345,
-		Algorithm:  8,
-		DigestType: 1,
-		Digest:     "DEADBEEF",
-	}
+	ds := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	ds.KeyTag = 12345
+	ds.Algorithm = 8
+	ds.DigestType = 1
+	ds.Digest = "DEADBEEF"
 
 	nsWithDS := newNameserver(t, "ns1.example", "192.0.2.80", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DS" {
@@ -3140,18 +2891,11 @@ func TestDNSSEC11DSButUnsignedZone(t *testing.T) {
 		method5 = origM5
 	})
 
-	ds := &dns.DS{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDS,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		KeyTag:     54321,
-		Algorithm:  8,
-		DigestType: 1,
-		Digest:     "FEEDBEEF",
-	}
+	ds := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	ds.KeyTag = 54321
+	ds.Algorithm = 8
+	ds.DigestType = 1
+	ds.Digest = "FEEDBEEF"
 
 	parentNS := newNameserver(t, "ns1.example", "192.0.2.82", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DS" {
@@ -3208,43 +2952,23 @@ func TestDNSSEC13AlgoNotSigned(t *testing.T) {
 		method5 = origM5
 	})
 
-	key := &dns.DNSKEY{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDNSKEY,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Flags:     dns.ZONE,
-		Protocol:  3,
-		Algorithm: 8,
-		PublicKey: "AwEAAc==",
-	}
-	nsRR := &dns.NS{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeNS,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Ns: "ns1.example.",
-	}
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = 8
+	key.PublicKey = "AwEAAc=="
+	nsRR := &dns.NS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	nsRR.Ns = "ns1.example."
 
 	makeRRSIG := func(owner string, typeCovered uint16) *dns.RRSIG {
-		return &dns.RRSIG{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(owner),
-				Rrtype: dns.TypeRRSIG,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			TypeCovered: typeCovered,
-			Algorithm:   13,
-			Inception:   1,
-			Expiration:  2,
-			KeyTag:      12345,
-			SignerName:  dns.Fqdn(owner),
-		}
+		rr := &dns.RRSIG{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
+		rr.TypeCovered = typeCovered
+		rr.Algorithm = 13
+		rr.Inception = 1
+		rr.Expiration = 2
+		rr.KeyTag = 12345
+		rr.SignerName = dnsutil.Fqdn(owner)
+		return rr
 	}
 
 	ns := newNameserver(t, "ns1.example", "192.0.2.90", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
@@ -3301,18 +3025,11 @@ func TestDNSSEC13ParallelQueries(t *testing.T) {
 	profile.Effective().Resolver.Defaults.Parallel = 2
 
 	now := time.Now().UTC()
-	key := &dns.DNSKEY{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDNSKEY,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Flags:     dns.ZONE,
-		Protocol:  3,
-		Algorithm: 8,
-		PublicKey: "AwEAAc==",
-	}
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = 8
+	key.PublicKey = "AwEAAc=="
 	keySig := rrsigRecord("example", dns.TypeDNSKEY, key.KeyTag(), now.Add(-time.Hour).Unix(), now.Add(time.Hour).Unix())
 
 	soaSig := rrsigRecord("example", dns.TypeSOA, key.KeyTag(), now.Add(-time.Hour).Unix(), now.Add(time.Hour).Unix())
@@ -3320,15 +3037,8 @@ func TestDNSSEC13ParallelQueries(t *testing.T) {
 	nsSig := rrsigRecord("example", dns.TypeNS, key.KeyTag(), now.Add(-time.Hour).Unix(), now.Add(time.Hour).Unix())
 	nsSig.Algorithm = 13
 
-	nsRR := &dns.NS{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeNS,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Ns: dns.Fqdn("ns.example"),
-	}
+	nsRR := &dns.NS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	nsRR.Ns = dnsutil.Fqdn("ns.example")
 
 	started := make(chan string, 2)
 	release := make(chan struct{})
@@ -3450,17 +3160,10 @@ func TestDNSSEC14KeySizeSmallerThanRec(t *testing.T) {
 		method5 = origM5
 	})
 
-	key := &dns.DNSKEY{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDNSKEY,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Flags:     dns.ZONE,
-		Protocol:  3,
-		Algorithm: 8,
-	}
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = 8
 	if _, err := key.Generate(1024); err != nil {
 		t.Fatalf("generate key: %v", err)
 	}
@@ -3506,17 +3209,10 @@ func TestDNSSEC14ParallelDNSKEYQueries(t *testing.T) {
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
 
-	key := &dns.DNSKEY{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDNSKEY,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Flags:     dns.ZONE,
-		Protocol:  3,
-		Algorithm: 8,
-	}
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = 8
 	if _, err := key.Generate(1024); err != nil {
 		t.Fatalf("generate key: %v", err)
 	}
@@ -3660,20 +3356,11 @@ func TestDNSSEC15ParallelQueries(t *testing.T) {
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
 
-	cds := &dns.CDS{
-		DS: dns.DS{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn("example"),
-				Rrtype: dns.TypeCDS,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			KeyTag:     12345,
-			Algorithm:  8,
-			DigestType: 2,
-			Digest:     "DEADBEEF",
-		},
-	}
+	cds := &dns.CDS{DS: dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}}
+	cds.KeyTag = 12345
+	cds.Algorithm = 8
+	cds.DigestType = 2
+	cds.Digest = "DEADBEEF"
 
 	started := make(chan string, 2)
 	release := make(chan struct{})
@@ -3790,20 +3477,11 @@ func TestDNSSEC16CDSWithoutDNSKEY(t *testing.T) {
 		method5 = origM5
 	})
 
-	cds := &dns.CDS{
-		DS: dns.DS{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn("example"),
-				Rrtype: dns.TypeCDS,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			KeyTag:     12345,
-			Algorithm:  8,
-			DigestType: 1,
-			Digest:     "DEADBEEF",
-		},
-	}
+	cds := &dns.CDS{DS: dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}}
+	cds.KeyTag = 12345
+	cds.Algorithm = 8
+	cds.DigestType = 1
+	cds.Digest = "DEADBEEF"
 
 	ns := newNameserver(t, "ns1.example", "192.0.2.93", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
@@ -3850,20 +3528,11 @@ func TestDNSSEC16ParallelQueries(t *testing.T) {
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
 
-	cds := &dns.CDS{
-		DS: dns.DS{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn("example"),
-				Rrtype: dns.TypeCDS,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			KeyTag:     12345,
-			Algorithm:  8,
-			DigestType: 2,
-			Digest:     "DEADBEEF",
-		},
-	}
+	cds := &dns.CDS{DS: dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}}
+	cds.KeyTag = 12345
+	cds.Algorithm = 8
+	cds.DigestType = 2
+	cds.Digest = "DEADBEEF"
 
 	started := make(chan string, 2)
 	release := make(chan struct{})
@@ -3980,20 +3649,11 @@ func TestDNSSEC17CDNSKEYWithoutDNSKEY(t *testing.T) {
 		method5 = origM5
 	})
 
-	cdnskey := &dns.CDNSKEY{
-		DNSKEY: dns.DNSKEY{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn("example"),
-				Rrtype: dns.TypeCDNSKEY,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Flags:     dns.ZONE,
-			Protocol:  3,
-			Algorithm: 8,
-			PublicKey: "AwEAAc==",
-		},
-	}
+	cdnskey := &dns.CDNSKEY{DNSKEY: dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}}
+	cdnskey.Flags = dns.FlagZONE
+	cdnskey.Protocol = 3
+	cdnskey.Algorithm = 8
+	cdnskey.PublicKey = "AwEAAc=="
 
 	ns := newNameserver(t, "ns1.example", "192.0.2.94", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
@@ -4040,20 +3700,11 @@ func TestDNSSEC17ParallelQueries(t *testing.T) {
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
 
-	cdnskey := &dns.CDNSKEY{
-		DNSKEY: dns.DNSKEY{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn("example"),
-				Rrtype: dns.TypeCDNSKEY,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Flags:     dns.ZONE | dns.SEP,
-			Protocol:  3,
-			Algorithm: 8,
-			PublicKey: "AwEAAc==",
-		},
-	}
+	cdnskey := &dns.CDNSKEY{DNSKEY: dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}}
+	cdnskey.Flags = dns.FlagZONE | dns.FlagSEP
+	cdnskey.Protocol = 3
+	cdnskey.Algorithm = 8
+	cdnskey.PublicKey = "AwEAAc=="
 
 	started := make(chan string, 2)
 	release := make(chan struct{})
@@ -4172,62 +3823,30 @@ func TestDNSSEC18NoMatchRRSIGDS(t *testing.T) {
 		method5 = origM5
 	})
 
-	key := &dns.DNSKEY{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDNSKEY,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Flags:     dns.ZONE,
-		Protocol:  3,
-		Algorithm: 8,
-		PublicKey: "AwEAAc==",
-	}
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = 8
+	key.PublicKey = "AwEAAc=="
 	keytag := key.KeyTag()
 
-	ds := &dns.DS{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDS,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		KeyTag:     keytag,
-		Algorithm:  8,
-		DigestType: 1,
-		Digest:     "DEADBEEF",
-	}
+	ds := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	ds.KeyTag = keytag
+	ds.Algorithm = 8
+	ds.DigestType = 1
+	ds.Digest = "DEADBEEF"
 
-	cds := &dns.CDS{
-		DS: dns.DS{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn("example"),
-				Rrtype: dns.TypeCDS,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			KeyTag:     keytag,
-			Algorithm:  8,
-			DigestType: 1,
-			Digest:     "DEADBEEF",
-		},
-	}
+	cds := &dns.CDS{DS: dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}}
+	cds.KeyTag = keytag
+	cds.Algorithm = 8
+	cds.DigestType = 1
+	cds.Digest = "DEADBEEF"
 
-	cdnskey := &dns.CDNSKEY{
-		DNSKEY: dns.DNSKEY{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn("example"),
-				Rrtype: dns.TypeCDNSKEY,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Flags:     dns.ZONE,
-			Protocol:  3,
-			Algorithm: 8,
-			PublicKey: "AwEAAc==",
-		},
-	}
+	cdnskey := &dns.CDNSKEY{DNSKEY: dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}}
+	cdnskey.Flags = dns.FlagZONE
+	cdnskey.Protocol = 3
+	cdnskey.Algorithm = 8
+	cdnskey.PublicKey = "AwEAAc=="
 
 	badKeytag := keytag + 1
 	cdsSig := rrsigRecord("example", dns.TypeCDS, badKeytag, 1, 2)
@@ -4294,62 +3913,30 @@ func TestDNSSEC18ParallelQueries(t *testing.T) {
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
 
-	key := &dns.DNSKEY{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDNSKEY,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Flags:     dns.ZONE,
-		Protocol:  3,
-		Algorithm: 8,
-		PublicKey: "AwEAAc==",
-	}
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = 8
+	key.PublicKey = "AwEAAc=="
 	keytag := key.KeyTag()
 
-	ds := &dns.DS{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn("example"),
-			Rrtype: dns.TypeDS,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		KeyTag:     keytag,
-		Algorithm:  8,
-		DigestType: 1,
-		Digest:     "DEADBEEF",
-	}
+	ds := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	ds.KeyTag = keytag
+	ds.Algorithm = 8
+	ds.DigestType = 1
+	ds.Digest = "DEADBEEF"
 
-	cds := &dns.CDS{
-		DS: dns.DS{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn("example"),
-				Rrtype: dns.TypeCDS,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			KeyTag:     keytag,
-			Algorithm:  8,
-			DigestType: 1,
-			Digest:     "DEADBEEF",
-		},
-	}
+	cds := &dns.CDS{DS: dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}}
+	cds.KeyTag = keytag
+	cds.Algorithm = 8
+	cds.DigestType = 1
+	cds.Digest = "DEADBEEF"
 
-	cdnskey := &dns.CDNSKEY{
-		DNSKEY: dns.DNSKEY{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn("example"),
-				Rrtype: dns.TypeCDNSKEY,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Flags:     dns.ZONE,
-			Protocol:  3,
-			Algorithm: 8,
-			PublicKey: "AwEAAc==",
-		},
-	}
+	cdnskey := &dns.CDNSKEY{DNSKEY: dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}}
+	cdnskey.Flags = dns.FlagZONE
+	cdnskey.Protocol = 3
+	cdnskey.Algorithm = 8
+	cdnskey.PublicKey = "AwEAAc=="
 
 	badKeytag := keytag + 1
 	cdsSig := rrsigRecord("example", dns.TypeCDS, badKeytag, 1, 2)
@@ -4495,62 +4082,30 @@ func TestDNSSEC18ParallelOutputStable(t *testing.T) {
 
 		nameserver.EmptyCache()
 
-		key := &dns.DNSKEY{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn("example"),
-				Rrtype: dns.TypeDNSKEY,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Flags:     dns.ZONE,
-			Protocol:  3,
-			Algorithm: 8,
-			PublicKey: "AwEAAc==",
-		}
+		key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+		key.Flags = dns.FlagZONE
+		key.Protocol = 3
+		key.Algorithm = 8
+		key.PublicKey = "AwEAAc=="
 		keytag := key.KeyTag()
 
-		ds := &dns.DS{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn("example"),
-				Rrtype: dns.TypeDS,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			KeyTag:     keytag,
-			Algorithm:  8,
-			DigestType: 1,
-			Digest:     "DEADBEEF",
-		}
+		ds := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+		ds.KeyTag = keytag
+		ds.Algorithm = 8
+		ds.DigestType = 1
+		ds.Digest = "DEADBEEF"
 
-		cds := &dns.CDS{
-			DS: dns.DS{
-				Hdr: dns.RR_Header{
-					Name:   dns.Fqdn("example"),
-					Rrtype: dns.TypeCDS,
-					Class:  dns.ClassINET,
-					Ttl:    60,
-				},
-				KeyTag:     keytag,
-				Algorithm:  8,
-				DigestType: 1,
-				Digest:     "DEADBEEF",
-			},
-		}
+		cds := &dns.CDS{DS: dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}}
+		cds.KeyTag = keytag
+		cds.Algorithm = 8
+		cds.DigestType = 1
+		cds.Digest = "DEADBEEF"
 
-		cdnskey := &dns.CDNSKEY{
-			DNSKEY: dns.DNSKEY{
-				Hdr: dns.RR_Header{
-					Name:   dns.Fqdn("example"),
-					Rrtype: dns.TypeCDNSKEY,
-					Class:  dns.ClassINET,
-					Ttl:    60,
-				},
-				Flags:     dns.ZONE,
-				Protocol:  3,
-				Algorithm: 8,
-				PublicKey: "AwEAAc==",
-			},
-		}
+		cdnskey := &dns.CDNSKEY{DNSKEY: dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}}
+		cdnskey.Flags = dns.FlagZONE
+		cdnskey.Protocol = 3
+		cdnskey.Algorithm = 8
+		cdnskey.PublicKey = "AwEAAc=="
 
 		badKeytag := keytag + 1
 		cdsSig := rrsigRecord("example", dns.TypeCDS, badKeytag, 1, 2)
@@ -4669,57 +4224,52 @@ func normalizeEntriesForComparison(entries []*logger.Entry) []string {
 
 func dsPacket(owner string, keytag uint16, algo uint8, digestType uint8) packet.Packet {
 	msg := new(dns.Msg)
-	msg.SetQuestion(dns.Fqdn(owner), dns.TypeDS)
+	dnsutil.SetQuestion(msg, dnsutil.Fqdn(owner), dns.TypeDS)
 	msg.Response = true
 	msg.Authoritative = true
 	msg.Rcode = dns.RcodeSuccess
-	msg.Answer = []dns.RR{
-		&dns.DS{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(owner),
-				Rrtype: dns.TypeDS,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			KeyTag:     keytag,
-			Algorithm:  algo,
-			DigestType: digestType,
-			Digest:     "DEADBEEF",
-		},
-	}
-	msg.SetEdns0(1232, true)
+	dsRR := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
+	dsRR.KeyTag = keytag
+	dsRR.Algorithm = algo
+	dsRR.DigestType = digestType
+	dsRR.Digest = "DEADBEEF"
+	msg.Answer = []dns.RR{dsRR}
+	msg.UDPSize = 1232
+	msg.Security = true
 	return packet.Packet{Msg: msg}
 }
 
 func dsPacketFromDS(owner string, ds *dns.DS) packet.Packet {
 	msg := new(dns.Msg)
-	msg.SetQuestion(dns.Fqdn(owner), dns.TypeDS)
+	dnsutil.SetQuestion(msg, dnsutil.Fqdn(owner), dns.TypeDS)
 	msg.Response = true
 	msg.Authoritative = true
 	msg.Rcode = dns.RcodeSuccess
 	if ds != nil {
 		msg.Answer = append(msg.Answer, ds)
 	}
-	msg.SetEdns0(1232, true)
+	msg.UDPSize = 1232
+	msg.Security = true
 	return packet.Packet{Msg: msg}
 }
 
 func dnskeyPacket(owner string, key *dns.DNSKEY) packet.Packet {
 	msg := new(dns.Msg)
-	msg.SetQuestion(dns.Fqdn(owner), dns.TypeDNSKEY)
+	dnsutil.SetQuestion(msg, dnsutil.Fqdn(owner), dns.TypeDNSKEY)
 	msg.Response = true
 	msg.Authoritative = true
 	msg.Rcode = dns.RcodeSuccess
 	if key != nil {
 		msg.Answer = append(msg.Answer, key)
 	}
-	msg.SetEdns0(1232, true)
+	msg.UDPSize = 1232
+	msg.Security = true
 	return packet.Packet{Msg: msg}
 }
 
 func nsecPacket(owner string) packet.Packet {
 	msg := new(dns.Msg)
-	msg.SetQuestion(dns.Fqdn(owner), dns.TypeNSEC)
+	dnsutil.SetQuestion(msg, dnsutil.Fqdn(owner), dns.TypeNSEC)
 	msg.Response = true
 	msg.Authoritative = true
 	msg.Rcode = dns.RcodeSuccess
@@ -4728,59 +4278,49 @@ func nsecPacket(owner string) packet.Packet {
 
 func nsec3Packet(owner string, nsec3 *dns.NSEC3) packet.Packet {
 	msg := new(dns.Msg)
-	msg.SetQuestion(dns.Fqdn(owner), dns.TypeNSEC)
+	dnsutil.SetQuestion(msg, dnsutil.Fqdn(owner), dns.TypeNSEC)
 	msg.Response = true
 	msg.Authoritative = true
 	msg.Rcode = dns.RcodeSuccess
 	if nsec3 != nil {
 		msg.Ns = append(msg.Ns, nsec3)
 	}
-	msg.SetEdns0(1232, true)
+	msg.UDPSize = 1232
+	msg.Security = true
 	return packet.Packet{Msg: msg}
 }
 
 func rrsigRecord(owner string, typeCovered uint16, keytag uint16, inception int64, expiration int64) *dns.RRSIG {
-	return &dns.RRSIG{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn(owner),
-			Rrtype: dns.TypeRRSIG,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		TypeCovered: typeCovered,
-		Algorithm:   8,
-		Inception:   uint32(inception),
-		Expiration:  uint32(expiration),
-		KeyTag:      keytag,
-		SignerName:  dns.Fqdn(owner),
-	}
+	rr := &dns.RRSIG{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
+	rr.TypeCovered = typeCovered
+	rr.Algorithm = 8
+	rr.Inception = uint32(inception)
+	rr.Expiration = uint32(expiration)
+	rr.KeyTag = keytag
+	rr.SignerName = dnsutil.Fqdn(owner)
+	return rr
 }
 
 func answerPacket(owner string, qtype uint16, answers ...dns.RR) packet.Packet {
 	msg := new(dns.Msg)
-	msg.SetQuestion(dns.Fqdn(owner), qtype)
+	dnsutil.SetQuestion(msg, dnsutil.Fqdn(owner), qtype)
 	msg.Response = true
 	msg.Authoritative = true
 	msg.Rcode = dns.RcodeSuccess
 	msg.Answer = append(msg.Answer, answers...)
-	msg.SetEdns0(1232, true)
+	msg.UDPSize = 1232
+	msg.Security = true
 	return packet.Packet{Msg: msg}
 }
 
 func soaRecord(owner string) *dns.SOA {
-	return &dns.SOA{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn(owner),
-			Rrtype: dns.TypeSOA,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Ns:      "ns1.example.",
-		Mbox:    "hostmaster.example.",
-		Serial:  1,
-		Refresh: 60,
-		Retry:   60,
-		Expire:  60,
-		Minttl:  60,
-	}
+	rr := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
+	rr.Ns = "ns1.example."
+	rr.Mbox = "hostmaster.example."
+	rr.Serial = 1
+	rr.Refresh = 60
+	rr.Retry = 60
+	rr.Expire = 60
+	rr.Minttl = 60
+	return rr
 }

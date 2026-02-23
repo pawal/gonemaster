@@ -267,7 +267,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 
 	if showVersion {
 		fmt.Fprintf(out, "Gonemaster version %s\n", engine.VersionFull())
-		fmt.Fprintf(out, "Miekg DNS version %s\n", moduleVersion("github.com/miekg/dns"))
+		fmt.Fprintf(out, "Miekg DNS version %s\n", moduleVersion("codeberg.org/miekg/dns"))
 		return 0
 	}
 

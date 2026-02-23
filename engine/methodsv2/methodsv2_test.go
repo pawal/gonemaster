@@ -2,10 +2,11 @@ package methodsv2
 
 import (
 	"context"
-	"net"
+	"net/netip"
 	"testing"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
@@ -19,15 +20,10 @@ func authoritativeNSPacket(zoneName string, nsNames ...string) packet.Packet {
 	msg.Rcode = dns.RcodeSuccess
 	msg.Authoritative = true
 	for _, nsName := range nsNames {
-		msg.Answer = append(msg.Answer, &dns.NS{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(zoneName),
-				Rrtype: dns.TypeNS,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Ns: dns.Fqdn(nsName),
-		})
+		nsRR := &dns.NS{}
+		nsRR.Hdr = dns.Header{Name: dnsutil.Fqdn(zoneName), Class: dns.ClassINET, TTL: 60}
+		nsRR.Ns = dnsutil.Fqdn(nsName)
+		msg.Answer = append(msg.Answer, nsRR)
 	}
 	return packet.Packet{Msg: msg}
 }
@@ -263,16 +259,10 @@ func TestGetDelNSNamesAndIPsUndelegatedLookupWhenNoIP(t *testing.T) {
 		}
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
-		msg.Answer = []dns.RR{
-			&dns.A{
-				Hdr: dns.RR_Header{
-					Name:   "ns1.example.net.",
-					Rrtype: dns.TypeA,
-					Class:  dns.ClassINET,
-				},
-				A: net.IPv4(192, 0, 2, 99),
-			},
-		}
+		aRR := &dns.A{}
+		aRR.Hdr = dns.Header{Name: "ns1.example.net.", Class: dns.ClassINET}
+		aRR.Addr = netip.AddrFrom4([4]byte{192, 0, 2, 99})
+		msg.Answer = []dns.RR{aRR}
 		return packet.Packet{Msg: msg}, nil
 	})
 
@@ -413,18 +403,11 @@ func TestGetParentNSNamesAndIPsSkipsOnIntermediateNoResponse(t *testing.T) {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
 		msg.Authoritative = true
-		msg.Answer = []dns.RR{
-			&dns.SOA{
-				Hdr: dns.RR_Header{
-					Name:   dns.Fqdn(name),
-					Rrtype: dns.TypeSOA,
-					Class:  dns.ClassINET,
-				},
-				Ns:     "ns.example.",
-				Mbox:   "hostmaster.example.",
-				Serial: 1,
-			},
-		}
+		soaRR := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET}}
+		soaRR.Ns = "ns.example."
+		soaRR.Mbox = "hostmaster.example."
+		soaRR.Serial = 1
+		msg.Answer = []dns.RR{soaRR}
 		return packet.Packet{Msg: msg}
 	}
 
@@ -432,42 +415,20 @@ func TestGetParentNSNamesAndIPsSkipsOnIntermediateNoResponse(t *testing.T) {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
 		msg.Authoritative = true
-		msg.Answer = []dns.RR{
-			&dns.NS{
-				Hdr: dns.RR_Header{
-					Name:   ".",
-					Rrtype: dns.TypeNS,
-					Class:  dns.ClassINET,
-				},
-				Ns: "ns1.root.",
-			},
-			&dns.NS{
-				Hdr: dns.RR_Header{
-					Name:   ".",
-					Rrtype: dns.TypeNS,
-					Class:  dns.ClassINET,
-				},
-				Ns: "ns2.root.",
-			},
-		}
-		msg.Extra = []dns.RR{
-			&dns.A{
-				Hdr: dns.RR_Header{
-					Name:   "ns1.root.",
-					Rrtype: dns.TypeA,
-					Class:  dns.ClassINET,
-				},
-				A: net.IPv4(192, 0, 2, 1),
-			},
-			&dns.A{
-				Hdr: dns.RR_Header{
-					Name:   "ns2.root.",
-					Rrtype: dns.TypeA,
-					Class:  dns.ClassINET,
-				},
-				A: net.IPv4(192, 0, 2, 2),
-			},
-		}
+		ns1RR := &dns.NS{}
+		ns1RR.Hdr = dns.Header{Name: ".", Class: dns.ClassINET}
+		ns1RR.Ns = "ns1.root."
+		ns2RR := &dns.NS{}
+		ns2RR.Hdr = dns.Header{Name: ".", Class: dns.ClassINET}
+		ns2RR.Ns = "ns2.root."
+		msg.Answer = []dns.RR{ns1RR, ns2RR}
+		a1RR := &dns.A{}
+		a1RR.Hdr = dns.Header{Name: "ns1.root.", Class: dns.ClassINET}
+		a1RR.Addr = netip.AddrFrom4([4]byte{192, 0, 2, 1})
+		a2RR := &dns.A{}
+		a2RR.Hdr = dns.Header{Name: "ns2.root.", Class: dns.ClassINET}
+		a2RR.Addr = netip.AddrFrom4([4]byte{192, 0, 2, 2})
+		msg.Extra = []dns.RR{a1RR, a2RR}
 		return packet.Packet{Msg: msg}
 	}
 

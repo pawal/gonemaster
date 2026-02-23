@@ -6,7 +6,8 @@ import (
 	"net"
 	"strings"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/transport"
@@ -52,47 +53,39 @@ func (ns Nameserver) AXFR(ctx context.Context, domain string, callback func(dns.
 	applyProfileSourceAddress(&base, ns.Address, prof)
 
 	msg := new(dns.Msg)
-	msg.SetAxfr(dns.Fqdn(domain))
-	msg.Question[0].Qclass = qclass
+	dnsutil.SetQuestion(msg, dnsutil.Fqdn(domain), dns.TypeAXFR)
+	msg.Question[0].Header().Class = qclass
 	msg.RecursionDesired = false
 
-	transfer := &dns.Transfer{
-		DialTimeout:  base.Timeout,
-		ReadTimeout:  base.Timeout,
-		WriteTimeout: base.Timeout,
+	client := dns.NewClient()
+	if base.Timeout > 0 {
+		client.Transport.ReadTimeout = base.Timeout
+		client.Transport.WriteTimeout = base.Timeout
 	}
-
 	dialer, err := base.Dialer("tcp")
 	if err != nil {
 		return err
 	}
+	client.Transport.Dialer = dialer
 
 	address := net.JoinHostPort(ns.Address.String(), "53")
-	conn, err := dialer.DialContext(ctx, "tcp", address)
-	if err != nil {
-		return err
-	}
-	transfer.Conn = &dns.Conn{Conn: conn}
 
-	ch, err := transfer.In(msg, address)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	ch, err := client.TransferIn(ctx, msg, "tcp", address)
 	if err != nil {
 		return err
 	}
 
-	stop := false
 	for env := range ch {
 		if env.Error != nil {
-			if stop {
-				return nil
-			}
 			return env.Error
 		}
-		for _, rr := range env.RR {
-			if callback != nil && !stop {
-				if !callback(rr) {
-					stop = true
-					transfer.Close()
-				}
+		for _, rr := range env.Answer {
+			if callback != nil && !callback(rr) {
+				cancel()
+				return nil
 			}
 		}
 	}

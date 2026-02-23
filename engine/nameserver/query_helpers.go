@@ -8,7 +8,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/logger"
@@ -52,15 +53,12 @@ func (ns *Nameserver) AddFakeDelegation(domain string, data map[string][]string)
 	var additional []dns.RR
 	for nsName, ips := range data {
 		nsObj := dnsname.New(nsName)
-		authority = append(authority, &dns.NS{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(domainName.String()),
-				Rrtype: dns.TypeNS,
-				Class:  dns.ClassINET,
-				Ttl:    0,
-			},
-			Ns: dns.Fqdn(nsObj.String()),
-		})
+		nsRR := &dns.NS{Hdr: dns.Header{
+			Name:  dnsutil.Fqdn(domainName.String()),
+			Class: dns.ClassINET,
+		}}
+		nsRR.Ns = dnsutil.Fqdn(nsObj.String())
+		authority = append(authority, nsRR)
 
 		for _, ip := range ips {
 			addr, err := netip.ParseAddr(ip)
@@ -77,25 +75,19 @@ func (ns *Nameserver) AddFakeDelegation(domain string, data map[string][]string)
 			}
 
 			if addr.Is6() {
-				additional = append(additional, &dns.AAAA{
-					Hdr: dns.RR_Header{
-						Name:   dns.Fqdn(nsObj.String()),
-						Rrtype: dns.TypeAAAA,
-						Class:  dns.ClassINET,
-						Ttl:    0,
-					},
-					AAAA: addr.AsSlice(),
-				})
+				aaaa := &dns.AAAA{Hdr: dns.Header{
+					Name:  dnsutil.Fqdn(nsObj.String()),
+					Class: dns.ClassINET,
+				}}
+				aaaa.Addr = addr
+				additional = append(additional, aaaa)
 			} else {
-				additional = append(additional, &dns.A{
-					Hdr: dns.RR_Header{
-						Name:   dns.Fqdn(nsObj.String()),
-						Rrtype: dns.TypeA,
-						Class:  dns.ClassINET,
-						Ttl:    0,
-					},
-					A: addr.AsSlice(),
-				})
+				a := &dns.A{Hdr: dns.Header{
+					Name:  dnsutil.Fqdn(nsObj.String()),
+					Class: dns.ClassINET,
+				}}
+				a.Addr = addr
+				additional = append(additional, a)
 			}
 		}
 	}
@@ -132,18 +124,15 @@ func (ns *Nameserver) AddFakeDS(domain string, data []DSData) error {
 	domainKey := strings.ToLower(domainName.String())
 	var records []dns.RR
 	for _, ds := range data {
-		records = append(records, &dns.DS{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(domainName.String()),
-				Rrtype: dns.TypeDS,
-				Class:  dns.ClassINET,
-				Ttl:    0,
-			},
-			KeyTag:     ds.KeyTag,
-			Algorithm:  ds.Algorithm,
-			DigestType: ds.DigestType,
-			Digest:     ds.Digest,
-		})
+		dsRR := &dns.DS{Hdr: dns.Header{
+			Name:  dnsutil.Fqdn(domainName.String()),
+			Class: dns.ClassINET,
+		}}
+		dsRR.KeyTag = ds.KeyTag
+		dsRR.Algorithm = ds.Algorithm
+		dsRR.DigestType = ds.DigestType
+		dsRR.Digest = ds.Digest
+		records = append(records, dsRR)
 	}
 	ns.state.fakeDS[domainKey] = records
 	logSystemWithLogger(ns.log, "FAKE_DS_ADDED", map[string]any{
@@ -185,11 +174,7 @@ func (ns Nameserver) fakeDSResponse(name string, qtype string, qclass string, op
 	msg.Response = true
 	msg.Authoritative = true
 	msg.RecursionDesired = resolveRecurse(opts)
-	msg.Question = []dns.Question{{
-		Name:   dns.Fqdn(name),
-		Qtype:  dns.TypeDS,
-		Qclass: dns.ClassINET,
-	}}
+	dnsutil.SetQuestion(msg, dnsutil.Fqdn(name), dns.TypeDS)
 	msg.Answer = append(msg.Answer, records...)
 
 	dnssec := resolveDNSSEC(opts)
@@ -231,11 +216,8 @@ func (ns Nameserver) fakeDelegationResponse(name string, qtype string, qclass st
 		msg.Response = true
 		msg.Authoritative = qtype == "DS"
 		msg.RecursionDesired = resolveRecurse(opts)
-		msg.Question = []dns.Question{{
-			Name:   dns.Fqdn(name),
-			Qtype:  dns.StringToType[qtype],
-			Qclass: dns.StringToClass[qclass],
-		}}
+		dnsutil.SetQuestion(msg, dnsutil.Fqdn(name), dns.StringToType[qtype])
+		msg.Question[0].Header().Class = dns.StringToClass[qclass]
 
 		if strings.EqualFold(nameKey, key) && qtype == "NS" {
 			msg.Answer = append(msg.Answer, del.authority...)
@@ -303,25 +285,24 @@ func setResponseEDNS(msg *dns.Msg, dnssec bool, size uint16, opts *QueryOptions)
 		return
 	}
 
-	msg.SetEdns0(size, dnssec)
-	opt := msg.IsEdns0()
-	if opt == nil || opts == nil || opts.EDNSDetails == nil {
+	msg.UDPSize = size
+	msg.Security = dnssec
+
+	if opts == nil || opts.EDNSDetails == nil {
 		return
 	}
 	if opts.EDNSDetails.Do != nil {
-		opt.SetDo(*opts.EDNSDetails.Do)
+		msg.Security = *opts.EDNSDetails.Do
 	}
 	if opts.EDNSDetails.Version != nil {
-		opt.SetVersion(*opts.EDNSDetails.Version)
+		msg.Version = *opts.EDNSDetails.Version
 	}
-	if opts.EDNSDetails.Z != nil {
-		opt.SetZ(*opts.EDNSDetails.Z)
-	}
+	// Z bits are not directly settable in v2; opts.EDNSDetails.Z is ignored.
 	if opts.EDNSDetails.Rcode != nil {
-		opt.SetExtendedRcode(uint16(*opts.EDNSDetails.Rcode))
+		msg.Rcode = uint16(*opts.EDNSDetails.Rcode)
 	}
-	if len(opts.EDNSDetails.Data) > 0 {
-		opt.Option = append(opt.Option, opts.EDNSDetails.Data...)
+	for _, opt := range opts.EDNSDetails.Data {
+		msg.Pseudo = append(msg.Pseudo, opt)
 	}
 }
 

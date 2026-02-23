@@ -7,7 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/logger"
@@ -201,7 +202,7 @@ func TestZone09MXQueryDisablesFallback(t *testing.T) {
 			mu.Unlock()
 
 			msg := new(dns.Msg)
-			msg.SetQuestion(dns.Fqdn("example"), dns.TypeMX)
+			dnsutil.SetQuestion(msg, dnsutil.Fqdn("example"), dns.TypeMX)
 			msg.Authoritative = true
 			msg.Rcode = dns.RcodeSuccess
 			if call == 1 {
@@ -311,44 +312,28 @@ func newNameserver(t *testing.T, name string, ip string, handler func(qname stri
 
 func soaPacket(owner string, serial uint32, refresh uint32, retry uint32, expire uint32, minimum uint32) packet.Packet {
 	msg := new(dns.Msg)
-	msg.SetQuestion(dns.Fqdn(owner), dns.TypeSOA)
+	dnsutil.SetQuestion(msg, dnsutil.Fqdn(owner), dns.TypeSOA)
 	msg.Authoritative = true
 	msg.Rcode = dns.RcodeSuccess
-	msg.Answer = []dns.RR{
-		&dns.SOA{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(owner),
-				Rrtype: dns.TypeSOA,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Ns:      dns.Fqdn("ns1.example"),
-			Mbox:    dns.Fqdn("hostmaster.example"),
-			Serial:  serial,
-			Refresh: refresh,
-			Retry:   retry,
-			Expire:  expire,
-			Minttl:  minimum,
-		},
-	}
+	soaRR := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
+	soaRR.Ns = dnsutil.Fqdn("ns1.example")
+	soaRR.Mbox = dnsutil.Fqdn("hostmaster.example")
+	soaRR.Serial = serial
+	soaRR.Refresh = refresh
+	soaRR.Retry = retry
+	soaRR.Expire = expire
+	soaRR.Minttl = minimum
+	msg.Answer = []dns.RR{soaRR}
 	return packet.Packet{Msg: msg}
 }
 
 func txtPacket(name string, value string) packet.Packet {
 	msg := new(dns.Msg)
-	msg.SetQuestion(dns.Fqdn(name), dns.TypeTXT)
+	dnsutil.SetQuestion(msg, dnsutil.Fqdn(name), dns.TypeTXT)
 	msg.Authoritative = true
 	msg.Rcode = dns.RcodeSuccess
-	msg.Answer = []dns.RR{
-		&dns.TXT{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(name),
-				Rrtype: dns.TypeTXT,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Txt: []string{value},
-		},
-	}
+	txtRR := &dns.TXT{Hdr: dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET, TTL: 60}}
+	txtRR.Txt = []string{value}
+	msg.Answer = []dns.RR{txtRR}
 	return packet.Packet{Msg: msg}
 }

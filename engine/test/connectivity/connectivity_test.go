@@ -7,7 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/asnlookup"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
@@ -432,23 +433,15 @@ func soaPacket(owner string, mname string, rname string) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
 	msg.Authoritative = true
-	msg.Answer = []dns.RR{
-		&dns.SOA{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(owner),
-				Rrtype: dns.TypeSOA,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Ns:      dns.Fqdn(mname),
-			Mbox:    dns.Fqdn(rname),
-			Serial:  2024010101,
-			Refresh: 3600,
-			Retry:   600,
-			Expire:  86400,
-			Minttl:  60,
-		},
-	}
+	soaRR := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
+	soaRR.Ns = dnsutil.Fqdn(mname)
+	soaRR.Mbox = dnsutil.Fqdn(rname)
+	soaRR.Serial = 2024010101
+	soaRR.Refresh = 3600
+	soaRR.Retry = 600
+	soaRR.Expire = 86400
+	soaRR.Minttl = 60
+	msg.Answer = []dns.RR{soaRR}
 	return packet.Packet{Msg: msg}
 }
 
@@ -456,16 +449,8 @@ func nsPacket(owner string, nsname string) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
 	msg.Authoritative = true
-	msg.Answer = []dns.RR{
-		&dns.NS{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(owner),
-				Rrtype: dns.TypeNS,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Ns: dns.Fqdn(nsname),
-		},
-	}
+	nsRR := &dns.NS{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
+	nsRR.Ns = dnsutil.Fqdn(nsname)
+	msg.Answer = []dns.RR{nsRR}
 	return packet.Packet{Msg: msg}
 }

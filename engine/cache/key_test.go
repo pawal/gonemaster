@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
 )
 
 func TestBuildKeyBasic(t *testing.T) {
@@ -54,7 +54,7 @@ func TestBuildKeyWithEDNS(t *testing.T) {
 		EDNSVersion: &version,
 		EDNSZ:       &z,
 		EDNSRcode:   &rcode,
-		EDNSData:    []dns.EDNS0{&dns.EDNS0_NSID{Code: dns.EDNS0NSID, Nsid: "aa"}},
+		EDNSData:    []dns.EDNS0{&dns.NSID{Nsid: "aa"}},
 	})
 	if err != nil {
 		t.Fatalf("BuildKey: %v", err)

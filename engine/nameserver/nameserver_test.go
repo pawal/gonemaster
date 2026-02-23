@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/netip"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -11,7 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/packet"
@@ -90,17 +92,9 @@ func TestQueryCacheHit(t *testing.T) {
 		calls++
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
-		msg.Answer = []dns.RR{
-			&dns.A{
-				Hdr: dns.RR_Header{
-					Name:   "example.",
-					Rrtype: dns.TypeA,
-					Class:  dns.ClassINET,
-					Ttl:    60,
-				},
-				A: net.IPv4(192, 0, 2, 5),
-			},
-		}
+		aRR := &dns.A{Hdr: dns.Header{Name: "example.", Class: dns.ClassINET, TTL: 60}}
+		aRR.Addr = netip.AddrFrom4([4]byte{192, 0, 2, 5})
+		msg.Answer = []dns.RR{aRR}
 		return packet.Packet{Msg: msg}, nil
 	})
 
@@ -538,11 +532,11 @@ func TestAXFRHook(t *testing.T) {
 		t.Fatalf("new nameserver: %v", err)
 	}
 
-	rr1, err := dns.NewRR("example. 60 IN SOA ns.example. hostmaster.example. 1 3600 600 86400 60")
+	rr1, err := dns.New("example. 60 IN SOA ns.example. hostmaster.example. 1 3600 600 86400 60")
 	if err != nil {
 		t.Fatalf("soa rr: %v", err)
 	}
-	rr2, err := dns.NewRR("example. 60 IN A 192.0.2.10")
+	rr2, err := dns.New("example. 60 IN A 192.0.2.10")
 	if err != nil {
 		t.Fatalf("a rr: %v", err)
 	}
@@ -740,7 +734,7 @@ func TestQueryEmitsQueryAndCachedReturn(t *testing.T) {
 	ns.SetQueryHook(func(_ context.Context, qname string, qtype string, qclass string, _ *QueryOptions) (packet.Packet, error) {
 		calls++
 		msg := new(dns.Msg)
-		msg.SetQuestion(dns.Fqdn(qname), dns.StringToType[qtype])
+		dnsutil.SetQuestion(msg, dnsutil.Fqdn(qname), dns.StringToType[qtype])
 		msg.Rcode = dns.RcodeSuccess
 		return packet.Packet{Msg: msg}, nil
 	})

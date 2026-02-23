@@ -2,12 +2,14 @@ package nameserver
 
 import (
 	"context"
-	"net"
+	"math/rand"
+	"net/netip"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/logger"
@@ -418,15 +420,17 @@ func TestNameserver08QNameCaseInsensitive(t *testing.T) {
 	setupTest(t)
 
 	origM4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origM4and5 })
+	origScramble := scrambleCaseFunc
+	t.Cleanup(func() {
+		method4and5 = origM4and5
+		scrambleCaseFunc = origScramble
+	})
+	fixedRand := rand.New(rand.NewSource(42))
+	scrambleCaseFunc = func(s string) string { return util.ScrambleCaseWith(s, fixedRand) }
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.9", func(qname string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
 		msg := new(dns.Msg)
-		msg.Question = []dns.Question{{
-			Name:   dns.Fqdn(strings.ToLower(qname)),
-			Qtype:  dns.TypeSOA,
-			Qclass: dns.ClassINET,
-		}}
+		dnsutil.SetQuestion(msg, dnsutil.Fqdn(strings.ToLower(qname)), dns.TypeSOA)
 		return packet.Packet{Msg: msg}
 	})
 	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
@@ -447,7 +451,13 @@ func TestNameserver09CaseQueriesSameAnswer(t *testing.T) {
 	setupTest(t)
 
 	origM4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origM4and5 })
+	origScramble := scrambleCaseFunc
+	t.Cleanup(func() {
+		method4and5 = origM4and5
+		scrambleCaseFunc = origScramble
+	})
+	fixedRand := rand.New(rand.NewSource(42))
+	scrambleCaseFunc = func(s string) string { return util.ScrambleCaseWith(s, fixedRand) }
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.10", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
 		return soaPacket("example")
@@ -508,7 +518,7 @@ func TestNameserver11ReturnsUnknownOption(t *testing.T) {
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.12", func(_ string, _ string, _ string, opts *ens.QueryOptions) packet.Packet {
 		if opts != nil && opts.EDNSDetails != nil && len(opts.EDNSDetails.Data) > 0 {
-			return soaPacketWithEdns("example", 0, 0, []dns.EDNS0{&dns.EDNS0_LOCAL{Code: 137}})
+			return soaPacketWithEdns("example", 0, 0, []dns.EDNS0{&dns.ERFC3597{EDNS0Code: 137}})
 		}
 		return soaPacketWithEdns("example", 0, 0, nil)
 	})
@@ -654,21 +664,15 @@ func hasEntryTag(entries []*logger.Entry, tag string) bool {
 }
 
 func soaRecord(owner string) dns.RR {
-	return &dns.SOA{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn(owner),
-			Rrtype: dns.TypeSOA,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Ns:      dns.Fqdn("ns1.example"),
-		Mbox:    dns.Fqdn("hostmaster.example"),
-		Serial:  1,
-		Refresh: 3600,
-		Retry:   600,
-		Expire:  86400,
-		Minttl:  60,
-	}
+	soaRR := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
+	soaRR.Ns = dnsutil.Fqdn("ns1.example")
+	soaRR.Mbox = dnsutil.Fqdn("hostmaster.example")
+	soaRR.Serial = 1
+	soaRR.Refresh = 3600
+	soaRR.Retry = 600
+	soaRR.Expire = 86400
+	soaRR.Minttl = 60
+	return soaRR
 }
 
 func soaMsg(owner string) *dns.Msg {
@@ -685,15 +689,16 @@ func soaPacket(owner string) packet.Packet {
 
 func soaPacketWithEdns(owner string, version uint8, z uint16, options []dns.EDNS0) packet.Packet {
 	msg := soaMsg(owner)
-	msg.SetEdns0(1232, false)
-	if opt := msg.IsEdns0(); opt != nil {
-		opt.SetVersion(version)
-		if z != 0 {
-			opt.SetZ(z)
-		}
-		if len(options) > 0 {
-			opt.Option = append(opt.Option, options...)
-		}
+	msg.UDPSize = 1232
+	msg.Version = version
+	for _, opt := range options {
+		msg.Pseudo = append(msg.Pseudo, opt)
+	}
+	if z != 0 {
+		optRR := &dns.OPT{}
+		optRR.Hdr = dns.Header{Name: "."}
+		optRR.SetZ(z)
+		msg.Extra = append(msg.Extra, optRR)
 	}
 	return packet.Packet{Msg: msg}
 }
@@ -701,50 +706,29 @@ func soaPacketWithEdns(owner string, version uint8, z uint16, options []dns.EDNS
 func aPacket(name string, address string) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
-	msg.Answer = []dns.RR{
-		&dns.A{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(name),
-				Rrtype: dns.TypeA,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			A: net.ParseIP(address).To4(),
-		},
-	}
+	aRR := &dns.A{}
+	aRR.Hdr = dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET, TTL: 60}
+	aRR.Addr = netip.MustParseAddr(address)
+	msg.Answer = []dns.RR{aRR}
 	return packet.Packet{Msg: msg}
 }
 
 func aaaaPacket(name string, address string) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
-	msg.Answer = []dns.RR{
-		&dns.AAAA{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(name),
-				Rrtype: dns.TypeAAAA,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			AAAA: net.ParseIP(address),
-		},
-	}
+	aaaaRR := &dns.AAAA{}
+	aaaaRR.Hdr = dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET, TTL: 60}
+	aaaaRR.Addr = netip.MustParseAddr(address)
+	msg.Answer = []dns.RR{aaaaRR}
 	return packet.Packet{Msg: msg}
 }
 
 func txtPacket(name string, value string, class uint16) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
-	msg.Answer = []dns.RR{
-		&dns.TXT{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(name),
-				Rrtype: dns.TypeTXT,
-				Class:  class,
-				Ttl:    60,
-			},
-			Txt: []string{value},
-		},
-	}
+	txtRR := &dns.TXT{}
+	txtRR.Hdr = dns.Header{Name: dnsutil.Fqdn(name), Class: class, TTL: 60}
+	txtRR.Txt = []string{value}
+	msg.Answer = []dns.RR{txtRR}
 	return packet.Packet{Msg: msg}
 }

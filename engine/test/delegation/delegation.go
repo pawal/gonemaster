@@ -3,11 +3,11 @@ package delegation
 import (
 	"context"
 	"fmt"
-	"net"
 	"sort"
 	"strings"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
@@ -398,53 +398,36 @@ func Delegation03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	msg := new(dns.Msg)
-	msg.SetQuestion(dns.Fqdn(longName), dns.TypeNS)
+	dnsutil.SetQuestion(msg, dnsutil.Fqdn(longName), dns.TypeNS)
 	for _, nsName := range nsNames {
-		msg.Ns = append(msg.Ns, &dns.NS{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(z.Name.String()),
-				Rrtype: dns.TypeNS,
-				Class:  dns.ClassINET,
-				Ttl:    0,
-			},
-			Ns: dns.Fqdn(nsName.String()),
-		})
+		nsRR := &dns.NS{}
+		nsRR.Hdr = dns.Header{Name: dnsutil.Fqdn(z.Name.String()), Class: dns.ClassINET}
+		nsRR.Ns = dnsutil.Fqdn(nsName.String())
+		msg.Ns = append(msg.Ns, nsRR)
 	}
 
 	nssV4 := filterByIPVersion(nss, constants.IPVersion4)
 	if len(nssV4) > 0 && allInBailiwick(parent.Name, nssV4) {
 		ns := nssV4[0]
-		msg.Extra = append(msg.Extra, &dns.A{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(ns.Name.String()),
-				Rrtype: dns.TypeA,
-				Class:  dns.ClassINET,
-				Ttl:    0,
-			},
-			A: net.IP(ns.Address.AsSlice()),
-		})
+		aRR := &dns.A{}
+		aRR.Hdr = dns.Header{Name: dnsutil.Fqdn(ns.Name.String()), Class: dns.ClassINET}
+		aRR.Addr = ns.Address
+		msg.Extra = append(msg.Extra, aRR)
 	}
 
 	nssV6 := filterByIPVersion(nss, constants.IPVersion6)
 	if len(nssV6) > 0 && allInBailiwick(parent.Name, nssV6) {
 		ns := nssV6[0]
-		msg.Extra = append(msg.Extra, &dns.AAAA{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(ns.Name.String()),
-				Rrtype: dns.TypeAAAA,
-				Class:  dns.ClassINET,
-				Ttl:    0,
-			},
-			AAAA: net.IP(ns.Address.AsSlice()),
-		})
+		aaaaRR := &dns.AAAA{}
+		aaaaRR.Hdr = dns.Header{Name: dnsutil.Fqdn(ns.Name.String()), Class: dns.ClassINET}
+		aaaaRR.Addr = ns.Address
+		msg.Extra = append(msg.Extra, aaaaRR)
 	}
 
-	msg.Compress = true
-	wire, err := msg.Pack()
-	if err != nil {
+	if err := msg.Pack(); err != nil {
 		return results, err
 	}
-	size := len(wire)
+	size := len(msg.Data)
 	if size > constants.UDPPayloadLimit {
 		if err := appendLog(ctx, &results, testcase, "REFERRAL_SIZE_TOO_LARGE", map[string]any{"size": size}); err != nil {
 			return results, err

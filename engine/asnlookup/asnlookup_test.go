@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/packet"
@@ -26,30 +26,28 @@ func (f fakeResolver) Recurse(ctx context.Context, name string, qtype string, qc
 
 func packetFor(rcode int, answer []dns.RR, authority []dns.RR) packet.Packet {
 	msg := new(dns.Msg)
-	msg.Rcode = rcode
+	msg.Rcode = uint16(rcode)
 	msg.Answer = answer
 	msg.Ns = authority
 	return packet.New(msg)
 }
 
 func txtRR(name string, txt string) *dns.TXT {
-	return &dns.TXT{
-		Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeTXT, Class: dns.ClassINET, Ttl: 3600},
-		Txt: []string{txt},
-	}
+	rr := &dns.TXT{Hdr: dns.Header{Name: name, Class: dns.ClassINET, TTL: 3600}}
+	rr.Txt = []string{txt}
+	return rr
 }
 
 func soaRR(name string, mname string, rname string) *dns.SOA {
-	return &dns.SOA{
-		Hdr:     dns.RR_Header{Name: name, Rrtype: dns.TypeSOA, Class: dns.ClassINET, Ttl: 3600},
-		Ns:      mname,
-		Mbox:    rname,
-		Serial:  1,
-		Refresh: 2,
-		Retry:   3,
-		Expire:  4,
-		Minttl:  5,
-	}
+	rr := &dns.SOA{Hdr: dns.Header{Name: name, Class: dns.ClassINET, TTL: 3600}}
+	rr.Ns = mname
+	rr.Mbox = rname
+	rr.Serial = 1
+	rr.Refresh = 2
+	rr.Retry = 3
+	rr.Expire = 4
+	rr.Minttl = 5
+	return rr
 }
 
 func TestGetWithPrefixValidationErrors(t *testing.T) {

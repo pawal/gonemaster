@@ -3,11 +3,13 @@ package transport
 import (
 	"context"
 	"net"
+	"net/netip"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -18,8 +20,11 @@ func TestBuildQueryWithClass(t *testing.T) {
 	if len(msg.Question) != 1 {
 		t.Fatalf("expected 1 question")
 	}
-	if msg.Question[0].Qclass != dns.ClassCHAOS {
-		t.Fatalf("unexpected qclass: %d", msg.Question[0].Qclass)
+	if msg.Question[0].Header().Class != dns.ClassCHAOS {
+		t.Fatalf("unexpected qclass: %d", msg.Question[0].Header().Class)
+	}
+	if dns.RRToType(msg.Question[0]) != dns.TypeA {
+		t.Fatalf("unexpected qtype: %d", dns.RRToType(msg.Question[0]))
 	}
 	if msg.RecursionDesired {
 		t.Fatalf("expected recursion disabled by default")
@@ -92,7 +97,6 @@ func TestEnsurePort(t *testing.T) {
 func TestPrepareMessageWithEDNSDetails(t *testing.T) {
 	do := true
 	version := uint8(1)
-	z := uint16(3)
 	rcode := uint8(16)
 
 	client := &Client{
@@ -101,10 +105,9 @@ func TestPrepareMessageWithEDNSDetails(t *testing.T) {
 		EDNSDetails: &EDNSDetails{
 			Do:      &do,
 			Version: &version,
-			Z:       &z,
 			Rcode:   &rcode,
 			Data: []dns.EDNS0{
-				&dns.EDNS0_NSID{Code: dns.EDNS0NSID},
+				&dns.NSID{},
 			},
 		},
 	}
@@ -115,16 +118,23 @@ func TestPrepareMessageWithEDNSDetails(t *testing.T) {
 	if !prepared.RecursionDesired {
 		t.Fatalf("expected recursion desired to be true")
 	}
-
-	opt := prepared.IsEdns0()
-	if opt == nil {
-		t.Fatalf("expected edns option")
+	if prepared.UDPSize != 1232 {
+		t.Fatalf("unexpected UDP size: %d", prepared.UDPSize)
 	}
-	if !opt.Do() || opt.Version() != 1 || opt.Z() != 3 || opt.ExtendedRcode() != 16 {
-		t.Fatalf("unexpected edns values: do=%v version=%d z=%d rcode=%d", opt.Do(), opt.Version(), opt.Z(), opt.ExtendedRcode())
+	if !prepared.Security {
+		t.Fatalf("expected DO bit set")
 	}
-	if len(opt.Option) != 1 {
-		t.Fatalf("expected edns option data")
+	if prepared.Version != 1 {
+		t.Fatalf("unexpected EDNS version: %d", prepared.Version)
+	}
+	if prepared.Rcode != 16 {
+		t.Fatalf("unexpected extended rcode: %d", prepared.Rcode)
+	}
+	if len(prepared.Pseudo) != 1 {
+		t.Fatalf("expected 1 pseudo-section option, got %d", len(prepared.Pseudo))
+	}
+	if _, ok := prepared.Pseudo[0].(*dns.NSID); !ok {
+		t.Fatalf("expected NSID option in pseudo section")
 	}
 }
 
@@ -187,12 +197,12 @@ func startUDPDNSServer(t *testing.T, handler dns.HandlerFunc) (string, func()) {
 
 	done := make(chan struct{})
 	go func() {
-		_ = server.ActivateAndServe()
+		_ = server.ListenAndServe()
 		close(done)
 	}()
 
 	shutdown := func() {
-		_ = server.Shutdown()
+		server.Shutdown(context.Background())
 		_ = packetConn.Close()
 		select {
 		case <-done:
@@ -224,12 +234,12 @@ func startTCPDNSServer(t *testing.T, handler dns.HandlerFunc, configure func(*dn
 
 	done := make(chan struct{})
 	go func() {
-		_ = server.ActivateAndServe()
+		_ = server.ListenAndServe()
 		close(done)
 	}()
 
 	shutdown := func() {
-		_ = server.Shutdown()
+		server.Shutdown(context.Background())
 		_ = listener.Close()
 		select {
 		case <-done:
@@ -243,21 +253,19 @@ func startTCPDNSServer(t *testing.T, handler dns.HandlerFunc, configure func(*dn
 
 func writeSimpleAResponse(w dns.ResponseWriter, req *dns.Msg) {
 	resp := new(dns.Msg)
-	resp.SetReply(req)
+	dnsutil.SetReply(resp, req)
 	if len(req.Question) > 0 {
-		resp.Answer = []dns.RR{
-			&dns.A{
-				Hdr: dns.RR_Header{
-					Name:   req.Question[0].Name,
-					Rrtype: dns.TypeA,
-					Class:  dns.ClassINET,
-					Ttl:    60,
-				},
-				A: net.IPv4(192, 0, 2, 10),
+		a := &dns.A{
+			Hdr: dns.Header{
+				Name:  req.Question[0].Header().Name,
+				Class: dns.ClassINET,
+				TTL:   60,
 			},
 		}
+		a.Addr = netip.AddrFrom4([4]byte{192, 0, 2, 10})
+		resp.Answer = []dns.RR{a}
 	}
-	_ = w.WriteMsg(resp)
+	_, _ = resp.WriteTo(w)
 }
 
 func TestEffectiveAttemptTimeoutUsesConfiguredTimeout(t *testing.T) {
@@ -325,7 +333,7 @@ func TestEffectiveAttemptTimeoutRespectsContextDeadline(t *testing.T) {
 }
 
 func TestExchangeTCPDoesNotClampTimeoutToRetrans(t *testing.T) {
-	serverAddr, _, shutdown := startTCPDNSServer(t, func(w dns.ResponseWriter, req *dns.Msg) {
+	serverAddr, _, shutdown := startTCPDNSServer(t, func(_ context.Context, w dns.ResponseWriter, req *dns.Msg) {
 		time.Sleep(120 * time.Millisecond)
 		writeSimpleAResponse(w, req)
 	}, nil)
@@ -350,7 +358,7 @@ func TestExchangeTCPDoesNotClampTimeoutToRetrans(t *testing.T) {
 }
 
 func TestExchangeFallbackTCPOnTruncatedUDP(t *testing.T) {
-	serverAddr, listener, shutdownTCP := startTCPDNSServer(t, func(w dns.ResponseWriter, req *dns.Msg) {
+	serverAddr, listener, shutdownTCP := startTCPDNSServer(t, func(_ context.Context, w dns.ResponseWriter, req *dns.Msg) {
 		writeSimpleAResponse(w, req)
 	}, nil)
 	defer shutdownTCP()
@@ -361,20 +369,20 @@ func TestExchangeFallbackTCPOnTruncatedUDP(t *testing.T) {
 	}
 	udpServer := &dns.Server{
 		PacketConn: packetConn,
-		Handler: dns.HandlerFunc(func(w dns.ResponseWriter, req *dns.Msg) {
+		Handler: dns.HandlerFunc(func(_ context.Context, w dns.ResponseWriter, req *dns.Msg) {
 			resp := new(dns.Msg)
-			resp.SetReply(req)
+			dnsutil.SetReply(resp, req)
 			resp.Truncated = true
-			_ = w.WriteMsg(resp)
+			_, _ = resp.WriteTo(w)
 		}),
 	}
 	udpDone := make(chan struct{})
 	go func() {
-		_ = udpServer.ActivateAndServe()
+		_ = udpServer.ListenAndServe()
 		close(udpDone)
 	}()
 	defer func() {
-		_ = udpServer.Shutdown()
+		udpServer.Shutdown(context.Background())
 		_ = packetConn.Close()
 		select {
 		case <-udpDone:
@@ -400,7 +408,7 @@ func TestExchangeFallbackTCPOnTruncatedUDP(t *testing.T) {
 }
 
 func TestExchangeDoesNotFallbackTCPOnUDPFailure(t *testing.T) {
-	serverAddr, listener, shutdownTCP := startTCPDNSServer(t, func(w dns.ResponseWriter, req *dns.Msg) {
+	serverAddr, listener, shutdownTCP := startTCPDNSServer(t, func(_ context.Context, w dns.ResponseWriter, req *dns.Msg) {
 		writeSimpleAResponse(w, req)
 	}, nil)
 	defer shutdownTCP()
@@ -411,17 +419,17 @@ func TestExchangeDoesNotFallbackTCPOnUDPFailure(t *testing.T) {
 	}
 	udpServer := &dns.Server{
 		PacketConn: packetConn,
-		Handler: dns.HandlerFunc(func(_ dns.ResponseWriter, _ *dns.Msg) {
+		Handler: dns.HandlerFunc(func(_ context.Context, _ dns.ResponseWriter, _ *dns.Msg) {
 			// Intentionally blackhole UDP queries so fallback path is exercised.
 		}),
 	}
 	udpDone := make(chan struct{})
 	go func() {
-		_ = udpServer.ActivateAndServe()
+		_ = udpServer.ListenAndServe()
 		close(udpDone)
 	}()
 	defer func() {
-		_ = udpServer.Shutdown()
+		udpServer.Shutdown(context.Background())
 		_ = packetConn.Close()
 		select {
 		case <-udpDone:
@@ -464,7 +472,7 @@ func TestEffectiveAttemptTimeoutFallsBackToRetransWhenTimeoutUnset(t *testing.T)
 }
 
 func TestExchangeReturnsPromptlyOnContextCancel(t *testing.T) {
-	serverAddr, shutdown := startUDPDNSServer(t, func(_ dns.ResponseWriter, _ *dns.Msg) {
+	serverAddr, shutdown := startUDPDNSServer(t, func(_ context.Context, _ dns.ResponseWriter, _ *dns.Msg) {
 		// Intentionally return no response to force a client-side read wait.
 	})
 	defer shutdown()

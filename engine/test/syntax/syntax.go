@@ -3,12 +3,12 @@ package syntax
 import (
 	"context"
 	"fmt"
-	"net"
 	"net/mail"
+	"net/netip"
 	"sort"
 	"strings"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/internal/parallel"
@@ -565,7 +565,7 @@ func Syntax06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 
 		if q := pMX.Question(); len(q) > 0 {
-			qname := dnsname.New(q[0].Name)
+			qname := dnsname.New(q[0].Header().Name)
 			if !strings.EqualFold(qname.String(), domain.String()) {
 				domain = qname
 			} else if len(pMX.GetRecords("CNAME", "answer")) > 0 {
@@ -998,12 +998,12 @@ func matchingAAAARecords(resp packet.Packet, owner string) []*dns.AAAA {
 }
 
 func hasIPv4Loopback(records []*dns.A) bool {
-	loopback := net.IPv4(127, 0, 0, 1)
+	loopback := netip.MustParseAddr("127.0.0.1")
 	for _, rr := range records {
 		if rr == nil {
 			continue
 		}
-		if rr.A.Equal(loopback) {
+		if rr.Addr == loopback {
 			return true
 		}
 	}
@@ -1011,12 +1011,12 @@ func hasIPv4Loopback(records []*dns.A) bool {
 }
 
 func hasIPv6Loopback(records []*dns.AAAA) bool {
-	loopback := net.ParseIP("::1")
+	loopback := netip.MustParseAddr("::1")
 	for _, rr := range records {
 		if rr == nil {
 			continue
 		}
-		if rr.AAAA.Equal(loopback) {
+		if rr.Addr == loopback {
 			return true
 		}
 	}

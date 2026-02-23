@@ -298,7 +298,7 @@ func TestZone11NoSpfNonMailDomain(t *testing.T) {
 
 	newNameserver(t, "ns1.se", "192.0.2.10", func(qname string, qtype string, _ *ens.QueryOptions) packet.Packet {
 		msg := new(dns.Msg)
-		msg.SetQuestion(dns.Fqdn(qname), dns.TypeTXT)
+		dnsutil.SetQuestion(msg, dnsutil.Fqdn(qname), dns.TypeTXT)
 		msg.Authoritative = true
 		msg.Rcode = dns.RcodeSuccess
 		return packet.Packet{Msg: msg}

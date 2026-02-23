@@ -104,3 +104,14 @@ The following behaviors are implementation choices, not mandated by RFC 4034/403
 - If either DNSKEY or SOA query returns no DNS message, testcase ends with only boundary tags and no RRSIG findings.
 - `DURATION_OK` is emitted only when no remaining-time tag and no `DURATION_LONG` tag were emitted for the same RRSIG.
 - All remaining-time checks use the DNSKEY response packet time as the reference "now".
+
+---
+
+Copyright (c) Patrik Wallström  
+Copyright (c) The Swedish Internet Foundation (https://internetstiftelsen.se/en/)  
+Copyright (c) AFNIC (https://www.afnic.fr/en/)  
+All rights reserved.  
+
+Copyright belongs to external contributor where applicable.  
+
+Creative Commons Attribution 4.0 International License applies. See https://creativecommons.org/licenses/by/4.0/ for the license conditions.

@@ -123,3 +123,14 @@ Status: Draft
 - If parent DS discovery yields no DS records, testcase stops after boundary tags and emits no DS02 findings.
 - Child nameservers are deduplicated by IP before DNSKEY checks, so repeated names on one IP collapse into one probe context.
 - `DS02_NO_VALID_DNSKEY_FOR_ANY_DS` and `DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS` are mutually exclusive by implementation (`else if` branch).
+
+---
+
+Copyright (c) Patrik Wallström  
+Copyright (c) The Swedish Internet Foundation (https://internetstiftelsen.se/en/)  
+Copyright (c) AFNIC (https://www.afnic.fr/en/)  
+All rights reserved.  
+
+Copyright belongs to external contributor where applicable.  
+
+Creative Commons Attribution 4.0 International License applies. See https://creativecommons.org/licenses/by/4.0/ for the license conditions.

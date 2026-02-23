@@ -99,3 +99,14 @@ Status: Draft
 - Distinct nameserver names sharing one IP are grouped and represented together in `ns_list` outputs.
 - TXT responses with authoritative `NOERROR` but without SPF TXT records are treated as empty-policy results.
 - Runtime boundary markers (`TEST_CASE_START`/`TEST_CASE_END`) are emitted by shared testcase wrappers but omitted from current Zone11 metadata tag contract.
+
+---
+
+Copyright (c) Patrik Wallström  
+Copyright (c) The Swedish Internet Foundation (https://internetstiftelsen.se/en/)  
+Copyright (c) AFNIC (https://www.afnic.fr/en/)  
+All rights reserved.  
+
+Copyright belongs to external contributor where applicable.  
+
+Creative Commons Attribution 4.0 International License applies. See https://creativecommons.org/licenses/by/4.0/ for the license conditions.

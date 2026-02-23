@@ -96,3 +96,14 @@ Status: Draft
 - If `Method4` yields no nameserver addresses, function path emits only testcase markers unless orchestration emitted `HAS_NAMESERVER_NO_WWW_A_TEST`.
 - `A_QUERY_NO_RESPONSES` is emitted only when there are zero response packets; responses without `A` produce `NO_A_RECORDS` instead.
 - Per-nameserver output ordering is deterministic after parallel execution due runner merge order.
+
+---
+
+Copyright (c) Patrik Wallström  
+Copyright (c) The Swedish Internet Foundation (https://internetstiftelsen.se/en/)  
+Copyright (c) AFNIC (https://www.afnic.fr/en/)  
+All rights reserved.  
+
+Copyright belongs to external contributor where applicable.  
+
+Creative Commons Attribution 4.0 International License applies. See https://creativecommons.org/licenses/by/4.0/ for the license conditions.

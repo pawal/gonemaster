@@ -112,3 +112,14 @@ Status: Draft
 - Nameservers are not deduplicated by IP in this testcase; duplicate IPs under different names are queried separately.
 - Invalid/undecodable RSA public keys produce key size `0`, which can trigger small-key findings.
 - **`KEY_SIZE_OK` is effectively unreachable in the current implementation.** The gate condition compares the total result-entry count (which always includes at least the `TEST_CASE_START` and `TEST_CASE_END` boundary entries) against the `NO_RESPONSE` count. Because boundary entries are always present, the two counts can never be equal, so `KEY_SIZE_OK` is never emitted. This is a known gonemaster implementation defect (see Differences From Upstream).
+
+---
+
+Copyright (c) Patrik Wallström  
+Copyright (c) The Swedish Internet Foundation (https://internetstiftelsen.se/en/)  
+Copyright (c) AFNIC (https://www.afnic.fr/en/)  
+All rights reserved.  
+
+Copyright belongs to external contributor where applicable.  
+
+Creative Commons Attribution 4.0 International License applies. See https://creativecommons.org/licenses/by/4.0/ for the license conditions.

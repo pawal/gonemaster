@@ -85,3 +85,14 @@ Status: Draft
 - Missing/no-response cases emit no dedicated tag in this testcase.
 - `ARE_AUTHORITATIVE` is suppressed by any non-start tag, including transport-disabled debug tags.
 - If all SOA queries fail to return usable responses, the testcase emits only `TEST_CASE_START`, `TEST_CASE_END`, and, if any transport is disabled, `IPV4_DISABLED` and/or `IPV6_DISABLED`.
+
+---
+
+Copyright (c) Patrik Wallström  
+Copyright (c) The Swedish Internet Foundation (https://internetstiftelsen.se/en/)  
+Copyright (c) AFNIC (https://www.afnic.fr/en/)  
+All rights reserved.  
+
+Copyright belongs to external contributor where applicable.  
+
+Creative Commons Attribution 4.0 International License applies. See https://creativecommons.org/licenses/by/4.0/ for the license conditions.

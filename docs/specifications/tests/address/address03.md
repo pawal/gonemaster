@@ -87,3 +87,14 @@ The following behaviors are implementation choices, not mandated by protocol:
 - If `Method5` yields no IP addresses, only `TEST_CASE_START` and `TEST_CASE_END` are emitted.
 - Duplicate IPs are checked once; if multiple nameservers share an IP, only the first-seen nameserver name is evaluated for PTR-name match.
 - PTR target matching is case-insensitive and exact on normalized DNS name string.
+
+---
+
+Copyright (c) Patrik Wallström  
+Copyright (c) The Swedish Internet Foundation (https://internetstiftelsen.se/en/)  
+Copyright (c) AFNIC (https://www.afnic.fr/en/)  
+All rights reserved.  
+
+Copyright belongs to external contributor where applicable.  
+
+Creative Commons Attribution 4.0 International License applies. See https://creativecommons.org/licenses/by/4.0/ for the license conditions.

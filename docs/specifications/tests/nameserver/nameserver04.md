@@ -73,3 +73,14 @@ Status: Draft
 - Missing responses or unparsable `AnswerFrom` values do not emit `DIFFERENT_SOURCE_IP`.
 - `SAME_SOURCE_IP` is not emitted when no nameservers are included (for example all skipped due disabled transport).
 - `SAME_SOURCE_IP` uses comma as delimiter in `names`, unlike many other tags that use semicolon.
+
+---
+
+Copyright (c) Patrik Wallström  
+Copyright (c) The Swedish Internet Foundation (https://internetstiftelsen.se/en/)  
+Copyright (c) AFNIC (https://www.afnic.fr/en/)  
+All rights reserved.  
+
+Copyright belongs to external contributor where applicable.  
+
+Creative Commons Attribution 4.0 International License applies. See https://creativecommons.org/licenses/by/4.0/ for the license conditions.

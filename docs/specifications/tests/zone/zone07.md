@@ -81,3 +81,14 @@ Status: Draft
 - `MNAME_IS_CNAME` and `MNAME_IS_NOT_CNAME` are evaluated independently for each of the `A` and `AAAA` query types; both tags are emitted in the same testcase run when MNAME resolves to a CNAME for one address family but not the other.
 - Address success counts by query type branch and does not require both families to resolve.
 - The shared retrieval helper emits `IPV4_DISABLED` or `IPV6_DISABLED` when the corresponding transport is disabled; these tags are not declared in this testcase's `Metadata()` function.
+
+---
+
+Copyright (c) Patrik Wallström  
+Copyright (c) The Swedish Internet Foundation (https://internetstiftelsen.se/en/)  
+Copyright (c) AFNIC (https://www.afnic.fr/en/)  
+All rights reserved.  
+
+Copyright belongs to external contributor where applicable.  
+
+Creative Commons Attribution 4.0 International License applies. See https://creativecommons.org/licenses/by/4.0/ for the license conditions.

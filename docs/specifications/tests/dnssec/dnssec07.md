@@ -136,3 +136,14 @@ Status: Draft
 - Ignored parent nameserver outcomes are tracked internally but have no dedicated DS07 output tag.
 - Child transport-disabled path logs rrtypes `SOA`, `DNSKEY`, and `DS`, even though DS is only queried against parent nameservers in this testcase.
 - Parent DS evaluation is fully skipped when no signed child response is observed.
+
+---
+
+Copyright (c) Patrik Wallström  
+Copyright (c) The Swedish Internet Foundation (https://internetstiftelsen.se/en/)  
+Copyright (c) AFNIC (https://www.afnic.fr/en/)  
+All rights reserved.  
+
+Copyright belongs to external contributor where applicable.  
+
+Creative Commons Attribution 4.0 International License applies. See https://creativecommons.org/licenses/by/4.0/ for the license conditions.

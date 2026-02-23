@@ -92,3 +92,14 @@ Status: Draft
 - Success branch does not explicitly require SOA answer content.
 - `MISSING_OPT_IN_TRUNCATED` is checked before the generic success-shape branch.
 - Any behavior outside explicit branches collapses into `NS_ERROR`.
+
+---
+
+Copyright (c) Patrik Wallström  
+Copyright (c) The Swedish Internet Foundation (https://internetstiftelsen.se/en/)  
+Copyright (c) AFNIC (https://www.afnic.fr/en/)  
+All rights reserved.  
+
+Copyright belongs to external contributor where applicable.  
+
+Creative Commons Attribution 4.0 International License applies. See https://creativecommons.org/licenses/by/4.0/ for the license conditions.

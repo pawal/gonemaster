@@ -109,3 +109,14 @@ Status: Draft
 - If all probes are skipped due transport disable, testcase can still end in `B02_NO_WORKING_NS`.
 - Detailed error tags are emitted only when `B02_NO_WORKING_NS` is emitted.
 - Output ordering is deterministic after parallel execution because runner output is merged in task index order.
+
+---
+
+Copyright (c) Patrik Wallström  
+Copyright (c) The Swedish Internet Foundation (https://internetstiftelsen.se/en/)  
+Copyright (c) AFNIC (https://www.afnic.fr/en/)  
+All rights reserved.  
+
+Copyright belongs to external contributor where applicable.  
+
+Creative Commons Attribution 4.0 International License applies. See https://creativecommons.org/licenses/by/4.0/ for the license conditions.

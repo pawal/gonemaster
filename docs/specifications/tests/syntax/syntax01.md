@@ -53,3 +53,14 @@ Status: Draft
 ## Edge Cases And Limitations
 - For the root name (`.`), label iteration is empty and the testcase emits `ONLY_ALLOWED_CHARS`.
 - This testcase does not validate label length or full-name length; it only validates character set.
+
+---
+
+Copyright (c) Patrik Wallström  
+Copyright (c) The Swedish Internet Foundation (https://internetstiftelsen.se/en/)  
+Copyright (c) AFNIC (https://www.afnic.fr/en/)  
+All rights reserved.  
+
+Copyright belongs to external contributor where applicable.  
+
+Creative Commons Attribution 4.0 International License applies. See https://creativecommons.org/licenses/by/4.0/ for the license conditions.

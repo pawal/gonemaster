@@ -82,3 +82,14 @@ Status: Draft
 - The testcase ignores nameserver entries that lack resolved IP addresses.
 - If all discovered addresses are reserved/non-global, `A01_NO_GLOBALLY_REACHABLE_ADDR` can be emitted together with one or more category error tags.
 - Multiple nameserver names sharing one IP are preserved as distinct `name/ip` entries in output lists.
+
+---
+
+Copyright (c) Patrik Wallström  
+Copyright (c) The Swedish Internet Foundation (https://internetstiftelsen.se/en/)  
+Copyright (c) AFNIC (https://www.afnic.fr/en/)  
+All rights reserved.  
+
+Copyright belongs to external contributor where applicable.  
+
+Creative Commons Attribution 4.0 International License applies. See https://creativecommons.org/licenses/by/4.0/ for the license conditions.

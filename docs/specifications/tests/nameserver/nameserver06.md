@@ -65,3 +65,14 @@ Status: Draft
 - Name comparisons are case-insensitive (all names lowercased before set operations).
 - If both `allNames` and `withIP` are empty, `NO_RESOLUTION` is emitted with empty `names`.
 - Resolution quality depends entirely on upstream method outputs (`Method2`, `Method3`, `Method4and5`).
+
+---
+
+Copyright (c) Patrik Wallström  
+Copyright (c) The Swedish Internet Foundation (https://internetstiftelsen.se/en/)  
+Copyright (c) AFNIC (https://www.afnic.fr/en/)  
+All rights reserved.  
+
+Copyright belongs to external contributor where applicable.  
+
+Creative Commons Attribution 4.0 International License applies. See https://creativecommons.org/licenses/by/4.0/ for the license conditions.

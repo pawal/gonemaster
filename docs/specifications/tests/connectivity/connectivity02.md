@@ -109,3 +109,14 @@ Status: Draft
 - If Method4+Method5 yields no nameservers, only testcase start/end tags are emitted.
 - Query call errors are treated as absent response messages.
 - A single nameserver can emit multiple findings in one run (for example one SOA issue and one NS issue).
+
+---
+
+Copyright (c) Patrik Wallström  
+Copyright (c) The Swedish Internet Foundation (https://internetstiftelsen.se/en/)  
+Copyright (c) AFNIC (https://www.afnic.fr/en/)  
+All rights reserved.  
+
+Copyright belongs to external contributor where applicable.  
+
+Creative Commons Attribution 4.0 International License applies. See https://creativecommons.org/licenses/by/4.0/ for the license conditions.

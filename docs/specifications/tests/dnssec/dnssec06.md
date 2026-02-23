@@ -64,3 +64,14 @@ Status: Draft
 - Responses with missing message (`Msg == nil`) do not produce DS06 tags.
 - Responses with non-`NOERROR` RCODE do not produce DS06 tags, even if DNSKEY/RRSIG are absent.
 - This testcase does not validate signature cryptography; it only checks presence/absence of DNSKEY and RRSIG records.
+
+---
+
+Copyright (c) Patrik Wallström  
+Copyright (c) The Swedish Internet Foundation (https://internetstiftelsen.se/en/)  
+Copyright (c) AFNIC (https://www.afnic.fr/en/)  
+All rights reserved.  
+
+Copyright belongs to external contributor where applicable.  
+
+Creative Commons Attribution 4.0 International License applies. See https://creativecommons.org/licenses/by/4.0/ for the license conditions.

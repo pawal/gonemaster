@@ -99,3 +99,14 @@ Status: Draft
 - Nameserver evaluation is deduplicated by IP; repeated names on one IP share one DS09 outcome.
 - Nameservers failing response-shape checks (`Msg`, `NOERROR`, `AA`, apex owner match) are skipped for DS09 findings.
 - If no usable DNSKEY records are found for a nameserver, SOA signing checks are skipped for that nameserver.
+
+---
+
+Copyright (c) Patrik Wallström  
+Copyright (c) The Swedish Internet Foundation (https://internetstiftelsen.se/en/)  
+Copyright (c) AFNIC (https://www.afnic.fr/en/)  
+All rights reserved.  
+
+Copyright belongs to external contributor where applicable.  
+
+Creative Commons Attribution 4.0 International License applies. See https://creativecommons.org/licenses/by/4.0/ for the license conditions.

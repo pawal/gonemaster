@@ -80,3 +80,14 @@ Status: Draft
 - A nameserver can emit only one of `NO_EDNS_SUPPORT`, `Z_FLAGS_NOTCLEAR`, or `NS_ERROR` due branch ordering.
 - `Z_FLAGS_NOTCLEAR` branch is checked before full success-shape validation.
 - Query failures are reported as `NO_RESPONSE`; no retry path exists in this testcase.
+
+---
+
+Copyright (c) Patrik Wallström  
+Copyright (c) The Swedish Internet Foundation (https://internetstiftelsen.se/en/)  
+Copyright (c) AFNIC (https://www.afnic.fr/en/)  
+All rights reserved.  
+
+Copyright belongs to external contributor where applicable.  
+
+Creative Commons Attribution 4.0 International License applies. See https://creativecommons.org/licenses/by/4.0/ for the license conditions.

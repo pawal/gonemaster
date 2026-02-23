@@ -82,3 +82,14 @@ Status: Draft
 - DNSKEY algorithms are discovered from DNSKEY responses only; if no usable DNSKEY answer exists, DS13 emits no algorithm findings.
 - Nameserver evaluation is deduplicated by IP; repeated names on one IP share one DS13 outcome.
 - Query-type checks are independent; a nameserver can emit findings for SOA/NS while DNSKEY-side checks are skipped, or vice versa, based on response shape.
+
+---
+
+Copyright (c) Patrik Wallström  
+Copyright (c) The Swedish Internet Foundation (https://internetstiftelsen.se/en/)  
+Copyright (c) AFNIC (https://www.afnic.fr/en/)  
+All rights reserved.  
+
+Copyright belongs to external contributor where applicable.  
+
+Creative Commons Attribution 4.0 International License applies. See https://creativecommons.org/licenses/by/4.0/ for the license conditions.

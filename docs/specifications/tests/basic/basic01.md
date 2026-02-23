@@ -149,3 +149,14 @@ The following behaviors are implementation choices, not mandated by RFC 1034/103
 - Loop-protection fallback is defensive; when triggered it logs `LOOP_PROTECTION` and terminates the testcase early.
 - Child existence outcomes differ between normal and fake-address modes (`B01_NO_CHILD` vs `B01_CHILD_NOT_EXIST`).
 - Nameserver list argument order is deterministic because lists are sorted before join.
+
+---
+
+Copyright (c) Patrik Wallström  
+Copyright (c) The Swedish Internet Foundation (https://internetstiftelsen.se/en/)  
+Copyright (c) AFNIC (https://www.afnic.fr/en/)  
+All rights reserved.  
+
+Copyright belongs to external contributor where applicable.  
+
+Creative Commons Attribution 4.0 International License applies. See https://creativecommons.org/licenses/by/4.0/ for the license conditions.

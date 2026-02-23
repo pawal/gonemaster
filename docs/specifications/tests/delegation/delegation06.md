@@ -82,3 +82,14 @@ Status: Draft
 - Non-`NOERROR` responses and query failures do not emit `SOA_NOT_EXISTS`.
 - `SOA_EXISTS` is suppressed by any non-start tag, including transport-disabled debug tags.
 - If no nameservers are available from `Method4` and `Method5`, testcase emits start/end only.
+
+---
+
+Copyright (c) Patrik Wallström  
+Copyright (c) The Swedish Internet Foundation (https://internetstiftelsen.se/en/)  
+Copyright (c) AFNIC (https://www.afnic.fr/en/)  
+All rights reserved.  
+
+Copyright belongs to external contributor where applicable.  
+
+Creative Commons Attribution 4.0 International License applies. See https://creativecommons.org/licenses/by/4.0/ for the license conditions.

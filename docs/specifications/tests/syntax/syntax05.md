@@ -69,3 +69,14 @@ Status: Draft
 - If multiple SOA records exist, only the first SOA record found is evaluated.
 - A DNS response without SOA in answer is treated the same as no response (`NO_RESPONSE_SOA_QUERY`).
 - When running through `syntax.All`, this testcase is skipped if `syntax01` did not emit `ONLY_ALLOWED_CHARS`.
+
+---
+
+Copyright (c) Patrik Wallström  
+Copyright (c) The Swedish Internet Foundation (https://internetstiftelsen.se/en/)  
+Copyright (c) AFNIC (https://www.afnic.fr/en/)  
+All rights reserved.  
+
+Copyright belongs to external contributor where applicable.  
+
+Creative Commons Attribution 4.0 International License applies. See https://creativecommons.org/licenses/by/4.0/ for the license conditions.

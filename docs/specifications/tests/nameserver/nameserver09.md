@@ -115,3 +115,14 @@ Status: Draft
 - If both queries for a nameserver return no DNS message, that nameserver does not set mismatch and emits no `CASE_QUERY_*` tag.
 - In the answer-comparison branch (`len(p1.Answer()) > 0`), a missing/no-message second response is treated as `CASE_QUERY_DIFFERENT_ANSWER` (not `CASE_QUERY_NO_ANSWER`).
 - `CASE_QUERIES_RESULTS_OK` can still be emitted when all nameservers were skipped by transport-disable checks.
+
+---
+
+Copyright (c) Patrik Wallström  
+Copyright (c) The Swedish Internet Foundation (https://internetstiftelsen.se/en/)  
+Copyright (c) AFNIC (https://www.afnic.fr/en/)  
+All rights reserved.  
+
+Copyright belongs to external contributor where applicable.  
+
+Creative Commons Attribution 4.0 International License applies. See https://creativecommons.org/licenses/by/4.0/ for the license conditions.

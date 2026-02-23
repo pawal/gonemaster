@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/logger"
@@ -1068,11 +1068,9 @@ func hasTag(entries []*logger.Entry, tag string) bool {
 func addrFromRR(rr dns.RR) (netip.Addr, bool) {
 	switch v := rr.(type) {
 	case *dns.A:
-		addr, err := netip.ParseAddr(v.A.String())
-		return addr, err == nil
+		return v.Addr, v.Addr.IsValid()
 	case *dns.AAAA:
-		addr, err := netip.ParseAddr(v.AAAA.String())
-		return addr, err == nil
+		return v.Addr, v.Addr.IsValid()
 	default:
 		return netip.Addr{}, false
 	}

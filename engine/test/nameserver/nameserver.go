@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/logger"
@@ -754,10 +754,10 @@ func Nameserver05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 				for _, rr := range resp.GetRecords("AAAA", "answer") {
 					if aaaa, ok := rr.(*dns.AAAA); ok {
-						if len(aaaa.AAAA) != net.IPv6len {
+						if !aaaa.Addr.IsValid() {
 							if _, err := buf.Add("AAAA_BAD_RDATA", map[string]any{
 								"ns":     server.String(),
-								"length": len(aaaa.AAAA),
+								"length": 0,
 							}); err != nil {
 								return err
 							}
@@ -1003,7 +1003,7 @@ func Nameserver08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				if err == nil && resp.Msg != nil {
 					questions := resp.Question()
 					if len(questions) > 0 {
-						qname := strings.TrimRight(questions[0].Name, ".")
+						qname := strings.TrimRight(questions[0].Header().Name, ".")
 						if qname == randomized {
 							if _, err := buf.Add("QNAME_CASE_SENSITIVE", map[string]any{
 								"ns":     server.String(),
@@ -1326,7 +1326,7 @@ func Nameserver11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var unknownOpt []string
 
 	optCode := uint16(137)
-	unknownOptData := &dns.EDNS0_LOCAL{Code: optCode, Data: []byte{}}
+	unknownOptData := &dns.ERFC3597{EDNS0Code: optCode, Code: ""}
 
 	nss, err := method4and5(ctx, z)
 	if err != nil {
@@ -1395,7 +1395,7 @@ func Nameserver11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					return nil
 				}
 				for _, opt := range resp.EdnsData() {
-					if opt.Option() == optCode {
+					if erfc, ok := opt.(*dns.ERFC3597); ok && erfc.EDNS0Code == optCode {
 						outcome.unknownOpt = true
 						break
 					}

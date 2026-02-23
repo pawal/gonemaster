@@ -6,7 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
@@ -725,15 +726,10 @@ func TestDelegation07UndelegatedReportsExtraNameChild(t *testing.T) {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
 		for _, nsName := range nsNames {
-			msg.Answer = append(msg.Answer, &dns.NS{
-				Hdr: dns.RR_Header{
-					Name:   dns.Fqdn("example.com"),
-					Rrtype: dns.TypeNS,
-					Class:  dns.ClassINET,
-					Ttl:    60,
-				},
-				Ns: dns.Fqdn(nsName),
-			})
+			nsRR := &dns.NS{}
+			nsRR.Hdr = dns.Header{Name: dnsutil.Fqdn("example.com"), Class: dns.ClassINET, TTL: 60}
+			nsRR.Ns = dnsutil.Fqdn(nsName)
+			msg.Answer = append(msg.Answer, nsRR)
 		}
 		return packet.Packet{Msg: msg}
 	}
@@ -810,23 +806,15 @@ func soaPacket(owner string, authoritative bool) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
 	msg.Authoritative = authoritative
-	msg.Answer = []dns.RR{
-		&dns.SOA{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(owner),
-				Rrtype: dns.TypeSOA,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Ns:      "ns1.example.",
-			Mbox:    "hostmaster.example.",
-			Serial:  1,
-			Refresh: 3600,
-			Retry:   600,
-			Expire:  86400,
-			Minttl:  60,
-		},
-	}
+	soaRR := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
+	soaRR.Ns = "ns1.example."
+	soaRR.Mbox = "hostmaster.example."
+	soaRR.Serial = 1
+	soaRR.Refresh = 3600
+	soaRR.Retry = 600
+	soaRR.Expire = 86400
+	soaRR.Minttl = 60
+	msg.Answer = []dns.RR{soaRR}
 	return packet.Packet{Msg: msg}
 }
 
@@ -834,17 +822,10 @@ func cnamePacket(owner string, target string) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
 	msg.Authoritative = true
-	msg.Answer = []dns.RR{
-		&dns.CNAME{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(owner),
-				Rrtype: dns.TypeCNAME,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Target: dns.Fqdn(target),
-		},
-	}
+	cnameRR := &dns.CNAME{}
+	cnameRR.Hdr = dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}
+	cnameRR.Target = dnsutil.Fqdn(target)
+	msg.Answer = []dns.RR{cnameRR}
 	return packet.Packet{Msg: msg}
 }
 

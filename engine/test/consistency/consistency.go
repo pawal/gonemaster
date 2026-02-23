@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
@@ -806,7 +806,7 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				if !ok {
 					continue
 				}
-				glueKey := strings.ToLower(rr.Header().Name) + "/" + aRR.A.String()
+				glueKey := strings.ToLower(rr.Header().Name) + "/" + aRR.Addr.String()
 				parentGlues[glueKey] = nsName
 			}
 		}
@@ -824,7 +824,7 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				if !ok {
 					continue
 				}
-				glueKey := strings.ToLower(rr.Header().Name) + "/" + AAAArr.AAAA.String()
+				glueKey := strings.ToLower(rr.Header().Name) + "/" + AAAArr.Addr.String()
 				parentGlues[glueKey] = nsName
 			}
 		}
@@ -1225,9 +1225,9 @@ func addrKey(rr dns.RR) string {
 	owner := strings.ToLower(rr.Header().Name)
 	switch r := rr.(type) {
 	case *dns.A:
-		return owner + "/" + r.A.String()
+		return owner + "/" + r.Addr.String()
 	case *dns.AAAA:
-		return owner + "/" + r.AAAA.String()
+		return owner + "/" + r.Addr.String()
 	default:
 		return owner + "/" + rr.String()
 	}

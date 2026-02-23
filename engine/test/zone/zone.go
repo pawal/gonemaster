@@ -10,7 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/logger"
@@ -810,7 +811,7 @@ func Zone07(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 
 					finalName := soaMname
 					if q := pMname.Question(); len(q) > 0 {
-						questionName := dnsname.New(q[0].Name)
+						questionName := dnsname.New(q[0].Header().Name)
 						finalName = questionName.String()
 					}
 
@@ -1706,7 +1707,7 @@ func validDomain(value string) bool {
 	if value == "" {
 		return false
 	}
-	_, ok := dns.IsDomainName(value)
+	ok := dnsutil.IsName(value)
 	return ok
 }
 

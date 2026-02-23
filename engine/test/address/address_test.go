@@ -4,9 +4,11 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"net/netip"
 	"time"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/logger"
@@ -54,10 +56,7 @@ func TestAddress01NoNameServersFound(t *testing.T) {
 
 func TestAddress02NameserversIPWithReverse(t *testing.T) {
 	ctx := testContext(t)
-	ptrName, err := dns.ReverseAddr("192.0.2.1")
-	if err != nil {
-		t.Fatalf("reverse addr: %v", err)
-	}
+	ptrName := dnsutil.ReverseAddr(netip.MustParseAddr("192.0.2.1"))
 
 	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
 		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "NS") {
@@ -80,10 +79,7 @@ func TestAddress02NameserversIPWithReverse(t *testing.T) {
 
 func TestAddress02NameserverIPWithoutReverse(t *testing.T) {
 	ctx := testContext(t)
-	ptrName, err := dns.ReverseAddr("192.0.2.1")
-	if err != nil {
-		t.Fatalf("reverse addr: %v", err)
-	}
+	ptrName := dnsutil.ReverseAddr(netip.MustParseAddr("192.0.2.1"))
 
 	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
 		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "NS") {
@@ -106,10 +102,7 @@ func TestAddress02NameserverIPWithoutReverse(t *testing.T) {
 
 func TestAddress03PTRMatch(t *testing.T) {
 	ctx := testContext(t)
-	ptrName, err := dns.ReverseAddr("192.0.2.1")
-	if err != nil {
-		t.Fatalf("reverse addr: %v", err)
-	}
+	ptrName := dnsutil.ReverseAddr(netip.MustParseAddr("192.0.2.1"))
 
 	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
 		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "NS") {
@@ -132,10 +125,7 @@ func TestAddress03PTRMatch(t *testing.T) {
 
 func TestAddress03PTRMismatch(t *testing.T) {
 	ctx := testContext(t)
-	ptrName, err := dns.ReverseAddr("192.0.2.1")
-	if err != nil {
-		t.Fatalf("reverse addr: %v", err)
-	}
+	ptrName := dnsutil.ReverseAddr(netip.MustParseAddr("192.0.2.1"))
 
 	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
 		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "NS") {
@@ -218,14 +208,8 @@ func TestAddress02ParallelPTRQueries(t *testing.T) {
 	}()
 
 	want := map[string]bool{}
-	ptr1, err := dns.ReverseAddr("192.0.2.1")
-	if err != nil {
-		t.Fatalf("reverse addr: %v", err)
-	}
-	ptr2, err := dns.ReverseAddr("192.0.2.2")
-	if err != nil {
-		t.Fatalf("reverse addr: %v", err)
-	}
+	ptr1 := dnsutil.ReverseAddr(netip.MustParseAddr("192.0.2.1"))
+	ptr2 := dnsutil.ReverseAddr(netip.MustParseAddr("192.0.2.2"))
 	want[ptr1] = true
 	want[ptr2] = true
 
@@ -425,17 +409,9 @@ func newZoneWithFakeAddresses(ctx context.Context, t *testing.T, zoneName string
 func nsPacket(zoneName string, nsName string) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
-	msg.Answer = []dns.RR{
-		&dns.NS{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(zoneName),
-				Rrtype: dns.TypeNS,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Ns: dns.Fqdn(nsName),
-		},
-	}
+	nsRR := &dns.NS{Hdr: dns.Header{Name: dnsutil.Fqdn(zoneName), Class: dns.ClassINET, TTL: 60}}
+	nsRR.Ns = dnsutil.Fqdn(nsName)
+	msg.Answer = []dns.RR{nsRR}
 	return packet.Packet{Msg: msg}
 }
 
@@ -443,15 +419,9 @@ func ptrPacket(owner string, targets ...string) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
 	for _, target := range targets {
-		msg.Answer = append(msg.Answer, &dns.PTR{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(owner),
-				Rrtype: dns.TypePTR,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Ptr: dns.Fqdn(target),
-		})
+		ptrRR := &dns.PTR{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
+		ptrRR.Ptr = dnsutil.Fqdn(target)
+		msg.Answer = append(msg.Answer, ptrRR)
 	}
 	return packet.Packet{Msg: msg}
 }
@@ -462,11 +432,7 @@ func noAnswerPacket(owner string, qtype string) packet.Packet {
 	if qtype == "" {
 		qtype = "A"
 	}
-	msg.Question = []dns.Question{{
-		Name:   dns.Fqdn(owner),
-		Qtype:  dns.StringToType[strings.ToUpper(qtype)],
-		Qclass: dns.ClassINET,
-	}}
+	dnsutil.SetQuestion(msg, dnsutil.Fqdn(owner), dns.StringToType[strings.ToUpper(qtype)])
 	return packet.Packet{Msg: msg}
 }
 

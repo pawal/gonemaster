@@ -159,8 +159,17 @@ func (p Packet) EdnsVersion() uint8 {
 }
 
 // EdnsZ returns the raw EDNS Z bits.
-// Z bits are not directly exposed in v2's Msg; always returns 0.
+// For wire-decoded messages, Z bits are not preserved by v2's Msg.
+// Test helpers can signal Z by placing an *dns.OPT record in Extra with SetZ called.
 func (p Packet) EdnsZ() uint16 {
+	if p.Msg == nil {
+		return 0
+	}
+	for _, rr := range p.Msg.Extra {
+		if opt, ok := rr.(*dns.OPT); ok {
+			return opt.Z()
+		}
+	}
 	return 0
 }
 

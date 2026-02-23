@@ -2,12 +2,13 @@ package consistency
 
 import (
 	"context"
-	"net"
+	"net/netip"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/logger"
@@ -638,23 +639,15 @@ func soaPacket(owner string, serial uint32, mname string, rname string, refresh 
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
 	msg.Authoritative = true
-	msg.Answer = []dns.RR{
-		&dns.SOA{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(owner),
-				Rrtype: dns.TypeSOA,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Ns:      dns.Fqdn(mname),
-			Mbox:    dns.Fqdn(rname),
-			Serial:  serial,
-			Refresh: refresh,
-			Retry:   retry,
-			Expire:  expire,
-			Minttl:  minimum,
-		},
-	}
+	soaRR := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
+	soaRR.Ns = dnsutil.Fqdn(mname)
+	soaRR.Mbox = dnsutil.Fqdn(rname)
+	soaRR.Serial = serial
+	soaRR.Refresh = refresh
+	soaRR.Retry = retry
+	soaRR.Expire = expire
+	soaRR.Minttl = minimum
+	msg.Answer = []dns.RR{soaRR}
 	return packet.Packet{Msg: msg}
 }
 
@@ -663,15 +656,9 @@ func nsPacket(owner string, nsNames []string) packet.Packet {
 	msg.Rcode = dns.RcodeSuccess
 	msg.Authoritative = true
 	for _, nsName := range nsNames {
-		msg.Answer = append(msg.Answer, &dns.NS{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(owner),
-				Rrtype: dns.TypeNS,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Ns: dns.Fqdn(nsName),
-		})
+		nsRR := &dns.NS{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
+		nsRR.Ns = dnsutil.Fqdn(nsName)
+		msg.Answer = append(msg.Answer, nsRR)
 	}
 	return packet.Packet{Msg: msg}
 }
@@ -681,39 +668,19 @@ func addrPacket(name string, qtype string, address string) packet.Packet {
 	msg.Rcode = dns.RcodeSuccess
 	msg.Authoritative = true
 
+	addr, err := netip.ParseAddr(address)
+	if err != nil {
+		return packet.Packet{}
+	}
 	switch strings.ToUpper(qtype) {
 	case "A":
-		ip := net.ParseIP(address).To4()
-		if ip == nil {
-			return packet.Packet{}
-		}
-		msg.Answer = []dns.RR{
-			&dns.A{
-				Hdr: dns.RR_Header{
-					Name:   dns.Fqdn(name),
-					Rrtype: dns.TypeA,
-					Class:  dns.ClassINET,
-					Ttl:    60,
-				},
-				A: ip,
-			},
-		}
+		aRR := &dns.A{Hdr: dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET, TTL: 60}}
+		aRR.Addr = addr.Unmap()
+		msg.Answer = []dns.RR{aRR}
 	case "AAAA":
-		ip := net.ParseIP(address)
-		if ip == nil {
-			return packet.Packet{}
-		}
-		msg.Answer = []dns.RR{
-			&dns.AAAA{
-				Hdr: dns.RR_Header{
-					Name:   dns.Fqdn(name),
-					Rrtype: dns.TypeAAAA,
-					Class:  dns.ClassINET,
-					Ttl:    60,
-				},
-				AAAA: ip,
-			},
-		}
+		aaaaRR := &dns.AAAA{Hdr: dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET, TTL: 60}}
+		aaaaRR.Addr = addr
+		msg.Answer = []dns.RR{aaaaRR}
 	default:
 		return packet.Packet{}
 	}

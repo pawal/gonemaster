@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"

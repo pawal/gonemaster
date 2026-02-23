@@ -10,7 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/internal/parallel"
@@ -1056,11 +1057,11 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						outcome.noMatchDSDNSKEY[ds.KeyTag] = true
 					}
 
-					if matchingDNSKEY.Flags&dns.ZONE == 0 {
+					if matchingDNSKEY.Flags&dns.FlagZONE == 0 {
 						outcome.dnskeyNotForZoneSigning[ds.KeyTag] = true
 						continue
 					}
-					if matchingDNSKEY.Flags&dns.SEP == 0 {
+					if matchingDNSKEY.Flags&dns.FlagSEP == 0 {
 						outcome.dnskeyNotSEP[ds.KeyTag] = true
 					}
 
@@ -5060,7 +5061,7 @@ func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					}
 					hasNonZone := false
 					for _, dnskey := range matchingDNSKEYs {
-						if dnskey.Flags&dns.ZONE == 0 {
+						if dnskey.Flags&dns.FlagZONE == 0 {
 							hasNonZone = true
 							break
 						}
@@ -5078,7 +5079,7 @@ func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					}
 					hasNonSEP := false
 					for _, dnskey := range matchingDNSKEYs {
-						if dnskey.Flags&dns.SEP == 0 {
+						if dnskey.Flags&dns.FlagSEP == 0 {
 							hasNonSEP = true
 							break
 						}
@@ -5562,11 +5563,11 @@ func DNSSEC17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						continue
 					}
 					keytag := cdnskey.KeyTag()
-					if cdnskey.Flags&dns.ZONE == 0 {
+					if cdnskey.Flags&dns.FlagZONE == 0 {
 						outcome.cdnskeyIsNonZone[keytag] = true
 						continue
 					}
-					if cdnskey.Flags&dns.SEP == 0 {
+					if cdnskey.Flags&dns.FlagSEP == 0 {
 						outcome.cdnskeyIsNonSEP[keytag] = true
 					}
 
@@ -6292,7 +6293,7 @@ func nsec3OwnerMatchesApex(rr *dns.NSEC3, apex dnsname.Name) bool {
 	if rr == nil {
 		return false
 	}
-	hash := dns.HashName(apex.FQDN(), rr.Hash, rr.Iterations, rr.Salt)
+	hash := dnsutil.NSEC3Name(apex.FQDN(), rr.Salt, rr.Iterations)
 	if hash == "" {
 		return false
 	}
@@ -6850,10 +6851,10 @@ func verifyRRSIG(sig *dns.RRSIG, rrset []dns.RR, key *dns.DNSKEY, at time.Time) 
 	if sig == nil || key == nil {
 		return errors.New("missing rrsig or key")
 	}
-	if !sig.ValidityPeriod(at) {
+	if !sig.ValidPeriod(at) {
 		return errors.New("rrsig not valid at time")
 	}
-	return sig.Verify(key, rrset)
+	return sig.Verify(key, rrset, &dns.SignOption{})
 }
 
 func algoPropertyFor(algo uint8) algoProperty {

@@ -33,9 +33,10 @@ var nonExistentNames = []string{
 }
 
 var (
-	method2     = methods.Method2
-	method3     = methods.Method3
-	method4and5 = methods.Method4and5
+	method2       = methods.Method2
+	method3       = methods.Method3
+	method4and5   = methods.Method4and5
+	scrambleCaseFunc = util.ScrambleCase
 )
 
 // All runs the Nameserver test cases in order, mirroring the Perl implementation.
@@ -976,9 +977,9 @@ func Nameserver08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	original := strings.TrimRight("www."+z.Name.String(), ".")
-	randomized := util.ScrambleCase(original)
+	randomized := scrambleCaseFunc(original)
 	for randomized == original {
-		randomized = util.ScrambleCase(original)
+		randomized = scrambleCaseFunc(original)
 	}
 
 	nss, err := method4and5(ctx, z)
@@ -1047,13 +1048,13 @@ func Nameserver09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	original := strings.TrimRight("www."+z.Name.String(), ".")
 	recordType := "SOA"
-	random1 := util.ScrambleCase(original)
+	random1 := scrambleCaseFunc(original)
 	for random1 == original {
-		random1 = util.ScrambleCase(original)
+		random1 = scrambleCaseFunc(original)
 	}
-	random2 := util.ScrambleCase(original)
+	random2 := scrambleCaseFunc(original)
 	for random2 == original || random2 == random1 {
-		random2 = util.ScrambleCase(original)
+		random2 = scrambleCaseFunc(original)
 	}
 
 	allResultsMatch := true

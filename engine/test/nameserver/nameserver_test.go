@@ -2,6 +2,7 @@ package nameserver
 
 import (
 	"context"
+	"math/rand"
 	"net/netip"
 	"strings"
 	"testing"
@@ -419,7 +420,13 @@ func TestNameserver08QNameCaseInsensitive(t *testing.T) {
 	setupTest(t)
 
 	origM4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origM4and5 })
+	origScramble := scrambleCaseFunc
+	t.Cleanup(func() {
+		method4and5 = origM4and5
+		scrambleCaseFunc = origScramble
+	})
+	fixedRand := rand.New(rand.NewSource(42))
+	scrambleCaseFunc = func(s string) string { return util.ScrambleCaseWith(s, fixedRand) }
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.9", func(qname string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
 		msg := new(dns.Msg)
@@ -444,7 +451,13 @@ func TestNameserver09CaseQueriesSameAnswer(t *testing.T) {
 	setupTest(t)
 
 	origM4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origM4and5 })
+	origScramble := scrambleCaseFunc
+	t.Cleanup(func() {
+		method4and5 = origM4and5
+		scrambleCaseFunc = origScramble
+	})
+	fixedRand := rand.New(rand.NewSource(42))
+	scrambleCaseFunc = func(s string) string { return util.ScrambleCaseWith(s, fixedRand) }
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.10", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
 		return soaPacket("example")

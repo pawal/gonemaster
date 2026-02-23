@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
@@ -859,11 +859,9 @@ func nsMapFromResponse(resp packet.Packet, owner dnsname.Name, section string) m
 func addrFromRR(rr dns.RR) (netip.Addr, bool) {
 	switch v := rr.(type) {
 	case *dns.A:
-		addr, err := netip.ParseAddr(v.A.String())
-		return addr, err == nil
+		return v.Addr, v.Addr.IsValid()
 	case *dns.AAAA:
-		addr, err := netip.ParseAddr(v.AAAA.String())
-		return addr, err == nil
+		return v.Addr, v.Addr.IsValid()
 	default:
 		return netip.Addr{}, false
 	}
@@ -904,7 +902,7 @@ func cnameFollowed(resp packet.Packet, nsName dnsname.Name) bool {
 	if len(questions) == 0 {
 		return false
 	}
-	owner := dnsname.New(questions[0].Name)
+	owner := dnsname.New(questions[0].Header().Name)
 	return !strings.EqualFold(owner.String(), nsName.String())
 }
 
@@ -913,7 +911,7 @@ func cnameTargetFromQuestion(resp packet.Packet) dnsname.Name {
 	if len(questions) == 0 {
 		return dnsname.Name{}
 	}
-	return dnsname.New(questions[0].Name)
+	return dnsname.New(questions[0].Header().Name)
 }
 
 func followCNAME(resp packet.Packet, start dnsname.Name) dnsname.Name {

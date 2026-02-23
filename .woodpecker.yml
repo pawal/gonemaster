@@ -7,13 +7,13 @@ steps:
       - npm --prefix ui run build
 
   spec_check:
-    image: golang:1.24
+    image: golang:1.25
     commands:
       - go run ./tools/specifications/validate
       - go run ./tools/specifications/generate-tag-catalog --check
 
   go_test:
-    image: golang:1.24
+    image: golang:1.25
     depends_on:
       - ui_checks
     environment:
@@ -22,7 +22,7 @@ steps:
       - go test -p 4 -parallel 4 ./...
 
   build_server_with_ui:
-    image: golang:1.24
+    image: golang:1.25
     depends_on:
       - ui_checks
     commands:
@@ -41,7 +41,7 @@ steps:
       - npm --prefix ui run build
 
   build_artifacts:
-    image: golang:1.24
+    image: golang:1.25
     depends_on:
       - ui_build
     commands:

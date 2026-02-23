@@ -9,24 +9,27 @@ The Zonemaster project may be used as an upstream reference during migration, bu
 - Treat emitted tags as part of the testcase contract.
 - Keep documentation aligned with code through explicit workflow and validation.
 
-## Directory Layout
-- `upstream/`
-  - Reference material copied from Zonemaster specifications.
-  - Not normative for gonemaster.
-- `tests/`
-  - Canonical gonemaster testcase specifications.
-  - Normative source for documented testcase behavior.
-- `tags/`
-  - Tag-level documentation and catalogs.
-  - Covers possible tags per testcase/module and severity expectations.
-- `templates/`
-  - Reusable templates for testcase specs and tag tables.
-- `migration-tracker.md`
-  - Checklist-style tracker for migration status per testcase.
-- `known-intentional-gaps.md`
-  - Recorded implementation gaps against upstream testcase specs with rationale.
-- `known-behavior-divergences.md`
-  - Review-tagged behavior/spec divergences found in prior investigations.
+## Documents
+
+### Testcase Specifications
+- [tests/](tests/README.md) — Canonical per-testcase specifications (algorithm, emitted tags, arguments, severity, upstream differences).
+- [tags/](tags/README.md) — Per-module tag catalogs with severity levels and i18n coverage.
+
+### Inventories
+- [implemented-testcases.md](implemented-testcases.md) — Authoritative list of all implemented testcases.
+- [possible-tags-by-testcase.md](possible-tags-by-testcase.md) — All possible tags per testcase, derived from code metadata.
+
+### Gap and Divergence Tracking
+- [known-intentional-gaps.md](known-intentional-gaps.md) — Upstream testcase gaps that are intentionally not implemented, with rationale.
+- [known-behavior-divergences.md](known-behavior-divergences.md) — Behavior divergences identified during investigation, tagged for review.
+
+### Migration
+- [migration-tracker.md](migration-tracker.md) — Checklist tracking migration status per testcase.
+- [upstream-testcase-matrix.md](upstream-testcase-matrix.md) — Maps upstream Zonemaster specs to gonemaster testcase IDs and migration status.
+
+### Reference
+- [upstream/](upstream/README.md) — Imported Zonemaster reference material (not normative for gonemaster).
+- [templates/](templates/testcase-spec-template.md) — Reusable templates for testcase specs and tag tables.
 
 ## Source-Of-Truth Rules
 - Gonemaster implementation is the runtime source of truth.

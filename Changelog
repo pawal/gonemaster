@@ -2,7 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [v1.0.2] - 2026-02-24
+
+### Added
+
+ - CC license text to test case specifications
+
+### Changed
+
+ - Test:  Z11_NO_SPF_NON_MAIL_DOMAIN now emits domain to follow upstream difference from test specification
+ - Engine: Now using miekg dns version 2
+ - Tests: Now using Golang 1.25
 
 ## [v1.0.1] - 2026-02-22
 

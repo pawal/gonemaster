@@ -3220,6 +3220,42 @@ msgstr ""
 "Odottamaton RCODE-arvo ({rcode}) MX-kyselyssä nimipalvelimista "
 "\"{ns_ip_list}\"."
 
+
+#. ZONE:Z12_CSYNC_FOUND
+#, perl-brace-format
+msgid ""
+"CSYNC record found at zone apex on name server {ns} with SOA serial "
+"{serial}, flags {flags}, and type bitmap {type_bitmap}."
+msgstr ""
+"CSYNC-tietue löytyi vyöhykkeen kärjestä nimipalvelimelta {ns} SOA-sarjanumerolla "
+"{serial}, lipuilla {flags} ja tyyppibittikartalla {type_bitmap}."
+
+#. ZONE:Z12_INCONSISTENT_CSYNC
+msgid "CSYNC record content differs across authoritative name servers."
+msgstr "CSYNC-tietueen sisältö eroaa auktoritatiivisten nimipalvelimien välillä."
+
+#. ZONE:Z12_MIXED_PRESENCE
+msgid "CSYNC record is present on some name servers but absent on others."
+msgstr "CSYNC-tietue on olemassa joillakin nimipalvelimilla, mutta puuttuu toisilta."
+
+#. ZONE:Z12_MULTIPLE_CSYNC
+#, perl-brace-format
+msgid "{count} CSYNC records found at zone apex on name server {ns}."
+msgstr "Nimipalvelimelta {ns} löytyi {count} CSYNC-tietuetta vyöhykkeen kärjestä."
+
+#. ZONE:Z12_NO_CSYNC
+#, perl-brace-format
+msgid "No CSYNC record found at zone apex on name server {ns}."
+msgstr "CSYNC-tietuetta ei löytynyt vyöhykkeen kärjestä nimipalvelimelta {ns}."
+
+#. ZONE:Z12_SERIAL_MISMATCH
+#, perl-brace-format
+msgid ""
+"CSYNC SOA serial {csync_serial} does not match current SOA serial "
+"{soa_serial} on name server {ns}."
+msgstr ""
+"CSYNC:n SOA-sarjanumero {csync_serial} ei vastaa nimipalvelimen {ns} nykyistä "
+"SOA-sarjanumeroa {soa_serial}."
 #. SYSTEM:CANNOT_CONTINUE
 #, perl-brace-format
 msgid "Not enough data about {domain} was found to be able to run tests."

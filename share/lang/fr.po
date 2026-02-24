@@ -4136,6 +4136,43 @@ msgstr ""
 "Aucun des serveurs de noms de la zone n'a répondu avec une réponse faisant "
 "autorité pour les requêtes de politiques SPF."
 
+
+#. ZONE:Z12_CSYNC_FOUND
+#, perl-brace-format
+msgid ""
+"CSYNC record found at zone apex on name server {ns} with SOA serial "
+"{serial}, flags {flags}, and type bitmap {type_bitmap}."
+msgstr ""
+"Un enregistrement CSYNC a été trouvé à l'apex de la zone sur le serveur de noms "
+"{ns} avec le numéro de série SOA {serial}, les indicateurs {flags} et la carte de "
+"types {type_bitmap}."
+
+#. ZONE:Z12_INCONSISTENT_CSYNC
+msgid "CSYNC record content differs across authoritative name servers."
+msgstr "Le contenu de l'enregistrement CSYNC diffère entre les serveurs de noms faisant autorité."
+
+#. ZONE:Z12_MIXED_PRESENCE
+msgid "CSYNC record is present on some name servers but absent on others."
+msgstr "L'enregistrement CSYNC est présent sur certains serveurs de noms mais absent sur d'autres."
+
+#. ZONE:Z12_MULTIPLE_CSYNC
+#, perl-brace-format
+msgid "{count} CSYNC records found at zone apex on name server {ns}."
+msgstr "{count} enregistrements CSYNC trouvés à l'apex de la zone sur le serveur de noms {ns}."
+
+#. ZONE:Z12_NO_CSYNC
+#, perl-brace-format
+msgid "No CSYNC record found at zone apex on name server {ns}."
+msgstr "Aucun enregistrement CSYNC trouvé à l'apex de la zone sur le serveur de noms {ns}."
+
+#. ZONE:Z12_SERIAL_MISMATCH
+#, perl-brace-format
+msgid ""
+"CSYNC SOA serial {csync_serial} does not match current SOA serial "
+"{soa_serial} on name server {ns}."
+msgstr ""
+"Le numéro de série SOA CSYNC {csync_serial} ne correspond pas au numéro de série "
+"SOA actuel {soa_serial} sur le serveur de noms {ns}."
 #. SYSTEM:CANNOT_CONTINUE
 #, perl-brace-format
 msgid "Not enough data about {domain} was found to be able to run tests."

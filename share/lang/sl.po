@@ -3557,6 +3557,42 @@ msgstr ""
 "Nobeden od strežnikov za domeno ne odgovori z avtoritativnim odgovorom na "
 "poizvedbe za politike SPF."
 
+
+#. ZONE:Z12_CSYNC_FOUND
+#, perl-brace-format
+msgid ""
+"CSYNC record found at zone apex on name server {ns} with SOA serial "
+"{serial}, flags {flags}, and type bitmap {type_bitmap}."
+msgstr ""
+"Zapis CSYNC je bil najden na vrhu cone pri imenskem strežniku {ns} s serijsko "
+"številko SOA {serial}, zastavicami {flags} in bitno karto tipov {type_bitmap}."
+
+#. ZONE:Z12_INCONSISTENT_CSYNC
+msgid "CSYNC record content differs across authoritative name servers."
+msgstr "Vsebina zapisa CSYNC se razlikuje med avtoritativnimi imenskimi strežniki."
+
+#. ZONE:Z12_MIXED_PRESENCE
+msgid "CSYNC record is present on some name servers but absent on others."
+msgstr "Zapis CSYNC je prisoten pri nekaterih imenskih strežnikih, pri drugih pa odsoten."
+
+#. ZONE:Z12_MULTIPLE_CSYNC
+#, perl-brace-format
+msgid "{count} CSYNC records found at zone apex on name server {ns}."
+msgstr "Pri imenskem strežniku {ns} je bilo na vrhu cone najdenih {count} zapisov CSYNC."
+
+#. ZONE:Z12_NO_CSYNC
+#, perl-brace-format
+msgid "No CSYNC record found at zone apex on name server {ns}."
+msgstr "Pri imenskem strežniku {ns} ni bil najden noben zapis CSYNC na vrhu cone."
+
+#. ZONE:Z12_SERIAL_MISMATCH
+#, perl-brace-format
+msgid ""
+"CSYNC SOA serial {csync_serial} does not match current SOA serial "
+"{soa_serial} on name server {ns}."
+msgstr ""
+"Serijska številka SOA CSYNC {csync_serial} se ne ujema s trenutno serijsko številko "
+"SOA {soa_serial} pri imenskem strežniku {ns}."
 #. SYSTEM:CANNOT_CONTINUE
 #, perl-brace-format
 msgid "Not enough data about {domain} was found to be able to run tests."

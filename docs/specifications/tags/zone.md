@@ -14,6 +14,8 @@ _Do not edit by hand — regenerate with the command above._
 | `EXPIRE_LOWER_THAN_REFRESH` | `WARNING` | [zone05](../tests/zone/zone05.md) | yes |
 | `EXPIRE_MINIMUM_VALUE_LOWER` | `WARNING` | [zone05](../tests/zone/zone05.md) | yes |
 | `EXPIRE_MINIMUM_VALUE_OK` | `INFO` | [zone05](../tests/zone/zone05.md) | yes |
+| `IPV4_DISABLED` | `—` | [zone12](../tests/zone/zone12.md) | yes |
+| `IPV6_DISABLED` | `—` | [zone12](../tests/zone/zone12.md) | yes |
 | `MNAME_HAS_NO_ADDRESS` | `WARNING` | [zone07](../tests/zone/zone07.md) | yes |
 | `MNAME_IS_CNAME` | `NOTICE` | [zone07](../tests/zone/zone07.md) | yes |
 | `MNAME_IS_NOT_CNAME` | `INFO` | [zone07](../tests/zone/zone07.md) | yes |
@@ -34,8 +36,8 @@ _Do not edit by hand — regenerate with the command above._
 | `SOA_DEFAULT_TTL_MAXIMUM_VALUE_HIGHER` | `NOTICE` | [zone06](../tests/zone/zone06.md) | yes |
 | `SOA_DEFAULT_TTL_MAXIMUM_VALUE_LOWER` | `NOTICE` | [zone06](../tests/zone/zone06.md) | yes |
 | `SOA_DEFAULT_TTL_MAXIMUM_VALUE_OK` | `INFO` | [zone06](../tests/zone/zone06.md) | yes |
-| `TEST_CASE_END` | `DEBUG` | [zone01](../tests/zone/zone01.md), [zone02](../tests/zone/zone02.md), [zone03](../tests/zone/zone03.md), [zone04](../tests/zone/zone04.md), [zone05](../tests/zone/zone05.md), [zone06](../tests/zone/zone06.md), [zone07](../tests/zone/zone07.md), [zone08](../tests/zone/zone08.md), [zone09](../tests/zone/zone09.md), [zone10](../tests/zone/zone10.md) | yes |
-| `TEST_CASE_START` | `DEBUG` | [zone01](../tests/zone/zone01.md), [zone02](../tests/zone/zone02.md), [zone03](../tests/zone/zone03.md), [zone04](../tests/zone/zone04.md), [zone05](../tests/zone/zone05.md), [zone06](../tests/zone/zone06.md), [zone07](../tests/zone/zone07.md), [zone08](../tests/zone/zone08.md), [zone09](../tests/zone/zone09.md), [zone10](../tests/zone/zone10.md) | yes |
+| `TEST_CASE_END` | `DEBUG` | [zone01](../tests/zone/zone01.md), [zone02](../tests/zone/zone02.md), [zone03](../tests/zone/zone03.md), [zone04](../tests/zone/zone04.md), [zone05](../tests/zone/zone05.md), [zone06](../tests/zone/zone06.md), [zone07](../tests/zone/zone07.md), [zone08](../tests/zone/zone08.md), [zone09](../tests/zone/zone09.md), [zone10](../tests/zone/zone10.md), [zone12](../tests/zone/zone12.md) | yes |
+| `TEST_CASE_START` | `DEBUG` | [zone01](../tests/zone/zone01.md), [zone02](../tests/zone/zone02.md), [zone03](../tests/zone/zone03.md), [zone04](../tests/zone/zone04.md), [zone05](../tests/zone/zone05.md), [zone06](../tests/zone/zone06.md), [zone07](../tests/zone/zone07.md), [zone08](../tests/zone/zone08.md), [zone09](../tests/zone/zone09.md), [zone10](../tests/zone/zone10.md), [zone12](../tests/zone/zone12.md) | yes |
 | `WRONG_SOA` | `DEBUG` | [zone10](../tests/zone/zone10.md) | yes |
 | `Z01_MNAME_HAS_LOCALHOST_ADDR` | `NOTICE` | [zone01](../tests/zone/zone01.md) | yes |
 | `Z01_MNAME_IS_DOT` | `NOTICE` | [zone01](../tests/zone/zone01.md) | yes |
@@ -71,6 +73,12 @@ _Do not edit by hand — regenerate with the command above._
 | `Z11_SPF_SYNTAX_ERROR` | `WARNING` | [zone11](../tests/zone/zone11.md) | yes |
 | `Z11_SPF_SYNTAX_OK` | `INFO` | [zone11](../tests/zone/zone11.md) | yes |
 | `Z11_UNABLE_TO_CHECK_FOR_SPF` | `WARNING` | [zone11](../tests/zone/zone11.md) | yes |
+| `Z12_CSYNC_FOUND` | `INFO` | [zone12](../tests/zone/zone12.md) | yes |
+| `Z12_INCONSISTENT_CSYNC` | `WARNING` | [zone12](../tests/zone/zone12.md) | yes |
+| `Z12_MIXED_PRESENCE` | `WARNING` | [zone12](../tests/zone/zone12.md) | yes |
+| `Z12_MULTIPLE_CSYNC` | `WARNING` | [zone12](../tests/zone/zone12.md) | yes |
+| `Z12_NO_CSYNC` | `INFO` | [zone12](../tests/zone/zone12.md) | yes |
+| `Z12_SERIAL_MISMATCH` | `WARNING` | [zone12](../tests/zone/zone12.md) | yes |
 
 ## i18n Notes
 
@@ -79,8 +87,6 @@ _Do not edit by hand — regenerate with the command above._
 These tags appear as `ZONE:<TAG>` in `.po` files but are absent from
 current code metadata.  The messages may be dead translations.
 
-- `IPV4_DISABLED`
-- `IPV6_DISABLED`
 - `Z11_SPF1_MULTIPLE_RECORDS`
 - `Z11_SPF1_SYNTAX_ERROR`
 - `Z11_SPF1_SYNTAX_OK`

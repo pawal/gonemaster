@@ -80,6 +80,7 @@ var moduleTestcases = map[string][]string{
 		"zone09",
 		"zone10",
 		"zone11",
+		"zone12",
 	},
 }
 

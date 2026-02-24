@@ -390,3 +390,214 @@ func txtPacket(name string, value string) packet.Packet {
 	msg.Answer = []dns.RR{txtRR}
 	return packet.Packet{Msg: msg}
 }
+
+func csyncPacket(name string, serial uint32, flags uint16, types []uint16) packet.Packet {
+	msg := new(dns.Msg)
+	msg.Authoritative = true
+	msg.Rcode = dns.RcodeSuccess
+	csync := &dns.CSYNC{}
+	csync.Hdr = dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET, TTL: 300}
+	csync.CSYNC.Serial = serial
+	csync.CSYNC.Flags = flags
+	csync.CSYNC.TypeBitMap = types
+	msg.Answer = []dns.RR{csync}
+	return packet.Packet{Msg: msg}
+}
+
+func TestZone12CSYNCFound(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	const serial uint32 = 2024010101
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		switch qtype {
+		case "CSYNC":
+			return csyncPacket("example", serial, 0x0001, []uint16{dns.TypeNS, dns.TypeA, dns.TypeAAAA})
+		case "SOA":
+			return soaPacket("example", serial, 3600, 900, 604800, 300)
+		}
+		return packet.Packet{}
+	})
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example")}
+	entries, err := Zone12(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone12: %v", err)
+	}
+	if !hasEntryTag(entries, "Z12_CSYNC_FOUND") {
+		t.Fatalf("expected Z12_CSYNC_FOUND")
+	}
+}
+
+func TestZone12NoCSYNC(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		switch qtype {
+		case "CSYNC":
+			// Authoritative NOERROR with no CSYNC in answer.
+			msg := new(dns.Msg)
+			msg.Authoritative = true
+			msg.Rcode = dns.RcodeSuccess
+			return packet.Packet{Msg: msg}
+		case "SOA":
+			return soaPacket("example", 2024010101, 3600, 900, 604800, 300)
+		}
+		return packet.Packet{}
+	})
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example")}
+	entries, err := Zone12(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone12: %v", err)
+	}
+	if !hasEntryTag(entries, "Z12_NO_CSYNC") {
+		t.Fatalf("expected Z12_NO_CSYNC")
+	}
+}
+
+func TestZone12SerialMismatch(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		switch qtype {
+		case "CSYNC":
+			// CSYNC carries serial 100, but SOA has serial 200.
+			return csyncPacket("example", 100, 0, []uint16{dns.TypeNS})
+		case "SOA":
+			return soaPacket("example", 200, 3600, 900, 604800, 300)
+		}
+		return packet.Packet{}
+	})
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example")}
+	entries, err := Zone12(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone12: %v", err)
+	}
+	if !hasEntryTag(entries, "Z12_SERIAL_MISMATCH") {
+		t.Fatalf("expected Z12_SERIAL_MISMATCH")
+	}
+}
+
+func TestZone12MultipleCSYNC(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		if qtype != "CSYNC" {
+			return packet.Packet{}
+		}
+		msg := new(dns.Msg)
+		msg.Authoritative = true
+		msg.Rcode = dns.RcodeSuccess
+		for i := range 2 {
+			csync := &dns.CSYNC{}
+			csync.Hdr = dns.Header{Name: "example.", Class: dns.ClassINET, TTL: 300}
+			csync.CSYNC.Serial = uint32(2024010100 + i)
+			csync.CSYNC.TypeBitMap = []uint16{dns.TypeNS}
+			msg.Answer = append(msg.Answer, csync)
+		}
+		return packet.Packet{Msg: msg}
+	})
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example")}
+	entries, err := Zone12(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone12: %v", err)
+	}
+	if !hasEntryTag(entries, "Z12_MULTIPLE_CSYNC") {
+		t.Fatalf("expected Z12_MULTIPLE_CSYNC")
+	}
+}
+
+func TestZone12InconsistentCSYNC(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	// ns1 and ns2 return CSYNC records with different serials.
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		if qtype == "CSYNC" {
+			return csyncPacket("example", 2024010101, 0, []uint16{dns.TypeNS})
+		}
+		return packet.Packet{}
+	})
+	ns2 := newNameserver(t, "ns2.example", "192.0.2.2", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		if qtype == "CSYNC" {
+			return csyncPacket("example", 2024010199, 0, []uint16{dns.TypeNS})
+		}
+		return packet.Packet{}
+	})
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1, ns2}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example")}
+	entries, err := Zone12(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone12: %v", err)
+	}
+	if !hasEntryTag(entries, "Z12_INCONSISTENT_CSYNC") {
+		t.Fatalf("expected Z12_INCONSISTENT_CSYNC")
+	}
+}
+
+func TestZone12MixedPresence(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	// ns1 returns CSYNC, ns2 returns authoritative NOERROR without CSYNC.
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		if qtype == "CSYNC" {
+			return csyncPacket("example", 2024010101, 0, []uint16{dns.TypeNS})
+		}
+		return packet.Packet{}
+	})
+	ns2 := newNameserver(t, "ns2.example", "192.0.2.2", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		if qtype == "CSYNC" {
+			msg := new(dns.Msg)
+			msg.Authoritative = true
+			msg.Rcode = dns.RcodeSuccess
+			return packet.Packet{Msg: msg}
+		}
+		return packet.Packet{}
+	})
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1, ns2}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example")}
+	entries, err := Zone12(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone12: %v", err)
+	}
+	if !hasEntryTag(entries, "Z12_MIXED_PRESENCE") {
+		t.Fatalf("expected Z12_MIXED_PRESENCE")
+	}
+}

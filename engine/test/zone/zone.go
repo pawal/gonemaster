@@ -171,6 +171,16 @@ func All(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
+	if util.ShouldRunTest(ctx, "zone12") {
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Zone12(ctx, z)
+		})
+		results = append(results, entries...)
+		if err != nil {
+			return results, err
+		}
+	}
+
 	return results, nil
 }
 
@@ -281,6 +291,18 @@ func Metadata() map[string][]string {
 			"Z11_SPF_SYNTAX_ERROR",
 			"Z11_SPF_SYNTAX_OK",
 			"Z11_UNABLE_TO_CHECK_FOR_SPF",
+		},
+		"zone12": {
+			"IPV4_DISABLED",
+			"IPV6_DISABLED",
+			"Z12_CSYNC_FOUND",
+			"Z12_INCONSISTENT_CSYNC",
+			"Z12_MIXED_PRESENCE",
+			"Z12_MULTIPLE_CSYNC",
+			"Z12_NO_CSYNC",
+			"Z12_SERIAL_MISMATCH",
+			"TEST_CASE_END",
+			"TEST_CASE_START",
 		},
 	}
 }
@@ -1449,6 +1471,158 @@ func Zone11(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	}
 
 	return appendTestCaseEnd(ctx, results, testcase)
+}
+
+// Zone12 runs the Zone12 test case.
+func Zone12(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
+	const testcase = "Zone12"
+	var results []*logger.Entry
+
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+		return results, err
+	}
+
+	nss, err := method4and5(ctx, z)
+	if err != nil {
+		return results, err
+	}
+
+	type csyncOutcome struct {
+		ns        nameserver.Nameserver
+		checked   bool
+		csyncRRs  []dns.RR
+		soaSerial uint32
+		soaOK     bool
+	}
+
+	var outcomes []csyncOutcome
+	if len(nss) > 0 {
+		outcomes = make([]csyncOutcome, len(nss))
+		tasks := make([]runner.Task, len(nss))
+		for i, ns := range nss {
+			i, ns := i, ns
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				outcome := csyncOutcome{ns: ns}
+
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "CSYNC"); err != nil {
+					return err
+				} else if disabled {
+					outcomes[i] = outcome
+					return nil
+				}
+
+				resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "CSYNC", nil)
+				if resp.Msg == nil || resp.Rcode() != "NOERROR" || !resp.AA() {
+					outcomes[i] = outcome
+					return nil
+				}
+
+				outcome.csyncRRs = resp.GetRecordsForName("CSYNC", z.Name)
+
+				// Query SOA from the same NS to get the current serial for comparison.
+				soaResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "SOA", nil)
+				if soaResp.Msg != nil {
+					for _, rr := range soaResp.GetRecordsForName("SOA", z.Name) {
+						if soa, ok := rr.(*dns.SOA); ok {
+							outcome.soaSerial = soa.Serial
+							outcome.soaOK = true
+							break
+						}
+					}
+				}
+
+				outcome.checked = true
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+		if err != nil {
+			return results, err
+		}
+		results = append(results, entries...)
+	}
+
+	var hasCSYNC, noCSYNC int
+	csyncKeys := map[string]struct{}{}
+
+	for _, outcome := range outcomes {
+		if !outcome.checked {
+			continue
+		}
+		ns := outcome.ns
+		if len(outcome.csyncRRs) > 1 {
+			hasCSYNC++
+			if err := appendLog(ctx, &results, testcase, "Z12_MULTIPLE_CSYNC", map[string]any{
+				"ns":    ns.String(),
+				"count": len(outcome.csyncRRs),
+			}); err != nil {
+				return results, err
+			}
+		} else if len(outcome.csyncRRs) == 1 {
+			hasCSYNC++
+			csync, ok := outcome.csyncRRs[0].(*dns.CSYNC)
+			if !ok {
+				continue
+			}
+			typeBitmap := csyncTypeBitmap(csync.CSYNC.TypeBitMap)
+			if err := appendLog(ctx, &results, testcase, "Z12_CSYNC_FOUND", map[string]any{
+				"ns":          ns.String(),
+				"serial":      csync.CSYNC.Serial,
+				"flags":       csync.CSYNC.Flags,
+				"type_bitmap": typeBitmap,
+			}); err != nil {
+				return results, err
+			}
+			if outcome.soaOK && csync.CSYNC.Serial != outcome.soaSerial {
+				if err := appendLog(ctx, &results, testcase, "Z12_SERIAL_MISMATCH", map[string]any{
+					"ns":           ns.String(),
+					"csync_serial": csync.CSYNC.Serial,
+					"soa_serial":   outcome.soaSerial,
+				}); err != nil {
+					return results, err
+				}
+			}
+			key := fmt.Sprintf("%d/%d/%v", csync.CSYNC.Serial, csync.CSYNC.Flags, csync.CSYNC.TypeBitMap)
+			csyncKeys[key] = struct{}{}
+		} else {
+			noCSYNC++
+			if err := appendLog(ctx, &results, testcase, "Z12_NO_CSYNC", map[string]any{
+				"ns": ns.String(),
+			}); err != nil {
+				return results, err
+			}
+		}
+	}
+
+	if hasCSYNC > 0 && noCSYNC > 0 {
+		if err := appendLog(ctx, &results, testcase, "Z12_MIXED_PRESENCE", map[string]any{}); err != nil {
+			return results, err
+		}
+	}
+	if hasCSYNC > 1 && len(csyncKeys) > 1 {
+		if err := appendLog(ctx, &results, testcase, "Z12_INCONSISTENT_CSYNC", map[string]any{}); err != nil {
+			return results, err
+		}
+	}
+
+	return appendTestCaseEnd(ctx, results, testcase)
+}
+
+// csyncTypeBitmap formats a CSYNC TypeBitMap as a semicolon-separated list of DNS type names.
+func csyncTypeBitmap(types []uint16) string {
+	var names []string
+	for _, t := range types {
+		if name, ok := dns.TypeToString[t]; ok {
+			names = append(names, name)
+		} else {
+			names = append(names, fmt.Sprintf("TYPE%d", t))
+		}
+	}
+	return strings.Join(names, ";")
 }
 
 func appendTestCaseEnd(ctx context.Context, results []*logger.Entry, testcase string) ([]*logger.Entry, error) {

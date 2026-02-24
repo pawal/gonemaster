@@ -131,7 +131,7 @@ func (p Packet) HasEdns() bool {
 	if p.Msg == nil {
 		return false
 	}
-	return p.Msg.UDPSize > 0 || p.Msg.Security || len(p.Msg.Pseudo) > 0
+	return p.Msg.UDPSize > 0 || p.Msg.Security || len(p.Msg.Pseudo) > 0 || ednsOPT(p.Msg) != nil
 }
 
 // EdnsSize returns the EDNS UDP payload size.
@@ -139,7 +139,13 @@ func (p Packet) EdnsSize() uint16 {
 	if p.Msg == nil {
 		return 0
 	}
-	return p.Msg.UDPSize
+	if p.Msg.UDPSize > 0 {
+		return p.Msg.UDPSize
+	}
+	if opt := ednsOPT(p.Msg); opt != nil {
+		return opt.UDPSize()
+	}
+	return 0
 }
 
 // EdnsRcode returns the EDNS extended rcode upper byte (bits 4–11 of the 12-bit rcode).
@@ -147,7 +153,13 @@ func (p Packet) EdnsRcode() int {
 	if p.Msg == nil {
 		return 0
 	}
-	return int(p.Msg.Rcode >> 4)
+	if p.Msg.Rcode > 0xF {
+		return int(p.Msg.Rcode >> 4)
+	}
+	if opt := ednsOPT(p.Msg); opt != nil {
+		return int(opt.Rcode() >> 4)
+	}
+	return 0
 }
 
 // EdnsVersion returns the EDNS version.
@@ -155,20 +167,22 @@ func (p Packet) EdnsVersion() uint8 {
 	if p.Msg == nil {
 		return 0
 	}
-	return p.Msg.Version
+	if p.Msg.Version != 0 {
+		return p.Msg.Version
+	}
+	if opt := ednsOPT(p.Msg); opt != nil {
+		return opt.Version()
+	}
+	return 0
 }
 
 // EdnsZ returns the raw EDNS Z bits.
-// For wire-decoded messages, Z bits are not preserved by v2's Msg.
-// Test helpers can signal Z by placing an *dns.OPT record in Extra with SetZ called.
 func (p Packet) EdnsZ() uint16 {
 	if p.Msg == nil {
 		return 0
 	}
-	for _, rr := range p.Msg.Extra {
-		if opt, ok := rr.(*dns.OPT); ok {
-			return opt.Z()
-		}
+	if opt := ednsOPT(p.Msg); opt != nil {
+		return opt.Z()
 	}
 	return 0
 }
@@ -178,7 +192,17 @@ func (p Packet) EdnsData() []dns.RR {
 	if p.Msg == nil {
 		return nil
 	}
-	return p.Msg.Pseudo
+	if len(p.Msg.Pseudo) > 0 {
+		return p.Msg.Pseudo
+	}
+	if opt := ednsOPT(p.Msg); opt != nil && len(opt.Options) > 0 {
+		out := make([]dns.RR, 0, len(opt.Options))
+		for _, edns := range opt.Options {
+			out = append(out, edns)
+		}
+		return out
+	}
+	return nil
 }
 
 // DO reports whether the EDNS DO bit is set.
@@ -186,7 +210,13 @@ func (p Packet) DO() bool {
 	if p.Msg == nil {
 		return false
 	}
-	return p.Msg.Security
+	if p.Msg.Security {
+		return true
+	}
+	if opt := ednsOPT(p.Msg); opt != nil {
+		return opt.Security()
+	}
+	return false
 }
 
 // Type approximates LDNS packet classification.
@@ -269,6 +299,19 @@ func (p Packet) logSystem(tag string, args map[string]any) {
 		return
 	}
 	_, _ = p.Log.Add(tag, args, "System", "")
+}
+
+func ednsOPT(msg *dns.Msg) *dns.OPT {
+	if msg == nil {
+		return nil
+	}
+	for _, rr := range msg.Extra {
+		opt, ok := rr.(*dns.OPT)
+		if ok {
+			return opt
+		}
+	}
+	return nil
 }
 
 func packetQuestionInfo(msg *dns.Msg) (string, string, bool) {

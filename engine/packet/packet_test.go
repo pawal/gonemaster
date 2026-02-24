@@ -152,6 +152,44 @@ func TestEdnsHelpers(t *testing.T) {
 	}
 }
 
+func TestEdnsHelpersFromExplicitOPTRecord(t *testing.T) {
+	msg := new(dns.Msg)
+	opt := &dns.OPT{Hdr: dns.Header{Name: "."}}
+	opt.SetUDPSize(1232)
+	opt.SetVersion(1)
+	opt.SetSecurity(true)
+	opt.SetRcode(16)
+	opt.SetZ(3)
+	opt.Options = []dns.EDNS0{&dns.NSID{Nsid: "beef"}}
+	msg.Extra = []dns.RR{opt}
+
+	pkt := New(msg)
+	if !pkt.HasEdns() {
+		t.Fatalf("expected EDNS present from explicit OPT record")
+	}
+	if pkt.EdnsSize() != 1232 {
+		t.Fatalf("unexpected EDNS size: %d", pkt.EdnsSize())
+	}
+	if pkt.EdnsVersion() != 1 {
+		t.Fatalf("unexpected EDNS version: %d", pkt.EdnsVersion())
+	}
+	if pkt.EdnsRcode() != 1 {
+		t.Fatalf("unexpected EDNS extended rcode: %d", pkt.EdnsRcode())
+	}
+	if pkt.EdnsZ() != 3 {
+		t.Fatalf("unexpected EDNS Z: %d", pkt.EdnsZ())
+	}
+	if !pkt.DO() {
+		t.Fatalf("expected DO bit set from OPT")
+	}
+	if len(pkt.EdnsData()) != 1 {
+		t.Fatalf("expected 1 EDNS option from OPT, got %d", len(pkt.EdnsData()))
+	}
+	if _, ok := pkt.EdnsData()[0].(*dns.NSID); !ok {
+		t.Fatalf("expected NSID option from OPT")
+	}
+}
+
 func TestPacketBasicHelpers(t *testing.T) {
 	msg := new(dns.Msg)
 	msg.ID = 1234

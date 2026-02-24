@@ -2,6 +2,7 @@ package transport
 
 import (
 	"context"
+	"encoding/binary"
 	"net"
 	"net/netip"
 	"sync/atomic"
@@ -135,6 +136,143 @@ func TestPrepareMessageWithEDNSDetails(t *testing.T) {
 	}
 	if _, ok := prepared.Pseudo[0].(*dns.NSID); !ok {
 		t.Fatalf("expected NSID option in pseudo section")
+	}
+}
+
+func TestPrepareMessageWithEDNSZEncodesSingleOPT(t *testing.T) {
+	do := true
+	size := uint16(1232)
+	version := uint8(1)
+	z := uint16(0x1234)
+	rcode := uint8(16)
+
+	client := &Client{
+		EDNSDetails: &EDNSDetails{
+			Do:      &do,
+			Size:    &size,
+			Version: &version,
+			Z:       &z,
+			Rcode:   &rcode,
+			Data: []dns.EDNS0{
+				&dns.NSID{},
+			},
+		},
+	}
+
+	prepared := client.prepareMessage(BuildQuery("example.com", dns.TypeA))
+
+	if len(prepared.Pseudo) != 0 {
+		t.Fatalf("expected pseudo section to be empty when explicit OPT is used, got %d entries", len(prepared.Pseudo))
+	}
+	if prepared.UDPSize != 0 {
+		t.Fatalf("expected UDPSize to be moved into OPT record, got %d", prepared.UDPSize)
+	}
+
+	var opt *dns.OPT
+	for _, rr := range prepared.Extra {
+		if typed, ok := rr.(*dns.OPT); ok {
+			opt = typed
+			break
+		}
+	}
+	if opt == nil {
+		t.Fatalf("expected explicit OPT record in additional section")
+	}
+	if got := opt.Z(); got != (z & 0x1FFF) {
+		t.Fatalf("unexpected OPT Z value: got %d want %d", got, z&0x1FFF)
+	}
+	if got := opt.UDPSize(); got != size {
+		t.Fatalf("unexpected OPT UDP size: got %d want %d", got, size)
+	}
+	if got := opt.Version(); got != version {
+		t.Fatalf("unexpected OPT version: got %d want %d", got, version)
+	}
+	if !opt.Security() {
+		t.Fatalf("expected OPT DO bit set")
+	}
+	if got := opt.Rcode(); got != 16 {
+		t.Fatalf("unexpected OPT extended rcode: got %d want 16", got)
+	}
+	if len(opt.Options) != 1 {
+		t.Fatalf("expected one EDNS option in OPT, got %d", len(opt.Options))
+	}
+
+	if err := prepared.Pack(); err != nil {
+		t.Fatalf("pack prepared query: %v", err)
+	}
+	wireZ := extractSingleOptZFromWire(t, prepared.Data)
+	if wireZ != (z & 0x1FFF) {
+		t.Fatalf("wire OPT Z mismatch: got %d want %d", wireZ, z&0x1FFF)
+	}
+}
+
+func extractSingleOptZFromWire(t *testing.T, wire []byte) uint16 {
+	t.Helper()
+
+	if len(wire) < 12 {
+		t.Fatalf("wire message too short: %d", len(wire))
+	}
+	qd := binary.BigEndian.Uint16(wire[4:6])
+	an := binary.BigEndian.Uint16(wire[6:8])
+	ns := binary.BigEndian.Uint16(wire[8:10])
+	ar := binary.BigEndian.Uint16(wire[10:12])
+	if qd != 1 || an != 0 || ns != 0 || ar != 1 {
+		t.Fatalf("unexpected DNS section counts: qd=%d an=%d ns=%d ar=%d", qd, an, ns, ar)
+	}
+
+	offset, ok := skipName(wire, 12)
+	if !ok || offset+4 > len(wire) {
+		t.Fatalf("failed to parse question section")
+	}
+	offset += 4 // qtype + qclass
+
+	offset, ok = skipName(wire, offset)
+	if !ok || offset+10 > len(wire) {
+		t.Fatalf("failed to parse OPT owner name/header")
+	}
+	typ := binary.BigEndian.Uint16(wire[offset : offset+2])
+	offset += 2
+	_ = binary.BigEndian.Uint16(wire[offset : offset+2]) // class
+	offset += 2
+	ttl := binary.BigEndian.Uint32(wire[offset : offset+4])
+	offset += 4
+	rdlen := int(binary.BigEndian.Uint16(wire[offset : offset+2]))
+	offset += 2
+
+	if typ != dns.TypeOPT {
+		t.Fatalf("expected additional record type OPT, got %d", typ)
+	}
+	if offset+rdlen > len(wire) {
+		t.Fatalf("invalid OPT rdata length: rdlen=%d offset=%d total=%d", rdlen, offset, len(wire))
+	}
+
+	return uint16(ttl & 0x1FFF)
+}
+
+func skipName(wire []byte, offset int) (int, bool) {
+	for {
+		if offset >= len(wire) {
+			return 0, false
+		}
+		length := wire[offset]
+		offset++
+		switch length & 0xC0 {
+		case 0x00:
+			if length == 0 {
+				return offset, true
+			}
+			offset += int(length)
+			if offset > len(wire) {
+				return 0, false
+			}
+		case 0xC0:
+			if offset >= len(wire) {
+				return 0, false
+			}
+			return offset + 1, true
+		default:
+			return 0, false
+		}
 	}
 }
 

@@ -297,13 +297,60 @@ func setResponseEDNS(msg *dns.Msg, dnssec bool, size uint16, opts *QueryOptions)
 	if opts.EDNSDetails.Version != nil {
 		msg.Version = *opts.EDNSDetails.Version
 	}
-	// Z bits are not directly settable in v2; opts.EDNSDetails.Z is ignored.
 	if opts.EDNSDetails.Rcode != nil {
 		msg.Rcode = uint16(*opts.EDNSDetails.Rcode)
 	}
 	for _, opt := range opts.EDNSDetails.Data {
 		msg.Pseudo = append(msg.Pseudo, opt)
 	}
+	if opts.EDNSDetails.Z != nil {
+		setMessageEDNSZ(msg, *opts.EDNSDetails.Z)
+	}
+}
+
+func setMessageEDNSZ(msg *dns.Msg, z uint16) {
+	if msg == nil {
+		return
+	}
+
+	opt := &dns.OPT{Hdr: dns.Header{Name: "."}}
+	for _, rr := range msg.Pseudo {
+		edns, ok := rr.(dns.EDNS0)
+		if !ok {
+			return
+		}
+		opt.Options = append(opt.Options, edns)
+	}
+
+	udpSize := msg.UDPSize
+	if udpSize < dns.MinMsgSize {
+		udpSize = dns.MinMsgSize
+	}
+	opt.SetUDPSize(udpSize)
+	opt.SetVersion(msg.Version)
+	opt.SetSecurity(msg.Security)
+	opt.SetCompactAnswers(msg.CompactAnswers)
+	opt.SetDelegation(msg.Delegation)
+	opt.SetRcode(msg.Rcode)
+	opt.SetZ(z)
+
+	extra := make([]dns.RR, 0, len(msg.Extra)+1)
+	for _, rr := range msg.Extra {
+		if _, isOPT := rr.(*dns.OPT); isOPT {
+			continue
+		}
+		extra = append(extra, rr)
+	}
+	extra = append(extra, opt)
+	msg.Extra = extra
+
+	msg.Pseudo = nil
+	msg.UDPSize = 0
+	msg.Security = false
+	msg.CompactAnswers = false
+	msg.Delegation = false
+	msg.Version = 0
+	msg.Rcode &= 0xF
 }
 
 func buildCacheKey(name string, qtype string, qclass string, opts *QueryOptions) (string, uint16, bool, error) {

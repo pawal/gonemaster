@@ -44,8 +44,8 @@ type EDNSDetails struct {
 	Do      *bool
 	Size    *uint16
 	Version *uint8
-	// Z bits are not directly settable on a dns.Msg in v2; this field is kept for
-	// future use but has no effect on the outgoing message.
+	// Z carries the EDNS Z flags (low 15 bits). When set, prepareMessage encodes
+	// EDNS using an explicit OPT RR so Z is preserved on the wire.
 	Z     *uint16
 	Rcode *uint8
 	Data  []dns.EDNS0 // pseudo-section EDNS0 sub-options to append (e.g. *dns.NSID)
@@ -334,6 +334,7 @@ func (c *Client) prepareMessage(msg *dns.Msg) *dns.Msg {
 		prepared.UDPSize = c.EDNSSize
 		prepared.Security = c.DNSSEC
 
+		var z *uint16
 		if c.EDNSDetails != nil {
 			if c.EDNSDetails.Do != nil {
 				prepared.Security = *c.EDNSDetails.Do
@@ -343,6 +344,9 @@ func (c *Client) prepareMessage(msg *dns.Msg) *dns.Msg {
 			}
 			if c.EDNSDetails.Version != nil {
 				prepared.Version = *c.EDNSDetails.Version
+			}
+			if c.EDNSDetails.Z != nil {
+				z = c.EDNSDetails.Z
 			}
 			if c.EDNSDetails.Rcode != nil {
 				// Extended rcode: lower 4 bits stay in header Rcode; upper 8 bits go in OPT.
@@ -355,9 +359,62 @@ func (c *Client) prepareMessage(msg *dns.Msg) *dns.Msg {
 				}
 			}
 		}
+
+		if z != nil {
+			applyEDNSZ(prepared, *z)
+		}
 	}
 
 	return prepared
+}
+
+func applyEDNSZ(msg *dns.Msg, z uint16) {
+	if msg == nil {
+		return
+	}
+
+	// If pseudo contains non-EDNS records (e.g. TSIG), keep default packing path
+	// to avoid changing section ordering semantics.
+	opt := &dns.OPT{Hdr: dns.Header{Name: "."}}
+	for _, rr := range msg.Pseudo {
+		edns, ok := rr.(dns.EDNS0)
+		if !ok {
+			return
+		}
+		opt.Options = append(opt.Options, edns)
+	}
+
+	udpSize := msg.UDPSize
+	if udpSize < dns.MinMsgSize {
+		udpSize = dns.MinMsgSize
+	}
+	opt.SetUDPSize(udpSize)
+	opt.SetVersion(msg.Version)
+	opt.SetSecurity(msg.Security)
+	opt.SetCompactAnswers(msg.CompactAnswers)
+	opt.SetDelegation(msg.Delegation)
+	opt.SetRcode(msg.Rcode)
+	opt.SetZ(z)
+
+	extra := make([]dns.RR, 0, len(msg.Extra)+1)
+	for _, rr := range msg.Extra {
+		if _, isOPT := rr.(*dns.OPT); isOPT {
+			continue
+		}
+		extra = append(extra, rr)
+	}
+	extra = append(extra, opt)
+	msg.Extra = extra
+
+	// Prevent Msg.Pack from auto-synthesizing a second OPT RR. The explicit OPT
+	// above now carries EDNS settings/options, with the base rcode kept in header.
+	msg.Pseudo = nil
+	msg.UDPSize = 0
+	msg.Security = false
+	msg.CompactAnswers = false
+	msg.Delegation = false
+	msg.Version = 0
+	msg.Rcode &= 0xF
 }
 
 func ensurePort(server string) string {

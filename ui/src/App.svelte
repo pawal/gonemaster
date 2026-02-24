@@ -1,5 +1,5 @@
 <script>
-  import { onDestroy } from "svelte";
+  import { onMount } from "svelte";
   import { fetchMetricsSnapshot, metricsWindowOptions } from "./metrics.js";
 
   let statusMessage = "";
@@ -68,6 +68,7 @@
   let persistenceReady = false;
   let persistenceSignature = "";
   let initialized = false;
+  let undelegatedRowCounter = 0;
 
   const apiPrefix = "/api/v1";
   const persistedStateKey = "gonemaster.ui.state.v1";
@@ -341,6 +342,10 @@
   const persistState = () => {
     const params = new URLSearchParams(window.location.search);
     persistedQueryKeys.forEach((key) => params.delete(key));
+    const normalizedRecentPage = normalizeRecentPageSize(recentPageSize);
+    const normalizedRecentCursor = normalizeCursor(recentCursor);
+    const normalizedBatchPage = normalizeBatchPageSize(batchPageSize);
+    const normalizedBatchCursor = normalizeCursor(batchCursor);
 
     if (jobSort !== "started_at_desc") {
       params.set("r_sort", jobSort);
@@ -356,11 +361,11 @@
     if (normalizedRecentDomain) {
       params.set("r_domain", normalizedRecentDomain);
     }
-    if (normalizeRecentPageSize(recentPageSize) !== 20) {
-      params.set("r_limit", String(normalizeRecentPageSize(recentPageSize)));
+    if (normalizedRecentPage !== 20) {
+      params.set("r_limit", String(normalizedRecentPage));
     }
-    if (normalizeCursor(recentCursor) > 0) {
-      params.set("r_cursor", String(normalizeCursor(recentCursor)));
+    if (normalizedRecentCursor > 0) {
+      params.set("r_cursor", String(normalizedRecentCursor));
     }
     const normalizedBatchID = selectedBatchId.trim();
     if (normalizedBatchID) {
@@ -369,11 +374,11 @@
     if (batchSort !== "started_at_desc") {
       params.set("b_sort", batchSort);
     }
-    if (normalizeBatchPageSize(batchPageSize) !== 20) {
-      params.set("b_limit", String(normalizeBatchPageSize(batchPageSize)));
+    if (normalizedBatchPage !== 20) {
+      params.set("b_limit", String(normalizedBatchPage));
     }
-    if (normalizeCursor(batchCursor) > 0) {
-      params.set("b_cursor", String(normalizeCursor(batchCursor)));
+    if (normalizedBatchCursor > 0) {
+      params.set("b_cursor", String(normalizedBatchCursor));
     }
     if (batchStatusFilter) {
       params.set("b_status", batchStatusFilter);
@@ -395,12 +400,12 @@
         severityFilter,
         jobBatchFilter: normalizedJobBatch,
         recentDomainFilter: normalizedRecentDomain,
-        recentPageSize: normalizeRecentPageSize(recentPageSize),
-        recentCursor: normalizeCursor(recentCursor),
+        recentPageSize: normalizedRecentPage,
+        recentCursor: normalizedRecentCursor,
         selectedBatchId: normalizedBatchID,
         batchSort,
-        batchPageSize: normalizeBatchPageSize(batchPageSize),
-        batchCursor: normalizeCursor(batchCursor),
+        batchPageSize: normalizedBatchPage,
+        batchCursor: normalizedBatchCursor,
         batchStatusFilter,
         batchDomainFilter: normalizedBatchDomain
       };
@@ -642,8 +647,15 @@
     }
   };
 
-  const emptyUndelegatedNameserverRow = () => ({ ns: "", ip: "" });
-  const emptyUndelegatedDSRow = () => ({ keytag: "", algorithm: "", digtype: "", digest: "" });
+  const nextUndelegatedRowID = (prefix) => `${prefix}-${++undelegatedRowCounter}`;
+  const emptyUndelegatedNameserverRow = () => ({ id: nextUndelegatedRowID("ns"), ns: "", ip: "" });
+  const emptyUndelegatedDSRow = () => ({
+    id: nextUndelegatedRowID("ds"),
+    keytag: "",
+    algorithm: "",
+    digtype: "",
+    digest: ""
+  });
   const trimUndelegatedNameserverRow = (row = {}) => ({
     ns: String(row?.ns || "").trim(),
     ip: String(row?.ip || "").trim()
@@ -682,16 +694,16 @@
     undelegatedNameservers = [...undelegatedNameservers, emptyUndelegatedNameserverRow()];
   };
 
-  const removeUndelegatedNameserverRow = (index) => {
-    undelegatedNameservers = undelegatedNameservers.filter((_, i) => i !== index);
+  const removeUndelegatedNameserverRow = (rowID) => {
+    undelegatedNameservers = undelegatedNameservers.filter((row) => row?.id !== rowID);
   };
 
   const addUndelegatedDSRow = () => {
     undelegatedDSInfo = [...undelegatedDSInfo, emptyUndelegatedDSRow()];
   };
 
-  const removeUndelegatedDSRow = (index) => {
-    undelegatedDSInfo = undelegatedDSInfo.filter((_, i) => i !== index);
+  const removeUndelegatedDSRow = (rowID) => {
+    undelegatedDSInfo = undelegatedDSInfo.filter((row) => row?.id !== rowID);
   };
 
   const buildUndelegatedPayload = () => {
@@ -1201,7 +1213,6 @@
   $: {
     autoRefreshBatch;
     selectedBatchId;
-    batchLoading;
     startBatchPolling();
   }
 
@@ -1304,16 +1315,17 @@
     }
   };
 
-  initializeApp();
-
-  onDestroy(() => {
-    if (jobPoller) clearInterval(jobPoller);
-    if (batchPoller) clearInterval(batchPoller);
-    if (recentPoller) clearInterval(recentPoller);
-    if (metricsPoller) clearInterval(metricsPoller);
-    if (jobInspectorHighlightTimer) clearTimeout(jobInspectorHighlightTimer);
-    if (statusDismissTimer) clearTimeout(statusDismissTimer);
-    window.removeEventListener("hashchange", updateTabFromHash);
+  onMount(() => {
+    initializeApp();
+    return () => {
+      if (jobPoller) clearInterval(jobPoller);
+      if (batchPoller) clearInterval(batchPoller);
+      if (recentPoller) clearInterval(recentPoller);
+      if (metricsPoller) clearInterval(metricsPoller);
+      if (jobInspectorHighlightTimer) clearTimeout(jobInspectorHighlightTimer);
+      if (statusDismissTimer) clearTimeout(statusDismissTimer);
+      window.removeEventListener("hashchange", updateTabFromHash);
+    };
   });
 </script>
 
@@ -1380,7 +1392,7 @@
               <div class="small">No undelegated nameservers configured.</div>
             {:else}
               <div class="undelegated-list">
-                {#each undelegatedNameservers as row, index (index)}
+                {#each undelegatedNameservers as row, index (row.id)}
                   <div class="undelegated-row">
                     <input
                       type="text"
@@ -1394,7 +1406,7 @@
                       placeholder="192.0.2.10 or 2001:db8::10"
                       bind:value={row.ip}
                     />
-                    <button class="ghost mini-button" type="button" on:click={() => removeUndelegatedNameserverRow(index)}>
+                    <button class="ghost mini-button" type="button" on:click={() => removeUndelegatedNameserverRow(row.id)}>
                       Remove
                     </button>
                   </div>
@@ -1410,7 +1422,7 @@
               <div class="small">No undelegated DS records configured.</div>
             {:else}
               <div class="undelegated-list">
-                {#each undelegatedDSInfo as row, index (index)}
+                {#each undelegatedDSInfo as row, index (row.id)}
                   <div class="undelegated-ds-row">
                     <input type="text" aria-label={`Undelegated DS keytag ${index + 1}`} placeholder="12345" bind:value={row.keytag} />
                     <input type="text" aria-label={`Undelegated DS algorithm ${index + 1}`} placeholder="13" bind:value={row.algorithm} />
@@ -1421,7 +1433,7 @@
                       placeholder="ABCD..."
                       bind:value={row.digest}
                     />
-                    <button class="ghost mini-button" type="button" on:click={() => removeUndelegatedDSRow(index)}>
+                    <button class="ghost mini-button" type="button" on:click={() => removeUndelegatedDSRow(row.id)}>
                       Remove
                     </button>
                   </div>
@@ -1477,7 +1489,7 @@
             <div class="field-label">Result summary</div>
             {#if summaryRows(selectedJobResult.summary).length}
               <div class="summary-grid">
-                {#each summaryRows(selectedJobResult.summary) as row}
+                {#each summaryRows(selectedJobResult.summary) as row (row.level)}
                   <div class={`summary-item severity-${row.level.toLowerCase()}`}>
                     <span class="summary-label">{row.level}</span>
                     <span class="summary-count">{row.count}</span>
@@ -1493,7 +1505,7 @@
             {:else}
               <div class="small">Grouped by module. Click a module to expand.</div>
               <div class="module-list">
-                {#each moduleGroups as group}
+                {#each moduleGroups as group (group.key)}
                   <div class="module-card">
                     <button
                       class="module-toggle"
@@ -1649,7 +1661,7 @@
         {:else if filteredJobs.length === 0}
           <div class="small">No jobs match the selected severity filter.</div>
         {:else}
-          {#each filteredJobs as job}
+          {#each filteredJobs as job (job.id)}
             <div class="list-item">
               <div class="list-item-main">
                 <div class="mono">{job.id}</div>
@@ -1659,7 +1671,7 @@
                 {/if}
                 <div class="job-severity-tags">
                   {#if jobSeverityRows(job).length}
-                    {#each jobSeverityRows(job) as entry}
+                    {#each jobSeverityRows(job) as entry (entry.level)}
                       <span class={`level-pill severity-${entry.level.toLowerCase()}`}>{entry.level} {entry.count}</span>
                     {/each}
                   {:else}
@@ -1829,7 +1841,7 @@ example.org`}
               {#if selectedBatch.items.length === 0}
                 <div class="small">No batch jobs match the current filters.</div>
               {:else}
-                {#each selectedBatch.items as item}
+                {#each selectedBatch.items as item (item.id)}
                   <div class="list-item">
                     <div class="list-item-main">
                       <div class="mono">{item.id}</div>

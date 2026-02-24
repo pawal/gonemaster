@@ -179,14 +179,14 @@ msgid ""
 "\"{domain_child}\" does not exist as a DNS zone. Try to test "
 "\"{domain_super}\" instead."
 msgstr ""
-"\"{domain_child}\" ne obstaja kot DNS cona.  Poskusite testirati "
+"\"{domain_child}\" ne obstaja kot DNS cona. Poskusite testirati "
 "\"{domain_super}\"."
 
 #. BASIC:B01_PARENT_DISREGARDED
 msgid ""
 "This is a test of an undelegated domain so finding the parent zone is "
 "disregarded."
-msgstr "V tem  testu ne iščemo starševske cone, ker je to 'undelegated' test."
+msgstr "V tem testu ne iščemo starševske cone, ker je to 'undelegated' test."
 
 #. BASIC:B01_PARENT_FOUND
 #, perl-brace-format
@@ -693,7 +693,7 @@ msgstr "IPv6 naslovi domenskih strežnikov se nahajajo v AS: {asn}."
 #. CONNECTIVITY:ASN_INFOS_ANNOUNCE_BY
 #, perl-brace-format
 msgid "Name server IP address \"{ns_ip}\" is announced by ASN {asn}."
-msgstr "IP naslov domenskega strežnika \"{ns_ip}\"  se oglaša iz AS {asn}."
+msgstr "IP naslov domenskega strežnika \"{ns_ip}\" se oglaša iz AS {asn}."
 
 #. CONSISTENCY:CONSISTENCY01
 msgid "SOA serial number consistency"
@@ -1151,7 +1151,7 @@ msgid ""
 "the DNSKEY RRset. Fetched from the nameservers with IP \"{ns_ip_list}\"."
 msgstr ""
 "DNSKEY z oznako {keytag} na katerega se sklicuje DS, ne obstaja v DNSKEY "
-"RRsetu. Podatki pridobljeni iz  \"{ns_ip_list}\"."
+"RRsetu. Podatki pridobljeni iz \"{ns_ip_list}\"."
 
 #. DNSSEC:DS02_NO_MATCHING_DNSKEY_RRSIG
 #, perl-brace-format
@@ -1305,7 +1305,7 @@ msgid ""
 "The zone is not DNSSEC signed or not properly DNSSEC signed. Testing for "
 "NSEC3 has been skipped. Fetched from name servers \"{ns_list}\"."
 msgstr ""
-"Cona ni (pravilno) DNSSEC podpisana. Test za NSEC3 je izpuščen.  Zapisi "
+"Cona ni (pravilno) DNSSEC podpisana. Test za NSEC3 je izpuščen. Zapisi "
 "pridobljeni iz \"{ns_list}\"."
 
 #. DNSSEC:DS03_NO_NSEC3
@@ -1372,7 +1372,7 @@ msgid ""
 "\"{ns_list}\"."
 msgstr ""
 "Naslednji domenski strežniki ne uporabljajo NSEC3, za razliko od ostalih. "
-"NSEC3 testiranje za te strežnike je bilo preskočeno.  Podatki pridobljeni "
+"NSEC3 testiranje za te strežnike je bilo preskočeno. Podatki pridobljeni "
 "iz: \"{ns_list}\"."
 
 #. DNSSEC:DS03_UNASSIGNED_FLAG_USED
@@ -1400,7 +1400,7 @@ msgid ""
 "the future. Fetched from the nameservers with IP addresses \"{ns_ip_list}\"."
 msgstr ""
 "RRSIG z oznako {keytag}, ki zajema DNSKEY zapise, ima datum začetka v "
-"prihodnosti. Podatki pridobljeni iz  \"{ns_ip_list}\"."
+"prihodnosti. Podatki pridobljeni iz \"{ns_ip_list}\"."
 
 #. DNSSEC:DS08_MISSING_RRSIG_IN_RESPONSE
 #, perl-brace-format
@@ -1448,7 +1448,7 @@ msgid ""
 "addresses \"{ns_ip_list}\"."
 msgstr ""
 "SOA RRset je podpisan z RRSIG z oznako {keytag}, ki se ga ne da preveriti z "
-"ustreznim DNSKEY-em. Podatki pridobljeni iz  \"{ns_ip_list}\"."
+"ustreznim DNSKEY-em. Podatki pridobljeni iz \"{ns_ip_list}\"."
 
 #. DNSSEC:DS09_SOA_RRSIG_EXPIRED
 #, perl-brace-format
@@ -1620,7 +1620,7 @@ msgid ""
 "Fetched from name servers \"{ns_list}\"."
 msgstr ""
 "Napačno ime lastnika (\"{domain}\") v SOA zapisu NODATA odgovora z NSEC3. "
-"Podatki pridobljeni iz  \"{ns_list}\"."
+"Podatki pridobljeni iz \"{ns_list}\"."
 
 #. DNSSEC:DS10_NSEC3_NO_VERIFIED_SIGNATURE
 #, perl-brace-format
@@ -1719,7 +1719,7 @@ msgid ""
 "Fetched from name servers \"{ns_list}\"."
 msgstr ""
 "Napačno ime lastnika (\"{domain}\") v SOA zapisu NODATA odgovora z NSEC. "
-"Podatki pridobljeni iz  \"{ns_list}\"."
+"Podatki pridobljeni iz \"{ns_list}\"."
 
 #. DNSSEC:DS10_NSEC_NO_VERIFIED_SIGNATURE
 #, perl-brace-format
@@ -1792,7 +1792,7 @@ msgid ""
 "The zone is not DNSSEC signed or not properly DNSSEC signed. Testing for "
 "NSEC and NSEC3 has been skipped. Fetched from name servers \"{ns_list}\"."
 msgstr ""
-"Cona ni (pravilno) DNSSEC podpisana. Testa za NSEC in NSEC3 sta izpuščena.  "
+"Cona ni (pravilno) DNSSEC podpisana. Testa za NSEC in NSEC3 sta izpuščena. "
 "Zapisi pridobljeni iz \"{ns_list}\"."
 
 #. DNSSEC:DS11_INCONSISTENT_DS
@@ -1845,7 +1845,7 @@ msgstr ""
 msgid ""
 "Unsigned child zone found on nameservers with IP addresses \"{ns_ip_list}\"."
 msgstr ""
-"Nepodpisana podrejena cona najdena na domenskih strežnikih  \"{ns_ip_list}\"."
+"Nepodpisana podrejena cona najdena na domenskih strežnikih \"{ns_ip_list}\"."
 
 #. DNSSEC:DS11_DS_BUT_UNSIGNED_ZONE
 msgid "The child zone is unsigned, but the parent zone has DS record."
@@ -2305,7 +2305,7 @@ msgid ""
 "Child lists enough ({count}) nameservers that resolve to IPv4 addresses. "
 "Lower limit set to {minimum}. Name servers: {ns_list}"
 msgstr ""
-"Podrejena cona ima dovolj ({count}) domenskih strežnikov  z IPv4 naslovi "
+"Podrejena cona ima dovolj ({count}) domenskih strežnikov z IPv4 naslovi "
 "({ns_list}). Spodnja meja je nastavljena na {minimum}."
 
 #. DELEGATION:ENOUGH_IPV4_NS_DEL
@@ -3119,7 +3119,7 @@ msgid ""
 "The SOA RNAME mail domain ({domain}) resolved to a mail server with "
 "localhost ({localhost}) IP address."
 msgstr ""
-"Domena ({domain}) iz SOA RNAME polja se je razrešila v localhost  "
+"Domena ({domain}) iz SOA RNAME polja se je razrešila v localhost "
 "({localhost}) IP naslov."
 
 #. SYNTAX:RNAME_MAIL_ILLEGAL_CNAME
@@ -3128,7 +3128,7 @@ msgid ""
 "The SOA RNAME mail domain ({domain}) refers to an address which is an alias "
 "(CNAME)."
 msgstr ""
-"Domena ({domain}) iz SOA RNMAME polja se nanaša na naslov, ki je alias "
+"Domena ({domain}) iz SOA RNAME polja se nanaša na naslov, ki je alias "
 "(CNAME)."
 
 #. SYNTAX:RNAME_MISUSED_AT_SIGN

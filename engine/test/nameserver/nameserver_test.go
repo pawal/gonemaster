@@ -585,6 +585,32 @@ func TestNameserver13MissingOptInTruncated(t *testing.T) {
 	}
 }
 
+func TestNameserver13NoEdnsSupport(t *testing.T) {
+	setupTest(t)
+
+	origM4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origM4and5 })
+
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.14", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeFormatError
+		// No EDNS OPT record in response
+		return packet.Packet{Msg: msg}
+	})
+	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Nameserver13(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("nameserver13: %v", err)
+	}
+	if !hasEntryTag(entries, "NO_EDNS_SUPPORT") {
+		t.Fatalf("expected NO_EDNS_SUPPORT")
+	}
+}
+
 func TestNameserver15SoftwareVersionAndWrongClass(t *testing.T) {
 	setupTest(t)
 

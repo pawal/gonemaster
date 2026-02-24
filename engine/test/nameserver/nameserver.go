@@ -1583,7 +1583,7 @@ func Nameserver13(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			i, server := i, server
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
-				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, server, "SOA"); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, server, "DNSKEY"); err != nil {
 					return err
 				} else if disabled {
 					return nil
@@ -1594,7 +1594,7 @@ func Nameserver13(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				size := uint16(512)
 				useVC := false
 				fallback := false
-				resp, err := server.QueryWithOptions(ctx, z.Name.String(), "SOA", &ns.QueryOptions{
+				resp, err := server.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &ns.QueryOptions{
 					UseVC:    &useVC,
 					Fallback: &fallback,
 					EDNSDetails: &transport.EDNSDetails{
@@ -1604,7 +1604,7 @@ func Nameserver13(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					},
 				})
 				if err == nil && resp.Msg != nil {
-					if resp.Rcode() == "FORMERR" && resp.EdnsRcode() == 0 {
+					if resp.Rcode() == "FORMERR" && !resp.HasEdns() {
 						if _, err := buf.Add("NO_EDNS_SUPPORT", map[string]any{"ns": server.String()}); err != nil {
 							return err
 						}
@@ -1612,7 +1612,7 @@ func Nameserver13(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						if _, err := buf.Add("MISSING_OPT_IN_TRUNCATED", map[string]any{"ns": server.String()}); err != nil {
 							return err
 						}
-					} else if resp.Rcode() == "NOERROR" && resp.EdnsRcode() == 0 && resp.EdnsVersion() == 0 {
+					} else if resp.Rcode() == "NOERROR" && resp.EdnsVersion() == 0 {
 						return nil
 					} else {
 						if _, err := buf.Add("NS_ERROR", map[string]any{"ns": server.String()}); err != nil {

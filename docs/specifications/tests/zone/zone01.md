@@ -91,6 +91,9 @@ Status: Draft
 | `Z01_MNAME_UNEXPECTED_RCODE` | `rcode` | `string` | Non-`NOERROR` response code text. |
 
 ## Severity Levels Per Tag
+
+SOA MNAME is never used for authoritative nameserver discovery and is not part of normal DNS lookup, so operational impact of MNAME errors is limited. Accordingly, no MNAME-related tag exceeds `NOTICE` severity.
+
 | Tag | Level | Notes |
 | --- | --- | --- |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.ZONE`). |

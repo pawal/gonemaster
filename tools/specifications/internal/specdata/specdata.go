@@ -1,7 +1,10 @@
 package specdata
 
 import (
+	"bufio"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -60,6 +63,51 @@ func KnownTagsByModule() map[string]map[string][]string {
 		"syntax":       normalizeTags(syntaxpkg.Metadata()),
 		"zone":         normalizeTags(zonepkg.Metadata()),
 	}
+}
+
+// TestcaseTitles reads the first Purpose bullet from each spec file.
+// specsRoot is the directory containing per-module subdirectories (e.g., "docs/specifications/tests").
+// Missing spec files or missing Purpose sections produce an empty string for that testcase.
+func TestcaseTitles(specsRoot string, modules map[string][]string) map[string]string {
+	titles := make(map[string]string)
+	for module, testcases := range modules {
+		for _, tc := range testcases {
+			path := filepath.Join(specsRoot, module, tc+".md")
+			if title, err := readSpecPurpose(path); err == nil {
+				titles[tc] = title
+			}
+		}
+	}
+	return titles
+}
+
+// readSpecPurpose returns the first bullet point from the "## Purpose" section.
+func readSpecPurpose(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	inPurpose := false
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "## Purpose" {
+			inPurpose = true
+			continue
+		}
+		if inPurpose {
+			if strings.HasPrefix(line, "- ") {
+				return strings.TrimSuffix(strings.TrimPrefix(line, "- "), ":"), nil
+			}
+			// Stop at the next section heading.
+			if strings.HasPrefix(line, "## ") {
+				break
+			}
+		}
+	}
+	return "", fmt.Errorf("no Purpose bullet in %s", path)
 }
 
 func normalizeTags(input map[string][]string) map[string][]string {

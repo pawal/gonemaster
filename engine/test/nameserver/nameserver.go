@@ -2,6 +2,7 @@ package nameserver
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"net"
 	"net/netip"
@@ -169,6 +170,15 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
+	if util.ShouldRunTest(ctx, "nameserver16") {
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Nameserver16(ctx, z)
+		})
+		results = append(results, entries...)
+		if err != nil {
+			return results, err
+		}
+	}
 
 	return results, nil
 }
@@ -309,6 +319,16 @@ func Metadata() map[string][]string {
 			"N15_NO_VERSION_REVEALED",
 			"N15_SOFTWARE_VERSION",
 			"N15_WRONG_CLASS",
+			"IPV4_DISABLED",
+			"IPV6_DISABLED",
+			"TEST_CASE_END",
+			"TEST_CASE_START",
+		},
+		"nameserver16": {
+			"N16_HAS_NSID",
+			"N16_NO_NSID_REVEALED",
+			"N16_NO_RESPONSE",
+			"N16_UNEXPECTED_RCODE",
 			"IPV4_DISABLED",
 			"IPV6_DISABLED",
 			"TEST_CASE_END",
@@ -1824,6 +1844,172 @@ func Nameserver15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			"ns_list": strings.Join(sortedKeys(wrongRecordClass), ";"),
 		}); err != nil {
 			return results, err
+		}
+	}
+
+	return appendTestCaseEnd(ctx, results, testcase)
+}
+
+// Nameserver16 runs the NAMESERVER16 test case.
+func Nameserver16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
+	const testcase = "Nameserver16"
+	var results []*logger.Entry
+
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+		return results, err
+	}
+
+	nsidData := map[string][]string{}
+	var noNSID []string
+	var noResponse []string
+	unexpectedRcode := map[string][]string{}
+
+	nss, err := method4and5(ctx, z)
+	if err != nil {
+		return results, err
+	}
+
+	type n16Outcome struct {
+		server          string
+		nsidValue       string
+		hasNSID         bool
+		noNSID          bool
+		noResponse      bool
+		unexpectedRcode string
+	}
+
+	ver0 := uint8(0)
+	nsidOpt := &dns.NSID{}
+
+	var outcomes []n16Outcome
+	if len(nss) > 0 {
+		outcomes = make([]n16Outcome, len(nss))
+		tasks := make([]runner.Task, len(nss))
+		for i, server := range nss {
+			i, server := i, server
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				outcome := n16Outcome{server: server.String()}
+
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, server, "SOA"); err != nil {
+					return err
+				} else if disabled {
+					outcomes[i] = outcome
+					return nil
+				}
+
+				resp, err := server.QueryWithOptions(ctx, z.Name.String(), "SOA", &ns.QueryOptions{
+					EDNSDetails: &transport.EDNSDetails{
+						Version: &ver0,
+						Data:    []dns.EDNS0{nsidOpt},
+					},
+				})
+				if err != nil || resp.Msg == nil {
+					outcome.noResponse = true
+					outcomes[i] = outcome
+					return nil
+				}
+
+				if resp.Rcode() != "NOERROR" {
+					outcome.unexpectedRcode = resp.Rcode()
+					outcomes[i] = outcome
+					return nil
+				}
+
+				for _, opt := range resp.EdnsData() {
+					if nsid, ok := opt.(*dns.NSID); ok {
+						if decoded, err := hex.DecodeString(nsid.Nsid); err == nil {
+							value := strings.TrimSpace(string(decoded))
+							if value != "" {
+								outcome.hasNSID = true
+								outcome.nsidValue = value
+							}
+						}
+						break
+					}
+				}
+				if !outcome.hasNSID {
+					outcome.noNSID = true
+				}
+
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+		if err != nil {
+			return results, err
+		}
+		results = append(results, entries...)
+	}
+
+	for _, outcome := range outcomes {
+		if outcome.server == "" {
+			continue
+		}
+		if outcome.hasNSID {
+			nsidData[outcome.nsidValue] = append(nsidData[outcome.nsidValue], outcome.server)
+		}
+		if outcome.noNSID {
+			noNSID = append(noNSID, outcome.server)
+		}
+		if outcome.noResponse {
+			noResponse = append(noResponse, outcome.server)
+		}
+		if outcome.unexpectedRcode != "" {
+			unexpectedRcode[outcome.unexpectedRcode] = append(unexpectedRcode[outcome.unexpectedRcode], outcome.server)
+		}
+	}
+
+	if len(nsidData) > 0 {
+		valueList := make([]string, 0, len(nsidData))
+		for value := range nsidData {
+			valueList = append(valueList, value)
+		}
+		sort.Strings(valueList)
+		for _, value := range valueList {
+			list := sortedStrings(nsidData[value])
+			if err := appendLog(ctx, &results, testcase, "N16_HAS_NSID", map[string]any{
+				"nsid":    value,
+				"ns_list": strings.Join(list, ";"),
+			}); err != nil {
+				return results, err
+			}
+		}
+	}
+
+	if len(noNSID) > 0 {
+		if err := appendLog(ctx, &results, testcase, "N16_NO_NSID_REVEALED", map[string]any{
+			"ns_list": strings.Join(sortedStrings(noNSID), ";"),
+		}); err != nil {
+			return results, err
+		}
+	}
+
+	if len(noResponse) > 0 {
+		if err := appendLog(ctx, &results, testcase, "N16_NO_RESPONSE", map[string]any{
+			"ns_list": strings.Join(sortedStrings(noResponse), ";"),
+		}); err != nil {
+			return results, err
+		}
+	}
+
+	if len(unexpectedRcode) > 0 {
+		keys := make([]string, 0, len(unexpectedRcode))
+		for key := range unexpectedRcode {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, rcode := range keys {
+			list := sortedStrings(unexpectedRcode[rcode])
+			if err := appendLog(ctx, &results, testcase, "N16_UNEXPECTED_RCODE", map[string]any{
+				"rcode":   rcode,
+				"ns_list": strings.Join(list, ";"),
+			}); err != nil {
+				return results, err
+			}
 		}
 	}
 

@@ -2,6 +2,7 @@ package nameserver
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"net/netip"
 	"strings"
@@ -757,4 +758,65 @@ func txtPacket(name string, value string, class uint16) packet.Packet {
 	txtRR.Txt = []string{value}
 	msg.Answer = []dns.RR{txtRR}
 	return packet.Packet{Msg: msg}
+}
+
+func TestNameserver16HasNSID(t *testing.T) {
+	setupTest(t)
+
+	origM4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origM4and5 })
+
+	nsidValue := "ns1.example"
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.16", func(_ string, qtype string, _ string, _ *ens.QueryOptions) packet.Packet {
+		if strings.ToUpper(qtype) == "SOA" {
+			return soaPacketWithEdns("example", 0, 0, []dns.EDNS0{
+				&dns.NSID{Nsid: fmt.Sprintf("%x", nsidValue)},
+			})
+		}
+		return packet.Packet{}
+	})
+	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Nameserver16(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("nameserver16: %v", err)
+	}
+	if !hasEntryTag(entries, "N16_HAS_NSID") {
+		t.Fatalf("expected N16_HAS_NSID")
+	}
+	if hasEntryTag(entries, "N16_NO_NSID_REVEALED") {
+		t.Fatalf("unexpected N16_NO_NSID_REVEALED")
+	}
+}
+
+func TestNameserver16NoNSID(t *testing.T) {
+	setupTest(t)
+
+	origM4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origM4and5 })
+
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.16", func(_ string, qtype string, _ string, _ *ens.QueryOptions) packet.Packet {
+		if strings.ToUpper(qtype) == "SOA" {
+			return soaPacket("example")
+		}
+		return packet.Packet{}
+	})
+	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Nameserver16(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("nameserver16: %v", err)
+	}
+	if hasEntryTag(entries, "N16_HAS_NSID") {
+		t.Fatalf("unexpected N16_HAS_NSID")
+	}
+	if !hasEntryTag(entries, "N16_NO_NSID_REVEALED") {
+		t.Fatalf("expected N16_NO_NSID_REVEALED")
+	}
 }

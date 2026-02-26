@@ -2914,6 +2914,43 @@ msgstr ""
 "Naslednji doemnski strežniki ne vrnejo zapisov CH razreda na poizvedbo za "
 "zapise CH razreda. Podatki pridobljeni iz: \"{ns_list}\""
 
+#. NAMESERVER:N16_HAS_NSID
+#, perl-brace-format
+msgid ""
+"The following name server(s) responded to an NSID query (RFC 5001) with "
+"NSID value \"{nsid}\". Returned from name servers: \"{ns_list}\""
+msgstr ""
+"Naslednji domenski strežniki so se odzvali na poizvedbo NSID (RFC 5001) z "
+"vrednostjo NSID \"{nsid}\". Podatki pridobljeni iz: \"{ns_list}\""
+
+#. NAMESERVER:N16_NO_NSID_REVEALED
+#, perl-brace-format
+msgid ""
+"The following name server(s) did not include an NSID option in response to "
+"an NSID query (RFC 5001). Returned from name servers: \"{ns_list}\""
+msgstr ""
+"Naslednji domenski strežniki niso vključili možnosti NSID v odgovor na "
+"poizvedbo NSID (RFC 5001). Podatki pridobljeni iz: \"{ns_list}\""
+
+#. NAMESERVER:N16_NO_RESPONSE
+#, perl-brace-format
+msgid ""
+"The following name server(s) did not respond to an NSID query (RFC 5001). "
+"Returned from name servers: \"{ns_list}\""
+msgstr ""
+"Naslednji domenski strežniki se niso odzvali na poizvedbo NSID (RFC 5001). "
+"Podatki pridobljeni iz: \"{ns_list}\""
+
+#. NAMESERVER:N16_UNEXPECTED_RCODE
+#, perl-brace-format
+msgid ""
+"The following name server(s) returned an unexpected RCODE \"{rcode}\" in "
+"response to an NSID query (RFC 5001). Returned from name servers: "
+"\"{ns_list}\""
+msgstr ""
+"Naslednji domenski strežniki so vrnili nepričakovano RCODE \"{rcode}\" v "
+"odgovor na poizvedbo NSID (RFC 5001). Podatki pridobljeni iz: \"{ns_list}\""
+
 #. NAMESERVER:QNAME_CASE_INSENSITIVE
 #, perl-brace-format
 msgid ""

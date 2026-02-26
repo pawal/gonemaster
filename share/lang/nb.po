@@ -2942,6 +2942,43 @@ msgstr ""
 "Følgende navnetjenere returnerer ikke CH-klasseposter på CH-klassespørring. "
 "Returnert fra navnetjenere: \"{ns_list}\""
 
+#. NAMESERVER:N16_HAS_NSID
+#, perl-brace-format
+msgid ""
+"The following name server(s) responded to an NSID query (RFC 5001) with "
+"NSID value \"{nsid}\". Returned from name servers: \"{ns_list}\""
+msgstr ""
+"Følgende navnetjenere svarte på en NSID-forespørsel (RFC 5001) med NSID-"
+"verdien \"{nsid}\". Returnert fra navnetjenere: \"{ns_list}\""
+
+#. NAMESERVER:N16_NO_NSID_REVEALED
+#, perl-brace-format
+msgid ""
+"The following name server(s) did not include an NSID option in response to "
+"an NSID query (RFC 5001). Returned from name servers: \"{ns_list}\""
+msgstr ""
+"Følgende navnetjenere inkluderte ikke NSID-alternativet i svaret på en "
+"NSID-forespørsel (RFC 5001). Returnert fra navnetjenere: \"{ns_list}\""
+
+#. NAMESERVER:N16_NO_RESPONSE
+#, perl-brace-format
+msgid ""
+"The following name server(s) did not respond to an NSID query (RFC 5001). "
+"Returned from name servers: \"{ns_list}\""
+msgstr ""
+"Følgende navnetjenere svarte ikke på en NSID-forespørsel (RFC 5001). "
+"Returnert fra navnetjenere: \"{ns_list}\""
+
+#. NAMESERVER:N16_UNEXPECTED_RCODE
+#, perl-brace-format
+msgid ""
+"The following name server(s) returned an unexpected RCODE \"{rcode}\" in "
+"response to an NSID query (RFC 5001). Returned from name servers: "
+"\"{ns_list}\""
+msgstr ""
+"Følgende navnetjenere returnerte en uventet RCODE \"{rcode}\" som svar på "
+"en NSID-forespørsel (RFC 5001). Returnert fra navnetjenere: \"{ns_list}\""
+
 #. NAMESERVER:QNAME_CASE_INSENSITIVE
 #, perl-brace-format
 msgid ""

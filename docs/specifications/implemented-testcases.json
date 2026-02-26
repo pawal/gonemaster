@@ -7,7 +7,7 @@
   ],
   "summary": {
     "module_count": 9,
-    "testcase_count": 74
+    "testcase_count": 75
   },
   "module_order": [
     "basic",
@@ -87,7 +87,8 @@
       "nameserver11",
       "nameserver12",
       "nameserver13",
-      "nameserver15"
+      "nameserver15",
+      "nameserver16"
     ],
     "syntax": [
       "syntax01",
@@ -169,6 +170,7 @@
     "nameserver12": "Validate behavior when querying with unknown EDNS Z flags set.",
     "nameserver13": "Check truncated EDNS responses for missing OPT records.",
     "nameserver15": "Detect whether authoritative nameservers reveal software version data through CHAOS-class TXT queries.",
+    "nameserver16": "Query authoritative nameservers with an EDNS NSID option request (RFC 5001, option code 3) and report which servers provide NSID values and what those values contain.",
     "syntax01": "Validate that the tested domain name contains only allowed DNS hostname characters.",
     "syntax02": "Validate that no domain label starts or ends with a hyphen (`-`).",
     "syntax03": "Validate that domain labels do not contain a double hyphen in positions 3 and 4, except ACE labels (`xn--...`).",

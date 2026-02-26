@@ -12,7 +12,7 @@ Notes:
 
 ## Summary
 - Modules: 9
-- Implemented testcases: 74
+- Implemented testcases: 75
 
 ## Regeneration
 
@@ -74,7 +74,7 @@ make spec-export-implemented
 - dnssec17 — Validate CDNSKEY RRsets against DNSKEY data and CDNSKEY signatures, including delete semantics and signature/keytag consistency checks.
 - dnssec18 — Validate that CDS and CDNSKEY RRsets are signed by a DNSKEY that corresponds to DS information observed at the parent side.
 
-### nameserver (14)
+### nameserver (15)
 - nameserver01 — Detect whether authoritative nameservers also behave as recursors.
 - nameserver02 — Validate EDNS(0) handling on authoritative nameservers.
 - nameserver03 — Check whether nameservers allow AXFR zone transfer.
@@ -89,6 +89,7 @@ make spec-export-implemented
 - nameserver12 — Validate behavior when querying with unknown EDNS Z flags set.
 - nameserver13 — Check truncated EDNS responses for missing OPT records.
 - nameserver15 — Detect whether authoritative nameservers reveal software version data through CHAOS-class TXT queries.
+- nameserver16 — Query authoritative nameservers with an EDNS NSID option request (RFC 5001, option code 3) and report which servers provide NSID values and what those values contain.
 
 ### syntax (8)
 - syntax01 — Validate that the tested domain name contains only allowed DNS hostname characters.

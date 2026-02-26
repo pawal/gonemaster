@@ -2612,6 +2612,44 @@ msgstr ""
 "Seuraavat nimipalvelimet vastaavat ohjelmistoversiokyselyyn \"{query_name}\" "
 "merkkijonolla \"{string}\". Palautettu nimipalvelimista: \"{ns_ip_list}\""
 
+#. NAMESERVER:N16_HAS_NSID
+#, perl-brace-format
+msgid ""
+"The following name server(s) responded to an NSID query (RFC 5001) with "
+"NSID value \"{nsid}\". Returned from name servers: \"{ns_list}\""
+msgstr ""
+"Seuraavat nimipalvelimet vastasivat NSID-kyselyyn (RFC 5001) NSID-arvolla "
+"\"{nsid}\". Palautettu nimipalvelimista: \"{ns_list}\""
+
+#. NAMESERVER:N16_NO_NSID_REVEALED
+#, perl-brace-format
+msgid ""
+"The following name server(s) did not include an NSID option in response to "
+"an NSID query (RFC 5001). Returned from name servers: \"{ns_list}\""
+msgstr ""
+"Seuraavat nimipalvelimet eivät sisällyttäneet NSID-vaihtoehtoa vastaukseen "
+"NSID-kyselyyn (RFC 5001). Palautettu nimipalvelimista: \"{ns_list}\""
+
+#. NAMESERVER:N16_NO_RESPONSE
+#, perl-brace-format
+msgid ""
+"The following name server(s) did not respond to an NSID query (RFC 5001). "
+"Returned from name servers: \"{ns_list}\""
+msgstr ""
+"Seuraavat nimipalvelimet eivät vastanneet NSID-kyselyyn (RFC 5001). "
+"Palautettu nimipalvelimista: \"{ns_list}\""
+
+#. NAMESERVER:N16_UNEXPECTED_RCODE
+#, perl-brace-format
+msgid ""
+"The following name server(s) returned an unexpected RCODE \"{rcode}\" in "
+"response to an NSID query (RFC 5001). Returned from name servers: "
+"\"{ns_list}\""
+msgstr ""
+"Seuraavat nimipalvelimet palauttivat odottamattoman RCODE-arvon \"{rcode}\" "
+"vastauksena NSID-kyselyyn (RFC 5001). Palautettu nimipalvelimista: "
+"\"{ns_list}\""
+
 #. NAMESERVER:QNAME_CASE_INSENSITIVE
 #, perl-brace-format
 msgid ""

@@ -146,24 +146,24 @@ race:
 	$(GO) test -race ./...
 
 spec-export-implemented:
-	GOCACHE=/tmp/go-build-cache $(GO) run ./tools/specifications/export-implemented > docs/specifications/implemented-testcases.json
+	$(GO) run ./tools/specifications/export-implemented > docs/specifications/implemented-testcases.json
 
 spec-export-tags:
-	GOCACHE=/tmp/go-build-cache $(GO) run ./tools/specifications/export-tags > docs/specifications/possible-tags-by-testcase.json
+	$(GO) run ./tools/specifications/export-tags > docs/specifications/possible-tags-by-testcase.json
 
 spec-export: spec-export-implemented spec-export-tags
 
 spec-validate:
-	GOCACHE=/tmp/go-build-cache $(GO) run ./tools/specifications/validate
+	$(GO) run ./tools/specifications/validate
 
 spec-validate-scan:
-	GOCACHE=/tmp/go-build-cache $(GO) run ./tools/specifications/validate --scan-append-log
+	$(GO) run ./tools/specifications/validate --scan-append-log
 
 spec-generate-tags:
-	GOCACHE=/tmp/go-build-cache $(GO) run ./tools/specifications/generate-tag-catalog
+	$(GO) run ./tools/specifications/generate-tag-catalog
 
 spec-check-tags:
-	GOCACHE=/tmp/go-build-cache $(GO) run ./tools/specifications/generate-tag-catalog --check
+	$(GO) run ./tools/specifications/generate-tag-catalog --check
 
 spec-check: spec-validate spec-check-tags
 

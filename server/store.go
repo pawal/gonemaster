@@ -276,7 +276,11 @@ func parseTime(value string) (time.Time, error) {
 	if value == "" {
 		return time.Time{}, nil
 	}
-	return time.Parse(time.RFC3339, value)
+	t, err := time.Parse(time.RFC3339Nano, value)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return t.UTC(), nil
 }
 
 func normalizeJobSort(value JobSort) JobSort {

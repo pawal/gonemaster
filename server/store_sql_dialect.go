@@ -6,6 +6,14 @@ import (
 	"time"
 )
 
+const sortableTimestampLayout = "2006-01-02T15:04:05.000000000Z07:00"
+
+// formatSortableTimestamp returns a fixed-width UTC timestamp string that is
+// lexicographically sortable.
+func formatSortableTimestamp(t time.Time) string {
+	return t.UTC().Format(sortableTimestampLayout)
+}
+
 // sqlDialect abstracts backend-specific SQL differences.
 type sqlDialect interface {
 	// Placeholder returns a bind-parameter marker for position n (1-based).
@@ -26,7 +34,7 @@ func (sqliteDialect) TimestampVal(t time.Time) any {
 	if t.IsZero() {
 		return nil
 	}
-	return t.UTC().Format(time.RFC3339Nano)
+	return formatSortableTimestamp(t)
 }
 func (sqliteDialect) DriverName() string { return "sqlite" }
 

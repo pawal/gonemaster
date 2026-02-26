@@ -98,7 +98,8 @@ func parseTimestampStr(s string) time.Time {
 }
 
 // sqlOrderByClause returns the ORDER BY expression for the given sort value.
-// Timestamps stored as RFC3339Nano are lexicographically sortable as TEXT.
+// Timestamps are stored as fixed-width UTC strings and are lexicographically
+// sortable as TEXT.
 func sqlOrderByClause(sort JobSort) string {
 	switch sort {
 	case JobSortCreatedAtDesc:
@@ -315,10 +316,10 @@ func (s *SQLJobStore) List(filter JobFilter) JobList {
 		conds = append(conds, "LOWER(domain) LIKE "+addArg("%"+strings.ToLower(filter.Domain)+"%"))
 	}
 	if !filter.CreatedAfter.IsZero() {
-		conds = append(conds, "created_at > "+addArg(filter.CreatedAfter.UTC().Format(time.RFC3339Nano)))
+		conds = append(conds, "created_at > "+addArg(formatSortableTimestamp(filter.CreatedAfter)))
 	}
 	if !filter.CreatedBefore.IsZero() {
-		conds = append(conds, "created_at < "+addArg(filter.CreatedBefore.UTC().Format(time.RFC3339Nano)))
+		conds = append(conds, "created_at < "+addArg(formatSortableTimestamp(filter.CreatedBefore)))
 	}
 	switch normalizedSeverity {
 	case JobSeverityWarningsPlus:

@@ -341,6 +341,41 @@ func TestSQLJobStoreListFilters(t *testing.T) {
 	})
 }
 
+func TestSQLJobStoreListFiltersSecondBoundary(t *testing.T) {
+	s := testSQLiteStore(t)
+	base := time.Date(2026, 2, 3, 0, 0, 0, 500_000_000, time.UTC)
+
+	for _, j := range []Job{
+		{ID: "b1", Domain: "alpha.example.com", Status: JobQueued, CreatedAt: base},
+		{ID: "b2", Domain: "beta.example.com", Status: JobQueued, CreatedAt: base.Add(time.Second)},
+		{ID: "b3", Domain: "gamma.example.com", Status: JobQueued, CreatedAt: base.Add(2 * time.Second)},
+	} {
+		if _, err := s.Create(j); err != nil {
+			t.Fatalf("Create %q: %v", j.ID, err)
+		}
+	}
+
+	cutoff := base.Add(500 * time.Millisecond) // 2026-02-03T00:00:01Z
+
+	after := s.List(JobFilter{
+		CreatedAfter: cutoff,
+		Limit:        10,
+		Sort:         JobSortCreatedAtAsc,
+	})
+	if after.Total != 2 || len(after.Items) != 2 || after.Items[0].ID != "b2" || after.Items[1].ID != "b3" {
+		t.Fatalf("created_after boundary: total=%d items=%v", after.Total, ids(after.Items))
+	}
+
+	before := s.List(JobFilter{
+		CreatedBefore: cutoff,
+		Limit:         10,
+		Sort:          JobSortCreatedAtAsc,
+	})
+	if before.Total != 1 || len(before.Items) != 1 || before.Items[0].ID != "b1" {
+		t.Fatalf("created_before boundary: total=%d items=%v", before.Total, ids(before.Items))
+	}
+}
+
 // ---- List severity filters -------------------------------------------------
 
 func TestSQLJobStoreListSeverityFilter(t *testing.T) {

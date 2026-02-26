@@ -29,7 +29,9 @@ Status: Draft
      - If the CSYNC RRset has more than one record, emit `Z12_MULTIPLE_CSYNC` (`ns`, `count`).
      - Else if exactly one CSYNC record is present:
        - Emit `Z12_CSYNC_FOUND` (`ns`, `serial`, `flags`, `type_bitmap`).
-       - If the SOA serial was retrieved and the CSYNC `soaserial` field differs from the SOA serial, emit `Z12_SERIAL_MISMATCH` (`ns`, `csync_serial`, `soa_serial`).
+       - If the SOA serial was retrieved, evaluate CSYNC serial against SOA serial:
+         - When `soaminimum` flag is set (bit 1), emit `Z12_SERIAL_MISMATCH` only if `csync soaserial` is greater than current SOA serial.
+         - When `soaminimum` flag is not set, emit `Z12_SERIAL_MISMATCH` if `csync soaserial` differs from current SOA serial.
      - Else (zero CSYNC records) emit `Z12_NO_CSYNC` (`ns`).
    - If at least one nameserver has CSYNC and at least one has no CSYNC, emit `Z12_MIXED_PRESENCE`.
    - If more than one nameserver has CSYNC and the CSYNC content differs across them, emit `Z12_INCONSISTENT_CSYNC`.
@@ -47,7 +49,7 @@ CSYNC content identity is determined by comparing the concatenation of `soaseria
 | `Z12_MIXED_PRESENCE` | CSYNC present on some nameservers but absent on others. |
 | `Z12_MULTIPLE_CSYNC` | More than one CSYNC RR found at zone apex on this nameserver. |
 | `Z12_NO_CSYNC` | No CSYNC record found at zone apex on this nameserver. |
-| `Z12_SERIAL_MISMATCH` | CSYNC soaserial does not match current SOA serial from the same nameserver. |
+| `Z12_SERIAL_MISMATCH` | CSYNC soaserial fails RFC 7477 serial precondition against current SOA serial from the same nameserver. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
 
@@ -93,4 +95,5 @@ CSYNC content identity is determined by comparing the concatenation of `soaseria
 - CSYNC is an optional zone apex record per RFC 7477; `Z12_NO_CSYNC` is informational only and does not indicate a problem.
 - Only authoritative NOERROR responses are evaluated. Nameservers returning non-NOERROR or non-AA responses are skipped silently.
 - SOA serial comparison (`Z12_SERIAL_MISMATCH`) is only performed when the SOA query to the same nameserver succeeds and returns a SOA record. If the SOA query fails, no mismatch is reported for that nameserver.
+- With CSYNC `soaminimum` flag set, an older CSYNC serial than current SOA serial is accepted and does not emit `Z12_SERIAL_MISMATCH`.
 - For nameservers returning multiple CSYNC records (`Z12_MULTIPLE_CSYNC`), the records are not included in the cross-nameserver consistency comparison.

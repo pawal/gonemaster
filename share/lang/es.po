@@ -3841,7 +3841,8 @@ msgstr ""
 #. ZONE:Z12_SERIAL_MISMATCH
 #, perl-brace-format
 msgid ""
-"CSYNC SOA serial {csync_serial} does not match current SOA serial "
+"CSYNC SOA serial {csync_serial} fails RFC 7477 serial precondition against current "
+"SOA serial "
 "{soa_serial} on name server {ns}."
 msgstr ""
 "El número de serie SOA de CSYNC {csync_serial} no coincide con el número de serie "

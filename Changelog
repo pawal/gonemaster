@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
  - UI: Refactored App.svelte to match Svelte 4
  - Engine: Minor translation fixes
  - Engine: Fixed encoding explicit OPT RR when Z is set, so Z flags are now preserved
+ - Engine: Fixed EDNS regression problem from migrating to DNS v2
 
 ## [v1.0.2] - 2026-02-24
 

@@ -497,6 +497,66 @@ func TestZone12SerialMismatch(t *testing.T) {
 	}
 }
 
+func TestZone12SerialMismatchSoaMinimumNewerCSYNC(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		switch qtype {
+		case "CSYNC":
+			// soaminimum set, but CSYNC serial is newer than current SOA serial.
+			return csyncPacket("example", 300, csyncFlagSoaMinimum, []uint16{dns.TypeNS})
+		case "SOA":
+			return soaPacket("example", 200, 3600, 900, 604800, 300)
+		}
+		return packet.Packet{}
+	})
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example")}
+	entries, err := Zone12(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone12: %v", err)
+	}
+	if !hasEntryTag(entries, "Z12_SERIAL_MISMATCH") {
+		t.Fatalf("expected Z12_SERIAL_MISMATCH")
+	}
+}
+
+func TestZone12SerialMismatchSoaMinimumOlderCSYNCNotMismatch(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		switch qtype {
+		case "CSYNC":
+			// soaminimum set and SOA serial has advanced, which is valid.
+			return csyncPacket("example", 100, csyncFlagSoaMinimum, []uint16{dns.TypeNS})
+		case "SOA":
+			return soaPacket("example", 200, 3600, 900, 604800, 300)
+		}
+		return packet.Packet{}
+	})
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example")}
+	entries, err := Zone12(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone12: %v", err)
+	}
+	if hasEntryTag(entries, "Z12_SERIAL_MISMATCH") {
+		t.Fatalf("did not expect Z12_SERIAL_MISMATCH")
+	}
+}
+
 func TestZone12MultipleCSYNC(t *testing.T) {
 	setupTest(t)
 

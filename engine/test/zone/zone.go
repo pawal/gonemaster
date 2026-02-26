@@ -42,6 +42,8 @@ var (
 
 var nullSpfRegex = regexp.MustCompile(`(?i)^v=spf1[ \t]+-all[ \t]*$`)
 
+const csyncFlagSoaMinimum uint16 = 0x0002
+
 func defaultGetAddressesFor(ctx context.Context, z *zonepkg.Zone, name string) ([]netip.Addr, error) {
 	if z == nil || z.Recursor() == nil {
 		return nil, fmt.Errorf("missing recursor")
@@ -1577,7 +1579,7 @@ func Zone12(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			}); err != nil {
 				return results, err
 			}
-			if outcome.soaOK && csync.CSYNC.Serial != outcome.soaSerial {
+			if outcome.soaOK && csyncSerialMismatch(csync.CSYNC.Serial, csync.CSYNC.Flags, outcome.soaSerial) {
 				if err := appendLog(ctx, &results, testcase, "Z12_SERIAL_MISMATCH", map[string]any{
 					"ns":           ns.String(),
 					"csync_serial": csync.CSYNC.Serial,
@@ -1610,6 +1612,14 @@ func Zone12(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	}
 
 	return appendTestCaseEnd(ctx, results, testcase)
+}
+
+func csyncSerialMismatch(csyncSerial uint32, flags uint16, soaSerial uint32) bool {
+	// RFC 7477: with soaminimum set, CSYNC serial is a lower-bound gate.
+	if flags&csyncFlagSoaMinimum != 0 {
+		return util.SerialGT(csyncSerial, soaSerial)
+	}
+	return csyncSerial != soaSerial
 }
 
 // csyncTypeBitmap formats a CSYNC TypeBitMap as a semicolon-separated list of DNS type names.

@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [v1.0.3] - 2026-02-26
 
 ### Added
 
@@ -10,7 +10,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
- - Test: Nameserver 13 queries DNSKEY instead of SOA
+ - Test: Nameserver 13 queries DNSKEY instead of SOA (follow upstream change)
  - UI: Refactored App.svelte to match Svelte 4
  - Engine: Minor translation fixes
  - Engine: Fixed encoding explicit OPT RR when Z is set, so Z flags are now preserved

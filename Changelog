@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.0.4] - 2026-02-26
+
+### Added
+
+ - Test: Added Nameserver16 test case specification and implementation, NSID
+
+### Changed
+
+ - Docs: More descriptive test case listings
+
 ## [v1.0.3] - 2026-02-26
 
 ### Added

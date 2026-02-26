@@ -119,23 +119,120 @@ func TestPrepareMessageWithEDNSDetails(t *testing.T) {
 	if !prepared.RecursionDesired {
 		t.Fatalf("expected recursion desired to be true")
 	}
-	if prepared.UDPSize != 1232 {
-		t.Fatalf("unexpected UDP size: %d", prepared.UDPSize)
+	if len(prepared.Pseudo) != 0 {
+		t.Fatalf("expected pseudo section to be empty when explicit OPT is used, got %d entries", len(prepared.Pseudo))
 	}
-	if !prepared.Security {
-		t.Fatalf("expected DO bit set")
+	if prepared.UDPSize != 0 {
+		t.Fatalf("expected UDPSize to be moved into OPT record, got %d", prepared.UDPSize)
 	}
-	if prepared.Version != 1 {
-		t.Fatalf("unexpected EDNS version: %d", prepared.Version)
+	var opt *dns.OPT
+	for _, rr := range prepared.Extra {
+		if typed, ok := rr.(*dns.OPT); ok {
+			opt = typed
+			break
+		}
 	}
-	if prepared.Rcode != 16 {
-		t.Fatalf("unexpected extended rcode: %d", prepared.Rcode)
+	if opt == nil {
+		t.Fatalf("expected explicit OPT record in additional section")
 	}
-	if len(prepared.Pseudo) != 1 {
-		t.Fatalf("expected 1 pseudo-section option, got %d", len(prepared.Pseudo))
+	if got := opt.UDPSize(); got != 1232 {
+		t.Fatalf("unexpected OPT UDP size: got %d want 1232", got)
 	}
-	if _, ok := prepared.Pseudo[0].(*dns.NSID); !ok {
-		t.Fatalf("expected NSID option in pseudo section")
+	if !opt.Security() {
+		t.Fatalf("expected OPT DO bit set")
+	}
+	if got := opt.Version(); got != 1 {
+		t.Fatalf("unexpected OPT version: got %d want 1", got)
+	}
+	if got := opt.Rcode(); got != 16 {
+		t.Fatalf("unexpected OPT extended rcode: got %d want 16", got)
+	}
+	if len(opt.Options) != 1 {
+		t.Fatalf("expected one EDNS option in OPT, got %d", len(opt.Options))
+	}
+
+	if err := prepared.Pack(); err != nil {
+		t.Fatalf("pack prepared query: %v", err)
+	}
+	var unpacked dns.Msg
+	unpacked.Data = append([]byte(nil), prepared.Data...)
+	if err := unpacked.Unpack(); err != nil {
+		t.Fatalf("unpack prepared query: %v", err)
+	}
+	if unpacked.UDPSize != 1232 || unpacked.Version != 1 || unpacked.Rcode != 16 {
+		t.Fatalf("unexpected unpacked EDNS fields: udp=%d version=%d rcode=%d", unpacked.UDPSize, unpacked.Version, unpacked.Rcode)
+	}
+}
+
+func TestPrepareMessageWithEDNSVersionAndDefaultSizeEncodesOPT(t *testing.T) {
+	version := uint8(1)
+	client := &Client{
+		EDNSDetails: &EDNSDetails{
+			Version: &version,
+		},
+	}
+
+	prepared := client.prepareMessage(BuildQuery("example.com", dns.TypeA))
+
+	var opt *dns.OPT
+	for _, rr := range prepared.Extra {
+		if typed, ok := rr.(*dns.OPT); ok {
+			opt = typed
+			break
+		}
+	}
+	if opt == nil {
+		t.Fatalf("expected explicit OPT record in additional section")
+	}
+	if got := opt.UDPSize(); got != dns.MinMsgSize {
+		t.Fatalf("unexpected OPT UDP size: got %d want %d", got, dns.MinMsgSize)
+	}
+	if got := opt.Version(); got != 1 {
+		t.Fatalf("unexpected OPT version: got %d want 1", got)
+	}
+
+	if err := prepared.Pack(); err != nil {
+		t.Fatalf("pack prepared query: %v", err)
+	}
+	var unpacked dns.Msg
+	unpacked.Data = append([]byte(nil), prepared.Data...)
+	if err := unpacked.Unpack(); err != nil {
+		t.Fatalf("unpack prepared query: %v", err)
+	}
+	if unpacked.UDPSize != dns.MinMsgSize || unpacked.Version != 1 {
+		t.Fatalf("unexpected unpacked EDNS fields: udp=%d version=%d", unpacked.UDPSize, unpacked.Version)
+	}
+}
+
+func TestPrepareMessageWithEDNSSize512EncodesOPT(t *testing.T) {
+	client := &Client{EDNSSize: dns.MinMsgSize}
+
+	prepared := client.prepareMessage(BuildQuery("example.com", dns.TypeA))
+
+	var opt *dns.OPT
+	for _, rr := range prepared.Extra {
+		if typed, ok := rr.(*dns.OPT); ok {
+			opt = typed
+			break
+		}
+	}
+	if opt == nil {
+		t.Fatalf("expected explicit OPT record in additional section")
+	}
+	if got := opt.UDPSize(); got != dns.MinMsgSize {
+		t.Fatalf("unexpected OPT UDP size: got %d want %d", got, dns.MinMsgSize)
+	}
+
+	if err := prepared.Pack(); err != nil {
+		t.Fatalf("pack prepared query: %v", err)
+	}
+	var unpacked dns.Msg
+	unpacked.Data = append([]byte(nil), prepared.Data...)
+	if err := unpacked.Unpack(); err != nil {
+		t.Fatalf("unpack prepared query: %v", err)
+	}
+	if unpacked.UDPSize != dns.MinMsgSize {
+		t.Fatalf("unexpected unpacked UDP size: got %d want %d", unpacked.UDPSize, dns.MinMsgSize)
 	}
 }
 

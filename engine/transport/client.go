@@ -360,15 +360,17 @@ func (c *Client) prepareMessage(msg *dns.Msg) *dns.Msg {
 			}
 		}
 
-		if z != nil {
-			applyEDNSZ(prepared, *z)
+		// The dns v2 auto-OPT path ignores Version and omits OPT when UDPSize is 512.
+		// Force explicit OPT for EDNSDetails and 512-byte EDNS queries.
+		if c.EDNSDetails != nil || prepared.UDPSize <= dns.MinMsgSize {
+			applyExplicitEDNS(prepared, z)
 		}
 	}
 
 	return prepared
 }
 
-func applyEDNSZ(msg *dns.Msg, z uint16) {
+func applyExplicitEDNS(msg *dns.Msg, z *uint16) {
 	if msg == nil {
 		return
 	}
@@ -394,7 +396,9 @@ func applyEDNSZ(msg *dns.Msg, z uint16) {
 	opt.SetCompactAnswers(msg.CompactAnswers)
 	opt.SetDelegation(msg.Delegation)
 	opt.SetRcode(msg.Rcode)
-	opt.SetZ(z)
+	if z != nil {
+		opt.SetZ(*z)
+	}
 
 	extra := make([]dns.RR, 0, len(msg.Extra)+1)
 	for _, rr := range msg.Extra {

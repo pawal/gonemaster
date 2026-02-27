@@ -3898,3 +3898,11 @@ msgid "Big packet size ({size}) (try with \"{command}\")."
 msgstr ""
 "La taille du paquet ({size} octets) est trop importante (tester avec la "
 "commande \"{command}\")."
+
+msgctxt "BASIC:B01_CHILD_NOT_EXIST"
+msgid "The zone \"{domain}\" does not exist as a zone."
+msgstr "La zone \"{domain}\" n'existe pas en tant que zone."
+
+msgctxt "DNSSEC:DS01_DS_ALGO_OK"
+msgid "DS record with key tag {keytag} and digest algorithm {ds_algo_num} ({ds_algo_descr}) is acceptable. Fetched from name servers {ns_list}."
+msgstr "L'enregistrement DS avec le tag de clé {keytag} et l'algorithme de condensé {ds_algo_num} ({ds_algo_descr}) est acceptable. Récupéré depuis les serveurs de noms {ns_list}."

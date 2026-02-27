@@ -3676,3 +3676,55 @@ msgstr ""
 #~ msgstr ""
 #~ "Se agregó una delegación falsa para el dominio {domain} en el servidor de "
 #~ "nombres {ns}."
+
+msgctxt "ADDRESS:A01_GLOBALLY_REACHABLE_ADDR"
+msgid "All tested nameservers in {ns_list} are globally reachable."
+msgstr "Todos los servidores de nombres probados en {ns_list} son accesibles globalmente."
+
+msgctxt "BASIC:B01_CHILD_NOT_EXIST"
+msgid "The zone \"{domain}\" does not exist as a zone."
+msgstr "La zona \"{domain}\" no existe como zona."
+
+msgctxt "DNSSEC:DS01_DS_ALGO_OK"
+msgid "DS record with key tag {keytag} and digest algorithm {ds_algo_num} ({ds_algo_descr}) is acceptable. Fetched from name servers {ns_list}."
+msgstr "El registro DS con la etiqueta de clave {keytag} y el algoritmo de resumen {ds_algo_num} ({ds_algo_descr}) es aceptable. Obtenido de los servidores de nombres {ns_list}."
+
+msgctxt "DNSSEC:DS01_ROOT_N_NO_UNDEL_DS"
+msgid "No undelegated DS records provided for the root zone."
+msgstr "No se proporcionaron registros DS no delegados para la zona raíz."
+
+msgctxt "DNSSEC:DS01_UNDEL_N_NO_UNDEL_DS"
+msgid "No undelegated DS records provided for this test."
+msgstr "No se proporcionaron registros DS no delegados para esta prueba."
+
+msgctxt "DNSSEC:DS05_ALGO_OK"
+msgid "DNSKEY with key tag {keytag} uses algorithm {algo_num} ({algo_descr}, {algo_mnemo}) which is acceptable. Fetched from name servers {ns_list}."
+msgstr "La clave DNSKEY con etiqueta {keytag} usa el algoritmo {algo_num} ({algo_descr}, {algo_mnemo}) que es aceptable. Obtenido de los servidores de nombres {ns_list}."
+
+msgctxt "DNSSEC:DS07_DS_FOR_SIGNED_ZONE"
+msgid "DS records are published in the parent zone for the signed zone."
+msgstr "Los registros DS están publicados en la zona padre para la zona firmada."
+
+msgctxt "DNSSEC:DS07_DS_ON_PARENT_SERVER"
+msgid "DS records found on parent name servers {ns_list}."
+msgstr "Registros DS encontrados en los servidores de nombres padre {ns_list}."
+
+msgctxt "DNSSEC:DS07_SIGNED"
+msgid "The zone is signed with DNSSEC."
+msgstr "La zona está firmada con DNSSEC."
+
+msgctxt "DNSSEC:DS07_SIGNED_ON_SERVER"
+msgid "Signed responses received from name servers {ns_list}."
+msgstr "Respuestas firmadas recibidas de los servidores de nombres {ns_list}."
+
+msgctxt "ZONE:Z11_NO_SPF_NON_MAIL_DOMAIN"
+msgid "No SPF policy found for {domain}, which is not a mail domain."
+msgstr "No se encontró política SPF para {domain}, que no es un dominio de correo."
+
+msgctxt "ZONE:Z11_NULL_SPF_NON_MAIL_DOMAIN"
+msgid "Null SPF policy found for {domain}, which is not a mail domain."
+msgstr "Política SPF nula encontrada para {domain}, que no es un dominio de correo."
+
+msgctxt "ZONE:Z11_SPF_SYNTAX_OK"
+msgid "SPF syntax is correct for {domain}."
+msgstr "La sintaxis SPF es correcta para {domain}."

@@ -3040,3 +3040,51 @@ msgstr ""
 msgctxt "SYSTEM:PACKET_BIG"
 msgid "Big packet size ({size}) (try with \"{command}\")."
 msgstr "Suurikokoinen paketti ({size}) (yritä käyttää komentoa \"{command}\")."
+
+msgctxt "ADDRESS:A01_GLOBALLY_REACHABLE_ADDR"
+msgid "All tested nameservers in {ns_list} are globally reachable."
+msgstr "Kaikki testatut nimipalvelimet {ns_list} ovat globaalisti tavoitettavissa."
+
+msgctxt "DNSSEC:DS01_DS_ALGO_OK"
+msgid "DS record with key tag {keytag} and digest algorithm {ds_algo_num} ({ds_algo_descr}) is acceptable. Fetched from name servers {ns_list}."
+msgstr "DS-tietue avaintunnisteella {keytag} ja tiivistealgoritmi {ds_algo_num} ({ds_algo_descr}) on hyväksyttävä. Haettu nimipalvelimilta {ns_list}."
+
+msgctxt "DNSSEC:DS01_ROOT_N_NO_UNDEL_DS"
+msgid "No undelegated DS records provided for the root zone."
+msgstr "Juurivyöhykkeelle ei toimitettu delegoimattomia DS-tietueita."
+
+msgctxt "DNSSEC:DS01_UNDEL_N_NO_UNDEL_DS"
+msgid "No undelegated DS records provided for this test."
+msgstr "Tälle testille ei toimitettu delegoimattomia DS-tietueita."
+
+msgctxt "DNSSEC:DS05_ALGO_OK"
+msgid "DNSKEY with key tag {keytag} uses algorithm {algo_num} ({algo_descr}, {algo_mnemo}) which is acceptable. Fetched from name servers {ns_list}."
+msgstr "DNSKEY avaintunnisteella {keytag} käyttää algoritmia {algo_num} ({algo_descr}, {algo_mnemo}), joka on hyväksyttävä. Haettu nimipalvelimilta {ns_list}."
+
+msgctxt "DNSSEC:DS07_DS_FOR_SIGNED_ZONE"
+msgid "DS records are published in the parent zone for the signed zone."
+msgstr "DS-tietueet on julkaistu ylävyöhykkeessä allekirjoitetulle vyöhykkeelle."
+
+msgctxt "DNSSEC:DS07_DS_ON_PARENT_SERVER"
+msgid "DS records found on parent name servers {ns_list}."
+msgstr "DS-tietueet löydetty ylänimipalvelimilta {ns_list}."
+
+msgctxt "DNSSEC:DS07_SIGNED"
+msgid "The zone is signed with DNSSEC."
+msgstr "Vyöhyke on allekirjoitettu DNSSEC:llä."
+
+msgctxt "DNSSEC:DS07_SIGNED_ON_SERVER"
+msgid "Signed responses received from name servers {ns_list}."
+msgstr "Allekirjoitetut vastaukset vastaanotettu nimipalvelimilta {ns_list}."
+
+msgctxt "ZONE:Z11_NO_SPF_NON_MAIL_DOMAIN"
+msgid "No SPF policy found for {domain}, which is not a mail domain."
+msgstr "SPF-käytäntöä ei löydetty vyöhykkeelle {domain}, joka ei ole sähköpostidomain."
+
+msgctxt "ZONE:Z11_NULL_SPF_NON_MAIL_DOMAIN"
+msgid "Null SPF policy found for {domain}, which is not a mail domain."
+msgstr "Nolla-SPF-käytäntö löydetty vyöhykkeelle {domain}, joka ei ole sähköpostidomain."
+
+msgctxt "ZONE:Z11_SPF_SYNTAX_OK"
+msgid "SPF syntax is correct for {domain}."
+msgstr "SPF-syntaksi on oikein vyöhykkeelle {domain}."

@@ -3426,3 +3426,55 @@ msgid "Big packet size ({size}) (try with \"{command}\")."
 msgstr ""
 "Stort paket ({size} byte). Använd kommandot '{command}' för att se "
 "svarspaketet."
+
+msgctxt "ADDRESS:A01_GLOBALLY_REACHABLE_ADDR"
+msgid "All tested nameservers in {ns_list} are globally reachable."
+msgstr "Alla testade namnservrar i {ns_list} är globalt nåbara."
+
+msgctxt "BASIC:B01_CHILD_NOT_EXIST"
+msgid "The zone \"{domain}\" does not exist as a zone."
+msgstr "Zonen \"{domain}\" existerar inte som en zon."
+
+msgctxt "DNSSEC:DS01_DS_ALGO_OK"
+msgid "DS record with key tag {keytag} and digest algorithm {ds_algo_num} ({ds_algo_descr}) is acceptable. Fetched from name servers {ns_list}."
+msgstr "DS-posten med nyckeltagg {keytag} och sammanfattningsalgoritm {ds_algo_num} ({ds_algo_descr}) är godtagbar. Hämtad från namnservrar {ns_list}."
+
+msgctxt "DNSSEC:DS01_ROOT_N_NO_UNDEL_DS"
+msgid "No undelegated DS records provided for the root zone."
+msgstr "Inga odelegerade DS-poster angavs för rotzonen."
+
+msgctxt "DNSSEC:DS01_UNDEL_N_NO_UNDEL_DS"
+msgid "No undelegated DS records provided for this test."
+msgstr "Inga odelegerade DS-poster angavs för det här testet."
+
+msgctxt "DNSSEC:DS05_ALGO_OK"
+msgid "DNSKEY with key tag {keytag} uses algorithm {algo_num} ({algo_descr}, {algo_mnemo}) which is acceptable. Fetched from name servers {ns_list}."
+msgstr "DNSKEY med nyckeltagg {keytag} använder algoritm {algo_num} ({algo_descr}, {algo_mnemo}) som är godtagbar. Hämtad från namnservrar {ns_list}."
+
+msgctxt "DNSSEC:DS07_DS_FOR_SIGNED_ZONE"
+msgid "DS records are published in the parent zone for the signed zone."
+msgstr "DS-poster är publicerade i föräldrazonen för den signerade zonen."
+
+msgctxt "DNSSEC:DS07_DS_ON_PARENT_SERVER"
+msgid "DS records found on parent name servers {ns_list}."
+msgstr "DS-poster hittades på föräldranamnservrar {ns_list}."
+
+msgctxt "DNSSEC:DS07_SIGNED"
+msgid "The zone is signed with DNSSEC."
+msgstr "Zonen är signerad med DNSSEC."
+
+msgctxt "DNSSEC:DS07_SIGNED_ON_SERVER"
+msgid "Signed responses received from name servers {ns_list}."
+msgstr "Signerade svar mottogs från namnservrar {ns_list}."
+
+msgctxt "ZONE:Z11_NO_SPF_NON_MAIL_DOMAIN"
+msgid "No SPF policy found for {domain}, which is not a mail domain."
+msgstr "Ingen SPF-policy hittades för {domain}, som inte är en e-postdomän."
+
+msgctxt "ZONE:Z11_NULL_SPF_NON_MAIL_DOMAIN"
+msgid "Null SPF policy found for {domain}, which is not a mail domain."
+msgstr "Null-SPF-policy hittades för {domain}, som inte är en e-postdomän."
+
+msgctxt "ZONE:Z11_SPF_SYNTAX_OK"
+msgid "SPF syntax is correct for {domain}."
+msgstr "SPF-syntax är korrekt för {domain}."

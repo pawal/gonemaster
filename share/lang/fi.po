@@ -12,7 +12,6 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "X-Generator: Poedit 3.3.1\n"
 
-#, perl-brace-format
 msgid ""
 "Ambiguous downcaseing of character \"{unicode_name}\" in the domain name. "
 "Use all lower case instead."
@@ -30,14 +29,12 @@ msgstr "Verkkotunnuksen nimi on tyhjä."
 msgid "Domain name starts with dot."
 msgstr "Verkkotunnuksen nimi alkaa pisteellä."
 
-#, perl-brace-format
 msgid ""
 "Domain name has an ASCII label (\"{label}\") with a character not permitted."
 msgstr ""
 "Verkkotunnuksen nimessä on ASCII-tunniste (\"{label}\"), jonka merkki ei ole "
 "sallittu."
 
-#, perl-brace-format
 msgid ""
 "Domain name has a non-ASCII label (\"{label}\") which is not a valid U-label."
 msgstr ""
@@ -47,7 +44,6 @@ msgstr ""
 msgid "Domain name has repeated dots."
 msgstr "Verkkotunnuksen nimessä on toistuvia pisteitä."
 
-#, perl-brace-format
 msgid ""
 "Domain name has a label that is too long (more than 63 characters), "
 "\"{label}\"."
@@ -55,28 +51,26 @@ msgstr ""
 "Verkkotunnuksen nimessä on liian pitkä tunniste (yli 63 merkkiä), "
 "\"{label}\"."
 
-#. ADDRESS:ADDRESS01
+msgctxt "ADDRESS:ADDRESS01"
 msgid "Name server address must be globally routable"
 msgstr ""
 "Nimipalvelimen osoitteen tulee olla maailmanlaajuisesti reititettävissä"
 
-#. ADDRESS:ADDRESS02
+msgctxt "ADDRESS:ADDRESS02"
 msgid "Reverse DNS entry exists for name server IP address"
 msgstr "Nimipalvelimen IP-osoite on käänteisnimipalvelussa"
 
-#. ADDRESS:ADDRESS03
+msgctxt "ADDRESS:ADDRESS03"
 msgid "Reverse DNS entry matches name server name"
 msgstr "Käänteisnimipalvelun määritys vastaa nimipalvelimen nimeä"
 
-#. ADDRESS:NAMESERVER_IP_WITHOUT_REVERSE
-#, perl-brace-format
+msgctxt "ADDRESS:NAMESERVER_IP_WITHOUT_REVERSE"
 msgid "Nameserver {nsname} has an IP address ({ns_ip}) without PTR configured."
 msgstr ""
 "Nimipalvelimen {nsname} IP-osoitteen ({ns_ip}) PTR-tietuetta ei ole "
 "konfiguroitu."
 
-#. ADDRESS:NAMESERVER_IP_PTR_MISMATCH
-#, perl-brace-format
+msgctxt "ADDRESS:NAMESERVER_IP_PTR_MISMATCH"
 msgid ""
 "Nameserver {nsname} has an IP address ({ns_ip}) with mismatched PTR result "
 "({names})."
@@ -84,8 +78,7 @@ msgstr ""
 "Nimipalvelimen {nsname} IP-osoitteella ({ns_ip}) on yhteensopimaton PTR-"
 "tulos ({names})."
 
-#. ADDRESS:NAMESERVER_IP_PRIVATE_NETWORK
-#, perl-brace-format
+msgctxt "ADDRESS:NAMESERVER_IP_PRIVATE_NETWORK"
 msgid ""
 "Nameserver {nsname} has an IP address ({ns_ip}) with prefix {prefix} "
 "referenced in {reference} as a '{name}'."
@@ -93,23 +86,22 @@ msgstr ""
 "Nimipalvelimen {nsname} IP-osoitteen ({ns_ip}) etuliitteeseen {prefix} "
 "viitataan kohdassa {reference} seuraavasti: '{name}'."
 
-#. ADDRESS:NO_IP_PRIVATE_NETWORK
+msgctxt "ADDRESS:NO_IP_PRIVATE_NETWORK"
 msgid "All Nameserver addresses are in the routable public addressing space."
 msgstr ""
 "Kaikki nimipalvelimen osoitteet ovat reititettävässä julkisessa "
 "osoiteavaruudessa."
 
-#. ADDRESS:NAMESERVERS_IP_WITH_REVERSE
+msgctxt "ADDRESS:NAMESERVERS_IP_WITH_REVERSE"
 msgid "Reverse DNS entry exists for each Nameserver IP address."
 msgstr ""
 "Nimipalvelimen jokaisella IP-osoitteella on nimi käänteisnimipalvelussa."
 
-#. ADDRESS:NAMESERVER_IP_PTR_MATCH
+msgctxt "ADDRESS:NAMESERVER_IP_PTR_MATCH"
 msgid "Every reverse DNS entry matches name server name."
 msgstr "Jokainen käänteisnimipalvelun merkintä vastaa nimipalvelimen nimeä."
 
-#. ADDRESS:NO_RESPONSE_PTR_QUERY
-#, perl-brace-format
+msgctxt "ADDRESS:NO_RESPONSE_PTR_QUERY"
 msgid "No response from nameserver(s) on PTR query ({domain})."
 msgstr ""
 "Ei vastausta yhdeltä tai useammalta nimipalvelimelta PTR-kyselyyn ({domain})."
@@ -123,7 +115,6 @@ msgstr ""
 #. NAMESERVER:TEST_CASE_END
 #. SYNTAX:TEST_CASE_END
 #. ZONE:TEST_CASE_END
-#, perl-brace-format
 msgid "TEST_CASE_END {testcase}."
 msgstr "TEST_CASE_END {testcase}."
 
@@ -136,32 +127,30 @@ msgstr "TEST_CASE_END {testcase}."
 #. NAMESERVER:TEST_CASE_START
 #. SYNTAX:TEST_CASE_START
 #. ZONE:TEST_CASE_START
-#, perl-brace-format
 msgid "TEST_CASE_START {testcase}."
 msgstr "TEST_CASE_START {testcase}."
 
-#. BASIC:BASIC00
+msgctxt "BASIC:BASIC00"
 msgid "Domain name must be valid"
 msgstr "Verkkotunnuksen nimen on oltava kelvollinen"
 
-#. BASIC:BASIC01
+msgctxt "BASIC:BASIC01"
 msgid "The domain must have a parent domain"
 msgstr "Verkkotunnuksella on oltava myös ylemmän tason verkkotunnus"
 
-#. BASIC:BASIC02
+msgctxt "BASIC:BASIC02"
 msgid "The domain must have at least one working name server"
 msgstr "Verkkotunnuksella on oltava vähintään yksi toimiva nimipalvelin"
 
-#. BASIC:BASIC03
+msgctxt "BASIC:BASIC03"
 msgid "The Broken but functional test"
 msgstr "Rikkinäinen mutta toimiva testi"
 
-#. BASIC:A_QUERY_NO_RESPONSES
+msgctxt "BASIC:A_QUERY_NO_RESPONSES"
 msgid "Nameservers did not respond to A query."
 msgstr "Nimipalvelimet eivät vastanneet A-tietue kyselyyn."
 
-#. BASIC:B01_CHILD_IS_ALIAS
-#, perl-brace-format
+msgctxt "BASIC:B01_CHILD_IS_ALIAS"
 msgid ""
 "\"{domain_child}\" is not a zone. It is an alias for \"{domain_target}\". "
 "Run a test for \"{domain_target}\" instead. Returned from name servers "
@@ -171,25 +160,21 @@ msgstr ""
 "\"{domain_target}\". Suorita sen sijaan testi verkkotunnukselle "
 "{domain_target}. Vastaus nimipalvelimilta \"{ns_ip_list}\"."
 
-#. BASIC:B01_CHILD_FOUND
-#, perl-brace-format
+msgctxt "BASIC:B01_CHILD_FOUND"
 msgid "The zone \"{domain}\" is found."
 msgstr "Vyöhyke \"{domain}\" löytyy."
 
-#. BASIC:B01_CHILD_NOT_EXIST
-#, perl-brace-format
+msgctxt "BASIC:B01_CHILD_NOT_EXIST"
 msgid "\"{domain}\" does not exist as it is not delegated."
 msgstr "\"{domain}\" ei ole olemassa, sillä sitä ei ole delegoitu."
 
-#. BASIC:B01_INCONSISTENT_ALIAS
-#, perl-brace-format
+msgctxt "BASIC:B01_INCONSISTENT_ALIAS"
 msgid "The alias for \"{domain}\" is inconsistent between name servers."
 msgstr ""
 "Verkkotunnuksen \"{domain}\" alias on epäjohdonmukainen nimipalvelimien "
 "välillä."
 
-#. BASIC:B01_INCONSISTENT_DELEGATION
-#, perl-brace-format
+msgctxt "BASIC:B01_INCONSISTENT_DELEGATION"
 msgid ""
 "The name servers for parent zone \"{domain_parent}\" give inconsistent "
 "delegation of \"{domain_child}\". Returned from name servers "
@@ -198,8 +183,7 @@ msgstr ""
 "Päävyöhykkeen \"{domain_parent}\" nimipalvelimet antavat epäjohdonmukaisen "
 "delegoinnin \"{domain_child}\". Vastaus nimipalvelimilta \"{ns_ip_list}\"."
 
-#. BASIC:B01_NO_CHILD
-#, perl-brace-format
+msgctxt "BASIC:B01_NO_CHILD"
 msgid ""
 "\"{domain_child}\" does not exist as a DNS zone. Try to test "
 "\"{domain_super}\" instead."
@@ -207,21 +191,18 @@ msgstr ""
 "\"{domain_child}\" ei ole olemassa DNS-vyöhykkeenä. Kokeile sen sijaan "
 "testata verkkotunnusta \"{domain_super}\"."
 
-#. BASIC:B01_PARENT_FOUND
-#, perl-brace-format
+msgctxt "BASIC:B01_PARENT_FOUND"
 msgid ""
 "The parent zone is \"{domain}\" as returned from name servers "
 "\"{ns_ip_list}\"."
 msgstr ""
 "Päävyöhyke on \"{domain}\", joka palautui nimipalvelimilta \"{ns_ip_list}\"."
 
-#. BASIC:B01_PARENT_UNDETERMINED
-#, perl-brace-format
+msgctxt "BASIC:B01_PARENT_UNDETERMINED"
 msgid "The parent zone cannot be determined on name servers \"{ns_ip_list}\"."
 msgstr "Päävyöhykettä ei voida määrittää nimipalvelimilla \"{ns_ip_list}\"."
 
-#. BASIC:B01_UNEXPECTED_NS_RESPONSE
-#, perl-brace-format
+msgctxt "BASIC:B01_UNEXPECTED_NS_RESPONSE"
 msgid ""
 "Name servers for parent domain \"{domain_parent}\" give an incorrect "
 "response on SOA query for \"{domain_child}\". Returned from name servers "
@@ -231,8 +212,7 @@ msgstr ""
 "vastauksen SOA-kyselyyn \"{domain_child}\". Vastaus nimipalvelimilta "
 "\"{ns_ip_list}\"."
 
-#. BASIC:B02_AUTH_RESPONSE_SOA
-#, perl-brace-format
+msgctxt "BASIC:B02_AUTH_RESPONSE_SOA"
 msgid ""
 "Authoritative answer on SOA query for \"{domain}\" is returned by name "
 "servers \"{ns_list}\"."
@@ -240,8 +220,7 @@ msgstr ""
 "Autoritatiivinen vastaus SOA-tietue kyselyyn verkkotunnukselle \"{domain}\" "
 "palautuu nimipalvelimilta \"{ns_list}\"."
 
-#. BASIC:B02_NO_DELEGATION
-#, perl-brace-format
+msgctxt "BASIC:B02_NO_DELEGATION"
 msgid ""
 "There is no delegation (name servers) for \"{domain}\" which means it does "
 "not exist as a zone."
@@ -249,36 +228,30 @@ msgstr ""
 "Verkkotunnukselle \"{domain}\" ei ole delegointia (nimipalvelimia), mikä "
 "tarkoittaa, että sitä ei ole olemassa."
 
-#. BASIC:B02_NO_WORKING_NS
-#, perl-brace-format
+msgctxt "BASIC:B02_NO_WORKING_NS"
 msgid "There is no working name server for \"{domain}\" so it is unreachable."
 msgstr ""
 "Verkkotunnukselle \"{domain}\" ei ole toimivaa nimipalvelinta, joten siihen "
 "ei saada yhteyttä."
 
-#. BASIC:B02_NS_BROKEN
-#, perl-brace-format
+msgctxt "BASIC:B02_NS_BROKEN"
 msgid "Broken response from name server \"{ns}\" on an SOA query."
 msgstr "Rikkinäinen vastaus nimipalvelimelta {ns} SOA-kyselyyn."
 
-#. BASIC:B02_NS_NOT_AUTH
-#, perl-brace-format
+msgctxt "BASIC:B02_NS_NOT_AUTH"
 msgid ""
 "Name server \"{ns}\" does not give an authoritative answer on an SOA query."
 msgstr "Nimipalvelin {ns} ei vastannut autoritatiivisesti SOA-kyselyyn."
 
-#. BASIC:B02_NS_NO_IP_ADDR
-#, perl-brace-format
+msgctxt "BASIC:B02_NS_NO_IP_ADDR"
 msgid "Name server \"{nsname}\" cannot be resolved into an IP address."
 msgstr "Nimipalvelinta \"{nsname}\" ei voida muuttaa IP-osoitteeksi."
 
-#. BASIC:B02_NS_NO_RESPONSE
-#, perl-brace-format
+msgctxt "BASIC:B02_NS_NO_RESPONSE"
 msgid "Name server \"{ns}\" does not respond to an SOA query."
 msgstr "Nimipalvelin {ns} ei vastaa SOA-kyselyyn."
 
-#. BASIC:B02_UNEXPECTED_RCODE
-#, perl-brace-format
+msgctxt "BASIC:B02_UNEXPECTED_RCODE"
 msgid ""
 "Name server \"{ns}\" responds with an unexpected RCODE name (\"{rcode}\") on "
 "an SOA query."
@@ -286,32 +259,27 @@ msgstr ""
 "Nimipalvelin \"{ns}\" vastaa odottamattomalla RCODE-nimellä (\"{rcode}\") "
 "SOA-kyselyyn."
 
-#. BASIC:DOMAIN_NAME_LABEL_TOO_LONG
-#, perl-brace-format
+msgctxt "BASIC:DOMAIN_NAME_LABEL_TOO_LONG"
 msgid ""
 "Domain name ({domain}) has a label ({label}) too long ({dlength}/{max})."
 msgstr ""
 "Verkkotunnuksen ({domain}) osa ({label}) on liian pitkä ({dlength}/{max})."
 
-#. BASIC:DOMAIN_NAME_TOO_LONG
-#, perl-brace-format
+msgctxt "BASIC:DOMAIN_NAME_TOO_LONG"
 msgid "Domain name is too long ({fqdnlength}/{max})."
 msgstr "Verkkotunnus on liian pitkä ({fqdnlength}/{max})."
 
-#. BASIC:DOMAIN_NAME_ZERO_LENGTH_LABEL
-#, perl-brace-format
+msgctxt "BASIC:DOMAIN_NAME_ZERO_LENGTH_LABEL"
 msgid "Domain name ({domain}) has a zero-length label."
 msgstr "Verkkotunnuksen ({domain}) osan pituus on nolla."
 
-#. BASIC:HAS_A_RECORDS
-#, perl-brace-format
+msgctxt "BASIC:HAS_A_RECORDS"
 msgid "Nameserver {ns} returned \"A\" record(s) for {domain}."
 msgstr ""
 "Nimipalvelin {ns} palautti yhden tai useamman ”A”-tietueen kohteelle "
 "{domain}."
 
-#. BASIC:HAS_NAMESERVER_NO_WWW_A_TEST
-#, perl-brace-format
+msgctxt "BASIC:HAS_NAMESERVER_NO_WWW_A_TEST"
 msgid "Functional nameserver found. \"A\" query for www.{zname} test skipped."
 msgstr ""
 "Toimiva nimipalvelin löytyi. ”A”-kysely www.{zname} testiä varten ohitettiin."
@@ -324,12 +292,10 @@ msgstr ""
 #. NAMESERVER:IPV4_DISABLED
 #. SYNTAX:IPV4_DISABLED
 #. SYSTEM:SKIP_IPV4_DISABLED
-#, perl-brace-format
 msgid "IPv4 is disabled, not sending \"{rrtype}\" query to {ns}."
 msgstr "IPv4 ei ole käytössä, ei lähetä kyselyä \"{rrtype}\" kohteelle {ns}."
 
-#. BASIC:IPV4_ENABLED
-#, perl-brace-format
+msgctxt "BASIC:IPV4_ENABLED"
 msgid "IPv4 is enabled, can send \"{rrtype}\" query to {ns}."
 msgstr "IPv4 on käytössä ja voi lähettää kyselyn \"{rrtype}\" kohteelle {ns}."
 
@@ -341,43 +307,38 @@ msgstr "IPv4 on käytössä ja voi lähettää kyselyn \"{rrtype}\" kohteelle {n
 #. NAMESERVER:IPV6_DISABLED
 #. SYNTAX:IPV6_DISABLED
 #. SYSTEM:SKIP_IPV6_DISABLED
-#, perl-brace-format
 msgid "IPv6 is disabled, not sending \"{rrtype}\" query to {ns}."
 msgstr "IPv6 ei ole käytössä, ei lähetä kyselyä \"{rrtype}\" kohteelle {ns}."
 
-#. SYSTEM:ERROR_CACHE_SKIP
-#, perl-brace-format
+msgctxt "SYSTEM:ERROR_CACHE_SKIP"
 msgid "Skipping {query_type} query to {query_name} ({query_class}) at {ip} over {protocol} for {ttl_seconds}s after network error."
 msgstr "Ohitetaan {query_type}-kysely kohteeseen {query_name} ({query_class}) osoitteessa {ip} protokollalla {protocol} {ttl_seconds}s ajan verkko-virheen jälkeen."
 
-#. BASIC:IPV6_ENABLED
-#, perl-brace-format
+msgctxt "BASIC:IPV6_ENABLED"
 msgid "IPv6 is enabled, can send \"{rrtype}\" query to {ns}."
 msgstr "IPv6 on käytössä ja voi lähettää kyselyn \"{rrtype}\" kohteelle {ns}."
 
-#. BASIC:NO_A_RECORDS
-#, perl-brace-format
+msgctxt "BASIC:NO_A_RECORDS"
 msgid "Nameserver {ns} did not return \"A\" record(s) for {domain}."
 msgstr "Nimipalvelin {ns} ei palauttanut \"A”-tietueita kohteelle {domain}."
 
-#. CONNECTIVITY:CONNECTIVITY01
+msgctxt "CONNECTIVITY:CONNECTIVITY01"
 msgid "UDP connectivity"
 msgstr "UDP yhteys"
 
-#. CONNECTIVITY:CONNECTIVITY02
+msgctxt "CONNECTIVITY:CONNECTIVITY02"
 msgid "TCP connectivity"
 msgstr "TCP yhteys"
 
-#. CONNECTIVITY:CONNECTIVITY03
+msgctxt "CONNECTIVITY:CONNECTIVITY03"
 msgid "AS Diversity"
 msgstr "AS Hajautus"
 
-#. CONNECTIVITY:CONNECTIVITY04
+msgctxt "CONNECTIVITY:CONNECTIVITY04"
 msgid "IP Prefix Diversity"
 msgstr "IP Prefix Hajautus"
 
-#. CONNECTIVITY:CN01_IPV4_DISABLED
-#, perl-brace-format
+msgctxt "CONNECTIVITY:CN01_IPV4_DISABLED"
 msgid ""
 "IPv4 is disabled. No DNS queries are sent to these name servers: "
 "\"{ns_list}\"."
@@ -385,8 +346,7 @@ msgstr ""
 "IPv4 on poistettu käytöstä. Näihin nimipalvelimiin ei lähetetä DNS-kyselyjä: "
 "\"{ns_list}\"."
 
-#. CONNECTIVITY:CN01_IPV6_DISABLED
-#, perl-brace-format
+msgctxt "CONNECTIVITY:CN01_IPV6_DISABLED"
 msgid ""
 "IPv6 is disabled. No DNS queries are sent to these name servers: "
 "\"{ns_list}\"."
@@ -394,8 +354,7 @@ msgstr ""
 "IPv6 on poistettu käytöstä. Näihin nimipalvelimiin ei lähetetä DNS-kyselyjä: "
 "\"{ns_list}\"."
 
-#. CONNECTIVITY:CN01_MISSING_NS_RECORD_UDP
-#, perl-brace-format
+msgctxt "CONNECTIVITY:CN01_MISSING_NS_RECORD_UDP"
 msgid ""
 "Nameserver {ns} responds to a NS query with no NS records in the answer "
 "section over UDP."
@@ -403,8 +362,7 @@ msgstr ""
 "Nimipalvelin {ns} vastaa NS-kyselyyn ilman NS-tietueita vastausosiossa UDP:n "
 "yli."
 
-#. CONNECTIVITY:CN01_MISSING_SOA_RECORD_UDP
-#, perl-brace-format
+msgctxt "CONNECTIVITY:CN01_MISSING_SOA_RECORD_UDP"
 msgid ""
 "Nameserver {ns} responds to a SOA query with no SOA records in the answer "
 "section over UDP."
@@ -412,39 +370,33 @@ msgstr ""
 "Nimipalvelin {ns} vastaa SOA-kyselyyn ilman SOA-tietueita vastausosiossa UDP:"
 "n yli."
 
-#. CONNECTIVITY:CN01_NO_RESPONSE_NS_QUERY_UDP
-#, perl-brace-format
+msgctxt "CONNECTIVITY:CN01_NO_RESPONSE_NS_QUERY_UDP"
 msgid "Nameserver {ns} does not respond to NS queries over UDP."
 msgstr "Nimipalvelin {ns} ei vastaa NS-kyselyihin UDP:n yli."
 
-#. CONNECTIVITY:CN01_NO_RESPONSE_SOA_QUERY_UDP
-#, perl-brace-format
+msgctxt "CONNECTIVITY:CN01_NO_RESPONSE_SOA_QUERY_UDP"
 msgid "Nameserver {ns} does not respond to SOA queries over UDP."
 msgstr "Nimipalvelin {ns} ei vastannut SOA-kyselyyn UDP:n yli."
 
-#. CONNECTIVITY:CN01_NO_RESPONSE_UDP
-#, perl-brace-format
+msgctxt "CONNECTIVITY:CN01_NO_RESPONSE_UDP"
 msgid "Nameserver {ns} does not respond to any queries over UDP."
 msgstr "Nimipalvelin {ns} ei vastaa mihinkään kyselyihin UDP:n yli."
 
-#. CONNECTIVITY:CN01_NS_RECORD_NOT_AA_UDP
-#, perl-brace-format
+msgctxt "CONNECTIVITY:CN01_NS_RECORD_NOT_AA_UDP"
 msgid ""
 "Nameserver {ns} does not give an authoritative response on an NS query over "
 "UDP."
 msgstr ""
 "Nimipalvelin {ns} ei anna autoritatiivista vastausta NS-kyselyyn UDP:n yli."
 
-#. CONNECTIVITY:CN01_SOA_RECORD_NOT_AA_UDP
-#, perl-brace-format
+msgctxt "CONNECTIVITY:CN01_SOA_RECORD_NOT_AA_UDP"
 msgid ""
 "Nameserver {ns} does not give an authoritative response on an SOA query over "
 "UDP."
 msgstr ""
 "Nimipalvelin {ns} ei vastannut autoritatiivisesti SOA-kyselyyn UDP:n yli."
 
-#. CONNECTIVITY:CN01_UNEXPECTED_RCODE_NS_QUERY_UDP
-#, perl-brace-format
+msgctxt "CONNECTIVITY:CN01_UNEXPECTED_RCODE_NS_QUERY_UDP"
 msgid ""
 "Nameserver {ns} responds with an unexpected RCODE ({rcode}) on an NS query "
 "over UDP."
@@ -452,8 +404,7 @@ msgstr ""
 "Nimipalvelin {ns} antoi vastaukseksi odottamattoman RCODE ({rcode}) NS-"
 "kyselyyn UDP:n yli."
 
-#. CONNECTIVITY:CN01_UNEXPECTED_RCODE_SOA_QUERY_UDP
-#, perl-brace-format
+msgctxt "CONNECTIVITY:CN01_UNEXPECTED_RCODE_SOA_QUERY_UDP"
 msgid ""
 "Nameserver {ns} responds with an unexpected RCODE ({rcode}) on an SOA query "
 "over UDP."
@@ -461,8 +412,7 @@ msgstr ""
 "Nimipalvelin {ns} antoi vastaukseksi odottamattoman RCODE ({rcode}) SOA-"
 "kyselyyn UDP:n yli."
 
-#. CONNECTIVITY:CN01_WRONG_NS_RECORD_UDP
-#, perl-brace-format
+msgctxt "CONNECTIVITY:CN01_WRONG_NS_RECORD_UDP"
 msgid ""
 "Nameserver {ns} responds with a wrong owner name ({domain_found} instead of "
 "{domain_expected}) on NS queries over UDP."
@@ -470,8 +420,7 @@ msgstr ""
 "Nimipalvelin {ns} vastaa väärällä omistajanimellä ({domain_found} eikä "
 "{domain_expected}) NS-kyselyihin UDP:n kautta."
 
-#. CONNECTIVITY:CN01_WRONG_SOA_RECORD_UDP
-#, perl-brace-format
+msgctxt "CONNECTIVITY:CN01_WRONG_SOA_RECORD_UDP"
 msgid ""
 "Nameserver {ns} responds with a wrong owner name ({domain_found} instead of "
 "{domain_expected}) on SOA queries over UDP."
@@ -479,8 +428,7 @@ msgstr ""
 "Nimipalvelin {ns} vastaa väärällä omistajanimellä ({domain_found} eikä "
 "{domain_expected}) SOA-kyselyihin UDP:n yli."
 
-#. CONNECTIVITY:CN02_MISSING_NS_RECORD_TCP
-#, perl-brace-format
+msgctxt "CONNECTIVITY:CN02_MISSING_NS_RECORD_TCP"
 msgid ""
 "Nameserver {ns} responds to a NS query with no NS records in the answer "
 "section over TCP."
@@ -488,8 +436,7 @@ msgstr ""
 "Nimipalvelin {ns} vastaa NS-kyselyyn ilman NS-tietueita vastausosiossa TCP:n "
 "yli."
 
-#. CONNECTIVITY:CN02_MISSING_SOA_RECORD_TCP
-#, perl-brace-format
+msgctxt "CONNECTIVITY:CN02_MISSING_SOA_RECORD_TCP"
 msgid ""
 "Nameserver {ns} responds to a SOA query with no SOA records in the answer "
 "section over TCP."
@@ -497,39 +444,33 @@ msgstr ""
 "Nimipalvelin {ns} vastaa SOA-kyselyyn ilman SOA-tietueita vastausosiossa TCP:"
 "n yli."
 
-#. CONNECTIVITY:CN02_NO_RESPONSE_NS_QUERY_TCP
-#, perl-brace-format
+msgctxt "CONNECTIVITY:CN02_NO_RESPONSE_NS_QUERY_TCP"
 msgid "Nameserver {ns} does not respond to NS queries over TCP."
 msgstr "Nimipalvelin {ns} ei vastannut NS-kyselyyn TCP:n yli."
 
-#. CONNECTIVITY:CN02_NO_RESPONSE_SOA_QUERY_TCP
-#, perl-brace-format
+msgctxt "CONNECTIVITY:CN02_NO_RESPONSE_SOA_QUERY_TCP"
 msgid "Nameserver {ns} does not respond to SOA queries over TCP."
 msgstr "Nimipalvelin {ns} ei vastannut SOA-kyselyyn TCP:n yli."
 
-#. CONNECTIVITY:CN02_NO_RESPONSE_TCP
-#, perl-brace-format
+msgctxt "CONNECTIVITY:CN02_NO_RESPONSE_TCP"
 msgid "Nameserver {ns} does not respond to any queries over TCP."
 msgstr "Nimipalvelin {ns} ei vastaa kyselyihin TCP:n yli."
 
-#. CONNECTIVITY:CN02_NS_RECORD_NOT_AA_TCP
-#, perl-brace-format
+msgctxt "CONNECTIVITY:CN02_NS_RECORD_NOT_AA_TCP"
 msgid ""
 "Nameserver {ns} does not give an authoritative response on an NS query over "
 "TCP."
 msgstr ""
 "Nimipalvelin {ns} ei anna autoritatiivista vastausta NS-kyselyyn TCP:n yli."
 
-#. CONNECTIVITY:CN02_SOA_RECORD_NOT_AA_TCP
-#, perl-brace-format
+msgctxt "CONNECTIVITY:CN02_SOA_RECORD_NOT_AA_TCP"
 msgid ""
 "Nameserver {ns} does not give an authoritative response on an SOA query over "
 "TCP."
 msgstr ""
 "Nimipalvelin {ns} ei vastannut autoritatiivisesti SOA-kyselyyn TCP:n yli."
 
-#. CONNECTIVITY:CN02_UNEXPECTED_RCODE_NS_QUERY_TCP
-#, perl-brace-format
+msgctxt "CONNECTIVITY:CN02_UNEXPECTED_RCODE_NS_QUERY_TCP"
 msgid ""
 "Nameserver {ns} responds with an unexpected RCODE ({rcode}) on an NS query "
 "over TCP."
@@ -537,8 +478,7 @@ msgstr ""
 "Nimipalvelin {ns} antoi vastaukseksi odottamattoman RCODE ({rcode}) NS-"
 "kyselyyn TCP:n yli."
 
-#. CONNECTIVITY:CN02_UNEXPECTED_RCODE_SOA_QUERY_TCP
-#, perl-brace-format
+msgctxt "CONNECTIVITY:CN02_UNEXPECTED_RCODE_SOA_QUERY_TCP"
 msgid ""
 "Nameserver {ns} responds with an unexpected RCODE ({rcode}) on an SOA query "
 "over TCP."
@@ -546,8 +486,7 @@ msgstr ""
 "Nimipalvelin {ns} vastaa odottamattomalla RCODE:lla ({rcode}) SOA-kyselyyn "
 "TCP:n yli."
 
-#. CONNECTIVITY:CN02_WRONG_NS_RECORD_TCP
-#, perl-brace-format
+msgctxt "CONNECTIVITY:CN02_WRONG_NS_RECORD_TCP"
 msgid ""
 "Nameserver {ns} responds with a wrong owner name ({domain_found} instead of "
 "{domain_expected}) on NS queries over TCP."
@@ -555,8 +494,7 @@ msgstr ""
 "Nimipalvelin {ns} vastaa väärällä omistajan nimellä ({domain_found} eikä "
 "{domain_expected}) NS-kyselyihin TCP:n yli."
 
-#. CONNECTIVITY:CN02_WRONG_SOA_RECORD_TCP
-#, perl-brace-format
+msgctxt "CONNECTIVITY:CN02_WRONG_SOA_RECORD_TCP"
 msgid ""
 "Nameserver {ns} responds with a wrong owner name ({domain_found} instead of "
 "{domain_expected}) on SOA queries over TCP."
@@ -564,31 +502,26 @@ msgstr ""
 "Nimipalvelin {ns} vastaa väärällä omistajanimellä ({domain_found} eikä "
 "{domain_expected}) SOA-kyselyihin TCP:n yli."
 
-#. CONNECTIVITY:ASN_INFOS_ANNOUNCE_IN
-#, perl-brace-format
+msgctxt "CONNECTIVITY:ASN_INFOS_ANNOUNCE_IN"
 msgid "Name server IP address \"{ns_ip}\" is announced in prefix \"{prefix}\"."
 msgstr ""
 "Nimipalvelimen IP-osoite \"{ns_ip}\" ilmoitetaan Prefixissä \"{prefix}\"."
 
-#. CONNECTIVITY:ASN_INFOS_RAW
-#, perl-brace-format
+msgctxt "CONNECTIVITY:ASN_INFOS_RAW"
 msgid "The ASN data for name server IP address \"{ns_ip}\" is \"{data}\"."
 msgstr "Nimipalvelimen IP-osoitteen \"{ns_ip}\" ASN-tieto on \"{data}\"."
 
-#. CONNECTIVITY:CN04_EMPTY_PREFIX_SET
-#, perl-brace-format
+msgctxt "CONNECTIVITY:CN04_EMPTY_PREFIX_SET"
 msgid "Prefix database returned no information for IP address {ns_ip}."
 msgstr "IP prefix tietokanta ei palauttanut tietoja IP-osoitteesta {ns_ip}."
 
-#. CONNECTIVITY:CN04_ERROR_PREFIX_DATABASE
-#, perl-brace-format
+msgctxt "CONNECTIVITY:CN04_ERROR_PREFIX_DATABASE"
 msgid "Prefix database error. No data to analyze for IP address {ns_ip}."
 msgstr ""
 "IP Prefix tietokantavirhe. IP-osoitteelle {ns_ip} ei ole analysoitavia "
 "tietoja."
 
-#. CONNECTIVITY:CN04_IPV4_SAME_PREFIX
-#, perl-brace-format
+msgctxt "CONNECTIVITY:CN04_IPV4_SAME_PREFIX"
 msgid ""
 "The following name server(s) are announced in the same IPv4 prefix "
 "({ip_prefix}): \"{ns_list}\""
@@ -596,8 +529,7 @@ msgstr ""
 "Seuraavat nimipalvelimet ilmoitetaan samalla IPv4 prefixillä ({ip_prefix}): "
 "\"{ns_list}\""
 
-#. CONNECTIVITY:CN04_IPV4_DIFFERENT_PREFIX
-#, perl-brace-format
+msgctxt "CONNECTIVITY:CN04_IPV4_DIFFERENT_PREFIX"
 msgid ""
 "The following name server(s) are announced in unique IPv4 prefix(es): "
 "\"{ns_list}\""
@@ -605,8 +537,7 @@ msgstr ""
 "Seuraavat nimipalvelimet ilmoitetaan yksilöllisillä IPv4 prefixeillä: "
 "\"{ns_list}\""
 
-#. CONNECTIVITY:CN04_IPV6_SAME_PREFIX
-#, perl-brace-format
+msgctxt "CONNECTIVITY:CN04_IPV6_SAME_PREFIX"
 msgid ""
 "The following name server(s) are announced in the same IPv6 prefix "
 "({ip_prefix}): \"{ns_list}\""
@@ -614,8 +545,7 @@ msgstr ""
 "Seuraavat nimipalvelimet ilmoitetaan samalla IPv6 prefixillä ({ip_prefix}): "
 "\"{ns_list}\""
 
-#. CONNECTIVITY:CN04_IPV6_DIFFERENT_PREFIX
-#, perl-brace-format
+msgctxt "CONNECTIVITY:CN04_IPV6_DIFFERENT_PREFIX"
 msgid ""
 "The following name server(s) are announced in unique IPv6 prefix(es): "
 "\"{ns_list}\""
@@ -623,18 +553,15 @@ msgstr ""
 "Seuraavat nimipalvelimet ilmoitetaan yksilöllisillä IPv6 prefixeillä: "
 "\"{ns_list}\""
 
-#. CONNECTIVITY:ERROR_ASN_DATABASE
-#, perl-brace-format
+msgctxt "CONNECTIVITY:ERROR_ASN_DATABASE"
 msgid "ASN Database error. No data to analyze for {ns_ip}."
 msgstr "ASN-tietokantavirhe. Ei analysoitavia tietoja kohteelle {ns_ip}."
 
-#. CONNECTIVITY:EMPTY_ASN_SET
-#, perl-brace-format
+msgctxt "CONNECTIVITY:EMPTY_ASN_SET"
 msgid "AS database returned no informations for IP address {ns_ip}."
 msgstr "AS-tietokanta ei palauttanut tietoa IP-osoitteesta {ns_ip}."
 
-#. CONNECTIVITY:IPV4_SAME_ASN
-#, perl-brace-format
+msgctxt "CONNECTIVITY:IPV4_SAME_ASN"
 msgid ""
 "All authoritative nameservers have their IPv4 addresses in the same AS set "
 "({asn_list})."
@@ -642,8 +569,7 @@ msgstr ""
 "Kaikkien autoritatiivisten nimipalvelimien IPv4-osoitteet kuuluvat samaan AS-"
 "joukkoon ({asn_list})."
 
-#. CONNECTIVITY:IPV4_ONE_ASN
-#, perl-brace-format
+msgctxt "CONNECTIVITY:IPV4_ONE_ASN"
 msgid ""
 "All authoritative nameservers have their IPv4 addresses in the same AS "
 "({asn})."
@@ -651,8 +577,7 @@ msgstr ""
 "Kaikkien autoritatiivisten nimipalvelimien IPv4-osoitteet kuuluvat samaan AS:"
 "ään ({asn})."
 
-#. CONNECTIVITY:IPV4_DIFFERENT_ASN
-#, perl-brace-format
+msgctxt "CONNECTIVITY:IPV4_DIFFERENT_ASN"
 msgid ""
 "At least two IPv4 addresses of the authoritative nameservers are announced "
 "by different AS sets. A merged list of all AS: ({asn_list})."
@@ -660,8 +585,7 @@ msgstr ""
 "Eri AS:t ilmoittavat vähintään kaksi autoritatiivistä nimipalvelinten IPv4-"
 "osoitetta. Yhdistetty luettelo kaikista AS:ista: ({asn_list})."
 
-#. CONNECTIVITY:IPV6_SAME_ASN
-#, perl-brace-format
+msgctxt "CONNECTIVITY:IPV6_SAME_ASN"
 msgid ""
 "All authoritative nameservers have their IPv6 addresses in the same AS set "
 "({asn_list})."
@@ -669,8 +593,7 @@ msgstr ""
 "Kaikilla autoritatiivisilla nimipalvelimilla on IPv6-osoitteensa samassa AS:"
 "ssa ({asn_list})."
 
-#. CONNECTIVITY:IPV6_ONE_ASN
-#, perl-brace-format
+msgctxt "CONNECTIVITY:IPV6_ONE_ASN"
 msgid ""
 "All authoritative nameservers have their IPv6 addresses in the same AS "
 "({asn})."
@@ -678,8 +601,7 @@ msgstr ""
 "Kaikkien autoritatiivisten nimipalvelimien IPv6-osoitteet kuuluvat samaan AS:"
 "ään ({asn})."
 
-#. CONNECTIVITY:IPV6_DIFFERENT_ASN
-#, perl-brace-format
+msgctxt "CONNECTIVITY:IPV6_DIFFERENT_ASN"
 msgid ""
 "At least two IPv6 addresses of the authoritative nameservers are announced "
 "by different AS sets. A merged list of all AS: ({asn_list})."
@@ -687,60 +609,55 @@ msgstr ""
 "Eri AS:t ilmoittavat vähintään kaksi arvovaltaisten nimipalvelinten IPv6-"
 "osoitetta. Yhdistetty luettelo kaikista AS:ista: ({asn_list})."
 
-#. CONNECTIVITY:IPV4_ASN
-#, perl-brace-format
+msgctxt "CONNECTIVITY:IPV4_ASN"
 msgid "Name servers have IPv4 addresses in the following ASs: {asn}."
 msgstr "Nimipalvelimilla on IPv4-osoitteita seuraavissa AS:issä: {asn}."
 
-#. CONNECTIVITY:IPV6_ASN
-#, perl-brace-format
+msgctxt "CONNECTIVITY:IPV6_ASN"
 msgid "Name servers have IPv6 addresses in the following ASs: {asn}."
 msgstr "Nimipalvelimilla on IPv6-osoitteet seuraavissa AS:issa: {asn}."
 
-#. CONNECTIVITY:ASN_INFOS_ANNOUNCE_BY
-#, perl-brace-format
+msgctxt "CONNECTIVITY:ASN_INFOS_ANNOUNCE_BY"
 msgid "Name server IP address \"{ns_ip}\" is announced by ASN {asn}."
 msgstr "Nimipalvelimen IP-osoitteen \"{ns_ip}\" ilmoittaa ASN {asn}."
 
-#. CONSISTENCY:CONSISTENCY01
+msgctxt "CONSISTENCY:CONSISTENCY01"
 msgid "SOA serial number consistency"
 msgstr "SOA-sarjanumeron johdonmukaisuus"
 
-#. CONSISTENCY:CONSISTENCY02
+msgctxt "CONSISTENCY:CONSISTENCY02"
 msgid "SOA RNAME consistency"
 msgstr "SOA RNAME johdonmukaisuus"
 
-#. CONSISTENCY:CONSISTENCY03
+msgctxt "CONSISTENCY:CONSISTENCY03"
 msgid "SOA timers consistency"
 msgstr "SOA-ajastinten johdonmukaisuus"
 
-#. CONSISTENCY:CONSISTENCY04
+msgctxt "CONSISTENCY:CONSISTENCY04"
 msgid "Name server NS consistency"
 msgstr "Nimipalvelimen NS johdonmukaisuus"
 
-#. CONSISTENCY:CONSISTENCY05
+msgctxt "CONSISTENCY:CONSISTENCY05"
 msgid "Consistency between glue and authoritative data"
 msgstr "Johdonmukaisuus liimatietueen ja autoritatiivisten tietojen välillä"
 
-#. CONSISTENCY:CONSISTENCY06
+msgctxt "CONSISTENCY:CONSISTENCY06"
 msgid "SOA MNAME consistency"
 msgstr "SOA MNAME johdonmukaisuus"
 
-#. CONSISTENCY:ADDRESSES_MATCH
+msgctxt "CONSISTENCY:ADDRESSES_MATCH"
 msgid "Glue records are consistent between glue and authoritative data."
 msgstr "Liimatietueet ovat yhtäpitäviä liiman ja autoritäärisen tiedon kanssa."
 
-#. CONSISTENCY:CHILD_NS_FAILED
-#, perl-brace-format
+msgctxt "CONSISTENCY:CHILD_NS_FAILED"
 msgid "Unexpected or erroneous reply from {ns}."
 msgstr "Odottamaton tai virheellinen vastaus kohteelta {ns}."
 
-#. CONSISTENCY:CHILD_ZONE_LAME
+msgctxt "CONSISTENCY:CHILD_ZONE_LAME"
 msgid "Lame delegation."
 msgstr "Delegointivirhe."
 
-#. CONSISTENCY:EXTRA_ADDRESS_CHILD
-#, perl-brace-format
+msgctxt "CONSISTENCY:EXTRA_ADDRESS_CHILD"
 msgid ""
 "Child has extra nameserver IP address(es) not listed at parent "
 "({ns_ip_list})."
@@ -748,8 +665,7 @@ msgstr ""
 "Alemmalla tasolla on yksi tai useampia nimipalvelimen IP-osoitteita, joita "
 "ei ole listattu ylemmällä tasolla ({ns_ip_list})."
 
-#. CONSISTENCY:IN_BAILIWICK_ADDR_MISMATCH
-#, perl-brace-format
+msgctxt "CONSISTENCY:IN_BAILIWICK_ADDR_MISMATCH"
 msgid ""
 "In-bailiwick name server listed at parent has a mismatch between glue data "
 "at parent ({parent_addresses}) and any equivalent address record in child "
@@ -760,28 +676,23 @@ msgstr ""
 "alemman vyöhykkeen mahdollisten vastaavien osoitetietueiden välillä "
 "({zone_addresses})."
 
-#. CONSISTENCY:MULTIPLE_NS_SET
-#, perl-brace-format
+msgctxt "CONSISTENCY:MULTIPLE_NS_SET"
 msgid "Found {count} NS set(s)."
 msgstr "NS-joukkoja löydetty {count} kpl."
 
-#. CONSISTENCY:MULTIPLE_SOA_MNAMES
-#, perl-brace-format
+msgctxt "CONSISTENCY:MULTIPLE_SOA_MNAMES"
 msgid "Saw {count} SOA mname."
 msgstr "SOA mname -tietoja havaittu {count} kpl."
 
-#. CONSISTENCY:MULTIPLE_SOA_RNAMES
-#, perl-brace-format
+msgctxt "CONSISTENCY:MULTIPLE_SOA_RNAMES"
 msgid "Found {count} SOA rname(s)."
 msgstr "SOA rname -tietoja löydetty {count} kpl."
 
-#. CONSISTENCY:MULTIPLE_SOA_SERIALS
-#, perl-brace-format
+msgctxt "CONSISTENCY:MULTIPLE_SOA_SERIALS"
 msgid "Found {count} SOA serial number(s)."
 msgstr "SOA-sarjanumeroita löydetty {count} kpl."
 
-#. CONSISTENCY:MULTIPLE_SOA_TIME_PARAMETER_SET
-#, perl-brace-format
+msgctxt "CONSISTENCY:MULTIPLE_SOA_TIME_PARAMETER_SET"
 msgid "Found {count} SOA time parameter set(s)."
 msgstr "SOA-aikaparametrijoukkoja löydetty {count} kpl."
 
@@ -789,49 +700,40 @@ msgstr "SOA-aikaparametrijoukkoja löydetty {count} kpl."
 #. DNSSEC:NO_RESPONSE
 #. DELEGATION:NO_RESPONSE
 #. ZONE:NO_RESPONSE
-#, perl-brace-format
 msgid "Nameserver {ns} did not respond."
 msgstr "Nimipalvelin {ns} ei vastannut."
 
-#. CONSISTENCY:NO_RESPONSE_NS_QUERY
-#, perl-brace-format
+msgctxt "CONSISTENCY:NO_RESPONSE_NS_QUERY"
 msgid "No response from nameserver {ns} on NS queries."
 msgstr "Nimipalvelin {ns} ei vastannut NS-kyselyihin."
 
-#. CONSISTENCY:NO_RESPONSE_SOA_QUERY
-#, perl-brace-format
+msgctxt "CONSISTENCY:NO_RESPONSE_SOA_QUERY"
 msgid "No response from nameserver {ns} on SOA queries."
 msgstr "Nimipalvelin {ns} ei vastannut SOA-kyselyihin."
 
-#. CONSISTENCY:NS_SET
-#, perl-brace-format
+msgctxt "CONSISTENCY:NS_SET"
 msgid "Saw NS set ({nsname_list}) on following nameserver set : {servers}."
 msgstr ""
 "Havaittu NS-joukko ({nsname_list}) seuraavassa nimipalvelinjoukossa: "
 "{servers}."
 
-#. CONSISTENCY:ONE_NS_SET
-#, perl-brace-format
+msgctxt "CONSISTENCY:ONE_NS_SET"
 msgid "A single NS set was found ({nsname_list})."
 msgstr "Yksi NS-joukko löydettiin kohteesta ({nsname_list})."
 
-#. CONSISTENCY:ONE_SOA_MNAME
-#, perl-brace-format
+msgctxt "CONSISTENCY:ONE_SOA_MNAME"
 msgid "A single SOA mname value was seen ({mname})."
 msgstr "Yksi SOA mname -arvo havaittiin kohteessa ({mname})."
 
-#. CONSISTENCY:ONE_SOA_RNAME
-#, perl-brace-format
+msgctxt "CONSISTENCY:ONE_SOA_RNAME"
 msgid "A single SOA rname value was found ({rname})."
 msgstr "Yksi SOA rname -arvo löydettiin kohteesta ({rname})."
 
-#. CONSISTENCY:ONE_SOA_SERIAL
-#, perl-brace-format
+msgctxt "CONSISTENCY:ONE_SOA_SERIAL"
 msgid "A single SOA serial number was found ({serial})."
 msgstr "Yksi SOA-sarjanumero löydettiin kohteesta ({serial})."
 
-#. CONSISTENCY:ONE_SOA_TIME_PARAMETER_SET
-#, perl-brace-format
+msgctxt "CONSISTENCY:ONE_SOA_TIME_PARAMETER_SET"
 msgid ""
 "A single SOA time parameter set was seen (REFRESH={refresh},RETRY={retry},"
 "EXPIRE={expire},MINIMUM={minimum})."
@@ -839,8 +741,7 @@ msgstr ""
 "Yksi SOA-aikaparametrijoukko havaittiin (REFRESH={refresh},RETRY={retry},"
 "EXPIRE={expire},MINIMUM={minimum})."
 
-#. CONSISTENCY:OUT_OF_BAILIWICK_ADDR_MISMATCH
-#, perl-brace-format
+msgctxt "CONSISTENCY:OUT_OF_BAILIWICK_ADDR_MISMATCH"
 msgid ""
 "Out-of-bailiwick name server listed at parent with glue record has a "
 "mismatch between the glue at the parent ({parent_addresses}) and any "
@@ -851,21 +752,18 @@ msgstr ""
 "autoritäärisen alueen mahdollisten vastaavien osoitetietueiden välillä "
 "({zone_addresses})."
 
-#. CONSISTENCY:SOA_RNAME
-#, perl-brace-format
+msgctxt "CONSISTENCY:SOA_RNAME"
 msgid "Found SOA rname {rname} on following nameserver set : {ns_list}."
 msgstr ""
 "Löydetty SOA rname {rname} seuraavasta nimipalvelinjoukosta: {ns_list}."
 
-#. CONSISTENCY:SOA_SERIAL
-#, perl-brace-format
+msgctxt "CONSISTENCY:SOA_SERIAL"
 msgid "Saw SOA serial number {serial} on following nameserver set : {ns_list}."
 msgstr ""
 "Havaittu SOA-sarjanumero {serial} seuraavassa nimipalvelinjoukossa: "
 "{ns_list}."
 
-#. CONSISTENCY:SOA_SERIAL_VARIATION
-#, perl-brace-format
+msgctxt "CONSISTENCY:SOA_SERIAL_VARIATION"
 msgid ""
 "Difference between the smaller serial ({serial_min}) and the bigger one "
 "({serial_max}) is greater than the maximum allowed ({max_variation})."
@@ -873,8 +771,7 @@ msgstr ""
 "Pienemmän sarjanumeron ({serial_min}) ja suuremman ({serial_max}) välinen "
 "ero on suurempi kuin suurin mahdollinen sallittu arvo ({max_variation})."
 
-#. CONSISTENCY:SOA_TIME_PARAMETER_SET
-#, perl-brace-format
+msgctxt "CONSISTENCY:SOA_TIME_PARAMETER_SET"
 msgid ""
 "Saw SOA time parameter set (REFRESH={refresh}, RETRY={retry}, "
 "EXPIRE={expire}, MINIMUM={minimum}) on following nameserver set : {ns_list}."
@@ -883,84 +780,83 @@ msgstr ""
 "EXPIRE={expire}, MINIMUM={minimum}) seuraavassa nimipalvelinjoukossa: "
 "{ns_list}."
 
-#. DNSSEC:DNSSEC01
+msgctxt "DNSSEC:DNSSEC01"
 msgid "Legal values for the DS hash digest algorithm"
 msgstr "Sallitut arvot DS-tietueiden hash algoritmille"
 
-#. DNSSEC:DNSSEC02
+msgctxt "DNSSEC:DNSSEC02"
 msgid "DS must match a valid DNSKEY in the child zone"
 msgstr "DS:n on vastattava validia DNSKEY:tä lapsi vyöhykkeellä (child zone)"
 
-#. DNSSEC:DNSSEC03
+msgctxt "DNSSEC:DNSSEC03"
 msgid "Check for too many NSEC3 iterations"
 msgstr "Tarkista, onko liian monta NSEC3-iteraatiota"
 
-#. DNSSEC:DNSSEC04
+msgctxt "DNSSEC:DNSSEC04"
 msgid "Check for too short or too long RRSIG lifetimes"
 msgstr "Tarkista, onko RRSIG:n elinikä liian lyhyt tai liian pitkä"
 
-#. DNSSEC:DNSSEC05
+msgctxt "DNSSEC:DNSSEC05"
 msgid "Check for invalid DNSKEY algorithms"
 msgstr "Tarkista, onko virheellisiä DNSKEY-algoritmeja"
 
-#. DNSSEC:DNSSEC06
+msgctxt "DNSSEC:DNSSEC06"
 msgid "Verify DNSSEC additional processing"
 msgstr "Tarkista DNSSEC lisäkäsittely"
 
-#. DNSSEC:DNSSEC07
+msgctxt "DNSSEC:DNSSEC07"
 msgid "If DNSKEY at child, parent should have DS"
 msgstr "Jos DNSKEY on lapsivyöhykkeellä, tulee olla DS emovyöhykkeellä"
 
-#. DNSSEC:DNSSEC08
+msgctxt "DNSSEC:DNSSEC08"
 msgid "Valid RRSIG for DNSKEY"
 msgstr "Kelvollinen RRSIG DNSKEY:lle"
 
-#. DNSSEC:DNSSEC09
+msgctxt "DNSSEC:DNSSEC09"
 msgid "RRSIG(SOA) must be valid and created by a valid DNSKEY"
 msgstr "RRSIG(SOA):n on oltava kelvollinen ja luotu kelvollisen DNSKEYn avulla"
 
-#. DNSSEC:DNSSEC10
+msgctxt "DNSSEC:DNSSEC10"
 msgid "Zone contains NSEC or NSEC3 records"
 msgstr "Vyöhyke sisältää NSEC tai NSEC3 tietueita"
 
-#. DNSSEC:DNSSEC11
+msgctxt "DNSSEC:DNSSEC11"
 msgid "DS in delegation requires signed zone"
 msgstr "DS delegoinnissa vaatii allekirjoitetun vyöhykkeen"
 
-#. DNSSEC:DNSSEC12
+msgctxt "DNSSEC:DNSSEC12"
 msgid "Test for DNSSEC Algorithm Completeness"
 msgstr "Testaa DNSSEC-algoritmin toimivuus"
 
-#. DNSSEC:DNSSEC13
+msgctxt "DNSSEC:DNSSEC13"
 msgid "All DNSKEY algorithms used to sign the zone"
 msgstr "Kaikki vyöhykkeen allekirjoittamiseen käytetyt DNSKEY-algoritmit"
 
-#. DNSSEC:DNSSEC14
+msgctxt "DNSSEC:DNSSEC14"
 msgid "Check for valid RSA DNSKEY key size"
 msgstr "Tarkista kelvollinen RSA DNSKEY -avaimen koko"
 
-#. DNSSEC:DNSSEC15
+msgctxt "DNSSEC:DNSSEC15"
 msgid "Existence of CDS and CDNSKEY"
 msgstr "CDS:n ja CDNSKEY:n olemassaolo"
 
-#. DNSSEC:DNSSEC16
+msgctxt "DNSSEC:DNSSEC16"
 msgid "Validate CDS"
 msgstr "Vahvista CDS"
 
-#. DNSSEC:DNSSEC17
+msgctxt "DNSSEC:DNSSEC17"
 msgid "Validate CDNSKEY"
 msgstr "Validoi CDNSKEY"
 
-#. DNSSEC:DNSSEC18
+msgctxt "DNSSEC:DNSSEC18"
 msgid "Validate trust from DS to CDS and CDNSKEY"
 msgstr "Validoi luottamus DS:stä CDS:ään ja CDNSKEY:n"
 
-#. DNSSEC:ADDITIONAL_DNSKEY_SKIPPED
+msgctxt "DNSSEC:ADDITIONAL_DNSKEY_SKIPPED"
 msgid "No DNSKEYs found. Additional tests skipped."
 msgstr "DNSKEY:tä ei löytynyt. Lisätestit ohitettu."
 
-#. DNSSEC:ALGORITHM_DEPRECATED
-#, perl-brace-format
+msgctxt "DNSSEC:ALGORITHM_DEPRECATED"
 msgid ""
 "The DNSKEY with tag {keytag} uses deprecated algorithm number {algo_num} "
 "({algo_descr})."
@@ -968,8 +864,7 @@ msgstr ""
 "DNSKEY, jolla on tunniste {keytag}, käyttää vanhentunutta algoritmin numeroa "
 "{algo_num} ({algo_descr})."
 
-#. DNSSEC:ALGORITHM_NOT_RECOMMENDED
-#, perl-brace-format
+msgctxt "DNSSEC:ALGORITHM_NOT_RECOMMENDED"
 msgid ""
 "The DNSKEY with tag {keytag} uses an algorithm number {algo_num} "
 "({algo_descr}) which is not recommended to be used."
@@ -977,8 +872,7 @@ msgstr ""
 "DNSKEY, jolla on tunniste {keytag}, käyttää algoritmin numeroa {algo_num} "
 "({algo_descr}), vaikka sen käyttöä ei suositella."
 
-#. DNSSEC:ALGORITHM_NOT_ZONE_SIGN
-#, perl-brace-format
+msgctxt "DNSSEC:ALGORITHM_NOT_ZONE_SIGN"
 msgid ""
 "The DNSKEY with tag {keytag} uses algorithm number not meant for zone "
 "signing, algorithm number {algo_num} ({algo_descr})."
@@ -987,8 +881,7 @@ msgstr ""
 "tarkoitettu vyöhykkeen allekirjoittamiseen, algoritmin numero {algo_num} "
 "({algo_descr})."
 
-#. DNSSEC:ALGORITHM_OK
-#, perl-brace-format
+msgctxt "DNSSEC:ALGORITHM_OK"
 msgid ""
 "The DNSKEY with tag {keytag} uses algorithm number {algo_num} "
 "({algo_descr}), which is OK."
@@ -996,8 +889,7 @@ msgstr ""
 "DNSKEY, jolla on tunniste {keytag}, käyttää algoritmin numeroa {algo_num} "
 "({algo_descr}), joka on OK."
 
-#. DNSSEC:ALGORITHM_PRIVATE
-#, perl-brace-format
+msgctxt "DNSSEC:ALGORITHM_PRIVATE"
 msgid ""
 "The DNSKEY with tag {keytag} uses private algorithm number {algo_num} "
 "({algo_descr})."
@@ -1005,8 +897,7 @@ msgstr ""
 "DNSKEY, jolla on tunniste {keytag}, käyttää yksityistä algoritmin numeroa "
 "{algo_num} ({algo_descr})."
 
-#. DNSSEC:ALGORITHM_RESERVED
-#, perl-brace-format
+msgctxt "DNSSEC:ALGORITHM_RESERVED"
 msgid ""
 "The DNSKEY with tag {keytag} uses reserved algorithm number {algo_num} "
 "({algo_descr})."
@@ -1014,8 +905,7 @@ msgstr ""
 "DNSKEY, jolla on tunniste {keytag}, käyttää varattua algoritmin numeroa "
 "{algo_num} ({algo_descr})."
 
-#. DNSSEC:ALGORITHM_UNASSIGNED
-#, perl-brace-format
+msgctxt "DNSSEC:ALGORITHM_UNASSIGNED"
 msgid ""
 "The DNSKEY with tag {keytag} uses unassigned algorithm number {algo_num} "
 "({algo_descr})."
@@ -1023,19 +913,16 @@ msgstr ""
 "DNSKEY, jolla on tunniste {keytag}, käyttää asettamatonta algoritmin numeroa "
 "{algo_num} ({algo_descr})."
 
-#. DNSSEC:DNSKEY_AND_DS
-#, perl-brace-format
+msgctxt "DNSSEC:DNSKEY_AND_DS"
 msgid "{parent} sent a DS record, and {child} a DNSKEY record."
 msgstr "{parent} lähetti DS-tietueen ja {child} DNSKEY-tietueen."
 
-#. DNSSEC:DNSKEY_BUT_NOT_DS
-#, perl-brace-format
+msgctxt "DNSSEC:DNSKEY_BUT_NOT_DS"
 msgid "{child} sent a DNSKEY record, but {parent} did not send a DS record."
 msgstr ""
 "{child} lähetti DNSKEY-tietueen, mutta {parent} ei lähettänyt DS-tietuetta."
 
-#. DNSSEC:DNSKEY_SMALLER_THAN_REC
-#, perl-brace-format
+msgctxt "DNSSEC:DNSKEY_SMALLER_THAN_REC"
 msgid ""
 "DNSKEY with tag {keytag} and using algorithm {algo_num} ({algo_descr}) has a "
 "size ({keysize}) smaller than the recommended one ({keysizerec})."
@@ -1044,8 +931,7 @@ msgstr ""
 "({algo_descr}), on kooltaan ({keysize}) pienempi kuin suositeltu "
 "({keysizerec})."
 
-#. DNSSEC:DNSKEY_TOO_SMALL_FOR_ALGO
-#, perl-brace-format
+msgctxt "DNSSEC:DNSKEY_TOO_SMALL_FOR_ALGO"
 msgid ""
 "DNSKEY with tag {keytag} and using algorithm {algo_num} ({algo_descr}) has a "
 "size ({keysize}) smaller than the minimum one ({keysizemin})."
@@ -1054,8 +940,7 @@ msgstr ""
 "({algo_descr}), on kooltaan ({keysize}) pienempi kuin vähimmäiskoko "
 "({keysizemin})."
 
-#. DNSSEC:DNSKEY_TOO_LARGE_FOR_ALGO
-#, perl-brace-format
+msgctxt "DNSSEC:DNSKEY_TOO_LARGE_FOR_ALGO"
 msgid ""
 "DNSKEY with tag {keytag} and using algorithm {algo_num} ({algo_descr}) has a "
 "size ({keysize}) larger than the maximum one ({keysizemax})."
@@ -1064,8 +949,7 @@ msgstr ""
 "({algo_descr}), on kooltaan ({keysize}) suurempi kuin enimmäiskoko "
 "({keysizemax})."
 
-#. DNSSEC:DS01_DIGEST_NOT_SUPPORTED_BY_ZM
-#, perl-brace-format
+msgctxt "DNSSEC:DS01_DIGEST_NOT_SUPPORTED_BY_ZM"
 msgid ""
 "DS record for zone {domain} with keytag {keytag} was created by digest "
 "algorithm {ds_algo_num} ({ds_algo_mnemo}) which cannot be validated by this "
@@ -1077,8 +961,7 @@ msgstr ""
 "versio ei pysty validoimaan. Tiedot on haettu nimipalvelimilta joiden IP-"
 "osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS01_DS_ALGO_DEPRECATED
-#, perl-brace-format
+msgctxt "DNSSEC:DS01_DS_ALGO_DEPRECATED"
 msgid ""
 "DS record for zone {domain} with keytag {keytag} was created by digest "
 "algorithm {ds_algo_num} ({ds_algo_mnemo}) which is deprecated. Fetched from "
@@ -1089,8 +972,7 @@ msgstr ""
 "käytöstä. Tiedot on haettu nimipalvelimilta joiden IP-osoitteet ovat "
 "\"{ns_ip_list}\"."
 
-#. DNSSEC:DS01_DS_ALGO_2_MISSING
-#, perl-brace-format
+msgctxt "DNSSEC:DS01_DS_ALGO_2_MISSING"
 msgid ""
 "No DS record created by digest algorithm 2 (SHA-256) is present for zone "
 "{domain}."
@@ -1098,8 +980,7 @@ msgstr ""
 "Vyöhykkeellä {domain} ei ole tiivistealgoritmilla 2 (SHA-256) luotua DS-"
 "tietuetta."
 
-#. DNSSEC:DS01_DS_ALGO_NOT_DS
-#, perl-brace-format
+msgctxt "DNSSEC:DS01_DS_ALGO_NOT_DS"
 msgid ""
 "DS record for zone {domain} with keytag {keytag} was created by digest "
 "algorithm {ds_algo_num} ({ds_algo_mnemo}) which is not meant for DS. Fetched "
@@ -1110,8 +991,7 @@ msgstr ""
 "DS-tietueelle. Tiedot on haettu nimipalvelimilta joiden IP-osoitteet ovat "
 "\"{ns_ip_list}\"."
 
-#. DNSSEC:DS01_DS_ALGO_RESERVED
-#, perl-brace-format
+msgctxt "DNSSEC:DS01_DS_ALGO_RESERVED"
 msgid ""
 "DS record for zone {domain} with keytag {keytag} was created with an "
 "unassigned digest algorithm (algorithm number {ds_algo_num}). Fetched from "
@@ -1125,7 +1005,6 @@ msgstr ""
 #. DNSSEC:DS08_ALGO_NOT_SUPPORTED_BY_ZM
 #. DNSSEC:DS09_ALGO_NOT_SUPPORTED_BY_ZM
 #. DNSSEC:DS10_ALGO_NOT_SUPPORTED_BY_ZM
-#, perl-brace-format
 msgid ""
 "DNSKEY with tag {keytag} uses unsupported algorithm {algo_num} "
 "({algo_mnemo}) by this installation of Zonemaster. Fetched from the "
@@ -1135,8 +1014,7 @@ msgstr ""
 "({algo_mnemo}) jota Zonemaster ei tue. Tiedot haettu nimipalvelimilta joiden "
 "IP-osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS02_DNSKEY_NOT_FOR_ZONE_SIGNING
-#, perl-brace-format
+msgctxt "DNSSEC:DS02_DNSKEY_NOT_FOR_ZONE_SIGNING"
 msgid ""
 "Flags field of DNSKEY record with tag {keytag} has not ZONE bit set although "
 "DS with same tag is present in parent. Fetched from the nameservers with IP "
@@ -1146,8 +1024,7 @@ msgstr ""
 "vaikka DS-tietue samalla tunnisteella löytyy ylemmältä tasolta. Tiedot "
 "haettu nimipalvelimilta joiden IP-osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS02_DNSKEY_NOT_SEP
-#, perl-brace-format
+msgctxt "DNSSEC:DS02_DNSKEY_NOT_SEP"
 msgid ""
 "Flags field of DNSKEY record with tag {keytag} has not SEP bit set although "
 "DS with same tag is present in parent. Fetched from the nameservers with IP "
@@ -1157,8 +1034,7 @@ msgstr ""
 "bittiä vaikka samalla tunnisteella DS-tietue on asetettu ylätasolle. Tiedot "
 "haettu nimipalvelimilta joiden IP-osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS
-#, perl-brace-format
+msgctxt "DNSSEC:DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS"
 msgid ""
 "The DNSKEY RRset has not been signed by any DNSKEY matched by a DS record. "
 "Fetched from the nameservers with IP addresses \"{ns_ip_list}\"."
@@ -1166,8 +1042,7 @@ msgstr ""
 "DNSKEY RRset ei ole allekirjoitettu millään DS-tietuetta vastaavalla DNSKEY:"
 "llä. Haettu nimipalvelimista, joiden IP-osoite on \"{ns_ip_list}\"."
 
-#. DNSSEC:DS02_NO_DNSKEY_FOR_DS
-#, perl-brace-format
+msgctxt "DNSSEC:DS02_NO_DNSKEY_FOR_DS"
 msgid ""
 "The DNSKEY record with tag {keytag} that the DS refers to does not exist in "
 "the DNSKEY RRset. Fetched from the nameservers with IP \"{ns_ip_list}\"."
@@ -1176,8 +1051,7 @@ msgstr ""
 "olemassa DNSKEY RRsetissä. Tiedot haettu nimipalvelimilta joiden IP-"
 "osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS02_NO_MATCHING_DNSKEY_RRSIG
-#, perl-brace-format
+msgctxt "DNSSEC:DS02_NO_MATCHING_DNSKEY_RRSIG"
 msgid ""
 "The DNSKEY RRset is not signed by the DNSKEY with tag {keytag} that the DS "
 "record refers to. Fetched from the nameservers with IP \"{ns_ip_list}\"."
@@ -1186,8 +1060,7 @@ msgstr ""
 "(keytag) on {keytag} ja johon DS-tietue viittaa. Tiedot haettu "
 "nimipalvelimilta joiden IP-osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS02_NO_MATCH_DS_DNSKEY
-#, perl-brace-format
+msgctxt "DNSSEC:DS02_NO_MATCH_DS_DNSKEY"
 msgid ""
 "The DS record does not match the DNSKEY with tag {keytag} by algorithm or "
 "digest. Fetched from the nameservers with IP \"{ns_ip_list}\"."
@@ -1196,8 +1069,7 @@ msgstr ""
 "tiivisteen osalta. Tiedot haettu nimipalvelimilta joiden IP-osoitteet ovat "
 "\"{ns_ip_list}\"."
 
-#. DNSSEC:DS02_NO_VALID_DNSKEY_FOR_ANY_DS
-#, perl-brace-format
+msgctxt "DNSSEC:DS02_NO_VALID_DNSKEY_FOR_ANY_DS"
 msgid ""
 "There is no valid DNSKEY matched by any of the DS records. Fetched from the "
 "nameservers with IP addresses \"{ns_ip_list}\"."
@@ -1207,7 +1079,6 @@ msgstr ""
 
 #. DNSSEC:DS02_RRSIG_NOT_VALID_BY_DNSKEY
 #. DNSSEC:DS08_RRSIG_NOT_VALID_BY_DNSKEY
-#, perl-brace-format
 msgid ""
 "The DNSKEY RRset is signed with an RRSIG with tag {keytag} which cannot be "
 "validated by the matching DNSKEY. Fetched from the nameservers with IP "
@@ -1217,8 +1088,7 @@ msgstr ""
 "sitä ei voi validoida DNSKEY:llä. Tiedot haettu nimipalvelimilta joiden IP-"
 "osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS08_DNSKEY_RRSIG_EXPIRED
-#, perl-brace-format
+msgctxt "DNSSEC:DS08_DNSKEY_RRSIG_EXPIRED"
 msgid ""
 "RRSIG with keytag {keytag} and covering type DNSKEY has already expired. "
 "Fetched from the nameservers with IP addresses \"{ns_ip_list}\"."
@@ -1226,8 +1096,7 @@ msgstr ""
 "RRSIG tunnisteella {keytag} ja DNSKEY on jo vanhentunut. Tiedot haettu "
 "nimipalvelimilta joiden IP-osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS08_DNSKEY_RRSIG_NOT_YET_VALID
-#, perl-brace-format
+msgctxt "DNSSEC:DS08_DNSKEY_RRSIG_NOT_YET_VALID"
 msgid ""
 "RRSIG with keytag {keytag} and covering type DNSKEY has inception date in "
 "the future. Fetched from the nameservers with IP addresses \"{ns_ip_list}\"."
@@ -1236,8 +1105,7 @@ msgstr ""
 "tulevaisuudessa. Tiedot haettu nimipalvelimilta joiden IP-osoitteet ovat "
 "\"{ns_ip_list}\"."
 
-#. DNSSEC:DS08_MISSING_RRSIG_IN_RESPONSE
-#, perl-brace-format
+msgctxt "DNSSEC:DS08_MISSING_RRSIG_IN_RESPONSE"
 msgid ""
 "The DNSKEY RRset is not signed, which is against expectation. Fetched from "
 "the nameservers with IP addresses \"{ns_ip_list}\"."
@@ -1245,8 +1113,7 @@ msgstr ""
 "DNSKEY RRset ei ole allekirjoitettu. Tiedot haettu nimipalvelimilta joiden "
 "IP-osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS08_NO_MATCHING_DNSKEY
-#, perl-brace-format
+msgctxt "DNSSEC:DS08_NO_MATCHING_DNSKEY"
 msgid ""
 "The DNSKEY RRset is signed with an RRSIG with tag {keytag} which does not "
 "match any DNSKEY record. Fetched from the nameservers with IP addresses "
@@ -1256,8 +1123,7 @@ msgstr ""
 "yhteenkään DNSKEY tietueeseen. Tiedot haettu nimipalvelimilta joiden IP-"
 "osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS09_MISSING_RRSIG_IN_RESPONSE
-#, perl-brace-format
+msgctxt "DNSSEC:DS09_MISSING_RRSIG_IN_RESPONSE"
 msgid ""
 "The SOA RRset is not signed, which is against expectation. Fetched from the "
 "nameservers with IP addresses \"{ns_ip_list}\"."
@@ -1265,8 +1131,7 @@ msgstr ""
 "SOA RRset ei ole allekirjoitettu. Tiedot haettu nimipalvelimilta joiden IP-"
 "osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS09_NO_MATCHING_DNSKEY
-#, perl-brace-format
+msgctxt "DNSSEC:DS09_NO_MATCHING_DNSKEY"
 msgid ""
 "The SOA RRset is signed with an RRSIG with tag {keytag} which does not match "
 "any DNSKEY record. Fetched from the nameservers with IP addresses "
@@ -1276,8 +1141,7 @@ msgstr ""
 "yhteenkään DNSKEY tietueeseen. Tiedot haettu nimipalvelimilta joiden IP-"
 "osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS09_RRSIG_NOT_VALID_BY_DNSKEY
-#, perl-brace-format
+msgctxt "DNSSEC:DS09_RRSIG_NOT_VALID_BY_DNSKEY"
 msgid ""
 "The SOA RRset is signed with an RRSIG with tag {keytag} which cannot be "
 "validated by the matching DNSKEY. Fetched from the nameservers with IP "
@@ -1287,8 +1151,7 @@ msgstr ""
 "voida validoida vastaavalla DNSKEY RRset:llä. Tiedot haettu nimipalvelimilta "
 "joiden IP-osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS09_SOA_RRSIG_EXPIRED
-#, perl-brace-format
+msgctxt "DNSSEC:DS09_SOA_RRSIG_EXPIRED"
 msgid ""
 "RRSIG with keytag {keytag} and covering type SOA has already expired. "
 "Fetched from the nameservers with IP addresses \"{ns_ip_list}\"."
@@ -1296,8 +1159,7 @@ msgstr ""
 "RRSIG tietue {keytag} ei täsmää DNSKEY tietueeseen. Tiedot haettu "
 "nimipalvelimilta joiden IP-osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS09_SOA_RRSIG_NOT_YET_VALID
-#, perl-brace-format
+msgctxt "DNSSEC:DS09_SOA_RRSIG_NOT_YET_VALID"
 msgid ""
 "RRSIG with keytag {keytag} and covering type SOA has inception date in the "
 "future. Fetched from the nameservers with IP addresses \"{ns_ip_list}\"."
@@ -1306,8 +1168,7 @@ msgstr ""
 "on tulevaisuudessa. Tiedot haettu nimipalvelimilta joiden IP-osoitteet ovat "
 "\"{ns_ip_list}\"."
 
-#. DNSSEC:DS10_ANSWER_VERIFY_ERROR
-#, perl-brace-format
+msgctxt "DNSSEC:DS10_ANSWER_VERIFY_ERROR"
 msgid ""
 "The name \"{domain}\" of RR type \"{rrtype}\" is signed by RRSIG, but the "
 "signature or signatures cannot be verified. Fetched from the nameservers "
@@ -1317,8 +1178,7 @@ msgstr ""
 "allekirjoitusta tai allekirjoituksia ei pystytä varmistamaan. Tiedot haettu "
 "nimipalvelimilta joiden IP-osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS10_HAS_NSEC
-#, perl-brace-format
+msgctxt "DNSSEC:DS10_HAS_NSEC"
 msgid ""
 "The zone has NSEC records. Fetched from the nameservers with IP addresses "
 "\"{ns_ip_list}\"."
@@ -1326,8 +1186,7 @@ msgstr ""
 "Zonella on NSEC tietueita. Tiedot haettu nimipalvelimilta joiden IP-"
 "osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS10_HAS_NSEC3
-#, perl-brace-format
+msgctxt "DNSSEC:DS10_HAS_NSEC3"
 msgid ""
 "The zone has NSEC3 records. Fetched from the nameservers with IP addresses "
 "\"{ns_ip_list}\"."
@@ -1335,8 +1194,7 @@ msgstr ""
 "Zonella on NSEC3 tietueita. Tiedot haettu nimipalvelimilta joiden IP-"
 "osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS10_INCONSISTENT_NSEC_NSEC3
-#, perl-brace-format
+msgctxt "DNSSEC:DS10_INCONSISTENT_NSEC_NSEC3"
 msgid ""
 "The zone is inconsistent on NSEC and NSEC3. NSEC is fetched from nameservers "
 "with IP addresses \"{ns_ip_list_nsec}\". NSEC3 is fetched from nameservers "
@@ -1346,8 +1204,7 @@ msgstr ""
 "nimipalvelimilta joiden IP-osoitteet ovat \"{ns_ip_list_nsec}\". NSEC3 on "
 "haettu nimipalvelimilta joiden IP-osoitteet ovat \"{ns_ip_list_nsec3}\"."
 
-#. DNSSEC:DS10_MISSING_NSEC_NSEC3
-#, perl-brace-format
+msgctxt "DNSSEC:DS10_MISSING_NSEC_NSEC3"
 msgid ""
 "NSEC or NSEC3 is expected but is missing. Fetched from the nameservers with "
 "IP addresses \"{ns_ip_list}\"."
@@ -1355,8 +1212,7 @@ msgstr ""
 "NSEC tai NSEC3 puuttuu. Tiedot haettu nimipalvelimilta joiden IP-osoitteet "
 "ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS10_MIXED_NSEC_NSEC3
-#, perl-brace-format
+msgctxt "DNSSEC:DS10_MIXED_NSEC_NSEC3"
 msgid ""
 "Unexpectedly both NSEC and NSEC3 are reported. Fetched from the nameservers "
 "with IP addresses \"{ns_ip_list}\"."
@@ -1364,8 +1220,7 @@ msgstr ""
 "Sekä NSEC että NSEC3 raportoidaan. Tiedot haettu nimipalvelimilta joiden IP-"
 "osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS10_NAME_NOT_COVERED_BY_NSEC
-#, perl-brace-format
+msgctxt "DNSSEC:DS10_NAME_NOT_COVERED_BY_NSEC"
 msgid ""
 "A non-existent name is not correctly covered by the NSEC records. Fetched "
 "from the nameservers with IP addresses \"{ns_ip_list}\"."
@@ -1373,8 +1228,7 @@ msgstr ""
 "NSEC tietueet eivät kata olematonta nimeä niin kuin pitäisi. Tiedot haettu "
 "nimipalvelimilta joiden IP-osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS10_NAME_NOT_COVERED_BY_NSEC3
-#, perl-brace-format
+msgctxt "DNSSEC:DS10_NAME_NOT_COVERED_BY_NSEC3"
 msgid ""
 "A non-existent name is not correctly covered by the NSEC3 records. Fetched "
 "from the nameservers with IP addresses \"{ns_ip_list}\"."
@@ -1382,8 +1236,7 @@ msgstr ""
 "NSEC3 tietueet eivät kata olematonta nimeä niin kuin pitäisi. Tiedot haettu "
 "nimipalvelimilta joiden IP-osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS10_NON_EXISTENT_RESPONSE_ERROR
-#, perl-brace-format
+msgctxt "DNSSEC:DS10_NON_EXISTENT_RESPONSE_ERROR"
 msgid ""
 "No response or error in response on an expected non-existent name. Fetched "
 "from the nameservers with IP addresses \"{ns_ip_list}\"."
@@ -1392,8 +1245,7 @@ msgstr ""
 "liittyvässä kyselyssä. Tiedot haettu nimipalvelimilta joiden IP-osoitteet "
 "ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS10_NSEC3_MISSING_SIGNATURE
-#, perl-brace-format
+msgctxt "DNSSEC:DS10_NSEC3_MISSING_SIGNATURE"
 msgid ""
 "Missing signatures (RRSIG) for the NSEC3 record or records. Fetched from the "
 "nameservers with IP addresses \"{ns_ip_list}\"."
@@ -1401,8 +1253,7 @@ msgstr ""
 "Allekirjoitukset (RRSIG) puuttuvat NSEC3 tietueelta tai tietueilta. Tiedot "
 "haettu nimipalvelimilta joiden IP-osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS10_NSEC3_RRSIG_VERIFY_ERROR
-#, perl-brace-format
+msgctxt "DNSSEC:DS10_NSEC3_RRSIG_VERIFY_ERROR"
 msgid ""
 "The signatures (RRSIG) for the NSEC3 record or records cannot be verified. "
 "Fetched from the nameservers with IP addresses \"{ns_ip_list}\"."
@@ -1410,8 +1261,7 @@ msgstr ""
 "Allekirjoituksia (RRSIG) NSEC3 tietueen osalta ei pystytä varmistamaan. "
 "Tiedot haettu nimipalvelimilta joiden IP-osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS10_NSEC_MISSING_SIGNATURE
-#, perl-brace-format
+msgctxt "DNSSEC:DS10_NSEC_MISSING_SIGNATURE"
 msgid ""
 "Missing signatures (RRSIG) for the NSEC record or records. Fetched from the "
 "nameservers with IP addresses \"{ns_ip_list}\"."
@@ -1419,8 +1269,7 @@ msgstr ""
 "Allekirjoitukset (RRSIG) puuttuvat NSEC3 tietueen tai tietueiden osalta. "
 "Tiedot haettu nimipalvelimilta joiden IP-osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS10_NSEC_RRSIG_VERIFY_ERROR
-#, perl-brace-format
+msgctxt "DNSSEC:DS10_NSEC_RRSIG_VERIFY_ERROR"
 msgid ""
 "The signatures (RRSIG) for the NSEC record or records cannot be verified. "
 "Fetched from the nameservers with IP addresses \"{ns_ip_list}\"."
@@ -1429,8 +1278,7 @@ msgstr ""
 "varmentamaan. Tiedot haettu nimipalvelimilta joiden IP-osoitteet ovat "
 "\"{ns_ip_list}\"."
 
-#. DNSSEC:DS10_UNSIGNED_ANSWER
-#, perl-brace-format
+msgctxt "DNSSEC:DS10_UNSIGNED_ANSWER"
 msgid ""
 "The name \"{domain}\" of RR type \"{rrtype}\" in the answer section of the "
 "response is not signed by any RRSIG. Fetched from the nameservers with IP "
@@ -1440,11 +1288,11 @@ msgstr ""
 "allekirjoitettu RRSIGllä. Tiedot haettu nimipalvelimilta joiden IP-osoitteet "
 "ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS11_INCONSISTENT_DS
+msgctxt "DNSSEC:DS11_INCONSISTENT_DS"
 msgid "Parent name servers are inconsistent on the existence of DS."
 msgstr "Päänimipalvelimien tiedot ovat epäjohdonmukaiset DS-tietueen osalta."
 
-#. DNSSEC:DS11_INCONSISTENT_SIGNED_ZONE
+msgctxt "DNSSEC:DS11_INCONSISTENT_SIGNED_ZONE"
 msgid ""
 "Name servers for the child zone are inconsistent on whether the zone is "
 "signed or not."
@@ -1452,19 +1300,18 @@ msgstr ""
 "Alemman vyöhykkeen nimipalvelimet palauttavat ristiriitaista tietoa siitä "
 "onko vyöhyke (zone) allekirjoitettu vai ei."
 
-#. DNSSEC:DS11_UNDETERMINED_DS
+msgctxt "DNSSEC:DS11_UNDETERMINED_DS"
 msgid ""
 "It cannot be determined if the parent zone has DS for the child zone or not."
 msgstr ""
 "Ei pystytä päättelemään onko ylemmällä vyöhykkeellä DS-tietue alemmalle "
 "vyöhykkeelle."
 
-#. DNSSEC:DS11_UNDETERMINED_SIGNED_ZONE
+msgctxt "DNSSEC:DS11_UNDETERMINED_SIGNED_ZONE"
 msgid "It cannot be determined if the child zone is signed or not."
 msgstr "Ei pystytä päättelemään onko alempi vyöhyke allekirjoitettu vai ei."
 
-#. DNSSEC:DS11_PARENT_WITHOUT_DS
-#, perl-brace-format
+msgctxt "DNSSEC:DS11_PARENT_WITHOUT_DS"
 msgid ""
 "No DS record for the child zone found on parent nameservers with IP "
 "addresses \"{ns_ip_list}\"."
@@ -1472,8 +1319,7 @@ msgstr ""
 "Alemmalle vyöhykkeelle (child zone) ei löydy DS-tietueita ylemmän vyöhykkeen "
 "nimipalvelimilta joiden IP-osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS11_PARENT_WITH_DS
-#, perl-brace-format
+msgctxt "DNSSEC:DS11_PARENT_WITH_DS"
 msgid ""
 "DS record for the child zone found on parent nameservers with IP addresses "
 "\"{ns_ip_list}\"."
@@ -1481,30 +1327,27 @@ msgstr ""
 "Alemman vyöhykkeen DS-tietue löytyi ylemmän vyöhykkeen nimipalvelimilta "
 "joiden IP-osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS11_NS_WITH_SIGNED_ZONE
-#, perl-brace-format
+msgctxt "DNSSEC:DS11_NS_WITH_SIGNED_ZONE"
 msgid ""
 "Signed child zone found on nameservers with IP addresses \"{ns_ip_list}\"."
 msgstr ""
 "Allekirjoitettu alempi vyöhyke löytyi nimipalvelimilta joiden IP-osoitteet "
 "ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS11_NS_WITH_UNSIGNED_ZONE
-#, perl-brace-format
+msgctxt "DNSSEC:DS11_NS_WITH_UNSIGNED_ZONE"
 msgid ""
 "Unsigned child zone found on nameservers with IP addresses \"{ns_ip_list}\"."
 msgstr ""
 "Allekirjoittamaton alempi vyöhyke (child zone) löytyi nimipalvelimilta "
 "joiden IP-osoitteet ovat \"{ns_ip_list}"
 
-#. DNSSEC:DS11_DS_BUT_UNSIGNED_ZONE
+msgctxt "DNSSEC:DS11_DS_BUT_UNSIGNED_ZONE"
 msgid "The child zone is unsigned, but the parent zone has DS record."
 msgstr ""
 "Alempi vyöhyke (child zone) on allekirjoittamaton, mutta ylemmällä "
 "vyöhykkeellä (parent) on DS-tietue."
 
-#. DNSSEC:DS13_ALGO_NOT_SIGNED_DNSKEY
-#, perl-brace-format
+msgctxt "DNSSEC:DS13_ALGO_NOT_SIGNED_DNSKEY"
 msgid ""
 "The DNSKEY RRset is not signed by algorithm {algo_num} ({algo_mnemo}) "
 "present in the DNSKEY RRset. Fetched from the nameservers with IP addresses "
@@ -1514,8 +1357,7 @@ msgstr ""
 "joka löytyy DNSKEY RRset:stä. Tiedot haettu nimipalvelimilta joiden IP-"
 "osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS13_ALGO_NOT_SIGNED_NS
-#, perl-brace-format
+msgctxt "DNSSEC:DS13_ALGO_NOT_SIGNED_NS"
 msgid ""
 "The NS RRset is not signed by algorithm {algo_num} ({algo_mnemo}) present in "
 "the DNSKEY RRset. Fetched from the nameservers with IP addresses "
@@ -1525,8 +1367,7 @@ msgstr ""
 "löytyy DNSKEY RRset:stä Tiedot haettu nimipalvelimilta joiden IP-osoitteet "
 "ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS13_ALGO_NOT_SIGNED_SOA
-#, perl-brace-format
+msgctxt "DNSSEC:DS13_ALGO_NOT_SIGNED_SOA"
 msgid ""
 "The SOA RRset is not signed by algorithm {algo_num} ({algo_mnemo}) present "
 "in the DNSKEY RRset. Fetched from the nameservers with IP addresses "
@@ -1536,8 +1377,7 @@ msgstr ""
 "löytyy DNSKEY RRset:stä. Tiedot haettu nimipalvelimilta joiden IP-osoitteet "
 "ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS15_HAS_CDNSKEY_NO_CDS
-#, perl-brace-format
+msgctxt "DNSSEC:DS15_HAS_CDNSKEY_NO_CDS"
 msgid ""
 "CDNSKEY RRset is found on nameservers that resolve to IP addresses "
 "({ns_ip_list}), but no CDS RRset."
@@ -1545,8 +1385,7 @@ msgstr ""
 "CDNSKEY RRset löytyy nimipalvelimilta IP-osoitteista ({ns_ip_list}), mutta "
 "ei CDS RRset asetuksia."
 
-#. DNSSEC:DS15_HAS_CDS_AND_CDNSKEY
-#, perl-brace-format
+msgctxt "DNSSEC:DS15_HAS_CDS_AND_CDNSKEY"
 msgid ""
 "CDNSKEY and CDS RRsets are found on nameservers that resolve to IP addresses "
 "({ns_ip_list})."
@@ -1554,8 +1393,7 @@ msgstr ""
 "CDNSKEY ja CDS RRsets löytyvät nimipalvelimilta IP-osoitteista "
 "({ns_ip_list})."
 
-#. DNSSEC:DS15_HAS_CDS_NO_CDNSKEY
-#, perl-brace-format
+msgctxt "DNSSEC:DS15_HAS_CDS_NO_CDNSKEY"
 msgid ""
 "CDS RRset is found on nameservers that resolve to IP addresses "
 "({ns_ip_list}), but no CDNSKEY RRset."
@@ -1563,16 +1401,15 @@ msgstr ""
 "CDS RRset löytyy nimipalvelimilta IP-osoitteista ({ns_ip_list}), mutta ei "
 "CDNSKEY RRset asetuksia."
 
-#. DNSSEC:DS15_INCONSISTENT_CDNSKEY
+msgctxt "DNSSEC:DS15_INCONSISTENT_CDNSKEY"
 msgid "All servers do not have the same CDNSKEY RRset."
 msgstr "Kaikilla nimipalvelimilla ei ole sama CDNSKEY RRset."
 
-#. DNSSEC:DS15_INCONSISTENT_CDS
+msgctxt "DNSSEC:DS15_INCONSISTENT_CDS"
 msgid "All servers do not have the same CDS RRset."
 msgstr "Kaikilla nimipalvelimilla ei ole sama CDS RRset."
 
-#. DNSSEC:DS15_MISMATCH_CDS_CDNSKEY
-#, perl-brace-format
+msgctxt "DNSSEC:DS15_MISMATCH_CDS_CDNSKEY"
 msgid ""
 "Both CDS and CDNSKEY RRsets are found on nameservers that resolve to IP "
 "addresses ({ns_ip_list}) but they do not match."
@@ -1580,12 +1417,11 @@ msgstr ""
 "CDS ja CDNSKEY RRsets löytyvät nimipalvelimilta IP-osoitteista "
 "({ns_ip_list}), mutta ne eivät täsmää."
 
-#. DNSSEC:DS15_NO_CDS_CDNSKEY
+msgctxt "DNSSEC:DS15_NO_CDS_CDNSKEY"
 msgid "No CDS or CDNSKEY RRsets are found on any name server."
 msgstr "CDS tai CDNSKEY RR eivät löydy yhdeltäkään nimipalvelimista."
 
-#. DNSSEC:DS16_CDS_INVALID_RRSIG
-#, perl-brace-format
+msgctxt "DNSSEC:DS16_CDS_INVALID_RRSIG"
 msgid ""
 "The CDS RRset is signed with an RRSIG with tag {keytag}, but the RRSIG does "
 "not match the DNSKEY with the same key tag. Fetched from the nameservers "
@@ -1595,8 +1431,7 @@ msgstr ""
 "DNSKEY:n samalla tunnisteella. Tiedot haettu nimipalvelimilta joiden IP-"
 "osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS16_CDS_MATCHES_NON_SEP_DNSKEY
-#, perl-brace-format
+msgctxt "DNSSEC:DS16_CDS_MATCHES_NON_SEP_DNSKEY"
 msgid ""
 "The CDS record with tag {keytag} matches a DNSKEY record with SEP bit (bit "
 "15) unset. Fetched from the nameservers with IP addresses \"{ns_ip_list}\"."
@@ -1605,8 +1440,7 @@ msgstr ""
 "päältä. Tiedot haettu nimipalvelimilta joiden IP-osoitteet ovat "
 "\"{ns_ip_list}\"."
 
-#. DNSSEC:DS16_CDS_MATCHES_NON_ZONE_DNSKEY
-#, perl-brace-format
+msgctxt "DNSSEC:DS16_CDS_MATCHES_NON_ZONE_DNSKEY"
 msgid ""
 "The CDS record with tag {keytag} matches a DNSKEY record with zone bit (bit "
 "7) unset. Fetched from the nameservers with IP addresses \"{ns_ip_list}\"."
@@ -1615,8 +1449,7 @@ msgstr ""
 "päältä. Tiedot haettu nimipalvelimilta joiden IP-osoitteet ovat "
 "\"{ns_ip_list}\"."
 
-#. DNSSEC:DS16_CDS_MATCHES_NO_DNSKEY
-#, perl-brace-format
+msgctxt "DNSSEC:DS16_CDS_MATCHES_NO_DNSKEY"
 msgid ""
 "The CDS record with tag {keytag} does not match any DNSKEY record. Fetched "
 "from the nameservers with IP addresses \"{ns_ip_list}\"."
@@ -1624,8 +1457,7 @@ msgstr ""
 "CDS tietue {keytag} ei täsmää yhteenkään DNSKEY tietueeseen. Tiedot haettu "
 "nimipalvelimilta joiden IP-osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS16_CDS_NOT_SIGNED_BY_CDS
-#, perl-brace-format
+msgctxt "DNSSEC:DS16_CDS_NOT_SIGNED_BY_CDS"
 msgid ""
 "The CDS RRset is not signed by the DNSKEY that the CDS record with tag "
 "{keytag} points to. Fetched from the nameservers with IP addresses "
@@ -1635,8 +1467,7 @@ msgstr ""
 "{keytag} osoittaa. Tiedot haettu nimipalvelimilta joiden IP-osoitteet ovat "
 "\"{ns_ip_list}\"."
 
-#. DNSSEC:DS16_CDS_SIGNED_BY_UNKNOWN_DNSKEY
-#, perl-brace-format
+msgctxt "DNSSEC:DS16_CDS_SIGNED_BY_UNKNOWN_DNSKEY"
 msgid ""
 "The CDS RRset is signed by RRSIG with tag {keytag} but that is not in the "
 "DNSKEY RRset. Fetched from the nameservers with P addresses \"{ns_ip_list}\"."
@@ -1645,8 +1476,7 @@ msgstr ""
 "ssä. Tiedot haettu nimipalvelimilta joiden IP-osoitteet ovat "
 "\"{ns_ip_list}\"."
 
-#. DNSSEC:DS16_CDS_UNSIGNED
-#, perl-brace-format
+msgctxt "DNSSEC:DS16_CDS_UNSIGNED"
 msgid ""
 "The CDS RRset is not signed. Fetched from the nameservers with IP addresses "
 "\"{ns_ip_list}\"."
@@ -1654,8 +1484,7 @@ msgstr ""
 "CDS RRset ei ole allekirjoitettu. Tiedot haettu nimipalvelimilta joiden IP-"
 "osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS16_CDS_WITHOUT_DNSKEY
-#, perl-brace-format
+msgctxt "DNSSEC:DS16_CDS_WITHOUT_DNSKEY"
 msgid ""
 "A CDS RRset exists, but no DNSKEY record exists. Fetched from the "
 "nameservers with IP addresses \"{ns_ip_list}\"."
@@ -1663,8 +1492,7 @@ msgstr ""
 "CDS RRset on olemassa, mutta DNSKEY tietuetta ei löydy. Tiedot haettu "
 "nimipalvelimilta joiden IP-osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS16_DELETE_CDS
-#, perl-brace-format
+msgctxt "DNSSEC:DS16_DELETE_CDS"
 msgid ""
 "A single \"delete\" CDS record is found on the nameservers with IP addresses "
 "\"{ns_ip_list}\"."
@@ -1672,8 +1500,7 @@ msgstr ""
 "Yksittäinen \"delete\" CDS-tietue löytyi nimipalvelimilta joiden IP-"
 "osoitteet ovat \"{ns_ip_list}"
 
-#. DNSSEC:DS16_DNSKEY_NOT_SIGNED_BY_CDS
-#, perl-brace-format
+msgctxt "DNSSEC:DS16_DNSKEY_NOT_SIGNED_BY_CDS"
 msgid ""
 "The DNSKEY RRset is not signed by the DNSKEY that the CDS record with tag "
 "{keytag} points to. Fetched from the nameservers with IP addresses "
@@ -1683,8 +1510,7 @@ msgstr ""
 "{keytag} osoittaa. Tiedot haettu nimipalvelimilta joiden IP-osoitteet ovat "
 "\"{ns_ip_list}\"."
 
-#. DNSSEC:DS16_MIXED_DELETE_CDS
-#, perl-brace-format
+msgctxt "DNSSEC:DS16_MIXED_DELETE_CDS"
 msgid ""
 "The CDS RRset is a mixture between \"delete\" record and other records. "
 "Fetched from the nameservers with IP addresses \"{ns_ip_list}\"."
@@ -1692,8 +1518,7 @@ msgstr ""
 "CDS RRset on sekoitus \"delete\" tietuetta ja muita tietueita. Tiedot haettu "
 "nimipalvelimilta joiden IP-osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS17_CDNSKEY_INVALID_RRSIG
-#, perl-brace-format
+msgctxt "DNSSEC:DS17_CDNSKEY_INVALID_RRSIG"
 msgid ""
 "The CDNSKEY RRset is signed with an RRSIG with tag {keytag}, but the RRSIG "
 "does not match the DNSKEY with the same key tag. Fetched from the "
@@ -1703,8 +1528,7 @@ msgstr ""
 "RRSIG ei täsmää DNSKEY:n samalla tunnisteella. Tiedot haettu "
 "nimipalvelimilta joiden IP-osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS17_CDNSKEY_IS_NON_SEP
-#, perl-brace-format
+msgctxt "DNSSEC:DS17_CDNSKEY_IS_NON_SEP"
 msgid ""
 "The CDNSKEY record with tag {keytag} has the SEP bit (bit 15) unset. Fetched "
 "from the nameservers with IP addresses \"{ns_ip_list}\"."
@@ -1713,8 +1537,7 @@ msgstr ""
 "asettamatta. Tiedot haettu nimipalvelimilta joiden IP-osoitteet ovat "
 "\"{ns_ip_list}\"."
 
-#. DNSSEC:DS17_CDNSKEY_IS_NON_ZONE
-#, perl-brace-format
+msgctxt "DNSSEC:DS17_CDNSKEY_IS_NON_ZONE"
 msgid ""
 "The CDNSKEY record with tag {keytag} has the zone bit (bit 7) unset. Fetched "
 "from the nameservers with IP addresses \"{ns_ip_list}\"."
@@ -1723,8 +1546,7 @@ msgstr ""
 "asettamatta. Tiedot haettu nimipalvelimilta joiden IP-osoitteet ovat "
 "\"{ns_ip_list}\"."
 
-#. DNSSEC:DS17_CDNSKEY_MATCHES_NO_DNSKEY
-#, perl-brace-format
+msgctxt "DNSSEC:DS17_CDNSKEY_MATCHES_NO_DNSKEY"
 msgid ""
 "The CDNSKEY record with tag {keytag} does not match any DNSKEY record. "
 "Fetched from the nameservers with IP addresses \"{ns_ip_list}\"."
@@ -1733,8 +1555,7 @@ msgstr ""
 "tietueeseen. Tiedot haettu nimipalvelimilta joiden IP-osoitteet ovat "
 "\"{ns_ip_list}\"."
 
-#. DNSSEC:DS17_CDNSKEY_NOT_SIGNED_BY_CDNSKEY
-#, perl-brace-format
+msgctxt "DNSSEC:DS17_CDNSKEY_NOT_SIGNED_BY_CDNSKEY"
 msgid ""
 "The CDNSKEY RRset is not signed by the DNSKEY that the CDNSKEY record with "
 "tag {keytag} points to. Fetched from the nameservers with IP addresses "
@@ -1744,8 +1565,7 @@ msgstr ""
 "tunnisteella {keytag} osoittaa. Tiedot haettu nimipalvelimilta joiden IP-"
 "osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS17_CDNSKEY_SIGNED_BY_UNKNOWN_DNSKEY
-#, perl-brace-format
+msgctxt "DNSSEC:DS17_CDNSKEY_SIGNED_BY_UNKNOWN_DNSKEY"
 msgid ""
 "The CDNSKEY RRset is signed by RRSIG with tag {keytag} but that is not in "
 "the DNSKEY RRset. Fetched from the nameservers with P addresses "
@@ -1755,8 +1575,7 @@ msgstr ""
 "se ei löydy DNSKEY RRset:stä. Tiedot haettu nimipalvelimilta joiden IP-"
 "osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS17_CDNSKEY_UNSIGNED
-#, perl-brace-format
+msgctxt "DNSSEC:DS17_CDNSKEY_UNSIGNED"
 msgid ""
 "The CDNSKEY RRset is not signed. Fetched from the nameservers with IP "
 "addresses \"{ns_ip_list}\"."
@@ -1764,8 +1583,7 @@ msgstr ""
 "CDNSKEY RRset ei ole allekirjoitettu. Tiedot haettu nimipalvelimilta joiden "
 "IP-osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS17_CDNSKEY_WITHOUT_DNSKEY
-#, perl-brace-format
+msgctxt "DNSSEC:DS17_CDNSKEY_WITHOUT_DNSKEY"
 msgid ""
 "A CDNSKEY RRset exists, but no DNSKEY record exists. Fetched from the "
 "nameservers with IP addresses \"{ns_ip_list}\"."
@@ -1773,8 +1591,7 @@ msgstr ""
 "CDNSKEY RRset on olemassa, mutta DNSKEY tietuetta ei löydy. Tiedot haettu "
 "nimipalvelimilta joiden IP-osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS17_DELETE_CDNSKEY
-#, perl-brace-format
+msgctxt "DNSSEC:DS17_DELETE_CDNSKEY"
 msgid ""
 "A single \"delete\" CDNSKEY record is found on the nameservers with IP "
 "addresses \"{ns_ip_list}\"."
@@ -1782,8 +1599,7 @@ msgstr ""
 "Yksittäinen \"delete\" CDNSKEY tietue löytyy nimipalvelimilta joiden IP-"
 "osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS17_DNSKEY_NOT_SIGNED_BY_CDNSKEY
-#, perl-brace-format
+msgctxt "DNSSEC:DS17_DNSKEY_NOT_SIGNED_BY_CDNSKEY"
 msgid ""
 "The DNSKEY RRset is not signed by the DNSKEY that the CDNSKEY record with "
 "tag {keytag} points to. Fetched from the nameservers with IP addresses "
@@ -1793,8 +1609,7 @@ msgstr ""
 "tunnisteella {keytag} osoittaa. Tiedot haettu nimipalvelimilta joiden IP-"
 "osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS17_MIXED_DELETE_CDNSKEY
-#, perl-brace-format
+msgctxt "DNSSEC:DS17_MIXED_DELETE_CDNSKEY"
 msgid ""
 "The CDNSKEY RRset is a mixture between \"delete\" record and other records. "
 "Fetched from the nameservers with IP addresses \"{ns_ip_list}\"."
@@ -1802,8 +1617,7 @@ msgstr ""
 "CDNSKEY RRset on sekoitus \"delete\" tietuetta ja muita tietueita. Tiedot "
 "haettu nimipalvelimilta joiden IP-osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS18_NO_MATCH_CDS_RRSIG_DS
-#, perl-brace-format
+msgctxt "DNSSEC:DS18_NO_MATCH_CDS_RRSIG_DS"
 msgid ""
 "The CDS RRset is not signed with a DNSKEY record that a DS record points to. "
 "Fetched from the nameservers with IP addresses \"{ns_ip_list}\"."
@@ -1811,8 +1625,7 @@ msgstr ""
 "CDS RRset ei ole allekirjoitettu DNSKEY tietueella johon DS-tietue osoittaa. "
 "Tiedot haettu nimipalvelimilta joiden IP-osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS18_NO_MATCH_CDNSKEY_RRSIG_DS
-#, perl-brace-format
+msgctxt "DNSSEC:DS18_NO_MATCH_CDNSKEY_RRSIG_DS"
 msgid ""
 "The CDNSKEY RRset is not signed with a DNSKEY record that a DS record points "
 "to. Fetched from the nameservers with IP addresses \"{ns_ip_list}\"."
@@ -1820,14 +1633,12 @@ msgstr ""
 "CDNSKEY RRset ei ole allekirjoitettu DNSKEY:llä johon DS-tietue osoittaa. "
 "Tiedot haettu nimipalvelimilta joiden IP-osoitteet ovat \"{ns_ip_list}\"."
 
-#. DNSSEC:DS_BUT_NOT_DNSKEY
-#, perl-brace-format
+msgctxt "DNSSEC:DS_BUT_NOT_DNSKEY"
 msgid "{parent} sent a DS record, but {child} did not send a DNSKEY record."
 msgstr ""
 "{parent} lähetti DS-tietueen, mutta {child} ei lähettänyt DNSKEY-tietuetta."
 
-#. DNSSEC:DURATION_LONG
-#, perl-brace-format
+msgctxt "DNSSEC:DURATION_LONG"
 msgid ""
 "RRSIG with keytag {keytag} and covering type(s) {types} has a duration of "
 "{duration} seconds, which is too long."
@@ -1835,8 +1646,7 @@ msgstr ""
 "RRSIG, jolla on avaintunniste {keytag} ja joka kattaa tyypin/tyypit {types}, "
 "kestää {duration} sekuntia, mikä on liian kauan."
 
-#. DNSSEC:DURATION_OK
-#, perl-brace-format
+msgctxt "DNSSEC:DURATION_OK"
 msgid ""
 "RRSIG with keytag {keytag} and covering type(s) {types} has a duration of "
 "{duration} seconds, which is just fine."
@@ -1844,28 +1654,24 @@ msgstr ""
 "RRSIG, jolla on avaintunniste {keytag} ja joka kattaa tyypin/tyypit {types}, "
 "kestää {duration} sekuntia, mikä on sopivasti."
 
-#. DNSSEC:EXTRA_PROCESSING_BROKEN
-#, perl-brace-format
+msgctxt "DNSSEC:EXTRA_PROCESSING_BROKEN"
 msgid ""
 "Server at {server} sent {keys} DNSKEY records, and {sigs} RRSIG records."
 msgstr ""
 "Palvelin kohteessa {server} lähetti {keys} DNSKEY-tietueet ja {sigs} RRSIG-"
 "tietueet."
 
-#. DNSSEC:EXTRA_PROCESSING_OK
-#, perl-brace-format
+msgctxt "DNSSEC:EXTRA_PROCESSING_OK"
 msgid "Server at {server} sent {keys} DNSKEY records and {sigs} RRSIG records."
 msgstr ""
 "Palvelin kohteessa {server} lähetti {keys} DNSKEY-tietueet ja {sigs} RRSIG-"
 "tietueet."
 
-#. DNSSEC:ITERATIONS_OK
-#, perl-brace-format
+msgctxt "DNSSEC:ITERATIONS_OK"
 msgid "The number of NSEC3 iterations is {count}, which is OK."
 msgstr "NSEC3-toistojen lukumäärä on {count}, joka on OK."
 
-#. DNSSEC:KEY_DETAILS
-#, perl-brace-format
+msgctxt "DNSSEC:KEY_DETAILS"
 msgid ""
 "Key with keytag {keytag} details : Size = {keysize}, Flags ({sep}, "
 "{rfc5011})."
@@ -1873,39 +1679,35 @@ msgstr ""
 "Avaimen, jolla on avaintunniste {keytag}, tiedot: koko = {keysize}, liput "
 "({sep}, {rfc5011})."
 
-#. DNSSEC:KEY_SIZE_OK
+msgctxt "DNSSEC:KEY_SIZE_OK"
 msgid "All keys from the DNSKEY RRset have the correct size."
 msgstr "Kaikki DNSKEY RRset -joukon avaimet ovat oikean kokoisia."
 
-#. DNSSEC:MANY_ITERATIONS
-#, perl-brace-format
+msgctxt "DNSSEC:MANY_ITERATIONS"
 msgid "The number of NSEC3 iterations is {count}, which is on the high side."
 msgstr "NSEC3-toistojen lukumäärä on {count}, joka on suhteellisen suuri."
 
-#. DNSSEC:NEITHER_DNSKEY_NOR_DS
+msgctxt "DNSSEC:NEITHER_DNSKEY_NOR_DS"
 msgid "There are neither DS nor DNSKEY records for the zone."
 msgstr "Vyöhykkeellä ei ole DS- eikä DNSKEY-tietueita."
 
-#. DNSSEC:NO_DNSKEY
+msgctxt "DNSSEC:NO_DNSKEY"
 msgid "No DNSKEYs were returned."
 msgstr "DNSKEY-tietueita ei palautettu."
 
-#. DNSSEC:NO_NSEC3PARAM
-#, perl-brace-format
+msgctxt "DNSSEC:NO_NSEC3PARAM"
 msgid "{server} returned no NSEC3PARAM records."
 msgstr "{server} ei palauttanut NSEC3PARAM-tietueita."
 
-#. DNSSEC:NO_RESPONSE_DNSKEY
-#, perl-brace-format
+msgctxt "DNSSEC:NO_RESPONSE_DNSKEY"
 msgid "Nameserver {ns} responded with no DNSKEY record(s)."
 msgstr "Nimipalvelimen {ns} vastauksessa ei ollut DNSKEY-tietueita."
 
-#. DNSSEC:NOT_SIGNED
+msgctxt "DNSSEC:NOT_SIGNED"
 msgid "The zone is not signed with DNSSEC."
 msgstr "Vyöhykkeellä ei ole DNSSEC-allekirjoitusta."
 
-#. DNSSEC:REMAINING_LONG
-#, perl-brace-format
+msgctxt "DNSSEC:REMAINING_LONG"
 msgid ""
 "RRSIG with keytag {keytag} and covering type(s) {types} has a remaining "
 "validity of {duration} seconds, which is too long."
@@ -1913,8 +1715,7 @@ msgstr ""
 "RRSIG-tietue, jolla on avaintunniste {keytag} ja joka kattaa tyypin/tyypit "
 "{types}, on voimassa vielä {duration} sekuntia, mikä on liian pitkään."
 
-#. DNSSEC:REMAINING_SHORT
-#, perl-brace-format
+msgctxt "DNSSEC:REMAINING_SHORT"
 msgid ""
 "RRSIG with keytag {keytag} and covering type(s) {types} has a remaining "
 "validity of {duration} seconds, which is too short."
@@ -1922,16 +1723,14 @@ msgstr ""
 "RRSIG-tietue, jolla on avaintunniste {keytag} ja joka kattaa tyypin/tyypit "
 "{types}, on voimassa enää {duration} sekuntia, mikä on liian vähän."
 
-#. DNSSEC:RRSIG_EXPIRATION
-#, perl-brace-format
+msgctxt "DNSSEC:RRSIG_EXPIRATION"
 msgid ""
 "RRSIG with keytag {keytag} and covering type(s) {types} expires at : {date}."
 msgstr ""
 "RRSIG-tietueen, jolla on avaintunniste {keytag} ja joka kattaa tyypin/tyypit "
 "{types}, voimassaolo päättyy: {date}."
 
-#. DNSSEC:RRSIG_EXPIRED
-#, perl-brace-format
+msgctxt "DNSSEC:RRSIG_EXPIRED"
 msgid ""
 "RRSIG with keytag {keytag} and covering type(s) {types} has already expired "
 "(expiration is: {expiration})."
@@ -1940,8 +1739,7 @@ msgstr ""
 "{types}, voimassaolo on jo päättynyt (voimassaolon päättymisaika: "
 "{expiration})."
 
-#. DNSSEC:TOO_MANY_ITERATIONS
-#, perl-brace-format
+msgctxt "DNSSEC:TOO_MANY_ITERATIONS"
 msgid ""
 "The number of NSEC3 iterations is {count}, which is too high for key length "
 "{keylength}."
@@ -1949,75 +1747,71 @@ msgstr ""
 "NSEC3-toistojen lukumäärä on {count}, joka on liian suuri avaimen pituudelle "
 "{keylength}."
 
-#. DELEGATION:DELEGATION01
+msgctxt "DELEGATION:DELEGATION01"
 msgid "Minimum number of name servers"
 msgstr "Nimipalvelimien vähimmäismäärä"
 
-#. DELEGATION:DELEGATION02
+msgctxt "DELEGATION:DELEGATION02"
 msgid "Name servers must have distinct IP addresses"
 msgstr "Nimipalvelimilla on oltava erilliset IP-osoitteet"
 
-#. DELEGATION:DELEGATION03
+msgctxt "DELEGATION:DELEGATION03"
 msgid "No truncation of referrals"
 msgstr "Ei viittausten lyhentämistä"
 
-#. DELEGATION:DELEGATION04
+msgctxt "DELEGATION:DELEGATION04"
 msgid "Name server is authoritative"
 msgstr "Nimipalvelin on autoritatiivinen"
 
-#. DELEGATION:DELEGATION05
+msgctxt "DELEGATION:DELEGATION05"
 msgid "Name server must not point at CNAME alias"
 msgstr "Nimipalvelin ei saa osoittaa CNAME-aliakseen"
 
-#. DELEGATION:DELEGATION06
+msgctxt "DELEGATION:DELEGATION06"
 msgid "Existence of SOA"
 msgstr "SOA:n olemassaolo"
 
-#. DELEGATION:DELEGATION07
+msgctxt "DELEGATION:DELEGATION07"
 msgid "Parent glue name records present in child"
 msgstr ""
 "Ylätason (parent) nimipalvelimien liimatietueet ovat myös alatasolla (child)"
 
-#. DELEGATION:ARE_AUTHORITATIVE
-#, perl-brace-format
+msgctxt "DELEGATION:ARE_AUTHORITATIVE"
 msgid ""
 "All these nameservers are confirmed to be authoritative : {nsname_list}."
 msgstr ""
 "Vahvistetaan, että kaikki nämä nimipalvelimet ovat autoritäärisiä: "
 "{nsname_list}."
 
-#. DELEGATION:CHILD_DISTINCT_NS_IP
+msgctxt "DELEGATION:CHILD_DISTINCT_NS_IP"
 msgid "All the IP addresses used by the nameservers in child are unique."
 msgstr ""
 "Kaikki alemman tason nimipalvelinten käyttämät IP-osoitteet ovat "
 "ainutkertaisia."
 
-#. DELEGATION:CHILD_NS_SAME_IP
-#, perl-brace-format
+msgctxt "DELEGATION:CHILD_NS_SAME_IP"
 msgid "IP {ns_ip} in child refers to multiple nameservers ({nsname_list})."
 msgstr ""
 "IP {ns_ip} alemmalla tasolla viittaa useisiin nimipalvelimiin "
 "({nsname_list})."
 
-#. DELEGATION:DEL_DISTINCT_NS_IP
+msgctxt "DELEGATION:DEL_DISTINCT_NS_IP"
 msgid "All the IP addresses used by the nameservers in parent are unique."
 msgstr ""
 "Kaikki ylemmän tason nimipalvelinten käyttämät IP-osoitteet ovat "
 "ainutkertaisia."
 
-#. DELEGATION:DEL_NS_SAME_IP
-#, perl-brace-format
+msgctxt "DELEGATION:DEL_NS_SAME_IP"
 msgid "IP {ns_ip} in parent refers to multiple nameservers ({nsname_list})."
 msgstr ""
 "IP {ns_ip} ylemmällä tasolla viittaa useisiin nimipalvelimiin "
 "({nsname_list})."
 
-#. DELEGATION:DISTINCT_IP_ADDRESS
+msgctxt "DELEGATION:DISTINCT_IP_ADDRESS"
 msgid "All the IP addresses used by the nameservers are unique."
 msgstr "Kaikki nimipalvelinten käyttämät IP-osoitteet ovat ainutkertaisia."
 
-#. DELEGATION:ENOUGH_IPV4_NS_CHILD
-#, perl-brace-format
+msgctxt "DELEGATION:ENOUGH_IPV4_NS_CHILD"
 msgid ""
 "Child lists enough ({count}) nameservers ({nsname_list}) that resolve to "
 "IPv4 addresses ({ns_ip_list}). Lower limit set to {minimum}."
@@ -2026,8 +1820,7 @@ msgstr ""
 "({nsname_list}), joita vastaavat IPv4-osoitteet ({ns_ip_list}). Alarajaksi "
 "on asetettu {minimum}."
 
-#. DELEGATION:ENOUGH_IPV4_NS_DEL
-#, perl-brace-format
+msgctxt "DELEGATION:ENOUGH_IPV4_NS_DEL"
 msgid ""
 "Delegation lists enough ({count}) nameservers ({nsname_list}) that resolve "
 "to IPv4 addresses ({ns_ip_list}). Lower limit set to {minimum}."
@@ -2035,8 +1828,7 @@ msgstr ""
 "Delegointi listaa tarpeeksi ({count}) nimipalvelimia ({nsname_list}), joita "
 "vastaavat IPv4-osoitteet ({ns_ip_list}). Alarajaksi on asetettu {minimum}."
 
-#. DELEGATION:ENOUGH_IPV6_NS_CHILD
-#, perl-brace-format
+msgctxt "DELEGATION:ENOUGH_IPV6_NS_CHILD"
 msgid ""
 "Child lists enough ({count}) nameservers ({nsname_list}) that resolve to "
 "IPv6 addresses ({ns_ip_list}). Lower limit set to {minimum}."
@@ -2045,8 +1837,7 @@ msgstr ""
 "({nsname_list}), joita vastaavat IPv6-osoitteet ({ns_ip_list}). Alarajaksi "
 "on asetettu {minimum}."
 
-#. DELEGATION:ENOUGH_IPV6_NS_DEL
-#, perl-brace-format
+msgctxt "DELEGATION:ENOUGH_IPV6_NS_DEL"
 msgid ""
 "Delegation lists enough ({count}) nameservers ({nsname_list}) that resolve "
 "to IPv6 addresses ({ns_ip_list}). Lower limit set to {minimum}."
@@ -2054,8 +1845,7 @@ msgstr ""
 "Delegointi listaa tarpeeksi ({count}) nimipalvelimia ({nsname_list}), joita "
 "vastaavat IPv6-osoitteet ({ns_ip_list}). Alarajaksi on asetettu {minimum}."
 
-#. DELEGATION:ENOUGH_NS_CHILD
-#, perl-brace-format
+msgctxt "DELEGATION:ENOUGH_NS_CHILD"
 msgid ""
 "Child lists enough ({count}) nameservers ({nsname_list}). Lower limit set to "
 "{minimum}."
@@ -2063,8 +1853,7 @@ msgstr ""
 "Alemmalla tasolla listataan tarpeeksi ({count}) nimipalvelimia "
 "({nsname_list}). Alarajaksi on asetettu {minimum}."
 
-#. DELEGATION:ENOUGH_NS_DEL
-#, perl-brace-format
+msgctxt "DELEGATION:ENOUGH_NS_DEL"
 msgid ""
 "Parent lists enough ({count}) nameservers ({nsname_list}). Lower limit set "
 "to {minimum}."
@@ -2072,35 +1861,31 @@ msgstr ""
 "Ylemmällä tasolla listataan tarpeeksi ({count}) nimipalvelimia "
 "({nsname_list}). Alarajaksi on asetettu {minimum}."
 
-#. DELEGATION:EXTRA_NAME_CHILD
-#, perl-brace-format
+msgctxt "DELEGATION:EXTRA_NAME_CHILD"
 msgid "Child has nameserver(s) not listed at parent ({extra})."
 msgstr ""
 "Alemmalla tasolla on yksi tai useampi nimipalvelin, joita ei ole listattu "
 "ylemmällä tasolla ({extra})."
 
-#. DELEGATION:EXTRA_NAME_PARENT
-#, perl-brace-format
+msgctxt "DELEGATION:EXTRA_NAME_PARENT"
 msgid "Parent has nameserver(s) not listed at the child ({extra})."
 msgstr ""
 "Ylemmällä tasolla on yksi tai useampi nimipalvelin, joita ei ole listattu "
 "alemmalla tasolla ({extra})."
 
-#. DELEGATION:IS_NOT_AUTHORITATIVE
-#, perl-brace-format
+msgctxt "DELEGATION:IS_NOT_AUTHORITATIVE"
 msgid "Nameserver {ns} response is not authoritative on {proto} port 53."
 msgstr ""
 "Nimipalvelimen {ns} vastaus ei ole autoritäärinen koskien kohdetta {proto} "
 "portissa 53."
 
-#. DELEGATION:NAMES_MATCH
+msgctxt "DELEGATION:NAMES_MATCH"
 msgid "All of the nameserver names are listed both at parent and child."
 msgstr ""
 "Kaikki nimipalvelimen nimet on listattu sekä alemmalla että ylemmällä "
 "tasolla."
 
-#. DELEGATION:NOT_ENOUGH_IPV4_NS_CHILD
-#, perl-brace-format
+msgctxt "DELEGATION:NOT_ENOUGH_IPV4_NS_CHILD"
 msgid ""
 "Child does not list enough ({count}) nameservers ({nsname_list}) that "
 "resolve to IPv4 addresses ({ns_ip_list}). Lower limit set to {minimum}."
@@ -2109,8 +1894,7 @@ msgstr ""
 "({nsname_list}), joita vastaavat IPv4-osoitteet ({ns_ip_list}). Alarajaksi "
 "on asetettu {minimum}."
 
-#. DELEGATION:NOT_ENOUGH_IPV4_NS_DEL
-#, perl-brace-format
+msgctxt "DELEGATION:NOT_ENOUGH_IPV4_NS_DEL"
 msgid ""
 "Delegation does not list enough ({count}) nameservers ({nsname_list}) that "
 "resolve to IPv4 addresses ({ns_ip_list}). Lower limit set to {minimum}."
@@ -2119,8 +1903,7 @@ msgstr ""
 "joita vastaavat IPv4-osoitteet ({ns_ip_list}). Alarajaksi on asetettu "
 "{minimum}."
 
-#. DELEGATION:NOT_ENOUGH_IPV6_NS_CHILD
-#, perl-brace-format
+msgctxt "DELEGATION:NOT_ENOUGH_IPV6_NS_CHILD"
 msgid ""
 "Child does not list enough ({count}) nameservers ({nsname_list}) that "
 "resolve to IPv6 addresses ({ns_ip_list}). Lower limit set to {minimum}."
@@ -2129,8 +1912,7 @@ msgstr ""
 "({nsname_list}), joita vastaavat IPv6-osoitteet ({ns_ip_list}). Alarajaksi "
 "on asetettu {minimum}."
 
-#. DELEGATION:NOT_ENOUGH_IPV6_NS_DEL
-#, perl-brace-format
+msgctxt "DELEGATION:NOT_ENOUGH_IPV6_NS_DEL"
 msgid ""
 "Delegation does not list enough ({count}) nameservers ({nsname_list}) that "
 "resolve to IPv6 addresses ({ns_ip_list}). Lower limit set to {minimum}."
@@ -2139,8 +1921,7 @@ msgstr ""
 "joita vastaavat IPv6-osoitteet ({ns_ip_list}). Alarajaksi on asetettu "
 "{minimum}."
 
-#. DELEGATION:NOT_ENOUGH_NS_CHILD
-#, perl-brace-format
+msgctxt "DELEGATION:NOT_ENOUGH_NS_CHILD"
 msgid ""
 "Child does not list enough ({count}) nameservers ({nsname_list}). Lower "
 "limit set to {minimum}."
@@ -2148,8 +1929,7 @@ msgstr ""
 "Alemmalla tasolla ei listata tarpeeksi ({count}) nimipalvelimia "
 "({nsname_list}). Alarajaksi on asetettu {minimum}."
 
-#. DELEGATION:NOT_ENOUGH_NS_DEL
-#, perl-brace-format
+msgctxt "DELEGATION:NOT_ENOUGH_NS_DEL"
 msgid ""
 "Parent does not list enough ({count}) nameservers ({nsname_list}). Lower "
 "limit set to {minimum}."
@@ -2157,8 +1937,7 @@ msgstr ""
 "Ylemmällä tasolla ei listata tarpeeksi ({count}) nimipalvelimia "
 "({nsname_list}). Alarajaksi on asetettu {minimum}."
 
-#. DELEGATION:NO_IPV4_NS_CHILD
-#, perl-brace-format
+msgctxt "DELEGATION:NO_IPV4_NS_CHILD"
 msgid ""
 "Child lists no nameserver that resolves to an IPv4 address. If any were "
 "present, the minimum allowed would be {minimum}."
@@ -2166,8 +1945,7 @@ msgstr ""
 "Alemmalla tasolla ei listata yhtään nimipalvelinta, joka vastaisi IPv4-"
 "osoitetta. Jos niitä olisi olemassa, alin sallittu määrä olisi {minimum}."
 
-#. DELEGATION:NO_IPV4_NS_DEL
-#, perl-brace-format
+msgctxt "DELEGATION:NO_IPV4_NS_DEL"
 msgid ""
 "Delegation lists no nameserver that resolves to an IPv4 address. If any were "
 "present, the minimum allowed would be {minimum}."
@@ -2175,8 +1953,7 @@ msgstr ""
 "Delegointi ei listaa yhtään nimipalvelinta, joka vastaisi IPv4-osoitetta. "
 "Jos niitä olisi olemassa, alin sallittu määrä olisi {minimum}."
 
-#. DELEGATION:NO_IPV6_NS_CHILD
-#, perl-brace-format
+msgctxt "DELEGATION:NO_IPV6_NS_CHILD"
 msgid ""
 "Child lists no nameserver that resolves to an IPv6 address. If any were "
 "present, the minimum allowed would be {minimum}."
@@ -2184,8 +1961,7 @@ msgstr ""
 "Alemmalla tasolla ei listata yhtään nimipalvelinta, joka vastaisi IPv6-"
 "osoitetta. Jos niitä olisi olemassa, alin sallittu määrä olisi {minimum}."
 
-#. DELEGATION:NO_IPV6_NS_DEL
-#, perl-brace-format
+msgctxt "DELEGATION:NO_IPV6_NS_DEL"
 msgid ""
 "Delegation lists no nameserver that resolves to an IPv6 address. If any were "
 "present, the minimum allowed would be {minimum}."
@@ -2193,17 +1969,15 @@ msgstr ""
 "Delegointi ei listaa yhtään nimipalvelinta, joka vastaisi IPv6-osoitetta. "
 "Jos niitä olisi olemassa, alin sallittu määrä olisi {minimum}."
 
-#. DELEGATION:NS_IS_CNAME
-#, perl-brace-format
+msgctxt "DELEGATION:NS_IS_CNAME"
 msgid "Nameserver {nsname} RR points to CNAME."
 msgstr "Nimipalvelimen {nsname} RR osoittaa tietueeseen CNAME."
 
-#. DELEGATION:NO_NS_CNAME
+msgctxt "DELEGATION:NO_NS_CNAME"
 msgid "No nameserver points to CNAME alias."
 msgstr "Mikään nimipalvelin ei osoita CNAME-aliakseen."
 
-#. DELEGATION:REFERRAL_SIZE_TOO_LARGE
-#, perl-brace-format
+msgctxt "DELEGATION:REFERRAL_SIZE_TOO_LARGE"
 msgid ""
 "The smallest possible legal referral packet is larger than 512 octets (it is "
 "{size})."
@@ -2211,8 +1985,7 @@ msgstr ""
 "Pienin mahdollinen sallittu ohjauspaketti on suurempi kuin 512 oktettia (eli "
 "{size})."
 
-#. DELEGATION:REFERRAL_SIZE_OK
-#, perl-brace-format
+msgctxt "DELEGATION:REFERRAL_SIZE_OK"
 msgid ""
 "The smallest possible legal referral packet is smaller than 513 octets (it "
 "is {size})."
@@ -2220,96 +1993,92 @@ msgstr ""
 "Pienin mahdollinen sallittu ohjauspaketti on pienempi kuin 513 oktettia (eli "
 "{size})."
 
-#. DELEGATION:SAME_IP_ADDRESS
-#, perl-brace-format
+msgctxt "DELEGATION:SAME_IP_ADDRESS"
 msgid "IP {ns_ip} refers to multiple nameservers ({nsname_list})."
 msgstr "IP {ns_ip} viittaa useisiin nimipalvelimiin ({nsname_list})."
 
-#. DELEGATION:SOA_EXISTS
+msgctxt "DELEGATION:SOA_EXISTS"
 msgid "All the nameservers have SOA record."
 msgstr "Kaikilla nimipalvelimilla on SOA-tietue."
 
-#. DELEGATION:SOA_NOT_EXISTS
-#, perl-brace-format
+msgctxt "DELEGATION:SOA_NOT_EXISTS"
 msgid "Empty NOERROR response to SOA query was received from {ns}."
 msgstr "Tyhjä NOERROR-vastaus SOA-kyselyyn vastaanotettiin kohteesta {ns}."
 
-#. DELEGATION:TOTAL_NAME_MISMATCH
+msgctxt "DELEGATION:TOTAL_NAME_MISMATCH"
 msgid "None of the nameservers listed at the parent are listed at the child."
 msgstr ""
 "Mitään ylemmällä tasolla listatuista nimipalvelimista ei ole listattu "
 "alemmalla tasolla."
 
-#. DELEGATION:UNEXPECTED_RCODE
-#, perl-brace-format
+msgctxt "DELEGATION:UNEXPECTED_RCODE"
 msgid "Nameserver {ns} answered query with an unexpected rcode ({rcode})."
 msgstr ""
 "Nimipalvelin {ns} vastasi kyselyyn odottamattomalla rcode:lla ({rcode})."
 
-#. NAMESERVER:NAMESERVER01
+msgctxt "NAMESERVER:NAMESERVER01"
 msgid "A name server should not be a recursor"
 msgstr "Nimipalvelin ei saisi olla recursori"
 
-#. NAMESERVER:NAMESERVER02
+msgctxt "NAMESERVER:NAMESERVER02"
 msgid "Test of EDNS0 support"
 msgstr "EDNS0-tuen testi"
 
-#. NAMESERVER:NAMESERVER03
+msgctxt "NAMESERVER:NAMESERVER03"
 msgid "Test availability of zone transfer (AXFR)"
 msgstr "Testaa vyöhykesiirron (AXFR) saatavuus"
 
-#. NAMESERVER:NAMESERVER04
+msgctxt "NAMESERVER:NAMESERVER04"
 msgid "Same source address"
 msgstr "Sama lähdeosoite"
 
-#. NAMESERVER:NAMESERVER05
+msgctxt "NAMESERVER:NAMESERVER05"
 msgid "Behaviour against AAAA query"
 msgstr "Käyttäytyminen AAAA-kyselyssä"
 
-#. NAMESERVER:NAMESERVER06
+msgctxt "NAMESERVER:NAMESERVER06"
 msgid "NS can be resolved"
 msgstr "NS voidaan resolvoida"
 
-#. NAMESERVER:NAMESERVER07
+msgctxt "NAMESERVER:NAMESERVER07"
 msgid "To check whether authoritative name servers return an upward referral"
 msgstr ""
 "Tarkistaaksesi palauttavatko autoritatiiviset nimipalvelimet ylöspäin "
 "suuntautuvan viittauksen"
 
-#. NAMESERVER:NAMESERVER08
+msgctxt "NAMESERVER:NAMESERVER08"
 msgid "Testing QNAME case insensitivity"
 msgstr "Testataan QNAME:a eri kirjainkoolla"
 
-#. NAMESERVER:NAMESERVER09
+msgctxt "NAMESERVER:NAMESERVER09"
 msgid "Testing QNAME case sensitivity"
 msgstr "Testataan QNAME:a eri kirjainkoolla"
 
-#. NAMESERVER:NAMESERVER10
+msgctxt "NAMESERVER:NAMESERVER10"
 msgid "Test for undefined EDNS version"
 msgstr "Testaa määrittelemätön EDNS-versio"
 
-#. NAMESERVER:NAMESERVER11
+msgctxt "NAMESERVER:NAMESERVER11"
 msgid "Test for unknown EDNS OPTION-CODE"
 msgstr "Testaa tuntematon ENDS OPTION-CODE"
 
-#. NAMESERVER:NAMESERVER12
+msgctxt "NAMESERVER:NAMESERVER12"
 msgid "Test for unknown EDNS flags"
 msgstr "Testaa tuntemattomia EDNS-lippuja"
 
-#. NAMESERVER:NAMESERVER13
+msgctxt "NAMESERVER:NAMESERVER13"
 msgid "Test for truncated response on EDNS query"
 msgstr "Testaa lyhennetty vastaus EDNS-kyselyssä"
 
-#. NAMESERVER:NAMESERVER14
+msgctxt "NAMESERVER:NAMESERVER14"
 msgid "Test for unknown version with unknown OPTION-CODE"
 msgstr "Testaa tuntematon versio tuntemattomalla OPTION-CODE:lla"
 
-#. NAMESERVER:NAMESERVER15
+msgctxt "NAMESERVER:NAMESERVER15"
 msgid "Checking for revealed software version"
 msgstr "Tarkastetaan palauttaako ohjelmiston version"
 
-#. NAMESERVER:AAAA_BAD_RDATA
-#, perl-brace-format
+msgctxt "NAMESERVER:AAAA_BAD_RDATA"
 msgid ""
 "Nameserver {ns} answered AAAA query with an unexpected RDATA length "
 "({length} instead of 16)."
@@ -2317,60 +2086,51 @@ msgstr ""
 "Nimipalvelin {ns} vastasi AAAA-kyselyyn odottamattomalla RDATA:n pituudella "
 "({length}, ei 16)."
 
-#. NAMESERVER:AAAA_QUERY_DROPPED
-#, perl-brace-format
+msgctxt "NAMESERVER:AAAA_QUERY_DROPPED"
 msgid "Nameserver {ns} dropped AAAA query."
 msgstr "Nimipalvelin {ns} pudotti AAAA-kyselyn."
 
-#. NAMESERVER:AAAA_UNEXPECTED_RCODE
-#, perl-brace-format
+msgctxt "NAMESERVER:AAAA_UNEXPECTED_RCODE"
 msgid "Nameserver {ns} answered AAAA query with an unexpected rcode ({rcode})."
 msgstr ""
 "Nimipalvelin {ns} vastasi AAAA-kyselyyn odottamattomalla rcode:lla ({rcode})."
 
-#. NAMESERVER:AAAA_WELL_PROCESSED
-#, perl-brace-format
+msgctxt "NAMESERVER:AAAA_WELL_PROCESSED"
 msgid ""
 "The following nameservers answer AAAA queries without problems : {ns_list}."
 msgstr ""
 "Seuraavat nimipalvelimet vastaavat AAAA-kyselyihin ongelmitta: {ns_list}."
 
-#. NAMESERVER:A_UNEXPECTED_RCODE
-#, perl-brace-format
+msgctxt "NAMESERVER:A_UNEXPECTED_RCODE"
 msgid "Nameserver {ns} answered A query with an unexpected rcode ({rcode})."
 msgstr ""
 "Nimipalvelin {ns} vastasi A-kyselyyn odottamattomalla rcode:lla ({rcode})."
 
-#. NAMESERVER:AXFR_AVAILABLE
-#, perl-brace-format
+msgctxt "NAMESERVER:AXFR_AVAILABLE"
 msgid "Nameserver {ns} allow zone transfer using AXFR."
 msgstr "Nimipalvelin {ns} sallii vyöhykkeen vaihdon käyttäen AXFR:ää."
 
-#. NAMESERVER:AXFR_FAILURE
-#, perl-brace-format
+msgctxt "NAMESERVER:AXFR_FAILURE"
 msgid "AXFR not available on nameserver {ns}."
 msgstr "AXFR ei ole saatavilla nimipalvelimella {ns}."
 
-#. NAMESERVER:BREAKS_ON_EDNS
-#, perl-brace-format
+msgctxt "NAMESERVER:BREAKS_ON_EDNS"
 msgid "No response from {ns} when EDNS is used in query asking for {domain}."
 msgstr ""
 "Nimipalvelin {ns} ei vastaa, kun EDNS:ää käytetään kyselyssä, joka koskee "
 "kohdetta {domain}."
 
-#. NAMESERVER:CAN_BE_RESOLVED
+msgctxt "NAMESERVER:CAN_BE_RESOLVED"
 msgid "All nameservers succeeded to resolve to an IP address."
 msgstr ""
 "Kaikille nimipalvelimille löytyi niitä vastaava IP-osoite onnistuneesti."
 
-#. NAMESERVER:CAN_NOT_BE_RESOLVED
-#, perl-brace-format
+msgctxt "NAMESERVER:CAN_NOT_BE_RESOLVED"
 msgid ""
 "The following nameservers failed to resolve to an IP address : {nsname_list}."
 msgstr "Seuraavat nimipalvelimet eivät vastanneet IP-osoitetta: {nsname_list}."
 
-#. NAMESERVER:CASE_QUERIES_RESULTS_DIFFER
-#, perl-brace-format
+msgctxt "NAMESERVER:CASE_QUERIES_RESULTS_DIFFER"
 msgid ""
 "When asked for {type} records on \"{domain}\" with different cases, all "
 "servers do not reply consistently."
@@ -2378,8 +2138,7 @@ msgstr ""
 "Pyydettäessä {type}-tietueita koskien kohdetta \"{domain}”, jossa käytetään "
 "eri merkkikokoja, kaikki palvelimet eivät vastaa yhdenmukaisesti."
 
-#. NAMESERVER:CASE_QUERIES_RESULTS_OK
-#, perl-brace-format
+msgctxt "NAMESERVER:CASE_QUERIES_RESULTS_OK"
 msgid ""
 "When asked for {type} records on \"{domain}\" with different cases, all "
 "servers reply consistently."
@@ -2387,8 +2146,7 @@ msgstr ""
 "Pyydettäessä {type}-tietueita koskien kohdetta \"{domain}\", jossa käytetään "
 "eri merkkikokoja, kaikki palvelimet vastaavat yhdenmukaisesti."
 
-#. NAMESERVER:CASE_QUERY_DIFFERENT_ANSWER
-#, perl-brace-format
+msgctxt "NAMESERVER:CASE_QUERY_DIFFERENT_ANSWER"
 msgid ""
 "When asked for {type} records on \"{query1}\" and \"{query2}\", nameserver "
 "{ns} returns different answers."
@@ -2396,8 +2154,7 @@ msgstr ""
 "Pyydettäessä {type}-tietueita koskien kohteita \"{query1}\" ja \"{query2}\", "
 "nimipalvelin {ns} antaa erilaiset vastaukset."
 
-#. NAMESERVER:CASE_QUERY_DIFFERENT_RC
-#, perl-brace-format
+msgctxt "NAMESERVER:CASE_QUERY_DIFFERENT_RC"
 msgid ""
 "When asked for {type} records on \"{query1}\" and \"{query2}\", nameserver "
 "{ns} returns different RCODE (\"{rcode1}\" vs \"{rcode2}\")."
@@ -2405,8 +2162,7 @@ msgstr ""
 "Pyydettäessä {type}-tietueita koskien kohteita \"{query1}\" ja \"{query2}\", "
 "nimipalvelin {ns} palauttaa eri RCODE:t (\"{rcode1}\" vs. \"{rcode2}\")."
 
-#. NAMESERVER:CASE_QUERY_NO_ANSWER
-#, perl-brace-format
+msgctxt "NAMESERVER:CASE_QUERY_NO_ANSWER"
 msgid ""
 "When asked for {type} records on \"{domain}\", nameserver {ns} returns "
 "nothing."
@@ -2414,8 +2170,7 @@ msgstr ""
 "Pyydettäessä {type}-tietueita koskien kohdetta \"{domain}\", nimipalvelin "
 "{ns} ei palauta mitään."
 
-#. NAMESERVER:CASE_QUERY_SAME_ANSWER
-#, perl-brace-format
+msgctxt "NAMESERVER:CASE_QUERY_SAME_ANSWER"
 msgid ""
 "When asked for {type} records on \"{query1}\" and \"{query2}\", nameserver "
 "{ns} returns same answers."
@@ -2423,8 +2178,7 @@ msgstr ""
 "Pyydettäessä {type}-tietueita koskien kohteita \"{query1}\" ja\"{query2}\", "
 "nimipalvelin {ns} palauttaa samat vastaukset."
 
-#. NAMESERVER:CASE_QUERY_SAME_RC
-#, perl-brace-format
+msgctxt "NAMESERVER:CASE_QUERY_SAME_RC"
 msgid ""
 "When asked for {type} records on \"{query1}\" and \"{query2}\", nameserver "
 "{ns} returns same RCODE \"{rcode}\"."
@@ -2432,23 +2186,20 @@ msgstr ""
 "Pyydettäessä {type}-tietueita koskien kohteita \"{query1}\" ja \"{query2}\", "
 "nimipalvelin {ns} palauttaa saman RCODE:n \"{rcode}\"."
 
-#. NAMESERVER:DIFFERENT_SOURCE_IP
-#, perl-brace-format
+msgctxt "NAMESERVER:DIFFERENT_SOURCE_IP"
 msgid ""
 "Nameserver {ns} replies on a SOA query with a different source address "
 "({source})."
 msgstr "Nimipalvelin {ns} vastaa SOA-kyselyyn eri lähdeosoitteella ({source})."
 
-#. NAMESERVER:EDNS_RESPONSE_WITHOUT_EDNS
-#, perl-brace-format
+msgctxt "NAMESERVER:EDNS_RESPONSE_WITHOUT_EDNS"
 msgid ""
 "Response without EDNS from {ns} on query with EDNS0 asking for {domain}."
 msgstr ""
 "Vastaus ilman EDNS:ää kohteesta {ns} kyselyyn, jolla on EDNS0 ja joka pyytää "
 "kohdetta {domain}."
 
-#. NAMESERVER:EDNS_VERSION_ERROR
-#, perl-brace-format
+msgctxt "NAMESERVER:EDNS_VERSION_ERROR"
 msgid ""
 "Incorrect version of EDNS (expected 0) in response from {ns} on query with "
 "EDNS (version 0) asking for {domain}."
@@ -2456,18 +2207,15 @@ msgstr ""
 "Väärä EDNS-versio (odotettu: 0) vastauksessa kohteelta {ns} kyselyyn, jonka "
 "EDNS (versio 0) pyytää kohdetta {domain}."
 
-#. NAMESERVER:EDNS0_SUPPORT
-#, perl-brace-format
+msgctxt "NAMESERVER:EDNS0_SUPPORT"
 msgid "The following nameservers support EDNS0 : {ns_list}."
 msgstr "Seuraavat nimipalvelimet tukevat EDNS0:aa: {ns_list}."
 
-#. NAMESERVER:IS_A_RECURSOR
-#, perl-brace-format
+msgctxt "NAMESERVER:IS_A_RECURSOR"
 msgid "Nameserver {ns} is a recursor."
 msgstr "Nimipalvelin {ns} on resolveri."
 
-#. NAMESERVER:MISSING_OPT_IN_TRUNCATED
-#, perl-brace-format
+msgctxt "NAMESERVER:MISSING_OPT_IN_TRUNCATED"
 msgid ""
 "Nameserver {ns} replies on an EDNS query with a truncated response without "
 "EDNS."
@@ -2475,42 +2223,36 @@ msgstr ""
 "Nimipalvelin {ns} vastaa EDNS-kyselyyn typistetyllä vastauksella ilman EDNS:"
 "ää."
 
-#. NAMESERVER:NO_EDNS_SUPPORT
-#, perl-brace-format
+msgctxt "NAMESERVER:NO_EDNS_SUPPORT"
 msgid "Nameserver {ns} does not support EDNS0 (replies with FORMERR)."
 msgstr "Nimipalvelin {ns} ei tue EDNS0:aa (antaa vastaukseksi FORMERR)."
 
-#. NAMESERVER:NO_RECURSOR
-#, perl-brace-format
+msgctxt "NAMESERVER:NO_RECURSOR"
 msgid "Nameserver {ns} is not a recursor."
 msgstr "Nimipalvelin {ns} ei ole resolveri."
 
-#. NAMESERVER:NO_RESOLUTION
+msgctxt "NAMESERVER:NO_RESOLUTION"
 msgid "No nameserver was successfully resolved to an IP address."
 msgstr ""
 "Millekään nimipalvelimelle ei löytynyt onnistuneesti vastaavaa IP-osoitetta."
 
 #. NAMESERVER:NO_RESPONSE
 #. SYNTAX:NO_RESPONSE
-#, perl-brace-format
 msgid "No response from {ns} asking for {domain}."
 msgstr "Ei vastausta kohteelta {ns} kysyttäessä kohteesta {domain}."
 
-#. NAMESERVER:NO_UPWARD_REFERRAL
-#, perl-brace-format
+msgctxt "NAMESERVER:NO_UPWARD_REFERRAL"
 msgid ""
 "None of the following nameservers returns an upward referral : {nsname_list}."
 msgstr ""
 "Mikään seuraavista nimipalvelimista ei palauta viittausta ylöspäin: "
 "{nsname_list}."
 
-#. NAMESERVER:NS_ERROR
-#, perl-brace-format
+msgctxt "NAMESERVER:NS_ERROR"
 msgid "Erroneous response from nameserver {ns}."
 msgstr "Virheellinen vastaus nimipalvelimelta {ns}."
 
-#. NAMESERVER:N10_EDNS_RESPONSE_ERROR
-#, perl-brace-format
+msgctxt "NAMESERVER:N10_EDNS_RESPONSE_ERROR"
 msgid ""
 "Expected RCODE but received erroneous response to an EDNS version 1 query. "
 "Fetched from the nameservers with IP addresses {ns_ip_list}"
@@ -2519,8 +2261,7 @@ msgstr ""
 "version 1 kyselyyn. Tiedot haettu nimipalvelimilta joiden IP-osoitteet ovat "
 "\"{ns_ip_list}\"."
 
-#. NAMESERVER:N10_NO_RESPONSE_EDNS1_QUERY
-#, perl-brace-format
+msgctxt "NAMESERVER:N10_NO_RESPONSE_EDNS1_QUERY"
 msgid ""
 "No response to an EDNS version 1 query. Fetched from the nameservers with IP "
 "addresses {ns_ip_list}"
@@ -2528,8 +2269,7 @@ msgstr ""
 "Ei saatu vastausta EDNS versiolla 1 tehtyyn kyselyyn. Tiedot haettu "
 "nimipalvelimilta joiden IP-osoitteet ovat \"{ns_ip_list}\"."
 
-#. NAMESERVER:N10_UNEXPECTED_RCODE
-#, perl-brace-format
+msgctxt "NAMESERVER:N10_UNEXPECTED_RCODE"
 msgid ""
 "Erroneous RCODE (\"{rcode}\") in response to an EDNS version 1 query. "
 "Fetched from the nameservers with IP addresses {ns_ip_list}"
@@ -2538,8 +2278,7 @@ msgstr ""
 "tehtyyn kyselyyn. Tiedot haettu nimipalvelimilta joiden IP-osoitteet ovat "
 "\"{ns_ip_list}"
 
-#. NAMESERVER:N11_NO_EDNS
-#, perl-brace-format
+msgctxt "NAMESERVER:N11_NO_EDNS"
 msgid ""
 "The DNS response, on query with unknown EDNS option-code, does not contain "
 "any EDNS from name servers \"{ns_ip_list}\"."
@@ -2547,8 +2286,7 @@ msgstr ""
 "Tuntemattomalla EDNS-optiokoodilla tehtyyn kyselyyn DNS-vastaus ei sisällä "
 "nimipalvelimien \"{ns_ip_list}\" EDNS:ää."
 
-#. NAMESERVER:N11_NO_RESPONSE
-#, perl-brace-format
+msgctxt "NAMESERVER:N11_NO_RESPONSE"
 msgid ""
 "There is no response on query with unknown EDNS option-code from name "
 "servers \"{ns_ip_list}\"."
@@ -2556,8 +2294,7 @@ msgstr ""
 "Nimipalvelimien \"{ns_ip_list}\" kyselyyn, jossa on tuntematon EDNS-"
 "optiokoodi, ei saatu vastausta."
 
-#. NAMESERVER:N11_RETURNS_UNKNOWN_OPTION_CODE
-#, perl-brace-format
+msgctxt "NAMESERVER:N11_RETURNS_UNKNOWN_OPTION_CODE"
 msgid ""
 "The DNS response contains an unknown EDNS option-code. Returned from name "
 "servers \"{ns_ip_list}\"."
@@ -2565,8 +2302,7 @@ msgstr ""
 "DNS-vastaus sisältää tuntemattoman EDNS-optiokoodin. Palautettu "
 "nimipalvelimista \"{ns_ip_list}\"."
 
-#. NAMESERVER:N11_UNEXPECTED_ANSWER_SECTION
-#, perl-brace-format
+msgctxt "NAMESERVER:N11_UNEXPECTED_ANSWER_SECTION"
 msgid ""
 "The DNS response, on query with unknown EDNS option-code, does not contain "
 "the expected SOA record in the answer section from name servers "
@@ -2575,8 +2311,7 @@ msgstr ""
 "Tuntemattomalla EDNS-optiokoodilla tehdyn kyselyn DNS-vastaus ei sisällä "
 "nimipalvelimien \"{ns_ip_list}\" vastausosiossa odotettua SOA-tietuetta."
 
-#. NAMESERVER:N11_UNEXPECTED_RCODE
-#, perl-brace-format
+msgctxt "NAMESERVER:N11_UNEXPECTED_RCODE"
 msgid ""
 "The DNS response, on query with unknown EDNS option-code, has unexpected "
 "RCODE name \"{rcode}\" from name servers \"{ns_ip_list}\"."
@@ -2584,8 +2319,7 @@ msgstr ""
 "Tuntemattomalla EDNS-optiokoodilla tehdyssä kyselyssä DNS-vastauksessa on "
 "odottamaton RCODE-nimi \"{rcode}\" nimipalvelimista \"{ns_ip_list}\"."
 
-#. NAMESERVER:N11_UNSET_AA
-#, perl-brace-format
+msgctxt "NAMESERVER:N11_UNSET_AA"
 msgid ""
 "The DNS response, on query with unknown EDNS option-code, is unexpectedly "
 "not authoritative from name servers \"{ns_ip_list}\"."
@@ -2593,8 +2327,7 @@ msgstr ""
 "Tuntemattomalla EDNS-optiokoodilla tehty DNS-vastaus odottamattomasti ei ole "
 "nimipalvelimista autoritatiiviselta \"{ns_ip_list}\"."
 
-#. NAMESERVER:N15_NO_VERSION
-#, perl-brace-format
+msgctxt "NAMESERVER:N15_NO_VERSION"
 msgid ""
 "The following name server(s) do not respond to software version queries. "
 "Returned from name servers: \"{ns_ip_list}\""
@@ -2602,8 +2335,7 @@ msgstr ""
 "Seuraavat nimipalvelimet eivät vastaa ohjelmistoversiokyselyihin. Palautettu "
 "nimipalvelimista: \"{ns_ip_list}\""
 
-#. NAMESERVER:N15_SOFTWARE_VERSION
-#, perl-brace-format
+msgctxt "NAMESERVER:N15_SOFTWARE_VERSION"
 msgid ""
 "The following name server(s) respond to software version query "
 "\"{query_name}\" with string \"{string}\". Returned from name servers: "
@@ -2612,8 +2344,7 @@ msgstr ""
 "Seuraavat nimipalvelimet vastaavat ohjelmistoversiokyselyyn \"{query_name}\" "
 "merkkijonolla \"{string}\". Palautettu nimipalvelimista: \"{ns_ip_list}\""
 
-#. NAMESERVER:N16_HAS_NSID
-#, perl-brace-format
+msgctxt "NAMESERVER:N16_HAS_NSID"
 msgid ""
 "The following name server(s) responded to an NSID query (RFC 5001) with "
 "NSID value \"{nsid}\". Returned from name servers: \"{ns_list}\""
@@ -2621,8 +2352,7 @@ msgstr ""
 "Seuraavat nimipalvelimet vastasivat NSID-kyselyyn (RFC 5001) NSID-arvolla "
 "\"{nsid}\". Palautettu nimipalvelimista: \"{ns_list}\""
 
-#. NAMESERVER:N16_NO_NSID_REVEALED
-#, perl-brace-format
+msgctxt "NAMESERVER:N16_NO_NSID_REVEALED"
 msgid ""
 "The following name server(s) did not include an NSID option in response to "
 "an NSID query (RFC 5001). Returned from name servers: \"{ns_list}\""
@@ -2630,8 +2360,7 @@ msgstr ""
 "Seuraavat nimipalvelimet eivät sisällyttäneet NSID-vaihtoehtoa vastaukseen "
 "NSID-kyselyyn (RFC 5001). Palautettu nimipalvelimista: \"{ns_list}\""
 
-#. NAMESERVER:N16_NO_RESPONSE
-#, perl-brace-format
+msgctxt "NAMESERVER:N16_NO_RESPONSE"
 msgid ""
 "The following name server(s) did not respond to an NSID query (RFC 5001). "
 "Returned from name servers: \"{ns_list}\""
@@ -2639,8 +2368,7 @@ msgstr ""
 "Seuraavat nimipalvelimet eivät vastanneet NSID-kyselyyn (RFC 5001). "
 "Palautettu nimipalvelimista: \"{ns_list}\""
 
-#. NAMESERVER:N16_UNEXPECTED_RCODE
-#, perl-brace-format
+msgctxt "NAMESERVER:N16_UNEXPECTED_RCODE"
 msgid ""
 "The following name server(s) returned an unexpected RCODE \"{rcode}\" in "
 "response to an NSID query (RFC 5001). Returned from name servers: "
@@ -2650,8 +2378,7 @@ msgstr ""
 "vastauksena NSID-kyselyyn (RFC 5001). Palautettu nimipalvelimista: "
 "\"{ns_list}\""
 
-#. NAMESERVER:QNAME_CASE_INSENSITIVE
-#, perl-brace-format
+msgctxt "NAMESERVER:QNAME_CASE_INSENSITIVE"
 msgid ""
 "Nameserver {ns} does not preserve original case of the queried name "
 "({domain})."
@@ -2659,70 +2386,66 @@ msgstr ""
 "Nimipalvelin {ns} ei säilytä kysytyn nimen alkuperäistä merkkikokoa "
 "({domain})."
 
-#. NAMESERVER:QNAME_CASE_SENSITIVE
-#, perl-brace-format
+msgctxt "NAMESERVER:QNAME_CASE_SENSITIVE"
 msgid "Nameserver {ns} preserves original case of queried names ({domain})."
 msgstr ""
 "Nimipalvelin {ns} säilyttää kysyttyjen nimien alkuperäisen merkkikoon "
 "({domain})."
 
-#. NAMESERVER:SAME_SOURCE_IP
+msgctxt "NAMESERVER:SAME_SOURCE_IP"
 msgid "All nameservers reply with same IP used to query them."
 msgstr ""
 "Kaikki nimipalvelimet vastaavat samalla IP-osoitteella, jota käytetiin "
 "niiden kyselyyn."
 
-#. NAMESERVER:UPWARD_REFERRAL
-#, perl-brace-format
+msgctxt "NAMESERVER:UPWARD_REFERRAL"
 msgid "Nameserver {ns} returns an upward referral."
 msgstr "Nimipalvelin {ns} palauttaa viittauksen ylöspäin."
 
-#. NAMESERVER:UPWARD_REFERRAL_IRRELEVANT
+msgctxt "NAMESERVER:UPWARD_REFERRAL_IRRELEVANT"
 msgid "Upward referral tests skipped for root zone."
 msgstr "Juuritason ylöspäin viittauksen testit ohitettu."
 
-#. NAMESERVER:Z_FLAGS_NOTCLEAR
-#, perl-brace-format
+msgctxt "NAMESERVER:Z_FLAGS_NOTCLEAR"
 msgid "Nameserver {ns} has one or more unknown EDNS Z flag bits set."
 msgstr ""
 "Nimipalvelimella {ns} on asetettu yksi tai useampi tuntematon EDNS Z -"
 "lippubitti."
 
-#. SYNTAX:SYNTAX01
+msgctxt "SYNTAX:SYNTAX01"
 msgid "No illegal characters in the domain name"
 msgstr "Ei kiellettyjä merkkejä verkkotunnuksen nimessä"
 
-#. SYNTAX:SYNTAX02
+msgctxt "SYNTAX:SYNTAX02"
 msgid "No hyphen ('-') at the start or end of the domain name"
 msgstr "Ei väliviivaa ('-') verkkotunnuksen nimen alussa tai lopussa"
 
-#. SYNTAX:SYNTAX03
+msgctxt "SYNTAX:SYNTAX03"
 msgid ""
 "There must be no double hyphen ('--') in position 3 and 4 of the domain name"
 msgstr "Verkkotunnuksen 3 ja 4 merkki eivät saa olla väliviivoja ('--')"
 
-#. SYNTAX:SYNTAX04
+msgctxt "SYNTAX:SYNTAX04"
 msgid "The NS name must have a valid domain/hostname"
 msgstr "NS-nimellä on oltava kelvollinen verkkotunnus/isäntänimi"
 
-#. SYNTAX:SYNTAX05
+msgctxt "SYNTAX:SYNTAX05"
 msgid "Misuse of '@' character in the SOA RNAME field"
 msgstr "Väärin käytetty ’@’-merkki löydetty SOA RNAME -kentästä"
 
-#. SYNTAX:SYNTAX06
+msgctxt "SYNTAX:SYNTAX06"
 msgid "No illegal characters in the SOA RNAME field"
 msgstr "Ei löydetty kiellettyjä merkkejä SOA RNAME:sta"
 
-#. SYNTAX:SYNTAX07
+msgctxt "SYNTAX:SYNTAX07"
 msgid "No illegal characters in the SOA MNAME field"
 msgstr "Ei kiellettyjä merkkejä SOA MNAME kentässä"
 
-#. SYNTAX:SYNTAX08
+msgctxt "SYNTAX:SYNTAX08"
 msgid "MX name must have a valid hostname"
 msgstr "MX-nimellä on oltava kelvollinen isäntänimi"
 
-#. SYNTAX:DISCOURAGED_DOUBLE_DASH
-#, perl-brace-format
+msgctxt "SYNTAX:DISCOURAGED_DOUBLE_DASH"
 msgid ""
 "Domain name ({domain}) has a label ({label}) with a double hyphen ('--') in "
 "position 3 and 4 (with a prefix which is not 'xn--')."
@@ -2730,16 +2453,14 @@ msgstr ""
 "Verkkotunnuksella ({domain}) on osa ({label}), jossa on kaksoisyhdysmerkki "
 "('--') kohdissa 3 ja 4 (sekä etuliite, joka ei ole 'xn--')."
 
-#. SYNTAX:INITIAL_HYPHEN
-#, perl-brace-format
+msgctxt "SYNTAX:INITIAL_HYPHEN"
 msgid ""
 "Domain name ({domain}) has a label ({label}) starting with an hyphen ('-')."
 msgstr ""
 "Verkkotunnuksella ({domain}) on osa ({label}), joka alkaa yhdysmerkillä "
 "('-')."
 
-#. SYNTAX:MNAME_DISCOURAGED_DOUBLE_DASH
-#, perl-brace-format
+msgctxt "SYNTAX:MNAME_DISCOURAGED_DOUBLE_DASH"
 msgid ""
 "SOA MNAME ({domain}) has a label ({label}) with a double hyphen ('--') in "
 "position 3 and 4 (with a prefix which is not 'xn--')."
@@ -2747,25 +2468,21 @@ msgstr ""
 "SOA MNAME:lla ({domain}) on osa ({label}), jossa on kaksoisyhdysmerkki "
 "('--') kohdissa 3 ja 4 (sekä etuliite, joka ei ole 'xn--')."
 
-#. SYNTAX:MNAME_NON_ALLOWED_CHARS
-#, perl-brace-format
+msgctxt "SYNTAX:MNAME_NON_ALLOWED_CHARS"
 msgid "Found illegal characters in SOA MNAME ({domain})."
 msgstr "Kiellettyjä merkkejä löydetty SOA MNAME:sta ({domain})."
 
-#. SYNTAX:MNAME_NUMERIC_TLD
-#, perl-brace-format
+msgctxt "SYNTAX:MNAME_NUMERIC_TLD"
 msgid "SOA MNAME ({domain}) within a 'numeric only' TLD ({tld})."
 msgstr ""
 "SOA MNAME ({domain}) kuuluu ’pelkästään numeerisessa muodossa olevaan’ TLD:"
 "hen ({tld})."
 
-#. SYNTAX:MNAME_SYNTAX_OK
-#, perl-brace-format
+msgctxt "SYNTAX:MNAME_SYNTAX_OK"
 msgid "SOA MNAME ({domain}) syntax is valid."
 msgstr "SOA MNAME:n ({domain}) syntaksi on oikein."
 
-#. SYNTAX:MX_DISCOURAGED_DOUBLE_DASH
-#, perl-brace-format
+msgctxt "SYNTAX:MX_DISCOURAGED_DOUBLE_DASH"
 msgid ""
 "Domain name MX ({domain}) has a label ({label}) with a double hyphen ('--') "
 "in position 3 and 4 (with a prefix which is not 'xn--')."
@@ -2774,25 +2491,21 @@ msgstr ""
 "kaksoisyhdysmerkki ('--') kohdissa 3 ja 4 (sekä etuliite, joka ei ole "
 "'xn--')."
 
-#. SYNTAX:MX_NON_ALLOWED_CHARS
-#, perl-brace-format
+msgctxt "SYNTAX:MX_NON_ALLOWED_CHARS"
 msgid "Found illegal characters in MX ({domain})."
 msgstr "Kiellettyjä merkkejä löydetty kohteesta MX ({domain})."
 
-#. SYNTAX:MX_NUMERIC_TLD
-#, perl-brace-format
+msgctxt "SYNTAX:MX_NUMERIC_TLD"
 msgid "Domain name MX ({domain}) within a 'numeric only' TLD ({tld})."
 msgstr ""
 "Verkkotunnus MX ({domain}) kuuluu ’pelkästään numeerisessa muodossa olevaan’ "
 "TLD:hen ({tld})."
 
-#. SYNTAX:MX_SYNTAX_OK
-#, perl-brace-format
+msgctxt "SYNTAX:MX_SYNTAX_OK"
 msgid "Domain name MX ({domain}) syntax is valid."
 msgstr "Verkkotunnuksen MX ({domain}) syntaksi on oikein."
 
-#. SYNTAX:NAMESERVER_DISCOURAGED_DOUBLE_DASH
-#, perl-brace-format
+msgctxt "SYNTAX:NAMESERVER_DISCOURAGED_DOUBLE_DASH"
 msgid ""
 "Nameserver ({domain}) has a label ({label}) with a double hyphen ('--') in "
 "position 3 and 4 (with a prefix which is not 'xn--')."
@@ -2800,30 +2513,25 @@ msgstr ""
 "Nimipalvelimella ({domain}) on osa ({label}), jossa on kaksoisyhdysmerkki "
 "('--') kohdissa 3 ja 4 (sekä etuliite, joka ei ole 'xn--')."
 
-#. SYNTAX:NAMESERVER_NON_ALLOWED_CHARS
-#, perl-brace-format
+msgctxt "SYNTAX:NAMESERVER_NON_ALLOWED_CHARS"
 msgid "Found illegal characters in the nameserver ({domain})."
 msgstr "Kiellettyjä merkkejä löydetty nimipalvelimelta ({domain})."
 
-#. SYNTAX:NAMESERVER_NUMERIC_TLD
-#, perl-brace-format
+msgctxt "SYNTAX:NAMESERVER_NUMERIC_TLD"
 msgid "Nameserver ({domain}) within a 'numeric only' TLD ({tld})."
 msgstr ""
 "Nimipalvelin ({domain}) kuuluu ’pelkästään numeerisessa muodossa olevaan’ "
 "TLD:hen ({tld})."
 
-#. SYNTAX:NAMESERVER_SYNTAX_OK
-#, perl-brace-format
+msgctxt "SYNTAX:NAMESERVER_SYNTAX_OK"
 msgid "Nameserver ({domain}) syntax is valid."
 msgstr "Nimipalvelimen ({domain}) syntaksi on oikein."
 
-#. SYNTAX:NON_ALLOWED_CHARS
-#, perl-brace-format
+msgctxt "SYNTAX:NON_ALLOWED_CHARS"
 msgid "Found illegal characters in the domain name ({domain})."
 msgstr "Kiellettyjä merkkejä löydetty verkkotunnuksesta ({domain})."
 
-#. SYNTAX:NO_DOUBLE_DASH
-#, perl-brace-format
+msgctxt "SYNTAX:NO_DOUBLE_DASH"
 msgid ""
 "Domain name ({domain}) has no label with a double hyphen ('--') in position "
 "3 and 4 (with a prefix which is not 'xn--')."
@@ -2831,8 +2539,7 @@ msgstr ""
 "Verkkotunnuksella ({domain}) ei ole osaa, jossa on kaksoisyhdysmerkki ('--') "
 "kohdissa 3 ja 4 (sekä etuliite, joka ei ole 'xn--')."
 
-#. SYNTAX:NO_ENDING_HYPHENS
-#, perl-brace-format
+msgctxt "SYNTAX:NO_ENDING_HYPHENS"
 msgid "Neither end of any label in the domain name ({domain}) has a hyphen."
 msgstr ""
 "Minkään verkkotunnuksen ({domain}) osan kummassakaan päässä ei ole "
@@ -2848,13 +2555,11 @@ msgstr "Yksi tai useampi nimipalvelin ei vastaa MX-kyselyihin."
 msgid "No response from nameserver(s) on SOA queries."
 msgstr "Yksi tai useampi nimipalvelin ei vastaa SOA-kyselyihin."
 
-#. SYNTAX:ONLY_ALLOWED_CHARS
-#, perl-brace-format
+msgctxt "SYNTAX:ONLY_ALLOWED_CHARS"
 msgid "No illegal characters in the domain name ({domain})."
 msgstr "Ei kiellettyjä merkkejä verkkotunnuksessa ({domain})."
 
-#. SYNTAX:RNAME_MAIL_DOMAIN_INVALID
-#, perl-brace-format
+msgctxt "SYNTAX:RNAME_MAIL_DOMAIN_INVALID"
 msgid ""
 "The SOA RNAME mail domain ({domain}) cannot be resolved to a mail server "
 "with an IP address."
@@ -2862,8 +2567,7 @@ msgstr ""
 "SOA RNAME postin verkkotunnukselle ({domain}) ei löydy vastaavaa "
 "postipalvelinta, jolla on IP-osoite."
 
-#. SYNTAX:RNAME_MAIL_DOMAIN_LOCALHOST
-#, perl-brace-format
+msgctxt "SYNTAX:RNAME_MAIL_DOMAIN_LOCALHOST"
 msgid ""
 "The SOA RNAME mail domain ({domain}) resolved to a mail server with "
 "localhost ({localhost}) IP address."
@@ -2871,8 +2575,7 @@ msgstr ""
 "SOA RNAME sähköpostidomaini ({domain}) viittaa postipalvelimeen, jolla on "
 "localhost ({localhost}) IP-osoite."
 
-#. SYNTAX:RNAME_MAIL_ILLEGAL_CNAME
-#, perl-brace-format
+msgctxt "SYNTAX:RNAME_MAIL_ILLEGAL_CNAME"
 msgid ""
 "The SOA RNAME mail domain ({domain}) refers to an address which is an alias "
 "(CNAME)."
@@ -2880,85 +2583,78 @@ msgstr ""
 "SOA RNAME sähköpostiosoite ({domain}) viittaa osoitteeseen joka on alias "
 "(CNAME)."
 
-#. SYNTAX:RNAME_MISUSED_AT_SIGN
-#, perl-brace-format
+msgctxt "SYNTAX:RNAME_MISUSED_AT_SIGN"
 msgid "Misused '@' character found in SOA RNAME field ({rname})."
 msgstr "Väärin käytetty ’@’-merkki löydetty SOA RNAME -kentästä ({rname})."
 
-#. SYNTAX:RNAME_NO_AT_SIGN
-#, perl-brace-format
+msgctxt "SYNTAX:RNAME_NO_AT_SIGN"
 msgid "There is no misused '@' character in the SOA RNAME field ({rname})."
 msgstr "Ei väärin käytettyjä ’@’-merkkejä SOA RNAME -kentässä ({rname})."
 
-#. SYNTAX:RNAME_RFC822_INVALID
-#, perl-brace-format
+msgctxt "SYNTAX:RNAME_RFC822_INVALID"
 msgid "Illegal character(s) found in SOA RNAME field ({rname})."
 msgstr ""
 "Yksi tai useampi kielletty merkki löydetty SOA RNAME -kentästä ({rname})."
 
-#. SYNTAX:RNAME_RFC822_VALID
-#, perl-brace-format
+msgctxt "SYNTAX:RNAME_RFC822_VALID"
 msgid "The SOA RNAME field ({rname}) is compliant with RFC2822."
 msgstr "SOA RNAME -kenttä ({rname}) on RFC2822:n mukainen."
 
-#. SYNTAX:TERMINAL_HYPHEN
-#, perl-brace-format
+msgctxt "SYNTAX:TERMINAL_HYPHEN"
 msgid ""
 "Domain name ({domain}) has a label ({label}) ending with a hyphen ('-')."
 msgstr ""
 "Verkkotunnuksella ({domain}) on osa ({label}), joka päättyy yhdysmerkkiin "
 "('-')."
 
-#. ZONE:ZONE01
+msgctxt "ZONE:ZONE01"
 msgid "Fully qualified master nameserver in SOA"
 msgstr "Täysin toimiva master nimipalvelin SOA:ssa"
 
-#. ZONE:ZONE02
+msgctxt "ZONE:ZONE02"
 msgid "SOA 'refresh' minimum value"
 msgstr "SOA 'refresh' -minimiarvo"
 
-#. ZONE:ZONE03
+msgctxt "ZONE:ZONE03"
 msgid "SOA 'retry' lower than 'refresh'"
 msgstr "SOA \"retry\" pienempi kuin \"refresh\""
 
-#. ZONE:ZONE04
+msgctxt "ZONE:ZONE04"
 msgid "SOA 'retry' at least 1 hour"
 msgstr "SOA 'retry' vähintään 1 tunti"
 
-#. ZONE:ZONE05
+msgctxt "ZONE:ZONE05"
 msgid "SOA 'expire' minimum value"
 msgstr "SOA 'expire' -minimiarvo"
 
-#. ZONE:ZONE06
+msgctxt "ZONE:ZONE06"
 msgid "SOA 'minimum' maximum value"
 msgstr "SOA:n \"minimum\" maksimiarvo"
 
-#. ZONE:ZONE07
+msgctxt "ZONE:ZONE07"
 msgid "SOA master is not an alias"
 msgstr "SOA master ei ole alias"
 
-#. ZONE:ZONE08
+msgctxt "ZONE:ZONE08"
 msgid "MX is not an alias"
 msgstr "MX ei ole alias"
 
-#. ZONE:ZONE09
+msgctxt "ZONE:ZONE09"
 msgid "MX record present"
 msgstr "MX-tietue on"
 
-#. ZONE:ZONE10
+msgctxt "ZONE:ZONE10"
 msgid "No multiple SOA records"
 msgstr "Ei useita SOA-tietueita"
 
-#. ZONE:RETRY_MINIMUM_VALUE_LOWER
-#, perl-brace-format
+msgctxt "ZONE:RETRY_MINIMUM_VALUE_LOWER"
 msgid ""
 "SOA 'retry' value ({retry}) is less than the recommended one "
 "({required_retry})."
 msgstr ""
 "SOA 'retry' -arvo ({retry}) on pienempi kuin suositus ({required_retry})."
 
-#. ZONE:RETRY_MINIMUM_VALUE_OK
-#, perl-brace-format
+msgctxt "ZONE:RETRY_MINIMUM_VALUE_OK"
 msgid ""
 "SOA 'retry' value ({retry}) is at least equal to the minimum recommended "
 "value ({required_retry})."
@@ -2966,19 +2662,16 @@ msgstr ""
 "SOA 'retry' -arvo ({retry}) on vähintään yhtä suuri kuin suositeltu "
 "vähimmäisarvo ({required_retry})."
 
-#. ZONE:MNAME_IS_CNAME
-#, perl-brace-format
+msgctxt "ZONE:MNAME_IS_CNAME"
 msgid "SOA 'mname' value ({mname}) refers to a NS which is an alias (CNAME)."
 msgstr "SOA 'mname' -arvo ({mname}) viittaa NS:ään, joka on alias (CNAME)."
 
-#. ZONE:MNAME_IS_NOT_CNAME
-#, perl-brace-format
+msgctxt "ZONE:MNAME_IS_NOT_CNAME"
 msgid ""
 "SOA 'mname' value ({mname}) refers to a NS which is not an alias (CNAME)."
 msgstr "SOA 'mname' -arvo ({mname}) viittaa NS:ään, joka ei ole alias (CNAME)."
 
-#. ZONE:REFRESH_MINIMUM_VALUE_LOWER
-#, perl-brace-format
+msgctxt "ZONE:REFRESH_MINIMUM_VALUE_LOWER"
 msgid ""
 "SOA 'refresh' value ({refresh}) is less than the recommended one "
 "({required_refresh})."
@@ -2986,8 +2679,7 @@ msgstr ""
 "SOA 'refresh' -arvo ({refresh}) on pienempi kuin suositus "
 "({required_refresh})."
 
-#. ZONE:REFRESH_MINIMUM_VALUE_OK
-#, perl-brace-format
+msgctxt "ZONE:REFRESH_MINIMUM_VALUE_OK"
 msgid ""
 "SOA 'refresh' value ({refresh}) is at least equal to the minimum recommended "
 "value ({required_refresh})."
@@ -2995,8 +2687,7 @@ msgstr ""
 "SOA-refresh-arvo ({refresh}) on vähintään yhtä suuri kuin suositeltu "
 "vähimmäisarvo ({required_refresh})."
 
-#. ZONE:EXPIRE_LOWER_THAN_REFRESH
-#, perl-brace-format
+msgctxt "ZONE:EXPIRE_LOWER_THAN_REFRESH"
 msgid ""
 "SOA 'expire' value ({expire}) is lower than the SOA 'refresh' value "
 "({refresh})."
@@ -3004,8 +2695,7 @@ msgstr ""
 "SOA 'expire' -arvo ({expire}) on pienempi kuin SOA 'refresh' -arvo "
 "({refresh})."
 
-#. ZONE:SOA_DEFAULT_TTL_MAXIMUM_VALUE_HIGHER
-#, perl-brace-format
+msgctxt "ZONE:SOA_DEFAULT_TTL_MAXIMUM_VALUE_HIGHER"
 msgid ""
 "SOA 'minimum' value ({minimum}) is higher than the recommended one "
 "({highest_minimum})."
@@ -3013,16 +2703,14 @@ msgstr ""
 "SOA 'minimum' -arvo ({minimum}) on suurempi kuin suositus "
 "({highest_minimum})."
 
-#. ZONE:SOA_DEFAULT_TTL_MAXIMUM_VALUE_LOWER
-#, perl-brace-format
+msgctxt "ZONE:SOA_DEFAULT_TTL_MAXIMUM_VALUE_LOWER"
 msgid ""
 "SOA 'minimum' value ({minimum}) is less than the recommended one "
 "({lowest_minimum})."
 msgstr ""
 "SOA 'minimum' -arvo ({minimum}) on pienempi kuin suositus ({lowest_minimum})."
 
-#. ZONE:SOA_DEFAULT_TTL_MAXIMUM_VALUE_OK
-#, perl-brace-format
+msgctxt "ZONE:SOA_DEFAULT_TTL_MAXIMUM_VALUE_OK"
 msgid ""
 "SOA 'minimum' value ({minimum}) is between the recommended ones "
 "({lowest_minimum}/{highest_minimum})."
@@ -3030,64 +2718,57 @@ msgstr ""
 "SOA 'minimum' -arvo ({minimum}) on suositusten välillä ({lowest_minimum}/"
 "{highest_minimum})."
 
-#. ZONE:EXPIRE_MINIMUM_VALUE_LOWER
-#, perl-brace-format
+msgctxt "ZONE:EXPIRE_MINIMUM_VALUE_LOWER"
 msgid ""
 "SOA 'expire' value ({expire}) is less than the recommended one "
 "({required_expire})."
 msgstr ""
 "SOA 'expire' -arvo ({expire}) on pienempi kuin suositus ({required_expire})."
 
-#. ZONE:REFRESH_LOWER_THAN_RETRY
-#, perl-brace-format
+msgctxt "ZONE:REFRESH_LOWER_THAN_RETRY"
 msgid ""
 "SOA 'refresh' value ({refresh}) is lower than the SOA 'retry' value "
 "({retry})."
 msgstr ""
 "SOA 'refresh' -arvo ({refresh}) on pienempi kuin SOA 'retry' -arvo ({retry})."
 
-#. ZONE:REFRESH_HIGHER_THAN_RETRY
-#, perl-brace-format
+msgctxt "ZONE:REFRESH_HIGHER_THAN_RETRY"
 msgid ""
 "SOA 'refresh' value ({refresh}) is higher than the SOA 'retry' value "
 "({retry})."
 msgstr ""
 "SOA 'refresh' -arvo ({refresh}) on suurempi kuin SOA 'retry' -arvo ({retry})."
 
-#. ZONE:MX_RECORD_IS_CNAME
+msgctxt "ZONE:MX_RECORD_IS_CNAME"
 msgid "MX record for the domain is pointing to a CNAME."
 msgstr "Verkkotunnuksen MX-tietue osoittaa CNAME-tietueeseen."
 
-#. ZONE:MX_RECORD_IS_NOT_CNAME
+msgctxt "ZONE:MX_RECORD_IS_NOT_CNAME"
 msgid "MX record for the domain is not pointing to a CNAME."
 msgstr "Verkkotunnuksen MX-tietue ei osoita CNAME-tietueeseen."
 
-#. ZONE:MULTIPLE_SOA
-#, perl-brace-format
+msgctxt "ZONE:MULTIPLE_SOA"
 msgid ""
 "Nameserver {ns} responds with multiple ({count}) SOA records on SOA queries."
 msgstr ""
 "Nimipalvelimen {ns} vastaa SOA-kyselyihin useammalla kuin yhdellä ({count}) "
 "SOA-tietueella."
 
-#. ZONE:NO_SOA_IN_RESPONSE
-#, perl-brace-format
+msgctxt "ZONE:NO_SOA_IN_RESPONSE"
 msgid ""
 "Response from nameserver {ns} on SOA queries does not contain SOA record."
 msgstr "Nimipalvelimen {ns} vastaus SOA-kyselyihin ei sisällä SOA-tietuetta."
 
-#. ZONE:MNAME_HAS_NO_ADDRESS
-#, perl-brace-format
+msgctxt "ZONE:MNAME_HAS_NO_ADDRESS"
 msgid "No IP address found for SOA 'mname' nameserver ({mname})."
 msgstr "IP-osoitetta ei löytynyt SOA 'mname' -nimipalvelimelle ({mname})."
 
-#. ZONE:ONE_SOA
+msgctxt "ZONE:ONE_SOA"
 msgid "A unique SOA record is returned by all nameservers of the zone."
 msgstr ""
 "Vyöhykkeen kaikki nimipalvelimet palauttavat ainutkertaisen SOA-tietueen."
 
-#. ZONE:EXPIRE_MINIMUM_VALUE_OK
-#, perl-brace-format
+msgctxt "ZONE:EXPIRE_MINIMUM_VALUE_OK"
 msgid ""
 "SOA 'expire' value ({expire}) is higher than the minimum recommended value "
 "({required_expire}) and not lower than the 'refresh' value ({refresh})."
@@ -3095,8 +2776,7 @@ msgstr ""
 "SOA 'expire' -arvo ({expire}) on suurempi kuin pienin suositeltu arvo "
 "({required_expire}), muttei pienempi kuin 'refresh' -arvo ({refresh})."
 
-#. ZONE:WRONG_SOA
-#, perl-brace-format
+msgctxt "ZONE:WRONG_SOA"
 msgid ""
 "Nameserver {ns} responds with a wrong owner name ({owner} instead of {name}) "
 "on SOA queries."
@@ -3104,16 +2784,14 @@ msgstr ""
 "Nimipalvelin {ns} vastaa SOA-kyselyihin väärällä omistajan nimellä ({owner}, "
 "ei {name})."
 
-#. ZONE:Z01_MNAME_HAS_LOCALHOST_ADDR
-#, perl-brace-format
+msgctxt "ZONE:Z01_MNAME_HAS_LOCALHOST_ADDR"
 msgid ""
 "SOA MNAME name server \"{nsname}\" resolves to a localhost IP address "
 "({ns_ip})."
 msgstr ""
 "SOA MNAME -nimipalvelimella \"{nsname}\" on localhost:n IP-osoitte ({ns_ip})."
 
-#. ZONE:Z01_MNAME_IS_DOT
-#, perl-brace-format
+msgctxt "ZONE:Z01_MNAME_IS_DOT"
 msgid ""
 "SOA MNAME is specified as \".\" which usually means \"no server\". Fetched "
 "from name servers \"{ns_ip_list}\"."
@@ -3121,8 +2799,7 @@ msgstr ""
 "SOA MNAME on määritetty muodossa \".\" mikä yleensä tarkoittaa \"ei "
 "palvelinta\". Haettu nimipalvelimista \"{ns_ip_list}\"."
 
-#. ZONE:Z01_MNAME_IS_LOCALHOST
-#, perl-brace-format
+msgctxt "ZONE:Z01_MNAME_IS_LOCALHOST"
 msgid ""
 "SOA MNAME name server is \"localhost\", which is invalid. Fetched from name "
 "servers \"{ns_ip_list}\"."
@@ -3130,14 +2807,12 @@ msgstr ""
 "SOA MNAME -nimipalvelin on \"localhost\", joka on virheellinen. Haettu "
 "nimipalvelimista \"{ns_ip_list}\"."
 
-#. ZONE:Z01_MNAME_IS_MASTER
-#, perl-brace-format
+msgctxt "ZONE:Z01_MNAME_IS_MASTER"
 msgid "SOA MNAME name server(s) \"{ns_list}\" appears to be master."
 msgstr ""
 "SOA MNAME nimipalvelin/nimipalvelimet \"{ns_list}\" näyttävät olevan master."
 
-#. ZONE:Z01_MNAME_MISSING_SOA_RECORD
-#, perl-brace-format
+msgctxt "ZONE:Z01_MNAME_MISSING_SOA_RECORD"
 msgid ""
 "SOA MNAME name server \"{ns}\" responds to an SOA query with no SOA records "
 "in the answer section."
@@ -3145,26 +2820,22 @@ msgstr ""
 "SOA MNAME -nimipalvelin \"{ns}\" vastaa SOA-kyselyyn ilman SOA-tietueita "
 "vastausosiossa."
 
-#. ZONE:Z01_MNAME_NO_RESPONSE
-#, perl-brace-format
+msgctxt "ZONE:Z01_MNAME_NO_RESPONSE"
 msgid "SOA MNAME name server \"{ns}\" does not respond to an SOA query."
 msgstr "SOA MNAME -nimipalvelin \"{ns}\" ei vastaa SOA kyselyyn."
 
-#. ZONE:Z01_MNAME_NOT_AUTHORITATIVE
-#, perl-brace-format
+msgctxt "ZONE:Z01_MNAME_NOT_AUTHORITATIVE"
 msgid "SOA MNAME name server \"{ns}\" is not authoritative for the zone."
 msgstr "SOA MNAME -nimipalvelin \"{ns}\" ei ole autoritatiivinen vyöhykkeelle."
 
-#. ZONE:Z01_MNAME_NOT_IN_NS_LIST
-#, perl-brace-format
+msgctxt "ZONE:Z01_MNAME_NOT_IN_NS_LIST"
 msgid ""
 "SOA MNAME name server \"{nsname}\" is not listed as NS record for the zone."
 msgstr ""
 "SOA MNAME -nimipalvelinta \"{nsname}\" ei ole listattu vyöhykkeen NS-"
 "tietueeksi."
 
-#. ZONE:Z01_MNAME_NOT_MASTER
-#, perl-brace-format
+msgctxt "ZONE:Z01_MNAME_NOT_MASTER"
 msgid ""
 "SOA MNAME name server(s) \"{ns_list}\" do not have the highest SOA SERIAL "
 "(expected \"{soaserial}\" but got \"{soaserial_list}\")"
@@ -3172,15 +2843,13 @@ msgstr ""
 "SOA MNAME -nimipalvelimilla \"{ns_list}\" ei ole korkeinta SOA sarjanumeroa "
 "(odotettu \"{soaserial}\", mutta saatiin \"{soaserial_list}\")"
 
-#. ZONE:Z01_MNAME_NOT_RESOLVE
-#, perl-brace-format
+msgctxt "ZONE:Z01_MNAME_NOT_RESOLVE"
 msgid ""
 "SOA MNAME name server \"{nsname}\" cannot be resolved into an IP address."
 msgstr ""
 "SOA MNAME -nimipalvelinta \"{nsname}\" ei voida selvittää IP-osoitteeksi."
 
-#. ZONE:Z01_MNAME_UNEXPECTED_RCODE
-#, perl-brace-format
+msgctxt "ZONE:Z01_MNAME_UNEXPECTED_RCODE"
 msgid ""
 "SOA MNAME name server \"{ns}\" gives unexpected RCODE name (\"{rcode}\") in "
 "response to an SOA query."
@@ -3188,22 +2857,21 @@ msgstr ""
 "SOA MNAME -nimipalvelin \"{ns}\" antaa odottamattoman RCODE-nimen "
 "(\"{rcode}\") vastauksena SOA-kyselyyn."
 
-#. ZONE:Z09_INCONSISTENT_MX
+msgctxt "ZONE:Z09_INCONSISTENT_MX"
 msgid "Some name servers return an MX RRset while others return none."
 msgstr ""
 "Jotkut nimipalvelimet palauttavat MX RRsetin, kun taas toiset eivät palauta "
 "yhtään."
 
-#. ZONE:Z09_INCONSISTENT_MX_DATA
+msgctxt "ZONE:Z09_INCONSISTENT_MX_DATA"
 msgid "The MX RRset data is inconsistent between the name servers."
 msgstr "MX RRset -tiedot ovat ristiriidassa nimipalvelimien välillä."
 
-#. ZONE:Z09_MISSING_MAIL_TARGET
+msgctxt "ZONE:Z09_MISSING_MAIL_TARGET"
 msgid "The child zone has no mail target (no MX)."
 msgstr "Lapsivyöhykkeellä ei ole sähköpostin kohdetta (ei MX:ää)."
 
-#. ZONE:Z09_MX_DATA
-#, perl-brace-format
+msgctxt "ZONE:Z09_MX_DATA"
 msgid ""
 "Mail targets in the MX RRset \"{mailtarget_list}\" returned from name "
 "servers \"{ns_ip_list}\"."
@@ -3211,46 +2879,41 @@ msgstr ""
 "Postikohteet MX RRsetissä \"{mailtarget_list}\" palautettiin "
 "nimipalvelimista \"{ns_ip_list}\"."
 
-#. ZONE:Z09_MX_FOUND
-#, perl-brace-format
+msgctxt "ZONE:Z09_MX_FOUND"
 msgid "MX RRset was returned by name servers \"{ns_ip_list}\"."
 msgstr "Nimipalvelimet \"{ns_ip_list}\" palauttivat MX RRsetin."
 
-#. ZONE:Z09_NON_AUTH_MX_RESPONSE
-#, perl-brace-format
+msgctxt "ZONE:Z09_NON_AUTH_MX_RESPONSE"
 msgid ""
 "Non-authoritative response on MX query from name servers \"{ns_ip_list}\"."
 msgstr ""
 "Ei autoritatiivinen vastaus MX-kyselyyn nimipalvelimista \"{ns_ip_list}\"."
 
-#. ZONE:Z09_NO_MX_FOUND
-#, perl-brace-format
+msgctxt "ZONE:Z09_NO_MX_FOUND"
 msgid "No MX RRset was returned by name servers \"{ns_ip_list}\"."
 msgstr "Nimipalvelimet \"{ns_ip_list}\" eivät palauttaneet MX RRsetiä."
 
-#. ZONE:Z09_NO_RESPONSE_MX_QUERY
-#, perl-brace-format
+msgctxt "ZONE:Z09_NO_RESPONSE_MX_QUERY"
 msgid "No response on MX query from name servers \"{ns_ip_list}\"."
 msgstr "Ei vastausta MX-kyselyyn nimipalvelimista \"{ns_ip_list}\"."
 
-#. ZONE:Z09_NULL_MX_NON_ZERO_PREF
+msgctxt "ZONE:Z09_NULL_MX_NON_ZERO_PREF"
 msgid "The zone has a Null MX with non-zero preference."
 msgstr "Vyöhykkeellä on Null MX, jossa on nollasta poikkeava prioriteetti."
 
-#. ZONE:Z09_NULL_MX_WITH_OTHER_MX
+msgctxt "ZONE:Z09_NULL_MX_WITH_OTHER_MX"
 msgid "The zone has a Null MX mixed with other MX records."
 msgstr "Zonella on Null MX sekoitettuna muiden MX-tietueiden kanssa."
 
-#. ZONE:Z09_ROOT_EMAIL_DOMAIN
+msgctxt "ZONE:Z09_ROOT_EMAIL_DOMAIN"
 msgid "Root zone with an unexpected MX RRset (non-Null MX)."
 msgstr "Juurivyöhyke odottamattomalla MX RRsetillä (ei-Null MX)."
 
-#. ZONE:Z09_TLD_EMAIL_DOMAIN
+msgctxt "ZONE:Z09_TLD_EMAIL_DOMAIN"
 msgid "The zone is a TLD and has an unexpected MX RRset (non-Null MX)."
 msgstr "Zone on TLD ja sillä on odottamaton MX RRset (ei-Null MX)."
 
-#. ZONE:Z09_UNEXPECTED_RCODE_MX
-#, perl-brace-format
+msgctxt "ZONE:Z09_UNEXPECTED_RCODE_MX"
 msgid ""
 "Unexpected RCODE value ({rcode}) on the MX query from name servers "
 "\"{ns_ip_list}\"."
@@ -3259,8 +2922,7 @@ msgstr ""
 "\"{ns_ip_list}\"."
 
 
-#. ZONE:Z12_CSYNC_FOUND
-#, perl-brace-format
+msgctxt "ZONE:Z12_CSYNC_FOUND"
 msgid ""
 "CSYNC record found at zone apex on name server {ns} with SOA serial "
 "{serial}, flags {flags}, and type bitmap {type_bitmap}."
@@ -3268,26 +2930,23 @@ msgstr ""
 "CSYNC-tietue löytyi vyöhykkeen kärjestä nimipalvelimelta {ns} SOA-sarjanumerolla "
 "{serial}, lipuilla {flags} ja tyyppibittikartalla {type_bitmap}."
 
-#. ZONE:Z12_INCONSISTENT_CSYNC
+msgctxt "ZONE:Z12_INCONSISTENT_CSYNC"
 msgid "CSYNC record content differs across authoritative name servers."
 msgstr "CSYNC-tietueen sisältö eroaa auktoritatiivisten nimipalvelimien välillä."
 
-#. ZONE:Z12_MIXED_PRESENCE
+msgctxt "ZONE:Z12_MIXED_PRESENCE"
 msgid "CSYNC record is present on some name servers but absent on others."
 msgstr "CSYNC-tietue on olemassa joillakin nimipalvelimilla, mutta puuttuu toisilta."
 
-#. ZONE:Z12_MULTIPLE_CSYNC
-#, perl-brace-format
+msgctxt "ZONE:Z12_MULTIPLE_CSYNC"
 msgid "{count} CSYNC records found at zone apex on name server {ns}."
 msgstr "Nimipalvelimelta {ns} löytyi {count} CSYNC-tietuetta vyöhykkeen kärjestä."
 
-#. ZONE:Z12_NO_CSYNC
-#, perl-brace-format
+msgctxt "ZONE:Z12_NO_CSYNC"
 msgid "No CSYNC record found at zone apex on name server {ns}."
 msgstr "CSYNC-tietuetta ei löytynyt vyöhykkeen kärjestä nimipalvelimelta {ns}."
 
 #. ZONE:Z12_SERIAL_MISMATCH
-#, perl-brace-format
 msgid ""
 "CSYNC SOA serial {csync_serial} fails RFC 7477 serial precondition against current "
 "SOA serial "
@@ -3296,59 +2955,49 @@ msgstr ""
 "CSYNC:n SOA-sarjanumero {csync_serial} ei vastaa nimipalvelimen {ns} nykyistä "
 "SOA-sarjanumeroa {soa_serial}."
 #. SYSTEM:CANNOT_CONTINUE
-#, perl-brace-format
 msgid "Not enough data about {domain} was found to be able to run tests."
 msgstr "Kohteesta {domain} ei löydetty tarpeeksi tietoa testien ajamiseksi."
 
-#. SYSTEM:DEPENDENCY_VERSION
-#, perl-brace-format
+msgctxt "SYSTEM:DEPENDENCY_VERSION"
 msgid "Using prerequisite module {name} version {version}."
 msgstr "Käytetään edellytetyn moduulin {name} versiota {version}."
 
-#. SYSTEM:GLOBAL_VERSION
-#, perl-brace-format
+msgctxt "SYSTEM:GLOBAL_VERSION"
 msgid "Using version {version} of the Gonemaster engine."
 msgstr "Käytössä on Gonemaster-moottorin versio {version}."
 
-#. SYSTEM:LOGGER_CALLBACK_ERROR
-#, perl-brace-format
+msgctxt "SYSTEM:LOGGER_CALLBACK_ERROR"
 msgid "Logger callback died with error: {exception}"
 msgstr "Tallentimen takaisinkutsu loppui virheeseen: {exception}"
 
-#. SYSTEM:LOOKUP_ERROR
-#, perl-brace-format
+msgctxt "SYSTEM:LOOKUP_ERROR"
 msgid ""
 "DNS query to {ns} for {domain}/{type}/{class} failed with error: {message}"
 msgstr ""
 "DNS-kysely kohteeseen {ns} koskien kohdetta {domain}/{type}/{class} "
 "epäonnistui ja tapahtui virhe: {message}"
 
-#. SYSTEM:MODULE_ERROR
-#, perl-brace-format
+msgctxt "SYSTEM:MODULE_ERROR"
 msgid "Fatal error in {module}: {msg}"
 msgstr "Vakava virhe kohteessa {module}: {msg}"
 
-#. SYSTEM:MODULE_VERSION
-#, perl-brace-format
+msgctxt "SYSTEM:MODULE_VERSION"
 msgid "Using module {module} version {version}."
 msgstr "Käytetään moduulin {module} versiota {version}."
 
-#. SYSTEM:MODULE_END
-#, perl-brace-format
+msgctxt "SYSTEM:MODULE_END"
 msgid "Module {module} finished running."
 msgstr "Moduulin {module} ajo päättyi."
 
-#. SYSTEM:NO_NETWORK
+msgctxt "SYSTEM:NO_NETWORK"
 msgid "Both IPv4 and IPv6 are disabled."
 msgstr "Sekä IPv4 että IPv6 ovat pois käytöstä."
 
-#. SYSTEM:UNKNOWN_METHOD
-#, perl-brace-format
+msgctxt "SYSTEM:UNKNOWN_METHOD"
 msgid "Request to run unknown method {testcase} in module {module}."
 msgstr "Pyyntö ajaa tuntematon metodi {testcase} moduulissa {module}."
 
-#. SYSTEM:UNKNOWN_MODULE
-#, perl-brace-format
+msgctxt "SYSTEM:UNKNOWN_MODULE"
 msgid ""
 "Request to run {testcase} in unknown module {module}. Known modules: "
 "{module_list}."
@@ -3356,26 +3005,23 @@ msgstr ""
 "Pyyntö ajaa {testcase} tuntemattomassa moduulissa {module}. Tunnetut "
 "moduulit: {module_list}."
 
-#. SYSTEM:FAKE_DELEGATION
+msgctxt "SYSTEM:FAKE_DELEGATION"
 msgid "Followed a fake delegation."
 msgstr "Seurattu väärää delegointia."
 
-#. SYSTEM:ADDED_FAKE_DELEGATION
-#, perl-brace-format
+msgctxt "SYSTEM:ADDED_FAKE_DELEGATION"
 msgid "Added a fake delegation for domain {domain} to name server {ns}."
 msgstr ""
 "Lisätty väärä delegointi verkkotunnukselle {domain} nimipalvelimelle {ns}."
 
-#. SYSTEM:FAKE_DELEGATION_TO_SELF
-#, perl-brace-format
+msgctxt "SYSTEM:FAKE_DELEGATION_TO_SELF"
 msgid ""
 "Name server {ns} not adding fake delegation for domain {domain} to itself."
 msgstr ""
 "Nimipalvelin {ns} ei lisää verkkotunnuksen {domain} väärää delegointia "
 "itselleen."
 
-#. SYSTEM:FAKE_DELEGATION_IN_ZONE_NO_IP
-#, perl-brace-format
+msgctxt "SYSTEM:FAKE_DELEGATION_IN_ZONE_NO_IP"
 msgid ""
 "The fake delegation of domain {domain} includes an in-zone name server "
 "{nsname} without mandatory glue (without IP address)."
@@ -3383,8 +3029,7 @@ msgstr ""
 "Verkkotunnuksen {domain} väärään delegointiin kuuluu vyöhykkeen sisäinen "
 "nimipalvelin {nsname} ilman pakollista liimaa (ilman IP-osoitetta)."
 
-#. SYSTEM:FAKE_DELEGATION_NO_IP
-#, perl-brace-format
+msgctxt "SYSTEM:FAKE_DELEGATION_NO_IP"
 msgid ""
 "The fake delegation of domain {domain} includes a name server {nsname} that "
 "cannot be resolved to any IP address."
@@ -3392,7 +3037,6 @@ msgstr ""
 "Verkkotunnuksen {domain} väärään delegointiin kuuluu nimipalvelin {nsname}, "
 "joka ei vastaa mitään IP-osoitetta."
 
-#. SYSTEM:PACKET_BIG
-#, perl-brace-format
+msgctxt "SYSTEM:PACKET_BIG"
 msgid "Big packet size ({size}) (try with \"{command}\")."
 msgstr "Suurikokoinen paketti ({size}) (yritä käyttää komentoa \"{command}\")."

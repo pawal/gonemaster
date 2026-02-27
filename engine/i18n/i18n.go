@@ -209,6 +209,20 @@ func parsePO(data string) (map[string]string, map[string]string) {
 			}
 			continue
 		}
+		if strings.HasPrefix(line, "msgctxt ") {
+			// msgctxt is the canonical key for this entry; it takes priority
+			// over any #. comment keys accumulated above.
+			if value, ok := parseQuoted(line); ok {
+				if parts := strings.SplitN(value, ":", 2); len(parts) == 2 {
+					module := strings.ToUpper(strings.TrimSpace(parts[0]))
+					msgTag := strings.ToUpper(strings.TrimSpace(parts[1]))
+					if module != "" && msgTag != "" {
+						pendingKeys = []string{module + ":" + msgTag}
+					}
+				}
+			}
+			continue
+		}
 		if strings.HasPrefix(line, "msgid ") {
 			if msgid.Len() > 0 || msgstr.Len() > 0 {
 				flush()

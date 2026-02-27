@@ -376,7 +376,6 @@
             "DURATION_OK": "DEBUG",
             "EXTRA_PROCESSING_BROKEN": "ERROR",
             "EXTRA_PROCESSING_OK": "DEBUG",
-            "HAS_NSEC3_OPTOUT": "INFO",
             "IPV4_DISABLED": "DEBUG",
             "IPV6_DISABLED": "DEBUG",
             "KEY_SIZE_OK": "INFO",

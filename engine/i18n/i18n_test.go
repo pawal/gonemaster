@@ -5,6 +5,20 @@ import (
 	"testing"
 )
 
+func TestAvailableLocalesIncludesJapanese(t *testing.T) {
+	locales := AvailableLocales()
+	found := false
+	for _, locale := range locales {
+		if locale == "ja" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected ja in available locales, got %v", locales)
+	}
+}
+
 func TestParsePOExtractsMessages(t *testing.T) {
 	data := `
 #. ZONE:TEST_TAG
@@ -50,6 +64,21 @@ func TestTranslateEnglishFallbackAndLocaleNormalization(t *testing.T) {
 	daRegion := Translate("da_DK.UTF-8", "basic", "B01_ROOT_HAS_NO_PARENT", nil)
 	if daRegion != da {
 		t.Fatalf("expected locale normalization to match base locale")
+	}
+}
+
+func TestTranslateJapaneseUsesLocaleCatalog(t *testing.T) {
+	out := Translate("ja", "zone", "Z12_NO_CSYNC", map[string]any{
+		"ns": "ns1.example",
+	})
+	if out == "" {
+		t.Fatal("expected japanese translation")
+	}
+	if strings.Contains(out, "No CSYNC record found") {
+		t.Fatalf("expected non-english translation, got %q", out)
+	}
+	if !strings.Contains(out, "ns1.example") {
+		t.Fatalf("expected interpolation to include ns argument, got %q", out)
 	}
 }
 

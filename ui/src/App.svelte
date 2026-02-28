@@ -1,6 +1,7 @@
 <script>
   import { onMount } from "svelte";
   import { fetchMetricsSnapshot, metricsWindowOptions } from "./metrics.js";
+  import { t, locale, loadCatalog } from "./i18n.js";
 
   let statusMessage = "";
   let statusTone = "";
@@ -93,8 +94,9 @@
   };
 
   $: themeIcon = theme === "light" ? "☀" : theme === "dark" ? "☾" : "⊙";
-  $: themeTitle =
-    "Color theme: " + (theme === "light" ? "Light" : theme === "dark" ? "Dark" : "System") + " — click to cycle";
+  $: themeTitle = $t("theme_cycle_title", {
+    theme: theme === "light" ? $t("theme_light") : theme === "dark" ? $t("theme_dark") : $t("theme_system")
+  });
 
   // Locale management: fetch available locales from the server, persist choice
   // in localStorage, and auto-detect from the browser language on first visit.
@@ -135,10 +137,10 @@
   let lastResultJobId = "";
   let activeTab = "single";
   const tabs = [
-    { id: "single", label: "Single Job" },
-    { id: "recent", label: "Recent Tests" },
-    { id: "batches", label: "Batch Jobs" },
-    { id: "metrics", label: "Metrics" }
+    { id: "single", labelKey: "tab_single" },
+    { id: "recent", labelKey: "tab_recent" },
+    { id: "batches", labelKey: "tab_batches" },
+    { id: "metrics", labelKey: "tab_metrics" }
   ];
 
   const clearStatus = () => {
@@ -186,29 +188,29 @@
 
   const summaryLevels = ["NOTICE", "WARNING", "ERROR", "CRITICAL"];
   const severityFilters = [
-    { id: "all", label: "All severities" },
-    { id: "warnings_plus", label: "Warnings+" },
-    { id: "errors_only", label: "Errors only" }
+    { id: "all", labelKey: "sev_all" },
+    { id: "warnings_plus", labelKey: "sev_warnings_plus" },
+    { id: "errors_only", labelKey: "sev_errors_only" }
   ];
   const jobSortOptions = [
-    { id: "started_at_desc", label: "Start time (newest)" },
-    { id: "started_at_asc", label: "Start time (oldest)" },
-    { id: "batch_id_asc", label: "Batch ID (A-Z)" },
-    { id: "batch_id_desc", label: "Batch ID (Z-A)" },
-    { id: "error_desc", label: "Errors + critical (high-low)" },
-    { id: "critical_desc", label: "Critical (high-low)" },
-    { id: "domain_asc", label: "Domain (A-Z)" },
-    { id: "domain_desc", label: "Domain (Z-A)" }
+    { id: "started_at_desc", labelKey: "sort_started_at_desc" },
+    { id: "started_at_asc", labelKey: "sort_started_at_asc" },
+    { id: "batch_id_asc", labelKey: "sort_batch_id_asc" },
+    { id: "batch_id_desc", labelKey: "sort_batch_id_desc" },
+    { id: "error_desc", labelKey: "sort_error_desc" },
+    { id: "critical_desc", labelKey: "sort_critical_desc" },
+    { id: "domain_asc", labelKey: "sort_domain_asc" },
+    { id: "domain_desc", labelKey: "sort_domain_desc" }
   ];
   const batchSortOptions = [
-    { id: "started_at_desc", label: "Start time (newest)" },
-    { id: "started_at_asc", label: "Start time (oldest)" },
-    { id: "error_desc", label: "Errors + critical (high-low)" },
-    { id: "critical_desc", label: "Critical (high-low)" },
-    { id: "domain_asc", label: "Domain (A-Z)" },
-    { id: "domain_desc", label: "Domain (Z-A)" },
-    { id: "created_at_desc", label: "Created (newest)" },
-    { id: "created_at_asc", label: "Created (oldest)" }
+    { id: "started_at_desc", labelKey: "sort_started_at_desc" },
+    { id: "started_at_asc", labelKey: "sort_started_at_asc" },
+    { id: "error_desc", labelKey: "sort_error_desc" },
+    { id: "critical_desc", labelKey: "sort_critical_desc" },
+    { id: "domain_asc", labelKey: "sort_domain_asc" },
+    { id: "domain_desc", labelKey: "sort_domain_desc" },
+    { id: "created_at_desc", labelKey: "sort_created_at_desc" },
+    { id: "created_at_asc", labelKey: "sort_created_at_asc" }
   ];
   const batchStatuses = ["", "queued", "running", "succeeded", "failed", "canceled", "expired", "paused"];
   const listPageSizes = [10, 20, 50, 100];
@@ -581,19 +583,17 @@
     return displayEntries.map(([status, count]) => `${status} ${formatInteger(count)}`).join(" · ");
   };
   const metricsCardHelp = {
-    queue_depth: "Current number of jobs waiting in the queue.",
-    in_flight_jobs: "Jobs currently being processed by workers.",
-    dns_queries_ipv4_total: "Total DNS queries sent over IPv4 across all processed jobs.",
-    dns_queries_ipv6_total: "Total DNS queries sent over IPv6 across all processed jobs.",
-    success_rate: "Share of completed jobs that succeeded.",
-    failed_rate: "Share of completed jobs that failed.",
-    api_p90: "Worst route-level 90th percentile API latency.",
-    avg_job_duration: "Average runtime of completed jobs.",
-    completed_total: "Total number of jobs that reached a terminal state.",
-    failed_total: "Total number of completed jobs with failed status."
+    queue_depth: "help_queue_depth",
+    in_flight_jobs: "help_in_flight_jobs",
+    dns_queries_ipv4_total: "help_ipv4_queries",
+    dns_queries_ipv6_total: "help_ipv6_queries",
+    success_rate: "help_success_rate",
+    failed_rate: "help_failed_rate",
+    api_p90: "help_api_p90",
+    avg_job_duration: "help_avg_duration",
+    completed_total: "help_completed",
+    failed_total: "help_failed"
   };
-  const severityCardHelp = (level) =>
-    `Total ${String(level || "").toUpperCase()} log entries aggregated across completed jobs.`;
   const lastLoadedLabel = (value) => {
     if (!value) return "never";
     const parsed = new Date(value);
@@ -755,13 +755,13 @@
       const row = trimUndelegatedNameserverRow(undelegatedNameservers[i]);
       if (!row.ns && !row.ip) continue;
       if (!row.ns) {
-        return { error: `Undelegated nameserver row ${i + 1}: NS is required when IP is provided.` };
+        return { error: $t("error_ns_row_ns_required", { row: i + 1 }) };
       }
       if (/\s/.test(row.ns)) {
-        return { error: `Undelegated nameserver row ${i + 1}: NS must not contain whitespace.` };
+        return { error: $t("error_ns_row_ns_whitespace", { row: i + 1 }) };
       }
       if (row.ip && !isIPAddress(row.ip)) {
-        return { error: `Undelegated nameserver row ${i + 1}: IP must be a valid IPv4 or IPv6 address.` };
+        return { error: $t("error_ns_row_ip_invalid", { row: i + 1 }) };
       }
       const payloadRow = { ns: row.ns };
       if (row.ip) payloadRow.ip = row.ip;
@@ -775,21 +775,19 @@
       if (!hasAny) continue;
       const hasAll = row.keytag && row.algorithm && row.digtype && row.digest;
       if (!hasAll) {
-        return {
-          error: `Undelegated DS row ${i + 1}: keytag, algorithm, digest type, and digest are all required.`
-        };
+        return { error: $t("error_ds_row_all_required", { row: i + 1 }) };
       }
       if (!isUIntInRange(row.keytag, 0, 65535)) {
-        return { error: `Undelegated DS row ${i + 1}: keytag must be in range 0-65535.` };
+        return { error: $t("error_ds_row_keytag_range", { row: i + 1, min: 0, max: 65535 }) };
       }
       if (!isUIntInRange(row.algorithm, 0, 255)) {
-        return { error: `Undelegated DS row ${i + 1}: algorithm must be in range 0-255.` };
+        return { error: $t("error_ds_row_algorithm_range", { row: i + 1, min: 0, max: 255 }) };
       }
       if (!isUIntInRange(row.digtype, 0, 255)) {
-        return { error: `Undelegated DS row ${i + 1}: digest type must be in range 0-255.` };
+        return { error: $t("error_ds_row_digtype_range", { row: i + 1, min: 0, max: 255 }) };
       }
       if (!isHexDigest(row.digest)) {
-        return { error: `Undelegated DS row ${i + 1}: digest must be hex encoded.` };
+        return { error: $t("error_ds_row_digest_hex", { row: i + 1 }) };
       }
       dsInfo.push({
         keytag: Number(row.keytag),
@@ -928,7 +926,7 @@
         autoRefreshRecent = false;
       }
     } catch (error) {
-      setStatus(`Failed to load jobs: ${error.message}`, "warn");
+      setStatus($t("error_load_jobs", { error: error.message }), "warn");
     } finally {
       jobsLoading = false;
     }
@@ -954,7 +952,7 @@
   const submitSingle = async () => {
     const normalizedDomain = normalizeDomainInput(singleDomain);
     if (!normalizedDomain) {
-      setStatus("Domain is required.", "warn");
+      setStatus($t("error_domain_required"), "warn");
       return;
     }
     const undelegatedPayload = buildUndelegatedPayload();
@@ -1005,12 +1003,12 @@
         jobInspectorHighlight = false;
         jobInspectorHighlightTimer = null;
       }, 6000);
-      setStatus(`Job ${job.id} created.`, "ok");
+      setStatus($t("job_created", { id: job.id }), "ok");
       recentCursor = 0;
       await loadJobs({ resetCursor: true });
       await loadJob(job.id);
     } catch (error) {
-      setStatus(`Failed to create job: ${error.message}`, "warn");
+      setStatus($t("error_create_job", { error: error.message }), "warn");
     } finally {
       singleSubmitting = false;
     }
@@ -1022,7 +1020,7 @@
       .map((entry) => normalizeDomainInput(entry))
       .filter(Boolean);
     if (!domains.length) {
-      setStatus("Provide at least one domain for the batch.", "warn");
+      setStatus($t("error_batch_empty"), "warn");
       return;
     }
     batchSubmitting = true;
@@ -1036,13 +1034,13 @@
       });
       createdBatchId = response.batch_id;
       selectedBatchId = response.batch_id;
-      setStatus(`Batch ${response.batch_id} accepted.`, "ok");
+      setStatus($t("batch_accepted", { id: response.batch_id }), "ok");
       recentCursor = 0;
       await loadJobs({ resetCursor: true });
       await loadRecentBatchOptions();
       await loadBatch(response.batch_id, { resetCursor: true });
     } catch (error) {
-      setStatus(`Failed to create batch: ${error.message}`, "warn");
+      setStatus($t("error_create_batch", { error: error.message }), "warn");
     } finally {
       batchSubmitting = false;
     }
@@ -1062,7 +1060,7 @@
         await loadJobResult(jobId);
       }
     } catch (error) {
-      setStatus(`Failed to load job: ${error.message}`, "warn");
+      setStatus($t("error_load_job", { error: error.message }), "warn");
       selectedJob = null;
       selectedJobResult = null;
     } finally {
@@ -1078,7 +1076,7 @@
       const locale = resultLocale ? `?locale=${encodeURIComponent(resultLocale)}` : "";
       selectedJobResult = await apiFetch(`/jobs/${jobId}/result${locale}`);
     } catch (error) {
-      setStatus(`Failed to load job result: ${error.message}`, "warn");
+      setStatus($t("error_load_result", { error: error.message }), "warn");
     }
   };
 
@@ -1149,7 +1147,7 @@
       recentBatchOptions = collected;
       syncSelectedRecentBatch();
     } catch (error) {
-      setStatus(`Failed to load recent batches: ${error.message}`, "warn");
+      setStatus($t("error_load_batches", { error: error.message }), "warn");
     } finally {
       recentBatchLoading = false;
     }
@@ -1170,7 +1168,7 @@
         autoRefreshBatch = false;
       }
     } catch (error) {
-      setStatus(`Failed to load batch: ${error.message}`, "warn");
+      setStatus($t("error_load_batch", { error: error.message }), "warn");
       selectedBatch = null;
     } finally {
       batchLoading = false;
@@ -1214,7 +1212,7 @@
     } catch (error) {
       metricsError = error.message || "unknown error";
       if (!metricsSnapshot) {
-        setStatus(`Failed to load metrics: ${metricsError}`, "warn");
+        setStatus($t("metrics_load_error", { error: metricsError }), "warn");
       }
     } finally {
       if (!silent) {
@@ -1233,6 +1231,8 @@
           resultLocale = "en";
           try { localStorage.setItem(localeKey, resultLocale); } catch (_) {}
         }
+        locale.set(resultLocale);
+        loadCatalog(resultLocale);
       }
     } catch (_) {
       // Keep availableLocales as ["en"] default; locale select stays hidden.
@@ -1241,6 +1241,8 @@
 
   const onLocaleChange = () => {
     try { localStorage.setItem(localeKey, resultLocale); } catch (_) {}
+    locale.set(resultLocale);
+    loadCatalog(resultLocale);
     if (selectedJobResult) {
       loadJobResult(selectedJobId);
     }
@@ -1373,6 +1375,8 @@
         resultLocale = browserLang; // validated against available list after loadLocales()
       }
     }
+    locale.set(resultLocale);
+    loadCatalog(resultLocale);
     loadLocales();
 
     updateTabFromHash();
@@ -1418,10 +1422,8 @@
 <main>
   <header class="reveal" style="--d: 0.05s">
     <div class="header-text">
-      <h1>Gonemaster</h1>
-      <p class="subtitle">
-        Launch single or batch domain jobs, watch progress, and inspect results from the embedded server UI.
-      </p>
+      <h1>{$t("app_title")}</h1>
+      <p class="subtitle">{$t("app_subtitle")}</p>
     </div>
     <div class="header-controls">
       {#if availableLocales.length > 1}
@@ -1429,8 +1431,8 @@
           bind:value={resultLocale}
           on:change={onLocaleChange}
           class="locale-select"
-          title="Result message language"
-          aria-label="Result language"
+          title={$t("locale_select_title")}
+          aria-label={$t("locale_select_aria")}
         >
           {#each availableLocales as code}
             <option value={code}>{localeLabel(code)}</option>
@@ -1443,7 +1445,7 @@
     </div>
   </header>
 
-  <div class="tabs" role="tablist" aria-label="Job views">
+  <div class="tabs" role="tablist" aria-label={$t("tabs_aria_label")}>
     {#each tabs as tab}
       <button
         class={`tab ${activeTab === tab.id ? "active" : ""}`}
@@ -1454,7 +1456,7 @@
         aria-controls={`panel-${tab.id}`}
         on:click={() => setTab(tab.id)}
       >
-        {tab.label}
+        {$t(tab.labelKey)}
       </button>
     {/each}
   </div>
@@ -1462,9 +1464,9 @@
   {#if activeTab === "single"}
     <div class="grid" id="panel-single" role="tabpanel" aria-labelledby="tab-single" style="margin-top: 22px;">
       <div class="card reveal" style="--d: 0.18s">
-        <h2>Single Job</h2>
+        <h2>{$t("single_job_heading")}</h2>
         <div class="stack">
-          <label for="single-domain">Domain</label>
+          <label for="single-domain">{$t("single_domain_label")}</label>
           <input
             id="single-domain"
             type="text"
@@ -1479,120 +1481,120 @@
           />
         </div>
         <details class="advanced-options">
-          <summary>Advanced profile</summary>
+          <summary>{$t("advanced_profile_summary")}</summary>
           <div class="stack advanced-stack">
-            <label for="single-ip-mode">IP transport</label>
+            <label for="single-ip-mode">{$t("ip_transport_label")}</label>
             <select id="single-ip-mode" bind:value={singleIPMode}>
-              <option value="default">Profile default (IPv4 + IPv6)</option>
-              <option value="disable_ipv4">Disable IPv4 (IPv6 only)</option>
-              <option value="disable_ipv6">Disable IPv6 (IPv4 only)</option>
+              <option value="default">{$t("ip_mode_default")}</option>
+              <option value="disable_ipv4">{$t("ip_mode_disable_ipv4")}</option>
+              <option value="disable_ipv6">{$t("ip_mode_disable_ipv6")}</option>
             </select>
-            <div class="small">Choose at most one protocol to disable.</div>
+            <div class="small">{$t("ip_mode_hint")}</div>
           </div>
         </details>
         <details class="advanced-options">
-          <summary>Undelegated / Pre-delegation</summary>
+          <summary>{$t("undelegated_summary")}</summary>
           <div class="stack advanced-stack">
-            <div class="field-label">Nameservers (NS + optional IP)</div>
+            <div class="field-label">{$t("ns_field_label")}</div>
             {#if undelegatedNameservers.length === 0}
-              <div class="small">No undelegated nameservers configured.</div>
+              <div class="small">{$t("ns_none")}</div>
             {:else}
               <div class="undelegated-list">
                 {#each undelegatedNameservers as row, index (row.id)}
                   <div class="undelegated-row">
                     <input
                       type="text"
-                      aria-label={`Undelegated NS ${index + 1}`}
+                      aria-label={$t("ns_aria_label", { n: index + 1 })}
                       placeholder="ns1.example.com"
                       bind:value={row.ns}
                     />
                     <input
                       type="text"
-                      aria-label={`Undelegated NS IP ${index + 1}`}
+                      aria-label={$t("ns_ip_aria_label", { n: index + 1 })}
                       placeholder="192.0.2.10 or 2001:db8::10"
                       bind:value={row.ip}
                     />
                     <button class="ghost mini-button" type="button" on:click={() => removeUndelegatedNameserverRow(row.id)}>
-                      Remove
+                      {$t("remove")}
                     </button>
                   </div>
                 {/each}
               </div>
             {/if}
             <button class="ghost" type="button" on:click={addUndelegatedNameserverRow}>
-              Add nameserver
+              {$t("add_nameserver")}
             </button>
 
-            <div class="field-label">DS records</div>
+            <div class="field-label">{$t("ds_field_label")}</div>
             {#if undelegatedDSInfo.length === 0}
-              <div class="small">No undelegated DS records configured.</div>
+              <div class="small">{$t("ds_none")}</div>
             {:else}
               <div class="undelegated-list">
                 {#each undelegatedDSInfo as row, index (row.id)}
                   <div class="undelegated-ds-row">
-                    <input type="text" aria-label={`Undelegated DS keytag ${index + 1}`} placeholder="12345" bind:value={row.keytag} />
-                    <input type="text" aria-label={`Undelegated DS algorithm ${index + 1}`} placeholder="13" bind:value={row.algorithm} />
-                    <input type="text" aria-label={`Undelegated DS digest type ${index + 1}`} placeholder="2" bind:value={row.digtype} />
+                    <input type="text" aria-label={$t("ds_keytag_aria_label", { n: index + 1 })} placeholder="12345" bind:value={row.keytag} />
+                    <input type="text" aria-label={$t("ds_algorithm_aria_label", { n: index + 1 })} placeholder="13" bind:value={row.algorithm} />
+                    <input type="text" aria-label={$t("ds_digtype_aria_label", { n: index + 1 })} placeholder="2" bind:value={row.digtype} />
                     <input
                       type="text"
-                      aria-label={`Undelegated DS digest ${index + 1}`}
+                      aria-label={$t("ds_digest_aria_label", { n: index + 1 })}
                       placeholder="ABCD..."
                       bind:value={row.digest}
                     />
                     <button class="ghost mini-button" type="button" on:click={() => removeUndelegatedDSRow(row.id)}>
-                      Remove
+                      {$t("remove")}
                     </button>
                   </div>
                 {/each}
               </div>
             {/if}
             <button class="ghost" type="button" on:click={addUndelegatedDSRow}>
-              Add DS record
+              {$t("add_ds_record")}
             </button>
-            <div class="small">Validation: NS is required for nameserver rows; DS values must be numeric + hex digest.</div>
+            <div class="small">{$t("undelegated_validation_hint")}</div>
           </div>
         </details>
         <button on:click={submitSingle} disabled={singleSubmitting}>
-          {singleSubmitting ? "Submitting..." : "Run Single Job"}
+          {singleSubmitting ? $t("submitting") : $t("run_single_job")}
         </button>
         {#if createdJobId}
-          <div class="small">Created job: <span class="mono">{createdJobId}</span></div>
+          <div class="small">{$t("created_job_prefix")} <span class="mono">{createdJobId}</span></div>
         {/if}
       </div>
 
       <div class="card reveal" style="--d: 0.26s" class:highlight={jobInspectorHighlight}>
-        <h2>Job Inspector</h2>
+        <h2>{$t("job_inspector_heading")}</h2>
         <div class="stack">
-          <label for="job-id">Job ID</label>
+          <label for="job-id">{$t("job_id_label")}</label>
           <input id="job-id" type="text" placeholder="job_123" bind:value={selectedJobId} on:change={() => loadJob()} />
         </div>
         <div class="row">
-          <button on:click={() => loadJob()} disabled={jobLoading}>{jobLoading ? "Loading..." : "Refresh"}</button>
+          <button on:click={() => loadJob()} disabled={jobLoading}>{jobLoading ? $t("loading") : $t("refresh")}</button>
           <button class="ghost" type="button" on:click={() => (autoRefreshJob = !autoRefreshJob)}>
-            {autoRefreshJob ? "Auto refresh: on" : "Auto refresh: off"}
+            {autoRefreshJob ? $t("auto_refresh_on") : $t("auto_refresh_off")}
           </button>
         </div>
         {#if selectedJob}
           <div class="kv">
-            <span>Status</span>
+            <span>{$t("status_label")}</span>
             <strong>{selectedJob.status} · {formatJobTotalRuntime(selectedJob)}</strong>
-            <span>Progress</span>
+            <span>{$t("progress_label")}</span>
             <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={progressPercent(selectedJob)}>
               <div class="progress-bar" style={`width: ${progressPercent(selectedJob)}%`}></div>
               <span class="progress-value">{progressPercent(selectedJob)}%</span>
             </div>
-            <span>Domain</span>
+            <span>{$t("domain_label")}</span>
             <strong class="mono">{selectedJob.domain}</strong>
-            <span>Created</span>
+            <span>{$t("created_label")}</span>
             <strong>{formatTimestampLocal(selectedJob.created_at)}</strong>
           </div>
           {#if selectedJob.error}
-            <div class="notice">Error: {selectedJob.error}</div>
+            <div class="notice">{$t("error_prefix")} {selectedJob.error}</div>
           {/if}
         {/if}
         {#if selectedJobResult}
           <div class="stack">
-            <div class="field-label">Result summary</div>
+            <div class="field-label">{$t("result_summary_label")}</div>
             {#if summaryRows(selectedJobResult.summary).length}
               <div class="summary-grid">
                 {#each summaryRows(selectedJobResult.summary) as row (row.level)}
@@ -1603,13 +1605,13 @@
                 {/each}
               </div>
             {:else}
-              <div class="summary-empty">No NOTICE/WARNING/ERROR entries.</div>
+              <div class="summary-empty">{$t("no_result_entries")}</div>
             {/if}
-            <div class="field-label">Result details</div>
+            <div class="field-label">{$t("result_details_label")}</div>
             {#if moduleGroups.length === 0}
-              <div class="summary-empty">No raw entries available.</div>
+              <div class="summary-empty">{$t("no_raw_entries")}</div>
             {:else}
-              <div class="small">Grouped by module. Click a module to expand.</div>
+              <div class="small">{$t("module_expand_hint")}</div>
               <div class="module-list">
                 {#each moduleGroups as group (group.key)}
                   <div class="module-card">
@@ -1621,7 +1623,7 @@
                       on:click={() => toggleModule(group.key)}
                     >
                       <div class="module-title">{group.name}</div>
-                      <div class="module-meta">{group.entries.length} entries</div>
+                      <div class="module-meta">{$t("entries_count", { count: group.entries.length })}</div>
                       <div class="module-badges">
                         {#each moduleLevels as level}
                           {#if group.counts[level]}
@@ -1634,9 +1636,9 @@
                     {#if moduleOpen[group.key]}
                       <div class="module-body" id={moduleId(group.key)}>
                         <div class="result-header">
-                          <span>Seconds</span>
-                          <span>Level</span>
-                          <span>Message</span>
+                          <span>{$t("result_col_seconds")}</span>
+                          <span>{$t("result_col_level")}</span>
+                          <span>{$t("result_col_message")}</span>
                         </div>
                         {#each group.entries as entry}
                           {@const level = normalizeLevel(entry.level)}
@@ -1660,31 +1662,31 @@
         {/if}
         {#if selectedJob && !selectedJobResult && isResultReadyStatus(selectedJob.status)}
           <button class="ghost" type="button" on:click={() => loadJobResult()}>
-            Load result payload
+            {$t("load_result")}
           </button>
         {/if}
       </div>
     </div>
   {:else if activeTab === "recent"}
     <div class="card reveal" id="panel-recent" role="tabpanel" aria-labelledby="tab-recent" style="--d: 0.34s; margin-top: 22px;">
-      <h2>Recent Tests</h2>
+      <h2>{$t("recent_tests_heading")}</h2>
       <div class="row">
         <button class="ghost" type="button" on:click={loadJobs} disabled={jobsLoading}>
-          {jobsLoading ? "Refreshing..." : "Refresh list"}
+          {jobsLoading ? $t("refreshing") : $t("refresh_list")}
         </button>
         <button class="ghost" type="button" on:click={() => (autoRefreshRecent = !autoRefreshRecent)}>
-          {autoRefreshRecent ? "Auto refresh: on" : "Auto refresh: off"}
+          {autoRefreshRecent ? $t("auto_refresh_on") : $t("auto_refresh_off")}
         </button>
         <div class="sort-control">
-          <label for="recent-sort">Sort</label>
+          <label for="recent-sort">{$t("sort_label")}</label>
           <select id="recent-sort" bind:value={jobSort} on:change={applyRecentFilters}>
             {#each jobSortOptions as option}
-              <option value={option.id}>{option.label}</option>
+              <option value={option.id}>{$t(option.labelKey)}</option>
             {/each}
           </select>
         </div>
         <div class="sort-control">
-          <label for="recent-page-size">Page size</label>
+          <label for="recent-page-size">{$t("page_size_label")}</label>
           <select id="recent-page-size" bind:value={recentPageSize} on:change={applyRecentFilters}>
             {#each recentPageSizes as pageSize}
               <option value={pageSize}>{pageSize}</option>
@@ -1692,7 +1694,7 @@
           </select>
         </div>
         <div class="sort-control grow">
-          <label for="recent-domain-filter">Domain contains</label>
+          <label for="recent-domain-filter">{$t("domain_contains_label")}</label>
           <input
             id="recent-domain-filter"
             type="text"
@@ -1707,7 +1709,7 @@
           />
         </div>
         <div class="sort-control grow">
-          <label for="recent-batch-filter">Batch ID filter</label>
+          <label for="recent-batch-filter">{$t("batch_id_filter_label")}</label>
           <input
             id="recent-batch-filter"
             type="text"
@@ -1722,11 +1724,11 @@
           />
         </div>
         <div class="row">
-          <button class="ghost" type="button" on:click={applyRecentFilters} disabled={jobsLoading}>Apply filters</button>
-          <button class="ghost" type="button" on:click={clearRecentFilters} disabled={jobsLoading}>Clear</button>
+          <button class="ghost" type="button" on:click={applyRecentFilters} disabled={jobsLoading}>{$t("apply_filters")}</button>
+          <button class="ghost" type="button" on:click={clearRecentFilters} disabled={jobsLoading}>{$t("clear")}</button>
         </div>
       </div>
-      <div class="severity-filter-bar" role="group" aria-label="Severity filters">
+      <div class="severity-filter-bar" role="group" aria-label={$t("severity_filters_aria")}>
         {#each severityFilters as filter}
           <button
             type="button"
@@ -1736,7 +1738,7 @@
               await applyRecentFilters();
             }}
           >
-            {filter.label}
+            {$t(filter.labelKey)}
           </button>
         {/each}
       </div>
@@ -1747,7 +1749,7 @@
           on:click={() => goToRecentCursor(recentPrevCursor)}
           disabled={!recentPrevCursor || jobsLoading}
         >
-          Previous
+          {$t("previous")}
         </button>
         <button
           class="ghost"
@@ -1755,17 +1757,17 @@
           on:click={() => goToRecentCursor(recentNextCursor)}
           disabled={!recentNextCursor || jobsLoading}
         >
-          Next
+          {$t("next")}
         </button>
         <span class="small">
-          Showing {jobs.length} of {recentTotal} matching jobs (offset {recentOffset || 0})
+          {$t("showing_jobs", { shown: jobs.length, total: recentTotal, offset: recentOffset || 0 })}
         </span>
       </div>
       <div class="list">
         {#if jobs.length === 0}
-          <div class="small">No jobs yet. Run a single or batch job from the tabs above.</div>
+          <div class="small">{$t("no_jobs")}</div>
         {:else if filteredJobs.length === 0}
-          <div class="small">No jobs match the selected severity filter.</div>
+          <div class="small">{$t("no_jobs_severity")}</div>
         {:else}
           {#each filteredJobs as job (job.id)}
             <div class="list-item">
@@ -1773,7 +1775,7 @@
                 <div class="mono">{job.id}</div>
                 <div class="small">{job.domain} - {job.status}</div>
                 {#if job.batch_id}
-                  <div class="small mono">Batch: {job.batch_id}</div>
+                  <div class="small mono">{$t("batch_prefix")} {job.batch_id}</div>
                 {/if}
                 <div class="job-severity-tags">
                   {#if jobSeverityRows(job).length}
@@ -1781,7 +1783,7 @@
                       <span class={`level-pill severity-${entry.level.toLowerCase()}`}>{entry.level} {entry.count}</span>
                     {/each}
                   {:else}
-                    <span class="small">No severity entries.</span>
+                    <span class="small">{$t("no_severity_entries")}</span>
                   {/if}
                 </div>
                 <div class="progress compact list-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={progressPercent(job)}>
@@ -1793,7 +1795,7 @@
                 selectedJobId = job.id;
                 loadJob(job.id);
                 setTab("single");
-              }}>Inspect</button>
+              }}>{$t("inspect")}</button>
             </div>
           {/each}
         {/if}
@@ -1802,9 +1804,9 @@
   {:else if activeTab === "batches"}
     <div class="grid" id="panel-batches" role="tabpanel" aria-labelledby="tab-batches" style="margin-top: 22px;">
       <div class="card reveal" style="--d: 0.22s">
-        <h2>Batch Jobs</h2>
+        <h2>{$t("batch_jobs_heading")}</h2>
         <div class="stack">
-          <label for="batch-domains">Domains (one per line)</label>
+          <label for="batch-domains">{$t("domains_label")}</label>
           <textarea
             id="batch-domains"
             placeholder={`example.com
@@ -1813,17 +1815,17 @@ example.org`}
           ></textarea>
         </div>
         <button class="secondary" on:click={submitBatch} disabled={batchSubmitting}>
-          {batchSubmitting ? "Submitting..." : "Run Batch"}
+          {batchSubmitting ? $t("submitting") : $t("run_batch")}
         </button>
         {#if createdBatchId}
-          <div class="small">Created batch: <span class="mono">{createdBatchId}</span></div>
+          <div class="small">{$t("created_batch_prefix")} <span class="mono">{createdBatchId}</span></div>
         {/if}
       </div>
 
       <div class="card reveal" style="--d: 0.3s">
-        <h2>Batch Inspector</h2>
+        <h2>{$t("batch_inspector_heading")}</h2>
         <div class="stack">
-          <label for="batch-recent">Recent batches</label>
+          <label for="batch-recent">{$t("recent_batches_label")}</label>
           <select
             id="batch-recent"
             bind:value={selectedRecentBatch}
@@ -1835,13 +1837,13 @@ example.org`}
               await loadBatch(nextBatchID, { resetCursor: true });
             }}
           >
-            <option value="">{recentBatchLoading ? "Loading latest batches..." : "Select one of the latest 20 batches"}</option>
+            <option value="">{recentBatchLoading ? $t("loading_batches") : $t("select_recent_batch")}</option>
             {#each recentBatchOptions as option}
               <option value={option.id}>{formatRecentBatchOption(option)}</option>
             {/each}
           </select>
-          <div class="small">Latest 20 unique batch IDs, newest first.</div>
-          <label for="batch-id">Batch ID</label>
+          <div class="small">{$t("latest_batches_hint")}</div>
+          <label for="batch-id">{$t("batch_id_label")}</label>
           <input
             id="batch-id"
             type="text"
@@ -1858,23 +1860,23 @@ example.org`}
             }}
             disabled={batchLoading}
           >
-            {batchLoading ? "Loading..." : "Refresh"}
+            {batchLoading ? $t("loading") : $t("refresh")}
           </button>
           <button class="ghost" type="button" on:click={() => (autoRefreshBatch = !autoRefreshBatch)}>
-            {autoRefreshBatch ? "Auto refresh: on" : "Auto refresh: off"}
+            {autoRefreshBatch ? $t("auto_refresh_on") : $t("auto_refresh_off")}
           </button>
         </div>
         <div class="batch-controls">
           <div class="sort-control">
-            <label for="batch-sort">Sort</label>
+            <label for="batch-sort">{$t("sort_label")}</label>
             <select id="batch-sort" bind:value={batchSort} on:change={applyBatchFilters}>
               {#each batchSortOptions as option}
-                <option value={option.id}>{option.label}</option>
+                <option value={option.id}>{$t(option.labelKey)}</option>
               {/each}
             </select>
           </div>
           <div class="sort-control">
-            <label for="batch-page-size">Page size</label>
+            <label for="batch-page-size">{$t("page_size_label")}</label>
             <select id="batch-page-size" bind:value={batchPageSize} on:change={applyBatchFilters}>
               {#each batchPageSizes as pageSize}
                 <option value={pageSize}>{pageSize}</option>
@@ -1882,15 +1884,15 @@ example.org`}
             </select>
           </div>
           <div class="sort-control">
-            <label for="batch-status">Status</label>
+            <label for="batch-status">{$t("status_label")}</label>
             <select id="batch-status" bind:value={batchStatusFilter} on:change={applyBatchFilters}>
               {#each batchStatuses as status}
-                <option value={status}>{status || "all"}</option>
+                <option value={status}>{status || $t("batch_status_all")}</option>
               {/each}
             </select>
           </div>
           <div class="sort-control grow">
-            <label for="batch-domain-filter">Domain contains</label>
+            <label for="batch-domain-filter">{$t("domain_contains_label")}</label>
             <input
               id="batch-domain-filter"
               type="text"
@@ -1905,23 +1907,23 @@ example.org`}
             />
           </div>
           <div class="row">
-            <button class="ghost" type="button" on:click={applyBatchFilters} disabled={batchLoading}>Apply filters</button>
-            <button class="ghost" type="button" on:click={clearBatchFilters} disabled={batchLoading}>Clear</button>
+            <button class="ghost" type="button" on:click={applyBatchFilters} disabled={batchLoading}>{$t("apply_filters")}</button>
+            <button class="ghost" type="button" on:click={clearBatchFilters} disabled={batchLoading}>{$t("clear")}</button>
           </div>
         </div>
         {#if selectedBatch}
           <div class="kv">
-            <span>Total</span>
+            <span>{$t("total_label")}</span>
             <strong>{selectedBatch.total}</strong>
-            <span>Created</span>
+            <span>{$t("created_label")}</span>
             <strong>{formatTimestampLocal(selectedBatch.created_at)}</strong>
-            <span>Total runtime</span>
+            <span>{$t("total_runtime_label")}</span>
             <strong>{formatBatchTotalRuntime(selectedBatch)}</strong>
-            <span>Status counts</span>
+            <span>{$t("status_counts_label")}</span>
             <strong>{formatBatchStatusCounts(selectedBatch.status_counts)}</strong>
           </div>
           <div class="stack">
-            <div class="field-label">Jobs</div>
+            <div class="field-label">{$t("jobs_label")}</div>
             <div class="row batch-pagination">
               <button
                 class="ghost"
@@ -1929,7 +1931,7 @@ example.org`}
                 on:click={() => goToBatchCursor(selectedBatch.prev_cursor)}
                 disabled={!selectedBatch.prev_cursor || batchLoading}
               >
-                Previous
+                {$t("previous")}
               </button>
               <button
                 class="ghost"
@@ -1937,15 +1939,15 @@ example.org`}
                 on:click={() => goToBatchCursor(selectedBatch.next_cursor)}
                 disabled={!selectedBatch.next_cursor || batchLoading}
               >
-                Next
+                {$t("next")}
               </button>
               <span class="small">
-                Showing {selectedBatch.items.length} of {selectedBatch.total} matching jobs (offset {selectedBatch.offset || 0})
+                {$t("showing_jobs", { shown: selectedBatch.items.length, total: selectedBatch.total, offset: selectedBatch.offset || 0 })}
               </span>
             </div>
             <div class="list">
               {#if selectedBatch.items.length === 0}
-                <div class="small">No batch jobs match the current filters.</div>
+                <div class="small">{$t("no_batch_jobs")}</div>
               {:else}
                 {#each selectedBatch.items as item (item.id)}
                   <div class="list-item">
@@ -1961,7 +1963,7 @@ example.org`}
                       selectedJobId = item.id;
                       loadJob(item.id);
                       setTab("single");
-                    }}>Inspect</button>
+                    }}>{$t("inspect")}</button>
                   </div>
                 {/each}
               {/if}
@@ -1972,24 +1974,24 @@ example.org`}
     </div>
   {:else if activeTab === "metrics"}
     <div class="card reveal" id="panel-metrics" role="tabpanel" aria-labelledby="tab-metrics" style="--d: 0.38s; margin-top: 22px;">
-      <h2>Metrics</h2>
+      <h2>{$t("metrics_heading")}</h2>
       <div class="row">
         <button class="ghost" type="button" on:click={() => loadMetrics()} disabled={metricsLoading}>
-          {metricsLoading ? "Refreshing..." : "Refresh metrics"}
+          {metricsLoading ? $t("refreshing") : $t("refresh_metrics")}
         </button>
         <button class="ghost" type="button" on:click={() => (autoRefreshMetrics = !autoRefreshMetrics)}>
-          {autoRefreshMetrics ? "Auto refresh: on" : "Auto refresh: off"}
+          {autoRefreshMetrics ? $t("auto_refresh_on") : $t("auto_refresh_off")}
         </button>
         <div class="sort-control">
-          <label for="metrics-window">Trend window</label>
+          <label for="metrics-window">{$t("trend_window_label")}</label>
           <select id="metrics-window" bind:value={metricsWindow} on:change={() => loadMetrics()}>
             {#each metricsWindowOptions as option}
-              <option value={option.id}>{option.label}</option>
+              <option value={option.id}>{$t(option.labelKey)}</option>
             {/each}
           </select>
         </div>
         <div class="sort-control">
-          <label for="metrics-domain-limit">Top domains</label>
+          <label for="metrics-domain-limit">{$t("top_domains_label")}</label>
           <select id="metrics-domain-limit" bind:value={metricsDomainLimit} on:change={() => loadMetrics()}>
             {#each metricsLimitOptions as value}
               <option value={value}>{value}</option>
@@ -1997,7 +1999,7 @@ example.org`}
           </select>
         </div>
         <div class="sort-control">
-          <label for="metrics-batch-limit">Top batches</label>
+          <label for="metrics-batch-limit">{$t("top_batches_label")}</label>
           <select id="metrics-batch-limit" bind:value={metricsBatchLimit} on:change={() => loadMetrics()}>
             {#each metricsLimitOptions as value}
               <option value={value}>{value}</option>
@@ -2006,14 +2008,14 @@ example.org`}
         </div>
       </div>
       <div class="small">
-        Last loaded: {lastLoadedLabel(metricsLoadedAt)} | Server uptime: {formatUptime(metricsSnapshot?.health?.uptime_seconds)} | Server version: {metricsSnapshot?.server_version || "unknown"}
+        {$t("metrics_status_line", { time: lastLoadedLabel(metricsLoadedAt), uptime: formatUptime(metricsSnapshot?.health?.uptime_seconds), version: metricsSnapshot?.server_version || "unknown" })}
       </div>
 
       {#if metricsLoading && !hasMetricsData(metricsSnapshot)}
-        <div class="summary-empty">Loading metrics snapshot...</div>
+        <div class="summary-empty">{$t("loading_metrics")}</div>
       {:else if metricsError && !hasMetricsData(metricsSnapshot)}
-        <div class="notice">Failed to load metrics: {metricsError}</div>
-        <button type="button" on:click={() => loadMetrics()}>Retry</button>
+        <div class="notice">{$t("metrics_load_error", { error: metricsError })}</div>
+        <button type="button" on:click={() => loadMetrics()}>{$t("retry")}</button>
       {:else if hasMetricsData(metricsSnapshot)}
         {@const throughputSeries = metricsSeriesValues(metricsSnapshot, metricsWindow, "throughput")}
         {@const failedSeries = metricsSeriesValues(metricsSnapshot, metricsWindow, "failed")}
@@ -2023,52 +2025,52 @@ example.org`}
         {@const severityTotals = metricsSnapshot?.quality?.severity?.totals || {}}
 
         {#if metricsError}
-          <div class="notice">Showing last snapshot. Latest refresh failed: {metricsError}</div>
+          <div class="notice">{$t("metrics_stale_error", { error: metricsError })}</div>
         {/if}
 
         <div class="summary-grid metrics-summary-grid">
-          <div class="summary-item" title={metricsCardHelp.queue_depth}>
-            <span class="summary-label">Queue depth</span>
+          <div class="summary-item" title={$t(metricsCardHelp.queue_depth)}>
+            <span class="summary-label">{$t("metric_queue_depth")}</span>
             <span class="summary-count">{formatInteger(metricsSnapshot?.health?.queue_depth)}</span>
           </div>
-          <div class="summary-item" title={metricsCardHelp.in_flight_jobs}>
-            <span class="summary-label">In-flight jobs</span>
+          <div class="summary-item" title={$t(metricsCardHelp.in_flight_jobs)}>
+            <span class="summary-label">{$t("metric_in_flight")}</span>
             <span class="summary-count">{formatInteger(metricsSnapshot?.health?.in_flight_jobs)}</span>
           </div>
-          <div class="summary-item" title={metricsCardHelp.dns_queries_ipv4_total}>
-            <span class="summary-label">Total IPv4 queries</span>
+          <div class="summary-item" title={$t(metricsCardHelp.dns_queries_ipv4_total)}>
+            <span class="summary-label">{$t("metric_ipv4_queries")}</span>
             <span class="summary-count">{formatCompactInteger(metricsSnapshot?.health?.dns_queries_ipv4_total)}</span>
           </div>
-          <div class="summary-item" title={metricsCardHelp.dns_queries_ipv6_total}>
-            <span class="summary-label">Total IPv6 queries</span>
+          <div class="summary-item" title={$t(metricsCardHelp.dns_queries_ipv6_total)}>
+            <span class="summary-label">{$t("metric_ipv6_queries")}</span>
             <span class="summary-count">{formatCompactInteger(metricsSnapshot?.health?.dns_queries_ipv6_total)}</span>
           </div>
-          <div class="summary-item" title={metricsCardHelp.success_rate}>
-            <span class="summary-label">Success rate</span>
+          <div class="summary-item" title={$t(metricsCardHelp.success_rate)}>
+            <span class="summary-label">{$t("metric_success_rate")}</span>
             <span class="summary-count">{formatPercent(metricsSnapshot?.quality?.outcomes?.success_rate)}</span>
           </div>
-          <div class="summary-item" title={metricsCardHelp.failed_rate}>
-            <span class="summary-label">Failure rate</span>
+          <div class="summary-item" title={$t(metricsCardHelp.failed_rate)}>
+            <span class="summary-label">{$t("metric_failure_rate")}</span>
             <span class="summary-count">{formatPercent(metricsSnapshot?.quality?.outcomes?.failed_rate)}</span>
           </div>
-          <div class="summary-item" title={metricsCardHelp.api_p90}>
-            <span class="summary-label">API p90</span>
+          <div class="summary-item" title={$t(metricsCardHelp.api_p90)}>
+            <span class="summary-label">{$t("metric_api_p90")}</span>
             <span class="summary-count">{formatDurationMs(metricsTopAPIP90(metricsSnapshot))}</span>
           </div>
-          <div class="summary-item" title={metricsCardHelp.avg_job_duration}>
-            <span class="summary-label">Avg job duration</span>
+          <div class="summary-item" title={$t(metricsCardHelp.avg_job_duration)}>
+            <span class="summary-label">{$t("metric_avg_duration")}</span>
             <span class="summary-count">{formatDurationMs(metricsSnapshot?.quality?.job_duration_ms?.avg)}</span>
           </div>
-          <div class="summary-item jobs-finished" title={metricsCardHelp.completed_total}>
-            <span class="summary-label">Total jobs finished</span>
+          <div class="summary-item jobs-finished" title={$t(metricsCardHelp.completed_total)}>
+            <span class="summary-label">{$t("metric_completed")}</span>
             <span class="summary-count">{formatInteger(metricsSnapshot?.jobs?.completed_total)}</span>
           </div>
-          <div class="summary-item failed-jobs" title={metricsCardHelp.failed_total}>
-            <span class="summary-label">Failed jobs</span>
+          <div class="summary-item failed-jobs" title={$t(metricsCardHelp.failed_total)}>
+            <span class="summary-label">{$t("metric_failed")}</span>
             <span class="summary-count">{formatInteger(metricsSnapshot?.quality?.outcomes?.failed_total)}</span>
           </div>
           {#each summaryLevels as level}
-            <div class={`summary-item severity-${level.toLowerCase()}`} title={severityCardHelp(level)}>
+            <div class={`summary-item severity-${level.toLowerCase()}`} title={$t("help_severity_card", { level })}>
               <span class="summary-label">{level}</span>
               <span class="summary-count">{formatInteger(severityTotals[level])}</span>
             </div>
@@ -2078,39 +2080,39 @@ example.org`}
         <div class="metrics-trend-grid">
           <div class="metrics-trend-card">
             <div class="metrics-trend-head">
-              <strong>Throughput</strong>
-              <span>{formatInteger(seriesLast(throughputSeries))}/bucket</span>
+              <strong>{$t("metric_throughput")}</strong>
+              <span>{formatInteger(seriesLast(throughputSeries))}{$t("per_bucket")}</span>
             </div>
-            <svg class="sparkline" viewBox="0 0 260 66" role="img" aria-label="Throughput trend">
+            <svg class="sparkline" viewBox="0 0 260 66" role="img" aria-label={$t("aria_throughput_trend")}>
               <polyline points={sparklinePoints(throughputSeries)} />
             </svg>
           </div>
           <div class="metrics-trend-card">
             <div class="metrics-trend-head">
-              <strong>Failures</strong>
-              <span>{formatInteger(seriesLast(failedSeries))}/bucket</span>
+              <strong>{$t("metric_failures")}</strong>
+              <span>{formatInteger(seriesLast(failedSeries))}{$t("per_bucket")}</span>
             </div>
-            <svg class="sparkline sparkline-warn" viewBox="0 0 260 66" role="img" aria-label="Failure trend">
+            <svg class="sparkline sparkline-warn" viewBox="0 0 260 66" role="img" aria-label={$t("aria_failure_trend")}>
               <polyline points={sparklinePoints(failedSeries)} />
             </svg>
           </div>
           <div class="metrics-trend-card">
             <div class="metrics-trend-head">
-              <strong>DNS queries/s</strong>
+              <strong>{$t("metric_dns_rate")}</strong>
               <span>{formatRate(seriesLast(querySeriesIPv4) + seriesLast(querySeriesIPv6))}</span>
             </div>
-            <svg class="sparkline sparkline-queries" viewBox="0 0 260 66" role="img" aria-label="DNS query rates trend">
+            <svg class="sparkline sparkline-queries" viewBox="0 0 260 66" role="img" aria-label={$t("aria_dns_trend")}>
               <polyline class="sparkline-ipv4" points={sparklinePoints(querySeriesIPv4, 260, 66, 6, queryBounds)} />
               <polyline class="sparkline-ipv6" points={sparklinePoints(querySeriesIPv6, 260, 66, 6, queryBounds)} />
             </svg>
             <div class="sparkline-legend">
               <span class="sparkline-legend-item">
                 <span class="sparkline-legend-dot sparkline-legend-dot-ipv4" aria-hidden="true"></span>
-                IPv4 {formatRate(seriesLast(querySeriesIPv4))}
+                {$t("ipv4_label")} {formatRate(seriesLast(querySeriesIPv4))}
               </span>
               <span class="sparkline-legend-item">
                 <span class="sparkline-legend-dot sparkline-legend-dot-ipv6" aria-hidden="true"></span>
-                IPv6 {formatRate(seriesLast(querySeriesIPv6))}
+                {$t("ipv6_label")} {formatRate(seriesLast(querySeriesIPv6))}
               </span>
             </div>
           </div>
@@ -2118,18 +2120,18 @@ example.org`}
 
         <div class="metrics-tables">
           <div class="metrics-table-wrap">
-            <h3>Top domains</h3>
+            <h3>{$t("top_domains_heading")}</h3>
             {#if metricsDomainRows(metricsSnapshot).length === 0}
-              <div class="summary-empty">No domain insight data yet.</div>
+              <div class="summary-empty">{$t("no_domain_data")}</div>
             {:else}
               <table class="metrics-table">
                 <thead>
                   <tr>
-                    <th>Domain</th>
-                    <th>Runs</th>
-                    <th>Last status</th>
-                    <th>Avg duration</th>
-                    <th>Error+critical</th>
+                    <th>{$t("domain_col")}</th>
+                    <th>{$t("runs_col")}</th>
+                    <th>{$t("last_status_col")}</th>
+                    <th>{$t("avg_duration_col")}</th>
+                    <th>{$t("error_critical_col")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2148,9 +2150,9 @@ example.org`}
           </div>
 
           <div class="metrics-table-wrap">
-            <h3>Error-heavy batches</h3>
+            <h3>{$t("error_heavy_batches_heading")}</h3>
             {#if metricsBatchRows(metricsSnapshot).length === 0}
-              <div class="summary-empty">No batch insight data yet.</div>
+              <div class="summary-empty">{$t("no_batch_data")}</div>
             {:else}
               <table class="metrics-table metrics-table-batches">
                 <colgroup>
@@ -2162,11 +2164,11 @@ example.org`}
                 </colgroup>
                 <thead>
                   <tr>
-                    <th>Batch ID</th>
-                    <th>Processed</th>
-                    <th>Failed+expired</th>
-                    <th>Canceled</th>
-                    <th>Error+critical</th>
+                    <th>{$t("batch_id_col")}</th>
+                    <th>{$t("processed_col")}</th>
+                    <th>{$t("failed_expired_col")}</th>
+                    <th>{$t("canceled_col")}</th>
+                    <th>{$t("error_critical_col")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2185,15 +2187,15 @@ example.org`}
           </div>
         </div>
       {:else}
-        <div class="summary-empty">No metrics data available yet.</div>
+        <div class="summary-empty">{$t("no_metrics_data")}</div>
       {/if}
     </div>
   {/if}
 
   {#if statusMessage}
     <div class={`status-toast status-${statusTone === "ok" ? "ok" : "warn"} reveal`} role="status" aria-live="polite" style="--d: 0.12s;">
-      <div><strong>{statusTone === "ok" ? "OK" : "Heads up"}:</strong> {statusMessage}</div>
-      <button class="status-toast-close" type="button" aria-label="Dismiss notification" on:click={clearStatus}>Dismiss</button>
+      <div><strong>{statusTone === "ok" ? $t("toast_ok") : $t("toast_warn")}:</strong> {statusMessage}</div>
+      <button class="status-toast-close" type="button" aria-label={$t("dismiss_notification_aria")} on:click={clearStatus}>{$t("dismiss")}</button>
     </div>
   {/if}
 </main>

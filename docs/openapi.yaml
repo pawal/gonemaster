@@ -231,6 +231,14 @@ paths:
       responses:
         '200':
           description: Queue paused
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: paused
 
   /queue/resume:
     post:
@@ -240,6 +248,14 @@ paths:
       responses:
         '200':
           description: Queue resumed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: resumed
 
   /queue/reorder:
     post:
@@ -323,6 +339,31 @@ paths:
                 type: object
         '400':
           $ref: '#/components/responses/ErrorResponse'
+
+  /locales:
+    get:
+      tags: [Ops]
+      summary: List available translation locales
+      operationId: listLocales
+      description: >
+        Returns the list of locale codes for which translated result messages
+        are available. The list always includes `en` (English). Pass one of
+        these codes as the `locale` query parameter on `GET /jobs/{id}/result`
+        to receive translated messages.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [locales]
+                properties:
+                  locales:
+                    type: array
+                    items:
+                      type: string
+                    example: [da, en, es, fi, fr, nb, sl, sv]
 
   /healthz:
     get:

@@ -494,7 +494,7 @@ func (s *Server) handleQueuePause(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.metrics.ObserveQueuePaused(true)
-	w.WriteHeader(http.StatusOK)
+	writeJSON(w, http.StatusOK, map[string]string{"status": "paused"})
 }
 
 func (s *Server) handleQueueResume(w http.ResponseWriter, r *http.Request) {
@@ -510,7 +510,7 @@ func (s *Server) handleQueueResume(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.metrics.ObserveQueuePaused(false)
-	w.WriteHeader(http.StatusOK)
+	writeJSON(w, http.StatusOK, map[string]string{"status": "resumed"})
 }
 
 func (s *Server) handleQueueReorder(w http.ResponseWriter, r *http.Request) {

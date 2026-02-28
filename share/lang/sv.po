@@ -3478,3 +3478,15 @@ msgstr "Null-SPF-policy hittades för {domain}, som inte är en e-postdomän."
 msgctxt "ZONE:Z11_SPF_SYNTAX_OK"
 msgid "SPF syntax is correct for {domain}."
 msgstr "SPF-syntax är korrekt för {domain}."
+
+msgctxt "SYSTEM:CLI_HEADER_SECONDS"
+msgid "Seconds"
+msgstr "Sekunder"
+
+msgctxt "SYSTEM:CLI_HEADER_LEVEL"
+msgid "Level"
+msgstr "Nivå"
+
+msgctxt "SYSTEM:CLI_HEADER_MESSAGE"
+msgid "Message"
+msgstr "Meddelande"

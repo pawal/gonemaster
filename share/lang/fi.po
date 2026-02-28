@@ -3088,3 +3088,15 @@ msgstr "Nolla-SPF-käytäntö löydetty vyöhykkeelle {domain}, joka ei ole säh
 msgctxt "ZONE:Z11_SPF_SYNTAX_OK"
 msgid "SPF syntax is correct for {domain}."
 msgstr "SPF-syntaksi on oikein vyöhykkeelle {domain}."
+
+msgctxt "SYSTEM:CLI_HEADER_SECONDS"
+msgid "Seconds"
+msgstr "Sekunnit"
+
+msgctxt "SYSTEM:CLI_HEADER_LEVEL"
+msgid "Level"
+msgstr "Taso"
+
+msgctxt "SYSTEM:CLI_HEADER_MESSAGE"
+msgid "Message"
+msgstr "Viesti"

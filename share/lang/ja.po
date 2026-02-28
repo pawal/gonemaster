@@ -3417,3 +3417,15 @@ msgid ""
 "The CDS RRset is not signed with a DNSKEY record that a DS record points to. "
 "Fetched from the nameservers with IP addresses \"{ns_ip_list}\"."
 msgstr "CDS RRset が、DS レコードが指す DNSKEY で署名されていません。取得元ネームサーバー IP: \"{ns_ip_list}\"。"
+
+msgctxt "SYSTEM:CLI_HEADER_SECONDS"
+msgid "Seconds"
+msgstr "秒"
+
+msgctxt "SYSTEM:CLI_HEADER_LEVEL"
+msgid "Level"
+msgstr "レベル"
+
+msgctxt "SYSTEM:CLI_HEADER_MESSAGE"
+msgid "Message"
+msgstr "メッセージ"

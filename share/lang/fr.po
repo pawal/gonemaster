@@ -3906,3 +3906,15 @@ msgstr "La zone \"{domain}\" n'existe pas en tant que zone."
 msgctxt "DNSSEC:DS01_DS_ALGO_OK"
 msgid "DS record with key tag {keytag} and digest algorithm {ds_algo_num} ({ds_algo_descr}) is acceptable. Fetched from name servers {ns_list}."
 msgstr "L'enregistrement DS avec le tag de clé {keytag} et l'algorithme de condensé {ds_algo_num} ({ds_algo_descr}) est acceptable. Récupéré depuis les serveurs de noms {ns_list}."
+
+msgctxt "SYSTEM:CLI_HEADER_SECONDS"
+msgid "Seconds"
+msgstr "Secondes"
+
+msgctxt "SYSTEM:CLI_HEADER_LEVEL"
+msgid "Level"
+msgstr "Niveau"
+
+msgctxt "SYSTEM:CLI_HEADER_MESSAGE"
+msgid "Message"
+msgstr "Message"

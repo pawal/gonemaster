@@ -856,6 +856,50 @@ func TestRunOutputsTranslatedByDefault(t *testing.T) {
 	}
 }
 
+func TestRunOutputsLocalizedHeaderByLocale(t *testing.T) {
+	stubRunEngine(t, nil)
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	code := run([]string{"--domain", "example.com", "--min-level", "CRITICAL", "--locale", "sv"}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+
+	firstLine := strings.SplitN(out.String(), "\n", 2)[0]
+	if !strings.Contains(firstLine, "Sekunder") || !strings.Contains(firstLine, "Nivå") || !strings.Contains(firstLine, "Meddelande") {
+		t.Fatalf("expected localized header for sv locale, got %q", firstLine)
+	}
+	if strings.Contains(firstLine, "Seconds") {
+		t.Fatalf("expected non-English header for sv locale, got %q", firstLine)
+	}
+	if errOut.Len() != 0 {
+		t.Fatalf("expected no stderr output, got %q", errOut.String())
+	}
+}
+
+func TestWriteHumanHeaderAlignsDisplayWidthForJapanese(t *testing.T) {
+	var out bytes.Buffer
+	if err := writeHumanHeader(&out, "ja"); err != nil {
+		t.Fatalf("write header: %v", err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 header lines, got %d (%q)", len(lines), out.String())
+	}
+
+	headerWidth := terminalCellWidth(lines[0])
+	dividerWidth := terminalCellWidth(lines[1])
+	if headerWidth != dividerWidth {
+		t.Fatalf("expected header/divider display widths to match, got header=%d divider=%d (%q)", headerWidth, dividerWidth, out.String())
+	}
+	if !strings.Contains(lines[0], "秒") || !strings.Contains(lines[0], "レベル") || !strings.Contains(lines[0], "メッセージ") {
+		t.Fatalf("expected Japanese labels in header, got %q", lines[0])
+	}
+}
+
 func TestRunOutputsLooksOKWhenNoEntriesAtLevel(t *testing.T) {
 	var out bytes.Buffer
 	var errOut bytes.Buffer

@@ -3375,3 +3375,15 @@ msgstr "Za {domain}, ki ni poštna domena, je bila najdena ničelna SPF-politika
 msgctxt "ZONE:Z11_SPF_SYNTAX_OK"
 msgid "SPF syntax is correct for {domain}."
 msgstr "Sintaksa SPF je pravilna za {domain}."
+
+msgctxt "SYSTEM:CLI_HEADER_SECONDS"
+msgid "Seconds"
+msgstr "Sekunde"
+
+msgctxt "SYSTEM:CLI_HEADER_LEVEL"
+msgid "Level"
+msgstr "Raven"
+
+msgctxt "SYSTEM:CLI_HEADER_MESSAGE"
+msgid "Message"
+msgstr "Sporočilo"

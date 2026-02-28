@@ -49,7 +49,7 @@ _Do not edit by hand — regenerate with the command above._
 | `N15_NO_VERSION_REVEALED` | `INFO` | [nameserver15](../tests/nameserver/nameserver15.md) | **no** |
 | `N15_SOFTWARE_VERSION` | `NOTICE` | [nameserver15](../tests/nameserver/nameserver15.md) | **no** |
 | `N15_WRONG_CLASS` | `WARNING` | [nameserver15](../tests/nameserver/nameserver15.md) | **no** |
-| `N16_HAS_NSID` | `NOTICE` | [nameserver16](../tests/nameserver/nameserver16.md) | **no** |
+| `N16_HAS_NSID` | `INFO` | [nameserver16](../tests/nameserver/nameserver16.md) | **no** |
 | `N16_NO_NSID_REVEALED` | `INFO` | [nameserver16](../tests/nameserver/nameserver16.md) | **no** |
 | `N16_NO_RESPONSE` | `WARNING` | [nameserver16](../tests/nameserver/nameserver16.md) | **no** |
 | `N16_UNEXPECTED_RCODE` | `WARNING` | [nameserver16](../tests/nameserver/nameserver16.md) | **no** |

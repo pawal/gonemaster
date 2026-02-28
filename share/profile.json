@@ -433,7 +433,7 @@
             "N15_NO_VERSION_REVEALED": "INFO",
             "N15_SOFTWARE_VERSION": "NOTICE",
             "N15_WRONG_CLASS": "WARNING",
-            "N16_HAS_NSID": "NOTICE",
+            "N16_HAS_NSID": "INFO",
             "N16_NO_NSID_REVEALED": "INFO",
             "N16_NO_RESPONSE": "WARNING",
             "N16_UNEXPECTED_RCODE": "WARNING",

@@ -70,6 +70,32 @@
   let initialized = false;
   let undelegatedRowCounter = 0;
 
+  // Theme management: "system" follows OS preference via CSS media query;
+  // "light" and "dark" set data-theme on <html> explicitly.
+  const themeKey = "gonemaster.ui.theme.v1";
+  let theme = "system";
+
+  const applyTheme = (t) => {
+    if (typeof document === "undefined") return;
+    const root = document.documentElement;
+    if (t === "light" || t === "dark") {
+      root.setAttribute("data-theme", t);
+    } else {
+      root.removeAttribute("data-theme");
+    }
+  };
+
+  const cycleTheme = () => {
+    const order = ["system", "light", "dark"];
+    theme = order[(order.indexOf(theme) + 1) % order.length];
+    localStorage.setItem(themeKey, theme);
+    applyTheme(theme);
+  };
+
+  $: themeIcon = theme === "light" ? "☀" : theme === "dark" ? "☾" : "⊙";
+  $: themeTitle =
+    "Color theme: " + (theme === "light" ? "Light" : theme === "dark" ? "Dark" : "System") + " — click to cycle";
+
   const apiPrefix = "/api/v1";
   const persistedStateKey = "gonemaster.ui.state.v1";
   const persistedQueryKeys = [
@@ -1289,6 +1315,11 @@
   const initializeApp = () => {
     if (initialized || typeof window === "undefined") return;
     initialized = true;
+    const storedTheme = localStorage.getItem(themeKey);
+    if (storedTheme === "light" || storedTheme === "dark" || storedTheme === "system") {
+      theme = storedTheme;
+    }
+    applyTheme(theme);
     updateTabFromHash();
     const urlState = readStateFromURL();
     if (urlState) {
@@ -1331,10 +1362,15 @@
 
 <main>
   <header class="reveal" style="--d: 0.05s">
-    <h1>Gonemaster</h1>
-    <p class="subtitle">
-      Launch single or batch domain jobs, watch progress, and inspect results from the embedded server UI.
-    </p>
+    <div class="header-text">
+      <h1>Gonemaster</h1>
+      <p class="subtitle">
+        Launch single or batch domain jobs, watch progress, and inspect results from the embedded server UI.
+      </p>
+    </div>
+    <button class="theme-toggle" type="button" on:click={cycleTheme} title={themeTitle} aria-label={themeTitle}>
+      {themeIcon}
+    </button>
   </header>
 
   <div class="tabs" role="tablist" aria-label="Job views">

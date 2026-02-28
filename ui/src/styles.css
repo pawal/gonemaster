@@ -12,6 +12,9 @@
   --radius: 12px;
   --mono: "IBM Plex Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
   --sans: "IBM Plex Sans", "Source Sans 3", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --surface: #f8fafc;
+  --surface-2: #e4e7ec;
+  --on-surface-2: #344054;
 }
 
 * {
@@ -39,9 +42,37 @@ main {
 
 header {
   display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.header-text {
+  display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-bottom: 16px;
+}
+
+.theme-toggle {
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  box-shadow: none;
+  padding: 6px 11px;
+  font-size: 1rem;
+  line-height: 1;
+  border-radius: 8px;
+  margin-top: 8px;
+}
+
+.theme-toggle:hover:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+  background: var(--surface);
+  color: var(--ink);
 }
 
 h1 {
@@ -86,7 +117,7 @@ h1 {
   padding: 6px 14px;
   font-size: 0.85rem;
   font-weight: 600;
-  background: #ffffff;
+  background: var(--card);
   color: var(--muted);
   box-shadow: none;
 }
@@ -94,7 +125,7 @@ h1 {
 .tab:hover {
   transform: none;
   box-shadow: none;
-  background: #f8fafc;
+  background: var(--surface);
 }
 
 .tab.active {
@@ -140,7 +171,7 @@ h1 {
   border: 1px dashed var(--border);
   border-radius: 10px;
   padding: 8px 10px;
-  background: #f8fafc;
+  background: var(--surface);
 }
 
 .advanced-options summary {
@@ -200,7 +231,8 @@ select {
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid var(--border);
-  background: #ffffff;
+  background: var(--card);
+  color: var(--ink);
   font-family: inherit;
   font-size: 0.95rem;
 }
@@ -316,7 +348,7 @@ button:hover:not(:disabled) {
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 10px 12px;
-  background: #f8fafc;
+  background: var(--surface);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -378,7 +410,7 @@ button:hover:not(:disabled) {
 .summary-empty {
   padding: 10px 12px;
   border-radius: 10px;
-  background: #f8fafc;
+  background: var(--surface);
   border: 1px dashed var(--border);
   color: var(--muted);
   font-size: 0.85rem;
@@ -393,7 +425,7 @@ button:hover:not(:disabled) {
 .module-card {
   border: 1px solid var(--border);
   border-radius: 12px;
-  background: #ffffff;
+  background: var(--card);
   overflow: hidden;
 }
 
@@ -414,7 +446,7 @@ button:hover:not(:disabled) {
 .module-toggle:hover {
   transform: none;
   box-shadow: none;
-  background: #f8fafc;
+  background: var(--surface);
 }
 
 .module-title {
@@ -440,8 +472,8 @@ button:hover:not(:disabled) {
   font-weight: 600;
   padding: 2px 8px;
   border-radius: 999px;
-  background: #e4e7ec;
-  color: #344054;
+  background: var(--surface-2);
+  color: var(--on-surface-2);
   text-transform: uppercase;
   letter-spacing: 0.02em;
 }
@@ -482,7 +514,7 @@ button:hover:not(:disabled) {
 .module-body {
   border-top: 1px solid var(--border);
   padding: 12px 14px;
-  background: #f8fafc;
+  background: var(--surface);
 }
 
 .result-header {
@@ -518,8 +550,8 @@ button:hover:not(:disabled) {
   text-transform: uppercase;
   padding: 2px 8px;
   border-radius: 999px;
-  background: #e4e7ec;
-  color: #344054;
+  background: var(--surface-2);
+  color: var(--on-surface-2);
   width: max-content;
 }
 
@@ -561,7 +593,7 @@ button:hover:not(:disabled) {
   position: relative;
   height: 12px;
   border-radius: 999px;
-  background: #e4e7ec;
+  background: var(--surface-2);
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -578,7 +610,7 @@ button:hover:not(:disabled) {
   right: 8px;
   font-size: 0.72rem;
   font-weight: 600;
-  color: #344054;
+  color: var(--on-surface-2);
 }
 
 .progress.compact {
@@ -600,7 +632,7 @@ button:hover:not(:disabled) {
 .list-item {
   padding: 10px 12px;
   border-radius: 10px;
-  background: #f8fafc;
+  background: var(--surface);
   border: 1px solid var(--border);
   display: flex;
   justify-content: space-between;
@@ -634,7 +666,7 @@ button:hover:not(:disabled) {
   padding: 6px 12px;
   font-size: 0.78rem;
   font-weight: 600;
-  background: #ffffff;
+  background: var(--card);
   color: var(--muted);
   box-shadow: none;
 }
@@ -642,7 +674,7 @@ button:hover:not(:disabled) {
 .severity-filter:hover:not(:disabled) {
   transform: none;
   box-shadow: none;
-  background: #f8fafc;
+  background: var(--surface);
 }
 
 .severity-filter.active {
@@ -732,7 +764,7 @@ button:hover:not(:disabled) {
 .metrics-trend-card {
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: #f8fafc;
+  background: var(--surface);
   padding: 10px 12px;
   display: flex;
   flex-direction: column;
@@ -814,7 +846,7 @@ button:hover:not(:disabled) {
 .metrics-table-wrap {
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: #f8fafc;
+  background: var(--surface);
   padding: 10px 12px;
   display: flex;
   flex-direction: column;
@@ -923,4 +955,159 @@ pre {
   overflow: auto;
   font-size: 0.82rem;
   line-height: 1.4;
+}
+
+/* ── Dark theme ────────────────────────────────────────────────────────────── */
+
+/* System preference: applies when no explicit data-theme is set */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) {
+    color-scheme: dark;
+    --bg: #0d1117;
+    --bg-2: #161b22;
+    --ink: #e6edf3;
+    --muted: #8b949e;
+    --card: #161b22;
+    --border: #30363d;
+    --shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
+    --surface: #21262d;
+    --surface-2: #30363d;
+    --on-surface-2: #8b949e;
+  }
+}
+
+/* Explicit dark: applies when data-theme="dark" is set */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0d1117;
+  --bg-2: #161b22;
+  --ink: #e6edf3;
+  --muted: #8b949e;
+  --card: #161b22;
+  --border: #30363d;
+  --shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
+  --surface: #21262d;
+  --surface-2: #30363d;
+  --on-surface-2: #8b949e;
+}
+
+/* Shared dark overrides for both system-dark and explicit-dark */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) body {
+    background-image:
+      linear-gradient(90deg, rgba(200, 220, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(0deg, rgba(200, 220, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(180deg, var(--bg), var(--bg-2));
+  }
+
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .badge {
+    background: rgba(14, 116, 144, 0.2);
+  }
+
+  :root:not([data-theme="light"]):not([data-theme="dark"]) button.secondary {
+    background: #2d3a4a;
+  }
+
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .summary-item.severity-notice {
+    background: #0f2a38;
+    border-color: #1e4a60;
+  }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .summary-item.severity-notice .summary-label,
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .summary-item.severity-notice .summary-count {
+    color: #7dd3fc;
+  }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .summary-item.severity-warning {
+    background: #2a1f0a;
+    border-color: #78450a;
+  }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .summary-item.severity-warning .summary-label,
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .summary-item.severity-warning .summary-count {
+    color: #fbbf24;
+  }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .summary-item.severity-error {
+    background: #2a150a;
+    border-color: #7c2d12;
+  }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .summary-item.severity-error .summary-label,
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .summary-item.severity-error .summary-count {
+    color: #fb923c;
+  }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .summary-item.severity-critical {
+    background: #2a0a0a;
+    border-color: #7f1d1d;
+  }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .summary-item.severity-critical .summary-label,
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .summary-item.severity-critical .summary-count {
+    color: #f87171;
+  }
+
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .status-toast.status-ok {
+    background: #0f2a1e;
+    border-color: #166534;
+    color: #4ade80;
+  }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .status-toast.status-warn {
+    background: #2a1f0a;
+    border-color: #854d0e;
+    color: #fbbf24;
+  }
+}
+
+:root[data-theme="dark"] body {
+  background-image:
+    linear-gradient(90deg, rgba(200, 220, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(200, 220, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(180deg, var(--bg), var(--bg-2));
+}
+
+:root[data-theme="dark"] .badge {
+  background: rgba(14, 116, 144, 0.2);
+}
+
+:root[data-theme="dark"] button.secondary {
+  background: #2d3a4a;
+}
+
+:root[data-theme="dark"] .summary-item.severity-notice {
+  background: #0f2a38;
+  border-color: #1e4a60;
+}
+:root[data-theme="dark"] .summary-item.severity-notice .summary-label,
+:root[data-theme="dark"] .summary-item.severity-notice .summary-count {
+  color: #7dd3fc;
+}
+:root[data-theme="dark"] .summary-item.severity-warning {
+  background: #2a1f0a;
+  border-color: #78450a;
+}
+:root[data-theme="dark"] .summary-item.severity-warning .summary-label,
+:root[data-theme="dark"] .summary-item.severity-warning .summary-count {
+  color: #fbbf24;
+}
+:root[data-theme="dark"] .summary-item.severity-error {
+  background: #2a150a;
+  border-color: #7c2d12;
+}
+:root[data-theme="dark"] .summary-item.severity-error .summary-label,
+:root[data-theme="dark"] .summary-item.severity-error .summary-count {
+  color: #fb923c;
+}
+:root[data-theme="dark"] .summary-item.severity-critical {
+  background: #2a0a0a;
+  border-color: #7f1d1d;
+}
+:root[data-theme="dark"] .summary-item.severity-critical .summary-label,
+:root[data-theme="dark"] .summary-item.severity-critical .summary-count {
+  color: #f87171;
+}
+
+:root[data-theme="dark"] .status-toast.status-ok {
+  background: #0f2a1e;
+  border-color: #166534;
+  color: #4ade80;
+}
+:root[data-theme="dark"] .status-toast.status-warn {
+  background: #2a1f0a;
+  border-color: #854d0e;
+  color: #fbbf24;
 }

@@ -1,6 +1,6 @@
 # Zone10 (zone10)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Validate SOA answer-shape correctness on nameservers: response presence, SOA presence, owner name correctness, and multiplicity.

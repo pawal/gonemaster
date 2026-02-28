@@ -1,6 +1,6 @@
 # Nameserver04 (nameserver04)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Verify that nameserver responses come from the same IP address that was queried.

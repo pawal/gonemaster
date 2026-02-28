@@ -1,6 +1,6 @@
 # Delegation01 (delegation01)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Validate that delegation-side and child-side nameserver sets meet minimum-count requirements overall and per IP family.

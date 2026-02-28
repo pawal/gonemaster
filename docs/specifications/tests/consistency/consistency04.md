@@ -1,6 +1,6 @@
 # Consistency04 (consistency04)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Check NS RRset consistency across nameservers for the tested zone.

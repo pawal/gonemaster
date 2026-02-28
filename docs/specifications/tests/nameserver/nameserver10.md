@@ -1,6 +1,6 @@
 # Nameserver10 (nameserver10)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Validate authoritative nameserver behavior for unsupported EDNS version queries (version 1).

@@ -1,6 +1,6 @@
 # DNSSEC10 (dnssec10)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Verify that signed child-zone nameservers consistently provide NSEC or NSEC3 denial-of-existence material (including signatures and owner/type-shape checks) when querying for apex `NSEC` and `NSEC3PARAM`.

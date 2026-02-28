@@ -1,6 +1,6 @@
 # Delegation05 (delegation05)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Verify that NS names used for the tested zone are not aliases (CNAME targets).

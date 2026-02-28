@@ -1,6 +1,6 @@
 # Nameserver05 (nameserver05)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Evaluate nameserver behavior for AAAA queries after successful A-query baseline checks.

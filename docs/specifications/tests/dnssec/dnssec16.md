@@ -1,6 +1,6 @@
 # DNSSEC16 (dnssec16)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Validate CDS RRsets against DNSKEY data and CDS signatures, including delete semantics and signature/keytag consistency checks.

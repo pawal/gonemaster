@@ -1,6 +1,6 @@
 # Syntax07 (syntax07)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Validate SOA `MNAME` hostname syntax using the same hostname validator as `syntax04`.

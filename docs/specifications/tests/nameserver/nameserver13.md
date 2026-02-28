@@ -1,6 +1,6 @@
 # Nameserver13 (nameserver13)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Check truncated EDNS responses for missing OPT records.

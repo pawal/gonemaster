@@ -1,6 +1,6 @@
 # Zone08 (zone08)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Validate that MX exchange hostnames are not aliases (CNAME).

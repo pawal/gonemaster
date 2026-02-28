@@ -1,6 +1,6 @@
 # Syntax06 (syntax06)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Validate SOA `RNAME` as an email-like mailbox and verify that its mail domain/exchange resolution path is usable.

@@ -1,6 +1,6 @@
 # Syntax04 (syntax04)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Validate syntax of nameserver hostnames gathered from parent delegation and child apex NS sets.

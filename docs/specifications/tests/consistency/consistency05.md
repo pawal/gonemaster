@@ -1,6 +1,6 @@
 # Consistency05 (consistency05)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Compare delegation glue addresses against child authoritative address data for in-bailiwick nameservers.

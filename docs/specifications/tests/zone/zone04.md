@@ -1,6 +1,6 @@
 # Zone04 (zone04)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Validate that SOA `retry` is at or above the configured minimum threshold.

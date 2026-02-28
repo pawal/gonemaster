@@ -1,6 +1,6 @@
 # Nameserver12 (nameserver12)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Validate behavior when querying with unknown EDNS Z flags set.

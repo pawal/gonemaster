@@ -1,6 +1,6 @@
 # Nameserver07 (nameserver07)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Detect upward referrals (root NS records in authority section) returned by authoritative nameservers.

@@ -1,6 +1,6 @@
 # Syntax01 (syntax01)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Validate that the tested domain name contains only allowed DNS hostname characters.

@@ -1,6 +1,6 @@
 # Nameserver01 (nameserver01)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Detect whether authoritative nameservers also behave as recursors.

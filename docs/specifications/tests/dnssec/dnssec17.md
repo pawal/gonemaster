@@ -1,6 +1,6 @@
 # DNSSEC17 (dnssec17)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Validate CDNSKEY RRsets against DNSKEY data and CDNSKEY signatures, including delete semantics and signature/keytag consistency checks.

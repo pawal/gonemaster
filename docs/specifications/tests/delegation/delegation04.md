@@ -1,6 +1,6 @@
 # Delegation04 (delegation04)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Verify whether nameservers from delegation and child sources answer authoritatively for SOA queries.

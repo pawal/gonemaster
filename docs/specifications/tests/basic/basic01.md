@@ -1,6 +1,6 @@
 # Basic01 (basic01)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Determine whether the child zone exists and whether a parent zone can be identified from iterative authoritative responses.

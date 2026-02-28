@@ -1,6 +1,6 @@
 # Consistency01 (consistency01)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Check SOA serial consistency across nameservers for the tested zone.

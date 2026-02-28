@@ -1,6 +1,6 @@
 # DNSSEC11 (dnssec11)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Verify that parent-side DS presence is consistent with child-side DNSKEY presence (zone signing expectation), including parent consistency and child consistency reporting.

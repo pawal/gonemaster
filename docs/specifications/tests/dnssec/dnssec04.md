@@ -1,6 +1,6 @@
 # DNSSEC04 (dnssec04)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Evaluate DNSKEY/SOA RRSIG validity windows and flag signatures that are expired, too short-lived, too long-lived, or otherwise within configured limits.

@@ -1,6 +1,6 @@
 # DNSSEC01 (dnssec01)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Validate DS digest algorithm usage for the child delegation and classify each observed DS digest type.

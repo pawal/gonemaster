@@ -1,6 +1,6 @@
 # Syntax05 (syntax05)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Detect misuse of `@` in SOA `RNAME` and ensure mailbox form is represented with dot-separated DNS notation.

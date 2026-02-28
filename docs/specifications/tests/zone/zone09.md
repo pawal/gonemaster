@@ -1,6 +1,6 @@
 # Zone09 (zone09)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Validate MX presence and consistency across authoritative nameservers, including null-MX and domain-class exceptions (root/TLD/.arpa).

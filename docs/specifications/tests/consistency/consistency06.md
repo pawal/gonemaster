@@ -1,6 +1,6 @@
 # Consistency06 (consistency06)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Check SOA MNAME consistency across nameservers for the tested zone.

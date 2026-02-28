@@ -1,6 +1,6 @@
 # Connectivity04 (connectivity04)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Evaluate prefix diversity of nameserver IP addresses by IP family.

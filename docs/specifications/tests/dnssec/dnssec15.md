@@ -1,6 +1,6 @@
 # DNSSEC15 (dnssec15)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Verify presence and consistency of CDS and CDNSKEY RRsets and detect mismatches between the two at child nameservers.

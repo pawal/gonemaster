@@ -1,6 +1,6 @@
 # DNSSEC09 (dnssec09)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Verify that SOA responses are signed and that SOA RRSIG records are time-valid, algorithm-supported, and cryptographically matched by DNSKEY records from the same nameserver.

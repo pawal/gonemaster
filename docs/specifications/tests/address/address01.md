@@ -1,6 +1,6 @@
 # Address01 (address01)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Classify authoritative nameserver IP addresses as globally reachable, documentation, local-use, or otherwise not globally reachable.

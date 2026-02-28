@@ -1,6 +1,6 @@
 # DNSSEC07 (dnssec07)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Determine whether the child zone is signed (based on DNSKEY + covering RRSIG observations) and, for signed zones, whether parent-side DS data is present and consistent.

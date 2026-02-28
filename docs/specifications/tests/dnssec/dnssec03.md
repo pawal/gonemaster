@@ -1,6 +1,6 @@
 # DNSSEC03 (dnssec03)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Verify NSEC3 parameter consistency and policy compliance across child nameservers when DNSKEY support is present.

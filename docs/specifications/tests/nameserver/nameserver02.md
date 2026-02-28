@@ -1,6 +1,6 @@
 # Nameserver02 (nameserver02)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Validate EDNS(0) handling on authoritative nameservers.

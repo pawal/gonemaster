@@ -1,6 +1,6 @@
 # Zone05 (zone05)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Validate SOA `expire` constraints:

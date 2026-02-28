@@ -1,6 +1,6 @@
 # DNSSEC08 (dnssec08)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Verify that DNSKEY RRset signatures are present, time-valid, algorithm-supported, and cryptographically match DNSKEY records at child nameservers.

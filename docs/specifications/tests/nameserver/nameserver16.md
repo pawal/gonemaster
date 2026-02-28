@@ -1,6 +1,6 @@
 # Nameserver16 (nameserver16)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Query authoritative nameservers with an EDNS NSID option request (RFC 5001, option code 3) and report which servers provide NSID values and what those values contain.

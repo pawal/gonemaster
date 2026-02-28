@@ -1,6 +1,6 @@
 # Basic02 (basic02)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Verify that the child zone has at least one working authoritative nameserver for SOA.

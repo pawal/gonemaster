@@ -1,6 +1,6 @@
 # DNSSEC06 (dnssec06)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Verify DNSSEC additional-processing behavior for DNSKEY responses by checking whether DNSKEY answers include accompanying RRSIG data.

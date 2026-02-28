@@ -1,6 +1,6 @@
 # Zone07 (zone07)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Validate SOA MNAME alias/address behavior:

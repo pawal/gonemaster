@@ -1,6 +1,6 @@
 # Zone02 (zone02)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Validate that SOA `refresh` is at or above the configured minimum threshold.

@@ -1,6 +1,6 @@
 # Address02 (address02)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Verify that every unique nameserver IP address has a usable reverse DNS PTR mapping.

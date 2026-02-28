@@ -1,6 +1,6 @@
 # DNSSEC13 (dnssec13)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Verify that each DNSKEY algorithm observed in the DNSKEY RRset also appears in RRSIG records for DNSKEY, SOA, and NS answer flows at child nameservers.

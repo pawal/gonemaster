@@ -1,6 +1,6 @@
 # DNSSEC02 (dnssec02)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Verify that DS records found at the parent delegation match usable DNSKEYs in the child zone and that matching DNSKEYs can validate DNSKEY RRset signatures.

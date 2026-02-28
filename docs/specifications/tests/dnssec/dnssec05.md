@@ -1,6 +1,6 @@
 # DNSSEC05 (dnssec05)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Validate DNSKEY algorithm classes used by child-zone nameservers and report deprecated, reserved, private, unassigned, non-zone-signing, unrecommended, and acceptable algorithm usage.

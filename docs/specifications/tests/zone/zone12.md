@@ -1,6 +1,6 @@
 # Zone12 (zone12)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Check existence and RFC 7477 compliance of the CSYNC RR at the zone apex.

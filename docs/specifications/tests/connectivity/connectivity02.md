@@ -1,6 +1,6 @@
 # Connectivity02 (connectivity02)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Verify that nameservers are reachable over TCP for SOA and NS queries at the child zone name.

@@ -1,6 +1,6 @@
 # Delegation06 (delegation06)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Verify SOA RRset existence on nameservers collected from delegation and child sources.

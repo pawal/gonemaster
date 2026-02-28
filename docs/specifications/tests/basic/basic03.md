@@ -1,6 +1,6 @@
 # Basic03 (basic03)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Detect the "broken but functional" case by probing `A` records for `www.<child-zone>` against delegation nameservers.

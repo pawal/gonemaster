@@ -1,6 +1,6 @@
 # DNSSEC14 (dnssec14)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Validate RSA DNSKEY key sizes against per-algorithm minimum/maximum ranges and recommended size thresholds.

@@ -1,6 +1,6 @@
 # Connectivity01 (connectivity01)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Verify that nameservers are reachable over UDP for SOA and NS queries at the child zone name.

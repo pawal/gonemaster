@@ -1,6 +1,6 @@
 # Nameserver08 (nameserver08)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Check whether nameservers preserve or alter query-name case in the echoed question section.

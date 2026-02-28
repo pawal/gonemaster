@@ -1,6 +1,6 @@
 # Delegation02 (delegation02)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Detect nameserver IP-address reuse within delegation data, within child data, and across the combined delegation+child addressed NS set.

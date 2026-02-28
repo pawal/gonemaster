@@ -1,6 +1,6 @@
 # Delegation07 (delegation07)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Compare parent-side and child-side NS name sets and report mismatches.

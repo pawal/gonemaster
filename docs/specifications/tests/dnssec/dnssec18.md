@@ -1,6 +1,6 @@
 # DNSSEC18 (dnssec18)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Validate that CDS and CDNSKEY RRsets are signed by a DNSKEY that corresponds to DS information observed at the parent side.

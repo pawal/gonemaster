@@ -1,6 +1,6 @@
 # Consistency03 (consistency03)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Check consistency of SOA timer fields (`refresh`, `retry`, `expire`, `minimum`) across nameservers.

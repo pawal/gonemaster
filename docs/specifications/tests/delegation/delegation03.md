@@ -1,6 +1,6 @@
 # Delegation03 (delegation03)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Check whether a synthesized maximal referral response can fit within the 512-byte non-EDNS UDP DNS payload limit.

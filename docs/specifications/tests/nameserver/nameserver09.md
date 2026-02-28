@@ -1,6 +1,6 @@
 # Nameserver09 (nameserver09)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Compare nameserver results for two differently cased query names that are equivalent under DNS case-insensitive matching.

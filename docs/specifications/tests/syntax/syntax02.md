@@ -1,6 +1,6 @@
 # Syntax02 (syntax02)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Validate that no domain label starts or ends with a hyphen (`-`).

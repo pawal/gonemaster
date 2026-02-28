@@ -1,6 +1,6 @@
 # Connectivity03 (connectivity03)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Evaluate ASN diversity of authoritative nameserver IP addresses.

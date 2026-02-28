@@ -1,6 +1,6 @@
 # Zone01 (zone01)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Validate SOA MNAME handling for the child zone: name sanity, resolvability, authority behavior, and serial-based master inference.

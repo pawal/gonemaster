@@ -1,6 +1,6 @@
 # Nameserver06 (nameserver06)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Verify that NS names discovered from delegation/child data can be resolved to at least one IP address.

@@ -1,6 +1,6 @@
 # Syntax08 (syntax08)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Validate syntax of MX exchange hostnames for the tested zone.

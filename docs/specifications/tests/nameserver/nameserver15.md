@@ -1,6 +1,6 @@
 # Nameserver15 (nameserver15)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Detect whether authoritative nameservers reveal software version data through CHAOS-class TXT queries.

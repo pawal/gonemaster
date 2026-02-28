@@ -1,6 +1,6 @@
 # Syntax03 (syntax03)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Validate that domain labels do not contain a double hyphen in positions 3 and 4, except ACE labels (`xn--...`).

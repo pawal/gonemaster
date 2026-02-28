@@ -1,6 +1,6 @@
 # Zone11 (zone11)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Validate SPF policy publication at zone apex:

@@ -1,6 +1,6 @@
 # Zone03 (zone03)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Validate ordering relationship between SOA timers: `refresh` should be greater than `retry`.

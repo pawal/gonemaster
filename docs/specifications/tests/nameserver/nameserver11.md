@@ -1,6 +1,6 @@
 # Nameserver11 (nameserver11)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Verify handling of an unknown EDNS option code in authoritative SOA responses.

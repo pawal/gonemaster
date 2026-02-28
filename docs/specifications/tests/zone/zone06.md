@@ -1,6 +1,6 @@
 # Zone06 (zone06)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Validate that SOA default TTL (`minimum` field) is within configured lower and upper bounds.

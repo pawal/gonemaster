@@ -1,6 +1,6 @@
 # Consistency02 (consistency02)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Check SOA RNAME consistency across nameservers for the tested zone.

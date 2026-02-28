@@ -1,6 +1,6 @@
 # Nameserver03 (nameserver03)
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Check whether nameservers allow AXFR zone transfer.

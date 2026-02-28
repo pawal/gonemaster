@@ -96,6 +96,23 @@
   $: themeTitle =
     "Color theme: " + (theme === "light" ? "Light" : theme === "dark" ? "Dark" : "System") + " — click to cycle";
 
+  // Locale management: fetch available locales from the server, persist choice
+  // in localStorage, and auto-detect from the browser language on first visit.
+  const localeKey = "gonemaster.ui.locale.v1";
+  const localeDisplayNames = {
+    da: "Dansk",
+    en: "English",
+    es: "Español",
+    fi: "Suomi",
+    fr: "Français",
+    ja: "日本語",
+    nb: "Norsk bokmål",
+    sl: "Slovenščina",
+    sv: "Svenska"
+  };
+  let availableLocales = ["en"];
+  const localeLabel = (code) => localeDisplayNames[code] || code;
+
   const apiPrefix = "/api/v1";
   const persistedStateKey = "gonemaster.ui.state.v1";
   const persistedQueryKeys = [
@@ -1206,6 +1223,29 @@
     }
   };
 
+  const loadLocales = async () => {
+    try {
+      const data = await apiFetch("/locales");
+      if (Array.isArray(data?.locales) && data.locales.length > 0) {
+        availableLocales = data.locales;
+        // Re-validate current locale against what the server actually supports.
+        if (!availableLocales.includes(resultLocale)) {
+          resultLocale = "en";
+          try { localStorage.setItem(localeKey, resultLocale); } catch (_) {}
+        }
+      }
+    } catch (_) {
+      // Keep availableLocales as ["en"] default; locale select stays hidden.
+    }
+  };
+
+  const onLocaleChange = () => {
+    try { localStorage.setItem(localeKey, resultLocale); } catch (_) {}
+    if (selectedJobResult) {
+      loadJobResult(selectedJobId);
+    }
+  };
+
   const startJobPolling = () => {
     if (jobPoller) clearInterval(jobPoller);
     if (!autoRefreshJob || !selectedJobId) return;
@@ -1320,6 +1360,21 @@
       theme = storedTheme;
     }
     applyTheme(theme);
+
+    // Locale: restore from localStorage, or auto-detect from browser language.
+    const storedLocale = (() => { try { return localStorage.getItem(localeKey); } catch (_) { return null; } })();
+    if (storedLocale) {
+      resultLocale = storedLocale;
+    } else {
+      const browserLang = (typeof navigator !== "undefined" ? navigator.language || "" : "")
+        .split("-")[0]
+        .toLowerCase();
+      if (browserLang) {
+        resultLocale = browserLang; // validated against available list after loadLocales()
+      }
+    }
+    loadLocales();
+
     updateTabFromHash();
     const urlState = readStateFromURL();
     if (urlState) {
@@ -1368,9 +1423,24 @@
         Launch single or batch domain jobs, watch progress, and inspect results from the embedded server UI.
       </p>
     </div>
-    <button class="theme-toggle" type="button" on:click={cycleTheme} title={themeTitle} aria-label={themeTitle}>
-      {themeIcon}
-    </button>
+    <div class="header-controls">
+      {#if availableLocales.length > 1}
+        <select
+          bind:value={resultLocale}
+          on:change={onLocaleChange}
+          class="locale-select"
+          title="Result message language"
+          aria-label="Result language"
+        >
+          {#each availableLocales as code}
+            <option value={code}>{localeLabel(code)}</option>
+          {/each}
+        </select>
+      {/if}
+      <button class="theme-toggle" type="button" on:click={cycleTheme} title={themeTitle} aria-label={themeTitle}>
+        {themeIcon}
+      </button>
+    </div>
   </header>
 
   <div class="tabs" role="tablist" aria-label="Job views">

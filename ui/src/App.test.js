@@ -1952,4 +1952,93 @@ describe("App", () => {
 
     unmount();
   });
+
+  describe("locale selector", () => {
+    const mockFetchWithLocales = (locales) => {
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value.includes("/api/v1/locales")) {
+          return jsonResponse({ locales });
+        }
+        if (value.includes("/api/v1/jobs?")) {
+          return jsonResponse({ items: [], total: 0 });
+        }
+        return jsonResponse({});
+      });
+    };
+
+    it("shows language selector when server returns multiple locales", async () => {
+      mockFetchWithLocales(["da", "en", "fr", "sv"]);
+
+      const { unmount } = render(App);
+
+      await waitFor(() => {
+        expect(screen.getByRole("combobox", { name: "Result language" })).toBeInTheDocument();
+      });
+      const select = screen.getByRole("combobox", { name: "Result language" });
+      expect(within(select).getByRole("option", { name: "English" })).toBeInTheDocument();
+      expect(within(select).getByRole("option", { name: "Dansk" })).toBeInTheDocument();
+      expect(within(select).getByRole("option", { name: "Français" })).toBeInTheDocument();
+      expect(within(select).getByRole("option", { name: "Svenska" })).toBeInTheDocument();
+
+      unmount();
+    });
+
+    it("hides language selector when server returns only one locale", async () => {
+      mockFetchWithLocales(["en"]);
+
+      const { unmount } = render(App);
+
+      // Give the locales fetch time to resolve.
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalled();
+      });
+      // Wait a tick for Svelte to re-render.
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(screen.queryByRole("combobox", { name: "Result language" })).toBeNull();
+
+      unmount();
+    });
+
+    it("persists chosen locale to localStorage when changed", async () => {
+      mockFetchWithLocales(["en", "sv", "da"]);
+
+      const { unmount } = render(App);
+
+      const select = await screen.findByRole("combobox", { name: "Result language" });
+      await fireEvent.change(select, { target: { value: "sv" } });
+
+      expect(localStorage.getItem("gonemaster.ui.locale.v1")).toBe("sv");
+
+      unmount();
+    });
+
+    it("restores locale from localStorage on load", async () => {
+      localStorage.setItem("gonemaster.ui.locale.v1", "fr");
+      mockFetchWithLocales(["en", "fr", "sv"]);
+
+      const { unmount } = render(App);
+
+      const select = await screen.findByRole("combobox", { name: "Result language" });
+      expect(select.value).toBe("fr");
+
+      unmount();
+    });
+
+    it("falls back to English when stored locale is not in server list", async () => {
+      localStorage.setItem("gonemaster.ui.locale.v1", "ja");
+      mockFetchWithLocales(["en", "da", "sv"]);
+
+      const { unmount } = render(App);
+
+      const select = await screen.findByRole("combobox", { name: "Result language" });
+      await waitFor(() => {
+        expect(select.value).toBe("en");
+      });
+      expect(localStorage.getItem("gonemaster.ui.locale.v1")).toBe("en");
+
+      unmount();
+    });
+  });
 });

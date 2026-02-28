@@ -11,33 +11,33 @@ _Do not edit by hand — regenerate with the command above._
 
 | Tag | Level | Testcase(s) | i18n |
 | --- | --- | --- | --- |
-| `ADDRESSES_MATCH` | `INFO` | [consistency05](../tests/consistency/consistency05.md) | yes |
-| `CHILD_NS_FAILED` | `DEBUG` | [consistency05](../tests/consistency/consistency05.md) | yes |
-| `CHILD_ZONE_LAME` | `ERROR` | [consistency05](../tests/consistency/consistency05.md) | yes |
-| `EXTRA_ADDRESS_CHILD` | `NOTICE` | [consistency05](../tests/consistency/consistency05.md) | yes |
-| `IN_BAILIWICK_ADDR_MISMATCH` | `ERROR` | [consistency05](../tests/consistency/consistency05.md) | yes |
+| `ADDRESSES_MATCH` | `INFO` | [consistency05](../tests/consistency/consistency05.md) | **no** |
+| `CHILD_NS_FAILED` | `DEBUG` | [consistency05](../tests/consistency/consistency05.md) | **no** |
+| `CHILD_ZONE_LAME` | `ERROR` | [consistency05](../tests/consistency/consistency05.md) | **no** |
+| `EXTRA_ADDRESS_CHILD` | `NOTICE` | [consistency05](../tests/consistency/consistency05.md) | **no** |
+| `IN_BAILIWICK_ADDR_MISMATCH` | `ERROR` | [consistency05](../tests/consistency/consistency05.md) | **no** |
 | `IPV4_DISABLED` | `DEBUG` | [consistency01](../tests/consistency/consistency01.md), [consistency02](../tests/consistency/consistency02.md), [consistency03](../tests/consistency/consistency03.md), [consistency04](../tests/consistency/consistency04.md), [consistency06](../tests/consistency/consistency06.md) | yes |
 | `IPV6_DISABLED` | `DEBUG` | [consistency01](../tests/consistency/consistency01.md), [consistency02](../tests/consistency/consistency02.md), [consistency03](../tests/consistency/consistency03.md), [consistency04](../tests/consistency/consistency04.md), [consistency06](../tests/consistency/consistency06.md) | yes |
-| `MULTIPLE_NS_SET` | `NOTICE` | [consistency04](../tests/consistency/consistency04.md) | yes |
-| `MULTIPLE_SOA_MNAMES` | `NOTICE` | [consistency06](../tests/consistency/consistency06.md) | yes |
-| `MULTIPLE_SOA_RNAMES` | `NOTICE` | [consistency02](../tests/consistency/consistency02.md) | yes |
-| `MULTIPLE_SOA_SERIALS` | `WARNING` | [consistency01](../tests/consistency/consistency01.md) | yes |
-| `MULTIPLE_SOA_TIME_PARAMETER_SET` | `NOTICE` | [consistency03](../tests/consistency/consistency03.md) | yes |
+| `MULTIPLE_NS_SET` | `NOTICE` | [consistency04](../tests/consistency/consistency04.md) | **no** |
+| `MULTIPLE_SOA_MNAMES` | `NOTICE` | [consistency06](../tests/consistency/consistency06.md) | **no** |
+| `MULTIPLE_SOA_RNAMES` | `NOTICE` | [consistency02](../tests/consistency/consistency02.md) | **no** |
+| `MULTIPLE_SOA_SERIALS` | `WARNING` | [consistency01](../tests/consistency/consistency01.md) | **no** |
+| `MULTIPLE_SOA_TIME_PARAMETER_SET` | `NOTICE` | [consistency03](../tests/consistency/consistency03.md) | **no** |
 | `NO_RESPONSE` | `DEBUG` | [consistency01](../tests/consistency/consistency01.md), [consistency02](../tests/consistency/consistency02.md), [consistency03](../tests/consistency/consistency03.md), [consistency04](../tests/consistency/consistency04.md), [consistency05](../tests/consistency/consistency05.md), [consistency06](../tests/consistency/consistency06.md) | yes |
-| `NO_RESPONSE_NS_QUERY` | `DEBUG` | [consistency04](../tests/consistency/consistency04.md) | yes |
-| `NO_RESPONSE_SOA_QUERY` | `DEBUG` | [consistency01](../tests/consistency/consistency01.md), [consistency02](../tests/consistency/consistency02.md), [consistency03](../tests/consistency/consistency03.md), [consistency06](../tests/consistency/consistency06.md) | yes |
-| `NS_SET` | `INFO` | [consistency04](../tests/consistency/consistency04.md) | yes |
-| `ONE_NS_SET` | `INFO` | [consistency04](../tests/consistency/consistency04.md) | yes |
-| `ONE_SOA_MNAME` | `INFO` | [consistency06](../tests/consistency/consistency06.md) | yes |
-| `ONE_SOA_RNAME` | `INFO` | [consistency02](../tests/consistency/consistency02.md) | yes |
-| `ONE_SOA_SERIAL` | `INFO` | [consistency01](../tests/consistency/consistency01.md) | yes |
-| `ONE_SOA_TIME_PARAMETER_SET` | `INFO` | [consistency03](../tests/consistency/consistency03.md) | yes |
-| `OUT_OF_BAILIWICK_ADDR_MISMATCH` | `ERROR` | [consistency05](../tests/consistency/consistency05.md) | yes |
+| `NO_RESPONSE_NS_QUERY` | `DEBUG` | [consistency04](../tests/consistency/consistency04.md) | **no** |
+| `NO_RESPONSE_SOA_QUERY` | `DEBUG` | [consistency01](../tests/consistency/consistency01.md), [consistency02](../tests/consistency/consistency02.md), [consistency03](../tests/consistency/consistency03.md), [consistency06](../tests/consistency/consistency06.md) | **no** |
+| `NS_SET` | `INFO` | [consistency04](../tests/consistency/consistency04.md) | **no** |
+| `ONE_NS_SET` | `INFO` | [consistency04](../tests/consistency/consistency04.md) | **no** |
+| `ONE_SOA_MNAME` | `INFO` | [consistency06](../tests/consistency/consistency06.md) | **no** |
+| `ONE_SOA_RNAME` | `INFO` | [consistency02](../tests/consistency/consistency02.md) | **no** |
+| `ONE_SOA_SERIAL` | `INFO` | [consistency01](../tests/consistency/consistency01.md) | **no** |
+| `ONE_SOA_TIME_PARAMETER_SET` | `INFO` | [consistency03](../tests/consistency/consistency03.md) | **no** |
+| `OUT_OF_BAILIWICK_ADDR_MISMATCH` | `ERROR` | [consistency05](../tests/consistency/consistency05.md) | **no** |
 | `SOA_MNAME` | `—` | [consistency06](../tests/consistency/consistency06.md) | **no** |
-| `SOA_RNAME` | `INFO` | [consistency02](../tests/consistency/consistency02.md) | yes |
-| `SOA_SERIAL` | `INFO` | [consistency01](../tests/consistency/consistency01.md) | yes |
-| `SOA_SERIAL_VARIATION` | `NOTICE` | [consistency01](../tests/consistency/consistency01.md) | yes |
-| `SOA_TIME_PARAMETER_SET` | `INFO` | [consistency03](../tests/consistency/consistency03.md) | yes |
+| `SOA_RNAME` | `INFO` | [consistency02](../tests/consistency/consistency02.md) | **no** |
+| `SOA_SERIAL` | `INFO` | [consistency01](../tests/consistency/consistency01.md) | **no** |
+| `SOA_SERIAL_VARIATION` | `NOTICE` | [consistency01](../tests/consistency/consistency01.md) | **no** |
+| `SOA_TIME_PARAMETER_SET` | `INFO` | [consistency03](../tests/consistency/consistency03.md) | **no** |
 | `TEST_CASE_END` | `DEBUG` | [consistency01](../tests/consistency/consistency01.md), [consistency02](../tests/consistency/consistency02.md), [consistency03](../tests/consistency/consistency03.md), [consistency04](../tests/consistency/consistency04.md), [consistency05](../tests/consistency/consistency05.md), [consistency06](../tests/consistency/consistency06.md) | yes |
 | `TEST_CASE_START` | `DEBUG` | [consistency01](../tests/consistency/consistency01.md), [consistency02](../tests/consistency/consistency02.md), [consistency03](../tests/consistency/consistency03.md), [consistency04](../tests/consistency/consistency04.md), [consistency05](../tests/consistency/consistency05.md), [consistency06](../tests/consistency/consistency06.md) | yes |
 
@@ -48,17 +48,28 @@ _Do not edit by hand — regenerate with the command above._
 These tags have no `CONSISTENCY:<TAG>` comment in any `.po` file.
 They will render as the raw tag name in translated output.
 
+- `ADDRESSES_MATCH`
+- `CHILD_NS_FAILED`
+- `CHILD_ZONE_LAME`
+- `EXTRA_ADDRESS_CHILD`
+- `IN_BAILIWICK_ADDR_MISMATCH`
+- `MULTIPLE_NS_SET`
+- `MULTIPLE_SOA_MNAMES`
+- `MULTIPLE_SOA_RNAMES`
+- `MULTIPLE_SOA_SERIALS`
+- `MULTIPLE_SOA_TIME_PARAMETER_SET`
+- `NO_RESPONSE_NS_QUERY`
+- `NO_RESPONSE_SOA_QUERY`
+- `NS_SET`
+- `ONE_NS_SET`
+- `ONE_SOA_MNAME`
+- `ONE_SOA_RNAME`
+- `ONE_SOA_SERIAL`
+- `ONE_SOA_TIME_PARAMETER_SET`
+- `OUT_OF_BAILIWICK_ADDR_MISMATCH`
 - `SOA_MNAME`
-
-### Stale Entries In Locale Files
-
-These tags appear as `CONSISTENCY:<TAG>` in `.po` files but are absent from
-current code metadata.  The messages may be dead translations.
-
-- `CONSISTENCY01`
-- `CONSISTENCY02`
-- `CONSISTENCY03`
-- `CONSISTENCY04`
-- `CONSISTENCY05`
-- `CONSISTENCY06`
+- `SOA_RNAME`
+- `SOA_SERIAL`
+- `SOA_SERIAL_VARIATION`
+- `SOA_TIME_PARAMETER_SET`
 

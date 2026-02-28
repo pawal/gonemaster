@@ -11,53 +11,53 @@ _Do not edit by hand — regenerate with the command above._
 
 | Tag | Level | Testcase(s) | i18n |
 | --- | --- | --- | --- |
-| `ASN_INFOS_ANNOUNCE_BY` | `DEBUG` | [connectivity03](../tests/connectivity/connectivity03.md) | yes |
-| `ASN_INFOS_ANNOUNCE_IN` | `DEBUG` | [connectivity03](../tests/connectivity/connectivity03.md) | yes |
-| `ASN_INFOS_RAW` | `DEBUG` | [connectivity03](../tests/connectivity/connectivity03.md) | yes |
-| `CN01_IPV4_DISABLED` | `NOTICE` | [connectivity01](../tests/connectivity/connectivity01.md) | yes |
-| `CN01_IPV6_DISABLED` | `NOTICE` | [connectivity01](../tests/connectivity/connectivity01.md) | yes |
-| `CN01_MISSING_NS_RECORD_UDP` | `WARNING` | [connectivity01](../tests/connectivity/connectivity01.md) | yes |
-| `CN01_MISSING_SOA_RECORD_UDP` | `WARNING` | [connectivity01](../tests/connectivity/connectivity01.md) | yes |
-| `CN01_NO_RESPONSE_NS_QUERY_UDP` | `WARNING` | [connectivity01](../tests/connectivity/connectivity01.md) | yes |
-| `CN01_NO_RESPONSE_SOA_QUERY_UDP` | `WARNING` | [connectivity01](../tests/connectivity/connectivity01.md) | yes |
-| `CN01_NO_RESPONSE_UDP` | `WARNING` | [connectivity01](../tests/connectivity/connectivity01.md) | yes |
-| `CN01_NS_RECORD_NOT_AA_UDP` | `WARNING` | [connectivity01](../tests/connectivity/connectivity01.md) | yes |
-| `CN01_SOA_RECORD_NOT_AA_UDP` | `WARNING` | [connectivity01](../tests/connectivity/connectivity01.md) | yes |
-| `CN01_UNEXPECTED_RCODE_NS_QUERY_UDP` | `WARNING` | [connectivity01](../tests/connectivity/connectivity01.md) | yes |
-| `CN01_UNEXPECTED_RCODE_SOA_QUERY_UDP` | `WARNING` | [connectivity01](../tests/connectivity/connectivity01.md) | yes |
-| `CN01_WRONG_NS_RECORD_UDP` | `WARNING` | [connectivity01](../tests/connectivity/connectivity01.md) | yes |
-| `CN01_WRONG_SOA_RECORD_UDP` | `WARNING` | [connectivity01](../tests/connectivity/connectivity01.md) | yes |
-| `CN02_MISSING_NS_RECORD_TCP` | `WARNING` | [connectivity02](../tests/connectivity/connectivity02.md) | yes |
-| `CN02_MISSING_SOA_RECORD_TCP` | `WARNING` | [connectivity02](../tests/connectivity/connectivity02.md) | yes |
-| `CN02_NO_RESPONSE_NS_QUERY_TCP` | `WARNING` | [connectivity02](../tests/connectivity/connectivity02.md) | yes |
-| `CN02_NO_RESPONSE_SOA_QUERY_TCP` | `WARNING` | [connectivity02](../tests/connectivity/connectivity02.md) | yes |
-| `CN02_NO_RESPONSE_TCP` | `WARNING` | [connectivity02](../tests/connectivity/connectivity02.md) | yes |
-| `CN02_NS_RECORD_NOT_AA_TCP` | `WARNING` | [connectivity02](../tests/connectivity/connectivity02.md) | yes |
-| `CN02_SOA_RECORD_NOT_AA_TCP` | `WARNING` | [connectivity02](../tests/connectivity/connectivity02.md) | yes |
-| `CN02_UNEXPECTED_RCODE_NS_QUERY_TCP` | `WARNING` | [connectivity02](../tests/connectivity/connectivity02.md) | yes |
-| `CN02_UNEXPECTED_RCODE_SOA_QUERY_TCP` | `WARNING` | [connectivity02](../tests/connectivity/connectivity02.md) | yes |
-| `CN02_WRONG_NS_RECORD_TCP` | `WARNING` | [connectivity02](../tests/connectivity/connectivity02.md) | yes |
-| `CN02_WRONG_SOA_RECORD_TCP` | `WARNING` | [connectivity02](../tests/connectivity/connectivity02.md) | yes |
+| `ASN_INFOS_ANNOUNCE_BY` | `DEBUG` | [connectivity03](../tests/connectivity/connectivity03.md) | **no** |
+| `ASN_INFOS_ANNOUNCE_IN` | `DEBUG` | [connectivity03](../tests/connectivity/connectivity03.md) | **no** |
+| `ASN_INFOS_RAW` | `DEBUG` | [connectivity03](../tests/connectivity/connectivity03.md) | **no** |
+| `CN01_IPV4_DISABLED` | `NOTICE` | [connectivity01](../tests/connectivity/connectivity01.md) | **no** |
+| `CN01_IPV6_DISABLED` | `NOTICE` | [connectivity01](../tests/connectivity/connectivity01.md) | **no** |
+| `CN01_MISSING_NS_RECORD_UDP` | `WARNING` | [connectivity01](../tests/connectivity/connectivity01.md) | **no** |
+| `CN01_MISSING_SOA_RECORD_UDP` | `WARNING` | [connectivity01](../tests/connectivity/connectivity01.md) | **no** |
+| `CN01_NO_RESPONSE_NS_QUERY_UDP` | `WARNING` | [connectivity01](../tests/connectivity/connectivity01.md) | **no** |
+| `CN01_NO_RESPONSE_SOA_QUERY_UDP` | `WARNING` | [connectivity01](../tests/connectivity/connectivity01.md) | **no** |
+| `CN01_NO_RESPONSE_UDP` | `WARNING` | [connectivity01](../tests/connectivity/connectivity01.md) | **no** |
+| `CN01_NS_RECORD_NOT_AA_UDP` | `WARNING` | [connectivity01](../tests/connectivity/connectivity01.md) | **no** |
+| `CN01_SOA_RECORD_NOT_AA_UDP` | `WARNING` | [connectivity01](../tests/connectivity/connectivity01.md) | **no** |
+| `CN01_UNEXPECTED_RCODE_NS_QUERY_UDP` | `WARNING` | [connectivity01](../tests/connectivity/connectivity01.md) | **no** |
+| `CN01_UNEXPECTED_RCODE_SOA_QUERY_UDP` | `WARNING` | [connectivity01](../tests/connectivity/connectivity01.md) | **no** |
+| `CN01_WRONG_NS_RECORD_UDP` | `WARNING` | [connectivity01](../tests/connectivity/connectivity01.md) | **no** |
+| `CN01_WRONG_SOA_RECORD_UDP` | `WARNING` | [connectivity01](../tests/connectivity/connectivity01.md) | **no** |
+| `CN02_MISSING_NS_RECORD_TCP` | `WARNING` | [connectivity02](../tests/connectivity/connectivity02.md) | **no** |
+| `CN02_MISSING_SOA_RECORD_TCP` | `WARNING` | [connectivity02](../tests/connectivity/connectivity02.md) | **no** |
+| `CN02_NO_RESPONSE_NS_QUERY_TCP` | `WARNING` | [connectivity02](../tests/connectivity/connectivity02.md) | **no** |
+| `CN02_NO_RESPONSE_SOA_QUERY_TCP` | `WARNING` | [connectivity02](../tests/connectivity/connectivity02.md) | **no** |
+| `CN02_NO_RESPONSE_TCP` | `WARNING` | [connectivity02](../tests/connectivity/connectivity02.md) | **no** |
+| `CN02_NS_RECORD_NOT_AA_TCP` | `WARNING` | [connectivity02](../tests/connectivity/connectivity02.md) | **no** |
+| `CN02_SOA_RECORD_NOT_AA_TCP` | `WARNING` | [connectivity02](../tests/connectivity/connectivity02.md) | **no** |
+| `CN02_UNEXPECTED_RCODE_NS_QUERY_TCP` | `WARNING` | [connectivity02](../tests/connectivity/connectivity02.md) | **no** |
+| `CN02_UNEXPECTED_RCODE_SOA_QUERY_TCP` | `WARNING` | [connectivity02](../tests/connectivity/connectivity02.md) | **no** |
+| `CN02_WRONG_NS_RECORD_TCP` | `WARNING` | [connectivity02](../tests/connectivity/connectivity02.md) | **no** |
+| `CN02_WRONG_SOA_RECORD_TCP` | `WARNING` | [connectivity02](../tests/connectivity/connectivity02.md) | **no** |
 | `CN04_ASN_INFOS_ANNOUNCE_IN` | `DEBUG` | [connectivity04](../tests/connectivity/connectivity04.md) | **no** |
 | `CN04_ASN_INFOS_RAW` | `DEBUG` | [connectivity04](../tests/connectivity/connectivity04.md) | **no** |
-| `CN04_EMPTY_PREFIX_SET` | `NOTICE` | [connectivity04](../tests/connectivity/connectivity04.md) | yes |
-| `CN04_ERROR_PREFIX_DATABASE` | `NOTICE` | [connectivity04](../tests/connectivity/connectivity04.md) | yes |
-| `CN04_IPV4_DIFFERENT_PREFIX` | `INFO` | [connectivity04](../tests/connectivity/connectivity04.md) | yes |
-| `CN04_IPV4_SAME_PREFIX` | `NOTICE` | [connectivity04](../tests/connectivity/connectivity04.md) | yes |
-| `CN04_IPV4_SINGLE_PREFIX` | `WARNING` | [connectivity04](../tests/connectivity/connectivity04.md) | yes |
-| `CN04_IPV6_DIFFERENT_PREFIX` | `INFO` | [connectivity04](../tests/connectivity/connectivity04.md) | yes |
-| `CN04_IPV6_SAME_PREFIX` | `NOTICE` | [connectivity04](../tests/connectivity/connectivity04.md) | yes |
-| `CN04_IPV6_SINGLE_PREFIX` | `WARNING` | [connectivity04](../tests/connectivity/connectivity04.md) | yes |
-| `EMPTY_ASN_SET` | `NOTICE` | [connectivity03](../tests/connectivity/connectivity03.md) | yes |
-| `ERROR_ASN_DATABASE` | `NOTICE` | [connectivity03](../tests/connectivity/connectivity03.md) | yes |
-| `IPV4_DIFFERENT_ASN` | `INFO` | [connectivity03](../tests/connectivity/connectivity03.md) | yes |
+| `CN04_EMPTY_PREFIX_SET` | `NOTICE` | [connectivity04](../tests/connectivity/connectivity04.md) | **no** |
+| `CN04_ERROR_PREFIX_DATABASE` | `NOTICE` | [connectivity04](../tests/connectivity/connectivity04.md) | **no** |
+| `CN04_IPV4_DIFFERENT_PREFIX` | `INFO` | [connectivity04](../tests/connectivity/connectivity04.md) | **no** |
+| `CN04_IPV4_SAME_PREFIX` | `NOTICE` | [connectivity04](../tests/connectivity/connectivity04.md) | **no** |
+| `CN04_IPV4_SINGLE_PREFIX` | `WARNING` | [connectivity04](../tests/connectivity/connectivity04.md) | **no** |
+| `CN04_IPV6_DIFFERENT_PREFIX` | `INFO` | [connectivity04](../tests/connectivity/connectivity04.md) | **no** |
+| `CN04_IPV6_SAME_PREFIX` | `NOTICE` | [connectivity04](../tests/connectivity/connectivity04.md) | **no** |
+| `CN04_IPV6_SINGLE_PREFIX` | `WARNING` | [connectivity04](../tests/connectivity/connectivity04.md) | **no** |
+| `EMPTY_ASN_SET` | `NOTICE` | [connectivity03](../tests/connectivity/connectivity03.md) | **no** |
+| `ERROR_ASN_DATABASE` | `NOTICE` | [connectivity03](../tests/connectivity/connectivity03.md) | **no** |
+| `IPV4_DIFFERENT_ASN` | `INFO` | [connectivity03](../tests/connectivity/connectivity03.md) | **no** |
 | `IPV4_DISABLED` | `DEBUG` | [connectivity01](../tests/connectivity/connectivity01.md), [connectivity02](../tests/connectivity/connectivity02.md) | yes |
-| `IPV4_ONE_ASN` | `WARNING` | [connectivity03](../tests/connectivity/connectivity03.md) | yes |
-| `IPV4_SAME_ASN` | `NOTICE` | [connectivity03](../tests/connectivity/connectivity03.md) | yes |
-| `IPV6_DIFFERENT_ASN` | `INFO` | [connectivity03](../tests/connectivity/connectivity03.md) | yes |
+| `IPV4_ONE_ASN` | `WARNING` | [connectivity03](../tests/connectivity/connectivity03.md) | **no** |
+| `IPV4_SAME_ASN` | `NOTICE` | [connectivity03](../tests/connectivity/connectivity03.md) | **no** |
+| `IPV6_DIFFERENT_ASN` | `INFO` | [connectivity03](../tests/connectivity/connectivity03.md) | **no** |
 | `IPV6_DISABLED` | `DEBUG` | [connectivity01](../tests/connectivity/connectivity01.md), [connectivity02](../tests/connectivity/connectivity02.md) | yes |
-| `IPV6_ONE_ASN` | `WARNING` | [connectivity03](../tests/connectivity/connectivity03.md) | yes |
-| `IPV6_SAME_ASN` | `NOTICE` | [connectivity03](../tests/connectivity/connectivity03.md) | yes |
+| `IPV6_ONE_ASN` | `WARNING` | [connectivity03](../tests/connectivity/connectivity03.md) | **no** |
+| `IPV6_SAME_ASN` | `NOTICE` | [connectivity03](../tests/connectivity/connectivity03.md) | **no** |
 | `TEST_CASE_END` | `DEBUG` | [connectivity01](../tests/connectivity/connectivity01.md), [connectivity02](../tests/connectivity/connectivity02.md), [connectivity03](../tests/connectivity/connectivity03.md), [connectivity04](../tests/connectivity/connectivity04.md) | yes |
 | `TEST_CASE_START` | `DEBUG` | [connectivity01](../tests/connectivity/connectivity01.md), [connectivity02](../tests/connectivity/connectivity02.md), [connectivity03](../tests/connectivity/connectivity03.md), [connectivity04](../tests/connectivity/connectivity04.md) | yes |
 
@@ -68,18 +68,49 @@ _Do not edit by hand — regenerate with the command above._
 These tags have no `CONNECTIVITY:<TAG>` comment in any `.po` file.
 They will render as the raw tag name in translated output.
 
+- `ASN_INFOS_ANNOUNCE_BY`
+- `ASN_INFOS_ANNOUNCE_IN`
+- `ASN_INFOS_RAW`
+- `CN01_IPV4_DISABLED`
+- `CN01_IPV6_DISABLED`
+- `CN01_MISSING_NS_RECORD_UDP`
+- `CN01_MISSING_SOA_RECORD_UDP`
+- `CN01_NO_RESPONSE_NS_QUERY_UDP`
+- `CN01_NO_RESPONSE_SOA_QUERY_UDP`
+- `CN01_NO_RESPONSE_UDP`
+- `CN01_NS_RECORD_NOT_AA_UDP`
+- `CN01_SOA_RECORD_NOT_AA_UDP`
+- `CN01_UNEXPECTED_RCODE_NS_QUERY_UDP`
+- `CN01_UNEXPECTED_RCODE_SOA_QUERY_UDP`
+- `CN01_WRONG_NS_RECORD_UDP`
+- `CN01_WRONG_SOA_RECORD_UDP`
+- `CN02_MISSING_NS_RECORD_TCP`
+- `CN02_MISSING_SOA_RECORD_TCP`
+- `CN02_NO_RESPONSE_NS_QUERY_TCP`
+- `CN02_NO_RESPONSE_SOA_QUERY_TCP`
+- `CN02_NO_RESPONSE_TCP`
+- `CN02_NS_RECORD_NOT_AA_TCP`
+- `CN02_SOA_RECORD_NOT_AA_TCP`
+- `CN02_UNEXPECTED_RCODE_NS_QUERY_TCP`
+- `CN02_UNEXPECTED_RCODE_SOA_QUERY_TCP`
+- `CN02_WRONG_NS_RECORD_TCP`
+- `CN02_WRONG_SOA_RECORD_TCP`
 - `CN04_ASN_INFOS_ANNOUNCE_IN`
 - `CN04_ASN_INFOS_RAW`
-
-### Stale Entries In Locale Files
-
-These tags appear as `CONNECTIVITY:<TAG>` in `.po` files but are absent from
-current code metadata.  The messages may be dead translations.
-
-- `CONNECTIVITY01`
-- `CONNECTIVITY02`
-- `CONNECTIVITY03`
-- `CONNECTIVITY04`
-- `IPV4_ASN`
-- `IPV6_ASN`
+- `CN04_EMPTY_PREFIX_SET`
+- `CN04_ERROR_PREFIX_DATABASE`
+- `CN04_IPV4_DIFFERENT_PREFIX`
+- `CN04_IPV4_SAME_PREFIX`
+- `CN04_IPV4_SINGLE_PREFIX`
+- `CN04_IPV6_DIFFERENT_PREFIX`
+- `CN04_IPV6_SAME_PREFIX`
+- `CN04_IPV6_SINGLE_PREFIX`
+- `EMPTY_ASN_SET`
+- `ERROR_ASN_DATABASE`
+- `IPV4_DIFFERENT_ASN`
+- `IPV4_ONE_ASN`
+- `IPV4_SAME_ASN`
+- `IPV6_DIFFERENT_ASN`
+- `IPV6_ONE_ASN`
+- `IPV6_SAME_ASN`
 

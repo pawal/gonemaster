@@ -11,94 +11,140 @@ _Do not edit by hand — regenerate with the command above._
 
 | Tag | Level | Testcase(s) | i18n |
 | --- | --- | --- | --- |
-| `EXPIRE_LOWER_THAN_REFRESH` | `WARNING` | [zone05](../tests/zone/zone05.md) | yes |
-| `EXPIRE_MINIMUM_VALUE_LOWER` | `WARNING` | [zone05](../tests/zone/zone05.md) | yes |
-| `EXPIRE_MINIMUM_VALUE_OK` | `INFO` | [zone05](../tests/zone/zone05.md) | yes |
+| `EXPIRE_LOWER_THAN_REFRESH` | `WARNING` | [zone05](../tests/zone/zone05.md) | **no** |
+| `EXPIRE_MINIMUM_VALUE_LOWER` | `WARNING` | [zone05](../tests/zone/zone05.md) | **no** |
+| `EXPIRE_MINIMUM_VALUE_OK` | `INFO` | [zone05](../tests/zone/zone05.md) | **no** |
 | `IPV4_DISABLED` | `—` | [zone12](../tests/zone/zone12.md) | yes |
 | `IPV6_DISABLED` | `—` | [zone12](../tests/zone/zone12.md) | yes |
-| `MNAME_HAS_NO_ADDRESS` | `WARNING` | [zone07](../tests/zone/zone07.md) | yes |
-| `MNAME_IS_CNAME` | `NOTICE` | [zone07](../tests/zone/zone07.md) | yes |
-| `MNAME_IS_NOT_CNAME` | `INFO` | [zone07](../tests/zone/zone07.md) | yes |
-| `MULTIPLE_SOA` | `ERROR` | [zone10](../tests/zone/zone10.md) | yes |
-| `MX_RECORD_IS_CNAME` | `ERROR` | [zone08](../tests/zone/zone08.md) | yes |
-| `MX_RECORD_IS_NOT_CNAME` | `INFO` | [zone08](../tests/zone/zone08.md) | yes |
+| `MNAME_HAS_NO_ADDRESS` | `WARNING` | [zone07](../tests/zone/zone07.md) | **no** |
+| `MNAME_IS_CNAME` | `NOTICE` | [zone07](../tests/zone/zone07.md) | **no** |
+| `MNAME_IS_NOT_CNAME` | `INFO` | [zone07](../tests/zone/zone07.md) | **no** |
+| `MULTIPLE_SOA` | `ERROR` | [zone10](../tests/zone/zone10.md) | **no** |
+| `MX_RECORD_IS_CNAME` | `ERROR` | [zone08](../tests/zone/zone08.md) | **no** |
+| `MX_RECORD_IS_NOT_CNAME` | `INFO` | [zone08](../tests/zone/zone08.md) | **no** |
 | `NO_RESPONSE` | `DEBUG` | [zone10](../tests/zone/zone10.md) | yes |
 | `NO_RESPONSE_MX_QUERY` | `DEBUG` | [zone08](../tests/zone/zone08.md) | yes |
 | `NO_RESPONSE_SOA_QUERY` | `DEBUG` | [zone02](../tests/zone/zone02.md), [zone03](../tests/zone/zone03.md), [zone04](../tests/zone/zone04.md), [zone05](../tests/zone/zone05.md), [zone06](../tests/zone/zone06.md), [zone07](../tests/zone/zone07.md) | yes |
-| `NO_SOA_IN_RESPONSE` | `DEBUG` | [zone10](../tests/zone/zone10.md) | yes |
-| `ONE_SOA` | `INFO` | [zone10](../tests/zone/zone10.md) | yes |
-| `REFRESH_HIGHER_THAN_RETRY` | `INFO` | [zone03](../tests/zone/zone03.md) | yes |
-| `REFRESH_LOWER_THAN_RETRY` | `INFO` | [zone03](../tests/zone/zone03.md) | yes |
-| `REFRESH_MINIMUM_VALUE_LOWER` | `NOTICE` | [zone02](../tests/zone/zone02.md) | yes |
-| `REFRESH_MINIMUM_VALUE_OK` | `INFO` | [zone02](../tests/zone/zone02.md) | yes |
-| `RETRY_MINIMUM_VALUE_LOWER` | `NOTICE` | [zone04](../tests/zone/zone04.md) | yes |
-| `RETRY_MINIMUM_VALUE_OK` | `INFO` | [zone04](../tests/zone/zone04.md) | yes |
-| `SOA_DEFAULT_TTL_MAXIMUM_VALUE_HIGHER` | `NOTICE` | [zone06](../tests/zone/zone06.md) | yes |
-| `SOA_DEFAULT_TTL_MAXIMUM_VALUE_LOWER` | `NOTICE` | [zone06](../tests/zone/zone06.md) | yes |
-| `SOA_DEFAULT_TTL_MAXIMUM_VALUE_OK` | `INFO` | [zone06](../tests/zone/zone06.md) | yes |
+| `NO_SOA_IN_RESPONSE` | `DEBUG` | [zone10](../tests/zone/zone10.md) | **no** |
+| `ONE_SOA` | `INFO` | [zone10](../tests/zone/zone10.md) | **no** |
+| `REFRESH_HIGHER_THAN_RETRY` | `INFO` | [zone03](../tests/zone/zone03.md) | **no** |
+| `REFRESH_LOWER_THAN_RETRY` | `INFO` | [zone03](../tests/zone/zone03.md) | **no** |
+| `REFRESH_MINIMUM_VALUE_LOWER` | `NOTICE` | [zone02](../tests/zone/zone02.md) | **no** |
+| `REFRESH_MINIMUM_VALUE_OK` | `INFO` | [zone02](../tests/zone/zone02.md) | **no** |
+| `RETRY_MINIMUM_VALUE_LOWER` | `NOTICE` | [zone04](../tests/zone/zone04.md) | **no** |
+| `RETRY_MINIMUM_VALUE_OK` | `INFO` | [zone04](../tests/zone/zone04.md) | **no** |
+| `SOA_DEFAULT_TTL_MAXIMUM_VALUE_HIGHER` | `NOTICE` | [zone06](../tests/zone/zone06.md) | **no** |
+| `SOA_DEFAULT_TTL_MAXIMUM_VALUE_LOWER` | `NOTICE` | [zone06](../tests/zone/zone06.md) | **no** |
+| `SOA_DEFAULT_TTL_MAXIMUM_VALUE_OK` | `INFO` | [zone06](../tests/zone/zone06.md) | **no** |
 | `TEST_CASE_END` | `DEBUG` | [zone01](../tests/zone/zone01.md), [zone02](../tests/zone/zone02.md), [zone03](../tests/zone/zone03.md), [zone04](../tests/zone/zone04.md), [zone05](../tests/zone/zone05.md), [zone06](../tests/zone/zone06.md), [zone07](../tests/zone/zone07.md), [zone08](../tests/zone/zone08.md), [zone09](../tests/zone/zone09.md), [zone10](../tests/zone/zone10.md), [zone12](../tests/zone/zone12.md) | yes |
 | `TEST_CASE_START` | `DEBUG` | [zone01](../tests/zone/zone01.md), [zone02](../tests/zone/zone02.md), [zone03](../tests/zone/zone03.md), [zone04](../tests/zone/zone04.md), [zone05](../tests/zone/zone05.md), [zone06](../tests/zone/zone06.md), [zone07](../tests/zone/zone07.md), [zone08](../tests/zone/zone08.md), [zone09](../tests/zone/zone09.md), [zone10](../tests/zone/zone10.md), [zone12](../tests/zone/zone12.md) | yes |
-| `WRONG_SOA` | `DEBUG` | [zone10](../tests/zone/zone10.md) | yes |
-| `Z01_MNAME_HAS_LOCALHOST_ADDR` | `NOTICE` | [zone01](../tests/zone/zone01.md) | yes |
-| `Z01_MNAME_IS_DOT` | `NOTICE` | [zone01](../tests/zone/zone01.md) | yes |
-| `Z01_MNAME_IS_LOCALHOST` | `NOTICE` | [zone01](../tests/zone/zone01.md) | yes |
-| `Z01_MNAME_IS_MASTER` | `DEBUG` | [zone01](../tests/zone/zone01.md) | yes |
-| `Z01_MNAME_MISSING_SOA_RECORD` | `NOTICE` | [zone01](../tests/zone/zone01.md) | yes |
-| `Z01_MNAME_NOT_AUTHORITATIVE` | `NOTICE` | [zone01](../tests/zone/zone01.md) | yes |
-| `Z01_MNAME_NOT_IN_NS_LIST` | `INFO` | [zone01](../tests/zone/zone01.md) | yes |
-| `Z01_MNAME_NOT_MASTER` | `NOTICE` | [zone01](../tests/zone/zone01.md) | yes |
-| `Z01_MNAME_NOT_RESOLVE` | `NOTICE` | [zone01](../tests/zone/zone01.md) | yes |
-| `Z01_MNAME_NO_RESPONSE` | `NOTICE` | [zone01](../tests/zone/zone01.md) | yes |
-| `Z01_MNAME_UNEXPECTED_RCODE` | `NOTICE` | [zone01](../tests/zone/zone01.md) | yes |
-| `Z09_INCONSISTENT_MX` | `WARNING` | [zone09](../tests/zone/zone09.md) | yes |
-| `Z09_INCONSISTENT_MX_DATA` | `WARNING` | [zone09](../tests/zone/zone09.md) | yes |
-| `Z09_MISSING_MAIL_TARGET` | `NOTICE` | [zone09](../tests/zone/zone09.md) | yes |
-| `Z09_MX_DATA` | `INFO` | [zone09](../tests/zone/zone09.md) | yes |
-| `Z09_MX_FOUND` | `INFO` | [zone09](../tests/zone/zone09.md) | yes |
-| `Z09_NON_AUTH_MX_RESPONSE` | `WARNING` | [zone09](../tests/zone/zone09.md) | yes |
-| `Z09_NO_MX_FOUND` | `INFO` | [zone09](../tests/zone/zone09.md) | yes |
-| `Z09_NO_RESPONSE_MX_QUERY` | `WARNING` | [zone09](../tests/zone/zone09.md) | yes |
-| `Z09_NULL_MX_NON_ZERO_PREF` | `NOTICE` | [zone09](../tests/zone/zone09.md) | yes |
-| `Z09_NULL_MX_WITH_OTHER_MX` | `WARNING` | [zone09](../tests/zone/zone09.md) | yes |
-| `Z09_ROOT_EMAIL_DOMAIN` | `NOTICE` | [zone09](../tests/zone/zone09.md) | yes |
-| `Z09_TLD_EMAIL_DOMAIN` | `WARNING` | [zone09](../tests/zone/zone09.md) | yes |
-| `Z09_UNEXPECTED_RCODE_MX` | `WARNING` | [zone09](../tests/zone/zone09.md) | yes |
-| `Z11_DIFFERENT_SPF_POLICIES_FOUND` | `NOTICE` | [zone11](../tests/zone/zone11.md) | yes |
-| `Z11_INCONSISTENT_SPF_POLICIES` | `WARNING` | [zone11](../tests/zone/zone11.md) | yes |
-| `Z11_NON_NULL_SPF_NON_MAIL_DOMAIN` | `NOTICE` | [zone11](../tests/zone/zone11.md) | yes |
-| `Z11_NO_SPF_FOUND` | `NOTICE` | [zone11](../tests/zone/zone11.md) | yes |
-| `Z11_NO_SPF_NON_MAIL_DOMAIN` | `INFO` | [zone11](../tests/zone/zone11.md) | yes |
-| `Z11_NULL_SPF_NON_MAIL_DOMAIN` | `INFO` | [zone11](../tests/zone/zone11.md) | yes |
-| `Z11_SPF_MULTIPLE_RECORDS` | `WARNING` | [zone11](../tests/zone/zone11.md) | yes |
-| `Z11_SPF_SYNTAX_ERROR` | `WARNING` | [zone11](../tests/zone/zone11.md) | yes |
-| `Z11_SPF_SYNTAX_OK` | `INFO` | [zone11](../tests/zone/zone11.md) | yes |
-| `Z11_UNABLE_TO_CHECK_FOR_SPF` | `WARNING` | [zone11](../tests/zone/zone11.md) | yes |
-| `Z12_CSYNC_FOUND` | `INFO` | [zone12](../tests/zone/zone12.md) | yes |
-| `Z12_INCONSISTENT_CSYNC` | `WARNING` | [zone12](../tests/zone/zone12.md) | yes |
-| `Z12_MIXED_PRESENCE` | `WARNING` | [zone12](../tests/zone/zone12.md) | yes |
-| `Z12_MULTIPLE_CSYNC` | `WARNING` | [zone12](../tests/zone/zone12.md) | yes |
-| `Z12_NO_CSYNC` | `INFO` | [zone12](../tests/zone/zone12.md) | yes |
+| `WRONG_SOA` | `DEBUG` | [zone10](../tests/zone/zone10.md) | **no** |
+| `Z01_MNAME_HAS_LOCALHOST_ADDR` | `NOTICE` | [zone01](../tests/zone/zone01.md) | **no** |
+| `Z01_MNAME_IS_DOT` | `NOTICE` | [zone01](../tests/zone/zone01.md) | **no** |
+| `Z01_MNAME_IS_LOCALHOST` | `NOTICE` | [zone01](../tests/zone/zone01.md) | **no** |
+| `Z01_MNAME_IS_MASTER` | `DEBUG` | [zone01](../tests/zone/zone01.md) | **no** |
+| `Z01_MNAME_MISSING_SOA_RECORD` | `NOTICE` | [zone01](../tests/zone/zone01.md) | **no** |
+| `Z01_MNAME_NOT_AUTHORITATIVE` | `NOTICE` | [zone01](../tests/zone/zone01.md) | **no** |
+| `Z01_MNAME_NOT_IN_NS_LIST` | `INFO` | [zone01](../tests/zone/zone01.md) | **no** |
+| `Z01_MNAME_NOT_MASTER` | `NOTICE` | [zone01](../tests/zone/zone01.md) | **no** |
+| `Z01_MNAME_NOT_RESOLVE` | `NOTICE` | [zone01](../tests/zone/zone01.md) | **no** |
+| `Z01_MNAME_NO_RESPONSE` | `NOTICE` | [zone01](../tests/zone/zone01.md) | **no** |
+| `Z01_MNAME_UNEXPECTED_RCODE` | `NOTICE` | [zone01](../tests/zone/zone01.md) | **no** |
+| `Z09_INCONSISTENT_MX` | `WARNING` | [zone09](../tests/zone/zone09.md) | **no** |
+| `Z09_INCONSISTENT_MX_DATA` | `WARNING` | [zone09](../tests/zone/zone09.md) | **no** |
+| `Z09_MISSING_MAIL_TARGET` | `NOTICE` | [zone09](../tests/zone/zone09.md) | **no** |
+| `Z09_MX_DATA` | `INFO` | [zone09](../tests/zone/zone09.md) | **no** |
+| `Z09_MX_FOUND` | `INFO` | [zone09](../tests/zone/zone09.md) | **no** |
+| `Z09_NON_AUTH_MX_RESPONSE` | `WARNING` | [zone09](../tests/zone/zone09.md) | **no** |
+| `Z09_NO_MX_FOUND` | `INFO` | [zone09](../tests/zone/zone09.md) | **no** |
+| `Z09_NO_RESPONSE_MX_QUERY` | `WARNING` | [zone09](../tests/zone/zone09.md) | **no** |
+| `Z09_NULL_MX_NON_ZERO_PREF` | `NOTICE` | [zone09](../tests/zone/zone09.md) | **no** |
+| `Z09_NULL_MX_WITH_OTHER_MX` | `WARNING` | [zone09](../tests/zone/zone09.md) | **no** |
+| `Z09_ROOT_EMAIL_DOMAIN` | `NOTICE` | [zone09](../tests/zone/zone09.md) | **no** |
+| `Z09_TLD_EMAIL_DOMAIN` | `WARNING` | [zone09](../tests/zone/zone09.md) | **no** |
+| `Z09_UNEXPECTED_RCODE_MX` | `WARNING` | [zone09](../tests/zone/zone09.md) | **no** |
+| `Z11_DIFFERENT_SPF_POLICIES_FOUND` | `NOTICE` | [zone11](../tests/zone/zone11.md) | **no** |
+| `Z11_INCONSISTENT_SPF_POLICIES` | `WARNING` | [zone11](../tests/zone/zone11.md) | **no** |
+| `Z11_NON_NULL_SPF_NON_MAIL_DOMAIN` | `NOTICE` | [zone11](../tests/zone/zone11.md) | **no** |
+| `Z11_NO_SPF_FOUND` | `NOTICE` | [zone11](../tests/zone/zone11.md) | **no** |
+| `Z11_NO_SPF_NON_MAIL_DOMAIN` | `INFO` | [zone11](../tests/zone/zone11.md) | **no** |
+| `Z11_NULL_SPF_NON_MAIL_DOMAIN` | `INFO` | [zone11](../tests/zone/zone11.md) | **no** |
+| `Z11_SPF_MULTIPLE_RECORDS` | `WARNING` | [zone11](../tests/zone/zone11.md) | **no** |
+| `Z11_SPF_SYNTAX_ERROR` | `WARNING` | [zone11](../tests/zone/zone11.md) | **no** |
+| `Z11_SPF_SYNTAX_OK` | `INFO` | [zone11](../tests/zone/zone11.md) | **no** |
+| `Z11_UNABLE_TO_CHECK_FOR_SPF` | `WARNING` | [zone11](../tests/zone/zone11.md) | **no** |
+| `Z12_CSYNC_FOUND` | `INFO` | [zone12](../tests/zone/zone12.md) | **no** |
+| `Z12_INCONSISTENT_CSYNC` | `WARNING` | [zone12](../tests/zone/zone12.md) | **no** |
+| `Z12_MIXED_PRESENCE` | `WARNING` | [zone12](../tests/zone/zone12.md) | **no** |
+| `Z12_MULTIPLE_CSYNC` | `WARNING` | [zone12](../tests/zone/zone12.md) | **no** |
+| `Z12_NO_CSYNC` | `INFO` | [zone12](../tests/zone/zone12.md) | **no** |
 | `Z12_SERIAL_MISMATCH` | `WARNING` | [zone12](../tests/zone/zone12.md) | yes |
 
 ## i18n Notes
 
-### Stale Entries In Locale Files
+### Tags Missing From Locale Files
 
-These tags appear as `ZONE:<TAG>` in `.po` files but are absent from
-current code metadata.  The messages may be dead translations.
+These tags have no `ZONE:<TAG>` comment in any `.po` file.
+They will render as the raw tag name in translated output.
 
-- `Z11_SPF1_MULTIPLE_RECORDS`
-- `Z11_SPF1_SYNTAX_ERROR`
-- `Z11_SPF1_SYNTAX_OK`
-- `ZONE01`
-- `ZONE02`
-- `ZONE03`
-- `ZONE04`
-- `ZONE05`
-- `ZONE06`
-- `ZONE07`
-- `ZONE08`
-- `ZONE09`
-- `ZONE10`
-- `ZONE11`
+- `EXPIRE_LOWER_THAN_REFRESH`
+- `EXPIRE_MINIMUM_VALUE_LOWER`
+- `EXPIRE_MINIMUM_VALUE_OK`
+- `MNAME_HAS_NO_ADDRESS`
+- `MNAME_IS_CNAME`
+- `MNAME_IS_NOT_CNAME`
+- `MULTIPLE_SOA`
+- `MX_RECORD_IS_CNAME`
+- `MX_RECORD_IS_NOT_CNAME`
+- `NO_SOA_IN_RESPONSE`
+- `ONE_SOA`
+- `REFRESH_HIGHER_THAN_RETRY`
+- `REFRESH_LOWER_THAN_RETRY`
+- `REFRESH_MINIMUM_VALUE_LOWER`
+- `REFRESH_MINIMUM_VALUE_OK`
+- `RETRY_MINIMUM_VALUE_LOWER`
+- `RETRY_MINIMUM_VALUE_OK`
+- `SOA_DEFAULT_TTL_MAXIMUM_VALUE_HIGHER`
+- `SOA_DEFAULT_TTL_MAXIMUM_VALUE_LOWER`
+- `SOA_DEFAULT_TTL_MAXIMUM_VALUE_OK`
+- `WRONG_SOA`
+- `Z01_MNAME_HAS_LOCALHOST_ADDR`
+- `Z01_MNAME_IS_DOT`
+- `Z01_MNAME_IS_LOCALHOST`
+- `Z01_MNAME_IS_MASTER`
+- `Z01_MNAME_MISSING_SOA_RECORD`
+- `Z01_MNAME_NOT_AUTHORITATIVE`
+- `Z01_MNAME_NOT_IN_NS_LIST`
+- `Z01_MNAME_NOT_MASTER`
+- `Z01_MNAME_NOT_RESOLVE`
+- `Z01_MNAME_NO_RESPONSE`
+- `Z01_MNAME_UNEXPECTED_RCODE`
+- `Z09_INCONSISTENT_MX`
+- `Z09_INCONSISTENT_MX_DATA`
+- `Z09_MISSING_MAIL_TARGET`
+- `Z09_MX_DATA`
+- `Z09_MX_FOUND`
+- `Z09_NON_AUTH_MX_RESPONSE`
+- `Z09_NO_MX_FOUND`
+- `Z09_NO_RESPONSE_MX_QUERY`
+- `Z09_NULL_MX_NON_ZERO_PREF`
+- `Z09_NULL_MX_WITH_OTHER_MX`
+- `Z09_ROOT_EMAIL_DOMAIN`
+- `Z09_TLD_EMAIL_DOMAIN`
+- `Z09_UNEXPECTED_RCODE_MX`
+- `Z11_DIFFERENT_SPF_POLICIES_FOUND`
+- `Z11_INCONSISTENT_SPF_POLICIES`
+- `Z11_NON_NULL_SPF_NON_MAIL_DOMAIN`
+- `Z11_NO_SPF_FOUND`
+- `Z11_NO_SPF_NON_MAIL_DOMAIN`
+- `Z11_NULL_SPF_NON_MAIL_DOMAIN`
+- `Z11_SPF_MULTIPLE_RECORDS`
+- `Z11_SPF_SYNTAX_ERROR`
+- `Z11_SPF_SYNTAX_OK`
+- `Z11_UNABLE_TO_CHECK_FOR_SPF`
+- `Z12_CSYNC_FOUND`
+- `Z12_INCONSISTENT_CSYNC`
+- `Z12_MIXED_PRESENCE`
+- `Z12_MULTIPLE_CSYNC`
+- `Z12_NO_CSYNC`
 

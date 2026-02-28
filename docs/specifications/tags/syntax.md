@@ -11,53 +11,71 @@ _Do not edit by hand — regenerate with the command above._
 
 | Tag | Level | Testcase(s) | i18n |
 | --- | --- | --- | --- |
-| `DISCOURAGED_DOUBLE_DASH` | `WARNING` | [syntax03](../tests/syntax/syntax03.md) | yes |
-| `INITIAL_HYPHEN` | `ERROR` | [syntax02](../tests/syntax/syntax02.md) | yes |
+| `DISCOURAGED_DOUBLE_DASH` | `WARNING` | [syntax03](../tests/syntax/syntax03.md) | **no** |
+| `INITIAL_HYPHEN` | `ERROR` | [syntax02](../tests/syntax/syntax02.md) | **no** |
 | `IPV4_DISABLED` | `DEBUG` | [syntax06](../tests/syntax/syntax06.md) | yes |
 | `IPV6_DISABLED` | `DEBUG` | [syntax06](../tests/syntax/syntax06.md) | yes |
-| `MNAME_DISCOURAGED_DOUBLE_DASH` | `WARNING` | [syntax07](../tests/syntax/syntax07.md) | yes |
-| `MNAME_NON_ALLOWED_CHARS` | `WARNING` | [syntax07](../tests/syntax/syntax07.md) | yes |
-| `MNAME_NUMERIC_TLD` | `WARNING` | [syntax07](../tests/syntax/syntax07.md) | yes |
-| `MNAME_SYNTAX_OK` | `INFO` | [syntax07](../tests/syntax/syntax07.md) | yes |
-| `MX_DISCOURAGED_DOUBLE_DASH` | `WARNING` | [syntax08](../tests/syntax/syntax08.md) | yes |
-| `MX_NON_ALLOWED_CHARS` | `WARNING` | [syntax08](../tests/syntax/syntax08.md) | yes |
-| `MX_NUMERIC_TLD` | `WARNING` | [syntax08](../tests/syntax/syntax08.md) | yes |
-| `MX_SYNTAX_OK` | `INFO` | [syntax08](../tests/syntax/syntax08.md) | yes |
-| `NAMESERVER_DISCOURAGED_DOUBLE_DASH` | `WARNING` | [syntax04](../tests/syntax/syntax04.md) | yes |
-| `NAMESERVER_NON_ALLOWED_CHARS` | `ERROR` | [syntax04](../tests/syntax/syntax04.md) | yes |
-| `NAMESERVER_NUMERIC_TLD` | `ERROR` | [syntax04](../tests/syntax/syntax04.md) | yes |
-| `NAMESERVER_SYNTAX_OK` | `INFO` | [syntax04](../tests/syntax/syntax04.md) | yes |
-| `NON_ALLOWED_CHARS` | `ERROR` | [syntax01](../tests/syntax/syntax01.md) | yes |
-| `NO_DOUBLE_DASH` | `INFO` | [syntax03](../tests/syntax/syntax03.md) | yes |
-| `NO_ENDING_HYPHENS` | `INFO` | [syntax02](../tests/syntax/syntax02.md) | yes |
+| `MNAME_DISCOURAGED_DOUBLE_DASH` | `WARNING` | [syntax07](../tests/syntax/syntax07.md) | **no** |
+| `MNAME_NON_ALLOWED_CHARS` | `WARNING` | [syntax07](../tests/syntax/syntax07.md) | **no** |
+| `MNAME_NUMERIC_TLD` | `WARNING` | [syntax07](../tests/syntax/syntax07.md) | **no** |
+| `MNAME_SYNTAX_OK` | `INFO` | [syntax07](../tests/syntax/syntax07.md) | **no** |
+| `MX_DISCOURAGED_DOUBLE_DASH` | `WARNING` | [syntax08](../tests/syntax/syntax08.md) | **no** |
+| `MX_NON_ALLOWED_CHARS` | `WARNING` | [syntax08](../tests/syntax/syntax08.md) | **no** |
+| `MX_NUMERIC_TLD` | `WARNING` | [syntax08](../tests/syntax/syntax08.md) | **no** |
+| `MX_SYNTAX_OK` | `INFO` | [syntax08](../tests/syntax/syntax08.md) | **no** |
+| `NAMESERVER_DISCOURAGED_DOUBLE_DASH` | `WARNING` | [syntax04](../tests/syntax/syntax04.md) | **no** |
+| `NAMESERVER_NON_ALLOWED_CHARS` | `ERROR` | [syntax04](../tests/syntax/syntax04.md) | **no** |
+| `NAMESERVER_NUMERIC_TLD` | `ERROR` | [syntax04](../tests/syntax/syntax04.md) | **no** |
+| `NAMESERVER_SYNTAX_OK` | `INFO` | [syntax04](../tests/syntax/syntax04.md) | **no** |
+| `NON_ALLOWED_CHARS` | `ERROR` | [syntax01](../tests/syntax/syntax01.md) | **no** |
+| `NO_DOUBLE_DASH` | `INFO` | [syntax03](../tests/syntax/syntax03.md) | **no** |
+| `NO_ENDING_HYPHENS` | `INFO` | [syntax02](../tests/syntax/syntax02.md) | **no** |
 | `NO_RESPONSE` | `DEBUG` | [syntax06](../tests/syntax/syntax06.md) | yes |
 | `NO_RESPONSE_MX_QUERY` | `DEBUG` | [syntax08](../tests/syntax/syntax08.md) | yes |
 | `NO_RESPONSE_SOA_QUERY` | `DEBUG` | [syntax05](../tests/syntax/syntax05.md), [syntax06](../tests/syntax/syntax06.md), [syntax07](../tests/syntax/syntax07.md) | yes |
-| `ONLY_ALLOWED_CHARS` | `INFO` | [syntax01](../tests/syntax/syntax01.md) | yes |
-| `RNAME_MAIL_DOMAIN_INVALID` | `NOTICE` | [syntax06](../tests/syntax/syntax06.md) | yes |
-| `RNAME_MAIL_DOMAIN_LOCALHOST` | `WARNING` | [syntax06](../tests/syntax/syntax06.md) | yes |
-| `RNAME_MAIL_ILLEGAL_CNAME` | `WARNING` | [syntax06](../tests/syntax/syntax06.md) | yes |
-| `RNAME_MISUSED_AT_SIGN` | `WARNING` | [syntax05](../tests/syntax/syntax05.md) | yes |
-| `RNAME_NO_AT_SIGN` | `INFO` | [syntax05](../tests/syntax/syntax05.md) | yes |
-| `RNAME_RFC822_INVALID` | `WARNING` | [syntax06](../tests/syntax/syntax06.md) | yes |
-| `RNAME_RFC822_VALID` | `INFO` | [syntax06](../tests/syntax/syntax06.md) | yes |
-| `TERMINAL_HYPHEN` | `ERROR` | [syntax02](../tests/syntax/syntax02.md) | yes |
+| `ONLY_ALLOWED_CHARS` | `INFO` | [syntax01](../tests/syntax/syntax01.md) | **no** |
+| `RNAME_MAIL_DOMAIN_INVALID` | `NOTICE` | [syntax06](../tests/syntax/syntax06.md) | **no** |
+| `RNAME_MAIL_DOMAIN_LOCALHOST` | `WARNING` | [syntax06](../tests/syntax/syntax06.md) | **no** |
+| `RNAME_MAIL_ILLEGAL_CNAME` | `WARNING` | [syntax06](../tests/syntax/syntax06.md) | **no** |
+| `RNAME_MISUSED_AT_SIGN` | `WARNING` | [syntax05](../tests/syntax/syntax05.md) | **no** |
+| `RNAME_NO_AT_SIGN` | `INFO` | [syntax05](../tests/syntax/syntax05.md) | **no** |
+| `RNAME_RFC822_INVALID` | `WARNING` | [syntax06](../tests/syntax/syntax06.md) | **no** |
+| `RNAME_RFC822_VALID` | `INFO` | [syntax06](../tests/syntax/syntax06.md) | **no** |
+| `TERMINAL_HYPHEN` | `ERROR` | [syntax02](../tests/syntax/syntax02.md) | **no** |
 | `TEST_CASE_END` | `DEBUG` | [syntax01](../tests/syntax/syntax01.md), [syntax02](../tests/syntax/syntax02.md), [syntax03](../tests/syntax/syntax03.md), [syntax04](../tests/syntax/syntax04.md), [syntax05](../tests/syntax/syntax05.md), [syntax06](../tests/syntax/syntax06.md), [syntax07](../tests/syntax/syntax07.md), [syntax08](../tests/syntax/syntax08.md) | yes |
 | `TEST_CASE_START` | `DEBUG` | [syntax01](../tests/syntax/syntax01.md), [syntax02](../tests/syntax/syntax02.md), [syntax03](../tests/syntax/syntax03.md), [syntax04](../tests/syntax/syntax04.md), [syntax05](../tests/syntax/syntax05.md), [syntax06](../tests/syntax/syntax06.md), [syntax07](../tests/syntax/syntax07.md), [syntax08](../tests/syntax/syntax08.md) | yes |
 
 ## i18n Notes
 
-### Stale Entries In Locale Files
+### Tags Missing From Locale Files
 
-These tags appear as `SYNTAX:<TAG>` in `.po` files but are absent from
-current code metadata.  The messages may be dead translations.
+These tags have no `SYNTAX:<TAG>` comment in any `.po` file.
+They will render as the raw tag name in translated output.
 
-- `SYNTAX01`
-- `SYNTAX02`
-- `SYNTAX03`
-- `SYNTAX04`
-- `SYNTAX05`
-- `SYNTAX06`
-- `SYNTAX07`
-- `SYNTAX08`
+- `DISCOURAGED_DOUBLE_DASH`
+- `INITIAL_HYPHEN`
+- `MNAME_DISCOURAGED_DOUBLE_DASH`
+- `MNAME_NON_ALLOWED_CHARS`
+- `MNAME_NUMERIC_TLD`
+- `MNAME_SYNTAX_OK`
+- `MX_DISCOURAGED_DOUBLE_DASH`
+- `MX_NON_ALLOWED_CHARS`
+- `MX_NUMERIC_TLD`
+- `MX_SYNTAX_OK`
+- `NAMESERVER_DISCOURAGED_DOUBLE_DASH`
+- `NAMESERVER_NON_ALLOWED_CHARS`
+- `NAMESERVER_NUMERIC_TLD`
+- `NAMESERVER_SYNTAX_OK`
+- `NON_ALLOWED_CHARS`
+- `NO_DOUBLE_DASH`
+- `NO_ENDING_HYPHENS`
+- `ONLY_ALLOWED_CHARS`
+- `RNAME_MAIL_DOMAIN_INVALID`
+- `RNAME_MAIL_DOMAIN_LOCALHOST`
+- `RNAME_MAIL_ILLEGAL_CNAME`
+- `RNAME_MISUSED_AT_SIGN`
+- `RNAME_NO_AT_SIGN`
+- `RNAME_RFC822_INVALID`
+- `RNAME_RFC822_VALID`
+- `TERMINAL_HYPHEN`
 

@@ -11,35 +11,35 @@ _Do not edit by hand — regenerate with the command above._
 
 | Tag | Level | Testcase(s) | i18n |
 | --- | --- | --- | --- |
-| `A_QUERY_NO_RESPONSES` | `INFO` | [basic03](../tests/basic/basic03.md) | yes |
-| `B01_CHILD_FOUND` | `INFO` | [basic01](../tests/basic/basic01.md) | yes |
-| `B01_CHILD_IS_ALIAS` | `NOTICE` | [basic01](../tests/basic/basic01.md) | yes |
-| `B01_CHILD_NOT_EXIST` | `INFO` | [basic01](../tests/basic/basic01.md) | yes |
-| `B01_INCONSISTENT_ALIAS` | `ERROR` | [basic01](../tests/basic/basic01.md) | yes |
-| `B01_INCONSISTENT_DELEGATION` | `ERROR` | [basic01](../tests/basic/basic01.md) | yes |
-| `B01_NO_CHILD` | `ERROR` | [basic01](../tests/basic/basic01.md) | yes |
-| `B01_PARENT_DISREGARDED` | `INFO` | [basic01](../tests/basic/basic01.md) | yes |
-| `B01_PARENT_FOUND` | `INFO` | [basic01](../tests/basic/basic01.md) | yes |
-| `B01_PARENT_NOT_FOUND` | `WARNING` | [basic01](../tests/basic/basic01.md) | yes |
-| `B01_PARENT_UNDETERMINED` | `WARNING` | [basic01](../tests/basic/basic01.md) | yes |
-| `B01_ROOT_HAS_NO_PARENT` | `INFO` | [basic01](../tests/basic/basic01.md) | yes |
-| `B01_SERVER_ZONE_ERROR` | `DEBUG` | [basic01](../tests/basic/basic01.md) | yes |
-| `B02_AUTH_RESPONSE_SOA` | `INFO` | [basic02](../tests/basic/basic02.md) | yes |
-| `B02_NO_DELEGATION` | `CRITICAL` | [basic02](../tests/basic/basic02.md) | yes |
-| `B02_NO_WORKING_NS` | `CRITICAL` | [basic02](../tests/basic/basic02.md) | yes |
-| `B02_NS_BROKEN` | `ERROR` | [basic02](../tests/basic/basic02.md) | yes |
-| `B02_NS_NOT_AUTH` | `ERROR` | [basic02](../tests/basic/basic02.md) | yes |
-| `B02_NS_NO_IP_ADDR` | `ERROR` | [basic02](../tests/basic/basic02.md) | yes |
-| `B02_NS_NO_RESPONSE` | `WARNING` | [basic02](../tests/basic/basic02.md) | yes |
-| `B02_UNEXPECTED_RCODE` | `ERROR` | [basic02](../tests/basic/basic02.md) | yes |
-| `HAS_A_RECORDS` | `ERROR` | [basic03](../tests/basic/basic03.md) | yes |
-| `HAS_NAMESERVER_NO_WWW_A_TEST` | `INFO` | [basic03](../tests/basic/basic03.md) | yes |
+| `A_QUERY_NO_RESPONSES` | `INFO` | [basic03](../tests/basic/basic03.md) | **no** |
+| `B01_CHILD_FOUND` | `INFO` | [basic01](../tests/basic/basic01.md) | **no** |
+| `B01_CHILD_IS_ALIAS` | `NOTICE` | [basic01](../tests/basic/basic01.md) | **no** |
+| `B01_CHILD_NOT_EXIST` | `INFO` | [basic01](../tests/basic/basic01.md) | **no** |
+| `B01_INCONSISTENT_ALIAS` | `ERROR` | [basic01](../tests/basic/basic01.md) | **no** |
+| `B01_INCONSISTENT_DELEGATION` | `ERROR` | [basic01](../tests/basic/basic01.md) | **no** |
+| `B01_NO_CHILD` | `ERROR` | [basic01](../tests/basic/basic01.md) | **no** |
+| `B01_PARENT_DISREGARDED` | `INFO` | [basic01](../tests/basic/basic01.md) | **no** |
+| `B01_PARENT_FOUND` | `INFO` | [basic01](../tests/basic/basic01.md) | **no** |
+| `B01_PARENT_NOT_FOUND` | `WARNING` | [basic01](../tests/basic/basic01.md) | **no** |
+| `B01_PARENT_UNDETERMINED` | `WARNING` | [basic01](../tests/basic/basic01.md) | **no** |
+| `B01_ROOT_HAS_NO_PARENT` | `INFO` | [basic01](../tests/basic/basic01.md) | **no** |
+| `B01_SERVER_ZONE_ERROR` | `DEBUG` | [basic01](../tests/basic/basic01.md) | **no** |
+| `B02_AUTH_RESPONSE_SOA` | `INFO` | [basic02](../tests/basic/basic02.md) | **no** |
+| `B02_NO_DELEGATION` | `CRITICAL` | [basic02](../tests/basic/basic02.md) | **no** |
+| `B02_NO_WORKING_NS` | `CRITICAL` | [basic02](../tests/basic/basic02.md) | **no** |
+| `B02_NS_BROKEN` | `ERROR` | [basic02](../tests/basic/basic02.md) | **no** |
+| `B02_NS_NOT_AUTH` | `ERROR` | [basic02](../tests/basic/basic02.md) | **no** |
+| `B02_NS_NO_IP_ADDR` | `ERROR` | [basic02](../tests/basic/basic02.md) | **no** |
+| `B02_NS_NO_RESPONSE` | `WARNING` | [basic02](../tests/basic/basic02.md) | **no** |
+| `B02_UNEXPECTED_RCODE` | `ERROR` | [basic02](../tests/basic/basic02.md) | **no** |
+| `HAS_A_RECORDS` | `ERROR` | [basic03](../tests/basic/basic03.md) | **no** |
+| `HAS_NAMESERVER_NO_WWW_A_TEST` | `INFO` | [basic03](../tests/basic/basic03.md) | **no** |
 | `IPV4_DISABLED` | `DEBUG` | [basic01](../tests/basic/basic01.md), [basic02](../tests/basic/basic02.md), [basic03](../tests/basic/basic03.md) | yes |
-| `IPV4_ENABLED` | `DEBUG` | [basic01](../tests/basic/basic01.md), [basic02](../tests/basic/basic02.md), [basic03](../tests/basic/basic03.md) | yes |
+| `IPV4_ENABLED` | `DEBUG` | [basic01](../tests/basic/basic01.md), [basic02](../tests/basic/basic02.md), [basic03](../tests/basic/basic03.md) | **no** |
 | `IPV6_DISABLED` | `DEBUG` | [basic01](../tests/basic/basic01.md), [basic02](../tests/basic/basic02.md), [basic03](../tests/basic/basic03.md) | yes |
-| `IPV6_ENABLED` | `DEBUG` | [basic01](../tests/basic/basic01.md), [basic02](../tests/basic/basic02.md), [basic03](../tests/basic/basic03.md) | yes |
+| `IPV6_ENABLED` | `DEBUG` | [basic01](../tests/basic/basic01.md), [basic02](../tests/basic/basic02.md), [basic03](../tests/basic/basic03.md) | **no** |
 | `LOOP_PROTECTION` | `DEBUG2` | [basic01](../tests/basic/basic01.md) | **no** |
-| `NO_A_RECORDS` | `DEBUG` | [basic03](../tests/basic/basic03.md) | yes |
+| `NO_A_RECORDS` | `DEBUG` | [basic03](../tests/basic/basic03.md) | **no** |
 | `TEST_CASE_END` | `DEBUG` | [basic01](../tests/basic/basic01.md), [basic02](../tests/basic/basic02.md), [basic03](../tests/basic/basic03.md) | yes |
 | `TEST_CASE_START` | `DEBUG` | [basic01](../tests/basic/basic01.md), [basic02](../tests/basic/basic02.md), [basic03](../tests/basic/basic03.md) | yes |
 
@@ -50,19 +50,31 @@ _Do not edit by hand — regenerate with the command above._
 These tags have no `BASIC:<TAG>` comment in any `.po` file.
 They will render as the raw tag name in translated output.
 
+- `A_QUERY_NO_RESPONSES`
+- `B01_CHILD_FOUND`
+- `B01_CHILD_IS_ALIAS`
+- `B01_CHILD_NOT_EXIST`
+- `B01_INCONSISTENT_ALIAS`
+- `B01_INCONSISTENT_DELEGATION`
+- `B01_NO_CHILD`
+- `B01_PARENT_DISREGARDED`
+- `B01_PARENT_FOUND`
+- `B01_PARENT_NOT_FOUND`
+- `B01_PARENT_UNDETERMINED`
+- `B01_ROOT_HAS_NO_PARENT`
+- `B01_SERVER_ZONE_ERROR`
+- `B02_AUTH_RESPONSE_SOA`
+- `B02_NO_DELEGATION`
+- `B02_NO_WORKING_NS`
+- `B02_NS_BROKEN`
+- `B02_NS_NOT_AUTH`
+- `B02_NS_NO_IP_ADDR`
+- `B02_NS_NO_RESPONSE`
+- `B02_UNEXPECTED_RCODE`
+- `HAS_A_RECORDS`
+- `HAS_NAMESERVER_NO_WWW_A_TEST`
+- `IPV4_ENABLED`
+- `IPV6_ENABLED`
 - `LOOP_PROTECTION`
-
-### Stale Entries In Locale Files
-
-These tags appear as `BASIC:<TAG>` in `.po` files but are absent from
-current code metadata.  The messages may be dead translations.
-
-- `B01_UNEXPECTED_NS_RESPONSE`
-- `BASIC00`
-- `BASIC01`
-- `BASIC02`
-- `BASIC03`
-- `DOMAIN_NAME_LABEL_TOO_LONG`
-- `DOMAIN_NAME_TOO_LONG`
-- `DOMAIN_NAME_ZERO_LENGTH_LABEL`
+- `NO_A_RECORDS`
 

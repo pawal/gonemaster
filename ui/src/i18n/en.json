@@ -1,0 +1,6 @@
+{
+  "app_title": "Gonemaster",
+  "app_subtitle": "Launch single or batch domain jobs, watch progress, and inspect results from the embedded server UI.",
+  "job_created": "Job {id} created.",
+  "batch_accepted": "Batch {id} accepted."
+}

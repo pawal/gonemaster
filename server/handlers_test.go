@@ -1458,3 +1458,49 @@ func TestHealthAndMetrics(t *testing.T) {
 		t.Fatal("expected generated_at in metrics response")
 	}
 }
+
+func TestLocalesEndpoint(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	t.Run("GET returns locales list", func(t *testing.T) {
+		resp := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/locales", nil)
+		srv.Handler().ServeHTTP(resp, req)
+
+		if resp.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d", resp.Code)
+		}
+		if ct := resp.Header().Get("Content-Type"); ct != "application/json" {
+			t.Fatalf("expected application/json, got %q", ct)
+		}
+
+		var body struct {
+			Locales []string `json:"locales"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+		if len(body.Locales) == 0 {
+			t.Fatal("expected at least one locale in response")
+		}
+		found := false
+		for _, l := range body.Locales {
+			if l == "en" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("expected \"en\" in locales, got %v", body.Locales)
+		}
+	})
+
+	t.Run("POST returns 405", func(t *testing.T) {
+		resp := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/locales", nil)
+		srv.Handler().ServeHTTP(resp, req)
+		if resp.Code != http.StatusMethodNotAllowed {
+			t.Fatalf("expected 405, got %d", resp.Code)
+		}
+	})
+}

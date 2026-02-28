@@ -118,6 +118,7 @@ func (s *Server) routes() {
 	apiMux.HandleFunc("/queue/reorder", s.handleQueueReorder)
 	apiMux.HandleFunc("/queue/remove", s.handleQueueRemove)
 
+	apiMux.HandleFunc("/locales", s.handleLocales)
 	apiMux.HandleFunc("/metrics", s.handleMetrics)
 	apiMux.HandleFunc("/healthz", s.handleHealth)
 

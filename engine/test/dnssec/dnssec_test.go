@@ -404,7 +404,7 @@ func TestDNSSEC01ParallelParentQueries(t *testing.T) {
 	if nsList == "" {
 		t.Fatalf("expected ns_list for DS01_DS_ALGO_OK")
 	}
-	if nsList != "ns-parent1.example/192.0.2.80;ns-parent2.example/192.0.2.81" {
+	if nsList != "ns-parent1.example;ns-parent2.example" {
 		t.Fatalf("expected deterministic ns_list order, got %q", nsList)
 	}
 }
@@ -871,7 +871,7 @@ func TestDNSSEC03ParallelDNSKEYQueries(t *testing.T) {
 	if nsList == "" {
 		t.Fatalf("expected ns_list for DS03_NO_NSEC3")
 	}
-	if nsList != "ns1.example/192.0.2.201;ns2.example/192.0.2.202" {
+	if nsList != "ns1.example;ns2.example" {
 		t.Fatalf("expected deterministic ns_list order, got %q", nsList)
 	}
 }
@@ -1361,7 +1361,7 @@ func TestDNSSEC05ParallelDNSKEYQueries(t *testing.T) {
 	if nsList == "" {
 		t.Fatalf("expected ns_list for DS05_ALGO_OK")
 	}
-	if nsList != "ns1.example/192.0.2.220;ns2.example/192.0.2.221" {
+	if nsList != "ns1.example;ns2.example" {
 		t.Fatalf("expected deterministic ns_list order, got %q", nsList)
 	}
 }
@@ -1775,7 +1775,7 @@ func TestDNSSEC07ParallelChildQueries(t *testing.T) {
 	if nsList == "" {
 		t.Fatalf("expected ns_list for DS07_NOT_SIGNED_ON_SERVER")
 	}
-	if nsList != "ns1.example/192.0.2.60;ns2.example/192.0.2.61" {
+	if nsList != "ns1.example;ns2.example" {
 		t.Fatalf("expected deterministic ns_list order, got %q", nsList)
 	}
 }
@@ -1931,7 +1931,7 @@ func TestDNSSEC07ParallelParentQueries(t *testing.T) {
 	if nsList == "" {
 		t.Fatalf("expected ns_list for DS07_DS_ON_PARENT_SERVER")
 	}
-	if nsList != "ns-parent1.example/192.0.2.70;ns-parent2.example/192.0.2.71" {
+	if nsList != "ns-parent1.example;ns-parent2.example" {
 		t.Fatalf("expected deterministic ns_list order, got %q", nsList)
 	}
 }
@@ -2752,7 +2752,7 @@ func TestDNSSEC10ParallelQueries(t *testing.T) {
 	if nsList == "" {
 		t.Fatalf("expected ns_list for DS10_NSEC_QUERY_RESPONSE_ERR")
 	}
-	if nsList != "ns1.example/192.0.2.201;ns2.example/192.0.2.202" {
+	if nsList != "ns1.example;ns2.example" {
 		t.Fatalf("expected deterministic ns_list order, got %q", nsList)
 	}
 }

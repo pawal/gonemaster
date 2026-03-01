@@ -281,8 +281,7 @@ func Consistency01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	sort.Strings(serialKeys)
 
 	for _, serial := range serialKeys {
-		nsList := append([]string{}, serials[serial]...)
-		sort.Strings(nsList)
+		nsList := normalizeEndpointNames(serials[serial])
 		if err := appendLog(ctx, &results, testcase, "SOA_SERIAL", map[string]any{
 			"serial":  serial,
 			"ns_list": strings.Join(nsList, ";"),
@@ -445,7 +444,7 @@ func Consistency02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		for _, rname := range order {
 			if err := appendLog(ctx, &results, testcase, "SOA_RNAME", map[string]any{
 				"rname":   rname,
-				"ns_list": strings.Join(rnames[rname], ";"),
+				"ns_list": strings.Join(normalizeEndpointNames(rnames[rname]), ";"),
 			}); err != nil {
 				return results, err
 			}
@@ -591,8 +590,7 @@ func Consistency03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 		for _, setKey := range order {
 			params := timeValues[setKey]
-			nsList := append([]string{}, timeSets[setKey]...)
-			sort.Strings(nsList)
+			nsList := normalizeEndpointNames(timeSets[setKey])
 			if err := appendLog(ctx, &results, testcase, "SOA_TIME_PARAMETER_SET", map[string]any{
 				"refresh": params.refresh,
 				"retry":   params.retry,
@@ -1110,7 +1108,7 @@ func Consistency06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		for _, mname := range order {
 			if err := appendLog(ctx, &results, testcase, "SOA_MNAME", map[string]any{
 				"mname":   mname,
-				"ns_list": strings.Join(mnames[mname], ";"),
+				"ns_list": strings.Join(normalizeEndpointNames(mnames[mname]), ";"),
 			}); err != nil {
 				return results, err
 			}
@@ -1245,4 +1243,8 @@ func sortedKeys(m map[string]bool) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+func normalizeEndpointNames(values []string) []string {
+	return logargs.UniqueSortedEndpointNames(values)
 }

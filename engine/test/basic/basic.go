@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/netip"
-	"sort"
 	"strings"
 
 	dns "codeberg.org/miekg/dns"
@@ -1074,12 +1073,11 @@ func collectParents(dst map[string]bool, src map[string]map[string]bool) {
 }
 
 func joinSorted(items map[string]bool) string {
-	keys := make([]string, 0, len(items))
+	values := make([]string, 0, len(items))
 	for key := range items {
-		keys = append(keys, key)
+		values = append(values, key)
 	}
-	sort.Strings(keys)
-	return strings.Join(keys, ";")
+	return strings.Join(logargs.UniqueSortedEndpointNames(values), ";")
 }
 
 func hasTag(entries []*logger.Entry, tag string) bool {

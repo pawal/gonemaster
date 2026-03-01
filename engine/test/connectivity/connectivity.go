@@ -540,7 +540,7 @@ func Connectivity04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 					outcomes[i] = prefixOutcome{
 						version: entry.version,
 						prefix:  prefixStr,
-						item:    entry.item.String(),
+						item:    entry.item.Name.String(),
 					}
 				}
 				return nil
@@ -789,11 +789,11 @@ func disabledNS(ctx context.Context, nsList []nameserver.Nameserver) ([]string, 
 	var ipv6 []string
 	for _, ns := range nsList {
 		if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
-			ipv4 = append(ipv4, ns.String())
+			ipv4 = append(ipv4, ns.NameString())
 			continue
 		}
 		if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
-			ipv6 = append(ipv6, ns.String())
+			ipv6 = append(ipv6, ns.NameString())
 		}
 	}
 	return ipv4, ipv6
@@ -893,22 +893,9 @@ func joinASNNumeric(values []int) string {
 }
 
 func joinSorted(values []string) string {
-	copyVals := append([]string{}, values...)
-	sort.Strings(copyVals)
-	return strings.Join(copyVals, ";")
+	return strings.Join(logargs.UniqueSortedEndpointNames(values), ";")
 }
 
 func joinUniqueSorted(values []string) string {
-	if len(values) == 0 {
-		return ""
-	}
-	copyVals := append([]string{}, values...)
-	sort.Strings(copyVals)
-	out := []string{copyVals[0]}
-	for _, value := range copyVals[1:] {
-		if value != out[len(out)-1] {
-			out = append(out, value)
-		}
-	}
-	return strings.Join(out, ";")
+	return strings.Join(logargs.UniqueSortedEndpointNames(values), ";")
 }

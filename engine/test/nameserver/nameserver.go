@@ -2036,18 +2036,7 @@ func parseAnswerFrom(value string) (netip.Addr, bool) {
 }
 
 func sortedStrings(values []string) []string {
-	unique := map[string]bool{}
-	for _, value := range values {
-		if value != "" {
-			unique[value] = true
-		}
-	}
-	keys := make([]string, 0, len(unique))
-	for value := range unique {
-		keys = append(keys, value)
-	}
-	sort.Strings(keys)
-	return keys
+	return logargs.UniqueSortedEndpointNames(values)
 }
 
 func sortedKeys(values map[string]bool) []string {
@@ -2055,8 +2044,7 @@ func sortedKeys(values map[string]bool) []string {
 	for value := range values {
 		keys = append(keys, value)
 	}
-	sort.Strings(keys)
-	return keys
+	return logargs.UniqueSortedEndpointNames(keys)
 }
 
 func uniqueServersByKey(nss []ns.Nameserver) []ns.Nameserver {

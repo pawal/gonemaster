@@ -110,3 +110,34 @@ func TestEnsureSchema(t *testing.T) {
 		t.Fatalf("missing schema marker: %#v", args["arg_schema"])
 	}
 }
+
+func TestEndpointName(t *testing.T) {
+	if got := EndpointName("NS1.Example.org./192.0.2.1"); got != "ns1.example.org" {
+		t.Fatalf("unexpected endpoint name: %q", got)
+	}
+	if got := EndpointName("192.0.2.0/24"); got != "192.0.2.0/24" {
+		t.Fatalf("prefix should be unchanged: %q", got)
+	}
+	if got := EndpointName("  - "); got != "-" {
+		t.Fatalf("unexpected passthrough value: %q", got)
+	}
+}
+
+func TestUniqueSortedEndpointNames(t *testing.T) {
+	got := UniqueSortedEndpointNames([]string{
+		"ns2.example/2001:db8::53",
+		"NS1.Example/192.0.2.1",
+		"ns1.example/192.0.2.2",
+		"192.0.2.0/24",
+		"",
+	})
+	want := []string{"192.0.2.0/24", "ns1.example", "ns2.example"}
+	if len(got) != len(want) {
+		t.Fatalf("unexpected length: got=%v want=%v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("unexpected value at %d: got=%v want=%v", i, got, want)
+		}
+	}
+}

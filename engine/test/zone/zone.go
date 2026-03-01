@@ -503,13 +503,16 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			var soaserials []uint32
 			for mname, ipMap := range mnameNotMaster {
 				for ip, serial := range ipMap {
-					nsList = append(nsList, mname+"/"+ip)
+					if ip != "" {
+						nsList = append(nsList, mname+"/"+ip)
+					} else {
+						nsList = append(nsList, mname)
+					}
 					soaserials = append(soaserials, serial)
 				}
 			}
-			sort.Strings(nsList)
 			if err := appendLog(ctx, &results, testcase, "Z01_MNAME_NOT_MASTER", map[string]any{
-				"ns_list":        strings.Join(nsList, ";"),
+				"ns_list":        strings.Join(logargs.UniqueSortedEndpointNames(nsList), ";"),
 				"soaserial":      maxUint32(uniqueUint32(soaserials)),
 				"soaserial_list": joinUint32(serials, ";"),
 			}); err != nil {
@@ -518,9 +521,8 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		}
 
 		if len(mnameMaster) > 0 {
-			sort.Strings(mnameMaster)
 			if err := appendLog(ctx, &results, testcase, "Z01_MNAME_IS_MASTER", map[string]any{
-				"ns_list": strings.Join(mnameMaster, ";"),
+				"ns_list": strings.Join(logargs.UniqueSortedEndpointNames(mnameMaster), ";"),
 			}); err != nil {
 				return results, err
 			}
@@ -1933,7 +1935,7 @@ func nameserversByIP(servers []nameserver.Nameserver) [][]nameserver.Nameserver 
 func nsStrings(servers []nameserver.Nameserver) []string {
 	values := make([]string, 0, len(servers))
 	for _, ns := range servers {
-		values = append(values, ns.String())
+		values = append(values, ns.NameString())
 	}
 	return values
 }

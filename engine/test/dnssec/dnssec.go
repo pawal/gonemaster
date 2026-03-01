@@ -6536,24 +6536,13 @@ func nameserversByIP(servers []nameserver.Nameserver) [][]nameserver.Nameserver 
 func nsStrings(servers []nameserver.Nameserver) []string {
 	values := make([]string, 0, len(servers))
 	for _, ns := range servers {
-		values = append(values, ns.String())
+		values = append(values, ns.NameString())
 	}
 	return values
 }
 
 func joinUniqueSorted(values []string) string {
-	if len(values) == 0 {
-		return ""
-	}
-	copyVals := append([]string{}, values...)
-	sort.Strings(copyVals)
-	out := []string{copyVals[0]}
-	for _, value := range copyVals[1:] {
-		if value != out[len(out)-1] {
-			out = append(out, value)
-		}
-	}
-	return strings.Join(out, ";")
+	return strings.Join(logargs.UniqueSortedEndpointNames(values), ";")
 }
 
 func differenceStrings(left []string, right []string) []string {

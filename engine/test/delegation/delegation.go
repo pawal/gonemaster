@@ -843,10 +843,9 @@ func uniqueNamesCount(nss []nameserver.Nameserver) int {
 func sortedNameserverStrings(nss []nameserver.Nameserver) []string {
 	values := make([]string, 0, len(nss))
 	for _, ns := range nss {
-		values = append(values, ns.String())
+		values = append(values, ns.NameString())
 	}
-	sort.Strings(values)
-	return values
+	return logargs.UniqueSortedEndpointNames(values)
 }
 
 func namesToStrings(names []dnsname.Name) []string {

@@ -1,6 +1,7 @@
 package logargs
 
 import (
+	"net/netip"
 	"sort"
 	"strings"
 
@@ -134,6 +135,52 @@ func SetQueryIdentity(args map[string]any, name string, qtype string, qclass str
 	if qclass != "" {
 		args["query_class"] = qclass
 	}
+}
+
+// EndpointName returns a canonical nameserver name when value is a mixed
+// endpoint identity in "<name>/<ip>" form. Non-endpoint values are returned as-is.
+func EndpointName(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return ""
+	}
+
+	sep := strings.LastIndex(trimmed, "/")
+	if sep <= 0 || sep >= len(trimmed)-1 {
+		return trimmed
+	}
+
+	namePart := strings.TrimSpace(trimmed[:sep])
+	addressPart := strings.TrimSpace(trimmed[sep+1:])
+	if namePart == "" || addressPart == "" {
+		return trimmed
+	}
+
+	if _, err := netip.ParseAddr(addressPart); err != nil {
+		return trimmed
+	}
+	return normalizeName(namePart)
+}
+
+// UniqueSortedEndpointNames normalizes mixed endpoint identity strings to
+// nameserver names when possible, then deduplicates and sorts.
+func UniqueSortedEndpointNames(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+
+	seen := map[string]bool{}
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		name := EndpointName(value)
+		if name == "" || seen[name] {
+			continue
+		}
+		seen[name] = true
+		out = append(out, name)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func normalizeName(name string) string {

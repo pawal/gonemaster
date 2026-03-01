@@ -10,6 +10,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine/asnlookup"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/methods"
 	"codeberg.org/pawal/gonemaster/engine/methodsv2"
@@ -667,9 +668,7 @@ func connectivityLoop(ctx context.Context, testcase string, name dnsname.Name, n
 				nsResp, _ := ns.QueryWithOptions(ctx, name.String(), "NS", opts)
 
 				if soaResp.Msg == nil && nsResp.Msg == nil {
-					if _, err := buf.Add(fmt.Sprintf("%s_NO_RESPONSE_%s", prefix, protocol), map[string]any{
-						"ns": ns.String(),
-					}); err != nil {
+					if _, err := buf.Add(fmt.Sprintf("%s_NO_RESPONSE_%s", prefix, protocol), withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					return nil
@@ -682,19 +681,16 @@ func connectivityLoop(ctx context.Context, testcase string, name dnsname.Name, n
 					}
 
 					if resp.Msg == nil {
-						if _, err := buf.Add(fmt.Sprintf("%s_NO_RESPONSE_%s_QUERY_%s", prefix, qtype, protocol), map[string]any{
-							"ns": ns.String(),
-						}); err != nil {
+						if _, err := buf.Add(fmt.Sprintf("%s_NO_RESPONSE_%s_QUERY_%s", prefix, qtype, protocol), withNameserverArgs(ns, nil)); err != nil {
 							return err
 						}
 						continue
 					}
 
 					if resp.Rcode() != "NOERROR" {
-						if _, err := buf.Add(fmt.Sprintf("%s_UNEXPECTED_RCODE_%s_QUERY_%s", prefix, qtype, protocol), map[string]any{
-							"ns":    ns.String(),
+						if _, err := buf.Add(fmt.Sprintf("%s_UNEXPECTED_RCODE_%s_QUERY_%s", prefix, qtype, protocol), withNameserverArgs(ns, map[string]any{
 							"rcode": resp.Rcode(),
-						}); err != nil {
+						})); err != nil {
 							return err
 						}
 						continue
@@ -702,9 +698,7 @@ func connectivityLoop(ctx context.Context, testcase string, name dnsname.Name, n
 
 					rrs := resp.GetRecords(qtype, "answer")
 					if len(rrs) == 0 {
-						if _, err := buf.Add(fmt.Sprintf("%s_MISSING_%s_RECORD_%s", prefix, qtype, protocol), map[string]any{
-							"ns": ns.String(),
-						}); err != nil {
+						if _, err := buf.Add(fmt.Sprintf("%s_MISSING_%s_RECORD_%s", prefix, qtype, protocol), withNameserverArgs(ns, nil)); err != nil {
 							return err
 						}
 						continue
@@ -713,20 +707,17 @@ func connectivityLoop(ctx context.Context, testcase string, name dnsname.Name, n
 					rrOwner := dnsname.New(rrs[0].Header().Name).FQDN()
 					expected := name.FQDN()
 					if !strings.EqualFold(rrOwner, expected) {
-						if _, err := buf.Add(fmt.Sprintf("%s_WRONG_%s_RECORD_%s", prefix, qtype, protocol), map[string]any{
-							"ns":              ns.String(),
+						if _, err := buf.Add(fmt.Sprintf("%s_WRONG_%s_RECORD_%s", prefix, qtype, protocol), withNameserverArgs(ns, map[string]any{
 							"domain_found":    strings.ToLower(rrOwner),
 							"domain_expected": strings.ToLower(expected),
-						}); err != nil {
+						})); err != nil {
 							return err
 						}
 						continue
 					}
 
 					if !resp.AA() {
-						if _, err := buf.Add(fmt.Sprintf("%s_%s_RECORD_NOT_AA_%s", prefix, qtype, protocol), map[string]any{
-							"ns": ns.String(),
-						}); err != nil {
+						if _, err := buf.Add(fmt.Sprintf("%s_%s_RECORD_NOT_AA_%s", prefix, qtype, protocol), withNameserverArgs(ns, nil)); err != nil {
 							return err
 						}
 						continue
@@ -763,13 +754,20 @@ func appendLog(ctx context.Context, results *[]*logger.Entry, testcase string, t
 	return nil
 }
 
+func withNameserverArgs(ns nameserver.Nameserver, args map[string]any) map[string]any {
+	if args == nil {
+		args = map[string]any{}
+	}
+	logargs.SetNS(args, ns.NameString(), ns.AddressString())
+	return args
+}
+
 func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
 	if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 		for _, rrtype := range rrtypes {
-			if _, err := buf.Add("IPV6_DISABLED", map[string]any{
-				"ns":     ns.String(),
+			if _, err := buf.Add("IPV6_DISABLED", withNameserverArgs(ns, map[string]any{
 				"rrtype": rrtype,
-			}); err != nil {
+			})); err != nil {
 				return true, err
 			}
 		}
@@ -777,10 +775,9 @@ func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, ns
 	}
 	if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
 		for _, rrtype := range rrtypes {
-			if _, err := buf.Add("IPV4_DISABLED", map[string]any{
-				"ns":     ns.String(),
+			if _, err := buf.Add("IPV4_DISABLED", withNameserverArgs(ns, map[string]any{
 				"rrtype": rrtype,
-			}); err != nil {
+			})); err != nil {
 				return true, err
 			}
 		}

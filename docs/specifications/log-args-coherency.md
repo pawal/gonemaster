@@ -36,23 +36,105 @@ All new and migrated log entries MUST follow schema id:
 
 - `arg_schema = "gonemaster.logargs/1.1"`
 
-Canonical field model:
+This section is the normative contract for schema `gonemaster.logargs/1.1`.
 
-- `ns`: nameserver name only (FQDN, normalized)
-- `address`: single IP address (string)
-- `servers`: array of objects `{ "ns": "<fqdn>", "address": "<ip>" }`
-- `addresses`: array of IP address strings
-- `asns`: array of ASN integers
-- `prefixes`: array of prefix strings (CIDR)
+### Contract Scope
 
-For role-specific sets, use semantic list keys with the same object shape:
+The v1.1 contract applies to any entry where:
 
-- `parent_servers`, `child_servers`, `failing_servers`, etc.
+- `args` exists, and
+- `args.arg_schema == "gonemaster.logargs/1.1"`.
 
-Prohibited as primary machine fields:
+Entries that do not set `arg_schema` are legacy/non-migrated and outside this contract.
 
-- packed semicolon/comma list strings for server/IP identity
-- mixed endpoint encoding in a single identity field (for example `name/ip` in `ns`)
+### Entry-Level Fields
+
+| Key | Type | Optionality | Meaning |
+| --- | --- | --- | --- |
+| `arg_schema` | `string` | required | Must be exactly `gonemaster.logargs/1.1`. |
+
+### Core Identity Fields
+
+| Key | Type | Optionality | Meaning |
+| --- | --- | --- | --- |
+| `ns` | `string` | conditional | Nameserver name only (normalized FQDN string). Required when a singular nameserver identity is emitted. |
+| `address` | `string` | conditional | Single IP address. Required when a singular endpoint address is known and emitted. |
+
+Rules:
+
+- `ns` MUST NOT contain `name/ip` combined values.
+- If both nameserver name and address are known for a singular endpoint, emit both `ns` and `address`.
+
+### Query Identity Fields
+
+| Key | Type | Optionality | Meaning |
+| --- | --- | --- | --- |
+| `query_name` | `string` | conditional | Queried owner name. |
+| `query_type` | `string` | conditional | Queried RR type (uppercase, for example `SOA`). |
+| `query_class` | `string` | conditional | Queried RR class (uppercase, usually `IN`). |
+
+Rules:
+
+- For query/response/cache-skip style tags, `query_name`, `query_type`, and `query_class` SHOULD be emitted together.
+
+### Structured Collection Fields
+
+| Key | Type | Optionality | Meaning |
+| --- | --- | --- | --- |
+| `servers` | `array<object>` | optional | List of endpoint objects. |
+| `addresses` | `array<string>` | optional | List of IP addresses. |
+| `asns` | `array<int>` | optional | List of ASN integers. |
+| `prefixes` | `array<string>` | optional | List of CIDR prefixes. |
+
+`servers` object contract:
+
+- object keys:
+  - `ns` (`string`, optional)
+  - `address` (`string`, optional)
+- each item MUST contain at least one of `ns` or `address`.
+- role-specific server lists MAY use semantic keys with same item shape:
+  - for example `parent_servers`, `child_servers`, `failing_servers`.
+
+### Legacy Compatibility Fields
+
+Legacy keys may still exist during migration (for example `name`, `type`, `ip`, `ns_list`, `ns_ip_list`), but they are non-canonical.
+
+Rules:
+
+- New implementations MUST prefer canonical fields in this section.
+- New packed-list-only identity keys MUST NOT be introduced.
+
+### Prohibited Canonical Patterns
+
+- Packed semicolon/comma identity lists as the only machine-readable representation.
+- Mixed endpoint encoding in `ns` (for example `name/ip`).
+
+### Minimal Examples
+
+Singular endpoint + query:
+
+```json
+{
+  "arg_schema": "gonemaster.logargs/1.1",
+  "ns": "ns1.example",
+  "address": "192.0.2.53",
+  "query_name": "example",
+  "query_type": "SOA",
+  "query_class": "IN"
+}
+```
+
+Multiple endpoints:
+
+```json
+{
+  "arg_schema": "gonemaster.logargs/1.1",
+  "servers": [
+    {"ns": "ns1.example", "address": "192.0.2.53"},
+    {"ns": "ns2.example", "address": "2001:db8::53"}
+  ]
+}
+```
 
 ## Invariants
 

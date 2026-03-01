@@ -641,13 +641,13 @@ func TestEmptyCache(t *testing.T) {
 }
 
 func TestQueryLogging(t *testing.T) {
-	ns, err := New("ns.example", "127.0.0.1", nil)
+	ctx, _ := testContext(t)
+	log := logger.FromContext(ctx)
+
+	ns, err := NewWithContext(ctx, "ns.example", "127.0.0.1", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
-
-	log := logger.New()
-	ctx := logger.WithContext(context.Background(), log)
 
 	// Use a very short timeout since we expect network failure
 	timeout := 10 * time.Millisecond

@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor, within, cleanup } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App.svelte";
+import { setCatalog, locale } from "./i18n.js";
 
 const jsonResponse = (data, ok = true) => ({
   ok,
@@ -2039,6 +2040,42 @@ describe("App", () => {
       expect(localStorage.getItem("gonemaster.ui.locale.v1")).toBe("en");
 
       unmount();
+    });
+
+    it("switching locale selector updates UI chrome strings reactively", async () => {
+      // Inject a minimal Swedish catalog so we can observe a chrome string change.
+      setCatalog("sv", { run_single_job: "Kör enkeljobb" });
+
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value.includes("/api/v1/locales")) {
+          return jsonResponse({ locales: ["en", "sv"] });
+        }
+        if (value.includes("/api/v1/jobs?")) {
+          return jsonResponse({ items: [], total: 0 });
+        }
+        return jsonResponse({});
+      });
+
+      const { unmount } = render(App);
+
+      // Wait for the locale selector to appear (loadLocales must resolve first).
+      const select = await screen.findByRole("combobox", { name: "Result language" });
+
+      // Initially English.
+      expect(screen.getByRole("button", { name: "Run Single Job" })).toBeInTheDocument();
+
+      // Switch to Swedish.
+      await fireEvent.change(select, { target: { value: "sv" } });
+
+      // The chrome string should update reactively to the Swedish translation.
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Kör enkeljobb" })).toBeInTheDocument();
+      });
+
+      unmount();
+      // Reset locale store so subsequent tests start in English.
+      locale.set("en");
     });
   });
 });

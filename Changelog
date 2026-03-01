@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.0.5] - 2026-03-01
+
+### Added
+
+ - Japanese translations to the engine and UI
+ - Translations of the UI, with language selector
+ - Dark mode / system, in the UI
+ - Added OpenAPI coverage test
+ - Browser notifications for finished jobs and batches
+
+### Changed
+ - Updated dependencies on Go and NPM
+ - OpenAPI matches handlers.go
+ - Use msgctxt for the translation tags, removed unneccessary comments form the po files
+ - Fixed erranous N11_N11_NO_DNS tag from upstream
+ - N16_HAS_NSID is now INFO instead of NOTICE
+
 ## [v1.0.4] - 2026-02-26
 
 ### Added

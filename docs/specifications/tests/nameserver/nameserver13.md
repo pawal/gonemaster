@@ -48,15 +48,27 @@ Status: Final
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
-| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv4. |
+| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
+| `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `IPV4_DISABLED` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`DNSKEY`). |
-| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv6. |
+| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
+| `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `IPV6_DISABLED` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`DNSKEY`). |
-| `MISSING_OPT_IN_TRUNCATED` | `ns` | `string` | Nameserver identity (`name/ip`) returning truncated response without OPT. |
-| `NO_EDNS_SUPPORT` | `ns` | `string` | Nameserver identity (`name/ip`) treated as no-EDNS support path. |
-| `NO_RESPONSE` | `ns` | `string` | Nameserver identity (`name/ip`) with no response. |
+| `MISSING_OPT_IN_TRUNCATED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) returning truncated response without OPT. |
+| `MISSING_OPT_IN_TRUNCATED` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `MISSING_OPT_IN_TRUNCATED` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
+| `NO_EDNS_SUPPORT` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) treated as no-EDNS support path. |
+| `NO_EDNS_SUPPORT` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `NO_EDNS_SUPPORT` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
+| `NO_RESPONSE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with no response. |
+| `NO_RESPONSE` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `NO_RESPONSE` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `NO_RESPONSE` | `domain` | `string` | Tested zone name. |
-| `NS_ERROR` | `ns` | `string` | Nameserver identity (`name/ip`) with unexpected behavior. |
+| `NS_ERROR` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with unexpected behavior. |
+| `NS_ERROR` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `NS_ERROR` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Nameserver13`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Nameserver13`). |
 

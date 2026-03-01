@@ -51,19 +51,33 @@ Status: Final
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
-| `AAAA_BAD_RDATA` | `ns` | `string` | Nameserver identity (`name/ip`) returning invalid AAAA RDATA length. |
+| `AAAA_BAD_RDATA` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) returning invalid AAAA RDATA length. |
+| `AAAA_BAD_RDATA` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `AAAA_BAD_RDATA` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `AAAA_BAD_RDATA` | `length` | `int` | Observed AAAA RDATA byte length. |
-| `AAAA_QUERY_DROPPED` | `ns` | `string` | Nameserver identity (`name/ip`) that dropped AAAA query. |
-| `AAAA_UNEXPECTED_RCODE` | `ns` | `string` | Nameserver identity (`name/ip`) with unexpected AAAA RCODE. |
+| `AAAA_QUERY_DROPPED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) that dropped AAAA query. |
+| `AAAA_QUERY_DROPPED` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `AAAA_QUERY_DROPPED` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
+| `AAAA_UNEXPECTED_RCODE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with unexpected AAAA RCODE. |
+| `AAAA_UNEXPECTED_RCODE` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `AAAA_UNEXPECTED_RCODE` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `AAAA_UNEXPECTED_RCODE` | `rcode` | `string` | Returned AAAA-query RCODE string. |
 | `AAAA_WELL_PROCESSED` | `ns_list` | `string` | Semicolon-delimited sorted included nameserver identities (`name/ip`). |
-| `A_UNEXPECTED_RCODE` | `ns` | `string` | Nameserver identity (`name/ip`) with unexpected A-query RCODE. |
+| `A_UNEXPECTED_RCODE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with unexpected A-query RCODE. |
+| `A_UNEXPECTED_RCODE` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `A_UNEXPECTED_RCODE` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `A_UNEXPECTED_RCODE` | `rcode` | `string` | Returned A-query RCODE string. |
-| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv4. |
+| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
+| `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `IPV4_DISABLED` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`A`). |
-| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv6. |
+| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
+| `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `IPV6_DISABLED` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`A`). |
-| `NO_RESPONSE` | `ns` | `string` | Nameserver identity (`name/ip`) with no A-query response. |
+| `NO_RESPONSE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with no A-query response. |
+| `NO_RESPONSE` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `NO_RESPONSE` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `NO_RESPONSE` | `domain` | `string` | Tested zone name. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Nameserver05`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Nameserver05`). |

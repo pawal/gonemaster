@@ -32,6 +32,7 @@ The Zonemaster project may be used as an upstream reference during migration, bu
 - [upstream/](upstream/README.md) — Imported Zonemaster reference material (not normative for gonemaster).
 - [templates/](templates/testcase-spec-template.md) — Reusable templates for testcase specs and tag tables.
 - [log-args-coherency.md](log-args-coherency.md) — Shared glossary and invariants for log argument naming/types.
+- [log-args-key-glossary.md](log-args-key-glossary.md) — Canonical v1.1 key/type glossary for machine consumers.
 
 ## Source-Of-Truth Rules
 - Gonemaster implementation is the runtime source of truth.

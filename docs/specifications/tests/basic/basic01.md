@@ -84,14 +84,24 @@ Status: Final
 | `B01_ROOT_HAS_NO_PARENT` | `-` | `-` | No arguments. |
 | `B01_SERVER_ZONE_ERROR` | `query_name` | `string` | Queried owner name that failed validation. |
 | `B01_SERVER_ZONE_ERROR` | `rrtype` | `string` | Queried rrtype (`SOA` or `NS`). |
-| `B01_SERVER_ZONE_ERROR` | `ns` | `string` | Nameserver identity (`name/ip`). |
-| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`). |
+| `B01_SERVER_ZONE_ERROR` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
+| `B01_SERVER_ZONE_ERROR` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `B01_SERVER_ZONE_ERROR` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
+| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
+| `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `IPV4_DISABLED` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped due to transport disable. |
-| `IPV4_ENABLED` | `ns` | `string` | Nameserver identity (`name/ip`). |
+| `IPV4_ENABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
+| `IPV4_ENABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `IPV4_ENABLED` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `IPV4_ENABLED` | `rrtype` | `string` | rrtype queried over enabled transport. |
-| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`). |
+| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
+| `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `IPV6_DISABLED` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped due to transport disable. |
-| `IPV6_ENABLED` | `ns` | `string` | Nameserver identity (`name/ip`). |
+| `IPV6_ENABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
+| `IPV6_ENABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `IPV6_ENABLED` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `IPV6_ENABLED` | `rrtype` | `string` | rrtype queried over enabled transport. |
 | `LOOP_PROTECTION` | `caller` | `string` | Internal caller name that hit loop protection. |
 | `LOOP_PROTECTION` | `child_zone_name` | `string` | Child zone name under test. |

@@ -115,9 +115,13 @@ Status: Final
 | `DS03_SERVER_NO_NSEC3` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) lacking NSEC3 while others provide it. |
 | `DS03_UNASSIGNED_FLAG_USED` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) where the unassigned bit is set. |
 | `DS03_UNASSIGNED_FLAG_USED` | `int` | `int` | NSEC3 flag bit index (`0..6`) treated as unassigned. |
-| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv4. |
+| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
+| `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `IPV4_DISABLED` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`DNSKEY` or `NSEC`). |
-| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv6. |
+| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
+| `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `IPV6_DISABLED` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`DNSKEY` or `NSEC`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`DNSSEC03`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`DNSSEC03`). |

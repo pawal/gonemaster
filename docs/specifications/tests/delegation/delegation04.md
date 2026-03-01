@@ -48,11 +48,17 @@ Status: Final
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
 | `ARE_AUTHORITATIVE` | `nsname_list` | `string` | Semicolon-delimited sorted unique authoritative NS names. |
-| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv4. |
+| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
+| `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `IPV4_DISABLED` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
-| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv6. |
+| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
+| `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `IPV6_DISABLED` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
-| `IS_NOT_AUTHORITATIVE` | `ns` | `string` | Nameserver identity (`name/ip`) with non-authoritative SOA response. |
+| `IS_NOT_AUTHORITATIVE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with non-authoritative SOA response. |
+| `IS_NOT_AUTHORITATIVE` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `IS_NOT_AUTHORITATIVE` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `IS_NOT_AUTHORITATIVE` | `proto` | `string` | Query transport label (`UDP` or `TCP`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Delegation04`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Delegation04`). |

@@ -42,14 +42,22 @@ Status: Final
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
-| `MULTIPLE_SOA` | `ns` | `string` | Nameserver identity (`name/ip`) producing multiple SOA RRs. |
+| `MULTIPLE_SOA` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) producing multiple SOA RRs. |
+| `MULTIPLE_SOA` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `MULTIPLE_SOA` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `MULTIPLE_SOA` | `count` | `int` | Number of SOA RRs in answer section. |
-| `NO_RESPONSE` | `ns` | `string` | Nameserver identity (`name/ip`) with no response. |
-| `NO_SOA_IN_RESPONSE` | `ns` | `string` | Nameserver identity (`name/ip`) with SOA-missing answer. |
+| `NO_RESPONSE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with no response. |
+| `NO_RESPONSE` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `NO_RESPONSE` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
+| `NO_SOA_IN_RESPONSE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with SOA-missing answer. |
+| `NO_SOA_IN_RESPONSE` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `NO_SOA_IN_RESPONSE` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `ONE_SOA` | `-` | `-` | No arguments. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Zone10`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Zone10`). |
-| `WRONG_SOA` | `ns` | `string` | Nameserver identity (`name/ip`) returning wrong SOA owner. |
+| `WRONG_SOA` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) returning wrong SOA owner. |
+| `WRONG_SOA` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `WRONG_SOA` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `WRONG_SOA` | `owner` | `string` | SOA owner name found in response (lowercased). |
 | `WRONG_SOA` | `name` | `string` | Expected zone apex FQDN (lowercased). |
 

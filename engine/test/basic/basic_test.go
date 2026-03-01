@@ -234,6 +234,7 @@ func TestBasic02ParallelQueries(t *testing.T) {
 	}
 
 	var enabled []string
+	var enabledAddresses []string
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "IPV4_ENABLED" {
 			continue
@@ -241,12 +242,21 @@ func TestBasic02ParallelQueries(t *testing.T) {
 		if ns, ok := entry.Args["ns"].(string); ok {
 			enabled = append(enabled, ns)
 		}
+		if address, ok := entry.Args["address"].(string); ok {
+			enabledAddresses = append(enabledAddresses, address)
+		}
 	}
 	if len(enabled) < 2 {
 		t.Fatalf("expected IPV4_ENABLED entries for both nameservers, got %v", enabled)
 	}
-	if enabled[0] != "a.root/192.0.2.1" || enabled[1] != "b.root/192.0.2.2" {
-		t.Fatalf("expected deterministic log order, got %v", enabled)
+	if enabled[0] != "a.root" || enabled[1] != "b.root" {
+		t.Fatalf("expected deterministic nameserver order, got %v", enabled)
+	}
+	if len(enabledAddresses) < 2 {
+		t.Fatalf("expected IPV4_ENABLED address args for both nameservers, got %v", enabledAddresses)
+	}
+	if enabledAddresses[0] != "192.0.2.1" || enabledAddresses[1] != "192.0.2.2" {
+		t.Fatalf("expected deterministic address order, got %v", enabledAddresses)
 	}
 	if !hasEntryTag(entries, "B02_AUTH_RESPONSE_SOA") {
 		t.Fatalf("expected B02_AUTH_RESPONSE_SOA")
@@ -652,6 +662,7 @@ func TestBasic03ParallelQueries(t *testing.T) {
 	}
 
 	var enabled []string
+	var enabledAddresses []string
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "IPV4_ENABLED" {
 			continue
@@ -659,12 +670,21 @@ func TestBasic03ParallelQueries(t *testing.T) {
 		if ns, ok := entry.Args["ns"].(string); ok {
 			enabled = append(enabled, ns)
 		}
+		if address, ok := entry.Args["address"].(string); ok {
+			enabledAddresses = append(enabledAddresses, address)
+		}
 	}
 	if len(enabled) < 2 {
 		t.Fatalf("expected IPV4_ENABLED entries for both nameservers, got %v", enabled)
 	}
-	if enabled[0] != "ns1.example/192.0.2.53" || enabled[1] != "ns2.example/192.0.2.54" {
-		t.Fatalf("expected deterministic log order, got %v", enabled)
+	if enabled[0] != "ns1.example" || enabled[1] != "ns2.example" {
+		t.Fatalf("expected deterministic nameserver order, got %v", enabled)
+	}
+	if len(enabledAddresses) < 2 {
+		t.Fatalf("expected IPV4_ENABLED address args for both nameservers, got %v", enabledAddresses)
+	}
+	if enabledAddresses[0] != "192.0.2.53" || enabledAddresses[1] != "192.0.2.54" {
+		t.Fatalf("expected deterministic address order, got %v", enabledAddresses)
 	}
 	if !hasEntryTag(entries, "HAS_A_RECORDS") {
 		t.Fatalf("expected HAS_A_RECORDS")

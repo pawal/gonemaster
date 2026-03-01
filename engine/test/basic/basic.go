@@ -10,6 +10,7 @@ import (
 	dns "codeberg.org/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/methods"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
@@ -227,11 +228,10 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 			pSOA, err := ns.Query(ctx, zoneName, "SOA")
 			if err != nil || pSOA.Msg == nil || pSOA.Rcode() != "NOERROR" || !pSOA.AA() || len(pSOA.GetRecordsForName("SOA", dnsname.New(zoneName), "answer")) != 1 {
-				if err := appendLog(ctx, &results, testcase, "B01_SERVER_ZONE_ERROR", map[string]any{
+				if err := appendLog(ctx, &results, testcase, "B01_SERVER_ZONE_ERROR", withNameserverArgs(ns, map[string]any{
 					"query_name": zoneName,
 					"rrtype":     "SOA",
-					"ns":         ns.String(),
-				}); err != nil {
+				})); err != nil {
 					return results, err
 				}
 				continue serverLoop
@@ -239,11 +239,10 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 			pNS, err := ns.Query(ctx, zoneName, "NS")
 			if err != nil || pNS.Msg == nil || pNS.Rcode() != "NOERROR" || !pNS.AA() || len(pNS.GetRecords("NS", "answer")) == 0 || len(pNS.GetRecords("NS", "answer")) != len(pNS.GetRecordsForName("NS", dnsname.New(zoneName), "answer")) {
-				if err := appendLog(ctx, &results, testcase, "B01_SERVER_ZONE_ERROR", map[string]any{
+				if err := appendLog(ctx, &results, testcase, "B01_SERVER_ZONE_ERROR", withNameserverArgs(ns, map[string]any{
 					"query_name": zoneName,
 					"rrtype":     "NS",
-					"ns":         ns.String(),
-				}); err != nil {
+				})); err != nil {
 					return results, err
 				}
 				continue serverLoop
@@ -324,11 +323,10 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 				pSOA, err = ns.Query(ctx, intermediate.String(), "SOA")
 				if err != nil || pSOA.Msg == nil {
-					if err := appendLog(ctx, &results, testcase, "B01_SERVER_ZONE_ERROR", map[string]any{
+					if err := appendLog(ctx, &results, testcase, "B01_SERVER_ZONE_ERROR", withNameserverArgs(ns, map[string]any{
 						"query_name": intermediate.String(),
 						"rrtype":     "SOA",
-						"ns":         ns.String(),
-					}); err != nil {
+					})); err != nil {
 						return results, err
 					}
 					continue serverLoop
@@ -341,11 +339,10 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					} else {
 						pNS, err = ns.Query(ctx, intermediate.String(), "NS")
 						if err != nil || pNS.Msg == nil || pNS.Rcode() != "NOERROR" || !pNS.AA() || len(pNS.GetRecords("NS", "answer")) == 0 || len(pNS.GetRecords("NS", "answer")) != len(pNS.GetRecordsForName("NS", intermediate, "answer")) {
-							if err := appendLog(ctx, &results, testcase, "B01_SERVER_ZONE_ERROR", map[string]any{
+							if err := appendLog(ctx, &results, testcase, "B01_SERVER_ZONE_ERROR", withNameserverArgs(ns, map[string]any{
 								"query_name": intermediate.String(),
 								"rrtype":     "NS",
-								"ns":         ns.String(),
-							}); err != nil {
+							})); err != nil {
 								return results, err
 							}
 							continue serverLoop
@@ -496,11 +493,10 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					addNS(parentFound, loopZoneName, ns.String())
 					addNS(cnameWithReferral, loopZoneName, ns.String())
 				} else {
-					if err := appendLog(ctx, &results, testcase, "B01_SERVER_ZONE_ERROR", map[string]any{
+					if err := appendLog(ctx, &results, testcase, "B01_SERVER_ZONE_ERROR", withNameserverArgs(ns, map[string]any{
 						"query_name": intermediate.String(),
 						"rrtype":     "SOA",
-						"ns":         ns.String(),
-					}); err != nil {
+					})); err != nil {
 						return results, err
 					}
 				}
@@ -705,7 +701,7 @@ func Basic02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				outcome := nsOutcome{ns: ns}
 
 				if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
-					if _, err := buf.Add("IPV6_DISABLED", map[string]any{"ns": ns.String(), "rrtype": "SOA"}); err != nil {
+					if _, err := buf.Add("IPV6_DISABLED", withNameserverArgs(ns, map[string]any{"rrtype": "SOA"})); err != nil {
 						return err
 					}
 					outcome.skipped = true
@@ -713,7 +709,7 @@ func Basic02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					return nil
 				}
 				if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
-					if _, err := buf.Add("IPV4_DISABLED", map[string]any{"ns": ns.String(), "rrtype": "SOA"}); err != nil {
+					if _, err := buf.Add("IPV4_DISABLED", withNameserverArgs(ns, map[string]any{"rrtype": "SOA"})); err != nil {
 						return err
 					}
 					outcome.skipped = true
@@ -722,12 +718,12 @@ func Basic02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				}
 
 				if ns.Address.Is6() && profile.FromContext(ctx).Net.IPv6 {
-					if _, err := buf.Add("IPV6_ENABLED", map[string]any{"ns": ns.String(), "rrtype": "SOA"}); err != nil {
+					if _, err := buf.Add("IPV6_ENABLED", withNameserverArgs(ns, map[string]any{"rrtype": "SOA"})); err != nil {
 						return err
 					}
 				}
 				if ns.Address.Is4() && profile.FromContext(ctx).Net.IPv4 {
-					if _, err := buf.Add("IPV4_ENABLED", map[string]any{"ns": ns.String(), "rrtype": "SOA"}); err != nil {
+					if _, err := buf.Add("IPV4_ENABLED", withNameserverArgs(ns, map[string]any{"rrtype": "SOA"})); err != nil {
 						return err
 					}
 				}
@@ -769,7 +765,7 @@ func Basic02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			if outcome.skipped {
 				continue
 			}
-			key := outcome.ns.String()
+			key := nameserverEndpointKey(outcome.ns)
 			switch {
 			case outcome.noResponse:
 				nsNoResponse[key] = true
@@ -800,12 +796,12 @@ func Basic02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 
 		for ns := range nsBroken {
-			if err := appendLog(ctx, &results, testcase, "B02_NS_BROKEN", map[string]any{"ns": ns}); err != nil {
+			if err := appendLog(ctx, &results, testcase, "B02_NS_BROKEN", withEndpointKeyArgs(ns, nil)); err != nil {
 				return results, err
 			}
 		}
 		for ns := range nsNotAuth {
-			if err := appendLog(ctx, &results, testcase, "B02_NS_NOT_AUTH", map[string]any{"ns": ns}); err != nil {
+			if err := appendLog(ctx, &results, testcase, "B02_NS_NOT_AUTH", withEndpointKeyArgs(ns, nil)); err != nil {
 				return results, err
 			}
 		}
@@ -815,15 +811,14 @@ func Basic02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 		for ns := range nsNoResponse {
-			if err := appendLog(ctx, &results, testcase, "B02_NS_NO_RESPONSE", map[string]any{"ns": ns}); err != nil {
+			if err := appendLog(ctx, &results, testcase, "B02_NS_NO_RESPONSE", withEndpointKeyArgs(ns, nil)); err != nil {
 				return results, err
 			}
 		}
 		for ns, rcode := range unexpectedRcode {
-			if err := appendLog(ctx, &results, testcase, "B02_UNEXPECTED_RCODE", map[string]any{
+			if err := appendLog(ctx, &results, testcase, "B02_UNEXPECTED_RCODE", withEndpointKeyArgs(ns, map[string]any{
 				"rcode": rcode,
-				"ns":    ns,
-			}); err != nil {
+			})); err != nil {
 				return results, err
 			}
 		}
@@ -862,14 +857,14 @@ func Basic03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				outcome := nsOutcome{}
 
 				if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
-					if _, err := buf.Add("IPV6_DISABLED", map[string]any{"ns": ns.String(), "rrtype": "A"}); err != nil {
+					if _, err := buf.Add("IPV6_DISABLED", withNameserverArgs(ns, map[string]any{"rrtype": "A"})); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
 					return nil
 				}
 				if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
-					if _, err := buf.Add("IPV4_DISABLED", map[string]any{"ns": ns.String(), "rrtype": "A"}); err != nil {
+					if _, err := buf.Add("IPV4_DISABLED", withNameserverArgs(ns, map[string]any{"rrtype": "A"})); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
@@ -877,12 +872,12 @@ func Basic03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				}
 
 				if ns.Address.Is6() && profile.FromContext(ctx).Net.IPv6 {
-					if _, err := buf.Add("IPV6_ENABLED", map[string]any{"ns": ns.String(), "rrtype": "A"}); err != nil {
+					if _, err := buf.Add("IPV6_ENABLED", withNameserverArgs(ns, map[string]any{"rrtype": "A"})); err != nil {
 						return err
 					}
 				}
 				if ns.Address.Is4() && profile.FromContext(ctx).Net.IPv4 {
-					if _, err := buf.Add("IPV4_ENABLED", map[string]any{"ns": ns.String(), "rrtype": "A"}); err != nil {
+					if _, err := buf.Add("IPV4_ENABLED", withNameserverArgs(ns, map[string]any{"rrtype": "A"})); err != nil {
 						return err
 					}
 				}
@@ -895,17 +890,15 @@ func Basic03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				outcome.responded = true
 				target := dnsname.New(queryName)
 				if resp.HasRRsOfTypeForName("A", target) {
-					if _, err := buf.Add("HAS_A_RECORDS", map[string]any{
-						"ns":     ns.String(),
+					if _, err := buf.Add("HAS_A_RECORDS", withNameserverArgs(ns, map[string]any{
 						"domain": queryName,
-					}); err != nil {
+					})); err != nil {
 						return err
 					}
 				} else {
-					if _, err := buf.Add("NO_A_RECORDS", map[string]any{
-						"ns":     ns.String(),
+					if _, err := buf.Add("NO_A_RECORDS", withNameserverArgs(ns, map[string]any{
 						"domain": queryName,
-					}); err != nil {
+					})); err != nil {
 						return err
 					}
 				}
@@ -957,10 +950,9 @@ func appendLog(ctx context.Context, results *[]*logger.Entry, testcase string, t
 func ipDisabledMessage(ctx context.Context, results *[]*logger.Entry, testcase string, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
 	if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
 		for _, rrtype := range rrtypes {
-			if err := appendLog(ctx, results, testcase, "IPV4_DISABLED", map[string]any{
-				"ns":     ns.String(),
+			if err := appendLog(ctx, results, testcase, "IPV4_DISABLED", withNameserverArgs(ns, map[string]any{
 				"rrtype": rrtype,
-			}); err != nil {
+			})); err != nil {
 				return true, err
 			}
 		}
@@ -968,10 +960,9 @@ func ipDisabledMessage(ctx context.Context, results *[]*logger.Entry, testcase s
 	}
 	if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 		for _, rrtype := range rrtypes {
-			if err := appendLog(ctx, results, testcase, "IPV6_DISABLED", map[string]any{
-				"ns":     ns.String(),
+			if err := appendLog(ctx, results, testcase, "IPV6_DISABLED", withNameserverArgs(ns, map[string]any{
 				"rrtype": rrtype,
-			}); err != nil {
+			})); err != nil {
 				return true, err
 			}
 		}
@@ -983,25 +974,67 @@ func ipDisabledMessage(ctx context.Context, results *[]*logger.Entry, testcase s
 func ipEnabledMessage(ctx context.Context, results *[]*logger.Entry, testcase string, ns nameserver.Nameserver, rrtypes ...string) error {
 	if ns.Address.Is4() && profile.FromContext(ctx).Net.IPv4 {
 		for _, rrtype := range rrtypes {
-			if err := appendLog(ctx, results, testcase, "IPV4_ENABLED", map[string]any{
-				"ns":     ns.String(),
+			if err := appendLog(ctx, results, testcase, "IPV4_ENABLED", withNameserverArgs(ns, map[string]any{
 				"rrtype": rrtype,
-			}); err != nil {
+			})); err != nil {
 				return err
 			}
 		}
 	}
 	if ns.Address.Is6() && profile.FromContext(ctx).Net.IPv6 {
 		for _, rrtype := range rrtypes {
-			if err := appendLog(ctx, results, testcase, "IPV6_ENABLED", map[string]any{
-				"ns":     ns.String(),
+			if err := appendLog(ctx, results, testcase, "IPV6_ENABLED", withNameserverArgs(ns, map[string]any{
 				"rrtype": rrtype,
-			}); err != nil {
+			})); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
+}
+
+func withNameserverArgs(ns nameserver.Nameserver, args map[string]any) map[string]any {
+	if args == nil {
+		args = map[string]any{}
+	}
+	logargs.SetNS(args, ns.NameString(), ns.AddressString())
+	return args
+}
+
+func withEndpointKeyArgs(endpoint string, args map[string]any) map[string]any {
+	if args == nil {
+		args = map[string]any{}
+	}
+	name, address := splitNameserverEndpoint(endpoint)
+	logargs.SetNS(args, name, address)
+	return args
+}
+
+func nameserverEndpointKey(ns nameserver.Nameserver) string {
+	name := strings.TrimSpace(ns.NameString())
+	if name == "" {
+		name = strings.TrimSpace(ns.Name.String())
+	}
+	address := strings.TrimSpace(ns.AddressString())
+	if address == "" {
+		address = strings.TrimSpace(ns.Address.String())
+	}
+	if address == "" {
+		return name
+	}
+	return name + "/" + address
+}
+
+func splitNameserverEndpoint(endpoint string) (string, string) {
+	trimmed := strings.TrimSpace(endpoint)
+	if trimmed == "" {
+		return "", ""
+	}
+	sep := strings.LastIndex(trimmed, "/")
+	if sep <= 0 || sep >= len(trimmed)-1 {
+		return trimmed, ""
+	}
+	return strings.TrimSpace(trimmed[:sep]), strings.TrimSpace(trimmed[sep+1:])
 }
 
 func markHandled(handled map[string]map[string]bool, zoneName string, addr string) bool {

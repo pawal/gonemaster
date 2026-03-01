@@ -11,6 +11,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/methods"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
@@ -511,10 +512,9 @@ func Delegation04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						continue
 					}
 					if !resp.AA() {
-						if _, err := buf.Add("IS_NOT_AUTHORITATIVE", map[string]any{
-							"ns":    task.ns.String(),
+						if _, err := buf.Add("IS_NOT_AUTHORITATIVE", withNameserverArgs(task.ns, map[string]any{
 							"proto": protoLabel(useVC),
-						}); err != nil {
+						})); err != nil {
 							return err
 						}
 					} else {
@@ -595,11 +595,10 @@ func Delegation05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					ns := allNS[key]
 					tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 						buf := testlogger.Wrap(log, moduleName, testcase)
-						args := map[string]any{
-							"ns":         ns.String(),
+						args := withNameserverArgs(ns, map[string]any{
 							"query_name": nsName.String(),
 							"rrtype":     "A",
-						}
+						})
 
 						disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "A")
 						if err != nil {
@@ -725,7 +724,7 @@ func Delegation06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				resp, err := task.ns.QueryWithOptions(ctx, z.Name.String(), queryType, nil)
 				if err == nil && resp.Msg != nil && resp.Rcode() == "NOERROR" {
 					if len(resp.GetRecords(queryType, "answer")) == 0 {
-						_, err := buf.Add("SOA_NOT_EXISTS", map[string]any{"ns": task.ns.String()})
+						_, err := buf.Add("SOA_NOT_EXISTS", withNameserverArgs(task.ns, nil))
 						return err
 					}
 				}
@@ -995,13 +994,20 @@ func appendLog(ctx context.Context, results *[]*logger.Entry, testcase string, t
 	return nil
 }
 
+func withNameserverArgs(ns nameserver.Nameserver, args map[string]any) map[string]any {
+	if args == nil {
+		args = map[string]any{}
+	}
+	logargs.SetNS(args, ns.NameString(), ns.AddressString())
+	return args
+}
+
 func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
 	if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 		for _, rrtype := range rrtypes {
-			if _, err := buf.Add("IPV6_DISABLED", map[string]any{
-				"ns":     ns.String(),
+			if _, err := buf.Add("IPV6_DISABLED", withNameserverArgs(ns, map[string]any{
 				"rrtype": rrtype,
-			}); err != nil {
+			})); err != nil {
 				return true, err
 			}
 		}
@@ -1009,10 +1015,9 @@ func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, ns
 	}
 	if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
 		for _, rrtype := range rrtypes {
-			if _, err := buf.Add("IPV4_DISABLED", map[string]any{
-				"ns":     ns.String(),
+			if _, err := buf.Add("IPV4_DISABLED", withNameserverArgs(ns, map[string]any{
 				"rrtype": rrtype,
-			}); err != nil {
+			})); err != nil {
 				return true, err
 			}
 		}

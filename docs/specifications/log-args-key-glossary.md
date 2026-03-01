@@ -1,22 +1,21 @@
 # Log Argument Key Glossary
 
-This glossary defines the canonical log argument keys for machine consumers.
+This glossary defines canonical log argument keys for machine consumers.
 It complements `docs/specifications/log-args-coherency.md`.
 
-Schema id:
+Contract version:
 
-- `arg_schema = "gonemaster.logargs/1.1"`
+- `v1.1` (documentation version, not emitted in runtime `args`)
 
 Scope:
 
-- Normative for entries that include `args.arg_schema = "gonemaster.logargs/1.1"`.
-- Legacy entries without `arg_schema` may use older keys during migration.
+- Normative for newly migrated tags following the coherency contract.
+- Non-migrated tags may still use legacy keys during migration.
 
 ## Core Identity Keys
 
 | Key | Type | Meaning | Notes |
 | --- | --- | --- | --- |
-| `arg_schema` | `string` | Log argument schema id. | Must be `gonemaster.logargs/1.1` for canonical entries. |
 | `ns` | `string` | Nameserver name (FQDN string). | Name only. Never `name/ip`. |
 | `address` | `string` | Single nameserver IP address. | Use together with `ns` when both are known. |
 | `domain` | `string` | Domain name in testcase-specific contexts. | Keep testcase meaning explicit. |

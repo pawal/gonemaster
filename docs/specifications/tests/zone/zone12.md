@@ -58,28 +58,22 @@ CSYNC content identity is determined by comparing the concatenation of `soaseria
 | --- | --- | --- | --- |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`CSYNC`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`CSYNC`). |
 | `Z12_CSYNC_FOUND` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `Z12_CSYNC_FOUND` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `Z12_CSYNC_FOUND` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `Z12_CSYNC_FOUND` | `serial` | `uint32` | SOA serial from the CSYNC `soaserial` field. |
 | `Z12_CSYNC_FOUND` | `flags` | `uint16` | CSYNC flags field (bit 0 = `immediate`, bit 1 = `soaminimum`). |
 | `Z12_CSYNC_FOUND` | `type_bitmap` | `string` | Semicolon-separated DNS type names from the CSYNC TypeBitMap (e.g. `NS;A;AAAA`). |
 | `Z12_MULTIPLE_CSYNC` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `Z12_MULTIPLE_CSYNC` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `Z12_MULTIPLE_CSYNC` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `Z12_MULTIPLE_CSYNC` | `count` | `int` | Number of CSYNC records returned. |
 | `Z12_NO_CSYNC` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `Z12_NO_CSYNC` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `Z12_NO_CSYNC` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `Z12_SERIAL_MISMATCH` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `Z12_SERIAL_MISMATCH` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `Z12_SERIAL_MISMATCH` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `Z12_SERIAL_MISMATCH` | `csync_serial` | `uint32` | The serial carried in the CSYNC `soaserial` field. |
 | `Z12_SERIAL_MISMATCH` | `soa_serial` | `uint32` | The current SOA serial from the same nameserver. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Zone12`). |

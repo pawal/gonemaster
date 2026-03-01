@@ -593,16 +593,14 @@ components:
           description: |
             Structured log arguments map.
 
-            For entries where `args.arg_schema == "gonemaster.logargs/1.1"`,
-            canonical key semantics/types/optionality are defined in
-            `docs/specifications/log-args-coherency.md`.
+            Canonical key semantics/types/optionality for coherency-migrated
+            entries are defined in `docs/specifications/log-args-coherency.md`.
 
             Schema `1.x` is additive-only; consumers should ignore unknown keys.
           externalDocs:
             description: Log argument coherency contract (v1.1)
             url: ./specifications/log-args-coherency.md
           example:
-            arg_schema: gonemaster.logargs/1.1
             ns: ns1.example
             address: 192.0.2.53
             query_name: example

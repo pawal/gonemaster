@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 )
@@ -26,7 +25,7 @@ func TestContract_IPV4BlockedArgs(t *testing.T) {
 	}
 
 	entry := requireEntryByTag(t, log.Entries(), "IPV4_BLOCKED")
-	requireSchema(t, entry)
+	requireNoArgSchema(t, entry)
 	requireStringArg(t, entry, "ns", "ns.example")
 	requireStringArg(t, entry, "address", "192.0.2.81")
 
@@ -50,7 +49,7 @@ func TestContract_ExternalQueryArgs(t *testing.T) {
 	_, _ = ns.QueryWithOptions(ctx, "example.com", "SOA", opts)
 
 	entry := requireEntryByTag(t, log.Entries(), "EXTERNAL_QUERY")
-	requireSchema(t, entry)
+	requireNoArgSchema(t, entry)
 	requireStringArg(t, entry, "ns", "ns.example")
 	requireStringArg(t, entry, "address", "127.0.0.1")
 	requireStringArg(t, entry, "query_name", "example.com")
@@ -84,7 +83,7 @@ func TestContract_ErrorCacheSkipArgs(t *testing.T) {
 	}
 
 	entry := requireEntryByTag(t, log.Entries(), "ERROR_CACHE_SKIP")
-	requireSchema(t, entry)
+	requireNoArgSchema(t, entry)
 	requireStringArg(t, entry, "ns", "ns.example")
 	requireStringArg(t, entry, "address", "192.0.2.15")
 	requireStringArg(t, entry, "query_name", "example2")
@@ -118,7 +117,7 @@ func TestContract_FakeDSReturnedArgs(t *testing.T) {
 	}
 
 	entry := requireEntryByTag(t, log.Entries(), "FAKE_DS_RETURNED")
-	requireSchema(t, entry)
+	requireNoArgSchema(t, entry)
 	requireStringArg(t, entry, "ns", "ns.example")
 	requireStringArg(t, entry, "address", "192.0.2.1")
 	requireStringArg(t, entry, "query_name", "example")
@@ -137,9 +136,11 @@ func requireEntryByTag(t *testing.T, entries []*logger.Entry, tag string) *logge
 	return nil
 }
 
-func requireSchema(t *testing.T, entry *logger.Entry) {
+func requireNoArgSchema(t *testing.T, entry *logger.Entry) {
 	t.Helper()
-	requireStringArg(t, entry, "arg_schema", logargs.SchemaID)
+	if _, ok := entry.Args["arg_schema"]; ok {
+		t.Fatalf("did not expect arg_schema in args: %#v", entry.Args["arg_schema"])
+	}
 }
 
 func requireStringArg(t *testing.T, entry *logger.Entry, key string, want string) {

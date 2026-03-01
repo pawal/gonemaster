@@ -53,16 +53,13 @@ Status: Final
 | --- | --- | --- | --- |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`A`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`A`). |
 | `NO_NS_CNAME` | `-` | `-` | No arguments. |
 | `NO_RESPONSE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) that did not return DNS message. |
 | `NO_RESPONSE` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `NO_RESPONSE` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `NO_RESPONSE` | `query_name` | `string` | NS name queried for type `A`. |
 | `NO_RESPONSE` | `rrtype` | `string` | Queried rrtype (`A`). |
 | `NS_IS_CNAME` | `nsname` | `string` | NS name found as CNAME. |
@@ -70,7 +67,6 @@ Status: Final
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Delegation05`). |
 | `UNEXPECTED_RCODE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) that returned unexpected RCODE. |
 | `UNEXPECTED_RCODE` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `UNEXPECTED_RCODE` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `UNEXPECTED_RCODE` | `query_name` | `string` | NS name queried for type `A`. |
 | `UNEXPECTED_RCODE` | `rrtype` | `string` | Queried rrtype (`A`). |
 | `UNEXPECTED_RCODE` | `rcode` | `string` | Returned DNS response code string. |

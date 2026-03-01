@@ -293,7 +293,6 @@ Machine extraction from API result:
 ```
 curl -s "http://localhost:8080/api/v1/jobs/$JOB_ID/result?locale=en" \
   | jq -r '.raw.entries[]
-           | select(.args.arg_schema=="gonemaster.logargs/1.1")
            | select(.args.ns and .args.address)
            | [.args.ns, .args.address] | @tsv'
 ```
@@ -302,7 +301,6 @@ Extract ASN lists (when present):
 ```
 curl -s "http://localhost:8080/api/v1/jobs/$JOB_ID/result?locale=en" \
   | jq -r '.raw.entries[]
-           | select(.args.arg_schema=="gonemaster.logargs/1.1")
            | select(.args.asns != null)
            | [.tag, (.args.asns | map(tostring) | join(","))] | @tsv'
 ```

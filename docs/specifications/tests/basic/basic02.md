@@ -63,33 +63,25 @@ Status: Final
 | `B02_NO_WORKING_NS` | `domain` | `string` | Child zone name without working authoritative NS. |
 | `B02_NS_BROKEN` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with broken SOA content. |
 | `B02_NS_BROKEN` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `B02_NS_BROKEN` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `B02_NS_NOT_AUTH` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) missing AA. |
 | `B02_NS_NOT_AUTH` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `B02_NS_NOT_AUTH` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `B02_NS_NO_IP_ADDR` | `nsname` | `string` | Nameserver owner name lacking resolved IP addresses. |
 | `B02_NS_NO_RESPONSE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with no response. |
 | `B02_NS_NO_RESPONSE` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `B02_NS_NO_RESPONSE` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `B02_UNEXPECTED_RCODE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) returning unexpected rcode. |
 | `B02_UNEXPECTED_RCODE` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `B02_UNEXPECTED_RCODE` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `B02_UNEXPECTED_RCODE` | `rcode` | `string` | Observed non-`NOERROR` rcode name. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
 | `IPV4_ENABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `IPV4_ENABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_ENABLED` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `IPV4_ENABLED` | `rrtype` | `string` | rrtype queried (`SOA`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
 | `IPV6_ENABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `IPV6_ENABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_ENABLED` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `IPV6_ENABLED` | `rrtype` | `string` | rrtype queried (`SOA`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Basic02`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Basic02`). |

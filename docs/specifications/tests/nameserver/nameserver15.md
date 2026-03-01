@@ -59,11 +59,9 @@ Status: Final
 | --- | --- | --- | --- |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA TXT`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA TXT`). |
 | `N15_ERROR_ON_VERSION_QUERY` | `query_name` | `string` | Version query name (`version.bind` or `version.server`). |
 | `N15_ERROR_ON_VERSION_QUERY` | `ns_list` | `string` | Semicolon-delimited sorted unique nameserver identities (`name/ip`). |

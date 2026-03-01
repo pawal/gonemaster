@@ -104,13 +104,6 @@ func TestSetNSSetsOnlyProvidedValues(t *testing.T) {
 	}
 }
 
-func TestEnsureSchema(t *testing.T) {
-	args := EnsureSchema(nil)
-	if args["arg_schema"] != SchemaID {
-		t.Fatalf("missing schema marker: %#v", args["arg_schema"])
-	}
-}
-
 func TestEndpointName(t *testing.T) {
 	if got := EndpointName("NS1.Example.org./192.0.2.1"); got != "ns1.example.org" {
 		t.Fatalf("unexpected endpoint name: %q", got)

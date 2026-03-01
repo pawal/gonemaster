@@ -3530,8 +3530,8 @@ func TestDNSSEC14NoResponseArgsSplit(t *testing.T) {
 	if entry == nil {
 		t.Fatalf("expected NO_RESPONSE")
 	}
-	if schema, ok := entry.Args["arg_schema"].(string); !ok || schema != "gonemaster.logargs/1.1" {
-		t.Fatalf("expected arg_schema=gonemaster.logargs/1.1, got %#v", entry.Args["arg_schema"])
+	if _, ok := entry.Args["arg_schema"]; ok {
+		t.Fatalf("did not expect arg_schema in args: %#v", entry.Args["arg_schema"])
 	}
 	if nsArg, ok := entry.Args["ns"].(string); !ok || nsArg != "ns1.example" {
 		t.Fatalf("expected ns=ns1.example, got %#v", entry.Args["ns"])
@@ -3582,8 +3582,8 @@ func TestDNSSEC14NoResponseDNSKEYArgsSplit(t *testing.T) {
 	if entry == nil {
 		t.Fatalf("expected NO_RESPONSE_DNSKEY")
 	}
-	if schema, ok := entry.Args["arg_schema"].(string); !ok || schema != "gonemaster.logargs/1.1" {
-		t.Fatalf("expected arg_schema=gonemaster.logargs/1.1, got %#v", entry.Args["arg_schema"])
+	if _, ok := entry.Args["arg_schema"]; ok {
+		t.Fatalf("did not expect arg_schema in args: %#v", entry.Args["arg_schema"])
 	}
 	if nsArg, ok := entry.Args["ns"].(string); !ok || nsArg != "ns1.example" {
 		t.Fatalf("expected ns=ns1.example, got %#v", entry.Args["ns"])
@@ -3630,8 +3630,8 @@ func TestDNSSEC14IPv4DisabledArgsSplit(t *testing.T) {
 	if entry == nil {
 		t.Fatalf("expected IPV4_DISABLED")
 	}
-	if schema, ok := entry.Args["arg_schema"].(string); !ok || schema != "gonemaster.logargs/1.1" {
-		t.Fatalf("expected arg_schema=gonemaster.logargs/1.1, got %#v", entry.Args["arg_schema"])
+	if _, ok := entry.Args["arg_schema"]; ok {
+		t.Fatalf("did not expect arg_schema in args: %#v", entry.Args["arg_schema"])
 	}
 	if nsArg, ok := entry.Args["ns"].(string); !ok || nsArg != "ns1.example" {
 		t.Fatalf("expected ns=ns1.example, got %#v", entry.Args["ns"])

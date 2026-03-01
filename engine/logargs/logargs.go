@@ -8,9 +8,6 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 )
 
-// SchemaID is the canonical args schema identifier for coherent log arguments.
-const SchemaID = "gonemaster.logargs/1.1"
-
 // Server represents a nameserver endpoint using canonical key names.
 type Server struct {
 	NS      string
@@ -24,15 +21,6 @@ type Server struct {
 type NameserverLike interface {
 	NameString() string
 	AddressString() string
-}
-
-// EnsureSchema sets the args schema marker on the map and returns it.
-func EnsureSchema(args map[string]any) map[string]any {
-	if args == nil {
-		args = map[string]any{}
-	}
-	args["arg_schema"] = SchemaID
-	return args
 }
 
 // NS returns canonical singular endpoint fields.

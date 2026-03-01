@@ -21,8 +21,8 @@ Applies to all emitted log entries consumed through:
 
 | Term | Current key(s) in use | Typical current shape | Notes |
 | --- | --- | --- | --- |
-| Nameserver endpoint identity | `ns` | `"<name>/<ip>"` | Most frequent pattern today; semantically overloaded. |
-| Nameserver name | `nsname`, sometimes `ns`, sometimes `name` | `string` | Naming is not yet coherent across modules. |
+| Nameserver endpoint identity | `ns` | `"<name>/<ip>"` or `"<name>"` | Mixed usage still exists across tags. |
+| Nameserver name | `nsname`, sometimes `ns`, sometimes `name` | `string` | Naming is not yet coherent across all modules. |
 | Nameserver address | `ns_ip`, `ip`, sometimes `address` | `string` IP | Key choice depends on tag/module. |
 | Nameserver list (display) | `ns_list` | `string` joined by `;` | Often contains endpoint strings (`name/ip`). |
 | Nameserver IP list (display) | `ns_ip_list` | `string` joined by `;` | Machine consumers must split strings today. |
@@ -30,28 +30,17 @@ Applies to all emitted log entries consumed through:
 | ASN collection | `asn_list`, sometimes `asn` | mostly joined `string` | Shape varies (`string` vs list-like). |
 | Query name/type/class | `query_name`, `rrtype`, `type`, `query_type`, `query_class` | `string` | Partially overlapping key set. |
 
-## Canonical Schema (v1.1)
+## Current Migration Status
 
-All new and migrated log entries MUST follow schema id:
+- `args.ns` no longer uses `name/ip` for migrated singular-endpoint callsites.
+- `args.address` exists on migrated singular-endpoint callsites.
+- Packed list keys (`ns_list`, `ns_ip_list`, `asn_list`) still exist on many non-migrated tags.
+- This is why `.po` catalogs still contain placeholders such as `{ns_list}` and `{ns_ip_list}`.
 
-- `arg_schema = "gonemaster.logargs/1.1"`
+## Canonical Contract (v1.1)
 
-This section is the normative contract for schema `gonemaster.logargs/1.1`.
-
-### Contract Scope
-
-The v1.1 contract applies to any entry where:
-
-- `args` exists, and
-- `args.arg_schema == "gonemaster.logargs/1.1"`.
-
-Entries that do not set `arg_schema` are legacy/non-migrated and outside this contract.
-
-### Entry-Level Fields
-
-| Key | Type | Optionality | Meaning |
-| --- | --- | --- | --- |
-| `arg_schema` | `string` | required | Must be exactly `gonemaster.logargs/1.1`. |
+`v1.1` is a documentation contract version. It is not emitted as a runtime
+marker in `args`.
 
 ### Core Identity Fields
 
@@ -97,7 +86,8 @@ Rules:
 
 ### Legacy Compatibility Fields
 
-Legacy keys may still exist during migration (for example `name`, `type`, `ip`, `ns_list`, `ns_ip_list`), but they are non-canonical.
+Legacy keys may still exist during migration (for example `name`, `type`, `ip`,
+`ns_list`, `ns_ip_list`), but they are non-canonical.
 
 Rules:
 
@@ -115,7 +105,6 @@ Singular endpoint + query:
 
 ```json
 {
-  "arg_schema": "gonemaster.logargs/1.1",
   "ns": "ns1.example",
   "address": "192.0.2.53",
   "query_name": "example",
@@ -128,7 +117,6 @@ Multiple endpoints:
 
 ```json
 {
-  "arg_schema": "gonemaster.logargs/1.1",
   "servers": [
     {"ns": "ns1.example", "address": "192.0.2.53"},
     {"ns": "ns2.example", "address": "2001:db8::53"}
@@ -163,14 +151,7 @@ These invariants apply to all new and migrated tags:
 5. Use typed list fields (`servers`, `addresses`, `asns`, `prefixes`) for machine data.
 6. Do not introduce new packed list strings as canonical data.
 
-### Compatibility and versioning invariants
-
-- `1.1` is the canonical baseline.
-- Future `1.x` updates MUST be additive only.
-- Renames/removals/type changes are forbidden in `1.x`.
-- Any breaking schema change requires a new major schema id (`2.0`).
-
-## Immediate authoring rules
+## Immediate Authoring Rules
 
 For new logging changes:
 
@@ -180,5 +161,4 @@ For new logging changes:
   - `args["address"] = <ip>` (when available)
 - Prefer typed structures for machine consumption:
   - `servers`, `addresses`, `asns`, `prefixes`.
-- Always set `args["arg_schema"] = "gonemaster.logargs/1.1"` for entries
-  participating in the coherency migration.
+- Do not add `arg_schema` to runtime output.

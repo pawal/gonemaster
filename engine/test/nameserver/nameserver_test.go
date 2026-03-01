@@ -141,8 +141,8 @@ func TestNameserver01ParallelQueries(t *testing.T) {
 		if entry == nil || entry.Tag != "IS_A_RECURSOR" {
 			continue
 		}
-		if schema, ok := entry.Args["arg_schema"].(string); !ok || schema != "gonemaster.logargs/1.1" {
-			t.Fatalf("expected arg_schema=gonemaster.logargs/1.1, got %#v", entry.Args["arg_schema"])
+		if _, ok := entry.Args["arg_schema"]; ok {
+			t.Fatalf("did not expect arg_schema in args: %#v", entry.Args["arg_schema"])
 		}
 		if ns, ok := entry.Args["ns"].(string); ok {
 			if strings.Contains(ns, "/") {
@@ -361,8 +361,8 @@ func TestNameserver05ParallelQueries(t *testing.T) {
 		if entry == nil || entry.Tag != "NO_RESPONSE" {
 			continue
 		}
-		if schema, ok := entry.Args["arg_schema"].(string); !ok || schema != "gonemaster.logargs/1.1" {
-			t.Fatalf("expected arg_schema=gonemaster.logargs/1.1, got %#v", entry.Args["arg_schema"])
+		if _, ok := entry.Args["arg_schema"]; ok {
+			t.Fatalf("did not expect arg_schema in args: %#v", entry.Args["arg_schema"])
 		}
 		if ns, ok := entry.Args["ns"].(string); ok {
 			if strings.Contains(ns, "/") {

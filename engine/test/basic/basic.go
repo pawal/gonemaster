@@ -993,13 +993,17 @@ func ipEnabledMessage(ctx context.Context, results *[]*logger.Entry, testcase st
 }
 
 func withNameserverArgs(ns nameserver.Nameserver, args map[string]any) map[string]any {
-	args = logargs.EnsureSchema(args)
+	if args == nil {
+		args = map[string]any{}
+	}
 	logargs.SetNS(args, ns.NameString(), ns.AddressString())
 	return args
 }
 
 func withEndpointKeyArgs(endpoint string, args map[string]any) map[string]any {
-	args = logargs.EnsureSchema(args)
+	if args == nil {
+		args = map[string]any{}
+	}
 	name, address := splitNameserverEndpoint(endpoint)
 	logargs.SetNS(args, name, address)
 	return args

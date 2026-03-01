@@ -297,8 +297,8 @@ func TestSyntax06NoResponseArgsSplit(t *testing.T) {
 	if entry == nil {
 		t.Fatalf("expected NO_RESPONSE")
 	}
-	if schema, ok := entry.Args["arg_schema"].(string); !ok || schema != "gonemaster.logargs/1.1" {
-		t.Fatalf("expected arg_schema=gonemaster.logargs/1.1, got %#v", entry.Args["arg_schema"])
+	if _, ok := entry.Args["arg_schema"]; ok {
+		t.Fatalf("did not expect arg_schema in args: %#v", entry.Args["arg_schema"])
 	}
 	if nsArg, ok := entry.Args["ns"].(string); !ok || nsArg != "a.root" {
 		t.Fatalf("expected ns=a.root, got %#v", entry.Args["ns"])
@@ -330,8 +330,8 @@ func TestSyntax06IPv4DisabledArgsSplit(t *testing.T) {
 	if entry == nil {
 		t.Fatalf("expected IPV4_DISABLED")
 	}
-	if schema, ok := entry.Args["arg_schema"].(string); !ok || schema != "gonemaster.logargs/1.1" {
-		t.Fatalf("expected arg_schema=gonemaster.logargs/1.1, got %#v", entry.Args["arg_schema"])
+	if _, ok := entry.Args["arg_schema"]; ok {
+		t.Fatalf("did not expect arg_schema in args: %#v", entry.Args["arg_schema"])
 	}
 	if nsArg, ok := entry.Args["ns"].(string); !ok || nsArg != "a.root" {
 		t.Fatalf("expected ns=a.root, got %#v", entry.Args["ns"])

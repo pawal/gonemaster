@@ -2078,7 +2078,9 @@ func appendLog(ctx context.Context, results *[]*logger.Entry, testcase string, t
 }
 
 func withNameserverArgs(server ns.Nameserver, args map[string]any) map[string]any {
-	args = logargs.EnsureSchema(args)
+	if args == nil {
+		args = map[string]any{}
+	}
 	logargs.SetNS(args, server.NameString(), server.AddressString())
 	return args
 }

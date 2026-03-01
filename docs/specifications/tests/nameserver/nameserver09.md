@@ -60,13 +60,11 @@ Status: Final
 | `CASE_QUERIES_RESULTS_OK` | `domain` | `string` | Base name used for comparisons (`www.<zone>`). |
 | `CASE_QUERY_DIFFERENT_ANSWER` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `CASE_QUERY_DIFFERENT_ANSWER` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `CASE_QUERY_DIFFERENT_ANSWER` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `CASE_QUERY_DIFFERENT_ANSWER` | `type` | `string` | Compared rrtype (`SOA`). |
 | `CASE_QUERY_DIFFERENT_ANSWER` | `query1` | `string` | First randomized query name. |
 | `CASE_QUERY_DIFFERENT_ANSWER` | `query2` | `string` | Second randomized query name. |
 | `CASE_QUERY_DIFFERENT_RC` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `CASE_QUERY_DIFFERENT_RC` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `CASE_QUERY_DIFFERENT_RC` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `CASE_QUERY_DIFFERENT_RC` | `type` | `string` | Compared rrtype (`SOA`). |
 | `CASE_QUERY_DIFFERENT_RC` | `query1` | `string` | First randomized query name. |
 | `CASE_QUERY_DIFFERENT_RC` | `query2` | `string` | Second randomized query name. |
@@ -74,29 +72,24 @@ Status: Final
 | `CASE_QUERY_DIFFERENT_RC` | `rcode2` | `string` | Second query response code. |
 | `CASE_QUERY_NO_ANSWER` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `CASE_QUERY_NO_ANSWER` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `CASE_QUERY_NO_ANSWER` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `CASE_QUERY_NO_ANSWER` | `type` | `string` | Compared rrtype (`SOA`). |
 | `CASE_QUERY_NO_ANSWER` | `domain` | `string` | Query name that had a DNS message. |
 | `CASE_QUERY_SAME_ANSWER` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `CASE_QUERY_SAME_ANSWER` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `CASE_QUERY_SAME_ANSWER` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `CASE_QUERY_SAME_ANSWER` | `type` | `string` | Compared rrtype (`SOA`). |
 | `CASE_QUERY_SAME_ANSWER` | `query1` | `string` | First randomized query name. |
 | `CASE_QUERY_SAME_ANSWER` | `query2` | `string` | Second randomized query name. |
 | `CASE_QUERY_SAME_RC` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `CASE_QUERY_SAME_RC` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `CASE_QUERY_SAME_RC` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `CASE_QUERY_SAME_RC` | `type` | `string` | Compared rrtype (`SOA`). |
 | `CASE_QUERY_SAME_RC` | `query1` | `string` | First randomized query name. |
 | `CASE_QUERY_SAME_RC` | `query2` | `string` | Second randomized query name. |
 | `CASE_QUERY_SAME_RC` | `rcode` | `string` | Shared query response code. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `arg_schema` | `string` | Schema identifier (`gonemaster.logargs/1.1`) for coherent log arguments. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Nameserver09`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Nameserver09`). |

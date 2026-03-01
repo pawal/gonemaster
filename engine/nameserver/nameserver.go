@@ -461,7 +461,9 @@ func logSystemWithLogger(log *logger.Logger, tag string, args map[string]any) {
 	if log == nil {
 		return
 	}
-	args = logargs.EnsureSchema(args)
+	if args == nil {
+		args = map[string]any{}
+	}
 	_, _ = log.Add(tag, args, systemModuleName, "")
 }
 
@@ -473,7 +475,6 @@ func logCachedReturnWithLogger(log *logger.Logger, resp packet.Packet) {
 	if resp.Msg != nil {
 		args["packet"] = packetStringForLog(resp)
 	}
-	args = logargs.EnsureSchema(args)
 	_, _ = log.Add("CACHED_RETURN", args, systemModuleName, "")
 }
 

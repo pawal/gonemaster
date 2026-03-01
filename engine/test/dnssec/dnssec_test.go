@@ -3530,8 +3530,14 @@ func TestDNSSEC14NoResponseArgsSplit(t *testing.T) {
 	if entry == nil {
 		t.Fatalf("expected NO_RESPONSE")
 	}
+	if schema, ok := entry.Args["arg_schema"].(string); !ok || schema != "gonemaster.logargs/1.1" {
+		t.Fatalf("expected arg_schema=gonemaster.logargs/1.1, got %#v", entry.Args["arg_schema"])
+	}
 	if nsArg, ok := entry.Args["ns"].(string); !ok || nsArg != "ns1.example" {
 		t.Fatalf("expected ns=ns1.example, got %#v", entry.Args["ns"])
+	}
+	if nsArg, _ := entry.Args["ns"].(string); strings.Contains(nsArg, "/") {
+		t.Fatalf("expected nameserver-only ns argument, got %q", nsArg)
 	}
 	if address, ok := entry.Args["address"].(string); !ok || address != "192.0.2.141" {
 		t.Fatalf("expected address=192.0.2.141, got %#v", entry.Args["address"])
@@ -3576,8 +3582,14 @@ func TestDNSSEC14NoResponseDNSKEYArgsSplit(t *testing.T) {
 	if entry == nil {
 		t.Fatalf("expected NO_RESPONSE_DNSKEY")
 	}
+	if schema, ok := entry.Args["arg_schema"].(string); !ok || schema != "gonemaster.logargs/1.1" {
+		t.Fatalf("expected arg_schema=gonemaster.logargs/1.1, got %#v", entry.Args["arg_schema"])
+	}
 	if nsArg, ok := entry.Args["ns"].(string); !ok || nsArg != "ns1.example" {
 		t.Fatalf("expected ns=ns1.example, got %#v", entry.Args["ns"])
+	}
+	if nsArg, _ := entry.Args["ns"].(string); strings.Contains(nsArg, "/") {
+		t.Fatalf("expected nameserver-only ns argument, got %q", nsArg)
 	}
 	if address, ok := entry.Args["address"].(string); !ok || address != "192.0.2.142" {
 		t.Fatalf("expected address=192.0.2.142, got %#v", entry.Args["address"])
@@ -3618,8 +3630,14 @@ func TestDNSSEC14IPv4DisabledArgsSplit(t *testing.T) {
 	if entry == nil {
 		t.Fatalf("expected IPV4_DISABLED")
 	}
+	if schema, ok := entry.Args["arg_schema"].(string); !ok || schema != "gonemaster.logargs/1.1" {
+		t.Fatalf("expected arg_schema=gonemaster.logargs/1.1, got %#v", entry.Args["arg_schema"])
+	}
 	if nsArg, ok := entry.Args["ns"].(string); !ok || nsArg != "ns1.example" {
 		t.Fatalf("expected ns=ns1.example, got %#v", entry.Args["ns"])
+	}
+	if nsArg, _ := entry.Args["ns"].(string); strings.Contains(nsArg, "/") {
+		t.Fatalf("expected nameserver-only ns argument, got %q", nsArg)
 	}
 	if address, ok := entry.Args["address"].(string); !ok || address != "192.0.2.143" {
 		t.Fatalf("expected address=192.0.2.143, got %#v", entry.Args["address"])

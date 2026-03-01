@@ -444,8 +444,14 @@ func TestConsistency05ChildZoneLame(t *testing.T) {
 		t.Fatalf("expected CHILD_NS_FAILED")
 	}
 	entry := firstEntryByTag(entries, "CHILD_NS_FAILED")
+	if schema, ok := entry.Args["arg_schema"].(string); !ok || schema != "gonemaster.logargs/1.1" {
+		t.Fatalf("expected arg_schema=gonemaster.logargs/1.1, got %#v", entry.Args["arg_schema"])
+	}
 	if ns, ok := entry.Args["ns"].(string); !ok || ns != "auth.example" {
 		t.Fatalf("expected CHILD_NS_FAILED ns=auth.example, got %#v", entry.Args["ns"])
+	}
+	if ns, _ := entry.Args["ns"].(string); strings.Contains(ns, "/") {
+		t.Fatalf("expected nameserver-only ns argument, got %q", ns)
 	}
 	if address, ok := entry.Args["address"].(string); !ok || address != "192.0.2.53" {
 		t.Fatalf("expected CHILD_NS_FAILED address=192.0.2.53, got %#v", entry.Args["address"])

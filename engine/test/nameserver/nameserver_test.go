@@ -141,7 +141,13 @@ func TestNameserver01ParallelQueries(t *testing.T) {
 		if entry == nil || entry.Tag != "IS_A_RECURSOR" {
 			continue
 		}
+		if schema, ok := entry.Args["arg_schema"].(string); !ok || schema != "gonemaster.logargs/1.1" {
+			t.Fatalf("expected arg_schema=gonemaster.logargs/1.1, got %#v", entry.Args["arg_schema"])
+		}
 		if ns, ok := entry.Args["ns"].(string); ok {
+			if strings.Contains(ns, "/") {
+				t.Fatalf("expected nameserver-only ns argument, got %q", ns)
+			}
 			order = append(order, ns)
 		}
 		if address, ok := entry.Args["address"].(string); ok {
@@ -355,7 +361,13 @@ func TestNameserver05ParallelQueries(t *testing.T) {
 		if entry == nil || entry.Tag != "NO_RESPONSE" {
 			continue
 		}
+		if schema, ok := entry.Args["arg_schema"].(string); !ok || schema != "gonemaster.logargs/1.1" {
+			t.Fatalf("expected arg_schema=gonemaster.logargs/1.1, got %#v", entry.Args["arg_schema"])
+		}
 		if ns, ok := entry.Args["ns"].(string); ok {
+			if strings.Contains(ns, "/") {
+				t.Fatalf("expected nameserver-only ns argument, got %q", ns)
+			}
 			order = append(order, ns)
 		}
 		if address, ok := entry.Args["address"].(string); ok {

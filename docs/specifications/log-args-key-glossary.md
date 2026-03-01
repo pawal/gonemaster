@@ -1,0 +1,63 @@
+# Log Argument Key Glossary
+
+This glossary defines the canonical log argument keys for machine consumers.
+It complements `docs/specifications/log-args-coherency.md`.
+
+Schema id:
+
+- `arg_schema = "gonemaster.logargs/1.1"`
+
+Scope:
+
+- Normative for entries that include `args.arg_schema = "gonemaster.logargs/1.1"`.
+- Legacy entries without `arg_schema` may use older keys during migration.
+
+## Core Identity Keys
+
+| Key | Type | Meaning | Notes |
+| --- | --- | --- | --- |
+| `arg_schema` | `string` | Log argument schema id. | Must be `gonemaster.logargs/1.1` for canonical entries. |
+| `ns` | `string` | Nameserver name (FQDN string). | Name only. Never `name/ip`. |
+| `address` | `string` | Single nameserver IP address. | Use together with `ns` when both are known. |
+| `domain` | `string` | Domain name in testcase-specific contexts. | Keep testcase meaning explicit. |
+| `mname` | `string` | SOA MNAME hostname. | Hostname only. |
+
+## Query Identity Keys
+
+| Key | Type | Meaning | Notes |
+| --- | --- | --- | --- |
+| `query_name` | `string` | DNS owner name queried. | |
+| `query_type` | `string` | DNS RR type queried. | Uppercase form (for example `SOA`). |
+| `query_class` | `string` | DNS class queried. | Usually `IN`. |
+
+## Structured Collection Keys
+
+| Key | Type | Meaning | Notes |
+| --- | --- | --- | --- |
+| `servers` | `array<object>` | Endpoint list for machine use. | Items use `{ "ns": "...", "address": "..." }`. |
+| `addresses` | `array<string>` | IP address list. | |
+| `asns` | `array<int>` | ASN list. | Integer ASN values. |
+| `prefixes` | `array<string>` | CIDR prefix list. | |
+
+## Role-Specific Collection Variants
+
+Use role-specific server collections where needed, with the same endpoint item
+shape as `servers`:
+
+- `parent_servers`
+- `child_servers`
+- `failing_servers`
+
+## Transitional Legacy Keys
+
+These keys may appear in non-migrated entries and are not canonical in v1.1:
+
+- `ip`, `ns_ip`
+- `nsname`, `name`, `server`
+- `ns_list`, `ns_ip_list`, `asn_list`
+- delimiter-packed identity fields (`;` or `,`) without typed counterparts
+
+Migration rule:
+
+- New and migrated emits must prefer canonical keys above.
+- Do not introduce new packed-list-only identity fields.

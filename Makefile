@@ -17,7 +17,7 @@ CMD ?= all
 	build-gonemaster-nagios install-gonemaster install-gonemaster-server install-gonemaster-client \
 	install-gonemaster-nagios ui-check test-go vet race \
 	spec-export-implemented spec-export-tags spec-export spec-validate spec-validate-scan spec-check \
-	spec-generate-tags spec-check-tags
+	spec-generate-tags spec-check-tags spec-export-log-args
 
 help:
 	@echo "Targets:"
@@ -36,6 +36,7 @@ help:
 	@echo "  build-gonemaster-client       Build the HTTP API client"
 	@echo "  build-gonemaster-nagios       Build the Nagios plugin"
 	@echo "  spec-export        Refresh generated specification inventories (JSON)"
+	@echo "  spec-export-log-args  Refresh generated log argument inventory (JSON + markdown)"
 	@echo "  spec-validate      Validate canonical testcase specs against implementation metadata"
 	@echo "  spec-validate-scan Validate specs + scan append*Log literals for metadata omissions"
 	@echo "  spec-generate-tags Regenerate per-module tag catalog markdown files"
@@ -152,6 +153,9 @@ spec-export-tags:
 	$(GO) run ./tools/specifications/export-tags > docs/specifications/possible-tags-by-testcase.json
 
 spec-export: spec-export-implemented spec-export-tags
+
+spec-export-log-args:
+	$(GO) run ./tools/specifications/export-log-args > docs/specifications/log-args-inventory.json
 
 spec-validate:
 	$(GO) run ./tools/specifications/validate

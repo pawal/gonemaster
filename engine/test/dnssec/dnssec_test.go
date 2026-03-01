@@ -3492,6 +3492,140 @@ func TestDNSSEC14ParallelDNSKEYQueries(t *testing.T) {
 	}
 }
 
+func TestDNSSEC14NoResponseArgsSplit(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origM4 := method4
+	origM5 := method5
+	t.Cleanup(func() {
+		method4 = origM4
+		method5 = origM5
+	})
+
+	ns := newNameserver(t, "ns1.example", "192.0.2.141", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype == "DNSKEY" {
+			return packet.Packet{}
+		}
+		return packet.Packet{}
+	})
+
+	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns}, nil
+	}
+	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := DNSSEC14(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("dnssec14: %v", err)
+	}
+	entry := firstEntryByTag(entries, "NO_RESPONSE")
+	if entry == nil {
+		t.Fatalf("expected NO_RESPONSE")
+	}
+	if nsArg, ok := entry.Args["ns"].(string); !ok || nsArg != "ns1.example" {
+		t.Fatalf("expected ns=ns1.example, got %#v", entry.Args["ns"])
+	}
+	if address, ok := entry.Args["address"].(string); !ok || address != "192.0.2.141" {
+		t.Fatalf("expected address=192.0.2.141, got %#v", entry.Args["address"])
+	}
+}
+
+func TestDNSSEC14NoResponseDNSKEYArgsSplit(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origM4 := method4
+	origM5 := method5
+	t.Cleanup(func() {
+		method4 = origM4
+		method5 = origM5
+	})
+
+	ns := newNameserver(t, "ns1.example", "192.0.2.142", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype == "DNSKEY" {
+			return answerPacket(qname, dns.TypeDNSKEY)
+		}
+		return packet.Packet{}
+	})
+
+	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns}, nil
+	}
+	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := DNSSEC14(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("dnssec14: %v", err)
+	}
+	entry := firstEntryByTag(entries, "NO_RESPONSE_DNSKEY")
+	if entry == nil {
+		t.Fatalf("expected NO_RESPONSE_DNSKEY")
+	}
+	if nsArg, ok := entry.Args["ns"].(string); !ok || nsArg != "ns1.example" {
+		t.Fatalf("expected ns=ns1.example, got %#v", entry.Args["ns"])
+	}
+	if address, ok := entry.Args["address"].(string); !ok || address != "192.0.2.142" {
+		t.Fatalf("expected address=192.0.2.142, got %#v", entry.Args["address"])
+	}
+}
+
+func TestDNSSEC14IPv4DisabledArgsSplit(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origM4 := method4
+	origM5 := method5
+	t.Cleanup(func() {
+		method4 = origM4
+		method5 = origM5
+	})
+
+	profile.Effective().Net.IPv4 = false
+
+	ns := newNameserver(t, "ns1.example", "192.0.2.143", nil)
+	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns}, nil
+	}
+	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := DNSSEC14(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("dnssec14: %v", err)
+	}
+	entry := firstEntryByTag(entries, "IPV4_DISABLED")
+	if entry == nil {
+		t.Fatalf("expected IPV4_DISABLED")
+	}
+	if nsArg, ok := entry.Args["ns"].(string); !ok || nsArg != "ns1.example" {
+		t.Fatalf("expected ns=ns1.example, got %#v", entry.Args["ns"])
+	}
+	if address, ok := entry.Args["address"].(string); !ok || address != "192.0.2.143" {
+		t.Fatalf("expected address=192.0.2.143, got %#v", entry.Args["address"])
+	}
+}
+
 func TestDNSSEC15NoCDSCDNSKEY(t *testing.T) {
 	nameserver.EmptyCache()
 	t.Cleanup(nameserver.EmptyCache)
@@ -4394,6 +4528,18 @@ func hasEntryTag(entries []*logger.Entry, tag string) bool {
 		}
 	}
 	return false
+}
+
+func firstEntryByTag(entries []*logger.Entry, tag string) *logger.Entry {
+	for _, entry := range entries {
+		if entry == nil {
+			continue
+		}
+		if entry.Tag == tag {
+			return entry
+		}
+	}
+	return nil
 }
 
 func normalizeEntriesForComparison(entries []*logger.Entry) []string {

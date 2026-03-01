@@ -15,6 +15,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/internal/parallel"
+	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/methods"
 	methodsv2 "codeberg.org/pawal/gonemaster/engine/methodsv2"
@@ -4459,9 +4460,7 @@ func DNSSEC14(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				useVC := false
 				resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
 				if resp.Msg == nil {
-					if _, err := buf.Add("NO_RESPONSE", map[string]any{
-						"ns": ns.String(),
-					}); err != nil {
+					if _, err := buf.Add("NO_RESPONSE", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
@@ -4470,9 +4469,7 @@ func DNSSEC14(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 				keyRecords := resp.GetRecords("DNSKEY", "answer")
 				if len(keyRecords) == 0 {
-					if _, err := buf.Add("NO_RESPONSE_DNSKEY", map[string]any{
-						"ns": ns.String(),
-					}); err != nil {
+					if _, err := buf.Add("NO_RESPONSE_DNSKEY", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
@@ -6452,6 +6449,14 @@ func appendLog(ctx context.Context, results *[]*logger.Entry, testcase string, t
 	return nil
 }
 
+func withNameserverArgs(server nameserver.Nameserver, args map[string]any) map[string]any {
+	if args == nil {
+		args = map[string]any{}
+	}
+	logargs.SetNS(args, server.NameString(), server.AddressString())
+	return args
+}
+
 func hasTag(entries []*logger.Entry, tag string) bool {
 	for _, entry := range entries {
 		if entry == nil {
@@ -6467,10 +6472,9 @@ func hasTag(entries []*logger.Entry, tag string) bool {
 func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, server nameserver.Nameserver, rrtypes ...string) (bool, error) {
 	if server.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 		for _, rrtype := range rrtypes {
-			if _, err := buf.Add("IPV6_DISABLED", map[string]any{
-				"ns":     server.String(),
+			if _, err := buf.Add("IPV6_DISABLED", withNameserverArgs(server, map[string]any{
 				"rrtype": rrtype,
-			}); err != nil {
+			})); err != nil {
 				return true, err
 			}
 		}
@@ -6478,10 +6482,9 @@ func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, se
 	}
 	if server.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
 		for _, rrtype := range rrtypes {
-			if _, err := buf.Add("IPV4_DISABLED", map[string]any{
-				"ns":     server.String(),
+			if _, err := buf.Add("IPV4_DISABLED", withNameserverArgs(server, map[string]any{
 				"rrtype": rrtype,
-			}); err != nil {
+			})); err != nil {
 				return true, err
 			}
 		}
@@ -6493,10 +6496,9 @@ func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, se
 func ipDisabledMessage(ctx context.Context, results *[]*logger.Entry, testcase string, server nameserver.Nameserver, rrtypes ...string) (bool, error) {
 	if !profile.FromContext(ctx).Net.IPv6 && server.Address.Is6() {
 		for _, rrtype := range rrtypes {
-			if err := appendLog(ctx, results, testcase, "IPV6_DISABLED", map[string]any{
-				"ns":     server.String(),
+			if err := appendLog(ctx, results, testcase, "IPV6_DISABLED", withNameserverArgs(server, map[string]any{
 				"rrtype": rrtype,
-			}); err != nil {
+			})); err != nil {
 				return true, err
 			}
 		}
@@ -6504,10 +6506,9 @@ func ipDisabledMessage(ctx context.Context, results *[]*logger.Entry, testcase s
 	}
 	if !profile.FromContext(ctx).Net.IPv4 && server.Address.Is4() {
 		for _, rrtype := range rrtypes {
-			if err := appendLog(ctx, results, testcase, "IPV4_DISABLED", map[string]any{
-				"ns":     server.String(),
+			if err := appendLog(ctx, results, testcase, "IPV4_DISABLED", withNameserverArgs(server, map[string]any{
 				"rrtype": rrtype,
-			}); err != nil {
+			})); err != nil {
 				return true, err
 			}
 		}

@@ -77,6 +77,12 @@ func Servers(items []Server) map[string]any {
 	sort.Slice(servers, func(i, j int) bool {
 		leftNS, _ := servers[i]["ns"].(string)
 		rightNS, _ := servers[j]["ns"].(string)
+		if leftNS == "" && rightNS != "" {
+			return false
+		}
+		if leftNS != "" && rightNS == "" {
+			return true
+		}
 		if leftNS != rightNS {
 			return leftNS < rightNS
 		}

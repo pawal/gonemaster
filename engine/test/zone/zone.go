@@ -14,6 +14,7 @@ import (
 	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/methods"
 	methodsv2 "codeberg.org/pawal/gonemaster/engine/methodsv2"
@@ -436,9 +437,7 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 
 				resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "SOA", nil)
 				if resp.Msg == nil {
-					if err := appendLog(ctx, &results, testcase, "Z01_MNAME_NO_RESPONSE", map[string]any{
-						"ns": ns.String(),
-					}); err != nil {
+					if err := appendLog(ctx, &results, testcase, "Z01_MNAME_NO_RESPONSE", withNameserverArgs(ns, nil)); err != nil {
 						return results, err
 					}
 					continue
@@ -447,9 +446,7 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 				soaRecords := resp.GetRecordsForName("SOA", z.Name, "answer")
 				if resp.Rcode() == "NOERROR" && len(soaRecords) > 0 {
 					if !resp.AA() {
-						if err := appendLog(ctx, &results, testcase, "Z01_MNAME_NOT_AUTHORITATIVE", map[string]any{
-							"ns": ns.String(),
-						}); err != nil {
+						if err := appendLog(ctx, &results, testcase, "Z01_MNAME_NOT_AUTHORITATIVE", withNameserverArgs(ns, nil)); err != nil {
 							return results, err
 						}
 					} else {
@@ -460,16 +457,13 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 						}
 					}
 				} else if resp.Rcode() != "NOERROR" {
-					if err := appendLog(ctx, &results, testcase, "Z01_MNAME_UNEXPECTED_RCODE", map[string]any{
-						"ns":    ns.String(),
+					if err := appendLog(ctx, &results, testcase, "Z01_MNAME_UNEXPECTED_RCODE", withNameserverArgs(ns, map[string]any{
 						"rcode": resp.Rcode(),
-					}); err != nil {
+					})); err != nil {
 						return results, err
 					}
 				} else if len(soaRecords) == 0 {
-					if err := appendLog(ctx, &results, testcase, "Z01_MNAME_MISSING_SOA_RECORD", map[string]any{
-						"ns": ns.String(),
-					}); err != nil {
+					if err := appendLog(ctx, &results, testcase, "Z01_MNAME_MISSING_SOA_RECORD", withNameserverArgs(ns, nil)); err != nil {
 						return results, err
 					}
 				}
@@ -1220,9 +1214,7 @@ func Zone10(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 
 				resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "SOA", nil)
 				if resp.Msg == nil {
-					if _, err := buf.Add("NO_RESPONSE", map[string]any{
-						"ns": ns.String(),
-					}); err != nil {
+					if _, err := buf.Add("NO_RESPONSE", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					return nil
@@ -1231,29 +1223,25 @@ func Zone10(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 				records := resp.GetRecords("SOA", "answer")
 				if len(records) > 0 {
 					if len(records) > 1 {
-						if _, err := buf.Add("MULTIPLE_SOA", map[string]any{
-							"ns":    ns.String(),
+						if _, err := buf.Add("MULTIPLE_SOA", withNameserverArgs(ns, map[string]any{
 							"count": len(records),
-						}); err != nil {
+						})); err != nil {
 							return err
 						}
 					} else if soa, ok := records[0].(*dns.SOA); ok {
 						owner := strings.ToLower(soa.Hdr.Name)
 						expected := strings.ToLower(z.Name.FQDN())
 						if owner != expected {
-							if _, err := buf.Add("WRONG_SOA", map[string]any{
-								"ns":    ns.String(),
+							if _, err := buf.Add("WRONG_SOA", withNameserverArgs(ns, map[string]any{
 								"owner": owner,
 								"name":  expected,
-							}); err != nil {
+							})); err != nil {
 								return err
 							}
 						}
 					}
 				} else {
-					if _, err := buf.Add("NO_SOA_IN_RESPONSE", map[string]any{
-						"ns": ns.String(),
-					}); err != nil {
+					if _, err := buf.Add("NO_SOA_IN_RESPONSE", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 				}
@@ -1558,10 +1546,9 @@ func Zone12(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		ns := outcome.ns
 		if len(outcome.csyncRRs) > 1 {
 			hasCSYNC++
-			if err := appendLog(ctx, &results, testcase, "Z12_MULTIPLE_CSYNC", map[string]any{
-				"ns":    ns.String(),
+			if err := appendLog(ctx, &results, testcase, "Z12_MULTIPLE_CSYNC", withNameserverArgs(ns, map[string]any{
 				"count": len(outcome.csyncRRs),
-			}); err != nil {
+			})); err != nil {
 				return results, err
 			}
 		} else if len(outcome.csyncRRs) == 1 {
@@ -1571,20 +1558,18 @@ func Zone12(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 				continue
 			}
 			typeBitmap := csyncTypeBitmap(csync.CSYNC.TypeBitMap)
-			if err := appendLog(ctx, &results, testcase, "Z12_CSYNC_FOUND", map[string]any{
-				"ns":          ns.String(),
+			if err := appendLog(ctx, &results, testcase, "Z12_CSYNC_FOUND", withNameserverArgs(ns, map[string]any{
 				"serial":      csync.CSYNC.Serial,
 				"flags":       csync.CSYNC.Flags,
 				"type_bitmap": typeBitmap,
-			}); err != nil {
+			})); err != nil {
 				return results, err
 			}
 			if outcome.soaOK && csyncSerialMismatch(csync.CSYNC.Serial, csync.CSYNC.Flags, outcome.soaSerial) {
-				if err := appendLog(ctx, &results, testcase, "Z12_SERIAL_MISMATCH", map[string]any{
-					"ns":           ns.String(),
+				if err := appendLog(ctx, &results, testcase, "Z12_SERIAL_MISMATCH", withNameserverArgs(ns, map[string]any{
 					"csync_serial": csync.CSYNC.Serial,
 					"soa_serial":   outcome.soaSerial,
-				}); err != nil {
+				})); err != nil {
 					return results, err
 				}
 			}
@@ -1592,9 +1577,7 @@ func Zone12(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			csyncKeys[key] = struct{}{}
 		} else {
 			noCSYNC++
-			if err := appendLog(ctx, &results, testcase, "Z12_NO_CSYNC", map[string]any{
-				"ns": ns.String(),
-			}); err != nil {
+			if err := appendLog(ctx, &results, testcase, "Z12_NO_CSYNC", withNameserverArgs(ns, nil)); err != nil {
 				return results, err
 			}
 		}
@@ -1651,13 +1634,20 @@ func appendLog(ctx context.Context, results *[]*logger.Entry, testcase string, t
 	return nil
 }
 
+func withNameserverArgs(ns nameserver.Nameserver, args map[string]any) map[string]any {
+	if args == nil {
+		args = map[string]any{}
+	}
+	logargs.SetNS(args, ns.NameString(), ns.AddressString())
+	return args
+}
+
 func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
 	if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 		for _, rrtype := range rrtypes {
-			if _, err := buf.Add("IPV6_DISABLED", map[string]any{
-				"ns":     ns.String(),
+			if _, err := buf.Add("IPV6_DISABLED", withNameserverArgs(ns, map[string]any{
 				"rrtype": rrtype,
-			}); err != nil {
+			})); err != nil {
 				return true, err
 			}
 		}
@@ -1665,10 +1655,9 @@ func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, ns
 	}
 	if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
 		for _, rrtype := range rrtypes {
-			if _, err := buf.Add("IPV4_DISABLED", map[string]any{
-				"ns":     ns.String(),
+			if _, err := buf.Add("IPV4_DISABLED", withNameserverArgs(ns, map[string]any{
 				"rrtype": rrtype,
-			}); err != nil {
+			})); err != nil {
 				return true, err
 			}
 		}
@@ -1680,10 +1669,9 @@ func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, ns
 func ipDisabledMessage(ctx context.Context, results *[]*logger.Entry, testcase string, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
 	if !profile.FromContext(ctx).Net.IPv6 && ns.Address.Is6() {
 		for _, rrtype := range rrtypes {
-			if err := appendLog(ctx, results, testcase, "IPV6_DISABLED", map[string]any{
-				"ns":     ns.String(),
+			if err := appendLog(ctx, results, testcase, "IPV6_DISABLED", withNameserverArgs(ns, map[string]any{
 				"rrtype": rrtype,
-			}); err != nil {
+			})); err != nil {
 				return true, err
 			}
 		}
@@ -1691,10 +1679,9 @@ func ipDisabledMessage(ctx context.Context, results *[]*logger.Entry, testcase s
 	}
 	if !profile.FromContext(ctx).Net.IPv4 && ns.Address.Is4() {
 		for _, rrtype := range rrtypes {
-			if err := appendLog(ctx, results, testcase, "IPV4_DISABLED", map[string]any{
-				"ns":     ns.String(),
+			if err := appendLog(ctx, results, testcase, "IPV4_DISABLED", withNameserverArgs(ns, map[string]any{
 				"rrtype": rrtype,
-			}); err != nil {
+			})); err != nil {
 				return true, err
 			}
 		}

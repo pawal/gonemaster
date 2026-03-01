@@ -136,6 +136,7 @@ func TestNameserver01ParallelQueries(t *testing.T) {
 	}
 
 	var order []string
+	var addresses []string
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "IS_A_RECURSOR" {
 			continue
@@ -143,12 +144,18 @@ func TestNameserver01ParallelQueries(t *testing.T) {
 		if ns, ok := entry.Args["ns"].(string); ok {
 			order = append(order, ns)
 		}
+		if address, ok := entry.Args["address"].(string); ok {
+			addresses = append(addresses, address)
+		}
 	}
 	if len(order) != 2 {
 		t.Fatalf("expected 2 recursor entries, got %v", order)
 	}
-	if order[0] != "ns1.example/192.0.2.1" || order[1] != "ns2.example/192.0.2.2" {
+	if order[0] != "ns1.example" || order[1] != "ns2.example" {
 		t.Fatalf("expected deterministic log order, got %v", order)
+	}
+	if len(addresses) != 2 || addresses[0] != "192.0.2.1" || addresses[1] != "192.0.2.2" {
+		t.Fatalf("expected deterministic address order, got %v", addresses)
 	}
 }
 
@@ -343,6 +350,7 @@ func TestNameserver05ParallelQueries(t *testing.T) {
 	}
 
 	var order []string
+	var addresses []string
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "NO_RESPONSE" {
 			continue
@@ -350,12 +358,18 @@ func TestNameserver05ParallelQueries(t *testing.T) {
 		if ns, ok := entry.Args["ns"].(string); ok {
 			order = append(order, ns)
 		}
+		if address, ok := entry.Args["address"].(string); ok {
+			addresses = append(addresses, address)
+		}
 	}
 	if len(order) != 2 {
 		t.Fatalf("expected 2 no-response entries, got %v", order)
 	}
-	if order[0] != "ns1.example/192.0.2.1" || order[1] != "ns2.example/192.0.2.2" {
+	if order[0] != "ns1.example" || order[1] != "ns2.example" {
 		t.Fatalf("expected deterministic log order, got %v", order)
+	}
+	if len(addresses) != 2 || addresses[0] != "192.0.2.1" || addresses[1] != "192.0.2.2" {
+		t.Fatalf("expected deterministic address order, got %v", addresses)
 	}
 }
 

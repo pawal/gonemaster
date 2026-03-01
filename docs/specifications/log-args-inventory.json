@@ -11,10 +11,10 @@
     "file_count": 93,
     "log_call_count": 623,
     "unique_tag_count": 427,
-    "unique_key_count": 109,
-    "ns_string_call_count": 111,
+    "unique_key_count": 103,
+    "ns_string_call_count": 76,
     "packed_list_only_key_count": 8,
-    "unresolved_log_call_count": 2
+    "unresolved_log_call_count": 37
   },
   "keys": {
     "aa": {
@@ -705,15 +705,11 @@
         "B02_AUTH_RESPONSE_SOA",
         "B02_NO_DELEGATION",
         "B02_NO_WORKING_NS",
-        "BREAKS_ON_EDNS",
         "CASE_QUERIES_RESULTS_DIFFER",
         "CASE_QUERIES_RESULTS_OK",
-        "CASE_QUERY_NO_ANSWER",
         "DISCOURAGED_DOUBLE_DASH",
         "DS10_NSEC3_NODATA_WRONG_SOA",
         "DS10_NSEC_NODATA_WRONG_SOA",
-        "EDNS_RESPONSE_WITHOUT_EDNS",
-        "EDNS_VERSION_ERROR",
         "FAKE_DELEGATION_ADDED",
         "FAKE_DELEGATION_TO_SELF",
         "FAKE_DS_ADDED",
@@ -726,8 +722,6 @@
         "NO_RESPONSE",
         "NO_RESPONSE_PTR_QUERY",
         "ONLY_ALLOWED_CHARS",
-        "QNAME_CASE_INSENSITIVE",
-        "QNAME_CASE_SENSITIVE",
         "RNAME_MAIL_DOMAIN_INVALID",
         "RNAME_MAIL_DOMAIN_LOCALHOST",
         "RNAME_MAIL_ILLEGAL_CNAME",
@@ -756,7 +750,7 @@
         "engine/test/syntax/syntax.go",
         "engine/test/zone/zone.go"
       ],
-      "occurrences": 55,
+      "occurrences": 44,
       "samples": [
         {
           "tag": "B01_CHILD_FOUND",
@@ -1740,26 +1734,6 @@
         }
       ]
     },
-    "length": {
-      "tags": [
-        "AAAA_BAD_RDATA"
-      ],
-      "shapes": [
-        "int"
-      ],
-      "producer_files": [
-        "engine/test/nameserver/nameserver.go"
-      ],
-      "occurrences": 1,
-      "samples": [
-        {
-          "tag": "AAAA_BAD_RDATA",
-          "file": "engine/test/nameserver/nameserver.go",
-          "line": 779,
-          "shape": "int"
-        }
-      ]
-    },
     "localhost": {
       "tags": [
         "RNAME_MAIL_DOMAIN_LOCALHOST"
@@ -2104,63 +2078,40 @@
         {
           "tag": "NO_RESOLUTION",
           "file": "engine/test/nameserver/nameserver.go",
-          "line": 877,
+          "line": 868,
           "shape": "string"
         },
         {
           "tag": "SAME_SOURCE_IP",
           "file": "engine/test/nameserver/nameserver.go",
-          "line": 682,
+          "line": 677,
           "shape": "string"
         }
       ]
     },
     "ns": {
       "tags": [
-        "AAAA_BAD_RDATA",
-        "AAAA_QUERY_DROPPED",
-        "AAAA_UNEXPECTED_RCODE",
-        "AXFR_AVAILABLE",
-        "AXFR_FAILURE",
-        "A_UNEXPECTED_RCODE",
         "B01_SERVER_ZONE_ERROR",
         "B02_NS_BROKEN",
         "B02_NS_NOT_AUTH",
         "B02_NS_NO_RESPONSE",
         "B02_UNEXPECTED_RCODE",
-        "BREAKS_ON_EDNS",
-        "CASE_QUERY_DIFFERENT_ANSWER",
-        "CASE_QUERY_DIFFERENT_RC",
-        "CASE_QUERY_NO_ANSWER",
-        "CASE_QUERY_SAME_ANSWER",
-        "CASE_QUERY_SAME_RC",
         "CHILD_NS_FAILED",
-        "DIFFERENT_SOURCE_IP",
-        "EDNS_RESPONSE_WITHOUT_EDNS",
-        "EDNS_VERSION_ERROR",
         "HAS_A_RECORDS",
         "IPV4_DISABLED",
         "IPV4_ENABLED",
         "IPV6_DISABLED",
         "IPV6_ENABLED",
-        "IS_A_RECURSOR",
         "IS_NOT_AUTHORITATIVE",
-        "MISSING_OPT_IN_TRUNCATED",
         "MULTIPLE_SOA",
         "NO_A_RECORDS",
-        "NO_EDNS_SUPPORT",
-        "NO_RECURSOR",
         "NO_RESPONSE",
         "NO_RESPONSE_DNSKEY",
         "NO_RESPONSE_NS_QUERY",
         "NO_RESPONSE_SOA_QUERY",
         "NO_SOA_IN_RESPONSE",
-        "NS_ERROR",
-        "QNAME_CASE_INSENSITIVE",
-        "QNAME_CASE_SENSITIVE",
         "SOA_NOT_EXISTS",
         "UNEXPECTED_RCODE",
-        "UPWARD_REFERRAL",
         "WRONG_SOA",
         "Z01_MNAME_MISSING_SOA_RECORD",
         "Z01_MNAME_NOT_AUTHORITATIVE",
@@ -2170,7 +2121,6 @@
         "Z12_MULTIPLE_CSYNC",
         "Z12_NO_CSYNC",
         "Z12_SERIAL_MISMATCH",
-        "Z_FLAGS_NOTCLEAR",
         "fmt.Sprintf(\"%s_%s_RECORD_NOT_AA_%s\", prefix, qtype, protocol)",
         "fmt.Sprintf(\"%s_MISSING_%s_RECORD_%s\", prefix, qtype, protocol)",
         "fmt.Sprintf(\"%s_NO_RESPONSE_%s\", prefix, protocol)",
@@ -2188,11 +2138,10 @@
         "engine/test/consistency/consistency.go",
         "engine/test/delegation/delegation.go",
         "engine/test/dnssec/dnssec.go",
-        "engine/test/nameserver/nameserver.go",
         "engine/test/syntax/syntax.go",
         "engine/test/zone/zone.go"
       ],
-      "occurrences": 116,
+      "occurrences": 81,
       "samples": [
         {
           "tag": "B01_SERVER_ZONE_ERROR",
@@ -2650,7 +2599,7 @@
         {
           "tag": "N16_HAS_NSID",
           "file": "engine/test/nameserver/nameserver.go",
-          "line": 1974,
+          "line": 1956,
           "shape": "unknown"
         }
       ]
@@ -2970,88 +2919,6 @@
         }
       ]
     },
-    "query1": {
-      "tags": [
-        "CASE_QUERY_DIFFERENT_ANSWER",
-        "CASE_QUERY_DIFFERENT_RC",
-        "CASE_QUERY_SAME_ANSWER",
-        "CASE_QUERY_SAME_RC"
-      ],
-      "shapes": [
-        "unknown"
-      ],
-      "producer_files": [
-        "engine/test/nameserver/nameserver.go"
-      ],
-      "occurrences": 4,
-      "samples": [
-        {
-          "tag": "CASE_QUERY_DIFFERENT_ANSWER",
-          "file": "engine/test/nameserver/nameserver.go",
-          "line": 1126,
-          "shape": "unknown"
-        },
-        {
-          "tag": "CASE_QUERY_DIFFERENT_RC",
-          "file": "engine/test/nameserver/nameserver.go",
-          "line": 1148,
-          "shape": "unknown"
-        },
-        {
-          "tag": "CASE_QUERY_SAME_ANSWER",
-          "file": "engine/test/nameserver/nameserver.go",
-          "line": 1116,
-          "shape": "unknown"
-        },
-        {
-          "tag": "CASE_QUERY_SAME_RC",
-          "file": "engine/test/nameserver/nameserver.go",
-          "line": 1137,
-          "shape": "unknown"
-        }
-      ]
-    },
-    "query2": {
-      "tags": [
-        "CASE_QUERY_DIFFERENT_ANSWER",
-        "CASE_QUERY_DIFFERENT_RC",
-        "CASE_QUERY_SAME_ANSWER",
-        "CASE_QUERY_SAME_RC"
-      ],
-      "shapes": [
-        "unknown"
-      ],
-      "producer_files": [
-        "engine/test/nameserver/nameserver.go"
-      ],
-      "occurrences": 4,
-      "samples": [
-        {
-          "tag": "CASE_QUERY_DIFFERENT_ANSWER",
-          "file": "engine/test/nameserver/nameserver.go",
-          "line": 1126,
-          "shape": "unknown"
-        },
-        {
-          "tag": "CASE_QUERY_DIFFERENT_RC",
-          "file": "engine/test/nameserver/nameserver.go",
-          "line": 1148,
-          "shape": "unknown"
-        },
-        {
-          "tag": "CASE_QUERY_SAME_ANSWER",
-          "file": "engine/test/nameserver/nameserver.go",
-          "line": 1116,
-          "shape": "unknown"
-        },
-        {
-          "tag": "CASE_QUERY_SAME_RC",
-          "file": "engine/test/nameserver/nameserver.go",
-          "line": 1137,
-          "shape": "unknown"
-        }
-      ]
-    },
     "query_class": {
       "tags": [
         "ERROR_CACHE_SKIP",
@@ -3207,10 +3074,7 @@
     },
     "rcode": {
       "tags": [
-        "AAAA_UNEXPECTED_RCODE",
-        "A_UNEXPECTED_RCODE",
         "B02_UNEXPECTED_RCODE",
-        "CASE_QUERY_SAME_RC",
         "DS07_UNEXP_RCODE_RESP_DNSKEY",
         "EMPTY_RETURN",
         "EXTERNAL_RESPONSE",
@@ -3235,14 +3099,8 @@
         "engine/test/nameserver/nameserver.go",
         "engine/test/zone/zone.go"
       ],
-      "occurrences": 15,
+      "occurrences": 12,
       "samples": [
-        {
-          "tag": "A_UNEXPECTED_RCODE",
-          "file": "engine/test/nameserver/nameserver.go",
-          "line": 745,
-          "shape": "unknown"
-        },
         {
           "tag": "B02_UNEXPECTED_RCODE",
           "file": "engine/test/basic/basic.go",
@@ -3268,6 +3126,12 @@
           "shape": "unknown"
         },
         {
+          "tag": "N10_UNEXPECTED_RCODE",
+          "file": "engine/test/nameserver/nameserver.go",
+          "line": 1297,
+          "shape": "unknown"
+        },
+        {
           "tag": "NO_RESPONSE",
           "file": "engine/test/delegation/delegation.go",
           "line": 615,
@@ -3283,46 +3147,6 @@
           "tag": "fmt.Sprintf(\"%s_UNEXPECTED_RCODE_%s_QUERY_%s\", prefix, qtype, protocol)",
           "file": "engine/test/connectivity/connectivity.go",
           "line": 694,
-          "shape": "unknown"
-        }
-      ]
-    },
-    "rcode1": {
-      "tags": [
-        "CASE_QUERY_DIFFERENT_RC"
-      ],
-      "shapes": [
-        "unknown"
-      ],
-      "producer_files": [
-        "engine/test/nameserver/nameserver.go"
-      ],
-      "occurrences": 1,
-      "samples": [
-        {
-          "tag": "CASE_QUERY_DIFFERENT_RC",
-          "file": "engine/test/nameserver/nameserver.go",
-          "line": 1148,
-          "shape": "unknown"
-        }
-      ]
-    },
-    "rcode2": {
-      "tags": [
-        "CASE_QUERY_DIFFERENT_RC"
-      ],
-      "shapes": [
-        "unknown"
-      ],
-      "producer_files": [
-        "engine/test/nameserver/nameserver.go"
-      ],
-      "occurrences": 1,
-      "samples": [
-        {
-          "tag": "CASE_QUERY_DIFFERENT_RC",
-          "file": "engine/test/nameserver/nameserver.go",
-          "line": 1148,
           "shape": "unknown"
         }
       ]
@@ -3643,11 +3467,10 @@
         "engine/test/consistency/consistency.go",
         "engine/test/delegation/delegation.go",
         "engine/test/dnssec/dnssec.go",
-        "engine/test/nameserver/nameserver.go",
         "engine/test/syntax/syntax.go",
         "engine/test/zone/zone.go"
       ],
-      "occurrences": 37,
+      "occurrences": 35,
       "samples": [
         {
           "tag": "B01_SERVER_ZONE_ERROR",
@@ -3935,26 +3758,6 @@
         }
       ]
     },
-    "source": {
-      "tags": [
-        "DIFFERENT_SOURCE_IP"
-      ],
-      "shapes": [
-        "unknown"
-      ],
-      "producer_files": [
-        "engine/test/nameserver/nameserver.go"
-      ],
-      "occurrences": 1,
-      "samples": [
-        {
-          "tag": "DIFFERENT_SOURCE_IP",
-          "file": "engine/test/nameserver/nameserver.go",
-          "line": 647,
-          "shape": "unknown"
-        }
-      ]
-    },
     "string": {
       "tags": [
         "N15_SOFTWARE_VERSION"
@@ -3970,7 +3773,7 @@
         {
           "tag": "N15_SOFTWARE_VERSION",
           "file": "engine/test/nameserver/nameserver.go",
-          "line": 1806,
+          "line": 1788,
           "shape": "unknown"
         }
       ]
@@ -4145,11 +3948,6 @@
       "tags": [
         "CASE_QUERIES_RESULTS_DIFFER",
         "CASE_QUERIES_RESULTS_OK",
-        "CASE_QUERY_DIFFERENT_ANSWER",
-        "CASE_QUERY_DIFFERENT_RC",
-        "CASE_QUERY_NO_ANSWER",
-        "CASE_QUERY_SAME_ANSWER",
-        "CASE_QUERY_SAME_RC",
         "EMPTY_RETURN",
         "EXTERNAL_QUERY",
         "EXTERNAL_RESPONSE",
@@ -4170,7 +3968,7 @@
         "engine/packet/packet.go",
         "engine/test/nameserver/nameserver.go"
       ],
-      "occurrences": 16,
+      "occurrences": 11,
       "samples": [
         {
           "tag": "EMPTY_RETURN",
@@ -4351,7 +4149,6 @@
     "engine/test/consistency/consistency.go": 19,
     "engine/test/delegation/delegation.go": 5,
     "engine/test/dnssec/dnssec.go": 6,
-    "engine/test/nameserver/nameserver.go": 35,
     "engine/test/syntax/syntax.go": 3,
     "engine/test/zone/zone.go": 16
   },
@@ -4367,16 +4164,226 @@
   ],
   "unresolved_calls": [
     {
+      "tag": "AAAA_BAD_RDATA",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 771,
+      "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"length\": 0,\n})"
+    },
+    {
+      "tag": "AAAA_QUERY_DROPPED",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 750,
+      "args_expr": "withNameserverArgs(server, nil)"
+    },
+    {
+      "tag": "AAAA_UNEXPECTED_RCODE",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 758,
+      "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"rcode\": resp.Rcode(),\n})"
+    },
+    {
+      "tag": "AXFR_AVAILABLE",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 582,
+      "args_expr": "withNameserverArgs(server, nil)"
+    },
+    {
+      "tag": "AXFR_FAILURE",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 578,
+      "args_expr": "withNameserverArgs(server, nil)"
+    },
+    {
+      "tag": "A_UNEXPECTED_RCODE",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 739,
+      "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"rcode\": resp.Rcode(),\n})"
+    },
+    {
+      "tag": "BREAKS_ON_EDNS",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 492,
+      "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"domain\": z.Name.String(),\n})"
+    },
+    {
+      "tag": "CASE_QUERY_DIFFERENT_ANSWER",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 1114,
+      "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"type\":\t\trecordType,\n\t\"query1\":\trandom1,\n\t\"query2\":\trandom2,\n})"
+    },
+    {
+      "tag": "CASE_QUERY_DIFFERENT_RC",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 1134,
+      "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"type\":\t\trecordType,\n\t\"query1\":\trandom1,\n\t\"query2\":\trandom2,\n\t\"rcode1\":\tp1.Rcode(),\n\t\"rcode2\":\tp2.Rcode(),\n})"
+    },
+    {
+      "tag": "CASE_QUERY_NO_ANSWER",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 1146,
+      "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"type\":\t\trecordType,\n\t\"domain\":\tfirstNonEmpty(random1, p1, random2, p2),\n})"
+    },
+    {
+      "tag": "CASE_QUERY_SAME_ANSWER",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 1105,
+      "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"type\":\t\trecordType,\n\t\"query1\":\trandom1,\n\t\"query2\":\trandom2,\n})"
+    },
+    {
+      "tag": "CASE_QUERY_SAME_RC",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 1124,
+      "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"type\":\t\trecordType,\n\t\"query1\":\trandom1,\n\t\"query2\":\trandom2,\n\t\"rcode\":\tp1.Rcode(),\n})"
+    },
+    {
+      "tag": "DIFFERENT_SOURCE_IP",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 643,
+      "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"source\": resp.AnswerFrom,\n})"
+    },
+    {
+      "tag": "EDNS_RESPONSE_WITHOUT_EDNS",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 470,
+      "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"domain\": z.Name.String(),\n})"
+    },
+    {
+      "tag": "EDNS_VERSION_ERROR",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 477,
+      "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"domain\": z.Name.String(),\n})"
+    },
+    {
       "tag": "IPV4_BLOCKED",
       "file": "engine/nameserver/nameserver.go",
       "line": 150,
       "args_expr": "logargs.NS(ns.NameString(), ns.AddressString())"
     },
     {
+      "tag": "IPV4_DISABLED",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 2113,
+      "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"rrtype\": rrtype,\n})"
+    },
+    {
       "tag": "IPV6_BLOCKED",
       "file": "engine/nameserver/nameserver.go",
       "line": 154,
       "args_expr": "logargs.NS(ns.NameString(), ns.AddressString())"
+    },
+    {
+      "tag": "IPV6_DISABLED",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 2103,
+      "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"rrtype\": rrtype,\n})"
+    },
+    {
+      "tag": "IS_A_RECURSOR",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 394,
+      "args_expr": "withNameserverArgs(server, nil)"
+    },
+    {
+      "tag": "MISSING_OPT_IN_TRUNCATED",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 1615,
+      "args_expr": "withNameserverArgs(server, nil)"
+    },
+    {
+      "tag": "NO_EDNS_SUPPORT",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 462,
+      "args_expr": "withNameserverArgs(server, nil)"
+    },
+    {
+      "tag": "NO_EDNS_SUPPORT",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 1533,
+      "args_expr": "withNameserverArgs(server, nil)"
+    },
+    {
+      "tag": "NO_EDNS_SUPPORT",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 1611,
+      "args_expr": "withNameserverArgs(server, nil)"
+    },
+    {
+      "tag": "NO_RECURSOR",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 400,
+      "args_expr": "withNameserverArgs(server, nil)"
+    },
+    {
+      "tag": "NO_RESPONSE",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 375,
+      "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"domain\": name,\n})"
+    },
+    {
+      "tag": "NO_RESPONSE",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 499,
+      "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"domain\": z.Name.String(),\n})"
+    },
+    {
+      "tag": "NO_RESPONSE",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 730,
+      "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"domain\": z.Name.String(),\n})"
+    },
+    {
+      "tag": "NO_RESPONSE",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 1548,
+      "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"domain\": z.Name.String(),\n})"
+    },
+    {
+      "tag": "NO_RESPONSE",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 1626,
+      "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"domain\": z.Name.String(),\n})"
+    },
+    {
+      "tag": "NS_ERROR",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 484,
+      "args_expr": "withNameserverArgs(server, nil)"
+    },
+    {
+      "tag": "NS_ERROR",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 1543,
+      "args_expr": "withNameserverArgs(server, nil)"
+    },
+    {
+      "tag": "NS_ERROR",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 1621,
+      "args_expr": "withNameserverArgs(server, nil)"
+    },
+    {
+      "tag": "QNAME_CASE_INSENSITIVE",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 1026,
+      "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"domain\": randomized,\n})"
+    },
+    {
+      "tag": "QNAME_CASE_SENSITIVE",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 1020,
+      "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"domain\": randomized,\n})"
+    },
+    {
+      "tag": "UPWARD_REFERRAL",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 932,
+      "args_expr": "withNameserverArgs(server, nil)"
+    },
+    {
+      "tag": "Z_FLAGS_NOTCLEAR",
+      "file": "engine/test/nameserver/nameserver.go",
+      "line": 1537,
+      "args_expr": "withNameserverArgs(server, nil)"
     }
   ]
 }

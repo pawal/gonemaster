@@ -12,6 +12,7 @@ import (
 	dns "codeberg.org/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/methods"
 	ns "codeberg.org/pawal/gonemaster/engine/nameserver"
@@ -34,9 +35,9 @@ var nonExistentNames = []string{
 }
 
 var (
-	method2       = methods.Method2
-	method3       = methods.Method3
-	method4and5   = methods.Method4and5
+	method2          = methods.Method2
+	method3          = methods.Method3
+	method4and5      = methods.Method4and5
 	scrambleCaseFunc = util.ScrambleCase
 )
 
@@ -371,10 +372,9 @@ func Nameserver01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				for _, name := range nonExistentNames {
 					resp, err := server.QueryWithOptions(ctx, name, "A", nil)
 					if err != nil || resp.Msg == nil {
-						if _, err := buf.Add("NO_RESPONSE", map[string]any{
-							"ns":     server.String(),
+						if _, err := buf.Add("NO_RESPONSE", withNameserverArgs(server, map[string]any{
 							"domain": name,
-						}); err != nil {
+						})); err != nil {
 							return err
 						}
 						isNoRecursor = false
@@ -391,13 +391,13 @@ func Nameserver01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				}
 
 				if hasSeenRA || (responseCount > 0 && nxdomainCount == responseCount) {
-					if _, err := buf.Add("IS_A_RECURSOR", map[string]any{"ns": server.String()}); err != nil {
+					if _, err := buf.Add("IS_A_RECURSOR", withNameserverArgs(server, nil)); err != nil {
 						return err
 					}
 					isNoRecursor = false
 				}
 				if isNoRecursor {
-					if _, err := buf.Add("NO_RECURSOR", map[string]any{"ns": server.String()}); err != nil {
+					if _, err := buf.Add("NO_RECURSOR", withNameserverArgs(server, nil)); err != nil {
 						return err
 					}
 				}
@@ -459,7 +459,7 @@ func Nameserver02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				resp, err := server.QueryWithOptions(ctx, z.Name.String(), "SOA", &ns.QueryOptions{EDNSDetails: &transport.EDNSDetails{Version: &ver}})
 				if err == nil && resp.Msg != nil {
 					if resp.Rcode() == "FORMERR" && !resp.HasEdns() {
-						if _, err := buf.Add("NO_EDNS_SUPPORT", map[string]any{"ns": server.String()}); err != nil {
+						if _, err := buf.Add("NO_EDNS_SUPPORT", withNameserverArgs(server, nil)); err != nil {
 							return err
 						}
 						outcome.hasError = true
@@ -467,23 +467,21 @@ func Nameserver02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						outcomes[i] = outcome
 						return nil
 					} else if resp.Rcode() == "NOERROR" && !resp.HasEdns() {
-						if _, err := buf.Add("EDNS_RESPONSE_WITHOUT_EDNS", map[string]any{
-							"ns":     server.String(),
+						if _, err := buf.Add("EDNS_RESPONSE_WITHOUT_EDNS", withNameserverArgs(server, map[string]any{
 							"domain": z.Name.String(),
-						}); err != nil {
+						})); err != nil {
 							return err
 						}
 						outcome.hasError = true
 					} else if resp.Rcode() == "NOERROR" && resp.HasEdns() && resp.EdnsVersion() != 0 {
-						if _, err := buf.Add("EDNS_VERSION_ERROR", map[string]any{
-							"ns":     server.String(),
+						if _, err := buf.Add("EDNS_VERSION_ERROR", withNameserverArgs(server, map[string]any{
 							"domain": z.Name.String(),
-						}); err != nil {
+						})); err != nil {
 							return err
 						}
 						outcome.hasError = true
 					} else {
-						if _, err := buf.Add("NS_ERROR", map[string]any{"ns": server.String()}); err != nil {
+						if _, err := buf.Add("NS_ERROR", withNameserverArgs(server, nil)); err != nil {
 							return err
 						}
 						outcome.hasError = true
@@ -491,18 +489,16 @@ func Nameserver02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				} else {
 					resp2, err := server.QueryWithOptions(ctx, z.Name.String(), "SOA", nil)
 					if err == nil && resp2.Msg != nil {
-						if _, err := buf.Add("BREAKS_ON_EDNS", map[string]any{
-							"ns":     server.String(),
+						if _, err := buf.Add("BREAKS_ON_EDNS", withNameserverArgs(server, map[string]any{
 							"domain": z.Name.String(),
-						}); err != nil {
+						})); err != nil {
 							return err
 						}
 						outcome.hasError = true
 					} else {
-						if _, err := buf.Add("NO_RESPONSE", map[string]any{
-							"ns":     server.String(),
+						if _, err := buf.Add("NO_RESPONSE", withNameserverArgs(server, map[string]any{
 							"domain": z.Name.String(),
-						}); err != nil {
+						})); err != nil {
 							return err
 						}
 						outcome.hasError = true
@@ -579,11 +575,11 @@ func Nameserver03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					return false
 				}, "")
 				if err != nil {
-					if _, err := buf.Add("AXFR_FAILURE", map[string]any{"ns": server.String()}); err != nil {
+					if _, err := buf.Add("AXFR_FAILURE", withNameserverArgs(server, nil)); err != nil {
 						return err
 					}
 				} else if soa, ok := firstRR.(*dns.SOA); ok && soa != nil {
-					if _, err := buf.Add("AXFR_AVAILABLE", map[string]any{"ns": server.String()}); err != nil {
+					if _, err := buf.Add("AXFR_AVAILABLE", withNameserverArgs(server, nil)); err != nil {
 						return err
 					}
 				}
@@ -644,10 +640,9 @@ func Nameserver04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				resp, err := server.QueryWithOptions(ctx, z.Name.String(), "SOA", nil)
 				if err == nil && resp.Msg != nil {
 					if addr, ok := parseAnswerFrom(resp.AnswerFrom); ok && addr != server.Address {
-						if _, err := buf.Add("DIFFERENT_SOURCE_IP", map[string]any{
-							"ns":     server.String(),
+						if _, err := buf.Add("DIFFERENT_SOURCE_IP", withNameserverArgs(server, map[string]any{
 							"source": resp.AnswerFrom,
-						}); err != nil {
+						})); err != nil {
 							return err
 						}
 						outcome.hasError = true
@@ -732,20 +727,18 @@ func Nameserver05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				useVC := false
 				resp, err := server.QueryWithOptions(ctx, z.Name.String(), "A", &ns.QueryOptions{UseVC: &useVC})
 				if err != nil || resp.Msg == nil {
-					if _, err := buf.Add("NO_RESPONSE", map[string]any{
-						"ns":     server.String(),
+					if _, err := buf.Add("NO_RESPONSE", withNameserverArgs(server, map[string]any{
 						"domain": z.Name.String(),
-					}); err != nil {
+					})); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
 					return nil
 				}
 				if resp.Rcode() != "NOERROR" {
-					if _, err := buf.Add("A_UNEXPECTED_RCODE", map[string]any{
-						"ns":    server.String(),
+					if _, err := buf.Add("A_UNEXPECTED_RCODE", withNameserverArgs(server, map[string]any{
 						"rcode": resp.Rcode(),
-					}); err != nil {
+					})); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
@@ -754,7 +747,7 @@ func Nameserver05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 				resp, err = server.QueryWithOptions(ctx, z.Name.String(), "AAAA", &ns.QueryOptions{UseVC: &useVC})
 				if err != nil || resp.Msg == nil {
-					if _, err := buf.Add("AAAA_QUERY_DROPPED", map[string]any{"ns": server.String()}); err != nil {
+					if _, err := buf.Add("AAAA_QUERY_DROPPED", withNameserverArgs(server, nil)); err != nil {
 						return err
 					}
 					outcome.aaaaIssue++
@@ -762,10 +755,9 @@ func Nameserver05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					return nil
 				}
 				if resp.Rcode() != "NOERROR" {
-					if _, err := buf.Add("AAAA_UNEXPECTED_RCODE", map[string]any{
-						"ns":    server.String(),
+					if _, err := buf.Add("AAAA_UNEXPECTED_RCODE", withNameserverArgs(server, map[string]any{
 						"rcode": resp.Rcode(),
-					}); err != nil {
+					})); err != nil {
 						return err
 					}
 					outcome.aaaaIssue++
@@ -776,10 +768,9 @@ func Nameserver05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				for _, rr := range resp.GetRecords("AAAA", "answer") {
 					if aaaa, ok := rr.(*dns.AAAA); ok {
 						if !aaaa.Addr.IsValid() {
-							if _, err := buf.Add("AAAA_BAD_RDATA", map[string]any{
-								"ns":     server.String(),
+							if _, err := buf.Add("AAAA_BAD_RDATA", withNameserverArgs(server, map[string]any{
 								"length": 0,
-							}); err != nil {
+							})); err != nil {
 								return err
 							}
 							outcome.aaaaIssue++
@@ -938,7 +929,7 @@ func Nameserver07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				resp, err := server.QueryWithOptions(ctx, ".", "NS", nil)
 				if err == nil && resp.Msg != nil {
 					if len(resp.GetRecords("NS", "authority")) > 0 {
-						if _, err := buf.Add("UPWARD_REFERRAL", map[string]any{"ns": server.String()}); err != nil {
+						if _, err := buf.Add("UPWARD_REFERRAL", withNameserverArgs(server, nil)); err != nil {
 							return err
 						}
 						outcome.hasError = true
@@ -1026,17 +1017,15 @@ func Nameserver08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					if len(questions) > 0 {
 						qname := strings.TrimRight(questions[0].Header().Name, ".")
 						if qname == randomized {
-							if _, err := buf.Add("QNAME_CASE_SENSITIVE", map[string]any{
-								"ns":     server.String(),
+							if _, err := buf.Add("QNAME_CASE_SENSITIVE", withNameserverArgs(server, map[string]any{
 								"domain": randomized,
-							}); err != nil {
+							})); err != nil {
 								return err
 							}
 						} else {
-							if _, err := buf.Add("QNAME_CASE_INSENSITIVE", map[string]any{
-								"ns":     server.String(),
+							if _, err := buf.Add("QNAME_CASE_INSENSITIVE", withNameserverArgs(server, map[string]any{
 								"domain": randomized,
-							}); err != nil {
+							})); err != nil {
 								return err
 							}
 						}
@@ -1113,56 +1102,51 @@ func Nameserver09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				if len(p1.Answer()) > 0 {
 					answer2 = normalizedAnswer(p2)
 					if answer1 == answer2 {
-						if _, err := buf.Add("CASE_QUERY_SAME_ANSWER", map[string]any{
-							"ns":     server.String(),
+						if _, err := buf.Add("CASE_QUERY_SAME_ANSWER", withNameserverArgs(server, map[string]any{
 							"type":   recordType,
 							"query1": random1,
 							"query2": random2,
-						}); err != nil {
+						})); err != nil {
 							return err
 						}
 					} else {
 						outcome.mismatch = true
-						if _, err := buf.Add("CASE_QUERY_DIFFERENT_ANSWER", map[string]any{
-							"ns":     server.String(),
+						if _, err := buf.Add("CASE_QUERY_DIFFERENT_ANSWER", withNameserverArgs(server, map[string]any{
 							"type":   recordType,
 							"query1": random1,
 							"query2": random2,
-						}); err != nil {
+						})); err != nil {
 							return err
 						}
 					}
 				} else if p1.Msg != nil && p2.Msg != nil {
 					if p1.Rcode() == p2.Rcode() {
-						if _, err := buf.Add("CASE_QUERY_SAME_RC", map[string]any{
-							"ns":     server.String(),
+						if _, err := buf.Add("CASE_QUERY_SAME_RC", withNameserverArgs(server, map[string]any{
 							"type":   recordType,
 							"query1": random1,
 							"query2": random2,
 							"rcode":  p1.Rcode(),
-						}); err != nil {
+						})); err != nil {
 							return err
 						}
 					} else {
 						outcome.mismatch = true
-						if _, err := buf.Add("CASE_QUERY_DIFFERENT_RC", map[string]any{
-							"ns":     server.String(),
+						if _, err := buf.Add("CASE_QUERY_DIFFERENT_RC", withNameserverArgs(server, map[string]any{
 							"type":   recordType,
 							"query1": random1,
 							"query2": random2,
 							"rcode1": p1.Rcode(),
 							"rcode2": p2.Rcode(),
-						}); err != nil {
+						})); err != nil {
 							return err
 						}
 					}
 				} else if p1.Msg != nil || p2.Msg != nil {
 					outcome.mismatch = true
-					if _, err := buf.Add("CASE_QUERY_NO_ANSWER", map[string]any{
-						"ns":     server.String(),
+					if _, err := buf.Add("CASE_QUERY_NO_ANSWER", withNameserverArgs(server, map[string]any{
 						"type":   recordType,
 						"domain": firstNonEmpty(random1, p1, random2, p2),
-					}); err != nil {
+					})); err != nil {
 						return err
 					}
 				}
@@ -1546,25 +1530,24 @@ func Nameserver12(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				resp, err := server.QueryWithOptions(ctx, z.Name.String(), "SOA", &ns.QueryOptions{EDNSDetails: &transport.EDNSDetails{Version: &ver0, Z: &zFlag}})
 				if err == nil && resp.Msg != nil {
 					if resp.Rcode() == "FORMERR" && resp.EdnsRcode() == 0 {
-						if _, err := buf.Add("NO_EDNS_SUPPORT", map[string]any{"ns": server.String()}); err != nil {
+						if _, err := buf.Add("NO_EDNS_SUPPORT", withNameserverArgs(server, nil)); err != nil {
 							return err
 						}
 					} else if resp.EdnsZ() != 0 {
-						if _, err := buf.Add("Z_FLAGS_NOTCLEAR", map[string]any{"ns": server.String()}); err != nil {
+						if _, err := buf.Add("Z_FLAGS_NOTCLEAR", withNameserverArgs(server, nil)); err != nil {
 							return err
 						}
 					} else if resp.Rcode() == "NOERROR" && resp.EdnsRcode() == 0 && resp.EdnsVersion() == 0 && resp.EdnsZ() == 0 && len(resp.GetRecords("SOA", "answer")) > 0 {
 						return nil
 					} else {
-						if _, err := buf.Add("NS_ERROR", map[string]any{"ns": server.String()}); err != nil {
+						if _, err := buf.Add("NS_ERROR", withNameserverArgs(server, nil)); err != nil {
 							return err
 						}
 					}
 				} else {
-					if _, err := buf.Add("NO_RESPONSE", map[string]any{
-						"ns":     server.String(),
+					if _, err := buf.Add("NO_RESPONSE", withNameserverArgs(server, map[string]any{
 						"domain": z.Name.String(),
-					}); err != nil {
+					})); err != nil {
 						return err
 					}
 				}
@@ -1625,25 +1608,24 @@ func Nameserver13(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				})
 				if err == nil && resp.Msg != nil {
 					if resp.Rcode() == "FORMERR" && !resp.HasEdns() {
-						if _, err := buf.Add("NO_EDNS_SUPPORT", map[string]any{"ns": server.String()}); err != nil {
+						if _, err := buf.Add("NO_EDNS_SUPPORT", withNameserverArgs(server, nil)); err != nil {
 							return err
 						}
 					} else if resp.TC() && !resp.HasEdns() {
-						if _, err := buf.Add("MISSING_OPT_IN_TRUNCATED", map[string]any{"ns": server.String()}); err != nil {
+						if _, err := buf.Add("MISSING_OPT_IN_TRUNCATED", withNameserverArgs(server, nil)); err != nil {
 							return err
 						}
 					} else if resp.Rcode() == "NOERROR" && resp.EdnsVersion() == 0 {
 						return nil
 					} else {
-						if _, err := buf.Add("NS_ERROR", map[string]any{"ns": server.String()}); err != nil {
+						if _, err := buf.Add("NS_ERROR", withNameserverArgs(server, nil)); err != nil {
 							return err
 						}
 					}
 				} else {
-					if _, err := buf.Add("NO_RESPONSE", map[string]any{
-						"ns":     server.String(),
+					if _, err := buf.Add("NO_RESPONSE", withNameserverArgs(server, map[string]any{
 						"domain": z.Name.String(),
-					}); err != nil {
+					})); err != nil {
 						return err
 					}
 				}
@@ -2107,13 +2089,20 @@ func appendLog(ctx context.Context, results *[]*logger.Entry, testcase string, t
 	return nil
 }
 
+func withNameserverArgs(server ns.Nameserver, args map[string]any) map[string]any {
+	if args == nil {
+		args = map[string]any{}
+	}
+	logargs.SetNS(args, server.NameString(), server.AddressString())
+	return args
+}
+
 func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, server ns.Nameserver, rrtypes ...string) (bool, error) {
 	if server.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 		for _, rrtype := range rrtypes {
-			if _, err := buf.Add("IPV6_DISABLED", map[string]any{
-				"ns":     server.String(),
+			if _, err := buf.Add("IPV6_DISABLED", withNameserverArgs(server, map[string]any{
 				"rrtype": rrtype,
-			}); err != nil {
+			})); err != nil {
 				return true, err
 			}
 		}
@@ -2121,10 +2110,9 @@ func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, se
 	}
 	if server.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
 		for _, rrtype := range rrtypes {
-			if _, err := buf.Add("IPV4_DISABLED", map[string]any{
-				"ns":     server.String(),
+			if _, err := buf.Add("IPV4_DISABLED", withNameserverArgs(server, map[string]any{
 				"rrtype": rrtype,
-			}); err != nil {
+			})); err != nil {
 				return true, err
 			}
 		}

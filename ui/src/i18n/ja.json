@@ -205,5 +205,9 @@
   "error_ds_row_keytag_range": "未委任DS行 {row}: キータグは {min}〜{max} の範囲内である必要があります。",
   "error_ds_row_algorithm_range": "未委任DS行 {row}: アルゴリズムは {min}〜{max} の範囲内である必要があります。",
   "error_ds_row_digtype_range": "未委任DS行 {row}: ダイジェストタイプは {min}〜{max} の範囲内である必要があります。",
-  "error_ds_row_digest_hex": "未委任DS行 {row}: ダイジェストは16進数でエンコードされている必要があります。"
+  "error_ds_row_digest_hex": "未委任DS行 {row}: ダイジェストは16進数でエンコードされている必要があります。",
+  "notify_job_done_title": "スキャン完了",
+  "notify_job_done_body": "{domain} はステータス {status} で完了しました",
+  "notify_batch_done_title": "バッチ完了",
+  "notify_batch_done_body": "バッチ {id} が完了しました"
 }

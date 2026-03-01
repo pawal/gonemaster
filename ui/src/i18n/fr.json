@@ -205,5 +205,9 @@
   "error_ds_row_keytag_range": "Ligne DS non déléguée {row} : l'étiquette de clé doit être dans la plage {min}–{max}.",
   "error_ds_row_algorithm_range": "Ligne DS non déléguée {row} : l'algorithme doit être dans la plage {min}–{max}.",
   "error_ds_row_digtype_range": "Ligne DS non déléguée {row} : le type de condensé doit être dans la plage {min}–{max}.",
-  "error_ds_row_digest_hex": "Ligne DS non déléguée {row} : le condensé doit être encodé en hexadécimal."
+  "error_ds_row_digest_hex": "Ligne DS non déléguée {row} : le condensé doit être encodé en hexadécimal.",
+  "notify_job_done_title": "Analyse terminée",
+  "notify_job_done_body": "{domain} est terminé avec le statut {status}",
+  "notify_batch_done_title": "Lot terminé",
+  "notify_batch_done_body": "Le lot {id} est terminé"
 }

@@ -205,5 +205,9 @@
   "error_ds_row_keytag_range": "Delegoimaton DS-rivi {row}: avaintunnisteen on oltava välillä {min}–{max}.",
   "error_ds_row_algorithm_range": "Delegoimaton DS-rivi {row}: algoritmin on oltava välillä {min}–{max}.",
   "error_ds_row_digtype_range": "Delegoimaton DS-rivi {row}: tiivistetyypin on oltava välillä {min}–{max}.",
-  "error_ds_row_digest_hex": "Delegoimaton DS-rivi {row}: tiivisteen on oltava hex-koodattu."
+  "error_ds_row_digest_hex": "Delegoimaton DS-rivi {row}: tiivisteen on oltava hex-koodattu.",
+  "notify_job_done_title": "Skannaus valmis",
+  "notify_job_done_body": "{domain} valmistui tilalla {status}",
+  "notify_batch_done_title": "Erä valmis",
+  "notify_batch_done_body": "Erä {id} on valmistunut"
 }

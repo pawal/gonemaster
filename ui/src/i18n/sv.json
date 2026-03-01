@@ -205,5 +205,9 @@
   "error_ds_row_keytag_range": "Odelegerad DS-rad {row}: nyckeltagg måste vara i intervallet {min}–{max}.",
   "error_ds_row_algorithm_range": "Odelegerad DS-rad {row}: algoritm måste vara i intervallet {min}–{max}.",
   "error_ds_row_digtype_range": "Odelegerad DS-rad {row}: sammanfattningstyp måste vara i intervallet {min}–{max}.",
-  "error_ds_row_digest_hex": "Odelegerad DS-rad {row}: sammanfattning måste vara hex-kodad."
+  "error_ds_row_digest_hex": "Odelegerad DS-rad {row}: sammanfattning måste vara hex-kodad.",
+  "notify_job_done_title": "Skanning slutförd",
+  "notify_job_done_body": "{domain} slutfördes med status {status}",
+  "notify_batch_done_title": "Batch slutförd",
+  "notify_batch_done_body": "Batch {id} har slutförts"
 }

@@ -205,5 +205,9 @@
   "error_ds_row_keytag_range": "Nedelegirana DS-vrstica {row}: oznaka ključa mora biti v razponu {min}–{max}.",
   "error_ds_row_algorithm_range": "Nedelegirana DS-vrstica {row}: algoritem mora biti v razponu {min}–{max}.",
   "error_ds_row_digtype_range": "Nedelegirana DS-vrstica {row}: tip povzetka mora biti v razponu {min}–{max}.",
-  "error_ds_row_digest_hex": "Nedelegirana DS-vrstica {row}: povzetek mora biti šestnajstiško kodiran."
+  "error_ds_row_digest_hex": "Nedelegirana DS-vrstica {row}: povzetek mora biti šestnajstiško kodiran.",
+  "notify_job_done_title": "Skeniranje končano",
+  "notify_job_done_body": "{domain} je končana s statusom {status}",
+  "notify_batch_done_title": "Serija končana",
+  "notify_batch_done_body": "Serija {id} je končana"
 }

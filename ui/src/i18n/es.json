@@ -205,5 +205,9 @@
   "error_ds_row_keytag_range": "Fila DS no delegada {row}: la etiqueta de clave debe estar en el rango {min}–{max}.",
   "error_ds_row_algorithm_range": "Fila DS no delegada {row}: el algoritmo debe estar en el rango {min}–{max}.",
   "error_ds_row_digtype_range": "Fila DS no delegada {row}: el tipo de resumen debe estar en el rango {min}–{max}.",
-  "error_ds_row_digest_hex": "Fila DS no delegada {row}: el resumen debe estar codificado en hexadecimal."
+  "error_ds_row_digest_hex": "Fila DS no delegada {row}: el resumen debe estar codificado en hexadecimal.",
+  "notify_job_done_title": "Escaneo completado",
+  "notify_job_done_body": "{domain} finalizó con estado {status}",
+  "notify_batch_done_title": "Lote completado",
+  "notify_batch_done_body": "El lote {id} ha finalizado"
 }

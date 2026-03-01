@@ -205,5 +205,9 @@
   "error_ds_row_keytag_range": "Udelegeret DS-række {row}: nøgletag skal være i intervallet {min}–{max}.",
   "error_ds_row_algorithm_range": "Udelegeret DS-række {row}: algoritme skal være i intervallet {min}–{max}.",
   "error_ds_row_digtype_range": "Udelegeret DS-række {row}: sammendragstype skal være i intervallet {min}–{max}.",
-  "error_ds_row_digest_hex": "Udelegeret DS-række {row}: sammendrag skal være hex-kodet."
+  "error_ds_row_digest_hex": "Udelegeret DS-række {row}: sammendrag skal være hex-kodet.",
+  "notify_job_done_title": "Scanning fuldført",
+  "notify_job_done_body": "{domain} er færdig med status {status}",
+  "notify_batch_done_title": "Batch fuldført",
+  "notify_batch_done_body": "Batch {id} er færdig"
 }

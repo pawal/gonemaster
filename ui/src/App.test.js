@@ -2078,4 +2078,226 @@ describe("App", () => {
       locale.set("en");
     });
   });
+
+  describe("Browser notifications", () => {
+    const makeNotificationMock = (permission) => {
+      const mock = vi.fn();
+      mock.permission = permission;
+      mock.requestPermission = vi.fn().mockResolvedValue(permission);
+      return mock;
+    };
+
+    const submitAndWaitForQueued = async (domain) => {
+      const input = await screen.findByPlaceholderText("example.com");
+      await fireEvent.input(input, { target: { value: domain } });
+      await fireEvent.click(screen.getByText("Run Single Job"));
+      await waitFor(() => {
+        expect(screen.getByText(/queued/)).toBeInTheDocument();
+      });
+    };
+
+    it("sends a browser notification when a watched single job completes", async () => {
+      const NotificationMock = makeNotificationMock("granted");
+      vi.stubGlobal("Notification", NotificationMock);
+
+      const intervalCallbacks = [];
+      vi.spyOn(global, "setInterval").mockImplementation((fn) => {
+        intervalCallbacks.push(fn);
+        return intervalCallbacks.length;
+      });
+      vi.spyOn(global, "clearInterval").mockImplementation(() => {});
+
+      let jobCallCount = 0;
+      const queuedJob = {
+        id: "job_notify",
+        domain: "notify.example",
+        status: "queued",
+        progress: 0,
+        created_at: "2026-02-03T00:00:00Z"
+      };
+      const doneJob = { ...queuedJob, status: "succeeded", progress: 100 };
+
+      global.fetch.mockImplementation((url, options = {}) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (url === "/api/v1/jobs" && options?.method === "POST") return jsonResponse(queuedJob);
+        if (value.includes(`/api/v1/jobs/${queuedJob.id}`)) {
+          jobCallCount++;
+          return jsonResponse(jobCallCount >= 2 ? doneJob : queuedJob);
+        }
+        if (value.includes("/api/v1/jobs?")) return jsonResponse({ items: [queuedJob], total: 1 });
+        return jsonResponse({});
+      });
+
+      const { unmount } = render(App);
+      await submitAndWaitForQueued("notify.example");
+
+      expect(intervalCallbacks.length).toBeGreaterThan(0);
+      const poller = intervalCallbacks[intervalCallbacks.length - 1];
+      await poller();
+
+      await waitFor(() => {
+        expect(NotificationMock).toHaveBeenCalledWith(
+          "Scan complete",
+          expect.objectContaining({ body: expect.stringContaining("notify.example") })
+        );
+      });
+
+      unmount();
+    });
+
+    it("requests notification permission when submitting a single job", async () => {
+      const NotificationMock = makeNotificationMock("default");
+      vi.stubGlobal("Notification", NotificationMock);
+
+      const queuedJob = {
+        id: "job_perm",
+        domain: "perm.example",
+        status: "queued",
+        progress: 0,
+        created_at: "2026-02-03T00:00:00Z"
+      };
+
+      global.fetch.mockImplementation((url, options = {}) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (url === "/api/v1/jobs" && options?.method === "POST") return jsonResponse(queuedJob);
+        if (value.includes(`/api/v1/jobs/${queuedJob.id}`)) return jsonResponse(queuedJob);
+        if (value.includes("/api/v1/jobs?")) return jsonResponse({ items: [], total: 0 });
+        return jsonResponse({});
+      });
+
+      const { unmount } = render(App);
+      await submitAndWaitForQueued("perm.example");
+
+      await waitFor(() => {
+        expect(NotificationMock.requestPermission).toHaveBeenCalled();
+      });
+
+      unmount();
+    });
+
+    it("does not send a notification when Notification permission is denied", async () => {
+      const NotificationMock = makeNotificationMock("denied");
+      vi.stubGlobal("Notification", NotificationMock);
+
+      const intervalCallbacks = [];
+      vi.spyOn(global, "setInterval").mockImplementation((fn) => {
+        intervalCallbacks.push(fn);
+        return intervalCallbacks.length;
+      });
+      vi.spyOn(global, "clearInterval").mockImplementation(() => {});
+
+      let jobCallCount = 0;
+      const queuedJob = {
+        id: "job_denied",
+        domain: "denied.example",
+        status: "queued",
+        progress: 0,
+        created_at: "2026-02-03T00:00:00Z"
+      };
+      const doneJob = { ...queuedJob, status: "succeeded", progress: 100 };
+
+      global.fetch.mockImplementation((url, options = {}) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (url === "/api/v1/jobs" && options?.method === "POST") return jsonResponse(queuedJob);
+        if (value.includes(`/api/v1/jobs/${queuedJob.id}`)) {
+          jobCallCount++;
+          return jsonResponse(jobCallCount >= 2 ? doneJob : queuedJob);
+        }
+        if (value.includes("/api/v1/jobs?")) return jsonResponse({ items: [], total: 0 });
+        return jsonResponse({});
+      });
+
+      const { unmount } = render(App);
+      await submitAndWaitForQueued("denied.example");
+
+      expect(intervalCallbacks.length).toBeGreaterThan(0);
+      const poller = intervalCallbacks[intervalCallbacks.length - 1];
+      await poller();
+
+      await waitFor(() => {
+        expect(screen.getByText(/succeeded/)).toBeInTheDocument();
+      });
+
+      // Notification constructor must not have been called.
+      expect(NotificationMock).not.toHaveBeenCalled();
+
+      unmount();
+    });
+
+    it("sends a browser notification when a batch finishes", async () => {
+      const NotificationMock = makeNotificationMock("granted");
+      vi.stubGlobal("Notification", NotificationMock);
+
+      const intervalCallbacks = [];
+      vi.spyOn(global, "setInterval").mockImplementation((fn) => {
+        intervalCallbacks.push(fn);
+        return intervalCallbacks.length;
+      });
+      vi.spyOn(global, "clearInterval").mockImplementation(() => {});
+
+      let batchCalls = 0;
+      const runningBatch = {
+        batch_id: "batch_notify",
+        total: 1,
+        status_counts: { running: 1 },
+        items: [
+          {
+            id: "job_bn",
+            domain: "bn.example",
+            status: "running",
+            created_at: "2026-02-03T00:00:00Z",
+            progress: 50
+          }
+        ],
+        created_at: "2026-02-03T00:00:00Z"
+      };
+      const doneBatch = {
+        ...runningBatch,
+        status_counts: { succeeded: 1 },
+        items: [{ ...runningBatch.items[0], status: "succeeded", progress: 100 }]
+      };
+
+      global.fetch.mockImplementation((url, options = {}) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (url === "/api/v1/jobs/batch" && options?.method === "POST") {
+          return jsonResponse({ batch_id: "batch_notify", job_ids: ["job_bn"] });
+        }
+        if (value.includes("/api/v1/batches/batch_notify")) {
+          batchCalls++;
+          return jsonResponse(batchCalls >= 2 ? doneBatch : runningBatch);
+        }
+        if (value.includes("/api/v1/jobs?")) return jsonResponse({ items: [], total: 0 });
+        return jsonResponse({});
+      });
+
+      const { unmount } = render(App);
+
+      await fireEvent.click(screen.getByRole("tab", { name: "Batch Jobs" }));
+      await fireEvent.input(await screen.findByLabelText("Domains (one per line)"), {
+        target: { value: "bn.example" }
+      });
+      await fireEvent.click(screen.getByText("Run Batch"));
+
+      await waitFor(() => {
+        expect(screen.getByText("job_bn")).toBeInTheDocument();
+      });
+
+      // Fire the batch poller
+      expect(intervalCallbacks.length).toBeGreaterThan(0);
+      const poller = intervalCallbacks[intervalCallbacks.length - 1];
+      await poller();
+
+      // Flush microtasks so the async sendBatchNotification completes
+      await new Promise((r) => setTimeout(r, 0));
+
+      await waitFor(() => {
+        expect(NotificationMock).toHaveBeenCalledWith(
+          "Batch complete",
+          expect.objectContaining({ body: expect.stringContaining("batch_notify") })
+        );
+      });
+
+      unmount();
+    });
+  });
 });

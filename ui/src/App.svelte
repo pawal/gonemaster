@@ -70,6 +70,9 @@
   let persistenceSignature = "";
   let initialized = false;
   let undelegatedRowCounter = 0;
+  let notifyOnJobComplete = false;
+  let notifyOnBatchComplete = false;
+  let pendingPermission = null;
 
   // Theme management: "system" follows OS preference via CSS media query;
   // "light" and "dark" set data-theme on <html> explicitly.
@@ -995,6 +998,8 @@
       createdJobId = job.id;
       selectedJobId = job.id;
       autoRefreshJob = true;
+      notifyOnJobComplete = true;
+      ensureNotificationPermission();
       jobInspectorHighlight = true;
       if (jobInspectorHighlightTimer) {
         clearTimeout(jobInspectorHighlightTimer);
@@ -1034,6 +1039,9 @@
       });
       createdBatchId = response.batch_id;
       selectedBatchId = response.batch_id;
+      autoRefreshBatch = true;
+      notifyOnBatchComplete = true;
+      ensureNotificationPermission();
       setStatus($t("batch_accepted", { id: response.batch_id }), "ok");
       recentCursor = 0;
       await loadJobs({ resetCursor: true });
@@ -1056,6 +1064,10 @@
       const job = await apiFetch(`/jobs/${jobId}`);
       selectedJob = job;
       selectedJobResult = null;
+      if (notifyOnJobComplete && isResultReadyStatus(job.status)) {
+        notifyOnJobComplete = false;
+        sendJobNotification(job);
+      }
       if (isResultReadyStatus(job.status)) {
         await loadJobResult(jobId);
       }
@@ -1164,6 +1176,10 @@
       const params = batchQueryParams();
       const batch = await apiFetch(`/batches/${batchId}?${params.toString()}`);
       selectedBatch = batch;
+      if (notifyOnBatchComplete && !hasActiveBatchJobs(batch)) {
+        notifyOnBatchComplete = false;
+        sendBatchNotification(batch);
+      }
       if (autoRefreshBatch && !hasActiveBatchJobs(batch)) {
         autoRefreshBatch = false;
       }
@@ -1245,6 +1261,45 @@
     loadCatalog(resultLocale);
     if (selectedJobResult) {
       loadJobResult(selectedJobId);
+    }
+  };
+
+  const ensureNotificationPermission = () => {
+    if (typeof Notification === "undefined") return Promise.resolve("denied");
+    const perm = Notification.permission;
+    if (perm === "granted" || perm === "denied") return Promise.resolve(perm);
+    if (!pendingPermission) {
+      pendingPermission = Notification.requestPermission().then((result) => {
+        pendingPermission = null;
+        return result;
+      });
+    }
+    return pendingPermission;
+  };
+
+  const sendJobNotification = async (job) => {
+    const permission = await ensureNotificationPermission();
+    console.debug("[notify] job done – permission=%s domain=%s status=%s", permission, job.domain, job.status);
+    if (permission !== "granted") return;
+    const title = $t("notify_job_done_title");
+    const body = $t("notify_job_done_body", { domain: job.domain, status: job.status });
+    try {
+      new Notification(title, { body });
+    } catch (err) {
+      console.warn("[notify] Notification constructor failed:", err);
+    }
+  };
+
+  const sendBatchNotification = async (batch) => {
+    const permission = await ensureNotificationPermission();
+    console.debug("[notify] batch done – permission=%s batch_id=%s", permission, batch.batch_id);
+    if (permission !== "granted") return;
+    const title = $t("notify_batch_done_title");
+    const body = $t("notify_batch_done_body", { id: batch.batch_id });
+    try {
+      new Notification(title, { body });
+    } catch (err) {
+      console.warn("[notify] Notification constructor failed:", err);
     }
   };
 
@@ -1430,6 +1485,7 @@
         <select
           bind:value={resultLocale}
           on:change={onLocaleChange}
+          id="locale-select"
           class="locale-select"
           title={$t("locale_select_title")}
           aria-label={$t("locale_select_aria")}

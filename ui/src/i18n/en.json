@@ -206,5 +206,10 @@
   "error_ds_row_keytag_range": "Undelegated DS row {row}: keytag must be in range {min}-{max}.",
   "error_ds_row_algorithm_range": "Undelegated DS row {row}: algorithm must be in range {min}-{max}.",
   "error_ds_row_digtype_range": "Undelegated DS row {row}: digest type must be in range {min}-{max}.",
-  "error_ds_row_digest_hex": "Undelegated DS row {row}: digest must be hex encoded."
+  "error_ds_row_digest_hex": "Undelegated DS row {row}: digest must be hex encoded.",
+
+  "notify_job_done_title": "Scan complete",
+  "notify_job_done_body": "{domain} finished with status {status}",
+  "notify_batch_done_title": "Batch complete",
+  "notify_batch_done_body": "Batch {id} has finished"
 }

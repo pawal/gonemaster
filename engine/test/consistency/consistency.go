@@ -11,6 +11,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/methods"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
@@ -228,7 +229,7 @@ func Consistency01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 				resp, err := ns.QueryWithOptions(ctx, z.Name.String(), queryType, nil)
 				if err != nil || resp.Msg == nil {
-					if _, err := buf.Add("NO_RESPONSE", map[string]any{"ns": ns.String()}); err != nil {
+					if _, err := buf.Add("NO_RESPONSE", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
@@ -237,7 +238,7 @@ func Consistency01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 				records := resp.GetRecordsForName(queryType, z.Name)
 				if len(records) == 0 {
-					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", map[string]any{"ns": ns.String()}); err != nil {
+					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
@@ -245,7 +246,7 @@ func Consistency01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				}
 				soa, ok := records[0].(*dns.SOA)
 				if !ok {
-					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", map[string]any{"ns": ns.String()}); err != nil {
+					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
@@ -381,7 +382,7 @@ func Consistency02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 				resp, err := ns.QueryWithOptions(ctx, z.Name.String(), queryType, nil)
 				if err != nil || resp.Msg == nil {
-					if _, err := buf.Add("NO_RESPONSE", map[string]any{"ns": ns.String()}); err != nil {
+					if _, err := buf.Add("NO_RESPONSE", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
@@ -390,7 +391,7 @@ func Consistency02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 				records := resp.GetRecordsForName(queryType, z.Name)
 				if len(records) == 0 {
-					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", map[string]any{"ns": ns.String()}); err != nil {
+					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
@@ -398,7 +399,7 @@ func Consistency02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				}
 				soa, ok := records[0].(*dns.SOA)
 				if !ok {
-					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", map[string]any{"ns": ns.String()}); err != nil {
+					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
@@ -516,7 +517,7 @@ func Consistency03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 				resp, err := ns.QueryWithOptions(ctx, z.Name.String(), queryType, nil)
 				if err != nil || resp.Msg == nil {
-					if _, err := buf.Add("NO_RESPONSE", map[string]any{"ns": ns.String()}); err != nil {
+					if _, err := buf.Add("NO_RESPONSE", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
@@ -525,7 +526,7 @@ func Consistency03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 				records := resp.GetRecordsForName(queryType, z.Name)
 				if len(records) == 0 {
-					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", map[string]any{"ns": ns.String()}); err != nil {
+					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
@@ -533,7 +534,7 @@ func Consistency03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				}
 				soa, ok := records[0].(*dns.SOA)
 				if !ok {
-					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", map[string]any{"ns": ns.String()}); err != nil {
+					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
@@ -667,7 +668,7 @@ func Consistency04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 				resp, err := ns.QueryWithOptions(ctx, z.Name.String(), queryType, nil)
 				if err != nil || resp.Msg == nil {
-					if _, err := buf.Add("NO_RESPONSE", map[string]any{"ns": ns.String()}); err != nil {
+					if _, err := buf.Add("NO_RESPONSE", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
@@ -676,7 +677,7 @@ func Consistency04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 				records := resp.GetRecordsForName(queryType, z.Name)
 				if len(records) == 0 {
-					if _, err := buf.Add("NO_RESPONSE_NS_QUERY", map[string]any{"ns": ns.String()}); err != nil {
+					if _, err := buf.Add("NO_RESPONSE_NS_QUERY", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
@@ -692,7 +693,7 @@ func Consistency04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					names = append(names, strings.ToLower(nsRR.Ns))
 				}
 				if len(names) == 0 {
-					if _, err := buf.Add("NO_RESPONSE_NS_QUERY", map[string]any{"ns": ns.String()}); err != nil {
+					if _, err := buf.Add("NO_RESPONSE_NS_QUERY", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
@@ -1046,7 +1047,7 @@ func Consistency06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 				resp, err := ns.QueryWithOptions(ctx, z.Name.String(), queryType, nil)
 				if err != nil || resp.Msg == nil {
-					if _, err := buf.Add("NO_RESPONSE", map[string]any{"ns": ns.String()}); err != nil {
+					if _, err := buf.Add("NO_RESPONSE", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
@@ -1055,7 +1056,7 @@ func Consistency06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 				records := resp.GetRecordsForName(queryType, z.Name)
 				if len(records) == 0 {
-					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", map[string]any{"ns": ns.String()}); err != nil {
+					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
@@ -1063,7 +1064,7 @@ func Consistency06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				}
 				soa, ok := records[0].(*dns.SOA)
 				if !ok {
-					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", map[string]any{"ns": ns.String()}); err != nil {
+					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
@@ -1149,7 +1150,7 @@ func getAddrRRs(ctx context.Context, ns nameserver.Nameserver, name dnsname.Name
 	opts := &nameserver.QueryOptions{Recurse: &recurseOff}
 	resp, err := ns.QueryWithOptions(ctx, name.String(), qtype, opts)
 	if err != nil || resp.Msg == nil {
-		entry, addErr := util.LoggerFromContext(ctx).Add("NO_RESPONSE", map[string]any{"ns": ns.String()}, moduleName, testcase)
+		entry, addErr := util.LoggerFromContext(ctx).Add("NO_RESPONSE", withNameserverArgs(ns, nil), moduleName, testcase)
 		if addErr != nil {
 			return nil, nil, addErr
 		}
@@ -1169,7 +1170,7 @@ func getAddrRRs(ctx context.Context, ns nameserver.Nameserver, name dnsname.Name
 	}
 
 	if !(resp.AA() && resp.Rcode() == "NXDOMAIN") {
-		entry, addErr := util.LoggerFromContext(ctx).Add("CHILD_NS_FAILED", map[string]any{"ns": ns.String()}, moduleName, testcase)
+		entry, addErr := util.LoggerFromContext(ctx).Add("CHILD_NS_FAILED", withNameserverArgs(ns, nil), moduleName, testcase)
 		if addErr != nil {
 			return nil, nil, addErr
 		}
@@ -1195,13 +1196,20 @@ func appendLog(ctx context.Context, results *[]*logger.Entry, testcase string, t
 	return nil
 }
 
+func withNameserverArgs(ns nameserver.Nameserver, args map[string]any) map[string]any {
+	if args == nil {
+		args = map[string]any{}
+	}
+	logargs.SetNS(args, ns.NameString(), ns.AddressString())
+	return args
+}
+
 func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
 	if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 		for _, rrtype := range rrtypes {
-			if _, err := buf.Add("IPV6_DISABLED", map[string]any{
-				"ns":     ns.String(),
+			if _, err := buf.Add("IPV6_DISABLED", withNameserverArgs(ns, map[string]any{
 				"rrtype": rrtype,
-			}); err != nil {
+			})); err != nil {
 				return true, err
 			}
 		}
@@ -1209,10 +1217,9 @@ func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, ns
 	}
 	if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
 		for _, rrtype := range rrtypes {
-			if _, err := buf.Add("IPV4_DISABLED", map[string]any{
-				"ns":     ns.String(),
+			if _, err := buf.Add("IPV4_DISABLED", withNameserverArgs(ns, map[string]any{
 				"rrtype": rrtype,
-			}); err != nil {
+			})); err != nil {
 				return true, err
 			}
 		}

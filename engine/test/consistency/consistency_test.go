@@ -443,6 +443,13 @@ func TestConsistency05ChildZoneLame(t *testing.T) {
 	if !hasEntryTag(entries, "CHILD_NS_FAILED") {
 		t.Fatalf("expected CHILD_NS_FAILED")
 	}
+	entry := firstEntryByTag(entries, "CHILD_NS_FAILED")
+	if ns, ok := entry.Args["ns"].(string); !ok || ns != "auth.example" {
+		t.Fatalf("expected CHILD_NS_FAILED ns=auth.example, got %#v", entry.Args["ns"])
+	}
+	if address, ok := entry.Args["address"].(string); !ok || address != "192.0.2.53" {
+		t.Fatalf("expected CHILD_NS_FAILED address=192.0.2.53, got %#v", entry.Args["address"])
+	}
 	if !hasEntryTag(entries, "CHILD_ZONE_LAME") {
 		t.Fatalf("expected CHILD_ZONE_LAME")
 	}
@@ -633,6 +640,18 @@ func hasEntryTag(entries []*logger.Entry, tag string) bool {
 		}
 	}
 	return false
+}
+
+func firstEntryByTag(entries []*logger.Entry, tag string) *logger.Entry {
+	for _, entry := range entries {
+		if entry == nil {
+			continue
+		}
+		if entry.Tag == tag {
+			return entry
+		}
+	}
+	return nil
 }
 
 func soaPacket(owner string, serial uint32, mname string, rname string, refresh uint32, retry uint32, expire uint32, minimum uint32) packet.Packet {

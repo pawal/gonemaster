@@ -280,6 +280,67 @@ func TestSyntax06RnameSingleLabelDomainInvalid(t *testing.T) {
 	}
 }
 
+func TestSyntax06NoResponseArgsSplit(t *testing.T) {
+	ctx := testContext(t)
+	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
+		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "NS") {
+			return nsPacket(".", "a.root.")
+		}
+		return packet.Packet{}
+	})
+
+	entries, err := Syntax06(ctx, z)
+	if err != nil {
+		t.Fatalf("syntax06: %v", err)
+	}
+	entry := firstEntryByTag(entries, "NO_RESPONSE")
+	if entry == nil {
+		t.Fatalf("expected NO_RESPONSE")
+	}
+	if nsArg, ok := entry.Args["ns"].(string); !ok || nsArg != "a.root" {
+		t.Fatalf("expected ns=a.root, got %#v", entry.Args["ns"])
+	}
+	if address, ok := entry.Args["address"].(string); !ok || address != "192.0.2.1" {
+		t.Fatalf("expected address=192.0.2.1, got %#v", entry.Args["address"])
+	}
+	if nsArg, _ := entry.Args["ns"].(string); strings.Contains(nsArg, "/") {
+		t.Fatalf("expected nameserver-only ns argument, got %q", nsArg)
+	}
+}
+
+func TestSyntax06IPv4DisabledArgsSplit(t *testing.T) {
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.Net.IPv4 = false
+
+	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
+		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "NS") {
+			return nsPacket(".", "a.root.")
+		}
+		return packet.Packet{}
+	})
+
+	entries, err := Syntax06(ctx, z)
+	if err != nil {
+		t.Fatalf("syntax06: %v", err)
+	}
+	entry := firstEntryByTag(entries, "IPV4_DISABLED")
+	if entry == nil {
+		t.Fatalf("expected IPV4_DISABLED")
+	}
+	if nsArg, ok := entry.Args["ns"].(string); !ok || nsArg != "a.root" {
+		t.Fatalf("expected ns=a.root, got %#v", entry.Args["ns"])
+	}
+	if address, ok := entry.Args["address"].(string); !ok || address != "192.0.2.1" {
+		t.Fatalf("expected address=192.0.2.1, got %#v", entry.Args["address"])
+	}
+	if rrtype, ok := entry.Args["rrtype"].(string); !ok || rrtype != "SOA" {
+		t.Fatalf("expected rrtype=SOA, got %#v", entry.Args["rrtype"])
+	}
+	if nsArg, _ := entry.Args["ns"].(string); strings.Contains(nsArg, "/") {
+		t.Fatalf("expected nameserver-only ns argument, got %q", nsArg)
+	}
+}
+
 func TestSyntax07MNameSyntaxOK(t *testing.T) {
 	ctx := testContext(t)
 	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
@@ -468,4 +529,16 @@ func hasEntryTag(entries []*logger.Entry, tag string) bool {
 		}
 	}
 	return false
+}
+
+func firstEntryByTag(entries []*logger.Entry, tag string) *logger.Entry {
+	for _, entry := range entries {
+		if entry == nil {
+			continue
+		}
+		if entry.Tag == tag {
+			return entry
+		}
+	}
+	return nil
 }

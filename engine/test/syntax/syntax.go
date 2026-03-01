@@ -12,6 +12,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/internal/parallel"
+	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/methods"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
@@ -512,10 +513,9 @@ func Syntax06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			UseVC:   &usevc,
 		})
 		if err != nil || resp.Msg == nil {
-			if err := appendLog(ctx, &results, testcase, "NO_RESPONSE", map[string]any{
-				"ns":     ns.String(),
+			if err := appendLog(ctx, &results, testcase, "NO_RESPONSE", withNameserverArgs(ns, map[string]any{
 				"domain": z.Name.String(),
-			}); err != nil {
+			})); err != nil {
 				return results, err
 			}
 			continue
@@ -762,21 +762,27 @@ func appendLog(ctx context.Context, results *[]*logger.Entry, testcase string, t
 	return nil
 }
 
+func withNameserverArgs(ns nameserver.Nameserver, args map[string]any) map[string]any {
+	if args == nil {
+		args = map[string]any{}
+	}
+	logargs.SetNS(args, ns.NameString(), ns.AddressString())
+	return args
+}
+
 func ipDisabledMessage(ctx context.Context, results *[]*logger.Entry, testcase string, ns nameserver.Nameserver, rrtype string) (bool, error) {
 	if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
-		if err := appendLog(ctx, results, testcase, "IPV4_DISABLED", map[string]any{
-			"ns":     ns.String(),
+		if err := appendLog(ctx, results, testcase, "IPV4_DISABLED", withNameserverArgs(ns, map[string]any{
 			"rrtype": rrtype,
-		}); err != nil {
+		})); err != nil {
 			return true, err
 		}
 		return true, nil
 	}
 	if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
-		if err := appendLog(ctx, results, testcase, "IPV6_DISABLED", map[string]any{
-			"ns":     ns.String(),
+		if err := appendLog(ctx, results, testcase, "IPV6_DISABLED", withNameserverArgs(ns, map[string]any{
 			"rrtype": rrtype,
-		}); err != nil {
+		})); err != nil {
 			return true, err
 		}
 		return true, nil

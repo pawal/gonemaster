@@ -15,6 +15,7 @@
   --surface: #f8fafc;
   --surface-2: #e4e7ec;
   --on-surface-2: #344054;
+  --btn-fg: white;
 }
 
 * {
@@ -146,7 +147,7 @@ h1 {
 
 .tab.active {
   background: var(--accent);
-  color: #ffffff;
+  color: var(--btn-fg);
   border-color: var(--accent);
 }
 
@@ -266,13 +267,14 @@ button {
   letter-spacing: 0.01em;
   cursor: pointer;
   background: var(--accent);
-  color: white;
+  color: var(--btn-fg);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
   box-shadow: 0 8px 16px rgba(11, 45, 77, 0.18);
 }
 
 button.secondary {
   background: #1d2939;
+  color: white;
   box-shadow: 0 8px 16px rgba(29, 41, 57, 0.2);
 }
 
@@ -696,7 +698,7 @@ button:hover:not(:disabled) {
 .severity-filter.active {
   background: var(--accent);
   border-color: var(--accent);
-  color: #ffffff;
+  color: var(--btn-fg);
 }
 
 .notice {
@@ -983,12 +985,15 @@ pre {
     --bg-2: #161b22;
     --ink: #e6edf3;
     --muted: #8b949e;
+    --accent: #58a6ff;
+    --accent-2: #22d3ee;
     --card: #161b22;
     --border: #30363d;
     --shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
     --surface: #21262d;
     --surface-2: #30363d;
     --on-surface-2: #8b949e;
+    --btn-fg: #0d1117;
   }
 }
 
@@ -999,12 +1004,15 @@ pre {
   --bg-2: #161b22;
   --ink: #e6edf3;
   --muted: #8b949e;
+  --accent: #58a6ff;
+  --accent-2: #22d3ee;
   --card: #161b22;
   --border: #30363d;
   --shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
   --surface: #21262d;
   --surface-2: #30363d;
   --on-surface-2: #8b949e;
+  --btn-fg: #0d1117;
 }
 
 /* Shared dark overrides for both system-dark and explicit-dark */

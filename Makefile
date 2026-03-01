@@ -17,7 +17,7 @@ CMD ?= all
 	build-gonemaster-nagios install-gonemaster install-gonemaster-server install-gonemaster-client \
 	install-gonemaster-nagios ui-check test-go vet race \
 	spec-export-implemented spec-export-tags spec-export spec-validate spec-validate-scan spec-check \
-	spec-generate-tags spec-check-tags spec-export-log-args spec-check-coherency
+	spec-generate-tags spec-check-tags spec-export-log-args spec-check-coherency spec-check-i18n-placeholders
 
 help:
 	@echo "Targets:"
@@ -42,7 +42,8 @@ help:
 	@echo "  spec-generate-tags Regenerate per-module tag catalog markdown files"
 	@echo "  spec-check-tags    Check tag catalog files are up to date (drift detection)"
 	@echo "  spec-check-coherency Run log-args coherency guardrail checks"
-	@echo "  spec-check         Run spec-validate + spec-check-tags"
+	@echo "  spec-check-i18n-placeholders  Verify placeholder parity between msgid/msgstr in locale files"
+	@echo "  spec-check         Run spec-validate + spec-check-tags + coherency + i18n placeholder checks"
 	@echo "  clean            Remove build artifacts"
 
 $(BIN_DIR):
@@ -173,7 +174,10 @@ spec-check-tags:
 spec-check-coherency:
 	$(GO) run ./tools/specifications/export-log-args --check-coherency --markdown-out '' >/dev/null
 
-spec-check: spec-validate spec-check-tags spec-check-coherency
+spec-check-i18n-placeholders:
+	$(GO) run ./tools/i18n/check-placeholders
+
+spec-check: spec-validate spec-check-tags spec-check-coherency spec-check-i18n-placeholders
 
 clean:
 	@rm -rf $(BIN_DIR) $(UI_BUILD_DIR) $(UI_DIR)/node_modules

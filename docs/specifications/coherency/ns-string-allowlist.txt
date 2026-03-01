@@ -1,14 +1,14 @@
-# Baseline allowlist for legacy `args["ns"] = <endpoint>.String()` usage.
+# Strict allowlist for `args["ns"] = <endpoint>.String()` usage.
 # Format: <path> <max_count>
-# The coherency guardrail fails if a file exceeds its allowed count.
+# All limits are zero in phase 6 hardening; any non-zero hit is a CI failure.
 
-engine/nameserver/nameserver.go 2
-engine/nameserver/query_helpers.go 3
-engine/test/basic/basic.go 19
-engine/test/connectivity/connectivity.go 8
-engine/test/consistency/consistency.go 19
-engine/test/delegation/delegation.go 5
-engine/test/dnssec/dnssec.go 6
-engine/test/nameserver/nameserver.go 35
-engine/test/syntax/syntax.go 3
-engine/test/zone/zone.go 16
+engine/nameserver/nameserver.go 0
+engine/nameserver/query_helpers.go 0
+engine/test/basic/basic.go 0
+engine/test/connectivity/connectivity.go 0
+engine/test/consistency/consistency.go 0
+engine/test/delegation/delegation.go 0
+engine/test/dnssec/dnssec.go 0
+engine/test/nameserver/nameserver.go 0
+engine/test/syntax/syntax.go 0
+engine/test/zone/zone.go 0

@@ -74,6 +74,12 @@ Optional validation with append-log scanner (metadata omission hints):
 make spec-validate-scan
 ```
 
+Run coherency guardrails (no new `ns=.String()` growth; no new packed-list-only keys):
+
+```sh
+make spec-check-coherency
+```
+
 ## Writing Principles
 - Use exact language and explicit conditions.
 - Prefer deterministic phrasing (`MUST`, `MUST NOT`, `MAY`) over vague wording.

@@ -17,7 +17,7 @@ CMD ?= all
 	build-gonemaster-nagios install-gonemaster install-gonemaster-server install-gonemaster-client \
 	install-gonemaster-nagios ui-check test-go vet race \
 	spec-export-implemented spec-export-tags spec-export spec-validate spec-validate-scan spec-check \
-	spec-generate-tags spec-check-tags spec-export-log-args
+	spec-generate-tags spec-check-tags spec-export-log-args spec-check-coherency
 
 help:
 	@echo "Targets:"
@@ -41,6 +41,7 @@ help:
 	@echo "  spec-validate-scan Validate specs + scan append*Log literals for metadata omissions"
 	@echo "  spec-generate-tags Regenerate per-module tag catalog markdown files"
 	@echo "  spec-check-tags    Check tag catalog files are up to date (drift detection)"
+	@echo "  spec-check-coherency Run log-args coherency guardrail checks"
 	@echo "  spec-check         Run spec-validate + spec-check-tags"
 	@echo "  clean            Remove build artifacts"
 
@@ -169,7 +170,10 @@ spec-generate-tags:
 spec-check-tags:
 	$(GO) run ./tools/specifications/generate-tag-catalog --check
 
-spec-check: spec-validate spec-check-tags
+spec-check-coherency:
+	$(GO) run ./tools/specifications/export-log-args --check-coherency --markdown-out '' >/dev/null
+
+spec-check: spec-validate spec-check-tags spec-check-coherency
 
 clean:
 	@rm -rf $(BIN_DIR) $(UI_BUILD_DIR) $(UI_DIR)/node_modules

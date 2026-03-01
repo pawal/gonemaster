@@ -12,6 +12,8 @@
     "log_call_count": 623,
     "unique_tag_count": 427,
     "unique_key_count": 109,
+    "ns_string_call_count": 116,
+    "packed_list_only_key_count": 8,
     "unresolved_log_call_count": 0
   },
   "keys": {
@@ -2846,13 +2848,13 @@
           "tag": "CACHED_RETURN",
           "file": "engine/nameserver/nameserver.go",
           "line": 463,
-          "shape": "unknown"
+          "shape": "string"
         },
         {
           "tag": "CACHED_RETURN",
           "file": "engine/nameserver/nameserver.go",
           "line": 463,
-          "shape": "string"
+          "shape": "unknown"
         },
         {
           "tag": "FAKE_PACKET_RETURNED",
@@ -4350,5 +4352,27 @@
         }
       ]
     }
-  }
+  },
+  "ns_string_by_file": {
+    "engine/nameserver/nameserver.go": 2,
+    "engine/nameserver/query_helpers.go": 3,
+    "engine/test/basic/basic.go": 19,
+    "engine/test/connectivity/connectivity.go": 8,
+    "engine/test/consistency/consistency.go": 19,
+    "engine/test/delegation/delegation.go": 5,
+    "engine/test/dnssec/dnssec.go": 6,
+    "engine/test/nameserver/nameserver.go": 35,
+    "engine/test/syntax/syntax.go": 3,
+    "engine/test/zone/zone.go": 16
+  },
+  "packed_list_only_keys": [
+    "mailtarget_list",
+    "names",
+    "ns_ip_list",
+    "ns_list",
+    "nsname_list",
+    "parent_addresses",
+    "servers",
+    "zone_addresses"
+  ]
 }

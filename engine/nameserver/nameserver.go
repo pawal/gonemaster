@@ -11,6 +11,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -146,11 +147,11 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 
 	prof := profile.FromContext(ctx)
 	if ns.Address.Is4() && !prof.Net.IPv4 {
-		logSystemWithLogger(runLog, "IPV4_BLOCKED", map[string]any{"ns": ns.String()})
+		logSystemWithLogger(runLog, "IPV4_BLOCKED", logargs.NS(ns.NameString(), ns.AddressString()))
 		return packet.Packet{}, nil
 	}
 	if ns.Address.Is6() && !prof.Net.IPv6 {
-		logSystemWithLogger(runLog, "IPV6_BLOCKED", map[string]any{"ns": ns.String()})
+		logSystemWithLogger(runLog, "IPV6_BLOCKED", logargs.NS(ns.NameString(), ns.AddressString()))
 		return packet.Packet{}, nil
 	}
 	queryArgs := map[string]any{
@@ -159,6 +160,8 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 		"flags": queryFlags(qclass, opts),
 		"ip":    ns.Address.String(),
 	}
+	logargs.SetNS(queryArgs, ns.NameString(), ns.AddressString())
+	logargs.SetQueryIdentity(queryArgs, qname, qtype, qclass)
 	logSystemWithLogger(runLog, "QUERY", queryArgs)
 
 	if resp, ok := ns.fakeDSResponse(qname, qtype, qclass, opts, runLog); ok {
@@ -192,27 +195,31 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	usevc := resolveUseVC(opts)
 	if ttl := resolveReachabilityTTL(prof, opts); ttl > 0 {
 		if skip, remaining := globalReachability.shouldSkip(ns.Address.String()); skip {
-			logSystem(ctx, "REACHABILITY_CACHE_SKIP", map[string]any{
+			skipArgs := map[string]any{
 				"ip":          ns.Address.String(),
 				"protocol":    errorCacheProtocol(usevc),
 				"ttl_seconds": int(remaining.Seconds()),
 				"query_name":  qname,
 				"query_type":  qtype,
 				"query_class": qclass,
-			})
+			}
+			logargs.SetNS(skipArgs, ns.NameString(), ns.AddressString())
+			logSystem(ctx, "REACHABILITY_CACHE_SKIP", skipArgs)
 			return packet.Packet{}, nil
 		}
 	}
 	if errorCacheTTL := resolveErrorCacheTTL(prof, opts); errorCacheTTL > 0 && ns.state != nil && ns.state.errorCache != nil {
 		if skip, remaining := ns.state.errorCache.shouldSkip(errorCacheKey(usevc)); skip {
-			logSystem(ctx, "ERROR_CACHE_SKIP", map[string]any{
+			skipArgs := map[string]any{
 				"ip":          ns.Address.String(),
 				"protocol":    errorCacheProtocol(usevc),
 				"ttl_seconds": int(remaining.Seconds()),
 				"query_name":  qname,
 				"query_type":  qtype,
 				"query_class": qclass,
-			})
+			}
+			logargs.SetNS(skipArgs, ns.NameString(), ns.AddressString())
+			logSystem(ctx, "ERROR_CACHE_SKIP", skipArgs)
 			return packet.Packet{}, nil
 		}
 	}
@@ -401,12 +408,15 @@ func (ns Nameserver) queryNetwork(ctx context.Context, qname string, qtype strin
 	server := ns.Address.String()
 
 	// Emit EXTERNAL_QUERY log entry
-	logSystem(ctx, "EXTERNAL_QUERY", map[string]any{
+	queryArgs := map[string]any{
 		"name":  qname,
 		"type":  qtype,
 		"ip":    ns.Address.String(),
 		"flags": fmt.Sprintf(`{"class":%q}`, qclass),
-	})
+	}
+	logargs.SetNS(queryArgs, ns.NameString(), ns.AddressString())
+	logargs.SetQueryIdentity(queryArgs, qname, qtype, qclass)
+	logSystem(ctx, "EXTERNAL_QUERY", queryArgs)
 
 	resp, err := client.Exchange(ctx, server, msg)
 	resp.Log = loggerFromContextOrFallback(ctx, ns.log)
@@ -417,6 +427,8 @@ func (ns Nameserver) queryNetwork(ctx context.Context, qname string, qtype strin
 		"ip":    ns.Address.String(),
 		"flags": fmt.Sprintf(`{"class":%q}`, qclass),
 	}
+	logargs.SetNS(args, ns.NameString(), ns.AddressString())
+	logargs.SetQueryIdentity(args, qname, qtype, qclass)
 	if resp.Msg != nil {
 		args["rcode"] = dns.RcodeToString[resp.Msg.Rcode]
 		args["answers"] = len(resp.Msg.Answer)
@@ -449,6 +461,7 @@ func logSystemWithLogger(log *logger.Logger, tag string, args map[string]any) {
 	if log == nil {
 		return
 	}
+	args = logargs.EnsureSchema(args)
 	_, _ = log.Add(tag, args, systemModuleName, "")
 }
 
@@ -460,6 +473,7 @@ func logCachedReturnWithLogger(log *logger.Logger, resp packet.Packet) {
 	if resp.Msg != nil {
 		args["packet"] = packetStringForLog(resp)
 	}
+	args = logargs.EnsureSchema(args)
 	_, _ = log.Add("CACHED_RETURN", args, systemModuleName, "")
 }
 

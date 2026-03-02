@@ -2293,17 +2293,17 @@ func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(noResponseDNSKEY) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS07_NO_RESPONSE_DNSKEY", map[string]any{
-			"ns_list": joinUniqueSorted(noResponseDNSKEY),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, noResponseDNSKEY)
+		if err := appendLog(ctx, &results, testcase, "DS07_NO_RESPONSE_DNSKEY", args); err != nil {
 			return results, err
 		}
 	}
 
 	if len(noAuthDNSKEY) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS07_NON_AUTH_RESPONSE_DNSKEY", map[string]any{
-			"ns_list": joinUniqueSorted(noAuthDNSKEY),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, noAuthDNSKEY)
+		if err := appendLog(ctx, &results, testcase, "DS07_NON_AUTH_RESPONSE_DNSKEY", args); err != nil {
 			return results, err
 		}
 	}
@@ -2315,27 +2315,28 @@ func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 		sort.Strings(rcodeKeys)
 		for _, rcode := range rcodeKeys {
-			if err := appendLog(ctx, &results, testcase, "DS07_UNEXP_RCODE_RESP_DNSKEY", map[string]any{
-				"ns_list": joinUniqueSorted(errorRcodeDNSKEY[rcode]),
-				"rcode":   rcode,
-			}); err != nil {
+			args := map[string]any{
+				"rcode": rcode,
+			}
+			setTypedServersFromNames(args, errorRcodeDNSKEY[rcode])
+			if err := appendLog(ctx, &results, testcase, "DS07_UNEXP_RCODE_RESP_DNSKEY", args); err != nil {
 				return results, err
 			}
 		}
 	}
 
 	if len(signedResponse) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS07_SIGNED_ON_SERVER", map[string]any{
-			"ns_list": joinUniqueSorted(signedResponse),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, signedResponse)
+		if err := appendLog(ctx, &results, testcase, "DS07_SIGNED_ON_SERVER", args); err != nil {
 			return results, err
 		}
 	}
 
 	if len(noDNSKEY) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS07_NOT_SIGNED_ON_SERVER", map[string]any{
-			"ns_list": joinUniqueSorted(noDNSKEY),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, noDNSKEY)
+		if err := appendLog(ctx, &results, testcase, "DS07_NOT_SIGNED_ON_SERVER", args); err != nil {
 			return results, err
 		}
 	}
@@ -2359,17 +2360,17 @@ func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(noDS) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS07_NO_DS_ON_PARENT_SERVER", map[string]any{
-			"ns_list": joinUniqueSorted(noDS),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, noDS)
+		if err := appendLog(ctx, &results, testcase, "DS07_NO_DS_ON_PARENT_SERVER", args); err != nil {
 			return results, err
 		}
 	}
 
 	if len(dsInResponse) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS07_DS_ON_PARENT_SERVER", map[string]any{
-			"ns_list": joinUniqueSorted(dsInResponse),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, dsInResponse)
+		if err := appendLog(ctx, &results, testcase, "DS07_DS_ON_PARENT_SERVER", args); err != nil {
 			return results, err
 		}
 	}
@@ -6545,6 +6546,23 @@ func nsStrings(servers []nameserver.Nameserver) []string {
 
 func joinUniqueSorted(values []string) string {
 	return strings.Join(logargs.UniqueSortedEndpointNames(values), ";")
+}
+
+func setTypedServersFromNames(args map[string]any, values []string) {
+	if args == nil || len(values) == 0 {
+		return
+	}
+	names := logargs.UniqueSortedEndpointNames(values)
+	if len(names) == 0 {
+		return
+	}
+	servers := make([]logargs.Server, 0, len(names))
+	for _, name := range names {
+		servers = append(servers, logargs.Server{NS: name})
+	}
+	if typed, ok := logargs.Servers(servers)["servers"]; ok {
+		args["servers"] = typed
+	}
 }
 
 func differenceStrings(left []string, right []string) []string {

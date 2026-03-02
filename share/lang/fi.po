@@ -3065,16 +3065,16 @@ msgid "DS records are published in the parent zone for the signed zone."
 msgstr "DS-tietueet on julkaistu ylävyöhykkeessä allekirjoitetulle vyöhykkeelle."
 
 msgctxt "DNSSEC:DS07_DS_ON_PARENT_SERVER"
-msgid "DS records found on parent name servers {ns_list}."
-msgstr "DS-tietueet löydetty ylänimipalvelimilta {ns_list}."
+msgid "DS records found on parent name servers {servers}."
+msgstr "DS-tietueet löydetty ylänimipalvelimilta {servers}."
 
 msgctxt "DNSSEC:DS07_SIGNED"
 msgid "The zone is signed with DNSSEC."
 msgstr "Vyöhyke on allekirjoitettu DNSSEC:llä."
 
 msgctxt "DNSSEC:DS07_SIGNED_ON_SERVER"
-msgid "Signed responses received from name servers {ns_list}."
-msgstr "Allekirjoitetut vastaukset vastaanotettu nimipalvelimilta {ns_list}."
+msgid "Signed responses received from name servers {servers}."
+msgstr "Allekirjoitetut vastaukset vastaanotettu nimipalvelimilta {servers}."
 
 msgctxt "ZONE:Z11_NO_SPF_NON_MAIL_DOMAIN"
 msgid "No SPF policy found for {domain}, which is not a mail domain."

@@ -3417,16 +3417,16 @@ msgid "DS records are published in the parent zone for the signed zone."
 msgstr "DS-poster er offentliggjort i forældrezonen for den signerede zone."
 
 msgctxt "DNSSEC:DS07_DS_ON_PARENT_SERVER"
-msgid "DS records found on parent name servers {ns_list}."
-msgstr "DS-poster fundet på forældre-navneservere {ns_list}."
+msgid "DS records found on parent name servers {servers}."
+msgstr "DS-poster fundet på forældre-navneservere {servers}."
 
 msgctxt "DNSSEC:DS07_SIGNED"
 msgid "The zone is signed with DNSSEC."
 msgstr "Zonen er signeret med DNSSEC."
 
 msgctxt "DNSSEC:DS07_SIGNED_ON_SERVER"
-msgid "Signed responses received from name servers {ns_list}."
-msgstr "Signerede svar modtaget fra navneservere {ns_list}."
+msgid "Signed responses received from name servers {servers}."
+msgstr "Signerede svar modtaget fra navneservere {servers}."
 
 msgctxt "ZONE:Z11_NO_SPF_NON_MAIL_DOMAIN"
 msgid "No SPF policy found for {domain}, which is not a mail domain."

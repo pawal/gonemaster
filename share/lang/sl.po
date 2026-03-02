@@ -3352,16 +3352,16 @@ msgid "DS records are published in the parent zone for the signed zone."
 msgstr "DS zapisi so objavljeni v nadrejeni coni za podpisano cono."
 
 msgctxt "DNSSEC:DS07_DS_ON_PARENT_SERVER"
-msgid "DS records found on parent name servers {ns_list}."
-msgstr "DS zapisi najdeni na nadrejenih imenskih strežnikih {ns_list}."
+msgid "DS records found on parent name servers {servers}."
+msgstr "DS zapisi najdeni na nadrejenih imenskih strežnikih {servers}."
 
 msgctxt "DNSSEC:DS07_SIGNED"
 msgid "The zone is signed with DNSSEC."
 msgstr "Cona je podpisana z DNSSEC."
 
 msgctxt "DNSSEC:DS07_SIGNED_ON_SERVER"
-msgid "Signed responses received from name servers {ns_list}."
-msgstr "Podpisani odgovori prejeti od imenskih strežnikov {ns_list}."
+msgid "Signed responses received from name servers {servers}."
+msgstr "Podpisani odgovori prejeti od imenskih strežnikov {servers}."
 
 msgctxt "ZONE:Z11_NO_SPF_NON_MAIL_DOMAIN"
 msgid "No SPF policy found for {domain}, which is not a mail domain."

@@ -3705,16 +3705,16 @@ msgid "DS records are published in the parent zone for the signed zone."
 msgstr "Los registros DS están publicados en la zona padre para la zona firmada."
 
 msgctxt "DNSSEC:DS07_DS_ON_PARENT_SERVER"
-msgid "DS records found on parent name servers {ns_list}."
-msgstr "Registros DS encontrados en los servidores de nombres padre {ns_list}."
+msgid "DS records found on parent name servers {servers}."
+msgstr "Registros DS encontrados en los servidores de nombres padre {servers}."
 
 msgctxt "DNSSEC:DS07_SIGNED"
 msgid "The zone is signed with DNSSEC."
 msgstr "La zona está firmada con DNSSEC."
 
 msgctxt "DNSSEC:DS07_SIGNED_ON_SERVER"
-msgid "Signed responses received from name servers {ns_list}."
-msgstr "Respuestas firmadas recibidas de los servidores de nombres {ns_list}."
+msgid "Signed responses received from name servers {servers}."
+msgstr "Respuestas firmadas recibidas de los servidores de nombres {servers}."
 
 msgctxt "ZONE:Z11_NO_SPF_NON_MAIL_DOMAIN"
 msgid "No SPF policy found for {domain}, which is not a mail domain."

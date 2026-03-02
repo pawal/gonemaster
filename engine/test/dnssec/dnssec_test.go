@@ -705,6 +705,20 @@ func TestDNSSEC03NoNSEC3(t *testing.T) {
 	if !hasEntryTag(entries, "DS03_NO_NSEC3") {
 		t.Fatalf("expected DS03_NO_NSEC3")
 	}
+	noNSEC3 := firstEntryByTag(entries, "DS03_NO_NSEC3")
+	if noNSEC3 == nil {
+		t.Fatalf("missing DS03_NO_NSEC3 entry")
+	}
+	noNSEC3Servers, ok := noNSEC3.Args["servers"].([]map[string]any)
+	if !ok || len(noNSEC3Servers) != 1 {
+		t.Fatalf("expected one typed server for DS03_NO_NSEC3, got %#v", noNSEC3.Args["servers"])
+	}
+	if noNSEC3Servers[0]["ns"] != "ns1.example" {
+		t.Fatalf("unexpected typed server payload for DS03_NO_NSEC3: %#v", noNSEC3Servers[0])
+	}
+	if _, ok := noNSEC3.Args["ns_list"]; ok {
+		t.Fatalf("legacy key ns_list should not be present: %#v", noNSEC3.Args)
+	}
 }
 
 func TestDNSSEC03IllegalHashAlgo(t *testing.T) {
@@ -755,6 +769,23 @@ func TestDNSSEC03IllegalHashAlgo(t *testing.T) {
 	}
 	if !hasEntryTag(entries, "DS03_ILLEGAL_HASH_ALGO") {
 		t.Fatalf("expected DS03_ILLEGAL_HASH_ALGO")
+	}
+	illegal := firstEntryByTag(entries, "DS03_ILLEGAL_HASH_ALGO")
+	if illegal == nil {
+		t.Fatalf("missing DS03_ILLEGAL_HASH_ALGO entry")
+	}
+	illegalServers, ok := illegal.Args["servers"].([]map[string]any)
+	if !ok || len(illegalServers) != 1 {
+		t.Fatalf("expected one typed server for DS03_ILLEGAL_HASH_ALGO, got %#v", illegal.Args["servers"])
+	}
+	if illegalServers[0]["ns"] != "ns1.example" {
+		t.Fatalf("unexpected typed server payload for DS03_ILLEGAL_HASH_ALGO: %#v", illegalServers[0])
+	}
+	if _, ok := illegal.Args["ns_list"]; ok {
+		t.Fatalf("legacy key ns_list should not be present: %#v", illegal.Args)
+	}
+	if algo, _ := illegal.Args["algo_num"].(uint8); algo != 2 {
+		t.Fatalf("expected algo_num=2 for DS03_ILLEGAL_HASH_ALGO, got %#v", illegal.Args["algo_num"])
 	}
 }
 

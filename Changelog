@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.0.6] - 2026-03-02
+
+### Changed
+
+- Fixed resolveCNAME to use a fresh inProgress map instead of sharing the parent's
+
 ## [v1.0.5] - 2026-03-01
 
 ### Added

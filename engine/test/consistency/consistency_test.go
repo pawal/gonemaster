@@ -262,6 +262,9 @@ func TestConsistency04OneNSSetTypedServers(t *testing.T) {
 	if servers[0]["ns"] != "ns1.example" || servers[1]["ns"] != "ns2.example" {
 		t.Fatalf("expected sorted typed servers for ONE_NS_SET, got %#v", servers)
 	}
+	if _, ok := entry.Args["nsname_list"]; ok {
+		t.Fatalf("legacy key nsname_list should not be present: %#v", entry.Args)
+	}
 }
 
 func TestConsistency04ParallelNSQueries(t *testing.T) {

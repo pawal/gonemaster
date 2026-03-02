@@ -509,8 +509,7 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	if len(parentFound) > 0 {
 		for domain, nsMap := range parentFound {
 			args := map[string]any{
-				"domain":  domain,
-				"ns_list": joinSorted(nsMap),
+				"domain": domain,
 			}
 			setTypedEndpointsFromSet(args, nsMap)
 			if err := appendLog(ctx, &results, testcase, "B01_PARENT_FOUND", args); err != nil {
@@ -785,8 +784,7 @@ func Basic02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	if len(authResponseSOA) > 0 {
 		args := map[string]any{
-			"domain":  z.Name.String(),
-			"ns_list": joinSorted(authResponseSOA),
+			"domain": z.Name.String(),
 		}
 		setTypedEndpointsFromSet(args, authResponseSOA)
 		if err := appendLog(ctx, &results, testcase, "B02_AUTH_RESPONSE_SOA", args); err != nil {

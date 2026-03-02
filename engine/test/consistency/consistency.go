@@ -724,9 +724,7 @@ func Consistency04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(order) == 1 {
-		args := map[string]any{
-			"nsname_list": order[0],
-		}
+		args := map[string]any{}
 		setTypedServersFromNames(args, order[0])
 		if err := appendLog(ctx, &results, testcase, "ONE_NS_SET", args); err != nil {
 			return results, err

@@ -245,7 +245,6 @@ func Delegation01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	childIPv4Args := map[string]any{
 		"count":   childIPv4Count,
 		"minimum": constants.MinimumNumberOfNameservers,
-		"ns_list": strings.Join(sortedNameserverStrings(childIPv4), ";"),
 	}
 	setTypedEndpointsFromNameservers(childIPv4Args, childIPv4)
 	if childIPv4Count >= constants.MinimumNumberOfNameservers {

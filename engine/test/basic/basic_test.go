@@ -150,6 +150,9 @@ func TestBasic02AuthResponseSOA(t *testing.T) {
 	if !ok || len(addresses) != 1 || addresses[0] != "192.0.2.1" {
 		t.Fatalf("unexpected typed addresses payload: %#v", entry.Args["addresses"])
 	}
+	if _, ok := entry.Args["ns_list"]; ok {
+		t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
+	}
 }
 
 func TestBasic02ParallelQueries(t *testing.T) {

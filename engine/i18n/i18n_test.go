@@ -102,6 +102,32 @@ func TestInterpolateFallbacks(t *testing.T) {
 	}
 }
 
+func TestInterpolateFormatsServersList(t *testing.T) {
+	out := interpolate("Servers: {servers}.", map[string]any{
+		"servers": []map[string]any{
+			{"ns": "ns1.example.org", "address": "192.0.2.1"},
+			{"ns": "ns2.example.org"},
+		},
+	})
+	expected := "Servers: ns1.example.org/192.0.2.1;ns2.example.org."
+	if out != expected {
+		t.Fatalf("unexpected interpolation: %q", out)
+	}
+}
+
+func TestInterpolateFormatsServerMap(t *testing.T) {
+	out := interpolate("Server: {server}.", map[string]any{
+		"server": map[string]any{
+			"ns":      "ns1.example.org",
+			"address": "2001:db8::53",
+		},
+	})
+	expected := "Server: ns1.example.org/2001:db8::53."
+	if out != expected {
+		t.Fatalf("unexpected interpolation: %q", out)
+	}
+}
+
 func TestTranslateWithStatusMissing(t *testing.T) {
 	msg, found := TranslateWithStatus("en", "basic", "B99_DOES_NOT_EXIST", nil)
 	if found {

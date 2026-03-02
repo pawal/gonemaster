@@ -753,13 +753,13 @@ func DNSSEC01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			sort.Ints(keytagKeys)
 			for _, keytagKey := range keytagKeys {
 				keytag := uint16(keytagKey)
-				nsList := joinUniqueSorted(keytags[keytag])
-				if err := appendLog(ctx, &results, testcase, tag, map[string]any{
-					"ns_list":       nsList,
+				args := map[string]any{
 					"keytag":        keytag,
 					"ds_algo_num":   digest,
 					"ds_algo_descr": digestDescription(digest),
-				}); err != nil {
+				}
+				setTypedServersFromNames(args, keytags[keytag])
+				if err := appendLog(ctx, &results, testcase, tag, args); err != nil {
 					return results, err
 				}
 			}
@@ -771,18 +771,19 @@ func DNSSEC01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		if len(missing) == 0 {
 			continue
 		}
-		if err := appendLog(ctx, &results, testcase, "DS01_DS_ALGO_2_MISSING", map[string]any{
-			"ns_list": joinUniqueSorted(missing),
-			"keytag":  keytag,
-		}); err != nil {
+		args := map[string]any{
+			"keytag": keytag,
+		}
+		setTypedServersFromNames(args, missing)
+		if err := appendLog(ctx, &results, testcase, "DS01_DS_ALGO_2_MISSING", args); err != nil {
 			return results, err
 		}
 	}
 
 	if len(respondsWithoutValidDS) == 0 && len(respondsWithDS) == 0 && len(ignoredParentNS) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS01_NO_RESPONSE", map[string]any{
-			"ns_list": joinUniqueSorted(ignoredParentNS),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, ignoredParentNS)
+		if err := appendLog(ctx, &results, testcase, "DS01_NO_RESPONSE", args); err != nil {
 			return results, err
 		}
 	}
@@ -804,9 +805,9 @@ func DNSSEC01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		if len(respondsWithDS) > 0 {
 			tag = "DS01_PARENT_SERVER_NO_DS"
 		}
-		if err := appendLog(ctx, &results, testcase, tag, map[string]any{
-			"ns_list": joinUniqueSorted(respondsWithoutValidDS),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, respondsWithoutValidDS)
+		if err := appendLog(ctx, &results, testcase, tag, args); err != nil {
 			return results, err
 		}
 	}
@@ -1971,9 +1972,9 @@ func DNSSEC05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(respondsWithoutDNSKEY) == 0 && len(respondsWithDNSKEY) == 0 {
-		if err := appendLog(ctx, &results, testcase, "DS05_NO_RESPONSE", map[string]any{
-			"ns_list": joinUniqueSorted(ignoredNS),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, ignoredNS)
+		if err := appendLog(ctx, &results, testcase, "DS05_NO_RESPONSE", args); err != nil {
 			return results, err
 		}
 	}
@@ -1983,9 +1984,9 @@ func DNSSEC05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		if len(respondsWithDNSKEY) == 0 {
 			tag = "DS05_ZONE_NO_DNSSEC"
 		}
-		if err := appendLog(ctx, &results, testcase, tag, map[string]any{
-			"ns_list": joinUniqueSorted(respondsWithoutDNSKEY),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, respondsWithoutDNSKEY)
+		if err := appendLog(ctx, &results, testcase, tag, args); err != nil {
 			return results, err
 		}
 	}
@@ -3457,23 +3458,23 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(erroneousMultipleNSEC) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS10_ERR_MULT_NSEC", map[string]any{
-			"ns_list": joinUniqueSorted(erroneousMultipleNSEC),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, erroneousMultipleNSEC)
+		if err := appendLog(ctx, &results, testcase, "DS10_ERR_MULT_NSEC", args); err != nil {
 			return results, err
 		}
 	}
 	if len(erroneousMultipleNSEC3) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS10_ERR_MULT_NSEC3", map[string]any{
-			"ns_list": joinUniqueSorted(erroneousMultipleNSEC3),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, erroneousMultipleNSEC3)
+		if err := appendLog(ctx, &results, testcase, "DS10_ERR_MULT_NSEC3", args); err != nil {
 			return results, err
 		}
 	}
 	if len(erroneousMultipleNSEC3PARAM) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS10_ERR_MULT_NSEC3PARAM", map[string]any{
-			"ns_list": joinUniqueSorted(erroneousMultipleNSEC3PARAM),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, erroneousMultipleNSEC3PARAM)
+		if err := appendLog(ctx, &results, testcase, "DS10_ERR_MULT_NSEC3PARAM", args); err != nil {
 			return results, err
 		}
 	}
@@ -3482,9 +3483,9 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	union := uniqueStrings(append(nsec3paramInAnswer, nsecNsec3Nodata...))
 	finalDiff := symmetricDifferenceStrings(diff, union)
 	if len(diff) > 0 && len(finalDiff) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS10_INCONSISTENT_NSEC", map[string]any{
-			"ns_list": joinUniqueSorted(finalDiff),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, finalDiff)
+		if err := appendLog(ctx, &results, testcase, "DS10_INCONSISTENT_NSEC", args); err != nil {
 			return results, err
 		}
 	}
@@ -3493,34 +3494,34 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	union = uniqueStrings(append(nsecInAnswer, nsec3paramNsecNodata...))
 	finalDiff = symmetricDifferenceStrings(diff, union)
 	if len(diff) > 0 && len(finalDiff) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS10_INCONSISTENT_NSEC3", map[string]any{
-			"ns_list": joinUniqueSorted(finalDiff),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, finalDiff)
+		if err := appendLog(ctx, &results, testcase, "DS10_INCONSISTENT_NSEC3", args); err != nil {
 			return results, err
 		}
 	}
 
 	intersection := intersectionStrings(append(nsec3paramInAnswer, nsecNsec3Nodata...), append(nsecInAnswer, nsec3paramNsecNodata...))
 	if len(intersection) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS10_MIXED_NSEC_NSEC3", map[string]any{
-			"ns_list": joinUniqueSorted(intersection),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, intersection)
+		if err := appendLog(ctx, &results, testcase, "DS10_MIXED_NSEC_NSEC3", args); err != nil {
 			return results, err
 		}
 	}
 
 	if (len(nsecInAnswer) > 0 || len(nsec3paramNsecNodata) > 0) && len(nsec3paramInAnswer) == 0 && len(nsecNsec3Nodata) == 0 {
-		if err := appendLog(ctx, &results, testcase, "DS10_HAS_NSEC", map[string]any{
-			"ns_list": joinUniqueSorted(append(nsecInAnswer, nsec3paramNsecNodata...)),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, append(nsecInAnswer, nsec3paramNsecNodata...))
+		if err := appendLog(ctx, &results, testcase, "DS10_HAS_NSEC", args); err != nil {
 			return results, err
 		}
 	}
 
 	if (len(nsec3paramInAnswer) > 0 || len(nsecNsec3Nodata) > 0) && len(nsecInAnswer) == 0 && len(nsec3paramNsecNodata) == 0 {
-		if err := appendLog(ctx, &results, testcase, "DS10_HAS_NSEC3", map[string]any{
-			"ns_list": joinUniqueSorted(append(nsec3paramInAnswer, nsecNsec3Nodata...)),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, append(nsec3paramInAnswer, nsecNsec3Nodata...))
+		if err := appendLog(ctx, &results, testcase, "DS10_HAS_NSEC3", args); err != nil {
 			return results, err
 		}
 	}
@@ -3530,24 +3531,24 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	first := differenceStrings(union, secondUnion)
 	second := differenceStrings(secondUnion, union)
 	if len(first) > 0 && len(second) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS10_INCONSISTENT_NSEC_NSEC3", map[string]any{
-			"ns_list": joinUniqueSorted(append(union, secondUnion...)),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, append(union, secondUnion...))
+		if err := appendLog(ctx, &results, testcase, "DS10_INCONSISTENT_NSEC_NSEC3", args); err != nil {
 			return results, err
 		}
 	}
 
 	if len(nsecIncorrectTypeList) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS10_NSEC_ERR_TYPE_LIST", map[string]any{
-			"ns_list": joinUniqueSorted(nsecIncorrectTypeList),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, nsecIncorrectTypeList)
+		if err := appendLog(ctx, &results, testcase, "DS10_NSEC_ERR_TYPE_LIST", args); err != nil {
 			return results, err
 		}
 	}
 	if len(nsecMismatchesApex) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS10_NSEC_MISMATCHES_APEX", map[string]any{
-			"ns_list": joinUniqueSorted(nsecMismatchesApex),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, nsecMismatchesApex)
+		if err := appendLog(ctx, &results, testcase, "DS10_NSEC_MISMATCHES_APEX", args); err != nil {
 			return results, err
 		}
 	}
@@ -3558,25 +3559,26 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 		sort.Strings(keys)
 		for _, key := range keys {
-			if err := appendLog(ctx, &results, testcase, "DS10_NSEC_NODATA_WRONG_SOA", map[string]any{
-				"domain":  key,
-				"ns_list": joinUniqueSorted(nsecNodataWrongSOA[key]),
-			}); err != nil {
+			args := map[string]any{
+				"domain": key,
+			}
+			setTypedServersFromNames(args, nsecNodataWrongSOA[key])
+			if err := appendLog(ctx, &results, testcase, "DS10_NSEC_NODATA_WRONG_SOA", args); err != nil {
 				return results, err
 			}
 		}
 	}
 	if len(nsecNodataMissingSOA) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS10_NSEC_NODATA_MISSING_SOA", map[string]any{
-			"ns_list": joinUniqueSorted(nsecNodataMissingSOA),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, nsecNodataMissingSOA)
+		if err := appendLog(ctx, &results, testcase, "DS10_NSEC_NODATA_MISSING_SOA", args); err != nil {
 			return results, err
 		}
 	}
 	if len(nsecErroneousAnswer) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS10_NSEC_GIVES_ERR_ANSWER", map[string]any{
-			"ns_list": joinUniqueSorted(nsecErroneousAnswer),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, nsecErroneousAnswer)
+		if err := appendLog(ctx, &results, testcase, "DS10_NSEC_GIVES_ERR_ANSWER", args); err != nil {
 			return results, err
 		}
 	}
@@ -3588,16 +3590,16 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 	if len(nsec3IncorrectTypeList) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS10_NSEC3_ERR_TYPE_LIST", map[string]any{
-			"ns_list": joinUniqueSorted(nsec3IncorrectTypeList),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, nsec3IncorrectTypeList)
+		if err := appendLog(ctx, &results, testcase, "DS10_NSEC3_ERR_TYPE_LIST", args); err != nil {
 			return results, err
 		}
 	}
 	if len(nsec3MismatchesApex) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS10_NSEC3_MISMATCHES_APEX", map[string]any{
-			"ns_list": joinUniqueSorted(nsec3MismatchesApex),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, nsec3MismatchesApex)
+		if err := appendLog(ctx, &results, testcase, "DS10_NSEC3_MISMATCHES_APEX", args); err != nil {
 			return results, err
 		}
 	}
@@ -3608,53 +3610,54 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 		sort.Strings(keys)
 		for _, key := range keys {
-			if err := appendLog(ctx, &results, testcase, "DS10_NSEC3_NODATA_WRONG_SOA", map[string]any{
-				"domain":  key,
-				"ns_list": joinUniqueSorted(nsec3NodataWrongSOA[key]),
-			}); err != nil {
+			args := map[string]any{
+				"domain": key,
+			}
+			setTypedServersFromNames(args, nsec3NodataWrongSOA[key])
+			if err := appendLog(ctx, &results, testcase, "DS10_NSEC3_NODATA_WRONG_SOA", args); err != nil {
 				return results, err
 			}
 		}
 	}
 	if len(nsec3NodataMissingSOA) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS10_NSEC3_NODATA_MISSING_SOA", map[string]any{
-			"ns_list": joinUniqueSorted(nsec3NodataMissingSOA),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, nsec3NodataMissingSOA)
+		if err := appendLog(ctx, &results, testcase, "DS10_NSEC3_NODATA_MISSING_SOA", args); err != nil {
 			return results, err
 		}
 	}
 	if len(nsec3paramErroneousAnswer) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS10_NSEC3PARAM_GIVES_ERR_ANSWER", map[string]any{
-			"ns_list": joinUniqueSorted(nsec3paramErroneousAnswer),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, nsec3paramErroneousAnswer)
+		if err := appendLog(ctx, &results, testcase, "DS10_NSEC3PARAM_GIVES_ERR_ANSWER", args); err != nil {
 			return results, err
 		}
 	}
 	if len(nsec3paramMismatchesApex) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS10_NSEC3PARAM_MISMATCHES_APEX", map[string]any{
-			"ns_list": joinUniqueSorted(nsec3paramMismatchesApex),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, nsec3paramMismatchesApex)
+		if err := appendLog(ctx, &results, testcase, "DS10_NSEC3PARAM_MISMATCHES_APEX", args); err != nil {
 			return results, err
 		}
 	}
 	if len(nsec3paramResponseError) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS10_NSEC3PARAM_QUERY_RESPONSE_ERR", map[string]any{
-			"ns_list": joinUniqueSorted(nsec3paramResponseError),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, nsec3paramResponseError)
+		if err := appendLog(ctx, &results, testcase, "DS10_NSEC3PARAM_QUERY_RESPONSE_ERR", args); err != nil {
 			return results, err
 		}
 	}
 	if len(nsecMissingSignature) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS10_NSEC_MISSING_SIGNATURE", map[string]any{
-			"ns_list": joinUniqueSorted(nsecMissingSignature),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, nsecMissingSignature)
+		if err := appendLog(ctx, &results, testcase, "DS10_NSEC_MISSING_SIGNATURE", args); err != nil {
 			return results, err
 		}
 	}
 	if len(nsec3MissingSignature) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS10_NSEC3_MISSING_SIGNATURE", map[string]any{
-			"ns_list": joinUniqueSorted(nsec3MissingSignature),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, nsec3MissingSignature)
+		if err := appendLog(ctx, &results, testcase, "DS10_NSEC3_MISSING_SIGNATURE", args); err != nil {
 			return results, err
 		}
 	}
@@ -3667,10 +3670,11 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		sort.Ints(keytags)
 		for _, keytag := range keytags {
 			kt := uint16(keytag)
-			if err := appendLog(ctx, &results, testcase, "DS10_NSEC_RRSIG_NO_DNSKEY", map[string]any{
-				"keytag":  kt,
-				"ns_list": joinUniqueSorted(nsecRRSIGNoDNSKEY[kt]),
-			}); err != nil {
+			args := map[string]any{
+				"keytag": kt,
+			}
+			setTypedServersFromNames(args, nsecRRSIGNoDNSKEY[kt])
+			if err := appendLog(ctx, &results, testcase, "DS10_NSEC_RRSIG_NO_DNSKEY", args); err != nil {
 				return results, err
 			}
 		}
@@ -3683,10 +3687,11 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		sort.Ints(keytags)
 		for _, keytag := range keytags {
 			kt := uint16(keytag)
-			if err := appendLog(ctx, &results, testcase, "DS10_NSEC_RRSIG_EXPIRED", map[string]any{
-				"keytag":  kt,
-				"ns_list": joinUniqueSorted(nsecRRSIGExpired[kt]),
-			}); err != nil {
+			args := map[string]any{
+				"keytag": kt,
+			}
+			setTypedServersFromNames(args, nsecRRSIGExpired[kt])
+			if err := appendLog(ctx, &results, testcase, "DS10_NSEC_RRSIG_EXPIRED", args); err != nil {
 				return results, err
 			}
 		}
@@ -3699,10 +3704,11 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		sort.Ints(keytags)
 		for _, keytag := range keytags {
 			kt := uint16(keytag)
-			if err := appendLog(ctx, &results, testcase, "DS10_NSEC_RRSIG_NOT_YET_VALID", map[string]any{
-				"keytag":  kt,
-				"ns_list": joinUniqueSorted(nsecRRSIGNotYetValid[kt]),
-			}); err != nil {
+			args := map[string]any{
+				"keytag": kt,
+			}
+			setTypedServersFromNames(args, nsecRRSIGNotYetValid[kt])
+			if err := appendLog(ctx, &results, testcase, "DS10_NSEC_RRSIG_NOT_YET_VALID", args); err != nil {
 				return results, err
 			}
 		}
@@ -3715,10 +3721,11 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		sort.Ints(keytags)
 		for _, keytag := range keytags {
 			kt := uint16(keytag)
-			if err := appendLog(ctx, &results, testcase, "DS10_NSEC_RRSIG_VERIFY_ERROR", map[string]any{
-				"keytag":  kt,
-				"ns_list": joinUniqueSorted(nsecRRSIGVerifyError[kt]),
-			}); err != nil {
+			args := map[string]any{
+				"keytag": kt,
+			}
+			setTypedServersFromNames(args, nsecRRSIGVerifyError[kt])
+			if err := appendLog(ctx, &results, testcase, "DS10_NSEC_RRSIG_VERIFY_ERROR", args); err != nil {
 				return results, err
 			}
 		}
@@ -3759,9 +3766,9 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 		if len(nsList) > 0 {
-			if err := appendLog(ctx, &results, testcase, "DS10_NSEC_NO_VERIFIED_SIGNATURE", map[string]any{
-				"ns_list": joinUniqueSorted(nsList),
-			}); err != nil {
+			args := map[string]any{}
+			setTypedServersFromNames(args, nsList)
+			if err := appendLog(ctx, &results, testcase, "DS10_NSEC_NO_VERIFIED_SIGNATURE", args); err != nil {
 				return results, err
 			}
 		}
@@ -3775,10 +3782,11 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		sort.Ints(keytags)
 		for _, keytag := range keytags {
 			kt := uint16(keytag)
-			if err := appendLog(ctx, &results, testcase, "DS10_NSEC3_RRSIG_NO_DNSKEY", map[string]any{
-				"keytag":  kt,
-				"ns_list": joinUniqueSorted(nsec3RRSIGNoDNSKEY[kt]),
-			}); err != nil {
+			args := map[string]any{
+				"keytag": kt,
+			}
+			setTypedServersFromNames(args, nsec3RRSIGNoDNSKEY[kt])
+			if err := appendLog(ctx, &results, testcase, "DS10_NSEC3_RRSIG_NO_DNSKEY", args); err != nil {
 				return results, err
 			}
 		}
@@ -3791,10 +3799,11 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		sort.Ints(keytags)
 		for _, keytag := range keytags {
 			kt := uint16(keytag)
-			if err := appendLog(ctx, &results, testcase, "DS10_NSEC3_RRSIG_EXPIRED", map[string]any{
-				"keytag":  kt,
-				"ns_list": joinUniqueSorted(nsec3RRSIGExpired[kt]),
-			}); err != nil {
+			args := map[string]any{
+				"keytag": kt,
+			}
+			setTypedServersFromNames(args, nsec3RRSIGExpired[kt])
+			if err := appendLog(ctx, &results, testcase, "DS10_NSEC3_RRSIG_EXPIRED", args); err != nil {
 				return results, err
 			}
 		}
@@ -3807,10 +3816,11 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		sort.Ints(keytags)
 		for _, keytag := range keytags {
 			kt := uint16(keytag)
-			if err := appendLog(ctx, &results, testcase, "DS10_NSEC3_RRSIG_NOT_YET_VALID", map[string]any{
-				"keytag":  kt,
-				"ns_list": joinUniqueSorted(nsec3RRSIGNotYetValid[kt]),
-			}); err != nil {
+			args := map[string]any{
+				"keytag": kt,
+			}
+			setTypedServersFromNames(args, nsec3RRSIGNotYetValid[kt])
+			if err := appendLog(ctx, &results, testcase, "DS10_NSEC3_RRSIG_NOT_YET_VALID", args); err != nil {
 				return results, err
 			}
 		}
@@ -3823,10 +3833,11 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		sort.Ints(keytags)
 		for _, keytag := range keytags {
 			kt := uint16(keytag)
-			if err := appendLog(ctx, &results, testcase, "DS10_NSEC3_RRSIG_VERIFY_ERROR", map[string]any{
-				"keytag":  kt,
-				"ns_list": joinUniqueSorted(nsec3RRSIGVerifyError[kt]),
-			}); err != nil {
+			args := map[string]any{
+				"keytag": kt,
+			}
+			setTypedServersFromNames(args, nsec3RRSIGVerifyError[kt])
+			if err := appendLog(ctx, &results, testcase, "DS10_NSEC3_RRSIG_VERIFY_ERROR", args); err != nil {
 				return results, err
 			}
 		}
@@ -3867,9 +3878,9 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 		if len(nsList) > 0 {
-			if err := appendLog(ctx, &results, testcase, "DS10_NSEC3_NO_VERIFIED_SIGNATURE", map[string]any{
-				"ns_list": joinUniqueSorted(nsList),
-			}); err != nil {
+			args := map[string]any{}
+			setTypedServersFromNames(args, nsList)
+			if err := appendLog(ctx, &results, testcase, "DS10_NSEC3_NO_VERIFIED_SIGNATURE", args); err != nil {
 				return results, err
 			}
 		}
@@ -3905,16 +3916,16 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(withDNSKEY) == 0 && len(withoutDNSKEY) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS10_ZONE_NO_DNSSEC", map[string]any{
-			"ns_list": joinUniqueSorted(withoutDNSKEY),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, withoutDNSKEY)
+		if err := appendLog(ctx, &results, testcase, "DS10_ZONE_NO_DNSSEC", args); err != nil {
 			return results, err
 		}
 	}
 	if len(withDNSKEY) > 0 && len(withoutDNSKEY) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS10_SERVER_NO_DNSSEC", map[string]any{
-			"ns_list": joinUniqueSorted(withoutDNSKEY),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, withoutDNSKEY)
+		if err := appendLog(ctx, &results, testcase, "DS10_SERVER_NO_DNSSEC", args); err != nil {
 			return results, err
 		}
 	}
@@ -3922,9 +3933,9 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	combined := uniqueStrings(append(append(append(append(append(ignoredNS, withoutDNSKEY...), nsecInAnswer...), nsec3paramNsecNodata...), nsec3paramInAnswer...), nsecNsec3Nodata...))
 	missing := differenceStrings(allNS, combined)
 	if len(missing) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS10_EXPECTED_NSEC_NSEC3_MISSING", map[string]any{
-			"ns_list": joinUniqueSorted(missing),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, missing)
+		if err := appendLog(ctx, &results, testcase, "DS10_EXPECTED_NSEC_NSEC3_MISSING", args); err != nil {
 			return results, err
 		}
 	}

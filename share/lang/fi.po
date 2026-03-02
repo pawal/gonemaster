@@ -3045,8 +3045,8 @@ msgid "All tested nameservers in {ns_list} are globally reachable."
 msgstr "Kaikki testatut nimipalvelimet {ns_list} ovat globaalisti tavoitettavissa."
 
 msgctxt "DNSSEC:DS01_DS_ALGO_OK"
-msgid "DS record with key tag {keytag} and digest algorithm {ds_algo_num} ({ds_algo_descr}) is acceptable. Fetched from name servers {ns_list}."
-msgstr "DS-tietue avaintunnisteella {keytag} ja tiivistealgoritmi {ds_algo_num} ({ds_algo_descr}) on hyväksyttävä. Haettu nimipalvelimilta {ns_list}."
+msgid "DS record with key tag {keytag} and digest algorithm {ds_algo_num} ({ds_algo_descr}) is acceptable. Fetched from name servers {servers}."
+msgstr "DS-tietue avaintunnisteella {keytag} ja tiivistealgoritmi {ds_algo_num} ({ds_algo_descr}) on hyväksyttävä. Haettu nimipalvelimilta {servers}."
 
 msgctxt "DNSSEC:DS01_ROOT_N_NO_UNDEL_DS"
 msgid "No undelegated DS records provided for the root zone."

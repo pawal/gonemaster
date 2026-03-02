@@ -1431,9 +1431,9 @@ func DNSSEC03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(respondsWithNSEC3) == 0 && len(respondsWithoutNSEC3) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS03_NO_NSEC3", map[string]any{
-			"ns_list": joinUniqueSorted(respondsWithoutNSEC3),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, respondsWithoutNSEC3)
+		if err := appendLog(ctx, &results, testcase, "DS03_NO_NSEC3", args); err != nil {
 			return results, err
 		}
 	}
@@ -1952,13 +1952,14 @@ func DNSSEC05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			for _, keytagKey := range keytagKeys {
 				keytag := uint16(keytagKey)
 				prop := algoPropertyFor(algo)
-				if err := appendLog(ctx, &results, testcase, tag, map[string]any{
-					"ns_list":    joinUniqueSorted(keytagMap[keytag]),
+				args := map[string]any{
 					"keytag":     keytag,
 					"algo_num":   algo,
 					"algo_descr": prop.description,
 					"algo_mnemo": prop.mnemonic,
-				}); err != nil {
+				}
+				setTypedServersFromNames(args, keytagMap[keytag])
+				if err := appendLog(ctx, &results, testcase, tag, args); err != nil {
 					return results, err
 				}
 			}
@@ -3576,9 +3577,9 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 	if len(nsecResponseError) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS10_NSEC_QUERY_RESPONSE_ERR", map[string]any{
-			"ns_list": joinUniqueSorted(nsecResponseError),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, nsecResponseError)
+		if err := appendLog(ctx, &results, testcase, "DS10_NSEC_QUERY_RESPONSE_ERR", args); err != nil {
 			return results, err
 		}
 	}

@@ -858,21 +858,27 @@ func TestDNSSEC03ParallelDNSKEYQueries(t *testing.T) {
 		t.Fatalf("expected DS03_NO_NSEC3")
 	}
 
-	var nsList string
+	var gotServers []map[string]any
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "DS03_NO_NSEC3" {
 			continue
 		}
-		if list, ok := entry.Args["ns_list"].(string); ok {
-			nsList = list
-			break
+		if servers, ok := entry.Args["servers"].([]map[string]any); ok {
+			gotServers = servers
 		}
+		if _, ok := entry.Args["ns_list"]; ok {
+			t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
+		}
+		break
 	}
-	if nsList == "" {
-		t.Fatalf("expected ns_list for DS03_NO_NSEC3")
+	if len(gotServers) == 0 {
+		t.Fatalf("expected typed servers for DS03_NO_NSEC3")
 	}
-	if nsList != "ns1.example;ns2.example" {
-		t.Fatalf("expected deterministic ns_list order, got %q", nsList)
+	if len(gotServers) != 2 {
+		t.Fatalf("expected two typed servers for DS03_NO_NSEC3, got %#v", gotServers)
+	}
+	if gotServers[0]["ns"] != "ns1.example" || gotServers[1]["ns"] != "ns2.example" {
+		t.Fatalf("expected deterministic server order, got %#v", gotServers)
 	}
 }
 
@@ -1348,21 +1354,27 @@ func TestDNSSEC05ParallelDNSKEYQueries(t *testing.T) {
 		t.Fatalf("expected DS05_ALGO_OK")
 	}
 
-	var nsList string
+	var gotServers []map[string]any
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "DS05_ALGO_OK" {
 			continue
 		}
-		if list, ok := entry.Args["ns_list"].(string); ok {
-			nsList = list
-			break
+		if servers, ok := entry.Args["servers"].([]map[string]any); ok {
+			gotServers = servers
 		}
+		if _, ok := entry.Args["ns_list"]; ok {
+			t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
+		}
+		break
 	}
-	if nsList == "" {
-		t.Fatalf("expected ns_list for DS05_ALGO_OK")
+	if len(gotServers) == 0 {
+		t.Fatalf("expected typed servers for DS05_ALGO_OK")
 	}
-	if nsList != "ns1.example;ns2.example" {
-		t.Fatalf("expected deterministic ns_list order, got %q", nsList)
+	if len(gotServers) != 2 {
+		t.Fatalf("expected two typed servers for DS05_ALGO_OK, got %#v", gotServers)
+	}
+	if gotServers[0]["ns"] != "ns1.example" || gotServers[1]["ns"] != "ns2.example" {
+		t.Fatalf("expected deterministic server order, got %#v", gotServers)
 	}
 }
 
@@ -3035,21 +3047,27 @@ func TestDNSSEC10ParallelQueries(t *testing.T) {
 		t.Fatalf("expected DS10_NSEC_QUERY_RESPONSE_ERR")
 	}
 
-	var nsList string
+	var gotServers []map[string]any
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "DS10_NSEC_QUERY_RESPONSE_ERR" {
 			continue
 		}
-		if list, ok := entry.Args["ns_list"].(string); ok {
-			nsList = list
-			break
+		if servers, ok := entry.Args["servers"].([]map[string]any); ok {
+			gotServers = servers
 		}
+		if _, ok := entry.Args["ns_list"]; ok {
+			t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
+		}
+		break
 	}
-	if nsList == "" {
-		t.Fatalf("expected ns_list for DS10_NSEC_QUERY_RESPONSE_ERR")
+	if len(gotServers) == 0 {
+		t.Fatalf("expected typed servers for DS10_NSEC_QUERY_RESPONSE_ERR")
 	}
-	if nsList != "ns1.example;ns2.example" {
-		t.Fatalf("expected deterministic ns_list order, got %q", nsList)
+	if len(gotServers) != 2 {
+		t.Fatalf("expected two typed servers for DS10_NSEC_QUERY_RESPONSE_ERR, got %#v", gotServers)
+	}
+	if gotServers[0]["ns"] != "ns1.example" || gotServers[1]["ns"] != "ns2.example" {
+		t.Fatalf("expected deterministic server order, got %#v", gotServers)
 	}
 }
 

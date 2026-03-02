@@ -3057,8 +3057,8 @@ msgid "No undelegated DS records provided for this test."
 msgstr "Tälle testille ei toimitettu delegoimattomia DS-tietueita."
 
 msgctxt "DNSSEC:DS05_ALGO_OK"
-msgid "DNSKEY with key tag {keytag} uses algorithm {algo_num} ({algo_descr}, {algo_mnemo}) which is acceptable. Fetched from name servers {ns_list}."
-msgstr "DNSKEY avaintunnisteella {keytag} käyttää algoritmia {algo_num} ({algo_descr}, {algo_mnemo}), joka on hyväksyttävä. Haettu nimipalvelimilta {ns_list}."
+msgid "DNSKEY with key tag {keytag} uses algorithm {algo_num} ({algo_descr}, {algo_mnemo}) which is acceptable. Fetched from name servers {servers}."
+msgstr "DNSKEY avaintunnisteella {keytag} käyttää algoritmia {algo_num} ({algo_descr}, {algo_mnemo}), joka on hyväksyttävä. Haettu nimipalvelimilta {servers}."
 
 msgctxt "DNSSEC:DS07_DS_FOR_SIGNED_ZONE"
 msgid "DS records are published in the parent zone for the signed zone."

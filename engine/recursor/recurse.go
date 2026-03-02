@@ -718,12 +718,19 @@ func (r *Recursor) resolveCNAME(ctx context.Context, name dnsname.Name, qtype st
 			queryers = append(queryers, server)
 		}
 
+		// Use a fresh inProgress map for CNAME resolution. The parent's
+		// inProgress blocks re-resolution of nameserver addresses (e.g.
+		// ns1.example A) that were already resolved during the parent
+		// delegation walk. The CNAME target may need the same nameservers
+		// via a different delegation path, so it must be able to resolve
+		// them independently. CNAME-specific loop detection is handled
+		// separately by tseen/tcount.
 		nextState := &recurseState{
 			ns:         queryers,
 			count:      0,
 			common:     0,
 			seen:       map[string]bool{},
-			inProgress: state.inProgress,
+			inProgress: map[string]map[string]bool{},
 			tseen:      state.tseen,
 			tcount:     tcount,
 			mu:         state.mu,

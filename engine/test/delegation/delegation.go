@@ -247,6 +247,7 @@ func Delegation01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		"minimum": constants.MinimumNumberOfNameservers,
 		"ns_list": strings.Join(sortedNameserverStrings(childIPv4), ";"),
 	}
+	setTypedEndpointsFromNameservers(childIPv4Args, childIPv4)
 	if childIPv4Count >= constants.MinimumNumberOfNameservers {
 		if err := appendLog(ctx, &results, testcase, "ENOUGH_IPV4_NS_CHILD", childIPv4Args); err != nil {
 			return results, err
@@ -846,6 +847,34 @@ func sortedNameserverStrings(nss []nameserver.Nameserver) []string {
 		values = append(values, ns.NameString())
 	}
 	return logargs.UniqueSortedEndpointNames(values)
+}
+
+func setTypedEndpointsFromNameservers(args map[string]any, nss []nameserver.Nameserver) {
+	if args == nil || len(nss) == 0 {
+		return
+	}
+
+	if typed, ok := logargs.ServersFromNameservers(nss)["servers"]; ok {
+		args["servers"] = typed
+	}
+
+	addressSet := map[string]bool{}
+	for _, ns := range nss {
+		address := strings.TrimSpace(ns.AddressString())
+		if address != "" {
+			addressSet[address] = true
+		}
+	}
+	if len(addressSet) == 0 {
+		return
+	}
+
+	addresses := make([]string, 0, len(addressSet))
+	for address := range addressSet {
+		addresses = append(addresses, address)
+	}
+	sort.Strings(addresses)
+	args["addresses"] = addresses
 }
 
 func namesToStrings(names []dnsname.Name) []string {

@@ -138,6 +138,18 @@ func TestBasic02AuthResponseSOA(t *testing.T) {
 	if !hasEntryTag(entries, "B02_AUTH_RESPONSE_SOA") {
 		t.Fatalf("expected B02_AUTH_RESPONSE_SOA")
 	}
+	entry := firstEntryByTag(entries, "B02_AUTH_RESPONSE_SOA")
+	servers, ok := entry.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 {
+		t.Fatalf("expected one typed server for B02_AUTH_RESPONSE_SOA, got %#v", entry.Args["servers"])
+	}
+	if servers[0]["ns"] != "a.root" || servers[0]["address"] != "192.0.2.1" {
+		t.Fatalf("unexpected typed server payload: %#v", servers[0])
+	}
+	addresses, ok := entry.Args["addresses"].([]string)
+	if !ok || len(addresses) != 1 || addresses[0] != "192.0.2.1" {
+		t.Fatalf("unexpected typed addresses payload: %#v", entry.Args["addresses"])
+	}
 }
 
 func TestBasic02ParallelQueries(t *testing.T) {
@@ -812,6 +824,18 @@ func hasEntryTag(entries []*logger.Entry, tag string) bool {
 		}
 	}
 	return false
+}
+
+func firstEntryByTag(entries []*logger.Entry, tag string) *logger.Entry {
+	for _, entry := range entries {
+		if entry == nil {
+			continue
+		}
+		if entry.Tag == tag {
+			return entry
+		}
+	}
+	return nil
 }
 
 func normalizeEntriesForComparison(entries []*logger.Entry) []string {

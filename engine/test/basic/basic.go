@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/netip"
+	"sort"
 	"strings"
 
 	dns "codeberg.org/miekg/dns"
@@ -507,10 +508,12 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	if len(parentFound) > 0 {
 		for domain, nsMap := range parentFound {
-			if err := appendLog(ctx, &results, testcase, "B01_PARENT_FOUND", map[string]any{
+			args := map[string]any{
 				"domain":  domain,
 				"ns_list": joinSorted(nsMap),
-			}); err != nil {
+			}
+			setTypedEndpointsFromSet(args, nsMap)
+			if err := appendLog(ctx, &results, testcase, "B01_PARENT_FOUND", args); err != nil {
 				return results, err
 			}
 		}
@@ -781,10 +784,12 @@ func Basic02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(authResponseSOA) > 0 {
-		if err := appendLog(ctx, &results, testcase, "B02_AUTH_RESPONSE_SOA", map[string]any{
+		args := map[string]any{
 			"domain":  z.Name.String(),
 			"ns_list": joinSorted(authResponseSOA),
-		}); err != nil {
+		}
+		setTypedEndpointsFromSet(args, authResponseSOA)
+		if err := appendLog(ctx, &results, testcase, "B02_AUTH_RESPONSE_SOA", args); err != nil {
 			return results, err
 		}
 	} else {
@@ -1082,6 +1087,46 @@ func joinSorted(items map[string]bool) string {
 		values = append(values, key)
 	}
 	return strings.Join(logargs.UniqueSortedEndpointNames(values), ";")
+}
+
+func setTypedEndpointsFromSet(args map[string]any, items map[string]bool) {
+	if args == nil || len(items) == 0 {
+		return
+	}
+
+	values := make([]string, 0, len(items))
+	for key := range items {
+		values = append(values, key)
+	}
+	sort.Strings(values)
+
+	servers := make([]logargs.Server, 0, len(values))
+	addressSet := map[string]bool{}
+	for _, value := range values {
+		name, address := splitNameserverEndpoint(value)
+		if name == "" && address == "" {
+			continue
+		}
+		servers = append(servers, logargs.Server{NS: name, Address: address})
+		if address != "" {
+			addressSet[address] = true
+		}
+	}
+
+	if len(servers) > 0 {
+		if typed, ok := logargs.Servers(servers)["servers"]; ok {
+			args["servers"] = typed
+		}
+	}
+
+	if len(addressSet) > 0 {
+		addresses := make([]string, 0, len(addressSet))
+		for address := range addressSet {
+			addresses = append(addresses, address)
+		}
+		sort.Strings(addresses)
+		args["addresses"] = addresses
+	}
 }
 
 func hasTag(entries []*logger.Entry, tag string) bool {

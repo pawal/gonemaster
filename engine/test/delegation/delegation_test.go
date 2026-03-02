@@ -76,6 +76,18 @@ func TestDelegation01Counts(t *testing.T) {
 	if !hasEntryTag(entries, "NOT_ENOUGH_IPV4_NS_CHILD") {
 		t.Fatalf("expected NOT_ENOUGH_IPV4_NS_CHILD")
 	}
+	entry := firstEntryByTag(entries, "NOT_ENOUGH_IPV4_NS_CHILD")
+	servers, ok := entry.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 {
+		t.Fatalf("expected one typed server for NOT_ENOUGH_IPV4_NS_CHILD, got %#v", entry.Args["servers"])
+	}
+	if servers[0]["ns"] != "ns1.example" || servers[0]["address"] != "192.0.2.2" {
+		t.Fatalf("unexpected typed server payload: %#v", servers[0])
+	}
+	addresses, ok := entry.Args["addresses"].([]string)
+	if !ok || len(addresses) != 1 || addresses[0] != "192.0.2.2" {
+		t.Fatalf("unexpected typed addresses payload: %#v", entry.Args["addresses"])
+	}
 	if !hasEntryTag(entries, "NO_IPV6_NS_CHILD") {
 		t.Fatalf("expected NO_IPV6_NS_CHILD")
 	}
@@ -823,6 +835,18 @@ func hasEntryTag(entries []*logger.Entry, tag string) bool {
 		}
 	}
 	return false
+}
+
+func firstEntryByTag(entries []*logger.Entry, tag string) *logger.Entry {
+	for _, entry := range entries {
+		if entry == nil {
+			continue
+		}
+		if entry.Tag == tag {
+			return entry
+		}
+	}
+	return nil
 }
 
 func soaPacket(owner string, authoritative bool) packet.Packet {

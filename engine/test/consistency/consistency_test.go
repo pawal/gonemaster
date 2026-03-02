@@ -211,6 +211,59 @@ func TestConsistency04MultipleNSSets(t *testing.T) {
 	}
 }
 
+func TestConsistency04OneNSSetTypedServers(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origM4 := method4
+	origM5 := method5
+	t.Cleanup(func() {
+		method4 = origM4
+		method5 = origM5
+	})
+
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string) packet.Packet {
+		if strings.EqualFold(qtype, "NS") {
+			return nsPacket("example", []string{"ns1.example", "ns2.example"})
+		}
+		return packet.Packet{}
+	})
+	ns2 := newNameserver(t, "ns2.example", "192.0.2.2", func(_ string, qtype string) packet.Packet {
+		if strings.EqualFold(qtype, "NS") {
+			return nsPacket("example", []string{"ns1.example", "ns2.example"})
+		}
+		return packet.Packet{}
+	})
+
+	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns1}, nil
+	}
+	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns2}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Consistency04(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("consistency04: %v", err)
+	}
+	if !hasEntryTag(entries, "ONE_NS_SET") {
+		t.Fatalf("expected ONE_NS_SET")
+	}
+	entry := firstEntryByTag(entries, "ONE_NS_SET")
+	servers, ok := entry.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 2 {
+		t.Fatalf("expected typed server list for ONE_NS_SET, got %#v", entry.Args["servers"])
+	}
+	if servers[0]["ns"] != "ns1.example" || servers[1]["ns"] != "ns2.example" {
+		t.Fatalf("expected sorted typed servers for ONE_NS_SET, got %#v", servers)
+	}
+}
+
 func TestConsistency04ParallelNSQueries(t *testing.T) {
 	nameserver.EmptyCache()
 	t.Cleanup(nameserver.EmptyCache)

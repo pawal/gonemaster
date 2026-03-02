@@ -724,9 +724,11 @@ func Consistency04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(order) == 1 {
-		if err := appendLog(ctx, &results, testcase, "ONE_NS_SET", map[string]any{
+		args := map[string]any{
 			"nsname_list": order[0],
-		}); err != nil {
+		}
+		setTypedServersFromNames(args, order[0])
+		if err := appendLog(ctx, &results, testcase, "ONE_NS_SET", args); err != nil {
 			return results, err
 		}
 	} else if len(order) > 0 {
@@ -1200,6 +1202,29 @@ func withNameserverArgs(ns nameserver.Nameserver, args map[string]any) map[strin
 	}
 	logargs.SetNS(args, ns.NameString(), ns.AddressString())
 	return args
+}
+
+func setTypedServersFromNames(args map[string]any, namesList string) {
+	if args == nil || strings.TrimSpace(namesList) == "" {
+		return
+	}
+
+	parts := strings.Split(namesList, ";")
+	servers := make([]logargs.Server, 0, len(parts))
+	for _, part := range parts {
+		name := strings.TrimSpace(part)
+		if name == "" {
+			continue
+		}
+		servers = append(servers, logargs.Server{NS: name})
+	}
+	if len(servers) == 0 {
+		return
+	}
+
+	if typed, ok := logargs.Servers(servers)["servers"]; ok {
+		args["servers"] = typed
+	}
 }
 
 func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {

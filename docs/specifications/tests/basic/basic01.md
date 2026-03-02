@@ -68,19 +68,19 @@ Status: Final
 | `B01_CHILD_NOT_EXIST` | `domain` | `string` | Child zone name. |
 | `B01_CHILD_IS_ALIAS` | `domain_child` | `string` | Child zone name. |
 | `B01_CHILD_IS_ALIAS` | `domain_target` | `string` | Alias target name from DNAME. |
-| `B01_CHILD_IS_ALIAS` | `ns_list` | `string` | Semicolon-delimited nameserver list that returned the result. |
+| `B01_CHILD_IS_ALIAS` | `servers` | `array<object>` | Structured nameserver list that returned the result. |
 | `B01_CHILD_FOUND` | `domain` | `string` | Child zone name found. |
 | `B01_INCONSISTENT_ALIAS` | `domain` | `string` | Child zone name with inconsistent alias targets. |
 | `B01_INCONSISTENT_DELEGATION` | `domain_parent` | `string` | Parent zone candidate showing inconsistency. |
 | `B01_INCONSISTENT_DELEGATION` | `domain_child` | `string` | Child zone name. |
-| `B01_INCONSISTENT_DELEGATION` | `ns_list` | `string` | Semicolon-delimited nameserver list tied to inconsistency. |
+| `B01_INCONSISTENT_DELEGATION` | `servers` | `array<object>` | Structured nameserver list tied to inconsistency. |
 | `B01_NO_CHILD` | `domain_child` | `string` | Child zone name. |
 | `B01_NO_CHILD` | `domain_super` | `string` | Next-higher domain suggested for testing. |
 | `B01_PARENT_DISREGARDED` | `-` | `-` | No arguments. |
 | `B01_PARENT_FOUND` | `domain` | `string` | Parent zone name candidate. |
-| `B01_PARENT_FOUND` | `ns_list` | `string` | Semicolon-delimited nameserver list returning parent evidence. |
+| `B01_PARENT_FOUND` | `servers` | `array<object>` | Structured nameserver list returning parent evidence. |
 | `B01_PARENT_NOT_FOUND` | `-` | `-` | No arguments. |
-| `B01_PARENT_UNDETERMINED` | `ns_list` | `string` | Semicolon-delimited nameserver list across competing parents. |
+| `B01_PARENT_UNDETERMINED` | `servers` | `array<object>` | Structured nameserver list across competing parents. |
 | `B01_ROOT_HAS_NO_PARENT` | `-` | `-` | No arguments. |
 | `B01_SERVER_ZONE_ERROR` | `query_name` | `string` | Queried owner name that failed validation. |
 | `B01_SERVER_ZONE_ERROR` | `rrtype` | `string` | Queried rrtype (`SOA` or `NS`). |
@@ -146,7 +146,7 @@ Status: Final
 The following behaviors are implementation choices, not mandated by RFC 1034/1035:
 
 - **Traversal strategy**: The testcase probes iteratively from root servers using SOA, NS, and DNAME queries, extending the intermediate name toward the child zone at each step.  The DNS protocol specifies the resolution model but does not define how a testcase tool should walk the hierarchy.
-- **Sorted `ns_list` arguments**: Nameserver lists passed in tag arguments are sorted before joining with `;`.  Deterministic ordering simplifies reproducible output but is not a protocol requirement.
+- **Sorted `servers` arguments**: Nameserver lists passed in tag arguments are sorted before joining with `;`.  Deterministic ordering simplifies reproducible output but is not a protocol requirement.
 - **Loop protection threshold**: Traversal stops at a fixed internal limit and emits `LOOP_PROTECTION`.  No DNS standard defines a specific iteration bound; the limit is a defensive implementation choice.
 
 ## Edge Cases And Limitations

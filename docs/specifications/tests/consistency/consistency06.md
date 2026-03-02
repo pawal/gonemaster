@@ -27,7 +27,7 @@ Status: Final
 4. If exactly one MNAME value exists, emit `ONE_SOA_MNAME`.
 5. If multiple MNAME values exist:
    - Emit `MULTIPLE_SOA_MNAMES`.
-   - Emit `SOA_MNAME` once per observed MNAME with associated `ns_list`.
+   - Emit `SOA_MNAME` once per observed MNAME with associated `servers`.
 6. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
@@ -59,7 +59,7 @@ Status: Final
 | `NO_RESPONSE_SOA_QUERY` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `ONE_SOA_MNAME` | `mname` | `string` | The single observed SOA MNAME value. |
 | `SOA_MNAME` | `mname` | `string` | One observed SOA MNAME value. |
-| `SOA_MNAME` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) serving that MNAME. |
+| `SOA_MNAME` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) serving that MNAME. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Consistency06`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Consistency06`). |
 
@@ -86,4 +86,4 @@ Status: Final
 
 ## Edge Cases And Limitations
 - If no usable SOA MNAME is obtained, neither `ONE_SOA_MNAME` nor `MULTIPLE_SOA_MNAMES` is emitted.
-- `SOA_MNAME` `ns_list` ordering follows nameserver processing order.
+- `SOA_MNAME` `servers` ordering follows nameserver processing order.

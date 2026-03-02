@@ -36,8 +36,8 @@ Status: Final
        - Concatenate TXT strings, trim leading/trailing whitespace.
        - If resulting string is non-empty, store `(string, query_name, nameserver)` as revealed data.
    - If no non-empty string was revealed for this nameserver, mark nameserver for no-version-revealed.
-5. Emit `N15_SOFTWARE_VERSION` for each unique `(string, query_name)` pair with sorted unique `ns_list`.
-6. Emit `N15_ERROR_ON_VERSION_QUERY` per query name with sorted unique `ns_list`.
+5. Emit `N15_SOFTWARE_VERSION` for each unique `(string, query_name)` pair with sorted unique `servers`.
+6. Emit `N15_ERROR_ON_VERSION_QUERY` per query name with sorted unique `servers`.
 7. Emit `N15_NO_VERSION_REVEALED` with sorted unique nameserver list when non-empty.
 8. Emit `N15_WRONG_CLASS` with sorted unique nameserver list when non-empty.
 9. Emit `TEST_CASE_END`.
@@ -64,12 +64,12 @@ Status: Final
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA TXT`). |
 | `N15_ERROR_ON_VERSION_QUERY` | `query_name` | `string` | Version query name (`version.bind` or `version.server`). |
-| `N15_ERROR_ON_VERSION_QUERY` | `ns_list` | `string` | Semicolon-delimited sorted unique nameserver identities (`name/ip`). |
-| `N15_NO_VERSION_REVEALED` | `ns_list` | `string` | Semicolon-delimited sorted unique nameserver identities (`name/ip`). |
+| `N15_ERROR_ON_VERSION_QUERY` | `servers` | `array<object>` | Structured sorted unique nameserver identities (`{ns,address}` object). |
+| `N15_NO_VERSION_REVEALED` | `servers` | `array<object>` | Structured sorted unique nameserver identities (`{ns,address}` object). |
 | `N15_SOFTWARE_VERSION` | `string` | `string` | Revealed trimmed software/version string. |
 | `N15_SOFTWARE_VERSION` | `query_name` | `string` | Query name producing the string (`version.bind` or `version.server`). |
-| `N15_SOFTWARE_VERSION` | `ns_list` | `string` | Semicolon-delimited sorted unique nameserver identities (`name/ip`). |
-| `N15_WRONG_CLASS` | `ns_list` | `string` | Semicolon-delimited sorted unique nameserver identities (`name/ip`). |
+| `N15_SOFTWARE_VERSION` | `servers` | `array<object>` | Structured sorted unique nameserver identities (`{ns,address}` object). |
+| `N15_WRONG_CLASS` | `servers` | `array<object>` | Structured sorted unique nameserver identities (`{ns,address}` object). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Nameserver15`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Nameserver15`). |
 
@@ -89,7 +89,7 @@ Status: Final
 - Upstream reference: [`nameserver15.md`](../../upstream/tests/Nameserver-TP/nameserver15.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: describes a conceptual "Sending Version Query" set then removal based on TXT data. Gonemaster: computes equivalent behavior via per-server `noVersion` state (set only when no non-empty version string was revealed).
-  - Upstream: states nameserver IP collection semantics. Gonemaster: iterates raw `Method4and5` output and emits deduplicated sorted `ns_list` aggregates.
+  - Upstream: states nameserver IP collection semantics. Gonemaster: iterates raw `Method4and5` output and emits deduplicated sorted `servers` aggregates.
   - Upstream: does not explicitly describe testcase boundary and transport-disabled debug emissions. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
 - Potential upstream report:
   - `no`

@@ -20,8 +20,8 @@ Status: Final
 1. Emit `TEST_CASE_START`.
 2. Resolve nameserver list from `Method4and5`.
 3. Build disabled-transport summary tags:
-   - If any IPv4 nameservers exist while IPv4 is disabled, emit `CN01_IPV4_DISABLED` with `ns_list`.
-   - If any IPv6 nameservers exist while IPv6 is disabled, emit `CN01_IPV6_DISABLED` with `ns_list`.
+   - If any IPv4 nameservers exist while IPv4 is disabled, emit `CN01_IPV4_DISABLED` with `servers`.
+   - If any IPv6 nameservers exist while IPv6 is disabled, emit `CN01_IPV6_DISABLED` with `servers`.
 4. For each nameserver (parallelized):
    - If transport for this nameserver IP version is disabled:
      - Emit `IPV4_DISABLED` or `IPV6_DISABLED` for each rrtype (`SOA`, `NS`) and skip queries for that nameserver.
@@ -59,8 +59,8 @@ Status: Final
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
-| `CN01_IPV4_DISABLED` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) skipped due to IPv4 disable. |
-| `CN01_IPV6_DISABLED` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) skipped due to IPv6 disable. |
+| `CN01_IPV4_DISABLED` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) skipped due to IPv4 disable. |
+| `CN01_IPV6_DISABLED` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) skipped due to IPv6 disable. |
 | `CN01_MISSING_NS_RECORD_UDP` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) producing the response. |
 | `CN01_MISSING_NS_RECORD_UDP` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `CN01_MISSING_SOA_RECORD_UDP` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) producing the response. |

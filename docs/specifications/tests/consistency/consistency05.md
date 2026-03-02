@@ -60,7 +60,7 @@ Status: Final
 | `CHILD_NS_FAILED` | `ns` | `string` | Child nameserver identity (`ns` name only; use `address` for IP) that failed authoritative child lookup requirements. |
 | `CHILD_NS_FAILED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `CHILD_ZONE_LAME` | `-` | `-` | No arguments. |
-| `EXTRA_ADDRESS_CHILD` | `ns_ip_list` | `string` | Semicolon-delimited `owner/ip` entries found only in child authoritative data. |
+| `EXTRA_ADDRESS_CHILD` | `addresses` | `array<string>` | Structured `owner/ip` entries found only in child authoritative data. |
 | `IN_BAILIWICK_ADDR_MISMATCH` | `parent_addresses` | `string` | Semicolon-delimited strict glue `owner/ip` entries from parent. |
 | `IN_BAILIWICK_ADDR_MISMATCH` | `zone_addresses` | `string` | Semicolon-delimited in-bailiwick child `owner/ip` entries. |
 | `NO_RESPONSE` | `ns` | `string` | Child nameserver identity (`ns` name only; use `address` for IP) with no response. |

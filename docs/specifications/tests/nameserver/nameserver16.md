@@ -30,10 +30,10 @@ Status: Final
    - Else if `RCODE != NOERROR`, collect nameserver for `N16_UNEXPECTED_RCODE` under the observed `rcode` value.
    - Else if response EDNS options include NSID (option code `3`), extract the NSID payload as a printable string (non-UTF-8 bytes are hex-escaped), trim leading and trailing whitespace, and collect `(nsid, nameserver)` for `N16_HAS_NSID`.
    - Else collect nameserver for `N16_NO_NSID_REVEALED`.
-5. Emit `N16_HAS_NSID` for each unique `nsid` value with sorted unique `ns_list`.
-6. Emit `N16_NO_NSID_REVEALED` with sorted unique `ns_list` when non-empty.
-7. Emit `N16_NO_RESPONSE` with sorted unique `ns_list` when non-empty.
-8. Emit `N16_UNEXPECTED_RCODE` per `rcode` with sorted unique `ns_list` when non-empty.
+5. Emit `N16_HAS_NSID` for each unique `nsid` value with sorted unique `servers`.
+6. Emit `N16_NO_NSID_REVEALED` with sorted unique `servers` when non-empty.
+7. Emit `N16_NO_RESPONSE` with sorted unique `servers` when non-empty.
+8. Emit `N16_UNEXPECTED_RCODE` per `rcode` with sorted unique `servers` when non-empty.
 9. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
@@ -58,11 +58,11 @@ Status: Final
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
 | `N16_HAS_NSID` | `nsid` | `string` | NSID payload as a trimmed printable string (non-UTF-8 bytes hex-escaped). |
-| `N16_HAS_NSID` | `ns_list` | `string` | Semicolon-delimited sorted unique nameserver identities (`name/ip`) returning this NSID value. |
-| `N16_NO_NSID_REVEALED` | `ns_list` | `string` | Semicolon-delimited sorted unique nameserver identities (`name/ip`). |
-| `N16_NO_RESPONSE` | `ns_list` | `string` | Semicolon-delimited sorted unique nameserver identities (`name/ip`). |
+| `N16_HAS_NSID` | `servers` | `array<object>` | Structured sorted unique nameserver identities (`{ns,address}` object) returning this NSID value. |
+| `N16_NO_NSID_REVEALED` | `servers` | `array<object>` | Structured sorted unique nameserver identities (`{ns,address}` object). |
+| `N16_NO_RESPONSE` | `servers` | `array<object>` | Structured sorted unique nameserver identities (`{ns,address}` object). |
 | `N16_UNEXPECTED_RCODE` | `rcode` | `string` | Unexpected response code name. |
-| `N16_UNEXPECTED_RCODE` | `ns_list` | `string` | Semicolon-delimited sorted unique nameserver identities (`name/ip`) for that rcode. |
+| `N16_UNEXPECTED_RCODE` | `servers` | `array<object>` | Structured sorted unique nameserver identities (`{ns,address}` object) for that rcode. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Nameserver16`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Nameserver16`). |
 

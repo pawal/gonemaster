@@ -90,30 +90,30 @@ Status: Final
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
-| `DS03_ERROR_RESPONSE_NSEC_QUERY` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) with erroneous NSEC response. |
-| `DS03_ERR_MULT_NSEC3` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) returning multiple NSEC3 RRs. |
-| `DS03_ILLEGAL_HASH_ALGO` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) using non-1 NSEC3 hash. |
+| `DS03_ERROR_RESPONSE_NSEC_QUERY` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) with erroneous NSEC response. |
+| `DS03_ERR_MULT_NSEC3` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) returning multiple NSEC3 RRs. |
+| `DS03_ILLEGAL_HASH_ALGO` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) using non-1 NSEC3 hash. |
 | `DS03_ILLEGAL_HASH_ALGO` | `algo_num` | `int` | NSEC3 hash algorithm number. |
-| `DS03_ILLEGAL_ITERATION_VALUE` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) with non-zero NSEC3 iterations. |
+| `DS03_ILLEGAL_ITERATION_VALUE` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) with non-zero NSEC3 iterations. |
 | `DS03_ILLEGAL_ITERATION_VALUE` | `int` | `int` | NSEC3 iteration value. |
-| `DS03_ILLEGAL_SALT_LENGTH` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) with non-zero salt length. |
+| `DS03_ILLEGAL_SALT_LENGTH` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) with non-zero salt length. |
 | `DS03_ILLEGAL_SALT_LENGTH` | `int` | `int` | NSEC3 salt length value used by implementation. |
 | `DS03_INCONSISTENT_HASH_ALGO` | `-` | `-` | No arguments. |
 | `DS03_INCONSISTENT_ITERATION` | `-` | `-` | No arguments. |
 | `DS03_INCONSISTENT_NSEC3_FLAGS` | `-` | `-` | No arguments. |
 | `DS03_INCONSISTENT_SALT_LENGTH` | `-` | `-` | No arguments. |
-| `DS03_LEGAL_EMPTY_SALT` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) with zero salt length. |
-| `DS03_LEGAL_HASH_ALGO` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) using hash algorithm `1`. |
-| `DS03_LEGAL_ITERATION_VALUE` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) using iteration `0`. |
-| `DS03_NO_DNSSEC_SUPPORT` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) without usable DNSKEY support. |
-| `DS03_NO_NSEC3` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) without NSEC3. |
-| `DS03_NO_RESPONSE_NSEC_QUERY` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) with no NSEC response. |
-| `DS03_NSEC3_OPT_OUT_DISABLED` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) with opt-out bit unset. |
-| `DS03_NSEC3_OPT_OUT_ENABLED_NON_TLD` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) with opt-out bit set for non-root/non-single-label-TLD zone. |
-| `DS03_NSEC3_OPT_OUT_ENABLED_TLD` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) with opt-out bit set for root/single-label-TLD zone. |
-| `DS03_SERVER_NO_DNSSEC_SUPPORT` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) lacking DNSKEY support while others support it. |
-| `DS03_SERVER_NO_NSEC3` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) lacking NSEC3 while others provide it. |
-| `DS03_UNASSIGNED_FLAG_USED` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) where the unassigned bit is set. |
+| `DS03_LEGAL_EMPTY_SALT` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) with zero salt length. |
+| `DS03_LEGAL_HASH_ALGO` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) using hash algorithm `1`. |
+| `DS03_LEGAL_ITERATION_VALUE` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) using iteration `0`. |
+| `DS03_NO_DNSSEC_SUPPORT` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) without usable DNSKEY support. |
+| `DS03_NO_NSEC3` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) without NSEC3. |
+| `DS03_NO_RESPONSE_NSEC_QUERY` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) with no NSEC response. |
+| `DS03_NSEC3_OPT_OUT_DISABLED` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) with opt-out bit unset. |
+| `DS03_NSEC3_OPT_OUT_ENABLED_NON_TLD` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) with opt-out bit set for non-root/non-single-label-TLD zone. |
+| `DS03_NSEC3_OPT_OUT_ENABLED_TLD` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) with opt-out bit set for root/single-label-TLD zone. |
+| `DS03_SERVER_NO_DNSSEC_SUPPORT` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) lacking DNSKEY support while others support it. |
+| `DS03_SERVER_NO_NSEC3` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) lacking NSEC3 while others provide it. |
+| `DS03_UNASSIGNED_FLAG_USED` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) where the unassigned bit is set. |
 | `DS03_UNASSIGNED_FLAG_USED` | `int` | `int` | NSEC3 flag bit index (`0..6`) treated as unassigned. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |

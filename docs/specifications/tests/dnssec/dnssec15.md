@@ -29,7 +29,7 @@ Status: Final
      - `Has CDNSKEY No CDS` (non-empty CDNSKEY, empty CDS),
      - `Has CDS And CDNSKEY` (both non-empty).
    - If both RRsets are non-empty, compare each CDS against CDNSKEY set and each CDNSKEY against CDS set; mark nameserver mismatch when no match is found.
-6. Emit classification tags with `ns_ip_list`.
+6. Emit classification tags with `addresses`.
 7. Emit `DS15_INCONSISTENT_CDS` when CDS RRsets differ across nameservers.
 8. Emit `DS15_INCONSISTENT_CDNSKEY` when CDNSKEY RRsets differ across nameservers.
 9. Emit `DS15_MISMATCH_CDS_CDNSKEY` for nameservers with CDS/CDNSKEY mismatch.
@@ -53,12 +53,12 @@ Status: Final
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
-| `DS15_HAS_CDNSKEY_NO_CDS` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
-| `DS15_HAS_CDS_AND_CDNSKEY` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
-| `DS15_HAS_CDS_NO_CDNSKEY` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
+| `DS15_HAS_CDNSKEY_NO_CDS` | `addresses` | `array<string>` | Structured child nameserver IP list. |
+| `DS15_HAS_CDS_AND_CDNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
+| `DS15_HAS_CDS_NO_CDNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS15_INCONSISTENT_CDNSKEY` | `-` | `-` | No arguments. |
 | `DS15_INCONSISTENT_CDS` | `-` | `-` | No arguments. |
-| `DS15_MISMATCH_CDS_CDNSKEY` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list with mismatch. |
+| `DS15_MISMATCH_CDS_CDNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list with mismatch. |
 | `DS15_NO_CDS_CDNSKEY` | `-` | `-` | No arguments. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |

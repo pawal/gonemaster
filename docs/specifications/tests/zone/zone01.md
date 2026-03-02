@@ -76,15 +76,15 @@ Status: Final
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Zone01`). |
 | `Z01_MNAME_HAS_LOCALHOST_ADDR` | `nsname` | `string` | SOA MNAME hostname. |
 | `Z01_MNAME_HAS_LOCALHOST_ADDR` | `ns_ip` | `string` | Localhost IP address for that MNAME (`127.0.0.1` or `::1`). |
-| `Z01_MNAME_IS_DOT` | `ns_ip_list` | `string` | Semicolon-delimited source child nameserver IPs returning MNAME as dot. |
-| `Z01_MNAME_IS_LOCALHOST` | `ns_ip_list` | `string` | Semicolon-delimited source child nameserver IPs returning MNAME as localhost. |
-| `Z01_MNAME_IS_MASTER` | `ns_list` | `string` | Semicolon-delimited inferred-master `mname/ip` list. |
+| `Z01_MNAME_IS_DOT` | `addresses` | `array<string>` | Structured source child nameserver IPs returning MNAME as dot. |
+| `Z01_MNAME_IS_LOCALHOST` | `addresses` | `array<string>` | Structured source child nameserver IPs returning MNAME as localhost. |
+| `Z01_MNAME_IS_MASTER` ns/address` list. |
 | `Z01_MNAME_MISSING_SOA_RECORD` | `ns` | `string` | Queried MNAME endpoint (`ns` name only; use `address` for IP) that returned no SOA in answer. |
 | `Z01_MNAME_MISSING_SOA_RECORD` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `Z01_MNAME_NOT_AUTHORITATIVE` | `ns` | `string` | Queried MNAME endpoint (`ns` name only; use `address` for IP) that returned non-authoritative answer. |
 | `Z01_MNAME_NOT_AUTHORITATIVE` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `Z01_MNAME_NOT_IN_NS_LIST` | `nsname` | `string` | MNAME hostname absent from child NS set. |
-| `Z01_MNAME_NOT_MASTER` | `ns_list` | `string` | Semicolon-delimited non-master `mname/ip` list. |
+| `Z01_MNAME_NOT_MASTER` ns/address` list. |
 | `Z01_MNAME_NOT_MASTER` | `soaserial` | `uint32` | Highest serial among non-master candidates in the emitted set. |
 | `Z01_MNAME_NOT_MASTER` | `soaserial_list` | `string` | Semicolon-delimited unique child nameserver serial values used for comparison. |
 | `Z01_MNAME_NOT_RESOLVE` | `nsname` | `string` | MNAME hostname that did not resolve. |

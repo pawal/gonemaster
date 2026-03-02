@@ -28,7 +28,7 @@ Status: Final
    - Local-use categories (`Private-Use`, `Loopback`, `Link Local`, `Link-Local`, `Unique-Local`, `Shared Address Space`) -> add to local-use set.
    - Any other non-globally-reachable special range -> add to not-globally-reachable set.
    - Otherwise -> add to globally-reachable set.
-7. If globally-reachable set is non-empty, emit `A01_GLOBALLY_REACHABLE_ADDR` with `ns_list`; else emit `A01_NO_GLOBALLY_REACHABLE_ADDR`.
+7. If globally-reachable set is non-empty, emit `A01_GLOBALLY_REACHABLE_ADDR` with `servers`; else emit `A01_NO_GLOBALLY_REACHABLE_ADDR`.
 8. Emit `A01_DOCUMENTATION_ADDR` if documentation set is non-empty.
 9. Emit `A01_LOCAL_USE_ADDR` if local-use set is non-empty.
 10. Emit `A01_ADDR_NOT_GLOBALLY_REACHABLE` if not-globally-reachable set is non-empty.
@@ -49,10 +49,10 @@ Status: Final
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
-| `A01_ADDR_NOT_GLOBALLY_REACHABLE` | `ns_list` | `string` | Semicolon-delimited `name/ip` pairs in the non-globally-reachable set. |
-| `A01_DOCUMENTATION_ADDR` | `ns_list` | `string` | Semicolon-delimited `name/ip` pairs in documentation ranges. |
-| `A01_GLOBALLY_REACHABLE_ADDR` | `ns_list` | `string` | Semicolon-delimited `name/ip` pairs in globally reachable ranges. |
-| `A01_LOCAL_USE_ADDR` | `ns_list` | `string` | Semicolon-delimited `name/ip` pairs in local-use ranges. |
+| `A01_ADDR_NOT_GLOBALLY_REACHABLE` | `servers` | `array<object>` | Structured `{ns,address}` object pairs in the non-globally-reachable set. |
+| `A01_DOCUMENTATION_ADDR` | `servers` | `array<object>` | Structured `{ns,address}` object pairs in documentation ranges. |
+| `A01_GLOBALLY_REACHABLE_ADDR` | `servers` | `array<object>` | Structured `{ns,address}` object pairs in globally reachable ranges. |
+| `A01_LOCAL_USE_ADDR` | `servers` | `array<object>` | Structured `{ns,address}` object pairs in local-use ranges. |
 | `A01_NO_GLOBALLY_REACHABLE_ADDR` | `-` | `-` | No arguments. |
 | `A01_NO_NAME_SERVERS_FOUND` | `-` | `-` | No arguments. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Address01`). |
@@ -74,7 +74,7 @@ Status: Final
 - Upstream reference: [`address01.md`](../../upstream/tests/Address-TP/address01.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: does not define a strict order for category tag emission. Gonemaster: emits `A01_GLOBALLY_REACHABLE_ADDR`/`A01_NO_GLOBALLY_REACHABLE_ADDR` before other category tags.
-  - Upstream: does not require a specific `ns_list` presentation order. Gonemaster: deduplicates and lexicographically sorts `ns_list` values before emission.
+  - Upstream: does not require a specific `servers` presentation order. Gonemaster: deduplicates and lexicographically sorts `servers` values before emission.
 - Potential upstream report:
   - `no`
 

@@ -27,7 +27,7 @@ Status: Final
    - Response without usable SOA record for zone apex -> emit `NO_RESPONSE_SOA_QUERY`.
    - Otherwise store serial value for that nameserver.
 4. Group successful responses by serial value.
-5. Emit `SOA_SERIAL` once per serial with sorted `ns_list`.
+5. Emit `SOA_SERIAL` once per serial with sorted `servers`.
 6. If exactly one serial exists, emit `ONE_SOA_SERIAL`.
 7. If multiple serials exist:
    - Emit `MULTIPLE_SOA_SERIALS`.
@@ -64,7 +64,7 @@ Status: Final
 | `NO_RESPONSE_SOA_QUERY` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `ONE_SOA_SERIAL` | `serial` | `string` | The single observed SOA serial value. |
 | `SOA_SERIAL` | `serial` | `string` | One observed SOA serial value. |
-| `SOA_SERIAL` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) serving that serial. |
+| `SOA_SERIAL` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) serving that serial. |
 | `SOA_SERIAL_VARIATION` | `serial_min` | `string` | Lowest serial key used in variation check. |
 | `SOA_SERIAL_VARIATION` | `serial_max` | `string` | Highest serial key used in variation check. |
 | `SOA_SERIAL_VARIATION` | `max_variation` | `int` | Allowed maximum variation threshold. |
@@ -99,7 +99,7 @@ The following behaviors are implementation choices, not mandated by protocol:
 
 - **String-key sort for variation delta**: When multiple distinct serials are observed, the variation delta is computed by sorting the serial values as strings (lexicographically) and subtracting the first from the last.  Lexicographic ordering differs from numeric ordering when serials have different digit counts (e.g., `"9"` sorts after `"10"` lexicographically, so the min/max assignment and resulting delta can differ from a numerically sorted result).  This only affects `SOA_SERIAL_VARIATION` emission when `SerialMaxVariation > 0`; with the default of `0` any difference between serials is flagged regardless of this sort order.
 - **Deduplication by `name/ip`**: Nameservers are deduplicated using their full `name/ip` identity string.  Two entries with the same IP but different names are treated as distinct sources.  The protocol defines no deduplication rule for testcase purposes; this choice is implementation-defined.
-- **Sorted `ns_list` in `SOA_SERIAL`**: Nameserver identities in `SOA_SERIAL` arguments are sorted before joining.  Deterministic ordering is an implementation choice for reproducible output.
+- **Sorted `servers` in `SOA_SERIAL`**: Nameserver identities in `SOA_SERIAL` arguments are sorted before joining.  Deterministic ordering is an implementation choice for reproducible output.
 
 ## Edge Cases And Limitations
 - If no usable SOA serial is obtained from any nameserver, no serial-summary tag (`ONE_SOA_SERIAL`/`MULTIPLE_SOA_SERIALS`) is emitted.

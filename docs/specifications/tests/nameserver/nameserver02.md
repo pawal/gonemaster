@@ -57,7 +57,7 @@ Status: Final
 | `BREAKS_ON_EDNS` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) failing on EDNS query. |
 | `BREAKS_ON_EDNS` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `BREAKS_ON_EDNS` | `domain` | `string` | Tested zone name. |
-| `EDNS0_SUPPORT` | `ns_list` | `string` | Semicolon-delimited sorted included nameserver identities (`name/ip`). |
+| `EDNS0_SUPPORT` | `servers` | `array<object>` | Structured sorted included nameserver identities (`{ns,address}` object). |
 | `EDNS_RESPONSE_WITHOUT_EDNS` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with missing OPT in EDNS response. |
 | `EDNS_RESPONSE_WITHOUT_EDNS` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `EDNS_RESPONSE_WITHOUT_EDNS` | `domain` | `string` | Tested zone name. |

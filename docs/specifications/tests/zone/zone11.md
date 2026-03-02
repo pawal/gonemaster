@@ -61,14 +61,14 @@ Status: Final
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
-| `Z11_DIFFERENT_SPF_POLICIES_FOUND` | `ns_list` | `string` | Semicolon-delimited nameserver `name/ip` list for one policy-set group. |
+| `Z11_DIFFERENT_SPF_POLICIES_FOUND` | `servers` | `array<object>` | Structured nameserver `{ns,address}` object list for one policy-set group. |
 | `Z11_INCONSISTENT_SPF_POLICIES` | `-` | `-` | No arguments. |
 | `Z11_NO_SPF_FOUND` | `domain` | `string` | Tested zone name. |
 | `Z11_NO_SPF_NON_MAIL_DOMAIN` | `domain` | `string` | Tested zone name. |
 | `Z11_NON_NULL_SPF_NON_MAIL_DOMAIN` | `domain` | `string` | Tested zone name. |
 | `Z11_NULL_SPF_NON_MAIL_DOMAIN` | `domain` | `string` | Tested zone name. |
-| `Z11_SPF_MULTIPLE_RECORDS` | `ns_list` | `string` | Semicolon-delimited nameserver `name/ip` list with multi-policy responses. |
-| `Z11_SPF_SYNTAX_ERROR` | `ns_list` | `string` | Semicolon-delimited nameserver `name/ip` list used for evaluated policy. |
+| `Z11_SPF_MULTIPLE_RECORDS` | `servers` | `array<object>` | Structured nameserver `{ns,address}` object list with multi-policy responses. |
+| `Z11_SPF_SYNTAX_ERROR` | `servers` | `array<object>` | Structured nameserver `{ns,address}` object list used for evaluated policy. |
 | `Z11_SPF_SYNTAX_ERROR` | `domain` | `string` | Tested zone name. |
 | `Z11_SPF_SYNTAX_OK` | `domain` | `string` | Tested zone name. |
 | `Z11_UNABLE_TO_CHECK_FOR_SPF` | `-` | `-` | No arguments. |
@@ -96,6 +96,6 @@ Status: Final
   - `no`
 
 ## Edge Cases And Limitations
-- Distinct nameserver names sharing one IP are grouped and represented together in `ns_list` outputs.
+- Distinct nameserver names sharing one IP are grouped and represented together in `servers` outputs.
 - TXT responses with authoritative `NOERROR` but without SPF TXT records are treated as empty-policy results.
 - Runtime boundary markers (`TEST_CASE_START`/`TEST_CASE_END`) are emitted by shared testcase wrappers but omitted from current Zone11 metadata tag contract.

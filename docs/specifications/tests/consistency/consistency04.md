@@ -58,7 +58,7 @@ Status: Final
 | `NO_RESPONSE_NS_QUERY` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) without usable NS answer. |
 | `NO_RESPONSE_NS_QUERY` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `NS_SET` | `nsname_list` | `string` | Semicolon-delimited sorted lowercase NS target names in this set. |
-| `NS_SET` | `servers` | `string` | Semicolon-delimited nameserver identities (`name/ip`) returning this set. |
+| `NS_SET` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) returning this set. |
 | `ONE_NS_SET` | `nsname_list` | `string` | The single observed semicolon-delimited NS target set. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Consistency04`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Consistency04`). |

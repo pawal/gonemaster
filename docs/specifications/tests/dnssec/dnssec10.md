@@ -95,44 +95,44 @@ Status: Final
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
-| `DS10_ALGO_NOT_SUPPORTED_BY_ZM` | `keytag`, `algo_num`, `algo_mnemo`, `ns_ip_list` | `int`, `int`, `string`, `string` | Unsupported algorithm details and semicolon-delimited nameserver identity/IP list from verification path. |
-| `DS10_ERR_MULT_NSEC` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`). |
-| `DS10_ERR_MULT_NSEC3` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`). |
-| `DS10_ERR_MULT_NSEC3PARAM` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`). |
-| `DS10_EXPECTED_NSEC_NSEC3_MISSING` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`). |
-| `DS10_HAS_NSEC` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`). |
-| `DS10_HAS_NSEC3` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`). |
-| `DS10_INCONSISTENT_NSEC` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`). |
-| `DS10_INCONSISTENT_NSEC3` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`). |
-| `DS10_INCONSISTENT_NSEC_NSEC3` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`). |
-| `DS10_MIXED_NSEC_NSEC3` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`). |
-| `DS10_NSEC3PARAM_GIVES_ERR_ANSWER` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`). |
-| `DS10_NSEC3PARAM_MISMATCHES_APEX` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`). |
-| `DS10_NSEC3PARAM_QUERY_RESPONSE_ERR` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`). |
-| `DS10_NSEC3_ERR_TYPE_LIST` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`). |
-| `DS10_NSEC3_MISMATCHES_APEX` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`). |
-| `DS10_NSEC3_MISSING_SIGNATURE` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`). |
-| `DS10_NSEC3_NODATA_MISSING_SOA` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`). |
-| `DS10_NSEC3_NODATA_WRONG_SOA` | `domain`, `ns_list` | `string`, `string` | Wrong SOA owner domain and affected nameserver identities (`name/ip`). |
-| `DS10_NSEC3_NO_VERIFIED_SIGNATURE` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) lacking any verified NSEC3 signature. |
-| `DS10_NSEC3_RRSIG_EXPIRED` | `keytag`, `ns_list` | `int`, `string` | Keytag and affected nameserver identities (`name/ip`). |
-| `DS10_NSEC3_RRSIG_NOT_YET_VALID` | `keytag`, `ns_list` | `int`, `string` | Keytag and affected nameserver identities (`name/ip`). |
-| `DS10_NSEC3_RRSIG_NO_DNSKEY` | `keytag`, `ns_list` | `int`, `string` | Keytag and affected nameserver identities (`name/ip`). |
-| `DS10_NSEC3_RRSIG_VERIFY_ERROR` | `keytag`, `ns_list` | `int`, `string` | Keytag and affected nameserver identities (`name/ip`). |
-| `DS10_NSEC_ERR_TYPE_LIST` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`). |
-| `DS10_NSEC_GIVES_ERR_ANSWER` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`). |
-| `DS10_NSEC_MISMATCHES_APEX` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`). |
-| `DS10_NSEC_MISSING_SIGNATURE` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`). |
-| `DS10_NSEC_NODATA_MISSING_SOA` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`). |
-| `DS10_NSEC_NODATA_WRONG_SOA` | `domain`, `ns_list` | `string`, `string` | Wrong SOA owner domain and affected nameserver identities (`name/ip`). |
-| `DS10_NSEC_NO_VERIFIED_SIGNATURE` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) lacking any verified NSEC signature. |
-| `DS10_NSEC_QUERY_RESPONSE_ERR` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`). |
-| `DS10_NSEC_RRSIG_EXPIRED` | `keytag`, `ns_list` | `int`, `string` | Keytag and affected nameserver identities (`name/ip`). |
-| `DS10_NSEC_RRSIG_NOT_YET_VALID` | `keytag`, `ns_list` | `int`, `string` | Keytag and affected nameserver identities (`name/ip`). |
-| `DS10_NSEC_RRSIG_NO_DNSKEY` | `keytag`, `ns_list` | `int`, `string` | Keytag and affected nameserver identities (`name/ip`). |
-| `DS10_NSEC_RRSIG_VERIFY_ERROR` | `keytag`, `ns_list` | `int`, `string` | Keytag and affected nameserver identities (`name/ip`). |
-| `DS10_SERVER_NO_DNSSEC` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) without DNSKEY among mixed responders. |
-| `DS10_ZONE_NO_DNSSEC` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) without DNSKEY when zone appears unsigned. |
+| `DS10_ALGO_NOT_SUPPORTED_BY_ZM` | `keytag`, `algo_num`, `algo_mnemo`, `addresses` | `int`, `int`, `string`, `string` | Unsupported algorithm details and semicolon-delimited nameserver identity/IP list from verification path. |
+| `DS10_ERR_MULT_NSEC` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
+| `DS10_ERR_MULT_NSEC3` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
+| `DS10_ERR_MULT_NSEC3PARAM` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
+| `DS10_EXPECTED_NSEC_NSEC3_MISSING` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
+| `DS10_HAS_NSEC` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
+| `DS10_HAS_NSEC3` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
+| `DS10_INCONSISTENT_NSEC` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
+| `DS10_INCONSISTENT_NSEC3` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
+| `DS10_INCONSISTENT_NSEC_NSEC3` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
+| `DS10_MIXED_NSEC_NSEC3` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
+| `DS10_NSEC3PARAM_GIVES_ERR_ANSWER` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
+| `DS10_NSEC3PARAM_MISMATCHES_APEX` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
+| `DS10_NSEC3PARAM_QUERY_RESPONSE_ERR` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
+| `DS10_NSEC3_ERR_TYPE_LIST` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
+| `DS10_NSEC3_MISMATCHES_APEX` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
+| `DS10_NSEC3_MISSING_SIGNATURE` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
+| `DS10_NSEC3_NODATA_MISSING_SOA` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
+| `DS10_NSEC3_NODATA_WRONG_SOA` | `domain`, `servers` | `string`, `string` | Wrong SOA owner domain and affected nameserver identities (`name/ip`). |
+| `DS10_NSEC3_NO_VERIFIED_SIGNATURE` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) lacking any verified NSEC3 signature. |
+| `DS10_NSEC3_RRSIG_EXPIRED` | `keytag`, `servers` | `int`, `string` | Keytag and affected nameserver identities (`name/ip`). |
+| `DS10_NSEC3_RRSIG_NOT_YET_VALID` | `keytag`, `servers` | `int`, `string` | Keytag and affected nameserver identities (`name/ip`). |
+| `DS10_NSEC3_RRSIG_NO_DNSKEY` | `keytag`, `servers` | `int`, `string` | Keytag and affected nameserver identities (`name/ip`). |
+| `DS10_NSEC3_RRSIG_VERIFY_ERROR` | `keytag`, `servers` | `int`, `string` | Keytag and affected nameserver identities (`name/ip`). |
+| `DS10_NSEC_ERR_TYPE_LIST` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
+| `DS10_NSEC_GIVES_ERR_ANSWER` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
+| `DS10_NSEC_MISMATCHES_APEX` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
+| `DS10_NSEC_MISSING_SIGNATURE` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
+| `DS10_NSEC_NODATA_MISSING_SOA` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
+| `DS10_NSEC_NODATA_WRONG_SOA` | `domain`, `servers` | `string`, `string` | Wrong SOA owner domain and affected nameserver identities (`name/ip`). |
+| `DS10_NSEC_NO_VERIFIED_SIGNATURE` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) lacking any verified NSEC signature. |
+| `DS10_NSEC_QUERY_RESPONSE_ERR` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
+| `DS10_NSEC_RRSIG_EXPIRED` | `keytag`, `servers` | `int`, `string` | Keytag and affected nameserver identities (`name/ip`). |
+| `DS10_NSEC_RRSIG_NOT_YET_VALID` | `keytag`, `servers` | `int`, `string` | Keytag and affected nameserver identities (`name/ip`). |
+| `DS10_NSEC_RRSIG_NO_DNSKEY` | `keytag`, `servers` | `int`, `string` | Keytag and affected nameserver identities (`name/ip`). |
+| `DS10_NSEC_RRSIG_VERIFY_ERROR` | `keytag`, `servers` | `int`, `string` | Keytag and affected nameserver identities (`name/ip`). |
+| `DS10_SERVER_NO_DNSSEC` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) without DNSKEY among mixed responders. |
+| `DS10_ZONE_NO_DNSSEC` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) without DNSKEY when zone appears unsigned. |
 | `IPV4_DISABLED` | `ns`, `rrtype` | `string`, `string` | Disabled nameserver identity (`name/ip`) and skipped rrtype (`DNSKEY`, `NSEC`, `NSEC3PARAM`). |
 | `IPV6_DISABLED` | `ns`, `rrtype` | `string`, `string` | Disabled nameserver identity (`name/ip`) and skipped rrtype (`DNSKEY`, `NSEC`, `NSEC3PARAM`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`DNSSEC10`). |
@@ -187,8 +187,8 @@ Status: Final
 ## Differences From Upstream
 - Upstream reference: [`dnssec10.md`](../../upstream/tests/DNSSEC-TP/dnssec10.md)
 - Differences (Upstream vs Gonemaster):
-  - Upstream: summary for `DS10_INCONSISTENT_NSEC_NSEC3` describes two separate lists (`ns_list_nsec`, `ns_list_nsec3`). Gonemaster: emits a single combined `ns_list` argument.
-  - Upstream: most DS10 tags are documented with `ns_list`. Gonemaster: `DS10_ALGO_NOT_SUPPORTED_BY_ZM` uses `ns_ip_list` while other DS10 tags use `ns_list`.
+  - Upstream: summary for `DS10_INCONSISTENT_NSEC_NSEC3` describes two separate lists (`ns_list_nsec`, `ns_list_nsec3`). Gonemaster: emits a single combined `servers` argument.
+  - Upstream: most DS10 tags are documented with `servers`. Gonemaster: `DS10_ALGO_NOT_SUPPORTED_BY_ZM` uses `addresses` while other DS10 tags use `servers`.
   - Upstream: does not explicitly specify testcase boundary and per-query transport debug emissions in this testcase summary. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
 - Potential upstream report:
   - `no`
@@ -199,9 +199,9 @@ The following behaviors are implementation choices, not mandated by RFC 4034/403
 
 - **Reference time source**: RRSIG validity checks use wall-clock time (`time.Now().UTC()`) as the reference "now".  RFC 4034 requires checking whether signatures are currently valid; using wall-clock time rather than packet timestamps (as `dnssec04` does) is an implementation choice appropriate for aggregate multi-nameserver analysis where a single consistent reference point is preferred.
 - **Deduplication by IP**: The nameserver set is built by IP address; delegation and zone NS entries sharing the same IP are merged.  First-seen nameserver identity string (`name/ip`) is used in output arguments.  The protocol does not specify how to handle NS records for the same IP from different sources.
-- **`ns_list` vs `ns_ip_list` argument name**: Most DS10 tags use `ns_list` (nameserver identity strings) while `DS10_ALGO_NOT_SUPPORTED_BY_ZM` uses `ns_ip_list` (raw IPs from the signature verification path).  This asymmetry is an implementation-defined output format.
+- **`servers` vs `addresses` argument name**: Most DS10 tags use `servers` (nameserver identity strings) while `DS10_ALGO_NOT_SUPPORTED_BY_ZM` uses `addresses` (raw IPs from the signature verification path).  This asymmetry is an implementation-defined output format.
 
 ## Edge Cases And Limitations
-- Nameserver processing is deduplicated by IP; all DS10 output tags except `DS10_ALGO_NOT_SUPPORTED_BY_ZM` report `ns_list` as nameserver identity strings (`name/ip`) rather than raw IPs.
+- Nameserver processing is deduplicated by IP; all DS10 output tags except `DS10_ALGO_NOT_SUPPORTED_BY_ZM` report `servers` as nameserver identity strings (`name/ip`) rather than raw IPs.
 - `DS10_NSEC_NO_VERIFIED_SIGNATURE` and `DS10_NSEC3_NO_VERIFIED_SIGNATURE` are suppressed per nameserver when at least one signature verifies for that nameserver.
 - Signature validity checks use testcase wall-clock time (`time.Now().UTC()`), not packet capture timestamps.

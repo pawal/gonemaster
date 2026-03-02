@@ -43,7 +43,7 @@ Status: Final
      - Unsupported verification algorithm contributes `DS02_ALGO_NOT_SUPPORTED_BY_ZM`.
      - Signature verification failure contributes `DS02_RRSIG_NOT_VALID_BY_DNSKEY`.
      - Successful verification marks nameserver as having an RRSIG match for DS.
-6. Emit accumulated per-keytag findings (`DS02_*`) with merged `ns_ip_list`.
+6. Emit accumulated per-keytag findings (`DS02_*`) with merged `addresses`.
 7. Emit per-nameserver summary:
    - `DS02_NO_VALID_DNSKEY_FOR_ANY_DS` for responding nameservers with no DS-matching DNSKEY.
    - Else `DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS` for responding nameservers with DS-matching DNSKEY but no validating RRSIG from those keys.
@@ -72,21 +72,21 @@ Status: Final
 | `DS02_ALGO_NOT_SUPPORTED_BY_ZM` | `keytag` | `int` | DNSKEY keytag associated with unsupported signature algorithm. |
 | `DS02_ALGO_NOT_SUPPORTED_BY_ZM` | `algo_num` | `int` | DNSSEC algorithm number that verification cannot process. |
 | `DS02_ALGO_NOT_SUPPORTED_BY_ZM` | `algo_mnemo` | `string` | DNSSEC algorithm mnemonic string. |
-| `DS02_ALGO_NOT_SUPPORTED_BY_ZM` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
+| `DS02_ALGO_NOT_SUPPORTED_BY_ZM` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS02_DNSKEY_NOT_FOR_ZONE_SIGNING` | `keytag` | `int` | DS/DNSKEY keytag lacking ZONE bit. |
-| `DS02_DNSKEY_NOT_FOR_ZONE_SIGNING` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
+| `DS02_DNSKEY_NOT_FOR_ZONE_SIGNING` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS02_DNSKEY_NOT_SEP` | `keytag` | `int` | DS/DNSKEY keytag lacking SEP bit. |
-| `DS02_DNSKEY_NOT_SEP` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
-| `DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
+| `DS02_DNSKEY_NOT_SEP` | `addresses` | `array<string>` | Structured child nameserver IP list. |
+| `DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS02_NO_DNSKEY_FOR_DS` | `keytag` | `int` | DS keytag for which no DNSKEY was found. |
-| `DS02_NO_DNSKEY_FOR_DS` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
+| `DS02_NO_DNSKEY_FOR_DS` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS02_NO_MATCHING_DNSKEY_RRSIG` | `keytag` | `int` | DS-matching DNSKEY keytag lacking a validating DNSKEY RRSIG. |
-| `DS02_NO_MATCHING_DNSKEY_RRSIG` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
+| `DS02_NO_MATCHING_DNSKEY_RRSIG` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS02_NO_MATCH_DS_DNSKEY` | `keytag` | `int` | DS keytag whose DS digest/algorithm did not match DNSKEY data. |
-| `DS02_NO_MATCH_DS_DNSKEY` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
-| `DS02_NO_VALID_DNSKEY_FOR_ANY_DS` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
+| `DS02_NO_MATCH_DS_DNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
+| `DS02_NO_VALID_DNSKEY_FOR_ANY_DS` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS02_RRSIG_NOT_VALID_BY_DNSKEY` | `keytag` | `int` | Keytag from DNSKEY RRSIG verification failure. |
-| `DS02_RRSIG_NOT_VALID_BY_DNSKEY` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
+| `DS02_RRSIG_NOT_VALID_BY_DNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`DS` or `DNSKEY`). |

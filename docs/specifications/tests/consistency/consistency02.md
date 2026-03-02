@@ -27,7 +27,7 @@ Status: Final
 4. If exactly one RNAME value exists, emit `ONE_SOA_RNAME`.
 5. If multiple RNAME values exist:
    - Emit `MULTIPLE_SOA_RNAMES`.
-   - Emit `SOA_RNAME` once per observed RNAME with associated `ns_list`.
+   - Emit `SOA_RNAME` once per observed RNAME with associated `servers`.
 6. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
@@ -59,7 +59,7 @@ Status: Final
 | `NO_RESPONSE_SOA_QUERY` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `ONE_SOA_RNAME` | `rname` | `string` | The single observed SOA RNAME value. |
 | `SOA_RNAME` | `rname` | `string` | One observed SOA RNAME value. |
-| `SOA_RNAME` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) serving that RNAME. |
+| `SOA_RNAME` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) serving that RNAME. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Consistency02`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Consistency02`). |
 
@@ -86,4 +86,4 @@ Status: Final
 
 ## Edge Cases And Limitations
 - If no usable SOA RNAME is obtained, neither `ONE_SOA_RNAME` nor `MULTIPLE_SOA_RNAMES` is emitted.
-- `SOA_RNAME` `ns_list` ordering follows nameserver processing order.
+- `SOA_RNAME` `servers` ordering follows nameserver processing order.

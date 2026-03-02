@@ -82,18 +82,18 @@ Status: Final
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
 | `DS07_DS_FOR_SIGNED_ZONE` | `-` | `-` | No arguments. |
-| `DS07_DS_ON_PARENT_SERVER` | `ns_list` | `string` | Semicolon-delimited parent nameserver identities (`name/ip`) with DS-signature evidence, or `-` in undelegated fake-DS path. |
+| `DS07_DS_ON_PARENT_SERVER` | `servers` | `array<object>` | Structured parent nameserver identities (`{ns,address}` object) with DS-signature evidence, or `-` in undelegated fake-DS path. |
 | `DS07_INCONSISTENT_DS` | `-` | `-` | No arguments. |
 | `DS07_INCONSISTENT_SIGNED` | `-` | `-` | No arguments. |
-| `DS07_NON_AUTH_RESPONSE_DNSKEY` | `ns_list` | `string` | Semicolon-delimited child nameserver identities (`name/ip`) returning non-AA DNSKEY responses. |
+| `DS07_NON_AUTH_RESPONSE_DNSKEY` | `servers` | `array<object>` | Structured child nameserver identities (`{ns,address}` object) returning non-AA DNSKEY responses. |
 | `DS07_NOT_SIGNED` | `-` | `-` | No arguments. |
-| `DS07_NOT_SIGNED_ON_SERVER` | `ns_list` | `string` | Semicolon-delimited child nameserver identities (`name/ip`) without DNSKEY-signature evidence. |
-| `DS07_NO_DS_ON_PARENT_SERVER` | `ns_list` | `string` | Semicolon-delimited parent nameserver identities (`name/ip`) with no DS-signature evidence. |
+| `DS07_NOT_SIGNED_ON_SERVER` | `servers` | `array<object>` | Structured child nameserver identities (`{ns,address}` object) without DNSKEY-signature evidence. |
+| `DS07_NO_DS_ON_PARENT_SERVER` | `servers` | `array<object>` | Structured parent nameserver identities (`{ns,address}` object) with no DS-signature evidence. |
 | `DS07_NO_DS_FOR_SIGNED_ZONE` | `-` | `-` | No arguments. |
-| `DS07_NO_RESPONSE_DNSKEY` | `ns_list` | `string` | Semicolon-delimited child nameserver identities (`name/ip`) with no DNSKEY response. |
+| `DS07_NO_RESPONSE_DNSKEY` | `servers` | `array<object>` | Structured child nameserver identities (`{ns,address}` object) with no DNSKEY response. |
 | `DS07_SIGNED` | `-` | `-` | No arguments. |
-| `DS07_SIGNED_ON_SERVER` | `ns_list` | `string` | Semicolon-delimited child nameserver identities (`name/ip`) with DNSKEY-signature evidence. |
-| `DS07_UNEXP_RCODE_RESP_DNSKEY` | `ns_list` | `string` | Semicolon-delimited child nameserver identities (`name/ip`) returning this unexpected RCODE. |
+| `DS07_SIGNED_ON_SERVER` | `servers` | `array<object>` | Structured child nameserver identities (`{ns,address}` object) with DNSKEY-signature evidence. |
+| `DS07_UNEXP_RCODE_RESP_DNSKEY` | `servers` | `array<object>` | Structured child nameserver identities (`{ns,address}` object) returning this unexpected RCODE. |
 | `DS07_UNEXP_RCODE_RESP_DNSKEY` | `rcode` | `string` | DNSKEY response RCODE mnemonic. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |

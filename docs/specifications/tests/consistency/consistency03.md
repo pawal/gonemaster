@@ -27,7 +27,7 @@ Status: Final
 4. If exactly one timer tuple exists, emit `ONE_SOA_TIME_PARAMETER_SET`.
 5. If multiple timer tuples exist:
    - Emit `MULTIPLE_SOA_TIME_PARAMETER_SET`.
-   - Emit `SOA_TIME_PARAMETER_SET` once per tuple with associated sorted `ns_list`.
+   - Emit `SOA_TIME_PARAMETER_SET` once per tuple with associated sorted `servers`.
 6. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
@@ -65,7 +65,7 @@ Status: Final
 | `SOA_TIME_PARAMETER_SET` | `retry` | `int` | SOA retry value. |
 | `SOA_TIME_PARAMETER_SET` | `expire` | `int` | SOA expire value. |
 | `SOA_TIME_PARAMETER_SET` | `minimum` | `int` | SOA minimum (minttl) value. |
-| `SOA_TIME_PARAMETER_SET` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) serving that tuple. |
+| `SOA_TIME_PARAMETER_SET` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) serving that tuple. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Consistency03`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Consistency03`). |
 

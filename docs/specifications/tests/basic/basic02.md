@@ -58,7 +58,7 @@ Status: Final
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
 | `B02_AUTH_RESPONSE_SOA` | `domain` | `string` | Child zone name. |
-| `B02_AUTH_RESPONSE_SOA` | `ns_list` | `string` | Semicolon-delimited list of nameserver identities (`name/ip`). |
+| `B02_AUTH_RESPONSE_SOA` | `servers` | `array<object>` | Structured list of nameserver identities (`{ns,address}` object). |
 | `B02_NO_DELEGATION` | `domain` | `string` | Child zone name without delegation. |
 | `B02_NO_WORKING_NS` | `domain` | `string` | Child zone name without working authoritative NS. |
 | `B02_NS_BROKEN` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with broken SOA content. |

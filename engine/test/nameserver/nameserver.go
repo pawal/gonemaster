@@ -532,9 +532,9 @@ func Nameserver02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	if len(included) > 0 && nErrors == 0 {
 		keys := sortedKeys(included)
-		if err := appendLog(ctx, &results, testcase, "EDNS0_SUPPORT", map[string]any{
-			"ns_list": strings.Join(keys, ";"),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, keys)
+		if err := appendLog(ctx, &results, testcase, "EDNS0_SUPPORT", args); err != nil {
 			return results, err
 		}
 	}
@@ -806,9 +806,9 @@ func Nameserver05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if aaaaOK > 0 && aaaaIssue == 0 {
-		if err := appendLog(ctx, &results, testcase, "AAAA_WELL_PROCESSED", map[string]any{
-			"ns_list": strings.Join(sortedKeys(included), ";"),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, sortedKeys(included))
+		if err := appendLog(ctx, &results, testcase, "AAAA_WELL_PROCESSED", args); err != nil {
 			return results, err
 		}
 	}
@@ -1279,9 +1279,9 @@ func Nameserver10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(noResponseEDNS1) > 0 {
-		if err := appendLog(ctx, &results, testcase, "N10_NO_RESPONSE_EDNS1_QUERY", map[string]any{
-			"ns_ip_list": strings.Join(sortedStrings(noResponseEDNS1), ";"),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedAddressesFromValues(args, noResponseEDNS1)
+		if err := appendLog(ctx, &results, testcase, "N10_NO_RESPONSE_EDNS1_QUERY", args); err != nil {
 			return results, err
 		}
 	}
@@ -1293,20 +1293,20 @@ func Nameserver10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 		sort.Strings(keys)
 		for _, rcode := range keys {
-			list := sortedStrings(unexpectedRcode[rcode])
-			if err := appendLog(ctx, &results, testcase, "N10_UNEXPECTED_RCODE", map[string]any{
-				"rcode":      rcode,
-				"ns_ip_list": strings.Join(list, ";"),
-			}); err != nil {
+			args := map[string]any{
+				"rcode": rcode,
+			}
+			setTypedAddressesFromValues(args, unexpectedRcode[rcode])
+			if err := appendLog(ctx, &results, testcase, "N10_UNEXPECTED_RCODE", args); err != nil {
 				return results, err
 			}
 		}
 	}
 
 	if len(ednsResponseError) > 0 {
-		if err := appendLog(ctx, &results, testcase, "N10_EDNS_RESPONSE_ERROR", map[string]any{
-			"ns_ip_list": strings.Join(sortedStrings(ednsResponseError), ";"),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedAddressesFromValues(args, ednsResponseError)
+		if err := appendLog(ctx, &results, testcase, "N10_EDNS_RESPONSE_ERROR", args); err != nil {
 			return results, err
 		}
 	}
@@ -1440,9 +1440,9 @@ func Nameserver11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(noResponse) > 0 {
-		if err := appendLog(ctx, &results, testcase, "N11_NO_RESPONSE", map[string]any{
-			"ns_ip_list": strings.Join(sortedStrings(noResponse), ";"),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedAddressesFromValues(args, noResponse)
+		if err := appendLog(ctx, &results, testcase, "N11_NO_RESPONSE", args); err != nil {
 			return results, err
 		}
 	}
@@ -1454,44 +1454,44 @@ func Nameserver11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 		sort.Strings(keys)
 		for _, rcode := range keys {
-			list := sortedStrings(unexpectedRcode[rcode])
-			if err := appendLog(ctx, &results, testcase, "N11_UNEXPECTED_RCODE", map[string]any{
-				"rcode":      rcode,
-				"ns_ip_list": strings.Join(list, ";"),
-			}); err != nil {
+			args := map[string]any{
+				"rcode": rcode,
+			}
+			setTypedAddressesFromValues(args, unexpectedRcode[rcode])
+			if err := appendLog(ctx, &results, testcase, "N11_UNEXPECTED_RCODE", args); err != nil {
 				return results, err
 			}
 		}
 	}
 
 	if len(noEdns) > 0 {
-		if err := appendLog(ctx, &results, testcase, "N11_NO_EDNS", map[string]any{
-			"ns_ip_list": strings.Join(sortedStrings(noEdns), ";"),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedAddressesFromValues(args, noEdns)
+		if err := appendLog(ctx, &results, testcase, "N11_NO_EDNS", args); err != nil {
 			return results, err
 		}
 	}
 
 	if len(unexpectedAnswer) > 0 {
-		if err := appendLog(ctx, &results, testcase, "N11_UNEXPECTED_ANSWER_SECTION", map[string]any{
-			"ns_ip_list": strings.Join(sortedStrings(unexpectedAnswer), ";"),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedAddressesFromValues(args, unexpectedAnswer)
+		if err := appendLog(ctx, &results, testcase, "N11_UNEXPECTED_ANSWER_SECTION", args); err != nil {
 			return results, err
 		}
 	}
 
 	if len(unsetAA) > 0 {
-		if err := appendLog(ctx, &results, testcase, "N11_UNSET_AA", map[string]any{
-			"ns_ip_list": strings.Join(sortedStrings(unsetAA), ";"),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedAddressesFromValues(args, unsetAA)
+		if err := appendLog(ctx, &results, testcase, "N11_UNSET_AA", args); err != nil {
 			return results, err
 		}
 	}
 
 	if len(unknownOpt) > 0 {
-		if err := appendLog(ctx, &results, testcase, "N11_RETURNS_UNKNOWN_OPTION_CODE", map[string]any{
-			"ns_ip_list": strings.Join(sortedStrings(unknownOpt), ";"),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedAddressesFromValues(args, unknownOpt)
+		if err := appendLog(ctx, &results, testcase, "N11_RETURNS_UNKNOWN_OPTION_CODE", args); err != nil {
 			return results, err
 		}
 	}
@@ -1785,11 +1785,12 @@ func Nameserver15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			sort.Strings(queryNames)
 			for _, queryName := range queryNames {
 				list := sortedStrings(queries[queryName])
-				if err := appendLog(ctx, &results, testcase, "N15_SOFTWARE_VERSION", map[string]any{
+				args := map[string]any{
 					"string":     value,
 					"query_name": queryName,
-					"ns_list":    strings.Join(list, ";"),
-				}); err != nil {
+				}
+				setTypedServersFromNames(args, list)
+				if err := appendLog(ctx, &results, testcase, "N15_SOFTWARE_VERSION", args); err != nil {
 					return results, err
 				}
 			}
@@ -1804,27 +1805,28 @@ func Nameserver15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		sort.Strings(queryNames)
 		for _, queryName := range queryNames {
 			list := sortedStrings(errorOnVersionQuery[queryName])
-			if err := appendLog(ctx, &results, testcase, "N15_ERROR_ON_VERSION_QUERY", map[string]any{
+			args := map[string]any{
 				"query_name": queryName,
-				"ns_list":    strings.Join(list, ";"),
-			}); err != nil {
+			}
+			setTypedServersFromNames(args, list)
+			if err := appendLog(ctx, &results, testcase, "N15_ERROR_ON_VERSION_QUERY", args); err != nil {
 				return results, err
 			}
 		}
 	}
 
 	if len(sendingVersionQuery) > 0 {
-		if err := appendLog(ctx, &results, testcase, "N15_NO_VERSION_REVEALED", map[string]any{
-			"ns_list": strings.Join(sortedKeys(sendingVersionQuery), ";"),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, sortedKeys(sendingVersionQuery))
+		if err := appendLog(ctx, &results, testcase, "N15_NO_VERSION_REVEALED", args); err != nil {
 			return results, err
 		}
 	}
 
 	if len(wrongRecordClass) > 0 {
-		if err := appendLog(ctx, &results, testcase, "N15_WRONG_CLASS", map[string]any{
-			"ns_list": strings.Join(sortedKeys(wrongRecordClass), ";"),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, sortedKeys(wrongRecordClass))
+		if err := appendLog(ctx, &results, testcase, "N15_WRONG_CLASS", args); err != nil {
 			return results, err
 		}
 	}
@@ -1953,27 +1955,28 @@ func Nameserver16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		sort.Strings(valueList)
 		for _, value := range valueList {
 			list := sortedStrings(nsidData[value])
-			if err := appendLog(ctx, &results, testcase, "N16_HAS_NSID", map[string]any{
-				"nsid":    value,
-				"ns_list": strings.Join(list, ";"),
-			}); err != nil {
+			args := map[string]any{
+				"nsid": value,
+			}
+			setTypedServersFromNames(args, list)
+			if err := appendLog(ctx, &results, testcase, "N16_HAS_NSID", args); err != nil {
 				return results, err
 			}
 		}
 	}
 
 	if len(noNSID) > 0 {
-		if err := appendLog(ctx, &results, testcase, "N16_NO_NSID_REVEALED", map[string]any{
-			"ns_list": strings.Join(sortedStrings(noNSID), ";"),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, sortedStrings(noNSID))
+		if err := appendLog(ctx, &results, testcase, "N16_NO_NSID_REVEALED", args); err != nil {
 			return results, err
 		}
 	}
 
 	if len(noResponse) > 0 {
-		if err := appendLog(ctx, &results, testcase, "N16_NO_RESPONSE", map[string]any{
-			"ns_list": strings.Join(sortedStrings(noResponse), ";"),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, sortedStrings(noResponse))
+		if err := appendLog(ctx, &results, testcase, "N16_NO_RESPONSE", args); err != nil {
 			return results, err
 		}
 	}
@@ -1986,10 +1989,11 @@ func Nameserver16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		sort.Strings(keys)
 		for _, rcode := range keys {
 			list := sortedStrings(unexpectedRcode[rcode])
-			if err := appendLog(ctx, &results, testcase, "N16_UNEXPECTED_RCODE", map[string]any{
-				"rcode":   rcode,
-				"ns_list": strings.Join(list, ";"),
-			}); err != nil {
+			args := map[string]any{
+				"rcode": rcode,
+			}
+			setTypedServersFromNames(args, list)
+			if err := appendLog(ctx, &results, testcase, "N16_UNEXPECTED_RCODE", args); err != nil {
 				return results, err
 			}
 		}
@@ -2037,6 +2041,52 @@ func parseAnswerFrom(value string) (netip.Addr, bool) {
 
 func sortedStrings(values []string) []string {
 	return logargs.UniqueSortedEndpointNames(values)
+}
+
+func uniqueSortedValues(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	seen := map[string]bool{}
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func setTypedAddressesFromValues(args map[string]any, values []string) {
+	if args == nil || len(values) == 0 {
+		return
+	}
+	addresses := uniqueSortedValues(values)
+	if len(addresses) == 0 {
+		return
+	}
+	args["addresses"] = append([]string(nil), addresses...)
+}
+
+func setTypedServersFromNames(args map[string]any, values []string) {
+	if args == nil || len(values) == 0 {
+		return
+	}
+	names := logargs.UniqueSortedEndpointNames(values)
+	if len(names) == 0 {
+		return
+	}
+	servers := make([]logargs.Server, 0, len(names))
+	for _, name := range names {
+		servers = append(servers, logargs.Server{NS: name})
+	}
+	if typed, ok := logargs.Servers(servers)["servers"]; ok {
+		args["servers"] = typed
+	}
 }
 
 func sortedKeys(values map[string]bool) []string {

@@ -521,9 +521,9 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			for _, nsMap := range parentFound {
 				mergeSet(nsSet, nsMap)
 			}
-			if err := appendLog(ctx, &results, testcase, "B01_PARENT_UNDETERMINED", map[string]any{
-				"ns_list": joinSorted(nsSet),
-			}); err != nil {
+			args := map[string]any{}
+			setTypedEndpointsFromSet(args, nsSet)
+			if err := appendLog(ctx, &results, testcase, "B01_PARENT_UNDETERMINED", args); err != nil {
 				return results, err
 			}
 		}
@@ -559,11 +559,12 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				for _, perTarget := range aaDname {
 					mergeSet(nsSet, perTarget[parent])
 				}
-				if err := appendLog(ctx, &results, testcase, "B01_INCONSISTENT_DELEGATION", map[string]any{
+				args := map[string]any{
 					"domain_parent": parent,
 					"domain_child":  z.Name.String(),
-					"ns_list":       joinSorted(nsSet),
-				}); err != nil {
+				}
+				setTypedEndpointsFromSet(args, nsSet)
+				if err := appendLog(ctx, &results, testcase, "B01_INCONSISTENT_DELEGATION", args); err != nil {
 					return results, err
 				}
 			}
@@ -594,11 +595,12 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			for _, nsMap := range perParent {
 				mergeSet(nsSet, nsMap)
 			}
-			if err := appendLog(ctx, &results, testcase, "B01_CHILD_IS_ALIAS", map[string]any{
+			args := map[string]any{
 				"domain_child":  z.Name.String(),
 				"domain_target": target,
-				"ns_list":       joinSorted(nsSet),
-			}); err != nil {
+			}
+			setTypedEndpointsFromSet(args, nsSet)
+			if err := appendLog(ctx, &results, testcase, "B01_CHILD_IS_ALIAS", args); err != nil {
 				return results, err
 			}
 		}
@@ -1077,14 +1079,6 @@ func collectParents(dst map[string]bool, src map[string]map[string]bool) {
 	for key := range src {
 		dst[key] = true
 	}
-}
-
-func joinSorted(items map[string]bool) string {
-	values := make([]string, 0, len(items))
-	for key := range items {
-		values = append(values, key)
-	}
-	return strings.Join(logargs.UniqueSortedEndpointNames(values), ";")
 }
 
 func setTypedEndpointsFromSet(args map[string]any, items map[string]bool) {

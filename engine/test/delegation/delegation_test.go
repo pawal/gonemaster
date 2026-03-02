@@ -70,21 +70,57 @@ func TestDelegation01Counts(t *testing.T) {
 	if !hasEntryTag(entries, "NOT_ENOUGH_IPV4_NS_DEL") {
 		t.Fatalf("expected NOT_ENOUGH_IPV4_NS_DEL")
 	}
+	entry := firstEntryByTag(entries, "NOT_ENOUGH_IPV4_NS_DEL")
+	if entry == nil {
+		t.Fatalf("missing NOT_ENOUGH_IPV4_NS_DEL entry")
+	}
+	servers, ok := entry.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 {
+		t.Fatalf("expected one typed server for NOT_ENOUGH_IPV4_NS_DEL, got %#v", entry.Args["servers"])
+	}
+	if servers[0]["ns"] != "ns1.example" || servers[0]["address"] != "192.0.2.1" {
+		t.Fatalf("unexpected typed server payload: %#v", servers[0])
+	}
+	addresses, ok := entry.Args["addresses"].([]string)
+	if !ok || len(addresses) != 1 || addresses[0] != "192.0.2.1" {
+		t.Fatalf("unexpected typed addresses payload: %#v", entry.Args["addresses"])
+	}
+	if _, ok := entry.Args["ns_list"]; ok {
+		t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
+	}
 	if !hasEntryTag(entries, "NOT_ENOUGH_IPV6_NS_DEL") {
 		t.Fatalf("expected NOT_ENOUGH_IPV6_NS_DEL")
+	}
+	entry = firstEntryByTag(entries, "NOT_ENOUGH_IPV6_NS_DEL")
+	if entry == nil {
+		t.Fatalf("missing NOT_ENOUGH_IPV6_NS_DEL entry")
+	}
+	servers, ok = entry.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 {
+		t.Fatalf("expected one typed server for NOT_ENOUGH_IPV6_NS_DEL, got %#v", entry.Args["servers"])
+	}
+	if servers[0]["ns"] != "ns2.example" || servers[0]["address"] != "2001:db8::1" {
+		t.Fatalf("unexpected typed server payload: %#v", servers[0])
+	}
+	addresses, ok = entry.Args["addresses"].([]string)
+	if !ok || len(addresses) != 1 || addresses[0] != "2001:db8::1" {
+		t.Fatalf("unexpected typed addresses payload: %#v", entry.Args["addresses"])
+	}
+	if _, ok := entry.Args["ns_list"]; ok {
+		t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
 	}
 	if !hasEntryTag(entries, "NOT_ENOUGH_IPV4_NS_CHILD") {
 		t.Fatalf("expected NOT_ENOUGH_IPV4_NS_CHILD")
 	}
-	entry := firstEntryByTag(entries, "NOT_ENOUGH_IPV4_NS_CHILD")
-	servers, ok := entry.Args["servers"].([]map[string]any)
+	entry = firstEntryByTag(entries, "NOT_ENOUGH_IPV4_NS_CHILD")
+	servers, ok = entry.Args["servers"].([]map[string]any)
 	if !ok || len(servers) != 1 {
 		t.Fatalf("expected one typed server for NOT_ENOUGH_IPV4_NS_CHILD, got %#v", entry.Args["servers"])
 	}
 	if servers[0]["ns"] != "ns1.example" || servers[0]["address"] != "192.0.2.2" {
 		t.Fatalf("unexpected typed server payload: %#v", servers[0])
 	}
-	addresses, ok := entry.Args["addresses"].([]string)
+	addresses, ok = entry.Args["addresses"].([]string)
 	if !ok || len(addresses) != 1 || addresses[0] != "192.0.2.2" {
 		t.Fatalf("unexpected typed addresses payload: %#v", entry.Args["addresses"])
 	}

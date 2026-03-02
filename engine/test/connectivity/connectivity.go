@@ -168,16 +168,16 @@ func Connectivity01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 
 	ipv4Disabled, ipv6Disabled := disabledNS(ctx, nsList)
 	if len(ipv4Disabled) > 0 {
-		if err := appendLog(ctx, &results, testcase, "CN01_IPV4_DISABLED", map[string]any{
-			"ns_list": strings.Join(ipv4Disabled, ";"),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, ipv4Disabled)
+		if err := appendLog(ctx, &results, testcase, "CN01_IPV4_DISABLED", args); err != nil {
 			return results, err
 		}
 	}
 	if len(ipv6Disabled) > 0 {
-		if err := appendLog(ctx, &results, testcase, "CN01_IPV6_DISABLED", map[string]any{
-			"ns_list": strings.Join(ipv6Disabled, ";"),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, ipv6Disabled)
+		if err := appendLog(ctx, &results, testcase, "CN01_IPV6_DISABLED", args); err != nil {
 			return results, err
 		}
 	}
@@ -592,10 +592,11 @@ func Connectivity04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 			}
 			if len(list) >= 2 {
 				tag := fmt.Sprintf("CN04_IPV%d_SAME_PREFIX", version)
-				if err := appendLog(ctx, &results, testcase, tag, map[string]any{
+				args := map[string]any{
 					"ip_prefix": prefix,
-					"ns_list":   joinSorted(list),
-				}); err != nil {
+				}
+				setTypedServersFromNames(args, list)
+				if err := appendLog(ctx, &results, testcase, tag, args); err != nil {
 					return results, err
 				}
 			}
@@ -603,9 +604,9 @@ func Connectivity04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 
 		if len(combined) > 0 {
 			tag := fmt.Sprintf("CN04_IPV%d_DIFFERENT_PREFIX", version)
-			if err := appendLog(ctx, &results, testcase, tag, map[string]any{
-				"ns_list": joinUniqueSorted(combined),
-			}); err != nil {
+			args := map[string]any{}
+			setTypedServersFromNames(args, combined)
+			if err := appendLog(ctx, &results, testcase, tag, args); err != nil {
 				return results, err
 			}
 		}
@@ -894,10 +895,19 @@ func joinASNNumeric(values []int) string {
 	return joinInts(copyVals)
 }
 
-func joinSorted(values []string) string {
-	return strings.Join(logargs.UniqueSortedEndpointNames(values), ";")
-}
-
-func joinUniqueSorted(values []string) string {
-	return strings.Join(logargs.UniqueSortedEndpointNames(values), ";")
+func setTypedServersFromNames(args map[string]any, values []string) {
+	if args == nil || len(values) == 0 {
+		return
+	}
+	names := logargs.UniqueSortedEndpointNames(values)
+	if len(names) == 0 {
+		return
+	}
+	servers := make([]logargs.Server, 0, len(names))
+	for _, name := range names {
+		servers = append(servers, logargs.Server{NS: name})
+	}
+	if typed, ok := logargs.Servers(servers)["servers"]; ok {
+		args["servers"] = typed
+	}
 }

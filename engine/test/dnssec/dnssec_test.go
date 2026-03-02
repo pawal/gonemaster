@@ -659,21 +659,24 @@ func TestDNSSEC02ParallelChildDNSKEYQueries(t *testing.T) {
 		t.Fatalf("expected DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS")
 	}
 
-	var nsList string
+	var gotAddresses []string
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS" {
 			continue
 		}
-		if list, ok := entry.Args["ns_ip_list"].(string); ok {
-			nsList = list
-			break
+		if addresses, ok := entry.Args["addresses"].([]string); ok {
+			gotAddresses = addresses
 		}
+		if _, ok := entry.Args["ns_ip_list"]; ok {
+			t.Fatalf("legacy key ns_ip_list should not be present: %#v", entry.Args)
+		}
+		break
 	}
-	if nsList == "" {
-		t.Fatalf("expected ns_ip_list for DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS")
+	if len(gotAddresses) == 0 {
+		t.Fatalf("expected addresses for DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS")
 	}
-	if nsList != "192.0.2.101;192.0.2.102" {
-		t.Fatalf("expected deterministic ns_ip_list order, got %q", nsList)
+	if strings.Join(gotAddresses, ";") != "192.0.2.101;192.0.2.102" {
+		t.Fatalf("expected deterministic addresses order, got %#v", gotAddresses)
 	}
 }
 
@@ -2708,21 +2711,24 @@ func TestDNSSEC08ParallelDNSKEYQueries(t *testing.T) {
 		t.Fatalf("expected DS08_MISSING_RRSIG_IN_RESPONSE")
 	}
 
-	var nsList string
+	var gotAddresses []string
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "DS08_MISSING_RRSIG_IN_RESPONSE" {
 			continue
 		}
-		if list, ok := entry.Args["ns_ip_list"].(string); ok {
-			nsList = list
-			break
+		if addresses, ok := entry.Args["addresses"].([]string); ok {
+			gotAddresses = addresses
 		}
+		if _, ok := entry.Args["ns_ip_list"]; ok {
+			t.Fatalf("legacy key ns_ip_list should not be present: %#v", entry.Args)
+		}
+		break
 	}
-	if nsList == "" {
-		t.Fatalf("expected ns_ip_list for DS08_MISSING_RRSIG_IN_RESPONSE")
+	if len(gotAddresses) == 0 {
+		t.Fatalf("expected addresses for DS08_MISSING_RRSIG_IN_RESPONSE")
 	}
-	if nsList != "192.0.2.101;192.0.2.102" {
-		t.Fatalf("expected deterministic ns_ip_list order, got %q", nsList)
+	if strings.Join(gotAddresses, ";") != "192.0.2.101;192.0.2.102" {
+		t.Fatalf("expected deterministic addresses order, got %#v", gotAddresses)
 	}
 }
 
@@ -2880,21 +2886,24 @@ func TestDNSSEC09ParallelQueries(t *testing.T) {
 		t.Fatalf("expected DS09_MISSING_RRSIG_IN_RESPONSE")
 	}
 
-	var nsList string
+	var gotAddresses []string
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "DS09_MISSING_RRSIG_IN_RESPONSE" {
 			continue
 		}
-		if list, ok := entry.Args["ns_ip_list"].(string); ok {
-			nsList = list
-			break
+		if addresses, ok := entry.Args["addresses"].([]string); ok {
+			gotAddresses = addresses
 		}
+		if _, ok := entry.Args["ns_ip_list"]; ok {
+			t.Fatalf("legacy key ns_ip_list should not be present: %#v", entry.Args)
+		}
+		break
 	}
-	if nsList == "" {
-		t.Fatalf("expected ns_ip_list for DS09_MISSING_RRSIG_IN_RESPONSE")
+	if len(gotAddresses) == 0 {
+		t.Fatalf("expected addresses for DS09_MISSING_RRSIG_IN_RESPONSE")
 	}
-	if nsList != "192.0.2.111;192.0.2.112" {
-		t.Fatalf("expected deterministic ns_ip_list order, got %q", nsList)
+	if strings.Join(gotAddresses, ";") != "192.0.2.111;192.0.2.112" {
+		t.Fatalf("expected deterministic addresses order, got %#v", gotAddresses)
 	}
 }
 
@@ -3681,21 +3690,24 @@ func TestDNSSEC13ParallelQueries(t *testing.T) {
 		t.Fatalf("expected DS13_ALGO_NOT_SIGNED_NS")
 	}
 
-	var nsList string
+	var gotAddresses []string
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "DS13_ALGO_NOT_SIGNED_SOA" {
 			continue
 		}
-		if list, ok := entry.Args["ns_ip_list"].(string); ok {
-			nsList = list
-			break
+		if addresses, ok := entry.Args["addresses"].([]string); ok {
+			gotAddresses = addresses
 		}
+		if _, ok := entry.Args["ns_ip_list"]; ok {
+			t.Fatalf("legacy key ns_ip_list should not be present: %#v", entry.Args)
+		}
+		break
 	}
-	if nsList == "" {
-		t.Fatalf("expected ns_ip_list for DS13_ALGO_NOT_SIGNED_SOA")
+	if len(gotAddresses) == 0 {
+		t.Fatalf("expected addresses for DS13_ALGO_NOT_SIGNED_SOA")
 	}
-	if nsList != "192.0.2.121;192.0.2.122" {
-		t.Fatalf("expected deterministic ns_ip_list order, got %q", nsList)
+	if strings.Join(gotAddresses, ";") != "192.0.2.121;192.0.2.122" {
+		t.Fatalf("expected deterministic addresses order, got %#v", gotAddresses)
 	}
 }
 
@@ -4150,21 +4162,24 @@ func TestDNSSEC15ParallelQueries(t *testing.T) {
 		t.Fatalf("expected DS15_HAS_CDS_NO_CDNSKEY")
 	}
 
-	var nsList string
+	var gotAddresses []string
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "DS15_HAS_CDS_NO_CDNSKEY" {
 			continue
 		}
-		if list, ok := entry.Args["ns_ip_list"].(string); ok {
-			nsList = list
-			break
+		if addresses, ok := entry.Args["addresses"].([]string); ok {
+			gotAddresses = addresses
 		}
+		if _, ok := entry.Args["ns_ip_list"]; ok {
+			t.Fatalf("legacy key ns_ip_list should not be present: %#v", entry.Args)
+		}
+		break
 	}
-	if nsList == "" {
-		t.Fatalf("expected ns_ip_list for DS15_HAS_CDS_NO_CDNSKEY")
+	if len(gotAddresses) == 0 {
+		t.Fatalf("expected addresses for DS15_HAS_CDS_NO_CDNSKEY")
 	}
-	if nsList != "192.0.2.231;192.0.2.232" {
-		t.Fatalf("expected deterministic ns_ip_list order, got %q", nsList)
+	if strings.Join(gotAddresses, ";") != "192.0.2.231;192.0.2.232" {
+		t.Fatalf("expected deterministic addresses order, got %#v", gotAddresses)
 	}
 }
 
@@ -4322,21 +4337,24 @@ func TestDNSSEC16ParallelQueries(t *testing.T) {
 		t.Fatalf("expected DS16_CDS_WITHOUT_DNSKEY")
 	}
 
-	var nsList string
+	var gotAddresses []string
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "DS16_CDS_WITHOUT_DNSKEY" {
 			continue
 		}
-		if list, ok := entry.Args["ns_ip_list"].(string); ok {
-			nsList = list
-			break
+		if addresses, ok := entry.Args["addresses"].([]string); ok {
+			gotAddresses = addresses
 		}
+		if _, ok := entry.Args["ns_ip_list"]; ok {
+			t.Fatalf("legacy key ns_ip_list should not be present: %#v", entry.Args)
+		}
+		break
 	}
-	if nsList == "" {
-		t.Fatalf("expected ns_ip_list for DS16_CDS_WITHOUT_DNSKEY")
+	if len(gotAddresses) == 0 {
+		t.Fatalf("expected addresses for DS16_CDS_WITHOUT_DNSKEY")
 	}
-	if nsList != "192.0.2.241;192.0.2.242" {
-		t.Fatalf("expected deterministic ns_ip_list order, got %q", nsList)
+	if strings.Join(gotAddresses, ";") != "192.0.2.241;192.0.2.242" {
+		t.Fatalf("expected deterministic addresses order, got %#v", gotAddresses)
 	}
 }
 
@@ -4494,21 +4512,24 @@ func TestDNSSEC17ParallelQueries(t *testing.T) {
 		t.Fatalf("expected DS17_CDNSKEY_WITHOUT_DNSKEY")
 	}
 
-	var nsList string
+	var gotAddresses []string
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "DS17_CDNSKEY_WITHOUT_DNSKEY" {
 			continue
 		}
-		if list, ok := entry.Args["ns_ip_list"].(string); ok {
-			nsList = list
-			break
+		if addresses, ok := entry.Args["addresses"].([]string); ok {
+			gotAddresses = addresses
 		}
+		if _, ok := entry.Args["ns_ip_list"]; ok {
+			t.Fatalf("legacy key ns_ip_list should not be present: %#v", entry.Args)
+		}
+		break
 	}
-	if nsList == "" {
-		t.Fatalf("expected ns_ip_list for DS17_CDNSKEY_WITHOUT_DNSKEY")
+	if len(gotAddresses) == 0 {
+		t.Fatalf("expected addresses for DS17_CDNSKEY_WITHOUT_DNSKEY")
 	}
-	if nsList != "192.0.2.243;192.0.2.244" {
-		t.Fatalf("expected deterministic ns_ip_list order, got %q", nsList)
+	if strings.Join(gotAddresses, ";") != "192.0.2.243;192.0.2.244" {
+		t.Fatalf("expected deterministic addresses order, got %#v", gotAddresses)
 	}
 }
 
@@ -4745,21 +4766,24 @@ func TestDNSSEC18ParallelQueries(t *testing.T) {
 		t.Fatalf("expected DS18_NO_MATCH_CDNSKEY_RRSIG_DS")
 	}
 
-	var nsList string
+	var gotAddresses []string
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "DS18_NO_MATCH_CDS_RRSIG_DS" {
 			continue
 		}
-		if list, ok := entry.Args["ns_ip_list"].(string); ok {
-			nsList = list
-			break
+		if addresses, ok := entry.Args["addresses"].([]string); ok {
+			gotAddresses = addresses
 		}
+		if _, ok := entry.Args["ns_ip_list"]; ok {
+			t.Fatalf("legacy key ns_ip_list should not be present: %#v", entry.Args)
+		}
+		break
 	}
-	if nsList == "" {
-		t.Fatalf("expected ns_ip_list for DS18_NO_MATCH_CDS_RRSIG_DS")
+	if len(gotAddresses) == 0 {
+		t.Fatalf("expected addresses for DS18_NO_MATCH_CDS_RRSIG_DS")
 	}
-	if nsList != "192.0.2.251;192.0.2.252" {
-		t.Fatalf("expected deterministic ns_ip_list order, got %q", nsList)
+	if strings.Join(gotAddresses, ";") != "192.0.2.251;192.0.2.252" {
+		t.Fatalf("expected deterministic addresses order, got %#v", gotAddresses)
 	}
 }
 

@@ -265,8 +265,8 @@ func Delegation01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	childIPv6Args := map[string]any{
 		"count":   childIPv6Count,
 		"minimum": constants.MinimumNumberOfNameservers,
-		"ns_list": strings.Join(sortedNameserverStrings(childIPv6), ";"),
 	}
+	setTypedEndpointsFromNameservers(childIPv6Args, childIPv6)
 	if childIPv6Count >= constants.MinimumNumberOfNameservers {
 		if err := appendLog(ctx, &results, testcase, "ENOUGH_IPV6_NS_CHILD", childIPv6Args); err != nil {
 			return results, err
@@ -292,8 +292,8 @@ func Delegation01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	delIPv4Args := map[string]any{
 		"count":   delIPv4Count,
 		"minimum": constants.MinimumNumberOfNameservers,
-		"ns_list": strings.Join(sortedNameserverStrings(delIPv4), ";"),
 	}
+	setTypedEndpointsFromNameservers(delIPv4Args, delIPv4)
 	if delIPv4Count >= constants.MinimumNumberOfNameservers {
 		if err := appendLog(ctx, &results, testcase, "ENOUGH_IPV4_NS_DEL", delIPv4Args); err != nil {
 			return results, err
@@ -312,8 +312,8 @@ func Delegation01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	delIPv6Args := map[string]any{
 		"count":   delIPv6Count,
 		"minimum": constants.MinimumNumberOfNameservers,
-		"ns_list": strings.Join(sortedNameserverStrings(delIPv6), ";"),
 	}
+	setTypedEndpointsFromNameservers(delIPv6Args, delIPv6)
 	if delIPv6Count >= constants.MinimumNumberOfNameservers {
 		if err := appendLog(ctx, &results, testcase, "ENOUGH_IPV6_NS_DEL", delIPv6Args); err != nil {
 			return results, err
@@ -838,14 +838,6 @@ func uniqueNamesCount(nss []nameserver.Nameserver) int {
 		seen[ns.Name.String()] = true
 	}
 	return len(seen)
-}
-
-func sortedNameserverStrings(nss []nameserver.Nameserver) []string {
-	values := make([]string, 0, len(nss))
-	for _, ns := range nss {
-		values = append(values, ns.NameString())
-	}
-	return logargs.UniqueSortedEndpointNames(values)
 }
 
 func setTypedEndpointsFromNameservers(args map[string]any, nss []nameserver.Nameserver) {

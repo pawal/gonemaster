@@ -1160,63 +1160,70 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	for keytag, nsList := range noDNSKEYForDS {
-		if err := appendLog(ctx, &results, testcase, "DS02_NO_DNSKEY_FOR_DS", map[string]any{
-			"keytag":     keytag,
-			"ns_ip_list": joinUniqueSorted(nsList),
-		}); err != nil {
+		args := map[string]any{
+			"keytag": keytag,
+		}
+		setTypedAddressesFromValues(args, nsList)
+		if err := appendLog(ctx, &results, testcase, "DS02_NO_DNSKEY_FOR_DS", args); err != nil {
 			return results, err
 		}
 	}
 	for keytag, nsList := range noMatchDSDNSKEY {
-		if err := appendLog(ctx, &results, testcase, "DS02_NO_MATCH_DS_DNSKEY", map[string]any{
-			"keytag":     keytag,
-			"ns_ip_list": joinUniqueSorted(nsList),
-		}); err != nil {
+		args := map[string]any{
+			"keytag": keytag,
+		}
+		setTypedAddressesFromValues(args, nsList)
+		if err := appendLog(ctx, &results, testcase, "DS02_NO_MATCH_DS_DNSKEY", args); err != nil {
 			return results, err
 		}
 	}
 	for keytag, nsList := range dnskeyNotForZoneSigning {
-		if err := appendLog(ctx, &results, testcase, "DS02_DNSKEY_NOT_FOR_ZONE_SIGNING", map[string]any{
-			"keytag":     keytag,
-			"ns_ip_list": joinUniqueSorted(nsList),
-		}); err != nil {
+		args := map[string]any{
+			"keytag": keytag,
+		}
+		setTypedAddressesFromValues(args, nsList)
+		if err := appendLog(ctx, &results, testcase, "DS02_DNSKEY_NOT_FOR_ZONE_SIGNING", args); err != nil {
 			return results, err
 		}
 	}
 	for keytag, nsList := range dnskeyNotSEP {
-		if err := appendLog(ctx, &results, testcase, "DS02_DNSKEY_NOT_SEP", map[string]any{
-			"keytag":     keytag,
-			"ns_ip_list": joinUniqueSorted(nsList),
-		}); err != nil {
+		args := map[string]any{
+			"keytag": keytag,
+		}
+		setTypedAddressesFromValues(args, nsList)
+		if err := appendLog(ctx, &results, testcase, "DS02_DNSKEY_NOT_SEP", args); err != nil {
 			return results, err
 		}
 	}
 	for keytag, nsList := range noMatchingDNSKEYRRSIG {
-		if err := appendLog(ctx, &results, testcase, "DS02_NO_MATCHING_DNSKEY_RRSIG", map[string]any{
-			"keytag":     keytag,
-			"ns_ip_list": joinUniqueSorted(nsList),
-		}); err != nil {
+		args := map[string]any{
+			"keytag": keytag,
+		}
+		setTypedAddressesFromValues(args, nsList)
+		if err := appendLog(ctx, &results, testcase, "DS02_NO_MATCHING_DNSKEY_RRSIG", args); err != nil {
 			return results, err
 		}
 	}
 	for keytag, algoMap := range algoNotSupportedByZM {
 		for algo, nsList := range algoMap {
 			prop := algoPropertyFor(algo)
-			if err := appendLog(ctx, &results, testcase, "DS02_ALGO_NOT_SUPPORTED_BY_ZM", map[string]any{
+			args := map[string]any{
 				"keytag":     keytag,
 				"algo_num":   algo,
 				"algo_mnemo": prop.mnemonic,
-				"ns_ip_list": joinUniqueSorted(nsList),
-			}); err != nil {
+			}
+			setTypedAddressesFromValues(args, nsList)
+			if err := appendLog(ctx, &results, testcase, "DS02_ALGO_NOT_SUPPORTED_BY_ZM", args); err != nil {
 				return results, err
 			}
 		}
 	}
 	for keytag, nsList := range rrsigNotValidByDNSKEY {
-		if err := appendLog(ctx, &results, testcase, "DS02_RRSIG_NOT_VALID_BY_DNSKEY", map[string]any{
-			"keytag":     keytag,
-			"ns_ip_list": joinUniqueSorted(nsList),
-		}); err != nil {
+		args := map[string]any{
+			"keytag": keytag,
+		}
+		setTypedAddressesFromValues(args, nsList)
+		if err := appendLog(ctx, &results, testcase, "DS02_RRSIG_NOT_VALID_BY_DNSKEY", args); err != nil {
 			return results, err
 		}
 	}
@@ -1231,15 +1238,15 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(nsDNSKEY) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS02_NO_VALID_DNSKEY_FOR_ANY_DS", map[string]any{
-			"ns_ip_list": joinUniqueSorted(nsDNSKEY),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedAddressesFromValues(args, nsDNSKEY)
+		if err := appendLog(ctx, &results, testcase, "DS02_NO_VALID_DNSKEY_FOR_ANY_DS", args); err != nil {
 			return results, err
 		}
 	} else if len(nsRRSIG) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS", map[string]any{
-			"ns_ip_list": joinUniqueSorted(nsRRSIG),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedAddressesFromValues(args, nsRRSIG)
+		if err := appendLog(ctx, &results, testcase, "DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS", args); err != nil {
 			return results, err
 		}
 	}
@@ -2622,53 +2629,58 @@ func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(dnskeyWithoutRRSIG) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS08_MISSING_RRSIG_IN_RESPONSE", map[string]any{
-			"ns_ip_list": joinUniqueSorted(dnskeyWithoutRRSIG),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedAddressesFromValues(args, dnskeyWithoutRRSIG)
+		if err := appendLog(ctx, &results, testcase, "DS08_MISSING_RRSIG_IN_RESPONSE", args); err != nil {
 			return results, err
 		}
 	}
 	for keytag, nsList := range dnskeyRRSIGNotYetValid {
-		if err := appendLog(ctx, &results, testcase, "DS08_DNSKEY_RRSIG_NOT_YET_VALID", map[string]any{
-			"keytag":     keytag,
-			"ns_ip_list": joinUniqueSorted(nsList),
-		}); err != nil {
+		args := map[string]any{
+			"keytag": keytag,
+		}
+		setTypedAddressesFromValues(args, nsList)
+		if err := appendLog(ctx, &results, testcase, "DS08_DNSKEY_RRSIG_NOT_YET_VALID", args); err != nil {
 			return results, err
 		}
 	}
 	for keytag, nsList := range dnskeyRRSIGExpired {
-		if err := appendLog(ctx, &results, testcase, "DS08_DNSKEY_RRSIG_EXPIRED", map[string]any{
-			"keytag":     keytag,
-			"ns_ip_list": joinUniqueSorted(nsList),
-		}); err != nil {
+		args := map[string]any{
+			"keytag": keytag,
+		}
+		setTypedAddressesFromValues(args, nsList)
+		if err := appendLog(ctx, &results, testcase, "DS08_DNSKEY_RRSIG_EXPIRED", args); err != nil {
 			return results, err
 		}
 	}
 	for keytag, nsList := range noMatchingDNSKEY {
-		if err := appendLog(ctx, &results, testcase, "DS08_NO_MATCHING_DNSKEY", map[string]any{
-			"keytag":     keytag,
-			"ns_ip_list": joinUniqueSorted(nsList),
-		}); err != nil {
+		args := map[string]any{
+			"keytag": keytag,
+		}
+		setTypedAddressesFromValues(args, nsList)
+		if err := appendLog(ctx, &results, testcase, "DS08_NO_MATCHING_DNSKEY", args); err != nil {
 			return results, err
 		}
 	}
 	for keytag, nsList := range rrsigNotValidByDNSKEY {
-		if err := appendLog(ctx, &results, testcase, "DS08_RRSIG_NOT_VALID_BY_DNSKEY", map[string]any{
-			"keytag":     keytag,
-			"ns_ip_list": joinUniqueSorted(nsList),
-		}); err != nil {
+		args := map[string]any{
+			"keytag": keytag,
+		}
+		setTypedAddressesFromValues(args, nsList)
+		if err := appendLog(ctx, &results, testcase, "DS08_RRSIG_NOT_VALID_BY_DNSKEY", args); err != nil {
 			return results, err
 		}
 	}
 	for keytag, algoMap := range algoNotSupportedByZM {
 		for algo, nsList := range algoMap {
 			prop := algoPropertyFor(algo)
-			if err := appendLog(ctx, &results, testcase, "DS08_ALGO_NOT_SUPPORTED_BY_ZM", map[string]any{
+			args := map[string]any{
 				"keytag":     keytag,
 				"algo_num":   algo,
 				"algo_mnemo": prop.mnemonic,
-				"ns_ip_list": joinUniqueSorted(nsList),
-			}); err != nil {
+			}
+			setTypedAddressesFromValues(args, nsList)
+			if err := appendLog(ctx, &results, testcase, "DS08_ALGO_NOT_SUPPORTED_BY_ZM", args); err != nil {
 				return results, err
 			}
 		}
@@ -2909,53 +2921,58 @@ func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(soaWithoutRRSIG) > 0 {
-		if err := appendLog(ctx, &results, testcase, "DS09_MISSING_RRSIG_IN_RESPONSE", map[string]any{
-			"ns_ip_list": joinUniqueSorted(soaWithoutRRSIG),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedAddressesFromValues(args, soaWithoutRRSIG)
+		if err := appendLog(ctx, &results, testcase, "DS09_MISSING_RRSIG_IN_RESPONSE", args); err != nil {
 			return results, err
 		}
 	}
 	for keytag, nsList := range soaRRSIGNotYetValid {
-		if err := appendLog(ctx, &results, testcase, "DS09_SOA_RRSIG_NOT_YET_VALID", map[string]any{
-			"keytag":     keytag,
-			"ns_ip_list": joinUniqueSorted(nsList),
-		}); err != nil {
+		args := map[string]any{
+			"keytag": keytag,
+		}
+		setTypedAddressesFromValues(args, nsList)
+		if err := appendLog(ctx, &results, testcase, "DS09_SOA_RRSIG_NOT_YET_VALID", args); err != nil {
 			return results, err
 		}
 	}
 	for keytag, nsList := range soaRRSIGExpired {
-		if err := appendLog(ctx, &results, testcase, "DS09_SOA_RRSIG_EXPIRED", map[string]any{
-			"keytag":     keytag,
-			"ns_ip_list": joinUniqueSorted(nsList),
-		}); err != nil {
+		args := map[string]any{
+			"keytag": keytag,
+		}
+		setTypedAddressesFromValues(args, nsList)
+		if err := appendLog(ctx, &results, testcase, "DS09_SOA_RRSIG_EXPIRED", args); err != nil {
 			return results, err
 		}
 	}
 	for keytag, nsList := range noMatchingDNSKEY {
-		if err := appendLog(ctx, &results, testcase, "DS09_NO_MATCHING_DNSKEY", map[string]any{
-			"keytag":     keytag,
-			"ns_ip_list": joinUniqueSorted(nsList),
-		}); err != nil {
+		args := map[string]any{
+			"keytag": keytag,
+		}
+		setTypedAddressesFromValues(args, nsList)
+		if err := appendLog(ctx, &results, testcase, "DS09_NO_MATCHING_DNSKEY", args); err != nil {
 			return results, err
 		}
 	}
 	for keytag, nsList := range rrsigNotValidByDNSKEY {
-		if err := appendLog(ctx, &results, testcase, "DS09_RRSIG_NOT_VALID_BY_DNSKEY", map[string]any{
-			"keytag":     keytag,
-			"ns_ip_list": joinUniqueSorted(nsList),
-		}); err != nil {
+		args := map[string]any{
+			"keytag": keytag,
+		}
+		setTypedAddressesFromValues(args, nsList)
+		if err := appendLog(ctx, &results, testcase, "DS09_RRSIG_NOT_VALID_BY_DNSKEY", args); err != nil {
 			return results, err
 		}
 	}
 	for keytag, algoMap := range algoNotSupportedByZM {
 		for algo, nsList := range algoMap {
 			prop := algoPropertyFor(algo)
-			if err := appendLog(ctx, &results, testcase, "DS09_ALGO_NOT_SUPPORTED_BY_ZM", map[string]any{
+			args := map[string]any{
 				"keytag":     keytag,
 				"algo_num":   algo,
 				"algo_mnemo": prop.mnemonic,
-				"ns_ip_list": joinUniqueSorted(nsList),
-			}); err != nil {
+			}
+			setTypedAddressesFromValues(args, nsList)
+			if err := appendLog(ctx, &results, testcase, "DS09_ALGO_NOT_SUPPORTED_BY_ZM", args); err != nil {
 				return results, err
 			}
 		}
@@ -3903,12 +3920,13 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			for _, algoKey := range algos {
 				algo := uint8(algoKey)
 				prop := algoPropertyFor(algo)
-				if err := appendLog(ctx, &results, testcase, "DS10_ALGO_NOT_SUPPORTED_BY_ZM", map[string]any{
+				args := map[string]any{
 					"keytag":     kt,
 					"algo_num":   algo,
 					"algo_mnemo": prop.mnemonic,
-					"ns_ip_list": joinUniqueSorted(algoMap[algo]),
-				}); err != nil {
+				}
+				setTypedAddressesFromValues(args, algoMap[algo])
+				if err := appendLog(ctx, &results, testcase, "DS10_ALGO_NOT_SUPPORTED_BY_ZM", args); err != nil {
 					return results, err
 				}
 			}
@@ -4081,14 +4099,14 @@ func DNSSEC11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		if err := appendLog(ctx, &results, testcase, "DS11_INCONSISTENT_DS", map[string]any{}); err != nil {
 			return results, err
 		}
-		if err := appendLog(ctx, &results, testcase, "DS11_PARENT_WITHOUT_DS", map[string]any{
-			"ns_ip_list": joinUniqueSorted(noDSRecord),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedAddressesFromValues(args, noDSRecord)
+		if err := appendLog(ctx, &results, testcase, "DS11_PARENT_WITHOUT_DS", args); err != nil {
 			return results, err
 		}
-		if err := appendLog(ctx, &results, testcase, "DS11_PARENT_WITH_DS", map[string]any{
-			"ns_ip_list": joinUniqueSorted(hasDSRecord),
-		}); err != nil {
+		args = map[string]any{}
+		setTypedAddressesFromValues(args, hasDSRecord)
+		if err := appendLog(ctx, &results, testcase, "DS11_PARENT_WITH_DS", args); err != nil {
 			return results, err
 		}
 	}
@@ -4221,14 +4239,14 @@ func DNSSEC11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			if err := appendLog(ctx, &results, testcase, "DS11_INCONSISTENT_SIGNED_ZONE", map[string]any{}); err != nil {
 				return results, err
 			}
-			if err := appendLog(ctx, &results, testcase, "DS11_NS_WITH_UNSIGNED_ZONE", map[string]any{
-				"ns_ip_list": joinUniqueSorted(noDNSKEYRecord),
-			}); err != nil {
+			args := map[string]any{}
+			setTypedAddressesFromValues(args, noDNSKEYRecord)
+			if err := appendLog(ctx, &results, testcase, "DS11_NS_WITH_UNSIGNED_ZONE", args); err != nil {
 				return results, err
 			}
-			if err := appendLog(ctx, &results, testcase, "DS11_NS_WITH_SIGNED_ZONE", map[string]any{
-				"ns_ip_list": joinUniqueSorted(hasDNSKEYRecord),
-			}); err != nil {
+			args = map[string]any{}
+			setTypedAddressesFromValues(args, hasDNSKEYRecord)
+			if err := appendLog(ctx, &results, testcase, "DS11_NS_WITH_SIGNED_ZONE", args); err != nil {
 				return results, err
 			}
 		}
@@ -4402,11 +4420,12 @@ func DNSSEC13(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		for _, algoKey := range algos {
 			algo := uint8(algoKey)
 			prop := algoPropertyFor(algo)
-			if err := appendLog(ctx, &results, testcase, "DS13_ALGO_NOT_SIGNED_"+queryType, map[string]any{
-				"ns_ip_list": joinUniqueSorted(algoNotSigned[key][algo]),
+			args := map[string]any{
 				"algo_num":   algo,
 				"algo_mnemo": prop.mnemonic,
-			}); err != nil {
+			}
+			setTypedAddressesFromValues(args, algoNotSigned[key][algo])
+			if err := appendLog(ctx, &results, testcase, "DS13_ALGO_NOT_SIGNED_"+queryType, args); err != nil {
 				return results, err
 			}
 		}
@@ -4779,23 +4798,23 @@ func DNSSEC15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 
 		if len(hasCDSNoCDNSKEY) > 0 {
-			if err := appendLog(ctx, &results, testcase, "DS15_HAS_CDS_NO_CDNSKEY", map[string]any{
-				"ns_ip_list": joinUniqueSorted(mapKeysSorted(hasCDSNoCDNSKEY)),
-			}); err != nil {
+			args := map[string]any{}
+			setTypedAddressesFromValues(args, mapKeysSorted(hasCDSNoCDNSKEY))
+			if err := appendLog(ctx, &results, testcase, "DS15_HAS_CDS_NO_CDNSKEY", args); err != nil {
 				return results, err
 			}
 		}
 		if len(hasCDNSKEYNoCDS) > 0 {
-			if err := appendLog(ctx, &results, testcase, "DS15_HAS_CDNSKEY_NO_CDS", map[string]any{
-				"ns_ip_list": joinUniqueSorted(mapKeysSorted(hasCDNSKEYNoCDS)),
-			}); err != nil {
+			args := map[string]any{}
+			setTypedAddressesFromValues(args, mapKeysSorted(hasCDNSKEYNoCDS))
+			if err := appendLog(ctx, &results, testcase, "DS15_HAS_CDNSKEY_NO_CDS", args); err != nil {
 				return results, err
 			}
 		}
 		if len(hasCDSAndCDNSKEY) > 0 {
-			if err := appendLog(ctx, &results, testcase, "DS15_HAS_CDS_AND_CDNSKEY", map[string]any{
-				"ns_ip_list": joinUniqueSorted(mapKeysSorted(hasCDSAndCDNSKEY)),
-			}); err != nil {
+			args := map[string]any{}
+			setTypedAddressesFromValues(args, mapKeysSorted(hasCDSAndCDNSKEY))
+			if err := appendLog(ctx, &results, testcase, "DS15_HAS_CDS_AND_CDNSKEY", args); err != nil {
 				return results, err
 			}
 		}
@@ -4813,9 +4832,9 @@ func DNSSEC15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 
 		if len(mismatch) > 0 {
-			if err := appendLog(ctx, &results, testcase, "DS15_MISMATCH_CDS_CDNSKEY", map[string]any{
-				"ns_ip_list": joinUniqueSorted(mapKeysSorted(mismatch)),
-			}); err != nil {
+			args := map[string]any{}
+			setTypedAddressesFromValues(args, mapKeysSorted(mismatch))
+			if err := appendLog(ctx, &results, testcase, "DS15_MISMATCH_CDS_CDNSKEY", args); err != nil {
 				return results, err
 			}
 		}
@@ -5184,25 +5203,25 @@ func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 
 		if len(noDNSKEYRRset) > 0 {
-			if err := appendLog(ctx, &results, testcase, "DS16_CDS_WITHOUT_DNSKEY", map[string]any{
-				"ns_ip_list": joinUniqueSorted(mapKeysSorted(noDNSKEYRRset)),
-			}); err != nil {
+			args := map[string]any{}
+			setTypedAddressesFromValues(args, mapKeysSorted(noDNSKEYRRset))
+			if err := appendLog(ctx, &results, testcase, "DS16_CDS_WITHOUT_DNSKEY", args); err != nil {
 				return results, err
 			}
 		}
 
 		if len(mixedDeleteCDS) > 0 {
-			if err := appendLog(ctx, &results, testcase, "DS16_MIXED_DELETE_CDS", map[string]any{
-				"ns_ip_list": joinUniqueSorted(mapKeysSorted(mixedDeleteCDS)),
-			}); err != nil {
+			args := map[string]any{}
+			setTypedAddressesFromValues(args, mapKeysSorted(mixedDeleteCDS))
+			if err := appendLog(ctx, &results, testcase, "DS16_MIXED_DELETE_CDS", args); err != nil {
 				return results, err
 			}
 		}
 
 		if len(deleteCDS) > 0 {
-			if err := appendLog(ctx, &results, testcase, "DS16_DELETE_CDS", map[string]any{
-				"ns_ip_list": joinUniqueSorted(mapKeysSorted(deleteCDS)),
-			}); err != nil {
+			args := map[string]any{}
+			setTypedAddressesFromValues(args, mapKeysSorted(deleteCDS))
+			if err := appendLog(ctx, &results, testcase, "DS16_DELETE_CDS", args); err != nil {
 				return results, err
 			}
 		}
@@ -5215,10 +5234,11 @@ func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			sort.Ints(keytags)
 			for _, keytag := range keytags {
 				kt := uint16(keytag)
-				if err := appendLog(ctx, &results, testcase, "DS16_CDS_MATCHES_NO_DNSKEY", map[string]any{
-					"keytag":     kt,
-					"ns_ip_list": joinUniqueSorted(noMatchCDSWithDNSKEY[kt]),
-				}); err != nil {
+				args := map[string]any{
+					"keytag": kt,
+				}
+				setTypedAddressesFromValues(args, noMatchCDSWithDNSKEY[kt])
+				if err := appendLog(ctx, &results, testcase, "DS16_CDS_MATCHES_NO_DNSKEY", args); err != nil {
 					return results, err
 				}
 			}
@@ -5232,10 +5252,11 @@ func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			sort.Ints(keytags)
 			for _, keytag := range keytags {
 				kt := uint16(keytag)
-				if err := appendLog(ctx, &results, testcase, "DS16_CDS_MATCHES_NON_ZONE_DNSKEY", map[string]any{
-					"keytag":     kt,
-					"ns_ip_list": joinUniqueSorted(cdsPointsToNonZoneDNSKEY[kt]),
-				}); err != nil {
+				args := map[string]any{
+					"keytag": kt,
+				}
+				setTypedAddressesFromValues(args, cdsPointsToNonZoneDNSKEY[kt])
+				if err := appendLog(ctx, &results, testcase, "DS16_CDS_MATCHES_NON_ZONE_DNSKEY", args); err != nil {
 					return results, err
 				}
 			}
@@ -5249,10 +5270,11 @@ func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			sort.Ints(keytags)
 			for _, keytag := range keytags {
 				kt := uint16(keytag)
-				if err := appendLog(ctx, &results, testcase, "DS16_CDS_MATCHES_NON_SEP_DNSKEY", map[string]any{
-					"keytag":     kt,
-					"ns_ip_list": joinUniqueSorted(cdsPointsToNonSEPDNSKEY[kt]),
-				}); err != nil {
+				args := map[string]any{
+					"keytag": kt,
+				}
+				setTypedAddressesFromValues(args, cdsPointsToNonSEPDNSKEY[kt])
+				if err := appendLog(ctx, &results, testcase, "DS16_CDS_MATCHES_NON_SEP_DNSKEY", args); err != nil {
 					return results, err
 				}
 			}
@@ -5266,10 +5288,11 @@ func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			sort.Ints(keytags)
 			for _, keytag := range keytags {
 				kt := uint16(keytag)
-				if err := appendLog(ctx, &results, testcase, "DS16_DNSKEY_NOT_SIGNED_BY_CDS", map[string]any{
-					"keytag":     kt,
-					"ns_ip_list": joinUniqueSorted(dnskeyNotSignedByCDS[kt]),
-				}); err != nil {
+				args := map[string]any{
+					"keytag": kt,
+				}
+				setTypedAddressesFromValues(args, dnskeyNotSignedByCDS[kt])
+				if err := appendLog(ctx, &results, testcase, "DS16_DNSKEY_NOT_SIGNED_BY_CDS", args); err != nil {
 					return results, err
 				}
 			}
@@ -5283,10 +5306,11 @@ func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			sort.Ints(keytags)
 			for _, keytag := range keytags {
 				kt := uint16(keytag)
-				if err := appendLog(ctx, &results, testcase, "DS16_CDS_NOT_SIGNED_BY_CDS", map[string]any{
-					"keytag":     kt,
-					"ns_ip_list": joinUniqueSorted(cdsNotSignedByCDS[kt]),
-				}); err != nil {
+				args := map[string]any{
+					"keytag": kt,
+				}
+				setTypedAddressesFromValues(args, cdsNotSignedByCDS[kt])
+				if err := appendLog(ctx, &results, testcase, "DS16_CDS_NOT_SIGNED_BY_CDS", args); err != nil {
 					return results, err
 				}
 			}
@@ -5300,19 +5324,20 @@ func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			sort.Ints(keytags)
 			for _, keytag := range keytags {
 				kt := uint16(keytag)
-				if err := appendLog(ctx, &results, testcase, "DS16_CDS_INVALID_RRSIG", map[string]any{
-					"keytag":     kt,
-					"ns_ip_list": joinUniqueSorted(cdsInvalidRRSIG[kt]),
-				}); err != nil {
+				args := map[string]any{
+					"keytag": kt,
+				}
+				setTypedAddressesFromValues(args, cdsInvalidRRSIG[kt])
+				if err := appendLog(ctx, &results, testcase, "DS16_CDS_INVALID_RRSIG", args); err != nil {
 					return results, err
 				}
 			}
 		}
 
 		if len(cdsNotSigned) > 0 {
-			if err := appendLog(ctx, &results, testcase, "DS16_CDS_UNSIGNED", map[string]any{
-				"ns_ip_list": joinUniqueSorted(mapKeysSorted(cdsNotSigned)),
-			}); err != nil {
+			args := map[string]any{}
+			setTypedAddressesFromValues(args, mapKeysSorted(cdsNotSigned))
+			if err := appendLog(ctx, &results, testcase, "DS16_CDS_UNSIGNED", args); err != nil {
 				return results, err
 			}
 		}
@@ -5325,10 +5350,11 @@ func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			sort.Ints(keytags)
 			for _, keytag := range keytags {
 				kt := uint16(keytag)
-				if err := appendLog(ctx, &results, testcase, "DS16_CDS_SIGNED_BY_UNKNOWN_DNSKEY", map[string]any{
-					"keytag":     kt,
-					"ns_ip_list": joinUniqueSorted(cdsSignedByUnknownDNSKEY[kt]),
-				}); err != nil {
+				args := map[string]any{
+					"keytag": kt,
+				}
+				setTypedAddressesFromValues(args, cdsSignedByUnknownDNSKEY[kt])
+				if err := appendLog(ctx, &results, testcase, "DS16_CDS_SIGNED_BY_UNKNOWN_DNSKEY", args); err != nil {
 					return results, err
 				}
 			}
@@ -5685,25 +5711,25 @@ func DNSSEC17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 
 		if len(noDNSKEYRRset) > 0 {
-			if err := appendLog(ctx, &results, testcase, "DS17_CDNSKEY_WITHOUT_DNSKEY", map[string]any{
-				"ns_ip_list": joinUniqueSorted(mapKeysSorted(noDNSKEYRRset)),
-			}); err != nil {
+			args := map[string]any{}
+			setTypedAddressesFromValues(args, mapKeysSorted(noDNSKEYRRset))
+			if err := appendLog(ctx, &results, testcase, "DS17_CDNSKEY_WITHOUT_DNSKEY", args); err != nil {
 				return results, err
 			}
 		}
 
 		if len(mixedDeleteCDNSKEY) > 0 {
-			if err := appendLog(ctx, &results, testcase, "DS17_MIXED_DELETE_CDNSKEY", map[string]any{
-				"ns_ip_list": joinUniqueSorted(mapKeysSorted(mixedDeleteCDNSKEY)),
-			}); err != nil {
+			args := map[string]any{}
+			setTypedAddressesFromValues(args, mapKeysSorted(mixedDeleteCDNSKEY))
+			if err := appendLog(ctx, &results, testcase, "DS17_MIXED_DELETE_CDNSKEY", args); err != nil {
 				return results, err
 			}
 		}
 
 		if len(deleteCDNSKEY) > 0 {
-			if err := appendLog(ctx, &results, testcase, "DS17_DELETE_CDNSKEY", map[string]any{
-				"ns_ip_list": joinUniqueSorted(mapKeysSorted(deleteCDNSKEY)),
-			}); err != nil {
+			args := map[string]any{}
+			setTypedAddressesFromValues(args, mapKeysSorted(deleteCDNSKEY))
+			if err := appendLog(ctx, &results, testcase, "DS17_DELETE_CDNSKEY", args); err != nil {
 				return results, err
 			}
 		}
@@ -5716,10 +5742,11 @@ func DNSSEC17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			sort.Ints(keytags)
 			for _, keytag := range keytags {
 				kt := uint16(keytag)
-				if err := appendLog(ctx, &results, testcase, "DS17_CDNSKEY_MATCHES_NO_DNSKEY", map[string]any{
-					"keytag":     kt,
-					"ns_ip_list": joinUniqueSorted(noMatchCDNSKEYWithDNSKEY[kt]),
-				}); err != nil {
+				args := map[string]any{
+					"keytag": kt,
+				}
+				setTypedAddressesFromValues(args, noMatchCDNSKEYWithDNSKEY[kt])
+				if err := appendLog(ctx, &results, testcase, "DS17_CDNSKEY_MATCHES_NO_DNSKEY", args); err != nil {
 					return results, err
 				}
 			}
@@ -5733,10 +5760,11 @@ func DNSSEC17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			sort.Ints(keytags)
 			for _, keytag := range keytags {
 				kt := uint16(keytag)
-				if err := appendLog(ctx, &results, testcase, "DS17_CDNSKEY_IS_NON_ZONE", map[string]any{
-					"keytag":     kt,
-					"ns_ip_list": joinUniqueSorted(cdnskeyIsNonZone[kt]),
-				}); err != nil {
+				args := map[string]any{
+					"keytag": kt,
+				}
+				setTypedAddressesFromValues(args, cdnskeyIsNonZone[kt])
+				if err := appendLog(ctx, &results, testcase, "DS17_CDNSKEY_IS_NON_ZONE", args); err != nil {
 					return results, err
 				}
 			}
@@ -5750,10 +5778,11 @@ func DNSSEC17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			sort.Ints(keytags)
 			for _, keytag := range keytags {
 				kt := uint16(keytag)
-				if err := appendLog(ctx, &results, testcase, "DS17_CDNSKEY_IS_NON_SEP", map[string]any{
-					"keytag":     kt,
-					"ns_ip_list": joinUniqueSorted(cdnskeyIsNonSEP[kt]),
-				}); err != nil {
+				args := map[string]any{
+					"keytag": kt,
+				}
+				setTypedAddressesFromValues(args, cdnskeyIsNonSEP[kt])
+				if err := appendLog(ctx, &results, testcase, "DS17_CDNSKEY_IS_NON_SEP", args); err != nil {
 					return results, err
 				}
 			}
@@ -5767,10 +5796,11 @@ func DNSSEC17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			sort.Ints(keytags)
 			for _, keytag := range keytags {
 				kt := uint16(keytag)
-				if err := appendLog(ctx, &results, testcase, "DS17_DNSKEY_NOT_SIGNED_BY_CDNSKEY", map[string]any{
-					"keytag":     kt,
-					"ns_ip_list": joinUniqueSorted(dnskeyNotSignedByCDNSKEY[kt]),
-				}); err != nil {
+				args := map[string]any{
+					"keytag": kt,
+				}
+				setTypedAddressesFromValues(args, dnskeyNotSignedByCDNSKEY[kt])
+				if err := appendLog(ctx, &results, testcase, "DS17_DNSKEY_NOT_SIGNED_BY_CDNSKEY", args); err != nil {
 					return results, err
 				}
 			}
@@ -5784,10 +5814,11 @@ func DNSSEC17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			sort.Ints(keytags)
 			for _, keytag := range keytags {
 				kt := uint16(keytag)
-				if err := appendLog(ctx, &results, testcase, "DS17_CDNSKEY_NOT_SIGNED_BY_CDNSKEY", map[string]any{
-					"keytag":     kt,
-					"ns_ip_list": joinUniqueSorted(cdnskeyNotSignedByCDNSKEY[kt]),
-				}); err != nil {
+				args := map[string]any{
+					"keytag": kt,
+				}
+				setTypedAddressesFromValues(args, cdnskeyNotSignedByCDNSKEY[kt])
+				if err := appendLog(ctx, &results, testcase, "DS17_CDNSKEY_NOT_SIGNED_BY_CDNSKEY", args); err != nil {
 					return results, err
 				}
 			}
@@ -5801,19 +5832,20 @@ func DNSSEC17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			sort.Ints(keytags)
 			for _, keytag := range keytags {
 				kt := uint16(keytag)
-				if err := appendLog(ctx, &results, testcase, "DS17_CDNSKEY_INVALID_RRSIG", map[string]any{
-					"keytag":     kt,
-					"ns_ip_list": joinUniqueSorted(cdnskeyInvalidRRSIG[kt]),
-				}); err != nil {
+				args := map[string]any{
+					"keytag": kt,
+				}
+				setTypedAddressesFromValues(args, cdnskeyInvalidRRSIG[kt])
+				if err := appendLog(ctx, &results, testcase, "DS17_CDNSKEY_INVALID_RRSIG", args); err != nil {
 					return results, err
 				}
 			}
 		}
 
 		if len(cdnskeyNotSigned) > 0 {
-			if err := appendLog(ctx, &results, testcase, "DS17_CDNSKEY_UNSIGNED", map[string]any{
-				"ns_ip_list": joinUniqueSorted(mapKeysSorted(cdnskeyNotSigned)),
-			}); err != nil {
+			args := map[string]any{}
+			setTypedAddressesFromValues(args, mapKeysSorted(cdnskeyNotSigned))
+			if err := appendLog(ctx, &results, testcase, "DS17_CDNSKEY_UNSIGNED", args); err != nil {
 				return results, err
 			}
 		}
@@ -5826,10 +5858,11 @@ func DNSSEC17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			sort.Ints(keytags)
 			for _, keytag := range keytags {
 				kt := uint16(keytag)
-				if err := appendLog(ctx, &results, testcase, "DS17_CDNSKEY_SIGNED_BY_UNKNOWN_DNSKEY", map[string]any{
-					"keytag":     kt,
-					"ns_ip_list": joinUniqueSorted(cdnskeySignedByUnknownDNSKEY[kt]),
-				}); err != nil {
+				args := map[string]any{
+					"keytag": kt,
+				}
+				setTypedAddressesFromValues(args, cdnskeySignedByUnknownDNSKEY[kt])
+				if err := appendLog(ctx, &results, testcase, "DS17_CDNSKEY_SIGNED_BY_UNKNOWN_DNSKEY", args); err != nil {
 					return results, err
 				}
 			}
@@ -6191,16 +6224,16 @@ func DNSSEC18(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 
 			if len(dsNoMatchCDSRRSIG) > 0 {
-				if err := appendLog(ctx, &results, testcase, "DS18_NO_MATCH_CDS_RRSIG_DS", map[string]any{
-					"ns_ip_list": joinUniqueSorted(mapKeysSorted(dsNoMatchCDSRRSIG)),
-				}); err != nil {
+				args := map[string]any{}
+				setTypedAddressesFromValues(args, mapKeysSorted(dsNoMatchCDSRRSIG))
+				if err := appendLog(ctx, &results, testcase, "DS18_NO_MATCH_CDS_RRSIG_DS", args); err != nil {
 					return results, err
 				}
 			}
 			if len(dsNoMatchCDNSKEYRRSIG) > 0 {
-				if err := appendLog(ctx, &results, testcase, "DS18_NO_MATCH_CDNSKEY_RRSIG_DS", map[string]any{
-					"ns_ip_list": joinUniqueSorted(mapKeysSorted(dsNoMatchCDNSKEYRRSIG)),
-				}); err != nil {
+				args := map[string]any{}
+				setTypedAddressesFromValues(args, mapKeysSorted(dsNoMatchCDNSKEYRRSIG))
+				if err := appendLog(ctx, &results, testcase, "DS18_NO_MATCH_CDNSKEY_RRSIG_DS", args); err != nil {
 					return results, err
 				}
 			}
@@ -6562,6 +6595,35 @@ func nsStrings(servers []nameserver.Nameserver) []string {
 
 func joinUniqueSorted(values []string) string {
 	return strings.Join(logargs.UniqueSortedEndpointNames(values), ";")
+}
+
+func uniqueSortedValues(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	seen := map[string]bool{}
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func setTypedAddressesFromValues(args map[string]any, values []string) {
+	if args == nil || len(values) == 0 {
+		return
+	}
+	addresses := uniqueSortedValues(values)
+	if len(addresses) == 0 {
+		return
+	}
+	args["addresses"] = append([]string(nil), addresses...)
 }
 
 func setTypedServersFromNames(args map[string]any, values []string) {

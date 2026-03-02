@@ -3,6 +3,7 @@ package connectivity
 import (
 	"context"
 	"net/netip"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -47,6 +48,17 @@ func TestConnectivity01IPv6Disabled(t *testing.T) {
 	}
 	if !hasEntryTag(entries, "CN01_IPV6_DISABLED") {
 		t.Fatalf("expected CN01_IPV6_DISABLED")
+	}
+	entry := findEntry(entries, "CN01_IPV6_DISABLED")
+	if entry == nil {
+		t.Fatalf("expected CN01_IPV6_DISABLED entry")
+	}
+	if _, ok := entry.Args["ns_list"]; ok {
+		t.Fatalf("did not expect legacy ns_list key in args")
+	}
+	names := serverNamesFromArgs(t, entry.Args)
+	if len(names) != 1 || names[0] != "ns2.example" {
+		t.Fatalf("expected typed servers with ns2.example, got %v", names)
 	}
 }
 
@@ -410,6 +422,17 @@ func TestConnectivity04SinglePrefix(t *testing.T) {
 	if !hasEntryTag(entries, "CN04_IPV4_SAME_PREFIX") {
 		t.Fatalf("expected CN04_IPV4_SAME_PREFIX")
 	}
+	samePrefix := findEntry(entries, "CN04_IPV4_SAME_PREFIX")
+	if samePrefix == nil {
+		t.Fatalf("expected CN04_IPV4_SAME_PREFIX entry")
+	}
+	if _, ok := samePrefix.Args["ns_list"]; ok {
+		t.Fatalf("did not expect legacy ns_list key in args")
+	}
+	names := serverNamesFromArgs(t, samePrefix.Args)
+	if len(names) != 2 || names[0] != "ns1.example" || names[1] != "ns2.example" {
+		t.Fatalf("expected typed servers [ns1.example ns2.example], got %v", names)
+	}
 	if !hasEntryTag(entries, "CN04_IPV4_SINGLE_PREFIX") {
 		t.Fatalf("expected CN04_IPV4_SINGLE_PREFIX")
 	}
@@ -443,6 +466,51 @@ func hasEntryTag(entries []*logger.Entry, tag string) bool {
 		}
 	}
 	return false
+}
+
+func findEntry(entries []*logger.Entry, tag string) *logger.Entry {
+	for _, entry := range entries {
+		if entry == nil {
+			continue
+		}
+		if entry.Tag == tag {
+			return entry
+		}
+	}
+	return nil
+}
+
+func serverNamesFromArgs(t *testing.T, args map[string]any) []string {
+	t.Helper()
+	raw, ok := args["servers"]
+	if !ok {
+		t.Fatalf("expected servers key in args")
+	}
+
+	var names []string
+	switch items := raw.(type) {
+	case []map[string]any:
+		for _, item := range items {
+			if ns, ok := item["ns"].(string); ok && ns != "" {
+				names = append(names, ns)
+			}
+		}
+	case []any:
+		for _, item := range items {
+			m, ok := item.(map[string]any)
+			if !ok {
+				continue
+			}
+			if ns, ok := m["ns"].(string); ok && ns != "" {
+				names = append(names, ns)
+			}
+		}
+	default:
+		t.Fatalf("unexpected servers type: %T", raw)
+	}
+
+	sort.Strings(names)
+	return names
 }
 
 func soaPacket(owner string, mname string, rname string) packet.Packet {

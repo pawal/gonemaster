@@ -13,6 +13,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/methods"
 	methodsv2 "codeberg.org/pawal/gonemaster/engine/methodsv2"
@@ -175,9 +176,9 @@ func Address01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(globallyReachable) > 0 {
-		if err := appendAddressLog(ctx, &results, testcase, "A01_GLOBALLY_REACHABLE_ADDR", map[string]any{
-			"ns_list": joinNSList(globallyReachable),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromEndpoints(args, globallyReachable)
+		if err := appendAddressLog(ctx, &results, testcase, "A01_GLOBALLY_REACHABLE_ADDR", args); err != nil {
 			return results, err
 		}
 	} else {
@@ -187,25 +188,25 @@ func Address01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(documentationAddr) > 0 {
-		if err := appendAddressLog(ctx, &results, testcase, "A01_DOCUMENTATION_ADDR", map[string]any{
-			"ns_list": joinNSList(documentationAddr),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromEndpoints(args, documentationAddr)
+		if err := appendAddressLog(ctx, &results, testcase, "A01_DOCUMENTATION_ADDR", args); err != nil {
 			return results, err
 		}
 	}
 
 	if len(localUseAddr) > 0 {
-		if err := appendAddressLog(ctx, &results, testcase, "A01_LOCAL_USE_ADDR", map[string]any{
-			"ns_list": joinNSList(localUseAddr),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromEndpoints(args, localUseAddr)
+		if err := appendAddressLog(ctx, &results, testcase, "A01_LOCAL_USE_ADDR", args); err != nil {
 			return results, err
 		}
 	}
 
 	if len(notGloballyReachable) > 0 {
-		if err := appendAddressLog(ctx, &results, testcase, "A01_ADDR_NOT_GLOBALLY_REACHABLE", map[string]any{
-			"ns_list": joinNSList(notGloballyReachable),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromEndpoints(args, notGloballyReachable)
+		if err := appendAddressLog(ctx, &results, testcase, "A01_ADDR_NOT_GLOBALLY_REACHABLE", args); err != nil {
 			return results, err
 		}
 	}
@@ -482,9 +483,54 @@ func nsItemStrings(items []methodsv2.NSItem) []string {
 	return out
 }
 
-func joinNSList(items []string) string {
-	unique := uniqueSortedStrings(items)
-	return strings.Join(unique, ";")
+func setTypedServersFromEndpoints(args map[string]any, values []string) {
+	if args == nil || len(values) == 0 {
+		return
+	}
+	seen := map[string]bool{}
+	servers := make([]logargs.Server, 0, len(values))
+	for _, value := range values {
+		ns, address := parseEndpoint(value)
+		if ns == "" && address == "" {
+			continue
+		}
+		key := ns + "|" + address
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		servers = append(servers, logargs.Server{NS: ns, Address: address})
+	}
+	if len(servers) == 0 {
+		return
+	}
+	if typed, ok := logargs.Servers(servers)["servers"]; ok {
+		args["servers"] = typed
+	}
+}
+
+func parseEndpoint(value string) (string, string) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", ""
+	}
+
+	sep := strings.LastIndex(value, "/")
+	if sep > 0 && sep < len(value)-1 {
+		name := strings.TrimSpace(value[:sep])
+		ipText := strings.TrimSpace(value[sep+1:])
+		if name != "" {
+			if ip, err := netip.ParseAddr(ipText); err == nil {
+				return logargs.EndpointName(name), ip.String()
+			}
+		}
+	}
+
+	if ip, err := netip.ParseAddr(value); err == nil {
+		return "", ip.String()
+	}
+
+	return logargs.EndpointName(value), ""
 }
 
 func uniqueSortedStrings(items []string) []string {

@@ -535,6 +535,27 @@ func TestNameserver10NoResponseEDNS1(t *testing.T) {
 	if !hasEntryTag(entries, "N10_NO_RESPONSE_EDNS1_QUERY") {
 		t.Fatalf("expected N10_NO_RESPONSE_EDNS1_QUERY")
 	}
+
+	var entry *logger.Entry
+	for _, item := range entries {
+		if item != nil && item.Tag == "N10_NO_RESPONSE_EDNS1_QUERY" {
+			entry = item
+			break
+		}
+	}
+	if entry == nil {
+		t.Fatalf("expected N10_NO_RESPONSE_EDNS1_QUERY entry payload")
+	}
+	if _, ok := entry.Args["ns_ip_list"]; ok {
+		t.Fatalf("legacy key ns_ip_list should not be present: %#v", entry.Args)
+	}
+	addresses, ok := entry.Args["addresses"].([]string)
+	if !ok || len(addresses) != 1 {
+		t.Fatalf("expected one typed address for N10_NO_RESPONSE_EDNS1_QUERY, got %#v", entry.Args["addresses"])
+	}
+	if strings.Join(addresses, ";") != "192.0.2.11" {
+		t.Fatalf("expected deterministic addresses order, got %#v", addresses)
+	}
 }
 
 func TestNameserver11ReturnsUnknownOption(t *testing.T) {
@@ -560,6 +581,27 @@ func TestNameserver11ReturnsUnknownOption(t *testing.T) {
 	}
 	if !hasEntryTag(entries, "N11_RETURNS_UNKNOWN_OPTION_CODE") {
 		t.Fatalf("expected N11_RETURNS_UNKNOWN_OPTION_CODE")
+	}
+
+	var entry *logger.Entry
+	for _, item := range entries {
+		if item != nil && item.Tag == "N11_RETURNS_UNKNOWN_OPTION_CODE" {
+			entry = item
+			break
+		}
+	}
+	if entry == nil {
+		t.Fatalf("expected N11_RETURNS_UNKNOWN_OPTION_CODE entry payload")
+	}
+	if _, ok := entry.Args["ns_ip_list"]; ok {
+		t.Fatalf("legacy key ns_ip_list should not be present: %#v", entry.Args)
+	}
+	addresses, ok := entry.Args["addresses"].([]string)
+	if !ok || len(addresses) != 1 {
+		t.Fatalf("expected one typed address for N11_RETURNS_UNKNOWN_OPTION_CODE, got %#v", entry.Args["addresses"])
+	}
+	if strings.Join(addresses, ";") != "192.0.2.12" {
+		t.Fatalf("expected deterministic addresses order, got %#v", addresses)
 	}
 }
 
@@ -672,6 +714,27 @@ func TestNameserver15SoftwareVersionAndWrongClass(t *testing.T) {
 	}
 	if !hasEntryTag(entries, "N15_WRONG_CLASS") {
 		t.Fatalf("expected N15_WRONG_CLASS")
+	}
+
+	var software *logger.Entry
+	for _, item := range entries {
+		if item != nil && item.Tag == "N15_SOFTWARE_VERSION" {
+			software = item
+			break
+		}
+	}
+	if software == nil {
+		t.Fatalf("expected N15_SOFTWARE_VERSION entry payload")
+	}
+	if _, ok := software.Args["ns_list"]; ok {
+		t.Fatalf("legacy key ns_list should not be present: %#v", software.Args)
+	}
+	servers, ok := software.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 {
+		t.Fatalf("expected one typed server for N15_SOFTWARE_VERSION, got %#v", software.Args["servers"])
+	}
+	if servers[0]["ns"] != "ns1.example" {
+		t.Fatalf("unexpected server payload for N15_SOFTWARE_VERSION: %#v", servers[0])
 	}
 }
 
@@ -816,6 +879,27 @@ func TestNameserver16HasNSID(t *testing.T) {
 	if hasEntryTag(entries, "N16_NO_NSID_REVEALED") {
 		t.Fatalf("unexpected N16_NO_NSID_REVEALED")
 	}
+
+	var hasNSID *logger.Entry
+	for _, item := range entries {
+		if item != nil && item.Tag == "N16_HAS_NSID" {
+			hasNSID = item
+			break
+		}
+	}
+	if hasNSID == nil {
+		t.Fatalf("expected N16_HAS_NSID entry payload")
+	}
+	if _, ok := hasNSID.Args["ns_list"]; ok {
+		t.Fatalf("legacy key ns_list should not be present: %#v", hasNSID.Args)
+	}
+	servers, ok := hasNSID.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 {
+		t.Fatalf("expected one typed server for N16_HAS_NSID, got %#v", hasNSID.Args["servers"])
+	}
+	if servers[0]["ns"] != "ns1.example" {
+		t.Fatalf("unexpected server payload for N16_HAS_NSID: %#v", servers[0])
+	}
 }
 
 func TestNameserver16NoNSID(t *testing.T) {
@@ -844,5 +928,26 @@ func TestNameserver16NoNSID(t *testing.T) {
 	}
 	if !hasEntryTag(entries, "N16_NO_NSID_REVEALED") {
 		t.Fatalf("expected N16_NO_NSID_REVEALED")
+	}
+
+	var noNSID *logger.Entry
+	for _, item := range entries {
+		if item != nil && item.Tag == "N16_NO_NSID_REVEALED" {
+			noNSID = item
+			break
+		}
+	}
+	if noNSID == nil {
+		t.Fatalf("expected N16_NO_NSID_REVEALED entry payload")
+	}
+	if _, ok := noNSID.Args["ns_list"]; ok {
+		t.Fatalf("legacy key ns_list should not be present: %#v", noNSID.Args)
+	}
+	servers, ok := noNSID.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 {
+		t.Fatalf("expected one typed server for N16_NO_NSID_REVEALED, got %#v", noNSID.Args["servers"])
+	}
+	if servers[0]["ns"] != "ns1.example" {
+		t.Fatalf("unexpected server payload for N16_NO_NSID_REVEALED: %#v", servers[0])
 	}
 }

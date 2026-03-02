@@ -282,10 +282,11 @@ func Consistency01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	for _, serial := range serialKeys {
 		nsList := normalizeEndpointNames(serials[serial])
-		if err := appendLog(ctx, &results, testcase, "SOA_SERIAL", map[string]any{
-			"serial":  serial,
-			"ns_list": strings.Join(nsList, ";"),
-		}); err != nil {
+		args := map[string]any{
+			"serial": serial,
+		}
+		setTypedServersFromNames(args, strings.Join(nsList, ";"))
+		if err := appendLog(ctx, &results, testcase, "SOA_SERIAL", args); err != nil {
 			return results, err
 		}
 	}
@@ -442,10 +443,11 @@ func Consistency02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 		for _, rname := range order {
-			if err := appendLog(ctx, &results, testcase, "SOA_RNAME", map[string]any{
-				"rname":   rname,
-				"ns_list": strings.Join(normalizeEndpointNames(rnames[rname]), ";"),
-			}); err != nil {
+			args := map[string]any{
+				"rname": rname,
+			}
+			setTypedServersFromNames(args, strings.Join(normalizeEndpointNames(rnames[rname]), ";"))
+			if err := appendLog(ctx, &results, testcase, "SOA_RNAME", args); err != nil {
 				return results, err
 			}
 		}
@@ -591,13 +593,14 @@ func Consistency03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		for _, setKey := range order {
 			params := timeValues[setKey]
 			nsList := normalizeEndpointNames(timeSets[setKey])
-			if err := appendLog(ctx, &results, testcase, "SOA_TIME_PARAMETER_SET", map[string]any{
+			args := map[string]any{
 				"refresh": params.refresh,
 				"retry":   params.retry,
 				"expire":  params.expire,
 				"minimum": params.minimum,
-				"ns_list": strings.Join(nsList, ";"),
-			}); err != nil {
+			}
+			setTypedServersFromNames(args, strings.Join(nsList, ";"))
+			if err := appendLog(ctx, &results, testcase, "SOA_TIME_PARAMETER_SET", args); err != nil {
 				return results, err
 			}
 		}
@@ -736,10 +739,11 @@ func Consistency04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 		for _, setKey := range order {
-			if err := appendLog(ctx, &results, testcase, "NS_SET", map[string]any{
+			args := map[string]any{
 				"nsname_list": setKey,
-				"servers":     strings.Join(nsSets[setKey], ";"),
-			}); err != nil {
+			}
+			setTypedServersFromNames(args, strings.Join(normalizeEndpointNames(nsSets[setKey]), ";"))
+			if err := appendLog(ctx, &results, testcase, "NS_SET", args); err != nil {
 				return results, err
 			}
 		}
@@ -923,9 +927,13 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(ibExtraChild) > 0 {
-		sort.Strings(ibExtraChild)
+		addresses := addressesFromAddrKeys(ibExtraChild)
+		if len(addresses) == 0 {
+			addresses = append([]string(nil), ibExtraChild...)
+			sort.Strings(addresses)
+		}
 		if err := appendLog(ctx, &results, testcase, "EXTRA_ADDRESS_CHILD", map[string]any{
-			"ns_ip_list": strings.Join(ibExtraChild, ";"),
+			"addresses": addresses,
 		}); err != nil {
 			return results, err
 		}
@@ -1106,10 +1114,11 @@ func Consistency06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 		for _, mname := range order {
-			if err := appendLog(ctx, &results, testcase, "SOA_MNAME", map[string]any{
-				"mname":   mname,
-				"ns_list": strings.Join(normalizeEndpointNames(mnames[mname]), ";"),
-			}); err != nil {
+			args := map[string]any{
+				"mname": mname,
+			}
+			setTypedServersFromNames(args, strings.Join(normalizeEndpointNames(mnames[mname]), ";"))
+			if err := appendLog(ctx, &results, testcase, "SOA_MNAME", args); err != nil {
 				return results, err
 			}
 		}
@@ -1268,6 +1277,28 @@ func sortedKeys(m map[string]bool) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+func addressesFromAddrKeys(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	seen := map[string]bool{}
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		address := strings.TrimSpace(value)
+		sep := strings.LastIndex(address, "/")
+		if sep >= 0 && sep < len(address)-1 {
+			address = strings.TrimSpace(address[sep+1:])
+		}
+		if address == "" || seen[address] {
+			continue
+		}
+		seen[address] = true
+		out = append(out, address)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func normalizeEndpointNames(values []string) []string {

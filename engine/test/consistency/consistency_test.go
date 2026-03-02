@@ -68,6 +68,16 @@ func TestConsistency01MultipleSerials(t *testing.T) {
 	if !hasEntryTag(entries, "SOA_SERIAL") {
 		t.Fatalf("expected SOA_SERIAL")
 	}
+	entry := firstEntryByTag(entries, "SOA_SERIAL")
+	if entry == nil {
+		t.Fatalf("missing SOA_SERIAL entry")
+	}
+	if _, ok := entry.Args["servers"]; !ok {
+		t.Fatalf("expected typed servers in SOA_SERIAL args: %#v", entry.Args)
+	}
+	if _, ok := entry.Args["ns_list"]; ok {
+		t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
+	}
 }
 
 func TestConsistency02MultipleRnames(t *testing.T) {
@@ -116,6 +126,16 @@ func TestConsistency02MultipleRnames(t *testing.T) {
 	if !hasEntryTag(entries, "SOA_RNAME") {
 		t.Fatalf("expected SOA_RNAME")
 	}
+	entry := firstEntryByTag(entries, "SOA_RNAME")
+	if entry == nil {
+		t.Fatalf("missing SOA_RNAME entry")
+	}
+	if _, ok := entry.Args["servers"]; !ok {
+		t.Fatalf("expected typed servers in SOA_RNAME args: %#v", entry.Args)
+	}
+	if _, ok := entry.Args["ns_list"]; ok {
+		t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
+	}
 }
 
 func TestConsistency03MultipleTimeSets(t *testing.T) {
@@ -160,6 +180,19 @@ func TestConsistency03MultipleTimeSets(t *testing.T) {
 	}
 	if !hasEntryTag(entries, "MULTIPLE_SOA_TIME_PARAMETER_SET") {
 		t.Fatalf("expected MULTIPLE_SOA_TIME_PARAMETER_SET")
+	}
+	if !hasEntryTag(entries, "SOA_TIME_PARAMETER_SET") {
+		t.Fatalf("expected SOA_TIME_PARAMETER_SET")
+	}
+	entry := firstEntryByTag(entries, "SOA_TIME_PARAMETER_SET")
+	if entry == nil {
+		t.Fatalf("missing SOA_TIME_PARAMETER_SET entry")
+	}
+	if _, ok := entry.Args["servers"]; !ok {
+		t.Fatalf("expected typed servers in SOA_TIME_PARAMETER_SET args: %#v", entry.Args)
+	}
+	if _, ok := entry.Args["ns_list"]; ok {
+		t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
 	}
 }
 
@@ -363,14 +396,14 @@ func TestConsistency04ParallelNSQueries(t *testing.T) {
 		if entry == nil || entry.Tag != "NS_SET" {
 			continue
 		}
-		if servers, ok := entry.Args["servers"].(string); ok {
-			order = append(order, servers)
+		if name := firstServerName(entry.Args); name != "" {
+			order = append(order, name)
 		}
 	}
 	if len(order) != 2 {
 		t.Fatalf("expected 2 NS_SET entries, got %v", order)
 	}
-	if order[0] != "ns1.example/192.0.2.1" || order[1] != "ns2.example/192.0.2.2" {
+	if order[0] != "ns1.example" || order[1] != "ns2.example" {
 		t.Fatalf("expected deterministic log order, got %v", order)
 	}
 }
@@ -572,6 +605,17 @@ func TestConsistency05InBailiwickMismatch(t *testing.T) {
 	if !hasEntryTag(entries, "EXTRA_ADDRESS_CHILD") {
 		t.Fatalf("expected EXTRA_ADDRESS_CHILD")
 	}
+	entry := firstEntryByTag(entries, "EXTRA_ADDRESS_CHILD")
+	if entry == nil {
+		t.Fatalf("missing EXTRA_ADDRESS_CHILD entry")
+	}
+	addresses, ok := entry.Args["addresses"].([]string)
+	if !ok || len(addresses) != 1 || addresses[0] != "192.0.2.2" {
+		t.Fatalf("expected typed addresses [192.0.2.2], got %#v", entry.Args["addresses"])
+	}
+	if _, ok := entry.Args["ns_ip_list"]; ok {
+		t.Fatalf("legacy key ns_ip_list should not be present: %#v", entry.Args)
+	}
 }
 
 func TestConsistency05OutOfBailiwickMismatch(t *testing.T) {
@@ -672,6 +716,16 @@ func TestConsistency06MultipleMnames(t *testing.T) {
 	if !hasEntryTag(entries, "SOA_MNAME") {
 		t.Fatalf("expected SOA_MNAME")
 	}
+	entry := firstEntryByTag(entries, "SOA_MNAME")
+	if entry == nil {
+		t.Fatalf("missing SOA_MNAME entry")
+	}
+	if _, ok := entry.Args["servers"]; !ok {
+		t.Fatalf("expected typed servers in SOA_MNAME args: %#v", entry.Args)
+	}
+	if _, ok := entry.Args["ns_list"]; ok {
+		t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
+	}
 }
 
 func newNameserver(t *testing.T, name string, ip string, handler func(qname string, qtype string) packet.Packet) nameserver.Nameserver {
@@ -714,6 +768,29 @@ func firstEntryByTag(entries []*logger.Entry, tag string) *logger.Entry {
 		}
 	}
 	return nil
+}
+
+func firstServerName(args map[string]any) string {
+	if args == nil {
+		return ""
+	}
+	switch servers := args["servers"].(type) {
+	case []map[string]any:
+		if len(servers) == 0 {
+			return ""
+		}
+		name, _ := servers[0]["ns"].(string)
+		return name
+	case []any:
+		if len(servers) == 0 {
+			return ""
+		}
+		item, _ := servers[0].(map[string]any)
+		name, _ := item["ns"].(string)
+		return name
+	default:
+		return ""
+	}
 }
 
 func soaPacket(owner string, serial uint32, mname string, rname string, refresh uint32, retry uint32, expire uint32, minimum uint32) packet.Packet {

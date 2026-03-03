@@ -664,11 +664,14 @@ func TestQueryLogging(t *testing.T) {
 		if entry.Tag == "EXTERNAL_QUERY" {
 			foundQuery = true
 			loggedArgs := entry.Args
-			if name, ok := loggedArgs["name"]; !ok || name != "example.com" {
-				t.Errorf("expected name=example.com, got %v", name)
+			if name, ok := loggedArgs["query_name"]; !ok || name != "example.com" {
+				t.Errorf("expected query_name=example.com, got %v", name)
 			}
-			if qtype, ok := loggedArgs["type"]; !ok || qtype != "SOA" {
-				t.Errorf("expected type=SOA, got %v", qtype)
+			if qtype, ok := loggedArgs["query_type"]; !ok || qtype != "SOA" {
+				t.Errorf("expected query_type=SOA, got %v", qtype)
+			}
+			if qclass, ok := loggedArgs["query_class"]; !ok || qclass != "IN" {
+				t.Errorf("expected query_class=IN, got %v", qclass)
 			}
 			if ip, ok := loggedArgs["ip"]; !ok || ip != "127.0.0.1" {
 				t.Errorf("expected ip=127.0.0.1, got %v", ip)

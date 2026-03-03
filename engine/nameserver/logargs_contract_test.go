@@ -55,10 +55,6 @@ func TestContract_ExternalQueryArgs(t *testing.T) {
 	requireStringArg(t, entry, "query_name", "example.com")
 	requireStringArg(t, entry, "query_type", "SOA")
 	requireStringArg(t, entry, "query_class", "IN")
-
-	// Legacy keys remain during migration and should still be present.
-	requireStringArg(t, entry, "name", "example.com")
-	requireStringArg(t, entry, "type", "SOA")
 	requireStringArg(t, entry, "ip", "127.0.0.1")
 }
 

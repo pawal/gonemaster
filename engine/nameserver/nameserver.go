@@ -155,13 +155,13 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 		return packet.Packet{}, nil
 	}
 	queryArgs := map[string]any{
-		"name":  qname,
-		"type":  qtype,
-		"flags": queryFlags(qclass, opts),
-		"ip":    ns.Address.String(),
+		"query_name":  qname,
+		"query_type":  qtype,
+		"query_class": qclass,
+		"flags":       queryFlags(qclass, opts),
+		"ip":          ns.Address.String(),
 	}
 	logargs.SetNS(queryArgs, ns.NameString(), ns.AddressString())
-	logargs.SetQueryIdentity(queryArgs, qname, qtype, qclass)
 	logSystemWithLogger(runLog, "QUERY", queryArgs)
 
 	if resp, ok := ns.fakeDSResponse(qname, qtype, qclass, opts, runLog); ok {
@@ -409,26 +409,26 @@ func (ns Nameserver) queryNetwork(ctx context.Context, qname string, qtype strin
 
 	// Emit EXTERNAL_QUERY log entry
 	queryArgs := map[string]any{
-		"name":  qname,
-		"type":  qtype,
-		"ip":    ns.Address.String(),
-		"flags": fmt.Sprintf(`{"class":%q}`, qclass),
+		"query_name":  qname,
+		"query_type":  qtype,
+		"query_class": qclass,
+		"ip":          ns.Address.String(),
+		"flags":       fmt.Sprintf(`{"class":%q}`, qclass),
 	}
 	logargs.SetNS(queryArgs, ns.NameString(), ns.AddressString())
-	logargs.SetQueryIdentity(queryArgs, qname, qtype, qclass)
 	logSystem(ctx, "EXTERNAL_QUERY", queryArgs)
 
 	resp, err := client.Exchange(ctx, server, msg)
 	resp.Log = loggerFromContextOrFallback(ctx, ns.log)
 
 	args := map[string]any{
-		"name":  qname,
-		"type":  qtype,
-		"ip":    ns.Address.String(),
-		"flags": fmt.Sprintf(`{"class":%q}`, qclass),
+		"query_name":  qname,
+		"query_type":  qtype,
+		"query_class": qclass,
+		"ip":          ns.Address.String(),
+		"flags":       fmt.Sprintf(`{"class":%q}`, qclass),
 	}
 	logargs.SetNS(args, ns.NameString(), ns.AddressString())
-	logargs.SetQueryIdentity(args, qname, qtype, qclass)
 	if resp.Msg != nil {
 		args["rcode"] = dns.RcodeToString[resp.Msg.Rcode]
 		args["answers"] = len(resp.Msg.Answer)

@@ -130,9 +130,9 @@ msgstr "これはルートゾーンのテストです。ルートゾーンには
 msgctxt "BASIC:B01_SERVER_ZONE_ERROR"
 msgid ""
 "Unexpected response on query for \"{query_name}\" with query type "
-"\"{rrtype}\" to \"{ns}/{address}\"."
+"\"{query_type}\" to \"{ns}/{address}\"."
 msgstr ""
-"\"{ns}/{address}\" への \"{rrtype}\" クエリ (\"{query_name}\") で予期しない応答を受信しました。"
+"\"{ns}/{address}\" への \"{query_type}\" クエリ (\"{query_name}\") で予期しない応答を受信しました。"
 
 msgctxt "BASIC:B02_AUTH_RESPONSE_SOA"
 msgid ""
@@ -203,12 +203,12 @@ msgid "Functional nameserver found. \"A\" query for www.{zname} test skipped."
 msgstr "動作するネームサーバーが見つかったため、www.{zname} への \"A\" クエリ試験をスキップしました。"
 
 msgctxt "BASIC:IPV4_ENABLED"
-msgid "IPv4 is enabled, can send \"{rrtype}\" query to {ns}/{address}."
-msgstr "IPv4 は有効です。{ns}/{address} に \"{rrtype}\" クエリを送信できます。"
+msgid "IPv4 is enabled, can send \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 は有効です。{ns}/{address} に \"{query_type}\" クエリを送信できます。"
 
 msgctxt "BASIC:IPV6_ENABLED"
-msgid "IPv6 is enabled, can send \"{rrtype}\" query to {ns}/{address}."
-msgstr "IPv6 は有効です。{ns}/{address} に \"{rrtype}\" クエリを送信できます。"
+msgid "IPv6 is enabled, can send \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 は有効です。{ns}/{address} に \"{query_type}\" クエリを送信できます。"
 
 msgctxt "BASIC:NO_A_RECORDS"
 msgid "Nameserver {ns}/{address} did not return \"A\" record(s) for {domain}."
@@ -223,8 +223,8 @@ msgstr "ネームサーバー {ns}/{address} は {domain} に対して \"A\" レ
 #. SYNTAX:IPV4_DISABLED
 #. ZONE:IPV4_DISABLED
 #. SYSTEM:SKIP_IPV4_DISABLED
-msgid "IPv4 is disabled, not sending \"{rrtype}\" query to {ns}/{address}."
-msgstr "IPv4 が無効のため、{ns}/{address} に \"{rrtype}\" クエリを送信しません。"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 が無効のため、{ns}/{address} に \"{query_type}\" クエリを送信しません。"
 
 #. BASIC:IPV6_DISABLED
 #. CONNECTIVITY:IPV6_DISABLED
@@ -235,8 +235,8 @@ msgstr "IPv4 が無効のため、{ns}/{address} に \"{rrtype}\" クエリを�
 #. SYNTAX:IPV6_DISABLED
 #. ZONE:IPV6_DISABLED
 #. SYSTEM:SKIP_IPV6_DISABLED
-msgid "IPv6 is disabled, not sending \"{rrtype}\" query to {ns}/{address}."
-msgstr "IPv6 が無効のため、{ns}/{address} に \"{rrtype}\" クエリを送信しません。"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 が無効のため、{ns}/{address} に \"{query_type}\" クエリを送信しません。"
 
 msgctxt "CONNECTIVITY:CN01_IPV4_DISABLED"
 msgid ""
@@ -781,8 +781,8 @@ msgstr "すべてのネームサーバー名が親ゾーンと子ゾーンの両
 msgctxt "DELEGATION:NO_RESPONSE"
 msgid ""
 "Nameserver {ns} did not respond to a query for name {query_name} and type "
-"{rrtype}."
-msgstr "ネームサーバー {ns} は {query_name}/{rrtype} クエリに応答しませんでした。"
+"{query_type}."
+msgstr "ネームサーバー {ns} は {query_name}/{query_type} クエリに応答しませんでした。"
 
 msgctxt "DELEGATION:NOT_ENOUGH_IPV4_NS_CHILD"
 msgid ""
@@ -902,10 +902,10 @@ msgstr "親ゾーンにあるネームサーバーは、子ゾーンには 1 つ
 
 msgctxt "DELEGATION:UNEXPECTED_RCODE"
 msgid ""
-"Nameserver {ns} answered query for name {query_name} and type {rrtype} with "
+"Nameserver {ns} answered query for name {query_name} and type {query_type} with "
 "RCODE {rcode}."
 msgstr ""
-"ネームサーバー {ns} は {query_name}/{rrtype} クエリに "
+"ネームサーバー {ns} は {query_name}/{query_type} クエリに "
 "RCODE {rcode} で応答しました。"
 
 msgctxt "ADDRESS:NAMESERVER_IP_WITHOUT_REVERSE"
@@ -1447,56 +1447,56 @@ msgstr "次のネームサーバー名は IP アドレスへ解決できませ�
 
 msgctxt "NAMESERVER:CASE_QUERIES_RESULTS_DIFFER"
 msgid ""
-"When asked for {type} records on \"{domain}\" with different cases, all "
+"When asked for {query_type} records on \"{domain}\" with different cases, all "
 "servers do not reply consistently."
 msgstr ""
-"\"{domain}\" への {type} クエリを大小文字違いで行うと、"
+"\"{domain}\" への {query_type} クエリを大小文字違いで行うと、"
 "サーバー間で応答結果が一致しません。"
 
 msgctxt "NAMESERVER:CASE_QUERIES_RESULTS_OK"
 msgid ""
-"When asked for {type} records on \"{domain}\" with different cases, all "
+"When asked for {query_type} records on \"{domain}\" with different cases, all "
 "servers reply consistently."
 msgstr ""
-"\"{domain}\" への {type} クエリを大小文字違いで行っても、"
+"\"{domain}\" への {query_type} クエリを大小文字違いで行っても、"
 "サーバー間で応答結果は一致します。"
 
 msgctxt "NAMESERVER:CASE_QUERY_DIFFERENT_ANSWER"
 msgid ""
-"When asked for {type} records on \"{query1}\" and \"{query2}\", nameserver "
+"When asked for {query_type} records on \"{query1}\" and \"{query2}\", nameserver "
 "{ns}/{address} returns different answers."
 msgstr ""
-"{ns}/{address} は \"{query1}\" と \"{query2}\" への {type} クエリに"
+"{ns}/{address} は \"{query1}\" と \"{query2}\" への {query_type} クエリに"
 "異なる回答を返しました。"
 
 msgctxt "NAMESERVER:CASE_QUERY_DIFFERENT_RC"
 msgid ""
-"When asked for {type} records on \"{query1}\" and \"{query2}\", nameserver "
+"When asked for {query_type} records on \"{query1}\" and \"{query2}\", nameserver "
 "{ns}/{address} returns different RCODE (\"{rcode1}\" vs \"{rcode2}\")."
 msgstr ""
-"{ns}/{address} は \"{query1}\" と \"{query2}\" への {type} クエリで"
+"{ns}/{address} は \"{query1}\" と \"{query2}\" への {query_type} クエリで"
 "異なる RCODE (\"{rcode1}\" vs \"{rcode2}\") を返しました。"
 
 msgctxt "NAMESERVER:CASE_QUERY_NO_ANSWER"
 msgid ""
-"When asked for {type} records on \"{domain}\", nameserver {ns}/{address} returns "
+"When asked for {query_type} records on \"{domain}\", nameserver {ns}/{address} returns "
 "nothing."
-msgstr "{ns}/{address} は \"{domain}\" への {type} クエリに応答を返しませんでした。"
+msgstr "{ns}/{address} は \"{domain}\" への {query_type} クエリに応答を返しませんでした。"
 
 msgctxt "NAMESERVER:CASE_QUERY_SAME_ANSWER"
 msgid ""
-"When asked for {type} records on \"{query1}\" and \"{query2}\", nameserver "
+"When asked for {query_type} records on \"{query1}\" and \"{query2}\", nameserver "
 "{ns}/{address} returns same answers."
 msgstr ""
-"{ns}/{address} は \"{query1}\" と \"{query2}\" への {type} クエリに"
+"{ns}/{address} は \"{query1}\" と \"{query2}\" への {query_type} クエリに"
 "同じ回答を返しました。"
 
 msgctxt "NAMESERVER:CASE_QUERY_SAME_RC"
 msgid ""
-"When asked for {type} records on \"{query1}\" and \"{query2}\", nameserver "
+"When asked for {query_type} records on \"{query1}\" and \"{query2}\", nameserver "
 "{ns}/{address} returns same RCODE \"{rcode}\"."
 msgstr ""
-"{ns}/{address} は \"{query1}\" と \"{query2}\" への {type} クエリに"
+"{ns}/{address} は \"{query1}\" と \"{query2}\" への {query_type} クエリに"
 "同じ RCODE \"{rcode}\" を返しました。"
 
 msgctxt "NAMESERVER:DIFFERENT_SOURCE_IP"
@@ -2891,11 +2891,11 @@ msgstr ""
 
 msgctxt "DNSSEC:DS10_ANSWER_VERIFY_ERROR"
 msgid ""
-"The name \"{domain}\" of RR type \"{rrtype}\" is signed by RRSIG, but the "
+"The name \"{domain}\" of RR type \"{query_type}\" is signed by RRSIG, but the "
 "signature or signatures cannot be verified. Fetched from the nameservers "
 "with IP addresses \"{addresses}\"."
 msgstr ""
-"RR タイプ \"{rrtype}\" の名前 \"{domain}\" は RRSIG で署名されていますが、"
+"RR タイプ \"{query_type}\" の名前 \"{domain}\" は RRSIG で署名されていますが、"
 "署名を検証できません。取得元ネームサーバー IP: \"{addresses}\"。"
 
 msgctxt "DNSSEC:DS10_ERR_MULT_NSEC"
@@ -3142,11 +3142,11 @@ msgstr ""
 
 msgctxt "DNSSEC:DS10_UNSIGNED_ANSWER"
 msgid ""
-"The name \"{domain}\" of RR type \"{rrtype}\" in the answer section of the "
+"The name \"{domain}\" of RR type \"{query_type}\" in the answer section of the "
 "response is not signed by any RRSIG. Fetched from the nameservers with IP "
 "addresses \"{addresses}\"."
 msgstr ""
-"応答の answer セクションにある RR タイプ \"{rrtype}\" の名前 \"{domain}\" が、"
+"応答の answer セクションにある RR タイプ \"{query_type}\" の名前 \"{domain}\" が、"
 "どの RRSIG にも署名されていません。取得元ネームサーバー IP: \"{addresses}\"。"
 
 msgctxt "DNSSEC:DS10_ZONE_NO_DNSSEC"

@@ -597,7 +597,7 @@ func Delegation05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						buf := testlogger.Wrap(log, moduleName, testcase)
 						args := withNameserverArgs(ns, map[string]any{
 							"query_name": nsName.String(),
-							"rrtype":     "A",
+							"query_type": "A",
 						})
 
 						disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "A")
@@ -1017,7 +1017,7 @@ func withNameserverArgs(ns nameserver.Nameserver, args map[string]any) map[strin
 	if args == nil {
 		args = map[string]any{}
 	}
-	logargs.EnsureQueryIdentity(args)
+	logargs.NormalizeQueryIdentity(args)
 	logargs.SetNS(args, ns.NameString(), ns.AddressString())
 	return args
 }
@@ -1026,7 +1026,7 @@ func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, ns
 	if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 		for _, rrtype := range rrtypes {
 			if _, err := buf.Add("IPV6_DISABLED", withNameserverArgs(ns, map[string]any{
-				"rrtype": rrtype,
+				"query_type": rrtype,
 			})); err != nil {
 				return true, err
 			}
@@ -1036,7 +1036,7 @@ func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, ns
 	if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
 		for _, rrtype := range rrtypes {
 			if _, err := buf.Add("IPV4_DISABLED", withNameserverArgs(ns, map[string]any{
-				"rrtype": rrtype,
+				"query_type": rrtype,
 			})); err != nil {
 				return true, err
 			}

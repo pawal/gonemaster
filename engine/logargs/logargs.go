@@ -147,6 +147,18 @@ func EnsureQueryIdentity(args map[string]any) {
 	}
 }
 
+// NormalizeQueryIdentity ensures canonical query keys and drops legacy
+// query aliases used during migration.
+func NormalizeQueryIdentity(args map[string]any) {
+	if args == nil {
+		return
+	}
+	EnsureQueryIdentity(args)
+	delete(args, "rrtype")
+	delete(args, "type")
+	delete(args, "class")
+}
+
 // EndpointName returns a canonical nameserver name when value is a mixed
 // endpoint identity in "<name>/<ip>" form. Non-endpoint values are returned as-is.
 func EndpointName(value string) string {

@@ -248,8 +248,9 @@ func (p Packet) NoSuchRecord() bool {
 	}
 	args := map[string]any{}
 	if name, qtype, ok := packetQuestionInfo(p.Msg); ok {
-		args["name"] = name
-		args["type"] = qtype
+		args["query_name"] = name
+		args["query_type"] = qtype
+		args["query_class"] = "IN"
 	}
 	p.logSystem("NO_SUCH_RECORD", args)
 	return true
@@ -262,8 +263,9 @@ func (p Packet) NoSuchName() bool {
 	}
 	args := map[string]any{}
 	if name, qtype, ok := packetQuestionInfo(p.Msg); ok {
-		args["name"] = name
-		args["type"] = qtype
+		args["query_name"] = name
+		args["query_type"] = qtype
+		args["query_class"] = "IN"
 	}
 	p.logSystem("NO_SUCH_NAME", args)
 	return true
@@ -276,8 +278,9 @@ func (p Packet) IsRedirect() bool {
 	}
 	args := map[string]any{}
 	if name, qtype, ok := packetQuestionInfo(p.Msg); ok {
-		args["name"] = name
-		args["type"] = qtype
+		args["query_name"] = name
+		args["query_type"] = qtype
+		args["query_class"] = "IN"
 	}
 	if p.Msg != nil && len(p.Msg.Ns) > 0 {
 		args["to"] = dnsname.New(p.Msg.Ns[0].Header().Name).String()

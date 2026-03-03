@@ -137,6 +137,31 @@ func TestEnsureQueryIdentityKeepsCanonicalValues(t *testing.T) {
 	}
 }
 
+func TestNormalizeQueryIdentityDropsLegacyAliases(t *testing.T) {
+	args := map[string]any{
+		"rrtype": "soa",
+		"class":  "in",
+		"type":   "A",
+	}
+	NormalizeQueryIdentity(args)
+
+	if args["query_type"] != "SOA" {
+		t.Fatalf("unexpected query_type: %#v", args["query_type"])
+	}
+	if args["query_class"] != "IN" {
+		t.Fatalf("unexpected query_class: %#v", args["query_class"])
+	}
+	if _, ok := args["rrtype"]; ok {
+		t.Fatalf("did not expect rrtype in %#v", args)
+	}
+	if _, ok := args["type"]; ok {
+		t.Fatalf("did not expect type in %#v", args)
+	}
+	if _, ok := args["class"]; ok {
+		t.Fatalf("did not expect class in %#v", args)
+	}
+}
+
 func TestSetNSSetsOnlyProvidedValues(t *testing.T) {
 	args := map[string]any{}
 	SetNS(args, "", " 192.0.2.44 ")

@@ -766,7 +766,7 @@ func withNameserverArgs(ns nameserver.Nameserver, args map[string]any) map[strin
 	if args == nil {
 		args = map[string]any{}
 	}
-	logargs.EnsureQueryIdentity(args)
+	logargs.NormalizeQueryIdentity(args)
 	logargs.SetNS(args, ns.NameString(), ns.AddressString())
 	return args
 }
@@ -774,7 +774,7 @@ func withNameserverArgs(ns nameserver.Nameserver, args map[string]any) map[strin
 func ipDisabledMessage(ctx context.Context, results *[]*logger.Entry, testcase string, ns nameserver.Nameserver, rrtype string) (bool, error) {
 	if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
 		if err := appendLog(ctx, results, testcase, "IPV4_DISABLED", withNameserverArgs(ns, map[string]any{
-			"rrtype": rrtype,
+			"query_type": rrtype,
 		})); err != nil {
 			return true, err
 		}
@@ -782,7 +782,7 @@ func ipDisabledMessage(ctx context.Context, results *[]*logger.Entry, testcase s
 	}
 	if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 		if err := appendLog(ctx, results, testcase, "IPV6_DISABLED", withNameserverArgs(ns, map[string]any{
-			"rrtype": rrtype,
+			"query_type": rrtype,
 		})); err != nil {
 			return true, err
 		}

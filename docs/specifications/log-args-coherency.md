@@ -28,7 +28,7 @@ Applies to all emitted log entries consumed through:
 | Nameserver IP list (structured) | `addresses` | `array<string>` | Typed list for machine use. |
 | ASN (single) | `asn` | `int` | Singular ASN value for explicit one-ASN semantics. |
 | ASN collection | `asns` | `array<int>` | Structured ASN list for machine use. |
-| Query name/type/class | `query_name`, `rrtype`, `type`, `query_type`, `query_class` | `string` | Partially overlapping key set. |
+| Query name/type/class | canonical `query_name`, `query_type`, `query_class` | `string` | Legacy aliases remain only in non-migrated/system paths. |
 
 ## Current Migration Status
 

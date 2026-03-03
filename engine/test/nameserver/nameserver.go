@@ -1103,18 +1103,18 @@ func Nameserver09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					answer2 = normalizedAnswer(p2)
 					if answer1 == answer2 {
 						if _, err := buf.Add("CASE_QUERY_SAME_ANSWER", withNameserverArgs(server, map[string]any{
-							"type":   recordType,
-							"query1": random1,
-							"query2": random2,
+							"query_type": recordType,
+							"query1":     random1,
+							"query2":     random2,
 						})); err != nil {
 							return err
 						}
 					} else {
 						outcome.mismatch = true
 						if _, err := buf.Add("CASE_QUERY_DIFFERENT_ANSWER", withNameserverArgs(server, map[string]any{
-							"type":   recordType,
-							"query1": random1,
-							"query2": random2,
+							"query_type": recordType,
+							"query1":     random1,
+							"query2":     random2,
 						})); err != nil {
 							return err
 						}
@@ -1122,21 +1122,21 @@ func Nameserver09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				} else if p1.Msg != nil && p2.Msg != nil {
 					if p1.Rcode() == p2.Rcode() {
 						if _, err := buf.Add("CASE_QUERY_SAME_RC", withNameserverArgs(server, map[string]any{
-							"type":   recordType,
-							"query1": random1,
-							"query2": random2,
-							"rcode":  p1.Rcode(),
+							"query_type": recordType,
+							"query1":     random1,
+							"query2":     random2,
+							"rcode":      p1.Rcode(),
 						})); err != nil {
 							return err
 						}
 					} else {
 						outcome.mismatch = true
 						if _, err := buf.Add("CASE_QUERY_DIFFERENT_RC", withNameserverArgs(server, map[string]any{
-							"type":   recordType,
-							"query1": random1,
-							"query2": random2,
-							"rcode1": p1.Rcode(),
-							"rcode2": p2.Rcode(),
+							"query_type": recordType,
+							"query1":     random1,
+							"query2":     random2,
+							"rcode1":     p1.Rcode(),
+							"rcode2":     p2.Rcode(),
 						})); err != nil {
 							return err
 						}
@@ -1144,8 +1144,8 @@ func Nameserver09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				} else if p1.Msg != nil || p2.Msg != nil {
 					outcome.mismatch = true
 					if _, err := buf.Add("CASE_QUERY_NO_ANSWER", withNameserverArgs(server, map[string]any{
-						"type":   recordType,
-						"domain": firstNonEmpty(random1, p1, random2, p2),
+						"query_type": recordType,
+						"domain":     firstNonEmpty(random1, p1, random2, p2),
 					})); err != nil {
 						return err
 					}
@@ -1174,15 +1174,15 @@ func Nameserver09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	if allResultsMatch {
 		if err := appendLog(ctx, &results, testcase, "CASE_QUERIES_RESULTS_OK", map[string]any{
-			"type":   recordType,
-			"domain": original,
+			"query_type": recordType,
+			"domain":     original,
 		}); err != nil {
 			return results, err
 		}
 	} else {
 		if err := appendLog(ctx, &results, testcase, "CASE_QUERIES_RESULTS_DIFFER", map[string]any{
-			"type":   recordType,
-			"domain": original,
+			"query_type": recordType,
+			"domain":     original,
 		}); err != nil {
 			return results, err
 		}
@@ -2131,7 +2131,7 @@ func withNameserverArgs(server ns.Nameserver, args map[string]any) map[string]an
 	if args == nil {
 		args = map[string]any{}
 	}
-	logargs.EnsureQueryIdentity(args)
+	logargs.NormalizeQueryIdentity(args)
 	logargs.SetNS(args, server.NameString(), server.AddressString())
 	return args
 }
@@ -2140,7 +2140,7 @@ func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, se
 	if server.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 		for _, rrtype := range rrtypes {
 			if _, err := buf.Add("IPV6_DISABLED", withNameserverArgs(server, map[string]any{
-				"rrtype": rrtype,
+				"query_type": rrtype,
 			})); err != nil {
 				return true, err
 			}
@@ -2150,7 +2150,7 @@ func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, se
 	if server.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
 		for _, rrtype := range rrtypes {
 			if _, err := buf.Add("IPV4_DISABLED", withNameserverArgs(server, map[string]any{
-				"rrtype": rrtype,
+				"query_type": rrtype,
 			})); err != nil {
 				return true, err
 			}

@@ -187,13 +187,12 @@ func (ns Nameserver) fakeDSResponse(name string, qtype string, qclass string, op
 
 	resp := packet.Packet{Msg: msg, AnswerFrom: ns.Address.String(), Log: runLog}
 	logArgs := map[string]any{
-		"name":  nameObj.String(),
-		"type":  qtype,
-		"class": qclass,
-		"from":  ns.String(),
+		"query_name":  nameObj.String(),
+		"query_type":  qtype,
+		"query_class": qclass,
+		"from":        ns.String(),
 	}
 	logargs.SetNS(logArgs, ns.NameString(), ns.AddressString())
-	logargs.SetQueryIdentity(logArgs, nameObj.String(), qtype, qclass)
 	logSystemWithLogger(runLog, "FAKE_DS_RETURNED", logArgs)
 	logSystemWithLogger(runLog, "FAKE_PACKET_RETURNED", map[string]any{
 		"packet": resp.String(),
@@ -240,13 +239,12 @@ func (ns Nameserver) fakeDelegationResponse(name string, qtype string, qclass st
 
 		resp := packet.Packet{Msg: msg, AnswerFrom: ns.Address.String(), Log: runLog}
 		logArgs := map[string]any{
-			"name":  nameObj.String(),
-			"type":  qtype,
-			"class": qclass,
-			"from":  ns.String(),
+			"query_name":  nameObj.String(),
+			"query_type":  qtype,
+			"query_class": qclass,
+			"from":        ns.String(),
 		}
 		logargs.SetNS(logArgs, ns.NameString(), ns.AddressString())
-		logargs.SetQueryIdentity(logArgs, nameObj.String(), qtype, qclass)
 		logSystemWithLogger(runLog, "FAKE_DELEGATION_RETURNED", logArgs)
 		logSystemWithLogger(runLog, "FAKE_PACKET_RETURNED", map[string]any{
 			"packet": resp.String(),

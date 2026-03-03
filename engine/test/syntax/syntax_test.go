@@ -339,8 +339,11 @@ func TestSyntax06IPv4DisabledArgsSplit(t *testing.T) {
 	if address, ok := entry.Args["address"].(string); !ok || address != "192.0.2.1" {
 		t.Fatalf("expected address=192.0.2.1, got %#v", entry.Args["address"])
 	}
-	if rrtype, ok := entry.Args["rrtype"].(string); !ok || rrtype != "SOA" {
-		t.Fatalf("expected rrtype=SOA, got %#v", entry.Args["rrtype"])
+	if _, ok := entry.Args["rrtype"]; ok {
+		t.Fatalf("did not expect legacy rrtype in args: %#v", entry.Args["rrtype"])
+	}
+	if qtype, ok := entry.Args["query_type"].(string); !ok || qtype != "SOA" {
+		t.Fatalf("expected query_type=SOA, got %#v", entry.Args["query_type"])
 	}
 	if nsArg, _ := entry.Args["ns"].(string); strings.Contains(nsArg, "/") {
 		t.Fatalf("expected nameserver-only ns argument, got %q", nsArg)

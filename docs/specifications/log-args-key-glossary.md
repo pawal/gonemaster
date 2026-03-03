@@ -37,6 +37,7 @@ Scope:
 | `addresses` | `array<string>` | IP address list. | |
 | `asns` | `array<int>` | ASN list. | Integer ASN values. |
 | `prefixes` | `array<string>` | CIDR prefix list. | |
+| `ptr_names` | `array<string>` | PTR hostname list from reverse-DNS checks. | Used for PTR mismatch detail payloads. |
 
 ## Role-Specific Collection Variants
 
@@ -51,8 +52,8 @@ shape as `servers`:
 
 These keys may appear in non-migrated entries and are not canonical in v1.1:
 
-- `ip`, `ns_ip`
-- `nsname`, `name`, `server`
+- `ip`
+- `name`, `server`
 - query aliases `type`, `class`, `rrtype`
 - delimiter-packed identity fields (`;` or `,`) without typed counterparts
 

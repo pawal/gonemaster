@@ -810,7 +810,7 @@ func Basic02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 		for nsName := range nsCantResolve {
-			if err := appendLog(ctx, &results, testcase, "B02_NS_NO_IP_ADDR", map[string]any{"nsname": nsName}); err != nil {
+			if err := appendLog(ctx, &results, testcase, "B02_NS_NO_IP_ADDR", map[string]any{"ns": nsName}); err != nil {
 				return results, err
 			}
 		}

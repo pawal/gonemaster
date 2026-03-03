@@ -395,7 +395,7 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	for mname := range mnameNS {
 		if !method3Set[strings.ToLower(mname)] {
 			if err := appendLog(ctx, &results, testcase, "Z01_MNAME_NOT_IN_NS_LIST", map[string]any{
-				"nsname": mname,
+				"ns": mname,
 			}); err != nil {
 				return results, err
 			}
@@ -414,8 +414,8 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			for ip := range mnameNS[mname] {
 				if ip == "127.0.0.1" || ip == "::1" {
 					if err := appendLog(ctx, &results, testcase, "Z01_MNAME_HAS_LOCALHOST_ADDR", map[string]any{
-						"nsname": mname,
-						"ns_ip":  ip,
+						"ns":      mname,
+						"address": ip,
 					}); err != nil {
 						return results, err
 					}
@@ -470,7 +470,7 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			}
 		} else {
 			if err := appendLog(ctx, &results, testcase, "Z01_MNAME_NOT_RESOLVE", map[string]any{
-				"nsname": mname,
+				"ns": mname,
 			}); err != nil {
 				return results, err
 			}

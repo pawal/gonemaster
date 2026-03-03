@@ -284,8 +284,8 @@ func Address02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				if resp.Msg != nil {
 					if resp.Rcode() != "NOERROR" || len(resp.GetRecords("PTR", "answer")) == 0 {
 						if _, err := buf.Add("NAMESERVER_IP_WITHOUT_REVERSE", map[string]any{
-							"nsname": item.name,
-							"ns_ip":  item.ip,
+							"ns":      item.name,
+							"address": item.ip,
 						}); err != nil {
 							return err
 						}
@@ -390,18 +390,19 @@ func Address03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						}
 
 						if !matched {
+							ptrNames := uniqueSortedStrings(names)
 							if _, err := buf.Add("NAMESERVER_IP_PTR_MISMATCH", map[string]any{
-								"nsname": item.name,
-								"ns_ip":  item.ip,
-								"names":  strings.Join(names, "/"),
+								"ns":        item.name,
+								"address":   item.ip,
+								"ptr_names": ptrNames,
 							}); err != nil {
 								return err
 							}
 						}
 					} else {
 						if _, err := buf.Add("NAMESERVER_IP_WITHOUT_REVERSE", map[string]any{
-							"nsname": item.name,
-							"ns_ip":  item.ip,
+							"ns":      item.name,
+							"address": item.ip,
 						}); err != nil {
 							return err
 						}

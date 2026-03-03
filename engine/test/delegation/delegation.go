@@ -620,14 +620,14 @@ func Delegation05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 							return err
 						}
 						if len(resp.GetRecords("CNAME", "answer")) > 0 {
-							_, err := buf.Add("NS_IS_CNAME", map[string]any{"nsname": nsName.String()})
+							_, err := buf.Add("NS_IS_CNAME", map[string]any{"ns": logargs.EndpointName(nsName.String())})
 							return err
 						}
 						if resp.IsRedirect() {
 							recurseOn := true
 							recResp, err := ns.QueryWithOptions(ctx, nsName.String(), "A", &nameserver.QueryOptions{Recurse: &recurseOn})
 							if err == nil && recResp.Msg != nil && len(recResp.GetRecords("CNAME", "answer")) > 0 {
-								_, err := buf.Add("NS_IS_CNAME", map[string]any{"nsname": nsName.String()})
+								_, err := buf.Add("NS_IS_CNAME", map[string]any{"ns": logargs.EndpointName(nsName.String())})
 								return err
 							}
 						}
@@ -645,7 +645,7 @@ func Delegation05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		} else {
 			resp, err := recurse(ctx, z, nsName.String(), "A")
 			if err == nil && resp.Msg != nil && len(resp.GetRecords("CNAME", "answer")) > 0 {
-				if err := appendLog(ctx, &results, testcase, "NS_IS_CNAME", map[string]any{"nsname": nsName.String()}); err != nil {
+				if err := appendLog(ctx, &results, testcase, "NS_IS_CNAME", map[string]any{"ns": logargs.EndpointName(nsName.String())}); err != nil {
 					return results, err
 				}
 			}
@@ -803,7 +803,9 @@ func Delegation07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 	if len(extraParent) == 0 && len(extraChild) == 0 {
-		if err := appendLog(ctx, &results, testcase, "NAMES_MATCH", map[string]any{"names": strings.Join(sameNames, ";")}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, sameNames)
+		if err := appendLog(ctx, &results, testcase, "NAMES_MATCH", args); err != nil {
 			return results, err
 		}
 	}
@@ -914,7 +916,7 @@ func findDupNS(ctx context.Context, testcase string, duplicateTag string, distin
 	for _, ip := range keys {
 		if len(ips[ip]) > 1 {
 			args := map[string]any{
-				"ns_ip": ip,
+				"address": ip,
 			}
 			setTypedServersFromNames(args, ips[ip])
 			entry, err := util.LoggerFromContext(ctx).Add(duplicateTag, args, moduleName, testcase)

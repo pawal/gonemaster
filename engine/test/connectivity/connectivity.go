@@ -264,15 +264,15 @@ func Connectivity03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 					return err
 				}
 				if res.Code == asnlookup.CodeError || res.Code == asnlookup.CodeEmpty {
-					if _, err := buf.Add(res.Code, map[string]any{"ns_ip": ip.String()}); err != nil {
+					if _, err := buf.Add(res.Code, map[string]any{"address": ip.String()}); err != nil {
 						return err
 					}
 					return nil
 				}
 				if res.Raw != "" {
 					if _, err := buf.Add("ASN_INFOS_RAW", map[string]any{
-						"ns_ip": ip.String(),
-						"data":  res.Raw,
+						"address": ip.String(),
+						"data":    res.Raw,
 					}); err != nil {
 						return err
 					}
@@ -280,8 +280,8 @@ func Connectivity03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 				if len(res.ASNs) > 0 {
 					asns := uniqueSortedInts(append([]int{}, res.ASNs...))
 					if _, err := buf.Add("ASN_INFOS_ANNOUNCE_BY", map[string]any{
-						"ns_ip": ip.String(),
-						"asns":  asns,
+						"address": ip.String(),
+						"asns":    asns,
 					}); err != nil {
 						return err
 					}
@@ -292,7 +292,7 @@ func Connectivity03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 				}
 				if res.Prefix != nil {
 					if _, err := buf.Add("ASN_INFOS_ANNOUNCE_IN", map[string]any{
-						"ns_ip":    ip.String(),
+						"address":  ip.String(),
 						"prefixes": []string{res.Prefix.String()},
 					}); err != nil {
 						return err
@@ -330,15 +330,15 @@ func Connectivity03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 					return err
 				}
 				if res.Code == asnlookup.CodeError || res.Code == asnlookup.CodeEmpty {
-					if _, err := buf.Add(res.Code, map[string]any{"ns_ip": ip.String()}); err != nil {
+					if _, err := buf.Add(res.Code, map[string]any{"address": ip.String()}); err != nil {
 						return err
 					}
 					return nil
 				}
 				if res.Raw != "" {
 					if _, err := buf.Add("ASN_INFOS_RAW", map[string]any{
-						"ns_ip": ip.String(),
-						"data":  res.Raw,
+						"address": ip.String(),
+						"data":    res.Raw,
 					}); err != nil {
 						return err
 					}
@@ -346,8 +346,8 @@ func Connectivity03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 				if len(res.ASNs) > 0 {
 					asns := uniqueSortedInts(append([]int{}, res.ASNs...))
 					if _, err := buf.Add("ASN_INFOS_ANNOUNCE_BY", map[string]any{
-						"ns_ip": ip.String(),
-						"asns":  asns,
+						"address": ip.String(),
+						"asns":    asns,
 					}); err != nil {
 						return err
 					}
@@ -358,7 +358,7 @@ func Connectivity03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 				}
 				if res.Prefix != nil {
 					if _, err := buf.Add("ASN_INFOS_ANNOUNCE_IN", map[string]any{
-						"ns_ip":    ip.String(),
+						"address":  ip.String(),
 						"prefixes": []string{res.Prefix.String()},
 					}); err != nil {
 						return err
@@ -514,7 +514,7 @@ func Connectivity04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 					} else if res.Code == asnlookup.CodeEmpty {
 						tag = "CN04_EMPTY_PREFIX_SET"
 					}
-					if _, err := buf.Add(tag, map[string]any{"ns_ip": ip.String()}); err != nil {
+					if _, err := buf.Add(tag, map[string]any{"address": ip.String()}); err != nil {
 						return err
 					}
 					return nil
@@ -522,8 +522,8 @@ func Connectivity04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 
 				if res.Raw != "" {
 					if _, err := buf.Add("CN04_ASN_INFOS_RAW", map[string]any{
-						"ns_ip": ip.String(),
-						"data":  res.Raw,
+						"address": ip.String(),
+						"data":    res.Raw,
 					}); err != nil {
 						return err
 					}
@@ -532,7 +532,7 @@ func Connectivity04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 				if res.Prefix != nil {
 					prefixStr := res.Prefix.String()
 					if _, err := buf.Add("CN04_ASN_INFOS_ANNOUNCE_IN", map[string]any{
-						"ns_ip":    ip.String(),
+						"address":  ip.String(),
 						"prefixes": []string{prefixStr},
 					}); err != nil {
 						return err

@@ -473,6 +473,16 @@ func TestBasic02NoIPAddress(t *testing.T) {
 	if !hasEntryTag(entries, "B02_NS_NO_IP_ADDR") {
 		t.Fatalf("expected B02_NS_NO_IP_ADDR")
 	}
+	entry := firstEntryByTag(entries, "B02_NS_NO_IP_ADDR")
+	if entry == nil {
+		t.Fatalf("expected B02_NS_NO_IP_ADDR entry")
+	}
+	if ns, _ := entry.Args["ns"].(string); ns != "b.root" {
+		t.Fatalf("expected ns=b.root in B02_NS_NO_IP_ADDR, got %#v", entry.Args["ns"])
+	}
+	if _, ok := entry.Args["nsname"]; ok {
+		t.Fatalf("did not expect legacy nsname key in args")
+	}
 }
 
 func TestBasic03HasARecords(t *testing.T) {

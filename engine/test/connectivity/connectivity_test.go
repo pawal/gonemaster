@@ -384,7 +384,7 @@ func TestConnectivity03ParallelASNLookups(t *testing.T) {
 		if entry == nil || entry.Tag != "ASN_INFOS_ANNOUNCE_BY" {
 			continue
 		}
-		if ip, ok := entry.Args["ns_ip"].(string); ok {
+		if ip, ok := entry.Args["address"].(string); ok {
 			order = append(order, ip)
 		}
 	}

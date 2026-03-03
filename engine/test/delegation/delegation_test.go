@@ -323,6 +323,12 @@ func TestDelegation02DuplicateIPs(t *testing.T) {
 	if !ok || len(servers) != 2 {
 		t.Fatalf("expected typed server list for DEL_NS_SAME_IP, got %#v", entry.Args["servers"])
 	}
+	if address, _ := entry.Args["address"].(string); address != "192.0.2.1" {
+		t.Fatalf("expected address=192.0.2.1 for DEL_NS_SAME_IP, got %#v", entry.Args["address"])
+	}
+	if _, ok := entry.Args["ns_ip"]; ok {
+		t.Fatalf("legacy key ns_ip should not be present: %#v", entry.Args)
+	}
 	if _, ok := entry.Args["nsname_list"]; ok {
 		t.Fatalf("legacy key nsname_list should not be present: %#v", entry.Args)
 	}
@@ -336,6 +342,12 @@ func TestDelegation02DuplicateIPs(t *testing.T) {
 	servers, ok = entry.Args["servers"].([]map[string]any)
 	if !ok || len(servers) != 2 {
 		t.Fatalf("expected typed server list for SAME_IP_ADDRESS, got %#v", entry.Args["servers"])
+	}
+	if address, _ := entry.Args["address"].(string); address != "192.0.2.1" {
+		t.Fatalf("expected address=192.0.2.1 for SAME_IP_ADDRESS, got %#v", entry.Args["address"])
+	}
+	if _, ok := entry.Args["ns_ip"]; ok {
+		t.Fatalf("legacy key ns_ip should not be present: %#v", entry.Args)
 	}
 	if _, ok := entry.Args["nsname_list"]; ok {
 		t.Fatalf("legacy key nsname_list should not be present: %#v", entry.Args)
@@ -620,6 +632,16 @@ func TestDelegation05InBailiwickCNAME(t *testing.T) {
 	}
 	if !hasEntryTag(entries, "NS_IS_CNAME") {
 		t.Fatalf("expected NS_IS_CNAME")
+	}
+	entry := firstEntryByTag(entries, "NS_IS_CNAME")
+	if entry == nil {
+		t.Fatalf("expected NS_IS_CNAME entry")
+	}
+	if ns, _ := entry.Args["ns"].(string); ns != "ns1.example" {
+		t.Fatalf("expected ns=ns1.example, got %#v", entry.Args["ns"])
+	}
+	if _, ok := entry.Args["nsname"]; ok {
+		t.Fatalf("legacy key nsname should not be present: %#v", entry.Args)
 	}
 	if hasEntryTag(entries, "NO_NS_CNAME") {
 		t.Fatalf("did not expect NO_NS_CNAME")
@@ -937,6 +959,17 @@ func TestDelegation07NamesMatch(t *testing.T) {
 	}
 	if !hasEntryTag(entries, "NAMES_MATCH") {
 		t.Fatalf("expected NAMES_MATCH")
+	}
+	entry := firstEntryByTag(entries, "NAMES_MATCH")
+	if entry == nil {
+		t.Fatalf("expected NAMES_MATCH entry")
+	}
+	servers, ok := entry.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 || servers[0]["ns"] != "ns1.example" {
+		t.Fatalf("expected typed server list for NAMES_MATCH, got %#v", entry.Args["servers"])
+	}
+	if _, ok := entry.Args["names"]; ok {
+		t.Fatalf("legacy key names should not be present: %#v", entry.Args)
 	}
 }
 

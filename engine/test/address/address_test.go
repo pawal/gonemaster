@@ -258,7 +258,7 @@ func TestAddress02ParallelPTRQueries(t *testing.T) {
 		if entry == nil || entry.Tag != "NAMESERVER_IP_WITHOUT_REVERSE" {
 			continue
 		}
-		if ip, ok := entry.Args["ns_ip"].(string); ok {
+		if ip, ok := entry.Args["address"].(string); ok {
 			ips = append(ips, ip)
 		}
 	}
@@ -358,7 +358,7 @@ func TestAddress03ParallelPTRQueries(t *testing.T) {
 		if entry == nil || entry.Tag != "NAMESERVER_IP_PTR_MISMATCH" {
 			continue
 		}
-		if ip, ok := entry.Args["ns_ip"].(string); ok {
+		if ip, ok := entry.Args["address"].(string); ok {
 			ips = append(ips, ip)
 		}
 	}

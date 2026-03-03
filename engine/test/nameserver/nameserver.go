@@ -674,9 +674,9 @@ func Nameserver04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(included) > 0 && nErrors == 0 {
-		if err := appendLog(ctx, &results, testcase, "SAME_SOURCE_IP", map[string]any{
-			"names": strings.Join(sortedKeys(included), ","),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, sortedKeys(included))
+		if err := appendLog(ctx, &results, testcase, "SAME_SOURCE_IP", args); err != nil {
 			return results, err
 		}
 	}
@@ -865,9 +865,9 @@ func Nameserver06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	} else if len(withIP) == 0 {
-		if err := appendLog(ctx, &results, testcase, "NO_RESOLUTION", map[string]any{
-			"names": strings.Join(withoutIP, ","),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, withoutIP)
+		if err := appendLog(ctx, &results, testcase, "NO_RESOLUTION", args); err != nil {
 			return results, err
 		}
 	} else {

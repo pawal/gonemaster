@@ -379,7 +379,7 @@ func buildUndelegatedFakeDelegation(ctx context.Context, zoneName dnsname.Name, 
 			if emit != nil {
 				if err := emit("FAKE_DELEGATION_IN_ZONE_NO_IP", map[string]any{
 					"domain": zoneName.String(),
-					"nsname": name,
+					"ns":     name,
 				}); err != nil {
 					return nil, err
 				}
@@ -402,7 +402,7 @@ func buildUndelegatedFakeDelegation(ctx context.Context, zoneName dnsname.Name, 
 		if len(out[name]) == 0 && emit != nil {
 			if err := emit("FAKE_DELEGATION_NO_IP", map[string]any{
 				"domain": zoneName.String(),
-				"nsname": name,
+				"ns":     name,
 			}); err != nil {
 				return nil, err
 			}

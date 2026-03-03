@@ -13,6 +13,29 @@ import (
 
 var placeholderPattern = regexp.MustCompile(`\{[A-Za-z0-9_]+\}`)
 
+var legacyPlaceholders = map[string]bool{
+	"nsname":     true,
+	"ns_ip":      true,
+	"ns_list":    true,
+	"ns_ip_list": true,
+	"asn_list":   true,
+	"type":       true,
+	"class":      true,
+	"rrtype":     true,
+	"server":     true,
+	"ip":         true,
+}
+
+var legacyPlaceholderAllowlist = map[string]map[string]bool{
+	"SYSTEM:LOOKUP_ERROR": {
+		"type":  true,
+		"class": true,
+	},
+	"DNSSEC:NO_NSEC3PARAM": {
+		"server": true,
+	},
+}
+
 type entry struct {
 	file      string
 	startLine int
@@ -33,6 +56,7 @@ func main() {
 	}
 
 	var mismatches int
+	var legacyViolations int
 	for _, path := range files {
 		entries, err := parsePO(path)
 		if err != nil {
@@ -42,26 +66,40 @@ func main() {
 		for _, e := range entries {
 			missing, extra := comparePlaceholders(e.msgID, e.msgStr)
 			if len(missing) == 0 && len(extra) == 0 {
-				continue
+				// Continue checking legacy keys even when parity is clean.
+			} else {
+				mismatches++
+				ctx := e.context
+				if ctx == "" {
+					ctx = "<none>"
+				}
+				fmt.Printf("%s:%d: msgctxt=%s", e.file, e.startLine, ctx)
+				if len(missing) > 0 {
+					fmt.Printf(" missing=%s", strings.Join(missing, ","))
+				}
+				if len(extra) > 0 {
+					fmt.Printf(" extra=%s", strings.Join(extra, ","))
+				}
+				fmt.Println()
 			}
-			mismatches++
-			ctx := e.context
-			if ctx == "" {
-				ctx = "<none>"
+			for _, key := range legacyKeysForEntry(e) {
+				legacyViolations++
+				ctx := e.context
+				if ctx == "" {
+					ctx = "<none>"
+				}
+				fmt.Printf("%s:%d: msgctxt=%s legacy=%s\n", e.file, e.startLine, ctx, key)
 			}
-			fmt.Printf("%s:%d: msgctxt=%s", e.file, e.startLine, ctx)
-			if len(missing) > 0 {
-				fmt.Printf(" missing=%s", strings.Join(missing, ","))
-			}
-			if len(extra) > 0 {
-				fmt.Printf(" extra=%s", strings.Join(extra, ","))
-			}
-			fmt.Println()
 		}
 	}
 
 	if mismatches > 0 {
 		fmt.Fprintf(os.Stderr, "placeholder parity check failed: %d mismatch(es)\n", mismatches)
+	}
+	if legacyViolations > 0 {
+		fmt.Fprintf(os.Stderr, "legacy placeholder check failed: %d violation(s)\n", legacyViolations)
+	}
+	if mismatches > 0 || legacyViolations > 0 {
 		os.Exit(1)
 	}
 }
@@ -230,4 +268,21 @@ func placeholderSet(s string) map[string]bool {
 		}
 	}
 	return out
+}
+
+func legacyKeysForEntry(e entry) []string {
+	idSet := placeholderSet(e.msgID)
+	allowed := legacyPlaceholderAllowlist[e.context]
+	var legacy []string
+	for key := range idSet {
+		if !legacyPlaceholders[key] {
+			continue
+		}
+		if allowed != nil && allowed[key] {
+			continue
+		}
+		legacy = append(legacy, key)
+	}
+	sort.Strings(legacy)
+	return legacy
 }

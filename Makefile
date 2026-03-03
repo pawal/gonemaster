@@ -42,7 +42,7 @@ help:
 	@echo "  spec-generate-tags Regenerate per-module tag catalog markdown files"
 	@echo "  spec-check-tags    Check tag catalog files are up to date (drift detection)"
 	@echo "  spec-check-coherency Run log-args coherency guardrail checks"
-	@echo "  spec-check-i18n-placeholders  Verify placeholder parity between msgid/msgstr in locale files"
+	@echo "  spec-check-i18n-placeholders  Verify placeholder parity and reject non-allowlisted legacy placeholders"
 	@echo "  spec-check         Run spec-validate + spec-check-tags + coherency + i18n placeholder checks"
 	@echo "  clean            Remove build artifacts"
 

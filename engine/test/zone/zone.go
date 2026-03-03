@@ -1122,7 +1122,7 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 							continue
 						}
 						args := map[string]any{
-							"mailtarget_list": strings.Join(mxExchangeList(records), ";"),
+							"mail_targets": mxExchangeList(records),
 						}
 						setTypedAddresses(args, ips)
 						if err := appendLog(ctx, &results, testcase, "Z09_MX_DATA", args); err != nil {
@@ -1171,7 +1171,7 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 					}
 				} else {
 					args := map[string]any{
-						"mailtarget_list": strings.Join(mxExchangeList(mxSet[firstIP]), ";"),
+						"mail_targets": mxExchangeList(mxSet[firstIP]),
 					}
 					setTypedAddresses(args, mxSetOrder)
 					if err := appendLog(ctx, &results, testcase, "Z09_MX_DATA", args); err != nil {
@@ -1959,6 +1959,7 @@ func encodeLowercaseRRSet(records []dns.RR) string {
 }
 
 func mxExchangeList(records []dns.RR) []string {
+	seen := map[string]bool{}
 	var out []string
 	for _, rr := range records {
 		mx, ok := rr.(*dns.MX)
@@ -1966,8 +1967,14 @@ func mxExchangeList(records []dns.RR) []string {
 			continue
 		}
 		mxName := dnsname.New(mx.Mx)
-		out = append(out, mxName.String())
+		value := mxName.String()
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
 	}
+	sort.Strings(out)
 	return out
 }
 

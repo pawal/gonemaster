@@ -11,9 +11,9 @@
     "file_count": 93,
     "log_call_count": 616,
     "unique_tag_count": 424,
-    "unique_key_count": 80,
+    "unique_key_count": 77,
     "ns_string_call_count": 0,
-    "packed_list_only_key_count": 4,
+    "packed_list_only_key_count": 0,
     "unresolved_log_call_count": 118
   },
   "keys": {
@@ -100,24 +100,39 @@
     },
     "address": {
       "tags": [
+        "ASN_INFOS_ANNOUNCE_BY",
+        "ASN_INFOS_ANNOUNCE_IN",
+        "ASN_INFOS_RAW",
         "CACHE_CREATED",
         "CACHE_FETCHED",
+        "CN04_ASN_INFOS_ANNOUNCE_IN",
+        "CN04_ASN_INFOS_RAW",
+        "CN04_EMPTY_PREFIX_SET",
         "EMPTY_RETURN",
         "ERROR_CACHE_SKIP",
         "EXTERNAL_QUERY",
         "EXTERNAL_RESPONSE",
+        "NAMESERVER_IP_PTR_MISMATCH",
+        "NAMESERVER_IP_WITHOUT_REVERSE",
         "NS_CREATED",
         "QUERY",
-        "REACHABILITY_CACHE_SKIP"
+        "REACHABILITY_CACHE_SKIP",
+        "Z01_MNAME_HAS_LOCALHOST_ADDR",
+        "duplicateTag",
+        "res.Code"
       ],
       "shapes": [
         "string",
         "unknown"
       ],
       "producer_files": [
-        "engine/nameserver/nameserver.go"
+        "engine/nameserver/nameserver.go",
+        "engine/test/address/address.go",
+        "engine/test/connectivity/connectivity.go",
+        "engine/test/delegation/delegation.go",
+        "engine/test/zone/zone.go"
       ],
-      "occurrences": 9,
+      "occurrences": 25,
       "samples": [
         {
           "tag": "CACHE_CREATED",
@@ -571,7 +586,7 @@
         {
           "tag": "TOTAL_NAME_MISMATCH",
           "file": "engine/test/delegation/delegation.go",
-          "line": 811,
+          "line": 813,
           "shape": "string"
         }
       ]
@@ -851,7 +866,7 @@
         {
           "tag": "NO_RESPONSE_PTR_QUERY",
           "file": "engine/test/address/address.go",
-          "line": 410,
+          "line": 411,
           "shape": "unknown"
         }
       ]
@@ -1221,7 +1236,7 @@
         {
           "tag": "TOTAL_NAME_MISMATCH",
           "file": "engine/test/delegation/delegation.go",
-          "line": 811,
+          "line": 813,
           "shape": "string"
         }
       ]
@@ -1634,7 +1649,7 @@
         }
       ]
     },
-    "mailtarget_list": {
+    "mail_targets": {
       "tags": [
         "Z09_MX_DATA",
         "Z09_NON_AUTH_MX_RESPONSE",
@@ -1642,7 +1657,7 @@
         "Z09_UNEXPECTED_RCODE_MX"
       ],
       "shapes": [
-        "string"
+        "unknown"
       ],
       "producer_files": [
         "engine/test/zone/zone.go"
@@ -1653,31 +1668,31 @@
           "tag": "Z09_MX_DATA",
           "file": "engine/test/zone/zone.go",
           "line": 1128,
-          "shape": "string"
+          "shape": "unknown"
         },
         {
           "tag": "Z09_MX_DATA",
           "file": "engine/test/zone/zone.go",
           "line": 1177,
-          "shape": "string"
+          "shape": "unknown"
         },
         {
           "tag": "Z09_NON_AUTH_MX_RESPONSE",
           "file": "engine/test/zone/zone.go",
           "line": 1079,
-          "shape": "string"
+          "shape": "unknown"
         },
         {
           "tag": "Z09_NO_RESPONSE_MX_QUERY",
           "file": "engine/test/zone/zone.go",
           "line": 1059,
-          "shape": "string"
+          "shape": "unknown"
         },
         {
           "tag": "Z09_UNEXPECTED_RCODE_MX",
           "file": "engine/test/zone/zone.go",
           "line": 1070,
-          "shape": "string"
+          "shape": "unknown"
         }
       ]
     },
@@ -1871,126 +1886,7 @@
         }
       ]
     },
-    "names": {
-      "tags": [
-        "NAMESERVER_IP_PTR_MISMATCH",
-        "NAMES_MATCH",
-        "NO_RESOLUTION",
-        "SAME_SOURCE_IP"
-      ],
-      "shapes": [
-        "string"
-      ],
-      "producer_files": [
-        "engine/test/address/address.go",
-        "engine/test/delegation/delegation.go",
-        "engine/test/nameserver/nameserver.go"
-      ],
-      "occurrences": 4,
-      "samples": [
-        {
-          "tag": "NAMESERVER_IP_PTR_MISMATCH",
-          "file": "engine/test/address/address.go",
-          "line": 393,
-          "shape": "string"
-        },
-        {
-          "tag": "NAMES_MATCH",
-          "file": "engine/test/delegation/delegation.go",
-          "line": 806,
-          "shape": "string"
-        },
-        {
-          "tag": "NO_RESOLUTION",
-          "file": "engine/test/nameserver/nameserver.go",
-          "line": 868,
-          "shape": "string"
-        },
-        {
-          "tag": "SAME_SOURCE_IP",
-          "file": "engine/test/nameserver/nameserver.go",
-          "line": 677,
-          "shape": "string"
-        }
-      ]
-    },
-    "ns_ip": {
-      "tags": [
-        "ASN_INFOS_ANNOUNCE_BY",
-        "ASN_INFOS_ANNOUNCE_IN",
-        "ASN_INFOS_RAW",
-        "CN04_ASN_INFOS_ANNOUNCE_IN",
-        "CN04_ASN_INFOS_RAW",
-        "CN04_EMPTY_PREFIX_SET",
-        "NAMESERVER_IP_PTR_MISMATCH",
-        "NAMESERVER_IP_WITHOUT_REVERSE",
-        "Z01_MNAME_HAS_LOCALHOST_ADDR",
-        "duplicateTag",
-        "res.Code"
-      ],
-      "shapes": [
-        "string",
-        "unknown"
-      ],
-      "producer_files": [
-        "engine/test/address/address.go",
-        "engine/test/connectivity/connectivity.go",
-        "engine/test/delegation/delegation.go",
-        "engine/test/zone/zone.go"
-      ],
-      "occurrences": 16,
-      "samples": [
-        {
-          "tag": "ASN_INFOS_ANNOUNCE_BY",
-          "file": "engine/test/connectivity/connectivity.go",
-          "line": 282,
-          "shape": "string"
-        },
-        {
-          "tag": "ASN_INFOS_ANNOUNCE_IN",
-          "file": "engine/test/connectivity/connectivity.go",
-          "line": 294,
-          "shape": "string"
-        },
-        {
-          "tag": "ASN_INFOS_RAW",
-          "file": "engine/test/connectivity/connectivity.go",
-          "line": 273,
-          "shape": "string"
-        },
-        {
-          "tag": "NAMESERVER_IP_PTR_MISMATCH",
-          "file": "engine/test/address/address.go",
-          "line": 393,
-          "shape": "unknown"
-        },
-        {
-          "tag": "NAMESERVER_IP_WITHOUT_REVERSE",
-          "file": "engine/test/address/address.go",
-          "line": 286,
-          "shape": "unknown"
-        },
-        {
-          "tag": "NAMESERVER_IP_WITHOUT_REVERSE",
-          "file": "engine/test/address/address.go",
-          "line": 402,
-          "shape": "unknown"
-        },
-        {
-          "tag": "res.Code",
-          "file": "engine/test/connectivity/connectivity.go",
-          "line": 267,
-          "shape": "string"
-        },
-        {
-          "tag": "res.Code",
-          "file": "engine/test/connectivity/connectivity.go",
-          "line": 333,
-          "shape": "string"
-        }
-      ]
-    },
-    "nsname": {
+    "ns": {
       "tags": [
         "B02_NS_NO_IP_ADDR",
         "NAMESERVER_IP_PTR_MISMATCH",
@@ -2001,7 +1897,6 @@
         "Z01_MNAME_NOT_RESOLVE"
       ],
       "shapes": [
-        "string",
         "unknown"
       ],
       "producer_files": [
@@ -2021,7 +1916,7 @@
         {
           "tag": "NAMESERVER_IP_PTR_MISMATCH",
           "file": "engine/test/address/address.go",
-          "line": 393,
+          "line": 394,
           "shape": "unknown"
         },
         {
@@ -2033,26 +1928,26 @@
         {
           "tag": "NAMESERVER_IP_WITHOUT_REVERSE",
           "file": "engine/test/address/address.go",
-          "line": 402,
+          "line": 403,
           "shape": "unknown"
         },
         {
           "tag": "NS_IS_CNAME",
           "file": "engine/test/delegation/delegation.go",
           "line": 623,
-          "shape": "string"
+          "shape": "unknown"
         },
         {
           "tag": "NS_IS_CNAME",
           "file": "engine/test/delegation/delegation.go",
           "line": 630,
-          "shape": "string"
+          "shape": "unknown"
         },
         {
           "tag": "NS_IS_CNAME",
           "file": "engine/test/delegation/delegation.go",
           "line": 648,
-          "shape": "string"
+          "shape": "unknown"
         },
         {
           "tag": "Z01_MNAME_NOT_IN_NS_LIST",
@@ -2099,33 +1994,6 @@
           "tag": "FAKE_PACKET_RETURNED",
           "file": "engine/nameserver/query_helpers.go",
           "line": 249,
-          "shape": "string"
-        }
-      ]
-    },
-    "parent_addresses": {
-      "tags": [
-        "IN_BAILIWICK_ADDR_MISMATCH",
-        "OUT_OF_BAILIWICK_ADDR_MISMATCH"
-      ],
-      "shapes": [
-        "string"
-      ],
-      "producer_files": [
-        "engine/test/consistency/consistency.go"
-      ],
-      "occurrences": 2,
-      "samples": [
-        {
-          "tag": "IN_BAILIWICK_ADDR_MISMATCH",
-          "file": "engine/test/consistency/consistency.go",
-          "line": 920,
-          "shape": "string"
-        },
-        {
-          "tag": "OUT_OF_BAILIWICK_ADDR_MISMATCH",
-          "file": "engine/test/consistency/consistency.go",
-          "line": 977,
           "shape": "string"
         }
       ]
@@ -2186,6 +2054,26 @@
           "tag": "REACHABILITY_CACHE_SKIP",
           "file": "engine/nameserver/nameserver.go",
           "line": 207,
+          "shape": "unknown"
+        }
+      ]
+    },
+    "ptr_names": {
+      "tags": [
+        "NAMESERVER_IP_PTR_MISMATCH"
+      ],
+      "shapes": [
+        "unknown"
+      ],
+      "producer_files": [
+        "engine/test/address/address.go"
+      ],
+      "occurrences": 1,
+      "samples": [
+        {
+          "tag": "NAMESERVER_IP_PTR_MISMATCH",
+          "file": "engine/test/address/address.go",
+          "line": 394,
           "shape": "unknown"
         }
       ]
@@ -2997,7 +2885,7 @@
         {
           "tag": "TEST_CASE_END",
           "file": "engine/test/address/address.go",
-          "line": 439,
+          "line": 440,
           "shape": "unknown"
         },
         {
@@ -3185,41 +3073,8 @@
           "shape": "string"
         }
       ]
-    },
-    "zone_addresses": {
-      "tags": [
-        "IN_BAILIWICK_ADDR_MISMATCH",
-        "OUT_OF_BAILIWICK_ADDR_MISMATCH"
-      ],
-      "shapes": [
-        "string"
-      ],
-      "producer_files": [
-        "engine/test/consistency/consistency.go"
-      ],
-      "occurrences": 2,
-      "samples": [
-        {
-          "tag": "IN_BAILIWICK_ADDR_MISMATCH",
-          "file": "engine/test/consistency/consistency.go",
-          "line": 920,
-          "shape": "string"
-        },
-        {
-          "tag": "OUT_OF_BAILIWICK_ADDR_MISMATCH",
-          "file": "engine/test/consistency/consistency.go",
-          "line": 977,
-          "shape": "string"
-        }
-      ]
     }
   },
-  "packed_list_only_keys": [
-    "mailtarget_list",
-    "names",
-    "parent_addresses",
-    "zone_addresses"
-  ],
   "unresolved_calls": [
     {
       "tag": "AAAA_BAD_RDATA",
@@ -3416,7 +3271,7 @@
     {
       "tag": "IPV4_DISABLED",
       "file": "engine/test/delegation/delegation.go",
-      "line": 1056,
+      "line": 1058,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
@@ -3512,7 +3367,7 @@
     {
       "tag": "IPV6_DISABLED",
       "file": "engine/test/delegation/delegation.go",
-      "line": 1046,
+      "line": 1048,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {

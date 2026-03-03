@@ -256,6 +256,63 @@ func TestZone09MXQueryDisablesFallback(t *testing.T) {
 	}
 }
 
+func TestZone09MXDataUsesTypedMailTargets(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	ns := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		switch qtype {
+		case "SOA":
+			return soaPacket("example.com", 1, 1, 1, 1, 1)
+		case "MX":
+			msg := new(dns.Msg)
+			msg.Authoritative = true
+			msg.Rcode = dns.RcodeSuccess
+			mx := &dns.MX{Hdr: dns.Header{Name: "example.com.", Class: dns.ClassINET, TTL: 300}}
+			mx.Mx = "mail.example."
+			mx.Preference = 10
+			msg.Answer = []dns.RR{mx}
+			return packet.Packet{Msg: msg}
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example.com")}
+	entries, err := Zone09(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone09: %v", err)
+	}
+
+	var mxData *logger.Entry
+	for _, entry := range entries {
+		if entry != nil && entry.Tag == "Z09_MX_DATA" {
+			mxData = entry
+			break
+		}
+	}
+	if mxData == nil {
+		t.Fatalf("expected Z09_MX_DATA")
+	}
+	targets, ok := mxData.Args["mail_targets"].([]string)
+	if !ok || len(targets) != 1 || targets[0] != "mail.example" {
+		t.Fatalf("expected typed mail_targets [mail.example], got %#v", mxData.Args["mail_targets"])
+	}
+	addresses, ok := mxData.Args["addresses"].([]string)
+	if !ok || len(addresses) != 1 || addresses[0] != "192.0.2.1" {
+		t.Fatalf("expected typed addresses [192.0.2.1], got %#v", mxData.Args["addresses"])
+	}
+	if _, ok := mxData.Args["mailtarget_list"]; ok {
+		t.Fatalf("legacy key mailtarget_list should not be present: %#v", mxData.Args)
+	}
+}
+
 func TestZone11SpfSyntaxError(t *testing.T) {
 	setupTest(t)
 

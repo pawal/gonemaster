@@ -917,10 +917,10 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(ibMismatch) > 0 {
-		if err := appendLog(ctx, &results, testcase, "IN_BAILIWICK_ADDR_MISMATCH", map[string]any{
-			"parent_addresses": strings.Join(sortedKeys(strictGlue), ";"),
-			"zone_addresses":   strings.Join(sortedKeys(childIBStrings), ";"),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromAddrKeysAtKey(args, "parent_servers", sortedKeys(strictGlue))
+		setTypedServersFromAddrKeysAtKey(args, "zone_servers", sortedKeys(childIBStrings))
+		if err := appendLog(ctx, &results, testcase, "IN_BAILIWICK_ADDR_MISMATCH", args); err != nil {
 			return results, err
 		}
 	}
@@ -974,10 +974,10 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 		if len(mismatchForGlue) > 0 {
 			sort.Strings(glueStrings)
-			if err := appendLog(ctx, &results, testcase, "OUT_OF_BAILIWICK_ADDR_MISMATCH", map[string]any{
-				"parent_addresses": strings.Join(glueStrings, ";"),
-				"zone_addresses":   strings.Join(sortedKeys(childOOB), ";"),
-			}); err != nil {
+			args := map[string]any{}
+			setTypedServersFromAddrKeysAtKey(args, "parent_servers", glueStrings)
+			setTypedServersFromAddrKeysAtKey(args, "zone_servers", sortedKeys(childOOB))
+			if err := appendLog(ctx, &results, testcase, "OUT_OF_BAILIWICK_ADDR_MISMATCH", args); err != nil {
 				return results, err
 			}
 		}
@@ -1307,4 +1307,49 @@ func addressesFromAddrKeys(values []string) []string {
 
 func normalizeEndpointNames(values []string) []string {
 	return logargs.UniqueSortedEndpointNames(values)
+}
+
+func parseAddrKey(value string) (string, string) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", ""
+	}
+	sep := strings.LastIndex(value, "/")
+	if sep < 1 || sep >= len(value)-1 {
+		return "", value
+	}
+	name := logargs.EndpointName(value[:sep])
+	address := strings.TrimSpace(value[sep+1:])
+	return name, address
+}
+
+func setTypedServersFromAddrKeysAtKey(args map[string]any, key string, values []string) {
+	if args == nil || key == "" || len(values) == 0 {
+		return
+	}
+	seen := map[string]bool{}
+	servers := make([]logargs.Server, 0, len(values))
+	for _, value := range values {
+		ns, address := parseAddrKey(value)
+		if ns == "" && address == "" {
+			continue
+		}
+		dedupe := ns + "|" + address
+		if seen[dedupe] {
+			continue
+		}
+		seen[dedupe] = true
+		servers = append(servers, logargs.Server{NS: ns, Address: address})
+	}
+	if len(servers) == 0 {
+		return
+	}
+	sort.Slice(servers, func(i, j int) bool {
+		left := servers[i].NS + "|" + servers[i].Address
+		right := servers[j].NS + "|" + servers[j].Address
+		return left < right
+	})
+	if typed, ok := logargs.Servers(servers)["servers"]; ok {
+		args[key] = typed
+	}
 }

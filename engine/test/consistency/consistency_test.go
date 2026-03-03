@@ -3,6 +3,7 @@ package consistency
 import (
 	"context"
 	"net/netip"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -613,6 +614,24 @@ func TestConsistency05InBailiwickMismatch(t *testing.T) {
 	if !hasEntryTag(entries, "IN_BAILIWICK_ADDR_MISMATCH") {
 		t.Fatalf("expected IN_BAILIWICK_ADDR_MISMATCH")
 	}
+	mismatch := firstEntryByTag(entries, "IN_BAILIWICK_ADDR_MISMATCH")
+	if mismatch == nil {
+		t.Fatalf("missing IN_BAILIWICK_ADDR_MISMATCH entry")
+	}
+	parent := serverEndpointsAtKey(mismatch.Args, "parent_servers")
+	if len(parent) != 1 || parent[0] != "ns1.example/192.0.2.1" {
+		t.Fatalf("expected parent_servers [ns1.example/192.0.2.1], got %v", parent)
+	}
+	zone := serverEndpointsAtKey(mismatch.Args, "zone_servers")
+	if len(zone) != 1 || zone[0] != "ns1.example/192.0.2.2" {
+		t.Fatalf("expected zone_servers [ns1.example/192.0.2.2], got %v", zone)
+	}
+	if _, ok := mismatch.Args["parent_addresses"]; ok {
+		t.Fatalf("legacy key parent_addresses should not be present: %#v", mismatch.Args)
+	}
+	if _, ok := mismatch.Args["zone_addresses"]; ok {
+		t.Fatalf("legacy key zone_addresses should not be present: %#v", mismatch.Args)
+	}
 	if !hasEntryTag(entries, "EXTRA_ADDRESS_CHILD") {
 		t.Fatalf("expected EXTRA_ADDRESS_CHILD")
 	}
@@ -678,6 +697,23 @@ func TestConsistency05OutOfBailiwickMismatch(t *testing.T) {
 	}
 	if !hasEntryTag(entries, "OUT_OF_BAILIWICK_ADDR_MISMATCH") {
 		t.Fatalf("expected OUT_OF_BAILIWICK_ADDR_MISMATCH")
+	}
+	mismatch := firstEntryByTag(entries, "OUT_OF_BAILIWICK_ADDR_MISMATCH")
+	if mismatch == nil {
+		t.Fatalf("missing OUT_OF_BAILIWICK_ADDR_MISMATCH entry")
+	}
+	parent := serverEndpointsAtKey(mismatch.Args, "parent_servers")
+	if len(parent) != 1 || parent[0] != "ns1.other/192.0.2.1" {
+		t.Fatalf("expected parent_servers [ns1.other/192.0.2.1], got %v", parent)
+	}
+	if zone := serverEndpointsAtKey(mismatch.Args, "zone_servers"); len(zone) != 0 {
+		t.Fatalf("expected empty zone_servers for OOB mismatch, got %v", zone)
+	}
+	if _, ok := mismatch.Args["parent_addresses"]; ok {
+		t.Fatalf("legacy key parent_addresses should not be present: %#v", mismatch.Args)
+	}
+	if _, ok := mismatch.Args["zone_addresses"]; ok {
+		t.Fatalf("legacy key zone_addresses should not be present: %#v", mismatch.Args)
 	}
 }
 
@@ -802,6 +838,52 @@ func firstServerName(args map[string]any) string {
 	default:
 		return ""
 	}
+}
+
+func serverEndpointsAtKey(args map[string]any, key string) []string {
+	if args == nil {
+		return nil
+	}
+	raw, ok := args[key]
+	if !ok {
+		return nil
+	}
+	toEndpoint := func(ns string, address string) string {
+		ns = strings.TrimSpace(ns)
+		address = strings.TrimSpace(address)
+		switch {
+		case ns != "" && address != "":
+			return ns + "/" + address
+		case ns != "":
+			return ns
+		case address != "":
+			return address
+		default:
+			return ""
+		}
+	}
+	var out []string
+	switch items := raw.(type) {
+	case []map[string]any:
+		for _, item := range items {
+			ns, _ := item["ns"].(string)
+			address, _ := item["address"].(string)
+			if endpoint := toEndpoint(ns, address); endpoint != "" {
+				out = append(out, endpoint)
+			}
+		}
+	case []any:
+		for _, rawItem := range items {
+			item, _ := rawItem.(map[string]any)
+			ns, _ := item["ns"].(string)
+			address, _ := item["address"].(string)
+			if endpoint := toEndpoint(ns, address); endpoint != "" {
+				out = append(out, endpoint)
+			}
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 func soaPacket(owner string, serial uint32, mname string, rname string, refresh uint32, retry uint32, expire uint32, minimum uint32) packet.Packet {

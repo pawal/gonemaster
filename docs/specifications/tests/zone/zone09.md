@@ -80,7 +80,7 @@ Status: Final
 | `Z09_INCONSISTENT_MX_DATA` | `-` | `-` | No arguments. |
 | `Z09_MISSING_MAIL_TARGET` | `-` | `-` | No arguments. |
 | `Z09_MX_DATA` | `addresses` | `array<string>` | Structured nameserver IP list for this data group. |
-| `Z09_MX_DATA` | `mailtarget_list` | `string` | Semicolon-delimited MX exchange list. |
+| `Z09_MX_DATA` | `mail_targets` | `array<string>` | Structured MX exchange hostname list. |
 | `Z09_MX_FOUND` | `addresses` | `array<string>` | Structured nameserver IPs that returned MX RRset. |
 | `Z09_NON_AUTH_MX_RESPONSE` | `addresses` | `array<string>` | Structured nameserver IPs reported as non-authoritative (see limitation below). |
 | `Z09_NO_MX_FOUND` | `addresses` | `array<string>` | Structured nameserver IPs with no MX RRset. |

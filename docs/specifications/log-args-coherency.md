@@ -36,7 +36,7 @@ Applies to all emitted log entries consumed through:
 - `args.ns` no longer uses `name/ip` in current `engine/test` emits.
 - `args.address` exists on migrated singular-endpoint callsites.
 - `servers` / `addresses` are now used for nameserver list identity in migrated tags.
-- Legacy packed-list drift is now concentrated in non-nameserver list keys (for example `mailtarget_list`, `parent_addresses`, `zone_addresses`).
+- Packed-list-only identity keys are removed in current migrated emits; remaining drift is legacy generic aliases in non-migrated tags (for example `name`, `server`).
 
 ## Canonical Contract (v1.1)
 

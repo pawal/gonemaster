@@ -93,6 +93,50 @@ func TestSetQueryIdentityOmitsEmptyValues(t *testing.T) {
 	}
 }
 
+func TestEnsureQueryIdentityFromRrtype(t *testing.T) {
+	args := map[string]any{"rrtype": "soa"}
+	EnsureQueryIdentity(args)
+
+	if args["query_type"] != "SOA" {
+		t.Fatalf("unexpected query_type: %#v", args["query_type"])
+	}
+	if args["query_class"] != "IN" {
+		t.Fatalf("unexpected query_class: %#v", args["query_class"])
+	}
+}
+
+func TestEnsureQueryIdentityFromTypeAndClass(t *testing.T) {
+	args := map[string]any{
+		"type":  "mx",
+		"class": "ch",
+	}
+	EnsureQueryIdentity(args)
+
+	if args["query_type"] != "MX" {
+		t.Fatalf("unexpected query_type: %#v", args["query_type"])
+	}
+	if args["query_class"] != "CH" {
+		t.Fatalf("unexpected query_class: %#v", args["query_class"])
+	}
+}
+
+func TestEnsureQueryIdentityKeepsCanonicalValues(t *testing.T) {
+	args := map[string]any{
+		"query_type":  "TXT",
+		"query_class": "HS",
+		"rrtype":      "A",
+		"class":       "IN",
+	}
+	EnsureQueryIdentity(args)
+
+	if args["query_type"] != "TXT" {
+		t.Fatalf("expected canonical query_type to win, got %#v", args["query_type"])
+	}
+	if args["query_class"] != "HS" {
+		t.Fatalf("expected canonical query_class to win, got %#v", args["query_class"])
+	}
+}
+
 func TestSetNSSetsOnlyProvidedValues(t *testing.T) {
 	args := map[string]any{}
 	SetNS(args, "", " 192.0.2.44 ")

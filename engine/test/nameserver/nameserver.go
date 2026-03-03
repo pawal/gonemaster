@@ -2131,6 +2131,7 @@ func withNameserverArgs(server ns.Nameserver, args map[string]any) map[string]an
 	if args == nil {
 		args = map[string]any{}
 	}
+	logargs.EnsureQueryIdentity(args)
 	logargs.SetNS(args, server.NameString(), server.AddressString())
 	return args
 }

@@ -125,6 +125,28 @@ func SetQueryIdentity(args map[string]any, name string, qtype string, qclass str
 	}
 }
 
+// EnsureQueryIdentity adds canonical query identity keys when legacy query keys
+// are present. Legacy keys are left intact to keep template compatibility
+// during migration.
+func EnsureQueryIdentity(args map[string]any) {
+	if args == nil {
+		return
+	}
+
+	// Prefer canonical key, then legacy aliases.
+	if queryType := firstNonEmptyStringArg(args, "query_type", "rrtype", "type"); queryType != "" {
+		args["query_type"] = strings.ToUpper(queryType)
+	}
+
+	// Prefer canonical key, then legacy alias.
+	if queryClass := firstNonEmptyStringArg(args, "query_class", "class"); queryClass != "" {
+		args["query_class"] = strings.ToUpper(queryClass)
+	} else if _, ok := args["query_type"]; ok {
+		// DNS query class is IN in current engine query callsites.
+		args["query_class"] = "IN"
+	}
+}
+
 // EndpointName returns a canonical nameserver name when value is a mixed
 // endpoint identity in "<name>/<ip>" form. Non-endpoint values are returned as-is.
 func EndpointName(value string) string {
@@ -177,4 +199,22 @@ func normalizeName(name string) string {
 		return ""
 	}
 	return strings.ToLower(dnsname.New(name).String())
+}
+
+func firstNonEmptyStringArg(args map[string]any, keys ...string) string {
+	for _, key := range keys {
+		value, ok := args[key]
+		if !ok {
+			continue
+		}
+		text, ok := value.(string)
+		if !ok {
+			continue
+		}
+		text = strings.TrimSpace(text)
+		if text != "" {
+			return text
+		}
+	}
+	return ""
 }

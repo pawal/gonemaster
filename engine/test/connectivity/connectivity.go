@@ -759,6 +759,7 @@ func withNameserverArgs(ns nameserver.Nameserver, args map[string]any) map[strin
 	if args == nil {
 		args = map[string]any{}
 	}
+	logargs.EnsureQueryIdentity(args)
 	logargs.SetNS(args, ns.NameString(), ns.AddressString())
 	return args
 }

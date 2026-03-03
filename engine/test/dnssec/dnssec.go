@@ -6503,6 +6503,7 @@ func withNameserverArgs(server nameserver.Nameserver, args map[string]any) map[s
 	if args == nil {
 		args = map[string]any{}
 	}
+	logargs.EnsureQueryIdentity(args)
 	logargs.SetNS(args, server.NameString(), server.AddressString())
 	return args
 }

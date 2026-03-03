@@ -977,6 +977,22 @@ func TestDNSSEC04ExpiredRRSIG(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec04: %v", err)
 	}
+	expirationEntry := firstEntryByTag(entries, "RRSIG_EXPIRATION")
+	if expirationEntry == nil {
+		t.Fatalf("expected RRSIG_EXPIRATION")
+	}
+	dateRaw, ok := expirationEntry.Args["date"].(string)
+	if !ok || dateRaw == "" {
+		t.Fatalf("expected non-empty RFC3339 date string, got %#v", expirationEntry.Args["date"])
+	}
+	parsed, err := time.Parse(time.RFC3339, dateRaw)
+	if err != nil {
+		t.Fatalf("expected RFC3339 date, got %q (%v)", dateRaw, err)
+	}
+	wantExpiration := time.Unix(now.Unix()-1, 0).UTC()
+	if !parsed.Equal(wantExpiration) {
+		t.Fatalf("expected expiration %s, got %s", wantExpiration.Format(time.RFC3339), parsed.Format(time.RFC3339))
+	}
 	if !hasEntryTag(entries, "RRSIG_EXPIRED") {
 		t.Fatalf("expected RRSIG_EXPIRED")
 	}

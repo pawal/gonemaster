@@ -39,6 +39,12 @@ Scope:
 | `prefixes` | `array<string>` | CIDR prefix list. | |
 | `ptr_names` | `array<string>` | PTR hostname list from reverse-DNS checks. | Used for PTR mismatch detail payloads. |
 
+## Temporal Keys
+
+| Key | Type | Meaning | Notes |
+| --- | --- | --- | --- |
+| `date` | `string` | Human-visible timestamp argument in tag-specific contexts. | Use UTC RFC3339 (ISO 8601 profile). |
+
 ## Role-Specific Collection Variants
 
 Use role-specific server collections where needed, with the same endpoint item

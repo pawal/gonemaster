@@ -136,6 +136,7 @@ These are stable and must remain unchanged:
 - Every entry has `timestamp`, `module`, `testcase`, `tag`, `level`.
 - `args` is optional and, when present, is a JSON object.
 - `args` values must be JSON-serializable.
+- Date/time string values in `args` should use UTC RFC3339 (ISO 8601 profile).
 
 ### Translation invariants
 

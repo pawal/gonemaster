@@ -39,6 +39,9 @@ The migration affects keys and value shapes inside `args`.
 - `arg_schema` is not emitted in runtime output.
 - v1.1 is documented in specs, not carried as an `args` field.
 
+7. Date/time string arguments are RFC3339.
+- If a tag emits a date/time string argument (for example `RRSIG_EXPIRATION.date`), it uses UTC RFC3339 (ISO 8601 profile).
+
 ## Key Mapping (Old -> New)
 
 | Old key | New key | New type |

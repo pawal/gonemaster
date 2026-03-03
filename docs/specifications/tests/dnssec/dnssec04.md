@@ -27,7 +27,7 @@ Status: Final
 5. Collect `RRSIG` records from answer sections of both responses.
 6. Load thresholds from profile (`REMAINING_SHORT`, `REMAINING_LONG`, `DURATION_LONG`) and compute current reference time from DNSKEY packet timestamp.
 7. For each RRSIG:
-   - Emit `RRSIG_EXPIRATION` with human-readable UTC expiration date, keytag, and covered RR type.
+   - Emit `RRSIG_EXPIRATION` with UTC expiration timestamp in RFC3339 format, keytag, and covered RR type.
    - Compute remaining time (`expiration - now`) and emit one of:
      - `RRSIG_EXPIRED` if remaining is negative,
      - `REMAINING_SHORT` if remaining is below short threshold,
@@ -63,7 +63,7 @@ Status: Final
 | `REMAINING_SHORT` | `duration` | `int` | Remaining validity in seconds (`expiration - now`). |
 | `REMAINING_SHORT` | `keytag` | `int` | DNSKEY keytag from the RRSIG. |
 | `REMAINING_SHORT` | `types` | `string` | Covered RR type mnemonic (`DNSKEY` or `SOA`). |
-| `RRSIG_EXPIRATION` | `date` | `string` | UTC expiration timestamp formatted with `time.ANSIC`. |
+| `RRSIG_EXPIRATION` | `date` | `string` | UTC expiration timestamp formatted with `time.RFC3339` (ISO 8601 profile). |
 | `RRSIG_EXPIRATION` | `keytag` | `int` | DNSKEY keytag from the RRSIG. |
 | `RRSIG_EXPIRATION` | `types` | `string` | Covered RR type mnemonic (`DNSKEY` or `SOA`). |
 | `RRSIG_EXPIRED` | `expiration` | `int` | Signature expiration epoch timestamp (seconds). |

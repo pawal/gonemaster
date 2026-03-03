@@ -1737,7 +1737,7 @@ func DNSSEC04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 		expiration := int64(sig.Expiration)
 		types := rrsigTypeString(sig.TypeCovered)
-		date := time.Unix(expiration, 0).UTC().Format(time.ANSIC)
+		date := time.Unix(expiration, 0).UTC().Format(time.RFC3339)
 
 		if err := appendLog(ctx, &results, testcase, "RRSIG_EXPIRATION", map[string]any{
 			"date":   date,

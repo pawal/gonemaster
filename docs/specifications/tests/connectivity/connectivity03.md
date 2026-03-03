@@ -25,8 +25,8 @@ Status: Final
    - Run ASN lookup (`lookupASN`).
    - If result code is `ERROR_ASN_DATABASE` or `EMPTY_ASN_SET`, emit that tag with `ns_ip` and stop processing for that IP.
    - If raw lookup text exists, emit `ASN_INFOS_RAW` (`ns_ip`, `data`).
-   - If ASN list exists, emit `ASN_INFOS_ANNOUNCE_BY` (`ns_ip`, `asn`) and store ASN set for diversity classification.
-   - If prefix exists, emit `ASN_INFOS_ANNOUNCE_IN` (`ns_ip`, `prefix`).
+   - If ASN list exists, emit `ASN_INFOS_ANNOUNCE_BY` (`ns_ip`, `asns`) and store ASN set for diversity classification.
+   - If prefix exists, emit `ASN_INFOS_ANNOUNCE_IN` (`ns_ip`, `prefixes`).
 5. For IPv4 stored ASN data:
    - If no ASN values were stored, emit no IPv4 diversity summary tag.
    - If exactly one unique ASN exists, emit `IPV4_ONE_ASN`.
@@ -56,19 +56,19 @@ Status: Final
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
 | `ASN_INFOS_ANNOUNCE_BY` | `ns_ip` | `string` | IP address looked up. |
-| `ASN_INFOS_ANNOUNCE_BY` | `asn` | `string` | Comma-delimited ASN list reported for the IP. |
+| `ASN_INFOS_ANNOUNCE_BY` | `asns` | `array<int>` | Structured ASN list reported for the IP. |
 | `ASN_INFOS_ANNOUNCE_IN` | `ns_ip` | `string` | IP address looked up. |
-| `ASN_INFOS_ANNOUNCE_IN` | `prefix` | `string` | Prefix announcing the IP. |
+| `ASN_INFOS_ANNOUNCE_IN` | `prefixes` | `array<string>` | Structured prefix list announcing the IP (single-item list per entry). |
 | `ASN_INFOS_RAW` | `ns_ip` | `string` | IP address looked up. |
 | `ASN_INFOS_RAW` | `data` | `string` | Raw backend response data string. |
 | `EMPTY_ASN_SET` | `ns_ip` | `string` | IP address with empty ASN lookup result. |
 | `ERROR_ASN_DATABASE` | `ns_ip` | `string` | IP address where ASN lookup backend failed. |
-| `IPV4_DIFFERENT_ASN` | `asn_list` | `string` | Comma-delimited unique IPv4 ASN values. |
+| `IPV4_DIFFERENT_ASN` | `asns` | `array<int>` | Structured unique IPv4 ASN values. |
 | `IPV4_ONE_ASN` | `asn` | `int` | Single unique IPv4 ASN value. |
-| `IPV4_SAME_ASN` | `asn_list` | `string` | Shared comma-delimited ASN-set signature across IPv4 IPs. |
-| `IPV6_DIFFERENT_ASN` | `asn_list` | `string` | Comma-delimited unique IPv6 ASN values. |
+| `IPV4_SAME_ASN` | `asns` | `array<int>` | Structured ASN values shared across IPv4 IPs. |
+| `IPV6_DIFFERENT_ASN` | `asns` | `array<int>` | Structured unique IPv6 ASN values. |
 | `IPV6_ONE_ASN` | `asn` | `int` | Single unique IPv6 ASN value. |
-| `IPV6_SAME_ASN` | `asn_list` | `string` | Shared comma-delimited ASN-set signature across IPv6 IPs. |
+| `IPV6_SAME_ASN` | `asns` | `array<int>` | Structured ASN values shared across IPv6 IPs. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Connectivity03`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Connectivity03`). |
 

@@ -332,7 +332,6 @@
     },
     "asn": {
       "tags": [
-        "ASN_INFOS_ANNOUNCE_BY",
         "IPV4_ONE_ASN",
         "IPV6_ONE_ASN"
       ],
@@ -342,20 +341,8 @@
       "producer_files": [
         "engine/test/connectivity/connectivity.go"
       ],
-      "occurrences": 4,
+      "occurrences": 2,
       "samples": [
-        {
-          "tag": "ASN_INFOS_ANNOUNCE_BY",
-          "file": "engine/test/connectivity/connectivity.go",
-          "line": 282,
-          "shape": "unknown"
-        },
-        {
-          "tag": "ASN_INFOS_ANNOUNCE_BY",
-          "file": "engine/test/connectivity/connectivity.go",
-          "line": 348,
-          "shape": "unknown"
-        },
         {
           "tag": "IPV4_ONE_ASN",
           "file": "engine/test/connectivity/connectivity.go",
@@ -370,8 +357,9 @@
         }
       ]
     },
-    "asn_list": {
+    "asns": {
       "tags": [
+        "ASN_INFOS_ANNOUNCE_BY",
         "IPV4_DIFFERENT_ASN",
         "IPV4_SAME_ASN",
         "IPV6_DIFFERENT_ASN",
@@ -383,8 +371,20 @@
       "producer_files": [
         "engine/test/connectivity/connectivity.go"
       ],
-      "occurrences": 4,
+      "occurrences": 6,
       "samples": [
+        {
+          "tag": "ASN_INFOS_ANNOUNCE_BY",
+          "file": "engine/test/connectivity/connectivity.go",
+          "line": 282,
+          "shape": "unknown"
+        },
+        {
+          "tag": "ASN_INFOS_ANNOUNCE_BY",
+          "file": "engine/test/connectivity/connectivity.go",
+          "line": 348,
+          "shape": "unknown"
+        },
         {
           "tag": "IPV4_DIFFERENT_ASN",
           "file": "engine/test/connectivity/connectivity.go",
@@ -2272,14 +2272,13 @@
         }
       ]
     },
-    "prefix": {
+    "prefixes": {
       "tags": [
         "ASN_INFOS_ANNOUNCE_IN",
         "CN04_ASN_INFOS_ANNOUNCE_IN"
       ],
       "shapes": [
-        "string",
-        "unknown"
+        "array"
       ],
       "producer_files": [
         "engine/test/connectivity/connectivity.go"
@@ -2290,19 +2289,19 @@
           "tag": "ASN_INFOS_ANNOUNCE_IN",
           "file": "engine/test/connectivity/connectivity.go",
           "line": 294,
-          "shape": "string"
+          "shape": "array"
         },
         {
           "tag": "ASN_INFOS_ANNOUNCE_IN",
           "file": "engine/test/connectivity/connectivity.go",
           "line": 360,
-          "shape": "string"
+          "shape": "array"
         },
         {
           "tag": "CN04_ASN_INFOS_ANNOUNCE_IN",
           "file": "engine/test/connectivity/connectivity.go",
           "line": 534,
-          "shape": "unknown"
+          "shape": "array"
         }
       ]
     },

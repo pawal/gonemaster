@@ -154,6 +154,39 @@ func TestConnectivity03SameASNSet(t *testing.T) {
 	if !hasEntryTag(entries, "IPV4_SAME_ASN") {
 		t.Fatalf("expected IPV4_SAME_ASN")
 	}
+	sameASN := findEntry(entries, "IPV4_SAME_ASN")
+	if sameASN == nil {
+		t.Fatalf("expected IPV4_SAME_ASN entry")
+	}
+	if _, ok := sameASN.Args["asn_list"]; ok {
+		t.Fatalf("did not expect legacy asn_list key in args")
+	}
+	asns := intSliceFromArgs(t, sameASN.Args, "asns")
+	if len(asns) != 2 || asns[0] != 64500 || asns[1] != 64501 {
+		t.Fatalf("expected asns [64500 64501], got %v", asns)
+	}
+	announce := findEntry(entries, "ASN_INFOS_ANNOUNCE_BY")
+	if announce == nil {
+		t.Fatalf("expected ASN_INFOS_ANNOUNCE_BY entry")
+	}
+	if _, ok := announce.Args["asn"]; ok {
+		t.Fatalf("did not expect legacy asn key in ASN_INFOS_ANNOUNCE_BY args")
+	}
+	announceASNs := intSliceFromArgs(t, announce.Args, "asns")
+	if len(announceASNs) != 2 || announceASNs[0] != 64500 || announceASNs[1] != 64501 {
+		t.Fatalf("expected announce asns [64500 64501], got %v", announceASNs)
+	}
+	announceIn := findEntry(entries, "ASN_INFOS_ANNOUNCE_IN")
+	if announceIn == nil {
+		t.Fatalf("expected ASN_INFOS_ANNOUNCE_IN entry")
+	}
+	if _, ok := announceIn.Args["prefix"]; ok {
+		t.Fatalf("did not expect legacy prefix key in ASN_INFOS_ANNOUNCE_IN args")
+	}
+	prefixes := stringSliceFromArgs(t, announceIn.Args, "prefixes")
+	if len(prefixes) != 1 || prefixes[0] != "192.0.2.0/24" {
+		t.Fatalf("expected prefixes [192.0.2.0/24], got %v", prefixes)
+	}
 }
 
 func TestConnectivityLoopParallelQueries(t *testing.T) {
@@ -429,13 +462,87 @@ func TestConnectivity04SinglePrefix(t *testing.T) {
 	if _, ok := samePrefix.Args["ns_list"]; ok {
 		t.Fatalf("did not expect legacy ns_list key in args")
 	}
+	if _, ok := samePrefix.Args["ip_prefix"]; ok {
+		t.Fatalf("did not expect legacy ip_prefix key in args")
+	}
 	names := serverNamesFromArgs(t, samePrefix.Args)
 	if len(names) != 2 || names[0] != "ns1.example" || names[1] != "ns2.example" {
 		t.Fatalf("expected typed servers [ns1.example ns2.example], got %v", names)
 	}
+	prefixes := stringSliceFromArgs(t, samePrefix.Args, "prefixes")
+	if len(prefixes) != 1 || prefixes[0] != "192.0.2.0/24" {
+		t.Fatalf("expected prefixes [192.0.2.0/24], got %v", prefixes)
+	}
+	announceIn := findEntry(entries, "CN04_ASN_INFOS_ANNOUNCE_IN")
+	if announceIn == nil {
+		t.Fatalf("expected CN04_ASN_INFOS_ANNOUNCE_IN entry")
+	}
+	if _, ok := announceIn.Args["prefix"]; ok {
+		t.Fatalf("did not expect legacy prefix key in CN04_ASN_INFOS_ANNOUNCE_IN args")
+	}
+	announcePrefixes := stringSliceFromArgs(t, announceIn.Args, "prefixes")
+	if len(announcePrefixes) != 1 || announcePrefixes[0] != "192.0.2.0/24" {
+		t.Fatalf("expected announce prefixes [192.0.2.0/24], got %v", announcePrefixes)
+	}
 	if !hasEntryTag(entries, "CN04_IPV4_SINGLE_PREFIX") {
 		t.Fatalf("expected CN04_IPV4_SINGLE_PREFIX")
 	}
+}
+
+func intSliceFromArgs(t *testing.T, args map[string]any, key string) []int {
+	t.Helper()
+	raw, ok := args[key]
+	if !ok {
+		t.Fatalf("expected %s key in args", key)
+	}
+	switch items := raw.(type) {
+	case []int:
+		out := append([]int{}, items...)
+		sort.Ints(out)
+		return out
+	case []any:
+		out := make([]int, 0, len(items))
+		for _, item := range items {
+			switch v := item.(type) {
+			case int:
+				out = append(out, v)
+			case float64:
+				out = append(out, int(v))
+			default:
+				t.Fatalf("unexpected %s element type: %T", key, item)
+			}
+		}
+		sort.Ints(out)
+		return out
+	default:
+		t.Fatalf("unexpected %s type: %T", key, raw)
+	}
+	return nil
+}
+
+func stringSliceFromArgs(t *testing.T, args map[string]any, key string) []string {
+	t.Helper()
+	raw, ok := args[key]
+	if !ok {
+		t.Fatalf("expected %s key in args", key)
+	}
+	switch items := raw.(type) {
+	case []string:
+		return append([]string{}, items...)
+	case []any:
+		out := make([]string, 0, len(items))
+		for _, item := range items {
+			value, ok := item.(string)
+			if !ok {
+				t.Fatalf("unexpected %s element type: %T", key, item)
+			}
+			out = append(out, value)
+		}
+		return out
+	default:
+		t.Fatalf("unexpected %s type: %T", key, raw)
+	}
+	return nil
 }
 
 func newNameserver(t *testing.T, name string, ip string, handler func(qname string, qtype string) packet.Packet) nameserver.Nameserver {

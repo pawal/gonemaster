@@ -278,22 +278,22 @@ func Connectivity03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 					}
 				}
 				if len(res.ASNs) > 0 {
-					asnStr := joinASNStrings(res.ASNs)
+					asns := uniqueSortedInts(append([]int{}, res.ASNs...))
 					if _, err := buf.Add("ASN_INFOS_ANNOUNCE_BY", map[string]any{
 						"ns_ip": ip.String(),
-						"asn":   asnStr,
+						"asns":  asns,
 					}); err != nil {
 						return err
 					}
 					outcomes[i] = asnOutcome{
-						asns:   append([]int{}, res.ASNs...),
-						asnset: joinASNNumeric(res.ASNs),
+						asns:   asns,
+						asnset: asnSetSignature(asns),
 					}
 				}
 				if res.Prefix != nil {
 					if _, err := buf.Add("ASN_INFOS_ANNOUNCE_IN", map[string]any{
-						"ns_ip":  ip.String(),
-						"prefix": res.Prefix.String(),
+						"ns_ip":    ip.String(),
+						"prefixes": []string{res.Prefix.String()},
 					}); err != nil {
 						return err
 					}
@@ -344,22 +344,22 @@ func Connectivity03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 					}
 				}
 				if len(res.ASNs) > 0 {
-					asnStr := joinASNStrings(res.ASNs)
+					asns := uniqueSortedInts(append([]int{}, res.ASNs...))
 					if _, err := buf.Add("ASN_INFOS_ANNOUNCE_BY", map[string]any{
 						"ns_ip": ip.String(),
-						"asn":   asnStr,
+						"asns":  asns,
 					}); err != nil {
 						return err
 					}
 					outcomes[i] = asnOutcome{
-						asns:   append([]int{}, res.ASNs...),
-						asnset: joinASNNumeric(res.ASNs),
+						asns:   asns,
+						asnset: asnSetSignature(asns),
 					}
 				}
 				if res.Prefix != nil {
 					if _, err := buf.Add("ASN_INFOS_ANNOUNCE_IN", map[string]any{
-						"ns_ip":  ip.String(),
-						"prefix": res.Prefix.String(),
+						"ns_ip":    ip.String(),
+						"prefixes": []string{res.Prefix.String()},
 					}); err != nil {
 						return err
 					}
@@ -397,13 +397,13 @@ func Connectivity03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 			}
 		} else if len(v4asnsets) == 1 {
 			if err := appendLog(ctx, &results, testcase, "IPV4_SAME_ASN", map[string]any{
-				"asn_list": v4asnsets[0],
+				"asns": v4asns,
 			}); err != nil {
 				return results, err
 			}
 		} else {
 			if err := appendLog(ctx, &results, testcase, "IPV4_DIFFERENT_ASN", map[string]any{
-				"asn_list": joinInts(v4asns),
+				"asns": v4asns,
 			}); err != nil {
 				return results, err
 			}
@@ -419,13 +419,13 @@ func Connectivity03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 			}
 		} else if len(v6asnsets) == 1 {
 			if err := appendLog(ctx, &results, testcase, "IPV6_SAME_ASN", map[string]any{
-				"asn_list": v6asnsets[0],
+				"asns": v6asns,
 			}); err != nil {
 				return results, err
 			}
 		} else {
 			if err := appendLog(ctx, &results, testcase, "IPV6_DIFFERENT_ASN", map[string]any{
-				"asn_list": joinInts(v6asns),
+				"asns": v6asns,
 			}); err != nil {
 				return results, err
 			}
@@ -532,8 +532,8 @@ func Connectivity04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 				if res.Prefix != nil {
 					prefixStr := res.Prefix.String()
 					if _, err := buf.Add("CN04_ASN_INFOS_ANNOUNCE_IN", map[string]any{
-						"ns_ip":  ip.String(),
-						"prefix": prefixStr,
+						"ns_ip":    ip.String(),
+						"prefixes": []string{prefixStr},
 					}); err != nil {
 						return err
 					}
@@ -593,7 +593,7 @@ func Connectivity04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 			if len(list) >= 2 {
 				tag := fmt.Sprintf("CN04_IPV%d_SAME_PREFIX", version)
 				args := map[string]any{
-					"ip_prefix": prefix,
+					"prefixes": []string{prefix},
 				}
 				setTypedServersFromNames(args, list)
 				if err := appendLog(ctx, &results, testcase, tag, args); err != nil {
@@ -866,15 +866,7 @@ func uniqueSortedStrings(values []string) []string {
 	return out
 }
 
-func joinInts(values []int) string {
-	parts := make([]string, len(values))
-	for i, value := range values {
-		parts[i] = strconv.Itoa(value)
-	}
-	return strings.Join(parts, ",")
-}
-
-func joinASNStrings(values []int) string {
+func asnSetSignature(values []int) string {
 	if len(values) == 0 {
 		return ""
 	}
@@ -882,17 +874,7 @@ func joinASNStrings(values []int) string {
 	for i, value := range values {
 		parts[i] = strconv.Itoa(value)
 	}
-	sort.Strings(parts)
 	return strings.Join(parts, ",")
-}
-
-func joinASNNumeric(values []int) string {
-	if len(values) == 0 {
-		return ""
-	}
-	copyVals := append([]int{}, values...)
-	sort.Ints(copyVals)
-	return joinInts(copyVals)
 }
 
 func setTypedServersFromNames(args map[string]any, values []string) {

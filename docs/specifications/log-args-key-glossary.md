@@ -53,7 +53,6 @@ These keys may appear in non-migrated entries and are not canonical in v1.1:
 
 - `ip`, `ns_ip`
 - `nsname`, `name`, `server`
-- `asn_list`
 - delimiter-packed identity fields (`;` or `,`) without typed counterparts
 
 Migration rule:

@@ -26,8 +26,8 @@ Applies to all emitted log entries consumed through:
 | Nameserver address | `ns_ip`, `ip`, sometimes `address` | `string` IP | Key choice depends on tag/module. |
 | Nameserver list (structured) | `servers` | `array<object>` | Items use `{ "ns": "...", "address": "..." }`. |
 | Nameserver IP list (structured) | `addresses` | `array<string>` | Typed list for machine use. |
-| ASN (single) | `asn` | `int` or `string` | Type varies by producer/tag. |
-| ASN collection | `asn_list`, sometimes `asn` | mostly joined `string` | Shape varies (`string` vs list-like). |
+| ASN (single) | `asn` | `int` | Singular ASN value for explicit one-ASN semantics. |
+| ASN collection | `asns` | `array<int>` | Structured ASN list for machine use. |
 | Query name/type/class | `query_name`, `rrtype`, `type`, `query_type`, `query_class` | `string` | Partially overlapping key set. |
 
 ## Current Migration Status
@@ -35,7 +35,7 @@ Applies to all emitted log entries consumed through:
 - `args.ns` no longer uses `name/ip` in current `engine/test` emits.
 - `args.address` exists on migrated singular-endpoint callsites.
 - `servers` / `addresses` are now used for nameserver list identity in migrated tags.
-- Remaining non-canonical list drift is primarily in `asn_list` and a few other legacy keys.
+- Remaining non-canonical list drift is primarily in other legacy list keys (for example `nsname_list`, `names`).
 
 ## Canonical Contract (v1.1)
 
@@ -87,7 +87,7 @@ Rules:
 ### Legacy Compatibility Fields
 
 Legacy keys may still exist during migration (for example `name`, `type`, `ip`,
-`asn_list`), but they are non-canonical.
+`nsname_list`), but they are non-canonical.
 
 Rules:
 

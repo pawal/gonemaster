@@ -1340,8 +1340,8 @@ msgid "Big packet size ({size}) (try with \"{command}\")."
 msgstr "パケットサイズが大きすぎます ({size}) (\"{command}\" を試してください)。"
 
 msgctxt "SYSTEM:ERROR_CACHE_SKIP"
-msgid "Skipping {query_type} query to {query_name} ({query_class}) at {ip} over {protocol} for {ttl_seconds}s after network error."
-msgstr "{query_type} クエリ ({query_name}/{query_class}) を {ip} ({protocol}) で {ttl_seconds} 秒スキップします (ネットワークエラー後)。"
+msgid "Skipping {query_type} query to {query_name} ({query_class}) at {address} over {protocol} for {ttl_seconds}s after network error."
+msgstr "{query_type} クエリ ({query_name}/{query_class}) を {address} ({protocol}) で {ttl_seconds} 秒スキップします (ネットワークエラー後)。"
 
 msgctxt "NAMESERVER:NAMESERVER01"
 msgid "A name server should not be a recursor"

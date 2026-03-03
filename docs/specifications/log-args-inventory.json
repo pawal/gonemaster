@@ -98,6 +98,77 @@
         }
       ]
     },
+    "address": {
+      "tags": [
+        "CACHE_CREATED",
+        "CACHE_FETCHED",
+        "EMPTY_RETURN",
+        "ERROR_CACHE_SKIP",
+        "EXTERNAL_QUERY",
+        "EXTERNAL_RESPONSE",
+        "NS_CREATED",
+        "QUERY",
+        "REACHABILITY_CACHE_SKIP"
+      ],
+      "shapes": [
+        "string",
+        "unknown"
+      ],
+      "producer_files": [
+        "engine/nameserver/nameserver.go"
+      ],
+      "occurrences": 9,
+      "samples": [
+        {
+          "tag": "CACHE_CREATED",
+          "file": "engine/nameserver/nameserver.go",
+          "line": 90,
+          "shape": "unknown"
+        },
+        {
+          "tag": "CACHE_FETCHED",
+          "file": "engine/nameserver/nameserver.go",
+          "line": 92,
+          "shape": "unknown"
+        },
+        {
+          "tag": "EMPTY_RETURN",
+          "file": "engine/nameserver/nameserver.go",
+          "line": 448,
+          "shape": "string"
+        },
+        {
+          "tag": "ERROR_CACHE_SKIP",
+          "file": "engine/nameserver/nameserver.go",
+          "line": 222,
+          "shape": "string"
+        },
+        {
+          "tag": "EXTERNAL_QUERY",
+          "file": "engine/nameserver/nameserver.go",
+          "line": 419,
+          "shape": "string"
+        },
+        {
+          "tag": "NS_CREATED",
+          "file": "engine/nameserver/nameserver.go",
+          "line": 112,
+          "shape": "unknown"
+        },
+        {
+          "tag": "QUERY",
+          "file": "engine/nameserver/nameserver.go",
+          "line": 165,
+          "shape": "string"
+        },
+        {
+          "tag": "REACHABILITY_CACHE_SKIP",
+          "file": "engine/nameserver/nameserver.go",
+          "line": 207,
+          "shape": "string"
+        }
+      ]
+    },
     "addresses": {
       "tags": [
         "EXTRA_ADDRESS_CHILD"
@@ -1198,77 +1269,6 @@
           "tag": "LOOP_PROTECTION",
           "file": "engine/test/basic/basic.go",
           "line": 309,
-          "shape": "string"
-        }
-      ]
-    },
-    "ip": {
-      "tags": [
-        "CACHE_CREATED",
-        "CACHE_FETCHED",
-        "EMPTY_RETURN",
-        "ERROR_CACHE_SKIP",
-        "EXTERNAL_QUERY",
-        "EXTERNAL_RESPONSE",
-        "NS_CREATED",
-        "QUERY",
-        "REACHABILITY_CACHE_SKIP"
-      ],
-      "shapes": [
-        "string",
-        "unknown"
-      ],
-      "producer_files": [
-        "engine/nameserver/nameserver.go"
-      ],
-      "occurrences": 9,
-      "samples": [
-        {
-          "tag": "CACHE_CREATED",
-          "file": "engine/nameserver/nameserver.go",
-          "line": 90,
-          "shape": "unknown"
-        },
-        {
-          "tag": "CACHE_FETCHED",
-          "file": "engine/nameserver/nameserver.go",
-          "line": 92,
-          "shape": "unknown"
-        },
-        {
-          "tag": "EMPTY_RETURN",
-          "file": "engine/nameserver/nameserver.go",
-          "line": 448,
-          "shape": "string"
-        },
-        {
-          "tag": "ERROR_CACHE_SKIP",
-          "file": "engine/nameserver/nameserver.go",
-          "line": 222,
-          "shape": "string"
-        },
-        {
-          "tag": "EXTERNAL_QUERY",
-          "file": "engine/nameserver/nameserver.go",
-          "line": 419,
-          "shape": "string"
-        },
-        {
-          "tag": "NS_CREATED",
-          "file": "engine/nameserver/nameserver.go",
-          "line": 112,
-          "shape": "unknown"
-        },
-        {
-          "tag": "QUERY",
-          "file": "engine/nameserver/nameserver.go",
-          "line": 165,
-          "shape": "string"
-        },
-        {
-          "tag": "REACHABILITY_CACHE_SKIP",
-          "file": "engine/nameserver/nameserver.go",
-          "line": 207,
           "shape": "string"
         }
       ]

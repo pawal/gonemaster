@@ -55,7 +55,9 @@ func TestContract_ExternalQueryArgs(t *testing.T) {
 	requireStringArg(t, entry, "query_name", "example.com")
 	requireStringArg(t, entry, "query_type", "SOA")
 	requireStringArg(t, entry, "query_class", "IN")
-	requireStringArg(t, entry, "ip", "127.0.0.1")
+	if _, ok := entry.Args["ip"]; ok {
+		t.Fatalf("legacy key ip should not be present: %#v", entry.Args)
+	}
 }
 
 func TestContract_ErrorCacheSkipArgs(t *testing.T) {

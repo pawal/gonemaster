@@ -87,9 +87,9 @@ func newWithCache(ctx context.Context, cache *CacheStore, name string, address s
 	}
 	queryCache, cacheCreated := cache.cacheForAddressWithStatus(addrKey)
 	if cacheCreated {
-		logSystemWithLogger(runLog, "CACHE_CREATED", map[string]any{"ip": addrKey})
+		logSystemWithLogger(runLog, "CACHE_CREATED", map[string]any{"address": addrKey})
 	} else {
-		logSystemWithLogger(runLog, "CACHE_FETCHED", map[string]any{"ip": addrKey})
+		logSystemWithLogger(runLog, "CACHE_FETCHED", map[string]any{"address": addrKey})
 	}
 
 	state := &nsState{
@@ -110,8 +110,8 @@ func newWithCache(ctx context.Context, cache *CacheStore, name string, address s
 	}
 	cache.storeNameserver(nameKey, addrKey, ns)
 	logSystemWithLogger(runLog, "NS_CREATED", map[string]any{
-		"name": nameObj.String(),
-		"ip":   addrKey,
+		"name":    nameObj.String(),
+		"address": addrKey,
 	})
 	return *ns, nil
 }
@@ -159,7 +159,7 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 		"query_type":  qtype,
 		"query_class": qclass,
 		"flags":       queryFlags(qclass, opts),
-		"ip":          ns.Address.String(),
+		"address":     ns.Address.String(),
 	}
 	logargs.SetNS(queryArgs, ns.NameString(), ns.AddressString())
 	logSystemWithLogger(runLog, "QUERY", queryArgs)
@@ -196,7 +196,7 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	if ttl := resolveReachabilityTTL(prof, opts); ttl > 0 {
 		if skip, remaining := globalReachability.shouldSkip(ns.Address.String()); skip {
 			skipArgs := map[string]any{
-				"ip":          ns.Address.String(),
+				"address":     ns.Address.String(),
 				"protocol":    errorCacheProtocol(usevc),
 				"ttl_seconds": int(remaining.Seconds()),
 				"query_name":  qname,
@@ -211,7 +211,7 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	if errorCacheTTL := resolveErrorCacheTTL(prof, opts); errorCacheTTL > 0 && ns.state != nil && ns.state.errorCache != nil {
 		if skip, remaining := ns.state.errorCache.shouldSkip(errorCacheKey(usevc)); skip {
 			skipArgs := map[string]any{
-				"ip":          ns.Address.String(),
+				"address":     ns.Address.String(),
 				"protocol":    errorCacheProtocol(usevc),
 				"ttl_seconds": int(remaining.Seconds()),
 				"query_name":  qname,
@@ -412,7 +412,7 @@ func (ns Nameserver) queryNetwork(ctx context.Context, qname string, qtype strin
 		"query_name":  qname,
 		"query_type":  qtype,
 		"query_class": qclass,
-		"ip":          ns.Address.String(),
+		"address":     ns.Address.String(),
 		"flags":       fmt.Sprintf(`{"class":%q}`, qclass),
 	}
 	logargs.SetNS(queryArgs, ns.NameString(), ns.AddressString())
@@ -425,7 +425,7 @@ func (ns Nameserver) queryNetwork(ctx context.Context, qname string, qtype strin
 		"query_name":  qname,
 		"query_type":  qtype,
 		"query_class": qclass,
-		"ip":          ns.Address.String(),
+		"address":     ns.Address.String(),
 		"flags":       fmt.Sprintf(`{"class":%q}`, qclass),
 	}
 	logargs.SetNS(args, ns.NameString(), ns.AddressString())

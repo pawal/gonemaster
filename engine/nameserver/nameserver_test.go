@@ -673,8 +673,11 @@ func TestQueryLogging(t *testing.T) {
 			if qclass, ok := loggedArgs["query_class"]; !ok || qclass != "IN" {
 				t.Errorf("expected query_class=IN, got %v", qclass)
 			}
-			if ip, ok := loggedArgs["ip"]; !ok || ip != "127.0.0.1" {
-				t.Errorf("expected ip=127.0.0.1, got %v", ip)
+			if address, ok := loggedArgs["address"]; !ok || address != "127.0.0.1" {
+				t.Errorf("expected address=127.0.0.1, got %v", address)
+			}
+			if _, ok := loggedArgs["ip"]; ok {
+				t.Errorf("legacy key ip should not be present, got %v", loggedArgs["ip"])
 			}
 			if flags, ok := loggedArgs["flags"]; !ok || flags != "{\"class\":\"IN\"}" {
 				t.Errorf("expected flags={\"class\":\"IN\"}, got %v", flags)

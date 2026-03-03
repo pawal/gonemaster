@@ -23,7 +23,7 @@ Applies to all emitted log entries consumed through:
 | --- | --- | --- | --- |
 | Nameserver endpoint identity | `ns` | `"<name>"` | Name-only in current `engine/test` emits (`name/ip` is CI-rejected). |
 | Nameserver name | `nsname`, sometimes `name`, canonical `ns` | `string` | `nsname`/`name` remain only as legacy key drift in non-migrated tags. |
-| Nameserver address | `ns_ip`, `ip`, sometimes `address` | `string` IP | Key choice depends on tag/module. |
+| Nameserver address | `ns_ip`, canonical `address` | `string` IP | `ip` was removed from system query/cache tags; `ns_ip` remains in non-migrated tags. |
 | Nameserver list (structured) | `servers` | `array<object>` | Items use `{ "ns": "...", "address": "..." }`. |
 | Nameserver IP list (structured) | `addresses` | `array<string>` | Typed list for machine use. |
 | ASN (single) | `asn` | `int` | Singular ASN value for explicit one-ASN semantics. |

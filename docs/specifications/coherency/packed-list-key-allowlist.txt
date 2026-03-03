@@ -5,7 +5,6 @@ mailtarget_list
 names
 ns_ip_list
 ns_list
-nsname_list
 parent_addresses
 servers
 zone_addresses

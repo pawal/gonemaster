@@ -199,10 +199,10 @@ func Delegation01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	delNameStrings := namesToStrings(delNames)
 	sort.Strings(delNameStrings)
 	delArgs := map[string]any{
-		"count":       len(delNameStrings),
-		"minimum":     constants.MinimumNumberOfNameservers,
-		"nsname_list": strings.Join(delNameStrings, ";"),
+		"count":   len(delNameStrings),
+		"minimum": constants.MinimumNumberOfNameservers,
 	}
+	setTypedServersFromNames(delArgs, delNameStrings)
 	if len(delNameStrings) >= constants.MinimumNumberOfNameservers {
 		if err := appendLog(ctx, &results, testcase, "ENOUGH_NS_DEL", delArgs); err != nil {
 			return results, err
@@ -220,10 +220,10 @@ func Delegation01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	childNameStrings := namesToStrings(childNames)
 	sort.Strings(childNameStrings)
 	childArgs := map[string]any{
-		"count":       len(childNameStrings),
-		"minimum":     constants.MinimumNumberOfNameservers,
-		"nsname_list": strings.Join(childNameStrings, ";"),
+		"count":   len(childNameStrings),
+		"minimum": constants.MinimumNumberOfNameservers,
 	}
+	setTypedServersFromNames(childArgs, childNameStrings)
 	if len(childNameStrings) >= constants.MinimumNumberOfNameservers {
 		if err := appendLog(ctx, &results, testcase, "ENOUGH_NS_CHILD", childArgs); err != nil {
 			return results, err
@@ -543,9 +543,9 @@ func Delegation04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	if (len(list4) > 0 || len(list5) > 0) && onlyTestCaseStart(results) && len(authoritatives) > 0 {
 		uniq := uniqueStrings(authoritatives)
 		sort.Strings(uniq)
-		if err := appendLog(ctx, &results, testcase, "ARE_AUTHORITATIVE", map[string]any{
-			"nsname_list": strings.Join(uniq, ";"),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, uniq)
+		if err := appendLog(ctx, &results, testcase, "ARE_AUTHORITATIVE", args); err != nil {
 			return results, err
 		}
 	}
@@ -876,6 +876,23 @@ func namesToStrings(names []dnsname.Name) []string {
 	return values
 }
 
+func setTypedServersFromNames(args map[string]any, values []string) {
+	if args == nil || len(values) == 0 {
+		return
+	}
+	names := logargs.UniqueSortedEndpointNames(values)
+	if len(names) == 0 {
+		return
+	}
+	servers := make([]logargs.Server, 0, len(names))
+	for _, name := range names {
+		servers = append(servers, logargs.Server{NS: name})
+	}
+	if typed, ok := logargs.Servers(servers)["servers"]; ok {
+		args["servers"] = typed
+	}
+}
+
 func findDupNS(ctx context.Context, testcase string, duplicateTag string, distinctTag string, nsList []nameserver.Nameserver) ([]*logger.Entry, error) {
 	nsnamesAndIP := map[string]bool{}
 	ips := map[string][]string{}
@@ -896,10 +913,11 @@ func findDupNS(ctx context.Context, testcase string, duplicateTag string, distin
 	sort.Strings(keys)
 	for _, ip := range keys {
 		if len(ips[ip]) > 1 {
-			entry, err := util.LoggerFromContext(ctx).Add(duplicateTag, map[string]any{
-				"nsname_list": strings.Join(ips[ip], ";"),
-				"ns_ip":       ip,
-			}, moduleName, testcase)
+			args := map[string]any{
+				"ns_ip": ip,
+			}
+			setTypedServersFromNames(args, ips[ip])
+			entry, err := util.LoggerFromContext(ctx).Add(duplicateTag, args, moduleName, testcase)
 			if err != nil {
 				return results, err
 			}

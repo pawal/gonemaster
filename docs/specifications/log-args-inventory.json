@@ -11,9 +11,9 @@
     "file_count": 93,
     "log_call_count": 616,
     "unique_tag_count": 424,
-    "unique_key_count": 81,
+    "unique_key_count": 80,
     "ns_string_call_count": 0,
-    "packed_list_only_key_count": 5,
+    "packed_list_only_key_count": 4,
     "unresolved_log_call_count": 118
   },
   "keys": {
@@ -113,7 +113,7 @@
         {
           "tag": "EXTRA_ADDRESS_CHILD",
           "file": "engine/test/consistency/consistency.go",
-          "line": 935,
+          "line": 934,
           "shape": "unknown"
         }
       ]
@@ -580,7 +580,7 @@
         {
           "tag": "MULTIPLE_SOA_MNAMES",
           "file": "engine/test/consistency/consistency.go",
-          "line": 1111,
+          "line": 1110,
           "shape": "int"
         },
         {
@@ -1823,13 +1823,13 @@
         {
           "tag": "ONE_SOA_MNAME",
           "file": "engine/test/consistency/consistency.go",
-          "line": 1105,
+          "line": 1104,
           "shape": "unknown"
         },
         {
           "tag": "SOA_MNAME",
           "file": "engine/test/consistency/consistency.go",
-          "line": 1121,
+          "line": 1120,
           "shape": "unknown"
         }
       ]
@@ -2062,80 +2062,6 @@
         }
       ]
     },
-    "nsname_list": {
-      "tags": [
-        "ARE_AUTHORITATIVE",
-        "CAN_NOT_BE_RESOLVED",
-        "ENOUGH_NS_CHILD",
-        "ENOUGH_NS_DEL",
-        "NOT_ENOUGH_NS_CHILD",
-        "NOT_ENOUGH_NS_DEL",
-        "NO_UPWARD_REFERRAL",
-        "NS_SET",
-        "ONE_NS_SET",
-        "duplicateTag"
-      ],
-      "shapes": [
-        "string",
-        "unknown"
-      ],
-      "producer_files": [
-        "engine/test/consistency/consistency.go",
-        "engine/test/delegation/delegation.go",
-        "engine/test/nameserver/nameserver.go"
-      ],
-      "occurrences": 10,
-      "samples": [
-        {
-          "tag": "ARE_AUTHORITATIVE",
-          "file": "engine/test/delegation/delegation.go",
-          "line": 546,
-          "shape": "string"
-        },
-        {
-          "tag": "ENOUGH_NS_CHILD",
-          "file": "engine/test/delegation/delegation.go",
-          "line": 228,
-          "shape": "string"
-        },
-        {
-          "tag": "ENOUGH_NS_DEL",
-          "file": "engine/test/delegation/delegation.go",
-          "line": 207,
-          "shape": "string"
-        },
-        {
-          "tag": "NOT_ENOUGH_NS_CHILD",
-          "file": "engine/test/delegation/delegation.go",
-          "line": 232,
-          "shape": "string"
-        },
-        {
-          "tag": "NOT_ENOUGH_NS_DEL",
-          "file": "engine/test/delegation/delegation.go",
-          "line": 211,
-          "shape": "string"
-        },
-        {
-          "tag": "NS_SET",
-          "file": "engine/test/consistency/consistency.go",
-          "line": 746,
-          "shape": "unknown"
-        },
-        {
-          "tag": "ONE_NS_SET",
-          "file": "engine/test/consistency/consistency.go",
-          "line": 732,
-          "shape": "unknown"
-        },
-        {
-          "tag": "duplicateTag",
-          "file": "engine/test/delegation/delegation.go",
-          "line": 899,
-          "shape": "string"
-        }
-      ]
-    },
     "packet": {
       "tags": [
         "CACHED_RETURN",
@@ -2193,13 +2119,13 @@
         {
           "tag": "IN_BAILIWICK_ADDR_MISMATCH",
           "file": "engine/test/consistency/consistency.go",
-          "line": 921,
+          "line": 920,
           "shape": "string"
         },
         {
           "tag": "OUT_OF_BAILIWICK_ADDR_MISMATCH",
           "file": "engine/test/consistency/consistency.go",
-          "line": 978,
+          "line": 977,
           "shape": "string"
         }
       ]
@@ -3276,13 +3202,13 @@
         {
           "tag": "IN_BAILIWICK_ADDR_MISMATCH",
           "file": "engine/test/consistency/consistency.go",
-          "line": 921,
+          "line": 920,
           "shape": "string"
         },
         {
           "tag": "OUT_OF_BAILIWICK_ADDR_MISMATCH",
           "file": "engine/test/consistency/consistency.go",
-          "line": 978,
+          "line": 977,
           "shape": "string"
         }
       ]
@@ -3291,7 +3217,6 @@
   "packed_list_only_keys": [
     "mailtarget_list",
     "names",
-    "nsname_list",
     "parent_addresses",
     "zone_addresses"
   ],
@@ -3425,7 +3350,7 @@
     {
       "tag": "CHILD_NS_FAILED",
       "file": "engine/test/consistency/consistency.go",
-      "line": 1180,
+      "line": 1179,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
@@ -3485,13 +3410,13 @@
     {
       "tag": "IPV4_DISABLED",
       "file": "engine/test/consistency/consistency.go",
-      "line": 1251,
+      "line": 1254,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
       "tag": "IPV4_DISABLED",
       "file": "engine/test/delegation/delegation.go",
-      "line": 1038,
+      "line": 1056,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
@@ -3581,13 +3506,13 @@
     {
       "tag": "IPV6_DISABLED",
       "file": "engine/test/consistency/consistency.go",
-      "line": 1241,
+      "line": 1244,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
       "tag": "IPV6_DISABLED",
       "file": "engine/test/delegation/delegation.go",
-      "line": 1028,
+      "line": 1046,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
@@ -3725,13 +3650,13 @@
     {
       "tag": "NO_RESPONSE",
       "file": "engine/test/consistency/consistency.go",
-      "line": 1056,
+      "line": 1055,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
       "tag": "NO_RESPONSE",
       "file": "engine/test/consistency/consistency.go",
-      "line": 1160,
+      "line": 1159,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
@@ -3845,13 +3770,13 @@
     {
       "tag": "NO_RESPONSE_SOA_QUERY",
       "file": "engine/test/consistency/consistency.go",
-      "line": 1065,
+      "line": 1064,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
       "tag": "NO_RESPONSE_SOA_QUERY",
       "file": "engine/test/consistency/consistency.go",
-      "line": 1073,
+      "line": 1072,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {

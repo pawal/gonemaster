@@ -38,7 +38,7 @@ Status: Final
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
 | `CAN_BE_RESOLVED` | `-` | `-` | No arguments. |
-| `CAN_NOT_BE_RESOLVED` | `nsname_list` | `string` | Semicolon-delimited unresolved NS names (lowercase, sorted). |
+| `CAN_NOT_BE_RESOLVED` | `servers` | `array<object>` | Structured unresolved nameserver names as `{ns}` items (lowercase, sorted). |
 | `NO_RESOLUTION` | `names` | `string` | Comma-delimited unresolved NS names (lowercase, sorted). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Nameserver06`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Nameserver06`). |

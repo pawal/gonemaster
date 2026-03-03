@@ -72,10 +72,10 @@ Status: Final
 | `ENOUGH_IPV6_NS_DEL` | `servers` | `array<object>` | Structured delegation `{ns,address}` object items considered for IPv6. |
 | `ENOUGH_NS_CHILD` | `count` | `int` | Number of child NS names. |
 | `ENOUGH_NS_CHILD` | `minimum` | `int` | Required minimum NS count. |
-| `ENOUGH_NS_CHILD` | `nsname_list` | `string` | Semicolon-delimited child NS names. |
+| `ENOUGH_NS_CHILD` | `servers` | `array<object>` | Structured child nameserver names as `{ns}` items. |
 | `ENOUGH_NS_DEL` | `count` | `int` | Number of delegation NS names. |
 | `ENOUGH_NS_DEL` | `minimum` | `int` | Required minimum NS count. |
-| `ENOUGH_NS_DEL` | `nsname_list` | `string` | Semicolon-delimited delegation NS names. |
+| `ENOUGH_NS_DEL` | `servers` | `array<object>` | Structured delegation nameserver names as `{ns}` items. |
 | `NOT_ENOUGH_IPV4_NS_CHILD` | `count` | `int` | Number of unique child NS names with IPv4 addresses. |
 | `NOT_ENOUGH_IPV4_NS_CHILD` | `minimum` | `int` | Required minimum NS count. |
 | `NOT_ENOUGH_IPV4_NS_CHILD` | `servers` | `array<object>` | Structured child `{ns,address}` object items considered for IPv4. |
@@ -90,10 +90,10 @@ Status: Final
 | `NOT_ENOUGH_IPV6_NS_DEL` | `servers` | `array<object>` | Structured delegation `{ns,address}` object items considered for IPv6. |
 | `NOT_ENOUGH_NS_CHILD` | `count` | `int` | Number of child NS names. |
 | `NOT_ENOUGH_NS_CHILD` | `minimum` | `int` | Required minimum NS count. |
-| `NOT_ENOUGH_NS_CHILD` | `nsname_list` | `string` | Semicolon-delimited child NS names. |
+| `NOT_ENOUGH_NS_CHILD` | `servers` | `array<object>` | Structured child nameserver names as `{ns}` items. |
 | `NOT_ENOUGH_NS_DEL` | `count` | `int` | Number of delegation NS names. |
 | `NOT_ENOUGH_NS_DEL` | `minimum` | `int` | Required minimum NS count. |
-| `NOT_ENOUGH_NS_DEL` | `nsname_list` | `string` | Semicolon-delimited delegation NS names. |
+| `NOT_ENOUGH_NS_DEL` | `servers` | `array<object>` | Structured delegation nameserver names as `{ns}` items. |
 | `NO_IPV4_NS_CHILD` | `count` | `int` | Number of unique child NS names with IPv4 addresses (`0`). |
 | `NO_IPV4_NS_CHILD` | `minimum` | `int` | Required minimum NS count. |
 | `NO_IPV4_NS_CHILD` | `servers` | `array<object>` | Structured child `{ns,address}` object items considered for IPv4. |

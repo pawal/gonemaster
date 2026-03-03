@@ -859,9 +859,9 @@ func Nameserver06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	sort.Strings(withoutIP)
 
 	if len(withoutIP) > 0 && len(withIP) > 0 {
-		if err := appendLog(ctx, &results, testcase, "CAN_NOT_BE_RESOLVED", map[string]any{
-			"nsname_list": strings.Join(withoutIP, ";"),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, withoutIP)
+		if err := appendLog(ctx, &results, testcase, "CAN_NOT_BE_RESOLVED", args); err != nil {
 			return results, err
 		}
 	} else if len(withIP) == 0 {
@@ -968,9 +968,9 @@ func Nameserver07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			keys = append(keys, name)
 		}
 		sort.Strings(keys)
-		if err := appendLog(ctx, &results, testcase, "NO_UPWARD_REFERRAL", map[string]any{
-			"nsname_list": strings.Join(keys, ";"),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, keys)
+		if err := appendLog(ctx, &results, testcase, "NO_UPWARD_REFERRAL", args); err != nil {
 			return results, err
 		}
 	}

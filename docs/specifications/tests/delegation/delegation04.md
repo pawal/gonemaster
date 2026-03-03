@@ -47,7 +47,7 @@ Status: Final
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
-| `ARE_AUTHORITATIVE` | `nsname_list` | `string` | Semicolon-delimited sorted unique authoritative NS names. |
+| `ARE_AUTHORITATIVE` | `servers` | `array<object>` | Structured authoritative nameserver names as `{ns}` items. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |

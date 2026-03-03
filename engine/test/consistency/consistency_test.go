@@ -242,6 +242,17 @@ func TestConsistency04MultipleNSSets(t *testing.T) {
 	if !hasEntryTag(entries, "NS_SET") {
 		t.Fatalf("expected NS_SET")
 	}
+	entry := firstEntryByTag(entries, "NS_SET")
+	if entry == nil {
+		t.Fatalf("expected NS_SET entry")
+	}
+	if _, ok := entry.Args["nsname_list"]; ok {
+		t.Fatalf("legacy key nsname_list should not be present: %#v", entry.Args)
+	}
+	nsSet, ok := entry.Args["ns_set_servers"].([]map[string]any)
+	if !ok || len(nsSet) == 0 {
+		t.Fatalf("expected typed ns_set_servers for NS_SET, got %#v", entry.Args["ns_set_servers"])
+	}
 }
 
 func TestConsistency04OneNSSetTypedServers(t *testing.T) {

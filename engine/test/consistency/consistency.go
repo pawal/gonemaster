@@ -739,9 +739,8 @@ func Consistency04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 		for _, setKey := range order {
-			args := map[string]any{
-				"nsname_list": setKey,
-			}
+			args := map[string]any{}
+			setTypedServerListAtKey(args, "ns_set_servers", setKey)
 			setTypedServersFromNames(args, strings.Join(normalizeEndpointNames(nsSets[setKey]), ";"))
 			if err := appendLog(ctx, &results, testcase, "NS_SET", args); err != nil {
 				return results, err
@@ -1213,6 +1212,10 @@ func withNameserverArgs(ns nameserver.Nameserver, args map[string]any) map[strin
 }
 
 func setTypedServersFromNames(args map[string]any, namesList string) {
+	setTypedServerListAtKey(args, "servers", namesList)
+}
+
+func setTypedServerListAtKey(args map[string]any, key string, namesList string) {
 	if args == nil || strings.TrimSpace(namesList) == "" {
 		return
 	}
@@ -1231,7 +1234,7 @@ func setTypedServersFromNames(args map[string]any, namesList string) {
 	}
 
 	if typed, ok := logargs.Servers(servers)["servers"]; ok {
-		args["servers"] = typed
+		args[key] = typed
 	}
 }
 

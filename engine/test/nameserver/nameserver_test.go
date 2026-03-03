@@ -416,6 +416,17 @@ func TestNameserver06NotResolved(t *testing.T) {
 	if !hasEntryTag(entries, "CAN_NOT_BE_RESOLVED") {
 		t.Fatalf("expected CAN_NOT_BE_RESOLVED")
 	}
+	entry := firstEntryByTag(entries, "CAN_NOT_BE_RESOLVED")
+	if entry == nil {
+		t.Fatalf("missing CAN_NOT_BE_RESOLVED entry")
+	}
+	servers, ok := entry.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 || servers[0]["ns"] != "ns2.example" {
+		t.Fatalf("expected typed unresolved nameserver list, got %#v", entry.Args["servers"])
+	}
+	if _, ok := entry.Args["nsname_list"]; ok {
+		t.Fatalf("legacy key nsname_list should not be present: %#v", entry.Args)
+	}
 }
 
 func TestNameserver07NoUpwardReferral(t *testing.T) {
@@ -440,6 +451,17 @@ func TestNameserver07NoUpwardReferral(t *testing.T) {
 	}
 	if !hasEntryTag(entries, "NO_UPWARD_REFERRAL") {
 		t.Fatalf("expected NO_UPWARD_REFERRAL")
+	}
+	entry := firstEntryByTag(entries, "NO_UPWARD_REFERRAL")
+	if entry == nil {
+		t.Fatalf("missing NO_UPWARD_REFERRAL entry")
+	}
+	servers, ok := entry.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 || servers[0]["ns"] != "ns1.example" {
+		t.Fatalf("expected typed nameserver list for NO_UPWARD_REFERRAL, got %#v", entry.Args["servers"])
+	}
+	if _, ok := entry.Args["nsname_list"]; ok {
+		t.Fatalf("legacy key nsname_list should not be present: %#v", entry.Args)
 	}
 }
 
@@ -777,6 +799,18 @@ func hasEntryTag(entries []*logger.Entry, tag string) bool {
 		}
 	}
 	return false
+}
+
+func firstEntryByTag(entries []*logger.Entry, tag string) *logger.Entry {
+	for _, entry := range entries {
+		if entry == nil {
+			continue
+		}
+		if entry.Tag == tag {
+			return entry
+		}
+	}
+	return nil
 }
 
 func soaRecord(owner string) dns.RR {

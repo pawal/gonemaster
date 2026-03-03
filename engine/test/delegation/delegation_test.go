@@ -64,17 +64,33 @@ func TestDelegation01Counts(t *testing.T) {
 	if !hasEntryTag(entries, "ENOUGH_NS_DEL") {
 		t.Fatalf("expected ENOUGH_NS_DEL")
 	}
+	entry := firstEntryByTag(entries, "ENOUGH_NS_DEL")
+	servers, ok := entry.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 2 {
+		t.Fatalf("expected typed server list for ENOUGH_NS_DEL, got %#v", entry.Args["servers"])
+	}
+	if _, ok := entry.Args["nsname_list"]; ok {
+		t.Fatalf("legacy key nsname_list should not be present: %#v", entry.Args)
+	}
 	if !hasEntryTag(entries, "NOT_ENOUGH_NS_CHILD") {
 		t.Fatalf("expected NOT_ENOUGH_NS_CHILD")
+	}
+	entry = firstEntryByTag(entries, "NOT_ENOUGH_NS_CHILD")
+	servers, ok = entry.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 || servers[0]["ns"] != "ns1.example" {
+		t.Fatalf("expected typed server list for NOT_ENOUGH_NS_CHILD, got %#v", entry.Args["servers"])
+	}
+	if _, ok := entry.Args["nsname_list"]; ok {
+		t.Fatalf("legacy key nsname_list should not be present: %#v", entry.Args)
 	}
 	if !hasEntryTag(entries, "NOT_ENOUGH_IPV4_NS_DEL") {
 		t.Fatalf("expected NOT_ENOUGH_IPV4_NS_DEL")
 	}
-	entry := firstEntryByTag(entries, "NOT_ENOUGH_IPV4_NS_DEL")
+	entry = firstEntryByTag(entries, "NOT_ENOUGH_IPV4_NS_DEL")
 	if entry == nil {
 		t.Fatalf("missing NOT_ENOUGH_IPV4_NS_DEL entry")
 	}
-	servers, ok := entry.Args["servers"].([]map[string]any)
+	servers, ok = entry.Args["servers"].([]map[string]any)
 	if !ok || len(servers) != 1 {
 		t.Fatalf("expected one typed server for NOT_ENOUGH_IPV4_NS_DEL, got %#v", entry.Args["servers"])
 	}
@@ -302,11 +318,27 @@ func TestDelegation02DuplicateIPs(t *testing.T) {
 	if !hasEntryTag(entries, "DEL_NS_SAME_IP") {
 		t.Fatalf("expected DEL_NS_SAME_IP")
 	}
+	entry := firstEntryByTag(entries, "DEL_NS_SAME_IP")
+	servers, ok := entry.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 2 {
+		t.Fatalf("expected typed server list for DEL_NS_SAME_IP, got %#v", entry.Args["servers"])
+	}
+	if _, ok := entry.Args["nsname_list"]; ok {
+		t.Fatalf("legacy key nsname_list should not be present: %#v", entry.Args)
+	}
 	if !hasEntryTag(entries, "CHILD_DISTINCT_NS_IP") {
 		t.Fatalf("expected CHILD_DISTINCT_NS_IP")
 	}
 	if !hasEntryTag(entries, "SAME_IP_ADDRESS") {
 		t.Fatalf("expected SAME_IP_ADDRESS")
+	}
+	entry = firstEntryByTag(entries, "SAME_IP_ADDRESS")
+	servers, ok = entry.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 2 {
+		t.Fatalf("expected typed server list for SAME_IP_ADDRESS, got %#v", entry.Args["servers"])
+	}
+	if _, ok := entry.Args["nsname_list"]; ok {
+		t.Fatalf("legacy key nsname_list should not be present: %#v", entry.Args)
 	}
 }
 
@@ -384,6 +416,14 @@ func TestDelegation04Authoritative(t *testing.T) {
 	}
 	if !hasEntryTag(entries, "ARE_AUTHORITATIVE") {
 		t.Fatalf("expected ARE_AUTHORITATIVE")
+	}
+	entry := firstEntryByTag(entries, "ARE_AUTHORITATIVE")
+	servers, ok := entry.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 || servers[0]["ns"] != "ns1.example" {
+		t.Fatalf("expected typed server list for ARE_AUTHORITATIVE, got %#v", entry.Args["servers"])
+	}
+	if _, ok := entry.Args["nsname_list"]; ok {
+		t.Fatalf("legacy key nsname_list should not be present: %#v", entry.Args)
 	}
 }
 

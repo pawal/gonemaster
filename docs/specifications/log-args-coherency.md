@@ -35,7 +35,7 @@ Applies to all emitted log entries consumed through:
 - `args.ns` no longer uses `name/ip` in current `engine/test` emits.
 - `args.address` exists on migrated singular-endpoint callsites.
 - `servers` / `addresses` are now used for nameserver list identity in migrated tags.
-- Remaining non-canonical list drift is primarily in other legacy list keys (for example `nsname_list`, `names`).
+- Remaining non-canonical list drift is primarily in other legacy list keys (for example `names`).
 
 ## Canonical Contract (v1.1)
 
@@ -87,7 +87,7 @@ Rules:
 ### Legacy Compatibility Fields
 
 Legacy keys may still exist during migration (for example `name`, `type`, `ip`,
-`nsname_list`), but they are non-canonical.
+`names`), but they are non-canonical.
 
 Rules:
 

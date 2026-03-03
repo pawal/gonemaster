@@ -14,7 +14,7 @@ func TestFormatRawArgValueEndpointList(t *testing.T) {
 		{"ns": "ns2.example", "address": "192.0.2.2"},
 	}
 	got := formatRawArgValue(value)
-	want := "ns1.example/192.0.2.1, ns2.example/192.0.2.2"
+	want := "ns1.example/192.0.2.1,ns2.example/192.0.2.2"
 	if got != want {
 		t.Fatalf("unexpected formatted endpoint list: got %q want %q", got, want)
 	}
@@ -26,7 +26,7 @@ func TestFormatRawArgValueGenericMap(t *testing.T) {
 		"query_name": "example.com",
 	}
 	got := formatRawArgValue(value)
-	want := "{query_name=example.com; query_type=SOA}"
+	want := "{query_name=example.com;query_type=SOA}"
 	if got != want {
 		t.Fatalf("unexpected formatted map: got %q want %q", got, want)
 	}
@@ -60,13 +60,13 @@ func TestRawReporterFormatsCollectionsWithoutJSON(t *testing.T) {
 		t.Fatalf("callback: %v", err)
 	}
 	line := strings.TrimSpace(out.String())
-	if !strings.Contains(line, "servers=ns1.example/192.0.2.1, ns2.example/192.0.2.2") {
+	if !strings.Contains(line, "servers=ns1.example/192.0.2.1,ns2.example/192.0.2.2") {
 		t.Fatalf("expected human-readable servers list, got %q", line)
 	}
-	if !strings.Contains(line, "mail_targets=mx1.example, mx2.example") {
+	if !strings.Contains(line, "mail_targets=mx1.example,mx2.example") {
 		t.Fatalf("expected human-readable string list, got %q", line)
 	}
-	if !strings.Contains(line, "details={query_name=example.com; query_type=SOA}") {
+	if !strings.Contains(line, "details={query_name=example.com;query_type=SOA}") {
 		t.Fatalf("expected human-readable map, got %q", line)
 	}
 	if strings.Contains(line, `{"ns":"ns1.example"`) || strings.Contains(line, `["mx1.example"`) {

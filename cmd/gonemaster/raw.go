@@ -111,7 +111,7 @@ func formatRawArgValue(value any) string {
 		for _, key := range keys {
 			parts = append(parts, key+"="+formatRawArgValue(v[key]))
 		}
-		return "{" + strings.Join(parts, "; ") + "}"
+		return "{" + strings.Join(parts, ";") + "}"
 	}
 
 	rv := reflect.ValueOf(value)
@@ -131,7 +131,7 @@ func formatRawArgValue(value any) string {
 		if len(parts) == 0 {
 			return "<empty>"
 		}
-		return strings.Join(parts, ", ")
+		return strings.Join(parts, ",")
 	case reflect.Map:
 		if rv.Type().Key().Kind() == reflect.String {
 			keys := make([]string, 0, rv.Len())
@@ -148,7 +148,7 @@ func formatRawArgValue(value any) string {
 				}
 				parts = append(parts, key+"="+formatRawArgValue(item))
 			}
-			return "{" + strings.Join(parts, "; ") + "}"
+			return "{" + strings.Join(parts, ";") + "}"
 		}
 		return fmt.Sprint(value)
 	default:

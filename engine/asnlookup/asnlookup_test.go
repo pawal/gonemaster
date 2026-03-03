@@ -129,7 +129,7 @@ func TestLookupCymruNXDomainSOAEmpty(t *testing.T) {
 }
 
 func TestLookupCymruSelectsMostSpecificPrefix(t *testing.T) {
-	ctx, _, _ := testhelpers.Context(t)
+	ctx, _, log := testhelpers.Context(t)
 
 	ip := netip.MustParseAddr("192.0.2.1")
 	source := "asnlookup.zonemaster.net"
@@ -157,6 +157,22 @@ func TestLookupCymruSelectsMostSpecificPrefix(t *testing.T) {
 	}
 	if len(result.ASNs) != 2 || result.ASNs[0] != 64500 || result.ASNs[1] != 64501 {
 		t.Fatalf("unexpected ASN list: %v", result.ASNs)
+	}
+	var found bool
+	for _, entry := range log.Entries() {
+		if entry == nil || entry.Tag != "ASN_LOOKUP_SOURCE" {
+			continue
+		}
+		found = true
+		if sourceArg, ok := entry.Args["source"].(string); !ok || sourceArg != source {
+			t.Fatalf("expected source=%q in ASN_LOOKUP_SOURCE args, got %#v", source, entry.Args)
+		}
+		if _, ok := entry.Args["name"]; ok {
+			t.Fatalf("legacy key name should not be present: %#v", entry.Args)
+		}
+	}
+	if !found {
+		t.Fatalf("expected ASN_LOOKUP_SOURCE log entry")
 	}
 }
 

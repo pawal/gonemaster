@@ -336,7 +336,7 @@ func (r *Recursor) processOrderedResponse(ctx context.Context, nameObj dnsname.N
 			logRecursorSystem(ctx, "LOOP_PROTECTION", map[string]any{
 				"caller":          "gonemaster.recursor._recurse",
 				"child_zone_name": nameObj.String(),
-				"name":            zname,
+				"zone_name":       zname,
 			})
 			return packet.Packet{}, state, orderedActionReturn, nil
 		}
@@ -542,7 +542,7 @@ func (r *Recursor) recurseUnordered(ctx context.Context, name string, qtype stri
 				logRecursorSystem(ctx, "LOOP_PROTECTION", map[string]any{
 					"caller":          "gonemaster.recursor._recurse",
 					"child_zone_name": nameObj.String(),
-					"name":            redirectZName,
+					"zone_name":       redirectZName,
 				})
 				return packet.Packet{}, state, nil
 			}

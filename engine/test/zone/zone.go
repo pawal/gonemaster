@@ -1239,8 +1239,8 @@ func Zone10(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 						expected := strings.ToLower(z.Name.FQDN())
 						if owner != expected {
 							if _, err := buf.Add("WRONG_SOA", withNameserverArgs(ns, map[string]any{
-								"owner": owner,
-								"name":  expected,
+								"owner":      owner,
+								"query_name": expected,
 							})); err != nil {
 								return err
 							}

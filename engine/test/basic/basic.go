@@ -309,7 +309,7 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					_, _ = util.LoggerFromContext(ctx).Add("LOOP_PROTECTION", map[string]any{
 						"caller":                  "basic.Basic01",
 						"child_zone_name":         z.Name.String(),
-						"name":                    loopZoneName,
+						"zone_name":               loopZoneName,
 						"intermediate_query_name": intermediate.String(),
 					}, moduleName, testcase)
 					return appendTestCaseEnd(ctx, results, testcase)

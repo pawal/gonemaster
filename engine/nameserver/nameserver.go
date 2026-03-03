@@ -109,8 +109,9 @@ func newWithCache(ctx context.Context, cache *CacheStore, name string, address s
 		log:     runLog,
 	}
 	cache.storeNameserver(nameKey, addrKey, ns)
+	nsName := nameObj.String()
 	logSystemWithLogger(runLog, "NS_CREATED", map[string]any{
-		"name":    nameObj.String(),
+		"ns":      nsName,
 		"address": addrKey,
 	})
 	return *ns, nil

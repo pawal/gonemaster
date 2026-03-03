@@ -100,7 +100,7 @@ Status: Final
 | `IPV6_ENABLED` | `rrtype` | `string` | rrtype queried over enabled transport. |
 | `LOOP_PROTECTION` | `caller` | `string` | Internal caller name that hit loop protection. |
 | `LOOP_PROTECTION` | `child_zone_name` | `string` | Child zone name under test. |
-| `LOOP_PROTECTION` | `name` | `string` | Current loop zone name state. |
+| `LOOP_PROTECTION` | `zone_name` | `string` | Current loop zone name state. |
 | `LOOP_PROTECTION` | `intermediate_query_name` | `string` | Intermediate query name at stop point. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Basic01`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Basic01`). |

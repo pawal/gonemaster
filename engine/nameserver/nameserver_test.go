@@ -703,6 +703,7 @@ func TestConstructorEmitsCreationLogs(t *testing.T) {
 	}
 
 	var cacheCreated, cacheFetched, nsCreated int
+	seenNS := map[string]bool{}
 	for _, entry := range log.Entries() {
 		if entry == nil {
 			continue
@@ -714,6 +715,15 @@ func TestConstructorEmitsCreationLogs(t *testing.T) {
 			cacheFetched++
 		case "NS_CREATED":
 			nsCreated++
+			ns, _ := entry.Args["ns"].(string)
+			address, _ := entry.Args["address"].(string)
+			if ns == "" || address == "" {
+				t.Fatalf("expected typed ns/address args in NS_CREATED, got %#v", entry.Args)
+			}
+			seenNS[ns] = true
+			if _, ok := entry.Args["name"]; ok {
+				t.Fatalf("legacy key name should not be present: %#v", entry.Args)
+			}
 		}
 	}
 	if cacheCreated != 1 {
@@ -724,6 +734,9 @@ func TestConstructorEmitsCreationLogs(t *testing.T) {
 	}
 	if nsCreated != 2 {
 		t.Fatalf("expected 2 NS_CREATED, got %d", nsCreated)
+	}
+	if !seenNS["ns1.example"] || !seenNS["ns2.example"] {
+		t.Fatalf("expected NS_CREATED entries for ns1/ns2.example, got %#v", seenNS)
 	}
 }
 

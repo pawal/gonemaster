@@ -55,7 +55,7 @@ Status: Final
 | `WRONG_SOA` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) returning wrong SOA owner. |
 | `WRONG_SOA` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `WRONG_SOA` | `owner` | `string` | SOA owner name found in response (lowercased). |
-| `WRONG_SOA` | `name` | `string` | Expected zone apex FQDN (lowercased). |
+| `WRONG_SOA` | `query_name` | `string` | Expected zone apex FQDN (lowercased). |
 
 ## Severity Levels Per Tag
 | Tag | Level | Notes |

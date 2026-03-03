@@ -1556,6 +1556,16 @@ func TestDNSSEC06ExtraProcessingOK(t *testing.T) {
 	if !hasEntryTag(entries, "EXTRA_PROCESSING_OK") {
 		t.Fatalf("expected EXTRA_PROCESSING_OK")
 	}
+	entry := firstEntryByTag(entries, "EXTRA_PROCESSING_OK")
+	if entry == nil {
+		t.Fatalf("missing EXTRA_PROCESSING_OK entry")
+	}
+	if address, ok := entry.Args["address"].(string); !ok || address != "192.0.2.30" {
+		t.Fatalf("expected address=192.0.2.30, got %#v", entry.Args["address"])
+	}
+	if _, ok := entry.Args["server"]; ok {
+		t.Fatalf("legacy key server should not be present: %#v", entry.Args)
+	}
 }
 
 func TestDNSSEC06ExtraProcessingBroken(t *testing.T) {
@@ -1591,6 +1601,16 @@ func TestDNSSEC06ExtraProcessingBroken(t *testing.T) {
 	}
 	if !hasEntryTag(entries, "EXTRA_PROCESSING_BROKEN") {
 		t.Fatalf("expected EXTRA_PROCESSING_BROKEN")
+	}
+	entry := firstEntryByTag(entries, "EXTRA_PROCESSING_BROKEN")
+	if entry == nil {
+		t.Fatalf("missing EXTRA_PROCESSING_BROKEN entry")
+	}
+	if address, ok := entry.Args["address"].(string); !ok || address != "192.0.2.31" {
+		t.Fatalf("expected address=192.0.2.31, got %#v", entry.Args["address"])
+	}
+	if _, ok := entry.Args["server"]; ok {
+		t.Fatalf("legacy key server should not be present: %#v", entry.Args)
 	}
 }
 

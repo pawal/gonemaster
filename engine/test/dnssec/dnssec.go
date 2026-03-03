@@ -2027,17 +2027,17 @@ func DNSSEC06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		sigs := resp.GetRecords("RRSIG", "answer")
 		if len(keys) > 0 && len(sigs) > 0 {
 			if err := appendLog(ctx, &results, testcase, "EXTRA_PROCESSING_OK", map[string]any{
-				"server": resp.AnswerFromString(),
-				"keys":   len(keys),
-				"sigs":   len(sigs),
+				"address": resp.AnswerFromString(),
+				"keys":    len(keys),
+				"sigs":    len(sigs),
 			}); err != nil {
 				return results, err
 			}
 		} else if resp.Rcode() == "NOERROR" {
 			if err := appendLog(ctx, &results, testcase, "EXTRA_PROCESSING_BROKEN", map[string]any{
-				"server": resp.AnswerFromString(),
-				"keys":   len(keys),
-				"sigs":   len(sigs),
+				"address": resp.AnswerFromString(),
+				"keys":    len(keys),
+				"sigs":    len(sigs),
 			}); err != nil {
 				return results, err
 			}

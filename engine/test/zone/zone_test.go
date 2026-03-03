@@ -185,6 +185,60 @@ func TestZone10ParallelQueries(t *testing.T) {
 	}
 }
 
+func TestZone10WrongSOAUsesQueryName(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	ns := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		if qtype != "SOA" {
+			return packet.Packet{}
+		}
+		msg := new(dns.Msg)
+		msg.Authoritative = true
+		msg.Rcode = dns.RcodeSuccess
+		soa := &dns.SOA{Hdr: dns.Header{Name: "wrong.example.", Class: dns.ClassINET, TTL: 300}}
+		soa.Ns = "ns1.example."
+		soa.Mbox = "hostmaster.example."
+		soa.Serial = 1
+		soa.Refresh = 1
+		soa.Retry = 1
+		soa.Expire = 1
+		soa.Minttl = 1
+		msg.Answer = []dns.RR{soa}
+		return packet.Packet{Msg: msg}
+	})
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example.com")}
+	entries, err := Zone10(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone10: %v", err)
+	}
+	if !hasEntryTag(entries, "WRONG_SOA") {
+		t.Fatalf("expected WRONG_SOA")
+	}
+	var entry *logger.Entry
+	for _, e := range entries {
+		if e != nil && e.Tag == "WRONG_SOA" {
+			entry = e
+			break
+		}
+	}
+	if entry == nil {
+		t.Fatalf("missing WRONG_SOA")
+	}
+	if got, ok := entry.Args["query_name"].(string); !ok || got != "example.com." {
+		t.Fatalf("expected query_name=example.com., got %#v", entry.Args["query_name"])
+	}
+	if _, ok := entry.Args["name"]; ok {
+		t.Fatalf("legacy key name should not be present: %#v", entry.Args)
+	}
+}
+
 func TestZone09MXQueryDisablesFallback(t *testing.T) {
 	setupTest(t)
 

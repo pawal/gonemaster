@@ -1847,11 +1847,11 @@ msgstr "ゾーンの全ネームサーバーが同一の SOA レコードを返�
 
 msgctxt "ZONE:WRONG_SOA"
 msgid ""
-"Nameserver {ns}/{address} responds with a wrong owner name ({owner} instead of {name}) "
+"Nameserver {ns}/{address} responds with a wrong owner name ({owner} instead of {query_name}) "
 "on SOA queries."
 msgstr ""
 "ネームサーバー {ns}/{address} は SOA クエリに誤った owner 名 "
-"({name} ではなく {owner}) で応答しました。"
+"({query_name} ではなく {owner}) で応答しました。"
 
 msgctxt "ZONE:NO_RESPONSE"
 msgid "Nameserver {ns}/{address} did not respond."
@@ -2314,12 +2314,12 @@ msgstr "キータグ {keytag} の RRSIG (対象: {types}) は既に失効して�
 
 msgctxt "DNSSEC:EXTRA_PROCESSING_BROKEN"
 msgid ""
-"Server at {server} sent {keys} DNSKEY records, and {sigs} RRSIG records."
-msgstr "サーバー {server} は DNSKEY {keys} 件と RRSIG {sigs} 件を返しました。"
+"Server at {address} sent {keys} DNSKEY records, and {sigs} RRSIG records."
+msgstr "サーバー {address} は DNSKEY {keys} 件と RRSIG {sigs} 件を返しました。"
 
 msgctxt "DNSSEC:EXTRA_PROCESSING_OK"
-msgid "Server at {server} sent {keys} DNSKEY records and {sigs} RRSIG records."
-msgstr "サーバー {server} は DNSKEY {keys} 件と RRSIG {sigs} 件を返しました。"
+msgid "Server at {address} sent {keys} DNSKEY records and {sigs} RRSIG records."
+msgstr "サーバー {address} は DNSKEY {keys} 件と RRSIG {sigs} 件を返しました。"
 
 msgctxt "DNSSEC:DS01_DIGEST_NOT_SUPPORTED_BY_ZM"
 msgid ""

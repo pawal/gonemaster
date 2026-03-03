@@ -20,8 +20,8 @@ Status: Final
 3. For each response packet:
    - If response message is absent, skip packet with no DS06 finding.
    - Count DNSKEY records in answer and RRSIG records in answer.
-   - If both counts are non-zero, emit `EXTRA_PROCESSING_OK` with `server`, `keys`, and `sigs`.
-   - Else if `RCODE` is `NOERROR`, emit `EXTRA_PROCESSING_BROKEN` with `server`, `keys`, and `sigs`.
+   - If both counts are non-zero, emit `EXTRA_PROCESSING_OK` with `address`, `keys`, and `sigs`.
+   - Else if `RCODE` is `NOERROR`, emit `EXTRA_PROCESSING_BROKEN` with `address`, `keys`, and `sigs`.
 4. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
@@ -35,10 +35,10 @@ Status: Final
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
-| `EXTRA_PROCESSING_BROKEN` | `server` | `string` | Server/source identity from `packet.AnswerFromString()`. |
+| `EXTRA_PROCESSING_BROKEN` | `address` | `string` | Server/source identity from `packet.AnswerFromString()`. |
 | `EXTRA_PROCESSING_BROKEN` | `keys` | `int` | Number of DNSKEY records found in answer. |
 | `EXTRA_PROCESSING_BROKEN` | `sigs` | `int` | Number of RRSIG records found in answer. |
-| `EXTRA_PROCESSING_OK` | `server` | `string` | Server/source identity from `packet.AnswerFromString()`. |
+| `EXTRA_PROCESSING_OK` | `address` | `string` | Server/source identity from `packet.AnswerFromString()`. |
 | `EXTRA_PROCESSING_OK` | `keys` | `int` | Number of DNSKEY records found in answer. |
 | `EXTRA_PROCESSING_OK` | `sigs` | `int` | Number of RRSIG records found in answer. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`DNSSEC06`). |

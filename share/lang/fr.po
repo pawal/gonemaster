@@ -3833,13 +3833,6 @@ msgstr ""
 "L'appel au système de log (Callback) s'est terminé avec l'erreur suivante: "
 "{exception}."
 
-msgctxt "SYSTEM:LOOKUP_ERROR"
-msgid ""
-"DNS query to {ns} for {domain}/{type}/{class} failed with error: {message}"
-msgstr ""
-"La requête DNS {domain}/{type}/{class} au serveur de noms {ns} a échoué avec "
-"le message d'erreur suivant: {message}."
-
 msgctxt "SYSTEM:MODULE_ERROR"
 msgid "Fatal error in {module}: {msg}"
 msgstr "Erreur fatale dans le module {module}: {msg}."

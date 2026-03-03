@@ -26,15 +26,9 @@ var legacyPlaceholders = map[string]bool{
 	"ip":         true,
 }
 
-var legacyPlaceholderAllowlist = map[string]map[string]bool{
-	"SYSTEM:LOOKUP_ERROR": {
-		"type":  true,
-		"class": true,
-	},
-	"DNSSEC:NO_NSEC3PARAM": {
-		"server": true,
-	},
-}
+// Keep allowlist support for deliberate short-lived exceptions, but the
+// target state is an empty allowlist.
+var legacyPlaceholderAllowlist = map[string]map[string]bool{}
 
 type entry struct {
 	file      string

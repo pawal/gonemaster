@@ -3308,13 +3308,6 @@ msgid "Logger callback died with error: {exception}"
 msgstr ""
 "Callback-funksjonen for loggmodulen stoppet med feilmelding: {exception}."
 
-msgctxt "SYSTEM:LOOKUP_ERROR"
-msgid ""
-"DNS query to {ns} for {domain}/{type}/{class} failed with error: {message}"
-msgstr ""
-"DNS-spørring til {ns} for {domain}/{type}/{class} mislyktes med følgende "
-"feil: {message}."
-
 msgctxt "SYSTEM:MODULE_ERROR"
 msgid "Fatal error in {module}: {msg}"
 msgstr "Fatal feil i {module}: {msg}."

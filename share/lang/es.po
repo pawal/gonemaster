@@ -3520,13 +3520,6 @@ msgctxt "SYSTEM:LOGGER_CALLBACK_ERROR"
 msgid "Logger callback died with error: {exception}"
 msgstr "La llamada al registro de operación murió con el error: {exception}"
 
-msgctxt "SYSTEM:LOOKUP_ERROR"
-msgid ""
-"DNS query to {ns} for {domain}/{type}/{class} failed with error: {message}"
-msgstr ""
-"La consulta DNS {domain}/{type}/{class} al servidor {ns} falló con error: "
-"{message}"
-
 msgctxt "SYSTEM:MODULE_ERROR"
 msgid "Fatal error in {module}: {msg}"
 msgstr "Error fatal en {module}: {msg}"

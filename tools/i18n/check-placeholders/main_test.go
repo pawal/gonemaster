@@ -36,14 +36,21 @@ func TestLegacyPlaceholderFailForNonAllowlistedContext(t *testing.T) {
 	}
 }
 
-func TestLegacyPlaceholderPassForAllowlistedContext(t *testing.T) {
+func TestLegacyPlaceholderFailForFormerAllowlistedContext(t *testing.T) {
 	e := entry{
 		context: "SYSTEM:LOOKUP_ERROR",
 		msgID:   "DNS query to {ns} for {domain}/{type}/{class} failed with error: {message}",
 	}
 	got := legacyKeysForEntry(e)
-	if len(got) != 0 {
-		t.Fatalf("expected no legacy violations for allowlisted placeholders, got %v", got)
+	want := []string{"class", "type"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("expected legacy keys %v, got %v", want, got)
+	}
+}
+
+func TestLegacyPlaceholderAllowlistEmpty(t *testing.T) {
+	if len(legacyPlaceholderAllowlist) != 0 {
+		t.Fatalf("expected empty allowlist, got %d entries", len(legacyPlaceholderAllowlist))
 	}
 }
 

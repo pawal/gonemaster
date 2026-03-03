@@ -22,21 +22,22 @@ Applies to all emitted log entries consumed through:
 | Term | Current key(s) in use | Typical current shape | Notes |
 | --- | --- | --- | --- |
 | Nameserver endpoint identity | `ns` | `"<name>"` | Name-only in current `engine/test` emits (`name/ip` is CI-rejected). |
-| Nameserver name | canonical `ns`, legacy `name`/`server` in non-migrated tags | `string` | `nsname` is no longer emitted in current runtime paths. |
-| Nameserver address | canonical `address`, legacy `ip` in non-migrated tags | `string` IP | `ns_ip` is no longer emitted in current runtime paths. |
+| Nameserver name | `ns` | `string` | Canonical key in current runtime inventory. |
+| Nameserver address | `address` | `string` IP | Canonical key in current runtime inventory. |
 | Nameserver list (structured) | `servers` | `array<object>` | Items use `{ "ns": "...", "address": "..." }`. |
 | Nameserver IP list (structured) | `addresses` | `array<string>` | Typed list for machine use. |
 | PTR name list | `ptr_names` | `array<string>` | PTR hostname list for reverse-DNS mismatch contexts. |
 | ASN (single) | `asn` | `int` | Singular ASN value for explicit one-ASN semantics. |
 | ASN collection | `asns` | `array<int>` | Structured ASN list for machine use. |
-| Query name/type/class | canonical `query_name`, `query_type`, `query_class` | `string` | Legacy aliases remain only in non-migrated/system paths. |
+| Query name/type/class | `query_name`, `query_type`, `query_class` | `string` | Canonical query identity keys in current runtime inventory. |
 
 ## Current Migration Status
 
 - `args.ns` no longer uses `name/ip` in current `engine/test` emits.
 - `args.address` exists on migrated singular-endpoint callsites.
 - `servers` / `addresses` are now used for nameserver list identity in migrated tags.
-- Packed-list-only identity keys are removed in current migrated emits; remaining drift is legacy generic aliases in non-migrated tags (for example `name`, `server`).
+- Packed-list-only identity keys are removed in current migrated emits.
+- Current runtime inventory no longer includes legacy identity/query aliases (`name`, `server`, `ip`, `type`, `class`, `rrtype`).
 
 ## Canonical Contract (v1.1)
 
@@ -87,8 +88,9 @@ Rules:
 
 ### Legacy Compatibility Fields
 
-Legacy keys may still exist during migration (for example `name`, `server`,
-`type`, `class`, `rrtype`, `ip`), but they are non-canonical.
+Legacy identity/query aliases are not part of the current core runtime
+inventory. If any are encountered in historical outputs, external adapters, or
+in-flight branches, they are non-canonical.
 
 Rules:
 

@@ -50,7 +50,9 @@ shape as `servers`:
 
 ## Transitional Legacy Keys
 
-These keys may appear in non-migrated entries and are not canonical in v1.1:
+Current runtime inventory no longer emits legacy identity/query aliases.
+If these keys are encountered in historical outputs, external adapters, or
+in-flight branches, they are non-canonical in v1.1:
 
 - `ip`
 - `name`, `server`

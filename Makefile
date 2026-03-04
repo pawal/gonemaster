@@ -17,7 +17,8 @@ CMD ?= all
 	build-gonemaster-nagios install-gonemaster install-gonemaster-server install-gonemaster-client \
 	install-gonemaster-nagios ui-check test-go vet race \
 	spec-export-implemented spec-export-tags spec-export spec-validate spec-validate-scan spec-check \
-	spec-generate-tags spec-check-tags spec-export-log-args spec-check-coherency spec-check-i18n-placeholders
+	spec-generate-tags spec-check-tags spec-export-log-args spec-check-coherency spec-check-i18n-placeholders \
+	badkeys-update badkeys-update-embed
 
 help:
 	@echo "Targets:"
@@ -44,6 +45,8 @@ help:
 	@echo "  spec-check-coherency Run log-args coherency guardrail checks"
 	@echo "  spec-check-i18n-placeholders  Verify placeholder parity and reject non-allowlisted legacy placeholders"
 	@echo "  spec-check         Run spec-validate + spec-check-tags + coherency + i18n placeholder checks"
+	@echo "  badkeys-update     Download badkeys blocklist to share/badkeys/"
+	@echo "  badkeys-update-embed  Download and gzip-compress blocklist for embedded builds"
 	@echo "  clean            Remove build artifacts"
 
 $(BIN_DIR):
@@ -178,6 +181,12 @@ spec-check-i18n-placeholders:
 	$(GO) run ./tools/i18n/check-placeholders
 
 spec-check: spec-validate spec-check-tags spec-check-coherency spec-check-i18n-placeholders
+
+badkeys-update:
+	$(GO) run ./tools/badkeys-update --output share/badkeys
+
+badkeys-update-embed: badkeys-update
+	gzip -9 -k -f share/badkeys/blocklist.dat
 
 clean:
 	@rm -rf $(BIN_DIR) $(UI_BUILD_DIR) $(UI_DIR)/node_modules

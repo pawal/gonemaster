@@ -25,4 +25,5 @@
 
 # Badkeys blocklist data (downloaded, not committed)
 /share/badkeys/blocklist.dat
+/share/badkeys/blocklist.dat.gz
 /share/badkeys/badkeysdata.json

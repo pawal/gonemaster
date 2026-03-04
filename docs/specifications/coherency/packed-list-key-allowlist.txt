@@ -1,7 +1,0 @@
-# Baseline allowlist for legacy packed-list-only log arg keys.
-# The coherency guardrail fails if a new packed-list-only key appears.
-
-names
-ns_ip_list
-ns_list
-servers

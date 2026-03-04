@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -228,17 +227,13 @@ func (i *inventory) asPayload(fileCount int) payload {
 
 func main() {
 	var (
-		rootDir         string
-		markdownOut     string
-		checkCoherency  bool
-		nsAllowlist     string
-		packedAllowlist string
+		rootDir        string
+		markdownOut    string
+		checkCoherency bool
 	)
 	flag.StringVar(&rootDir, "root", "engine", "Root directory to scan for Go files")
 	flag.StringVar(&markdownOut, "markdown-out", "docs/specifications/log-args-inventory.md", "Path to write markdown report")
-	flag.BoolVar(&checkCoherency, "check-coherency", false, "Validate coherency guardrails against allowlists")
-	flag.StringVar(&nsAllowlist, "ns-string-allowlist", "docs/specifications/coherency/ns-string-allowlist.txt", "Allowlist file mapping path to max allowed ns=.String occurrences")
-	flag.StringVar(&packedAllowlist, "packed-list-allowlist", "docs/specifications/coherency/packed-list-key-allowlist.txt", "Allowlist of existing packed-list-only arg keys")
+	flag.BoolVar(&checkCoherency, "check-coherency", false, "Validate coherency guardrails")
 	flag.Parse()
 
 	files, err := collectGoFiles(rootDir)
@@ -274,7 +269,7 @@ func main() {
 	}
 
 	if checkCoherency {
-		if err := checkCoherencyGuardrails(data, nsAllowlist, packedAllowlist); err != nil {
+		if err := checkCoherencyGuardrails(data); err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "coherency check failed: %v\n", err)
 			os.Exit(1)
 		}
@@ -1114,33 +1109,15 @@ func containsString(values []string, target string) bool {
 	return false
 }
 
-func checkCoherencyGuardrails(data payload, nsAllowlistPath string, packedAllowlistPath string) error {
-	nsAllowlist, err := loadNSAllowlist(nsAllowlistPath)
-	if err != nil {
-		return fmt.Errorf("load ns-string allowlist: %w", err)
-	}
-	packedAllowlist, err := loadStringSetAllowlist(packedAllowlistPath)
-	if err != nil {
-		return fmt.Errorf("load packed-list allowlist: %w", err)
-	}
-
+func checkCoherencyGuardrails(data payload) error {
 	var errs []string
 
 	for path, count := range data.NSStringByFile {
-		limit, ok := nsAllowlist[path]
-		if !ok {
-			errs = append(errs, fmt.Sprintf("new ns=.String() usage file not in allowlist: %s (%d)", path, count))
-			continue
-		}
-		if count > limit {
-			errs = append(errs, fmt.Sprintf("ns=.String() usage increased: %s (current=%d allowed=%d)", path, count, limit))
-		}
+		errs = append(errs, fmt.Sprintf("ns=.String() usage found: %s (%d)", path, count))
 	}
 
 	for _, key := range data.PackedListOnlyKeys {
-		if _, ok := packedAllowlist[key]; !ok {
-			errs = append(errs, fmt.Sprintf("new packed-list-only arg key not in allowlist: %s", key))
-		}
+		errs = append(errs, fmt.Sprintf("packed-list-only arg key found: %s", key))
 	}
 
 	if len(errs) > 0 {
@@ -1153,58 +1130,4 @@ func checkCoherencyGuardrails(data payload, nsAllowlistPath string, packedAllowl
 
 	_, _ = fmt.Fprintf(os.Stderr, "coherency check passed: ns_string_files=%d packed_list_keys=%d\n", len(data.NSStringByFile), len(data.PackedListOnlyKeys))
 	return nil
-}
-
-func loadNSAllowlist(path string) (map[string]int, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	out := map[string]int{}
-	scanner := bufio.NewScanner(file)
-	lineNo := 0
-	for scanner.Scan() {
-		lineNo++
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		fields := strings.Fields(line)
-		if len(fields) != 2 {
-			return nil, fmt.Errorf("%s:%d: expected '<path> <count>'", path, lineNo)
-		}
-		count, err := strconv.Atoi(fields[1])
-		if err != nil || count < 0 {
-			return nil, fmt.Errorf("%s:%d: invalid count %q", path, lineNo, fields[1])
-		}
-		out[fields[0]] = count
-	}
-	if err := scanner.Err(); err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func loadStringSetAllowlist(path string) (map[string]struct{}, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	out := map[string]struct{}{}
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		out[line] = struct{}{}
-	}
-	if err := scanner.Err(); err != nil {
-		return nil, err
-	}
-	return out, nil
 }

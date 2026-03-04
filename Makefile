@@ -13,7 +13,8 @@ CMDS := gonemaster gonemaster-server gonemaster-client gonemaster-nagios
 CMD ?= all
 
 .PHONY: help build build-all test install ui-build ui-install ui-dev ui-test clean \
-	build-gonemaster build-gonemaster-server build-gonemaster-server-noui build-gonemaster-client \
+	build-gonemaster build-gonemaster-server build-gonemaster-server-noui \
+	build-gonemaster-server-badkeys-embed build-gonemaster-server-noui-badkeys-embed build-gonemaster-client \
 	build-gonemaster-nagios install-gonemaster install-gonemaster-server install-gonemaster-client \
 	install-gonemaster-nagios ui-check test-go vet race \
 	spec-export-implemented spec-export-tags spec-export spec-validate spec-validate-scan spec-check \
@@ -34,6 +35,8 @@ help:
 	@echo "  ui-dev           Run the UI dev server"
 	@echo "  ui-test          Run UI tests"
 	@echo "  build-gonemaster-server-noui  Build API-only server (no npm/UI embed)"
+	@echo "  build-gonemaster-server-badkeys-embed  Build server with embedded badkeys blocklist (with UI)"
+	@echo "  build-gonemaster-server-noui-badkeys-embed  Build API-only server with embedded badkeys blocklist"
 	@echo "  build-gonemaster-client       Build the HTTP API client"
 	@echo "  build-gonemaster-nagios       Build the Nagios plugin"
 	@echo "  spec-export        Refresh generated specification inventories (JSON)"
@@ -112,6 +115,12 @@ build-gonemaster-server: $(BIN_DIR) ui-build
 
 build-gonemaster-server-noui: $(BIN_DIR)
 	$(GO) build -tags nogui -o $(BIN_DIR)/gonemaster-server ./cmd/gonemaster-server
+
+build-gonemaster-server-badkeys-embed: $(BIN_DIR) ui-build badkeys-update-embed
+	$(GO) build -tags badkeys_embed -o $(BIN_DIR)/gonemaster-server ./cmd/gonemaster-server
+
+build-gonemaster-server-noui-badkeys-embed: $(BIN_DIR) badkeys-update-embed
+	$(GO) build -tags "nogui badkeys_embed" -o $(BIN_DIR)/gonemaster-server ./cmd/gonemaster-server
 
 build-gonemaster-client: $(BIN_DIR)
 	$(GO) build -o $(BIN_DIR)/gonemaster-client ./cmd/gonemaster-client

@@ -9,8 +9,8 @@ Contract version:
 
 Scope:
 
-- Normative for newly migrated tags following the coherency contract.
-- Non-migrated tags may still use legacy keys during migration.
+- Normative for all tags following the coherency contract.
+- Migration is complete; all engine emitters use canonical keys.
 
 ## Core Identity Keys
 
@@ -38,6 +38,7 @@ Scope:
 | `asns` | `array<int>` | ASN list. | Integer ASN values. |
 | `prefixes` | `array<string>` | CIDR prefix list. | |
 | `ptr_names` | `array<string>` | PTR hostname list from reverse-DNS checks. | Used for PTR mismatch detail payloads. |
+| `mail_targets` | `array<string>` | MX target hostname list. | Replaces `mailtarget_list`. |
 
 ## Temporal Keys
 
@@ -54,18 +55,17 @@ shape as `servers`:
 - `child_servers`
 - `failing_servers`
 
-## Transitional Legacy Keys
+## Retired Legacy Keys
 
-Current runtime inventory no longer emits legacy identity/query aliases.
-If these keys are encountered in historical outputs, external adapters, or
-in-flight branches, they are non-canonical in v1.1:
+These keys are no longer emitted by the engine. If encountered in historical
+outputs or external adapters, they are non-canonical:
 
-- `ip`
-- `name`, `server`
-- query aliases `type`, `class`, `rrtype`
+- `ip` (replaced by `address`)
+- `name`, `server` (replaced by `ns` or context-specific keys)
+- `nsname`, `ns_ip` (replaced by `ns` + `address`)
+- `ns_list`, `ns_ip_list`, `nsname_list` (replaced by `servers`)
+- `asn_list` (replaced by `asns`)
+- query aliases `type`, `class`, `rrtype` (replaced by `query_name`, `query_type`, `query_class`)
 - delimiter-packed identity fields (`;` or `,`) without typed counterparts
 
-Migration rule:
-
-- New and migrated emits must prefer canonical keys above.
-- Do not introduce new packed-list-only identity fields.
+CI guardrails reject reintroduction of these patterns.

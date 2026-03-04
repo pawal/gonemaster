@@ -29,15 +29,23 @@ Applies to all emitted log entries consumed through:
 | PTR name list | `ptr_names` | `array<string>` | PTR hostname list for reverse-DNS mismatch contexts. |
 | ASN (single) | `asn` | `int` | Singular ASN value for explicit one-ASN semantics. |
 | ASN collection | `asns` | `array<int>` | Structured ASN list for machine use. |
+| Prefix collection | `prefixes` | `array<string>` | CIDR prefix list. |
+| MX target list | `mail_targets` | `array<string>` | MX target hostname list. |
 | Query name/type/class | `query_name`, `query_type`, `query_class` | `string` | Canonical query identity keys in current runtime inventory. |
 
-## Current Migration Status
+## Migration Status
 
-- `args.ns` no longer uses `name/ip` in current `engine/test` emits.
-- `args.address` exists on migrated singular-endpoint callsites.
-- `servers` / `addresses` are now used for nameserver list identity in migrated tags.
-- Packed-list-only identity keys are removed in current migrated emits.
-- Current runtime inventory no longer includes legacy identity/query aliases (`name`, `server`, `ip`, `type`, `class`, `rrtype`).
+Migration is complete. All engine emitters use canonical keys:
+
+- `ns` is nameserver name only (never `name/ip`).
+- `address` carries a single IP address.
+- `servers`, `addresses` replace `ns_list`, `ns_ip_list`, `nsname_list`.
+- `asn` (singular int) and `asns` (list) replace `asn_list`.
+- `prefixes` replaces `prefix` / `ip_prefix`.
+- `ptr_names` replaces `names` in PTR mismatch contexts.
+- `mail_targets` replaces `mailtarget_list`.
+- `query_name`, `query_type`, `query_class` replace legacy query aliases.
+- CI guardrails reject reintroduction of legacy patterns.
 
 ## Canonical Contract (v1.1)
 
@@ -76,6 +84,8 @@ Rules:
 | `addresses` | `array<string>` | optional | List of IP addresses. |
 | `asns` | `array<int>` | optional | List of ASN integers. |
 | `prefixes` | `array<string>` | optional | List of CIDR prefixes. |
+| `ptr_names` | `array<string>` | optional | PTR hostname list. |
+| `mail_targets` | `array<string>` | optional | MX target hostname list. |
 
 `servers` object contract:
 
@@ -86,43 +96,75 @@ Rules:
 - role-specific server lists MAY use semantic keys with same item shape:
   - for example `parent_servers`, `child_servers`, `failing_servers`.
 
-### Legacy Compatibility Fields
+### Retired Legacy Fields
 
-Legacy identity/query aliases are not part of the current core runtime
-inventory. If any are encountered in historical outputs, external adapters, or
-in-flight branches, they are non-canonical.
+Legacy identity/query aliases are no longer emitted. See the
+[key glossary](log-args-key-glossary.md) for the complete list of retired keys.
 
 Rules:
 
-- New implementations MUST prefer canonical fields in this section.
+- New implementations MUST use canonical fields defined above.
 - New packed-list-only identity keys MUST NOT be introduced.
+- CI guardrails enforce both rules.
 
 ### Prohibited Canonical Patterns
 
 - Packed semicolon/comma identity lists as the only machine-readable representation.
 - Mixed endpoint encoding in `ns` (for example `name/ip`).
 
-### Minimal Examples
+### Consumer Examples
 
-Singular endpoint + query:
+Singular endpoint with query identity:
 
 ```json
 {
-  "ns": "ns1.example",
+  "ns": "ns1.example.",
   "address": "192.0.2.53",
-  "query_name": "example",
+  "query_name": "example.",
   "query_type": "SOA",
   "query_class": "IN"
 }
 ```
 
-Multiple endpoints:
+Multiple endpoints (`servers`):
 
 ```json
 {
   "servers": [
-    {"ns": "ns1.example", "address": "192.0.2.53"},
-    {"ns": "ns2.example", "address": "2001:db8::53"}
+    {"ns": "ns1.example.", "address": "192.0.2.53"},
+    {"ns": "ns2.example.", "address": "2001:db8::53"}
+  ]
+}
+```
+
+Address list (`addresses`):
+
+```json
+{
+  "ns": "ns1.example.",
+  "addresses": ["192.0.2.53", "2001:db8::53"]
+}
+```
+
+ASN collection (`asns`) with prefixes:
+
+```json
+{
+  "address": "192.0.2.53",
+  "asns": [64496, 64497],
+  "prefixes": ["192.0.2.0/24"]
+}
+```
+
+Role-specific server lists share the same item shape as `servers`:
+
+```json
+{
+  "parent_servers": [
+    {"ns": "ns1.parent.", "address": "192.0.2.1"}
+  ],
+  "zone_servers": [
+    {"ns": "ns1.example.", "address": "192.0.2.53"}
   ]
 }
 ```

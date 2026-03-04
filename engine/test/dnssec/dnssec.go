@@ -13,6 +13,7 @@ import (
 	dns "codeberg.org/miekg/dns"
 	"codeberg.org/miekg/dns/dnsutil"
 
+	"codeberg.org/pawal/gonemaster/engine/badkeys"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/internal/parallel"
 	"codeberg.org/pawal/gonemaster/engine/logargs"
@@ -6246,6 +6247,358 @@ func DNSSEC18(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	return results, nil
 }
 
+type dnssec19Key struct {
+	keytag uint16
+	algo   uint8
+}
+
+type dnssec19FindingKey struct {
+	key           dnssec19Key
+	check         string
+	blocklistName string
+}
+
+// DNSSEC19 runs the DNSSEC19 test case.
+func DNSSEC19(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
+	const testcase = "DNSSEC19"
+	var results []*logger.Entry
+
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+		return results, err
+	}
+
+	prof := profile.FromContext(ctx)
+	blocklistPath := strings.TrimSpace(prof.Badkeys.Path)
+	bl, err := badkeys.LoadBlocklist(blocklistPath)
+	if err != nil {
+		bl = nil
+	}
+	if bl == nil {
+		if err := appendLog(ctx, &results, testcase, "DS19_BLOCKLIST_NOT_FOUND", nil); err != nil {
+			return results, err
+		}
+	}
+
+	delItems, err := getDelNSNamesAndIPs(ctx, z)
+	if err != nil {
+		return results, err
+	}
+	zoneItems, err := getZoneNSNamesAndIPs(ctx, z)
+	if err != nil {
+		return results, err
+	}
+
+	merged := map[string]nameserver.Nameserver{}
+	for _, ns := range append(nameserversFromNSItems(ctx, z, delItems), nameserversFromNSItems(ctx, z, zoneItems)...) {
+		merged[strings.ToLower(ns.String())] = ns
+	}
+
+	keys := make([]string, 0, len(merged))
+	for key := range merged {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	ordered := make([]nameserver.Nameserver, 0, len(keys))
+	for _, key := range keys {
+		ordered = append(ordered, merged[key])
+	}
+	nsByIP := nameserversByIP(ordered)
+
+	findingServers := map[dnssec19FindingKey][]logargs.Server{}
+	okServers := map[dnssec19Key][]logargs.Server{}
+	var ignored []logargs.Server
+	var noDNSKEY []logargs.Server
+	respondsWithDNSKEY := false
+
+	if len(nsByIP) > 0 {
+		type nsOutcome struct {
+			respondsWithDNSKEY bool
+			ignored            []logargs.Server
+			noDNSKEY           []logargs.Server
+			findings           map[dnssec19FindingKey][]logargs.Server
+			ok                 map[dnssec19Key][]logargs.Server
+		}
+
+		outcomes := make([]nsOutcome, len(nsByIP))
+		tasks := make([]runner.Task, len(nsByIP))
+		for i, matchingNS := range nsByIP {
+			i, matchingNS := i, matchingNS
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				outcome := nsOutcome{
+					findings: map[dnssec19FindingKey][]logargs.Server{},
+					ok:       map[dnssec19Key][]logargs.Server{},
+				}
+				if len(matchingNS) == 0 {
+					outcomes[i] = outcome
+					return nil
+				}
+
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				ns := matchingNS[0]
+				servers := dnssec19ServersForNameservers(matchingNS)
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "DNSKEY"); err != nil {
+					return err
+				} else if disabled {
+					outcomes[i] = outcome
+					return nil
+				}
+
+				dnssecOn := true
+				resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn})
+				if resp.Msg == nil || resp.Rcode() != "NOERROR" || !resp.AA() {
+					outcome.ignored = append(outcome.ignored, servers...)
+					outcomes[i] = outcome
+					return nil
+				}
+
+				dnskeyRRs := resp.GetRecordsForName("DNSKEY", z.Name, "answer")
+				if len(dnskeyRRs) == 0 {
+					outcome.noDNSKEY = append(outcome.noDNSKEY, servers...)
+					outcomes[i] = outcome
+					return nil
+				}
+
+				var dnskeys []*dns.DNSKEY
+				for _, rr := range dnskeyRRs {
+					if key, ok := rr.(*dns.DNSKEY); ok {
+						dnskeys = append(dnskeys, key)
+					}
+				}
+				if len(dnskeys) == 0 {
+					outcome.noDNSKEY = append(outcome.noDNSKEY, servers...)
+					outcomes[i] = outcome
+					return nil
+				}
+
+				outcome.respondsWithDNSKEY = true
+				keysWithFindings := map[dnssec19Key]bool{}
+
+				for _, key := range dnskeys {
+					if key == nil {
+						continue
+					}
+					keyData, err := base64.StdEncoding.DecodeString(strings.TrimSpace(key.PublicKey))
+					if err != nil || len(keyData) == 0 {
+						continue
+					}
+
+					findings, err := badkeys.CheckDNSKEY(key.Algorithm, keyData, bl)
+					if err != nil {
+						continue
+					}
+
+					keyID := dnssec19Key{keytag: key.KeyTag(), algo: key.Algorithm}
+					if len(findings) == 0 {
+						outcome.ok[keyID] = append(outcome.ok[keyID], servers...)
+						continue
+					}
+
+					keysWithFindings[keyID] = true
+					for _, finding := range findings {
+						group := dnssec19FindingKey{
+							key:           keyID,
+							check:         finding.Check,
+							blocklistName: finding.BlocklistName,
+						}
+						outcome.findings[group] = append(outcome.findings[group], servers...)
+					}
+				}
+
+				for keyID := range keysWithFindings {
+					delete(outcome.ok, keyID)
+				}
+
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+		if err != nil {
+			return results, err
+		}
+		results = append(results, entries...)
+
+		for _, outcome := range outcomes {
+			if outcome.respondsWithDNSKEY {
+				respondsWithDNSKEY = true
+			}
+			ignored = append(ignored, outcome.ignored...)
+			noDNSKEY = append(noDNSKEY, outcome.noDNSKEY...)
+
+			for key, servers := range outcome.findings {
+				findingServers[key] = append(findingServers[key], servers...)
+			}
+			for key, servers := range outcome.ok {
+				okServers[key] = append(okServers[key], servers...)
+			}
+		}
+	}
+
+	if len(findingServers) > 0 {
+		keys := make([]dnssec19FindingKey, 0, len(findingServers))
+		for key := range findingServers {
+			keys = append(keys, key)
+		}
+		sort.Slice(keys, func(i, j int) bool {
+			left, right := keys[i], keys[j]
+			if left.key.keytag != right.key.keytag {
+				return left.key.keytag < right.key.keytag
+			}
+			leftOrder, rightOrder := dnssec19CheckOrder(left.check), dnssec19CheckOrder(right.check)
+			if leftOrder != rightOrder {
+				return leftOrder < rightOrder
+			}
+			if left.check != right.check {
+				return left.check < right.check
+			}
+			if left.key.algo != right.key.algo {
+				return left.key.algo < right.key.algo
+			}
+			return left.blocklistName < right.blocklistName
+		})
+
+		for _, key := range keys {
+			tag := dnssec19CheckTag(key.check)
+			if tag == "" {
+				continue
+			}
+			args := map[string]any{
+				"keytag":     key.key.keytag,
+				"algo_num":   key.key.algo,
+				"algo_descr": dnssec19AlgoDescription(key.key.algo),
+			}
+			if key.check == "blocklist" && strings.TrimSpace(key.blocklistName) != "" {
+				args["blocklist_name"] = key.blocklistName
+			}
+			if key.check == "rsainvalid" {
+				args["subtest"] = "invalid_params"
+			}
+			setTypedServersFromEndpoints(args, findingServers[key])
+			if err := appendLog(ctx, &results, testcase, tag, args); err != nil {
+				return results, err
+			}
+		}
+	}
+
+	keysWithFindings := map[dnssec19Key]bool{}
+	for key := range findingServers {
+		keysWithFindings[key.key] = true
+	}
+	if len(okServers) > 0 {
+		keys := make([]dnssec19Key, 0, len(okServers))
+		for key := range okServers {
+			if keysWithFindings[key] {
+				continue
+			}
+			keys = append(keys, key)
+		}
+		sort.Slice(keys, func(i, j int) bool {
+			if keys[i].keytag != keys[j].keytag {
+				return keys[i].keytag < keys[j].keytag
+			}
+			return keys[i].algo < keys[j].algo
+		})
+		for _, key := range keys {
+			args := map[string]any{
+				"keytag":     key.keytag,
+				"algo_num":   key.algo,
+				"algo_descr": dnssec19AlgoDescription(key.algo),
+			}
+			setTypedServersFromEndpoints(args, okServers[key])
+			if err := appendLog(ctx, &results, testcase, "DS19_KEY_OK", args); err != nil {
+				return results, err
+			}
+		}
+	}
+
+	if !respondsWithDNSKEY && len(noDNSKEY) > 0 {
+		args := map[string]any{}
+		setTypedServersFromEndpoints(args, noDNSKEY)
+		if err := appendLog(ctx, &results, testcase, "DS19_NO_DNSKEY", args); err != nil {
+			return results, err
+		}
+	}
+
+	if !respondsWithDNSKEY && len(noDNSKEY) == 0 && len(ignored) > 0 {
+		args := map[string]any{}
+		setTypedServersFromEndpoints(args, ignored)
+		if err := appendLog(ctx, &results, testcase, "DS19_NO_RESPONSE", args); err != nil {
+			return results, err
+		}
+	}
+
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
+		return results, err
+	}
+	return results, nil
+}
+
+func dnssec19ServersForNameservers(servers []nameserver.Nameserver) []logargs.Server {
+	if len(servers) == 0 {
+		return nil
+	}
+	out := make([]logargs.Server, 0, len(servers))
+	for _, ns := range servers {
+		out = append(out, logargs.Server{
+			NS:      ns.NameString(),
+			Address: ns.AddressString(),
+		})
+	}
+	return out
+}
+
+func dnssec19CheckOrder(check string) int {
+	switch check {
+	case "blocklist":
+		return 0
+	case "fermat":
+		return 1
+	case "pattern":
+		return 2
+	case "roca":
+		return 3
+	case "rsainvalid":
+		return 4
+	case "smallfactors":
+		return 5
+	case "smalld":
+		return 6
+	default:
+		return 99
+	}
+}
+
+func dnssec19CheckTag(check string) string {
+	switch check {
+	case "blocklist":
+		return "DS19_BADKEY_BLOCKLIST"
+	case "fermat":
+		return "DS19_BADKEY_FERMAT"
+	case "pattern":
+		return "DS19_BADKEY_PATTERN"
+	case "roca":
+		return "DS19_BADKEY_ROCA"
+	case "rsainvalid":
+		return "DS19_BADKEY_RSA_INVALID"
+	case "smallfactors":
+		return "DS19_BADKEY_SMALL_FACTORS"
+	case "smalld":
+		return "DS19_BADKEY_SMALL_D"
+	default:
+		return ""
+	}
+}
+
+func dnssec19AlgoDescription(algo uint8) string {
+	if props, ok := algoProperties[algo]; ok && strings.TrimSpace(props.description) != "" {
+		return props.description
+	}
+	return "Unknown"
+}
+
 func uniqueStrings(values []string) []string {
 	if len(values) == 0 {
 		return nil
@@ -6625,6 +6978,30 @@ func setTypedAddressesFromValues(args map[string]any, values []string) {
 		return
 	}
 	args["addresses"] = append([]string(nil), addresses...)
+}
+
+func setTypedServersFromEndpoints(args map[string]any, values []logargs.Server) {
+	if args == nil || len(values) == 0 {
+		return
+	}
+	seen := map[string]bool{}
+	servers := make([]logargs.Server, 0, len(values))
+	for _, value := range values {
+		name := strings.TrimSpace(value.NS)
+		address := strings.TrimSpace(value.Address)
+		if name == "" && address == "" {
+			continue
+		}
+		key := strings.ToLower(name) + "|" + address
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		servers = append(servers, logargs.Server{NS: name, Address: address})
+	}
+	if typed, ok := logargs.Servers(servers)["servers"]; ok {
+		args["servers"] = typed
+	}
 }
 
 func setTypedServersFromNames(args map[string]any, values []string) {

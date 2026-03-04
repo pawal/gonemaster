@@ -43,14 +43,17 @@ Status: Final
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
-| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv4. |
+| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
+| `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`NS`). |
-| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv6. |
+| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
+| `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`NS`). |
-| `NO_UPWARD_REFERRAL` | `nsname_list` | `string` | Semicolon-delimited sorted unique nameserver names. |
+| `NO_UPWARD_REFERRAL` | `servers` | `array<object>` | Structured sorted unique nameserver names as `{ns}` items. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Nameserver07`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Nameserver07`). |
-| `UPWARD_REFERRAL` | `ns` | `string` | Nameserver identity (`name/ip`) returning upward referral. |
+| `UPWARD_REFERRAL` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) returning upward referral. |
+| `UPWARD_REFERRAL` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `UPWARD_REFERRAL_IRRELEVANT` | `-` | `-` | No arguments. |
 
 ## Severity Levels Per Tag
@@ -76,4 +79,4 @@ Status: Final
 ## Edge Cases And Limitations
 - Query failures or missing responses do not produce dedicated failure tags in this testcase.
 - If all nameservers are skipped (disabled transport), `NO_UPWARD_REFERRAL` is not emitted.
-- The summary uses nameserver names (`nsname_list`), while per-finding tag uses `name/ip` (`ns`).
+- The summary uses nameserver names (`servers` with `{ns}` items), while per-finding tag uses singular endpoint identity (`ns` + `address`).

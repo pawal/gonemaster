@@ -27,7 +27,7 @@ Status: Final
 4. If exactly one NS-set key exists, emit `ONE_NS_SET`.
 5. If multiple NS-set keys exist:
    - Emit `MULTIPLE_NS_SET`.
-   - Emit `NS_SET` once per NS-set key with contributing `servers`.
+   - Emit `NS_SET` once per NS-set key with the NS target set (`ns_set_servers`) and contributing nameserver endpoints (`servers`).
 6. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
@@ -46,16 +46,20 @@ Status: Final
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
-| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv4. |
+| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
+| `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`NS`). |
-| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv6. |
+| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
+| `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`NS`). |
 | `MULTIPLE_NS_SET` | `count` | `int` | Number of distinct NS target sets observed. |
-| `NO_RESPONSE` | `ns` | `string` | Nameserver identity (`name/ip`) with no response. |
-| `NO_RESPONSE_NS_QUERY` | `ns` | `string` | Nameserver identity (`name/ip`) without usable NS answer. |
-| `NS_SET` | `nsname_list` | `string` | Semicolon-delimited sorted lowercase NS target names in this set. |
-| `NS_SET` | `servers` | `string` | Semicolon-delimited nameserver identities (`name/ip`) returning this set. |
-| `ONE_NS_SET` | `nsname_list` | `string` | The single observed semicolon-delimited NS target set. |
+| `NO_RESPONSE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with no response. |
+| `NO_RESPONSE` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `NO_RESPONSE_NS_QUERY` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) without usable NS answer. |
+| `NO_RESPONSE_NS_QUERY` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `NS_SET` | `ns_set_servers` | `array<object>` | Structured NS target names in this set as `{ns}` items. |
+| `NS_SET` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) returning this set. |
+| `ONE_NS_SET` | `servers` | `array<object>` | Structured single observed NS target set as `{ns}` items. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Consistency04`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Consistency04`). |
 

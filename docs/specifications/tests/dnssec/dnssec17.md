@@ -68,26 +68,28 @@ Status: Final
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
 | `DS17_CDNSKEY_INVALID_RRSIG` | `keytag` | `int` | RRSIG keytag with invalid signature. |
-| `DS17_CDNSKEY_INVALID_RRSIG` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
+| `DS17_CDNSKEY_INVALID_RRSIG` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS17_CDNSKEY_IS_NON_SEP` | `keytag` | `int` | CDNSKEY keytag with SEP bit unset. |
-| `DS17_CDNSKEY_IS_NON_SEP` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
+| `DS17_CDNSKEY_IS_NON_SEP` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS17_CDNSKEY_IS_NON_ZONE` | `keytag` | `int` | CDNSKEY keytag with zone bit unset. |
-| `DS17_CDNSKEY_IS_NON_ZONE` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
+| `DS17_CDNSKEY_IS_NON_ZONE` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS17_CDNSKEY_MATCHES_NO_DNSKEY` | `keytag` | `int` | CDNSKEY keytag not found in DNSKEY RRset. |
-| `DS17_CDNSKEY_MATCHES_NO_DNSKEY` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
+| `DS17_CDNSKEY_MATCHES_NO_DNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS17_CDNSKEY_NOT_SIGNED_BY_CDNSKEY` | `keytag` | `int` | CDNSKEY keytag missing from CDNSKEY RRset RRSIG keytags. |
-| `DS17_CDNSKEY_NOT_SIGNED_BY_CDNSKEY` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
+| `DS17_CDNSKEY_NOT_SIGNED_BY_CDNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS17_CDNSKEY_SIGNED_BY_UNKNOWN_DNSKEY` | `keytag` | `int` | CDNSKEY RRSIG keytag with no DNSKEY match. |
-| `DS17_CDNSKEY_SIGNED_BY_UNKNOWN_DNSKEY` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
-| `DS17_CDNSKEY_UNSIGNED` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
-| `DS17_CDNSKEY_WITHOUT_DNSKEY` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
-| `DS17_DELETE_CDNSKEY` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
+| `DS17_CDNSKEY_SIGNED_BY_UNKNOWN_DNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
+| `DS17_CDNSKEY_UNSIGNED` | `addresses` | `array<string>` | Structured child nameserver IP list. |
+| `DS17_CDNSKEY_WITHOUT_DNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
+| `DS17_DELETE_CDNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS17_DNSKEY_NOT_SIGNED_BY_CDNSKEY` | `keytag` | `int` | CDNSKEY keytag missing from DNSKEY RRset RRSIG keytags. |
-| `DS17_DNSKEY_NOT_SIGNED_BY_CDNSKEY` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
-| `DS17_MIXED_DELETE_CDNSKEY` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
-| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv4. |
+| `DS17_DNSKEY_NOT_SIGNED_BY_CDNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
+| `DS17_MIXED_DELETE_CDNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
+| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
+| `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`CDNSKEY` or `DNSKEY`). |
-| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv6. |
+| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
+| `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`CDNSKEY` or `DNSKEY`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`DNSSEC17`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`DNSSEC17`). |

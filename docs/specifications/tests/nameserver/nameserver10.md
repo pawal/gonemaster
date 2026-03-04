@@ -35,9 +35,9 @@ Status: Final
    - Else if response has EDNS version `0` and empty answer section, treat as expected and do not mark issues.
    - Else mark nameserver IP for `N10_EDNS_RESPONSE_ERROR`.
 5. Emit aggregate tags for non-empty collectors:
-   - `N10_NO_RESPONSE_EDNS1_QUERY` with sorted unique `ns_ip_list`.
-   - For each sorted `rcode`, `N10_UNEXPECTED_RCODE` with sorted unique `ns_ip_list`.
-   - `N10_EDNS_RESPONSE_ERROR` with sorted unique `ns_ip_list`.
+   - `N10_NO_RESPONSE_EDNS1_QUERY` with sorted unique `addresses`.
+   - For each sorted `rcode`, `N10_UNEXPECTED_RCODE` with sorted unique `addresses`.
+   - `N10_EDNS_RESPONSE_ERROR` with sorted unique `addresses`.
 6. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
@@ -54,14 +54,16 @@ Status: Final
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
-| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv4. |
+| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
+| `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
-| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv6. |
+| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
+| `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
-| `N10_EDNS_RESPONSE_ERROR` | `ns_ip_list` | `string` | Semicolon-delimited sorted unique nameserver IPs. |
-| `N10_NO_RESPONSE_EDNS1_QUERY` | `ns_ip_list` | `string` | Semicolon-delimited sorted unique nameserver IPs. |
+| `N10_EDNS_RESPONSE_ERROR` | `addresses` | `array<string>` | Structured sorted unique nameserver IPs. |
+| `N10_NO_RESPONSE_EDNS1_QUERY` | `addresses` | `array<string>` | Structured sorted unique nameserver IPs. |
 | `N10_UNEXPECTED_RCODE` | `rcode` | `string` | Unexpected response code for EDNSv1 query. |
-| `N10_UNEXPECTED_RCODE` | `ns_ip_list` | `string` | Semicolon-delimited sorted unique nameserver IPs for that rcode. |
+| `N10_UNEXPECTED_RCODE` | `addresses` | `array<string>` | Structured sorted unique nameserver IPs for that rcode. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Nameserver10`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Nameserver10`). |
 
@@ -79,7 +81,7 @@ Status: Final
 ## Differences From Upstream
 - Upstream reference: [`nameserver10.md`](../../upstream/tests/Nameserver-TP/nameserver10.md)
 - Differences (Upstream vs Gonemaster):
-  - Upstream: says input is nameserver IP set. Gonemaster: iterates raw `Method4and5` output, but aggregate `ns_ip_list` values are sorted and deduplicated by IP.
+  - Upstream: says input is nameserver IP set. Gonemaster: iterates raw `Method4and5` output, but aggregate `addresses` values are sorted and deduplicated by IP.
   - Upstream: summary assumes this testcase is relevant only after EDNSv0 success. Gonemaster: implements that gating explicitly by only evaluating EDNSv1 when EDNSv0 response exists and has `NOERROR`.
   - Upstream: does not explicitly describe testcase boundary and transport-disabled debug emissions. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
 - Potential upstream report:

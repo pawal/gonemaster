@@ -27,7 +27,7 @@ Status: Final
 4. If exactly one RNAME value exists, emit `ONE_SOA_RNAME`.
 5. If multiple RNAME values exist:
    - Emit `MULTIPLE_SOA_RNAMES`.
-   - Emit `SOA_RNAME` once per observed RNAME with associated `ns_list`.
+   - Emit `SOA_RNAME` once per observed RNAME with associated `servers`.
 6. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
@@ -46,16 +46,20 @@ Status: Final
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
-| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv4. |
+| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
+| `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
-| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv6. |
+| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
+| `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
 | `MULTIPLE_SOA_RNAMES` | `count` | `int` | Number of distinct RNAME values observed. |
-| `NO_RESPONSE` | `ns` | `string` | Nameserver identity (`name/ip`) with no response. |
-| `NO_RESPONSE_SOA_QUERY` | `ns` | `string` | Nameserver identity (`name/ip`) without usable SOA answer. |
+| `NO_RESPONSE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with no response. |
+| `NO_RESPONSE` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `NO_RESPONSE_SOA_QUERY` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) without usable SOA answer. |
+| `NO_RESPONSE_SOA_QUERY` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `ONE_SOA_RNAME` | `rname` | `string` | The single observed SOA RNAME value. |
 | `SOA_RNAME` | `rname` | `string` | One observed SOA RNAME value. |
-| `SOA_RNAME` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) serving that RNAME. |
+| `SOA_RNAME` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) serving that RNAME. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Consistency02`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Consistency02`). |
 
@@ -82,4 +86,4 @@ Status: Final
 
 ## Edge Cases And Limitations
 - If no usable SOA RNAME is obtained, neither `ONE_SOA_RNAME` nor `MULTIPLE_SOA_RNAMES` is emitted.
-- `SOA_RNAME` `ns_list` ordering follows nameserver processing order.
+- `SOA_RNAME` `servers` ordering follows nameserver processing order.

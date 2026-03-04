@@ -45,12 +45,15 @@ Status: Final
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
-| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv4. |
+| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
+| `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
-| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv6. |
+| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
+| `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
 | `SOA_EXISTS` | `-` | `-` | No arguments. |
-| `SOA_NOT_EXISTS` | `ns` | `string` | Nameserver identity (`name/ip`) with empty SOA answer on `NOERROR`. |
+| `SOA_NOT_EXISTS` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with empty SOA answer on `NOERROR`. |
+| `SOA_NOT_EXISTS` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Delegation06`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Delegation06`). |
 

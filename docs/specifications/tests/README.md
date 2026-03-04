@@ -107,8 +107,8 @@ requirement.
 | --- | --- |
 | Parallel execution | `resolver.defaults.parallel` controls whether per-nameserver queries run sequentially or concurrently |
 | Deduplication strategy | Group by `name/ip`, by IP only, or by composite key; first-seen-wins vs last-seen-wins |
-| List ordering | Sorting `ns_list` values before joining; lexicographic ordering of serial keys |
-| Argument formatting | Semicolon delimiter for `ns_list`, slash delimiter for PTR names |
+| List ordering | Sorting `servers` values before joining; lexicographic ordering of serial keys |
+| Argument formatting | Semicolon delimiter for `servers`, slash delimiter for PTR names |
 | Reference time source | DNSKEY packet timestamp vs wall-clock `time.Now()` for RRSIG validity checks |
 | OK-tag gating | Emitting a success tag only when no non-start diagnostic tag was emitted |
 | Module orchestration | Testcase A runs only if testcase B emitted a specific tag |

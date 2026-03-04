@@ -79,18 +79,18 @@ Status: Final
 | `Z09_INCONSISTENT_MX` | `-` | `-` | No arguments. |
 | `Z09_INCONSISTENT_MX_DATA` | `-` | `-` | No arguments. |
 | `Z09_MISSING_MAIL_TARGET` | `-` | `-` | No arguments. |
-| `Z09_MX_DATA` | `ns_ip_list` | `string` | Semicolon-delimited nameserver IP list for this data group. |
-| `Z09_MX_DATA` | `mailtarget_list` | `string` | Semicolon-delimited MX exchange list. |
-| `Z09_MX_FOUND` | `ns_ip_list` | `string` | Semicolon-delimited nameserver IPs that returned MX RRset. |
-| `Z09_NON_AUTH_MX_RESPONSE` | `ns_ip_list` | `string` | Semicolon-delimited nameserver IPs reported as non-authoritative (see limitation below). |
-| `Z09_NO_MX_FOUND` | `ns_ip_list` | `string` | Semicolon-delimited nameserver IPs with no MX RRset. |
-| `Z09_NO_RESPONSE_MX_QUERY` | `ns_ip_list` | `string` | Semicolon-delimited nameserver IPs with no MX response. |
+| `Z09_MX_DATA` | `addresses` | `array<string>` | Structured nameserver IP list for this data group. |
+| `Z09_MX_DATA` | `mail_targets` | `array<string>` | Structured MX exchange hostname list. |
+| `Z09_MX_FOUND` | `addresses` | `array<string>` | Structured nameserver IPs that returned MX RRset. |
+| `Z09_NON_AUTH_MX_RESPONSE` | `addresses` | `array<string>` | Structured nameserver IPs reported as non-authoritative (see limitation below). |
+| `Z09_NO_MX_FOUND` | `addresses` | `array<string>` | Structured nameserver IPs with no MX RRset. |
+| `Z09_NO_RESPONSE_MX_QUERY` | `addresses` | `array<string>` | Structured nameserver IPs with no MX response. |
 | `Z09_NULL_MX_NON_ZERO_PREF` | `-` | `-` | No arguments. |
 | `Z09_NULL_MX_WITH_OTHER_MX` | `-` | `-` | No arguments. |
 | `Z09_ROOT_EMAIL_DOMAIN` | `-` | `-` | No arguments. |
 | `Z09_TLD_EMAIL_DOMAIN` | `-` | `-` | No arguments. |
 | `Z09_UNEXPECTED_RCODE_MX` | `rcode` | `string` | Unexpected RCODE text. |
-| `Z09_UNEXPECTED_RCODE_MX` | `ns_ip_list` | `string` | Semicolon-delimited nameserver IPs for that RCODE. |
+| `Z09_UNEXPECTED_RCODE_MX` | `addresses` | `array<string>` | Structured nameserver IPs for that RCODE. |
 
 ## Severity Levels Per Tag
 | Tag | Level | Notes |
@@ -114,7 +114,7 @@ Status: Final
 ## Differences From Upstream
 - Upstream reference: [`zone09.md`](../../upstream/tests/Zone-TP/zone09.md)
 - Differences (Upstream vs Gonemaster):
-  - Upstream: defines `Z09_NON_AUTH_MX_RESPONSE` from the non-authoritative MX set. Gonemaster: currently populates `ns_ip_list` for this tag from the no-response set (`noResponseMX`), not the non-authoritative set (`nonAuthoritativeMX`).
+  - Upstream: defines `Z09_NON_AUTH_MX_RESPONSE` from the non-authoritative MX set. Gonemaster: currently populates `addresses` for this tag from the no-response set (`noResponseMX`), not the non-authoritative set (`nonAuthoritativeMX`).
   - Upstream: describes name server IP set processing. Gonemaster: deduplicates probing by IP before classification and separately keeps name-group reporting views.
   - Upstream: does not describe testcase boundary debug markers. Gonemaster: emits `TEST_CASE_START` and `TEST_CASE_END`.
 - Potential upstream report:

@@ -27,7 +27,7 @@ Status: Final
      - Compute keytag.
      - Classify `Algorithm` value with `dnssec05TagForAlgorithm`.
      - Store `(tag, algo, keytag, ns)` tuple.
-4. Emit all `DS05_ALGO_*` tags grouped by `(algo, keytag)` with merged `ns_list`, including `algo_descr` and `algo_mnemo`.
+4. Emit all `DS05_ALGO_*` tags grouped by `(algo, keytag)` with merged `servers`, including `algo_descr` and `algo_mnemo`.
 5. If both `Responds Without DNSKEY` and `Responds With DNSKEY` are empty, emit `DS05_NO_RESPONSE` for ignored nameservers.
 6. If `Responds Without DNSKEY` is non-empty:
    - Emit `DS05_ZONE_NO_DNSSEC` if `Responds With DNSKEY` is empty.
@@ -55,47 +55,49 @@ Status: Final
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
-| `DS05_ALGO_DEPRECATED` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) for this `(algo,keytag)` class entry. |
+| `DS05_ALGO_DEPRECATED` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) for this `(algo,keytag)` class entry. |
 | `DS05_ALGO_DEPRECATED` | `keytag` | `int` | DNSKEY keytag. |
 | `DS05_ALGO_DEPRECATED` | `algo_num` | `int` | DNSKEY algorithm number. |
 | `DS05_ALGO_DEPRECATED` | `algo_descr` | `string` | DNSKEY algorithm description. |
 | `DS05_ALGO_DEPRECATED` | `algo_mnemo` | `string` | DNSKEY algorithm mnemonic. |
-| `DS05_ALGO_NOT_RECOMMENDED` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) for this `(algo,keytag)` class entry. |
+| `DS05_ALGO_NOT_RECOMMENDED` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) for this `(algo,keytag)` class entry. |
 | `DS05_ALGO_NOT_RECOMMENDED` | `keytag` | `int` | DNSKEY keytag. |
 | `DS05_ALGO_NOT_RECOMMENDED` | `algo_num` | `int` | DNSKEY algorithm number. |
 | `DS05_ALGO_NOT_RECOMMENDED` | `algo_descr` | `string` | DNSKEY algorithm description. |
 | `DS05_ALGO_NOT_RECOMMENDED` | `algo_mnemo` | `string` | DNSKEY algorithm mnemonic. |
-| `DS05_ALGO_NOT_ZONE_SIGN` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) for this `(algo,keytag)` class entry. |
+| `DS05_ALGO_NOT_ZONE_SIGN` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) for this `(algo,keytag)` class entry. |
 | `DS05_ALGO_NOT_ZONE_SIGN` | `keytag` | `int` | DNSKEY keytag. |
 | `DS05_ALGO_NOT_ZONE_SIGN` | `algo_num` | `int` | DNSKEY algorithm number. |
 | `DS05_ALGO_NOT_ZONE_SIGN` | `algo_descr` | `string` | DNSKEY algorithm description. |
 | `DS05_ALGO_NOT_ZONE_SIGN` | `algo_mnemo` | `string` | DNSKEY algorithm mnemonic. |
-| `DS05_ALGO_OK` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) for this `(algo,keytag)` class entry. |
+| `DS05_ALGO_OK` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) for this `(algo,keytag)` class entry. |
 | `DS05_ALGO_OK` | `keytag` | `int` | DNSKEY keytag. |
 | `DS05_ALGO_OK` | `algo_num` | `int` | DNSKEY algorithm number. |
 | `DS05_ALGO_OK` | `algo_descr` | `string` | DNSKEY algorithm description. |
 | `DS05_ALGO_OK` | `algo_mnemo` | `string` | DNSKEY algorithm mnemonic. |
-| `DS05_ALGO_PRIVATE` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) for this `(algo,keytag)` class entry. |
+| `DS05_ALGO_PRIVATE` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) for this `(algo,keytag)` class entry. |
 | `DS05_ALGO_PRIVATE` | `keytag` | `int` | DNSKEY keytag. |
 | `DS05_ALGO_PRIVATE` | `algo_num` | `int` | DNSKEY algorithm number. |
 | `DS05_ALGO_PRIVATE` | `algo_descr` | `string` | DNSKEY algorithm description. |
 | `DS05_ALGO_PRIVATE` | `algo_mnemo` | `string` | DNSKEY algorithm mnemonic. |
-| `DS05_ALGO_RESERVED` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) for this `(algo,keytag)` class entry. |
+| `DS05_ALGO_RESERVED` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) for this `(algo,keytag)` class entry. |
 | `DS05_ALGO_RESERVED` | `keytag` | `int` | DNSKEY keytag. |
 | `DS05_ALGO_RESERVED` | `algo_num` | `int` | DNSKEY algorithm number. |
 | `DS05_ALGO_RESERVED` | `algo_descr` | `string` | DNSKEY algorithm description. |
 | `DS05_ALGO_RESERVED` | `algo_mnemo` | `string` | DNSKEY algorithm mnemonic. |
-| `DS05_ALGO_UNASSIGNED` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) for this `(algo,keytag)` class entry. |
+| `DS05_ALGO_UNASSIGNED` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) for this `(algo,keytag)` class entry. |
 | `DS05_ALGO_UNASSIGNED` | `keytag` | `int` | DNSKEY keytag. |
 | `DS05_ALGO_UNASSIGNED` | `algo_num` | `int` | DNSKEY algorithm number. |
 | `DS05_ALGO_UNASSIGNED` | `algo_descr` | `string` | DNSKEY algorithm description. |
 | `DS05_ALGO_UNASSIGNED` | `algo_mnemo` | `string` | DNSKEY algorithm mnemonic. |
-| `DS05_NO_RESPONSE` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) ignored due to invalid/no response shape. |
-| `DS05_SERVER_NO_DNSSEC` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) returning no usable DNSKEY while other nameservers did. |
-| `DS05_ZONE_NO_DNSSEC` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) returning no usable DNSKEY. |
-| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv4. |
+| `DS05_NO_RESPONSE` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) ignored due to invalid/no response shape. |
+| `DS05_SERVER_NO_DNSSEC` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) returning no usable DNSKEY while other nameservers did. |
+| `DS05_ZONE_NO_DNSSEC` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) returning no usable DNSKEY. |
+| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
+| `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`DNSKEY`). |
-| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv6. |
+| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
+| `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`DNSKEY`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`DNSSEC05`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`DNSSEC05`). |
@@ -127,6 +129,6 @@ Status: Final
   - `no`
 
 ## Edge Cases And Limitations
-- Nameserver evaluation is deduplicated by IP; multiple names mapped to one IP are merged into one query outcome and expanded in `ns_list`.
+- Nameserver evaluation is deduplicated by IP; multiple names mapped to one IP are merged into one query outcome and expanded in `servers`.
 - Nameservers with non-`NOERROR` or non-`AA` DNSKEY responses are treated as ignored for DS05 classification and can only contribute to `DS05_NO_RESPONSE`.
 - If a DNSKEY algorithm maps outside explicit switch cases, Gonemaster classifies it as `DS05_ALGO_UNASSIGNED`.

@@ -49,18 +49,24 @@ Status: Final
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
 | `A_QUERY_NO_RESPONSES` | `-` | `-` | No arguments. |
-| `HAS_A_RECORDS` | `ns` | `string` | Nameserver identity (`name/ip`) that returned `A` records. |
+| `HAS_A_RECORDS` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) that returned `A` records. |
+| `HAS_A_RECORDS` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `HAS_A_RECORDS` | `domain` | `string` | Queried name (`www.<child-zone>`). |
 | `HAS_NAMESERVER_NO_WWW_A_TEST` | `zname` | `string` | Child zone name for skipped `Basic03` probing path. |
-| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`). |
+| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
+| `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`A`). |
-| `IPV4_ENABLED` | `ns` | `string` | Nameserver identity (`name/ip`). |
+| `IPV4_ENABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
+| `IPV4_ENABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV4_ENABLED` | `rrtype` | `string` | rrtype queried (`A`). |
-| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`). |
+| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
+| `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`A`). |
-| `IPV6_ENABLED` | `ns` | `string` | Nameserver identity (`name/ip`). |
+| `IPV6_ENABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
+| `IPV6_ENABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV6_ENABLED` | `rrtype` | `string` | rrtype queried (`A`). |
-| `NO_A_RECORDS` | `ns` | `string` | Nameserver identity (`name/ip`) with no matching `A` data. |
+| `NO_A_RECORDS` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with no matching `A` data. |
+| `NO_A_RECORDS` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `NO_A_RECORDS` | `domain` | `string` | Queried name (`www.<child-zone>`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Basic03`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Basic03`). |

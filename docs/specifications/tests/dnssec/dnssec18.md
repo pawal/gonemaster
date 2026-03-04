@@ -39,7 +39,7 @@ Status: Final
 9. For each nameserver with CDNSKEY RRset:
    - Search DS records for any DS whose keytag exists in nameserver DNSKEY RRset and also in CDNSKEY RRSIG keytags.
    - If no such DS/keytag match exists, mark nameserver for `DS18_NO_MATCH_CDNSKEY_RRSIG_DS`.
-10. Emit marked DS18 findings with `ns_ip_list`.
+10. Emit marked DS18 findings with `addresses`.
 11. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
@@ -55,11 +55,13 @@ Status: Final
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
-| `DS18_NO_MATCH_CDNSKEY_RRSIG_DS` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
-| `DS18_NO_MATCH_CDS_RRSIG_DS` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
-| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv4. |
+| `DS18_NO_MATCH_CDNSKEY_RRSIG_DS` | `addresses` | `array<string>` | Structured child nameserver IP list. |
+| `DS18_NO_MATCH_CDS_RRSIG_DS` | `addresses` | `array<string>` | Structured child nameserver IP list. |
+| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
+| `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`DS`, `CDS`, `CDNSKEY`, or `DNSKEY`). |
-| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv6. |
+| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
+| `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`DS`, `CDS`, `CDNSKEY`, or `DNSKEY`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`DNSSEC18`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`DNSSEC18`). |

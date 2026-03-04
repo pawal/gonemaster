@@ -37,7 +37,7 @@ Status: Final
      - `N11_UNSET_AA` when `AA=false`.
      - `N11_RETURNS_UNKNOWN_OPTION_CODE` when response EDNS data still includes option code `137`.
      - no finding when none of the above applies.
-4. Emit aggregate tags for non-empty collectors (sorted unique `ns_ip_list` values; `N11_UNEXPECTED_RCODE` emitted per sorted `rcode`).
+4. Emit aggregate tags for non-empty collectors (sorted unique `addresses` values; `N11_UNEXPECTED_RCODE` emitted per sorted `rcode`).
 5. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
@@ -57,17 +57,19 @@ Status: Final
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
-| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv4. |
+| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
+| `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
-| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv6. |
+| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
+| `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
-| `N11_NO_EDNS` | `ns_ip_list` | `string` | Semicolon-delimited sorted unique nameserver IPs. |
-| `N11_NO_RESPONSE` | `ns_ip_list` | `string` | Semicolon-delimited sorted unique nameserver IPs. |
-| `N11_RETURNS_UNKNOWN_OPTION_CODE` | `ns_ip_list` | `string` | Semicolon-delimited sorted unique nameserver IPs. |
-| `N11_UNEXPECTED_ANSWER_SECTION` | `ns_ip_list` | `string` | Semicolon-delimited sorted unique nameserver IPs. |
+| `N11_NO_EDNS` | `addresses` | `array<string>` | Structured sorted unique nameserver IPs. |
+| `N11_NO_RESPONSE` | `addresses` | `array<string>` | Structured sorted unique nameserver IPs. |
+| `N11_RETURNS_UNKNOWN_OPTION_CODE` | `addresses` | `array<string>` | Structured sorted unique nameserver IPs. |
+| `N11_UNEXPECTED_ANSWER_SECTION` | `addresses` | `array<string>` | Structured sorted unique nameserver IPs. |
 | `N11_UNEXPECTED_RCODE` | `rcode` | `string` | Unexpected response code name. |
-| `N11_UNEXPECTED_RCODE` | `ns_ip_list` | `string` | Semicolon-delimited sorted unique nameserver IPs for that rcode. |
-| `N11_UNSET_AA` | `ns_ip_list` | `string` | Semicolon-delimited sorted unique nameserver IPs. |
+| `N11_UNEXPECTED_RCODE` | `addresses` | `array<string>` | Structured sorted unique nameserver IPs for that rcode. |
+| `N11_UNSET_AA` | `addresses` | `array<string>` | Structured sorted unique nameserver IPs. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Nameserver11`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Nameserver11`). |
 
@@ -88,7 +90,7 @@ Status: Final
 ## Differences From Upstream
 - Upstream reference: [`nameserver11.md`](../../upstream/tests/Nameserver-TP/nameserver11.md)
 - Differences (Upstream vs Gonemaster):
-  - Upstream: assumes nameserver IP evaluation set. Gonemaster: iterates raw `Method4and5` output, then emits deduplicated/sorted `ns_ip_list` aggregates.
+  - Upstream: assumes nameserver IP evaluation set. Gonemaster: iterates raw `Method4and5` output, then emits deduplicated/sorted `addresses` aggregates.
   - Upstream: defines baseline gate before unknown-option probe. Gonemaster: implements this gate exactly and silently skips nameservers failing baseline checks.
   - Upstream: does not explicitly describe testcase boundary and transport-disabled debug emissions. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
 - Potential upstream report:

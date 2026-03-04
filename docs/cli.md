@@ -51,6 +51,19 @@ You can switch output modes:
 
 Use `--output PATH` to write the selected output to a file.
 
+### Machine-consumer args contract
+For machine consumption, use `--json` or `--json-stream`.
+
+For migrated coherent entries:
+- `args.ns` is nameserver name only.
+- `args.address` is the nameserver IP address.
+- `args.asns` is a typed array of ASN integers when ASN data is emitted.
+
+Legacy keys can still appear on non-migrated tags during migration. Prefer the
+v1.1 keys above when they are present. See:
+- `docs/specifications/log-args-coherency.md`
+- `docs/specifications/log-args-key-glossary.md`
+
 ### Options
 
 | Flag | Type | Details |
@@ -158,6 +171,21 @@ Undelegated DS-only test:
 ```
 gonemaster --domain example.com \
   --ds 12345,13,2,0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF
+```
+
+Extract coherent nameserver name/IP pairs from a local run:
+```
+gonemaster --json-stream --domain example.com \
+  | jq -r 'select(.args.ns and .args.address)
+           | [.args.ns, .args.address] | @tsv'
+```
+
+Extract ASN lists from a local run:
+```
+gonemaster --json --domain example.com \
+  | jq -r '.[]
+           | select(.args.asns != null)
+           | [.tag, (.args.asns | map(tostring) | join(","))] | @tsv'
 ```
 
 ## gonemaster-client (HTTP API client)
@@ -363,6 +391,22 @@ gonemaster-client batches results batch_123 --view json --split-dir /tmp/gonemas
 Fetch the full JSON result for a job:
 ```
 gonemaster-client jobs results job_123 --view full --format json
+```
+
+Extract coherent nameserver name/IP pairs from client JSON output:
+```
+gonemaster-client jobs results job_123 --view raw --format json \
+  | jq -r '.entries[]
+           | select(.args.ns and .args.address)
+           | [.args.ns, .args.address] | @tsv'
+```
+
+Extract ASN lists from client JSON output:
+```
+gonemaster-client jobs results job_123 --view raw --format json \
+  | jq -r '.entries[]
+           | select(.args.asns != null)
+           | [.tag, (.args.asns | map(tostring) | join(","))] | @tsv'
 ```
 
 Fetch translated, readable output (per module):

@@ -54,21 +54,29 @@ Status: Final
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
-| `BREAKS_ON_EDNS` | `ns` | `string` | Nameserver identity (`name/ip`) failing on EDNS query. |
+| `BREAKS_ON_EDNS` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) failing on EDNS query. |
+| `BREAKS_ON_EDNS` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `BREAKS_ON_EDNS` | `domain` | `string` | Tested zone name. |
-| `EDNS0_SUPPORT` | `ns_list` | `string` | Semicolon-delimited sorted included nameserver identities (`name/ip`). |
-| `EDNS_RESPONSE_WITHOUT_EDNS` | `ns` | `string` | Nameserver identity (`name/ip`) with missing OPT in EDNS response. |
+| `EDNS0_SUPPORT` | `servers` | `array<object>` | Structured sorted included nameserver identities (`{ns,address}` object). |
+| `EDNS_RESPONSE_WITHOUT_EDNS` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with missing OPT in EDNS response. |
+| `EDNS_RESPONSE_WITHOUT_EDNS` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `EDNS_RESPONSE_WITHOUT_EDNS` | `domain` | `string` | Tested zone name. |
-| `EDNS_VERSION_ERROR` | `ns` | `string` | Nameserver identity (`name/ip`) with unexpected EDNS version. |
+| `EDNS_VERSION_ERROR` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with unexpected EDNS version. |
+| `EDNS_VERSION_ERROR` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `EDNS_VERSION_ERROR` | `domain` | `string` | Tested zone name. |
-| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv4. |
+| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
+| `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
-| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv6. |
+| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
+| `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
-| `NO_EDNS_SUPPORT` | `ns` | `string` | Nameserver identity (`name/ip`) not supporting EDNS as tested. |
-| `NO_RESPONSE` | `ns` | `string` | Nameserver identity (`name/ip`) with no response in EDNS/non-EDNS fallback path. |
+| `NO_EDNS_SUPPORT` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) not supporting EDNS as tested. |
+| `NO_EDNS_SUPPORT` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `NO_RESPONSE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with no response in EDNS/non-EDNS fallback path. |
+| `NO_RESPONSE` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `NO_RESPONSE` | `domain` | `string` | Tested zone name. |
-| `NS_ERROR` | `ns` | `string` | Nameserver identity (`name/ip`) with unexpected EDNS response behavior. |
+| `NS_ERROR` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with unexpected EDNS response behavior. |
+| `NS_ERROR` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Nameserver02`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Nameserver02`). |
 

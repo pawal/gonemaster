@@ -27,7 +27,7 @@ Status: Final
 4. If exactly one timer tuple exists, emit `ONE_SOA_TIME_PARAMETER_SET`.
 5. If multiple timer tuples exist:
    - Emit `MULTIPLE_SOA_TIME_PARAMETER_SET`.
-   - Emit `SOA_TIME_PARAMETER_SET` once per tuple with associated sorted `ns_list`.
+   - Emit `SOA_TIME_PARAMETER_SET` once per tuple with associated sorted `servers`.
 6. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
@@ -46,13 +46,17 @@ Status: Final
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
-| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv4. |
+| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
+| `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
-| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv6. |
+| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
+| `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
 | `MULTIPLE_SOA_TIME_PARAMETER_SET` | `count` | `int` | Number of distinct timer tuples observed. |
-| `NO_RESPONSE` | `ns` | `string` | Nameserver identity (`name/ip`) with no response. |
-| `NO_RESPONSE_SOA_QUERY` | `ns` | `string` | Nameserver identity (`name/ip`) without usable SOA answer. |
+| `NO_RESPONSE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with no response. |
+| `NO_RESPONSE` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `NO_RESPONSE_SOA_QUERY` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) without usable SOA answer. |
+| `NO_RESPONSE_SOA_QUERY` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `ONE_SOA_TIME_PARAMETER_SET` | `refresh` | `int` | SOA refresh value. |
 | `ONE_SOA_TIME_PARAMETER_SET` | `retry` | `int` | SOA retry value. |
 | `ONE_SOA_TIME_PARAMETER_SET` | `expire` | `int` | SOA expire value. |
@@ -61,7 +65,7 @@ Status: Final
 | `SOA_TIME_PARAMETER_SET` | `retry` | `int` | SOA retry value. |
 | `SOA_TIME_PARAMETER_SET` | `expire` | `int` | SOA expire value. |
 | `SOA_TIME_PARAMETER_SET` | `minimum` | `int` | SOA minimum (minttl) value. |
-| `SOA_TIME_PARAMETER_SET` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) serving that tuple. |
+| `SOA_TIME_PARAMETER_SET` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) serving that tuple. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Consistency03`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Consistency03`). |
 

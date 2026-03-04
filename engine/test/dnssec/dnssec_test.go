@@ -280,13 +280,20 @@ func TestDNSSEC01UndelegatedDSOnlyUsesFakeDS(t *testing.T) {
 		if entry == nil || entry.Tag != "DS01_DS_ALGO_OK" {
 			continue
 		}
-		if nsList, ok := entry.Args["ns_list"].(string); ok && nsList == "-" {
+		servers, ok := entry.Args["servers"].([]map[string]any)
+		if !ok || len(servers) != 1 {
+			continue
+		}
+		if _, ok := entry.Args["ns_list"]; ok {
+			t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
+		}
+		if servers[0]["ns"] == "-" {
 			foundFakeSource = true
 			break
 		}
 	}
 	if !foundFakeSource {
-		t.Fatalf("expected DS01_DS_ALGO_OK to be sourced from undelegated fake DS (ns_list='-')")
+		t.Fatalf("expected DS01_DS_ALGO_OK to be sourced from undelegated fake DS (servers[0].ns='-')")
 	}
 }
 
@@ -391,21 +398,27 @@ func TestDNSSEC01ParallelParentQueries(t *testing.T) {
 		t.Fatalf("expected DS01_DS_ALGO_OK")
 	}
 
-	var nsList string
+	var gotServers []map[string]any
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "DS01_DS_ALGO_OK" {
 			continue
 		}
-		if list, ok := entry.Args["ns_list"].(string); ok {
-			nsList = list
-			break
+		if servers, ok := entry.Args["servers"].([]map[string]any); ok {
+			gotServers = servers
 		}
+		if _, ok := entry.Args["ns_list"]; ok {
+			t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
+		}
+		break
 	}
-	if nsList == "" {
-		t.Fatalf("expected ns_list for DS01_DS_ALGO_OK")
+	if len(gotServers) == 0 {
+		t.Fatalf("expected typed servers for DS01_DS_ALGO_OK")
 	}
-	if nsList != "ns-parent1.example/192.0.2.80;ns-parent2.example/192.0.2.81" {
-		t.Fatalf("expected deterministic ns_list order, got %q", nsList)
+	if len(gotServers) != 2 {
+		t.Fatalf("expected two typed servers for DS01_DS_ALGO_OK, got %#v", gotServers)
+	}
+	if gotServers[0]["ns"] != "ns-parent1.example" || gotServers[1]["ns"] != "ns-parent2.example" {
+		t.Fatalf("expected deterministic server order, got %#v", gotServers)
 	}
 }
 
@@ -646,21 +659,24 @@ func TestDNSSEC02ParallelChildDNSKEYQueries(t *testing.T) {
 		t.Fatalf("expected DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS")
 	}
 
-	var nsList string
+	var gotAddresses []string
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS" {
 			continue
 		}
-		if list, ok := entry.Args["ns_ip_list"].(string); ok {
-			nsList = list
-			break
+		if addresses, ok := entry.Args["addresses"].([]string); ok {
+			gotAddresses = addresses
 		}
+		if _, ok := entry.Args["ns_ip_list"]; ok {
+			t.Fatalf("legacy key ns_ip_list should not be present: %#v", entry.Args)
+		}
+		break
 	}
-	if nsList == "" {
-		t.Fatalf("expected ns_ip_list for DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS")
+	if len(gotAddresses) == 0 {
+		t.Fatalf("expected addresses for DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS")
 	}
-	if nsList != "192.0.2.101;192.0.2.102" {
-		t.Fatalf("expected deterministic ns_ip_list order, got %q", nsList)
+	if strings.Join(gotAddresses, ";") != "192.0.2.101;192.0.2.102" {
+		t.Fatalf("expected deterministic addresses order, got %#v", gotAddresses)
 	}
 }
 
@@ -704,6 +720,20 @@ func TestDNSSEC03NoNSEC3(t *testing.T) {
 	}
 	if !hasEntryTag(entries, "DS03_NO_NSEC3") {
 		t.Fatalf("expected DS03_NO_NSEC3")
+	}
+	noNSEC3 := firstEntryByTag(entries, "DS03_NO_NSEC3")
+	if noNSEC3 == nil {
+		t.Fatalf("missing DS03_NO_NSEC3 entry")
+	}
+	noNSEC3Servers, ok := noNSEC3.Args["servers"].([]map[string]any)
+	if !ok || len(noNSEC3Servers) != 1 {
+		t.Fatalf("expected one typed server for DS03_NO_NSEC3, got %#v", noNSEC3.Args["servers"])
+	}
+	if noNSEC3Servers[0]["ns"] != "ns1.example" {
+		t.Fatalf("unexpected typed server payload for DS03_NO_NSEC3: %#v", noNSEC3Servers[0])
+	}
+	if _, ok := noNSEC3.Args["ns_list"]; ok {
+		t.Fatalf("legacy key ns_list should not be present: %#v", noNSEC3.Args)
 	}
 }
 
@@ -755,6 +785,23 @@ func TestDNSSEC03IllegalHashAlgo(t *testing.T) {
 	}
 	if !hasEntryTag(entries, "DS03_ILLEGAL_HASH_ALGO") {
 		t.Fatalf("expected DS03_ILLEGAL_HASH_ALGO")
+	}
+	illegal := firstEntryByTag(entries, "DS03_ILLEGAL_HASH_ALGO")
+	if illegal == nil {
+		t.Fatalf("missing DS03_ILLEGAL_HASH_ALGO entry")
+	}
+	illegalServers, ok := illegal.Args["servers"].([]map[string]any)
+	if !ok || len(illegalServers) != 1 {
+		t.Fatalf("expected one typed server for DS03_ILLEGAL_HASH_ALGO, got %#v", illegal.Args["servers"])
+	}
+	if illegalServers[0]["ns"] != "ns1.example" {
+		t.Fatalf("unexpected typed server payload for DS03_ILLEGAL_HASH_ALGO: %#v", illegalServers[0])
+	}
+	if _, ok := illegal.Args["ns_list"]; ok {
+		t.Fatalf("legacy key ns_list should not be present: %#v", illegal.Args)
+	}
+	if algo, _ := illegal.Args["algo_num"].(uint8); algo != 2 {
+		t.Fatalf("expected algo_num=2 for DS03_ILLEGAL_HASH_ALGO, got %#v", illegal.Args["algo_num"])
 	}
 }
 
@@ -858,21 +905,27 @@ func TestDNSSEC03ParallelDNSKEYQueries(t *testing.T) {
 		t.Fatalf("expected DS03_NO_NSEC3")
 	}
 
-	var nsList string
+	var gotServers []map[string]any
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "DS03_NO_NSEC3" {
 			continue
 		}
-		if list, ok := entry.Args["ns_list"].(string); ok {
-			nsList = list
-			break
+		if servers, ok := entry.Args["servers"].([]map[string]any); ok {
+			gotServers = servers
 		}
+		if _, ok := entry.Args["ns_list"]; ok {
+			t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
+		}
+		break
 	}
-	if nsList == "" {
-		t.Fatalf("expected ns_list for DS03_NO_NSEC3")
+	if len(gotServers) == 0 {
+		t.Fatalf("expected typed servers for DS03_NO_NSEC3")
 	}
-	if nsList != "ns1.example/192.0.2.201;ns2.example/192.0.2.202" {
-		t.Fatalf("expected deterministic ns_list order, got %q", nsList)
+	if len(gotServers) != 2 {
+		t.Fatalf("expected two typed servers for DS03_NO_NSEC3, got %#v", gotServers)
+	}
+	if gotServers[0]["ns"] != "ns1.example" || gotServers[1]["ns"] != "ns2.example" {
+		t.Fatalf("expected deterministic server order, got %#v", gotServers)
 	}
 }
 
@@ -923,6 +976,22 @@ func TestDNSSEC04ExpiredRRSIG(t *testing.T) {
 	entries, err := DNSSEC04(context.Background(), &z)
 	if err != nil {
 		t.Fatalf("dnssec04: %v", err)
+	}
+	expirationEntry := firstEntryByTag(entries, "RRSIG_EXPIRATION")
+	if expirationEntry == nil {
+		t.Fatalf("expected RRSIG_EXPIRATION")
+	}
+	dateRaw, ok := expirationEntry.Args["date"].(string)
+	if !ok || dateRaw == "" {
+		t.Fatalf("expected non-empty RFC3339 date string, got %#v", expirationEntry.Args["date"])
+	}
+	parsed, err := time.Parse(time.RFC3339, dateRaw)
+	if err != nil {
+		t.Fatalf("expected RFC3339 date, got %q (%v)", dateRaw, err)
+	}
+	wantExpiration := time.Unix(now.Unix()-1, 0).UTC()
+	if !parsed.Equal(wantExpiration) {
+		t.Fatalf("expected expiration %s, got %s", wantExpiration.Format(time.RFC3339), parsed.Format(time.RFC3339))
 	}
 	if !hasEntryTag(entries, "RRSIG_EXPIRED") {
 		t.Fatalf("expected RRSIG_EXPIRED")
@@ -1348,21 +1417,27 @@ func TestDNSSEC05ParallelDNSKEYQueries(t *testing.T) {
 		t.Fatalf("expected DS05_ALGO_OK")
 	}
 
-	var nsList string
+	var gotServers []map[string]any
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "DS05_ALGO_OK" {
 			continue
 		}
-		if list, ok := entry.Args["ns_list"].(string); ok {
-			nsList = list
-			break
+		if servers, ok := entry.Args["servers"].([]map[string]any); ok {
+			gotServers = servers
 		}
+		if _, ok := entry.Args["ns_list"]; ok {
+			t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
+		}
+		break
 	}
-	if nsList == "" {
-		t.Fatalf("expected ns_list for DS05_ALGO_OK")
+	if len(gotServers) == 0 {
+		t.Fatalf("expected typed servers for DS05_ALGO_OK")
 	}
-	if nsList != "ns1.example/192.0.2.220;ns2.example/192.0.2.221" {
-		t.Fatalf("expected deterministic ns_list order, got %q", nsList)
+	if len(gotServers) != 2 {
+		t.Fatalf("expected two typed servers for DS05_ALGO_OK, got %#v", gotServers)
+	}
+	if gotServers[0]["ns"] != "ns1.example" || gotServers[1]["ns"] != "ns2.example" {
+		t.Fatalf("expected deterministic server order, got %#v", gotServers)
 	}
 }
 
@@ -1497,6 +1572,16 @@ func TestDNSSEC06ExtraProcessingOK(t *testing.T) {
 	if !hasEntryTag(entries, "EXTRA_PROCESSING_OK") {
 		t.Fatalf("expected EXTRA_PROCESSING_OK")
 	}
+	entry := firstEntryByTag(entries, "EXTRA_PROCESSING_OK")
+	if entry == nil {
+		t.Fatalf("missing EXTRA_PROCESSING_OK entry")
+	}
+	if address, ok := entry.Args["address"].(string); !ok || address != "192.0.2.30" {
+		t.Fatalf("expected address=192.0.2.30, got %#v", entry.Args["address"])
+	}
+	if _, ok := entry.Args["server"]; ok {
+		t.Fatalf("legacy key server should not be present: %#v", entry.Args)
+	}
 }
 
 func TestDNSSEC06ExtraProcessingBroken(t *testing.T) {
@@ -1532,6 +1617,16 @@ func TestDNSSEC06ExtraProcessingBroken(t *testing.T) {
 	}
 	if !hasEntryTag(entries, "EXTRA_PROCESSING_BROKEN") {
 		t.Fatalf("expected EXTRA_PROCESSING_BROKEN")
+	}
+	entry := firstEntryByTag(entries, "EXTRA_PROCESSING_BROKEN")
+	if entry == nil {
+		t.Fatalf("missing EXTRA_PROCESSING_BROKEN entry")
+	}
+	if address, ok := entry.Args["address"].(string); !ok || address != "192.0.2.31" {
+		t.Fatalf("expected address=192.0.2.31, got %#v", entry.Args["address"])
+	}
+	if _, ok := entry.Args["server"]; ok {
+		t.Fatalf("legacy key server should not be present: %#v", entry.Args)
 	}
 }
 
@@ -1618,11 +1713,39 @@ func TestDNSSEC07SignedZone(t *testing.T) {
 	if !hasEntryTag(entries, "DS07_SIGNED_ON_SERVER") {
 		t.Fatalf("expected DS07_SIGNED_ON_SERVER")
 	}
+	signedOnServer := firstEntryByTag(entries, "DS07_SIGNED_ON_SERVER")
+	if signedOnServer == nil {
+		t.Fatalf("missing DS07_SIGNED_ON_SERVER entry")
+	}
+	signedServers, ok := signedOnServer.Args["servers"].([]map[string]any)
+	if !ok || len(signedServers) != 1 {
+		t.Fatalf("expected typed servers for DS07_SIGNED_ON_SERVER, got %#v", signedOnServer.Args["servers"])
+	}
+	if signedServers[0]["ns"] != "ns1.example" {
+		t.Fatalf("unexpected typed server payload for DS07_SIGNED_ON_SERVER: %#v", signedServers[0])
+	}
+	if _, ok := signedOnServer.Args["ns_list"]; ok {
+		t.Fatalf("legacy key ns_list should not be present: %#v", signedOnServer.Args)
+	}
 	if !hasEntryTag(entries, "DS07_SIGNED") {
 		t.Fatalf("expected DS07_SIGNED")
 	}
 	if !hasEntryTag(entries, "DS07_DS_ON_PARENT_SERVER") {
 		t.Fatalf("expected DS07_DS_ON_PARENT_SERVER")
+	}
+	dsOnParent := firstEntryByTag(entries, "DS07_DS_ON_PARENT_SERVER")
+	if dsOnParent == nil {
+		t.Fatalf("missing DS07_DS_ON_PARENT_SERVER entry")
+	}
+	parentServers, ok := dsOnParent.Args["servers"].([]map[string]any)
+	if !ok || len(parentServers) != 1 {
+		t.Fatalf("expected typed servers for DS07_DS_ON_PARENT_SERVER, got %#v", dsOnParent.Args["servers"])
+	}
+	if parentServers[0]["ns"] != "ns-parent.example" {
+		t.Fatalf("unexpected typed server payload for DS07_DS_ON_PARENT_SERVER: %#v", parentServers[0])
+	}
+	if _, ok := dsOnParent.Args["ns_list"]; ok {
+		t.Fatalf("legacy key ns_list should not be present: %#v", dsOnParent.Args)
 	}
 	if !hasEntryTag(entries, "DS07_DS_FOR_SIGNED_ZONE") {
 		t.Fatalf("expected DS07_DS_FOR_SIGNED_ZONE")
@@ -1762,21 +1885,27 @@ func TestDNSSEC07ParallelChildQueries(t *testing.T) {
 		t.Fatalf("expected DS07_NOT_SIGNED")
 	}
 
-	var nsList string
+	var gotServers []map[string]any
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "DS07_NOT_SIGNED_ON_SERVER" {
 			continue
 		}
-		if list, ok := entry.Args["ns_list"].(string); ok {
-			nsList = list
-			break
+		if servers, ok := entry.Args["servers"].([]map[string]any); ok {
+			gotServers = servers
 		}
+		if _, ok := entry.Args["ns_list"]; ok {
+			t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
+		}
+		break
 	}
-	if nsList == "" {
-		t.Fatalf("expected ns_list for DS07_NOT_SIGNED_ON_SERVER")
+	if len(gotServers) == 0 {
+		t.Fatalf("expected typed servers for DS07_NOT_SIGNED_ON_SERVER")
 	}
-	if nsList != "ns1.example/192.0.2.60;ns2.example/192.0.2.61" {
-		t.Fatalf("expected deterministic ns_list order, got %q", nsList)
+	if len(gotServers) != 2 {
+		t.Fatalf("expected two typed servers for DS07_NOT_SIGNED_ON_SERVER, got %#v", gotServers)
+	}
+	if gotServers[0]["ns"] != "ns1.example" || gotServers[1]["ns"] != "ns2.example" {
+		t.Fatalf("expected deterministic server order, got %#v", gotServers)
 	}
 }
 
@@ -1918,21 +2047,27 @@ func TestDNSSEC07ParallelParentQueries(t *testing.T) {
 		t.Fatalf("dnssec07 did not finish")
 	}
 
-	var nsList string
+	var gotServers []map[string]any
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "DS07_DS_ON_PARENT_SERVER" {
 			continue
 		}
-		if list, ok := entry.Args["ns_list"].(string); ok {
-			nsList = list
-			break
+		if servers, ok := entry.Args["servers"].([]map[string]any); ok {
+			gotServers = servers
 		}
+		if _, ok := entry.Args["ns_list"]; ok {
+			t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
+		}
+		break
 	}
-	if nsList == "" {
-		t.Fatalf("expected ns_list for DS07_DS_ON_PARENT_SERVER")
+	if len(gotServers) == 0 {
+		t.Fatalf("expected typed servers for DS07_DS_ON_PARENT_SERVER")
 	}
-	if nsList != "ns-parent1.example/192.0.2.70;ns-parent2.example/192.0.2.71" {
-		t.Fatalf("expected deterministic ns_list order, got %q", nsList)
+	if len(gotServers) != 2 {
+		t.Fatalf("expected two typed servers for DS07_DS_ON_PARENT_SERVER, got %#v", gotServers)
+	}
+	if gotServers[0]["ns"] != "ns-parent1.example" || gotServers[1]["ns"] != "ns-parent2.example" {
+		t.Fatalf("expected deterministic server order, got %#v", gotServers)
 	}
 }
 
@@ -2003,8 +2138,264 @@ func TestDNSSEC07NotSigned(t *testing.T) {
 	if !hasEntryTag(entries, "DS07_NOT_SIGNED_ON_SERVER") {
 		t.Fatalf("expected DS07_NOT_SIGNED_ON_SERVER")
 	}
+	notSignedOnServer := firstEntryByTag(entries, "DS07_NOT_SIGNED_ON_SERVER")
+	if notSignedOnServer == nil {
+		t.Fatalf("missing DS07_NOT_SIGNED_ON_SERVER entry")
+	}
+	notSignedServers, ok := notSignedOnServer.Args["servers"].([]map[string]any)
+	if !ok || len(notSignedServers) != 1 {
+		t.Fatalf("expected typed servers for DS07_NOT_SIGNED_ON_SERVER, got %#v", notSignedOnServer.Args["servers"])
+	}
+	if notSignedServers[0]["ns"] != "ns2.example" {
+		t.Fatalf("unexpected typed server payload for DS07_NOT_SIGNED_ON_SERVER: %#v", notSignedServers[0])
+	}
+	if _, ok := notSignedOnServer.Args["ns_list"]; ok {
+		t.Fatalf("legacy key ns_list should not be present: %#v", notSignedOnServer.Args)
+	}
 	if !hasEntryTag(entries, "DS07_NOT_SIGNED") {
 		t.Fatalf("expected DS07_NOT_SIGNED")
+	}
+}
+
+func TestDNSSEC07ChildOutcomeTagsTypedServers(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origDel := getDelNSNamesAndIPs
+	origZone := getZoneNSNamesAndIPs
+	origParent := getParentNSNamesAndIPs
+	origZoneParent := zoneParent
+	t.Cleanup(func() {
+		getDelNSNamesAndIPs = origDel
+		getZoneNSNamesAndIPs = origZone
+		getParentNSNamesAndIPs = origParent
+		zoneParent = origZoneParent
+	})
+
+	zoneParent = func(_ context.Context, _ *zone.Zone) (*zone.Zone, error) {
+		return nil, nil
+	}
+	getParentNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	}
+
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = 8
+	key.PublicKey = "AwEAAc=="
+
+	newNameserver(t, "ns-noresp.example", "192.0.2.170", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		switch qtype {
+		case "SOA":
+			return answerPacket(qname, dns.TypeSOA, soaRecord(qname))
+		case "DNSKEY":
+			return packet.Packet{}
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	newNameserver(t, "ns-noauth.example", "192.0.2.171", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		switch qtype {
+		case "SOA":
+			return answerPacket(qname, dns.TypeSOA, soaRecord(qname))
+		case "DNSKEY":
+			p := dnskeyPacket(qname, key)
+			p.Msg.Authoritative = false
+			return p
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	newNameserver(t, "ns-rcode.example", "192.0.2.172", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		switch qtype {
+		case "SOA":
+			return answerPacket(qname, dns.TypeSOA, soaRecord(qname))
+		case "DNSKEY":
+			msg := new(dns.Msg)
+			dnsutil.SetQuestion(msg, dnsutil.Fqdn(qname), dns.TypeDNSKEY)
+			msg.Response = true
+			msg.Authoritative = true
+			msg.Rcode = dns.RcodeServerFailure
+			msg.UDPSize = 1232
+			msg.Security = true
+			return packet.Packet{Msg: msg}
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+		return []methodsv2.NSItem{
+			{
+				Name:       dnsname.New("ns-noresp.example"),
+				Address:    netip.MustParseAddr("192.0.2.170"),
+				HasAddress: true,
+			},
+			{
+				Name:       dnsname.New("ns-noauth.example"),
+				Address:    netip.MustParseAddr("192.0.2.171"),
+				HasAddress: true,
+			},
+			{
+				Name:       dnsname.New("ns-rcode.example"),
+				Address:    netip.MustParseAddr("192.0.2.172"),
+				HasAddress: true,
+			},
+		}, nil
+	}
+	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+		return []methodsv2.NSItem{}, nil
+	}
+
+	z, err := zone.New("example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC07(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("dnssec07: %v", err)
+	}
+	if !hasEntryTag(entries, "DS07_NO_RESPONSE_DNSKEY") {
+		t.Fatalf("expected DS07_NO_RESPONSE_DNSKEY")
+	}
+	if !hasEntryTag(entries, "DS07_NON_AUTH_RESPONSE_DNSKEY") {
+		t.Fatalf("expected DS07_NON_AUTH_RESPONSE_DNSKEY")
+	}
+	if !hasEntryTag(entries, "DS07_UNEXP_RCODE_RESP_DNSKEY") {
+		t.Fatalf("expected DS07_UNEXP_RCODE_RESP_DNSKEY")
+	}
+
+	noResp := firstEntryByTag(entries, "DS07_NO_RESPONSE_DNSKEY")
+	noAuth := firstEntryByTag(entries, "DS07_NON_AUTH_RESPONSE_DNSKEY")
+	unexp := firstEntryByTag(entries, "DS07_UNEXP_RCODE_RESP_DNSKEY")
+	if noResp == nil || noAuth == nil || unexp == nil {
+		t.Fatalf("expected child outcome entries to be present")
+	}
+	for _, entry := range []*logger.Entry{noResp, noAuth, unexp} {
+		if _, ok := entry.Args["ns_list"]; ok {
+			t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
+		}
+	}
+	if rcode, _ := unexp.Args["rcode"].(string); rcode != "SERVFAIL" {
+		t.Fatalf("expected rcode SERVFAIL, got %#v", unexp.Args["rcode"])
+	}
+	expectOneServer := func(entry *logger.Entry, ns string) {
+		t.Helper()
+		servers, ok := entry.Args["servers"].([]map[string]any)
+		if !ok || len(servers) != 1 {
+			t.Fatalf("expected one typed server for %s, got %#v", entry.Tag, entry.Args["servers"])
+		}
+		if servers[0]["ns"] != ns {
+			t.Fatalf("unexpected typed server payload for %s: %#v", entry.Tag, servers[0])
+		}
+	}
+	expectOneServer(noResp, "ns-noresp.example")
+	expectOneServer(noAuth, "ns-noauth.example")
+	expectOneServer(unexp, "ns-rcode.example")
+}
+
+func TestDNSSEC07NoDSOnParentServerTypedServers(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origDel := getDelNSNamesAndIPs
+	origZone := getZoneNSNamesAndIPs
+	origParent := getParentNSNamesAndIPs
+	origZoneParent := zoneParent
+	t.Cleanup(func() {
+		getDelNSNamesAndIPs = origDel
+		getZoneNSNamesAndIPs = origZone
+		getParentNSNamesAndIPs = origParent
+		zoneParent = origZoneParent
+	})
+
+	zoneParent = func(_ context.Context, _ *zone.Zone) (*zone.Zone, error) {
+		return nil, nil
+	}
+
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = 8
+	key.PublicKey = "AwEAAc=="
+	sig := rrsigRecord("example", dns.TypeDNSKEY, 11111, time.Now().Add(-time.Hour).Unix(), time.Now().Add(time.Hour).Unix())
+
+	newNameserver(t, "ns1.example", "192.0.2.180", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		switch qtype {
+		case "SOA":
+			return answerPacket(qname, dns.TypeSOA, soaRecord(qname))
+		case "DNSKEY":
+			return answerPacket(qname, dns.TypeDNSKEY, key, sig)
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	ds := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	ds.KeyTag = 11111
+	ds.Algorithm = 8
+	ds.DigestType = 2
+	ds.Digest = "DEADBEEF"
+
+	newNameserver(t, "ns-parent.example", "192.0.2.181", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype == "DS" {
+			return answerPacket(qname, dns.TypeDS, ds)
+		}
+		return packet.Packet{}
+	})
+
+	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+		return []methodsv2.NSItem{
+			{
+				Name:       dnsname.New("ns1.example"),
+				Address:    netip.MustParseAddr("192.0.2.180"),
+				HasAddress: true,
+			},
+		}, nil
+	}
+	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+		return []methodsv2.NSItem{}, nil
+	}
+	getParentNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		ns, _ := nameserver.New("ns-parent.example", "192.0.2.181", nil)
+		return []nameserver.Nameserver{ns}, nil
+	}
+
+	z, err := zone.New("example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC07(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("dnssec07: %v", err)
+	}
+	if !hasEntryTag(entries, "DS07_NO_DS_ON_PARENT_SERVER") {
+		t.Fatalf("expected DS07_NO_DS_ON_PARENT_SERVER")
+	}
+	noDS := firstEntryByTag(entries, "DS07_NO_DS_ON_PARENT_SERVER")
+	if noDS == nil {
+		t.Fatalf("missing DS07_NO_DS_ON_PARENT_SERVER entry")
+	}
+	servers, ok := noDS.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 {
+		t.Fatalf("expected typed servers for DS07_NO_DS_ON_PARENT_SERVER, got %#v", noDS.Args["servers"])
+	}
+	if servers[0]["ns"] != "ns-parent.example" {
+		t.Fatalf("unexpected typed server payload for DS07_NO_DS_ON_PARENT_SERVER: %#v", servers[0])
+	}
+	if _, ok := noDS.Args["ns_list"]; ok {
+		t.Fatalf("legacy key ns_list should not be present: %#v", noDS.Args)
 	}
 }
 
@@ -2356,21 +2747,24 @@ func TestDNSSEC08ParallelDNSKEYQueries(t *testing.T) {
 		t.Fatalf("expected DS08_MISSING_RRSIG_IN_RESPONSE")
 	}
 
-	var nsList string
+	var gotAddresses []string
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "DS08_MISSING_RRSIG_IN_RESPONSE" {
 			continue
 		}
-		if list, ok := entry.Args["ns_ip_list"].(string); ok {
-			nsList = list
-			break
+		if addresses, ok := entry.Args["addresses"].([]string); ok {
+			gotAddresses = addresses
 		}
+		if _, ok := entry.Args["ns_ip_list"]; ok {
+			t.Fatalf("legacy key ns_ip_list should not be present: %#v", entry.Args)
+		}
+		break
 	}
-	if nsList == "" {
-		t.Fatalf("expected ns_ip_list for DS08_MISSING_RRSIG_IN_RESPONSE")
+	if len(gotAddresses) == 0 {
+		t.Fatalf("expected addresses for DS08_MISSING_RRSIG_IN_RESPONSE")
 	}
-	if nsList != "192.0.2.101;192.0.2.102" {
-		t.Fatalf("expected deterministic ns_ip_list order, got %q", nsList)
+	if strings.Join(gotAddresses, ";") != "192.0.2.101;192.0.2.102" {
+		t.Fatalf("expected deterministic addresses order, got %#v", gotAddresses)
 	}
 }
 
@@ -2528,21 +2922,24 @@ func TestDNSSEC09ParallelQueries(t *testing.T) {
 		t.Fatalf("expected DS09_MISSING_RRSIG_IN_RESPONSE")
 	}
 
-	var nsList string
+	var gotAddresses []string
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "DS09_MISSING_RRSIG_IN_RESPONSE" {
 			continue
 		}
-		if list, ok := entry.Args["ns_ip_list"].(string); ok {
-			nsList = list
-			break
+		if addresses, ok := entry.Args["addresses"].([]string); ok {
+			gotAddresses = addresses
 		}
+		if _, ok := entry.Args["ns_ip_list"]; ok {
+			t.Fatalf("legacy key ns_ip_list should not be present: %#v", entry.Args)
+		}
+		break
 	}
-	if nsList == "" {
-		t.Fatalf("expected ns_ip_list for DS09_MISSING_RRSIG_IN_RESPONSE")
+	if len(gotAddresses) == 0 {
+		t.Fatalf("expected addresses for DS09_MISSING_RRSIG_IN_RESPONSE")
 	}
-	if nsList != "192.0.2.111;192.0.2.112" {
-		t.Fatalf("expected deterministic ns_ip_list order, got %q", nsList)
+	if strings.Join(gotAddresses, ";") != "192.0.2.111;192.0.2.112" {
+		t.Fatalf("expected deterministic addresses order, got %#v", gotAddresses)
 	}
 }
 
@@ -2739,21 +3136,27 @@ func TestDNSSEC10ParallelQueries(t *testing.T) {
 		t.Fatalf("expected DS10_NSEC_QUERY_RESPONSE_ERR")
 	}
 
-	var nsList string
+	var gotServers []map[string]any
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "DS10_NSEC_QUERY_RESPONSE_ERR" {
 			continue
 		}
-		if list, ok := entry.Args["ns_list"].(string); ok {
-			nsList = list
-			break
+		if servers, ok := entry.Args["servers"].([]map[string]any); ok {
+			gotServers = servers
 		}
+		if _, ok := entry.Args["ns_list"]; ok {
+			t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
+		}
+		break
 	}
-	if nsList == "" {
-		t.Fatalf("expected ns_list for DS10_NSEC_QUERY_RESPONSE_ERR")
+	if len(gotServers) == 0 {
+		t.Fatalf("expected typed servers for DS10_NSEC_QUERY_RESPONSE_ERR")
 	}
-	if nsList != "ns1.example/192.0.2.201;ns2.example/192.0.2.202" {
-		t.Fatalf("expected deterministic ns_list order, got %q", nsList)
+	if len(gotServers) != 2 {
+		t.Fatalf("expected two typed servers for DS10_NSEC_QUERY_RESPONSE_ERR, got %#v", gotServers)
+	}
+	if gotServers[0]["ns"] != "ns1.example" || gotServers[1]["ns"] != "ns2.example" {
+		t.Fatalf("expected deterministic server order, got %#v", gotServers)
 	}
 }
 
@@ -3323,21 +3726,24 @@ func TestDNSSEC13ParallelQueries(t *testing.T) {
 		t.Fatalf("expected DS13_ALGO_NOT_SIGNED_NS")
 	}
 
-	var nsList string
+	var gotAddresses []string
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "DS13_ALGO_NOT_SIGNED_SOA" {
 			continue
 		}
-		if list, ok := entry.Args["ns_ip_list"].(string); ok {
-			nsList = list
-			break
+		if addresses, ok := entry.Args["addresses"].([]string); ok {
+			gotAddresses = addresses
 		}
+		if _, ok := entry.Args["ns_ip_list"]; ok {
+			t.Fatalf("legacy key ns_ip_list should not be present: %#v", entry.Args)
+		}
+		break
 	}
-	if nsList == "" {
-		t.Fatalf("expected ns_ip_list for DS13_ALGO_NOT_SIGNED_SOA")
+	if len(gotAddresses) == 0 {
+		t.Fatalf("expected addresses for DS13_ALGO_NOT_SIGNED_SOA")
 	}
-	if nsList != "192.0.2.121;192.0.2.122" {
-		t.Fatalf("expected deterministic ns_ip_list order, got %q", nsList)
+	if strings.Join(gotAddresses, ";") != "192.0.2.121;192.0.2.122" {
+		t.Fatalf("expected deterministic addresses order, got %#v", gotAddresses)
 	}
 }
 
@@ -3492,6 +3898,158 @@ func TestDNSSEC14ParallelDNSKEYQueries(t *testing.T) {
 	}
 }
 
+func TestDNSSEC14NoResponseArgsSplit(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origM4 := method4
+	origM5 := method5
+	t.Cleanup(func() {
+		method4 = origM4
+		method5 = origM5
+	})
+
+	ns := newNameserver(t, "ns1.example", "192.0.2.141", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype == "DNSKEY" {
+			return packet.Packet{}
+		}
+		return packet.Packet{}
+	})
+
+	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns}, nil
+	}
+	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := DNSSEC14(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("dnssec14: %v", err)
+	}
+	entry := firstEntryByTag(entries, "NO_RESPONSE")
+	if entry == nil {
+		t.Fatalf("expected NO_RESPONSE")
+	}
+	if _, ok := entry.Args["arg_schema"]; ok {
+		t.Fatalf("did not expect arg_schema in args: %#v", entry.Args["arg_schema"])
+	}
+	if nsArg, ok := entry.Args["ns"].(string); !ok || nsArg != "ns1.example" {
+		t.Fatalf("expected ns=ns1.example, got %#v", entry.Args["ns"])
+	}
+	if nsArg, _ := entry.Args["ns"].(string); strings.Contains(nsArg, "/") {
+		t.Fatalf("expected nameserver-only ns argument, got %q", nsArg)
+	}
+	if address, ok := entry.Args["address"].(string); !ok || address != "192.0.2.141" {
+		t.Fatalf("expected address=192.0.2.141, got %#v", entry.Args["address"])
+	}
+}
+
+func TestDNSSEC14NoResponseDNSKEYArgsSplit(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origM4 := method4
+	origM5 := method5
+	t.Cleanup(func() {
+		method4 = origM4
+		method5 = origM5
+	})
+
+	ns := newNameserver(t, "ns1.example", "192.0.2.142", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype == "DNSKEY" {
+			return answerPacket(qname, dns.TypeDNSKEY)
+		}
+		return packet.Packet{}
+	})
+
+	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns}, nil
+	}
+	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := DNSSEC14(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("dnssec14: %v", err)
+	}
+	entry := firstEntryByTag(entries, "NO_RESPONSE_DNSKEY")
+	if entry == nil {
+		t.Fatalf("expected NO_RESPONSE_DNSKEY")
+	}
+	if _, ok := entry.Args["arg_schema"]; ok {
+		t.Fatalf("did not expect arg_schema in args: %#v", entry.Args["arg_schema"])
+	}
+	if nsArg, ok := entry.Args["ns"].(string); !ok || nsArg != "ns1.example" {
+		t.Fatalf("expected ns=ns1.example, got %#v", entry.Args["ns"])
+	}
+	if nsArg, _ := entry.Args["ns"].(string); strings.Contains(nsArg, "/") {
+		t.Fatalf("expected nameserver-only ns argument, got %q", nsArg)
+	}
+	if address, ok := entry.Args["address"].(string); !ok || address != "192.0.2.142" {
+		t.Fatalf("expected address=192.0.2.142, got %#v", entry.Args["address"])
+	}
+}
+
+func TestDNSSEC14IPv4DisabledArgsSplit(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origM4 := method4
+	origM5 := method5
+	t.Cleanup(func() {
+		method4 = origM4
+		method5 = origM5
+	})
+
+	profile.Effective().Net.IPv4 = false
+
+	ns := newNameserver(t, "ns1.example", "192.0.2.143", nil)
+	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns}, nil
+	}
+	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := DNSSEC14(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("dnssec14: %v", err)
+	}
+	entry := firstEntryByTag(entries, "IPV4_DISABLED")
+	if entry == nil {
+		t.Fatalf("expected IPV4_DISABLED")
+	}
+	if _, ok := entry.Args["arg_schema"]; ok {
+		t.Fatalf("did not expect arg_schema in args: %#v", entry.Args["arg_schema"])
+	}
+	if nsArg, ok := entry.Args["ns"].(string); !ok || nsArg != "ns1.example" {
+		t.Fatalf("expected ns=ns1.example, got %#v", entry.Args["ns"])
+	}
+	if nsArg, _ := entry.Args["ns"].(string); strings.Contains(nsArg, "/") {
+		t.Fatalf("expected nameserver-only ns argument, got %q", nsArg)
+	}
+	if address, ok := entry.Args["address"].(string); !ok || address != "192.0.2.143" {
+		t.Fatalf("expected address=192.0.2.143, got %#v", entry.Args["address"])
+	}
+}
+
 func TestDNSSEC15NoCDSCDNSKEY(t *testing.T) {
 	nameserver.EmptyCache()
 	t.Cleanup(nameserver.EmptyCache)
@@ -3640,21 +4198,24 @@ func TestDNSSEC15ParallelQueries(t *testing.T) {
 		t.Fatalf("expected DS15_HAS_CDS_NO_CDNSKEY")
 	}
 
-	var nsList string
+	var gotAddresses []string
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "DS15_HAS_CDS_NO_CDNSKEY" {
 			continue
 		}
-		if list, ok := entry.Args["ns_ip_list"].(string); ok {
-			nsList = list
-			break
+		if addresses, ok := entry.Args["addresses"].([]string); ok {
+			gotAddresses = addresses
 		}
+		if _, ok := entry.Args["ns_ip_list"]; ok {
+			t.Fatalf("legacy key ns_ip_list should not be present: %#v", entry.Args)
+		}
+		break
 	}
-	if nsList == "" {
-		t.Fatalf("expected ns_ip_list for DS15_HAS_CDS_NO_CDNSKEY")
+	if len(gotAddresses) == 0 {
+		t.Fatalf("expected addresses for DS15_HAS_CDS_NO_CDNSKEY")
 	}
-	if nsList != "192.0.2.231;192.0.2.232" {
-		t.Fatalf("expected deterministic ns_ip_list order, got %q", nsList)
+	if strings.Join(gotAddresses, ";") != "192.0.2.231;192.0.2.232" {
+		t.Fatalf("expected deterministic addresses order, got %#v", gotAddresses)
 	}
 }
 
@@ -3812,21 +4373,24 @@ func TestDNSSEC16ParallelQueries(t *testing.T) {
 		t.Fatalf("expected DS16_CDS_WITHOUT_DNSKEY")
 	}
 
-	var nsList string
+	var gotAddresses []string
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "DS16_CDS_WITHOUT_DNSKEY" {
 			continue
 		}
-		if list, ok := entry.Args["ns_ip_list"].(string); ok {
-			nsList = list
-			break
+		if addresses, ok := entry.Args["addresses"].([]string); ok {
+			gotAddresses = addresses
 		}
+		if _, ok := entry.Args["ns_ip_list"]; ok {
+			t.Fatalf("legacy key ns_ip_list should not be present: %#v", entry.Args)
+		}
+		break
 	}
-	if nsList == "" {
-		t.Fatalf("expected ns_ip_list for DS16_CDS_WITHOUT_DNSKEY")
+	if len(gotAddresses) == 0 {
+		t.Fatalf("expected addresses for DS16_CDS_WITHOUT_DNSKEY")
 	}
-	if nsList != "192.0.2.241;192.0.2.242" {
-		t.Fatalf("expected deterministic ns_ip_list order, got %q", nsList)
+	if strings.Join(gotAddresses, ";") != "192.0.2.241;192.0.2.242" {
+		t.Fatalf("expected deterministic addresses order, got %#v", gotAddresses)
 	}
 }
 
@@ -3984,21 +4548,24 @@ func TestDNSSEC17ParallelQueries(t *testing.T) {
 		t.Fatalf("expected DS17_CDNSKEY_WITHOUT_DNSKEY")
 	}
 
-	var nsList string
+	var gotAddresses []string
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "DS17_CDNSKEY_WITHOUT_DNSKEY" {
 			continue
 		}
-		if list, ok := entry.Args["ns_ip_list"].(string); ok {
-			nsList = list
-			break
+		if addresses, ok := entry.Args["addresses"].([]string); ok {
+			gotAddresses = addresses
 		}
+		if _, ok := entry.Args["ns_ip_list"]; ok {
+			t.Fatalf("legacy key ns_ip_list should not be present: %#v", entry.Args)
+		}
+		break
 	}
-	if nsList == "" {
-		t.Fatalf("expected ns_ip_list for DS17_CDNSKEY_WITHOUT_DNSKEY")
+	if len(gotAddresses) == 0 {
+		t.Fatalf("expected addresses for DS17_CDNSKEY_WITHOUT_DNSKEY")
 	}
-	if nsList != "192.0.2.243;192.0.2.244" {
-		t.Fatalf("expected deterministic ns_ip_list order, got %q", nsList)
+	if strings.Join(gotAddresses, ";") != "192.0.2.243;192.0.2.244" {
+		t.Fatalf("expected deterministic addresses order, got %#v", gotAddresses)
 	}
 }
 
@@ -4235,21 +4802,24 @@ func TestDNSSEC18ParallelQueries(t *testing.T) {
 		t.Fatalf("expected DS18_NO_MATCH_CDNSKEY_RRSIG_DS")
 	}
 
-	var nsList string
+	var gotAddresses []string
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "DS18_NO_MATCH_CDS_RRSIG_DS" {
 			continue
 		}
-		if list, ok := entry.Args["ns_ip_list"].(string); ok {
-			nsList = list
-			break
+		if addresses, ok := entry.Args["addresses"].([]string); ok {
+			gotAddresses = addresses
 		}
+		if _, ok := entry.Args["ns_ip_list"]; ok {
+			t.Fatalf("legacy key ns_ip_list should not be present: %#v", entry.Args)
+		}
+		break
 	}
-	if nsList == "" {
-		t.Fatalf("expected ns_ip_list for DS18_NO_MATCH_CDS_RRSIG_DS")
+	if len(gotAddresses) == 0 {
+		t.Fatalf("expected addresses for DS18_NO_MATCH_CDS_RRSIG_DS")
 	}
-	if nsList != "192.0.2.251;192.0.2.252" {
-		t.Fatalf("expected deterministic ns_ip_list order, got %q", nsList)
+	if strings.Join(gotAddresses, ";") != "192.0.2.251;192.0.2.252" {
+		t.Fatalf("expected deterministic addresses order, got %#v", gotAddresses)
 	}
 }
 
@@ -4394,6 +4964,18 @@ func hasEntryTag(entries []*logger.Entry, tag string) bool {
 		}
 	}
 	return false
+}
+
+func firstEntryByTag(entries []*logger.Entry, tag string) *logger.Entry {
+	for _, entry := range entries {
+		if entry == nil {
+			continue
+		}
+		if entry.Tag == tag {
+			return entry
+		}
+	}
+	return nil
 }
 
 func normalizeEntriesForComparison(entries []*logger.Entry) []string {

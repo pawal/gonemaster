@@ -55,11 +55,14 @@ Status: Final
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
-| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`). |
+| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
+| `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
-| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`). |
+| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
+| `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
-| `NO_RESPONSE` | `ns` | `string` | Nameserver identity (`name/ip`) with no response. |
+| `NO_RESPONSE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with no response. |
+| `NO_RESPONSE` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `NO_RESPONSE` | `domain` | `string` | Tested child zone name. |
 | `NO_RESPONSE_SOA_QUERY` | `-` | `-` | No arguments. |
 | `RNAME_MAIL_DOMAIN_INVALID` | `domain` | `string` | Invalid mail domain/exchange target. |

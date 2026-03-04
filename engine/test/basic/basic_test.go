@@ -74,6 +74,88 @@ func TestBasic01Undelegated(t *testing.T) {
 	}
 }
 
+func TestBasic01ParentFoundTypedArgs(t *testing.T) {
+	nameserver.EmptyCache()
+	defer nameserver.EmptyCache()
+	ctx, _, _ := testhelpers.Context(t)
+
+	r := &recursor.Recursor{}
+	if err := r.AddFakeAddresses(".", map[string][]string{
+		"b.root": {"192.0.2.2"},
+		"a.root": {"192.0.2.1"},
+	}); err != nil {
+		t.Fatalf("add root hints: %v", err)
+	}
+
+	rootHook := func(owner string) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
+		return func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+			name := strings.ToLower(qname)
+			kind := strings.ToUpper(qtype)
+			switch {
+			case name == "." && kind == "SOA":
+				return soaPacket(".", owner, "hostmaster.root"), nil
+			case name == "." && kind == "NS":
+				return nsPacketMulti(".", "b.root", "a.root"), nil
+			case name == "example" && kind == "SOA":
+				return referralPacketMulti("example", []nsEntry{
+					{name: "ns1.example", addr: net.IPv4(192, 0, 2, 53)},
+				}), nil
+			default:
+				return packet.Packet{}, nil
+			}
+		}
+	}
+
+	aroot, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
+	if err != nil {
+		t.Fatalf("new root nameserver: %v", err)
+	}
+	aroot.SetQueryHook(rootHook("a.root"))
+
+	broot, err := nameserver.NewWithContext(ctx, "b.root", "192.0.2.2", r.Client())
+	if err != nil {
+		t.Fatalf("new root nameserver: %v", err)
+	}
+	broot.SetQueryHook(rootHook("b.root"))
+
+	z, err := zone.NewWithRecursor("example", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	entries, err := Basic01(ctx, &z)
+	if err != nil {
+		t.Fatalf("basic01: %v", err)
+	}
+	if !hasEntryTag(entries, "B01_PARENT_FOUND") {
+		t.Fatalf("expected B01_PARENT_FOUND")
+	}
+	entry := firstEntryByTag(entries, "B01_PARENT_FOUND")
+	if entry == nil {
+		t.Fatalf("missing B01_PARENT_FOUND entry")
+	}
+	servers, ok := entry.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 2 {
+		t.Fatalf("expected two typed servers for B01_PARENT_FOUND, got %#v", entry.Args["servers"])
+	}
+	if servers[0]["ns"] != "a.root" || servers[0]["address"] != "192.0.2.1" {
+		t.Fatalf("unexpected first typed server payload: %#v", servers[0])
+	}
+	if servers[1]["ns"] != "b.root" || servers[1]["address"] != "192.0.2.2" {
+		t.Fatalf("unexpected second typed server payload: %#v", servers[1])
+	}
+	addresses, ok := entry.Args["addresses"].([]string)
+	if !ok || len(addresses) != 2 {
+		t.Fatalf("expected two typed addresses for B01_PARENT_FOUND, got %#v", entry.Args["addresses"])
+	}
+	if addresses[0] != "192.0.2.1" || addresses[1] != "192.0.2.2" {
+		t.Fatalf("expected deterministic address order, got %v", addresses)
+	}
+	if _, ok := entry.Args["ns_list"]; ok {
+		t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
+	}
+}
+
 func TestBasic02NoDelegation(t *testing.T) {
 	nameserver.EmptyCache()
 	defer nameserver.EmptyCache()
@@ -137,6 +219,21 @@ func TestBasic02AuthResponseSOA(t *testing.T) {
 	}
 	if !hasEntryTag(entries, "B02_AUTH_RESPONSE_SOA") {
 		t.Fatalf("expected B02_AUTH_RESPONSE_SOA")
+	}
+	entry := firstEntryByTag(entries, "B02_AUTH_RESPONSE_SOA")
+	servers, ok := entry.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 {
+		t.Fatalf("expected one typed server for B02_AUTH_RESPONSE_SOA, got %#v", entry.Args["servers"])
+	}
+	if servers[0]["ns"] != "a.root" || servers[0]["address"] != "192.0.2.1" {
+		t.Fatalf("unexpected typed server payload: %#v", servers[0])
+	}
+	addresses, ok := entry.Args["addresses"].([]string)
+	if !ok || len(addresses) != 1 || addresses[0] != "192.0.2.1" {
+		t.Fatalf("unexpected typed addresses payload: %#v", entry.Args["addresses"])
+	}
+	if _, ok := entry.Args["ns_list"]; ok {
+		t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
 	}
 }
 
@@ -234,22 +331,62 @@ func TestBasic02ParallelQueries(t *testing.T) {
 	}
 
 	var enabled []string
+	var enabledAddresses []string
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "IPV4_ENABLED" {
 			continue
 		}
+		if _, ok := entry.Args["arg_schema"]; ok {
+			t.Fatalf("did not expect arg_schema in args: %#v", entry.Args["arg_schema"])
+		}
 		if ns, ok := entry.Args["ns"].(string); ok {
+			if strings.Contains(ns, "/") {
+				t.Fatalf("expected nameserver-only ns argument, got %q", ns)
+			}
 			enabled = append(enabled, ns)
+		}
+		if address, ok := entry.Args["address"].(string); ok {
+			enabledAddresses = append(enabledAddresses, address)
 		}
 	}
 	if len(enabled) < 2 {
 		t.Fatalf("expected IPV4_ENABLED entries for both nameservers, got %v", enabled)
 	}
-	if enabled[0] != "a.root/192.0.2.1" || enabled[1] != "b.root/192.0.2.2" {
-		t.Fatalf("expected deterministic log order, got %v", enabled)
+	if enabled[0] != "a.root" || enabled[1] != "b.root" {
+		t.Fatalf("expected deterministic nameserver order, got %v", enabled)
+	}
+	if len(enabledAddresses) < 2 {
+		t.Fatalf("expected IPV4_ENABLED address args for both nameservers, got %v", enabledAddresses)
+	}
+	if enabledAddresses[0] != "192.0.2.1" || enabledAddresses[1] != "192.0.2.2" {
+		t.Fatalf("expected deterministic address order, got %v", enabledAddresses)
 	}
 	if !hasEntryTag(entries, "B02_AUTH_RESPONSE_SOA") {
 		t.Fatalf("expected B02_AUTH_RESPONSE_SOA")
+	}
+	entry := firstEntryByTag(entries, "B02_AUTH_RESPONSE_SOA")
+	if entry == nil {
+		t.Fatalf("missing B02_AUTH_RESPONSE_SOA entry")
+	}
+	servers, ok := entry.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 2 {
+		t.Fatalf("expected two typed servers for B02_AUTH_RESPONSE_SOA, got %#v", entry.Args["servers"])
+	}
+	if servers[0]["ns"] != "a.root" || servers[0]["address"] != "192.0.2.1" {
+		t.Fatalf("unexpected first typed server payload: %#v", servers[0])
+	}
+	if servers[1]["ns"] != "b.root" || servers[1]["address"] != "192.0.2.2" {
+		t.Fatalf("unexpected second typed server payload: %#v", servers[1])
+	}
+	addresses, ok := entry.Args["addresses"].([]string)
+	if !ok || len(addresses) != 2 {
+		t.Fatalf("expected two typed addresses for B02_AUTH_RESPONSE_SOA, got %#v", entry.Args["addresses"])
+	}
+	if addresses[0] != "192.0.2.1" || addresses[1] != "192.0.2.2" {
+		t.Fatalf("expected deterministic address order, got %v", addresses)
+	}
+	if _, ok := entry.Args["ns_list"]; ok {
+		t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
 	}
 }
 
@@ -335,6 +472,16 @@ func TestBasic02NoIPAddress(t *testing.T) {
 	}
 	if !hasEntryTag(entries, "B02_NS_NO_IP_ADDR") {
 		t.Fatalf("expected B02_NS_NO_IP_ADDR")
+	}
+	entry := firstEntryByTag(entries, "B02_NS_NO_IP_ADDR")
+	if entry == nil {
+		t.Fatalf("expected B02_NS_NO_IP_ADDR entry")
+	}
+	if ns, _ := entry.Args["ns"].(string); ns != "b.root" {
+		t.Fatalf("expected ns=b.root in B02_NS_NO_IP_ADDR, got %#v", entry.Args["ns"])
+	}
+	if _, ok := entry.Args["nsname"]; ok {
+		t.Fatalf("did not expect legacy nsname key in args")
 	}
 }
 
@@ -652,19 +799,35 @@ func TestBasic03ParallelQueries(t *testing.T) {
 	}
 
 	var enabled []string
+	var enabledAddresses []string
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "IPV4_ENABLED" {
 			continue
 		}
+		if _, ok := entry.Args["arg_schema"]; ok {
+			t.Fatalf("did not expect arg_schema in args: %#v", entry.Args["arg_schema"])
+		}
 		if ns, ok := entry.Args["ns"].(string); ok {
+			if strings.Contains(ns, "/") {
+				t.Fatalf("expected nameserver-only ns argument, got %q", ns)
+			}
 			enabled = append(enabled, ns)
+		}
+		if address, ok := entry.Args["address"].(string); ok {
+			enabledAddresses = append(enabledAddresses, address)
 		}
 	}
 	if len(enabled) < 2 {
 		t.Fatalf("expected IPV4_ENABLED entries for both nameservers, got %v", enabled)
 	}
-	if enabled[0] != "ns1.example/192.0.2.53" || enabled[1] != "ns2.example/192.0.2.54" {
-		t.Fatalf("expected deterministic log order, got %v", enabled)
+	if enabled[0] != "ns1.example" || enabled[1] != "ns2.example" {
+		t.Fatalf("expected deterministic nameserver order, got %v", enabled)
+	}
+	if len(enabledAddresses) < 2 {
+		t.Fatalf("expected IPV4_ENABLED address args for both nameservers, got %v", enabledAddresses)
+	}
+	if enabledAddresses[0] != "192.0.2.53" || enabledAddresses[1] != "192.0.2.54" {
+		t.Fatalf("expected deterministic address order, got %v", enabledAddresses)
 	}
 	if !hasEntryTag(entries, "HAS_A_RECORDS") {
 		t.Fatalf("expected HAS_A_RECORDS")
@@ -780,6 +943,18 @@ func hasEntryTag(entries []*logger.Entry, tag string) bool {
 		}
 	}
 	return false
+}
+
+func firstEntryByTag(entries []*logger.Entry, tag string) *logger.Entry {
+	for _, entry := range entries {
+		if entry == nil {
+			continue
+		}
+		if entry.Tag == tag {
+			return entry
+		}
+	}
+	return nil
 }
 
 func normalizeEntriesForComparison(entries []*logger.Entry) []string {

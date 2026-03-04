@@ -2,9 +2,10 @@ package address
 
 import (
 	"context"
+	"net/netip"
+	"sort"
 	"strings"
 	"testing"
-	"net/netip"
 	"time"
 
 	dns "codeberg.org/miekg/dns"
@@ -36,6 +37,17 @@ func TestAddress01DocumentationAddr(t *testing.T) {
 	}
 	if hasEntryTag(entries, "A01_GLOBALLY_REACHABLE_ADDR") {
 		t.Fatalf("did not expect A01_GLOBALLY_REACHABLE_ADDR")
+	}
+	entry := findEntry(entries, "A01_DOCUMENTATION_ADDR")
+	if entry == nil {
+		t.Fatalf("expected A01_DOCUMENTATION_ADDR entry")
+	}
+	if _, ok := entry.Args["ns_list"]; ok {
+		t.Fatalf("did not expect legacy ns_list key in args")
+	}
+	endpoints := serverEndpointsFromArgs(t, entry.Args)
+	if len(endpoints) != 1 || endpoints[0] != "ns1.example/192.0.2.1" {
+		t.Fatalf("expected typed servers [ns1.example/192.0.2.1], got %v", endpoints)
 	}
 }
 
@@ -246,7 +258,7 @@ func TestAddress02ParallelPTRQueries(t *testing.T) {
 		if entry == nil || entry.Tag != "NAMESERVER_IP_WITHOUT_REVERSE" {
 			continue
 		}
-		if ip, ok := entry.Args["ns_ip"].(string); ok {
+		if ip, ok := entry.Args["address"].(string); ok {
 			ips = append(ips, ip)
 		}
 	}
@@ -346,7 +358,7 @@ func TestAddress03ParallelPTRQueries(t *testing.T) {
 		if entry == nil || entry.Tag != "NAMESERVER_IP_PTR_MISMATCH" {
 			continue
 		}
-		if ip, ok := entry.Args["ns_ip"].(string); ok {
+		if ip, ok := entry.Args["address"].(string); ok {
 			ips = append(ips, ip)
 		}
 	}
@@ -446,4 +458,62 @@ func hasEntryTag(entries []*logger.Entry, tag string) bool {
 		}
 	}
 	return false
+}
+
+func findEntry(entries []*logger.Entry, tag string) *logger.Entry {
+	for _, entry := range entries {
+		if entry == nil {
+			continue
+		}
+		if entry.Tag == tag {
+			return entry
+		}
+	}
+	return nil
+}
+
+func serverEndpointsFromArgs(t *testing.T, args map[string]any) []string {
+	t.Helper()
+	raw, ok := args["servers"]
+	if !ok {
+		t.Fatalf("expected servers key in args")
+	}
+
+	var endpoints []string
+	appendEndpoint := func(ns string, address string) {
+		ns = strings.TrimSpace(ns)
+		address = strings.TrimSpace(address)
+		switch {
+		case ns != "" && address != "":
+			endpoints = append(endpoints, ns+"/"+address)
+		case ns != "":
+			endpoints = append(endpoints, ns)
+		case address != "":
+			endpoints = append(endpoints, address)
+		}
+	}
+
+	switch items := raw.(type) {
+	case []map[string]any:
+		for _, item := range items {
+			ns, _ := item["ns"].(string)
+			address, _ := item["address"].(string)
+			appendEndpoint(ns, address)
+		}
+	case []any:
+		for _, item := range items {
+			m, ok := item.(map[string]any)
+			if !ok {
+				continue
+			}
+			ns, _ := m["ns"].(string)
+			address, _ := m["address"].(string)
+			appendEndpoint(ns, address)
+		}
+	default:
+		t.Fatalf("unexpected servers type: %T", raw)
+	}
+
+	sort.Strings(endpoints)
+	return endpoints
 }

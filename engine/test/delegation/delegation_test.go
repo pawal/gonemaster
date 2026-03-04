@@ -64,20 +64,224 @@ func TestDelegation01Counts(t *testing.T) {
 	if !hasEntryTag(entries, "ENOUGH_NS_DEL") {
 		t.Fatalf("expected ENOUGH_NS_DEL")
 	}
+	entry := firstEntryByTag(entries, "ENOUGH_NS_DEL")
+	servers, ok := entry.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 2 {
+		t.Fatalf("expected typed server list for ENOUGH_NS_DEL, got %#v", entry.Args["servers"])
+	}
+	if _, ok := entry.Args["nsname_list"]; ok {
+		t.Fatalf("legacy key nsname_list should not be present: %#v", entry.Args)
+	}
 	if !hasEntryTag(entries, "NOT_ENOUGH_NS_CHILD") {
 		t.Fatalf("expected NOT_ENOUGH_NS_CHILD")
+	}
+	entry = firstEntryByTag(entries, "NOT_ENOUGH_NS_CHILD")
+	servers, ok = entry.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 || servers[0]["ns"] != "ns1.example" {
+		t.Fatalf("expected typed server list for NOT_ENOUGH_NS_CHILD, got %#v", entry.Args["servers"])
+	}
+	if _, ok := entry.Args["nsname_list"]; ok {
+		t.Fatalf("legacy key nsname_list should not be present: %#v", entry.Args)
 	}
 	if !hasEntryTag(entries, "NOT_ENOUGH_IPV4_NS_DEL") {
 		t.Fatalf("expected NOT_ENOUGH_IPV4_NS_DEL")
 	}
+	entry = firstEntryByTag(entries, "NOT_ENOUGH_IPV4_NS_DEL")
+	if entry == nil {
+		t.Fatalf("missing NOT_ENOUGH_IPV4_NS_DEL entry")
+	}
+	servers, ok = entry.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 {
+		t.Fatalf("expected one typed server for NOT_ENOUGH_IPV4_NS_DEL, got %#v", entry.Args["servers"])
+	}
+	if servers[0]["ns"] != "ns1.example" || servers[0]["address"] != "192.0.2.1" {
+		t.Fatalf("unexpected typed server payload: %#v", servers[0])
+	}
+	addresses, ok := entry.Args["addresses"].([]string)
+	if !ok || len(addresses) != 1 || addresses[0] != "192.0.2.1" {
+		t.Fatalf("unexpected typed addresses payload: %#v", entry.Args["addresses"])
+	}
+	if _, ok := entry.Args["ns_list"]; ok {
+		t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
+	}
 	if !hasEntryTag(entries, "NOT_ENOUGH_IPV6_NS_DEL") {
 		t.Fatalf("expected NOT_ENOUGH_IPV6_NS_DEL")
+	}
+	entry = firstEntryByTag(entries, "NOT_ENOUGH_IPV6_NS_DEL")
+	if entry == nil {
+		t.Fatalf("missing NOT_ENOUGH_IPV6_NS_DEL entry")
+	}
+	servers, ok = entry.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 {
+		t.Fatalf("expected one typed server for NOT_ENOUGH_IPV6_NS_DEL, got %#v", entry.Args["servers"])
+	}
+	if servers[0]["ns"] != "ns2.example" || servers[0]["address"] != "2001:db8::1" {
+		t.Fatalf("unexpected typed server payload: %#v", servers[0])
+	}
+	addresses, ok = entry.Args["addresses"].([]string)
+	if !ok || len(addresses) != 1 || addresses[0] != "2001:db8::1" {
+		t.Fatalf("unexpected typed addresses payload: %#v", entry.Args["addresses"])
+	}
+	if _, ok := entry.Args["ns_list"]; ok {
+		t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
 	}
 	if !hasEntryTag(entries, "NOT_ENOUGH_IPV4_NS_CHILD") {
 		t.Fatalf("expected NOT_ENOUGH_IPV4_NS_CHILD")
 	}
+	entry = firstEntryByTag(entries, "NOT_ENOUGH_IPV4_NS_CHILD")
+	servers, ok = entry.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 {
+		t.Fatalf("expected one typed server for NOT_ENOUGH_IPV4_NS_CHILD, got %#v", entry.Args["servers"])
+	}
+	if servers[0]["ns"] != "ns1.example" || servers[0]["address"] != "192.0.2.2" {
+		t.Fatalf("unexpected typed server payload: %#v", servers[0])
+	}
+	addresses, ok = entry.Args["addresses"].([]string)
+	if !ok || len(addresses) != 1 || addresses[0] != "192.0.2.2" {
+		t.Fatalf("unexpected typed addresses payload: %#v", entry.Args["addresses"])
+	}
+	if _, ok := entry.Args["ns_list"]; ok {
+		t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
+	}
 	if !hasEntryTag(entries, "NO_IPV6_NS_CHILD") {
 		t.Fatalf("expected NO_IPV6_NS_CHILD")
+	}
+}
+
+func TestDelegation01EnoughIPv4ChildTypedArgsOrder(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origM2 := method2
+	origM3 := method3
+	origM4 := method4
+	origM5 := method5
+	t.Cleanup(func() {
+		method2 = origM2
+		method3 = origM3
+		method4 = origM4
+		method5 = origM5
+	})
+
+	method2 = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+		return []dnsname.Name{
+			dnsname.New("ns1.example"),
+			dnsname.New("ns2.example"),
+		}, nil
+	}
+	method3 = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+		return []dnsname.Name{
+			dnsname.New("ns2.example"),
+			dnsname.New("ns1.example"),
+		}, nil
+	}
+	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{
+			newNameserver(t, "ns1.example", "192.0.2.1", nil),
+			newNameserver(t, "ns2.example", "192.0.2.2", nil),
+		}, nil
+	}
+	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{
+			newNameserver(t, "ns2.example", "192.0.2.22", nil),
+			newNameserver(t, "ns1.example", "192.0.2.11", nil),
+		}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Delegation01(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("delegation01: %v", err)
+	}
+	if !hasEntryTag(entries, "ENOUGH_IPV4_NS_CHILD") {
+		t.Fatalf("expected ENOUGH_IPV4_NS_CHILD")
+	}
+	entry := firstEntryByTag(entries, "ENOUGH_IPV4_NS_CHILD")
+	if entry == nil {
+		t.Fatalf("missing ENOUGH_IPV4_NS_CHILD entry")
+	}
+	servers, ok := entry.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 2 {
+		t.Fatalf("expected two typed servers for ENOUGH_IPV4_NS_CHILD, got %#v", entry.Args["servers"])
+	}
+	if servers[0]["ns"] != "ns1.example" || servers[0]["address"] != "192.0.2.11" {
+		t.Fatalf("unexpected first typed server payload: %#v", servers[0])
+	}
+	if servers[1]["ns"] != "ns2.example" || servers[1]["address"] != "192.0.2.22" {
+		t.Fatalf("unexpected second typed server payload: %#v", servers[1])
+	}
+	addresses, ok := entry.Args["addresses"].([]string)
+	if !ok || len(addresses) != 2 {
+		t.Fatalf("expected two typed addresses for ENOUGH_IPV4_NS_CHILD, got %#v", entry.Args["addresses"])
+	}
+	if addresses[0] != "192.0.2.11" || addresses[1] != "192.0.2.22" {
+		t.Fatalf("expected deterministic address order, got %v", addresses)
+	}
+	if _, ok := entry.Args["ns_list"]; ok {
+		t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
+	}
+}
+
+func TestDelegation01NoIPv4ChildNoLegacyKeys(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origM2 := method2
+	origM3 := method3
+	origM4 := method4
+	origM5 := method5
+	t.Cleanup(func() {
+		method2 = origM2
+		method3 = origM3
+		method4 = origM4
+		method5 = origM5
+	})
+
+	method2 = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+		return []dnsname.Name{dnsname.New("ns1.example")}, nil
+	}
+	method3 = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+		return []dnsname.Name{dnsname.New("ns1.example")}, nil
+	}
+	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{
+			newNameserver(t, "ns1.example", "192.0.2.1", nil),
+		}, nil
+	}
+	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{
+			newNameserver(t, "ns1.example", "2001:db8::53", nil),
+		}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Delegation01(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("delegation01: %v", err)
+	}
+	if !hasEntryTag(entries, "NO_IPV4_NS_CHILD") {
+		t.Fatalf("expected NO_IPV4_NS_CHILD")
+	}
+	entry := firstEntryByTag(entries, "NO_IPV4_NS_CHILD")
+	if entry == nil {
+		t.Fatalf("missing NO_IPV4_NS_CHILD entry")
+	}
+	if _, ok := entry.Args["ns_list"]; ok {
+		t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
+	}
+	if _, ok := entry.Args["servers"]; ok {
+		t.Fatalf("did not expect servers for NO_IPV4_NS_CHILD: %#v", entry.Args["servers"])
+	}
+	if _, ok := entry.Args["addresses"]; ok {
+		t.Fatalf("did not expect addresses for NO_IPV4_NS_CHILD: %#v", entry.Args["addresses"])
 	}
 }
 
@@ -114,11 +318,39 @@ func TestDelegation02DuplicateIPs(t *testing.T) {
 	if !hasEntryTag(entries, "DEL_NS_SAME_IP") {
 		t.Fatalf("expected DEL_NS_SAME_IP")
 	}
+	entry := firstEntryByTag(entries, "DEL_NS_SAME_IP")
+	servers, ok := entry.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 2 {
+		t.Fatalf("expected typed server list for DEL_NS_SAME_IP, got %#v", entry.Args["servers"])
+	}
+	if address, _ := entry.Args["address"].(string); address != "192.0.2.1" {
+		t.Fatalf("expected address=192.0.2.1 for DEL_NS_SAME_IP, got %#v", entry.Args["address"])
+	}
+	if _, ok := entry.Args["ns_ip"]; ok {
+		t.Fatalf("legacy key ns_ip should not be present: %#v", entry.Args)
+	}
+	if _, ok := entry.Args["nsname_list"]; ok {
+		t.Fatalf("legacy key nsname_list should not be present: %#v", entry.Args)
+	}
 	if !hasEntryTag(entries, "CHILD_DISTINCT_NS_IP") {
 		t.Fatalf("expected CHILD_DISTINCT_NS_IP")
 	}
 	if !hasEntryTag(entries, "SAME_IP_ADDRESS") {
 		t.Fatalf("expected SAME_IP_ADDRESS")
+	}
+	entry = firstEntryByTag(entries, "SAME_IP_ADDRESS")
+	servers, ok = entry.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 2 {
+		t.Fatalf("expected typed server list for SAME_IP_ADDRESS, got %#v", entry.Args["servers"])
+	}
+	if address, _ := entry.Args["address"].(string); address != "192.0.2.1" {
+		t.Fatalf("expected address=192.0.2.1 for SAME_IP_ADDRESS, got %#v", entry.Args["address"])
+	}
+	if _, ok := entry.Args["ns_ip"]; ok {
+		t.Fatalf("legacy key ns_ip should not be present: %#v", entry.Args)
+	}
+	if _, ok := entry.Args["nsname_list"]; ok {
+		t.Fatalf("legacy key nsname_list should not be present: %#v", entry.Args)
 	}
 }
 
@@ -196,6 +428,14 @@ func TestDelegation04Authoritative(t *testing.T) {
 	}
 	if !hasEntryTag(entries, "ARE_AUTHORITATIVE") {
 		t.Fatalf("expected ARE_AUTHORITATIVE")
+	}
+	entry := firstEntryByTag(entries, "ARE_AUTHORITATIVE")
+	servers, ok := entry.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 || servers[0]["ns"] != "ns1.example" {
+		t.Fatalf("expected typed server list for ARE_AUTHORITATIVE, got %#v", entry.Args["servers"])
+	}
+	if _, ok := entry.Args["nsname_list"]; ok {
+		t.Fatalf("legacy key nsname_list should not be present: %#v", entry.Args)
 	}
 }
 
@@ -332,15 +572,22 @@ func TestDelegation04ParallelQueries(t *testing.T) {
 		if entry == nil || entry.Tag != "IS_NOT_AUTHORITATIVE" {
 			continue
 		}
+		if _, ok := entry.Args["arg_schema"]; ok {
+			t.Fatalf("did not expect arg_schema in args: %#v", entry.Args["arg_schema"])
+		}
 		ns, _ := entry.Args["ns"].(string)
+		if strings.Contains(ns, "/") {
+			t.Fatalf("expected nameserver-only ns argument, got %q", ns)
+		}
+		address, _ := entry.Args["address"].(string)
 		proto, _ := entry.Args["proto"].(string)
-		order = append(order, ns+"|"+proto)
+		order = append(order, ns+"|"+address+"|"+proto)
 	}
 	if len(order) != 4 {
 		t.Fatalf("expected 4 not-authoritative entries, got %v", order)
 	}
-	if order[0] != "ns1.example/192.0.2.1|UDP" || order[1] != "ns1.example/192.0.2.1|TCP" ||
-		order[2] != "ns2.example/192.0.2.2|UDP" || order[3] != "ns2.example/192.0.2.2|TCP" {
+	if order[0] != "ns1.example|192.0.2.1|UDP" || order[1] != "ns1.example|192.0.2.1|TCP" ||
+		order[2] != "ns2.example|192.0.2.2|UDP" || order[3] != "ns2.example|192.0.2.2|TCP" {
 		t.Fatalf("expected deterministic log order, got %v", order)
 	}
 }
@@ -385,6 +632,16 @@ func TestDelegation05InBailiwickCNAME(t *testing.T) {
 	}
 	if !hasEntryTag(entries, "NS_IS_CNAME") {
 		t.Fatalf("expected NS_IS_CNAME")
+	}
+	entry := firstEntryByTag(entries, "NS_IS_CNAME")
+	if entry == nil {
+		t.Fatalf("expected NS_IS_CNAME entry")
+	}
+	if ns, _ := entry.Args["ns"].(string); ns != "ns1.example" {
+		t.Fatalf("expected ns=ns1.example, got %#v", entry.Args["ns"])
+	}
+	if _, ok := entry.Args["nsname"]; ok {
+		t.Fatalf("legacy key nsname should not be present: %#v", entry.Args)
 	}
 	if hasEntryTag(entries, "NO_NS_CNAME") {
 		t.Fatalf("did not expect NO_NS_CNAME")
@@ -488,19 +745,35 @@ func TestDelegation05ParallelQueries(t *testing.T) {
 	}
 
 	var order []string
+	var addresses []string
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "NO_RESPONSE" {
 			continue
 		}
+		if _, ok := entry.Args["arg_schema"]; ok {
+			t.Fatalf("did not expect arg_schema in args: %#v", entry.Args["arg_schema"])
+		}
 		if ns, ok := entry.Args["ns"].(string); ok {
+			if strings.Contains(ns, "/") {
+				t.Fatalf("expected nameserver-only ns argument, got %q", ns)
+			}
 			order = append(order, ns)
+		}
+		if address, ok := entry.Args["address"].(string); ok {
+			addresses = append(addresses, address)
 		}
 	}
 	if len(order) != 2 {
 		t.Fatalf("expected 2 no-response entries, got %v", order)
 	}
-	if order[0] != "ns1.example/192.0.2.1" || order[1] != "ns2.example/192.0.2.2" {
-		t.Fatalf("expected deterministic log order, got %v", order)
+	if order[0] != "ns1.example" || order[1] != "ns2.example" {
+		t.Fatalf("expected deterministic nameserver order, got %v", order)
+	}
+	if len(addresses) != 2 {
+		t.Fatalf("expected 2 no-response addresses, got %v", addresses)
+	}
+	if addresses[0] != "192.0.2.1" || addresses[1] != "192.0.2.2" {
+		t.Fatalf("expected deterministic address order, got %v", addresses)
 	}
 }
 
@@ -687,6 +960,17 @@ func TestDelegation07NamesMatch(t *testing.T) {
 	if !hasEntryTag(entries, "NAMES_MATCH") {
 		t.Fatalf("expected NAMES_MATCH")
 	}
+	entry := firstEntryByTag(entries, "NAMES_MATCH")
+	if entry == nil {
+		t.Fatalf("expected NAMES_MATCH entry")
+	}
+	servers, ok := entry.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 || servers[0]["ns"] != "ns1.example" {
+		t.Fatalf("expected typed server list for NAMES_MATCH, got %#v", entry.Args["servers"])
+	}
+	if _, ok := entry.Args["names"]; ok {
+		t.Fatalf("legacy key names should not be present: %#v", entry.Args)
+	}
 }
 
 func TestDelegation07UndelegatedReportsExtraNameChild(t *testing.T) {
@@ -800,6 +1084,18 @@ func hasEntryTag(entries []*logger.Entry, tag string) bool {
 		}
 	}
 	return false
+}
+
+func firstEntryByTag(entries []*logger.Entry, tag string) *logger.Entry {
+	for _, entry := range entries {
+		if entry == nil {
+			continue
+		}
+		if entry.Tag == tag {
+			return entry
+		}
+	}
+	return nil
 }
 
 func soaPacket(owner string, authoritative bool) packet.Packet {

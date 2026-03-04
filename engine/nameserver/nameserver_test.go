@@ -641,13 +641,13 @@ func TestEmptyCache(t *testing.T) {
 }
 
 func TestQueryLogging(t *testing.T) {
-	ns, err := New("ns.example", "127.0.0.1", nil)
+	ctx, _ := testContext(t)
+	log := logger.FromContext(ctx)
+
+	ns, err := NewWithContext(ctx, "ns.example", "127.0.0.1", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
-
-	log := logger.New()
-	ctx := logger.WithContext(context.Background(), log)
 
 	// Use a very short timeout since we expect network failure
 	timeout := 10 * time.Millisecond
@@ -664,14 +664,20 @@ func TestQueryLogging(t *testing.T) {
 		if entry.Tag == "EXTERNAL_QUERY" {
 			foundQuery = true
 			loggedArgs := entry.Args
-			if name, ok := loggedArgs["name"]; !ok || name != "example.com" {
-				t.Errorf("expected name=example.com, got %v", name)
+			if name, ok := loggedArgs["query_name"]; !ok || name != "example.com" {
+				t.Errorf("expected query_name=example.com, got %v", name)
 			}
-			if qtype, ok := loggedArgs["type"]; !ok || qtype != "SOA" {
-				t.Errorf("expected type=SOA, got %v", qtype)
+			if qtype, ok := loggedArgs["query_type"]; !ok || qtype != "SOA" {
+				t.Errorf("expected query_type=SOA, got %v", qtype)
 			}
-			if ip, ok := loggedArgs["ip"]; !ok || ip != "127.0.0.1" {
-				t.Errorf("expected ip=127.0.0.1, got %v", ip)
+			if qclass, ok := loggedArgs["query_class"]; !ok || qclass != "IN" {
+				t.Errorf("expected query_class=IN, got %v", qclass)
+			}
+			if address, ok := loggedArgs["address"]; !ok || address != "127.0.0.1" {
+				t.Errorf("expected address=127.0.0.1, got %v", address)
+			}
+			if _, ok := loggedArgs["ip"]; ok {
+				t.Errorf("legacy key ip should not be present, got %v", loggedArgs["ip"])
 			}
 			if flags, ok := loggedArgs["flags"]; !ok || flags != "{\"class\":\"IN\"}" {
 				t.Errorf("expected flags={\"class\":\"IN\"}, got %v", flags)
@@ -697,6 +703,7 @@ func TestConstructorEmitsCreationLogs(t *testing.T) {
 	}
 
 	var cacheCreated, cacheFetched, nsCreated int
+	seenNS := map[string]bool{}
 	for _, entry := range log.Entries() {
 		if entry == nil {
 			continue
@@ -708,6 +715,15 @@ func TestConstructorEmitsCreationLogs(t *testing.T) {
 			cacheFetched++
 		case "NS_CREATED":
 			nsCreated++
+			ns, _ := entry.Args["ns"].(string)
+			address, _ := entry.Args["address"].(string)
+			if ns == "" || address == "" {
+				t.Fatalf("expected typed ns/address args in NS_CREATED, got %#v", entry.Args)
+			}
+			seenNS[ns] = true
+			if _, ok := entry.Args["name"]; ok {
+				t.Fatalf("legacy key name should not be present: %#v", entry.Args)
+			}
 		}
 	}
 	if cacheCreated != 1 {
@@ -718,6 +734,9 @@ func TestConstructorEmitsCreationLogs(t *testing.T) {
 	}
 	if nsCreated != 2 {
 		t.Fatalf("expected 2 NS_CREATED, got %d", nsCreated)
+	}
+	if !seenNS["ns1.example"] || !seenNS["ns2.example"] {
+		t.Fatalf("expected NS_CREATED entries for ns1/ns2.example, got %#v", seenNS)
 	}
 }
 

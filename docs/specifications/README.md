@@ -18,6 +18,7 @@ The Zonemaster project may be used as an upstream reference during migration, bu
 ### Inventories
 - [implemented-testcases.md](implemented-testcases.md) — Authoritative list of all implemented testcases.
 - [possible-tags-by-testcase.md](possible-tags-by-testcase.md) — All possible tags per testcase, derived from code metadata.
+- [log-args-inventory.md](log-args-inventory.md) — Current inventory of emitted log argument keys, tags, value shapes, and producer file paths.
 
 ### Gap and Divergence Tracking
 - [known-intentional-gaps.md](known-intentional-gaps.md) — Upstream testcase gaps that are intentionally not implemented, with rationale.
@@ -30,6 +31,8 @@ The Zonemaster project may be used as an upstream reference during migration, bu
 ### Reference
 - [upstream/](upstream/README.md) — Imported Zonemaster reference material (not normative for gonemaster).
 - [templates/](templates/testcase-spec-template.md) — Reusable templates for testcase specs and tag tables.
+- [log-args-coherency.md](log-args-coherency.md) — Shared glossary and invariants for log argument naming/types.
+- [log-args-key-glossary.md](log-args-key-glossary.md) — Canonical v1.1 key/type glossary for machine consumers.
 
 ## Source-Of-Truth Rules
 - Gonemaster implementation is the runtime source of truth.
@@ -54,6 +57,12 @@ Refresh generated inventories:
 make spec-export
 ```
 
+Refresh the log argument inventory report:
+
+```sh
+make spec-export-log-args
+```
+
 Validate canonical testcase specs against implementation metadata:
 
 ```sh
@@ -64,6 +73,12 @@ Optional validation with append-log scanner (metadata omission hints):
 
 ```sh
 make spec-validate-scan
+```
+
+Run coherency guardrails (no new `ns=.String()` growth; no new packed-list-only keys):
+
+```sh
+make spec-check-coherency
 ```
 
 ## Writing Principles

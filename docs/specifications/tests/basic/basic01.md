@@ -68,34 +68,39 @@ Status: Final
 | `B01_CHILD_NOT_EXIST` | `domain` | `string` | Child zone name. |
 | `B01_CHILD_IS_ALIAS` | `domain_child` | `string` | Child zone name. |
 | `B01_CHILD_IS_ALIAS` | `domain_target` | `string` | Alias target name from DNAME. |
-| `B01_CHILD_IS_ALIAS` | `ns_list` | `string` | Semicolon-delimited nameserver list that returned the result. |
+| `B01_CHILD_IS_ALIAS` | `servers` | `array<object>` | Structured nameserver list that returned the result. |
 | `B01_CHILD_FOUND` | `domain` | `string` | Child zone name found. |
 | `B01_INCONSISTENT_ALIAS` | `domain` | `string` | Child zone name with inconsistent alias targets. |
 | `B01_INCONSISTENT_DELEGATION` | `domain_parent` | `string` | Parent zone candidate showing inconsistency. |
 | `B01_INCONSISTENT_DELEGATION` | `domain_child` | `string` | Child zone name. |
-| `B01_INCONSISTENT_DELEGATION` | `ns_list` | `string` | Semicolon-delimited nameserver list tied to inconsistency. |
+| `B01_INCONSISTENT_DELEGATION` | `servers` | `array<object>` | Structured nameserver list tied to inconsistency. |
 | `B01_NO_CHILD` | `domain_child` | `string` | Child zone name. |
 | `B01_NO_CHILD` | `domain_super` | `string` | Next-higher domain suggested for testing. |
 | `B01_PARENT_DISREGARDED` | `-` | `-` | No arguments. |
 | `B01_PARENT_FOUND` | `domain` | `string` | Parent zone name candidate. |
-| `B01_PARENT_FOUND` | `ns_list` | `string` | Semicolon-delimited nameserver list returning parent evidence. |
+| `B01_PARENT_FOUND` | `servers` | `array<object>` | Structured nameserver list returning parent evidence. |
 | `B01_PARENT_NOT_FOUND` | `-` | `-` | No arguments. |
-| `B01_PARENT_UNDETERMINED` | `ns_list` | `string` | Semicolon-delimited nameserver list across competing parents. |
+| `B01_PARENT_UNDETERMINED` | `servers` | `array<object>` | Structured nameserver list across competing parents. |
 | `B01_ROOT_HAS_NO_PARENT` | `-` | `-` | No arguments. |
 | `B01_SERVER_ZONE_ERROR` | `query_name` | `string` | Queried owner name that failed validation. |
 | `B01_SERVER_ZONE_ERROR` | `rrtype` | `string` | Queried rrtype (`SOA` or `NS`). |
-| `B01_SERVER_ZONE_ERROR` | `ns` | `string` | Nameserver identity (`name/ip`). |
-| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`). |
+| `B01_SERVER_ZONE_ERROR` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
+| `B01_SERVER_ZONE_ERROR` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
+| `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped due to transport disable. |
-| `IPV4_ENABLED` | `ns` | `string` | Nameserver identity (`name/ip`). |
+| `IPV4_ENABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
+| `IPV4_ENABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV4_ENABLED` | `rrtype` | `string` | rrtype queried over enabled transport. |
-| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`). |
+| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
+| `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped due to transport disable. |
-| `IPV6_ENABLED` | `ns` | `string` | Nameserver identity (`name/ip`). |
+| `IPV6_ENABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
+| `IPV6_ENABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV6_ENABLED` | `rrtype` | `string` | rrtype queried over enabled transport. |
 | `LOOP_PROTECTION` | `caller` | `string` | Internal caller name that hit loop protection. |
 | `LOOP_PROTECTION` | `child_zone_name` | `string` | Child zone name under test. |
-| `LOOP_PROTECTION` | `name` | `string` | Current loop zone name state. |
+| `LOOP_PROTECTION` | `zone_name` | `string` | Current loop zone name state. |
 | `LOOP_PROTECTION` | `intermediate_query_name` | `string` | Intermediate query name at stop point. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Basic01`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Basic01`). |
@@ -141,7 +146,7 @@ Status: Final
 The following behaviors are implementation choices, not mandated by RFC 1034/1035:
 
 - **Traversal strategy**: The testcase probes iteratively from root servers using SOA, NS, and DNAME queries, extending the intermediate name toward the child zone at each step.  The DNS protocol specifies the resolution model but does not define how a testcase tool should walk the hierarchy.
-- **Sorted `ns_list` arguments**: Nameserver lists passed in tag arguments are sorted before joining with `;`.  Deterministic ordering simplifies reproducible output but is not a protocol requirement.
+- **Sorted `servers` arguments**: Nameserver lists passed in tag arguments are sorted before joining with `;`.  Deterministic ordering simplifies reproducible output but is not a protocol requirement.
 - **Loop protection threshold**: Traversal stops at a fixed internal limit and emits `LOOP_PROTECTION`.  No DNS standard defines a specific iteration bound; the limit is a defensive implementation choice.
 
 ## Edge Cases And Limitations

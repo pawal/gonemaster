@@ -25,7 +25,7 @@ Status: Final
    - keytags seen with digest algorithm 2 vs non-2.
 3. Resolve parent nameserver names/IPs.
 4. Check undelegated DS input path:
-   - If parent fake DS records are present, classify those DS records immediately with source `ns_list` value `-`.
+   - If parent fake DS records are present, classify those DS records immediately with source `servers` value `-`.
    - Mark parent-NS query list empty so external parent DS queries are skipped.
 5. For each unique parent nameserver IP (parallelized):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `DS` and skip.
@@ -33,7 +33,7 @@ Status: Final
    - If response is absent or fails required shape checks (`NOERROR`, `OPT`, `DO`, `AA`), mark nameserver as ignored.
    - If response has no DS record with owner matching child zone name, mark nameserver in `Responds Without Valid DS`.
    - Else mark nameserver in `Responds With DS` and classify each DS digest algorithm into the corresponding DS01 tag set.
-6. Emit DS classification tags (`DS01_DS_ALGO_*`) grouped by `(digest, keytag)` with merged `ns_list`.
+6. Emit DS classification tags (`DS01_DS_ALGO_*`) grouped by `(digest, keytag)` with merged `servers`.
 7. Emit `DS01_DS_ALGO_2_MISSING` for keytags that have non-2 DS but no digest-2 DS on the same source nameservers.
 8. If no valid/non-valid DS responders exist and ignored responders exist, emit `DS01_NO_RESPONSE`.
 9. Emit informational tags based on zone type and undelegated DS status:
@@ -67,40 +67,42 @@ Status: Final
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
-| `DS01_DS_ALGO_2_MISSING` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) where digest-2 DS is missing, or `-` for undelegated DS source. |
+| `DS01_DS_ALGO_2_MISSING` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) where digest-2 DS is missing, or `-` for undelegated DS source. |
 | `DS01_DS_ALGO_2_MISSING` | `keytag` | `int` | DNSKEY key tag referenced by DS records. |
-| `DS01_DS_ALGO_DEPRECATED` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`), or `-` for undelegated DS source. |
+| `DS01_DS_ALGO_DEPRECATED` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object), or `-` for undelegated DS source. |
 | `DS01_DS_ALGO_DEPRECATED` | `keytag` | `int` | DNSKEY key tag referenced by DS record. |
 | `DS01_DS_ALGO_DEPRECATED` | `ds_algo_num` | `int` | DS digest algorithm number from DS RDATA. |
 | `DS01_DS_ALGO_DEPRECATED` | `ds_algo_descr` | `string` | Text description of DS digest algorithm number. |
-| `DS01_DS_ALGO_NOT_DS` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`), or `-` for undelegated DS source. |
+| `DS01_DS_ALGO_NOT_DS` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object), or `-` for undelegated DS source. |
 | `DS01_DS_ALGO_NOT_DS` | `keytag` | `int` | DNSKEY key tag referenced by DS record. |
 | `DS01_DS_ALGO_NOT_DS` | `ds_algo_num` | `int` | DS digest algorithm number from DS RDATA. |
 | `DS01_DS_ALGO_NOT_DS` | `ds_algo_descr` | `string` | Text description of DS digest algorithm number. |
-| `DS01_DS_ALGO_OK` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`), or `-` for undelegated DS source. |
+| `DS01_DS_ALGO_OK` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object), or `-` for undelegated DS source. |
 | `DS01_DS_ALGO_OK` | `keytag` | `int` | DNSKEY key tag referenced by DS record. |
 | `DS01_DS_ALGO_OK` | `ds_algo_num` | `int` | DS digest algorithm number from DS RDATA. |
 | `DS01_DS_ALGO_OK` | `ds_algo_descr` | `string` | Text description of DS digest algorithm number. |
-| `DS01_DS_ALGO_PRIVATE` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`), or `-` for undelegated DS source. |
+| `DS01_DS_ALGO_PRIVATE` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object), or `-` for undelegated DS source. |
 | `DS01_DS_ALGO_PRIVATE` | `keytag` | `int` | DNSKEY key tag referenced by DS record. |
 | `DS01_DS_ALGO_PRIVATE` | `ds_algo_num` | `int` | DS digest algorithm number from DS RDATA. |
 | `DS01_DS_ALGO_PRIVATE` | `ds_algo_descr` | `string` | Text description of DS digest algorithm number. |
-| `DS01_DS_ALGO_RESERVED` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`), or `-` for undelegated DS source. |
+| `DS01_DS_ALGO_RESERVED` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object), or `-` for undelegated DS source. |
 | `DS01_DS_ALGO_RESERVED` | `keytag` | `int` | DNSKEY key tag referenced by DS record. |
 | `DS01_DS_ALGO_RESERVED` | `ds_algo_num` | `int` | DS digest algorithm number from DS RDATA. |
 | `DS01_DS_ALGO_RESERVED` | `ds_algo_descr` | `string` | Text description of DS digest algorithm number. |
-| `DS01_DS_ALGO_UNASSIGNED` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`), or `-` for undelegated DS source. |
+| `DS01_DS_ALGO_UNASSIGNED` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object), or `-` for undelegated DS source. |
 | `DS01_DS_ALGO_UNASSIGNED` | `keytag` | `int` | DNSKEY key tag referenced by DS record. |
 | `DS01_DS_ALGO_UNASSIGNED` | `ds_algo_num` | `int` | DS digest algorithm number from DS RDATA. |
 | `DS01_DS_ALGO_UNASSIGNED` | `ds_algo_descr` | `string` | Text description of DS digest algorithm number. |
-| `DS01_NO_RESPONSE` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) ignored due to invalid/no DS response shape. |
-| `DS01_PARENT_SERVER_NO_DS` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) that returned no valid DS owner. |
-| `DS01_PARENT_ZONE_NO_DS` | `ns_list` | `string` | Semicolon-delimited nameserver identities (`name/ip`) that returned no valid DS owner. |
+| `DS01_NO_RESPONSE` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) ignored due to invalid/no DS response shape. |
+| `DS01_PARENT_SERVER_NO_DS` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) that returned no valid DS owner. |
+| `DS01_PARENT_ZONE_NO_DS` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) that returned no valid DS owner. |
 | `DS01_ROOT_N_NO_UNDEL_DS` | `-` | `-` | No arguments. |
 | `DS01_UNDEL_N_NO_UNDEL_DS` | `-` | `-` | No arguments. |
-| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv4. |
+| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
+| `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`DS`). |
-| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv6. |
+| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
+| `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`DS`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`DNSSEC01`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`DNSSEC01`). |
@@ -135,5 +137,5 @@ Status: Final
 
 ## Edge Cases And Limitations
 - If no parent nameservers are available and no undelegated DS data exists, only the applicable root/undelegated informational tags and testcase boundary tags are emitted.
-- For undelegated DS input, `ns_list` uses the sentinel source value `-`.
+- For undelegated DS input, `servers` uses the sentinel source value `-`.
 - DS answer processing requires at least one DS with owner matching child zone, but once accepted the testcase classifies all DS records in that answer section.

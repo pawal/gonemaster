@@ -43,18 +43,20 @@ Status: Final
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
-| `DS13_ALGO_NOT_SIGNED_DNSKEY` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
+| `DS13_ALGO_NOT_SIGNED_DNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS13_ALGO_NOT_SIGNED_DNSKEY` | `algo_num` | `int` | DNSKEY algorithm number missing in RRSIG coverage. |
 | `DS13_ALGO_NOT_SIGNED_DNSKEY` | `algo_mnemo` | `string` | DNSKEY algorithm mnemonic missing in RRSIG coverage. |
-| `DS13_ALGO_NOT_SIGNED_NS` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
+| `DS13_ALGO_NOT_SIGNED_NS` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS13_ALGO_NOT_SIGNED_NS` | `algo_num` | `int` | DNSKEY algorithm number missing in RRSIG coverage. |
 | `DS13_ALGO_NOT_SIGNED_NS` | `algo_mnemo` | `string` | DNSKEY algorithm mnemonic missing in RRSIG coverage. |
-| `DS13_ALGO_NOT_SIGNED_SOA` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
+| `DS13_ALGO_NOT_SIGNED_SOA` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS13_ALGO_NOT_SIGNED_SOA` | `algo_num` | `int` | DNSKEY algorithm number missing in RRSIG coverage. |
 | `DS13_ALGO_NOT_SIGNED_SOA` | `algo_mnemo` | `string` | DNSKEY algorithm mnemonic missing in RRSIG coverage. |
-| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv4. |
+| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
+| `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`DNSKEY`, `SOA`, or `NS`). |
-| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv6. |
+| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
+| `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`DNSKEY`, `SOA`, or `NS`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`DNSSEC13`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`DNSSEC13`). |

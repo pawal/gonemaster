@@ -73,13 +73,17 @@ Status: Final
 | `DNSKEY_TOO_SMALL_FOR_ALGO` | `keysizemin` | `int` | Allowed minimum size for algorithm. |
 | `DNSKEY_TOO_SMALL_FOR_ALGO` | `keysizemax` | `int` | Allowed maximum size for algorithm. |
 | `DNSKEY_TOO_SMALL_FOR_ALGO` | `keysizerec` | `int` | Recommended size for algorithm. |
-| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv4. |
+| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
+| `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`DNSKEY`). |
-| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv6. |
+| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
+| `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`DNSKEY`). |
 | `KEY_SIZE_OK` | `-` | `-` | No arguments. |
-| `NO_RESPONSE` | `ns` | `string` | Nameserver identity (`name/ip`) with no response. |
-| `NO_RESPONSE_DNSKEY` | `ns` | `string` | Nameserver identity (`name/ip`) with no DNSKEY answer RRset. |
+| `NO_RESPONSE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with no response. |
+| `NO_RESPONSE` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `NO_RESPONSE_DNSKEY` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with no DNSKEY answer RRset. |
+| `NO_RESPONSE_DNSKEY` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`DNSSEC14`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`DNSSEC14`). |
 

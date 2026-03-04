@@ -1,0 +1,14 @@
+# Strict allowlist for `args["ns"] = <endpoint>.String()` usage.
+# Format: <path> <max_count>
+# All limits are zero in phase 6 hardening; any non-zero hit is a CI failure.
+
+engine/nameserver/nameserver.go 0
+engine/nameserver/query_helpers.go 0
+engine/test/basic/basic.go 0
+engine/test/connectivity/connectivity.go 0
+engine/test/consistency/consistency.go 0
+engine/test/delegation/delegation.go 0
+engine/test/dnssec/dnssec.go 0
+engine/test/nameserver/nameserver.go 0
+engine/test/syntax/syntax.go 0
+engine/test/zone/zone.go 0

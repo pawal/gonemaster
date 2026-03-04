@@ -590,6 +590,22 @@ components:
           type: string
         args:
           type: object
+          description: |
+            Structured log arguments map.
+
+            Canonical key semantics/types/optionality for coherency-migrated
+            entries are defined in `docs/specifications/log-args-coherency.md`.
+
+            Schema `1.x` is additive-only; consumers should ignore unknown keys.
+          externalDocs:
+            description: Log argument coherency contract (v1.1)
+            url: ./specifications/log-args-coherency.md
+          example:
+            ns: ns1.example
+            address: 192.0.2.53
+            query_name: example
+            query_type: SOA
+            query_class: IN
           additionalProperties: true
         message:
           type: string

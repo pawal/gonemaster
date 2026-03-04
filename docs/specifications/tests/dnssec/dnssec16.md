@@ -68,26 +68,28 @@ Status: Final
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
 | `DS16_CDS_INVALID_RRSIG` | `keytag` | `int` | RRSIG keytag with invalid signature. |
-| `DS16_CDS_INVALID_RRSIG` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
+| `DS16_CDS_INVALID_RRSIG` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS16_CDS_MATCHES_NON_SEP_DNSKEY` | `keytag` | `int` | CDS keytag referencing non-SEP DNSKEY. |
-| `DS16_CDS_MATCHES_NON_SEP_DNSKEY` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
+| `DS16_CDS_MATCHES_NON_SEP_DNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS16_CDS_MATCHES_NON_ZONE_DNSKEY` | `keytag` | `int` | CDS keytag referencing non-zone DNSKEY. |
-| `DS16_CDS_MATCHES_NON_ZONE_DNSKEY` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
+| `DS16_CDS_MATCHES_NON_ZONE_DNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS16_CDS_MATCHES_NO_DNSKEY` | `keytag` | `int` | CDS keytag not found in DNSKEY RRset. |
-| `DS16_CDS_MATCHES_NO_DNSKEY` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
+| `DS16_CDS_MATCHES_NO_DNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS16_CDS_NOT_SIGNED_BY_CDS` | `keytag` | `int` | CDS keytag missing from CDS RRset RRSIG keytags. |
-| `DS16_CDS_NOT_SIGNED_BY_CDS` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
+| `DS16_CDS_NOT_SIGNED_BY_CDS` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS16_CDS_SIGNED_BY_UNKNOWN_DNSKEY` | `keytag` | `int` | CDS RRSIG keytag with no DNSKEY match. |
-| `DS16_CDS_SIGNED_BY_UNKNOWN_DNSKEY` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
-| `DS16_CDS_UNSIGNED` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
-| `DS16_CDS_WITHOUT_DNSKEY` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
-| `DS16_DELETE_CDS` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
+| `DS16_CDS_SIGNED_BY_UNKNOWN_DNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
+| `DS16_CDS_UNSIGNED` | `addresses` | `array<string>` | Structured child nameserver IP list. |
+| `DS16_CDS_WITHOUT_DNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
+| `DS16_DELETE_CDS` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS16_DNSKEY_NOT_SIGNED_BY_CDS` | `keytag` | `int` | CDS keytag missing from DNSKEY RRset RRSIG keytags. |
-| `DS16_DNSKEY_NOT_SIGNED_BY_CDS` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
-| `DS16_MIXED_DELETE_CDS` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
-| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv4. |
+| `DS16_DNSKEY_NOT_SIGNED_BY_CDS` | `addresses` | `array<string>` | Structured child nameserver IP list. |
+| `DS16_MIXED_DELETE_CDS` | `addresses` | `array<string>` | Structured child nameserver IP list. |
+| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
+| `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`CDS` or `DNSKEY`). |
-| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv6. |
+| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
+| `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`CDS` or `DNSKEY`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`DNSSEC16`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`DNSSEC16`). |

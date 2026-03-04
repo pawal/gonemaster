@@ -12,6 +12,7 @@ import (
 	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 )
@@ -66,11 +67,12 @@ func (ns *Nameserver) AddFakeDelegation(domain string, data map[string][]string)
 				return fmt.Errorf("invalid delegation IP %q: %w", ip, err)
 			}
 			if addr == ns.Address {
-				logSystemWithLogger(ns.log, "FAKE_DELEGATION_TO_SELF", map[string]any{
-					"ns":     ns.String(),
+				logArgs := map[string]any{
 					"domain": domainKey,
 					"data":   data,
-				})
+				}
+				logargs.SetNS(logArgs, ns.NameString(), ns.AddressString())
+				logSystemWithLogger(ns.log, "FAKE_DELEGATION_TO_SELF", logArgs)
 				return nil
 			}
 
@@ -96,11 +98,12 @@ func (ns *Nameserver) AddFakeDelegation(domain string, data map[string][]string)
 		authority:  authority,
 		additional: additional,
 	}
-	logSystemWithLogger(ns.log, "FAKE_DELEGATION_ADDED", map[string]any{
-		"ns":     ns.String(),
+	logArgs := map[string]any{
 		"domain": domainKey,
 		"data":   data,
-	})
+	}
+	logargs.SetNS(logArgs, ns.NameString(), ns.AddressString())
+	logSystemWithLogger(ns.log, "FAKE_DELEGATION_ADDED", logArgs)
 	return nil
 }
 
@@ -135,11 +138,12 @@ func (ns *Nameserver) AddFakeDS(domain string, data []DSData) error {
 		records = append(records, dsRR)
 	}
 	ns.state.fakeDS[domainKey] = records
-	logSystemWithLogger(ns.log, "FAKE_DS_ADDED", map[string]any{
+	logArgs := map[string]any{
 		"domain": domainKey,
 		"data":   data,
-		"ns":     ns.String(),
-	})
+	}
+	logargs.SetNS(logArgs, ns.NameString(), ns.AddressString())
+	logSystemWithLogger(ns.log, "FAKE_DS_ADDED", logArgs)
 	return nil
 }
 
@@ -182,12 +186,14 @@ func (ns Nameserver) fakeDSResponse(name string, qtype string, qclass string, op
 	setResponseEDNS(msg, dnssec, ednsSize, opts)
 
 	resp := packet.Packet{Msg: msg, AnswerFrom: ns.Address.String(), Log: runLog}
-	logSystemWithLogger(runLog, "FAKE_DS_RETURNED", map[string]any{
-		"name":  nameObj.String(),
-		"type":  qtype,
-		"class": qclass,
-		"from":  ns.String(),
-	})
+	logArgs := map[string]any{
+		"query_name":  nameObj.String(),
+		"query_type":  qtype,
+		"query_class": qclass,
+		"from":        ns.String(),
+	}
+	logargs.SetNS(logArgs, ns.NameString(), ns.AddressString())
+	logSystemWithLogger(runLog, "FAKE_DS_RETURNED", logArgs)
 	logSystemWithLogger(runLog, "FAKE_PACKET_RETURNED", map[string]any{
 		"packet": resp.String(),
 	})
@@ -232,12 +238,14 @@ func (ns Nameserver) fakeDelegationResponse(name string, qtype string, qclass st
 		setResponseEDNS(msg, dnssec, ednsSize, opts)
 
 		resp := packet.Packet{Msg: msg, AnswerFrom: ns.Address.String(), Log: runLog}
-		logSystemWithLogger(runLog, "FAKE_DELEGATION_RETURNED", map[string]any{
-			"name":  nameObj.String(),
-			"type":  qtype,
-			"class": qclass,
-			"from":  ns.String(),
-		})
+		logArgs := map[string]any{
+			"query_name":  nameObj.String(),
+			"query_type":  qtype,
+			"query_class": qclass,
+			"from":        ns.String(),
+		}
+		logargs.SetNS(logArgs, ns.NameString(), ns.AddressString())
+		logSystemWithLogger(runLog, "FAKE_DELEGATION_RETURNED", logArgs)
 		logSystemWithLogger(runLog, "FAKE_PACKET_RETURNED", map[string]any{
 			"packet": resp.String(),
 		})

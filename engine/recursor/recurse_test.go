@@ -395,9 +395,16 @@ func TestRecurseLogsLoopProtection(t *testing.T) {
 	}
 
 	for _, entry := range log.Entries() {
-		if entry != nil && entry.Tag == "LOOP_PROTECTION" {
-			return
+		if entry == nil || entry.Tag != "LOOP_PROTECTION" {
+			continue
 		}
+		if zoneName, ok := entry.Args["zone_name"].(string); !ok || zoneName == "" {
+			t.Fatalf("expected zone_name in LOOP_PROTECTION args, got %#v", entry.Args)
+		}
+		if _, ok := entry.Args["name"]; ok {
+			t.Fatalf("legacy key name should not be present: %#v", entry.Args)
+		}
+		return
 	}
 	t.Fatalf("expected LOOP_PROTECTION tag")
 }

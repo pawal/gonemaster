@@ -11,6 +11,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -86,9 +87,9 @@ func newWithCache(ctx context.Context, cache *CacheStore, name string, address s
 	}
 	queryCache, cacheCreated := cache.cacheForAddressWithStatus(addrKey)
 	if cacheCreated {
-		logSystemWithLogger(runLog, "CACHE_CREATED", map[string]any{"ip": addrKey})
+		logSystemWithLogger(runLog, "CACHE_CREATED", map[string]any{"address": addrKey})
 	} else {
-		logSystemWithLogger(runLog, "CACHE_FETCHED", map[string]any{"ip": addrKey})
+		logSystemWithLogger(runLog, "CACHE_FETCHED", map[string]any{"address": addrKey})
 	}
 
 	state := &nsState{
@@ -108,9 +109,10 @@ func newWithCache(ctx context.Context, cache *CacheStore, name string, address s
 		log:     runLog,
 	}
 	cache.storeNameserver(nameKey, addrKey, ns)
+	nsName := nameObj.String()
 	logSystemWithLogger(runLog, "NS_CREATED", map[string]any{
-		"name": nameObj.String(),
-		"ip":   addrKey,
+		"ns":      nsName,
+		"address": addrKey,
 	})
 	return *ns, nil
 }
@@ -146,19 +148,21 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 
 	prof := profile.FromContext(ctx)
 	if ns.Address.Is4() && !prof.Net.IPv4 {
-		logSystemWithLogger(runLog, "IPV4_BLOCKED", map[string]any{"ns": ns.String()})
+		logSystemWithLogger(runLog, "IPV4_BLOCKED", logargs.NS(ns.NameString(), ns.AddressString()))
 		return packet.Packet{}, nil
 	}
 	if ns.Address.Is6() && !prof.Net.IPv6 {
-		logSystemWithLogger(runLog, "IPV6_BLOCKED", map[string]any{"ns": ns.String()})
+		logSystemWithLogger(runLog, "IPV6_BLOCKED", logargs.NS(ns.NameString(), ns.AddressString()))
 		return packet.Packet{}, nil
 	}
 	queryArgs := map[string]any{
-		"name":  qname,
-		"type":  qtype,
-		"flags": queryFlags(qclass, opts),
-		"ip":    ns.Address.String(),
+		"query_name":  qname,
+		"query_type":  qtype,
+		"query_class": qclass,
+		"flags":       queryFlags(qclass, opts),
+		"address":     ns.Address.String(),
 	}
+	logargs.SetNS(queryArgs, ns.NameString(), ns.AddressString())
 	logSystemWithLogger(runLog, "QUERY", queryArgs)
 
 	if resp, ok := ns.fakeDSResponse(qname, qtype, qclass, opts, runLog); ok {
@@ -192,27 +196,31 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	usevc := resolveUseVC(opts)
 	if ttl := resolveReachabilityTTL(prof, opts); ttl > 0 {
 		if skip, remaining := globalReachability.shouldSkip(ns.Address.String()); skip {
-			logSystem(ctx, "REACHABILITY_CACHE_SKIP", map[string]any{
-				"ip":          ns.Address.String(),
+			skipArgs := map[string]any{
+				"address":     ns.Address.String(),
 				"protocol":    errorCacheProtocol(usevc),
 				"ttl_seconds": int(remaining.Seconds()),
 				"query_name":  qname,
 				"query_type":  qtype,
 				"query_class": qclass,
-			})
+			}
+			logargs.SetNS(skipArgs, ns.NameString(), ns.AddressString())
+			logSystem(ctx, "REACHABILITY_CACHE_SKIP", skipArgs)
 			return packet.Packet{}, nil
 		}
 	}
 	if errorCacheTTL := resolveErrorCacheTTL(prof, opts); errorCacheTTL > 0 && ns.state != nil && ns.state.errorCache != nil {
 		if skip, remaining := ns.state.errorCache.shouldSkip(errorCacheKey(usevc)); skip {
-			logSystem(ctx, "ERROR_CACHE_SKIP", map[string]any{
-				"ip":          ns.Address.String(),
+			skipArgs := map[string]any{
+				"address":     ns.Address.String(),
 				"protocol":    errorCacheProtocol(usevc),
 				"ttl_seconds": int(remaining.Seconds()),
 				"query_name":  qname,
 				"query_type":  qtype,
 				"query_class": qclass,
-			})
+			}
+			logargs.SetNS(skipArgs, ns.NameString(), ns.AddressString())
+			logSystem(ctx, "ERROR_CACHE_SKIP", skipArgs)
 			return packet.Packet{}, nil
 		}
 	}
@@ -401,22 +409,27 @@ func (ns Nameserver) queryNetwork(ctx context.Context, qname string, qtype strin
 	server := ns.Address.String()
 
 	// Emit EXTERNAL_QUERY log entry
-	logSystem(ctx, "EXTERNAL_QUERY", map[string]any{
-		"name":  qname,
-		"type":  qtype,
-		"ip":    ns.Address.String(),
-		"flags": fmt.Sprintf(`{"class":%q}`, qclass),
-	})
+	queryArgs := map[string]any{
+		"query_name":  qname,
+		"query_type":  qtype,
+		"query_class": qclass,
+		"address":     ns.Address.String(),
+		"flags":       fmt.Sprintf(`{"class":%q}`, qclass),
+	}
+	logargs.SetNS(queryArgs, ns.NameString(), ns.AddressString())
+	logSystem(ctx, "EXTERNAL_QUERY", queryArgs)
 
 	resp, err := client.Exchange(ctx, server, msg)
 	resp.Log = loggerFromContextOrFallback(ctx, ns.log)
 
 	args := map[string]any{
-		"name":  qname,
-		"type":  qtype,
-		"ip":    ns.Address.String(),
-		"flags": fmt.Sprintf(`{"class":%q}`, qclass),
+		"query_name":  qname,
+		"query_type":  qtype,
+		"query_class": qclass,
+		"address":     ns.Address.String(),
+		"flags":       fmt.Sprintf(`{"class":%q}`, qclass),
 	}
+	logargs.SetNS(args, ns.NameString(), ns.AddressString())
 	if resp.Msg != nil {
 		args["rcode"] = dns.RcodeToString[resp.Msg.Rcode]
 		args["answers"] = len(resp.Msg.Answer)
@@ -448,6 +461,9 @@ func logSystem(ctx context.Context, tag string, args map[string]any) {
 func logSystemWithLogger(log *logger.Logger, tag string, args map[string]any) {
 	if log == nil {
 		return
+	}
+	if args == nil {
+		args = map[string]any{}
 	}
 	_, _ = log.Add(tag, args, systemModuleName, "")
 }

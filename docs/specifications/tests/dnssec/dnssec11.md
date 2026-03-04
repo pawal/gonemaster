@@ -68,15 +68,17 @@ Status: Final
 | `DS11_DS_BUT_UNSIGNED_ZONE` | `-` | `-` | No arguments. |
 | `DS11_INCONSISTENT_DS` | `-` | `-` | No arguments. |
 | `DS11_INCONSISTENT_SIGNED_ZONE` | `-` | `-` | No arguments. |
-| `DS11_NS_WITH_SIGNED_ZONE` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
-| `DS11_NS_WITH_UNSIGNED_ZONE` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
-| `DS11_PARENT_WITHOUT_DS` | `ns_ip_list` | `string` | Semicolon-delimited parent nameserver IP list without DS. |
-| `DS11_PARENT_WITH_DS` | `ns_ip_list` | `string` | Semicolon-delimited parent nameserver IP list with DS. |
+| `DS11_NS_WITH_SIGNED_ZONE` | `addresses` | `array<string>` | Structured child nameserver IP list. |
+| `DS11_NS_WITH_UNSIGNED_ZONE` | `addresses` | `array<string>` | Structured child nameserver IP list. |
+| `DS11_PARENT_WITHOUT_DS` | `addresses` | `array<string>` | Structured parent nameserver IP list without DS. |
+| `DS11_PARENT_WITH_DS` | `addresses` | `array<string>` | Structured parent nameserver IP list with DS. |
 | `DS11_UNDETERMINED_DS` | `-` | `-` | No arguments. |
 | `DS11_UNDETERMINED_SIGNED_ZONE` | `-` | `-` | No arguments. |
-| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv4. |
+| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
+| `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`DS`, `SOA`, or `DNSKEY`). |
-| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv6. |
+| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
+| `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`DS`, `SOA`, or `DNSKEY`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`DNSSEC11`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`DNSSEC11`). |

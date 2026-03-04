@@ -40,11 +40,15 @@ Status: Final
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
-| `AXFR_AVAILABLE` | `ns` | `string` | Nameserver identity (`name/ip`) allowing AXFR. |
-| `AXFR_FAILURE` | `ns` | `string` | Nameserver identity (`name/ip`) where AXFR failed. |
-| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv4. |
+| `AXFR_AVAILABLE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) allowing AXFR. |
+| `AXFR_AVAILABLE` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `AXFR_FAILURE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) where AXFR failed. |
+| `AXFR_FAILURE` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
+| `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`AXFR`). |
-| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv6. |
+| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
+| `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`AXFR`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Nameserver03`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Nameserver03`). |

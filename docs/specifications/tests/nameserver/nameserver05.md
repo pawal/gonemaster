@@ -51,19 +51,26 @@ Status: Final
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
-| `AAAA_BAD_RDATA` | `ns` | `string` | Nameserver identity (`name/ip`) returning invalid AAAA RDATA length. |
+| `AAAA_BAD_RDATA` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) returning invalid AAAA RDATA length. |
+| `AAAA_BAD_RDATA` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `AAAA_BAD_RDATA` | `length` | `int` | Observed AAAA RDATA byte length. |
-| `AAAA_QUERY_DROPPED` | `ns` | `string` | Nameserver identity (`name/ip`) that dropped AAAA query. |
-| `AAAA_UNEXPECTED_RCODE` | `ns` | `string` | Nameserver identity (`name/ip`) with unexpected AAAA RCODE. |
+| `AAAA_QUERY_DROPPED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) that dropped AAAA query. |
+| `AAAA_QUERY_DROPPED` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `AAAA_UNEXPECTED_RCODE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with unexpected AAAA RCODE. |
+| `AAAA_UNEXPECTED_RCODE` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `AAAA_UNEXPECTED_RCODE` | `rcode` | `string` | Returned AAAA-query RCODE string. |
-| `AAAA_WELL_PROCESSED` | `ns_list` | `string` | Semicolon-delimited sorted included nameserver identities (`name/ip`). |
-| `A_UNEXPECTED_RCODE` | `ns` | `string` | Nameserver identity (`name/ip`) with unexpected A-query RCODE. |
+| `AAAA_WELL_PROCESSED` | `servers` | `array<object>` | Structured sorted included nameserver identities (`{ns,address}` object). |
+| `A_UNEXPECTED_RCODE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with unexpected A-query RCODE. |
+| `A_UNEXPECTED_RCODE` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `A_UNEXPECTED_RCODE` | `rcode` | `string` | Returned A-query RCODE string. |
-| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv4. |
+| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
+| `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`A`). |
-| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv6. |
+| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
+| `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`A`). |
-| `NO_RESPONSE` | `ns` | `string` | Nameserver identity (`name/ip`) with no A-query response. |
+| `NO_RESPONSE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with no A-query response. |
+| `NO_RESPONSE` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `NO_RESPONSE` | `domain` | `string` | Tested zone name. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Nameserver05`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Nameserver05`). |
@@ -85,7 +92,7 @@ Status: Final
 ## Differences From Upstream
 - Upstream reference: [`nameserver05.md`](../../upstream/tests/Nameserver-TP/nameserver05.md)
 - Differences (Upstream vs Gonemaster):
-  - Upstream: models an `AAAA OK` set of nameserver IPs and uses that set for the final positive condition. Gonemaster: final `AAAA_WELL_PROCESSED` condition is also global (no AAAA issues anywhere), but emitted `ns_list` contains all included nameservers, not only nameservers with successful AAAA records.
+  - Upstream: models an `AAAA OK` set of nameserver IPs and uses that set for the final positive condition. Gonemaster: final `AAAA_WELL_PROCESSED` condition is also global (no AAAA issues anywhere), but emitted `servers` contains all included nameservers, not only nameservers with successful AAAA records.
   - Upstream: describes iterating nameserver IP set. Gonemaster: deduplicates nameservers by `name/ip` before evaluation.
   - Upstream: does not explicitly describe testcase boundary and transport-disabled debug emissions. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
 - Potential upstream report:

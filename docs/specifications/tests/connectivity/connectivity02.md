@@ -54,26 +54,39 @@ Status: Final
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
-| `CN02_MISSING_NS_RECORD_TCP` | `ns` | `string` | Nameserver identity (`name/ip`) producing the response. |
-| `CN02_MISSING_SOA_RECORD_TCP` | `ns` | `string` | Nameserver identity (`name/ip`) producing the response. |
-| `CN02_NO_RESPONSE_NS_QUERY_TCP` | `ns` | `string` | Nameserver identity (`name/ip`) with no NS response. |
-| `CN02_NO_RESPONSE_SOA_QUERY_TCP` | `ns` | `string` | Nameserver identity (`name/ip`) with no SOA response. |
-| `CN02_NO_RESPONSE_TCP` | `ns` | `string` | Nameserver identity (`name/ip`) with no SOA and NS response. |
-| `CN02_NS_RECORD_NOT_AA_TCP` | `ns` | `string` | Nameserver identity (`name/ip`) with non-AA NS response. |
-| `CN02_SOA_RECORD_NOT_AA_TCP` | `ns` | `string` | Nameserver identity (`name/ip`) with non-AA SOA response. |
-| `CN02_UNEXPECTED_RCODE_NS_QUERY_TCP` | `ns` | `string` | Nameserver identity (`name/ip`) producing unexpected NS RCODE. |
+| `CN02_MISSING_NS_RECORD_TCP` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) producing the response. |
+| `CN02_MISSING_NS_RECORD_TCP` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `CN02_MISSING_SOA_RECORD_TCP` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) producing the response. |
+| `CN02_MISSING_SOA_RECORD_TCP` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `CN02_NO_RESPONSE_NS_QUERY_TCP` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with no NS response. |
+| `CN02_NO_RESPONSE_NS_QUERY_TCP` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `CN02_NO_RESPONSE_SOA_QUERY_TCP` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with no SOA response. |
+| `CN02_NO_RESPONSE_SOA_QUERY_TCP` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `CN02_NO_RESPONSE_TCP` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with no SOA and NS response. |
+| `CN02_NO_RESPONSE_TCP` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `CN02_NS_RECORD_NOT_AA_TCP` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with non-AA NS response. |
+| `CN02_NS_RECORD_NOT_AA_TCP` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `CN02_SOA_RECORD_NOT_AA_TCP` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with non-AA SOA response. |
+| `CN02_SOA_RECORD_NOT_AA_TCP` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `CN02_UNEXPECTED_RCODE_NS_QUERY_TCP` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) producing unexpected NS RCODE. |
+| `CN02_UNEXPECTED_RCODE_NS_QUERY_TCP` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `CN02_UNEXPECTED_RCODE_NS_QUERY_TCP` | `rcode` | `string` | Returned RCODE mnemonic. |
-| `CN02_UNEXPECTED_RCODE_SOA_QUERY_TCP` | `ns` | `string` | Nameserver identity (`name/ip`) producing unexpected SOA RCODE. |
+| `CN02_UNEXPECTED_RCODE_SOA_QUERY_TCP` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) producing unexpected SOA RCODE. |
+| `CN02_UNEXPECTED_RCODE_SOA_QUERY_TCP` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `CN02_UNEXPECTED_RCODE_SOA_QUERY_TCP` | `rcode` | `string` | Returned RCODE mnemonic. |
-| `CN02_WRONG_NS_RECORD_TCP` | `ns` | `string` | Nameserver identity (`name/ip`) returning wrong NS owner name. |
+| `CN02_WRONG_NS_RECORD_TCP` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) returning wrong NS owner name. |
+| `CN02_WRONG_NS_RECORD_TCP` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `CN02_WRONG_NS_RECORD_TCP` | `domain_found` | `string` | Lowercased owner name found in first NS answer record. |
 | `CN02_WRONG_NS_RECORD_TCP` | `domain_expected` | `string` | Lowercased expected child zone FQDN. |
-| `CN02_WRONG_SOA_RECORD_TCP` | `ns` | `string` | Nameserver identity (`name/ip`) returning wrong SOA owner name. |
+| `CN02_WRONG_SOA_RECORD_TCP` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) returning wrong SOA owner name. |
+| `CN02_WRONG_SOA_RECORD_TCP` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `CN02_WRONG_SOA_RECORD_TCP` | `domain_found` | `string` | Lowercased owner name found in first SOA answer record. |
 | `CN02_WRONG_SOA_RECORD_TCP` | `domain_expected` | `string` | Lowercased expected child zone FQDN. |
-| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv4. |
+| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
+| `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA` or `NS`). |
-| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv6. |
+| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
+| `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA` or `NS`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Connectivity02`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Connectivity02`). |

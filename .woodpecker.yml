@@ -11,6 +11,8 @@ steps:
     commands:
       - go run ./tools/specifications/validate
       - go run ./tools/specifications/generate-tag-catalog --check
+      - go run ./tools/specifications/export-log-args --check-coherency --markdown-out '' >/dev/null
+      - go run ./tools/i18n/check-placeholders
 
   go_test:
     image: golang:1.25

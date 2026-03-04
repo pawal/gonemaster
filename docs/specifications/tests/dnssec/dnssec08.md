@@ -62,19 +62,21 @@ Status: Final
 | `DS08_ALGO_NOT_SUPPORTED_BY_ZM` | `keytag` | `int` | RRSIG keytag associated with unsupported algorithm. |
 | `DS08_ALGO_NOT_SUPPORTED_BY_ZM` | `algo_num` | `int` | Unsupported DNSSEC algorithm number. |
 | `DS08_ALGO_NOT_SUPPORTED_BY_ZM` | `algo_mnemo` | `string` | Unsupported DNSSEC algorithm mnemonic. |
-| `DS08_ALGO_NOT_SUPPORTED_BY_ZM` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
+| `DS08_ALGO_NOT_SUPPORTED_BY_ZM` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS08_DNSKEY_RRSIG_EXPIRED` | `keytag` | `int` | RRSIG keytag with expired validity window. |
-| `DS08_DNSKEY_RRSIG_EXPIRED` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
+| `DS08_DNSKEY_RRSIG_EXPIRED` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS08_DNSKEY_RRSIG_NOT_YET_VALID` | `keytag` | `int` | RRSIG keytag with not-yet-valid validity window. |
-| `DS08_DNSKEY_RRSIG_NOT_YET_VALID` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
-| `DS08_MISSING_RRSIG_IN_RESPONSE` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list lacking RRSIG in DNSKEY response. |
+| `DS08_DNSKEY_RRSIG_NOT_YET_VALID` | `addresses` | `array<string>` | Structured child nameserver IP list. |
+| `DS08_MISSING_RRSIG_IN_RESPONSE` | `addresses` | `array<string>` | Structured child nameserver IP list lacking RRSIG in DNSKEY response. |
 | `DS08_NO_MATCHING_DNSKEY` | `keytag` | `int` | RRSIG keytag with no matching DNSKEY keytag in DNSKEY RRset. |
-| `DS08_NO_MATCHING_DNSKEY` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
+| `DS08_NO_MATCHING_DNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS08_RRSIG_NOT_VALID_BY_DNSKEY` | `keytag` | `int` | RRSIG keytag that failed DNSKEY verification. |
-| `DS08_RRSIG_NOT_VALID_BY_DNSKEY` | `ns_ip_list` | `string` | Semicolon-delimited child nameserver IP list. |
-| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv4. |
+| `DS08_RRSIG_NOT_VALID_BY_DNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
+| `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
+| `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`DNSKEY`). |
-| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`name/ip`) skipped on IPv6. |
+| `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
+| `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`DNSKEY`). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`DNSSEC08`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`DNSSEC08`). |

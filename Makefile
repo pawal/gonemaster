@@ -17,7 +17,7 @@ CMD ?= all
 	build-gonemaster-nagios install-gonemaster install-gonemaster-server install-gonemaster-client \
 	install-gonemaster-nagios ui-check test-go vet race \
 	spec-export-implemented spec-export-tags spec-export spec-validate spec-validate-scan spec-check \
-	spec-generate-tags spec-check-tags
+	spec-generate-tags spec-check-tags spec-export-log-args spec-check-coherency spec-check-i18n-placeholders
 
 help:
 	@echo "Targets:"
@@ -36,11 +36,14 @@ help:
 	@echo "  build-gonemaster-client       Build the HTTP API client"
 	@echo "  build-gonemaster-nagios       Build the Nagios plugin"
 	@echo "  spec-export        Refresh generated specification inventories (JSON)"
+	@echo "  spec-export-log-args  Refresh generated log argument inventory (JSON + markdown)"
 	@echo "  spec-validate      Validate canonical testcase specs against implementation metadata"
 	@echo "  spec-validate-scan Validate specs + scan append*Log literals for metadata omissions"
 	@echo "  spec-generate-tags Regenerate per-module tag catalog markdown files"
 	@echo "  spec-check-tags    Check tag catalog files are up to date (drift detection)"
-	@echo "  spec-check         Run spec-validate + spec-check-tags"
+	@echo "  spec-check-coherency Run log-args coherency guardrail checks"
+	@echo "  spec-check-i18n-placeholders  Verify placeholder parity and reject non-allowlisted legacy placeholders"
+	@echo "  spec-check         Run spec-validate + spec-check-tags + coherency + i18n placeholder checks"
 	@echo "  clean            Remove build artifacts"
 
 $(BIN_DIR):
@@ -153,6 +156,9 @@ spec-export-tags:
 
 spec-export: spec-export-implemented spec-export-tags
 
+spec-export-log-args:
+	$(GO) run ./tools/specifications/export-log-args > docs/specifications/log-args-inventory.json
+
 spec-validate:
 	$(GO) run ./tools/specifications/validate
 
@@ -165,7 +171,13 @@ spec-generate-tags:
 spec-check-tags:
 	$(GO) run ./tools/specifications/generate-tag-catalog --check
 
-spec-check: spec-validate spec-check-tags
+spec-check-coherency:
+	$(GO) run ./tools/specifications/export-log-args --check-coherency --markdown-out '' >/dev/null
+
+spec-check-i18n-placeholders:
+	$(GO) run ./tools/i18n/check-placeholders
+
+spec-check: spec-validate spec-check-tags spec-check-coherency spec-check-i18n-placeholders
 
 clean:
 	@rm -rf $(BIN_DIR) $(UI_BUILD_DIR) $(UI_DIR)/node_modules

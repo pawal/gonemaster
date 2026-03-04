@@ -3,6 +3,7 @@ package zone
 import (
 	"context"
 	"net/netip"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -152,19 +153,89 @@ func TestZone10ParallelQueries(t *testing.T) {
 	}
 
 	var order []string
+	var addresses []string
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "NO_RESPONSE" {
 			continue
 		}
+		if _, ok := entry.Args["arg_schema"]; ok {
+			t.Fatalf("did not expect arg_schema in args: %#v", entry.Args["arg_schema"])
+		}
 		if ns, ok := entry.Args["ns"].(string); ok {
+			if strings.Contains(ns, "/") {
+				t.Fatalf("expected nameserver-only ns argument, got %q", ns)
+			}
 			order = append(order, ns)
+		}
+		if address, ok := entry.Args["address"].(string); ok {
+			addresses = append(addresses, address)
 		}
 	}
 	if len(order) != 2 {
 		t.Fatalf("expected 2 no-response entries, got %v", order)
 	}
-	if order[0] != "ns1.example/192.0.2.1" || order[1] != "ns2.example/192.0.2.2" {
-		t.Fatalf("expected deterministic log order, got %v", order)
+	if order[0] != "ns1.example" || order[1] != "ns2.example" {
+		t.Fatalf("expected deterministic nameserver order, got %v", order)
+	}
+	if len(addresses) != 2 {
+		t.Fatalf("expected 2 no-response addresses, got %v", addresses)
+	}
+	if addresses[0] != "192.0.2.1" || addresses[1] != "192.0.2.2" {
+		t.Fatalf("expected deterministic address order, got %v", addresses)
+	}
+}
+
+func TestZone10WrongSOAUsesQueryName(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	ns := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		if qtype != "SOA" {
+			return packet.Packet{}
+		}
+		msg := new(dns.Msg)
+		msg.Authoritative = true
+		msg.Rcode = dns.RcodeSuccess
+		soa := &dns.SOA{Hdr: dns.Header{Name: "wrong.example.", Class: dns.ClassINET, TTL: 300}}
+		soa.Ns = "ns1.example."
+		soa.Mbox = "hostmaster.example."
+		soa.Serial = 1
+		soa.Refresh = 1
+		soa.Retry = 1
+		soa.Expire = 1
+		soa.Minttl = 1
+		msg.Answer = []dns.RR{soa}
+		return packet.Packet{Msg: msg}
+	})
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example.com")}
+	entries, err := Zone10(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone10: %v", err)
+	}
+	if !hasEntryTag(entries, "WRONG_SOA") {
+		t.Fatalf("expected WRONG_SOA")
+	}
+	var entry *logger.Entry
+	for _, e := range entries {
+		if e != nil && e.Tag == "WRONG_SOA" {
+			entry = e
+			break
+		}
+	}
+	if entry == nil {
+		t.Fatalf("missing WRONG_SOA")
+	}
+	if got, ok := entry.Args["query_name"].(string); !ok || got != "example.com." {
+		t.Fatalf("expected query_name=example.com., got %#v", entry.Args["query_name"])
+	}
+	if _, ok := entry.Args["name"]; ok {
+		t.Fatalf("legacy key name should not be present: %#v", entry.Args)
 	}
 }
 
@@ -236,6 +307,63 @@ func TestZone09MXQueryDisablesFallback(t *testing.T) {
 	}
 	if len(useVCValues) < 2 || useVCValues[0] || !useVCValues[1] {
 		t.Fatalf("expected MX query to retry with UseVC after truncation, got %v", useVCValues)
+	}
+}
+
+func TestZone09MXDataUsesTypedMailTargets(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	ns := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		switch qtype {
+		case "SOA":
+			return soaPacket("example.com", 1, 1, 1, 1, 1)
+		case "MX":
+			msg := new(dns.Msg)
+			msg.Authoritative = true
+			msg.Rcode = dns.RcodeSuccess
+			mx := &dns.MX{Hdr: dns.Header{Name: "example.com.", Class: dns.ClassINET, TTL: 300}}
+			mx.Mx = "mail.example."
+			mx.Preference = 10
+			msg.Answer = []dns.RR{mx}
+			return packet.Packet{Msg: msg}
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example.com")}
+	entries, err := Zone09(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone09: %v", err)
+	}
+
+	var mxData *logger.Entry
+	for _, entry := range entries {
+		if entry != nil && entry.Tag == "Z09_MX_DATA" {
+			mxData = entry
+			break
+		}
+	}
+	if mxData == nil {
+		t.Fatalf("expected Z09_MX_DATA")
+	}
+	targets, ok := mxData.Args["mail_targets"].([]string)
+	if !ok || len(targets) != 1 || targets[0] != "mail.example" {
+		t.Fatalf("expected typed mail_targets [mail.example], got %#v", mxData.Args["mail_targets"])
+	}
+	addresses, ok := mxData.Args["addresses"].([]string)
+	if !ok || len(addresses) != 1 || addresses[0] != "192.0.2.1" {
+		t.Fatalf("expected typed addresses [192.0.2.1], got %#v", mxData.Args["addresses"])
+	}
+	if _, ok := mxData.Args["mailtarget_list"]; ok {
+		t.Fatalf("legacy key mailtarget_list should not be present: %#v", mxData.Args)
 	}
 }
 

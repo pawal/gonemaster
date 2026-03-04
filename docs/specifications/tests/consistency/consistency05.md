@@ -57,14 +57,16 @@ Status: Final
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
 | `ADDRESSES_MATCH` | `-` | `-` | No arguments. |
-| `CHILD_NS_FAILED` | `ns` | `string` | Child nameserver identity (`name/ip`) that failed authoritative child lookup requirements. |
+| `CHILD_NS_FAILED` | `ns` | `string` | Child nameserver identity (`ns` name only; use `address` for IP) that failed authoritative child lookup requirements. |
+| `CHILD_NS_FAILED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `CHILD_ZONE_LAME` | `-` | `-` | No arguments. |
-| `EXTRA_ADDRESS_CHILD` | `ns_ip_list` | `string` | Semicolon-delimited `owner/ip` entries found only in child authoritative data. |
-| `IN_BAILIWICK_ADDR_MISMATCH` | `parent_addresses` | `string` | Semicolon-delimited strict glue `owner/ip` entries from parent. |
-| `IN_BAILIWICK_ADDR_MISMATCH` | `zone_addresses` | `string` | Semicolon-delimited in-bailiwick child `owner/ip` entries. |
-| `NO_RESPONSE` | `ns` | `string` | Child nameserver identity (`name/ip`) with no response. |
-| `OUT_OF_BAILIWICK_ADDR_MISMATCH` | `parent_addresses` | `string` | Semicolon-delimited out-of-bailiwick glue addresses for one NS name. |
-| `OUT_OF_BAILIWICK_ADDR_MISMATCH` | `zone_addresses` | `string` | Semicolon-delimited recursively resolved `owner/ip` entries for that NS name. |
+| `EXTRA_ADDRESS_CHILD` | `addresses` | `array<string>` | Structured `owner/ip` entries found only in child authoritative data. |
+| `IN_BAILIWICK_ADDR_MISMATCH` | `parent_servers` | `array<object>` | Structured parent strict-glue endpoint list; each item is `{ "ns": "...", "address": "..." }`. |
+| `IN_BAILIWICK_ADDR_MISMATCH` | `zone_servers` | `array<object>` | Structured child authoritative in-bailiwick endpoint list; each item is `{ "ns": "...", "address": "..." }`. |
+| `NO_RESPONSE` | `ns` | `string` | Child nameserver identity (`ns` name only; use `address` for IP) with no response. |
+| `NO_RESPONSE` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `OUT_OF_BAILIWICK_ADDR_MISMATCH` | `parent_servers` | `array<object>` | Structured parent out-of-bailiwick glue endpoint list for one NS name. |
+| `OUT_OF_BAILIWICK_ADDR_MISMATCH` | `zone_servers` | `array<object>` | Structured recursively resolved endpoint list for the same NS name. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Consistency05`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Consistency05`). |
 

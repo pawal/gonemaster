@@ -2,7 +2,11 @@ package dnssec
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"net/netip"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -10,6 +14,7 @@ import (
 	dns "codeberg.org/miekg/dns"
 	"codeberg.org/miekg/dns/dnsutil"
 
+	"codeberg.org/pawal/gonemaster/engine/badkeys"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	methodsv2 "codeberg.org/pawal/gonemaster/engine/methodsv2"
@@ -4936,6 +4941,287 @@ func TestDNSSEC18ParallelOutputStable(t *testing.T) {
 	}
 }
 
+func TestDNSSEC19CleanZone(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origDel := getDelNSNamesAndIPs
+	origZone := getZoneNSNamesAndIPs
+	t.Cleanup(func() {
+		getDelNSNamesAndIPs = origDel
+		getZoneNSNamesAndIPs = origZone
+	})
+
+	if err := profile.Effective().Set("badkeys.path", filepath.Join(t.TempDir(), "missing")); err != nil {
+		t.Fatalf("set badkeys.path: %v", err)
+	}
+
+	newNameserver(t, "ns1.example", "192.0.2.201", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype != "DNSKEY" {
+			return packet.Packet{}
+		}
+		return dnskeyPacket(qname, dnssec19P256Key(qname))
+	})
+
+	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+		return []methodsv2.NSItem{{
+			Name:       dnsname.New("ns1.example"),
+			Address:    netip.MustParseAddr("192.0.2.201"),
+			HasAddress: true,
+		}}, nil
+	}
+	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+		return nil, nil
+	}
+
+	z, err := zone.New("example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC19(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("dnssec19: %v", err)
+	}
+
+	if !hasEntryTag(entries, "DS19_KEY_OK") {
+		t.Fatalf("expected DS19_KEY_OK")
+	}
+	if !hasEntryTag(entries, "DS19_BLOCKLIST_NOT_FOUND") {
+		t.Fatalf("expected DS19_BLOCKLIST_NOT_FOUND")
+	}
+}
+
+func TestDNSSEC19BlocklistedKey(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origDel := getDelNSNamesAndIPs
+	origZone := getZoneNSNamesAndIPs
+	t.Cleanup(func() {
+		getDelNSNamesAndIPs = origDel
+		getZoneNSNamesAndIPs = origZone
+	})
+
+	key := dnssec19P256Key("example")
+	dir := t.TempDir()
+	writeDNSSEC19BlocklistFixture(t, dir, key.Algorithm, key.PublicKey, 7, "unit-blocklist")
+	if err := profile.Effective().Set("badkeys.path", dir); err != nil {
+		t.Fatalf("set badkeys.path: %v", err)
+	}
+
+	newNameserver(t, "ns1.example", "192.0.2.202", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype != "DNSKEY" {
+			return packet.Packet{}
+		}
+		return dnskeyPacket(qname, dnssec19P256Key(qname))
+	})
+
+	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+		return []methodsv2.NSItem{{
+			Name:       dnsname.New("ns1.example"),
+			Address:    netip.MustParseAddr("192.0.2.202"),
+			HasAddress: true,
+		}}, nil
+	}
+	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+		return nil, nil
+	}
+
+	z, err := zone.New("example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC19(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("dnssec19: %v", err)
+	}
+
+	if !hasEntryTag(entries, "DS19_BADKEY_BLOCKLIST") {
+		t.Fatalf("expected DS19_BADKEY_BLOCKLIST")
+	}
+	if hasEntryTag(entries, "DS19_KEY_OK") {
+		t.Fatalf("did not expect DS19_KEY_OK for blocklisted key")
+	}
+	if hasEntryTag(entries, "DS19_BLOCKLIST_NOT_FOUND") {
+		t.Fatalf("did not expect DS19_BLOCKLIST_NOT_FOUND when fixture blocklist exists")
+	}
+
+	blocklisted := firstEntryByTag(entries, "DS19_BADKEY_BLOCKLIST")
+	if blocklisted == nil {
+		t.Fatalf("missing DS19_BADKEY_BLOCKLIST entry")
+	}
+	if got, _ := blocklisted.Args["blocklist_name"].(string); got != "unit-blocklist" {
+		t.Fatalf("unexpected blocklist_name: got %q want %q", got, "unit-blocklist")
+	}
+}
+
+func TestDNSSEC19NoDNSKEY(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origDel := getDelNSNamesAndIPs
+	origZone := getZoneNSNamesAndIPs
+	t.Cleanup(func() {
+		getDelNSNamesAndIPs = origDel
+		getZoneNSNamesAndIPs = origZone
+	})
+
+	if err := profile.Effective().Set("badkeys.path", filepath.Join(t.TempDir(), "missing")); err != nil {
+		t.Fatalf("set badkeys.path: %v", err)
+	}
+
+	newNameserver(t, "ns1.example", "192.0.2.203", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype != "DNSKEY" {
+			return packet.Packet{}
+		}
+		return dnskeyPacket(qname, nil)
+	})
+
+	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+		return []methodsv2.NSItem{{
+			Name:       dnsname.New("ns1.example"),
+			Address:    netip.MustParseAddr("192.0.2.203"),
+			HasAddress: true,
+		}}, nil
+	}
+	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+		return nil, nil
+	}
+
+	z, err := zone.New("example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC19(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("dnssec19: %v", err)
+	}
+
+	if !hasEntryTag(entries, "DS19_NO_DNSKEY") {
+		t.Fatalf("expected DS19_NO_DNSKEY")
+	}
+	if hasEntryTag(entries, "DS19_NO_RESPONSE") {
+		t.Fatalf("did not expect DS19_NO_RESPONSE when nameserver answered without DNSKEY")
+	}
+}
+
+func TestDNSSEC19NoResponse(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origDel := getDelNSNamesAndIPs
+	origZone := getZoneNSNamesAndIPs
+	t.Cleanup(func() {
+		getDelNSNamesAndIPs = origDel
+		getZoneNSNamesAndIPs = origZone
+	})
+
+	if err := profile.Effective().Set("badkeys.path", filepath.Join(t.TempDir(), "missing")); err != nil {
+		t.Fatalf("set badkeys.path: %v", err)
+	}
+
+	newNameserver(t, "ns1.example", "192.0.2.204", func(_ string, _ string, _ *nameserver.QueryOptions) packet.Packet {
+		return packet.Packet{}
+	})
+
+	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+		return []methodsv2.NSItem{{
+			Name:       dnsname.New("ns1.example"),
+			Address:    netip.MustParseAddr("192.0.2.204"),
+			HasAddress: true,
+		}}, nil
+	}
+	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+		return nil, nil
+	}
+
+	z, err := zone.New("example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC19(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("dnssec19: %v", err)
+	}
+
+	if !hasEntryTag(entries, "DS19_NO_RESPONSE") {
+		t.Fatalf("expected DS19_NO_RESPONSE")
+	}
+	if hasEntryTag(entries, "DS19_NO_DNSKEY") {
+		t.Fatalf("did not expect DS19_NO_DNSKEY when nameserver did not respond")
+	}
+}
+
+func TestDNSSEC19TransportDisabled(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origDel := getDelNSNamesAndIPs
+	origZone := getZoneNSNamesAndIPs
+	t.Cleanup(func() {
+		getDelNSNamesAndIPs = origDel
+		getZoneNSNamesAndIPs = origZone
+	})
+
+	if err := profile.Effective().Set("net.ipv4", false); err != nil {
+		t.Fatalf("set net.ipv4: %v", err)
+	}
+	if err := profile.Effective().Set("badkeys.path", filepath.Join(t.TempDir(), "missing")); err != nil {
+		t.Fatalf("set badkeys.path: %v", err)
+	}
+
+	newNameserver(t, "ns1.example", "192.0.2.205", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype != "DNSKEY" {
+			return packet.Packet{}
+		}
+		return dnskeyPacket(qname, dnssec19P256Key(qname))
+	})
+
+	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+		return []methodsv2.NSItem{{
+			Name:       dnsname.New("ns1.example"),
+			Address:    netip.MustParseAddr("192.0.2.205"),
+			HasAddress: true,
+		}}, nil
+	}
+	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+		return nil, nil
+	}
+
+	z, err := zone.New("example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC19(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("dnssec19: %v", err)
+	}
+
+	if !hasEntryTag(entries, "IPV4_DISABLED") {
+		t.Fatalf("expected IPV4_DISABLED")
+	}
+}
+
 func newNameserver(t *testing.T, name string, ip string, handler func(qname string, qtype string, opts *nameserver.QueryOptions) packet.Packet) nameserver.Nameserver {
 	t.Helper()
 
@@ -5101,4 +5387,49 @@ func soaRecord(owner string) *dns.SOA {
 	rr.Expire = 60
 	rr.Minttl = 60
 	return rr
+}
+
+func dnssec19P256Key(owner string) *dns.DNSKEY {
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = dns.ECDSAP256SHA256
+	key.PublicKey = "GojIhhXUN/u4v54ZQqGSnyhWJwaubCvTmeexv7bR6edbkrSqQpF64cYbcB7wNcP+e+MAnLr+Wi9xMWyQLc8NAA=="
+	return key
+}
+
+func writeDNSSEC19BlocklistFixture(t *testing.T, dir string, algo uint8, publicKey string, sourceID byte, sourceName string) {
+	t.Helper()
+
+	keyData, err := base64.StdEncoding.DecodeString(strings.TrimSpace(publicKey))
+	if err != nil {
+		t.Fatalf("decode DNSKEY public key: %v", err)
+	}
+	parsed, err := badkeys.ParseDNSKEY(algo, keyData)
+	if err != nil {
+		t.Fatalf("parse DNSKEY for blocklist fixture: %v", err)
+	}
+
+	hash := badkeys.BKHASH120(parsed.Val)
+	entry := append(append([]byte{}, hash[:]...), sourceID)
+
+	if err := os.WriteFile(filepath.Join(dir, "blocklist.dat"), entry, 0o644); err != nil {
+		t.Fatalf("write blocklist.dat: %v", err)
+	}
+
+	meta := map[string]any{
+		"blocklists": []map[string]any{
+			{
+				"id":   int(sourceID),
+				"name": sourceName,
+			},
+		},
+	}
+	raw, err := json.Marshal(meta)
+	if err != nil {
+		t.Fatalf("marshal badkeysdata.json: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "badkeysdata.json"), raw, 0o644); err != nil {
+		t.Fatalf("write badkeysdata.json: %v", err)
+	}
 }

@@ -109,6 +109,16 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, nil
 	}
 
+	if util.ShouldRunTest(ctx, "dnssec19") {
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC19(ctx, z)
+		})
+		results = append(results, entries...)
+		if err != nil {
+			return results, err
+		}
+	}
+
 	if util.ShouldRunTest(ctx, "dnssec01") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return DNSSEC01(ctx, z)

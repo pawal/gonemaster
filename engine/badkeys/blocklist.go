@@ -3,8 +3,11 @@ package badkeys
 import (
 	"bytes"
 	"compress/gzip"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"io"
+	"math/big"
 	"os"
 	"path/filepath"
 
@@ -135,3 +138,57 @@ type BlocklistError struct {
 }
 
 func (e *BlocklistError) Error() string { return e.msg }
+
+// BKHASH120 computes the badkeys truncated hash for a key's numeric value.
+// The value is encoded as big-endian bytes without leading zeros, SHA-256
+// hashed, and truncated to 15 bytes (120 bits).
+func BKHASH120(val *big.Int) [15]byte {
+	b := val.Bytes() // big-endian, no leading zeros
+	h := sha256.Sum256(b)
+	var trunc [15]byte
+	copy(trunc[:], h[:15])
+	return trunc
+}
+
+// CheckResult holds the result of a blocklist lookup.
+type CheckResult struct {
+	SourceID   int
+	SourceName string
+}
+
+// Check looks up a key's numeric value in the blocklist.
+// Returns nil if the key is not found.
+func (bl *Blocklist) Check(val *big.Int) *CheckResult {
+	if bl == nil || bl.Entries == 0 {
+		return nil
+	}
+
+	hash := BKHASH120(val)
+
+	lo, hi := 0, bl.Entries-1
+	for lo <= hi {
+		mid := lo + (hi-lo)/2
+		offset := mid * blockSize
+		entry := bl.Data[offset : offset+15]
+
+		cmp := bytes.Compare(hash[:], entry)
+		if cmp == 0 {
+			sourceID := int(bl.Data[offset+15])
+			name := fmt.Sprintf("id%d", sourceID)
+			if n, ok := bl.Sources[sourceID]; ok {
+				name = n
+			}
+			return &CheckResult{
+				SourceID:   sourceID,
+				SourceName: name,
+			}
+		}
+		if cmp > 0 {
+			lo = mid + 1
+		} else {
+			hi = mid - 1
+		}
+	}
+
+	return nil
+}

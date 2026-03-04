@@ -267,6 +267,17 @@ var propertyDefs = map[string]propertyDef{
 			return p.ASNDB.Sources
 		},
 	},
+	"badkeys.path": {
+		typ:          propStr,
+		defaultValue: "",
+		hasDefault:   true,
+		setter: func(p *Profile, value any) {
+			p.Badkeys.Path = value.(string)
+		},
+		getter: func(p *Profile) any {
+			return p.Badkeys.Path
+		},
+	},
 	"logfilter": {
 		typ:          propMap,
 		defaultValue: map[string]map[string][]LogFilterRule{},

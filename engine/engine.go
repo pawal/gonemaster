@@ -70,6 +70,8 @@ type RunRequest struct {
 	PositiveCacheTTL *int
 	// NegativeCacheTTL sets resolver.defaults.negative_cache_ttl in seconds.
 	NegativeCacheTTL *int
+	// BadkeysPath overrides badkeys.path when non-nil.
+	BadkeysPath *string
 	// NameserverCache optionally provides the per-run nameserver cache store.
 	NameserverCache *ns.CacheStore
 	// LogCallback receives each log entry as it is created.
@@ -374,6 +376,11 @@ func buildProfile(req RunRequest, module string, testcase string) (*profile.Prof
 	}
 	if req.NegativeCacheTTL != nil {
 		if err := p.Set("resolver.defaults.negative_cache_ttl", *req.NegativeCacheTTL); err != nil {
+			return nil, false, err
+		}
+	}
+	if req.BadkeysPath != nil {
+		if err := p.Set("badkeys.path", *req.BadkeysPath); err != nil {
 			return nil, false, err
 		}
 	}

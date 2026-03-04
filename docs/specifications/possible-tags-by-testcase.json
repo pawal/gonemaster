@@ -13,8 +13,8 @@
   ],
   "summary": {
     "module_count": 9,
-    "testcase_count": 73,
-    "unique_tag_count": 447
+    "testcase_count": 76,
+    "unique_tag_count": 468
   },
   "modules": {
     "address": {
@@ -573,6 +573,23 @@
         "IPV6_DISABLED",
         "TEST_CASE_END",
         "TEST_CASE_START"
+      ],
+      "dnssec19": [
+        "DS19_BADKEY_BLOCKLIST",
+        "DS19_BADKEY_FERMAT",
+        "DS19_BADKEY_PATTERN",
+        "DS19_BADKEY_ROCA",
+        "DS19_BADKEY_RSA_INVALID",
+        "DS19_BADKEY_SMALL_D",
+        "DS19_BADKEY_SMALL_FACTORS",
+        "DS19_BLOCKLIST_NOT_FOUND",
+        "DS19_KEY_OK",
+        "DS19_NO_DNSKEY",
+        "DS19_NO_RESPONSE",
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
+        "TEST_CASE_END",
+        "TEST_CASE_START"
       ]
     },
     "nameserver": {
@@ -711,6 +728,16 @@
         "N15_NO_VERSION_REVEALED",
         "N15_SOFTWARE_VERSION",
         "N15_WRONG_CLASS",
+        "TEST_CASE_END",
+        "TEST_CASE_START"
+      ],
+      "nameserver16": [
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
+        "N16_HAS_NSID",
+        "N16_NO_NSID_REVEALED",
+        "N16_NO_RESPONSE",
+        "N16_UNEXPECTED_RCODE",
         "TEST_CASE_END",
         "TEST_CASE_START"
       ]
@@ -887,6 +914,18 @@
         "Z11_SPF_SYNTAX_ERROR",
         "Z11_SPF_SYNTAX_OK",
         "Z11_UNABLE_TO_CHECK_FOR_SPF"
+      ],
+      "zone12": [
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
+        "TEST_CASE_END",
+        "TEST_CASE_START",
+        "Z12_CSYNC_FOUND",
+        "Z12_INCONSISTENT_CSYNC",
+        "Z12_MIXED_PRESENCE",
+        "Z12_MULTIPLE_CSYNC",
+        "Z12_NO_CSYNC",
+        "Z12_SERIAL_MISMATCH"
       ]
     }
   }

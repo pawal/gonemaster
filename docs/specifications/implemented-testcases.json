@@ -7,7 +7,7 @@
   ],
   "summary": {
     "module_count": 9,
-    "testcase_count": 75
+    "testcase_count": 76
   },
   "module_order": [
     "basic",
@@ -71,7 +71,8 @@
       "dnssec15",
       "dnssec16",
       "dnssec17",
-      "dnssec18"
+      "dnssec18",
+      "dnssec19"
     ],
     "nameserver": [
       "nameserver01",
@@ -156,6 +157,7 @@
     "dnssec16": "Validate CDS RRsets against DNSKEY data and CDS signatures, including delete semantics and signature/keytag consistency checks.",
     "dnssec17": "Validate CDNSKEY RRsets against DNSKEY data and CDNSKEY signatures, including delete semantics and signature/keytag consistency checks.",
     "dnssec18": "Validate that CDS and CDNSKEY RRsets are signed by a DNSKEY that corresponds to DS information observed at the parent side.",
+    "dnssec19": "Check DNSKEY records published by authoritative nameservers for known cryptographic weaknesses and membership in blocklists of compromised keys. This testcase ports DNSSEC-relevant checks from the [badkeys](https://github.com/badkeys/badkeys) project to detect vulnerable RSA keys (Fermat factorization, ROCA, pattern anomalies, invalid parameters, small factors, Wiener's attack) and keys matching the badkeys blocklist of known-compromised keys (e.g., Debian OpenSSL CVE-2008-0166, RFC example keys, firmware keys).",
     "nameserver01": "Detect whether authoritative nameservers also behave as recursors.",
     "nameserver02": "Validate EDNS(0) handling on authoritative nameservers.",
     "nameserver03": "Check whether nameservers allow AXFR zone transfer.",

@@ -22,3 +22,7 @@
 /majestic_million.csv
 /perf-runs/
 /server-perf-kit-*.tar.gz
+
+# Badkeys blocklist data (downloaded, not committed)
+/share/badkeys/blocklist.dat
+/share/badkeys/badkeysdata.json

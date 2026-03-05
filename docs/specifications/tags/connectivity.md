@@ -38,8 +38,8 @@ _Do not edit by hand — regenerate with the command above._
 | `CN02_UNEXPECTED_RCODE_SOA_QUERY_TCP` | `WARNING` | [connectivity02](../tests/connectivity/connectivity02.md) | yes |
 | `CN02_WRONG_NS_RECORD_TCP` | `WARNING` | [connectivity02](../tests/connectivity/connectivity02.md) | yes |
 | `CN02_WRONG_SOA_RECORD_TCP` | `WARNING` | [connectivity02](../tests/connectivity/connectivity02.md) | yes |
-| `CN04_ASN_INFOS_ANNOUNCE_IN` | `DEBUG` | [connectivity04](../tests/connectivity/connectivity04.md) | **no** |
-| `CN04_ASN_INFOS_RAW` | `DEBUG` | [connectivity04](../tests/connectivity/connectivity04.md) | **no** |
+| `CN04_ASN_INFOS_ANNOUNCE_IN` | `DEBUG` | [connectivity04](../tests/connectivity/connectivity04.md) | yes |
+| `CN04_ASN_INFOS_RAW` | `DEBUG` | [connectivity04](../tests/connectivity/connectivity04.md) | yes |
 | `CN04_EMPTY_PREFIX_SET` | `NOTICE` | [connectivity04](../tests/connectivity/connectivity04.md) | yes |
 | `CN04_ERROR_PREFIX_DATABASE` | `NOTICE` | [connectivity04](../tests/connectivity/connectivity04.md) | yes |
 | `CN04_IPV4_DIFFERENT_PREFIX` | `INFO` | [connectivity04](../tests/connectivity/connectivity04.md) | yes |
@@ -63,11 +63,4 @@ _Do not edit by hand — regenerate with the command above._
 
 ## i18n Notes
 
-### Tags Missing From Locale Files
-
-These tags have no `CONNECTIVITY:<TAG>` `msgctxt` entry in any `.po` file.
-They will render as the raw tag name in translated output.
-
-- `CN04_ASN_INFOS_ANNOUNCE_IN`
-- `CN04_ASN_INFOS_RAW`
-
+All tags have i18n coverage and no stale entries found.

@@ -38,17 +38,11 @@ _Do not edit by hand — regenerate with the command above._
 | `IPV4_ENABLED` | `DEBUG` | [basic01](../tests/basic/basic01.md), [basic02](../tests/basic/basic02.md), [basic03](../tests/basic/basic03.md) | yes |
 | `IPV6_DISABLED` | `DEBUG` | [basic01](../tests/basic/basic01.md), [basic02](../tests/basic/basic02.md), [basic03](../tests/basic/basic03.md) | yes |
 | `IPV6_ENABLED` | `DEBUG` | [basic01](../tests/basic/basic01.md), [basic02](../tests/basic/basic02.md), [basic03](../tests/basic/basic03.md) | yes |
-| `LOOP_PROTECTION` | `DEBUG2` | [basic01](../tests/basic/basic01.md) | **no** |
+| `LOOP_PROTECTION` | `DEBUG2` | [basic01](../tests/basic/basic01.md) | yes |
 | `NO_A_RECORDS` | `DEBUG` | [basic03](../tests/basic/basic03.md) | yes |
 | `TEST_CASE_END` | `DEBUG` | [basic01](../tests/basic/basic01.md), [basic02](../tests/basic/basic02.md), [basic03](../tests/basic/basic03.md) | yes |
 | `TEST_CASE_START` | `DEBUG` | [basic01](../tests/basic/basic01.md), [basic02](../tests/basic/basic02.md), [basic03](../tests/basic/basic03.md) | yes |
 
 ## i18n Notes
 
-### Tags Missing From Locale Files
-
-These tags have no `BASIC:<TAG>` `msgctxt` entry in any `.po` file.
-They will render as the raw tag name in translated output.
-
-- `LOOP_PROTECTION`
-
+All tags have i18n coverage and no stale entries found.

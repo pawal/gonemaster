@@ -33,7 +33,7 @@ _Do not edit by hand — regenerate with the command above._
 | `ONE_SOA_SERIAL` | `INFO` | [consistency01](../tests/consistency/consistency01.md) | yes |
 | `ONE_SOA_TIME_PARAMETER_SET` | `INFO` | [consistency03](../tests/consistency/consistency03.md) | yes |
 | `OUT_OF_BAILIWICK_ADDR_MISMATCH` | `ERROR` | [consistency05](../tests/consistency/consistency05.md) | yes |
-| `SOA_MNAME` | `—` | [consistency06](../tests/consistency/consistency06.md) | **no** |
+| `SOA_MNAME` | `—` | [consistency06](../tests/consistency/consistency06.md) | yes |
 | `SOA_RNAME` | `INFO` | [consistency02](../tests/consistency/consistency02.md) | yes |
 | `SOA_SERIAL` | `INFO` | [consistency01](../tests/consistency/consistency01.md) | yes |
 | `SOA_SERIAL_VARIATION` | `NOTICE` | [consistency01](../tests/consistency/consistency01.md) | yes |
@@ -43,10 +43,4 @@ _Do not edit by hand — regenerate with the command above._
 
 ## i18n Notes
 
-### Tags Missing From Locale Files
-
-These tags have no `CONSISTENCY:<TAG>` `msgctxt` entry in any `.po` file.
-They will render as the raw tag name in translated output.
-
-- `SOA_MNAME`
-
+All tags have i18n coverage and no stale entries found.

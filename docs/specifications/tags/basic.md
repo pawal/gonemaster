@@ -34,14 +34,14 @@ _Do not edit by hand — regenerate with the command above._
 | `B02_UNEXPECTED_RCODE` | `ERROR` | [basic02](../tests/basic/basic02.md) | **no** |
 | `HAS_A_RECORDS` | `ERROR` | [basic03](../tests/basic/basic03.md) | **no** |
 | `HAS_NAMESERVER_NO_WWW_A_TEST` | `INFO` | [basic03](../tests/basic/basic03.md) | **no** |
-| `IPV4_DISABLED` | `DEBUG` | [basic01](../tests/basic/basic01.md), [basic02](../tests/basic/basic02.md), [basic03](../tests/basic/basic03.md) | yes |
+| `IPV4_DISABLED` | `DEBUG` | [basic01](../tests/basic/basic01.md), [basic02](../tests/basic/basic02.md), [basic03](../tests/basic/basic03.md) | **no** |
 | `IPV4_ENABLED` | `DEBUG` | [basic01](../tests/basic/basic01.md), [basic02](../tests/basic/basic02.md), [basic03](../tests/basic/basic03.md) | **no** |
-| `IPV6_DISABLED` | `DEBUG` | [basic01](../tests/basic/basic01.md), [basic02](../tests/basic/basic02.md), [basic03](../tests/basic/basic03.md) | yes |
+| `IPV6_DISABLED` | `DEBUG` | [basic01](../tests/basic/basic01.md), [basic02](../tests/basic/basic02.md), [basic03](../tests/basic/basic03.md) | **no** |
 | `IPV6_ENABLED` | `DEBUG` | [basic01](../tests/basic/basic01.md), [basic02](../tests/basic/basic02.md), [basic03](../tests/basic/basic03.md) | **no** |
 | `LOOP_PROTECTION` | `DEBUG2` | [basic01](../tests/basic/basic01.md) | **no** |
 | `NO_A_RECORDS` | `DEBUG` | [basic03](../tests/basic/basic03.md) | **no** |
-| `TEST_CASE_END` | `DEBUG` | [basic01](../tests/basic/basic01.md), [basic02](../tests/basic/basic02.md), [basic03](../tests/basic/basic03.md) | yes |
-| `TEST_CASE_START` | `DEBUG` | [basic01](../tests/basic/basic01.md), [basic02](../tests/basic/basic02.md), [basic03](../tests/basic/basic03.md) | yes |
+| `TEST_CASE_END` | `DEBUG` | [basic01](../tests/basic/basic01.md), [basic02](../tests/basic/basic02.md), [basic03](../tests/basic/basic03.md) | **no** |
+| `TEST_CASE_START` | `DEBUG` | [basic01](../tests/basic/basic01.md), [basic02](../tests/basic/basic02.md), [basic03](../tests/basic/basic03.md) | **no** |
 
 ## i18n Notes
 
@@ -73,8 +73,12 @@ They will render as the raw tag name in translated output.
 - `B02_UNEXPECTED_RCODE`
 - `HAS_A_RECORDS`
 - `HAS_NAMESERVER_NO_WWW_A_TEST`
+- `IPV4_DISABLED`
 - `IPV4_ENABLED`
+- `IPV6_DISABLED`
 - `IPV6_ENABLED`
 - `LOOP_PROTECTION`
 - `NO_A_RECORDS`
+- `TEST_CASE_END`
+- `TEST_CASE_START`
 

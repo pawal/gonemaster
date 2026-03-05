@@ -22,8 +22,8 @@ _Do not edit by hand — regenerate with the command above._
 | `NAMESERVER_IP_PTR_MISMATCH` | `NOTICE` | [address03](../tests/address/address03.md) | **no** |
 | `NAMESERVER_IP_WITHOUT_REVERSE` | `WARNING` | [address02](../tests/address/address02.md), [address03](../tests/address/address03.md) | **no** |
 | `NO_RESPONSE_PTR_QUERY` | `WARNING` | [address02](../tests/address/address02.md), [address03](../tests/address/address03.md) | **no** |
-| `TEST_CASE_END` | `DEBUG` | [address01](../tests/address/address01.md), [address02](../tests/address/address02.md), [address03](../tests/address/address03.md) | yes |
-| `TEST_CASE_START` | `DEBUG` | [address01](../tests/address/address01.md), [address02](../tests/address/address02.md), [address03](../tests/address/address03.md) | yes |
+| `TEST_CASE_END` | `DEBUG` | [address01](../tests/address/address01.md), [address02](../tests/address/address02.md), [address03](../tests/address/address03.md) | **no** |
+| `TEST_CASE_START` | `DEBUG` | [address01](../tests/address/address01.md), [address02](../tests/address/address02.md), [address03](../tests/address/address03.md) | **no** |
 
 ## i18n Notes
 
@@ -43,4 +43,6 @@ They will render as the raw tag name in translated output.
 - `NAMESERVER_IP_PTR_MISMATCH`
 - `NAMESERVER_IP_WITHOUT_REVERSE`
 - `NO_RESPONSE_PTR_QUERY`
+- `TEST_CASE_END`
+- `TEST_CASE_START`
 

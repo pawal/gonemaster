@@ -32,8 +32,8 @@ _Do not edit by hand — regenerate with the command above._
 | `EDNS0_SUPPORT` | `INFO` | [nameserver02](../tests/nameserver/nameserver02.md) | **no** |
 | `EDNS_RESPONSE_WITHOUT_EDNS` | `ERROR` | [nameserver02](../tests/nameserver/nameserver02.md) | **no** |
 | `EDNS_VERSION_ERROR` | `ERROR` | [nameserver02](../tests/nameserver/nameserver02.md) | **no** |
-| `IPV4_DISABLED` | `DEBUG` | [nameserver01](../tests/nameserver/nameserver01.md), [nameserver02](../tests/nameserver/nameserver02.md), [nameserver03](../tests/nameserver/nameserver03.md), [nameserver04](../tests/nameserver/nameserver04.md), [nameserver05](../tests/nameserver/nameserver05.md), [nameserver07](../tests/nameserver/nameserver07.md), [nameserver08](../tests/nameserver/nameserver08.md), [nameserver09](../tests/nameserver/nameserver09.md), [nameserver10](../tests/nameserver/nameserver10.md), [nameserver11](../tests/nameserver/nameserver11.md), [nameserver12](../tests/nameserver/nameserver12.md), [nameserver13](../tests/nameserver/nameserver13.md), [nameserver15](../tests/nameserver/nameserver15.md), [nameserver16](../tests/nameserver/nameserver16.md) | yes |
-| `IPV6_DISABLED` | `DEBUG` | [nameserver01](../tests/nameserver/nameserver01.md), [nameserver02](../tests/nameserver/nameserver02.md), [nameserver03](../tests/nameserver/nameserver03.md), [nameserver04](../tests/nameserver/nameserver04.md), [nameserver05](../tests/nameserver/nameserver05.md), [nameserver07](../tests/nameserver/nameserver07.md), [nameserver08](../tests/nameserver/nameserver08.md), [nameserver09](../tests/nameserver/nameserver09.md), [nameserver10](../tests/nameserver/nameserver10.md), [nameserver11](../tests/nameserver/nameserver11.md), [nameserver12](../tests/nameserver/nameserver12.md), [nameserver13](../tests/nameserver/nameserver13.md), [nameserver15](../tests/nameserver/nameserver15.md), [nameserver16](../tests/nameserver/nameserver16.md) | yes |
+| `IPV4_DISABLED` | `DEBUG` | [nameserver01](../tests/nameserver/nameserver01.md), [nameserver02](../tests/nameserver/nameserver02.md), [nameserver03](../tests/nameserver/nameserver03.md), [nameserver04](../tests/nameserver/nameserver04.md), [nameserver05](../tests/nameserver/nameserver05.md), [nameserver07](../tests/nameserver/nameserver07.md), [nameserver08](../tests/nameserver/nameserver08.md), [nameserver09](../tests/nameserver/nameserver09.md), [nameserver10](../tests/nameserver/nameserver10.md), [nameserver11](../tests/nameserver/nameserver11.md), [nameserver12](../tests/nameserver/nameserver12.md), [nameserver13](../tests/nameserver/nameserver13.md), [nameserver15](../tests/nameserver/nameserver15.md), [nameserver16](../tests/nameserver/nameserver16.md) | **no** |
+| `IPV6_DISABLED` | `DEBUG` | [nameserver01](../tests/nameserver/nameserver01.md), [nameserver02](../tests/nameserver/nameserver02.md), [nameserver03](../tests/nameserver/nameserver03.md), [nameserver04](../tests/nameserver/nameserver04.md), [nameserver05](../tests/nameserver/nameserver05.md), [nameserver07](../tests/nameserver/nameserver07.md), [nameserver08](../tests/nameserver/nameserver08.md), [nameserver09](../tests/nameserver/nameserver09.md), [nameserver10](../tests/nameserver/nameserver10.md), [nameserver11](../tests/nameserver/nameserver11.md), [nameserver12](../tests/nameserver/nameserver12.md), [nameserver13](../tests/nameserver/nameserver13.md), [nameserver15](../tests/nameserver/nameserver15.md), [nameserver16](../tests/nameserver/nameserver16.md) | **no** |
 | `IS_A_RECURSOR` | `ERROR` | [nameserver01](../tests/nameserver/nameserver01.md) | **no** |
 | `MISSING_OPT_IN_TRUNCATED` | `WARNING` | [nameserver13](../tests/nameserver/nameserver13.md) | **no** |
 | `N10_EDNS_RESPONSE_ERROR` | `WARNING` | [nameserver10](../tests/nameserver/nameserver10.md) | **no** |
@@ -56,14 +56,14 @@ _Do not edit by hand — regenerate with the command above._
 | `NO_EDNS_SUPPORT` | `WARNING` | [nameserver02](../tests/nameserver/nameserver02.md), [nameserver12](../tests/nameserver/nameserver12.md), [nameserver13](../tests/nameserver/nameserver13.md) | **no** |
 | `NO_RECURSOR` | `INFO` | [nameserver01](../tests/nameserver/nameserver01.md) | **no** |
 | `NO_RESOLUTION` | `ERROR` | [nameserver06](../tests/nameserver/nameserver06.md) | **no** |
-| `NO_RESPONSE` | `DEBUG` | [nameserver01](../tests/nameserver/nameserver01.md), [nameserver02](../tests/nameserver/nameserver02.md), [nameserver05](../tests/nameserver/nameserver05.md), [nameserver12](../tests/nameserver/nameserver12.md), [nameserver13](../tests/nameserver/nameserver13.md) | yes |
+| `NO_RESPONSE` | `DEBUG` | [nameserver01](../tests/nameserver/nameserver01.md), [nameserver02](../tests/nameserver/nameserver02.md), [nameserver05](../tests/nameserver/nameserver05.md), [nameserver12](../tests/nameserver/nameserver12.md), [nameserver13](../tests/nameserver/nameserver13.md) | **no** |
 | `NO_UPWARD_REFERRAL` | `INFO` | [nameserver07](../tests/nameserver/nameserver07.md) | **no** |
 | `NS_ERROR` | `WARNING` | [nameserver02](../tests/nameserver/nameserver02.md), [nameserver12](../tests/nameserver/nameserver12.md), [nameserver13](../tests/nameserver/nameserver13.md) | **no** |
 | `QNAME_CASE_INSENSITIVE` | `WARNING` | [nameserver08](../tests/nameserver/nameserver08.md) | **no** |
 | `QNAME_CASE_SENSITIVE` | `INFO` | [nameserver08](../tests/nameserver/nameserver08.md) | **no** |
 | `SAME_SOURCE_IP` | `INFO` | [nameserver04](../tests/nameserver/nameserver04.md) | **no** |
-| `TEST_CASE_END` | `DEBUG` | [nameserver01](../tests/nameserver/nameserver01.md), [nameserver02](../tests/nameserver/nameserver02.md), [nameserver03](../tests/nameserver/nameserver03.md), [nameserver04](../tests/nameserver/nameserver04.md), [nameserver05](../tests/nameserver/nameserver05.md), [nameserver06](../tests/nameserver/nameserver06.md), [nameserver07](../tests/nameserver/nameserver07.md), [nameserver08](../tests/nameserver/nameserver08.md), [nameserver09](../tests/nameserver/nameserver09.md), [nameserver10](../tests/nameserver/nameserver10.md), [nameserver11](../tests/nameserver/nameserver11.md), [nameserver12](../tests/nameserver/nameserver12.md), [nameserver13](../tests/nameserver/nameserver13.md), [nameserver15](../tests/nameserver/nameserver15.md), [nameserver16](../tests/nameserver/nameserver16.md) | yes |
-| `TEST_CASE_START` | `DEBUG` | [nameserver01](../tests/nameserver/nameserver01.md), [nameserver02](../tests/nameserver/nameserver02.md), [nameserver03](../tests/nameserver/nameserver03.md), [nameserver04](../tests/nameserver/nameserver04.md), [nameserver05](../tests/nameserver/nameserver05.md), [nameserver06](../tests/nameserver/nameserver06.md), [nameserver07](../tests/nameserver/nameserver07.md), [nameserver08](../tests/nameserver/nameserver08.md), [nameserver09](../tests/nameserver/nameserver09.md), [nameserver10](../tests/nameserver/nameserver10.md), [nameserver11](../tests/nameserver/nameserver11.md), [nameserver12](../tests/nameserver/nameserver12.md), [nameserver13](../tests/nameserver/nameserver13.md), [nameserver15](../tests/nameserver/nameserver15.md), [nameserver16](../tests/nameserver/nameserver16.md) | yes |
+| `TEST_CASE_END` | `DEBUG` | [nameserver01](../tests/nameserver/nameserver01.md), [nameserver02](../tests/nameserver/nameserver02.md), [nameserver03](../tests/nameserver/nameserver03.md), [nameserver04](../tests/nameserver/nameserver04.md), [nameserver05](../tests/nameserver/nameserver05.md), [nameserver06](../tests/nameserver/nameserver06.md), [nameserver07](../tests/nameserver/nameserver07.md), [nameserver08](../tests/nameserver/nameserver08.md), [nameserver09](../tests/nameserver/nameserver09.md), [nameserver10](../tests/nameserver/nameserver10.md), [nameserver11](../tests/nameserver/nameserver11.md), [nameserver12](../tests/nameserver/nameserver12.md), [nameserver13](../tests/nameserver/nameserver13.md), [nameserver15](../tests/nameserver/nameserver15.md), [nameserver16](../tests/nameserver/nameserver16.md) | **no** |
+| `TEST_CASE_START` | `DEBUG` | [nameserver01](../tests/nameserver/nameserver01.md), [nameserver02](../tests/nameserver/nameserver02.md), [nameserver03](../tests/nameserver/nameserver03.md), [nameserver04](../tests/nameserver/nameserver04.md), [nameserver05](../tests/nameserver/nameserver05.md), [nameserver06](../tests/nameserver/nameserver06.md), [nameserver07](../tests/nameserver/nameserver07.md), [nameserver08](../tests/nameserver/nameserver08.md), [nameserver09](../tests/nameserver/nameserver09.md), [nameserver10](../tests/nameserver/nameserver10.md), [nameserver11](../tests/nameserver/nameserver11.md), [nameserver12](../tests/nameserver/nameserver12.md), [nameserver13](../tests/nameserver/nameserver13.md), [nameserver15](../tests/nameserver/nameserver15.md), [nameserver16](../tests/nameserver/nameserver16.md) | **no** |
 | `UPWARD_REFERRAL` | `WARNING` | [nameserver07](../tests/nameserver/nameserver07.md) | **no** |
 | `UPWARD_REFERRAL_IRRELEVANT` | `INFO` | [nameserver07](../tests/nameserver/nameserver07.md) | **no** |
 | `Z_FLAGS_NOTCLEAR` | `—` | [nameserver12](../tests/nameserver/nameserver12.md) | **no** |
@@ -96,6 +96,8 @@ They will render as the raw tag name in translated output.
 - `EDNS0_SUPPORT`
 - `EDNS_RESPONSE_WITHOUT_EDNS`
 - `EDNS_VERSION_ERROR`
+- `IPV4_DISABLED`
+- `IPV6_DISABLED`
 - `IS_A_RECURSOR`
 - `MISSING_OPT_IN_TRUNCATED`
 - `N10_EDNS_RESPONSE_ERROR`
@@ -118,11 +120,14 @@ They will render as the raw tag name in translated output.
 - `NO_EDNS_SUPPORT`
 - `NO_RECURSOR`
 - `NO_RESOLUTION`
+- `NO_RESPONSE`
 - `NO_UPWARD_REFERRAL`
 - `NS_ERROR`
 - `QNAME_CASE_INSENSITIVE`
 - `QNAME_CASE_SENSITIVE`
 - `SAME_SOURCE_IP`
+- `TEST_CASE_END`
+- `TEST_CASE_START`
 - `UPWARD_REFERRAL`
 - `UPWARD_REFERRAL_IRRELEVANT`
 - `Z_FLAGS_NOTCLEAR`

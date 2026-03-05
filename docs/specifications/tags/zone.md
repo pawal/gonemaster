@@ -14,17 +14,17 @@ _Do not edit by hand — regenerate with the command above._
 | `EXPIRE_LOWER_THAN_REFRESH` | `WARNING` | [zone05](../tests/zone/zone05.md) | **no** |
 | `EXPIRE_MINIMUM_VALUE_LOWER` | `WARNING` | [zone05](../tests/zone/zone05.md) | **no** |
 | `EXPIRE_MINIMUM_VALUE_OK` | `INFO` | [zone05](../tests/zone/zone05.md) | **no** |
-| `IPV4_DISABLED` | `—` | [zone12](../tests/zone/zone12.md) | yes |
-| `IPV6_DISABLED` | `—` | [zone12](../tests/zone/zone12.md) | yes |
+| `IPV4_DISABLED` | `—` | [zone12](../tests/zone/zone12.md) | **no** |
+| `IPV6_DISABLED` | `—` | [zone12](../tests/zone/zone12.md) | **no** |
 | `MNAME_HAS_NO_ADDRESS` | `WARNING` | [zone07](../tests/zone/zone07.md) | **no** |
 | `MNAME_IS_CNAME` | `NOTICE` | [zone07](../tests/zone/zone07.md) | **no** |
 | `MNAME_IS_NOT_CNAME` | `INFO` | [zone07](../tests/zone/zone07.md) | **no** |
 | `MULTIPLE_SOA` | `ERROR` | [zone10](../tests/zone/zone10.md) | **no** |
 | `MX_RECORD_IS_CNAME` | `ERROR` | [zone08](../tests/zone/zone08.md) | **no** |
 | `MX_RECORD_IS_NOT_CNAME` | `INFO` | [zone08](../tests/zone/zone08.md) | **no** |
-| `NO_RESPONSE` | `DEBUG` | [zone10](../tests/zone/zone10.md) | yes |
-| `NO_RESPONSE_MX_QUERY` | `DEBUG` | [zone08](../tests/zone/zone08.md) | yes |
-| `NO_RESPONSE_SOA_QUERY` | `DEBUG` | [zone02](../tests/zone/zone02.md), [zone03](../tests/zone/zone03.md), [zone04](../tests/zone/zone04.md), [zone05](../tests/zone/zone05.md), [zone06](../tests/zone/zone06.md), [zone07](../tests/zone/zone07.md) | yes |
+| `NO_RESPONSE` | `DEBUG` | [zone10](../tests/zone/zone10.md) | **no** |
+| `NO_RESPONSE_MX_QUERY` | `DEBUG` | [zone08](../tests/zone/zone08.md) | **no** |
+| `NO_RESPONSE_SOA_QUERY` | `DEBUG` | [zone02](../tests/zone/zone02.md), [zone03](../tests/zone/zone03.md), [zone04](../tests/zone/zone04.md), [zone05](../tests/zone/zone05.md), [zone06](../tests/zone/zone06.md), [zone07](../tests/zone/zone07.md) | **no** |
 | `NO_SOA_IN_RESPONSE` | `DEBUG` | [zone10](../tests/zone/zone10.md) | **no** |
 | `ONE_SOA` | `INFO` | [zone10](../tests/zone/zone10.md) | **no** |
 | `REFRESH_HIGHER_THAN_RETRY` | `INFO` | [zone03](../tests/zone/zone03.md) | **no** |
@@ -36,8 +36,8 @@ _Do not edit by hand — regenerate with the command above._
 | `SOA_DEFAULT_TTL_MAXIMUM_VALUE_HIGHER` | `NOTICE` | [zone06](../tests/zone/zone06.md) | **no** |
 | `SOA_DEFAULT_TTL_MAXIMUM_VALUE_LOWER` | `NOTICE` | [zone06](../tests/zone/zone06.md) | **no** |
 | `SOA_DEFAULT_TTL_MAXIMUM_VALUE_OK` | `INFO` | [zone06](../tests/zone/zone06.md) | **no** |
-| `TEST_CASE_END` | `DEBUG` | [zone01](../tests/zone/zone01.md), [zone02](../tests/zone/zone02.md), [zone03](../tests/zone/zone03.md), [zone04](../tests/zone/zone04.md), [zone05](../tests/zone/zone05.md), [zone06](../tests/zone/zone06.md), [zone07](../tests/zone/zone07.md), [zone08](../tests/zone/zone08.md), [zone09](../tests/zone/zone09.md), [zone10](../tests/zone/zone10.md), [zone12](../tests/zone/zone12.md) | yes |
-| `TEST_CASE_START` | `DEBUG` | [zone01](../tests/zone/zone01.md), [zone02](../tests/zone/zone02.md), [zone03](../tests/zone/zone03.md), [zone04](../tests/zone/zone04.md), [zone05](../tests/zone/zone05.md), [zone06](../tests/zone/zone06.md), [zone07](../tests/zone/zone07.md), [zone08](../tests/zone/zone08.md), [zone09](../tests/zone/zone09.md), [zone10](../tests/zone/zone10.md), [zone12](../tests/zone/zone12.md) | yes |
+| `TEST_CASE_END` | `DEBUG` | [zone01](../tests/zone/zone01.md), [zone02](../tests/zone/zone02.md), [zone03](../tests/zone/zone03.md), [zone04](../tests/zone/zone04.md), [zone05](../tests/zone/zone05.md), [zone06](../tests/zone/zone06.md), [zone07](../tests/zone/zone07.md), [zone08](../tests/zone/zone08.md), [zone09](../tests/zone/zone09.md), [zone10](../tests/zone/zone10.md), [zone12](../tests/zone/zone12.md) | **no** |
+| `TEST_CASE_START` | `DEBUG` | [zone01](../tests/zone/zone01.md), [zone02](../tests/zone/zone02.md), [zone03](../tests/zone/zone03.md), [zone04](../tests/zone/zone04.md), [zone05](../tests/zone/zone05.md), [zone06](../tests/zone/zone06.md), [zone07](../tests/zone/zone07.md), [zone08](../tests/zone/zone08.md), [zone09](../tests/zone/zone09.md), [zone10](../tests/zone/zone10.md), [zone12](../tests/zone/zone12.md) | **no** |
 | `WRONG_SOA` | `DEBUG` | [zone10](../tests/zone/zone10.md) | **no** |
 | `Z01_MNAME_HAS_LOCALHOST_ADDR` | `NOTICE` | [zone01](../tests/zone/zone01.md) | **no** |
 | `Z01_MNAME_IS_DOT` | `NOTICE` | [zone01](../tests/zone/zone01.md) | **no** |
@@ -78,7 +78,7 @@ _Do not edit by hand — regenerate with the command above._
 | `Z12_MIXED_PRESENCE` | `WARNING` | [zone12](../tests/zone/zone12.md) | **no** |
 | `Z12_MULTIPLE_CSYNC` | `WARNING` | [zone12](../tests/zone/zone12.md) | **no** |
 | `Z12_NO_CSYNC` | `INFO` | [zone12](../tests/zone/zone12.md) | **no** |
-| `Z12_SERIAL_MISMATCH` | `WARNING` | [zone12](../tests/zone/zone12.md) | yes |
+| `Z12_SERIAL_MISMATCH` | `WARNING` | [zone12](../tests/zone/zone12.md) | **no** |
 
 ## i18n Notes
 
@@ -90,12 +90,17 @@ They will render as the raw tag name in translated output.
 - `EXPIRE_LOWER_THAN_REFRESH`
 - `EXPIRE_MINIMUM_VALUE_LOWER`
 - `EXPIRE_MINIMUM_VALUE_OK`
+- `IPV4_DISABLED`
+- `IPV6_DISABLED`
 - `MNAME_HAS_NO_ADDRESS`
 - `MNAME_IS_CNAME`
 - `MNAME_IS_NOT_CNAME`
 - `MULTIPLE_SOA`
 - `MX_RECORD_IS_CNAME`
 - `MX_RECORD_IS_NOT_CNAME`
+- `NO_RESPONSE`
+- `NO_RESPONSE_MX_QUERY`
+- `NO_RESPONSE_SOA_QUERY`
 - `NO_SOA_IN_RESPONSE`
 - `ONE_SOA`
 - `REFRESH_HIGHER_THAN_RETRY`
@@ -107,6 +112,8 @@ They will render as the raw tag name in translated output.
 - `SOA_DEFAULT_TTL_MAXIMUM_VALUE_HIGHER`
 - `SOA_DEFAULT_TTL_MAXIMUM_VALUE_LOWER`
 - `SOA_DEFAULT_TTL_MAXIMUM_VALUE_OK`
+- `TEST_CASE_END`
+- `TEST_CASE_START`
 - `WRONG_SOA`
 - `Z01_MNAME_HAS_LOCALHOST_ADDR`
 - `Z01_MNAME_IS_DOT`
@@ -147,4 +154,5 @@ They will render as the raw tag name in translated output.
 - `Z12_MIXED_PRESENCE`
 - `Z12_MULTIPLE_CSYNC`
 - `Z12_NO_CSYNC`
+- `Z12_SERIAL_MISMATCH`
 

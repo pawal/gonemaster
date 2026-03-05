@@ -51,15 +51,15 @@ _Do not edit by hand — regenerate with the command above._
 | `EMPTY_ASN_SET` | `NOTICE` | [connectivity03](../tests/connectivity/connectivity03.md) | **no** |
 | `ERROR_ASN_DATABASE` | `NOTICE` | [connectivity03](../tests/connectivity/connectivity03.md) | **no** |
 | `IPV4_DIFFERENT_ASN` | `INFO` | [connectivity03](../tests/connectivity/connectivity03.md) | **no** |
-| `IPV4_DISABLED` | `DEBUG` | [connectivity01](../tests/connectivity/connectivity01.md), [connectivity02](../tests/connectivity/connectivity02.md) | yes |
+| `IPV4_DISABLED` | `DEBUG` | [connectivity01](../tests/connectivity/connectivity01.md), [connectivity02](../tests/connectivity/connectivity02.md) | **no** |
 | `IPV4_ONE_ASN` | `WARNING` | [connectivity03](../tests/connectivity/connectivity03.md) | **no** |
 | `IPV4_SAME_ASN` | `NOTICE` | [connectivity03](../tests/connectivity/connectivity03.md) | **no** |
 | `IPV6_DIFFERENT_ASN` | `INFO` | [connectivity03](../tests/connectivity/connectivity03.md) | **no** |
-| `IPV6_DISABLED` | `DEBUG` | [connectivity01](../tests/connectivity/connectivity01.md), [connectivity02](../tests/connectivity/connectivity02.md) | yes |
+| `IPV6_DISABLED` | `DEBUG` | [connectivity01](../tests/connectivity/connectivity01.md), [connectivity02](../tests/connectivity/connectivity02.md) | **no** |
 | `IPV6_ONE_ASN` | `WARNING` | [connectivity03](../tests/connectivity/connectivity03.md) | **no** |
 | `IPV6_SAME_ASN` | `NOTICE` | [connectivity03](../tests/connectivity/connectivity03.md) | **no** |
-| `TEST_CASE_END` | `DEBUG` | [connectivity01](../tests/connectivity/connectivity01.md), [connectivity02](../tests/connectivity/connectivity02.md), [connectivity03](../tests/connectivity/connectivity03.md), [connectivity04](../tests/connectivity/connectivity04.md) | yes |
-| `TEST_CASE_START` | `DEBUG` | [connectivity01](../tests/connectivity/connectivity01.md), [connectivity02](../tests/connectivity/connectivity02.md), [connectivity03](../tests/connectivity/connectivity03.md), [connectivity04](../tests/connectivity/connectivity04.md) | yes |
+| `TEST_CASE_END` | `DEBUG` | [connectivity01](../tests/connectivity/connectivity01.md), [connectivity02](../tests/connectivity/connectivity02.md), [connectivity03](../tests/connectivity/connectivity03.md), [connectivity04](../tests/connectivity/connectivity04.md) | **no** |
+| `TEST_CASE_START` | `DEBUG` | [connectivity01](../tests/connectivity/connectivity01.md), [connectivity02](../tests/connectivity/connectivity02.md), [connectivity03](../tests/connectivity/connectivity03.md), [connectivity04](../tests/connectivity/connectivity04.md) | **no** |
 
 ## i18n Notes
 
@@ -108,9 +108,13 @@ They will render as the raw tag name in translated output.
 - `EMPTY_ASN_SET`
 - `ERROR_ASN_DATABASE`
 - `IPV4_DIFFERENT_ASN`
+- `IPV4_DISABLED`
 - `IPV4_ONE_ASN`
 - `IPV4_SAME_ASN`
 - `IPV6_DIFFERENT_ASN`
+- `IPV6_DISABLED`
 - `IPV6_ONE_ASN`
 - `IPV6_SAME_ASN`
+- `TEST_CASE_END`
+- `TEST_CASE_START`
 

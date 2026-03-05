@@ -13,8 +13,8 @@ _Do not edit by hand — regenerate with the command above._
 | --- | --- | --- | --- |
 | `DISCOURAGED_DOUBLE_DASH` | `WARNING` | [syntax03](../tests/syntax/syntax03.md) | **no** |
 | `INITIAL_HYPHEN` | `ERROR` | [syntax02](../tests/syntax/syntax02.md) | **no** |
-| `IPV4_DISABLED` | `DEBUG` | [syntax06](../tests/syntax/syntax06.md) | yes |
-| `IPV6_DISABLED` | `DEBUG` | [syntax06](../tests/syntax/syntax06.md) | yes |
+| `IPV4_DISABLED` | `DEBUG` | [syntax06](../tests/syntax/syntax06.md) | **no** |
+| `IPV6_DISABLED` | `DEBUG` | [syntax06](../tests/syntax/syntax06.md) | **no** |
 | `MNAME_DISCOURAGED_DOUBLE_DASH` | `WARNING` | [syntax07](../tests/syntax/syntax07.md) | **no** |
 | `MNAME_NON_ALLOWED_CHARS` | `WARNING` | [syntax07](../tests/syntax/syntax07.md) | **no** |
 | `MNAME_NUMERIC_TLD` | `WARNING` | [syntax07](../tests/syntax/syntax07.md) | **no** |
@@ -30,9 +30,9 @@ _Do not edit by hand — regenerate with the command above._
 | `NON_ALLOWED_CHARS` | `ERROR` | [syntax01](../tests/syntax/syntax01.md) | **no** |
 | `NO_DOUBLE_DASH` | `INFO` | [syntax03](../tests/syntax/syntax03.md) | **no** |
 | `NO_ENDING_HYPHENS` | `INFO` | [syntax02](../tests/syntax/syntax02.md) | **no** |
-| `NO_RESPONSE` | `DEBUG` | [syntax06](../tests/syntax/syntax06.md) | yes |
-| `NO_RESPONSE_MX_QUERY` | `DEBUG` | [syntax08](../tests/syntax/syntax08.md) | yes |
-| `NO_RESPONSE_SOA_QUERY` | `DEBUG` | [syntax05](../tests/syntax/syntax05.md), [syntax06](../tests/syntax/syntax06.md), [syntax07](../tests/syntax/syntax07.md) | yes |
+| `NO_RESPONSE` | `DEBUG` | [syntax06](../tests/syntax/syntax06.md) | **no** |
+| `NO_RESPONSE_MX_QUERY` | `DEBUG` | [syntax08](../tests/syntax/syntax08.md) | **no** |
+| `NO_RESPONSE_SOA_QUERY` | `DEBUG` | [syntax05](../tests/syntax/syntax05.md), [syntax06](../tests/syntax/syntax06.md), [syntax07](../tests/syntax/syntax07.md) | **no** |
 | `ONLY_ALLOWED_CHARS` | `INFO` | [syntax01](../tests/syntax/syntax01.md) | **no** |
 | `RNAME_MAIL_DOMAIN_INVALID` | `NOTICE` | [syntax06](../tests/syntax/syntax06.md) | **no** |
 | `RNAME_MAIL_DOMAIN_LOCALHOST` | `WARNING` | [syntax06](../tests/syntax/syntax06.md) | **no** |
@@ -42,8 +42,8 @@ _Do not edit by hand — regenerate with the command above._
 | `RNAME_RFC822_INVALID` | `WARNING` | [syntax06](../tests/syntax/syntax06.md) | **no** |
 | `RNAME_RFC822_VALID` | `INFO` | [syntax06](../tests/syntax/syntax06.md) | **no** |
 | `TERMINAL_HYPHEN` | `ERROR` | [syntax02](../tests/syntax/syntax02.md) | **no** |
-| `TEST_CASE_END` | `DEBUG` | [syntax01](../tests/syntax/syntax01.md), [syntax02](../tests/syntax/syntax02.md), [syntax03](../tests/syntax/syntax03.md), [syntax04](../tests/syntax/syntax04.md), [syntax05](../tests/syntax/syntax05.md), [syntax06](../tests/syntax/syntax06.md), [syntax07](../tests/syntax/syntax07.md), [syntax08](../tests/syntax/syntax08.md) | yes |
-| `TEST_CASE_START` | `DEBUG` | [syntax01](../tests/syntax/syntax01.md), [syntax02](../tests/syntax/syntax02.md), [syntax03](../tests/syntax/syntax03.md), [syntax04](../tests/syntax/syntax04.md), [syntax05](../tests/syntax/syntax05.md), [syntax06](../tests/syntax/syntax06.md), [syntax07](../tests/syntax/syntax07.md), [syntax08](../tests/syntax/syntax08.md) | yes |
+| `TEST_CASE_END` | `DEBUG` | [syntax01](../tests/syntax/syntax01.md), [syntax02](../tests/syntax/syntax02.md), [syntax03](../tests/syntax/syntax03.md), [syntax04](../tests/syntax/syntax04.md), [syntax05](../tests/syntax/syntax05.md), [syntax06](../tests/syntax/syntax06.md), [syntax07](../tests/syntax/syntax07.md), [syntax08](../tests/syntax/syntax08.md) | **no** |
+| `TEST_CASE_START` | `DEBUG` | [syntax01](../tests/syntax/syntax01.md), [syntax02](../tests/syntax/syntax02.md), [syntax03](../tests/syntax/syntax03.md), [syntax04](../tests/syntax/syntax04.md), [syntax05](../tests/syntax/syntax05.md), [syntax06](../tests/syntax/syntax06.md), [syntax07](../tests/syntax/syntax07.md), [syntax08](../tests/syntax/syntax08.md) | **no** |
 
 ## i18n Notes
 
@@ -54,6 +54,8 @@ They will render as the raw tag name in translated output.
 
 - `DISCOURAGED_DOUBLE_DASH`
 - `INITIAL_HYPHEN`
+- `IPV4_DISABLED`
+- `IPV6_DISABLED`
 - `MNAME_DISCOURAGED_DOUBLE_DASH`
 - `MNAME_NON_ALLOWED_CHARS`
 - `MNAME_NUMERIC_TLD`
@@ -69,6 +71,9 @@ They will render as the raw tag name in translated output.
 - `NON_ALLOWED_CHARS`
 - `NO_DOUBLE_DASH`
 - `NO_ENDING_HYPHENS`
+- `NO_RESPONSE`
+- `NO_RESPONSE_MX_QUERY`
+- `NO_RESPONSE_SOA_QUERY`
 - `ONLY_ALLOWED_CHARS`
 - `RNAME_MAIL_DOMAIN_INVALID`
 - `RNAME_MAIL_DOMAIN_LOCALHOST`
@@ -78,4 +83,6 @@ They will render as the raw tag name in translated output.
 - `RNAME_RFC822_INVALID`
 - `RNAME_RFC822_VALID`
 - `TERMINAL_HYPHEN`
+- `TEST_CASE_END`
+- `TEST_CASE_START`
 

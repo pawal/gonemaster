@@ -16,14 +16,14 @@ _Do not edit by hand — regenerate with the command above._
 | `CHILD_ZONE_LAME` | `ERROR` | [consistency05](../tests/consistency/consistency05.md) | **no** |
 | `EXTRA_ADDRESS_CHILD` | `NOTICE` | [consistency05](../tests/consistency/consistency05.md) | **no** |
 | `IN_BAILIWICK_ADDR_MISMATCH` | `ERROR` | [consistency05](../tests/consistency/consistency05.md) | **no** |
-| `IPV4_DISABLED` | `DEBUG` | [consistency01](../tests/consistency/consistency01.md), [consistency02](../tests/consistency/consistency02.md), [consistency03](../tests/consistency/consistency03.md), [consistency04](../tests/consistency/consistency04.md), [consistency06](../tests/consistency/consistency06.md) | yes |
-| `IPV6_DISABLED` | `DEBUG` | [consistency01](../tests/consistency/consistency01.md), [consistency02](../tests/consistency/consistency02.md), [consistency03](../tests/consistency/consistency03.md), [consistency04](../tests/consistency/consistency04.md), [consistency06](../tests/consistency/consistency06.md) | yes |
+| `IPV4_DISABLED` | `DEBUG` | [consistency01](../tests/consistency/consistency01.md), [consistency02](../tests/consistency/consistency02.md), [consistency03](../tests/consistency/consistency03.md), [consistency04](../tests/consistency/consistency04.md), [consistency06](../tests/consistency/consistency06.md) | **no** |
+| `IPV6_DISABLED` | `DEBUG` | [consistency01](../tests/consistency/consistency01.md), [consistency02](../tests/consistency/consistency02.md), [consistency03](../tests/consistency/consistency03.md), [consistency04](../tests/consistency/consistency04.md), [consistency06](../tests/consistency/consistency06.md) | **no** |
 | `MULTIPLE_NS_SET` | `NOTICE` | [consistency04](../tests/consistency/consistency04.md) | **no** |
 | `MULTIPLE_SOA_MNAMES` | `NOTICE` | [consistency06](../tests/consistency/consistency06.md) | **no** |
 | `MULTIPLE_SOA_RNAMES` | `NOTICE` | [consistency02](../tests/consistency/consistency02.md) | **no** |
 | `MULTIPLE_SOA_SERIALS` | `WARNING` | [consistency01](../tests/consistency/consistency01.md) | **no** |
 | `MULTIPLE_SOA_TIME_PARAMETER_SET` | `NOTICE` | [consistency03](../tests/consistency/consistency03.md) | **no** |
-| `NO_RESPONSE` | `DEBUG` | [consistency01](../tests/consistency/consistency01.md), [consistency02](../tests/consistency/consistency02.md), [consistency03](../tests/consistency/consistency03.md), [consistency04](../tests/consistency/consistency04.md), [consistency05](../tests/consistency/consistency05.md), [consistency06](../tests/consistency/consistency06.md) | yes |
+| `NO_RESPONSE` | `DEBUG` | [consistency01](../tests/consistency/consistency01.md), [consistency02](../tests/consistency/consistency02.md), [consistency03](../tests/consistency/consistency03.md), [consistency04](../tests/consistency/consistency04.md), [consistency05](../tests/consistency/consistency05.md), [consistency06](../tests/consistency/consistency06.md) | **no** |
 | `NO_RESPONSE_NS_QUERY` | `DEBUG` | [consistency04](../tests/consistency/consistency04.md) | **no** |
 | `NO_RESPONSE_SOA_QUERY` | `DEBUG` | [consistency01](../tests/consistency/consistency01.md), [consistency02](../tests/consistency/consistency02.md), [consistency03](../tests/consistency/consistency03.md), [consistency06](../tests/consistency/consistency06.md) | **no** |
 | `NS_SET` | `INFO` | [consistency04](../tests/consistency/consistency04.md) | **no** |
@@ -38,8 +38,8 @@ _Do not edit by hand — regenerate with the command above._
 | `SOA_SERIAL` | `INFO` | [consistency01](../tests/consistency/consistency01.md) | **no** |
 | `SOA_SERIAL_VARIATION` | `NOTICE` | [consistency01](../tests/consistency/consistency01.md) | **no** |
 | `SOA_TIME_PARAMETER_SET` | `INFO` | [consistency03](../tests/consistency/consistency03.md) | **no** |
-| `TEST_CASE_END` | `DEBUG` | [consistency01](../tests/consistency/consistency01.md), [consistency02](../tests/consistency/consistency02.md), [consistency03](../tests/consistency/consistency03.md), [consistency04](../tests/consistency/consistency04.md), [consistency05](../tests/consistency/consistency05.md), [consistency06](../tests/consistency/consistency06.md) | yes |
-| `TEST_CASE_START` | `DEBUG` | [consistency01](../tests/consistency/consistency01.md), [consistency02](../tests/consistency/consistency02.md), [consistency03](../tests/consistency/consistency03.md), [consistency04](../tests/consistency/consistency04.md), [consistency05](../tests/consistency/consistency05.md), [consistency06](../tests/consistency/consistency06.md) | yes |
+| `TEST_CASE_END` | `DEBUG` | [consistency01](../tests/consistency/consistency01.md), [consistency02](../tests/consistency/consistency02.md), [consistency03](../tests/consistency/consistency03.md), [consistency04](../tests/consistency/consistency04.md), [consistency05](../tests/consistency/consistency05.md), [consistency06](../tests/consistency/consistency06.md) | **no** |
+| `TEST_CASE_START` | `DEBUG` | [consistency01](../tests/consistency/consistency01.md), [consistency02](../tests/consistency/consistency02.md), [consistency03](../tests/consistency/consistency03.md), [consistency04](../tests/consistency/consistency04.md), [consistency05](../tests/consistency/consistency05.md), [consistency06](../tests/consistency/consistency06.md) | **no** |
 
 ## i18n Notes
 
@@ -53,11 +53,14 @@ They will render as the raw tag name in translated output.
 - `CHILD_ZONE_LAME`
 - `EXTRA_ADDRESS_CHILD`
 - `IN_BAILIWICK_ADDR_MISMATCH`
+- `IPV4_DISABLED`
+- `IPV6_DISABLED`
 - `MULTIPLE_NS_SET`
 - `MULTIPLE_SOA_MNAMES`
 - `MULTIPLE_SOA_RNAMES`
 - `MULTIPLE_SOA_SERIALS`
 - `MULTIPLE_SOA_TIME_PARAMETER_SET`
+- `NO_RESPONSE`
 - `NO_RESPONSE_NS_QUERY`
 - `NO_RESPONSE_SOA_QUERY`
 - `NS_SET`
@@ -72,4 +75,6 @@ They will render as the raw tag name in translated output.
 - `SOA_SERIAL`
 - `SOA_SERIAL_VARIATION`
 - `SOA_TIME_PARAMETER_SET`
+- `TEST_CASE_END`
+- `TEST_CASE_START`
 

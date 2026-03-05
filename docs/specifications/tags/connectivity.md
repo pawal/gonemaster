@@ -71,15 +71,3 @@ They will render as the raw tag name in translated output.
 - `CN04_ASN_INFOS_ANNOUNCE_IN`
 - `CN04_ASN_INFOS_RAW`
 
-### Stale Entries In Locale Files
-
-These tags appear as `CONNECTIVITY:<TAG>` in `.po` files but are absent from
-current code metadata.  The messages may be dead translations.
-
-- `CONNECTIVITY01`
-- `CONNECTIVITY02`
-- `CONNECTIVITY03`
-- `CONNECTIVITY04`
-- `IPV4_ASN`
-- `IPV6_ASN`
-

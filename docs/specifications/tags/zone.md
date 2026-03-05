@@ -82,23 +82,4 @@ _Do not edit by hand — regenerate with the command above._
 
 ## i18n Notes
 
-### Stale Entries In Locale Files
-
-These tags appear as `ZONE:<TAG>` in `.po` files but are absent from
-current code metadata.  The messages may be dead translations.
-
-- `Z11_SPF1_MULTIPLE_RECORDS`
-- `Z11_SPF1_SYNTAX_ERROR`
-- `Z11_SPF1_SYNTAX_OK`
-- `ZONE01`
-- `ZONE02`
-- `ZONE03`
-- `ZONE04`
-- `ZONE05`
-- `ZONE06`
-- `ZONE07`
-- `ZONE08`
-- `ZONE09`
-- `ZONE10`
-- `ZONE11`
-
+All tags have i18n coverage and no stale entries found.

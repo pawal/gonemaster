@@ -50,15 +50,3 @@ They will render as the raw tag name in translated output.
 
 - `SOA_MNAME`
 
-### Stale Entries In Locale Files
-
-These tags appear as `CONSISTENCY:<TAG>` in `.po` files but are absent from
-current code metadata.  The messages may be dead translations.
-
-- `CONSISTENCY01`
-- `CONSISTENCY02`
-- `CONSISTENCY03`
-- `CONSISTENCY04`
-- `CONSISTENCY05`
-- `CONSISTENCY06`
-

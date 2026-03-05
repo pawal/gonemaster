@@ -70,25 +70,4 @@ _Do not edit by hand — regenerate with the command above._
 
 ## i18n Notes
 
-### Stale Entries In Locale Files
-
-These tags appear as `NAMESERVER:<TAG>` in `.po` files but are absent from
-current code metadata.  The messages may be dead translations.
-
-- `N15_NO_VERSION`
-- `NAMESERVER01`
-- `NAMESERVER02`
-- `NAMESERVER03`
-- `NAMESERVER04`
-- `NAMESERVER05`
-- `NAMESERVER06`
-- `NAMESERVER07`
-- `NAMESERVER08`
-- `NAMESERVER09`
-- `NAMESERVER10`
-- `NAMESERVER11`
-- `NAMESERVER12`
-- `NAMESERVER13`
-- `NAMESERVER14`
-- `NAMESERVER15`
-
+All tags have i18n coverage and no stale entries found.

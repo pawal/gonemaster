@@ -47,17 +47,4 @@ _Do not edit by hand — regenerate with the command above._
 
 ## i18n Notes
 
-### Stale Entries In Locale Files
-
-These tags appear as `SYNTAX:<TAG>` in `.po` files but are absent from
-current code metadata.  The messages may be dead translations.
-
-- `SYNTAX01`
-- `SYNTAX02`
-- `SYNTAX03`
-- `SYNTAX04`
-- `SYNTAX05`
-- `SYNTAX06`
-- `SYNTAX07`
-- `SYNTAX08`
-
+All tags have i18n coverage and no stale entries found.

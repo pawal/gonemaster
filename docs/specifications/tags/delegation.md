@@ -54,16 +54,4 @@ _Do not edit by hand — regenerate with the command above._
 
 ## i18n Notes
 
-### Stale Entries In Locale Files
-
-These tags appear as `DELEGATION:<TAG>` in `.po` files but are absent from
-current code metadata.  The messages may be dead translations.
-
-- `DELEGATION01`
-- `DELEGATION02`
-- `DELEGATION03`
-- `DELEGATION04`
-- `DELEGATION05`
-- `DELEGATION06`
-- `DELEGATION07`
-
+All tags have i18n coverage and no stale entries found.

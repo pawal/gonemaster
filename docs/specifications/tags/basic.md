@@ -52,17 +52,3 @@ They will render as the raw tag name in translated output.
 
 - `LOOP_PROTECTION`
 
-### Stale Entries In Locale Files
-
-These tags appear as `BASIC:<TAG>` in `.po` files but are absent from
-current code metadata.  The messages may be dead translations.
-
-- `B01_UNEXPECTED_NS_RESPONSE`
-- `BASIC00`
-- `BASIC01`
-- `BASIC02`
-- `BASIC03`
-- `DOMAIN_NAME_LABEL_TOO_LONG`
-- `DOMAIN_NAME_TOO_LONG`
-- `DOMAIN_NAME_ZERO_LENGTH_LABEL`
-

@@ -3058,3 +3058,19 @@ msgstr "レベル"
 msgctxt "SYSTEM:CLI_HEADER_MESSAGE"
 msgid "Message"
 msgstr "メッセージ"
+
+msgctxt "CONNECTIVITY:CN04_ASN_INFOS_ANNOUNCE_IN"
+msgid "Name server IP address \"{address}\" is announced in prefix \"{prefixes}\"."
+msgstr "ネームサーバー IP アドレス \"{address}\" はプレフィックス \"{prefixes}\" でアナウンスされています。"
+
+msgctxt "CONNECTIVITY:CN04_ASN_INFOS_RAW"
+msgid "The ASN data for name server IP address \"{address}\" is \"{data}\"."
+msgstr "ネームサーバー IP アドレス \"{address}\" の ASN データは \"{data}\" です。"
+
+msgctxt "CONSISTENCY:SOA_MNAME"
+msgid "Found SOA mname {mname} on following nameserver set : {servers}."
+msgstr "次のネームサーバー集合 {servers} で SOA mname {mname} が見つかりました。"
+
+msgctxt "BASIC:LOOP_PROTECTION"
+msgid "Loop protection triggered in {caller} for child zone {child_zone_name} at zone {zone_name} (query name {intermediate_query_name})."
+msgstr "{caller} でループ保護が作動しました。子ゾーン {child_zone_name}、現在のゾーン {zone_name}（問い合わせ名 {intermediate_query_name}）。"

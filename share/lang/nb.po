@@ -3177,3 +3177,19 @@ msgstr "Nivå"
 msgctxt "SYSTEM:CLI_HEADER_MESSAGE"
 msgid "Message"
 msgstr "Melding"
+
+msgctxt "CONNECTIVITY:CN04_ASN_INFOS_ANNOUNCE_IN"
+msgid "Name server IP address \"{address}\" is announced in prefix \"{prefixes}\"."
+msgstr "IP-adressen \"{address}\" er annonsert i prefix \"{prefixes}\"."
+
+msgctxt "CONNECTIVITY:CN04_ASN_INFOS_RAW"
+msgid "The ASN data for name server IP address \"{address}\" is \"{data}\"."
+msgstr "ASN-dataene for navnetjenerens IP-adresse \"{address}\" er \"{data}\"."
+
+msgctxt "CONSISTENCY:SOA_MNAME"
+msgid "Found SOA mname {mname} on following nameserver set : {servers}."
+msgstr "Fant SOA/MNAME {mname} på følgende navnetjenere: {servers}."
+
+msgctxt "BASIC:LOOP_PROTECTION"
+msgid "Loop protection triggered in {caller} for child zone {child_zone_name} at zone {zone_name} (query name {intermediate_query_name})."
+msgstr "Løkkebeskyttelse ble utløst i {caller} for barnesonen {child_zone_name} ved sone {zone_name} (spørringsnavn {intermediate_query_name})."

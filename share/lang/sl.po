@@ -3134,3 +3134,21 @@ msgstr "Raven"
 msgctxt "SYSTEM:CLI_HEADER_MESSAGE"
 msgid "Message"
 msgstr "Sporočilo"
+
+msgctxt "CONNECTIVITY:CN04_ASN_INFOS_ANNOUNCE_IN"
+msgid "Name server IP address \"{address}\" is announced in prefix \"{prefixes}\"."
+msgstr ""
+"Številka IP domenskega strežnika \"{address}\" je oglaševana v prefixu "
+"\"{prefixes}\"."
+
+msgctxt "CONNECTIVITY:CN04_ASN_INFOS_RAW"
+msgid "The ASN data for name server IP address \"{address}\" is \"{data}\"."
+msgstr "ASN podatki domenskega strežnika \"{address}\" so \"{data}\"."
+
+msgctxt "CONSISTENCY:SOA_MNAME"
+msgid "Found SOA mname {mname} on following nameserver set : {servers}."
+msgstr "Najden SOA MNAME {mname} v naboru domenskih strežnikov : {servers}."
+
+msgctxt "BASIC:LOOP_PROTECTION"
+msgid "Loop protection triggered in {caller} for child zone {child_zone_name} at zone {zone_name} (query name {intermediate_query_name})."
+msgstr "Zaščita pred zanko se je sprožila v {caller} za podrejeno cono {child_zone_name} pri coni {zone_name} (ime poizvedbe {intermediate_query_name})."

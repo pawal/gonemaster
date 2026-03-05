@@ -2760,3 +2760,21 @@ msgstr "Taso"
 msgctxt "SYSTEM:CLI_HEADER_MESSAGE"
 msgid "Message"
 msgstr "Viesti"
+
+msgctxt "CONNECTIVITY:CN04_ASN_INFOS_ANNOUNCE_IN"
+msgid "Name server IP address \"{address}\" is announced in prefix \"{prefixes}\"."
+msgstr ""
+"Nimipalvelimen IP-osoite \"{address}\" ilmoitetaan Prefixissä \"{prefixes}\"."
+
+msgctxt "CONNECTIVITY:CN04_ASN_INFOS_RAW"
+msgid "The ASN data for name server IP address \"{address}\" is \"{data}\"."
+msgstr "Nimipalvelimen IP-osoitteen \"{address}\" ASN-tieto on \"{data}\"."
+
+msgctxt "CONSISTENCY:SOA_MNAME"
+msgid "Found SOA mname {mname} on following nameserver set : {servers}."
+msgstr ""
+"Löydetty SOA mname {mname} seuraavasta nimipalvelinjoukosta: {servers}."
+
+msgctxt "BASIC:LOOP_PROTECTION"
+msgid "Loop protection triggered in {caller} for child zone {child_zone_name} at zone {zone_name} (query name {intermediate_query_name})."
+msgstr "Silmukkasuojaus laukei kohdassa {caller} lapsivyöhykkeelle {child_zone_name} vyöhykkeessä {zone_name} (kyselynimi {intermediate_query_name})."

@@ -51,18 +51,6 @@ msgstr ""
 "Domännamnet inkluderar en domändel (\"label\") som är för lång (mer än 63 "
 "tecken). Domändelen är \"{label}\"."
 
-msgctxt "ADDRESS:ADDRESS01"
-msgid "Name server address must be globally routable"
-msgstr "Namnserverns adress måste vara globalt nåbar."
-
-msgctxt "ADDRESS:ADDRESS02"
-msgid "Reverse DNS entry exists for name server IP address"
-msgstr "Bakåtuppslagning (PTR) finns för namnserverns IP-adress."
-
-msgctxt "ADDRESS:ADDRESS03"
-msgid "Reverse DNS entry matches name server name"
-msgstr "Bakåtuppslagningen (PTR) stämmer med namnservernamnet."
-
 msgctxt "ADDRESS:NAMESERVER_IP_WITHOUT_REVERSE"
 msgid "Nameserver {ns} has an IP address ({address}) without PTR configured."
 msgstr ""
@@ -75,19 +63,6 @@ msgid ""
 msgstr ""
 "Namnservern '{ns}' har en IP-adress ({address}) med en reversuppslagning "
 "(PTR) till '{ptr_names}' som inte stämmer med namnservernamnet."
-
-msgctxt "ADDRESS:NAMESERVER_IP_PRIVATE_NETWORK"
-msgid ""
-"Nameserver {ns} has an IP address ({address}) with prefix {prefix} "
-"referenced in {reference} as a '{name}'."
-msgstr ""
-"Namnservern {ns} har en IP-adress ({address}) med prefixet {prefix} som "
-"{reference} klassificerar som '{name}'."
-
-msgctxt "ADDRESS:NO_IP_PRIVATE_NETWORK"
-msgid "All Nameserver addresses are in the routable public addressing space."
-msgstr ""
-"Alla namnserveradresser finns i den publikt routningsbara addressrymden."
 
 msgctxt "ADDRESS:NAMESERVERS_IP_WITH_REVERSE"
 msgid "Reverse DNS entry exists for each Nameserver IP address."
@@ -172,18 +147,6 @@ msgstr "TEST_CASE_START {testcase}."
 msgctxt "ZONE:TEST_CASE_START"
 msgid "TEST_CASE_START {testcase}."
 msgstr "TEST_CASE_START {testcase}."
-
-msgctxt "BASIC:BASIC01"
-msgid "The domain must have a parent domain"
-msgstr "Domännamnet måste ha en moderzon"
-
-msgctxt "BASIC:BASIC02"
-msgid "The domain must have at least one working name server"
-msgstr "Domännamnet måste ha åtminstone en fungerande namnserver"
-
-msgctxt "BASIC:BASIC03"
-msgid "The Broken but functional test"
-msgstr "Funktionell test av otestbart namn"
 
 msgctxt "BASIC:A_QUERY_NO_RESPONSES"
 msgid "Nameservers did not respond to A query."
@@ -306,21 +269,6 @@ msgstr ""
 "Namnservern {ns} svarar med den oväntade svarskoden (RCODE) \"{rcode}\" på "
 "en SOA-fråga."
 
-msgctxt "BASIC:DOMAIN_NAME_LABEL_TOO_LONG"
-msgid ""
-"Domain name ({domain}) has a label ({label}) too long ({dlength}/{max})."
-msgstr ""
-"Domändelen '{label}' i domännamnet {domain} är för lång ({dlength} tecken). Maximal "
-"längd är {max}."
-
-msgctxt "BASIC:DOMAIN_NAME_TOO_LONG"
-msgid "Domain name is too long ({fqdnlength}/{max})."
-msgstr "Domännamnet är för långt ({fqdnlength} tecken). Maximal längd är {max}."
-
-msgctxt "BASIC:DOMAIN_NAME_ZERO_LENGTH_LABEL"
-msgid "Domain name ({domain}) has a zero-length label."
-msgstr "Domännamnet '{domain}' har en domändel med längden noll."
-
 msgctxt "BASIC:HAS_A_RECORDS"
 msgid "Nameserver {ns}/{address} returned \"A\" record(s) for {domain}."
 msgstr "Namnservern {ns}/{address} svarade med A-poster för '{domain}'."
@@ -418,22 +366,6 @@ msgstr "IPv6 är aktiverat. Skickar fråga om '{query_type}' till {ns}/{address}
 msgctxt "BASIC:NO_A_RECORDS"
 msgid "Nameserver {ns}/{address} did not return \"A\" record(s) for {domain}."
 msgstr "Namnservern {ns}/{address} svarade inte med några A-poster för '{domain}'."
-
-msgctxt "CONNECTIVITY:CONNECTIVITY01"
-msgid "UDP connectivity"
-msgstr "Nätåtkomst över UDP"
-
-msgctxt "CONNECTIVITY:CONNECTIVITY02"
-msgid "TCP connectivity"
-msgstr "Nätåtkomst över TCP"
-
-msgctxt "CONNECTIVITY:CONNECTIVITY03"
-msgid "AS Diversity"
-msgstr "AS-spridning"
-
-msgctxt "CONNECTIVITY:CONNECTIVITY04"
-msgid "IP Prefix Diversity"
-msgstr "IP-prefix-spridning"
 
 msgctxt "CONNECTIVITY:CN01_IPV4_DISABLED"
 msgid ""
@@ -702,41 +634,9 @@ msgstr ""
 "Minst två IPv6-adresser för de auktoritativa namnservrarna tillhör två olika "
 "AS-uppsättningar. En ihopslagen lista över alla AS: {asns}."
 
-msgctxt "CONNECTIVITY:IPV4_ASN"
-msgid "Name servers have IPv4 addresses in the following ASs: {asn}."
-msgstr "Namnservrarna har IPv4-adresser i följande AS: {asn}."
-
-msgctxt "CONNECTIVITY:IPV6_ASN"
-msgid "Name servers have IPv6 addresses in the following ASs: {asn}."
-msgstr "Namnservrarna har IPv6-adresser i följande AS: {asn}."
-
 msgctxt "CONNECTIVITY:ASN_INFOS_ANNOUNCE_BY"
 msgid "Name server IP address \"{address}\" is announced by ASN {asns}."
 msgstr "Namnserver-IP-adressen \"{address}\" tillhör AS {asns}."
-
-msgctxt "CONSISTENCY:CONSISTENCY01"
-msgid "SOA serial number consistency"
-msgstr "Samma SOA Serial överallt"
-
-msgctxt "CONSISTENCY:CONSISTENCY02"
-msgid "SOA RNAME consistency"
-msgstr "Samma SOA RNAME överallt"
-
-msgctxt "CONSISTENCY:CONSISTENCY03"
-msgid "SOA timers consistency"
-msgstr "Samma tidsinställningar i SOA överallt"
-
-msgctxt "CONSISTENCY:CONSISTENCY04"
-msgid "Name server NS consistency"
-msgstr "Samma uppsättning NS-poster överallt"
-
-msgctxt "CONSISTENCY:CONSISTENCY05"
-msgid "Consistency between glue and authoritative data"
-msgstr "Glue-poster återfinns som auktoritativa adressposter"
-
-msgctxt "CONSISTENCY:CONSISTENCY06"
-msgid "SOA MNAME consistency"
-msgstr "Samma SOA MNAME överallt"
 
 msgctxt "CONSISTENCY:ADDRESSES_MATCH"
 msgid "Glue records are consistent between glue and authoritative data."
@@ -876,153 +776,6 @@ msgstr ""
 "SOA-tidsparametrarna (REFRESH={refresh}, RETRY={retry}, EXPIRE={expire}, "
 "MINIMUM={minimum}) hittades på följande uppsättning namnservrar: {servers}."
 
-msgctxt "DNSSEC:DNSSEC01"
-msgid "Legal values for the DS hash digest algorithm"
-msgstr "Kontrollera så att giltiga digest-algoritmer används för DS-posterna"
-
-msgctxt "DNSSEC:DNSSEC02"
-msgid "DS must match a valid DNSKEY in the child zone"
-msgstr "DS-posten måste peka på en giltig DNSKEY-post i dotterzonen"
-
-msgctxt "DNSSEC:DNSSEC03"
-msgid "Verify NSEC3 parameters"
-msgstr "Verifiera NSEC3-parametrar"
-
-msgctxt "DNSSEC:DNSSEC04"
-msgid "Check for too short or too long RRSIG lifetimes"
-msgstr ""
-"Kontrollera så att RRSIG-postens livslängd inte är för kort eller för lång"
-
-msgctxt "DNSSEC:DNSSEC05"
-msgid "Check for invalid DNSKEY algorithms"
-msgstr ""
-"Kontrollera så att ogiltiga algoritmer inte används för DNSKEY-posterna"
-
-msgctxt "DNSSEC:DNSSEC06"
-msgid "Verify DNSSEC additional processing"
-msgstr "Verifiera hantering av RRSIG-poster i \"Additional Section\""
-
-msgctxt "DNSSEC:DNSSEC07"
-msgid "If DNSKEY at child, parent should have DS"
-msgstr "Zonen är DNSSEC-signerad och moderzonen innehåller motsvarande DS-post."
-
-msgctxt "DNSSEC:DNSSEC08"
-msgid "Valid RRSIG for DNSKEY"
-msgstr "Giltig RRSIG-post för DNSKEY-posterna"
-
-msgctxt "DNSSEC:DNSSEC09"
-msgid "RRSIG(SOA) must be valid and created by a valid DNSKEY"
-msgstr ""
-"RRSIG-posterna för SOA-posten måste vara giltiga och skapade av giltig DNSKEY"
-
-msgctxt "DNSSEC:DNSSEC10"
-msgid "Zone contains NSEC or NSEC3 records"
-msgstr "Zonen har NSEC eller NSEC3"
-
-msgctxt "DNSSEC:DNSSEC11"
-msgid "DS in delegation requires signed zone"
-msgstr "Delegering med DS-post kräver DNSSEC-signerad dotterzon"
-
-msgctxt "DNSSEC:DNSSEC12"
-msgid "Test for DNSSEC Algorithm Completeness"
-msgstr "Test av komplett användning av DNSSEC-algoritmer"
-
-msgctxt "DNSSEC:DNSSEC13"
-msgid "All DNSKEY algorithms used to sign the zone"
-msgstr "Alla DNSKEY-algoritmer ska användas för att signera zonen"
-
-msgctxt "DNSSEC:DNSSEC14"
-msgid "Check for valid RSA DNSKEY key size"
-msgstr "Kontrollera för giltig storlek på DNSKEY av type RSA"
-
-msgctxt "DNSSEC:DNSSEC15"
-msgid "Existence of CDS and CDNSKEY"
-msgstr "Existens av CDS- och CDNSKEY-poster"
-
-msgctxt "DNSSEC:DNSSEC16"
-msgid "Validate CDS"
-msgstr "Validera CDS-poster"
-
-msgctxt "DNSSEC:DNSSEC17"
-msgid "Validate CDNSKEY"
-msgstr "Validera CDNSKEY-poster"
-
-msgctxt "DNSSEC:DNSSEC18"
-msgid "Validate trust from DS to CDS and CDNSKEY"
-msgstr "Validera tillit från DS-poster till CDS- och CDNSKEY-poster"
-
-msgctxt "DNSSEC:ADDITIONAL_DNSKEY_SKIPPED"
-msgid "No DNSKEYs found. Additional tests skipped."
-msgstr "Inga DNSKEY-poster hittades. Resterande test hoppades över."
-
-msgctxt "DNSSEC:ALGORITHM_DEPRECATED"
-msgid ""
-"The DNSKEY with tag {keytag} uses deprecated algorithm number {algo_num} "
-"({algo_descr})."
-msgstr ""
-"DNSKEY-posten med \"key tag\" {keytag} används med den utfasade "
-"kryptoalgoritmen {algo_num} ({algo_descr})."
-
-msgctxt "DNSSEC:ALGORITHM_NOT_RECOMMENDED"
-msgid ""
-"The DNSKEY with tag {keytag} uses an algorithm number {algo_num} "
-"({algo_descr}) which is not recommended to be used."
-msgstr ""
-"DNSKEY-posten med \"key tag\" {keytag} används med kryptoalgoritm {algo_num} "
-"({algo_descr}), som inte rekommenderas för zonsignering."
-
-msgctxt "DNSSEC:ALGORITHM_NOT_ZONE_SIGN"
-msgid ""
-"The DNSKEY with tag {keytag} uses algorithm number not meant for zone "
-"signing, algorithm number {algo_num} ({algo_descr})."
-msgstr ""
-"DNSKEY-posten med \"key tag\" {keytag} används med kryptoalgoritm {algo_num} "
-"({algo_descr}), som inte är avsedd för zonsignering."
-
-msgctxt "DNSSEC:ALGORITHM_OK"
-msgid ""
-"The DNSKEY with tag {keytag} uses algorithm number {algo_num} "
-"({algo_descr}), which is OK."
-msgstr ""
-"DNSKEY-posten med \"key tag\" {keytag} används med kryptoalgoritm {algo_num} "
-"({algo_descr}), vilket är OK."
-
-msgctxt "DNSSEC:ALGORITHM_PRIVATE"
-msgid ""
-"The DNSKEY with tag {keytag} uses private algorithm number {algo_num} "
-"({algo_descr})."
-msgstr ""
-"DNSKEY-posten med \"key tag\" {keytag} används med den privata "
-"kryptoalgoritmen {algo_num} ({algo_descr})."
-
-msgctxt "DNSSEC:ALGORITHM_RESERVED"
-msgid ""
-"The DNSKEY with tag {keytag} uses reserved algorithm number {algo_num} "
-"({algo_descr})."
-msgstr ""
-"DNSKEY-posten med \"key tag\" {keytag} används med kryptoalgoritm {algo_num} "
-"({algo_descr}). Algoritmnumret är undanlagt för framtida behov."
-
-msgctxt "DNSSEC:ALGORITHM_UNASSIGNED"
-msgid ""
-"The DNSKEY with tag {keytag} uses unassigned algorithm number {algo_num} "
-"({algo_descr})."
-msgstr ""
-"DNSKEY-posten med \"key tag\" {keytag} används med kryptoalgoritm {algo_num} "
-"({algo_descr}). Algoritmnumret är inte tilldelat någon algoritm."
-
-msgctxt "DNSSEC:DNSKEY_AND_DS"
-msgid "{parent} sent a DS record, and {child} a DNSKEY record."
-msgstr ""
-"Moderzonen '{parent}' skickade en DS-post, och dotterzonen '{child}' en "
-"DNSKEY-post."
-
-msgctxt "DNSSEC:DNSKEY_BUT_NOT_DS"
-msgid "{child} sent a DNSKEY record, but {parent} did not send a DS record."
-msgstr ""
-"Dotterzonen '{child}' skickade en DNSKEY-post, men moderzonen '{parent}' "
-"skickade inte någon DS-post."
-
 msgctxt "DNSSEC:DNSKEY_SMALLER_THAN_REC"
 msgid ""
 "DNSKEY with tag {keytag} and using algorithm {algo_num} ({algo_descr}) has a "
@@ -1049,18 +802,6 @@ msgstr ""
 "DNSKEY-posten med \"key tag\" {keytag}, som används med kryptoalgoritm "
 "{algo_num} ({algo_descr}), har en nyckelstorlek ({keysize}) som är större än "
 "den maximala storleken ({keysizemax}) för den algoritmen."
-
-msgctxt "DNSSEC:DS01_DIGEST_NOT_SUPPORTED_BY_ZM"
-msgid ""
-"DS record for zone {domain} with keytag {keytag} was created by digest "
-"algorithm {ds_algo_num} ({ds_algo_mnemo}) which cannot be validated by this "
-"installation of Zonemaster. Fetched from the nameservers with IP addresses "
-"\"{addresses}\"."
-msgstr ""
-"DS-posten för zonen {domain} med \"key tag\" {keytag} skapades med "
-"hashfunktionen (\"digest algorithm\") {ds_algo_num} ({ds_algo_mnemo}) som "
-"inte kan valideras av denna Zonemasterinstallation. Hämtad från "
-"namnservrarna med IP-adresserna \"{addresses}\"."
 
 msgctxt "DNSSEC:DS01_DS_ALGO_DEPRECATED"
 msgid ""
@@ -2117,14 +1858,6 @@ msgstr ""
 "CDNSKEY RRset har inte signerats av en DNSKEY-post som någon DS-post "
 "refererar till. Hämtat från namnservrarna med IP-adresserna \"{addresses}\"."
 
-msgctxt "DNSSEC:DS_BUT_NOT_DNSKEY"
-msgctxt "DNSSEC:DS19_BADKEY_BLOCKLIST"
-msgid ""
-"DNSKEY with keytag {keytag} and algorithm {algo_descr} ({algo_num}) matches "
-"known compromised key in blocklist \"{blocklist_name}\" on name server(s) "
-"{servers}."
-msgstr "DNSKEY med keytag {keytag} och algoritm {algo_descr} ({algo_num}) matchar en känd komprometterad nyckel i blockeringslistan \"{blocklist_name}\" på namnserver(ar) {servers}."
-
 msgctxt "DNSSEC:DS19_BADKEY_FERMAT"
 msgid ""
 "DNSKEY with keytag {keytag} and algorithm {algo_descr} ({algo_num}) has RSA "
@@ -2215,29 +1948,13 @@ msgid "Server at {address} sent {keys} DNSKEY records and {sigs} RRSIG records."
 msgstr ""
 "Namnservern '{address}' skickade {keys} DNSKEY-poster och {sigs} RRSIG-poster."
 
-msgctxt "DNSSEC:KEY_DETAILS"
-msgid ""
-"Key with keytag {keytag} details : Size = {keysize}, Flags ({sep}, "
-"{rfc5011})."
-msgstr ""
-"Nyckel med \"key tag\" {keytag}. Detaljer: storlek = {keysize}, Flaggor = "
-"({sep} {rfc5011})."
-
 msgctxt "DNSSEC:KEY_SIZE_OK"
 msgid "All keys from the DNSKEY RRset have the correct size."
 msgstr "Alla nycklar i DNSKEY RR-uppsättningen har rätt storlek."
 
-msgctxt "DNSSEC:NEITHER_DNSKEY_NOR_DS"
-msgid "There are neither DS nor DNSKEY records for the zone."
-msgstr "Zonen har varken DS- eller DNSKEY-poster."
-
 msgctxt "DNSSEC:NO_RESPONSE_DNSKEY"
 msgid "Nameserver {ns}/{address} responded with no DNSKEY record(s)."
 msgstr "Svaret från namnservern {ns}/{address} har ingen DNSKEY-post."
-
-msgctxt "DNSSEC:NOT_SIGNED"
-msgid "The zone is not signed with DNSSEC."
-msgstr "Zonen är inte signerad med DNSSEC."
 
 msgctxt "DNSSEC:REMAINING_LONG"
 msgid ""
@@ -2269,34 +1986,6 @@ msgid ""
 msgstr ""
 "Giltighetstiden för RRSIG-posten med \"key tag\" {keytag} och som täcker "
 "posttyp(er) {types} har löpt ut (utgångstiden är: {expiration})."
-
-msgctxt "DELEGATION:DELEGATION01"
-msgid "Minimum number of name servers"
-msgstr "Minsta antal namnservrar"
-
-msgctxt "DELEGATION:DELEGATION02"
-msgid "Name servers must have distinct IP addresses"
-msgstr "Namnservrarna måste ha distinkta IP-adresser"
-
-msgctxt "DELEGATION:DELEGATION03"
-msgid "No truncation of referrals"
-msgstr "Ingen avkortning av hänvisningar"
-
-msgctxt "DELEGATION:DELEGATION04"
-msgid "Name server is authoritative"
-msgstr "Namnservern är auktoritativ"
-
-msgctxt "DELEGATION:DELEGATION05"
-msgid "Name server must not point at CNAME alias"
-msgstr "Inget namnservernamn får peka mot ett CNAME-alias"
-
-msgctxt "DELEGATION:DELEGATION06"
-msgid "Existence of SOA"
-msgstr "Existens av SOA-post"
-
-msgctxt "DELEGATION:DELEGATION07"
-msgid "Parent glue name records present in child"
-msgstr "Glue-poster i moderzonen återfinns i dotterzonen"
 
 msgctxt "DELEGATION:ARE_AUTHORITATIVE"
 msgid ""
@@ -2547,63 +2236,6 @@ msgid ""
 msgstr ""
 "Namnservern {ns} besvarade en fråga om namnet {query_name} och typ {query_type} "
 "med den oväntade svarskoden (RCODE) \"{rcode}\"."
-
-msgctxt "NAMESERVER:NAMESERVER01"
-msgid "A name server should not be a recursor"
-msgstr "En namnserver ska inte vara en rekursiv resolver"
-
-msgctxt "NAMESERVER:NAMESERVER02"
-msgid "Test of EDNS0 support"
-msgstr "Test av stöd för EDNS0"
-
-msgctxt "NAMESERVER:NAMESERVER03"
-msgid "Test availability of zone transfer (AXFR)"
-msgstr "Test av tillgänglighet för zonöverföring (AXFR)"
-
-msgctxt "NAMESERVER:NAMESERVER04"
-msgid "Same source address"
-msgstr "Konsekvent källadress"
-
-msgctxt "NAMESERVER:NAMESERVER05"
-msgid "Behaviour against AAAA query"
-msgstr "Beteende gällande AAAA-frågor"
-
-msgctxt "NAMESERVER:NAMESERVER06"
-msgid "NS can be resolved"
-msgstr "Namnet i NS-posten kan slås upp"
-
-msgctxt "NAMESERVER:NAMESERVER07"
-msgid "To check whether authoritative name servers return an upward referral"
-msgstr ""
-"Kontrollera ifall auktoritativa namnservrar svarar med hänvisning till rot"
-
-msgctxt "NAMESERVER:NAMESERVER08"
-msgid "Testing QNAME case insensitivity"
-msgstr "Test att skiftläget i QNAME bibehålls i \"Question section\""
-
-msgctxt "NAMESERVER:NAMESERVER09"
-msgid "Testing QNAME case sensitivity"
-msgstr "Test att skiftläge i QNAME ignoreras för frågan"
-
-msgctxt "NAMESERVER:NAMESERVER10"
-msgid "Test for undefined EDNS version"
-msgstr "Test med odefinierad EDNS-version"
-
-msgctxt "NAMESERVER:NAMESERVER11"
-msgid "Test for unknown EDNS OPTION-CODE"
-msgstr "Test med odefinierad OPTION-CODE i EDNS"
-
-msgctxt "NAMESERVER:NAMESERVER12"
-msgid "Test for unknown EDNS flags"
-msgstr "Test med odefinierad EDNS-flagga"
-
-msgctxt "NAMESERVER:NAMESERVER13"
-msgid "Test for truncated response on EDNS query"
-msgstr "Test med avkortat (\"truncated\") svar på fråga med EDNS"
-
-msgctxt "NAMESERVER:NAMESERVER15"
-msgid "Checking for revealed software version"
-msgstr "Kontroll av rapporterad version av programvara"
 
 msgctxt "NAMESERVER:AAAA_BAD_RDATA"
 msgid ""
@@ -2958,41 +2590,6 @@ msgstr ""
 "Svarspaket från namnservern {ns}/{address} har en eller flera odefinierade bitar satta "
 "i Z-flaggan (EDNS)."
 
-msgctxt "SYNTAX:SYNTAX01"
-msgid "No illegal characters in the domain name"
-msgstr "Inga otillåtna tecken i domännamnet"
-
-msgctxt "SYNTAX:SYNTAX02"
-msgid "No hyphen ('-') at the start or end of the domain name"
-msgstr "Inget bindestreck (\"-\") i start eller slut av domännamnsdel"
-
-msgctxt "SYNTAX:SYNTAX03"
-msgid ""
-"There must be no double hyphen ('--') in position 3 and 4 of the domain name"
-msgstr ""
-"Det får inte finnas dubbla bindestreck (\"--\") i position 3 och 4 i "
-"domännamnsdel"
-
-msgctxt "SYNTAX:SYNTAX04"
-msgid "The NS name must have a valid domain/hostname"
-msgstr "En NS-post måste ha ett giltigt namn (\"hostname\")"
-
-msgctxt "SYNTAX:SYNTAX05"
-msgid "Misuse of '@' character in the SOA RNAME field"
-msgstr "Otillåten användning av @-tecken i SOA RNAME-fältet"
-
-msgctxt "SYNTAX:SYNTAX06"
-msgid "No illegal characters in the SOA RNAME field"
-msgstr "Inga otillåtna tecken i SOA RNAME-fältet"
-
-msgctxt "SYNTAX:SYNTAX07"
-msgid "No illegal characters in the SOA MNAME field"
-msgstr "Inga otillåtna tecken i SOA MNAME-fältet"
-
-msgctxt "SYNTAX:SYNTAX08"
-msgid "MX name must have a valid hostname"
-msgstr "En MX-post måste ha ett giltigt namn (\"hostname\")"
-
 msgctxt "SYNTAX:DISCOURAGED_DOUBLE_DASH"
 msgid ""
 "Domain name ({domain}) has a label ({label}) with a double hyphen ('--') in "
@@ -3151,50 +2748,6 @@ msgid ""
 msgstr ""
 "Domännamnet '{domain}' har domändelen '{label}' som slutar med ett "
 "bindestreck."
-
-msgctxt "ZONE:ZONE01"
-msgid "Fully qualified master nameserver in SOA"
-msgstr "Faktisk primär namnserver i SOA MNAME"
-
-msgctxt "ZONE:ZONE02"
-msgid "SOA 'refresh' minimum value"
-msgstr "Minsta värde för SOA \"refresh\""
-
-msgctxt "ZONE:ZONE03"
-msgid "SOA 'retry' lower than 'refresh'"
-msgstr "SOA \"retry\" lägre än \"refresh\""
-
-msgctxt "ZONE:ZONE04"
-msgid "SOA 'retry' at least 1 hour"
-msgstr "SOA \"retry\" minst en timme"
-
-msgctxt "ZONE:ZONE05"
-msgid "SOA 'expire' minimum value"
-msgstr "Minsta värde för SOA \"expire\""
-
-msgctxt "ZONE:ZONE06"
-msgid "SOA 'minimum' maximum value"
-msgstr "Lägsta och högsta värde för SOA \"minimum\""
-
-msgctxt "ZONE:ZONE07"
-msgid "SOA master is not an alias"
-msgstr "Namnet i SOA MNAME ska inte vara ett alias"
-
-msgctxt "ZONE:ZONE08"
-msgid "MX is not an alias"
-msgstr "Namnet i MX-post ska inte vara ett alias"
-
-msgctxt "ZONE:ZONE09"
-msgid "MX record present"
-msgstr "Test av existens av MX-post"
-
-msgctxt "ZONE:ZONE10"
-msgid "No multiple SOA records"
-msgstr "Inte multipla SOA-poster"
-
-msgctxt "ZONE:ZONE11"
-msgid "SPF policy validation"
-msgstr "Validering av SPF-policy"
 
 msgctxt "ZONE:RETRY_MINIMUM_VALUE_LOWER"
 msgid ""
@@ -3491,26 +3044,6 @@ msgstr ""
 msgctxt "ZONE:Z11_NO_SPF_FOUND"
 msgid "No SPF policy was found for {domain}."
 msgstr "Ingen SPF-policy hittades för {domain}."
-
-msgctxt "ZONE:Z11_SPF1_MULTIPLE_RECORDS"
-msgid ""
-"The following name servers returned more than one SPF policy. Name servers: "
-"{addresses}."
-msgstr ""
-"Följande namnservrar returnerade mer än en SPF-policy. Namnservrar: "
-"{addresses}."
-
-msgctxt "ZONE:Z11_SPF1_SYNTAX_ERROR"
-msgid ""
-"The SPF policy of {domain} has a syntax error. Policy retrieved from the "
-"following nameservers: {addresses}."
-msgstr ""
-"SPF-policyn för {domain} har ett syntaxfel. Policyn hämtades från följande "
-"namnservrar: {addresses}."
-
-msgctxt "ZONE:Z11_SPF1_SYNTAX_OK"
-msgid "The SPF policy of {domain} has correct syntax."
-msgstr "SPF-policyn för {domain} har korrekt syntax."
 
 msgctxt "ZONE:Z11_UNABLE_TO_CHECK_FOR_SPF"
 msgid ""

@@ -83,22 +83,6 @@ msgctxt "ZONE:TEST_CASE_START"
 msgid "TEST_CASE_START {testcase}."
 msgstr "テストケース開始 {testcase}。"
 
-msgctxt "BASIC:BASIC00"
-msgid "Domain name must be valid"
-msgstr "ドメイン名は有効である必要があります。"
-
-msgctxt "BASIC:BASIC01"
-msgid "The domain must have a parent domain"
-msgstr "ドメインには親ドメインが必要です。"
-
-msgctxt "BASIC:BASIC02"
-msgid "The domain must have at least one working name server"
-msgstr "ドメインには少なくとも 1 台の動作するネームサーバーが必要です。"
-
-msgctxt "BASIC:BASIC03"
-msgid "The Broken but functional test"
-msgstr "壊れているが機能しているテスト"
-
 msgctxt "BASIC:A_QUERY_NO_RESPONSES"
 msgid "Nameservers did not respond to A query."
 msgstr "ネームサーバーが A クエリに応答しませんでした。"
@@ -161,16 +145,6 @@ msgctxt "BASIC:B01_PARENT_UNDETERMINED"
 msgid "The parent zone cannot be determined on name servers \"{servers}\"."
 msgstr "親ゾーンをネームサーバー \"{servers}\" から判定できません。"
 
-msgctxt "BASIC:B01_UNEXPECTED_NS_RESPONSE"
-msgid ""
-"Name servers for parent domain \"{domain_parent}\" give an incorrect "
-"response on SOA query for \"{domain_child}\". Returned from name servers "
-"\"{addresses}\"."
-msgstr ""
-"親ドメイン \"{domain_parent}\" のネームサーバーが "
-"\"{domain_child}\" への SOA クエリに不正な応答を返しました。"
-"応答したネームサーバー: \"{addresses}\"。"
-
 msgctxt "BASIC:B01_ROOT_HAS_NO_PARENT"
 msgid "This is a test of the root zone which has no parent zone."
 msgstr "これはルートゾーンのテストです。ルートゾーンには親ゾーンがありません。"
@@ -226,21 +200,6 @@ msgid ""
 msgstr ""
 "ネームサーバー \"{ns}\" が SOA クエリに予期しない RCODE "
 "(\"{rcode}\") を返しました。"
-
-msgctxt "BASIC:DOMAIN_NAME_LABEL_TOO_LONG"
-msgid ""
-"Domain name ({domain}) has a label ({label}) too long ({dlength}/{max})."
-msgstr ""
-"ドメイン名 ({domain}) に長すぎるラベル ({label}) があります "
-"({dlength}/{max})。"
-
-msgctxt "BASIC:DOMAIN_NAME_TOO_LONG"
-msgid "Domain name is too long ({fqdnlength}/{max})."
-msgstr "ドメイン名が長すぎます ({fqdnlength}/{max})。"
-
-msgctxt "BASIC:DOMAIN_NAME_ZERO_LENGTH_LABEL"
-msgid "Domain name ({domain}) has a zero-length label."
-msgstr "ドメイン名 ({domain}) に長さ 0 のラベルがあります。"
 
 msgctxt "BASIC:HAS_A_RECORDS"
 msgid "Nameserver {ns}/{address} returned \"A\" record(s) for {domain}."
@@ -349,22 +308,6 @@ msgid ""
 msgstr ""
 "IPv6 が無効です。次のネームサーバーには DNS クエリを送信しません: "
 "\"{servers}\"。"
-
-msgctxt "CONNECTIVITY:CONNECTIVITY01"
-msgid "UDP connectivity"
-msgstr "UDP 接続性"
-
-msgctxt "CONNECTIVITY:CONNECTIVITY02"
-msgid "TCP connectivity"
-msgstr "TCP 接続性"
-
-msgctxt "CONNECTIVITY:CONNECTIVITY03"
-msgid "AS Diversity"
-msgstr "AS 多様性"
-
-msgctxt "CONNECTIVITY:CONNECTIVITY04"
-msgid "IP Prefix Diversity"
-msgstr "IP プレフィックス多様性"
 
 msgctxt "CONNECTIVITY:CN01_MISSING_NS_RECORD_UDP"
 msgid ""
@@ -596,41 +539,9 @@ msgid ""
 "by different AS sets. A merged list of all AS: ({asns})."
 msgstr "権威ネームサーバーの少なくとも 2 つの IPv6 アドレスが異なる AS 集合でアナウンスされています。AS 一覧: ({asns})。"
 
-msgctxt "CONNECTIVITY:IPV4_ASN"
-msgid "Name servers have IPv4 addresses in the following ASs: {asn}."
-msgstr "ネームサーバーの IPv4 アドレスは次の AS に属します: {asn}。"
-
-msgctxt "CONNECTIVITY:IPV6_ASN"
-msgid "Name servers have IPv6 addresses in the following ASs: {asn}."
-msgstr "ネームサーバーの IPv6 アドレスは次の AS に属します: {asn}。"
-
 msgctxt "CONNECTIVITY:ASN_INFOS_ANNOUNCE_BY"
 msgid "Name server IP address \"{address}\" is announced by ASN {asns}."
 msgstr "ネームサーバー IP アドレス \"{address}\" は ASN {asns} によりアナウンスされています。"
-
-msgctxt "CONSISTENCY:CONSISTENCY01"
-msgid "SOA serial number consistency"
-msgstr "SOA シリアル番号の一貫性"
-
-msgctxt "CONSISTENCY:CONSISTENCY02"
-msgid "SOA RNAME consistency"
-msgstr "SOA RNAME の一貫性"
-
-msgctxt "CONSISTENCY:CONSISTENCY03"
-msgid "SOA timers consistency"
-msgstr "SOA タイマー値の一貫性"
-
-msgctxt "CONSISTENCY:CONSISTENCY04"
-msgid "Name server NS consistency"
-msgstr "ネームサーバー NS の一貫性"
-
-msgctxt "CONSISTENCY:CONSISTENCY05"
-msgid "Consistency between glue and authoritative data"
-msgstr "グルーと権威データ間の一貫性"
-
-msgctxt "CONSISTENCY:CONSISTENCY06"
-msgid "SOA MNAME consistency"
-msgstr "SOA MNAME の一貫性"
 
 msgctxt "CONSISTENCY:ADDRESSES_MATCH"
 msgid "Glue records are consistent between glue and authoritative data."
@@ -756,34 +667,6 @@ msgstr ""
 "次のネームサーバー集合 {servers} で SOA 時間パラメータセット "
 "(REFRESH={refresh}, RETRY={retry}, EXPIRE={expire}, MINIMUM={minimum}) "
 "を確認しました。"
-
-msgctxt "DELEGATION:DELEGATION01"
-msgid "Minimum number of name servers"
-msgstr "ネームサーバーの最小台数"
-
-msgctxt "DELEGATION:DELEGATION02"
-msgid "Name servers must have distinct IP addresses"
-msgstr "ネームサーバーは異なる IP アドレスを持つ必要があります"
-
-msgctxt "DELEGATION:DELEGATION03"
-msgid "No truncation of referrals"
-msgstr "リファラルが切り詰められないこと"
-
-msgctxt "DELEGATION:DELEGATION04"
-msgid "Name server is authoritative"
-msgstr "ネームサーバーが権威であること"
-
-msgctxt "DELEGATION:DELEGATION05"
-msgid "Name server must not point at CNAME alias"
-msgstr "ネームサーバーは CNAME エイリアスを指してはいけません"
-
-msgctxt "DELEGATION:DELEGATION06"
-msgid "Existence of SOA"
-msgstr "SOA の存在"
-
-msgctxt "DELEGATION:DELEGATION07"
-msgid "Parent glue name records present in child"
-msgstr "親ゾーンのグルーネームレコードが子ゾーンにも存在すること"
 
 msgctxt "DELEGATION:ARE_AUTHORITATIVE"
 msgid ""
@@ -1029,30 +912,6 @@ msgctxt "ADDRESS:NO_RESPONSE_PTR_QUERY"
 msgid "No response from nameserver(s) on PTR query ({domain})."
 msgstr "PTR クエリ ({domain}) に対してネームサーバーから応答がありません。"
 
-msgctxt "ADDRESS:ADDRESS01"
-msgid "Name server address must be globally reachable"
-msgstr "ネームサーバーのアドレスはグローバル到達可能である必要があります。"
-
-msgctxt "ADDRESS:ADDRESS02"
-msgid "Reverse DNS entry exists for name server IP address"
-msgstr "ネームサーバー IP アドレスに逆引き DNS エントリが存在します。"
-
-msgctxt "ADDRESS:ADDRESS03"
-msgid "Reverse DNS entry matches name server name"
-msgstr "逆引き DNS エントリがネームサーバー名と一致します。"
-
-msgctxt "ADDRESS:NAMESERVER_IP_PRIVATE_NETWORK"
-msgid ""
-"Nameserver {ns} has an IP address ({address}) with prefix {prefix} "
-"referenced in {reference} as a '{name}'."
-msgstr ""
-"ネームサーバー {ns} の IP アドレス ({address}) は、{reference} で "
-"'{name}' と定義されるプレフィックス {prefix} に含まれます。"
-
-msgctxt "ADDRESS:NO_IP_PRIVATE_NETWORK"
-msgid "All Nameserver addresses are in the routable public addressing space."
-msgstr "すべてのネームサーバーアドレスは公開ルーティング可能なアドレス空間にあります。"
-
 msgctxt "ADDRESS:A01_ADDR_NOT_GLOBALLY_REACHABLE"
 msgid "IP address(es) not listed as globally reachable: \"{servers}\"."
 msgstr "グローバル到達可能として定義されていない IP アドレス: \"{servers}\"。"
@@ -1136,39 +995,6 @@ msgid ""
 msgstr ""
 "EDNS version 1 クエリに対する応答で RCODE (\"{rcode}\") が不正です。"
 "取得元ネームサーバー IP: {addresses}"
-
-msgctxt "SYNTAX:SYNTAX01"
-msgid "No illegal characters in the domain name"
-msgstr "ドメイン名に不正文字がないこと"
-
-msgctxt "SYNTAX:SYNTAX02"
-msgid "No hyphen ('-') at the start or end of the domain name"
-msgstr "ドメイン名の各ラベルの先頭または末尾にハイフン ('-') がないこと"
-
-msgctxt "SYNTAX:SYNTAX03"
-msgid ""
-"There must be no double hyphen ('--') in position 3 and 4 of the domain name"
-msgstr "ドメイン名ラベルの 3 文字目と 4 文字目に二重ハイフン ('--') がないこと"
-
-msgctxt "SYNTAX:SYNTAX04"
-msgid "The NS name must have a valid domain/hostname"
-msgstr "NS 名が有効なドメイン名/ホスト名であること"
-
-msgctxt "SYNTAX:SYNTAX05"
-msgid "Misuse of '@' character in the SOA RNAME field"
-msgstr "SOA RNAME フィールドでの '@' 文字の誤用"
-
-msgctxt "SYNTAX:SYNTAX06"
-msgid "No illegal characters in the SOA RNAME field"
-msgstr "SOA RNAME フィールドに不正文字がないこと"
-
-msgctxt "SYNTAX:SYNTAX07"
-msgid "No illegal characters in the SOA MNAME field"
-msgstr "SOA MNAME フィールドに不正文字がないこと"
-
-msgctxt "SYNTAX:SYNTAX08"
-msgid "MX name must have a valid hostname"
-msgstr "MX 名が有効なホスト名であること"
 
 msgctxt "SYNTAX:DISCOURAGED_DOUBLE_DASH"
 msgid ""
@@ -1434,66 +1260,6 @@ msgctxt "SYSTEM:ERROR_CACHE_SKIP"
 msgid "Skipping {query_type} query to {query_name} ({query_class}) at {address} over {protocol} for {ttl_seconds}s after network error."
 msgstr "{query_type} クエリ ({query_name}/{query_class}) を {address} ({protocol}) で {ttl_seconds} 秒スキップします (ネットワークエラー後)。"
 
-msgctxt "NAMESERVER:NAMESERVER01"
-msgid "A name server should not be a recursor"
-msgstr "ネームサーバーは再帰リゾルバであってはなりません"
-
-msgctxt "NAMESERVER:NAMESERVER02"
-msgid "Test of EDNS0 support"
-msgstr "EDNS0 サポートのテスト"
-
-msgctxt "NAMESERVER:NAMESERVER03"
-msgid "Test availability of zone transfer (AXFR)"
-msgstr "ゾーン転送 (AXFR) 可否のテスト"
-
-msgctxt "NAMESERVER:NAMESERVER04"
-msgid "Same source address"
-msgstr "送信元アドレスの一致"
-
-msgctxt "NAMESERVER:NAMESERVER05"
-msgid "Behaviour against AAAA query"
-msgstr "AAAA クエリに対する挙動"
-
-msgctxt "NAMESERVER:NAMESERVER06"
-msgid "NS can be resolved"
-msgstr "NS が解決できること"
-
-msgctxt "NAMESERVER:NAMESERVER07"
-msgid "To check whether authoritative name servers return an upward referral"
-msgstr "権威ネームサーバーが upward referral を返すかの確認"
-
-msgctxt "NAMESERVER:NAMESERVER08"
-msgid "Testing QNAME case insensitivity"
-msgstr "QNAME 大文字小文字非依存性のテスト"
-
-msgctxt "NAMESERVER:NAMESERVER09"
-msgid "Testing QNAME case sensitivity"
-msgstr "QNAME 大文字小文字保持のテスト"
-
-msgctxt "NAMESERVER:NAMESERVER10"
-msgid "Test for undefined EDNS version"
-msgstr "未定義 EDNS バージョンのテスト"
-
-msgctxt "NAMESERVER:NAMESERVER11"
-msgid "Test for unknown EDNS OPTION-CODE"
-msgstr "未知の EDNS OPTION-CODE のテスト"
-
-msgctxt "NAMESERVER:NAMESERVER12"
-msgid "Test for unknown EDNS flags"
-msgstr "未知の EDNS フラグのテスト"
-
-msgctxt "NAMESERVER:NAMESERVER13"
-msgid "Test for truncated response on EDNS query"
-msgstr "EDNS クエリでの切り詰め応答のテスト"
-
-msgctxt "NAMESERVER:NAMESERVER14"
-msgid "Test for unknown version with unknown OPTION-CODE"
-msgstr "未知の OPTION-CODE を伴う未知バージョンのテスト"
-
-msgctxt "NAMESERVER:NAMESERVER15"
-msgid "Checking for revealed software version"
-msgstr "公開されるソフトウェアバージョンの確認"
-
 msgctxt "NAMESERVER:AAAA_BAD_RDATA"
 msgid ""
 "Nameserver {ns}/{address} answered AAAA query with an unexpected RDATA length "
@@ -1670,14 +1436,6 @@ msgstr ""
 "次のネームサーバーはソフトウェアバージョンクエリ \"{query_name}\" に"
 "応答しないか、SERVFAIL で応答しました。応答元: \"{servers}\"。"
 
-msgctxt "NAMESERVER:N15_NO_VERSION"
-msgid ""
-"The following name server(s) do not respond to software version queries. "
-"Returned from name servers: \"{addresses}\""
-msgstr ""
-"次のネームサーバーはソフトウェアバージョンクエリに応答しません。"
-"応答元: \"{addresses}\"。"
-
 msgctxt "NAMESERVER:N15_NO_VERSION_REVEALED"
 msgid ""
 "The following name server(s) do not reveal the software version. Returned "
@@ -1780,50 +1538,6 @@ msgstr "ルートゾーンでは上位リファラルのテストをスキップ
 msgctxt "NAMESERVER:Z_FLAGS_NOTCLEAR"
 msgid "Nameserver {ns}/{address} has one or more unknown EDNS Z flag bits set."
 msgstr "ネームサーバー {ns}/{address} は未知の EDNS Z フラグビットを 1 つ以上立てています。"
-
-msgctxt "ZONE:ZONE01"
-msgid "Fully qualified master nameserver in SOA"
-msgstr "SOA のマスターネームサーバーは完全修飾名であること"
-
-msgctxt "ZONE:ZONE02"
-msgid "SOA 'refresh' minimum value"
-msgstr "SOA 'refresh' の最小値"
-
-msgctxt "ZONE:ZONE03"
-msgid "SOA 'retry' lower than 'refresh'"
-msgstr "SOA 'retry' が 'refresh' より小さいこと"
-
-msgctxt "ZONE:ZONE04"
-msgid "SOA 'retry' at least 1 hour"
-msgstr "SOA 'retry' が少なくとも 1 時間であること"
-
-msgctxt "ZONE:ZONE05"
-msgid "SOA 'expire' minimum value"
-msgstr "SOA 'expire' の最小値"
-
-msgctxt "ZONE:ZONE06"
-msgid "SOA 'minimum' maximum value"
-msgstr "SOA 'minimum' の最大値"
-
-msgctxt "ZONE:ZONE07"
-msgid "SOA master is not an alias"
-msgstr "SOA マスターがエイリアスでないこと"
-
-msgctxt "ZONE:ZONE08"
-msgid "MX is not an alias"
-msgstr "MX がエイリアスでないこと"
-
-msgctxt "ZONE:ZONE09"
-msgid "MX record present"
-msgstr "MX レコードの存在"
-
-msgctxt "ZONE:ZONE10"
-msgid "No multiple SOA records"
-msgstr "SOA レコードが複数ないこと"
-
-msgctxt "ZONE:ZONE11"
-msgid "SPF policy validation"
-msgstr "SPF ポリシーの検証"
 
 msgctxt "ZONE:RETRY_MINIMUM_VALUE_LOWER"
 msgid ""
@@ -2124,24 +1838,6 @@ msgstr ""
 "{domain} で null SPF ポリシーが見つかりました。"
 "この種のドメイン (root, TLD, .ARPA 配下) はメール用途を想定していません。"
 
-msgctxt "ZONE:Z11_SPF1_MULTIPLE_RECORDS"
-msgid ""
-"The following name servers returned more than one SPF policy. Name servers: "
-"{addresses}."
-msgstr "次のネームサーバーは複数の SPF ポリシーを返しました。ネームサーバー: {addresses}。"
-
-msgctxt "ZONE:Z11_SPF1_SYNTAX_ERROR"
-msgid ""
-"The SPF policy of {domain} has a syntax error. Policy retrieved from the "
-"following nameservers: {addresses}."
-msgstr ""
-"{domain} の SPF ポリシーに構文エラーがあります。"
-"ポリシー取得元ネームサーバー: {addresses}。"
-
-msgctxt "ZONE:Z11_SPF1_SYNTAX_OK"
-msgid "The SPF policy of {domain} has correct syntax."
-msgstr "{domain} の SPF ポリシー構文は正しいです。"
-
 msgctxt "ZONE:Z11_SPF_MULTIPLE_RECORDS"
 msgid ""
 "The following name servers returned more than one SPF policy. Name servers: "
@@ -2166,132 +1862,6 @@ msgid ""
 "queries for SPF policies."
 msgstr "ゾーンのどのネームサーバーも SPF ポリシークエリに権威応答を返しませんでした。"
 
-msgctxt "DNSSEC:DNSSEC01"
-msgid "Legal values for the DS hash digest algorithm"
-msgstr "DS ハッシュダイジェストアルゴリズムの有効値"
-
-msgctxt "DNSSEC:DNSSEC02"
-msgid "DS must match a valid DNSKEY in the child zone"
-msgstr "DS は子ゾーンの有効な DNSKEY と一致する必要があります"
-
-msgctxt "DNSSEC:DNSSEC03"
-msgid "Check for too many NSEC3 iterations"
-msgstr "NSEC3 反復回数が多すぎないかを確認"
-
-msgctxt "DNSSEC:DNSSEC04"
-msgid "Check for too short or too long RRSIG lifetimes"
-msgstr "RRSIG 有効期間が短すぎる/長すぎる場合を確認"
-
-msgctxt "DNSSEC:DNSSEC05"
-msgid "Check for invalid DNSKEY algorithms"
-msgstr "無効な DNSKEY アルゴリズムを確認"
-
-msgctxt "DNSSEC:DNSSEC06"
-msgid "Verify DNSSEC additional processing"
-msgstr "DNSSEC 追加処理を検証"
-
-msgctxt "DNSSEC:DNSSEC07"
-msgid "If DNSKEY at child, parent should have DS"
-msgstr "子ゾーンに DNSKEY がある場合、親ゾーンに DS があること"
-
-msgctxt "DNSSEC:DNSSEC08"
-msgid "Valid RRSIG for DNSKEY"
-msgstr "DNSKEY に対して有効な RRSIG"
-
-msgctxt "DNSSEC:DNSSEC09"
-msgid "RRSIG(SOA) must be valid and created by a valid DNSKEY"
-msgstr "RRSIG(SOA) は有効な DNSKEY によって作成され有効である必要があります"
-
-msgctxt "DNSSEC:DNSSEC10"
-msgid "Zone contains NSEC or NSEC3 records"
-msgstr "ゾーンが NSEC または NSEC3 レコードを含むこと"
-
-msgctxt "DNSSEC:DNSSEC11"
-msgid "DS in delegation requires signed zone"
-msgstr "委任に DS がある場合はゾーン署名が必要"
-
-msgctxt "DNSSEC:DNSSEC12"
-msgid "Test for DNSSEC Algorithm Completeness"
-msgstr "DNSSEC アルゴリズム完全性のテスト"
-
-msgctxt "DNSSEC:DNSSEC13"
-msgid "All DNSKEY algorithms used to sign the zone"
-msgstr "ゾーン署名に使われる DNSKEY アルゴリズムの確認"
-
-msgctxt "DNSSEC:DNSSEC14"
-msgid "Check for valid RSA DNSKEY key size"
-msgstr "RSA DNSKEY 鍵長の妥当性確認"
-
-msgctxt "DNSSEC:DNSSEC15"
-msgid "Existence of CDS and CDNSKEY"
-msgstr "CDS と CDNSKEY の存在確認"
-
-msgctxt "DNSSEC:DNSSEC16"
-msgid "Validate CDS"
-msgstr "CDS の検証"
-
-msgctxt "DNSSEC:DNSSEC17"
-msgid "Validate CDNSKEY"
-msgstr "CDNSKEY の検証"
-
-msgctxt "DNSSEC:DNSSEC18"
-msgid "Validate trust from DS to CDS and CDNSKEY"
-msgstr "DS から CDS/CDNSKEY までの信頼連鎖の検証"
-
-msgctxt "DNSSEC:ADDITIONAL_DNSKEY_SKIPPED"
-msgid "No DNSKEYs found. Additional tests skipped."
-msgstr "DNSKEY が見つからないため、追加テストをスキップしました。"
-
-msgctxt "DNSSEC:ALGORITHM_DEPRECATED"
-msgid ""
-"The DNSKEY with tag {keytag} uses deprecated algorithm number {algo_num} "
-"({algo_descr})."
-msgstr "タグ {keytag} の DNSKEY は非推奨アルゴリズム {algo_num} ({algo_descr}) を使用しています。"
-
-msgctxt "DNSSEC:ALGORITHM_NOT_RECOMMENDED"
-msgid ""
-"The DNSKEY with tag {keytag} uses an algorithm number {algo_num} "
-"({algo_descr}) which is not recommended to be used."
-msgstr "タグ {keytag} の DNSKEY は非推奨アルゴリズム {algo_num} ({algo_descr}) を使用しています。"
-
-msgctxt "DNSSEC:ALGORITHM_NOT_ZONE_SIGN"
-msgid ""
-"The DNSKEY with tag {keytag} uses algorithm number not meant for zone "
-"signing, algorithm number {algo_num} ({algo_descr})."
-msgstr "タグ {keytag} の DNSKEY はゾーン署名用ではないアルゴリズム {algo_num} ({algo_descr}) を使用しています。"
-
-msgctxt "DNSSEC:ALGORITHM_OK"
-msgid ""
-"The DNSKEY with tag {keytag} uses algorithm number {algo_num} "
-"({algo_descr}), which is OK."
-msgstr "タグ {keytag} の DNSKEY は許容されるアルゴリズム {algo_num} ({algo_descr}) を使用しています。"
-
-msgctxt "DNSSEC:ALGORITHM_PRIVATE"
-msgid ""
-"The DNSKEY with tag {keytag} uses private algorithm number {algo_num} "
-"({algo_descr})."
-msgstr "タグ {keytag} の DNSKEY は私用アルゴリズム {algo_num} ({algo_descr}) を使用しています。"
-
-msgctxt "DNSSEC:ALGORITHM_RESERVED"
-msgid ""
-"The DNSKEY with tag {keytag} uses reserved algorithm number {algo_num} "
-"({algo_descr})."
-msgstr "タグ {keytag} の DNSKEY は予約済みアルゴリズム {algo_num} ({algo_descr}) を使用しています。"
-
-msgctxt "DNSSEC:ALGORITHM_UNASSIGNED"
-msgid ""
-"The DNSKEY with tag {keytag} uses unassigned algorithm number {algo_num} "
-"({algo_descr})."
-msgstr "タグ {keytag} の DNSKEY は未割り当てアルゴリズム {algo_num} ({algo_descr}) を使用しています。"
-
-msgctxt "DNSSEC:DNSKEY_AND_DS"
-msgid "{parent} sent a DS record, and {child} a DNSKEY record."
-msgstr "{parent} は DS レコードを返し、{child} は DNSKEY レコードを返しました。"
-
-msgctxt "DNSSEC:DNSKEY_BUT_NOT_DS"
-msgid "{child} sent a DNSKEY record, but {parent} did not send a DS record."
-msgstr "{child} は DNSKEY レコードを返しましたが、{parent} は DS レコードを返しませんでした。"
-
 msgctxt "DNSSEC:DNSKEY_SMALLER_THAN_REC"
 msgid ""
 "DNSKEY with tag {keytag} and using algorithm {algo_num} ({algo_descr}) has a "
@@ -2315,14 +1885,6 @@ msgid ""
 msgstr ""
 "タグ {keytag} の DNSKEY (アルゴリズム {algo_num} / {algo_descr}) の鍵長 "
 "({keysize}) が最小値 ({keysizemin}) 未満です。"
-
-msgctxt "DNSSEC:DS_BUT_NOT_DNSKEY"
-msgctxt "DNSSEC:DS19_BADKEY_BLOCKLIST"
-msgid ""
-"DNSKEY with keytag {keytag} and algorithm {algo_descr} ({algo_num}) matches "
-"known compromised key in blocklist \"{blocklist_name}\" on name server(s) "
-"{servers}."
-msgstr "キータグ {keytag}、アルゴリズム {algo_descr} ({algo_num}) の DNSKEY は、ネームサーバー {servers} でブロックリスト \"{blocklist_name}\" に登録された既知の漏えい鍵と一致しました。"
 
 msgctxt "DNSSEC:DS19_BADKEY_FERMAT"
 msgid ""
@@ -2386,18 +1948,6 @@ msgstr "badkey チェック用の利用可能な DNSKEY 応答を返したネー
 msgid "{parent} sent a DS record, but {child} did not send a DNSKEY record."
 msgstr "{parent} sent a DS record, but {child} did not send a DNSKEY record."
 
-msgctxt "DNSSEC:NEITHER_DNSKEY_NOR_DS"
-msgid "There are neither DS nor DNSKEY records for the zone."
-msgstr "このゾーンには DS も DNSKEY もありません。"
-
-msgctxt "DNSSEC:NOT_SIGNED"
-msgid "The zone is not signed with DNSSEC."
-msgstr "このゾーンは DNSSEC で署名されていません。"
-
-msgctxt "DNSSEC:NO_DNSKEY"
-msgid "No DNSKEYs were returned."
-msgstr "DNSKEY が返されませんでした。"
-
 msgctxt "DNSSEC:NO_RESPONSE"
 msgid "Nameserver {ns}/{address} did not respond."
 msgstr "ネームサーバー {ns}/{address} は応答しませんでした。"
@@ -2406,29 +1956,9 @@ msgctxt "DNSSEC:NO_RESPONSE_DNSKEY"
 msgid "Nameserver {ns}/{address} responded with no DNSKEY record(s)."
 msgstr "ネームサーバー {ns}/{address} は DNSKEY レコードなしで応答しました。"
 
-msgctxt "DNSSEC:KEY_DETAILS"
-msgid ""
-"Key with keytag {keytag} details : Size = {keysize}, Flags ({sep}, "
-"{rfc5011})."
-msgstr "キータグ {keytag} の詳細: サイズ = {keysize}, フラグ ({sep}, {rfc5011})。"
-
 msgctxt "DNSSEC:KEY_SIZE_OK"
 msgid "All keys from the DNSKEY RRset have the correct size."
 msgstr "DNSKEY RRset のすべての鍵サイズは適正です。"
-
-msgctxt "DNSSEC:ITERATIONS_OK"
-msgid "The number of NSEC3 iterations is {count}, which is OK."
-msgstr "NSEC3 反復回数は {count} で、問題ありません。"
-
-msgctxt "DNSSEC:MANY_ITERATIONS"
-msgid "The number of NSEC3 iterations is {count}, which is on the high side."
-msgstr "NSEC3 反復回数は {count} で、やや多めです。"
-
-msgctxt "DNSSEC:TOO_MANY_ITERATIONS"
-msgid ""
-"The number of NSEC3 iterations is {count}, which is too high for key length "
-"{keylength}."
-msgstr "NSEC3 反復回数 {count} は鍵長 {keylength} に対して多すぎます。"
 
 msgctxt "DNSSEC:DURATION_LONG"
 msgid ""
@@ -2473,18 +2003,6 @@ msgstr "サーバー {address} は DNSKEY {keys} 件と RRSIG {sigs} 件を返�
 msgctxt "DNSSEC:EXTRA_PROCESSING_OK"
 msgid "Server at {address} sent {keys} DNSKEY records and {sigs} RRSIG records."
 msgstr "サーバー {address} は DNSKEY {keys} 件と RRSIG {sigs} 件を返しました。"
-
-msgctxt "DNSSEC:DS01_DIGEST_NOT_SUPPORTED_BY_ZM"
-msgid ""
-"DS record for zone {domain} with keytag {keytag} was created by digest "
-"algorithm {ds_algo_num} ({ds_algo_mnemo}) which cannot be validated by this "
-"installation of Zonemaster. Fetched from the nameservers with IP addresses "
-"\"{addresses}\"."
-msgstr ""
-"ゾーン {domain} の DS レコード (keytag {keytag}) は、"
-"この Zonemaster 環境で検証できないダイジェストアルゴリズム "
-"{ds_algo_num} ({ds_algo_mnemo}) で作成されています。"
-"取得元ネームサーバー IP: \"{addresses}\"。"
 
 msgctxt "DNSSEC:DS01_DS_ALGO_2_MISSING"
 msgid ""
@@ -3042,15 +2560,6 @@ msgstr ""
 "タグ {keytag} の DNSKEY は、この Zonemaster 環境で未サポートのアルゴリズム "
 "{algo_num} ({algo_mnemo}) を使用しています。取得元: \"{addresses}\"。"
 
-msgctxt "DNSSEC:DS10_ANSWER_VERIFY_ERROR"
-msgid ""
-"The name \"{domain}\" of RR type \"{query_type}\" is signed by RRSIG, but the "
-"signature or signatures cannot be verified. Fetched from the nameservers "
-"with IP addresses \"{addresses}\"."
-msgstr ""
-"RR タイプ \"{query_type}\" の名前 \"{domain}\" は RRSIG で署名されていますが、"
-"署名を検証できません。取得元ネームサーバー IP: \"{addresses}\"。"
-
 msgctxt "DNSSEC:DS10_ERR_MULT_NSEC"
 msgid ""
 "Multiple NSEC records when one is expected. Fetched from name servers "
@@ -3104,35 +2613,11 @@ msgstr ""
 "このゾーンは NSEC と NSEC3 の整合性がありません。"
 "NSEC 取得元: \"{ns_list_nsec}\"。NSEC3 取得元: \"{ns_list_nsec3}\"。"
 
-msgctxt "DNSSEC:DS10_MISSING_NSEC_NSEC3"
-msgid ""
-"NSEC or NSEC3 is expected but is missing. Fetched from the nameservers with "
-"IP addresses \"{addresses}\"."
-msgstr "NSEC または NSEC3 が期待されますが存在しません。取得元ネームサーバー IP: \"{addresses}\"。"
-
 msgctxt "DNSSEC:DS10_MIXED_NSEC_NSEC3"
 msgid ""
 "The zone responds with both NSEC and NSEC3, where only one of them is "
 "expected. Fetched from name servers \"{servers}\"."
 msgstr "このゾーンは NSEC と NSEC3 の両方で応答しました (本来は片方のみ)。取得元: \"{servers}\"。"
-
-msgctxt "DNSSEC:DS10_NAME_NOT_COVERED_BY_NSEC"
-msgid ""
-"A non-existent name is not correctly covered by the NSEC records. Fetched "
-"from the nameservers with IP addresses \"{addresses}\"."
-msgstr "存在しない名前が NSEC レコードで正しくカバーされていません。取得元ネームサーバー IP: \"{addresses}\"。"
-
-msgctxt "DNSSEC:DS10_NAME_NOT_COVERED_BY_NSEC3"
-msgid ""
-"A non-existent name is not correctly covered by the NSEC3 records. Fetched "
-"from the nameservers with IP addresses \"{addresses}\"."
-msgstr "存在しない名前が NSEC3 レコードで正しくカバーされていません。取得元ネームサーバー IP: \"{addresses}\"。"
-
-msgctxt "DNSSEC:DS10_NON_EXISTENT_RESPONSE_ERROR"
-msgid ""
-"No response or error in response on an expected non-existent name. Fetched "
-"from the nameservers with IP addresses \"{addresses}\"."
-msgstr "存在しないはずの名前への問い合わせで無応答、またはエラー応答でした。取得元ネームサーバー IP: \"{addresses}\"。"
 
 msgctxt "DNSSEC:DS10_NSEC3PARAM_GIVES_ERR_ANSWER"
 msgid ""
@@ -3292,15 +2777,6 @@ msgid ""
 msgstr ""
 "次のネームサーバーは DNSSEC をサポートしないか、設定が不適切です。"
 "これらのサーバーでは NSEC/NSEC3 テストをスキップしました。取得元: \"{servers}\"。"
-
-msgctxt "DNSSEC:DS10_UNSIGNED_ANSWER"
-msgid ""
-"The name \"{domain}\" of RR type \"{query_type}\" in the answer section of the "
-"response is not signed by any RRSIG. Fetched from the nameservers with IP "
-"addresses \"{addresses}\"."
-msgstr ""
-"応答の answer セクションにある RR タイプ \"{query_type}\" の名前 \"{domain}\" が、"
-"どの RRSIG にも署名されていません。取得元ネームサーバー IP: \"{addresses}\"。"
 
 msgctxt "DNSSEC:DS10_ZONE_NO_DNSSEC"
 msgid ""

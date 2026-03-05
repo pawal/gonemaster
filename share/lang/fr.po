@@ -50,19 +50,6 @@ msgid ""
 msgstr ""
 "Le nom de domaine a un label trop long (plus de 63 caractères), \"{label}\"."
 
-msgctxt "ADDRESS:ADDRESS01"
-msgid "Name server address must be globally reachable"
-msgstr "L'adresse du serveur de noms doit être joignable globalement"
-
-msgctxt "ADDRESS:ADDRESS02"
-msgid "Reverse DNS entry exists for name server IP address"
-msgstr ""
-"Un enregistrement DNS inverse existe pour l’adresse IP du serveur de noms"
-
-msgctxt "ADDRESS:ADDRESS03"
-msgid "Reverse DNS entry matches name server name"
-msgstr "L’enregistrement DNS inverse correspond au nom du serveur de noms"
-
 msgctxt "ADDRESS:A01_ADDR_NOT_GLOBALLY_REACHABLE"
 msgid "IP address(es) not listed as globally reachable: \"{servers}\"."
 msgstr ""
@@ -196,18 +183,6 @@ msgctxt "ZONE:TEST_CASE_START"
 msgid "TEST_CASE_START {testcase}."
 msgstr "TEST_CASE_START {testcase}."
 
-msgctxt "BASIC:BASIC01"
-msgid "The domain must have a parent domain"
-msgstr "Le nom de domaine doit avoir un domaine parent"
-
-msgctxt "BASIC:BASIC02"
-msgid "The domain must have at least one working name server"
-msgstr "Le nom de domaine doit avoir au moins un serveur de noms fonctionnel"
-
-msgctxt "BASIC:BASIC03"
-msgid "The Broken but functional test"
-msgstr "Le test \"cassé mais fonctionnel\""
-
 msgctxt "BASIC:A_QUERY_NO_RESPONSES"
 msgid "Nameservers did not respond to A query."
 msgstr "Aucune réponse des serveurs de noms sur une requête de type \"A\"."
@@ -334,21 +309,6 @@ msgid ""
 msgstr ""
 "Le serveur de noms \"{ns}\" répond avec un code retour inattendu "
 "(\"{rcode}\") à une requête de type SOA."
-
-msgctxt "BASIC:DOMAIN_NAME_LABEL_TOO_LONG"
-msgid ""
-"Domain name ({domain}) has a label ({label}) too long ({dlength}/{max})."
-msgstr ""
-"Le nom de domaine '{domain}' a un label ({label}) trop long ({dlength}/"
-"{max})."
-
-msgctxt "BASIC:DOMAIN_NAME_TOO_LONG"
-msgid "Domain name is too long ({fqdnlength}/{max})."
-msgstr "Le nom de domaine est trop long ({fqdnlength}/{max})."
-
-msgctxt "BASIC:DOMAIN_NAME_ZERO_LENGTH_LABEL"
-msgid "Domain name ({domain}) has a zero-length label."
-msgstr "Le nom de domaine '{domain}' a un label de taille zéro."
 
 msgctxt "BASIC:HAS_A_RECORDS"
 msgid "Nameserver {ns}/{address} returned \"A\" record(s) for {domain}."
@@ -491,22 +451,6 @@ msgid "Nameserver {ns}/{address} did not return \"A\" record(s) for {domain}."
 msgstr ""
 "Le serveur de noms {ns}/{address} ne renvoie pas d'enregistrement de type \"A\" en "
 "réponse à une requête pour '{domain}'."
-
-msgctxt "CONNECTIVITY:CONNECTIVITY01"
-msgid "UDP connectivity"
-msgstr "Connectivité UDP"
-
-msgctxt "CONNECTIVITY:CONNECTIVITY02"
-msgid "TCP connectivity"
-msgstr "Connectivité TCP"
-
-msgctxt "CONNECTIVITY:CONNECTIVITY03"
-msgid "AS Diversity"
-msgstr "Diversité des AS"
-
-msgctxt "CONNECTIVITY:CONNECTIVITY04"
-msgid "IP Prefix Diversity"
-msgstr "Diversité des préfixes IP"
 
 msgctxt "CONNECTIVITY:CN01_IPV4_DISABLED"
 msgid ""
@@ -811,44 +755,10 @@ msgstr ""
 "Au moins 2 adresses IPv6 des serveurs faisant autorité sont annoncées par "
 "des ensembles d'AS différents. Liste de l'ensemble des AS: ({asns})."
 
-msgctxt "CONNECTIVITY:IPV4_ASN"
-msgid "Name servers have IPv4 addresses in the following ASs: {asn}."
-msgstr ""
-"Les serveurs de noms ont des adresses IPv4 dans les AS suivants: {asn}."
-
-msgctxt "CONNECTIVITY:IPV6_ASN"
-msgid "Name servers have IPv6 addresses in the following ASs: {asn}."
-msgstr ""
-"Les serveurs de noms ont des adresses IPv6 dans les AS suivants: {asn}."
-
 msgctxt "CONNECTIVITY:ASN_INFOS_ANNOUNCE_BY"
 msgid "Name server IP address \"{address}\" is announced by ASN {asns}."
 msgstr ""
 "L'adresse IP du serveur de noms \"{address}\" est annoncée par l'AS {asns}."
-
-msgctxt "CONSISTENCY:CONSISTENCY01"
-msgid "SOA serial number consistency"
-msgstr "Cohérence du numéro de série du SOA"
-
-msgctxt "CONSISTENCY:CONSISTENCY02"
-msgid "SOA RNAME consistency"
-msgstr "Cohérence du RNAME du SOA"
-
-msgctxt "CONSISTENCY:CONSISTENCY03"
-msgid "SOA timers consistency"
-msgstr "Cohérence des intervalles du SOA"
-
-msgctxt "CONSISTENCY:CONSISTENCY04"
-msgid "Name server NS consistency"
-msgstr "Cohérence des entrées NS des serveurs de noms"
-
-msgctxt "CONSISTENCY:CONSISTENCY05"
-msgid "Consistency between glue and authoritative data"
-msgstr "Cohérence entre la colle et les données des serveurs faisant autorité"
-
-msgctxt "CONSISTENCY:CONSISTENCY06"
-msgid "SOA MNAME consistency"
-msgstr "Cohérence du MNAME du SOA"
 
 msgctxt "CONSISTENCY:ADDRESSES_MATCH"
 msgid "Glue records are consistent between glue and authoritative data."
@@ -1009,78 +919,6 @@ msgstr ""
 "L'ensemble de paramètres temporels (REFRESH={refresh}, RETRY={retry}, "
 "EXPIRE={expire}, MINIMUM={minimum}) a été récupérée sur les serveurs "
 "suivants : {servers}."
-
-msgctxt "DNSSEC:DNSSEC01"
-msgid "Legal values for the DS hash digest algorithm"
-msgstr "Valeurs autorisées pour l'algorithme de calcul de condensat du DS"
-
-msgctxt "DNSSEC:DNSSEC02"
-msgid "DS must match a valid DNSKEY in the child zone"
-msgstr "Le DS doit avoir un enregistrement DNSKEY valide dans la zone enfant"
-
-msgctxt "DNSSEC:DNSSEC03"
-msgid "Verify NSEC3 parameters"
-msgstr "Vérification des paramètres NSEC3"
-
-msgctxt "DNSSEC:DNSSEC04"
-msgid "Check for too short or too long RRSIG lifetimes"
-msgstr "Recherche de durées de vie de RRSIG trop courtes ou trop longues"
-
-msgctxt "DNSSEC:DNSSEC05"
-msgid "Check for invalid DNSKEY algorithms"
-msgstr "Recherche d’algorithmes DNSKEY non valables"
-
-msgctxt "DNSSEC:DNSSEC06"
-msgid "Verify DNSSEC additional processing"
-msgstr "Vérification du traitement des données additionnelles DNSSEC"
-
-msgctxt "DNSSEC:DNSSEC07"
-msgid "DNSSEC signed zone and DS in parent for signed zone"
-msgstr "Zone signée DNSSEC et DS dans le parent pour la zone signée"
-
-msgctxt "DNSSEC:DNSSEC08"
-msgid "Valid RRSIG for DNSKEY"
-msgstr "RRSIG valide pour DNSKEY"
-
-msgctxt "DNSSEC:DNSSEC09"
-msgid "RRSIG(SOA) must be valid and created by a valid DNSKEY"
-msgstr "RRSIG(SOA) doit être valide et créé par une clé DNSKEY valide"
-
-msgctxt "DNSSEC:DNSSEC10"
-msgid "Zone contains NSEC or NSEC3 records"
-msgstr "La zone contient des enregistrements NSEC ou NSEC3"
-
-msgctxt "DNSSEC:DNSSEC11"
-msgid "DS in delegation requires signed zone"
-msgstr "La présence de DS requiert une zone signée"
-
-msgctxt "DNSSEC:DNSSEC12"
-msgid "Test for DNSSEC Algorithm Completeness"
-msgstr "Test pour l'exhaustivité des algorithmes DNSSEC"
-
-msgctxt "DNSSEC:DNSSEC13"
-msgid "All DNSKEY algorithms used to sign the zone"
-msgstr "Tous les algorithmes des DNSKEY sont utilisés pour signer la zone"
-
-msgctxt "DNSSEC:DNSSEC14"
-msgid "Check for valid RSA DNSKEY key size"
-msgstr "Vérification de la validité de la taille de la clé RSA dans les DNSKEY"
-
-msgctxt "DNSSEC:DNSSEC15"
-msgid "Existence of CDS and CDNSKEY"
-msgstr "Existence des CDS et CDNSKEY"
-
-msgctxt "DNSSEC:DNSSEC16"
-msgid "Validate CDS"
-msgstr "Validation des CDS"
-
-msgctxt "DNSSEC:DNSSEC17"
-msgid "Validate CDNSKEY"
-msgstr "Validation des CDNSKEY"
-
-msgctxt "DNSSEC:DNSSEC18"
-msgid "Validate trust from DS to CDS and CDNSKEY"
-msgstr "Validation de la chaîne de confiance du DS jusqu'aux CDS et CDNSKEY"
 
 msgctxt "DNSSEC:DNSKEY_SMALLER_THAN_REC"
 msgid ""
@@ -2634,35 +2472,6 @@ msgstr ""
 "enregistrements de type(s) \"{types}\" a expiré (date d'expiration: "
 "{expiration})."
 
-msgctxt "DELEGATION:DELEGATION01"
-msgid "Minimum number of name servers"
-msgstr "Nombre minimal de serveurs de noms"
-
-msgctxt "DELEGATION:DELEGATION02"
-msgid "Name servers must have distinct IP addresses"
-msgstr "Les serveurs de noms doivent avoir des adresses IP distinctes"
-
-msgctxt "DELEGATION:DELEGATION03"
-msgid "No truncation of referrals"
-msgstr "Non-troncature des références"
-
-msgctxt "DELEGATION:DELEGATION04"
-msgid "Name server is authoritative"
-msgstr "Le serveur de noms fait autorité"
-
-msgctxt "DELEGATION:DELEGATION05"
-msgid "Name server must not point at CNAME alias"
-msgstr "Le serveur de noms ne doit pas pointer sur un alias (CNAME)"
-
-msgctxt "DELEGATION:DELEGATION06"
-msgid "Existence of SOA"
-msgstr "Existence du SOA"
-
-msgctxt "DELEGATION:DELEGATION07"
-msgid "Parent glue name records present in child"
-msgstr ""
-"Présence des enregistrements de la colle de la zone parente dans la zone"
-
 msgctxt "DELEGATION:ARE_AUTHORITATIVE"
 msgid ""
 "All these nameservers are confirmed to be authoritative : {servers}."
@@ -2930,64 +2739,6 @@ msgid ""
 msgstr ""
 "Le serveur de noms {ns} a répondu à une requête pour le nom {query_name} et "
 "type {query_type} avec le RCODE {rcode}."
-
-msgctxt "NAMESERVER:NAMESERVER01"
-msgid "A name server should not be a recursor"
-msgstr "Un serveur de noms ne doit pas être un récurseur"
-
-msgctxt "NAMESERVER:NAMESERVER02"
-msgid "Test of EDNS0 support"
-msgstr "Vérification du support d'EDNS0"
-
-msgctxt "NAMESERVER:NAMESERVER03"
-msgid "Test availability of zone transfer (AXFR)"
-msgstr "Test de la possibilité du transfert de zone (AXFR)"
-
-msgctxt "NAMESERVER:NAMESERVER04"
-msgid "Same source address"
-msgstr "Adresse source identique"
-
-msgctxt "NAMESERVER:NAMESERVER05"
-msgid "Behaviour against AAAA query"
-msgstr "Comportement vis-à-vis des requêtes AAAA"
-
-msgctxt "NAMESERVER:NAMESERVER06"
-msgid "NS can be resolved"
-msgstr "Les NS peuvent être résolus"
-
-msgctxt "NAMESERVER:NAMESERVER07"
-msgid "To check whether authoritative name servers return an upward referral"
-msgstr ""
-"Vérifier si les serveurs de noms faisant autorité répondent aux requêtes de "
-"type \"NS\" sur la racine '.' (upward referral)"
-
-msgctxt "NAMESERVER:NAMESERVER08"
-msgid "Testing QNAME case insensitivity"
-msgstr "Test de l'insensibilité à la casse du QNAME"
-
-msgctxt "NAMESERVER:NAMESERVER09"
-msgid "Testing QNAME case sensitivity"
-msgstr "Test de la sensibilité à la casse du QNAME"
-
-msgctxt "NAMESERVER:NAMESERVER10"
-msgid "Test for undefined EDNS version"
-msgstr "Test d'une version d'EDNS non définie"
-
-msgctxt "NAMESERVER:NAMESERVER11"
-msgid "Test for unknown EDNS OPTION-CODE"
-msgstr "Test de codes d’option EDNS inconnus"
-
-msgctxt "NAMESERVER:NAMESERVER12"
-msgid "Test for unknown EDNS flags"
-msgstr "Test d'un drapeau EDNS inconnu"
-
-msgctxt "NAMESERVER:NAMESERVER13"
-msgid "Test for truncated response on EDNS query"
-msgstr "Test d'une réponse tronquée pour une requête EDNS"
-
-msgctxt "NAMESERVER:NAMESERVER15"
-msgid "Checking for revealed software version"
-msgstr "Vérification du dévoilement de version logicielle"
 
 msgctxt "NAMESERVER:AAAA_BAD_RDATA"
 msgid ""
@@ -3374,41 +3125,6 @@ msgstr ""
 "Le serveur de noms {ns}/{address} répond à une requête avec un ou plusieurs bits "
 "\"Z\" (EDNS) positionnés."
 
-msgctxt "SYNTAX:SYNTAX01"
-msgid "No illegal characters in the domain name"
-msgstr "Le nom de domaine ne contient aucun caractère interdit"
-
-msgctxt "SYNTAX:SYNTAX02"
-msgid "No hyphen ('-') at the start or end of the domain name"
-msgstr "Aucun tiret ('-') au début ou à la fin du nom de domaine"
-
-msgctxt "SYNTAX:SYNTAX03"
-msgid ""
-"There must be no double hyphen ('--') in position 3 and 4 of the domain name"
-msgstr ""
-"Le double tiret ('--') ne doit pas apparaitre aux positions 3 et 4 du nom de "
-"domaine"
-
-msgctxt "SYNTAX:SYNTAX04"
-msgid "The NS name must have a valid domain/hostname"
-msgstr "Le nom du NS doit être un domaine / nom d'hôte valide"
-
-msgctxt "SYNTAX:SYNTAX05"
-msgid "Misuse of '@' character in the SOA RNAME field"
-msgstr "Usage erroné du caractère '@' dans le champ RNAME du SOA"
-
-msgctxt "SYNTAX:SYNTAX06"
-msgid "No illegal characters in the SOA RNAME field"
-msgstr "Absence de caractères interdits dans le champ RNAME du SOA"
-
-msgctxt "SYNTAX:SYNTAX07"
-msgid "No illegal characters in the SOA MNAME field"
-msgstr "Absence de caractères interdits dans le champ MNAME du SOA"
-
-msgctxt "SYNTAX:SYNTAX08"
-msgid "MX name must have a valid hostname"
-msgstr "Le nom du MX doit être un nom d'hôte valide"
-
 msgctxt "SYNTAX:DISCOURAGED_DOUBLE_DASH"
 msgid ""
 "Domain name ({domain}) has a label ({label}) with a double hyphen ('--') in "
@@ -3589,50 +3305,6 @@ msgid ""
 msgstr ""
 "Le nom de domaine '{domain}' contient un label ({label}) se terminant par un "
 "tiret '-'."
-
-msgctxt "ZONE:ZONE01"
-msgid "Fully qualified master nameserver in SOA"
-msgstr "Le serveur de noms principal est pleinement qualifié dans le SOA"
-
-msgctxt "ZONE:ZONE02"
-msgid "SOA 'refresh' minimum value"
-msgstr "Valeur minimale du champ 'refresh' du SOA"
-
-msgctxt "ZONE:ZONE03"
-msgid "SOA 'retry' lower than 'refresh'"
-msgstr "Champ 'retry' du SOA inférieur au champ 'refresh'"
-
-msgctxt "ZONE:ZONE04"
-msgid "SOA 'retry' at least 1 hour"
-msgstr "Champ 'retry' du SOA supérieur à 1 heure"
-
-msgctxt "ZONE:ZONE05"
-msgid "SOA 'expire' minimum value"
-msgstr "Valeur minimale du champ 'expire' du SOA"
-
-msgctxt "ZONE:ZONE06"
-msgid "SOA 'minimum' maximum value"
-msgstr "Valeur maximale du champ 'expire' du SOA"
-
-msgctxt "ZONE:ZONE07"
-msgid "SOA master is not an alias"
-msgstr "Le nom primaire du SOA n’est pas un alias"
-
-msgctxt "ZONE:ZONE08"
-msgid "MX is not an alias"
-msgstr "Le MX n’est pas un alias"
-
-msgctxt "ZONE:ZONE09"
-msgid "MX record present"
-msgstr "Présence d’un enregistrement MX"
-
-msgctxt "ZONE:ZONE10"
-msgid "No multiple SOA records"
-msgstr "Absence d’enregistrements SOA multiples"
-
-msgctxt "ZONE:ZONE11"
-msgid "SPF policy validation"
-msgstr "Validation de la politique SPF"
 
 msgctxt "ZONE:RETRY_MINIMUM_VALUE_LOWER"
 msgid ""

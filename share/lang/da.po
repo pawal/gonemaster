@@ -48,18 +48,6 @@ msgstr ""
 "Domænenavnet indeholder en label, der er for lang (mere end 63 tegn), "
 "\"{label}\"."
 
-msgctxt "ADDRESS:ADDRESS01"
-msgid "Name server address must be globally routable"
-msgstr "Navneserveradresse skal være globalt routebar"
-
-msgctxt "ADDRESS:ADDRESS02"
-msgid "Reverse DNS entry exists for name server IP address"
-msgstr "Reverse DNS eksisterer for navneserverens IP-adresse"
-
-msgctxt "ADDRESS:ADDRESS03"
-msgid "Reverse DNS entry matches name server name"
-msgstr "Reverse DNS matcher navneserverennavn"
-
 msgctxt "ADDRESS:NAMESERVER_IP_WITHOUT_REVERSE"
 msgid "Nameserver {ns} has an IP address ({address}) without PTR configured."
 msgstr ""
@@ -72,19 +60,6 @@ msgid ""
 msgstr ""
 "Navneserveren {ns} har en IP-adresse ({address}) med en ikke matchende PTR "
 "({ptr_names})."
-
-msgctxt "ADDRESS:NAMESERVER_IP_PRIVATE_NETWORK"
-msgid ""
-"Nameserver {ns} has an IP address ({address}) with prefix {prefix} "
-"referenced in {reference} as a '{name}'."
-msgstr ""
-"Navneserveren {ns} har en IP-adresse ({address}) med præfikset {prefix}, "
-"som {reference} klassificerer som '{name}'."
-
-msgctxt "ADDRESS:NO_IP_PRIVATE_NETWORK"
-msgid "All Nameserver addresses are in the routable public addressing space."
-msgstr ""
-"Alle navneserveradresser eksisterer i det routebare offentlige adresserum."
 
 msgctxt "ADDRESS:NAMESERVERS_IP_WITH_REVERSE"
 msgid "Reverse DNS entry exists for each Nameserver IP address."
@@ -169,18 +144,6 @@ msgstr "TEST_CASE_START {testcase}."
 msgctxt "ZONE:TEST_CASE_START"
 msgid "TEST_CASE_START {testcase}."
 msgstr "TEST_CASE_START {testcase}."
-
-msgctxt "BASIC:BASIC01"
-msgid "The domain must have a parent domain"
-msgstr "Domænenavnet skal have et forældredomænenavn"
-
-msgctxt "BASIC:BASIC02"
-msgid "The domain must have at least one working name server"
-msgstr "Domænenavnet skal have mindst en fungerende navneserver"
-
-msgctxt "BASIC:BASIC03"
-msgid "The Broken but functional test"
-msgstr "Den ødelagte, men funktionelle test"
 
 msgctxt "BASIC:A_QUERY_NO_RESPONSES"
 msgid "Nameservers did not respond to A query."
@@ -303,21 +266,6 @@ msgstr ""
 "Navneserveren \"{ns}\" besvarede en SOA-forespørgsel med en uventet RCODE "
 "(\"{rcode}\")."
 
-msgctxt "BASIC:DOMAIN_NAME_LABEL_TOO_LONG"
-msgid ""
-"Domain name ({domain}) has a label ({label}) too long ({dlength}/{max})."
-msgstr ""
-"Domænenavnet ({domain}) indeholder en label ({label}), der er for lang "
-"({dlength}/{max})."
-
-msgctxt "BASIC:DOMAIN_NAME_TOO_LONG"
-msgid "Domain name is too long ({fqdnlength}/{max})."
-msgstr "Domænenavnet er for langt ({fqdnlength}/{max})."
-
-msgctxt "BASIC:DOMAIN_NAME_ZERO_LENGTH_LABEL"
-msgid "Domain name ({domain}) has a zero-length label."
-msgstr "Domænenavnet ({domain}) har en label med længden nul."
-
 msgctxt "BASIC:HAS_A_RECORDS"
 msgid "Nameserver {ns}/{address} returned \"A\" record(s) for {domain}."
 msgstr "Navneserveren {ns}/{address} svarede A-record(s) for {domain}."
@@ -415,22 +363,6 @@ msgstr "IPv6 er aktiveret, kan udføre \"{query_type}\"-forespørgsel til {ns}/{
 msgctxt "BASIC:NO_A_RECORDS"
 msgid "Nameserver {ns}/{address} did not return \"A\" record(s) for {domain}."
 msgstr "Navneserveren {ns}/{address} returnerede ikke nogle A-records for {domain}."
-
-msgctxt "CONNECTIVITY:CONNECTIVITY01"
-msgid "UDP connectivity"
-msgstr "UDP forbindelse"
-
-msgctxt "CONNECTIVITY:CONNECTIVITY02"
-msgid "TCP connectivity"
-msgstr "TCP forbindelse"
-
-msgctxt "CONNECTIVITY:CONNECTIVITY03"
-msgid "AS Diversity"
-msgstr "AS Diversitet"
-
-msgctxt "CONNECTIVITY:CONNECTIVITY04"
-msgid "IP Prefix Diversity"
-msgstr "IP Prefix Diversitet"
 
 msgctxt "CONNECTIVITY:CN01_IPV4_DISABLED"
 msgid ""
@@ -710,41 +642,9 @@ msgstr ""
 "Mindst to IPv6-adresser bag den autoritative navneserver annonceres af "
 "forskellige AS sæt. En kombineret liste af alle AS'er: ({asns})."
 
-msgctxt "CONNECTIVITY:IPV4_ASN"
-msgid "Name servers have IPv4 addresses in the following ASs: {asn}."
-msgstr "Navneserverne har IPv4-adresser i følgende AS'er: {asn}."
-
-msgctxt "CONNECTIVITY:IPV6_ASN"
-msgid "Name servers have IPv6 addresses in the following ASs: {asn}."
-msgstr "Navneserverne har IPv6-adresser i følgende AS: {asn}."
-
 msgctxt "CONNECTIVITY:ASN_INFOS_ANNOUNCE_BY"
 msgid "Name server IP address \"{address}\" is announced by ASN {asns}."
 msgstr "Navneserver IP-adresse \"{address}\" annonceres af AS {asns}."
-
-msgctxt "CONSISTENCY:CONSISTENCY01"
-msgid "SOA serial number consistency"
-msgstr "SOA serienummer konsistens"
-
-msgctxt "CONSISTENCY:CONSISTENCY02"
-msgid "SOA RNAME consistency"
-msgstr "SOA RNAME konsistens"
-
-msgctxt "CONSISTENCY:CONSISTENCY03"
-msgid "SOA timers consistency"
-msgstr "SOA timere konsistens"
-
-msgctxt "CONSISTENCY:CONSISTENCY04"
-msgid "Name server NS consistency"
-msgstr "Navneserver NS konsistens"
-
-msgctxt "CONSISTENCY:CONSISTENCY05"
-msgid "Consistency between glue and authoritative data"
-msgstr "Konsistens mellem glue-record og autoritativ data"
-
-msgctxt "CONSISTENCY:CONSISTENCY06"
-msgid "SOA MNAME consistency"
-msgstr "SOA MNAME konsistens"
 
 msgctxt "CONSISTENCY:ADDRESSES_MATCH"
 msgid "Glue records are consistent between glue and authoritative data."
@@ -879,148 +779,6 @@ msgstr ""
 "Så dette SOA-tidsparametersæt (REFRESH={refresh}, RETRY={retry}, "
 "EXPIRE={expire}, MINIMUM={minimum}) på følgende navneservere : {servers}."
 
-msgctxt "DNSSEC:DNSSEC01"
-msgid "Legal values for the DS hash digest algorithm"
-msgstr "Lovlige værdier for DS hash digest algoritme"
-
-msgctxt "DNSSEC:DNSSEC02"
-msgid "DS must match a valid DNSKEY in the child zone"
-msgstr "DS skal matche en gyldig DNSKEY i børnezonen"
-
-msgctxt "DNSSEC:DNSSEC03"
-msgid "Verify NSEC3 parameters"
-msgstr "Verificer NSEC3 parametre"
-
-msgctxt "DNSSEC:DNSSEC04"
-msgid "Check for too short or too long RRSIG lifetimes"
-msgstr "Undersøg om RRSIG levetider er for korte eller lange"
-
-msgctxt "DNSSEC:DNSSEC05"
-msgid "Check for invalid DNSKEY algorithms"
-msgstr "Undersøg om DNSKEY algoritmer er ulovlige"
-
-msgctxt "DNSSEC:DNSSEC06"
-msgid "Verify DNSSEC additional processing"
-msgstr "Valider yderligere DNSSEC behandling"
-
-msgctxt "DNSSEC:DNSSEC07"
-msgid "If DNSKEY at child, parent should have DS"
-msgstr "Hvis DNSKEY hos barnet, skal forælderen have en DS"
-
-msgctxt "DNSSEC:DNSSEC08"
-msgid "Valid RRSIG for DNSKEY"
-msgstr "Valider RRSIG for DNSKEY"
-
-msgctxt "DNSSEC:DNSSEC09"
-msgid "RRSIG(SOA) must be valid and created by a valid DNSKEY"
-msgstr "RRSIG(SOA) skal være gyldig og oprettet af en gyldig DNSKEY"
-
-msgctxt "DNSSEC:DNSSEC10"
-msgid "Zone contains NSEC or NSEC3 records"
-msgstr "Zonen indeholder NSEC eller NSEC3 records"
-
-msgctxt "DNSSEC:DNSSEC11"
-msgid "DS in delegation requires signed zone"
-msgstr "DS i delegation kræver en signeret zone"
-
-msgctxt "DNSSEC:DNSSEC12"
-msgid "Test for DNSSEC Algorithm Completeness"
-msgstr "Test af DNSSEC-algoritmens fuldstændighed"
-
-msgctxt "DNSSEC:DNSSEC13"
-msgid "All DNSKEY algorithms used to sign the zone"
-msgstr "Alle DNSKEY algoritmer brugt til at signere zonen"
-
-msgctxt "DNSSEC:DNSSEC14"
-msgid "Check for valid RSA DNSKEY key size"
-msgstr "Undersøg om RSA DNSKEY nøglestørrelse er gyldig"
-
-msgctxt "DNSSEC:DNSSEC15"
-msgid "Existence of CDS and CDNSKEY"
-msgstr "Eksistens af CDS og CDNSKEY"
-
-msgctxt "DNSSEC:DNSSEC16"
-msgid "Validate CDS"
-msgstr "Valider CDS"
-
-msgctxt "DNSSEC:DNSSEC17"
-msgid "Validate CDNSKEY"
-msgstr "Valider CDNSKEY"
-
-msgctxt "DNSSEC:DNSSEC18"
-msgid "Validate trust from DS to CDS and CDNSKEY"
-msgstr "Valider tillid fra DS to CDS and CDNSKEY"
-
-msgctxt "DNSSEC:ADDITIONAL_DNSKEY_SKIPPED"
-msgid "No DNSKEYs found. Additional tests skipped."
-msgstr "Ingen DNSKEY-records fundet. Yderligere tests ignoreret."
-
-msgctxt "DNSSEC:ALGORITHM_DEPRECATED"
-msgid ""
-"The DNSKEY with tag {keytag} uses deprecated algorithm number {algo_num} "
-"({algo_descr})."
-msgstr ""
-"DNSKEY-recorden med tag {keytag} anvender forældet algoritme nummer "
-"{algo_num}/({algo_descr})."
-
-msgctxt "DNSSEC:ALGORITHM_NOT_RECOMMENDED"
-msgid ""
-"The DNSKEY with tag {keytag} uses an algorithm number {algo_num} "
-"({algo_descr}) which is not recommended to be used."
-msgstr ""
-"DNSKEY med tag {keytag} bruger en ikke anbefalet algoritme {algo_num}/"
-"({algo_descr}."
-
-msgctxt "DNSSEC:ALGORITHM_NOT_ZONE_SIGN"
-msgid ""
-"The DNSKEY with tag {keytag} uses algorithm number not meant for zone "
-"signing, algorithm number {algo_num} ({algo_descr})."
-msgstr ""
-"DNSKEY med tag {keytag} bruger et algoritmenummer, der ikke er beregnet til "
-"signering, algoritmenummer {algo_num} ({algo_descr})."
-
-msgctxt "DNSSEC:ALGORITHM_OK"
-msgid ""
-"The DNSKEY with tag {keytag} uses algorithm number {algo_num} "
-"({algo_descr}), which is OK."
-msgstr ""
-"DNSKEY-recorden med tag {keytag} anvender algoritme nummer {algo_num}/"
-"({algo_descr}), hvilket er OK."
-
-msgctxt "DNSSEC:ALGORITHM_PRIVATE"
-msgid ""
-"The DNSKEY with tag {keytag} uses private algorithm number {algo_num} "
-"({algo_descr})."
-msgstr ""
-"DNSKEY-recorden med tag {keytag} anvender den private algoritme med nummer "
-"{algo_num}/({algo_descr})."
-
-msgctxt "DNSSEC:ALGORITHM_RESERVED"
-msgid ""
-"The DNSKEY with tag {keytag} uses reserved algorithm number {algo_num} "
-"({algo_descr})."
-msgstr ""
-"DNSKEY-recorden med tag {keytag} anvender reserveret algoritme nummer "
-"{algo_num}/({algo_descr})."
-
-msgctxt "DNSSEC:ALGORITHM_UNASSIGNED"
-msgid ""
-"The DNSKEY with tag {keytag} uses unassigned algorithm number {algo_num} "
-"({algo_descr})."
-msgstr ""
-"DNSKEY-recorden med tag {keytag} anvender en ikke tildelt algoritme med "
-"nummer {algo_num}/({algo_descr})."
-
-msgctxt "DNSSEC:DNSKEY_AND_DS"
-msgid "{parent} sent a DS record, and {child} a DNSKEY record."
-msgstr "{parent} returnerede en DS-record, og {child} en DNSKEY-record."
-
-msgctxt "DNSSEC:DNSKEY_BUT_NOT_DS"
-msgid "{child} sent a DNSKEY record, but {parent} did not send a DS record."
-msgstr ""
-"{child} returnerede en DNSKEY-record, men {parent} returnerede ikke en DS-"
-"record."
-
 msgctxt "DNSSEC:DNSKEY_SMALLER_THAN_REC"
 msgid ""
 "DNSKEY with tag {keytag} and using algorithm {algo_num} ({algo_descr}) has a "
@@ -1047,17 +805,6 @@ msgstr ""
 "DNSKEY med tag {keytag} bruger en algoritme {algo_num} ({algo_descr}) med "
 "størrelsen ({keysize}), der er større end den største tilladte værdi "
 "({keysizemax})."
-
-msgctxt "DNSSEC:DS01_DIGEST_NOT_SUPPORTED_BY_ZM"
-msgid ""
-"DS record for zone {domain} with keytag {keytag} was created by digest "
-"algorithm {ds_algo_num} ({ds_algo_mnemo}) which cannot be validated by this "
-"installation of Zonemaster. Fetched from the nameservers with IP addresses "
-"\"{addresses}\"."
-msgstr ""
-"DS-recorden for zonen {domain} med tag {keytag} benytter algoritmen "
-"{ds_algo_num} ({ds_algo_mnemo}) som ikke kan valideres på denne version af "
-"Zonemaster. Fundet på navneserverne med IP-adresserne \"{addresses}\"."
 
 msgctxt "DNSSEC:DS01_DS_ALGO_DEPRECATED"
 msgid ""
@@ -2094,14 +1841,6 @@ msgstr ""
 "CDNSKEY RR-sætter er ikke signeret af en DNSKEY-record som en DS-record "
 "peger på. Fundet på navneserverne med IP-adresserne \"{addresses}\"."
 
-msgctxt "DNSSEC:DS_BUT_NOT_DNSKEY"
-msgctxt "DNSSEC:DS19_BADKEY_BLOCKLIST"
-msgid ""
-"DNSKEY with keytag {keytag} and algorithm {algo_descr} ({algo_num}) matches "
-"known compromised key in blocklist \"{blocklist_name}\" on name server(s) "
-"{servers}."
-msgstr "DNSKEY med keytag {keytag} og algoritme {algo_descr} ({algo_num}) matcher en kendt kompromitteret nøgle i blokeringslisten \"{blocklist_name}\" på navneserver(e) {servers}."
-
 msgctxt "DNSSEC:DS19_BADKEY_FERMAT"
 msgid ""
 "DNSKEY with keytag {keytag} and algorithm {algo_descr} ({algo_num}) has RSA "
@@ -2193,29 +1932,13 @@ msgstr ""
 "Navneserveren {address} returnerede {keys} DNSKEY-records, og {sigs} RRSIG-"
 "records."
 
-msgctxt "DNSSEC:KEY_DETAILS"
-msgid ""
-"Key with keytag {keytag} details : Size = {keysize}, Flags ({sep}, "
-"{rfc5011})."
-msgstr ""
-"Detaljer bag nøglen med keytag {keytag}: Størrelse = {keysize}, Flag ({sep}, "
-"{rfc5011})."
-
 msgctxt "DNSSEC:KEY_SIZE_OK"
 msgid "All keys from the DNSKEY RRset have the correct size."
 msgstr "Alle nøgler i DNSKEY RRset har den rigtige størrelse."
 
-msgctxt "DNSSEC:NEITHER_DNSKEY_NOR_DS"
-msgid "There are neither DS nor DNSKEY records for the zone."
-msgstr "Zonen indeholder hverken DS- eller DNSKEY-records."
-
 msgctxt "DNSSEC:NO_RESPONSE_DNSKEY"
 msgid "Nameserver {ns}/{address} responded with no DNSKEY record(s)."
 msgstr "Navneserveren {ns}/{address} returnerede ingen DNSKEY record(s)."
-
-msgctxt "DNSSEC:NOT_SIGNED"
-msgid "The zone is not signed with DNSSEC."
-msgstr "Zonen er ikke signeret med DNSSEC."
 
 msgctxt "DNSSEC:REMAINING_LONG"
 msgid ""
@@ -2245,34 +1968,6 @@ msgid ""
 msgstr ""
 "RRSIG-recorden med {keytag}, dækkende typerne {types}, er allerede udløbet "
 "(udløbsdato er: {expiration})."
-
-msgctxt "DELEGATION:DELEGATION01"
-msgid "Minimum number of name servers"
-msgstr "Minimum antal navneservere"
-
-msgctxt "DELEGATION:DELEGATION02"
-msgid "Name servers must have distinct IP addresses"
-msgstr "Navneserverne skal have distinkte IP-adresser"
-
-msgctxt "DELEGATION:DELEGATION03"
-msgid "No truncation of referrals"
-msgstr "Ingen afkortning af henvisninger"
-
-msgctxt "DELEGATION:DELEGATION04"
-msgid "Name server is authoritative"
-msgstr "Navneserveren er autoritativ"
-
-msgctxt "DELEGATION:DELEGATION05"
-msgid "Name server must not point at CNAME alias"
-msgstr "Navneserveren må ikke pege på et CNAME-alias"
-
-msgctxt "DELEGATION:DELEGATION06"
-msgid "Existence of SOA"
-msgstr "Eksistens af SOA"
-
-msgctxt "DELEGATION:DELEGATION07"
-msgid "Parent glue name records present in child"
-msgstr "Glue-record navn hos forælderen findes hos barnet"
 
 msgctxt "DELEGATION:ARE_AUTHORITATIVE"
 msgid ""
@@ -2511,63 +2206,6 @@ msgid ""
 msgstr ""
 "Navneserveren {ns} besvarede forespørgslen for navnet {query_name} og typen "
 "{query_type} med RCODE {rcode}."
-
-msgctxt "NAMESERVER:NAMESERVER01"
-msgid "A name server should not be a recursor"
-msgstr "En navneserver bør ikke være rekursiv"
-
-msgctxt "NAMESERVER:NAMESERVER02"
-msgid "Test of EDNS0 support"
-msgstr "Test af EDNS0 support"
-
-msgctxt "NAMESERVER:NAMESERVER03"
-msgid "Test availability of zone transfer (AXFR)"
-msgstr "Test af tilgængelighed af zoneoverførsler (AXFR)"
-
-msgctxt "NAMESERVER:NAMESERVER04"
-msgid "Same source address"
-msgstr "Samme kildeadresse"
-
-msgctxt "NAMESERVER:NAMESERVER05"
-msgid "Behaviour against AAAA query"
-msgstr "Opførsel imod AAAA-forespørgsel"
-
-msgctxt "NAMESERVER:NAMESERVER06"
-msgid "NS can be resolved"
-msgstr "NS kan ikke opløses"
-
-msgctxt "NAMESERVER:NAMESERVER07"
-msgid "To check whether authoritative name servers return an upward referral"
-msgstr ""
-"Undersøg om de autoritative navneservere returnerede en opadgående henvisning"
-
-msgctxt "NAMESERVER:NAMESERVER08"
-msgid "Testing QNAME case insensitivity"
-msgstr "Tester QNAME-ufølsomhed overfor store og små bogstaver"
-
-msgctxt "NAMESERVER:NAMESERVER09"
-msgid "Testing QNAME case sensitivity"
-msgstr "Tester QNAME-følsomhed overfor store og små bogstaver"
-
-msgctxt "NAMESERVER:NAMESERVER10"
-msgid "Test for undefined EDNS version"
-msgstr "Undersøger for udefineret EDNS version"
-
-msgctxt "NAMESERVER:NAMESERVER11"
-msgid "Test for unknown EDNS OPTION-CODE"
-msgstr "Undersøger for udefineret ENDS OPTION-CODE"
-
-msgctxt "NAMESERVER:NAMESERVER12"
-msgid "Test for unknown EDNS flags"
-msgstr "Undersøger for ukendt EDNS-flag"
-
-msgctxt "NAMESERVER:NAMESERVER13"
-msgid "Test for truncated response on EDNS query"
-msgstr "Undersøger for afkortet svar på EDNS-forespørgsel"
-
-msgctxt "NAMESERVER:NAMESERVER15"
-msgid "Checking for revealed software version"
-msgstr "Kontrollerer for afsløret softwareversion"
 
 msgctxt "NAMESERVER:AAAA_BAD_RDATA"
 msgid ""
@@ -2919,40 +2557,6 @@ msgctxt "NAMESERVER:Z_FLAGS_NOTCLEAR"
 msgid "Nameserver {ns}/{address} has one or more unknown EDNS Z flag bits set."
 msgstr "Navneserveren {ns}/{address} har et eller flere EDNS Z flag bits sat."
 
-msgctxt "SYNTAX:SYNTAX01"
-msgid "No illegal characters in the domain name"
-msgstr "Ingen ulovlige tegn i domænenavnet"
-
-msgctxt "SYNTAX:SYNTAX02"
-msgid "No hyphen ('-') at the start or end of the domain name"
-msgstr "Ingen bindestreg ('-') i begyndelsen eller slutningen af domænenavnet"
-
-msgctxt "SYNTAX:SYNTAX03"
-msgid ""
-"There must be no double hyphen ('--') in position 3 and 4 of the domain name"
-msgstr ""
-"Der må ikke være to bindestreger ('--') i position 3 og 4 i domænenavnet"
-
-msgctxt "SYNTAX:SYNTAX04"
-msgid "The NS name must have a valid domain/hostname"
-msgstr "NS-navnet skal have et gyldigt domæne/hostnavn"
-
-msgctxt "SYNTAX:SYNTAX05"
-msgid "Misuse of '@' character in the SOA RNAME field"
-msgstr "Misbrug af '@'-tegnet i SOA RNAME feltet"
-
-msgctxt "SYNTAX:SYNTAX06"
-msgid "No illegal characters in the SOA RNAME field"
-msgstr "Ingen ulovlige tegn i SOA RNAME feltet"
-
-msgctxt "SYNTAX:SYNTAX07"
-msgid "No illegal characters in the SOA MNAME field"
-msgstr "Ingen ulovlige tegn i SOA MNAME feltet"
-
-msgctxt "SYNTAX:SYNTAX08"
-msgid "MX name must have a valid hostname"
-msgstr "MX-navnet skal have et gyldigt hostnavn"
-
 msgctxt "SYNTAX:DISCOURAGED_DOUBLE_DASH"
 msgid ""
 "Domain name ({domain}) has a label ({label}) with a double hyphen ('--') in "
@@ -3111,50 +2715,6 @@ msgid ""
 "Domain name ({domain}) has a label ({label}) ending with a hyphen ('-')."
 msgstr ""
 "Domænenavnet ({domain}) har en label ({label}) som slutter med en bindestreg."
-
-msgctxt "ZONE:ZONE01"
-msgid "Fully qualified master nameserver in SOA"
-msgstr "Fuldt kvalificeret primær navneserver i SOA"
-
-msgctxt "ZONE:ZONE02"
-msgid "SOA 'refresh' minimum value"
-msgstr "SOA 'refresh' minimumsværdi"
-
-msgctxt "ZONE:ZONE03"
-msgid "SOA 'retry' lower than 'refresh'"
-msgstr "SOA 'retry' mindre end 'refresh'"
-
-msgctxt "ZONE:ZONE04"
-msgid "SOA 'retry' at least 1 hour"
-msgstr "SOA 'retry' mindst 1 time"
-
-msgctxt "ZONE:ZONE05"
-msgid "SOA 'expire' minimum value"
-msgstr "SOA 'expire' minimumsværdi"
-
-msgctxt "ZONE:ZONE06"
-msgid "SOA 'minimum' maximum value"
-msgstr "SOA 'minimum' maksimumsværdi"
-
-msgctxt "ZONE:ZONE07"
-msgid "SOA master is not an alias"
-msgstr "SOA primær er ikke et alias"
-
-msgctxt "ZONE:ZONE08"
-msgid "MX is not an alias"
-msgstr "MX er ikke et alias"
-
-msgctxt "ZONE:ZONE09"
-msgid "MX record present"
-msgstr "MX-record tilstede"
-
-msgctxt "ZONE:ZONE10"
-msgid "No multiple SOA records"
-msgstr "Ingen multiple SOA-records"
-
-msgctxt "ZONE:ZONE11"
-msgid "SPF policy validation"
-msgstr "SPF politik-validering"
 
 msgctxt "ZONE:RETRY_MINIMUM_VALUE_LOWER"
 msgid ""
@@ -3454,26 +3014,6 @@ msgstr ""
 msgctxt "ZONE:Z11_NO_SPF_FOUND"
 msgid "No SPF policy was found for {domain}."
 msgstr "Ingen SPF-politik blev fundet for {domain}."
-
-msgctxt "ZONE:Z11_SPF1_MULTIPLE_RECORDS"
-msgid ""
-"The following name servers returned more than one SPF policy. Name servers: "
-"{addresses}."
-msgstr ""
-"De følgende navneservere returnerede mere end én SPF-politik. Navneservere: "
-"{addresses}."
-
-msgctxt "ZONE:Z11_SPF1_SYNTAX_ERROR"
-msgid ""
-"The SPF policy of {domain} has a syntax error. Policy retrieved from the "
-"following nameservers: {addresses}."
-msgstr ""
-"SPF-politikken for {domain} har en syntaksfejl. Politik hentet fra de "
-"følgende navneservere: {addresses}."
-
-msgctxt "ZONE:Z11_SPF1_SYNTAX_OK"
-msgid "The SPF policy of {domain} has correct syntax."
-msgstr "SPF-politikken for {domain} har korrekt syntaks."
 
 msgctxt "ZONE:Z11_UNABLE_TO_CHECK_FOR_SPF"
 msgid ""

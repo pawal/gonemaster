@@ -44,18 +44,6 @@ msgid ""
 "\"{label}\"."
 msgstr "Domena ima predolgo oznako (več kot 63 znakov), \"{label}\"."
 
-msgctxt "ADDRESS:ADDRESS01"
-msgid "Name server address must be globally routable"
-msgstr "Naslov domenskega strežnika mora biti globalno usmerljiv"
-
-msgctxt "ADDRESS:ADDRESS02"
-msgid "Reverse DNS entry exists for name server IP address"
-msgstr "Za IP-naslov domenskega strežnika obstaja povratni DNS zapis"
-
-msgctxt "ADDRESS:ADDRESS03"
-msgid "Reverse DNS entry matches name server name"
-msgstr "Povratni vnos DNS se ujema z domenskim strežnikom"
-
 msgctxt "ADDRESS:NAMESERVER_IP_WITHOUT_REVERSE"
 msgid "Nameserver {ns} has an IP address ({address}) without PTR configured."
 msgstr ""
@@ -68,18 +56,6 @@ msgid ""
 msgstr ""
 "Domenski strežnik {ns} ima IP-naslov ({address}), ki se ne ujema z \"PTR\" "
 "rezultati ({ptr_names}) zanj."
-
-msgctxt "ADDRESS:NAMESERVER_IP_PRIVATE_NETWORK"
-msgid ""
-"Nameserver {ns} has an IP address ({address}) with prefix {prefix} "
-"referenced in {reference} as a '{name}'."
-msgstr ""
-"Domenski strežnik {ns} z IP-naslovom ({address}) ima prefix {prefix}, ki "
-"je naveden v {reference} kot '{name}'."
-
-msgctxt "ADDRESS:NO_IP_PRIVATE_NETWORK"
-msgid "All Nameserver addresses are in the routable public addressing space."
-msgstr "Vsi naslovi domenskih strežnikov so v javnem naslovnem prostoru."
 
 msgctxt "ADDRESS:NAMESERVERS_IP_WITH_REVERSE"
 msgid "Reverse DNS entry exists for each Nameserver IP address."
@@ -164,18 +140,6 @@ msgstr "TEST_CASE_START {testcase}."
 msgctxt "ZONE:TEST_CASE_START"
 msgid "TEST_CASE_START {testcase}."
 msgstr "TEST_CASE_START {testcase}."
-
-msgctxt "BASIC:BASIC01"
-msgid "The domain must have a parent domain"
-msgstr "Domena mora imeti nadrejeno domeno"
-
-msgctxt "BASIC:BASIC02"
-msgid "The domain must have at least one working name server"
-msgstr "Domena mora imeti vsaj en delujoč domenski strežnik"
-
-msgctxt "BASIC:BASIC03"
-msgid "The Broken but functional test"
-msgstr "Pokvarjen toda funkcionalen test"
 
 msgctxt "BASIC:A_QUERY_NO_RESPONSES"
 msgid "Nameservers did not respond to A query."
@@ -293,19 +257,6 @@ msgstr ""
 "Domenski strežnik\"{ns}\" odgovarja z nepričakovanim RCODE (\"{rcode}\") za "
 "SOA poizvedbo."
 
-msgctxt "BASIC:DOMAIN_NAME_LABEL_TOO_LONG"
-msgid ""
-"Domain name ({domain}) has a label ({label}) too long ({dlength}/{max})."
-msgstr "Oznaka ({label}) za domeno '{domain}' je predolga ({dlength}/{max})."
-
-msgctxt "BASIC:DOMAIN_NAME_TOO_LONG"
-msgid "Domain name is too long ({fqdnlength}/{max})."
-msgstr "Domena je predolga ({fqdnlength}/{max})."
-
-msgctxt "BASIC:DOMAIN_NAME_ZERO_LENGTH_LABEL"
-msgid "Domain name ({domain}) has a zero-length label."
-msgstr "Dolžina domene '{domain}' je enaka nič."
-
 msgctxt "BASIC:HAS_A_RECORDS"
 msgid "Nameserver {ns}/{address} returned \"A\" record(s) for {domain}."
 msgstr "Domenski strežnik {ns}/{address} je vrnil \"A\" zapise za '{domain}'."
@@ -403,22 +354,6 @@ msgstr "IPv6 je omogočen, \"{query_type}\" poizvedbo lahko pošljemo na {ns}/{a
 msgctxt "BASIC:NO_A_RECORDS"
 msgid "Nameserver {ns}/{address} did not return \"A\" record(s) for {domain}."
 msgstr "Domenski strežnik {ns}/{address} ni vrnil \"A\" zapisa za '{domain}'."
-
-msgctxt "CONNECTIVITY:CONNECTIVITY01"
-msgid "UDP connectivity"
-msgstr "Povezljivost UDP"
-
-msgctxt "CONNECTIVITY:CONNECTIVITY02"
-msgid "TCP connectivity"
-msgstr "Povezljivost TCP"
-
-msgctxt "CONNECTIVITY:CONNECTIVITY03"
-msgid "AS Diversity"
-msgstr "Raznolikost AS"
-
-msgctxt "CONNECTIVITY:CONNECTIVITY04"
-msgid "IP Prefix Diversity"
-msgstr "Raznolikost IP prefixov"
 
 msgctxt "CONNECTIVITY:CN01_IPV4_DISABLED"
 msgid ""
@@ -699,41 +634,9 @@ msgstr ""
 "Vsaj dva IPv6 naslova avtoritativnih strežnikov sta iz različnih AS. "
 "Grupiran seznam vseh AS: ({asns})."
 
-msgctxt "CONNECTIVITY:IPV4_ASN"
-msgid "Name servers have IPv4 addresses in the following ASs: {asn}."
-msgstr "IPv4 naslovi domenskih strežnikov se nahajajo v AS: {asn}."
-
-msgctxt "CONNECTIVITY:IPV6_ASN"
-msgid "Name servers have IPv6 addresses in the following ASs: {asn}."
-msgstr "IPv6 naslovi domenskih strežnikov se nahajajo v AS: {asn}."
-
 msgctxt "CONNECTIVITY:ASN_INFOS_ANNOUNCE_BY"
 msgid "Name server IP address \"{address}\" is announced by ASN {asns}."
 msgstr "IP naslov domenskega strežnika \"{address}\" se oglaša iz AS {asns}."
-
-msgctxt "CONSISTENCY:CONSISTENCY01"
-msgid "SOA serial number consistency"
-msgstr "Konsistenca SOA serijske številke"
-
-msgctxt "CONSISTENCY:CONSISTENCY02"
-msgid "SOA RNAME consistency"
-msgstr "Konsistenca SOA RNAME"
-
-msgctxt "CONSISTENCY:CONSISTENCY03"
-msgid "SOA timers consistency"
-msgstr "Konsistenca SOA časovnih intervalov"
-
-msgctxt "CONSISTENCY:CONSISTENCY04"
-msgid "Name server NS consistency"
-msgstr "Konsistenca NS zapisov"
-
-msgctxt "CONSISTENCY:CONSISTENCY05"
-msgid "Consistency between glue and authoritative data"
-msgstr "Konsistenca med glue in avtoritativnimi podatki"
-
-msgctxt "CONSISTENCY:CONSISTENCY06"
-msgid "SOA MNAME consistency"
-msgstr "Konsistenca SOA MNAME"
 
 msgctxt "CONSISTENCY:ADDRESSES_MATCH"
 msgid "Glue records are consistent between glue and authoritative data."
@@ -871,146 +774,6 @@ msgstr ""
 "EXPIRE={expire}, MINIMUM={minimum}) na naboru domenskih strežnikov : "
 "{servers}."
 
-msgctxt "DNSSEC:DNSSEC01"
-msgid "Legal values for the DS hash digest algorithm"
-msgstr "Dovoljene vrednosti algoritma za DS hash digest"
-
-msgctxt "DNSSEC:DNSSEC02"
-msgid "DS must match a valid DNSKEY in the child zone"
-msgstr "DS se mora ujemati z veljavnim DNSKEY v podrejeni coni"
-
-msgctxt "DNSSEC:DNSSEC03"
-msgid "Verify NSEC3 parameters"
-msgstr "Preveri NSEC3 parametre"
-
-msgctxt "DNSSEC:DNSSEC04"
-msgid "Check for too short or too long RRSIG lifetimes"
-msgstr "Preverjanje prekratkih ali predolgih RRSIG življenjskih dob"
-
-msgctxt "DNSSEC:DNSSEC05"
-msgid "Check for invalid DNSKEY algorithms"
-msgstr "Preverjanje neveljavnih DNSKEY algoritmov"
-
-msgctxt "DNSSEC:DNSSEC06"
-msgid "Verify DNSSEC additional processing"
-msgstr "Preverjanje dodatnih DNSSEC podatkov"
-
-msgctxt "DNSSEC:DNSSEC07"
-msgid "If DNSKEY at child, parent should have DS"
-msgstr "Če je DNSKEY v podrejeni coni, mora imeti nadrejena cona DS"
-
-msgctxt "DNSSEC:DNSSEC08"
-msgid "Valid RRSIG for DNSKEY"
-msgstr "Veljaven RRSIG za DNSKEY"
-
-msgctxt "DNSSEC:DNSSEC09"
-msgid "RRSIG(SOA) must be valid and created by a valid DNSKEY"
-msgstr "RRSIG(SOA) mora biti veljaven in ustvarjen z veljavnim DNSKEY"
-
-msgctxt "DNSSEC:DNSSEC10"
-msgid "Zone contains NSEC or NSEC3 records"
-msgstr "Cona ima NSEC ali NSEC3 zapise"
-
-msgctxt "DNSSEC:DNSSEC11"
-msgid "DS in delegation requires signed zone"
-msgstr "Prisotnost DS zahteva podpisano cono"
-
-msgctxt "DNSSEC:DNSSEC12"
-msgid "Test for DNSSEC Algorithm Completeness"
-msgstr "Test popolnosti DNSSEC algoritma"
-
-msgctxt "DNSSEC:DNSSEC13"
-msgid "All DNSKEY algorithms used to sign the zone"
-msgstr "Vsi DNSKEY algoritmi za podpis cone"
-
-msgctxt "DNSSEC:DNSSEC14"
-msgid "Check for valid RSA DNSKEY key size"
-msgstr "Preverjanje velikosti ključa RSA DNSKEY"
-
-msgctxt "DNSSEC:DNSSEC15"
-msgid "Existence of CDS and CDNSKEY"
-msgstr "Obstoj CDS in CDNSKEY"
-
-msgctxt "DNSSEC:DNSSEC16"
-msgid "Validate CDS"
-msgstr "Validiraj CDS"
-
-msgctxt "DNSSEC:DNSSEC17"
-msgid "Validate CDNSKEY"
-msgstr "Validiraj CDNSKEY"
-
-msgctxt "DNSSEC:DNSSEC18"
-msgid "Validate trust from DS to CDS and CDNSKEY"
-msgstr "Validiraj zaupanje od DS do CDS in CDNSKEY"
-
-msgctxt "DNSSEC:ADDITIONAL_DNSKEY_SKIPPED"
-msgid "No DNSKEYs found. Additional tests skipped."
-msgstr "DNSKEY ni najden. Vsi dodatni testi so preskočeni."
-
-msgctxt "DNSSEC:ALGORITHM_DEPRECATED"
-msgid ""
-"The DNSKEY with tag {keytag} uses deprecated algorithm number {algo_num} "
-"({algo_descr})."
-msgstr ""
-"DNSKEY z oznako {keytag} uporablja zastarel algoritem {algo_num} "
-"({algo_descr})."
-
-msgctxt "DNSSEC:ALGORITHM_NOT_RECOMMENDED"
-msgid ""
-"The DNSKEY with tag {keytag} uses an algorithm number {algo_num} "
-"({algo_descr}) which is not recommended to be used."
-msgstr ""
-"DNSKEY z oznako {keytag} uporablja algoritem, ki ni priporočljiv za uporabo "
-"{algo_num} ({algo_descr})."
-
-msgctxt "DNSSEC:ALGORITHM_NOT_ZONE_SIGN"
-msgid ""
-"The DNSKEY with tag {keytag} uses algorithm number not meant for zone "
-"signing, algorithm number {algo_num} ({algo_descr})."
-msgstr ""
-"DNSKEY z oznako {keytag} uporablja algoritem, ki ni namenjen podpisovanju "
-"cone {algo_num} ({algo_descr})."
-
-msgctxt "DNSSEC:ALGORITHM_OK"
-msgid ""
-"The DNSKEY with tag {keytag} uses algorithm number {algo_num} "
-"({algo_descr}), which is OK."
-msgstr ""
-"DNSKEY z oznako {keytag} uporablja veljaven algoritem {algo_num} "
-"({algo_descr})."
-
-msgctxt "DNSSEC:ALGORITHM_PRIVATE"
-msgid ""
-"The DNSKEY with tag {keytag} uses private algorithm number {algo_num} "
-"({algo_descr})."
-msgstr ""
-"DNSKEY z oznako {keytag} uporablja zasebni algoritem {algo_num} "
-"({algo_descr})."
-
-msgctxt "DNSSEC:ALGORITHM_RESERVED"
-msgid ""
-"The DNSKEY with tag {keytag} uses reserved algorithm number {algo_num} "
-"({algo_descr})."
-msgstr ""
-"DNSKEY z oznako {keytag} uporablja rezerviran algoritem {algo_num} "
-"({algo_descr})."
-
-msgctxt "DNSSEC:ALGORITHM_UNASSIGNED"
-msgid ""
-"The DNSKEY with tag {keytag} uses unassigned algorithm number {algo_num} "
-"({algo_descr})."
-msgstr ""
-"DNSKEY z oznako {keytag} uporablja nepodprt algoritem (ni v veljavi) "
-"{algo_num} ({algo_descr})."
-
-msgctxt "DNSSEC:DNSKEY_AND_DS"
-msgid "{parent} sent a DS record, and {child} a DNSKEY record."
-msgstr "{parent} je poslal DS zapis, {child} pa DNSKEY zapis."
-
-msgctxt "DNSSEC:DNSKEY_BUT_NOT_DS"
-msgid "{child} sent a DNSKEY record, but {parent} did not send a DS record."
-msgstr "{child} je poslal DNSKEY zapis, toda {parent} ni poslal DS zapisa."
-
 msgctxt "DNSSEC:DNSKEY_SMALLER_THAN_REC"
 msgid ""
 "DNSKEY with tag {keytag} and using algorithm {algo_num} ({algo_descr}) has a "
@@ -1036,17 +799,6 @@ msgstr ""
 "DNSKEY z oznako {keytag} uporablja algoritem {algo_num} ({algo_descr}) z "
 "velikostjo ključa ({keysize}), ki je večja od maksimalno dovoljene velikosti "
 "({keysizemax})."
-
-msgctxt "DNSSEC:DS01_DIGEST_NOT_SUPPORTED_BY_ZM"
-msgid ""
-"DS record for zone {domain} with keytag {keytag} was created by digest "
-"algorithm {ds_algo_num} ({ds_algo_mnemo}) which cannot be validated by this "
-"installation of Zonemaster. Fetched from the nameservers with IP addresses "
-"\"{addresses}\"."
-msgstr ""
-"DS zapis za {domain} z oznako {keytag} je bil ustvarjen z algoritmom "
-"{ds_algo_num}({ds_algo_mnemo}), ki ga trenutna Zonemaster verzija ne more "
-"preveriti. Podatki pridobljeni iz \"{addresses}\"."
 
 msgctxt "DNSSEC:DS01_DS_ALGO_DEPRECATED"
 msgid ""
@@ -2053,14 +1805,6 @@ msgstr ""
 "CDNSKEY RRset ni podpisan z DNSKEY zapisom na katerega kaže DS zapis. "
 "Podatki pridobljeni iz \"{addresses}\"."
 
-msgctxt "DNSSEC:DS_BUT_NOT_DNSKEY"
-msgctxt "DNSSEC:DS19_BADKEY_BLOCKLIST"
-msgid ""
-"DNSKEY with keytag {keytag} and algorithm {algo_descr} ({algo_num}) matches "
-"known compromised key in blocklist \"{blocklist_name}\" on name server(s) "
-"{servers}."
-msgstr "DNSKEY s keytag {keytag} in algoritmom {algo_descr} ({algo_num}) se ujema z znanim kompromitiranim ključem v blokirnem seznamu \"{blocklist_name}\" na imenskih strežnikih {servers}."
-
 msgctxt "DNSSEC:DS19_BADKEY_FERMAT"
 msgid ""
 "DNSKEY with keytag {keytag} and algorithm {algo_descr} ({algo_num}) has RSA "
@@ -2148,28 +1892,13 @@ msgctxt "DNSSEC:EXTRA_PROCESSING_OK"
 msgid "Server at {address} sent {keys} DNSKEY records and {sigs} RRSIG records."
 msgstr "{address} je poslal (DNSKEY) {keys} in podpise (RRSIG) {sigs}."
 
-msgctxt "DNSSEC:KEY_DETAILS"
-msgid ""
-"Key with keytag {keytag} details : Size = {keysize}, Flags ({sep}, "
-"{rfc5011})."
-msgstr ""
-"Ključ z oznako {keytag}. Velikost = {keysize}, Zastavice ({sep}, {rfc5011})."
-
 msgctxt "DNSSEC:KEY_SIZE_OK"
 msgid "All keys from the DNSKEY RRset have the correct size."
 msgstr "Vsi ključi DNSKEY RRseta so pravilne velikosti."
 
-msgctxt "DNSSEC:NEITHER_DNSKEY_NOR_DS"
-msgid "There are neither DS nor DNSKEY records for the zone."
-msgstr "Ni niti DS niti DNSKEY zapisov za cono."
-
 msgctxt "DNSSEC:NO_RESPONSE_DNSKEY"
 msgid "Nameserver {ns}/{address} responded with no DNSKEY record(s)."
 msgstr "Domenski strežnik {ns}/{address} je poslal odgovor brez DNSKEY zapisov."
-
-msgctxt "DNSSEC:NOT_SIGNED"
-msgid "The zone is not signed with DNSSEC."
-msgstr "Cona ni DNSSEC podpisana."
 
 msgctxt "DNSSEC:REMAINING_LONG"
 msgid ""
@@ -2199,34 +1928,6 @@ msgid ""
 msgstr ""
 "RRSIG z oznako {keytag}, ki pokriva \"{types}\" je že potekel (datum poteka: "
 "{expiration})."
-
-msgctxt "DELEGATION:DELEGATION01"
-msgid "Minimum number of name servers"
-msgstr "Minimalno število domenskih strežnikov"
-
-msgctxt "DELEGATION:DELEGATION02"
-msgid "Name servers must have distinct IP addresses"
-msgstr "Domenski strežniki morajo imeti razočne IP naslove"
-
-msgctxt "DELEGATION:DELEGATION03"
-msgid "No truncation of referrals"
-msgstr "Ni dovoljeno skrajševanje referenc"
-
-msgctxt "DELEGATION:DELEGATION04"
-msgid "Name server is authoritative"
-msgstr "Domenski strežnik je avtoritativen"
-
-msgctxt "DELEGATION:DELEGATION05"
-msgid "Name server must not point at CNAME alias"
-msgstr "Domenski strežnik ne sme kazati na CNAME alias"
-
-msgctxt "DELEGATION:DELEGATION06"
-msgid "Existence of SOA"
-msgstr "Obstoj SOA"
-
-msgctxt "DELEGATION:DELEGATION07"
-msgid "Parent glue name records present in child"
-msgstr "Glue zapisi starševske cone so prisotni v podrejeni coni"
 
 msgctxt "DELEGATION:ARE_AUTHORITATIVE"
 msgid ""
@@ -2461,64 +2162,6 @@ msgid ""
 msgstr ""
 "Domenski strežnik {ns} je na poizvedbo za {query_name} in {query_type} odgovoril "
 "z nepričakovano RCODE ({rcode})."
-
-msgctxt "NAMESERVER:NAMESERVER01"
-msgid "A name server should not be a recursor"
-msgstr "Domenski strežnik ne bi smel biti rekurziven"
-
-msgctxt "NAMESERVER:NAMESERVER02"
-msgid "Test of EDNS0 support"
-msgstr "Test podpore EDNS0"
-
-msgctxt "NAMESERVER:NAMESERVER03"
-msgid "Test availability of zone transfer (AXFR)"
-msgstr "Test prenosa cone (AXFR)"
-
-msgctxt "NAMESERVER:NAMESERVER04"
-msgid "Same source address"
-msgstr "Enak izvorni naslov"
-
-msgctxt "NAMESERVER:NAMESERVER05"
-msgid "Behaviour against AAAA query"
-msgstr "Obnašanje pri AAAA poizvedbi"
-
-msgctxt "NAMESERVER:NAMESERVER06"
-msgid "NS can be resolved"
-msgstr "NS je možno razrešiti"
-
-msgctxt "NAMESERVER:NAMESERVER07"
-msgid "To check whether authoritative name servers return an upward referral"
-msgstr ""
-"Test, ki preverja, če avtoritativni strežniki vračajo usmeritev na "
-"starševsko cono"
-
-msgctxt "NAMESERVER:NAMESERVER08"
-msgid "Testing QNAME case insensitivity"
-msgstr "Test neobčutljivosti na velike črke QNAME"
-
-msgctxt "NAMESERVER:NAMESERVER09"
-msgid "Testing QNAME case sensitivity"
-msgstr "Test občutljivosti na velike črke QNAME"
-
-msgctxt "NAMESERVER:NAMESERVER10"
-msgid "Test for undefined EDNS version"
-msgstr "Test za nedefinirane verzije EDNS"
-
-msgctxt "NAMESERVER:NAMESERVER11"
-msgid "Test for unknown EDNS OPTION-CODE"
-msgstr "Test za neznane EDNS OPTION-CODE"
-
-msgctxt "NAMESERVER:NAMESERVER12"
-msgid "Test for unknown EDNS flags"
-msgstr "Test za neznane EDNS zastavice"
-
-msgctxt "NAMESERVER:NAMESERVER13"
-msgid "Test for truncated response on EDNS query"
-msgstr "Test za skrajšane odgovore na EDNS poizvedbe"
-
-msgctxt "NAMESERVER:NAMESERVER15"
-msgid "Checking for revealed software version"
-msgstr "Test objavljene verzije programske opreme"
 
 msgctxt "NAMESERVER:AAAA_BAD_RDATA"
 msgid ""
@@ -2873,39 +2516,6 @@ msgctxt "NAMESERVER:Z_FLAGS_NOTCLEAR"
 msgid "Nameserver {ns}/{address} has one or more unknown EDNS Z flag bits set."
 msgstr "Domenski strežnik {ns}/{address} ima nastavljen bit za neznan EDNS Z."
 
-msgctxt "SYNTAX:SYNTAX01"
-msgid "No illegal characters in the domain name"
-msgstr "Domena nima prepovedanih znakov"
-
-msgctxt "SYNTAX:SYNTAX02"
-msgid "No hyphen ('-') at the start or end of the domain name"
-msgstr "Ni vezaja ('-') na začetku ali koncu domene"
-
-msgctxt "SYNTAX:SYNTAX03"
-msgid ""
-"There must be no double hyphen ('--') in position 3 and 4 of the domain name"
-msgstr "Dvojni vezaj ('--') ne sme biti na 3. in 4. mestu v domeni"
-
-msgctxt "SYNTAX:SYNTAX04"
-msgid "The NS name must have a valid domain/hostname"
-msgstr "NS mora imeti veljavno domeno/hostname"
-
-msgctxt "SYNTAX:SYNTAX05"
-msgid "Misuse of '@' character in the SOA RNAME field"
-msgstr "Nepravilno uporabljen znak '@' v SOA RNAME polju"
-
-msgctxt "SYNTAX:SYNTAX06"
-msgid "No illegal characters in the SOA RNAME field"
-msgstr "Ni prepovedanih znakov v SOA RNAME polju"
-
-msgctxt "SYNTAX:SYNTAX07"
-msgid "No illegal characters in the SOA MNAME field"
-msgstr "Ni prepovedanih znakov v SOA MNAME polju"
-
-msgctxt "SYNTAX:SYNTAX08"
-msgid "MX name must have a valid hostname"
-msgstr "MX mora imeti veljaven hostname"
-
 msgctxt "SYNTAX:DISCOURAGED_DOUBLE_DASH"
 msgid ""
 "Domain name ({domain}) has a label ({label}) with a double hyphen ('--') in "
@@ -3061,50 +2671,6 @@ msgctxt "SYNTAX:TERMINAL_HYPHEN"
 msgid ""
 "Domain name ({domain}) has a label ({label}) ending with a hyphen ('-')."
 msgstr "Domena '{domain}' vsebuje ({label}), ki se konča z vezajem '-'."
-
-msgctxt "ZONE:ZONE01"
-msgid "Fully qualified master nameserver in SOA"
-msgstr "Master domenski strežnik je opredeljen v SOA"
-
-msgctxt "ZONE:ZONE02"
-msgid "SOA 'refresh' minimum value"
-msgstr "Minimalna vrednost 'refresh' v SOA"
-
-msgctxt "ZONE:ZONE03"
-msgid "SOA 'retry' lower than 'refresh'"
-msgstr "Vrednost SOA 'retry' je manjša od 'refresh'"
-
-msgctxt "ZONE:ZONE04"
-msgid "SOA 'retry' at least 1 hour"
-msgstr "SOA 'retry' vsaj 1 uro"
-
-msgctxt "ZONE:ZONE05"
-msgid "SOA 'expire' minimum value"
-msgstr "Minimalna vrednost 'expire' v SOA"
-
-msgctxt "ZONE:ZONE06"
-msgid "SOA 'minimum' maximum value"
-msgstr "Maksimalna vrednost 'expire' v SOA"
-
-msgctxt "ZONE:ZONE07"
-msgid "SOA master is not an alias"
-msgstr "SOA master ni alias"
-
-msgctxt "ZONE:ZONE08"
-msgid "MX is not an alias"
-msgstr "MX ni alias"
-
-msgctxt "ZONE:ZONE09"
-msgid "MX record present"
-msgstr "MX zapis je prisoten"
-
-msgctxt "ZONE:ZONE10"
-msgid "No multiple SOA records"
-msgstr "Ni prisotnih več SOA zapisov"
-
-msgctxt "ZONE:ZONE11"
-msgid "SPF policy validation"
-msgstr "Validacija politike SPF"
 
 msgctxt "ZONE:RETRY_MINIMUM_VALUE_LOWER"
 msgid ""
@@ -3393,26 +2959,6 @@ msgstr ""
 msgctxt "ZONE:Z11_NO_SPF_FOUND"
 msgid "No SPF policy was found for {domain}."
 msgstr "Za {domain} ni bila najdena nobena politika SPF."
-
-msgctxt "ZONE:Z11_SPF1_MULTIPLE_RECORDS"
-msgid ""
-"The following name servers returned more than one SPF policy. Name servers: "
-"{addresses}."
-msgstr ""
-"Naslednji domenski strežniki ({addresses}) so vrnili več kot eno politiko "
-"SPF."
-
-msgctxt "ZONE:Z11_SPF1_SYNTAX_ERROR"
-msgid ""
-"The SPF policy of {domain} has a syntax error. Policy retrieved from the "
-"following nameservers: {addresses}."
-msgstr ""
-"Politika SPF za {domain} ima sintaktično napako. Politika pridobljena iz "
-"{addresses}."
-
-msgctxt "ZONE:Z11_SPF1_SYNTAX_OK"
-msgid "The SPF policy of {domain} has correct syntax."
-msgstr "Politika SPF za {domain} ima pravilno sintakso."
 
 msgctxt "ZONE:Z11_UNABLE_TO_CHECK_FOR_SPF"
 msgid ""

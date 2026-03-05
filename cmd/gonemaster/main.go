@@ -16,6 +16,7 @@ import (
 	"syscall"
 
 	"codeberg.org/pawal/gonemaster/engine"
+	"codeberg.org/pawal/gonemaster/engine/badkeys"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/normalization"
 )
@@ -95,6 +96,9 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	var stopLevelSet bool
 	var undelegatedNSSpecs repeatableStringFlag
 	var undelegatedDSSpecs repeatableStringFlag
+	var badkeysUpdate bool
+	var badkeysPath string
+	var badkeysPathSet bool
 
 	fs := flag.NewFlagSet("gonemaster", flag.ContinueOnError)
 	fs.SetOutput(errOut)
@@ -140,12 +144,14 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 			{flag: "--error-cache-ttl N", detail: "Skip query retry after network errors (seconds)"},
 			{flag: "--positive-cache-ttl N", detail: "Cache positive DNS responses (seconds)"},
 			{flag: "--negative-cache-ttl N", detail: "Cache negative DNS responses (seconds)"},
+			{flag: "--badkeys-path PATH", detail: "Override badkeys blocklist directory path"},
 		})
 		printUsageGroup(errOut, "Undelegated", []usageLine{
 			{flag: "--ns NAME[/IP]", detail: "Undelegated nameserver (repeatable)"},
 			{flag: "--ds KEYTAG,ALGORITHM,DIGTYPE,DIGEST", detail: "Undelegated DS info (repeatable)"},
 		})
 		printUsageGroup(errOut, "Utility", []usageLine{
+			{flag: "--badkeys-update", detail: "Download badkeys blocklist and exit"},
 			{flag: "--dump-profile", detail: "Print effective profile in JSON and exit"},
 			{flag: "--list-tests", detail: "List all available test cases and exit"},
 			{flag: "--version", detail: "Print version information and exit"},
@@ -195,6 +201,8 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs.BoolVar(&count, "count", false, "Print count summary by level and message tag (optional)")
 	fs.BoolVar(&listTests, "list-tests", false, "List all available test cases (optional)")
 	fs.BoolVar(&showVersion, "version", false, "Print version and exit (optional)")
+	fs.BoolVar(&badkeysUpdate, "badkeys-update", false, "Download badkeys blocklist and exit (optional)")
+	fs.StringVar(&badkeysPath, "badkeys-path", "", "Override badkeys blocklist directory path (optional)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -253,6 +261,9 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		if f.Name == "stop-level" {
 			stopLevelSet = true
 		}
+		if f.Name == "badkeys-path" {
+			badkeysPathSet = true
+		}
 	})
 
 	hasPacketCacheFlags := strings.TrimSpace(savePacketCachePath) != "" || strings.TrimSpace(restorePacketCachePath) != ""
@@ -274,6 +285,18 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	if listTests {
 		for _, testCase := range engine.AvailableTestcases() {
 			fmt.Fprintln(out, testCase)
+		}
+		return 0
+	}
+
+	if badkeysUpdate {
+		dir := badkeys.DefaultDataDir()
+		if badkeysPathSet {
+			dir = strings.TrimSpace(badkeysPath)
+		}
+		if err := badkeys.Update(dir, out); err != nil {
+			fmt.Fprintln(errOut, err.Error())
+			return 2
 		}
 		return 0
 	}
@@ -403,6 +426,11 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		value := negativeCacheTTL
 		negativeCacheOverride = &value
 	}
+	var badkeysPathOverride *string
+	if badkeysPathSet {
+		value := strings.TrimSpace(badkeysPath)
+		badkeysPathOverride = &value
+	}
 	if orderedSet && unorderedSet {
 		fmt.Fprintln(errOut, "--ordered cannot be combined with --unordered")
 		return 2
@@ -435,6 +463,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		SourceAddr6:      sourceAddr6Override,
 		PositiveCacheTTL: positiveCacheOverride,
 		NegativeCacheTTL: negativeCacheOverride,
+		BadkeysPath:      badkeysPathOverride,
 	}
 	var stopController *stopLevelController
 	var stopCapture *entryCaptureReporter

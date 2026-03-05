@@ -12,7 +12,7 @@ Notes:
 
 ## Summary
 - Modules: 9
-- Implemented testcases: 75
+- Implemented testcases: 76
 
 ## Regeneration
 
@@ -55,7 +55,7 @@ make spec-export-implemented
 - delegation06 — Verify SOA RRset existence on nameservers collected from delegation and child sources.
 - delegation07 — Compare parent-side and child-side NS name sets and report mismatches.
 
-### dnssec (17)
+### dnssec (18)
 - dnssec01 — Validate DS digest algorithm usage for the child delegation and classify each observed DS digest type.
 - dnssec02 — Verify that DS records found at the parent delegation match usable DNSKEYs in the child zone and that matching DNSKEYs can validate DNSKEY RRset signatures.
 - dnssec03 — Verify NSEC3 parameter consistency and policy compliance across child nameservers when DNSKEY support is present.
@@ -73,6 +73,7 @@ make spec-export-implemented
 - dnssec16 — Validate CDS RRsets against DNSKEY data and CDS signatures, including delete semantics and signature/keytag consistency checks.
 - dnssec17 — Validate CDNSKEY RRsets against DNSKEY data and CDNSKEY signatures, including delete semantics and signature/keytag consistency checks.
 - dnssec18 — Validate that CDS and CDNSKEY RRsets are signed by a DNSKEY that corresponds to DS information observed at the parent side.
+- dnssec19 — Check DNSKEY records published by authoritative nameservers for known cryptographic weaknesses and membership in blocklists of compromised keys. This testcase ports DNSSEC-relevant checks from the [badkeys](https://github.com/badkeys/badkeys) project to detect vulnerable RSA keys (Fermat factorization, ROCA, pattern anomalies, invalid parameters, small factors, Wiener's attack) and keys matching the badkeys blocklist of known-compromised keys (e.g., Debian OpenSSL CVE-2008-0166, RFC example keys, firmware keys).
 
 ### nameserver (15)
 - nameserver01 — Detect whether authoritative nameservers also behave as recursors.

@@ -172,12 +172,23 @@ _Do not edit by hand — regenerate with the command above._
 | `DS17_MIXED_DELETE_CDNSKEY` | `ERROR` | [dnssec17](../tests/dnssec/dnssec17.md) | **no** |
 | `DS18_NO_MATCH_CDNSKEY_RRSIG_DS` | `ERROR` | [dnssec18](../tests/dnssec/dnssec18.md) | **no** |
 | `DS18_NO_MATCH_CDS_RRSIG_DS` | `ERROR` | [dnssec18](../tests/dnssec/dnssec18.md) | **no** |
+| `DS19_BADKEY_BLOCKLIST` | `ERROR` | [dnssec19](../tests/dnssec/dnssec19.md) | **no** |
+| `DS19_BADKEY_FERMAT` | `ERROR` | [dnssec19](../tests/dnssec/dnssec19.md) | **no** |
+| `DS19_BADKEY_PATTERN` | `ERROR` | [dnssec19](../tests/dnssec/dnssec19.md) | **no** |
+| `DS19_BADKEY_ROCA` | `ERROR` | [dnssec19](../tests/dnssec/dnssec19.md) | **no** |
+| `DS19_BADKEY_RSA_INVALID` | `ERROR` | [dnssec19](../tests/dnssec/dnssec19.md) | **no** |
+| `DS19_BADKEY_SMALL_D` | `ERROR` | [dnssec19](../tests/dnssec/dnssec19.md) | **no** |
+| `DS19_BADKEY_SMALL_FACTORS` | `ERROR` | [dnssec19](../tests/dnssec/dnssec19.md) | **no** |
+| `DS19_BLOCKLIST_NOT_FOUND` | `NOTICE` | [dnssec19](../tests/dnssec/dnssec19.md) | **no** |
+| `DS19_KEY_OK` | `INFO` | [dnssec19](../tests/dnssec/dnssec19.md) | **no** |
+| `DS19_NO_DNSKEY` | `INFO` | [dnssec19](../tests/dnssec/dnssec19.md) | **no** |
+| `DS19_NO_RESPONSE` | `WARNING` | [dnssec19](../tests/dnssec/dnssec19.md) | **no** |
 | `DURATION_LONG` | `WARNING` | [dnssec04](../tests/dnssec/dnssec04.md) | **no** |
 | `DURATION_OK` | `DEBUG` | [dnssec04](../tests/dnssec/dnssec04.md) | **no** |
 | `EXTRA_PROCESSING_BROKEN` | `ERROR` | [dnssec06](../tests/dnssec/dnssec06.md) | **no** |
 | `EXTRA_PROCESSING_OK` | `DEBUG` | [dnssec06](../tests/dnssec/dnssec06.md) | **no** |
-| `IPV4_DISABLED` | `DEBUG` | [dnssec01](../tests/dnssec/dnssec01.md), [dnssec02](../tests/dnssec/dnssec02.md), [dnssec03](../tests/dnssec/dnssec03.md), [dnssec05](../tests/dnssec/dnssec05.md), [dnssec07](../tests/dnssec/dnssec07.md), [dnssec08](../tests/dnssec/dnssec08.md), [dnssec09](../tests/dnssec/dnssec09.md), [dnssec10](../tests/dnssec/dnssec10.md), [dnssec11](../tests/dnssec/dnssec11.md), [dnssec13](../tests/dnssec/dnssec13.md), [dnssec14](../tests/dnssec/dnssec14.md), [dnssec15](../tests/dnssec/dnssec15.md), [dnssec16](../tests/dnssec/dnssec16.md), [dnssec17](../tests/dnssec/dnssec17.md), [dnssec18](../tests/dnssec/dnssec18.md) | yes |
-| `IPV6_DISABLED` | `DEBUG` | [dnssec01](../tests/dnssec/dnssec01.md), [dnssec02](../tests/dnssec/dnssec02.md), [dnssec03](../tests/dnssec/dnssec03.md), [dnssec05](../tests/dnssec/dnssec05.md), [dnssec07](../tests/dnssec/dnssec07.md), [dnssec08](../tests/dnssec/dnssec08.md), [dnssec09](../tests/dnssec/dnssec09.md), [dnssec10](../tests/dnssec/dnssec10.md), [dnssec11](../tests/dnssec/dnssec11.md), [dnssec13](../tests/dnssec/dnssec13.md), [dnssec14](../tests/dnssec/dnssec14.md), [dnssec15](../tests/dnssec/dnssec15.md), [dnssec16](../tests/dnssec/dnssec16.md), [dnssec17](../tests/dnssec/dnssec17.md), [dnssec18](../tests/dnssec/dnssec18.md) | yes |
+| `IPV4_DISABLED` | `DEBUG` | [dnssec01](../tests/dnssec/dnssec01.md), [dnssec02](../tests/dnssec/dnssec02.md), [dnssec03](../tests/dnssec/dnssec03.md), [dnssec05](../tests/dnssec/dnssec05.md), [dnssec07](../tests/dnssec/dnssec07.md), [dnssec08](../tests/dnssec/dnssec08.md), [dnssec09](../tests/dnssec/dnssec09.md), [dnssec10](../tests/dnssec/dnssec10.md), [dnssec11](../tests/dnssec/dnssec11.md), [dnssec13](../tests/dnssec/dnssec13.md), [dnssec14](../tests/dnssec/dnssec14.md), [dnssec15](../tests/dnssec/dnssec15.md), [dnssec16](../tests/dnssec/dnssec16.md), [dnssec17](../tests/dnssec/dnssec17.md), [dnssec18](../tests/dnssec/dnssec18.md), [dnssec19](../tests/dnssec/dnssec19.md) | yes |
+| `IPV6_DISABLED` | `DEBUG` | [dnssec01](../tests/dnssec/dnssec01.md), [dnssec02](../tests/dnssec/dnssec02.md), [dnssec03](../tests/dnssec/dnssec03.md), [dnssec05](../tests/dnssec/dnssec05.md), [dnssec07](../tests/dnssec/dnssec07.md), [dnssec08](../tests/dnssec/dnssec08.md), [dnssec09](../tests/dnssec/dnssec09.md), [dnssec10](../tests/dnssec/dnssec10.md), [dnssec11](../tests/dnssec/dnssec11.md), [dnssec13](../tests/dnssec/dnssec13.md), [dnssec14](../tests/dnssec/dnssec14.md), [dnssec15](../tests/dnssec/dnssec15.md), [dnssec16](../tests/dnssec/dnssec16.md), [dnssec17](../tests/dnssec/dnssec17.md), [dnssec18](../tests/dnssec/dnssec18.md), [dnssec19](../tests/dnssec/dnssec19.md) | yes |
 | `KEY_SIZE_OK` | `INFO` | [dnssec14](../tests/dnssec/dnssec14.md) | **no** |
 | `NO_RESPONSE` | `DEBUG` | [dnssec14](../tests/dnssec/dnssec14.md) | yes |
 | `NO_RESPONSE_DNSKEY` | `ERROR` | [dnssec14](../tests/dnssec/dnssec14.md) | **no** |
@@ -185,8 +196,8 @@ _Do not edit by hand — regenerate with the command above._
 | `REMAINING_SHORT` | `WARNING` | [dnssec04](../tests/dnssec/dnssec04.md) | **no** |
 | `RRSIG_EXPIRATION` | `INFO` | [dnssec04](../tests/dnssec/dnssec04.md) | **no** |
 | `RRSIG_EXPIRED` | `ERROR` | [dnssec04](../tests/dnssec/dnssec04.md) | **no** |
-| `TEST_CASE_END` | `DEBUG` | [dnssec01](../tests/dnssec/dnssec01.md), [dnssec02](../tests/dnssec/dnssec02.md), [dnssec03](../tests/dnssec/dnssec03.md), [dnssec04](../tests/dnssec/dnssec04.md), [dnssec05](../tests/dnssec/dnssec05.md), [dnssec06](../tests/dnssec/dnssec06.md), [dnssec07](../tests/dnssec/dnssec07.md), [dnssec08](../tests/dnssec/dnssec08.md), [dnssec09](../tests/dnssec/dnssec09.md), [dnssec10](../tests/dnssec/dnssec10.md), [dnssec11](../tests/dnssec/dnssec11.md), [dnssec13](../tests/dnssec/dnssec13.md), [dnssec14](../tests/dnssec/dnssec14.md), [dnssec15](../tests/dnssec/dnssec15.md), [dnssec16](../tests/dnssec/dnssec16.md), [dnssec17](../tests/dnssec/dnssec17.md), [dnssec18](../tests/dnssec/dnssec18.md) | yes |
-| `TEST_CASE_START` | `DEBUG` | [dnssec01](../tests/dnssec/dnssec01.md), [dnssec02](../tests/dnssec/dnssec02.md), [dnssec03](../tests/dnssec/dnssec03.md), [dnssec04](../tests/dnssec/dnssec04.md), [dnssec05](../tests/dnssec/dnssec05.md), [dnssec06](../tests/dnssec/dnssec06.md), [dnssec07](../tests/dnssec/dnssec07.md), [dnssec08](../tests/dnssec/dnssec08.md), [dnssec09](../tests/dnssec/dnssec09.md), [dnssec10](../tests/dnssec/dnssec10.md), [dnssec11](../tests/dnssec/dnssec11.md), [dnssec13](../tests/dnssec/dnssec13.md), [dnssec14](../tests/dnssec/dnssec14.md), [dnssec15](../tests/dnssec/dnssec15.md), [dnssec16](../tests/dnssec/dnssec16.md), [dnssec17](../tests/dnssec/dnssec17.md), [dnssec18](../tests/dnssec/dnssec18.md) | yes |
+| `TEST_CASE_END` | `DEBUG` | [dnssec01](../tests/dnssec/dnssec01.md), [dnssec02](../tests/dnssec/dnssec02.md), [dnssec03](../tests/dnssec/dnssec03.md), [dnssec04](../tests/dnssec/dnssec04.md), [dnssec05](../tests/dnssec/dnssec05.md), [dnssec06](../tests/dnssec/dnssec06.md), [dnssec07](../tests/dnssec/dnssec07.md), [dnssec08](../tests/dnssec/dnssec08.md), [dnssec09](../tests/dnssec/dnssec09.md), [dnssec10](../tests/dnssec/dnssec10.md), [dnssec11](../tests/dnssec/dnssec11.md), [dnssec13](../tests/dnssec/dnssec13.md), [dnssec14](../tests/dnssec/dnssec14.md), [dnssec15](../tests/dnssec/dnssec15.md), [dnssec16](../tests/dnssec/dnssec16.md), [dnssec17](../tests/dnssec/dnssec17.md), [dnssec18](../tests/dnssec/dnssec18.md), [dnssec19](../tests/dnssec/dnssec19.md) | yes |
+| `TEST_CASE_START` | `DEBUG` | [dnssec01](../tests/dnssec/dnssec01.md), [dnssec02](../tests/dnssec/dnssec02.md), [dnssec03](../tests/dnssec/dnssec03.md), [dnssec04](../tests/dnssec/dnssec04.md), [dnssec05](../tests/dnssec/dnssec05.md), [dnssec06](../tests/dnssec/dnssec06.md), [dnssec07](../tests/dnssec/dnssec07.md), [dnssec08](../tests/dnssec/dnssec08.md), [dnssec09](../tests/dnssec/dnssec09.md), [dnssec10](../tests/dnssec/dnssec10.md), [dnssec11](../tests/dnssec/dnssec11.md), [dnssec13](../tests/dnssec/dnssec13.md), [dnssec14](../tests/dnssec/dnssec14.md), [dnssec15](../tests/dnssec/dnssec15.md), [dnssec16](../tests/dnssec/dnssec16.md), [dnssec17](../tests/dnssec/dnssec17.md), [dnssec18](../tests/dnssec/dnssec18.md), [dnssec19](../tests/dnssec/dnssec19.md) | yes |
 
 ## i18n Notes
 
@@ -348,6 +359,17 @@ They will render as the raw tag name in translated output.
 - `DS17_MIXED_DELETE_CDNSKEY`
 - `DS18_NO_MATCH_CDNSKEY_RRSIG_DS`
 - `DS18_NO_MATCH_CDS_RRSIG_DS`
+- `DS19_BADKEY_BLOCKLIST`
+- `DS19_BADKEY_FERMAT`
+- `DS19_BADKEY_PATTERN`
+- `DS19_BADKEY_ROCA`
+- `DS19_BADKEY_RSA_INVALID`
+- `DS19_BADKEY_SMALL_D`
+- `DS19_BADKEY_SMALL_FACTORS`
+- `DS19_BLOCKLIST_NOT_FOUND`
+- `DS19_KEY_OK`
+- `DS19_NO_DNSKEY`
+- `DS19_NO_RESPONSE`
 - `DURATION_LONG`
 - `DURATION_OK`
 - `EXTRA_PROCESSING_BROKEN`

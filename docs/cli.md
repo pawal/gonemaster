@@ -95,6 +95,8 @@ v1.1 keys above when they are present. See:
 | `--error-cache-ttl N` | int | Seconds to skip queries after network errors. Must be `>= 0` when set. |
 | `--positive-cache-ttl N` | int | Seconds to cache positive DNS responses. Must be `>= 0` when set. |
 | `--negative-cache-ttl N` | int | Seconds to cache negative DNS responses. Must be `>= 0` when set. |
+| `--badkeys-path PATH` | string | Override badkeys blocklist directory path (`blocklist.dat` + `badkeysdata.json`). |
+| `--badkeys-update` | bool | Download/update badkeys blocklist data and exit. |
 | `--ns NAME[/IP]` | string (repeatable) | Undelegated nameserver input. `NAME` is required, `IP` is optional. May be repeated. Repeat the same `NAME` with different IPs to supply multiple addresses. |
 | `--ds KEYTAG,ALGORITHM,DIGTYPE,DIGEST` | string (repeatable) | Undelegated DS input. May be repeated. |
 | `--no-progress` | bool | Disable progress indicator/spinner. |
@@ -143,6 +145,16 @@ Dump the effective profile (no domain required):
 gonemaster --dump-profile --profile ./profile.yaml
 ```
 
+Download/update badkeys blocklist data for DNSSEC19 and exit:
+```
+gonemaster --badkeys-update
+```
+
+Download/update badkeys blocklist data into a custom directory and exit:
+```
+gonemaster --badkeys-update --badkeys-path /path/to/badkeys
+```
+
 List available test cases:
 ```
 gonemaster --list-tests
@@ -186,6 +198,18 @@ gonemaster --json --domain example.com \
   | jq -r '.[]
            | select(.args.asns != null)
            | [.tag, (.args.asns | map(tostring) | join(","))] | @tsv'
+```
+
+### Badkeys blocklist setup (DNSSEC19)
+
+Update blocklist data in the default user data directory:
+```
+gonemaster --badkeys-update
+```
+
+For developers/packagers, update blocklist data in `share/badkeys/`:
+```
+make badkeys-update
 ```
 
 ## gonemaster-client (HTTP API client)

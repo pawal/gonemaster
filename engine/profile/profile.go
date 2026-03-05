@@ -18,6 +18,7 @@ type Profile struct {
 	NoNetwork     bool                                  `json:"no_network"`
 	Cache         map[string]map[string]any             `json:"cache"`
 	ASNDB         ASNDBSettings                         `json:"asn_db"`
+	Badkeys       BadkeysSettings                       `json:"badkeys"`
 	LogFilter     map[string]map[string][]LogFilterRule `json:"logfilter"`
 	TestLevels    map[string]map[string]string          `json:"test_levels"`
 	TestCases     []any                                 `json:"test_cases"`
@@ -63,6 +64,11 @@ type NetSettings struct {
 type ASNDBSettings struct {
 	Style   string              `json:"style"`
 	Sources map[string][]string `json:"sources"`
+}
+
+// BadkeysSettings holds badkeys blocklist configuration.
+type BadkeysSettings struct {
+	Path string `json:"path"`
 }
 
 // TestCasesVars stores per-testcase tunables.

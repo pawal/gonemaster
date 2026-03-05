@@ -70,6 +70,8 @@ type RunRequest struct {
 	PositiveCacheTTL *int
 	// NegativeCacheTTL sets resolver.defaults.negative_cache_ttl in seconds.
 	NegativeCacheTTL *int
+	// BadkeysPath overrides badkeys.path when non-nil.
+	BadkeysPath *string
 	// NameserverCache optionally provides the per-run nameserver cache store.
 	NameserverCache *ns.CacheStore
 	// LogCallback receives each log entry as it is created.
@@ -204,6 +206,7 @@ var dnssecTests = map[string]func(context.Context, *zone.Zone) ([]*logger.Entry,
 	"dnssec16": dnssec.DNSSEC16,
 	"dnssec17": dnssec.DNSSEC17,
 	"dnssec18": dnssec.DNSSEC18,
+	"dnssec19": dnssec.DNSSEC19,
 }
 
 var zoneTests = map[string]func(context.Context, *zone.Zone) ([]*logger.Entry, error){
@@ -374,6 +377,11 @@ func buildProfile(req RunRequest, module string, testcase string) (*profile.Prof
 	}
 	if req.NegativeCacheTTL != nil {
 		if err := p.Set("resolver.defaults.negative_cache_ttl", *req.NegativeCacheTTL); err != nil {
+			return nil, false, err
+		}
+	}
+	if req.BadkeysPath != nil {
+		if err := p.Set("badkeys.path", *req.BadkeysPath); err != nil {
 			return nil, false, err
 		}
 	}

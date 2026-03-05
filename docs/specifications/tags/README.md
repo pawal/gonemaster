@@ -15,10 +15,10 @@ coverage status across the supported locale files.
 | [connectivity.md](connectivity.md) | CONNECTIVITY | connectivity01–connectivity04 |
 | [consistency.md](consistency.md) | CONSISTENCY | consistency01–consistency06 |
 | [delegation.md](delegation.md) | DELEGATION | delegation01–delegation07 |
-| [dnssec.md](dnssec.md) | DNSSEC | dnssec01–dnssec18 |
+| [dnssec.md](dnssec.md) | DNSSEC | dnssec01–dnssec19 |
 | [nameserver.md](nameserver.md) | NAMESERVER | nameserver01–nameserver15 |
 | [syntax.md](syntax.md) | SYNTAX | syntax01–syntax08 |
-| [zone.md](zone.md) | ZONE | zone01–zone11 |
+| [zone.md](zone.md) | ZONE | zone01–zone12 |
 
 ## Structure Of Each Catalog
 

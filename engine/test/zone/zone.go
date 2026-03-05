@@ -172,15 +172,15 @@ func All(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 				return results, err
 			}
 		}
-	}
 
-	if util.ShouldRunTest(ctx, "zone12") {
-		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
-			return Zone12(ctx, z)
-		})
-		results = append(results, entries...)
-		if err != nil {
-			return results, err
+		if util.ShouldRunTest(ctx, "zone12") {
+			entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+				return Zone12(ctx, z)
+			})
+			results = append(results, entries...)
+			if err != nil {
+				return results, err
+			}
 		}
 	}
 

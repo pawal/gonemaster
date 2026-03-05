@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.0] - 2026-03-05
+
+**BREAKING CHANGE** - log.args in JSON logs are now coherent, read docs/MIGRATION-1.1.md
+
+### Added
+
+ - DNSSEC19, test for badkeys, work from Hanno Böck, https://badkeys.info/, requires extra config
+ - Added docs/MIGRATION-1.1.md to explain the new coherent log.args with mapping to legacy args
+
+### Changed
+
+ - **BREAKING CHANGE** - log.args in JSON logs are now coherent, read docs/MIGRATION-1.1.md
+ - log.args has a contract version - 1.1
+ - Updated tooling for automatic generation and verification of tags, and updated the tags documents
+ - Bump codeberg.org/miekg/dns to v0.6.66 to fix MNAME bug
+ - Use msgctxt for all translations
+ - Only run Zone12 if zone exists
+ - Swedish language updated, following upstream changes
+ - RRSIG Expiration formatted as RFC3339 UTC
+ - Removed stale translation and profile entries
+ - Changed resolveCNAME to use a fresh inProgress map - fixed a DNSSEC validation bug
+ - Update translation files with the new coherent tags
+
 ## [v1.0.6] - 2026-03-02
 
 ### Changed

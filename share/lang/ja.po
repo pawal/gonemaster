@@ -11,27 +11,75 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#. ADDRESS:TEST_CASE_END
-#. BASIC:TEST_CASE_END
-#. CONNECTIVITY:TEST_CASE_END
-#. CONSISTENCY:TEST_CASE_END
-#. DELEGATION:TEST_CASE_END
-#. DNSSEC:TEST_CASE_END
-#. NAMESERVER:TEST_CASE_END
-#. SYNTAX:TEST_CASE_END
-#. ZONE:TEST_CASE_END
+msgctxt "ADDRESS:TEST_CASE_END"
 msgid "TEST_CASE_END {testcase}."
 msgstr "テストケース終了 {testcase}。"
 
-#. ADDRESS:TEST_CASE_START
-#. BASIC:TEST_CASE_START
-#. CONNECTIVITY:TEST_CASE_START
-#. CONSISTENCY:TEST_CASE_START
-#. DELEGATION:TEST_CASE_START
-#. DNSSEC:TEST_CASE_START
-#. NAMESERVER:TEST_CASE_START
-#. SYNTAX:TEST_CASE_START
-#. ZONE:TEST_CASE_START
+msgctxt "BASIC:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "テストケース終了 {testcase}。"
+
+msgctxt "CONNECTIVITY:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "テストケース終了 {testcase}。"
+
+msgctxt "CONSISTENCY:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "テストケース終了 {testcase}。"
+
+msgctxt "DELEGATION:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "テストケース終了 {testcase}。"
+
+msgctxt "DNSSEC:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "テストケース終了 {testcase}。"
+
+msgctxt "NAMESERVER:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "テストケース終了 {testcase}。"
+
+msgctxt "SYNTAX:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "テストケース終了 {testcase}。"
+
+msgctxt "ZONE:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "テストケース終了 {testcase}。"
+
+msgctxt "ADDRESS:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "テストケース開始 {testcase}。"
+
+msgctxt "BASIC:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "テストケース開始 {testcase}。"
+
+msgctxt "CONNECTIVITY:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "テストケース開始 {testcase}。"
+
+msgctxt "CONSISTENCY:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "テストケース開始 {testcase}。"
+
+msgctxt "DELEGATION:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "テストケース開始 {testcase}。"
+
+msgctxt "DNSSEC:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "テストケース開始 {testcase}。"
+
+msgctxt "NAMESERVER:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "テストケース開始 {testcase}。"
+
+msgctxt "SYNTAX:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "テストケース開始 {testcase}。"
+
+msgctxt "ZONE:TEST_CASE_START"
 msgid "TEST_CASE_START {testcase}."
 msgstr "テストケース開始 {testcase}。"
 
@@ -214,27 +262,75 @@ msgctxt "BASIC:NO_A_RECORDS"
 msgid "Nameserver {ns}/{address} did not return \"A\" record(s) for {domain}."
 msgstr "ネームサーバー {ns}/{address} は {domain} に対して \"A\" レコードを返しませんでした。"
 
-#. BASIC:IPV4_DISABLED
-#. CONNECTIVITY:IPV4_DISABLED
-#. CONSISTENCY:IPV4_DISABLED
-#. DELEGATION:IPV4_DISABLED
-#. DNSSEC:IPV4_DISABLED
-#. NAMESERVER:IPV4_DISABLED
-#. SYNTAX:IPV4_DISABLED
-#. ZONE:IPV4_DISABLED
-#. SYSTEM:SKIP_IPV4_DISABLED
+msgctxt "BASIC:IPV4_DISABLED"
 msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
 msgstr "IPv4 が無効のため、{ns}/{address} に \"{query_type}\" クエリを送信しません。"
 
-#. BASIC:IPV6_DISABLED
-#. CONNECTIVITY:IPV6_DISABLED
-#. CONSISTENCY:IPV6_DISABLED
-#. DELEGATION:IPV6_DISABLED
-#. DNSSEC:IPV6_DISABLED
-#. NAMESERVER:IPV6_DISABLED
-#. SYNTAX:IPV6_DISABLED
-#. ZONE:IPV6_DISABLED
-#. SYSTEM:SKIP_IPV6_DISABLED
+msgctxt "CONNECTIVITY:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 が無効のため、{ns}/{address} に \"{query_type}\" クエリを送信しません。"
+
+msgctxt "CONSISTENCY:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 が無効のため、{ns}/{address} に \"{query_type}\" クエリを送信しません。"
+
+msgctxt "DELEGATION:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 が無効のため、{ns}/{address} に \"{query_type}\" クエリを送信しません。"
+
+msgctxt "DNSSEC:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 が無効のため、{ns}/{address} に \"{query_type}\" クエリを送信しません。"
+
+msgctxt "NAMESERVER:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 が無効のため、{ns}/{address} に \"{query_type}\" クエリを送信しません。"
+
+msgctxt "SYNTAX:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 が無効のため、{ns}/{address} に \"{query_type}\" クエリを送信しません。"
+
+msgctxt "ZONE:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 が無効のため、{ns}/{address} に \"{query_type}\" クエリを送信しません。"
+
+msgctxt "SYSTEM:SKIP_IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 が無効のため、{ns}/{address} に \"{query_type}\" クエリを送信しません。"
+
+msgctxt "BASIC:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 が無効のため、{ns}/{address} に \"{query_type}\" クエリを送信しません。"
+
+msgctxt "CONNECTIVITY:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 が無効のため、{ns}/{address} に \"{query_type}\" クエリを送信しません。"
+
+msgctxt "CONSISTENCY:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 が無効のため、{ns}/{address} に \"{query_type}\" クエリを送信しません。"
+
+msgctxt "DELEGATION:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 が無効のため、{ns}/{address} に \"{query_type}\" クエリを送信しません。"
+
+msgctxt "DNSSEC:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 が無効のため、{ns}/{address} に \"{query_type}\" クエリを送信しません。"
+
+msgctxt "NAMESERVER:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 が無効のため、{ns}/{address} に \"{query_type}\" クエリを送信しません。"
+
+msgctxt "SYNTAX:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 が無効のため、{ns}/{address} に \"{query_type}\" クエリを送信しません。"
+
+msgctxt "ZONE:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 が無効のため、{ns}/{address} に \"{query_type}\" クエリを送信しません。"
+
+msgctxt "SYSTEM:SKIP_IPV6_DISABLED"
 msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
 msgstr "IPv6 が無効のため、{ns}/{address} に \"{query_type}\" クエリを送信しません。"
 

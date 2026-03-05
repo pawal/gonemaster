@@ -101,27 +101,75 @@ msgctxt "ADDRESS:NO_RESPONSE_PTR_QUERY"
 msgid "No response from nameserver(s) on PTR query ({domain})."
 msgstr "Inget svar från namnservern på PTR-fråga ({domain})."
 
-#. ADDRESS:TEST_CASE_END
-#. BASIC:TEST_CASE_END
-#. CONNECTIVITY:TEST_CASE_END
-#. CONSISTENCY:TEST_CASE_END
-#. DELEGATION:TEST_CASE_END
-#. DNSSEC:TEST_CASE_END
-#. NAMESERVER:TEST_CASE_END
-#. SYNTAX:TEST_CASE_END
-#. ZONE:TEST_CASE_END
+msgctxt "ADDRESS:TEST_CASE_END"
 msgid "TEST_CASE_END {testcase}."
 msgstr "TEST_CASE_END {testcase}."
 
-#. ADDRESS:TEST_CASE_START
-#. BASIC:TEST_CASE_START
-#. CONNECTIVITY:TEST_CASE_START
-#. CONSISTENCY:TEST_CASE_START
-#. DELEGATION:TEST_CASE_START
-#. DNSSEC:TEST_CASE_START
-#. NAMESERVER:TEST_CASE_START
-#. SYNTAX:TEST_CASE_START
-#. ZONE:TEST_CASE_START
+msgctxt "BASIC:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "TEST_CASE_END {testcase}."
+
+msgctxt "CONNECTIVITY:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "TEST_CASE_END {testcase}."
+
+msgctxt "CONSISTENCY:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "TEST_CASE_END {testcase}."
+
+msgctxt "DELEGATION:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "TEST_CASE_END {testcase}."
+
+msgctxt "DNSSEC:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "TEST_CASE_END {testcase}."
+
+msgctxt "NAMESERVER:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "TEST_CASE_END {testcase}."
+
+msgctxt "SYNTAX:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "TEST_CASE_END {testcase}."
+
+msgctxt "ZONE:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "TEST_CASE_END {testcase}."
+
+msgctxt "ADDRESS:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "TEST_CASE_START {testcase}."
+
+msgctxt "BASIC:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "TEST_CASE_START {testcase}."
+
+msgctxt "CONNECTIVITY:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "TEST_CASE_START {testcase}."
+
+msgctxt "CONSISTENCY:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "TEST_CASE_START {testcase}."
+
+msgctxt "DELEGATION:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "TEST_CASE_START {testcase}."
+
+msgctxt "DNSSEC:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "TEST_CASE_START {testcase}."
+
+msgctxt "NAMESERVER:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "TEST_CASE_START {testcase}."
+
+msgctxt "SYNTAX:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "TEST_CASE_START {testcase}."
+
+msgctxt "ZONE:TEST_CASE_START"
 msgid "TEST_CASE_START {testcase}."
 msgstr "TEST_CASE_START {testcase}."
 
@@ -283,15 +331,39 @@ msgstr ""
 "En fungerande namnserver hittades. Skickade ingen fråga om 'A' för 'www."
 "{zname}' (behövdes inte)."
 
-#. BASIC:IPV4_DISABLED
-#. CONNECTIVITY:IPV4_DISABLED
-#. CONSISTENCY:IPV4_DISABLED
-#. DELEGATION:IPV4_DISABLED
-#. DNSSEC:IPV4_DISABLED
-#. NAMESERVER:IPV4_DISABLED
-#. SYNTAX:IPV4_DISABLED
-#. ZONE:IPV4_DISABLED
-#. SYSTEM:SKIP_IPV4_DISABLED
+msgctxt "BASIC:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 är inaktiverat. Skickar ingen fråga om '{query_type}' till {ns}/{address}."
+
+msgctxt "CONNECTIVITY:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 är inaktiverat. Skickar ingen fråga om '{query_type}' till {ns}/{address}."
+
+msgctxt "CONSISTENCY:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 är inaktiverat. Skickar ingen fråga om '{query_type}' till {ns}/{address}."
+
+msgctxt "DELEGATION:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 är inaktiverat. Skickar ingen fråga om '{query_type}' till {ns}/{address}."
+
+msgctxt "DNSSEC:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 är inaktiverat. Skickar ingen fråga om '{query_type}' till {ns}/{address}."
+
+msgctxt "NAMESERVER:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 är inaktiverat. Skickar ingen fråga om '{query_type}' till {ns}/{address}."
+
+msgctxt "SYNTAX:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 är inaktiverat. Skickar ingen fråga om '{query_type}' till {ns}/{address}."
+
+msgctxt "ZONE:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 är inaktiverat. Skickar ingen fråga om '{query_type}' till {ns}/{address}."
+
+msgctxt "SYSTEM:SKIP_IPV4_DISABLED"
 msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
 msgstr "IPv4 är inaktiverat. Skickar ingen fråga om '{query_type}' till {ns}/{address}."
 
@@ -299,15 +371,39 @@ msgctxt "BASIC:IPV4_ENABLED"
 msgid "IPv4 is enabled, can send \"{query_type}\" query to {ns}/{address}."
 msgstr "IPv4 är aktiverat. Skickar fråga om '{query_type}' till {ns}/{address}."
 
-#. BASIC:IPV6_DISABLED
-#. CONNECTIVITY:IPV6_DISABLED
-#. CONSISTENCY:IPV6_DISABLED
-#. DELEGATION:IPV6_DISABLED
-#. DNSSEC:IPV6_DISABLED
-#. NAMESERVER:IPV6_DISABLED
-#. SYNTAX:IPV6_DISABLED
-#. ZONE:IPV6_DISABLED
-#. SYSTEM:SKIP_IPV6_DISABLED
+msgctxt "BASIC:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 är inaktiverat. Skickar ingen fråga om '{query_type}' till {ns}/{address}."
+
+msgctxt "CONNECTIVITY:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 är inaktiverat. Skickar ingen fråga om '{query_type}' till {ns}/{address}."
+
+msgctxt "CONSISTENCY:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 är inaktiverat. Skickar ingen fråga om '{query_type}' till {ns}/{address}."
+
+msgctxt "DELEGATION:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 är inaktiverat. Skickar ingen fråga om '{query_type}' till {ns}/{address}."
+
+msgctxt "DNSSEC:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 är inaktiverat. Skickar ingen fråga om '{query_type}' till {ns}/{address}."
+
+msgctxt "NAMESERVER:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 är inaktiverat. Skickar ingen fråga om '{query_type}' till {ns}/{address}."
+
+msgctxt "SYNTAX:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 är inaktiverat. Skickar ingen fråga om '{query_type}' till {ns}/{address}."
+
+msgctxt "ZONE:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 är inaktiverat. Skickar ingen fråga om '{query_type}' till {ns}/{address}."
+
+msgctxt "SYSTEM:SKIP_IPV6_DISABLED"
 msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
 msgstr "IPv6 är inaktiverat. Skickar ingen fråga om '{query_type}' till {ns}/{address}."
 
@@ -693,9 +789,15 @@ msgctxt "CONSISTENCY:MULTIPLE_SOA_TIME_PARAMETER_SET"
 msgid "Found {count} SOA time parameter set(s)."
 msgstr "{count} olika uppsättningar med SOA-tidsparametrar hittades."
 
-#. CONSISTENCY:NO_RESPONSE
-#. DNSSEC:NO_RESPONSE
-#. ZONE:NO_RESPONSE
+msgctxt "CONSISTENCY:NO_RESPONSE"
+msgid "Nameserver {ns} did not respond."
+msgstr "Inget svar från namnservern {ns}."
+
+msgctxt "DNSSEC:NO_RESPONSE"
+msgid "Nameserver {ns} did not respond."
+msgstr "Inget svar från namnservern {ns}."
+
+msgctxt "ZONE:NO_RESPONSE"
 msgid "Nameserver {ns} did not respond."
 msgstr "Inget svar från namnservern {ns}."
 
@@ -1000,9 +1102,27 @@ msgstr ""
 "Algoritmnumret är inte tilldelat någon hashfunktion. Hämtad från "
 "namnservrarna med IP-adresserna \"{addresses}\"."
 
-#. DNSSEC:DS02_ALGO_NOT_SUPPORTED_BY_ZM
-#. DNSSEC:DS08_ALGO_NOT_SUPPORTED_BY_ZM
-#. DNSSEC:DS09_ALGO_NOT_SUPPORTED_BY_ZM
+msgctxt "DNSSEC:DS02_ALGO_NOT_SUPPORTED_BY_ZM"
+msgid ""
+"DNSKEY with tag {keytag} uses unsupported algorithm {algo_num} "
+"({algo_mnemo}) by this installation of Zonemaster. Fetched from the "
+"nameservers with IP addresses \"{addresses}\"."
+msgstr ""
+"DNSKEY-posten med \"key tag\" {keytag} används med kryptoalgoritm {algo_num} "
+"({algo_mnemo}) som inte stöds av denna installation av Zonemaster. Hämtad "
+"från namnservrarna med IP-adresserna \"{addresses}\". "
+
+msgctxt "DNSSEC:DS08_ALGO_NOT_SUPPORTED_BY_ZM"
+msgid ""
+"DNSKEY with tag {keytag} uses unsupported algorithm {algo_num} "
+"({algo_mnemo}) by this installation of Zonemaster. Fetched from the "
+"nameservers with IP addresses \"{addresses}\"."
+msgstr ""
+"DNSKEY-posten med \"key tag\" {keytag} används med kryptoalgoritm {algo_num} "
+"({algo_mnemo}) som inte stöds av denna installation av Zonemaster. Hämtad "
+"från namnservrarna med IP-adresserna \"{addresses}\". "
+
+msgctxt "DNSSEC:DS09_ALGO_NOT_SUPPORTED_BY_ZM"
 msgid ""
 "DNSKEY with tag {keytag} uses unsupported algorithm {algo_num} "
 "({algo_mnemo}) by this installation of Zonemaster. Fetched from the "
@@ -1075,8 +1195,17 @@ msgstr ""
 "Det finns inga giltiga DNSKEY-poster som pekas ut från någon av DS-posterna. "
 "Hämtad från namnservrarna med IP-adresserna \"{addresses}\"."
 
-#. DNSSEC:DS02_RRSIG_NOT_VALID_BY_DNSKEY
-#. DNSSEC:DS08_RRSIG_NOT_VALID_BY_DNSKEY
+msgctxt "DNSSEC:DS02_RRSIG_NOT_VALID_BY_DNSKEY"
+msgid ""
+"The DNSKEY RRset is signed with an RRSIG with tag {keytag} which cannot be "
+"validated by the matching DNSKEY. Fetched from the nameservers with IP "
+"addresses \"{addresses}\"."
+msgstr ""
+"DNSKEY RRset är signerat med en RRSIG-post med \"key tag\" {keytag} som inte "
+"kan valideras med motsvarande DNSKEY-post. Hämtad från namnservrarna med IP-"
+"adresserna \"{addresses}\"."
+
+msgctxt "DNSSEC:DS08_RRSIG_NOT_VALID_BY_DNSKEY"
 msgid ""
 "The DNSKEY RRset is signed with an RRSIG with tag {keytag} which cannot be "
 "validated by the matching DNSKEY. Fetched from the nameservers with IP "
@@ -1094,8 +1223,15 @@ msgstr ""
 "Följande namnservrar ger ett felaktigt svar på NSEC-förfrågan. Hämtad från "
 "namnservrarna \"{servers}\"."
 
-#. DNSSEC:DS03_ERR_MULT_NSEC3
-#. DNSSEC:DS10_ERR_MULT_NSEC3
+msgctxt "DNSSEC:DS03_ERR_MULT_NSEC3"
+msgid ""
+"Multiple NSEC3 records when one is expected. Fetched from name servers "
+"\"{servers}\"."
+msgstr ""
+"Flera NSEC3-poster hittades när endast en förväntades. Hämtad från "
+"namnservrarna \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_ERR_MULT_NSEC3"
 msgid ""
 "Multiple NSEC3 records when one is expected. Fetched from name servers "
 "\"{servers}\"."
@@ -2563,8 +2699,11 @@ msgctxt "NAMESERVER:NO_RESOLUTION"
 msgid "No nameserver was successfully resolved to an IP address."
 msgstr "Det gick inte att slå upp IP-adressen för någon namnserver."
 
-#. NAMESERVER:NO_RESPONSE
-#. SYNTAX:NO_RESPONSE
+msgctxt "NAMESERVER:NO_RESPONSE"
+msgid "No response from {ns} asking for {domain}."
+msgstr "Inget svar från {ns} på förfrågan efter {domain}."
+
+msgctxt "SYNTAX:NO_RESPONSE"
 msgid "No response from {ns} asking for {domain}."
 msgstr "Inget svar från {ns} på förfrågan efter {domain}."
 
@@ -2883,13 +3022,19 @@ msgstr ""
 "Domännamnet '{domain}' har ingen domändel som börjar eller slutar med ett "
 "bindestreck."
 
-#. SYNTAX:NO_RESPONSE_MX_QUERY
-#. ZONE:NO_RESPONSE_MX_QUERY
+msgctxt "SYNTAX:NO_RESPONSE_MX_QUERY"
 msgid "No response from nameserver(s) on MX queries."
 msgstr "Inget svar från namnserver på fråga efter MX-post."
 
-#. SYNTAX:NO_RESPONSE_SOA_QUERY
-#. ZONE:NO_RESPONSE_SOA_QUERY
+msgctxt "ZONE:NO_RESPONSE_MX_QUERY"
+msgid "No response from nameserver(s) on MX queries."
+msgstr "Inget svar från namnserver på fråga efter MX-post."
+
+msgctxt "SYNTAX:NO_RESPONSE_SOA_QUERY"
+msgid "No response from nameserver(s) on SOA queries."
+msgstr "Inget svar från namnserver på fråga efter SOA-post."
+
+msgctxt "ZONE:NO_RESPONSE_SOA_QUERY"
 msgid "No response from nameserver(s) on SOA queries."
 msgstr "Inget svar från namnserver på fråga efter SOA-post."
 
@@ -3335,7 +3480,7 @@ msgctxt "ZONE:Z12_NO_CSYNC"
 msgid "No CSYNC record found at zone apex on name server {ns}/{address}."
 msgstr "Ingen CSYNC-post hittad vid zoneapex på namnserver {ns}/{address}."
 
-#. ZONE:Z12_SERIAL_MISMATCH
+msgctxt "ZONE:Z12_SERIAL_MISMATCH"
 msgid ""
 "CSYNC SOA serial {csync_serial} fails RFC 7477 serial precondition against current "
 "SOA serial "
@@ -3343,7 +3488,8 @@ msgid ""
 msgstr ""
 "CSYNC SOA-serienummer {csync_serial} stämmer inte överens med det aktuella "
 "SOA-serienumret {soa_serial} på namnserver {ns}."
-#. SYSTEM:CANNOT_CONTINUE
+
+msgctxt "SYSTEM:CANNOT_CONTINUE"
 msgid "Not enough data about {domain} was found to be able to run tests."
 msgstr ""
 "Det finns inte tillräckligt med data om '{domain}' för att kunna köra tester."

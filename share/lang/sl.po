@@ -93,27 +93,75 @@ msgctxt "ADDRESS:NO_RESPONSE_PTR_QUERY"
 msgid "No response from nameserver(s) on PTR query ({domain})."
 msgstr "Ni odgovora od domenskega strežnika za \"PTR\" ({domain})."
 
-#. ADDRESS:TEST_CASE_END
-#. BASIC:TEST_CASE_END
-#. CONNECTIVITY:TEST_CASE_END
-#. CONSISTENCY:TEST_CASE_END
-#. DELEGATION:TEST_CASE_END
-#. DNSSEC:TEST_CASE_END
-#. NAMESERVER:TEST_CASE_END
-#. SYNTAX:TEST_CASE_END
-#. ZONE:TEST_CASE_END
+msgctxt "ADDRESS:TEST_CASE_END"
 msgid "TEST_CASE_END {testcase}."
 msgstr "TEST_CASE_END {testcase}."
 
-#. ADDRESS:TEST_CASE_START
-#. BASIC:TEST_CASE_START
-#. CONNECTIVITY:TEST_CASE_START
-#. CONSISTENCY:TEST_CASE_START
-#. DELEGATION:TEST_CASE_START
-#. DNSSEC:TEST_CASE_START
-#. NAMESERVER:TEST_CASE_START
-#. SYNTAX:TEST_CASE_START
-#. ZONE:TEST_CASE_START
+msgctxt "BASIC:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "TEST_CASE_END {testcase}."
+
+msgctxt "CONNECTIVITY:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "TEST_CASE_END {testcase}."
+
+msgctxt "CONSISTENCY:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "TEST_CASE_END {testcase}."
+
+msgctxt "DELEGATION:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "TEST_CASE_END {testcase}."
+
+msgctxt "DNSSEC:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "TEST_CASE_END {testcase}."
+
+msgctxt "NAMESERVER:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "TEST_CASE_END {testcase}."
+
+msgctxt "SYNTAX:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "TEST_CASE_END {testcase}."
+
+msgctxt "ZONE:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "TEST_CASE_END {testcase}."
+
+msgctxt "ADDRESS:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "TEST_CASE_START {testcase}."
+
+msgctxt "BASIC:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "TEST_CASE_START {testcase}."
+
+msgctxt "CONNECTIVITY:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "TEST_CASE_START {testcase}."
+
+msgctxt "CONSISTENCY:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "TEST_CASE_START {testcase}."
+
+msgctxt "DELEGATION:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "TEST_CASE_START {testcase}."
+
+msgctxt "DNSSEC:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "TEST_CASE_START {testcase}."
+
+msgctxt "NAMESERVER:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "TEST_CASE_START {testcase}."
+
+msgctxt "SYNTAX:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "TEST_CASE_START {testcase}."
+
+msgctxt "ZONE:TEST_CASE_START"
 msgid "TEST_CASE_START {testcase}."
 msgstr "TEST_CASE_START {testcase}."
 
@@ -268,15 +316,39 @@ msgstr ""
 "Najden delujoč domenski strežnik. Test \"A\" zapisa za www.{zname} ni bil "
 "opravljen."
 
-#. BASIC:IPV4_DISABLED
-#. CONNECTIVITY:IPV4_DISABLED
-#. CONSISTENCY:IPV4_DISABLED
-#. DELEGATION:IPV4_DISABLED
-#. DNSSEC:IPV4_DISABLED
-#. NAMESERVER:IPV4_DISABLED
-#. SYNTAX:IPV4_DISABLED
-#. ZONE:IPV4_DISABLED
-#. SYSTEM:SKIP_IPV4_DISABLED
+msgctxt "BASIC:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 je onemogočen, \"{query_type}\" poizvedba ni bila poslana na {ns}/{address}."
+
+msgctxt "CONNECTIVITY:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 je onemogočen, \"{query_type}\" poizvedba ni bila poslana na {ns}/{address}."
+
+msgctxt "CONSISTENCY:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 je onemogočen, \"{query_type}\" poizvedba ni bila poslana na {ns}/{address}."
+
+msgctxt "DELEGATION:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 je onemogočen, \"{query_type}\" poizvedba ni bila poslana na {ns}/{address}."
+
+msgctxt "DNSSEC:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 je onemogočen, \"{query_type}\" poizvedba ni bila poslana na {ns}/{address}."
+
+msgctxt "NAMESERVER:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 je onemogočen, \"{query_type}\" poizvedba ni bila poslana na {ns}/{address}."
+
+msgctxt "SYNTAX:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 je onemogočen, \"{query_type}\" poizvedba ni bila poslana na {ns}/{address}."
+
+msgctxt "ZONE:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 je onemogočen, \"{query_type}\" poizvedba ni bila poslana na {ns}/{address}."
+
+msgctxt "SYSTEM:SKIP_IPV4_DISABLED"
 msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
 msgstr "IPv4 je onemogočen, \"{query_type}\" poizvedba ni bila poslana na {ns}/{address}."
 
@@ -284,15 +356,39 @@ msgctxt "BASIC:IPV4_ENABLED"
 msgid "IPv4 is enabled, can send \"{query_type}\" query to {ns}/{address}."
 msgstr "IPv4 je omogočen, lahko pošljemo \"{query_type}\" poizvedbo na {ns}/{address}."
 
-#. BASIC:IPV6_DISABLED
-#. CONNECTIVITY:IPV6_DISABLED
-#. CONSISTENCY:IPV6_DISABLED
-#. DELEGATION:IPV6_DISABLED
-#. DNSSEC:IPV6_DISABLED
-#. NAMESERVER:IPV6_DISABLED
-#. SYNTAX:IPV6_DISABLED
-#. ZONE:IPV6_DISABLED
-#. SYSTEM:SKIP_IPV6_DISABLED
+msgctxt "BASIC:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 je onemogočen, \"{query_type}\" ni bila poslana na {ns}/{address}."
+
+msgctxt "CONNECTIVITY:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 je onemogočen, \"{query_type}\" ni bila poslana na {ns}/{address}."
+
+msgctxt "CONSISTENCY:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 je onemogočen, \"{query_type}\" ni bila poslana na {ns}/{address}."
+
+msgctxt "DELEGATION:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 je onemogočen, \"{query_type}\" ni bila poslana na {ns}/{address}."
+
+msgctxt "DNSSEC:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 je onemogočen, \"{query_type}\" ni bila poslana na {ns}/{address}."
+
+msgctxt "NAMESERVER:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 je onemogočen, \"{query_type}\" ni bila poslana na {ns}/{address}."
+
+msgctxt "SYNTAX:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 je onemogočen, \"{query_type}\" ni bila poslana na {ns}/{address}."
+
+msgctxt "ZONE:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 je onemogočen, \"{query_type}\" ni bila poslana na {ns}/{address}."
+
+msgctxt "SYSTEM:SKIP_IPV6_DISABLED"
 msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
 msgstr "IPv6 je onemogočen, \"{query_type}\" ni bila poslana na {ns}/{address}."
 
@@ -689,9 +785,15 @@ msgctxt "CONSISTENCY:MULTIPLE_SOA_TIME_PARAMETER_SET"
 msgid "Found {count} SOA time parameter set(s)."
 msgstr "Najdeno število časovnih parametrov v SOA ({count})."
 
-#. CONSISTENCY:NO_RESPONSE
-#. DNSSEC:NO_RESPONSE
-#. ZONE:NO_RESPONSE
+msgctxt "CONSISTENCY:NO_RESPONSE"
+msgid "Nameserver {ns} did not respond."
+msgstr "Domenski strežnik {ns} ni odgovoril na poizvedbo."
+
+msgctxt "DNSSEC:NO_RESPONSE"
+msgid "Nameserver {ns} did not respond."
+msgstr "Domenski strežnik {ns} ni odgovoril na poizvedbo."
+
+msgctxt "ZONE:NO_RESPONSE"
 msgid "Nameserver {ns} did not respond."
 msgstr "Domenski strežnik {ns} ni odgovoril na poizvedbo."
 
@@ -981,9 +1083,27 @@ msgstr ""
 "DS zapis za {domain} z oznako {keytag} je bil ustvarjen z algoritmom "
 "({ds_algo_num}), ki še ni v uporabi. Podatki pridobljeni iz \"{addresses}\"."
 
-#. DNSSEC:DS02_ALGO_NOT_SUPPORTED_BY_ZM
-#. DNSSEC:DS08_ALGO_NOT_SUPPORTED_BY_ZM
-#. DNSSEC:DS09_ALGO_NOT_SUPPORTED_BY_ZM
+msgctxt "DNSSEC:DS02_ALGO_NOT_SUPPORTED_BY_ZM"
+msgid ""
+"DNSKEY with tag {keytag} uses unsupported algorithm {algo_num} "
+"({algo_mnemo}) by this installation of Zonemaster. Fetched from the "
+"nameservers with IP addresses \"{addresses}\"."
+msgstr ""
+"DNSKEY z oznako {keytag} uporablja algoritem {algo_num} ({algo_mnemo}), ki "
+"ga trenutna Zonemaster verzija ne podpira. Podatki pridobljeni iz "
+"\"{addresses}\"."
+
+msgctxt "DNSSEC:DS08_ALGO_NOT_SUPPORTED_BY_ZM"
+msgid ""
+"DNSKEY with tag {keytag} uses unsupported algorithm {algo_num} "
+"({algo_mnemo}) by this installation of Zonemaster. Fetched from the "
+"nameservers with IP addresses \"{addresses}\"."
+msgstr ""
+"DNSKEY z oznako {keytag} uporablja algoritem {algo_num} ({algo_mnemo}), ki "
+"ga trenutna Zonemaster verzija ne podpira. Podatki pridobljeni iz "
+"\"{addresses}\"."
+
+msgctxt "DNSSEC:DS09_ALGO_NOT_SUPPORTED_BY_ZM"
 msgid ""
 "DNSKEY with tag {keytag} uses unsupported algorithm {algo_num} "
 "({algo_mnemo}) by this installation of Zonemaster. Fetched from the "
@@ -1053,8 +1173,16 @@ msgstr ""
 "Ni veljavnega DNSKEY-a, ki bi se ujemal z DS zapisom. Podatki pridobljeni iz "
 "\"{addresses}\"."
 
-#. DNSSEC:DS02_RRSIG_NOT_VALID_BY_DNSKEY
-#. DNSSEC:DS08_RRSIG_NOT_VALID_BY_DNSKEY
+msgctxt "DNSSEC:DS02_RRSIG_NOT_VALID_BY_DNSKEY"
+msgid ""
+"The DNSKEY RRset is signed with an RRSIG with tag {keytag} which cannot be "
+"validated by the matching DNSKEY. Fetched from the nameservers with IP "
+"addresses \"{addresses}\"."
+msgstr ""
+"DNSKEY RRset je podpisan z RRSIG z oznako {keytag}, ki ga ni mogoče "
+"validirati z ustreznim DNSKEY-em. Podatki pridobljeni iz \"{addresses}\"."
+
+msgctxt "DNSSEC:DS08_RRSIG_NOT_VALID_BY_DNSKEY"
 msgid ""
 "The DNSKEY RRset is signed with an RRSIG with tag {keytag} which cannot be "
 "validated by the matching DNSKEY. Fetched from the nameservers with IP "
@@ -1071,8 +1199,15 @@ msgstr ""
 "Naslednji domenski strežniki vračajo napačen odgovor na NSEC poizvedbo. "
 "Podatki pridobljeni iz: \"{servers}\"."
 
-#. DNSSEC:DS03_ERR_MULT_NSEC3
-#. DNSSEC:DS10_ERR_MULT_NSEC3
+msgctxt "DNSSEC:DS03_ERR_MULT_NSEC3"
+msgid ""
+"Multiple NSEC3 records when one is expected. Fetched from name servers "
+"\"{servers}\"."
+msgstr ""
+"Več NSEC3 zapisov, ko je pričakovan eden. Podatki pridobljeni iz "
+"\"{servers}\"."
+
+msgctxt "DNSSEC:DS10_ERR_MULT_NSEC3"
 msgid ""
 "Multiple NSEC3 records when one is expected. Fetched from name servers "
 "\"{servers}\"."
@@ -2483,8 +2618,11 @@ msgctxt "NAMESERVER:NO_RESOLUTION"
 msgid "No nameserver was successfully resolved to an IP address."
 msgstr "Noben domenski strežnik se ni razrešil v IP naslov."
 
-#. NAMESERVER:NO_RESPONSE
-#. SYNTAX:NO_RESPONSE
+msgctxt "NAMESERVER:NO_RESPONSE"
+msgid "No response from {ns} asking for {domain}."
+msgstr "Domenski strežnik {ns} ne odgovarja na poizvedbe za '{domain}'."
+
+msgctxt "SYNTAX:NO_RESPONSE"
 msgid "No response from {ns} asking for {domain}."
 msgstr "Domenski strežnik {ns} ne odgovarja na poizvedbe za '{domain}'."
 
@@ -2795,13 +2933,19 @@ msgctxt "SYNTAX:NO_ENDING_HYPHENS"
 msgid "Neither end of any label in the domain name ({domain}) has a hyphen."
 msgstr "Niti začetek niti konec domene '{domain}' ne vsebuje vezaja '-'."
 
-#. SYNTAX:NO_RESPONSE_MX_QUERY
-#. ZONE:NO_RESPONSE_MX_QUERY
+msgctxt "SYNTAX:NO_RESPONSE_MX_QUERY"
 msgid "No response from nameserver(s) on MX queries."
 msgstr "Domenski strežnik se ne odziva na MX poizvedbe."
 
-#. SYNTAX:NO_RESPONSE_SOA_QUERY
-#. ZONE:NO_RESPONSE_SOA_QUERY
+msgctxt "ZONE:NO_RESPONSE_MX_QUERY"
+msgid "No response from nameserver(s) on MX queries."
+msgstr "Domenski strežnik se ne odziva na MX poizvedbe."
+
+msgctxt "SYNTAX:NO_RESPONSE_SOA_QUERY"
+msgid "No response from nameserver(s) on SOA queries."
+msgstr "Domenski strežnik se ne odziva na SOA poizvedbe."
+
+msgctxt "ZONE:NO_RESPONSE_SOA_QUERY"
 msgid "No response from nameserver(s) on SOA queries."
 msgstr "Domenski strežnik se ne odziva na SOA poizvedbe."
 
@@ -3238,7 +3382,7 @@ msgctxt "ZONE:Z12_NO_CSYNC"
 msgid "No CSYNC record found at zone apex on name server {ns}/{address}."
 msgstr "Pri imenskem strežniku {ns}/{address} ni bil najden noben zapis CSYNC na vrhu cone."
 
-#. ZONE:Z12_SERIAL_MISMATCH
+msgctxt "ZONE:Z12_SERIAL_MISMATCH"
 msgid ""
 "CSYNC SOA serial {csync_serial} fails RFC 7477 serial precondition against current "
 "SOA serial "
@@ -3246,7 +3390,8 @@ msgid ""
 msgstr ""
 "Serijska številka SOA CSYNC {csync_serial} se ne ujema s trenutno serijsko številko "
 "SOA {soa_serial} pri imenskem strežniku {ns}."
-#. SYSTEM:CANNOT_CONTINUE
+
+msgctxt "SYSTEM:CANNOT_CONTINUE"
 msgid "Not enough data about {domain} was found to be able to run tests."
 msgstr "Premalo informacij za '{domain}', da bi lahko zagnali teste."
 

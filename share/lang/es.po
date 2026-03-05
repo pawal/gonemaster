@@ -111,27 +111,75 @@ msgctxt "ADDRESS:NO_RESPONSE_PTR_QUERY"
 msgid "No response from nameserver(s) on PTR query ({domain})."
 msgstr "Los servidores de nombre no responden a las consultas PTR ({domain})."
 
-#. ADDRESS:TEST_CASE_END
-#. BASIC:TEST_CASE_END
-#. CONNECTIVITY:TEST_CASE_END
-#. CONSISTENCY:TEST_CASE_END
-#. DELEGATION:TEST_CASE_END
-#. DNSSEC:TEST_CASE_END
-#. NAMESERVER:TEST_CASE_END
-#. SYNTAX:TEST_CASE_END
-#. ZONE:TEST_CASE_END
+msgctxt "ADDRESS:TEST_CASE_END"
 msgid "TEST_CASE_END {testcase}."
 msgstr "FIN_DE_PRUEBA {testcase}."
 
-#. ADDRESS:TEST_CASE_START
-#. BASIC:TEST_CASE_START
-#. CONNECTIVITY:TEST_CASE_START
-#. CONSISTENCY:TEST_CASE_START
-#. DELEGATION:TEST_CASE_START
-#. DNSSEC:TEST_CASE_START
-#. NAMESERVER:TEST_CASE_START
-#. SYNTAX:TEST_CASE_START
-#. ZONE:TEST_CASE_START
+msgctxt "BASIC:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "FIN_DE_PRUEBA {testcase}."
+
+msgctxt "CONNECTIVITY:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "FIN_DE_PRUEBA {testcase}."
+
+msgctxt "CONSISTENCY:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "FIN_DE_PRUEBA {testcase}."
+
+msgctxt "DELEGATION:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "FIN_DE_PRUEBA {testcase}."
+
+msgctxt "DNSSEC:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "FIN_DE_PRUEBA {testcase}."
+
+msgctxt "NAMESERVER:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "FIN_DE_PRUEBA {testcase}."
+
+msgctxt "SYNTAX:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "FIN_DE_PRUEBA {testcase}."
+
+msgctxt "ZONE:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "FIN_DE_PRUEBA {testcase}."
+
+msgctxt "ADDRESS:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "COMIENZO_DE_PRUEBA {testcase}."
+
+msgctxt "BASIC:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "COMIENZO_DE_PRUEBA {testcase}."
+
+msgctxt "CONNECTIVITY:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "COMIENZO_DE_PRUEBA {testcase}."
+
+msgctxt "CONSISTENCY:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "COMIENZO_DE_PRUEBA {testcase}."
+
+msgctxt "DELEGATION:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "COMIENZO_DE_PRUEBA {testcase}."
+
+msgctxt "DNSSEC:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "COMIENZO_DE_PRUEBA {testcase}."
+
+msgctxt "NAMESERVER:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "COMIENZO_DE_PRUEBA {testcase}."
+
+msgctxt "SYNTAX:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "COMIENZO_DE_PRUEBA {testcase}."
+
+msgctxt "ZONE:TEST_CASE_START"
 msgid "TEST_CASE_START {testcase}."
 msgstr "COMIENZO_DE_PRUEBA {testcase}."
 
@@ -300,15 +348,39 @@ msgstr ""
 "Se encontró un servidor de nombres en funcionamiento. La prueba de consulta "
 "\"A\" para www.{zname} será omitida."
 
-#. BASIC:IPV4_DISABLED
-#. CONNECTIVITY:IPV4_DISABLED
-#. CONSISTENCY:IPV4_DISABLED
-#. DELEGATION:IPV4_DISABLED
-#. DNSSEC:IPV4_DISABLED
-#. NAMESERVER:IPV4_DISABLED
-#. SYNTAX:IPV4_DISABLED
-#. ZONE:IPV4_DISABLED
-#. SYSTEM:SKIP_IPV4_DISABLED
+msgctxt "BASIC:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "Desactivado IPv4, no se enviará la consulta \"{query_type}\" hacia {ns}/{address}."
+
+msgctxt "CONNECTIVITY:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "Desactivado IPv4, no se enviará la consulta \"{query_type}\" hacia {ns}/{address}."
+
+msgctxt "CONSISTENCY:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "Desactivado IPv4, no se enviará la consulta \"{query_type}\" hacia {ns}/{address}."
+
+msgctxt "DELEGATION:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "Desactivado IPv4, no se enviará la consulta \"{query_type}\" hacia {ns}/{address}."
+
+msgctxt "DNSSEC:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "Desactivado IPv4, no se enviará la consulta \"{query_type}\" hacia {ns}/{address}."
+
+msgctxt "NAMESERVER:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "Desactivado IPv4, no se enviará la consulta \"{query_type}\" hacia {ns}/{address}."
+
+msgctxt "SYNTAX:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "Desactivado IPv4, no se enviará la consulta \"{query_type}\" hacia {ns}/{address}."
+
+msgctxt "ZONE:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "Desactivado IPv4, no se enviará la consulta \"{query_type}\" hacia {ns}/{address}."
+
+msgctxt "SYSTEM:SKIP_IPV4_DISABLED"
 msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
 msgstr "Desactivado IPv4, no se enviará la consulta \"{query_type}\" hacia {ns}/{address}."
 
@@ -316,15 +388,39 @@ msgctxt "BASIC:IPV4_ENABLED"
 msgid "IPv4 is enabled, can send \"{query_type}\" query to {ns}/{address}."
 msgstr "Activado IPv4, se puede enviar la consulta \"{query_type}\" hacia {ns}/{address}."
 
-#. BASIC:IPV6_DISABLED
-#. CONNECTIVITY:IPV6_DISABLED
-#. CONSISTENCY:IPV6_DISABLED
-#. DELEGATION:IPV6_DISABLED
-#. DNSSEC:IPV6_DISABLED
-#. NAMESERVER:IPV6_DISABLED
-#. SYNTAX:IPV6_DISABLED
-#. ZONE:IPV6_DISABLED
-#. SYSTEM:SKIP_IPV6_DISABLED
+msgctxt "BASIC:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "Desactivado IPv6, no se enviará la consulta \"{query_type}\" hacia {ns}/{address}."
+
+msgctxt "CONNECTIVITY:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "Desactivado IPv6, no se enviará la consulta \"{query_type}\" hacia {ns}/{address}."
+
+msgctxt "CONSISTENCY:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "Desactivado IPv6, no se enviará la consulta \"{query_type}\" hacia {ns}/{address}."
+
+msgctxt "DELEGATION:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "Desactivado IPv6, no se enviará la consulta \"{query_type}\" hacia {ns}/{address}."
+
+msgctxt "DNSSEC:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "Desactivado IPv6, no se enviará la consulta \"{query_type}\" hacia {ns}/{address}."
+
+msgctxt "NAMESERVER:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "Desactivado IPv6, no se enviará la consulta \"{query_type}\" hacia {ns}/{address}."
+
+msgctxt "SYNTAX:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "Desactivado IPv6, no se enviará la consulta \"{query_type}\" hacia {ns}/{address}."
+
+msgctxt "ZONE:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "Desactivado IPv6, no se enviará la consulta \"{query_type}\" hacia {ns}/{address}."
+
+msgctxt "SYSTEM:SKIP_IPV6_DISABLED"
 msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
 msgstr "Desactivado IPv6, no se enviará la consulta \"{query_type}\" hacia {ns}/{address}."
 
@@ -750,9 +846,15 @@ msgctxt "CONSISTENCY:MULTIPLE_SOA_TIME_PARAMETER_SET"
 msgid "Found {count} SOA time parameter set(s)."
 msgstr "Se encontraron {count} grupos de parámetros de tiempo en el SOA."
 
-#. CONSISTENCY:NO_RESPONSE
-#. DNSSEC:NO_RESPONSE
-#. ZONE:NO_RESPONSE
+msgctxt "CONSISTENCY:NO_RESPONSE"
+msgid "Nameserver {ns} did not respond."
+msgstr "El servidor de nombres {ns} no respondió."
+
+msgctxt "DNSSEC:NO_RESPONSE"
+msgid "Nameserver {ns} did not respond."
+msgstr "El servidor de nombres {ns} no respondió."
+
+msgctxt "ZONE:NO_RESPONSE"
 msgid "Nameserver {ns} did not respond."
 msgstr "El servidor de nombres {ns} no respondió."
 
@@ -1061,9 +1163,27 @@ msgstr ""
 "está asignado. Obtenido de los servidores de nombres con direcciones IP "
 "\"{addresses}\"."
 
-#. DNSSEC:DS02_ALGO_NOT_SUPPORTED_BY_ZM
-#. DNSSEC:DS08_ALGO_NOT_SUPPORTED_BY_ZM
-#. DNSSEC:DS09_ALGO_NOT_SUPPORTED_BY_ZM
+msgctxt "DNSSEC:DS02_ALGO_NOT_SUPPORTED_BY_ZM"
+msgid ""
+"DNSKEY with tag {keytag} uses unsupported algorithm {algo_num} "
+"({algo_mnemo}) by this installation of Zonemaster. Fetched from the "
+"nameservers with IP addresses \"{addresses}\"."
+msgstr ""
+"El registro DNSKEY con tag {keytag} usa un algoritmo no soportado {algo_num} "
+"({algo_mnemo}) por esta versión de Zonemaster. Obtenido de los servidores de "
+"nombres con direcciones IP \"{addresses}\"."
+
+msgctxt "DNSSEC:DS08_ALGO_NOT_SUPPORTED_BY_ZM"
+msgid ""
+"DNSKEY with tag {keytag} uses unsupported algorithm {algo_num} "
+"({algo_mnemo}) by this installation of Zonemaster. Fetched from the "
+"nameservers with IP addresses \"{addresses}\"."
+msgstr ""
+"El registro DNSKEY con tag {keytag} usa un algoritmo no soportado {algo_num} "
+"({algo_mnemo}) por esta versión de Zonemaster. Obtenido de los servidores de "
+"nombres con direcciones IP \"{addresses}\"."
+
+msgctxt "DNSSEC:DS09_ALGO_NOT_SUPPORTED_BY_ZM"
 msgid ""
 "DNSKEY with tag {keytag} uses unsupported algorithm {algo_num} "
 "({algo_mnemo}) by this installation of Zonemaster. Fetched from the "
@@ -1137,8 +1257,17 @@ msgstr ""
 "No hay DNSKEY válido que calce con alguno de los registros DS. Obtenido de "
 "los servidores de nombres con direcciones IP \"{addresses}\"."
 
-#. DNSSEC:DS02_RRSIG_NOT_VALID_BY_DNSKEY
-#. DNSSEC:DS08_RRSIG_NOT_VALID_BY_DNSKEY
+msgctxt "DNSSEC:DS02_RRSIG_NOT_VALID_BY_DNSKEY"
+msgid ""
+"The DNSKEY RRset is signed with an RRSIG with tag {keytag} which cannot be "
+"validated by the matching DNSKEY. Fetched from the nameservers with IP "
+"addresses \"{addresses}\"."
+msgstr ""
+"El grupo de llaves (RRset) del DNSKEY está firmado por un RRSIG con tag "
+"{keytag} que no puede ser validada por la llave DNSKEY corresponiente. "
+"Obtenido de los servidores de nombres con direcciones IP \"{addresses}\"."
+
+msgctxt "DNSSEC:DS08_RRSIG_NOT_VALID_BY_DNSKEY"
 msgid ""
 "The DNSKEY RRset is signed with an RRSIG with tag {keytag} which cannot be "
 "validated by the matching DNSKEY. Fetched from the nameservers with IP "
@@ -1156,8 +1285,15 @@ msgstr ""
 "Los siguientes servidores entregan respuestas incorrectas a consultas NSEC. "
 "Obtenido de los servidores de nombres: \"{servers}\"."
 
-#. DNSSEC:DS03_ERR_MULT_NSEC3
-#. DNSSEC:DS10_ERR_MULT_NSEC3
+msgctxt "DNSSEC:DS03_ERR_MULT_NSEC3"
+msgid ""
+"Multiple NSEC3 records when one is expected. Fetched from name servers "
+"\"{servers}\"."
+msgstr ""
+"Hay múltiples registros NSEC3 y se espera solo uno. Obtenido desde los "
+"servidores de nombres \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_ERR_MULT_NSEC3"
 msgid ""
 "Multiple NSEC3 records when one is expected. Fetched from name servers "
 "\"{servers}\"."
@@ -2661,8 +2797,11 @@ msgctxt "NAMESERVER:NO_RESOLUTION"
 msgid "No nameserver was successfully resolved to an IP address."
 msgstr "Ningún servidor de nombres pudo ser resuelto a una dirección IP."
 
-#. NAMESERVER:NO_RESPONSE
-#. SYNTAX:NO_RESPONSE
+msgctxt "NAMESERVER:NO_RESPONSE"
+msgid "No response from {ns} asking for {domain}."
+msgstr "No hay respuesta desde {ns} a las consultas por {domain}."
+
+msgctxt "SYNTAX:NO_RESPONSE"
 msgid "No response from {ns} asking for {domain}."
 msgstr "No hay respuesta desde {ns} a las consultas por {domain}."
 
@@ -3002,13 +3141,19 @@ msgid "Neither end of any label in the domain name ({domain}) has a hyphen."
 msgstr ""
 "Ninguna etiqueta del nombre de dominio '{domain}' termina con un guión ('-')."
 
-#. SYNTAX:NO_RESPONSE_MX_QUERY
-#. ZONE:NO_RESPONSE_MX_QUERY
+msgctxt "SYNTAX:NO_RESPONSE_MX_QUERY"
 msgid "No response from nameserver(s) on MX queries."
 msgstr "No hay respuesta de los servidores de nombres a consultas MX."
 
-#. SYNTAX:NO_RESPONSE_SOA_QUERY
-#. ZONE:NO_RESPONSE_SOA_QUERY
+msgctxt "ZONE:NO_RESPONSE_MX_QUERY"
+msgid "No response from nameserver(s) on MX queries."
+msgstr "No hay respuesta de los servidores de nombres a consultas MX."
+
+msgctxt "SYNTAX:NO_RESPONSE_SOA_QUERY"
+msgid "No response from nameserver(s) on SOA queries."
+msgstr "No hay respuesta de los servidores de nombres a consultas SOA."
+
+msgctxt "ZONE:NO_RESPONSE_SOA_QUERY"
 msgid "No response from nameserver(s) on SOA queries."
 msgstr "No hay respuesta de los servidores de nombres a consultas SOA."
 
@@ -3494,7 +3639,7 @@ msgstr ""
 "No se encontró ningún registro CSYNC en el ápice de la zona en el servidor de "
 "nombres {ns}/{address}."
 
-#. ZONE:Z12_SERIAL_MISMATCH
+msgctxt "ZONE:Z12_SERIAL_MISMATCH"
 msgid ""
 "CSYNC SOA serial {csync_serial} fails RFC 7477 serial precondition against current "
 "SOA serial "
@@ -3502,7 +3647,8 @@ msgid ""
 msgstr ""
 "El número de serie SOA de CSYNC {csync_serial} no coincide con el número de serie "
 "SOA actual {soa_serial} en el servidor de nombres {ns}."
-#. SYSTEM:CANNOT_CONTINUE
+
+msgctxt "SYSTEM:CANNOT_CONTINUE"
 msgid "Not enough data about {domain} was found to be able to run tests."
 msgstr ""
 "No hay suficiente información sobre {domain} que permita ejecutar las "

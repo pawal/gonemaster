@@ -11,38 +11,30 @@ _Do not edit by hand — regenerate with the command above._
 
 | Tag | Level | Testcase(s) | i18n |
 | --- | --- | --- | --- |
-| `A01_ADDR_NOT_GLOBALLY_REACHABLE` | `ERROR` | [address01](../tests/address/address01.md) | **no** |
-| `A01_DOCUMENTATION_ADDR` | `ERROR` | [address01](../tests/address/address01.md) | **no** |
-| `A01_GLOBALLY_REACHABLE_ADDR` | `INFO` | [address01](../tests/address/address01.md) | **no** |
-| `A01_LOCAL_USE_ADDR` | `ERROR` | [address01](../tests/address/address01.md) | **no** |
-| `A01_NO_GLOBALLY_REACHABLE_ADDR` | `ERROR` | [address01](../tests/address/address01.md) | **no** |
-| `A01_NO_NAME_SERVERS_FOUND` | `CRITICAL` | [address01](../tests/address/address01.md) | **no** |
-| `NAMESERVERS_IP_WITH_REVERSE` | `INFO` | [address02](../tests/address/address02.md) | **no** |
-| `NAMESERVER_IP_PTR_MATCH` | `INFO` | [address03](../tests/address/address03.md) | **no** |
-| `NAMESERVER_IP_PTR_MISMATCH` | `NOTICE` | [address03](../tests/address/address03.md) | **no** |
-| `NAMESERVER_IP_WITHOUT_REVERSE` | `WARNING` | [address02](../tests/address/address02.md), [address03](../tests/address/address03.md) | **no** |
-| `NO_RESPONSE_PTR_QUERY` | `WARNING` | [address02](../tests/address/address02.md), [address03](../tests/address/address03.md) | **no** |
-| `TEST_CASE_END` | `DEBUG` | [address01](../tests/address/address01.md), [address02](../tests/address/address02.md), [address03](../tests/address/address03.md) | **no** |
-| `TEST_CASE_START` | `DEBUG` | [address01](../tests/address/address01.md), [address02](../tests/address/address02.md), [address03](../tests/address/address03.md) | **no** |
+| `A01_ADDR_NOT_GLOBALLY_REACHABLE` | `ERROR` | [address01](../tests/address/address01.md) | yes |
+| `A01_DOCUMENTATION_ADDR` | `ERROR` | [address01](../tests/address/address01.md) | yes |
+| `A01_GLOBALLY_REACHABLE_ADDR` | `INFO` | [address01](../tests/address/address01.md) | yes |
+| `A01_LOCAL_USE_ADDR` | `ERROR` | [address01](../tests/address/address01.md) | yes |
+| `A01_NO_GLOBALLY_REACHABLE_ADDR` | `ERROR` | [address01](../tests/address/address01.md) | yes |
+| `A01_NO_NAME_SERVERS_FOUND` | `CRITICAL` | [address01](../tests/address/address01.md) | yes |
+| `NAMESERVERS_IP_WITH_REVERSE` | `INFO` | [address02](../tests/address/address02.md) | yes |
+| `NAMESERVER_IP_PTR_MATCH` | `INFO` | [address03](../tests/address/address03.md) | yes |
+| `NAMESERVER_IP_PTR_MISMATCH` | `NOTICE` | [address03](../tests/address/address03.md) | yes |
+| `NAMESERVER_IP_WITHOUT_REVERSE` | `WARNING` | [address02](../tests/address/address02.md), [address03](../tests/address/address03.md) | yes |
+| `NO_RESPONSE_PTR_QUERY` | `WARNING` | [address02](../tests/address/address02.md), [address03](../tests/address/address03.md) | yes |
+| `TEST_CASE_END` | `DEBUG` | [address01](../tests/address/address01.md), [address02](../tests/address/address02.md), [address03](../tests/address/address03.md) | yes |
+| `TEST_CASE_START` | `DEBUG` | [address01](../tests/address/address01.md), [address02](../tests/address/address02.md), [address03](../tests/address/address03.md) | yes |
 
 ## i18n Notes
 
-### Tags Missing From Locale Files
+### Stale Entries In Locale Files
 
-These tags have no `ADDRESS:<TAG>` comment in any `.po` file.
-They will render as the raw tag name in translated output.
+These tags appear as `ADDRESS:<TAG>` in `.po` files but are absent from
+current code metadata.  The messages may be dead translations.
 
-- `A01_ADDR_NOT_GLOBALLY_REACHABLE`
-- `A01_DOCUMENTATION_ADDR`
-- `A01_GLOBALLY_REACHABLE_ADDR`
-- `A01_LOCAL_USE_ADDR`
-- `A01_NO_GLOBALLY_REACHABLE_ADDR`
-- `A01_NO_NAME_SERVERS_FOUND`
-- `NAMESERVERS_IP_WITH_REVERSE`
-- `NAMESERVER_IP_PTR_MATCH`
-- `NAMESERVER_IP_PTR_MISMATCH`
-- `NAMESERVER_IP_WITHOUT_REVERSE`
-- `NO_RESPONSE_PTR_QUERY`
-- `TEST_CASE_END`
-- `TEST_CASE_START`
+- `ADDRESS01`
+- `ADDRESS02`
+- `ADDRESS03`
+- `NAMESERVER_IP_PRIVATE_NETWORK`
+- `NO_IP_PRIVATE_NETWORK`
 

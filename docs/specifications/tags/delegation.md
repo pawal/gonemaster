@@ -11,92 +11,59 @@ _Do not edit by hand — regenerate with the command above._
 
 | Tag | Level | Testcase(s) | i18n |
 | --- | --- | --- | --- |
-| `ARE_AUTHORITATIVE` | `INFO` | [delegation04](../tests/delegation/delegation04.md) | **no** |
-| `CHILD_DISTINCT_NS_IP` | `INFO` | [delegation02](../tests/delegation/delegation02.md) | **no** |
-| `CHILD_NS_SAME_IP` | `ERROR` | [delegation02](../tests/delegation/delegation02.md) | **no** |
-| `DEL_DISTINCT_NS_IP` | `INFO` | [delegation02](../tests/delegation/delegation02.md) | **no** |
-| `DEL_NS_SAME_IP` | `ERROR` | [delegation02](../tests/delegation/delegation02.md) | **no** |
-| `DISTINCT_IP_ADDRESS` | `INFO` | [delegation02](../tests/delegation/delegation02.md) | **no** |
-| `ENOUGH_IPV4_NS_CHILD` | `INFO` | [delegation01](../tests/delegation/delegation01.md) | **no** |
-| `ENOUGH_IPV4_NS_DEL` | `INFO` | [delegation01](../tests/delegation/delegation01.md) | **no** |
-| `ENOUGH_IPV6_NS_CHILD` | `INFO` | [delegation01](../tests/delegation/delegation01.md) | **no** |
-| `ENOUGH_IPV6_NS_DEL` | `INFO` | [delegation01](../tests/delegation/delegation01.md) | **no** |
-| `ENOUGH_NS_CHILD` | `INFO` | [delegation01](../tests/delegation/delegation01.md) | **no** |
-| `ENOUGH_NS_DEL` | `INFO` | [delegation01](../tests/delegation/delegation01.md) | **no** |
-| `EXTRA_NAME_CHILD` | `NOTICE` | [delegation07](../tests/delegation/delegation07.md) | **no** |
-| `EXTRA_NAME_PARENT` | `ERROR` | [delegation07](../tests/delegation/delegation07.md) | **no** |
-| `IPV4_DISABLED` | `DEBUG` | [delegation04](../tests/delegation/delegation04.md), [delegation05](../tests/delegation/delegation05.md), [delegation06](../tests/delegation/delegation06.md) | **no** |
-| `IPV6_DISABLED` | `DEBUG` | [delegation04](../tests/delegation/delegation04.md), [delegation05](../tests/delegation/delegation05.md), [delegation06](../tests/delegation/delegation06.md) | **no** |
-| `IS_NOT_AUTHORITATIVE` | `WARNING` | [delegation04](../tests/delegation/delegation04.md) | **no** |
-| `NAMES_MATCH` | `INFO` | [delegation07](../tests/delegation/delegation07.md) | **no** |
-| `NOT_ENOUGH_IPV4_NS_CHILD` | `ERROR` | [delegation01](../tests/delegation/delegation01.md) | **no** |
-| `NOT_ENOUGH_IPV4_NS_DEL` | `ERROR` | [delegation01](../tests/delegation/delegation01.md) | **no** |
-| `NOT_ENOUGH_IPV6_NS_CHILD` | `ERROR` | [delegation01](../tests/delegation/delegation01.md) | **no** |
-| `NOT_ENOUGH_IPV6_NS_DEL` | `ERROR` | [delegation01](../tests/delegation/delegation01.md) | **no** |
-| `NOT_ENOUGH_NS_CHILD` | `ERROR` | [delegation01](../tests/delegation/delegation01.md) | **no** |
-| `NOT_ENOUGH_NS_DEL` | `ERROR` | [delegation01](../tests/delegation/delegation01.md) | **no** |
-| `NO_IPV4_NS_CHILD` | `WARNING` | [delegation01](../tests/delegation/delegation01.md) | **no** |
-| `NO_IPV4_NS_DEL` | `WARNING` | [delegation01](../tests/delegation/delegation01.md) | **no** |
-| `NO_IPV6_NS_CHILD` | `NOTICE` | [delegation01](../tests/delegation/delegation01.md) | **no** |
-| `NO_IPV6_NS_DEL` | `NOTICE` | [delegation01](../tests/delegation/delegation01.md) | **no** |
-| `NO_NS_CNAME` | `INFO` | [delegation05](../tests/delegation/delegation05.md) | **no** |
-| `NO_RESPONSE` | `DEBUG` | [delegation05](../tests/delegation/delegation05.md) | **no** |
-| `NS_IS_CNAME` | `ERROR` | [delegation05](../tests/delegation/delegation05.md) | **no** |
-| `REFERRAL_SIZE_OK` | `INFO` | [delegation03](../tests/delegation/delegation03.md) | **no** |
-| `REFERRAL_SIZE_TOO_LARGE` | `WARNING` | [delegation03](../tests/delegation/delegation03.md) | **no** |
-| `SAME_IP_ADDRESS` | `ERROR` | [delegation02](../tests/delegation/delegation02.md) | **no** |
-| `SOA_EXISTS` | `INFO` | [delegation06](../tests/delegation/delegation06.md) | **no** |
-| `SOA_NOT_EXISTS` | `ERROR` | [delegation06](../tests/delegation/delegation06.md) | **no** |
-| `TEST_CASE_END` | `DEBUG` | [delegation01](../tests/delegation/delegation01.md), [delegation02](../tests/delegation/delegation02.md), [delegation03](../tests/delegation/delegation03.md), [delegation04](../tests/delegation/delegation04.md), [delegation05](../tests/delegation/delegation05.md), [delegation06](../tests/delegation/delegation06.md), [delegation07](../tests/delegation/delegation07.md) | **no** |
-| `TEST_CASE_START` | `DEBUG` | [delegation01](../tests/delegation/delegation01.md), [delegation02](../tests/delegation/delegation02.md), [delegation03](../tests/delegation/delegation03.md), [delegation04](../tests/delegation/delegation04.md), [delegation05](../tests/delegation/delegation05.md), [delegation06](../tests/delegation/delegation06.md), [delegation07](../tests/delegation/delegation07.md) | **no** |
-| `TOTAL_NAME_MISMATCH` | `ERROR` | [delegation07](../tests/delegation/delegation07.md) | **no** |
-| `UNEXPECTED_RCODE` | `WARNING` | [delegation05](../tests/delegation/delegation05.md) | **no** |
+| `ARE_AUTHORITATIVE` | `INFO` | [delegation04](../tests/delegation/delegation04.md) | yes |
+| `CHILD_DISTINCT_NS_IP` | `INFO` | [delegation02](../tests/delegation/delegation02.md) | yes |
+| `CHILD_NS_SAME_IP` | `ERROR` | [delegation02](../tests/delegation/delegation02.md) | yes |
+| `DEL_DISTINCT_NS_IP` | `INFO` | [delegation02](../tests/delegation/delegation02.md) | yes |
+| `DEL_NS_SAME_IP` | `ERROR` | [delegation02](../tests/delegation/delegation02.md) | yes |
+| `DISTINCT_IP_ADDRESS` | `INFO` | [delegation02](../tests/delegation/delegation02.md) | yes |
+| `ENOUGH_IPV4_NS_CHILD` | `INFO` | [delegation01](../tests/delegation/delegation01.md) | yes |
+| `ENOUGH_IPV4_NS_DEL` | `INFO` | [delegation01](../tests/delegation/delegation01.md) | yes |
+| `ENOUGH_IPV6_NS_CHILD` | `INFO` | [delegation01](../tests/delegation/delegation01.md) | yes |
+| `ENOUGH_IPV6_NS_DEL` | `INFO` | [delegation01](../tests/delegation/delegation01.md) | yes |
+| `ENOUGH_NS_CHILD` | `INFO` | [delegation01](../tests/delegation/delegation01.md) | yes |
+| `ENOUGH_NS_DEL` | `INFO` | [delegation01](../tests/delegation/delegation01.md) | yes |
+| `EXTRA_NAME_CHILD` | `NOTICE` | [delegation07](../tests/delegation/delegation07.md) | yes |
+| `EXTRA_NAME_PARENT` | `ERROR` | [delegation07](../tests/delegation/delegation07.md) | yes |
+| `IPV4_DISABLED` | `DEBUG` | [delegation04](../tests/delegation/delegation04.md), [delegation05](../tests/delegation/delegation05.md), [delegation06](../tests/delegation/delegation06.md) | yes |
+| `IPV6_DISABLED` | `DEBUG` | [delegation04](../tests/delegation/delegation04.md), [delegation05](../tests/delegation/delegation05.md), [delegation06](../tests/delegation/delegation06.md) | yes |
+| `IS_NOT_AUTHORITATIVE` | `WARNING` | [delegation04](../tests/delegation/delegation04.md) | yes |
+| `NAMES_MATCH` | `INFO` | [delegation07](../tests/delegation/delegation07.md) | yes |
+| `NOT_ENOUGH_IPV4_NS_CHILD` | `ERROR` | [delegation01](../tests/delegation/delegation01.md) | yes |
+| `NOT_ENOUGH_IPV4_NS_DEL` | `ERROR` | [delegation01](../tests/delegation/delegation01.md) | yes |
+| `NOT_ENOUGH_IPV6_NS_CHILD` | `ERROR` | [delegation01](../tests/delegation/delegation01.md) | yes |
+| `NOT_ENOUGH_IPV6_NS_DEL` | `ERROR` | [delegation01](../tests/delegation/delegation01.md) | yes |
+| `NOT_ENOUGH_NS_CHILD` | `ERROR` | [delegation01](../tests/delegation/delegation01.md) | yes |
+| `NOT_ENOUGH_NS_DEL` | `ERROR` | [delegation01](../tests/delegation/delegation01.md) | yes |
+| `NO_IPV4_NS_CHILD` | `WARNING` | [delegation01](../tests/delegation/delegation01.md) | yes |
+| `NO_IPV4_NS_DEL` | `WARNING` | [delegation01](../tests/delegation/delegation01.md) | yes |
+| `NO_IPV6_NS_CHILD` | `NOTICE` | [delegation01](../tests/delegation/delegation01.md) | yes |
+| `NO_IPV6_NS_DEL` | `NOTICE` | [delegation01](../tests/delegation/delegation01.md) | yes |
+| `NO_NS_CNAME` | `INFO` | [delegation05](../tests/delegation/delegation05.md) | yes |
+| `NO_RESPONSE` | `DEBUG` | [delegation05](../tests/delegation/delegation05.md) | yes |
+| `NS_IS_CNAME` | `ERROR` | [delegation05](../tests/delegation/delegation05.md) | yes |
+| `REFERRAL_SIZE_OK` | `INFO` | [delegation03](../tests/delegation/delegation03.md) | yes |
+| `REFERRAL_SIZE_TOO_LARGE` | `WARNING` | [delegation03](../tests/delegation/delegation03.md) | yes |
+| `SAME_IP_ADDRESS` | `ERROR` | [delegation02](../tests/delegation/delegation02.md) | yes |
+| `SOA_EXISTS` | `INFO` | [delegation06](../tests/delegation/delegation06.md) | yes |
+| `SOA_NOT_EXISTS` | `ERROR` | [delegation06](../tests/delegation/delegation06.md) | yes |
+| `TEST_CASE_END` | `DEBUG` | [delegation01](../tests/delegation/delegation01.md), [delegation02](../tests/delegation/delegation02.md), [delegation03](../tests/delegation/delegation03.md), [delegation04](../tests/delegation/delegation04.md), [delegation05](../tests/delegation/delegation05.md), [delegation06](../tests/delegation/delegation06.md), [delegation07](../tests/delegation/delegation07.md) | yes |
+| `TEST_CASE_START` | `DEBUG` | [delegation01](../tests/delegation/delegation01.md), [delegation02](../tests/delegation/delegation02.md), [delegation03](../tests/delegation/delegation03.md), [delegation04](../tests/delegation/delegation04.md), [delegation05](../tests/delegation/delegation05.md), [delegation06](../tests/delegation/delegation06.md), [delegation07](../tests/delegation/delegation07.md) | yes |
+| `TOTAL_NAME_MISMATCH` | `ERROR` | [delegation07](../tests/delegation/delegation07.md) | yes |
+| `UNEXPECTED_RCODE` | `WARNING` | [delegation05](../tests/delegation/delegation05.md) | yes |
 
 ## i18n Notes
 
-### Tags Missing From Locale Files
+### Stale Entries In Locale Files
 
-These tags have no `DELEGATION:<TAG>` comment in any `.po` file.
-They will render as the raw tag name in translated output.
+These tags appear as `DELEGATION:<TAG>` in `.po` files but are absent from
+current code metadata.  The messages may be dead translations.
 
-- `ARE_AUTHORITATIVE`
-- `CHILD_DISTINCT_NS_IP`
-- `CHILD_NS_SAME_IP`
-- `DEL_DISTINCT_NS_IP`
-- `DEL_NS_SAME_IP`
-- `DISTINCT_IP_ADDRESS`
-- `ENOUGH_IPV4_NS_CHILD`
-- `ENOUGH_IPV4_NS_DEL`
-- `ENOUGH_IPV6_NS_CHILD`
-- `ENOUGH_IPV6_NS_DEL`
-- `ENOUGH_NS_CHILD`
-- `ENOUGH_NS_DEL`
-- `EXTRA_NAME_CHILD`
-- `EXTRA_NAME_PARENT`
-- `IPV4_DISABLED`
-- `IPV6_DISABLED`
-- `IS_NOT_AUTHORITATIVE`
-- `NAMES_MATCH`
-- `NOT_ENOUGH_IPV4_NS_CHILD`
-- `NOT_ENOUGH_IPV4_NS_DEL`
-- `NOT_ENOUGH_IPV6_NS_CHILD`
-- `NOT_ENOUGH_IPV6_NS_DEL`
-- `NOT_ENOUGH_NS_CHILD`
-- `NOT_ENOUGH_NS_DEL`
-- `NO_IPV4_NS_CHILD`
-- `NO_IPV4_NS_DEL`
-- `NO_IPV6_NS_CHILD`
-- `NO_IPV6_NS_DEL`
-- `NO_NS_CNAME`
-- `NO_RESPONSE`
-- `NS_IS_CNAME`
-- `REFERRAL_SIZE_OK`
-- `REFERRAL_SIZE_TOO_LARGE`
-- `SAME_IP_ADDRESS`
-- `SOA_EXISTS`
-- `SOA_NOT_EXISTS`
-- `TEST_CASE_END`
-- `TEST_CASE_START`
-- `TOTAL_NAME_MISMATCH`
-- `UNEXPECTED_RCODE`
+- `DELEGATION01`
+- `DELEGATION02`
+- `DELEGATION03`
+- `DELEGATION04`
+- `DELEGATION05`
+- `DELEGATION06`
+- `DELEGATION07`
 

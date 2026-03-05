@@ -106,9 +106,12 @@ on-disk files and exit non-zero if they differ.
 
 ## i18n Reconciliation
 
-The `#. MODULE:TAG` comment in each `.po` file identifies which messages are
-used for which module/tag pair.  A tag is considered **covered** if at least
-one locale file contains a `#. MODULE:TAG` comment for it.
+The `msgctxt "MODULE:TAG"` entry in each `.po` file identifies which messages
+are used for which module/tag pair. A tag is considered **covered** if at
+least one locale file contains a matching `msgctxt`.
+
+Legacy `#. MODULE:TAG` comments are still recognized by the generator, but
+`msgctxt` is the canonical source.
 
 Missing entries mean the tag will be rendered as its raw tag string in translated
 output.  Stale entries mean the PO file references a tag that no longer exists in

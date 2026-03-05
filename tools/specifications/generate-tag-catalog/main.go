@@ -19,6 +19,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"codeberg.org/pawal/gonemaster/tools/specifications/internal/specdata"
@@ -218,7 +219,7 @@ func generateCatalog(
 	} else {
 		if len(missingI18n) > 0 {
 			fmt.Fprintf(&b, "### Tags Missing From Locale Files\n\n")
-			fmt.Fprintf(&b, "These tags have no `%s:<TAG>` comment in any `.po` file.\n", displayName)
+			fmt.Fprintf(&b, "These tags have no `%s:<TAG>` `msgctxt` entry in any `.po` file.\n", displayName)
 			fmt.Fprintf(&b, "They will render as the raw tag name in translated output.\n\n")
 			for _, tag := range missingI18n {
 				fmt.Fprintf(&b, "- `%s`\n", tag)
@@ -263,7 +264,8 @@ func loadProfile(path string) (*profile, error) {
 }
 
 // loadI18nCoverage scans all *.po files in dir and returns a set of
-// "MODULE:TAG" strings that appear as "#. MODULE:TAG" comment lines.
+// "MODULE:TAG" strings that appear in msgctxt entries. It also accepts legacy
+// "#. MODULE:TAG" comment lines for backward compatibility.
 func loadI18nCoverage(dir string) (map[string]bool, error) {
 	coverage := map[string]bool{}
 
@@ -285,7 +287,9 @@ func loadI18nCoverage(dir string) (map[string]bool, error) {
 	return coverage, nil
 }
 
-// scanPOFile extracts "#. MODULE:TAG" comment entries from a PO file.
+// scanPOFile extracts coverage entries from a PO file.
+// Preferred form: msgctxt "MODULE:TAG"
+// Legacy form:    #. MODULE:TAG
 func scanPOFile(path string, out map[string]bool) error {
 	f, err := os.Open(path)
 	if err != nil {
@@ -296,20 +300,42 @@ func scanPOFile(path string, out map[string]bool) error {
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
+		// Preferred modern source of truth.
+		if strings.HasPrefix(line, "msgctxt ") {
+			if token, ok := parsePOQuotedValue(line, "msgctxt "); ok {
+				addCoverageToken(token, out)
+			}
+			continue
+		}
+		// Legacy fallback.
 		if !strings.HasPrefix(line, "#. ") {
 			continue
 		}
 		token := strings.TrimPrefix(line, "#. ")
-		token = strings.TrimSpace(token)
-		// Expect format MODULE:TAG — both parts must be non-empty and
-		// the tag must look like an uppercase identifier.
-		parts := strings.SplitN(token, ":", 2)
-		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-			continue
-		}
-		out[token] = true
+		addCoverageToken(token, out)
 	}
 	return scanner.Err()
+}
+
+func parsePOQuotedValue(line string, prefix string) (string, bool) {
+	payload := strings.TrimSpace(strings.TrimPrefix(line, prefix))
+	if payload == "" {
+		return "", false
+	}
+	unquoted, err := strconv.Unquote(payload)
+	if err != nil {
+		return "", false
+	}
+	return strings.TrimSpace(unquoted), true
+}
+
+func addCoverageToken(token string, out map[string]bool) {
+	token = strings.TrimSpace(token)
+	parts := strings.SplitN(token, ":", 2)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return
+	}
+	out[token] = true
 }
 
 func sortedStringKeys(m map[string][]string) []string {

@@ -11,124 +11,84 @@ _Do not edit by hand — regenerate with the command above._
 
 | Tag | Level | Testcase(s) | i18n |
 | --- | --- | --- | --- |
-| `AAAA_BAD_RDATA` | `ERROR` | [nameserver05](../tests/nameserver/nameserver05.md) | **no** |
-| `AAAA_QUERY_DROPPED` | `ERROR` | [nameserver05](../tests/nameserver/nameserver05.md) | **no** |
-| `AAAA_UNEXPECTED_RCODE` | `ERROR` | [nameserver05](../tests/nameserver/nameserver05.md) | **no** |
-| `AAAA_WELL_PROCESSED` | `INFO` | [nameserver05](../tests/nameserver/nameserver05.md) | **no** |
-| `AXFR_AVAILABLE` | `NOTICE` | [nameserver03](../tests/nameserver/nameserver03.md) | **no** |
-| `AXFR_FAILURE` | `INFO` | [nameserver03](../tests/nameserver/nameserver03.md) | **no** |
-| `A_UNEXPECTED_RCODE` | `WARNING` | [nameserver05](../tests/nameserver/nameserver05.md) | **no** |
-| `BREAKS_ON_EDNS` | `ERROR` | [nameserver02](../tests/nameserver/nameserver02.md) | **no** |
-| `CAN_BE_RESOLVED` | `INFO` | [nameserver06](../tests/nameserver/nameserver06.md) | **no** |
-| `CAN_NOT_BE_RESOLVED` | `ERROR` | [nameserver06](../tests/nameserver/nameserver06.md) | **no** |
-| `CASE_QUERIES_RESULTS_DIFFER` | `ERROR` | [nameserver09](../tests/nameserver/nameserver09.md) | **no** |
-| `CASE_QUERIES_RESULTS_OK` | `INFO` | [nameserver09](../tests/nameserver/nameserver09.md) | **no** |
-| `CASE_QUERY_DIFFERENT_ANSWER` | `WARNING` | [nameserver09](../tests/nameserver/nameserver09.md) | **no** |
-| `CASE_QUERY_DIFFERENT_RC` | `WARNING` | [nameserver09](../tests/nameserver/nameserver09.md) | **no** |
-| `CASE_QUERY_NO_ANSWER` | `WARNING` | [nameserver09](../tests/nameserver/nameserver09.md) | **no** |
-| `CASE_QUERY_SAME_ANSWER` | `DEBUG` | [nameserver09](../tests/nameserver/nameserver09.md) | **no** |
-| `CASE_QUERY_SAME_RC` | `DEBUG` | [nameserver09](../tests/nameserver/nameserver09.md) | **no** |
-| `DIFFERENT_SOURCE_IP` | `WARNING` | [nameserver04](../tests/nameserver/nameserver04.md) | **no** |
-| `EDNS0_SUPPORT` | `INFO` | [nameserver02](../tests/nameserver/nameserver02.md) | **no** |
-| `EDNS_RESPONSE_WITHOUT_EDNS` | `ERROR` | [nameserver02](../tests/nameserver/nameserver02.md) | **no** |
-| `EDNS_VERSION_ERROR` | `ERROR` | [nameserver02](../tests/nameserver/nameserver02.md) | **no** |
-| `IPV4_DISABLED` | `DEBUG` | [nameserver01](../tests/nameserver/nameserver01.md), [nameserver02](../tests/nameserver/nameserver02.md), [nameserver03](../tests/nameserver/nameserver03.md), [nameserver04](../tests/nameserver/nameserver04.md), [nameserver05](../tests/nameserver/nameserver05.md), [nameserver07](../tests/nameserver/nameserver07.md), [nameserver08](../tests/nameserver/nameserver08.md), [nameserver09](../tests/nameserver/nameserver09.md), [nameserver10](../tests/nameserver/nameserver10.md), [nameserver11](../tests/nameserver/nameserver11.md), [nameserver12](../tests/nameserver/nameserver12.md), [nameserver13](../tests/nameserver/nameserver13.md), [nameserver15](../tests/nameserver/nameserver15.md), [nameserver16](../tests/nameserver/nameserver16.md) | **no** |
-| `IPV6_DISABLED` | `DEBUG` | [nameserver01](../tests/nameserver/nameserver01.md), [nameserver02](../tests/nameserver/nameserver02.md), [nameserver03](../tests/nameserver/nameserver03.md), [nameserver04](../tests/nameserver/nameserver04.md), [nameserver05](../tests/nameserver/nameserver05.md), [nameserver07](../tests/nameserver/nameserver07.md), [nameserver08](../tests/nameserver/nameserver08.md), [nameserver09](../tests/nameserver/nameserver09.md), [nameserver10](../tests/nameserver/nameserver10.md), [nameserver11](../tests/nameserver/nameserver11.md), [nameserver12](../tests/nameserver/nameserver12.md), [nameserver13](../tests/nameserver/nameserver13.md), [nameserver15](../tests/nameserver/nameserver15.md), [nameserver16](../tests/nameserver/nameserver16.md) | **no** |
-| `IS_A_RECURSOR` | `ERROR` | [nameserver01](../tests/nameserver/nameserver01.md) | **no** |
-| `MISSING_OPT_IN_TRUNCATED` | `WARNING` | [nameserver13](../tests/nameserver/nameserver13.md) | **no** |
-| `N10_EDNS_RESPONSE_ERROR` | `WARNING` | [nameserver10](../tests/nameserver/nameserver10.md) | **no** |
-| `N10_NO_RESPONSE_EDNS1_QUERY` | `WARNING` | [nameserver10](../tests/nameserver/nameserver10.md) | **no** |
-| `N10_UNEXPECTED_RCODE` | `WARNING` | [nameserver10](../tests/nameserver/nameserver10.md) | **no** |
-| `N11_NO_EDNS` | `WARNING` | [nameserver11](../tests/nameserver/nameserver11.md) | **no** |
-| `N11_NO_RESPONSE` | `WARNING` | [nameserver11](../tests/nameserver/nameserver11.md) | **no** |
-| `N11_RETURNS_UNKNOWN_OPTION_CODE` | `WARNING` | [nameserver11](../tests/nameserver/nameserver11.md) | **no** |
-| `N11_UNEXPECTED_ANSWER_SECTION` | `WARNING` | [nameserver11](../tests/nameserver/nameserver11.md) | **no** |
-| `N11_UNEXPECTED_RCODE` | `WARNING` | [nameserver11](../tests/nameserver/nameserver11.md) | **no** |
-| `N11_UNSET_AA` | `WARNING` | [nameserver11](../tests/nameserver/nameserver11.md) | **no** |
-| `N15_ERROR_ON_VERSION_QUERY` | `NOTICE` | [nameserver15](../tests/nameserver/nameserver15.md) | **no** |
-| `N15_NO_VERSION_REVEALED` | `INFO` | [nameserver15](../tests/nameserver/nameserver15.md) | **no** |
-| `N15_SOFTWARE_VERSION` | `NOTICE` | [nameserver15](../tests/nameserver/nameserver15.md) | **no** |
-| `N15_WRONG_CLASS` | `WARNING` | [nameserver15](../tests/nameserver/nameserver15.md) | **no** |
-| `N16_HAS_NSID` | `INFO` | [nameserver16](../tests/nameserver/nameserver16.md) | **no** |
-| `N16_NO_NSID_REVEALED` | `INFO` | [nameserver16](../tests/nameserver/nameserver16.md) | **no** |
-| `N16_NO_RESPONSE` | `WARNING` | [nameserver16](../tests/nameserver/nameserver16.md) | **no** |
-| `N16_UNEXPECTED_RCODE` | `WARNING` | [nameserver16](../tests/nameserver/nameserver16.md) | **no** |
-| `NO_EDNS_SUPPORT` | `WARNING` | [nameserver02](../tests/nameserver/nameserver02.md), [nameserver12](../tests/nameserver/nameserver12.md), [nameserver13](../tests/nameserver/nameserver13.md) | **no** |
-| `NO_RECURSOR` | `INFO` | [nameserver01](../tests/nameserver/nameserver01.md) | **no** |
-| `NO_RESOLUTION` | `ERROR` | [nameserver06](../tests/nameserver/nameserver06.md) | **no** |
-| `NO_RESPONSE` | `DEBUG` | [nameserver01](../tests/nameserver/nameserver01.md), [nameserver02](../tests/nameserver/nameserver02.md), [nameserver05](../tests/nameserver/nameserver05.md), [nameserver12](../tests/nameserver/nameserver12.md), [nameserver13](../tests/nameserver/nameserver13.md) | **no** |
-| `NO_UPWARD_REFERRAL` | `INFO` | [nameserver07](../tests/nameserver/nameserver07.md) | **no** |
-| `NS_ERROR` | `WARNING` | [nameserver02](../tests/nameserver/nameserver02.md), [nameserver12](../tests/nameserver/nameserver12.md), [nameserver13](../tests/nameserver/nameserver13.md) | **no** |
-| `QNAME_CASE_INSENSITIVE` | `WARNING` | [nameserver08](../tests/nameserver/nameserver08.md) | **no** |
-| `QNAME_CASE_SENSITIVE` | `INFO` | [nameserver08](../tests/nameserver/nameserver08.md) | **no** |
-| `SAME_SOURCE_IP` | `INFO` | [nameserver04](../tests/nameserver/nameserver04.md) | **no** |
-| `TEST_CASE_END` | `DEBUG` | [nameserver01](../tests/nameserver/nameserver01.md), [nameserver02](../tests/nameserver/nameserver02.md), [nameserver03](../tests/nameserver/nameserver03.md), [nameserver04](../tests/nameserver/nameserver04.md), [nameserver05](../tests/nameserver/nameserver05.md), [nameserver06](../tests/nameserver/nameserver06.md), [nameserver07](../tests/nameserver/nameserver07.md), [nameserver08](../tests/nameserver/nameserver08.md), [nameserver09](../tests/nameserver/nameserver09.md), [nameserver10](../tests/nameserver/nameserver10.md), [nameserver11](../tests/nameserver/nameserver11.md), [nameserver12](../tests/nameserver/nameserver12.md), [nameserver13](../tests/nameserver/nameserver13.md), [nameserver15](../tests/nameserver/nameserver15.md), [nameserver16](../tests/nameserver/nameserver16.md) | **no** |
-| `TEST_CASE_START` | `DEBUG` | [nameserver01](../tests/nameserver/nameserver01.md), [nameserver02](../tests/nameserver/nameserver02.md), [nameserver03](../tests/nameserver/nameserver03.md), [nameserver04](../tests/nameserver/nameserver04.md), [nameserver05](../tests/nameserver/nameserver05.md), [nameserver06](../tests/nameserver/nameserver06.md), [nameserver07](../tests/nameserver/nameserver07.md), [nameserver08](../tests/nameserver/nameserver08.md), [nameserver09](../tests/nameserver/nameserver09.md), [nameserver10](../tests/nameserver/nameserver10.md), [nameserver11](../tests/nameserver/nameserver11.md), [nameserver12](../tests/nameserver/nameserver12.md), [nameserver13](../tests/nameserver/nameserver13.md), [nameserver15](../tests/nameserver/nameserver15.md), [nameserver16](../tests/nameserver/nameserver16.md) | **no** |
-| `UPWARD_REFERRAL` | `WARNING` | [nameserver07](../tests/nameserver/nameserver07.md) | **no** |
-| `UPWARD_REFERRAL_IRRELEVANT` | `INFO` | [nameserver07](../tests/nameserver/nameserver07.md) | **no** |
-| `Z_FLAGS_NOTCLEAR` | `—` | [nameserver12](../tests/nameserver/nameserver12.md) | **no** |
+| `AAAA_BAD_RDATA` | `ERROR` | [nameserver05](../tests/nameserver/nameserver05.md) | yes |
+| `AAAA_QUERY_DROPPED` | `ERROR` | [nameserver05](../tests/nameserver/nameserver05.md) | yes |
+| `AAAA_UNEXPECTED_RCODE` | `ERROR` | [nameserver05](../tests/nameserver/nameserver05.md) | yes |
+| `AAAA_WELL_PROCESSED` | `INFO` | [nameserver05](../tests/nameserver/nameserver05.md) | yes |
+| `AXFR_AVAILABLE` | `NOTICE` | [nameserver03](../tests/nameserver/nameserver03.md) | yes |
+| `AXFR_FAILURE` | `INFO` | [nameserver03](../tests/nameserver/nameserver03.md) | yes |
+| `A_UNEXPECTED_RCODE` | `WARNING` | [nameserver05](../tests/nameserver/nameserver05.md) | yes |
+| `BREAKS_ON_EDNS` | `ERROR` | [nameserver02](../tests/nameserver/nameserver02.md) | yes |
+| `CAN_BE_RESOLVED` | `INFO` | [nameserver06](../tests/nameserver/nameserver06.md) | yes |
+| `CAN_NOT_BE_RESOLVED` | `ERROR` | [nameserver06](../tests/nameserver/nameserver06.md) | yes |
+| `CASE_QUERIES_RESULTS_DIFFER` | `ERROR` | [nameserver09](../tests/nameserver/nameserver09.md) | yes |
+| `CASE_QUERIES_RESULTS_OK` | `INFO` | [nameserver09](../tests/nameserver/nameserver09.md) | yes |
+| `CASE_QUERY_DIFFERENT_ANSWER` | `WARNING` | [nameserver09](../tests/nameserver/nameserver09.md) | yes |
+| `CASE_QUERY_DIFFERENT_RC` | `WARNING` | [nameserver09](../tests/nameserver/nameserver09.md) | yes |
+| `CASE_QUERY_NO_ANSWER` | `WARNING` | [nameserver09](../tests/nameserver/nameserver09.md) | yes |
+| `CASE_QUERY_SAME_ANSWER` | `DEBUG` | [nameserver09](../tests/nameserver/nameserver09.md) | yes |
+| `CASE_QUERY_SAME_RC` | `DEBUG` | [nameserver09](../tests/nameserver/nameserver09.md) | yes |
+| `DIFFERENT_SOURCE_IP` | `WARNING` | [nameserver04](../tests/nameserver/nameserver04.md) | yes |
+| `EDNS0_SUPPORT` | `INFO` | [nameserver02](../tests/nameserver/nameserver02.md) | yes |
+| `EDNS_RESPONSE_WITHOUT_EDNS` | `ERROR` | [nameserver02](../tests/nameserver/nameserver02.md) | yes |
+| `EDNS_VERSION_ERROR` | `ERROR` | [nameserver02](../tests/nameserver/nameserver02.md) | yes |
+| `IPV4_DISABLED` | `DEBUG` | [nameserver01](../tests/nameserver/nameserver01.md), [nameserver02](../tests/nameserver/nameserver02.md), [nameserver03](../tests/nameserver/nameserver03.md), [nameserver04](../tests/nameserver/nameserver04.md), [nameserver05](../tests/nameserver/nameserver05.md), [nameserver07](../tests/nameserver/nameserver07.md), [nameserver08](../tests/nameserver/nameserver08.md), [nameserver09](../tests/nameserver/nameserver09.md), [nameserver10](../tests/nameserver/nameserver10.md), [nameserver11](../tests/nameserver/nameserver11.md), [nameserver12](../tests/nameserver/nameserver12.md), [nameserver13](../tests/nameserver/nameserver13.md), [nameserver15](../tests/nameserver/nameserver15.md), [nameserver16](../tests/nameserver/nameserver16.md) | yes |
+| `IPV6_DISABLED` | `DEBUG` | [nameserver01](../tests/nameserver/nameserver01.md), [nameserver02](../tests/nameserver/nameserver02.md), [nameserver03](../tests/nameserver/nameserver03.md), [nameserver04](../tests/nameserver/nameserver04.md), [nameserver05](../tests/nameserver/nameserver05.md), [nameserver07](../tests/nameserver/nameserver07.md), [nameserver08](../tests/nameserver/nameserver08.md), [nameserver09](../tests/nameserver/nameserver09.md), [nameserver10](../tests/nameserver/nameserver10.md), [nameserver11](../tests/nameserver/nameserver11.md), [nameserver12](../tests/nameserver/nameserver12.md), [nameserver13](../tests/nameserver/nameserver13.md), [nameserver15](../tests/nameserver/nameserver15.md), [nameserver16](../tests/nameserver/nameserver16.md) | yes |
+| `IS_A_RECURSOR` | `ERROR` | [nameserver01](../tests/nameserver/nameserver01.md) | yes |
+| `MISSING_OPT_IN_TRUNCATED` | `WARNING` | [nameserver13](../tests/nameserver/nameserver13.md) | yes |
+| `N10_EDNS_RESPONSE_ERROR` | `WARNING` | [nameserver10](../tests/nameserver/nameserver10.md) | yes |
+| `N10_NO_RESPONSE_EDNS1_QUERY` | `WARNING` | [nameserver10](../tests/nameserver/nameserver10.md) | yes |
+| `N10_UNEXPECTED_RCODE` | `WARNING` | [nameserver10](../tests/nameserver/nameserver10.md) | yes |
+| `N11_NO_EDNS` | `WARNING` | [nameserver11](../tests/nameserver/nameserver11.md) | yes |
+| `N11_NO_RESPONSE` | `WARNING` | [nameserver11](../tests/nameserver/nameserver11.md) | yes |
+| `N11_RETURNS_UNKNOWN_OPTION_CODE` | `WARNING` | [nameserver11](../tests/nameserver/nameserver11.md) | yes |
+| `N11_UNEXPECTED_ANSWER_SECTION` | `WARNING` | [nameserver11](../tests/nameserver/nameserver11.md) | yes |
+| `N11_UNEXPECTED_RCODE` | `WARNING` | [nameserver11](../tests/nameserver/nameserver11.md) | yes |
+| `N11_UNSET_AA` | `WARNING` | [nameserver11](../tests/nameserver/nameserver11.md) | yes |
+| `N15_ERROR_ON_VERSION_QUERY` | `NOTICE` | [nameserver15](../tests/nameserver/nameserver15.md) | yes |
+| `N15_NO_VERSION_REVEALED` | `INFO` | [nameserver15](../tests/nameserver/nameserver15.md) | yes |
+| `N15_SOFTWARE_VERSION` | `NOTICE` | [nameserver15](../tests/nameserver/nameserver15.md) | yes |
+| `N15_WRONG_CLASS` | `WARNING` | [nameserver15](../tests/nameserver/nameserver15.md) | yes |
+| `N16_HAS_NSID` | `INFO` | [nameserver16](../tests/nameserver/nameserver16.md) | yes |
+| `N16_NO_NSID_REVEALED` | `INFO` | [nameserver16](../tests/nameserver/nameserver16.md) | yes |
+| `N16_NO_RESPONSE` | `WARNING` | [nameserver16](../tests/nameserver/nameserver16.md) | yes |
+| `N16_UNEXPECTED_RCODE` | `WARNING` | [nameserver16](../tests/nameserver/nameserver16.md) | yes |
+| `NO_EDNS_SUPPORT` | `WARNING` | [nameserver02](../tests/nameserver/nameserver02.md), [nameserver12](../tests/nameserver/nameserver12.md), [nameserver13](../tests/nameserver/nameserver13.md) | yes |
+| `NO_RECURSOR` | `INFO` | [nameserver01](../tests/nameserver/nameserver01.md) | yes |
+| `NO_RESOLUTION` | `ERROR` | [nameserver06](../tests/nameserver/nameserver06.md) | yes |
+| `NO_RESPONSE` | `DEBUG` | [nameserver01](../tests/nameserver/nameserver01.md), [nameserver02](../tests/nameserver/nameserver02.md), [nameserver05](../tests/nameserver/nameserver05.md), [nameserver12](../tests/nameserver/nameserver12.md), [nameserver13](../tests/nameserver/nameserver13.md) | yes |
+| `NO_UPWARD_REFERRAL` | `INFO` | [nameserver07](../tests/nameserver/nameserver07.md) | yes |
+| `NS_ERROR` | `WARNING` | [nameserver02](../tests/nameserver/nameserver02.md), [nameserver12](../tests/nameserver/nameserver12.md), [nameserver13](../tests/nameserver/nameserver13.md) | yes |
+| `QNAME_CASE_INSENSITIVE` | `WARNING` | [nameserver08](../tests/nameserver/nameserver08.md) | yes |
+| `QNAME_CASE_SENSITIVE` | `INFO` | [nameserver08](../tests/nameserver/nameserver08.md) | yes |
+| `SAME_SOURCE_IP` | `INFO` | [nameserver04](../tests/nameserver/nameserver04.md) | yes |
+| `TEST_CASE_END` | `DEBUG` | [nameserver01](../tests/nameserver/nameserver01.md), [nameserver02](../tests/nameserver/nameserver02.md), [nameserver03](../tests/nameserver/nameserver03.md), [nameserver04](../tests/nameserver/nameserver04.md), [nameserver05](../tests/nameserver/nameserver05.md), [nameserver06](../tests/nameserver/nameserver06.md), [nameserver07](../tests/nameserver/nameserver07.md), [nameserver08](../tests/nameserver/nameserver08.md), [nameserver09](../tests/nameserver/nameserver09.md), [nameserver10](../tests/nameserver/nameserver10.md), [nameserver11](../tests/nameserver/nameserver11.md), [nameserver12](../tests/nameserver/nameserver12.md), [nameserver13](../tests/nameserver/nameserver13.md), [nameserver15](../tests/nameserver/nameserver15.md), [nameserver16](../tests/nameserver/nameserver16.md) | yes |
+| `TEST_CASE_START` | `DEBUG` | [nameserver01](../tests/nameserver/nameserver01.md), [nameserver02](../tests/nameserver/nameserver02.md), [nameserver03](../tests/nameserver/nameserver03.md), [nameserver04](../tests/nameserver/nameserver04.md), [nameserver05](../tests/nameserver/nameserver05.md), [nameserver06](../tests/nameserver/nameserver06.md), [nameserver07](../tests/nameserver/nameserver07.md), [nameserver08](../tests/nameserver/nameserver08.md), [nameserver09](../tests/nameserver/nameserver09.md), [nameserver10](../tests/nameserver/nameserver10.md), [nameserver11](../tests/nameserver/nameserver11.md), [nameserver12](../tests/nameserver/nameserver12.md), [nameserver13](../tests/nameserver/nameserver13.md), [nameserver15](../tests/nameserver/nameserver15.md), [nameserver16](../tests/nameserver/nameserver16.md) | yes |
+| `UPWARD_REFERRAL` | `WARNING` | [nameserver07](../tests/nameserver/nameserver07.md) | yes |
+| `UPWARD_REFERRAL_IRRELEVANT` | `INFO` | [nameserver07](../tests/nameserver/nameserver07.md) | yes |
+| `Z_FLAGS_NOTCLEAR` | `—` | [nameserver12](../tests/nameserver/nameserver12.md) | yes |
 
 ## i18n Notes
 
-### Tags Missing From Locale Files
+### Stale Entries In Locale Files
 
-These tags have no `NAMESERVER:<TAG>` comment in any `.po` file.
-They will render as the raw tag name in translated output.
+These tags appear as `NAMESERVER:<TAG>` in `.po` files but are absent from
+current code metadata.  The messages may be dead translations.
 
-- `AAAA_BAD_RDATA`
-- `AAAA_QUERY_DROPPED`
-- `AAAA_UNEXPECTED_RCODE`
-- `AAAA_WELL_PROCESSED`
-- `AXFR_AVAILABLE`
-- `AXFR_FAILURE`
-- `A_UNEXPECTED_RCODE`
-- `BREAKS_ON_EDNS`
-- `CAN_BE_RESOLVED`
-- `CAN_NOT_BE_RESOLVED`
-- `CASE_QUERIES_RESULTS_DIFFER`
-- `CASE_QUERIES_RESULTS_OK`
-- `CASE_QUERY_DIFFERENT_ANSWER`
-- `CASE_QUERY_DIFFERENT_RC`
-- `CASE_QUERY_NO_ANSWER`
-- `CASE_QUERY_SAME_ANSWER`
-- `CASE_QUERY_SAME_RC`
-- `DIFFERENT_SOURCE_IP`
-- `EDNS0_SUPPORT`
-- `EDNS_RESPONSE_WITHOUT_EDNS`
-- `EDNS_VERSION_ERROR`
-- `IPV4_DISABLED`
-- `IPV6_DISABLED`
-- `IS_A_RECURSOR`
-- `MISSING_OPT_IN_TRUNCATED`
-- `N10_EDNS_RESPONSE_ERROR`
-- `N10_NO_RESPONSE_EDNS1_QUERY`
-- `N10_UNEXPECTED_RCODE`
-- `N11_NO_EDNS`
-- `N11_NO_RESPONSE`
-- `N11_RETURNS_UNKNOWN_OPTION_CODE`
-- `N11_UNEXPECTED_ANSWER_SECTION`
-- `N11_UNEXPECTED_RCODE`
-- `N11_UNSET_AA`
-- `N15_ERROR_ON_VERSION_QUERY`
-- `N15_NO_VERSION_REVEALED`
-- `N15_SOFTWARE_VERSION`
-- `N15_WRONG_CLASS`
-- `N16_HAS_NSID`
-- `N16_NO_NSID_REVEALED`
-- `N16_NO_RESPONSE`
-- `N16_UNEXPECTED_RCODE`
-- `NO_EDNS_SUPPORT`
-- `NO_RECURSOR`
-- `NO_RESOLUTION`
-- `NO_RESPONSE`
-- `NO_UPWARD_REFERRAL`
-- `NS_ERROR`
-- `QNAME_CASE_INSENSITIVE`
-- `QNAME_CASE_SENSITIVE`
-- `SAME_SOURCE_IP`
-- `TEST_CASE_END`
-- `TEST_CASE_START`
-- `UPWARD_REFERRAL`
-- `UPWARD_REFERRAL_IRRELEVANT`
-- `Z_FLAGS_NOTCLEAR`
+- `N15_NO_VERSION`
+- `NAMESERVER01`
+- `NAMESERVER02`
+- `NAMESERVER03`
+- `NAMESERVER04`
+- `NAMESERVER05`
+- `NAMESERVER06`
+- `NAMESERVER07`
+- `NAMESERVER08`
+- `NAMESERVER09`
+- `NAMESERVER10`
+- `NAMESERVER11`
+- `NAMESERVER12`
+- `NAMESERVER13`
+- `NAMESERVER14`
+- `NAMESERVER15`
 

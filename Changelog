@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.1] - 2026-03-06
+
+### Added
+
+ - Added translations for tags with missing translations
+
+### Changed
+
+ - Lowered severity level of NAMESERVER_IP_WITHOUT_REVERSE to NOTICE
+ - Bump codeberg.org/miekg/dns to 0.6.68
+ - Fixed a bunch of regressions from logargs coherency
+ - RNAME_MAIL_DOMAIN_INVALID now logs according to configured severity level
+ - UDP can succeed even when a non-EDNS reply is slightly above 512 bytes (fixes BASIC tests)
+ - Removed a large amount of stale translations
+
 ## [v1.1.0] - 2026-03-05
 
 **BREAKING CHANGE** - log.args in JSON logs are now coherent, read docs/MIGRATION-1.1.md

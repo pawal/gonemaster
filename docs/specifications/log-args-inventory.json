@@ -1944,13 +1944,13 @@
           "tag": "CACHED_RETURN",
           "file": "engine/nameserver/nameserver.go",
           "line": 479,
-          "shape": "string"
+          "shape": "unknown"
         },
         {
           "tag": "CACHED_RETURN",
           "file": "engine/nameserver/nameserver.go",
           "line": 479,
-          "shape": "unknown"
+          "shape": "string"
         },
         {
           "tag": "FAKE_PACKET_RETURNED",

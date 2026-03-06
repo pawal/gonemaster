@@ -405,6 +405,18 @@ var propertyDefs = map[string]propertyDef{
 			return p.TestCasesVars.Zone06.SOADefaultTTLMinimumValue
 		},
 	},
+	"test_cases_vars.zone13.SPF_LOOKUP_LIMIT": {
+		typ:          propNum,
+		min:          intPtr(1),
+		defaultValue: 10,
+		hasDefault:   true,
+		setter: func(p *Profile, value any) {
+			p.TestCasesVars.Zone13.SPFLookupLimit = value.(int)
+		},
+		getter: func(p *Profile) any {
+			return p.TestCasesVars.Zone13.SPFLookupLimit
+		},
+	},
 }
 
 func intPtr(value int) *int {

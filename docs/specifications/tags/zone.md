@@ -36,8 +36,8 @@ _Do not edit by hand — regenerate with the command above._
 | `SOA_DEFAULT_TTL_MAXIMUM_VALUE_HIGHER` | `NOTICE` | [zone06](../tests/zone/zone06.md) | yes |
 | `SOA_DEFAULT_TTL_MAXIMUM_VALUE_LOWER` | `NOTICE` | [zone06](../tests/zone/zone06.md) | yes |
 | `SOA_DEFAULT_TTL_MAXIMUM_VALUE_OK` | `INFO` | [zone06](../tests/zone/zone06.md) | yes |
-| `TEST_CASE_END` | `DEBUG` | [zone01](../tests/zone/zone01.md), [zone02](../tests/zone/zone02.md), [zone03](../tests/zone/zone03.md), [zone04](../tests/zone/zone04.md), [zone05](../tests/zone/zone05.md), [zone06](../tests/zone/zone06.md), [zone07](../tests/zone/zone07.md), [zone08](../tests/zone/zone08.md), [zone09](../tests/zone/zone09.md), [zone10](../tests/zone/zone10.md), [zone12](../tests/zone/zone12.md) | yes |
-| `TEST_CASE_START` | `DEBUG` | [zone01](../tests/zone/zone01.md), [zone02](../tests/zone/zone02.md), [zone03](../tests/zone/zone03.md), [zone04](../tests/zone/zone04.md), [zone05](../tests/zone/zone05.md), [zone06](../tests/zone/zone06.md), [zone07](../tests/zone/zone07.md), [zone08](../tests/zone/zone08.md), [zone09](../tests/zone/zone09.md), [zone10](../tests/zone/zone10.md), [zone12](../tests/zone/zone12.md) | yes |
+| `TEST_CASE_END` | `DEBUG` | [zone01](../tests/zone/zone01.md), [zone02](../tests/zone/zone02.md), [zone03](../tests/zone/zone03.md), [zone04](../tests/zone/zone04.md), [zone05](../tests/zone/zone05.md), [zone06](../tests/zone/zone06.md), [zone07](../tests/zone/zone07.md), [zone08](../tests/zone/zone08.md), [zone09](../tests/zone/zone09.md), [zone10](../tests/zone/zone10.md), [zone12](../tests/zone/zone12.md), [zone13](../tests/zone/zone13.md) | yes |
+| `TEST_CASE_START` | `DEBUG` | [zone01](../tests/zone/zone01.md), [zone02](../tests/zone/zone02.md), [zone03](../tests/zone/zone03.md), [zone04](../tests/zone/zone04.md), [zone05](../tests/zone/zone05.md), [zone06](../tests/zone/zone06.md), [zone07](../tests/zone/zone07.md), [zone08](../tests/zone/zone08.md), [zone09](../tests/zone/zone09.md), [zone10](../tests/zone/zone10.md), [zone12](../tests/zone/zone12.md), [zone13](../tests/zone/zone13.md) | yes |
 | `WRONG_SOA` | `DEBUG` | [zone10](../tests/zone/zone10.md) | yes |
 | `Z01_MNAME_HAS_LOCALHOST_ADDR` | `NOTICE` | [zone01](../tests/zone/zone01.md) | yes |
 | `Z01_MNAME_IS_DOT` | `NOTICE` | [zone01](../tests/zone/zone01.md) | yes |
@@ -79,7 +79,14 @@ _Do not edit by hand — regenerate with the command above._
 | `Z12_MULTIPLE_CSYNC` | `WARNING` | [zone12](../tests/zone/zone12.md) | yes |
 | `Z12_NO_CSYNC` | `INFO` | [zone12](../tests/zone/zone12.md) | yes |
 | `Z12_SERIAL_MISMATCH` | `WARNING` | [zone12](../tests/zone/zone12.md) | yes |
+| `Z13_NO_SPF_FOUND` | `INFO` | [zone13](../tests/zone/zone13.md) | no |
+| `Z13_SPF_LOOKUP_COUNT_EXCEEDED` | `WARNING` | [zone13](../tests/zone/zone13.md) | no |
+| `Z13_SPF_LOOKUP_COUNT_OK` | `INFO` | [zone13](../tests/zone/zone13.md) | no |
+| `Z13_SPF_LOOKUP_LOOP` | `WARNING` | [zone13](../tests/zone/zone13.md) | no |
+| `Z13_SPF_PTR_DEPRECATED` | `WARNING` | [zone13](../tests/zone/zone13.md) | no |
+| `Z13_SPF_RECURSIVE_ERROR` | `NOTICE` | [zone13](../tests/zone/zone13.md) | no |
+| `Z13_UNABLE_TO_CHECK` | `WARNING` | [zone13](../tests/zone/zone13.md) | no |
 
 ## i18n Notes
 
-All tags have i18n coverage and no stale entries found.
+All tags have i18n coverage except Zone13 tags (pending Phase 2 translation work).

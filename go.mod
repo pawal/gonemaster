@@ -3,7 +3,7 @@ module codeberg.org/pawal/gonemaster
 go 1.25.0
 
 require (
-	codeberg.org/miekg/dns v0.6.66
+	codeberg.org/miekg/dns v0.6.68
 	github.com/ulikunitz/xz v0.5.15
 	golang.org/x/net v0.51.0
 	golang.org/x/text v0.34.0

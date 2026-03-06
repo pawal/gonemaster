@@ -79,6 +79,10 @@ func TestConsistency01MultipleSerials(t *testing.T) {
 	if _, ok := entry.Args["ns_list"]; ok {
 		t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
 	}
+	servers, ok := entry.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 || servers[0]["address"] != "192.0.2.1" {
+		t.Fatalf("expected endpoint-preserving typed server for SOA_SERIAL, got %#v", entry.Args["servers"])
+	}
 }
 
 func TestConsistency02MultipleRnames(t *testing.T) {
@@ -253,6 +257,10 @@ func TestConsistency04MultipleNSSets(t *testing.T) {
 	nsSet, ok := entry.Args["ns_set_servers"].([]map[string]any)
 	if !ok || len(nsSet) == 0 {
 		t.Fatalf("expected typed ns_set_servers for NS_SET, got %#v", entry.Args["ns_set_servers"])
+	}
+	servers, ok := entry.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 || servers[0]["address"] != "192.0.2.1" {
+		t.Fatalf("expected endpoint-preserving typed servers for NS_SET, got %#v", entry.Args["servers"])
 	}
 }
 

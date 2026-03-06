@@ -6975,7 +6975,7 @@ func nsStrings(servers []nameserver.Nameserver) []string {
 }
 
 func joinUniqueSorted(values []string) string {
-	return strings.Join(logargs.UniqueSortedEndpointNames(values), ";")
+	return strings.Join(uniqueSortedValues(values), ";")
 }
 
 func uniqueSortedValues(values []string) []string {

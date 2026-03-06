@@ -758,6 +758,9 @@ func TestNameserver15SoftwareVersionAndWrongClass(t *testing.T) {
 	if servers[0]["ns"] != "ns1.example" {
 		t.Fatalf("unexpected server payload for N15_SOFTWARE_VERSION: %#v", servers[0])
 	}
+	if servers[0]["address"] != "192.0.2.15" {
+		t.Fatalf("expected server address in N15_SOFTWARE_VERSION payload, got %#v", servers[0])
+	}
 }
 
 func setupTest(t *testing.T) {

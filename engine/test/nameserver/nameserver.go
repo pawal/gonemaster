@@ -2040,7 +2040,7 @@ func parseAnswerFrom(value string) (netip.Addr, bool) {
 }
 
 func sortedStrings(values []string) []string {
-	return logargs.UniqueSortedEndpointNames(values)
+	return uniqueSortedValues(values)
 }
 
 func uniqueSortedValues(values []string) []string {
@@ -2092,7 +2092,7 @@ func sortedKeys(values map[string]bool) []string {
 	for value := range values {
 		keys = append(keys, value)
 	}
-	return logargs.UniqueSortedEndpointNames(keys)
+	return uniqueSortedValues(keys)
 }
 
 func uniqueServersByKey(nss []ns.Nameserver) []ns.Nameserver {

@@ -604,7 +604,14 @@
             "Z12_MIXED_PRESENCE": "WARNING",
             "Z12_MULTIPLE_CSYNC": "WARNING",
             "Z12_NO_CSYNC": "INFO",
-            "Z12_SERIAL_MISMATCH": "WARNING"
+            "Z12_SERIAL_MISMATCH": "WARNING",
+            "Z13_NO_SPF_FOUND": "INFO",
+            "Z13_SPF_LOOKUP_COUNT_EXCEEDED": "WARNING",
+            "Z13_SPF_LOOKUP_COUNT_OK": "INFO",
+            "Z13_SPF_LOOKUP_LOOP": "WARNING",
+            "Z13_SPF_PTR_DEPRECATED": "WARNING",
+            "Z13_SPF_RECURSIVE_ERROR": "NOTICE",
+            "Z13_UNABLE_TO_CHECK": "WARNING"
         }
     },
     "test_cases": [
@@ -682,6 +689,7 @@
         "zone09",
         "zone10",
         "zone11",
-        "zone12"
+        "zone12",
+        "zone13"
     ]
 }

@@ -256,6 +256,44 @@ func TestSyntax06ParallelMailServers(t *testing.T) {
 	}
 }
 
+func TestSyntax06MailDomainInvalidUsesProfileLevel(t *testing.T) {
+	ctx, prof, log := testhelpers.Context(t)
+	log.SetProfile(prof)
+
+	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
+		switch {
+		case strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "NS"):
+			return nsPacket(".", "a.root.")
+		case strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "SOA"):
+			return soaPacket(".", "a.root.", "hostmaster.example.com.")
+		case strings.EqualFold(qname, "example.com") && strings.EqualFold(qtype, "MX"):
+			return mxPacket("example.com", "mail.example.com.")
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	entries, err := Syntax06(ctx, z)
+	if err != nil {
+		t.Fatalf("syntax06: %v", err)
+	}
+
+	entry := firstEntryByTag(entries, "RNAME_MAIL_DOMAIN_INVALID")
+	if entry == nil {
+		t.Fatalf("expected RNAME_MAIL_DOMAIN_INVALID")
+	}
+
+	wantLevel := "NOTICE"
+	if moduleLevels := prof.TestLevels["SYNTAX"]; moduleLevels != nil {
+		if configured, ok := moduleLevels["RNAME_MAIL_DOMAIN_INVALID"]; ok {
+			wantLevel = strings.ToUpper(configured)
+		}
+	}
+	if entry.Level() != wantLevel {
+		t.Fatalf("RNAME_MAIL_DOMAIN_INVALID level=%s, want %s", entry.Level(), wantLevel)
+	}
+}
+
 func TestSyntax06RnameSingleLabelDomainInvalid(t *testing.T) {
 	ctx := testContext(t)
 	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {

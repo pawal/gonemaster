@@ -429,6 +429,7 @@ func Syntax06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	rnameCandidates := map[string]bool{}
 	seenMailServers := map[string]bool{}
 	invalidExchanges := -1
+	parentLog := util.LoggerFromContext(ctx)
 
 	type mailOutcome struct {
 		entries       []*logger.Entry
@@ -437,6 +438,8 @@ func Syntax06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	processMailServer := func(ctx context.Context, mailServer string) (mailOutcome, error) {
 		buf := logger.New()
+		buf.CopyConfigFrom(parentLog)
+		buf.CopyStartTimeFrom(parentLog)
 		tlog := testlogger.Wrap(buf, moduleName, testcase)
 		exchangeValid := false
 

@@ -642,6 +642,84 @@ func TestExchangeFallbackTCPOnTruncatedUDP(t *testing.T) {
 	}
 }
 
+func TestExchangeAcceptsOversizedUDPWithoutTCPFallback(t *testing.T) {
+	serverAddr, listener, shutdownTCP := startTCPDNSServer(t, func(_ context.Context, w dns.ResponseWriter, req *dns.Msg) {
+		writeSimpleAResponse(w, req)
+	}, nil)
+	defer shutdownTCP()
+
+	packetConn, err := net.ListenPacket("udp", serverAddr)
+	if err != nil {
+		t.Fatalf("listen udp on tcp addr: %v", err)
+	}
+	udpServer := &dns.Server{
+		PacketConn: packetConn,
+		Handler: dns.HandlerFunc(func(_ context.Context, w dns.ResponseWriter, req *dns.Msg) {
+			resp := new(dns.Msg)
+			dnsutil.SetReply(resp, req)
+			if len(req.Question) > 0 {
+				a := &dns.A{
+					Hdr: dns.Header{
+						Name:  req.Question[0].Header().Name,
+						Class: dns.ClassINET,
+						TTL:   60,
+					},
+				}
+				a.Addr = netip.AddrFrom4([4]byte{192, 0, 2, 10})
+				resp.Answer = append(resp.Answer, a)
+			}
+
+			// Keep the response valid but larger than the classic 512-byte UDP
+			// receive buffer used when the request has no EDNS.
+			for i := 0; i < 64; i++ {
+				additional := &dns.A{
+					Hdr: dns.Header{
+						Name:  "extra.example.",
+						Class: dns.ClassINET,
+						TTL:   60,
+					},
+				}
+				additional.Addr = netip.AddrFrom4([4]byte{192, 0, 2, byte(i + 1)})
+				resp.Extra = append(resp.Extra, additional)
+			}
+
+			_, _ = resp.WriteTo(w)
+		}),
+	}
+	udpDone := make(chan struct{})
+	go func() {
+		_ = udpServer.ListenAndServe()
+		close(udpDone)
+	}()
+	defer func() {
+		udpServer.Shutdown(context.Background())
+		_ = packetConn.Close()
+		select {
+		case <-udpDone:
+		case <-time.After(2 * time.Second):
+			t.Logf("udp dns server shutdown timed out")
+		}
+	}()
+
+	client := &Client{}
+	client.SetUseTCP(false)
+	client.SetFallback(true)
+	client.SetRetries(0)
+	client.SetTimeout(1 * time.Second)
+	client.SetRetrans(40 * time.Millisecond)
+
+	resp, err := client.Exchange(context.Background(), serverAddr, BuildQuery("udp-oversized-response.example", dns.TypeA))
+	if err != nil {
+		t.Fatalf("expected successful UDP response, got %v", err)
+	}
+	if resp.Msg == nil || len(resp.Msg.Answer) == 0 {
+		t.Fatalf("expected answer records in UDP response, got %#v", resp.Msg)
+	}
+	if got := listener.accepts.Load(); got != 0 {
+		t.Fatalf("expected no TCP fallback attempt, got %d TCP accepts", got)
+	}
+}
+
 func TestExchangeDoesNotFallbackTCPOnUDPFailure(t *testing.T) {
 	serverAddr, listener, shutdownTCP := startTCPDNSServer(t, func(_ context.Context, w dns.ResponseWriter, req *dns.Msg) {
 		writeSimpleAResponse(w, req)

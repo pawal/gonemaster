@@ -237,16 +237,21 @@ func (c *Client) exchangeOnce(ctx context.Context, server string, msg *dns.Msg, 
 
 	client := dns.NewClient()
 	client.Transport.ReadTimeout = timeout
-	return c.exchangeWithConnCancelable(ctx, client, msg, conn)
+	return c.exchangeWithConnCancelable(ctx, client, msg, conn, useTCP)
 }
 
-func (c *Client) exchangeWithConnCancelable(ctx context.Context, client *dns.Client, msg *dns.Msg, conn net.Conn) (*dns.Msg, time.Duration, error) {
+func (c *Client) exchangeWithConnCancelable(ctx context.Context, client *dns.Client, msg *dns.Msg, conn net.Conn, useTCP bool) (*dns.Msg, time.Duration, error) {
 	if client == nil || conn == nil {
 		return nil, 0, fmt.Errorf("missing dns client or connection")
 	}
 
+	wireMsg, err := prepareWireMessage(msg, useTCP)
+	if err != nil {
+		return nil, 0, err
+	}
+
 	if ctx == nil || ctx.Done() == nil {
-		return client.ExchangeWithConn(ctx, msg.Copy(), conn)
+		return client.ExchangeWithConn(ctx, wireMsg, conn)
 	}
 
 	done := make(chan struct{})
@@ -260,12 +265,33 @@ func (c *Client) exchangeWithConnCancelable(ctx context.Context, client *dns.Cli
 		}
 	}()
 
-	resp, rtt, err := client.ExchangeWithConn(ctx, msg.Copy(), conn)
+	resp, rtt, err := client.ExchangeWithConn(ctx, wireMsg, conn)
 	close(done)
 	if cerr := ctx.Err(); cerr != nil {
 		return nil, 0, cerr
 	}
 	return resp, rtt, err
+}
+
+func prepareWireMessage(msg *dns.Msg, useTCP bool) (*dns.Msg, error) {
+	if msg == nil {
+		return nil, fmt.Errorf("nil DNS message")
+	}
+
+	wireMsg := msg.Copy()
+	if len(wireMsg.Data) == 0 {
+		if err := wireMsg.Pack(); err != nil {
+			return nil, err
+		}
+	}
+
+	if !useTCP && wireMsg.UDPSize < constants.EDNSUDPPayloadCommonLimit {
+		// Keep the outgoing query bytes untouched, but allow reception of UDP
+		// responses that exceed 512 bytes from authoritative servers.
+		wireMsg.UDPSize = constants.EDNSUDPPayloadCommonLimit
+	}
+
+	return wireMsg, nil
 }
 
 func (c *Client) effectiveAttemptTimeout(ctx context.Context, useTCP bool, fromUDPFallback bool) time.Duration {

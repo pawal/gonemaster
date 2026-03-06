@@ -1221,21 +1221,15 @@ func setTypedServerListAtKey(args map[string]any, key string, namesList string) 
 	}
 
 	parts := strings.Split(namesList, ";")
-	servers := make([]logargs.Server, 0, len(parts))
-	for _, part := range parts {
-		name := strings.TrimSpace(part)
-		if name == "" {
-			continue
-		}
-		servers = append(servers, logargs.Server{NS: name})
-	}
-	if len(servers) == 0 {
+	raw, ok := logargs.ServersFromValues(parts)["servers"]
+	if !ok {
 		return
 	}
-
-	if typed, ok := logargs.Servers(servers)["servers"]; ok {
-		args[key] = typed
+	servers, ok := raw.([]map[string]any)
+	if !ok || len(servers) == 0 {
+		return
 	}
+	args[key] = servers
 }
 
 func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {

@@ -71,6 +71,37 @@ func TestServersDeterministicOrdering(t *testing.T) {
 	}
 }
 
+func TestServersFromValues(t *testing.T) {
+	got := ServersFromValues([]string{
+		"ns2.example/2001:db8::53",
+		"ns1.example/192.0.2.1",
+		"ns1.example",
+		"192.0.2.2",
+		" ",
+	})
+
+	raw, ok := got["servers"].([]map[string]any)
+	if !ok {
+		t.Fatalf("missing servers list: %#v", got["servers"])
+	}
+	if len(raw) != 4 {
+		t.Fatalf("expected 4 emitted server objects, got %d (%#v)", len(raw), raw)
+	}
+
+	if raw[0]["ns"] != "ns1.example" {
+		t.Fatalf("unexpected first server: %#v", raw[0])
+	}
+	if raw[1]["ns"] != "ns1.example" || raw[1]["address"] != "192.0.2.1" {
+		t.Fatalf("unexpected second server: %#v", raw[1])
+	}
+	if raw[2]["ns"] != "ns2.example" || raw[2]["address"] != "2001:db8::53" {
+		t.Fatalf("unexpected third server: %#v", raw[2])
+	}
+	if raw[3]["address"] != "192.0.2.2" {
+		t.Fatalf("unexpected fourth server: %#v", raw[3])
+	}
+}
+
 func TestSetQueryIdentity(t *testing.T) {
 	args := map[string]any{}
 	SetQueryIdentity(args, "WWW.Example.org.", "soa", "in")

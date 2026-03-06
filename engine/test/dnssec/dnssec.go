@@ -6969,7 +6969,7 @@ func nameserversByIP(servers []nameserver.Nameserver) [][]nameserver.Nameserver 
 func nsStrings(servers []nameserver.Nameserver) []string {
 	values := make([]string, 0, len(servers))
 	for _, ns := range servers {
-		values = append(values, ns.NameString())
+		values = append(values, ns.String())
 	}
 	return values
 }
@@ -7035,17 +7035,15 @@ func setTypedServersFromNames(args map[string]any, values []string) {
 	if args == nil || len(values) == 0 {
 		return
 	}
-	names := logargs.UniqueSortedEndpointNames(values)
-	if len(names) == 0 {
+	raw, ok := logargs.ServersFromValues(values)["servers"]
+	if !ok {
 		return
 	}
-	servers := make([]logargs.Server, 0, len(names))
-	for _, name := range names {
-		servers = append(servers, logargs.Server{NS: name})
+	servers, ok := raw.([]map[string]any)
+	if !ok || len(servers) == 0 {
+		return
 	}
-	if typed, ok := logargs.Servers(servers)["servers"]; ok {
-		args["servers"] = typed
-	}
+	args["servers"] = servers
 }
 
 func differenceStrings(left []string, right []string) []string {

@@ -94,6 +94,28 @@ func ServersFromNameservers[T NameserverLike](items []T) map[string]any {
 	return Servers(servers)
 }
 
+// ServersFromValues converts mixed endpoint identity values to canonical servers data.
+//
+// Each input value may be:
+// - "<name>/<ip>"
+// - "<name>"
+// - "<ip>"
+func ServersFromValues(values []string) map[string]any {
+	if len(values) == 0 {
+		return map[string]any{"servers": []map[string]any{}}
+	}
+
+	servers := make([]Server, 0, len(values))
+	for _, value := range values {
+		server, ok := serverFromValue(value)
+		if !ok {
+			continue
+		}
+		servers = append(servers, server)
+	}
+	return Servers(servers)
+}
+
 // QueryIdentity returns canonical query identity fields.
 //
 // Output keys:
@@ -203,6 +225,30 @@ func UniqueSortedEndpointNames(values []string) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+func serverFromValue(value string) (Server, bool) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return Server{}, false
+	}
+
+	if ip, err := netip.ParseAddr(value); err == nil {
+		return Server{Address: ip.String()}, true
+	}
+
+	sep := strings.LastIndex(value, "/")
+	if sep > 0 && sep < len(value)-1 {
+		namePart := strings.TrimSpace(value[:sep])
+		addressPart := strings.TrimSpace(value[sep+1:])
+		if namePart != "" && addressPart != "" {
+			if ip, err := netip.ParseAddr(addressPart); err == nil {
+				return Server{NS: namePart, Address: ip.String()}, true
+			}
+		}
+	}
+
+	return Server{NS: value}, true
 }
 
 func normalizeName(name string) string {

@@ -13,9 +13,9 @@ CMDS := gonemaster gonemaster-server gonemaster-client gonemaster-nagios
 CMD ?= all
 
 .PHONY: help build build-all test install ui-build ui-install ui-dev ui-test clean \
-	build-gonemaster build-gonemaster-server build-gonemaster-server-noui \
+	build-gonemaster build-gonemaster-badkeys-embed build-gonemaster-server build-gonemaster-server-noui \
 	build-gonemaster-server-badkeys-embed build-gonemaster-server-noui-badkeys-embed build-gonemaster-client \
-	build-gonemaster-nagios install-gonemaster install-gonemaster-server install-gonemaster-client \
+	build-gonemaster-nagios install-gonemaster install-gonemaster-badkeys-embed install-gonemaster-server install-gonemaster-client \
 	install-gonemaster-nagios ui-check test-go vet race \
 	spec-export-implemented spec-export-tags spec-export spec-validate spec-validate-scan spec-check \
 	spec-generate-tags spec-check-tags spec-export-log-args spec-check-coherency spec-check-i18n-placeholders \
@@ -34,6 +34,7 @@ help:
 	@echo "  ui-build         Build the embedded UI"
 	@echo "  ui-dev           Run the UI dev server"
 	@echo "  ui-test          Run UI tests"
+	@echo "  build-gonemaster-badkeys-embed  Build CLI with embedded badkeys blocklist"
 	@echo "  build-gonemaster-server-noui  Build API-only server (no npm/UI embed)"
 	@echo "  build-gonemaster-server-badkeys-embed  Build server with embedded badkeys blocklist (with UI)"
 	@echo "  build-gonemaster-server-noui-badkeys-embed  Build API-only server with embedded badkeys blocklist"
@@ -110,6 +111,9 @@ build: $(BIN_DIR)
 build-gonemaster: $(BIN_DIR)
 	$(GO) build -o $(BIN_DIR)/gonemaster ./cmd/gonemaster
 
+build-gonemaster-badkeys-embed: $(BIN_DIR) badkeys-update-embed
+	$(GO) build -tags badkeys_embed -o $(BIN_DIR)/gonemaster ./cmd/gonemaster
+
 build-gonemaster-server: $(BIN_DIR) ui-build
 	$(GO) build -o $(BIN_DIR)/gonemaster-server ./cmd/gonemaster-server
 
@@ -144,6 +148,9 @@ install:
 
 install-gonemaster:
 	$(GO) install ./cmd/gonemaster
+
+install-gonemaster-badkeys-embed: badkeys-update-embed
+	$(GO) install -tags badkeys_embed ./cmd/gonemaster
 
 install-gonemaster-server: ui-build
 	$(GO) install ./cmd/gonemaster-server

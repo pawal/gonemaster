@@ -8,13 +8,13 @@
     "logSystem(tag, args), logSystemWithLogger(..., tag, args)"
   ],
   "summary": {
-    "file_count": 93,
-    "log_call_count": 616,
-    "unique_tag_count": 424,
+    "file_count": 98,
+    "log_call_count": 628,
+    "unique_tag_count": 432,
     "unique_key_count": 77,
     "ns_string_call_count": 0,
     "packed_list_only_key_count": 0,
-    "unresolved_log_call_count": 118
+    "unresolved_log_call_count": 124
   },
   "keys": {
     "aa": {
@@ -224,19 +224,19 @@
         {
           "tag": "DNSKEY_SMALLER_THAN_REC",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 4571,
+          "line": 4599,
           "shape": "unknown"
         },
         {
           "tag": "DNSKEY_TOO_LARGE_FOR_ALGO",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 4577,
+          "line": 4605,
           "shape": "unknown"
         },
         {
           "tag": "DNSKEY_TOO_SMALL_FOR_ALGO",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 4565,
+          "line": 4593,
           "shape": "unknown"
         }
       ]
@@ -268,49 +268,49 @@
         {
           "tag": "DS08_ALGO_NOT_SUPPORTED_BY_ZM",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 2683,
+          "line": 2711,
           "shape": "unknown"
         },
         {
           "tag": "DS08_DNSKEY_RRSIG_EXPIRED",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 2652,
+          "line": 2680,
           "shape": "unknown"
         },
         {
           "tag": "DS08_DNSKEY_RRSIG_NOT_YET_VALID",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 2643,
+          "line": 2671,
           "shape": "unknown"
         },
         {
           "tag": "DS08_MISSING_RRSIG_IN_RESPONSE",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 2634,
+          "line": 2662,
           "shape": "unknown"
         },
         {
           "tag": "DS08_NO_MATCHING_DNSKEY",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 2661,
+          "line": 2689,
           "shape": "unknown"
         },
         {
           "tag": "DS08_RRSIG_NOT_VALID_BY_DNSKEY",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 2670,
+          "line": 2698,
           "shape": "unknown"
         },
         {
           "tag": "DS09_MISSING_RRSIG_IN_RESPONSE",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 2926,
+          "line": 2954,
           "shape": "unknown"
         },
         {
           "tag": "DS09_SOA_RRSIG_NOT_YET_VALID",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 2935,
+          "line": 2963,
           "shape": "unknown"
         }
       ]
@@ -345,49 +345,49 @@
         {
           "tag": "DS08_ALGO_NOT_SUPPORTED_BY_ZM",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 2683,
+          "line": 2711,
           "shape": "unknown"
         },
         {
           "tag": "DS08_DNSKEY_RRSIG_EXPIRED",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 2652,
+          "line": 2680,
           "shape": "unknown"
         },
         {
           "tag": "DS08_DNSKEY_RRSIG_NOT_YET_VALID",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 2643,
+          "line": 2671,
           "shape": "unknown"
         },
         {
           "tag": "DS08_MISSING_RRSIG_IN_RESPONSE",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 2634,
+          "line": 2662,
           "shape": "unknown"
         },
         {
           "tag": "DS08_NO_MATCHING_DNSKEY",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 2661,
+          "line": 2689,
           "shape": "unknown"
         },
         {
           "tag": "DS08_RRSIG_NOT_VALID_BY_DNSKEY",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 2670,
+          "line": 2698,
           "shape": "unknown"
         },
         {
           "tag": "DS09_MISSING_RRSIG_IN_RESPONSE",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 2926,
+          "line": 2954,
           "shape": "unknown"
         },
         {
           "tag": "DS09_SOA_RRSIG_NOT_YET_VALID",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 2935,
+          "line": 2963,
           "shape": "unknown"
         }
       ]
@@ -768,7 +768,7 @@
         {
           "tag": "RRSIG_EXPIRATION",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 1742,
+          "line": 1770,
           "shape": "unknown"
         }
       ]
@@ -1001,25 +1001,25 @@
         {
           "tag": "DURATION_LONG",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 1784,
+          "line": 1812,
           "shape": "unknown"
         },
         {
           "tag": "DURATION_OK",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 1795,
+          "line": 1823,
           "shape": "unknown"
         },
         {
           "tag": "REMAINING_LONG",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 1771,
+          "line": 1799,
           "shape": "unknown"
         },
         {
           "tag": "REMAINING_SHORT",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 1762,
+          "line": 1790,
           "shape": "unknown"
         }
       ]
@@ -1074,7 +1074,7 @@
         {
           "tag": "RRSIG_EXPIRED",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 1753,
+          "line": 1781,
           "shape": "unknown"
         }
       ]
@@ -1307,13 +1307,13 @@
         {
           "tag": "EXTRA_PROCESSING_BROKEN",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 2037,
+          "line": 2065,
           "shape": "int"
         },
         {
           "tag": "EXTRA_PROCESSING_OK",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 2029,
+          "line": 2057,
           "shape": "int"
         }
       ]
@@ -1335,19 +1335,19 @@
         {
           "tag": "DNSKEY_SMALLER_THAN_REC",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 4571,
+          "line": 4599,
           "shape": "unknown"
         },
         {
           "tag": "DNSKEY_TOO_LARGE_FOR_ALGO",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 4577,
+          "line": 4605,
           "shape": "unknown"
         },
         {
           "tag": "DNSKEY_TOO_SMALL_FOR_ALGO",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 4565,
+          "line": 4593,
           "shape": "unknown"
         }
       ]
@@ -1369,19 +1369,19 @@
         {
           "tag": "DNSKEY_SMALLER_THAN_REC",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 4571,
+          "line": 4599,
           "shape": "unknown"
         },
         {
           "tag": "DNSKEY_TOO_LARGE_FOR_ALGO",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 4577,
+          "line": 4605,
           "shape": "unknown"
         },
         {
           "tag": "DNSKEY_TOO_SMALL_FOR_ALGO",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 4565,
+          "line": 4593,
           "shape": "unknown"
         }
       ]
@@ -1403,19 +1403,19 @@
         {
           "tag": "DNSKEY_SMALLER_THAN_REC",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 4571,
+          "line": 4599,
           "shape": "unknown"
         },
         {
           "tag": "DNSKEY_TOO_LARGE_FOR_ALGO",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 4577,
+          "line": 4605,
           "shape": "unknown"
         },
         {
           "tag": "DNSKEY_TOO_SMALL_FOR_ALGO",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 4565,
+          "line": 4593,
           "shape": "unknown"
         }
       ]
@@ -1437,19 +1437,19 @@
         {
           "tag": "DNSKEY_SMALLER_THAN_REC",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 4571,
+          "line": 4599,
           "shape": "unknown"
         },
         {
           "tag": "DNSKEY_TOO_LARGE_FOR_ALGO",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 4577,
+          "line": 4605,
           "shape": "unknown"
         },
         {
           "tag": "DNSKEY_TOO_SMALL_FOR_ALGO",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 4565,
+          "line": 4593,
           "shape": "unknown"
         }
       ]
@@ -1511,49 +1511,49 @@
         {
           "tag": "DS08_DNSKEY_RRSIG_NOT_YET_VALID",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 2643,
+          "line": 2671,
           "shape": "unknown"
         },
         {
           "tag": "DS08_MISSING_RRSIG_IN_RESPONSE",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 2634,
+          "line": 2662,
           "shape": "unknown"
         },
         {
           "tag": "DURATION_LONG",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 1784,
+          "line": 1812,
           "shape": "unknown"
         },
         {
           "tag": "DURATION_OK",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 1795,
+          "line": 1823,
           "shape": "unknown"
         },
         {
           "tag": "REMAINING_LONG",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 1771,
+          "line": 1799,
           "shape": "unknown"
         },
         {
           "tag": "REMAINING_SHORT",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 1762,
+          "line": 1790,
           "shape": "unknown"
         },
         {
           "tag": "RRSIG_EXPIRATION",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 1742,
+          "line": 1770,
           "shape": "unknown"
         },
         {
           "tag": "RRSIG_EXPIRED",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 1753,
+          "line": 1781,
           "shape": "unknown"
         }
       ]
@@ -1594,7 +1594,7 @@
         {
           "tag": "prefix + \"_DISCOURAGED_DOUBLE_DASH\"",
           "file": "engine/test/syntax/syntax.go",
-          "line": 866,
+          "line": 869,
           "shape": "unknown"
         }
       ]
@@ -1614,13 +1614,13 @@
         {
           "tag": "RNAME_MAIL_DOMAIN_LOCALHOST",
           "file": "engine/test/syntax/syntax.go",
-          "line": 455,
+          "line": 458,
           "shape": "string"
         },
         {
           "tag": "RNAME_MAIL_DOMAIN_LOCALHOST",
           "file": "engine/test/syntax/syntax.go",
-          "line": 479,
+          "line": 482,
           "shape": "string"
         }
       ]
@@ -2630,19 +2630,19 @@
         {
           "tag": "RNAME_RFC822_INVALID",
           "file": "engine/test/syntax/syntax.go",
-          "line": 541,
+          "line": 544,
           "shape": "unknown"
         },
         {
           "tag": "RNAME_RFC822_INVALID",
           "file": "engine/test/syntax/syntax.go",
-          "line": 549,
+          "line": 552,
           "shape": "unknown"
         },
         {
           "tag": "RNAME_RFC822_VALID",
           "file": "engine/test/syntax/syntax.go",
-          "line": 656,
+          "line": 659,
           "shape": "unknown"
         },
         {
@@ -2736,13 +2736,13 @@
         {
           "tag": "EXTRA_PROCESSING_BROKEN",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 2037,
+          "line": 2065,
           "shape": "int"
         },
         {
           "tag": "EXTRA_PROCESSING_OK",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 2029,
+          "line": 2057,
           "shape": "int"
         }
       ]
@@ -2841,7 +2841,7 @@
         "engine/test/syntax/syntax.go",
         "engine/test/zone/zone.go"
       ],
-      "occurrences": 105,
+      "occurrences": 107,
       "samples": [
         {
           "tag": "TEST_CASE_END",
@@ -2908,7 +2908,7 @@
         {
           "tag": "prefix + \"_NUMERIC_TLD\"",
           "file": "engine/test/syntax/syntax.go",
-          "line": 880,
+          "line": 883,
           "shape": "unknown"
         }
       ]
@@ -2980,37 +2980,37 @@
         {
           "tag": "DURATION_LONG",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 1784,
+          "line": 1812,
           "shape": "unknown"
         },
         {
           "tag": "DURATION_OK",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 1795,
+          "line": 1823,
           "shape": "unknown"
         },
         {
           "tag": "REMAINING_LONG",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 1771,
+          "line": 1799,
           "shape": "unknown"
         },
         {
           "tag": "REMAINING_SHORT",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 1762,
+          "line": 1790,
           "shape": "unknown"
         },
         {
           "tag": "RRSIG_EXPIRATION",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 1742,
+          "line": 1770,
           "shape": "unknown"
         },
         {
           "tag": "RRSIG_EXPIRED",
           "file": "engine/test/dnssec/dnssec.go",
-          "line": 1753,
+          "line": 1781,
           "shape": "unknown"
         }
       ]
@@ -3246,37 +3246,37 @@
     {
       "tag": "IPV4_DISABLED",
       "file": "engine/test/consistency/consistency.go",
-      "line": 1254,
+      "line": 1248,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
       "tag": "IPV4_DISABLED",
       "file": "engine/test/delegation/delegation.go",
-      "line": 1058,
+      "line": 1056,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
       "tag": "IPV4_DISABLED",
       "file": "engine/test/dnssec/dnssec.go",
-      "line": 6536,
+      "line": 6916,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
       "tag": "IPV4_DISABLED",
       "file": "engine/test/dnssec/dnssec.go",
-      "line": 6560,
+      "line": 6940,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
       "tag": "IPV4_DISABLED",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 2152,
+      "line": 2150,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
       "tag": "IPV4_DISABLED",
       "file": "engine/test/syntax/syntax.go",
-      "line": 776,
+      "line": 779,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
@@ -3342,37 +3342,37 @@
     {
       "tag": "IPV6_DISABLED",
       "file": "engine/test/consistency/consistency.go",
-      "line": 1244,
+      "line": 1238,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
       "tag": "IPV6_DISABLED",
       "file": "engine/test/delegation/delegation.go",
-      "line": 1048,
+      "line": 1046,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
       "tag": "IPV6_DISABLED",
       "file": "engine/test/dnssec/dnssec.go",
-      "line": 6526,
+      "line": 6906,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
       "tag": "IPV6_DISABLED",
       "file": "engine/test/dnssec/dnssec.go",
-      "line": 6550,
+      "line": 6930,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
       "tag": "IPV6_DISABLED",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 2142,
+      "line": 2140,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
       "tag": "IPV6_DISABLED",
       "file": "engine/test/syntax/syntax.go",
-      "line": 784,
+      "line": 787,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
@@ -3504,7 +3504,7 @@
     {
       "tag": "NO_RESPONSE",
       "file": "engine/test/dnssec/dnssec.go",
-      "line": 4499,
+      "line": 4527,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
@@ -3540,7 +3540,7 @@
     {
       "tag": "NO_RESPONSE",
       "file": "engine/test/syntax/syntax.go",
-      "line": 516,
+      "line": 519,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"domain\": z.Name.String(),\n})"
     },
     {
@@ -3552,7 +3552,7 @@
     {
       "tag": "NO_RESPONSE_DNSKEY",
       "file": "engine/test/dnssec/dnssec.go",
-      "line": 4508,
+      "line": 4536,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
@@ -3730,6 +3730,24 @@
       "args_expr": "withNameserverArgs(server, nil)"
     },
     {
+      "tag": "a",
+      "file": "engine/badkeys/rsa_checks.go",
+      "line": 48,
+      "args_expr": "bigOne"
+    },
+    {
+      "tag": "dd",
+      "file": "engine/badkeys/rsa_checks.go",
+      "line": 159,
+      "args_expr": "d0"
+    },
+    {
+      "tag": "dd",
+      "file": "engine/badkeys/rsa_checks.go",
+      "line": 165,
+      "args_expr": "prevD"
+    },
+    {
       "tag": "fmt.Sprintf(\"%s_%s_RECORD_NOT_AA_%s\", prefix, qtype, protocol)",
       "file": "engine/test/connectivity/connectivity.go",
       "line": 721,
@@ -3764,6 +3782,24 @@
       "file": "engine/test/connectivity/connectivity.go",
       "line": 711,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"domain_found\":\t\tstrings.ToLower(rrOwner),\n\t\"domain_expected\":\tstrings.ToLower(expected),\n})"
+    },
+    {
+      "tag": "nn",
+      "file": "engine/badkeys/rsa_checks.go",
+      "line": 157,
+      "args_expr": "n0"
+    },
+    {
+      "tag": "nn",
+      "file": "engine/badkeys/rsa_checks.go",
+      "line": 164,
+      "args_expr": "prevN"
+    },
+    {
+      "tag": "xVal",
+      "file": "engine/badkeys/rsa_checks.go",
+      "line": 190,
+      "args_expr": "bigOne"
     }
   ]
 }

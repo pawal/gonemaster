@@ -79,14 +79,14 @@ _Do not edit by hand — regenerate with the command above._
 | `Z12_MULTIPLE_CSYNC` | `WARNING` | [zone12](../tests/zone/zone12.md) | yes |
 | `Z12_NO_CSYNC` | `INFO` | [zone12](../tests/zone/zone12.md) | yes |
 | `Z12_SERIAL_MISMATCH` | `WARNING` | [zone12](../tests/zone/zone12.md) | yes |
-| `Z13_NO_SPF_FOUND` | `INFO` | [zone13](../tests/zone/zone13.md) | no |
-| `Z13_SPF_LOOKUP_COUNT_EXCEEDED` | `WARNING` | [zone13](../tests/zone/zone13.md) | no |
-| `Z13_SPF_LOOKUP_COUNT_OK` | `INFO` | [zone13](../tests/zone/zone13.md) | no |
-| `Z13_SPF_LOOKUP_LOOP` | `WARNING` | [zone13](../tests/zone/zone13.md) | no |
-| `Z13_SPF_PTR_DEPRECATED` | `WARNING` | [zone13](../tests/zone/zone13.md) | no |
-| `Z13_SPF_RECURSIVE_ERROR` | `NOTICE` | [zone13](../tests/zone/zone13.md) | no |
-| `Z13_UNABLE_TO_CHECK` | `WARNING` | [zone13](../tests/zone/zone13.md) | no |
+| `Z13_NO_SPF_FOUND` | `INFO` | [zone13](../tests/zone/zone13.md) | yes |
+| `Z13_SPF_LOOKUP_COUNT_EXCEEDED` | `WARNING` | [zone13](../tests/zone/zone13.md) | yes |
+| `Z13_SPF_LOOKUP_COUNT_OK` | `INFO` | [zone13](../tests/zone/zone13.md) | yes |
+| `Z13_SPF_LOOKUP_LOOP` | `WARNING` | [zone13](../tests/zone/zone13.md) | yes |
+| `Z13_SPF_PTR_DEPRECATED` | `WARNING` | [zone13](../tests/zone/zone13.md) | yes |
+| `Z13_SPF_RECURSIVE_ERROR` | `NOTICE` | [zone13](../tests/zone/zone13.md) | yes |
+| `Z13_UNABLE_TO_CHECK` | `WARNING` | [zone13](../tests/zone/zone13.md) | yes |
 
 ## i18n Notes
 
-All tags have i18n coverage except Zone13 tags (pending Phase 2 translation work).
+All tags have i18n coverage and no stale entries found.

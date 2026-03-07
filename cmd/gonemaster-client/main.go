@@ -289,7 +289,7 @@ func parseGlobalFlags(args []string, errOut io.Writer) (globalOptions, []string,
 	}
 	fs.StringVar(&opts.server, "server", "", "Base server URL (default http://localhost:8080/api/v1)")
 	fs.DurationVar(&opts.timeout, "timeout", 30*time.Second, "HTTP timeout (default 30s)")
-	fs.StringVar(&opts.format, "format", defaultFormat, "Output format: pretty, json, jsonl")
+	fs.StringVar(&opts.format, "format", defaultFormat, "Output format: pretty, json, jsonl (or json-stream)")
 	fs.StringVar(&opts.output, "output", "", "Write output to file instead of stdout")
 	fs.StringVar(&opts.locale, "locale", "en", "Locale for translated messages")
 	fs.BoolVar(&opts.version, "version", false, "Print version and exit")
@@ -297,6 +297,9 @@ func parseGlobalFlags(args []string, errOut io.Writer) (globalOptions, []string,
 	fs.Var(&opts.headers, "header", "Extra HTTP header (repeatable, NAME:VALUE)")
 	if err := fs.Parse(args); err != nil {
 		return opts, nil, err
+	}
+	if opts.format == "json-stream" {
+		opts.format = "jsonl"
 	}
 	if opts.server == "" {
 		opts.server = defaultServer
@@ -310,7 +313,7 @@ func printUsage(out io.Writer) {
 	fmt.Fprintln(out, "Global options:")
 	fmt.Fprintln(out, "  --server URL     Base API URL (default http://localhost:8080/api/v1)")
 	fmt.Fprintln(out, "  --timeout DURATION  HTTP timeout (default 30s)")
-	fmt.Fprintln(out, "  --format FORMAT  Output format: pretty, json, jsonl")
+	fmt.Fprintln(out, "  --format FORMAT  Output format: pretty, json, jsonl (or json-stream)")
 	fmt.Fprintln(out, "  --output PATH    Write output to file instead of stdout")
 	fmt.Fprintln(out, "  --locale LOCALE  Locale for translated messages (default en)")
 	fmt.Fprintln(out, "  --version        Print version information and exit")
@@ -324,13 +327,28 @@ func printUsage(out io.Writer) {
 	fmt.Fprintln(out, "  queue pause|resume|reorder|remove")
 }
 
+func setSubcommandUsage(fs *flag.FlagSet) {
+	fs.Usage = func() {
+		out := fs.Output()
+		fmt.Fprintf(out, "Usage of %s:\n", fs.Name())
+		fs.VisitAll(func(f *flag.Flag) {
+			if bf, ok := f.Value.(boolFlag); ok && bf.IsBoolFlag() {
+				fmt.Fprintf(out, "  --%s\n    \t%s\n", f.Name, f.Usage)
+			} else {
+				name := strings.ToUpper(strings.ReplaceAll(f.Name, "-", "_"))
+				fmt.Fprintf(out, "  --%s %s\n    \t%s\n", f.Name, name, f.Usage)
+			}
+		})
+	}
+}
+
 func rejectSingleDashFlags(args []string) error {
 	for _, arg := range args {
 		if arg == "-" {
 			continue
 		}
 		if strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") {
-			return fmt.Errorf("use double-hyphen options (e.g. --server), not %q", arg)
+			return fmt.Errorf("use double-hyphen options (e.g. --%s), not %q", strings.TrimPrefix(arg, "-"), arg)
 		}
 	}
 	return nil
@@ -408,6 +426,17 @@ func openOutput(path string, fallback io.Writer) (io.Writer, func(), error) {
 }
 
 func parseWithReorderedFlags(fs *flag.FlagSet, args []string) error {
+	setSubcommandUsage(fs)
+	for _, arg := range args {
+		if arg == "-" || arg == "--" {
+			break
+		}
+		if strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") {
+			err := fmt.Errorf("use double-hyphen options (e.g. --%s), not %q", strings.TrimPrefix(arg, "-"), arg)
+			fmt.Fprintln(fs.Output(), err.Error())
+			return err
+		}
+	}
 	return fs.Parse(reorderFlags(fs, args))
 }
 

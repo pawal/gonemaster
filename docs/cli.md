@@ -231,7 +231,7 @@ gonemaster-client [global options] <command> [command options] [args]
 | --- | --- | --- |
 | `--server URL` | string | Base API URL (default `http://localhost:8080/api/v1`). |
 | `--timeout DURATION` | string | HTTP timeout (default `30s`). |
-| `--format FORMAT` | string | Output format: `pretty`, `json`, `jsonl`. |
+| `--format FORMAT` | string | Output format: `pretty`, `json`, `jsonl` (or `json-stream`). |
 | `--output PATH` | string | Write output to a file instead of stdout. |
 | `--locale LOCALE` | string | Locale for translated result messages (default `en`). |
 | `--version` | bool | Print version information and exit. |

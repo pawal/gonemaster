@@ -12,7 +12,7 @@ Both commands normalize IDN domains to IDNA A-labels (punycode) before use.
 ### Output formats
 - `pretty` (default): human-friendly text suitable for terminals.
 - `json`: a single JSON document.
-- `jsonl`: newline-delimited JSON (one object per line).
+- `jsonl` / `json-stream`: newline-delimited JSON (one object per line). The client uses `jsonl` via `--format jsonl`; the engine uses `--json-stream`.
 
 ### Exit codes
 - `0`: success

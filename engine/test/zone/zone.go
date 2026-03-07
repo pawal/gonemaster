@@ -1545,6 +1545,7 @@ func Zone12(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 
 	var hasCSYNC, noCSYNC int
 	csyncKeys := map[string]struct{}{}
+	var noCSYNCNames []string
 
 	for _, outcome := range outcomes {
 		if !outcome.checked {
@@ -1584,9 +1585,15 @@ func Zone12(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			csyncKeys[key] = struct{}{}
 		} else {
 			noCSYNC++
-			if err := appendLog(ctx, &results, testcase, "Z12_NO_CSYNC", withNameserverArgs(ns, nil)); err != nil {
-				return results, err
-			}
+			noCSYNCNames = append(noCSYNCNames, ns.NameString()+"/"+ns.AddressString())
+		}
+	}
+
+	if noCSYNC > 0 {
+		args := map[string]any{}
+		setTypedServersFromEndpoints(args, noCSYNCNames)
+		if err := appendLog(ctx, &results, testcase, "Z12_NO_CSYNC", args); err != nil {
+			return results, err
 		}
 	}
 

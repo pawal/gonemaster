@@ -32,7 +32,7 @@ Status: Final
        - If the SOA serial was retrieved, evaluate CSYNC serial against SOA serial:
          - When `soaminimum` flag is set (bit 1), emit `Z12_SERIAL_MISMATCH` only if `csync soaserial` is greater than current SOA serial.
          - When `soaminimum` flag is not set, emit `Z12_SERIAL_MISMATCH` if `csync soaserial` differs from current SOA serial.
-     - Else (zero CSYNC records) emit `Z12_NO_CSYNC` (`ns`).
+     - Else (zero CSYNC records) collect nameserver for consolidated `Z12_NO_CSYNC`.
    - If at least one nameserver has CSYNC and at least one has no CSYNC, emit `Z12_MIXED_PRESENCE`.
    - If more than one nameserver has CSYNC and the CSYNC content differs across them, emit `Z12_INCONSISTENT_CSYNC`.
 5. Emit `TEST_CASE_END`.
@@ -48,7 +48,7 @@ CSYNC content identity is determined by comparing the concatenation of `soaseria
 | `Z12_INCONSISTENT_CSYNC` | CSYNC content differs across authoritative nameservers. |
 | `Z12_MIXED_PRESENCE` | CSYNC present on some nameservers but absent on others. |
 | `Z12_MULTIPLE_CSYNC` | More than one CSYNC RR found at zone apex on this nameserver. |
-| `Z12_NO_CSYNC` | No CSYNC record found at zone apex on this nameserver. |
+| `Z12_NO_CSYNC` | No CSYNC record found at zone apex (consolidated across all nameservers without CSYNC). |
 | `Z12_SERIAL_MISMATCH` | CSYNC soaserial fails RFC 7477 serial precondition against current SOA serial from the same nameserver. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
@@ -70,8 +70,7 @@ CSYNC content identity is determined by comparing the concatenation of `soaseria
 | `Z12_MULTIPLE_CSYNC` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `Z12_MULTIPLE_CSYNC` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `Z12_MULTIPLE_CSYNC` | `count` | `int` | Number of CSYNC records returned. |
-| `Z12_NO_CSYNC` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
-| `Z12_NO_CSYNC` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `Z12_NO_CSYNC` | `servers` | `array` | Structured list of nameserver endpoints (name + address) without CSYNC. |
 | `Z12_SERIAL_MISMATCH` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `Z12_SERIAL_MISMATCH` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `Z12_SERIAL_MISMATCH` | `csync_serial` | `uint32` | The serial carried in the CSYNC `soaserial` field. |

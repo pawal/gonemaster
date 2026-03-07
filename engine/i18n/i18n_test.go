@@ -69,7 +69,7 @@ func TestTranslateEnglishFallbackAndLocaleNormalization(t *testing.T) {
 
 func TestTranslateJapaneseUsesLocaleCatalog(t *testing.T) {
 	out := Translate("ja", "zone", "Z12_NO_CSYNC", map[string]any{
-		"ns": "ns1.example",
+		"servers": "ns1.example/192.0.2.1",
 	})
 	if out == "" {
 		t.Fatal("expected japanese translation")
@@ -78,7 +78,7 @@ func TestTranslateJapaneseUsesLocaleCatalog(t *testing.T) {
 		t.Fatalf("expected non-english translation, got %q", out)
 	}
 	if !strings.Contains(out, "ns1.example") {
-		t.Fatalf("expected interpolation to include ns argument, got %q", out)
+		t.Fatalf("expected interpolation to include servers argument, got %q", out)
 	}
 }
 

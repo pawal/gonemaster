@@ -31,9 +31,10 @@ Status: Final
      - Increment `responseCount`.
      - If response has `RA=1`, set `hasSeenRA=true`.
      - If response `RCODE` is `NXDOMAIN`, increment `nxdomainCount`.
-   - If `hasSeenRA=true` or (`responseCount>0` and `nxdomainCount==responseCount`), emit `IS_A_RECURSOR` and set `isNoRecursor=false`.
-   - If `isNoRecursor` is still true, emit `NO_RECURSOR`.
-4. Emit `TEST_CASE_END`.
+   - If `hasSeenRA=true` or (`responseCount>0` and `nxdomainCount==responseCount`), record server as recursor and set `isNoRecursor=false`.
+   - If `isNoRecursor` is still true, record server as non-recursor.
+4. After all parallel tasks, emit a single consolidated `IS_A_RECURSOR` with `servers` list (if any), and a single consolidated `NO_RECURSOR` with `servers` list (if any).
+5. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
@@ -55,10 +56,8 @@ Status: Final
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`A`). |
-| `IS_A_RECURSOR` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) classified as recursor. |
-| `IS_A_RECURSOR` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `NO_RECURSOR` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) classified as non-recursor. |
-| `NO_RECURSOR` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `IS_A_RECURSOR` | `servers` | `array<object>` | Structured sorted list of nameservers classified as recursors (`{ns}`, `{address}` items). |
+| `NO_RECURSOR` | `servers` | `array<object>` | Structured sorted list of nameservers classified as non-recursors (`{ns}`, `{address}` items). |
 | `NO_RESPONSE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with missing response. |
 | `NO_RESPONSE` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `NO_RESPONSE` | `domain` | `string` | Probe name queried. |

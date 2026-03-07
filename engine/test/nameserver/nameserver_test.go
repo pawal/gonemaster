@@ -135,33 +135,31 @@ func TestNameserver01ParallelQueries(t *testing.T) {
 		t.Fatalf("nameserver01 did not finish")
 	}
 
-	var order []string
-	var addresses []string
+	var found *logger.Entry
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "IS_A_RECURSOR" {
 			continue
 		}
-		if _, ok := entry.Args["arg_schema"]; ok {
-			t.Fatalf("did not expect arg_schema in args: %#v", entry.Args["arg_schema"])
+		if found != nil {
+			t.Fatalf("expected single consolidated IS_A_RECURSOR entry, got multiple")
 		}
-		if ns, ok := entry.Args["ns"].(string); ok {
-			if strings.Contains(ns, "/") {
-				t.Fatalf("expected nameserver-only ns argument, got %q", ns)
-			}
-			order = append(order, ns)
-		}
-		if address, ok := entry.Args["address"].(string); ok {
-			addresses = append(addresses, address)
-		}
+		found = entry
 	}
-	if len(order) != 2 {
-		t.Fatalf("expected 2 recursor entries, got %v", order)
+	if found == nil {
+		t.Fatalf("expected IS_A_RECURSOR entry, got none")
 	}
-	if order[0] != "ns1.example" || order[1] != "ns2.example" {
-		t.Fatalf("expected deterministic log order, got %v", order)
+	servers, ok := found.Args["servers"].([]map[string]any)
+	if !ok {
+		t.Fatalf("expected servers array in IS_A_RECURSOR args, got %#v", found.Args)
 	}
-	if len(addresses) != 2 || addresses[0] != "192.0.2.1" || addresses[1] != "192.0.2.2" {
-		t.Fatalf("expected deterministic address order, got %v", addresses)
+	if len(servers) != 2 {
+		t.Fatalf("expected 2 servers in consolidated entry, got %d", len(servers))
+	}
+	if servers[0]["ns"] != "ns1.example" || servers[1]["ns"] != "ns2.example" {
+		t.Fatalf("expected sorted ns1/ns2, got %v", servers)
+	}
+	if servers[0]["address"] != "192.0.2.1" || servers[1]["address"] != "192.0.2.2" {
+		t.Fatalf("expected addresses 192.0.2.1/192.0.2.2, got %v", servers)
 	}
 }
 

@@ -22,10 +22,11 @@ Status: Final
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `AXFR`, then skip.
    - Attempt AXFR for zone name.
    - Capture first RR returned by AXFR callback and stop callback immediately.
-   - If AXFR call returns an error, emit `AXFR_FAILURE`.
-   - Else if first RR is an `SOA`, emit `AXFR_AVAILABLE`.
-   - Else (AXFR succeeded but first RR is not `SOA`): emit no tag for this nameserver.
-4. Emit `TEST_CASE_END`.
+   - If AXFR call returns an error, record server as AXFR failure.
+   - Else if first RR is an `SOA`, record server as AXFR available.
+   - Else (AXFR succeeded but first RR is not `SOA`): no record for this nameserver.
+4. After all parallel tasks, emit a single consolidated `AXFR_FAILURE` with `servers` list (if any), and a single consolidated `AXFR_AVAILABLE` with `servers` list (if any).
+5. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
@@ -40,10 +41,8 @@ Status: Final
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
-| `AXFR_AVAILABLE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) allowing AXFR. |
-| `AXFR_AVAILABLE` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `AXFR_FAILURE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) where AXFR failed. |
-| `AXFR_FAILURE` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `AXFR_AVAILABLE` | `servers` | `array<object>` | Structured sorted list of nameservers allowing AXFR (`{ns}`, `{address}` items). |
+| `AXFR_FAILURE` | `servers` | `array<object>` | Structured sorted list of nameservers where AXFR failed (`{ns}`, `{address}` items). |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`AXFR`). |

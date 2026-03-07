@@ -25,9 +25,10 @@ Status: Final
    - Query `randomized` with rrtype `SOA`.
    - If response exists and question section is non-empty:
      - Compare first question name (trim trailing dot) to `randomized`.
-     - If equal, emit `QNAME_CASE_SENSITIVE`.
-     - Else, emit `QNAME_CASE_INSENSITIVE`.
-6. Emit `TEST_CASE_END`.
+     - If equal, record server as case-sensitive.
+     - Else, record server as case-insensitive.
+6. After all parallel tasks, emit a single consolidated `QNAME_CASE_SENSITIVE` with `servers` and `domain` (if any), and a single consolidated `QNAME_CASE_INSENSITIVE` with `servers` and `domain` (if any).
+7. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
@@ -48,11 +49,9 @@ Status: Final
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA`). |
-| `QNAME_CASE_INSENSITIVE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with case-insensitive echo behavior. |
-| `QNAME_CASE_INSENSITIVE` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `QNAME_CASE_INSENSITIVE` | `servers` | `array<object>` | Structured sorted list of nameservers with case-insensitive echo behavior (`{ns}`, `{address}` items). |
 | `QNAME_CASE_INSENSITIVE` | `domain` | `string` | Randomized query name used for check. |
-| `QNAME_CASE_SENSITIVE` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with case-preserving echo behavior. |
-| `QNAME_CASE_SENSITIVE` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `QNAME_CASE_SENSITIVE` | `servers` | `array<object>` | Structured sorted list of nameservers with case-preserving echo behavior (`{ns}`, `{address}` items). |
 | `QNAME_CASE_SENSITIVE` | `domain` | `string` | Randomized query name used for check. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Nameserver08`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Nameserver08`). |
@@ -70,7 +69,7 @@ Status: Final
 ## Differences From Upstream
 - Upstream reference: [`nameserver08.md`](../../upstream/tests/Nameserver-TP/nameserver08.md)
 - Differences (Upstream vs Gonemaster):
-  - Upstream: describes a failure condition; messaging detail is not defined. Gonemaster: emits per-server explicit tags `QNAME_CASE_SENSITIVE` and `QNAME_CASE_INSENSITIVE`.
+  - Upstream: describes a failure condition; messaging detail is not defined. Gonemaster: emits consolidated `QNAME_CASE_SENSITIVE` and `QNAME_CASE_INSENSITIVE` tags with server lists.
   - Upstream: describes querying unique nameserver IPs. Gonemaster: deduplicates by `name/ip` and then queries.
   - Upstream: does not explicitly describe testcase boundary and transport-disabled debug emissions. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
 - Potential upstream report:

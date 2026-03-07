@@ -25,8 +25,8 @@ Status: Final
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `NS`, mark not included in summary, and skip.
    - Mark nameserver as included.
    - Query qname `.` rrtype `NS`.
-   - If response exists and authority section contains `NS` records, emit `UPWARD_REFERRAL` and mark error.
-5. After all tasks, if at least one nameserver was included and no errors were marked, emit `NO_UPWARD_REFERRAL` with sorted unique nameserver names.
+   - If response exists and authority section contains `NS` records, record server as having upward referral.
+5. After all tasks, emit a single consolidated `UPWARD_REFERRAL` with `servers` list (if any), or a single `NO_UPWARD_REFERRAL` with `servers` list (if at least one nameserver was included and none had errors).
 6. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
@@ -49,11 +49,10 @@ Status: Final
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`NS`). |
-| `NO_UPWARD_REFERRAL` | `servers` | `array<object>` | Structured sorted unique nameserver names as `{ns}` items. |
+| `NO_UPWARD_REFERRAL` | `servers` | `array<object>` | Structured sorted list of nameservers without upward referral (`{ns}`, `{address}` items). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Nameserver07`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Nameserver07`). |
-| `UPWARD_REFERRAL` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) returning upward referral. |
-| `UPWARD_REFERRAL` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `UPWARD_REFERRAL` | `servers` | `array<object>` | Structured sorted list of nameservers returning upward referral (`{ns}`, `{address}` items). |
 | `UPWARD_REFERRAL_IRRELEVANT` | `-` | `-` | No arguments. |
 
 ## Severity Levels Per Tag
@@ -79,4 +78,4 @@ Status: Final
 ## Edge Cases And Limitations
 - Query failures or missing responses do not produce dedicated failure tags in this testcase.
 - If all nameservers are skipped (disabled transport), `NO_UPWARD_REFERRAL` is not emitted.
-- The summary uses nameserver names (`servers` with `{ns}` items), while per-finding tag uses singular endpoint identity (`ns` + `address`).
+- Both `UPWARD_REFERRAL` and `NO_UPWARD_REFERRAL` now use consolidated `servers` lists with `{ns}` and `{address}` items.

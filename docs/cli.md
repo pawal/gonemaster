@@ -23,11 +23,12 @@ Both commands normalize IDN domains to IDNA A-labels (punycode) before use.
 
 ### Synopsis
 ```
-gonemaster --domain DOMAIN [options]
+gonemaster [flags] [DOMAIN]
 ```
 
 Notes:
-- `--domain` is required for test runs.
+- `DOMAIN` can be provided as a positional argument or via `--domain`.
+- `--domain` (or positional `DOMAIN`) is required for test runs.
 - `--version` and `--list-tests` do not require `--domain`.
 - `--dump-profile` can be used without `--domain`.
 - malformed undelegated inputs (`--ns`, `--ds`) return exit code `2`.
@@ -55,8 +56,9 @@ Use `--output PATH` to write the selected output to a file.
 For machine consumption, use `--json` or `--json-stream`.
 
 For migrated coherent entries:
-- `args.ns` is nameserver name only.
-- `args.address` is the nameserver IP address.
+- `args.ns` is nameserver name only (per-nameserver tags).
+- `args.address` is the nameserver IP address (per-nameserver tags).
+- `args.servers` is a structured array of `{ns, address}` objects (consolidated tags that report on multiple nameservers).
 - `args.asns` is a typed array of ASN integers when ASN data is emitted.
 
 Legacy keys can still appear on non-migrated tags during migration. Prefer the
@@ -73,6 +75,7 @@ v1.1 keys above when they are present. See:
 | `--testcase TESTCASE` | string | Run a single testcase (optional). |
 | `--profile PATH` | string | Profile file in JSON or YAML (optional). |
 | `--min-level LEVEL` | string | Minimum log level (default `NOTICE`). One of `DEBUG3`, `DEBUG2`, `DEBUG`, `INFO`, `NOTICE`, `WARNING`, `ERROR`, `CRITICAL`. |
+| `--stop-level LEVEL` | string | Stop the run after the first log entry at `LEVEL` or higher. Same values as `--min-level`. |
 | `--output PATH` | string | Write output to a file instead of stdout. |
 | `--raw` | bool | Stream raw log entries. Incompatible with `--json` and `--json-stream`. |
 | `--json` | bool | Print a single JSON array. Incompatible with `--raw` and `--json-stream`. |
@@ -84,6 +87,7 @@ v1.1 keys above when they are present. See:
 | `--locale LOCALE` | string | Locale for translated output (defaults to environment, then `en`). |
 | `--no-ipv4` | bool | Disable IPv4 queries (overrides profile setting). |
 | `--no-ipv6` | bool | Disable IPv6 queries (overrides profile setting). |
+| `--ipv6` | bool | Force IPv6 queries (overrides profile setting). |
 | `--parallel N` | int | Override `resolver.defaults.parallel`. Must be `>= 1` when set. |
 | `--unordered` | bool | Allow unordered resolver behavior (overrides `resolver.defaults.unordered`). |
 | `--ordered` | bool | Force ordered resolver behavior (overrides `resolver.defaults.unordered`). |
@@ -92,6 +96,8 @@ v1.1 keys above when they are present. See:
 | `--retrans N` | int | Override `resolver.defaults.retrans` in seconds. Must be `>= 0` when set. |
 | `--fallback` | bool | Enable TCP fallback on UDP failure (overrides `resolver.defaults.fallback`). |
 | `--no-fallback` | bool | Disable TCP fallback on UDP failure (overrides `resolver.defaults.fallback`). |
+| `--sourceaddr4 IPADDR` | string | Override `resolver.source4` (IPv4 source address for outgoing queries). |
+| `--sourceaddr6 IPADDR` | string | Override `resolver.source6` (IPv6 source address for outgoing queries). |
 | `--error-cache-ttl N` | int | Seconds to skip queries after network errors. Must be `>= 0` when set. |
 | `--positive-cache-ttl N` | int | Seconds to cache positive DNS responses. Must be `>= 0` when set. |
 | `--negative-cache-ttl N` | int | Seconds to cache negative DNS responses. Must be `>= 0` when set. |
@@ -107,12 +113,12 @@ v1.1 keys above when they are present. See:
 
 Run a full test with human-readable output:
 ```
-gonemaster --domain example.com
+gonemaster example.com
 ```
 
 Run a single module and testcase:
 ```
-gonemaster --module address --testcase address01 --domain example.com
+gonemaster --module address --testcase address01 example.com
 ```
 
 JSON output, formatted with `jq`:
@@ -228,6 +234,7 @@ gonemaster-client [global options] <command> [command options] [args]
 | `--format FORMAT` | string | Output format: `pretty`, `json`, `jsonl`. |
 | `--output PATH` | string | Write output to a file instead of stdout. |
 | `--locale LOCALE` | string | Locale for translated result messages (default `en`). |
+| `--version` | bool | Print version information and exit. |
 | `--no-color` | bool | Disable ANSI colors in `pretty` output. |
 | `--header NAME:VALUE` | string | Extra HTTP header (repeatable). |
 

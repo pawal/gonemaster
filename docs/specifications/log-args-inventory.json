@@ -14,7 +14,7 @@
     "unique_key_count": 80,
     "ns_string_call_count": 0,
     "packed_list_only_key_count": 0,
-    "unresolved_log_call_count": 125
+    "unresolved_log_call_count": 124
   },
   "keys": {
     "aa": {
@@ -1623,7 +1623,7 @@
         {
           "tag": "Z13_SPF_LOOKUP_COUNT_EXCEEDED",
           "file": "engine/test/zone/zone.go",
-          "line": 1731,
+          "line": 1758,
           "shape": "unknown"
         }
       ]
@@ -1669,7 +1669,7 @@
         {
           "tag": "Z13_SPF_LOOKUP_LOOP",
           "file": "engine/test/zone/zone.go",
-          "line": 1713,
+          "line": 1740,
           "shape": "unknown"
         }
       ]
@@ -2858,7 +2858,7 @@
         {
           "tag": "Z13_SPF_RECURSIVE_ERROR",
           "file": "engine/test/zone/zone.go",
-          "line": 1722,
+          "line": 1749,
           "shape": "unknown"
         }
       ]
@@ -3351,13 +3351,13 @@
     {
       "tag": "IPV4_DISABLED",
       "file": "engine/test/zone/zone.go",
-      "line": 1899,
+      "line": 1926,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
       "tag": "IPV4_DISABLED",
       "file": "engine/test/zone/zone.go",
-      "line": 1923,
+      "line": 1950,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
@@ -3447,13 +3447,13 @@
     {
       "tag": "IPV6_DISABLED",
       "file": "engine/test/zone/zone.go",
-      "line": 1889,
+      "line": 1916,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
       "tag": "IPV6_DISABLED",
       "file": "engine/test/zone/zone.go",
-      "line": 1913,
+      "line": 1940,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
@@ -3781,21 +3781,15 @@
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"rcode\": resp.Rcode(),\n})"
     },
     {
-      "tag": "Z12_CSYNC_FOUND",
-      "file": "engine/test/zone/zone.go",
-      "line": 1592,
-      "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"serial\":\tcsync.CSYNC.Serial,\n\t\"flags\":\tcsync.CSYNC.Flags,\n\t\"type_bitmap\":\ttypeBitmap,\n})"
-    },
-    {
       "tag": "Z12_MULTIPLE_CSYNC",
       "file": "engine/test/zone/zone.go",
-      "line": 1580,
+      "line": 1589,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"count\": len(outcome.csyncRRs),\n})"
     },
     {
       "tag": "Z12_SERIAL_MISMATCH",
       "file": "engine/test/zone/zone.go",
-      "line": 1600,
+      "line": 1602,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"csync_serial\":\tcsync.CSYNC.Serial,\n\t\"soa_serial\":\toutcome.soaSerial,\n})"
     },
     {

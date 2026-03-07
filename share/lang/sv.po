@@ -2268,11 +2268,11 @@ msgstr ""
 
 msgctxt "NAMESERVER:AXFR_AVAILABLE"
 msgid "The following nameservers allow zone transfer using AXFR: {servers}."
-msgstr "The following nameservers allow zone transfer using AXFR: {servers}."
+msgstr "Följande namnservrar tillåter zonöverföringar med AXFR: {servers}."
 
 msgctxt "NAMESERVER:AXFR_FAILURE"
 msgid "AXFR not available on the following nameservers: {servers}."
-msgstr "AXFR not available on the following nameservers: {servers}."
+msgstr "AXFR är inte tillgänglig från följande namnservrar: {servers}."
 
 msgctxt "NAMESERVER:BREAKS_ON_EDNS"
 msgid "No response from {ns}/{address} when EDNS is used in query asking for {domain}."
@@ -2373,7 +2373,7 @@ msgstr "Följande namnservrar stöder EDNS0: {servers}."
 
 msgctxt "NAMESERVER:IS_A_RECURSOR"
 msgid "The following nameservers are recursors: {servers}."
-msgstr "The following nameservers are recursors: {servers}."
+msgstr "Följande namnservrar är rekursiva resolvers: {servers}."
 
 msgctxt "NAMESERVER:MISSING_OPT_IN_TRUNCATED"
 msgid ""
@@ -2389,7 +2389,7 @@ msgstr "Namnservern {ns}/{address} stöder inte EDNS0 (svarar med 'FORMERR')."
 
 msgctxt "NAMESERVER:NO_RECURSOR"
 msgid "The following nameservers are not recursors: {servers}."
-msgstr "The following nameservers are not recursors: {servers}."
+msgstr "Följande namnservrar är inte rekursiva resolvers: {servers}."
 
 msgctxt "NAMESERVER:NO_RESOLUTION"
 msgid "No nameserver was successfully resolved to an IP address."
@@ -2559,11 +2559,11 @@ msgstr ""
 
 msgctxt "NAMESERVER:QNAME_CASE_INSENSITIVE"
 msgid "The following nameservers do not preserve original case of the queried name ({domain}): {servers}."
-msgstr "The following nameservers do not preserve original case of the queried name ({domain}): {servers}."
+msgstr "Följande namnservrar bevarar inte skillnaden mellan versaler och gemener från frågan ({domain}): {servers}."
 
 msgctxt "NAMESERVER:QNAME_CASE_SENSITIVE"
 msgid "The following nameservers preserve original case of queried names ({domain}): {servers}."
-msgstr "The following nameservers preserve original case of queried names ({domain}): {servers}."
+msgstr "Följande namnservrar bevarade versaler och gemener från frågan ({domain}): {servers}."
 
 msgctxt "NAMESERVER:SAME_SOURCE_IP"
 msgid "All nameservers reply with same IP used to query them."
@@ -2572,7 +2572,7 @@ msgstr ""
 
 msgctxt "NAMESERVER:UPWARD_REFERRAL"
 msgid "The following nameservers return an upward referral: {servers}."
-msgstr "The following nameservers return an upward referral: {servers}."
+msgstr "Följande namnservrar skickade en hänvisning till moderzonen: {servers}."
 
 msgctxt "NAMESERVER:UPWARD_REFERRAL_IRRELEVANT"
 msgid "Upward referral tests skipped for root zone."
@@ -2659,7 +2659,7 @@ msgstr "Namnserver '{domain}' finns under en helnumerisk TLD ('{tld}')."
 
 msgctxt "SYNTAX:NAMESERVER_SYNTAX_OK"
 msgid "The following nameservers have valid syntax: {servers}."
-msgstr "The following nameservers have valid syntax: {servers}."
+msgstr "Följande namnservrar har giltig syntax: {servers}."
 
 msgctxt "SYNTAX:NON_ALLOWED_CHARS"
 msgid "Found illegal characters in the domain name ({domain})."
@@ -3050,12 +3050,8 @@ msgstr ""
 "policys."
 
 msgctxt "ZONE:Z12_CSYNC_FOUND"
-msgid ""
-"CSYNC record found at zone apex on name server {ns}/{address} with SOA serial "
-"{serial}, flags {flags}, and type bitmap {type_bitmap}."
-msgstr ""
-"CSYNC-post hittad vid zoneapex på namnserver {ns}/{address} med SOA-serienummer {serial}, "
-"flaggor {flags} och typbitmap {type_bitmap}."
+msgid "CSYNC record found at zone apex on the following nameservers with SOA serial {serial}, flags {flags}, and type bitmap {type_bitmap}: {servers}."
+msgstr "CSYNC-post hittad vid zoneapex på följande namnservrar med SOA-serienummer {serial}, flaggor {flags} och typbitmap {type_bitmap}: {servers}."
 
 msgctxt "ZONE:Z12_INCONSISTENT_CSYNC"
 msgid "CSYNC record content differs across authoritative name servers."

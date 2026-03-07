@@ -1566,8 +1566,17 @@ func Zone12(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		results = append(results, entries...)
 	}
 
+	type csyncGroup struct {
+		serial      uint32
+		flags       uint16
+		typeBitmap  string
+		endpoints   []string
+	}
+
 	var hasCSYNC, noCSYNC int
 	csyncKeys := map[string]struct{}{}
+	csyncGroups := map[string]*csyncGroup{}
+	var csyncGroupOrder []string
 	var noCSYNCNames []string
 
 	for _, outcome := range outcomes {
@@ -1589,13 +1598,6 @@ func Zone12(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 				continue
 			}
 			typeBitmap := csyncTypeBitmap(csync.CSYNC.TypeBitMap)
-			if err := appendLog(ctx, &results, testcase, "Z12_CSYNC_FOUND", withNameserverArgs(ns, map[string]any{
-				"serial":      csync.CSYNC.Serial,
-				"flags":       csync.CSYNC.Flags,
-				"type_bitmap": typeBitmap,
-			})); err != nil {
-				return results, err
-			}
 			if outcome.soaOK && csyncSerialMismatch(csync.CSYNC.Serial, csync.CSYNC.Flags, outcome.soaSerial) {
 				if err := appendLog(ctx, &results, testcase, "Z12_SERIAL_MISMATCH", withNameserverArgs(ns, map[string]any{
 					"csync_serial": csync.CSYNC.Serial,
@@ -1606,9 +1608,34 @@ func Zone12(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			}
 			key := fmt.Sprintf("%d/%d/%v", csync.CSYNC.Serial, csync.CSYNC.Flags, csync.CSYNC.TypeBitMap)
 			csyncKeys[key] = struct{}{}
+			endpoint := ns.NameString() + "/" + ns.AddressString()
+			if g, ok := csyncGroups[key]; ok {
+				g.endpoints = append(g.endpoints, endpoint)
+			} else {
+				csyncGroups[key] = &csyncGroup{
+					serial:     csync.CSYNC.Serial,
+					flags:      csync.CSYNC.Flags,
+					typeBitmap: typeBitmap,
+					endpoints:  []string{endpoint},
+				}
+				csyncGroupOrder = append(csyncGroupOrder, key)
+			}
 		} else {
 			noCSYNC++
 			noCSYNCNames = append(noCSYNCNames, ns.NameString()+"/"+ns.AddressString())
+		}
+	}
+
+	for _, key := range csyncGroupOrder {
+		g := csyncGroups[key]
+		args := map[string]any{
+			"serial":      g.serial,
+			"flags":       g.flags,
+			"type_bitmap": g.typeBitmap,
+		}
+		setTypedServersFromEndpoints(args, g.endpoints)
+		if err := appendLog(ctx, &results, testcase, "Z12_CSYNC_FOUND", args); err != nil {
+			return results, err
 		}
 	}
 

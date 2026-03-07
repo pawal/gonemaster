@@ -1067,7 +1067,7 @@ msgstr "ネームサーバー名 ({domain}) が数字のみの TLD ({tld}) 配�
 
 msgctxt "SYNTAX:NAMESERVER_SYNTAX_OK"
 msgid "The following nameservers have valid syntax: {servers}."
-msgstr "The following nameservers have valid syntax: {servers}."
+msgstr "以下のネームサーバー名の構文は有効です: {servers}。"
 
 msgctxt "SYNTAX:NON_ALLOWED_CHARS"
 msgid "Found illegal characters in the domain name ({domain})."
@@ -1147,12 +1147,8 @@ msgid ""
 msgstr "ドメイン名 ({domain}) のラベル ({label}) がハイフン ('-') で終わっています。"
 
 msgctxt "ZONE:Z12_CSYNC_FOUND"
-msgid ""
-"CSYNC record found at zone apex on name server {ns}/{address} with SOA serial "
-"{serial}, flags {flags}, and type bitmap {type_bitmap}."
-msgstr ""
-"ネームサーバー {ns}/{address} のゾーン頂点で CSYNC レコードを検出しました。"
-"SOA シリアル: {serial}、フラグ: {flags}、タイプビットマップ: {type_bitmap}。"
+msgid "CSYNC record found at zone apex on the following nameservers with SOA serial {serial}, flags {flags}, and type bitmap {type_bitmap}: {servers}."
+msgstr "以下のネームサーバーのゾーン頂点で CSYNC レコードを検出しました。SOA シリアル: {serial}、フラグ: {flags}、タイプビットマップ: {type_bitmap}: {servers}。"
 
 msgctxt "ZONE:Z12_INCONSISTENT_CSYNC"
 msgid "CSYNC record content differs across authoritative name servers."
@@ -1339,11 +1335,11 @@ msgstr "ネームサーバー {ns}/{address} は A クエリに予期しない R
 
 msgctxt "NAMESERVER:AXFR_AVAILABLE"
 msgid "The following nameservers allow zone transfer using AXFR: {servers}."
-msgstr "The following nameservers allow zone transfer using AXFR: {servers}."
+msgstr "以下のネームサーバーは AXFR によるゾーン転送を許可しています: {servers}。"
 
 msgctxt "NAMESERVER:AXFR_FAILURE"
 msgid "AXFR not available on the following nameservers: {servers}."
-msgstr "AXFR not available on the following nameservers: {servers}."
+msgstr "以下のネームサーバーでは AXFR が利用できません: {servers}。"
 
 msgctxt "NAMESERVER:CAN_BE_RESOLVED"
 msgid "All nameservers succeeded to resolve to an IP address."
@@ -1418,7 +1414,7 @@ msgstr ""
 
 msgctxt "NAMESERVER:IS_A_RECURSOR"
 msgid "The following nameservers are recursors: {servers}."
-msgstr "The following nameservers are recursors: {servers}."
+msgstr "以下のネームサーバーは再帰リゾルバとして動作しています: {servers}。"
 
 msgctxt "NAMESERVER:MISSING_OPT_IN_TRUNCATED"
 msgid ""
@@ -1548,7 +1544,7 @@ msgstr ""
 
 msgctxt "NAMESERVER:NO_RECURSOR"
 msgid "The following nameservers are not recursors: {servers}."
-msgstr "The following nameservers are not recursors: {servers}."
+msgstr "以下のネームサーバーは再帰リゾルバではありません: {servers}。"
 
 msgctxt "NAMESERVER:NO_RESOLUTION"
 msgid "No nameserver was successfully resolved to an IP address."
@@ -1565,11 +1561,11 @@ msgstr "次のネームサーバーはいずれも上位リファラルを返し
 
 msgctxt "NAMESERVER:QNAME_CASE_INSENSITIVE"
 msgid "The following nameservers do not preserve original case of the queried name ({domain}): {servers}."
-msgstr "The following nameservers do not preserve original case of the queried name ({domain}): {servers}."
+msgstr "以下のネームサーバーは問い合わせ名 ({domain}) の元の大文字小文字を保持しません: {servers}。"
 
 msgctxt "NAMESERVER:QNAME_CASE_SENSITIVE"
 msgid "The following nameservers preserve original case of queried names ({domain}): {servers}."
-msgstr "The following nameservers preserve original case of queried names ({domain}): {servers}."
+msgstr "以下のネームサーバーは問い合わせ名 ({domain}) の大文字小文字を保持します: {servers}。"
 
 msgctxt "NAMESERVER:SAME_SOURCE_IP"
 msgid "All nameservers reply with same IP used to query them."
@@ -1577,7 +1573,7 @@ msgstr "すべてのネームサーバーが問い合わせ先と同じ IP ア�
 
 msgctxt "NAMESERVER:UPWARD_REFERRAL"
 msgid "The following nameservers return an upward referral: {servers}."
-msgstr "The following nameservers return an upward referral: {servers}."
+msgstr "以下のネームサーバーは上位リファラルを返します: {servers}。"
 
 msgctxt "NAMESERVER:UPWARD_REFERRAL_IRRELEVANT"
 msgid "Upward referral tests skipped for root zone."

@@ -28,11 +28,12 @@ Status: Final
    - For each nameserver that returned an authoritative NOERROR response:
      - If the CSYNC RRset has more than one record, emit `Z12_MULTIPLE_CSYNC` (`ns`, `count`).
      - Else if exactly one CSYNC record is present:
-       - Emit `Z12_CSYNC_FOUND` (`ns`, `serial`, `flags`, `type_bitmap`).
+       - Group nameserver for consolidated `Z12_CSYNC_FOUND` by CSYNC content (`serial`, `flags`, `type_bitmap`).
        - If the SOA serial was retrieved, evaluate CSYNC serial against SOA serial:
          - When `soaminimum` flag is set (bit 1), emit `Z12_SERIAL_MISMATCH` only if `csync soaserial` is greater than current SOA serial.
          - When `soaminimum` flag is not set, emit `Z12_SERIAL_MISMATCH` if `csync soaserial` differs from current SOA serial.
      - Else (zero CSYNC records) collect nameserver for consolidated `Z12_NO_CSYNC`.
+   - Emit consolidated `Z12_CSYNC_FOUND` for each distinct CSYNC content group, with `servers` list, `serial`, `flags`, and `type_bitmap`.
    - If at least one nameserver has CSYNC and at least one has no CSYNC, emit `Z12_MIXED_PRESENCE`.
    - If more than one nameserver has CSYNC and the CSYNC content differs across them, emit `Z12_INCONSISTENT_CSYNC`.
 5. Emit `TEST_CASE_END`.
@@ -44,7 +45,7 @@ CSYNC content identity is determined by comparing the concatenation of `soaseria
 | --- | --- |
 | `IPV4_DISABLED` | IPv4 nameserver evaluation is skipped because IPv4 is disabled. |
 | `IPV6_DISABLED` | IPv6 nameserver evaluation is skipped because IPv6 is disabled. |
-| `Z12_CSYNC_FOUND` | CSYNC record found at zone apex on this nameserver. |
+| `Z12_CSYNC_FOUND` | CSYNC record found at zone apex (consolidated per distinct CSYNC content). |
 | `Z12_INCONSISTENT_CSYNC` | CSYNC content differs across authoritative nameservers. |
 | `Z12_MIXED_PRESENCE` | CSYNC present on some nameservers but absent on others. |
 | `Z12_MULTIPLE_CSYNC` | More than one CSYNC RR found at zone apex on this nameserver. |
@@ -62,8 +63,7 @@ CSYNC content identity is determined by comparing the concatenation of `soaseria
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`CSYNC`). |
-| `Z12_CSYNC_FOUND` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
-| `Z12_CSYNC_FOUND` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `Z12_CSYNC_FOUND` | `servers` | `array<object>` | Structured sorted list of nameservers with this CSYNC content (`{ns}`, `{address}` items). |
 | `Z12_CSYNC_FOUND` | `serial` | `uint32` | SOA serial from the CSYNC `soaserial` field. |
 | `Z12_CSYNC_FOUND` | `flags` | `uint16` | CSYNC flags field (bit 0 = `immediate`, bit 1 = `soaminimum`). |
 | `Z12_CSYNC_FOUND` | `type_bitmap` | `string` | Semicolon-separated DNS type names from the CSYNC TypeBitMap (e.g. `NS;A;AAAA`). |

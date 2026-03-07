@@ -2,15 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [v1.1.2] 2026-03-07
+
+ **BREAKING CHANGE**: More spammy log entries consolidated
 
 ### Added
 
- - Zone13: SPF DNS lookup count validation per RFC 7208 Section 4.6.4 
+ - Zone13: New SPF test
 
 ### Changed
 
- - Consolidated the CSYNC log messages
+ - Zone12: Consolidated the CSYNC log messages
+ - Consolidated output from the logs in Nameserver01, 02, 07, and 08
 
 ## [v1.1.1] - 2026-03-06
 

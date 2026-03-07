@@ -14,7 +14,7 @@
     "unique_key_count": 77,
     "ns_string_call_count": 0,
     "packed_list_only_key_count": 0,
-    "unresolved_log_call_count": 124
+    "unresolved_log_call_count": 123
   },
   "keys": {
     "aa": {
@@ -3282,13 +3282,13 @@
     {
       "tag": "IPV4_DISABLED",
       "file": "engine/test/zone/zone.go",
-      "line": 1666,
+      "line": 1673,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
       "tag": "IPV4_DISABLED",
       "file": "engine/test/zone/zone.go",
-      "line": 1690,
+      "line": 1697,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
@@ -3378,13 +3378,13 @@
     {
       "tag": "IPV6_DISABLED",
       "file": "engine/test/zone/zone.go",
-      "line": 1656,
+      "line": 1663,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
       "tag": "IPV6_DISABLED",
       "file": "engine/test/zone/zone.go",
-      "line": 1680,
+      "line": 1687,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
@@ -3702,25 +3702,19 @@
     {
       "tag": "Z12_CSYNC_FOUND",
       "file": "engine/test/zone/zone.go",
-      "line": 1568,
+      "line": 1569,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"serial\":\tcsync.CSYNC.Serial,\n\t\"flags\":\tcsync.CSYNC.Flags,\n\t\"type_bitmap\":\ttypeBitmap,\n})"
     },
     {
       "tag": "Z12_MULTIPLE_CSYNC",
       "file": "engine/test/zone/zone.go",
-      "line": 1556,
+      "line": 1557,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"count\": len(outcome.csyncRRs),\n})"
-    },
-    {
-      "tag": "Z12_NO_CSYNC",
-      "file": "engine/test/zone/zone.go",
-      "line": 1587,
-      "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
       "tag": "Z12_SERIAL_MISMATCH",
       "file": "engine/test/zone/zone.go",
-      "line": 1576,
+      "line": 1577,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"csync_serial\":\tcsync.CSYNC.Serial,\n\t\"soa_serial\":\toutcome.soaSerial,\n})"
     },
     {

@@ -10,39 +10,39 @@ import (
 type DatabaseConfig struct {
 	// Driver selects the storage backend: "memory" (default), "sqlite",
 	// "postgres", or "mariadb".
-	Driver string
+	Driver string `json:"driver,omitempty"`
 	// DSN is the data source name. For sqlite this is a file path.
 	// For postgres/mariadb this is a connection string. Empty for memory.
-	DSN string
+	DSN string `json:"dsn,omitempty"`
 }
 
 // Config controls HTTP server behavior.
 type Config struct {
-	ListenAddr  string
-	MaxBodySize int64
-	Debug       bool
-	WorkerCount int
+	ListenAddr  string `json:"listen_addr"`
+	MaxBodySize int64  `json:"max_body_size"`
+	Debug       bool   `json:"debug"`
+	WorkerCount int    `json:"worker_count"`
 	// MaxConcurrentJobs caps engine runs across workers when >0.
-	MaxConcurrentJobs int
+	MaxConcurrentJobs int `json:"max_concurrent_jobs"`
 	// PositiveCacheTTL overrides resolver.defaults.positive_cache_ttl when set.
-	PositiveCacheTTL *int
+	PositiveCacheTTL *int `json:"positive_cache_ttl,omitempty"`
 	// NegativeCacheTTL overrides resolver.defaults.negative_cache_ttl when set.
-	NegativeCacheTTL *int
+	NegativeCacheTTL *int `json:"negative_cache_ttl,omitempty"`
 	// Timeout overrides resolver.defaults.timeout when set (seconds).
-	Timeout *int
+	Timeout *int `json:"timeout,omitempty"`
 	// Retry overrides resolver.defaults.retry when set.
-	Retry *int
+	Retry *int `json:"retry,omitempty"`
 	// Retrans overrides resolver.defaults.retrans when set (seconds).
-	Retrans *int
+	Retrans *int `json:"retrans,omitempty"`
 	// Fallback overrides resolver.defaults.fallback when set.
-	Fallback *bool
+	Fallback *bool `json:"fallback,omitempty"`
 	// SourceAddr4 overrides resolver.source4 when set.
-	SourceAddr4 *string
+	SourceAddr4 *string `json:"source_addr4,omitempty"`
 	// SourceAddr6 overrides resolver.source6 when set.
-	SourceAddr6 *string
-	MinLevel    string
-	ProfilePath string
-	Database    DatabaseConfig
+	SourceAddr6 *string `json:"source_addr6,omitempty"`
+	MinLevel    string  `json:"min_level"`
+	ProfilePath string  `json:"profile_path,omitempty"`
+	Database    DatabaseConfig `json:"database,omitempty"`
 }
 
 // DatabaseFileConfig holds optional database configuration from JSON.

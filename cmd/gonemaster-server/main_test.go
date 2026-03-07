@@ -110,6 +110,24 @@ func TestRunVersion(t *testing.T) {
 	}
 }
 
+func TestRunDumpConfig(t *testing.T) {
+	out := newTempFile(t)
+	errOut := newTempFile(t)
+	defer cleanupTempFile(t, out)
+	defer cleanupTempFile(t, errOut)
+
+	code := run([]string{"--dump-config", "--workers", "8", "--debug"}, out, errOut)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	outText := readTempFile(t, out)
+	for _, want := range []string{`"worker_count": 8`, `"debug": true`, `"listen_addr":`} {
+		if !strings.Contains(outText, want) {
+			t.Fatalf("expected %q in dump-config output, got:\n%s", want, outText)
+		}
+	}
+}
+
 func TestRunSourceAddr6Validation(t *testing.T) {
 	out := newTempFile(t)
 	errOut := newTempFile(t)

@@ -78,6 +78,7 @@ type TestCasesVars struct {
 	Zone04   Zone04Vars   `json:"zone04"`
 	Zone05   Zone05Vars   `json:"zone05"`
 	Zone06   Zone06Vars   `json:"zone06"`
+	Zone13   Zone13Vars   `json:"zone13"`
 }
 
 // DNSSEC04Vars holds profile tunables for DNSSEC04 checks.
@@ -106,6 +107,11 @@ type Zone05Vars struct {
 type Zone06Vars struct {
 	SOADefaultTTLMaximumValue int `json:"SOA_DEFAULT_TTL_MAXIMUM_VALUE"`
 	SOADefaultTTLMinimumValue int `json:"SOA_DEFAULT_TTL_MINIMUM_VALUE"`
+}
+
+// Zone13Vars holds profile tunables for Zone13 (SPF DNS lookup count) checks.
+type Zone13Vars struct {
+	SPFLookupLimit int `json:"SPF_LOOKUP_LIMIT"`
 }
 
 // LogFilterRule mirrors the logfilter rule structure.

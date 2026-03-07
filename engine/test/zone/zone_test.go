@@ -789,3 +789,231 @@ func TestZone12MixedPresence(t *testing.T) {
 		t.Fatalf("expected Z12_MIXED_PRESENCE")
 	}
 }
+
+// --- Zone13 tests ---
+
+// spfTxtPacket creates an authoritative TXT response with an SPF record.
+func spfTxtPacket(name string, spf string) packet.Packet {
+	return txtPacket(name, spf)
+}
+
+// recurseTxtPacket creates a non-authoritative TXT response (for recursive lookups).
+func recurseTxtPacket(name string, value string) packet.Packet {
+	msg := new(dns.Msg)
+	dnsutil.SetQuestion(msg, dnsutil.Fqdn(name), dns.TypeTXT)
+	msg.Rcode = dns.RcodeSuccess
+	txtRR := &dns.TXT{Hdr: dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET, TTL: 60}}
+	txtRR.Txt = []string{value}
+	msg.Answer = []dns.RR{txtRR}
+	return packet.Packet{Msg: msg}
+}
+
+func setupZone13(t *testing.T) {
+	t.Helper()
+	setupTest(t)
+	origQueryAuth := queryAuth
+	origRecurse := recurse
+	t.Cleanup(func() {
+		queryAuth = origQueryAuth
+		recurse = origRecurse
+	})
+}
+
+func TestZone13LookupCountOK_NoLookups(t *testing.T) {
+	setupZone13(t)
+
+	queryAuth = func(_ context.Context, _ *zonepkg.Zone, _ string, _ string) (packet.Packet, error) {
+		return spfTxtPacket("example.com", "v=spf1 ip4:192.0.2.0/24 ip6:2001:db8::/32 -all"), nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example.com")}
+	entries, err := Zone13(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone13: %v", err)
+	}
+	if !hasEntryTag(entries, "Z13_SPF_LOOKUP_COUNT_OK") {
+		t.Fatalf("expected Z13_SPF_LOOKUP_COUNT_OK")
+	}
+	for _, e := range entries {
+		if e != nil && e.Tag == "Z13_SPF_LOOKUP_COUNT_OK" {
+			if count, ok := e.Args["count"].(int); !ok || count != 0 {
+				t.Fatalf("expected count=0, got %v", e.Args["count"])
+			}
+		}
+	}
+}
+
+func TestZone13LookupCountOK_Boundary(t *testing.T) {
+	setupZone13(t)
+
+	// SPF with exactly 10 mechanisms that require DNS: a, mx, include (with 7 mechanisms inside)
+	queryAuth = func(_ context.Context, _ *zonepkg.Zone, _ string, _ string) (packet.Packet, error) {
+		return spfTxtPacket("example.com", "v=spf1 a mx include:other.example.com -all"), nil
+	}
+	recurse = func(_ context.Context, _ *zonepkg.Zone, name string, _ string) (packet.Packet, error) {
+		if strings.HasPrefix(name, "other.example.com") {
+			// 7 more lookups inside: a mx exists:x1 exists:x2 exists:x3 exists:x4 exists:x5
+			return recurseTxtPacket("other.example.com", "v=spf1 a mx exists:x1.example.com exists:x2.example.com exists:x3.example.com exists:x4.example.com exists:x5.example.com -all"), nil
+		}
+		return packet.Packet{}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example.com")}
+	entries, err := Zone13(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone13: %v", err)
+	}
+	if !hasEntryTag(entries, "Z13_SPF_LOOKUP_COUNT_OK") {
+		t.Fatalf("expected Z13_SPF_LOOKUP_COUNT_OK, got tags: %v", entryTags(entries))
+	}
+	for _, e := range entries {
+		if e != nil && e.Tag == "Z13_SPF_LOOKUP_COUNT_OK" {
+			if count, ok := e.Args["count"].(int); !ok || count != 10 {
+				t.Fatalf("expected count=10, got %v", e.Args["count"])
+			}
+		}
+	}
+}
+
+func TestZone13LookupCountExceeded(t *testing.T) {
+	setupZone13(t)
+
+	// SPF with 11 mechanisms: a mx ptr exists:x1 ... exists:x8
+	queryAuth = func(_ context.Context, _ *zonepkg.Zone, _ string, _ string) (packet.Packet, error) {
+		return spfTxtPacket("example.com", "v=spf1 a mx ptr exists:x1.example.com exists:x2.example.com exists:x3.example.com exists:x4.example.com exists:x5.example.com exists:x6.example.com exists:x7.example.com exists:x8.example.com -all"), nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example.com")}
+	entries, err := Zone13(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone13: %v", err)
+	}
+	if !hasEntryTag(entries, "Z13_SPF_LOOKUP_COUNT_EXCEEDED") {
+		t.Fatalf("expected Z13_SPF_LOOKUP_COUNT_EXCEEDED, got tags: %v", entryTags(entries))
+	}
+	// Also should get ptr deprecated
+	if !hasEntryTag(entries, "Z13_SPF_PTR_DEPRECATED") {
+		t.Fatalf("expected Z13_SPF_PTR_DEPRECATED")
+	}
+}
+
+func TestZone13IncludeLoop(t *testing.T) {
+	setupZone13(t)
+
+	queryAuth = func(_ context.Context, _ *zonepkg.Zone, _ string, _ string) (packet.Packet, error) {
+		return spfTxtPacket("example.com", "v=spf1 include:loop.example.com -all"), nil
+	}
+	recurse = func(_ context.Context, _ *zonepkg.Zone, name string, _ string) (packet.Packet, error) {
+		if strings.HasPrefix(name, "loop.example.com") {
+			return recurseTxtPacket("loop.example.com", "v=spf1 include:loop.example.com -all"), nil
+		}
+		return packet.Packet{}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example.com")}
+	entries, err := Zone13(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone13: %v", err)
+	}
+	if !hasEntryTag(entries, "Z13_SPF_LOOKUP_LOOP") {
+		t.Fatalf("expected Z13_SPF_LOOKUP_LOOP, got tags: %v", entryTags(entries))
+	}
+}
+
+func TestZone13RecursiveError(t *testing.T) {
+	setupZone13(t)
+
+	queryAuth = func(_ context.Context, _ *zonepkg.Zone, _ string, _ string) (packet.Packet, error) {
+		return spfTxtPacket("example.com", "v=spf1 include:missing.example.com -all"), nil
+	}
+	recurse = func(_ context.Context, _ *zonepkg.Zone, _ string, _ string) (packet.Packet, error) {
+		return packet.Packet{}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example.com")}
+	entries, err := Zone13(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone13: %v", err)
+	}
+	if !hasEntryTag(entries, "Z13_SPF_RECURSIVE_ERROR") {
+		t.Fatalf("expected Z13_SPF_RECURSIVE_ERROR, got tags: %v", entryTags(entries))
+	}
+}
+
+func TestZone13PtrDeprecated(t *testing.T) {
+	setupZone13(t)
+
+	queryAuth = func(_ context.Context, _ *zonepkg.Zone, _ string, _ string) (packet.Packet, error) {
+		return spfTxtPacket("example.com", "v=spf1 ptr -all"), nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example.com")}
+	entries, err := Zone13(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone13: %v", err)
+	}
+	if !hasEntryTag(entries, "Z13_SPF_PTR_DEPRECATED") {
+		t.Fatalf("expected Z13_SPF_PTR_DEPRECATED")
+	}
+	if !hasEntryTag(entries, "Z13_SPF_LOOKUP_COUNT_OK") {
+		t.Fatalf("expected Z13_SPF_LOOKUP_COUNT_OK")
+	}
+}
+
+func TestZone13NoSpfFound(t *testing.T) {
+	setupZone13(t)
+
+	queryAuth = func(_ context.Context, _ *zonepkg.Zone, _ string, _ string) (packet.Packet, error) {
+		msg := new(dns.Msg)
+		dnsutil.SetQuestion(msg, "example.com.", dns.TypeTXT)
+		msg.Authoritative = true
+		msg.Rcode = dns.RcodeSuccess
+		return packet.Packet{Msg: msg}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example.com")}
+	entries, err := Zone13(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone13: %v", err)
+	}
+	if !hasEntryTag(entries, "Z13_NO_SPF_FOUND") {
+		t.Fatalf("expected Z13_NO_SPF_FOUND, got tags: %v", entryTags(entries))
+	}
+}
+
+func TestZone13CustomLimit(t *testing.T) {
+	setupZone13(t)
+
+	profile.Effective().TestCasesVars.Zone13.SPFLookupLimit = 5
+
+	// SPF with 6 mechanisms: a mx exists:x1 exists:x2 exists:x3 exists:x4
+	queryAuth = func(_ context.Context, _ *zonepkg.Zone, _ string, _ string) (packet.Packet, error) {
+		return spfTxtPacket("example.com", "v=spf1 a mx exists:x1.example.com exists:x2.example.com exists:x3.example.com exists:x4.example.com -all"), nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example.com")}
+	entries, err := Zone13(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone13: %v", err)
+	}
+	if !hasEntryTag(entries, "Z13_SPF_LOOKUP_COUNT_EXCEEDED") {
+		t.Fatalf("expected Z13_SPF_LOOKUP_COUNT_EXCEEDED with limit=5, got tags: %v", entryTags(entries))
+	}
+	for _, e := range entries {
+		if e != nil && e.Tag == "Z13_SPF_LOOKUP_COUNT_EXCEEDED" {
+			if limit, ok := e.Args["limit"].(int); !ok || limit != 5 {
+				t.Fatalf("expected limit=5, got %v", e.Args["limit"])
+			}
+		}
+	}
+}
+
+func entryTags(entries []*logger.Entry) []string {
+	var tags []string
+	for _, e := range entries {
+		if e != nil {
+			tags = append(tags, e.Tag)
+		}
+	}
+	return tags
+}

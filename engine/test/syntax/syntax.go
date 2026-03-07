@@ -337,7 +337,25 @@ func Syntax04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		if err != nil {
 			return results, err
 		}
-		results = append(results, entries...)
+
+		// Consolidate NAMESERVER_SYNTAX_OK entries into a single message with servers list.
+		var okNames []string
+		for _, entry := range entries {
+			if entry != nil && entry.Tag == "NAMESERVER_SYNTAX_OK" {
+				if domain, ok := entry.Args["domain"].(string); ok {
+					okNames = append(okNames, domain)
+				}
+				continue
+			}
+			results = append(results, entry)
+		}
+		if len(okNames) > 0 {
+			sort.Strings(okNames)
+			args := logargs.ServersFromValues(okNames)
+			if err := appendLog(ctx, &results, testcase, "NAMESERVER_SYNTAX_OK", args); err != nil {
+				return results, err
+			}
+		}
 	}
 
 	return appendTestCaseEnd(ctx, results, testcase)

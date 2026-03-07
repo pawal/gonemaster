@@ -2607,8 +2607,8 @@ msgid "Nameserver ({domain}) within a 'numeric only' TLD ({tld})."
 msgstr "Navnetjener ({domain}) er i et helnumerisk TLD ({tld})."
 
 msgctxt "SYNTAX:NAMESERVER_SYNTAX_OK"
-msgid "Nameserver ({domain}) syntax is valid."
-msgstr "Navnetjener ({domain}) har gyldig syntaks."
+msgid "The following nameservers have valid syntax: {servers}."
+msgstr "The following nameservers have valid syntax: {servers}."
 
 msgctxt "SYNTAX:NON_ALLOWED_CHARS"
 msgid "Found illegal characters in the domain name ({domain})."

@@ -1066,8 +1066,8 @@ msgid "Nameserver ({domain}) within a 'numeric only' TLD ({tld})."
 msgstr "ネームサーバー名 ({domain}) が数字のみの TLD ({tld}) 配下にあります。"
 
 msgctxt "SYNTAX:NAMESERVER_SYNTAX_OK"
-msgid "Nameserver ({domain}) syntax is valid."
-msgstr "ネームサーバー名 ({domain}) の構文は有効です。"
+msgid "The following nameservers have valid syntax: {servers}."
+msgstr "The following nameservers have valid syntax: {servers}."
 
 msgctxt "SYNTAX:NON_ALLOWED_CHARS"
 msgid "Found illegal characters in the domain name ({domain})."

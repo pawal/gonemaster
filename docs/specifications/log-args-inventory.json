@@ -9,12 +9,12 @@
   ],
   "summary": {
     "file_count": 98,
-    "log_call_count": 636,
-    "unique_tag_count": 439,
+    "log_call_count": 637,
+    "unique_tag_count": 440,
     "unique_key_count": 80,
     "ns_string_call_count": 0,
     "packed_list_only_key_count": 0,
-    "unresolved_log_call_count": 124
+    "unresolved_log_call_count": 125
   },
   "keys": {
     "aa": {
@@ -1603,7 +1603,7 @@
         {
           "tag": "prefix + \"_DISCOURAGED_DOUBLE_DASH\"",
           "file": "engine/test/syntax/syntax.go",
-          "line": 869,
+          "line": 887,
           "shape": "unknown"
         }
       ]
@@ -1643,13 +1643,13 @@
         {
           "tag": "RNAME_MAIL_DOMAIN_LOCALHOST",
           "file": "engine/test/syntax/syntax.go",
-          "line": 458,
+          "line": 476,
           "shape": "string"
         },
         {
           "tag": "RNAME_MAIL_DOMAIN_LOCALHOST",
           "file": "engine/test/syntax/syntax.go",
-          "line": 482,
+          "line": 500,
           "shape": "string"
         }
       ]
@@ -2667,31 +2667,31 @@
         {
           "tag": "RNAME_MISUSED_AT_SIGN",
           "file": "engine/test/syntax/syntax.go",
-          "line": 369,
+          "line": 387,
           "shape": "unknown"
         },
         {
           "tag": "RNAME_NO_AT_SIGN",
           "file": "engine/test/syntax/syntax.go",
-          "line": 373,
+          "line": 391,
           "shape": "unknown"
         },
         {
           "tag": "RNAME_RFC822_INVALID",
           "file": "engine/test/syntax/syntax.go",
-          "line": 544,
+          "line": 562,
           "shape": "unknown"
         },
         {
           "tag": "RNAME_RFC822_INVALID",
           "file": "engine/test/syntax/syntax.go",
-          "line": 552,
+          "line": 570,
           "shape": "unknown"
         },
         {
           "tag": "RNAME_RFC822_VALID",
           "file": "engine/test/syntax/syntax.go",
-          "line": 659,
+          "line": 677,
           "shape": "unknown"
         },
         {
@@ -2977,7 +2977,7 @@
         {
           "tag": "prefix + \"_NUMERIC_TLD\"",
           "file": "engine/test/syntax/syntax.go",
-          "line": 883,
+          "line": 901,
           "shape": "unknown"
         }
       ]
@@ -3345,7 +3345,7 @@
     {
       "tag": "IPV4_DISABLED",
       "file": "engine/test/syntax/syntax.go",
-      "line": 779,
+      "line": 797,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
@@ -3441,7 +3441,7 @@
     {
       "tag": "IPV6_DISABLED",
       "file": "engine/test/syntax/syntax.go",
-      "line": 787,
+      "line": 805,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
@@ -3497,6 +3497,12 @@
       "file": "engine/test/zone/zone.go",
       "line": 1255,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"count\": len(records),\n})"
+    },
+    {
+      "tag": "NAMESERVER_SYNTAX_OK",
+      "file": "engine/test/syntax/syntax.go",
+      "line": 355,
+      "args_expr": "args"
     },
     {
       "tag": "NO_A_RECORDS",
@@ -3609,7 +3615,7 @@
     {
       "tag": "NO_RESPONSE",
       "file": "engine/test/syntax/syntax.go",
-      "line": 519,
+      "line": 537,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"domain\": z.Name.String(),\n})"
     },
     {

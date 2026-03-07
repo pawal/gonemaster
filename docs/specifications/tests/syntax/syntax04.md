@@ -21,8 +21,9 @@ Status: Final
    - Emit `NAMESERVER_NON_ALLOWED_CHARS` if any label has disallowed characters.
    - Emit `NAMESERVER_DISCOURAGED_DOUBLE_DASH` for non-ACE `--` in positions 3 and 4.
    - Emit `NAMESERVER_NUMERIC_TLD` for all-numeric TLD.
-   - Emit `NAMESERVER_SYNTAX_OK` only if no prior issue tag was emitted for that name.
-5. Emit `TEST_CASE_END`.
+   - Record name as syntax-OK if no prior issue tag was emitted for that name.
+5. After all parallel tasks, emit a single consolidated `NAMESERVER_SYNTAX_OK` with `servers` list of all names that passed checks (if any).
+6. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
@@ -42,7 +43,7 @@ Status: Final
 | `NAMESERVER_NON_ALLOWED_CHARS` | `domain` | `string` | Nameserver hostname with disallowed characters. |
 | `NAMESERVER_NUMERIC_TLD` | `domain` | `string` | Nameserver hostname being checked. |
 | `NAMESERVER_NUMERIC_TLD` | `tld` | `string` | Numeric TLD label. |
-| `NAMESERVER_SYNTAX_OK` | `domain` | `string` | Nameserver hostname that passed checks. |
+| `NAMESERVER_SYNTAX_OK` | `servers` | `array<object>` | Structured sorted list of nameserver hostnames that passed checks (`{ns}` items). |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Syntax04`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Syntax04`). |
 

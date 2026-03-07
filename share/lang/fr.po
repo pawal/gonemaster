@@ -3200,8 +3200,8 @@ msgstr ""
 "Le serveur de noms ({domain}) se trouve dans un TLD 'numeric only' ({tld})."
 
 msgctxt "SYNTAX:NAMESERVER_SYNTAX_OK"
-msgid "Nameserver ({domain}) syntax is valid."
-msgstr "La syntaxe du nom du serveur de noms ({domain}) est valide."
+msgid "The following nameservers have valid syntax: {servers}."
+msgstr "The following nameservers have valid syntax: {servers}."
 
 msgctxt "SYNTAX:NON_ALLOWED_CHARS"
 msgid "Found illegal characters in the domain name ({domain})."

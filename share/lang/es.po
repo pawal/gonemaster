@@ -2763,8 +2763,8 @@ msgstr ""
 "numérico' ({tld})."
 
 msgctxt "SYNTAX:NAMESERVER_SYNTAX_OK"
-msgid "Nameserver ({domain}) syntax is valid."
-msgstr "La sintaxis del servidor de nombres ({domain}) es válida."
+msgid "The following nameservers have valid syntax: {servers}."
+msgstr "The following nameservers have valid syntax: {servers}."
 
 msgctxt "SYNTAX:NON_ALLOWED_CHARS"
 msgid "Found illegal characters in the domain name ({domain})."

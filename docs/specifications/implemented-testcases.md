@@ -115,4 +115,5 @@ make spec-export-implemented
 - zone10 — Validate SOA answer-shape correctness on nameservers: response presence, SOA presence, owner name correctness, and multiplicity.
 - zone11 — Validate SPF policy publication at zone apex
 - zone12 — Check existence and RFC 7477 compliance of the CSYNC RR at the zone apex.
+- zone13 — Validate SPF DNS lookup count at zone apex per RFC 7208 Section 4.6.4.
 

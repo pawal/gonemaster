@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
+	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 )
 
@@ -331,10 +332,10 @@ func TestRunEngineForJobPassesSourceAddrOverrides(t *testing.T) {
 func TestDNSQueryCounterCallback(t *testing.T) {
 	counter := &dnsQueryCounter{}
 	entries := []*logger.Entry{
-		{Tag: "EXTERNAL_QUERY", Args: map[string]any{"ip": "192.0.2.10"}},
-		{Tag: "external_query", Args: map[string]any{"ip": "2001:db8::10"}},
-		{Tag: "EXTERNAL_QUERY", Args: map[string]any{"ip": "not-an-ip"}},
-		{Tag: "EXTERNAL_RESPONSE", Args: map[string]any{"ip": "198.51.100.20"}},
+		{Tag: "EXTERNAL_QUERY", Args: map[string]any{logargs.KeyAddress: "192.0.2.10"}},
+		{Tag: "external_query", Args: map[string]any{logargs.KeyAddress: "2001:db8::10"}},
+		{Tag: "EXTERNAL_QUERY", Args: map[string]any{logargs.KeyAddress: "not-an-ip"}},
+		{Tag: "EXTERNAL_RESPONSE", Args: map[string]any{logargs.KeyAddress: "198.51.100.20"}},
 	}
 	for _, entry := range entries {
 		if err := counter.Callback(entry); err != nil {

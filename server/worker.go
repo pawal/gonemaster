@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
+	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 )
@@ -352,7 +353,7 @@ func dnsQueryAddrFromArgs(args map[string]any) (netip.Addr, bool) {
 	if len(args) == 0 {
 		return netip.Addr{}, false
 	}
-	value, ok := args["ip"]
+	value, ok := args[logargs.KeyAddress]
 	if !ok {
 		return netip.Addr{}, false
 	}

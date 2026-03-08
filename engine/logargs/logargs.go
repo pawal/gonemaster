@@ -8,6 +8,11 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 )
 
+// KeyAddress is the canonical log-entry key for an endpoint IP address.
+// It is exported so that both producers (engine) and consumers (metrics)
+// stay in sync when the key name changes.
+const KeyAddress = "address"
+
 // Server represents a nameserver endpoint using canonical key names.
 type Server struct {
 	NS      string
@@ -45,7 +50,7 @@ func SetNS(args map[string]any, name string, address string) {
 		args["ns"] = name
 	}
 	if address != "" {
-		args["address"] = address
+		args[KeyAddress] = address
 	}
 }
 

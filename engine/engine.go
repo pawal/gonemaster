@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -137,6 +138,19 @@ func VersionFull() string {
 		return short
 	}
 	return fmt.Sprintf("%s (%s)", short, strings.Join(details, " "))
+}
+
+func dnsLibVersion() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return ""
+	}
+	for _, dep := range info.Deps {
+		if strings.HasSuffix(dep.Path, "/dns") {
+			return dep.Version
+		}
+	}
+	return ""
 }
 
 var basicTests = map[string]func(context.Context, *zone.Zone) ([]*logger.Entry, error){
@@ -454,6 +468,11 @@ func RunWithRunner(req RunRequest, runner *Runner) ([]LogEntry, error) {
 
 	module, testcase, err := normalizeRequest(req)
 	if err != nil {
+		if req.Module != "" {
+			runner.Logger.AddWithoutCallback("UNKNOWN_MODULE", map[string]any{"module": req.Module}, "", "")
+		} else if req.Testcase != "" {
+			runner.Logger.AddWithoutCallback("UNKNOWN_METHOD", map[string]any{"testcase": req.Testcase}, "", "")
+		}
 		return nil, err
 	}
 
@@ -483,11 +502,36 @@ func RunWithRunner(req RunRequest, runner *Runner) ([]LogEntry, error) {
 	if _, err := runner.Logger.AddWithoutCallback("GLOBAL_VERSION", map[string]any{"version": VersionString()}, "", ""); err != nil {
 		return nil, err
 	}
+	runner.Logger.AddWithoutCallback("START_TIME", map[string]any{"start_time": runner.StartedAt.UTC().Format(time.RFC3339)}, "", "")
+	runner.Logger.AddWithoutCallback("TEST_TARGET", map[string]any{"domain": req.Domain}, "", "")
+	if v := dnsLibVersion(); v != "" {
+		runner.Logger.AddWithoutCallback("DEPENDENCY_VERSION", map[string]any{"name": "dns", "version": v}, "", "")
+	}
+
+	if !runner.Profile.Net.IPv4 && !runner.Profile.Net.IPv6 {
+		runner.Logger.AddWithoutCallback("NO_NETWORK", map[string]any{}, "", "")
+		return convertEntries(nil, req.MinLevel)
+	}
+	if !runner.Profile.Net.IPv4 {
+		runner.Logger.AddWithoutCallback("SKIP_IPV4_DISABLED", map[string]any{}, "", "")
+	}
+	if !runner.Profile.Net.IPv6 {
+		runner.Logger.AddWithoutCallback("SKIP_IPV6_DISABLED", map[string]any{}, "", "")
+	}
+
+	if req.NameserverCache != nil && runner.NameserverCache == req.NameserverCache {
+		runner.Logger.AddWithoutCallback("RESTORED_NS_CACHE", map[string]any{}, "", "")
+	}
 
 	entries, err := runWithContext(ctx, req, module, testcase)
 	if err != nil {
 		return nil, err
 	}
+
+	if req.NameserverCache != nil {
+		runner.Logger.AddWithoutCallback("SAVED_NS_CACHE", map[string]any{}, "", "")
+	}
+
 	return convertEntries(entries, req.MinLevel)
 }
 
@@ -555,48 +599,60 @@ func runWithContext(ctx context.Context, req RunRequest, module string, testcase
 	if err := applyUndelegatedDelegation(ctx, r, &z, req.UndelegatedNameservers, req.UndelegatedDSInfo); err != nil {
 		return nil, err
 	}
+	log := util.LoggerFromContext(ctx)
+
+	runModule := func(name string, fn func(context.Context, *zone.Zone) ([]*logger.Entry, error)) ([]*logger.Entry, error) {
+		result, runErr := fn(ctx, &z)
+		if runErr != nil {
+			log.Add("MODULE_ERROR", map[string]any{"module": name, "exception": runErr.Error()}, "", "")
+		}
+		log.Add("MODULE_END", map[string]any{"module": name}, "", "")
+		return result, runErr
+	}
+
 	var entries []*logger.Entry
 	switch {
 	case testcase != "":
+		tcModule := testcaseModule(testcase)
 		if fn, ok := basicTests[testcase]; ok {
-			entries, err = fn(ctx, &z)
+			entries, err = runModule(tcModule, func(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) { return fn(ctx, z) })
 		} else if fn, ok := syntaxTests[testcase]; ok {
-			entries, err = fn(ctx, &z)
+			entries, err = runModule(tcModule, func(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) { return fn(ctx, z) })
 		} else if fn, ok := addressTests[testcase]; ok {
-			entries, err = fn(ctx, &z)
+			entries, err = runModule(tcModule, func(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) { return fn(ctx, z) })
 		} else if fn, ok := connectivityTests[testcase]; ok {
-			entries, err = fn(ctx, &z)
+			entries, err = runModule(tcModule, func(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) { return fn(ctx, z) })
 		} else if fn, ok := consistencyTests[testcase]; ok {
-			entries, err = fn(ctx, &z)
+			entries, err = runModule(tcModule, func(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) { return fn(ctx, z) })
 		} else if fn, ok := dnssecTests[testcase]; ok {
-			entries, err = fn(ctx, &z)
+			entries, err = runModule(tcModule, func(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) { return fn(ctx, z) })
 		} else if fn, ok := delegationTests[testcase]; ok {
-			entries, err = fn(ctx, &z)
+			entries, err = runModule(tcModule, func(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) { return fn(ctx, z) })
 		} else if fn, ok := nameserverTests[testcase]; ok {
-			entries, err = fn(ctx, &z)
+			entries, err = runModule(tcModule, func(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) { return fn(ctx, z) })
 		} else if fn, ok := zoneTests[testcase]; ok {
-			entries, err = fn(ctx, &z)
+			entries, err = runModule(tcModule, func(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) { return fn(ctx, z) })
 		}
 	case module == "basic":
-		entries, err = basic.All(ctx, &z)
+		entries, err = runModule("Basic", basic.All)
 	case module == "syntax":
-		entries, err = syntax.All(ctx, &z)
+		entries, err = runModule("Syntax", syntax.All)
 	case module == "address":
-		entries, err = address.AddressAll(ctx, &z)
+		entries, err = runModule("Address", address.AddressAll)
 	case module == "connectivity":
-		entries, err = connectivity.All(ctx, &z)
+		entries, err = runModule("Connectivity", connectivity.All)
 	case module == "consistency":
-		entries, err = consistency.All(ctx, &z)
+		entries, err = runModule("Consistency", consistency.All)
 	case module == "dnssec":
-		entries, err = dnssec.All(ctx, &z)
+		entries, err = runModule("DNSSEC", dnssec.All)
 	case module == "delegation":
-		entries, err = delegation.All(ctx, &z)
+		entries, err = runModule("Delegation", delegation.All)
 	case module == "nameserver":
-		entries, err = nameserver.All(ctx, &z)
+		entries, err = runModule("Nameserver", nameserver.All)
 	case module == "zone":
-		entries, err = zonetest.All(ctx, &z)
+		entries, err = runModule("Zone", zonetest.All)
 	case module == "":
-		entries, err = basic.All(ctx, &z)
+		entries, err = runModule("Basic", basic.All)
 		if err == nil {
 			if !basic.CanContinue(ctx, &z, entries) {
 				entry, addErr := util.Info(ctx, "CANNOT_CONTINUE", map[string]any{"domain": z.Name.String()})
@@ -608,42 +664,42 @@ func runWithContext(ctx context.Context, req RunRequest, module string, testcase
 				}
 				return entries, nil
 			}
-			more, err2 := address.AddressAll(ctx, &z)
+			more, err2 := runModule("Address", address.AddressAll)
 			if err2 != nil {
 				return nil, err2
 			}
 			entries = append(entries, more...)
-			more, err2 = connectivity.All(ctx, &z)
+			more, err2 = runModule("Connectivity", connectivity.All)
 			if err2 != nil {
 				return nil, err2
 			}
 			entries = append(entries, more...)
-			more, err2 = consistency.All(ctx, &z)
+			more, err2 = runModule("Consistency", consistency.All)
 			if err2 != nil {
 				return nil, err2
 			}
 			entries = append(entries, more...)
-			more, err2 = delegation.All(ctx, &z)
+			more, err2 = runModule("Delegation", delegation.All)
 			if err2 != nil {
 				return nil, err2
 			}
 			entries = append(entries, more...)
-			more, err2 = dnssec.All(ctx, &z)
+			more, err2 = runModule("DNSSEC", dnssec.All)
 			if err2 != nil {
 				return nil, err2
 			}
 			entries = append(entries, more...)
-			more, err2 = nameserver.All(ctx, &z)
+			more, err2 = runModule("Nameserver", nameserver.All)
 			if err2 != nil {
 				return nil, err2
 			}
 			entries = append(entries, more...)
-			more, err2 = syntax.All(ctx, &z)
+			more, err2 = runModule("Syntax", syntax.All)
 			if err2 != nil {
 				return nil, err2
 			}
 			entries = append(entries, more...)
-			more, err2 = zonetest.All(ctx, &z)
+			more, err2 = runModule("Zone", zonetest.All)
 			if err2 != nil {
 				return nil, err2
 			}

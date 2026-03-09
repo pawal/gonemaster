@@ -225,6 +225,13 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 		}
 	}
 	if constants.BlacklistingEnabled && ns.state != nil && ns.state.blacklisted[usevc] {
+		blArgs := map[string]any{
+			"query_name":  qname,
+			"query_type":  qtype,
+			"query_class": qclass,
+		}
+		logargs.SetNS(blArgs, ns.NameString(), ns.AddressString())
+		logSystemWithLogger(runLog, "IS_BLACKLISTED", blArgs)
 		return packet.Packet{}, nil
 	}
 
@@ -266,6 +273,13 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	if err != nil && (ctx == nil || ctx.Err() == nil) && qtype == "SOA" && ednsSize == 0 && !blacklistingDisabled {
 		if ns.state != nil {
 			ns.state.blacklisted[usevc] = true
+			blArgs := map[string]any{
+				"query_name":  qname,
+				"query_type":  qtype,
+				"query_class": qclass,
+			}
+			logargs.SetNS(blArgs, ns.NameString(), ns.AddressString())
+			logSystemWithLogger(runLog, "BLACKLISTING", blArgs)
 		}
 	}
 	if err != nil && (ctx == nil || ctx.Err() == nil) && ns.state != nil && ns.state.errorCache != nil {
@@ -449,6 +463,16 @@ func (ns Nameserver) queryNetwork(ctx context.Context, qname string, qtype strin
 		logSystem(ctx, "EMPTY_RETURN", args)
 	} else {
 		logSystem(ctx, "EXTERNAL_RESPONSE", args)
+	}
+	if resp.Msg != nil && resp.Msg.Len() > 512 {
+		bigArgs := map[string]any{
+			"query_name":  qname,
+			"query_type":  qtype,
+			"query_class": qclass,
+			"length":      resp.Msg.Len(),
+		}
+		logargs.SetNS(bigArgs, ns.NameString(), ns.AddressString())
+		logSystem(ctx, "PACKET_BIG", bigArgs)
 	}
 
 	return resp, err

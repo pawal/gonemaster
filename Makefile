@@ -19,7 +19,7 @@ CMD ?= all
 	install-gonemaster-nagios ui-check test-go vet race \
 	spec-export-implemented spec-export-tags spec-export spec-validate spec-validate-scan spec-check \
 	spec-generate-tags spec-check-tags spec-export-log-args spec-check-coherency spec-check-i18n-placeholders \
-	badkeys-update badkeys-update-embed
+	badkeys-update badkeys-update-embed man clean-man
 
 help:
 	@echo "Targets:"
@@ -49,6 +49,7 @@ help:
 	@echo "  spec-check-coherency Run log-args coherency guardrail checks"
 	@echo "  spec-check-i18n-placeholders  Verify placeholder parity and reject non-allowlisted legacy placeholders"
 	@echo "  spec-check         Run spec-validate + spec-check-tags + coherency + i18n placeholder checks"
+	@echo "  man              Generate man pages from docs/man/*.md"
 	@echo "  badkeys-update     Download badkeys blocklist to share/badkeys/"
 	@echo "  badkeys-update-embed  Download and gzip-compress blocklist for embedded builds"
 	@echo "  clean            Remove build artifacts"
@@ -204,5 +205,17 @@ badkeys-update:
 badkeys-update-embed: badkeys-update
 	gzip -9 -k -f share/badkeys/blocklist.dat
 
-clean:
+MAN_SRCS := $(wildcard docs/man/*.md)
+MAN_OUT  := $(patsubst docs/man/%.md,man/man1/%,$(MAN_SRCS))
+
+man: $(MAN_OUT)
+
+man/man1/%: docs/man/%.md
+	@mkdir -p man/man1
+	$(GO) run github.com/cpuguy83/go-md2man/v2@latest -in $< -out $@
+
+clean-man:
+	@rm -rf man
+
+clean: clean-man
 	@rm -rf $(BIN_DIR) $(UI_BUILD_DIR) $(UI_DIR)/node_modules

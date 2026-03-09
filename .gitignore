@@ -23,6 +23,9 @@
 /perf-runs/
 /server-perf-kit-*.tar.gz
 
+# Generated man pages
+/man/
+
 # Badkeys blocklist data (downloaded, not committed)
 /share/badkeys/blocklist.dat
 /share/badkeys/blocklist.dat.gz

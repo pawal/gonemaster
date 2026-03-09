@@ -79,7 +79,7 @@ Status: Final
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 
 ## Differences From Upstream
-- Upstream reference: none (Gonemaster extension — no corresponding Zonemaster testcase exists).
+- Upstream reference: none (Gonemaster extension - no corresponding Zonemaster testcase exists).
 
 ## Edge Cases And Limitations
 - A server that returns a non-`NOERROR` RCODE for an NSID-carrying query is not separately tested for basic SOA reachability; `N16_UNEXPECTED_RCODE` covers this outcome.

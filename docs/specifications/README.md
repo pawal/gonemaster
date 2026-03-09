@@ -12,27 +12,27 @@ The Zonemaster project may be used as an upstream reference during migration, bu
 ## Documents
 
 ### Testcase Specifications
-- [tests/](tests/README.md) — Canonical per-testcase specifications (algorithm, emitted tags, arguments, severity, upstream differences).
-- [tags/](tags/README.md) — Per-module tag catalogs with severity levels and i18n coverage.
+- [tests/](tests/README.md) - Canonical per-testcase specifications (algorithm, emitted tags, arguments, severity, upstream differences).
+- [tags/](tags/README.md) - Per-module tag catalogs with severity levels and i18n coverage.
 
 ### Inventories
-- [implemented-testcases.md](implemented-testcases.md) — Authoritative list of all implemented testcases.
-- [possible-tags-by-testcase.md](possible-tags-by-testcase.md) — All possible tags per testcase, derived from code metadata.
-- [log-args-inventory.md](log-args-inventory.md) — Current inventory of emitted log argument keys, tags, value shapes, and producer file paths.
+- [implemented-testcases.md](implemented-testcases.md) - Authoritative list of all implemented testcases.
+- [possible-tags-by-testcase.md](possible-tags-by-testcase.md) - All possible tags per testcase, derived from code metadata.
+- [log-args-inventory.md](log-args-inventory.md) - Current inventory of emitted log argument keys, tags, value shapes, and producer file paths.
 
 ### Gap and Divergence Tracking
-- [known-intentional-gaps.md](known-intentional-gaps.md) — Upstream testcase gaps that are intentionally not implemented, with rationale.
-- [known-behavior-divergences.md](known-behavior-divergences.md) — Behavior divergences identified during investigation, tagged for review.
+- [known-intentional-gaps.md](known-intentional-gaps.md) - Upstream testcase gaps that are intentionally not implemented, with rationale.
+- [known-behavior-divergences.md](known-behavior-divergences.md) - Behavior divergences identified during investigation, tagged for review.
 
 ### Migration
-- [migration-tracker.md](migration-tracker.md) — Checklist tracking migration status per testcase.
-- [upstream-testcase-matrix.md](upstream-testcase-matrix.md) — Maps upstream Zonemaster specs to gonemaster testcase IDs and migration status.
+- [migration-tracker.md](migration-tracker.md) - Checklist tracking migration status per testcase.
+- [upstream-testcase-matrix.md](upstream-testcase-matrix.md) - Maps upstream Zonemaster specs to gonemaster testcase IDs and migration status.
 
 ### Reference
-- [upstream/](upstream/README.md) — Imported Zonemaster reference material (not normative for gonemaster).
-- [templates/](templates/testcase-spec-template.md) — Reusable templates for testcase specs and tag tables.
-- [log-args-coherency.md](log-args-coherency.md) — Shared glossary and invariants for log argument naming/types.
-- [log-args-key-glossary.md](log-args-key-glossary.md) — Canonical v1.1 key/type glossary for machine consumers.
+- [upstream/](upstream/README.md) - Imported Zonemaster reference material (not normative for gonemaster).
+- [templates/](templates/testcase-spec-template.md) - Reusable templates for testcase specs and tag tables.
+- [log-args-coherency.md](log-args-coherency.md) - Shared glossary and invariants for log argument naming/types.
+- [log-args-key-glossary.md](log-args-key-glossary.md) - Canonical v1.1 key/type glossary for machine consumers.
 
 ## Source-Of-Truth Rules
 - Gonemaster implementation is the runtime source of truth.

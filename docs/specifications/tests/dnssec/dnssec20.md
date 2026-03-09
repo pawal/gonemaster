@@ -3,7 +3,7 @@
 Status: Draft
 
 ## Purpose
-- Verify that the NSEC or NSEC3 type bitmap at the zone apex accurately reflects the RR types actually present in the zone. An incomplete (subset) bitmap enables cache poisoning via RFC 8198 aggressive negative caching and replay attacks (see Petr Špaček, ISC, 2021-11-30, "Type Bitmap: Subset – Broken").
+- Verify that the NSEC or NSEC3 type bitmap at the zone apex accurately reflects the RR types actually present in the zone. An incomplete (subset) bitmap enables cache poisoning via RFC 8198 aggressive negative caching and replay attacks (see Petr Špaček, ISC, 2021-11-30, "Type Bitmap: Subset - Broken").
 
 ## Preconditions And Inputs
 - Preconditions:
@@ -97,7 +97,7 @@ Status: Draft
 - Nameserver evaluation is deduplicated by IP; multiple names mapped to one IP are merged into one query outcome and expanded in `servers`.
 - Nameservers with non-`NOERROR` or non-`AA` DNSKEY responses are treated as `no_dnssec` and can only contribute to `DS20_NO_DNSSEC`.
 - The set of probed types (A, AAAA, MX, TXT) is intentionally limited to common apex types. DNSKEY, SOA, NS, RRSIG, and NSEC/NSEC3 are already validated structurally by DNSSEC10 and are not re-checked here.
-- Super-set bitmaps (types listed in the bitmap but not actually present) are not flagged — only subset bitmaps (existing types missing from the bitmap) are checked, as these are the security-relevant case per the ISC presentation.
+- Super-set bitmaps (types listed in the bitmap but not actually present) are not flagged - only subset bitmaps (existing types missing from the bitmap) are checked, as these are the security-relevant case per the ISC presentation.
 - For NSEC3 zones, the NSEC3 record must have an owner hash matching the apex for the bitmap to be used; non-matching NSEC3 records are ignored.
 - All queries in DNSSEC20 benefit from the per-nameserver query cache. In a full test run (after DNSSEC10, Basic, Zone, etc.), most queries are cache hits with zero network overhead.
 

@@ -10,28 +10,28 @@ coverage status across the supported locale files.
 
 | File | Module | Tags |
 | --- | --- | --- |
-| [address.md](address.md) | ADDRESS | address01–address03 |
-| [basic.md](basic.md) | BASIC | basic01–basic03 |
-| [connectivity.md](connectivity.md) | CONNECTIVITY | connectivity01–connectivity04 |
-| [consistency.md](consistency.md) | CONSISTENCY | consistency01–consistency06 |
-| [delegation.md](delegation.md) | DELEGATION | delegation01–delegation07 |
-| [dnssec.md](dnssec.md) | DNSSEC | dnssec01–dnssec19 |
-| [nameserver.md](nameserver.md) | NAMESERVER | nameserver01–nameserver15 |
-| [syntax.md](syntax.md) | SYNTAX | syntax01–syntax08 |
-| [zone.md](zone.md) | ZONE | zone01–zone12 |
+| [address.md](address.md) | ADDRESS | address01-address03 |
+| [basic.md](basic.md) | BASIC | basic01-basic03 |
+| [connectivity.md](connectivity.md) | CONNECTIVITY | connectivity01-connectivity04 |
+| [consistency.md](consistency.md) | CONSISTENCY | consistency01-consistency06 |
+| [delegation.md](delegation.md) | DELEGATION | delegation01-delegation07 |
+| [dnssec.md](dnssec.md) | DNSSEC | dnssec01-dnssec19 |
+| [nameserver.md](nameserver.md) | NAMESERVER | nameserver01-nameserver15 |
+| [syntax.md](syntax.md) | SYNTAX | syntax01-syntax08 |
+| [zone.md](zone.md) | ZONE | zone01-zone12 |
 
 ## Structure Of Each Catalog
 
 Every per-module catalog contains:
 
-- **Module header** — module name, metadata source file, profile.json key, and
+- **Module header** - module name, metadata source file, profile.json key, and
   the tool used to generate the file.
-- **Tag table** — one row per unique tag the module can emit:
-  - `Tag` — tag name as it appears in log entries.
-  - `Level` — default severity from `share/profile.json` (configurable at runtime).
-  - `Testcase(s)` — which testcase(s) in the module declare the tag in their `Metadata()`.
-  - `i18n` — whether the tag has an entry in the bundled locale files.
-- **i18n notes** — lists of tags missing from locale files and stale locale entries
+- **Tag table** - one row per unique tag the module can emit:
+  - `Tag` - tag name as it appears in log entries.
+  - `Level` - default severity from `share/profile.json` (configurable at runtime).
+  - `Testcase(s)` - which testcase(s) in the module declare the tag in their `Metadata()`.
+  - `i18n` - whether the tag has an entry in the bundled locale files.
+- **i18n notes** - lists of tags missing from locale files and stale locale entries
   (present in PO files but absent from current code metadata).
 
 ## Severity Levels
@@ -40,8 +40,8 @@ Levels are ordered from least to most severe:
 
 | Level | Numeric | Meaning |
 | --- | --- | --- |
-| `DEBUG3` | −2 | Lowest-detail internal tracing |
-| `DEBUG2` | −1 | Detailed internal tracing |
+| `DEBUG3` | -2 | Lowest-detail internal tracing |
+| `DEBUG2` | -1 | Detailed internal tracing |
 | `DEBUG` | 0 | Internal diagnostic |
 | `INFO` | 1 | Informational result |
 | `NOTICE` | 2 | Notable but not an error |
@@ -79,10 +79,10 @@ go run ./tools/specifications/generate-tag-catalog/
 ```
 
 The generator reads:
-- `engine/test/<module>/<module>.go` — `Metadata()` functions (via the
+- `engine/test/<module>/<module>.go` - `Metadata()` functions (via the
   `specdata` package).
-- `share/profile.json` — default severity levels.
-- `share/lang/*.po` — bundled locale files for i18n coverage.
+- `share/profile.json` - default severity levels.
+- `share/lang/*.po` - bundled locale files for i18n coverage.
 
 Regenerate after any change to module `Metadata()` functions or `profile.json`.
 

@@ -160,7 +160,7 @@
     "dnssec17": "Validate CDNSKEY RRsets against DNSKEY data and CDNSKEY signatures, including delete semantics and signature/keytag consistency checks.",
     "dnssec18": "Validate that CDS and CDNSKEY RRsets are signed by a DNSKEY that corresponds to DS information observed at the parent side.",
     "dnssec19": "Check DNSKEY records published by authoritative nameservers for known cryptographic weaknesses and membership in blocklists of compromised keys. This testcase ports DNSSEC-relevant checks from the [badkeys](https://github.com/badkeys/badkeys) project to detect vulnerable RSA keys (Fermat factorization, ROCA, pattern anomalies, invalid parameters, small factors, Wiener's attack) and keys matching the badkeys blocklist of known-compromised keys (e.g., Debian OpenSSL CVE-2008-0166, RFC example keys, firmware keys).",
-    "dnssec20": "Verify that the NSEC or NSEC3 type bitmap at the zone apex accurately reflects the RR types actually present in the zone. An incomplete (subset) bitmap enables cache poisoning via RFC 8198 aggressive negative caching and replay attacks (see Petr Špaček, ISC, 2021-11-30, \"Type Bitmap: Subset – Broken\").",
+    "dnssec20": "Verify that the NSEC or NSEC3 type bitmap at the zone apex accurately reflects the RR types actually present in the zone. An incomplete (subset) bitmap enables cache poisoning via RFC 8198 aggressive negative caching and replay attacks (see Petr Špaček, ISC, 2021-11-30, \"Type Bitmap: Subset - Broken\").",
     "nameserver01": "Detect whether authoritative nameservers also behave as recursors.",
     "nameserver02": "Validate EDNS(0) handling on authoritative nameservers.",
     "nameserver03": "Check whether nameservers allow AXFR zone transfer.",

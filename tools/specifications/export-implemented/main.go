@@ -105,7 +105,7 @@ func generateMarkdown(p exportPayload) string {
 		fmt.Fprintf(&b, "\n### %s (%d)\n", module, len(testcases))
 		for _, tc := range testcases {
 			if title, ok := p.Titles[tc]; ok && title != "" {
-				fmt.Fprintf(&b, "- %s — %s\n", tc, title)
+				fmt.Fprintf(&b, "- %s - %s\n", tc, title)
 			} else {
 				fmt.Fprintf(&b, "- %s\n", tc)
 			}

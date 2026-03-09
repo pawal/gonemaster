@@ -5398,6 +5398,266 @@ func dnssec19P256Key(owner string) *dns.DNSKEY {
 	return key
 }
 
+// --- DNSSEC20 tests ---
+
+func TestDNSSEC20BitmapOK(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origDel := getDelNSNamesAndIPs
+	origZone := getZoneNSNamesAndIPs
+	t.Cleanup(func() {
+		getDelNSNamesAndIPs = origDel
+		getZoneNSNamesAndIPs = origZone
+	})
+
+	newNameserver(t, "ns1.example", "192.0.2.201", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		switch qtype {
+		case "DNSKEY":
+			return dnskeyPacket(qname, dnssec19P256Key(qname))
+		case "NSEC":
+			nsecRR := &dns.NSEC{Hdr: dns.Header{Name: dnsutil.Fqdn(qname), Class: dns.ClassINET, TTL: 60}}
+			nsecRR.NextDomain = "\\000." + dnsutil.Fqdn(qname)
+			nsecRR.TypeBitMap = []uint16{dns.TypeA, dns.TypeNS, dns.TypeSOA, dns.TypeAAAA, dns.TypeRRSIG, dns.TypeNSEC, dns.TypeDNSKEY}
+			return answerPacket(qname, dns.TypeNSEC, nsecRR)
+		case "A":
+			aRR := &dns.A{Hdr: dns.Header{Name: dnsutil.Fqdn(qname), Class: dns.ClassINET, TTL: 60}}
+			aRR.Addr = netip.MustParseAddr("192.0.2.1")
+			return answerPacket(qname, dns.TypeA, aRR)
+		case "AAAA":
+			aaaaRR := &dns.AAAA{Hdr: dns.Header{Name: dnsutil.Fqdn(qname), Class: dns.ClassINET, TTL: 60}}
+			aaaaRR.Addr = netip.MustParseAddr("2001:db8::1")
+			return answerPacket(qname, dns.TypeAAAA, aaaaRR)
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+		return []methodsv2.NSItem{{
+			Name: dnsname.New("ns1.example"), Address: netip.MustParseAddr("192.0.2.201"), HasAddress: true,
+		}}, nil
+	}
+	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+		return nil, nil
+	}
+
+	z, err := zone.New("example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC20(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("dnssec20: %v", err)
+	}
+
+	if !hasEntryTag(entries, "DS20_BITMAP_OK") {
+		t.Fatalf("expected DS20_BITMAP_OK, got tags: %v", entryTags(entries))
+	}
+	if hasEntryTag(entries, "DS20_NSEC_BITMAP_MISMATCHES_RRTYPE") {
+		t.Fatalf("unexpected DS20_NSEC_BITMAP_MISMATCHES_RRTYPE")
+	}
+}
+
+func TestDNSSEC20NSECSubsetBitmap(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origDel := getDelNSNamesAndIPs
+	origZone := getZoneNSNamesAndIPs
+	t.Cleanup(func() {
+		getDelNSNamesAndIPs = origDel
+		getZoneNSNamesAndIPs = origZone
+	})
+
+	newNameserver(t, "ns1.example", "192.0.2.201", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		switch qtype {
+		case "DNSKEY":
+			return dnskeyPacket(qname, dnssec19P256Key(qname))
+		case "NSEC":
+			nsecRR := &dns.NSEC{Hdr: dns.Header{Name: dnsutil.Fqdn(qname), Class: dns.ClassINET, TTL: 60}}
+			nsecRR.NextDomain = "\\000." + dnsutil.Fqdn(qname)
+			nsecRR.TypeBitMap = []uint16{dns.TypeNS, dns.TypeSOA, dns.TypeRRSIG, dns.TypeNSEC, dns.TypeDNSKEY}
+			return answerPacket(qname, dns.TypeNSEC, nsecRR)
+		case "A":
+			aRR := &dns.A{Hdr: dns.Header{Name: dnsutil.Fqdn(qname), Class: dns.ClassINET, TTL: 60}}
+			aRR.Addr = netip.MustParseAddr("3.13.31.214")
+			return answerPacket(qname, dns.TypeA, aRR)
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+		return []methodsv2.NSItem{{
+			Name: dnsname.New("ns1.example"), Address: netip.MustParseAddr("192.0.2.201"), HasAddress: true,
+		}}, nil
+	}
+	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+		return nil, nil
+	}
+
+	z, err := zone.New("example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC20(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("dnssec20: %v", err)
+	}
+
+	if !hasEntryTag(entries, "DS20_NSEC_BITMAP_MISMATCHES_RRTYPE") {
+		t.Fatalf("expected DS20_NSEC_BITMAP_MISMATCHES_RRTYPE, got tags: %v", entryTags(entries))
+	}
+	entry := firstEntryByTag(entries, "DS20_NSEC_BITMAP_MISMATCHES_RRTYPE")
+	if entry == nil {
+		t.Fatal("missing DS20_NSEC_BITMAP_MISMATCHES_RRTYPE entry")
+	}
+	if rrtype, _ := entry.Args["query_type"].(string); rrtype != "A" {
+		t.Fatalf("expected rrtype=A, got %q", rrtype)
+	}
+	if hasEntryTag(entries, "DS20_BITMAP_OK") {
+		t.Fatalf("unexpected DS20_BITMAP_OK when bitmap has mismatches")
+	}
+}
+
+func TestDNSSEC20NSEC3SubsetBitmap(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origDel := getDelNSNamesAndIPs
+	origZone := getZoneNSNamesAndIPs
+	t.Cleanup(func() {
+		getDelNSNamesAndIPs = origDel
+		getZoneNSNamesAndIPs = origZone
+	})
+
+	// Build an NSEC3 record whose owner hash matches the apex.
+	apexHash := dnsutil.NSEC3Name("example.", "", 0)
+	nsec3Owner := apexHash + ".example."
+
+	newNameserver(t, "ns1.example", "192.0.2.201", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		switch qtype {
+		case "DNSKEY":
+			return dnskeyPacket(qname, dnssec19P256Key(qname))
+		case "NSEC":
+			// NSEC3 zone: return NSEC3 in authority section (NODATA).
+			nsec3RR := &dns.NSEC3{Hdr: dns.Header{Name: nsec3Owner, Class: dns.ClassINET, TTL: 60}}
+			nsec3RR.Hash = dns.SHA1
+			nsec3RR.Iterations = 0
+			nsec3RR.Salt = ""
+			nsec3RR.TypeBitMap = []uint16{dns.TypeNS, dns.TypeSOA, dns.TypeRRSIG, dns.TypeDNSKEY, dns.TypeNSEC3PARAM}
+			return nsec3Packet(qname, nsec3RR)
+		case "A":
+			aRR := &dns.A{Hdr: dns.Header{Name: dnsutil.Fqdn(qname), Class: dns.ClassINET, TTL: 60}}
+			aRR.Addr = netip.MustParseAddr("3.13.31.214")
+			return answerPacket(qname, dns.TypeA, aRR)
+		case "AAAA":
+			aaaaRR := &dns.AAAA{Hdr: dns.Header{Name: dnsutil.Fqdn(qname), Class: dns.ClassINET, TTL: 60}}
+			aaaaRR.Addr = netip.MustParseAddr("2001:db8::1")
+			return answerPacket(qname, dns.TypeAAAA, aaaaRR)
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+		return []methodsv2.NSItem{{
+			Name: dnsname.New("ns1.example"), Address: netip.MustParseAddr("192.0.2.201"), HasAddress: true,
+		}}, nil
+	}
+	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+		return nil, nil
+	}
+
+	z, err := zone.New("example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC20(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("dnssec20: %v", err)
+	}
+
+	if !hasEntryTag(entries, "DS20_NSEC3_BITMAP_MISMATCHES_RRTYPE") {
+		t.Fatalf("expected DS20_NSEC3_BITMAP_MISMATCHES_RRTYPE, got tags: %v", entryTags(entries))
+	}
+	// Both A and AAAA should be missing from the bitmap.
+	count := 0
+	for _, e := range entries {
+		if e != nil && e.Tag == "DS20_NSEC3_BITMAP_MISMATCHES_RRTYPE" {
+			count++
+		}
+	}
+	if count != 2 {
+		t.Fatalf("expected 2 NSEC3 mismatch tags (A and AAAA), got %d", count)
+	}
+}
+
+func TestDNSSEC20NoDNSSEC(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origDel := getDelNSNamesAndIPs
+	origZone := getZoneNSNamesAndIPs
+	t.Cleanup(func() {
+		getDelNSNamesAndIPs = origDel
+		getZoneNSNamesAndIPs = origZone
+	})
+
+	newNameserver(t, "ns1.example", "192.0.2.201", func(_ string, _ string, _ *nameserver.QueryOptions) packet.Packet {
+		return packet.Packet{}
+	})
+
+	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+		return []methodsv2.NSItem{{
+			Name: dnsname.New("ns1.example"), Address: netip.MustParseAddr("192.0.2.201"), HasAddress: true,
+		}}, nil
+	}
+	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+		return nil, nil
+	}
+
+	z, err := zone.New("example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC20(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("dnssec20: %v", err)
+	}
+
+	if !hasEntryTag(entries, "DS20_NO_DNSSEC") {
+		t.Fatalf("expected DS20_NO_DNSSEC, got tags: %v", entryTags(entries))
+	}
+}
+
+func entryTags(entries []*logger.Entry) []string {
+	var tags []string
+	for _, e := range entries {
+		if e != nil {
+			tags = append(tags, e.Tag)
+		}
+	}
+	return tags
+}
+
 func writeDNSSEC19BlocklistFixture(t *testing.T, dir string, algo uint8, publicKey string, sourceID byte, sourceName string) {
 	t.Helper()
 

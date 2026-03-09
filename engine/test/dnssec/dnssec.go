@@ -267,6 +267,16 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
+	if util.ShouldRunTest(ctx, "dnssec20") {
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC20(ctx, z)
+		})
+		results = append(results, entries...)
+		if err != nil {
+			return results, err
+		}
+	}
+
 	return results, nil
 }
 
@@ -555,6 +565,17 @@ func Metadata() map[string][]string {
 			"DS19_KEY_OK",
 			"DS19_NO_DNSKEY",
 			"DS19_NO_RESPONSE",
+			"IPV4_DISABLED",
+			"IPV6_DISABLED",
+			"TEST_CASE_END",
+			"TEST_CASE_START",
+		},
+		"dnssec20": {
+			"DS20_BITMAP_OK",
+			"DS20_NO_BITMAP",
+			"DS20_NO_DNSSEC",
+			"DS20_NSEC3_BITMAP_MISMATCHES_RRTYPE",
+			"DS20_NSEC_BITMAP_MISMATCHES_RRTYPE",
 			"IPV4_DISABLED",
 			"IPV6_DISABLED",
 			"TEST_CASE_END",
@@ -7344,6 +7365,253 @@ func verifyRRSIG(sig *dns.RRSIG, rrset []dns.RR, key *dns.DNSKEY, at time.Time) 
 		return errors.New("rrsig not valid at time")
 	}
 	return sig.Verify(key, rrset, &dns.SignOption{})
+}
+
+// DNSSEC20 runs the DNSSEC20 test case.
+// It verifies that the NSEC/NSEC3 type bitmap at the zone apex accurately
+// reflects the RR types actually present, detecting the "subset bitmap"
+// problem that enables cache poisoning via RFC 8198.
+func DNSSEC20(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
+	const testcase = "DNSSEC20"
+	var results []*logger.Entry
+
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+		return results, err
+	}
+
+	typeDNSKEY := "DNSKEY"
+	typeNSEC := "NSEC"
+	typeNSEC3 := "NSEC3"
+	typeNSEC3PARAM := "NSEC3PARAM"
+	probeTypes := []string{"A", "AAAA", "MX", "TXT"}
+
+	// Aggregate per-type mismatch servers (NSEC vs NSEC3).
+	nsecMismatchServers := map[string][]string{}
+	nsec3MismatchServers := map[string][]string{}
+	var bitmapOK []string
+	var noDNSSEC []string
+	var noBitmap []string
+
+	delItems, err := getDelNSNamesAndIPs(ctx, z)
+	if err != nil {
+		return results, err
+	}
+	zoneItems, err := getZoneNSNamesAndIPs(ctx, z)
+	if err != nil {
+		return results, err
+	}
+
+	nss := nameserversFromNSItems(ctx, z, append(delItems, zoneItems...))
+	groups := nameserversByIP(nss)
+
+	if len(groups) > 0 {
+		type nsOutcome struct {
+			groupList      []string
+			ignored        bool
+			noDNSSEC       bool
+			noBitmap       bool
+			isNSEC3        bool
+			missingTypes   []string // probed types present in zone but missing from bitmap
+		}
+
+		outcomes := make([]nsOutcome, len(groups))
+		tasks := make([]runner.Task, len(groups))
+		for i, group := range groups {
+			i, group := i, group
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				if len(group) == 0 {
+					return nil
+				}
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				ns := group[0]
+				outcome := nsOutcome{
+					groupList: nsStrings(group),
+				}
+
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, typeDNSKEY); err != nil {
+					return err
+				} else if disabled {
+					outcome.ignored = true
+					outcomes[i] = outcome
+					return nil
+				}
+
+				dnssecOn := true
+				dnskeyResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), typeDNSKEY, &nameserver.QueryOptions{DNSSEC: &dnssecOn})
+				if dnskeyResp.Msg == nil || dnskeyResp.Rcode() != "NOERROR" || !dnskeyResp.AA() {
+					outcome.noDNSSEC = true
+					outcomes[i] = outcome
+					return nil
+				}
+				dnskeyRRs := dnskeyResp.GetRecordsForName(typeDNSKEY, z.Name, "answer")
+				if len(dnskeyRRs) == 0 {
+					outcome.noDNSSEC = true
+					outcomes[i] = outcome
+					return nil
+				}
+
+				// Try to obtain the apex type bitmap from NSEC or NSEC3.
+				var typeMap map[string]bool
+				var isNSEC3 bool
+
+				nsecResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), typeNSEC, &nameserver.QueryOptions{DNSSEC: &dnssecOn})
+				if nsecResp.Msg != nil && nsecResp.Rcode() == "NOERROR" && nsecResp.AA() {
+					// NSEC zone: apex NSEC in answer section.
+					nsecRRs := nsecResp.GetRecords(typeNSEC, "answer")
+					for _, rr := range nsecRRs {
+						if nsec, ok := rr.(*dns.NSEC); ok && rrOwnerMatchesZone(rr, z.Name) {
+							typeMap = typeMapFromBitmap(nsec.TypeBitMap)
+							break
+						}
+					}
+					// NSEC3 zone: NSEC3 in authority section (NODATA response).
+					if typeMap == nil {
+						nsec3RRs := nsecResp.GetRecords(typeNSEC3, "authority")
+						for _, rr := range nsec3RRs {
+							if nsec3, ok := rr.(*dns.NSEC3); ok && nsec3OwnerMatchesApex(nsec3, z.Name) {
+								typeMap = typeMapFromBitmap(nsec3.TypeBitMap)
+								isNSEC3 = true
+								break
+							}
+						}
+					}
+				}
+
+				// If we still don't have a bitmap, try NSEC3PARAM query.
+				if typeMap == nil {
+					nsec3paramResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), typeNSEC3PARAM, &nameserver.QueryOptions{DNSSEC: &dnssecOn})
+					if nsec3paramResp.Msg != nil && nsec3paramResp.Rcode() == "NOERROR" && nsec3paramResp.AA() {
+						// NSEC zone: NSEC in authority section (NODATA response).
+						nsecRRs := nsec3paramResp.GetRecords(typeNSEC, "authority")
+						for _, rr := range nsecRRs {
+							if nsec, ok := rr.(*dns.NSEC); ok && rrOwnerMatchesZone(rr, z.Name) {
+								typeMap = typeMapFromBitmap(nsec.TypeBitMap)
+								break
+							}
+						}
+					}
+				}
+
+				if typeMap == nil {
+					outcome.noBitmap = true
+					outcomes[i] = outcome
+					return nil
+				}
+				outcome.isNSEC3 = isNSEC3
+
+				// Probe common types and check presence in bitmap.
+				for _, probeType := range probeTypes {
+					resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), probeType, &nameserver.QueryOptions{DNSSEC: &dnssecOn})
+					if resp.Msg == nil || resp.Rcode() != "NOERROR" || !resp.AA() {
+						continue
+					}
+					matchingRRs := resp.GetRecordsForName(probeType, z.Name, "answer")
+					if len(matchingRRs) == 0 {
+						continue
+					}
+					// Type exists at apex — check if bitmap includes it.
+					if !typeMap[probeType] {
+						outcome.missingTypes = append(outcome.missingTypes, probeType)
+					}
+				}
+
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		entries, err := runner.Run(ctx, tasks, runner.Options{
+			Parallel:      profile.FromContext(ctx).Resolver.Defaults.Parallel,
+			CancelOnError: false,
+		})
+		results = append(results, entries...)
+		if err != nil {
+			return results, err
+		}
+
+		for _, outcome := range outcomes {
+			if outcome.ignored {
+				continue
+			}
+			if outcome.noDNSSEC {
+				noDNSSEC = append(noDNSSEC, outcome.groupList...)
+				continue
+			}
+			if outcome.noBitmap {
+				noBitmap = append(noBitmap, outcome.groupList...)
+				continue
+			}
+
+			if len(outcome.missingTypes) == 0 {
+				bitmapOK = append(bitmapOK, outcome.groupList...)
+			} else {
+				for _, rrtype := range outcome.missingTypes {
+					if outcome.isNSEC3 {
+						nsec3MismatchServers[rrtype] = append(nsec3MismatchServers[rrtype], outcome.groupList...)
+					} else {
+						nsecMismatchServers[rrtype] = append(nsecMismatchServers[rrtype], outcome.groupList...)
+					}
+				}
+			}
+		}
+	}
+
+	// Emit mismatch tags per type.
+	mismatchTypes := make([]string, 0, len(nsecMismatchServers)+len(nsec3MismatchServers))
+	for t := range nsecMismatchServers {
+		mismatchTypes = append(mismatchTypes, t)
+	}
+	sort.Strings(mismatchTypes)
+	for _, rrtype := range mismatchTypes {
+		args := map[string]any{"query_type": rrtype}
+		setTypedServersFromNames(args, nsecMismatchServers[rrtype])
+		if err := appendLog(ctx, &results, testcase, "DS20_NSEC_BITMAP_MISMATCHES_RRTYPE", args); err != nil {
+			return results, err
+		}
+	}
+
+	nsec3MismatchTypes := make([]string, 0, len(nsec3MismatchServers))
+	for t := range nsec3MismatchServers {
+		nsec3MismatchTypes = append(nsec3MismatchTypes, t)
+	}
+	sort.Strings(nsec3MismatchTypes)
+	for _, rrtype := range nsec3MismatchTypes {
+		args := map[string]any{"query_type": rrtype}
+		setTypedServersFromNames(args, nsec3MismatchServers[rrtype])
+		if err := appendLog(ctx, &results, testcase, "DS20_NSEC3_BITMAP_MISMATCHES_RRTYPE", args); err != nil {
+			return results, err
+		}
+	}
+
+	if len(nsecMismatchServers) == 0 && len(nsec3MismatchServers) == 0 && len(bitmapOK) > 0 {
+		args := map[string]any{}
+		setTypedServersFromNames(args, bitmapOK)
+		if err := appendLog(ctx, &results, testcase, "DS20_BITMAP_OK", args); err != nil {
+			return results, err
+		}
+	}
+
+	if len(noBitmap) > 0 {
+		args := map[string]any{}
+		setTypedServersFromNames(args, noBitmap)
+		if err := appendLog(ctx, &results, testcase, "DS20_NO_BITMAP", args); err != nil {
+			return results, err
+		}
+	}
+
+	if len(bitmapOK) == 0 && len(nsecMismatchServers) == 0 && len(nsec3MismatchServers) == 0 && len(noBitmap) == 0 && len(noDNSSEC) > 0 {
+		args := map[string]any{}
+		setTypedServersFromNames(args, noDNSSEC)
+		if err := appendLog(ctx, &results, testcase, "DS20_NO_DNSSEC", args); err != nil {
+			return results, err
+		}
+	}
+
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
+		return results, err
+	}
+
+	return results, nil
 }
 
 func algoPropertyFor(algo uint8) algoProperty {

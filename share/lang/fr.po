@@ -2391,6 +2391,26 @@ msgid ""
 "records."
 msgstr "Aucune réponse exploitable du/des serveur(s) de noms {servers} lors de la requête des enregistrements DNSKEY."
 
+
+msgctxt "DNSSEC:DS20_BITMAP_OK"
+msgid "NSEC/NSEC3 type bitmap at the zone apex correctly includes all observed RR types on name server(s) {servers}."
+msgstr "Le bitmap de types NSEC/NSEC3 à l'apex de la zone inclut correctement tous les types RR observés sur le(s) serveur(s) de noms {servers}."
+
+msgctxt "DNSSEC:DS20_NO_BITMAP"
+msgid "No NSEC or NSEC3 type bitmap could be obtained for the zone apex on name server(s) {servers}."
+msgstr "Aucun bitmap de types NSEC ou NSEC3 n'a pu être obtenu pour l'apex de la zone sur le(s) serveur(s) de noms {servers}."
+
+msgctxt "DNSSEC:DS20_NO_DNSSEC"
+msgid "No nameserver returned a usable DNSKEY; NSEC/NSEC3 bitmap check skipped on name server(s) {servers}."
+msgstr "Aucun serveur de noms n'a retourné de DNSKEY utilisable ; vérification du bitmap NSEC/NSEC3 ignorée sur le(s) serveur(s) de noms {servers}."
+
+msgctxt "DNSSEC:DS20_NSEC3_BITMAP_MISMATCHES_RRTYPE"
+msgid "RR type {query_type} exists at the zone apex but is missing from the NSEC3 type bitmap on name server(s) {servers}. This enables cache poisoning via RFC 8198 aggressive negative caching."
+msgstr "Le type RR {query_type} existe à l'apex de la zone mais est absent du bitmap de types NSEC3 sur le(s) serveur(s) de noms {servers}. Cela permet l'empoisonnement du cache via la mise en cache négative agressive de la RFC 8198."
+
+msgctxt "DNSSEC:DS20_NSEC_BITMAP_MISMATCHES_RRTYPE"
+msgid "RR type {query_type} exists at the zone apex but is missing from the NSEC type bitmap on name server(s) {servers}. This enables cache poisoning via RFC 8198 aggressive negative caching."
+msgstr "Le type RR {query_type} existe à l'apex de la zone mais est absent du bitmap de types NSEC sur le(s) serveur(s) de noms {servers}. Cela permet l'empoisonnement du cache via la mise en cache négative agressive de la RFC 8198."
 msgctxt "DNSSEC:DURATION_LONG"
 msgid ""
 "RRSIG with keytag {keytag} and covering type(s) {types} has a duration of "

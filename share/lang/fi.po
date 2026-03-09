@@ -1499,6 +1499,26 @@ msgid ""
 "name server(s) {servers}."
 msgstr "Yksikään nimipalvelin ei tuottanut käyttökelpoista DNSKEY-vastausta badkeys-tarkistusta varten nimipalvelimilla {servers}."
 
+
+msgctxt "DNSSEC:DS20_BITMAP_OK"
+msgid "NSEC/NSEC3 type bitmap at the zone apex correctly includes all observed RR types on name server(s) {servers}."
+msgstr "NSEC/NSEC3-tyyppibittikartta vyöhykkeen huipulla sisältää oikein kaikki havaitut RR-tyypit nimipalvelimilla {servers}."
+
+msgctxt "DNSSEC:DS20_NO_BITMAP"
+msgid "No NSEC or NSEC3 type bitmap could be obtained for the zone apex on name server(s) {servers}."
+msgstr "NSEC- tai NSEC3-tyyppibittikarttaa ei voitu hakea vyöhykkeen huipulle nimipalvelimilla {servers}."
+
+msgctxt "DNSSEC:DS20_NO_DNSSEC"
+msgid "No nameserver returned a usable DNSKEY; NSEC/NSEC3 bitmap check skipped on name server(s) {servers}."
+msgstr "Yksikään nimipalvelin ei palauttanut käyttökelpoista DNSKEY-tietuetta; NSEC/NSEC3-bittikarttotarkistus ohitettiin nimipalvelimilla {servers}."
+
+msgctxt "DNSSEC:DS20_NSEC3_BITMAP_MISMATCHES_RRTYPE"
+msgid "RR type {query_type} exists at the zone apex but is missing from the NSEC3 type bitmap on name server(s) {servers}. This enables cache poisoning via RFC 8198 aggressive negative caching."
+msgstr "RR-tyyppi {query_type} on olemassa vyöhykkeen huipulla, mutta puuttuu NSEC3-tyyppibittikarttasta nimipalvelimilla {servers}. Tämä mahdollistaa välimuistin myrkyttämisen RFC 8198:n aggressiivisen negatiivisen välimuistitallennuksen kautta."
+
+msgctxt "DNSSEC:DS20_NSEC_BITMAP_MISMATCHES_RRTYPE"
+msgid "RR type {query_type} exists at the zone apex but is missing from the NSEC type bitmap on name server(s) {servers}. This enables cache poisoning via RFC 8198 aggressive negative caching."
+msgstr "RR-tyyppi {query_type} on olemassa vyöhykkeen huipulla, mutta puuttuu NSEC-tyyppibittikarttasta nimipalvelimilla {servers}. Tämä mahdollistaa välimuistin myrkyttämisen RFC 8198:n aggressiivisen negatiivisen välimuistitallennuksen kautta."
 msgid "{parent} sent a DS record, but {child} did not send a DNSKEY record."
 msgstr "{parent} sent a DS record, but {child} did not send a DNSKEY record."
 

@@ -1859,6 +1859,26 @@ msgid ""
 "name server(s) {servers}."
 msgstr "Noben imenski strežnik ni vrnil uporabnega odziva DNSKEY za preverjanje badkey na imenskih strežnikih {servers}."
 
+
+msgctxt "DNSSEC:DS20_BITMAP_OK"
+msgid "NSEC/NSEC3 type bitmap at the zone apex correctly includes all observed RR types on name server(s) {servers}."
+msgstr "NSEC/NSEC3-tipska bitkarta na vrhu cone pravilno vključuje vse opažene RR-tipe na imenskih strežnikih {servers}."
+
+msgctxt "DNSSEC:DS20_NO_BITMAP"
+msgid "No NSEC or NSEC3 type bitmap could be obtained for the zone apex on name server(s) {servers}."
+msgstr "NSEC- ali NSEC3-tipske bitkarte za vrh cone ni bilo mogoče pridobiti na imenskih strežnikih {servers}."
+
+msgctxt "DNSSEC:DS20_NO_DNSSEC"
+msgid "No nameserver returned a usable DNSKEY; NSEC/NSEC3 bitmap check skipped on name server(s) {servers}."
+msgstr "Noben imenski strežnik ni vrnil uporabnega DNSKEY; preverjanje NSEC/NSEC3-bitkarte je bilo preskočeno na imenskih strežnikih {servers}."
+
+msgctxt "DNSSEC:DS20_NSEC3_BITMAP_MISMATCHES_RRTYPE"
+msgid "RR type {query_type} exists at the zone apex but is missing from the NSEC3 type bitmap on name server(s) {servers}. This enables cache poisoning via RFC 8198 aggressive negative caching."
+msgstr "RR-tip {query_type} obstaja na vrhu cone, vendar manjka v NSEC3-tipski bitkarti na imenskih strežnikih {servers}. To omogoča zastrupljanje predpomnilnika prek agresivnega negativnega predpomnjenja po RFC 8198."
+
+msgctxt "DNSSEC:DS20_NSEC_BITMAP_MISMATCHES_RRTYPE"
+msgid "RR type {query_type} exists at the zone apex but is missing from the NSEC type bitmap on name server(s) {servers}. This enables cache poisoning via RFC 8198 aggressive negative caching."
+msgstr "RR-tip {query_type} obstaja na vrhu cone, vendar manjka v NSEC-tipski bitkarti na imenskih strežnikih {servers}. To omogoča zastrupljanje predpomnilnika prek agresivnega negativnega predpomnjenja po RFC 8198."
 msgid "{parent} sent a DS record, but {child} did not send a DNSKEY record."
 msgstr "{parent} sent a DS record, but {child} did not send a DNSKEY record."
 

@@ -1911,6 +1911,26 @@ msgid ""
 "name server(s) {servers}."
 msgstr "Ingen namnserver gav ett användbart DNSKEY-svar för badkey-kontroll på namnserver(ar) {servers}."
 
+
+msgctxt "DNSSEC:DS20_BITMAP_OK"
+msgid "NSEC/NSEC3 type bitmap at the zone apex correctly includes all observed RR types on name server(s) {servers}."
+msgstr "NSEC/NSEC3-typbitmappen vid zonens apex inkluderar korrekt alla observerade RR-typer på namnserver(ar) {servers}."
+
+msgctxt "DNSSEC:DS20_NO_BITMAP"
+msgid "No NSEC or NSEC3 type bitmap could be obtained for the zone apex on name server(s) {servers}."
+msgstr "Ingen NSEC- eller NSEC3-typbitmapp kunde hämtas för zonens apex på namnserver(ar) {servers}."
+
+msgctxt "DNSSEC:DS20_NO_DNSSEC"
+msgid "No nameserver returned a usable DNSKEY; NSEC/NSEC3 bitmap check skipped on name server(s) {servers}."
+msgstr "Ingen namnserver returnerade en användbar DNSKEY; NSEC/NSEC3-bitmappskontroll överhoppades på namnserver(ar) {servers}."
+
+msgctxt "DNSSEC:DS20_NSEC3_BITMAP_MISMATCHES_RRTYPE"
+msgid "RR type {query_type} exists at the zone apex but is missing from the NSEC3 type bitmap on name server(s) {servers}. This enables cache poisoning via RFC 8198 aggressive negative caching."
+msgstr "RR-typ {query_type} finns vid zonens apex men saknas i NSEC3-typbitmappen på namnserver(ar) {servers}. Detta möjliggör cacheförgiftning via aggressiv negativ cachning enligt RFC 8198."
+
+msgctxt "DNSSEC:DS20_NSEC_BITMAP_MISMATCHES_RRTYPE"
+msgid "RR type {query_type} exists at the zone apex but is missing from the NSEC type bitmap on name server(s) {servers}. This enables cache poisoning via RFC 8198 aggressive negative caching."
+msgstr "RR-typ {query_type} finns vid zonens apex men saknas i NSEC-typbitmappen på namnserver(ar) {servers}. Detta möjliggör cacheförgiftning via aggressiv negativ cachning enligt RFC 8198."
 msgid "{parent} sent a DS record, but {child} did not send a DNSKEY record."
 msgstr "{parent} sent a DS record, but {child} did not send a DNSKEY record."
 

@@ -13,8 +13,8 @@
   ],
   "summary": {
     "module_count": 9,
-    "testcase_count": 76,
-    "unique_tag_count": 468
+    "testcase_count": 78,
+    "unique_tag_count": 480
   },
   "modules": {
     "address": {
@@ -590,6 +590,17 @@
         "IPV6_DISABLED",
         "TEST_CASE_END",
         "TEST_CASE_START"
+      ],
+      "dnssec20": [
+        "DS20_BITMAP_OK",
+        "DS20_NO_BITMAP",
+        "DS20_NO_DNSSEC",
+        "DS20_NSEC3_BITMAP_MISMATCHES_RRTYPE",
+        "DS20_NSEC_BITMAP_MISMATCHES_RRTYPE",
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
+        "TEST_CASE_END",
+        "TEST_CASE_START"
       ]
     },
     "nameserver": {
@@ -926,6 +937,17 @@
         "Z12_MULTIPLE_CSYNC",
         "Z12_NO_CSYNC",
         "Z12_SERIAL_MISMATCH"
+      ],
+      "zone13": [
+        "TEST_CASE_END",
+        "TEST_CASE_START",
+        "Z13_NO_SPF_FOUND",
+        "Z13_SPF_LOOKUP_COUNT_EXCEEDED",
+        "Z13_SPF_LOOKUP_COUNT_OK",
+        "Z13_SPF_LOOKUP_LOOP",
+        "Z13_SPF_PTR_DEPRECATED",
+        "Z13_SPF_RECURSIVE_ERROR",
+        "Z13_UNABLE_TO_CHECK"
       ]
     }
   }

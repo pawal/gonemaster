@@ -1989,6 +1989,26 @@ msgid ""
 "name server(s) {servers}."
 msgstr "badkey チェック用の利用可能な DNSKEY 応答を返したネームサーバーはありませんでした（ネームサーバー: {servers}）。"
 
+
+msgctxt "DNSSEC:DS20_BITMAP_OK"
+msgid "NSEC/NSEC3 type bitmap at the zone apex correctly includes all observed RR types on name server(s) {servers}."
+msgstr "ゾーン頂点の NSEC/NSEC3 タイプビットマップは、ネームサーバー {servers} で観測されたすべての RR タイプを正しく含んでいます。"
+
+msgctxt "DNSSEC:DS20_NO_BITMAP"
+msgid "No NSEC or NSEC3 type bitmap could be obtained for the zone apex on name server(s) {servers}."
+msgstr "ネームサーバー {servers} でゾーン頂点の NSEC または NSEC3 タイプビットマップを取得できませんでした。"
+
+msgctxt "DNSSEC:DS20_NO_DNSSEC"
+msgid "No nameserver returned a usable DNSKEY; NSEC/NSEC3 bitmap check skipped on name server(s) {servers}."
+msgstr "使用可能な DNSKEY を返したネームサーバーがありません。ネームサーバー {servers} で NSEC/NSEC3 ビットマップチェックをスキップしました。"
+
+msgctxt "DNSSEC:DS20_NSEC3_BITMAP_MISMATCHES_RRTYPE"
+msgid "RR type {query_type} exists at the zone apex but is missing from the NSEC3 type bitmap on name server(s) {servers}. This enables cache poisoning via RFC 8198 aggressive negative caching."
+msgstr "RR タイプ {query_type} がゾーン頂点に存在しますが、ネームサーバー {servers} の NSEC3 タイプビットマップに含まれていません。これにより RFC 8198 の積極的ネガティブキャッシュを介したキャッシュポイズニングが可能になります。"
+
+msgctxt "DNSSEC:DS20_NSEC_BITMAP_MISMATCHES_RRTYPE"
+msgid "RR type {query_type} exists at the zone apex but is missing from the NSEC type bitmap on name server(s) {servers}. This enables cache poisoning via RFC 8198 aggressive negative caching."
+msgstr "RR タイプ {query_type} がゾーン頂点に存在しますが、ネームサーバー {servers} の NSEC タイプビットマップに含まれていません。これにより RFC 8198 の積極的ネガティブキャッシュを介したキャッシュポイズニングが可能になります。"
 msgid "{parent} sent a DS record, but {child} did not send a DNSKEY record."
 msgstr "{parent} sent a DS record, but {child} did not send a DNSKEY record."
 

@@ -1980,6 +1980,26 @@ msgid ""
 "name server(s) {servers}."
 msgstr "Ningún servidor de nombres produjo una respuesta DNSKEY utilizable para la comprobación de badkeys en los servidores de nombres {servers}."
 
+
+msgctxt "DNSSEC:DS20_BITMAP_OK"
+msgid "NSEC/NSEC3 type bitmap at the zone apex correctly includes all observed RR types on name server(s) {servers}."
+msgstr "El bitmap de tipos NSEC/NSEC3 en el ápex de la zona incluye correctamente todos los tipos RR observados en los servidores de nombres {servers}."
+
+msgctxt "DNSSEC:DS20_NO_BITMAP"
+msgid "No NSEC or NSEC3 type bitmap could be obtained for the zone apex on name server(s) {servers}."
+msgstr "No se pudo obtener ningún bitmap de tipos NSEC o NSEC3 para el ápex de la zona en los servidores de nombres {servers}."
+
+msgctxt "DNSSEC:DS20_NO_DNSSEC"
+msgid "No nameserver returned a usable DNSKEY; NSEC/NSEC3 bitmap check skipped on name server(s) {servers}."
+msgstr "Ningún servidor de nombres devolvió un DNSKEY utilizable; se omitió la comprobación del bitmap NSEC/NSEC3 en los servidores de nombres {servers}."
+
+msgctxt "DNSSEC:DS20_NSEC3_BITMAP_MISMATCHES_RRTYPE"
+msgid "RR type {query_type} exists at the zone apex but is missing from the NSEC3 type bitmap on name server(s) {servers}. This enables cache poisoning via RFC 8198 aggressive negative caching."
+msgstr "El tipo RR {query_type} existe en el ápex de la zona pero falta en el bitmap de tipos NSEC3 en los servidores de nombres {servers}. Esto permite el envenenamiento de caché mediante la caché negativa agresiva de la RFC 8198."
+
+msgctxt "DNSSEC:DS20_NSEC_BITMAP_MISMATCHES_RRTYPE"
+msgid "RR type {query_type} exists at the zone apex but is missing from the NSEC type bitmap on name server(s) {servers}. This enables cache poisoning via RFC 8198 aggressive negative caching."
+msgstr "El tipo RR {query_type} existe en el ápex de la zona pero falta en el bitmap de tipos NSEC en los servidores de nombres {servers}. Esto permite el envenenamiento de caché mediante la caché negativa agresiva de la RFC 8198."
 msgid "{parent} sent a DS record, but {child} did not send a DNSKEY record."
 msgstr "{parent} sent a DS record, but {child} did not send a DNSKEY record."
 
@@ -3365,11 +3385,11 @@ msgstr ""
 #~ msgstr "Revisando exceso de iteraciones NSEC3"
 
 #~ msgid ""
-#~ "The name \"{domain}\" of RR type \"{rrtype}\" is signed by RRSIG, but the "
+#~ "The name \"{domain}\" of RR type \"{query_type}\" is signed by RRSIG, but the "
 #~ "signature or signatures cannot be verified. Fetched from the nameservers "
 #~ "with IP addresses \"{addresses}\"."
 #~ msgstr ""
-#~ "El nombre \"{domain}\" con tipo de registro \"{rrtype}\" está firmado por "
+#~ "El nombre \"{domain}\" con tipo de registro \"{query_type}\" está firmado por "
 #~ "un RRSIG, pero la firma o firmas no se pueden verificar. Obtenido de los "
 #~ "servidores de nombres con direcciones IP \"{addresses}\"."
 
@@ -3395,11 +3415,11 @@ msgstr ""
 #~ "Obtenido de los servidores de nombres con direcciones IP \"{addresses}\"."
 
 #~ msgid ""
-#~ "The name \"{domain}\" of RR type \"{rrtype}\" in the answer section of "
+#~ "The name \"{domain}\" of RR type \"{query_type}\" in the answer section of "
 #~ "the response is not signed by any RRSIG. Fetched from the nameservers "
 #~ "with IP addresses \"{addresses}\"."
 #~ msgstr ""
-#~ "El nombre \"{domain}\" con tipo de registro \"{rrtype}\" en la sección "
+#~ "El nombre \"{domain}\" con tipo de registro \"{query_type}\" en la sección "
 #~ "\"answer\" de la respuesta no está firmada por ningún RRSIG. Obtenido de "
 #~ "los servidores de nombres con direcciones IP \"{addresses}\"."
 

@@ -532,6 +532,7 @@
             "NS_CREATED": "DEBUG2",
             "PACKET_BIG": "DEBUG",
             "QUERY": "DEBUG2",
+            "REACHABILITY_CACHE_SKIP": "DEBUG2",
             "RECURSE": "DEBUG2",
             "RECURSE_QUERY": "DEBUG2",
             "RESTORED_NS_CACHE": "DEBUG2",

@@ -857,10 +857,10 @@ func TestPacketBigEmitted(t *testing.T) {
 	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
-		// Add enough records to exceed 512 bytes.
-		for i := 0; i < 30; i++ {
+		// Add enough records to exceed 4096 bytes.
+		for i := 0; i < 250; i++ {
 			rr := &dns.A{Hdr: dns.Header{Name: fmt.Sprintf("host%d.example.", i), Class: dns.ClassINET, TTL: 300}}
-			rr.Addr = netip.AddrFrom4([4]byte{192, 0, 2, byte(i)})
+			rr.Addr = netip.AddrFrom4([4]byte{192, 0, 2, byte(i % 256)})
 			msg.Answer = append(msg.Answer, rr)
 		}
 		return packet.Packet{Msg: msg}, nil
@@ -873,8 +873,8 @@ func TestPacketBigEmitted(t *testing.T) {
 
 	for _, entry := range log.Entries() {
 		if entry != nil && entry.Tag == "PACKET_BIG" {
-			if length, ok := entry.Args["length"]; ok {
-				if l, ok := length.(int); ok && l > 512 {
+			if size, ok := entry.Args["size"]; ok {
+				if s, ok := size.(int); ok && s > 4096 {
 					return
 				}
 			}

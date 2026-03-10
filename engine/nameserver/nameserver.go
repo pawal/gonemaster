@@ -306,14 +306,11 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 			ns.state.cache.finish(cacheKey, infResp, err)
 		}
 	}
-	if resp.Msg != nil && resp.Msg.Len() > 512 {
+	if resp.Msg != nil && resp.Msg.Len() > 4096 {
 		bigArgs := map[string]any{
-			"query_name":  qname,
-			"query_type":  qtype,
-			"query_class": qclass,
-			"length":      resp.Msg.Len(),
+			"size":    resp.Msg.Len(),
+			"command": fmt.Sprintf("dig @%s %s %s", ns.Address.String(), qname, qtype),
 		}
-		logargs.SetNS(bigArgs, ns.NameString(), ns.AddressString())
 		logSystemWithLogger(runLog, "PACKET_BIG", bigArgs)
 	}
 	logCachedReturnWithLogger(runLog, resp)

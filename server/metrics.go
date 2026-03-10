@@ -107,9 +107,12 @@ type MetricsHealthSnapshot struct {
 	QueuePaused       bool      `json:"queue_paused"`
 	QueueDepth        int64     `json:"queue_depth"`
 	InFlightJobs      int64     `json:"in_flight_jobs"`
-	DNSQueriesTotal   int64     `json:"dns_queries_total"`
-	DNSQueriesIPv4    int64     `json:"dns_queries_ipv4_total"`
-	DNSQueriesIPv6    int64     `json:"dns_queries_ipv6_total"`
+	DNSQueriesTotal    int64     `json:"dns_queries_total"`
+	DNSQueriesIPv4     int64     `json:"dns_queries_ipv4_total"`
+	DNSQueriesIPv6     int64     `json:"dns_queries_ipv6_total"`
+	DNSCacheHits       int64     `json:"dns_cache_hits"`
+	DNSCacheMisses     int64     `json:"dns_cache_misses"`
+	DNSCacheEvictions  int64     `json:"dns_cache_evictions"`
 }
 
 // MetricsJobsSnapshot captures lifecycle counters for submitted jobs.

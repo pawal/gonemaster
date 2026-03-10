@@ -553,6 +553,9 @@ func (m *MetricsCollector) snapshotAtWithLimits(now time.Time, domainLimit int, 
 	dnsQueries := m.dnsQueries
 	dnsQueries4 := m.dnsQueries4
 	dnsQueries6 := m.dnsQueries6
+	dnsCacheHits := m.dnsCacheHits
+	dnsCacheMisses := m.dnsCacheMisses
+	dnsCacheEvictions := m.dnsCacheEvictions
 	submittedTotal := m.submittedTotal
 	startedTotal := m.startedTotal
 	completedTotal := m.completedTotal
@@ -605,6 +608,9 @@ func (m *MetricsCollector) snapshotAtWithLimits(now time.Time, domainLimit int, 
 			DNSQueriesTotal:   dnsQueries,
 			DNSQueriesIPv4:    dnsQueries4,
 			DNSQueriesIPv6:    dnsQueries6,
+			DNSCacheHits:      dnsCacheHits,
+			DNSCacheMisses:    dnsCacheMisses,
+			DNSCacheEvictions: dnsCacheEvictions,
 		},
 		Jobs: MetricsJobsSnapshot{
 			SubmittedTotal: submittedTotal,

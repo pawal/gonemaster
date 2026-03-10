@@ -306,6 +306,16 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 			ns.state.cache.finish(cacheKey, infResp, err)
 		}
 	}
+	if resp.Msg != nil && resp.Msg.Len() > 512 {
+		bigArgs := map[string]any{
+			"query_name":  qname,
+			"query_type":  qtype,
+			"query_class": qclass,
+			"length":      resp.Msg.Len(),
+		}
+		logargs.SetNS(bigArgs, ns.NameString(), ns.AddressString())
+		logSystemWithLogger(runLog, "PACKET_BIG", bigArgs)
+	}
 	logCachedReturnWithLogger(runLog, resp)
 	return resp, err
 }
@@ -464,17 +474,6 @@ func (ns Nameserver) queryNetwork(ctx context.Context, qname string, qtype strin
 	} else {
 		logSystem(ctx, "EXTERNAL_RESPONSE", args)
 	}
-	if resp.Msg != nil && resp.Msg.Len() > 512 {
-		bigArgs := map[string]any{
-			"query_name":  qname,
-			"query_type":  qtype,
-			"query_class": qclass,
-			"length":      resp.Msg.Len(),
-		}
-		logargs.SetNS(bigArgs, ns.NameString(), ns.AddressString())
-		logSystem(ctx, "PACKET_BIG", bigArgs)
-	}
-
 	return resp, err
 }
 

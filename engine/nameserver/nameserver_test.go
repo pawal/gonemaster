@@ -809,6 +809,80 @@ func TestQueryLogsIPBlocked(t *testing.T) {
 	t.Fatalf("expected IPV4_BLOCKED log entry")
 }
 
+func TestBlacklistingEmitsTags(t *testing.T) {
+	ctx, _ := testContext(t)
+	log := logger.FromContext(ctx)
+
+	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.90", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		return packet.Packet{}, fmt.Errorf("timeout")
+	})
+
+	// First SOA query triggers blacklisting.
+	_, _ = ns.QueryWithOptions(ctx, "example", "SOA", nil)
+	// Second query should be skipped via IS_BLACKLISTED.
+	_, _ = ns.QueryWithOptions(ctx, "example", "SOA", nil)
+
+	var hasBlacklisting, hasIsBlacklisted bool
+	for _, entry := range log.Entries() {
+		if entry == nil {
+			continue
+		}
+		switch entry.Tag {
+		case "BLACKLISTING":
+			hasBlacklisting = true
+		case "IS_BLACKLISTED":
+			hasIsBlacklisted = true
+		}
+	}
+	if !hasBlacklisting {
+		t.Fatalf("expected BLACKLISTING tag after failed SOA query")
+	}
+	if !hasIsBlacklisted {
+		t.Fatalf("expected IS_BLACKLISTED tag on second query to blacklisted NS")
+	}
+}
+
+func TestPacketBigEmitted(t *testing.T) {
+	ctx, _ := testContext(t)
+	log := logger.FromContext(ctx)
+
+	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.91", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeSuccess
+		// Add enough records to exceed 512 bytes.
+		for i := 0; i < 30; i++ {
+			rr := &dns.A{Hdr: dns.Header{Name: fmt.Sprintf("host%d.example.", i), Class: dns.ClassINET, TTL: 300}}
+			rr.Addr = netip.AddrFrom4([4]byte{192, 0, 2, byte(i)})
+			msg.Answer = append(msg.Answer, rr)
+		}
+		return packet.Packet{Msg: msg}, nil
+	})
+
+	_, err = ns.QueryWithOptions(ctx, "example", "A", nil)
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+
+	for _, entry := range log.Entries() {
+		if entry != nil && entry.Tag == "PACKET_BIG" {
+			if length, ok := entry.Args["length"]; ok {
+				if l, ok := length.(int); ok && l > 512 {
+					return
+				}
+			}
+		}
+	}
+	t.Fatalf("expected PACKET_BIG tag for large response")
+}
+
 func testContext(t *testing.T) (context.Context, *profile.Profile) {
 	t.Helper()
 	prof, err := profile.Default()

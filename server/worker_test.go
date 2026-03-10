@@ -182,11 +182,11 @@ func TestRunEngineForJobParallel(t *testing.T) {
 
 	errs := make(chan error, 2)
 	go func() {
-		_, _, _, err := srv.runEngineForJob(job1, context.Background())
+		_, _, err := srv.runEngineForJob(job1, context.Background())
 		errs <- err
 	}()
 	go func() {
-		_, _, _, err := srv.runEngineForJob(job2, context.Background())
+		_, _, err := srv.runEngineForJob(job2, context.Background())
 		errs <- err
 	}()
 
@@ -224,11 +224,11 @@ func TestRunEngineForJobLimiter(t *testing.T) {
 
 	errs := make(chan error, 2)
 	go func() {
-		_, _, _, err := srv.runEngineForJob(job1, context.Background())
+		_, _, err := srv.runEngineForJob(job1, context.Background())
 		errs <- err
 	}()
 	go func() {
-		_, _, _, err := srv.runEngineForJob(job2, context.Background())
+		_, _, err := srv.runEngineForJob(job2, context.Background())
 		errs <- err
 	}()
 
@@ -275,7 +275,7 @@ func TestRunEngineForJobPassesUndelegatedInputs(t *testing.T) {
 		},
 	}
 
-	_, _, _, err := srv.runEngineForJob(job, context.Background())
+	_, _, err := srv.runEngineForJob(job, context.Background())
 	if err != nil {
 		t.Fatalf("runEngineForJob: %v", err)
 	}
@@ -317,7 +317,7 @@ func TestRunEngineForJobPassesSourceAddrOverrides(t *testing.T) {
 		CreatedAt: time.Now().UTC(),
 	}
 
-	_, _, _, err := srv.runEngineForJob(job, context.Background())
+	_, _, err := srv.runEngineForJob(job, context.Background())
 	if err != nil {
 		t.Fatalf("runEngineForJob: %v", err)
 	}

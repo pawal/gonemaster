@@ -14,6 +14,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
+	ns "codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 )
 
@@ -103,8 +104,8 @@ func (s *Server) runJob(jobID string) error {
 	s.initProgressWriteState(job.ID, 0, now)
 	defer s.clearProgressWriteState(job.ID)
 
-	entries, ipv4Queries, ipv6Queries, runErr := s.runEngineForJob(job, jobCtx)
-	s.metrics.ObserveDNSQueries(ipv4Queries, ipv6Queries)
+	entries, qStats, runErr := s.runEngineForJob(job, jobCtx)
+	s.metrics.ObserveDNSQueries(qStats.ipv4, qStats.ipv6)
 	finishedAt := time.Now().UTC()
 
 	result := JobResult{
@@ -160,10 +161,18 @@ func (s *Server) runJob(jobID string) error {
 	return runErr
 }
 
-func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntry, int64, int64, error) {
+type jobQueryStats struct {
+	ipv4       int64
+	ipv6       int64
+	cacheHits  int64
+	cacheMisses int64
+	cacheEvictions int64
+}
+
+func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntry, jobQueryStats, error) {
 	if s.engineLimiter != nil {
 		if err := s.engineLimiter.Acquire(ctx); err != nil {
-			return nil, 0, 0, err
+			return nil, jobQueryStats{}, err
 		}
 		defer s.engineLimiter.Release()
 	}
@@ -172,11 +181,13 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 	if job.MinLevel != "" {
 		minLevel = job.MinLevel
 	}
+	cacheStore := ns.NewCacheStore()
 	req := engine.RunRequest{
 		Domain:                 job.Domain,
 		UndelegatedNameservers: job.UndelegatedNS,
 		UndelegatedDSInfo:      job.UndelegatedDS,
 		MinLevel:               minLevel,
+		NameserverCache:        cacheStore,
 		Context:                ctx,
 	}
 	if s.cfg.PositiveCacheTTL != nil {
@@ -210,7 +221,7 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 	}
 	cleanup, err := applyProfileOverrides(&req, job.Overrides, s.cfg.ProfilePath)
 	if err != nil {
-		return nil, 0, 0, err
+		return nil, jobQueryStats{}, err
 	}
 	if cleanup != nil {
 		defer cleanup()
@@ -223,16 +234,26 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 	}
 	req.LogCallback = chainLogCallbacks(callbacks...)
 
+	collectStats := func() jobQueryStats {
+		ipv4, ipv6 := queryCounter.Totals()
+		cm := cacheStore.QueryMetrics()
+		return jobQueryStats{
+			ipv4:           ipv4,
+			ipv6:           ipv6,
+			cacheHits:      int64(cm.Hits),
+			cacheMisses:    int64(cm.Misses),
+			cacheEvictions: int64(cm.Evictions),
+		}
+	}
+
 	if len(job.Tests) == 1 {
 		req.Testcase = job.Tests[0]
 		entries, err := s.runEngine(req)
-		ipv4, ipv6 := queryCounter.Totals()
-		return entries, ipv4, ipv6, err
+		return entries, collectStats(), err
 	}
 	if len(job.Tests) == 0 {
 		entries, err := s.runEngine(req)
-		ipv4, ipv6 := queryCounter.Totals()
-		return entries, ipv4, ipv6, err
+		return entries, collectStats(), err
 	}
 
 	var all []engine.LogEntry
@@ -247,13 +268,11 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 			s.updateJobProgress(job.ID, progress)
 		}
 		if err != nil {
-			ipv4, ipv6 := queryCounter.Totals()
-			return all, ipv4, ipv6, err
+			return all, collectStats(), err
 		}
 		all = append(all, entries...)
 	}
-	ipv4, ipv6 := queryCounter.Totals()
-	return all, ipv4, ipv6, nil
+	return all, collectStats(), nil
 }
 
 func (s *Server) runEngine(req engine.RunRequest) ([]engine.LogEntry, error) {

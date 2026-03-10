@@ -106,6 +106,7 @@ func (s *Server) runJob(jobID string) error {
 
 	entries, qStats, runErr := s.runEngineForJob(job, jobCtx)
 	s.metrics.ObserveDNSQueries(qStats.ipv4, qStats.ipv6)
+	s.metrics.ObserveCacheMetrics(qStats.cacheHits, qStats.cacheMisses, qStats.cacheEvictions)
 	finishedAt := time.Now().UTC()
 
 	result := JobResult{

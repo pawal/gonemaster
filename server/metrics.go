@@ -342,6 +342,28 @@ func (m *MetricsCollector) ObserveDNSQueries(ipv4Queries int64, ipv6Queries int6
 	m.mu.Unlock()
 }
 
+// ObserveCacheMetrics records DNS resolver cache hit/miss/eviction counters.
+func (m *MetricsCollector) ObserveCacheMetrics(hits int64, misses int64, evictions int64) {
+	if hits < 0 {
+		hits = 0
+	}
+	if misses < 0 {
+		misses = 0
+	}
+	if evictions < 0 {
+		evictions = 0
+	}
+	if hits == 0 && misses == 0 && evictions == 0 {
+		return
+	}
+
+	m.mu.Lock()
+	m.dnsCacheHits += hits
+	m.dnsCacheMisses += misses
+	m.dnsCacheEvictions += evictions
+	m.mu.Unlock()
+}
+
 // ObserveJobSubmitted records a submitted job without batch/domain context.
 func (m *MetricsCollector) ObserveJobSubmitted(initialStatus JobStatus) {
 	m.ObserveJobSubmittedWithContext("", "", initialStatus)

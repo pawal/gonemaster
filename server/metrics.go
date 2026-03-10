@@ -207,9 +207,12 @@ type MetricsCollector struct {
 	queuePaused bool
 	queueDepth  int64
 	inFlight    int64
-	dnsQueries  int64
-	dnsQueries4 int64
-	dnsQueries6 int64
+	dnsQueries        int64
+	dnsQueries4       int64
+	dnsQueries6       int64
+	dnsCacheHits      int64
+	dnsCacheMisses    int64
+	dnsCacheEvictions int64
 
 	submittedTotal int64
 	startedTotal   int64

@@ -34,10 +34,10 @@ _Do not edit by hand - regenerate with the command above._
 | `B02_UNEXPECTED_RCODE` | `ERROR` | [basic02](../tests/basic/basic02.md) | yes |
 | `HAS_A_RECORDS` | `ERROR` | [basic03](../tests/basic/basic03.md) | yes |
 | `HAS_NAMESERVER_NO_WWW_A_TEST` | `INFO` | [basic03](../tests/basic/basic03.md) | yes |
-| `IPV4_DISABLED` | `DEBUG` | [basic01](../tests/basic/basic01.md), [basic02](../tests/basic/basic02.md), [basic03](../tests/basic/basic03.md) | yes |
-| `IPV4_ENABLED` | `DEBUG` | [basic01](../tests/basic/basic01.md), [basic02](../tests/basic/basic02.md), [basic03](../tests/basic/basic03.md) | yes |
-| `IPV6_DISABLED` | `DEBUG` | [basic01](../tests/basic/basic01.md), [basic02](../tests/basic/basic02.md), [basic03](../tests/basic/basic03.md) | yes |
-| `IPV6_ENABLED` | `DEBUG` | [basic01](../tests/basic/basic01.md), [basic02](../tests/basic/basic02.md), [basic03](../tests/basic/basic03.md) | yes |
+| `IPV4_DISABLED` | `DEBUG2` | [basic01](../tests/basic/basic01.md), [basic02](../tests/basic/basic02.md), [basic03](../tests/basic/basic03.md) | yes |
+| `IPV4_ENABLED` | `DEBUG2` | [basic01](../tests/basic/basic01.md), [basic02](../tests/basic/basic02.md), [basic03](../tests/basic/basic03.md) | yes |
+| `IPV6_DISABLED` | `DEBUG2` | [basic01](../tests/basic/basic01.md), [basic02](../tests/basic/basic02.md), [basic03](../tests/basic/basic03.md) | yes |
+| `IPV6_ENABLED` | `DEBUG2` | [basic01](../tests/basic/basic01.md), [basic02](../tests/basic/basic02.md), [basic03](../tests/basic/basic03.md) | yes |
 | `LOOP_PROTECTION` | `DEBUG2` | [basic01](../tests/basic/basic01.md) | yes |
 | `NO_A_RECORDS` | `DEBUG` | [basic03](../tests/basic/basic03.md) | yes |
 | `TEST_CASE_END` | `DEBUG` | [basic01](../tests/basic/basic01.md), [basic02](../tests/basic/basic02.md), [basic03](../tests/basic/basic03.md) | yes |

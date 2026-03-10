@@ -3125,6 +3125,10 @@ msgctxt "SYSTEM:GLOBAL_VERSION"
 msgid "Using version {version} of the Gonemaster engine."
 msgstr "Anvender version {version} af Gonemasters testmotor."
 
+msgctxt "SYSTEM:IPV6_AUTO_DISABLED"
+msgid "IPv6 automatically disabled: {reason}."
+msgstr "IPv6 automatisk deaktiveret: {reason}."
+
 msgctxt "SYSTEM:LOGGER_CALLBACK_ERROR"
 msgid "Logger callback died with error: {exception}"
 msgstr ""

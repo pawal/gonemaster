@@ -51,11 +51,11 @@ _Do not edit by hand - regenerate with the command above._
 | `EMPTY_ASN_SET` | `NOTICE` | [connectivity03](../tests/connectivity/connectivity03.md) | yes |
 | `ERROR_ASN_DATABASE` | `NOTICE` | [connectivity03](../tests/connectivity/connectivity03.md) | yes |
 | `IPV4_DIFFERENT_ASN` | `INFO` | [connectivity03](../tests/connectivity/connectivity03.md) | yes |
-| `IPV4_DISABLED` | `DEBUG` | [connectivity01](../tests/connectivity/connectivity01.md), [connectivity02](../tests/connectivity/connectivity02.md) | yes |
+| `IPV4_DISABLED` | `DEBUG2` | [connectivity01](../tests/connectivity/connectivity01.md), [connectivity02](../tests/connectivity/connectivity02.md) | yes |
 | `IPV4_ONE_ASN` | `WARNING` | [connectivity03](../tests/connectivity/connectivity03.md) | yes |
 | `IPV4_SAME_ASN` | `NOTICE` | [connectivity03](../tests/connectivity/connectivity03.md) | yes |
 | `IPV6_DIFFERENT_ASN` | `INFO` | [connectivity03](../tests/connectivity/connectivity03.md) | yes |
-| `IPV6_DISABLED` | `DEBUG` | [connectivity01](../tests/connectivity/connectivity01.md), [connectivity02](../tests/connectivity/connectivity02.md) | yes |
+| `IPV6_DISABLED` | `DEBUG2` | [connectivity01](../tests/connectivity/connectivity01.md), [connectivity02](../tests/connectivity/connectivity02.md) | yes |
 | `IPV6_ONE_ASN` | `WARNING` | [connectivity03](../tests/connectivity/connectivity03.md) | yes |
 | `IPV6_SAME_ASN` | `NOTICE` | [connectivity03](../tests/connectivity/connectivity03.md) | yes |
 | `TEST_CASE_END` | `DEBUG` | [connectivity01](../tests/connectivity/connectivity01.md), [connectivity02](../tests/connectivity/connectivity02.md), [connectivity03](../tests/connectivity/connectivity03.md), [connectivity04](../tests/connectivity/connectivity04.md) | yes |

@@ -3303,6 +3303,10 @@ msgctxt "SYSTEM:GLOBAL_VERSION"
 msgid "Using version {version} of the Gonemaster engine."
 msgstr "Usando la versión {version} del motor Gonemaster."
 
+msgctxt "SYSTEM:IPV6_AUTO_DISABLED"
+msgid "IPv6 automatically disabled: {reason}."
+msgstr "IPv6 desactivado automáticamente: {reason}."
+
 msgctxt "SYSTEM:LOGGER_CALLBACK_ERROR"
 msgid "Logger callback died with error: {exception}"
 msgstr "La llamada al registro de operación murió con el error: {exception}"

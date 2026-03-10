@@ -73,6 +73,7 @@ func TestSystemSeverityParity(t *testing.T) {
 		"START_TIME":                 "DEBUG",
 		"TEST_TARGET":                "DEBUG",
 		"GLOBAL_VERSION":             "INFO",
+		"IPV6_AUTO_DISABLED":         "INFO",
 		"FAKE_DELEGATION_IN_ZONE_NO_IP": "ERROR",
 		"FAKE_DELEGATION_NO_IP":      "ERROR",
 		"CANNOT_CONTINUE":            "CRITICAL",

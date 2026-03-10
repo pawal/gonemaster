@@ -495,7 +495,7 @@ func RunWithRunner(req RunRequest, runner *Runner) ([]LogEntry, error) {
 	ctx = WithRunner(ctx, runner)
 
 	if runner.AutoIPv6Disabled {
-		if _, err := runner.Logger.AddWithoutCallback("IPV6_DISABLED", map[string]any{"reason": "auto_no_global_ipv6"}, "", ""); err != nil {
+		if _, err := runner.Logger.AddWithoutCallback("IPV6_AUTO_DISABLED", map[string]any{"reason": "no global IPv6 address detected"}, "", ""); err != nil {
 			return nil, err
 		}
 	}

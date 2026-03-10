@@ -25,8 +25,8 @@ _Do not edit by hand - regenerate with the command above._
 | `ENOUGH_NS_DEL` | `INFO` | [delegation01](../tests/delegation/delegation01.md) | yes |
 | `EXTRA_NAME_CHILD` | `NOTICE` | [delegation07](../tests/delegation/delegation07.md) | yes |
 | `EXTRA_NAME_PARENT` | `ERROR` | [delegation07](../tests/delegation/delegation07.md) | yes |
-| `IPV4_DISABLED` | `DEBUG` | [delegation04](../tests/delegation/delegation04.md), [delegation05](../tests/delegation/delegation05.md), [delegation06](../tests/delegation/delegation06.md) | yes |
-| `IPV6_DISABLED` | `DEBUG` | [delegation04](../tests/delegation/delegation04.md), [delegation05](../tests/delegation/delegation05.md), [delegation06](../tests/delegation/delegation06.md) | yes |
+| `IPV4_DISABLED` | `DEBUG2` | [delegation04](../tests/delegation/delegation04.md), [delegation05](../tests/delegation/delegation05.md), [delegation06](../tests/delegation/delegation06.md) | yes |
+| `IPV6_DISABLED` | `DEBUG2` | [delegation04](../tests/delegation/delegation04.md), [delegation05](../tests/delegation/delegation05.md), [delegation06](../tests/delegation/delegation06.md) | yes |
 | `IS_NOT_AUTHORITATIVE` | `WARNING` | [delegation04](../tests/delegation/delegation04.md) | yes |
 | `NAMES_MATCH` | `INFO` | [delegation07](../tests/delegation/delegation07.md) | yes |
 | `NOT_ENOUGH_IPV4_NS_CHILD` | `ERROR` | [delegation01](../tests/delegation/delegation01.md) | yes |

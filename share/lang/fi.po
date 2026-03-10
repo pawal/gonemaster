@@ -2691,6 +2691,10 @@ msgctxt "SYSTEM:GLOBAL_VERSION"
 msgid "Using version {version} of the Gonemaster engine."
 msgstr "Käytössä on Gonemaster-moottorin versio {version}."
 
+msgctxt "SYSTEM:IPV6_AUTO_DISABLED"
+msgid "IPv6 automatically disabled: {reason}."
+msgstr "IPv6 poistettu automaattisesti käytöstä: {reason}."
+
 msgctxt "SYSTEM:LOGGER_CALLBACK_ERROR"
 msgid "Logger callback died with error: {exception}"
 msgstr "Tallentimen takaisinkutsu loppui virheeseen: {exception}"

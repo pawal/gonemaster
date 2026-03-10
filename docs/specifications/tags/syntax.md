@@ -13,8 +13,8 @@ _Do not edit by hand - regenerate with the command above._
 | --- | --- | --- | --- |
 | `DISCOURAGED_DOUBLE_DASH` | `WARNING` | [syntax03](../tests/syntax/syntax03.md) | yes |
 | `INITIAL_HYPHEN` | `ERROR` | [syntax02](../tests/syntax/syntax02.md) | yes |
-| `IPV4_DISABLED` | `DEBUG` | [syntax06](../tests/syntax/syntax06.md) | yes |
-| `IPV6_DISABLED` | `DEBUG` | [syntax06](../tests/syntax/syntax06.md) | yes |
+| `IPV4_DISABLED` | `DEBUG2` | [syntax06](../tests/syntax/syntax06.md) | yes |
+| `IPV6_DISABLED` | `DEBUG2` | [syntax06](../tests/syntax/syntax06.md) | yes |
 | `MNAME_DISCOURAGED_DOUBLE_DASH` | `WARNING` | [syntax07](../tests/syntax/syntax07.md) | yes |
 | `MNAME_NON_ALLOWED_CHARS` | `WARNING` | [syntax07](../tests/syntax/syntax07.md) | yes |
 | `MNAME_NUMERIC_TLD` | `WARNING` | [syntax07](../tests/syntax/syntax07.md) | yes |

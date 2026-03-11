@@ -595,7 +595,17 @@
     api_p90: "help_api_p90",
     avg_job_duration: "help_avg_duration",
     completed_total: "help_completed",
-    failed_total: "help_failed"
+    failed_total: "help_failed",
+    dns_cache_hits: "help_cache_hits",
+    dns_cache_hit_rate: "help_cache_hit_rate",
+    dns_queries_total: "help_total_queries"
+  };
+  const metricsCacheHitRate = (snapshot) => {
+    const hits = snapshot?.health?.dns_cache_hits || 0;
+    const misses = snapshot?.health?.dns_cache_misses || 0;
+    const total = hits + misses;
+    if (total === 0) return 0;
+    return hits / total;
   };
   const lastLoadedLabel = (value) => {
     if (!value) return "never";
@@ -2084,53 +2094,92 @@ example.org`}
           <div class="notice">{$t("metrics_stale_error", { error: metricsError })}</div>
         {/if}
 
-        <div class="summary-grid metrics-summary-grid">
-          <div class="summary-item" title={$t(metricsCardHelp.queue_depth)}>
-            <span class="summary-label">{$t("metric_queue_depth")}</span>
-            <span class="summary-count">{formatInteger(metricsSnapshot?.health?.queue_depth)}</span>
-          </div>
-          <div class="summary-item" title={$t(metricsCardHelp.in_flight_jobs)}>
-            <span class="summary-label">{$t("metric_in_flight")}</span>
-            <span class="summary-count">{formatInteger(metricsSnapshot?.health?.in_flight_jobs)}</span>
-          </div>
-          <div class="summary-item" title={$t(metricsCardHelp.dns_queries_ipv4_total)}>
-            <span class="summary-label">{$t("metric_ipv4_queries")}</span>
-            <span class="summary-count">{formatCompactInteger(metricsSnapshot?.health?.dns_queries_ipv4_total)}</span>
-          </div>
-          <div class="summary-item" title={$t(metricsCardHelp.dns_queries_ipv6_total)}>
-            <span class="summary-label">{$t("metric_ipv6_queries")}</span>
-            <span class="summary-count">{formatCompactInteger(metricsSnapshot?.health?.dns_queries_ipv6_total)}</span>
-          </div>
-          <div class="summary-item" title={$t(metricsCardHelp.success_rate)}>
-            <span class="summary-label">{$t("metric_success_rate")}</span>
-            <span class="summary-count">{formatPercent(metricsSnapshot?.quality?.outcomes?.success_rate)}</span>
-          </div>
-          <div class="summary-item" title={$t(metricsCardHelp.failed_rate)}>
-            <span class="summary-label">{$t("metric_failure_rate")}</span>
-            <span class="summary-count">{formatPercent(metricsSnapshot?.quality?.outcomes?.failed_rate)}</span>
-          </div>
-          <div class="summary-item" title={$t(metricsCardHelp.api_p90)}>
-            <span class="summary-label">{$t("metric_api_p90")}</span>
-            <span class="summary-count">{formatDurationMs(metricsTopAPIP90(metricsSnapshot))}</span>
-          </div>
-          <div class="summary-item" title={$t(metricsCardHelp.avg_job_duration)}>
-            <span class="summary-label">{$t("metric_avg_duration")}</span>
-            <span class="summary-count">{formatDurationMs(metricsSnapshot?.quality?.job_duration_ms?.avg)}</span>
-          </div>
-          <div class="summary-item jobs-finished" title={$t(metricsCardHelp.completed_total)}>
-            <span class="summary-label">{$t("metric_completed")}</span>
-            <span class="summary-count">{formatInteger(metricsSnapshot?.jobs?.completed_total)}</span>
-          </div>
-          <div class="summary-item failed-jobs" title={$t(metricsCardHelp.failed_total)}>
-            <span class="summary-label">{$t("metric_failed")}</span>
-            <span class="summary-count">{formatInteger(metricsSnapshot?.quality?.outcomes?.failed_total)}</span>
-          </div>
-          {#each summaryLevels as level}
-            <div class={`summary-item severity-${level.toLowerCase()}`} title={$t("help_severity_card", { level })}>
-              <span class="summary-label">{level}</span>
-              <span class="summary-count">{formatInteger(severityTotals[level])}</span>
+        <div class="metrics-card-group">
+          <h4 class="metrics-group-heading">{$t("metrics_group_queue")}</h4>
+          <div class="summary-grid metrics-summary-grid">
+            <div class="summary-item" title={$t(metricsCardHelp.queue_depth)}>
+              <span class="summary-label">{$t("metric_queue_depth")}</span>
+              <span class="summary-count">{formatInteger(metricsSnapshot?.health?.queue_depth)}</span>
             </div>
-          {/each}
+            <div class="summary-item" title={$t(metricsCardHelp.in_flight_jobs)}>
+              <span class="summary-label">{$t("metric_in_flight")}</span>
+              <span class="summary-count">{formatInteger(metricsSnapshot?.health?.in_flight_jobs)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="metrics-card-group">
+          <h4 class="metrics-group-heading">{$t("metrics_group_dns")}</h4>
+          <div class="summary-grid metrics-summary-grid">
+            <div class="summary-item" title={$t(metricsCardHelp.dns_queries_ipv4_total)}>
+              <span class="summary-label">{$t("metric_ipv4_queries")}</span>
+              <span class="summary-count">{formatCompactInteger(metricsSnapshot?.health?.dns_queries_ipv4_total)}</span>
+            </div>
+            <div class="summary-item" title={$t(metricsCardHelp.dns_queries_ipv6_total)}>
+              <span class="summary-label">{$t("metric_ipv6_queries")}</span>
+              <span class="summary-count">{formatCompactInteger(metricsSnapshot?.health?.dns_queries_ipv6_total)}</span>
+            </div>
+            <div class="summary-item" title={$t(metricsCardHelp.dns_cache_hits)}>
+              <span class="summary-label">{$t("metric_cache_hits")}</span>
+              <span class="summary-count">{formatCompactInteger(metricsSnapshot?.health?.dns_cache_hits)}</span>
+            </div>
+            <div class="summary-item" title={$t(metricsCardHelp.dns_cache_hit_rate)}>
+              <span class="summary-label">{$t("metric_cache_hit_rate")}</span>
+              <span class="summary-count">{formatPercent(metricsCacheHitRate(metricsSnapshot))}</span>
+            </div>
+            <div class="summary-item" title={$t(metricsCardHelp.dns_queries_total)}>
+              <span class="summary-label">{$t("metric_total_queries")}</span>
+              <span class="summary-count">{formatCompactInteger((metricsSnapshot?.health?.dns_queries_total || 0) + (metricsSnapshot?.health?.dns_cache_hits || 0))}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="metrics-card-group">
+          <h4 class="metrics-group-heading">{$t("metrics_group_jobs")}</h4>
+          <div class="summary-grid metrics-summary-grid">
+            <div class="summary-item jobs-finished" title={$t(metricsCardHelp.completed_total)}>
+              <span class="summary-label">{$t("metric_completed")}</span>
+              <span class="summary-count">{formatInteger(metricsSnapshot?.jobs?.completed_total)}</span>
+            </div>
+            <div class="summary-item failed-jobs" title={$t(metricsCardHelp.failed_total)}>
+              <span class="summary-label">{$t("metric_failed")}</span>
+              <span class="summary-count">{formatInteger(metricsSnapshot?.quality?.outcomes?.failed_total)}</span>
+            </div>
+            <div class="summary-item" title={$t(metricsCardHelp.success_rate)}>
+              <span class="summary-label">{$t("metric_success_rate")}</span>
+              <span class="summary-count">{formatPercent(metricsSnapshot?.quality?.outcomes?.success_rate)}</span>
+            </div>
+            <div class="summary-item" title={$t(metricsCardHelp.failed_rate)}>
+              <span class="summary-label">{$t("metric_failure_rate")}</span>
+              <span class="summary-count">{formatPercent(metricsSnapshot?.quality?.outcomes?.failed_rate)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="metrics-card-group">
+          <h4 class="metrics-group-heading">{$t("metrics_group_performance")}</h4>
+          <div class="summary-grid metrics-summary-grid">
+            <div class="summary-item" title={$t(metricsCardHelp.avg_job_duration)}>
+              <span class="summary-label">{$t("metric_avg_duration")}</span>
+              <span class="summary-count">{formatDurationMs(metricsSnapshot?.quality?.job_duration_ms?.avg)}</span>
+            </div>
+            <div class="summary-item" title={$t(metricsCardHelp.api_p90)}>
+              <span class="summary-label">{$t("metric_api_p90")}</span>
+              <span class="summary-count">{formatDurationMs(metricsTopAPIP90(metricsSnapshot))}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="metrics-card-group">
+          <h4 class="metrics-group-heading">{$t("metrics_group_severity")}</h4>
+          <div class="summary-grid metrics-summary-grid">
+            {#each summaryLevels as level}
+              <div class={`summary-item severity-${level.toLowerCase()}`} title={$t("help_severity_card", { level })}>
+                <span class="summary-label">{level}</span>
+                <span class="summary-count">{formatInteger(severityTotals[level])}</span>
+              </div>
+            {/each}
+          </div>
         </div>
 
         <div class="metrics-trend-grid">

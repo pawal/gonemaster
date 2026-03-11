@@ -598,7 +598,7 @@
     failed_total: "help_failed",
     dns_cache_hits: "help_cache_hits",
     dns_cache_hit_rate: "help_cache_hit_rate",
-    dns_queries_total: "help_total_queries"
+    dns_lookups_total: "help_dns_lookups"
   };
   const metricsCacheHitRate = (snapshot) => {
     const hits = snapshot?.health?.dns_cache_hits || 0;
@@ -2111,13 +2111,9 @@ example.org`}
         <div class="metrics-card-group">
           <h4 class="metrics-group-heading">{$t("metrics_group_dns")}</h4>
           <div class="summary-grid metrics-summary-grid">
-            <div class="summary-item" title={$t(metricsCardHelp.dns_queries_ipv4_total)}>
-              <span class="summary-label">{$t("metric_ipv4_queries")}</span>
-              <span class="summary-count">{formatCompactInteger(metricsSnapshot?.health?.dns_queries_ipv4_total)}</span>
-            </div>
-            <div class="summary-item" title={$t(metricsCardHelp.dns_queries_ipv6_total)}>
-              <span class="summary-label">{$t("metric_ipv6_queries")}</span>
-              <span class="summary-count">{formatCompactInteger(metricsSnapshot?.health?.dns_queries_ipv6_total)}</span>
+            <div class="summary-item" title={$t(metricsCardHelp.dns_lookups_total)}>
+              <span class="summary-label">{$t("metric_dns_lookups")}</span>
+              <span class="summary-count">{formatCompactInteger((metricsSnapshot?.health?.dns_cache_hits || 0) + (metricsSnapshot?.health?.dns_cache_misses || 0))}</span>
             </div>
             <div class="summary-item" title={$t(metricsCardHelp.dns_cache_hits)}>
               <span class="summary-label">{$t("metric_cache_hits")}</span>
@@ -2127,9 +2123,13 @@ example.org`}
               <span class="summary-label">{$t("metric_cache_hit_rate")}</span>
               <span class="summary-count">{formatPercent(metricsCacheHitRate(metricsSnapshot))}</span>
             </div>
-            <div class="summary-item" title={$t(metricsCardHelp.dns_queries_total)}>
-              <span class="summary-label">{$t("metric_total_queries")}</span>
-              <span class="summary-count">{formatCompactInteger((metricsSnapshot?.health?.dns_queries_total || 0) + (metricsSnapshot?.health?.dns_cache_hits || 0))}</span>
+            <div class="summary-item" title={$t(metricsCardHelp.dns_queries_ipv4_total)}>
+              <span class="summary-label">{$t("metric_ipv4_queries")}</span>
+              <span class="summary-count">{formatCompactInteger(metricsSnapshot?.health?.dns_queries_ipv4_total)}</span>
+            </div>
+            <div class="summary-item" title={$t(metricsCardHelp.dns_queries_ipv6_total)}>
+              <span class="summary-label">{$t("metric_ipv6_queries")}</span>
+              <span class="summary-count">{formatCompactInteger(metricsSnapshot?.health?.dns_queries_ipv6_total)}</span>
             </div>
           </div>
         </div>

@@ -1354,8 +1354,20 @@ func TestMetricsEndpointSupportsIncludeWindowAndLimits(t *testing.T) {
 	if len(windows) != 1 {
 		t.Fatalf("trends.windows size = %d, want 1", len(windows))
 	}
-	if _, ok := windows["1h"]; !ok {
+	window1h, ok := windows["1h"]
+	if !ok {
 		t.Fatalf("expected trends window 1h, got %+v", windows)
+	}
+	points := window1h.(map[string]any)["points"].([]any)
+	if len(points) == 0 {
+		t.Fatal("expected at least one trend point")
+	}
+	point, ok := points[0].(map[string]any)
+	if !ok {
+		t.Fatalf("unexpected trend point type: %T", points[0])
+	}
+	if _, ok := point["dns_cache_hit_rate"]; !ok {
+		t.Fatalf("expected dns_cache_hit_rate in trend point, got %+v", point)
 	}
 }
 

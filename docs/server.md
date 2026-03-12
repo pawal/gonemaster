@@ -371,6 +371,9 @@ Responses:
 - `200` JSON snapshot.
 - `400` structured error for invalid query params.
 
+Trend points in the metrics snapshot include throughput, failures, DNS query
+rates, and per-bucket cache hit rate.
+
 The metrics endpoint caches rendered responses for 1 second per unique query option set.
 
 For full Metrics API details and Metrics tab notes, see `docs/metrics.md`.

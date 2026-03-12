@@ -54,6 +54,7 @@ Commonly used fields:
 - `insights.domains.items[]`
 - `insights.batches.items[]`
 - `trends.windows["1h"|"6h"|"24h"|"48h"]`
+- `trends.windows[...].points[].dns_cache_hit_rate`
 
 ## Examples
 

@@ -139,6 +139,9 @@ func TestMetricsCollectorZeroStateSnapshot(t *testing.T) {
 	if got := len(snapshot.Trends.Windows["48h"].Points); got != 576 {
 		t.Fatalf("trends.windows[48h].points size = %d, want 576", got)
 	}
+	if first := snapshot.Trends.Windows["1h"].Points[0]; first.DNSCacheHitRate != 0 {
+		t.Fatalf("trends.windows[1h].points[0].dns_cache_hit_rate = %f, want 0", first.DNSCacheHitRate)
+	}
 	if snapshot.Insights.Batches.Limit != metricsDefaultBatchLimit {
 		t.Fatalf("insights.batches.limit = %d, want %d", snapshot.Insights.Batches.Limit, metricsDefaultBatchLimit)
 	}

@@ -56,6 +56,7 @@ type MetricsTrendPoint struct {
 	DNSQueriesPerSecond     float64          `json:"dns_queries_per_second"`
 	DNSQueriesIPv4PerSecond float64          `json:"dns_queries_ipv4_per_second"`
 	DNSQueriesIPv6PerSecond float64          `json:"dns_queries_ipv6_per_second"`
+	DNSCacheHitRate         float64          `json:"dns_cache_hit_rate"`
 	Severity                map[string]int64 `json:"severity"`
 	APIP90Ms                map[string]int64 `json:"api_p90_ms,omitempty"`
 }

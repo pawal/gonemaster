@@ -1283,6 +1283,8 @@ func TestMetricsEndpointValidatesQueryParams(t *testing.T) {
 
 func TestMetricsEndpointSupportsIncludeWindowAndLimits(t *testing.T) {
 	srv := New(DefaultConfig())
+	now := time.Date(2026, 2, 9, 10, 0, 0, 0, time.UTC)
+	srv.metrics.nowFn = func() time.Time { return now }
 	srv.metrics.ObserveJobSubmittedWithContext("batch-a", "alpha.example", JobQueued)
 	srv.metrics.ObserveJobStatusTransition(JobQueued, JobSucceeded)
 	srv.metrics.ObserveJobCompletionWithContext("batch-a", "alpha.example", JobSucceeded, 1200*time.Millisecond, map[string]int64{
@@ -1293,6 +1295,7 @@ func TestMetricsEndpointSupportsIncludeWindowAndLimits(t *testing.T) {
 	srv.metrics.ObserveJobCompletionWithContext("batch-b", "beta.example", JobFailed, 1800*time.Millisecond, map[string]int64{
 		"ERROR": 2,
 	})
+	srv.metrics.ObserveCacheMetrics(9, 3, 1)
 
 	resp := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/metrics?include=health,insights,trends&window=1h&limit_domains=1&limit_batches=1", nil)
@@ -1362,12 +1365,26 @@ func TestMetricsEndpointSupportsIncludeWindowAndLimits(t *testing.T) {
 	if len(points) == 0 {
 		t.Fatal("expected at least one trend point")
 	}
-	point, ok := points[0].(map[string]any)
-	if !ok {
-		t.Fatalf("unexpected trend point type: %T", points[0])
+	maxHitRate := 0.0
+	for _, rawPoint := range points {
+		point, ok := rawPoint.(map[string]any)
+		if !ok {
+			t.Fatalf("unexpected trend point type: %T", rawPoint)
+		}
+		value, ok := point["dns_cache_hit_rate"]
+		if !ok {
+			t.Fatalf("expected dns_cache_hit_rate in trend point, got %+v", point)
+		}
+		rate, ok := value.(float64)
+		if !ok {
+			t.Fatalf("unexpected dns_cache_hit_rate type: %T", value)
+		}
+		if rate > maxHitRate {
+			maxHitRate = rate
+		}
 	}
-	if _, ok := point["dns_cache_hit_rate"]; !ok {
-		t.Fatalf("expected dns_cache_hit_rate in trend point, got %+v", point)
+	if maxHitRate <= 0 {
+		t.Fatalf("expected positive dns_cache_hit_rate, got %v", maxHitRate)
 	}
 }
 

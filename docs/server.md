@@ -372,7 +372,7 @@ Responses:
 - `400` structured error for invalid query params.
 
 Trend points in the metrics snapshot include throughput, failures, DNS query
-rates, and per-bucket cache hit rate.
+rates, and per-bucket cache hit rate (`0..1`).
 
 The metrics endpoint caches rendered responses for 1 second per unique query option set.
 

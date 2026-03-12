@@ -62,16 +62,19 @@ type MetricsTrendPoint struct {
 }
 
 type trendBucket struct {
-	Start         time.Time
-	Throughput    int64
-	Failed        int64
-	QueueDepth    int64
-	QueueDepthSet bool
-	DNSQueries    int64
-	DNSQueries4   int64
-	DNSQueries6   int64
-	Severity      map[string]int64
-	APILatency    map[string]boundedHistogram
+	Start          time.Time
+	Throughput     int64
+	Failed         int64
+	QueueDepth     int64
+	QueueDepthSet  bool
+	DNSQueries     int64
+	DNSQueries4    int64
+	DNSQueries6    int64
+	CacheHits      int64
+	CacheMisses    int64
+	CacheEvictions int64
+	Severity       map[string]int64
+	APILatency     map[string]boundedHistogram
 }
 
 type trendRing struct {
@@ -113,6 +116,11 @@ func (m *MetricsCollector) observeTrendQueueDepthLocked(now time.Time, queueDept
 func (m *MetricsCollector) observeTrendDNSQueriesLocked(now time.Time, ipv4Queries int64, ipv6Queries int64) {
 	m.trend1m.ObserveDNSQueries(now, ipv4Queries, ipv6Queries)
 	m.trend5m.ObserveDNSQueries(now, ipv4Queries, ipv6Queries)
+}
+
+func (m *MetricsCollector) observeTrendCacheMetricsLocked(now time.Time, hits int64, misses int64, evictions int64) {
+	m.trend1m.ObserveCacheMetrics(now, hits, misses, evictions)
+	m.trend5m.ObserveCacheMetrics(now, hits, misses, evictions)
 }
 
 func (m *MetricsCollector) observeTrendOutcomeLocked(now time.Time, status JobStatus) {
@@ -182,6 +190,29 @@ func (r *trendRing) ObserveDNSQueries(at time.Time, ipv4Queries int64, ipv6Queri
 	bucket.DNSQueries += totalQueries
 	bucket.DNSQueries4 += ipv4Queries
 	bucket.DNSQueries6 += ipv6Queries
+}
+
+// ObserveCacheMetrics adds cache counters to the bucket containing the timestamp.
+func (r *trendRing) ObserveCacheMetrics(at time.Time, hits int64, misses int64, evictions int64) {
+	if hits < 0 {
+		hits = 0
+	}
+	if misses < 0 {
+		misses = 0
+	}
+	if evictions < 0 {
+		evictions = 0
+	}
+	if hits == 0 && misses == 0 && evictions == 0 {
+		return
+	}
+	bucket := r.bucketForWrite(at)
+	if bucket == nil {
+		return
+	}
+	bucket.CacheHits += hits
+	bucket.CacheMisses += misses
+	bucket.CacheEvictions += evictions
 }
 
 // ObserveOutcome adds terminal job outcome counters to the current bucket.
@@ -278,6 +309,10 @@ func (r *trendRing) Snapshot(now time.Time, window time.Duration) MetricsTrendWi
 				point.DNSQueriesIPv4PerSecond = float64(bucket.DNSQueries4) / resolutionSeconds
 				point.DNSQueriesIPv6PerSecond = float64(bucket.DNSQueries6) / resolutionSeconds
 			}
+			totalLookups := bucket.CacheHits + bucket.CacheMisses
+			if totalLookups > 0 {
+				point.DNSCacheHitRate = float64(bucket.CacheHits) / float64(totalLookups)
+			}
 			if bucket.Severity != nil {
 				point.Severity = copyStringCounts(bucket.Severity)
 			}
@@ -365,6 +400,9 @@ func resetTrendBucket(bucket *trendBucket, start time.Time) {
 	bucket.DNSQueries = 0
 	bucket.DNSQueries4 = 0
 	bucket.DNSQueries6 = 0
+	bucket.CacheHits = 0
+	bucket.CacheMisses = 0
+	bucket.CacheEvictions = 0
 	bucket.Severity = nil
 	bucket.APILatency = nil
 }

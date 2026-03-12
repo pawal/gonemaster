@@ -287,10 +287,13 @@ func TestMetricsCollectorTracksDNSQueries(t *testing.T) {
 func TestMetricsCollectorTracksCacheMetrics(t *testing.T) {
 	cfg := DefaultConfig()
 	startedAt := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+	now := startedAt
 	collector := newMetricsCollector(cfg, startedAt)
+	collector.nowFn = func() time.Time { return now }
 
 	// First job run: some hits and misses.
 	collector.ObserveCacheMetrics(10, 5, 1)
+	now = now.Add(30 * time.Second)
 	// Second job run: more accumulation.
 	collector.ObserveCacheMetrics(20, 3, 2)
 
@@ -303,6 +306,15 @@ func TestMetricsCollectorTracksCacheMetrics(t *testing.T) {
 	}
 	if snapshot.Health.DNSCacheEvictions != 3 {
 		t.Fatalf("health.dns_cache_evictions = %d, want 3", snapshot.Health.DNSCacheEvictions)
+	}
+	maxHitRate := 0.0
+	for _, point := range snapshot.Trends.Windows["1h"].Points {
+		if point.DNSCacheHitRate > maxHitRate {
+			maxHitRate = point.DNSCacheHitRate
+		}
+	}
+	if math.Abs(maxHitRate-(30.0/38.0)) > 0.0001 {
+		t.Fatalf("trends.windows[1h].max.dns_cache_hit_rate = %f, want %f", maxHitRate, 30.0/38.0)
 	}
 }
 

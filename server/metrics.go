@@ -107,12 +107,12 @@ type MetricsHealthSnapshot struct {
 	QueuePaused       bool      `json:"queue_paused"`
 	QueueDepth        int64     `json:"queue_depth"`
 	InFlightJobs      int64     `json:"in_flight_jobs"`
-	DNSQueriesTotal    int64     `json:"dns_queries_total"`
-	DNSQueriesIPv4     int64     `json:"dns_queries_ipv4_total"`
-	DNSQueriesIPv6     int64     `json:"dns_queries_ipv6_total"`
-	DNSCacheHits       int64     `json:"dns_cache_hits"`
-	DNSCacheMisses     int64     `json:"dns_cache_misses"`
-	DNSCacheEvictions  int64     `json:"dns_cache_evictions"`
+	DNSQueriesTotal   int64     `json:"dns_queries_total"`
+	DNSQueriesIPv4    int64     `json:"dns_queries_ipv4_total"`
+	DNSQueriesIPv6    int64     `json:"dns_queries_ipv6_total"`
+	DNSCacheHits      int64     `json:"dns_cache_hits"`
+	DNSCacheMisses    int64     `json:"dns_cache_misses"`
+	DNSCacheEvictions int64     `json:"dns_cache_evictions"`
 }
 
 // MetricsJobsSnapshot captures lifecycle counters for submitted jobs.
@@ -207,9 +207,9 @@ type MetricsCollector struct {
 	maxConcurrentJobs int
 	nowFn             func() time.Time
 
-	queuePaused bool
-	queueDepth  int64
-	inFlight    int64
+	queuePaused       bool
+	queueDepth        int64
+	inFlight          int64
 	dnsQueries        int64
 	dnsQueries4       int64
 	dnsQueries6       int64
@@ -364,6 +364,11 @@ func (m *MetricsCollector) ObserveCacheMetrics(hits int64, misses int64, evictio
 	m.dnsCacheHits += hits
 	m.dnsCacheMisses += misses
 	m.dnsCacheEvictions += evictions
+	now := time.Now().UTC()
+	if m.nowFn != nil {
+		now = m.nowFn().UTC()
+	}
+	m.observeTrendCacheMetricsLocked(now, hits, misses, evictions)
 	m.mu.Unlock()
 }
 

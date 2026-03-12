@@ -3,6 +3,10 @@
 `gonemaster-nagios` is a Nagios-compatible wrapper that reports the highest
 severity found in a full run.
 
+Gonemaster’s Nagios plugin is useful because it turns DNS delegation testing into a standard operational check. It runs the same delegation analysis as the main tool, but returns the result in a form that monitoring systems can evaluate directly. That makes delegation health testable, repeatable, and suitable for alerting instead of relying on manual verification.
+
+For operations, this means DNS delegation problems can be detected early and handled as a defined service state. The plugin is a practical way to integrate delegation checks into monitoring platforms such as Nagios, Icinga, Naemon, Shinken, or Sensu, while keeping the test logic consistent with the rest of Gonemaster.
+
 ## Install
 ```
 go install codeberg.org/pawal/gonemaster/cmd/gonemaster-nagios@latest

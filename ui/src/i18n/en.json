@@ -163,6 +163,7 @@
   "aria_throughput_trend": "Throughput trend",
   "aria_failure_trend": "Failure trend",
   "aria_dns_trend": "DNS query rates trend",
+  "aria_cache_hit_rate_trend": "Cache hit rate trend",
 
   "top_domains_heading": "Top domains",
   "no_domain_data": "No domain insight data yet.",

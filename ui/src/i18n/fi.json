@@ -162,6 +162,7 @@
   "aria_throughput_trend": "Läpäisykyvyn trendi",
   "aria_failure_trend": "Virheiden trendi",
   "aria_dns_trend": "DNS-kyselynopeuksien trendi",
+  "aria_cache_hit_rate_trend": "Välimuistin osumaprosentin trendi",
 
   "top_domains_heading": "Suosituimmat verkkotunnukset",
   "no_domain_data": "Ei verkkotunnustietoja vielä.",

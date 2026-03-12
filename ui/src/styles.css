@@ -831,6 +831,10 @@ button:hover:not(:disabled) {
   stroke: #dc2626;
 }
 
+.sparkline-cache polyline {
+  stroke: #16a34a;
+}
+
 .sparkline-queries .sparkline-ipv4 {
   stroke: #0284c7;
 }

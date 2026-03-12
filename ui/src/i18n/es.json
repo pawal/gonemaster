@@ -162,6 +162,7 @@
   "aria_throughput_trend": "Tendencia de rendimiento",
   "aria_failure_trend": "Tendencia de fallos",
   "aria_dns_trend": "Tendencia de tasas de consultas DNS",
+  "aria_cache_hit_rate_trend": "Tendencia de la tasa de aciertos",
 
   "top_domains_heading": "Dominios principales",
   "no_domain_data": "Aún no hay datos de análisis de dominios.",

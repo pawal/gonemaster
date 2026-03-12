@@ -2087,6 +2087,7 @@ example.org`}
         {@const failedSeries = metricsSeriesValues(metricsSnapshot, metricsWindow, "failed")}
         {@const querySeriesIPv4 = metricsSeriesValues(metricsSnapshot, metricsWindow, "dns_queries_ipv4_per_second")}
         {@const querySeriesIPv6 = metricsSeriesValues(metricsSnapshot, metricsWindow, "dns_queries_ipv6_per_second")}
+        {@const cacheHitRateSeries = metricsSeriesValues(metricsSnapshot, metricsWindow, "dns_cache_hit_rate")}
         {@const queryBounds = sparklineBounds(querySeriesIPv4, querySeriesIPv6)}
         {@const severityTotals = metricsSnapshot?.quality?.severity?.totals || {}}
 
@@ -2220,6 +2221,15 @@ example.org`}
                 {$t("ipv6_label")} {formatRate(seriesLast(querySeriesIPv6))}
               </span>
             </div>
+          </div>
+          <div class="metrics-trend-card">
+            <div class="metrics-trend-head">
+              <strong>{$t("metric_cache_hit_rate")}</strong>
+              <span>{formatPercent(seriesLast(cacheHitRateSeries))}</span>
+            </div>
+            <svg class="sparkline sparkline-cache" viewBox="0 0 260 66" role="img" aria-label={$t("aria_cache_hit_rate_trend")}>
+              <polyline points={sparklinePoints(cacheHitRateSeries)} />
+            </svg>
           </div>
         </div>
 

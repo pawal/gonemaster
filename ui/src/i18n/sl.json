@@ -162,6 +162,7 @@
   "aria_throughput_trend": "Trend prepustnosti",
   "aria_failure_trend": "Trend napak",
   "aria_dns_trend": "Trend stopenj DNS-poizvedb",
+  "aria_cache_hit_rate_trend": "Trend stopnje zadetkov predpomnilnika",
 
   "top_domains_heading": "Najboljše domene",
   "no_domain_data": "Še ni podatkov o domenah.",

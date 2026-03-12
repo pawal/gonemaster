@@ -94,7 +94,7 @@ The embedded web UI (`/`) has a **Metrics** tab backed by `GET /api/v1/metrics`.
 
 It provides:
 - Top cards for queue/flow/quality signals (queue depth, in-flight, rates, durations, finished/failed totals, severity totals).
-- Trend mini-charts for throughput, failures, and queue depth.
+- Trend mini-charts for throughput, failures, DNS query rates, and cache hit rate.
 - Insight tables for top domains and error-heavy batches.
 - Refresh controls (`Refresh metrics`, auto-refresh toggle, trend window, insight limits).
 - Loading/empty/error states and retry behavior.

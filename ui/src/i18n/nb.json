@@ -162,6 +162,7 @@
   "aria_throughput_trend": "Gjennomstrømningstrend",
   "aria_failure_trend": "Feiltrend",
   "aria_dns_trend": "DNS-forespørselsrater trend",
+  "aria_cache_hit_rate_trend": "Trend for hurtigbuffertreffrate",
 
   "top_domains_heading": "Toppdomener",
   "no_domain_data": "Ingen domeneinnsiktsdata ennå.",

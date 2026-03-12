@@ -162,6 +162,7 @@
   "aria_throughput_trend": "スループットトレンド",
   "aria_failure_trend": "失敗トレンド",
   "aria_dns_trend": "DNSクエリレートトレンド",
+  "aria_cache_hit_rate_trend": "キャッシュヒット率トレンド",
 
   "top_domains_heading": "上位ドメイン",
   "no_domain_data": "ドメインインサイトデータはまだありません。",

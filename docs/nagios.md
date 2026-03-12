@@ -19,31 +19,51 @@ go build -o gonemaster-nagios ./cmd/gonemaster-nagios
 
 ## Usage
 ```
-gonemaster-nagios -d example.com
-gonemaster-nagios -vv -d example.com
-gonemaster-nagios -d example.com --module address
-gonemaster-nagios -d example.com --testcase zone09
-gonemaster-nagios -d example.com --profile ./profile.json
+gonemaster-nagios -H example.com
+gonemaster-nagios -H example.com -w WARNING -c ERROR -t 15
+gonemaster-nagios -H example.com -vv
+gonemaster-nagios --domain example.com --module address
+gonemaster-nagios --domain example.com --testcase zone09
+gonemaster-nagios --domain example.com --profile ./profile.json
 ```
+
+## Core Nagios-style options
+- `-H`, `--hostname` Zone name to test (preferred)
+- `-d`, `--domain` DNS-specific alias for the zone name
+- `-w`, `--warning` Highest Gonemaster severity that should map to Nagios WARNING. Default: `WARNING`
+- `-c`, `--critical` Highest Gonemaster severity that should map to Nagios CRITICAL. Default: `ERROR`
+- `-t`, `--timeout` Plugin runtime deadline in seconds. A timeout returns `UNKNOWN`
+- Valid severity values: `DEBUG3`, `DEBUG2`, `DEBUG`, `INFO`, `NOTICE`, `WARNING`, `ERROR`, `CRITICAL`
+
+## Gonemaster-specific options
+- `--module` Run a single module
+- `--testcase` Run a single testcase
+- `--profile` Profile JSON/YAML path
+- `--no-ipv4` Disable IPv4 queries
+- `--no-ipv6` Disable IPv6 queries
+- `--force-ipv6` Force IPv6 queries
+- `--source-addr4` Override resolver IPv4 source address
+- `--source-addr6` Override resolver IPv6 source address
+
+## Compatibility aliases
+- `--ipv6` Alias for `--force-ipv6`
+- `--disable-ipv4` Alias for `--no-ipv4`
+- `--disable-ipv6` Alias for `--no-ipv6`
+- `--sourceaddr4` Alias for `--source-addr4`
+- `--sourceaddr6` Alias for `--source-addr6`
 
 ## Verbosity (`-v` repeatable)
 - `-v` prints WARNING/ERROR/CRITICAL messages
 - `-vv` adds NOTICE messages
 - `-vvv` adds INFO messages
 
-## Additional options (Nagios-friendly)
-- `--module` Run a single module
-- `--testcase` Run a single testcase
-- `--profile` Profile JSON/YAML path
-- `--no-ipv4` / `--disable-ipv4` Disable IPv4 queries
-- `--no-ipv6` / `--disable-ipv6` Disable IPv6 queries
-
 ## Exit codes
-- `0` OK
-- `1` WARNING
-- `2` CRITICAL
-- `3` UNKNOWN
+- `0` OK, highest severity stayed below `--warning`
+- `1` WARNING, highest severity reached `--warning` but stayed below `--critical`
+- `2` CRITICAL, highest severity reached `--critical`
+- `3` UNKNOWN, runtime error, timeout, or invalid required options
 
-Note: the Nagios wrapper uses the same profile settings as `gonemaster`. To
-tweak warning levels and performance settings, change the profile and pass
+Note: `--warning` and `--critical` only control how the plugin maps Gonemaster
+severity to Nagios states. To change Gonemaster's own severity assignments,
+resolver settings, or performance behavior, adjust the profile and pass
 `--profile`.

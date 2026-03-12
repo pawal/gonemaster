@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+ - Nagios plugin: prefer `-H/--hostname`, add `-w/--warning`, `-c/--critical`, and `-t/--timeout`, and keep legacy network/source flag aliases for compatibility
+
 ## [v1.1.2] 2026-03-07
 
  **BREAKING CHANGE**: More spammy log entries consolidated

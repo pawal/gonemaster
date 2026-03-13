@@ -1,12 +1,19 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to all gonemaster components will be documented in this file.
 
-## [Unreleased]
+## [v1.1.3] - 2026-03-13
+
+### Added
+
+ - Added Prometheus adapter for gonemaster-server with documentation
 
 ### Changed
 
  - Nagios plugin: prefer `-H/--hostname`, add `-w/--warning`, `-c/--critical`, and `-t/--timeout`, and keep legacy network/source flag aliases for compatibility
+ - Better metrics view, with added query cache information
+ - Improvements in the Nagios CLI to better conform to the structure of Nagios plugins
+ - Updated npm dependencies for UI
 
 ## [v1.1.2] 2026-03-07
 

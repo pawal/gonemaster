@@ -190,6 +190,7 @@ type apiRouteMetrics struct {
 	RequestsTotal     int64
 	StatusClassCounts map[string]int64
 	Latency           boundedHistogram
+	LatencyTotalMs    int64
 }
 
 type boundedHistogram struct {
@@ -429,6 +430,11 @@ func (m *MetricsCollector) ObserveAPIRequest(route string, method string, status
 	routeMetrics.RequestsTotal++
 	routeMetrics.StatusClassCounts[statusClass]++
 	routeMetrics.Latency.Observe(duration)
+	durationMs := int64(math.Round(float64(duration) / float64(time.Millisecond)))
+	if durationMs < 0 {
+		durationMs = 0
+	}
+	routeMetrics.LatencyTotalMs += durationMs
 	now := time.Now().UTC()
 	if m.nowFn != nil {
 		now = m.nowFn().UTC()

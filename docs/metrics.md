@@ -14,6 +14,9 @@ The endpoint returns a JSON snapshot intended for operators and the embedded web
 `GET /metrics`
 
 ### Query parameters
+- `format` (optional): `json | prom`
+  - Default: `json`
+  - `prom` returns Prometheus text exposition instead of the JSON snapshot.
 - `window` (optional): `1h | 6h | 24h | 48h`
   - Limits the `trends.windows` payload to one window.
 - `include` (optional): comma-separated sections
@@ -25,11 +28,13 @@ The endpoint returns a JSON snapshot intended for operators and the embedded web
   - Caps `insights.batches.items`.
 
 ### Response codes
-- `200`: metrics snapshot JSON
+- `200`: metrics snapshot JSON or Prometheus text
 - `400`: structured error for invalid query params
 
 ### Caching behavior
 The server caches rendered metrics responses for 1 second per unique query option set.
+
+When `format=prom` is used, JSON-only query params (`window`, `include`, `limit_domains`, `limit_batches`) are ignored.
 
 ## Snapshot structure
 
@@ -61,6 +66,11 @@ Commonly used fields:
 Fetch default snapshot:
 ```bash
 curl -s "http://127.0.0.1:8080/api/v1/metrics" | jq .
+```
+
+Fetch Prometheus exposition:
+```bash
+curl -s "http://127.0.0.1:8080/api/v1/metrics?format=prom"
 ```
 
 Fetch health/jobs/quality only:
@@ -100,6 +110,23 @@ It provides:
 - Loading/empty/error states and retry behavior.
 
 Auto-refresh runs on a 10-second interval while the tab is active.
+
+## Prometheus Format
+
+`GET /api/v1/metrics?format=prom` exposes low-cardinality Prometheus metric families under the
+`gonemaster_` prefix.
+
+Included families:
+- Server gauges for build info, start time, worker counts, queue paused, queue depth, and in-flight jobs.
+- DNS counters for external queries by family, cache lookups by result, and cache evictions.
+- Job lifecycle counters and current-status gauges.
+- API request counters plus per-route/per-method latency histograms.
+- Job duration histogram, severity totals, and locale usage totals.
+
+Excluded from Prometheus output:
+- Domain and batch insight tables.
+- Trend windows / sparkline point data.
+- Precomputed ratios and percentiles that Prometheus should derive from counters and histograms.
 
 ## References
 - API schema: `docs/openapi.yaml`

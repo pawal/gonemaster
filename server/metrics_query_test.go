@@ -17,6 +17,9 @@ func TestParseMetricsQueryOptionsValid(t *testing.T) {
 	if code != "" || message != "" {
 		t.Fatalf("expected valid options, got code=%q message=%q", code, message)
 	}
+	if options.format != metricsFormatJSON {
+		t.Fatalf("format = %q, want %q", options.format, metricsFormatJSON)
+	}
 	if options.window != "6h" {
 		t.Fatalf("window = %q, want 6h", options.window)
 	}
@@ -31,6 +34,18 @@ func TestParseMetricsQueryOptionsValid(t *testing.T) {
 	}
 	if options.limitBatches != 9 {
 		t.Fatalf("limitBatches = %d, want 9", options.limitBatches)
+	}
+}
+
+func TestParseMetricsQueryOptionsPromFormat(t *testing.T) {
+	options, code, message := parseMetricsQueryOptions(url.Values{
+		"format": []string{"prom"},
+	})
+	if code != "" || message != "" {
+		t.Fatalf("expected valid prom options, got code=%q message=%q", code, message)
+	}
+	if options.format != metricsFormatProm {
+		t.Fatalf("format = %q, want %q", options.format, metricsFormatProm)
 	}
 }
 
@@ -49,6 +64,11 @@ func TestParseMetricsQueryOptionsInvalid(t *testing.T) {
 			name:     "invalid include",
 			values:   url.Values{"include": []string{"bad"}},
 			wantCode: "invalid_include",
+		},
+		{
+			name:     "invalid format",
+			values:   url.Values{"format": []string{"yaml"}},
+			wantCode: "invalid_format",
 		},
 		{
 			name:     "invalid limit domains",
@@ -72,6 +92,7 @@ func TestParseMetricsQueryOptionsInvalid(t *testing.T) {
 
 func TestMetricsQueryCacheKeyIsStable(t *testing.T) {
 	left := metricsQueryOptions{
+		format:       metricsFormatJSON,
 		window:       "1h",
 		includeAll:   false,
 		include:      map[string]bool{"jobs": true, "health": true},
@@ -79,11 +100,35 @@ func TestMetricsQueryCacheKeyIsStable(t *testing.T) {
 		limitBatches: 6,
 	}
 	right := metricsQueryOptions{
+		format:       metricsFormatJSON,
 		window:       "1h",
 		includeAll:   false,
 		include:      map[string]bool{"health": true, "jobs": true},
 		limitDomains: 5,
 		limitBatches: 6,
+	}
+
+	if left.cacheKey() != right.cacheKey() {
+		t.Fatalf("cache keys differ: %q vs %q", left.cacheKey(), right.cacheKey())
+	}
+}
+
+func TestMetricsQueryCacheKeyForPromIgnoresJSONOnlyOptions(t *testing.T) {
+	left := metricsQueryOptions{
+		format:       metricsFormatProm,
+		window:       "1h",
+		includeAll:   false,
+		include:      map[string]bool{"health": true},
+		limitDomains: 5,
+		limitBatches: 6,
+	}
+	right := metricsQueryOptions{
+		format:       metricsFormatProm,
+		window:       "48h",
+		includeAll:   true,
+		include:      map[string]bool{},
+		limitDomains: 99,
+		limitBatches: 100,
 	}
 
 	if left.cacheKey() != right.cacheKey() {

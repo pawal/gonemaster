@@ -606,7 +606,7 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	now := s.metricsNow()
 	cacheKey := options.cacheKey()
 	if payload, ok := s.getMetricsCache(cacheKey, now); ok {
-		writeRawJSON(w, http.StatusOK, payload)
+		writeRawMetrics(w, http.StatusOK, options.format, payload)
 		return
 	}
 
@@ -616,7 +616,7 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.putMetricsCache(cacheKey, payload, now)
-	writeRawJSON(w, http.StatusOK, payload)
+	writeRawMetrics(w, http.StatusOK, options.format, payload)
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {

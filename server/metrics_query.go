@@ -12,6 +12,11 @@ import (
 
 const metricsCacheTTL = time.Second
 
+const (
+	metricsFormatJSON = "json"
+	metricsFormatProm = "prom"
+)
+
 var metricsIncludeSections = map[string]struct{}{
 	"health":   {},
 	"jobs":     {},
@@ -22,6 +27,7 @@ var metricsIncludeSections = map[string]struct{}{
 }
 
 type metricsQueryOptions struct {
+	format       string
 	window       string
 	includeAll   bool
 	include      map[string]bool
@@ -36,8 +42,18 @@ type metricsCacheEntry struct {
 
 func parseMetricsQueryOptions(values url.Values) (metricsQueryOptions, string, string) {
 	options := metricsQueryOptions{
+		format:     metricsFormatJSON,
 		includeAll: true,
 		include:    map[string]bool{},
+	}
+
+	if raw := strings.TrimSpace(values.Get("format")); raw != "" {
+		switch strings.ToLower(raw) {
+		case metricsFormatJSON, metricsFormatProm:
+			options.format = strings.ToLower(raw)
+		default:
+			return metricsQueryOptions{}, "invalid_format", "format must be one of json, prom"
+		}
 	}
 
 	if raw := strings.TrimSpace(values.Get("window")); raw != "" {
@@ -88,7 +104,11 @@ func parseMetricsQueryOptions(values url.Values) (metricsQueryOptions, string, s
 }
 
 func (o metricsQueryOptions) cacheKey() string {
+	if o.format == metricsFormatProm {
+		return "format=" + metricsFormatProm
+	}
 	parts := []string{
+		"format=" + o.format,
 		"window=" + o.window,
 		"limit_domains=" + strconv.Itoa(o.limitDomains),
 		"limit_batches=" + strconv.Itoa(o.limitBatches),
@@ -107,6 +127,10 @@ func (o metricsQueryOptions) cacheKey() string {
 }
 
 func (s *Server) buildMetricsResponseBody(options metricsQueryOptions) ([]byte, error) {
+	if options.format == metricsFormatProm {
+		return s.buildMetricsPrometheusResponse()
+	}
+
 	snapshot := s.metrics.SnapshotWithLimits(options.limitDomains, options.limitBatches)
 
 	if options.window != "" {
@@ -191,4 +215,14 @@ func writeRawJSON(w http.ResponseWriter, status int, payload []byte) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_, _ = w.Write(payload)
+}
+
+func writeRawMetrics(w http.ResponseWriter, status int, format string, payload []byte) {
+	if format == metricsFormatProm {
+		w.Header().Set("Content-Type", prometheusMetricsContentType)
+		w.WriteHeader(status)
+		_, _ = w.Write(payload)
+		return
+	}
+	writeRawJSON(w, status, payload)
 }

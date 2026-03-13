@@ -302,6 +302,14 @@ paths:
       operationId: metrics
       parameters:
         - in: query
+          name: format
+          required: false
+          schema:
+            type: string
+            enum: [json, prom]
+            default: json
+          description: Response format. `prom` returns Prometheus text exposition; JSON-only query params are ignored.
+        - in: query
           name: window
           required: false
           schema:
@@ -332,11 +340,14 @@ paths:
           description: Max number of batch insight rows in the response.
       responses:
         '200':
-          description: Metrics JSON
+          description: Metrics snapshot or Prometheus text exposition
           content:
             application/json:
               schema:
                 type: object
+            text/plain:
+              schema:
+                type: string
         '400':
           $ref: '#/components/responses/ErrorResponse'
 

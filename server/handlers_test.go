@@ -1,12 +1,15 @@
 package server
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -16,6 +19,7 @@ import (
 )
 
 var metricsRequestNonce uint32
+var prometheusSampleLine = regexp.MustCompile(`^[a-zA-Z_:][a-zA-Z0-9_:]*(\{[^{}]*\})? [-+]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][-+]?[0-9]+)?$`)
 
 func getMetricsSnapshot(t *testing.T, srv *Server) MetricsSnapshot {
 	t.Helper()
@@ -43,6 +47,31 @@ func findAPIRouteMetrics(t *testing.T, snapshot MetricsSnapshot, method string, 
 	}
 	t.Fatalf("route metrics not found for %s %s", method, route)
 	return MetricsAPIRouteMetrics{}
+}
+
+func assertPrometheusTextWellFormed(t *testing.T, body string) {
+	t.Helper()
+	scanner := bufio.NewScanner(strings.NewReader(body))
+	sampleCount := 0
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		if strings.HasPrefix(line, "# HELP ") || strings.HasPrefix(line, "# TYPE ") {
+			continue
+		}
+		if !prometheusSampleLine.MatchString(line) {
+			t.Fatalf("invalid Prometheus sample line: %q", line)
+		}
+		sampleCount++
+	}
+	if err := scanner.Err(); err != nil {
+		t.Fatalf("scan Prometheus output: %v", err)
+	}
+	if sampleCount == 0 {
+		t.Fatal("expected at least one Prometheus sample line")
+	}
 }
 
 func TestCreateAndGetJob(t *testing.T) {
@@ -1259,6 +1288,7 @@ func TestMetricsEndpointValidatesQueryParams(t *testing.T) {
 		wantCode string
 	}{
 		{path: "/api/v1/metrics?window=12h", wantCode: "invalid_window"},
+		{path: "/api/v1/metrics?format=yaml", wantCode: "invalid_format"},
 		{path: "/api/v1/metrics?include=unknown", wantCode: "invalid_include"},
 		{path: "/api/v1/metrics?limit_domains=0", wantCode: "invalid_limit_domains"},
 		{path: "/api/v1/metrics?limit_batches=999", wantCode: "invalid_limit_batches"},
@@ -1283,6 +1313,8 @@ func TestMetricsEndpointValidatesQueryParams(t *testing.T) {
 
 func TestMetricsEndpointSupportsIncludeWindowAndLimits(t *testing.T) {
 	srv := New(DefaultConfig())
+	now := time.Date(2026, 2, 9, 10, 0, 0, 0, time.UTC)
+	srv.metrics.nowFn = func() time.Time { return now }
 	srv.metrics.ObserveJobSubmittedWithContext("batch-a", "alpha.example", JobQueued)
 	srv.metrics.ObserveJobStatusTransition(JobQueued, JobSucceeded)
 	srv.metrics.ObserveJobCompletionWithContext("batch-a", "alpha.example", JobSucceeded, 1200*time.Millisecond, map[string]int64{
@@ -1293,6 +1325,7 @@ func TestMetricsEndpointSupportsIncludeWindowAndLimits(t *testing.T) {
 	srv.metrics.ObserveJobCompletionWithContext("batch-b", "beta.example", JobFailed, 1800*time.Millisecond, map[string]int64{
 		"ERROR": 2,
 	})
+	srv.metrics.ObserveCacheMetrics(9, 3, 1)
 
 	resp := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/metrics?include=health,insights,trends&window=1h&limit_domains=1&limit_batches=1", nil)
@@ -1354,8 +1387,91 @@ func TestMetricsEndpointSupportsIncludeWindowAndLimits(t *testing.T) {
 	if len(windows) != 1 {
 		t.Fatalf("trends.windows size = %d, want 1", len(windows))
 	}
-	if _, ok := windows["1h"]; !ok {
+	window1h, ok := windows["1h"]
+	if !ok {
 		t.Fatalf("expected trends window 1h, got %+v", windows)
+	}
+	points := window1h.(map[string]any)["points"].([]any)
+	if len(points) == 0 {
+		t.Fatal("expected at least one trend point")
+	}
+	maxHitRate := 0.0
+	for _, rawPoint := range points {
+		point, ok := rawPoint.(map[string]any)
+		if !ok {
+			t.Fatalf("unexpected trend point type: %T", rawPoint)
+		}
+		value, ok := point["dns_cache_hit_rate"]
+		if !ok {
+			t.Fatalf("expected dns_cache_hit_rate in trend point, got %+v", point)
+		}
+		rate, ok := value.(float64)
+		if !ok {
+			t.Fatalf("unexpected dns_cache_hit_rate type: %T", value)
+		}
+		if rate > maxHitRate {
+			maxHitRate = rate
+		}
+	}
+	if maxHitRate <= 0 {
+		t.Fatalf("expected positive dns_cache_hit_rate, got %v", maxHitRate)
+	}
+}
+
+func TestMetricsEndpointSupportsPrometheusFormat(t *testing.T) {
+	srv := New(DefaultConfig())
+	srv.metrics.ObserveQueuePaused(true)
+	srv.metrics.ObserveDNSQueries(11, 7)
+	srv.metrics.ObserveCacheMetrics(9, 3, 1)
+	srv.metrics.ObserveJobSubmittedWithContext("batch-a", "alpha.example", JobQueued)
+	srv.metrics.ObserveJobStatusTransition(JobQueued, JobRunning)
+	srv.metrics.ObserveJobStatusTransition(JobRunning, JobFailed)
+	srv.metrics.ObserveJobCompletionWithContext("batch-a", "alpha.example", JobFailed, 1500*time.Millisecond, map[string]int64{
+		"ERROR":    2,
+		"CRITICAL": 1,
+	})
+	srv.metrics.ObserveAPIRequest("/api/v1/jobs", http.MethodGet, http.StatusOK, 320*time.Millisecond, "")
+	srv.metrics.ObserveAPIRequest("/api/v1/jobs", http.MethodGet, http.StatusBadRequest, 90*time.Millisecond, "invalid_domain")
+	srv.metrics.ObserveResultLocale("sv-SE")
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/metrics?format=prom&include=trends&window=1h&limit_domains=1&limit_batches=1", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	if got := resp.Header().Get("Content-Type"); got != prometheusMetricsContentType {
+		t.Fatalf("expected %q content-type, got %q", prometheusMetricsContentType, got)
+	}
+
+	body := resp.Body.String()
+	assertPrometheusTextWellFormed(t, body)
+	if !strings.Contains(body, "# TYPE gonemaster_api_request_duration_seconds histogram") {
+		t.Fatalf("missing API histogram header in Prometheus output:\n%s", body)
+	}
+	if !strings.Contains(body, "gonemaster_dns_cache_lookups_total{result=\"hit\"} 9") {
+		t.Fatalf("missing cache hit counter in Prometheus output:\n%s", body)
+	}
+	if !strings.Contains(body, "gonemaster_api_route_requests_total{method=\"GET\",route=\"/api/v1/jobs\"} 2") {
+		t.Fatalf("missing per-route API counter in Prometheus output:\n%s", body)
+	}
+	if !strings.Contains(body, "gonemaster_job_duration_seconds_bucket{le=\"+Inf\"} 1") {
+		t.Fatalf("missing job duration histogram bucket in Prometheus output:\n%s", body)
+	}
+	if !strings.Contains(body, "gonemaster_job_severity_total{severity=\"CRITICAL\"} 1") {
+		t.Fatalf("missing severity counter in Prometheus output:\n%s", body)
+	}
+	if !strings.Contains(body, "gonemaster_result_locale_requests_total{locale=\"sv_se\"} 1") {
+		t.Fatalf("missing locale counter in Prometheus output:\n%s", body)
+	}
+	if strings.Contains(body, "alpha.example") {
+		t.Fatalf("unexpected domain label leaked into Prometheus output:\n%s", body)
+	}
+	if strings.Contains(body, "batch-a") {
+		t.Fatalf("unexpected batch label leaked into Prometheus output:\n%s", body)
+	}
+	if strings.Contains(body, "dns_cache_hit_rate") {
+		t.Fatalf("unexpected derived JSON trend metric leaked into Prometheus output:\n%s", body)
 	}
 }
 

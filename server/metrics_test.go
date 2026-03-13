@@ -139,6 +139,9 @@ func TestMetricsCollectorZeroStateSnapshot(t *testing.T) {
 	if got := len(snapshot.Trends.Windows["48h"].Points); got != 576 {
 		t.Fatalf("trends.windows[48h].points size = %d, want 576", got)
 	}
+	if first := snapshot.Trends.Windows["1h"].Points[0]; first.DNSCacheHitRate != 0 {
+		t.Fatalf("trends.windows[1h].points[0].dns_cache_hit_rate = %f, want 0", first.DNSCacheHitRate)
+	}
 	if snapshot.Insights.Batches.Limit != metricsDefaultBatchLimit {
 		t.Fatalf("insights.batches.limit = %d, want %d", snapshot.Insights.Batches.Limit, metricsDefaultBatchLimit)
 	}
@@ -278,6 +281,64 @@ func TestMetricsCollectorTracksDNSQueries(t *testing.T) {
 	}
 	if math.Abs(maxRateIPv6-(11.0/60.0)) > 0.0001 {
 		t.Fatalf("trends.windows[1h].max.dns_queries_ipv6_per_second = %f, want %f", maxRateIPv6, 11.0/60.0)
+	}
+}
+
+func TestMetricsCollectorTracksCacheMetrics(t *testing.T) {
+	cfg := DefaultConfig()
+	startedAt := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+	now := startedAt
+	collector := newMetricsCollector(cfg, startedAt)
+	collector.nowFn = func() time.Time { return now }
+
+	// First job run: some hits and misses.
+	collector.ObserveCacheMetrics(10, 5, 1)
+	now = now.Add(30 * time.Second)
+	// Second job run: more accumulation.
+	collector.ObserveCacheMetrics(20, 3, 2)
+
+	snapshot := collector.snapshotAt(startedAt.Add(time.Minute))
+	if snapshot.Health.DNSCacheHits != 30 {
+		t.Fatalf("health.dns_cache_hits = %d, want 30", snapshot.Health.DNSCacheHits)
+	}
+	if snapshot.Health.DNSCacheMisses != 8 {
+		t.Fatalf("health.dns_cache_misses = %d, want 8", snapshot.Health.DNSCacheMisses)
+	}
+	if snapshot.Health.DNSCacheEvictions != 3 {
+		t.Fatalf("health.dns_cache_evictions = %d, want 3", snapshot.Health.DNSCacheEvictions)
+	}
+	maxHitRate := 0.0
+	for _, point := range snapshot.Trends.Windows["1h"].Points {
+		if point.DNSCacheHitRate > maxHitRate {
+			maxHitRate = point.DNSCacheHitRate
+		}
+	}
+	if math.Abs(maxHitRate-(30.0/38.0)) > 0.0001 {
+		t.Fatalf("trends.windows[1h].max.dns_cache_hit_rate = %f, want %f", maxHitRate, 30.0/38.0)
+	}
+}
+
+func TestMetricsCollectorCacheMetricsIgnoresNegativeAndZero(t *testing.T) {
+	cfg := DefaultConfig()
+	startedAt := time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC)
+	collector := newMetricsCollector(cfg, startedAt)
+
+	// Negative values should be clamped to zero.
+	collector.ObserveCacheMetrics(-5, -1, -2)
+	// All-zero call should be a no-op (but harmless either way).
+	collector.ObserveCacheMetrics(0, 0, 0)
+	// Only hits.
+	collector.ObserveCacheMetrics(7, 0, 0)
+
+	snapshot := collector.snapshotAt(startedAt.Add(time.Minute))
+	if snapshot.Health.DNSCacheHits != 7 {
+		t.Fatalf("health.dns_cache_hits = %d, want 7", snapshot.Health.DNSCacheHits)
+	}
+	if snapshot.Health.DNSCacheMisses != 0 {
+		t.Fatalf("health.dns_cache_misses = %d, want 0", snapshot.Health.DNSCacheMisses)
+	}
+	if snapshot.Health.DNSCacheEvictions != 0 {
+		t.Fatalf("health.dns_cache_evictions = %d, want 0", snapshot.Health.DNSCacheEvictions)
 	}
 }
 

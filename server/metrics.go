@@ -110,6 +110,9 @@ type MetricsHealthSnapshot struct {
 	DNSQueriesTotal   int64     `json:"dns_queries_total"`
 	DNSQueriesIPv4    int64     `json:"dns_queries_ipv4_total"`
 	DNSQueriesIPv6    int64     `json:"dns_queries_ipv6_total"`
+	DNSCacheHits      int64     `json:"dns_cache_hits"`
+	DNSCacheMisses    int64     `json:"dns_cache_misses"`
+	DNSCacheEvictions int64     `json:"dns_cache_evictions"`
 }
 
 // MetricsJobsSnapshot captures lifecycle counters for submitted jobs.
@@ -187,6 +190,7 @@ type apiRouteMetrics struct {
 	RequestsTotal     int64
 	StatusClassCounts map[string]int64
 	Latency           boundedHistogram
+	LatencyTotalMs    int64
 }
 
 type boundedHistogram struct {
@@ -204,12 +208,15 @@ type MetricsCollector struct {
 	maxConcurrentJobs int
 	nowFn             func() time.Time
 
-	queuePaused bool
-	queueDepth  int64
-	inFlight    int64
-	dnsQueries  int64
-	dnsQueries4 int64
-	dnsQueries6 int64
+	queuePaused       bool
+	queueDepth        int64
+	inFlight          int64
+	dnsQueries        int64
+	dnsQueries4       int64
+	dnsQueries6       int64
+	dnsCacheHits      int64
+	dnsCacheMisses    int64
+	dnsCacheEvictions int64
 
 	submittedTotal int64
 	startedTotal   int64
@@ -339,6 +346,33 @@ func (m *MetricsCollector) ObserveDNSQueries(ipv4Queries int64, ipv6Queries int6
 	m.mu.Unlock()
 }
 
+// ObserveCacheMetrics records DNS resolver cache hit/miss/eviction counters.
+func (m *MetricsCollector) ObserveCacheMetrics(hits int64, misses int64, evictions int64) {
+	if hits < 0 {
+		hits = 0
+	}
+	if misses < 0 {
+		misses = 0
+	}
+	if evictions < 0 {
+		evictions = 0
+	}
+	if hits == 0 && misses == 0 && evictions == 0 {
+		return
+	}
+
+	m.mu.Lock()
+	m.dnsCacheHits += hits
+	m.dnsCacheMisses += misses
+	m.dnsCacheEvictions += evictions
+	now := time.Now().UTC()
+	if m.nowFn != nil {
+		now = m.nowFn().UTC()
+	}
+	m.observeTrendCacheMetricsLocked(now, hits, misses, evictions)
+	m.mu.Unlock()
+}
+
 // ObserveJobSubmitted records a submitted job without batch/domain context.
 func (m *MetricsCollector) ObserveJobSubmitted(initialStatus JobStatus) {
 	m.ObserveJobSubmittedWithContext("", "", initialStatus)
@@ -396,6 +430,11 @@ func (m *MetricsCollector) ObserveAPIRequest(route string, method string, status
 	routeMetrics.RequestsTotal++
 	routeMetrics.StatusClassCounts[statusClass]++
 	routeMetrics.Latency.Observe(duration)
+	durationMs := int64(math.Round(float64(duration) / float64(time.Millisecond)))
+	if durationMs < 0 {
+		durationMs = 0
+	}
+	routeMetrics.LatencyTotalMs += durationMs
 	now := time.Now().UTC()
 	if m.nowFn != nil {
 		now = m.nowFn().UTC()
@@ -525,6 +564,9 @@ func (m *MetricsCollector) snapshotAtWithLimits(now time.Time, domainLimit int, 
 	dnsQueries := m.dnsQueries
 	dnsQueries4 := m.dnsQueries4
 	dnsQueries6 := m.dnsQueries6
+	dnsCacheHits := m.dnsCacheHits
+	dnsCacheMisses := m.dnsCacheMisses
+	dnsCacheEvictions := m.dnsCacheEvictions
 	submittedTotal := m.submittedTotal
 	startedTotal := m.startedTotal
 	completedTotal := m.completedTotal
@@ -577,6 +619,9 @@ func (m *MetricsCollector) snapshotAtWithLimits(now time.Time, domainLimit int, 
 			DNSQueriesTotal:   dnsQueries,
 			DNSQueriesIPv4:    dnsQueries4,
 			DNSQueriesIPv6:    dnsQueries6,
+			DNSCacheHits:      dnsCacheHits,
+			DNSCacheMisses:    dnsCacheMisses,
+			DNSCacheEvictions: dnsCacheEvictions,
 		},
 		Jobs: MetricsJobsSnapshot{
 			SubmittedTotal: submittedTotal,

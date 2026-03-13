@@ -182,11 +182,11 @@ func TestRunEngineForJobParallel(t *testing.T) {
 
 	errs := make(chan error, 2)
 	go func() {
-		_, _, _, err := srv.runEngineForJob(job1, context.Background())
+		_, _, err := srv.runEngineForJob(job1, context.Background())
 		errs <- err
 	}()
 	go func() {
-		_, _, _, err := srv.runEngineForJob(job2, context.Background())
+		_, _, err := srv.runEngineForJob(job2, context.Background())
 		errs <- err
 	}()
 
@@ -224,11 +224,11 @@ func TestRunEngineForJobLimiter(t *testing.T) {
 
 	errs := make(chan error, 2)
 	go func() {
-		_, _, _, err := srv.runEngineForJob(job1, context.Background())
+		_, _, err := srv.runEngineForJob(job1, context.Background())
 		errs <- err
 	}()
 	go func() {
-		_, _, _, err := srv.runEngineForJob(job2, context.Background())
+		_, _, err := srv.runEngineForJob(job2, context.Background())
 		errs <- err
 	}()
 
@@ -275,7 +275,7 @@ func TestRunEngineForJobPassesUndelegatedInputs(t *testing.T) {
 		},
 	}
 
-	_, _, _, err := srv.runEngineForJob(job, context.Background())
+	_, _, err := srv.runEngineForJob(job, context.Background())
 	if err != nil {
 		t.Fatalf("runEngineForJob: %v", err)
 	}
@@ -317,7 +317,7 @@ func TestRunEngineForJobPassesSourceAddrOverrides(t *testing.T) {
 		CreatedAt: time.Now().UTC(),
 	}
 
-	_, _, _, err := srv.runEngineForJob(job, context.Background())
+	_, _, err := srv.runEngineForJob(job, context.Background())
 	if err != nil {
 		t.Fatalf("runEngineForJob: %v", err)
 	}
@@ -348,5 +348,36 @@ func TestDNSQueryCounterCallback(t *testing.T) {
 	}
 	if ipv6 != 1 {
 		t.Fatalf("ipv6 = %d, want 1", ipv6)
+	}
+}
+
+func TestRunEngineForJobPassesCacheStore(t *testing.T) {
+	cfg := DefaultConfig()
+	srv := New(cfg)
+
+	var captured engine.RunRequest
+	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		captured = req
+		return nil, nil
+	}
+
+	job := Job{
+		ID:        "job-cache",
+		Domain:    "example.com",
+		Status:    JobQueued,
+		CreatedAt: time.Now().UTC(),
+	}
+
+	_, stats, err := srv.runEngineForJob(job, context.Background())
+	if err != nil {
+		t.Fatalf("runEngineForJob: %v", err)
+	}
+	if captured.NameserverCache == nil {
+		t.Fatalf("expected NameserverCache to be set on RunRequest")
+	}
+	// With a stub engine that does no real queries, cache stats should be zero.
+	if stats.cacheHits != 0 || stats.cacheMisses != 0 || stats.cacheEvictions != 0 {
+		t.Fatalf("expected zero cache stats from stub engine, got hits=%d misses=%d evictions=%d",
+			stats.cacheHits, stats.cacheMisses, stats.cacheEvictions)
 	}
 }

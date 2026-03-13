@@ -355,6 +355,8 @@ describe("App", () => {
       health: {
         queue_depth: 3,
         in_flight_jobs: 2,
+        dns_cache_hits: 30,
+        dns_cache_misses: 10,
         dns_queries_ipv4_total: 11234,
         dns_queries_ipv6_total: 22000000
       },
@@ -429,6 +431,7 @@ describe("App", () => {
                 throughput: 1,
                 failed: 0,
                 queue_depth: 2,
+                dns_cache_hit_rate: 0.4,
                 dns_queries_per_second: 11.2,
                 dns_queries_ipv4_per_second: 7.1,
                 dns_queries_ipv6_per_second: 4.1
@@ -437,6 +440,7 @@ describe("App", () => {
                 throughput: 3,
                 failed: 1,
                 queue_depth: 4,
+                dns_cache_hit_rate: 0.75,
                 dns_queries_per_second: 18.6,
                 dns_queries_ipv4_per_second: 11.8,
                 dns_queries_ipv6_per_second: 6.8
@@ -463,13 +467,15 @@ describe("App", () => {
     const metricsPanel = getMetricsPanel();
 
     expect(await within(metricsPanel).findByLabelText("DNS query rates trend")).toBeInTheDocument();
+    expect(within(metricsPanel).getByLabelText("Cache hit rate trend")).toBeInTheDocument();
     expect(within(metricsPanel).getByText("In-flight jobs")).toBeInTheDocument();
-    expect(within(metricsPanel).getByText("Total IPv4 queries")).toBeInTheDocument();
-    expect(within(metricsPanel).getByText("Total IPv6 queries")).toBeInTheDocument();
+    expect(within(metricsPanel).getByText("External IPv4")).toBeInTheDocument();
+    expect(within(metricsPanel).getByText("External IPv6")).toBeInTheDocument();
     expect(within(metricsPanel).getByText("11,2K")).toBeInTheDocument();
     expect(within(metricsPanel).getByText("22M")).toBeInTheDocument();
     expect(within(metricsPanel).getByText("80.0%")).toBeInTheDocument();
     expect(within(metricsPanel).getByText("15.0%")).toBeInTheDocument();
+    expect(within(metricsPanel).getAllByText("75.0%")).toHaveLength(2);
     expect(within(metricsPanel).getByText("320 ms")).toBeInTheDocument();
     expect(within(metricsPanel).getByText("Total jobs finished")).toBeInTheDocument();
     expect(within(metricsPanel).getByText("Failed jobs")).toBeInTheDocument();

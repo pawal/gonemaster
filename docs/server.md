@@ -361,15 +361,22 @@ GET /metrics
 GET /healthz
 ```
 
-`GET /metrics` returns a JSON snapshot. Optional query params:
+`GET /metrics` returns a JSON snapshot by default. Optional query params:
+- `format=json|prom` to choose JSON snapshot output or Prometheus text exposition.
 - `window=1h|6h|24h|48h` to restrict `trends.windows` to one window.
 - `include=` comma-separated sections: `all`, `health`, `jobs`, `api`, `quality`, `insights`, `trends`.
 - `limit_domains=1..100` to cap `insights.domains.items`.
 - `limit_batches=1..100` to cap `insights.batches.items`.
 
+When `format=prom` is used, the JSON-only query params above are ignored and the response contains
+stable low-cardinality Prometheus counters, gauges, and histograms instead.
+
 Responses:
-- `200` JSON snapshot.
+- `200` JSON snapshot or Prometheus text exposition.
 - `400` structured error for invalid query params.
+
+Trend points in the metrics snapshot include throughput, failures, DNS query
+rates, and per-bucket cache hit rate (`0..1`).
 
 The metrics endpoint caches rendered responses for 1 second per unique query option set.
 

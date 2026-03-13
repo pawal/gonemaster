@@ -773,6 +773,19 @@ button:hover:not(:disabled) {
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
 }
 
+.metrics-card-group {
+  margin-bottom: 16px;
+}
+
+.metrics-group-heading {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin: 0 0 6px 2px;
+}
+
 .metrics-trend-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -816,6 +829,10 @@ button:hover:not(:disabled) {
 
 .sparkline-warn polyline {
   stroke: #dc2626;
+}
+
+.sparkline-cache polyline {
+  stroke: #16a34a;
 }
 
 .sparkline-queries .sparkline-ipv4 {

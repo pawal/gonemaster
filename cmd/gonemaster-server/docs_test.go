@@ -38,6 +38,54 @@ func TestServerMDDatabaseSection(t *testing.T) {
 	}
 }
 
+// TestServerMDLinksToSetupGuide verifies that docs/server.md references the
+// database setup guide so readers can find detailed configuration instructions.
+func TestServerMDLinksToSetupGuide(t *testing.T) {
+	data, err := os.ReadFile("../../docs/server.md")
+	if err != nil {
+		t.Fatalf("read docs/server.md: %v", err)
+	}
+	if !strings.Contains(string(data), "database-setup.md") {
+		t.Error("docs/server.md does not link to database-setup.md")
+	}
+}
+
+// TestDatabaseSetupMDExists verifies the database setup guide exists and
+// covers PostgreSQL, MariaDB, DSN requirements, and key tuning parameters.
+func TestDatabaseSetupMDExists(t *testing.T) {
+	data, err := os.ReadFile("../../docs/database-setup.md")
+	if err != nil {
+		t.Fatalf("read docs/database-setup.md: %v", err)
+	}
+	src := string(data)
+
+	for _, want := range []string{
+		// Both backends covered
+		"## PostgreSQL",
+		"## MariaDB",
+		// User/database creation
+		"CREATE DATABASE",
+		"CREATE USER",
+		// Key tuning params
+		"shared_buffers",
+		"innodb_buffer_pool_size",
+		"innodb_file_per_table",
+		// DSN requirements
+		"parseTime=true",
+		"utf8mb4",
+		// Backup
+		"pg_dump",
+		"mysqldump",
+		// Cross-references
+		"docker-compose.test.yml",
+		"test-integration",
+	} {
+		if !strings.Contains(src, want) {
+			t.Errorf("docs/database-setup.md missing %q", want)
+		}
+	}
+}
+
 // TestServerMDNoPhase2Placeholder verifies that the "not yet available"
 // placeholder text has been removed now that PostgreSQL and MariaDB are
 // implemented.

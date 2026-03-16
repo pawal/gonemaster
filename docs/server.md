@@ -171,6 +171,9 @@ GONEMASTER_DB_DSN="postgres://user:pass@host:5432/dbname?sslmode=disable" \
   gonemaster-server
 ```
 
+For PostgreSQL and MariaDB setup, tuning, and backup guidance see
+[docs/database-setup.md](database-setup.md).
+
 #### Connection pool defaults
 
 | Backend | Max open connections | Max idle | Connection lifetime |

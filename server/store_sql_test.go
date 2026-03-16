@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-sql-driver/mysql"
 	"github.com/lib/pq"
 	_ "modernc.org/sqlite"
 )
@@ -1031,12 +1032,13 @@ func TestPostgresDialectMatchesTestDollarDialect(t *testing.T) {
 
 func TestDialectFor(t *testing.T) {
 	tests := []struct {
-		driver  string
-		wantErr bool
+		driver   string
+		wantErr  bool
 		wantType string
 	}{
 		{"sqlite",   false, "sqliteDialect"},
 		{"postgres", false, "postgresDialect"},
+		{"mariadb",  false, "mariadbDialect"},
 		{"mysql",    true,  ""},
 		{"mongodb",  true,  ""},
 		{"",         true,  ""},
@@ -1065,8 +1067,23 @@ func TestDialectFor(t *testing.T) {
 				if _, ok := d.(postgresDialect); !ok {
 					t.Errorf("dialectFor(%q) = %T, want postgresDialect", tc.driver, d)
 				}
+			case "mariadbDialect":
+				if _, ok := d.(mariadbDialect); !ok {
+					t.Errorf("dialectFor(%q) = %T, want mariadbDialect", tc.driver, d)
+				}
 			}
 		})
+	}
+}
+
+func TestDialectForMariadbDriverName(t *testing.T) {
+	// "mariadb" is the user-facing name; the underlying sql.DB driver is "mysql".
+	d, err := dialectFor("mariadb")
+	if err != nil {
+		t.Fatalf("dialectFor(\"mariadb\"): %v", err)
+	}
+	if got := d.DriverName(); got != "mysql" {
+		t.Errorf("DriverName() = %q, want \"mysql\"", got)
 	}
 }
 
@@ -1112,6 +1129,26 @@ func TestConfigurePoolPostgres(t *testing.T) {
 	}
 }
 
+func TestConfigurePoolMySQL(t *testing.T) {
+	db := openRawSQLite(t)
+	configurePool(db, "mysql")
+	if got := db.Stats().MaxOpenConnections; got != 25 {
+		t.Errorf("mysql MaxOpenConnections = %d, want 25", got)
+	}
+}
+
+func TestConfigurePoolMySQLMatchesPostgres(t *testing.T) {
+	// MySQL and PostgreSQL should have identical pool defaults.
+	pgDB := openRawSQLite(t)
+	myDB := openRawSQLite(t)
+	configurePool(pgDB, "postgres")
+	configurePool(myDB, "mysql")
+	if pgDB.Stats().MaxOpenConnections != myDB.Stats().MaxOpenConnections {
+		t.Errorf("mysql MaxOpenConnections (%d) differs from postgres (%d)",
+			myDB.Stats().MaxOpenConnections, pgDB.Stats().MaxOpenConnections)
+	}
+}
+
 func TestConfigurePoolUnknownDriverNoChange(t *testing.T) {
 	db := openRawSQLite(t)
 	// Record default (0 = unlimited in sql.DB).
@@ -1119,5 +1156,142 @@ func TestConfigurePoolUnknownDriverNoChange(t *testing.T) {
 	configurePool(db, "unknown")
 	if got := db.Stats().MaxOpenConnections; got != before {
 		t.Errorf("unknown driver changed MaxOpenConnections to %d", got)
+	}
+}
+
+// ---- mariadbDialect --------------------------------------------------------
+
+// Compile-time interface check.
+var _ sqlDialect = mariadbDialect{}
+
+func TestMariadbDialectPlaceholder(t *testing.T) {
+	d := mariadbDialect{}
+	// MariaDB uses "?" for all positions, same as SQLite.
+	for _, n := range []int{1, 2, 10, 19} {
+		if got := d.Placeholder(n); got != "?" {
+			t.Errorf("Placeholder(%d) = %q, want \"?\"", n, got)
+		}
+	}
+}
+
+func TestMariadbDialectPlaceholderMatchesSQLite(t *testing.T) {
+	md := mariadbDialect{}
+	sd := sqliteDialect{}
+	for _, n := range []int{1, 5, 10} {
+		if md.Placeholder(n) != sd.Placeholder(n) {
+			t.Errorf("Placeholder(%d): mariadb=%q sqlite=%q", n, md.Placeholder(n), sd.Placeholder(n))
+		}
+	}
+}
+
+func TestMariadbDialectTimestampVal(t *testing.T) {
+	d := mariadbDialect{}
+	if v := d.TimestampVal(time.Time{}); v != nil {
+		t.Fatalf("zero time should return nil, got %v", v)
+	}
+	ts := time.Date(2026, 3, 15, 12, 0, 0, 0, time.UTC)
+	v := d.TimestampVal(ts)
+	s, ok := v.(string)
+	if !ok {
+		t.Fatalf("non-zero time should return string, got %T", v)
+	}
+	if !strings.HasPrefix(s, "2026-03-15T12:00:00") {
+		t.Fatalf("unexpected timestamp format: %q", s)
+	}
+}
+
+func TestMariadbDialectUpsertResultSQL(t *testing.T) {
+	sql := mariadbDialect{}.UpsertResultSQL()
+	if strings.Contains(sql, "INSERT OR REPLACE") {
+		t.Fatal("mariadb upsert must not use INSERT OR REPLACE")
+	}
+	if strings.Contains(sql, "ON CONFLICT") {
+		t.Fatal("mariadb upsert must not use ON CONFLICT (that is PostgreSQL syntax)")
+	}
+	if !strings.Contains(sql, "ON DUPLICATE KEY UPDATE") {
+		t.Fatalf("mariadb upsert must use ON DUPLICATE KEY UPDATE, got: %q", sql)
+	}
+	if count := strings.Count(sql, "?"); count != 5 {
+		t.Fatalf("mariadb upsert must have 5 '?' placeholders, got %d: %q", count, sql)
+	}
+	for _, col := range []string{"job_id", "batch_id", "status", "summary_json", "raw_json"} {
+		if !strings.Contains(sql, col) {
+			t.Fatalf("mariadb upsert missing column %q: %q", col, sql)
+		}
+	}
+}
+
+func TestMariadbDialectIsDuplicateKey(t *testing.T) {
+	d := mariadbDialect{}
+
+	// Exact mysql error with number 1062.
+	dupErr := &mysql.MySQLError{Number: 1062, Message: "Duplicate entry 'abc' for key 'PRIMARY'"}
+	if !d.IsDuplicateKey(dupErr) {
+		t.Fatal("expected true for MySQLError number 1062")
+	}
+
+	// Wrapped mysql error must also match.
+	wrappedErr := fmt.Errorf("db op failed: %w", &mysql.MySQLError{Number: 1062})
+	if !d.IsDuplicateKey(wrappedErr) {
+		t.Fatal("expected true for wrapped MySQLError number 1062")
+	}
+
+	// A mysql error with a different number must not match.
+	otherMysqlErr := &mysql.MySQLError{Number: 1045} // access denied
+	if d.IsDuplicateKey(otherMysqlErr) {
+		t.Fatal("expected false for MySQLError with non-1062 number")
+	}
+
+	// Plain (non-mysql) errors must not match, even if the text looks right.
+	plainErr := fmt.Errorf("Duplicate entry 'abc' for key 'PRIMARY'")
+	if d.IsDuplicateKey(plainErr) {
+		t.Fatal("expected false for plain error without MySQLError type")
+	}
+
+	// SQLite-style error must not match.
+	sqliteErr := fmt.Errorf("UNIQUE constraint failed: jobs.id")
+	if d.IsDuplicateKey(sqliteErr) {
+		t.Fatal("mariadb dialect should not match SQLite UNIQUE error")
+	}
+}
+
+// ---- mariadbDSN ------------------------------------------------------------
+
+func TestMariadbDSNNoParams(t *testing.T) {
+	in := "user:pass@tcp(host:3306)/dbname"
+	got := mariadbDSN(in)
+	want := "user:pass@tcp(host:3306)/dbname?parseTime=true"
+	if got != want {
+		t.Errorf("mariadbDSN(%q) = %q, want %q", in, got, want)
+	}
+}
+
+func TestMariadbDSNExistingParams(t *testing.T) {
+	in := "user:pass@tcp(host:3306)/dbname?charset=utf8mb4"
+	got := mariadbDSN(in)
+	want := "user:pass@tcp(host:3306)/dbname?charset=utf8mb4&parseTime=true"
+	if got != want {
+		t.Errorf("mariadbDSN(%q) = %q, want %q", in, got, want)
+	}
+}
+
+func TestMariadbDSNAlreadyHasParseTime(t *testing.T) {
+	cases := []string{
+		"user:pass@tcp(host:3306)/dbname?parseTime=true",
+		"user:pass@tcp(host:3306)/dbname?parseTime=false",
+		"user:pass@tcp(host:3306)/dbname?charset=utf8mb4&parseTime=true",
+	}
+	for _, in := range cases {
+		got := mariadbDSN(in)
+		if got != in {
+			t.Errorf("mariadbDSN(%q) = %q, want unchanged", in, got)
+		}
+	}
+}
+
+func TestMariadbDSNContainsParseTimeTrue(t *testing.T) {
+	dsn := mariadbDSN("user:pass@tcp(host:3306)/dbname")
+	if !strings.Contains(dsn, "parseTime=true") {
+		t.Errorf("expected parseTime=true in %q", dsn)
 	}
 }

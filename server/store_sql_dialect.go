@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-sql-driver/mysql"
 	"github.com/lib/pq"
 )
 
@@ -84,6 +85,34 @@ func (postgresDialect) IsDuplicateKey(err error) bool {
 	return errors.As(err, &pqErr) && pqErr.Code == "23505"
 }
 
+// mariadbDialect is the dialect for github.com/go-sql-driver/mysql (driver
+// name "mysql"), which also covers MariaDB.
+type mariadbDialect struct{}
+
+func (mariadbDialect) Placeholder(_ int) string { return "?" }
+func (mariadbDialect) TimestampVal(t time.Time) any {
+	if t.IsZero() {
+		return nil
+	}
+	return formatSortableTimestamp(t)
+}
+func (mariadbDialect) DriverName() string { return "mysql" }
+func (mariadbDialect) UpsertResultSQL() string {
+	return `INSERT INTO results (job_id, batch_id, status, summary_json, raw_json)
+		 VALUES (?, ?, ?, ?, ?)
+		 ON DUPLICATE KEY UPDATE
+		 	batch_id     = VALUES(batch_id),
+		 	status       = VALUES(status),
+		 	summary_json = VALUES(summary_json),
+		 	raw_json     = VALUES(raw_json)`
+}
+
+// IsDuplicateKey detects MySQL/MariaDB error 1062 (ER_DUP_ENTRY).
+func (mariadbDialect) IsDuplicateKey(err error) bool {
+	var mysqlErr *mysql.MySQLError
+	return errors.As(err, &mysqlErr) && mysqlErr.Number == 1062
+}
+
 // dialectFor returns the dialect for a given driver name.
 func dialectFor(driver string) (sqlDialect, error) {
 	switch driver {
@@ -91,6 +120,8 @@ func dialectFor(driver string) (sqlDialect, error) {
 		return sqliteDialect{}, nil
 	case "postgres":
 		return postgresDialect{}, nil
+	case "mariadb":
+		return mariadbDialect{}, nil
 	default:
 		return nil, fmt.Errorf("unsupported database driver %q", driver)
 	}
@@ -103,17 +134,33 @@ func configurePool(db *sql.DB, driver string) {
 	switch driver {
 	case "sqlite":
 		db.SetMaxOpenConns(1)
-	case "postgres":
+	case "postgres", "mysql":
 		db.SetMaxOpenConns(25)
 		db.SetMaxIdleConns(5)
 		db.SetConnMaxLifetime(5 * time.Minute)
 	}
 }
 
+// mariadbDSN ensures the DSN contains parseTime=true, which is required for
+// the go-sql-driver/mysql driver to scan DATETIME columns into time.Time. If
+// parseTime is already specified in the DSN it is left untouched.
+func mariadbDSN(dsn string) string {
+	if strings.Contains(dsn, "parseTime=") {
+		return dsn
+	}
+	if strings.Contains(dsn, "?") {
+		return dsn + "&parseTime=true"
+	}
+	return dsn + "?parseTime=true"
+}
+
 // openSQLDB opens and configures a *sql.DB for the given driver and DSN.
 func openSQLDB(driver, dsn string) (*sql.DB, error) {
 	if dsn == "" {
 		return nil, fmt.Errorf("database DSN is required for driver %q", driver)
+	}
+	if driver == "mysql" {
+		dsn = mariadbDSN(dsn)
 	}
 	db, err := sql.Open(driver, dsn)
 	if err != nil {

@@ -47,11 +47,8 @@ steps:
       TEST_POSTGRES_DSN: postgres://gonemaster:gonemaster@postgres/gonemaster_test?sslmode=disable
       TEST_MARIADB_DSN: gonemaster:gonemaster@tcp(mariadb:3306)/gonemaster_test
     commands:
-      - |
-        # Wait for PostgreSQL (max 30s)
-        i=0; until echo > /dev/tcp/postgres/5432 2>/dev/null || [ $i -ge 30 ]; do i=$((i+1)); sleep 1; done
-        # Wait for MariaDB (max 30s)
-        i=0; until echo > /dev/tcp/mariadb/3306 2>/dev/null || [ $i -ge 30 ]; do i=$((i+1)); sleep 1; done
+      - bash -c 'i=0; until echo > /dev/tcp/postgres/5432 2>/dev/null || [ $i -ge 30 ]; do i=$((i+1)); sleep 1; done'
+      - bash -c 'i=0; until echo > /dev/tcp/mariadb/3306 2>/dev/null || [ $i -ge 30 ]; do i=$((i+1)); sleep 1; done'
       - go test ./server/... -count=1 -timeout 120s
 
   build_server_with_ui:

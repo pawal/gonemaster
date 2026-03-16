@@ -16,17 +16,21 @@ var sqlMigrations = []sqlMigration{
 	{
 		version: 1,
 		stmts: []string{
+			// VARCHAR is used for PRIMARY KEY and indexed columns because
+			// MariaDB/MySQL requires a key length for TEXT columns in index
+			// specifications. SQLite and PostgreSQL treat VARCHAR identically
+			// to TEXT so the schema works across all three backends.
 			`CREATE TABLE IF NOT EXISTS jobs (
-				id                  TEXT PRIMARY KEY,
-				batch_id            TEXT NOT NULL DEFAULT '',
-				domain              TEXT NOT NULL DEFAULT '',
-				status              TEXT NOT NULL DEFAULT 'queued',
-				created_at          TEXT NOT NULL,
-				started_at          TEXT,
-				finished_at         TEXT,
+				id                  VARCHAR(255) NOT NULL PRIMARY KEY,
+				batch_id            VARCHAR(255) NOT NULL DEFAULT '',
+				domain              TEXT         NOT NULL DEFAULT '',
+				status              VARCHAR(32)  NOT NULL DEFAULT 'queued',
+				created_at          VARCHAR(64)  NOT NULL,
+				started_at          VARCHAR(64),
+				finished_at         VARCHAR(64),
 				progress            INTEGER NOT NULL DEFAULT 0,
-				result_url          TEXT NOT NULL DEFAULT '',
-				error               TEXT NOT NULL DEFAULT '',
+				result_url          TEXT    NOT NULL DEFAULT '',
+				error               TEXT    NOT NULL DEFAULT '',
 				sev_notice          INTEGER NOT NULL DEFAULT 0,
 				sev_warning         INTEGER NOT NULL DEFAULT 0,
 				sev_error           INTEGER NOT NULL DEFAULT 0,
@@ -41,7 +45,7 @@ var sqlMigrations = []sqlMigration{
 			`CREATE INDEX IF NOT EXISTS idx_jobs_status     ON jobs(status)`,
 			`CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at)`,
 			`CREATE TABLE IF NOT EXISTS results (
-				job_id       TEXT PRIMARY KEY,
+				job_id       VARCHAR(255) NOT NULL PRIMARY KEY,
 				batch_id     TEXT NOT NULL DEFAULT '',
 				status       TEXT NOT NULL DEFAULT '',
 				summary_json TEXT,
@@ -54,17 +58,19 @@ var sqlMigrations = []sqlMigration{
 // runMigrations creates the schema_migrations tracking table and applies any
 // pending migrations. Each migration runs inside its own transaction so a
 // partial failure leaves the database in the last fully-applied state.
-func runMigrations(db *sql.DB) error {
+// d is used for placeholder syntax so the runner works with any SQL dialect.
+func runMigrations(db *sql.DB, d sqlDialect) error {
 	if _, err := db.Exec(
 		`CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY)`,
 	); err != nil {
 		return fmt.Errorf("create schema_migrations: %w", err)
 	}
 
+	ph := d.Placeholder(1)
 	for _, m := range sqlMigrations {
 		var count int
 		if err := db.QueryRow(
-			`SELECT COUNT(*) FROM schema_migrations WHERE version = ?`, m.version,
+			`SELECT COUNT(*) FROM schema_migrations WHERE version = `+ph, m.version,
 		).Scan(&count); err != nil {
 			return fmt.Errorf("check migration %d: %w", m.version, err)
 		}
@@ -83,7 +89,7 @@ func runMigrations(db *sql.DB) error {
 			}
 		}
 		if _, err := tx.Exec(
-			`INSERT INTO schema_migrations(version) VALUES (?)`, m.version,
+			`INSERT INTO schema_migrations(version) VALUES (`+ph+`)`, m.version,
 		); err != nil {
 			_ = tx.Rollback()
 			return fmt.Errorf("record migration %d: %w", m.version, err)

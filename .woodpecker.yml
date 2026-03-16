@@ -1,3 +1,19 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: gonemaster
+      POSTGRES_PASSWORD: gonemaster
+      POSTGRES_DB: gonemaster_test
+
+  mariadb:
+    image: mariadb:11
+    environment:
+      MARIADB_USER: gonemaster
+      MARIADB_PASSWORD: gonemaster
+      MARIADB_DATABASE: gonemaster_test
+      MARIADB_ROOT_PASSWORD: root
+
 steps:
   ui_checks:
     image: node:22-bookworm
@@ -22,6 +38,18 @@ steps:
       GOMAXPROCS: 4
     commands:
       - go test -p 4 -parallel 4 ./...
+
+  integration_test:
+    image: golang:1.25
+    depends_on:
+      - go_test
+    environment:
+      TEST_POSTGRES_DSN: postgres://gonemaster:gonemaster@postgres/gonemaster_test?sslmode=disable
+      TEST_MARIADB_DSN: gonemaster:gonemaster@tcp(mariadb:3306)/gonemaster_test
+    commands:
+      - bash -c 'i=0; until echo > /dev/tcp/postgres/5432 2>/dev/null || [ $i -ge 30 ]; do i=$((i+1)); sleep 1; done'
+      - bash -c 'i=0; until echo > /dev/tcp/mariadb/3306 2>/dev/null || [ $i -ge 30 ]; do i=$((i+1)); sleep 1; done'
+      - go test ./server/... -count=1 -timeout 120s
 
   build_server_with_ui:
     image: golang:1.25

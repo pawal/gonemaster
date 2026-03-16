@@ -16,7 +16,7 @@ CMD ?= all
 	build-gonemaster build-gonemaster-badkeys-embed build-gonemaster-server build-gonemaster-server-noui \
 	build-gonemaster-server-badkeys-embed build-gonemaster-server-noui-badkeys-embed build-gonemaster-client \
 	build-gonemaster-nagios install-gonemaster install-gonemaster-badkeys-embed install-gonemaster-server install-gonemaster-client \
-	install-gonemaster-nagios ui-check test-go vet race \
+	install-gonemaster-nagios ui-check test-go test-integration vet race \
 	spec-export-implemented spec-export-tags spec-export spec-validate spec-validate-scan spec-check \
 	spec-generate-tags spec-check-tags spec-export-log-args spec-check-coherency spec-check-i18n-placeholders \
 	badkeys-update badkeys-update-embed man clean-man
@@ -26,6 +26,7 @@ help:
 	@echo "  build            Build all commands (override CMD=gonemaster-server)"
 	@echo "  test             Run Go tests, UI tests, and spec checks"
 	@echo "  test-go          Run Go tests (no UI)"
+	@echo "  test-integration Run Go tests against SQLite + PostgreSQL + MariaDB (requires Docker)"
 	@echo "  vet              Run go vet"
 	@echo "  race             Run Go tests with -race"
 	@echo "  install          Install all commands (override CMD=gonemaster-server)"
@@ -135,6 +136,18 @@ build-gonemaster-nagios: $(BIN_DIR)
 
 test-go:
 	$(GO) test ./...
+
+# test-integration starts PostgreSQL and MariaDB via docker-compose.test.yml,
+# runs all server tests against all three backends, then tears the containers
+# down. Requires Docker with Compose v2 support.
+test-integration:
+	docker compose -f docker-compose.test.yml up -d --wait
+	TEST_POSTGRES_DSN="postgres://gonemaster:gonemaster@localhost:5432/gonemaster_test?sslmode=disable" \
+	TEST_MARIADB_DSN="gonemaster:gonemaster@tcp(localhost:3306)/gonemaster_test" \
+	$(GO) test ./server/... -count=1 -timeout 120s; \
+	STATUS=$$?; \
+	docker compose -f docker-compose.test.yml down; \
+	exit $$STATUS
 
 test: ui-test test-go spec-check
 

@@ -60,7 +60,7 @@ func NewWithOptions(cfg Config) (*Server, error) {
 		if err != nil {
 			return nil, err
 		}
-		if err := runMigrations(db); err != nil {
+		if err := runMigrations(db, dialect); err != nil {
 			_ = db.Close()
 			return nil, fmt.Errorf("run migrations: %w", err)
 		}

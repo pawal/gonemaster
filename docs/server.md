@@ -141,19 +141,46 @@ The server supports pluggable storage backends selected by `--db-driver`:
 |---|---|
 | `memory` | In-memory only (default). All data lost on restart. |
 | `sqlite` | Embedded SQLite database. Recommended for single-server production use. |
-| `postgres` | PostgreSQL. Phase 2 — not yet available. |
-| `mariadb` | MariaDB/MySQL. Phase 2 — not yet available. |
+| `postgres` | PostgreSQL 13+. |
+| `mariadb` | MariaDB 10.6+ / MySQL 8.0+. |
 
-For SQLite, `--db-dsn` is the file path:
+#### DSN formats
+
+**SQLite** — file path:
 ```
 gonemaster-server --db-driver sqlite --db-dsn /var/lib/gonemaster/gonemaster.db
 ```
 
-Using environment variables (recommended for DSNs containing passwords):
+**PostgreSQL** — connection URL:
 ```
-GONEMASTER_DB_DRIVER=sqlite GONEMASTER_DB_DSN=/var/lib/gonemaster/gonemaster.db \
+gonemaster-server --db-driver postgres \
+  --db-dsn "postgres://user:pass@host:5432/dbname?sslmode=disable"
+```
+
+**MariaDB / MySQL** — DSN string:
+```
+gonemaster-server --db-driver mariadb \
+  --db-dsn "user:pass@tcp(host:3306)/dbname"
+```
+`parseTime=true` is appended automatically if not already present.
+
+Use environment variables to keep passwords out of process listings and shell history:
+```
+GONEMASTER_DB_DRIVER=postgres \
+GONEMASTER_DB_DSN="postgres://user:pass@host:5432/dbname?sslmode=disable" \
   gonemaster-server
 ```
+
+For PostgreSQL and MariaDB setup, tuning, and backup guidance see
+[docs/database-setup.md](database-setup.md).
+
+#### Connection pool defaults
+
+| Backend | Max open connections | Max idle | Connection lifetime |
+|---|---|---|---|
+| `sqlite` | 1 (serialised writes) | — | — |
+| `postgres` | 25 | 5 | 5 minutes |
+| `mariadb` | 25 | 5 | 5 minutes |
 
 On startup with a persistent backend, the server automatically:
 - Runs any pending schema migrations.

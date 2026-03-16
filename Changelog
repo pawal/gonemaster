@@ -2,6 +2,18 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+ - Server: Environment variable and JSON config file support for database configuration (`GONEMASTER_DB_DRIVER`, `GONEMASTER_DB_DSN`, `--db-driver`, `--db-dsn`)
+ - Server: SQLite persistent job store with versioned schema migrations and startup job recovery
+ - Server: PostgreSQL and MariaDB/MySQL persistence backends with multi-dialect SQL abstraction, connection pooling, and integration test infrastructure (`make test-integration`, CI)
+
+### Changed
+
+ - Refactor SQL layer for multi-dialect support
+
 ## [v1.1.3] - 2026-03-13
 
 ### Added

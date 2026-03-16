@@ -54,17 +54,19 @@ var sqlMigrations = []sqlMigration{
 // runMigrations creates the schema_migrations tracking table and applies any
 // pending migrations. Each migration runs inside its own transaction so a
 // partial failure leaves the database in the last fully-applied state.
-func runMigrations(db *sql.DB) error {
+// d is used for placeholder syntax so the runner works with any SQL dialect.
+func runMigrations(db *sql.DB, d sqlDialect) error {
 	if _, err := db.Exec(
 		`CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY)`,
 	); err != nil {
 		return fmt.Errorf("create schema_migrations: %w", err)
 	}
 
+	ph := d.Placeholder(1)
 	for _, m := range sqlMigrations {
 		var count int
 		if err := db.QueryRow(
-			`SELECT COUNT(*) FROM schema_migrations WHERE version = ?`, m.version,
+			`SELECT COUNT(*) FROM schema_migrations WHERE version = `+ph, m.version,
 		).Scan(&count); err != nil {
 			return fmt.Errorf("check migration %d: %w", m.version, err)
 		}
@@ -83,7 +85,7 @@ func runMigrations(db *sql.DB) error {
 			}
 		}
 		if _, err := tx.Exec(
-			`INSERT INTO schema_migrations(version) VALUES (?)`, m.version,
+			`INSERT INTO schema_migrations(version) VALUES (`+ph+`)`, m.version,
 		); err != nil {
 			_ = tx.Rollback()
 			return fmt.Errorf("record migration %d: %w", m.version, err)

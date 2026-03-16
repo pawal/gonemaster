@@ -3,12 +3,42 @@ package server
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 
 	_ "modernc.org/sqlite"
 )
+
+// spyDialect wraps another dialect and counts Placeholder calls.
+type spyDialect struct {
+	inner            sqlDialect
+	placeholderCalls int
+}
+
+func (d *spyDialect) Placeholder(n int) string    { d.placeholderCalls++; return d.inner.Placeholder(n) }
+func (d *spyDialect) TimestampVal(t time.Time) any { return d.inner.TimestampVal(t) }
+func (d *spyDialect) DriverName() string           { return d.inner.DriverName() }
+func (d *spyDialect) UpsertResultSQL() string      { return d.inner.UpsertResultSQL() }
+func (d *spyDialect) IsDuplicateKey(err error) bool { return d.inner.IsDuplicateKey(err) }
+
+// testDollarDialect simulates PostgreSQL's $n placeholder style for testing.
+type testDollarDialect struct{}
+
+func (testDollarDialect) Placeholder(n int) string    { return fmt.Sprintf("$%d", n) }
+func (testDollarDialect) TimestampVal(t time.Time) any { return sqliteDialect{}.TimestampVal(t) }
+func (testDollarDialect) DriverName() string           { return "test-dollar" }
+func (testDollarDialect) UpsertResultSQL() string {
+	return `INSERT INTO results (job_id, batch_id, status, summary_json, raw_json)
+		 VALUES ($1, $2, $3, $4, $5)
+		 ON CONFLICT (job_id) DO UPDATE SET
+		 	batch_id=EXCLUDED.batch_id, status=EXCLUDED.status,
+		 	summary_json=EXCLUDED.summary_json, raw_json=EXCLUDED.raw_json`
+}
+func (testDollarDialect) IsDuplicateKey(err error) bool {
+	return strings.Contains(err.Error(), "duplicate key value violates unique constraint")
+}
 
 // testSQLiteStore opens an in-memory SQLite store with migrations applied.
 func testSQLiteStore(t *testing.T) *SQLJobStore {
@@ -20,7 +50,7 @@ func testSQLiteStore(t *testing.T) *SQLJobStore {
 	db.SetMaxOpenConns(1)
 	t.Cleanup(func() { _ = db.Close() })
 
-	if err := runMigrations(db); err != nil {
+	if err := runMigrations(db, sqliteDialect{}); err != nil {
 		t.Fatalf("runMigrations: %v", err)
 	}
 	return NewSQLJobStore(db, sqliteDialect{})
@@ -45,11 +75,11 @@ func TestRunMigrationsFresh(t *testing.T) {
 	db.SetMaxOpenConns(1)
 	defer db.Close()
 
-	if err := runMigrations(db); err != nil {
+	if err := runMigrations(db, sqliteDialect{}); err != nil {
 		t.Fatalf("first run: %v", err)
 	}
 	// Idempotent: second run must not error.
-	if err := runMigrations(db); err != nil {
+	if err := runMigrations(db, sqliteDialect{}); err != nil {
 		t.Fatalf("second run (idempotent): %v", err)
 	}
 
@@ -65,6 +95,23 @@ func TestRunMigrationsFresh(t *testing.T) {
 	var version int
 	if err := db.QueryRow(`SELECT version FROM schema_migrations WHERE version=1`).Scan(&version); err != nil {
 		t.Fatalf("migration version 1 not recorded: %v", err)
+	}
+}
+
+func TestRunMigrationsUsesDialectPlaceholder(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	db.SetMaxOpenConns(1)
+	defer db.Close()
+
+	spy := &spyDialect{inner: sqliteDialect{}}
+	if err := runMigrations(db, spy); err != nil {
+		t.Fatalf("runMigrations: %v", err)
+	}
+	if spy.placeholderCalls == 0 {
+		t.Fatal("runMigrations did not call dialect.Placeholder")
 	}
 }
 
@@ -717,5 +764,166 @@ func TestNewWithOptionsInvalidDriver(t *testing.T) {
 	_, err := NewWithOptions(cfg)
 	if err == nil {
 		t.Fatal("expected error for unknown driver")
+	}
+}
+
+// ---- Placeholder helpers ---------------------------------------------------
+
+func TestPhRange(t *testing.T) {
+	tests := []struct {
+		name    string
+		dialect sqlDialect
+		start   int
+		count   int
+		want    string
+	}{
+		{"sqlite single", sqliteDialect{}, 1, 1, "?"},
+		{"sqlite multi", sqliteDialect{}, 1, 3, "?, ?, ?"},
+		{"sqlite offset", sqliteDialect{}, 5, 2, "?, ?"},
+		{"dollar single", testDollarDialect{}, 1, 1, "$1"},
+		{"dollar multi", testDollarDialect{}, 1, 3, "$1, $2, $3"},
+		{"dollar offset", testDollarDialect{}, 5, 2, "$5, $6"},
+		{"dollar high", testDollarDialect{}, 11, 5, "$11, $12, $13, $14, $15"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &SQLJobStore{dialect: tt.dialect}
+			got := s.phRange(tt.start, tt.count)
+			if got != tt.want {
+				t.Fatalf("phRange(%d, %d) = %q, want %q", tt.start, tt.count, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestPhRangeCreatePlaceholderCount(t *testing.T) {
+	// Verify Create's VALUES clause has the correct number of placeholders + literals.
+	// The INSERT has 19 columns: 10 bound params, 4 literal zeros, 5 bound params = 15 total bound.
+	s := &SQLJobStore{dialect: testDollarDialect{}}
+
+	firstBlock := s.phRange(1, 10)
+	secondBlock := s.phRange(11, 5)
+
+	// Count dollar-placeholders in each block.
+	firstCount := strings.Count(firstBlock, "$")
+	secondCount := strings.Count(secondBlock, "$")
+	if firstCount != 10 {
+		t.Fatalf("first block has %d placeholders, want 10: %q", firstCount, firstBlock)
+	}
+	if secondCount != 5 {
+		t.Fatalf("second block has %d placeholders, want 5: %q", secondCount, secondBlock)
+	}
+
+	// Verify sequential numbering.
+	if !strings.Contains(firstBlock, "$1") || !strings.Contains(firstBlock, "$10") {
+		t.Fatalf("first block should contain $1..$10: %q", firstBlock)
+	}
+	if !strings.Contains(secondBlock, "$11") || !strings.Contains(secondBlock, "$15") {
+		t.Fatalf("second block should contain $11..$15: %q", secondBlock)
+	}
+}
+
+func TestPhRangeUpdatePlaceholderCount(t *testing.T) {
+	// Verify Update uses 14 placeholders (13 SET + 1 WHERE).
+	s := &SQLJobStore{dialect: testDollarDialect{}}
+	for i := 1; i <= 14; i++ {
+		ph := s.ph(i)
+		want := fmt.Sprintf("$%d", i)
+		if ph != want {
+			t.Fatalf("ph(%d) = %q, want %q", i, ph, want)
+		}
+	}
+}
+
+// ---- Dialect: UpsertResultSQL ----------------------------------------------
+
+func TestUpsertResultSQLSQLite(t *testing.T) {
+	sql := sqliteDialect{}.UpsertResultSQL()
+	if !strings.Contains(sql, "INSERT OR REPLACE") {
+		t.Fatalf("sqlite upsert must use INSERT OR REPLACE, got: %q", sql)
+	}
+	if !strings.Contains(sql, "results") {
+		t.Fatalf("sqlite upsert must reference results table, got: %q", sql)
+	}
+	if count := strings.Count(sql, "?"); count != 5 {
+		t.Fatalf("sqlite upsert must have 5 '?' placeholders, got %d: %q", count, sql)
+	}
+	for _, col := range []string{"job_id", "batch_id", "status", "summary_json", "raw_json"} {
+		if !strings.Contains(sql, col) {
+			t.Fatalf("sqlite upsert missing column %q: %q", col, sql)
+		}
+	}
+}
+
+func TestUpsertResultSQLDollar(t *testing.T) {
+	sql := testDollarDialect{}.UpsertResultSQL()
+	if !strings.Contains(sql, "ON CONFLICT") {
+		t.Fatalf("dollar upsert must use ON CONFLICT, got: %q", sql)
+	}
+	if strings.Contains(sql, "INSERT OR REPLACE") {
+		t.Fatalf("dollar upsert must not use INSERT OR REPLACE, got: %q", sql)
+	}
+	for _, ph := range []string{"$1", "$2", "$3", "$4", "$5"} {
+		if !strings.Contains(sql, ph) {
+			t.Fatalf("dollar upsert missing placeholder %q: %q", ph, sql)
+		}
+	}
+	for _, col := range []string{"job_id", "batch_id", "status", "summary_json", "raw_json"} {
+		if !strings.Contains(sql, col) {
+			t.Fatalf("dollar upsert missing column %q: %q", col, sql)
+		}
+	}
+}
+
+func TestUpsertResultSQLDialectDifference(t *testing.T) {
+	// The two dialects must produce different SQL.
+	sqlit := sqliteDialect{}.UpsertResultSQL()
+	dollar := testDollarDialect{}.UpsertResultSQL()
+	if sqlit == dollar {
+		t.Fatalf("sqlite and dollar dialects produced identical UpsertResultSQL")
+	}
+}
+
+// ---- Dialect: IsDuplicateKey -----------------------------------------------
+
+func TestIsDuplicateKeySQLite(t *testing.T) {
+	d := sqliteDialect{}
+
+	uniqueErr := fmt.Errorf("UNIQUE constraint failed: jobs.id")
+	if !d.IsDuplicateKey(uniqueErr) {
+		t.Fatal("expected true for UNIQUE constraint error")
+	}
+
+	otherErr := fmt.Errorf("database is locked")
+	if d.IsDuplicateKey(otherErr) {
+		t.Fatal("expected false for unrelated error")
+	}
+}
+
+func TestIsDuplicateKeyDollar(t *testing.T) {
+	d := testDollarDialect{}
+
+	dupErr := fmt.Errorf(`pq: duplicate key value violates unique constraint "jobs_pkey"`)
+	if !d.IsDuplicateKey(dupErr) {
+		t.Fatal("expected true for duplicate key error")
+	}
+
+	otherErr := fmt.Errorf("connection refused")
+	if d.IsDuplicateKey(otherErr) {
+		t.Fatal("expected false for unrelated error")
+	}
+}
+
+func TestIsDuplicateKeyDialectDifference(t *testing.T) {
+	// The SQLite error string must not be detected as a duplicate by the dollar
+	// dialect (and vice versa), confirming each dialect checks its own format.
+	sqliteErr := fmt.Errorf("UNIQUE constraint failed: jobs.id")
+	if (testDollarDialect{}).IsDuplicateKey(sqliteErr) {
+		t.Fatal("dollar dialect should not match SQLite UNIQUE error")
+	}
+
+	pgErr := fmt.Errorf(`duplicate key value violates unique constraint "jobs_pkey"`)
+	if (sqliteDialect{}).IsDuplicateKey(pgErr) {
+		t.Fatal("sqlite dialect should not match PostgreSQL duplicate key error")
 	}
 }

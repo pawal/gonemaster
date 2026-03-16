@@ -3,6 +3,7 @@ package server
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -24,6 +25,13 @@ type sqlDialect interface {
 	TimestampVal(t time.Time) any
 	// DriverName returns the sql.DB driver name for this dialect.
 	DriverName() string
+	// UpsertResultSQL returns a complete INSERT-or-update statement for the
+	// results table using this dialect's placeholder and conflict-resolution
+	// syntax. Bind order: job_id, batch_id, status, summary_json, raw_json.
+	UpsertResultSQL() string
+	// IsDuplicateKey returns true when err represents a unique-constraint
+	// violation. Each driver surfaces this differently.
+	IsDuplicateKey(err error) bool
 }
 
 // sqliteDialect is the dialect for modernc.org/sqlite (driver name "sqlite").
@@ -37,6 +45,13 @@ func (sqliteDialect) TimestampVal(t time.Time) any {
 	return formatSortableTimestamp(t)
 }
 func (sqliteDialect) DriverName() string { return "sqlite" }
+func (sqliteDialect) UpsertResultSQL() string {
+	return `INSERT OR REPLACE INTO results (job_id, batch_id, status, summary_json, raw_json)
+		 VALUES (?, ?, ?, ?, ?)`
+}
+func (sqliteDialect) IsDuplicateKey(err error) bool {
+	return strings.Contains(err.Error(), "UNIQUE constraint failed")
+}
 
 // dialectFor returns the dialect for a given driver name.
 func dialectFor(driver string) (sqlDialect, error) {

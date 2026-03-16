@@ -37,6 +37,16 @@ func NewSQLJobStore(db *sql.DB, dialect sqlDialect) *SQLJobStore {
 // ph returns the n-th (1-based) placeholder for this dialect.
 func (s *SQLJobStore) ph(n int) string { return s.dialect.Placeholder(n) }
 
+// phRange returns count comma-separated placeholders starting at position start.
+// For SQLite: "?, ?, ?". For PostgreSQL: "$1, $2, $3".
+func (s *SQLJobStore) phRange(start, count int) string {
+	phs := make([]string, count)
+	for i := range phs {
+		phs[i] = s.ph(start + i)
+	}
+	return strings.Join(phs, ", ")
+}
+
 // ts returns the storable representation of a time.Time for this dialect.
 func (s *SQLJobStore) ts(t time.Time) any { return s.dialect.TimestampVal(t) }
 
@@ -213,19 +223,19 @@ func (s *SQLJobStore) Create(job Job) (Job, error) {
 	}
 
 	_, err = s.db.Exec(
-		`INSERT INTO jobs (
+		fmt.Sprintf(`INSERT INTO jobs (
 			id, batch_id, domain, status, created_at, started_at, finished_at,
 			progress, result_url, error,
 			sev_notice, sev_warning, sev_error, sev_critical,
 			tests_json, overrides_json, undelegated_ns_json, undelegated_ds_json, min_level
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, ?, ?, ?, ?, ?)`,
+		) VALUES (%s, 0, 0, 0, 0, %s)`, s.phRange(1, 10), s.phRange(11, 5)),
 		job.ID, job.BatchID, job.Domain, string(job.Status),
 		s.ts(job.CreatedAt), s.ts(job.StartedAt), s.ts(job.FinishedAt),
 		job.Progress, job.ResultURL, job.Error,
 		testsJSON, overridesJSON, nsJSON, dsJSON, job.MinLevel,
 	)
 	if err != nil {
-		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+		if s.dialect.IsDuplicateKey(err) {
 			return Job{}, errors.New("job already exists")
 		}
 		return Job{}, fmt.Errorf("insert job: %w", err)
@@ -235,7 +245,7 @@ func (s *SQLJobStore) Create(job Job) (Job, error) {
 
 // Get returns the job with the given id.
 func (s *SQLJobStore) Get(id string) (Job, bool) {
-	row := s.db.QueryRow("SELECT "+jobCols+" FROM jobs WHERE id = ?", id)
+	row := s.db.QueryRow(fmt.Sprintf("SELECT %s FROM jobs WHERE id = %s", jobCols, s.ph(1)), id)
 	job, err := s.scanJob(row)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -267,12 +277,17 @@ func (s *SQLJobStore) Update(job Job) error {
 	}
 
 	res, err := s.db.Exec(
-		`UPDATE jobs SET
-			batch_id=?, domain=?, status=?,
-			started_at=?, finished_at=?,
-			progress=?, result_url=?, error=?,
-			tests_json=?, overrides_json=?, undelegated_ns_json=?, undelegated_ds_json=?, min_level=?
-		 WHERE id=?`,
+		fmt.Sprintf(`UPDATE jobs SET
+			batch_id=%s, domain=%s, status=%s,
+			started_at=%s, finished_at=%s,
+			progress=%s, result_url=%s, error=%s,
+			tests_json=%s, overrides_json=%s, undelegated_ns_json=%s, undelegated_ds_json=%s, min_level=%s
+		 WHERE id=%s`,
+			s.ph(1), s.ph(2), s.ph(3),
+			s.ph(4), s.ph(5),
+			s.ph(6), s.ph(7), s.ph(8),
+			s.ph(9), s.ph(10), s.ph(11), s.ph(12), s.ph(13),
+			s.ph(14)),
 		job.BatchID, job.Domain, string(job.Status),
 		s.ts(job.StartedAt), s.ts(job.FinishedAt),
 		job.Progress, job.ResultURL, job.Error,
@@ -422,7 +437,7 @@ func (s *SQLJobStore) SetResult(jobID string, result JobResult) error {
 	}
 
 	var exists int
-	if err := tx.QueryRow("SELECT COUNT(*) FROM jobs WHERE id = ?", jobID).Scan(&exists); err != nil {
+	if err := tx.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM jobs WHERE id = %s", s.ph(1)), jobID).Scan(&exists); err != nil {
 		_ = tx.Rollback()
 		return fmt.Errorf("check job: %w", err)
 	}
@@ -432,8 +447,7 @@ func (s *SQLJobStore) SetResult(jobID string, result JobResult) error {
 	}
 
 	if _, err := tx.Exec(
-		`INSERT OR REPLACE INTO results (job_id, batch_id, status, summary_json, raw_json)
-		 VALUES (?, ?, ?, ?, ?)`,
+		s.dialect.UpsertResultSQL(),
 		jobID, result.BatchID, string(result.Status), summaryJSON, rawJSON,
 	); err != nil {
 		_ = tx.Rollback()
@@ -441,7 +455,8 @@ func (s *SQLJobStore) SetResult(jobID string, result JobResult) error {
 	}
 
 	if _, err := tx.Exec(
-		`UPDATE jobs SET sev_notice=?, sev_warning=?, sev_error=?, sev_critical=? WHERE id=?`,
+		fmt.Sprintf(`UPDATE jobs SET sev_notice=%s, sev_warning=%s, sev_error=%s, sev_critical=%s WHERE id=%s`,
+			s.ph(1), s.ph(2), s.ph(3), s.ph(4), s.ph(5)),
 		totals["NOTICE"], totals["WARNING"], totals["ERROR"], totals["CRITICAL"], jobID,
 	); err != nil {
 		_ = tx.Rollback()
@@ -458,7 +473,7 @@ func (s *SQLJobStore) GetResult(jobID string) (JobResult, bool) {
 		summaryJSON, rawJSON   sql.NullString
 	)
 	err := s.db.QueryRow(
-		`SELECT job_id, batch_id, status, summary_json, raw_json FROM results WHERE job_id = ?`,
+		fmt.Sprintf(`SELECT job_id, batch_id, status, summary_json, raw_json FROM results WHERE job_id = %s`, s.ph(1)),
 		jobID,
 	).Scan(&id, &batchID, &status, &summaryJSON, &rawJSON)
 	if err != nil {

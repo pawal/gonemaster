@@ -140,6 +140,72 @@ func ids(jobs []Job) []string {
 	return out
 }
 
+// ---- testBackends gating ---------------------------------------------------
+
+func TestTestBackendsSQLiteAlwaysPresent(t *testing.T) {
+	backends := testBackends(t)
+	for _, b := range backends {
+		if b.name == "sqlite" {
+			return
+		}
+	}
+	t.Fatal("testBackends: sqlite not present")
+}
+
+func TestTestBackendsPostgresExcludedWithoutEnv(t *testing.T) {
+	t.Setenv("TEST_POSTGRES_DSN", "")
+	for _, b := range testBackends(t) {
+		if b.name == "postgres" {
+			t.Fatal("testBackends: postgres present without TEST_POSTGRES_DSN")
+		}
+	}
+}
+
+func TestTestBackendsMariaDBExcludedWithoutEnv(t *testing.T) {
+	t.Setenv("TEST_MARIADB_DSN", "")
+	for _, b := range testBackends(t) {
+		if b.name == "mariadb" {
+			t.Fatal("testBackends: mariadb present without TEST_MARIADB_DSN")
+		}
+	}
+}
+
+func TestTestBackendsPostgresIncludedWhenEnvSet(t *testing.T) {
+	// Use a sentinel DSN — we only test inclusion, not connectivity.
+	t.Setenv("TEST_POSTGRES_DSN", "postgres://sentinel/test")
+	found := false
+	for _, b := range testBackends(t) {
+		if b.name == "postgres" {
+			found = true
+			if b.driver != "postgres" {
+				t.Errorf("postgres backend driver = %q, want \"postgres\"", b.driver)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("testBackends: postgres not present when TEST_POSTGRES_DSN is set")
+	}
+}
+
+func TestTestBackendsMariaDBIncludedWhenEnvSet(t *testing.T) {
+	t.Setenv("TEST_MARIADB_DSN", "gonemaster:pass@tcp(localhost:3306)/test")
+	found := false
+	for _, b := range testBackends(t) {
+		if b.name == "mariadb" {
+			found = true
+			if b.driver != "mysql" {
+				t.Errorf("mariadb backend driver = %q, want \"mysql\"", b.driver)
+			}
+			if !strings.Contains(b.dsn, "parseTime=true") {
+				t.Errorf("mariadb DSN missing parseTime=true: %q", b.dsn)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("testBackends: mariadb not present when TEST_MARIADB_DSN is set")
+	}
+}
+
 // ---- Migration tests -------------------------------------------------------
 
 func TestRunMigrationsFresh(t *testing.T) {

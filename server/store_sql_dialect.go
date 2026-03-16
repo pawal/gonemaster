@@ -2,9 +2,12 @@ package server
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/lib/pq"
 )
 
 const sortableTimestampLayout = "2006-01-02T15:04:05.000000000Z07:00"
@@ -53,18 +56,61 @@ func (sqliteDialect) IsDuplicateKey(err error) bool {
 	return strings.Contains(err.Error(), "UNIQUE constraint failed")
 }
 
+// postgresDialect is the dialect for github.com/lib/pq (driver name "postgres").
+type postgresDialect struct{}
+
+func (postgresDialect) Placeholder(n int) string { return fmt.Sprintf("$%d", n) }
+
+// TimestampVal formats t as a fixed-width RFC3339Nano string, consistent with
+// the TEXT columns used across all backends. A zero time returns nil (SQL NULL).
+func (postgresDialect) TimestampVal(t time.Time) any {
+	if t.IsZero() {
+		return nil
+	}
+	return formatSortableTimestamp(t)
+}
+func (postgresDialect) DriverName() string { return "postgres" }
+func (postgresDialect) UpsertResultSQL() string {
+	return `INSERT INTO results (job_id, batch_id, status, summary_json, raw_json)
+		 VALUES ($1, $2, $3, $4, $5)
+		 ON CONFLICT (job_id) DO UPDATE SET
+		 	batch_id     = EXCLUDED.batch_id,
+		 	status       = EXCLUDED.status,
+		 	summary_json = EXCLUDED.summary_json,
+		 	raw_json     = EXCLUDED.raw_json`
+}
+func (postgresDialect) IsDuplicateKey(err error) bool {
+	var pqErr *pq.Error
+	return errors.As(err, &pqErr) && pqErr.Code == "23505"
+}
+
 // dialectFor returns the dialect for a given driver name.
 func dialectFor(driver string) (sqlDialect, error) {
 	switch driver {
 	case "sqlite":
 		return sqliteDialect{}, nil
+	case "postgres":
+		return postgresDialect{}, nil
 	default:
 		return nil, fmt.Errorf("unsupported database driver %q", driver)
 	}
 }
 
+// configurePool sets connection pool parameters appropriate for the given driver.
+// SQLite must use a single connection to serialise writes; client/server
+// databases use a bounded pool.
+func configurePool(db *sql.DB, driver string) {
+	switch driver {
+	case "sqlite":
+		db.SetMaxOpenConns(1)
+	case "postgres":
+		db.SetMaxOpenConns(25)
+		db.SetMaxIdleConns(5)
+		db.SetConnMaxLifetime(5 * time.Minute)
+	}
+}
+
 // openSQLDB opens and configures a *sql.DB for the given driver and DSN.
-// For SQLite, MaxOpenConns is set to 1 to serialize all writes.
 func openSQLDB(driver, dsn string) (*sql.DB, error) {
 	if dsn == "" {
 		return nil, fmt.Errorf("database DSN is required for driver %q", driver)
@@ -73,9 +119,7 @@ func openSQLDB(driver, dsn string) (*sql.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open %s database: %w", driver, err)
 	}
-	if driver == "sqlite" {
-		db.SetMaxOpenConns(1)
-	}
+	configurePool(db, driver)
 	if err := db.Ping(); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("ping %s database: %w", driver, err)

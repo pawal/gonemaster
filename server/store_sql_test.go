@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lib/pq"
 	_ "modernc.org/sqlite"
 )
 
@@ -925,5 +926,198 @@ func TestIsDuplicateKeyDialectDifference(t *testing.T) {
 	pgErr := fmt.Errorf(`duplicate key value violates unique constraint "jobs_pkey"`)
 	if (sqliteDialect{}).IsDuplicateKey(pgErr) {
 		t.Fatal("sqlite dialect should not match PostgreSQL duplicate key error")
+	}
+}
+
+// ---- postgresDialect -------------------------------------------------------
+
+// Compile-time interface check.
+var _ sqlDialect = postgresDialect{}
+
+func TestPostgresDialectPlaceholder(t *testing.T) {
+	d := postgresDialect{}
+	for _, tc := range []struct{ n int; want string }{
+		{1, "$1"}, {2, "$2"}, {10, "$10"}, {15, "$15"},
+	} {
+		if got := d.Placeholder(tc.n); got != tc.want {
+			t.Errorf("Placeholder(%d) = %q, want %q", tc.n, got, tc.want)
+		}
+	}
+}
+
+func TestPostgresDialectTimestampVal(t *testing.T) {
+	d := postgresDialect{}
+	if v := d.TimestampVal(time.Time{}); v != nil {
+		t.Fatalf("zero time should return nil, got %v", v)
+	}
+	ts := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	v := d.TimestampVal(ts)
+	s, ok := v.(string)
+	if !ok {
+		t.Fatalf("non-zero time should return string, got %T", v)
+	}
+	if !strings.HasPrefix(s, "2026-01-02T03:04:05") {
+		t.Fatalf("unexpected timestamp format: %q", s)
+	}
+}
+
+func TestPostgresDialectUpsertResultSQL(t *testing.T) {
+	sql := postgresDialect{}.UpsertResultSQL()
+	if strings.Contains(sql, "INSERT OR REPLACE") {
+		t.Fatal("postgres upsert must not use INSERT OR REPLACE")
+	}
+	if !strings.Contains(sql, "ON CONFLICT") {
+		t.Fatalf("postgres upsert must use ON CONFLICT, got: %q", sql)
+	}
+	for _, ph := range []string{"$1", "$2", "$3", "$4", "$5"} {
+		if !strings.Contains(sql, ph) {
+			t.Fatalf("postgres upsert missing placeholder %q: %q", ph, sql)
+		}
+	}
+	for _, col := range []string{"job_id", "batch_id", "status", "summary_json", "raw_json"} {
+		if !strings.Contains(sql, col) {
+			t.Fatalf("postgres upsert missing column %q: %q", col, sql)
+		}
+	}
+}
+
+func TestPostgresDialectIsDuplicateKey(t *testing.T) {
+	d := postgresDialect{}
+
+	// Exact pq error with code 23505.
+	dupErr := &pq.Error{Code: "23505"}
+	if !d.IsDuplicateKey(dupErr) {
+		t.Fatal("expected true for pq.Error code 23505")
+	}
+
+	// Wrapped pq error must also match.
+	wrappedErr := fmt.Errorf("db op failed: %w", &pq.Error{Code: "23505"})
+	if !d.IsDuplicateKey(wrappedErr) {
+		t.Fatal("expected true for wrapped pq.Error code 23505")
+	}
+
+	// A pq error with a different code must not match.
+	syntaxErr := &pq.Error{Code: "42601"} // syntax_error
+	if d.IsDuplicateKey(syntaxErr) {
+		t.Fatal("expected false for pq.Error with non-23505 code")
+	}
+
+	// Plain (non-pq) errors must not match, even if the text looks right.
+	plainErr := fmt.Errorf("duplicate key value violates unique constraint")
+	if d.IsDuplicateKey(plainErr) {
+		t.Fatal("expected false for plain error without pq.Error type")
+	}
+
+	// SQLite-style error must not match.
+	sqliteErr := fmt.Errorf("UNIQUE constraint failed: jobs.id")
+	if d.IsDuplicateKey(sqliteErr) {
+		t.Fatal("postgres dialect should not match SQLite UNIQUE error")
+	}
+}
+
+func TestPostgresDialectMatchesTestDollarDialect(t *testing.T) {
+	// postgresDialect and testDollarDialect must agree on placeholder style
+	// since testDollarDialect is used as a stand-in for postgres in other tests.
+	pg := postgresDialect{}
+	td := testDollarDialect{}
+	for _, n := range []int{1, 5, 10, 19} {
+		if pg.Placeholder(n) != td.Placeholder(n) {
+			t.Errorf("Placeholder(%d): postgres=%q dollar=%q", n, pg.Placeholder(n), td.Placeholder(n))
+		}
+	}
+}
+
+// ---- dialectFor ------------------------------------------------------------
+
+func TestDialectFor(t *testing.T) {
+	tests := []struct {
+		driver  string
+		wantErr bool
+		wantType string
+	}{
+		{"sqlite",   false, "sqliteDialect"},
+		{"postgres", false, "postgresDialect"},
+		{"mysql",    true,  ""},
+		{"mongodb",  true,  ""},
+		{"",         true,  ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.driver, func(t *testing.T) {
+			d, err := dialectFor(tc.driver)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("dialectFor(%q): expected error, got dialect %T", tc.driver, d)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("dialectFor(%q): unexpected error: %v", tc.driver, err)
+			}
+			if d == nil {
+				t.Fatalf("dialectFor(%q): returned nil dialect", tc.driver)
+			}
+			switch tc.wantType {
+			case "sqliteDialect":
+				if _, ok := d.(sqliteDialect); !ok {
+					t.Errorf("dialectFor(%q) = %T, want sqliteDialect", tc.driver, d)
+				}
+			case "postgresDialect":
+				if _, ok := d.(postgresDialect); !ok {
+					t.Errorf("dialectFor(%q) = %T, want postgresDialect", tc.driver, d)
+				}
+			}
+		})
+	}
+}
+
+func TestDialectForErrorMessage(t *testing.T) {
+	_, err := dialectFor("baddriver")
+	if err == nil {
+		t.Fatal("expected error for unknown driver")
+	}
+	if !strings.Contains(err.Error(), "baddriver") {
+		t.Errorf("error should name the driver, got: %v", err)
+	}
+}
+
+// ---- configurePool ---------------------------------------------------------
+
+// openRawSQLite opens a bare in-memory SQLite DB without applying any pool
+// config, so tests can call configurePool themselves and inspect the result.
+func openRawSQLite(t *testing.T) *sql.DB {
+	t.Helper()
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	return db
+}
+
+func TestConfigurePoolSQLite(t *testing.T) {
+	db := openRawSQLite(t)
+	configurePool(db, "sqlite")
+	if got := db.Stats().MaxOpenConnections; got != 1 {
+		t.Errorf("sqlite MaxOpenConnections = %d, want 1", got)
+	}
+}
+
+func TestConfigurePoolPostgres(t *testing.T) {
+	// Use a SQLite DB as the target — configurePool calls Set* methods on
+	// *sql.DB directly, so the underlying driver is irrelevant here.
+	db := openRawSQLite(t)
+	configurePool(db, "postgres")
+	if got := db.Stats().MaxOpenConnections; got != 25 {
+		t.Errorf("postgres MaxOpenConnections = %d, want 25", got)
+	}
+}
+
+func TestConfigurePoolUnknownDriverNoChange(t *testing.T) {
+	db := openRawSQLite(t)
+	// Record default (0 = unlimited in sql.DB).
+	before := db.Stats().MaxOpenConnections
+	configurePool(db, "unknown")
+	if got := db.Stats().MaxOpenConnections; got != before {
+		t.Errorf("unknown driver changed MaxOpenConnections to %d", got)
 	}
 }

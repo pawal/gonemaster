@@ -7,12 +7,31 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine/normalization"
 )
+
+func TestCLIMDDocumentsPurge(t *testing.T) {
+	data, err := os.ReadFile("../../docs/cli.md")
+	if err != nil {
+		t.Fatalf("read docs/cli.md: %v", err)
+	}
+	src := string(data)
+	for _, want := range []string{
+		"jobs purge",
+		"--older-than",
+		"purged_jobs",
+		"retention_days",
+	} {
+		if !strings.Contains(src, want) {
+			t.Errorf("docs/cli.md missing %q", want)
+		}
+	}
+}
 
 func TestNormalizeBaseURL(t *testing.T) {
 	tests := []struct {

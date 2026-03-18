@@ -1620,3 +1620,96 @@ func TestLocalesEndpoint(t *testing.T) {
 		}
 	})
 }
+
+func TestHandleJobsPurge(t *testing.T) {
+	postPurge := func(srv *Server, body string) *httptest.ResponseRecorder {
+		t.Helper()
+		var reqBody *bytes.Buffer
+		if body != "" {
+			reqBody = bytes.NewBufferString(body)
+		} else {
+			reqBody = &bytes.Buffer{}
+		}
+		resp := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/purge", reqBody)
+		req.Header.Set("Content-Type", "application/json")
+		srv.Handler().ServeHTTP(resp, req)
+		return resp
+	}
+
+	t.Run("400 when no retention configured and no body", func(t *testing.T) {
+		srv := New(DefaultConfig())
+		resp := postPurge(srv, "")
+		if resp.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d", resp.Code)
+		}
+		var body map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&body)
+		if errObj, _ := body["error"].(map[string]any); errObj["code"] != "retention_not_configured" {
+			t.Fatalf("expected retention_not_configured, got %v", errObj)
+		}
+	})
+
+	t.Run("200 with older_than_days in body", func(t *testing.T) {
+		srv := New(DefaultConfig())
+		old := time.Now().UTC().Add(-48 * time.Hour)
+		job := Job{ID: "j1", Domain: "example.com", Status: JobSucceeded, CreatedAt: old, FinishedAt: old}
+		if _, err := srv.store.Create(job); err != nil {
+			t.Fatalf("create: %v", err)
+		}
+
+		resp := postPurge(srv, `{"older_than_days":1}`)
+		if resp.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
+		}
+		var body map[string]int64
+		_ = json.NewDecoder(resp.Body).Decode(&body)
+		if body["purged_jobs"] != 1 {
+			t.Fatalf("expected purged_jobs=1, got %d", body["purged_jobs"])
+		}
+	})
+
+	t.Run("200 using server retention_days when body omits older_than_days", func(t *testing.T) {
+		cfg := DefaultConfig()
+		cfg.Database.RetentionDays = 1
+		srv := New(cfg)
+		old := time.Now().UTC().Add(-48 * time.Hour)
+		job := Job{ID: "j1", Domain: "example.com", Status: JobSucceeded, CreatedAt: old, FinishedAt: old}
+		if _, err := srv.store.Create(job); err != nil {
+			t.Fatalf("create: %v", err)
+		}
+
+		resp := postPurge(srv, "")
+		if resp.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
+		}
+		var body map[string]int64
+		_ = json.NewDecoder(resp.Body).Decode(&body)
+		if body["purged_jobs"] != 1 {
+			t.Fatalf("expected purged_jobs=1, got %d", body["purged_jobs"])
+		}
+	})
+
+	t.Run("200 with zero purged when no old jobs", func(t *testing.T) {
+		srv := New(DefaultConfig())
+		resp := postPurge(srv, `{"older_than_days":90}`)
+		if resp.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d", resp.Code)
+		}
+		var body map[string]int64
+		_ = json.NewDecoder(resp.Body).Decode(&body)
+		if body["purged_jobs"] != 0 {
+			t.Fatalf("expected purged_jobs=0, got %d", body["purged_jobs"])
+		}
+	})
+
+	t.Run("GET returns 405", func(t *testing.T) {
+		srv := New(DefaultConfig())
+		resp := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs/purge", nil)
+		srv.Handler().ServeHTTP(resp, req)
+		if resp.Code != http.StatusMethodNotAllowed {
+			t.Fatalf("expected 405, got %d", resp.Code)
+		}
+	})
+}

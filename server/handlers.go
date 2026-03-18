@@ -634,3 +634,34 @@ func (s *Server) handleLocales(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string][]string{"locales": i18n.AvailableLocales()})
 }
+
+func (s *Server) handleJobsPurge(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
+		return
+	}
+
+	var req struct {
+		OlderThanDays int `json:"older_than_days"`
+	}
+	// Body is optional; ignore EOF (no body sent).
+	_ = readJSON(r, s.cfg.MaxBodySize, &req)
+
+	days := req.OlderThanDays
+	if days == 0 {
+		days = s.cfg.Database.RetentionDays
+	}
+	if days == 0 {
+		writeError(w, http.StatusBadRequest, "retention_not_configured",
+			"retention_days not configured and older_than_days not specified", nil)
+		return
+	}
+
+	cutoff := time.Now().UTC().Add(-time.Duration(days) * 24 * time.Hour)
+	n, err := s.store.PurgeOlderThan(cutoff)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "purge_error", err.Error(), nil)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]int64{"purged_jobs": n})
+}

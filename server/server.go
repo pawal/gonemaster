@@ -109,6 +109,7 @@ func (s *Server) Handler() http.Handler {
 func (s *Server) routes() {
 	apiMux := http.NewServeMux()
 	apiMux.HandleFunc("/jobs/batch", s.handleJobsBatch)
+	apiMux.HandleFunc("/jobs/purge", s.handleJobsPurge)
 	apiMux.HandleFunc("/jobs/", s.handleJobByID)
 	apiMux.HandleFunc("/jobs", s.handleJobs)
 	apiMux.HandleFunc("/batches/", s.handleBatchByID)

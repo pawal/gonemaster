@@ -91,6 +91,7 @@ Configuration is applied in priority order (highest wins):
 | `GONEMASTER_DEBUG` | `debug` | `true`/`false`/`1`/`0` |
 | `GONEMASTER_DB_DRIVER` | `database.driver` | |
 | `GONEMASTER_DB_DSN` | `database.dsn` | Use this for connection strings containing passwords |
+| `GONEMASTER_DB_RETENTION_DAYS` | `database.retention_days` | integer; 0 = keep forever |
 
 Invalid values for integer or boolean variables emit a warning and are ignored (the server continues with the lower-priority value).
 
@@ -205,7 +206,8 @@ On startup with a persistent backend, the server automatically:
   "profile_path": "/path/to/profile.json",
   "database": {
     "driver": "sqlite",
-    "dsn": "/var/lib/gonemaster/gonemaster.db"
+    "dsn": "/var/lib/gonemaster/gonemaster.db",
+    "retention_days": 90
   }
 }
 ```
@@ -229,6 +231,7 @@ On startup with a persistent backend, the server automatically:
 - `--shutdown-timeout` Graceful shutdown timeout
 - `--db-driver` Storage backend (`memory`, `sqlite`, `postgres`, `mariadb`; env: `GONEMASTER_DB_DRIVER`)
 - `--db-dsn` Database file path or connection string (env: `GONEMASTER_DB_DSN`)
+- `--db-retention-days` Delete completed jobs older than N days; 0 = keep forever (env: `GONEMASTER_DB_RETENTION_DAYS`)
 
 ## Domain normalization (IDN)
 Domains are normalized to IDNA A-labels (punycode). For example:

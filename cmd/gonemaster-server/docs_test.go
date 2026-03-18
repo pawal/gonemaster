@@ -98,3 +98,22 @@ func TestServerMDNoPhase2Placeholder(t *testing.T) {
 		t.Error("docs/server.md still contains 'not yet available' placeholder text")
 	}
 }
+
+// TestServerMDRetentionDays verifies that docs/server.md documents the
+// retention_days configuration field, env var, and CLI flag.
+func TestServerMDRetentionDays(t *testing.T) {
+	data, err := os.ReadFile("../../docs/server.md")
+	if err != nil {
+		t.Fatalf("read docs/server.md: %v", err)
+	}
+	src := string(data)
+	for _, want := range []string{
+		"retention_days",
+		"GONEMASTER_DB_RETENTION_DAYS",
+		"--db-retention-days",
+	} {
+		if !strings.Contains(src, want) {
+			t.Errorf("docs/server.md missing %q", want)
+		}
+	}
+}

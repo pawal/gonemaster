@@ -322,7 +322,7 @@ func printUsage(out io.Writer) {
 	fmt.Fprintln(out, "  (Options use double hyphens; short single-dash flags are not supported.)")
 	fmt.Fprintln(out, "")
 	fmt.Fprintln(out, "Commands:")
-	fmt.Fprintln(out, "  jobs create|batch|list|get|watch|cancel|results")
+	fmt.Fprintln(out, "  jobs create|batch|list|get|watch|cancel|results|purge")
 	fmt.Fprintln(out, "  batches get|watch|results|cancel|remove")
 	fmt.Fprintln(out, "  queue pause|resume|reorder|remove")
 }
@@ -565,6 +565,8 @@ func runJobs(ctx context.Context, client *apiClient, opts globalOptions, args []
 		return runJobsCancel(ctx, client, opts, args, out, errOut)
 	case "results":
 		return runJobsResults(ctx, client, opts, args, out, errOut)
+	case "purge":
+		return runJobsPurge(ctx, client, opts, args, out, errOut)
 	default:
 		fmt.Fprintf(errOut, "Unknown jobs command %q\n", cmd)
 		return 2
@@ -901,6 +903,40 @@ func runJobsCancel(ctx context.Context, client *apiClient, opts globalOptions, a
 
 func runJobsResults(ctx context.Context, client *apiClient, opts globalOptions, args []string, out io.Writer, errOut io.Writer) int {
 	return runResults(ctx, client, opts, args, out, errOut, false)
+}
+
+func runJobsPurge(ctx context.Context, client *apiClient, opts globalOptions, args []string, out io.Writer, errOut io.Writer) int {
+	fs := flag.NewFlagSet("jobs purge", flag.ContinueOnError)
+	fs.SetOutput(errOut)
+	setSubcommandUsage(fs)
+	var olderThan int
+	fs.IntVar(&olderThan, "older-than", 0, "Delete jobs completed more than N days ago (0 = use server's configured retention)")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+
+	reqBody := map[string]int{"older_than_days": olderThan}
+	var resp map[string]int64
+	if err := client.doJSON(ctx, http.MethodPost, "/jobs/purge", reqBody, &resp); err != nil {
+		fmt.Fprintln(errOut, err.Error())
+		return 2
+	}
+
+	if opts.format == "json" {
+		if err := writeOutput(out, opts.format, resp); err != nil {
+			fmt.Fprintln(errOut, err.Error())
+			return 2
+		}
+		return 0
+	}
+
+	n := resp["purged_jobs"]
+	if olderThan > 0 {
+		fmt.Fprintf(out, "Purged %d jobs older than %d days\n", n, olderThan)
+	} else {
+		fmt.Fprintf(out, "Purged %d jobs\n", n)
+	}
+	return 0
 }
 
 func runBatchesGet(ctx context.Context, client *apiClient, opts globalOptions, args []string, out io.Writer, errOut io.Writer) int {

@@ -256,6 +256,61 @@ func TestRunMigrationsUsesDialectPlaceholder(t *testing.T) {
 	}
 }
 
+func TestRunMigrationsMigration2CreatesFinishedAtIndex(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	db.SetMaxOpenConns(1)
+	defer db.Close()
+
+	if err := runMigrations(db, sqliteDialect{}); err != nil {
+		t.Fatalf("runMigrations: %v", err)
+	}
+
+	var name string
+	if err := db.QueryRow(
+		`SELECT name FROM sqlite_master WHERE type='index' AND name='idx_jobs_finished_at'`,
+	).Scan(&name); err != nil || name != "idx_jobs_finished_at" {
+		t.Error("idx_jobs_finished_at index not found after migration 2")
+	}
+
+	var version int
+	if err := db.QueryRow(`SELECT version FROM schema_migrations WHERE version=2`).Scan(&version); err != nil {
+		t.Fatalf("migration version 2 not recorded: %v", err)
+	}
+}
+
+func TestRunMigrationsRecordsBothVersions(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	db.SetMaxOpenConns(1)
+	defer db.Close()
+
+	if err := runMigrations(db, sqliteDialect{}); err != nil {
+		t.Fatalf("runMigrations: %v", err)
+	}
+
+	rows, err := db.Query(`SELECT version FROM schema_migrations ORDER BY version`)
+	if err != nil {
+		t.Fatalf("query schema_migrations: %v", err)
+	}
+	defer rows.Close()
+	var versions []int
+	for rows.Next() {
+		var v int
+		if err := rows.Scan(&v); err != nil {
+			t.Fatalf("scan: %v", err)
+		}
+		versions = append(versions, v)
+	}
+	if len(versions) != 2 || versions[0] != 1 || versions[1] != 2 {
+		t.Fatalf("expected versions [1 2], got %v", versions)
+	}
+}
+
 // ---- Create / Get ----------------------------------------------------------
 
 func TestSQLJobStoreCreateGet(t *testing.T) {

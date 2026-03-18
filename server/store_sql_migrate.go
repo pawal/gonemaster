@@ -53,6 +53,15 @@ var sqlMigrations = []sqlMigration{
 			)`,
 		},
 	},
+	{
+		version: 2,
+		stmts: []string{
+			// Index on finished_at makes PurgeOlderThan efficient even with
+			// millions of rows; NULL values (unfinished jobs) are excluded by
+			// the purge WHERE clause so the index stays compact.
+			`CREATE INDEX IF NOT EXISTS idx_jobs_finished_at ON jobs(finished_at)`,
+		},
+	},
 }
 
 // runMigrations creates the schema_migrations tracking table and applies any

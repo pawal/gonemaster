@@ -43,6 +43,10 @@ func (s *countingJobStore) GetResult(jobID string) (JobResult, bool) {
 	return s.inner.GetResult(jobID)
 }
 
+func (s *countingJobStore) PurgeOlderThan(cutoff time.Time) (int64, error) {
+	return s.inner.PurgeOlderThan(cutoff)
+}
+
 func (s *countingJobStore) UpdateCount() int64 {
 	return s.updateCount.Load()
 }

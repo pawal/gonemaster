@@ -19,6 +19,9 @@ type JobStore interface {
 	List(filter JobFilter) JobList
 	SetResult(jobID string, result JobResult) error
 	GetResult(jobID string) (JobResult, bool)
+	// PurgeOlderThan deletes terminal-status jobs whose finished_at is before
+	// cutoff, along with their results. Returns the number of jobs deleted.
+	PurgeOlderThan(cutoff time.Time) (int64, error)
 }
 
 // InMemoryJobStore stores jobs in memory.
@@ -270,6 +273,38 @@ func (s *InMemoryJobStore) GetResult(jobID string) (JobResult, bool) {
 	defer s.resultsMu.RUnlock()
 	result, ok := s.results[jobID]
 	return result, ok
+}
+
+// PurgeOlderThan deletes terminal-status jobs whose FinishedAt is before
+// cutoff, along with their associated results.
+func (s *InMemoryJobStore) PurgeOlderThan(cutoff time.Time) (int64, error) {
+	s.jobsMu.Lock()
+	s.resultsMu.Lock()
+	defer s.jobsMu.Unlock()
+	defer s.resultsMu.Unlock()
+
+	var count int64
+	for id, job := range s.jobs {
+		if !isTerminalStatus(job.Status) {
+			continue
+		}
+		if job.FinishedAt.IsZero() || !job.FinishedAt.Before(cutoff) {
+			continue
+		}
+		delete(s.jobs, id)
+		delete(s.results, id)
+		count++
+	}
+	return count, nil
+}
+
+func isTerminalStatus(status JobStatus) bool {
+	switch status {
+	case JobSucceeded, JobFailed, JobCanceled, JobExpired:
+		return true
+	default:
+		return false
+	}
 }
 
 func parseTime(value string) (time.Time, error) {

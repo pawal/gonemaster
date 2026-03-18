@@ -188,6 +188,21 @@ On startup with a persistent backend, the server automatically:
 - Marks jobs that were `running` when the server last stopped as `failed`.
 - Re-enqueues jobs that were `queued` but not yet started.
 
+#### Data retention
+
+Completed jobs (`succeeded`, `failed`, `canceled`, `expired`) accumulate over time. Configure automatic purging with `retention_days`:
+
+```
+gonemaster-server --db-driver sqlite --db-dsn /var/lib/gonemaster/gonemaster.db \
+  --db-retention-days 90
+```
+
+- `0` (default) — keep forever, no automatic purge.
+- Any positive value starts a background purge loop that runs **hourly** and deletes completed jobs with `finished_at` older than that many days, along with their results.
+- Running, queued, and paused jobs are never purged automatically.
+
+Recommended production setting: `90` days.
+
 ### Config example
 ```json
 {
@@ -345,6 +360,17 @@ Cancel a job:
 ```
 POST /jobs/{job_id}/cancel
 ```
+
+Purge completed jobs older than a given age:
+```
+POST /jobs/purge
+{ "older_than_days": 90 }
+```
+Response: `{ "purged_jobs": 42 }`
+
+- `older_than_days` is optional; if omitted the server's configured `retention_days` is used.
+- Returns `400` with `error.code=retention_not_configured` if both are `0`.
+- Only terminal-status jobs (`succeeded`, `failed`, `canceled`, `expired`) are deleted; associated results are also removed.
 
 ### Batches
 Submit a batch:

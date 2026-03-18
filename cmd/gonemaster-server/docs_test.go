@@ -100,7 +100,8 @@ func TestServerMDNoPhase2Placeholder(t *testing.T) {
 }
 
 // TestServerMDRetentionDays verifies that docs/server.md documents the
-// retention_days configuration field, env var, and CLI flag.
+// retention_days configuration field, env var, CLI flag, purge API endpoint,
+// and recommended production setting.
 func TestServerMDRetentionDays(t *testing.T) {
 	data, err := os.ReadFile("../../docs/server.md")
 	if err != nil {
@@ -108,9 +109,18 @@ func TestServerMDRetentionDays(t *testing.T) {
 	}
 	src := string(data)
 	for _, want := range []string{
+		// Config field, env var, flag
 		"retention_days",
 		"GONEMASTER_DB_RETENTION_DAYS",
 		"--db-retention-days",
+		// Purge API endpoint
+		"POST /jobs/purge",
+		"older_than_days",
+		"purged_jobs",
+		"retention_not_configured",
+		// Data retention section
+		"Data retention",
+		"hourly",
 	} {
 		if !strings.Contains(src, want) {
 			t.Errorf("docs/server.md missing %q", want)

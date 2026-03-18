@@ -162,3 +162,55 @@ func TestDatabaseFileConfigJSON(t *testing.T) {
 		t.Fatalf("expected /tmp/x.db, got %q", d.DSN)
 	}
 }
+
+func TestDefaultConfigRetentionDaysIsZero(t *testing.T) {
+	cfg := DefaultConfig()
+	if cfg.Database.RetentionDays != 0 {
+		t.Fatalf("expected default retention_days 0, got %d", cfg.Database.RetentionDays)
+	}
+}
+
+func TestApplyFileConfigRetentionDays(t *testing.T) {
+	cfg := DefaultConfig()
+	days := 90
+	cfg.ApplyFileConfig(FileConfig{
+		Database: &DatabaseFileConfig{RetentionDays: &days},
+	})
+	if cfg.Database.RetentionDays != 90 {
+		t.Fatalf("expected retention_days 90, got %d", cfg.Database.RetentionDays)
+	}
+}
+
+func TestApplyFileConfigRetentionDaysNilIsNoop(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Database.RetentionDays = 30
+	cfg.ApplyFileConfig(FileConfig{
+		Database: &DatabaseFileConfig{Driver: "sqlite"},
+	})
+	if cfg.Database.RetentionDays != 30 {
+		t.Fatalf("expected retention_days 30 unchanged, got %d", cfg.Database.RetentionDays)
+	}
+}
+
+func TestApplyFileConfigRetentionDaysZeroOverwrites(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Database.RetentionDays = 30
+	zero := 0
+	cfg.ApplyFileConfig(FileConfig{
+		Database: &DatabaseFileConfig{RetentionDays: &zero},
+	})
+	if cfg.Database.RetentionDays != 0 {
+		t.Fatalf("expected retention_days 0 after explicit zero, got %d", cfg.Database.RetentionDays)
+	}
+}
+
+func TestDatabaseFileConfigRetentionDaysJSON(t *testing.T) {
+	raw := `{"driver":"sqlite","dsn":"/tmp/x.db","retention_days":90}`
+	var d DatabaseFileConfig
+	if err := json.Unmarshal([]byte(raw), &d); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if d.RetentionDays == nil || *d.RetentionDays != 90 {
+		t.Fatalf("expected retention_days 90, got %v", d.RetentionDays)
+	}
+}

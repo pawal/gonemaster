@@ -162,3 +162,94 @@ func TestDatabaseFileConfigJSON(t *testing.T) {
 		t.Fatalf("expected /tmp/x.db, got %q", d.DSN)
 	}
 }
+
+func TestDefaultConfigRetentionDaysIsZero(t *testing.T) {
+	cfg := DefaultConfig()
+	if cfg.Database.RetentionDays != 0 {
+		t.Fatalf("expected default retention_days 0, got %d", cfg.Database.RetentionDays)
+	}
+}
+
+func TestApplyFileConfigRetentionDays(t *testing.T) {
+	cfg := DefaultConfig()
+	days := 90
+	cfg.ApplyFileConfig(FileConfig{
+		Database: &DatabaseFileConfig{RetentionDays: &days},
+	})
+	if cfg.Database.RetentionDays != 90 {
+		t.Fatalf("expected retention_days 90, got %d", cfg.Database.RetentionDays)
+	}
+}
+
+func TestApplyFileConfigRetentionDaysNilIsNoop(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Database.RetentionDays = 30
+	cfg.ApplyFileConfig(FileConfig{
+		Database: &DatabaseFileConfig{Driver: "sqlite"},
+	})
+	if cfg.Database.RetentionDays != 30 {
+		t.Fatalf("expected retention_days 30 unchanged, got %d", cfg.Database.RetentionDays)
+	}
+}
+
+func TestApplyFileConfigRetentionDaysZeroOverwrites(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Database.RetentionDays = 30
+	zero := 0
+	cfg.ApplyFileConfig(FileConfig{
+		Database: &DatabaseFileConfig{RetentionDays: &zero},
+	})
+	if cfg.Database.RetentionDays != 0 {
+		t.Fatalf("expected retention_days 0 after explicit zero, got %d", cfg.Database.RetentionDays)
+	}
+}
+
+func TestDatabaseFileConfigRetentionDaysJSON(t *testing.T) {
+	raw := `{"driver":"sqlite","dsn":"/tmp/x.db","retention_days":90}`
+	var d DatabaseFileConfig
+	if err := json.Unmarshal([]byte(raw), &d); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if d.RetentionDays == nil || *d.RetentionDays != 90 {
+		t.Fatalf("expected retention_days 90, got %v", d.RetentionDays)
+	}
+}
+
+func TestLoadFileConfigRetentionDays(t *testing.T) {
+	raw := `{
+		"database": {
+			"driver": "sqlite",
+			"dsn": "/var/lib/gonemaster/gonemaster.db",
+			"retention_days": 90
+		}
+	}`
+	f, err := os.CreateTemp("", "gm-config-*.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	if _, err := f.WriteString(raw); err != nil {
+		t.Fatal(err)
+	}
+	_ = f.Close()
+
+	fileCfg, err := LoadFileConfig(f.Name())
+	if err != nil {
+		t.Fatalf("LoadFileConfig: %v", err)
+	}
+	if fileCfg.Database == nil {
+		t.Fatal("expected database section, got nil")
+	}
+	if fileCfg.Database.RetentionDays == nil || *fileCfg.Database.RetentionDays != 90 {
+		t.Fatalf("expected retention_days 90, got %v", fileCfg.Database.RetentionDays)
+	}
+
+	cfg := DefaultConfig()
+	cfg.ApplyFileConfig(fileCfg)
+	if cfg.Database.RetentionDays != 90 {
+		t.Fatalf("expected Database.RetentionDays 90 after apply, got %d", cfg.Database.RetentionDays)
+	}
+	if cfg.Database.Driver != "sqlite" {
+		t.Fatalf("expected driver sqlite, got %q", cfg.Database.Driver)
+	}
+}

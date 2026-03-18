@@ -48,6 +48,10 @@ func (s *spyJobStore) GetResult(jobID string) (JobResult, bool) {
 	return s.inner.GetResult(jobID)
 }
 
+func (s *spyJobStore) PurgeOlderThan(cutoff time.Time) (int64, error) {
+	return s.inner.PurgeOlderThan(cutoff)
+}
+
 func (s *spyJobStore) Progresses() []int {
 	s.mu.Lock()
 	defer s.mu.Unlock()

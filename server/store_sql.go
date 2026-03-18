@@ -502,3 +502,39 @@ func (s *SQLJobStore) GetResult(jobID string) (JobResult, bool) {
 
 	return result, true
 }
+
+
+// PurgeOlderThan deletes terminal-status jobs whose finished_at is before
+// cutoff, along with their results. Returns the number of jobs deleted.
+func (s *SQLJobStore) PurgeOlderThan(cutoff time.Time) (int64, error) {
+	ph := s.ph(1)
+	statuses := "'succeeded','failed','canceled','expired'"
+	cutoffVal := s.dialect.TimestampVal(cutoff)
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return 0, fmt.Errorf("purge begin tx: %w", err)
+	}
+	_, err = tx.Exec(
+		`DELETE FROM results WHERE job_id IN `+
+			`(SELECT id FROM jobs WHERE finished_at < `+ph+` AND status IN (`+statuses+`))`,
+		cutoffVal,
+	)
+	if err != nil {
+		_ = tx.Rollback()
+		return 0, fmt.Errorf("purge results: %w", err)
+	}
+	res, err := tx.Exec(
+		`DELETE FROM jobs WHERE finished_at < `+ph+` AND status IN (`+statuses+`)`,
+		cutoffVal,
+	)
+	if err != nil {
+		_ = tx.Rollback()
+		return 0, fmt.Errorf("purge jobs: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("purge commit: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	return n, nil
+}

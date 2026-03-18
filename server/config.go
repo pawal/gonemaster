@@ -14,6 +14,9 @@ type DatabaseConfig struct {
 	// DSN is the data source name. For sqlite this is a file path.
 	// For postgres/mariadb this is a connection string. Empty for memory.
 	DSN string `json:"dsn,omitempty"`
+	// RetentionDays is the number of days to keep completed jobs. Zero means
+	// keep forever (disabled).
+	RetentionDays int `json:"retention_days,omitempty"`
 }
 
 // Config controls HTTP server behavior.
@@ -48,8 +51,9 @@ type Config struct {
 // DatabaseFileConfig holds optional database configuration from JSON.
 // An empty string for Driver or DSN means "not set" (inherit from default).
 type DatabaseFileConfig struct {
-	Driver string `json:"driver,omitempty"`
-	DSN    string `json:"dsn,omitempty"`
+	Driver        string `json:"driver,omitempty"`
+	DSN           string `json:"dsn,omitempty"`
+	RetentionDays *int   `json:"retention_days,omitempty"`
 }
 
 // FileConfig captures optional configuration fields from JSON.
@@ -150,6 +154,9 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 		}
 		if file.Database.DSN != "" {
 			c.Database.DSN = file.Database.DSN
+		}
+		if file.Database.RetentionDays != nil {
+			c.Database.RetentionDays = *file.Database.RetentionDays
 		}
 	}
 }

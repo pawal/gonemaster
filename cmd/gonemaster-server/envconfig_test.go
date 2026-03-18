@@ -255,3 +255,43 @@ func TestApplyEnvVarsMultipleFieldsTogether(t *testing.T) {
 		t.Fatalf("unexpected warning: %q", warn.String())
 	}
 }
+
+func TestApplyEnvVarsDBRetentionDays(t *testing.T) {
+	cfg := server.DefaultConfig()
+	var warn strings.Builder
+	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
+		"GONEMASTER_DB_RETENTION_DAYS": "90",
+	}), &warn)
+	if cfg.Database.RetentionDays != 90 {
+		t.Fatalf("expected RetentionDays=90, got %d", cfg.Database.RetentionDays)
+	}
+	if warn.String() != "" {
+		t.Fatalf("unexpected warning: %q", warn.String())
+	}
+}
+
+func TestApplyEnvVarsDBRetentionDaysInvalidIsWarned(t *testing.T) {
+	cfg := server.DefaultConfig()
+	var warn strings.Builder
+	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
+		"GONEMASTER_DB_RETENTION_DAYS": "notanumber",
+	}), &warn)
+	if cfg.Database.RetentionDays != 0 {
+		t.Fatalf("expected RetentionDays unchanged at 0, got %d", cfg.Database.RetentionDays)
+	}
+	if warn.String() == "" {
+		t.Fatal("expected warning for invalid retention_days, got none")
+	}
+}
+
+func TestApplyEnvVarsDBRetentionDaysCLIWins(t *testing.T) {
+	cfg := server.DefaultConfig()
+	cfg.Database.RetentionDays = 30
+	var warn strings.Builder
+	applyEnvVars(&cfg, map[string]bool{"db-retention-days": true}, fakeEnv(map[string]string{
+		"GONEMASTER_DB_RETENTION_DAYS": "90",
+	}), &warn)
+	if cfg.Database.RetentionDays != 30 {
+		t.Fatalf("expected CLI value 30 to win, got %d", cfg.Database.RetentionDays)
+	}
+}

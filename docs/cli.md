@@ -327,6 +327,19 @@ Options:
 
 This command is the primary way to retrieve results from all jobs in a convenient way.
 
+#### jobs purge
+Delete completed jobs older than a given number of days, along with their results.
+```
+gonemaster-client jobs purge [--older-than DAYS]
+```
+Options:
+- `--older-than N` — delete jobs finished more than N days ago; `0` (default) uses the server's configured `retention_days`.
+
+Returns `400` if both `--older-than` and the server's `retention_days` are `0`.
+
+Pretty output: `Purged 42 jobs older than 90 days`
+JSON output (`--format json`): `{"purged_jobs": 42}`
+
 #### batches get
 Fetch a batch summary.
 ```

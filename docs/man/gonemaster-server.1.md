@@ -85,10 +85,13 @@ variables, CLI flags. Later sources override earlier ones.
 ### Database
 
 **--db-driver** *DRIVER*
-: Storage backend: **sqlite** or empty for in-memory.
+: Storage backend: **memory** (default), **sqlite**, **postgres**, or **mariadb**.
 
 **--db-dsn** *DSN*
 : SQLite file path or database connection string.
+
+**--db-retention-days** *N*
+: Delete completed jobs older than N days on an hourly schedule. 0 (default) disables automatic purging.
 
 ### Output
 
@@ -121,6 +124,9 @@ variables, CLI flags. Later sources override earlier ones.
 **GONEMASTER_DB_DSN**
 : Equivalent to **--db-dsn**.
 
+**GONEMASTER_DB_RETENTION_DAYS**
+: Equivalent to **--db-retention-days**.
+
 ## CONFIG FILE
 
 The **--config** file is JSON with optional fields:
@@ -134,7 +140,8 @@ The **--config** file is JSON with optional fields:
       "profile_path": "",
       "database": {
         "driver": "sqlite",
-        "dsn": "/var/lib/gonemaster/db.sqlite"
+        "dsn": "/var/lib/gonemaster/db.sqlite",
+        "retention_days": 90
       }
     }
 
@@ -147,6 +154,11 @@ Start with defaults (in-memory, 4 workers):
 Start with SQLite persistence:
 
     gonemaster-server --db-driver sqlite --db-dsn /var/lib/gonemaster/db.sqlite
+
+Start with SQLite and 90-day retention:
+
+    gonemaster-server --db-driver sqlite --db-dsn /var/lib/gonemaster/db.sqlite \
+        --db-retention-days 90
 
 Start with a config file:
 

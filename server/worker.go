@@ -24,7 +24,8 @@ type workerPool struct {
 	wg     sync.WaitGroup
 }
 
-// Start launches background workers that consume queued jobs.
+// Start launches background workers that consume queued jobs. If
+// cfg.Database.RetentionDays > 0 the purge loop is also started.
 func (s *Server) Start() {
 	if s.workers.ctx != nil {
 		return
@@ -40,6 +41,12 @@ func (s *Server) Start() {
 	for i := 0; i < workerCount; i++ {
 		s.workers.wg.Add(1)
 		go s.workerLoop(i)
+	}
+
+	if s.cfg.Database.RetentionDays > 0 {
+		startPurgeLoop(ctx, s.store, s.cfg.Database.RetentionDays, func(format string, args ...any) {
+			log.Printf(format, args...)
+		})
 	}
 }
 

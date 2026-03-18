@@ -1,12 +1,161 @@
 # Database Setup Guide
 
-This guide covers setting up PostgreSQL and MariaDB for production use with
-`gonemaster-server`. For DSN formats and connection pool defaults, see
+This guide covers choosing and configuring a storage backend for `gonemaster-server`,
+including setup, recommended settings, tuning, and backup procedures.
+For DSN formats and connection pool defaults, see
 [server.md — Database](server.md#database).
 
 ---
 
+## Choosing a backend
+
+| Backend | Use when |
+|---|---|
+| `memory` | Development, one-off tests, or ephemeral CI environments |
+| `sqlite` | Single-server production; simple operations; no external database required |
+| `postgres` | Multiple server instances; high job volume; existing PostgreSQL infrastructure |
+| `mariadb` | Existing MariaDB or MySQL infrastructure |
+
+If in doubt: **use SQLite** for a single server. It requires no external database,
+handles the gonemaster workload well, and can be switched to PostgreSQL or MariaDB later
+by pointing `--db-dsn` at the new server after a data migration (or a clean start).
+
+---
+
+## Memory (default)
+
+```
+gonemaster-server
+```
+
+The default backend. All job data is stored in RAM and lost when the server stops.
+The purge loop works with this backend — set `--db-retention-days` if you run the server
+long-term to prevent unbounded memory growth.
+
+**Recommended settings:**
+
+| Setting | Recommended value | Notes |
+|---|---|---|
+| `--db-retention-days` | `1`–`7` for long-running services | Prevents unbounded RAM growth; omit for short-lived processes |
+
+**When to use:**
+- Development and local testing.
+- One-off batch runs where you only care about the current session.
+- CI environments where results are consumed before the process exits.
+
+**Limitations:**
+- No persistence across restarts. All job data is lost when the server stops.
+- Memory grows unbounded if many jobs accumulate without a retention policy; set `--db-retention-days` for long-running instances.
+
+---
+
+## SQLite
+
+```
+gonemaster-server \
+  --db-driver sqlite \
+  --db-dsn /var/lib/gonemaster/gonemaster.db \
+  --db-retention-days 90
+```
+
+Embedded database with no external dependency. The schema is created automatically on
+first start. A background purge loop runs hourly when `--db-retention-days` is set.
+
+**Recommended settings:**
+
+| Setting | Recommended value | Notes |
+|---|---|---|
+| `--db-retention-days` | `90` | Keeps disk use bounded; tune to your audit requirements |
+
+**When to use:**
+- Single-server production deployments.
+- Environments where running a separate database server is impractical.
+- Monitoring or NOC tooling that needs history across server restarts.
+
+**Limitations:**
+- Write-serialised: the connection pool is limited to one open connection.
+  Concurrent writes queue up, which is fine for gonemaster's workload but would bottleneck
+  extremely high batch throughput (thousands of jobs/minute).
+- Not suitable for multiple gonemaster-server instances sharing a single store.
+
+**Config file example:**
+
+```json
+{
+  "database": {
+    "driver": "sqlite",
+    "dsn": "/var/lib/gonemaster/gonemaster.db",
+    "retention_days": 90
+  }
+}
+```
+
+**Directory setup:**
+
+```bash
+mkdir -p /var/lib/gonemaster
+chown gonemaster:gonemaster /var/lib/gonemaster
+chmod 750 /var/lib/gonemaster
+```
+
+**Backup:**
+
+```bash
+# Safe online copy (SQLite's backup API handles live writes)
+sqlite3 /var/lib/gonemaster/gonemaster.db \
+  ".backup /var/backups/gonemaster_$(date +%Y%m%d).db"
+```
+
+---
+
 ## PostgreSQL
+
+**When to use:**
+- Multiple gonemaster-server instances sharing one database.
+- High job volume (hundreds of jobs per minute).
+- When you already operate a PostgreSQL cluster.
+
+**Recommended settings:**
+
+| Setting | Recommended value | Notes |
+|---|---|---|
+| `--db-retention-days` | `90` | Rows accumulate quickly; regular purging prevents table bloat |
+| `sslmode` | `require` or `verify-full` | Never use `disable` in production |
+| `max_connections` in postgresql.conf | `≥ 30` | gonemaster pool uses 25 max by default |
+
+**Connection pool defaults:** max 25 open, 5 idle, 5-minute lifetime.
+These work well for single-instance deployments. If running multiple server processes,
+lower `max_connections` per instance or increase the PostgreSQL `max_connections` accordingly.
+
+### Quick start
+
+```
+gonemaster-server \
+  --db-driver postgres \
+  --db-dsn "postgres://gonemaster:pass@host:5432/gonemaster?sslmode=require" \
+  --db-retention-days 90
+```
+
+Use environment variables to keep credentials out of process listings and shell history:
+
+```bash
+export GONEMASTER_DB_DRIVER=postgres
+export GONEMASTER_DB_DSN="postgres://gonemaster:pass@host:5432/gonemaster?sslmode=require"
+export GONEMASTER_DB_RETENTION_DAYS=90
+gonemaster-server
+```
+
+**Config file example:**
+
+```json
+{
+  "database": {
+    "driver": "postgres",
+    "dsn": "postgres://gonemaster:pass@host:5432/gonemaster?sslmode=require",
+    "retention_days": 90
+  }
+}
+```
 
 ### Create database and user
 
@@ -119,6 +268,52 @@ large purge to update planner statistics.
 
 ## MariaDB
 
+**When to use:**
+- When your infrastructure already runs MariaDB or MySQL.
+- Multi-server deployments on an existing managed MySQL service.
+
+**Recommended settings:**
+
+| Setting | Recommended value | Notes |
+|---|---|---|
+| `--db-retention-days` | `90` | Keeps the `jobs` and `results` tables from growing indefinitely |
+| `tls=true` or `tls=skip-verify` | production / internal CA | Protects credentials in transit |
+| `innodb_file_per_table` | `ON` | Allows disk reclamation after large purges |
+
+**Connection pool defaults:** max 25 open, 5 idle, 5-minute lifetime.
+
+### Quick start
+
+```
+gonemaster-server \
+  --db-driver mariadb \
+  --db-dsn "gonemaster:pass@tcp(host:3306)/gonemaster?tls=true" \
+  --db-retention-days 90
+```
+
+`parseTime=true` is appended to the DSN automatically if not already present.
+
+Use environment variables to keep credentials out of process listings and shell history:
+
+```bash
+export GONEMASTER_DB_DRIVER=mariadb
+export GONEMASTER_DB_DSN="gonemaster:pass@tcp(host:3306)/gonemaster"
+export GONEMASTER_DB_RETENTION_DAYS=90
+gonemaster-server
+```
+
+**Config file example:**
+
+```json
+{
+  "database": {
+    "driver": "mariadb",
+    "dsn": "gonemaster:pass@tcp(host:3306)/gonemaster",
+    "retention_days": 90
+  }
+}
+```
+
 ### Create database and user
 
 ```sql
@@ -224,6 +419,52 @@ OPTIMIZE TABLE results;
 ```
 
 This rebuilds the table and releases space back to the OS.
+
+---
+
+## Data retention
+
+All backends — including the default in-memory backend — support automatic purging of old
+completed jobs. Configure it with `--db-retention-days`:
+
+```
+gonemaster-server --db-driver sqlite --db-dsn /var/lib/gonemaster/gonemaster.db \
+  --db-retention-days 90
+```
+
+- The purge loop runs **hourly** in the background.
+- Only terminal-status jobs (`succeeded`, `failed`, `canceled`, `expired`) are deleted.
+  Running, queued, and paused jobs are never purged automatically.
+- Associated results are also deleted in the same operation.
+- **Recommended production value:** `90` days.
+- `0` (default) disables automatic purging; data accumulates indefinitely.
+
+You can also trigger a one-off purge via the API:
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/jobs/purge \
+  -H 'Content-Type: application/json' \
+  -d '{"older_than_days": 30}'
+```
+
+Or via the client:
+
+```bash
+gonemaster-client jobs purge --older-than 30
+```
+
+---
+
+## Switching backends
+
+`gonemaster-server` does not migrate data between backends. To switch:
+
+1. Let running jobs finish (or cancel them).
+2. Stop the server.
+3. Start the server with the new `--db-driver` and `--db-dsn`.
+
+The new backend will start empty. If you need to keep historical data, export results
+before switching (for example with `gonemaster-client results --batch-id ...`).
 
 ---
 

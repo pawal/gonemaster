@@ -91,6 +91,7 @@ Configuration is applied in priority order (highest wins):
 | `GONEMASTER_DEBUG` | `debug` | `true`/`false`/`1`/`0` |
 | `GONEMASTER_DB_DRIVER` | `database.driver` | |
 | `GONEMASTER_DB_DSN` | `database.dsn` | Use this for connection strings containing passwords |
+| `GONEMASTER_DB_RETENTION_DAYS` | `database.retention_days` | integer; 0 = keep forever |
 
 Invalid values for integer or boolean variables emit a warning and are ignored (the server continues with the lower-priority value).
 
@@ -171,8 +172,8 @@ GONEMASTER_DB_DSN="postgres://user:pass@host:5432/dbname?sslmode=disable" \
   gonemaster-server
 ```
 
-For PostgreSQL and MariaDB setup, tuning, and backup guidance see
-[docs/database-setup.md](database-setup.md).
+For a backend selection guide, per-backend recommended settings, and setup/tuning/backup
+procedures see [docs/database-setup.md](database-setup.md).
 
 #### Connection pool defaults
 
@@ -186,6 +187,21 @@ On startup with a persistent backend, the server automatically:
 - Runs any pending schema migrations.
 - Marks jobs that were `running` when the server last stopped as `failed`.
 - Re-enqueues jobs that were `queued` but not yet started.
+
+#### Data retention
+
+Completed jobs (`succeeded`, `failed`, `canceled`, `expired`) accumulate over time. Configure automatic purging with `retention_days`:
+
+```
+gonemaster-server --db-driver sqlite --db-dsn /var/lib/gonemaster/gonemaster.db \
+  --db-retention-days 90
+```
+
+- `0` (default) — keep forever, no automatic purge.
+- Any positive value starts a background purge loop that runs **hourly** and deletes completed jobs with `finished_at` older than that many days, along with their results.
+- Running, queued, and paused jobs are never purged automatically.
+
+Recommended production setting: `90` days.
 
 ### Config example
 ```json
@@ -205,7 +221,8 @@ On startup with a persistent backend, the server automatically:
   "profile_path": "/path/to/profile.json",
   "database": {
     "driver": "sqlite",
-    "dsn": "/var/lib/gonemaster/gonemaster.db"
+    "dsn": "/var/lib/gonemaster/gonemaster.db",
+    "retention_days": 90
   }
 }
 ```
@@ -229,6 +246,7 @@ On startup with a persistent backend, the server automatically:
 - `--shutdown-timeout` Graceful shutdown timeout
 - `--db-driver` Storage backend (`memory`, `sqlite`, `postgres`, `mariadb`; env: `GONEMASTER_DB_DRIVER`)
 - `--db-dsn` Database file path or connection string (env: `GONEMASTER_DB_DSN`)
+- `--db-retention-days` Delete completed jobs older than N days; 0 = keep forever (env: `GONEMASTER_DB_RETENTION_DAYS`)
 
 ## Domain normalization (IDN)
 Domains are normalized to IDNA A-labels (punycode). For example:
@@ -342,6 +360,17 @@ Cancel a job:
 ```
 POST /jobs/{job_id}/cancel
 ```
+
+Purge completed jobs older than a given age:
+```
+POST /jobs/purge
+{ "older_than_days": 90 }
+```
+Response: `{ "purged_jobs": 42 }`
+
+- `older_than_days` is optional; if omitted the server's configured `retention_days` is used.
+- Returns `400` with `error.code=retention_not_configured` if both are `0`.
+- Only terminal-status jobs (`succeeded`, `failed`, `canceled`, `expired`) are deleted; associated results are also removed.
 
 ### Batches
 Submit a batch:

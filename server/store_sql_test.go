@@ -114,22 +114,6 @@ func testStoreForBackend(t *testing.T, b testBackend) *SQLJobStore {
 	return NewSQLJobStore(db, b.dialect)
 }
 
-// testSQLiteStore opens an in-memory SQLite store. Kept for migration tests
-// that are SQLite-specific and cannot be parameterized.
-func testSQLiteStore(t *testing.T) *SQLJobStore {
-	t.Helper()
-	db, err := sql.Open("sqlite", ":memory:")
-	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
-	}
-	db.SetMaxOpenConns(1)
-	t.Cleanup(func() { _ = db.Close() })
-
-	if err := runMigrations(db, sqliteDialect{}); err != nil {
-		t.Fatalf("runMigrations: %v", err)
-	}
-	return NewSQLJobStore(db, sqliteDialect{})
-}
 
 // ids extracts job IDs from a slice for readable error messages.
 func ids(jobs []Job) []string {
@@ -253,6 +237,61 @@ func TestRunMigrationsUsesDialectPlaceholder(t *testing.T) {
 	}
 	if spy.placeholderCalls == 0 {
 		t.Fatal("runMigrations did not call dialect.Placeholder")
+	}
+}
+
+func TestRunMigrationsMigration2CreatesFinishedAtIndex(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	db.SetMaxOpenConns(1)
+	defer db.Close()
+
+	if err := runMigrations(db, sqliteDialect{}); err != nil {
+		t.Fatalf("runMigrations: %v", err)
+	}
+
+	var name string
+	if err := db.QueryRow(
+		`SELECT name FROM sqlite_master WHERE type='index' AND name='idx_jobs_finished_at'`,
+	).Scan(&name); err != nil || name != "idx_jobs_finished_at" {
+		t.Error("idx_jobs_finished_at index not found after migration 2")
+	}
+
+	var version int
+	if err := db.QueryRow(`SELECT version FROM schema_migrations WHERE version=2`).Scan(&version); err != nil {
+		t.Fatalf("migration version 2 not recorded: %v", err)
+	}
+}
+
+func TestRunMigrationsRecordsBothVersions(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	db.SetMaxOpenConns(1)
+	defer db.Close()
+
+	if err := runMigrations(db, sqliteDialect{}); err != nil {
+		t.Fatalf("runMigrations: %v", err)
+	}
+
+	rows, err := db.Query(`SELECT version FROM schema_migrations ORDER BY version`)
+	if err != nil {
+		t.Fatalf("query schema_migrations: %v", err)
+	}
+	defer rows.Close()
+	var versions []int
+	for rows.Next() {
+		var v int
+		if err := rows.Scan(&v); err != nil {
+			t.Fatalf("scan: %v", err)
+		}
+		versions = append(versions, v)
+	}
+	if len(versions) != 2 || versions[0] != 1 || versions[1] != 2 {
+		t.Fatalf("expected versions [1 2], got %v", versions)
 	}
 }
 
@@ -871,6 +910,148 @@ func TestSQLJobStoreRoundTripComplexFields(t *testing.T) {
 			}
 			if got.Overrides["key"] != "value" {
 				t.Fatalf("Overrides: got %v", got.Overrides)
+			}
+		})
+	}
+}
+
+// ---- PurgeOlderThan --------------------------------------------------------
+
+func TestSQLJobStorePurgeDeletesSucceeded(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			cutoff := time.Now().UTC()
+			old := cutoff.Add(-24 * time.Hour)
+
+			job := Job{ID: "s1", Domain: "example.com", Status: JobSucceeded, CreatedAt: old, FinishedAt: old}
+			if _, err := s.Create(job); err != nil {
+				t.Fatalf("create: %v", err)
+			}
+			n, err := s.PurgeOlderThan(cutoff)
+			if err != nil {
+				t.Fatalf("purge: %v", err)
+			}
+			if n != 1 {
+				t.Fatalf("expected 1 purged, got %d", n)
+			}
+			if _, ok := s.Get("s1"); ok {
+				t.Fatal("expected job deleted")
+			}
+		})
+	}
+}
+
+func TestSQLJobStorePurgeDeletesAllTerminalStatuses(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			cutoff := time.Now().UTC()
+			old := cutoff.Add(-24 * time.Hour)
+
+			for i, status := range []JobStatus{JobSucceeded, JobFailed, JobCanceled, JobExpired} {
+				id := fmt.Sprintf("j%d", i)
+				job := Job{ID: id, Domain: "example.com", Status: status, CreatedAt: old, FinishedAt: old}
+				if _, err := s.Create(job); err != nil {
+					t.Fatalf("create %s: %v", id, err)
+				}
+			}
+			n, err := s.PurgeOlderThan(cutoff)
+			if err != nil {
+				t.Fatalf("purge: %v", err)
+			}
+			if n != 4 {
+				t.Fatalf("expected 4 purged, got %d", n)
+			}
+		})
+	}
+}
+
+func TestSQLJobStorePurgePreservesActiveJobs(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			cutoff := time.Now().UTC()
+			old := cutoff.Add(-24 * time.Hour)
+
+			for i, status := range []JobStatus{JobQueued, JobRunning, JobPaused} {
+				id := fmt.Sprintf("j%d", i)
+				job := Job{ID: id, Domain: "example.com", Status: status, CreatedAt: old}
+				if _, err := s.Create(job); err != nil {
+					t.Fatalf("create %s: %v", id, err)
+				}
+			}
+			n, err := s.PurgeOlderThan(cutoff)
+			if err != nil {
+				t.Fatalf("purge: %v", err)
+			}
+			if n != 0 {
+				t.Fatalf("expected 0 purged, got %d", n)
+			}
+			if list := s.List(JobFilter{Limit: 10}); list.Total != 3 {
+				t.Fatalf("expected 3 preserved, got %d", list.Total)
+			}
+		})
+	}
+}
+
+func TestSQLJobStorePurgePreservesNewJobs(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			cutoff := time.Now().UTC()
+			recent := cutoff.Add(time.Hour)
+
+			job := Job{ID: "s1", Domain: "example.com", Status: JobSucceeded, CreatedAt: recent, FinishedAt: recent}
+			if _, err := s.Create(job); err != nil {
+				t.Fatalf("create: %v", err)
+			}
+			n, err := s.PurgeOlderThan(cutoff)
+			if err != nil {
+				t.Fatalf("purge: %v", err)
+			}
+			if n != 0 {
+				t.Fatalf("expected 0 purged, got %d", n)
+			}
+		})
+	}
+}
+
+func TestSQLJobStorePurgeDeletesAssociatedResults(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			cutoff := time.Now().UTC()
+			old := cutoff.Add(-24 * time.Hour)
+
+			job := Job{ID: "s1", Domain: "example.com", Status: JobSucceeded, CreatedAt: old, FinishedAt: old}
+			if _, err := s.Create(job); err != nil {
+				t.Fatalf("create: %v", err)
+			}
+			if err := s.SetResult("s1", JobResult{Summary: map[string]any{}}); err != nil {
+				t.Fatalf("set result: %v", err)
+			}
+
+			if _, err := s.PurgeOlderThan(cutoff); err != nil {
+				t.Fatalf("purge: %v", err)
+			}
+			if _, ok := s.GetResult("s1"); ok {
+				t.Fatal("expected result deleted after purge")
+			}
+		})
+	}
+}
+
+func TestSQLJobStorePurgeReturnsZeroWhenNothingMatches(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			n, err := s.PurgeOlderThan(time.Now().UTC())
+			if err != nil {
+				t.Fatalf("purge: %v", err)
+			}
+			if n != 0 {
+				t.Fatalf("expected 0 on empty store, got %d", n)
 			}
 		})
 	}

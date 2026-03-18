@@ -102,6 +102,13 @@ Watch a job until completion.
 
 Cancel a running job.
 
+### jobs purge
+
+Delete completed jobs older than a given age, along with their results.
+
+**--older-than** *N*
+: Delete jobs finished more than N days ago. 0 (default) uses the server's configured retention_days. Returns an error if both are 0.
+
 ### batches get *BATCH-ID*
 
 Get batch summary.
@@ -162,6 +169,10 @@ Get results for a completed job:
 Watch a batch in progress:
 
     gonemaster-client batches watch batch-456
+
+Purge completed jobs older than 90 days:
+
+    gonemaster-client jobs purge --older-than 90
 
 Use a remote server with JSON output:
 

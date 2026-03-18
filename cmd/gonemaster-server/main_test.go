@@ -128,6 +128,51 @@ func TestRunDumpConfig(t *testing.T) {
 	}
 }
 
+func TestRunDBRetentionDaysValidation(t *testing.T) {
+	out := newTempFile(t)
+	errOut := newTempFile(t)
+	defer cleanupTempFile(t, out)
+	defer cleanupTempFile(t, errOut)
+
+	code := run([]string{"--db-retention-days", "-1"}, out, errOut)
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d", code)
+	}
+	errText := readTempFile(t, errOut)
+	if !strings.Contains(errText, "--db-retention-days must be >= 0") {
+		t.Fatalf("expected retention-days validation error, got %q", errText)
+	}
+}
+
+func TestRunDBRetentionDaysDumpConfig(t *testing.T) {
+	out := newTempFile(t)
+	errOut := newTempFile(t)
+	defer cleanupTempFile(t, out)
+	defer cleanupTempFile(t, errOut)
+
+	code := run([]string{"--dump-config", "--db-retention-days", "90"}, out, errOut)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	outText := readTempFile(t, out)
+	if !strings.Contains(outText, `"retention_days": 90`) {
+		t.Fatalf("expected retention_days in dump-config output, got:\n%s", outText)
+	}
+}
+
+func TestRunDBRetentionDaysHelpText(t *testing.T) {
+	out := newTempFile(t)
+	errOut := newTempFile(t)
+	defer cleanupTempFile(t, out)
+	defer cleanupTempFile(t, errOut)
+
+	run([]string{"-h"}, out, errOut)
+	errText := readTempFile(t, errOut)
+	if !strings.Contains(errText, "--db-retention-days") {
+		t.Fatalf("expected --db-retention-days in help output, got:\n%s", errText)
+	}
+}
+
 func TestRunSourceAddr6Validation(t *testing.T) {
 	out := newTempFile(t)
 	errOut := newTempFile(t)

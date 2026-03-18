@@ -386,6 +386,120 @@ func TestInMemoryJobStoreConcurrentAccess(t *testing.T) {
 	}
 }
 
+func TestInMemoryJobStorePurgeOlderThanDeletesTerminalJobs(t *testing.T) {
+	store := NewInMemoryJobStore()
+	cutoff := time.Now().UTC()
+	old := cutoff.Add(-24 * time.Hour)
+
+	for _, tc := range []struct {
+		id     string
+		status JobStatus
+	}{
+		{"s1", JobSucceeded},
+		{"f1", JobFailed},
+		{"c1", JobCanceled},
+		{"e1", JobExpired},
+	} {
+		job := Job{ID: tc.id, Domain: "example.com", Status: tc.status, CreatedAt: old, FinishedAt: old}
+		if _, err := store.Create(job); err != nil {
+			t.Fatalf("create %s: %v", tc.id, err)
+		}
+	}
+
+	n, err := store.PurgeOlderThan(cutoff)
+	if err != nil {
+		t.Fatalf("purge: %v", err)
+	}
+	if n != 4 {
+		t.Fatalf("expected 4 purged, got %d", n)
+	}
+	if list := store.List(JobFilter{Limit: 100}); list.Total != 0 {
+		t.Fatalf("expected 0 jobs after purge, got %d", list.Total)
+	}
+}
+
+func TestInMemoryJobStorePurgeOlderThanPreservesActiveJobs(t *testing.T) {
+	store := NewInMemoryJobStore()
+	cutoff := time.Now().UTC()
+	old := cutoff.Add(-24 * time.Hour)
+
+	for _, tc := range []struct {
+		id     string
+		status JobStatus
+	}{
+		{"q1", JobQueued},
+		{"r1", JobRunning},
+		{"p1", JobPaused},
+	} {
+		job := Job{ID: tc.id, Domain: "example.com", Status: tc.status, CreatedAt: old}
+		if _, err := store.Create(job); err != nil {
+			t.Fatalf("create %s: %v", tc.id, err)
+		}
+	}
+
+	n, err := store.PurgeOlderThan(cutoff)
+	if err != nil {
+		t.Fatalf("purge: %v", err)
+	}
+	if n != 0 {
+		t.Fatalf("expected 0 purged, got %d", n)
+	}
+	if list := store.List(JobFilter{Limit: 100}); list.Total != 3 {
+		t.Fatalf("expected 3 jobs preserved, got %d", list.Total)
+	}
+}
+
+func TestInMemoryJobStorePurgeOlderThanPreservesNewJobs(t *testing.T) {
+	store := NewInMemoryJobStore()
+	cutoff := time.Now().UTC()
+	recent := cutoff.Add(time.Hour) // finished after cutoff
+
+	job := Job{ID: "s1", Domain: "example.com", Status: JobSucceeded, CreatedAt: recent, FinishedAt: recent}
+	if _, err := store.Create(job); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	n, err := store.PurgeOlderThan(cutoff)
+	if err != nil {
+		t.Fatalf("purge: %v", err)
+	}
+	if n != 0 {
+		t.Fatalf("expected 0 purged, got %d", n)
+	}
+}
+
+func TestInMemoryJobStorePurgeOlderThanDeletesResults(t *testing.T) {
+	store := NewInMemoryJobStore()
+	cutoff := time.Now().UTC()
+	old := cutoff.Add(-24 * time.Hour)
+
+	job := Job{ID: "s1", Domain: "example.com", Status: JobSucceeded, CreatedAt: old, FinishedAt: old}
+	if _, err := store.Create(job); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if err := store.SetResult("s1", JobResult{Summary: map[string]any{}}); err != nil {
+		t.Fatalf("set result: %v", err)
+	}
+
+	if _, err := store.PurgeOlderThan(cutoff); err != nil {
+		t.Fatalf("purge: %v", err)
+	}
+	if _, ok := store.GetResult("s1"); ok {
+		t.Fatal("expected result to be deleted after purge")
+	}
+}
+
+func TestInMemoryJobStorePurgeOlderThanReturnsZeroWhenEmpty(t *testing.T) {
+	store := NewInMemoryJobStore()
+	n, err := store.PurgeOlderThan(time.Now().UTC())
+	if err != nil {
+		t.Fatalf("purge: %v", err)
+	}
+	if n != 0 {
+		t.Fatalf("expected 0 on empty store, got %d", n)
+	}
+}
+
 func seedJob(store *InMemoryJobStore, id, batch string, created time.Time, status JobStatus) error {
 	job := Job{
 		ID:        id,

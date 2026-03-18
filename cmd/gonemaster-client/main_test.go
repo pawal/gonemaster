@@ -7,12 +7,31 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine/normalization"
 )
+
+func TestCLIMDDocumentsPurge(t *testing.T) {
+	data, err := os.ReadFile("../../docs/cli.md")
+	if err != nil {
+		t.Fatalf("read docs/cli.md: %v", err)
+	}
+	src := string(data)
+	for _, want := range []string{
+		"jobs purge",
+		"--older-than",
+		"purged_jobs",
+		"retention_days",
+	} {
+		if !strings.Contains(src, want) {
+			t.Errorf("docs/cli.md missing %q", want)
+		}
+	}
+}
 
 func TestNormalizeBaseURL(t *testing.T) {
 	tests := []struct {
@@ -476,6 +495,100 @@ func TestJobsResultsFlagsAfterID(t *testing.T) {
 	code := run([]string{"--server", "http://example.test", "--format", "json", "jobs", "results", "job_1", "--view", "translated"}, &out, &errOut)
 	if code != 0 {
 		t.Fatalf("run returned %d, stderr=%s", code, errOut.String())
+	}
+}
+
+func TestJobsPurgeSendsPostAndPrintsPretty(t *testing.T) {
+	var gotMethod, gotPath string
+	var gotBody map[string]int
+	oldFactory := newHTTPClient
+	defer func() { newHTTPClient = oldFactory }()
+	newHTTPClient = func(_ time.Duration) *http.Client {
+		return &http.Client{
+			Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+				gotMethod = r.Method
+				gotPath = r.URL.Path
+				_ = json.NewDecoder(r.Body).Decode(&gotBody)
+				return jsonResponse(http.StatusOK, `{"purged_jobs":42}`), nil
+			}),
+		}
+	}
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+	code := run([]string{"--server", "http://example.test", "jobs", "purge", "--older-than", "90"}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("run returned %d, stderr=%s", code, errOut.String())
+	}
+	if gotMethod != http.MethodPost {
+		t.Fatalf("expected POST, got %s", gotMethod)
+	}
+	if gotPath != "/api/v1/jobs/purge" {
+		t.Fatalf("expected /api/v1/jobs/purge, got %s", gotPath)
+	}
+	if gotBody["older_than_days"] != 90 {
+		t.Fatalf("expected older_than_days=90, got %v", gotBody)
+	}
+	if !strings.Contains(out.String(), "42") {
+		t.Fatalf("expected 42 in output, got %q", out.String())
+	}
+}
+
+func TestJobsPurgeJSONOutput(t *testing.T) {
+	oldFactory := newHTTPClient
+	defer func() { newHTTPClient = oldFactory }()
+	newHTTPClient = func(_ time.Duration) *http.Client {
+		return &http.Client{
+			Transport: roundTripFunc(func(_ *http.Request) (*http.Response, error) {
+				return jsonResponse(http.StatusOK, `{"purged_jobs":7}`), nil
+			}),
+		}
+	}
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+	code := run([]string{"--server", "http://example.test", "--format", "json", "jobs", "purge", "--older-than", "30"}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("run returned %d, stderr=%s", code, errOut.String())
+	}
+	var resp map[string]int64
+	if err := json.NewDecoder(&out).Decode(&resp); err != nil {
+		t.Fatalf("decode output: %v", err)
+	}
+	if resp["purged_jobs"] != 7 {
+		t.Fatalf("expected purged_jobs=7, got %v", resp)
+	}
+}
+
+func TestJobsPurgeZeroOlderThanSendsZero(t *testing.T) {
+	var gotBody map[string]int
+	oldFactory := newHTTPClient
+	defer func() { newHTTPClient = oldFactory }()
+	newHTTPClient = func(_ time.Duration) *http.Client {
+		return &http.Client{
+			Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+				_ = json.NewDecoder(r.Body).Decode(&gotBody)
+				return jsonResponse(http.StatusOK, `{"purged_jobs":0}`), nil
+			}),
+		}
+	}
+
+	var out, errOut bytes.Buffer
+	code := run([]string{"--server", "http://example.test", "jobs", "purge"}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("run returned %d, stderr=%s", code, errOut.String())
+	}
+	if gotBody["older_than_days"] != 0 {
+		t.Fatalf("expected older_than_days=0, got %v", gotBody)
+	}
+}
+
+func TestJobsPurgeInUsage(t *testing.T) {
+	var out, errOut bytes.Buffer
+	run([]string{"help"}, &out, &errOut)
+	combined := out.String() + errOut.String()
+	if !strings.Contains(combined, "purge") {
+		t.Fatalf("expected 'purge' in usage output, got:\n%s", combined)
 	}
 }
 

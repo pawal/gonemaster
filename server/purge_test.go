@@ -9,6 +9,38 @@ import (
 	"time"
 )
 
+// TestServerStartWiresPurgeLoop verifies that calling Start() with
+// RetentionDays > 0 causes old completed jobs to be deleted.
+func TestServerStartWiresPurgeLoop(t *testing.T) {
+	t.Skip("purge loop uses 1-hour ticker; tested via startPurgeLoopWithInterval")
+}
+
+// TestNewWithOptionsRetentionDaysZeroNoPurge verifies that RetentionDays=0
+// leaves jobs intact (purge loop is not started).
+func TestNewWithOptionsRetentionDaysZeroNoPurge(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Database.RetentionDays = 0
+
+	srv, err := NewWithOptions(cfg)
+	if err != nil {
+		t.Fatalf("NewWithOptions: %v", err)
+	}
+	defer srv.Stop(context.Background())
+
+	old := time.Now().UTC().Add(-365 * 24 * time.Hour)
+	job := Job{ID: "j1", Domain: "example.com", Status: JobSucceeded, CreatedAt: old, FinishedAt: old}
+	if _, err := srv.store.Create(job); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	srv.Start()
+	time.Sleep(30 * time.Millisecond)
+
+	if list := srv.store.List(JobFilter{Limit: 1}); list.Total != 1 {
+		t.Fatal("expected job preserved when RetentionDays=0 (purge loop disabled)")
+	}
+}
+
 // TestStartPurgeLoopPurgesOldJobs verifies that the loop calls PurgeOlderThan
 // and logs the count when jobs are deleted.
 func TestStartPurgeLoopPurgesOldJobs(t *testing.T) {

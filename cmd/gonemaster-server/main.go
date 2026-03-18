@@ -49,6 +49,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	var profilePath string
 	var dbDriver string
 	var dbDSN string
+	var dbRetentionDays int
 	var showVersion bool
 	var dumpConfig bool
 	var shutdownTimeout time.Duration
@@ -88,6 +89,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 		printUsageGroup(errOut, "Database", []usageLine{
 			{flag: "--db-driver DRIVER", detail: "Storage backend: sqlite (or leave empty for in-memory) (env: GONEMASTER_DB_DRIVER)"},
 			{flag: "--db-dsn DSN", detail: "SQLite: file path e.g. /var/lib/gonemaster/jobs.db (env: GONEMASTER_DB_DSN)"},
+			{flag: "--db-retention-days N", detail: "Delete completed jobs older than N days (0 = keep forever) (env: GONEMASTER_DB_RETENTION_DAYS)"},
 		})
 		printUsageGroup(errOut, "Output", []usageLine{
 			{flag: "--min-level LEVEL", detail: "Minimum result log level (default INFO)"},
@@ -112,6 +114,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	fs.StringVar(&profilePath, "profile", "", "Profile JSON/YAML path (optional)")
 	fs.StringVar(&dbDriver, "db-driver", "", "Storage backend: sqlite (empty = in-memory)")
 	fs.StringVar(&dbDSN, "db-dsn", "", "Database file path or connection string (optional)")
+	fs.IntVar(&dbRetentionDays, "db-retention-days", 0, "Delete completed jobs older than N days (0 = keep forever)")
 	fs.BoolVar(&showVersion, "version", false, "Print version and exit (optional)")
 	fs.BoolVar(&dumpConfig, "dump-config", false, "Print effective config as JSON and exit")
 	fs.DurationVar(&shutdownTimeout, "shutdown-timeout", 10*time.Second, "Graceful shutdown timeout (default 10s)")
@@ -154,6 +157,10 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	}
 	if flagsSet["retrans"] && retransSeconds < 0 {
 		fmt.Fprintln(errOut, "--retrans must be >= 0")
+		return 2
+	}
+	if flagsSet["db-retention-days"] && dbRetentionDays < 0 {
+		fmt.Fprintln(errOut, "--db-retention-days must be >= 0")
 		return 2
 	}
 	if flagsSet["fallback"] && flagsSet["no-fallback"] {
@@ -248,6 +255,9 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	}
 	if flagsSet["db-dsn"] {
 		cfg.Database.DSN = dbDSN
+	}
+	if flagsSet["db-retention-days"] {
+		cfg.Database.RetentionDays = dbRetentionDays
 	}
 
 	if dumpConfig {

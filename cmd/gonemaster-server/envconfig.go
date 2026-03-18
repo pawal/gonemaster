@@ -62,4 +62,5 @@ func applyEnvVars(cfg *server.Config, flagsSet map[string]bool, getenv func(stri
 	applyBool("debug", "GONEMASTER_DEBUG", &cfg.Debug)
 	applyString("db-driver", "GONEMASTER_DB_DRIVER", &cfg.Database.Driver)
 	applyString("db-dsn", "GONEMASTER_DB_DSN", &cfg.Database.DSN)
+	applyInt("db-retention-days", "GONEMASTER_DB_RETENTION_DAYS", &cfg.Database.RetentionDays)
 }

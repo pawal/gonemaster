@@ -114,22 +114,6 @@ func testStoreForBackend(t *testing.T, b testBackend) *SQLJobStore {
 	return NewSQLJobStore(db, b.dialect)
 }
 
-// testSQLiteStore opens an in-memory SQLite store. Kept for migration tests
-// that are SQLite-specific and cannot be parameterized.
-func testSQLiteStore(t *testing.T) *SQLJobStore {
-	t.Helper()
-	db, err := sql.Open("sqlite", ":memory:")
-	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
-	}
-	db.SetMaxOpenConns(1)
-	t.Cleanup(func() { _ = db.Close() })
-
-	if err := runMigrations(db, sqliteDialect{}); err != nil {
-		t.Fatalf("runMigrations: %v", err)
-	}
-	return NewSQLJobStore(db, sqliteDialect{})
-}
 
 // ids extracts job IDs from a slice for readable error messages.
 func ids(jobs []Job) []string {

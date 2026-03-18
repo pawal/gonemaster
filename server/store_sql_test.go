@@ -915,6 +915,148 @@ func TestSQLJobStoreRoundTripComplexFields(t *testing.T) {
 	}
 }
 
+// ---- PurgeOlderThan --------------------------------------------------------
+
+func TestSQLJobStorePurgeDeletesSucceeded(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			cutoff := time.Now().UTC()
+			old := cutoff.Add(-24 * time.Hour)
+
+			job := Job{ID: "s1", Domain: "example.com", Status: JobSucceeded, CreatedAt: old, FinishedAt: old}
+			if _, err := s.Create(job); err != nil {
+				t.Fatalf("create: %v", err)
+			}
+			n, err := s.PurgeOlderThan(cutoff)
+			if err != nil {
+				t.Fatalf("purge: %v", err)
+			}
+			if n != 1 {
+				t.Fatalf("expected 1 purged, got %d", n)
+			}
+			if _, ok := s.Get("s1"); ok {
+				t.Fatal("expected job deleted")
+			}
+		})
+	}
+}
+
+func TestSQLJobStorePurgeDeletesAllTerminalStatuses(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			cutoff := time.Now().UTC()
+			old := cutoff.Add(-24 * time.Hour)
+
+			for i, status := range []JobStatus{JobSucceeded, JobFailed, JobCanceled, JobExpired} {
+				id := fmt.Sprintf("j%d", i)
+				job := Job{ID: id, Domain: "example.com", Status: status, CreatedAt: old, FinishedAt: old}
+				if _, err := s.Create(job); err != nil {
+					t.Fatalf("create %s: %v", id, err)
+				}
+			}
+			n, err := s.PurgeOlderThan(cutoff)
+			if err != nil {
+				t.Fatalf("purge: %v", err)
+			}
+			if n != 4 {
+				t.Fatalf("expected 4 purged, got %d", n)
+			}
+		})
+	}
+}
+
+func TestSQLJobStorePurgePreservesActiveJobs(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			cutoff := time.Now().UTC()
+			old := cutoff.Add(-24 * time.Hour)
+
+			for i, status := range []JobStatus{JobQueued, JobRunning, JobPaused} {
+				id := fmt.Sprintf("j%d", i)
+				job := Job{ID: id, Domain: "example.com", Status: status, CreatedAt: old}
+				if _, err := s.Create(job); err != nil {
+					t.Fatalf("create %s: %v", id, err)
+				}
+			}
+			n, err := s.PurgeOlderThan(cutoff)
+			if err != nil {
+				t.Fatalf("purge: %v", err)
+			}
+			if n != 0 {
+				t.Fatalf("expected 0 purged, got %d", n)
+			}
+			if list := s.List(JobFilter{Limit: 10}); list.Total != 3 {
+				t.Fatalf("expected 3 preserved, got %d", list.Total)
+			}
+		})
+	}
+}
+
+func TestSQLJobStorePurgePreservesNewJobs(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			cutoff := time.Now().UTC()
+			recent := cutoff.Add(time.Hour)
+
+			job := Job{ID: "s1", Domain: "example.com", Status: JobSucceeded, CreatedAt: recent, FinishedAt: recent}
+			if _, err := s.Create(job); err != nil {
+				t.Fatalf("create: %v", err)
+			}
+			n, err := s.PurgeOlderThan(cutoff)
+			if err != nil {
+				t.Fatalf("purge: %v", err)
+			}
+			if n != 0 {
+				t.Fatalf("expected 0 purged, got %d", n)
+			}
+		})
+	}
+}
+
+func TestSQLJobStorePurgeDeletesAssociatedResults(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			cutoff := time.Now().UTC()
+			old := cutoff.Add(-24 * time.Hour)
+
+			job := Job{ID: "s1", Domain: "example.com", Status: JobSucceeded, CreatedAt: old, FinishedAt: old}
+			if _, err := s.Create(job); err != nil {
+				t.Fatalf("create: %v", err)
+			}
+			if err := s.SetResult("s1", JobResult{Summary: map[string]any{}}); err != nil {
+				t.Fatalf("set result: %v", err)
+			}
+
+			if _, err := s.PurgeOlderThan(cutoff); err != nil {
+				t.Fatalf("purge: %v", err)
+			}
+			if _, ok := s.GetResult("s1"); ok {
+				t.Fatal("expected result deleted after purge")
+			}
+		})
+	}
+}
+
+func TestSQLJobStorePurgeReturnsZeroWhenNothingMatches(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			n, err := s.PurgeOlderThan(time.Now().UTC())
+			if err != nil {
+				t.Fatalf("purge: %v", err)
+			}
+			if n != 0 {
+				t.Fatalf("expected 0 on empty store, got %d", n)
+			}
+		})
+	}
+}
+
 // ---- Recovery --------------------------------------------------------------
 
 func TestRecoverJobsRunningToFailed(t *testing.T) {

@@ -166,7 +166,7 @@ button:hover:not(:disabled) {
 }
 
 /* ── Progress bar ────────────────────────────────────────────────────────── */
-.progress {
+.progress-bar-track {
   position: relative;
   height: 12px;
   border-radius: 999px;
@@ -174,10 +174,11 @@ button:hover:not(:disabled) {
   overflow: hidden;
 }
 
-.progress-bar {
+.progress-bar-fill {
   height: 100%;
   background: linear-gradient(90deg, #0b2d4d 0%, #0e7490 100%);
   transition: width 0.3s ease;
+  min-width: 4px;
 }
 
 /* ── Status banner ───────────────────────────────────────────────────────── */

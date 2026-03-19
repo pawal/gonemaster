@@ -256,6 +256,12 @@ func (s *SQLJobStore) Get(id string) (Job, bool) {
 	return job, true
 }
 
+// GetByPublicID returns a job looked up by its public_id column.
+// A stub until migration 3 adds the public_id column; always returns false.
+func (s *SQLJobStore) GetByPublicID(_ string) (Job, bool) {
+	return Job{}, false
+}
+
 // Update replaces a job's mutable fields. Returns an error if the job does not
 // exist. The sev_* columns are managed exclusively by SetResult.
 func (s *SQLJobStore) Update(job Job) error {

@@ -26,6 +26,10 @@ func (s *countingJobStore) Get(id string) (Job, bool) {
 	return s.inner.Get(id)
 }
 
+func (s *countingJobStore) GetByPublicID(publicID string) (Job, bool) {
+	return s.inner.GetByPublicID(publicID)
+}
+
 func (s *countingJobStore) Update(job Job) error {
 	s.updateCount.Add(1)
 	return s.inner.Update(job)

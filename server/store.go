@@ -15,6 +15,7 @@ var severityLevels = []string{"NOTICE", "WARNING", "ERROR", "CRITICAL"}
 type JobStore interface {
 	Create(job Job) (Job, error)
 	Get(id string) (Job, bool)
+	GetByPublicID(publicID string) (Job, bool)
 	Update(job Job) error
 	List(filter JobFilter) JobList
 	SetResult(jobID string, result JobResult) error
@@ -30,25 +31,44 @@ type InMemoryJobStore struct {
 	resultsMu sync.RWMutex
 	jobs      map[string]Job
 	results   map[string]JobResult
+	publicIDs map[string]string // publicID → job ID
 }
 
 // NewInMemoryJobStore creates an empty in-memory job store.
 func NewInMemoryJobStore() *InMemoryJobStore {
 	return &InMemoryJobStore{
-		jobs:    map[string]Job{},
-		results: map[string]JobResult{},
+		jobs:      map[string]Job{},
+		results:   map[string]JobResult{},
+		publicIDs: map[string]string{},
 	}
 }
 
 // Create inserts a new job and fails if the id already exists.
+// A PublicID is generated automatically if the job does not already have one.
 func (s *InMemoryJobStore) Create(job Job) (Job, error) {
 	s.jobsMu.Lock()
 	defer s.jobsMu.Unlock()
 	if _, exists := s.jobs[job.ID]; exists {
 		return Job{}, errors.New("job already exists")
 	}
+	if job.PublicID == "" {
+		job.PublicID = GeneratePublicID()
+	}
 	s.jobs[job.ID] = job
+	s.publicIDs[job.PublicID] = job.ID
 	return job, nil
+}
+
+// GetByPublicID returns a job looked up by its public ID.
+func (s *InMemoryJobStore) GetByPublicID(publicID string) (Job, bool) {
+	s.jobsMu.RLock()
+	defer s.jobsMu.RUnlock()
+	id, ok := s.publicIDs[publicID]
+	if !ok {
+		return Job{}, false
+	}
+	job, ok := s.jobs[id]
+	return job, ok
 }
 
 // Get returns a job by id.
@@ -291,6 +311,7 @@ func (s *InMemoryJobStore) PurgeOlderThan(cutoff time.Time) (int64, error) {
 		if job.FinishedAt.IsZero() || !job.FinishedAt.Before(cutoff) {
 			continue
 		}
+		delete(s.publicIDs, job.PublicID)
 		delete(s.jobs, id)
 		delete(s.results, id)
 		count++

@@ -40,6 +40,7 @@
   }
 
   $: themeLabel = [$t("pub.theme_system"), $t("pub.theme_light"), $t("pub.theme_dark")][themeIndex];
+  $: themeIcon = themeIndex === 2 ? "☀" : "🌙";
 
   // ── Locale ─────────────────────────────────────────────────────────────────
   const localeDisplayNames = {
@@ -138,7 +139,7 @@
         title={$t("pub.theme_cycle_title", { theme: themeLabel })}
         aria-label={$t("pub.theme_cycle_title", { theme: themeLabel })}
         on:click={cycleTheme}
-      >☀</button>
+      >{themeIcon}</button>
     </div>
   </header>
 

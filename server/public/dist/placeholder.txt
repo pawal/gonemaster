@@ -1,1 +1,2 @@
-Run `make ui-public-build` to populate this directory.
+This placeholder keeps the dist directory embeddable when built UI assets are not present.
+Run 'make ui-build' before building the default server binary to embed the web UI.

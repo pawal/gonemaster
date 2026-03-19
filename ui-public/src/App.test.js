@@ -12,7 +12,8 @@ const fetchRouter = (routes) => {
   });
 };
 
-const localesResp = { ok: true, json: async () => ["en"] };
+const localesResp = { ok: true, json: async () => ({ locales: ["en"] }) };
+const multiLocalesResp = { ok: true, json: async () => ({ locales: ["en", "sv", "da"] }) };
 
 const jobResp = (status, domain = "example.com", progress = 0) => ({
   ok: true,
@@ -86,9 +87,21 @@ describe("App", () => {
     expect(screen.getByText("Gonemaster")).toBeTruthy();
   });
 
-  it("renders the locale selector", () => {
+  it("renders the locale selector when multiple locales are available", async () => {
+    fetchRouter([
+      ["/locales", multiLocalesResp],
+      ["/jobs/", jobResp("queued", "example.com", 0)],
+    ]);
     render(App);
-    expect(screen.getByRole("combobox", { name: /language/i })).toBeTruthy();
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: /language/i })).toBeTruthy()
+    );
+  });
+
+  it("hides locale selector when only one locale is available", async () => {
+    render(App);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByRole("combobox", { name: /language/i })).toBeNull();
   });
 
   it("renders the theme toggle button", () => {

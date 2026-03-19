@@ -43,18 +43,52 @@ main {
   max-width: 760px;
   margin: 0 auto;
   padding: 48px 24px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.header-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.header-controls {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-top: 8px;
+}
+
+.locale-select {
+  width: auto;
+  padding: 6px 10px;
+  font-size: 0.875rem;
+  border-radius: 8px;
+  min-width: 0;
 }
 
 h1 {
   font-size: clamp(1.8rem, 3vw, 2.6rem);
   letter-spacing: -0.02em;
-  margin: 0 0 8px;
+  margin: 0;
 }
 
 .subtitle {
   color: var(--muted);
   line-height: 1.5;
-  margin: 0 0 32px;
+  margin: 0;
 }
 
 /* ── Layout helpers ──────────────────────────────────────────────────────── */

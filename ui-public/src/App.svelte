@@ -42,6 +42,12 @@
   $: themeLabel = [$t("pub.theme_system"), $t("pub.theme_light"), $t("pub.theme_dark")][themeIndex];
 
   // ── Locale ─────────────────────────────────────────────────────────────────
+  const localeDisplayNames = {
+    en: "English", sv: "Svenska", da: "Dansk", fi: "Suomi",
+    fr: "Français", es: "Español", nb: "Norsk", sl: "Slovenščina", ja: "日本語",
+  };
+  const localeLabel = (code) => localeDisplayNames[code] || code;
+
   let availableLocales = ["en"];
   let resultLocale = "en";
 
@@ -50,7 +56,9 @@
       const res = await getLocales();
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data)) availableLocales = data;
+        if (Array.isArray(data?.locales) && data.locales.length > 0) {
+          availableLocales = data.locales;
+        }
       }
     } catch (_) {}
   }
@@ -112,16 +120,19 @@
       <p class="subtitle">{$t("pub.app_subtitle")}</p>
     </div>
     <div class="header-controls">
-      <select
-        aria-label={$t("pub.locale_select_aria")}
-        title={$t("pub.locale_select_title")}
-        bind:value={resultLocale}
-        on:change={onLocaleChange}
-      >
-        {#each availableLocales as code}
-          <option value={code}>{code}</option>
-        {/each}
-      </select>
+      {#if availableLocales.length > 1}
+        <select
+          class="locale-select"
+          aria-label={$t("pub.locale_select_aria")}
+          title={$t("pub.locale_select_title")}
+          bind:value={resultLocale}
+          on:change={onLocaleChange}
+        >
+          {#each availableLocales as code}
+            <option value={code}>{localeLabel(code)}</option>
+          {/each}
+        </select>
+      {/if}
       <button
         class="theme-toggle"
         title={$t("pub.theme_cycle_title", { theme: themeLabel })}

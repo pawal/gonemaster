@@ -109,34 +109,26 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: /theme/i })).toBeTruthy();
   });
 
-  // ── Theme cycling ──────────────────────────────────────────────────────────
+  // ── Theme toggle ───────────────────────────────────────────────────────────
+  // jsdom has no matchMedia, so isDark initialises to false → data-theme="light"
 
-  it("starts with no data-theme attribute (system default)", () => {
+  it("starts with data-theme=light in test env (no system dark preference)", () => {
     render(App);
-    expect(document.documentElement.getAttribute("data-theme")).toBeNull();
-  });
-
-  it("sets data-theme=light after one click", async () => {
-    render(App);
-    await fireEvent.click(screen.getByRole("button", { name: /theme/i }));
     expect(document.documentElement.getAttribute("data-theme")).toBe("light");
   });
 
-  it("sets data-theme=dark after two clicks", async () => {
+  it("sets data-theme=dark after one click", async () => {
     render(App);
-    const btn = screen.getByRole("button", { name: /theme/i });
-    await fireEvent.click(btn);
-    await fireEvent.click(btn);
+    await fireEvent.click(screen.getByRole("button", { name: /theme/i }));
     expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
   });
 
-  it("removes data-theme after three clicks (back to system)", async () => {
+  it("sets data-theme=light after two clicks", async () => {
     render(App);
     const btn = screen.getByRole("button", { name: /theme/i });
     await fireEvent.click(btn);
     await fireEvent.click(btn);
-    await fireEvent.click(btn);
-    expect(document.documentElement.getAttribute("data-theme")).toBeNull();
+    expect(document.documentElement.getAttribute("data-theme")).toBe("light");
   });
 
   // ── Component wiring ───────────────────────────────────────────────────────

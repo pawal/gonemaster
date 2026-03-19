@@ -22,25 +22,19 @@
   }
 
   // ── Theme ──────────────────────────────────────────────────────────────────
-  const THEMES = ["system", "light", "dark"];
-  let themeIndex = 0;
+  let isDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
 
-  function applyTheme(idx) {
-    const theme = THEMES[idx];
-    if (theme === "system") {
-      document.documentElement.removeAttribute("data-theme");
-    } else {
-      document.documentElement.setAttribute("data-theme", theme);
-    }
+  function applyTheme() {
+    document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
   }
 
-  function cycleTheme() {
-    themeIndex = (themeIndex + 1) % THEMES.length;
-    applyTheme(themeIndex);
+  function toggleTheme() {
+    isDark = !isDark;
+    applyTheme();
   }
 
-  $: themeLabel = [$t("pub.theme_system"), $t("pub.theme_light"), $t("pub.theme_dark")][themeIndex];
-  $: themeIcon = themeIndex === 2 ? "☀" : "🌙";
+  $: themeLabel = isDark ? $t("pub.theme_dark") : $t("pub.theme_light");
+  $: themeIcon = isDark ? "☀" : "☽";
 
   // ── Locale ─────────────────────────────────────────────────────────────────
   const localeDisplayNames = {
@@ -105,7 +99,7 @@
   // ── Lifecycle ──────────────────────────────────────────────────────────────
   onMount(() => {
     window.addEventListener("hashchange", onHashChange);
-    applyTheme(themeIndex);
+    applyTheme();
     fetchLocales();
   });
 
@@ -138,7 +132,7 @@
         class="theme-toggle"
         title={$t("pub.theme_cycle_title", { theme: themeLabel })}
         aria-label={$t("pub.theme_cycle_title", { theme: themeLabel })}
-        on:click={cycleTheme}
+        on:click={toggleTheme}
       >{themeIcon}</button>
     </div>
   </header>

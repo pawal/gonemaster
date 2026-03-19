@@ -77,6 +77,7 @@
         on:toggle={(e) => { if (e.target.open) openModules.add(moduleName); else openModules.delete(moduleName); openModules = openModules; }}
       >
         <summary class="module-summary">
+          <span class="module-chevron"></span>
           <span class="module-name">{moduleName}</span>
           <span class="module-badges">
             {#each levelCounts(modEntries) as { level, count }}

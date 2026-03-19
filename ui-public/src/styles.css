@@ -245,6 +245,20 @@ button:hover:not(:disabled) {
 
 .module-summary:hover { background: var(--surface); }
 
+.module-chevron {
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: rotate(-45deg);
+  transition: transform 0.18s ease;
+  flex-shrink: 0;
+}
+
+details[open] > .module-summary > .module-chevron {
+  transform: rotate(45deg);
+}
+
 .module-name {
   font-weight: 600;
   font-size: 0.95rem;
@@ -274,6 +288,13 @@ button:hover:not(:disabled) {
   gap: 10px;
   align-items: flex-start;
   padding: 6px 0;
+  min-width: 0;
+}
+
+.result-message {
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .entry-level   { font-family: var(--mono); font-size: 0.78rem; }

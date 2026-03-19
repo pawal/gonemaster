@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"time"
 
 	"codeberg.org/pawal/gonemaster/server"
 )
@@ -54,6 +55,22 @@ func applyEnvVars(cfg *server.Config, flagsSet map[string]bool, getenv func(stri
 		*dst = b
 	}
 
+	applyDuration := func(flagName, envName string, dst *server.Duration) {
+		if flagsSet[flagName] {
+			return
+		}
+		v := getenv(envName)
+		if v == "" {
+			return
+		}
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			fmt.Fprintf(warn, "warning: %s=%q is not a valid duration, ignoring\n", envName, v)
+			return
+		}
+		*dst = server.Duration{Duration: d}
+	}
+
 	applyString("listen", "GONEMASTER_LISTEN", &cfg.ListenAddr)
 	applyInt("workers", "GONEMASTER_WORKER_COUNT", &cfg.WorkerCount)
 	applyInt("max-concurrent-jobs", "GONEMASTER_MAX_CONCURRENT_JOBS", &cfg.MaxConcurrentJobs)
@@ -63,4 +80,7 @@ func applyEnvVars(cfg *server.Config, flagsSet map[string]bool, getenv func(stri
 	applyString("db-driver", "GONEMASTER_DB_DRIVER", &cfg.Database.Driver)
 	applyString("db-dsn", "GONEMASTER_DB_DSN", &cfg.Database.DSN)
 	applyInt("db-retention-days", "GONEMASTER_DB_RETENTION_DAYS", &cfg.Database.RetentionDays)
+	applyBool("public-api-rate-limit-enabled", "GONEMASTER_PUBLIC_API_RATE_LIMIT_ENABLED", &cfg.PublicAPI.RateLimitEnabled)
+	applyInt("public-api-rate-limit-max", "GONEMASTER_PUBLIC_API_RATE_LIMIT_MAX", &cfg.PublicAPI.RateLimitMax)
+	applyDuration("public-api-rate-limit-window", "GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW", &cfg.PublicAPI.RateLimitWindow)
 }

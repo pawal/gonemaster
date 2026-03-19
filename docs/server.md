@@ -248,6 +248,52 @@ gonemaster-server \
 | `public_api.rate_limit_max` | `10` | Max submissions per IP per window |
 | `public_api.rate_limit_window` | `10m` | Sliding window duration |
 
+### Reverse proxy setup
+
+To expose the public UI and its API to the internet while keeping the admin
+interface private, configure your reverse proxy to forward only two path
+prefixes:
+
+| Prefix | Purpose |
+|---|---|
+| `/public/` | Public Svelte SPA (static assets) |
+| `/pub/api/v1/` | Public API (job submission and result lookup) |
+
+The server enforces the boundary internally — no additional path filtering
+is required in the proxy.
+
+#### nginx
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name dns.example.com;
+
+    location /public/ {
+        proxy_pass http://127.0.0.1:8080/public/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    location /pub/api/v1/ {
+        proxy_pass http://127.0.0.1:8080/pub/api/v1/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+```
+
+#### Caddy
+
+```caddyfile
+dns.example.com {
+    reverse_proxy /public/* localhost:8080
+    reverse_proxy /pub/api/v1/* localhost:8080
+}
+```
+
 ### Config example
 ```json
 {

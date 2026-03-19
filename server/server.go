@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
+	serverpublic "codeberg.org/pawal/gonemaster/server/public"
 	serverui "codeberg.org/pawal/gonemaster/server/ui"
 )
 
@@ -147,5 +148,6 @@ func (s *Server) routes() {
 	}
 	s.mux.Handle("/pub/api/v1/", pubHandler)
 
+	s.mux.Handle("/public/", http.StripPrefix("/public", serverpublic.Handler()))
 	s.mux.Handle("/", serverui.Handler())
 }

@@ -513,6 +513,74 @@ func TestSQLJobStoreGetMissing(t *testing.T) {
 	}
 }
 
+// ---- GetByPublicID ---------------------------------------------------------
+
+func TestSQLJobStoreCreateSetsPublicID(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			created, err := s.Create(Job{ID: "j1", Domain: "example.com", Status: JobQueued, CreatedAt: time.Now().UTC()})
+			if err != nil {
+				t.Fatalf("Create: %v", err)
+			}
+			if created.PublicID == "" {
+				t.Fatal("expected PublicID to be set after Create")
+			}
+			// Round-trip: Get must also return the public ID.
+			got, ok := s.Get("j1")
+			if !ok {
+				t.Fatal("Get: not found")
+			}
+			if got.PublicID != created.PublicID {
+				t.Fatalf("Get returned PublicID %q, want %q", got.PublicID, created.PublicID)
+			}
+		})
+	}
+}
+
+func TestSQLJobStoreCreatePreservesExplicitPublicID(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			created, err := s.Create(Job{ID: "j1", PublicID: "myid1234", Domain: "example.com", Status: JobQueued, CreatedAt: time.Now().UTC()})
+			if err != nil {
+				t.Fatalf("Create: %v", err)
+			}
+			if created.PublicID != "myid1234" {
+				t.Fatalf("got PublicID %q, want %q", created.PublicID, "myid1234")
+			}
+		})
+	}
+}
+
+func TestSQLJobStoreGetByPublicIDReturnsJob(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			created, _ := s.Create(Job{ID: "j1", Domain: "example.com", Status: JobQueued, CreatedAt: time.Now().UTC()})
+			got, ok := s.GetByPublicID(created.PublicID)
+			if !ok {
+				t.Fatal("expected job to be found by public ID")
+			}
+			if got.ID != "j1" {
+				t.Fatalf("got ID %q, want %q", got.ID, "j1")
+			}
+		})
+	}
+}
+
+func TestSQLJobStoreGetByPublicIDMissingReturnsFalse(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			_, ok := s.GetByPublicID("notexist")
+			if ok {
+				t.Fatal("expected false for unknown public ID")
+			}
+		})
+	}
+}
+
 // ---- Update ----------------------------------------------------------------
 
 func TestSQLJobStoreUpdate(t *testing.T) {

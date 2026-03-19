@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node -e \"require('fs').writeFileSync('../server/public/dist/placeholder.txt', 'This placeholder keeps the dist directory embeddable when built UI assets are not present.\\nRun make ui-build before building the default server binary to embed the public web app.\\n')\"",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest"

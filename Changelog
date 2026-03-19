@@ -11,6 +11,7 @@ All notable changes to all gonemaster components will be documented in this file
  - Server: PostgreSQL and MariaDB/MySQL persistence backends with multi-dialect SQL abstraction, connection pooling, and integration test infrastructure (`make test-integration`, CI)
  - Server: Data retention — `--db-retention-days` / `GONEMASTER_DB_RETENTION_DAYS` runs an hourly background purge of completed jobs; `POST /api/v1/jobs/purge` and `gonemaster-client jobs purge` allow on-demand purging
  - Server: Public API at `/pub/api/v1/` exposes job submission and result lookup by short public ID without leaking internal UUIDs; suitable for reverse-proxy exposure
+ - Server: Per-IP sliding-window rate limiting on `POST /pub/api/v1/jobs`; configurable via `--public-api-rate-limit-*` flags, `GONEMASTER_PUBLIC_API_RATE_LIMIT_*` env vars, and `public_api` config section; `429` with `Retry-After` when exceeded
 
 ### Changed
 

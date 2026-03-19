@@ -65,6 +65,7 @@ const (
 // Job represents a single test job.
 type Job struct {
 	ID             string                         `json:"id"`
+	PublicID       string                         `json:"public_id,omitempty"`
 	BatchID        string                         `json:"batch_id,omitempty"`
 	Domain         string                         `json:"domain"`
 	SeverityTotals map[string]int                 `json:"severity_totals,omitempty"`

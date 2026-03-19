@@ -82,15 +82,17 @@ describe("Results", () => {
     );
   });
 
-  it("shows module-level severity badge", async () => {
+  it("shows per-level count badges in module summary", async () => {
     global.fetch.mockResolvedValue(resultResp([
       entry("Module::Alpha", "WARNING", "w msg"),
       entry("Module::Alpha", "INFO", "i msg"),
     ]));
     render(Results, { props: { publicID: "abc12345" } });
     await waitFor(() => {
-      const badge = screen.getByTestId("module-badge");
-      expect(badge.textContent).toBe("WARNING");
+      const badges = screen.getAllByTestId("module-badge");
+      const texts = badges.map((b) => b.textContent.trim());
+      expect(texts).toContain("INFO 1");
+      expect(texts).toContain("WARNING 1");
     });
   });
 

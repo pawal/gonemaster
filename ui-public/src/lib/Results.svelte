@@ -1,7 +1,16 @@
 <script>
   import { t } from "../i18n.js";
   import { getResult } from "../api.js";
-  import { levelClass, bannerClass, worstLevel } from "../severity.js";
+  import { LEVELS, levelClass, bannerClass, worstLevel } from "../severity.js";
+
+  function levelCounts(arr) {
+    const counts = {};
+    for (const e of arr) {
+      const l = e.level?.toUpperCase();
+      if (l) counts[l] = (counts[l] ?? 0) + 1;
+    }
+    return LEVELS.filter((l) => counts[l]).map((l) => ({ level: l, count: counts[l] }));
+  }
 
   export let publicID;
   export let domain = "";
@@ -69,7 +78,11 @@
       >
         <summary class="module-summary">
           <span class="module-name">{moduleName}</span>
-          <span class="level-pill {levelClass(modLevel)}" data-testid="module-badge">{modLevel}</span>
+          <span class="module-badges">
+            {#each levelCounts(modEntries) as { level, count }}
+              <span class="level-pill {levelClass(level)}" data-testid="module-badge">{level} {count}</span>
+            {/each}
+          </span>
         </summary>
         <div class="module-entries">
           {#each modEntries as entry}

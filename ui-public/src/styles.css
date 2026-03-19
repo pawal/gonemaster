@@ -226,48 +226,45 @@ button:hover:not(:disabled) {
 
 .module-card {
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 6px;
   background: var(--card);
   overflow: hidden;
 }
 
-.module-toggle {
-  width: 100%;
+.module-summary {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 14px;
-  background: transparent;
-  border: none;
-  box-shadow: none;
-  color: var(--ink);
-  text-align: left;
+  padding: 14px 18px;
   cursor: pointer;
+  list-style: none;
+  user-select: none;
 }
 
-.module-toggle:hover {
-  transform: none;
-  box-shadow: none;
-  background: var(--surface);
+.module-summary::-webkit-details-marker { display: none; }
+
+.module-summary:hover { background: var(--surface); }
+
+.module-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  flex: 1;
 }
 
-.module-title   { font-weight: 600; font-size: 0.95rem; }
-.module-badges  { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
-
-.module-chevron {
-  width: 10px;
-  height: 10px;
-  border-right: 2px solid var(--muted);
-  border-bottom: 2px solid var(--muted);
-  transform: rotate(-45deg);
-  transition: transform 0.2s ease;
+.module-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
 }
-.module-chevron.open { transform: rotate(135deg); }
 
-.module-body {
+.module-entries {
   border-top: 1px solid var(--border);
-  padding: 12px 14px;
+  padding: 14px 18px;
   background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 /* ── Result rows ─────────────────────────────────────────────────────────── */

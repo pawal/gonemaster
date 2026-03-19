@@ -124,4 +124,23 @@ describe("Results", () => {
     render(Results, { props: { publicID: "abc12345" } });
     await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
   });
+
+  it("re-fetches with new locale when locale prop changes", async () => {
+    const enResp = {
+      ok: true, status: 200,
+      json: async () => ({ job_id: "x", status: "succeeded", raw: { locale: "en", entries: [entry("M", "INFO", "english msg")] } }),
+    };
+    const svResp = {
+      ok: true, status: 200,
+      json: async () => ({ job_id: "x", status: "succeeded", raw: { locale: "sv", entries: [entry("M", "INFO", "swedish msg")] } }),
+    };
+    global.fetch.mockResolvedValueOnce(enResp).mockResolvedValueOnce(svResp);
+    const { rerender } = render(Results, { props: { publicID: "abc12345", locale: "en" } });
+    await waitFor(() => expect(screen.getByText("english msg")).toBeTruthy());
+
+    await rerender({ locale: "sv" });
+    await waitFor(() => expect(screen.getByText("swedish msg")).toBeTruthy());
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch.mock.calls[1][0]).toContain("locale=sv");
+  });
 });

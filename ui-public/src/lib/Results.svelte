@@ -1,5 +1,4 @@
 <script>
-  import { onMount } from "svelte";
   import { t } from "../i18n.js";
   import { getResult } from "../api.js";
   import { levelClass, bannerClass, worstLevel } from "../severity.js";
@@ -12,9 +11,11 @@
   let loading = true;
   let errorKey = "";
 
-  onMount(async () => {
+  async function fetchResult(pid, loc) {
+    loading = true;
+    errorKey = "";
     try {
-      const res = await getResult(publicID, locale);
+      const res = await getResult(pid, loc);
       if (!res.ok) {
         errorKey = res.status === 404 ? "pub.expired_heading" : "pub.error_unknown";
         loading = false;
@@ -27,7 +28,9 @@
       errorKey = "pub.error_network";
       loading = false;
     }
-  });
+  }
+
+  $: fetchResult(publicID, locale);
 
   // Group entries by module, preserving insertion order.
   $: modules = entries.reduce((acc, e) => {

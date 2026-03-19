@@ -64,6 +64,10 @@ func NewWithOptions(cfg Config) (*Server, error) {
 			_ = db.Close()
 			return nil, fmt.Errorf("run migrations: %w", err)
 		}
+		if err := backfillPublicIDs(db, dialect); err != nil {
+			_ = db.Close()
+			return nil, fmt.Errorf("backfill public IDs: %w", err)
+		}
 		store = NewSQLJobStore(db, dialect)
 	}
 

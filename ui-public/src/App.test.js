@@ -1,19 +1,40 @@
-import { render, screen, fireEvent, cleanup } from "@testing-library/svelte";
+import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App.svelte";
 
-const mockFetch = (data = [], ok = true) => {
-  global.fetch = vi.fn().mockResolvedValue({
-    ok,
-    json: async () => data,
+/** A fetch mock that dispatches different responses by URL pattern. */
+const fetchRouter = (routes) => {
+  global.fetch = vi.fn().mockImplementation(async (url) => {
+    for (const [pat, resp] of routes) {
+      if (url.includes(pat)) return resp;
+    }
+    return { ok: true, json: async () => [] };
   });
 };
+
+const localesResp = { ok: true, json: async () => ["en"] };
+
+const jobResp = (status, domain = "example.com", progress = 0) => ({
+  ok: true,
+  status: 200,
+  json: async () => ({ public_id: "abc12345", domain, status, progress }),
+});
+
+const resultResp = (entries = []) => ({
+  ok: true,
+  status: 200,
+  json: async () => ({ job_id: "x", status: "succeeded", raw: { locale: "en", entries } }),
+});
 
 describe("App", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     window.location.hash = "";
-    mockFetch(["en"]);
+    // Default: locales ok, jobs return queued (keeps Progress in-flight)
+    fetchRouter([
+      ["/locales", localesResp],
+      ["/jobs/", jobResp("queued", "example.com", 0)],
+    ]);
   });
 
   afterEach(() => {
@@ -29,7 +50,7 @@ describe("App", () => {
     expect(document.querySelector("[data-view='result']")).toBeNull();
   });
 
-  it("shows result view when hash is #/result/:id", async () => {
+  it("shows result view when hash is #/result/:id", () => {
     window.location.hash = "#/result/abc12345";
     render(App);
     expect(document.querySelector("[data-view='result']")).not.toBeNull();
@@ -38,6 +59,10 @@ describe("App", () => {
 
   it("result view carries the publicID as data attribute", () => {
     window.location.hash = "#/result/myid0001";
+    fetchRouter([
+      ["/locales", localesResp],
+      ["/jobs/", jobResp("queued", "example.com", 0)],
+    ]);
     render(App);
     const el = document.querySelector("[data-view='result']");
     expect(el?.dataset.publicId).toBe("myid0001");
@@ -50,7 +75,6 @@ describe("App", () => {
 
     window.location.hash = "#/";
     window.dispatchEvent(new Event("hashchange"));
-    // Allow Svelte to flush
     await new Promise((r) => setTimeout(r, 0));
     expect(document.querySelector("[data-view='home']")).not.toBeNull();
   });
@@ -64,7 +88,7 @@ describe("App", () => {
 
   it("renders the locale selector", () => {
     render(App);
-    expect(screen.getByRole("combobox")).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: /language/i })).toBeTruthy();
   });
 
   it("renders the theme toggle button", () => {
@@ -102,13 +126,51 @@ describe("App", () => {
     expect(document.documentElement.getAttribute("data-theme")).toBeNull();
   });
 
-  // ── Result view "New test" button ──────────────────────────────────────────
+  // ── Component wiring ───────────────────────────────────────────────────────
 
-  it("result view has a 'New test' button that navigates home", async () => {
+  it("home view renders TestForm", () => {
+    render(App);
+    expect(document.querySelector("[data-testid='test-form']")).not.toBeNull();
+  });
+
+  it("result view shows Progress initially", () => {
     window.location.hash = "#/result/abc12345";
     render(App);
-    const btn = screen.getByRole("button", { name: /new test/i });
-    await fireEvent.click(btn);
+    expect(document.querySelector("[data-testid='progress-view']")).not.toBeNull();
+  });
+
+  it("shows Results and New test button after job succeeds", async () => {
+    window.location.hash = "#/result/abc12345";
+    fetchRouter([
+      ["/locales", localesResp],
+      ["jobs/abc12345/result", resultResp()],
+      ["/jobs/", jobResp("succeeded", "example.com", 100)],
+    ]);
+    render(App);
+    await waitFor(() => screen.getByTestId("results-view"));
+    expect(screen.getByTestId("new-test-link")).toBeTruthy();
+  });
+
+  it("shows ExpiredResult when job is expired", async () => {
+    window.location.hash = "#/result/abc12345";
+    fetchRouter([
+      ["/locales", localesResp],
+      ["/jobs/", { ok: false, status: 404, json: async () => ({}) }],
+    ]);
+    render(App);
+    await waitFor(() => screen.getByTestId("expired-view"));
+  });
+
+  it("New test button navigates home after job succeeds", async () => {
+    window.location.hash = "#/result/abc12345";
+    fetchRouter([
+      ["/locales", localesResp],
+      ["jobs/abc12345/result", resultResp()],
+      ["/jobs/", jobResp("succeeded", "example.com", 100)],
+    ]);
+    render(App);
+    await waitFor(() => screen.getByTestId("new-test-link"));
+    await fireEvent.click(screen.getByTestId("new-test-link"));
     await new Promise((r) => setTimeout(r, 0));
     expect(document.querySelector("[data-view='home']")).not.toBeNull();
   });

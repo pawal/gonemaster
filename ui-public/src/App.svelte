@@ -3,12 +3,22 @@
   import { t, locale, loadCatalog } from "./i18n.js";
   import { parseHash, hashFor } from "./router.js";
   import { getLocales } from "./api.js";
+  import TestForm from "./lib/TestForm.svelte";
+  import Progress from "./lib/Progress.svelte";
+  import Results from "./lib/Results.svelte";
+  import ShareButton from "./lib/ShareButton.svelte";
+  import ExpiredResult from "./lib/ExpiredResult.svelte";
 
   // ── Routing ────────────────────────────────────────────────────────────────
   let route = parseHash(window.location.hash);
 
   function onHashChange() {
-    route = parseHash(window.location.hash);
+    const next = parseHash(window.location.hash);
+    if (next.view === "result" && next.publicID !== route.publicID) {
+      resetResultState();
+    }
+    if (next.view === "home") resetResultState();
+    route = next;
   }
 
   // ── Theme ──────────────────────────────────────────────────────────────────
@@ -50,6 +60,28 @@
     await loadCatalog(code);
     locale.set(code);
     resultLocale = code;
+  }
+
+  // ── Result sub-state ────────────────────────────────────────────────────────
+  let jobDone = false;
+  let jobStatus = "";
+  let jobDomain = "";
+
+  function resetResultState() {
+    jobDone = false;
+    jobStatus = "";
+    jobDomain = "";
+  }
+
+  function onJobCreated(e) {
+    resetResultState();
+    goResult(e.detail.publicID);
+  }
+
+  function onJobDone(e) {
+    jobStatus = e.detail.status;
+    jobDomain = e.detail.domain ?? "";
+    jobDone = true;
   }
 
   // ── Navigation helpers ─────────────────────────────────────────────────────
@@ -101,12 +133,30 @@
 
   {#if route.view === "result"}
     <div data-view="result" data-public-id={route.publicID}>
-      <!-- Results view — populated in C.6/C.7/C.8/C.9 -->
-      <button class="ghost" on:click={goHome}>{$t("pub.result_new_test")}</button>
+      {#if !jobDone}
+        <Progress
+          publicID={route.publicID}
+          on:jobdone={onJobDone}
+        />
+      {:else if jobStatus === "succeeded"}
+        <Results
+          publicID={route.publicID}
+          domain={jobDomain}
+          locale={resultLocale}
+        />
+        <div class="row result-actions">
+          <ShareButton publicID={route.publicID} />
+          <button class="ghost" on:click={goHome} data-testid="new-test-link">
+            {$t("pub.result_new_test")}
+          </button>
+        </div>
+      {:else}
+        <ExpiredResult on:newtest={goHome} />
+      {/if}
     </div>
   {:else}
     <div data-view="home">
-      <!-- Home / test form — populated in C.5 -->
+      <TestForm on:jobcreated={onJobCreated} />
     </div>
   {/if}
 </main>

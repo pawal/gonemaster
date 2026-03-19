@@ -115,6 +115,22 @@ describe("Results", () => {
     );
   });
 
+  it("shows formatted finished date when finishedAt prop is set", async () => {
+    global.fetch.mockResolvedValue(resultResp([]));
+    render(Results, { props: { publicID: "abc12345", domain: "example.com", finishedAt: "2024-06-15T14:30:00Z" } });
+    await waitFor(() => {
+      // The formatted date should contain at least the year
+      expect(screen.getByText(/2024/)).toBeTruthy();
+    });
+  });
+
+  it("does not show date when finishedAt is null", async () => {
+    global.fetch.mockResolvedValue(resultResp([]));
+    render(Results, { props: { publicID: "abc12345", domain: "example.com", finishedAt: null } });
+    await waitFor(() => screen.getByTestId("result-banner"));
+    expect(document.querySelector(".result-date")).toBeNull();
+  });
+
   it("shows error on 404", async () => {
     global.fetch.mockResolvedValue(errResp(404));
     render(Results, { props: { publicID: "abc12345" } });

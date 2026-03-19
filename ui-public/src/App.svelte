@@ -69,11 +69,13 @@
   let jobDone = false;
   let jobStatus = "";
   let jobDomain = "";
+  let jobFinishedAt = null;
 
   function resetResultState() {
     jobDone = false;
     jobStatus = "";
     jobDomain = "";
+    jobFinishedAt = null;
   }
 
   function onJobCreated(e) {
@@ -84,6 +86,7 @@
   function onJobDone(e) {
     jobStatus = e.detail.status;
     jobDomain = e.detail.domain ?? "";
+    jobFinishedAt = e.detail.finishedAt ?? null;
     jobDone = true;
   }
 
@@ -149,6 +152,7 @@
           publicID={route.publicID}
           domain={jobDomain}
           locale={resultLocale}
+          finishedAt={jobFinishedAt}
         />
         <div class="row result-actions">
           <ShareButton publicID={route.publicID} />

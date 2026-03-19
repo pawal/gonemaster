@@ -15,6 +15,15 @@
   export let publicID;
   export let domain = "";
   export let locale = "en";
+  export let finishedAt = null;
+
+  $: finishedStr = (() => {
+    if (!finishedAt) return "";
+    const d = new Date(finishedAt);
+    return d.getFullYear() > 2000
+      ? d.toLocaleString([], { dateStyle: "medium", timeStyle: "short" })
+      : "";
+  })();
 
   let entries = [];
   let loading = true;
@@ -63,13 +72,13 @@
   {:else}
     {#if domain}
       <h2 class="result-heading">{$t("pub.result_heading", { domain })}</h2>
+      {#if finishedStr}<p class="result-date small">{finishedStr}</p>{/if}
     {/if}
     <div class="status-banner {bannerCls}" data-testid="result-banner" role="status">
       {$t(statusKey)}
     </div>
     {#each moduleNames as moduleName}
       {@const modEntries = modules[moduleName]}
-      {@const modLevel = worstLevel(modEntries)}
       <details
         class="module-card"
         data-testid="module-group"

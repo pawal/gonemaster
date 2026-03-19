@@ -11,19 +11,24 @@ import (
 // PublicJobView is the restricted job representation returned by the public API.
 // The internal UUID (ID) is intentionally omitted.
 type PublicJobView struct {
-	PublicID string    `json:"public_id"`
-	Domain   string    `json:"domain"`
-	Status   JobStatus `json:"status"`
-	Progress int       `json:"progress"`
+	PublicID   string     `json:"public_id"`
+	Domain     string     `json:"domain"`
+	Status     JobStatus  `json:"status"`
+	Progress   int        `json:"progress"`
+	FinishedAt *time.Time `json:"finished_at,omitempty"`
 }
 
 func publicJobView(job Job) PublicJobView {
-	return PublicJobView{
+	view := PublicJobView{
 		PublicID: job.PublicID,
 		Domain:   job.Domain,
 		Status:   job.Status,
 		Progress: job.Progress,
 	}
+	if !job.FinishedAt.IsZero() {
+		view.FinishedAt = &job.FinishedAt
+	}
+	return view
 }
 
 // handlePublicCreateJob handles POST /pub/api/v1/jobs.

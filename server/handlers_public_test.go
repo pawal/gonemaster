@@ -165,6 +165,115 @@ func TestPublicGetResultUnknownPublicIDReturns404(t *testing.T) {
 	}
 }
 
+func TestPublicLocalesEndpointAccessible(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/locales", nil)
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200 from /pub/api/v1/locales, got %d", resp.Code)
+	}
+}
+
+func TestPublicGetResultNoResultYetReturns404(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	// Create a job but do not store a result for it.
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
+		bytes.NewBufferString(`{"domain":"example.com"}`))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+	var created PublicJobView
+	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	resp = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/pub/api/v1/jobs/"+created.PublicID+"/result", nil)
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 when result not yet available, got %d", resp.Code)
+	}
+}
+
+func TestPublicGetResultRespectsLocaleParam(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	job := Job{
+		ID:        newID("job"),
+		Domain:    "example.com",
+		Status:    JobSucceeded,
+		CreatedAt: time.Now().UTC(),
+		Progress:  100,
+	}
+	created, _ := srv.store.Create(job)
+	_ = srv.store.SetResult(created.ID, JobResult{
+		JobID:  created.ID,
+		Status: JobSucceeded,
+		Raw: &JobResultRaw{
+			Entries: []JobResultEntry{
+				{Module: "BASIC", Testcase: "basic01", Tag: "BASIC01", Level: "NOTICE"},
+			},
+		},
+	})
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/jobs/"+created.PublicID+"/result?locale=sv", nil)
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var result JobResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if result.Raw == nil || result.Raw.Locale != "sv" {
+		t.Fatalf("expected locale=sv in result, got %v", result.Raw)
+	}
+}
+
+func TestPublicAPIJobCreatedViaInternalAPIFetchableByPublicID(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	// Create via internal API.
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs",
+		bytes.NewBufferString(`{"domain":"example.com"}`))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("internal create: expected 201, got %d", resp.Code)
+	}
+	var internalJob Job
+	if err := json.NewDecoder(resp.Body).Decode(&internalJob); err != nil {
+		t.Fatalf("decode internal job: %v", err)
+	}
+	if internalJob.PublicID == "" {
+		t.Fatal("internal API response must include public_id")
+	}
+
+	// Fetch via public API using the public_id from the internal response.
+	resp = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/pub/api/v1/jobs/"+internalJob.PublicID, nil)
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("public get: expected 200, got %d", resp.Code)
+	}
+	var view PublicJobView
+	if err := json.NewDecoder(resp.Body).Decode(&view); err != nil {
+		t.Fatalf("decode public view: %v", err)
+	}
+	if view.PublicID != internalJob.PublicID {
+		t.Fatalf("public_id mismatch: got %q, want %q", view.PublicID, internalJob.PublicID)
+	}
+}
+
 func TestPublicAPIEndpointsUnreachableViaInternalPrefix(t *testing.T) {
 	srv := New(DefaultConfig())
 

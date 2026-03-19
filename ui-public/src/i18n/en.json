@@ -1,0 +1,72 @@
+{
+  "pub.app_title": "Gonemaster",
+  "pub.app_subtitle": "Test the DNS configuration of a domain.",
+
+  "pub.locale_select_title": "Result message language",
+  "pub.locale_select_aria": "Result language",
+
+  "pub.theme_cycle_title": "Color theme: {theme} — click to cycle",
+  "pub.theme_system": "System",
+  "pub.theme_light": "Light",
+  "pub.theme_dark": "Dark",
+
+  "pub.domain_label": "Domain",
+  "pub.domain_placeholder": "example.com",
+  "pub.test_button": "Test",
+  "pub.testing_button": "Testing…",
+
+  "pub.options_summary": "Options",
+  "pub.ip_transport_label": "IP transport",
+  "pub.ip_mode_default": "Profile default (IPv4 + IPv6)",
+  "pub.ip_mode_disable_ipv4": "Disable IPv4 (IPv6 only)",
+  "pub.ip_mode_disable_ipv6": "Disable IPv6 (IPv4 only)",
+
+  "pub.ns_summary": "Undelegated / Pre-delegation",
+  "pub.ns_field_label": "Nameservers (NS + optional IP)",
+  "pub.ns_placeholder_ns": "ns1.example.com",
+  "pub.ns_placeholder_ip": "192.0.2.1",
+  "pub.ns_add": "Add nameserver",
+  "pub.ns_remove": "Remove",
+
+  "pub.ds_summary": "DS records",
+  "pub.ds_field_label": "DS records",
+  "pub.ds_placeholder_keytag": "Keytag",
+  "pub.ds_placeholder_algo": "Algo",
+  "pub.ds_placeholder_digtype": "Digest type",
+  "pub.ds_placeholder_digest": "Digest (hex)",
+  "pub.ds_add": "Add DS record",
+  "pub.ds_remove": "Remove",
+
+  "pub.status_queued": "Queued",
+  "pub.status_running": "Running",
+  "pub.status_succeeded": "Completed",
+  "pub.status_failed": "Failed",
+  "pub.status_canceled": "Canceled",
+  "pub.status_expired": "Expired",
+
+  "pub.progress_testing": "Testing {domain}…",
+  "pub.progress_queued": "Waiting in queue…",
+
+  "pub.result_heading": "Results for {domain}",
+  "pub.result_share": "Share",
+  "pub.result_share_copied": "Copied!",
+  "pub.result_new_test": "New test",
+  "pub.result_locale_label": "Message language",
+
+  "pub.result_status_ok": "No issues found",
+  "pub.result_status_notice": "Notices",
+  "pub.result_status_warning": "Warnings found",
+  "pub.result_status_error": "Errors found",
+  "pub.result_status_critical": "Critical issues found",
+
+  "pub.expired_heading": "Result no longer available",
+  "pub.expired_body": "This result has expired or does not exist.",
+  "pub.expired_new_test": "Run new test",
+
+  "pub.error_domain_required": "Please enter a domain name.",
+  "pub.error_domain_invalid": "Invalid domain name.",
+  "pub.error_rate_limited": "Too many requests — please wait {seconds} seconds.",
+  "pub.error_job_failed": "The test run failed. Please try again.",
+  "pub.error_network": "Network error — could not reach the server.",
+  "pub.error_unknown": "An unexpected error occurred."
+}

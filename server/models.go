@@ -1,10 +1,29 @@
 package server
 
 import (
+	"crypto/rand"
+	"math/big"
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
 )
+
+const publicIDAlphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+const publicIDLen = 8
+
+// GeneratePublicID returns an 8-character base62 string using crypto/rand.
+func GeneratePublicID() string {
+	b := make([]byte, publicIDLen)
+	alphabetLen := big.NewInt(int64(len(publicIDAlphabet)))
+	for i := range b {
+		n, err := rand.Int(rand.Reader, alphabetLen)
+		if err != nil {
+			panic("crypto/rand unavailable: " + err.Error())
+		}
+		b[i] = publicIDAlphabet[n.Int64()]
+	}
+	return string(b)
+}
 
 // JobStatus describes the current state of a job.
 type JobStatus string

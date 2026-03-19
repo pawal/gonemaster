@@ -2,8 +2,38 @@ package server
 
 import (
 	"encoding/json"
+	"regexp"
 	"testing"
 )
+
+var base62RE = regexp.MustCompile(`^[a-zA-Z0-9]{8}$`)
+
+func TestGeneratePublicIDLength(t *testing.T) {
+	id := GeneratePublicID()
+	if len(id) != 8 {
+		t.Fatalf("got length %d, want 8", len(id))
+	}
+}
+
+func TestGeneratePublicIDBase62Chars(t *testing.T) {
+	for range 100 {
+		id := GeneratePublicID()
+		if !base62RE.MatchString(id) {
+			t.Fatalf("id %q contains non-base62 characters", id)
+		}
+	}
+}
+
+func TestGeneratePublicIDUnique(t *testing.T) {
+	seen := make(map[string]struct{}, 1000)
+	for range 1000 {
+		id := GeneratePublicID()
+		if _, dup := seen[id]; dup {
+			t.Fatalf("duplicate public ID generated: %q", id)
+		}
+		seen[id] = struct{}{}
+	}
+}
 
 func TestJobPublicIDFieldPresent(t *testing.T) {
 	j := Job{ID: "abc", PublicID: "x1y2z3w4", Domain: "example.com", Status: JobQueued}

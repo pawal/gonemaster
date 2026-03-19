@@ -1,0 +1,72 @@
+{
+  "pub.app_title": "Gonemaster",
+  "pub.app_subtitle": "Test DNS-konfigurationen for et domæne.",
+
+  "pub.locale_select_title": "Sprog til resultatmeddelelser",
+  "pub.locale_select_aria": "Resultatsprog",
+
+  "pub.theme_cycle_title": "Farvetema: {theme} — klik for at skifte",
+  "pub.theme_system": "System",
+  "pub.theme_light": "Lyst",
+  "pub.theme_dark": "Mørkt",
+
+  "pub.domain_label": "Domæne",
+  "pub.domain_placeholder": "example.com",
+  "pub.test_button": "Test",
+  "pub.testing_button": "Tester…",
+
+  "pub.options_summary": "Indstillinger",
+  "pub.ip_transport_label": "IP-transport",
+  "pub.ip_mode_default": "Profilstandard (IPv4 + IPv6)",
+  "pub.ip_mode_disable_ipv4": "Deaktiver IPv4 (kun IPv6)",
+  "pub.ip_mode_disable_ipv6": "Deaktiver IPv6 (kun IPv4)",
+
+  "pub.ns_summary": "Udelegeret / Foruddelegering",
+  "pub.ns_field_label": "Navneservere (NS + valgfri IP)",
+  "pub.ns_placeholder_ns": "ns1.example.com",
+  "pub.ns_placeholder_ip": "192.0.2.1",
+  "pub.ns_add": "Tilføj navneserver",
+  "pub.ns_remove": "Fjern",
+
+  "pub.ds_summary": "DS-poster",
+  "pub.ds_field_label": "DS-poster",
+  "pub.ds_placeholder_keytag": "Nøgletag",
+  "pub.ds_placeholder_algo": "Algoritme",
+  "pub.ds_placeholder_digtype": "Sammendragstype",
+  "pub.ds_placeholder_digest": "Sammendrag (hex)",
+  "pub.ds_add": "Tilføj DS-post",
+  "pub.ds_remove": "Fjern",
+
+  "pub.status_queued": "I kø",
+  "pub.status_running": "Kører",
+  "pub.status_succeeded": "Fuldført",
+  "pub.status_failed": "Mislykkedes",
+  "pub.status_canceled": "Annulleret",
+  "pub.status_expired": "Udløbet",
+
+  "pub.progress_testing": "Tester {domain}…",
+  "pub.progress_queued": "Venter i kø…",
+
+  "pub.result_heading": "Resultater for {domain}",
+  "pub.result_share": "Del",
+  "pub.result_share_copied": "Kopieret!",
+  "pub.result_new_test": "Ny test",
+  "pub.result_locale_label": "Meddelelsessprog",
+
+  "pub.result_status_ok": "Ingen problemer fundet",
+  "pub.result_status_notice": "Bemærkninger",
+  "pub.result_status_warning": "Advarsler fundet",
+  "pub.result_status_error": "Fejl fundet",
+  "pub.result_status_critical": "Kritiske problemer fundet",
+
+  "pub.expired_heading": "Resultat ikke længere tilgængeligt",
+  "pub.expired_body": "Dette resultat er udløbet eller findes ikke.",
+  "pub.expired_new_test": "Kør ny test",
+
+  "pub.error_domain_required": "Angiv venligst et domænenavn.",
+  "pub.error_domain_invalid": "Ugyldigt domænenavn.",
+  "pub.error_rate_limited": "For mange forespørgsler — vent venligst {seconds} sekunder.",
+  "pub.error_job_failed": "Testen mislykkedes. Prøv venligst igen.",
+  "pub.error_network": "Netværksfejl — kunne ikke nå serveren.",
+  "pub.error_unknown": "Der opstod en uventet fejl."
+}

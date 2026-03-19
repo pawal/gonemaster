@@ -1,0 +1,72 @@
+{
+  "pub.app_title": "Gonemaster",
+  "pub.app_subtitle": "Tester la configuration DNS d'un domaine.",
+
+  "pub.locale_select_title": "Langue des messages de résultats",
+  "pub.locale_select_aria": "Langue des résultats",
+
+  "pub.theme_cycle_title": "Thème de couleur : {theme} — cliquer pour changer",
+  "pub.theme_system": "Système",
+  "pub.theme_light": "Clair",
+  "pub.theme_dark": "Sombre",
+
+  "pub.domain_label": "Domaine",
+  "pub.domain_placeholder": "example.com",
+  "pub.test_button": "Tester",
+  "pub.testing_button": "Test en cours…",
+
+  "pub.options_summary": "Options",
+  "pub.ip_transport_label": "Transport IP",
+  "pub.ip_mode_default": "Défaut du profil (IPv4 + IPv6)",
+  "pub.ip_mode_disable_ipv4": "Désactiver IPv4 (IPv6 uniquement)",
+  "pub.ip_mode_disable_ipv6": "Désactiver IPv6 (IPv4 uniquement)",
+
+  "pub.ns_summary": "Non délégué / Pré-délégation",
+  "pub.ns_field_label": "Serveurs de noms (NS + IP optionnelle)",
+  "pub.ns_placeholder_ns": "ns1.example.com",
+  "pub.ns_placeholder_ip": "192.0.2.1",
+  "pub.ns_add": "Ajouter un serveur de noms",
+  "pub.ns_remove": "Supprimer",
+
+  "pub.ds_summary": "Enregistrements DS",
+  "pub.ds_field_label": "Enregistrements DS",
+  "pub.ds_placeholder_keytag": "Étiquette de clé",
+  "pub.ds_placeholder_algo": "Algo",
+  "pub.ds_placeholder_digtype": "Type de condensé",
+  "pub.ds_placeholder_digest": "Condensé (hex)",
+  "pub.ds_add": "Ajouter un enregistrement DS",
+  "pub.ds_remove": "Supprimer",
+
+  "pub.status_queued": "En attente",
+  "pub.status_running": "En cours",
+  "pub.status_succeeded": "Terminé",
+  "pub.status_failed": "Échoué",
+  "pub.status_canceled": "Annulé",
+  "pub.status_expired": "Expiré",
+
+  "pub.progress_testing": "Test de {domain}…",
+  "pub.progress_queued": "En attente dans la file…",
+
+  "pub.result_heading": "Résultats pour {domain}",
+  "pub.result_share": "Partager",
+  "pub.result_share_copied": "Copié !",
+  "pub.result_new_test": "Nouveau test",
+  "pub.result_locale_label": "Langue des messages",
+
+  "pub.result_status_ok": "Aucun problème détecté",
+  "pub.result_status_notice": "Notices",
+  "pub.result_status_warning": "Avertissements détectés",
+  "pub.result_status_error": "Erreurs détectées",
+  "pub.result_status_critical": "Problèmes critiques détectés",
+
+  "pub.expired_heading": "Résultat non disponible",
+  "pub.expired_body": "Ce résultat a expiré ou n'existe pas.",
+  "pub.expired_new_test": "Lancer un nouveau test",
+
+  "pub.error_domain_required": "Veuillez saisir un nom de domaine.",
+  "pub.error_domain_invalid": "Nom de domaine invalide.",
+  "pub.error_rate_limited": "Trop de requêtes — veuillez patienter {seconds} secondes.",
+  "pub.error_job_failed": "Le test a échoué. Veuillez réessayer.",
+  "pub.error_network": "Erreur réseau — impossible de joindre le serveur.",
+  "pub.error_unknown": "Une erreur inattendue s'est produite."
+}

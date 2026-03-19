@@ -1,0 +1,72 @@
+{
+  "pub.app_title": "Gonemaster",
+  "pub.app_subtitle": "Testaa verkkotunnuksen DNS-asetukset.",
+
+  "pub.locale_select_title": "Tulosviestien kieli",
+  "pub.locale_select_aria": "Tuloskieli",
+
+  "pub.theme_cycle_title": "Väriasetus: {theme} — napsauta vaihtaaksesi",
+  "pub.theme_system": "Järjestelmä",
+  "pub.theme_light": "Vaalea",
+  "pub.theme_dark": "Tumma",
+
+  "pub.domain_label": "Verkkotunnus",
+  "pub.domain_placeholder": "example.com",
+  "pub.test_button": "Testaa",
+  "pub.testing_button": "Testataan…",
+
+  "pub.options_summary": "Asetukset",
+  "pub.ip_transport_label": "IP-liikenne",
+  "pub.ip_mode_default": "Profiilin oletus (IPv4 + IPv6)",
+  "pub.ip_mode_disable_ipv4": "Poista IPv4 käytöstä (vain IPv6)",
+  "pub.ip_mode_disable_ipv6": "Poista IPv6 käytöstä (vain IPv4)",
+
+  "pub.ns_summary": "Delegoimaton / Esidelegointi",
+  "pub.ns_field_label": "Nimipalvelimet (NS + valinnainen IP)",
+  "pub.ns_placeholder_ns": "ns1.example.com",
+  "pub.ns_placeholder_ip": "192.0.2.1",
+  "pub.ns_add": "Lisää nimipalvelin",
+  "pub.ns_remove": "Poista",
+
+  "pub.ds_summary": "DS-tietueet",
+  "pub.ds_field_label": "DS-tietueet",
+  "pub.ds_placeholder_keytag": "Avaintunniste",
+  "pub.ds_placeholder_algo": "Algoritmi",
+  "pub.ds_placeholder_digtype": "Tiivistetyyppi",
+  "pub.ds_placeholder_digest": "Tiiviste (hex)",
+  "pub.ds_add": "Lisää DS-tietue",
+  "pub.ds_remove": "Poista",
+
+  "pub.status_queued": "Jonossa",
+  "pub.status_running": "Käynnissä",
+  "pub.status_succeeded": "Valmis",
+  "pub.status_failed": "Epäonnistui",
+  "pub.status_canceled": "Peruutettu",
+  "pub.status_expired": "Vanhentunut",
+
+  "pub.progress_testing": "Testataan {domain}…",
+  "pub.progress_queued": "Odotetaan jonossa…",
+
+  "pub.result_heading": "Tulokset verkkotunnukselle {domain}",
+  "pub.result_share": "Jaa",
+  "pub.result_share_copied": "Kopioitu!",
+  "pub.result_new_test": "Uusi testi",
+  "pub.result_locale_label": "Viestikieli",
+
+  "pub.result_status_ok": "Ei ongelmia löydetty",
+  "pub.result_status_notice": "Huomiot",
+  "pub.result_status_warning": "Varoituksia löydetty",
+  "pub.result_status_error": "Virheitä löydetty",
+  "pub.result_status_critical": "Kriittisiä ongelmia löydetty",
+
+  "pub.expired_heading": "Tulos ei ole enää saatavilla",
+  "pub.expired_body": "Tämä tulos on vanhentunut tai sitä ei ole olemassa.",
+  "pub.expired_new_test": "Suorita uusi testi",
+
+  "pub.error_domain_required": "Anna verkkotunnus.",
+  "pub.error_domain_invalid": "Virheellinen verkkotunnus.",
+  "pub.error_rate_limited": "Liian monta pyyntöä — odota {seconds} sekuntia.",
+  "pub.error_job_failed": "Testiajo epäonnistui. Yritä uudelleen.",
+  "pub.error_network": "Verkkovirhe — palvelimeen ei saatu yhteyttä.",
+  "pub.error_unknown": "Odottamaton virhe tapahtui."
+}

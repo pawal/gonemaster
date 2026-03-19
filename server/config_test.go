@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"testing"
+	"time"
 )
 
 func TestDefaultConfigListenAddr(t *testing.T) {
@@ -212,6 +213,136 @@ func TestDatabaseFileConfigRetentionDaysJSON(t *testing.T) {
 	}
 	if d.RetentionDays == nil || *d.RetentionDays != 90 {
 		t.Fatalf("expected retention_days 90, got %v", d.RetentionDays)
+	}
+}
+
+func TestDefaultConfigPublicAPIDefaults(t *testing.T) {
+	cfg := DefaultConfig()
+	if cfg.PublicAPI.RateLimitEnabled {
+		t.Fatal("expected rate limiting disabled by default")
+	}
+	if cfg.PublicAPI.RateLimitMax != 10 {
+		t.Fatalf("expected default rate_limit_max 10, got %d", cfg.PublicAPI.RateLimitMax)
+	}
+	if cfg.PublicAPI.RateLimitWindow.Duration != 10*time.Minute {
+		t.Fatalf("expected default rate_limit_window 10m, got %v", cfg.PublicAPI.RateLimitWindow)
+	}
+}
+
+func TestApplyFileConfigPublicAPIRateLimitEnabled(t *testing.T) {
+	cfg := DefaultConfig()
+	enabled := true
+	cfg.ApplyFileConfig(FileConfig{
+		PublicAPI: &PublicAPIFileConfig{RateLimitEnabled: &enabled},
+	})
+	if !cfg.PublicAPI.RateLimitEnabled {
+		t.Fatal("expected rate limiting enabled after apply")
+	}
+}
+
+func TestApplyFileConfigPublicAPIRateLimitMax(t *testing.T) {
+	cfg := DefaultConfig()
+	max := 50
+	cfg.ApplyFileConfig(FileConfig{
+		PublicAPI: &PublicAPIFileConfig{RateLimitMax: &max},
+	})
+	if cfg.PublicAPI.RateLimitMax != 50 {
+		t.Fatalf("expected rate_limit_max 50, got %d", cfg.PublicAPI.RateLimitMax)
+	}
+}
+
+func TestApplyFileConfigPublicAPIRateLimitWindow(t *testing.T) {
+	cfg := DefaultConfig()
+	window := "1m"
+	cfg.ApplyFileConfig(FileConfig{
+		PublicAPI: &PublicAPIFileConfig{RateLimitWindow: &window},
+	})
+	if cfg.PublicAPI.RateLimitWindow.Duration != time.Minute {
+		t.Fatalf("expected rate_limit_window 1m, got %v", cfg.PublicAPI.RateLimitWindow)
+	}
+}
+
+func TestApplyFileConfigPublicAPINilIsNoop(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.ApplyFileConfig(FileConfig{PublicAPI: nil})
+	if cfg.PublicAPI.RateLimitMax != 10 {
+		t.Fatalf("expected rate_limit_max unchanged at 10, got %d", cfg.PublicAPI.RateLimitMax)
+	}
+}
+
+func TestDurationMarshalJSON(t *testing.T) {
+	d := Duration{5 * time.Minute}
+	b, err := json.Marshal(d)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if string(b) != `"5m0s"` {
+		t.Fatalf("expected \"5m0s\", got %s", b)
+	}
+}
+
+func TestDurationUnmarshalJSON(t *testing.T) {
+	var d Duration
+	if err := json.Unmarshal([]byte(`"10m"`), &d); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if d.Duration != 10*time.Minute {
+		t.Fatalf("expected 10m, got %v", d.Duration)
+	}
+}
+
+func TestDurationUnmarshalJSONInvalid(t *testing.T) {
+	var d Duration
+	if err := json.Unmarshal([]byte(`"notaduration"`), &d); err == nil {
+		t.Fatal("expected error for invalid duration")
+	}
+}
+
+func TestLoadFileConfigPublicAPI(t *testing.T) {
+	raw := `{
+		"public_api": {
+			"rate_limit_enabled": true,
+			"rate_limit_max": 20,
+			"rate_limit_window": "2m"
+		}
+	}`
+	f, err := os.CreateTemp("", "gm-config-*.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	if _, err := f.WriteString(raw); err != nil {
+		t.Fatal(err)
+	}
+	_ = f.Close()
+
+	fileCfg, err := LoadFileConfig(f.Name())
+	if err != nil {
+		t.Fatalf("LoadFileConfig: %v", err)
+	}
+	if fileCfg.PublicAPI == nil {
+		t.Fatal("expected public_api section, got nil")
+	}
+	if fileCfg.PublicAPI.RateLimitEnabled == nil || !*fileCfg.PublicAPI.RateLimitEnabled {
+		t.Fatal("expected rate_limit_enabled true")
+	}
+	if fileCfg.PublicAPI.RateLimitMax == nil || *fileCfg.PublicAPI.RateLimitMax != 20 {
+		t.Fatalf("expected rate_limit_max 20, got %v", fileCfg.PublicAPI.RateLimitMax)
+	}
+	if fileCfg.PublicAPI.RateLimitWindow == nil || *fileCfg.PublicAPI.RateLimitWindow != "2m" {
+		t.Fatalf("expected rate_limit_window 2m, got %v", fileCfg.PublicAPI.RateLimitWindow)
+	}
+
+	cfg := DefaultConfig()
+	cfg.ApplyFileConfig(fileCfg)
+	if !cfg.PublicAPI.RateLimitEnabled {
+		t.Fatal("expected rate limiting enabled after apply")
+	}
+	if cfg.PublicAPI.RateLimitMax != 20 {
+		t.Fatalf("expected rate_limit_max 20 after apply, got %d", cfg.PublicAPI.RateLimitMax)
+	}
+	if cfg.PublicAPI.RateLimitWindow.Duration != 2*time.Minute {
+		t.Fatalf("expected rate_limit_window 2m after apply, got %v", cfg.PublicAPI.RateLimitWindow)
 	}
 }
 

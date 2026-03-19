@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 )
 
 // DatabaseConfig controls the persistence backend.
@@ -17,6 +18,40 @@ type DatabaseConfig struct {
 	// RetentionDays is the number of days to keep completed jobs. Zero means
 	// keep forever (disabled).
 	RetentionDays int `json:"retention_days,omitempty"`
+}
+
+// PublicAPIConfig controls the behaviour of the public-facing API at /pub/api/v1/.
+type PublicAPIConfig struct {
+	// RateLimitEnabled enables per-IP rate limiting on POST /pub/api/v1/jobs.
+	RateLimitEnabled bool `json:"rate_limit_enabled"`
+	// RateLimitMax is the maximum number of job submissions per window per IP.
+	// Default: 10.
+	RateLimitMax int `json:"rate_limit_max,omitempty"`
+	// RateLimitWindow is the sliding window duration for rate limiting.
+	// Default: 5m.
+	RateLimitWindow Duration `json:"rate_limit_window,omitempty"`
+}
+
+// Duration is a time.Duration that marshals/unmarshals as a string (e.g. "5m").
+type Duration struct {
+	time.Duration
+}
+
+func (d Duration) MarshalJSON() ([]byte, error) {
+	return json.Marshal(d.Duration.String())
+}
+
+func (d *Duration) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	v, err := time.ParseDuration(s)
+	if err != nil {
+		return err
+	}
+	d.Duration = v
+	return nil
 }
 
 // Config controls HTTP server behavior.
@@ -45,7 +80,15 @@ type Config struct {
 	SourceAddr6 *string `json:"source_addr6,omitempty"`
 	MinLevel    string  `json:"min_level"`
 	ProfilePath string  `json:"profile_path,omitempty"`
-	Database    DatabaseConfig `json:"database,omitempty"`
+	Database    DatabaseConfig   `json:"database,omitempty"`
+	PublicAPI   PublicAPIConfig  `json:"public_api,omitempty"`
+}
+
+// PublicAPIFileConfig holds optional public API configuration from JSON.
+type PublicAPIFileConfig struct {
+	RateLimitEnabled *bool   `json:"rate_limit_enabled,omitempty"`
+	RateLimitMax     *int    `json:"rate_limit_max,omitempty"`
+	RateLimitWindow  *string `json:"rate_limit_window,omitempty"`
 }
 
 // DatabaseFileConfig holds optional database configuration from JSON.
@@ -73,7 +116,8 @@ type FileConfig struct {
 	SourceAddr6       *string             `json:"source_addr6"`
 	MinLevel          *string             `json:"min_level"`
 	ProfilePath       *string             `json:"profile_path"`
-	Database          *DatabaseFileConfig `json:"database,omitempty"`
+	Database          *DatabaseFileConfig  `json:"database,omitempty"`
+	PublicAPI         *PublicAPIFileConfig `json:"public_api,omitempty"`
 }
 
 // DefaultConfig returns baseline config values.
@@ -85,6 +129,11 @@ func DefaultConfig() Config {
 		WorkerCount:       4,
 		MaxConcurrentJobs: 0,
 		MinLevel:          "INFO",
+		PublicAPI: PublicAPIConfig{
+			RateLimitEnabled: false,
+			RateLimitMax:     10,
+			RateLimitWindow:  Duration{10 * time.Minute},
+		},
 	}
 }
 
@@ -157,6 +206,20 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 		}
 		if file.Database.RetentionDays != nil {
 			c.Database.RetentionDays = *file.Database.RetentionDays
+		}
+	}
+	if file.PublicAPI != nil {
+		if file.PublicAPI.RateLimitEnabled != nil {
+			c.PublicAPI.RateLimitEnabled = *file.PublicAPI.RateLimitEnabled
+		}
+		if file.PublicAPI.RateLimitMax != nil {
+			c.PublicAPI.RateLimitMax = *file.PublicAPI.RateLimitMax
+		}
+		if file.PublicAPI.RateLimitWindow != nil {
+			d, err := time.ParseDuration(*file.PublicAPI.RateLimitWindow)
+			if err == nil {
+				c.PublicAPI.RateLimitWindow = Duration{d}
+			}
 		}
 	}
 }

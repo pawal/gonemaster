@@ -33,7 +33,7 @@
       progress = job.progress;
       if (TERMINAL.has(status)) {
         clearInterval(timer);
-        dispatch("jobdone", { publicID, status });
+        dispatch("jobdone", { publicID, status, domain });
       }
     } catch (_) {
       clearInterval(timer);

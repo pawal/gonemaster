@@ -52,7 +52,7 @@ describe("Progress", () => {
       events: { jobdone: (e) => events.push(e.detail) },
     });
     await waitFor(() => expect(events.length).toBe(1));
-    expect(events[0]).toEqual({ publicID: "abc12345", status: "succeeded" });
+    expect(events[0]).toEqual({ publicID: "abc12345", status: "succeeded", domain: "example.com" });
   });
 
   it("dispatches jobdone with status=failed", async () => {

@@ -131,5 +131,13 @@ func (s *Server) routes() {
 	s.mux.Handle("/api/v1", s.apiMetricsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/api/v1/", http.StatusMovedPermanently)
 	})))
+
+	pubMux := http.NewServeMux()
+	pubMux.HandleFunc("POST /jobs", s.handlePublicCreateJob)
+	pubMux.HandleFunc("GET /jobs/{publicID}/result", s.handlePublicGetResult)
+	pubMux.HandleFunc("GET /jobs/{publicID}", s.handlePublicGetJob)
+	pubMux.HandleFunc("GET /locales", s.handleLocales)
+	s.mux.Handle("/pub/api/v1/", http.StripPrefix("/pub/api/v1", pubMux))
+
 	s.mux.Handle("/", serverui.Handler())
 }

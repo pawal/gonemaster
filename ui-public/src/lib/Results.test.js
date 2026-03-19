@@ -1,4 +1,4 @@
-import { render, screen, waitFor, cleanup } from "@testing-library/svelte";
+import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Results from "./Results.svelte";
 
@@ -123,6 +123,28 @@ describe("Results", () => {
     global.fetch.mockRejectedValue(new Error("network down"));
     render(Results, { props: { publicID: "abc12345" } });
     await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
+  });
+
+  it("keeps module open after locale re-fetch", async () => {
+    const mkResp = (msg) => ({
+      ok: true, status: 200,
+      json: async () => ({ job_id: "x", status: "succeeded", raw: { locale: "en", entries: [entry("Module::Alpha", "INFO", msg)] } }),
+    });
+    global.fetch.mockResolvedValueOnce(mkResp("first")).mockResolvedValueOnce(mkResp("second"));
+    const { rerender } = render(Results, { props: { publicID: "abc12345", locale: "en" } });
+    await waitFor(() => screen.getByTestId("module-group"));
+
+    // Open the module group by setting its open property and firing toggle
+    const details = screen.getByTestId("module-group");
+    details.open = true;
+    await fireEvent(details, new Event("toggle"));
+
+    // Change locale — results re-fetch
+    await rerender({ locale: "sv" });
+    await waitFor(() => screen.getByText("second"));
+
+    // Module group should still be open
+    expect(screen.getByTestId("module-group").open).toBe(true);
   });
 
   it("re-fetches with new locale when locale prop changes", async () => {

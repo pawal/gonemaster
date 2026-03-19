@@ -10,6 +10,7 @@
   let entries = [];
   let loading = true;
   let errorKey = "";
+  let openModules = new Set();
 
   async function fetchResult(pid, loc) {
     loading = true;
@@ -60,7 +61,12 @@
     {#each moduleNames as moduleName}
       {@const modEntries = modules[moduleName]}
       {@const modLevel = worstLevel(modEntries)}
-      <details class="module-card" data-testid="module-group">
+      <details
+        class="module-card"
+        data-testid="module-group"
+        open={openModules.has(moduleName)}
+        on:toggle={(e) => { if (e.target.open) openModules.add(moduleName); else openModules.delete(moduleName); openModules = openModules; }}
+      >
         <summary class="module-summary">
           <span class="module-name">{moduleName}</span>
           <span class="level-pill {levelClass(modLevel)}" data-testid="module-badge">{modLevel}</span>

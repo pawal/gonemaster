@@ -29,6 +29,7 @@ type Server struct {
 	engineLimiter            *engineLimiter
 	cancelMu                 sync.Mutex
 	cancels                  map[string]context.CancelFunc
+	rateLimiter              *RateLimiter
 }
 
 // New builds a server with in-memory components.
@@ -98,6 +99,9 @@ func newServer(cfg Config, store JobStore, queue Queue) *Server {
 		engineLimiter:            newEngineLimiter(cfg.MaxConcurrentJobs),
 		cancels:                  map[string]context.CancelFunc{},
 	}
+	if cfg.PublicAPI.RateLimitEnabled {
+		s.rateLimiter = NewRateLimiter(cfg.PublicAPI.RateLimitMax, cfg.PublicAPI.RateLimitWindow.Duration)
+	}
 	s.routes()
 	return s
 }
@@ -137,7 +141,11 @@ func (s *Server) routes() {
 	pubMux.HandleFunc("GET /jobs/{publicID}/result", s.handlePublicGetResult)
 	pubMux.HandleFunc("GET /jobs/{publicID}", s.handlePublicGetJob)
 	pubMux.HandleFunc("GET /locales", s.handleLocales)
-	s.mux.Handle("/pub/api/v1/", http.StripPrefix("/pub/api/v1", pubMux))
+	var pubHandler http.Handler = http.StripPrefix("/pub/api/v1", pubMux)
+	if s.rateLimiter != nil {
+		pubHandler = rateLimitMiddleware(s.rateLimiter, pubHandler)
+	}
+	s.mux.Handle("/pub/api/v1/", pubHandler)
 
 	s.mux.Handle("/", serverui.Handler())
 }

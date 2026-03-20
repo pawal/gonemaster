@@ -15,10 +15,10 @@ const fetchRouter = (routes) => {
 const localesResp = { ok: true, json: async () => ({ locales: ["en"] }) };
 const multiLocalesResp = { ok: true, json: async () => ({ locales: ["en", "sv", "da"] }) };
 
-const jobResp = (status, domain = "example.com", progress = 0) => ({
+const jobResp = (status, domain = "example.com", progress = 0, finished_at = null) => ({
   ok: true,
   status: 200,
-  json: async () => ({ public_id: "abc12345", domain, status, progress }),
+  json: async () => ({ public_id: "abc12345", domain, status, progress, finished_at }),
 });
 
 const resultResp = (entries = []) => ({
@@ -31,7 +31,6 @@ describe("App", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     window.location.hash = "";
-    // Default: locales ok, jobs return queued (keeps Progress in-flight)
     fetchRouter([
       ["/locales", localesResp],
       ["/jobs/", jobResp("queued", "example.com", 0)],
@@ -43,44 +42,117 @@ describe("App", () => {
     document.documentElement.removeAttribute("data-theme");
   });
 
-  // ── Routing ────────────────────────────────────────────────────────────────
+  // ── Layout ──────────────────────────────────────────────────────────────────
 
-  it("shows home view by default", () => {
+  it("always renders the test form", () => {
     render(App);
-    expect(document.querySelector("[data-view='home']")).not.toBeNull();
-    expect(document.querySelector("[data-view='result']")).toBeNull();
+    expect(screen.getByTestId("test-form")).toBeTruthy();
   });
 
-  it("shows result view when hash is #/result/:id", () => {
+  it("shows no Progress or Results on initial load", () => {
+    render(App);
+    expect(document.querySelector("[data-testid='progress-view']")).toBeNull();
+    expect(document.querySelector("[data-testid='results-view']")).toBeNull();
+  });
+
+  // ── Shared-link init ────────────────────────────────────────────────────────
+
+  it("shows Progress when hash is a running job on load", async () => {
     window.location.hash = "#/result/abc12345";
-    render(App);
-    expect(document.querySelector("[data-view='result']")).not.toBeNull();
-    expect(document.querySelector("[data-view='home']")).toBeNull();
-  });
-
-  it("result view carries the publicID as data attribute", () => {
-    window.location.hash = "#/result/myid0001";
     fetchRouter([
       ["/locales", localesResp],
-      ["/jobs/", jobResp("queued", "example.com", 0)],
+      ["/jobs/abc12345", jobResp("running", "example.com", 30)],
     ]);
     render(App);
-    const el = document.querySelector("[data-view='result']");
-    expect(el?.dataset.publicId).toBe("myid0001");
+    await waitFor(() =>
+      expect(document.querySelector("[data-testid='progress-view']")).not.toBeNull()
+    );
   });
 
-  it("switches to home view when hashchange fires with #/", async () => {
+  it("shows Results when hash is a succeeded job on load", async () => {
     window.location.hash = "#/result/abc12345";
+    fetchRouter([
+      ["/locales", localesResp],
+      ["jobs/abc12345/result", resultResp()],
+      ["/jobs/", jobResp("succeeded", "example.com", 100)],
+    ]);
     render(App);
-    expect(document.querySelector("[data-view='result']")).not.toBeNull();
-
-    window.location.hash = "#/";
-    window.dispatchEvent(new Event("hashchange"));
-    await new Promise((r) => setTimeout(r, 0));
-    expect(document.querySelector("[data-view='home']")).not.toBeNull();
+    await waitFor(() =>
+      expect(screen.getByTestId("results-view")).toBeTruthy()
+    );
   });
 
-  // ── Header ─────────────────────────────────────────────────────────────────
+  it("shows ExpiredResult when hash job returns 404 on load", async () => {
+    window.location.hash = "#/result/abc12345";
+    fetchRouter([
+      ["/locales", localesResp],
+      ["/jobs/", { ok: false, status: 404, json: async () => ({}) }],
+    ]);
+    render(App);
+    await waitFor(() =>
+      expect(screen.getByTestId("expired-view")).toBeTruthy()
+    );
+  });
+
+  // ── Form disabled state ─────────────────────────────────────────────────────
+
+  it("form is enabled while idle", () => {
+    render(App);
+    expect(screen.getByLabelText("Domain").disabled).toBe(false);
+  });
+
+  it("form is disabled while test is running", async () => {
+    window.location.hash = "#/result/abc12345";
+    fetchRouter([
+      ["/locales", localesResp],
+      ["/jobs/abc12345", jobResp("running", "example.com", 30)],
+    ]);
+    render(App);
+    await waitFor(() =>
+      expect(screen.getByLabelText("Domain").disabled).toBe(true)
+    );
+  });
+
+  // ── Post-job flow ───────────────────────────────────────────────────────────
+
+  it("shows Results and New test button after job succeeds", async () => {
+    window.location.hash = "#/result/abc12345";
+    fetchRouter([
+      ["/locales", localesResp],
+      ["jobs/abc12345/result", resultResp()],
+      ["/jobs/", jobResp("succeeded", "example.com", 100)],
+    ]);
+    render(App);
+    await waitFor(() => screen.getByTestId("results-view"));
+    expect(screen.getByTestId("new-test-link")).toBeTruthy();
+  });
+
+  it("shows ExpiredResult when job is expired", async () => {
+    window.location.hash = "#/result/abc12345";
+    fetchRouter([
+      ["/locales", localesResp],
+      ["/jobs/", { ok: false, status: 404, json: async () => ({}) }],
+    ]);
+    render(App);
+    await waitFor(() => screen.getByTestId("expired-view"));
+  });
+
+  it("New test button resets to idle and re-enables form", async () => {
+    window.location.hash = "#/result/abc12345";
+    fetchRouter([
+      ["/locales", localesResp],
+      ["jobs/abc12345/result", resultResp()],
+      ["/jobs/", jobResp("succeeded", "example.com", 100)],
+    ]);
+    render(App);
+    await waitFor(() => screen.getByTestId("new-test-link"));
+    await fireEvent.click(screen.getByTestId("new-test-link"));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(document.querySelector("[data-testid='results-view']")).toBeNull();
+    expect(screen.getByLabelText("Domain").disabled).toBe(false);
+  });
+
+  // ── Header ──────────────────────────────────────────────────────────────────
 
   it("renders the app title", () => {
     render(App);
@@ -129,54 +201,5 @@ describe("App", () => {
     await fireEvent.click(btn);
     await fireEvent.click(btn);
     expect(document.documentElement.getAttribute("data-theme")).toBe("light");
-  });
-
-  // ── Component wiring ───────────────────────────────────────────────────────
-
-  it("home view renders TestForm", () => {
-    render(App);
-    expect(document.querySelector("[data-testid='test-form']")).not.toBeNull();
-  });
-
-  it("result view shows Progress initially", () => {
-    window.location.hash = "#/result/abc12345";
-    render(App);
-    expect(document.querySelector("[data-testid='progress-view']")).not.toBeNull();
-  });
-
-  it("shows Results and New test button after job succeeds", async () => {
-    window.location.hash = "#/result/abc12345";
-    fetchRouter([
-      ["/locales", localesResp],
-      ["jobs/abc12345/result", resultResp()],
-      ["/jobs/", jobResp("succeeded", "example.com", 100)],
-    ]);
-    render(App);
-    await waitFor(() => screen.getByTestId("results-view"));
-    expect(screen.getByTestId("new-test-link")).toBeTruthy();
-  });
-
-  it("shows ExpiredResult when job is expired", async () => {
-    window.location.hash = "#/result/abc12345";
-    fetchRouter([
-      ["/locales", localesResp],
-      ["/jobs/", { ok: false, status: 404, json: async () => ({}) }],
-    ]);
-    render(App);
-    await waitFor(() => screen.getByTestId("expired-view"));
-  });
-
-  it("New test button navigates home after job succeeds", async () => {
-    window.location.hash = "#/result/abc12345";
-    fetchRouter([
-      ["/locales", localesResp],
-      ["jobs/abc12345/result", resultResp()],
-      ["/jobs/", jobResp("succeeded", "example.com", 100)],
-    ]);
-    render(App);
-    await waitFor(() => screen.getByTestId("new-test-link"));
-    await fireEvent.click(screen.getByTestId("new-test-link"));
-    await new Promise((r) => setTimeout(r, 0));
-    expect(document.querySelector("[data-view='home']")).not.toBeNull();
   });
 });

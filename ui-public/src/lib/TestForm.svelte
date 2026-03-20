@@ -6,6 +6,8 @@
 
   const dispatch = createEventDispatcher();
 
+  export let disabled = false;
+
   let domain = "";
   let submitting = false;
   let errorKey = "";
@@ -16,6 +18,7 @@
   let dsRows = [];
 
   async function handleSubmit() {
+    if (disabled) return;
     const err = validateDomain(domain);
     if (err) { errorKey = err; errorExtra = {}; return; }
     errorKey = "";
@@ -65,7 +68,7 @@
         autocomplete="off"
         autocapitalize="none"
         spellcheck="false"
-        disabled={submitting}
+        disabled={submitting || disabled}
       />
 
       {#if errorKey}
@@ -79,7 +82,7 @@
 
         <div class="stack" style="margin-top:10px">
           <label for="ip-mode">{$t("pub.ip_transport_label")}</label>
-          <select id="ip-mode" bind:value={ipMode} disabled={submitting}>
+          <select id="ip-mode" bind:value={ipMode} disabled={submitting || disabled}>
             <option value="default">{$t("pub.ip_mode_default")}</option>
             <option value="disable_ipv4">{$t("pub.ip_mode_disable_ipv4")}</option>
             <option value="disable_ipv6">{$t("pub.ip_mode_disable_ipv6")}</option>
@@ -94,21 +97,21 @@
                     type="text"
                     bind:value={row.ns}
                     placeholder={$t("pub.ns_placeholder_ns")}
-                    disabled={submitting}
+                    disabled={submitting || disabled}
                     aria-label="NS hostname"
                   />
                   <input
                     type="text"
                     bind:value={row.ip}
                     placeholder={$t("pub.ns_placeholder_ip")}
-                    disabled={submitting}
+                    disabled={submitting || disabled}
                     aria-label="NS IP address"
                   />
                   <button
                     type="button"
                     class="ghost mini-button"
                     on:click={() => removeNsRow(i)}
-                    disabled={submitting}
+                    disabled={submitting || disabled}
                   >{$t("pub.ns_remove")}</button>
                 </div>
               {/each}
@@ -116,7 +119,7 @@
                 type="button"
                 class="ghost"
                 on:click={addNsRow}
-                disabled={submitting}
+                disabled={submitting || disabled}
                 data-testid="add-ns"
               >{$t("pub.ns_add")}</button>
             </div>
@@ -127,15 +130,15 @@
             <div class="stack" style="margin-top:8px">
               {#each dsRows as row, i}
                 <div class="undelegated-ds-row" data-testid="ds-row">
-                  <input type="number" bind:value={row.keytag}  placeholder={$t("pub.ds_placeholder_keytag")}  disabled={submitting} aria-label="DS keytag" />
-                  <input type="number" bind:value={row.algorithm} placeholder={$t("pub.ds_placeholder_algo")} disabled={submitting} aria-label="DS algorithm" />
-                  <input type="number" bind:value={row.digtype} placeholder={$t("pub.ds_placeholder_digtype")} disabled={submitting} aria-label="DS digest type" />
-                  <input type="text"   bind:value={row.digest}  placeholder={$t("pub.ds_placeholder_digest")} disabled={submitting} aria-label="DS digest" />
+                  <input type="number" bind:value={row.keytag}  placeholder={$t("pub.ds_placeholder_keytag")}  disabled={submitting || disabled} aria-label="DS keytag" />
+                  <input type="number" bind:value={row.algorithm} placeholder={$t("pub.ds_placeholder_algo")} disabled={submitting || disabled} aria-label="DS algorithm" />
+                  <input type="number" bind:value={row.digtype} placeholder={$t("pub.ds_placeholder_digtype")} disabled={submitting || disabled} aria-label="DS digest type" />
+                  <input type="text"   bind:value={row.digest}  placeholder={$t("pub.ds_placeholder_digest")} disabled={submitting || disabled} aria-label="DS digest" />
                   <button
                     type="button"
                     class="ghost mini-button"
                     on:click={() => removeDsRow(i)}
-                    disabled={submitting}
+                    disabled={submitting || disabled}
                   >{$t("pub.ds_remove")}</button>
                 </div>
               {/each}
@@ -143,7 +146,7 @@
                 type="button"
                 class="ghost"
                 on:click={addDsRow}
-                disabled={submitting}
+                disabled={submitting || disabled}
                 data-testid="add-ds"
               >{$t("pub.ds_add")}</button>
             </div>
@@ -151,7 +154,7 @@
         </div>
       </details>
 
-      <button type="submit" disabled={submitting}>
+      <button type="submit" disabled={submitting || disabled}>
         {submitting ? $t("pub.testing_button") : $t("pub.test_button")}
       </button>
     </div>

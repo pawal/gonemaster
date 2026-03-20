@@ -2,26 +2,26 @@
   import { onMount, onDestroy } from "svelte";
   import { t, locale, loadCatalog } from "./i18n.js";
   import { parseHash, hashFor } from "./router.js";
-  import { getLocales } from "./api.js";
+  import { getLocales, getJob } from "./api.js";
   import TestForm from "./lib/TestForm.svelte";
   import Progress from "./lib/Progress.svelte";
   import Results from "./lib/Results.svelte";
   import ShareButton from "./lib/ShareButton.svelte";
   import ExpiredResult from "./lib/ExpiredResult.svelte";
 
-  // ── Routing ────────────────────────────────────────────────────────────────
-  let route = parseHash(window.location.hash);
+  // ── Phase ───────────────────────────────────────────────────────────────────
+  // "idle"    — form shown, no results
+  // "running" — form disabled, Progress shown below
+  // "done"    — form enabled, Results/ExpiredResult shown below
+  let phase = "idle";
+  let publicID = null;
+  let jobStatus = "";
+  let jobDomain = "";
+  let jobFinishedAt = null;
 
-  function onHashChange() {
-    const next = parseHash(window.location.hash);
-    if (next.view === "result" && next.publicID !== route.publicID) {
-      resetResultState();
-    }
-    if (next.view === "home") resetResultState();
-    route = next;
-  }
+  const TERMINAL = new Set(["succeeded", "failed", "canceled", "expired"]);
 
-  // ── Theme ──────────────────────────────────────────────────────────────────
+  // ── Theme ───────────────────────────────────────────────────────────────────
   let isDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
 
   function applyTheme() {
@@ -36,7 +36,7 @@
   $: themeLabel = isDark ? $t("pub.theme_dark") : $t("pub.theme_light");
   $: themeIcon = isDark ? "☀" : "☽";
 
-  // ── Locale ─────────────────────────────────────────────────────────────────
+  // ── Locale ──────────────────────────────────────────────────────────────────
   const localeDisplayNames = {
     en: "English", sv: "Svenska", da: "Dansk", fi: "Suomi",
     fr: "Français", es: "Español", nb: "Norsk", sl: "Slovenščina", ja: "日本語",
@@ -65,45 +65,71 @@
     resultLocale = code;
   }
 
-  // ── Result sub-state ────────────────────────────────────────────────────────
-  let jobDone = false;
-  let jobStatus = "";
-  let jobDomain = "";
-  let jobFinishedAt = null;
+  // ── Shared-link init ────────────────────────────────────────────────────────
+  async function applyHash() {
+    const { view, publicID: id } = parseHash(window.location.hash);
+    if (view !== "result" || !id) return;
+    publicID = id;
+    try {
+      const res = await getJob(id);
+      if (!res.ok) {
+        jobStatus = "expired";
+        phase = "done";
+        return;
+      }
+      const job = await res.json();
+      jobDomain = job.domain ?? "";
+      jobFinishedAt = job.finished_at ?? null;
+      if (TERMINAL.has(job.status)) {
+        jobStatus = job.status;
+        phase = "done";
+      } else {
+        phase = "running";
+      }
+    } catch (_) {
+      jobStatus = "expired";
+      phase = "done";
+    }
+  }
 
-  function resetResultState() {
-    jobDone = false;
+  function onHashChange() {
+    const { view, publicID: id } = parseHash(window.location.hash);
+    if (view === "home") resetToIdle();
+    else if (view === "result" && id && id !== publicID) applyHash();
+  }
+
+  // ── Job handlers ────────────────────────────────────────────────────────────
+  function onJobCreated(e) {
+    publicID = e.detail.publicID;
     jobStatus = "";
     jobDomain = "";
     jobFinishedAt = null;
-  }
-
-  function onJobCreated(e) {
-    resetResultState();
-    goResult(e.detail.publicID);
+    phase = "running";
+    window.location.hash = hashFor("result", publicID).slice(1);
   }
 
   function onJobDone(e) {
     jobStatus = e.detail.status;
     jobDomain = e.detail.domain ?? "";
     jobFinishedAt = e.detail.finishedAt ?? null;
-    jobDone = true;
+    phase = "done";
   }
 
-  // ── Navigation helpers ─────────────────────────────────────────────────────
-  function goHome() {
+  function resetToIdle() {
+    phase = "idle";
+    publicID = null;
+    jobStatus = "";
+    jobDomain = "";
+    jobFinishedAt = null;
     window.location.hash = hashFor("home").slice(1);
   }
 
-  function goResult(publicID) {
-    window.location.hash = hashFor("result", publicID).slice(1);
-  }
-
-  // ── Lifecycle ──────────────────────────────────────────────────────────────
+  // ── Lifecycle ───────────────────────────────────────────────────────────────
   onMount(() => {
     window.addEventListener("hashchange", onHashChange);
     applyTheme();
     fetchLocales();
+    applyHash();
   });
 
   onDestroy(() => {
@@ -140,33 +166,29 @@
     </div>
   </header>
 
-  {#if route.view === "result"}
-    <div data-view="result" data-public-id={route.publicID}>
-      {#if !jobDone}
-        <Progress
-          publicID={route.publicID}
-          on:jobdone={onJobDone}
-        />
-      {:else if jobStatus === "succeeded"}
-        <Results
-          publicID={route.publicID}
-          domain={jobDomain}
-          locale={resultLocale}
-          finishedAt={jobFinishedAt}
-        />
-        <div class="row result-actions">
-          <ShareButton publicID={route.publicID} />
-          <button class="ghost" on:click={goHome} data-testid="new-test-link">
-            {$t("pub.result_new_test")}
-          </button>
-        </div>
-      {:else}
-        <ExpiredResult on:newtest={goHome} />
-      {/if}
-    </div>
-  {:else}
-    <div data-view="home">
-      <TestForm on:jobcreated={onJobCreated} />
-    </div>
+  <TestForm disabled={phase === "running"} on:jobcreated={onJobCreated} />
+
+  {#if phase === "running"}
+    <Progress
+      publicID={publicID}
+      on:jobdone={onJobDone}
+    />
+  {:else if phase === "done"}
+    {#if jobStatus === "succeeded"}
+      <Results
+        publicID={publicID}
+        domain={jobDomain}
+        locale={resultLocale}
+        finishedAt={jobFinishedAt}
+      />
+      <div class="row result-actions">
+        <ShareButton publicID={publicID} />
+        <button class="ghost" on:click={resetToIdle} data-testid="new-test-link">
+          {$t("pub.result_new_test")}
+        </button>
+      </div>
+    {:else}
+      <ExpiredResult on:newtest={resetToIdle} />
+    {/if}
   {/if}
 </main>

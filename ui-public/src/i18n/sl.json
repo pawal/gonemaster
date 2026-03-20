@@ -37,6 +37,9 @@
   "pub.ds_add": "Dodaj DS-zapis",
   "pub.ds_remove": "Odstrani",
 
+  "pub.fetch_from_parent": "Pridobi iz nadrejene cone",
+  "pub.fetch_loading": "Pridobivanje…",
+
   "pub.status_queued": "V čakalni vrsti",
   "pub.status_running": "V teku",
   "pub.status_succeeded": "Dokončano",

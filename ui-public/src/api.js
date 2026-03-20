@@ -44,3 +44,12 @@ export async function getResult(publicID, locale = "en") {
 export async function getLocales() {
   return fetch(`${API_BASE}/locales`);
 }
+
+/**
+ * Look up NS and DS records for a domain from the parent zone.
+ * @param {string} domain
+ * @returns {Promise<Response>}
+ */
+export async function lookupDomain(domain) {
+  return fetch(`${API_BASE}/lookup/${encodeURIComponent(domain)}`);
+}

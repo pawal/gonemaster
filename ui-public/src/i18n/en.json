@@ -37,6 +37,9 @@
   "pub.ds_add": "Add DS record",
   "pub.ds_remove": "Remove",
 
+  "pub.fetch_from_parent": "Fetch from parent",
+  "pub.fetch_loading": "Fetching…",
+
   "pub.status_queued": "Queued",
   "pub.status_running": "Running",
   "pub.status_succeeded": "Completed",

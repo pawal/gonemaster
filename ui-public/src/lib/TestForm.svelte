@@ -1,7 +1,7 @@
 <script>
   import { createEventDispatcher } from "svelte";
   import { t } from "../i18n.js";
-  import { createJob } from "../api.js";
+  import { createJob, lookupDomain } from "../api.js";
   import { validateDomain, emptyNsRow, emptyDsRow, buildJobOpts } from "./validate.js";
 
   const dispatch = createEventDispatcher();
@@ -88,6 +88,34 @@
   function removeNsRow(i) { nsRows = nsRows.filter((_, idx) => idx !== i); }
   function addDsRow() { dsRows = [...dsRows, emptyDsRow()]; }
   function removeDsRow(i) { dsRows = dsRows.filter((_, idx) => idx !== i); }
+
+  let fetching = false;
+
+  async function fetchFromParent() {
+    const d = domain.trim();
+    if (!d) return;
+    fetching = true;
+    try {
+      const res = await lookupDomain(d);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (Array.isArray(data.nameservers) && data.nameservers.length > 0) {
+        nsRows = data.nameservers.map((n) => ({ ns: n.ns ?? "", ip: n.ip ?? "" }));
+      }
+      if (Array.isArray(data.ds_records) && data.ds_records.length > 0) {
+        dsRows = data.ds_records.map((d) => ({
+          keytag: String(d.keytag ?? ""),
+          algorithm: d.algorithm ?? "",
+          digtype: d.digtype ?? "",
+          digest: d.digest ?? "",
+        }));
+      }
+    } catch (_) {
+      // silently ignore lookup failures
+    } finally {
+      fetching = false;
+    }
+  }
 </script>
 
 <div class="card stack" data-testid="test-form">
@@ -149,13 +177,22 @@
                   >{$t("pub.ns_remove")}</button>
                 </div>
               {/each}
-              <button
-                type="button"
-                class="ghost"
-                on:click={addNsRow}
-                disabled={submitting || disabled}
-                data-testid="add-ns"
-              >{$t("pub.ns_add")}</button>
+              <div class="row">
+                <button
+                  type="button"
+                  class="ghost"
+                  on:click={addNsRow}
+                  disabled={submitting || disabled}
+                  data-testid="add-ns"
+                >{$t("pub.ns_add")}</button>
+                <button
+                  type="button"
+                  class="ghost"
+                  on:click={fetchFromParent}
+                  disabled={submitting || disabled || fetching || !domain.trim()}
+                  data-testid="fetch-ns"
+                >{fetching ? $t("pub.fetch_loading") : $t("pub.fetch_from_parent")}</button>
+              </div>
             </div>
           </details>
 
@@ -202,13 +239,22 @@
                   >{$t("pub.ds_remove")}</button>
                 </div>
               {/each}
-              <button
-                type="button"
-                class="ghost"
-                on:click={addDsRow}
-                disabled={submitting || disabled}
-                data-testid="add-ds"
-              >{$t("pub.ds_add")}</button>
+              <div class="row">
+                <button
+                  type="button"
+                  class="ghost"
+                  on:click={addDsRow}
+                  disabled={submitting || disabled}
+                  data-testid="add-ds"
+                >{$t("pub.ds_add")}</button>
+                <button
+                  type="button"
+                  class="ghost"
+                  on:click={fetchFromParent}
+                  disabled={submitting || disabled || fetching || !domain.trim()}
+                  data-testid="fetch-ds"
+                >{fetching ? $t("pub.fetch_loading") : $t("pub.fetch_from_parent")}</button>
+              </div>
             </div>
           </details>
         </div>

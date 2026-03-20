@@ -177,6 +177,37 @@ describe("TestForm", () => {
     expect(screen.getAllByTestId("ds-row")).toHaveLength(1);
   });
 
+  // ── Fetch from parent ─────────────────────────────────────────────────────
+
+  it("fetch from parent populates NS and DS rows", async () => {
+    global.fetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        nameservers: [
+          { ns: "ns1.example.com", ip: "192.0.2.1" },
+          { ns: "ns2.example.com", ip: "198.51.100.1" },
+        ],
+        ds_records: [
+          { keytag: 12345, algorithm: 13, digtype: 2, digest: "abcdef" },
+        ],
+      }),
+    });
+    render(TestForm);
+    await fireEvent.input(screen.getByLabelText("Domain"), {
+      target: { value: "example.com" },
+    });
+    await fireEvent.click(screen.getByTestId("fetch-ns"));
+    await waitFor(() =>
+      expect(screen.getAllByTestId("ns-row")).toHaveLength(2)
+    );
+    expect(screen.getAllByTestId("ds-row")).toHaveLength(1);
+  });
+
+  it("fetch from parent button is disabled when domain is empty", () => {
+    render(TestForm);
+    expect(screen.getByTestId("fetch-ns").disabled).toBe(true);
+  });
+
   // ── Button state during submission ────────────────────────────────────────
 
   it("shows Testing… while submitting", async () => {

@@ -37,6 +37,9 @@
   "pub.ds_add": "Ajouter un enregistrement DS",
   "pub.ds_remove": "Supprimer",
 
+  "pub.fetch_from_parent": "Récupérer du parent",
+  "pub.fetch_loading": "Chargement…",
+
   "pub.status_queued": "En attente",
   "pub.status_running": "En cours",
   "pub.status_succeeded": "Terminé",

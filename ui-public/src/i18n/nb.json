@@ -37,6 +37,9 @@
   "pub.ds_add": "Legg til DS-post",
   "pub.ds_remove": "Fjern",
 
+  "pub.fetch_from_parent": "Hent fra overordnet",
+  "pub.fetch_loading": "Henter…",
+
   "pub.status_queued": "I kø",
   "pub.status_running": "Kjører",
   "pub.status_succeeded": "Fullført",

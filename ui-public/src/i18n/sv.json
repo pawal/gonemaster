@@ -37,6 +37,9 @@
   "pub.ds_add": "Lägg till DS-post",
   "pub.ds_remove": "Ta bort",
 
+  "pub.fetch_from_parent": "Hämta från förälder",
+  "pub.fetch_loading": "Hämtar…",
+
   "pub.status_queued": "I kö",
   "pub.status_running": "Pågår",
   "pub.status_succeeded": "Slutförd",

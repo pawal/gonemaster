@@ -37,6 +37,9 @@
   "pub.ds_add": "Agregar registro DS",
   "pub.ds_remove": "Eliminar",
 
+  "pub.fetch_from_parent": "Obtener del padre",
+  "pub.fetch_loading": "Obteniendo…",
+
   "pub.status_queued": "En cola",
   "pub.status_running": "En ejecución",
   "pub.status_succeeded": "Completado",

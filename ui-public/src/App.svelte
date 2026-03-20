@@ -184,4 +184,6 @@
       <ExpiredResult on:newtest={resetToIdle} />
     {/if}
   {/if}
+
+  <a class="fork-ribbon right-bottom fixed" href="https://codeberg.org/pawal/gonemaster" data-ribbon="Fork me on Codeberg" title="Fork me on Codeberg">Fork me on Codeberg</a>
 </main>

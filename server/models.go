@@ -155,11 +155,12 @@ type JobList struct {
 
 // JobResult holds output for a job.
 type JobResult struct {
-	JobID   string         `json:"job_id"`
-	BatchID string         `json:"batch_id,omitempty"`
-	Status  JobStatus      `json:"status"`
-	Summary map[string]any `json:"summary,omitempty"`
-	Raw     *JobResultRaw  `json:"raw,omitempty"`
+	JobID                string            `json:"job_id"`
+	BatchID              string            `json:"batch_id,omitempty"`
+	Status               JobStatus         `json:"status"`
+	Summary              map[string]any    `json:"summary,omitempty"`
+	Raw                  *JobResultRaw     `json:"raw,omitempty"`
+	TestcaseDescriptions map[string]string `json:"testcase_descriptions,omitempty"`
 }
 
 // JobResultRaw contains the raw log entries for a job.

@@ -292,6 +292,49 @@ details[open] > .module-summary > .module-chevron {
   gap: 6px;
 }
 
+/* ── Testcase groups ─────────────────────────────────────────────────────── */
+.testcase-group {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.testcase-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 0.88rem;
+  list-style: none;
+}
+.testcase-badge {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.testcase-summary::-webkit-details-marker { display: none; }
+.testcase-chevron {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: rotate(-45deg);
+  transition: transform 0.15s;
+  flex-shrink: 0;
+}
+details[open] > .testcase-summary .testcase-chevron {
+  transform: rotate(45deg);
+}
+.testcase-desc {
+  color: var(--ink);
+}
+.testcase-entries {
+  border-top: 1px solid var(--border);
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 /* ── Result rows ─────────────────────────────────────────────────────────── */
 .result-row {
   display: grid;

@@ -116,6 +116,7 @@ func (s *Server) handlePublicGetResult(w http.ResponseWriter, r *http.Request) {
 		raw.Locale = locale
 		raw.Entries = localizeResultEntries(result.Raw.Entries, locale)
 		result.Raw = &raw
+		result.TestcaseDescriptions = testcaseDescriptionsForEntries(raw.Entries)
 	}
 	writeJSON(w, http.StatusOK, result)
 }

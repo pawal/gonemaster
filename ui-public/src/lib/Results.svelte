@@ -25,9 +25,16 @@
   })();
 
   let entries = [];
+  let tcDescs = {};
   let loading = true;
   let errorKey = "";
+  const WARN_IDX = LEVELS.indexOf("WARNING");
+  function isWarningOrAbove(level) {
+    return LEVELS.indexOf(level?.toUpperCase()) >= WARN_IDX;
+  }
+
   let openModules = new Set();
+  let openTestcases = new Set();
 
   async function fetchResult(pid, loc) {
     loading = true;
@@ -41,6 +48,7 @@
       }
       const data = await res.json();
       entries = data.raw?.entries ?? [];
+      tcDescs = data.testcase_descriptions ?? {};
       loading = false;
     } catch (_) {
       errorKey = "pub.error_network";
@@ -50,12 +58,18 @@
 
   $: fetchResult(publicID, locale);
 
-  // Group entries by module, preserving insertion order.
+  // Group entries by module → testcase, preserving insertion order.
   $: modules = entries.reduce((acc, e) => {
-    if (!acc[e.module]) acc[e.module] = [];
-    acc[e.module].push(e);
+    if (!acc[e.module]) acc[e.module] = {};
+    const tc = e.testcase || "Unspecified";
+    if (!acc[e.module][tc]) acc[e.module][tc] = [];
+    acc[e.module][tc].push(e);
     return acc;
   }, {});
+
+  function allModuleEntries(mod) {
+    return Object.values(mod).flat();
+  }
 
   $: moduleNames = Object.keys(modules);
   $: overallLevel = worstLevel(entries);
@@ -82,7 +96,9 @@
       {$t(statusKey)}
     </div>
     {#each moduleNames as moduleName}
-      {@const modEntries = modules[moduleName]}
+      {@const mod = modules[moduleName]}
+      {@const modEntries = allModuleEntries(mod)}
+      {@const testcases = Object.keys(mod)}
       <details
         class="module-card"
         data-testid="module-group"
@@ -99,11 +115,42 @@
           </span>
         </summary>
         <div class="module-entries">
-          {#each modEntries as entry}
-            <div class="result-row" data-testid="result-row">
-              <span class="level-pill {levelClass(entry.level)}">{entry.level}</span>
-              <span class="result-message">{entry.message ?? entry.raw ?? ""}</span>
-            </div>
+          {#each testcases as tc}
+            {@const tcEntries = mod[tc]}
+            {@const tcLevel = worstLevel(tcEntries)}
+            {@const tcKey = `pub.tc.${tc.toLowerCase()}`}
+            {@const tcDesc = $t(tcKey)}
+            {#if tc !== "Unspecified" && tcDesc !== tcKey}
+              <details
+                class="testcase-group"
+                data-testid="testcase-group"
+                open={isWarningOrAbove(tcLevel) || openTestcases.has(tc)}
+                on:toggle={(e) => { if (e.target.open) openTestcases.add(tc); else openTestcases.delete(tc); openTestcases = openTestcases; }}
+              >
+                <summary class="testcase-summary">
+                  <span class="testcase-chevron"></span>
+                  <span class="testcase-desc">{tcDesc}</span>
+                  <span class="testcase-badge">
+                    <span class="level-pill {levelClass(tcLevel)}">{tcLevel}</span>
+                  </span>
+                </summary>
+                <div class="testcase-entries">
+                  {#each tcEntries as entry}
+                    <div class="result-row" data-testid="result-row">
+                      <span class="level-pill {levelClass(entry.level)}">{entry.level}</span>
+                      <span class="result-message">{entry.message ?? entry.raw ?? ""}</span>
+                    </div>
+                  {/each}
+                </div>
+              </details>
+            {:else}
+              {#each tcEntries as entry}
+                <div class="result-row" data-testid="result-row">
+                  <span class="level-pill {levelClass(entry.level)}">{entry.level}</span>
+                  <span class="result-message">{entry.message ?? entry.raw ?? ""}</span>
+                </div>
+              {/each}
+            {/if}
           {/each}
         </div>
       </details>

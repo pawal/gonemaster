@@ -2,13 +2,14 @@ import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/sv
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Results from "./Results.svelte";
 
-const resultResp = (entries = []) => ({
+const resultResp = (entries = [], testcase_descriptions = {}) => ({
   ok: true,
   status: 200,
   json: async () => ({
     job_id: "test-id",
     status: "succeeded",
     raw: { locale: "en", entries },
+    testcase_descriptions,
   }),
 });
 
@@ -18,10 +19,10 @@ const errResp = (status) => ({
   json: async () => ({}),
 });
 
-const entry = (module, level, message = "msg") => ({
+const entry = (module, level, message = "msg", testcase = "tc") => ({
   timestamp: 0,
   module,
-  testcase: "tc",
+  testcase,
   tag: "TAG",
   level,
   message,
@@ -105,6 +106,38 @@ describe("Results", () => {
     await waitFor(() =>
       expect(screen.getAllByTestId("result-row")).toHaveLength(2)
     );
+  });
+
+  it("groups entries by testcase within module", async () => {
+    global.fetch.mockResolvedValue(resultResp([
+      entry("ADDRESS", "INFO", "msg1", "Address01"),
+      entry("ADDRESS", "WARNING", "msg2", "Address02"),
+      entry("ADDRESS", "INFO", "msg3", "Address01"),
+    ]));
+    render(Results, { props: { publicID: "abc12345" } });
+    await waitFor(() =>
+      expect(screen.getAllByTestId("testcase-group")).toHaveLength(2)
+    );
+    // Descriptions come from i18n (en.json pub.tc.address01 / pub.tc.address02)
+    expect(screen.getByText(/globally routable/i)).toBeTruthy();
+    expect(screen.getByText(/Reverse DNS entry/i)).toBeTruthy();
+  });
+
+  it("testcase groups default closed for INFO/NOTICE, open for WARNING+", async () => {
+    global.fetch.mockResolvedValue(resultResp([
+      entry("ADDRESS", "INFO", "ok msg", "Address01"),
+      entry("ADDRESS", "WARNING", "warn msg", "Address02"),
+    ]));
+    render(Results, { props: { publicID: "abc12345" } });
+    await waitFor(() =>
+      expect(screen.getAllByTestId("testcase-group")).toHaveLength(2)
+    );
+    const groups = screen.getAllByTestId("testcase-group");
+    // Address01 has only INFO → closed; Address02 has WARNING → open
+    const infoGroup = groups.find((g) => g.querySelector("summary").textContent.includes("globally routable"));
+    const warnGroup = groups.find((g) => g.querySelector("summary").textContent.includes("Reverse DNS"));
+    expect(infoGroup.open).toBe(false);
+    expect(warnGroup.open).toBe(true);
   });
 
   it("shows domain heading when domain prop is set", async () => {

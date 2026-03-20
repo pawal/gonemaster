@@ -2,6 +2,7 @@
   import { t } from "../i18n.js";
   import { getResult } from "../api.js";
   import { LEVELS, levelClass, bannerClass, worstLevel } from "../severity.js";
+  import ShareButton from "./ShareButton.svelte";
 
   function levelCounts(arr) {
     const counts = {};
@@ -20,9 +21,7 @@
   $: finishedStr = (() => {
     if (!finishedAt) return "";
     const d = new Date(finishedAt);
-    return d.getFullYear() > 2000
-      ? d.toLocaleString([], { dateStyle: "medium", timeStyle: "short" })
-      : "";
+    return d.getFullYear() > 2000 ? d.toISOString().slice(0, 16) : "";
   })();
 
   let entries = [];
@@ -71,8 +70,13 @@
     <p data-testid="results-loading">{$t("pub.progress_queued")}</p>
   {:else}
     {#if domain}
-      <h2 class="result-heading">{$t("pub.result_heading", { domain })}</h2>
-      {#if finishedStr}<p class="result-date small">{finishedStr}</p>{/if}
+      <div class="result-heading-row">
+        <div>
+          <h2 class="result-heading">{$t("pub.result_heading", { domain })}</h2>
+          {#if finishedStr}<p class="result-date small">{finishedStr}</p>{/if}
+        </div>
+        <ShareButton {publicID} />
+      </div>
     {/if}
     <div class="status-banner {bannerCls}" data-testid="result-banner" role="status">
       {$t(statusKey)}

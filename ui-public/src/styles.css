@@ -217,6 +217,17 @@ button:hover:not(:disabled) {
 .level-pill.severity-error    { background: #ffedd5; color: #9a3412; }
 .level-pill.severity-critical { background: #fee2e2; color: #991b1b; }
 
+/* ── Result heading row ──────────────────────────────────────────────────── */
+.result-heading-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.result-heading { margin: 0; font-size: 1.1rem; }
+.result-date { margin: 2px 0 0; font-family: var(--mono); }
+
 /* ── Module list (grouped results) ──────────────────────────────────────── */
 .module-list {
   display: flex;

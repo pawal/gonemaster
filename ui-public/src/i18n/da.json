@@ -48,7 +48,7 @@
   "pub.progress_queued": "Venter i kø…",
 
   "pub.result_heading": "Resultater for {domain}",
-  "pub.result_share": "Del",
+  "pub.result_share": "Del resultat",
   "pub.result_share_copied": "Kopieret!",
   "pub.result_new_test": "Ny test",
   "pub.result_locale_label": "Meddelelsessprog",

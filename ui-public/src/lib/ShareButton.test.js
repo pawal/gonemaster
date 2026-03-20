@@ -20,7 +20,7 @@ describe("ShareButton", () => {
 
   it("renders Share button", () => {
     render(ShareButton, { props: { publicID: "abc12345" } });
-    expect(screen.getByTestId("share-button").textContent.trim()).toBe("Share");
+    expect(screen.getByTestId("share-button").textContent.trim()).toBe("Share result");
   });
 
   it("calls clipboard.writeText with the result URL", async () => {
@@ -51,7 +51,7 @@ describe("ShareButton", () => {
     );
     await vi.advanceTimersByTimeAsync(2001);
     await waitFor(() =>
-      expect(screen.getByTestId("share-button").textContent.trim()).toBe("Share")
+      expect(screen.getByTestId("share-button").textContent.trim()).toBe("Share result")
     );
   });
 });

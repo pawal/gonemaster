@@ -48,7 +48,7 @@
   "pub.progress_queued": "Odotetaan jonossa…",
 
   "pub.result_heading": "Tulokset verkkotunnukselle {domain}",
-  "pub.result_share": "Jaa",
+  "pub.result_share": "Jaa tulos",
   "pub.result_share_copied": "Kopioitu!",
   "pub.result_new_test": "Uusi testi",
   "pub.result_locale_label": "Viestikieli",

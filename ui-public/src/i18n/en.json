@@ -48,7 +48,7 @@
   "pub.progress_queued": "Waiting in queue…",
 
   "pub.result_heading": "Results for {domain}",
-  "pub.result_share": "Share",
+  "pub.result_share": "Share result",
   "pub.result_share_copied": "Copied!",
   "pub.result_new_test": "New test",
   "pub.result_locale_label": "Message language",

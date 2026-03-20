@@ -48,7 +48,7 @@
   "pub.progress_queued": "キューで待機中…",
 
   "pub.result_heading": "{domain} の結果",
-  "pub.result_share": "共有",
+  "pub.result_share": "結果を共有",
   "pub.result_share_copied": "コピーしました！",
   "pub.result_new_test": "新しいテスト",
   "pub.result_locale_label": "メッセージの言語",

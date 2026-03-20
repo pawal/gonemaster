@@ -115,7 +115,7 @@ describe("App", () => {
 
   // ── Post-job flow ───────────────────────────────────────────────────────────
 
-  it("shows Results and New test button after job succeeds", async () => {
+  it("shows Results after job succeeds", async () => {
     window.location.hash = "#/result/abc12345";
     fetchRouter([
       ["/locales", localesResp],
@@ -124,7 +124,6 @@ describe("App", () => {
     ]);
     render(App);
     await waitFor(() => screen.getByTestId("results-view"));
-    expect(screen.getByTestId("new-test-link")).toBeTruthy();
   });
 
   it("shows ExpiredResult when job is expired", async () => {
@@ -135,21 +134,6 @@ describe("App", () => {
     ]);
     render(App);
     await waitFor(() => screen.getByTestId("expired-view"));
-  });
-
-  it("New test button resets to idle and re-enables form", async () => {
-    window.location.hash = "#/result/abc12345";
-    fetchRouter([
-      ["/locales", localesResp],
-      ["jobs/abc12345/result", resultResp()],
-      ["/jobs/", jobResp("succeeded", "example.com", 100)],
-    ]);
-    render(App);
-    await waitFor(() => screen.getByTestId("new-test-link"));
-    await fireEvent.click(screen.getByTestId("new-test-link"));
-    await new Promise((r) => setTimeout(r, 0));
-    expect(document.querySelector("[data-testid='results-view']")).toBeNull();
-    expect(screen.getByLabelText("Domain").disabled).toBe(false);
   });
 
   // ── Header ──────────────────────────────────────────────────────────────────

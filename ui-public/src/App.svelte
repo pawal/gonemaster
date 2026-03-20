@@ -6,7 +6,6 @@
   import TestForm from "./lib/TestForm.svelte";
   import Progress from "./lib/Progress.svelte";
   import Results from "./lib/Results.svelte";
-  import ShareButton from "./lib/ShareButton.svelte";
   import ExpiredResult from "./lib/ExpiredResult.svelte";
 
   // ── Phase ───────────────────────────────────────────────────────────────────
@@ -181,12 +180,6 @@
         locale={resultLocale}
         finishedAt={jobFinishedAt}
       />
-      <div class="row result-actions">
-        <ShareButton publicID={publicID} />
-        <button class="ghost" on:click={resetToIdle} data-testid="new-test-link">
-          {$t("pub.result_new_test")}
-        </button>
-      </div>
     {:else}
       <ExpiredResult on:newtest={resetToIdle} />
     {/if}

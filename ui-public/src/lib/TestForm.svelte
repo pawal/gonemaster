@@ -8,6 +8,40 @@
 
   export let disabled = false;
 
+  const DNSSEC_ALGORITHMS = [
+    { group: "Recommended", options: [
+      { value: 8,  label: "8 – RSA/SHA-256" },
+      { value: 13, label: "13 – ECDSA P-256/SHA-256" },
+      { value: 14, label: "14 – ECDSA P-384/SHA-384" },
+      { value: 15, label: "15 – Ed25519" },
+      { value: 16, label: "16 – Ed448" },
+      { value: 17, label: "17 – SM2/SM3" },
+      { value: 23, label: "23 – GOST R 34.10-2012" },
+    ]},
+    { group: "Deprecated", options: [
+      { value: 10, label: "10 – RSA/SHA-512" },
+      { value: 1,  label: "1 – RSA/MD5" },
+      { value: 3,  label: "3 – DSA/SHA1" },
+      { value: 5,  label: "5 – RSA/SHA-1" },
+      { value: 6,  label: "6 – DSA-NSEC3-SHA1" },
+      { value: 7,  label: "7 – RSASHA1-NSEC3-SHA1" },
+      { value: 12, label: "12 – GOST R 34.10-2001" },
+    ]},
+  ];
+
+  const DS_DIGEST_TYPES = [
+    { group: "Recommended", options: [
+      { value: 2, label: "2 – SHA-256" },
+      { value: 4, label: "4 – SHA-384" },
+      { value: 5, label: "5 – GOST R 34.11-2012" },
+      { value: 6, label: "6 – SM3" },
+    ]},
+    { group: "Deprecated", options: [
+      { value: 1, label: "1 – SHA-1" },
+      { value: 3, label: "3 – GOST R 34.11-94" },
+    ]},
+  ];
+
   let domain = "";
   let submitting = false;
   let errorKey = "";
@@ -130,10 +164,36 @@
             <div class="stack" style="margin-top:8px">
               {#each dsRows as row, i}
                 <div class="undelegated-ds-row" data-testid="ds-row">
-                  <input type="number" bind:value={row.keytag}  placeholder={$t("pub.ds_placeholder_keytag")}  disabled={submitting || disabled} aria-label="DS keytag" />
-                  <input type="number" bind:value={row.algorithm} placeholder={$t("pub.ds_placeholder_algo")} disabled={submitting || disabled} aria-label="DS algorithm" />
-                  <input type="number" bind:value={row.digtype} placeholder={$t("pub.ds_placeholder_digtype")} disabled={submitting || disabled} aria-label="DS digest type" />
-                  <input type="text"   bind:value={row.digest}  placeholder={$t("pub.ds_placeholder_digest")} disabled={submitting || disabled} aria-label="DS digest" />
+                  <input
+                    type="text"
+                    inputmode="numeric"
+                    pattern="[0-9]*"
+                    bind:value={row.keytag}
+                    placeholder={$t("pub.ds_placeholder_keytag")}
+                    disabled={submitting || disabled}
+                    aria-label="DS keytag"
+                  />
+                  <select bind:value={row.algorithm} disabled={submitting || disabled} aria-label="DS algorithm">
+                    <option value="" disabled>{$t("pub.ds_placeholder_algo")}</option>
+                    {#each DNSSEC_ALGORITHMS as { group, options }}
+                      <optgroup label={group}>
+                        {#each options as { value, label }}
+                          <option {value}>{label}</option>
+                        {/each}
+                      </optgroup>
+                    {/each}
+                  </select>
+                  <select bind:value={row.digtype} disabled={submitting || disabled} aria-label="DS digest type">
+                    <option value="" disabled>{$t("pub.ds_placeholder_digtype")}</option>
+                    {#each DS_DIGEST_TYPES as { group, options }}
+                      <optgroup label={group}>
+                        {#each options as { value, label }}
+                          <option {value}>{label}</option>
+                        {/each}
+                      </optgroup>
+                    {/each}
+                  </select>
+                  <input type="text" bind:value={row.digest} placeholder={$t("pub.ds_placeholder_digest")} disabled={submitting || disabled} aria-label="DS digest" />
                   <button
                     type="button"
                     class="ghost mini-button"

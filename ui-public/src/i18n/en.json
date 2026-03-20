@@ -31,7 +31,7 @@
   "pub.ds_summary": "DS records",
   "pub.ds_field_label": "DS records",
   "pub.ds_placeholder_keytag": "Keytag",
-  "pub.ds_placeholder_algo": "Algo",
+  "pub.ds_placeholder_algo": "Algorithm",
   "pub.ds_placeholder_digtype": "Digest type",
   "pub.ds_placeholder_digest": "Digest (hex)",
   "pub.ds_add": "Add DS record",

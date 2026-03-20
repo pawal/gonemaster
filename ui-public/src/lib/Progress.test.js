@@ -28,11 +28,11 @@ describe("Progress", () => {
     await waitFor(() => expect(screen.getByRole("progressbar")).toBeTruthy());
   });
 
-  it("shows domain from job response", async () => {
+  it("shows domain in progress text", async () => {
     global.fetch.mockResolvedValue(jobResp("running", 30, "dns.example"));
     render(Progress, { props: { publicID: "abc12345" } });
     await waitFor(() =>
-      expect(screen.getByTestId("progress-domain").textContent).toBe("dns.example")
+      expect(screen.getByText(/dns\.example/)).toBeTruthy()
     );
   });
 

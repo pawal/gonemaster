@@ -60,9 +60,6 @@
   {#if errorKey}
     <p class="error-box" role="alert">{$t(errorKey)}</p>
   {:else}
-    {#if domain}
-      <p class="progress-domain" data-testid="progress-domain">{domain}</p>
-    {/if}
     <p class="progress-status">{progressText}</p>
     <div
       class="progress-bar-track"

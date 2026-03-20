@@ -40,6 +40,8 @@
   "pub.fetch_from_parent": "Fetch from parent",
   "pub.fetch_loading": "Fetching…",
 
+  "pub.reset_form": "Reset form",
+
   "pub.status_queued": "Queued",
   "pub.status_running": "Running",
   "pub.status_succeeded": "Completed",

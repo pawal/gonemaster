@@ -40,6 +40,8 @@
   "pub.fetch_from_parent": "親ゾーンから取得",
   "pub.fetch_loading": "取得中…",
 
+  "pub.reset_form": "フォームをリセット",
+
   "pub.status_queued": "キュー待ち",
   "pub.status_running": "実行中",
   "pub.status_succeeded": "完了",

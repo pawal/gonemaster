@@ -40,6 +40,8 @@
   "pub.fetch_from_parent": "Hämta från förälder",
   "pub.fetch_loading": "Hämtar…",
 
+  "pub.reset_form": "Återställ formulär",
+
   "pub.status_queued": "I kö",
   "pub.status_running": "Pågår",
   "pub.status_succeeded": "Slutförd",

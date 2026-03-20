@@ -40,6 +40,8 @@
   "pub.fetch_from_parent": "Hae ylätasolta",
   "pub.fetch_loading": "Haetaan…",
 
+  "pub.reset_form": "Tyhjennä lomake",
+
   "pub.status_queued": "Jonossa",
   "pub.status_running": "Käynnissä",
   "pub.status_succeeded": "Valmis",

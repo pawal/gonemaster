@@ -208,6 +208,28 @@ describe("TestForm", () => {
     expect(screen.getByTestId("fetch-ns").disabled).toBe(true);
   });
 
+  // ── Reset form ───────────────────────────────────────────────────────────
+
+  it("reset clears domain, NS rows, DS rows, and errors", async () => {
+    render(TestForm);
+    // Type a domain
+    await fireEvent.input(screen.getByLabelText("Domain"), {
+      target: { value: "example.com" },
+    });
+    // Add NS and DS rows
+    await fireEvent.click(screen.getByTestId("add-ns"));
+    await fireEvent.click(screen.getByTestId("add-ds"));
+    expect(screen.getAllByTestId("ns-row")).toHaveLength(1);
+    expect(screen.getAllByTestId("ds-row")).toHaveLength(1);
+    // Click reset
+    await fireEvent.click(screen.getByTestId("reset-form"));
+    // Domain cleared
+    expect(screen.getByLabelText("Domain").value).toBe("");
+    // NS and DS rows removed
+    expect(screen.queryAllByTestId("ns-row")).toHaveLength(0);
+    expect(screen.queryAllByTestId("ds-row")).toHaveLength(0);
+  });
+
   // ── Button state during submission ────────────────────────────────────────
 
   it("shows Testing… while submitting", async () => {

@@ -89,6 +89,22 @@
   function addDsRow() { dsRows = [...dsRows, emptyDsRow()]; }
   function removeDsRow(i) { dsRows = dsRows.filter((_, idx) => idx !== i); }
 
+  let optionsOpen = false;
+  let nsOpen = false;
+  let dsOpen = false;
+
+  function resetForm() {
+    domain = "";
+    nsRows = [];
+    dsRows = [];
+    ipMode = "default";
+    errorKey = "";
+    errorExtra = {};
+    optionsOpen = false;
+    nsOpen = false;
+    dsOpen = false;
+  }
+
   let fetching = false;
 
   async function fetchFromParent() {
@@ -139,7 +155,7 @@
         </p>
       {/if}
 
-      <details class="advanced-options">
+      <details class="advanced-options" bind:open={optionsOpen}>
         <summary>{$t("pub.options_summary")}</summary>
 
         <div class="stack" style="margin-top:10px">
@@ -150,7 +166,7 @@
             <option value="disable_ipv6">{$t("pub.ip_mode_disable_ipv6")}</option>
           </select>
 
-          <details class="advanced-options">
+          <details class="advanced-options" bind:open={nsOpen}>
             <summary>{$t("pub.ns_summary")}</summary>
             <div class="stack" style="margin-top:8px">
               {#each nsRows as row, i}
@@ -196,7 +212,7 @@
             </div>
           </details>
 
-          <details class="advanced-options">
+          <details class="advanced-options" bind:open={dsOpen}>
             <summary>{$t("pub.ds_summary")}</summary>
             <div class="stack" style="margin-top:8px">
               {#each dsRows as row, i}
@@ -263,6 +279,13 @@
       <button type="submit" disabled={submitting || disabled}>
         {submitting ? $t("pub.testing_button") : $t("pub.test_button")}
       </button>
+      <button
+        type="button"
+        class="ghost"
+        on:click={resetForm}
+        disabled={submitting || disabled}
+        data-testid="reset-form"
+      >{$t("pub.reset_form")}</button>
     </div>
   </form>
 </div>

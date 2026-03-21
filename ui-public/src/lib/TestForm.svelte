@@ -155,7 +155,7 @@
         </p>
       {/if}
 
-      <details class="advanced-options" bind:open={optionsOpen}>
+      <details class="advanced-options" bind:open={optionsOpen} inert={disabled || submitting ? '' : undefined}>
         <summary>{$t("pub.options_summary")}</summary>
 
         <div class="stack" style="margin-top:10px">

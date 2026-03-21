@@ -165,6 +165,15 @@ button:hover:not(:disabled) {
   box-shadow: 0 10px 18px rgba(11, 45, 77, 0.24);
 }
 
+/* ── Inert / disabled sections ───────────────────────────────────────────── */
+details[inert] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+details[inert] > summary {
+  pointer-events: none;
+}
+
 /* ── Progress bar ────────────────────────────────────────────────────────── */
 .progress-bar-track {
   position: relative;

@@ -62,6 +62,49 @@ var sqlMigrations = []sqlMigration{
 			`CREATE INDEX IF NOT EXISTS idx_jobs_finished_at ON jobs(finished_at)`,
 		},
 	},
+	{
+		version: 3,
+		stmts: []string{
+			// public_id is nullable so that the unique index works across all
+			// three backends — SQLite, PostgreSQL and MariaDB all treat NULL
+			// as distinct in a UNIQUE index, so pre-migration rows (NULL) do
+			// not collide with each other or with newly generated IDs.
+			`ALTER TABLE jobs ADD COLUMN public_id VARCHAR(16) DEFAULT NULL`,
+			`CREATE UNIQUE INDEX IF NOT EXISTS idx_jobs_public_id ON jobs(public_id)`,
+		},
+	},
+}
+
+// backfillPublicIDs assigns a public_id to every job that does not yet have
+// one. It is called after runMigrations so that jobs created before migration 3
+// get a stable public ID on the next server start.
+func backfillPublicIDs(db *sql.DB, d sqlDialect) error {
+	rows, err := db.Query(`SELECT id FROM jobs WHERE public_id IS NULL`)
+	if err != nil {
+		return fmt.Errorf("backfill public IDs: query: %w", err)
+	}
+	defer rows.Close()
+
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return fmt.Errorf("backfill public IDs: scan: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("backfill public IDs: rows: %w", err)
+	}
+
+	stmt := fmt.Sprintf(`UPDATE jobs SET public_id = %s WHERE id = %s`,
+		d.Placeholder(1), d.Placeholder(2))
+	for _, id := range ids {
+		if _, err := db.Exec(stmt, GeneratePublicID(), id); err != nil {
+			return fmt.Errorf("backfill public IDs: update %s: %w", id, err)
+		}
+	}
+	return nil
 }
 
 // runMigrations creates the schema_migrations tracking table and applies any

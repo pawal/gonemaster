@@ -1,10 +1,29 @@
 package server
 
 import (
+	"crypto/rand"
+	"math/big"
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
 )
+
+const publicIDAlphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+const publicIDLen = 8
+
+// GeneratePublicID returns an 8-character base62 string using crypto/rand.
+func GeneratePublicID() string {
+	b := make([]byte, publicIDLen)
+	alphabetLen := big.NewInt(int64(len(publicIDAlphabet)))
+	for i := range b {
+		n, err := rand.Int(rand.Reader, alphabetLen)
+		if err != nil {
+			panic("crypto/rand unavailable: " + err.Error())
+		}
+		b[i] = publicIDAlphabet[n.Int64()]
+	}
+	return string(b)
+}
 
 // JobStatus describes the current state of a job.
 type JobStatus string
@@ -65,6 +84,7 @@ const (
 // Job represents a single test job.
 type Job struct {
 	ID             string                         `json:"id"`
+	PublicID       string                         `json:"public_id,omitempty"`
 	BatchID        string                         `json:"batch_id,omitempty"`
 	Domain         string                         `json:"domain"`
 	SeverityTotals map[string]int                 `json:"severity_totals,omitempty"`
@@ -135,11 +155,12 @@ type JobList struct {
 
 // JobResult holds output for a job.
 type JobResult struct {
-	JobID   string         `json:"job_id"`
-	BatchID string         `json:"batch_id,omitempty"`
-	Status  JobStatus      `json:"status"`
-	Summary map[string]any `json:"summary,omitempty"`
-	Raw     *JobResultRaw  `json:"raw,omitempty"`
+	JobID                string            `json:"job_id"`
+	BatchID              string            `json:"batch_id,omitempty"`
+	Status               JobStatus         `json:"status"`
+	Summary              map[string]any    `json:"summary,omitempty"`
+	Raw                  *JobResultRaw     `json:"raw,omitempty"`
+	TestcaseDescriptions map[string]string `json:"testcase_descriptions,omitempty"`
 }
 
 // JobResultRaw contains the raw log entries for a job.

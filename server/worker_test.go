@@ -29,6 +29,10 @@ func (s *spyJobStore) Get(id string) (Job, bool) {
 	return s.inner.Get(id)
 }
 
+func (s *spyJobStore) GetByPublicID(publicID string) (Job, bool) {
+	return s.inner.GetByPublicID(publicID)
+}
+
 func (s *spyJobStore) Update(job Job) error {
 	s.mu.Lock()
 	s.progresses = append(s.progresses, job.Progress)

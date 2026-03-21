@@ -16,7 +16,8 @@ import (
 const jobCols = `id, batch_id, domain, status, created_at, started_at, finished_at,
 	progress, result_url, error,
 	sev_notice, sev_warning, sev_error, sev_critical,
-	tests_json, overrides_json, undelegated_ns_json, undelegated_ds_json, min_level`
+	tests_json, overrides_json, undelegated_ns_json, undelegated_ds_json, min_level,
+	public_id`
 
 // rowScanner is satisfied by both *sql.Row and *sql.Rows.
 type rowScanner interface {
@@ -149,6 +150,7 @@ func (s *SQLJobStore) scanJob(row rowScanner) (Job, error) {
 		testsJSON, overridesJSON            sql.NullString
 		nsJSON, dsJSON                      sql.NullString
 		minLevel                            string
+		publicID                            sql.NullString
 	)
 	if err := row.Scan(
 		&id, &batchID, &domain, &status,
@@ -157,6 +159,7 @@ func (s *SQLJobStore) scanJob(row rowScanner) (Job, error) {
 		&sevNotice, &sevWarn, &sevErr, &sevCrit,
 		&testsJSON, &overridesJSON, &nsJSON, &dsJSON,
 		&minLevel,
+		&publicID,
 	); err != nil {
 		return Job{}, err
 	}
@@ -180,6 +183,7 @@ func (s *SQLJobStore) scanJob(row rowScanner) (Job, error) {
 
 	return Job{
 		ID:         id,
+		PublicID:   publicID.String,
 		BatchID:    batchID,
 		Domain:     domain,
 		Status:     JobStatus(status),
@@ -204,7 +208,11 @@ func (s *SQLJobStore) scanJob(row rowScanner) (Job, error) {
 }
 
 // Create inserts a new job and fails if the id already exists.
+// A PublicID is generated automatically if the job does not already have one.
 func (s *SQLJobStore) Create(job Job) (Job, error) {
+	if job.PublicID == "" {
+		job.PublicID = GeneratePublicID()
+	}
 	testsJSON, err := toNullJSON(job.Tests)
 	if err != nil {
 		return Job{}, fmt.Errorf("marshal tests: %w", err)
@@ -227,12 +235,14 @@ func (s *SQLJobStore) Create(job Job) (Job, error) {
 			id, batch_id, domain, status, created_at, started_at, finished_at,
 			progress, result_url, error,
 			sev_notice, sev_warning, sev_error, sev_critical,
-			tests_json, overrides_json, undelegated_ns_json, undelegated_ds_json, min_level
-		) VALUES (%s, 0, 0, 0, 0, %s)`, s.phRange(1, 10), s.phRange(11, 5)),
+			tests_json, overrides_json, undelegated_ns_json, undelegated_ds_json, min_level,
+			public_id
+		) VALUES (%s, 0, 0, 0, 0, %s, %s)`, s.phRange(1, 10), s.phRange(11, 5), s.ph(16)),
 		job.ID, job.BatchID, job.Domain, string(job.Status),
 		s.ts(job.CreatedAt), s.ts(job.StartedAt), s.ts(job.FinishedAt),
 		job.Progress, job.ResultURL, job.Error,
 		testsJSON, overridesJSON, nsJSON, dsJSON, job.MinLevel,
+		sql.NullString{String: job.PublicID, Valid: job.PublicID != ""},
 	)
 	if err != nil {
 		if s.dialect.IsDuplicateKey(err) {
@@ -251,6 +261,16 @@ func (s *SQLJobStore) Get(id string) (Job, bool) {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Job{}, false
 		}
+		return Job{}, false
+	}
+	return job, true
+}
+
+// GetByPublicID returns the job with the given public_id.
+func (s *SQLJobStore) GetByPublicID(publicID string) (Job, bool) {
+	row := s.db.QueryRow(fmt.Sprintf("SELECT %s FROM jobs WHERE public_id = %s", jobCols, s.ph(1)), publicID)
+	job, err := s.scanJob(row)
+	if err != nil {
 		return Job{}, false
 	}
 	return job, true

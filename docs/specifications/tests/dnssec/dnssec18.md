@@ -40,11 +40,15 @@ Status: Final
    - Search DS records for any DS whose keytag exists in nameserver DNSKEY RRset and also in CDNSKEY RRSIG keytags.
    - If no such DS/keytag match exists, mark nameserver for `DS18_NO_MATCH_CDNSKEY_RRSIG_DS`.
 10. Emit marked DS18 findings with `addresses`.
-11. Emit `TEST_CASE_END`.
+11. For nameservers with CDS RRset that were not marked for `DS18_NO_MATCH_CDS_RRSIG_DS`, collect IPs and emit `DS18_MATCH_CDS_RRSIG_DS`.
+12. For nameservers with CDNSKEY RRset that were not marked for `DS18_NO_MATCH_CDNSKEY_RRSIG_DS`, collect IPs and emit `DS18_MATCH_CDNSKEY_RRSIG_DS`.
+13. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
+| `DS18_MATCH_CDNSKEY_RRSIG_DS` | CDNSKEY RRset is signed by a DS-linked DNSKEY keytag at at least one nameserver. |
+| `DS18_MATCH_CDS_RRSIG_DS` | CDS RRset is signed by a DS-linked DNSKEY keytag at at least one nameserver. |
 | `DS18_NO_MATCH_CDNSKEY_RRSIG_DS` | No DS-linked DNSKEY keytag matches any CDNSKEY RRSIG keytag for nameserver. |
 | `DS18_NO_MATCH_CDS_RRSIG_DS` | No DS-linked DNSKEY keytag matches any CDS RRSIG keytag for nameserver. |
 | `IPV4_DISABLED` | IPv4 transport is disabled for queried parent/child rrtypes. |
@@ -55,6 +59,8 @@ Status: Final
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
+| `DS18_MATCH_CDNSKEY_RRSIG_DS` | `addresses` | `array<string>` | Structured child nameserver IP list with matching CDNSKEY RRSIG. |
+| `DS18_MATCH_CDS_RRSIG_DS` | `addresses` | `array<string>` | Structured child nameserver IP list with matching CDS RRSIG. |
 | `DS18_NO_MATCH_CDNSKEY_RRSIG_DS` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS18_NO_MATCH_CDS_RRSIG_DS` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
@@ -69,6 +75,8 @@ Status: Final
 ## Severity Levels Per Tag
 | Tag | Level | Notes |
 | --- | --- | --- |
+| `DS18_MATCH_CDNSKEY_RRSIG_DS` | `INFO` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `DS18_MATCH_CDS_RRSIG_DS` | `INFO` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS18_NO_MATCH_CDNSKEY_RRSIG_DS` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS18_NO_MATCH_CDS_RRSIG_DS` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |

@@ -93,6 +93,17 @@ variables, CLI flags. Later sources override earlier ones.
 **--db-retention-days** *N*
 : Delete completed jobs older than N days on an hourly schedule. 0 (default) disables automatic purging.
 
+### Public API
+
+**--public-api-rate-limit-enabled**
+: Enable per-IP rate limiting on POST /pub/api/v1/jobs (default: disabled).
+
+**--public-api-rate-limit-max** *N*
+: Maximum job submissions per IP per window (default: 10).
+
+**--public-api-rate-limit-window** *DURATION*
+: Sliding window for rate limiting, e.g. **5m** or **1h** (default: 10m).
+
 ### Output
 
 **--min-level** *LEVEL*
@@ -127,6 +138,15 @@ variables, CLI flags. Later sources override earlier ones.
 **GONEMASTER_DB_RETENTION_DAYS**
 : Equivalent to **--db-retention-days**.
 
+**GONEMASTER_PUBLIC_API_RATE_LIMIT_ENABLED**
+: Equivalent to **--public-api-rate-limit-enabled**.
+
+**GONEMASTER_PUBLIC_API_RATE_LIMIT_MAX**
+: Equivalent to **--public-api-rate-limit-max**.
+
+**GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW**
+: Equivalent to **--public-api-rate-limit-window**.
+
 ## CONFIG FILE
 
 The **--config** file is JSON with optional fields:
@@ -142,6 +162,11 @@ The **--config** file is JSON with optional fields:
         "driver": "sqlite",
         "dsn": "/var/lib/gonemaster/db.sqlite",
         "retention_days": 90
+      },
+      "public_api": {
+        "rate_limit_enabled": true,
+        "rate_limit_max": 10,
+        "rate_limit_window": "10m"
       }
     }
 

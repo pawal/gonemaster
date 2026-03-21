@@ -290,8 +290,146 @@ func TestRunMigrationsRecordsBothVersions(t *testing.T) {
 		}
 		versions = append(versions, v)
 	}
-	if len(versions) != 2 || versions[0] != 1 || versions[1] != 2 {
-		t.Fatalf("expected versions [1 2], got %v", versions)
+	if len(versions) != 3 || versions[0] != 1 || versions[1] != 2 || versions[2] != 3 {
+		t.Fatalf("expected versions [1 2 3], got %v", versions)
+	}
+}
+
+func TestRunMigrationsMigration3AddsPublicIDColumn(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	db.SetMaxOpenConns(1)
+	defer db.Close()
+
+	if err := runMigrations(db, sqliteDialect{}); err != nil {
+		t.Fatalf("runMigrations: %v", err)
+	}
+
+	// The column must exist and accept NULL.
+	if _, err := db.Exec(`INSERT INTO jobs (id, created_at, public_id) VALUES ('x', '2026-01-01T00:00:00Z', NULL)`); err != nil {
+		t.Fatalf("insert with NULL public_id: %v", err)
+	}
+	var val sql.NullString
+	if err := db.QueryRow(`SELECT public_id FROM jobs WHERE id = 'x'`).Scan(&val); err != nil {
+		t.Fatalf("select public_id: %v", err)
+	}
+	if val.Valid {
+		t.Fatalf("expected NULL, got %q", val.String)
+	}
+}
+
+func TestRunMigrationsMigration3UniqueIndexEnforced(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	db.SetMaxOpenConns(1)
+	defer db.Close()
+
+	if err := runMigrations(db, sqliteDialect{}); err != nil {
+		t.Fatalf("runMigrations: %v", err)
+	}
+
+	if _, err := db.Exec(`INSERT INTO jobs (id, created_at, public_id) VALUES ('a', '2026-01-01T00:00:00Z', 'abc12345')`); err != nil {
+		t.Fatalf("first insert: %v", err)
+	}
+	if _, err := db.Exec(`INSERT INTO jobs (id, created_at, public_id) VALUES ('b', '2026-01-01T00:00:00Z', 'abc12345')`); err == nil {
+		t.Fatal("expected unique constraint violation on duplicate public_id")
+	}
+}
+
+func TestRunMigrationsMigration3NullNotUniqueViolation(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	db.SetMaxOpenConns(1)
+	defer db.Close()
+
+	if err := runMigrations(db, sqliteDialect{}); err != nil {
+		t.Fatalf("runMigrations: %v", err)
+	}
+
+	// Multiple NULL values must not violate the unique constraint.
+	for _, id := range []string{"r1", "r2", "r3"} {
+		if _, err := db.Exec(`INSERT INTO jobs (id, created_at, public_id) VALUES (?, '2026-01-01T00:00:00Z', NULL)`, id); err != nil {
+			t.Fatalf("insert NULL public_id for %s: %v", id, err)
+		}
+	}
+}
+
+func TestBackfillPublicIDsSetsNullRows(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	db.SetMaxOpenConns(1)
+	defer db.Close()
+
+	if err := runMigrations(db, sqliteDialect{}); err != nil {
+		t.Fatalf("runMigrations: %v", err)
+	}
+	// Insert two jobs with NULL public_id (pre-migration rows).
+	for _, id := range []string{"old1", "old2"} {
+		if _, err := db.Exec(`INSERT INTO jobs (id, created_at, public_id) VALUES (?, '2026-01-01T00:00:00Z', NULL)`, id); err != nil {
+			t.Fatalf("insert: %v", err)
+		}
+	}
+
+	if err := backfillPublicIDs(db, sqliteDialect{}); err != nil {
+		t.Fatalf("backfillPublicIDs: %v", err)
+	}
+
+	rows, err := db.Query(`SELECT id, public_id FROM jobs`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		var pubID sql.NullString
+		if err := rows.Scan(&id, &pubID); err != nil {
+			t.Fatal(err)
+		}
+		if !pubID.Valid || pubID.String == "" {
+			t.Errorf("job %q still has NULL/empty public_id after backfill", id)
+		}
+	}
+}
+
+func TestBackfillPublicIDsIdempotent(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	db.SetMaxOpenConns(1)
+	defer db.Close()
+
+	if err := runMigrations(db, sqliteDialect{}); err != nil {
+		t.Fatalf("runMigrations: %v", err)
+	}
+	if _, err := db.Exec(`INSERT INTO jobs (id, created_at, public_id) VALUES ('j1', '2026-01-01T00:00:00Z', NULL)`); err != nil {
+		t.Fatal(err)
+	}
+	if err := backfillPublicIDs(db, sqliteDialect{}); err != nil {
+		t.Fatalf("first backfill: %v", err)
+	}
+	var first sql.NullString
+	if err := db.QueryRow(`SELECT public_id FROM jobs WHERE id = 'j1'`).Scan(&first); err != nil {
+		t.Fatal(err)
+	}
+	// Second call must not change already-set IDs.
+	if err := backfillPublicIDs(db, sqliteDialect{}); err != nil {
+		t.Fatalf("second backfill: %v", err)
+	}
+	var second sql.NullString
+	if err := db.QueryRow(`SELECT public_id FROM jobs WHERE id = 'j1'`).Scan(&second); err != nil {
+		t.Fatal(err)
+	}
+	if first.String != second.String {
+		t.Fatalf("second backfill changed public_id from %q to %q", first.String, second.String)
 	}
 }
 
@@ -370,6 +508,74 @@ func TestSQLJobStoreGetMissing(t *testing.T) {
 			_, ok := s.Get("does-not-exist")
 			if ok {
 				t.Fatal("expected ok=false for missing job")
+			}
+		})
+	}
+}
+
+// ---- GetByPublicID ---------------------------------------------------------
+
+func TestSQLJobStoreCreateSetsPublicID(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			created, err := s.Create(Job{ID: "j1", Domain: "example.com", Status: JobQueued, CreatedAt: time.Now().UTC()})
+			if err != nil {
+				t.Fatalf("Create: %v", err)
+			}
+			if created.PublicID == "" {
+				t.Fatal("expected PublicID to be set after Create")
+			}
+			// Round-trip: Get must also return the public ID.
+			got, ok := s.Get("j1")
+			if !ok {
+				t.Fatal("Get: not found")
+			}
+			if got.PublicID != created.PublicID {
+				t.Fatalf("Get returned PublicID %q, want %q", got.PublicID, created.PublicID)
+			}
+		})
+	}
+}
+
+func TestSQLJobStoreCreatePreservesExplicitPublicID(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			created, err := s.Create(Job{ID: "j1", PublicID: "myid1234", Domain: "example.com", Status: JobQueued, CreatedAt: time.Now().UTC()})
+			if err != nil {
+				t.Fatalf("Create: %v", err)
+			}
+			if created.PublicID != "myid1234" {
+				t.Fatalf("got PublicID %q, want %q", created.PublicID, "myid1234")
+			}
+		})
+	}
+}
+
+func TestSQLJobStoreGetByPublicIDReturnsJob(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			created, _ := s.Create(Job{ID: "j1", Domain: "example.com", Status: JobQueued, CreatedAt: time.Now().UTC()})
+			got, ok := s.GetByPublicID(created.PublicID)
+			if !ok {
+				t.Fatal("expected job to be found by public ID")
+			}
+			if got.ID != "j1" {
+				t.Fatalf("got ID %q, want %q", got.ID, "j1")
+			}
+		})
+	}
+}
+
+func TestSQLJobStoreGetByPublicIDMissingReturnsFalse(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			_, ok := s.GetByPublicID("notexist")
+			if ok {
+				t.Fatal("expected false for unknown public ID")
 			}
 		})
 	}

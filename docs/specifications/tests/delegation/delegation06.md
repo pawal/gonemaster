@@ -29,7 +29,7 @@ Status: Final
    - If response has `RCODE=NOERROR` and SOA answer section is empty, emit `SOA_NOT_EXISTS` (`ns`).
 5. After all tasks, emit `SOA_EXISTS` only when both conditions are true:
    - At least one nameserver was present (`Method4` or `Method5` non-empty).
-   - No tag other than `TEST_CASE_START` has been emitted.
+   - No `SOA_NOT_EXISTS` tag has been emitted (transport-disabled debug tags do not suppress this).
 6. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
@@ -37,7 +37,7 @@ Status: Final
 | --- | --- |
 | `IPV4_DISABLED` | IPv4 nameserver evaluation is skipped because IPv4 is disabled. |
 | `IPV6_DISABLED` | IPv6 nameserver evaluation is skipped because IPv6 is disabled. |
-| `SOA_EXISTS` | Nameserver set is non-empty and testcase emitted no finding besides start marker. |
+| `SOA_EXISTS` | Nameserver set is non-empty and no `SOA_NOT_EXISTS` tag was emitted. |
 | `SOA_NOT_EXISTS` | SOA query returned `NOERROR` but answer section had no SOA RR. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
@@ -83,5 +83,5 @@ Status: Final
 
 ## Edge Cases And Limitations
 - Non-`NOERROR` responses and query failures do not emit `SOA_NOT_EXISTS`.
-- `SOA_EXISTS` is suppressed by any non-start tag, including transport-disabled debug tags.
+- `SOA_EXISTS` is suppressed only by `SOA_NOT_EXISTS`; transport-disabled debug tags (`IPV4_DISABLED`, `IPV6_DISABLED`) do not suppress it.
 - If no nameservers are available from `Method4` and `Method5`, testcase emits start/end only.

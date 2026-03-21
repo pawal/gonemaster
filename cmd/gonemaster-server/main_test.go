@@ -189,6 +189,88 @@ func TestRunSourceAddr6Validation(t *testing.T) {
 	}
 }
 
+func TestRunPublicAPIRateLimitMaxValidation(t *testing.T) {
+	out := newTempFile(t)
+	errOut := newTempFile(t)
+	defer cleanupTempFile(t, out)
+	defer cleanupTempFile(t, errOut)
+
+	code := run([]string{"--public-api-rate-limit-max", "0"}, out, errOut)
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d", code)
+	}
+	errText := readTempFile(t, errOut)
+	if !strings.Contains(errText, "--public-api-rate-limit-max must be >= 1") {
+		t.Fatalf("expected validation error, got %q", errText)
+	}
+}
+
+func TestRunPublicAPIRateLimitWindowValidation(t *testing.T) {
+	out := newTempFile(t)
+	errOut := newTempFile(t)
+	defer cleanupTempFile(t, out)
+	defer cleanupTempFile(t, errOut)
+
+	code := run([]string{"--public-api-rate-limit-window", "-1s"}, out, errOut)
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d", code)
+	}
+	errText := readTempFile(t, errOut)
+	if !strings.Contains(errText, "--public-api-rate-limit-window must be positive") {
+		t.Fatalf("expected validation error, got %q", errText)
+	}
+}
+
+func TestRunPublicAPIRateLimitDumpConfig(t *testing.T) {
+	out := newTempFile(t)
+	errOut := newTempFile(t)
+	defer cleanupTempFile(t, out)
+	defer cleanupTempFile(t, errOut)
+
+	code := run([]string{
+		"--dump-config",
+		"--public-api-rate-limit-enabled",
+		"--public-api-rate-limit-max", "20",
+		"--public-api-rate-limit-window", "5m",
+	}, out, errOut)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	outText := readTempFile(t, out)
+	for _, want := range []string{
+		`"rate_limit_enabled": true`,
+		`"rate_limit_max": 20`,
+		`"rate_limit_window": "5m0s"`,
+	} {
+		if !strings.Contains(outText, want) {
+			t.Fatalf("expected %q in dump-config output, got:\n%s", want, outText)
+		}
+	}
+}
+
+func TestRunPublicAPIRateLimitHelpText(t *testing.T) {
+	out := newTempFile(t)
+	errOut := newTempFile(t)
+	defer cleanupTempFile(t, out)
+	defer cleanupTempFile(t, errOut)
+
+	run([]string{"-h"}, out, errOut)
+	help := readTempFile(t, errOut)
+	for _, want := range []string{
+		"Public API:",
+		"--public-api-rate-limit-enabled",
+		"--public-api-rate-limit-max",
+		"--public-api-rate-limit-window",
+		"GONEMASTER_PUBLIC_API_RATE_LIMIT_ENABLED",
+		"GONEMASTER_PUBLIC_API_RATE_LIMIT_MAX",
+		"GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW",
+	} {
+		if !strings.Contains(help, want) {
+			t.Fatalf("expected %q in help output, got:\n%s", want, help)
+		}
+	}
+}
+
 func newTempFile(t *testing.T) *os.File {
 	t.Helper()
 	f, err := os.CreateTemp("", "gm-server-*.log")

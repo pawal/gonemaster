@@ -22,6 +22,7 @@ _Do not edit by hand - regenerate with the command above._
 | `CN01_NO_RESPONSE_SOA_QUERY_UDP` | `WARNING` | [connectivity01](../tests/connectivity/connectivity01.md) | yes |
 | `CN01_NO_RESPONSE_UDP` | `WARNING` | [connectivity01](../tests/connectivity/connectivity01.md) | yes |
 | `CN01_NS_RECORD_NOT_AA_UDP` | `WARNING` | [connectivity01](../tests/connectivity/connectivity01.md) | yes |
+| `CN01_OK_UDP` | `INFO` | [connectivity01](../tests/connectivity/connectivity01.md) | yes |
 | `CN01_SOA_RECORD_NOT_AA_UDP` | `WARNING` | [connectivity01](../tests/connectivity/connectivity01.md) | yes |
 | `CN01_UNEXPECTED_RCODE_NS_QUERY_UDP` | `WARNING` | [connectivity01](../tests/connectivity/connectivity01.md) | yes |
 | `CN01_UNEXPECTED_RCODE_SOA_QUERY_UDP` | `WARNING` | [connectivity01](../tests/connectivity/connectivity01.md) | yes |
@@ -33,6 +34,7 @@ _Do not edit by hand - regenerate with the command above._
 | `CN02_NO_RESPONSE_SOA_QUERY_TCP` | `WARNING` | [connectivity02](../tests/connectivity/connectivity02.md) | yes |
 | `CN02_NO_RESPONSE_TCP` | `WARNING` | [connectivity02](../tests/connectivity/connectivity02.md) | yes |
 | `CN02_NS_RECORD_NOT_AA_TCP` | `WARNING` | [connectivity02](../tests/connectivity/connectivity02.md) | yes |
+| `CN02_OK_TCP` | `INFO` | [connectivity02](../tests/connectivity/connectivity02.md) | yes |
 | `CN02_SOA_RECORD_NOT_AA_TCP` | `WARNING` | [connectivity02](../tests/connectivity/connectivity02.md) | yes |
 | `CN02_UNEXPECTED_RCODE_NS_QUERY_TCP` | `WARNING` | [connectivity02](../tests/connectivity/connectivity02.md) | yes |
 | `CN02_UNEXPECTED_RCODE_SOA_QUERY_TCP` | `WARNING` | [connectivity02](../tests/connectivity/connectivity02.md) | yes |

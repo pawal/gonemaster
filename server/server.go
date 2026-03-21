@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
+	serverpublic "codeberg.org/pawal/gonemaster/server/public"
 	serverui "codeberg.org/pawal/gonemaster/server/ui"
 )
 
@@ -29,6 +30,7 @@ type Server struct {
 	engineLimiter            *engineLimiter
 	cancelMu                 sync.Mutex
 	cancels                  map[string]context.CancelFunc
+	rateLimiter              *RateLimiter
 }
 
 // New builds a server with in-memory components.
@@ -64,6 +66,10 @@ func NewWithOptions(cfg Config) (*Server, error) {
 			_ = db.Close()
 			return nil, fmt.Errorf("run migrations: %w", err)
 		}
+		if err := backfillPublicIDs(db, dialect); err != nil {
+			_ = db.Close()
+			return nil, fmt.Errorf("backfill public IDs: %w", err)
+		}
 		store = NewSQLJobStore(db, dialect)
 	}
 
@@ -93,6 +99,9 @@ func newServer(cfg Config, store JobStore, queue Queue) *Server {
 		engineRunner:             engine.Run,
 		engineLimiter:            newEngineLimiter(cfg.MaxConcurrentJobs),
 		cancels:                  map[string]context.CancelFunc{},
+	}
+	if cfg.PublicAPI.RateLimitEnabled {
+		s.rateLimiter = NewRateLimiter(cfg.PublicAPI.RateLimitMax, cfg.PublicAPI.RateLimitWindow.Duration)
 	}
 	s.routes()
 	return s
@@ -127,5 +136,20 @@ func (s *Server) routes() {
 	s.mux.Handle("/api/v1", s.apiMetricsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/api/v1/", http.StatusMovedPermanently)
 	})))
+
+	pubMux := http.NewServeMux()
+	pubMux.HandleFunc("POST /jobs", s.handlePublicCreateJob)
+	pubMux.HandleFunc("GET /jobs/{publicID}/result", s.handlePublicGetResult)
+	pubMux.HandleFunc("GET /jobs/{publicID}", s.handlePublicGetJob)
+	pubMux.HandleFunc("GET /locales", s.handleLocales)
+	pubMux.HandleFunc("GET /lookup/{domain}", s.handlePublicLookupDomain)
+	pubMux.HandleFunc("GET /version", s.handlePublicVersion)
+	var pubHandler http.Handler = http.StripPrefix("/pub/api/v1", pubMux)
+	if s.rateLimiter != nil {
+		pubHandler = rateLimitMiddleware(s.rateLimiter, pubHandler)
+	}
+	s.mux.Handle("/pub/api/v1/", pubHandler)
+
+	s.mux.Handle("/public/", http.StripPrefix("/public", serverpublic.Handler()))
 	s.mux.Handle("/", serverui.Handler())
 }

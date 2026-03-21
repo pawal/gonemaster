@@ -40,12 +40,14 @@ Status: Final
    - `DS08_NO_MATCHING_DNSKEY`
    - `DS08_RRSIG_NOT_VALID_BY_DNSKEY`
    - `DS08_ALGO_NOT_SUPPORTED_BY_ZM`
-5. Emit `TEST_CASE_END`.
+5. Collect nameserver IPs that had RRSIGs and emitted no DS08 failure; if non-empty emit `DS08_DNSKEY_RRSIG_VALID`.
+6. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
 | `DS08_ALGO_NOT_SUPPORTED_BY_ZM` | RRSIG verification requires an unsupported DNSSEC algorithm. |
+| `DS08_DNSKEY_RRSIG_VALID` | At least one nameserver returned DNSKEY with RRSIG and all RRSIG checks passed. |
 | `DS08_DNSKEY_RRSIG_EXPIRED` | DNSKEY-related RRSIG expiration is before packet test time. |
 | `DS08_DNSKEY_RRSIG_NOT_YET_VALID` | DNSKEY-related RRSIG inception is after packet test time. |
 | `DS08_MISSING_RRSIG_IN_RESPONSE` | DNSKEY answer exists but contains no RRSIG records. |
@@ -67,6 +69,7 @@ Status: Final
 | `DS08_DNSKEY_RRSIG_EXPIRED` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS08_DNSKEY_RRSIG_NOT_YET_VALID` | `keytag` | `int` | RRSIG keytag with not-yet-valid validity window. |
 | `DS08_DNSKEY_RRSIG_NOT_YET_VALID` | `addresses` | `array<string>` | Structured child nameserver IP list. |
+| `DS08_DNSKEY_RRSIG_VALID` | `addresses` | `array<string>` | Structured child nameserver IP list where all DNSKEY RRSIG checks passed. |
 | `DS08_MISSING_RRSIG_IN_RESPONSE` | `addresses` | `array<string>` | Structured child nameserver IP list lacking RRSIG in DNSKEY response. |
 | `DS08_NO_MATCHING_DNSKEY` | `keytag` | `int` | RRSIG keytag with no matching DNSKEY keytag in DNSKEY RRset. |
 | `DS08_NO_MATCHING_DNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
@@ -87,6 +90,7 @@ Status: Final
 | `DS08_ALGO_NOT_SUPPORTED_BY_ZM` | `NOTICE` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS08_DNSKEY_RRSIG_EXPIRED` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS08_DNSKEY_RRSIG_NOT_YET_VALID` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `DS08_DNSKEY_RRSIG_VALID` | `INFO` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS08_MISSING_RRSIG_IN_RESPONSE` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS08_NO_MATCHING_DNSKEY` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS08_RRSIG_NOT_VALID_BY_DNSKEY` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |

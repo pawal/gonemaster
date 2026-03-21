@@ -50,6 +50,9 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	var dbDriver string
 	var dbDSN string
 	var dbRetentionDays int
+	var pubAPIRateLimitEnabled bool
+	var pubAPIRateLimitMax int
+	var pubAPIRateLimitWindow time.Duration
 	var showVersion bool
 	var dumpConfig bool
 	var shutdownTimeout time.Duration
@@ -91,6 +94,11 @@ func run(args []string, out *os.File, errOut *os.File) int {
 			{flag: "--db-dsn DSN", detail: "SQLite: file path e.g. /var/lib/gonemaster/jobs.db (env: GONEMASTER_DB_DSN)"},
 			{flag: "--db-retention-days N", detail: "Delete completed jobs older than N days (0 = keep forever) (env: GONEMASTER_DB_RETENTION_DAYS)"},
 		})
+		printUsageGroup(errOut, "Public API", []usageLine{
+			{flag: "--public-api-rate-limit-enabled", detail: "Enable per-IP rate limiting on POST /pub/api/v1/jobs (env: GONEMASTER_PUBLIC_API_RATE_LIMIT_ENABLED)"},
+			{flag: "--public-api-rate-limit-max N", detail: "Max job submissions per IP per window (default 10) (env: GONEMASTER_PUBLIC_API_RATE_LIMIT_MAX)"},
+			{flag: "--public-api-rate-limit-window DURATION", detail: "Rate limit sliding window e.g. 5m (default 10m) (env: GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW)"},
+		})
 		printUsageGroup(errOut, "Output", []usageLine{
 			{flag: "--min-level LEVEL", detail: "Minimum result log level (default INFO)"},
 		})
@@ -115,6 +123,9 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	fs.StringVar(&dbDriver, "db-driver", "", "Storage backend: sqlite (empty = in-memory)")
 	fs.StringVar(&dbDSN, "db-dsn", "", "Database file path or connection string (optional)")
 	fs.IntVar(&dbRetentionDays, "db-retention-days", 0, "Delete completed jobs older than N days (0 = keep forever)")
+	fs.BoolVar(&pubAPIRateLimitEnabled, "public-api-rate-limit-enabled", false, "Enable per-IP rate limiting on POST /pub/api/v1/jobs")
+	fs.IntVar(&pubAPIRateLimitMax, "public-api-rate-limit-max", 0, "Max job submissions per IP per window (default 10)")
+	fs.DurationVar(&pubAPIRateLimitWindow, "public-api-rate-limit-window", 0, "Rate limit sliding window e.g. 5m (default 10m)")
 	fs.BoolVar(&showVersion, "version", false, "Print version and exit (optional)")
 	fs.BoolVar(&dumpConfig, "dump-config", false, "Print effective config as JSON and exit")
 	fs.DurationVar(&shutdownTimeout, "shutdown-timeout", 10*time.Second, "Graceful shutdown timeout (default 10s)")
@@ -161,6 +172,14 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	}
 	if flagsSet["db-retention-days"] && dbRetentionDays < 0 {
 		fmt.Fprintln(errOut, "--db-retention-days must be >= 0")
+		return 2
+	}
+	if flagsSet["public-api-rate-limit-max"] && pubAPIRateLimitMax < 1 {
+		fmt.Fprintln(errOut, "--public-api-rate-limit-max must be >= 1")
+		return 2
+	}
+	if flagsSet["public-api-rate-limit-window"] && pubAPIRateLimitWindow <= 0 {
+		fmt.Fprintln(errOut, "--public-api-rate-limit-window must be positive")
 		return 2
 	}
 	if flagsSet["fallback"] && flagsSet["no-fallback"] {
@@ -258,6 +277,15 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	}
 	if flagsSet["db-retention-days"] {
 		cfg.Database.RetentionDays = dbRetentionDays
+	}
+	if flagsSet["public-api-rate-limit-enabled"] {
+		cfg.PublicAPI.RateLimitEnabled = pubAPIRateLimitEnabled
+	}
+	if flagsSet["public-api-rate-limit-max"] {
+		cfg.PublicAPI.RateLimitMax = pubAPIRateLimitMax
+	}
+	if flagsSet["public-api-rate-limit-window"] {
+		cfg.PublicAPI.RateLimitWindow = server.Duration{Duration: pubAPIRateLimitWindow}
 	}
 
 	if dumpConfig {

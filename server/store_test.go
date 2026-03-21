@@ -500,6 +500,65 @@ func TestInMemoryJobStorePurgeOlderThanReturnsZeroWhenEmpty(t *testing.T) {
 	}
 }
 
+func TestInMemoryJobStoreCreateSetsPublicID(t *testing.T) {
+	store := NewInMemoryJobStore()
+	created, err := store.Create(Job{ID: "j1", Domain: "example.com", Status: JobQueued})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if created.PublicID == "" {
+		t.Fatal("expected PublicID to be set after Create")
+	}
+}
+
+func TestInMemoryJobStoreGetByPublicIDReturnsJob(t *testing.T) {
+	store := NewInMemoryJobStore()
+	created, _ := store.Create(Job{ID: "j1", Domain: "example.com", Status: JobQueued})
+	got, ok := store.GetByPublicID(created.PublicID)
+	if !ok {
+		t.Fatal("expected job to be found by public ID")
+	}
+	if got.ID != "j1" {
+		t.Fatalf("got ID %q, want %q", got.ID, "j1")
+	}
+}
+
+func TestInMemoryJobStoreGetByPublicIDMissingReturnsFalse(t *testing.T) {
+	store := NewInMemoryJobStore()
+	_, ok := store.GetByPublicID("notexist")
+	if ok {
+		t.Fatal("expected false for unknown public ID")
+	}
+}
+
+func TestInMemoryJobStoreCreatePreservesExplicitPublicID(t *testing.T) {
+	store := NewInMemoryJobStore()
+	created, _ := store.Create(Job{ID: "j1", PublicID: "myid1234", Domain: "example.com", Status: JobQueued})
+	if created.PublicID != "myid1234" {
+		t.Fatalf("got %q, want %q", created.PublicID, "myid1234")
+	}
+	got, ok := store.GetByPublicID("myid1234")
+	if !ok || got.ID != "j1" {
+		t.Fatal("job not reachable by explicit public ID")
+	}
+}
+
+func TestInMemoryJobStorePurgeRemovesPublicIDIndex(t *testing.T) {
+	store := NewInMemoryJobStore()
+	created, _ := store.Create(Job{
+		ID:         "j1",
+		Domain:     "example.com",
+		Status:     JobSucceeded,
+		FinishedAt: time.Now().UTC().Add(-48 * time.Hour),
+	})
+	pubID := created.PublicID
+	store.PurgeOlderThan(time.Now().UTC())
+	_, ok := store.GetByPublicID(pubID)
+	if ok {
+		t.Fatal("expected public ID index to be cleaned up after purge")
+	}
+}
+
 func seedJob(store *InMemoryJobStore, id, batch string, created time.Time, status JobStatus) error {
 	job := Job{
 		ID:        id,

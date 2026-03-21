@@ -3,6 +3,7 @@ package main
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"codeberg.org/pawal/gonemaster/server"
 )
@@ -293,5 +294,112 @@ func TestApplyEnvVarsDBRetentionDaysCLIWins(t *testing.T) {
 	}), &warn)
 	if cfg.Database.RetentionDays != 30 {
 		t.Fatalf("expected CLI value 30 to win, got %d", cfg.Database.RetentionDays)
+	}
+}
+
+func TestApplyEnvVarsPublicAPIRateLimitEnabled(t *testing.T) {
+	cfg := server.DefaultConfig()
+	var warn strings.Builder
+	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
+		"GONEMASTER_PUBLIC_API_RATE_LIMIT_ENABLED": "true",
+	}), &warn)
+	if !cfg.PublicAPI.RateLimitEnabled {
+		t.Fatal("expected RateLimitEnabled=true")
+	}
+	if warn.String() != "" {
+		t.Fatalf("unexpected warning: %q", warn.String())
+	}
+}
+
+func TestApplyEnvVarsPublicAPIRateLimitEnabledInvalidIsWarning(t *testing.T) {
+	cfg := server.DefaultConfig()
+	var warn strings.Builder
+	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
+		"GONEMASTER_PUBLIC_API_RATE_LIMIT_ENABLED": "maybe",
+	}), &warn)
+	if cfg.PublicAPI.RateLimitEnabled {
+		t.Fatal("expected RateLimitEnabled unchanged (false)")
+	}
+	if !strings.Contains(warn.String(), "GONEMASTER_PUBLIC_API_RATE_LIMIT_ENABLED") {
+		t.Fatalf("expected warning mentioning env var, got %q", warn.String())
+	}
+}
+
+func TestApplyEnvVarsPublicAPIRateLimitEnabledCLIWins(t *testing.T) {
+	cfg := server.DefaultConfig()
+	cfg.PublicAPI.RateLimitEnabled = true
+	var warn strings.Builder
+	applyEnvVars(&cfg, map[string]bool{"public-api-rate-limit-enabled": true}, fakeEnv(map[string]string{
+		"GONEMASTER_PUBLIC_API_RATE_LIMIT_ENABLED": "false",
+	}), &warn)
+	if !cfg.PublicAPI.RateLimitEnabled {
+		t.Fatal("expected CLI value true to win")
+	}
+}
+
+func TestApplyEnvVarsPublicAPIRateLimitMax(t *testing.T) {
+	cfg := server.DefaultConfig()
+	var warn strings.Builder
+	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
+		"GONEMASTER_PUBLIC_API_RATE_LIMIT_MAX": "50",
+	}), &warn)
+	if cfg.PublicAPI.RateLimitMax != 50 {
+		t.Fatalf("expected RateLimitMax=50, got %d", cfg.PublicAPI.RateLimitMax)
+	}
+}
+
+func TestApplyEnvVarsPublicAPIRateLimitMaxInvalidIsWarning(t *testing.T) {
+	cfg := server.DefaultConfig()
+	original := cfg.PublicAPI.RateLimitMax
+	var warn strings.Builder
+	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
+		"GONEMASTER_PUBLIC_API_RATE_LIMIT_MAX": "notanumber",
+	}), &warn)
+	if cfg.PublicAPI.RateLimitMax != original {
+		t.Fatalf("expected RateLimitMax unchanged (%d), got %d", original, cfg.PublicAPI.RateLimitMax)
+	}
+	if !strings.Contains(warn.String(), "GONEMASTER_PUBLIC_API_RATE_LIMIT_MAX") {
+		t.Fatalf("expected warning mentioning env var, got %q", warn.String())
+	}
+}
+
+func TestApplyEnvVarsPublicAPIRateLimitWindow(t *testing.T) {
+	cfg := server.DefaultConfig()
+	var warn strings.Builder
+	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
+		"GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW": "2m",
+	}), &warn)
+	if cfg.PublicAPI.RateLimitWindow.Duration != 2*time.Minute {
+		t.Fatalf("expected RateLimitWindow=2m, got %v", cfg.PublicAPI.RateLimitWindow)
+	}
+	if warn.String() != "" {
+		t.Fatalf("unexpected warning: %q", warn.String())
+	}
+}
+
+func TestApplyEnvVarsPublicAPIRateLimitWindowInvalidIsWarning(t *testing.T) {
+	cfg := server.DefaultConfig()
+	original := cfg.PublicAPI.RateLimitWindow
+	var warn strings.Builder
+	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
+		"GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW": "notaduration",
+	}), &warn)
+	if cfg.PublicAPI.RateLimitWindow != original {
+		t.Fatalf("expected RateLimitWindow unchanged, got %v", cfg.PublicAPI.RateLimitWindow)
+	}
+	if !strings.Contains(warn.String(), "GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW") {
+		t.Fatalf("expected warning mentioning env var, got %q", warn.String())
+	}
+}
+
+func TestApplyEnvVarsPublicAPIRateLimitWindowCLIWins(t *testing.T) {
+	cfg := server.DefaultConfig()
+	var warn strings.Builder
+	applyEnvVars(&cfg, map[string]bool{"public-api-rate-limit-window": true}, fakeEnv(map[string]string{
+		"GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW": "30s",
+	}), &warn)
+	// Default is 10m — env must be ignored.
+	if cfg.PublicAPI.RateLimitWindow.Duration != 10*time.Minute {
+		t.Fatalf("expected default 10m to be preserved, got %v", cfg.PublicAPI.RateLimitWindow)
 	}
 }

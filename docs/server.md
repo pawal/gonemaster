@@ -92,6 +92,9 @@ Configuration is applied in priority order (highest wins):
 | `GONEMASTER_DB_DRIVER` | `database.driver` | |
 | `GONEMASTER_DB_DSN` | `database.dsn` | Use this for connection strings containing passwords |
 | `GONEMASTER_DB_RETENTION_DAYS` | `database.retention_days` | integer; 0 = keep forever |
+| `GONEMASTER_PUBLIC_API_RATE_LIMIT_ENABLED` | `public_api.rate_limit_enabled` | `true`/`false`/`1`/`0` |
+| `GONEMASTER_PUBLIC_API_RATE_LIMIT_MAX` | `public_api.rate_limit_max` | integer; requests per window per IP |
+| `GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW` | `public_api.rate_limit_window` | Go duration string e.g. `10m` |
 
 Invalid values for integer or boolean variables emit a warning and are ignored (the server continues with the lower-priority value).
 
@@ -203,6 +206,94 @@ gonemaster-server --db-driver sqlite --db-dsn /var/lib/gonemaster/gonemaster.db 
 
 Recommended production setting: `90` days.
 
+### Public API
+
+The server exposes a separate, restricted API at `/pub/api/v1/` intended for
+reverse-proxy exposure to untrusted clients. It supports job submission and
+result lookup by an opaque public ID; internal UUIDs are never disclosed.
+
+Available endpoints:
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/pub/api/v1/jobs` | Submit a job (returns `public_id`, not internal UUID) |
+| `GET` | `/pub/api/v1/jobs/{public_id}` | Poll job status by public ID |
+| `GET` | `/pub/api/v1/jobs/{public_id}/result` | Fetch result by public ID |
+| `GET` | `/pub/api/v1/locales` | List available locale codes |
+
+Admin-only paths (`/metrics`, `/queue/*`, `/batches`, `/jobs/purge`) are not
+reachable via the `/pub/` prefix — the boundary is enforced server-side.
+
+#### Rate limiting
+
+The public API supports per-IP sliding-window rate limiting on `POST /pub/api/v1/jobs`.
+GET requests are never counted. Blocked requests receive `429 Too Many Requests`
+with a `Retry-After` header indicating how many seconds to wait.
+
+Rate limiting uses the client IP resolved from (in order):
+`X-Forwarded-For` first value, `X-Real-IP`, `RemoteAddr`.
+
+Enable and configure via flags, environment variables, or config file:
+
+```
+gonemaster-server \
+  --public-api-rate-limit-enabled \
+  --public-api-rate-limit-max 10 \
+  --public-api-rate-limit-window 10m
+```
+
+| Setting | Default | Description |
+|---|---|---|
+| `public_api.rate_limit_enabled` | `false` | Enable rate limiting |
+| `public_api.rate_limit_max` | `10` | Max submissions per IP per window |
+| `public_api.rate_limit_window` | `10m` | Sliding window duration |
+
+### Reverse proxy setup
+
+To expose the public UI and its API to the internet while keeping the admin
+interface private, configure your reverse proxy to forward only two path
+prefixes:
+
+| Prefix | Purpose |
+|---|---|
+| `/public/` | Public Svelte SPA (static assets) |
+| `/pub/api/v1/` | Public API (job submission and result lookup) |
+
+The server enforces the boundary internally — no additional path filtering
+is required in the proxy.
+
+#### nginx
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name dns.example.com;
+
+    location /public/ {
+        proxy_pass http://127.0.0.1:8080/public/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    location /pub/api/v1/ {
+        proxy_pass http://127.0.0.1:8080/pub/api/v1/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+```
+
+#### Caddy
+
+```caddyfile
+dns.example.com {
+    reverse_proxy /public/* localhost:8080
+    reverse_proxy /pub/api/v1/* localhost:8080
+}
+```
+
 ### Config example
 ```json
 {
@@ -223,6 +314,11 @@ Recommended production setting: `90` days.
     "driver": "sqlite",
     "dsn": "/var/lib/gonemaster/gonemaster.db",
     "retention_days": 90
+  },
+  "public_api": {
+    "rate_limit_enabled": true,
+    "rate_limit_max": 10,
+    "rate_limit_window": "10m"
   }
 }
 ```
@@ -247,6 +343,9 @@ Recommended production setting: `90` days.
 - `--db-driver` Storage backend (`memory`, `sqlite`, `postgres`, `mariadb`; env: `GONEMASTER_DB_DRIVER`)
 - `--db-dsn` Database file path or connection string (env: `GONEMASTER_DB_DSN`)
 - `--db-retention-days` Delete completed jobs older than N days; 0 = keep forever (env: `GONEMASTER_DB_RETENTION_DAYS`)
+- `--public-api-rate-limit-enabled` Enable per-IP rate limiting on `POST /pub/api/v1/jobs` (env: `GONEMASTER_PUBLIC_API_RATE_LIMIT_ENABLED`)
+- `--public-api-rate-limit-max` Max submissions per IP per window, default 10 (env: `GONEMASTER_PUBLIC_API_RATE_LIMIT_MAX`)
+- `--public-api-rate-limit-window` Sliding window duration e.g. `10m`, default `10m` (env: `GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW`)
 
 ## Domain normalization (IDN)
 Domains are normalized to IDNA A-labels (punycode). For example:

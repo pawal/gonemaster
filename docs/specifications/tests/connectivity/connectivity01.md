@@ -33,6 +33,9 @@ Status: Final
      - No `<QTYPE>` record in answer -> `CN01_MISSING_<QTYPE>_RECORD_UDP`.
      - First answer owner name differs from child zone -> `CN01_WRONG_<QTYPE>_RECORD_UDP`.
      - AA flag unset -> `CN01_<QTYPE>_RECORD_NOT_AA_UDP`.
+   - If all checks passed, record nameserver as ok.
+5. If any nameservers passed all checks, emit one `CN01_OK_UDP` with `servers` listing them all.
+6. Emit `TEST_CASE_END`.
 5. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
@@ -46,6 +49,7 @@ Status: Final
 | `CN01_NO_RESPONSE_SOA_QUERY_UDP` | SOA query has no response message while NS handling continues. |
 | `CN01_NO_RESPONSE_UDP` | Both SOA and NS queries have no response message. |
 | `CN01_NS_RECORD_NOT_AA_UDP` | NS response has expected owner and record but AA flag is unset. |
+| `CN01_OK_UDP` | Nameserver responds correctly to both SOA and NS queries over UDP. |
 | `CN01_SOA_RECORD_NOT_AA_UDP` | SOA response has expected owner and record but AA flag is unset. |
 | `CN01_UNEXPECTED_RCODE_NS_QUERY_UDP` | NS response RCODE is not `NOERROR`. |
 | `CN01_UNEXPECTED_RCODE_SOA_QUERY_UDP` | SOA response RCODE is not `NOERROR`. |
@@ -73,6 +77,7 @@ Status: Final
 | `CN01_NO_RESPONSE_UDP` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `CN01_NS_RECORD_NOT_AA_UDP` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with non-AA NS response. |
 | `CN01_NS_RECORD_NOT_AA_UDP` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `CN01_OK_UDP` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` objects) that responded correctly over UDP. |
 | `CN01_SOA_RECORD_NOT_AA_UDP` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with non-AA SOA response. |
 | `CN01_SOA_RECORD_NOT_AA_UDP` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `CN01_UNEXPECTED_RCODE_NS_QUERY_UDP` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) producing unexpected NS RCODE. |
@@ -109,6 +114,7 @@ Status: Final
 | `CN01_NO_RESPONSE_SOA_QUERY_UDP` | `WARNING` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
 | `CN01_NO_RESPONSE_UDP` | `WARNING` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
 | `CN01_NS_RECORD_NOT_AA_UDP` | `WARNING` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
+| `CN01_OK_UDP` | `INFO` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
 | `CN01_SOA_RECORD_NOT_AA_UDP` | `WARNING` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
 | `CN01_UNEXPECTED_RCODE_NS_QUERY_UDP` | `WARNING` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
 | `CN01_UNEXPECTED_RCODE_SOA_QUERY_UDP` | `WARNING` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |

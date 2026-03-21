@@ -88,6 +88,7 @@ func Metadata() map[string][]string {
 			"CN01_NO_RESPONSE_SOA_QUERY_UDP",
 			"CN01_NO_RESPONSE_UDP",
 			"CN01_NS_RECORD_NOT_AA_UDP",
+			"CN01_OK_UDP",
 			"CN01_SOA_RECORD_NOT_AA_UDP",
 			"CN01_UNEXPECTED_RCODE_NS_QUERY_UDP",
 			"CN01_UNEXPECTED_RCODE_SOA_QUERY_UDP",
@@ -105,6 +106,7 @@ func Metadata() map[string][]string {
 			"CN02_NO_RESPONSE_SOA_QUERY_TCP",
 			"CN02_NO_RESPONSE_TCP",
 			"CN02_NS_RECORD_NOT_AA_TCP",
+			"CN02_OK_TCP",
 			"CN02_SOA_RECORD_NOT_AA_TCP",
 			"CN02_UNEXPECTED_RCODE_NS_QUERY_TCP",
 			"CN02_UNEXPECTED_RCODE_SOA_QUERY_TCP",
@@ -650,9 +652,10 @@ func connectivityLoop(ctx context.Context, testcase string, name dnsname.Name, n
 
 	if len(nsList) > 0 {
 		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
+		okNS := make([]string, len(nsList))
 		tasks := make([]runner.Task, len(nsList))
 		for i, ns := range nsList {
-			ns := ns
+			i, ns := i, ns
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "SOA", "NS")
@@ -675,6 +678,7 @@ func connectivityLoop(ctx context.Context, testcase string, name dnsname.Name, n
 					return nil
 				}
 
+				ok := true
 				for _, qtype := range []string{"SOA", "NS"} {
 					resp := soaResp
 					if qtype == "NS" {
@@ -685,6 +689,7 @@ func connectivityLoop(ctx context.Context, testcase string, name dnsname.Name, n
 						if _, err := buf.Add(fmt.Sprintf("%s_NO_RESPONSE_%s_QUERY_%s", prefix, qtype, protocol), withNameserverArgs(ns, nil)); err != nil {
 							return err
 						}
+						ok = false
 						continue
 					}
 
@@ -694,6 +699,7 @@ func connectivityLoop(ctx context.Context, testcase string, name dnsname.Name, n
 						})); err != nil {
 							return err
 						}
+						ok = false
 						continue
 					}
 
@@ -702,6 +708,7 @@ func connectivityLoop(ctx context.Context, testcase string, name dnsname.Name, n
 						if _, err := buf.Add(fmt.Sprintf("%s_MISSING_%s_RECORD_%s", prefix, qtype, protocol), withNameserverArgs(ns, nil)); err != nil {
 							return err
 						}
+						ok = false
 						continue
 					}
 
@@ -714,6 +721,7 @@ func connectivityLoop(ctx context.Context, testcase string, name dnsname.Name, n
 						})); err != nil {
 							return err
 						}
+						ok = false
 						continue
 					}
 
@@ -721,8 +729,13 @@ func connectivityLoop(ctx context.Context, testcase string, name dnsname.Name, n
 						if _, err := buf.Add(fmt.Sprintf("%s_%s_RECORD_NOT_AA_%s", prefix, qtype, protocol), withNameserverArgs(ns, nil)); err != nil {
 							return err
 						}
+						ok = false
 						continue
 					}
+				}
+
+				if ok {
+					okNS[i] = ns.NameString() + "/" + ns.AddressString()
 				}
 
 				return nil
@@ -734,6 +747,20 @@ func connectivityLoop(ctx context.Context, testcase string, name dnsname.Name, n
 			return err
 		}
 		*results = append(*results, entries...)
+
+		var okList []string
+		for _, v := range okNS {
+			if v != "" {
+				okList = append(okList, v)
+			}
+		}
+		if len(okList) > 0 {
+			args := map[string]any{}
+			setTypedServersFromNames(args, okList)
+			if err := appendLog(ctx, results, testcase, fmt.Sprintf("%s_OK_%s", prefix, protocol), args); err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil

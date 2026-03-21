@@ -48,6 +48,21 @@ func (s *Server) Start() {
 			log.Printf(format, args...)
 		})
 	}
+
+	if s.rateLimiter != nil {
+		go func() {
+			ticker := time.NewTicker(time.Minute)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					s.rateLimiter.Cleanup()
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+	}
 }
 
 // Stop requests worker shutdown and waits for completion.

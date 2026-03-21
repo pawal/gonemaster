@@ -4,16 +4,32 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [Unreleased]
 
+**Biggest changes:**
+  - New simple UI for end-users
+  - Database persistence with support for PostgreSQL, and MariaDB/MySQL
+
 ### Added
 
- - Server: Environment variable and JSON config file support for database configuration (`GONEMASTER_DB_DRIVER`, `GONEMASTER_DB_DSN`, `--db-driver`, `--db-dsn`)
- - Server: SQLite persistent job store with versioned schema migrations and startup job recovery
- - Server: PostgreSQL and MariaDB/MySQL persistence backends with multi-dialect SQL abstraction, connection pooling, and integration test infrastructure (`make test-integration`, CI)
- - Server: Data retention — `--db-retention-days` / `GONEMASTER_DB_RETENTION_DAYS` runs an hourly background purge of completed jobs; `POST /api/v1/jobs/purge` and `gonemaster-client jobs purge` allow on-demand purging
+ - Server: SQLite, PostgreSQL, and MariaDB/MySQL persistence backends with versioned schema migrations, startup recovery, and integration tests (`make test-integration`)
+ - Server: `--db-driver` / `--db-dsn` / `GONEMASTER_DB_*` env vars and JSON config file support
+ - Server: Data retention — `--db-retention-days` runs hourly background purge; `POST /api/v1/jobs/purge` and `gonemaster-client jobs purge` for on-demand purging
+ - Server: Public API at `/pub/api/v1/` — job submission and result lookup by short public ID, without leaking internal UUIDs; per-IP sliding-window rate limiting with `429`/`Retry-After`
+ - Server: Version endpoint at `/pub/api/v1/version` returning gonemaster and miekg/dns versions
+ - Public UI: Svelte SPA at `/public/` — domain testing without admin access; user config IPv4/IPv6 transport, undelegated NS/DS input, shareable result URLs, and 9 languages
+ - Public UI: Test results grouped by test case with translated descriptions; auto-expand for warnings/errors; severity badges per group
+ - Public UI: NS/DS lookup and fetch-from-parent buttons; DS algo/digest-type dropdowns with IANA values; reset button; striped progress bar; version footer
+ - Admin UI: Job inspector shows test case sub-groups within modules, translated descriptions, auto-expand for warnings/errors, and an overall status banner
+ - Engine: INFO-level success tags for DNSSEC02/06/08/09/11/13/18 (all-algorithms-signed, parent-DS-consistent, valid-RRSIGs, etc.)
+ - Engine: CN01_OK_UDP and CN02_OK_TCP summary INFO tags for passing connectivity tests
 
 ### Changed
 
- - Refactor SQL layer for multi-dialect support
+ - SQL layer refactored for multi-dialect support
+ - Engine: Fixed delegation04/06 success tags suppressed by transport-disabled entries
+ - Public UI: Fixed DS lookup to try next resolver on empty answer
+ - Public UI: Fixed TLD lookup to use FQDN and wire DNS with public resolver fallbacks
+ - UI translations: corrected nameserver08/09 test case labels across all 9 languages; fixed "lim"→"glue" and "lösas upp"→"slås upp" in Nordic translations
+ - Engine: Always include System module with version entry first in results
 
 ## [v1.1.3] - 2026-03-13
 

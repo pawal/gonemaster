@@ -6,13 +6,15 @@ NODE ?= node
 BIN_DIR ?= bin
 UI_DIR := ui
 UI_BUILD_DIR := $(UI_DIR)/dist
+UI_PUBLIC_DIR := ui-public
 NODE_MIN ?= 18
 NPM_MIN ?= 9
 
 CMDS := gonemaster gonemaster-server gonemaster-client gonemaster-nagios
 CMD ?= all
 
-.PHONY: help build build-all test install ui-build ui-install ui-dev ui-test clean \
+.PHONY: help build build-all test install ui-build ui-install ui-dev ui-test \
+	ui-public-build ui-public-install ui-public-dev ui-public-test clean \
 	build-gonemaster build-gonemaster-badkeys-embed build-gonemaster-server build-gonemaster-server-noui \
 	build-gonemaster-server-badkeys-embed build-gonemaster-server-noui-badkeys-embed build-gonemaster-client \
 	build-gonemaster-nagios install-gonemaster install-gonemaster-badkeys-embed install-gonemaster-server install-gonemaster-client \
@@ -30,11 +32,15 @@ help:
 	@echo "  vet              Run go vet"
 	@echo "  race             Run Go tests with -race"
 	@echo "  install          Install all commands (override CMD=gonemaster-server)"
-	@echo "  ui-check         Verify node/npm availability"
-	@echo "  ui-install       Install UI dependencies"
-	@echo "  ui-build         Build the embedded UI"
-	@echo "  ui-dev           Run the UI dev server"
-	@echo "  ui-test          Run UI tests"
+	@echo "  ui-check              Verify node/npm availability"
+	@echo "  ui-install            Install admin UI dependencies"
+	@echo "  ui-build              Build both admin and public embedded UIs"
+	@echo "  ui-dev                Run the admin UI dev server"
+	@echo "  ui-test               Run admin UI tests"
+	@echo "  ui-public-install     Install public UI dependencies"
+	@echo "  ui-public-build       Build the public embedded UI"
+	@echo "  ui-public-dev         Run the public UI dev server"
+	@echo "  ui-public-test        Run public UI tests"
 	@echo "  build-gonemaster-badkeys-embed  Build CLI with embedded badkeys blocklist"
 	@echo "  build-gonemaster-server-noui  Build API-only server (no npm/UI embed)"
 	@echo "  build-gonemaster-server-badkeys-embed  Build server with embedded badkeys blocklist (with UI)"
@@ -87,7 +93,7 @@ ui-check:
 ui-install: ui-check
 	$(NPM) --prefix $(UI_DIR) install
 
-ui-build: ui-install
+ui-build: ui-install ui-public-build
 	$(NPM) --prefix $(UI_DIR) run build
 	@mkdir -p server/ui/dist
 	@printf '%s\n' \
@@ -100,6 +106,23 @@ ui-dev: ui-install
 
 ui-test: ui-install
 	$(NPM) --prefix $(UI_DIR) run test
+
+ui-public-install: ui-check
+	$(NPM) --prefix $(UI_PUBLIC_DIR) install
+
+ui-public-build: ui-public-install
+	$(NPM) --prefix $(UI_PUBLIC_DIR) run build
+	@mkdir -p server/public/dist
+	@printf '%s\n' \
+		'This placeholder keeps the dist directory embeddable when built UI assets are not present.' \
+		'Run `make ui-build` before building the default server binary to embed the public web app.' \
+		> server/public/dist/placeholder.txt
+
+ui-public-dev: ui-public-install
+	$(NPM) --prefix $(UI_PUBLIC_DIR) run dev
+
+ui-public-test: ui-public-install
+	$(NPM) --prefix $(UI_PUBLIC_DIR) run test
 
 build: $(BIN_DIR)
 	@if [ "$(CMD)" = "all" ]; then \
@@ -149,7 +172,7 @@ test-integration:
 	docker compose -f docker-compose.test.yml down; \
 	exit $$STATUS
 
-test: ui-test test-go spec-check
+test: ui-test ui-public-test test-go spec-check
 
 install:
 	@if [ "$(CMD)" = "all" ]; then \

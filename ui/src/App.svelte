@@ -814,7 +814,27 @@
   };
 
   const moduleLevels = ["NOTICE", "WARNING", "ERROR", "CRITICAL"];
+  const LEVEL_ORDER = ["DEBUG", "INFO", "NOTICE", "WARNING", "ERROR", "CRITICAL"];
   const normalizeLevel = (value) => (value || "INFO").toUpperCase();
+  const worstLevel = (entries) => {
+    if (!entries?.length) return "INFO";
+    let worst = 0;
+    for (const e of entries) {
+      const idx = LEVEL_ORDER.indexOf(normalizeLevel(e.level));
+      if (idx > worst) worst = idx;
+    }
+    return LEVEL_ORDER[worst] ?? "INFO";
+  };
+  const bannerClass = (level) => {
+    const l = normalizeLevel(level);
+    if (l === "CRITICAL") return "critical";
+    if (l === "ERROR") return "error";
+    if (l === "WARNING") return "warning";
+    return "ok";
+  };
+  const isWarningOrAbove = (level) => {
+    return LEVEL_ORDER.indexOf(normalizeLevel(level)) >= LEVEL_ORDER.indexOf("WARNING");
+  };
   const formatSeconds = (value) => {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) return "0.00";
@@ -835,19 +855,31 @@
       const name = entry.module || "Unspecified";
       const key = name.toUpperCase();
       if (!modules.has(key)) {
-        modules.set(key, {
-          key,
-          name,
-          entries: [],
-          counts: {}
-        });
+        modules.set(key, { key, name, entries: [], testcases: new Map(), ungrouped: [], counts: {} });
       }
-      const current = modules.get(key);
-      current.entries.push(entry);
+      const mod = modules.get(key);
+      mod.entries.push(entry);
       const level = normalizeLevel(entry.level);
-      current.counts[level] = (current.counts[level] || 0) + 1;
+      mod.counts[level] = (mod.counts[level] || 0) + 1;
+      const tc = entry.testcase || "";
+      if (tc) {
+        if (!mod.testcases.has(tc)) mod.testcases.set(tc, { tc, entries: [] });
+        mod.testcases.get(tc).entries.push(entry);
+      } else {
+        mod.ungrouped.push(entry);
+      }
     });
-    return Array.from(modules.values());
+    for (const mod of modules.values()) {
+      for (const tcg of mod.testcases.values()) tcg.level = worstLevel(tcg.entries);
+      mod.testcasesArr = Array.from(mod.testcases.values());
+    }
+    const arr = Array.from(modules.values());
+    arr.sort((a, b) => {
+      if (a.key === "SYSTEM") return -1;
+      if (b.key === "SYSTEM") return 1;
+      return 0;
+    });
+    return arr;
   };
   const toggleModule = (key) => {
     moduleOpen = { ...moduleOpen, [key]: !moduleOpen[key] };
@@ -1659,7 +1691,12 @@
           {/if}
         {/if}
         {#if selectedJobResult}
+          {@const allEntries = selectedJobResult?.raw?.entries ?? []}
+          {@const bannerCls = bannerClass(worstLevel(allEntries))}
           <div class="stack">
+            {#if allEntries.length}
+              <div class="status-banner {bannerCls}">{$t(`result_status_${bannerCls}`)}</div>
+            {/if}
             <div class="field-label">{$t("result_summary_label")}</div>
             {#if summaryRows(selectedJobResult.summary).length}
               <div class="summary-grid">
@@ -1701,23 +1738,49 @@
                     </button>
                     {#if moduleOpen[group.key]}
                       <div class="module-body" id={moduleId(group.key)}>
-                        <div class="result-header">
-                          <span>{$t("result_col_seconds")}</span>
-                          <span>{$t("result_col_level")}</span>
-                          <span>{$t("result_col_message")}</span>
-                        </div>
-                        {#each group.entries as entry}
-                          {@const level = normalizeLevel(entry.level)}
-                          {@const meta = entryMeta(entry)}
-                          <div class="result-row">
-                            <span class="entry-time">{formatSeconds(entry.timestamp)}</span>
-                          <span class={`entry-level severity-${level.toLowerCase()}`}>{level}</span>
-                            <span class="entry-message">{entryMessage(entry)}</span>
-                          </div>
-                          {#if meta}
-                            <div class="entry-meta">{meta}</div>
-                          {/if}
+                        <!-- Test case sub-groups -->
+                        {#each group.testcasesArr as tcg (tcg.tc)}
+                          {@const tcKey = `tc.${tcg.tc.toLowerCase()}`}
+                          {@const tcDesc = $t(tcKey)}
+                          <details class="testcase-group" open={isWarningOrAbove(tcg.level)}>
+                            <summary class="testcase-summary">
+                              <span class="testcase-chevron"></span>
+                              <span class="testcase-desc">{tcDesc !== tcKey ? tcDesc : tcg.tc}</span>
+                              <span class="testcase-badge">
+                                <span class={`level-pill severity-${normalizeLevel(tcg.level).toLowerCase()}`}>{normalizeLevel(tcg.level)}</span>
+                              </span>
+                            </summary>
+                            <div class="testcase-entries">
+                              {#each tcg.entries as entry}
+                                {@const level = normalizeLevel(entry.level)}
+                                <div class="result-row tc-row">
+                                  <span class={`entry-level severity-${level.toLowerCase()}`}>{level}</span>
+                                  <span class="entry-message">{entryMessage(entry)}</span>
+                                </div>
+                              {/each}
+                            </div>
+                          </details>
                         {/each}
+                        <!-- Ungrouped entries (no testcase, e.g. START_TIME, DEPENDENCY_VERSION) -->
+                        {#if group.ungrouped.length}
+                          <div class="result-header ungrouped-header">
+                            <span>{$t("result_col_seconds")}</span>
+                            <span>{$t("result_col_level")}</span>
+                            <span>{$t("result_col_message")}</span>
+                          </div>
+                          {#each group.ungrouped as entry}
+                            {@const level = normalizeLevel(entry.level)}
+                            {@const meta = entryMeta(entry)}
+                            <div class="result-row">
+                              <span class="entry-time">{formatSeconds(entry.timestamp)}</span>
+                              <span class={`entry-level severity-${level.toLowerCase()}`}>{level}</span>
+                              <span class="entry-message">{entryMessage(entry)}</span>
+                            </div>
+                            {#if meta}
+                              <div class="entry-meta">{meta}</div>
+                            {/if}
+                          {/each}
+                        {/if}
                       </div>
                     {/if}
                   </div>

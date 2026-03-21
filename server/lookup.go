@@ -72,26 +72,51 @@ func lookupDelegation(ctx context.Context, domain string) DelegationInfo {
 		DSRecords:   []DelegationDS{},
 	}
 
-	// NS lookup via system resolver (FQDN to avoid search-domain expansion).
-	nss, err := net.DefaultResolver.LookupNS(ctx, fqdn(domain))
-	if err == nil {
-		for _, ns := range nss {
-			nsName := strings.TrimSuffix(ns.Host, ".")
-			ips, err := net.DefaultResolver.LookupHost(ctx, nsName)
-			if err != nil || len(ips) == 0 {
-				info.Nameservers = append(info.Nameservers, DelegationNS{NS: nsName})
-			} else {
-				for _, ip := range ips {
-					info.Nameservers = append(info.Nameservers, DelegationNS{NS: nsName, IP: ip})
-				}
-			}
-		}
-	}
-
-	// DS lookup via DNS wire query (system resolver, DNSSEC-enabled).
+	info.Nameservers = lookupNS(ctx, domain)
 	info.DSRecords = lookupDS(ctx, domain)
 
 	return info
+}
+
+// lookupNS queries for NS records via DNS wire protocol.
+func lookupNS(ctx context.Context, domain string) []DelegationNS {
+	msg := transport.BuildQuery(domain, dns.TypeNS)
+	msg.RecursionDesired = true
+
+	c := &transport.Client{
+		Timeout:  5 * time.Second,
+		Fallback: true,
+		EDNSSize: 4096,
+	}
+
+	servers := resolverAddresses()
+	for _, server := range servers {
+		pkt, err := c.Exchange(ctx, server, msg)
+		if err != nil || pkt.Msg == nil {
+			continue
+		}
+		var nameservers []DelegationNS
+		for _, ans := range pkt.Msg.Answer {
+			ns, ok := ans.(*dns.NS)
+			if !ok {
+				continue
+			}
+			nsName := strings.TrimSuffix(ns.Ns, ".")
+			addrs, err := net.DefaultResolver.LookupHost(ctx, nsName)
+			if err != nil || len(addrs) == 0 {
+				nameservers = append(nameservers, DelegationNS{NS: nsName})
+			} else {
+				for _, ip := range addrs {
+					nameservers = append(nameservers, DelegationNS{NS: nsName, IP: ip})
+				}
+			}
+		}
+		if len(nameservers) > 0 {
+			return nameservers
+		}
+		// Empty answer — try the next resolver.
+	}
+	return []DelegationNS{}
 }
 
 // lookupDS queries the system resolver for DS records.
@@ -132,11 +157,12 @@ func lookupDS(ctx context.Context, domain string) []DelegationDS {
 	return []DelegationDS{}
 }
 
-// resolverAddresses returns DNS server addresses from /etc/resolv.conf.
+// resolverAddresses returns DNS server addresses: local resolvers from
+// /etc/resolv.conf followed by public fallbacks (8.8.8.8, 1.1.1.1).
 func resolverAddresses() []string {
 	f, err := os.Open("/etc/resolv.conf")
 	if err != nil {
-		return []string{"127.0.0.1:53"}
+		return []string{"8.8.8.8:53", "1.1.1.1:53"}
 	}
 	defer f.Close()
 
@@ -152,8 +178,7 @@ func resolverAddresses() []string {
 			addrs = append(addrs, net.JoinHostPort(fields[1], "53"))
 		}
 	}
-	if len(addrs) > 0 {
-		return addrs
-	}
-	return []string{"127.0.0.1:53"}
+	// Always append public resolvers as fallbacks.
+	addrs = append(addrs, "8.8.8.8:53", "1.1.1.1:53")
+	return addrs
 }

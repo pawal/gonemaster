@@ -29,7 +29,7 @@ Status: Final
    - Else, if apex DS records are absent classify as `No DS`, otherwise `Has DS`.
 5. Parent decision:
    - `Undetermined DS` only => emit `DS11_UNDETERMINED_DS`, stop before child phase.
-   - `No DS` only => stop before child phase with no DS11 output.
+   - `No DS` only => emit `DS11_NO_PARENT_DS`, stop before child phase.
    - Mixed `No DS` and `Has DS` => emit `DS11_INCONSISTENT_DS`, `DS11_PARENT_WITHOUT_DS`, `DS11_PARENT_WITH_DS`, then continue to child phase.
    - `Has DS` only => continue to child phase.
 6. Child phase (only when parent decision allows):
@@ -43,11 +43,13 @@ Status: Final
    - `Undetermined` only => emit `DS11_UNDETERMINED_SIGNED_ZONE`.
    - `No DNSKEY` only => emit `DS11_DS_BUT_UNSIGNED_ZONE`.
    - Mixed `No DNSKEY` and `Has DNSKEY` => emit `DS11_INCONSISTENT_SIGNED_ZONE`, `DS11_NS_WITH_UNSIGNED_ZONE`, `DS11_NS_WITH_SIGNED_ZONE`.
+   - `Has DNSKEY` only (no undetermined, no absent) => emit `DS11_CONSISTENT_SIGNED`.
 8. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
+| `DS11_CONSISTENT_SIGNED` | Parent has DS and all child nameservers have DNSKEY — zone is consistently signed. |
 | `DS11_DS_BUT_UNSIGNED_ZONE` | Parent DS indicates signing expectation but child nameservers show no DNSKEY evidence. |
 | `DS11_INCONSISTENT_DS` | Parent nameservers disagree on DS existence. |
 | `DS11_INCONSISTENT_SIGNED_ZONE` | Child nameservers disagree on DNSKEY presence. |
@@ -56,6 +58,7 @@ Status: Final
 | `DS11_PARENT_WITHOUT_DS` | Parent nameservers without DS are listed in mixed-DS state. |
 | `DS11_PARENT_WITH_DS` | Parent nameservers with DS are listed in mixed-DS state. |
 | `DS11_UNDETERMINED_DS` | Parent DS state could not be determined at all. |
+| `DS11_NO_PARENT_DS` | All parent nameservers report no DS record — zone is unsigned from parent view. |
 | `DS11_UNDETERMINED_SIGNED_ZONE` | Child signed state could not be determined at all. |
 | `IPV4_DISABLED` | IPv4 transport is disabled for queried parent/child rrtypes. |
 | `IPV6_DISABLED` | IPv6 transport is disabled for queried parent/child rrtypes. |
@@ -65,6 +68,7 @@ Status: Final
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
+| `DS11_CONSISTENT_SIGNED` | `-` | `-` | No arguments. |
 | `DS11_DS_BUT_UNSIGNED_ZONE` | `-` | `-` | No arguments. |
 | `DS11_INCONSISTENT_DS` | `-` | `-` | No arguments. |
 | `DS11_INCONSISTENT_SIGNED_ZONE` | `-` | `-` | No arguments. |
@@ -72,6 +76,7 @@ Status: Final
 | `DS11_NS_WITH_UNSIGNED_ZONE` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS11_PARENT_WITHOUT_DS` | `addresses` | `array<string>` | Structured parent nameserver IP list without DS. |
 | `DS11_PARENT_WITH_DS` | `addresses` | `array<string>` | Structured parent nameserver IP list with DS. |
+| `DS11_NO_PARENT_DS` | `-` | `-` | No arguments. |
 | `DS11_UNDETERMINED_DS` | `-` | `-` | No arguments. |
 | `DS11_UNDETERMINED_SIGNED_ZONE` | `-` | `-` | No arguments. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
@@ -86,6 +91,7 @@ Status: Final
 ## Severity Levels Per Tag
 | Tag | Level | Notes |
 | --- | --- | --- |
+| `DS11_CONSISTENT_SIGNED` | `INFO` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS11_DS_BUT_UNSIGNED_ZONE` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS11_INCONSISTENT_DS` | `WARNING` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS11_INCONSISTENT_SIGNED_ZONE` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
@@ -93,6 +99,7 @@ Status: Final
 | `DS11_NS_WITH_UNSIGNED_ZONE` | `WARNING` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS11_PARENT_WITHOUT_DS` | `NOTICE` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS11_PARENT_WITH_DS` | `NOTICE` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `DS11_NO_PARENT_DS` | `INFO` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS11_UNDETERMINED_DS` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS11_UNDETERMINED_SIGNED_ZONE` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
@@ -110,5 +117,5 @@ Status: Final
 
 ## Edge Cases And Limitations
 - Nameserver evaluation is deduplicated by IP; repeated names on one IP share one DS11 outcome.
-- When parent evaluation yields only `No DS` (and no `Has DS`), testcase exits without child checks and without DS11 output.
+- When parent evaluation yields only `No DS` (and no `Has DS`), testcase emits `DS11_NO_PARENT_DS` and exits without child checks.
 - Child-side `undetermined` classification requires SOA preconditions to pass first; unusable SOA responses are skipped before DNSKEY classification.

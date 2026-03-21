@@ -48,7 +48,7 @@ Status: Final
 | Tag | Level | Notes |
 | --- | --- | --- |
 | `EXTRA_PROCESSING_BROKEN` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
-| `EXTRA_PROCESSING_OK` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `EXTRA_PROCESSING_OK` | `INFO` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 

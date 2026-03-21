@@ -47,12 +47,14 @@ Status: Final
 7. Emit per-nameserver summary:
    - `DS02_NO_VALID_DNSKEY_FOR_ANY_DS` for responding nameservers with no DS-matching DNSKEY.
    - Else `DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS` for responding nameservers with DS-matching DNSKEY but no validating RRSIG from those keys.
-8. Emit `TEST_CASE_END`.
+8. Collect IPs where DS→DNSKEY match and RRSIG validation passed; if non-empty emit `DS02_MATCH_DS_DNSKEY`.
+9. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
 | `DS02_ALGO_NOT_SUPPORTED_BY_ZM` | DNSKEY RRSIG verification requires an unsupported algorithm for this build/runtime. |
+| `DS02_MATCH_DS_DNSKEY` | At least one child nameserver has a DS-matching DNSKEY with a valid DNSKEY RRSIG. |
 | `DS02_DNSKEY_NOT_FOR_ZONE_SIGNING` | DS-matching DNSKEY is found but lacks ZONE flag. |
 | `DS02_DNSKEY_NOT_SEP` | DS-matching DNSKEY is found but lacks SEP flag. |
 | `DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS` | Nameserver has DS-matching DNSKEY(s), but no validating DNSKEY RRSIG from those keys. |
@@ -78,6 +80,7 @@ Status: Final
 | `DS02_DNSKEY_NOT_SEP` | `keytag` | `int` | DS/DNSKEY keytag lacking SEP bit. |
 | `DS02_DNSKEY_NOT_SEP` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS` | `addresses` | `array<string>` | Structured child nameserver IP list. |
+| `DS02_MATCH_DS_DNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list with DS-matching DNSKEY and valid RRSIG. |
 | `DS02_NO_DNSKEY_FOR_DS` | `keytag` | `int` | DS keytag for which no DNSKEY was found. |
 | `DS02_NO_DNSKEY_FOR_DS` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS02_NO_MATCHING_DNSKEY_RRSIG` | `keytag` | `int` | DS-matching DNSKEY keytag lacking a validating DNSKEY RRSIG. |
@@ -103,6 +106,7 @@ Status: Final
 | `DS02_DNSKEY_NOT_FOR_ZONE_SIGNING` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS02_DNSKEY_NOT_SEP` | `NOTICE` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `DS02_MATCH_DS_DNSKEY` | `INFO` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS02_NO_DNSKEY_FOR_DS` | `WARNING` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS02_NO_MATCHING_DNSKEY_RRSIG` | `WARNING` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS02_NO_MATCH_DS_DNSKEY` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |

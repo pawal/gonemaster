@@ -30,6 +30,7 @@ _Do not edit by hand - regenerate with the command above._
 | `DS02_DNSKEY_NOT_FOR_ZONE_SIGNING` | `ERROR` | [dnssec02](../tests/dnssec/dnssec02.md) | yes |
 | `DS02_DNSKEY_NOT_SEP` | `NOTICE` | [dnssec02](../tests/dnssec/dnssec02.md) | yes |
 | `DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS` | `ERROR` | [dnssec02](../tests/dnssec/dnssec02.md) | yes |
+| `DS02_MATCH_DS_DNSKEY` | `INFO` | [dnssec02](../tests/dnssec/dnssec02.md) | yes |
 | `DS02_NO_DNSKEY_FOR_DS` | `WARNING` | [dnssec02](../tests/dnssec/dnssec02.md) | yes |
 | `DS02_NO_MATCHING_DNSKEY_RRSIG` | `WARNING` | [dnssec02](../tests/dnssec/dnssec02.md) | yes |
 | `DS02_NO_MATCH_DS_DNSKEY` | `ERROR` | [dnssec02](../tests/dnssec/dnssec02.md) | yes |
@@ -82,6 +83,7 @@ _Do not edit by hand - regenerate with the command above._
 | `DS08_ALGO_NOT_SUPPORTED_BY_ZM` | `NOTICE` | [dnssec08](../tests/dnssec/dnssec08.md) | yes |
 | `DS08_DNSKEY_RRSIG_EXPIRED` | `ERROR` | [dnssec08](../tests/dnssec/dnssec08.md) | yes |
 | `DS08_DNSKEY_RRSIG_NOT_YET_VALID` | `ERROR` | [dnssec08](../tests/dnssec/dnssec08.md) | yes |
+| `DS08_DNSKEY_RRSIG_VALID` | `INFO` | [dnssec08](../tests/dnssec/dnssec08.md) | yes |
 | `DS08_MISSING_RRSIG_IN_RESPONSE` | `ERROR` | [dnssec08](../tests/dnssec/dnssec08.md) | yes |
 | `DS08_NO_MATCHING_DNSKEY` | `ERROR` | [dnssec08](../tests/dnssec/dnssec08.md) | yes |
 | `DS08_RRSIG_NOT_VALID_BY_DNSKEY` | `ERROR` | [dnssec08](../tests/dnssec/dnssec08.md) | yes |
@@ -91,6 +93,7 @@ _Do not edit by hand - regenerate with the command above._
 | `DS09_RRSIG_NOT_VALID_BY_DNSKEY` | `ERROR` | [dnssec09](../tests/dnssec/dnssec09.md) | yes |
 | `DS09_SOA_RRSIG_EXPIRED` | `ERROR` | [dnssec09](../tests/dnssec/dnssec09.md) | yes |
 | `DS09_SOA_RRSIG_NOT_YET_VALID` | `ERROR` | [dnssec09](../tests/dnssec/dnssec09.md) | yes |
+| `DS09_SOA_RRSIG_VALID` | `INFO` | [dnssec09](../tests/dnssec/dnssec09.md) | yes |
 | `DS10_ALGO_NOT_SUPPORTED_BY_ZM` | `NOTICE` | [dnssec10](../tests/dnssec/dnssec10.md) | yes |
 | `DS10_ERR_MULT_NSEC` | `ERROR` | [dnssec10](../tests/dnssec/dnssec10.md) | yes |
 | `DS10_ERR_MULT_NSEC3` | `ERROR` | [dnssec10](../tests/dnssec/dnssec10.md) | yes |
@@ -129,9 +132,11 @@ _Do not edit by hand - regenerate with the command above._
 | `DS10_NSEC_RRSIG_VERIFY_ERROR` | `ERROR` | [dnssec10](../tests/dnssec/dnssec10.md) | yes |
 | `DS10_SERVER_NO_DNSSEC` | `ERROR` | [dnssec10](../tests/dnssec/dnssec10.md) | yes |
 | `DS10_ZONE_NO_DNSSEC` | `NOTICE` | [dnssec10](../tests/dnssec/dnssec10.md) | yes |
+| `DS11_CONSISTENT_SIGNED` | `INFO` | [dnssec11](../tests/dnssec/dnssec11.md) | yes |
 | `DS11_DS_BUT_UNSIGNED_ZONE` | `ERROR` | [dnssec11](../tests/dnssec/dnssec11.md) | yes |
 | `DS11_INCONSISTENT_DS` | `WARNING` | [dnssec11](../tests/dnssec/dnssec11.md) | yes |
 | `DS11_INCONSISTENT_SIGNED_ZONE` | `ERROR` | [dnssec11](../tests/dnssec/dnssec11.md) | yes |
+| `DS11_NO_PARENT_DS` | `INFO` | [dnssec11](../tests/dnssec/dnssec11.md) | yes |
 | `DS11_NS_WITH_SIGNED_ZONE` | `NOTICE` | [dnssec11](../tests/dnssec/dnssec11.md) | yes |
 | `DS11_NS_WITH_UNSIGNED_ZONE` | `WARNING` | [dnssec11](../tests/dnssec/dnssec11.md) | yes |
 | `DS11_PARENT_WITHOUT_DS` | `NOTICE` | [dnssec11](../tests/dnssec/dnssec11.md) | yes |
@@ -141,6 +146,7 @@ _Do not edit by hand - regenerate with the command above._
 | `DS13_ALGO_NOT_SIGNED_DNSKEY` | `WARNING` | [dnssec13](../tests/dnssec/dnssec13.md) | yes |
 | `DS13_ALGO_NOT_SIGNED_NS` | `WARNING` | [dnssec13](../tests/dnssec/dnssec13.md) | yes |
 | `DS13_ALGO_NOT_SIGNED_SOA` | `WARNING` | [dnssec13](../tests/dnssec/dnssec13.md) | yes |
+| `DS13_ALL_ALGOS_SIGNED` | `INFO` | [dnssec13](../tests/dnssec/dnssec13.md) | yes |
 | `DS15_HAS_CDNSKEY_NO_CDS` | `NOTICE` | [dnssec15](../tests/dnssec/dnssec15.md) | yes |
 | `DS15_HAS_CDS_AND_CDNSKEY` | `INFO` | [dnssec15](../tests/dnssec/dnssec15.md) | yes |
 | `DS15_HAS_CDS_NO_CDNSKEY` | `NOTICE` | [dnssec15](../tests/dnssec/dnssec15.md) | yes |
@@ -170,6 +176,8 @@ _Do not edit by hand - regenerate with the command above._
 | `DS17_DELETE_CDNSKEY` | `INFO` | [dnssec17](../tests/dnssec/dnssec17.md) | yes |
 | `DS17_DNSKEY_NOT_SIGNED_BY_CDNSKEY` | `WARNING` | [dnssec17](../tests/dnssec/dnssec17.md) | yes |
 | `DS17_MIXED_DELETE_CDNSKEY` | `ERROR` | [dnssec17](../tests/dnssec/dnssec17.md) | yes |
+| `DS18_MATCH_CDNSKEY_RRSIG_DS` | `INFO` | [dnssec18](../tests/dnssec/dnssec18.md) | yes |
+| `DS18_MATCH_CDS_RRSIG_DS` | `INFO` | [dnssec18](../tests/dnssec/dnssec18.md) | yes |
 | `DS18_NO_MATCH_CDNSKEY_RRSIG_DS` | `ERROR` | [dnssec18](../tests/dnssec/dnssec18.md) | yes |
 | `DS18_NO_MATCH_CDS_RRSIG_DS` | `ERROR` | [dnssec18](../tests/dnssec/dnssec18.md) | yes |
 | `DS19_BADKEY_BLOCKLIST` | `ERROR` | [dnssec19](../tests/dnssec/dnssec19.md) | yes |
@@ -191,7 +199,7 @@ _Do not edit by hand - regenerate with the command above._
 | `DURATION_LONG` | `WARNING` | [dnssec04](../tests/dnssec/dnssec04.md) | yes |
 | `DURATION_OK` | `DEBUG` | [dnssec04](../tests/dnssec/dnssec04.md) | yes |
 | `EXTRA_PROCESSING_BROKEN` | `ERROR` | [dnssec06](../tests/dnssec/dnssec06.md) | yes |
-| `EXTRA_PROCESSING_OK` | `DEBUG` | [dnssec06](../tests/dnssec/dnssec06.md) | yes |
+| `EXTRA_PROCESSING_OK` | `INFO` | [dnssec06](../tests/dnssec/dnssec06.md) | yes |
 | `IPV4_DISABLED` | `DEBUG2` | [dnssec01](../tests/dnssec/dnssec01.md), [dnssec02](../tests/dnssec/dnssec02.md), [dnssec03](../tests/dnssec/dnssec03.md), [dnssec05](../tests/dnssec/dnssec05.md), [dnssec07](../tests/dnssec/dnssec07.md), [dnssec08](../tests/dnssec/dnssec08.md), [dnssec09](../tests/dnssec/dnssec09.md), [dnssec10](../tests/dnssec/dnssec10.md), [dnssec11](../tests/dnssec/dnssec11.md), [dnssec13](../tests/dnssec/dnssec13.md), [dnssec14](../tests/dnssec/dnssec14.md), [dnssec15](../tests/dnssec/dnssec15.md), [dnssec16](../tests/dnssec/dnssec16.md), [dnssec17](../tests/dnssec/dnssec17.md), [dnssec18](../tests/dnssec/dnssec18.md), [dnssec19](../tests/dnssec/dnssec19.md), [dnssec20](../tests/dnssec/dnssec20.md) | yes |
 | `IPV6_DISABLED` | `DEBUG2` | [dnssec01](../tests/dnssec/dnssec01.md), [dnssec02](../tests/dnssec/dnssec02.md), [dnssec03](../tests/dnssec/dnssec03.md), [dnssec05](../tests/dnssec/dnssec05.md), [dnssec07](../tests/dnssec/dnssec07.md), [dnssec08](../tests/dnssec/dnssec08.md), [dnssec09](../tests/dnssec/dnssec09.md), [dnssec10](../tests/dnssec/dnssec10.md), [dnssec11](../tests/dnssec/dnssec11.md), [dnssec13](../tests/dnssec/dnssec13.md), [dnssec14](../tests/dnssec/dnssec14.md), [dnssec15](../tests/dnssec/dnssec15.md), [dnssec16](../tests/dnssec/dnssec16.md), [dnssec17](../tests/dnssec/dnssec17.md), [dnssec18](../tests/dnssec/dnssec18.md), [dnssec19](../tests/dnssec/dnssec19.md), [dnssec20](../tests/dnssec/dnssec20.md) | yes |
 | `KEY_SIZE_OK` | `INFO` | [dnssec14](../tests/dnssec/dnssec14.md) | yes |

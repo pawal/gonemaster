@@ -306,6 +306,7 @@ func Metadata() map[string][]string {
 			"DS02_DNSKEY_NOT_FOR_ZONE_SIGNING",
 			"DS02_DNSKEY_NOT_SEP",
 			"DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS",
+			"DS02_MATCH_DS_DNSKEY",
 			"DS02_NO_DNSKEY_FOR_DS",
 			"DS02_NO_MATCHING_DNSKEY_RRSIG",
 			"DS02_NO_MATCH_DS_DNSKEY",
@@ -398,6 +399,7 @@ func Metadata() map[string][]string {
 			"DS08_ALGO_NOT_SUPPORTED_BY_ZM",
 			"DS08_DNSKEY_RRSIG_EXPIRED",
 			"DS08_DNSKEY_RRSIG_NOT_YET_VALID",
+			"DS08_DNSKEY_RRSIG_VALID",
 			"DS08_MISSING_RRSIG_IN_RESPONSE",
 			"DS08_NO_MATCHING_DNSKEY",
 			"DS08_RRSIG_NOT_VALID_BY_DNSKEY",
@@ -413,6 +415,7 @@ func Metadata() map[string][]string {
 			"DS09_RRSIG_NOT_VALID_BY_DNSKEY",
 			"DS09_SOA_RRSIG_EXPIRED",
 			"DS09_SOA_RRSIG_NOT_YET_VALID",
+			"DS09_SOA_RRSIG_VALID",
 			"IPV4_DISABLED",
 			"IPV6_DISABLED",
 			"TEST_CASE_END",
@@ -463,21 +466,24 @@ func Metadata() map[string][]string {
 			"TEST_CASE_START",
 		},
 		"dnssec11": {
+			"DS11_CONSISTENT_SIGNED",
+			"DS11_DS_BUT_UNSIGNED_ZONE",
 			"DS11_INCONSISTENT_DS",
 			"DS11_INCONSISTENT_SIGNED_ZONE",
-			"DS11_UNDETERMINED_DS",
-			"DS11_UNDETERMINED_SIGNED_ZONE",
-			"DS11_PARENT_WITHOUT_DS",
-			"DS11_PARENT_WITH_DS",
+			"DS11_NO_PARENT_DS",
 			"DS11_NS_WITH_SIGNED_ZONE",
 			"DS11_NS_WITH_UNSIGNED_ZONE",
-			"DS11_DS_BUT_UNSIGNED_ZONE",
+			"DS11_PARENT_WITHOUT_DS",
+			"DS11_PARENT_WITH_DS",
+			"DS11_UNDETERMINED_DS",
+			"DS11_UNDETERMINED_SIGNED_ZONE",
 			"IPV4_DISABLED",
 			"IPV6_DISABLED",
 			"TEST_CASE_END",
 			"TEST_CASE_START",
 		},
 		"dnssec13": {
+			"DS13_ALL_ALGOS_SIGNED",
 			"DS13_ALGO_NOT_SIGNED_DNSKEY",
 			"DS13_ALGO_NOT_SIGNED_NS",
 			"DS13_ALGO_NOT_SIGNED_SOA",
@@ -546,6 +552,8 @@ func Metadata() map[string][]string {
 			"TEST_CASE_START",
 		},
 		"dnssec18": {
+			"DS18_MATCH_CDNSKEY_RRSIG_DS",
+			"DS18_MATCH_CDS_RRSIG_DS",
 			"DS18_NO_MATCH_CDS_RRSIG_DS",
 			"DS18_NO_MATCH_CDNSKEY_RRSIG_DS",
 			"IPV4_DISABLED",
@@ -1296,6 +1304,21 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		args := map[string]any{}
 		setTypedAddressesFromValues(args, nsRRSIG)
 		if err := appendLog(ctx, &results, testcase, "DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS", args); err != nil {
+			return results, err
+		}
+	}
+
+	var matchedDSIPs []string
+	for nsIP := range respondingChildNS {
+		if hasRRSIGMatchDS[nsIP] {
+			matchedDSIPs = append(matchedDSIPs, nsIP)
+		}
+	}
+	if len(matchedDSIPs) > 0 {
+		sort.Strings(matchedDSIPs)
+		args := map[string]any{}
+		setTypedAddressesFromValues(args, matchedDSIPs)
+		if err := appendLog(ctx, &results, testcase, "DS02_MATCH_DS_DNSKEY", args); err != nil {
 			return results, err
 		}
 	}
@@ -2477,6 +2500,7 @@ func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	noMatchingDNSKEY := map[uint16][]string{}
 	rrsigNotValidByDNSKEY := map[uint16][]string{}
 	algoNotSupportedByZM := map[uint16]map[uint8][]string{}
+	var ds08PassedIPs []string
 
 	nssDel, err := method4(ctx, z)
 	if err != nil {
@@ -2513,6 +2537,7 @@ func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	if len(ordered) > 0 {
 		type nsOutcome struct {
 			nsIP                   string
+			hadRRSIGs              bool
 			dnskeyWithoutRRSIG     bool
 			dnskeyRRSIGNotYetValid map[uint16]bool
 			dnskeyRRSIGExpired     map[uint16]bool
@@ -2574,6 +2599,7 @@ func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					return nil
 				}
 
+				outcome.hadRRSIGs = true
 				testTime := packetTime(resp)
 
 				for _, rr := range rrsigRRs {
@@ -2674,6 +2700,15 @@ func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					algoNotSupportedByZM[keytag][algo] = append(algoNotSupportedByZM[keytag][algo], outcome.nsIP)
 				}
 			}
+			if outcome.hadRRSIGs &&
+				!outcome.dnskeyWithoutRRSIG &&
+				len(outcome.dnskeyRRSIGNotYetValid) == 0 &&
+				len(outcome.dnskeyRRSIGExpired) == 0 &&
+				len(outcome.noMatchingDNSKEY) == 0 &&
+				len(outcome.rrsigNotValidByDNSKEY) == 0 &&
+				len(outcome.algoNotSupportedByZM) == 0 {
+				ds08PassedIPs = append(ds08PassedIPs, outcome.nsIP)
+			}
 		}
 	}
 
@@ -2735,6 +2770,15 @@ func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
+	if len(ds08PassedIPs) > 0 {
+		sort.Strings(ds08PassedIPs)
+		args := map[string]any{}
+		setTypedAddressesFromValues(args, ds08PassedIPs)
+		if err := appendLog(ctx, &results, testcase, "DS08_DNSKEY_RRSIG_VALID", args); err != nil {
+			return results, err
+		}
+	}
+
 	if err := appendLog(ctx, &results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
 		return results, err
 	}
@@ -2750,6 +2794,7 @@ func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
+	var ds09PassedIPs []string
 	soaWithoutRRSIG := []string{}
 	soaRRSIGNotYetValid := map[uint16][]string{}
 	soaRRSIGExpired := map[uint16][]string{}
@@ -2792,6 +2837,7 @@ func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	if len(ordered) > 0 {
 		type nsOutcome struct {
 			nsIP                  string
+			hadRRSIGs             bool
 			soaWithoutRRSIG       bool
 			soaRRSIGNotYetValid   map[uint16]bool
 			soaRRSIGExpired       map[uint16]bool
@@ -2866,6 +2912,7 @@ func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					return nil
 				}
 
+				outcome.hadRRSIGs = true
 				testTime := packetTime(dnskeyResp)
 
 				for _, rr := range rrsigRRs {
@@ -2966,6 +3013,15 @@ func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					algoNotSupportedByZM[keytag][algo] = append(algoNotSupportedByZM[keytag][algo], outcome.nsIP)
 				}
 			}
+			if outcome.hadRRSIGs &&
+				!outcome.soaWithoutRRSIG &&
+				len(outcome.soaRRSIGNotYetValid) == 0 &&
+				len(outcome.soaRRSIGExpired) == 0 &&
+				len(outcome.noMatchingDNSKEY) == 0 &&
+				len(outcome.rrsigNotValidByDNSKEY) == 0 &&
+				len(outcome.algoNotSupportedByZM) == 0 {
+				ds09PassedIPs = append(ds09PassedIPs, outcome.nsIP)
+			}
 		}
 	}
 
@@ -3024,6 +3080,15 @@ func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			if err := appendLog(ctx, &results, testcase, "DS09_ALGO_NOT_SUPPORTED_BY_ZM", args); err != nil {
 				return results, err
 			}
+		}
+	}
+
+	if len(ds09PassedIPs) > 0 {
+		sort.Strings(ds09PassedIPs)
+		args := map[string]any{}
+		setTypedAddressesFromValues(args, ds09PassedIPs)
+		if err := appendLog(ctx, &results, testcase, "DS09_SOA_RRSIG_VALID", args); err != nil {
+			return results, err
 		}
 	}
 
@@ -4143,6 +4208,9 @@ func DNSSEC11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 		continueWithChildTests = false
 	} else if len(noDSRecord) > 0 && len(hasDSRecord) == 0 {
+		if err := appendLog(ctx, &results, testcase, "DS11_NO_PARENT_DS", map[string]any{}); err != nil {
+			return results, err
+		}
 		continueWithChildTests = false
 	} else if len(noDSRecord) > 0 && len(hasDSRecord) > 0 {
 		if err := appendLog(ctx, &results, testcase, "DS11_INCONSISTENT_DS", map[string]any{}); err != nil {
@@ -4298,6 +4366,10 @@ func DNSSEC11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			if err := appendLog(ctx, &results, testcase, "DS11_NS_WITH_SIGNED_ZONE", args); err != nil {
 				return results, err
 			}
+		} else if len(hasDNSKEYRecord) > 0 && len(noDNSKEYRecord) == 0 && len(undeterminedDNSKEY) == 0 {
+			if err := appendLog(ctx, &results, testcase, "DS11_CONSISTENT_SIGNED", map[string]any{}); err != nil {
+				return results, err
+			}
 		}
 	}
 
@@ -4317,6 +4389,7 @@ func DNSSEC13(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	queryTypes := []string{"DNSKEY", "SOA", "NS"}
+	var anyDNSKEYFound bool
 	algoNotSigned := map[string]map[uint8][]string{}
 
 	nssDel, err := method4(ctx, z)
@@ -4354,6 +4427,7 @@ func DNSSEC13(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	if len(ordered) > 0 {
 		type nsOutcome struct {
 			nsIP          string
+			dnskeyFound   bool
 			algoNotSigned map[string]map[uint8]bool
 		}
 
@@ -4403,6 +4477,9 @@ func DNSSEC13(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 								dnskeyAlgorithms[dnskey.Algorithm] = true
 							}
 						}
+						if len(dnskeyAlgorithms) > 0 {
+							outcome.dnskeyFound = true
+						}
 					}
 
 					if len(dnskeyAlgorithms) == 0 {
@@ -4445,6 +4522,9 @@ func DNSSEC13(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		results = append(results, entries...)
 
 		for _, outcome := range outcomes {
+			if outcome.dnskeyFound {
+				anyDNSKEYFound = true
+			}
 			for key, algoMap := range outcome.algoNotSigned {
 				if algoNotSigned[key] == nil {
 					algoNotSigned[key] = map[uint8][]string{}
@@ -4477,6 +4557,12 @@ func DNSSEC13(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			if err := appendLog(ctx, &results, testcase, "DS13_ALGO_NOT_SIGNED_"+queryType, args); err != nil {
 				return results, err
 			}
+		}
+	}
+
+	if anyDNSKEYFound && len(algoNotSigned) == 0 {
+		if err := appendLog(ctx, &results, testcase, "DS13_ALL_ALGOS_SIGNED", map[string]any{}); err != nil {
+			return results, err
 		}
 	}
 
@@ -6283,6 +6369,34 @@ func DNSSEC18(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				args := map[string]any{}
 				setTypedAddressesFromValues(args, mapKeysSorted(dsNoMatchCDNSKEYRRSIG))
 				if err := appendLog(ctx, &results, testcase, "DS18_NO_MATCH_CDNSKEY_RRSIG_DS", args); err != nil {
+					return results, err
+				}
+			}
+			var matchedCDSIPs []string
+			for nsIP := range cdsRRsets {
+				if !dsNoMatchCDSRRSIG[nsIP] {
+					matchedCDSIPs = append(matchedCDSIPs, nsIP)
+				}
+			}
+			if len(matchedCDSIPs) > 0 {
+				sort.Strings(matchedCDSIPs)
+				args := map[string]any{}
+				setTypedAddressesFromValues(args, matchedCDSIPs)
+				if err := appendLog(ctx, &results, testcase, "DS18_MATCH_CDS_RRSIG_DS", args); err != nil {
+					return results, err
+				}
+			}
+			var matchedCDNSKEYIPs []string
+			for nsIP := range cdnskeyRRsets {
+				if !dsNoMatchCDNSKEYRRSIG[nsIP] {
+					matchedCDNSKEYIPs = append(matchedCDNSKEYIPs, nsIP)
+				}
+			}
+			if len(matchedCDNSKEYIPs) > 0 {
+				sort.Strings(matchedCDNSKEYIPs)
+				args := map[string]any{}
+				setTypedAddressesFromValues(args, matchedCDNSKEYIPs)
+				if err := appendLog(ctx, &results, testcase, "DS18_MATCH_CDNSKEY_RRSIG_DS", args); err != nil {
 					return results, err
 				}
 			}

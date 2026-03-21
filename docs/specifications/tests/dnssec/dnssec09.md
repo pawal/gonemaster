@@ -33,12 +33,14 @@ Status: Final
        - If none found, mark `DS09_NO_MATCHING_DNSKEY`.
        - Else verify signature over SOA RRset; if no candidate validates, mark `DS09_RRSIG_NOT_VALID_BY_DNSKEY`.
 4. Emit accumulated DS09 findings grouped by keytag/algo as applicable.
-5. Emit `TEST_CASE_END`.
+5. Collect nameserver IPs that had RRSIGs and emitted no DS09 failure; if non-empty emit `DS09_SOA_RRSIG_VALID`.
+6. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
 | `DS09_ALGO_NOT_SUPPORTED_BY_ZM` | RRSIG verification requires an unsupported algorithm. |
+| `DS09_SOA_RRSIG_VALID` | At least one nameserver returned SOA with RRSIG and all RRSIG checks passed. |
 | `DS09_MISSING_RRSIG_IN_RESPONSE` | SOA response has no answer-section RRSIG records. |
 | `DS09_NO_MATCHING_DNSKEY` | RRSIG keytag has no matching DNSKEY keytag. |
 | `DS09_RRSIG_NOT_VALID_BY_DNSKEY` | Matching DNSKEY candidates exist but none verify the SOA signature. |
@@ -65,6 +67,7 @@ Status: Final
 | `DS09_SOA_RRSIG_EXPIRED` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS09_SOA_RRSIG_NOT_YET_VALID` | `keytag` | `int` | RRSIG keytag with not-yet-valid validity window. |
 | `DS09_SOA_RRSIG_NOT_YET_VALID` | `addresses` | `array<string>` | Structured child nameserver IP list. |
+| `DS09_SOA_RRSIG_VALID` | `addresses` | `array<string>` | Structured child nameserver IP list where all SOA RRSIG checks passed. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`DNSKEY`). |
@@ -83,6 +86,7 @@ Status: Final
 | `DS09_RRSIG_NOT_VALID_BY_DNSKEY` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS09_SOA_RRSIG_EXPIRED` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS09_SOA_RRSIG_NOT_YET_VALID` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `DS09_SOA_RRSIG_VALID` | `INFO` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |

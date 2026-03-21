@@ -27,11 +27,13 @@ Status: Final
      - For each collected DNSKEY algorithm, check whether any answer-section RRSIG has that algorithm.
      - If no matching RRSIG algorithm is found, record a missing-signature-algorithm finding for this query type.
 4. Emit `DS13_ALGO_NOT_SIGNED_DNSKEY`, `DS13_ALGO_NOT_SIGNED_SOA`, and/or `DS13_ALGO_NOT_SIGNED_NS` grouped by algorithm with merged nameserver IP lists.
-5. Emit `TEST_CASE_END`.
+5. If at least one DNSKEY algorithm was observed and no algorithm-missing findings were accumulated, emit `DS13_ALL_ALGOS_SIGNED`.
+6. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
+| `DS13_ALL_ALGOS_SIGNED` | All DNSKEY algorithms have RRSIG coverage in DNSKEY, SOA, and NS answers at all evaluated nameservers. |
 | `DS13_ALGO_NOT_SIGNED_DNSKEY` | DNSKEY RRset answer lacks RRSIG algorithm coverage for at least one DNSKEY algorithm. |
 | `DS13_ALGO_NOT_SIGNED_NS` | NS RRset answer lacks RRSIG algorithm coverage for at least one DNSKEY algorithm. |
 | `DS13_ALGO_NOT_SIGNED_SOA` | SOA RRset answer lacks RRSIG algorithm coverage for at least one DNSKEY algorithm. |
@@ -43,6 +45,7 @@ Status: Final
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
+| `DS13_ALL_ALGOS_SIGNED` | `-` | `-` | No arguments. |
 | `DS13_ALGO_NOT_SIGNED_DNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS13_ALGO_NOT_SIGNED_DNSKEY` | `algo_num` | `int` | DNSKEY algorithm number missing in RRSIG coverage. |
 | `DS13_ALGO_NOT_SIGNED_DNSKEY` | `algo_mnemo` | `string` | DNSKEY algorithm mnemonic missing in RRSIG coverage. |
@@ -64,6 +67,7 @@ Status: Final
 ## Severity Levels Per Tag
 | Tag | Level | Notes |
 | --- | --- | --- |
+| `DS13_ALL_ALGOS_SIGNED` | `INFO` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS13_ALGO_NOT_SIGNED_DNSKEY` | `WARNING` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS13_ALGO_NOT_SIGNED_NS` | `WARNING` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS13_ALGO_NOT_SIGNED_SOA` | `WARNING` | Default from `share/profile.json` (`test_levels.DNSSEC`). |

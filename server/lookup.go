@@ -148,10 +148,10 @@ func lookupDS(ctx context.Context, domain string) []DelegationDS {
 				})
 			}
 		}
-		if records == nil {
-			return []DelegationDS{}
+		if len(records) > 0 {
+			return records
 		}
-		return records
+		// Empty answer — try the next resolver.
 	}
 
 	return []DelegationDS{}

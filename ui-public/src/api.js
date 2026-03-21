@@ -53,3 +53,11 @@ export async function getLocales() {
 export async function lookupDomain(domain) {
   return fetch(`${API_BASE}/lookup/${encodeURIComponent(domain)}`);
 }
+
+/**
+ * Fetch the server version string.
+ * @returns {Promise<Response>}
+ */
+export async function getVersion() {
+  return fetch(`${API_BASE}/version`);
+}

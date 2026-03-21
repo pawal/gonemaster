@@ -2,7 +2,7 @@
   import { onMount, onDestroy } from "svelte";
   import { t, locale, loadCatalog } from "./i18n.js";
   import { parseHash, hashFor } from "./router.js";
-  import { getLocales, getJob } from "./api.js";
+  import { getLocales, getJob, getVersion } from "./api.js";
   import TestForm from "./lib/TestForm.svelte";
   import Progress from "./lib/Progress.svelte";
   import Results from "./lib/Results.svelte";
@@ -44,6 +44,8 @@
 
   let availableLocales = ["en"];
   let resultLocale = "en";
+  let versionGonemaster = "";
+  let versionDNS = "";
 
   async function fetchLocales() {
     try {
@@ -124,10 +126,22 @@
   }
 
   // ── Lifecycle ───────────────────────────────────────────────────────────────
+  async function fetchVersion() {
+    try {
+      const res = await getVersion();
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.gonemaster) versionGonemaster = data.gonemaster;
+        if (data?.dns) versionDNS = data.dns;
+      }
+    } catch (_) {}
+  }
+
   onMount(() => {
     window.addEventListener("hashchange", onHashChange);
     applyTheme();
     fetchLocales();
+    fetchVersion();
     applyHash();
   });
 
@@ -183,6 +197,17 @@
     {:else}
       <ExpiredResult on:newtest={resetToIdle} />
     {/if}
+  {/if}
+
+  {#if versionGonemaster}
+    <footer class="version-footer">
+      <div class="version-box">
+        <span class="version-row"><span class="version-name">gonemaster</span>{versionGonemaster}</span>
+        {#if versionDNS}
+          <span class="version-row"><span class="version-name">miekg/dns</span>{versionDNS}</span>
+        {/if}
+      </div>
+    </footer>
   {/if}
 
   <a class="fork-ribbon right-bottom fixed" href="https://codeberg.org/pawal/gonemaster" data-ribbon="Fork me on Codeberg" title="Fork me on Codeberg">Fork me on Codeberg</a>

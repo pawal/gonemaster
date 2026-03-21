@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/normalization"
 )
 
@@ -29,6 +30,15 @@ func publicJobView(job Job) PublicJobView {
 		view.FinishedAt = &job.FinishedAt
 	}
 	return view
+}
+
+// handlePublicVersion handles GET /pub/api/v1/version.
+func (s *Server) handlePublicVersion(w http.ResponseWriter, r *http.Request) {
+	resp := map[string]string{"gonemaster": engine.VersionFull()}
+	if dns := engine.DNSLibVersion(); dns != "" {
+		resp["dns"] = dns
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // handlePublicCreateJob handles POST /pub/api/v1/jobs.

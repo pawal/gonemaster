@@ -140,7 +140,8 @@ func VersionFull() string {
 	return fmt.Sprintf("%s (%s)", short, strings.Join(details, " "))
 }
 
-func dnsLibVersion() string {
+// DNSLibVersion returns the version of the miekg/dns library linked into the binary.
+func DNSLibVersion() string {
 	info, ok := debug.ReadBuildInfo()
 	if !ok {
 		return ""
@@ -504,7 +505,7 @@ func RunWithRunner(req RunRequest, runner *Runner) ([]LogEntry, error) {
 	}
 	runner.Logger.AddWithoutCallback("START_TIME", map[string]any{"start_time": runner.StartedAt.UTC().Format(time.RFC3339)}, "", "")
 	runner.Logger.AddWithoutCallback("TEST_TARGET", map[string]any{"domain": req.Domain}, "", "")
-	if v := dnsLibVersion(); v != "" {
+	if v := DNSLibVersion(); v != "" {
 		runner.Logger.AddWithoutCallback("DEPENDENCY_VERSION", map[string]any{"name": "dns", "version": v}, "", "")
 	}
 

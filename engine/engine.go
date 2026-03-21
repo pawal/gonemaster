@@ -509,9 +509,14 @@ func RunWithRunner(req RunRequest, runner *Runner) ([]LogEntry, error) {
 		runner.Logger.AddWithoutCallback("DEPENDENCY_VERSION", map[string]any{"name": "dns", "version": v}, "", "")
 	}
 
+	// Snapshot the logger entry count here so we can prepend these system
+	// init entries (GLOBAL_VERSION etc.) to the final result below.
+	prefixCount := len(runner.Logger.Entries())
+
 	if !runner.Profile.Net.IPv4 && !runner.Profile.Net.IPv6 {
 		runner.Logger.AddWithoutCallback("NO_NETWORK", map[string]any{}, "", "")
-		return convertEntries(nil, req.MinLevel)
+		prefix := runner.Logger.Entries()
+		return convertEntries(prefix, req.MinLevel)
 	}
 	if !runner.Profile.Net.IPv4 {
 		runner.Logger.AddWithoutCallback("SKIP_IPV4_DISABLED", map[string]any{}, "", "")
@@ -533,7 +538,10 @@ func RunWithRunner(req RunRequest, runner *Runner) ([]LogEntry, error) {
 		runner.Logger.AddWithoutCallback("SAVED_NS_CACHE", map[string]any{}, "", "")
 	}
 
-	return convertEntries(entries, req.MinLevel)
+	// Prepend the system prefix entries (logged before tests ran) so that the
+	// System module is always present and always first in results.
+	allEntries := append(runner.Logger.Entries()[:prefixCount], entries...)
+	return convertEntries(allEntries, req.MinLevel)
 }
 
 // Run executes a Zonemaster test run.

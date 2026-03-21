@@ -873,7 +873,13 @@
       for (const tcg of mod.testcases.values()) tcg.level = worstLevel(tcg.entries);
       mod.testcasesArr = Array.from(mod.testcases.values());
     }
-    return Array.from(modules.values());
+    const arr = Array.from(modules.values());
+    arr.sort((a, b) => {
+      if (a.key === "SYSTEM") return -1;
+      if (b.key === "SYSTEM") return 1;
+      return 0;
+    });
+    return arr;
   };
   const toggleModule = (key) => {
     moduleOpen = { ...moduleOpen, [key]: !moduleOpen[key] };

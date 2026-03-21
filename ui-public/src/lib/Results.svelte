@@ -71,7 +71,11 @@
     return Object.values(mod).flat();
   }
 
-  $: moduleNames = Object.keys(modules);
+  $: moduleNames = Object.keys(modules).sort((a, b) => {
+    if (a === "System") return -1;
+    if (b === "System") return 1;
+    return 0;
+  });
   $: overallLevel = worstLevel(entries);
   $: bannerCls = bannerClass(overallLevel);
   $: statusKey = `pub.result_status_${bannerCls}`;

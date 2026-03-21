@@ -740,7 +740,7 @@ func Delegation06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		results = append(results, entries...)
 	}
 
-	if (len(list4) > 0 || len(list5) > 0) && onlyTestCaseStart(results) {
+	if (len(list4) > 0 || len(list5) > 0) && !hasTag(results, "SOA_NOT_EXISTS") {
 		if err := appendLog(ctx, &results, testcase, "SOA_EXISTS", map[string]any{}); err != nil {
 			return results, err
 		}

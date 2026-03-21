@@ -97,7 +97,7 @@
   "pub.tc.delegation04": "Namnservern är auktoritativ",
   "pub.tc.delegation05": "Namnservern får inte peka på ett CNAME-alias",
   "pub.tc.delegation06": "Existens av SOA",
-  "pub.tc.delegation07": "Limnamn-poster från förälder finns i barnet",
+  "pub.tc.delegation07": "Glue-poster från förälder finns i barnet",
   "pub.tc.dnssec01": "Giltiga värden för DS-hashalgoritm",
   "pub.tc.dnssec02": "DS måste matcha en giltig DNSKEY i barnzonen",
   "pub.tc.dnssec03": "Verifiera NSEC3-parametrar",

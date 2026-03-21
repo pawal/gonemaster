@@ -97,7 +97,7 @@
   "pub.tc.delegation04": "Navneserveren er autoritativ",
   "pub.tc.delegation05": "Navneserveren må ikke pege på et CNAME-alias",
   "pub.tc.delegation06": "Eksistens af SOA",
-  "pub.tc.delegation07": "Limnavn-poster fra overordnet findes i barnet",
+  "pub.tc.delegation07": "Glue-poster fra overordnet findes i barnet",
   "pub.tc.dnssec01": "Gyldige værdier for DS-hash-algoritme",
   "pub.tc.dnssec02": "DS skal matche en gyldig DNSKEY i barnezonen",
   "pub.tc.dnssec03": "Verificer NSEC3-parametre",

@@ -540,7 +540,7 @@ func Delegation04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	if (len(list4) > 0 || len(list5) > 0) && onlyTestCaseStart(results) && len(authoritatives) > 0 {
+	if (len(list4) > 0 || len(list5) > 0) && !hasTag(results, "IS_NOT_AUTHORITATIVE") && len(authoritatives) > 0 {
 		uniq := uniqueStrings(authoritatives)
 		sort.Strings(uniq)
 		args := map[string]any{}

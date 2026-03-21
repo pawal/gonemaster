@@ -409,7 +409,7 @@ msgstr "Navnetjener {ns}/{address} svarte ikke autoritativt på NS-spørring ove
 
 msgctxt "CONNECTIVITY:CN01_OK_UDP"
 msgid "The following nameservers respond correctly to SOA and NS queries over UDP: \"{servers}\"."
-msgstr "Følgende navneservere svarer korrekt på SOA- og NS-forespørsler via UDP: "{servers}"."
+msgstr "Følgende navneservere svarer korrekt på SOA- og NS-forespørsler via UDP: \"{servers}\"."
 
 msgctxt "CONNECTIVITY:CN01_SOA_RECORD_NOT_AA_UDP"
 msgid ""
@@ -521,7 +521,7 @@ msgstr ""
 
 msgctxt "CONNECTIVITY:CN02_OK_TCP"
 msgid "The following nameservers respond correctly to SOA and NS queries over TCP: \"{servers}\"."
-msgstr "Følgende navneservere svarer korrekt på SOA- og NS-forespørsler via TCP: "{servers}"."
+msgstr "Følgende navneservere svarer korrekt på SOA- og NS-forespørsler via TCP: \"{servers}\"."
 
 msgctxt "CONNECTIVITY:ASN_INFOS_ANNOUNCE_IN"
 msgid "Name server IP address \"{address}\" is announced in prefix \"{prefixes}\"."

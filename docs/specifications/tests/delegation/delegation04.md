@@ -30,14 +30,14 @@ Status: Final
    - Track whether the nameserver produced at least one authoritative response (`AA=true`) across UDP/TCP.
 5. After all tasks, emit `ARE_AUTHORITATIVE` with sorted unique NS names only when all conditions are true:
    - At least one nameserver was present (`Method4` or `Method5` non-empty).
-   - No tag other than `TEST_CASE_START` has been emitted.
+   - No `IS_NOT_AUTHORITATIVE` tag has been emitted (transport-disabled debug tags do not suppress this).
    - At least one nameserver was observed authoritative.
 6. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
-| `ARE_AUTHORITATIVE` | At least one evaluated nameserver was authoritative and no non-start tags were emitted. |
+| `ARE_AUTHORITATIVE` | At least one evaluated nameserver was authoritative and no `IS_NOT_AUTHORITATIVE` tag was emitted. |
 | `IPV4_DISABLED` | IPv4 nameserver evaluation is skipped because IPv4 is disabled. |
 | `IPV6_DISABLED` | IPv6 nameserver evaluation is skipped because IPv6 is disabled. |
 | `IS_NOT_AUTHORITATIVE` | A SOA response was received with `AA=false` on UDP or TCP. |
@@ -86,5 +86,5 @@ Status: Final
 
 ## Edge Cases And Limitations
 - Missing/no-response cases emit no dedicated tag in this testcase.
-- `ARE_AUTHORITATIVE` is suppressed by any non-start tag, including transport-disabled debug tags.
+- `ARE_AUTHORITATIVE` is suppressed only by `IS_NOT_AUTHORITATIVE`; transport-disabled debug tags (`IPV4_DISABLED`, `IPV6_DISABLED`) do not suppress it.
 - If all SOA queries fail to return usable responses, the testcase emits only `TEST_CASE_START`, `TEST_CASE_END`, and, if any transport is disabled, `IPV4_DISABLED` and/or `IPV6_DISABLED`.

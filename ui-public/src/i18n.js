@@ -26,6 +26,9 @@ export const setCatalog = (code, catalog) => {
   _version.update((v) => v + 1);
 };
 
+// All locale JSON files except en (which is already statically bundled).
+const localeModules = import.meta.glob("./i18n/!(en).json");
+
 /**
  * Asynchronously loads `ui-public/src/i18n/<code>.json` if it has not been
  * loaded yet. On success, calls `setCatalog` so reactive derivations update.
@@ -34,8 +37,10 @@ export const setCatalog = (code, catalog) => {
  */
 export const loadCatalog = async (code) => {
   if (code === "en" || catalogs[code] !== undefined) return;
+  const loader = localeModules[`./i18n/${code}.json`];
+  if (!loader) return;
   try {
-    const mod = await import(`./i18n/${code}.json`);
+    const mod = await loader();
     setCatalog(code, mod.default ?? mod);
   } catch (_) {
     // Unknown or unavailable locale: stay on English.

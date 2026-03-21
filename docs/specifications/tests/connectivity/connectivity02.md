@@ -30,7 +30,9 @@ Status: Final
      - No `<QTYPE>` record in answer -> `CN02_MISSING_<QTYPE>_RECORD_TCP`.
      - First answer owner name differs from child zone -> `CN02_WRONG_<QTYPE>_RECORD_TCP`.
      - AA flag unset -> `CN02_<QTYPE>_RECORD_NOT_AA_TCP`.
-4. Emit `TEST_CASE_END`.
+   - If all checks passed, record nameserver as ok.
+4. If any nameservers passed all checks, emit one `CN02_OK_TCP` with `servers` listing them all.
+5. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
@@ -41,6 +43,7 @@ Status: Final
 | `CN02_NO_RESPONSE_SOA_QUERY_TCP` | SOA query has no response message while NS handling continues. |
 | `CN02_NO_RESPONSE_TCP` | Both SOA and NS queries have no response message. |
 | `CN02_NS_RECORD_NOT_AA_TCP` | NS response has expected owner and record but AA flag is unset. |
+| `CN02_OK_TCP` | Nameserver responds correctly to both SOA and NS queries over TCP. |
 | `CN02_SOA_RECORD_NOT_AA_TCP` | SOA response has expected owner and record but AA flag is unset. |
 | `CN02_UNEXPECTED_RCODE_NS_QUERY_TCP` | NS response RCODE is not `NOERROR`. |
 | `CN02_UNEXPECTED_RCODE_SOA_QUERY_TCP` | SOA response RCODE is not `NOERROR`. |
@@ -66,6 +69,7 @@ Status: Final
 | `CN02_NO_RESPONSE_TCP` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `CN02_NS_RECORD_NOT_AA_TCP` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with non-AA NS response. |
 | `CN02_NS_RECORD_NOT_AA_TCP` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `CN02_OK_TCP` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` objects) that responded correctly over TCP. |
 | `CN02_SOA_RECORD_NOT_AA_TCP` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) with non-AA SOA response. |
 | `CN02_SOA_RECORD_NOT_AA_TCP` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `CN02_UNEXPECTED_RCODE_NS_QUERY_TCP` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) producing unexpected NS RCODE. |
@@ -100,6 +104,7 @@ Status: Final
 | `CN02_NO_RESPONSE_SOA_QUERY_TCP` | `WARNING` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
 | `CN02_NO_RESPONSE_TCP` | `WARNING` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
 | `CN02_NS_RECORD_NOT_AA_TCP` | `WARNING` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
+| `CN02_OK_TCP` | `INFO` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
 | `CN02_SOA_RECORD_NOT_AA_TCP` | `WARNING` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
 | `CN02_UNEXPECTED_RCODE_NS_QUERY_TCP` | `WARNING` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
 | `CN02_UNEXPECTED_RCODE_SOA_QUERY_TCP` | `WARNING` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |

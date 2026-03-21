@@ -507,6 +507,10 @@ msgstr ""
 "La réponse du serveur de noms {ns}/{address} à une requête de type \"NS\" en UDP ne "
 "fait pas autorité."
 
+msgctxt "CONNECTIVITY:CN01_OK_UDP"
+msgid "The following nameservers respond correctly to SOA and NS queries over UDP: \"{servers}\"."
+msgstr "Les serveurs de noms suivants répondent correctement aux requêtes SOA et NS via UDP : "{servers}"."
+
 msgctxt "CONNECTIVITY:CN01_SOA_RECORD_NOT_AA_UDP"
 msgid ""
 "Nameserver {ns}/{address} does not give an authoritative response on an SOA query over "
@@ -625,6 +629,10 @@ msgid ""
 msgstr ""
 "Le serveur de noms {ns}/{address} répond aux requêtes de type \"SOA\" en TCP avec un "
 "nom de domaine erroné ({domain_found} à la place de {domain_expected})."
+
+msgctxt "CONNECTIVITY:CN02_OK_TCP"
+msgid "The following nameservers respond correctly to SOA and NS queries over TCP: \"{servers}\"."
+msgstr "Les serveurs de noms suivants répondent correctement aux requêtes SOA et NS via TCP : "{servers}"."
 
 msgctxt "CONNECTIVITY:ASN_INFOS_ANNOUNCE_IN"
 msgid "Name server IP address \"{address}\" is announced in prefix \"{prefixes}\"."

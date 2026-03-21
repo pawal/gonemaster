@@ -403,6 +403,10 @@ msgstr ""
 "Domenski strežnik {ns}/{address} ne vrača avtoritativnega odgovora na \"NS\" poizvedbe "
 "prek UDP."
 
+msgctxt "CONNECTIVITY:CN01_OK_UDP"
+msgid "The following nameservers respond correctly to SOA and NS queries over UDP: \"{servers}\"."
+msgstr "Naslednji imenski strežniki se pravilno odzivajo na poizvedbe SOA in NS prek UDP: "{servers}"."
+
 msgctxt "CONNECTIVITY:CN01_SOA_RECORD_NOT_AA_UDP"
 msgid ""
 "Nameserver {ns}/{address} does not give an authoritative response on an SOA query over "
@@ -518,6 +522,10 @@ msgid ""
 msgstr ""
 "Domenski strežnik {ns}/{address} je odgovoril z nepričakovano domeno ({domain_found}) "
 "namesto ({domain_expected}) v SOA poizvedbi prek TCP."
+
+msgctxt "CONNECTIVITY:CN02_OK_TCP"
+msgid "The following nameservers respond correctly to SOA and NS queries over TCP: \"{servers}\"."
+msgstr "Naslednji imenski strežniki se pravilno odzivajo na poizvedbe SOA in NS prek TCP: "{servers}"."
 
 msgctxt "CONNECTIVITY:ASN_INFOS_ANNOUNCE_IN"
 msgid "Name server IP address \"{address}\" is announced in prefix \"{prefixes}\"."

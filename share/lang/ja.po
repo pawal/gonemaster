@@ -343,6 +343,10 @@ msgid ""
 "UDP."
 msgstr "ネームサーバー {ns}/{address} は UDP の NS クエリに権威応答を返しません。"
 
+msgctxt "CONNECTIVITY:CN01_OK_UDP"
+msgid "The following nameservers respond correctly to SOA and NS queries over UDP: \"{servers}\"."
+msgstr "次のネームサーバーはUDPでSOAおよびNSクエリに正しく応答します："{servers}"。"
+
 msgctxt "CONNECTIVITY:CN01_SOA_RECORD_NOT_AA_UDP"
 msgid ""
 "Nameserver {ns}/{address} does not give an authoritative response on an SOA query over "
@@ -444,6 +448,10 @@ msgid ""
 msgstr ""
 "ネームサーバー {ns}/{address} は TCP の SOA クエリに誤った owner 名で応答しました "
 "({domain_expected} ではなく {domain_found})。"
+
+msgctxt "CONNECTIVITY:CN02_OK_TCP"
+msgid "The following nameservers respond correctly to SOA and NS queries over TCP: \"{servers}\"."
+msgstr "次のネームサーバーはTCPでSOAおよびNSクエリに正しく応答します："{servers}"。"
 
 msgctxt "CONNECTIVITY:ASN_INFOS_ANNOUNCE_IN"
 msgid "Name server IP address \"{address}\" is announced in prefix \"{prefixes}\"."

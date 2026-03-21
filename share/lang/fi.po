@@ -396,6 +396,10 @@ msgid ""
 msgstr ""
 "Nimipalvelin {ns}/{address} ei anna autoritatiivista vastausta NS-kyselyyn UDP:n yli."
 
+msgctxt "CONNECTIVITY:CN01_OK_UDP"
+msgid "The following nameservers respond correctly to SOA and NS queries over UDP: \"{servers}\"."
+msgstr "Seuraavat nimipalvelimet vastaavat oikein SOA- ja NS-kyselyihin UDP:n yli: "{servers}"."
+
 msgctxt "CONNECTIVITY:CN01_SOA_RECORD_NOT_AA_UDP"
 msgid ""
 "Nameserver {ns}/{address} does not give an authoritative response on an SOA query over "
@@ -508,6 +512,10 @@ msgid ""
 msgstr ""
 "Nimipalvelin {ns}/{address} vastaa väärällä omistajanimellä ({domain_found} eikä "
 "{domain_expected}) SOA-kyselyihin TCP:n yli."
+
+msgctxt "CONNECTIVITY:CN02_OK_TCP"
+msgid "The following nameservers respond correctly to SOA and NS queries over TCP: \"{servers}\"."
+msgstr "Seuraavat nimipalvelimet vastaavat oikein SOA- ja NS-kyselyihin TCP:n yli: "{servers}"."
 
 msgctxt "CONNECTIVITY:ASN_INFOS_ANNOUNCE_IN"
 msgid "Name server IP address \"{address}\" is announced in prefix \"{prefixes}\"."

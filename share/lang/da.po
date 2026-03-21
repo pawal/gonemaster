@@ -416,6 +416,10 @@ msgstr ""
 "Navneserveren {ns}/{address} returnerer ikke et autoritativt svar på en NS-forepørgsel "
 "over UDP."
 
+msgctxt "CONNECTIVITY:CN01_OK_UDP"
+msgid "The following nameservers respond correctly to SOA and NS queries over UDP: \"{servers}\"."
+msgstr "Følgende navneservere svarer korrekt på SOA- og NS-forespørgsler via UDP: "{servers}"."
+
 msgctxt "CONNECTIVITY:CN01_SOA_RECORD_NOT_AA_UDP"
 msgid ""
 "Nameserver {ns}/{address} does not give an authoritative response on an SOA query over "
@@ -529,6 +533,10 @@ msgid ""
 msgstr ""
 "Navneserveren {ns}/{address} svarede med et ugyldigt ejernavn ({domain_found} i stedet "
 "for {domain_expected}) på en SOA-forespørgsel over TCP."
+
+msgctxt "CONNECTIVITY:CN02_OK_TCP"
+msgid "The following nameservers respond correctly to SOA and NS queries over TCP: \"{servers}\"."
+msgstr "Følgende navneservere svarer korrekt på SOA- og NS-forespørgsler via TCP: "{servers}"."
 
 msgctxt "CONNECTIVITY:ASN_INFOS_ANNOUNCE_IN"
 msgid "Name server IP address \"{address}\" is announced in prefix \"{prefixes}\"."

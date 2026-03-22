@@ -120,7 +120,7 @@ func dialectFor(driver string) (sqlDialect, error) {
 		return sqliteDialect{}, nil
 	case "postgres":
 		return postgresDialect{}, nil
-	case "mariadb":
+	case "mariadb", "mysql":
 		return mariadbDialect{}, nil
 	default:
 		return nil, fmt.Errorf("unsupported database driver %q", driver)
@@ -134,7 +134,7 @@ func configurePool(db *sql.DB, driver string) {
 	switch driver {
 	case "sqlite":
 		db.SetMaxOpenConns(1)
-	case "postgres", "mysql":
+	case "postgres", "mariadb", "mysql":
 		db.SetMaxOpenConns(25)
 		db.SetMaxIdleConns(5)
 		db.SetConnMaxLifetime(5 * time.Minute)
@@ -159,10 +159,12 @@ func openSQLDB(driver, dsn string) (*sql.DB, error) {
 	if dsn == "" {
 		return nil, fmt.Errorf("database DSN is required for driver %q", driver)
 	}
-	if driver == "mysql" {
+	sqlDriver := driver
+	if driver == "mariadb" || driver == "mysql" {
+		sqlDriver = "mysql"
 		dsn = mariadbDSN(dsn)
 	}
-	db, err := sql.Open(driver, dsn)
+	db, err := sql.Open(sqlDriver, dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open %s database: %w", driver, err)
 	}

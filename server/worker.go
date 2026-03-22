@@ -171,6 +171,7 @@ func (s *Server) runJob(jobID string) error {
 		return err
 	}
 	if err := s.store.SetResult(job.ID, result); err != nil {
+		log.Printf("CRITICAL: job %s: failed to store result: %v", job.ID, err)
 		return err
 	}
 	if becameTerminal {

@@ -8,6 +8,7 @@ import (
 type sqlMigration struct {
 	version int
 	stmts   []string
+	stmtsFn func(sqlDialect) []string // dialect-specific statements (appended to stmts)
 }
 
 // sqlMigrations is the ordered list of schema migrations.
@@ -73,6 +74,21 @@ var sqlMigrations = []sqlMigration{
 			`CREATE UNIQUE INDEX IF NOT EXISTS idx_jobs_public_id ON jobs(public_id)`,
 		},
 	},
+	{
+		version: 4,
+		stmtsFn: func(d sqlDialect) []string {
+			if _, ok := d.(mariadbDialect); ok {
+				return []string{
+					// MariaDB TEXT is limited to 64 KB; large zones (e.g. "com")
+					// produce raw_json well over that limit. MEDIUMTEXT allows
+					// up to 16 MB. SQLite and PostgreSQL TEXT is unlimited.
+					`ALTER TABLE results MODIFY raw_json MEDIUMTEXT`,
+					`ALTER TABLE results MODIFY summary_json MEDIUMTEXT`,
+				}
+			}
+			return nil
+		},
+	},
 }
 
 // backfillPublicIDs assigns a public_id to every job that does not yet have
@@ -134,7 +150,11 @@ func runMigrations(db *sql.DB, d sqlDialect) error {
 		if err != nil {
 			return fmt.Errorf("begin migration %d: %w", m.version, err)
 		}
-		for _, stmt := range m.stmts {
+		allStmts := m.stmts
+		if m.stmtsFn != nil {
+			allStmts = append(allStmts, m.stmtsFn(d)...)
+		}
+		for _, stmt := range allStmts {
 			if _, err := tx.Exec(stmt); err != nil {
 				_ = tx.Rollback()
 				return fmt.Errorf("migration %d: %w", m.version, err)

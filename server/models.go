@@ -205,6 +205,21 @@ type RunFilter struct {
 	Sort        JobSort
 }
 
+// EntryFilter filters cross-run entry queries.
+type EntryFilter struct {
+	RunID      string // exact run ID
+	DomainID   int64  // exact domain ID
+	Tag        string // domain tag filter (join via domain_tags)
+	Module     string // exact module name
+	Testcase   string // exact testcase name
+	EntryTag   string // log event tag (entries.tag column)
+	Level      string // exact level
+	LatestOnly bool   // restrict to entries from each domain's latest run
+	BatchID    string // restrict to runs from a batch
+	Limit      int
+	Offset     int
+}
+
 // ── List result types ─────────────────────────────────────────────────────────
 
 // JobList represents paginated job results.
@@ -236,6 +251,16 @@ type RunList struct {
 	Offset     int    `json:"offset,omitempty"`
 	NextCursor string `json:"next_cursor,omitempty"`
 	PrevCursor string `json:"prev_cursor,omitempty"`
+}
+
+// EntryList represents paginated entry results.
+type EntryList struct {
+	Items      []Entry `json:"items"`
+	Total      int     `json:"total"`
+	Limit      int     `json:"limit,omitempty"`
+	Offset     int     `json:"offset,omitempty"`
+	NextCursor string  `json:"next_cursor,omitempty"`
+	PrevCursor string  `json:"prev_cursor,omitempty"`
 }
 
 // ── Result types (unchanged shape for API compat) ────────────────────────────

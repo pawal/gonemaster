@@ -54,6 +54,9 @@ type JobStore interface {
 	ListRuns(filter RunFilter) RunList
 	ListRunsByDomain(domainID int64, limit, offset int) RunList
 
+	// Entry queries (cross-run analysis).
+	QueryEntries(filter EntryFilter) EntryList
+
 	// Batch management.
 	CreateBatch(batch Batch) error
 	GetBatch(id string) (Batch, bool)
@@ -863,6 +866,127 @@ func (s *InMemoryJobStore) ListRuns(filter RunFilter) RunList {
 // ListRunsByDomain returns paginated runs for a specific domain.
 func (s *InMemoryJobStore) ListRunsByDomain(domainID int64, limit, offset int) RunList {
 	return s.ListRuns(RunFilter{DomainID: domainID, Limit: limit, Offset: offset})
+}
+
+// QueryEntries returns entries across runs matching the given filter.
+func (s *InMemoryJobStore) QueryEntries(filter EntryFilter) EntryList {
+	s.mu.RLock()
+
+	// Build set of allowed run IDs when LatestOnly is requested.
+	var latestRunIDs map[string]struct{}
+	if filter.LatestOnly {
+		latestRunIDs = make(map[string]struct{})
+		for _, d := range s.domainsByID {
+			if d.LatestRunID != "" {
+				latestRunIDs[d.LatestRunID] = struct{}{}
+			}
+		}
+	}
+
+	// Build set of domain IDs allowed by Tag filter.
+	var tagDomainIDs map[int64]struct{}
+	if filter.Tag != "" {
+		tagDomainIDs = make(map[int64]struct{})
+		for _, id := range s.tagDomains[filter.Tag] {
+			tagDomainIDs[id] = struct{}{}
+		}
+	}
+
+	// Build set of run IDs allowed by BatchID filter.
+	var batchRunIDs map[string]struct{}
+	if filter.BatchID != "" {
+		batchRunIDs = make(map[string]struct{})
+		for _, r := range s.runs {
+			if r.BatchID == filter.BatchID {
+				batchRunIDs[r.ID] = struct{}{}
+			}
+		}
+	}
+
+	var all []Entry
+	for runID, runEntries := range s.entries {
+		if filter.RunID != "" && runID != filter.RunID {
+			continue
+		}
+		if filter.LatestOnly {
+			if _, ok := latestRunIDs[runID]; !ok {
+				continue
+			}
+		}
+		if filter.BatchID != "" {
+			if _, ok := batchRunIDs[runID]; !ok {
+				continue
+			}
+		}
+		for _, e := range runEntries {
+			if filter.DomainID != 0 && e.DomainID != filter.DomainID {
+				continue
+			}
+			if filter.Tag != "" {
+				if _, ok := tagDomainIDs[e.DomainID]; !ok {
+					continue
+				}
+			}
+			if filter.Module != "" && e.Module != filter.Module {
+				continue
+			}
+			if filter.Testcase != "" && e.Testcase != filter.Testcase {
+				continue
+			}
+			if filter.EntryTag != "" && e.Tag != filter.EntryTag {
+				continue
+			}
+			if filter.Level != "" && e.Level != filter.Level {
+				continue
+			}
+			all = append(all, e)
+		}
+	}
+	s.mu.RUnlock()
+
+	// Sort by run_id then id for determinism.
+	sort.Slice(all, func(i, j int) bool {
+		if all[i].RunID != all[j].RunID {
+			return all[i].RunID < all[j].RunID
+		}
+		return all[i].ID < all[j].ID
+	})
+
+	total := len(all)
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = 100
+	}
+	offset := filter.Offset
+	if offset < 0 {
+		offset = 0
+	}
+	start := offset
+	if start > total {
+		start = total
+	}
+	end := start + limit
+	if end > total {
+		end = total
+	}
+
+	list := EntryList{
+		Items:  all[start:end],
+		Total:  total,
+		Limit:  limit,
+		Offset: offset,
+	}
+	if start > 0 {
+		prev := start - limit
+		if prev < 0 {
+			prev = 0
+		}
+		list.PrevCursor = strconv.Itoa(prev)
+	}
+	if end < total {
+		list.NextCursor = strconv.Itoa(end)
+	}
+	return list
 }
 
 // CreateBatch stores a batch record.

@@ -128,6 +128,10 @@ func (s *spyJobStore) ListRunsByDomain(domainID int64, limit, offset int) RunLis
 	return s.inner.ListRunsByDomain(domainID, limit, offset)
 }
 
+func (s *spyJobStore) QueryEntries(filter EntryFilter) EntryList {
+	return s.inner.QueryEntries(filter)
+}
+
 func (s *spyJobStore) CreateBatch(batch Batch) error {
 	return s.inner.CreateBatch(batch)
 }

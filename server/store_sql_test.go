@@ -2010,3 +2010,126 @@ func TestMariadbDSNContainsParseTimeTrue(t *testing.T) {
 		t.Errorf("expected parseTime=true in %q", dsn)
 	}
 }
+
+func TestSQLJobStoreQueryEntries(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			base := time.Now().UTC()
+
+			grad := func(id, domain, batchID string, entries []engine.LogEntry) {
+				t.Helper()
+				job := Job{
+					ID:        id,
+					Domain:    domain,
+					BatchID:   batchID,
+					Status:    JobSucceeded,
+					CreatedAt: base,
+				}
+				if _, err := s.Create(job); err != nil {
+					t.Fatalf("create: %v", err)
+				}
+				graduateSQLJob(t, s, job, entries)
+			}
+
+			grad("run1", "alpha.example", "batch1", []engine.LogEntry{
+				{Module: "DNSSEC", Testcase: "DNSSEC01", Tag: "DS01_ALGO_SHA1", Level: "WARNING"},
+				{Module: "DNSSEC", Testcase: "DNSSEC02", Tag: "DS02_NO_DS", Level: "ERROR"},
+			})
+			grad("run2", "beta.example", "batch1", []engine.LogEntry{
+				{Module: "DNSSEC", Testcase: "DNSSEC01", Tag: "DS01_ALGO_SHA1", Level: "NOTICE"},
+			})
+			grad("run3", "gamma.example", "", []engine.LogEntry{
+				{Module: "BASIC", Testcase: "BASIC01", Tag: "BASIC01_NO_GLUE", Level: "ERROR"},
+			})
+
+			// Tag beta and gamma.
+			betaDomain, _ := s.GetDomainByName("beta.example")
+			gammaDomain, _ := s.GetDomainByName("gamma.example")
+			if err := s.CreateTag("tagged", ""); err != nil {
+				t.Fatalf("CreateTag: %v", err)
+			}
+			if err := s.TagDomains("tagged", []int64{betaDomain.ID, gammaDomain.ID}); err != nil {
+				t.Fatalf("TagDomains: %v", err)
+			}
+
+			t.Run("no filter returns all", func(t *testing.T) {
+				list := s.QueryEntries(EntryFilter{})
+				if list.Total != 4 {
+					t.Fatalf("expected 4 entries, got %d", list.Total)
+				}
+			})
+
+			t.Run("filter by run_id", func(t *testing.T) {
+				list := s.QueryEntries(EntryFilter{RunID: "run1"})
+				if list.Total != 2 {
+					t.Fatalf("expected 2, got %d", list.Total)
+				}
+			})
+
+			t.Run("filter by module", func(t *testing.T) {
+				list := s.QueryEntries(EntryFilter{Module: "DNSSEC"})
+				if list.Total != 3 {
+					t.Fatalf("expected 3, got %d", list.Total)
+				}
+			})
+
+			t.Run("filter by testcase", func(t *testing.T) {
+				list := s.QueryEntries(EntryFilter{Testcase: "DNSSEC01"})
+				if list.Total != 2 {
+					t.Fatalf("expected 2, got %d", list.Total)
+				}
+			})
+
+			t.Run("filter by entry_tag", func(t *testing.T) {
+				list := s.QueryEntries(EntryFilter{EntryTag: "DS02_NO_DS"})
+				if list.Total != 1 {
+					t.Fatalf("expected 1, got %d", list.Total)
+				}
+			})
+
+			t.Run("filter by level", func(t *testing.T) {
+				list := s.QueryEntries(EntryFilter{Level: "ERROR"})
+				if list.Total != 2 {
+					t.Fatalf("expected 2, got %d", list.Total)
+				}
+			})
+
+			t.Run("filter by domain tag", func(t *testing.T) {
+				list := s.QueryEntries(EntryFilter{Tag: "tagged"})
+				if list.Total != 2 {
+					t.Fatalf("expected 2, got %d", list.Total)
+				}
+			})
+
+			t.Run("filter by batch_id", func(t *testing.T) {
+				list := s.QueryEntries(EntryFilter{BatchID: "batch1"})
+				if list.Total != 3 {
+					t.Fatalf("expected 3, got %d", list.Total)
+				}
+			})
+
+			t.Run("latest only", func(t *testing.T) {
+				// Graduate a second run for alpha — this becomes the latest.
+				grad("run1b", "alpha.example", "", []engine.LogEntry{
+					{Module: "BASIC", Testcase: "BASIC01", Tag: "B", Level: "NOTICE"},
+				})
+				list := s.QueryEntries(EntryFilter{LatestOnly: true, Module: "BASIC"})
+				// run1b (latest for alpha) contributes 1 BASIC entry; gamma contributes 1.
+				if list.Total != 2 {
+					t.Fatalf("expected 2 (latest-only BASIC entries), got %d", list.Total)
+				}
+			})
+
+			t.Run("pagination", func(t *testing.T) {
+				list := s.QueryEntries(EntryFilter{Limit: 2, Offset: 0})
+				if len(list.Items) != 2 {
+					t.Fatalf("expected 2 items on page 1, got %d", len(list.Items))
+				}
+				if list.NextCursor == "" {
+					t.Fatal("expected NextCursor to be set")
+				}
+			})
+		})
+	}
+}

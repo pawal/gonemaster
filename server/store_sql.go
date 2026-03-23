@@ -1272,6 +1272,136 @@ func (s *SQLJobStore) ListRunsByDomain(domainID int64, limit, offset int) RunLis
 	return s.ListRuns(RunFilter{DomainID: domainID, Limit: limit, Offset: offset})
 }
 
+// ── Entry queries ─────────────────────────────────────────────────────────────
+
+// QueryEntries returns entries across runs matching the given filter.
+func (s *SQLJobStore) QueryEntries(filter EntryFilter) EntryList {
+	var conds []string
+	var args []any
+	argN := 0
+	addArg := func(v any) string {
+		args = append(args, v)
+		argN++
+		return s.dialect.Placeholder(argN)
+	}
+
+	base := "FROM entries e"
+
+	if filter.Tag != "" {
+		base += " JOIN domain_tags dt ON dt.domain_id = e.domain_id AND dt.tag = " + addArg(filter.Tag)
+	}
+	if filter.LatestOnly {
+		base += " JOIN domains d ON d.id = e.domain_id AND d.latest_run_id = e.run_id"
+	}
+	if filter.BatchID != "" {
+		base += " JOIN runs r ON r.id = e.run_id AND r.batch_id = " + addArg(filter.BatchID)
+	}
+
+	if filter.RunID != "" {
+		conds = append(conds, "e.run_id = "+addArg(filter.RunID))
+	}
+	if filter.DomainID != 0 {
+		conds = append(conds, "e.domain_id = "+addArg(filter.DomainID))
+	}
+	if filter.Module != "" {
+		conds = append(conds, "e.module = "+addArg(filter.Module))
+	}
+	if filter.Testcase != "" {
+		conds = append(conds, "e.testcase = "+addArg(filter.Testcase))
+	}
+	if filter.EntryTag != "" {
+		conds = append(conds, "e.tag = "+addArg(filter.EntryTag))
+	}
+	if filter.Level != "" {
+		conds = append(conds, "e.level = "+addArg(filter.Level))
+	}
+
+	where := ""
+	if len(conds) > 0 {
+		where = " WHERE " + strings.Join(conds, " AND ")
+	}
+
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = 100
+	}
+	offset := filter.Offset
+	if offset < 0 {
+		offset = 0
+	}
+
+	var total int
+	if err := s.db.QueryRow("SELECT COUNT(*) "+base+where, args...).Scan(&total); err != nil {
+		return EntryList{Limit: limit}
+	}
+
+	limitPH := s.dialect.Placeholder(argN + 1)
+	offsetPH := s.dialect.Placeholder(argN + 2)
+	dataArgs := append(args, limit, offset)
+
+	rows, err := s.db.Query(
+		"SELECT e.id, e.run_id, e.domain_id, e.timestamp, e.module, e.testcase, e.tag, e.level, e.args_json "+
+			base+where+
+			" ORDER BY e.run_id ASC, e.id ASC"+
+			" LIMIT "+limitPH+" OFFSET "+offsetPH,
+		dataArgs...,
+	)
+	if err != nil {
+		return EntryList{Limit: limit}
+	}
+	defer rows.Close()
+
+	var items []Entry
+	for rows.Next() {
+		var (
+			id                                int64
+			runID, module, testcase, tag, lvl string
+			domainID                          int64
+			timestamp                         float64
+			argsJSON                          sql.NullString
+		)
+		if err := rows.Scan(&id, &runID, &domainID, &timestamp, &module, &testcase, &tag, &lvl, &argsJSON); err != nil {
+			continue
+		}
+		var entryArgs map[string]any
+		if argsJSON.Valid {
+			_ = json.Unmarshal([]byte(argsJSON.String), &entryArgs)
+		}
+		items = append(items, Entry{
+			ID:        id,
+			RunID:     runID,
+			DomainID:  domainID,
+			Timestamp: timestamp,
+			Module:    module,
+			Testcase:  testcase,
+			Tag:       tag,
+			Level:     lvl,
+			Args:      entryArgs,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return EntryList{Limit: limit}
+	}
+
+	list := EntryList{
+		Items:  items,
+		Total:  total,
+		Limit:  limit,
+		Offset: offset,
+	}
+	if offset > 0 {
+		prev := offset - limit
+		if prev < 0 {
+			prev = 0
+		}
+		list.PrevCursor = fmt.Sprintf("%d", prev)
+	}
+	if offset+len(items) < total {
+		list.NextCursor = fmt.Sprintf("%d", offset+len(items))
+	}
+	return list
+}
+
 // ── Batch management ──────────────────────────────────────────────────────────
 
 // CreateBatch inserts a batch record.

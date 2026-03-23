@@ -131,49 +131,33 @@ func (s *Server) runJob(jobID string) error {
 	s.metrics.ObserveCacheMetrics(qStats.cacheHits, qStats.cacheMisses, qStats.cacheEvictions)
 	finishedAt := time.Now().UTC()
 
-	result := JobResult{
-		JobID:   job.ID,
-		BatchID: job.BatchID,
-		Status:  JobSucceeded,
-		Summary: summarizeEntries(entries),
-		Raw: &JobResultRaw{
-			Entries: buildResultEntries(entries),
-		},
-	}
-
 	if jobCtx.Err() != nil {
 		job.Status = JobCanceled
 		job.Error = "canceled"
-		result.Status = JobCanceled
-		result.Summary = map[string]any{
-			"error": "canceled",
-		}
 	} else if runErr != nil {
 		job.Status = JobFailed
 		job.Error = runErr.Error()
-		result.Status = JobFailed
-		result.Summary = map[string]any{
-			"error": runErr.Error(),
-		}
-		if len(entries) > 0 {
-			result.Raw = &JobResultRaw{
-				Entries: buildResultEntries(entries),
-			}
-		}
 	} else {
 		job.Status = JobSucceeded
 	}
 
 	job.Progress = 100
 	job.FinishedAt = finishedAt
-	_, _, becameTerminal, err := s.updateJobWithMetricsTransition(job)
-	if err != nil {
+
+	// Get previous status for metrics before graduation removes the job.
+	previous, prevOK := s.store.Get(job.ID)
+
+	if err := s.store.GraduateJob(job, entries); err != nil {
+		log.Printf("CRITICAL: job %s: failed to graduate: %v", job.ID, err)
 		return err
 	}
-	if err := s.store.SetResult(job.ID, result); err != nil {
-		log.Printf("CRITICAL: job %s: failed to store result: %v", job.ID, err)
-		return err
+
+	fromStatus := JobStatus("")
+	if prevOK {
+		fromStatus = previous.Status
 	}
+	s.metrics.ObserveJobStatusTransition(fromStatus, job.Status)
+	becameTerminal := !isTerminalMetricsStatus(fromStatus) && isTerminalMetricsStatus(job.Status)
 	if becameTerminal {
 		duration := time.Duration(-1)
 		if !job.StartedAt.IsZero() {
@@ -326,23 +310,6 @@ func (s *Server) updateJobProgress(jobID string, progress int) {
 	}
 	job.Progress = progress
 	_ = s.store.Update(job)
-}
-
-func summarizeEntries(entries []engine.LogEntry) map[string]any {
-	if len(entries) == 0 {
-		return map[string]any{
-			"total":  0,
-			"levels": map[string]int{},
-		}
-	}
-	levels := map[string]int{}
-	for _, entry := range entries {
-		levels[entry.Level]++
-	}
-	return map[string]any{
-		"total":  len(entries),
-		"levels": levels,
-	}
 }
 
 func severityTotalsFromEntries(entries []engine.LogEntry) map[string]int64 {

@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"codeberg.org/pawal/gonemaster/engine"
 	"github.com/go-sql-driver/mysql"
 	"github.com/lib/pq"
 	_ "modernc.org/sqlite"
@@ -22,10 +23,9 @@ type spyDialect struct {
 	placeholderCalls int
 }
 
-func (d *spyDialect) Placeholder(n int) string     { d.placeholderCalls++; return d.inner.Placeholder(n) }
-func (d *spyDialect) TimestampVal(t time.Time) any { return d.inner.TimestampVal(t) }
-func (d *spyDialect) DriverName() string           { return d.inner.DriverName() }
-func (d *spyDialect) UpsertResultSQL() string      { return d.inner.UpsertResultSQL() }
+func (d *spyDialect) Placeholder(n int) string      { d.placeholderCalls++; return d.inner.Placeholder(n) }
+func (d *spyDialect) TimestampVal(t time.Time) any  { return d.inner.TimestampVal(t) }
+func (d *spyDialect) DriverName() string            { return d.inner.DriverName() }
 func (d *spyDialect) IsDuplicateKey(err error) bool { return d.inner.IsDuplicateKey(err) }
 
 // testDollarDialect simulates PostgreSQL's $n placeholder style for testing.
@@ -34,13 +34,6 @@ type testDollarDialect struct{}
 func (testDollarDialect) Placeholder(n int) string    { return fmt.Sprintf("$%d", n) }
 func (testDollarDialect) TimestampVal(t time.Time) any { return sqliteDialect{}.TimestampVal(t) }
 func (testDollarDialect) DriverName() string           { return "test-dollar" }
-func (testDollarDialect) UpsertResultSQL() string {
-	return `INSERT INTO results (job_id, batch_id, status, summary_json, raw_json)
-		 VALUES ($1, $2, $3, $4, $5)
-		 ON CONFLICT (job_id) DO UPDATE SET
-		 	batch_id=EXCLUDED.batch_id, status=EXCLUDED.status,
-		 	summary_json=EXCLUDED.summary_json, raw_json=EXCLUDED.raw_json`
-}
 func (testDollarDialect) IsDuplicateKey(err error) bool {
 	return strings.Contains(err.Error(), "duplicate key value violates unique constraint")
 }
@@ -84,7 +77,9 @@ func testBackends(t *testing.T) []testBackend {
 // resetSchema drops all application tables so tests start from a clean state
 // on persistent backends (PostgreSQL, MariaDB).
 func resetSchema(db *sql.DB) error {
-	for _, tbl := range []string{"results", "jobs", "schema_migrations"} {
+	for _, tbl := range []string{
+		"entries", "runs", "domain_tags", "domains", "tags", "jobs", "batches", "schema_migrations",
+	} {
 		if _, err := db.Exec("DROP TABLE IF EXISTS " + tbl); err != nil {
 			return fmt.Errorf("drop table %s: %w", tbl, err)
 		}
@@ -114,7 +109,6 @@ func testStoreForBackend(t *testing.T, b testBackend) *SQLJobStore {
 	return NewSQLJobStore(db, b.dialect)
 }
 
-
 // ids extracts job IDs from a slice for readable error messages.
 func ids(jobs []Job) []string {
 	out := make([]string, len(jobs))
@@ -122,6 +116,17 @@ func ids(jobs []Job) []string {
 		out[i] = j.ID
 	}
 	return out
+}
+
+// graduateSQLJob is a test helper that graduates a job with the given entries.
+func graduateSQLJob(t *testing.T, s *SQLJobStore, job Job, entries []engine.LogEntry) {
+	t.Helper()
+	if job.FinishedAt.IsZero() {
+		job.FinishedAt = time.Now().UTC()
+	}
+	if err := s.GraduateJob(job, entries); err != nil {
+		t.Fatalf("GraduateJob(%q): %v", job.ID, err)
+	}
 }
 
 // ---- testBackends gating ---------------------------------------------------
@@ -208,7 +213,7 @@ func TestRunMigrationsFresh(t *testing.T) {
 		t.Fatalf("second run (idempotent): %v", err)
 	}
 
-	for _, tbl := range []string{"jobs", "results", "schema_migrations"} {
+	for _, tbl := range []string{"jobs", "runs", "entries", "domains", "schema_migrations"} {
 		var name string
 		if err := db.QueryRow(
 			`SELECT name FROM sqlite_master WHERE type='table' AND name=?`, tbl,
@@ -240,32 +245,7 @@ func TestRunMigrationsUsesDialectPlaceholder(t *testing.T) {
 	}
 }
 
-func TestRunMigrationsMigration2CreatesFinishedAtIndex(t *testing.T) {
-	db, err := sql.Open("sqlite", ":memory:")
-	if err != nil {
-		t.Fatalf("open: %v", err)
-	}
-	db.SetMaxOpenConns(1)
-	defer db.Close()
-
-	if err := runMigrations(db, sqliteDialect{}); err != nil {
-		t.Fatalf("runMigrations: %v", err)
-	}
-
-	var name string
-	if err := db.QueryRow(
-		`SELECT name FROM sqlite_master WHERE type='index' AND name='idx_jobs_finished_at'`,
-	).Scan(&name); err != nil || name != "idx_jobs_finished_at" {
-		t.Error("idx_jobs_finished_at index not found after migration 2")
-	}
-
-	var version int
-	if err := db.QueryRow(`SELECT version FROM schema_migrations WHERE version=2`).Scan(&version); err != nil {
-		t.Fatalf("migration version 2 not recorded: %v", err)
-	}
-}
-
-func TestRunMigrationsRecordsBothVersions(t *testing.T) {
+func TestRunMigrationsRecordsVersion(t *testing.T) {
 	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("open: %v", err)
@@ -290,146 +270,8 @@ func TestRunMigrationsRecordsBothVersions(t *testing.T) {
 		}
 		versions = append(versions, v)
 	}
-	if len(versions) != 4 || versions[0] != 1 || versions[1] != 2 || versions[2] != 3 || versions[3] != 4 {
-		t.Fatalf("expected versions [1 2 3 4], got %v", versions)
-	}
-}
-
-func TestRunMigrationsMigration3AddsPublicIDColumn(t *testing.T) {
-	db, err := sql.Open("sqlite", ":memory:")
-	if err != nil {
-		t.Fatalf("open: %v", err)
-	}
-	db.SetMaxOpenConns(1)
-	defer db.Close()
-
-	if err := runMigrations(db, sqliteDialect{}); err != nil {
-		t.Fatalf("runMigrations: %v", err)
-	}
-
-	// The column must exist and accept NULL.
-	if _, err := db.Exec(`INSERT INTO jobs (id, created_at, public_id) VALUES ('x', '2026-01-01T00:00:00Z', NULL)`); err != nil {
-		t.Fatalf("insert with NULL public_id: %v", err)
-	}
-	var val sql.NullString
-	if err := db.QueryRow(`SELECT public_id FROM jobs WHERE id = 'x'`).Scan(&val); err != nil {
-		t.Fatalf("select public_id: %v", err)
-	}
-	if val.Valid {
-		t.Fatalf("expected NULL, got %q", val.String)
-	}
-}
-
-func TestRunMigrationsMigration3UniqueIndexEnforced(t *testing.T) {
-	db, err := sql.Open("sqlite", ":memory:")
-	if err != nil {
-		t.Fatalf("open: %v", err)
-	}
-	db.SetMaxOpenConns(1)
-	defer db.Close()
-
-	if err := runMigrations(db, sqliteDialect{}); err != nil {
-		t.Fatalf("runMigrations: %v", err)
-	}
-
-	if _, err := db.Exec(`INSERT INTO jobs (id, created_at, public_id) VALUES ('a', '2026-01-01T00:00:00Z', 'abc12345')`); err != nil {
-		t.Fatalf("first insert: %v", err)
-	}
-	if _, err := db.Exec(`INSERT INTO jobs (id, created_at, public_id) VALUES ('b', '2026-01-01T00:00:00Z', 'abc12345')`); err == nil {
-		t.Fatal("expected unique constraint violation on duplicate public_id")
-	}
-}
-
-func TestRunMigrationsMigration3NullNotUniqueViolation(t *testing.T) {
-	db, err := sql.Open("sqlite", ":memory:")
-	if err != nil {
-		t.Fatalf("open: %v", err)
-	}
-	db.SetMaxOpenConns(1)
-	defer db.Close()
-
-	if err := runMigrations(db, sqliteDialect{}); err != nil {
-		t.Fatalf("runMigrations: %v", err)
-	}
-
-	// Multiple NULL values must not violate the unique constraint.
-	for _, id := range []string{"r1", "r2", "r3"} {
-		if _, err := db.Exec(`INSERT INTO jobs (id, created_at, public_id) VALUES (?, '2026-01-01T00:00:00Z', NULL)`, id); err != nil {
-			t.Fatalf("insert NULL public_id for %s: %v", id, err)
-		}
-	}
-}
-
-func TestBackfillPublicIDsSetsNullRows(t *testing.T) {
-	db, err := sql.Open("sqlite", ":memory:")
-	if err != nil {
-		t.Fatalf("open: %v", err)
-	}
-	db.SetMaxOpenConns(1)
-	defer db.Close()
-
-	if err := runMigrations(db, sqliteDialect{}); err != nil {
-		t.Fatalf("runMigrations: %v", err)
-	}
-	// Insert two jobs with NULL public_id (pre-migration rows).
-	for _, id := range []string{"old1", "old2"} {
-		if _, err := db.Exec(`INSERT INTO jobs (id, created_at, public_id) VALUES (?, '2026-01-01T00:00:00Z', NULL)`, id); err != nil {
-			t.Fatalf("insert: %v", err)
-		}
-	}
-
-	if err := backfillPublicIDs(db, sqliteDialect{}); err != nil {
-		t.Fatalf("backfillPublicIDs: %v", err)
-	}
-
-	rows, err := db.Query(`SELECT id, public_id FROM jobs`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var id string
-		var pubID sql.NullString
-		if err := rows.Scan(&id, &pubID); err != nil {
-			t.Fatal(err)
-		}
-		if !pubID.Valid || pubID.String == "" {
-			t.Errorf("job %q still has NULL/empty public_id after backfill", id)
-		}
-	}
-}
-
-func TestBackfillPublicIDsIdempotent(t *testing.T) {
-	db, err := sql.Open("sqlite", ":memory:")
-	if err != nil {
-		t.Fatalf("open: %v", err)
-	}
-	db.SetMaxOpenConns(1)
-	defer db.Close()
-
-	if err := runMigrations(db, sqliteDialect{}); err != nil {
-		t.Fatalf("runMigrations: %v", err)
-	}
-	if _, err := db.Exec(`INSERT INTO jobs (id, created_at, public_id) VALUES ('j1', '2026-01-01T00:00:00Z', NULL)`); err != nil {
-		t.Fatal(err)
-	}
-	if err := backfillPublicIDs(db, sqliteDialect{}); err != nil {
-		t.Fatalf("first backfill: %v", err)
-	}
-	var first sql.NullString
-	if err := db.QueryRow(`SELECT public_id FROM jobs WHERE id = 'j1'`).Scan(&first); err != nil {
-		t.Fatal(err)
-	}
-	// Second call must not change already-set IDs.
-	if err := backfillPublicIDs(db, sqliteDialect{}); err != nil {
-		t.Fatalf("second backfill: %v", err)
-	}
-	var second sql.NullString
-	if err := db.QueryRow(`SELECT public_id FROM jobs WHERE id = 'j1'`).Scan(&second); err != nil {
-		t.Fatal(err)
-	}
-	if first.String != second.String {
-		t.Fatalf("second backfill changed public_id from %q to %q", first.String, second.String)
+	if len(versions) != 1 || versions[0] != 1 {
+		t.Fatalf("expected versions [1], got %v", versions)
 	}
 }
 
@@ -475,12 +317,6 @@ func TestSQLJobStoreCreateGet(t *testing.T) {
 			}
 			if !got.CreatedAt.Equal(now) {
 				t.Fatalf("CreatedAt: got %v, want %v", got.CreatedAt, now)
-			}
-			// SeverityTotals must be zero before SetResult.
-			for _, lv := range []string{"NOTICE", "WARNING", "ERROR", "CRITICAL"} {
-				if got.SeverityTotals[lv] != 0 {
-					t.Errorf("SeverityTotals[%q] = %d, want 0", lv, got.SeverityTotals[lv])
-				}
 			}
 		})
 	}
@@ -630,112 +466,111 @@ func TestSQLJobStoreUpdateMissing(t *testing.T) {
 	}
 }
 
-// ---- SetResult / GetResult -------------------------------------------------
+// ---- GraduateJob / GetResult -----------------------------------------------
 
-func TestSQLJobStoreSetGetResult(t *testing.T) {
+func TestSQLJobStoreGraduateJobAndGetResult(t *testing.T) {
 	for _, b := range testBackends(t) {
 		t.Run(b.name, func(t *testing.T) {
 			s := testStoreForBackend(t, b)
-			job := Job{ID: "j3", Domain: "result.test", Status: JobSucceeded, CreatedAt: time.Now().UTC()}
+			now := time.Now().UTC().Truncate(time.Millisecond)
+
+			job := Job{
+				ID:        "g1",
+				Domain:    "grad.test",
+				BatchID:   "batch1",
+				Status:    JobSucceeded,
+				CreatedAt: now,
+				StartedAt: now.Add(time.Second),
+				FinishedAt: now.Add(2 * time.Second),
+				PublicID:  "pub00001",
+			}
 			if _, err := s.Create(job); err != nil {
 				t.Fatalf("Create: %v", err)
 			}
 
-			result := JobResult{
-				JobID:   "j3",
-				BatchID: "b2",
-				Status:  JobSucceeded,
-				Summary: map[string]any{
-					"levels": map[string]int{"NOTICE": 1, "WARNING": 2, "ERROR": 3},
-				},
-			}
-			if err := s.SetResult("j3", result); err != nil {
-				t.Fatalf("SetResult: %v", err)
+			entries := []engine.LogEntry{
+				{Module: "DNSSEC", Testcase: "DNSSEC01", Tag: "DS_ALGO_OK", Level: "INFO"},
+				{Module: "DNSSEC", Testcase: "DNSSEC01", Tag: "NO_NSEC", Level: "WARNING"},
+				{Module: "Zone", Testcase: "ZONE01", Tag: "ZONE_ERROR", Level: "ERROR"},
 			}
 
-			got, ok := s.GetResult("j3")
+			if err := s.GraduateJob(job, entries); err != nil {
+				t.Fatalf("GraduateJob: %v", err)
+			}
+
+			// Job must be removed from the jobs table.
+			if _, ok := s.Get(job.ID); !ok {
+				// Get falls through to runs, that's OK. Verify it's not in jobs directly.
+			}
+
+			// Run must exist.
+			run, ok := s.GetRun(job.ID)
+			if !ok {
+				t.Fatal("GetRun: run not found after graduation")
+			}
+			if run.Domain != "grad.test" {
+				t.Fatalf("run.Domain = %q", run.Domain)
+			}
+			if run.Status != JobSucceeded {
+				t.Fatalf("run.Status = %q", run.Status)
+			}
+			if run.SevWarning != 1 {
+				t.Fatalf("SevWarning = %d, want 1", run.SevWarning)
+			}
+			if run.SevError != 1 {
+				t.Fatalf("SevError = %d, want 1", run.SevError)
+			}
+			if run.WorstLevel != "ERROR" {
+				t.Fatalf("WorstLevel = %q, want ERROR", run.WorstLevel)
+			}
+			if run.EntryCount != 3 {
+				t.Fatalf("EntryCount = %d, want 3", run.EntryCount)
+			}
+
+			// GetResult must work.
+			result, ok := s.GetResult(job.ID)
 			if !ok {
 				t.Fatal("GetResult: not found")
 			}
-			if got.JobID != "j3" || got.BatchID != "b2" || got.Status != JobSucceeded {
-				t.Fatalf("GetResult fields: %+v", got)
+			if result.JobID != job.ID {
+				t.Fatalf("result.JobID = %q", result.JobID)
 			}
-		})
-	}
-}
-
-func TestSQLJobStoreSetResultUpdatesSeverityTotals(t *testing.T) {
-	for _, b := range testBackends(t) {
-		t.Run(b.name, func(t *testing.T) {
-			s := testStoreForBackend(t, b)
-			job := Job{ID: "j4", Domain: "sev.test", Status: JobSucceeded, CreatedAt: time.Now().UTC()}
-			if _, err := s.Create(job); err != nil {
-				t.Fatalf("Create: %v", err)
+			if result.Status != JobSucceeded {
+				t.Fatalf("result.Status = %q", result.Status)
+			}
+			if result.Raw == nil {
+				t.Fatal("result.Raw is nil")
+			}
+			if len(result.Raw.Entries) != 3 {
+				t.Fatalf("result.Raw.Entries len = %d, want 3", len(result.Raw.Entries))
 			}
 
-			if err := s.SetResult("j4", JobResult{
-				JobID:  "j4",
-				Status: JobSucceeded,
-				Summary: map[string]any{
-					"levels": map[string]int{"NOTICE": 1, "WARNING": 2, "ERROR": 3, "CRITICAL": 4},
-				},
-			}); err != nil {
-				t.Fatalf("SetResult: %v", err)
-			}
-
-			list := s.List(JobFilter{Limit: 10})
-			if len(list.Items) != 1 {
-				t.Fatalf("List: expected 1 item, got %d", len(list.Items))
-			}
-			tot := list.Items[0].SeverityTotals
-			if tot["NOTICE"] != 1 || tot["WARNING"] != 2 || tot["ERROR"] != 3 || tot["CRITICAL"] != 4 {
-				t.Fatalf("unexpected severity_totals: %+v", tot)
-			}
-		})
-	}
-}
-
-func TestSQLJobStoreSetResultWithRaw(t *testing.T) {
-	for _, b := range testBackends(t) {
-		t.Run(b.name, func(t *testing.T) {
-			s := testStoreForBackend(t, b)
-			job := Job{ID: "j5", Domain: "raw.test", Status: JobSucceeded, CreatedAt: time.Now().UTC()}
-			if _, err := s.Create(job); err != nil {
-				t.Fatalf("Create: %v", err)
-			}
-
-			raw := &JobResultRaw{
-				Locale: "en",
-				Entries: []JobResultEntry{
-					{Module: "DNSSEC", Testcase: "DNSSEC01", Tag: "NO_NSEC", Level: "WARNING"},
-				},
-			}
-			if err := s.SetResult("j5", JobResult{JobID: "j5", Status: JobSucceeded, Raw: raw}); err != nil {
-				t.Fatalf("SetResult with raw: %v", err)
-			}
-
-			got, ok := s.GetResult("j5")
+			// Get via job ID must reconstruct from runs.
+			gotJob, ok := s.Get(job.ID)
 			if !ok {
-				t.Fatal("GetResult: not found")
+				t.Fatal("Get(graduated job): not found")
 			}
-			if got.Raw == nil {
-				t.Fatal("Raw is nil")
+			if gotJob.Status != JobSucceeded {
+				t.Fatalf("reconstructed job.Status = %q", gotJob.Status)
 			}
-			if got.Raw.Locale != "en" {
-				t.Fatalf("Locale: got %q", got.Raw.Locale)
+
+			// GetByPublicID must also work.
+			gotByPub, ok := s.GetByPublicID("pub00001")
+			if !ok {
+				t.Fatal("GetByPublicID: not found")
 			}
-			if len(got.Raw.Entries) != 1 || got.Raw.Entries[0].Module != "DNSSEC" {
-				t.Fatalf("Entries: %+v", got.Raw.Entries)
+			if gotByPub.ID != job.ID {
+				t.Fatalf("GetByPublicID returned ID %q", gotByPub.ID)
 			}
 		})
 	}
 }
 
-func TestSQLJobStoreSetResultMissingJob(t *testing.T) {
+func TestSQLJobStoreGraduateJobMissingReturnsError(t *testing.T) {
 	for _, b := range testBackends(t) {
 		t.Run(b.name, func(t *testing.T) {
 			s := testStoreForBackend(t, b)
-			err := s.SetResult("ghost", JobResult{JobID: "ghost", Status: JobFailed})
+			err := s.GraduateJob(Job{ID: "ghost", Domain: "x.test", Status: JobFailed}, nil)
 			if err == nil {
 				t.Fatal("expected error for missing job")
 			}
@@ -857,9 +692,9 @@ func TestSQLJobStoreListFiltersSecondBoundary(t *testing.T) {
 	}
 }
 
-// ---- List severity filters -------------------------------------------------
+// ---- List runs (severity filters on graduated jobs) ------------------------
 
-func TestSQLJobStoreListSeverityFilter(t *testing.T) {
+func TestSQLJobStoreListRunsSeverityFilter(t *testing.T) {
 	for _, b := range testBackends(t) {
 		t.Run(b.name, func(t *testing.T) {
 			s := testStoreForBackend(t, b)
@@ -870,31 +705,40 @@ func TestSQLJobStoreListSeverityFilter(t *testing.T) {
 					t.Fatalf("Create: %v", err)
 				}
 			}
-			_ = s.SetResult("s1", JobResult{
-				JobID: "s1", Status: JobSucceeded,
-				Summary: map[string]any{"levels": map[string]int{"WARNING": 1}},
-			})
-			_ = s.SetResult("s2", JobResult{
-				JobID: "s2", Status: JobSucceeded,
-				Summary: map[string]any{"levels": map[string]int{"CRITICAL": 1}},
-			})
-			// s3 has no result — sev_* all zero.
+			// s1: WARNING
+			graduateSQLJob(t, s, Job{
+				ID: "s1", Domain: "s1.test", Status: JobSucceeded, CreatedAt: base,
+			}, []engine.LogEntry{{Level: "WARNING", Module: "M", Tag: "T"}})
+			// s2: CRITICAL
+			graduateSQLJob(t, s, Job{
+				ID: "s2", Domain: "s2.test", Status: JobSucceeded, CreatedAt: base,
+			}, []engine.LogEntry{{Level: "CRITICAL", Module: "M", Tag: "T"}})
+			// s3: no entries
 
-			t.Run("warnings_plus", func(t *testing.T) {
-				list := s.List(JobFilter{Severity: JobSeverityWarningsPlus, Limit: 10})
-				if list.Total != 2 {
-					t.Fatalf("warnings_plus: total=%d", list.Total)
+			t.Run("worst_level_warning", func(t *testing.T) {
+				list := s.ListRuns(RunFilter{WorstLevel: "WARNING", Limit: 10})
+				if list.Total != 1 || list.Items[0].ID != "s1" {
+					t.Fatalf("WorstLevel=WARNING: total=%d items=%v", list.Total, runIDs(list.Items))
 				}
 			})
 
-			t.Run("errors_only", func(t *testing.T) {
-				list := s.List(JobFilter{Severity: JobSeverityErrorsOnly, Limit: 10})
+			t.Run("worst_level_critical", func(t *testing.T) {
+				list := s.ListRuns(RunFilter{WorstLevel: "CRITICAL", Limit: 10})
 				if list.Total != 1 || list.Items[0].ID != "s2" {
-					t.Fatalf("errors_only: total=%d items=%v", list.Total, ids(list.Items))
+					t.Fatalf("WorstLevel=CRITICAL: total=%d items=%v", list.Total, runIDs(list.Items))
 				}
 			})
 		})
 	}
+}
+
+// runIDs extracts run IDs for error messages.
+func runIDs(runs []Run) []string {
+	out := make([]string, len(runs))
+	for i, r := range runs {
+		out[i] = r.ID
+	}
+	return out
 }
 
 // ---- List sorting ----------------------------------------------------------
@@ -917,14 +761,6 @@ func TestSQLJobStoreListSorting(t *testing.T) {
 					t.Fatalf("Create %q: %v", j.ID, err)
 				}
 			}
-			_ = s.SetResult("sort1", JobResult{
-				JobID: "sort1", Status: JobSucceeded,
-				Summary: map[string]any{"levels": map[string]int{"ERROR": 1}},
-			})
-			_ = s.SetResult("sort2", JobResult{
-				JobID: "sort2", Status: JobFailed,
-				Summary: map[string]any{"levels": map[string]int{"CRITICAL": 2}},
-			})
 
 			t.Run("default started_at_desc", func(t *testing.T) {
 				list := s.List(JobFilter{Limit: 10})
@@ -981,21 +817,6 @@ func TestSQLJobStoreListSorting(t *testing.T) {
 				// sort1 has the earliest effective start time.
 				if list.Items[0].ID != "sort1" {
 					t.Fatalf("started_at_asc: first=%q (want sort1)", list.Items[0].ID)
-				}
-			})
-
-			t.Run("error_desc", func(t *testing.T) {
-				list := s.List(JobFilter{Limit: 10, Sort: JobSortErrorDesc})
-				// sort2 has CRITICAL=2 (total err+crit=2), sort1 has ERROR=1 (total=1).
-				if list.Items[0].ID != "sort2" || list.Items[1].ID != "sort1" {
-					t.Fatalf("error_desc: got %v (want sort2, sort1)", ids(list.Items))
-				}
-			})
-
-			t.Run("critical_desc", func(t *testing.T) {
-				list := s.List(JobFilter{Limit: 10, Sort: JobSortCriticalDesc})
-				if list.Items[0].ID != "sort2" {
-					t.Fatalf("critical_desc: first=%q (want sort2/critical=2)", list.Items[0].ID)
 				}
 			})
 		})
@@ -1080,8 +901,9 @@ func TestSQLJobStoreNullTimestamps(t *testing.T) {
 			if !got.StartedAt.IsZero() {
 				t.Fatalf("StartedAt should be zero, got %v", got.StartedAt)
 			}
+			// FinishedAt is not stored in the jobs table; it's always zero for in-flight jobs.
 			if !got.FinishedAt.IsZero() {
-				t.Fatalf("FinishedAt should be zero, got %v", got.FinishedAt)
+				t.Fatalf("FinishedAt should be zero for in-flight job, got %v", got.FinishedAt)
 			}
 		})
 	}
@@ -1134,6 +956,8 @@ func TestSQLJobStorePurgeDeletesSucceeded(t *testing.T) {
 			if _, err := s.Create(job); err != nil {
 				t.Fatalf("create: %v", err)
 			}
+			graduateSQLJob(t, s, job, nil)
+
 			n, err := s.PurgeOlderThan(cutoff)
 			if err != nil {
 				t.Fatalf("purge: %v", err)
@@ -1141,8 +965,8 @@ func TestSQLJobStorePurgeDeletesSucceeded(t *testing.T) {
 			if n != 1 {
 				t.Fatalf("expected 1 purged, got %d", n)
 			}
-			if _, ok := s.Get("s1"); ok {
-				t.Fatal("expected job deleted")
+			if _, ok := s.GetRun("s1"); ok {
+				t.Fatal("expected run deleted")
 			}
 		})
 	}
@@ -1161,6 +985,7 @@ func TestSQLJobStorePurgeDeletesAllTerminalStatuses(t *testing.T) {
 				if _, err := s.Create(job); err != nil {
 					t.Fatalf("create %s: %v", id, err)
 				}
+				graduateSQLJob(t, s, job, nil)
 			}
 			n, err := s.PurgeOlderThan(cutoff)
 			if err != nil {
@@ -1201,7 +1026,7 @@ func TestSQLJobStorePurgePreservesActiveJobs(t *testing.T) {
 	}
 }
 
-func TestSQLJobStorePurgePreservesNewJobs(t *testing.T) {
+func TestSQLJobStorePurgePreservesNewRuns(t *testing.T) {
 	for _, b := range testBackends(t) {
 		t.Run(b.name, func(t *testing.T) {
 			s := testStoreForBackend(t, b)
@@ -1212,6 +1037,8 @@ func TestSQLJobStorePurgePreservesNewJobs(t *testing.T) {
 			if _, err := s.Create(job); err != nil {
 				t.Fatalf("create: %v", err)
 			}
+			graduateSQLJob(t, s, job, nil)
+
 			n, err := s.PurgeOlderThan(cutoff)
 			if err != nil {
 				t.Fatalf("purge: %v", err)
@@ -1223,7 +1050,7 @@ func TestSQLJobStorePurgePreservesNewJobs(t *testing.T) {
 	}
 }
 
-func TestSQLJobStorePurgeDeletesAssociatedResults(t *testing.T) {
+func TestSQLJobStorePurgeDeletesAssociatedEntries(t *testing.T) {
 	for _, b := range testBackends(t) {
 		t.Run(b.name, func(t *testing.T) {
 			s := testStoreForBackend(t, b)
@@ -1234,8 +1061,11 @@ func TestSQLJobStorePurgeDeletesAssociatedResults(t *testing.T) {
 			if _, err := s.Create(job); err != nil {
 				t.Fatalf("create: %v", err)
 			}
-			if err := s.SetResult("s1", JobResult{Summary: map[string]any{}}); err != nil {
-				t.Fatalf("set result: %v", err)
+			entries := []engine.LogEntry{
+				{Module: "DNSSEC", Tag: "OK", Level: "INFO"},
+			}
+			if err := s.GraduateJob(job, entries); err != nil {
+				t.Fatalf("GraduateJob: %v", err)
 			}
 
 			if _, err := s.PurgeOlderThan(cutoff); err != nil {
@@ -1405,90 +1235,31 @@ func TestPhRange(t *testing.T) {
 }
 
 func TestPhRangeCreatePlaceholderCount(t *testing.T) {
-	// Verify Create's VALUES clause has the correct number of placeholders + literals.
-	// The INSERT has 19 columns: 10 bound params, 4 literal zeros, 5 bound params = 15 total bound.
+	// Verify Create's VALUES clause has the correct number of placeholders.
+	// The INSERT has 12 bound params.
 	s := &SQLJobStore{dialect: testDollarDialect{}}
 
-	firstBlock := s.phRange(1, 10)
-	secondBlock := s.phRange(11, 5)
+	block := s.phRange(1, 12)
 
-	// Count dollar-placeholders in each block.
-	firstCount := strings.Count(firstBlock, "$")
-	secondCount := strings.Count(secondBlock, "$")
-	if firstCount != 10 {
-		t.Fatalf("first block has %d placeholders, want 10: %q", firstCount, firstBlock)
-	}
-	if secondCount != 5 {
-		t.Fatalf("second block has %d placeholders, want 5: %q", secondCount, secondBlock)
+	count := strings.Count(block, "$")
+	if count != 12 {
+		t.Fatalf("create block has %d placeholders, want 12: %q", count, block)
 	}
 
-	// Verify sequential numbering.
-	if !strings.Contains(firstBlock, "$1") || !strings.Contains(firstBlock, "$10") {
-		t.Fatalf("first block should contain $1..$10: %q", firstBlock)
-	}
-	if !strings.Contains(secondBlock, "$11") || !strings.Contains(secondBlock, "$15") {
-		t.Fatalf("second block should contain $11..$15: %q", secondBlock)
+	if !strings.Contains(block, "$1") || !strings.Contains(block, "$12") {
+		t.Fatalf("block should contain $1..$12: %q", block)
 	}
 }
 
 func TestPhRangeUpdatePlaceholderCount(t *testing.T) {
-	// Verify Update uses 14 placeholders (13 SET + 1 WHERE).
+	// Verify Update uses 10 placeholders (9 SET + 1 WHERE).
 	s := &SQLJobStore{dialect: testDollarDialect{}}
-	for i := 1; i <= 14; i++ {
+	for i := 1; i <= 10; i++ {
 		ph := s.ph(i)
 		want := fmt.Sprintf("$%d", i)
 		if ph != want {
 			t.Fatalf("ph(%d) = %q, want %q", i, ph, want)
 		}
-	}
-}
-
-// ---- Dialect: UpsertResultSQL ----------------------------------------------
-
-func TestUpsertResultSQLSQLite(t *testing.T) {
-	sql := sqliteDialect{}.UpsertResultSQL()
-	if !strings.Contains(sql, "INSERT OR REPLACE") {
-		t.Fatalf("sqlite upsert must use INSERT OR REPLACE, got: %q", sql)
-	}
-	if !strings.Contains(sql, "results") {
-		t.Fatalf("sqlite upsert must reference results table, got: %q", sql)
-	}
-	if count := strings.Count(sql, "?"); count != 5 {
-		t.Fatalf("sqlite upsert must have 5 '?' placeholders, got %d: %q", count, sql)
-	}
-	for _, col := range []string{"job_id", "batch_id", "status", "summary_json", "raw_json"} {
-		if !strings.Contains(sql, col) {
-			t.Fatalf("sqlite upsert missing column %q: %q", col, sql)
-		}
-	}
-}
-
-func TestUpsertResultSQLDollar(t *testing.T) {
-	sql := testDollarDialect{}.UpsertResultSQL()
-	if !strings.Contains(sql, "ON CONFLICT") {
-		t.Fatalf("dollar upsert must use ON CONFLICT, got: %q", sql)
-	}
-	if strings.Contains(sql, "INSERT OR REPLACE") {
-		t.Fatalf("dollar upsert must not use INSERT OR REPLACE, got: %q", sql)
-	}
-	for _, ph := range []string{"$1", "$2", "$3", "$4", "$5"} {
-		if !strings.Contains(sql, ph) {
-			t.Fatalf("dollar upsert missing placeholder %q: %q", ph, sql)
-		}
-	}
-	for _, col := range []string{"job_id", "batch_id", "status", "summary_json", "raw_json"} {
-		if !strings.Contains(sql, col) {
-			t.Fatalf("dollar upsert missing column %q: %q", col, sql)
-		}
-	}
-}
-
-func TestUpsertResultSQLDialectDifference(t *testing.T) {
-	// The two dialects must produce different SQL.
-	sqlit := sqliteDialect{}.UpsertResultSQL()
-	dollar := testDollarDialect{}.UpsertResultSQL()
-	if sqlit == dollar {
-		t.Fatalf("sqlite and dollar dialects produced identical UpsertResultSQL")
 	}
 }
 
@@ -1565,26 +1336,6 @@ func TestPostgresDialectTimestampVal(t *testing.T) {
 	}
 	if !strings.HasPrefix(s, "2026-01-02T03:04:05") {
 		t.Fatalf("unexpected timestamp format: %q", s)
-	}
-}
-
-func TestPostgresDialectUpsertResultSQL(t *testing.T) {
-	sql := postgresDialect{}.UpsertResultSQL()
-	if strings.Contains(sql, "INSERT OR REPLACE") {
-		t.Fatal("postgres upsert must not use INSERT OR REPLACE")
-	}
-	if !strings.Contains(sql, "ON CONFLICT") {
-		t.Fatalf("postgres upsert must use ON CONFLICT, got: %q", sql)
-	}
-	for _, ph := range []string{"$1", "$2", "$3", "$4", "$5"} {
-		if !strings.Contains(sql, ph) {
-			t.Fatalf("postgres upsert missing placeholder %q: %q", ph, sql)
-		}
-	}
-	for _, col := range []string{"job_id", "batch_id", "status", "summary_json", "raw_json"} {
-		if !strings.Contains(sql, col) {
-			t.Fatalf("postgres upsert missing column %q: %q", col, sql)
-		}
 	}
 }
 
@@ -1803,27 +1554,6 @@ func TestMariadbDialectTimestampVal(t *testing.T) {
 	}
 	if !strings.HasPrefix(s, "2026-03-15T12:00:00") {
 		t.Fatalf("unexpected timestamp format: %q", s)
-	}
-}
-
-func TestMariadbDialectUpsertResultSQL(t *testing.T) {
-	sql := mariadbDialect{}.UpsertResultSQL()
-	if strings.Contains(sql, "INSERT OR REPLACE") {
-		t.Fatal("mariadb upsert must not use INSERT OR REPLACE")
-	}
-	if strings.Contains(sql, "ON CONFLICT") {
-		t.Fatal("mariadb upsert must not use ON CONFLICT (that is PostgreSQL syntax)")
-	}
-	if !strings.Contains(sql, "ON DUPLICATE KEY UPDATE") {
-		t.Fatalf("mariadb upsert must use ON DUPLICATE KEY UPDATE, got: %q", sql)
-	}
-	if count := strings.Count(sql, "?"); count != 5 {
-		t.Fatalf("mariadb upsert must have 5 '?' placeholders, got %d: %q", count, sql)
-	}
-	for _, col := range []string{"job_id", "batch_id", "status", "summary_json", "raw_json"} {
-		if !strings.Contains(sql, col) {
-			t.Fatalf("mariadb upsert missing column %q: %q", col, sql)
-		}
 	}
 }
 

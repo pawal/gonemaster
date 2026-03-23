@@ -5,6 +5,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"codeberg.org/pawal/gonemaster/engine"
 )
 
 func BenchmarkInMemoryJobStoreMixedContention(b *testing.B) {
@@ -39,21 +41,18 @@ func BenchmarkInMemoryJobStoreMixedContention(b *testing.B) {
 				_ = store.Update(job)
 			}
 
-			_ = store.SetResult(jobID, JobResult{
-				JobID:  jobID,
-				Status: JobSucceeded,
-				Summary: map[string]any{
-					"levels": map[string]int{
-						"WARNING": n % 3,
-						"ERROR":   n % 2,
-					},
-				},
-			})
+			if job, ok := store.Get(jobID); ok {
+				job.Status = JobSucceeded
+				job.FinishedAt = time.Now().UTC()
+				_ = store.GraduateJob(job, []engine.LogEntry{
+					{Module: "M", Tag: "T", Level: "WARNING"},
+					{Module: "M", Tag: "T", Level: "ERROR"},
+				})
+			}
 
-			_ = store.List(JobFilter{
-				Limit:    25,
-				Sort:     JobSortErrorDesc,
-				Severity: JobSeverityWarningsPlus,
+			_ = store.ListRuns(RunFilter{
+				Limit: 25,
+				Sort:  JobSortErrorDesc,
 			})
 		}
 	})

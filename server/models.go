@@ -29,120 +29,174 @@ func GeneratePublicID() string {
 type JobStatus string
 
 const (
-	// Job status values.
-	JobQueued JobStatus = "queued"
-	// JobRunning indicates a job currently executing.
-	JobRunning JobStatus = "running"
-	// JobSucceeded indicates a job completed successfully.
+	JobQueued    JobStatus = "queued"
+	JobRunning   JobStatus = "running"
 	JobSucceeded JobStatus = "succeeded"
-	// JobFailed indicates a job completed with an error.
-	JobFailed JobStatus = "failed"
-	// JobCanceled indicates a job was canceled.
-	JobCanceled JobStatus = "canceled"
-	// JobExpired indicates a job expired before completion.
-	JobExpired JobStatus = "expired"
-	// JobPaused indicates a job is paused in the queue.
-	JobPaused JobStatus = "paused"
+	JobFailed    JobStatus = "failed"
+	JobCanceled  JobStatus = "canceled"
+	JobExpired   JobStatus = "expired"
+	JobPaused    JobStatus = "paused"
 )
 
 // JobSort controls ordering in list responses.
 type JobSort string
 
 const (
-	// Job sort values for list and batch endpoints.
 	JobSortCreatedAtDesc JobSort = "created_at_desc"
-	// JobSortCreatedAtAsc sorts by creation time ascending.
-	JobSortCreatedAtAsc JobSort = "created_at_asc"
-	// JobSortStartedAtDesc sorts by start time descending.
+	JobSortCreatedAtAsc  JobSort = "created_at_asc"
 	JobSortStartedAtDesc JobSort = "started_at_desc"
-	// JobSortStartedAtAsc sorts by start time ascending.
-	JobSortStartedAtAsc JobSort = "started_at_asc"
-	// JobSortDomainAsc sorts by domain ascending.
-	JobSortDomainAsc JobSort = "domain_asc"
-	// JobSortDomainDesc sorts by domain descending.
-	JobSortDomainDesc JobSort = "domain_desc"
-	// JobSortBatchIDAsc sorts by batch id ascending.
-	JobSortBatchIDAsc JobSort = "batch_id_asc"
-	// JobSortBatchIDDesc sorts by batch id descending.
-	JobSortBatchIDDesc JobSort = "batch_id_desc"
-	// JobSortErrorDesc sorts by error-heavy jobs first.
-	JobSortErrorDesc JobSort = "error_desc"
-	// JobSortCriticalDesc sorts by critical-heavy jobs first.
-	JobSortCriticalDesc JobSort = "critical_desc"
+	JobSortStartedAtAsc  JobSort = "started_at_asc"
+	JobSortDomainAsc     JobSort = "domain_asc"
+	JobSortDomainDesc    JobSort = "domain_desc"
+	JobSortBatchIDAsc    JobSort = "batch_id_asc"
+	JobSortBatchIDDesc   JobSort = "batch_id_desc"
+	JobSortErrorDesc     JobSort = "error_desc"
+	JobSortCriticalDesc  JobSort = "critical_desc"
 )
 
 // JobSeverityFilter controls severity-based list filtering.
 type JobSeverityFilter string
 
 const (
-	// Job severity filter values for list endpoints.
 	JobSeverityWarningsPlus JobSeverityFilter = "warnings_plus"
-	// JobSeverityErrorsOnly filters to jobs with errors or criticals.
-	JobSeverityErrorsOnly JobSeverityFilter = "errors_only"
+	JobSeverityErrorsOnly   JobSeverityFilter = "errors_only"
 )
 
-// Job represents a single test job.
+// Job represents a single test job (queue entry).
+// Once completed, the job graduates to a Run + Entries.
+// FinishedAt and SeverityTotals are populated from the associated Run when
+// the job is terminal; they are not stored in the jobs table itself.
 type Job struct {
-	ID             string                         `json:"id"`
-	PublicID       string                         `json:"public_id,omitempty"`
-	BatchID        string                         `json:"batch_id,omitempty"`
-	Domain         string                         `json:"domain"`
-	SeverityTotals map[string]int                 `json:"severity_totals,omitempty"`
-	Tests          []string                       `json:"-"`
-	Overrides      map[string]any                 `json:"-"`
-	UndelegatedNS  []engine.UndelegatedNameserver `json:"-"`
-	UndelegatedDS  []engine.UndelegatedDSInfo     `json:"-"`
-	MinLevel       string                         `json:"-"`
-	Status         JobStatus                      `json:"status"`
-	CreatedAt      time.Time                      `json:"created_at"`
-	StartedAt      time.Time                      `json:"started_at,omitempty"`
-	FinishedAt     time.Time                      `json:"finished_at,omitempty"`
-	Progress       int                            `json:"progress"`
-	ResultURL      string                         `json:"result_url,omitempty"`
-	Error          string                         `json:"error,omitempty"`
+	ID       string    `json:"id"`
+	PublicID string    `json:"public_id,omitempty"`
+	BatchID  string    `json:"batch_id,omitempty"`
+	DomainID int64     `json:"-"`
+	Domain   string    `json:"domain"`
+	Status   JobStatus `json:"status"`
+	// FinishedAt is populated from the Run after graduation; zero for in-flight jobs.
+	FinishedAt     time.Time      `json:"finished_at,omitempty"`
+	SeverityTotals map[string]int `json:"severity_totals,omitempty"`
+	CreatedAt      time.Time      `json:"created_at"`
+	StartedAt      time.Time      `json:"started_at,omitempty"`
+	Progress       int            `json:"progress"`
+	Error          string         `json:"error,omitempty"`
+	Profile        string         `json:"-"`
+	// Config fields stored as config_json in the DB.
+	Tests         []string                       `json:"-"`
+	Overrides     map[string]any                 `json:"-"`
+	UndelegatedNS []engine.UndelegatedNameserver `json:"-"`
+	UndelegatedDS []engine.UndelegatedDSInfo     `json:"-"`
+	MinLevel      string                         `json:"-"`
 }
 
-// JobCreateRequest is the payload for a single job.
-type JobCreateRequest struct {
-	Domain           string                       `json:"domain"`
-	Tests            []string                     `json:"tests,omitempty"`
-	ProfileOverrides map[string]any               `json:"profile_overrides,omitempty"`
-	Nameservers      []UndelegatedNameserverInput `json:"nameservers,omitempty"`
-	DSInfo           []UndelegatedDSInput         `json:"ds_info,omitempty"`
-	MinLevel         string                       `json:"min_level,omitempty"`
+// Domain is a persistent domain registry entry.
+type Domain struct {
+	ID           int64     `json:"id"`
+	Name         string    `json:"name"`
+	LatestRunID  string    `json:"latest_run_id,omitempty"`
+	LatestRunAt  time.Time `json:"latest_run_at,omitempty"`
+	LatestStatus string    `json:"latest_status,omitempty"`
+	LatestLevel  string    `json:"latest_level,omitempty"`
+	CreatedAt    time.Time `json:"created_at"`
+	RunCount     int       `json:"run_count"`
+	Tags         []string  `json:"tags,omitempty"`
 }
 
-// JobBatchRequest is the payload for a batch submission.
-type JobBatchRequest struct {
-	Domains          []string                      `json:"domains"`
-	Tests            []string                      `json:"tests,omitempty"`
-	ProfileOverrides map[string]any                `json:"profile_overrides,omitempty"`
-	Nameservers      *[]UndelegatedNameserverInput `json:"nameservers,omitempty"`
-	DSInfo           *[]UndelegatedDSInput         `json:"ds_info,omitempty"`
-	MinLevel         string                        `json:"min_level,omitempty"`
+// Tag is a named domain collection.
+type Tag struct {
+	Name        string    `json:"name"`
+	Description string    `json:"description,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	DomainCount int       `json:"domain_count"`
 }
 
-// UndelegatedNameserverInput represents one undelegated nameserver row.
-type UndelegatedNameserverInput struct {
-	NS string `json:"ns"`
-	IP string `json:"ip,omitempty"`
+// Run is a completed execution, graduated from a Job.
+type Run struct {
+	ID          string         `json:"id"`
+	DomainID    int64          `json:"domain_id"`
+	Domain      string         `json:"domain"`
+	BatchID     string         `json:"batch_id,omitempty"`
+	Status      JobStatus      `json:"status"`
+	CreatedAt   time.Time      `json:"created_at"`
+	StartedAt   time.Time      `json:"started_at,omitempty"`
+	FinishedAt  time.Time      `json:"finished_at,omitempty"`
+	DurationMs  int64          `json:"duration_ms,omitempty"`
+	SevNotice   int            `json:"sev_notice"`
+	SevWarning  int            `json:"sev_warning"`
+	SevError    int            `json:"sev_error"`
+	SevCritical int            `json:"sev_critical"`
+	WorstLevel  string         `json:"worst_level,omitempty"`
+	EntryCount  int            `json:"entry_count"`
+	Profile     string         `json:"profile,omitempty"`
+	PublicID    string         `json:"public_id,omitempty"`
+	// SeverityTotals mirrors the sev_* columns as a map for API compat.
+	SeverityTotals map[string]int `json:"severity_totals,omitempty"`
 }
 
-// UndelegatedDSInput represents one undelegated DS row.
-type UndelegatedDSInput struct {
-	KeyTag    int    `json:"keytag"`
-	Algorithm int    `json:"algorithm"`
-	DigType   int    `json:"digtype"`
-	Digest    string `json:"digest"`
+// Entry is a single engine log entry stored as a row for SQL analysis.
+type Entry struct {
+	ID        int64          `json:"id"`
+	RunID     string         `json:"run_id"`
+	DomainID  int64          `json:"domain_id"`
+	Timestamp float64        `json:"timestamp"`
+	Module    string         `json:"module"`
+	Testcase  string         `json:"testcase"`
+	Tag       string         `json:"tag"`
+	Level     string         `json:"level"`
+	Args      map[string]any `json:"args,omitempty"`
 }
 
-// JobBatchResponse describes the batch submission result.
-type JobBatchResponse struct {
-	BatchID string   `json:"batch_id"`
-	JobIDs  []string `json:"job_ids"`
+// Batch is metadata for a batch submission.
+type Batch struct {
+	ID          string    `json:"id"`
+	Tag         string    `json:"tag,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	DomainCount int       `json:"domain_count"`
+	Description string    `json:"description,omitempty"`
 }
 
-// JobList represents list results.
+// ── Filter types ──────────────────────────────────────────────────────────────
+
+// JobFilter controls listing behavior.
+type JobFilter struct {
+	Status        JobStatus
+	BatchID       string
+	Domain        string
+	Severity      JobSeverityFilter
+	CreatedAfter  time.Time
+	CreatedBefore time.Time
+	Limit         int
+	Offset        int
+	Sort          JobSort
+}
+
+// DomainFilter filters domain list queries.
+type DomainFilter struct {
+	Tag         string
+	Name        string
+	LatestLevel string
+	Limit       int
+	Offset      int
+}
+
+// RunFilter filters run list queries.
+type RunFilter struct {
+	DomainID    int64
+	Domain      string
+	BatchID     string
+	Tag         string
+	Status      JobStatus
+	WorstLevel  string
+	FinishedAfter  time.Time
+	FinishedBefore time.Time
+	Limit       int
+	Offset      int
+	Sort        JobSort
+}
+
+// ── List result types ─────────────────────────────────────────────────────────
+
+// JobList represents paginated job results.
 type JobList struct {
 	Items      []Job  `json:"items"`
 	Total      int    `json:"total"`
@@ -153,7 +207,29 @@ type JobList struct {
 	Sort       string `json:"sort,omitempty"`
 }
 
-// JobResult holds output for a job.
+// DomainList represents paginated domain results.
+type DomainList struct {
+	Items      []Domain `json:"items"`
+	Total      int      `json:"total"`
+	Limit      int      `json:"limit,omitempty"`
+	Offset     int      `json:"offset,omitempty"`
+	NextCursor string   `json:"next_cursor,omitempty"`
+	PrevCursor string   `json:"prev_cursor,omitempty"`
+}
+
+// RunList represents paginated run results.
+type RunList struct {
+	Items      []Run  `json:"items"`
+	Total      int    `json:"total"`
+	Limit      int    `json:"limit,omitempty"`
+	Offset     int    `json:"offset,omitempty"`
+	NextCursor string `json:"next_cursor,omitempty"`
+	PrevCursor string `json:"prev_cursor,omitempty"`
+}
+
+// ── Result types (unchanged shape for API compat) ────────────────────────────
+
+// JobResult holds the assembled output for a job/run.
 type JobResult struct {
 	JobID                string            `json:"job_id"`
 	BatchID              string            `json:"batch_id,omitempty"`
@@ -179,6 +255,54 @@ type JobResultEntry struct {
 	Args      map[string]any `json:"args,omitempty"`
 	Message   string         `json:"message,omitempty"`
 	Raw       string         `json:"raw,omitempty"`
+}
+
+// ── Request/response types ────────────────────────────────────────────────────
+
+// JobCreateRequest is the payload for a single job.
+type JobCreateRequest struct {
+	Domain           string                      `json:"domain"`
+	Tests            []string                    `json:"tests,omitempty"`
+	ProfileOverrides map[string]any              `json:"profile_overrides,omitempty"`
+	Nameservers      []UndelegatedNameserverInput `json:"nameservers,omitempty"`
+	DSInfo           []UndelegatedDSInput         `json:"ds_info,omitempty"`
+	MinLevel         string                       `json:"min_level,omitempty"`
+	Tags             []string                     `json:"tags,omitempty"`
+	Profile          string                       `json:"profile,omitempty"`
+}
+
+// JobBatchRequest is the payload for a batch submission.
+type JobBatchRequest struct {
+	Domains          []string                     `json:"domains,omitempty"`
+	FromTag          string                       `json:"from_tag,omitempty"`
+	Tests            []string                     `json:"tests,omitempty"`
+	ProfileOverrides map[string]any               `json:"profile_overrides,omitempty"`
+	Nameservers      *[]UndelegatedNameserverInput `json:"nameservers,omitempty"`
+	DSInfo           *[]UndelegatedDSInput         `json:"ds_info,omitempty"`
+	MinLevel         string                        `json:"min_level,omitempty"`
+	Tags             []string                      `json:"tags,omitempty"`
+	Profile          string                        `json:"profile,omitempty"`
+	Description      string                        `json:"description,omitempty"`
+}
+
+// UndelegatedNameserverInput represents one undelegated nameserver row.
+type UndelegatedNameserverInput struct {
+	NS string `json:"ns"`
+	IP string `json:"ip,omitempty"`
+}
+
+// UndelegatedDSInput represents one undelegated DS row.
+type UndelegatedDSInput struct {
+	KeyTag    int    `json:"keytag"`
+	Algorithm int    `json:"algorithm"`
+	DigType   int    `json:"digtype"`
+	Digest    string `json:"digest"`
+}
+
+// JobBatchResponse describes the batch submission result.
+type JobBatchResponse struct {
+	BatchID string   `json:"batch_id"`
+	JobIDs  []string `json:"job_ids"`
 }
 
 // BatchSummary aggregates jobs for a batch.
@@ -222,17 +346,4 @@ type ErrorBody struct {
 	Code    string         `json:"code"`
 	Message string         `json:"message"`
 	Details map[string]any `json:"details,omitempty"`
-}
-
-// JobFilter controls listing behavior.
-type JobFilter struct {
-	Status        JobStatus
-	BatchID       string
-	Domain        string
-	Severity      JobSeverityFilter
-	CreatedAfter  time.Time
-	CreatedBefore time.Time
-	Limit         int
-	Offset        int
-	Sort          JobSort
 }

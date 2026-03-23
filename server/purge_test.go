@@ -16,7 +16,7 @@ func TestServerStartWiresPurgeLoop(t *testing.T) {
 }
 
 // TestNewWithOptionsRetentionDaysZeroNoPurge verifies that RetentionDays=0
-// leaves jobs intact (purge loop is not started).
+// leaves runs intact (purge loop is not started).
 func TestNewWithOptionsRetentionDaysZeroNoPurge(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Database.RetentionDays = 0
@@ -32,17 +32,20 @@ func TestNewWithOptionsRetentionDaysZeroNoPurge(t *testing.T) {
 	if _, err := srv.store.Create(job); err != nil {
 		t.Fatalf("create: %v", err)
 	}
+	if err := srv.store.GraduateJob(job, nil); err != nil {
+		t.Fatalf("graduate: %v", err)
+	}
 
 	srv.Start()
 	time.Sleep(30 * time.Millisecond)
 
-	if list := srv.store.List(JobFilter{Limit: 1}); list.Total != 1 {
-		t.Fatal("expected job preserved when RetentionDays=0 (purge loop disabled)")
+	if list := srv.store.ListRuns(RunFilter{Limit: 1}); list.Total != 1 {
+		t.Fatal("expected run preserved when RetentionDays=0 (purge loop disabled)")
 	}
 }
 
 // TestStartPurgeLoopPurgesOldJobs verifies that the loop calls PurgeOlderThan
-// and logs the count when jobs are deleted.
+// and logs the count when runs are deleted.
 func TestStartPurgeLoopPurgesOldJobs(t *testing.T) {
 	store := NewInMemoryJobStore()
 	cutoffAge := 90
@@ -51,6 +54,9 @@ func TestStartPurgeLoopPurgesOldJobs(t *testing.T) {
 	job := Job{ID: "j1", Domain: "example.com", Status: JobSucceeded, CreatedAt: old, FinishedAt: old}
 	if _, err := store.Create(job); err != nil {
 		t.Fatalf("create: %v", err)
+	}
+	if err := store.GraduateJob(job, nil); err != nil {
+		t.Fatalf("graduate: %v", err)
 	}
 
 	var logged []string
@@ -65,14 +71,14 @@ func TestStartPurgeLoopPurgesOldJobs(t *testing.T) {
 
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		if store.List(JobFilter{Limit: 1}).Total == 0 {
+		if store.ListRuns(RunFilter{Limit: 1}).Total == 0 {
 			break
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
 
-	if store.List(JobFilter{Limit: 1}).Total != 0 {
-		t.Fatal("expected job to be purged by loop")
+	if store.ListRuns(RunFilter{Limit: 1}).Total != 0 {
+		t.Fatal("expected run to be purged by loop")
 	}
 	if len(logged) == 0 || !strings.Contains(logged[0], "purged 1 jobs") {
 		t.Fatalf("expected purge log message, got %v", logged)
@@ -116,7 +122,7 @@ func TestStartPurgeLoopStopsOnContextCancel(t *testing.T) {
 	// -race or the goroutine count, but a clean exit here is sufficient.
 }
 
-// TestStartPurgeLoopPreservesNewJobs verifies that jobs newer than the
+// TestStartPurgeLoopPreservesNewJobs verifies that runs newer than the
 // retention cutoff are not deleted by the loop.
 func TestStartPurgeLoopPreservesNewJobs(t *testing.T) {
 	store := NewInMemoryJobStore()
@@ -125,6 +131,9 @@ func TestStartPurgeLoopPreservesNewJobs(t *testing.T) {
 	job := Job{ID: "j1", Domain: "example.com", Status: JobSucceeded, CreatedAt: recent, FinishedAt: recent}
 	if _, err := store.Create(job); err != nil {
 		t.Fatalf("create: %v", err)
+	}
+	if err := store.GraduateJob(job, nil); err != nil {
+		t.Fatalf("graduate: %v", err)
 	}
 
 	logger := func(string, ...any) {}
@@ -135,7 +144,7 @@ func TestStartPurgeLoopPreservesNewJobs(t *testing.T) {
 
 	time.Sleep(50 * time.Millisecond)
 
-	if store.List(JobFilter{Limit: 1}).Total != 1 {
-		t.Fatal("expected recent job to be preserved by loop")
+	if store.ListRuns(RunFilter{Limit: 1}).Total != 1 {
+		t.Fatal("expected recent run to be preserved by loop")
 	}
 }

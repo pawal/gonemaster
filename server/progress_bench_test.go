@@ -5,6 +5,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"codeberg.org/pawal/gonemaster/engine"
 )
 
 type countingJobStore struct {
@@ -39,12 +41,52 @@ func (s *countingJobStore) List(filter JobFilter) JobList {
 	return s.inner.List(filter)
 }
 
-func (s *countingJobStore) SetResult(jobID string, result JobResult) error {
-	return s.inner.SetResult(jobID, result)
+func (s *countingJobStore) GraduateJob(job Job, entries []engine.LogEntry) error {
+	return s.inner.GraduateJob(job, entries)
 }
 
 func (s *countingJobStore) GetResult(jobID string) (JobResult, bool) {
 	return s.inner.GetResult(jobID)
+}
+
+func (s *countingJobStore) GetOrCreateDomain(name string) (Domain, error) {
+	return s.inner.GetOrCreateDomain(name)
+}
+
+func (s *countingJobStore) ListDomains(filter DomainFilter) DomainList {
+	return s.inner.ListDomains(filter)
+}
+
+func (s *countingJobStore) CreateTag(name, description string) error {
+	return s.inner.CreateTag(name, description)
+}
+
+func (s *countingJobStore) ListTags(limit, offset int) []Tag {
+	return s.inner.ListTags(limit, offset)
+}
+
+func (s *countingJobStore) TagDomains(tag string, domainIDs []int64) error {
+	return s.inner.TagDomains(tag, domainIDs)
+}
+
+func (s *countingJobStore) GetRun(id string) (Run, bool) {
+	return s.inner.GetRun(id)
+}
+
+func (s *countingJobStore) GetRunByPublicID(publicID string) (Run, bool) {
+	return s.inner.GetRunByPublicID(publicID)
+}
+
+func (s *countingJobStore) ListRuns(filter RunFilter) RunList {
+	return s.inner.ListRuns(filter)
+}
+
+func (s *countingJobStore) CreateBatch(batch Batch) error {
+	return s.inner.CreateBatch(batch)
+}
+
+func (s *countingJobStore) GetBatch(id string) (Batch, bool) {
+	return s.inner.GetBatch(id)
 }
 
 func (s *countingJobStore) PurgeOlderThan(cutoff time.Time) (int64, error) {

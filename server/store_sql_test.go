@@ -705,6 +705,212 @@ func TestSQLJobStoreUpdateDomainLatestIncrements(t *testing.T) {
 	}
 }
 
+// ---- Tag store -------------------------------------------------------------
+
+func TestSQLJobStoreGetTag(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			if err := s.CreateTag("alpha", "first tag"); err != nil {
+				t.Fatalf("CreateTag: %v", err)
+			}
+			d, _ := s.GetOrCreateDomain("example.com")
+			_ = s.TagDomains("alpha", []int64{d.ID})
+
+			got, ok := s.GetTag("alpha")
+			if !ok {
+				t.Fatal("GetTag: not found")
+			}
+			if got.Name != "alpha" || got.Description != "first tag" || got.DomainCount != 1 {
+				t.Fatalf("unexpected tag: %+v", got)
+			}
+
+			_, ok = s.GetTag("notexist")
+			if ok {
+				t.Fatal("expected false for missing tag")
+			}
+		})
+	}
+}
+
+func TestSQLJobStoreUpdateTag(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			_ = s.CreateTag("beta", "old description")
+
+			if err := s.UpdateTag("beta", "new description"); err != nil {
+				t.Fatalf("UpdateTag: %v", err)
+			}
+			got, ok := s.GetTag("beta")
+			if !ok {
+				t.Fatal("GetTag after update: not found")
+			}
+			if got.Description != "new description" {
+				t.Fatalf("expected updated description, got %q", got.Description)
+			}
+
+			if err := s.UpdateTag("notexist", "x"); err == nil {
+				t.Fatal("expected error for missing tag")
+			}
+		})
+	}
+}
+
+func TestSQLJobStoreDeleteTag(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			d, _ := s.GetOrCreateDomain("example.com")
+			_ = s.CreateTag("gamma", "")
+			_ = s.TagDomains("gamma", []int64{d.ID})
+
+			if err := s.DeleteTag("gamma"); err != nil {
+				t.Fatalf("DeleteTag: %v", err)
+			}
+			if _, ok := s.GetTag("gamma"); ok {
+				t.Fatal("expected tag to be deleted")
+			}
+			tags := s.GetDomainTags(d.ID)
+			for _, tag := range tags {
+				if tag == "gamma" {
+					t.Fatal("expected domain_tag association to be removed")
+				}
+			}
+
+			if err := s.DeleteTag("notexist"); err == nil {
+				t.Fatal("expected error for missing tag")
+			}
+		})
+	}
+}
+
+func TestSQLJobStoreUntagDomains(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			d1, _ := s.GetOrCreateDomain("a.example")
+			d2, _ := s.GetOrCreateDomain("b.example")
+			_ = s.TagDomains("delta", []int64{d1.ID, d2.ID})
+
+			if err := s.UntagDomains("delta", []int64{d1.ID}); err != nil {
+				t.Fatalf("UntagDomains: %v", err)
+			}
+
+			got, ok := s.GetTag("delta")
+			if !ok {
+				t.Fatal("GetTag: not found")
+			}
+			if got.DomainCount != 1 {
+				t.Fatalf("expected 1 domain after untag, got %d", got.DomainCount)
+			}
+			tags := s.GetDomainTags(d1.ID)
+			for _, tag := range tags {
+				if tag == "delta" {
+					t.Fatal("expected d1 to be untagged")
+				}
+			}
+		})
+	}
+}
+
+func TestSQLJobStoreGetDomainTags(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			d, _ := s.GetOrCreateDomain("example.com")
+
+			if tags := s.GetDomainTags(d.ID); len(tags) != 0 {
+				t.Fatalf("expected no tags initially, got %v", tags)
+			}
+
+			_ = s.TagDomains("x", []int64{d.ID})
+			_ = s.TagDomains("y", []int64{d.ID})
+
+			tags := s.GetDomainTags(d.ID)
+			if len(tags) != 2 {
+				t.Fatalf("expected 2 tags, got %v", tags)
+			}
+		})
+	}
+}
+
+func TestSQLJobStoreListDomainsByTag(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			d1, _ := s.GetOrCreateDomain("a.example")
+			d2, _ := s.GetOrCreateDomain("b.example")
+			_, _ = s.GetOrCreateDomain("c.example")
+			_ = s.TagDomains("group", []int64{d1.ID, d2.ID})
+
+			result := s.ListDomainsByTag("group", DomainFilter{Limit: 10})
+			if result.Total != 2 {
+				t.Fatalf("expected 2 domains in tag, got %d", result.Total)
+			}
+		})
+	}
+}
+
+func TestSQLJobStoreGetTagSummary(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+
+			for _, tc := range []struct {
+				domain string
+				id     string
+				level  string
+			}{
+				{"a.example", "run-a", "ERROR"},
+				{"b.example", "run-b", "WARNING"},
+				{"c.example", "run-c", ""},
+			} {
+				job := Job{
+					ID:         tc.id,
+					Domain:     tc.domain,
+					Status:     JobSucceeded,
+					CreatedAt:  time.Now().UTC(),
+					FinishedAt: time.Now().UTC(),
+				}
+				if _, err := s.Create(job); err != nil {
+					t.Fatalf("Create %s: %v", tc.id, err)
+				}
+				graduateSQLJob(t, s, job, nil)
+				d, _ := s.GetDomainByName(tc.domain)
+				_ = s.UpdateDomainLatest(d.ID, tc.id, time.Now().UTC(), "succeeded", tc.level)
+			}
+
+			d1, _ := s.GetDomainByName("a.example")
+			d2, _ := s.GetDomainByName("b.example")
+			d3, _ := s.GetDomainByName("c.example")
+			_ = s.TagDomains("stag", []int64{d1.ID, d2.ID, d3.ID})
+
+			summary, ok := s.GetTagSummary("stag")
+			if !ok {
+				t.Fatal("GetTagSummary: not found")
+			}
+			if summary.DomainCount != 3 {
+				t.Fatalf("DomainCount: got %d, want 3", summary.DomainCount)
+			}
+			if summary.Error != 1 {
+				t.Fatalf("Error: got %d, want 1", summary.Error)
+			}
+			if summary.Warning != 1 {
+				t.Fatalf("Warning: got %d, want 1", summary.Warning)
+			}
+			if summary.OK != 1 {
+				t.Fatalf("OK: got %d, want 1", summary.OK)
+			}
+
+			_, ok = s.GetTagSummary("notexist")
+			if ok {
+				t.Fatal("expected false for missing tag")
+			}
+		})
+	}
+}
+
 // ---- List filters ----------------------------------------------------------
 
 func TestSQLJobStoreListFilters(t *testing.T) {

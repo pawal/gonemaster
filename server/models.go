@@ -110,6 +110,17 @@ type Tag struct {
 	DomainCount int       `json:"domain_count"`
 }
 
+// TagSummary holds per-severity domain counts for a tag.
+type TagSummary struct {
+	Tag         string `json:"tag"`
+	DomainCount int    `json:"domain_count"`
+	OK          int    `json:"ok"`
+	Notice      int    `json:"notice"`
+	Warning     int    `json:"warning"`
+	Error       int    `json:"error"`
+	Critical    int    `json:"critical"`
+}
+
 // Run is a completed execution, graduated from a Job.
 type Run struct {
 	ID          string         `json:"id"`

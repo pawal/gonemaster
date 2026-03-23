@@ -76,12 +76,40 @@ func (s *spyJobStore) CreateTag(name, description string) error {
 	return s.inner.CreateTag(name, description)
 }
 
+func (s *spyJobStore) GetTag(name string) (Tag, bool) {
+	return s.inner.GetTag(name)
+}
+
+func (s *spyJobStore) UpdateTag(name, description string) error {
+	return s.inner.UpdateTag(name, description)
+}
+
+func (s *spyJobStore) DeleteTag(name string) error {
+	return s.inner.DeleteTag(name)
+}
+
 func (s *spyJobStore) ListTags(limit, offset int) []Tag {
 	return s.inner.ListTags(limit, offset)
 }
 
 func (s *spyJobStore) TagDomains(tag string, domainIDs []int64) error {
 	return s.inner.TagDomains(tag, domainIDs)
+}
+
+func (s *spyJobStore) UntagDomains(tag string, domainIDs []int64) error {
+	return s.inner.UntagDomains(tag, domainIDs)
+}
+
+func (s *spyJobStore) GetDomainTags(domainID int64) []string {
+	return s.inner.GetDomainTags(domainID)
+}
+
+func (s *spyJobStore) ListDomainsByTag(tag string, filter DomainFilter) DomainList {
+	return s.inner.ListDomainsByTag(tag, filter)
+}
+
+func (s *spyJobStore) GetTagSummary(tag string) (TagSummary, bool) {
+	return s.inner.GetTagSummary(tag)
 }
 
 func (s *spyJobStore) GetRun(id string) (Run, bool) {

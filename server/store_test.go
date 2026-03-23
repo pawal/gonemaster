@@ -706,6 +706,189 @@ func TestInMemoryJobStoreGetDomainIncludesTags(t *testing.T) {
 	}
 }
 
+func TestInMemoryJobStoreGetTag(t *testing.T) {
+	store := NewInMemoryJobStore()
+	if err := store.CreateTag("alpha", "first tag"); err != nil {
+		t.Fatalf("CreateTag: %v", err)
+	}
+	d, _ := store.GetOrCreateDomain("example.com")
+	_ = store.TagDomains("alpha", []int64{d.ID})
+
+	got, ok := store.GetTag("alpha")
+	if !ok {
+		t.Fatal("GetTag: not found")
+	}
+	if got.Name != "alpha" || got.Description != "first tag" || got.DomainCount != 1 {
+		t.Fatalf("unexpected tag: %+v", got)
+	}
+
+	_, ok = store.GetTag("notexist")
+	if ok {
+		t.Fatal("expected false for missing tag")
+	}
+}
+
+func TestInMemoryJobStoreUpdateTag(t *testing.T) {
+	store := NewInMemoryJobStore()
+	_ = store.CreateTag("beta", "old description")
+
+	if err := store.UpdateTag("beta", "new description"); err != nil {
+		t.Fatalf("UpdateTag: %v", err)
+	}
+	got, _ := store.GetTag("beta")
+	if got.Description != "new description" {
+		t.Fatalf("expected updated description, got %q", got.Description)
+	}
+
+	if err := store.UpdateTag("notexist", "x"); err == nil {
+		t.Fatal("expected error for missing tag")
+	}
+}
+
+func TestInMemoryJobStoreDeleteTag(t *testing.T) {
+	store := NewInMemoryJobStore()
+	d, _ := store.GetOrCreateDomain("example.com")
+	_ = store.CreateTag("gamma", "")
+	_ = store.TagDomains("gamma", []int64{d.ID})
+
+	if err := store.DeleteTag("gamma"); err != nil {
+		t.Fatalf("DeleteTag: %v", err)
+	}
+	if _, ok := store.GetTag("gamma"); ok {
+		t.Fatal("expected tag to be deleted")
+	}
+	// Domain tag association should also be gone.
+	tags := store.GetDomainTags(d.ID)
+	for _, tag := range tags {
+		if tag == "gamma" {
+			t.Fatal("expected domain_tag association to be removed")
+		}
+	}
+
+	if err := store.DeleteTag("notexist"); err == nil {
+		t.Fatal("expected error for missing tag")
+	}
+}
+
+func TestInMemoryJobStoreUntagDomains(t *testing.T) {
+	store := NewInMemoryJobStore()
+	d1, _ := store.GetOrCreateDomain("a.example")
+	d2, _ := store.GetOrCreateDomain("b.example")
+	_ = store.TagDomains("delta", []int64{d1.ID, d2.ID})
+
+	if err := store.UntagDomains("delta", []int64{d1.ID}); err != nil {
+		t.Fatalf("UntagDomains: %v", err)
+	}
+
+	got, _ := store.GetTag("delta")
+	if got.DomainCount != 1 {
+		t.Fatalf("expected 1 domain after untag, got %d", got.DomainCount)
+	}
+	tags := store.GetDomainTags(d1.ID)
+	for _, tag := range tags {
+		if tag == "delta" {
+			t.Fatal("expected d1 to be untagged")
+		}
+	}
+	tags2 := store.GetDomainTags(d2.ID)
+	found := false
+	for _, tag := range tags2 {
+		if tag == "delta" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("expected d2 to still be tagged")
+	}
+}
+
+func TestInMemoryJobStoreGetDomainTags(t *testing.T) {
+	store := NewInMemoryJobStore()
+	d, _ := store.GetOrCreateDomain("example.com")
+
+	if tags := store.GetDomainTags(d.ID); len(tags) != 0 {
+		t.Fatalf("expected no tags initially, got %v", tags)
+	}
+
+	_ = store.TagDomains("x", []int64{d.ID})
+	_ = store.TagDomains("y", []int64{d.ID})
+
+	tags := store.GetDomainTags(d.ID)
+	if len(tags) != 2 {
+		t.Fatalf("expected 2 tags, got %v", tags)
+	}
+}
+
+func TestInMemoryJobStoreListDomainsByTag(t *testing.T) {
+	store := NewInMemoryJobStore()
+	d1, _ := store.GetOrCreateDomain("a.example")
+	d2, _ := store.GetOrCreateDomain("b.example")
+	_, _ = store.GetOrCreateDomain("c.example") // untagged
+	_ = store.TagDomains("group", []int64{d1.ID, d2.ID})
+
+	result := store.ListDomainsByTag("group", DomainFilter{Limit: 10})
+	if result.Total != 2 {
+		t.Fatalf("expected 2 domains in tag, got %d", result.Total)
+	}
+}
+
+func TestInMemoryJobStoreGetTagSummary(t *testing.T) {
+	store := NewInMemoryJobStore()
+	d1, _ := store.GetOrCreateDomain("a.example")
+	d2, _ := store.GetOrCreateDomain("b.example")
+	d3, _ := store.GetOrCreateDomain("c.example")
+	_ = store.TagDomains("summary-tag", []int64{d1.ID, d2.ID, d3.ID})
+
+	// Graduate jobs to set latest_level.
+	for _, tc := range []struct {
+		domain string
+		id     string
+		level  string
+	}{
+		{"a.example", "run-a", "ERROR"},
+		{"b.example", "run-b", "WARNING"},
+		{"c.example", "run-c", ""},
+	} {
+		job := Job{
+			ID:         tc.id,
+			Domain:     tc.domain,
+			Status:     JobSucceeded,
+			CreatedAt:  time.Now().UTC(),
+			FinishedAt: time.Now().UTC(),
+		}
+		if _, err := store.Create(job); err != nil {
+			t.Fatalf("Create %s: %v", tc.id, err)
+		}
+		if err := store.GraduateJob(job, nil); err != nil {
+			t.Fatalf("GraduateJob %s: %v", tc.id, err)
+		}
+		d, _ := store.GetDomainByName(tc.domain)
+		_ = store.UpdateDomainLatest(d.ID, tc.id, time.Now().UTC(), "succeeded", tc.level)
+	}
+
+	summary, ok := store.GetTagSummary("summary-tag")
+	if !ok {
+		t.Fatal("GetTagSummary: not found")
+	}
+	if summary.DomainCount != 3 {
+		t.Fatalf("DomainCount: got %d, want 3", summary.DomainCount)
+	}
+	if summary.Error != 1 {
+		t.Fatalf("Error: got %d, want 1", summary.Error)
+	}
+	if summary.Warning != 1 {
+		t.Fatalf("Warning: got %d, want 1", summary.Warning)
+	}
+	if summary.OK != 1 {
+		t.Fatalf("OK: got %d, want 1", summary.OK)
+	}
+
+	_, ok = store.GetTagSummary("notexist")
+	if ok {
+		t.Fatal("expected false for missing tag")
+	}
+}
+
 func TestInMemoryJobStoreCreateBatchGetBatch(t *testing.T) {
 	store := NewInMemoryJobStore()
 	now := time.Now().UTC()

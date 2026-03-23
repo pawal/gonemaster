@@ -38,8 +38,15 @@ type JobStore interface {
 
 	// Tag management.
 	CreateTag(name, description string) error
+	GetTag(name string) (Tag, bool)
+	UpdateTag(name, description string) error
+	DeleteTag(name string) error
 	ListTags(limit, offset int) []Tag
 	TagDomains(tag string, domainIDs []int64) error
+	UntagDomains(tag string, domainIDs []int64) error
+	GetDomainTags(domainID int64) []string
+	ListDomainsByTag(tag string, filter DomainFilter) DomainList
+	GetTagSummary(tag string) (TagSummary, bool)
 
 	// Run management (completed/graduated jobs).
 	GetRun(id string) (Run, bool)
@@ -590,6 +597,129 @@ func (s *InMemoryJobStore) TagDomains(tag string, domainIDs []int64) error {
 		}
 	}
 	return nil
+}
+
+// GetTag returns a tag by name with its current domain count.
+func (s *InMemoryJobStore) GetTag(name string) (Tag, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	t, ok := s.tags[name]
+	if !ok {
+		return Tag{}, false
+	}
+	t.DomainCount = len(s.tagDomains[name])
+	return t, true
+}
+
+// UpdateTag updates the description of an existing tag.
+func (s *InMemoryJobStore) UpdateTag(name, description string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	t, ok := s.tags[name]
+	if !ok {
+		return errors.New("tag not found")
+	}
+	t.Description = description
+	s.tags[name] = t
+	return nil
+}
+
+// DeleteTag removes a tag and all its domain associations.
+func (s *InMemoryJobStore) DeleteTag(name string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.tags[name]; !ok {
+		return errors.New("tag not found")
+	}
+	for _, domainID := range s.tagDomains[name] {
+		updated := s.domainTags[domainID][:0]
+		for _, t := range s.domainTags[domainID] {
+			if t != name {
+				updated = append(updated, t)
+			}
+		}
+		s.domainTags[domainID] = updated
+	}
+	delete(s.tagDomains, name)
+	delete(s.tags, name)
+	return nil
+}
+
+// UntagDomains removes the given domain IDs from a tag.
+func (s *InMemoryJobStore) UntagDomains(tag string, domainIDs []int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	remove := make(map[int64]bool, len(domainIDs))
+	for _, id := range domainIDs {
+		remove[id] = true
+	}
+	kept := s.tagDomains[tag][:0]
+	for _, id := range s.tagDomains[tag] {
+		if !remove[id] {
+			kept = append(kept, id)
+		}
+	}
+	s.tagDomains[tag] = kept
+	for _, domainID := range domainIDs {
+		updated := s.domainTags[domainID][:0]
+		for _, t := range s.domainTags[domainID] {
+			if t != tag {
+				updated = append(updated, t)
+			}
+		}
+		s.domainTags[domainID] = updated
+	}
+	return nil
+}
+
+// GetDomainTags returns the tag names associated with a domain.
+func (s *InMemoryJobStore) GetDomainTags(domainID int64) []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	tags := s.domainTags[domainID]
+	if len(tags) == 0 {
+		return nil
+	}
+	out := make([]string, len(tags))
+	copy(out, tags)
+	return out
+}
+
+// ListDomainsByTag returns domains associated with tag, applying filter.
+func (s *InMemoryJobStore) ListDomainsByTag(tag string, filter DomainFilter) DomainList {
+	filter.Tag = tag
+	return s.ListDomains(filter)
+}
+
+// GetTagSummary returns the severity distribution for domains with the latest
+// run data in the given tag.
+func (s *InMemoryJobStore) GetTagSummary(tag string) (TagSummary, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	domainIDs, ok := s.tagDomains[tag]
+	if !ok {
+		return TagSummary{}, false
+	}
+	summary := TagSummary{Tag: tag, DomainCount: len(domainIDs)}
+	for _, id := range domainIDs {
+		d, ok := s.domainsByID[id]
+		if !ok {
+			continue
+		}
+		switch strings.ToUpper(d.LatestLevel) {
+		case "CRITICAL":
+			summary.Critical++
+		case "ERROR":
+			summary.Error++
+		case "WARNING":
+			summary.Warning++
+		case "NOTICE":
+			summary.Notice++
+		default:
+			summary.OK++
+		}
+	}
+	return summary, true
 }
 
 // GetRun returns a graduated run by its ID.

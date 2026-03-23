@@ -73,12 +73,40 @@ func (s *countingJobStore) CreateTag(name, description string) error {
 	return s.inner.CreateTag(name, description)
 }
 
+func (s *countingJobStore) GetTag(name string) (Tag, bool) {
+	return s.inner.GetTag(name)
+}
+
+func (s *countingJobStore) UpdateTag(name, description string) error {
+	return s.inner.UpdateTag(name, description)
+}
+
+func (s *countingJobStore) DeleteTag(name string) error {
+	return s.inner.DeleteTag(name)
+}
+
 func (s *countingJobStore) ListTags(limit, offset int) []Tag {
 	return s.inner.ListTags(limit, offset)
 }
 
 func (s *countingJobStore) TagDomains(tag string, domainIDs []int64) error {
 	return s.inner.TagDomains(tag, domainIDs)
+}
+
+func (s *countingJobStore) UntagDomains(tag string, domainIDs []int64) error {
+	return s.inner.UntagDomains(tag, domainIDs)
+}
+
+func (s *countingJobStore) GetDomainTags(domainID int64) []string {
+	return s.inner.GetDomainTags(domainID)
+}
+
+func (s *countingJobStore) ListDomainsByTag(tag string, filter DomainFilter) DomainList {
+	return s.inner.ListDomainsByTag(tag, filter)
+}
+
+func (s *countingJobStore) GetTagSummary(tag string) (TagSummary, bool) {
+	return s.inner.GetTagSummary(tag)
 }
 
 func (s *countingJobStore) GetRun(id string) (Run, bool) {

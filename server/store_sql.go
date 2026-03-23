@@ -774,6 +774,7 @@ func (s *SQLJobStore) ListDomains(filter DomainFilter) DomainList {
 	}
 	defer rows.Close()
 
+	// Collect domains first; close cursor before making nested tag queries.
 	var items []Domain
 	for rows.Next() {
 		var (
@@ -787,7 +788,7 @@ func (s *SQLJobStore) ListDomains(filter DomainFilter) DomainList {
 			&latestStatus, &latestLevel, &createdAt, &runCount); err != nil {
 			continue
 		}
-		d := Domain{
+		items = append(items, Domain{
 			ID:           id,
 			Name:         name,
 			LatestRunID:  latestRunID.String,
@@ -796,10 +797,13 @@ func (s *SQLJobStore) ListDomains(filter DomainFilter) DomainList {
 			LatestLevel:  latestLevel.String,
 			CreatedAt:    parseTimestampStr(createdAt),
 			RunCount:     runCount,
-		}
-		// Load tags for this domain.
-		d.Tags = s.loadDomainTags(id)
-		items = append(items, d)
+		})
+	}
+	rows.Close()
+
+	// Load tags after the main cursor is closed.
+	for i := range items {
+		items[i].Tags = s.loadDomainTags(items[i].ID)
 	}
 
 	return DomainList{
@@ -923,6 +927,142 @@ func (s *SQLJobStore) TagDomains(tag string, domainIDs []int64) error {
 		}
 	}
 	return nil
+}
+
+// GetTag returns a tag by name with its current domain count.
+func (s *SQLJobStore) GetTag(name string) (Tag, bool) {
+	var (
+		tagName, description, createdAt string
+		domainCount                     int
+	)
+	err := s.db.QueryRow(
+		fmt.Sprintf(`SELECT t.name, t.description, t.created_at,
+			COUNT(dt.domain_id) AS domain_count
+		 FROM tags t
+		 LEFT JOIN domain_tags dt ON dt.tag = t.name
+		 WHERE t.name = %s
+		 GROUP BY t.name, t.description, t.created_at`, s.ph(1)),
+		name,
+	).Scan(&tagName, &description, &createdAt, &domainCount)
+	if err != nil {
+		return Tag{}, false
+	}
+	return Tag{
+		Name:        tagName,
+		Description: description,
+		CreatedAt:   parseTimestampStr(createdAt),
+		DomainCount: domainCount,
+	}, true
+}
+
+// UpdateTag updates the description of an existing tag.
+func (s *SQLJobStore) UpdateTag(name, description string) error {
+	res, err := s.db.Exec(
+		fmt.Sprintf(`UPDATE tags SET description = %s WHERE name = %s`, s.ph(1), s.ph(2)),
+		description, name,
+	)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return errors.New("tag not found")
+	}
+	return nil
+}
+
+// DeleteTag removes a tag and all its domain associations.
+func (s *SQLJobStore) DeleteTag(name string) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("delete tag begin tx: %w", err)
+	}
+	if _, err := tx.Exec(
+		fmt.Sprintf(`DELETE FROM domain_tags WHERE tag = %s`, s.ph(1)), name,
+	); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("delete domain_tags: %w", err)
+	}
+	res, err := tx.Exec(
+		fmt.Sprintf(`DELETE FROM tags WHERE name = %s`, s.ph(1)), name,
+	)
+	if err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("delete tag: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		_ = tx.Rollback()
+		return errors.New("tag not found")
+	}
+	return tx.Commit()
+}
+
+// UntagDomains removes the given domain IDs from a tag.
+func (s *SQLJobStore) UntagDomains(tag string, domainIDs []int64) error {
+	for _, id := range domainIDs {
+		if _, err := s.db.Exec(
+			fmt.Sprintf(`DELETE FROM domain_tags WHERE tag = %s AND domain_id = %s`,
+				s.ph(1), s.ph(2)),
+			tag, id,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// GetDomainTags returns tag names for a domain.
+func (s *SQLJobStore) GetDomainTags(domainID int64) []string {
+	return s.loadDomainTags(domainID)
+}
+
+// ListDomainsByTag returns domains associated with tag.
+func (s *SQLJobStore) ListDomainsByTag(tag string, filter DomainFilter) DomainList {
+	filter.Tag = tag
+	return s.ListDomains(filter)
+}
+
+// GetTagSummary returns the severity distribution of latest runs for domains in tag.
+func (s *SQLJobStore) GetTagSummary(tag string) (TagSummary, bool) {
+	rows, err := s.db.Query(
+		fmt.Sprintf(`SELECT d.latest_level
+		 FROM domains d
+		 JOIN domain_tags dt ON dt.domain_id = d.id
+		 WHERE dt.tag = %s`, s.ph(1)),
+		tag,
+	)
+	if err != nil {
+		return TagSummary{}, false
+	}
+	defer rows.Close()
+
+	summary := TagSummary{Tag: tag}
+	found := false
+	for rows.Next() {
+		found = true
+		var level sql.NullString
+		if err := rows.Scan(&level); err != nil {
+			continue
+		}
+		summary.DomainCount++
+		switch strings.ToUpper(level.String) {
+		case "CRITICAL":
+			summary.Critical++
+		case "ERROR":
+			summary.Error++
+		case "WARNING":
+			summary.Warning++
+		case "NOTICE":
+			summary.Notice++
+		default:
+			summary.OK++
+		}
+	}
+	if !found {
+		return TagSummary{}, false
+	}
+	return summary, true
 }
 
 // ── Run management ────────────────────────────────────────────────────────────

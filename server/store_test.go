@@ -578,6 +578,55 @@ func TestInMemoryJobStoreListRunsFiltersAndSorts(t *testing.T) {
 	}
 }
 
+func TestInMemoryJobStoreListRunsByDomain(t *testing.T) {
+	store := NewInMemoryJobStore()
+	base := time.Now().UTC()
+
+	graduateJob := func(id, domain string, i int) {
+		job := Job{
+			ID:         id,
+			Domain:     domain,
+			Status:     JobSucceeded,
+			CreatedAt:  base.Add(time.Duration(i) * time.Second),
+			FinishedAt: base.Add(time.Duration(i)*time.Second + time.Minute),
+		}
+		if _, err := store.Create(job); err != nil {
+			t.Fatalf("create %s: %v", id, err)
+		}
+		if err := store.GraduateJob(job, nil); err != nil {
+			t.Fatalf("graduate %s: %v", id, err)
+		}
+	}
+
+	graduateJob("r1", "alpha.example", 0)
+	graduateJob("r2", "alpha.example", 1)
+	graduateJob("r3", "beta.example", 2)
+
+	d, _ := store.GetDomainByName("alpha.example")
+
+	list := store.ListRunsByDomain(d.ID, 10, 0)
+	if list.Total != 2 {
+		t.Fatalf("expected 2 runs for alpha.example, got %d", list.Total)
+	}
+	for _, r := range list.Items {
+		if r.Domain != "alpha.example" {
+			t.Fatalf("expected only alpha.example runs, got %q", r.Domain)
+		}
+	}
+
+	// Pagination: limit 1.
+	page := store.ListRunsByDomain(d.ID, 1, 0)
+	if page.Total != 2 || len(page.Items) != 1 {
+		t.Fatalf("pagination: total=%d items=%d", page.Total, len(page.Items))
+	}
+
+	// Missing domain ID returns empty.
+	empty := store.ListRunsByDomain(9999, 10, 0)
+	if empty.Total != 0 {
+		t.Fatalf("expected 0 for unknown domain, got %d", empty.Total)
+	}
+}
+
 func TestInMemoryJobStoreGetOrCreateDomain(t *testing.T) {
 	store := NewInMemoryJobStore()
 	d1, err := store.GetOrCreateDomain("example.com")

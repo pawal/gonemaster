@@ -1267,6 +1267,11 @@ func (s *SQLJobStore) ListRuns(filter RunFilter) RunList {
 	return list
 }
 
+// ListRunsByDomain returns paginated runs for a specific domain ordered by finished_at DESC.
+func (s *SQLJobStore) ListRunsByDomain(domainID int64, limit, offset int) RunList {
+	return s.ListRuns(RunFilter{DomainID: domainID, Limit: limit, Offset: offset})
+}
+
 // ── Batch management ──────────────────────────────────────────────────────────
 
 // CreateBatch inserts a batch record.

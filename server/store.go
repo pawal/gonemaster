@@ -52,6 +52,7 @@ type JobStore interface {
 	GetRun(id string) (Run, bool)
 	GetRunByPublicID(publicID string) (Run, bool)
 	ListRuns(filter RunFilter) RunList
+	ListRunsByDomain(domainID int64, limit, offset int) RunList
 
 	// Batch management.
 	CreateBatch(batch Batch) error
@@ -857,6 +858,11 @@ func (s *InMemoryJobStore) ListRuns(filter RunFilter) RunList {
 		list.NextCursor = strconv.Itoa(end)
 	}
 	return list
+}
+
+// ListRunsByDomain returns paginated runs for a specific domain.
+func (s *InMemoryJobStore) ListRunsByDomain(domainID int64, limit, offset int) RunList {
+	return s.ListRuns(RunFilter{DomainID: domainID, Limit: limit, Offset: offset})
 }
 
 // CreateBatch stores a batch record.

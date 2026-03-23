@@ -1013,6 +1013,64 @@ func TestSQLJobStoreListFiltersSecondBoundary(t *testing.T) {
 	}
 }
 
+// ---- ListRunsByDomain -------------------------------------------------------
+
+func TestSQLJobStoreListRunsByDomain(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			base := time.Now().UTC()
+
+			for i, tc := range []struct {
+				id, domain string
+			}{
+				{"r1", "alpha.example"},
+				{"r2", "alpha.example"},
+				{"r3", "beta.example"},
+			} {
+				job := Job{
+					ID:         tc.id,
+					Domain:     tc.domain,
+					Status:     JobSucceeded,
+					CreatedAt:  base.Add(time.Duration(i) * time.Second),
+					FinishedAt: base.Add(time.Duration(i)*time.Second + time.Minute),
+				}
+				if _, err := s.Create(job); err != nil {
+					t.Fatalf("create %s: %v", tc.id, err)
+				}
+				graduateSQLJob(t, s, job, nil)
+			}
+
+			d, ok := s.GetDomainByName("alpha.example")
+			if !ok {
+				t.Fatal("GetDomainByName: not found")
+			}
+
+			list := s.ListRunsByDomain(d.ID, 10, 0)
+			if list.Total != 2 {
+				t.Fatalf("expected 2 runs for alpha.example, got %d", list.Total)
+			}
+			for _, r := range list.Items {
+				if r.Domain != "alpha.example" {
+					t.Fatalf("expected only alpha.example runs, got %q", r.Domain)
+				}
+			}
+
+			// Pagination: limit 1.
+			page := s.ListRunsByDomain(d.ID, 1, 0)
+			if page.Total != 2 || len(page.Items) != 1 {
+				t.Fatalf("pagination: total=%d items=%d", page.Total, len(page.Items))
+			}
+
+			// Unknown domain ID returns empty.
+			empty := s.ListRunsByDomain(9999, 10, 0)
+			if empty.Total != 0 {
+				t.Fatalf("expected 0 for unknown domain, got %d", empty.Total)
+			}
+		})
+	}
+}
+
 // ---- List runs (severity filters on graduated jobs) ------------------------
 
 func TestSQLJobStoreListRunsSeverityFilter(t *testing.T) {

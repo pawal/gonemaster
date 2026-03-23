@@ -121,6 +121,10 @@ func (s *countingJobStore) ListRuns(filter RunFilter) RunList {
 	return s.inner.ListRuns(filter)
 }
 
+func (s *countingJobStore) ListRunsByDomain(domainID int64, limit, offset int) RunList {
+	return s.inner.ListRunsByDomain(domainID, limit, offset)
+}
+
 func (s *countingJobStore) CreateBatch(batch Batch) error {
 	return s.inner.CreateBatch(batch)
 }

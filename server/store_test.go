@@ -597,6 +597,115 @@ func TestInMemoryJobStoreGetOrCreateDomain(t *testing.T) {
 	}
 }
 
+func TestInMemoryJobStoreGetDomain(t *testing.T) {
+	store := NewInMemoryJobStore()
+	d, err := store.GetOrCreateDomain("example.com")
+	if err != nil {
+		t.Fatalf("GetOrCreateDomain: %v", err)
+	}
+
+	got, ok := store.GetDomain(d.ID)
+	if !ok {
+		t.Fatal("GetDomain: not found")
+	}
+	if got.ID != d.ID || got.Name != "example.com" {
+		t.Fatalf("unexpected domain: %+v", got)
+	}
+
+	_, ok = store.GetDomain(9999)
+	if ok {
+		t.Fatal("expected false for missing id")
+	}
+}
+
+func TestInMemoryJobStoreGetDomainByName(t *testing.T) {
+	store := NewInMemoryJobStore()
+	_, err := store.GetOrCreateDomain("alpha.example")
+	if err != nil {
+		t.Fatalf("GetOrCreateDomain: %v", err)
+	}
+
+	got, ok := store.GetDomainByName("alpha.example")
+	if !ok {
+		t.Fatal("GetDomainByName: not found")
+	}
+	if got.Name != "alpha.example" {
+		t.Fatalf("unexpected name: %q", got.Name)
+	}
+
+	_, ok = store.GetDomainByName("notexist.example")
+	if ok {
+		t.Fatal("expected false for missing name")
+	}
+}
+
+func TestInMemoryJobStoreUpdateDomainLatest(t *testing.T) {
+	store := NewInMemoryJobStore()
+	d, err := store.GetOrCreateDomain("example.com")
+	if err != nil {
+		t.Fatalf("GetOrCreateDomain: %v", err)
+	}
+	if d.RunCount != 0 {
+		t.Fatalf("expected RunCount=0, got %d", d.RunCount)
+	}
+
+	now := time.Now().UTC().Truncate(time.Second)
+	if err := store.UpdateDomainLatest(d.ID, "run-1", now, "succeeded", "ERROR"); err != nil {
+		t.Fatalf("UpdateDomainLatest: %v", err)
+	}
+
+	got, ok := store.GetDomain(d.ID)
+	if !ok {
+		t.Fatal("GetDomain after update: not found")
+	}
+	if got.LatestRunID != "run-1" {
+		t.Fatalf("LatestRunID: got %q, want %q", got.LatestRunID, "run-1")
+	}
+	if got.LatestStatus != "succeeded" {
+		t.Fatalf("LatestStatus: got %q, want %q", got.LatestStatus, "succeeded")
+	}
+	if got.LatestLevel != "ERROR" {
+		t.Fatalf("LatestLevel: got %q, want %q", got.LatestLevel, "ERROR")
+	}
+	if got.RunCount != 1 {
+		t.Fatalf("RunCount: got %d, want 1", got.RunCount)
+	}
+	if !got.LatestRunAt.Equal(now) {
+		t.Fatalf("LatestRunAt: got %v, want %v", got.LatestRunAt, now)
+	}
+}
+
+func TestInMemoryJobStoreUpdateDomainLatestMissingReturnsError(t *testing.T) {
+	store := NewInMemoryJobStore()
+	err := store.UpdateDomainLatest(9999, "run-x", time.Now().UTC(), "succeeded", "")
+	if err == nil {
+		t.Fatal("expected error for missing domain ID")
+	}
+}
+
+func TestInMemoryJobStoreGetDomainIncludesTags(t *testing.T) {
+	store := NewInMemoryJobStore()
+	d, _ := store.GetOrCreateDomain("tagged.example")
+	_ = store.CreateTag("mytag", "")
+	_ = store.TagDomains("mytag", []int64{d.ID})
+
+	got, ok := store.GetDomain(d.ID)
+	if !ok {
+		t.Fatal("GetDomain: not found")
+	}
+	if len(got.Tags) != 1 || got.Tags[0] != "mytag" {
+		t.Fatalf("expected Tags=[mytag], got %v", got.Tags)
+	}
+
+	byName, ok := store.GetDomainByName("tagged.example")
+	if !ok {
+		t.Fatal("GetDomainByName: not found")
+	}
+	if len(byName.Tags) != 1 || byName.Tags[0] != "mytag" {
+		t.Fatalf("expected Tags=[mytag] from GetDomainByName, got %v", byName.Tags)
+	}
+}
+
 func TestInMemoryJobStoreCreateBatchGetBatch(t *testing.T) {
 	store := NewInMemoryJobStore()
 	now := time.Now().UTC()

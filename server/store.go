@@ -31,7 +31,10 @@ type JobStore interface {
 
 	// Domain management.
 	GetOrCreateDomain(name string) (Domain, error)
+	GetDomain(id int64) (Domain, bool)
+	GetDomainByName(name string) (Domain, bool)
 	ListDomains(filter DomainFilter) DomainList
+	UpdateDomainLatest(domainID int64, runID string, finishedAt time.Time, status, level string) error
 
 	// Tag management.
 	CreateTag(name, description string) error
@@ -402,6 +405,48 @@ func (s *InMemoryJobStore) GetOrCreateDomain(name string) (Domain, error) {
 	defer s.mu.Unlock()
 	d := s.getOrCreateDomainLocked(name)
 	return *d, nil
+}
+
+// GetDomain returns a domain by its numeric ID.
+func (s *InMemoryJobStore) GetDomain(id int64) (Domain, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	d, ok := s.domainsByID[id]
+	if !ok {
+		return Domain{}, false
+	}
+	dc := *d
+	dc.Tags = append([]string(nil), s.domainTags[d.ID]...)
+	return dc, true
+}
+
+// GetDomainByName returns a domain by its name.
+func (s *InMemoryJobStore) GetDomainByName(name string) (Domain, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	d, ok := s.domains[name]
+	if !ok {
+		return Domain{}, false
+	}
+	dc := *d
+	dc.Tags = append([]string(nil), s.domainTags[d.ID]...)
+	return dc, true
+}
+
+// UpdateDomainLatest updates the latest_* denormalized fields on a domain.
+func (s *InMemoryJobStore) UpdateDomainLatest(domainID int64, runID string, finishedAt time.Time, status, level string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	d, ok := s.domainsByID[domainID]
+	if !ok {
+		return errors.New("domain not found")
+	}
+	d.LatestRunID = runID
+	d.LatestRunAt = finishedAt
+	d.LatestStatus = status
+	d.LatestLevel = level
+	d.RunCount++
+	return nil
 }
 
 func (s *InMemoryJobStore) getOrCreateDomainLocked(name string) *Domain {

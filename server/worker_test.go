@@ -56,8 +56,20 @@ func (s *spyJobStore) GetOrCreateDomain(name string) (Domain, error) {
 	return s.inner.GetOrCreateDomain(name)
 }
 
+func (s *spyJobStore) GetDomain(id int64) (Domain, bool) {
+	return s.inner.GetDomain(id)
+}
+
+func (s *spyJobStore) GetDomainByName(name string) (Domain, bool) {
+	return s.inner.GetDomainByName(name)
+}
+
 func (s *spyJobStore) ListDomains(filter DomainFilter) DomainList {
 	return s.inner.ListDomains(filter)
+}
+
+func (s *spyJobStore) UpdateDomainLatest(domainID int64, runID string, finishedAt time.Time, status, level string) error {
+	return s.inner.UpdateDomainLatest(domainID, runID, finishedAt, status, level)
 }
 
 func (s *spyJobStore) CreateTag(name, description string) error {

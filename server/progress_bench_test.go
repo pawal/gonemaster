@@ -53,8 +53,20 @@ func (s *countingJobStore) GetOrCreateDomain(name string) (Domain, error) {
 	return s.inner.GetOrCreateDomain(name)
 }
 
+func (s *countingJobStore) GetDomain(id int64) (Domain, bool) {
+	return s.inner.GetDomain(id)
+}
+
+func (s *countingJobStore) GetDomainByName(name string) (Domain, bool) {
+	return s.inner.GetDomainByName(name)
+}
+
 func (s *countingJobStore) ListDomains(filter DomainFilter) DomainList {
 	return s.inner.ListDomains(filter)
+}
+
+func (s *countingJobStore) UpdateDomainLatest(domainID int64, runID string, finishedAt time.Time, status, level string) error {
+	return s.inner.UpdateDomainLatest(domainID, runID, finishedAt, status, level)
 }
 
 func (s *countingJobStore) CreateTag(name, description string) error {

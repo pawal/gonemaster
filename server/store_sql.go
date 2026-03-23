@@ -656,19 +656,15 @@ func (s *SQLJobStore) GetOrCreateDomain(name string) (Domain, error) {
 	return s.getDomainByName(name)
 }
 
-func (s *SQLJobStore) getDomainByName(name string) (Domain, error) {
+func (s *SQLJobStore) scanDomain(row *sql.Row) (Domain, error) {
 	var (
-		id                                int64
-		domainName, createdAt             string
-		latestRunID, latestRunAt          sql.NullString
-		latestStatus, latestLevel         sql.NullString
-		runCount                          int
+		id                       int64
+		domainName, createdAt    string
+		latestRunID, latestRunAt sql.NullString
+		latestStatus, latestLevel sql.NullString
+		runCount                 int
 	)
-	err := s.db.QueryRow(
-		fmt.Sprintf(`SELECT id, name, latest_run_id, latest_run_at, latest_status,
-			latest_level, created_at, run_count FROM domains WHERE name = %s`, s.ph(1)),
-		name,
-	).Scan(&id, &domainName, &latestRunID, &latestRunAt, &latestStatus,
+	err := row.Scan(&id, &domainName, &latestRunID, &latestRunAt, &latestStatus,
 		&latestLevel, &createdAt, &runCount)
 	if err != nil {
 		return Domain{}, err
@@ -683,6 +679,46 @@ func (s *SQLJobStore) getDomainByName(name string) (Domain, error) {
 		CreatedAt:    parseTimestampStr(createdAt),
 		RunCount:     runCount,
 	}, nil
+}
+
+const domainSelectCols = `SELECT id, name, latest_run_id, latest_run_at, latest_status,
+	latest_level, created_at, run_count FROM domains`
+
+func (s *SQLJobStore) getDomainByName(name string) (Domain, error) {
+	row := s.db.QueryRow(domainSelectCols+` WHERE name = `+s.ph(1), name)
+	return s.scanDomain(row)
+}
+
+// GetDomain returns a domain by its numeric ID.
+func (s *SQLJobStore) GetDomain(id int64) (Domain, bool) {
+	row := s.db.QueryRow(domainSelectCols+` WHERE id = `+s.ph(1), id)
+	d, err := s.scanDomain(row)
+	if err != nil {
+		return Domain{}, false
+	}
+	return d, true
+}
+
+// GetDomainByName returns a domain by its name.
+func (s *SQLJobStore) GetDomainByName(name string) (Domain, bool) {
+	d, err := s.getDomainByName(name)
+	if err != nil {
+		return Domain{}, false
+	}
+	return d, true
+}
+
+// UpdateDomainLatest updates the denormalized latest_* fields on a domain.
+func (s *SQLJobStore) UpdateDomainLatest(domainID int64, runID string, finishedAt time.Time, status, level string) error {
+	ph := s.ph
+	finishedAtVal := s.dialect.TimestampVal(finishedAt)
+	_, err := s.db.Exec(
+		`UPDATE domains SET latest_run_id = `+ph(1)+`, latest_run_at = `+ph(2)+
+			`, latest_status = `+ph(3)+`, latest_level = `+ph(4)+
+			`, run_count = run_count + 1 WHERE id = `+ph(5),
+		runID, finishedAtVal, status, level, domainID,
+	)
+	return err
 }
 
 // ListDomains returns paginated domains.

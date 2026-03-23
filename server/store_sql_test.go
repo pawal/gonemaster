@@ -590,6 +590,121 @@ func TestSQLJobStoreGetResultMissing(t *testing.T) {
 	}
 }
 
+// ---- Domain store ----------------------------------------------------------
+
+func TestSQLJobStoreGetDomain(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			d, err := s.GetOrCreateDomain("example.com")
+			if err != nil {
+				t.Fatalf("GetOrCreateDomain: %v", err)
+			}
+
+			got, ok := s.GetDomain(d.ID)
+			if !ok {
+				t.Fatal("GetDomain: not found")
+			}
+			if got.ID != d.ID || got.Name != "example.com" {
+				t.Fatalf("unexpected domain: %+v", got)
+			}
+
+			_, ok = s.GetDomain(9999)
+			if ok {
+				t.Fatal("expected false for missing id")
+			}
+		})
+	}
+}
+
+func TestSQLJobStoreGetDomainByName(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			_, err := s.GetOrCreateDomain("alpha.example")
+			if err != nil {
+				t.Fatalf("GetOrCreateDomain: %v", err)
+			}
+
+			got, ok := s.GetDomainByName("alpha.example")
+			if !ok {
+				t.Fatal("GetDomainByName: not found")
+			}
+			if got.Name != "alpha.example" {
+				t.Fatalf("unexpected name: %q", got.Name)
+			}
+
+			_, ok = s.GetDomainByName("notexist.example")
+			if ok {
+				t.Fatal("expected false for missing name")
+			}
+		})
+	}
+}
+
+func TestSQLJobStoreUpdateDomainLatest(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			d, err := s.GetOrCreateDomain("example.com")
+			if err != nil {
+				t.Fatalf("GetOrCreateDomain: %v", err)
+			}
+			if d.RunCount != 0 {
+				t.Fatalf("expected RunCount=0, got %d", d.RunCount)
+			}
+
+			finishedAt := time.Now().UTC().Add(-time.Hour).Truncate(time.Second)
+			if err := s.UpdateDomainLatest(d.ID, "run-1", finishedAt, "succeeded", "ERROR"); err != nil {
+				t.Fatalf("UpdateDomainLatest: %v", err)
+			}
+
+			got, ok := s.GetDomain(d.ID)
+			if !ok {
+				t.Fatal("GetDomain after update: not found")
+			}
+			if got.LatestRunID != "run-1" {
+				t.Fatalf("LatestRunID: got %q, want %q", got.LatestRunID, "run-1")
+			}
+			if got.LatestStatus != "succeeded" {
+				t.Fatalf("LatestStatus: got %q, want %q", got.LatestStatus, "succeeded")
+			}
+			if got.LatestLevel != "ERROR" {
+				t.Fatalf("LatestLevel: got %q, want %q", got.LatestLevel, "ERROR")
+			}
+			if got.RunCount != 1 {
+				t.Fatalf("RunCount: got %d, want 1", got.RunCount)
+			}
+			if !got.LatestRunAt.Equal(finishedAt) {
+				t.Fatalf("LatestRunAt: got %v, want %v", got.LatestRunAt, finishedAt)
+			}
+		})
+	}
+}
+
+func TestSQLJobStoreUpdateDomainLatestIncrements(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			d, _ := s.GetOrCreateDomain("counter.example")
+
+			for i := 0; i < 3; i++ {
+				if err := s.UpdateDomainLatest(d.ID, fmt.Sprintf("run-%d", i), time.Now().UTC(), "succeeded", ""); err != nil {
+					t.Fatalf("UpdateDomainLatest %d: %v", i, err)
+				}
+			}
+
+			got, ok := s.GetDomain(d.ID)
+			if !ok {
+				t.Fatal("GetDomain: not found")
+			}
+			if got.RunCount != 3 {
+				t.Fatalf("RunCount: got %d, want 3", got.RunCount)
+			}
+		})
+	}
+}
+
 // ---- List filters ----------------------------------------------------------
 
 func TestSQLJobStoreListFilters(t *testing.T) {

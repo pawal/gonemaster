@@ -20,6 +20,7 @@ All notable changes to all gonemaster components will be documented in this file
  - Server: SQLite, PostgreSQL, and MariaDB/MySQL persistence backends with versioned schema migrations, startup recovery, and integration tests (`make test-integration`)
  - Server: `--db-driver` / `--db-dsn` / `GONEMASTER_DB_*` env vars and JSON config file support
  - Server: Data retention — `--db-retention-days` runs hourly background purge; `POST /api/v1/jobs/purge` and `gonemaster-client jobs purge` for on-demand purging
+ - Docs: `docs/data-analysis.md` — end-to-end guide for bulk analysis: backend selection, tag/batch workflows, API queries, direct SQL examples, CSV export, and deployment patterns
  - Server: Public API at `/pub/api/v1/` — job submission and result lookup by short public ID, without leaking internal UUIDs; per-IP sliding-window rate limiting with `429`/`Retry-After`
  - Server: Version endpoint at `/pub/api/v1/version` returning gonemaster and miekg/dns versions
  - Admin UI: Domains tab — browse/filter the domain registry, drill into per-domain run history

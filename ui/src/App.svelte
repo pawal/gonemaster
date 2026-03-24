@@ -1214,7 +1214,7 @@
   const loadRun = async (jobId = selectedJobId) => {
     if (!jobId) return;
     try {
-      selectedRun = await apiFetch(`/api/v1/runs/${jobId}`);
+      selectedRun = await apiFetch(`/runs/${jobId}`);
     } catch (_) {
       selectedRun = null;
     }
@@ -1222,7 +1222,7 @@
 
   const navigateToDomainByName = async (name) => {
     try {
-      const data = await apiFetch(`/api/v1/domains?name=${encodeURIComponent(name)}&limit=20`);
+      const data = await apiFetch(`/domains?name=${encodeURIComponent(name)}&limit=20`);
       const match = (data?.items ?? []).find((d) => d.name === name);
       if (!match) return;
       selectedDomain = match;
@@ -1394,7 +1394,7 @@
       if (domainNameFilter) params.set("name", domainNameFilter);
       if (domainTagFilter) params.set("tag", domainTagFilter);
       if (domainLevelFilter) params.set("min_level", domainLevelFilter);
-      const data = await apiFetch(`/api/v1/domains?${params}`);
+      const data = await apiFetch(`/domains?${params}`);
       domains = data?.items ?? [];
       domainsTotal = data?.total ?? 0;
     } catch (error) {
@@ -1406,7 +1406,7 @@
 
   const loadDomainTags = async () => {
     try {
-      const data = await apiFetch("/api/v1/tags");
+      const data = await apiFetch("/tags");
       availableTags = Array.isArray(data) ? data : [];
       tagsLoaded = true;
     } catch (_) {
@@ -1422,7 +1422,7 @@
     domainRunsLoading = true;
     try {
       const params = new URLSearchParams({ limit: String(domainRunsLimit), offset: String(domainRunsOffset) });
-      const data = await apiFetch(`/api/v1/domains/${selectedDomain.id}/runs?${params}`);
+      const data = await apiFetch(`/domains/${selectedDomain.id}/runs?${params}`);
       domainRuns = data?.items ?? [];
       domainRunsTotal = data?.total ?? 0;
     } catch (error) {
@@ -1436,7 +1436,7 @@
     if (!selectedDomain) return;
     domainResubmitting = true;
     try {
-      const job = await apiFetch("/api/v1/jobs", {
+      const job = await apiFetch("/jobs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ domain: selectedDomain.name })
@@ -1456,7 +1456,7 @@
   const loadTagsList = async () => {
     tagsListLoading = true;
     try {
-      const data = await apiFetch("/api/v1/tags");
+      const data = await apiFetch("/tags");
       tagsList = Array.isArray(data) ? data : [];
     } catch (error) {
       setStatus($t("tags_load_error", { error: error.message || "unknown error" }), "warn");
@@ -1470,7 +1470,7 @@
     if (!name) return;
     tagCreating = true;
     try {
-      await apiFetch("/api/v1/tags", {
+      await apiFetch("/tags", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, description: tagCreateDescription.trim() })
@@ -1491,7 +1491,7 @@
     if (!selectedTag) return;
     tagSummaryLoading = true;
     try {
-      tagSummary = await apiFetch(`/api/v1/tags/${encodeURIComponent(selectedTag.name)}/summary`);
+      tagSummary = await apiFetch(`/tags/${encodeURIComponent(selectedTag.name)}/summary`);
     } catch (_) {
       tagSummary = null;
     } finally {
@@ -1507,7 +1507,7 @@
     try {
       const params = new URLSearchParams({ limit: String(tagDomainsLimit), offset: String(tagDomainsOffset) });
       if (tagDomainLevelFilter) params.set("min_level", tagDomainLevelFilter);
-      const data = await apiFetch(`/api/v1/tags/${encodeURIComponent(selectedTag.name)}/domains?${params}`);
+      const data = await apiFetch(`/tags/${encodeURIComponent(selectedTag.name)}/domains?${params}`);
       tagDomains = data?.items ?? [];
       tagDomainsTotal = data?.total ?? 0;
     } catch (error) {
@@ -1521,7 +1521,7 @@
     if (!selectedTag) return;
     tagRunAllSubmitting = true;
     try {
-      const response = await apiFetch("/api/v1/jobs/batch", {
+      const response = await apiFetch("/jobs/batch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ from_tag: selectedTag.name })
@@ -1542,7 +1542,7 @@
     if (domains.length === 0) return;
     tagAddingDomains = true;
     try {
-      await apiFetch(`/api/v1/tags/${encodeURIComponent(selectedTag.name)}/domains`, {
+      await apiFetch(`/tags/${encodeURIComponent(selectedTag.name)}/domains`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ domains })
@@ -1564,7 +1564,7 @@
     if (domains.length === 0) return;
     tagRemovingDomains = true;
     try {
-      await apiFetch(`/api/v1/tags/${encodeURIComponent(selectedTag.name)}/domains`, {
+      await apiFetch(`/tags/${encodeURIComponent(selectedTag.name)}/domains`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ domains })
@@ -1584,7 +1584,7 @@
     if (!selectedTag) return;
     tagDeleting = true;
     try {
-      await apiFetch(`/api/v1/tags/${encodeURIComponent(selectedTag.name)}`, { method: "DELETE" });
+      await apiFetch(`/tags/${encodeURIComponent(selectedTag.name)}`, { method: "DELETE" });
       setStatus($t("tag_deleted"), "ok");
       selectedTag = null;
       tagDeleteConfirm = false;

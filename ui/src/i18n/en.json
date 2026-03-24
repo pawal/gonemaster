@@ -107,6 +107,7 @@
   "run_batch": "Run Batch",
   "created_batch_prefix": "Created batch:",
   "job_inspector_heading": "Job Inspector",
+  "run_inspector_heading": "Run Inspector",
   "job_id_label": "Job ID",
   "refresh": "Refresh",
   "retry": "Retry",

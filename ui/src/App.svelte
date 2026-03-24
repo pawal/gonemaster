@@ -41,6 +41,7 @@
   let selectedJobId = "";
   let selectedJob = null;
   let selectedJobResult = null;
+  let selectedRun = null;
   let resultLocale = "en";
   let jobLoading = false;
   let autoRefreshJob = true;
@@ -1179,17 +1180,20 @@
       const job = await apiFetch(`/jobs/${jobId}`);
       selectedJob = job;
       selectedJobResult = null;
+      selectedRun = null;
       if (notifyOnJobComplete && isResultReadyStatus(job.status)) {
         notifyOnJobComplete = false;
         sendJobNotification(job);
       }
       if (isResultReadyStatus(job.status)) {
         await loadJobResult(jobId);
+        await loadRun(jobId);
       }
     } catch (error) {
       setStatus($t("error_load_job", { error: error.message }), "warn");
       selectedJob = null;
       selectedJobResult = null;
+      selectedRun = null;
     } finally {
       if (!silent) {
         jobLoading = false;
@@ -1205,6 +1209,28 @@
     } catch (error) {
       setStatus($t("error_load_result", { error: error.message }), "warn");
     }
+  };
+
+  const loadRun = async (jobId = selectedJobId) => {
+    if (!jobId) return;
+    try {
+      selectedRun = await apiFetch(`/api/v1/runs/${jobId}`);
+    } catch (_) {
+      selectedRun = null;
+    }
+  };
+
+  const navigateToDomainByName = async (name) => {
+    try {
+      const data = await apiFetch(`/api/v1/domains?name=${encodeURIComponent(name)}&limit=20`);
+      const match = (data?.items ?? []).find((d) => d.name === name);
+      if (!match) return;
+      selectedDomain = match;
+      domainRuns = [];
+      domainRunsOffset = 0;
+      loadDomainRuns();
+      setTab("domains");
+    } catch (_) {}
   };
 
   const batchQueryParams = () => {
@@ -1963,7 +1989,7 @@
       </div>
 
       <div class="card reveal" style="--d: 0.26s" class:highlight={jobInspectorHighlight}>
-        <h2>{$t("job_inspector_heading")}</h2>
+        <h2>{selectedJob && isResultReadyStatus(selectedJob.status) ? $t("run_inspector_heading") : $t("job_inspector_heading")}</h2>
         <div class="stack">
           <label for="job-id">{$t("job_id_label")}</label>
           <input id="job-id" type="text" placeholder="job_123" bind:value={selectedJobId} on:change={() => loadJob()} />
@@ -1984,9 +2010,17 @@
               <span class="progress-value">{progressPercent(selectedJob)}%</span>
             </div>
             <span>{$t("domain_label")}</span>
-            <strong class="mono">{selectedJob.domain}</strong>
+            <button class="ghost" type="button" style="padding: 0; font-family: monospace; text-align: left;" on:click={() => navigateToDomainByName(selectedJob.domain)}>{selectedJob.domain}</button>
             <span>{$t("created_label")}</span>
             <strong>{formatTimestampLocal(selectedJob.created_at)}</strong>
+            {#if selectedRun}
+              <span>{$t("col_duration")}</span>
+              <strong>{selectedRun.duration_ms != null ? selectedRun.duration_ms + " ms" : "—"}</strong>
+              <span>{$t("col_entries")}</span>
+              <strong>{selectedRun.entry_count ?? 0}</strong>
+              <span>{$t("col_worst_level")}</span>
+              <strong><span class="badge level-{(selectedRun.worst_level || '').toLowerCase()}">{selectedRun.worst_level || "—"}</span></strong>
+            {/if}
           </div>
           {#if selectedJob.error}
             <div class="notice">{$t("error_prefix")} {selectedJob.error}</div>

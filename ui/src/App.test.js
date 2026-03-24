@@ -2934,4 +2934,82 @@ describe("App", () => {
       unmount();
     });
   });
+
+  describe("Run Inspector", () => {
+    it("shows Run Inspector heading when viewing a completed job", async () => {
+      const job = { id: "run-done", domain: "example.com", status: "succeeded", created_at: "2026-01-01T00:00:00Z", progress: 100 };
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value.includes(`/api/v1/jobs/${job.id}/result`)) return jsonResponse({ job_id: job.id, status: "succeeded", summary: {}, raw: { entries: [] } });
+        if (value.includes(`/api/v1/jobs/${job.id}`)) return jsonResponse(job);
+        if (value.includes(`/api/v1/runs/${job.id}`)) return jsonResponse({ id: job.id, domain: "example.com", status: "succeeded", duration_ms: 3200, entry_count: 12, worst_level: "WARNING" });
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+
+      const jobIdInput = await screen.findByPlaceholderText("job_123");
+      await fireEvent.input(jobIdInput, { target: { value: job.id } });
+      await fireEvent.change(jobIdInput);
+
+      await waitFor(() => {
+        expect(screen.getByRole("heading", { name: "Run Inspector" })).toBeInTheDocument();
+      });
+      unmount();
+    });
+
+    it("shows run metadata (duration, entry count, worst level) when run is loaded", async () => {
+      const job = { id: "run-meta", domain: "meta.example.com", status: "succeeded", created_at: "2026-01-01T00:00:00Z", progress: 100 };
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value.includes(`/api/v1/jobs/${job.id}/result`)) return jsonResponse({ job_id: job.id, status: "succeeded", summary: {}, raw: { entries: [] } });
+        if (value.includes(`/api/v1/jobs/${job.id}`)) return jsonResponse(job);
+        if (value.includes(`/api/v1/runs/${job.id}`)) return jsonResponse({ id: job.id, domain: "meta.example.com", status: "succeeded", duration_ms: 4500, entry_count: 27, worst_level: "ERROR" });
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+
+      const jobIdInput = await screen.findByPlaceholderText("job_123");
+      await fireEvent.input(jobIdInput, { target: { value: job.id } });
+      await fireEvent.change(jobIdInput);
+
+      await waitFor(() => {
+        expect(screen.getByText("4500 ms")).toBeInTheDocument();
+        expect(screen.getByText("27")).toBeInTheDocument();
+        expect(screen.getByText("ERROR")).toBeInTheDocument();
+      });
+      unmount();
+    });
+
+    it("domain link in inspector navigates to domains tab on click", async () => {
+      const job = { id: "run-domlink", domain: "nav.example.com", status: "succeeded", created_at: "2026-01-01T00:00:00Z", progress: 100 };
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value.includes(`/api/v1/jobs/${job.id}/result`)) return jsonResponse({ job_id: job.id, status: "succeeded", summary: {}, raw: { entries: [] } });
+        if (value.includes(`/api/v1/jobs/${job.id}`)) return jsonResponse(job);
+        if (value.includes(`/api/v1/runs/${job.id}`)) return jsonResponse({ id: job.id, domain: "nav.example.com", status: "succeeded", duration_ms: 100, entry_count: 1, worst_level: "" });
+        if (value.includes("/api/v1/domains") && value.includes("nav.example.com")) return jsonResponse({ items: [{ id: 99, name: "nav.example.com", tags: [], latest_level: "", run_count: 1 }], total: 1 });
+        if (value.includes(`/api/v1/domains/99/runs`)) return jsonResponse({ items: [], total: 0 });
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+
+      const jobIdInput = await screen.findByPlaceholderText("job_123");
+      await fireEvent.input(jobIdInput, { target: { value: job.id } });
+      await fireEvent.change(jobIdInput);
+
+      await waitFor(() => screen.getByText("nav.example.com"));
+
+      const domainBtn = screen.getAllByText("nav.example.com").find((el) => el.tagName === "BUTTON");
+      expect(domainBtn).toBeTruthy();
+      await fireEvent.click(domainBtn);
+
+      await waitFor(() => {
+        expect(screen.getByRole("tab", { name: "Domains" })).toHaveAttribute("aria-selected", "true");
+      });
+      unmount();
+    });
+  });
 });

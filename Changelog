@@ -7,23 +7,40 @@ All notable changes to all gonemaster components will be documented in this file
 **Biggest changes:**
   - New simple UI for end-users
   - Database persistence with support for PostgreSQL, and MariaDB/MySQL
+  - Domain registry with tags, run history, and per-entry SQL analysis
 
 ### Added
 
+ - Server: Domain registry — completed jobs graduate to persistent `domains` + `runs` + `entries` records; all three are queryable via the admin API and directly via SQL
+ - Server: Tags — named domain collections; `POST/GET /api/v1/tags`, `PUT/DELETE /api/v1/tags/{name}`, `POST/GET/DELETE /api/v1/tags/{name}/domains`, `GET /api/v1/tags/{name}/summary`
+ - Server: Domains API — `GET /api/v1/domains`, `GET /api/v1/domains/{id}`, `GET /api/v1/domains/{id}/runs`; filter by tag, name, level, min_level
+ - Server: Runs API — `GET /api/v1/runs`, `GET /api/v1/runs/{id}`, `GET /api/v1/runs/{id}/result`; filter by tag, domain, batch, status, level, time range
+ - Server: Entries API — `GET /api/v1/entries` with filters for run, domain, tag, module, testcase, entry tag, level, latest-per-domain, batch; CSV export via `?format=csv`
+ - Server: Batch `POST /api/v1/jobs/batch` now accepts `from_tag` (re-run all domains in a tag), `tags` (tag all created domains), and `description` fields
  - Server: SQLite, PostgreSQL, and MariaDB/MySQL persistence backends with versioned schema migrations, startup recovery, and integration tests (`make test-integration`)
  - Server: `--db-driver` / `--db-dsn` / `GONEMASTER_DB_*` env vars and JSON config file support
  - Server: Data retention — `--db-retention-days` runs hourly background purge; `POST /api/v1/jobs/purge` and `gonemaster-client jobs purge` for on-demand purging
  - Server: Public API at `/pub/api/v1/` — job submission and result lookup by short public ID, without leaking internal UUIDs; per-IP sliding-window rate limiting with `429`/`Retry-After`
  - Server: Version endpoint at `/pub/api/v1/version` returning gonemaster and miekg/dns versions
+ - Admin UI: Domains tab — browse/filter the domain registry, drill into per-domain run history
+ - Admin UI: Tags tab — create/edit/delete tags, manage domain membership, per-tag severity summary
+ - Admin UI: Run inspector — shows duration, entry count, and worst level; domain name is a clickable link to the Domains tab; batch re-run support
+ - Admin UI: i18n — 75 new translation keys across 9 languages for all new UI sections
  - Public UI: Svelte SPA at `/public/` — domain testing without admin access; user config IPv4/IPv6 transport, undelegated NS/DS input, shareable result URLs, and 9 languages
  - Public UI: Test results grouped by test case with translated descriptions; auto-expand for warnings/errors; severity badges per group
  - Public UI: NS/DS lookup and fetch-from-parent buttons; DS algo/digest-type dropdowns with IANA values; reset button; striped progress bar; version footer
  - Admin UI: Job inspector shows test case sub-groups within modules, translated descriptions, auto-expand for warnings/errors, and an overall status banner
+ - Client: `domains` command group — `list`, `get`, `runs`, `tag`, `untag`
+ - Client: `tags` command group — `list`, `create`, `delete`, `domains`, `summary`, `add-domains`
+ - Client: `runs` command group — `list`, `get`, `results`
+ - Client: `entries` command group — `query` (with CSV export via `--format csv`)
+ - Client: `jobs batch` — new `--from-tag` (re-run all domains in a tag) and `--tag` (apply tag to batch) flags
  - Engine: INFO-level success tags for DNSSEC02/06/08/09/11/13/18 (all-algorithms-signed, parent-DS-consistent, valid-RRSIGs, etc.)
  - Engine: CN01_OK_UDP and CN02_OK_TCP summary INFO tags for passing connectivity tests
 
 ### Changed
 
+ - Server: Job results are now assembled from `runs` + `entries` tables; the old `results` table and `result_url` field are removed
  - SQL layer refactored for multi-dialect support
  - Engine: Fixed delegation04/06 success tags suppressed by transport-disabled entries
  - Public UI: Fixed DS lookup to try next resolver on empty answer

@@ -100,7 +100,6 @@ type job struct {
 	StartedAt  time.Time `json:"started_at,omitempty"`
 	FinishedAt time.Time `json:"finished_at,omitempty"`
 	Progress   int       `json:"progress"`
-	ResultURL  string    `json:"result_url,omitempty"`
 	Error      string    `json:"error,omitempty"`
 }
 

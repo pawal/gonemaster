@@ -46,15 +46,38 @@ func (s *Server) handleJobsBatch(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "undelegated_not_supported_for_batch", "undelegated input is only supported for POST /jobs", nil)
 		return
 	}
-	if len(req.Domains) == 0 {
+	if req.FromTag != "" && len(req.Domains) > 0 {
+		writeError(w, http.StatusBadRequest, "ambiguous_domains", "from_tag and domains are mutually exclusive", nil)
+		return
+	}
+
+	// Resolve domain list: either from an explicit list or from a tag.
+	domains := req.Domains
+	if req.FromTag != "" {
+		if _, ok := s.store.GetTag(req.FromTag); !ok {
+			writeError(w, http.StatusBadRequest, "tag_not_found", "tag not found: "+req.FromTag, nil)
+			return
+		}
+		list := s.store.ListDomainsByTag(req.FromTag, DomainFilter{Limit: 10000})
+		for _, d := range list.Items {
+			domains = append(domains, d.Name)
+		}
+	}
+	if len(domains) == 0 {
 		writeError(w, http.StatusBadRequest, "missing_domain", "domains is required", nil)
+		return
+	}
+
+	tagNames, ok := validateTags(w, s, req.Tags)
+	if !ok {
 		return
 	}
 
 	batchID := newID("batch")
 	now := time.Now().UTC()
-	jobIDs := make([]string, 0, len(req.Domains))
-	for _, domain := range req.Domains {
+	jobIDs := make([]string, 0, len(domains))
+	var domainIDs []int64
+	for _, domain := range domains {
 		trimmed := strings.TrimSpace(domain)
 		if trimmed == "" {
 			writeError(w, http.StatusBadRequest, "missing_domain", "domains is required", nil)
@@ -85,6 +108,18 @@ func (s *Server) handleJobsBatch(w http.ResponseWriter, r *http.Request) {
 		_ = s.queue.Enqueue(created.ID)
 		s.metrics.ObserveJobSubmittedWithContext(created.BatchID, created.Domain, JobQueued)
 		jobIDs = append(jobIDs, created.ID)
+		if len(tagNames) > 0 {
+			d, err := s.store.GetOrCreateDomain(trimmed)
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
+				return
+			}
+			domainIDs = append(domainIDs, d.ID)
+		}
+	}
+
+	for _, tagName := range tagNames {
+		_ = s.store.TagDomains(tagName, domainIDs)
 	}
 
 	_ = s.store.CreateBatch(Batch{
@@ -333,6 +368,10 @@ func (s *Server) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_undelegated", err.Error(), nil)
 		return
 	}
+	tagNames, ok := validateTags(w, s, req.Tags)
+	if !ok {
+		return
+	}
 
 	job := Job{
 		ID:            newID("job"),
@@ -354,7 +393,37 @@ func (s *Server) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 	_ = s.queue.Enqueue(created.ID)
 	s.metrics.ObserveJobSubmittedWithContext(created.BatchID, created.Domain, JobQueued)
 
+	if len(tagNames) > 0 {
+		d, err := s.store.GetOrCreateDomain(domain)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
+			return
+		}
+		for _, tagName := range tagNames {
+			_ = s.store.TagDomains(tagName, []int64{d.ID})
+		}
+	}
+
 	writeJSON(w, http.StatusCreated, created)
+}
+
+// validateTags checks that all requested tag names exist in the store.
+// Returns the deduplicated list of non-empty tag names, or writes a 400 and
+// returns false if any tag is unknown.
+func validateTags(w http.ResponseWriter, s *Server, tags []string) ([]string, bool) {
+	var names []string
+	for _, t := range tags {
+		t = strings.TrimSpace(t)
+		if t == "" {
+			continue
+		}
+		if _, ok := s.store.GetTag(t); !ok {
+			writeError(w, http.StatusBadRequest, "tag_not_found", "tag not found: "+t, nil)
+			return nil, false
+		}
+		names = append(names, t)
+	}
+	return names, true
 }
 
 func normalizeUndelegatedInputs(nameservers []UndelegatedNameserverInput, dsInfo []UndelegatedDSInput) ([]engine.UndelegatedNameserver, []engine.UndelegatedDSInfo, error) {

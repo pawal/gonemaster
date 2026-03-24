@@ -14,6 +14,7 @@ func (s *Server) handleListDomains(w http.ResponseWriter, r *http.Request) {
 	filter.Tag = strings.TrimSpace(q.Get("tag"))
 	filter.Name = strings.TrimSpace(q.Get("name"))
 	filter.LatestLevel = strings.TrimSpace(q.Get("level"))
+	filter.MinLevel = strings.TrimSpace(q.Get("min_level"))
 
 	if limitRaw := strings.TrimSpace(q.Get("limit")); limitRaw != "" {
 		v, err := strconv.Atoi(limitRaw)

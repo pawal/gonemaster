@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"codeberg.org/pawal/gonemaster/engine"
 )
 
 // makeGraduatedJob is a helper that creates a job and immediately graduates it.
@@ -293,4 +295,46 @@ func TestGetDomainRunsPagination(t *testing.T) {
 	if len(list.Items) != 2 {
 		t.Fatalf("expected 2 items on first page, got %d", len(list.Items))
 	}
+}
+
+// TestListDomainsFilterByMinLevel verifies the ?min_level= threshold filter.
+func TestListDomainsFilterByMinLevel(t *testing.T) {
+	srv := New(DefaultConfig())
+	makeGraduatedJobWithEntries(t, srv, "info.example.com", []engine.LogEntry{
+		{Module: "Basic", Level: "INFO"},
+	})
+	makeGraduatedJobWithEntries(t, srv, "warning.example.com", []engine.LogEntry{
+		{Module: "DNSSEC", Level: "WARNING"},
+	})
+	makeGraduatedJobWithEntries(t, srv, "error.example.com", []engine.LogEntry{
+		{Module: "DNSSEC", Level: "ERROR"},
+	})
+
+	t.Run("warning_plus", func(t *testing.T) {
+		resp := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/domains?min_level=WARNING", nil)
+		srv.Handler().ServeHTTP(resp, req)
+		if resp.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d", resp.Code)
+		}
+		var list DomainList
+		_ = json.NewDecoder(resp.Body).Decode(&list)
+		if list.Total != 2 {
+			t.Fatalf("expected total=2 for warning+, got %d", list.Total)
+		}
+	})
+
+	t.Run("error_plus", func(t *testing.T) {
+		resp := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/domains?min_level=ERROR", nil)
+		srv.Handler().ServeHTTP(resp, req)
+		var list DomainList
+		_ = json.NewDecoder(resp.Body).Decode(&list)
+		if list.Total != 1 {
+			t.Fatalf("expected total=1 for error+, got %d", list.Total)
+		}
+		if list.Items[0].Name != "error.example.com" {
+			t.Fatalf("expected error.example.com, got %q", list.Items[0].Name)
+		}
+	})
 }

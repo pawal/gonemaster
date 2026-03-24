@@ -157,6 +157,8 @@
   let domainsPrevCursor = "";
   let domainNameFilter = "";
   let domainTagFilter = "";
+  let domainLevelFilter = "";
+  let selectedDomain = null;
   let availableTags = [];
   let tagsLoaded = false;
 
@@ -1305,6 +1307,7 @@
       const params = new URLSearchParams({ limit: String(domainsLimit), offset: String(domainsOffset) });
       if (domainNameFilter) params.set("name", domainNameFilter);
       if (domainTagFilter) params.set("tag", domainTagFilter);
+      if (domainLevelFilter) params.set("min_level", domainLevelFilter);
       const data = await apiFetch(`/api/v1/domains?${params}`);
       domains = data?.items ?? [];
       domainsTotal = data?.total ?? 0;
@@ -1979,67 +1982,91 @@
     </div>
   {:else if activeTab === "domains"}
     <div class="card reveal" id="panel-domains" role="tabpanel" aria-labelledby="tab-domains" style="--d: 0.34s; margin-top: 22px;">
-      <h2>{$t("domains_tab_heading")}</h2>
-      <div class="toolbar" style="display:flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
-        <input
-          type="search"
-          placeholder={$t("domains_search_placeholder")}
-          bind:value={domainNameFilter}
-          on:input={() => loadDomains({ reset: true })}
-          style="flex: 1 1 180px;"
-        />
-        <select
-          bind:value={domainTagFilter}
-          on:change={() => loadDomains({ reset: true })}
-          style="flex: 0 1 180px;"
-          aria-label={$t("tag_filter_label")}
-        >
-          <option value="">{$t("tag_filter_all")}</option>
-          {#each availableTags as tag}
-            <option value={tag.name}>{tag.name}</option>
-          {/each}
-        </select>
-      </div>
-      {#if domainsLoading}
-        <p class="muted">{$t("loading")}</p>
-      {:else if domains.length === 0}
-        <p class="muted">{$t("no_domains")}</p>
-      {:else}
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>{$t("col_domain_name")}</th>
-              <th>{$t("col_tags")}</th>
-              <th>{$t("col_latest_level")}</th>
-              <th>{$t("col_latest_run_at")}</th>
-              <th>{$t("col_run_count")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each domains as d}
-              <tr>
-                <td class="mono">{d.name}</td>
-                <td>{d.tags ? d.tags.join(", ") : ""}</td>
-                <td><span class="badge level-{(d.latest_level || '').toLowerCase()}">{d.latest_level || "—"}</span></td>
-                <td>{d.latest_run_at ? d.latest_run_at.slice(0, 10) : "—"}</td>
-                <td>{d.run_count ?? 0}</td>
-              </tr>
-            {/each}
-          </tbody>
-        </table>
-        <div class="pagination" style="margin-top: 0.5rem; display:flex; gap: 0.5rem; align-items: center;">
-          <button
-            class="secondary small"
-            disabled={domainsOffset === 0}
-            on:click={() => { domainsOffset = Math.max(0, domainsOffset - domainsLimit); loadDomains(); }}
-          >{$t("prev_page")}</button>
-          <span class="muted small">{domainsOffset + 1}–{Math.min(domainsOffset + domainsLimit, domainsTotal)} / {domainsTotal}</span>
-          <button
-            class="secondary small"
-            disabled={domainsOffset + domainsLimit >= domainsTotal}
-            on:click={() => { domainsOffset += domainsLimit; loadDomains(); }}
-          >{$t("next_page")}</button>
+      {#if selectedDomain}
+        <div>
+          <button class="secondary small" on:click={() => { selectedDomain = null; }}>{$t("back_to_domains")}</button>
+          <h2 class="mono" style="margin-top: 0.5rem;">{selectedDomain.name}</h2>
+          <p class="muted">{$t("domain_detail_placeholder")}</p>
         </div>
+      {:else}
+        <h2>{$t("domains_tab_heading")}</h2>
+        <div class="toolbar" style="display:flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
+          <input
+            type="search"
+            placeholder={$t("domains_search_placeholder")}
+            bind:value={domainNameFilter}
+            on:input={() => loadDomains({ reset: true })}
+            style="flex: 1 1 180px;"
+          />
+          <select
+            bind:value={domainTagFilter}
+            on:change={() => loadDomains({ reset: true })}
+            style="flex: 0 1 180px;"
+            aria-label={$t("tag_filter_label")}
+          >
+            <option value="">{$t("tag_filter_all")}</option>
+            {#each availableTags as tag}
+              <option value={tag.name}>{tag.name}</option>
+            {/each}
+          </select>
+          <select
+            bind:value={domainLevelFilter}
+            on:change={() => loadDomains({ reset: true })}
+            style="flex: 0 1 160px;"
+            aria-label={$t("level_filter_label")}
+          >
+            <option value="">{$t("level_filter_all")}</option>
+            <option value="WARNING">{$t("level_filter_warning_plus")}</option>
+            <option value="ERROR">{$t("level_filter_error_plus")}</option>
+          </select>
+        </div>
+        {#if domainsLoading}
+          <p class="muted">{$t("loading")}</p>
+        {:else if domains.length === 0}
+          <p class="muted">{$t("no_domains")}</p>
+        {:else}
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>{$t("col_domain_name")}</th>
+                <th>{$t("col_tags")}</th>
+                <th>{$t("col_latest_level")}</th>
+                <th>{$t("col_latest_run_at")}</th>
+                <th>{$t("col_run_count")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each domains as d}
+                <tr
+                  style="cursor: pointer;"
+                  on:click={() => { selectedDomain = d; }}
+                  role="button"
+                  tabindex="0"
+                  on:keydown={(e) => { if (e.key === "Enter" || e.key === " ") selectedDomain = d; }}
+                >
+                  <td class="mono">{d.name}</td>
+                  <td>{d.tags ? d.tags.join(", ") : ""}</td>
+                  <td><span class="badge level-{(d.latest_level || '').toLowerCase()}">{d.latest_level || "—"}</span></td>
+                  <td>{d.latest_run_at ? d.latest_run_at.slice(0, 10) : "—"}</td>
+                  <td>{d.run_count ?? 0}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+          <div class="pagination" style="margin-top: 0.5rem; display:flex; gap: 0.5rem; align-items: center;">
+            <button
+              class="secondary small"
+              disabled={domainsOffset === 0}
+              on:click={() => { domainsOffset = Math.max(0, domainsOffset - domainsLimit); loadDomains(); }}
+            >{$t("prev_page")}</button>
+            <span class="muted small">{domainsOffset + 1}–{Math.min(domainsOffset + domainsLimit, domainsTotal)} / {domainsTotal}</span>
+            <button
+              class="secondary small"
+              disabled={domainsOffset + domainsLimit >= domainsTotal}
+              on:click={() => { domainsOffset += domainsLimit; loadDomains(); }}
+            >{$t("next_page")}</button>
+          </div>
+        {/if}
       {/if}
     </div>
   {:else if activeTab === "batches"}

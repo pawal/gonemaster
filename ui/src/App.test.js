@@ -2403,5 +2403,106 @@ describe("App", () => {
       });
       unmount();
     });
+
+    it("level filter sends min_level param", async () => {
+      const calls = [];
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        calls.push(value);
+        if (value.includes("/api/v1/domains")) return jsonResponse({ items: [], total: 0 });
+        if (value.includes("/api/v1/tags")) return jsonResponse([]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openDomainsTab();
+      await waitFor(() => calls.some((v) => v.includes("/api/v1/domains")));
+      calls.length = 0;
+
+      const levelSelect = await screen.findByRole("combobox", { name: "Filter by level" });
+      await fireEvent.change(levelSelect, { target: { value: "WARNING" } });
+
+      await waitFor(() => {
+        expect(calls.some((v) => v.includes("/api/v1/domains") && v.includes("min_level=WARNING"))).toBe(true);
+      });
+      unmount();
+    });
+
+    it("clicking a domain row shows detail view", async () => {
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value.includes("/api/v1/domains")) {
+          return jsonResponse({
+            items: [{ id: 1, name: "example.com", tags: [], latest_level: "WARNING", latest_run_at: "2026-03-15T10:00:00Z", run_count: 1 }],
+            total: 1
+          });
+        }
+        if (value.includes("/api/v1/tags")) return jsonResponse([]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openDomainsTab();
+
+      const row = await screen.findByText("example.com");
+      await fireEvent.click(row);
+
+      await waitFor(() => {
+        expect(screen.getByText("← Back to domains")).toBeInTheDocument();
+      });
+      unmount();
+    });
+
+    it("back button returns to domain list", async () => {
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value.includes("/api/v1/domains")) {
+          return jsonResponse({
+            items: [{ id: 1, name: "example.com", tags: [], latest_level: "OK", latest_run_at: null, run_count: 0 }],
+            total: 1
+          });
+        }
+        if (value.includes("/api/v1/tags")) return jsonResponse([]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openDomainsTab();
+
+      await fireEvent.click(await screen.findByText("example.com"));
+      await waitFor(() => screen.getByText("← Back to domains"));
+
+      await fireEvent.click(screen.getByText("← Back to domains"));
+      await waitFor(() => {
+        expect(screen.queryByText("← Back to domains")).not.toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "Domains" })).toBeInTheDocument();
+      });
+      unmount();
+    });
+
+    it("pagination next/prev buttons appear when total exceeds limit", async () => {
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value.includes("/api/v1/domains")) {
+          return jsonResponse({
+            items: Array.from({ length: 50 }, (_, i) => ({
+              id: i + 1, name: `domain${i}.example`, tags: [], run_count: 0
+            })),
+            total: 120
+          });
+        }
+        if (value.includes("/api/v1/tags")) return jsonResponse([]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openDomainsTab();
+
+      await waitFor(() => {
+        expect(screen.getByText("Next →")).toBeInTheDocument();
+      });
+      expect(screen.getByText("1–50 / 120")).toBeInTheDocument();
+      unmount();
+    });
   });
 });

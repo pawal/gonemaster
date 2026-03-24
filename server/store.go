@@ -13,6 +13,22 @@ import (
 
 var severityLevels = []string{"NOTICE", "WARNING", "ERROR", "CRITICAL"}
 
+// severityRank returns a numeric rank for level comparisons (higher = worse).
+func severityRank(level string) int {
+	switch strings.ToUpper(level) {
+	case "CRITICAL":
+		return 4
+	case "ERROR":
+		return 3
+	case "WARNING":
+		return 2
+	case "NOTICE":
+		return 1
+	default:
+		return 0
+	}
+}
+
 // JobStore persists job metadata and results.
 type JobStore interface {
 	// Job queue management (in-flight jobs only).
@@ -499,6 +515,9 @@ func (s *InMemoryJobStore) ListDomains(filter DomainFilter) DomainList {
 			continue
 		}
 		if filter.LatestLevel != "" && d.LatestLevel != filter.LatestLevel {
+			continue
+		}
+		if filter.MinLevel != "" && severityRank(d.LatestLevel) < severityRank(filter.MinLevel) {
 			continue
 		}
 		dc := *d

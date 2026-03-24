@@ -187,6 +187,7 @@ type DomainFilter struct {
 	Tag         string
 	Name        string
 	LatestLevel string
+	MinLevel    string // minimum severity threshold (inclusive); "WARNING" matches WARNING/ERROR/CRITICAL
 	Limit       int
 	Offset      int
 }

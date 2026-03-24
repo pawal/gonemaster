@@ -741,6 +741,16 @@ func (s *SQLJobStore) ListDomains(filter DomainFilter) DomainList {
 	if filter.LatestLevel != "" {
 		conds = append(conds, "latest_level = "+addArg(filter.LatestLevel))
 	}
+	if filter.MinLevel != "" {
+		switch strings.ToUpper(filter.MinLevel) {
+		case "WARNING":
+			conds = append(conds, "latest_level IN ('WARNING', 'ERROR', 'CRITICAL')")
+		case "ERROR":
+			conds = append(conds, "latest_level IN ('ERROR', 'CRITICAL')")
+		case "CRITICAL":
+			conds = append(conds, "latest_level = 'CRITICAL'")
+		}
+	}
 
 	where := ""
 	if len(conds) > 0 {

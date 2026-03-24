@@ -753,12 +753,24 @@ func (s *InMemoryJobStore) ListRuns(filter RunFilter) RunList {
 	for _, r := range s.runs {
 		snapshot = append(snapshot, r)
 	}
+	var tagDomainIDs map[int64]struct{}
+	if filter.Tag != "" {
+		tagDomainIDs = make(map[int64]struct{})
+		for _, id := range s.tagDomains[filter.Tag] {
+			tagDomainIDs[id] = struct{}{}
+		}
+	}
 	s.mu.RUnlock()
 
 	items := make([]Run, 0, len(snapshot))
 	for _, r := range snapshot {
 		if filter.DomainID != 0 && r.DomainID != filter.DomainID {
 			continue
+		}
+		if tagDomainIDs != nil {
+			if _, ok := tagDomainIDs[r.DomainID]; !ok {
+				continue
+			}
 		}
 		if filter.Domain != "" && !strings.Contains(strings.ToLower(r.Domain), strings.ToLower(filter.Domain)) {
 			continue

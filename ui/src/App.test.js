@@ -2428,12 +2428,15 @@ describe("App", () => {
       unmount();
     });
 
-    it("clicking a domain row shows detail view", async () => {
+    it("clicking a domain row shows detail view and loads runs", async () => {
+      const calls = [];
       global.fetch.mockImplementation((url) => {
         const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        calls.push(value);
+        if (value.includes("/runs")) return jsonResponse({ items: [], total: 0 });
         if (value.includes("/api/v1/domains")) {
           return jsonResponse({
-            items: [{ id: 1, name: "example.com", tags: [], latest_level: "WARNING", latest_run_at: "2026-03-15T10:00:00Z", run_count: 1 }],
+            items: [{ id: 7, name: "example.com", tags: ["tld"], latest_level: "WARNING", latest_run_at: "2026-03-15T10:00:00Z", run_count: 1 }],
             total: 1
           });
         }
@@ -2449,6 +2452,7 @@ describe("App", () => {
 
       await waitFor(() => {
         expect(screen.getByText("← Back to domains")).toBeInTheDocument();
+        expect(calls.some((v) => v.includes("/api/v1/domains/7/runs"))).toBe(true);
       });
       unmount();
     });
@@ -2476,6 +2480,100 @@ describe("App", () => {
       await waitFor(() => {
         expect(screen.queryByText("← Back to domains")).not.toBeInTheDocument();
         expect(screen.getByRole("heading", { name: "Domains" })).toBeInTheDocument();
+      });
+      unmount();
+    });
+
+    it("detail view shows tags, level, run count, and run history table", async () => {
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value.includes("/runs")) {
+          return jsonResponse({
+            items: [{ id: "run-abc", finished_at: "2026-03-15T10:00:00Z", worst_level: "WARNING", duration_ms: 1200, entry_count: 5 }],
+            total: 1
+          });
+        }
+        if (value.includes("/api/v1/domains")) {
+          return jsonResponse({
+            items: [{ id: 3, name: "example.com", tags: ["tld", "ccTLD"], latest_level: "WARNING", latest_run_at: "2026-03-15T10:00:00Z", run_count: 4 }],
+            total: 1
+          });
+        }
+        if (value.includes("/api/v1/tags")) return jsonResponse([]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openDomainsTab();
+      await fireEvent.click(await screen.findByText("example.com"));
+
+      await waitFor(() => {
+        expect(screen.getByText("tld")).toBeInTheDocument();
+        expect(screen.getByText("ccTLD")).toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "Run History" })).toBeInTheDocument();
+        expect(screen.getByText("run-abc")).toBeInTheDocument();
+        expect(screen.getByText("1200ms")).toBeInTheDocument();
+      });
+      unmount();
+    });
+
+    it("clicking a run row navigates to job inspector", async () => {
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value.includes("/runs")) {
+          return jsonResponse({
+            items: [{ id: "run-xyz", finished_at: "2026-03-15T10:00:00Z", worst_level: "ERROR", duration_ms: 800, entry_count: 3 }],
+            total: 1
+          });
+        }
+        if (value.includes("/api/v1/domains")) {
+          return jsonResponse({ items: [{ id: 2, name: "test.com", tags: [], latest_level: "ERROR", run_count: 1 }], total: 1 });
+        }
+        if (value.includes("/api/v1/jobs/run-xyz")) return jsonResponse({ id: "run-xyz", status: "succeeded", domain: "test.com" });
+        if (value.includes("/api/v1/tags")) return jsonResponse([]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openDomainsTab();
+      await fireEvent.click(await screen.findByText("test.com"));
+      const runRow = await screen.findByText("run-xyz");
+      await fireEvent.click(runRow);
+
+      await waitFor(() => {
+        expect(screen.getByRole("tab", { name: "Single Job" })).toHaveAttribute("aria-selected", "true");
+      });
+      unmount();
+    });
+
+    it("re-test button creates a new job and navigates to inspector", async () => {
+      const calls = [];
+      global.fetch.mockImplementation((url, opts) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        calls.push({ url: value, method: opts?.method });
+        if (value.includes("/runs")) return jsonResponse({ items: [], total: 0 });
+        if (value.includes("/api/v1/domains")) {
+          return jsonResponse({ items: [{ id: 5, name: "retest.com", tags: [], latest_level: "OK", run_count: 1 }], total: 1 });
+        }
+        if (value.includes("/api/v1/jobs") && opts?.method === "POST") {
+          return jsonResponse({ id: "new-job-99", domain: "retest.com", status: "pending" });
+        }
+        if (value.includes("/api/v1/jobs/new-job-99")) {
+          return jsonResponse({ id: "new-job-99", status: "pending", domain: "retest.com" });
+        }
+        if (value.includes("/api/v1/tags")) return jsonResponse([]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openDomainsTab();
+      await fireEvent.click(await screen.findByText("retest.com"));
+      await waitFor(() => screen.getByText("Re-test"));
+      await fireEvent.click(screen.getByText("Re-test"));
+
+      await waitFor(() => {
+        expect(calls.some((c) => c.url.includes("/api/v1/jobs") && c.method === "POST")).toBe(true);
+        expect(screen.getByRole("tab", { name: "Single Job" })).toHaveAttribute("aria-selected", "true");
       });
       unmount();
     });

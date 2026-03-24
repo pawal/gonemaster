@@ -159,6 +159,12 @@
   let domainTagFilter = "";
   let domainLevelFilter = "";
   let selectedDomain = null;
+  let domainRuns = [];
+  let domainRunsTotal = 0;
+  let domainRunsOffset = 0;
+  let domainRunsLimit = 20;
+  let domainRunsLoading = false;
+  let domainResubmitting = false;
   let availableTags = [];
   let tagsLoaded = false;
 
@@ -1329,6 +1335,44 @@
     }
   };
 
+  const loadDomainRuns = async (options = {}) => {
+    if (!selectedDomain) return;
+    const { reset = false } = options;
+    if (reset) domainRunsOffset = 0;
+    domainRunsLoading = true;
+    try {
+      const params = new URLSearchParams({ limit: String(domainRunsLimit), offset: String(domainRunsOffset) });
+      const data = await apiFetch(`/api/v1/domains/${selectedDomain.id}/runs?${params}`);
+      domainRuns = data?.items ?? [];
+      domainRunsTotal = data?.total ?? 0;
+    } catch (error) {
+      setStatus($t("domain_runs_load_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      domainRunsLoading = false;
+    }
+  };
+
+  const retestDomain = async () => {
+    if (!selectedDomain) return;
+    domainResubmitting = true;
+    try {
+      const job = await apiFetch("/api/v1/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domain: selectedDomain.name })
+      });
+      createdJobId = job.id;
+      selectedJobId = job.id;
+      setStatus($t("job_created", { id: job.id }), "ok");
+      setTab("single");
+      await loadJob(job.id);
+    } catch (error) {
+      setStatus($t("error_create_job", { error: error.message }), "warn");
+    } finally {
+      domainResubmitting = false;
+    }
+  };
+
   const loadLocales = async () => {
     try {
       const data = await apiFetch("/locales");
@@ -1984,9 +2028,71 @@
     <div class="card reveal" id="panel-domains" role="tabpanel" aria-labelledby="tab-domains" style="--d: 0.34s; margin-top: 22px;">
       {#if selectedDomain}
         <div>
-          <button class="secondary small" on:click={() => { selectedDomain = null; }}>{$t("back_to_domains")}</button>
+          <button class="secondary small" on:click={() => { selectedDomain = null; domainRuns = []; }}>{$t("back_to_domains")}</button>
           <h2 class="mono" style="margin-top: 0.5rem;">{selectedDomain.name}</h2>
-          <p class="muted">{$t("domain_detail_placeholder")}</p>
+          {#if selectedDomain.tags && selectedDomain.tags.length > 0}
+            <div style="display:flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
+              {#each selectedDomain.tags as tag}
+                <span class="badge">{tag}</span>
+              {/each}
+            </div>
+          {/if}
+          <div style="display:flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
+            <div><span class="muted small">{$t("col_latest_level")} </span><span class="badge level-{(selectedDomain.latest_level || '').toLowerCase()}">{selectedDomain.latest_level || "—"}</span></div>
+            <div><span class="muted small">{$t("col_latest_run_at")} </span>{selectedDomain.latest_run_at ? selectedDomain.latest_run_at.slice(0, 10) : "—"}</div>
+            <div><span class="muted small">{$t("col_run_count")} </span>{selectedDomain.run_count ?? 0}</div>
+          </div>
+          <button class="secondary" on:click={retestDomain} disabled={domainResubmitting}>
+            {domainResubmitting ? $t("submitting") : $t("retest_domain")}
+          </button>
+          <h3 style="margin-top: 1.25rem;">{$t("domain_run_history_heading")}</h3>
+          {#if domainRunsLoading}
+            <p class="muted">{$t("loading")}</p>
+          {:else if domainRuns.length === 0}
+            <p class="muted">{$t("no_runs")}</p>
+          {:else}
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>{$t("col_run_id")}</th>
+                  <th>{$t("col_finished_at")}</th>
+                  <th>{$t("col_worst_level")}</th>
+                  <th>{$t("col_duration")}</th>
+                  <th>{$t("col_entries")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {#each domainRuns as run}
+                  <tr
+                    style="cursor: pointer;"
+                    on:click={() => { selectedJobId = run.id; loadJob(run.id); setTab("single"); }}
+                    role="button"
+                    tabindex="0"
+                    on:keydown={(e) => { if (e.key === "Enter" || e.key === " ") { selectedJobId = run.id; loadJob(run.id); setTab("single"); } }}
+                  >
+                    <td class="mono small">{run.id}</td>
+                    <td>{run.finished_at ? run.finished_at.slice(0, 10) : "—"}</td>
+                    <td><span class="badge level-{(run.worst_level || '').toLowerCase()}">{run.worst_level || "—"}</span></td>
+                    <td>{run.duration_ms != null ? run.duration_ms + "ms" : "—"}</td>
+                    <td>{run.entry_count ?? 0}</td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+            <div class="pagination" style="margin-top: 0.5rem; display:flex; gap: 0.5rem; align-items: center;">
+              <button
+                class="secondary small"
+                disabled={domainRunsOffset === 0}
+                on:click={() => { domainRunsOffset = Math.max(0, domainRunsOffset - domainRunsLimit); loadDomainRuns(); }}
+              >{$t("prev_page")}</button>
+              <span class="muted small">{domainRunsOffset + 1}–{Math.min(domainRunsOffset + domainRunsLimit, domainRunsTotal)} / {domainRunsTotal}</span>
+              <button
+                class="secondary small"
+                disabled={domainRunsOffset + domainRunsLimit >= domainRunsTotal}
+                on:click={() => { domainRunsOffset += domainRunsLimit; loadDomainRuns(); }}
+              >{$t("next_page")}</button>
+            </div>
+          {/if}
         </div>
       {:else}
         <h2>{$t("domains_tab_heading")}</h2>
@@ -2039,10 +2145,10 @@
               {#each domains as d}
                 <tr
                   style="cursor: pointer;"
-                  on:click={() => { selectedDomain = d; }}
+                  on:click={() => { selectedDomain = d; domainRuns = []; domainRunsOffset = 0; loadDomainRuns(); }}
                   role="button"
                   tabindex="0"
-                  on:keydown={(e) => { if (e.key === "Enter" || e.key === " ") selectedDomain = d; }}
+                  on:keydown={(e) => { if (e.key === "Enter" || e.key === " ") { selectedDomain = d; domainRuns = []; domainRunsOffset = 0; loadDomainRuns(); } }}
                 >
                   <td class="mono">{d.name}</td>
                   <td>{d.tags ? d.tags.join(", ") : ""}</td>

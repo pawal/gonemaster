@@ -476,9 +476,16 @@ Submit a batch:
 ```
 POST /jobs/batch
 {
-  "domains": ["example.com", "example.org"]
+  "domains": ["example.com", "example.org"],
+  "from_tag": "tld",
+  "tags": ["tld"],
+  "description": "TLD sweep 2024-Q1",
+  "min_level": "NOTICE",
+  "profile_overrides": { "timeout": 5 }
 }
 ```
+
+Either `domains` or `from_tag` (or both) must be provided. `from_tag` expands to all domains currently in that tag, deduplicated against any explicit `domains` list. `tags` tags the resulting batch and all its runs (creating domains if needed).
 
 Batch submission does not support undelegated input; if `nameservers` or `ds_info` is included, the API returns `400` with `error.code=undelegated_not_supported_for_batch`.
 
@@ -486,6 +493,134 @@ Get batch summary:
 ```
 GET /batches/{batch_id}
 ```
+
+### Domains
+List domains (paginated):
+```
+GET /domains?tag=tld&name=.se&level=ERROR&min_level=WARNING&limit=100&offset=0
+```
+
+Query params:
+- `tag` — filter to domains belonging to this tag.
+- `name` — substring filter on domain name.
+- `level` — exact `latest_level` filter (e.g. `ERROR`).
+- `min_level` — minimum severity threshold; `WARNING` matches `WARNING`, `ERROR`, `CRITICAL`.
+- `limit` / `offset` — pagination (max 500, default 100).
+
+Get a domain by ID:
+```
+GET /domains/{id}
+```
+Returns the domain record with its tags populated.
+
+List run history for a domain:
+```
+GET /domains/{id}/runs?limit=50&offset=0
+```
+
+### Tags
+List all tags:
+```
+GET /tags?limit=100&offset=0
+```
+
+Create a tag:
+```
+POST /tags
+{ "name": "tld", "description": "Top-level domains" }
+```
+Returns `201` with the new tag. Returns `409` with `error.code=tag_exists` if the name is taken.
+
+Update tag description:
+```
+PUT /tags/{name}
+{ "description": "Updated description" }
+```
+
+Delete a tag:
+```
+DELETE /tags/{name}
+```
+Returns `204 No Content`. Removes all domain associations; domain records and their runs are preserved.
+
+Add domains to a tag (creates domain records if they don't exist):
+```
+POST /tags/{name}/domains
+{ "domains": ["example.com", "example.org"] }
+```
+Returns `204 No Content`.
+
+Remove domains from a tag:
+```
+DELETE /tags/{name}/domains
+{ "domains": ["example.com"] }
+```
+Returns `204 No Content`.
+
+List domains in a tag (same shape as `GET /domains`):
+```
+GET /tags/{name}/domains?limit=100&offset=0
+```
+
+Get tag severity summary (domain counts by worst-level bucket):
+```
+GET /tags/{name}/summary
+```
+```json
+{
+  "tag": "tld",
+  "domain_count": 1520,
+  "ok": 1200,
+  "notice": 150,
+  "warning": 100,
+  "error": 60,
+  "critical": 10
+}
+```
+
+### Runs
+List runs (paginated):
+```
+GET /runs?tag=tld&domain=example.com&batch=batch_123&status=succeeded&level=ERROR&finished_after=2024-01-01T00:00:00Z&finished_before=2024-02-01T00:00:00Z&limit=100&offset=0
+```
+
+Query params:
+- `tag` — filter to runs for domains in this tag.
+- `domain` — filter by domain name substring.
+- `batch` — filter by batch ID.
+- `status` — filter by run status.
+- `level` — filter by `worst_level`.
+- `finished_after` / `finished_before` — RFC3339 timestamps.
+- `limit` / `offset` — pagination (max 500, default 100).
+
+Get a run:
+```
+GET /runs/{id}
+```
+
+Get a run result (same shape as `GET /jobs/{id}/result`):
+```
+GET /runs/{id}/result?locale=en
+```
+
+### Entries
+Query individual engine log entries across all runs:
+```
+GET /entries?run=run_abc&tag=tld&domain=123&module=DNSSEC&testcase=dnssec01&entry_tag=DS_ALGO_NOT_SUPPORTED&level=ERROR&latest=1&batch=batch_123&format=csv&limit=100&offset=0
+```
+
+Query params:
+- `run` — exact run ID.
+- `domain` — domain ID (integer).
+- `tag` — domain tag filter (joined via domain→tag associations).
+- `module` — exact module name.
+- `testcase` — exact testcase name.
+- `entry_tag` — log event tag (the engine `tag` field, e.g. `DS_ALGO_NOT_SUPPORTED`).
+- `level` — exact severity level.
+- `latest` — `1` or `true` to restrict to each domain's latest run only.
+- `batch` — restrict to runs from this batch.
+- `format=csv` — download as CSV instead of JSON; columns: `id`, `run_id`, `domain_id`, `domain`, `timestamp`, `module`, `testcase`, `tag`, `level`, `args`.
+- `limit` / `offset` — pagination (max 500, default 100).
 
 ### Queue controls
 Pause queue:
@@ -548,6 +683,9 @@ The embedded UI is served at `/` and calls the API on the same host.
 - Summary view for NOTICE/WARNING/ERROR/CRITICAL.
 - Raw results grouped by module; click a module to expand/collapse.
 - Raw results show a CLI-style table (seconds, level, message) and use translated messages when available.
+- Domains tab: browse/filter the domain registry; drill into per-domain run history.
+- Tags tab: create/edit/delete tags, manage domain membership, view per-tag severity summary.
+- Run inspector: shows duration, entry count, and worst level alongside the full result.
 
 ### Build & dev
 Rebuild the embedded UI:

@@ -1,17 +1,36 @@
 # Gonemaster Server
 
 ## Overview
-- `gonemaster-server` is a REST API wrapper around the Gonemaster engine with an embedded web UI.
-- The API contract is defined in [openapi.yaml](openapi.yaml).
-- The UI is served at `/` from the embedded build output in `server/ui/dist`.
-- The API is served under `/api/v1`.
-- Job progress is reported as a percentage (0-100).
 
-The default profile is located in `share/profile.json`, but is built into the server binary.
-By default, it enables IPv4+IPv6 and currently sets `resolver.defaults.parallel=8` and
-`resolver.defaults.unordered=true`.
-If you don't have access to IPv6 on your development machine, or you need deterministic
-ordered behavior, use a custom profile via `--profile`.
+`gonemaster-server` wraps the Gonemaster DNS-testing engine in an HTTP server with a
+persistent job queue, pluggable storage, and two distinct APIs:
+
+| Path prefix | Who uses it | What it can do |
+|---|---|---|
+| `/api/v1/` | Trusted clients (admin UI, `gonemaster-client`, scripts) | Full control: jobs, batches, queue, domains, tags, runs, entries, metrics |
+| `/pub/api/v1/` | Untrusted clients over the internet (via reverse proxy) | Submit a job, poll status, fetch result — by opaque `public_id` only |
+
+The **admin API** (`/api/v1/`) exposes all server capabilities. Internal job UUIDs are
+visible. Never expose this directly to the internet.
+
+The **public API** (`/pub/api/v1/`) is a deliberately restricted subset intended for
+reverse-proxy exposure. It never discloses internal UUIDs — every response uses a
+randomly-generated `public_id` instead. Only four endpoints are available:
+`POST /jobs`, `GET /jobs/{public_id}`, `GET /jobs/{public_id}/result`,
+`GET /locales`. Admin paths are unreachable at this prefix, enforced server-side.
+
+Two matching UIs sit alongside the APIs:
+
+| Path prefix | Description |
+|---|---|
+| `/` | Admin UI — full job/batch/domain/tag management |
+| `/public/` | Public UI — single-page app for end-user zone testing |
+
+The full admin API contract is defined in [openapi.yaml](openapi.yaml).
+
+The default resolver profile is built into the binary (`share/profile.json`).
+It enables IPv4+IPv6 with `resolver.defaults.parallel=8` and `resolver.defaults.unordered=true`.
+Use `--profile` to override if you lack IPv6 or need deterministic ordered output.
 
 ## Build
 ```
@@ -209,8 +228,9 @@ Recommended production setting: `90` days.
 ### Public API
 
 The server exposes a separate, restricted API at `/pub/api/v1/` intended for
-reverse-proxy exposure to untrusted clients. It supports job submission and
-result lookup by an opaque public ID; internal UUIDs are never disclosed.
+reverse-proxy exposure to untrusted clients (see [Overview](#overview) for the
+full admin vs. public comparison). It supports job submission and result lookup
+by an opaque public ID; internal UUIDs are never disclosed.
 
 Available endpoints:
 
@@ -221,8 +241,9 @@ Available endpoints:
 | `GET` | `/pub/api/v1/jobs/{public_id}/result` | Fetch result by public ID |
 | `GET` | `/pub/api/v1/locales` | List available locale codes |
 
-Admin-only paths (`/metrics`, `/queue/*`, `/batches`, `/jobs/purge`) are not
-reachable via the `/pub/` prefix — the boundary is enforced server-side.
+Admin-only paths (`/metrics`, `/queue/*`, `/batches`, `/jobs/purge`, `/domains`, `/tags`,
+`/runs`, `/entries`) are not reachable via the `/pub/` prefix — the boundary is enforced
+server-side.
 
 #### Rate limiting
 
@@ -353,16 +374,23 @@ Domains are normalized to IDNA A-labels (punycode). For example:
 Invalid domains return a `400` error with `code=invalid_domain`.
 
 ## API basics
+
+This section describes the **admin API** (`/api/v1/`). For the public API, see
+[Public API](#public-api) under Configuration.
+
 - Base URL: the server listen address plus `/api/v1` (default `http://127.0.0.1:8080/api/v1`).
-- All endpoint paths below are relative to the base URL.
+- All endpoint paths in the [Endpoints](#endpoints) section below are relative to this base URL.
 - Content-Type: JSON for requests and responses.
-- CSRF protection: mutating endpoints (`POST`) validate `Origin` when provided and require it to match the request host. Clients without an `Origin` header (for example `gonemaster-client`) continue to work unchanged.
-- Errors: standard JSON envelope:
+- CSRF protection: mutating endpoints (`POST`, `PUT`, `DELETE`) validate `Origin` when provided and require it to match the request host. Clients without an `Origin` header (e.g. `gonemaster-client` or `curl`) continue to work unchanged.
+- Errors use a standard JSON envelope:
   ```json
   { "error": { "code": "invalid_domain", "message": "..." } }
   ```
 
 ## Endpoints
+
+All paths below are relative to `/api/v1/`. This is the **admin API** — do not expose
+it to untrusted clients. See [Public API](#public-api) for the internet-safe subset.
 
 ### Jobs
 Create a single job:

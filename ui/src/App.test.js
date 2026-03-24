@@ -663,6 +663,53 @@ describe("App", () => {
     unmount();
   });
 
+  it("includes tags in single job payload when tag field is filled", async () => {
+    const job = { id: "job_tagged", domain: "example.com", status: "pending" };
+    let capturedBody = null;
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (url === "/api/v1/jobs" && options.method === "POST") {
+        capturedBody = JSON.parse(options.body || "{}");
+        return jsonResponse(job);
+      }
+      if (url === `/api/v1/jobs/${job.id}`) return jsonResponse(job);
+      return jsonResponse({ items: [] });
+    });
+
+    const { unmount } = render(App);
+
+    await fireEvent.input(await screen.findByPlaceholderText("example.com"), { target: { value: "example.com" } });
+    await fireEvent.input(screen.getByLabelText("Tags"), { target: { value: "tld, ccTLD" } });
+    await fireEvent.click(screen.getByText("Run Single Job"));
+
+    await waitFor(() => {
+      expect(capturedBody?.tags).toEqual(["tld", "ccTLD"]);
+    });
+    unmount();
+  });
+
+  it("omits tags from single job payload when tag field is empty", async () => {
+    const job = { id: "job_notag", domain: "example.com", status: "pending" };
+    let capturedBody = null;
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (url === "/api/v1/jobs" && options.method === "POST") {
+        capturedBody = JSON.parse(options.body || "{}");
+        return jsonResponse(job);
+      }
+      if (url === `/api/v1/jobs/${job.id}`) return jsonResponse(job);
+      return jsonResponse({ items: [] });
+    });
+
+    const { unmount } = render(App);
+
+    await fireEvent.input(await screen.findByPlaceholderText("example.com"), { target: { value: "example.com" } });
+    await fireEvent.click(screen.getByText("Run Single Job"));
+
+    await waitFor(() => {
+      expect(capturedBody?.tags).toBeUndefined();
+    });
+    unmount();
+  });
+
   it("converts IDN domains to punycode before submit", async () => {
     const idn = "r\u00e4ksm\u00f6rg\u00e5s.se";
     const puny = "xn--rksmrgs-5wao1o.se";

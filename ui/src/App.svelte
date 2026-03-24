@@ -8,6 +8,7 @@
   let statusDismissTimer = null;
 
   let singleDomain = "";
+  let singleTags = "";
   let singleSubmitting = false;
   let createdJobId = "";
   let singleIPMode = "default";
@@ -1061,8 +1062,10 @@
     singleSubmitting = true;
     createdJobId = "";
     try {
+      const parsedTags = singleTags.split(/[,\s]+/).map((t) => t.trim()).filter(Boolean);
       const payload = {
-        domain: normalizedDomain
+        domain: normalizedDomain,
+        ...(parsedTags.length > 0 && { tags: parsedTags })
       };
       if (singleIPMode === "disable_ipv4") {
         payload.profile_overrides = {
@@ -1842,6 +1845,16 @@
               }
             }}
           />
+        </div>
+        <div class="stack">
+          <label for="single-tags">{$t("single_tags_label")}</label>
+          <input
+            id="single-tags"
+            type="text"
+            placeholder={$t("single_tags_placeholder")}
+            bind:value={singleTags}
+          />
+          <div class="small">{$t("single_tags_hint")}</div>
         </div>
         <details class="advanced-options">
           <summary>{$t("advanced_profile_summary")}</summary>

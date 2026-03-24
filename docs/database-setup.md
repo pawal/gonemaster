@@ -255,13 +255,13 @@ streaming replica for point-in-time recovery.
 ### Autovacuum and the purge workload
 
 When data retention / purge is enabled (`database.retention_days > 0`),
-`gonemaster-server` periodically deletes old rows from `jobs` and `results`.
+`gonemaster-server` periodically deletes old rows from `runs` and `entries`.
 PostgreSQL's autovacuum must reclaim the dead tuples promptly to prevent table
 bloat. The `autovacuum_vacuum_scale_factor = 0.05` value above triggers a
 vacuum once 5% of a table's rows are dead, which is appropriate for tables that
 see frequent bulk deletes.
 
-Run `VACUUM ANALYZE jobs; VACUUM ANALYZE results;` manually after the first
+Run `VACUUM ANALYZE runs; VACUUM ANALYZE entries;` manually after the first
 large purge to update planner statistics.
 
 ---
@@ -276,7 +276,7 @@ large purge to update planner statistics.
 
 | Setting | Recommended value | Notes |
 |---|---|---|
-| `--db-retention-days` | `90` | Keeps the `jobs` and `results` tables from growing indefinitely |
+| `--db-retention-days` | `90` | Keeps the `runs` and `entries` tables from growing indefinitely |
 | `tls=true` or `tls=skip-verify` | production / internal CA | Protects credentials in transit |
 | `innodb_file_per_table` | `ON` | Allows disk reclamation after large purges |
 
@@ -414,8 +414,8 @@ With `innodb_file_per_table = ON`, each table has its own `.ibd` file. After a
 large purge, reclaim space with:
 
 ```sql
-OPTIMIZE TABLE jobs;
-OPTIMIZE TABLE results;
+OPTIMIZE TABLE runs;
+OPTIMIZE TABLE entries;
 ```
 
 This rebuilds the table and releases space back to the OS.
@@ -435,7 +435,7 @@ gonemaster-server --db-driver sqlite --db-dsn /var/lib/gonemaster/gonemaster.db 
 - The purge loop runs **hourly** in the background.
 - Only terminal-status jobs (`succeeded`, `failed`, `canceled`, `expired`) are deleted.
   Running, queued, and paused jobs are never purged automatically.
-- Associated results are also deleted in the same operation.
+- Associated runs and entries are also deleted in the same operation.
 - **Recommended production value:** `90` days.
 - `0` (default) disables automatic purging; data accumulates indefinitely.
 
@@ -463,8 +463,9 @@ gonemaster-client jobs purge --older-than 30
 2. Stop the server.
 3. Start the server with the new `--db-driver` and `--db-dsn`.
 
-The new backend will start empty. If you need to keep historical data, export results
-before switching (for example with `gonemaster-client results --batch-id ...`).
+The new backend will start empty. If you need to keep historical data, export
+results before switching (for example with `gonemaster-client runs list --batch <id>` or
+`gonemaster-client entries query --tag <name> --format csv`).
 
 ---
 
@@ -500,7 +501,7 @@ Key metrics to watch in production:
 | Metric | PostgreSQL | MariaDB |
 |---|---|---|
 | Active connections | `pg_stat_activity` | `SHOW STATUS LIKE 'Threads_connected'` |
-| Table sizes | `pg_total_relation_size('jobs')` | `information_schema.tables` |
+| Table sizes | `pg_total_relation_size('runs')`, `pg_total_relation_size('entries')` | `information_schema.tables` |
 | Cache hit rate | `pg_statio_user_tables` | `Innodb_buffer_pool_read_requests` |
 | Slow queries | `pg_stat_statements` | `slow_query_log = ON` |
 | Dead tuples / bloat | `pg_stat_user_tables.n_dead_tup` | `SHOW ENGINE INNODB STATUS` |

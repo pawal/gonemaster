@@ -12,7 +12,7 @@ gonemaster-client - HTTP API client for gonemaster-server
 
 **gonemaster-client** interacts with a running **gonemaster-server** instance
 via its REST API. It can submit test jobs, monitor progress, retrieve results,
-and manage the job queue.
+manage the job queue, and query the domain/tag/run/entry analysis APIs.
 
 ## GLOBAL OPTIONS
 
@@ -74,6 +74,12 @@ Submit a batch of test jobs.
 **--stdin**
 : Read domains from stdin.
 
+**--from-tag** *TAG*
+: Re-run all domains currently in this tag. Mutually exclusive with **--domain**/**--file**/**--stdin**.
+
+**--tag** *TAG*
+: Apply this tag to all batch domains (repeatable; creates tag/domain records if needed).
+
 **--wait**
 : Wait for all jobs to complete.
 
@@ -108,6 +114,134 @@ Delete completed jobs older than a given age, along with their results.
 
 **--older-than** *N*
 : Delete jobs finished more than N days ago. 0 (default) uses the server's configured retention_days. Returns an error if both are 0.
+
+### domains list
+
+List domains in the registry.
+
+**--tag** *TAG*
+: Filter to domains in this tag.
+
+**--name** *SUBSTRING*
+: Filter by domain name substring.
+
+**--level** *LEVEL*
+: Filter by exact latest level (e.g. ERROR).
+
+**--limit** *N*
+: Maximum results (default: 100).
+
+### domains get *DOMAIN-NAME*
+
+Get details for a domain (tags, run count, latest level).
+
+### domains runs *DOMAIN-NAME*
+
+List run history for a domain.
+
+**--limit** *N*
+: Maximum results (default: 20).
+
+### domains tag *DOMAIN-NAME* *TAG* [*TAG*...]
+
+Add a domain to one or more tags (creates tag records if needed).
+
+### domains untag *DOMAIN-NAME* *TAG* [*TAG*...]
+
+Remove a domain from one or more tags.
+
+### tags list
+
+List all tags.
+
+### tags create *TAG-NAME*
+
+Create a new tag.
+
+**--description** *TEXT*
+: Optional description.
+
+### tags delete *TAG-NAME*
+
+Delete a tag (domain records and runs are preserved).
+
+### tags domains *TAG-NAME*
+
+List domains in a tag.
+
+**--limit** *N*
+: Maximum results (default: 100).
+
+### tags summary *TAG-NAME*
+
+Show per-severity domain counts for a tag.
+
+### tags add-domains *TAG-NAME* [*DOMAIN*...] [--file *PATH*] [--stdin]
+
+Add domains to a tag in bulk. Creates domain records if needed.
+
+**--file** *PATH*
+: File with one domain per line (repeatable).
+
+**--stdin**
+: Read domains from stdin.
+
+### runs list
+
+List completed runs.
+
+**--tag** *TAG*
+: Filter to runs for domains in this tag.
+
+**--domain** *SUBSTRING*
+: Filter by domain name substring.
+
+**--batch** *BATCH-ID*
+: Filter by batch ID.
+
+**--level** *LEVEL*
+: Filter by worst level.
+
+**--limit** *N*
+: Maximum results (default: 100).
+
+### runs get *RUN-ID*
+
+Get metadata for a single run.
+
+### runs results *RUN-ID*
+
+Fetch and display results for a run.
+
+**--view** *VIEW*
+: Result view: **summary**, **modules**, **raw**, **json**.
+
+### entries query
+
+Query individual engine log entries across runs.
+
+**--tag** *TAG*
+: Filter by domain tag.
+
+**--module** *MODULE*
+: Filter by module name (e.g. DNSSEC).
+
+**--testcase** *TESTCASE*
+: Filter by testcase name.
+
+**--entry-tag** *TAG*
+: Filter by log event tag (e.g. DS_ALGO_NOT_SUPPORTED).
+
+**--level** *LEVEL*
+: Filter by severity level.
+
+**--latest**
+: Only entries from each domain's latest run.
+
+**--limit** *N*
+: Maximum results (default: 100).
+
+Use **--format csv** to download results as CSV.
 
 ### batches get *BATCH-ID*
 
@@ -158,13 +292,37 @@ Test a single domain and wait for results:
 
     gonemaster-client jobs create --domain example.com --wait
 
-Batch test from a file:
+Batch test from a file and tag all domains:
 
-    gonemaster-client jobs batch --file domains.txt --wait --per-job
+    gonemaster-client jobs batch --file domains.txt --tag tld --wait --per-job
+
+Re-run all domains in a tag:
+
+    gonemaster-client jobs batch --from-tag tld --tag tld --wait
 
 Get results for a completed job:
 
     gonemaster-client results --job-id abc123 --view summary
+
+List domains with ERROR or worse:
+
+    gonemaster-client domains list --tag tld --level ERROR
+
+Show per-severity summary for a tag:
+
+    gonemaster-client tags summary tld
+
+List recent runs for a domain:
+
+    gonemaster-client domains runs example.com
+
+Fetch full results for a run:
+
+    gonemaster-client runs results <run-id> --view summary
+
+Export all DNSSEC entries for a tag as CSV:
+
+    gonemaster-client --format csv entries query --tag tld --module DNSSEC --latest
 
 Watch a batch in progress:
 

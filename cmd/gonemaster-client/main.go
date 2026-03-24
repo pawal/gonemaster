@@ -270,6 +270,14 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		return runBatches(ctx, client, opts, rest, writer, errOut)
 	case "queue":
 		return runQueue(ctx, client, opts, rest, writer, errOut)
+	case "domains":
+		return runDomains(ctx, client, opts, rest, writer, errOut)
+	case "tags":
+		return runTags(ctx, client, opts, rest, writer, errOut)
+	case "runs":
+		return runRuns(ctx, client, opts, rest, writer, errOut)
+	case "entries":
+		return runEntries(ctx, client, opts, rest, writer, errOut)
 	case "help", "-h", "--help":
 		printUsage(writer)
 		return 0
@@ -325,6 +333,10 @@ func printUsage(out io.Writer) {
 	fmt.Fprintln(out, "  jobs create|batch|list|get|watch|cancel|results|purge")
 	fmt.Fprintln(out, "  batches get|watch|results|cancel|remove")
 	fmt.Fprintln(out, "  queue pause|resume|reorder|remove")
+	fmt.Fprintln(out, "  domains list|get|runs|tag|untag")
+	fmt.Fprintln(out, "  tags list|create|delete|domains|summary|add-domains")
+	fmt.Fprintln(out, "  runs list|get|results")
+	fmt.Fprintln(out, "  entries query")
 }
 
 func setSubcommandUsage(fs *flag.FlagSet) {

@@ -50,6 +50,22 @@ func (s *Server) handleListEntries(w http.ResponseWriter, r *http.Request) {
 
 	result := s.store.QueryEntries(filter)
 
+	// Enrich entries with domain names.
+	domainNames := map[int64]string{}
+	for i, e := range result.Items {
+		if e.DomainID == 0 {
+			continue
+		}
+		if name, ok := domainNames[e.DomainID]; ok {
+			result.Items[i].Domain = name
+			continue
+		}
+		if d, ok := s.store.GetDomain(e.DomainID); ok {
+			domainNames[e.DomainID] = d.Name
+			result.Items[i].Domain = d.Name
+		}
+	}
+
 	if strings.TrimSpace(q.Get("format")) == "csv" {
 		writeEntriesCSV(w, result.Items)
 		return
@@ -58,13 +74,13 @@ func (s *Server) handleListEntries(w http.ResponseWriter, r *http.Request) {
 }
 
 // writeEntriesCSV writes entries as a CSV response with columns:
-// id, run_id, domain_id, timestamp, module, testcase, tag, level, args.
+// id, run_id, domain_id, domain, timestamp, module, testcase, tag, level, args.
 func writeEntriesCSV(w http.ResponseWriter, entries []Entry) {
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", `attachment; filename="entries.csv"`)
 	w.WriteHeader(http.StatusOK)
 	cw := csv.NewWriter(w)
-	_ = cw.Write([]string{"id", "run_id", "domain_id", "timestamp", "module", "testcase", "tag", "level", "args"})
+	_ = cw.Write([]string{"id", "run_id", "domain_id", "domain", "timestamp", "module", "testcase", "tag", "level", "args"})
 	for _, e := range entries {
 		args := ""
 		if e.Args != nil {
@@ -75,6 +91,7 @@ func writeEntriesCSV(w http.ResponseWriter, entries []Entry) {
 			strconv.FormatInt(e.ID, 10),
 			e.RunID,
 			strconv.FormatInt(e.DomainID, 10),
+			e.Domain,
 			strconv.FormatFloat(e.Timestamp, 'f', 3, 64),
 			e.Module,
 			e.Testcase,

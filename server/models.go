@@ -149,6 +149,7 @@ type Entry struct {
 	ID        int64          `json:"id"`
 	RunID     string         `json:"run_id"`
 	DomainID  int64          `json:"domain_id"`
+	Domain    string         `json:"domain,omitempty"`
 	Timestamp float64        `json:"timestamp"`
 	Module    string         `json:"module"`
 	Testcase  string         `json:"testcase"`

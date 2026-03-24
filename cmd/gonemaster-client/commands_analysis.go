@@ -17,6 +17,7 @@ type domain struct {
 	ID           int64    `json:"id"`
 	Name         string   `json:"name"`
 	LatestRunID  string   `json:"latest_run_id,omitempty"`
+	LatestRunAt  string   `json:"latest_run_at,omitempty"`
 	LatestLevel  string   `json:"latest_level,omitempty"`
 	LatestStatus string   `json:"latest_status,omitempty"`
 	RunCount     int      `json:"run_count"`
@@ -73,6 +74,7 @@ type entry struct {
 	ID       int64          `json:"id"`
 	RunID    string         `json:"run_id"`
 	DomainID int64          `json:"domain_id"`
+	Domain   string         `json:"domain,omitempty"`
 	Module   string         `json:"module"`
 	Testcase string         `json:"testcase"`
 	Tag      string         `json:"tag"`
@@ -202,15 +204,23 @@ func runDomainsList(ctx context.Context, client *apiClient, opts globalOptions, 
 	}
 	fmt.Fprintf(out, "Domains: %d\n", list.Total)
 	for _, d := range list.Items {
-		tags := ""
-		if len(d.Tags) > 0 {
-			tags = " [" + strings.Join(d.Tags, ", ") + "]"
-		}
 		level := d.LatestLevel
 		if level == "" {
 			level = "-"
 		}
-		fmt.Fprintf(out, "  %-40s  level=%-8s  runs=%-4d%s\n", d.Name, level, d.RunCount, tags)
+		runAt := d.LatestRunAt
+		if len(runAt) > 10 {
+			runAt = runAt[:10] // date only
+		}
+		if runAt == "" {
+			runAt = "-"
+		}
+		tags := ""
+		if len(d.Tags) > 0 {
+			tags = " [" + strings.Join(d.Tags, ", ") + "]"
+		}
+		fmt.Fprintf(out, "  %-40s  level=%-8s  last=%-10s  runs=%-4d%s\n",
+			d.Name, level, runAt, d.RunCount, tags)
 	}
 	return 0
 }
@@ -658,12 +668,19 @@ func runRunsList(ctx context.Context, client *apiClient, opts globalOptions, arg
 		if level == "" {
 			level = "-"
 		}
-		dur := ""
-		if r.DurationMs > 0 {
-			dur = fmt.Sprintf("  %dms", r.DurationMs)
+		finAt := r.FinishedAt
+		if len(finAt) > 10 {
+			finAt = finAt[:10] // date only
 		}
-		fmt.Fprintf(out, "  %-36s  %-30s  %-10s  level=%-8s%s\n",
-			r.ID, r.Domain, r.Status, level, dur)
+		if finAt == "" {
+			finAt = "-"
+		}
+		dur := "-"
+		if r.DurationMs > 0 {
+			dur = fmt.Sprintf("%dms", r.DurationMs)
+		}
+		fmt.Fprintf(out, "  %-36s  %-30s  %-10s  level=%-8s  %-10s  %s\n",
+			r.ID, r.Domain, r.Status, level, finAt, dur)
 	}
 	return 0
 }
@@ -841,7 +858,12 @@ func runEntriesQuery(ctx context.Context, client *apiClient, opts globalOptions,
 	}
 	fmt.Fprintf(out, "Entries: %d\n", list.Total)
 	for _, e := range list.Items {
-		fmt.Fprintf(out, "  %-10s  %-20s  %-30s  %s\n", e.Level, e.Module, e.Testcase, e.Tag)
+		domainCol := e.Domain
+		if domainCol == "" && e.DomainID != 0 {
+			domainCol = fmt.Sprintf("id:%d", e.DomainID)
+		}
+		fmt.Fprintf(out, "  %-30s  %-10s  %-20s  %-30s  %s\n",
+			domainCol, e.Level, e.Module, e.Testcase, e.Tag)
 	}
 	return 0
 }

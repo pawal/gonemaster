@@ -210,6 +210,51 @@ func TestListEntriesCSV(t *testing.T) {
 	}
 }
 
+func TestListEntriesIncludesDomainName(t *testing.T) {
+	srv := New(DefaultConfig())
+	makeGraduatedJobWithEntries(t, srv, "example.com", []engine.LogEntry{
+		{Module: "Basic", Testcase: "Basic01", Tag: "BASIC_WORKING_GLUE", Level: "INFO"},
+	})
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/entries", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var list EntryList
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(list.Items) == 0 {
+		t.Fatal("expected at least one entry")
+	}
+	if list.Items[0].Domain != "example.com" {
+		t.Fatalf("expected domain=example.com in entry, got %q", list.Items[0].Domain)
+	}
+}
+
+func TestListEntriesCSVIncludesDomainColumn(t *testing.T) {
+	srv := New(DefaultConfig())
+	makeGraduatedJobWithEntries(t, srv, "example.com", []engine.LogEntry{
+		{Module: "Basic", Testcase: "Basic01", Tag: "BASIC_WORKING_GLUE", Level: "INFO"},
+	})
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/entries?format=csv", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	body := resp.Body.String()
+	if !strings.Contains(body, "domain") {
+		t.Fatalf("expected 'domain' column in CSV header: %s", body)
+	}
+	if !strings.Contains(body, "example.com") {
+		t.Fatalf("expected domain name in CSV body: %s", body)
+	}
+}
+
 func TestListEntriesInvalidLimit(t *testing.T) {
 	srv := New(DefaultConfig())
 	resp := httptest.NewRecorder()

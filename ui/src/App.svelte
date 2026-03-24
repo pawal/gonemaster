@@ -16,6 +16,9 @@
   let undelegatedDSInfo = [];
 
   let batchDomains = "";
+  let batchTags = "";
+  let batchFromTagMode = false;
+  let batchFromTag = "";
   let batchSubmitting = false;
   let createdBatchId = "";
 
@@ -316,10 +319,13 @@
   };
   const formatRecentBatchOption = (option) => {
     if (!option || !option.id) return "";
-    if (!option.createdAt) return option.id;
-    const parsed = new Date(option.createdAt);
-    if (Number.isNaN(parsed.getTime())) return option.id;
-    return `${option.id} - ${parsed.toLocaleString()}`;
+    const parts = [option.id];
+    if (option.createdAt) {
+      const parsed = new Date(option.createdAt);
+      if (!Number.isNaN(parsed.getTime())) parts.push(parsed.toLocaleString());
+    }
+    if (option.tag) parts.push(`[${option.tag}]`);
+    return parts.join(" - ");
   };
 
   const hasPersistedURLState = (params) => persistedQueryKeys.some((key) => params.has(key));
@@ -967,6 +973,7 @@
       loadTagsList();
     } else if (next === "batches") {
       loadRecentBatchOptions();
+      if (!tagsLoaded) loadDomainTags();
       if (selectedBatchId) {
         loadBatch(selectedBatchId);
       }
@@ -1118,19 +1125,29 @@
   };
 
   const submitBatch = async () => {
-    const domains = batchDomains
-      .split(/\n/)
-      .map((entry) => normalizeDomainInput(entry))
-      .filter(Boolean);
-    if (!domains.length) {
-      setStatus($t("error_batch_empty"), "warn");
-      return;
+    let payload;
+    if (batchFromTagMode) {
+      if (!batchFromTag) {
+        setStatus($t("error_batch_from_tag_required"), "warn");
+        return;
+      }
+      payload = { from_tag: batchFromTag };
+    } else {
+      const domains = batchDomains
+        .split(/\n/)
+        .map((entry) => normalizeDomainInput(entry))
+        .filter(Boolean);
+      if (!domains.length) {
+        setStatus($t("error_batch_empty"), "warn");
+        return;
+      }
+      payload = { domains };
     }
+    const parsedTags = batchTags.split(/[,\s]+/).map((t) => t.trim()).filter(Boolean);
+    if (parsedTags.length > 0) payload.tags = parsedTags;
     batchSubmitting = true;
     createdBatchId = "";
     try {
-      const payload = { domains };
-
       const response = await apiFetch("/jobs/batch", {
         method: "POST",
         body: JSON.stringify(payload)
@@ -1274,6 +1291,13 @@
       const params = batchQueryParams();
       const batch = await apiFetch(`/batches/${batchId}?${params.toString()}`);
       selectedBatch = batch;
+      // Propagate tag into recentBatchOptions so the dropdown can show it.
+      if (batch?.tag) {
+        const idx = recentBatchOptions.findIndex((o) => o.id === batchId);
+        if (idx >= 0 && !recentBatchOptions[idx].tag) {
+          recentBatchOptions = recentBatchOptions.map((o, i) => i === idx ? { ...o, tag: batch.tag } : o);
+        }
+      }
       if (notifyOnBatchComplete && !hasActiveBatchJobs(batch)) {
         notifyOnBatchComplete = false;
         sendBatchNotification(batch);
@@ -2523,14 +2547,48 @@
     <div class="grid" id="panel-batches" role="tabpanel" aria-labelledby="tab-batches" style="margin-top: 22px;">
       <div class="card reveal" style="--d: 0.22s">
         <h2>{$t("batch_jobs_heading")}</h2>
-        <div class="stack">
-          <label for="batch-domains">{$t("domains_label")}</label>
-          <textarea
-            id="batch-domains"
-            placeholder={`example.com
+        <div style="display:flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+          <button
+            class={batchFromTagMode ? "ghost" : "secondary small"}
+            type="button"
+            on:click={() => { batchFromTagMode = false; }}
+          >{$t("batch_domains_mode_label")}</button>
+          <button
+            class={batchFromTagMode ? "secondary small" : "ghost"}
+            type="button"
+            on:click={() => { batchFromTagMode = true; }}
+          >{$t("batch_from_tag_mode_label")}</button>
+        </div>
+        {#if batchFromTagMode}
+          <div class="stack">
+            <label for="batch-from-tag">{$t("batch_from_tag_label")}</label>
+            <select id="batch-from-tag" bind:value={batchFromTag}>
+              <option value="">{$t("tag_filter_all")}</option>
+              {#each availableTags as tag}
+                <option value={tag.name}>{tag.name}{tag.domain_count ? ` (${tag.domain_count})` : ""}</option>
+              {/each}
+            </select>
+          </div>
+        {:else}
+          <div class="stack">
+            <label for="batch-domains">{$t("domains_label")}</label>
+            <textarea
+              id="batch-domains"
+              placeholder={`example.com
 example.org`}
-            bind:value={batchDomains}
-          ></textarea>
+              bind:value={batchDomains}
+            ></textarea>
+          </div>
+        {/if}
+        <div class="stack">
+          <label for="batch-tags">{$t("batch_tags_label")}</label>
+          <input
+            id="batch-tags"
+            type="text"
+            placeholder={$t("batch_tags_placeholder")}
+            bind:value={batchTags}
+          />
+          <div class="small">{$t("batch_tags_hint")}</div>
         </div>
         <button class="secondary" on:click={submitBatch} disabled={batchSubmitting}>
           {batchSubmitting ? $t("submitting") : $t("run_batch")}
@@ -2631,6 +2689,10 @@ example.org`}
         </div>
         {#if selectedBatch}
           <div class="kv">
+            {#if selectedBatch.tag}
+              <span>{$t("batch_tag_label")}</span>
+              <strong class="mono">{selectedBatch.tag}</strong>
+            {/if}
             <span>{$t("total_label")}</span>
             <strong>{selectedBatch.total}</strong>
             <span>{$t("created_label")}</span>

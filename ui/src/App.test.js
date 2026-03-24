@@ -1078,6 +1078,112 @@ describe("App", () => {
     unmount();
   });
 
+  it("includes tags in batch payload when tag field is filled", async () => {
+    let capturedBody = null;
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (url === "/api/v1/jobs/batch" && options.method === "POST") {
+        capturedBody = JSON.parse(options.body || "{}");
+        return jsonResponse({ batch_id: "batch_t" });
+      }
+      if (typeof url === "string" && url.startsWith("/api/v1/batches/")) return jsonResponse({ batch_id: "batch_t", total: 0, status_counts: {}, items: [], created_at: "2026-03-24T00:00:00Z" });
+      if (typeof url === "string" && url.startsWith("/api/v1/jobs?")) return jsonResponse({ items: [] });
+      if (url.includes("/api/v1/tags")) return jsonResponse([]);
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+    await openBatchTab();
+
+    await fireEvent.input(await screen.findByLabelText("Domains (one per line)"), { target: { value: "example.com" } });
+    await fireEvent.input(screen.getByLabelText("Tags"), { target: { value: "tld, ccTLD" } });
+    await fireEvent.click(screen.getByText("Run Batch"));
+
+    await waitFor(() => {
+      expect(capturedBody?.tags).toEqual(["tld", "ccTLD"]);
+      expect(capturedBody?.domains).toEqual(["example.com"]);
+    });
+    unmount();
+  });
+
+  it("from-tag mode sends from_tag in batch payload", async () => {
+    let capturedBody = null;
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (url === "/api/v1/jobs/batch" && options.method === "POST") {
+        capturedBody = JSON.parse(options.body || "{}");
+        return jsonResponse({ batch_id: "batch_ft" });
+      }
+      if (typeof url === "string" && url.startsWith("/api/v1/batches/")) return jsonResponse({ batch_id: "batch_ft", total: 0, status_counts: {}, items: [], created_at: "2026-03-24T00:00:00Z" });
+      if (typeof url === "string" && url.startsWith("/api/v1/jobs?")) return jsonResponse({ items: [] });
+      if (url.includes("/api/v1/tags")) return jsonResponse([{ name: "tld", description: "", domain_count: 3 }]);
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+    await openBatchTab();
+
+    await fireEvent.click(await screen.findByText("From tag"));
+    const tagSelect = await screen.findByLabelText("Run all domains in tag");
+    await fireEvent.change(tagSelect, { target: { value: "tld" } });
+    await fireEvent.click(screen.getByText("Run Batch"));
+
+    await waitFor(() => {
+      expect(capturedBody?.from_tag).toBe("tld");
+      expect(capturedBody?.domains).toBeUndefined();
+    });
+    unmount();
+  });
+
+  it("batch inspector shows tag when batch has a tag", async () => {
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (typeof url === "string" && url.startsWith("/api/v1/batches/batch_tagged")) {
+        return jsonResponse({ id: "batch_tagged", tag: "tld", total: 1, status_counts: { succeeded: 1 }, items: [], created_at: "2026-03-24T00:00:00Z" });
+      }
+      if (typeof url === "string" && url.startsWith("/api/v1/jobs?")) return jsonResponse({ items: [{ id: "j1", batch_id: "batch_tagged", created_at: "2026-03-24T00:00:00Z" }] });
+      if (url.includes("/api/v1/tags")) return jsonResponse([]);
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+    await openBatchTab();
+
+    await fireEvent.input(await screen.findByLabelText("Batch ID"), { target: { value: "batch_tagged" } });
+    await fireEvent.change(screen.getByLabelText("Batch ID"), {});
+
+    await waitFor(() => {
+      expect(screen.getByText("Tag")).toBeInTheDocument();
+      expect(screen.getByText("tld")).toBeInTheDocument();
+    });
+    unmount();
+  });
+
+  it("recent batch dropdown label includes tag when batch is loaded", async () => {
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (typeof url === "string" && url.startsWith("/api/v1/batches/batch_wtag")) {
+        return jsonResponse({ id: "batch_wtag", tag: "ccTLD", total: 1, status_counts: {}, items: [], created_at: "2026-03-24T00:00:00Z" });
+      }
+      if (typeof url === "string" && url.startsWith("/api/v1/jobs?")) {
+        return jsonResponse({ items: [{ id: "j1", batch_id: "batch_wtag", created_at: "2026-03-24T00:00:00Z" }] });
+      }
+      if (url.includes("/api/v1/tags")) return jsonResponse([]);
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+    await openBatchTab();
+
+    // Load the batch to populate the tag
+    const batchInput = await screen.findByLabelText("Batch ID");
+    await fireEvent.input(batchInput, { target: { value: "batch_wtag" } });
+    await fireEvent.change(batchInput, {});
+
+    await waitFor(() => {
+      const options = screen.getAllByRole("option");
+      const batchOption = options.find((o) => o.value === "batch_wtag");
+      expect(batchOption?.textContent).toContain("[ccTLD]");
+    });
+    unmount();
+  });
+
   it("applies batch filters and pagination query params", async () => {
     const calls = [];
     const firstPage = {

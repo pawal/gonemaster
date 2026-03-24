@@ -2306,4 +2306,102 @@ describe("App", () => {
       unmount();
     });
   });
+
+  describe("Domains tab", () => {
+    const openDomainsTab = async () => {
+      await fireEvent.click(screen.getByRole("tab", { name: "Domains" }));
+    };
+
+    it("renders Domains tab button", async () => {
+      global.fetch.mockImplementation(() => jsonResponse({ items: [], total: 0 }));
+      const { unmount } = render(App);
+      expect(screen.getByRole("tab", { name: "Domains" })).toBeInTheDocument();
+      unmount();
+    });
+
+    it("shows domain list when tab opened", async () => {
+      const calls = [];
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        calls.push(value);
+        if (value.includes("/api/v1/domains")) {
+          return jsonResponse({
+            items: [{ id: 1, name: "example.com", tags: ["tld"], latest_level: "WARNING", latest_run_at: "2026-03-15T10:00:00Z", run_count: 3 }],
+            total: 1
+          });
+        }
+        if (value.includes("/api/v1/tags")) {
+          return jsonResponse([{ name: "tld", description: "TLD", domain_count: 1 }]);
+        }
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openDomainsTab();
+
+      await waitFor(() => {
+        expect(calls.some((v) => v.includes("/api/v1/domains"))).toBe(true);
+      });
+      expect(await screen.findByText("example.com")).toBeInTheDocument();
+      expect(screen.getByText("WARNING")).toBeInTheDocument();
+
+      unmount();
+    });
+
+    it("shows placeholder when no domains", async () => {
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value.includes("/api/v1/domains")) return jsonResponse({ items: [], total: 0 });
+        if (value.includes("/api/v1/tags")) return jsonResponse([]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openDomainsTab();
+
+      expect(await screen.findByText("No domains found.")).toBeInTheDocument();
+      unmount();
+    });
+
+    it("tag filter dropdown is populated from /api/v1/tags", async () => {
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value.includes("/api/v1/domains")) return jsonResponse({ items: [], total: 0 });
+        if (value.includes("/api/v1/tags")) return jsonResponse([{ name: "ccTLD", description: "", domain_count: 5 }]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openDomainsTab();
+
+      await waitFor(() => {
+        expect(screen.getByRole("option", { name: "ccTLD" })).toBeInTheDocument();
+      });
+      unmount();
+    });
+
+    it("name filter triggers new domains request", async () => {
+      const calls = [];
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        calls.push(value);
+        if (value.includes("/api/v1/domains")) return jsonResponse({ items: [], total: 0 });
+        if (value.includes("/api/v1/tags")) return jsonResponse([]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openDomainsTab();
+      await waitFor(() => calls.some((v) => v.includes("/api/v1/domains")));
+      calls.length = 0;
+
+      const searchInput = await screen.findByPlaceholderText("Search by name…");
+      await fireEvent.input(searchInput, { target: { value: "example" } });
+
+      await waitFor(() => {
+        expect(calls.some((v) => v.includes("/api/v1/domains") && v.includes("name=example"))).toBe(true);
+      });
+      unmount();
+    });
+  });
 });

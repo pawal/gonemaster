@@ -142,9 +142,23 @@
   const tabs = [
     { id: "single", labelKey: "tab_single" },
     { id: "recent", labelKey: "tab_recent" },
+    { id: "domains", labelKey: "tab_domains" },
     { id: "batches", labelKey: "tab_batches" },
     { id: "metrics", labelKey: "tab_metrics" }
   ];
+
+  // Domains tab state.
+  let domains = [];
+  let domainsLoading = false;
+  let domainsTotal = 0;
+  let domainsOffset = 0;
+  let domainsLimit = 50;
+  let domainsNextCursor = "";
+  let domainsPrevCursor = "";
+  let domainNameFilter = "";
+  let domainTagFilter = "";
+  let availableTags = [];
+  let tagsLoaded = false;
 
   const clearStatus = () => {
     statusMessage = "";
@@ -889,6 +903,7 @@
     const tab = String(value || "").replace(/^\/+/, "").toLowerCase();
     if (tab === "single" || tab === "job" || tab === "jobs" || tab === "home") return "single";
     if (tab === "recent" || tab === "tests") return "recent";
+    if (tab === "domains" || tab === "domain") return "domains";
     if (tab === "batches" || tab === "batch") return "batches";
     if (tab === "metrics" || tab === "metric") return "metrics";
     return "";
@@ -911,6 +926,9 @@
     }
     if (next === "recent") {
       loadJobs();
+    } else if (next === "domains") {
+      loadDomains();
+      if (!tagsLoaded) loadDomainTags();
     } else if (next === "batches") {
       loadRecentBatchOptions();
       if (selectedBatchId) {
@@ -1276,6 +1294,35 @@
       if (!silent) {
         metricsLoading = false;
       }
+    }
+  };
+
+  const loadDomains = async (options = {}) => {
+    const { reset = false } = options;
+    if (reset) domainsOffset = 0;
+    domainsLoading = true;
+    try {
+      const params = new URLSearchParams({ limit: String(domainsLimit), offset: String(domainsOffset) });
+      if (domainNameFilter) params.set("name", domainNameFilter);
+      if (domainTagFilter) params.set("tag", domainTagFilter);
+      const data = await apiFetch(`/api/v1/domains?${params}`);
+      domains = data?.items ?? [];
+      domainsTotal = data?.total ?? 0;
+    } catch (error) {
+      setStatus($t("domains_load_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      domainsLoading = false;
+    }
+  };
+
+  const loadDomainTags = async () => {
+    try {
+      const data = await apiFetch("/api/v1/tags");
+      availableTags = Array.isArray(data) ? data : [];
+      tagsLoaded = true;
+    } catch (_) {
+      availableTags = [];
+      tagsLoaded = true;
     }
   };
 
@@ -1929,6 +1976,71 @@
           {/each}
         {/if}
       </div>
+    </div>
+  {:else if activeTab === "domains"}
+    <div class="card reveal" id="panel-domains" role="tabpanel" aria-labelledby="tab-domains" style="--d: 0.34s; margin-top: 22px;">
+      <h2>{$t("domains_tab_heading")}</h2>
+      <div class="toolbar" style="display:flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
+        <input
+          type="search"
+          placeholder={$t("domains_search_placeholder")}
+          bind:value={domainNameFilter}
+          on:input={() => loadDomains({ reset: true })}
+          style="flex: 1 1 180px;"
+        />
+        <select
+          bind:value={domainTagFilter}
+          on:change={() => loadDomains({ reset: true })}
+          style="flex: 0 1 180px;"
+          aria-label={$t("tag_filter_label")}
+        >
+          <option value="">{$t("tag_filter_all")}</option>
+          {#each availableTags as tag}
+            <option value={tag.name}>{tag.name}</option>
+          {/each}
+        </select>
+      </div>
+      {#if domainsLoading}
+        <p class="muted">{$t("loading")}</p>
+      {:else if domains.length === 0}
+        <p class="muted">{$t("no_domains")}</p>
+      {:else}
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>{$t("col_domain_name")}</th>
+              <th>{$t("col_tags")}</th>
+              <th>{$t("col_latest_level")}</th>
+              <th>{$t("col_latest_run_at")}</th>
+              <th>{$t("col_run_count")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each domains as d}
+              <tr>
+                <td class="mono">{d.name}</td>
+                <td>{d.tags ? d.tags.join(", ") : ""}</td>
+                <td><span class="badge level-{(d.latest_level || '').toLowerCase()}">{d.latest_level || "—"}</span></td>
+                <td>{d.latest_run_at ? d.latest_run_at.slice(0, 10) : "—"}</td>
+                <td>{d.run_count ?? 0}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+        <div class="pagination" style="margin-top: 0.5rem; display:flex; gap: 0.5rem; align-items: center;">
+          <button
+            class="secondary small"
+            disabled={domainsOffset === 0}
+            on:click={() => { domainsOffset = Math.max(0, domainsOffset - domainsLimit); loadDomains(); }}
+          >{$t("prev_page")}</button>
+          <span class="muted small">{domainsOffset + 1}–{Math.min(domainsOffset + domainsLimit, domainsTotal)} / {domainsTotal}</span>
+          <button
+            class="secondary small"
+            disabled={domainsOffset + domainsLimit >= domainsTotal}
+            on:click={() => { domainsOffset += domainsLimit; loadDomains(); }}
+          >{$t("next_page")}</button>
+        </div>
+      {/if}
     </div>
   {:else if activeTab === "batches"}
     <div class="grid" id="panel-batches" role="tabpanel" aria-labelledby="tab-batches" style="margin-top: 22px;">

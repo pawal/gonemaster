@@ -2603,4 +2603,182 @@ describe("App", () => {
       unmount();
     });
   });
+
+  describe("Tags tab", () => {
+    const openTagsTab = async () => {
+      await fireEvent.click(screen.getByRole("tab", { name: "Tags" }));
+    };
+
+    const mockTagFetch = (tags = [], summary = null, domains = []) => {
+      global.fetch.mockImplementation((url, opts) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value.includes("/summary")) return jsonResponse(summary ?? { tag: "t", domain_count: 0, ok: 0, notice: 0, warning: 0, error: 0, critical: 0 });
+        if (value.includes("/domains") && value.includes("/tags/")) return jsonResponse({ items: domains, total: domains.length });
+        if (value.includes("/api/v1/tags") && opts?.method === "POST") return jsonResponse({ name: "new-tag", description: "", domain_count: 0 }, true);
+        if (value.includes("/api/v1/tags") && opts?.method === "DELETE") return { ok: true, status: 204, headers: { get: () => null }, json: async () => ({}), text: async () => "" };
+        if (value.includes("/api/v1/tags")) return jsonResponse(tags);
+        return jsonResponse({ items: [], total: 0 });
+      });
+    };
+
+    it("renders Tags tab button", async () => {
+      mockTagFetch();
+      const { unmount } = render(App);
+      expect(screen.getByRole("tab", { name: "Tags" })).toBeInTheDocument();
+      unmount();
+    });
+
+    it("shows tag list when tab opened", async () => {
+      mockTagFetch([{ name: "tld", description: "Top-level", domain_count: 5 }]);
+      const { unmount } = render(App);
+      await openTagsTab();
+      expect(await screen.findByText("tld")).toBeInTheDocument();
+      expect(screen.getByText("Top-level")).toBeInTheDocument();
+      unmount();
+    });
+
+    it("shows placeholder when no tags", async () => {
+      mockTagFetch([]);
+      const { unmount } = render(App);
+      await openTagsTab();
+      expect(await screen.findByText("No tags found.")).toBeInTheDocument();
+      unmount();
+    });
+
+    it("create tag form calls POST /api/v1/tags", async () => {
+      const calls = [];
+      global.fetch.mockImplementation((url, opts) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        calls.push({ url: value, method: opts?.method });
+        if (value.includes("/api/v1/tags") && opts?.method === "POST") return jsonResponse({ name: "newtag", description: "", domain_count: 0 });
+        if (value.includes("/api/v1/tags")) return jsonResponse([]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openTagsTab();
+
+      await fireEvent.input(screen.getByLabelText("Name"), { target: { value: "newtag" } });
+      await fireEvent.click(screen.getByText("Create"));
+
+      await waitFor(() => {
+        expect(calls.some((c) => c.url.includes("/api/v1/tags") && c.method === "POST")).toBe(true);
+      });
+      unmount();
+    });
+
+    it("clicking a tag row opens detail view with summary and domains", async () => {
+      mockTagFetch(
+        [{ name: "ccTLD", description: "ccTLDs", domain_count: 2 }],
+        { tag: "ccTLD", domain_count: 2, ok: 0, notice: 0, warning: 1, error: 1, critical: 0 },
+        [{ id: 1, name: "example.com", latest_level: "WARNING", run_count: 1 }]
+      );
+      const { unmount } = render(App);
+      await openTagsTab();
+      await fireEvent.click(await screen.findByText("ccTLD"));
+
+      await waitFor(() => {
+        expect(screen.getByText("← Back to tags")).toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "Domains in this tag" })).toBeInTheDocument();
+        expect(screen.getByText("example.com")).toBeInTheDocument();
+      });
+      unmount();
+    });
+
+    it("back button returns to tag list", async () => {
+      mockTagFetch([{ name: "tld", description: "", domain_count: 0 }]);
+      const { unmount } = render(App);
+      await openTagsTab();
+      await fireEvent.click(await screen.findByText("tld"));
+      await waitFor(() => screen.getByText("← Back to tags"));
+      await fireEvent.click(screen.getByText("← Back to tags"));
+      await waitFor(() => {
+        expect(screen.queryByText("← Back to tags")).not.toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "Tags" })).toBeInTheDocument();
+      });
+      unmount();
+    });
+
+    it("Run all button POSTs batch with from_tag", async () => {
+      const calls = [];
+      global.fetch.mockImplementation((url, opts) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        calls.push({ url: value, method: opts?.method, body: opts?.body });
+        if (value.includes("/summary")) return jsonResponse({ tag: "t", domain_count: 0, ok: 0, notice: 0, warning: 0, error: 0, critical: 0 });
+        if (value.includes("/domains") && value.includes("/tags/")) return jsonResponse({ items: [], total: 0 });
+        if (value.includes("/api/v1/jobs/batch") && opts?.method === "POST") return jsonResponse({ batch_id: "batch-1" });
+        if (value.includes("/api/v1/tags")) return jsonResponse([{ name: "tld", description: "", domain_count: 3 }]);
+        if (value.includes("/api/v1/jobs")) return jsonResponse({ items: [], total: 0 });
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openTagsTab();
+      await fireEvent.click(await screen.findByText("tld"));
+      await waitFor(() => screen.getByText("Run all domains"));
+      await fireEvent.click(screen.getByText("Run all domains"));
+
+      await waitFor(() => {
+        const batchCall = calls.find((c) => c.url.includes("/api/v1/jobs/batch") && c.method === "POST");
+        expect(batchCall).toBeTruthy();
+        expect(batchCall.body).toContain("from_tag");
+      });
+      unmount();
+    });
+
+    it("delete tag button shows confirmation then calls DELETE", async () => {
+      const calls = [];
+      global.fetch.mockImplementation((url, opts) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        calls.push({ url: value, method: opts?.method });
+        if (value.includes("/summary")) return jsonResponse({ tag: "t", domain_count: 0, ok: 0, notice: 0, warning: 0, error: 0, critical: 0 });
+        if (value.includes("/domains") && value.includes("/tags/")) return jsonResponse({ items: [], total: 0 });
+        if (opts?.method === "DELETE" && value.includes("/api/v1/tags/")) return { ok: true, status: 204, headers: { get: () => null }, json: async () => ({}), text: async () => "" };
+        if (value.includes("/api/v1/tags")) return jsonResponse([{ name: "del-me", description: "", domain_count: 0 }]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openTagsTab();
+      await fireEvent.click(await screen.findByText("del-me"));
+      await waitFor(() => screen.getByText("Delete tag"));
+
+      await fireEvent.click(screen.getByText("Delete tag"));
+      await waitFor(() => screen.getByText("Confirm delete"));
+
+      await fireEvent.click(screen.getByText("Confirm delete"));
+      await waitFor(() => {
+        expect(calls.some((c) => c.method === "DELETE" && c.url.includes("/api/v1/tags/del-me"))).toBe(true);
+      });
+      unmount();
+    });
+
+    it("add domains calls POST tags/{name}/domains", async () => {
+      const calls = [];
+      global.fetch.mockImplementation((url, opts) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        calls.push({ url: value, method: opts?.method });
+        if (value.includes("/summary")) return jsonResponse({ tag: "t", domain_count: 0, ok: 0, notice: 0, warning: 0, error: 0, critical: 0 });
+        if (value.includes("/domains") && value.includes("/tags/") && opts?.method === "POST") return { ok: true, status: 204, headers: { get: () => null }, json: async () => ({}), text: async () => "" };
+        if (value.includes("/domains") && value.includes("/tags/")) return jsonResponse({ items: [], total: 0 });
+        if (value.includes("/api/v1/tags")) return jsonResponse([{ name: "mytag", description: "", domain_count: 0 }]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openTagsTab();
+      await fireEvent.click(await screen.findByText("mytag"));
+      await waitFor(() => screen.getByText("Add Domains"));
+
+      const textareas = screen.getAllByRole("textbox");
+      const addArea = textareas.find((el) => el.placeholder?.includes("example.com"));
+      await fireEvent.input(addArea, { target: { value: "new.example" } });
+      await fireEvent.click(screen.getByText("Add"));
+
+      await waitFor(() => {
+        expect(calls.some((c) => c.url.includes("/tags/mytag/domains") && c.method === "POST")).toBe(true);
+      });
+      unmount();
+    });
+  });
 });

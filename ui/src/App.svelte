@@ -143,6 +143,7 @@
     { id: "single", labelKey: "tab_single" },
     { id: "recent", labelKey: "tab_recent" },
     { id: "domains", labelKey: "tab_domains" },
+    { id: "tags", labelKey: "tab_tags" },
     { id: "batches", labelKey: "tab_batches" },
     { id: "metrics", labelKey: "tab_metrics" }
   ];
@@ -167,6 +168,29 @@
   let domainResubmitting = false;
   let availableTags = [];
   let tagsLoaded = false;
+
+  // Tags tab state.
+  let tagsList = [];
+  let tagsListLoading = false;
+  let tagCreateName = "";
+  let tagCreateDescription = "";
+  let tagCreating = false;
+  let selectedTag = null;
+  let tagSummary = null;
+  let tagSummaryLoading = false;
+  let tagDomains = [];
+  let tagDomainsTotal = 0;
+  let tagDomainsOffset = 0;
+  let tagDomainsLimit = 50;
+  let tagDomainsLoading = false;
+  let tagDomainLevelFilter = "";
+  let tagAddDomainsInput = "";
+  let tagAddingDomains = false;
+  let tagRemoveDomainsInput = "";
+  let tagRemovingDomains = false;
+  let tagRunAllSubmitting = false;
+  let tagDeleteConfirm = false;
+  let tagDeleting = false;
 
   const clearStatus = () => {
     statusMessage = "";
@@ -912,6 +936,7 @@
     if (tab === "single" || tab === "job" || tab === "jobs" || tab === "home") return "single";
     if (tab === "recent" || tab === "tests") return "recent";
     if (tab === "domains" || tab === "domain") return "domains";
+    if (tab === "tags" || tab === "tag") return "tags";
     if (tab === "batches" || tab === "batch") return "batches";
     if (tab === "metrics" || tab === "metric") return "metrics";
     return "";
@@ -937,6 +962,8 @@
     } else if (next === "domains") {
       loadDomains();
       if (!tagsLoaded) loadDomainTags();
+    } else if (next === "tags") {
+      loadTagsList();
     } else if (next === "batches") {
       loadRecentBatchOptions();
       if (selectedBatchId) {
@@ -1370,6 +1397,150 @@
       setStatus($t("error_create_job", { error: error.message }), "warn");
     } finally {
       domainResubmitting = false;
+    }
+  };
+
+  const loadTagsList = async () => {
+    tagsListLoading = true;
+    try {
+      const data = await apiFetch("/api/v1/tags");
+      tagsList = Array.isArray(data) ? data : [];
+    } catch (error) {
+      setStatus($t("tags_load_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      tagsListLoading = false;
+    }
+  };
+
+  const createTag = async () => {
+    const name = tagCreateName.trim();
+    if (!name) return;
+    tagCreating = true;
+    try {
+      await apiFetch("/api/v1/tags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, description: tagCreateDescription.trim() })
+      });
+      tagCreateName = "";
+      tagCreateDescription = "";
+      setStatus($t("tag_created"), "ok");
+      await loadTagsList();
+      await loadDomainTags();
+    } catch (error) {
+      setStatus($t("tag_create_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      tagCreating = false;
+    }
+  };
+
+  const loadTagSummary = async () => {
+    if (!selectedTag) return;
+    tagSummaryLoading = true;
+    try {
+      tagSummary = await apiFetch(`/api/v1/tags/${encodeURIComponent(selectedTag.name)}/summary`);
+    } catch (_) {
+      tagSummary = null;
+    } finally {
+      tagSummaryLoading = false;
+    }
+  };
+
+  const loadTagDomains = async (options = {}) => {
+    if (!selectedTag) return;
+    const { reset = false } = options;
+    if (reset) tagDomainsOffset = 0;
+    tagDomainsLoading = true;
+    try {
+      const params = new URLSearchParams({ limit: String(tagDomainsLimit), offset: String(tagDomainsOffset) });
+      if (tagDomainLevelFilter) params.set("min_level", tagDomainLevelFilter);
+      const data = await apiFetch(`/api/v1/tags/${encodeURIComponent(selectedTag.name)}/domains?${params}`);
+      tagDomains = data?.items ?? [];
+      tagDomainsTotal = data?.total ?? 0;
+    } catch (error) {
+      setStatus($t("tag_domains_load_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      tagDomainsLoading = false;
+    }
+  };
+
+  const runAllFromTag = async () => {
+    if (!selectedTag) return;
+    tagRunAllSubmitting = true;
+    try {
+      const response = await apiFetch("/api/v1/jobs/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ from_tag: selectedTag.name })
+      });
+      createdBatchId = response.batch_id || "";
+      setStatus($t("batch_accepted", { id: response.batch_id }), "ok");
+      setTab("batches");
+    } catch (error) {
+      setStatus($t("tag_run_all_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      tagRunAllSubmitting = false;
+    }
+  };
+
+  const addTagDomains = async () => {
+    if (!selectedTag || !tagAddDomainsInput.trim()) return;
+    const domains = tagAddDomainsInput.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
+    if (domains.length === 0) return;
+    tagAddingDomains = true;
+    try {
+      await apiFetch(`/api/v1/tags/${encodeURIComponent(selectedTag.name)}/domains`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domains })
+      });
+      tagAddDomainsInput = "";
+      setStatus($t("tag_domains_added"), "ok");
+      await loadTagDomains({ reset: true });
+      await loadTagSummary();
+    } catch (error) {
+      setStatus($t("tag_domains_add_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      tagAddingDomains = false;
+    }
+  };
+
+  const removeTagDomains = async () => {
+    if (!selectedTag || !tagRemoveDomainsInput.trim()) return;
+    const domains = tagRemoveDomainsInput.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
+    if (domains.length === 0) return;
+    tagRemovingDomains = true;
+    try {
+      await apiFetch(`/api/v1/tags/${encodeURIComponent(selectedTag.name)}/domains`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domains })
+      });
+      tagRemoveDomainsInput = "";
+      setStatus($t("tag_domains_removed"), "ok");
+      await loadTagDomains({ reset: true });
+      await loadTagSummary();
+    } catch (error) {
+      setStatus($t("tag_domains_remove_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      tagRemovingDomains = false;
+    }
+  };
+
+  const deleteTag = async () => {
+    if (!selectedTag) return;
+    tagDeleting = true;
+    try {
+      await apiFetch(`/api/v1/tags/${encodeURIComponent(selectedTag.name)}`, { method: "DELETE" });
+      setStatus($t("tag_deleted"), "ok");
+      selectedTag = null;
+      tagDeleteConfirm = false;
+      await loadTagsList();
+      await loadDomainTags();
+    } catch (error) {
+      setStatus($t("tag_delete_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      tagDeleting = false;
     }
   };
 
@@ -2172,6 +2343,166 @@
               on:click={() => { domainsOffset += domainsLimit; loadDomains(); }}
             >{$t("next_page")}</button>
           </div>
+        {/if}
+      {/if}
+    </div>
+  {:else if activeTab === "tags"}
+    <div class="card reveal" id="panel-tags" role="tabpanel" aria-labelledby="tab-tags" style="--d: 0.34s; margin-top: 22px;">
+      {#if selectedTag}
+        <button class="secondary small" on:click={() => { selectedTag = null; tagDeleteConfirm = false; }}>{$t("back_to_tags")}</button>
+        <h2 style="margin-top: 0.5rem;">{selectedTag.name}</h2>
+        {#if selectedTag.description}
+          <p class="muted small">{selectedTag.description}</p>
+        {/if}
+
+        <!-- Severity summary -->
+        {#if tagSummaryLoading}
+          <p class="muted">{$t("loading")}</p>
+        {:else if tagSummary}
+          <div style="display:flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
+            <span>{$t("sev_ok")}: {tagSummary.ok}</span>
+            <span><span class="badge level-notice">{$t("sev_notice")}</span>: {tagSummary.notice}</span>
+            <span><span class="badge level-warning">{$t("sev_warning")}</span>: {tagSummary.warning}</span>
+            <span><span class="badge level-error">{$t("sev_error")}</span>: {tagSummary.error}</span>
+            <span><span class="badge level-critical">{$t("sev_critical")}</span>: {tagSummary.critical}</span>
+          </div>
+        {/if}
+
+        <!-- Run all + delete -->
+        <div style="display:flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
+          <button class="secondary" on:click={runAllFromTag} disabled={tagRunAllSubmitting}>
+            {tagRunAllSubmitting ? $t("submitting") : $t("tag_run_all_button")}
+          </button>
+          {#if tagDeleteConfirm}
+            <button class="warn" on:click={deleteTag} disabled={tagDeleting}>{tagDeleting ? $t("submitting") : $t("tag_delete_confirm_button")}</button>
+            <button class="ghost" on:click={() => { tagDeleteConfirm = false; }}>{$t("tag_delete_cancel_button")}</button>
+          {:else}
+            <button class="ghost" on:click={() => { tagDeleteConfirm = true; }}>{$t("tag_delete_button")}</button>
+          {/if}
+        </div>
+
+        <!-- Domain list with level filter -->
+        <h3>{$t("tag_domains_heading")}</h3>
+        <div style="display:flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem;">
+          <select
+            bind:value={tagDomainLevelFilter}
+            on:change={() => loadTagDomains({ reset: true })}
+            aria-label={$t("level_filter_label")}
+            style="flex: 0 1 180px;"
+          >
+            <option value="">{$t("level_filter_all")}</option>
+            <option value="WARNING">{$t("level_filter_warning_plus")}</option>
+            <option value="ERROR">{$t("level_filter_error_plus")}</option>
+          </select>
+        </div>
+        {#if tagDomainsLoading}
+          <p class="muted">{$t("loading")}</p>
+        {:else if tagDomains.length === 0}
+          <p class="muted">{$t("no_domains")}</p>
+        {:else}
+          <table class="data-table">
+            <thead><tr>
+              <th>{$t("col_domain_name")}</th>
+              <th>{$t("col_latest_level")}</th>
+              <th>{$t("col_latest_run_at")}</th>
+            </tr></thead>
+            <tbody>
+              {#each tagDomains as d}
+                <tr
+                  style="cursor: pointer;"
+                  on:click={() => { selectedDomain = d; domainRuns = []; domainRunsOffset = 0; loadDomainRuns(); setTab("domains"); }}
+                  role="button"
+                  tabindex="0"
+                  on:keydown={(e) => { if (e.key === "Enter" || e.key === " ") { selectedDomain = d; domainRuns = []; domainRunsOffset = 0; loadDomainRuns(); setTab("domains"); } }}
+                >
+                  <td class="mono">{d.name}</td>
+                  <td><span class="badge level-{(d.latest_level || '').toLowerCase()}">{d.latest_level || "—"}</span></td>
+                  <td>{d.latest_run_at ? d.latest_run_at.slice(0, 10) : "—"}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+          <div class="pagination" style="margin-top: 0.5rem; display:flex; gap: 0.5rem; align-items: center;">
+            <button class="secondary small" disabled={tagDomainsOffset === 0}
+              on:click={() => { tagDomainsOffset = Math.max(0, tagDomainsOffset - tagDomainsLimit); loadTagDomains(); }}
+            >{$t("prev_page")}</button>
+            <span class="muted small">{tagDomainsOffset + 1}–{Math.min(tagDomainsOffset + tagDomainsLimit, tagDomainsTotal)} / {tagDomainsTotal}</span>
+            <button class="secondary small" disabled={tagDomainsOffset + tagDomainsLimit >= tagDomainsTotal}
+              on:click={() => { tagDomainsOffset += tagDomainsLimit; loadTagDomains(); }}
+            >{$t("next_page")}</button>
+          </div>
+        {/if}
+
+        <!-- Add domains -->
+        <h3 style="margin-top: 1.25rem;">{$t("tag_add_domains_heading")}</h3>
+        <textarea
+          bind:value={tagAddDomainsInput}
+          placeholder={$t("tag_domains_placeholder")}
+          rows="3"
+          style="width: 100%; box-sizing: border-box;"
+        ></textarea>
+        <button class="secondary" on:click={addTagDomains} disabled={tagAddingDomains}>
+          {tagAddingDomains ? $t("submitting") : $t("tag_add_domains_button")}
+        </button>
+
+        <!-- Remove domains -->
+        <h3 style="margin-top: 1.25rem;">{$t("tag_remove_domains_heading")}</h3>
+        <textarea
+          bind:value={tagRemoveDomainsInput}
+          placeholder={$t("tag_domains_placeholder")}
+          rows="3"
+          style="width: 100%; box-sizing: border-box;"
+        ></textarea>
+        <button class="ghost" on:click={removeTagDomains} disabled={tagRemovingDomains}>
+          {tagRemovingDomains ? $t("submitting") : $t("tag_remove_domains_button")}
+        </button>
+
+      {:else}
+        <h2>{$t("tags_tab_heading")}</h2>
+
+        <!-- Create tag form -->
+        <div style="display:flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; align-items: flex-end;">
+          <div class="stack" style="flex: 1 1 160px;">
+            <label for="tag-create-name">{$t("tag_name_label")}</label>
+            <input id="tag-create-name" type="text" bind:value={tagCreateName} placeholder="my-tag" />
+          </div>
+          <div class="stack" style="flex: 2 1 240px;">
+            <label for="tag-create-desc">{$t("tag_description_label")}</label>
+            <input id="tag-create-desc" type="text" bind:value={tagCreateDescription} placeholder={$t("tag_description_placeholder")} />
+          </div>
+          <button class="secondary" on:click={createTag} disabled={tagCreating || !tagCreateName.trim()}>
+            {tagCreating ? $t("submitting") : $t("tag_create_button")}
+          </button>
+        </div>
+
+        <!-- Tag list -->
+        {#if tagsListLoading}
+          <p class="muted">{$t("loading")}</p>
+        {:else if tagsList.length === 0}
+          <p class="muted">{$t("no_tags")}</p>
+        {:else}
+          <table class="data-table">
+            <thead><tr>
+              <th>{$t("tag_name_label")}</th>
+              <th>{$t("tag_description_label")}</th>
+              <th>{$t("col_domain_count")}</th>
+            </tr></thead>
+            <tbody>
+              {#each tagsList as tag}
+                <tr
+                  style="cursor: pointer;"
+                  on:click={() => { selectedTag = tag; tagSummary = null; tagDomains = []; tagDomainsOffset = 0; tagDomainLevelFilter = ""; tagDeleteConfirm = false; loadTagSummary(); loadTagDomains(); }}
+                  role="button"
+                  tabindex="0"
+                  on:keydown={(e) => { if (e.key === "Enter" || e.key === " ") { selectedTag = tag; tagSummary = null; tagDomains = []; tagDomainsOffset = 0; tagDomainLevelFilter = ""; tagDeleteConfirm = false; loadTagSummary(); loadTagDomains(); } }}
+                >
+                  <td class="mono">{tag.name}</td>
+                  <td>{tag.description || "—"}</td>
+                  <td>{tag.domain_count ?? 0}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
         {/if}
       {/if}
     </div>

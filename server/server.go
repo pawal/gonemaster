@@ -128,6 +128,11 @@ func (s *Server) routes() {
 	apiMux.HandleFunc("GET /domains/{id}", s.handleGetDomain)
 	apiMux.HandleFunc("GET /domains", s.handleListDomains)
 
+	apiMux.HandleFunc("GET /tags/{name}/summary", s.handleTagSummary)
+	apiMux.HandleFunc("/tags/{name}/domains", s.handleTagDomains)
+	apiMux.HandleFunc("/tags/{name}", s.handleTagByName)
+	apiMux.HandleFunc("/tags", s.handleTags)
+
 	apiMux.HandleFunc("/locales", s.handleLocales)
 	apiMux.HandleFunc("/metrics", s.handleMetrics)
 	apiMux.HandleFunc("/healthz", s.handleHealth)

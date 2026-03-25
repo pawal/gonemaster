@@ -2153,12 +2153,12 @@
                         {#if group.ungrouped.length}
                           {#if group.testcasesArr.length === 0}
                             <!-- Module has only ungrouped entries (e.g. System): flat level+message rows -->
-                            {#each group.ungrouped as entry}
+                            {#each group.ungrouped.filter(e => e.message) as entry}
                               {@const level = normalizeLevel(entry.level)}
                               {@const meta = entryMeta(entry)}
                               <div class="result-row tc-row">
                                 <span class={`entry-level severity-${level.toLowerCase()}`}>{level}</span>
-                                <span class="entry-message">{entryMessage(entry)}</span>
+                                <span class="entry-message">{entry.message}</span>
                               </div>
                               {#if meta}
                                 <div class="entry-meta">{meta}</div>
@@ -2170,13 +2170,13 @@
                               <span>{$t("result_col_level")}</span>
                               <span>{$t("result_col_message")}</span>
                             </div>
-                            {#each group.ungrouped as entry}
+                            {#each group.ungrouped.filter(e => e.message) as entry}
                               {@const level = normalizeLevel(entry.level)}
                               {@const meta = entryMeta(entry)}
                               <div class="result-row">
                                 <span class="entry-time">{formatSeconds(entry.timestamp)}</span>
                                 <span class={`entry-level severity-${level.toLowerCase()}`}>{level}</span>
-                                <span class="entry-message">{entryMessage(entry)}</span>
+                                <span class="entry-message">{entry.message}</span>
                               </div>
                               {#if meta}
                                 <div class="entry-meta">{meta}</div>
@@ -2436,12 +2436,12 @@
                           {/each}
                           {#if group.ungrouped.length}
                             {#if group.testcasesArr.length === 0}
-                              {#each group.ungrouped as entry}
+                              {#each group.ungrouped.filter(e => e.message) as entry}
                                 {@const level = normalizeLevel(entry.level)}
                                 {@const meta = entryMeta(entry)}
                                 <div class="result-row tc-row">
                                   <span class={`entry-level severity-${level.toLowerCase()}`}>{level}</span>
-                                  <span class="entry-message">{entryMessage(entry)}</span>
+                                  <span class="entry-message">{entry.message}</span>
                                 </div>
                                 {#if meta}
                                   <div class="entry-meta">{meta}</div>
@@ -2453,13 +2453,13 @@
                                 <span>{$t("result_col_level")}</span>
                                 <span>{$t("result_col_message")}</span>
                               </div>
-                              {#each group.ungrouped as entry}
+                              {#each group.ungrouped.filter(e => e.message) as entry}
                                 {@const level = normalizeLevel(entry.level)}
                                 {@const meta = entryMeta(entry)}
                                 <div class="result-row">
                                   <span class="entry-time">{formatSeconds(entry.timestamp)}</span>
                                   <span class={`entry-level severity-${level.toLowerCase()}`}>{level}</span>
-                                  <span class="entry-message">{entryMessage(entry)}</span>
+                                  <span class="entry-message">{entry.message}</span>
                                 </div>
                                 {#if meta}
                                   <div class="entry-meta">{meta}</div>

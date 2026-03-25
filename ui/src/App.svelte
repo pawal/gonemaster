@@ -891,8 +891,8 @@
     if (l === "WARNING") return "warning";
     return "ok";
   };
-  const isWarningOrAbove = (level) => {
-    return LEVEL_ORDER.indexOf(normalizeLevel(level)) >= LEVEL_ORDER.indexOf("WARNING");
+  const isNoticeOrAbove = (level) => {
+    return LEVEL_ORDER.indexOf(normalizeLevel(level)) >= LEVEL_ORDER.indexOf("NOTICE");
   };
   const formatSeconds = (value) => {
     const numeric = Number(value);
@@ -920,7 +920,7 @@
       mod.entries.push(entry);
       const level = normalizeLevel(entry.level);
       mod.counts[level] = (mod.counts[level] || 0) + 1;
-      const tc = entry.testcase || "";
+      const tc = (entry.testcase && entry.testcase !== "Unspecified") ? entry.testcase : "";
       if (tc) {
         if (!mod.testcases.has(tc)) mod.testcases.set(tc, { tc, entries: [] });
         mod.testcases.get(tc).entries.push(entry);
@@ -2130,7 +2130,7 @@
                         {#each group.testcasesArr as tcg (tcg.tc)}
                           {@const tcKey = `tc.${tcg.tc.toLowerCase()}`}
                           {@const tcDesc = $t(tcKey)}
-                          <details class="testcase-group" open={isWarningOrAbove(tcg.level)}>
+                          <details class="testcase-group" open={isNoticeOrAbove(tcg.level)}>
                             <summary class="testcase-summary">
                               <span class="testcase-chevron"></span>
                               <span class="testcase-desc">{tcDesc !== tcKey ? tcDesc : tcg.tc}</span>
@@ -2415,7 +2415,7 @@
                           {#each group.testcasesArr as tcg (tcg.tc)}
                             {@const tcKey = `tc.${tcg.tc.toLowerCase()}`}
                             {@const tcDesc = $t(tcKey)}
-                            <details class="testcase-group" open={isWarningOrAbove(tcg.level)}>
+                            <details class="testcase-group" open={isNoticeOrAbove(tcg.level)}>
                               <summary class="testcase-summary">
                                 <span class="testcase-chevron"></span>
                                 <span class="testcase-desc">{tcDesc !== tcKey ? tcDesc : tcg.tc}</span>

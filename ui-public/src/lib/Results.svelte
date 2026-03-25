@@ -28,9 +28,9 @@
   let tcDescs = {};
   let loading = true;
   let errorKey = "";
-  const WARN_IDX = LEVELS.indexOf("WARNING");
-  function isWarningOrAbove(level) {
-    return LEVELS.indexOf(level?.toUpperCase()) >= WARN_IDX;
+  const NOTICE_IDX = LEVELS.indexOf("NOTICE");
+  function isNoticeOrAbove(level) {
+    return LEVELS.indexOf(level?.toUpperCase()) >= NOTICE_IDX;
   }
 
   let openModules = new Set();
@@ -128,7 +128,7 @@
               <details
                 class="testcase-group"
                 data-testid="testcase-group"
-                open={isWarningOrAbove(tcLevel) || openTestcases.has(tc)}
+                open={isNoticeOrAbove(tcLevel) || openTestcases.has(tc)}
                 on:toggle={(e) => { if (e.target.open) openTestcases.add(tc); else openTestcases.delete(tc); openTestcases = openTestcases; }}
               >
                 <summary class="testcase-summary">

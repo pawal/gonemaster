@@ -1,6 +1,6 @@
 # Data Analysis with Gonemaster
 
-This guide covers using gonemaster as a bulk DNS analysis platform — running large domain
+This guide covers using gonemaster as a bulk DNS analysis platform - running large domain
 sets, tracking results over time, and querying the data through the API or directly via SQL.
 
 ---
@@ -67,7 +67,7 @@ Or via a JSON config file (`--config gonemaster.json`):
 ## Creating and managing tags
 
 Tags are named domain collections. A domain can belong to multiple tags.
-Tags are the primary analysis dimension — most API filters and CLI commands accept `--tag`.
+Tags are the primary analysis dimension - most API filters and CLI commands accept `--tag`.
 
 **Create a tag:**
 ```
@@ -142,7 +142,7 @@ gonemaster-client batches watch $BATCH
 
 ## Re-running a tag to update results
 
-Re-running is the same as the initial run — use `--from-tag`:
+Re-running is the same as the initial run - use `--from-tag`:
 
 ```
 gonemaster-client jobs batch --from-tag tld --tag tld --wait
@@ -303,7 +303,7 @@ ORDER BY CASE worst_level
 
 ---
 
-## Example: Trend analysis — weekly comparison of results
+## Example: Trend analysis - weekly comparison of results
 
 Compare DNSSEC error rate between two time windows:
 
@@ -417,9 +417,9 @@ print(df.groupby("tag")["domain"].nunique().sort_values(ascending=False))
 For production deployments it is common to run two separate `gonemaster-server`
 instances pointing at the same database:
 
-- **Public instance** — exposed via reverse proxy; serves `/public/` and
+- **Public instance** - exposed via reverse proxy; serves `/public/` and
   `/pub/api/v1/` only; the admin API is blocked at the proxy layer.
-- **Analysis instance** — internal network only; serves `/api/v1/` with full
+- **Analysis instance** - internal network only; serves `/api/v1/` with full
   admin access for batch runs, tag management, and data queries.
 
 Both instances share the same SQLite file (read-heavy workloads only) or the

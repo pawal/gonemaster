@@ -3,7 +3,7 @@
 This guide covers choosing and configuring a storage backend for `gonemaster-server`,
 including setup, recommended settings, tuning, and backup procedures.
 For DSN formats and connection pool defaults, see
-[server.md — Database](server.md#database).
+[server.md - Database](server.md#database).
 
 ---
 
@@ -29,7 +29,7 @@ gonemaster-server
 ```
 
 The default backend. All job data is stored in RAM and lost when the server stops.
-The purge loop works with this backend — set `--db-retention-days` if you run the server
+The purge loop works with this backend - set `--db-retention-days` if you run the server
 long-term to prevent unbounded memory growth.
 
 **Recommended settings:**
@@ -176,14 +176,14 @@ GRANT CREATE ON SCHEMA public TO gonemaster;
 ```
 
 `LC_COLLATE 'C'` is correct here. All domain names are stored in ACE/punycode
-form (e.g. `xn--mnchen-3ya.de` for `münchen.de`) — the server normalizes every
+form (e.g. `xn--mnchen-3ya.de` for `münchen.de`) - the server normalizes every
 submitted name to its ASCII-compatible encoding (A-label) before storing it.
 Since all stored names are ASCII, collation has no effect on sort order or
 uniqueness, and `C` avoids any locale availability issue across PostgreSQL
 versions and operating systems.
 
 `gonemaster-server` creates and manages its own tables via schema migrations on
-first start. The user only needs `CONNECT`, `USAGE`, and `CREATE` — no
+first start. The user only needs `CONNECT`, `USAGE`, and `CREATE` - no
 superuser privileges are required.
 
 ### pg_hba.conf
@@ -213,14 +213,14 @@ shared_buffers = 256MB          # 25% of RAM is a good starting point
 work_mem = 4MB                  # per sort/hash operation; raise if List() is slow
 maintenance_work_mem = 64MB     # for VACUUM, index builds
 
-# Connections — keep below max_connections to leave headroom for admin tools
+# Connections - keep below max_connections to leave headroom for admin tools
 max_connections = 50            # gonemaster pool uses 25 max; leave room for psql
 
 # WAL / checkpoint
 checkpoint_completion_target = 0.9
 wal_buffers = 16MB
 
-# Autovacuum — gonemaster purges rows frequently; keep autovacuum responsive
+# Autovacuum - gonemaster purges rows frequently; keep autovacuum responsive
 autovacuum_vacuum_scale_factor = 0.05   # vacuum sooner on busy tables
 autovacuum_analyze_scale_factor = 0.02
 ```
@@ -344,22 +344,22 @@ Replace `'localhost'` with the application host if connecting over the network.
 
 ```ini
 [mysqld]
-# InnoDB — use InnoDB for all tables (default in MariaDB 10.x+)
+# InnoDB - use InnoDB for all tables (default in MariaDB 10.x+)
 default_storage_engine = InnoDB
 
-# Buffer pool — set to 50-70% of RAM on a dedicated database server
+# Buffer pool - set to 50-70% of RAM on a dedicated database server
 innodb_buffer_pool_size = 512M
 
-# Redo log — larger = fewer checkpoints, better write throughput
+# Redo log - larger = fewer checkpoints, better write throughput
 innodb_log_file_size = 128M
 
-# One file per table — essential for reclaiming disk space after purge
+# One file per table - essential for reclaiming disk space after purge
 innodb_file_per_table = ON
 
-# Connections — gonemaster pool uses 25 max; leave headroom for admin tools
+# Connections - gonemaster pool uses 25 max; leave headroom for admin tools
 max_connections = 50
 
-# Character set defaults — must match the database collation
+# Character set defaults - must match the database collation
 character_set_server = utf8mb4
 collation_server = utf8mb4_unicode_ci
 ```
@@ -432,7 +432,7 @@ This rebuilds the table and releases space back to the OS.
 
 ## Data retention
 
-All backends — including the default in-memory backend — support automatic purging of old
+All backends - including the default in-memory backend - support automatic purging of old
 completed jobs. Configure it with `--db-retention-days`:
 
 ```

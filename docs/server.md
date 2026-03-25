@@ -8,13 +8,13 @@ persistent job queue, pluggable storage, and two distinct APIs:
 | Path prefix | Who uses it | What it can do |
 |---|---|---|
 | `/api/v1/` | Trusted clients (admin UI, `gonemaster-client`, scripts) | Full control: jobs, batches, queue, domains, tags, runs, entries, metrics |
-| `/pub/api/v1/` | Untrusted clients over the internet (via reverse proxy) | Submit a job, poll status, fetch result — by opaque `public_id` only |
+| `/pub/api/v1/` | Untrusted clients over the internet (via reverse proxy) | Submit a job, poll status, fetch result - by opaque `public_id` only |
 
 The **admin API** (`/api/v1/`) exposes all server capabilities. Internal job UUIDs are
 visible. Never expose this directly to the internet.
 
 The **public API** (`/pub/api/v1/`) is a deliberately restricted subset intended for
-reverse-proxy exposure. It never discloses internal UUIDs — every response uses a
+reverse-proxy exposure. It never discloses internal UUIDs - every response uses a
 randomly-generated `public_id` instead. Only four endpoints are available:
 `POST /jobs`, `GET /jobs/{public_id}`, `GET /jobs/{public_id}/result`,
 `GET /locales`. Admin paths are unreachable at this prefix, enforced server-side.
@@ -23,8 +23,8 @@ Two matching UIs sit alongside the APIs:
 
 | Path prefix | Description |
 |---|---|
-| `/` | Admin UI — full job/batch/domain/tag management |
-| `/public/` | Public UI — single-page app for end-user zone testing |
+| `/` | Admin UI - full job/batch/domain/tag management |
+| `/public/` | Public UI - single-page app for end-user zone testing |
 
 The full admin API contract is defined in [openapi.yaml](openapi.yaml).
 
@@ -169,18 +169,18 @@ The server supports pluggable storage backends selected by `--db-driver`:
 
 #### DSN formats
 
-**SQLite** — file path:
+**SQLite** - file path:
 ```
 gonemaster-server --db-driver sqlite --db-dsn /var/lib/gonemaster/gonemaster.db
 ```
 
-**PostgreSQL** — connection URL:
+**PostgreSQL** - connection URL:
 ```
 gonemaster-server --db-driver postgres \
   --db-dsn "postgres://user:pass@host:5432/dbname?sslmode=disable"
 ```
 
-**MariaDB / MySQL** — DSN string:
+**MariaDB / MySQL** - DSN string:
 ```
 gonemaster-server --db-driver mariadb \
   --db-dsn "user:pass@tcp(host:3306)/dbname"
@@ -201,7 +201,7 @@ procedures see [docs/database-setup.md](database-setup.md).
 
 | Backend | Max open connections | Max idle | Connection lifetime |
 |---|---|---|---|
-| `sqlite` | 1 (serialised writes) | — | — |
+| `sqlite` | 1 (serialised writes) | - | - |
 | `postgres` | 25 | 5 | 5 minutes |
 | `mariadb` | 25 | 5 | 5 minutes |
 
@@ -219,7 +219,7 @@ gonemaster-server --db-driver sqlite --db-dsn /var/lib/gonemaster/gonemaster.db 
   --db-retention-days 90
 ```
 
-- `0` (default) — keep forever, no automatic purge.
+- `0` (default) - keep forever, no automatic purge.
 - Any positive value starts a background purge loop that runs **hourly** and deletes completed jobs with `finished_at` older than that many days, along with their results.
 - Running, queued, and paused jobs are never purged automatically.
 
@@ -242,7 +242,7 @@ Available endpoints:
 | `GET` | `/pub/api/v1/locales` | List available locale codes |
 
 Admin-only paths (`/metrics`, `/queue/*`, `/batches`, `/jobs/purge`, `/domains`, `/tags`,
-`/runs`, `/entries`) are not reachable via the `/pub/` prefix — the boundary is enforced
+`/runs`, `/entries`) are not reachable via the `/pub/` prefix - the boundary is enforced
 server-side.
 
 #### Rate limiting
@@ -280,7 +280,7 @@ prefixes:
 | `/public/` | Public Svelte SPA (static assets) |
 | `/pub/api/v1/` | Public API (job submission and result lookup) |
 
-The server enforces the boundary internally — no additional path filtering
+The server enforces the boundary internally - no additional path filtering
 is required in the proxy.
 
 #### nginx
@@ -389,7 +389,7 @@ This section describes the **admin API** (`/api/v1/`). For the public API, see
 
 ## Endpoints
 
-All paths below are relative to `/api/v1/`. This is the **admin API** — do not expose
+All paths below are relative to `/api/v1/`. This is the **admin API** - do not expose
 it to untrusted clients. See [Public API](#public-api) for the internet-safe subset.
 
 ### Jobs
@@ -529,11 +529,11 @@ GET /domains?tag=tld&name=.se&level=ERROR&min_level=WARNING&limit=100&offset=0
 ```
 
 Query params:
-- `tag` — filter to domains belonging to this tag.
-- `name` — substring filter on domain name.
-- `level` — exact `latest_level` filter (e.g. `ERROR`).
-- `min_level` — minimum severity threshold; `WARNING` matches `WARNING`, `ERROR`, `CRITICAL`.
-- `limit` / `offset` — pagination (max 500, default 100).
+- `tag` - filter to domains belonging to this tag.
+- `name` - substring filter on domain name.
+- `level` - exact `latest_level` filter (e.g. `ERROR`).
+- `min_level` - minimum severity threshold; `WARNING` matches `WARNING`, `ERROR`, `CRITICAL`.
+- `limit` / `offset` - pagination (max 500, default 100).
 
 Get a domain by ID:
 ```
@@ -613,13 +613,13 @@ GET /runs?tag=tld&domain=example.com&batch=batch_123&status=succeeded&level=ERRO
 ```
 
 Query params:
-- `tag` — filter to runs for domains in this tag.
-- `domain` — filter by domain name substring.
-- `batch` — filter by batch ID.
-- `status` — filter by run status.
-- `level` — filter by `worst_level`.
-- `finished_after` / `finished_before` — RFC3339 timestamps.
-- `limit` / `offset` — pagination (max 500, default 100).
+- `tag` - filter to runs for domains in this tag.
+- `domain` - filter by domain name substring.
+- `batch` - filter by batch ID.
+- `status` - filter by run status.
+- `level` - filter by `worst_level`.
+- `finished_after` / `finished_before` - RFC3339 timestamps.
+- `limit` / `offset` - pagination (max 500, default 100).
 
 Get a run:
 ```
@@ -638,17 +638,17 @@ GET /entries?run=run_abc&tag=tld&domain=123&module=DNSSEC&testcase=dnssec01&entr
 ```
 
 Query params:
-- `run` — exact run ID.
-- `domain` — domain ID (integer).
-- `tag` — domain tag filter (joined via domain→tag associations).
-- `module` — exact module name.
-- `testcase` — exact testcase name.
-- `entry_tag` — log event tag (the engine `tag` field, e.g. `DS_ALGO_NOT_SUPPORTED`).
-- `level` — exact severity level.
-- `latest` — `1` or `true` to restrict to each domain's latest run only.
-- `batch` — restrict to runs from this batch.
-- `format=csv` — download as CSV instead of JSON; columns: `id`, `run_id`, `domain_id`, `domain`, `timestamp`, `module`, `testcase`, `tag`, `level`, `args`.
-- `limit` / `offset` — pagination (max 500, default 100).
+- `run` - exact run ID.
+- `domain` - domain ID (integer).
+- `tag` - domain tag filter (joined via domain→tag associations).
+- `module` - exact module name.
+- `testcase` - exact testcase name.
+- `entry_tag` - log event tag (the engine `tag` field, e.g. `DS_ALGO_NOT_SUPPORTED`).
+- `level` - exact severity level.
+- `latest` - `1` or `true` to restrict to each domain's latest run only.
+- `batch` - restrict to runs from this batch.
+- `format=csv` - download as CSV instead of JSON; columns: `id`, `run_id`, `domain_id`, `domain`, `timestamp`, `module`, `testcase`, `tag`, `level`, `args`.
+- `limit` / `offset` - pagination (max 500, default 100).
 
 ### Queue controls
 Pause queue:

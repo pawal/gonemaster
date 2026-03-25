@@ -199,6 +199,36 @@ msgstr "Testfall {testcase} avslutat."
 	}
 }
 
+// TestDS01AlgoDeprecatedAllLocalesExpandArgs verifies that the
+// DNSSEC:DS01_DS_ALGO_DEPRECATED translation resolves every placeholder in all
+// supported locales. This guards against stale PO files that still use the old
+// upstream placeholder names ({domain}, {ds_algo_mnemo}, {addresses}) which
+// the engine never emits.
+func TestDS01AlgoDeprecatedAllLocalesExpandArgs(t *testing.T) {
+	args := map[string]any{
+		"keytag":       12345,
+		"ds_algo_num":  1,
+		"ds_algo_descr": "SHA-1",
+		"servers":      "ns1.example.com/192.0.2.1",
+	}
+	staleKeys := []string{"{domain}", "{ds_algo_mnemo}", "{addresses}"}
+	for _, locale := range AvailableLocales() {
+		out := Translate(locale, "dnssec", "DS01_DS_ALGO_DEPRECATED", args)
+		if out == "" {
+			continue // no translation for this locale; skip
+		}
+		for _, stale := range staleKeys {
+			if strings.Contains(out, stale) {
+				t.Errorf("locale %s: translation still contains stale placeholder %q: %q", locale, stale, out)
+			}
+		}
+		if strings.Contains(out, "{keytag}") || strings.Contains(out, "{ds_algo_num}") ||
+			strings.Contains(out, "{ds_algo_descr}") || strings.Contains(out, "{servers}") {
+			t.Errorf("locale %s: unresolved placeholder in translation: %q", locale, out)
+		}
+	}
+}
+
 func TestParsePOMsgctxtMalformedIsIgnored(t *testing.T) {
 	// A msgctxt that is not MODULE:TAG format must not clobber #. keys.
 	data := `

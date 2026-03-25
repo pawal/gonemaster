@@ -2114,7 +2114,7 @@
                       <div class="module-meta">{group.testcasesArr.length > 0 ? `${group.testcasesArr.length} tests · ` : ""}{$t("entries_count", { count: group.entries.length })}</div>
                       <div class="module-badges">
                         {#if okTestcaseCount(group) > 0}
-                          <span class="level-pill severity-info">OK {okTestcaseCount(group)}</span>
+                          <span class="level-pill severity-info">INFO {okTestcaseCount(group)}</span>
                         {/if}
                         {#each moduleLevels as level}
                           {#if group.counts[level]}
@@ -2400,7 +2400,7 @@
                         <div class="module-meta">{group.testcasesArr.length > 0 ? `${group.testcasesArr.length} tests · ` : ""}{$t("entries_count", { count: group.entries.length })}</div>
                         <div class="module-badges">
                           {#if okTestcaseCount(group) > 0}
-                            <span class="level-pill severity-info">OK {okTestcaseCount(group)}</span>
+                            <span class="level-pill severity-info">INFO {okTestcaseCount(group)}</span>
                           {/if}
                           {#each moduleLevels as level}
                             {#if group.counts[level]}

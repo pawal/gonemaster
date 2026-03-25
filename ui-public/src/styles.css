@@ -234,7 +234,7 @@ details[inert] > summary {
 }
 
 .level-pill.severity-debug    { background: #f1f5f9; color: #475467; }
-.level-pill.severity-info     { background: #f0fdf4; color: #166534; }
+.level-pill.severity-info     { background: transparent; color: #6b7280; border: 1px solid #d1d5db; }
 .level-pill.severity-notice   { background: #e0f2fe; color: #075985; }
 .level-pill.severity-warning  { background: #fef3c7; color: #92400e; }
 .level-pill.severity-error    { background: #ffedd5; color: #9a3412; }

@@ -876,6 +876,10 @@
   const moduleLevels = ["NOTICE", "WARNING", "ERROR", "CRITICAL"];
   const LEVEL_ORDER = ["DEBUG", "INFO", "NOTICE", "WARNING", "ERROR", "CRITICAL"];
   const normalizeLevel = (value) => (value || "INFO").toUpperCase();
+  // Returns the effective display level for a domain. The server only tracks
+  // NOTICE and above in worst_level, so a clean run (INFO-only) leaves
+  // latest_level empty. Show "INFO" in that case rather than the missing-data dash.
+  const domainLevel = (d) => d?.latest_level || (d?.latest_run_at ? "INFO" : "");
   const worstLevel = (entries) => {
     if (!entries?.length) return "INFO";
     let worst = 0;
@@ -2389,7 +2393,7 @@
           {/if}
           <div class="kv" style="margin-bottom: 1rem;">
             <span>{$t("col_latest_level")}</span>
-            <span><span class="badge level-{(selectedDomain.latest_level || '').toLowerCase()}">{selectedDomain.latest_level || "—"}</span></span>
+            <span><span class="badge level-{domainLevel(selectedDomain).toLowerCase()}">{domainLevel(selectedDomain) || "—"}</span></span>
             <span>{$t("col_latest_run_at")}</span>
             <strong>{selectedDomain.latest_run_at ? formatTimestampLocal(selectedDomain.latest_run_at) : "—"}</strong>
             <span>{$t("col_run_count")}</span>
@@ -2618,7 +2622,7 @@
                 >
                   <td class="mono">{d.name}</td>
                   <td>{d.tags ? d.tags.join(", ") : ""}</td>
-                  <td><span class="badge level-{(d.latest_level || '').toLowerCase()}">{d.latest_level || "—"}</span></td>
+                  <td><span class="badge level-{domainLevel(d).toLowerCase()}">{domainLevel(d) || "—"}</span></td>
                   <td>{d.latest_run_at ? d.latest_run_at.slice(0, 10) : "—"}</td>
                   <td>{d.run_count ?? 0}</td>
                 </tr>
@@ -2711,7 +2715,7 @@
                   on:keydown={(e) => { if (e.key === "Enter" || e.key === " ") navigateToDomainDetail(d); }}
                 >
                   <td class="mono">{d.name}</td>
-                  <td><span class="badge level-{(d.latest_level || '').toLowerCase()}">{d.latest_level || "—"}</span></td>
+                  <td><span class="badge level-{domainLevel(d).toLowerCase()}">{domainLevel(d) || "—"}</span></td>
                   <td>{d.latest_run_at ? d.latest_run_at.slice(0, 10) : "—"}</td>
                 </tr>
               {/each}

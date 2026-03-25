@@ -171,6 +171,11 @@
   let domainRunsLimit = 20;
   let domainRunsLoading = false;
   let domainResubmitting = false;
+  let selectedDomainRunId = null;
+  let selectedDomainRunResult = null;
+  let domainRunResultLoading = false;
+  let domainModuleOpen = {};
+  let domainModuleGroups = [];
   let availableTags = [];
   let tagsLoaded = false;
 
@@ -939,6 +944,10 @@
     moduleOpen = { ...moduleOpen, [key]: !moduleOpen[key] };
   };
 
+  const toggleDomainModule = (key) => {
+    domainModuleOpen = { ...domainModuleOpen, [key]: !domainModuleOpen[key] };
+  };
+
   const normalizeTab = (value) => {
     const tab = String(value || "").replace(/^\/+/, "").toLowerCase();
     if (tab === "single" || tab === "job" || tab === "jobs" || tab === "home") return "single";
@@ -1429,10 +1438,28 @@
       const data = await apiFetch(`/domains/${selectedDomain.id}/runs?${params}`);
       domainRuns = data?.items ?? [];
       domainRunsTotal = data?.total ?? 0;
+      if (domainRuns.length > 0 && domainRunsOffset === 0) {
+        loadDomainRunResult(domainRuns[0].id);
+      }
     } catch (error) {
       setStatus($t("domain_runs_load_error", { error: error.message || "unknown error" }), "warn");
     } finally {
       domainRunsLoading = false;
+    }
+  };
+
+  const loadDomainRunResult = async (runId) => {
+    selectedDomainRunId = runId;
+    selectedDomainRunResult = null;
+    domainModuleOpen = {};
+    domainRunResultLoading = true;
+    try {
+      const locale = resultLocale ? `?locale=${encodeURIComponent(resultLocale)}` : "";
+      selectedDomainRunResult = await apiFetch(`/jobs/${runId}/result${locale}`);
+    } catch (_) {
+      // result not available for this run
+    } finally {
+      domainRunResultLoading = false;
     }
   };
 
@@ -1743,6 +1770,10 @@
 
   $: {
     moduleGroups = groupRawEntries(selectedJobResult?.raw);
+  }
+
+  $: {
+    domainModuleGroups = groupRawEntries(selectedDomainRunResult?.raw);
   }
 
   $: if (selectedJobResult?.job_id !== lastResultJobId) {
@@ -2285,7 +2316,7 @@
     <div class="card reveal" id="panel-domains" role="tabpanel" aria-labelledby="tab-domains" style="--d: 0.34s; margin-top: 22px;">
       {#if selectedDomain}
         <div>
-          <button class="secondary small" on:click={() => { selectedDomain = null; domainRuns = []; }}>{$t("back_to_domains")}</button>
+          <button class="secondary small" on:click={() => { selectedDomain = null; domainRuns = []; selectedDomainRunResult = null; selectedDomainRunId = null; }}>{$t("back_to_domains")}</button>
           <h2 class="mono" style="margin-top: 0.5rem;">{selectedDomain.name}</h2>
           {#if selectedDomain.tags && selectedDomain.tags.length > 0}
             <div style="display:flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
@@ -2294,15 +2325,121 @@
               {/each}
             </div>
           {/if}
-          <div style="display:flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
-            <div><span class="muted small">{$t("col_latest_level")} </span><span class="badge level-{(selectedDomain.latest_level || '').toLowerCase()}">{selectedDomain.latest_level || "—"}</span></div>
-            <div><span class="muted small">{$t("col_latest_run_at")} </span>{selectedDomain.latest_run_at ? selectedDomain.latest_run_at.slice(0, 10) : "—"}</div>
-            <div><span class="muted small">{$t("col_run_count")} </span>{selectedDomain.run_count ?? 0}</div>
+          <div class="kv" style="margin-bottom: 1rem;">
+            <span>{$t("col_latest_level")}</span>
+            <span><span class="badge level-{(selectedDomain.latest_level || '').toLowerCase()}">{selectedDomain.latest_level || "—"}</span></span>
+            <span>{$t("col_latest_run_at")}</span>
+            <strong>{selectedDomain.latest_run_at ? formatTimestampLocal(selectedDomain.latest_run_at) : "—"}</strong>
+            <span>{$t("col_run_count")}</span>
+            <strong>{selectedDomain.run_count ?? 0}</strong>
           </div>
           <button class="secondary" on:click={retestDomain} disabled={domainResubmitting}>
             {domainResubmitting ? $t("submitting") : $t("retest_domain")}
           </button>
-          <h3 style="margin-top: 1.25rem;">{$t("domain_run_history_heading")}</h3>
+
+          <!-- Latest / selected run result -->
+          {#if domainRunResultLoading}
+            <p class="muted" style="margin-top: 1rem;">{$t("loading")}</p>
+          {:else if selectedDomainRunResult}
+            {@const allEntries = selectedDomainRunResult?.raw?.entries ?? []}
+            {@const bannerCls = bannerClass(worstLevel(allEntries))}
+            <div class="stack" style="margin-top: 1.25rem;">
+              {#if allEntries.length}
+                <div class="status-banner {bannerCls}">{$t(`result_status_${bannerCls}`)}</div>
+              {/if}
+              <div class="field-label">{$t("result_summary_label")}</div>
+              {#if summaryRows(selectedDomainRunResult.summary).length}
+                <div class="summary-grid">
+                  {#each summaryRows(selectedDomainRunResult.summary) as row (row.level)}
+                    <div class={`summary-item severity-${row.level.toLowerCase()}`}>
+                      <span class="summary-label">{row.level}</span>
+                      <span class="summary-count">{row.count}</span>
+                    </div>
+                  {/each}
+                </div>
+              {:else}
+                <div class="summary-empty">{$t("no_result_entries")}</div>
+              {/if}
+              <div class="field-label">{$t("result_details_label")}</div>
+              {#if domainModuleGroups.length === 0}
+                <div class="summary-empty">{$t("no_raw_entries")}</div>
+              {:else}
+                <div class="small">{$t("module_expand_hint")}</div>
+                <div class="module-list">
+                  {#each domainModuleGroups as group (group.key)}
+                    <div class="module-card">
+                      <button
+                        class="module-toggle"
+                        type="button"
+                        aria-expanded={!!domainModuleOpen[group.key]}
+                        aria-controls={"dm-" + moduleId(group.key)}
+                        on:click={() => toggleDomainModule(group.key)}
+                      >
+                        <div class="module-title">{group.name}</div>
+                        <div class="module-meta">{$t("entries_count", { count: group.entries.length })}</div>
+                        <div class="module-badges">
+                          {#each moduleLevels as level}
+                            {#if group.counts[level]}
+                              <span class={`level-pill severity-${level.toLowerCase()}`}>{level} {group.counts[level]}</span>
+                            {/if}
+                          {/each}
+                        </div>
+                        <span class={`module-chevron ${domainModuleOpen[group.key] ? "open" : ""}`}></span>
+                      </button>
+                      {#if domainModuleOpen[group.key]}
+                        <div class="module-body" id={"dm-" + moduleId(group.key)}>
+                          {#each group.testcasesArr as tcg (tcg.tc)}
+                            {@const tcKey = `tc.${tcg.tc.toLowerCase()}`}
+                            {@const tcDesc = $t(tcKey)}
+                            <details class="testcase-group" open={isWarningOrAbove(tcg.level)}>
+                              <summary class="testcase-summary">
+                                <span class="testcase-chevron"></span>
+                                <span class="testcase-desc">{tcDesc !== tcKey ? tcDesc : tcg.tc}</span>
+                                <span class="testcase-badge">
+                                  <span class={`level-pill severity-${normalizeLevel(tcg.level).toLowerCase()}`}>{normalizeLevel(tcg.level)}</span>
+                                </span>
+                              </summary>
+                              <div class="testcase-entries">
+                                {#each tcg.entries as entry}
+                                  {@const level = normalizeLevel(entry.level)}
+                                  <div class="result-row tc-row">
+                                    <span class={`entry-level severity-${level.toLowerCase()}`}>{level}</span>
+                                    <span class="entry-message">{entryMessage(entry)}</span>
+                                  </div>
+                                {/each}
+                              </div>
+                            </details>
+                          {/each}
+                          {#if group.ungrouped.length}
+                            <div class="result-header ungrouped-header">
+                              <span>{$t("result_col_seconds")}</span>
+                              <span>{$t("result_col_level")}</span>
+                              <span>{$t("result_col_message")}</span>
+                            </div>
+                            {#each group.ungrouped as entry}
+                              {@const level = normalizeLevel(entry.level)}
+                              {@const meta = entryMeta(entry)}
+                              <div class="result-row">
+                                <span class="entry-time">{formatSeconds(entry.timestamp)}</span>
+                                <span class={`entry-level severity-${level.toLowerCase()}`}>{level}</span>
+                                <span class="entry-message">{entryMessage(entry)}</span>
+                              </div>
+                              {#if meta}
+                                <div class="entry-meta">{meta}</div>
+                              {/if}
+                            {/each}
+                          {/if}
+                        </div>
+                      {/if}
+                    </div>
+                  {/each}
+                </div>
+              {/if}
+            </div>
+          {/if}
+
+          <!-- Run history -->
+          <h3 style="margin-top: 1.5rem;">{$t("domain_run_history_heading")}</h3>
           {#if domainRunsLoading}
             <p class="muted">{$t("loading")}</p>
           {:else if domainRuns.length === 0}
@@ -2311,7 +2448,6 @@
             <table class="data-table">
               <thead>
                 <tr>
-                  <th>{$t("col_run_id")}</th>
                   <th>{$t("col_finished_at")}</th>
                   <th>{$t("col_worst_level")}</th>
                   <th>{$t("col_duration")}</th>
@@ -2322,13 +2458,13 @@
                 {#each domainRuns as run}
                   <tr
                     style="cursor: pointer;"
-                    on:click={() => { selectedJobId = run.id; loadJob(run.id); setTab("single"); }}
+                    class={selectedDomainRunId === run.id ? "run-row-selected" : ""}
+                    on:click={() => loadDomainRunResult(run.id)}
                     role="button"
                     tabindex="0"
-                    on:keydown={(e) => { if (e.key === "Enter" || e.key === " ") { selectedJobId = run.id; loadJob(run.id); setTab("single"); } }}
+                    on:keydown={(e) => { if (e.key === "Enter" || e.key === " ") loadDomainRunResult(run.id); }}
                   >
-                    <td class="mono small">{run.id}</td>
-                    <td>{run.finished_at ? run.finished_at.slice(0, 10) : "—"}</td>
+                    <td>{run.finished_at ? run.finished_at.slice(0, 16).replace("T", " ") : "—"}</td>
                     <td><span class="badge level-{(run.worst_level || '').toLowerCase()}">{run.worst_level || "—"}</span></td>
                     <td>{run.duration_ms != null ? run.duration_ms + "ms" : "—"}</td>
                     <td>{run.entry_count ?? 0}</td>

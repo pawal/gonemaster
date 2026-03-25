@@ -1016,6 +1016,10 @@ button:hover:not(:disabled) {
   background: rgba(11, 45, 77, 0.04);
 }
 
+.data-table tbody tr.run-row-selected {
+  background: rgba(11, 45, 77, 0.09);
+}
+
 .metrics-table {
   width: 100%;
   border-collapse: collapse;
@@ -1167,6 +1171,9 @@ pre {
   :root:not([data-theme="light"]):not([data-theme="dark"]) .data-table tbody tr:hover {
     background: rgba(255, 255, 255, 0.04);
   }
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .data-table tbody tr.run-row-selected {
+    background: rgba(255, 255, 255, 0.08);
+  }
 
   :root:not([data-theme="light"]):not([data-theme="dark"]) .badge {
     background: rgba(14, 116, 144, 0.2);
@@ -1285,6 +1292,10 @@ pre {
 
 :root[data-theme="dark"] .data-table tbody tr:hover {
   background: rgba(255, 255, 255, 0.04);
+}
+
+:root[data-theme="dark"] .data-table tbody tr.run-row-selected {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 :root[data-theme="dark"] .badge {

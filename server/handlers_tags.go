@@ -194,6 +194,7 @@ func (s *Server) handleListTagDomains(w http.ResponseWriter, r *http.Request, ta
 		}
 		filter.Offset = v
 	}
+	filter.MinLevel = strings.ToUpper(strings.TrimSpace(q.Get("min_level")))
 	writeJSON(w, http.StatusOK, s.store.ListDomainsByTag(tag, filter))
 }
 

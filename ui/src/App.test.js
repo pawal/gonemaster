@@ -2820,6 +2820,29 @@ describe("App", () => {
       unmount();
     });
 
+    it("pressing Enter in description field submits create tag form", async () => {
+      const calls = [];
+      global.fetch.mockImplementation((url, opts) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        calls.push({ url: value, method: opts?.method });
+        if (value.includes("/api/v1/tags") && opts?.method === "POST") return jsonResponse({ name: "newtag", description: "a desc", domain_count: 0 });
+        if (value.includes("/api/v1/tags")) return jsonResponse([]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openTagsTab();
+
+      await fireEvent.input(screen.getByLabelText("Name"), { target: { value: "newtag" } });
+      await fireEvent.input(screen.getByLabelText("Description"), { target: { value: "a desc" } });
+      await fireEvent.keyDown(screen.getByLabelText("Description"), { key: "Enter" });
+
+      await waitFor(() => {
+        expect(calls.some((c) => c.url.includes("/api/v1/tags") && c.method === "POST")).toBe(true);
+      });
+      unmount();
+    });
+
     it("clicking a tag row opens detail view with summary and domains", async () => {
       mockTagFetch(
         [{ name: "ccTLD", description: "ccTLDs", domain_count: 2 }],

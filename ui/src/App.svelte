@@ -2728,7 +2728,7 @@
           </div>
           <div class="stack" style="flex: 2 1 240px;">
             <label for="tag-create-desc">{$t("tag_description_label")}</label>
-            <input id="tag-create-desc" type="text" bind:value={tagCreateDescription} placeholder={$t("tag_description_placeholder")} />
+            <input id="tag-create-desc" type="text" bind:value={tagCreateDescription} placeholder={$t("tag_description_placeholder")} on:keydown={(e) => { if (e.key === 'Enter') createTag(); }} />
           </div>
           <button class="secondary" on:click={createTag} disabled={tagCreating || !tagCreateName.trim()}>
             {tagCreating ? $t("submitting") : $t("tag_create_button")}

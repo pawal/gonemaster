@@ -2151,23 +2151,38 @@
                         {/each}
                         <!-- Ungrouped entries (no testcase, e.g. START_TIME, DEPENDENCY_VERSION) -->
                         {#if group.ungrouped.length}
-                          <div class="result-header ungrouped-header">
-                            <span>{$t("result_col_seconds")}</span>
-                            <span>{$t("result_col_level")}</span>
-                            <span>{$t("result_col_message")}</span>
-                          </div>
-                          {#each group.ungrouped as entry}
-                            {@const level = normalizeLevel(entry.level)}
-                            {@const meta = entryMeta(entry)}
-                            <div class="result-row">
-                              <span class="entry-time">{formatSeconds(entry.timestamp)}</span>
-                              <span class={`entry-level severity-${level.toLowerCase()}`}>{level}</span>
-                              <span class="entry-message">{entryMessage(entry)}</span>
+                          {#if group.testcasesArr.length === 0}
+                            <!-- Module has only ungrouped entries (e.g. System): flat level+message rows -->
+                            {#each group.ungrouped as entry}
+                              {@const level = normalizeLevel(entry.level)}
+                              {@const meta = entryMeta(entry)}
+                              <div class="result-row tc-row">
+                                <span class={`entry-level severity-${level.toLowerCase()}`}>{level}</span>
+                                <span class="entry-message">{entryMessage(entry)}</span>
+                              </div>
+                              {#if meta}
+                                <div class="entry-meta">{meta}</div>
+                              {/if}
+                            {/each}
+                          {:else}
+                            <div class="result-header ungrouped-header">
+                              <span>{$t("result_col_seconds")}</span>
+                              <span>{$t("result_col_level")}</span>
+                              <span>{$t("result_col_message")}</span>
                             </div>
-                            {#if meta}
-                              <div class="entry-meta">{meta}</div>
-                            {/if}
-                          {/each}
+                            {#each group.ungrouped as entry}
+                              {@const level = normalizeLevel(entry.level)}
+                              {@const meta = entryMeta(entry)}
+                              <div class="result-row">
+                                <span class="entry-time">{formatSeconds(entry.timestamp)}</span>
+                                <span class={`entry-level severity-${level.toLowerCase()}`}>{level}</span>
+                                <span class="entry-message">{entryMessage(entry)}</span>
+                              </div>
+                              {#if meta}
+                                <div class="entry-meta">{meta}</div>
+                              {/if}
+                            {/each}
+                          {/if}
                         {/if}
                       </div>
                     {/if}
@@ -2420,23 +2435,37 @@
                             </details>
                           {/each}
                           {#if group.ungrouped.length}
-                            <div class="result-header ungrouped-header">
-                              <span>{$t("result_col_seconds")}</span>
-                              <span>{$t("result_col_level")}</span>
-                              <span>{$t("result_col_message")}</span>
-                            </div>
-                            {#each group.ungrouped as entry}
-                              {@const level = normalizeLevel(entry.level)}
-                              {@const meta = entryMeta(entry)}
-                              <div class="result-row">
-                                <span class="entry-time">{formatSeconds(entry.timestamp)}</span>
-                                <span class={`entry-level severity-${level.toLowerCase()}`}>{level}</span>
-                                <span class="entry-message">{entryMessage(entry)}</span>
+                            {#if group.testcasesArr.length === 0}
+                              {#each group.ungrouped as entry}
+                                {@const level = normalizeLevel(entry.level)}
+                                {@const meta = entryMeta(entry)}
+                                <div class="result-row tc-row">
+                                  <span class={`entry-level severity-${level.toLowerCase()}`}>{level}</span>
+                                  <span class="entry-message">{entryMessage(entry)}</span>
+                                </div>
+                                {#if meta}
+                                  <div class="entry-meta">{meta}</div>
+                                {/if}
+                              {/each}
+                            {:else}
+                              <div class="result-header ungrouped-header">
+                                <span>{$t("result_col_seconds")}</span>
+                                <span>{$t("result_col_level")}</span>
+                                <span>{$t("result_col_message")}</span>
                               </div>
-                              {#if meta}
-                                <div class="entry-meta">{meta}</div>
-                              {/if}
-                            {/each}
+                              {#each group.ungrouped as entry}
+                                {@const level = normalizeLevel(entry.level)}
+                                {@const meta = entryMeta(entry)}
+                                <div class="result-row">
+                                  <span class="entry-time">{formatSeconds(entry.timestamp)}</span>
+                                  <span class={`entry-level severity-${level.toLowerCase()}`}>{level}</span>
+                                  <span class="entry-message">{entryMessage(entry)}</span>
+                                </div>
+                                {#if meta}
+                                  <div class="entry-meta">{meta}</div>
+                                {/if}
+                              {/each}
+                            {/if}
                           {/if}
                         </div>
                       {/if}

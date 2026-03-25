@@ -2153,7 +2153,7 @@
                         {#if group.ungrouped.length}
                           {#if group.testcasesArr.length === 0}
                             <!-- Module has only ungrouped entries (e.g. System): flat level+message rows -->
-                            {#each group.ungrouped.filter(e => e.message) as entry}
+                            {#each group.ungrouped.filter(e => e.message && e.message !== e.raw) as entry}
                               {@const level = normalizeLevel(entry.level)}
                               {@const meta = entryMeta(entry)}
                               <div class="result-row tc-row">
@@ -2170,7 +2170,7 @@
                               <span>{$t("result_col_level")}</span>
                               <span>{$t("result_col_message")}</span>
                             </div>
-                            {#each group.ungrouped.filter(e => e.message) as entry}
+                            {#each group.ungrouped.filter(e => e.message && e.message !== e.raw) as entry}
                               {@const level = normalizeLevel(entry.level)}
                               {@const meta = entryMeta(entry)}
                               <div class="result-row">
@@ -2436,7 +2436,7 @@
                           {/each}
                           {#if group.ungrouped.length}
                             {#if group.testcasesArr.length === 0}
-                              {#each group.ungrouped.filter(e => e.message) as entry}
+                              {#each group.ungrouped.filter(e => e.message && e.message !== e.raw) as entry}
                                 {@const level = normalizeLevel(entry.level)}
                                 {@const meta = entryMeta(entry)}
                                 <div class="result-row tc-row">
@@ -2453,7 +2453,7 @@
                                 <span>{$t("result_col_level")}</span>
                                 <span>{$t("result_col_message")}</span>
                               </div>
-                              {#each group.ungrouped.filter(e => e.message) as entry}
+                              {#each group.ungrouped.filter(e => e.message && e.message !== e.raw) as entry}
                                 {@const level = normalizeLevel(entry.level)}
                                 {@const meta = entryMeta(entry)}
                                 <div class="result-row">

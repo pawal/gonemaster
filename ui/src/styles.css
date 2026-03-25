@@ -984,6 +984,38 @@ button:hover:not(:disabled) {
   font-size: 0.94rem;
 }
 
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.data-table th {
+  text-align: left;
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--border);
+  padding: 6px 8px;
+  white-space: nowrap;
+}
+
+.data-table td {
+  text-align: left;
+  border-bottom: 1px solid rgba(208, 213, 221, 0.4);
+  padding: 8px 8px;
+  vertical-align: middle;
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.data-table tbody tr:hover {
+  background: rgba(11, 45, 77, 0.04);
+}
+
 .metrics-table {
   width: 100%;
   border-collapse: collapse;
@@ -1132,6 +1164,10 @@ pre {
       linear-gradient(180deg, var(--bg), var(--bg-2));
   }
 
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .data-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.04);
+  }
+
   :root:not([data-theme="light"]):not([data-theme="dark"]) .badge {
     background: rgba(14, 116, 144, 0.2);
   }
@@ -1245,6 +1281,10 @@ pre {
     linear-gradient(90deg, rgba(200, 220, 255, 0.03) 1px, transparent 1px),
     linear-gradient(0deg, rgba(200, 220, 255, 0.03) 1px, transparent 1px),
     linear-gradient(180deg, var(--bg), var(--bg-2));
+}
+
+:root[data-theme="dark"] .data-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.04);
 }
 
 :root[data-theme="dark"] .badge {

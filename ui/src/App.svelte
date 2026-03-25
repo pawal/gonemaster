@@ -2473,6 +2473,7 @@
             <table class="data-table">
               <thead>
                 <tr>
+                  <th>{$t("col_run_id")}</th>
                   <th>{$t("col_finished_at")}</th>
                   <th>{$t("col_worst_level")}</th>
                   <th>{$t("col_duration")}</th>
@@ -2484,11 +2485,12 @@
                   <tr
                     style="cursor: pointer;"
                     class={selectedDomainRunId === run.id ? "run-row-selected" : ""}
-                    on:click={() => loadDomainRunResult(run.id)}
+                    on:click={() => { selectedJobId = run.id; setTab("single"); loadJob(run.id); }}
                     role="button"
                     tabindex="0"
-                    on:keydown={(e) => { if (e.key === "Enter" || e.key === " ") loadDomainRunResult(run.id); }}
+                    on:keydown={(e) => { if (e.key === "Enter" || e.key === " ") { selectedJobId = run.id; setTab("single"); loadJob(run.id); } }}
                   >
+                    <td class="run-id-cell" title={run.id}>{run.id}</td>
                     <td>{run.finished_at ? run.finished_at.slice(0, 16).replace("T", " ") : "—"}</td>
                     <td><span class="badge level-{(run.worst_level || '').toLowerCase()}">{run.worst_level || "—"}</span></td>
                     <td>{run.duration_ms != null ? run.duration_ms + "ms" : "—"}</td>

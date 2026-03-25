@@ -1026,6 +1026,15 @@ button:hover:not(:disabled) {
   background: rgba(11, 45, 77, 0.09);
 }
 
+.run-id-cell {
+  max-width: 10ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: monospace;
+  font-size: 0.8em;
+}
+
 .metrics-table {
   width: 100%;
   border-collapse: collapse;

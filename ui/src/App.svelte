@@ -2025,7 +2025,7 @@
               <span class="progress-value">{progressPercent(selectedJob)}%</span>
             </div>
             <span>{$t("domain_label")}</span>
-            <button class="ghost" type="button" style="padding: 0; font-family: monospace; text-align: left;" on:click={() => navigateToDomainByName(selectedJob.domain)}>{selectedJob.domain}</button>
+            <button class="ghost" type="button" style="padding: 0; font-family: monospace; text-align: left; border: none;" on:click={() => navigateToDomainByName(selectedJob.domain)}>{selectedJob.domain}</button>
             <span>{$t("created_label")}</span>
             <strong>{formatTimestampLocal(selectedJob.created_at)}</strong>
             {#if selectedRun}

@@ -1527,7 +1527,10 @@
         body: JSON.stringify({ from_tag: selectedTag.name })
       });
       createdBatchId = response.batch_id || "";
+      selectedBatchId = response.batch_id || "";
       setStatus($t("batch_accepted", { id: response.batch_id }), "ok");
+      await loadRecentBatchOptions();
+      await loadBatch(response.batch_id, { resetCursor: true });
       setTab("batches");
     } catch (error) {
       setStatus($t("tag_run_all_error", { error: error.message || "unknown error" }), "warn");

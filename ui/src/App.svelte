@@ -497,7 +497,7 @@
 
     const hash = window.location.hash || `#/${activeTab}`;
     const search = params.toString();
-    window.history.replaceState(null, "", `${window.location.pathname}${search ? `?${search}` : ""}${hash}`);
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}${search ? `?${search}` : ""}${hash}`);
 
     try {
       const storage = typeof window === "undefined" ? null : window.localStorage;
@@ -962,17 +962,17 @@
     return "";
   };
 
-  const setTab = (tab) => {
+  const setTab = (tab, { replace = false } = {}) => {
     const next = normalizeTab(tab) || "single";
     const changed = activeTab !== next;
     activeTab = next;
     const nextHash = `#/${next}`;
-    if (window.location.hash !== nextHash) {
-      window.history.replaceState(
-        null,
-        "",
-        `${window.location.pathname}${window.location.search}${nextHash}`
-      );
+    const url = `${window.location.pathname}${window.location.search}${nextHash}`;
+    const state = { tab: next, domain: null, tag: null };
+    if (!changed || replace) {
+      if (window.location.hash !== nextHash) window.history.replaceState(state, "", url);
+    } else {
+      window.history.pushState(state, "", url);
     }
     if (changed && statusMessage) {
       clearStatus();
@@ -999,18 +999,65 @@
     }
   };
 
+  const navigateToDomainDetail = (d) => {
+    activeTab = "domains";
+    selectedDomain = d;
+    domainRuns = [];
+    domainRunsOffset = 0;
+    selectedDomainRunResult = null;
+    selectedDomainRunId = null;
+    const hash = `#/domains/${encodeURIComponent(d.name)}`;
+    window.history.pushState({ tab: "domains", domain: d, tag: null }, "", `${window.location.pathname}${window.location.search}${hash}`);
+    if (statusMessage) clearStatus();
+    loadDomainRuns();
+  };
+
+  const navigateToTagDetail = (tag) => {
+    activeTab = "tags";
+    selectedTag = tag;
+    tagSummary = null;
+    tagDomains = [];
+    tagDomainsOffset = 0;
+    tagDomainLevelFilter = "";
+    tagDeleteConfirm = false;
+    const hash = `#/tags/${encodeURIComponent(tag.name)}`;
+    window.history.pushState({ tab: "tags", domain: null, tag }, "", `${window.location.pathname}${window.location.search}${hash}`);
+    if (statusMessage) clearStatus();
+    loadTagSummary();
+    loadTagDomains();
+  };
+
+  const onPopState = (e) => {
+    const state = e.state;
+    if (!state) { updateTabFromHash(); return; }
+    activeTab = state.tab || "single";
+    selectedDomain = state.domain ?? null;
+    selectedTag = state.tag ?? null;
+    if (!selectedDomain) {
+      domainRuns = [];
+      selectedDomainRunResult = null;
+      selectedDomainRunId = null;
+    } else {
+      loadDomainRuns();
+    }
+    if (!selectedTag) {
+      tagDeleteConfirm = false;
+    } else {
+      loadTagSummary();
+      loadTagDomains({ reset: true });
+    }
+  };
+
   const updateTabFromHash = () => {
     const hash = window.location.hash || "";
-    const value = hash.replace(/^#\/?/, "");
-    const next = normalizeTab(value) || "single";
+    const segment = hash.replace(/^#\/?/, "").split("/")[0];
+    const next = normalizeTab(segment) || "single";
     activeTab = next;
-    if (!hash) {
-      window.history.replaceState(
-        null,
-        "",
-        `${window.location.pathname}${window.location.search}#/${next}`
-      );
-    }
+    window.history.replaceState(
+      { tab: next, domain: null, tag: null },
+      "",
+      `${window.location.pathname}${window.location.search}#/${next}`
+    );
   };
 
   const loadJobs = async (options = {}) => {
@@ -1241,11 +1288,7 @@
       const data = await apiFetch(`/domains?name=${encodeURIComponent(name)}&limit=20`);
       const match = (data?.items ?? []).find((d) => d.name === name);
       if (!match) return;
-      selectedDomain = match;
-      domainRuns = [];
-      domainRunsOffset = 0;
-      loadDomainRuns();
-      setTab("domains");
+      navigateToDomainDetail(match);
     } catch (_) {}
   };
 
@@ -1852,6 +1895,7 @@
     recentCursor = normalizeCursor(recentCursor);
     persistenceReady = true;
     window.addEventListener("hashchange", updateTabFromHash);
+    window.addEventListener("popstate", onPopState);
     loadJobs();
     if (activeTab === "batches") {
       loadRecentBatchOptions();
@@ -1882,6 +1926,7 @@
       if (jobInspectorHighlightTimer) clearTimeout(jobInspectorHighlightTimer);
       if (statusDismissTimer) clearTimeout(statusDismissTimer);
       window.removeEventListener("hashchange", updateTabFromHash);
+      window.removeEventListener("popstate", onPopState);
     };
   });
 </script>
@@ -2332,7 +2377,7 @@
     <div class="card reveal" id="panel-domains" role="tabpanel" aria-labelledby="tab-domains" style="--d: 0.34s; margin-top: 22px;">
       {#if selectedDomain}
         <div>
-          <button class="secondary small" on:click={() => { selectedDomain = null; domainRuns = []; selectedDomainRunResult = null; selectedDomainRunId = null; }}>{$t("back_to_domains")}</button>
+          <button class="secondary small" on:click={() => history.back()}>{$t("back_to_domains")}</button>
           <h2 class="mono" style="margin-top: 0.5rem;">{selectedDomain.name}</h2>
           {#if selectedDomain.tags && selectedDomain.tags.length > 0}
             <div style="display:flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
@@ -2565,10 +2610,10 @@
               {#each domains as d}
                 <tr
                   style="cursor: pointer;"
-                  on:click={() => { selectedDomain = d; domainRuns = []; domainRunsOffset = 0; loadDomainRuns(); }}
+                  on:click={() => navigateToDomainDetail(d)}
                   role="button"
                   tabindex="0"
-                  on:keydown={(e) => { if (e.key === "Enter" || e.key === " ") { selectedDomain = d; domainRuns = []; domainRunsOffset = 0; loadDomainRuns(); } }}
+                  on:keydown={(e) => { if (e.key === "Enter" || e.key === " ") navigateToDomainDetail(d); }}
                 >
                   <td class="mono">{d.name}</td>
                   <td>{d.tags ? d.tags.join(", ") : ""}</td>
@@ -2598,7 +2643,7 @@
   {:else if activeTab === "tags"}
     <div class="card reveal" id="panel-tags" role="tabpanel" aria-labelledby="tab-tags" style="--d: 0.34s; margin-top: 22px;">
       {#if selectedTag}
-        <button class="secondary small" on:click={() => { selectedTag = null; tagDeleteConfirm = false; }}>{$t("back_to_tags")}</button>
+        <button class="secondary small" on:click={() => history.back()}>{$t("back_to_tags")}</button>
         <h2 style="margin-top: 0.5rem;">{selectedTag.name}</h2>
         {#if selectedTag.description}
           <p class="muted small">{selectedTag.description}</p>
@@ -2659,10 +2704,10 @@
               {#each tagDomains as d}
                 <tr
                   style="cursor: pointer;"
-                  on:click={() => { selectedDomain = d; domainRuns = []; domainRunsOffset = 0; loadDomainRuns(); setTab("domains"); }}
+                  on:click={() => navigateToDomainDetail(d)}
                   role="button"
                   tabindex="0"
-                  on:keydown={(e) => { if (e.key === "Enter" || e.key === " ") { selectedDomain = d; domainRuns = []; domainRunsOffset = 0; loadDomainRuns(); setTab("domains"); } }}
+                  on:keydown={(e) => { if (e.key === "Enter" || e.key === " ") navigateToDomainDetail(d); }}
                 >
                   <td class="mono">{d.name}</td>
                   <td><span class="badge level-{(d.latest_level || '').toLowerCase()}">{d.latest_level || "—"}</span></td>
@@ -2740,10 +2785,10 @@
               {#each tagsList as tag}
                 <tr
                   style="cursor: pointer;"
-                  on:click={() => { selectedTag = tag; tagSummary = null; tagDomains = []; tagDomainsOffset = 0; tagDomainLevelFilter = ""; tagDeleteConfirm = false; loadTagSummary(); loadTagDomains(); }}
+                  on:click={() => navigateToTagDetail(tag)}
                   role="button"
                   tabindex="0"
-                  on:keydown={(e) => { if (e.key === "Enter" || e.key === " ") { selectedTag = tag; tagSummary = null; tagDomains = []; tagDomainsOffset = 0; tagDomainLevelFilter = ""; tagDeleteConfirm = false; loadTagSummary(); loadTagDomains(); } }}
+                  on:keydown={(e) => { if (e.key === "Enter" || e.key === " ") navigateToTagDetail(tag); }}
                 >
                   <td class="mono">{tag.name}</td>
                   <td>{tag.description || "—"}</td>

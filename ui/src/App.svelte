@@ -1659,6 +1659,9 @@
     if (selectedJobResult) {
       loadJobResult(selectedJobId);
     }
+    if (selectedDomainRunResult) {
+      loadDomainRunResult(selectedDomainRunId);
+    }
   };
 
   const ensureNotificationPermission = () => {

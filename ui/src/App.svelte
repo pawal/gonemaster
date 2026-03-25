@@ -81,6 +81,7 @@
 
   // Theme management: "system" follows OS preference via CSS media query;
   // "light" and "dark" set data-theme on <html> explicitly.
+  // "system" is the default for first-time visitors and is never stored.
   const themeKey = "gonemaster.ui.theme.v1";
   let theme = "system";
 
@@ -94,17 +95,17 @@
     }
   };
 
-  const cycleTheme = () => {
-    const order = ["system", "light", "dark"];
-    theme = order[(order.indexOf(theme) + 1) % order.length];
+  const osDark = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+
+  const toggleTheme = () => {
+    const effectiveDark = theme === "dark" || (theme === "system" && osDark());
+    theme = effectiveDark ? "light" : "dark";
     localStorage.setItem(themeKey, theme);
     applyTheme(theme);
   };
 
-  $: themeIcon = theme === "light" ? "☀" : theme === "dark" ? "☾" : "⊙";
-  $: themeTitle = $t("theme_cycle_title", {
-    theme: theme === "light" ? $t("theme_light") : theme === "dark" ? $t("theme_dark") : $t("theme_system")
-  });
+  $: themeIcon = theme === "dark" || (theme === "system" && osDark()) ? "☾" : "☀";
+  $: themeTitle = $t("theme_toggle_title", { theme: theme === "dark" ? $t("theme_dark") : $t("theme_light") });
 
   // Locale management: fetch available locales from the server, persist choice
   // in localStorage, and auto-detect from the browser language on first visit.
@@ -1860,7 +1861,7 @@
     if (initialized || typeof window === "undefined") return;
     initialized = true;
     const storedTheme = localStorage.getItem(themeKey);
-    if (storedTheme === "light" || storedTheme === "dark" || storedTheme === "system") {
+    if (storedTheme === "light" || storedTheme === "dark") {
       theme = storedTheme;
     }
     applyTheme(theme);
@@ -1952,7 +1953,7 @@
           {/each}
         </select>
       {/if}
-      <button class="theme-toggle" type="button" on:click={cycleTheme} title={themeTitle} aria-label={themeTitle}>
+      <button class="theme-toggle" type="button" on:click={toggleTheme} title={themeTitle} aria-label={themeTitle}>
         {themeIcon}
       </button>
     </div>

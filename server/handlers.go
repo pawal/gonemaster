@@ -458,7 +458,77 @@ func (s *Server) handleListJobs(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, code, message, nil)
 		return
 	}
-	writeJSON(w, http.StatusOK, s.store.List(filter))
+
+	// Determine which sources to query based on the status filter.
+	// In-flight jobs (queued/running/paused) live in the jobs table.
+	// Graduated jobs (succeeded/failed/canceled/expired) live in the runs table.
+	isActiveOnly := filter.Status == JobQueued || filter.Status == JobRunning || filter.Status == JobPaused
+	isTerminalOnly := !isActiveOnly && filter.Status != ""
+
+	var allItems []Job
+
+	if !isTerminalOnly {
+		inFlightFilter := filter
+		inFlightFilter.Limit = 10000
+		inFlightFilter.Offset = 0
+		allItems = append(allItems, s.store.List(inFlightFilter).Items...)
+	}
+
+	if !isActiveOnly {
+		runFilter := RunFilter{
+			Domain:  filter.Domain,
+			BatchID: filter.BatchID,
+			Limit:   10000,
+			Offset:  0,
+		}
+		if isTerminalOnly {
+			runFilter.Status = filter.Status
+		}
+		for _, run := range s.store.ListRuns(runFilter).Items {
+			allItems = append(allItems, jobFromRun(run))
+		}
+	}
+
+	sortJobSlice(allItems, filter.Sort)
+
+	total := len(allItems)
+	offset := filter.Offset
+	if offset < 0 {
+		offset = 0
+	}
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = 100
+	}
+	start := offset
+	if start > total {
+		start = total
+	}
+	end := start + limit
+	if end > total {
+		end = total
+	}
+	pageItems := make([]Job, end-start)
+	copy(pageItems, allItems[start:end])
+
+	list := JobList{
+		Items:  pageItems,
+		Total:  total,
+		Limit:  limit,
+		Offset: offset,
+		Sort:   string(normalizeJobSort(filter.Sort)),
+	}
+	if start > 0 {
+		prevOffset := start - limit
+		if prevOffset < 0 {
+			prevOffset = 0
+		}
+		list.PrevCursor = strconv.Itoa(prevOffset)
+	}
+	if end < total {
+		list.NextCursor = strconv.Itoa(end)
+	}
+	writeJSON(w, http.StatusOK, list)
 }
 
 func parseListFilter(r *http.Request, defaultLimit int) (JobFilter, string, string) {

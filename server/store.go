@@ -218,61 +218,7 @@ func (s *InMemoryJobStore) List(filter JobFilter) JobList {
 	}
 
 	normalizedSort := normalizeJobSort(filter.Sort)
-
-	sort.Slice(items, func(i, j int) bool {
-		left := items[i]
-		right := items[j]
-		switch normalizedSort {
-		case JobSortCreatedAtAsc:
-			if !left.CreatedAt.Equal(right.CreatedAt) {
-				return left.CreatedAt.Before(right.CreatedAt)
-			}
-		case JobSortCreatedAtDesc:
-			if !left.CreatedAt.Equal(right.CreatedAt) {
-				return left.CreatedAt.After(right.CreatedAt)
-			}
-		case JobSortStartedAtDesc:
-			leftStarted := effectiveStartTime(left)
-			rightStarted := effectiveStartTime(right)
-			if !leftStarted.Equal(rightStarted) {
-				return leftStarted.After(rightStarted)
-			}
-		case JobSortStartedAtAsc:
-			leftStarted := effectiveStartTime(left)
-			rightStarted := effectiveStartTime(right)
-			if !leftStarted.Equal(rightStarted) {
-				return leftStarted.Before(rightStarted)
-			}
-		case JobSortDomainAsc:
-			leftDomain := strings.ToLower(left.Domain)
-			rightDomain := strings.ToLower(right.Domain)
-			if leftDomain != rightDomain {
-				return leftDomain < rightDomain
-			}
-		case JobSortDomainDesc:
-			leftDomain := strings.ToLower(left.Domain)
-			rightDomain := strings.ToLower(right.Domain)
-			if leftDomain != rightDomain {
-				return leftDomain > rightDomain
-			}
-		case JobSortBatchIDAsc:
-			leftBatchID := strings.ToLower(left.BatchID)
-			rightBatchID := strings.ToLower(right.BatchID)
-			if leftBatchID != rightBatchID {
-				return leftBatchID < rightBatchID
-			}
-		case JobSortBatchIDDesc:
-			leftBatchID := strings.ToLower(left.BatchID)
-			rightBatchID := strings.ToLower(right.BatchID)
-			if leftBatchID != rightBatchID {
-				return leftBatchID > rightBatchID
-			}
-		}
-		if !left.CreatedAt.Equal(right.CreatedAt) {
-			return left.CreatedAt.After(right.CreatedAt)
-		}
-		return left.ID < right.ID
-	})
+	sortJobSlice(items, filter.Sort)
 
 	total := len(items)
 	offset := filter.Offset
@@ -1194,6 +1140,65 @@ func normalizeJobSeverityFilter(value JobSeverityFilter) JobSeverityFilter {
 	default:
 		return ""
 	}
+}
+
+// sortJobSlice sorts a slice of jobs in-place by sortOrder.
+func sortJobSlice(items []Job, sortOrder JobSort) {
+	normalizedSort := normalizeJobSort(sortOrder)
+	sort.Slice(items, func(i, j int) bool {
+		left := items[i]
+		right := items[j]
+		switch normalizedSort {
+		case JobSortCreatedAtAsc:
+			if !left.CreatedAt.Equal(right.CreatedAt) {
+				return left.CreatedAt.Before(right.CreatedAt)
+			}
+		case JobSortCreatedAtDesc:
+			if !left.CreatedAt.Equal(right.CreatedAt) {
+				return left.CreatedAt.After(right.CreatedAt)
+			}
+		case JobSortStartedAtDesc:
+			leftStarted := effectiveStartTime(left)
+			rightStarted := effectiveStartTime(right)
+			if !leftStarted.Equal(rightStarted) {
+				return leftStarted.After(rightStarted)
+			}
+		case JobSortStartedAtAsc:
+			leftStarted := effectiveStartTime(left)
+			rightStarted := effectiveStartTime(right)
+			if !leftStarted.Equal(rightStarted) {
+				return leftStarted.Before(rightStarted)
+			}
+		case JobSortDomainAsc:
+			leftDomain := strings.ToLower(left.Domain)
+			rightDomain := strings.ToLower(right.Domain)
+			if leftDomain != rightDomain {
+				return leftDomain < rightDomain
+			}
+		case JobSortDomainDesc:
+			leftDomain := strings.ToLower(left.Domain)
+			rightDomain := strings.ToLower(right.Domain)
+			if leftDomain != rightDomain {
+				return leftDomain > rightDomain
+			}
+		case JobSortBatchIDAsc:
+			leftBatchID := strings.ToLower(left.BatchID)
+			rightBatchID := strings.ToLower(right.BatchID)
+			if leftBatchID != rightBatchID {
+				return leftBatchID < rightBatchID
+			}
+		case JobSortBatchIDDesc:
+			leftBatchID := strings.ToLower(left.BatchID)
+			rightBatchID := strings.ToLower(right.BatchID)
+			if leftBatchID != rightBatchID {
+				return leftBatchID > rightBatchID
+			}
+		}
+		if !left.CreatedAt.Equal(right.CreatedAt) {
+			return left.CreatedAt.After(right.CreatedAt)
+		}
+		return left.ID < right.ID
+	})
 }
 
 func effectiveStartTime(job Job) time.Time {

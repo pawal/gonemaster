@@ -972,6 +972,10 @@
       if (!tagsLoaded) loadDomainTags();
     } else if (next === "tags") {
       loadTagsList();
+      if (selectedTag) {
+        loadTagDomains({ reset: true });
+        loadTagSummary();
+      }
     } else if (next === "batches") {
       loadRecentBatchOptions();
       if (!tagsLoaded) loadDomainTags();

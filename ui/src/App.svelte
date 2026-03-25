@@ -1818,9 +1818,17 @@
     loadJobs();
     if (activeTab === "batches") {
       loadRecentBatchOptions();
+      if (!tagsLoaded) loadDomainTags();
       if (selectedBatchId) {
         loadBatch(selectedBatchId);
       }
+    }
+    if (activeTab === "tags") {
+      loadTagsList();
+    }
+    if (activeTab === "domains") {
+      loadDomains();
+      if (!tagsLoaded) loadDomainTags();
     }
     if (activeTab === "metrics") {
       loadMetrics();

@@ -948,6 +948,9 @@
     domainModuleOpen = { ...domainModuleOpen, [key]: !domainModuleOpen[key] };
   };
 
+  const okTestcaseCount = (group) =>
+    group.testcasesArr.filter(tcg => !moduleLevels.includes(normalizeLevel(tcg.level))).length;
+
   const normalizeTab = (value) => {
     const tab = String(value || "").replace(/^\/+/, "").toLowerCase();
     if (tab === "single" || tab === "job" || tab === "jobs" || tab === "home") return "single";
@@ -2108,8 +2111,11 @@
                       on:click={() => toggleModule(group.key)}
                     >
                       <div class="module-title">{group.name}</div>
-                      <div class="module-meta">{$t("entries_count", { count: group.entries.length })}</div>
+                      <div class="module-meta">{group.testcasesArr.length > 0 ? `${group.testcasesArr.length} tests · ` : ""}{$t("entries_count", { count: group.entries.length })}</div>
                       <div class="module-badges">
+                        {#if okTestcaseCount(group) > 0}
+                          <span class="level-pill severity-info">OK {okTestcaseCount(group)}</span>
+                        {/if}
                         {#each moduleLevels as level}
                           {#if group.counts[level]}
                             <span class={`level-pill severity-${level.toLowerCase()}`}>{level} {group.counts[level]}</span>
@@ -2376,8 +2382,11 @@
                         on:click={() => toggleDomainModule(group.key)}
                       >
                         <div class="module-title">{group.name}</div>
-                        <div class="module-meta">{$t("entries_count", { count: group.entries.length })}</div>
+                        <div class="module-meta">{group.testcasesArr.length > 0 ? `${group.testcasesArr.length} tests · ` : ""}{$t("entries_count", { count: group.entries.length })}</div>
                         <div class="module-badges">
+                          {#if okTestcaseCount(group) > 0}
+                            <span class="level-pill severity-info">OK {okTestcaseCount(group)}</span>
+                          {/if}
                           {#each moduleLevels as level}
                             {#if group.counts[level]}
                               <span class={`level-pill severity-${level.toLowerCase()}`}>{level} {group.counts[level]}</span>

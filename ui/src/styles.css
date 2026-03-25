@@ -516,6 +516,12 @@ button:hover:not(:disabled) {
   letter-spacing: 0.02em;
 }
 
+.level-pill.severity-info {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
 .level-pill.severity-notice {
   background: #e0f2fe;
   color: #075985;
@@ -1179,6 +1185,11 @@ pre {
     background: rgba(14, 116, 144, 0.2);
   }
 
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .level-pill.severity-info {
+    background: transparent;
+    color: var(--muted);
+  }
+
   :root:not([data-theme="light"]):not([data-theme="dark"]) .badge.level-notice {
     background: #0f2a38;
     color: #7dd3fc;
@@ -1300,6 +1311,11 @@ pre {
 
 :root[data-theme="dark"] .badge {
   background: rgba(14, 116, 144, 0.2);
+}
+
+:root[data-theme="dark"] .level-pill.severity-info {
+  background: transparent;
+  color: var(--muted);
 }
 
 :root[data-theme="dark"] .badge.level-notice {

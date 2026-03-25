@@ -162,8 +162,9 @@ gonemaster-server
 ```sql
 CREATE DATABASE gonemaster
     ENCODING 'UTF8'
-    LC_COLLATE 'en_US.UTF-8'
-    LC_CTYPE 'en_US.UTF-8'
+    LOCALE_PROVIDER libc
+    LC_COLLATE 'C'
+    LC_CTYPE 'C'
     TEMPLATE template0;
 
 CREATE USER gonemaster WITH PASSWORD 'strongpassword';
@@ -173,6 +174,13 @@ GRANT CONNECT ON DATABASE gonemaster TO gonemaster;
 GRANT USAGE  ON SCHEMA public TO gonemaster;
 GRANT CREATE ON SCHEMA public TO gonemaster;
 ```
+
+`LC_COLLATE 'C'` is correct here. All domain names are stored in ACE/punycode
+form (e.g. `xn--mnchen-3ya.de` for `münchen.de`) — the server normalizes every
+submitted name to its ASCII-compatible encoding (A-label) before storing it.
+Since all stored names are ASCII, collation has no effect on sort order or
+uniqueness, and `C` avoids any locale availability issue across PostgreSQL
+versions and operating systems.
 
 `gonemaster-server` creates and manages its own tables via schema migrations on
 first start. The user only needs `CONNECT`, `USAGE`, and `CREATE` — no

@@ -911,10 +911,10 @@ func (s *InMemoryJobStore) QueryEntries(filter EntryFilter) EntryList {
 					continue
 				}
 			}
-			if filter.Module != "" && e.Module != filter.Module {
+			if filter.Module != "" && !strings.EqualFold(e.Module, filter.Module) {
 				continue
 			}
-			if filter.Testcase != "" && e.Testcase != filter.Testcase {
+			if filter.Testcase != "" && !strings.EqualFold(e.Testcase, filter.Testcase) {
 				continue
 			}
 			if filter.EntryTag != "" && e.Tag != filter.EntryTag {

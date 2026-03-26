@@ -1321,10 +1321,10 @@ func (s *SQLJobStore) QueryEntries(filter EntryFilter) EntryList {
 		conds = append(conds, "e.domain_id = "+addArg(filter.DomainID))
 	}
 	if filter.Module != "" {
-		conds = append(conds, "e.module = "+addArg(filter.Module))
+		conds = append(conds, "LOWER(e.module) = LOWER("+addArg(filter.Module)+")")
 	}
 	if filter.Testcase != "" {
-		conds = append(conds, "e.testcase = "+addArg(filter.Testcase))
+		conds = append(conds, "LOWER(e.testcase) = LOWER("+addArg(filter.Testcase)+")")
 	}
 	if filter.EntryTag != "" {
 		conds = append(conds, "e.tag = "+addArg(filter.EntryTag))

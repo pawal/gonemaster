@@ -2393,7 +2393,7 @@
           {/if}
           <div class="kv" style="margin-bottom: 1rem;">
             <span>{$t("col_latest_level")}</span>
-            <span><span class="badge level-{domainLevel(selectedDomain).toLowerCase()}">{domainLevel(selectedDomain) || "—"}</span></span>
+            <span>{#if domainLevel(selectedDomain)}<span class="badge level-{domainLevel(selectedDomain).toLowerCase()}">{domainLevel(selectedDomain)}</span>{:else}—{/if}</span>
             <span>{$t("col_latest_run_at")}</span>
             <strong>{selectedDomain.latest_run_at ? formatTimestampLocal(selectedDomain.latest_run_at) : "—"}</strong>
             <span>{$t("col_run_count")}</span>
@@ -2622,7 +2622,7 @@
                 >
                   <td class="mono">{d.name}</td>
                   <td>{d.tags ? d.tags.join(", ") : ""}</td>
-                  <td><span class="badge level-{domainLevel(d).toLowerCase()}">{domainLevel(d) || "—"}</span></td>
+                  <td>{#if domainLevel(d)}<span class="badge level-{domainLevel(d).toLowerCase()}">{domainLevel(d)}</span>{:else}—{/if}</td>
                   <td>{d.latest_run_at ? d.latest_run_at.slice(0, 10) : "—"}</td>
                   <td>{d.run_count ?? 0}</td>
                 </tr>
@@ -2715,7 +2715,7 @@
                   on:keydown={(e) => { if (e.key === "Enter" || e.key === " ") navigateToDomainDetail(d); }}
                 >
                   <td class="mono">{d.name}</td>
-                  <td><span class="badge level-{domainLevel(d).toLowerCase()}">{domainLevel(d) || "—"}</span></td>
+                  <td>{#if domainLevel(d)}<span class="badge level-{domainLevel(d).toLowerCase()}">{domainLevel(d)}</span>{:else}—{/if}</td>
                   <td>{d.latest_run_at ? d.latest_run_at.slice(0, 10) : "—"}</td>
                 </tr>
               {/each}

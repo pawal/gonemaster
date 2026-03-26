@@ -3228,7 +3228,7 @@ example.org`}
                 <tbody>
                   {#each metricsDomainRows(metricsSnapshot) as row}
                     <tr>
-                      <td class="mono">{row.domain}</td>
+                      <td class="mono"><button class="ghost" type="button" style="padding: 0; font-family: monospace; text-align: left; border: none;" on:click={() => navigateToDomainByName(row.domain)}>{row.domain}</button></td>
                       <td>{formatInteger(row.runs_total)}</td>
                       <td>{row.last_status || "-"}</td>
                       <td>{formatDurationMs(row.avg_duration_ms)}</td>

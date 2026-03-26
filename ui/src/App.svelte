@@ -2381,14 +2381,14 @@
       {#if selectedDomain}
         <div>
           <button class="secondary small" on:click={() => { selectedDomain = null; setTab("domains"); }}>{$t("back_to_domains")}</button>
-          <h2 class="mono" style="margin-top: 0.5rem;">{selectedDomain.name}</h2>
-          {#if selectedDomain.tags && selectedDomain.tags.length > 0}
-            <div style="display:flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
+          <div style="display:flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.5rem; margin-bottom: 0.75rem;">
+            <h2 class="mono" style="margin: 0;">{selectedDomain.name}</h2>
+            {#if selectedDomain.tags && selectedDomain.tags.length > 0}
               {#each selectedDomain.tags as tag}
                 <span class="badge">{tag}</span>
               {/each}
-            </div>
-          {/if}
+            {/if}
+          </div>
           <div class="kv" style="margin-bottom: 1rem;">
             <span>{$t("col_latest_level")}</span>
             <span>{#if domainLevel(selectedDomain)}<span class="badge level-{domainLevel(selectedDomain).toLowerCase()}">{domainLevel(selectedDomain)}</span>{:else}-{/if}</span>

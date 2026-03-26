@@ -7,7 +7,7 @@ BIN_DIR ?= bin
 UI_DIR := ui
 UI_BUILD_DIR := $(UI_DIR)/dist
 UI_PUBLIC_DIR := ui-public
-NODE_MIN ?= 18
+NODE_MIN ?= 20
 NPM_MIN ?= 9
 
 CMDS := gonemaster gonemaster-server gonemaster-client gonemaster-nagios

@@ -2382,7 +2382,7 @@
     <div class="card reveal" id="panel-domains" role="tabpanel" aria-labelledby="tab-domains" style="--d: 0.34s; margin-top: 22px;">
       {#if selectedDomain}
         <div>
-          <button class="secondary small" on:click={() => history.back()}>{$t("back_to_domains")}</button>
+          <button class="secondary small" on:click={() => { selectedDomain = null; setTab("domains"); }}>{$t("back_to_domains")}</button>
           <h2 class="mono" style="margin-top: 0.5rem;">{selectedDomain.name}</h2>
           {#if selectedDomain.tags && selectedDomain.tags.length > 0}
             <div style="display:flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
@@ -2648,7 +2648,7 @@
   {:else if activeTab === "tags"}
     <div class="card reveal" id="panel-tags" role="tabpanel" aria-labelledby="tab-tags" style="--d: 0.34s; margin-top: 22px;">
       {#if selectedTag}
-        <button class="secondary small" on:click={() => history.back()}>{$t("back_to_tags")}</button>
+        <button class="secondary small" on:click={() => { selectedTag = null; setTab("tags"); }}>{$t("back_to_tags")}</button>
         <h2 style="margin-top: 0.5rem;">{selectedTag.name}</h2>
         {#if selectedTag.description}
           <p class="muted small">{selectedTag.description}</p>

@@ -646,6 +646,36 @@ func TestInMemoryJobStoreGetOrCreateDomain(t *testing.T) {
 	}
 }
 
+func TestInMemoryJobStoreGetOrCreateDomainNormalizesName(t *testing.T) {
+	store := NewInMemoryJobStore()
+
+	// Uppercase input should be stored as lowercase and deduplicated.
+	d1, err := store.GetOrCreateDomain("EXAMPLE.COM")
+	if err != nil {
+		t.Fatalf("GetOrCreateDomain uppercase: %v", err)
+	}
+	if d1.Name != "example.com" {
+		t.Fatalf("expected lowercase name, got %q", d1.Name)
+	}
+
+	d2, err := store.GetOrCreateDomain("example.com")
+	if err != nil {
+		t.Fatalf("GetOrCreateDomain lowercase: %v", err)
+	}
+	if d2.ID != d1.ID {
+		t.Fatalf("uppercase and lowercase should resolve to the same domain ID")
+	}
+
+	// Unicode IDN label should be converted to ACE.
+	d3, err := store.GetOrCreateDomain("münchen.de")
+	if err != nil {
+		t.Fatalf("GetOrCreateDomain IDN: %v", err)
+	}
+	if d3.Name != "xn--mnchen-3ya.de" {
+		t.Fatalf("expected ACE form xn--mnchen-3ya.de, got %q", d3.Name)
+	}
+}
+
 func TestInMemoryJobStoreGetDomain(t *testing.T) {
 	store := NewInMemoryJobStore()
 	d, err := store.GetOrCreateDomain("example.com")

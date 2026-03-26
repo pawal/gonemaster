@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
+	"codeberg.org/pawal/gonemaster/engine/normalization"
 )
 
 var severityLevels = []string{"NOTICE", "WARNING", "ERROR", "CRITICAL"}
@@ -373,10 +375,15 @@ func (s *InMemoryJobStore) GetResult(jobID string) (JobResult, bool) {
 }
 
 // GetOrCreateDomain returns the domain for name, creating it if necessary.
+// name is normalized (lowercased, Unicode labels converted to ACE) before storage.
 func (s *InMemoryJobStore) GetOrCreateDomain(name string) (Domain, error) {
+	errs, normalized := normalization.NormalizeName(strings.TrimSpace(name))
+	if len(errs) > 0 {
+		return Domain{}, fmt.Errorf("invalid domain name %q: %s", name, errs[0].Message())
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	d := s.getOrCreateDomainLocked(name)
+	d := s.getOrCreateDomainLocked(normalized)
 	return *d, nil
 }
 

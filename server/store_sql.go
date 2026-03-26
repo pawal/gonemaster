@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
+	"codeberg.org/pawal/gonemaster/engine/normalization"
 )
 
 // rowScanner is satisfied by both *sql.Row and *sql.Rows.
@@ -632,7 +633,13 @@ func (s *SQLJobStore) loadEntries(runID string) ([]Entry, error) {
 // ── Domain management ─────────────────────────────────────────────────────────
 
 // GetOrCreateDomain returns the domain for name, creating it if necessary.
+// name is normalized (lowercased, Unicode labels converted to ACE) before storage.
 func (s *SQLJobStore) GetOrCreateDomain(name string) (Domain, error) {
+	errs, normalized := normalization.NormalizeName(strings.TrimSpace(name))
+	if len(errs) > 0 {
+		return Domain{}, fmt.Errorf("invalid domain name %q: %s", name, errs[0].Message())
+	}
+	name = normalized
 	now := formatSortableTimestamp(time.Now().UTC())
 	switch s.dialect.(type) {
 	case postgresDialect:

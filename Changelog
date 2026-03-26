@@ -2,9 +2,9 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
-## [Unreleased]
+## [v1.2.0] - 2026-03-26
 
-**Biggest changes:**
+**Major changes:**
   - New simple UI for end-users
   - Database persistence with support for PostgreSQL, and MariaDB/MySQL
   - Domain registry with tags, run history, and per-entry SQL analysis
@@ -48,6 +48,9 @@ All notable changes to all gonemaster components will be documented in this file
  - Public UI: Fixed TLD lookup to use FQDN and wire DNS with public resolver fallbacks
  - UI translations: corrected nameserver08/09 test case labels across all 9 languages; fixed "lim"→"glue" and "lösas upp"→"slås upp" in Nordic translations
  - Engine: Always include System module with version entry first in results
+ - Bumped versions on dependencies (miekg/dns 0.6.70 etc.)
+ - Normalize domain names to lowercase ACE in GetOrCreateDomain
+ - Engine: Skip dead delegation servers and break early in getIBAddrInZone
 
 ## [v1.1.3] - 2026-03-13
 

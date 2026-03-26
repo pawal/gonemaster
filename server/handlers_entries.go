@@ -15,6 +15,12 @@ func (s *Server) handleListEntries(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	filter.RunID = strings.TrimSpace(q.Get("run"))
 	filter.Tag = strings.TrimSpace(q.Get("tag"))
+	if filter.Tag != "" {
+		if _, ok := s.store.GetTag(filter.Tag); !ok {
+			writeError(w, http.StatusNotFound, "tag_not_found", "tag not found", nil)
+			return
+		}
+	}
 	filter.Module = strings.TrimSpace(q.Get("module"))
 	filter.Testcase = strings.TrimSpace(q.Get("testcase"))
 	filter.EntryTag = strings.TrimSpace(q.Get("entry_tag"))

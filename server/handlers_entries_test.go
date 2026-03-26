@@ -158,6 +158,16 @@ func TestListEntriesFilterByTag(t *testing.T) {
 	}
 }
 
+func TestListEntriesUnknownTagReturns404(t *testing.T) {
+	srv := New(DefaultConfig())
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/entries?tag=doesnotexist", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for unknown tag, got %d", resp.Code)
+	}
+}
+
 func TestListEntriesLatestOnly(t *testing.T) {
 	srv := New(DefaultConfig())
 	// Graduate the same domain twice; latest_only should return only entries from the second run.

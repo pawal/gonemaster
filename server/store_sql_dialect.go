@@ -29,10 +29,6 @@ type sqlDialect interface {
 	TimestampVal(t time.Time) any
 	// DriverName returns the sql.DB driver name for this dialect.
 	DriverName() string
-	// UpsertResultSQL returns a complete INSERT-or-update statement for the
-	// results table using this dialect's placeholder and conflict-resolution
-	// syntax. Bind order: job_id, batch_id, status, summary_json, raw_json.
-	UpsertResultSQL() string
 	// IsDuplicateKey returns true when err represents a unique-constraint
 	// violation. Each driver surfaces this differently.
 	IsDuplicateKey(err error) bool
@@ -49,10 +45,6 @@ func (sqliteDialect) TimestampVal(t time.Time) any {
 	return formatSortableTimestamp(t)
 }
 func (sqliteDialect) DriverName() string { return "sqlite" }
-func (sqliteDialect) UpsertResultSQL() string {
-	return `INSERT OR REPLACE INTO results (job_id, batch_id, status, summary_json, raw_json)
-		 VALUES (?, ?, ?, ?, ?)`
-}
 func (sqliteDialect) IsDuplicateKey(err error) bool {
 	return strings.Contains(err.Error(), "UNIQUE constraint failed")
 }
@@ -71,15 +63,6 @@ func (postgresDialect) TimestampVal(t time.Time) any {
 	return formatSortableTimestamp(t)
 }
 func (postgresDialect) DriverName() string { return "postgres" }
-func (postgresDialect) UpsertResultSQL() string {
-	return `INSERT INTO results (job_id, batch_id, status, summary_json, raw_json)
-		 VALUES ($1, $2, $3, $4, $5)
-		 ON CONFLICT (job_id) DO UPDATE SET
-		 	batch_id     = EXCLUDED.batch_id,
-		 	status       = EXCLUDED.status,
-		 	summary_json = EXCLUDED.summary_json,
-		 	raw_json     = EXCLUDED.raw_json`
-}
 func (postgresDialect) IsDuplicateKey(err error) bool {
 	var pqErr *pq.Error
 	return errors.As(err, &pqErr) && pqErr.Code == "23505"
@@ -97,15 +80,6 @@ func (mariadbDialect) TimestampVal(t time.Time) any {
 	return formatSortableTimestamp(t)
 }
 func (mariadbDialect) DriverName() string { return "mysql" }
-func (mariadbDialect) UpsertResultSQL() string {
-	return `INSERT INTO results (job_id, batch_id, status, summary_json, raw_json)
-		 VALUES (?, ?, ?, ?, ?)
-		 ON DUPLICATE KEY UPDATE
-		 	batch_id     = VALUES(batch_id),
-		 	status       = VALUES(status),
-		 	summary_json = VALUES(summary_json),
-		 	raw_json     = VALUES(raw_json)`
-}
 
 // IsDuplicateKey detects MySQL/MariaDB error 1062 (ER_DUP_ENTRY).
 func (mariadbDialect) IsDuplicateKey(err error) bool {

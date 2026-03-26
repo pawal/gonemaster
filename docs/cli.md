@@ -333,7 +333,7 @@ Delete completed jobs older than a given number of days, along with their result
 gonemaster-client jobs purge [--older-than DAYS]
 ```
 Options:
-- `--older-than N` — delete jobs finished more than N days ago; `0` (default) uses the server's configured `retention_days`.
+- `--older-than N` - delete jobs finished more than N days ago; `0` (default) uses the server's configured `retention_days`.
 
 Returns `400` if both `--older-than` and the server's `retention_days` are `0`.
 

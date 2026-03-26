@@ -1,6 +1,15 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { get } from "svelte/store";
 import { locale, t, setCatalog, loadCatalog } from "./i18n.js";
+import enCatalog from "./i18n/en.json";
+import daCatalog from "./i18n/da.json";
+import esCatalog from "./i18n/es.json";
+import fiCatalog from "./i18n/fi.json";
+import frCatalog from "./i18n/fr.json";
+import jaCatalog from "./i18n/ja.json";
+import nbCatalog from "./i18n/nb.json";
+import slCatalog from "./i18n/sl.json";
+import svCatalog from "./i18n/sv.json";
 
 describe("i18n store", () => {
   beforeEach(() => {
@@ -126,5 +135,29 @@ describe("i18n store", () => {
       locale.set("surely-not-a-real-locale-xyzzy");
       expect(get(t)("app_title")).toBe("Gonemaster"); // English fallback
     });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Translation completeness
+  // ---------------------------------------------------------------------------
+
+  describe("translation completeness", () => {
+    // app_title is intentionally absent from non-English catalogs (brand name).
+    const SKIP = new Set(["app_title"]);
+    const enKeys = Object.keys(enCatalog).filter((k) => !SKIP.has(k));
+
+    const catalogs = { da: daCatalog, es: esCatalog, fi: fiCatalog, fr: frCatalog, ja: jaCatalog, nb: nbCatalog, sl: slCatalog, sv: svCatalog };
+
+    for (const [lang, catalog] of Object.entries(catalogs)) {
+      it(`${lang} catalog contains all required keys`, () => {
+        const missing = enKeys.filter((k) => !(k in catalog));
+        expect(missing, `${lang} missing keys: ${missing.join(", ")}`).toHaveLength(0);
+      });
+
+      it(`${lang} translations have no empty values`, () => {
+        const empty = enKeys.filter((k) => k in catalog && catalog[k] === "");
+        expect(empty, `${lang} empty values for: ${empty.join(", ")}`).toHaveLength(0);
+      });
+    }
   });
 });

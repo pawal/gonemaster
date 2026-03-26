@@ -100,7 +100,6 @@ type job struct {
 	StartedAt  time.Time `json:"started_at,omitempty"`
 	FinishedAt time.Time `json:"finished_at,omitempty"`
 	Progress   int       `json:"progress"`
-	ResultURL  string    `json:"result_url,omitempty"`
 	Error      string    `json:"error,omitempty"`
 }
 
@@ -114,13 +113,16 @@ type jobCreateRequest struct {
 	Tests            []string       `json:"tests,omitempty"`
 	ProfileOverrides map[string]any `json:"profile_overrides,omitempty"`
 	MinLevel         string         `json:"min_level,omitempty"`
+	Tags             []string       `json:"tags,omitempty"`
 }
 
 type jobBatchRequest struct {
-	Domains          []string       `json:"domains"`
+	Domains          []string       `json:"domains,omitempty"`
 	Tests            []string       `json:"tests,omitempty"`
 	ProfileOverrides map[string]any `json:"profile_overrides,omitempty"`
 	MinLevel         string         `json:"min_level,omitempty"`
+	Tags             []string       `json:"tags,omitempty"`
+	FromTag          string         `json:"from_tag,omitempty"`
 }
 
 type jobBatchResponse struct {
@@ -270,6 +272,14 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		return runBatches(ctx, client, opts, rest, writer, errOut)
 	case "queue":
 		return runQueue(ctx, client, opts, rest, writer, errOut)
+	case "domains":
+		return runDomains(ctx, client, opts, rest, writer, errOut)
+	case "tags":
+		return runTags(ctx, client, opts, rest, writer, errOut)
+	case "runs":
+		return runRuns(ctx, client, opts, rest, writer, errOut)
+	case "entries":
+		return runEntries(ctx, client, opts, rest, writer, errOut)
 	case "help", "-h", "--help":
 		printUsage(writer)
 		return 0
@@ -325,6 +335,10 @@ func printUsage(out io.Writer) {
 	fmt.Fprintln(out, "  jobs create|batch|list|get|watch|cancel|results|purge")
 	fmt.Fprintln(out, "  batches get|watch|results|cancel|remove")
 	fmt.Fprintln(out, "  queue pause|resume|reorder|remove")
+	fmt.Fprintln(out, "  domains list|get|runs|tag|untag")
+	fmt.Fprintln(out, "  tags list|create|delete|domains|summary|add-domains")
+	fmt.Fprintln(out, "  runs list|get|results")
+	fmt.Fprintln(out, "  entries query")
 }
 
 func setSubcommandUsage(fs *flag.FlagSet) {
@@ -624,6 +638,7 @@ func runJobsCreate(ctx context.Context, client *apiClient, opts globalOptions, a
 		domain        string
 		minLevel      string
 		tests         stringList
+		tags          stringList
 		overridePairs stringList
 		overrideFile  string
 		wait          bool
@@ -634,6 +649,7 @@ func runJobsCreate(ctx context.Context, client *apiClient, opts globalOptions, a
 	fs.StringVar(&domain, "domain", "", "Domain to test (required)")
 	fs.StringVar(&minLevel, "min-level", "", "Minimum log level (optional)")
 	fs.Var(&tests, "tests", "Test name (repeatable)")
+	fs.Var(&tags, "tag", "Tag to apply to the domain (repeatable)")
 	fs.Var(&overridePairs, "profile-override", "Profile override KEY=VALUE (repeatable)")
 	fs.StringVar(&overrideFile, "profile-overrides-file", "", "Profile overrides JSON/YAML file")
 	fs.BoolVar(&wait, "wait", false, "Wait for completion and display results")
@@ -660,6 +676,7 @@ func runJobsCreate(ctx context.Context, client *apiClient, opts globalOptions, a
 		Tests:            tests,
 		ProfileOverrides: overrides,
 		MinLevel:         minLevel,
+		Tags:             []string(tags),
 	}
 	var created job
 	if err := client.doJSON(ctx, http.MethodPost, "/jobs", req, &created); err != nil {
@@ -698,6 +715,8 @@ func runJobsBatch(ctx context.Context, client *apiClient, opts globalOptions, ar
 		files         stringList
 		useStdin      bool
 		tests         stringList
+		tags          stringList
+		fromTag       string
 		minLevel      string
 		overridePairs stringList
 		overrideFile  string
@@ -711,6 +730,8 @@ func runJobsBatch(ctx context.Context, client *apiClient, opts globalOptions, ar
 	fs.Var(&files, "file", "File with domains (repeatable)")
 	fs.BoolVar(&useStdin, "stdin", false, "Read domains from stdin")
 	fs.Var(&tests, "tests", "Test name (repeatable)")
+	fs.Var(&tags, "tag", "Tag to apply to all domains (repeatable)")
+	fs.StringVar(&fromTag, "from-tag", "", "Re-run all domains in this tag")
 	fs.StringVar(&minLevel, "min-level", "", "Minimum log level (optional)")
 	fs.Var(&overridePairs, "profile-override", "Profile override KEY=VALUE (repeatable)")
 	fs.StringVar(&overrideFile, "profile-overrides-file", "", "Profile overrides JSON/YAML file")
@@ -720,25 +741,35 @@ func runJobsBatch(ctx context.Context, client *apiClient, opts globalOptions, ar
 	if err := parseWithReorderedFlags(fs, args); err != nil {
 		return 2
 	}
-	entries, err := collectDomains(domains, files, useStdin, errOut)
-	if err != nil {
-		fmt.Fprintln(errOut, err.Error())
-		return 2
-	}
-	if len(entries) == 0 {
-		fmt.Fprintln(errOut, "no domains provided")
-		return 2
-	}
 	overrides, err := parseOverrides(overridePairs, overrideFile)
 	if err != nil {
 		fmt.Fprintln(errOut, err.Error())
 		return 2
 	}
+	var domainEntries []string
+	if fromTag != "" {
+		if len(domains) > 0 || len(files) > 0 || useStdin {
+			fmt.Fprintln(errOut, "--from-tag and --domain/--file/--stdin are mutually exclusive")
+			return 2
+		}
+	} else {
+		domainEntries, err = collectDomains(domains, files, useStdin, errOut)
+		if err != nil {
+			fmt.Fprintln(errOut, err.Error())
+			return 2
+		}
+		if len(domainEntries) == 0 {
+			fmt.Fprintln(errOut, "no domains provided: use --domain, --file, --stdin, or --from-tag")
+			return 2
+		}
+	}
 	req := jobBatchRequest{
-		Domains:          entries,
+		Domains:          domainEntries,
 		Tests:            tests,
 		ProfileOverrides: overrides,
 		MinLevel:         minLevel,
+		Tags:             []string(tags),
+		FromTag:          fromTag,
 	}
 	var resp jobBatchResponse
 	if err := client.doJSON(ctx, http.MethodPost, "/jobs/batch", req, &resp); err != nil {
@@ -785,7 +816,7 @@ func runJobsList(ctx context.Context, client *apiClient, opts globalOptions, arg
 	)
 	fs := flag.NewFlagSet("jobs list", flag.ContinueOnError)
 	fs.SetOutput(errOut)
-	fs.StringVar(&status, "status", "", "Filter by status")
+	fs.StringVar(&status, "status", "", "Filter by status (in-flight only; use 'runs list' for completed jobs)")
 	fs.StringVar(&batchID, "batch-id", "", "Filter by batch id")
 	fs.StringVar(&createdAfter, "created-after", "", "Filter by created after timestamp (RFC3339)")
 	fs.IntVar(&limit, "limit", 100, "Limit (1-500)")
@@ -848,8 +879,21 @@ func runJobsGet(ctx context.Context, client *apiClient, opts globalOptions, args
 	jobID := strings.TrimSpace(args[0])
 	var info job
 	if err := client.doJSON(ctx, http.MethodGet, "/jobs/"+jobID, nil, &info); err != nil {
-		fmt.Fprintln(errOut, err.Error())
-		return 2
+		if !isNotFoundError(err) {
+			fmt.Fprintln(errOut, err.Error())
+			return 2
+		}
+		// Fall back to run lookup for graduated jobs.
+		var run runRecord
+		if err2 := client.doJSON(ctx, http.MethodGet, "/runs/"+jobID, nil, &run); err2 != nil {
+			fmt.Fprintln(errOut, err.Error())
+			return 2
+		}
+		if err := writeOutput(out, opts.format, run); err != nil {
+			fmt.Fprintln(errOut, err.Error())
+			return 2
+		}
+		return 0
 	}
 	if err := writeOutput(out, opts.format, info); err != nil {
 		fmt.Fprintln(errOut, err.Error())
@@ -1372,36 +1416,62 @@ func fetchJobResult(ctx context.Context, client *apiClient, jobID string) (jobRe
 	if !isNotFoundError(err) {
 		return jobResult{}, err
 	}
-	info, err := fetchJobInfo(ctx, client, jobID)
-	if err != nil {
-		return jobResult{}, err
-	}
-	if !doneStatuses[info.Status] {
-		return jobResult{}, err
-	}
-	delay := 200 * time.Millisecond
-	for i := 0; i < 4; i++ {
-		select {
-		case <-ctx.Done():
-			return jobResult{}, ctx.Err()
-		case <-time.After(delay):
+	// Check whether the job itself exists; if it 404s, skip retries and go
+	// straight to the runs endpoint.
+	var jobNotFound bool
+	var info job
+	if jobErr := client.doJSON(ctx, http.MethodGet, "/jobs/"+jobID, nil, &info); jobErr != nil {
+		if !isNotFoundError(jobErr) {
+			return jobResult{}, jobErr
 		}
-		result, err = fetchJobResultOnce(ctx, client, jobID)
-		if err == nil {
-			return result, nil
-		}
-		if !isNotFoundError(err) {
+		jobNotFound = true
+	}
+	if !jobNotFound {
+		// Job exists but result is not ready yet — retry with backoff.
+		if !doneStatuses[info.Status] {
 			return jobResult{}, err
 		}
-		delay *= 2
+		delay := 200 * time.Millisecond
+		for i := 0; i < 4; i++ {
+			select {
+			case <-ctx.Done():
+				return jobResult{}, ctx.Err()
+			case <-time.After(delay):
+			}
+			result, err = fetchJobResultOnce(ctx, client, jobID)
+			if err == nil {
+				return result, nil
+			}
+			if !isNotFoundError(err) {
+				return jobResult{}, err
+			}
+			delay *= 2
+		}
 	}
-	return jobResult{}, err
+	// Final fallback: try the runs endpoint directly.
+	path := "/runs/" + jobID + "/result"
+	if client.locale != "" {
+		path += "?locale=" + url.QueryEscape(client.locale)
+	}
+	var runResult jobResult
+	if err2 := client.doJSON(ctx, http.MethodGet, path, nil, &runResult); err2 != nil {
+		return jobResult{}, err
+	}
+	return runResult, nil
 }
 
 func fetchJobInfo(ctx context.Context, client *apiClient, jobID string) (job, error) {
 	var info job
 	if err := client.doJSON(ctx, http.MethodGet, "/jobs/"+jobID, nil, &info); err != nil {
-		return job{}, err
+		if !isNotFoundError(err) {
+			return job{}, err
+		}
+		// Fall back to run lookup for graduated jobs.
+		var run runRecord
+		if err2 := client.doJSON(ctx, http.MethodGet, "/runs/"+jobID, nil, &run); err2 != nil {
+			return job{}, err
+		}
+		return job{ID: run.ID, BatchID: run.BatchID, Domain: run.Domain, Status: run.Status}, nil
 	}
 	return info, nil
 }

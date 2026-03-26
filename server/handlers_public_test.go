@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"codeberg.org/pawal/gonemaster/engine"
 )
 
 func TestPublicCreateJobReturnsPublicIDNotUUID(t *testing.T) {
@@ -132,10 +134,9 @@ func TestPublicGetResultReturnsResultByPublicID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	_ = srv.store.SetResult(created.ID, JobResult{
-		JobID:  created.ID,
-		Status: JobSucceeded,
-	})
+	if err := srv.store.GraduateJob(created, nil); err != nil {
+		t.Fatalf("GraduateJob: %v", err)
+	}
 
 	resp := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/jobs/"+created.PublicID+"/result", nil)
@@ -211,15 +212,11 @@ func TestPublicGetResultRespectsLocaleParam(t *testing.T) {
 		Progress:  100,
 	}
 	created, _ := srv.store.Create(job)
-	_ = srv.store.SetResult(created.ID, JobResult{
-		JobID:  created.ID,
-		Status: JobSucceeded,
-		Raw: &JobResultRaw{
-			Entries: []JobResultEntry{
-				{Module: "BASIC", Testcase: "basic01", Tag: "BASIC01", Level: "NOTICE"},
-			},
-		},
-	})
+	if err := srv.store.GraduateJob(created, []engine.LogEntry{
+		{Module: "BASIC", Testcase: "basic01", Tag: "BASIC01", Level: "NOTICE"},
+	}); err != nil {
+		t.Fatalf("GraduateJob: %v", err)
+	}
 
 	resp := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/jobs/"+created.PublicID+"/result?locale=sv", nil)

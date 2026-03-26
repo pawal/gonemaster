@@ -66,10 +66,6 @@ func NewWithOptions(cfg Config) (*Server, error) {
 			_ = db.Close()
 			return nil, fmt.Errorf("run migrations: %w", err)
 		}
-		if err := backfillPublicIDs(db, dialect); err != nil {
-			_ = db.Close()
-			return nil, fmt.Errorf("backfill public IDs: %w", err)
-		}
 		store = NewSQLJobStore(db, dialect)
 	}
 
@@ -127,6 +123,21 @@ func (s *Server) routes() {
 	apiMux.HandleFunc("/queue/resume", s.handleQueueResume)
 	apiMux.HandleFunc("/queue/reorder", s.handleQueueReorder)
 	apiMux.HandleFunc("/queue/remove", s.handleQueueRemove)
+
+	apiMux.HandleFunc("GET /domains/{id}/runs", s.handleGetDomainRuns)
+	apiMux.HandleFunc("GET /domains/{id}", s.handleGetDomain)
+	apiMux.HandleFunc("GET /domains", s.handleListDomains)
+
+	apiMux.HandleFunc("GET /entries", s.handleListEntries)
+
+	apiMux.HandleFunc("GET /runs/{id}/result", s.handleGetRunResult)
+	apiMux.HandleFunc("GET /runs/{id}", s.handleGetRun)
+	apiMux.HandleFunc("GET /runs", s.handleListRuns)
+
+	apiMux.HandleFunc("GET /tags/{name}/summary", s.handleTagSummary)
+	apiMux.HandleFunc("/tags/{name}/domains", s.handleTagDomains)
+	apiMux.HandleFunc("/tags/{name}", s.handleTagByName)
+	apiMux.HandleFunc("/tags", s.handleTags)
 
 	apiMux.HandleFunc("/locales", s.handleLocales)
 	apiMux.HandleFunc("/metrics", s.handleMetrics)

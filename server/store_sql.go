@@ -5,19 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
+	"codeberg.org/pawal/gonemaster/engine/normalization"
 )
-
-// jobCols is the canonical column list used in SELECT statements.
-const jobCols = `id, batch_id, domain, status, created_at, started_at, finished_at,
-	progress, result_url, error,
-	sev_notice, sev_warning, sev_error, sev_critical,
-	tests_json, overrides_json, undelegated_ns_json, undelegated_ds_json, min_level,
-	public_id`
 
 // rowScanner is satisfied by both *sql.Row and *sql.Rows.
 type rowScanner interface {
@@ -39,7 +32,6 @@ func NewSQLJobStore(db *sql.DB, dialect sqlDialect) *SQLJobStore {
 func (s *SQLJobStore) ph(n int) string { return s.dialect.Placeholder(n) }
 
 // phRange returns count comma-separated placeholders starting at position start.
-// For SQLite: "?, ?, ?". For PostgreSQL: "$1, $2, $3".
 func (s *SQLJobStore) phRange(start, count int) string {
 	phs := make([]string, count)
 	for i := range phs {
@@ -52,7 +44,7 @@ func (s *SQLJobStore) phRange(start, count int) string {
 func (s *SQLJobStore) ts(t time.Time) any { return s.dialect.TimestampVal(t) }
 
 // toNullJSON marshals v to a JSON NullString. Empty slices/maps and nil
-// values are stored as SQL NULL rather than "[]" / "{}".
+// values are stored as SQL NULL.
 func toNullJSON(v any) (sql.NullString, error) {
 	if v == nil {
 		return sql.NullString{}, nil
@@ -61,15 +53,14 @@ func toNullJSON(v any) (sql.NullString, error) {
 	if err != nil {
 		return sql.NullString{}, err
 	}
-	s := string(b)
-	if s == "null" || s == "[]" || s == "{}" {
+	str := string(b)
+	if str == "null" || str == "[]" || str == "{}" {
 		return sql.NullString{}, nil
 	}
-	return sql.NullString{String: s, Valid: true}, nil
+	return sql.NullString{String: str, Valid: true}, nil
 }
 
 // unmarshalNullJSON decodes a NullString back into T.
-// If the NullString is not valid (SQL NULL) the zero value is returned.
 func unmarshalNullJSON[T any](ns sql.NullString) (T, error) {
 	var zero T
 	if !ns.Valid {
@@ -82,8 +73,7 @@ func unmarshalNullJSON[T any](ns sql.NullString) (T, error) {
 	return v, nil
 }
 
-// parseTimestampNullStr parses an RFC3339Nano (or RFC3339) timestamp stored
-// in a nullable TEXT column. Returns zero time when the value is NULL.
+// parseTimestampNullStr parses an RFC3339Nano timestamp from a nullable TEXT column.
 func parseTimestampNullStr(ns sql.NullString) time.Time {
 	if !ns.Valid || ns.String == "" {
 		return time.Time{}
@@ -95,23 +85,199 @@ func parseTimestampNullStr(ns sql.NullString) time.Time {
 	return t.UTC()
 }
 
-// parseTimestampStr parses an RFC3339Nano (or RFC3339) timestamp from a NOT
-// NULL TEXT column.
-func parseTimestampStr(s string) time.Time {
-	if s == "" {
+// parseTimestampStr parses an RFC3339Nano timestamp from a NOT NULL TEXT column.
+func parseTimestampStr(str string) time.Time {
+	if str == "" {
 		return time.Time{}
 	}
-	t, err := time.Parse(time.RFC3339Nano, s)
+	t, err := time.Parse(time.RFC3339Nano, str)
 	if err != nil {
-		t, _ = time.Parse(time.RFC3339, s)
+		t, _ = time.Parse(time.RFC3339, str)
 	}
 	return t.UTC()
 }
 
-// sqlOrderByClause returns the ORDER BY expression for the given sort value.
-// Timestamps are stored as fixed-width UTC strings and are lexicographically
-// sortable as TEXT.
-func sqlOrderByClause(sort JobSort) string {
+// ── job column helpers ────────────────────────────────────────────────────────
+
+const jobCols = `id, domain_id, domain, batch_id, status, created_at, started_at,
+	progress, error, profile, config_json, public_id`
+
+type jobConfigJSON struct {
+	Tests         []string                       `json:"tests,omitempty"`
+	Overrides     map[string]any                 `json:"overrides,omitempty"`
+	UndelegatedNS []engine.UndelegatedNameserver `json:"undelegated_ns,omitempty"`
+	UndelegatedDS []engine.UndelegatedDSInfo     `json:"undelegated_ds,omitempty"`
+	MinLevel      string                         `json:"min_level,omitempty"`
+}
+
+func (s *SQLJobStore) scanJob(row rowScanner) (Job, error) {
+	var (
+		id, domain, batchID, status string
+		domainID                    int64
+		createdAt                   string
+		startedAt                   sql.NullString
+		progress                    int
+		jobError, profile           string
+		configJSON                  sql.NullString
+		publicID                    sql.NullString
+	)
+	if err := row.Scan(
+		&id, &domainID, &domain, &batchID, &status,
+		&createdAt, &startedAt,
+		&progress, &jobError, &profile,
+		&configJSON, &publicID,
+	); err != nil {
+		return Job{}, err
+	}
+
+	var cfg jobConfigJSON
+	if configJSON.Valid && configJSON.String != "" {
+		if err := json.Unmarshal([]byte(configJSON.String), &cfg); err != nil {
+			return Job{}, fmt.Errorf("unmarshal config_json: %w", err)
+		}
+	}
+
+	return Job{
+		ID:            id,
+		PublicID:      publicID.String,
+		DomainID:      domainID,
+		BatchID:       batchID,
+		Domain:        domain,
+		Status:        JobStatus(status),
+		CreatedAt:     parseTimestampStr(createdAt),
+		StartedAt:     parseTimestampNullStr(startedAt),
+		Progress:      progress,
+		Error:         jobError,
+		Profile:       profile,
+		Tests:         cfg.Tests,
+		Overrides:     cfg.Overrides,
+		UndelegatedNS: cfg.UndelegatedNS,
+		UndelegatedDS: cfg.UndelegatedDS,
+		MinLevel:      cfg.MinLevel,
+	}, nil
+}
+
+// Create inserts a new in-flight job.
+func (s *SQLJobStore) Create(job Job) (Job, error) {
+	if job.PublicID == "" {
+		job.PublicID = GeneratePublicID()
+	}
+
+	cfg := jobConfigJSON{
+		Tests:         job.Tests,
+		Overrides:     job.Overrides,
+		UndelegatedNS: job.UndelegatedNS,
+		UndelegatedDS: job.UndelegatedDS,
+		MinLevel:      job.MinLevel,
+	}
+	configJSON, err := toNullJSON(cfg)
+	if err != nil {
+		return Job{}, fmt.Errorf("marshal config_json: %w", err)
+	}
+
+	_, err = s.db.Exec(
+		fmt.Sprintf(`INSERT INTO jobs (id, domain_id, domain, batch_id, status,
+			created_at, started_at, progress, error, profile, config_json, public_id
+		) VALUES (%s)`, s.phRange(1, 12)),
+		job.ID, job.DomainID, job.Domain, job.BatchID, string(job.Status),
+		s.ts(job.CreatedAt), s.ts(job.StartedAt),
+		job.Progress, job.Error, job.Profile,
+		configJSON,
+		sql.NullString{String: job.PublicID, Valid: job.PublicID != ""},
+	)
+	if err != nil {
+		if s.dialect.IsDuplicateKey(err) {
+			return Job{}, errors.New("job already exists")
+		}
+		return Job{}, fmt.Errorf("insert job: %w", err)
+	}
+	return job, nil
+}
+
+// Get returns the job with the given id, checking jobs first then runs.
+func (s *SQLJobStore) Get(id string) (Job, bool) {
+	row := s.db.QueryRow(
+		fmt.Sprintf("SELECT %s FROM jobs WHERE id = %s", jobCols, s.ph(1)), id)
+	job, err := s.scanJob(row)
+	if err == nil {
+		return job, true
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return Job{}, false
+	}
+	// Check runs table.
+	run, ok := s.GetRun(id)
+	if !ok {
+		return Job{}, false
+	}
+	return jobFromRun(run), true
+}
+
+// GetByPublicID returns the job with the given public_id.
+func (s *SQLJobStore) GetByPublicID(publicID string) (Job, bool) {
+	row := s.db.QueryRow(
+		fmt.Sprintf("SELECT %s FROM jobs WHERE public_id = %s", jobCols, s.ph(1)), publicID)
+	job, err := s.scanJob(row)
+	if err == nil {
+		return job, true
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return Job{}, false
+	}
+	// Check runs table.
+	run, ok := s.GetRunByPublicID(publicID)
+	if !ok {
+		return Job{}, false
+	}
+	return jobFromRun(run), true
+}
+
+// Update replaces a job's mutable fields for in-flight jobs.
+func (s *SQLJobStore) Update(job Job) error {
+	cfg := jobConfigJSON{
+		Tests:         job.Tests,
+		Overrides:     job.Overrides,
+		UndelegatedNS: job.UndelegatedNS,
+		UndelegatedDS: job.UndelegatedDS,
+		MinLevel:      job.MinLevel,
+	}
+	configJSON, err := toNullJSON(cfg)
+	if err != nil {
+		return fmt.Errorf("marshal config_json: %w", err)
+	}
+
+	res, err := s.db.Exec(
+		fmt.Sprintf(`UPDATE jobs SET
+			domain_id=%s, domain=%s, batch_id=%s, status=%s,
+			started_at=%s, progress=%s, error=%s, profile=%s,
+			config_json=%s
+		 WHERE id=%s`,
+			s.ph(1), s.ph(2), s.ph(3), s.ph(4),
+			s.ph(5), s.ph(6), s.ph(7), s.ph(8),
+			s.ph(9),
+			s.ph(10)),
+		job.DomainID, job.Domain, job.BatchID, string(job.Status),
+		s.ts(job.StartedAt), job.Progress, job.Error, job.Profile,
+		configJSON,
+		job.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("update job: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("rows affected: %w", err)
+	}
+	if n == 0 {
+		return errors.New("job not found")
+	}
+	return nil
+}
+
+// sqlJobOrderBy returns the ORDER BY clause for the jobs table.
+// Severity-based sorts fall back to started_at ordering since jobs have no
+// sev_* columns (they are in-flight).
+func sqlJobOrderBy(sort JobSort) string {
 	switch sort {
 	case JobSortCreatedAtDesc:
 		return "created_at DESC, id ASC"
@@ -129,208 +295,15 @@ func sqlOrderByClause(sort JobSort) string {
 		return "LOWER(batch_id) ASC, created_at DESC, id ASC"
 	case JobSortBatchIDDesc:
 		return "LOWER(batch_id) DESC, created_at DESC, id ASC"
-	case JobSortErrorDesc:
-		return "(sev_error + sev_critical) DESC, sev_critical DESC, created_at DESC, id ASC"
-	case JobSortCriticalDesc:
-		return "sev_critical DESC, (sev_error + sev_critical) DESC, created_at DESC, id ASC"
 	default:
+		// JobSortErrorDesc, JobSortCriticalDesc and unknown: fall back to started_at
 		return "COALESCE(started_at, created_at) DESC, created_at DESC, id ASC"
 	}
 }
 
-// scanJob reads one row from a SELECT jobCols query into a Job.
-func (s *SQLJobStore) scanJob(row rowScanner) (Job, error) {
-	var (
-		id, batchID, domain, status string
-		createdAt                   string
-		startedAt, finishedAt       sql.NullString
-		progress                    int
-		resultURL, jobError         string
-		sevNotice, sevWarn, sevErr, sevCrit int
-		testsJSON, overridesJSON            sql.NullString
-		nsJSON, dsJSON                      sql.NullString
-		minLevel                            string
-		publicID                            sql.NullString
-	)
-	if err := row.Scan(
-		&id, &batchID, &domain, &status,
-		&createdAt, &startedAt, &finishedAt,
-		&progress, &resultURL, &jobError,
-		&sevNotice, &sevWarn, &sevErr, &sevCrit,
-		&testsJSON, &overridesJSON, &nsJSON, &dsJSON,
-		&minLevel,
-		&publicID,
-	); err != nil {
-		return Job{}, err
-	}
-
-	tests, err := unmarshalNullJSON[[]string](testsJSON)
-	if err != nil {
-		return Job{}, fmt.Errorf("unmarshal tests: %w", err)
-	}
-	overrides, err := unmarshalNullJSON[map[string]any](overridesJSON)
-	if err != nil {
-		return Job{}, fmt.Errorf("unmarshal overrides: %w", err)
-	}
-	ns, err := unmarshalNullJSON[[]engine.UndelegatedNameserver](nsJSON)
-	if err != nil {
-		return Job{}, fmt.Errorf("unmarshal undelegated_ns: %w", err)
-	}
-	ds, err := unmarshalNullJSON[[]engine.UndelegatedDSInfo](dsJSON)
-	if err != nil {
-		return Job{}, fmt.Errorf("unmarshal undelegated_ds: %w", err)
-	}
-
-	return Job{
-		ID:         id,
-		PublicID:   publicID.String,
-		BatchID:    batchID,
-		Domain:     domain,
-		Status:     JobStatus(status),
-		CreatedAt:  parseTimestampStr(createdAt),
-		StartedAt:  parseTimestampNullStr(startedAt),
-		FinishedAt: parseTimestampNullStr(finishedAt),
-		Progress:   progress,
-		ResultURL:  resultURL,
-		Error:      jobError,
-		SeverityTotals: map[string]int{
-			"NOTICE":   sevNotice,
-			"WARNING":  sevWarn,
-			"ERROR":    sevErr,
-			"CRITICAL": sevCrit,
-		},
-		Tests:         tests,
-		Overrides:     overrides,
-		UndelegatedNS: ns,
-		UndelegatedDS: ds,
-		MinLevel:      minLevel,
-	}, nil
-}
-
-// Create inserts a new job and fails if the id already exists.
-// A PublicID is generated automatically if the job does not already have one.
-func (s *SQLJobStore) Create(job Job) (Job, error) {
-	if job.PublicID == "" {
-		job.PublicID = GeneratePublicID()
-	}
-	testsJSON, err := toNullJSON(job.Tests)
-	if err != nil {
-		return Job{}, fmt.Errorf("marshal tests: %w", err)
-	}
-	overridesJSON, err := toNullJSON(job.Overrides)
-	if err != nil {
-		return Job{}, fmt.Errorf("marshal overrides: %w", err)
-	}
-	nsJSON, err := toNullJSON(job.UndelegatedNS)
-	if err != nil {
-		return Job{}, fmt.Errorf("marshal undelegated_ns: %w", err)
-	}
-	dsJSON, err := toNullJSON(job.UndelegatedDS)
-	if err != nil {
-		return Job{}, fmt.Errorf("marshal undelegated_ds: %w", err)
-	}
-
-	_, err = s.db.Exec(
-		fmt.Sprintf(`INSERT INTO jobs (
-			id, batch_id, domain, status, created_at, started_at, finished_at,
-			progress, result_url, error,
-			sev_notice, sev_warning, sev_error, sev_critical,
-			tests_json, overrides_json, undelegated_ns_json, undelegated_ds_json, min_level,
-			public_id
-		) VALUES (%s, 0, 0, 0, 0, %s, %s)`, s.phRange(1, 10), s.phRange(11, 5), s.ph(16)),
-		job.ID, job.BatchID, job.Domain, string(job.Status),
-		s.ts(job.CreatedAt), s.ts(job.StartedAt), s.ts(job.FinishedAt),
-		job.Progress, job.ResultURL, job.Error,
-		testsJSON, overridesJSON, nsJSON, dsJSON, job.MinLevel,
-		sql.NullString{String: job.PublicID, Valid: job.PublicID != ""},
-	)
-	if err != nil {
-		if s.dialect.IsDuplicateKey(err) {
-			return Job{}, errors.New("job already exists")
-		}
-		return Job{}, fmt.Errorf("insert job: %w", err)
-	}
-	return job, nil
-}
-
-// Get returns the job with the given id.
-func (s *SQLJobStore) Get(id string) (Job, bool) {
-	row := s.db.QueryRow(fmt.Sprintf("SELECT %s FROM jobs WHERE id = %s", jobCols, s.ph(1)), id)
-	job, err := s.scanJob(row)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return Job{}, false
-		}
-		return Job{}, false
-	}
-	return job, true
-}
-
-// GetByPublicID returns the job with the given public_id.
-func (s *SQLJobStore) GetByPublicID(publicID string) (Job, bool) {
-	row := s.db.QueryRow(fmt.Sprintf("SELECT %s FROM jobs WHERE public_id = %s", jobCols, s.ph(1)), publicID)
-	job, err := s.scanJob(row)
-	if err != nil {
-		return Job{}, false
-	}
-	return job, true
-}
-
-// Update replaces a job's mutable fields. Returns an error if the job does not
-// exist. The sev_* columns are managed exclusively by SetResult.
-func (s *SQLJobStore) Update(job Job) error {
-	testsJSON, err := toNullJSON(job.Tests)
-	if err != nil {
-		return fmt.Errorf("marshal tests: %w", err)
-	}
-	overridesJSON, err := toNullJSON(job.Overrides)
-	if err != nil {
-		return fmt.Errorf("marshal overrides: %w", err)
-	}
-	nsJSON, err := toNullJSON(job.UndelegatedNS)
-	if err != nil {
-		return fmt.Errorf("marshal undelegated_ns: %w", err)
-	}
-	dsJSON, err := toNullJSON(job.UndelegatedDS)
-	if err != nil {
-		return fmt.Errorf("marshal undelegated_ds: %w", err)
-	}
-
-	res, err := s.db.Exec(
-		fmt.Sprintf(`UPDATE jobs SET
-			batch_id=%s, domain=%s, status=%s,
-			started_at=%s, finished_at=%s,
-			progress=%s, result_url=%s, error=%s,
-			tests_json=%s, overrides_json=%s, undelegated_ns_json=%s, undelegated_ds_json=%s, min_level=%s
-		 WHERE id=%s`,
-			s.ph(1), s.ph(2), s.ph(3),
-			s.ph(4), s.ph(5),
-			s.ph(6), s.ph(7), s.ph(8),
-			s.ph(9), s.ph(10), s.ph(11), s.ph(12), s.ph(13),
-			s.ph(14)),
-		job.BatchID, job.Domain, string(job.Status),
-		s.ts(job.StartedAt), s.ts(job.FinishedAt),
-		job.Progress, job.ResultURL, job.Error,
-		testsJSON, overridesJSON, nsJSON, dsJSON, job.MinLevel,
-		job.ID,
-	)
-	if err != nil {
-		return fmt.Errorf("update job: %w", err)
-	}
-	n, err := res.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("rows affected: %w", err)
-	}
-	if n == 0 {
-		return errors.New("job not found")
-	}
-	return nil
-}
-
-// List returns jobs matching filter with sorting and pagination applied.
+// List returns in-flight jobs matching filter with sorting and pagination.
 func (s *SQLJobStore) List(filter JobFilter) JobList {
 	normalizedSort := normalizeJobSort(filter.Sort)
-	normalizedSeverity := normalizeJobSeverityFilter(filter.Severity)
 
 	var conds []string
 	var args []any
@@ -356,20 +329,14 @@ func (s *SQLJobStore) List(filter JobFilter) JobList {
 	if !filter.CreatedBefore.IsZero() {
 		conds = append(conds, "created_at < "+addArg(formatSortableTimestamp(filter.CreatedBefore)))
 	}
-	switch normalizedSeverity {
-	case JobSeverityWarningsPlus:
-		conds = append(conds, "(sev_warning + sev_error + sev_critical) > 0")
-	case JobSeverityErrorsOnly:
-		conds = append(conds, "(sev_error + sev_critical) > 0")
-	}
+	// Severity filtering is not applicable to in-flight jobs; silently ignored.
 
 	where := ""
 	if len(conds) > 0 {
 		where = " WHERE " + strings.Join(conds, " AND ")
 	}
 
-	orderBy := sqlOrderByClause(normalizedSort)
-
+	orderBy := sqlJobOrderBy(normalizedSort)
 	limit := filter.Limit
 	if limit <= 0 {
 		limit = 100
@@ -424,40 +391,48 @@ func (s *SQLJobStore) List(filter JobFilter) JobList {
 		if prevOffset < 0 {
 			prevOffset = 0
 		}
-		list.PrevCursor = strconv.Itoa(prevOffset)
+		list.PrevCursor = fmt.Sprintf("%d", prevOffset)
 	}
 	if offset+len(items) < total {
-		list.NextCursor = strconv.Itoa(offset + len(items))
+		list.NextCursor = fmt.Sprintf("%d", offset+len(items))
 	}
 	return list
 }
 
-// SetResult stores a result for an existing job and updates severity totals
-// atomically in a single transaction.
-func (s *SQLJobStore) SetResult(jobID string, result JobResult) error {
-	summaryJSON, err := toNullJSON(result.Summary)
-	if err != nil {
-		return fmt.Errorf("marshal summary: %w", err)
-	}
-
-	var rawJSON sql.NullString
-	if result.Raw != nil {
-		b, err := json.Marshal(result.Raw)
-		if err != nil {
-			return fmt.Errorf("marshal raw: %w", err)
+// GraduateJob atomically creates a run, inserts entries, upserts the domain
+// record, updates domain latest_* fields, and deletes the job from the queue.
+func (s *SQLJobStore) GraduateJob(job Job, engineEntries []engine.LogEntry) error {
+	// Compute severity totals and worst level.
+	sevNotice, sevWarning, sevError, sevCritical := 0, 0, 0, 0
+	for _, e := range engineEntries {
+		switch strings.ToUpper(strings.TrimSpace(e.Level)) {
+		case "NOTICE":
+			sevNotice++
+		case "WARNING":
+			sevWarning++
+		case "ERROR":
+			sevError++
+		case "CRITICAL":
+			sevCritical++
 		}
-		rawJSON = sql.NullString{String: string(b), Valid: true}
 	}
+	worstLevel := computeWorstLevel(sevNotice, sevWarning, sevError, sevCritical)
 
-	totals := severityTotalsFromSummary(result.Summary)
+	var durationMs int64
+	if !job.StartedAt.IsZero() && !job.FinishedAt.IsZero() {
+		durationMs = job.FinishedAt.Sub(job.StartedAt).Milliseconds()
+	}
 
 	tx, err := s.db.Begin()
 	if err != nil {
-		return fmt.Errorf("begin transaction: %w", err)
+		return fmt.Errorf("begin graduation tx: %w", err)
 	}
 
+	// Check the job still exists.
 	var exists int
-	if err := tx.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM jobs WHERE id = %s", s.ph(1)), jobID).Scan(&exists); err != nil {
+	if err := tx.QueryRow(
+		fmt.Sprintf("SELECT COUNT(*) FROM jobs WHERE id = %s", s.ph(1)), job.ID,
+	).Scan(&exists); err != nil {
 		_ = tx.Rollback()
 		return fmt.Errorf("check job: %w", err)
 	}
@@ -466,66 +441,1036 @@ func (s *SQLJobStore) SetResult(jobID string, result JobResult) error {
 		return errors.New("job not found")
 	}
 
-	if _, err := tx.Exec(
-		s.dialect.UpsertResultSQL(),
-		jobID, result.BatchID, string(result.Status), summaryJSON, rawJSON,
-	); err != nil {
+	// Upsert domain.
+	domainID, err := s.upsertDomainTx(tx, job.Domain)
+	if err != nil {
 		_ = tx.Rollback()
-		return fmt.Errorf("upsert result: %w", err)
+		return fmt.Errorf("upsert domain: %w", err)
 	}
 
+	// Insert run.
 	if _, err := tx.Exec(
-		fmt.Sprintf(`UPDATE jobs SET sev_notice=%s, sev_warning=%s, sev_error=%s, sev_critical=%s WHERE id=%s`,
-			s.ph(1), s.ph(2), s.ph(3), s.ph(4), s.ph(5)),
-		totals["NOTICE"], totals["WARNING"], totals["ERROR"], totals["CRITICAL"], jobID,
+		fmt.Sprintf(`INSERT INTO runs (
+			id, domain_id, domain, batch_id, status,
+			created_at, started_at, finished_at, duration_ms,
+			sev_notice, sev_warning, sev_error, sev_critical,
+			worst_level, entry_count, profile, public_id
+		) VALUES (%s)`, s.phRange(1, 17)),
+		job.ID, domainID, job.Domain, job.BatchID, string(job.Status),
+		s.ts(job.CreatedAt), s.ts(job.StartedAt), s.ts(job.FinishedAt), durationMs,
+		sevNotice, sevWarning, sevError, sevCritical,
+		worstLevel, len(engineEntries), job.Profile,
+		sql.NullString{String: job.PublicID, Valid: job.PublicID != ""},
 	); err != nil {
 		_ = tx.Rollback()
-		return fmt.Errorf("update severity totals: %w", err)
+		return fmt.Errorf("insert run: %w", err)
+	}
+
+	// Insert entries in batches to avoid huge parameter lists.
+	if len(engineEntries) > 0 {
+		if err := s.insertEntriesTx(tx, job.ID, domainID, engineEntries); err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("insert entries: %w", err)
+		}
+	}
+
+	// Update domain latest_*.
+	if _, err := tx.Exec(
+		fmt.Sprintf(`UPDATE domains SET
+			latest_run_id=%s, latest_run_at=%s, latest_status=%s,
+			latest_level=%s, run_count=run_count+1
+		 WHERE id=%s`,
+			s.ph(1), s.ph(2), s.ph(3), s.ph(4), s.ph(5)),
+		job.ID, s.ts(job.FinishedAt), string(job.Status),
+		worstLevel, domainID,
+	); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("update domain: %w", err)
+	}
+
+	// Delete the job from the queue.
+	if _, err := tx.Exec(
+		fmt.Sprintf("DELETE FROM jobs WHERE id = %s", s.ph(1)), job.ID,
+	); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("delete job: %w", err)
 	}
 
 	return tx.Commit()
 }
 
-// GetResult returns the stored result for jobID.
+// upsertDomainTx gets or creates a domain row inside tx, returning its ID.
+func (s *SQLJobStore) upsertDomainTx(tx *sql.Tx, name string) (int64, error) {
+	now := formatSortableTimestamp(time.Now().UTC())
+	switch s.dialect.(type) {
+	case postgresDialect:
+		if _, err := tx.Exec(
+			`INSERT INTO domains (name, created_at) VALUES ($1, $2)
+			 ON CONFLICT (name) DO NOTHING`,
+			name, now,
+		); err != nil {
+			return 0, err
+		}
+	case mariadbDialect:
+		if _, err := tx.Exec(
+			`INSERT IGNORE INTO domains (name, created_at) VALUES (?, ?)`,
+			name, now,
+		); err != nil {
+			return 0, err
+		}
+	default: // sqlite
+		if _, err := tx.Exec(
+			`INSERT OR IGNORE INTO domains (name, created_at) VALUES (?, ?)`,
+			name, now,
+		); err != nil {
+			return 0, err
+		}
+	}
+	var id int64
+	if err := tx.QueryRow(
+		fmt.Sprintf("SELECT id FROM domains WHERE name = %s", s.ph(1)), name,
+	).Scan(&id); err != nil {
+		return 0, fmt.Errorf("get domain id: %w", err)
+	}
+	return id, nil
+}
+
+const insertEntriesBatchSize = 200
+
+// insertEntriesTx inserts engine log entries into the entries table in batches.
+func (s *SQLJobStore) insertEntriesTx(tx *sql.Tx, runID string, domainID int64, entries []engine.LogEntry) error {
+	for start := 0; start < len(entries); start += insertEntriesBatchSize {
+		end := start + insertEntriesBatchSize
+		if end > len(entries) {
+			end = len(entries)
+		}
+		batch := entries[start:end]
+		placeholders := make([]string, len(batch))
+		args := make([]any, 0, len(batch)*8)
+		argN := 0
+		for _, e := range batch {
+			argsJSON, err := toNullJSON(e.Args)
+			if err != nil {
+				return fmt.Errorf("marshal args: %w", err)
+			}
+			p := make([]string, 8)
+			for i := range p {
+				argN++
+				p[i] = s.ph(argN)
+			}
+			placeholders[argN/8-1] = "(" + strings.Join(p, ", ") + ")"
+			args = append(args,
+				runID, domainID, e.Timestamp,
+				e.Module, e.Testcase, e.Tag, e.Level,
+				argsJSON,
+			)
+		}
+		query := `INSERT INTO entries (run_id, domain_id, timestamp, module, testcase, tag, level, args_json) VALUES ` +
+			strings.Join(placeholders, ", ")
+		if _, err := tx.Exec(query, args...); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// GetResult reconstructs a JobResult from the runs and entries tables.
 func (s *SQLJobStore) GetResult(jobID string) (JobResult, bool) {
-	var (
-		id, batchID, status    string
-		summaryJSON, rawJSON   sql.NullString
-	)
-	err := s.db.QueryRow(
-		fmt.Sprintf(`SELECT job_id, batch_id, status, summary_json, raw_json FROM results WHERE job_id = %s`, s.ph(1)),
-		jobID,
-	).Scan(&id, &batchID, &status, &summaryJSON, &rawJSON)
+	run, ok := s.GetRun(jobID)
+	if !ok {
+		return JobResult{}, false
+	}
+	entries, err := s.loadEntries(jobID)
 	if err != nil {
 		return JobResult{}, false
 	}
-
-	result := JobResult{
-		JobID:   id,
-		BatchID: batchID,
-		Status:  JobStatus(status),
-	}
-
-	if summaryJSON.Valid {
-		var summary map[string]any
-		if err := json.Unmarshal([]byte(summaryJSON.String), &summary); err == nil {
-			result.Summary = summary
-		}
-	}
-
-	if rawJSON.Valid {
-		var raw JobResultRaw
-		if err := json.Unmarshal([]byte(rawJSON.String), &raw); err == nil {
-			result.Raw = &raw
-		}
-	}
-
-	return result, true
+	return buildJobResult(run, entries), true
 }
 
+// loadEntries loads all entries for a run, ordered by timestamp.
+func (s *SQLJobStore) loadEntries(runID string) ([]Entry, error) {
+	rows, err := s.db.Query(
+		fmt.Sprintf(`SELECT id, run_id, domain_id, timestamp, module, testcase, tag, level, args_json
+		 FROM entries WHERE run_id = %s ORDER BY timestamp ASC, id ASC`, s.ph(1)),
+		runID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 
-// PurgeOlderThan deletes terminal-status jobs whose finished_at is before
-// cutoff, along with their results. Returns the number of jobs deleted.
+	var entries []Entry
+	for rows.Next() {
+		var (
+			id                                 int64
+			rid, module, testcase, tag, level  string
+			domainID                           int64
+			timestamp                          float64
+			argsJSON                           sql.NullString
+		)
+		if err := rows.Scan(&id, &rid, &domainID, &timestamp, &module, &testcase, &tag, &level, &argsJSON); err != nil {
+			return nil, err
+		}
+		var args map[string]any
+		if argsJSON.Valid {
+			_ = json.Unmarshal([]byte(argsJSON.String), &args)
+		}
+		entries = append(entries, Entry{
+			ID:        id,
+			RunID:     rid,
+			DomainID:  domainID,
+			Timestamp: timestamp,
+			Module:    module,
+			Testcase:  testcase,
+			Tag:       tag,
+			Level:     level,
+			Args:      args,
+		})
+	}
+	return entries, rows.Err()
+}
+
+// ── Domain management ─────────────────────────────────────────────────────────
+
+// GetOrCreateDomain returns the domain for name, creating it if necessary.
+// name is normalized (lowercased, Unicode labels converted to ACE) before storage.
+func (s *SQLJobStore) GetOrCreateDomain(name string) (Domain, error) {
+	errs, normalized := normalization.NormalizeName(strings.TrimSpace(name))
+	if len(errs) > 0 {
+		return Domain{}, fmt.Errorf("invalid domain name %q: %s", name, errs[0].Message())
+	}
+	name = normalized
+	now := formatSortableTimestamp(time.Now().UTC())
+	switch s.dialect.(type) {
+	case postgresDialect:
+		_, err := s.db.Exec(
+			`INSERT INTO domains (name, created_at) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING`,
+			name, now)
+		if err != nil {
+			return Domain{}, fmt.Errorf("upsert domain: %w", err)
+		}
+	case mariadbDialect:
+		_, err := s.db.Exec(`INSERT IGNORE INTO domains (name, created_at) VALUES (?, ?)`, name, now)
+		if err != nil {
+			return Domain{}, fmt.Errorf("upsert domain: %w", err)
+		}
+	default:
+		_, err := s.db.Exec(`INSERT OR IGNORE INTO domains (name, created_at) VALUES (?, ?)`, name, now)
+		if err != nil {
+			return Domain{}, fmt.Errorf("upsert domain: %w", err)
+		}
+	}
+	return s.getDomainByName(name)
+}
+
+func (s *SQLJobStore) scanDomain(row *sql.Row) (Domain, error) {
+	var (
+		id                       int64
+		domainName, createdAt    string
+		latestRunID, latestRunAt sql.NullString
+		latestStatus, latestLevel sql.NullString
+		runCount                 int
+	)
+	err := row.Scan(&id, &domainName, &latestRunID, &latestRunAt, &latestStatus,
+		&latestLevel, &createdAt, &runCount)
+	if err != nil {
+		return Domain{}, err
+	}
+	return Domain{
+		ID:           id,
+		Name:         domainName,
+		LatestRunID:  latestRunID.String,
+		LatestRunAt:  parseTimestampNullStr(latestRunAt),
+		LatestStatus: latestStatus.String,
+		LatestLevel:  latestLevel.String,
+		CreatedAt:    parseTimestampStr(createdAt),
+		RunCount:     runCount,
+	}, nil
+}
+
+const domainSelectCols = `SELECT id, name, latest_run_id, latest_run_at, latest_status,
+	latest_level, created_at, run_count FROM domains`
+
+func (s *SQLJobStore) getDomainByName(name string) (Domain, error) {
+	row := s.db.QueryRow(domainSelectCols+` WHERE name = `+s.ph(1), name)
+	return s.scanDomain(row)
+}
+
+// GetDomain returns a domain by its numeric ID.
+func (s *SQLJobStore) GetDomain(id int64) (Domain, bool) {
+	row := s.db.QueryRow(domainSelectCols+` WHERE id = `+s.ph(1), id)
+	d, err := s.scanDomain(row)
+	if err != nil {
+		return Domain{}, false
+	}
+	return d, true
+}
+
+// GetDomainByName returns a domain by its name.
+func (s *SQLJobStore) GetDomainByName(name string) (Domain, bool) {
+	d, err := s.getDomainByName(name)
+	if err != nil {
+		return Domain{}, false
+	}
+	return d, true
+}
+
+// UpdateDomainLatest updates the denormalized latest_* fields on a domain.
+func (s *SQLJobStore) UpdateDomainLatest(domainID int64, runID string, finishedAt time.Time, status, level string) error {
+	ph := s.ph
+	finishedAtVal := s.dialect.TimestampVal(finishedAt)
+	_, err := s.db.Exec(
+		`UPDATE domains SET latest_run_id = `+ph(1)+`, latest_run_at = `+ph(2)+
+			`, latest_status = `+ph(3)+`, latest_level = `+ph(4)+
+			`, run_count = run_count + 1 WHERE id = `+ph(5),
+		runID, finishedAtVal, status, level, domainID,
+	)
+	return err
+}
+
+// ListDomains returns paginated domains.
+func (s *SQLJobStore) ListDomains(filter DomainFilter) DomainList {
+	var conds []string
+	var args []any
+	argN := 0
+	addArg := func(v any) string {
+		args = append(args, v)
+		argN++
+		return s.dialect.Placeholder(argN)
+	}
+
+	if filter.Tag != "" {
+		conds = append(conds, "id IN (SELECT domain_id FROM domain_tags WHERE tag = "+addArg(filter.Tag)+")")
+	}
+	if filter.Name != "" {
+		conds = append(conds, "LOWER(name) LIKE "+addArg("%"+strings.ToLower(filter.Name)+"%"))
+	}
+	if filter.LatestLevel != "" {
+		conds = append(conds, "latest_level = "+addArg(filter.LatestLevel))
+	}
+	if filter.MinLevel != "" {
+		switch strings.ToUpper(filter.MinLevel) {
+		case "WARNING":
+			conds = append(conds, "latest_level IN ('WARNING', 'ERROR', 'CRITICAL')")
+		case "ERROR":
+			conds = append(conds, "latest_level IN ('ERROR', 'CRITICAL')")
+		case "CRITICAL":
+			conds = append(conds, "latest_level = 'CRITICAL'")
+		}
+	}
+
+	where := ""
+	if len(conds) > 0 {
+		where = " WHERE " + strings.Join(conds, " AND ")
+	}
+
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = 100
+	}
+	offset := filter.Offset
+	if offset < 0 {
+		offset = 0
+	}
+
+	var total int
+	if err := s.db.QueryRow("SELECT COUNT(*) FROM domains"+where, args...).Scan(&total); err != nil {
+		return DomainList{Limit: limit}
+	}
+
+	limitPH := s.dialect.Placeholder(argN + 1)
+	offsetPH := s.dialect.Placeholder(argN + 2)
+	dataArgs := append(args, limit, offset)
+
+	query := `SELECT id, name, latest_run_id, latest_run_at, latest_status,
+		latest_level, created_at, run_count FROM domains` + where +
+		" ORDER BY name ASC LIMIT " + limitPH + " OFFSET " + offsetPH
+	rows, err := s.db.Query(query, dataArgs...)
+	if err != nil {
+		return DomainList{Limit: limit}
+	}
+	defer rows.Close()
+
+	// Collect domains first; close cursor before making nested tag queries.
+	var items []Domain
+	for rows.Next() {
+		var (
+			id                                int64
+			name, createdAt                   string
+			latestRunID, latestRunAt          sql.NullString
+			latestStatus, latestLevel         sql.NullString
+			runCount                          int
+		)
+		if err := rows.Scan(&id, &name, &latestRunID, &latestRunAt,
+			&latestStatus, &latestLevel, &createdAt, &runCount); err != nil {
+			continue
+		}
+		items = append(items, Domain{
+			ID:           id,
+			Name:         name,
+			LatestRunID:  latestRunID.String,
+			LatestRunAt:  parseTimestampNullStr(latestRunAt),
+			LatestStatus: latestStatus.String,
+			LatestLevel:  latestLevel.String,
+			CreatedAt:    parseTimestampStr(createdAt),
+			RunCount:     runCount,
+		})
+	}
+	rows.Close()
+
+	// Load tags after the main cursor is closed.
+	for i := range items {
+		items[i].Tags = s.loadDomainTags(items[i].ID)
+	}
+
+	return DomainList{
+		Items:  items,
+		Total:  total,
+		Limit:  limit,
+		Offset: offset,
+	}
+}
+
+func (s *SQLJobStore) loadDomainTags(domainID int64) []string {
+	rows, err := s.db.Query(
+		fmt.Sprintf("SELECT tag FROM domain_tags WHERE domain_id = %s ORDER BY tag", s.ph(1)),
+		domainID,
+	)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var tags []string
+	for rows.Next() {
+		var tag string
+		if err := rows.Scan(&tag); err == nil {
+			tags = append(tags, tag)
+		}
+	}
+	return tags
+}
+
+// ── Tag management ────────────────────────────────────────────────────────────
+
+// CreateTag creates a new tag or does nothing if it already exists.
+func (s *SQLJobStore) CreateTag(name, description string) error {
+	now := formatSortableTimestamp(time.Now().UTC())
+	switch s.dialect.(type) {
+	case postgresDialect:
+		_, err := s.db.Exec(
+			`INSERT INTO tags (name, description, created_at) VALUES ($1, $2, $3) ON CONFLICT (name) DO NOTHING`,
+			name, description, now)
+		return err
+	case mariadbDialect:
+		_, err := s.db.Exec(
+			`INSERT IGNORE INTO tags (name, description, created_at) VALUES (?, ?, ?)`,
+			name, description, now)
+		return err
+	default:
+		_, err := s.db.Exec(
+			`INSERT OR IGNORE INTO tags (name, description, created_at) VALUES (?, ?, ?)`,
+			name, description, now)
+		return err
+	}
+}
+
+// ListTags returns all tags ordered by name.
+func (s *SQLJobStore) ListTags(limit, offset int) []Tag {
+	if limit <= 0 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	rows, err := s.db.Query(
+		fmt.Sprintf(`SELECT t.name, t.description, t.created_at,
+			COUNT(dt.domain_id) AS domain_count
+		 FROM tags t
+		 LEFT JOIN domain_tags dt ON dt.tag = t.name
+		 GROUP BY t.name, t.description, t.created_at
+		 ORDER BY t.name ASC
+		 LIMIT %s OFFSET %s`, s.ph(1), s.ph(2)),
+		limit, offset,
+	)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	var tags []Tag
+	for rows.Next() {
+		var (
+			name, description, createdAt string
+			domainCount                  int
+		)
+		if err := rows.Scan(&name, &description, &createdAt, &domainCount); err != nil {
+			continue
+		}
+		tags = append(tags, Tag{
+			Name:        name,
+			Description: description,
+			CreatedAt:   parseTimestampStr(createdAt),
+			DomainCount: domainCount,
+		})
+	}
+	return tags
+}
+
+// TagDomains associates the given domain IDs with tag.
+func (s *SQLJobStore) TagDomains(tag string, domainIDs []int64) error {
+	// Ensure tag exists.
+	if err := s.CreateTag(tag, ""); err != nil {
+		return err
+	}
+	for _, id := range domainIDs {
+		switch s.dialect.(type) {
+		case postgresDialect:
+			_, err := s.db.Exec(
+				`INSERT INTO domain_tags (domain_id, tag) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+				id, tag)
+			if err != nil {
+				return err
+			}
+		case mariadbDialect:
+			_, err := s.db.Exec(`INSERT IGNORE INTO domain_tags (domain_id, tag) VALUES (?, ?)`, id, tag)
+			if err != nil {
+				return err
+			}
+		default:
+			_, err := s.db.Exec(`INSERT OR IGNORE INTO domain_tags (domain_id, tag) VALUES (?, ?)`, id, tag)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// GetTag returns a tag by name with its current domain count.
+func (s *SQLJobStore) GetTag(name string) (Tag, bool) {
+	var (
+		tagName, description, createdAt string
+		domainCount                     int
+	)
+	err := s.db.QueryRow(
+		fmt.Sprintf(`SELECT t.name, t.description, t.created_at,
+			COUNT(dt.domain_id) AS domain_count
+		 FROM tags t
+		 LEFT JOIN domain_tags dt ON dt.tag = t.name
+		 WHERE t.name = %s
+		 GROUP BY t.name, t.description, t.created_at`, s.ph(1)),
+		name,
+	).Scan(&tagName, &description, &createdAt, &domainCount)
+	if err != nil {
+		return Tag{}, false
+	}
+	return Tag{
+		Name:        tagName,
+		Description: description,
+		CreatedAt:   parseTimestampStr(createdAt),
+		DomainCount: domainCount,
+	}, true
+}
+
+// UpdateTag updates the description of an existing tag.
+func (s *SQLJobStore) UpdateTag(name, description string) error {
+	res, err := s.db.Exec(
+		fmt.Sprintf(`UPDATE tags SET description = %s WHERE name = %s`, s.ph(1), s.ph(2)),
+		description, name,
+	)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return errors.New("tag not found")
+	}
+	return nil
+}
+
+// DeleteTag removes a tag and all its domain associations.
+func (s *SQLJobStore) DeleteTag(name string) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("delete tag begin tx: %w", err)
+	}
+	if _, err := tx.Exec(
+		fmt.Sprintf(`DELETE FROM domain_tags WHERE tag = %s`, s.ph(1)), name,
+	); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("delete domain_tags: %w", err)
+	}
+	res, err := tx.Exec(
+		fmt.Sprintf(`DELETE FROM tags WHERE name = %s`, s.ph(1)), name,
+	)
+	if err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("delete tag: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		_ = tx.Rollback()
+		return errors.New("tag not found")
+	}
+	return tx.Commit()
+}
+
+// UntagDomains removes the given domain IDs from a tag.
+func (s *SQLJobStore) UntagDomains(tag string, domainIDs []int64) error {
+	for _, id := range domainIDs {
+		if _, err := s.db.Exec(
+			fmt.Sprintf(`DELETE FROM domain_tags WHERE tag = %s AND domain_id = %s`,
+				s.ph(1), s.ph(2)),
+			tag, id,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// GetDomainTags returns tag names for a domain.
+func (s *SQLJobStore) GetDomainTags(domainID int64) []string {
+	return s.loadDomainTags(domainID)
+}
+
+// ListDomainsByTag returns domains associated with tag.
+func (s *SQLJobStore) ListDomainsByTag(tag string, filter DomainFilter) DomainList {
+	filter.Tag = tag
+	return s.ListDomains(filter)
+}
+
+// GetTagSummary returns the severity distribution of latest runs for domains in tag.
+func (s *SQLJobStore) GetTagSummary(tag string) (TagSummary, bool) {
+	rows, err := s.db.Query(
+		fmt.Sprintf(`SELECT d.latest_level
+		 FROM domains d
+		 JOIN domain_tags dt ON dt.domain_id = d.id
+		 WHERE dt.tag = %s`, s.ph(1)),
+		tag,
+	)
+	if err != nil {
+		return TagSummary{}, false
+	}
+	defer rows.Close()
+
+	summary := TagSummary{Tag: tag}
+	found := false
+	for rows.Next() {
+		found = true
+		var level sql.NullString
+		if err := rows.Scan(&level); err != nil {
+			continue
+		}
+		summary.DomainCount++
+		switch strings.ToUpper(level.String) {
+		case "CRITICAL":
+			summary.Critical++
+		case "ERROR":
+			summary.Error++
+		case "WARNING":
+			summary.Warning++
+		case "NOTICE":
+			summary.Notice++
+		default:
+			summary.OK++
+		}
+	}
+	if !found {
+		return TagSummary{}, false
+	}
+	return summary, true
+}
+
+// ── Run management ────────────────────────────────────────────────────────────
+
+const runCols = `id, domain_id, domain, batch_id, status,
+	created_at, started_at, finished_at, duration_ms,
+	sev_notice, sev_warning, sev_error, sev_critical,
+	worst_level, entry_count, profile, public_id`
+
+func (s *SQLJobStore) scanRun(row rowScanner) (Run, error) {
+	var (
+		id, domain, batchID, status, worstLevel, profile string
+		domainID, durationMs                             int64
+		sevNotice, sevWarning, sevError, sevCritical     int
+		entryCount                                       int
+		createdAt                                        string
+		startedAt, finishedAt                            sql.NullString
+		publicID                                         sql.NullString
+	)
+	if err := row.Scan(
+		&id, &domainID, &domain, &batchID, &status,
+		&createdAt, &startedAt, &finishedAt, &durationMs,
+		&sevNotice, &sevWarning, &sevError, &sevCritical,
+		&worstLevel, &entryCount, &profile, &publicID,
+	); err != nil {
+		return Run{}, err
+	}
+	r := Run{
+		ID:          id,
+		DomainID:    domainID,
+		Domain:      domain,
+		BatchID:     batchID,
+		Status:      JobStatus(status),
+		CreatedAt:   parseTimestampStr(createdAt),
+		StartedAt:   parseTimestampNullStr(startedAt),
+		FinishedAt:  parseTimestampNullStr(finishedAt),
+		DurationMs:  durationMs,
+		SevNotice:   sevNotice,
+		SevWarning:  sevWarning,
+		SevError:    sevError,
+		SevCritical: sevCritical,
+		WorstLevel:  worstLevel,
+		EntryCount:  entryCount,
+		Profile:     profile,
+		PublicID:    publicID.String,
+	}
+	r.SeverityTotals = map[string]int{
+		"NOTICE":   sevNotice,
+		"WARNING":  sevWarning,
+		"ERROR":    sevError,
+		"CRITICAL": sevCritical,
+	}
+	return r, nil
+}
+
+// GetRun returns a graduated run by ID.
+func (s *SQLJobStore) GetRun(id string) (Run, bool) {
+	row := s.db.QueryRow(
+		fmt.Sprintf("SELECT %s FROM runs WHERE id = %s", runCols, s.ph(1)), id)
+	run, err := s.scanRun(row)
+	if err != nil {
+		return Run{}, false
+	}
+	return run, true
+}
+
+// GetRunByPublicID returns a graduated run by public_id.
+func (s *SQLJobStore) GetRunByPublicID(publicID string) (Run, bool) {
+	row := s.db.QueryRow(
+		fmt.Sprintf("SELECT %s FROM runs WHERE public_id = %s", runCols, s.ph(1)), publicID)
+	run, err := s.scanRun(row)
+	if err != nil {
+		return Run{}, false
+	}
+	return run, true
+}
+
+// sqlRunOrderBy returns the ORDER BY clause for the runs table.
+func sqlRunOrderBy(sort JobSort) string {
+	switch sort {
+	case JobSortCreatedAtDesc:
+		return "created_at DESC, id ASC"
+	case JobSortCreatedAtAsc:
+		return "created_at ASC, id ASC"
+	case JobSortStartedAtDesc:
+		return "COALESCE(started_at, created_at) DESC, created_at DESC, id ASC"
+	case JobSortStartedAtAsc:
+		return "COALESCE(started_at, created_at) ASC, created_at ASC, id ASC"
+	case JobSortDomainAsc:
+		return "LOWER(domain) ASC, finished_at DESC, id ASC"
+	case JobSortDomainDesc:
+		return "LOWER(domain) DESC, finished_at DESC, id ASC"
+	case JobSortBatchIDAsc:
+		return "LOWER(batch_id) ASC, finished_at DESC, id ASC"
+	case JobSortBatchIDDesc:
+		return "LOWER(batch_id) DESC, finished_at DESC, id ASC"
+	case JobSortErrorDesc:
+		return "(sev_error + sev_critical) DESC, sev_critical DESC, finished_at DESC, id ASC"
+	case JobSortCriticalDesc:
+		return "sev_critical DESC, (sev_error + sev_critical) DESC, finished_at DESC, id ASC"
+	default:
+		return "finished_at DESC, id ASC"
+	}
+}
+
+// ListRuns returns paginated graduated runs matching filter.
+func (s *SQLJobStore) ListRuns(filter RunFilter) RunList {
+	var conds []string
+	var args []any
+	argN := 0
+	addArg := func(v any) string {
+		args = append(args, v)
+		argN++
+		return s.dialect.Placeholder(argN)
+	}
+
+	if filter.DomainID != 0 {
+		conds = append(conds, "domain_id = "+addArg(filter.DomainID))
+	}
+	if filter.Domain != "" {
+		conds = append(conds, "LOWER(domain) LIKE "+addArg("%"+strings.ToLower(filter.Domain)+"%"))
+	}
+	if filter.BatchID != "" {
+		conds = append(conds, "batch_id = "+addArg(filter.BatchID))
+	}
+	if filter.Status != "" {
+		conds = append(conds, "status = "+addArg(string(filter.Status)))
+	}
+	if filter.WorstLevel != "" {
+		conds = append(conds, "worst_level = "+addArg(filter.WorstLevel))
+	}
+	if !filter.FinishedAfter.IsZero() {
+		conds = append(conds, "finished_at > "+addArg(formatSortableTimestamp(filter.FinishedAfter)))
+	}
+	if !filter.FinishedBefore.IsZero() {
+		conds = append(conds, "finished_at < "+addArg(formatSortableTimestamp(filter.FinishedBefore)))
+	}
+
+	where := ""
+	if len(conds) > 0 {
+		where = " WHERE " + strings.Join(conds, " AND ")
+	}
+
+	orderBy := sqlRunOrderBy(filter.Sort)
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = 100
+	}
+	offset := filter.Offset
+	if offset < 0 {
+		offset = 0
+	}
+
+	var total int
+	if err := s.db.QueryRow("SELECT COUNT(*) FROM runs"+where, args...).Scan(&total); err != nil {
+		return RunList{Limit: limit}
+	}
+
+	limitPH := s.dialect.Placeholder(argN + 1)
+	offsetPH := s.dialect.Placeholder(argN + 2)
+	dataArgs := append(args, limit, offset)
+
+	rows, err := s.db.Query(
+		"SELECT "+runCols+" FROM runs"+where+
+			" ORDER BY "+orderBy+
+			" LIMIT "+limitPH+" OFFSET "+offsetPH,
+		dataArgs...,
+	)
+	if err != nil {
+		return RunList{Limit: limit}
+	}
+	defer rows.Close()
+
+	var items []Run
+	for rows.Next() {
+		run, err := s.scanRun(rows)
+		if err != nil {
+			continue
+		}
+		items = append(items, run)
+	}
+	if err := rows.Err(); err != nil {
+		return RunList{Limit: limit}
+	}
+
+	list := RunList{
+		Items:  items,
+		Total:  total,
+		Limit:  limit,
+		Offset: offset,
+	}
+	if offset > 0 {
+		prev := offset - limit
+		if prev < 0 {
+			prev = 0
+		}
+		list.PrevCursor = fmt.Sprintf("%d", prev)
+	}
+	if offset+len(items) < total {
+		list.NextCursor = fmt.Sprintf("%d", offset+len(items))
+	}
+	return list
+}
+
+// ListRunsByDomain returns paginated runs for a specific domain ordered by finished_at DESC.
+func (s *SQLJobStore) ListRunsByDomain(domainID int64, limit, offset int) RunList {
+	return s.ListRuns(RunFilter{DomainID: domainID, Limit: limit, Offset: offset})
+}
+
+// ── Entry queries ─────────────────────────────────────────────────────────────
+
+// QueryEntries returns entries across runs matching the given filter.
+func (s *SQLJobStore) QueryEntries(filter EntryFilter) EntryList {
+	var conds []string
+	var args []any
+	argN := 0
+	addArg := func(v any) string {
+		args = append(args, v)
+		argN++
+		return s.dialect.Placeholder(argN)
+	}
+
+	base := "FROM entries e"
+
+	if filter.Tag != "" {
+		base += " JOIN domain_tags dt ON dt.domain_id = e.domain_id AND dt.tag = " + addArg(filter.Tag)
+	}
+	if filter.LatestOnly {
+		base += " JOIN domains d ON d.id = e.domain_id AND d.latest_run_id = e.run_id"
+	}
+	if filter.BatchID != "" {
+		base += " JOIN runs r ON r.id = e.run_id AND r.batch_id = " + addArg(filter.BatchID)
+	}
+
+	if filter.RunID != "" {
+		conds = append(conds, "e.run_id = "+addArg(filter.RunID))
+	}
+	if filter.DomainID != 0 {
+		conds = append(conds, "e.domain_id = "+addArg(filter.DomainID))
+	}
+	if filter.Module != "" {
+		conds = append(conds, "LOWER(e.module) = LOWER("+addArg(filter.Module)+")")
+	}
+	if filter.Testcase != "" {
+		conds = append(conds, "LOWER(e.testcase) = LOWER("+addArg(filter.Testcase)+")")
+	}
+	if filter.EntryTag != "" {
+		conds = append(conds, "e.tag = "+addArg(filter.EntryTag))
+	}
+	if filter.Level != "" {
+		conds = append(conds, "e.level = "+addArg(filter.Level))
+	}
+
+	where := ""
+	if len(conds) > 0 {
+		where = " WHERE " + strings.Join(conds, " AND ")
+	}
+
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = 100
+	}
+	offset := filter.Offset
+	if offset < 0 {
+		offset = 0
+	}
+
+	var total int
+	if err := s.db.QueryRow("SELECT COUNT(*) "+base+where, args...).Scan(&total); err != nil {
+		return EntryList{Limit: limit}
+	}
+
+	limitPH := s.dialect.Placeholder(argN + 1)
+	offsetPH := s.dialect.Placeholder(argN + 2)
+	dataArgs := append(args, limit, offset)
+
+	rows, err := s.db.Query(
+		"SELECT e.id, e.run_id, e.domain_id, e.timestamp, e.module, e.testcase, e.tag, e.level, e.args_json "+
+			base+where+
+			" ORDER BY e.run_id ASC, e.id ASC"+
+			" LIMIT "+limitPH+" OFFSET "+offsetPH,
+		dataArgs...,
+	)
+	if err != nil {
+		return EntryList{Limit: limit}
+	}
+	defer rows.Close()
+
+	var items []Entry
+	for rows.Next() {
+		var (
+			id                                int64
+			runID, module, testcase, tag, lvl string
+			domainID                          int64
+			timestamp                         float64
+			argsJSON                          sql.NullString
+		)
+		if err := rows.Scan(&id, &runID, &domainID, &timestamp, &module, &testcase, &tag, &lvl, &argsJSON); err != nil {
+			continue
+		}
+		var entryArgs map[string]any
+		if argsJSON.Valid {
+			_ = json.Unmarshal([]byte(argsJSON.String), &entryArgs)
+		}
+		items = append(items, Entry{
+			ID:        id,
+			RunID:     runID,
+			DomainID:  domainID,
+			Timestamp: timestamp,
+			Module:    module,
+			Testcase:  testcase,
+			Tag:       tag,
+			Level:     lvl,
+			Args:      entryArgs,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return EntryList{Limit: limit}
+	}
+
+	list := EntryList{
+		Items:  items,
+		Total:  total,
+		Limit:  limit,
+		Offset: offset,
+	}
+	if offset > 0 {
+		prev := offset - limit
+		if prev < 0 {
+			prev = 0
+		}
+		list.PrevCursor = fmt.Sprintf("%d", prev)
+	}
+	if offset+len(items) < total {
+		list.NextCursor = fmt.Sprintf("%d", offset+len(items))
+	}
+	return list
+}
+
+// ── Batch management ──────────────────────────────────────────────────────────
+
+// CreateBatch inserts a batch record.
+func (s *SQLJobStore) CreateBatch(batch Batch) error {
+	switch s.dialect.(type) {
+	case postgresDialect:
+		_, err := s.db.Exec(
+			`INSERT INTO batches (id, tag, created_at, domain_count, description)
+			 VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO NOTHING`,
+			batch.ID, batch.Tag, formatSortableTimestamp(batch.CreatedAt), batch.DomainCount, batch.Description)
+		return err
+	case mariadbDialect:
+		_, err := s.db.Exec(
+			`INSERT IGNORE INTO batches (id, tag, created_at, domain_count, description)
+			 VALUES (?, ?, ?, ?, ?)`,
+			batch.ID, batch.Tag, formatSortableTimestamp(batch.CreatedAt), batch.DomainCount, batch.Description)
+		return err
+	default:
+		_, err := s.db.Exec(
+			`INSERT OR IGNORE INTO batches (id, tag, created_at, domain_count, description)
+			 VALUES (?, ?, ?, ?, ?)`,
+			batch.ID, batch.Tag, formatSortableTimestamp(batch.CreatedAt), batch.DomainCount, batch.Description)
+		return err
+	}
+}
+
+// GetBatch returns a batch by ID.
+func (s *SQLJobStore) GetBatch(id string) (Batch, bool) {
+	var (
+		batchID, tag, createdAt, description string
+		domainCount                          int
+	)
+	err := s.db.QueryRow(
+		fmt.Sprintf(`SELECT id, tag, created_at, domain_count, description FROM batches WHERE id = %s`, s.ph(1)),
+		id,
+	).Scan(&batchID, &tag, &createdAt, &domainCount, &description)
+	if err != nil {
+		return Batch{}, false
+	}
+	return Batch{
+		ID:          batchID,
+		Tag:         tag,
+		CreatedAt:   parseTimestampStr(createdAt),
+		DomainCount: domainCount,
+		Description: description,
+	}, true
+}
+
+// ── Purge ─────────────────────────────────────────────────────────────────────
+
+// PurgeOlderThan deletes terminal runs whose finished_at is before cutoff,
+// along with their entries. Returns the number of runs deleted.
 func (s *SQLJobStore) PurgeOlderThan(cutoff time.Time) (int64, error) {
 	ph := s.ph(1)
 	statuses := "'succeeded','failed','canceled','expired'"
@@ -536,21 +1481,21 @@ func (s *SQLJobStore) PurgeOlderThan(cutoff time.Time) (int64, error) {
 		return 0, fmt.Errorf("purge begin tx: %w", err)
 	}
 	_, err = tx.Exec(
-		`DELETE FROM results WHERE job_id IN `+
-			`(SELECT id FROM jobs WHERE finished_at < `+ph+` AND status IN (`+statuses+`))`,
+		`DELETE FROM entries WHERE run_id IN `+
+			`(SELECT id FROM runs WHERE finished_at < `+ph+` AND status IN (`+statuses+`))`,
 		cutoffVal,
 	)
 	if err != nil {
 		_ = tx.Rollback()
-		return 0, fmt.Errorf("purge results: %w", err)
+		return 0, fmt.Errorf("purge entries: %w", err)
 	}
 	res, err := tx.Exec(
-		`DELETE FROM jobs WHERE finished_at < `+ph+` AND status IN (`+statuses+`)`,
+		`DELETE FROM runs WHERE finished_at < `+ph+` AND status IN (`+statuses+`)`,
 		cutoffVal,
 	)
 	if err != nil {
 		_ = tx.Rollback()
-		return 0, fmt.Errorf("purge jobs: %w", err)
+		return 0, fmt.Errorf("purge runs: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
 		return 0, fmt.Errorf("purge commit: %w", err)

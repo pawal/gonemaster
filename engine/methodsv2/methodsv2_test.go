@@ -2,7 +2,9 @@ package methodsv2
 
 import (
 	"context"
+	"fmt"
 	"net/netip"
+	"sync/atomic"
 	"testing"
 
 	dns "codeberg.org/miekg/dns"
@@ -480,5 +482,294 @@ func TestGetParentNSNamesAndIPsSkipsOnIntermediateNoResponse(t *testing.T) {
 	}
 	if parent[0].String() != "ns2.root/192.0.2.2" {
 		t.Fatalf("unexpected parent nameserver %q", parent[0].String())
+	}
+}
+
+// delegationPacket builds a referral response for zoneName with NS records
+// pointing to the given nsNames and optional A glue for in-bailiwick names.
+func delegationPacket(zoneName string, nsGlue map[string]string) packet.Packet {
+	msg := new(dns.Msg)
+	msg.Rcode = dns.RcodeSuccess
+	msg.Authoritative = false
+	for nsName := range nsGlue {
+		nsRR := &dns.NS{}
+		nsRR.Hdr = dns.Header{Name: dnsutil.Fqdn(zoneName), Class: dns.ClassINET, TTL: 60}
+		nsRR.Ns = dnsutil.Fqdn(nsName)
+		msg.Ns = append(msg.Ns, nsRR)
+	}
+	for nsName, addr := range nsGlue {
+		if addr == "" {
+			continue
+		}
+		ip, err := netip.ParseAddr(addr)
+		if err != nil {
+			continue
+		}
+		if ip.Is4() {
+			aRR := &dns.A{}
+			aRR.Hdr = dns.Header{Name: dnsutil.Fqdn(nsName), Class: dns.ClassINET, TTL: 60}
+			aRR.Addr = ip
+			msg.Extra = append(msg.Extra, aRR)
+		}
+	}
+	return packet.Packet{Msg: msg}
+}
+
+// authoritativeAPacket builds an authoritative A response.
+func authoritativeAPacket(name string, addr string) packet.Packet {
+	msg := new(dns.Msg)
+	msg.Rcode = dns.RcodeSuccess
+	msg.Authoritative = true
+	ip, _ := netip.ParseAddr(addr)
+	aRR := &dns.A{}
+	aRR.Hdr = dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET, TTL: 60}
+	aRR.Addr = ip
+	msg.Answer = append(msg.Answer, aRR)
+	return packet.Packet{Msg: msg}
+}
+
+// ibTestRootHook returns a query hook for a root server that delegates zoneName
+// to the specified nameservers with glue.
+func ibTestRootHook(zoneName string, nsGlue map[string]string) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
+	return func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		if name == "." && qtype == "SOA" {
+			msg := new(dns.Msg)
+			msg.Rcode = dns.RcodeSuccess
+			msg.Authoritative = true
+			soaRR := &dns.SOA{Hdr: dns.Header{Name: ".", Class: dns.ClassINET}}
+			soaRR.Ns = "ns.root."
+			soaRR.Mbox = "admin.root."
+			soaRR.Serial = 1
+			msg.Answer = []dns.RR{soaRR}
+			return packet.Packet{Msg: msg}, nil
+		}
+		if name == "." && qtype == "NS" {
+			msg := new(dns.Msg)
+			msg.Rcode = dns.RcodeSuccess
+			msg.Authoritative = true
+			nsRR := &dns.NS{}
+			nsRR.Hdr = dns.Header{Name: ".", Class: dns.ClassINET}
+			nsRR.Ns = "ns.root."
+			msg.Answer = []dns.RR{nsRR}
+			aRR := &dns.A{}
+			aRR.Hdr = dns.Header{Name: "ns.root.", Class: dns.ClassINET}
+			aRR.Addr = netip.AddrFrom4([4]byte{192, 0, 2, 9})
+			msg.Extra = []dns.RR{aRR}
+			return packet.Packet{Msg: msg}, nil
+		}
+		if name == zoneName {
+			return delegationPacket(zoneName, nsGlue), nil
+		}
+		return packet.Packet{}, nil
+	}
+}
+
+// TestGetIBAddrInZoneSkipsDeadDelegationServer exercises the non-undelegated
+// in-bailiwick resolution path where one delegation server is unreachable.
+// Zone "example" is delegated from root to three in-bailiwick servers, one
+// dead. The dead server should be tried at most once then skipped.
+func TestGetIBAddrInZoneSkipsDeadDelegationServer(t *testing.T) {
+	ClearCache()
+	defer ClearCache()
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.Net.IPv4 = true
+	prof.Net.IPv6 = false
+
+	r := &recursor.Recursor{}
+	if err := r.AddFakeAddresses(".", map[string][]string{
+		"ns.root": {"192.0.2.9"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Root delegates "example" to three in-bailiwick servers with glue.
+	rootNS, err := nameserver.NewWithContext(ctx, "ns.root", "192.0.2.9", r.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootNS.SetQueryHook(ibTestRootHook("example", map[string]string{
+		"ns1.example":  "192.0.2.11",
+		"ns2.example":  "192.0.2.12",
+		"dead.example": "192.0.2.99",
+	}))
+
+	// Healthy delegation server — responds authoritatively for example.
+	ibHook := func(name string, qtype string) (packet.Packet, error) {
+		if name == "example" && qtype == "NS" {
+			return authoritativeNSPacket("example", "ns1.example", "ns2.example", "dead.example"), nil
+		}
+		if qtype == "A" {
+			switch name {
+			case "ns1.example":
+				return authoritativeAPacket("ns1.example", "192.0.2.11"), nil
+			case "ns2.example":
+				return authoritativeAPacket("ns2.example", "192.0.2.12"), nil
+			case "dead.example":
+				return authoritativeAPacket("dead.example", "192.0.2.99"), nil
+			}
+		}
+		if qtype == "AAAA" {
+			msg := new(dns.Msg)
+			msg.Rcode = dns.RcodeSuccess
+			msg.Authoritative = true
+			return packet.Packet{Msg: msg}, nil
+		}
+		return packet.Packet{}, nil
+	}
+
+	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.11", r.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ns1.SetQueryHook(func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		return ibHook(name, qtype)
+	})
+
+	ns2, err := nameserver.NewWithContext(ctx, "ns2.example", "192.0.2.12", r.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ns2.SetQueryHook(func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		return ibHook(name, qtype)
+	})
+
+	// Dead delegation server — returns error for all queries.
+	var deadQueryCount atomic.Int32
+	deadNS, err := nameserver.NewWithContext(ctx, "dead.example", "192.0.2.99", r.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	deadNS.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		deadQueryCount.Add(1)
+		return packet.Packet{}, fmt.Errorf("connection timed out")
+	})
+
+	z, err := zone.NewWithRecursor("example", r)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	items, err := GetZoneNSNamesAndIPs(ctx, &z)
+	if err != nil {
+		t.Fatalf("GetZoneNSNamesAndIPs: %v", err)
+	}
+
+	got := map[string]string{}
+	for _, item := range items {
+		if item.HasAddress {
+			got[item.Name.String()] = item.Address.String()
+		}
+	}
+	if got["ns1.example"] != "192.0.2.11" {
+		t.Errorf("ns1.example: want 192.0.2.11, got %q", got["ns1.example"])
+	}
+	if got["ns2.example"] != "192.0.2.12" {
+		t.Errorf("ns2.example: want 192.0.2.12, got %q", got["ns2.example"])
+	}
+
+	// The dead server should be tried at most a few times total. Without
+	// dead-server tracking it would be queried once per IB name × qtype
+	// (3 × 1 = 3 from getIBAddrInZone alone, plus GetZoneNSNames queries).
+	// With the fix, expect ≤ 5 total across both phases.
+	dq := int(deadQueryCount.Load())
+	if dq > 5 {
+		t.Errorf("dead server queried %d times (expected ≤ 5 with dead-server skip)", dq)
+	}
+}
+
+// TestGetIBAddrInZoneBreaksEarlyOnSuccess verifies that once a delegation
+// server provides addresses for an in-bailiwick NS name, remaining servers
+// are not tried for that name.
+func TestGetIBAddrInZoneBreaksEarlyOnSuccess(t *testing.T) {
+	ClearCache()
+	defer ClearCache()
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.Net.IPv4 = true
+	prof.Net.IPv6 = false
+
+	r := &recursor.Recursor{}
+	if err := r.AddFakeAddresses(".", map[string][]string{
+		"ns.root": {"192.0.2.9"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Root delegates "example" to two in-bailiwick servers with glue.
+	rootNS, err := nameserver.NewWithContext(ctx, "ns.root", "192.0.2.9", r.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootNS.SetQueryHook(ibTestRootHook("example", map[string]string{
+		"ns1.example": "192.0.2.21",
+		"ns2.example": "192.0.2.22",
+	}))
+
+	ibHook := func(counter *atomic.Int32) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
+		return func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+			counter.Add(1)
+			if name == "example" && qtype == "NS" {
+				return authoritativeNSPacket("example", "ns1.example", "ns2.example"), nil
+			}
+			if qtype == "A" {
+				switch name {
+				case "ns1.example":
+					return authoritativeAPacket("ns1.example", "192.0.2.21"), nil
+				case "ns2.example":
+					return authoritativeAPacket("ns2.example", "192.0.2.22"), nil
+				}
+			}
+			if qtype == "AAAA" {
+				msg := new(dns.Msg)
+				msg.Rcode = dns.RcodeSuccess
+				msg.Authoritative = true
+				return packet.Packet{Msg: msg}, nil
+			}
+			return packet.Packet{}, nil
+		}
+	}
+
+	var ns1Count, ns2Count atomic.Int32
+	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.21", r.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ns1.SetQueryHook(ibHook(&ns1Count))
+
+	ns2, err := nameserver.NewWithContext(ctx, "ns2.example", "192.0.2.22", r.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ns2.SetQueryHook(ibHook(&ns2Count))
+
+	z, err := zone.NewWithRecursor("example", r)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Reset counters after zone creation (GetZoneNSNames queries both servers).
+	ns1Count.Store(0)
+	ns2Count.Store(0)
+
+	result, err := getIBAddrInZone(ctx, &z)
+	if err != nil {
+		t.Fatalf("getIBAddrInZone: %v", err)
+	}
+
+	got := map[string]string{}
+	for _, ns := range result {
+		got[ns.Name.String()] = ns.Address.String()
+	}
+	if got["ns1.example"] != "192.0.2.21" {
+		t.Errorf("ns1.example: want 192.0.2.21, got %q", got["ns1.example"])
+	}
+	if got["ns2.example"] != "192.0.2.22" {
+		t.Errorf("ns2.example: want 192.0.2.22, got %q", got["ns2.example"])
+	}
+
+	c1 := int(ns1Count.Load())
+	c2 := int(ns2Count.Load())
+	t.Logf("ns1 queries (getIBAddrInZone phase): %d, ns2 queries: %d", c1, c2)
+	if c2 > c1 {
+		t.Errorf("ns2 queried more than ns1 (%d > %d); early break may not be working", c2, c1)
 	}
 }

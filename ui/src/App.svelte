@@ -8,6 +8,7 @@
   let statusDismissTimer = null;
 
   let singleDomain = "";
+  let singleTags = "";
   let singleSubmitting = false;
   let createdJobId = "";
   let singleIPMode = "default";
@@ -15,6 +16,9 @@
   let undelegatedDSInfo = [];
 
   let batchDomains = "";
+  let batchTags = "";
+  let batchFromTagMode = false;
+  let batchFromTag = "";
   let batchSubmitting = false;
   let createdBatchId = "";
 
@@ -37,6 +41,7 @@
   let selectedJobId = "";
   let selectedJob = null;
   let selectedJobResult = null;
+  let selectedRun = null;
   let resultLocale = "en";
   let jobLoading = false;
   let autoRefreshJob = true;
@@ -76,6 +81,7 @@
 
   // Theme management: "system" follows OS preference via CSS media query;
   // "light" and "dark" set data-theme on <html> explicitly.
+  // "system" is the default for first-time visitors and is never stored.
   const themeKey = "gonemaster.ui.theme.v1";
   let theme = "system";
 
@@ -89,17 +95,17 @@
     }
   };
 
-  const cycleTheme = () => {
-    const order = ["system", "light", "dark"];
-    theme = order[(order.indexOf(theme) + 1) % order.length];
+  const osDark = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+
+  const toggleTheme = () => {
+    const effectiveDark = theme === "dark" || (theme === "system" && osDark());
+    theme = effectiveDark ? "light" : "dark";
     localStorage.setItem(themeKey, theme);
     applyTheme(theme);
   };
 
-  $: themeIcon = theme === "light" ? "☀" : theme === "dark" ? "☾" : "⊙";
-  $: themeTitle = $t("theme_cycle_title", {
-    theme: theme === "light" ? $t("theme_light") : theme === "dark" ? $t("theme_dark") : $t("theme_system")
-  });
+  $: themeIcon = theme === "dark" || (theme === "system" && osDark()) ? "☾" : "☀";
+  $: themeTitle = $t("theme_toggle_title", { theme: theme === "dark" ? $t("theme_dark") : $t("theme_light") });
 
   // Locale management: fetch available locales from the server, persist choice
   // in localStorage, and auto-detect from the browser language on first visit.
@@ -142,9 +148,60 @@
   const tabs = [
     { id: "single", labelKey: "tab_single" },
     { id: "recent", labelKey: "tab_recent" },
+    { id: "domains", labelKey: "tab_domains" },
+    { id: "tags", labelKey: "tab_tags" },
     { id: "batches", labelKey: "tab_batches" },
     { id: "metrics", labelKey: "tab_metrics" }
   ];
+
+  // Domains tab state.
+  let domains = [];
+  let domainsLoading = false;
+  let domainsTotal = 0;
+  let domainsOffset = 0;
+  let domainsLimit = 50;
+  let domainsNextCursor = "";
+  let domainsPrevCursor = "";
+  let domainNameFilter = "";
+  let domainTagFilter = "";
+  let domainLevelFilter = "";
+  let selectedDomain = null;
+  let domainRuns = [];
+  let domainRunsTotal = 0;
+  let domainRunsOffset = 0;
+  let domainRunsLimit = 20;
+  let domainRunsLoading = false;
+  let domainResubmitting = false;
+  let selectedDomainRunId = null;
+  let selectedDomainRunResult = null;
+  let domainRunResultLoading = false;
+  let domainModuleOpen = {};
+  let domainModuleGroups = [];
+  let availableTags = [];
+  let tagsLoaded = false;
+
+  // Tags tab state.
+  let tagsList = [];
+  let tagsListLoading = false;
+  let tagCreateName = "";
+  let tagCreateDescription = "";
+  let tagCreating = false;
+  let selectedTag = null;
+  let tagSummary = null;
+  let tagSummaryLoading = false;
+  let tagDomains = [];
+  let tagDomainsTotal = 0;
+  let tagDomainsOffset = 0;
+  let tagDomainsLimit = 50;
+  let tagDomainsLoading = false;
+  let tagDomainLevelFilter = "";
+  let tagAddDomainsInput = "";
+  let tagAddingDomains = false;
+  let tagRemoveDomainsInput = "";
+  let tagRemovingDomains = false;
+  let tagRunAllSubmitting = false;
+  let tagDeleteConfirm = false;
+  let tagDeleting = false;
 
   const clearStatus = () => {
     statusMessage = "";
@@ -269,10 +326,13 @@
   };
   const formatRecentBatchOption = (option) => {
     if (!option || !option.id) return "";
-    if (!option.createdAt) return option.id;
-    const parsed = new Date(option.createdAt);
-    if (Number.isNaN(parsed.getTime())) return option.id;
-    return `${option.id} - ${parsed.toLocaleString()}`;
+    const parts = [option.id];
+    if (option.createdAt) {
+      const parsed = new Date(option.createdAt);
+      if (!Number.isNaN(parsed.getTime())) parts.push(parsed.toLocaleString());
+    }
+    if (option.tag) parts.push(`[${option.tag}]`);
+    return parts.join(" - ");
   };
 
   const hasPersistedURLState = (params) => persistedQueryKeys.some((key) => params.has(key));
@@ -438,7 +498,7 @@
 
     const hash = window.location.hash || `#/${activeTab}`;
     const search = params.toString();
-    window.history.replaceState(null, "", `${window.location.pathname}${search ? `?${search}` : ""}${hash}`);
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}${search ? `?${search}` : ""}${hash}`);
 
     try {
       const storage = typeof window === "undefined" ? null : window.localStorage;
@@ -816,6 +876,8 @@
   const moduleLevels = ["NOTICE", "WARNING", "ERROR", "CRITICAL"];
   const LEVEL_ORDER = ["DEBUG", "INFO", "NOTICE", "WARNING", "ERROR", "CRITICAL"];
   const normalizeLevel = (value) => (value || "INFO").toUpperCase();
+  // Returns the effective display level for a domain. The server only tracks
+  const domainLevel = (d) => d?.latest_level || "";
   const worstLevel = (entries) => {
     if (!entries?.length) return "INFO";
     let worst = 0;
@@ -832,8 +894,8 @@
     if (l === "WARNING") return "warning";
     return "ok";
   };
-  const isWarningOrAbove = (level) => {
-    return LEVEL_ORDER.indexOf(normalizeLevel(level)) >= LEVEL_ORDER.indexOf("WARNING");
+  const isNoticeOrAbove = (level) => {
+    return LEVEL_ORDER.indexOf(normalizeLevel(level)) >= LEVEL_ORDER.indexOf("NOTICE");
   };
   const formatSeconds = (value) => {
     const numeric = Number(value);
@@ -861,7 +923,7 @@
       mod.entries.push(entry);
       const level = normalizeLevel(entry.level);
       mod.counts[level] = (mod.counts[level] || 0) + 1;
-      const tc = entry.testcase || "";
+      const tc = (entry.testcase && entry.testcase !== "Unspecified") ? entry.testcase : "";
       if (tc) {
         if (!mod.testcases.has(tc)) mod.testcases.set(tc, { tc, entries: [] });
         mod.testcases.get(tc).entries.push(entry);
@@ -885,34 +947,53 @@
     moduleOpen = { ...moduleOpen, [key]: !moduleOpen[key] };
   };
 
+  const toggleDomainModule = (key) => {
+    domainModuleOpen = { ...domainModuleOpen, [key]: !domainModuleOpen[key] };
+  };
+
+  const okTestcaseCount = (group) =>
+    group.testcasesArr.filter(tcg => !moduleLevels.includes(normalizeLevel(tcg.level))).length;
+
   const normalizeTab = (value) => {
     const tab = String(value || "").replace(/^\/+/, "").toLowerCase();
     if (tab === "single" || tab === "job" || tab === "jobs" || tab === "home") return "single";
     if (tab === "recent" || tab === "tests") return "recent";
+    if (tab === "domains" || tab === "domain") return "domains";
+    if (tab === "tags" || tab === "tag") return "tags";
     if (tab === "batches" || tab === "batch") return "batches";
     if (tab === "metrics" || tab === "metric") return "metrics";
     return "";
   };
 
-  const setTab = (tab) => {
+  const setTab = (tab, { replace = false } = {}) => {
     const next = normalizeTab(tab) || "single";
     const changed = activeTab !== next;
     activeTab = next;
     const nextHash = `#/${next}`;
-    if (window.location.hash !== nextHash) {
-      window.history.replaceState(
-        null,
-        "",
-        `${window.location.pathname}${window.location.search}${nextHash}`
-      );
+    const url = `${window.location.pathname}${window.location.search}${nextHash}`;
+    const state = { tab: next, domain: null, tag: null };
+    if (!changed || replace) {
+      if (window.location.hash !== nextHash) window.history.replaceState(state, "", url);
+    } else {
+      window.history.pushState(state, "", url);
     }
     if (changed && statusMessage) {
       clearStatus();
     }
     if (next === "recent") {
       loadJobs();
+    } else if (next === "domains") {
+      loadDomains();
+      if (!tagsLoaded) loadDomainTags();
+    } else if (next === "tags") {
+      loadTagsList();
+      if (selectedTag) {
+        loadTagDomains({ reset: true });
+        loadTagSummary();
+      }
     } else if (next === "batches") {
       loadRecentBatchOptions();
+      if (!tagsLoaded) loadDomainTags();
       if (selectedBatchId) {
         loadBatch(selectedBatchId);
       }
@@ -921,18 +1002,65 @@
     }
   };
 
+  const navigateToDomainDetail = (d) => {
+    activeTab = "domains";
+    selectedDomain = d;
+    domainRuns = [];
+    domainRunsOffset = 0;
+    selectedDomainRunResult = null;
+    selectedDomainRunId = null;
+    const hash = `#/domains/${encodeURIComponent(d.name)}`;
+    window.history.pushState({ tab: "domains", domain: d, tag: null }, "", `${window.location.pathname}${window.location.search}${hash}`);
+    if (statusMessage) clearStatus();
+    loadDomainRuns();
+  };
+
+  const navigateToTagDetail = (tag) => {
+    activeTab = "tags";
+    selectedTag = tag;
+    tagSummary = null;
+    tagDomains = [];
+    tagDomainsOffset = 0;
+    tagDomainLevelFilter = "";
+    tagDeleteConfirm = false;
+    const hash = `#/tags/${encodeURIComponent(tag.name)}`;
+    window.history.pushState({ tab: "tags", domain: null, tag }, "", `${window.location.pathname}${window.location.search}${hash}`);
+    if (statusMessage) clearStatus();
+    loadTagSummary();
+    loadTagDomains();
+  };
+
+  const onPopState = (e) => {
+    const state = e.state;
+    if (!state) { updateTabFromHash(); return; }
+    activeTab = state.tab || "single";
+    selectedDomain = state.domain ?? null;
+    selectedTag = state.tag ?? null;
+    if (!selectedDomain) {
+      domainRuns = [];
+      selectedDomainRunResult = null;
+      selectedDomainRunId = null;
+    } else {
+      loadDomainRuns();
+    }
+    if (!selectedTag) {
+      tagDeleteConfirm = false;
+    } else {
+      loadTagSummary();
+      loadTagDomains({ reset: true });
+    }
+  };
+
   const updateTabFromHash = () => {
     const hash = window.location.hash || "";
-    const value = hash.replace(/^#\/?/, "");
-    const next = normalizeTab(value) || "single";
+    const segment = hash.replace(/^#\/?/, "").split("/")[0];
+    const next = normalizeTab(segment) || "single";
     activeTab = next;
-    if (!hash) {
-      window.history.replaceState(
-        null,
-        "",
-        `${window.location.pathname}${window.location.search}#/${next}`
-      );
-    }
+    window.history.replaceState(
+      { tab: next, domain: null, tag: null },
+      "",
+      `${window.location.pathname}${window.location.search}#/${next}`
+    );
   };
 
   const loadJobs = async (options = {}) => {
@@ -1008,8 +1136,10 @@
     singleSubmitting = true;
     createdJobId = "";
     try {
+      const parsedTags = singleTags.split(/[,\s]+/).map((t) => t.trim()).filter(Boolean);
       const payload = {
-        domain: normalizedDomain
+        domain: normalizedDomain,
+        ...(parsedTags.length > 0 && { tags: parsedTags })
       };
       if (singleIPMode === "disable_ipv4") {
         payload.profile_overrides = {
@@ -1062,19 +1192,29 @@
   };
 
   const submitBatch = async () => {
-    const domains = batchDomains
-      .split(/\n/)
-      .map((entry) => normalizeDomainInput(entry))
-      .filter(Boolean);
-    if (!domains.length) {
-      setStatus($t("error_batch_empty"), "warn");
-      return;
+    let payload;
+    if (batchFromTagMode) {
+      if (!batchFromTag) {
+        setStatus($t("error_batch_from_tag_required"), "warn");
+        return;
+      }
+      payload = { from_tag: batchFromTag };
+    } else {
+      const domains = batchDomains
+        .split(/\n/)
+        .map((entry) => normalizeDomainInput(entry))
+        .filter(Boolean);
+      if (!domains.length) {
+        setStatus($t("error_batch_empty"), "warn");
+        return;
+      }
+      payload = { domains };
     }
+    const parsedTags = batchTags.split(/[,\s]+/).map((t) => t.trim()).filter(Boolean);
+    if (parsedTags.length > 0) payload.tags = parsedTags;
     batchSubmitting = true;
     createdBatchId = "";
     try {
-      const payload = { domains };
-
       const response = await apiFetch("/jobs/batch", {
         method: "POST",
         body: JSON.stringify(payload)
@@ -1106,17 +1246,20 @@
       const job = await apiFetch(`/jobs/${jobId}`);
       selectedJob = job;
       selectedJobResult = null;
+      selectedRun = null;
       if (notifyOnJobComplete && isResultReadyStatus(job.status)) {
         notifyOnJobComplete = false;
         sendJobNotification(job);
       }
       if (isResultReadyStatus(job.status)) {
         await loadJobResult(jobId);
+        await loadRun(jobId);
       }
     } catch (error) {
       setStatus($t("error_load_job", { error: error.message }), "warn");
       selectedJob = null;
       selectedJobResult = null;
+      selectedRun = null;
     } finally {
       if (!silent) {
         jobLoading = false;
@@ -1132,6 +1275,24 @@
     } catch (error) {
       setStatus($t("error_load_result", { error: error.message }), "warn");
     }
+  };
+
+  const loadRun = async (jobId = selectedJobId) => {
+    if (!jobId) return;
+    try {
+      selectedRun = await apiFetch(`/runs/${jobId}`);
+    } catch (_) {
+      selectedRun = null;
+    }
+  };
+
+  const navigateToDomainByName = async (name) => {
+    try {
+      const data = await apiFetch(`/domains?name=${encodeURIComponent(name)}&limit=20`);
+      const match = (data?.items ?? []).find((d) => d.name === name);
+      if (!match) return;
+      navigateToDomainDetail(match);
+    } catch (_) {}
   };
 
   const batchQueryParams = () => {
@@ -1218,6 +1379,13 @@
       const params = batchQueryParams();
       const batch = await apiFetch(`/batches/${batchId}?${params.toString()}`);
       selectedBatch = batch;
+      // Propagate tag into recentBatchOptions so the dropdown can show it.
+      if (batch?.tag) {
+        const idx = recentBatchOptions.findIndex((o) => o.id === batchId);
+        if (idx >= 0 && !recentBatchOptions[idx].tag) {
+          recentBatchOptions = recentBatchOptions.map((o, i) => i === idx ? { ...o, tag: batch.tag } : o);
+        }
+      }
       if (notifyOnBatchComplete && !hasActiveBatchJobs(batch)) {
         notifyOnBatchComplete = false;
         sendBatchNotification(batch);
@@ -1279,6 +1447,239 @@
     }
   };
 
+  const loadDomains = async (options = {}) => {
+    const { reset = false } = options;
+    if (reset) domainsOffset = 0;
+    domainsLoading = true;
+    try {
+      const params = new URLSearchParams({ limit: String(domainsLimit), offset: String(domainsOffset) });
+      if (domainNameFilter) params.set("name", domainNameFilter);
+      if (domainTagFilter) params.set("tag", domainTagFilter);
+      if (domainLevelFilter) params.set("min_level", domainLevelFilter);
+      const data = await apiFetch(`/domains?${params}`);
+      domains = data?.items ?? [];
+      domainsTotal = data?.total ?? 0;
+    } catch (error) {
+      setStatus($t("domains_load_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      domainsLoading = false;
+    }
+  };
+
+  const loadDomainTags = async () => {
+    try {
+      const data = await apiFetch("/tags");
+      availableTags = Array.isArray(data) ? data : [];
+      tagsLoaded = true;
+    } catch (_) {
+      availableTags = [];
+      tagsLoaded = true;
+    }
+  };
+
+  const loadDomainRuns = async (options = {}) => {
+    if (!selectedDomain) return;
+    const { reset = false } = options;
+    if (reset) domainRunsOffset = 0;
+    domainRunsLoading = true;
+    try {
+      const params = new URLSearchParams({ limit: String(domainRunsLimit), offset: String(domainRunsOffset) });
+      const data = await apiFetch(`/domains/${selectedDomain.id}/runs?${params}`);
+      domainRuns = data?.items ?? [];
+      domainRunsTotal = data?.total ?? 0;
+      if (domainRuns.length > 0 && domainRunsOffset === 0) {
+        loadDomainRunResult(domainRuns[0].id);
+      }
+    } catch (error) {
+      setStatus($t("domain_runs_load_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      domainRunsLoading = false;
+    }
+  };
+
+  const loadDomainRunResult = async (runId) => {
+    selectedDomainRunId = runId;
+    selectedDomainRunResult = null;
+    domainModuleOpen = {};
+    domainRunResultLoading = true;
+    try {
+      const locale = resultLocale ? `?locale=${encodeURIComponent(resultLocale)}` : "";
+      selectedDomainRunResult = await apiFetch(`/jobs/${runId}/result${locale}`);
+    } catch (_) {
+      // result not available for this run
+    } finally {
+      domainRunResultLoading = false;
+    }
+  };
+
+  const retestDomain = async () => {
+    if (!selectedDomain) return;
+    domainResubmitting = true;
+    try {
+      const job = await apiFetch("/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domain: selectedDomain.name })
+      });
+      createdJobId = job.id;
+      selectedJobId = job.id;
+      setStatus($t("job_created", { id: job.id }), "ok");
+      setTab("single");
+      await loadJob(job.id);
+    } catch (error) {
+      setStatus($t("error_create_job", { error: error.message }), "warn");
+    } finally {
+      domainResubmitting = false;
+    }
+  };
+
+  const loadTagsList = async () => {
+    tagsListLoading = true;
+    try {
+      const data = await apiFetch("/tags");
+      tagsList = Array.isArray(data) ? data : [];
+    } catch (error) {
+      setStatus($t("tags_load_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      tagsListLoading = false;
+    }
+  };
+
+  const createTag = async () => {
+    const name = tagCreateName.trim();
+    if (!name) return;
+    tagCreating = true;
+    try {
+      await apiFetch("/tags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, description: tagCreateDescription.trim() })
+      });
+      tagCreateName = "";
+      tagCreateDescription = "";
+      setStatus($t("tag_created"), "ok");
+      await loadTagsList();
+      await loadDomainTags();
+    } catch (error) {
+      setStatus($t("tag_create_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      tagCreating = false;
+    }
+  };
+
+  const loadTagSummary = async () => {
+    if (!selectedTag) return;
+    tagSummaryLoading = true;
+    try {
+      tagSummary = await apiFetch(`/tags/${encodeURIComponent(selectedTag.name)}/summary`);
+    } catch (_) {
+      tagSummary = null;
+    } finally {
+      tagSummaryLoading = false;
+    }
+  };
+
+  const loadTagDomains = async (options = {}) => {
+    if (!selectedTag) return;
+    const { reset = false } = options;
+    if (reset) tagDomainsOffset = 0;
+    tagDomainsLoading = true;
+    try {
+      const params = new URLSearchParams({ limit: String(tagDomainsLimit), offset: String(tagDomainsOffset) });
+      if (tagDomainLevelFilter) params.set("min_level", tagDomainLevelFilter);
+      const data = await apiFetch(`/tags/${encodeURIComponent(selectedTag.name)}/domains?${params}`);
+      tagDomains = data?.items ?? [];
+      tagDomainsTotal = data?.total ?? 0;
+    } catch (error) {
+      setStatus($t("tag_domains_load_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      tagDomainsLoading = false;
+    }
+  };
+
+  const runAllFromTag = async () => {
+    if (!selectedTag) return;
+    tagRunAllSubmitting = true;
+    try {
+      const response = await apiFetch("/jobs/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ from_tag: selectedTag.name })
+      });
+      createdBatchId = response.batch_id || "";
+      selectedBatchId = response.batch_id || "";
+      setStatus($t("batch_accepted", { id: response.batch_id }), "ok");
+      await loadRecentBatchOptions();
+      await loadBatch(response.batch_id, { resetCursor: true });
+      setTab("batches");
+    } catch (error) {
+      setStatus($t("tag_run_all_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      tagRunAllSubmitting = false;
+    }
+  };
+
+  const addTagDomains = async () => {
+    if (!selectedTag || !tagAddDomainsInput.trim()) return;
+    const domains = tagAddDomainsInput.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
+    if (domains.length === 0) return;
+    tagAddingDomains = true;
+    try {
+      await apiFetch(`/tags/${encodeURIComponent(selectedTag.name)}/domains`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domains })
+      });
+      tagAddDomainsInput = "";
+      setStatus($t("tag_domains_added"), "ok");
+      await loadTagDomains({ reset: true });
+      await loadTagSummary();
+    } catch (error) {
+      setStatus($t("tag_domains_add_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      tagAddingDomains = false;
+    }
+  };
+
+  const removeTagDomains = async () => {
+    if (!selectedTag || !tagRemoveDomainsInput.trim()) return;
+    const domains = tagRemoveDomainsInput.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
+    if (domains.length === 0) return;
+    tagRemovingDomains = true;
+    try {
+      await apiFetch(`/tags/${encodeURIComponent(selectedTag.name)}/domains`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domains })
+      });
+      tagRemoveDomainsInput = "";
+      setStatus($t("tag_domains_removed"), "ok");
+      await loadTagDomains({ reset: true });
+      await loadTagSummary();
+    } catch (error) {
+      setStatus($t("tag_domains_remove_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      tagRemovingDomains = false;
+    }
+  };
+
+  const deleteTag = async () => {
+    if (!selectedTag) return;
+    tagDeleting = true;
+    try {
+      await apiFetch(`/tags/${encodeURIComponent(selectedTag.name)}`, { method: "DELETE" });
+      setStatus($t("tag_deleted"), "ok");
+      selectedTag = null;
+      tagDeleteConfirm = false;
+      await loadTagsList();
+      await loadDomainTags();
+    } catch (error) {
+      setStatus($t("tag_delete_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      tagDeleting = false;
+    }
+  };
+
   const loadLocales = async () => {
     try {
       const data = await apiFetch("/locales");
@@ -1303,6 +1704,9 @@
     loadCatalog(resultLocale);
     if (selectedJobResult) {
       loadJobResult(selectedJobId);
+    }
+    if (selectedDomainRunResult) {
+      loadDomainRunResult(selectedDomainRunId);
     }
   };
 
@@ -1420,6 +1824,10 @@
     moduleGroups = groupRawEntries(selectedJobResult?.raw);
   }
 
+  $: {
+    domainModuleGroups = groupRawEntries(selectedDomainRunResult?.raw);
+  }
+
   $: if (selectedJobResult?.job_id !== lastResultJobId) {
     lastResultJobId = selectedJobResult?.job_id || "";
     moduleOpen = {};
@@ -1455,7 +1863,7 @@
     if (initialized || typeof window === "undefined") return;
     initialized = true;
     const storedTheme = localStorage.getItem(themeKey);
-    if (storedTheme === "light" || storedTheme === "dark" || storedTheme === "system") {
+    if (storedTheme === "light" || storedTheme === "dark") {
       theme = storedTheme;
     }
     applyTheme(theme);
@@ -1490,12 +1898,21 @@
     recentCursor = normalizeCursor(recentCursor);
     persistenceReady = true;
     window.addEventListener("hashchange", updateTabFromHash);
+    window.addEventListener("popstate", onPopState);
     loadJobs();
     if (activeTab === "batches") {
       loadRecentBatchOptions();
+      if (!tagsLoaded) loadDomainTags();
       if (selectedBatchId) {
         loadBatch(selectedBatchId);
       }
+    }
+    if (activeTab === "tags") {
+      loadTagsList();
+    }
+    if (activeTab === "domains") {
+      loadDomains();
+      if (!tagsLoaded) loadDomainTags();
     }
     if (activeTab === "metrics") {
       loadMetrics();
@@ -1512,6 +1929,7 @@
       if (jobInspectorHighlightTimer) clearTimeout(jobInspectorHighlightTimer);
       if (statusDismissTimer) clearTimeout(statusDismissTimer);
       window.removeEventListener("hashchange", updateTabFromHash);
+      window.removeEventListener("popstate", onPopState);
     };
   });
 </script>
@@ -1537,7 +1955,7 @@
           {/each}
         </select>
       {/if}
-      <button class="theme-toggle" type="button" on:click={cycleTheme} title={themeTitle} aria-label={themeTitle}>
+      <button class="theme-toggle" type="button" on:click={toggleTheme} title={themeTitle} aria-label={themeTitle}>
         {themeIcon}
       </button>
     </div>
@@ -1577,6 +1995,16 @@
               }
             }}
           />
+        </div>
+        <div class="stack">
+          <label for="single-tags">{$t("single_tags_label")}</label>
+          <input
+            id="single-tags"
+            type="text"
+            placeholder={$t("single_tags_placeholder")}
+            bind:value={singleTags}
+          />
+          <div class="small">{$t("single_tags_hint")}</div>
         </div>
         <details class="advanced-options">
           <summary>{$t("advanced_profile_summary")}</summary>
@@ -1661,7 +2089,7 @@
       </div>
 
       <div class="card reveal" style="--d: 0.26s" class:highlight={jobInspectorHighlight}>
-        <h2>{$t("job_inspector_heading")}</h2>
+        <h2>{selectedJob && isResultReadyStatus(selectedJob.status) ? $t("run_inspector_heading") : $t("job_inspector_heading")}</h2>
         <div class="stack">
           <label for="job-id">{$t("job_id_label")}</label>
           <input id="job-id" type="text" placeholder="job_123" bind:value={selectedJobId} on:change={() => loadJob()} />
@@ -1682,9 +2110,17 @@
               <span class="progress-value">{progressPercent(selectedJob)}%</span>
             </div>
             <span>{$t("domain_label")}</span>
-            <strong class="mono">{selectedJob.domain}</strong>
+            <button class="ghost" type="button" style="padding: 0; font-family: monospace; text-align: left; border: none;" on:click={() => navigateToDomainByName(selectedJob.domain)}>{selectedJob.domain}</button>
             <span>{$t("created_label")}</span>
             <strong>{formatTimestampLocal(selectedJob.created_at)}</strong>
+            {#if selectedRun}
+              <span>{$t("col_duration")}</span>
+              <strong>{selectedRun.duration_ms != null ? selectedRun.duration_ms + " ms" : "—"}</strong>
+              <span>{$t("col_entries")}</span>
+              <strong>{selectedRun.entry_count ?? 0}</strong>
+              <span>{$t("col_worst_level")}</span>
+              <strong><span class="badge level-{(selectedRun.worst_level || '').toLowerCase()}">{selectedRun.worst_level || "—"}</span></strong>
+            {/if}
           </div>
           {#if selectedJob.error}
             <div class="notice">{$t("error_prefix")} {selectedJob.error}</div>
@@ -1726,8 +2162,11 @@
                       on:click={() => toggleModule(group.key)}
                     >
                       <div class="module-title">{group.name}</div>
-                      <div class="module-meta">{$t("entries_count", { count: group.entries.length })}</div>
+                      <div class="module-meta">{group.testcasesArr.length > 0 ? `${group.testcasesArr.length} tests · ` : ""}{$t("entries_count", { count: group.entries.length })}</div>
                       <div class="module-badges">
+                        {#if okTestcaseCount(group) > 0}
+                          <span class="level-pill severity-info">INFO {okTestcaseCount(group)}</span>
+                        {/if}
                         {#each moduleLevels as level}
                           {#if group.counts[level]}
                             <span class={`level-pill severity-${level.toLowerCase()}`}>{level} {group.counts[level]}</span>
@@ -1742,7 +2181,7 @@
                         {#each group.testcasesArr as tcg (tcg.tc)}
                           {@const tcKey = `tc.${tcg.tc.toLowerCase()}`}
                           {@const tcDesc = $t(tcKey)}
-                          <details class="testcase-group" open={isWarningOrAbove(tcg.level)}>
+                          <details class="testcase-group" open={isNoticeOrAbove(tcg.level)}>
                             <summary class="testcase-summary">
                               <span class="testcase-chevron"></span>
                               <span class="testcase-desc">{tcDesc !== tcKey ? tcDesc : tcg.tc}</span>
@@ -1763,23 +2202,30 @@
                         {/each}
                         <!-- Ungrouped entries (no testcase, e.g. START_TIME, DEPENDENCY_VERSION) -->
                         {#if group.ungrouped.length}
-                          <div class="result-header ungrouped-header">
-                            <span>{$t("result_col_seconds")}</span>
-                            <span>{$t("result_col_level")}</span>
-                            <span>{$t("result_col_message")}</span>
-                          </div>
-                          {#each group.ungrouped as entry}
-                            {@const level = normalizeLevel(entry.level)}
-                            {@const meta = entryMeta(entry)}
-                            <div class="result-row">
-                              <span class="entry-time">{formatSeconds(entry.timestamp)}</span>
-                              <span class={`entry-level severity-${level.toLowerCase()}`}>{level}</span>
-                              <span class="entry-message">{entryMessage(entry)}</span>
+                          {#if group.testcasesArr.length === 0}
+                            <!-- Module has only ungrouped entries (e.g. System): flat level+message rows -->
+                            {#each group.ungrouped as entry}
+                              {@const level = normalizeLevel(entry.level)}
+                              <div class="result-row tc-row">
+                                <span class={`entry-level severity-${level.toLowerCase()}`}>{level}</span>
+                                <span class="entry-message">{entryMessage(entry)}</span>
+                              </div>
+                            {/each}
+                          {:else}
+                            <div class="result-header ungrouped-header">
+                              <span>{$t("result_col_seconds")}</span>
+                              <span>{$t("result_col_level")}</span>
+                              <span>{$t("result_col_message")}</span>
                             </div>
-                            {#if meta}
-                              <div class="entry-meta">{meta}</div>
-                            {/if}
-                          {/each}
+                            {#each group.ungrouped as entry}
+                              {@const level = normalizeLevel(entry.level)}
+                              <div class="result-row">
+                                <span class="entry-time">{formatSeconds(entry.timestamp)}</span>
+                                <span class={`entry-level severity-${level.toLowerCase()}`}>{level}</span>
+                                <span class="entry-message">{entryMessage(entry)}</span>
+                              </div>
+                            {/each}
+                          {/if}
                         {/if}
                       </div>
                     {/if}
@@ -1930,18 +2376,479 @@
         {/if}
       </div>
     </div>
+  {:else if activeTab === "domains"}
+    <div class="card reveal" id="panel-domains" role="tabpanel" aria-labelledby="tab-domains" style="--d: 0.34s; margin-top: 22px;">
+      {#if selectedDomain}
+        <div>
+          <button class="secondary small" on:click={() => { selectedDomain = null; setTab("domains"); }}>{$t("back_to_domains")}</button>
+          <div style="display:flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.5rem; margin-bottom: 0.75rem;">
+            <h2 class="mono" style="margin: 0;">{selectedDomain.name}</h2>
+            {#if selectedDomain.tags && selectedDomain.tags.length > 0}
+              {#each selectedDomain.tags as tag}
+                <span class="badge">{tag}</span>
+              {/each}
+            {/if}
+          </div>
+          <div class="kv" style="margin-bottom: 1rem;">
+            <span>{$t("col_latest_level")}</span>
+            <span>{#if domainLevel(selectedDomain)}<span class="badge level-{domainLevel(selectedDomain).toLowerCase()}">{domainLevel(selectedDomain)}</span>{:else}-{/if}</span>
+            <span>{$t("col_latest_run_at")}</span>
+            <strong>{selectedDomain.latest_run_at ? formatTimestampLocal(selectedDomain.latest_run_at) : "—"}</strong>
+            <span>{$t("col_run_count")}</span>
+            <strong>{selectedDomain.run_count ?? 0}</strong>
+          </div>
+          <button class="secondary" on:click={retestDomain} disabled={domainResubmitting}>
+            {domainResubmitting ? $t("submitting") : $t("retest_domain")}
+          </button>
+
+          <!-- Latest / selected run result -->
+          {#if domainRunResultLoading}
+            <p class="muted" style="margin-top: 1rem;">{$t("loading")}</p>
+          {:else if selectedDomainRunResult}
+            {@const allEntries = selectedDomainRunResult?.raw?.entries ?? []}
+            {@const bannerCls = bannerClass(worstLevel(allEntries))}
+            <div class="stack" style="margin-top: 1.25rem;">
+              {#if allEntries.length}
+                <div class="status-banner {bannerCls}">{$t(`result_status_${bannerCls}`)}</div>
+              {/if}
+              <div class="field-label">{$t("result_summary_label")}</div>
+              {#if summaryRows(selectedDomainRunResult.summary).length}
+                <div class="summary-grid">
+                  {#each summaryRows(selectedDomainRunResult.summary) as row (row.level)}
+                    <div class={`summary-item severity-${row.level.toLowerCase()}`}>
+                      <span class="summary-label">{row.level}</span>
+                      <span class="summary-count">{row.count}</span>
+                    </div>
+                  {/each}
+                </div>
+              {:else}
+                <div class="summary-empty">{$t("no_result_entries")}</div>
+              {/if}
+              <div class="field-label">{$t("result_details_label")}</div>
+              {#if domainModuleGroups.length === 0}
+                <div class="summary-empty">{$t("no_raw_entries")}</div>
+              {:else}
+                <div class="small">{$t("module_expand_hint")}</div>
+                <div class="module-list">
+                  {#each domainModuleGroups as group (group.key)}
+                    <div class="module-card">
+                      <button
+                        class="module-toggle"
+                        type="button"
+                        aria-expanded={!!domainModuleOpen[group.key]}
+                        aria-controls={"dm-" + moduleId(group.key)}
+                        on:click={() => toggleDomainModule(group.key)}
+                      >
+                        <div class="module-title">{group.name}</div>
+                        <div class="module-meta">{group.testcasesArr.length > 0 ? `${group.testcasesArr.length} tests · ` : ""}{$t("entries_count", { count: group.entries.length })}</div>
+                        <div class="module-badges">
+                          {#if okTestcaseCount(group) > 0}
+                            <span class="level-pill severity-info">INFO {okTestcaseCount(group)}</span>
+                          {/if}
+                          {#each moduleLevels as level}
+                            {#if group.counts[level]}
+                              <span class={`level-pill severity-${level.toLowerCase()}`}>{level} {group.counts[level]}</span>
+                            {/if}
+                          {/each}
+                        </div>
+                        <span class={`module-chevron ${domainModuleOpen[group.key] ? "open" : ""}`}></span>
+                      </button>
+                      {#if domainModuleOpen[group.key]}
+                        <div class="module-body" id={"dm-" + moduleId(group.key)}>
+                          {#each group.testcasesArr as tcg (tcg.tc)}
+                            {@const tcKey = `tc.${tcg.tc.toLowerCase()}`}
+                            {@const tcDesc = $t(tcKey)}
+                            <details class="testcase-group" open={isNoticeOrAbove(tcg.level)}>
+                              <summary class="testcase-summary">
+                                <span class="testcase-chevron"></span>
+                                <span class="testcase-desc">{tcDesc !== tcKey ? tcDesc : tcg.tc}</span>
+                                <span class="testcase-badge">
+                                  <span class={`level-pill severity-${normalizeLevel(tcg.level).toLowerCase()}`}>{normalizeLevel(tcg.level)}</span>
+                                </span>
+                              </summary>
+                              <div class="testcase-entries">
+                                {#each tcg.entries as entry}
+                                  {@const level = normalizeLevel(entry.level)}
+                                  <div class="result-row tc-row">
+                                    <span class={`entry-level severity-${level.toLowerCase()}`}>{level}</span>
+                                    <span class="entry-message">{entryMessage(entry)}</span>
+                                  </div>
+                                {/each}
+                              </div>
+                            </details>
+                          {/each}
+                          {#if group.ungrouped.length}
+                            {#if group.testcasesArr.length === 0}
+                              {#each group.ungrouped as entry}
+                                {@const level = normalizeLevel(entry.level)}
+                                <div class="result-row tc-row">
+                                  <span class={`entry-level severity-${level.toLowerCase()}`}>{level}</span>
+                                  <span class="entry-message">{entryMessage(entry)}</span>
+                                </div>
+                              {/each}
+                            {:else}
+                              <div class="result-header ungrouped-header">
+                                <span>{$t("result_col_seconds")}</span>
+                                <span>{$t("result_col_level")}</span>
+                                <span>{$t("result_col_message")}</span>
+                              </div>
+                              {#each group.ungrouped as entry}
+                                {@const level = normalizeLevel(entry.level)}
+                                <div class="result-row">
+                                  <span class="entry-time">{formatSeconds(entry.timestamp)}</span>
+                                  <span class={`entry-level severity-${level.toLowerCase()}`}>{level}</span>
+                                  <span class="entry-message">{entryMessage(entry)}</span>
+                                </div>
+                              {/each}
+                            {/if}
+                          {/if}
+                        </div>
+                      {/if}
+                    </div>
+                  {/each}
+                </div>
+              {/if}
+            </div>
+          {/if}
+
+          <!-- Run history -->
+          <h3 style="margin-top: 1.5rem;">{$t("domain_run_history_heading")}</h3>
+          {#if domainRunsLoading}
+            <p class="muted">{$t("loading")}</p>
+          {:else if domainRuns.length === 0}
+            <p class="muted">{$t("no_runs")}</p>
+          {:else}
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>{$t("col_run_id")}</th>
+                  <th>{$t("col_finished_at")}</th>
+                  <th>{$t("col_worst_level")}</th>
+                  <th>{$t("col_duration")}</th>
+                  <th>{$t("col_entries")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {#each domainRuns as run}
+                  <tr
+                    style="cursor: pointer;"
+                    class={selectedDomainRunId === run.id ? "run-row-selected" : ""}
+                    on:click={() => { selectedJobId = run.id; setTab("single"); loadJob(run.id); }}
+                    role="button"
+                    tabindex="0"
+                    on:keydown={(e) => { if (e.key === "Enter" || e.key === " ") { selectedJobId = run.id; setTab("single"); loadJob(run.id); } }}
+                  >
+                    <td class="run-id-cell" title={run.id}>{run.id}</td>
+                    <td>{run.finished_at ? run.finished_at.slice(0, 16).replace("T", " ") : "—"}</td>
+                    <td><span class="badge level-{(run.worst_level || '').toLowerCase()}">{run.worst_level || "—"}</span></td>
+                    <td>{run.duration_ms != null ? run.duration_ms + "ms" : "—"}</td>
+                    <td>{run.entry_count ?? 0}</td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+            <div class="pagination" style="margin-top: 0.5rem; display:flex; gap: 0.5rem; align-items: center;">
+              <button
+                class="secondary small"
+                disabled={domainRunsOffset === 0}
+                on:click={() => { domainRunsOffset = Math.max(0, domainRunsOffset - domainRunsLimit); loadDomainRuns(); }}
+              >{$t("prev_page")}</button>
+              <span class="muted small">{domainRunsOffset + 1}–{Math.min(domainRunsOffset + domainRunsLimit, domainRunsTotal)} / {domainRunsTotal}</span>
+              <button
+                class="secondary small"
+                disabled={domainRunsOffset + domainRunsLimit >= domainRunsTotal}
+                on:click={() => { domainRunsOffset += domainRunsLimit; loadDomainRuns(); }}
+              >{$t("next_page")}</button>
+            </div>
+          {/if}
+        </div>
+      {:else}
+        <h2>{$t("domains_tab_heading")}</h2>
+        <div class="toolbar" style="display:flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
+          <input
+            type="search"
+            placeholder={$t("domains_search_placeholder")}
+            bind:value={domainNameFilter}
+            on:input={() => loadDomains({ reset: true })}
+            style="flex: 1 1 180px;"
+          />
+          <select
+            bind:value={domainTagFilter}
+            on:change={() => loadDomains({ reset: true })}
+            style="flex: 0 1 180px;"
+            aria-label={$t("tag_filter_label")}
+          >
+            <option value="">{$t("tag_filter_all")}</option>
+            {#each availableTags as tag}
+              <option value={tag.name}>{tag.name}</option>
+            {/each}
+          </select>
+          <select
+            bind:value={domainLevelFilter}
+            on:change={() => loadDomains({ reset: true })}
+            style="flex: 0 1 160px;"
+            aria-label={$t("level_filter_label")}
+          >
+            <option value="">{$t("level_filter_all")}</option>
+            <option value="WARNING">{$t("level_filter_warning_plus")}</option>
+            <option value="ERROR">{$t("level_filter_error_plus")}</option>
+          </select>
+        </div>
+        {#if domainsLoading}
+          <p class="muted">{$t("loading")}</p>
+        {:else if domains.length === 0}
+          <p class="muted">{$t("no_domains")}</p>
+        {:else}
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>{$t("col_domain_name")}</th>
+                <th>{$t("col_tags")}</th>
+                <th>{$t("col_latest_level")}</th>
+                <th>{$t("col_latest_run_at")}</th>
+                <th>{$t("col_run_count")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each domains as d}
+                <tr
+                  style="cursor: pointer;"
+                  on:click={() => navigateToDomainDetail(d)}
+                  role="button"
+                  tabindex="0"
+                  on:keydown={(e) => { if (e.key === "Enter" || e.key === " ") navigateToDomainDetail(d); }}
+                >
+                  <td class="mono">{d.name}</td>
+                  <td>{d.tags ? d.tags.join(", ") : ""}</td>
+                  <td>{#if domainLevel(d)}<span class="badge level-{domainLevel(d).toLowerCase()}">{domainLevel(d)}</span>{:else}-{/if}</td>
+                  <td>{d.latest_run_at ? d.latest_run_at.slice(0, 10) : "—"}</td>
+                  <td>{d.run_count ?? 0}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+          <div class="pagination" style="margin-top: 0.5rem; display:flex; gap: 0.5rem; align-items: center;">
+            <button
+              class="secondary small"
+              disabled={domainsOffset === 0}
+              on:click={() => { domainsOffset = Math.max(0, domainsOffset - domainsLimit); loadDomains(); }}
+            >{$t("prev_page")}</button>
+            <span class="muted small">{domainsOffset + 1}–{Math.min(domainsOffset + domainsLimit, domainsTotal)} / {domainsTotal}</span>
+            <button
+              class="secondary small"
+              disabled={domainsOffset + domainsLimit >= domainsTotal}
+              on:click={() => { domainsOffset += domainsLimit; loadDomains(); }}
+            >{$t("next_page")}</button>
+          </div>
+        {/if}
+      {/if}
+    </div>
+  {:else if activeTab === "tags"}
+    <div class="card reveal" id="panel-tags" role="tabpanel" aria-labelledby="tab-tags" style="--d: 0.34s; margin-top: 22px;">
+      {#if selectedTag}
+        <button class="secondary small" on:click={() => { selectedTag = null; setTab("tags"); }}>{$t("back_to_tags")}</button>
+        <h2 style="margin-top: 0.5rem;">{selectedTag.name}</h2>
+        {#if selectedTag.description}
+          <p class="muted small">{selectedTag.description}</p>
+        {/if}
+
+        <!-- Severity summary -->
+        {#if tagSummaryLoading}
+          <p class="muted">{$t("loading")}</p>
+        {:else if tagSummary}
+          <div style="display:flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
+            <span>{$t("sev_ok")}: {tagSummary.ok}</span>
+            <span><span class="badge level-notice">{$t("sev_notice")}</span>: {tagSummary.notice}</span>
+            <span><span class="badge level-warning">{$t("sev_warning")}</span>: {tagSummary.warning}</span>
+            <span><span class="badge level-error">{$t("sev_error")}</span>: {tagSummary.error}</span>
+            <span><span class="badge level-critical">{$t("sev_critical")}</span>: {tagSummary.critical}</span>
+          </div>
+        {/if}
+
+        <!-- Run all + delete -->
+        <div style="display:flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
+          <button class="secondary" on:click={runAllFromTag} disabled={tagRunAllSubmitting}>
+            {tagRunAllSubmitting ? $t("submitting") : $t("tag_run_all_button")}
+          </button>
+          {#if tagDeleteConfirm}
+            <button class="warn" on:click={deleteTag} disabled={tagDeleting}>{tagDeleting ? $t("submitting") : $t("tag_delete_confirm_button")}</button>
+            <button class="ghost" on:click={() => { tagDeleteConfirm = false; }}>{$t("tag_delete_cancel_button")}</button>
+          {:else}
+            <button class="ghost" on:click={() => { tagDeleteConfirm = true; }}>{$t("tag_delete_button")}</button>
+          {/if}
+        </div>
+
+        <!-- Domain list with level filter -->
+        <h3>{$t("tag_domains_heading")}</h3>
+        <div style="display:flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem;">
+          <select
+            bind:value={tagDomainLevelFilter}
+            on:change={() => loadTagDomains({ reset: true })}
+            aria-label={$t("level_filter_label")}
+            style="flex: 0 1 180px;"
+          >
+            <option value="">{$t("level_filter_all")}</option>
+            <option value="WARNING">{$t("level_filter_warning_plus")}</option>
+            <option value="ERROR">{$t("level_filter_error_plus")}</option>
+          </select>
+        </div>
+        {#if tagDomainsLoading}
+          <p class="muted">{$t("loading")}</p>
+        {:else if tagDomains.length === 0}
+          <p class="muted">{$t("no_domains")}</p>
+        {:else}
+          <table class="data-table">
+            <thead><tr>
+              <th>{$t("col_domain_name")}</th>
+              <th>{$t("col_latest_level")}</th>
+              <th>{$t("col_latest_run_at")}</th>
+            </tr></thead>
+            <tbody>
+              {#each tagDomains as d}
+                <tr
+                  style="cursor: pointer;"
+                  on:click={() => navigateToDomainDetail(d)}
+                  role="button"
+                  tabindex="0"
+                  on:keydown={(e) => { if (e.key === "Enter" || e.key === " ") navigateToDomainDetail(d); }}
+                >
+                  <td class="mono">{d.name}</td>
+                  <td>{#if domainLevel(d)}<span class="badge level-{domainLevel(d).toLowerCase()}">{domainLevel(d)}</span>{:else}-{/if}</td>
+                  <td>{d.latest_run_at ? d.latest_run_at.slice(0, 10) : "—"}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+          <div class="pagination" style="margin-top: 0.5rem; display:flex; gap: 0.5rem; align-items: center;">
+            <button class="secondary small" disabled={tagDomainsOffset === 0}
+              on:click={() => { tagDomainsOffset = Math.max(0, tagDomainsOffset - tagDomainsLimit); loadTagDomains(); }}
+            >{$t("prev_page")}</button>
+            <span class="muted small">{tagDomainsOffset + 1}–{Math.min(tagDomainsOffset + tagDomainsLimit, tagDomainsTotal)} / {tagDomainsTotal}</span>
+            <button class="secondary small" disabled={tagDomainsOffset + tagDomainsLimit >= tagDomainsTotal}
+              on:click={() => { tagDomainsOffset += tagDomainsLimit; loadTagDomains(); }}
+            >{$t("next_page")}</button>
+          </div>
+        {/if}
+
+        <!-- Add domains -->
+        <h3 style="margin-top: 1.25rem;">{$t("tag_add_domains_heading")}</h3>
+        <textarea
+          bind:value={tagAddDomainsInput}
+          placeholder={$t("tag_domains_placeholder")}
+          rows="3"
+          style="width: 100%; box-sizing: border-box;"
+        ></textarea>
+        <button class="secondary" on:click={addTagDomains} disabled={tagAddingDomains}>
+          {tagAddingDomains ? $t("submitting") : $t("tag_add_domains_button")}
+        </button>
+
+        <!-- Remove domains -->
+        <h3 style="margin-top: 1.25rem;">{$t("tag_remove_domains_heading")}</h3>
+        <textarea
+          bind:value={tagRemoveDomainsInput}
+          placeholder={$t("tag_domains_placeholder")}
+          rows="3"
+          style="width: 100%; box-sizing: border-box;"
+        ></textarea>
+        <button class="ghost" on:click={removeTagDomains} disabled={tagRemovingDomains}>
+          {tagRemovingDomains ? $t("submitting") : $t("tag_remove_domains_button")}
+        </button>
+
+      {:else}
+        <h2>{$t("tags_tab_heading")}</h2>
+
+        <!-- Create tag form -->
+        <div style="display:flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; align-items: flex-end;">
+          <div class="stack" style="flex: 1 1 160px;">
+            <label for="tag-create-name">{$t("tag_name_label")}</label>
+            <input id="tag-create-name" type="text" bind:value={tagCreateName} placeholder="my-tag" />
+          </div>
+          <div class="stack" style="flex: 2 1 240px;">
+            <label for="tag-create-desc">{$t("tag_description_label")}</label>
+            <input id="tag-create-desc" type="text" bind:value={tagCreateDescription} placeholder={$t("tag_description_placeholder")} on:keydown={(e) => { if (e.key === 'Enter') createTag(); }} />
+          </div>
+          <button class="secondary" on:click={createTag} disabled={tagCreating || !tagCreateName.trim()}>
+            {tagCreating ? $t("submitting") : $t("tag_create_button")}
+          </button>
+        </div>
+
+        <!-- Tag list -->
+        {#if tagsListLoading}
+          <p class="muted">{$t("loading")}</p>
+        {:else if tagsList.length === 0}
+          <p class="muted">{$t("no_tags")}</p>
+        {:else}
+          <table class="data-table">
+            <thead><tr>
+              <th>{$t("tag_name_label")}</th>
+              <th>{$t("tag_description_label")}</th>
+              <th>{$t("col_domain_count")}</th>
+            </tr></thead>
+            <tbody>
+              {#each tagsList as tag}
+                <tr
+                  style="cursor: pointer;"
+                  on:click={() => navigateToTagDetail(tag)}
+                  role="button"
+                  tabindex="0"
+                  on:keydown={(e) => { if (e.key === "Enter" || e.key === " ") navigateToTagDetail(tag); }}
+                >
+                  <td class="mono">{tag.name}</td>
+                  <td>{tag.description || "—"}</td>
+                  <td>{tag.domain_count ?? 0}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        {/if}
+      {/if}
+    </div>
   {:else if activeTab === "batches"}
     <div class="grid" id="panel-batches" role="tabpanel" aria-labelledby="tab-batches" style="margin-top: 22px;">
       <div class="card reveal" style="--d: 0.22s">
         <h2>{$t("batch_jobs_heading")}</h2>
-        <div class="stack">
-          <label for="batch-domains">{$t("domains_label")}</label>
-          <textarea
-            id="batch-domains"
-            placeholder={`example.com
+        <div style="display:flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+          <button
+            class={batchFromTagMode ? "ghost" : "secondary small"}
+            type="button"
+            on:click={() => { batchFromTagMode = false; }}
+          >{$t("batch_domains_mode_label")}</button>
+          <button
+            class={batchFromTagMode ? "secondary small" : "ghost"}
+            type="button"
+            on:click={() => { batchFromTagMode = true; }}
+          >{$t("batch_from_tag_mode_label")}</button>
+        </div>
+        {#if batchFromTagMode}
+          <div class="stack">
+            <label for="batch-from-tag">{$t("batch_from_tag_label")}</label>
+            <select id="batch-from-tag" bind:value={batchFromTag}>
+              <option value="">{$t("tag_filter_all")}</option>
+              {#each availableTags as tag}
+                <option value={tag.name}>{tag.name}{tag.domain_count ? ` (${tag.domain_count})` : ""}</option>
+              {/each}
+            </select>
+          </div>
+        {:else}
+          <div class="stack">
+            <label for="batch-domains">{$t("domains_label")}</label>
+            <textarea
+              id="batch-domains"
+              placeholder={`example.com
 example.org`}
-            bind:value={batchDomains}
-          ></textarea>
+              bind:value={batchDomains}
+            ></textarea>
+          </div>
+        {/if}
+        <div class="stack">
+          <label for="batch-tags">{$t("batch_tags_label")}</label>
+          <input
+            id="batch-tags"
+            type="text"
+            placeholder={$t("batch_tags_placeholder")}
+            bind:value={batchTags}
+          />
+          <div class="small">{$t("batch_tags_hint")}</div>
         </div>
         <button class="secondary" on:click={submitBatch} disabled={batchSubmitting}>
           {batchSubmitting ? $t("submitting") : $t("run_batch")}
@@ -2042,6 +2949,10 @@ example.org`}
         </div>
         {#if selectedBatch}
           <div class="kv">
+            {#if selectedBatch.tag}
+              <span>{$t("batch_tag_label")}</span>
+              <strong class="mono">{selectedBatch.tag}</strong>
+            {/if}
             <span>{$t("total_label")}</span>
             <strong>{selectedBatch.total}</strong>
             <span>{$t("created_label")}</span>
@@ -2315,7 +3226,7 @@ example.org`}
                 <tbody>
                   {#each metricsDomainRows(metricsSnapshot) as row}
                     <tr>
-                      <td class="mono">{row.domain}</td>
+                      <td class="mono"><button class="ghost" type="button" style="padding: 0; font-family: monospace; text-align: left; border: none;" on:click={() => navigateToDomainByName(row.domain)}>{row.domain}</button></td>
                       <td>{formatInteger(row.runs_total)}</td>
                       <td>{row.last_status || "-"}</td>
                       <td>{formatDurationMs(row.avg_duration_ms)}</td>

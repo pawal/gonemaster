@@ -3,7 +3,7 @@
 This guide covers choosing and configuring a storage backend for `gonemaster-server`,
 including setup, recommended settings, tuning, and backup procedures.
 For DSN formats and connection pool defaults, see
-[server.md — Database](server.md#database).
+[server.md - Database](server.md#database).
 
 ---
 
@@ -29,7 +29,7 @@ gonemaster-server
 ```
 
 The default backend. All job data is stored in RAM and lost when the server stops.
-The purge loop works with this backend — set `--db-retention-days` if you run the server
+The purge loop works with this backend - set `--db-retention-days` if you run the server
 long-term to prevent unbounded memory growth.
 
 **Recommended settings:**
@@ -162,8 +162,9 @@ gonemaster-server
 ```sql
 CREATE DATABASE gonemaster
     ENCODING 'UTF8'
-    LC_COLLATE 'en_US.UTF-8'
-    LC_CTYPE 'en_US.UTF-8'
+    LOCALE_PROVIDER libc
+    LC_COLLATE 'C'
+    LC_CTYPE 'C'
     TEMPLATE template0;
 
 CREATE USER gonemaster WITH PASSWORD 'strongpassword';
@@ -174,8 +175,15 @@ GRANT USAGE  ON SCHEMA public TO gonemaster;
 GRANT CREATE ON SCHEMA public TO gonemaster;
 ```
 
+`LC_COLLATE 'C'` is correct here. All domain names are stored in ACE/punycode
+form (e.g. `xn--mnchen-3ya.de` for `münchen.de`) - the server normalizes every
+submitted name to its ASCII-compatible encoding (A-label) before storing it.
+Since all stored names are ASCII, collation has no effect on sort order or
+uniqueness, and `C` avoids any locale availability issue across PostgreSQL
+versions and operating systems.
+
 `gonemaster-server` creates and manages its own tables via schema migrations on
-first start. The user only needs `CONNECT`, `USAGE`, and `CREATE` — no
+first start. The user only needs `CONNECT`, `USAGE`, and `CREATE` - no
 superuser privileges are required.
 
 ### pg_hba.conf
@@ -205,14 +213,14 @@ shared_buffers = 256MB          # 25% of RAM is a good starting point
 work_mem = 4MB                  # per sort/hash operation; raise if List() is slow
 maintenance_work_mem = 64MB     # for VACUUM, index builds
 
-# Connections — keep below max_connections to leave headroom for admin tools
+# Connections - keep below max_connections to leave headroom for admin tools
 max_connections = 50            # gonemaster pool uses 25 max; leave room for psql
 
 # WAL / checkpoint
 checkpoint_completion_target = 0.9
 wal_buffers = 16MB
 
-# Autovacuum — gonemaster purges rows frequently; keep autovacuum responsive
+# Autovacuum - gonemaster purges rows frequently; keep autovacuum responsive
 autovacuum_vacuum_scale_factor = 0.05   # vacuum sooner on busy tables
 autovacuum_analyze_scale_factor = 0.02
 ```
@@ -255,13 +263,13 @@ streaming replica for point-in-time recovery.
 ### Autovacuum and the purge workload
 
 When data retention / purge is enabled (`database.retention_days > 0`),
-`gonemaster-server` periodically deletes old rows from `jobs` and `results`.
+`gonemaster-server` periodically deletes old rows from `runs` and `entries`.
 PostgreSQL's autovacuum must reclaim the dead tuples promptly to prevent table
 bloat. The `autovacuum_vacuum_scale_factor = 0.05` value above triggers a
 vacuum once 5% of a table's rows are dead, which is appropriate for tables that
 see frequent bulk deletes.
 
-Run `VACUUM ANALYZE jobs; VACUUM ANALYZE results;` manually after the first
+Run `VACUUM ANALYZE runs; VACUUM ANALYZE entries;` manually after the first
 large purge to update planner statistics.
 
 ---
@@ -276,7 +284,7 @@ large purge to update planner statistics.
 
 | Setting | Recommended value | Notes |
 |---|---|---|
-| `--db-retention-days` | `90` | Keeps the `jobs` and `results` tables from growing indefinitely |
+| `--db-retention-days` | `90` | Keeps the `runs` and `entries` tables from growing indefinitely |
 | `tls=true` or `tls=skip-verify` | production / internal CA | Protects credentials in transit |
 | `innodb_file_per_table` | `ON` | Allows disk reclamation after large purges |
 
@@ -336,22 +344,22 @@ Replace `'localhost'` with the application host if connecting over the network.
 
 ```ini
 [mysqld]
-# InnoDB — use InnoDB for all tables (default in MariaDB 10.x+)
+# InnoDB - use InnoDB for all tables (default in MariaDB 10.x+)
 default_storage_engine = InnoDB
 
-# Buffer pool — set to 50-70% of RAM on a dedicated database server
+# Buffer pool - set to 50-70% of RAM on a dedicated database server
 innodb_buffer_pool_size = 512M
 
-# Redo log — larger = fewer checkpoints, better write throughput
+# Redo log - larger = fewer checkpoints, better write throughput
 innodb_log_file_size = 128M
 
-# One file per table — essential for reclaiming disk space after purge
+# One file per table - essential for reclaiming disk space after purge
 innodb_file_per_table = ON
 
-# Connections — gonemaster pool uses 25 max; leave headroom for admin tools
+# Connections - gonemaster pool uses 25 max; leave headroom for admin tools
 max_connections = 50
 
-# Character set defaults — must match the database collation
+# Character set defaults - must match the database collation
 character_set_server = utf8mb4
 collation_server = utf8mb4_unicode_ci
 ```
@@ -414,8 +422,8 @@ With `innodb_file_per_table = ON`, each table has its own `.ibd` file. After a
 large purge, reclaim space with:
 
 ```sql
-OPTIMIZE TABLE jobs;
-OPTIMIZE TABLE results;
+OPTIMIZE TABLE runs;
+OPTIMIZE TABLE entries;
 ```
 
 This rebuilds the table and releases space back to the OS.
@@ -424,7 +432,7 @@ This rebuilds the table and releases space back to the OS.
 
 ## Data retention
 
-All backends — including the default in-memory backend — support automatic purging of old
+All backends - including the default in-memory backend - support automatic purging of old
 completed jobs. Configure it with `--db-retention-days`:
 
 ```
@@ -435,7 +443,7 @@ gonemaster-server --db-driver sqlite --db-dsn /var/lib/gonemaster/gonemaster.db 
 - The purge loop runs **hourly** in the background.
 - Only terminal-status jobs (`succeeded`, `failed`, `canceled`, `expired`) are deleted.
   Running, queued, and paused jobs are never purged automatically.
-- Associated results are also deleted in the same operation.
+- Associated runs and entries are also deleted in the same operation.
 - **Recommended production value:** `90` days.
 - `0` (default) disables automatic purging; data accumulates indefinitely.
 
@@ -463,8 +471,9 @@ gonemaster-client jobs purge --older-than 30
 2. Stop the server.
 3. Start the server with the new `--db-driver` and `--db-dsn`.
 
-The new backend will start empty. If you need to keep historical data, export results
-before switching (for example with `gonemaster-client results --batch-id ...`).
+The new backend will start empty. If you need to keep historical data, export
+results before switching (for example with `gonemaster-client runs list --batch <id>` or
+`gonemaster-client entries query --tag <name> --format csv`).
 
 ---
 
@@ -500,7 +509,7 @@ Key metrics to watch in production:
 | Metric | PostgreSQL | MariaDB |
 |---|---|---|
 | Active connections | `pg_stat_activity` | `SHOW STATUS LIKE 'Threads_connected'` |
-| Table sizes | `pg_total_relation_size('jobs')` | `information_schema.tables` |
+| Table sizes | `pg_total_relation_size('runs')`, `pg_total_relation_size('entries')` | `information_schema.tables` |
 | Cache hit rate | `pg_statio_user_tables` | `Innodb_buffer_pool_read_requests` |
 | Slow queries | `pg_stat_statements` | `slow_query_log = ON` |
 | Dead tuples / bloat | `pg_stat_user_tables.n_dead_tup` | `SHOW ENGINE INNODB STATUS` |

@@ -1,17 +1,36 @@
 # Gonemaster Server
 
 ## Overview
-- `gonemaster-server` is a REST API wrapper around the Gonemaster engine with an embedded web UI.
-- The API contract is defined in [openapi.yaml](openapi.yaml).
-- The UI is served at `/` from the embedded build output in `server/ui/dist`.
-- The API is served under `/api/v1`.
-- Job progress is reported as a percentage (0-100).
 
-The default profile is located in `share/profile.json`, but is built into the server binary.
-By default, it enables IPv4+IPv6 and currently sets `resolver.defaults.parallel=8` and
-`resolver.defaults.unordered=true`.
-If you don't have access to IPv6 on your development machine, or you need deterministic
-ordered behavior, use a custom profile via `--profile`.
+`gonemaster-server` wraps the Gonemaster DNS-testing engine in an HTTP server with a
+persistent job queue, pluggable storage, and two distinct APIs:
+
+| Path prefix | Who uses it | What it can do |
+|---|---|---|
+| `/api/v1/` | Trusted clients (admin UI, `gonemaster-client`, scripts) | Full control: jobs, batches, queue, domains, tags, runs, entries, metrics |
+| `/pub/api/v1/` | Untrusted clients over the internet (via reverse proxy) | Submit a job, poll status, fetch result - by opaque `public_id` only |
+
+The **admin API** (`/api/v1/`) exposes all server capabilities. Internal job UUIDs are
+visible. Never expose this directly to the internet.
+
+The **public API** (`/pub/api/v1/`) is a deliberately restricted subset intended for
+reverse-proxy exposure. It never discloses internal UUIDs - every response uses a
+randomly-generated `public_id` instead. Only four endpoints are available:
+`POST /jobs`, `GET /jobs/{public_id}`, `GET /jobs/{public_id}/result`,
+`GET /locales`. Admin paths are unreachable at this prefix, enforced server-side.
+
+Two matching UIs sit alongside the APIs:
+
+| Path prefix | Description |
+|---|---|
+| `/` | Admin UI - full job/batch/domain/tag management |
+| `/public/` | Public UI - single-page app for end-user zone testing |
+
+The full admin API contract is defined in [openapi.yaml](openapi.yaml).
+
+The default resolver profile is built into the binary (`share/profile.json`).
+It enables IPv4+IPv6 with `resolver.defaults.parallel=8` and `resolver.defaults.unordered=true`.
+Use `--profile` to override if you lack IPv6 or need deterministic ordered output.
 
 ## Build
 ```
@@ -150,18 +169,18 @@ The server supports pluggable storage backends selected by `--db-driver`:
 
 #### DSN formats
 
-**SQLite** — file path:
+**SQLite** - file path:
 ```
 gonemaster-server --db-driver sqlite --db-dsn /var/lib/gonemaster/gonemaster.db
 ```
 
-**PostgreSQL** — connection URL:
+**PostgreSQL** - connection URL:
 ```
 gonemaster-server --db-driver postgres \
   --db-dsn "postgres://user:pass@host:5432/dbname?sslmode=disable"
 ```
 
-**MariaDB / MySQL** — DSN string:
+**MariaDB / MySQL** - DSN string:
 ```
 gonemaster-server --db-driver mariadb \
   --db-dsn "user:pass@tcp(host:3306)/dbname"
@@ -182,7 +201,7 @@ procedures see [docs/database-setup.md](database-setup.md).
 
 | Backend | Max open connections | Max idle | Connection lifetime |
 |---|---|---|---|
-| `sqlite` | 1 (serialised writes) | — | — |
+| `sqlite` | 1 (serialised writes) | - | - |
 | `postgres` | 25 | 5 | 5 minutes |
 | `mariadb` | 25 | 5 | 5 minutes |
 
@@ -200,7 +219,7 @@ gonemaster-server --db-driver sqlite --db-dsn /var/lib/gonemaster/gonemaster.db 
   --db-retention-days 90
 ```
 
-- `0` (default) — keep forever, no automatic purge.
+- `0` (default) - keep forever, no automatic purge.
 - Any positive value starts a background purge loop that runs **hourly** and deletes completed jobs with `finished_at` older than that many days, along with their results.
 - Running, queued, and paused jobs are never purged automatically.
 
@@ -209,8 +228,9 @@ Recommended production setting: `90` days.
 ### Public API
 
 The server exposes a separate, restricted API at `/pub/api/v1/` intended for
-reverse-proxy exposure to untrusted clients. It supports job submission and
-result lookup by an opaque public ID; internal UUIDs are never disclosed.
+reverse-proxy exposure to untrusted clients (see [Overview](#overview) for the
+full admin vs. public comparison). It supports job submission and result lookup
+by an opaque public ID; internal UUIDs are never disclosed.
 
 Available endpoints:
 
@@ -221,8 +241,9 @@ Available endpoints:
 | `GET` | `/pub/api/v1/jobs/{public_id}/result` | Fetch result by public ID |
 | `GET` | `/pub/api/v1/locales` | List available locale codes |
 
-Admin-only paths (`/metrics`, `/queue/*`, `/batches`, `/jobs/purge`) are not
-reachable via the `/pub/` prefix — the boundary is enforced server-side.
+Admin-only paths (`/metrics`, `/queue/*`, `/batches`, `/jobs/purge`, `/domains`, `/tags`,
+`/runs`, `/entries`) are not reachable via the `/pub/` prefix - the boundary is enforced
+server-side.
 
 #### Rate limiting
 
@@ -259,7 +280,7 @@ prefixes:
 | `/public/` | Public Svelte SPA (static assets) |
 | `/pub/api/v1/` | Public API (job submission and result lookup) |
 
-The server enforces the boundary internally — no additional path filtering
+The server enforces the boundary internally - no additional path filtering
 is required in the proxy.
 
 #### nginx
@@ -353,16 +374,23 @@ Domains are normalized to IDNA A-labels (punycode). For example:
 Invalid domains return a `400` error with `code=invalid_domain`.
 
 ## API basics
+
+This section describes the **admin API** (`/api/v1/`). For the public API, see
+[Public API](#public-api) under Configuration.
+
 - Base URL: the server listen address plus `/api/v1` (default `http://127.0.0.1:8080/api/v1`).
-- All endpoint paths below are relative to the base URL.
+- All endpoint paths in the [Endpoints](#endpoints) section below are relative to this base URL.
 - Content-Type: JSON for requests and responses.
-- CSRF protection: mutating endpoints (`POST`) validate `Origin` when provided and require it to match the request host. Clients without an `Origin` header (for example `gonemaster-client`) continue to work unchanged.
-- Errors: standard JSON envelope:
+- CSRF protection: mutating endpoints (`POST`, `PUT`, `DELETE`) validate `Origin` when provided and require it to match the request host. Clients without an `Origin` header (e.g. `gonemaster-client` or `curl`) continue to work unchanged.
+- Errors use a standard JSON envelope:
   ```json
   { "error": { "code": "invalid_domain", "message": "..." } }
   ```
 
 ## Endpoints
+
+All paths below are relative to `/api/v1/`. This is the **admin API** - do not expose
+it to untrusted clients. See [Public API](#public-api) for the internet-safe subset.
 
 ### Jobs
 Create a single job:
@@ -476,9 +504,16 @@ Submit a batch:
 ```
 POST /jobs/batch
 {
-  "domains": ["example.com", "example.org"]
+  "domains": ["example.com", "example.org"],
+  "from_tag": "tld",
+  "tags": ["tld"],
+  "description": "TLD sweep 2024-Q1",
+  "min_level": "NOTICE",
+  "profile_overrides": { "timeout": 5 }
 }
 ```
+
+Either `domains` or `from_tag` (or both) must be provided. `from_tag` expands to all domains currently in that tag, deduplicated against any explicit `domains` list. `tags` tags the resulting batch and all its runs (creating domains if needed).
 
 Batch submission does not support undelegated input; if `nameservers` or `ds_info` is included, the API returns `400` with `error.code=undelegated_not_supported_for_batch`.
 
@@ -486,6 +521,134 @@ Get batch summary:
 ```
 GET /batches/{batch_id}
 ```
+
+### Domains
+List domains (paginated):
+```
+GET /domains?tag=tld&name=.se&level=ERROR&min_level=WARNING&limit=100&offset=0
+```
+
+Query params:
+- `tag` - filter to domains belonging to this tag.
+- `name` - substring filter on domain name.
+- `level` - exact `latest_level` filter (e.g. `ERROR`).
+- `min_level` - minimum severity threshold; `WARNING` matches `WARNING`, `ERROR`, `CRITICAL`.
+- `limit` / `offset` - pagination (max 500, default 100).
+
+Get a domain by ID:
+```
+GET /domains/{id}
+```
+Returns the domain record with its tags populated.
+
+List run history for a domain:
+```
+GET /domains/{id}/runs?limit=50&offset=0
+```
+
+### Tags
+List all tags:
+```
+GET /tags?limit=100&offset=0
+```
+
+Create a tag:
+```
+POST /tags
+{ "name": "tld", "description": "Top-level domains" }
+```
+Returns `201` with the new tag. Returns `409` with `error.code=tag_exists` if the name is taken.
+
+Update tag description:
+```
+PUT /tags/{name}
+{ "description": "Updated description" }
+```
+
+Delete a tag:
+```
+DELETE /tags/{name}
+```
+Returns `204 No Content`. Removes all domain associations; domain records and their runs are preserved.
+
+Add domains to a tag (creates domain records if they don't exist):
+```
+POST /tags/{name}/domains
+{ "domains": ["example.com", "example.org"] }
+```
+Returns `204 No Content`.
+
+Remove domains from a tag:
+```
+DELETE /tags/{name}/domains
+{ "domains": ["example.com"] }
+```
+Returns `204 No Content`.
+
+List domains in a tag (same shape as `GET /domains`):
+```
+GET /tags/{name}/domains?limit=100&offset=0
+```
+
+Get tag severity summary (domain counts by worst-level bucket):
+```
+GET /tags/{name}/summary
+```
+```json
+{
+  "tag": "tld",
+  "domain_count": 1520,
+  "ok": 1200,
+  "notice": 150,
+  "warning": 100,
+  "error": 60,
+  "critical": 10
+}
+```
+
+### Runs
+List runs (paginated):
+```
+GET /runs?tag=tld&domain=example.com&batch=batch_123&status=succeeded&level=ERROR&finished_after=2024-01-01T00:00:00Z&finished_before=2024-02-01T00:00:00Z&limit=100&offset=0
+```
+
+Query params:
+- `tag` - filter to runs for domains in this tag.
+- `domain` - filter by domain name substring.
+- `batch` - filter by batch ID.
+- `status` - filter by run status.
+- `level` - filter by `worst_level`.
+- `finished_after` / `finished_before` - RFC3339 timestamps.
+- `limit` / `offset` - pagination (max 500, default 100).
+
+Get a run:
+```
+GET /runs/{id}
+```
+
+Get a run result (same shape as `GET /jobs/{id}/result`):
+```
+GET /runs/{id}/result?locale=en
+```
+
+### Entries
+Query individual engine log entries across all runs:
+```
+GET /entries?run=run_abc&tag=tld&domain=123&module=DNSSEC&testcase=dnssec01&entry_tag=DS_ALGO_NOT_SUPPORTED&level=ERROR&latest=1&batch=batch_123&format=csv&limit=100&offset=0
+```
+
+Query params:
+- `run` - exact run ID.
+- `domain` - domain ID (integer).
+- `tag` - domain tag filter (joined via domain→tag associations).
+- `module` - exact module name.
+- `testcase` - exact testcase name.
+- `entry_tag` - log event tag (the engine `tag` field, e.g. `DS_ALGO_NOT_SUPPORTED`).
+- `level` - exact severity level.
+- `latest` - `1` or `true` to restrict to each domain's latest run only.
+- `batch` - restrict to runs from this batch.
+- `format=csv` - download as CSV instead of JSON; columns: `id`, `run_id`, `domain_id`, `domain`, `timestamp`, `module`, `testcase`, `tag`, `level`, `args`.
+- `limit` / `offset` - pagination (max 500, default 100).
 
 ### Queue controls
 Pause queue:
@@ -548,6 +711,9 @@ The embedded UI is served at `/` and calls the API on the same host.
 - Summary view for NOTICE/WARNING/ERROR/CRITICAL.
 - Raw results grouped by module; click a module to expand/collapse.
 - Raw results show a CLI-style table (seconds, level, message) and use translated messages when available.
+- Domains tab: browse/filter the domain registry; drill into per-domain run history.
+- Tags tab: create/edit/delete tags, manage domain membership, view per-tag severity summary.
+- Run inspector: shows duration, entry count, and worst level alongside the full result.
 
 ### Build & dev
 Rebuild the embedded UI:

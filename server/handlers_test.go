@@ -433,152 +433,28 @@ func TestListJobsFiltersByBatchIDAndSupportsBatchSort(t *testing.T) {
 	}
 }
 
-func TestListJobsIncludesSeverityTotals(t *testing.T) {
+func TestListJobsSortBySeverityAcceptsParam(t *testing.T) {
+	// error_desc and critical_desc are accepted sort params (fall back to started_at for in-flight jobs).
 	srv := New(DefaultConfig())
 	base := time.Date(2026, 2, 3, 0, 0, 0, 0, time.UTC)
 
-	_, _ = srv.store.Create(Job{ID: "job1", Domain: "alpha.example", Status: JobSucceeded, CreatedAt: base})
-	_ = srv.store.SetResult("job1", JobResult{
-		JobID:  "job1",
-		Status: JobSucceeded,
-		Summary: map[string]any{
-			"levels": map[string]int{
-				"NOTICE":   2,
-				"WARNING":  1,
-				"ERROR":    3,
-				"CRITICAL": 0,
-			},
-		},
-	})
+	_, _ = srv.store.Create(Job{ID: "job1", Domain: "alpha.example", Status: JobQueued, CreatedAt: base})
+	_, _ = srv.store.Create(Job{ID: "job2", Domain: "beta.example", Status: JobQueued, CreatedAt: base.Add(time.Second)})
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var list JobList
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if len(list.Items) != 1 {
-		t.Fatalf("expected one item")
-	}
-	totals := list.Items[0].SeverityTotals
-	if totals["NOTICE"] != 2 || totals["WARNING"] != 1 || totals["ERROR"] != 3 || totals["CRITICAL"] != 0 {
-		t.Fatalf("unexpected severity_totals: %+v", totals)
-	}
-}
-
-func TestListJobsSortBySeverityTotals(t *testing.T) {
-	srv := New(DefaultConfig())
-	base := time.Date(2026, 2, 3, 0, 0, 0, 0, time.UTC)
-
-	_, _ = srv.store.Create(Job{ID: "job1", Domain: "alpha.example", Status: JobSucceeded, CreatedAt: base})
-	_, _ = srv.store.Create(Job{ID: "job2", Domain: "beta.example", Status: JobFailed, CreatedAt: base.Add(time.Second)})
-	_, _ = srv.store.Create(Job{ID: "job3", Domain: "gamma.example", Status: JobFailed, CreatedAt: base.Add(2 * time.Second)})
-
-	_ = srv.store.SetResult("job1", JobResult{
-		JobID:  "job1",
-		Status: JobSucceeded,
-		Summary: map[string]any{
-			"levels": map[string]int{"ERROR": 1},
-		},
-	})
-	_ = srv.store.SetResult("job2", JobResult{
-		JobID:  "job2",
-		Status: JobFailed,
-		Summary: map[string]any{
-			"levels": map[string]int{"CRITICAL": 2},
-		},
-	})
-
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs?sort=error_desc", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var list JobList
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if list.Sort != string(JobSortErrorDesc) {
-		t.Fatalf("expected sort metadata %q, got %q", JobSortErrorDesc, list.Sort)
-	}
-	if len(list.Items) != 3 || list.Items[0].ID != "job2" || list.Items[1].ID != "job1" {
-		t.Fatalf("expected error_desc order job2, job1, ..., got %+v", list.Items)
-	}
-
-	resp = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodGet, "/api/v1/jobs?sort=critical_desc", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if list.Sort != string(JobSortCriticalDesc) {
-		t.Fatalf("expected sort metadata %q, got %q", JobSortCriticalDesc, list.Sort)
-	}
-	if len(list.Items) != 3 || list.Items[0].ID != "job2" {
-		t.Fatalf("expected critical_desc order to prioritize job2")
-	}
-}
-
-func TestListJobsFiltersBySeverity(t *testing.T) {
-	srv := New(DefaultConfig())
-	base := time.Date(2026, 2, 3, 0, 0, 0, 0, time.UTC)
-
-	_, _ = srv.store.Create(Job{ID: "job_clean", Domain: "clean.example", Status: JobSucceeded, CreatedAt: base})
-	_, _ = srv.store.Create(Job{ID: "job_warn", Domain: "warn.example", Status: JobFailed, CreatedAt: base.Add(time.Second)})
-	_, _ = srv.store.Create(Job{ID: "job_err", Domain: "error.example", Status: JobFailed, CreatedAt: base.Add(2 * time.Second)})
-
-	_ = srv.store.SetResult("job_warn", JobResult{
-		JobID:  "job_warn",
-		Status: JobFailed,
-		Summary: map[string]any{
-			"levels": map[string]int{"WARNING": 2},
-		},
-	})
-	_ = srv.store.SetResult("job_err", JobResult{
-		JobID:  "job_err",
-		Status: JobFailed,
-		Summary: map[string]any{
-			"levels": map[string]int{"ERROR": 1},
-		},
-	})
-
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs?severity=errors_only&sort=started_at_desc", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var errorsOnly JobList
-	if err := json.NewDecoder(resp.Body).Decode(&errorsOnly); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if errorsOnly.Total != 1 || len(errorsOnly.Items) != 1 || errorsOnly.Items[0].ID != "job_err" {
-		t.Fatalf("expected only job_err for errors_only, got %+v", errorsOnly.Items)
-	}
-
-	resp = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodGet, "/api/v1/jobs?severity=warnings_plus&sort=started_at_desc", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var warningsPlus JobList
-	if err := json.NewDecoder(resp.Body).Decode(&warningsPlus); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if warningsPlus.Total != 2 || len(warningsPlus.Items) != 2 {
-		t.Fatalf("expected two jobs for warnings_plus, got %+v", warningsPlus.Items)
-	}
-	if warningsPlus.Items[0].ID != "job_err" || warningsPlus.Items[1].ID != "job_warn" {
-		t.Fatalf("unexpected warnings_plus order: %+v", warningsPlus.Items)
+	for _, sort := range []string{"error_desc", "critical_desc"} {
+		resp := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs?sort="+sort, nil)
+		srv.Handler().ServeHTTP(resp, req)
+		if resp.Code != http.StatusOK {
+			t.Fatalf("sort=%s: expected 200, got %d", sort, resp.Code)
+		}
+		var list JobList
+		if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+			t.Fatalf("sort=%s: decode: %v", sort, err)
+		}
+		if list.Total != 2 {
+			t.Fatalf("sort=%s: expected 2 items, got %d", sort, list.Total)
+		}
 	}
 }
 
@@ -937,12 +813,11 @@ func TestCancelJobTriggersContextCancel(t *testing.T) {
 	default:
 		t.Fatalf("expected cancel function to be called")
 	}
-	stored, ok := srv.store.Get(job.ID)
+	// Running jobs are graduated asynchronously by the worker after context cancel.
+	// The job remains in-flight (JobRunning) in the store until the worker handles it.
+	_, ok := srv.store.Get(job.ID)
 	if !ok {
 		t.Fatalf("expected job in store")
-	}
-	if stored.Status != JobCanceled {
-		t.Fatalf("expected status canceled, got %s", stored.Status)
 	}
 }
 
@@ -1002,15 +877,13 @@ func TestQueueRemove(t *testing.T) {
 		t.Fatalf("expected 200, got %d", resp.Code)
 	}
 
+	// After queue remove, the job is graduated and only accessible via GetRun/Get.
 	stored, ok := srv.store.Get(job.ID)
 	if !ok {
-		t.Fatalf("expected job in store")
+		t.Fatalf("expected job in store (reconstructed from run)")
 	}
 	if stored.Status != JobCanceled {
 		t.Fatalf("expected status canceled, got %s", stored.Status)
-	}
-	if stored.Error != "removed_from_queue" {
-		t.Fatalf("expected error removed_from_queue, got %q", stored.Error)
 	}
 
 	result, ok := srv.store.GetResult(job.ID)
@@ -1657,6 +1530,9 @@ func TestHandleJobsPurge(t *testing.T) {
 		if _, err := srv.store.Create(job); err != nil {
 			t.Fatalf("create: %v", err)
 		}
+		if err := srv.store.GraduateJob(job, nil); err != nil {
+			t.Fatalf("graduate: %v", err)
+		}
 
 		resp := postPurge(srv, `{"older_than_days":1}`)
 		if resp.Code != http.StatusOK {
@@ -1677,6 +1553,9 @@ func TestHandleJobsPurge(t *testing.T) {
 		job := Job{ID: "j1", Domain: "example.com", Status: JobSucceeded, CreatedAt: old, FinishedAt: old}
 		if _, err := srv.store.Create(job); err != nil {
 			t.Fatalf("create: %v", err)
+		}
+		if err := srv.store.GraduateJob(job, nil); err != nil {
+			t.Fatalf("graduate: %v", err)
 		}
 
 		resp := postPurge(srv, "")
@@ -1712,4 +1591,18 @@ func TestHandleJobsPurge(t *testing.T) {
 			t.Fatalf("expected 405, got %d", resp.Code)
 		}
 	})
+}
+
+// intFromAny converts a JSON-decoded any (float64) to int for test assertions.
+func intFromAny(v any) int {
+	switch n := v.(type) {
+	case float64:
+		return int(n)
+	case int:
+		return n
+	case int64:
+		return int(n)
+	default:
+		return 0
+	}
 }

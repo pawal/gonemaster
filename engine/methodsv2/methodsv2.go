@@ -765,17 +765,28 @@ func getIBAddrInZone(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver
 	}
 
 	ibNS := map[string][]netip.Addr{}
+	deadDel := map[string]bool{}
 	for _, nsName := range nsNames {
 		if !z.Name.IsInBailiwick(nsName) {
 			continue
 		}
 		for _, ns := range delServers {
+			if deadDel[ns.Address.String()] {
+				continue
+			}
 			for _, qtype := range []string{"A", "AAAA"} {
 				resp, err := r.RecurseWithNameservers(ctx, nsName.String(), qtype, "IN", []nameserver.Nameserver{ns})
-				if err != nil || resp.Msg == nil || resp.Rcode() != "NOERROR" || !resp.AA() {
+				if err != nil || resp.Msg == nil {
+					deadDel[ns.Address.String()] = true
+					break
+				}
+				if resp.Rcode() != "NOERROR" || !resp.AA() {
 					continue
 				}
 				ibNS[nsName.String()] = append(ibNS[nsName.String()], collectResolvedAddrs(resp, qtype, nsName)...)
+			}
+			if len(ibNS[nsName.String()]) > 0 {
+				break
 			}
 		}
 	}

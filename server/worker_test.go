@@ -44,12 +44,100 @@ func (s *spyJobStore) List(filter JobFilter) JobList {
 	return s.inner.List(filter)
 }
 
-func (s *spyJobStore) SetResult(jobID string, result JobResult) error {
-	return s.inner.SetResult(jobID, result)
+func (s *spyJobStore) GraduateJob(job Job, entries []engine.LogEntry) error {
+	return s.inner.GraduateJob(job, entries)
 }
 
 func (s *spyJobStore) GetResult(jobID string) (JobResult, bool) {
 	return s.inner.GetResult(jobID)
+}
+
+func (s *spyJobStore) GetOrCreateDomain(name string) (Domain, error) {
+	return s.inner.GetOrCreateDomain(name)
+}
+
+func (s *spyJobStore) GetDomain(id int64) (Domain, bool) {
+	return s.inner.GetDomain(id)
+}
+
+func (s *spyJobStore) GetDomainByName(name string) (Domain, bool) {
+	return s.inner.GetDomainByName(name)
+}
+
+func (s *spyJobStore) ListDomains(filter DomainFilter) DomainList {
+	return s.inner.ListDomains(filter)
+}
+
+func (s *spyJobStore) UpdateDomainLatest(domainID int64, runID string, finishedAt time.Time, status, level string) error {
+	return s.inner.UpdateDomainLatest(domainID, runID, finishedAt, status, level)
+}
+
+func (s *spyJobStore) CreateTag(name, description string) error {
+	return s.inner.CreateTag(name, description)
+}
+
+func (s *spyJobStore) GetTag(name string) (Tag, bool) {
+	return s.inner.GetTag(name)
+}
+
+func (s *spyJobStore) UpdateTag(name, description string) error {
+	return s.inner.UpdateTag(name, description)
+}
+
+func (s *spyJobStore) DeleteTag(name string) error {
+	return s.inner.DeleteTag(name)
+}
+
+func (s *spyJobStore) ListTags(limit, offset int) []Tag {
+	return s.inner.ListTags(limit, offset)
+}
+
+func (s *spyJobStore) TagDomains(tag string, domainIDs []int64) error {
+	return s.inner.TagDomains(tag, domainIDs)
+}
+
+func (s *spyJobStore) UntagDomains(tag string, domainIDs []int64) error {
+	return s.inner.UntagDomains(tag, domainIDs)
+}
+
+func (s *spyJobStore) GetDomainTags(domainID int64) []string {
+	return s.inner.GetDomainTags(domainID)
+}
+
+func (s *spyJobStore) ListDomainsByTag(tag string, filter DomainFilter) DomainList {
+	return s.inner.ListDomainsByTag(tag, filter)
+}
+
+func (s *spyJobStore) GetTagSummary(tag string) (TagSummary, bool) {
+	return s.inner.GetTagSummary(tag)
+}
+
+func (s *spyJobStore) GetRun(id string) (Run, bool) {
+	return s.inner.GetRun(id)
+}
+
+func (s *spyJobStore) GetRunByPublicID(publicID string) (Run, bool) {
+	return s.inner.GetRunByPublicID(publicID)
+}
+
+func (s *spyJobStore) ListRuns(filter RunFilter) RunList {
+	return s.inner.ListRuns(filter)
+}
+
+func (s *spyJobStore) ListRunsByDomain(domainID int64, limit, offset int) RunList {
+	return s.inner.ListRunsByDomain(domainID, limit, offset)
+}
+
+func (s *spyJobStore) QueryEntries(filter EntryFilter) EntryList {
+	return s.inner.QueryEntries(filter)
+}
+
+func (s *spyJobStore) CreateBatch(batch Batch) error {
+	return s.inner.CreateBatch(batch)
+}
+
+func (s *spyJobStore) GetBatch(id string) (Batch, bool) {
+	return s.inner.GetBatch(id)
 }
 
 func (s *spyJobStore) PurgeOlderThan(cutoff time.Time) (int64, error) {

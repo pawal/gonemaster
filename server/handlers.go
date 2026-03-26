@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -45,14 +46,38 @@ func (s *Server) handleJobsBatch(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "undelegated_not_supported_for_batch", "undelegated input is only supported for POST /jobs", nil)
 		return
 	}
-	if len(req.Domains) == 0 {
+	if req.FromTag != "" && len(req.Domains) > 0 {
+		writeError(w, http.StatusBadRequest, "ambiguous_domains", "from_tag and domains are mutually exclusive", nil)
+		return
+	}
+
+	// Resolve domain list: either from an explicit list or from a tag.
+	domains := req.Domains
+	if req.FromTag != "" {
+		if _, ok := s.store.GetTag(req.FromTag); !ok {
+			writeError(w, http.StatusBadRequest, "tag_not_found", "tag not found: "+req.FromTag, nil)
+			return
+		}
+		list := s.store.ListDomainsByTag(req.FromTag, DomainFilter{Limit: 10000})
+		for _, d := range list.Items {
+			domains = append(domains, d.Name)
+		}
+	}
+	if len(domains) == 0 {
 		writeError(w, http.StatusBadRequest, "missing_domain", "domains is required", nil)
 		return
 	}
 
+	tagNames, ok := validateTags(w, s, req.Tags)
+	if !ok {
+		return
+	}
+
 	batchID := newID("batch")
-	jobIDs := make([]string, 0, len(req.Domains))
-	for _, domain := range req.Domains {
+	now := time.Now().UTC()
+	jobIDs := make([]string, 0, len(domains))
+	var domainIDs []int64
+	for _, domain := range domains {
 		trimmed := strings.TrimSpace(domain)
 		if trimmed == "" {
 			writeError(w, http.StatusBadRequest, "missing_domain", "domains is required", nil)
@@ -72,7 +97,7 @@ func (s *Server) handleJobsBatch(w http.ResponseWriter, r *http.Request) {
 			Overrides: req.ProfileOverrides,
 			MinLevel:  req.MinLevel,
 			Status:    JobQueued,
-			CreatedAt: time.Now().UTC(),
+			CreatedAt: now,
 			Progress:  0,
 		}
 		created, err := s.store.Create(job)
@@ -83,7 +108,27 @@ func (s *Server) handleJobsBatch(w http.ResponseWriter, r *http.Request) {
 		_ = s.queue.Enqueue(created.ID)
 		s.metrics.ObserveJobSubmittedWithContext(created.BatchID, created.Domain, JobQueued)
 		jobIDs = append(jobIDs, created.ID)
+		if len(tagNames) > 0 {
+			d, err := s.store.GetOrCreateDomain(trimmed)
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
+				return
+			}
+			domainIDs = append(domainIDs, d.ID)
+		}
 	}
+
+	for _, tagName := range tagNames {
+		_ = s.store.TagDomains(tagName, domainIDs)
+	}
+
+	_ = s.store.CreateBatch(Batch{
+		ID:          batchID,
+		Tag:         req.FromTag,
+		Description: req.Description,
+		DomainCount: len(jobIDs),
+		CreatedAt:   now,
+	})
 
 	writeJSON(w, http.StatusAccepted, JobBatchResponse{BatchID: batchID, JobIDs: jobIDs})
 }
@@ -158,34 +203,41 @@ func (s *Server) handleBatchByID(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, code, message, nil)
 		return
 	}
-	filter.BatchID = batchID
 
-	batchProbe := s.store.List(JobFilter{
-		BatchID: batchID,
-		Limit:   1,
-		Sort:    JobSortCreatedAtAsc,
-	})
-	if batchProbe.Total == 0 {
-		writeError(w, http.StatusNotFound, "not_found", "batch not found", nil)
-		return
+	// Verify batch exists via the batches table or fallback to jobs/runs.
+	_, batchExists := s.store.GetBatch(batchID)
+	if !batchExists {
+		// Fallback: check if any jobs or runs have this batch_id.
+		probe := s.store.List(JobFilter{BatchID: batchID, Limit: 1})
+		if probe.Total == 0 {
+			runsProbe := s.store.ListRuns(RunFilter{BatchID: batchID, Limit: 1})
+			if runsProbe.Total == 0 {
+				writeError(w, http.StatusNotFound, "not_found", "batch not found", nil)
+				return
+			}
+		}
 	}
 
-	list := s.store.List(filter)
-	fullFilter := JobFilter{
-		BatchID: batchID,
-		Offset:  0,
-		Limit:   batchProbe.Total,
-		Sort:    JobSortCreatedAtAsc,
-	}
-	fullList := s.store.List(fullFilter)
+	// Collect all in-flight jobs for this batch.
+	allJobs := s.store.List(JobFilter{BatchID: batchID, Limit: 10000, Sort: JobSortCreatedAtAsc})
+	// Collect all graduated runs for this batch.
+	allRuns := s.store.ListRuns(RunFilter{BatchID: batchID, Limit: 10000})
 
+	// Build combined item list (jobs + runs converted to jobs).
+	combined := make([]Job, 0, len(allJobs.Items)+len(allRuns.Items))
+	combined = append(combined, allJobs.Items...)
+	for _, run := range allRuns.Items {
+		combined = append(combined, jobFromRun(run))
+	}
+
+	// Compute aggregate status counts and timing over the full combined list (all items, no filter).
 	statusCounts := map[string]int{}
 	var createdAt time.Time
 	var startedAt *time.Time
 	var finishedAtLatest time.Time
 	allFinished := true
 
-	for _, job := range fullList.Items {
+	for _, job := range combined {
 		statusCounts[string(job.Status)]++
 		if createdAt.IsZero() || job.CreatedAt.Before(createdAt) {
 			createdAt = job.CreatedAt
@@ -208,16 +260,85 @@ func (s *Server) handleBatchByID(w http.ResponseWriter, r *http.Request) {
 		finishedAt = &finishedAtLatest
 	}
 
+	// Apply optional filters (status, domain, created_after/before) to the combined list.
+	filtered := combined[:0:0]
+	for _, job := range combined {
+		if filter.Status != "" && job.Status != filter.Status {
+			continue
+		}
+		if filter.Domain != "" && !strings.Contains(job.Domain, filter.Domain) {
+			continue
+		}
+		if !filter.CreatedAfter.IsZero() && !job.CreatedAt.After(filter.CreatedAfter) {
+			continue
+		}
+		if !filter.CreatedBefore.IsZero() && job.CreatedAt.After(filter.CreatedBefore) {
+			continue
+		}
+		filtered = append(filtered, job)
+	}
+
+	// Sort filtered list.
+	sort.Slice(filtered, func(i, j int) bool {
+		a, b := filtered[i], filtered[j]
+		switch filter.Sort {
+		case JobSortCreatedAtAsc:
+			return a.CreatedAt.Before(b.CreatedAt)
+		case JobSortStartedAtDesc:
+			return a.StartedAt.After(b.StartedAt)
+		case JobSortStartedAtAsc:
+			return a.StartedAt.Before(b.StartedAt)
+		case JobSortDomainAsc:
+			return a.Domain < b.Domain
+		case JobSortDomainDesc:
+			return a.Domain > b.Domain
+		default: // created_at_desc
+			return a.CreatedAt.After(b.CreatedAt)
+		}
+	})
+
+	// Apply pagination to filtered list.
+	total := len(filtered)
+	offset := filter.Offset
+	if offset < 0 {
+		offset = 0
+	}
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = 100
+	}
+	start := offset
+	if start > total {
+		start = total
+	}
+	end := start + limit
+	if end > total {
+		end = total
+	}
+	pageItems := filtered[start:end]
+
+	var nextCursor, prevCursor string
+	if end < total {
+		nextCursor = strconv.Itoa(end)
+	}
+	if start > 0 {
+		prev := start - limit
+		if prev < 0 {
+			prev = 0
+		}
+		prevCursor = strconv.Itoa(prev)
+	}
+
 	summary := BatchSummary{
 		BatchID:      batchID,
-		Total:        list.Total,
+		Total:        total,
 		StatusCounts: statusCounts,
-		Items:        list.Items,
-		Limit:        list.Limit,
-		Offset:       list.Offset,
-		NextCursor:   list.NextCursor,
-		PrevCursor:   list.PrevCursor,
-		Sort:         list.Sort,
+		Items:        pageItems,
+		Limit:        limit,
+		Offset:       offset,
+		Sort:         string(filter.Sort),
+		NextCursor:   nextCursor,
+		PrevCursor:   prevCursor,
 		CreatedAt:    createdAt,
 		StartedAt:    startedAt,
 		FinishedAt:   finishedAt,
@@ -247,6 +368,10 @@ func (s *Server) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_undelegated", err.Error(), nil)
 		return
 	}
+	tagNames, ok := validateTags(w, s, req.Tags)
+	if !ok {
+		return
+	}
 
 	job := Job{
 		ID:            newID("job"),
@@ -268,7 +393,37 @@ func (s *Server) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 	_ = s.queue.Enqueue(created.ID)
 	s.metrics.ObserveJobSubmittedWithContext(created.BatchID, created.Domain, JobQueued)
 
+	if len(tagNames) > 0 {
+		d, err := s.store.GetOrCreateDomain(domain)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
+			return
+		}
+		for _, tagName := range tagNames {
+			_ = s.store.TagDomains(tagName, []int64{d.ID})
+		}
+	}
+
 	writeJSON(w, http.StatusCreated, created)
+}
+
+// validateTags checks that all requested tag names exist in the store.
+// Returns the deduplicated list of non-empty tag names, or writes a 400 and
+// returns false if any tag is unknown.
+func validateTags(w http.ResponseWriter, s *Server, tags []string) ([]string, bool) {
+	var names []string
+	for _, t := range tags {
+		t = strings.TrimSpace(t)
+		if t == "" {
+			continue
+		}
+		if _, ok := s.store.GetTag(t); !ok {
+			writeError(w, http.StatusBadRequest, "tag_not_found", "tag not found: "+t, nil)
+			return nil, false
+		}
+		names = append(names, t)
+	}
+	return names, true
 }
 
 func normalizeUndelegatedInputs(nameservers []UndelegatedNameserverInput, dsInfo []UndelegatedDSInput) ([]engine.UndelegatedNameserver, []engine.UndelegatedDSInfo, error) {
@@ -303,7 +458,77 @@ func (s *Server) handleListJobs(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, code, message, nil)
 		return
 	}
-	writeJSON(w, http.StatusOK, s.store.List(filter))
+
+	// Determine which sources to query based on the status filter.
+	// In-flight jobs (queued/running/paused) live in the jobs table.
+	// Graduated jobs (succeeded/failed/canceled/expired) live in the runs table.
+	isActiveOnly := filter.Status == JobQueued || filter.Status == JobRunning || filter.Status == JobPaused
+	isTerminalOnly := !isActiveOnly && filter.Status != ""
+
+	var allItems []Job
+
+	if !isTerminalOnly {
+		inFlightFilter := filter
+		inFlightFilter.Limit = 10000
+		inFlightFilter.Offset = 0
+		allItems = append(allItems, s.store.List(inFlightFilter).Items...)
+	}
+
+	if !isActiveOnly {
+		runFilter := RunFilter{
+			Domain:  filter.Domain,
+			BatchID: filter.BatchID,
+			Limit:   10000,
+			Offset:  0,
+		}
+		if isTerminalOnly {
+			runFilter.Status = filter.Status
+		}
+		for _, run := range s.store.ListRuns(runFilter).Items {
+			allItems = append(allItems, jobFromRun(run))
+		}
+	}
+
+	sortJobSlice(allItems, filter.Sort)
+
+	total := len(allItems)
+	offset := filter.Offset
+	if offset < 0 {
+		offset = 0
+	}
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = 100
+	}
+	start := offset
+	if start > total {
+		start = total
+	}
+	end := start + limit
+	if end > total {
+		end = total
+	}
+	pageItems := make([]Job, end-start)
+	copy(pageItems, allItems[start:end])
+
+	list := JobList{
+		Items:  pageItems,
+		Total:  total,
+		Limit:  limit,
+		Offset: offset,
+		Sort:   string(normalizeJobSort(filter.Sort)),
+	}
+	if start > 0 {
+		prevOffset := start - limit
+		if prevOffset < 0 {
+			prevOffset = 0
+		}
+		list.PrevCursor = strconv.Itoa(prevOffset)
+	}
+	if end < total {
+		list.NextCursor = strconv.Itoa(end)
+	}
+	writeJSON(w, http.StatusOK, list)
 }
 
 func parseListFilter(r *http.Request, defaultLimit int) (JobFilter, string, string) {
@@ -430,33 +655,29 @@ func (s *Server) handleCancelJob(w http.ResponseWriter, _ *http.Request, jobID s
 		writeError(w, http.StatusNotFound, "not_found", "job not found", nil)
 		return
 	}
+	fromStatus := job.Status
 	if job.Status == JobRunning {
+		// Just cancel the context; the worker goroutine handles graduation.
 		_ = s.cancelJob(jobID)
 	}
 	if job.Status == JobQueued {
 		_ = s.queue.Remove(jobID)
-	}
-	job.Status = JobCanceled
-	job.Error = "canceled"
-	job.FinishedAt = time.Now().UTC()
-	job.Progress = 100
-	_, _, becameTerminal, err := s.updateJobWithMetricsTransition(job)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
-		return
-	}
-	_ = s.store.SetResult(job.ID, JobResult{
-		JobID:   job.ID,
-		BatchID: job.BatchID,
-		Status:  JobCanceled,
-		Summary: map[string]any{"error": "canceled"},
-	})
-	if becameTerminal {
-		duration := time.Duration(-1)
-		if !job.StartedAt.IsZero() && !job.FinishedAt.IsZero() {
-			duration = job.FinishedAt.Sub(job.StartedAt)
+		job.Status = JobCanceled
+		job.Error = "canceled"
+		job.FinishedAt = time.Now().UTC()
+		job.Progress = 100
+		if err := s.store.GraduateJob(job, nil); err != nil {
+			writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
+			return
 		}
-		s.metrics.ObserveJobCompletionWithContext(job.BatchID, job.Domain, job.Status, duration, zeroMetricsSeverityTotals())
+		s.metrics.ObserveJobStatusTransition(fromStatus, job.Status)
+		if !isTerminalMetricsStatus(fromStatus) && isTerminalMetricsStatus(job.Status) {
+			duration := time.Duration(-1)
+			if !job.StartedAt.IsZero() && !job.FinishedAt.IsZero() {
+				duration = job.FinishedAt.Sub(job.StartedAt)
+			}
+			s.metrics.ObserveJobCompletionWithContext(job.BatchID, job.Domain, job.Status, duration, zeroMetricsSeverityTotals())
+		}
 	}
 	writeJSON(w, http.StatusOK, job)
 }
@@ -563,22 +784,17 @@ func (s *Server) handleQueueRemove(w http.ResponseWriter, r *http.Request) {
 		}
 		if job, ok := s.store.Get(jobID); ok {
 			if job.Status == JobQueued {
+				fromStatus := job.Status
 				job.Status = JobCanceled
 				job.Error = "removed_from_queue"
 				job.FinishedAt = time.Now().UTC()
 				job.Progress = 100
-				_, _, becameTerminal, err := s.updateJobWithMetricsTransition(job)
-				if err != nil {
+				if err := s.store.GraduateJob(job, nil); err != nil {
 					writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
 					return
 				}
-				_ = s.store.SetResult(job.ID, JobResult{
-					JobID:   job.ID,
-					BatchID: job.BatchID,
-					Status:  JobCanceled,
-					Summary: map[string]any{"error": "removed_from_queue"},
-				})
-				if becameTerminal {
+				s.metrics.ObserveJobStatusTransition(fromStatus, job.Status)
+				if !isTerminalMetricsStatus(fromStatus) && isTerminalMetricsStatus(job.Status) {
 					duration := time.Duration(-1)
 					if !job.StartedAt.IsZero() && !job.FinishedAt.IsZero() {
 						duration = job.FinishedAt.Sub(job.StartedAt)

@@ -107,6 +107,7 @@ func serveIndex(fsys fs.FS, w http.ResponseWriter, r *http.Request) {
 	if info, err := fs.Stat(fsys, "index.html"); err == nil {
 		modTime = info.ModTime()
 	}
+	w.Header().Set("Cache-Control", "no-cache")
 	http.ServeContent(w, r, "index.html", modTime, bytes.NewReader(data))
 }
 

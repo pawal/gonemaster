@@ -148,10 +148,10 @@
                 </div>
               </details>
             {:else}
-              {#each tcEntries as entry}
+              {#each tcEntries.filter(e => e.message && e.message !== e.raw) as entry}
                 <div class="result-row" data-testid="result-row">
                   <span class="level-pill {levelClass(entry.level)}">{entry.level}</span>
-                  <span class="result-message">{entry.message ?? entry.raw ?? ""}</span>
+                  <span class="result-message">{entry.message}</span>
                 </div>
               {/each}
             {/if}

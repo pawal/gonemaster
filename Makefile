@@ -205,38 +205,38 @@ race:
 	$(GO) test -race ./...
 
 spec-export-implemented:
-	$(GO) run ./tools/specifications/export-implemented > docs/specifications/implemented-testcases.json
+	GOOS= GOARCH= $(GO) run ./tools/specifications/export-implemented > docs/specifications/implemented-testcases.json
 
 spec-export-tags:
-	$(GO) run ./tools/specifications/export-tags > docs/specifications/possible-tags-by-testcase.json
+	GOOS= GOARCH= $(GO) run ./tools/specifications/export-tags > docs/specifications/possible-tags-by-testcase.json
 
 spec-export: spec-export-implemented spec-export-tags
 
 spec-export-log-args:
-	$(GO) run ./tools/specifications/export-log-args > docs/specifications/log-args-inventory.json
+	GOOS= GOARCH= $(GO) run ./tools/specifications/export-log-args > docs/specifications/log-args-inventory.json
 
 spec-validate:
-	$(GO) run ./tools/specifications/validate
+	GOOS= GOARCH= $(GO) run ./tools/specifications/validate
 
 spec-validate-scan:
-	$(GO) run ./tools/specifications/validate --scan-append-log
+	GOOS= GOARCH= $(GO) run ./tools/specifications/validate --scan-append-log
 
 spec-generate-tags:
-	$(GO) run ./tools/specifications/generate-tag-catalog
+	GOOS= GOARCH= $(GO) run ./tools/specifications/generate-tag-catalog
 
 spec-check-tags:
-	$(GO) run ./tools/specifications/generate-tag-catalog --check
+	GOOS= GOARCH= $(GO) run ./tools/specifications/generate-tag-catalog --check
 
 spec-check-coherency:
-	$(GO) run ./tools/specifications/export-log-args --check-coherency --markdown-out '' >/dev/null
+	GOOS= GOARCH= $(GO) run ./tools/specifications/export-log-args --check-coherency --markdown-out '' >/dev/null
 
 spec-check-i18n-placeholders:
-	$(GO) run ./tools/i18n/check-placeholders
+	GOOS= GOARCH= $(GO) run ./tools/i18n/check-placeholders
 
 spec-check: spec-validate spec-check-tags spec-check-coherency spec-check-i18n-placeholders
 
 badkeys-update:
-	$(GO) run ./tools/badkeys-update --output share/badkeys
+	GOOS= GOARCH= $(GO) run ./tools/badkeys-update --output share/badkeys
 
 badkeys-update-embed: badkeys-update
 	gzip -9 -k -f share/badkeys/blocklist.dat
@@ -248,7 +248,7 @@ man: $(MAN_OUT)
 
 man/man1/%: docs/man/%.md
 	@mkdir -p man/man1
-	$(GO) run github.com/cpuguy83/go-md2man/v2@latest -in $< -out $@
+	GOOS= GOARCH= $(GO) run github.com/cpuguy83/go-md2man/v2@latest -in $< -out $@
 
 clean-man:
 	@rm -rf man

@@ -387,6 +387,75 @@ ORDER BY failing DESC;
 
 ---
 
+## Example: Querying args_json on PostgreSQL
+
+The `entries.args_json` column is stored as `jsonb` on PostgreSQL with a GIN index,
+making it efficient to search inside log entry arguments without full-table scans.
+
+### Find all entries mentioning a specific IP address
+
+Single-server entries store the address at the top level (`{"address": "..."}`);
+multi-server entries store it inside a `servers` array
+(`{"servers": [{"ns": "...", "address": "..."}, ...]}`).
+
+```sql
+-- Top-level address field (e.g. N11_NO_EDNS, N01_NO_RESPONSE, ...)
+SELECT d.name, e.module, e.testcase, e.tag, e.level,
+       e.args_json->>'address' AS address
+FROM entries e
+JOIN domains d ON d.id = e.domain_id
+WHERE e.args_json @> '{"address": "192.0.2.1"}'
+ORDER BY d.name;
+
+-- Address inside the servers array (e.g. DELEGATION01, CONNECTIVITY03, ...)
+SELECT d.name, e.module, e.testcase, e.tag, e.level, srv->>'ns' AS ns
+FROM entries e
+JOIN domains d ON d.id = e.domain_id,
+     jsonb_array_elements(e.args_json->'servers') AS srv
+WHERE srv @> '{"address": "192.0.2.1"}'
+ORDER BY d.name;
+```
+
+### Find all entries involving a specific nameserver
+
+```sql
+-- Top-level ns field
+SELECT d.name, e.module, e.testcase, e.tag, e.level
+FROM entries e
+JOIN domains d ON d.id = e.domain_id
+WHERE e.args_json @> '{"ns": "ns1.example.com"}'
+ORDER BY d.name;
+
+-- ns inside the servers array
+SELECT d.name, e.module, e.testcase, e.tag, e.level,
+       srv->>'address' AS address
+FROM entries e
+JOIN domains d ON d.id = e.domain_id,
+     jsonb_array_elements(e.args_json->'servers') AS srv
+WHERE srv @> '{"ns": "ns1.example.com"}'
+ORDER BY d.name;
+```
+
+### Find which domains use a nameserver IP across a tag
+
+Useful for impact analysis — e.g. finding all TLDs served by a given anycast address:
+
+```sql
+SELECT DISTINCT d.name
+FROM entries e
+JOIN domains d ON d.id = e.domain_id
+JOIN domain_tags dt ON dt.domain_id = d.id AND dt.tag = 'tld'
+JOIN runs r ON r.id = e.run_id AND r.id = d.latest_run_id
+WHERE e.args_json @> '{"address": "192.0.2.1"}'
+   OR EXISTS (
+     SELECT 1 FROM jsonb_array_elements(e.args_json->'servers') s
+     WHERE s @> '{"address": "192.0.2.1"}'
+   )
+ORDER BY d.name;
+```
+
+---
+
 ## Example: CSV export for spreadsheet or pandas analysis
 
 **Via the client (recommended):**

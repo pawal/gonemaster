@@ -290,6 +290,9 @@ server {
     listen 443 ssl;
     server_name dns.example.com;
 
+    # HSTS — set at the proxy since the app may also serve plain HTTP internally
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
     location /public/ {
         proxy_pass http://127.0.0.1:8080/public/;
         proxy_set_header Host $host;
@@ -306,10 +309,18 @@ server {
 }
 ```
 
+All other security headers (`X-Content-Type-Options`, `X-Frame-Options`,
+`Content-Security-Policy`, `Referrer-Policy`, `Permissions-Policy`) are set
+by the application on every response. Only `Strict-Transport-Security` belongs
+at the proxy layer, since the app may also be reached over plain HTTP internally.
+
 #### Caddy
 
 ```caddyfile
 dns.example.com {
+    # Caddy adds HSTS automatically when it manages TLS.
+    # If terminating TLS elsewhere, add it explicitly:
+    # header Strict-Transport-Security "max-age=31536000; includeSubDomains"
     reverse_proxy /public/* localhost:8080
     reverse_proxy /pub/api/v1/* localhost:8080
 }

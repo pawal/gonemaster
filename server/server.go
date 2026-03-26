@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -106,9 +107,30 @@ func newServer(cfg Config, store JobStore, queue Queue) *Server {
 // Handler returns the root HTTP handler.
 func (s *Server) Handler() http.Handler {
 	if s.cfg.Debug {
-		return debugMiddleware(s.mux)
+		return securityHeadersMiddleware(debugMiddleware(s.mux))
 	}
-	return s.mux
+	return securityHeadersMiddleware(s.mux)
+}
+
+// securityHeadersMiddleware sets defensive HTTP security headers on every
+// response. API paths get a restrictive CSP; UI/static paths get one that
+// allows same-origin scripts, styles, and data URIs.
+func securityHeadersMiddleware(next http.Handler) http.Handler {
+	const apiCSP = "default-src 'none'"
+	const uiCSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'"
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("X-Frame-Options", "DENY")
+		h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		h.Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+		if strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/pub/api/") {
+			h.Set("Content-Security-Policy", apiCSP)
+		} else {
+			h.Set("Content-Security-Policy", uiCSP)
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) routes() {

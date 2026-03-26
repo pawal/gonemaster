@@ -2,6 +2,13 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [Unreleased]
+
+### Added
+ - Server: security headers middleware sets `X-Content-Type-Options`, `X-Frame-Options`, `Content-Security-Policy`, `Referrer-Policy`, and `Permissions-Policy` on all responses
+
+### Changed
+
 ## [v1.2.0] - 2026-03-26
 
 **Major changes:**

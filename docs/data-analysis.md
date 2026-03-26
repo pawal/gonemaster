@@ -506,3 +506,11 @@ location /pub/      { proxy_pass http://gonemaster-public/pub/; }
 # Block admin API from the internet
 location /api/      { return 403; }
 ```
+
+Add HSTS at the proxy layer for any publicly exposed instance:
+
+```nginx
+add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+```
+
+All other security headers are set by the application itself. See [server.md](server.md#reverse-proxy-setup) for full reverse proxy examples.

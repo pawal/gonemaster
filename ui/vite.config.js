@@ -9,7 +9,8 @@ export default defineConfig({
   },
   build: {
     outDir: "../server/ui/dist",
-    emptyOutDir: true
+    emptyOutDir: true,
+    modulePreload: { polyfill: false }
   },
   test: {
     environment: "jsdom",

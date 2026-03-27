@@ -53,7 +53,8 @@ header {
 .header-text {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
+  min-width: 0;
 }
 
 .header-controls {
@@ -92,16 +93,22 @@ header {
   color: var(--ink);
 }
 
-h1 {
-  font-size: clamp(2.1rem, 3vw, 3rem);
-  letter-spacing: -0.02em;
+.brand-mark {
   margin: 0;
+  line-height: 0;
+}
+
+.brand-logo {
+  display: block;
+  width: min(100%, 420px);
+  height: auto;
 }
 
 .subtitle {
   color: var(--muted);
   max-width: 680px;
   line-height: 1.5;
+  margin: 0;
 }
 
 .grid {
@@ -1096,6 +1103,20 @@ button:hover:not(:disabled) {
 @media (max-width: 720px) {
   main {
     padding: 32px 16px 60px;
+  }
+
+  header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .header-controls {
+    margin-top: 0;
+    align-self: flex-start;
+  }
+
+  .brand-logo {
+    width: min(100%, 340px);
   }
 
   .status-toast {

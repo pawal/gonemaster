@@ -44,7 +44,7 @@ describe("App", () => {
 
     const { container, unmount } = render(App);
 
-    expect(await screen.findByText("Gonemaster")).toBeInTheDocument();
+    expect(screen.getByAltText("gonemaster")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Single Job" })).toBeInTheDocument();
     expect(screen.getByRole("tablist", { name: "Job views" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Single Job" })).toBeInTheDocument();

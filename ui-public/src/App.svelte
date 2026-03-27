@@ -8,6 +8,8 @@
   import Results from "./lib/Results.svelte";
   import ExpiredResult from "./lib/ExpiredResult.svelte";
 
+  const logoSrc = `${import.meta.env.BASE_URL}gonemaster.svg`;
+
   // ── Phase ───────────────────────────────────────────────────────────────────
   // "idle"    — form shown, no results
   // "running" — form disabled, Progress shown below
@@ -153,7 +155,9 @@
 <main>
   <header>
     <div class="header-text">
-      <h1>{$t("pub.app_title")}</h1>
+      <h1 class="brand-mark">
+        <img class="brand-logo" src={logoSrc} alt="gonemaster" />
+      </h1>
       <p class="subtitle">{$t("pub.app_subtitle")}</p>
     </div>
     <div class="header-controls">

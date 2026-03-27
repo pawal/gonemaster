@@ -138,9 +138,9 @@ describe("App", () => {
 
   // ── Header ──────────────────────────────────────────────────────────────────
 
-  it("renders the app title", () => {
+  it("renders the app logo", () => {
     render(App);
-    expect(screen.getByText("Gonemaster")).toBeTruthy();
+    expect(screen.getByAltText("gonemaster")).toBeTruthy();
   });
 
   it("renders the locale selector when multiple locales are available", async () => {

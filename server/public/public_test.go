@@ -100,6 +100,76 @@ func TestHandlerServesAssetsWithCacheControl(t *testing.T) {
 	}
 }
 
+func TestHandlerServesFaviconFilesAndManifest(t *testing.T) {
+	fsys, err := dist()
+	if err != nil {
+		t.Fatalf("dist(): %v", err)
+	}
+	if _, err := fs.Stat(fsys, "site.webmanifest"); err != nil {
+		t.Skip("favicon assets are not embedded; run make ui-build")
+	}
+
+	requiredFiles := []string{
+		"favicon.svg",
+		"favicon-16x16.png",
+		"favicon-32x32.png",
+		"apple-touch-icon.png",
+		"android-chrome-192x192.png",
+		"android-chrome-512x512.png",
+		"site.webmanifest",
+	}
+
+	h := Handler()
+	for _, name := range requiredFiles {
+		if _, err := fs.Stat(fsys, name); err != nil {
+			t.Fatalf("expected embedded file %q: %v", name, err)
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/"+name, nil)
+		rr := httptest.NewRecorder()
+		h.ServeHTTP(rr, req)
+
+		if rr.Code != http.StatusOK {
+			t.Fatalf("GET /%s status = %d, want %d", name, rr.Code, http.StatusOK)
+		}
+		if rr.Body.Len() == 0 {
+			t.Fatalf("GET /%s returned an empty body", name)
+		}
+	}
+}
+
+func TestHandlerIndexIncludesFaviconLinks(t *testing.T) {
+	fsys, err := dist()
+	if err != nil {
+		t.Fatalf("dist(): %v", err)
+	}
+	if _, err := fs.Stat(fsys, "site.webmanifest"); err != nil {
+		t.Skip("favicon assets are not embedded; run make ui-build")
+	}
+
+	h := Handler()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
+	}
+
+	body := rr.Body.String()
+	for _, snippet := range []string{
+		`href="/public/favicon.svg"`,
+		`href="/public/favicon-32x32.png"`,
+		`href="/public/favicon-16x16.png"`,
+		`href="/public/apple-touch-icon.png"`,
+		`href="/public/site.webmanifest"`,
+	} {
+		if !strings.Contains(body, snippet) {
+			t.Fatalf("index.html missing %q", snippet)
+		}
+	}
+}
+
 func TestServeIndexFallsBackToUnavailablePageWhenIndexMissing(t *testing.T) {
 	fsys := fstest.MapFS{
 		"placeholder.txt": &fstest.MapFile{Data: []byte("placeholder")},

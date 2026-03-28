@@ -415,6 +415,46 @@ func TestReorderWithinTierPreservesOtherTier(t *testing.T) {
 	}
 }
 
+// TestQueueNormalAlwaysBeforeBatch verifies that all normal-priority jobs are
+// dequeued before any batch-priority job, regardless of enqueue order.
+func TestQueueNormalAlwaysBeforeBatch(t *testing.T) {
+	q := NewInMemoryQueue()
+	defer func() { _ = q.Close() }()
+
+	// Interleave batch and normal enqueues.
+	_ = q.Enqueue("b0", PriorityBatch)
+	_ = q.Enqueue("n0", PriorityNormal)
+	_ = q.Enqueue("b1", PriorityBatch)
+	_ = q.Enqueue("n1", PriorityNormal)
+	_ = q.Enqueue("b2", PriorityBatch)
+	_ = q.Enqueue("n2", PriorityNormal)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	// All three normal jobs must come out first in FIFO order.
+	for _, want := range []string{"n0", "n1", "n2"} {
+		id, err := q.Dequeue(ctx)
+		if err != nil {
+			t.Fatalf("dequeue: %v", err)
+		}
+		if id != want {
+			t.Fatalf("expected %s (normal tier), got %s", want, id)
+		}
+	}
+
+	// Then all three batch jobs in FIFO order.
+	for _, want := range []string{"b0", "b1", "b2"} {
+		id, err := q.Dequeue(ctx)
+		if err != nil {
+			t.Fatalf("dequeue: %v", err)
+		}
+		if id != want {
+			t.Fatalf("expected %s (batch tier), got %s", want, id)
+		}
+	}
+}
+
 func TestInMemoryQueueNormalBeforesBatch(t *testing.T) {
 	q := NewInMemoryQueue()
 	defer func() { _ = q.Close() }()

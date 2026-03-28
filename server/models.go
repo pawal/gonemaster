@@ -25,6 +25,15 @@ func GeneratePublicID() string {
 	return string(b)
 }
 
+// JobPriority controls queue ordering. Normal jobs are always dequeued before
+// batch jobs. Within each tier, FIFO order is preserved.
+type JobPriority int
+
+const (
+	PriorityNormal JobPriority = 0 // interactive: single-domain submit
+	PriorityBatch  JobPriority = 1 // background: batch / tag sweep
+)
+
 // JobStatus describes the current state of a job.
 type JobStatus string
 

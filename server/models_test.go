@@ -72,6 +72,25 @@ func TestJobPublicIDOmittedWhenEmpty(t *testing.T) {
 	}
 }
 
+func TestJobPriorityValues(t *testing.T) {
+	if PriorityNormal != 0 {
+		t.Fatalf("PriorityNormal = %d, want 0", PriorityNormal)
+	}
+	if PriorityBatch != 1 {
+		t.Fatalf("PriorityBatch = %d, want 1", PriorityBatch)
+	}
+	if PriorityNormal >= PriorityBatch {
+		t.Fatal("PriorityNormal must be less than PriorityBatch so normal jobs are dequeued first")
+	}
+}
+
+func TestJobPriorityIsInt(t *testing.T) {
+	var p JobPriority = PriorityNormal
+	if int(p) != 0 {
+		t.Fatalf("int(PriorityNormal) = %d, want 0", int(p))
+	}
+}
+
 func TestJobPublicIDRoundTrip(t *testing.T) {
 	j := Job{ID: "abc", PublicID: "x1y2z3w4", Domain: "example.com", Status: JobQueued}
 	b, err := json.Marshal(j)

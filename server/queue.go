@@ -8,7 +8,7 @@ import (
 
 // Queue holds queued job ids.
 type Queue interface {
-	Enqueue(jobID string) error
+	Enqueue(jobID string, priority JobPriority) error
 	Dequeue(ctx context.Context) (string, error)
 	Remove(jobID string) error
 	Pause() error
@@ -37,7 +37,7 @@ func NewInMemoryQueue() *InMemoryQueue {
 }
 
 // Enqueue adds a job id to the tail of the queue.
-func (q *InMemoryQueue) Enqueue(jobID string) error {
+func (q *InMemoryQueue) Enqueue(jobID string, priority JobPriority) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	if q.closed {

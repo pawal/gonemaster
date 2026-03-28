@@ -864,7 +864,7 @@ func TestQueueRemove(t *testing.T) {
 	if _, err := srv.store.Create(job); err != nil {
 		t.Fatalf("create job: %v", err)
 	}
-	if err := srv.queue.Enqueue(job.ID); err != nil {
+	if err := srv.queue.Enqueue(job.ID, PriorityNormal); err != nil {
 		t.Fatalf("enqueue: %v", err)
 	}
 

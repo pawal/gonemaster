@@ -12,7 +12,7 @@ import (
 
 func TestInMemoryQueueEnqueueDequeue(t *testing.T) {
 	q := NewInMemoryQueue()
-	if err := q.Enqueue("job1"); err != nil {
+	if err := q.Enqueue("job1", PriorityNormal); err != nil {
 		t.Fatalf("enqueue: %v", err)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -31,7 +31,7 @@ func TestInMemoryQueuePauseResume(t *testing.T) {
 	if err := q.Pause(); err != nil {
 		t.Fatalf("pause: %v", err)
 	}
-	if err := q.Enqueue("job1"); err != nil {
+	if err := q.Enqueue("job1", PriorityNormal); err != nil {
 		t.Fatalf("enqueue: %v", err)
 	}
 
@@ -59,8 +59,8 @@ func TestInMemoryQueuePauseResume(t *testing.T) {
 
 func TestInMemoryQueueReorder(t *testing.T) {
 	q := NewInMemoryQueue()
-	_ = q.Enqueue("job1")
-	_ = q.Enqueue("job2")
+	_ = q.Enqueue("job1", PriorityNormal)
+	_ = q.Enqueue("job2", PriorityNormal)
 
 	if err := q.Reorder([]string{"job2", "job1"}); err != nil {
 		t.Fatalf("reorder: %v", err)
@@ -78,8 +78,8 @@ func TestInMemoryQueueReorder(t *testing.T) {
 
 func TestInMemoryQueueRemove(t *testing.T) {
 	q := NewInMemoryQueue()
-	_ = q.Enqueue("job1")
-	_ = q.Enqueue("job2")
+	_ = q.Enqueue("job1", PriorityNormal)
+	_ = q.Enqueue("job2", PriorityNormal)
 
 	if err := q.Remove("job1"); err != nil {
 		t.Fatalf("remove: %v", err)
@@ -103,7 +103,7 @@ func TestInMemoryQueueClose(t *testing.T) {
 	if err := q.Close(); err != nil {
 		t.Fatalf("close: %v", err)
 	}
-	if err := q.Enqueue("job1"); err == nil {
+	if err := q.Enqueue("job1", PriorityNormal); err == nil {
 		t.Fatalf("expected enqueue to fail after close")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -161,7 +161,7 @@ func TestInMemoryQueueManyBlockedDequeuers(t *testing.T) {
 	for i := 0; i < jobs; i++ {
 		jobID := fmt.Sprintf("job-%03d", i)
 		expected[jobID] = true
-		if err := q.Enqueue(jobID); err != nil {
+		if err := q.Enqueue(jobID, PriorityNormal); err != nil {
 			t.Fatalf("enqueue %s: %v", jobID, err)
 		}
 	}
@@ -251,7 +251,7 @@ func TestInMemoryQueueBurstEnqueueDequeueConcurrent(t *testing.T) {
 			defer producerWG.Done()
 			for i := 0; i < perProducerJobs; i++ {
 				jobID := fmt.Sprintf("p%02d-job-%03d", producerID, i)
-				if err := q.Enqueue(jobID); err != nil {
+				if err := q.Enqueue(jobID, PriorityNormal); err != nil {
 					select {
 					case errs <- err:
 					default:
@@ -334,7 +334,7 @@ func TestInMemoryQueuePauseResumeUnderLoad(t *testing.T) {
 	for i := 0; i < jobs; i++ {
 		jobID := fmt.Sprintf("job-%03d", i)
 		expected[jobID] = true
-		if err := q.Enqueue(jobID); err != nil {
+		if err := q.Enqueue(jobID, PriorityNormal); err != nil {
 			t.Fatalf("enqueue %s: %v", jobID, err)
 		}
 	}
@@ -376,4 +376,18 @@ func TestInMemoryQueuePauseResumeUnderLoad(t *testing.T) {
 
 func isQueueClosedError(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "queue closed")
+}
+
+func TestQueueInterfaceEnqueueAcceptsPriority(t *testing.T) {
+	// Verify that the Queue interface accepts a JobPriority argument and that
+	// both priority values are accepted without error.
+	var q Queue = NewInMemoryQueue()
+	defer func() { _ = q.Close() }()
+
+	if err := q.Enqueue("n1", PriorityNormal); err != nil {
+		t.Fatalf("Enqueue PriorityNormal: %v", err)
+	}
+	if err := q.Enqueue("b1", PriorityBatch); err != nil {
+		t.Fatalf("Enqueue PriorityBatch: %v", err)
+	}
 }

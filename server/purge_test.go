@@ -59,9 +59,9 @@ func TestStartPurgeLoopPurgesOldJobs(t *testing.T) {
 		t.Fatalf("graduate: %v", err)
 	}
 
-	var logged []string
+	logCh := make(chan string, 10)
 	logger := func(format string, args ...any) {
-		logged = append(logged, fmt.Sprintf(format, args...))
+		logCh <- fmt.Sprintf(format, args...)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -69,19 +69,18 @@ func TestStartPurgeLoopPurgesOldJobs(t *testing.T) {
 
 	startPurgeLoopWithInterval(ctx, store, cutoffAge, logger, 10*time.Millisecond)
 
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		if store.ListRuns(RunFilter{Limit: 1}).Total == 0 {
-			break
-		}
-		time.Sleep(5 * time.Millisecond)
+	var msg string
+	select {
+	case msg = <-logCh:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for purge log message")
 	}
 
 	if store.ListRuns(RunFilter{Limit: 1}).Total != 0 {
 		t.Fatal("expected run to be purged by loop")
 	}
-	if len(logged) == 0 || !strings.Contains(logged[0], "purged 1 jobs") {
-		t.Fatalf("expected purge log message, got %v", logged)
+	if !strings.Contains(msg, "purged 1 jobs") {
+		t.Fatalf("expected purge log message, got %q", msg)
 	}
 }
 

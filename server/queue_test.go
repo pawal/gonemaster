@@ -378,6 +378,43 @@ func isQueueClosedError(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "queue closed")
 }
 
+func TestReorderRejectsCrossTier(t *testing.T) {
+	q := NewInMemoryQueue()
+	_ = q.Enqueue("n1", PriorityNormal)
+	_ = q.Enqueue("b1", PriorityBatch)
+
+	// Putting a batch job before a normal job must be rejected.
+	if err := q.Reorder([]string{"b1", "n1"}); err == nil {
+		t.Fatal("expected error when placing batch job before normal job")
+	}
+}
+
+func TestReorderWithinTierPreservesOtherTier(t *testing.T) {
+	q := NewInMemoryQueue()
+	_ = q.Enqueue("n1", PriorityNormal)
+	_ = q.Enqueue("n2", PriorityNormal)
+	_ = q.Enqueue("b1", PriorityBatch)
+	_ = q.Enqueue("b2", PriorityBatch)
+
+	// Reorder within each tier: normals reversed, batches reversed.
+	if err := q.Reorder([]string{"n2", "n1", "b2", "b1"}); err != nil {
+		t.Fatalf("reorder: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	for _, want := range []string{"n2", "n1", "b2", "b1"} {
+		id, err := q.Dequeue(ctx)
+		if err != nil {
+			t.Fatalf("dequeue: %v", err)
+		}
+		if id != want {
+			t.Fatalf("expected %s, got %s", want, id)
+		}
+	}
+}
+
 func TestInMemoryQueueNormalBeforesBatch(t *testing.T) {
 	q := NewInMemoryQueue()
 	defer func() { _ = q.Close() }()

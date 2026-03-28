@@ -172,9 +172,16 @@ func (q *InMemoryQueue) Reorder(jobIDs []string) error {
 	for _, id := range q.batch {
 		tierOf[id] = PriorityBatch
 	}
+	seenBatch := false
 	for _, id := range jobIDs {
-		if _, ok := tierOf[id]; !ok {
+		tier, ok := tierOf[id]
+		if !ok {
 			return errors.New("job id not in queue")
+		}
+		if tier == PriorityBatch {
+			seenBatch = true
+		} else if seenBatch {
+			return errors.New("cannot place a normal job after a batch job")
 		}
 	}
 	var newNormal, newBatch []string

@@ -141,6 +141,7 @@ var sqlMigrations = []sqlMigration{
 	{
 		version: 1,
 		stmtsFn: func(d sqlDialect) []string {
+
 			switch d.(type) {
 			case postgresDialect:
 				return buildV1DDL("BIGSERIAL PRIMARY KEY", "BIGINT")
@@ -149,6 +150,13 @@ var sqlMigrations = []sqlMigration{
 			default: // sqlite
 				return buildV1DDL("INTEGER PRIMARY KEY", "INTEGER")
 			}
+		},
+	},
+	{
+		version: 2,
+		stmts: []string{
+			`ALTER TABLE jobs ADD COLUMN priority INTEGER NOT NULL DEFAULT 0`,
+			`ALTER TABLE runs ADD COLUMN priority INTEGER NOT NULL DEFAULT 0`,
 		},
 	},
 }

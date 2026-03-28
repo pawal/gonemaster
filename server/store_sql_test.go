@@ -270,8 +270,8 @@ func TestRunMigrationsRecordsVersion(t *testing.T) {
 		}
 		versions = append(versions, v)
 	}
-	if len(versions) != 1 || versions[0] != 1 {
-		t.Fatalf("expected versions [1], got %v", versions)
+	if len(versions) != 2 || versions[0] != 1 || versions[1] != 2 {
+		t.Fatalf("expected versions [1 2], got %v", versions)
 	}
 }
 
@@ -2130,6 +2130,54 @@ func TestSQLJobStoreQueryEntries(t *testing.T) {
 					t.Fatal("expected NextCursor to be set")
 				}
 			})
+		})
+	}
+}
+
+func TestSQLJobStorePriorityPersistedOnJob(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			now := time.Now().UTC().Truncate(time.Microsecond)
+
+			job := Job{ID: "pj1", Domain: "example.com", Status: JobQueued, CreatedAt: now, Priority: PriorityBatch}
+			if _, err := s.Create(job); err != nil {
+				t.Fatalf("Create: %v", err)
+			}
+			got, ok := s.Get(job.ID)
+			if !ok {
+				t.Fatal("Get: not found")
+			}
+			if got.Priority != PriorityBatch {
+				t.Fatalf("Priority: got %d, want %d", got.Priority, PriorityBatch)
+			}
+		})
+	}
+}
+
+func TestSQLJobStorePriorityPersistedOnRun(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			now := time.Now().UTC().Truncate(time.Microsecond)
+
+			job := Job{
+				ID: "pj2", Domain: "example.com", Status: JobSucceeded,
+				CreatedAt: now, FinishedAt: now, Priority: PriorityBatch,
+			}
+			if _, err := s.Create(job); err != nil {
+				t.Fatalf("Create: %v", err)
+			}
+			if err := s.GraduateJob(job, nil); err != nil {
+				t.Fatalf("GraduateJob: %v", err)
+			}
+			run, ok := s.GetRun(job.ID)
+			if !ok {
+				t.Fatal("GetRun: not found")
+			}
+			if run.Priority != PriorityBatch {
+				t.Fatalf("Priority: got %d, want %d", run.Priority, PriorityBatch)
+			}
 		})
 	}
 }

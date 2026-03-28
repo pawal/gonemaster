@@ -314,6 +314,7 @@ func (s *InMemoryJobStore) GraduateJob(job Job, engineEntries []engine.LogEntry)
 		SevCritical: sevCritical,
 		WorstLevel:  worstLevel,
 		EntryCount:  len(engineEntries),
+		Priority:    job.Priority,
 		Profile:     job.Profile,
 		PublicID:    job.PublicID,
 	}
@@ -1032,6 +1033,7 @@ func jobFromRun(r Run) Job {
 		CreatedAt: r.CreatedAt,
 		StartedAt: r.StartedAt,
 		Progress:  100,
+		Priority:  r.Priority,
 		Profile:   r.Profile,
 	}
 }

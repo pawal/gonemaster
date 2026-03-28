@@ -20,7 +20,8 @@ type Queue interface {
 // InMemoryQueue is a simple in-memory queue.
 type InMemoryQueue struct {
 	mu      sync.Mutex
-	jobs    []string
+	normal  []string // PriorityNormal jobs
+	batch   []string // PriorityBatch jobs
 	paused  bool
 	closed  bool
 	waiters int
@@ -36,14 +37,18 @@ func NewInMemoryQueue() *InMemoryQueue {
 	}
 }
 
-// Enqueue adds a job id to the tail of the queue.
+// Enqueue adds a job id to the tail of the appropriate priority slice.
 func (q *InMemoryQueue) Enqueue(jobID string, priority JobPriority) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	if q.closed {
 		return errors.New("queue closed")
 	}
-	q.jobs = append(q.jobs, jobID)
+	if priority == PriorityBatch {
+		q.batch = append(q.batch, jobID)
+	} else {
+		q.normal = append(q.normal, jobID)
+	}
 	if !q.paused {
 		q.signalOneLocked()
 	}
@@ -58,11 +63,19 @@ func (q *InMemoryQueue) Dequeue(ctx context.Context) (string, error) {
 			q.mu.Unlock()
 			return "", errors.New("queue closed")
 		}
-		if !q.paused && len(q.jobs) > 0 {
-			jobID := q.jobs[0]
-			q.jobs = q.jobs[1:]
-			q.mu.Unlock()
-			return jobID, nil
+		if !q.paused {
+			if len(q.normal) > 0 {
+				jobID := q.normal[0]
+				q.normal = q.normal[1:]
+				q.mu.Unlock()
+				return jobID, nil
+			}
+			if len(q.batch) > 0 {
+				jobID := q.batch[0]
+				q.batch = q.batch[1:]
+				q.mu.Unlock()
+				return jobID, nil
+			}
 		}
 		q.waiters++
 		notify := q.notify
@@ -103,12 +116,17 @@ func (q *InMemoryQueue) Remove(jobID string) error {
 	if q.closed {
 		return errors.New("queue closed")
 	}
-	for i, id := range q.jobs {
-		if id != jobID {
-			continue
+	for i, id := range q.normal {
+		if id == jobID {
+			q.normal = append(q.normal[:i], q.normal[i+1:]...)
+			return nil
 		}
-		q.jobs = append(q.jobs[:i], q.jobs[i+1:]...)
-		return nil
+	}
+	for i, id := range q.batch {
+		if id == jobID {
+			q.batch = append(q.batch[:i], q.batch[i+1:]...)
+			return nil
+		}
 	}
 	return errors.New("job id not in queue")
 }
@@ -143,19 +161,32 @@ func (q *InMemoryQueue) Reorder(jobIDs []string) error {
 	if q.closed {
 		return errors.New("queue closed")
 	}
-	if len(jobIDs) != len(q.jobs) {
+	total := len(q.normal) + len(q.batch)
+	if len(jobIDs) != total {
 		return errors.New("job id list does not match queue length")
 	}
-	seen := map[string]bool{}
-	for _, id := range q.jobs {
-		seen[id] = true
+	tierOf := make(map[string]JobPriority, total)
+	for _, id := range q.normal {
+		tierOf[id] = PriorityNormal
+	}
+	for _, id := range q.batch {
+		tierOf[id] = PriorityBatch
 	}
 	for _, id := range jobIDs {
-		if !seen[id] {
+		if _, ok := tierOf[id]; !ok {
 			return errors.New("job id not in queue")
 		}
 	}
-	q.jobs = append([]string(nil), jobIDs...)
+	var newNormal, newBatch []string
+	for _, id := range jobIDs {
+		if tierOf[id] == PriorityBatch {
+			newBatch = append(newBatch, id)
+		} else {
+			newNormal = append(newNormal, id)
+		}
+	}
+	q.normal = newNormal
+	q.batch = newBatch
 	if !q.paused {
 		q.signalAvailableLocked()
 	}
@@ -185,10 +216,11 @@ func (q *InMemoryQueue) signalOneLocked() {
 }
 
 func (q *InMemoryQueue) signalAvailableLocked() {
-	if q.waiters < 1 || len(q.jobs) < 1 {
+	total := len(q.normal) + len(q.batch)
+	if q.waiters < 1 || total < 1 {
 		return
 	}
-	remaining := len(q.jobs)
+	remaining := total
 	if q.waiters < remaining {
 		remaining = q.waiters
 	}

@@ -378,6 +378,45 @@ func isQueueClosedError(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "queue closed")
 }
 
+func TestInMemoryQueueNormalBeforesBatch(t *testing.T) {
+	q := NewInMemoryQueue()
+	defer func() { _ = q.Close() }()
+
+	// Enqueue several batch jobs first, then a normal job.
+	for i := 0; i < 3; i++ {
+		if err := q.Enqueue(fmt.Sprintf("batch-%d", i), PriorityBatch); err != nil {
+			t.Fatalf("enqueue batch: %v", err)
+		}
+	}
+	if err := q.Enqueue("normal-0", PriorityNormal); err != nil {
+		t.Fatalf("enqueue normal: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	// The normal job must come out first despite being enqueued last.
+	first, err := q.Dequeue(ctx)
+	if err != nil {
+		t.Fatalf("dequeue: %v", err)
+	}
+	if first != "normal-0" {
+		t.Fatalf("expected normal-0 first, got %s", first)
+	}
+
+	// The remaining three dequeues should all be batch jobs in FIFO order.
+	for i := 0; i < 3; i++ {
+		id, err := q.Dequeue(ctx)
+		if err != nil {
+			t.Fatalf("dequeue batch %d: %v", i, err)
+		}
+		want := fmt.Sprintf("batch-%d", i)
+		if id != want {
+			t.Fatalf("expected %s, got %s", want, id)
+		}
+	}
+}
+
 func TestQueueInterfaceEnqueueAcceptsPriority(t *testing.T) {
 	// Verify that the Queue interface accepts a JobPriority argument and that
 	// both priority values are accepted without error.

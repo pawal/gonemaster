@@ -124,7 +124,7 @@
             {@const tcLevel = worstLevel(tcEntries)}
             {@const tcKey = `pub.tc.${tc.toLowerCase()}`}
             {@const tcDesc = $t(tcKey)}
-            {#if tc !== "Unspecified" && tcDesc !== tcKey}
+            {#if tc !== "Unspecified"}
               <details
                 class="testcase-group"
                 data-testid="testcase-group"
@@ -133,16 +133,16 @@
               >
                 <summary class="testcase-summary">
                   <span class="testcase-chevron"></span>
-                  <span class="testcase-desc">{tcDesc}</span>
+                  <span class="testcase-desc">{tcDesc !== tcKey ? tcDesc : tc}</span>
                   <span class="testcase-badge">
                     <span class="level-pill {levelClass(tcLevel)}">{tcLevel}</span>
                   </span>
                 </summary>
                 <div class="testcase-entries">
-                  {#each tcEntries as entry}
+                  {#each tcEntries.filter(e => e.message && e.message !== e.raw) as entry}
                     <div class="result-row" data-testid="result-row">
                       <span class="level-pill {levelClass(entry.level)}">{entry.level}</span>
-                      <span class="result-message">{entry.message ?? entry.raw ?? ""}</span>
+                      <span class="result-message">{entry.message}</span>
                     </div>
                   {/each}
                 </div>

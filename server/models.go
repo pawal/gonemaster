@@ -87,6 +87,7 @@ type Job struct {
 	SeverityTotals map[string]int `json:"severity_totals,omitempty"`
 	CreatedAt      time.Time      `json:"created_at"`
 	StartedAt      time.Time      `json:"started_at,omitempty"`
+	Priority       JobPriority    `json:"priority"`
 	Progress       int            `json:"progress"`
 	Error          string         `json:"error,omitempty"`
 	Profile        string         `json:"-"`
@@ -147,6 +148,7 @@ type Run struct {
 	SevCritical int            `json:"sev_critical"`
 	WorstLevel  string         `json:"worst_level,omitempty"`
 	EntryCount  int            `json:"entry_count"`
+	Priority    JobPriority    `json:"priority"`
 	Profile     string         `json:"profile,omitempty"`
 	PublicID    string         `json:"public_id,omitempty"`
 	// SeverityTotals mirrors the sev_* columns as a map for API compat.

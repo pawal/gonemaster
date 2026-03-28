@@ -1553,6 +1553,49 @@ func TestRecoverJobsQueuedReenqueued(t *testing.T) {
 	}
 }
 
+func TestRecoverJobsPreservesPriority(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			base := time.Now().UTC()
+
+			// Batch job created first (older), normal job created second.
+			// After recovery, normal must be dequeued before batch.
+			for _, job := range []Job{
+				{ID: "b1", Domain: "b1.test", Status: JobQueued, Priority: PriorityBatch, CreatedAt: base},
+				{ID: "n1", Domain: "n1.test", Status: JobQueued, Priority: PriorityNormal, CreatedAt: base.Add(time.Second)},
+			} {
+				if _, err := s.Create(job); err != nil {
+					t.Fatalf("Create %q: %v", job.ID, err)
+				}
+			}
+
+			q := NewInMemoryQueue()
+			if err := RecoverJobs(s, q); err != nil {
+				t.Fatalf("RecoverJobs: %v", err)
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+
+			first, err := q.Dequeue(ctx)
+			if err != nil {
+				t.Fatalf("dequeue: %v", err)
+			}
+			if first != "n1" {
+				t.Fatalf("expected n1 (normal) first, got %q", first)
+			}
+			second, err := q.Dequeue(ctx)
+			if err != nil {
+				t.Fatalf("dequeue: %v", err)
+			}
+			if second != "b1" {
+				t.Fatalf("expected b1 (batch) second, got %q", second)
+			}
+		})
+	}
+}
+
 func TestRecoverJobsNoopInMemory(t *testing.T) {
 	store := NewInMemoryJobStore()
 	queue := NewInMemoryQueue()

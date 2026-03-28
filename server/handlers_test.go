@@ -1606,3 +1606,55 @@ func intFromAny(v any) int {
 		return 0
 	}
 }
+
+func TestCreateJobHasNormalPriority(t *testing.T) {
+	srv := New(DefaultConfig())
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs",
+		bytes.NewBufferString(`{"domain":"example.com"}`))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", resp.Code, resp.Body.String())
+	}
+	var created Job
+	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if created.Priority != PriorityNormal {
+		t.Fatalf("response priority: expected PriorityNormal(0), got %d", created.Priority)
+	}
+	stored, ok := srv.store.Get(created.ID)
+	if !ok {
+		t.Fatalf("job not in store")
+	}
+	if stored.Priority != PriorityNormal {
+		t.Fatalf("stored priority: expected PriorityNormal(0), got %d", stored.Priority)
+	}
+}
+
+func TestBatchSubmitHasBatchPriority(t *testing.T) {
+	srv := New(DefaultConfig())
+	payload := `{"domains":["example.com","example.net"]}`
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/batch",
+		bytes.NewBufferString(payload))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d: %s", resp.Code, resp.Body.String())
+	}
+	var out JobBatchResponse
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	for _, jobID := range out.JobIDs {
+		job, ok := srv.store.Get(jobID)
+		if !ok {
+			t.Fatalf("job %q not in store", jobID)
+		}
+		if job.Priority != PriorityBatch {
+			t.Fatalf("job %q: expected PriorityBatch(1), got %d", jobID, job.Priority)
+		}
+	}
+}

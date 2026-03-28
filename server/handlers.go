@@ -96,6 +96,7 @@ func (s *Server) handleJobsBatch(w http.ResponseWriter, r *http.Request) {
 			Tests:     req.Tests,
 			Overrides: req.ProfileOverrides,
 			MinLevel:  req.MinLevel,
+			Priority:  PriorityBatch,
 			Status:    JobQueued,
 			CreatedAt: now,
 			Progress:  0,

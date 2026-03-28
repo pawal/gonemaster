@@ -23,7 +23,7 @@ func RecoverJobs(store JobStore, queue Queue) error {
 
 	// Re-enqueue jobs that were queued but never started.
 	rows, err := s.db.Query(
-		`SELECT id FROM jobs WHERE status = 'queued' ORDER BY created_at ASC`,
+		`SELECT id, priority FROM jobs WHERE status = 'queued' ORDER BY created_at ASC`,
 	)
 	if err != nil {
 		return fmt.Errorf("query queued jobs: %w", err)
@@ -32,10 +32,11 @@ func RecoverJobs(store JobStore, queue Queue) error {
 
 	for rows.Next() {
 		var id string
-		if err := rows.Scan(&id); err != nil {
+		var priority int
+		if err := rows.Scan(&id, &priority); err != nil {
 			return fmt.Errorf("scan job id: %w", err)
 		}
-		if err := queue.Enqueue(id); err != nil {
+		if err := queue.Enqueue(id, JobPriority(priority)); err != nil {
 			return fmt.Errorf("re-enqueue job %s: %w", id, err)
 		}
 	}

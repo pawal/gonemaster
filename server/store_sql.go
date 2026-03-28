@@ -100,7 +100,7 @@ func parseTimestampStr(str string) time.Time {
 // ── job column helpers ────────────────────────────────────────────────────────
 
 const jobCols = `id, domain_id, domain, batch_id, status, created_at, started_at,
-	progress, error, profile, config_json, public_id`
+	progress, error, profile, config_json, public_id, priority`
 
 type jobConfigJSON struct {
 	Tests         []string                       `json:"tests,omitempty"`
@@ -120,12 +120,13 @@ func (s *SQLJobStore) scanJob(row rowScanner) (Job, error) {
 		jobError, profile           string
 		configJSON                  sql.NullString
 		publicID                    sql.NullString
+		priority                    int
 	)
 	if err := row.Scan(
 		&id, &domainID, &domain, &batchID, &status,
 		&createdAt, &startedAt,
 		&progress, &jobError, &profile,
-		&configJSON, &publicID,
+		&configJSON, &publicID, &priority,
 	); err != nil {
 		return Job{}, err
 	}
@@ -149,6 +150,7 @@ func (s *SQLJobStore) scanJob(row rowScanner) (Job, error) {
 		Progress:      progress,
 		Error:         jobError,
 		Profile:       profile,
+		Priority:      JobPriority(priority),
 		Tests:         cfg.Tests,
 		Overrides:     cfg.Overrides,
 		UndelegatedNS: cfg.UndelegatedNS,
@@ -177,13 +179,14 @@ func (s *SQLJobStore) Create(job Job) (Job, error) {
 
 	_, err = s.db.Exec(
 		fmt.Sprintf(`INSERT INTO jobs (id, domain_id, domain, batch_id, status,
-			created_at, started_at, progress, error, profile, config_json, public_id
-		) VALUES (%s)`, s.phRange(1, 12)),
+			created_at, started_at, progress, error, profile, config_json, public_id, priority
+		) VALUES (%s)`, s.phRange(1, 13)),
 		job.ID, job.DomainID, job.Domain, job.BatchID, string(job.Status),
 		s.ts(job.CreatedAt), s.ts(job.StartedAt),
 		job.Progress, job.Error, job.Profile,
 		configJSON,
 		sql.NullString{String: job.PublicID, Valid: job.PublicID != ""},
+		int(job.Priority),
 	)
 	if err != nil {
 		if s.dialect.IsDuplicateKey(err) {
@@ -454,13 +457,14 @@ func (s *SQLJobStore) GraduateJob(job Job, engineEntries []engine.LogEntry) erro
 			id, domain_id, domain, batch_id, status,
 			created_at, started_at, finished_at, duration_ms,
 			sev_notice, sev_warning, sev_error, sev_critical,
-			worst_level, entry_count, profile, public_id
-		) VALUES (%s)`, s.phRange(1, 17)),
+			worst_level, entry_count, profile, public_id, priority
+		) VALUES (%s)`, s.phRange(1, 18)),
 		job.ID, domainID, job.Domain, job.BatchID, string(job.Status),
 		s.ts(job.CreatedAt), s.ts(job.StartedAt), s.ts(job.FinishedAt), durationMs,
 		sevNotice, sevWarning, sevError, sevCritical,
 		worstLevel, len(engineEntries), job.Profile,
 		sql.NullString{String: job.PublicID, Valid: job.PublicID != ""},
+		int(job.Priority),
 	); err != nil {
 		_ = tx.Rollback()
 		return fmt.Errorf("insert run: %w", err)
@@ -1087,7 +1091,7 @@ func (s *SQLJobStore) GetTagSummary(tag string) (TagSummary, bool) {
 const runCols = `id, domain_id, domain, batch_id, status,
 	created_at, started_at, finished_at, duration_ms,
 	sev_notice, sev_warning, sev_error, sev_critical,
-	worst_level, entry_count, profile, public_id`
+	worst_level, entry_count, profile, public_id, priority`
 
 func (s *SQLJobStore) scanRun(row rowScanner) (Run, error) {
 	var (
@@ -1098,12 +1102,13 @@ func (s *SQLJobStore) scanRun(row rowScanner) (Run, error) {
 		createdAt                                        string
 		startedAt, finishedAt                            sql.NullString
 		publicID                                         sql.NullString
+		priority                                         int
 	)
 	if err := row.Scan(
 		&id, &domainID, &domain, &batchID, &status,
 		&createdAt, &startedAt, &finishedAt, &durationMs,
 		&sevNotice, &sevWarning, &sevError, &sevCritical,
-		&worstLevel, &entryCount, &profile, &publicID,
+		&worstLevel, &entryCount, &profile, &publicID, &priority,
 	); err != nil {
 		return Run{}, err
 	}
@@ -1125,6 +1130,7 @@ func (s *SQLJobStore) scanRun(row rowScanner) (Run, error) {
 		EntryCount:  entryCount,
 		Profile:     profile,
 		PublicID:    publicID.String,
+		Priority:    JobPriority(priority),
 	}
 	r.SeverityTotals = map[string]int{
 		"NOTICE":   sevNotice,

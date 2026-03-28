@@ -1187,3 +1187,49 @@ func TestInMemoryJobStoreQueryEntries(t *testing.T) {
 		}
 	})
 }
+
+func TestInMemoryStorePriorityPersistedOnJob(t *testing.T) {
+	s := NewInMemoryJobStore()
+	now := time.Now().UTC()
+	job := Job{ID: "pj1", Domain: "example.com", Status: JobQueued, CreatedAt: now, Priority: PriorityBatch}
+	if _, err := s.Create(job); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	got, ok := s.Get(job.ID)
+	if !ok {
+		t.Fatal("Get: not found")
+	}
+	if got.Priority != PriorityBatch {
+		t.Fatalf("Priority: got %d, want %d", got.Priority, PriorityBatch)
+	}
+}
+
+func TestInMemoryStorePriorityPersistedOnRun(t *testing.T) {
+	s := NewInMemoryJobStore()
+	now := time.Now().UTC()
+	job := Job{
+		ID: "pj2", Domain: "example.com", Status: JobSucceeded,
+		CreatedAt: now, FinishedAt: now, Priority: PriorityBatch,
+	}
+	if _, err := s.Create(job); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if err := s.GraduateJob(job, nil); err != nil {
+		t.Fatalf("GraduateJob: %v", err)
+	}
+	run, ok := s.GetRun(job.ID)
+	if !ok {
+		t.Fatal("GetRun: not found")
+	}
+	if run.Priority != PriorityBatch {
+		t.Fatalf("run Priority: got %d, want %d", run.Priority, PriorityBatch)
+	}
+	// Also verify jobFromRun round-trip.
+	reconstructed, ok := s.Get(job.ID)
+	if !ok {
+		t.Fatal("Get after graduation: not found")
+	}
+	if reconstructed.Priority != PriorityBatch {
+		t.Fatalf("reconstructed Priority: got %d, want %d", reconstructed.Priority, PriorityBatch)
+	}
+}

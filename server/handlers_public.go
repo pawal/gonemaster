@@ -84,7 +84,7 @@ func (s *Server) handlePublicCreateJob(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
 		return
 	}
-	_ = s.queue.Enqueue(created.ID)
+	_ = s.queue.Enqueue(created.ID, PriorityNormal)
 	s.metrics.ObserveJobSubmittedWithContext(created.BatchID, created.Domain, JobQueued)
 
 	writeJSON(w, http.StatusCreated, publicJobView(created))

@@ -96,6 +96,7 @@ func (s *Server) handleJobsBatch(w http.ResponseWriter, r *http.Request) {
 			Tests:     req.Tests,
 			Overrides: req.ProfileOverrides,
 			MinLevel:  req.MinLevel,
+			Priority:  PriorityBatch,
 			Status:    JobQueued,
 			CreatedAt: now,
 			Progress:  0,
@@ -105,7 +106,7 @@ func (s *Server) handleJobsBatch(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
 			return
 		}
-		_ = s.queue.Enqueue(created.ID)
+		_ = s.queue.Enqueue(created.ID, PriorityBatch)
 		s.metrics.ObserveJobSubmittedWithContext(created.BatchID, created.Domain, JobQueued)
 		jobIDs = append(jobIDs, created.ID)
 		if len(tagNames) > 0 {
@@ -390,7 +391,7 @@ func (s *Server) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
 		return
 	}
-	_ = s.queue.Enqueue(created.ID)
+	_ = s.queue.Enqueue(created.ID, PriorityNormal)
 	s.metrics.ObserveJobSubmittedWithContext(created.BatchID, created.Domain, JobQueued)
 
 	if len(tagNames) > 0 {

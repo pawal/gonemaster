@@ -99,7 +99,7 @@ paths:
     post:
       tags: [Jobs]
       summary: Submit a batch of test jobs
-      description: Undelegated input (`nameservers`, `ds_info`) is not supported for batch submission.
+      description: "Submit multiple domains as a single batch. Each job is assigned priority=1 (batch) and will only be dequeued after all priority=0 (normal) jobs have been processed. Undelegated input (`nameservers`, `ds_info`) is not supported for batch submission."
       operationId: createJobBatch
       requestBody:
         required: true
@@ -770,6 +770,7 @@ paths:
     post:
       tags: [Queue]
       summary: Reorder queued jobs
+      description: "Replaces the queued job order. The provided list must contain all currently queued job IDs. Reordering is within-tier only: all normal-priority jobs (priority=0) must appear before all batch-priority jobs (priority=1) in the list. Placing a batch job before a normal job returns 400."
       operationId: reorderQueue
       requestBody:
         required: true
@@ -940,6 +941,11 @@ components:
           minimum: 0
           maximum: 100
           description: Progress percentage (0-100).
+        priority:
+          type: integer
+          format: int32
+          enum: [0, 1]
+          description: "Queue priority: 0=normal (interactive), 1=batch (background). Normal jobs are always dequeued before batch jobs."
         error:
           type: string
 
@@ -1318,6 +1324,11 @@ components:
           type: string
         public_id:
           type: string
+        priority:
+          type: integer
+          format: int32
+          enum: [0, 1]
+          description: "Queue priority at the time of submission: 0=normal, 1=batch."
         severity_totals:
           type: object
           additionalProperties:

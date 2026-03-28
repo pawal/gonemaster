@@ -425,6 +425,8 @@ POST /jobs
 
 `nameservers` and `ds_info` are optional and only supported on single-job `POST /jobs`.
 
+Jobs submitted via `POST /jobs` (and `POST /pub/api/v1/jobs`) are assigned **priority 0 (normal)**. The `priority` field is included in all job responses.
+
 List jobs:
 ```
 GET /jobs?status=running&limit=100
@@ -527,6 +529,8 @@ POST /jobs/batch
 Either `domains` or `from_tag` (or both) must be provided. `from_tag` expands to all domains currently in that tag, deduplicated against any explicit `domains` list. `tags` tags the resulting batch and all its runs (creating domains if needed).
 
 Batch submission does not support undelegated input; if `nameservers` or `ds_info` is included, the API returns `400` with `error.code=undelegated_not_supported_for_batch`.
+
+Jobs submitted via `POST /jobs/batch` are assigned **priority 1 (batch)**. Normal-priority jobs always drain before batch-priority jobs, so a large batch run does not delay interactive single-domain submissions.
 
 Get batch summary:
 ```
@@ -677,6 +681,7 @@ Reorder queued jobs:
 POST /queue/reorder
 { "job_ids": ["job_a", "job_b"] }
 ```
+The list must contain all currently queued job IDs. Reordering is within-tier only: all normal-priority jobs must appear before all batch-priority jobs. Placing a batch job before a normal job returns `400`.
 
 Remove queued jobs:
 ```

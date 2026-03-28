@@ -1,6 +1,8 @@
 package server
 
 import (
+	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -149,5 +151,72 @@ components:
 	}
 	if _, ok := got["schemas"]; ok {
 		t.Error("parser must not include components keys as paths")
+	}
+}
+
+// TestOpenAPIJobSchemaIncludesPriority verifies that the Job schema in
+// docs/openapi.yaml declares the priority field and that the real API
+// response includes it with the correct values.
+func TestOpenAPIJobSchemaIncludesPriority(t *testing.T) {
+	data, err := os.ReadFile("../docs/openapi.yaml")
+	if err != nil {
+		t.Fatalf("read docs/openapi.yaml: %v", err)
+	}
+	if !strings.Contains(string(data), "priority:") {
+		t.Fatal("docs/openapi.yaml Job schema is missing the priority field")
+	}
+
+	srv := New(DefaultConfig())
+
+	// POST /jobs → priority must be 0 (normal) in the response.
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs",
+		bytes.NewBufferString(`{"domain":"example.com"}`))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("POST /jobs: expected 201, got %d", resp.Code)
+	}
+	var job map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&job); err != nil {
+		t.Fatalf("decode job: %v", err)
+	}
+	if _, ok := job["priority"]; !ok {
+		t.Fatal("POST /jobs response is missing the priority field")
+	}
+	if int(job["priority"].(float64)) != int(PriorityNormal) {
+		t.Fatalf("POST /jobs priority: expected %d, got %v", PriorityNormal, job["priority"])
+	}
+
+	// POST /jobs/batch → each job must have priority 1 (batch).
+	resp2 := httptest.NewRecorder()
+	req2 := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/batch",
+		bytes.NewBufferString(`{"domains":["example.com"]}`))
+	req2.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp2, req2)
+	if resp2.Code != http.StatusAccepted {
+		t.Fatalf("POST /jobs/batch: expected 202, got %d", resp2.Code)
+	}
+	var batchResp JobBatchResponse
+	if err := json.NewDecoder(resp2.Body).Decode(&batchResp); err != nil {
+		t.Fatalf("decode batch response: %v", err)
+	}
+	for _, jobID := range batchResp.JobIDs {
+		resp3 := httptest.NewRecorder()
+		req3 := httptest.NewRequest(http.MethodGet, "/api/v1/jobs/"+jobID, nil)
+		srv.Handler().ServeHTTP(resp3, req3)
+		if resp3.Code != http.StatusOK {
+			t.Fatalf("GET /jobs/%s: expected 200, got %d", jobID, resp3.Code)
+		}
+		var batchJob map[string]any
+		if err := json.NewDecoder(resp3.Body).Decode(&batchJob); err != nil {
+			t.Fatalf("decode batch job: %v", err)
+		}
+		if _, ok := batchJob["priority"]; !ok {
+			t.Fatalf("GET /jobs/%s response is missing the priority field", jobID)
+		}
+		if int(batchJob["priority"].(float64)) != int(PriorityBatch) {
+			t.Fatalf("GET /jobs/%s priority: expected %d, got %v", jobID, PriorityBatch, batchJob["priority"])
+		}
 	}
 }

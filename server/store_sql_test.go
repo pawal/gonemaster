@@ -270,8 +270,8 @@ func TestRunMigrationsRecordsVersion(t *testing.T) {
 		}
 		versions = append(versions, v)
 	}
-	if len(versions) != 1 || versions[0] != 1 {
-		t.Fatalf("expected versions [1], got %v", versions)
+	if len(versions) != 2 || versions[0] != 1 || versions[1] != 2 {
+		t.Fatalf("expected versions [1 2], got %v", versions)
 	}
 }
 
@@ -1553,6 +1553,49 @@ func TestRecoverJobsQueuedReenqueued(t *testing.T) {
 	}
 }
 
+func TestRecoverJobsPreservesPriority(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			base := time.Now().UTC()
+
+			// Batch job created first (older), normal job created second.
+			// After recovery, normal must be dequeued before batch.
+			for _, job := range []Job{
+				{ID: "b1", Domain: "b1.test", Status: JobQueued, Priority: PriorityBatch, CreatedAt: base},
+				{ID: "n1", Domain: "n1.test", Status: JobQueued, Priority: PriorityNormal, CreatedAt: base.Add(time.Second)},
+			} {
+				if _, err := s.Create(job); err != nil {
+					t.Fatalf("Create %q: %v", job.ID, err)
+				}
+			}
+
+			q := NewInMemoryQueue()
+			if err := RecoverJobs(s, q); err != nil {
+				t.Fatalf("RecoverJobs: %v", err)
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+
+			first, err := q.Dequeue(ctx)
+			if err != nil {
+				t.Fatalf("dequeue: %v", err)
+			}
+			if first != "n1" {
+				t.Fatalf("expected n1 (normal) first, got %q", first)
+			}
+			second, err := q.Dequeue(ctx)
+			if err != nil {
+				t.Fatalf("dequeue: %v", err)
+			}
+			if second != "b1" {
+				t.Fatalf("expected b1 (batch) second, got %q", second)
+			}
+		})
+	}
+}
+
 func TestRecoverJobsNoopInMemory(t *testing.T) {
 	store := NewInMemoryJobStore()
 	queue := NewInMemoryQueue()
@@ -2130,6 +2173,54 @@ func TestSQLJobStoreQueryEntries(t *testing.T) {
 					t.Fatal("expected NextCursor to be set")
 				}
 			})
+		})
+	}
+}
+
+func TestSQLJobStorePriorityPersistedOnJob(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			now := time.Now().UTC().Truncate(time.Microsecond)
+
+			job := Job{ID: "pj1", Domain: "example.com", Status: JobQueued, CreatedAt: now, Priority: PriorityBatch}
+			if _, err := s.Create(job); err != nil {
+				t.Fatalf("Create: %v", err)
+			}
+			got, ok := s.Get(job.ID)
+			if !ok {
+				t.Fatal("Get: not found")
+			}
+			if got.Priority != PriorityBatch {
+				t.Fatalf("Priority: got %d, want %d", got.Priority, PriorityBatch)
+			}
+		})
+	}
+}
+
+func TestSQLJobStorePriorityPersistedOnRun(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			now := time.Now().UTC().Truncate(time.Microsecond)
+
+			job := Job{
+				ID: "pj2", Domain: "example.com", Status: JobSucceeded,
+				CreatedAt: now, FinishedAt: now, Priority: PriorityBatch,
+			}
+			if _, err := s.Create(job); err != nil {
+				t.Fatalf("Create: %v", err)
+			}
+			if err := s.GraduateJob(job, nil); err != nil {
+				t.Fatalf("GraduateJob: %v", err)
+			}
+			run, ok := s.GetRun(job.ID)
+			if !ok {
+				t.Fatal("GetRun: not found")
+			}
+			if run.Priority != PriorityBatch {
+				t.Fatalf("Priority: got %d, want %d", run.Priority, PriorityBatch)
+			}
 		})
 	}
 }

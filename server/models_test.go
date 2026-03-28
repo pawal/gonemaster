@@ -72,6 +72,81 @@ func TestJobPublicIDOmittedWhenEmpty(t *testing.T) {
 	}
 }
 
+func TestJobPriorityValues(t *testing.T) {
+	if PriorityNormal != 0 {
+		t.Fatalf("PriorityNormal = %d, want 0", PriorityNormal)
+	}
+	if PriorityBatch != 1 {
+		t.Fatalf("PriorityBatch = %d, want 1", PriorityBatch)
+	}
+	if PriorityNormal >= PriorityBatch {
+		t.Fatal("PriorityNormal must be less than PriorityBatch so normal jobs are dequeued first")
+	}
+}
+
+func TestJobPriorityIsInt(t *testing.T) {
+	var p JobPriority = PriorityNormal
+	if int(p) != 0 {
+		t.Fatalf("int(PriorityNormal) = %d, want 0", int(p))
+	}
+}
+
+func TestJobPriorityFieldPresent(t *testing.T) {
+	j := Job{ID: "abc", Domain: "example.com", Status: JobQueued, Priority: PriorityBatch}
+	if j.Priority != PriorityBatch {
+		t.Fatalf("got %d, want %d", j.Priority, PriorityBatch)
+	}
+}
+
+func TestJobPrioritySerializesAsNumber(t *testing.T) {
+	for _, tc := range []struct {
+		priority JobPriority
+		want     float64
+	}{
+		{PriorityNormal, 0},
+		{PriorityBatch, 1},
+	} {
+		j := Job{ID: "a", Domain: "example.com", Status: JobQueued, Priority: tc.priority}
+		b, err := json.Marshal(j)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var m map[string]any
+		if err := json.Unmarshal(b, &m); err != nil {
+			t.Fatal(err)
+		}
+		got, ok := m["priority"]
+		if !ok {
+			t.Fatal("priority field missing from JSON")
+		}
+		if got != tc.want {
+			t.Fatalf("priority: got %v, want %v", got, tc.want)
+		}
+	}
+}
+
+func TestRunPriorityFieldPresent(t *testing.T) {
+	r := Run{ID: "abc", Domain: "example.com", Status: JobSucceeded, Priority: PriorityBatch}
+	if r.Priority != PriorityBatch {
+		t.Fatalf("got %d, want %d", r.Priority, PriorityBatch)
+	}
+}
+
+func TestRunPrioritySerializesAsNumber(t *testing.T) {
+	r := Run{ID: "abc", Domain: "example.com", Status: JobSucceeded, Priority: PriorityNormal}
+	b, err := json.Marshal(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatal(err)
+	}
+	if m["priority"] != float64(0) {
+		t.Fatalf("priority: got %v, want 0", m["priority"])
+	}
+}
+
 func TestJobPublicIDRoundTrip(t *testing.T) {
 	j := Job{ID: "abc", PublicID: "x1y2z3w4", Domain: "example.com", Status: JobQueued}
 	b, err := json.Marshal(j)

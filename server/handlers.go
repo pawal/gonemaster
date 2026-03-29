@@ -752,7 +752,7 @@ func (s *Server) handleQueueReorder(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_queue", err.Error(), nil)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
+	writeJSON(w, http.StatusOK, map[string]string{"status": "reordered"})
 }
 
 func (s *Server) handleQueueRemove(w http.ResponseWriter, r *http.Request) {

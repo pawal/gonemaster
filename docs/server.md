@@ -665,6 +665,22 @@ Query params:
 - `format=csv` - download as CSV instead of JSON; columns: `id`, `run_id`, `domain_id`, `domain`, `timestamp`, `module`, `testcase`, `tag`, `level`, `args`.
 - `limit` / `offset` - pagination (max 500, default 100).
 
+### Queue priority
+
+The queue has two priority tiers. Workers always drain the normal tier before
+picking up any batch job.
+
+| Tier | Value | Assigned to |
+|---|---|---|
+| Normal | `0` | `POST /jobs` (admin UI) and `POST /pub/api/v1/jobs` (public UI) |
+| Batch | `1` | `POST /jobs/batch` and `gonemaster-client jobs batch` |
+
+Interactive single-domain submissions — whether from the public UI or the admin
+UI — always get priority 0 and are served first. Bulk batch runs get priority 1
+and never block a waiting user. Within each tier, jobs are served in FIFO order.
+
+The `priority` field is included in all job and run API responses.
+
 ### Queue controls
 Pause queue:
 ```

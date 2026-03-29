@@ -2,13 +2,13 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
-## [Unreleased]
+## [v1.2.1] - 2026-03-29
 
 ### Added
  - Server: security headers middleware sets `X-Content-Type-Options`, `X-Frame-Options`, `Content-Security-Policy`, `Referrer-Policy`, and `Permissions-Policy` on all responses
- - Server: Two-tier queue priority — `POST /jobs` submits at priority 0 (normal, for single jobs and the public ui), `POST /jobs/batch` at priority 1 (batch); normal always drains first.
-
-### Changed
+ - Server: Two-tier queue priority — `POST /jobs` submits at priority 0 (normal, for single jobs and the public ui), `POST /jobs/batch` at priority 1 (batch); normal always drains first
+ - UI: Added logotype and favicon
+ - UI: Added more security headers
 
 ## [v1.2.0] - 2026-03-26
 

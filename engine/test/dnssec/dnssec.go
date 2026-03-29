@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"math/big"
 	"sort"
 	"strconv"
@@ -7471,13 +7472,18 @@ func dnssecAlgorithmSupported(algo uint8) bool {
 	}
 }
 
-func verifyRRSIG(sig *dns.RRSIG, rrset []dns.RR, key *dns.DNSKEY, at time.Time) error {
+func verifyRRSIG(sig *dns.RRSIG, rrset []dns.RR, key *dns.DNSKEY, at time.Time) (err error) {
 	if sig == nil || key == nil {
 		return errors.New("missing rrsig or key")
 	}
 	if !sig.ValidPeriod(at) {
 		return errors.New("rrsig not valid at time")
 	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("dns library panic during RRSIG verification: %v", r)
+		}
+	}()
 	return sig.Verify(key, rrset, &dns.SignOption{})
 }
 

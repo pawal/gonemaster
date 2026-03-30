@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -383,5 +385,115 @@ func TestHelpIncludesNSAndDS(t *testing.T) {
 		if !strings.Contains(help, fragment) {
 			t.Fatalf("expected %q in usage output", fragment)
 		}
+	}
+}
+
+func TestRRSIGWarnDaysSetsProfileOnRequest(t *testing.T) {
+	var profileContent []byte
+	stubRunEngineFunc(t, func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		if req.Profile != "" {
+			// Read profile while temp file still exists (before run() defers cleanup).
+			profileContent, _ = os.ReadFile(req.Profile)
+		}
+		return nil, nil
+	})
+
+	var out, errOut bytes.Buffer
+	code := run([]string{"-H", "example.com", "--testcase", "dnssec04", "--rrsig-warn-days", "14"}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
+	}
+	if len(profileContent) == 0 {
+		t.Fatal("expected profile content to be captured inside engine stub")
+	}
+	var p map[string]any
+	if err := json.Unmarshal(profileContent, &p); err != nil {
+		t.Fatalf("parse profile: %v", err)
+	}
+	vars, _ := p["test_cases_vars"].(map[string]any)
+	dnssec04, _ := vars["dnssec04"].(map[string]any)
+	remaining, _ := dnssec04["REMAINING_SHORT"].(float64)
+	if int(remaining) != 14*86400 {
+		t.Fatalf("expected REMAINING_SHORT=%d, got %d", 14*86400, int(remaining))
+	}
+}
+
+func TestRRSIGWarnDaysZeroLeavesProfileUnchanged(t *testing.T) {
+	var captured engine.RunRequest
+	stubRunEngine(t, &captured)
+
+	var out, errOut bytes.Buffer
+	code := run([]string{"-H", "example.com"}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	if captured.Profile != "" {
+		t.Fatalf("expected Profile to be empty, got %q", captured.Profile)
+	}
+}
+
+func TestRRSIGWarnDaysNegativeIsError(t *testing.T) {
+	stubRunEngine(t, nil)
+
+	var out, errOut bytes.Buffer
+	code := run([]string{"-H", "example.com", "--rrsig-warn-days", "-1"}, &out, &errOut)
+	if code != 3 {
+		t.Fatalf("expected exit code 3, got %d", code)
+	}
+	if !strings.Contains(errOut.String(), "--rrsig-warn-days") {
+		t.Fatalf("expected error mentioning --rrsig-warn-days, got %q", errOut.String())
+	}
+}
+
+func TestBuildMergedProfileNoOverride(t *testing.T) {
+	path, cleanup, err := buildMergedProfile("", 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cleanup != nil {
+		t.Fatal("expected no cleanup for zero rrsigWarnDays")
+	}
+	if path != "" {
+		t.Fatalf("expected empty path, got %q", path)
+	}
+}
+
+func TestBuildMergedProfileWritesTempFile(t *testing.T) {
+	path, cleanup, err := buildMergedProfile("", 7)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cleanup == nil {
+		t.Fatal("expected cleanup function")
+	}
+	defer cleanup()
+
+	if path == "" {
+		t.Fatal("expected non-empty temp file path")
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read temp file: %v", err)
+	}
+	var p map[string]any
+	if err := json.Unmarshal(data, &p); err != nil {
+		t.Fatalf("parse temp file: %v", err)
+	}
+	vars, _ := p["test_cases_vars"].(map[string]any)
+	dnssec04, _ := vars["dnssec04"].(map[string]any)
+	remaining, _ := dnssec04["REMAINING_SHORT"].(float64)
+	if int(remaining) != 7*86400 {
+		t.Fatalf("expected REMAINING_SHORT=%d, got %d", 7*86400, int(remaining))
+	}
+}
+
+func TestHelpIncludesRRSIGWarnDays(t *testing.T) {
+	var out, errOut bytes.Buffer
+	code := run([]string{"--help"}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	if !strings.Contains(errOut.String(), "--rrsig-warn-days") {
+		t.Fatal("expected --rrsig-warn-days in usage output")
 	}
 }

@@ -44,6 +44,29 @@ gonemaster-nagios --domain example.com --profile ./profile.json
 - `--force-ipv6` Force IPv6 queries
 - `--source-addr4` Override resolver IPv4 source address
 - `--source-addr6` Override resolver IPv6 source address
+- `--ns` Undelegated nameserver: `name` or `name/ip` (repeatable)
+- `--ds` Undelegated DS record: `keytag,algorithm,digtype,digest` (repeatable; requires `--ns`)
+
+## Undelegated testing
+
+Use `--ns` to test a zone via specific nameservers, bypassing normal DNS
+delegation. This is useful for split-DNS environments, pre-delegation checks,
+or when public resolution is blocked by a firewall.
+
+```
+# Test via internal nameservers with explicit glue:
+gonemaster-nagios -H internal.example.com --ns ns1.internal/10.0.0.53 --ns ns2.internal/10.0.0.54
+
+# Test via hostname only (IP resolved normally):
+gonemaster-nagios -H example.com --ns ns1.example.com
+
+# Pre-delegation DNSSEC test with DS record:
+gonemaster-nagios -H example.com \
+    --ns ns1.new-provider.net/203.0.113.1 \
+    --ds 12345,13,2,ABCDEF0123456789...
+```
+
+`--ds` is only valid together with `--ns`; specifying it alone returns exit code 3.
 
 ## Compatibility aliases
 - `--ipv6` Alias for `--force-ipv6`

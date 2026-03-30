@@ -18,6 +18,15 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/logger"
 )
 
+// stringSliceFlag is a repeatable string flag.
+type stringSliceFlag []string
+
+func (s *stringSliceFlag) String() string { return strings.Join(*s, ", ") }
+func (s *stringSliceFlag) Set(v string) error {
+	*s = append(*s, v)
+	return nil
+}
+
 type countFlag int
 
 // String returns the current verbosity count.
@@ -70,6 +79,8 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	var sourceAddr6 string
 	var sourceAddr4Set bool
 	var sourceAddr6Set bool
+	var nsFlags stringSliceFlag
+	var dsFlags stringSliceFlag
 	var showVersion bool
 	var showHelp bool
 	var verbose countFlag
@@ -98,6 +109,8 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		fmt.Fprintln(errOut, "  --force-ipv6      Force IPv6 queries")
 		fmt.Fprintln(errOut, "  --source-addr4    Override resolver.source4 (IPv4 source address)")
 		fmt.Fprintln(errOut, "  --source-addr6    Override resolver.source6 (IPv6 source address)")
+		fmt.Fprintln(errOut, "  --ns              Undelegated nameserver: name or name/ip (repeatable)")
+		fmt.Fprintln(errOut, "  --ds              Undelegated DS record: keytag,algo,digtype,digest (repeatable)")
 		fmt.Fprintln(errOut, "")
 		fmt.Fprintln(errOut, "Compatibility aliases:")
 		fmt.Fprintln(errOut, "  --ipv6            Deprecated alias for --force-ipv6")
@@ -138,6 +151,8 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs.StringVar(&sourceAddr6, "source-addr6", "", "Override resolver.source6 (IPv6 source address) (optional)")
 	fs.StringVar(&sourceAddr4, "sourceaddr4", "", "Override resolver.source4 (IPv4 source address) (optional)")
 	fs.StringVar(&sourceAddr6, "sourceaddr6", "", "Override resolver.source6 (IPv6 source address) (optional)")
+	fs.Var(&nsFlags, "ns", "Undelegated nameserver: name or name/ip (repeatable)")
+	fs.Var(&dsFlags, "ds", "Undelegated DS record: keytag,algo,digtype,digest (repeatable)")
 	fs.Var(&verbose, "verbose", "Increase verbosity (repeatable)")
 	fs.Var(&verbose, "v", "Increase verbosity (repeatable)")
 	fs.BoolVar(&showVersion, "version", false, "Print version and exit")
@@ -224,6 +239,29 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		sourceAddr6Override = &value
 	}
 
+	var undelegatedNS []engine.UndelegatedNameserver
+	for _, spec := range nsFlags {
+		ns, err := engine.ParseUndelegatedNameserver(spec)
+		if err != nil {
+			fmt.Fprintln(errOut, err.Error())
+			return 3
+		}
+		undelegatedNS = append(undelegatedNS, ns)
+	}
+	var undelegatedDS []engine.UndelegatedDSInfo
+	for _, spec := range dsFlags {
+		ds, err := engine.ParseUndelegatedDS(spec)
+		if err != nil {
+			fmt.Fprintln(errOut, err.Error())
+			return 3
+		}
+		undelegatedDS = append(undelegatedDS, ds)
+	}
+	if len(undelegatedDS) > 0 && len(undelegatedNS) == 0 {
+		fmt.Fprintln(errOut, "--ds requires --ns")
+		return 3
+	}
+
 	var runCtx context.Context
 	var cancel context.CancelFunc
 	if timeoutSet {
@@ -232,14 +270,16 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	}
 
 	req := engine.RunRequest{
-		Domain:      domain,
-		Module:      module,
-		Testcase:    testcase,
-		Profile:     profilePath,
-		IPv4:        ipv4Override,
-		IPv6:        ipv6Override,
-		SourceAddr4: sourceAddr4Override,
-		SourceAddr6: sourceAddr6Override,
+		Domain:                 domain,
+		Module:                 module,
+		Testcase:               testcase,
+		Profile:                profilePath,
+		IPv4:                   ipv4Override,
+		IPv6:                   ipv6Override,
+		SourceAddr4:            sourceAddr4Override,
+		SourceAddr6:            sourceAddr6Override,
+		UndelegatedNameservers: undelegatedNS,
+		UndelegatedDSInfo:      undelegatedDS,
 	}
 	if runCtx != nil {
 		req.Context = runCtx

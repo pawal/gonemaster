@@ -80,6 +80,10 @@ type Config struct {
 	SourceAddr6 *string `json:"source_addr6,omitempty"`
 	MinLevel    string  `json:"min_level"`
 	ProfilePath string  `json:"profile_path,omitempty"`
+	// PublicURL is the canonical base URL of the public UI (e.g. "https://example.com/").
+	// Used for og:url, hreflang, robots.txt, and sitemap.xml. When empty, the URL
+	// is auto-detected from the request's Host and X-Forwarded-Proto headers.
+	PublicURL   string  `json:"public_url,omitempty"`
 	Database    DatabaseConfig   `json:"database,omitempty"`
 	PublicAPI   PublicAPIConfig  `json:"public_api,omitempty"`
 }
@@ -116,6 +120,7 @@ type FileConfig struct {
 	SourceAddr6       *string             `json:"source_addr6"`
 	MinLevel          *string             `json:"min_level"`
 	ProfilePath       *string             `json:"profile_path"`
+	PublicURL         *string             `json:"public_url,omitempty"`
 	Database          *DatabaseFileConfig  `json:"database,omitempty"`
 	PublicAPI         *PublicAPIFileConfig `json:"public_api,omitempty"`
 }
@@ -196,6 +201,9 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 	}
 	if file.ProfilePath != nil {
 		c.ProfilePath = *file.ProfilePath
+	}
+	if file.PublicURL != nil {
+		c.PublicURL = *file.PublicURL
 	}
 	if file.Database != nil {
 		if file.Database.Driver != "" {

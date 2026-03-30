@@ -24,6 +24,35 @@ var (
 	distErr  error
 )
 
+var hreflangLangs = []string{"da", "en", "es", "fi", "fr", "ja", "nb", "sl", "sv"}
+
+func resolvePublicURL(configured string, r *http.Request) string {
+	if configured != "" {
+		return configured
+	}
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	if proto := r.Header.Get("X-Forwarded-Proto"); proto == "https" || proto == "http" {
+		scheme = proto
+	}
+	host := r.Host
+	if fwdHost := r.Header.Get("X-Forwarded-Host"); fwdHost != "" {
+		host = fwdHost
+	}
+	return scheme + "://" + host + "/"
+}
+
+func buildHreflang(baseURL string) string {
+	var b strings.Builder
+	for _, lang := range hreflangLangs {
+		fmt.Fprintf(&b, "    <link rel=\"alternate\" hreflang=\"%s\" href=\"%s\" />\n", lang, baseURL)
+	}
+	fmt.Fprintf(&b, "    <link rel=\"alternate\" hreflang=\"x-default\" href=\"%s\" />", baseURL)
+	return b.String()
+}
+
 const noEmbeddedUIPage = `<!doctype html>
 <html lang="en">
   <head>
@@ -39,7 +68,9 @@ const noEmbeddedUIPage = `<!doctype html>
 `
 
 // Handler serves the embedded public UI with a basic SPA fallback.
-func Handler() http.Handler {
+// publicURL is the canonical base URL of the deployment (e.g. "https://example.com/");
+// leave empty to auto-detect from the request's Host and X-Forwarded-Proto headers.
+func Handler(publicURL string) http.Handler {
 	fsys, err := dist()
 	if err != nil {
 		return unavailableUIHandler()
@@ -54,7 +85,7 @@ func Handler() http.Handler {
 
 		cleanPath := cleanRequestPath(r.URL.Path)
 		if cleanPath == "" || cleanPath == "index.html" {
-			serveIndex(fsys, w, r)
+			serveIndex(fsys, w, r, publicURL)
 			return
 		}
 
@@ -66,7 +97,7 @@ func Handler() http.Handler {
 			return
 		}
 
-		serveIndex(fsys, w, r)
+		serveIndex(fsys, w, r, publicURL)
 	})
 }
 
@@ -97,12 +128,15 @@ func isFile(fsys fs.FS, name string) bool {
 	return !info.IsDir()
 }
 
-func serveIndex(fsys fs.FS, w http.ResponseWriter, r *http.Request) {
+func serveIndex(fsys fs.FS, w http.ResponseWriter, r *http.Request, publicURL string) {
 	data, err := fs.ReadFile(fsys, "index.html")
 	if err != nil {
 		serveUnavailableUIPage(w, r)
 		return
 	}
+	url := resolvePublicURL(publicURL, r)
+	data = bytes.ReplaceAll(data, []byte("__PUBLIC_URL__"), []byte(url))
+	data = bytes.ReplaceAll(data, []byte("<!-- HREFLANG_TAGS -->"), []byte(buildHreflang(url)))
 	modTime := time.Time{}
 	if info, err := fs.Stat(fsys, "index.html"); err == nil {
 		modTime = info.ModTime()

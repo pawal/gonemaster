@@ -4,6 +4,7 @@
 package public
 
 import (
+	"crypto/tls"
 	"io"
 	"io/fs"
 	"net/http"
@@ -33,7 +34,7 @@ func TestCleanRequestPath(t *testing.T) {
 }
 
 func TestHandlerMethodNotAllowed(t *testing.T) {
-	h := Handler()
+	h := Handler("")
 
 	req := httptest.NewRequest(http.MethodPost, "/", nil)
 	rr := httptest.NewRecorder()
@@ -45,7 +46,7 @@ func TestHandlerMethodNotAllowed(t *testing.T) {
 }
 
 func TestHandlerServesIndexForRootAndUnknownPaths(t *testing.T) {
-	h := Handler()
+	h := Handler("")
 
 	rootReq := httptest.NewRequest(http.MethodGet, "/", nil)
 	rootRR := httptest.NewRecorder()
@@ -86,7 +87,7 @@ func TestHandlerServesAssetsWithCacheControl(t *testing.T) {
 		t.Skip("no embedded asset files found under dist/assets")
 	}
 
-	h := Handler()
+	h := Handler("")
 	req := httptest.NewRequest(http.MethodGet, "/assets/"+assetName, nil)
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
@@ -119,7 +120,7 @@ func TestHandlerServesFaviconFilesAndManifest(t *testing.T) {
 		"site.webmanifest",
 	}
 
-	h := Handler()
+	h := Handler("")
 	for _, name := range requiredFiles {
 		if _, err := fs.Stat(fsys, name); err != nil {
 			t.Fatalf("expected embedded file %q: %v", name, err)
@@ -147,7 +148,7 @@ func TestHandlerIndexIncludesFaviconLinks(t *testing.T) {
 		t.Skip("favicon assets are not embedded; run make ui-build")
 	}
 
-	h := Handler()
+	h := Handler("")
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
@@ -177,7 +178,7 @@ func TestServeIndexFallsBackToUnavailablePageWhenIndexMissing(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rr := httptest.NewRecorder()
 
-	serveIndex(fsys, rr, req)
+	serveIndex(fsys, rr, req, "")
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
@@ -185,6 +186,147 @@ func TestServeIndexFallsBackToUnavailablePageWhenIndexMissing(t *testing.T) {
 	body := rr.Body.String()
 	if !strings.Contains(body, "UI is not embedded in this binary") {
 		t.Fatalf("unexpected fallback body: %q", body)
+	}
+}
+
+func TestResolvePublicURL(t *testing.T) {
+	tests := []struct {
+		name       string
+		configured string
+		host       string
+		fwdProto   string
+		fwdHost    string
+		tls        bool
+		want       string
+	}{
+		{
+			name:       "configured root",
+			configured: "https://example.com/",
+			host:       "ignored.example.com",
+			want:       "https://example.com/",
+		},
+		{
+			name:       "configured subpath",
+			configured: "https://example.com/public/",
+			host:       "ignored.example.com",
+			want:       "https://example.com/public/",
+		},
+		{
+			name: "auto-detect http",
+			host: "myhost.example.com",
+			want: "http://myhost.example.com/",
+		},
+		{
+			name:     "auto-detect tls",
+			host:     "myhost.example.com",
+			tls:      true,
+			want:     "https://myhost.example.com/",
+		},
+		{
+			name:     "X-Forwarded-Proto https",
+			host:     "myhost.example.com",
+			fwdProto: "https",
+			want:     "https://myhost.example.com/",
+		},
+		{
+			name:    "X-Forwarded-Host overrides Host",
+			host:    "internal:8080",
+			fwdHost: "public.example.com",
+			want:    "http://public.example.com/",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			req.Host = tt.host
+			if tt.fwdProto != "" {
+				req.Header.Set("X-Forwarded-Proto", tt.fwdProto)
+			}
+			if tt.fwdHost != "" {
+				req.Header.Set("X-Forwarded-Host", tt.fwdHost)
+			}
+			if tt.tls {
+				req.TLS = &tls.ConnectionState{}
+			}
+			got := resolvePublicURL(tt.configured, req)
+			if got != tt.want {
+				t.Fatalf("resolvePublicURL() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestBuildHreflang(t *testing.T) {
+	result := buildHreflang("https://example.com/")
+	for _, lang := range hreflangLangs {
+		if !strings.Contains(result, `hreflang="`+lang+`"`) {
+			t.Fatalf("buildHreflang missing hreflang=%q", lang)
+		}
+	}
+	if !strings.Contains(result, `hreflang="x-default"`) {
+		t.Fatal("buildHreflang missing x-default")
+	}
+	if !strings.Contains(result, `href="https://example.com/"`) {
+		t.Fatal("buildHreflang missing expected href")
+	}
+}
+
+func TestServeIndexInjectsPlaceholders(t *testing.T) {
+	const indexHTML = `<head>` +
+		`<meta property="og:url" content="__PUBLIC_URL__" />` +
+		`<!-- HREFLANG_TAGS -->` +
+		`</head>`
+	fsys := fstest.MapFS{
+		"index.html": &fstest.MapFile{Data: []byte(indexHTML)},
+	}
+
+	tests := []struct {
+		name        string
+		configured  string
+		reqHost     string
+		wantURL     string
+	}{
+		{
+			name:       "configured root",
+			configured: "https://example.com/",
+			reqHost:    "ignored.example.com",
+			wantURL:    "https://example.com/",
+		},
+		{
+			name:       "configured subpath",
+			configured: "https://example.com/public/",
+			reqHost:    "ignored.example.com",
+			wantURL:    "https://example.com/public/",
+		},
+		{
+			name:       "auto-detected from host",
+			configured: "",
+			reqHost:    "test.example.com",
+			wantURL:    "http://test.example.com/",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			req.Host = tt.reqHost
+			rr := httptest.NewRecorder()
+
+			serveIndex(fsys, rr, req, tt.configured)
+
+			body := rr.Body.String()
+			if strings.Contains(body, "__PUBLIC_URL__") {
+				t.Fatal("__PUBLIC_URL__ placeholder was not replaced")
+			}
+			if strings.Contains(body, "<!-- HREFLANG_TAGS -->") {
+				t.Fatal("<!-- HREFLANG_TAGS --> placeholder was not replaced")
+			}
+			if !strings.Contains(body, `content="`+tt.wantURL+`"`) {
+				t.Fatalf("og:url not set to %q in body: %s", tt.wantURL, body)
+			}
+			if !strings.Contains(body, `hreflang="en"`) {
+				t.Fatal("hreflang tags not injected")
+			}
+		})
 	}
 }
 

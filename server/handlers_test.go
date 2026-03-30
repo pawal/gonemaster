@@ -1658,3 +1658,110 @@ func TestBatchSubmitHasBatchPriority(t *testing.T) {
 		}
 	}
 }
+
+func TestRobotsTxt(t *testing.T) {
+	tests := []struct {
+		name        string
+		publicURL   string
+		host        string
+		wantSitemap string
+	}{
+		{
+			name:        "configured URL",
+			publicURL:   "https://example.com/",
+			host:        "ignored.example.com",
+			wantSitemap: "Sitemap: https://example.com/sitemap.xml",
+		},
+		{
+			name:        "configured subpath URL",
+			publicURL:   "https://example.com/public/",
+			host:        "ignored.example.com",
+			wantSitemap: "Sitemap: https://example.com/public/sitemap.xml",
+		},
+		{
+			name:        "auto-detected from host",
+			publicURL:   "",
+			host:        "myhost.example.com",
+			wantSitemap: "Sitemap: http://myhost.example.com/sitemap.xml",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.PublicURL = tt.publicURL
+			srv := New(cfg)
+
+			req := httptest.NewRequest(http.MethodGet, "/robots.txt", nil)
+			req.Host = tt.host
+			rr := httptest.NewRecorder()
+			srv.Handler().ServeHTTP(rr, req)
+
+			if rr.Code != http.StatusOK {
+				t.Fatalf("status = %d, want 200", rr.Code)
+			}
+			if ct := rr.Header().Get("Content-Type"); ct != "text/plain; charset=utf-8" {
+				t.Fatalf("Content-Type = %q", ct)
+			}
+			body := rr.Body.String()
+			if !strings.Contains(body, tt.wantSitemap) {
+				t.Fatalf("robots.txt missing %q\ngot: %s", tt.wantSitemap, body)
+			}
+		})
+	}
+}
+
+func TestSitemapXML(t *testing.T) {
+	tests := []struct {
+		name      string
+		publicURL string
+		host      string
+		wantLoc   string
+	}{
+		{
+			name:      "configured root URL",
+			publicURL: "https://example.com/",
+			host:      "ignored.example.com",
+			wantLoc:   "<loc>https://example.com/</loc>",
+		},
+		{
+			name:      "configured subpath URL",
+			publicURL: "https://example.com/public/",
+			host:      "ignored.example.com",
+			wantLoc:   "<loc>https://example.com/public/</loc>",
+		},
+		{
+			name:      "auto-detected from host",
+			publicURL: "",
+			host:      "myhost.example.com",
+			wantLoc:   "<loc>http://myhost.example.com/</loc>",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.PublicURL = tt.publicURL
+			srv := New(cfg)
+
+			req := httptest.NewRequest(http.MethodGet, "/sitemap.xml", nil)
+			req.Host = tt.host
+			rr := httptest.NewRecorder()
+			srv.Handler().ServeHTTP(rr, req)
+
+			if rr.Code != http.StatusOK {
+				t.Fatalf("status = %d, want 200", rr.Code)
+			}
+			if ct := rr.Header().Get("Content-Type"); ct != "application/xml; charset=utf-8" {
+				t.Fatalf("Content-Type = %q", ct)
+			}
+			body := rr.Body.String()
+			if !strings.Contains(body, tt.wantLoc) {
+				t.Fatalf("sitemap.xml missing %q\ngot: %s", tt.wantLoc, body)
+			}
+			for _, lang := range sitemapLangs {
+				if !strings.Contains(body, `hreflang="`+lang+`"`) {
+					t.Fatalf("sitemap.xml missing hreflang=%q", lang)
+				}
+			}
+		})
+	}
+}

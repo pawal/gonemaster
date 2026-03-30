@@ -12,7 +12,7 @@ import (
 )
 
 func TestNoUIHandlerServesIndexInfoPage(t *testing.T) {
-	h := Handler()
+	h := Handler("")
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rr := httptest.NewRecorder()
@@ -36,7 +36,7 @@ func TestNoUIHandlerServesIndexInfoPage(t *testing.T) {
 }
 
 func TestNoUIHandlerReturnsNotFoundForAssets(t *testing.T) {
-	h := Handler()
+	h := Handler("")
 
 	req := httptest.NewRequest(http.MethodGet, "/assets/index.js", nil)
 	rr := httptest.NewRecorder()
@@ -48,7 +48,7 @@ func TestNoUIHandlerReturnsNotFoundForAssets(t *testing.T) {
 }
 
 func TestNoUIHandlerMethodNotAllowed(t *testing.T) {
-	h := Handler()
+	h := Handler("")
 
 	req := httptest.NewRequest(http.MethodPost, "/", nil)
 	rr := httptest.NewRecorder()

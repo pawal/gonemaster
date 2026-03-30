@@ -183,6 +183,8 @@ func (s *Server) routes() {
 	}
 	s.mux.Handle("/pub/api/v1/", pubHandler)
 
-	s.mux.Handle("/public/", http.StripPrefix("/public", serverpublic.Handler()))
+	s.mux.HandleFunc("GET /robots.txt", s.handleRobotsTxt)
+	s.mux.HandleFunc("GET /sitemap.xml", s.handleSitemap)
+	s.mux.Handle("/public/", http.StripPrefix("/public", serverpublic.Handler(s.cfg.PublicURL)))
 	s.mux.Handle("/", serverui.Handler())
 }

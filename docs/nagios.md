@@ -44,6 +44,66 @@ gonemaster-nagios --domain example.com --profile ./profile.json
 - `--force-ipv6` Force IPv6 queries
 - `--source-addr4` Override resolver IPv4 source address
 - `--source-addr6` Override resolver IPv6 source address
+- `--ns` Undelegated nameserver: `name` or `name/ip` (repeatable)
+- `--ds` Undelegated DS record: `keytag,algorithm,digtype,digest` (repeatable; requires `--ns`)
+- `--rrsig-warn-days` Emit WARNING if any apex RRSIG expires within N days (requires DNSSEC04 or dnssec module)
+
+## Undelegated testing
+
+Use `--ns` to test a zone via specific nameservers, bypassing normal DNS
+delegation. This is useful for split-DNS environments, pre-delegation checks,
+or when public resolution is blocked by a firewall.
+
+```
+# Test via internal nameservers with explicit glue:
+gonemaster-nagios -H internal.example.com --ns ns1.internal/10.0.0.53 --ns ns2.internal/10.0.0.54
+
+# Test via hostname only (IP resolved normally):
+gonemaster-nagios -H example.com --ns ns1.example.com
+
+# Pre-delegation DNSSEC test with DS record:
+gonemaster-nagios -H example.com \
+    --ns ns1.new-provider.net/203.0.113.1 \
+    --ds 12345,13,2,ABCDEF0123456789...
+```
+
+`--ds` is only valid together with `--ns`; specifying it alone returns exit code 3.
+
+## RRSIG expiry monitoring
+
+Use `--rrsig-warn-days` to trigger a WARNING when any apex RRSIG expires within
+N days. This gives early notice when re-signing is broken, long before the
+engine's default 12-hour threshold fires.
+
+```
+# Alert WARNING if any apex RRSIG expires within 14 days:
+gonemaster-nagios -H example.com --testcase dnssec04 --rrsig-warn-days 14
+
+# Full DNSSEC module check + 30-day RRSIG warning:
+gonemaster-nagios -H example.com --module dnssec --rrsig-warn-days 30
+
+# Combined with undelegated testing:
+gonemaster-nagios -H example.com --ns ns1.example/10.0.0.1 \
+    --testcase dnssec04 --rrsig-warn-days 7
+```
+
+`--rrsig-warn-days` sets the `REMAINING_SHORT` threshold in the DNSSEC04 profile
+variable. Using it without `--testcase dnssec04` or `--module dnssec` prints a
+warning but proceeds normally.
+
+Example Icinga2 service:
+
+```
+apply Service "dns-rrsig-expiry" {
+    import "generic-service"
+    check_command   = "gonemaster-nagios"
+    vars.domain     = host.vars.dns_zone
+    vars.testcase   = "dnssec04"
+    vars.rrsig_warn = 14
+    vars.timeout    = 30
+    assign where host.vars.dns_zone
+}
+```
 
 ## Compatibility aliases
 - `--ipv6` Alias for `--force-ipv6`

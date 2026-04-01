@@ -10,6 +10,10 @@
 /ui/.vite/
 /server/ui/dist/*
 !/server/ui/dist/placeholder.txt
+/ui-public/node_modules/
+/ui-public/.vite/
+/server/public/dist/*
+!/server/public/dist/placeholder.txt
 
 # OS/editor files
 .DS_Store
@@ -17,3 +21,16 @@
 .vscode/
 *.swp
 *~
+
+# Perf benchmarking artifacts
+/majestic_million.csv
+/perf-runs/
+/server-perf-kit-*.tar.gz
+
+# Generated man pages
+/man/
+
+# Badkeys blocklist data (downloaded, not committed)
+/share/badkeys/blocklist.dat
+/share/badkeys/blocklist.dat.gz
+/share/badkeys/badkeysdata.json

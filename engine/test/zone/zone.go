@@ -10,9 +10,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/methods"
 	methodsv2 "codeberg.org/pawal/gonemaster/engine/methodsv2"
@@ -40,6 +42,8 @@ var (
 )
 
 var nullSpfRegex = regexp.MustCompile(`(?i)^v=spf1[ \t]+-all[ \t]*$`)
+
+const csyncFlagSoaMinimum uint16 = 0x0002
 
 func defaultGetAddressesFor(ctx context.Context, z *zonepkg.Zone, name string) ([]netip.Addr, error) {
 	if z == nil || z.Recursor() == nil {
@@ -168,6 +172,28 @@ func All(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 				return results, err
 			}
 		}
+
+		if util.ShouldRunTest(ctx, "zone12") {
+			entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+				return Zone12(ctx, z)
+			})
+			results = append(results, entries...)
+			if err != nil {
+				return results, err
+			}
+		}
+	}
+
+	if hasEntryTag(results, "Z11_SPF_SYNTAX_OK") {
+		if util.ShouldRunTest(ctx, "zone13") {
+			entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+				return Zone13(ctx, z)
+			})
+			results = append(results, entries...)
+			if err != nil {
+				return results, err
+			}
+		}
 	}
 
 	return results, nil
@@ -281,6 +307,29 @@ func Metadata() map[string][]string {
 			"Z11_SPF_SYNTAX_OK",
 			"Z11_UNABLE_TO_CHECK_FOR_SPF",
 		},
+		"zone12": {
+			"IPV4_DISABLED",
+			"IPV6_DISABLED",
+			"Z12_CSYNC_FOUND",
+			"Z12_INCONSISTENT_CSYNC",
+			"Z12_MIXED_PRESENCE",
+			"Z12_MULTIPLE_CSYNC",
+			"Z12_NO_CSYNC",
+			"Z12_SERIAL_MISMATCH",
+			"TEST_CASE_END",
+			"TEST_CASE_START",
+		},
+		"zone13": {
+			"Z13_NO_SPF_FOUND",
+			"Z13_SPF_LOOKUP_COUNT_EXCEEDED",
+			"Z13_SPF_LOOKUP_COUNT_OK",
+			"Z13_SPF_LOOKUP_LOOP",
+			"Z13_SPF_PTR_DEPRECATED",
+			"Z13_SPF_RECURSIVE_ERROR",
+			"Z13_UNABLE_TO_CHECK",
+			"TEST_CASE_END",
+			"TEST_CASE_START",
+		},
 	}
 }
 
@@ -339,17 +388,17 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(mnameLocalhost) > 0 {
-		if err := appendLog(ctx, &results, testcase, "Z01_MNAME_IS_LOCALHOST", map[string]any{
-			"ns_ip_list": strings.Join(mnameLocalhost, ";"),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedAddresses(args, mnameLocalhost)
+		if err := appendLog(ctx, &results, testcase, "Z01_MNAME_IS_LOCALHOST", args); err != nil {
 			return results, err
 		}
 	}
 
 	if len(mnameDot) > 0 {
-		if err := appendLog(ctx, &results, testcase, "Z01_MNAME_IS_DOT", map[string]any{
-			"ns_ip_list": strings.Join(mnameDot, ";"),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedAddresses(args, mnameDot)
+		if err := appendLog(ctx, &results, testcase, "Z01_MNAME_IS_DOT", args); err != nil {
 			return results, err
 		}
 	}
@@ -369,7 +418,7 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	for mname := range mnameNS {
 		if !method3Set[strings.ToLower(mname)] {
 			if err := appendLog(ctx, &results, testcase, "Z01_MNAME_NOT_IN_NS_LIST", map[string]any{
-				"nsname": mname,
+				"ns": mname,
 			}); err != nil {
 				return results, err
 			}
@@ -388,8 +437,8 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			for ip := range mnameNS[mname] {
 				if ip == "127.0.0.1" || ip == "::1" {
 					if err := appendLog(ctx, &results, testcase, "Z01_MNAME_HAS_LOCALHOST_ADDR", map[string]any{
-						"nsname": mname,
-						"ns_ip":  ip,
+						"ns":      mname,
+						"address": ip,
 					}); err != nil {
 						return results, err
 					}
@@ -411,9 +460,7 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 
 				resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "SOA", nil)
 				if resp.Msg == nil {
-					if err := appendLog(ctx, &results, testcase, "Z01_MNAME_NO_RESPONSE", map[string]any{
-						"ns": ns.String(),
-					}); err != nil {
+					if err := appendLog(ctx, &results, testcase, "Z01_MNAME_NO_RESPONSE", withNameserverArgs(ns, nil)); err != nil {
 						return results, err
 					}
 					continue
@@ -422,9 +469,7 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 				soaRecords := resp.GetRecordsForName("SOA", z.Name, "answer")
 				if resp.Rcode() == "NOERROR" && len(soaRecords) > 0 {
 					if !resp.AA() {
-						if err := appendLog(ctx, &results, testcase, "Z01_MNAME_NOT_AUTHORITATIVE", map[string]any{
-							"ns": ns.String(),
-						}); err != nil {
+						if err := appendLog(ctx, &results, testcase, "Z01_MNAME_NOT_AUTHORITATIVE", withNameserverArgs(ns, nil)); err != nil {
 							return results, err
 						}
 					} else {
@@ -435,23 +480,20 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 						}
 					}
 				} else if resp.Rcode() != "NOERROR" {
-					if err := appendLog(ctx, &results, testcase, "Z01_MNAME_UNEXPECTED_RCODE", map[string]any{
-						"ns":    ns.String(),
+					if err := appendLog(ctx, &results, testcase, "Z01_MNAME_UNEXPECTED_RCODE", withNameserverArgs(ns, map[string]any{
 						"rcode": resp.Rcode(),
-					}); err != nil {
+					})); err != nil {
 						return results, err
 					}
 				} else if len(soaRecords) == 0 {
-					if err := appendLog(ctx, &results, testcase, "Z01_MNAME_MISSING_SOA_RECORD", map[string]any{
-						"ns": ns.String(),
-					}); err != nil {
+					if err := appendLog(ctx, &results, testcase, "Z01_MNAME_MISSING_SOA_RECORD", withNameserverArgs(ns, nil)); err != nil {
 						return results, err
 					}
 				}
 			}
 		} else {
 			if err := appendLog(ctx, &results, testcase, "Z01_MNAME_NOT_RESOLVE", map[string]any{
-				"nsname": mname,
+				"ns": mname,
 			}); err != nil {
 				return results, err
 			}
@@ -484,25 +526,28 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			var soaserials []uint32
 			for mname, ipMap := range mnameNotMaster {
 				for ip, serial := range ipMap {
-					nsList = append(nsList, mname+"/"+ip)
+					if ip != "" {
+						nsList = append(nsList, mname+"/"+ip)
+					} else {
+						nsList = append(nsList, mname)
+					}
 					soaserials = append(soaserials, serial)
 				}
 			}
-			sort.Strings(nsList)
-			if err := appendLog(ctx, &results, testcase, "Z01_MNAME_NOT_MASTER", map[string]any{
-				"ns_list":        strings.Join(nsList, ";"),
+			args := map[string]any{
 				"soaserial":      maxUint32(uniqueUint32(soaserials)),
 				"soaserial_list": joinUint32(serials, ";"),
-			}); err != nil {
+			}
+			setTypedServersFromEndpoints(args, nsList)
+			if err := appendLog(ctx, &results, testcase, "Z01_MNAME_NOT_MASTER", args); err != nil {
 				return results, err
 			}
 		}
 
 		if len(mnameMaster) > 0 {
-			sort.Strings(mnameMaster)
-			if err := appendLog(ctx, &results, testcase, "Z01_MNAME_IS_MASTER", map[string]any{
-				"ns_list": strings.Join(mnameMaster, ";"),
-			}); err != nil {
+			args := map[string]any{}
+			setTypedServersFromEndpoints(args, mnameMaster)
+			if err := appendLog(ctx, &results, testcase, "Z01_MNAME_IS_MASTER", args); err != nil {
 				return results, err
 			}
 		}
@@ -810,7 +855,7 @@ func Zone07(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 
 					finalName := soaMname
 					if q := pMname.Question(); len(q) > 0 {
-						questionName := dnsname.New(q[0].Name)
+						questionName := dnsname.New(q[0].Header().Name)
 						finalName = questionName.String()
 					}
 
@@ -972,13 +1017,16 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 
 				outcome.checked = true
 				usevc := false
+				fallback := false
 				p2, _ := ns.QueryWithOptions(ctx, z.Name.String(), "MX", &nameserver.QueryOptions{
-					UseVC: &usevc,
+					UseVC:    &usevc,
+					Fallback: &fallback,
 				})
 				if p2.Msg != nil && p2.TC() {
 					usevc = true
 					p2, _ = ns.QueryWithOptions(ctx, z.Name.String(), "MX", &nameserver.QueryOptions{
-						UseVC: &usevc,
+						UseVC:    &usevc,
+						Fallback: &fallback,
 					})
 				}
 
@@ -1029,28 +1077,29 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(noResponseMX) > 0 {
-		if err := appendLog(ctx, &results, testcase, "Z09_NO_RESPONSE_MX_QUERY", map[string]any{
-			"ns_ip_list": strings.Join(sortedStrings(noResponseMX), ";"),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedAddresses(args, noResponseMX)
+		if err := appendLog(ctx, &results, testcase, "Z09_NO_RESPONSE_MX_QUERY", args); err != nil {
 			return results, err
 		}
 	}
 
 	if len(unexpectedRcodeMX) > 0 {
 		for _, rcode := range sortedKeys(unexpectedRcodeMX) {
-			if err := appendLog(ctx, &results, testcase, "Z09_UNEXPECTED_RCODE_MX", map[string]any{
-				"rcode":      rcode,
-				"ns_ip_list": strings.Join(sortedStrings(unexpectedRcodeMX[rcode]), ";"),
-			}); err != nil {
+			args := map[string]any{
+				"rcode": rcode,
+			}
+			setTypedAddresses(args, unexpectedRcodeMX[rcode])
+			if err := appendLog(ctx, &results, testcase, "Z09_UNEXPECTED_RCODE_MX", args); err != nil {
 				return results, err
 			}
 		}
 	}
 
 	if len(nonAuthoritativeMX) > 0 {
-		if err := appendLog(ctx, &results, testcase, "Z09_NON_AUTH_MX_RESPONSE", map[string]any{
-			"ns_ip_list": strings.Join(sortedStrings(noResponseMX), ";"),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedAddresses(args, noResponseMX)
+		if err := appendLog(ctx, &results, testcase, "Z09_NON_AUTH_MX_RESPONSE", args); err != nil {
 			return results, err
 		}
 	}
@@ -1059,14 +1108,14 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		if err := appendLog(ctx, &results, testcase, "Z09_INCONSISTENT_MX", map[string]any{}); err != nil {
 			return results, err
 		}
-		if err := appendLog(ctx, &results, testcase, "Z09_NO_MX_FOUND", map[string]any{
-			"ns_ip_list": strings.Join(sortedStrings(noMXSet), ";"),
-		}); err != nil {
+		argsNoMX := map[string]any{}
+		setTypedAddresses(argsNoMX, noMXSet)
+		if err := appendLog(ctx, &results, testcase, "Z09_NO_MX_FOUND", argsNoMX); err != nil {
 			return results, err
 		}
-		if err := appendLog(ctx, &results, testcase, "Z09_MX_FOUND", map[string]any{
-			"ns_ip_list": strings.Join(sortedStrings(mapKeys(mxSet)), ";"),
-		}); err != nil {
+		argsFound := map[string]any{}
+		setTypedAddresses(argsFound, mapKeys(mxSet))
+		if err := appendLog(ctx, &results, testcase, "Z09_MX_FOUND", argsFound); err != nil {
 			return results, err
 		}
 	}
@@ -1095,10 +1144,11 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 						if len(records) == 0 {
 							continue
 						}
-						if err := appendLog(ctx, &results, testcase, "Z09_MX_DATA", map[string]any{
-							"mailtarget_list": strings.Join(mxExchangeList(records), ";"),
-							"ns_ip_list":      strings.Join(ips, ";"),
-						}); err != nil {
+						args := map[string]any{
+							"mail_targets": mxExchangeList(records),
+						}
+						setTypedAddresses(args, ips)
+						if err := appendLog(ctx, &results, testcase, "Z09_MX_DATA", args); err != nil {
 							return results, err
 						}
 					}
@@ -1143,10 +1193,11 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 						return results, err
 					}
 				} else {
-					if err := appendLog(ctx, &results, testcase, "Z09_MX_DATA", map[string]any{
-						"ns_ip_list":      strings.Join(mxSetOrder, ";"),
-						"mailtarget_list": strings.Join(mxExchangeList(mxSet[firstIP]), ";"),
-					}); err != nil {
+					args := map[string]any{
+						"mail_targets": mxExchangeList(mxSet[firstIP]),
+					}
+					setTypedAddresses(args, mxSetOrder)
+					if err := appendLog(ctx, &results, testcase, "Z09_MX_DATA", args); err != nil {
 						return results, err
 					}
 				}
@@ -1192,9 +1243,7 @@ func Zone10(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 
 				resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "SOA", nil)
 				if resp.Msg == nil {
-					if _, err := buf.Add("NO_RESPONSE", map[string]any{
-						"ns": ns.String(),
-					}); err != nil {
+					if _, err := buf.Add("NO_RESPONSE", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					return nil
@@ -1203,29 +1252,25 @@ func Zone10(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 				records := resp.GetRecords("SOA", "answer")
 				if len(records) > 0 {
 					if len(records) > 1 {
-						if _, err := buf.Add("MULTIPLE_SOA", map[string]any{
-							"ns":    ns.String(),
+						if _, err := buf.Add("MULTIPLE_SOA", withNameserverArgs(ns, map[string]any{
 							"count": len(records),
-						}); err != nil {
+						})); err != nil {
 							return err
 						}
 					} else if soa, ok := records[0].(*dns.SOA); ok {
 						owner := strings.ToLower(soa.Hdr.Name)
 						expected := strings.ToLower(z.Name.FQDN())
 						if owner != expected {
-							if _, err := buf.Add("WRONG_SOA", map[string]any{
-								"ns":    ns.String(),
-								"owner": owner,
-								"name":  expected,
-							}); err != nil {
+							if _, err := buf.Add("WRONG_SOA", withNameserverArgs(ns, map[string]any{
+								"owner":      owner,
+								"query_name": expected,
+							})); err != nil {
 								return err
 							}
 						}
 					}
 				} else {
-					if _, err := buf.Add("NO_SOA_IN_RESPONSE", map[string]any{
-						"ns": ns.String(),
-					}); err != nil {
+					if _, err := buf.Add("NO_SOA_IN_RESPONSE", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 				}
@@ -1366,7 +1411,9 @@ func Zone11(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		}
 	} else if allEmptyKeys(spfNS) {
 		if z.Name.String() == "." || nextHigherIsRoot(z.Name) || strings.HasSuffix(strings.ToLower(z.Name.String()), ".arpa") {
-			if err := appendLog(ctx, &results, testcase, "Z11_NO_SPF_NON_MAIL_DOMAIN", map[string]any{}); err != nil {
+			if err := appendLog(ctx, &results, testcase, "Z11_NO_SPF_NON_MAIL_DOMAIN", map[string]any{
+				"domain": z.Name.String(),
+			}); err != nil {
 				return results, err
 			}
 		} else {
@@ -1381,9 +1428,9 @@ func Zone11(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 		for _, nsList := range spfNS {
-			if err := appendLog(ctx, &results, testcase, "Z11_DIFFERENT_SPF_POLICIES_FOUND", map[string]any{
-				"ns_list": strings.Join(sortedStrings(nsList), ";"),
-			}); err != nil {
+			args := map[string]any{}
+			setTypedServersFromNames(args, nsList)
+			if err := appendLog(ctx, &results, testcase, "Z11_DIFFERENT_SPF_POLICIES_FOUND", args); err != nil {
 				return results, err
 			}
 		}
@@ -1392,9 +1439,9 @@ func Zone11(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		for _, ip := range badSpfIPs(nsSpf) {
 			nsList = append(nsList, ipToNS[ip]...)
 		}
-		if err := appendLog(ctx, &results, testcase, "Z11_SPF_MULTIPLE_RECORDS", map[string]any{
-			"ns_list": strings.Join(sortedStrings(nsList), ";"),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, nsList)
+		if err := appendLog(ctx, &results, testcase, "Z11_SPF_MULTIPLE_RECORDS", args); err != nil {
 			return results, err
 		}
 	} else {
@@ -1433,16 +1480,409 @@ func Zone11(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			for ip := range nsSpf {
 				nsList = append(nsList, ipToNS[ip]...)
 			}
-			if err := appendLog(ctx, &results, testcase, "Z11_SPF_SYNTAX_ERROR", map[string]any{
-				"ns_list": strings.Join(sortedStrings(nsList), ";"),
-				"domain":  z.Name.String(),
-			}); err != nil {
+			args := map[string]any{
+				"domain": z.Name.String(),
+			}
+			setTypedServersFromNames(args, nsList)
+			if err := appendLog(ctx, &results, testcase, "Z11_SPF_SYNTAX_ERROR", args); err != nil {
 				return results, err
 			}
 		}
 	}
 
 	return appendTestCaseEnd(ctx, results, testcase)
+}
+
+// Zone12 runs the Zone12 test case.
+func Zone12(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
+	const testcase = "Zone12"
+	var results []*logger.Entry
+
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+		return results, err
+	}
+
+	nss, err := method4and5(ctx, z)
+	if err != nil {
+		return results, err
+	}
+
+	type csyncOutcome struct {
+		ns        nameserver.Nameserver
+		checked   bool
+		csyncRRs  []dns.RR
+		soaSerial uint32
+		soaOK     bool
+	}
+
+	var outcomes []csyncOutcome
+	if len(nss) > 0 {
+		outcomes = make([]csyncOutcome, len(nss))
+		tasks := make([]runner.Task, len(nss))
+		for i, ns := range nss {
+			i, ns := i, ns
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				outcome := csyncOutcome{ns: ns}
+
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "CSYNC"); err != nil {
+					return err
+				} else if disabled {
+					outcomes[i] = outcome
+					return nil
+				}
+
+				resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "CSYNC", nil)
+				if resp.Msg == nil || resp.Rcode() != "NOERROR" || !resp.AA() {
+					outcomes[i] = outcome
+					return nil
+				}
+
+				outcome.csyncRRs = resp.GetRecordsForName("CSYNC", z.Name)
+
+				// Query SOA from the same NS to get the current serial for comparison.
+				soaResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "SOA", nil)
+				if soaResp.Msg != nil {
+					for _, rr := range soaResp.GetRecordsForName("SOA", z.Name) {
+						if soa, ok := rr.(*dns.SOA); ok {
+							outcome.soaSerial = soa.Serial
+							outcome.soaOK = true
+							break
+						}
+					}
+				}
+
+				outcome.checked = true
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+		if err != nil {
+			return results, err
+		}
+		results = append(results, entries...)
+	}
+
+	type csyncGroup struct {
+		serial      uint32
+		flags       uint16
+		typeBitmap  string
+		endpoints   []string
+	}
+
+	var hasCSYNC, noCSYNC int
+	csyncKeys := map[string]struct{}{}
+	csyncGroups := map[string]*csyncGroup{}
+	var csyncGroupOrder []string
+	var noCSYNCNames []string
+
+	for _, outcome := range outcomes {
+		if !outcome.checked {
+			continue
+		}
+		ns := outcome.ns
+		if len(outcome.csyncRRs) > 1 {
+			hasCSYNC++
+			if err := appendLog(ctx, &results, testcase, "Z12_MULTIPLE_CSYNC", withNameserverArgs(ns, map[string]any{
+				"count": len(outcome.csyncRRs),
+			})); err != nil {
+				return results, err
+			}
+		} else if len(outcome.csyncRRs) == 1 {
+			hasCSYNC++
+			csync, ok := outcome.csyncRRs[0].(*dns.CSYNC)
+			if !ok {
+				continue
+			}
+			typeBitmap := csyncTypeBitmap(csync.CSYNC.TypeBitMap)
+			if outcome.soaOK && csyncSerialMismatch(csync.CSYNC.Serial, csync.CSYNC.Flags, outcome.soaSerial) {
+				if err := appendLog(ctx, &results, testcase, "Z12_SERIAL_MISMATCH", withNameserverArgs(ns, map[string]any{
+					"csync_serial": csync.CSYNC.Serial,
+					"soa_serial":   outcome.soaSerial,
+				})); err != nil {
+					return results, err
+				}
+			}
+			key := fmt.Sprintf("%d/%d/%v", csync.CSYNC.Serial, csync.CSYNC.Flags, csync.CSYNC.TypeBitMap)
+			csyncKeys[key] = struct{}{}
+			endpoint := ns.NameString() + "/" + ns.AddressString()
+			if g, ok := csyncGroups[key]; ok {
+				g.endpoints = append(g.endpoints, endpoint)
+			} else {
+				csyncGroups[key] = &csyncGroup{
+					serial:     csync.CSYNC.Serial,
+					flags:      csync.CSYNC.Flags,
+					typeBitmap: typeBitmap,
+					endpoints:  []string{endpoint},
+				}
+				csyncGroupOrder = append(csyncGroupOrder, key)
+			}
+		} else {
+			noCSYNC++
+			noCSYNCNames = append(noCSYNCNames, ns.NameString()+"/"+ns.AddressString())
+		}
+	}
+
+	for _, key := range csyncGroupOrder {
+		g := csyncGroups[key]
+		args := map[string]any{
+			"serial":      g.serial,
+			"flags":       g.flags,
+			"type_bitmap": g.typeBitmap,
+		}
+		setTypedServersFromEndpoints(args, g.endpoints)
+		if err := appendLog(ctx, &results, testcase, "Z12_CSYNC_FOUND", args); err != nil {
+			return results, err
+		}
+	}
+
+	if noCSYNC > 0 {
+		args := map[string]any{}
+		setTypedServersFromEndpoints(args, noCSYNCNames)
+		if err := appendLog(ctx, &results, testcase, "Z12_NO_CSYNC", args); err != nil {
+			return results, err
+		}
+	}
+
+	if hasCSYNC > 0 && noCSYNC > 0 {
+		if err := appendLog(ctx, &results, testcase, "Z12_MIXED_PRESENCE", map[string]any{}); err != nil {
+			return results, err
+		}
+	}
+	if hasCSYNC > 1 && len(csyncKeys) > 1 {
+		if err := appendLog(ctx, &results, testcase, "Z12_INCONSISTENT_CSYNC", map[string]any{}); err != nil {
+			return results, err
+		}
+	}
+
+	return appendTestCaseEnd(ctx, results, testcase)
+}
+
+func csyncSerialMismatch(csyncSerial uint32, flags uint16, soaSerial uint32) bool {
+	// RFC 7477: with soaminimum set, CSYNC serial is a lower-bound gate.
+	if flags&csyncFlagSoaMinimum != 0 {
+		return util.SerialGT(csyncSerial, soaSerial)
+	}
+	return csyncSerial != soaSerial
+}
+
+// csyncTypeBitmap formats a CSYNC TypeBitMap as a semicolon-separated list of DNS type names.
+func csyncTypeBitmap(types []uint16) string {
+	var names []string
+	for _, t := range types {
+		if name, ok := dns.TypeToString[t]; ok {
+			names = append(names, name)
+		} else {
+			names = append(names, fmt.Sprintf("TYPE%d", t))
+		}
+	}
+	return strings.Join(names, ";")
+}
+
+// Zone13 runs the Zone13 test case (SPF DNS lookup count per RFC 7208 Section 4.6.4).
+func Zone13(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
+	const testcase = "Zone13"
+	var results []*logger.Entry
+
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+		return results, err
+	}
+
+	// Retrieve SPF record from zone apex.
+	resp, _ := queryAuth(ctx, z, z.Name.String(), "TXT")
+	if resp.Msg == nil || resp.Rcode() != "NOERROR" || !resp.AA() {
+		if err := appendLog(ctx, &results, testcase, "Z13_UNABLE_TO_CHECK", map[string]any{}); err != nil {
+			return results, err
+		}
+		return appendTestCaseEnd(ctx, results, testcase)
+	}
+
+	txtRecords := resp.GetRecordsForName("TXT", z.Name)
+	var spfRecord string
+	for _, rr := range txtRecords {
+		txt, ok := rr.(*dns.TXT)
+		if !ok {
+			continue
+		}
+		joined := strings.Join(txt.Txt, "")
+		lower := strings.ToLower(joined)
+		if strings.HasPrefix(lower, "v=spf1") && (len(lower) == len("v=spf1") || lower[len("v=spf1")] == ' ' || lower[len("v=spf1")] == '\t') {
+			spfRecord = lower
+			break
+		}
+	}
+
+	if spfRecord == "" {
+		if err := appendLog(ctx, &results, testcase, "Z13_NO_SPF_FOUND", map[string]any{
+			"domain": z.Name.String(),
+		}); err != nil {
+			return results, err
+		}
+		return appendTestCaseEnd(ctx, results, testcase)
+	}
+
+	limit := profile.FromContext(ctx).TestCasesVars.Zone13.SPFLookupLimit
+	visited := map[string]bool{}
+	count, loopDomain, errorTarget, hasPtr, hasLoop, hasError := spfWalkLookups(ctx, z, spfRecord, visited)
+
+	if hasPtr {
+		if err := appendLog(ctx, &results, testcase, "Z13_SPF_PTR_DEPRECATED", map[string]any{
+			"domain": z.Name.String(),
+		}); err != nil {
+			return results, err
+		}
+	}
+
+	if hasLoop {
+		if err := appendLog(ctx, &results, testcase, "Z13_SPF_LOOKUP_LOOP", map[string]any{
+			"domain":      z.Name.String(),
+			"loop_domain": loopDomain,
+		}); err != nil {
+			return results, err
+		}
+	}
+
+	if hasError {
+		if err := appendLog(ctx, &results, testcase, "Z13_SPF_RECURSIVE_ERROR", map[string]any{
+			"domain": z.Name.String(),
+			"target": errorTarget,
+		}); err != nil {
+			return results, err
+		}
+	}
+
+	if count > limit {
+		if err := appendLog(ctx, &results, testcase, "Z13_SPF_LOOKUP_COUNT_EXCEEDED", map[string]any{
+			"domain": z.Name.String(),
+			"count":  count,
+			"limit":  limit,
+		}); err != nil {
+			return results, err
+		}
+	} else {
+		if err := appendLog(ctx, &results, testcase, "Z13_SPF_LOOKUP_COUNT_OK", map[string]any{
+			"domain": z.Name.String(),
+			"count":  count,
+		}); err != nil {
+			return results, err
+		}
+	}
+
+	return appendTestCaseEnd(ctx, results, testcase)
+}
+
+// spfWalkLookups recursively walks an SPF record and counts DNS-resolving mechanisms.
+// Returns (count, loopDomain, errorTarget, hasPtr, hasLoop, hasError).
+func spfWalkLookups(ctx context.Context, z *zonepkg.Zone, spfRecord string, visited map[string]bool) (int, string, string, bool, bool, bool) {
+	rest := strings.TrimSpace(spfRecord[len("v=spf1"):])
+	if rest == "" {
+		return 0, "", "", false, false, false
+	}
+
+	count := 0
+	var loopDomain, errorTarget string
+	var hasPtr, hasLoop, hasError bool
+
+	for _, term := range strings.Fields(rest) {
+		// Strip qualifier
+		if len(term) > 0 && (term[0] == '+' || term[0] == '-' || term[0] == '~' || term[0] == '?') {
+			term = term[1:]
+		}
+		if term == "" {
+			continue
+		}
+
+		switch {
+		case term == "all" || strings.HasPrefix(term, "ip4:") || strings.HasPrefix(term, "ip6:"):
+			// No DNS lookup needed.
+		case strings.HasPrefix(term, "exp="):
+			// exp modifier does not count toward the limit.
+
+		case strings.HasPrefix(term, "include:"):
+			count++
+			target := term[len("include:"):]
+			subCount, subLoop, subErr, subPtr, subHasLoop, subHasErr := spfResolveLookups(ctx, z, target, visited)
+			count += subCount
+			if subPtr {
+				hasPtr = true
+			}
+			if subHasLoop && !hasLoop {
+				hasLoop = true
+				loopDomain = subLoop
+			}
+			if subHasErr && !hasError {
+				hasError = true
+				errorTarget = subErr
+			}
+
+		case strings.HasPrefix(term, "redirect="):
+			count++
+			target := term[len("redirect="):]
+			subCount, subLoop, subErr, subPtr, subHasLoop, subHasErr := spfResolveLookups(ctx, z, target, visited)
+			count += subCount
+			if subPtr {
+				hasPtr = true
+			}
+			if subHasLoop && !hasLoop {
+				hasLoop = true
+				loopDomain = subLoop
+			}
+			if subHasErr && !hasError {
+				hasError = true
+				errorTarget = subErr
+			}
+
+		case term == "a" || strings.HasPrefix(term, "a:") || strings.HasPrefix(term, "a/"):
+			count++
+		case term == "mx" || strings.HasPrefix(term, "mx:") || strings.HasPrefix(term, "mx/"):
+			count++
+		case term == "ptr" || strings.HasPrefix(term, "ptr:") || strings.HasPrefix(term, "ptr/"):
+			count++
+			hasPtr = true
+		case strings.HasPrefix(term, "exists:"):
+			count++
+		}
+	}
+
+	return count, loopDomain, errorTarget, hasPtr, hasLoop, hasError
+}
+
+// spfResolveLookups fetches the SPF record for a target domain and recursively walks it.
+func spfResolveLookups(ctx context.Context, z *zonepkg.Zone, target string, visited map[string]bool) (int, string, string, bool, bool, bool) {
+	target = strings.ToLower(strings.TrimRight(target, "."))
+	if visited[target] {
+		return 0, target, "", false, true, false
+	}
+	visited[target] = true
+
+	// Ensure FQDN for DNS query.
+	fqdn := target
+	if !strings.HasSuffix(fqdn, ".") {
+		fqdn += "."
+	}
+
+	resp, err := recurse(ctx, z, fqdn, "TXT")
+	if err != nil || resp.Msg == nil {
+		return 0, "", target, false, false, true
+	}
+
+	txtRecords := resp.GetRecords("TXT")
+	for _, rr := range txtRecords {
+		txt, ok := rr.(*dns.TXT)
+		if !ok {
+			continue
+		}
+		joined := strings.ToLower(strings.Join(txt.Txt, ""))
+		if strings.HasPrefix(joined, "v=spf1") && (len(joined) == len("v=spf1") || joined[len("v=spf1")] == ' ' || joined[len("v=spf1")] == '\t') {
+			return spfWalkLookups(ctx, z, joined, visited)
+		}
+	}
+
+	// No SPF record found at target — treat as resolution error.
+	return 0, "", target, false, false, true
 }
 
 func appendTestCaseEnd(ctx context.Context, results []*logger.Entry, testcase string) ([]*logger.Entry, error) {
@@ -1461,13 +1901,21 @@ func appendLog(ctx context.Context, results *[]*logger.Entry, testcase string, t
 	return nil
 }
 
+func withNameserverArgs(ns nameserver.Nameserver, args map[string]any) map[string]any {
+	if args == nil {
+		args = map[string]any{}
+	}
+	logargs.NormalizeQueryIdentity(args)
+	logargs.SetNS(args, ns.NameString(), ns.AddressString())
+	return args
+}
+
 func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
 	if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 		for _, rrtype := range rrtypes {
-			if _, err := buf.Add("IPV6_DISABLED", map[string]any{
-				"ns":     ns.String(),
-				"rrtype": rrtype,
-			}); err != nil {
+			if _, err := buf.Add("IPV6_DISABLED", withNameserverArgs(ns, map[string]any{
+				"query_type": rrtype,
+			})); err != nil {
 				return true, err
 			}
 		}
@@ -1475,10 +1923,9 @@ func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, ns
 	}
 	if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
 		for _, rrtype := range rrtypes {
-			if _, err := buf.Add("IPV4_DISABLED", map[string]any{
-				"ns":     ns.String(),
-				"rrtype": rrtype,
-			}); err != nil {
+			if _, err := buf.Add("IPV4_DISABLED", withNameserverArgs(ns, map[string]any{
+				"query_type": rrtype,
+			})); err != nil {
 				return true, err
 			}
 		}
@@ -1490,10 +1937,9 @@ func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, ns
 func ipDisabledMessage(ctx context.Context, results *[]*logger.Entry, testcase string, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
 	if !profile.FromContext(ctx).Net.IPv6 && ns.Address.Is6() {
 		for _, rrtype := range rrtypes {
-			if err := appendLog(ctx, results, testcase, "IPV6_DISABLED", map[string]any{
-				"ns":     ns.String(),
-				"rrtype": rrtype,
-			}); err != nil {
+			if err := appendLog(ctx, results, testcase, "IPV6_DISABLED", withNameserverArgs(ns, map[string]any{
+				"query_type": rrtype,
+			})); err != nil {
 				return true, err
 			}
 		}
@@ -1501,10 +1947,9 @@ func ipDisabledMessage(ctx context.Context, results *[]*logger.Entry, testcase s
 	}
 	if !profile.FromContext(ctx).Net.IPv4 && ns.Address.Is4() {
 		for _, rrtype := range rrtypes {
-			if err := appendLog(ctx, results, testcase, "IPV4_DISABLED", map[string]any{
-				"ns":     ns.String(),
-				"rrtype": rrtype,
-			}); err != nil {
+			if err := appendLog(ctx, results, testcase, "IPV4_DISABLED", withNameserverArgs(ns, map[string]any{
+				"query_type": rrtype,
+			})); err != nil {
 				return true, err
 			}
 		}
@@ -1703,7 +2148,7 @@ func validDomain(value string) bool {
 	if value == "" {
 		return false
 	}
-	_, ok := dns.IsDomainName(value)
+	ok := dnsutil.IsName(value)
 	return ok
 }
 
@@ -1758,7 +2203,7 @@ func nameserversByIP(servers []nameserver.Nameserver) [][]nameserver.Nameserver 
 func nsStrings(servers []nameserver.Nameserver) []string {
 	values := make([]string, 0, len(servers))
 	for _, ns := range servers {
-		values = append(values, ns.String())
+		values = append(values, ns.NameString())
 	}
 	return values
 }
@@ -1774,6 +2219,7 @@ func encodeLowercaseRRSet(records []dns.RR) string {
 }
 
 func mxExchangeList(records []dns.RR) []string {
+	seen := map[string]bool{}
 	var out []string
 	for _, rr := range records {
 		mx, ok := rr.(*dns.MX)
@@ -1781,8 +2227,14 @@ func mxExchangeList(records []dns.RR) []string {
 			continue
 		}
 		mxName := dnsname.New(mx.Mx)
-		out = append(out, mxName.String())
+		value := mxName.String()
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
 	}
+	sort.Strings(out)
 	return out
 }
 
@@ -1790,6 +2242,87 @@ func sortedStrings(values []string) []string {
 	out := append([]string{}, values...)
 	sort.Strings(out)
 	return out
+}
+
+func setTypedAddresses(args map[string]any, values []string) {
+	if args == nil || len(values) == 0 {
+		return
+	}
+	seen := map[string]bool{}
+	addresses := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		addresses = append(addresses, value)
+	}
+	if len(addresses) == 0 {
+		return
+	}
+	sort.Strings(addresses)
+	args["addresses"] = addresses
+}
+
+func setTypedServersFromNames(args map[string]any, values []string) {
+	if args == nil || len(values) == 0 {
+		return
+	}
+	raw, ok := logargs.ServersFromValues(values)["servers"]
+	if !ok {
+		return
+	}
+	servers, ok := raw.([]map[string]any)
+	if !ok || len(servers) == 0 {
+		return
+	}
+	args["servers"] = servers
+}
+
+func setTypedServersFromEndpoints(args map[string]any, values []string) {
+	if args == nil || len(values) == 0 {
+		return
+	}
+	seen := map[string]bool{}
+	servers := make([]logargs.Server, 0, len(values))
+	for _, value := range values {
+		ns, address := splitEndpoint(value)
+		if ns == "" && address == "" {
+			continue
+		}
+		key := ns + "|" + address
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		servers = append(servers, logargs.Server{NS: ns, Address: address})
+	}
+	if len(servers) == 0 {
+		return
+	}
+	if typed, ok := logargs.Servers(servers)["servers"]; ok {
+		args["servers"] = typed
+	}
+}
+
+func splitEndpoint(value string) (string, string) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", ""
+	}
+	if ip, err := netip.ParseAddr(value); err == nil {
+		return "", ip.String()
+	}
+	sep := strings.LastIndex(value, "/")
+	if sep > 0 && sep < len(value)-1 {
+		name := strings.TrimSpace(value[:sep])
+		ipText := strings.TrimSpace(value[sep+1:])
+		if ip, err := netip.ParseAddr(ipText); err == nil {
+			return logargs.EndpointName(name), ip.String()
+		}
+	}
+	return logargs.EndpointName(value), ""
 }
 
 func sortedKeys(values map[string][]string) []string {

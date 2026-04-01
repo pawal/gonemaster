@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/netip"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -11,11 +12,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/transport"
 )
 
 func TestFakeDSResponse(t *testing.T) {
@@ -89,17 +92,9 @@ func TestQueryCacheHit(t *testing.T) {
 		calls++
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
-		msg.Answer = []dns.RR{
-			&dns.A{
-				Hdr: dns.RR_Header{
-					Name:   "example.",
-					Rrtype: dns.TypeA,
-					Class:  dns.ClassINET,
-					Ttl:    60,
-				},
-				A: net.IPv4(192, 0, 2, 5),
-			},
-		}
+		aRR := &dns.A{Hdr: dns.Header{Name: "example.", Class: dns.ClassINET, TTL: 60}}
+		aRR.Addr = netip.AddrFrom4([4]byte{192, 0, 2, 5})
+		msg.Answer = []dns.RR{aRR}
 		return packet.Packet{Msg: msg}, nil
 	})
 
@@ -339,149 +334,6 @@ func TestContextCanceledDoesNotBlacklist(t *testing.T) {
 	}
 }
 
-func TestSOATimeoutBurstBlacklistsTemporarily(t *testing.T) {
-	ns, err := New("ns.example", "192.0.2.201", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-
-	ctx, _ := testContext(t)
-	timeout := 60 * time.Millisecond
-	opts := &QueryOptions{Timeout: &timeout}
-
-	var calls int
-	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
-		calls++
-		return packet.Packet{}, fmt.Errorf("timeout")
-	})
-
-	_, err = ns.QueryWithOptions(ctx, "example1", "SOA", opts)
-	if err == nil {
-		t.Fatalf("expected first timeout error")
-	}
-	_, err = ns.QueryWithOptions(ctx, "example2", "SOA", opts)
-	if err == nil {
-		t.Fatalf("expected second timeout error")
-	}
-	_, err = ns.QueryWithOptions(ctx, "example3", "SOA", opts)
-	if err != nil {
-		t.Fatalf("expected blacklisted query to be skipped without error, got %v", err)
-	}
-	if calls != 2 {
-		t.Fatalf("expected 2 network calls before temporary blacklist, got %d", calls)
-	}
-}
-
-func TestSOATemporaryBlacklistExpires(t *testing.T) {
-	ns, err := New("ns.example", "192.0.2.202", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-
-	ctx, _ := testContext(t)
-	timeout := 50 * time.Millisecond
-	opts := &QueryOptions{Timeout: &timeout}
-
-	var calls int
-	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
-		calls++
-		return packet.Packet{}, fmt.Errorf("timeout")
-	})
-
-	_, _ = ns.QueryWithOptions(ctx, "example1", "SOA", opts)
-	_, _ = ns.QueryWithOptions(ctx, "example2", "SOA", opts)
-	_, _ = ns.QueryWithOptions(ctx, "example3", "SOA", opts)
-	if calls != 2 {
-		t.Fatalf("expected immediate third query to be skipped while blacklisted, got %d calls", calls)
-	}
-
-	time.Sleep(blacklistMinTTL + 80*time.Millisecond)
-	_, _ = ns.QueryWithOptions(ctx, "example4", "SOA", opts)
-	if calls != 3 {
-		t.Fatalf("expected blacklist to expire and allow new network call, got %d calls", calls)
-	}
-}
-
-func TestFastFailDisabledByDefault(t *testing.T) {
-	ns, err := New("ns.example", "192.0.2.203", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-
-	ctx, prof := testContext(t)
-	if prof.Resolver.Defaults.FastFailTimeoutCount != 0 {
-		t.Fatalf("expected default fast-fail timeout count to be 0")
-	}
-
-	var calls int
-	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
-		calls++
-		return packet.Packet{}, fmt.Errorf("timeout")
-	})
-
-	for i := 0; i < 4; i++ {
-		_, _ = ns.QueryWithOptions(ctx, fmt.Sprintf("example%d", i), "A", nil)
-	}
-	if calls != 4 {
-		t.Fatalf("expected no fast-fail skipping by default, got %d calls", calls)
-	}
-}
-
-func TestFastFailSkipsAfterConfiguredTimeoutThreshold(t *testing.T) {
-	ns, err := New("ns.example", "192.0.2.204", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-
-	ctx, prof := testContext(t)
-	prof.Resolver.Defaults.FastFailTimeoutCount = 2
-
-	var calls int
-	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
-		calls++
-		return packet.Packet{}, fmt.Errorf("timeout")
-	})
-
-	_, err = ns.QueryWithOptions(ctx, "example1", "A", nil)
-	if err == nil {
-		t.Fatalf("expected timeout error on first call")
-	}
-	_, err = ns.QueryWithOptions(ctx, "example2", "A", nil)
-	if err == nil {
-		t.Fatalf("expected timeout error on second call")
-	}
-	_, err = ns.QueryWithOptions(ctx, "example3", "A", nil)
-	if err != nil {
-		t.Fatalf("expected third call to be skipped by fast-fail, got %v", err)
-	}
-	if calls != 2 {
-		t.Fatalf("expected only 2 network calls before fast-fail skip, got %d", calls)
-	}
-}
-
-func TestFastFailDoesNotCountNonTimeoutErrors(t *testing.T) {
-	ns, err := New("ns.example", "192.0.2.205", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-
-	ctx, prof := testContext(t)
-	prof.Resolver.Defaults.FastFailTimeoutCount = 2
-
-	var calls int
-	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
-		calls++
-		return packet.Packet{}, fmt.Errorf("connection refused")
-	})
-
-	for i := 0; i < 4; i++ {
-		_, _ = ns.QueryWithOptions(ctx, fmt.Sprintf("example%d", i), "A", nil)
-	}
-	if calls != 4 {
-		t.Fatalf("expected non-timeout errors not to trigger fast-fail skip, got %d calls", calls)
-	}
-}
-
 func TestReachabilityCacheSkipsAcrossCaches(t *testing.T) {
 	clearReachabilityCache()
 	t.Cleanup(clearReachabilityCache)
@@ -631,17 +483,60 @@ func TestClientForOptionsDefaults(t *testing.T) {
 	}
 }
 
+func TestClientForOptionsAppliesProfileSourceAddressByFamily(t *testing.T) {
+	ctx, prof := testContext(t)
+	prof.Resolver.Source4 = "192.0.2.88"
+	prof.Resolver.Source6 = "2001:db8::88"
+
+	ns4, err := New("ns4.example", "192.0.2.30", nil)
+	if err != nil {
+		t.Fatalf("new ipv4 nameserver: %v", err)
+	}
+	client4, err := ns4.clientForOptions(ctx, nil)
+	if err != nil {
+		t.Fatalf("client4: %v", err)
+	}
+	if client4.SourceIP != "192.0.2.88" {
+		t.Fatalf("client4.SourceIP = %q, want 192.0.2.88", client4.SourceIP)
+	}
+
+	ns6, err := New("ns6.example", "2001:db8::30", nil)
+	if err != nil {
+		t.Fatalf("new ipv6 nameserver: %v", err)
+	}
+	client6, err := ns6.clientForOptions(ctx, nil)
+	if err != nil {
+		t.Fatalf("client6: %v", err)
+	}
+	if client6.SourceIP != "2001:db8::88" {
+		t.Fatalf("client6.SourceIP = %q, want 2001:db8::88", client6.SourceIP)
+	}
+
+	explicit := &transport.Client{SourceIP: "192.0.2.199"}
+	nsExplicit, err := New("ns-explicit.example", "192.0.2.31", explicit)
+	if err != nil {
+		t.Fatalf("new explicit nameserver: %v", err)
+	}
+	clientExplicit, err := nsExplicit.clientForOptions(ctx, nil)
+	if err != nil {
+		t.Fatalf("clientExplicit: %v", err)
+	}
+	if clientExplicit.SourceIP != "192.0.2.199" {
+		t.Fatalf("expected explicit source ip to be preserved, got %q", clientExplicit.SourceIP)
+	}
+}
+
 func TestAXFRHook(t *testing.T) {
 	ns, err := New("ns.example", "192.0.2.22", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
 
-	rr1, err := dns.NewRR("example. 60 IN SOA ns.example. hostmaster.example. 1 3600 600 86400 60")
+	rr1, err := dns.New("example. 60 IN SOA ns.example. hostmaster.example. 1 3600 600 86400 60")
 	if err != nil {
 		t.Fatalf("soa rr: %v", err)
 	}
-	rr2, err := dns.NewRR("example. 60 IN A 192.0.2.10")
+	rr2, err := dns.New("example. 60 IN A 192.0.2.10")
 	if err != nil {
 		t.Fatalf("a rr: %v", err)
 	}
@@ -746,13 +641,13 @@ func TestEmptyCache(t *testing.T) {
 }
 
 func TestQueryLogging(t *testing.T) {
-	ns, err := New("ns.example", "127.0.0.1", nil)
+	ctx, _ := testContext(t)
+	log := logger.FromContext(ctx)
+
+	ns, err := NewWithContext(ctx, "ns.example", "127.0.0.1", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
-
-	log := logger.New()
-	ctx := logger.WithContext(context.Background(), log)
 
 	// Use a very short timeout since we expect network failure
 	timeout := 10 * time.Millisecond
@@ -769,14 +664,20 @@ func TestQueryLogging(t *testing.T) {
 		if entry.Tag == "EXTERNAL_QUERY" {
 			foundQuery = true
 			loggedArgs := entry.Args
-			if name, ok := loggedArgs["name"]; !ok || name != "example.com" {
-				t.Errorf("expected name=example.com, got %v", name)
+			if name, ok := loggedArgs["query_name"]; !ok || name != "example.com" {
+				t.Errorf("expected query_name=example.com, got %v", name)
 			}
-			if qtype, ok := loggedArgs["type"]; !ok || qtype != "SOA" {
-				t.Errorf("expected type=SOA, got %v", qtype)
+			if qtype, ok := loggedArgs["query_type"]; !ok || qtype != "SOA" {
+				t.Errorf("expected query_type=SOA, got %v", qtype)
 			}
-			if ip, ok := loggedArgs["ip"]; !ok || ip != "127.0.0.1" {
-				t.Errorf("expected ip=127.0.0.1, got %v", ip)
+			if qclass, ok := loggedArgs["query_class"]; !ok || qclass != "IN" {
+				t.Errorf("expected query_class=IN, got %v", qclass)
+			}
+			if address, ok := loggedArgs["address"]; !ok || address != "127.0.0.1" {
+				t.Errorf("expected address=127.0.0.1, got %v", address)
+			}
+			if _, ok := loggedArgs["ip"]; ok {
+				t.Errorf("legacy key ip should not be present, got %v", loggedArgs["ip"])
 			}
 			if flags, ok := loggedArgs["flags"]; !ok || flags != "{\"class\":\"IN\"}" {
 				t.Errorf("expected flags={\"class\":\"IN\"}, got %v", flags)
@@ -790,247 +691,197 @@ func TestQueryLogging(t *testing.T) {
 	}
 }
 
-func TestRateLimitPacingDelaysQueryDispatch(t *testing.T) {
-	ns, err := New("ns.example", "192.0.2.70", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-
-	ctx, prof := testContext(t)
-	prof.Resolver.Defaults.RateLimitPacingEnabled = true
-	prof.Resolver.Defaults.RateLimitPacingMinMS = 80
-	prof.Resolver.Defaults.RateLimitPacingMaxMS = 80
-
-	ns.state.rateLimitPacing.jitterFn = func() float64 { return 0.5 }
-	ns.state.rateLimitPacing.observeResult(false, rateLimitSignalConnectionError, time.Now())
-
-	var calls int
-	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
-		calls++
-		msg := new(dns.Msg)
-		msg.Rcode = dns.RcodeSuccess
-		return packet.Packet{Msg: msg}, nil
-	})
-
-	start := time.Now()
-	_, err = ns.QueryWithOptions(ctx, "example", "A", nil)
-	if err != nil {
-		t.Fatalf("query with pacing delay: %v", err)
-	}
-	elapsed := time.Since(start)
-	if elapsed < 65*time.Millisecond {
-		t.Fatalf("expected paced delay >=65ms, got %v", elapsed)
-	}
-	if calls != 1 {
-		t.Fatalf("expected one network call after delay, got %d", calls)
-	}
-}
-
-func TestRateLimitPacingSkipsWhenDelayExceedsTimeoutBudget(t *testing.T) {
-	ns, err := New("ns.example", "192.0.2.71", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-
-	ctx, prof := testContext(t)
-	prof.Resolver.Defaults.RateLimitPacingEnabled = true
-	prof.Resolver.Defaults.RateLimitPacingMinMS = 200
-	prof.Resolver.Defaults.RateLimitPacingMaxMS = 200
-
-	ns.state.rateLimitPacing.jitterFn = func() float64 { return 0.5 }
-	ns.state.rateLimitPacing.observeResult(false, rateLimitSignalConnectionError, time.Now())
-
-	var calls int
-	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
-		calls++
-		msg := new(dns.Msg)
-		msg.Rcode = dns.RcodeSuccess
-		return packet.Packet{Msg: msg}, nil
-	})
-
-	timeout := 20 * time.Millisecond
-	resp, err := ns.QueryWithOptions(ctx, "example", "A", &QueryOptions{Timeout: &timeout})
-	if err != nil {
-		t.Fatalf("query with paced skip: %v", err)
-	}
-	if resp.Msg != nil {
-		t.Fatalf("expected paced query skip to return empty response")
-	}
-	if calls != 0 {
-		t.Fatalf("expected paced query skip before network dispatch, got %d calls", calls)
-	}
-}
-
-func TestRateLimitPacingIsPerNameserver(t *testing.T) {
-	nsSlow, err := New("ns-slow.example", "192.0.2.72", nil)
-	if err != nil {
-		t.Fatalf("new slow nameserver: %v", err)
-	}
-	nsFast, err := New("ns-fast.example", "192.0.2.73", nil)
-	if err != nil {
-		t.Fatalf("new fast nameserver: %v", err)
-	}
-
-	ctx, prof := testContext(t)
-	prof.Resolver.Defaults.RateLimitPacingEnabled = true
-	prof.Resolver.Defaults.RateLimitPacingMinMS = 150
-	prof.Resolver.Defaults.RateLimitPacingMaxMS = 150
-
-	nsSlow.state.rateLimitPacing.jitterFn = func() float64 { return 0.5 }
-	nsSlow.state.rateLimitPacing.observeResult(false, rateLimitSignalConnectionError, time.Now())
-
-	nsSlow.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
-		msg := new(dns.Msg)
-		msg.Rcode = dns.RcodeSuccess
-		return packet.Packet{Msg: msg}, nil
-	})
-	nsFast.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
-		msg := new(dns.Msg)
-		msg.Rcode = dns.RcodeSuccess
-		return packet.Packet{Msg: msg}, nil
-	})
-
-	start := make(chan struct{})
-	var wg sync.WaitGroup
-	wg.Add(2)
-
-	var slowElapsed time.Duration
-	var fastElapsed time.Duration
-	var slowErr error
-	var fastErr error
-
-	go func() {
-		defer wg.Done()
-		<-start
-		begin := time.Now()
-		_, slowErr = nsSlow.QueryWithOptions(ctx, "slow.example", "A", nil)
-		slowElapsed = time.Since(begin)
-	}()
-
-	go func() {
-		defer wg.Done()
-		<-start
-		begin := time.Now()
-		_, fastErr = nsFast.QueryWithOptions(ctx, "fast.example", "A", nil)
-		fastElapsed = time.Since(begin)
-	}()
-
-	close(start)
-	wg.Wait()
-
-	if slowErr != nil {
-		t.Fatalf("slow query error: %v", slowErr)
-	}
-	if fastErr != nil {
-		t.Fatalf("fast query error: %v", fastErr)
-	}
-	if slowElapsed < 120*time.Millisecond {
-		t.Fatalf("expected slow nameserver to be paced, got %v", slowElapsed)
-	}
-	if fastElapsed > 80*time.Millisecond {
-		t.Fatalf("expected fast nameserver to run without pacing delay, got %v", fastElapsed)
-	}
-}
-
-func TestRateLimitPacingStructuredLogsAndMetrics(t *testing.T) {
-	ns, err := New("ns-observe.example", "192.0.2.76", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-
-	ctx, prof := testContext(t)
-	prof.Resolver.Defaults.RateLimitPacingEnabled = true
-	prof.Resolver.Defaults.RateLimitPacingMinMS = 60
-	prof.Resolver.Defaults.RateLimitPacingMaxMS = 60
-
-	ns.state.rateLimitPacing.jitterFn = func() float64 { return 0.5 }
-
-	var calls int
-	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
-		calls++
-		if calls == 1 {
-			return packet.Packet{}, syscall.ECONNRESET
-		}
-		msg := new(dns.Msg)
-		msg.Rcode = dns.RcodeSuccess
-		return packet.Packet{Msg: msg}, nil
-	})
-
-	_, err = ns.QueryWithOptions(ctx, "observe-1.example", "A", nil)
-	if err == nil {
-		t.Fatalf("expected first query to return connection-reset error")
-	}
-
-	shortBudget := 10 * time.Millisecond
-	resp, err := ns.QueryWithOptions(ctx, "observe-2.example", "A", &QueryOptions{Timeout: &shortBudget})
-	if err != nil {
-		t.Fatalf("second query with skip budget: %v", err)
-	}
-	if resp.Msg != nil {
-		t.Fatalf("expected paced skip response to be empty")
-	}
-
-	longBudget := 300 * time.Millisecond
-	resp, err = ns.QueryWithOptions(ctx, "observe-3.example", "A", &QueryOptions{Timeout: &longBudget})
-	if err != nil {
-		t.Fatalf("third query with delay budget: %v", err)
-	}
-	if resp.Msg == nil {
-		t.Fatalf("expected delayed third query to reach network and return response")
-	}
-
+func TestConstructorEmitsCreationLogs(t *testing.T) {
+	ctx, _ := testContext(t)
 	log := logger.FromContext(ctx)
-	if log == nil {
-		t.Fatalf("expected logger in context")
+
+	if _, err := NewWithContext(ctx, "ns1.example", "192.0.2.77", nil); err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	if _, err := NewWithContext(ctx, "ns2.example", "192.0.2.77", nil); err != nil {
+		t.Fatalf("new nameserver with shared cache: %v", err)
 	}
 
-	var foundDetected bool
-	var foundSkip bool
-	var foundDelay bool
+	var cacheCreated, cacheFetched, nsCreated int
+	seenNS := map[string]bool{}
 	for _, entry := range log.Entries() {
 		if entry == nil {
 			continue
 		}
 		switch entry.Tag {
-		case "RATE_LIMIT_PACING_DETECTED":
-			foundDetected = true
-			if got := entry.Args["reason"]; got != "connection_error" {
-				t.Fatalf("detected reason = %v, want connection_error", got)
+		case "CACHE_CREATED":
+			cacheCreated++
+		case "CACHE_FETCHED":
+			cacheFetched++
+		case "NS_CREATED":
+			nsCreated++
+			ns, _ := entry.Args["ns"].(string)
+			address, _ := entry.Args["address"].(string)
+			if ns == "" || address == "" {
+				t.Fatalf("expected typed ns/address args in NS_CREATED, got %#v", entry.Args)
 			}
-			if got := entry.Args["signal"]; got != "connection_error" {
-				t.Fatalf("detected signal = %v, want connection_error", got)
-			}
-			if got, ok := entry.Args["detection_conn_error"].(int); !ok || got < 1 {
-				t.Fatalf("expected detection_conn_error >= 1, got %#v", entry.Args["detection_conn_error"])
-			}
-		case "RATE_LIMIT_PACING_SKIP":
-			foundSkip = true
-			if got := entry.Args["reason"]; got != "delay_exceeds_budget" {
-				t.Fatalf("skip reason = %v, want delay_exceeds_budget", got)
-			}
-			if got, ok := entry.Args["pacing_skips"].(int); !ok || got < 1 {
-				t.Fatalf("expected pacing_skips >= 1, got %#v", entry.Args["pacing_skips"])
-			}
-		case "RATE_LIMIT_PACING_DELAY":
-			foundDelay = true
-			if got := entry.Args["reason"]; got != "paced_wait" {
-				t.Fatalf("delay reason = %v, want paced_wait", got)
-			}
-			if got, ok := entry.Args["pacing_delays"].(int); !ok || got < 1 {
-				t.Fatalf("expected pacing_delays >= 1, got %#v", entry.Args["pacing_delays"])
+			seenNS[ns] = true
+			if _, ok := entry.Args["name"]; ok {
+				t.Fatalf("legacy key name should not be present: %#v", entry.Args)
 			}
 		}
 	}
+	if cacheCreated != 1 {
+		t.Fatalf("expected 1 CACHE_CREATED, got %d", cacheCreated)
+	}
+	if cacheFetched != 1 {
+		t.Fatalf("expected 1 CACHE_FETCHED, got %d", cacheFetched)
+	}
+	if nsCreated != 2 {
+		t.Fatalf("expected 2 NS_CREATED, got %d", nsCreated)
+	}
+	if !seenNS["ns1.example"] || !seenNS["ns2.example"] {
+		t.Fatalf("expected NS_CREATED entries for ns1/ns2.example, got %#v", seenNS)
+	}
+}
 
-	if !foundDetected {
-		t.Fatalf("expected RATE_LIMIT_PACING_DETECTED log entry")
+func TestQueryEmitsQueryAndCachedReturn(t *testing.T) {
+	ctx, _ := testContext(t)
+	log := logger.FromContext(ctx)
+
+	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.80", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
 	}
-	if !foundSkip {
-		t.Fatalf("expected RATE_LIMIT_PACING_SKIP log entry")
+
+	var calls int
+	ns.SetQueryHook(func(_ context.Context, qname string, qtype string, qclass string, _ *QueryOptions) (packet.Packet, error) {
+		calls++
+		msg := new(dns.Msg)
+		dnsutil.SetQuestion(msg, dnsutil.Fqdn(qname), dns.StringToType[qtype])
+		msg.Rcode = dns.RcodeSuccess
+		return packet.Packet{Msg: msg}, nil
+	})
+
+	if _, err := ns.QueryWithOptions(ctx, "example", "A", nil); err != nil {
+		t.Fatalf("query 1: %v", err)
 	}
-	if !foundDelay {
-		t.Fatalf("expected RATE_LIMIT_PACING_DELAY log entry")
+	if _, err := ns.QueryWithOptions(ctx, "example", "A", nil); err != nil {
+		t.Fatalf("query 2: %v", err)
 	}
+	if calls != 1 {
+		t.Fatalf("expected 1 network call due to cache hit, got %d", calls)
+	}
+
+	var queryCount, cachedReturnCount int
+	for _, entry := range log.Entries() {
+		if entry == nil {
+			continue
+		}
+		switch entry.Tag {
+		case "QUERY":
+			queryCount++
+		case "CACHED_RETURN":
+			cachedReturnCount++
+		}
+	}
+	if queryCount != 2 {
+		t.Fatalf("expected 2 QUERY logs, got %d", queryCount)
+	}
+	if cachedReturnCount != 2 {
+		t.Fatalf("expected 2 CACHED_RETURN logs, got %d", cachedReturnCount)
+	}
+}
+
+func TestQueryLogsIPBlocked(t *testing.T) {
+	ctx, prof := testContext(t)
+	log := logger.FromContext(ctx)
+	prof.Net.IPv4 = false
+
+	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.81", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	if _, err := ns.QueryWithOptions(ctx, "example", "A", nil); err != nil {
+		t.Fatalf("query with ipv4 disabled: %v", err)
+	}
+
+	for _, entry := range log.Entries() {
+		if entry != nil && entry.Tag == "IPV4_BLOCKED" {
+			return
+		}
+	}
+	t.Fatalf("expected IPV4_BLOCKED log entry")
+}
+
+func TestBlacklistingEmitsTags(t *testing.T) {
+	ctx, _ := testContext(t)
+	log := logger.FromContext(ctx)
+
+	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.90", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		return packet.Packet{}, fmt.Errorf("timeout")
+	})
+
+	// Two SOA timeouts trigger temporary blacklisting.
+	_, _ = ns.QueryWithOptions(ctx, "example", "SOA", nil)
+	_, _ = ns.QueryWithOptions(ctx, "example", "SOA", nil)
+	// Third query should be skipped via IS_BLACKLISTED.
+	_, _ = ns.QueryWithOptions(ctx, "example", "SOA", nil)
+
+	var hasBlacklisting, hasIsBlacklisted bool
+	for _, entry := range log.Entries() {
+		if entry == nil {
+			continue
+		}
+		switch entry.Tag {
+		case "BLACKLISTING":
+			hasBlacklisting = true
+		case "IS_BLACKLISTED":
+			hasIsBlacklisted = true
+		}
+	}
+	if !hasBlacklisting {
+		t.Fatalf("expected BLACKLISTING tag after failed SOA query")
+	}
+	if !hasIsBlacklisted {
+		t.Fatalf("expected IS_BLACKLISTED tag on blacklisted NS")
+	}
+}
+
+func TestPacketBigEmitted(t *testing.T) {
+	ctx, _ := testContext(t)
+	log := logger.FromContext(ctx)
+
+	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.91", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeSuccess
+		// Add enough records to exceed 4096 bytes.
+		for i := 0; i < 250; i++ {
+			rr := &dns.A{Hdr: dns.Header{Name: fmt.Sprintf("host%d.example.", i), Class: dns.ClassINET, TTL: 300}}
+			rr.Addr = netip.AddrFrom4([4]byte{192, 0, 2, byte(i % 256)})
+			msg.Answer = append(msg.Answer, rr)
+		}
+		return packet.Packet{Msg: msg}, nil
+	})
+
+	_, err = ns.QueryWithOptions(ctx, "example", "A", nil)
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+
+	for _, entry := range log.Entries() {
+		if entry != nil && entry.Tag == "PACKET_BIG" {
+			if size, ok := entry.Args["size"]; ok {
+				if s, ok := size.(int); ok && s > 4096 {
+					return
+				}
+			}
+		}
+	}
+	t.Fatalf("expected PACKET_BIG tag for large response")
 }
 
 func testContext(t *testing.T) (context.Context, *profile.Profile) {

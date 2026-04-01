@@ -2,12 +2,15 @@ package nameserver
 
 import (
 	"context"
-	"net"
+	"fmt"
+	"math/rand"
+	"net/netip"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/logger"
@@ -132,20 +135,31 @@ func TestNameserver01ParallelQueries(t *testing.T) {
 		t.Fatalf("nameserver01 did not finish")
 	}
 
-	var order []string
+	var found *logger.Entry
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "IS_A_RECURSOR" {
 			continue
 		}
-		if ns, ok := entry.Args["ns"].(string); ok {
-			order = append(order, ns)
+		if found != nil {
+			t.Fatalf("expected single consolidated IS_A_RECURSOR entry, got multiple")
 		}
+		found = entry
 	}
-	if len(order) != 2 {
-		t.Fatalf("expected 2 recursor entries, got %v", order)
+	if found == nil {
+		t.Fatalf("expected IS_A_RECURSOR entry, got none")
 	}
-	if order[0] != "ns1.example/192.0.2.1" || order[1] != "ns2.example/192.0.2.2" {
-		t.Fatalf("expected deterministic log order, got %v", order)
+	servers, ok := found.Args["servers"].([]map[string]any)
+	if !ok {
+		t.Fatalf("expected servers array in IS_A_RECURSOR args, got %#v", found.Args)
+	}
+	if len(servers) != 2 {
+		t.Fatalf("expected 2 servers in consolidated entry, got %d", len(servers))
+	}
+	if servers[0]["ns"] != "ns1.example" || servers[1]["ns"] != "ns2.example" {
+		t.Fatalf("expected sorted ns1/ns2, got %v", servers)
+	}
+	if servers[0]["address"] != "192.0.2.1" || servers[1]["address"] != "192.0.2.2" {
+		t.Fatalf("expected addresses 192.0.2.1/192.0.2.2, got %v", servers)
 	}
 }
 
@@ -340,19 +354,32 @@ func TestNameserver05ParallelQueries(t *testing.T) {
 	}
 
 	var order []string
+	var addresses []string
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "NO_RESPONSE" {
 			continue
 		}
+		if _, ok := entry.Args["arg_schema"]; ok {
+			t.Fatalf("did not expect arg_schema in args: %#v", entry.Args["arg_schema"])
+		}
 		if ns, ok := entry.Args["ns"].(string); ok {
+			if strings.Contains(ns, "/") {
+				t.Fatalf("expected nameserver-only ns argument, got %q", ns)
+			}
 			order = append(order, ns)
+		}
+		if address, ok := entry.Args["address"].(string); ok {
+			addresses = append(addresses, address)
 		}
 	}
 	if len(order) != 2 {
 		t.Fatalf("expected 2 no-response entries, got %v", order)
 	}
-	if order[0] != "ns1.example/192.0.2.1" || order[1] != "ns2.example/192.0.2.2" {
+	if order[0] != "ns1.example" || order[1] != "ns2.example" {
 		t.Fatalf("expected deterministic log order, got %v", order)
+	}
+	if len(addresses) != 2 || addresses[0] != "192.0.2.1" || addresses[1] != "192.0.2.2" {
+		t.Fatalf("expected deterministic address order, got %v", addresses)
 	}
 }
 
@@ -387,6 +414,17 @@ func TestNameserver06NotResolved(t *testing.T) {
 	if !hasEntryTag(entries, "CAN_NOT_BE_RESOLVED") {
 		t.Fatalf("expected CAN_NOT_BE_RESOLVED")
 	}
+	entry := firstEntryByTag(entries, "CAN_NOT_BE_RESOLVED")
+	if entry == nil {
+		t.Fatalf("missing CAN_NOT_BE_RESOLVED entry")
+	}
+	servers, ok := entry.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 || servers[0]["ns"] != "ns2.example" {
+		t.Fatalf("expected typed unresolved nameserver list, got %#v", entry.Args["servers"])
+	}
+	if _, ok := entry.Args["nsname_list"]; ok {
+		t.Fatalf("legacy key nsname_list should not be present: %#v", entry.Args)
+	}
 }
 
 func TestNameserver07NoUpwardReferral(t *testing.T) {
@@ -412,21 +450,34 @@ func TestNameserver07NoUpwardReferral(t *testing.T) {
 	if !hasEntryTag(entries, "NO_UPWARD_REFERRAL") {
 		t.Fatalf("expected NO_UPWARD_REFERRAL")
 	}
+	entry := firstEntryByTag(entries, "NO_UPWARD_REFERRAL")
+	if entry == nil {
+		t.Fatalf("missing NO_UPWARD_REFERRAL entry")
+	}
+	servers, ok := entry.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 || servers[0]["ns"] != "ns1.example" {
+		t.Fatalf("expected typed nameserver list for NO_UPWARD_REFERRAL, got %#v", entry.Args["servers"])
+	}
+	if _, ok := entry.Args["nsname_list"]; ok {
+		t.Fatalf("legacy key nsname_list should not be present: %#v", entry.Args)
+	}
 }
 
 func TestNameserver08QNameCaseInsensitive(t *testing.T) {
 	setupTest(t)
 
 	origM4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origM4and5 })
+	origScramble := scrambleCaseFunc
+	t.Cleanup(func() {
+		method4and5 = origM4and5
+		scrambleCaseFunc = origScramble
+	})
+	fixedRand := rand.New(rand.NewSource(42))
+	scrambleCaseFunc = func(s string) string { return util.ScrambleCaseWith(s, fixedRand) }
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.9", func(qname string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
 		msg := new(dns.Msg)
-		msg.Question = []dns.Question{{
-			Name:   dns.Fqdn(strings.ToLower(qname)),
-			Qtype:  dns.TypeSOA,
-			Qclass: dns.ClassINET,
-		}}
+		dnsutil.SetQuestion(msg, dnsutil.Fqdn(strings.ToLower(qname)), dns.TypeSOA)
 		return packet.Packet{Msg: msg}
 	})
 	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
@@ -447,7 +498,13 @@ func TestNameserver09CaseQueriesSameAnswer(t *testing.T) {
 	setupTest(t)
 
 	origM4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origM4and5 })
+	origScramble := scrambleCaseFunc
+	t.Cleanup(func() {
+		method4and5 = origM4and5
+		scrambleCaseFunc = origScramble
+	})
+	fixedRand := rand.New(rand.NewSource(42))
+	scrambleCaseFunc = func(s string) string { return util.ScrambleCaseWith(s, fixedRand) }
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.10", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
 		return soaPacket("example")
@@ -498,6 +555,27 @@ func TestNameserver10NoResponseEDNS1(t *testing.T) {
 	if !hasEntryTag(entries, "N10_NO_RESPONSE_EDNS1_QUERY") {
 		t.Fatalf("expected N10_NO_RESPONSE_EDNS1_QUERY")
 	}
+
+	var entry *logger.Entry
+	for _, item := range entries {
+		if item != nil && item.Tag == "N10_NO_RESPONSE_EDNS1_QUERY" {
+			entry = item
+			break
+		}
+	}
+	if entry == nil {
+		t.Fatalf("expected N10_NO_RESPONSE_EDNS1_QUERY entry payload")
+	}
+	if _, ok := entry.Args["ns_ip_list"]; ok {
+		t.Fatalf("legacy key ns_ip_list should not be present: %#v", entry.Args)
+	}
+	addresses, ok := entry.Args["addresses"].([]string)
+	if !ok || len(addresses) != 1 {
+		t.Fatalf("expected one typed address for N10_NO_RESPONSE_EDNS1_QUERY, got %#v", entry.Args["addresses"])
+	}
+	if strings.Join(addresses, ";") != "192.0.2.11" {
+		t.Fatalf("expected deterministic addresses order, got %#v", addresses)
+	}
 }
 
 func TestNameserver11ReturnsUnknownOption(t *testing.T) {
@@ -508,7 +586,7 @@ func TestNameserver11ReturnsUnknownOption(t *testing.T) {
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.12", func(_ string, _ string, _ string, opts *ens.QueryOptions) packet.Packet {
 		if opts != nil && opts.EDNSDetails != nil && len(opts.EDNSDetails.Data) > 0 {
-			return soaPacketWithEdns("example", 0, 0, []dns.EDNS0{&dns.EDNS0_LOCAL{Code: 137}})
+			return soaPacketWithEdns("example", 0, 0, []dns.EDNS0{&dns.ERFC3597{EDNS0Code: 137}})
 		}
 		return soaPacketWithEdns("example", 0, 0, nil)
 	})
@@ -523,6 +601,27 @@ func TestNameserver11ReturnsUnknownOption(t *testing.T) {
 	}
 	if !hasEntryTag(entries, "N11_RETURNS_UNKNOWN_OPTION_CODE") {
 		t.Fatalf("expected N11_RETURNS_UNKNOWN_OPTION_CODE")
+	}
+
+	var entry *logger.Entry
+	for _, item := range entries {
+		if item != nil && item.Tag == "N11_RETURNS_UNKNOWN_OPTION_CODE" {
+			entry = item
+			break
+		}
+	}
+	if entry == nil {
+		t.Fatalf("expected N11_RETURNS_UNKNOWN_OPTION_CODE entry payload")
+	}
+	if _, ok := entry.Args["ns_ip_list"]; ok {
+		t.Fatalf("legacy key ns_ip_list should not be present: %#v", entry.Args)
+	}
+	addresses, ok := entry.Args["addresses"].([]string)
+	if !ok || len(addresses) != 1 {
+		t.Fatalf("expected one typed address for N11_RETURNS_UNKNOWN_OPTION_CODE, got %#v", entry.Args["addresses"])
+	}
+	if strings.Join(addresses, ";") != "192.0.2.12" {
+		t.Fatalf("expected deterministic addresses order, got %#v", addresses)
 	}
 }
 
@@ -575,6 +674,32 @@ func TestNameserver13MissingOptInTruncated(t *testing.T) {
 	}
 }
 
+func TestNameserver13NoEdnsSupport(t *testing.T) {
+	setupTest(t)
+
+	origM4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origM4and5 })
+
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.14", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeFormatError
+		// No EDNS OPT record in response
+		return packet.Packet{Msg: msg}
+	})
+	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Nameserver13(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("nameserver13: %v", err)
+	}
+	if !hasEntryTag(entries, "NO_EDNS_SUPPORT") {
+		t.Fatalf("expected NO_EDNS_SUPPORT")
+	}
+}
+
 func TestNameserver15SoftwareVersionAndWrongClass(t *testing.T) {
 	setupTest(t)
 
@@ -609,6 +734,30 @@ func TestNameserver15SoftwareVersionAndWrongClass(t *testing.T) {
 	}
 	if !hasEntryTag(entries, "N15_WRONG_CLASS") {
 		t.Fatalf("expected N15_WRONG_CLASS")
+	}
+
+	var software *logger.Entry
+	for _, item := range entries {
+		if item != nil && item.Tag == "N15_SOFTWARE_VERSION" {
+			software = item
+			break
+		}
+	}
+	if software == nil {
+		t.Fatalf("expected N15_SOFTWARE_VERSION entry payload")
+	}
+	if _, ok := software.Args["ns_list"]; ok {
+		t.Fatalf("legacy key ns_list should not be present: %#v", software.Args)
+	}
+	servers, ok := software.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 {
+		t.Fatalf("expected one typed server for N15_SOFTWARE_VERSION, got %#v", software.Args["servers"])
+	}
+	if servers[0]["ns"] != "ns1.example" {
+		t.Fatalf("unexpected server payload for N15_SOFTWARE_VERSION: %#v", servers[0])
+	}
+	if servers[0]["address"] != "192.0.2.15" {
+		t.Fatalf("expected server address in N15_SOFTWARE_VERSION payload, got %#v", servers[0])
 	}
 }
 
@@ -653,22 +802,28 @@ func hasEntryTag(entries []*logger.Entry, tag string) bool {
 	return false
 }
 
-func soaRecord(owner string) dns.RR {
-	return &dns.SOA{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn(owner),
-			Rrtype: dns.TypeSOA,
-			Class:  dns.ClassINET,
-			Ttl:    60,
-		},
-		Ns:      dns.Fqdn("ns1.example"),
-		Mbox:    dns.Fqdn("hostmaster.example"),
-		Serial:  1,
-		Refresh: 3600,
-		Retry:   600,
-		Expire:  86400,
-		Minttl:  60,
+func firstEntryByTag(entries []*logger.Entry, tag string) *logger.Entry {
+	for _, entry := range entries {
+		if entry == nil {
+			continue
+		}
+		if entry.Tag == tag {
+			return entry
+		}
 	}
+	return nil
+}
+
+func soaRecord(owner string) dns.RR {
+	soaRR := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
+	soaRR.Ns = dnsutil.Fqdn("ns1.example")
+	soaRR.Mbox = dnsutil.Fqdn("hostmaster.example")
+	soaRR.Serial = 1
+	soaRR.Refresh = 3600
+	soaRR.Retry = 600
+	soaRR.Expire = 86400
+	soaRR.Minttl = 60
+	return soaRR
 }
 
 func soaMsg(owner string) *dns.Msg {
@@ -685,15 +840,16 @@ func soaPacket(owner string) packet.Packet {
 
 func soaPacketWithEdns(owner string, version uint8, z uint16, options []dns.EDNS0) packet.Packet {
 	msg := soaMsg(owner)
-	msg.SetEdns0(1232, false)
-	if opt := msg.IsEdns0(); opt != nil {
-		opt.SetVersion(version)
-		if z != 0 {
-			opt.SetZ(z)
-		}
-		if len(options) > 0 {
-			opt.Option = append(opt.Option, options...)
-		}
+	msg.UDPSize = 1232
+	msg.Version = version
+	for _, opt := range options {
+		msg.Pseudo = append(msg.Pseudo, opt)
+	}
+	if z != 0 {
+		optRR := &dns.OPT{}
+		optRR.Hdr = dns.Header{Name: "."}
+		optRR.SetZ(z)
+		msg.Extra = append(msg.Extra, optRR)
 	}
 	return packet.Packet{Msg: msg}
 }
@@ -701,50 +857,132 @@ func soaPacketWithEdns(owner string, version uint8, z uint16, options []dns.EDNS
 func aPacket(name string, address string) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
-	msg.Answer = []dns.RR{
-		&dns.A{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(name),
-				Rrtype: dns.TypeA,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			A: net.ParseIP(address).To4(),
-		},
-	}
+	aRR := &dns.A{}
+	aRR.Hdr = dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET, TTL: 60}
+	aRR.Addr = netip.MustParseAddr(address)
+	msg.Answer = []dns.RR{aRR}
 	return packet.Packet{Msg: msg}
 }
 
 func aaaaPacket(name string, address string) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
-	msg.Answer = []dns.RR{
-		&dns.AAAA{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(name),
-				Rrtype: dns.TypeAAAA,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			AAAA: net.ParseIP(address),
-		},
-	}
+	aaaaRR := &dns.AAAA{}
+	aaaaRR.Hdr = dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET, TTL: 60}
+	aaaaRR.Addr = netip.MustParseAddr(address)
+	msg.Answer = []dns.RR{aaaaRR}
 	return packet.Packet{Msg: msg}
 }
 
 func txtPacket(name string, value string, class uint16) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
-	msg.Answer = []dns.RR{
-		&dns.TXT{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(name),
-				Rrtype: dns.TypeTXT,
-				Class:  class,
-				Ttl:    60,
-			},
-			Txt: []string{value},
-		},
-	}
+	txtRR := &dns.TXT{}
+	txtRR.Hdr = dns.Header{Name: dnsutil.Fqdn(name), Class: class, TTL: 60}
+	txtRR.Txt = []string{value}
+	msg.Answer = []dns.RR{txtRR}
 	return packet.Packet{Msg: msg}
+}
+
+func TestNameserver16HasNSID(t *testing.T) {
+	setupTest(t)
+
+	origM4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origM4and5 })
+
+	nsidValue := "ns1.example"
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.16", func(_ string, qtype string, _ string, _ *ens.QueryOptions) packet.Packet {
+		if strings.ToUpper(qtype) == "SOA" {
+			return soaPacketWithEdns("example", 0, 0, []dns.EDNS0{
+				&dns.NSID{Nsid: fmt.Sprintf("%x", nsidValue)},
+			})
+		}
+		return packet.Packet{}
+	})
+	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Nameserver16(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("nameserver16: %v", err)
+	}
+	if !hasEntryTag(entries, "N16_HAS_NSID") {
+		t.Fatalf("expected N16_HAS_NSID")
+	}
+	if hasEntryTag(entries, "N16_NO_NSID_REVEALED") {
+		t.Fatalf("unexpected N16_NO_NSID_REVEALED")
+	}
+
+	var hasNSID *logger.Entry
+	for _, item := range entries {
+		if item != nil && item.Tag == "N16_HAS_NSID" {
+			hasNSID = item
+			break
+		}
+	}
+	if hasNSID == nil {
+		t.Fatalf("expected N16_HAS_NSID entry payload")
+	}
+	if _, ok := hasNSID.Args["ns_list"]; ok {
+		t.Fatalf("legacy key ns_list should not be present: %#v", hasNSID.Args)
+	}
+	servers, ok := hasNSID.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 {
+		t.Fatalf("expected one typed server for N16_HAS_NSID, got %#v", hasNSID.Args["servers"])
+	}
+	if servers[0]["ns"] != "ns1.example" {
+		t.Fatalf("unexpected server payload for N16_HAS_NSID: %#v", servers[0])
+	}
+}
+
+func TestNameserver16NoNSID(t *testing.T) {
+	setupTest(t)
+
+	origM4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origM4and5 })
+
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.16", func(_ string, qtype string, _ string, _ *ens.QueryOptions) packet.Packet {
+		if strings.ToUpper(qtype) == "SOA" {
+			return soaPacket("example")
+		}
+		return packet.Packet{}
+	})
+	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Nameserver16(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("nameserver16: %v", err)
+	}
+	if hasEntryTag(entries, "N16_HAS_NSID") {
+		t.Fatalf("unexpected N16_HAS_NSID")
+	}
+	if !hasEntryTag(entries, "N16_NO_NSID_REVEALED") {
+		t.Fatalf("expected N16_NO_NSID_REVEALED")
+	}
+
+	var noNSID *logger.Entry
+	for _, item := range entries {
+		if item != nil && item.Tag == "N16_NO_NSID_REVEALED" {
+			noNSID = item
+			break
+		}
+	}
+	if noNSID == nil {
+		t.Fatalf("expected N16_NO_NSID_REVEALED entry payload")
+	}
+	if _, ok := noNSID.Args["ns_list"]; ok {
+		t.Fatalf("legacy key ns_list should not be present: %#v", noNSID.Args)
+	}
+	servers, ok := noNSID.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 {
+		t.Fatalf("expected one typed server for N16_NO_NSID_REVEALED, got %#v", noNSID.Args["servers"])
+	}
+	if servers[0]["ns"] != "ns1.example" {
+		t.Fatalf("unexpected server payload for N16_NO_NSID_REVEALED: %#v", servers[0])
+	}
 }

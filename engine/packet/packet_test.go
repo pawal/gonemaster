@@ -1,19 +1,21 @@
 package packet
 
 import (
-	"net"
+	"net/netip"
 	"testing"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/logger"
 )
 
 func TestUniquePush(t *testing.T) {
 	msg := new(dns.Msg)
 	pkt := New(msg)
 
-	rr, err := dns.NewRR("example. 60 IN A 192.0.2.1")
+	rr, err := dns.New("example. 60 IN A 192.0.2.1")
 	if err != nil {
 		t.Fatalf("new rr: %v", err)
 	}
@@ -28,17 +30,13 @@ func TestUniquePush(t *testing.T) {
 
 func TestGetRecordsForNameIgnoresTrailingDot(t *testing.T) {
 	msg := new(dns.Msg)
-	msg.Answer = []dns.RR{
-		&dns.A{
-			Hdr: dns.RR_Header{
-				Name:   "Example.COM.",
-				Rrtype: dns.TypeA,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			A: []byte{192, 0, 2, 1},
-		},
-	}
+	a := &dns.A{Hdr: dns.Header{
+		Name:  "Example.COM.",
+		Class: dns.ClassINET,
+		TTL:   60,
+	}}
+	a.Addr = netip.AddrFrom4([4]byte{192, 0, 2, 1})
+	msg.Answer = []dns.RR{a}
 
 	pkt := New(msg)
 	recs := pkt.GetRecordsForName("A", dnsname.New("example.com"), "answer")
@@ -58,7 +56,7 @@ func TestPacketTypeClassification(t *testing.T) {
 	nodataMsg := new(dns.Msg)
 	nodataMsg.Rcode = dns.RcodeSuccess
 	nodataMsg.Ns = []dns.RR{
-		&dns.SOA{Hdr: dns.RR_Header{Name: "example.", Rrtype: dns.TypeSOA, Class: dns.ClassINET}},
+		&dns.SOA{Hdr: dns.Header{Name: "example.", Class: dns.ClassINET}},
 	}
 	nodata := New(nodataMsg)
 	if nodata.Type() != "nodata" || !nodata.NoSuchRecord() {
@@ -68,7 +66,7 @@ func TestPacketTypeClassification(t *testing.T) {
 	referralMsg := new(dns.Msg)
 	referralMsg.Rcode = dns.RcodeSuccess
 	referralMsg.Ns = []dns.RR{
-		&dns.NS{Hdr: dns.RR_Header{Name: "example.", Rrtype: dns.TypeNS, Class: dns.ClassINET}},
+		&dns.NS{Hdr: dns.Header{Name: "example.", Class: dns.ClassINET}},
 	}
 	referral := New(referralMsg)
 	if referral.Type() != "referral" || !referral.IsRedirect() {
@@ -78,7 +76,7 @@ func TestPacketTypeClassification(t *testing.T) {
 	answerMsg := new(dns.Msg)
 	answerMsg.Rcode = dns.RcodeSuccess
 	answerMsg.Answer = []dns.RR{
-		&dns.A{Hdr: dns.RR_Header{Name: "example.", Rrtype: dns.TypeA, Class: dns.ClassINET}},
+		&dns.A{Hdr: dns.Header{Name: "example.", Class: dns.ClassINET}},
 	}
 	answer := New(answerMsg)
 	if answer.Type() != "answer" {
@@ -86,9 +84,61 @@ func TestPacketTypeClassification(t *testing.T) {
 	}
 }
 
+func TestPacketClassificationEmitsSystemLogs(t *testing.T) {
+	log := logger.New()
+
+	nxdomainMsg := new(dns.Msg)
+	dnsutil.SetQuestion(nxdomainMsg, "www.example.", dns.TypeA)
+	nxdomainMsg.Rcode = dns.RcodeNameError
+	nxdomain := Packet{Msg: nxdomainMsg, Log: log}
+	if !nxdomain.NoSuchName() {
+		t.Fatalf("expected nxdomain packet")
+	}
+
+	nodataMsg := new(dns.Msg)
+	dnsutil.SetQuestion(nodataMsg, "www.example.", dns.TypeAAAA)
+	nodataMsg.Rcode = dns.RcodeSuccess
+	nodataMsg.Ns = []dns.RR{
+		&dns.SOA{Hdr: dns.Header{Name: "example.", Class: dns.ClassINET}},
+	}
+	nodata := Packet{Msg: nodataMsg, Log: log}
+	if !nodata.NoSuchRecord() {
+		t.Fatalf("expected nodata packet")
+	}
+
+	referralMsg := new(dns.Msg)
+	dnsutil.SetQuestion(referralMsg, "www.example.", dns.TypeA)
+	referralMsg.Rcode = dns.RcodeSuccess
+	referralMsg.Ns = []dns.RR{
+		&dns.NS{Hdr: dns.Header{Name: "example.", Class: dns.ClassINET}},
+	}
+	referral := Packet{Msg: referralMsg, Log: log}
+	if !referral.IsRedirect() {
+		t.Fatalf("expected referral packet")
+	}
+
+	tags := map[string]bool{}
+	for _, entry := range log.Entries() {
+		if entry == nil {
+			continue
+		}
+		tags[entry.Tag] = true
+	}
+	if !tags["NO_SUCH_NAME"] {
+		t.Fatalf("expected NO_SUCH_NAME log")
+	}
+	if !tags["NO_SUCH_RECORD"] {
+		t.Fatalf("expected NO_SUCH_RECORD log")
+	}
+	if !tags["IS_REDIRECT"] {
+		t.Fatalf("expected IS_REDIRECT log")
+	}
+}
+
 func TestEdnsHelpers(t *testing.T) {
 	msg := new(dns.Msg)
-	msg.SetEdns0(1232, true)
+	msg.UDPSize = 1232
+	msg.Security = true
 	pkt := New(msg)
 
 	if !pkt.HasEdns() {
@@ -102,41 +152,67 @@ func TestEdnsHelpers(t *testing.T) {
 	}
 }
 
+func TestEdnsHelpersFromExplicitOPTRecord(t *testing.T) {
+	msg := new(dns.Msg)
+	opt := &dns.OPT{Hdr: dns.Header{Name: "."}}
+	opt.SetUDPSize(1232)
+	opt.SetVersion(1)
+	opt.SetSecurity(true)
+	opt.SetRcode(16)
+	opt.SetZ(3)
+	opt.Options = []dns.EDNS0{&dns.NSID{Nsid: "beef"}}
+	msg.Extra = []dns.RR{opt}
+
+	pkt := New(msg)
+	if !pkt.HasEdns() {
+		t.Fatalf("expected EDNS present from explicit OPT record")
+	}
+	if pkt.EdnsSize() != 1232 {
+		t.Fatalf("unexpected EDNS size: %d", pkt.EdnsSize())
+	}
+	if pkt.EdnsVersion() != 1 {
+		t.Fatalf("unexpected EDNS version: %d", pkt.EdnsVersion())
+	}
+	if pkt.EdnsRcode() != 1 {
+		t.Fatalf("unexpected EDNS extended rcode: %d", pkt.EdnsRcode())
+	}
+	if pkt.EdnsZ() != 3 {
+		t.Fatalf("unexpected EDNS Z: %d", pkt.EdnsZ())
+	}
+	if !pkt.DO() {
+		t.Fatalf("expected DO bit set from OPT")
+	}
+	if len(pkt.EdnsData()) != 1 {
+		t.Fatalf("expected 1 EDNS option from OPT, got %d", len(pkt.EdnsData()))
+	}
+	if _, ok := pkt.EdnsData()[0].(*dns.NSID); !ok {
+		t.Fatalf("expected NSID option from OPT")
+	}
+}
+
 func TestPacketBasicHelpers(t *testing.T) {
 	msg := new(dns.Msg)
-	msg.Id = 1234
+	msg.ID = 1234
 	msg.Opcode = dns.OpcodeUpdate
 	msg.Rcode = dns.RcodeRefused
 	msg.Authoritative = true
 	msg.RecursionAvailable = true
 	msg.Truncated = true
 
-	msg.Answer = []dns.RR{
-		&dns.A{
-			Hdr: dns.RR_Header{
-				Name:   "example.",
-				Rrtype: dns.TypeA,
-				Class:  dns.ClassINET,
-			},
-			A: net.IPv4(192, 0, 2, 10),
-		},
-	}
-	msg.Ns = []dns.RR{
-		&dns.NS{
-			Hdr: dns.RR_Header{
-				Name:   "example.",
-				Rrtype: dns.TypeNS,
-				Class:  dns.ClassINET,
-			},
-			Ns: "ns1.example.",
-		},
-	}
+	a := &dns.A{Hdr: dns.Header{
+		Name:  "example.",
+		Class: dns.ClassINET,
+	}}
+	a.Addr = netip.AddrFrom4([4]byte{192, 0, 2, 10})
+	msg.Answer = []dns.RR{a}
+	ns := &dns.NS{Hdr: dns.Header{Name: "example.", Class: dns.ClassINET}}
+	ns.Ns = "ns1.example."
+	msg.Ns = []dns.RR{ns}
 
-	msg.SetEdns0(1232, false)
-	opt := msg.IsEdns0()
-	opt.SetVersion(2)
-	opt.SetZ(3)
-	opt.Option = append(opt.Option, &dns.EDNS0_NSID{Code: dns.EDNS0NSID})
+	msg.UDPSize = 1232
+	msg.Security = false
+	msg.Version = 2
+	msg.Pseudo = []dns.RR{&dns.NSID{}}
 
 	pkt := New(msg)
 	if pkt.ID() != 1234 {
@@ -162,8 +238,8 @@ func TestPacketBasicHelpers(t *testing.T) {
 		t.Fatalf("unexpected answer from string %q", pkt.AnswerFromString())
 	}
 
-	if pkt.EdnsRcode() != 0 || pkt.EdnsVersion() != 2 || pkt.EdnsZ() != 3 {
-		t.Fatalf("unexpected edns fields: rcode=%d version=%d z=%d", pkt.EdnsRcode(), pkt.EdnsVersion(), pkt.EdnsZ())
+	if pkt.EdnsRcode() != 0 || pkt.EdnsVersion() != 2 {
+		t.Fatalf("unexpected edns fields: rcode=%d version=%d", pkt.EdnsRcode(), pkt.EdnsVersion())
 	}
 	if len(pkt.EdnsData()) != 1 {
 		t.Fatalf("expected edns data")
@@ -178,7 +254,7 @@ func TestPacketBasicHelpers(t *testing.T) {
 }
 
 func TestUniquePushInvalidInputs(t *testing.T) {
-	rr, err := dns.NewRR("example. 60 IN A 192.0.2.1")
+	rr, err := dns.New("example. 60 IN A 192.0.2.1")
 	if err != nil {
 		t.Fatalf("new rr: %v", err)
 	}

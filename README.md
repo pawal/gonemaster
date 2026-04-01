@@ -39,6 +39,8 @@ Quick examples:
 ```
 gonemaster --domain example.com
 gonemaster --json --domain example.com | jq
+gonemaster --domain example.com --ns ns1.example.com/192.0.2.10 --ns ns2.example.net
+gonemaster --domain example.com --ns ns1.example.com/192.0.2.10 --ns ns1.example.com/2001:db8::10
 ```
 
 ![ascii animation](docs/demo.gif)
@@ -66,6 +68,19 @@ Nagios documentation has moved to [docs/nagios.md](docs/nagios.md).
 
 Developer usage (engine APIs, callbacks, profiles, and localization) is covered
 in [docs/dev.md](docs/dev.md).
+
+## Testcase Specifications
+
+Canonical specifications for all 73 implemented testcases are in
+[`docs/specifications/`](docs/specifications/).
+
+- [`docs/specifications/tests/`](docs/specifications/tests/) — per-testcase specs
+  (algorithm, emitted tags, tag arguments, severity levels, upstream differences).
+- [`docs/specifications/tags/`](docs/specifications/tags/) — per-module tag catalogs
+  with severity levels and i18n coverage.
+
+The `make spec-validate` and `make spec-check-tags` targets verify that specs and
+code metadata stay in sync.
 
 ## Development
 

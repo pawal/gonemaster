@@ -4,9 +4,13 @@ import { svelte } from "@sveltejs/vite-plugin-svelte";
 export default defineConfig({
   plugins: [svelte()],
   base: "/",
+  resolve: {
+    conditions: ["browser"]
+  },
   build: {
     outDir: "../server/ui/dist",
-    emptyOutDir: true
+    emptyOutDir: true,
+    modulePreload: { polyfill: false }
   },
   test: {
     environment: "jsdom",

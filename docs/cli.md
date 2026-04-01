@@ -12,7 +12,7 @@ Both commands normalize IDN domains to IDNA A-labels (punycode) before use.
 ### Output formats
 - `pretty` (default): human-friendly text suitable for terminals.
 - `json`: a single JSON document.
-- `jsonl`: newline-delimited JSON (one object per line).
+- `jsonl` / `json-stream`: newline-delimited JSON (one object per line). The client uses `jsonl` via `--format jsonl`; the engine uses `--json-stream`.
 
 ### Exit codes
 - `0`: success
@@ -23,13 +23,15 @@ Both commands normalize IDN domains to IDNA A-labels (punycode) before use.
 
 ### Synopsis
 ```
-gonemaster --domain DOMAIN [options]
+gonemaster [flags] [DOMAIN]
 ```
 
 Notes:
-- `--domain` is required for test runs.
+- `DOMAIN` can be provided as a positional argument or via `--domain`.
+- `--domain` (or positional `DOMAIN`) is required for test runs.
 - `--version` and `--list-tests` do not require `--domain`.
 - `--dump-profile` can be used without `--domain`.
+- malformed undelegated inputs (`--ns`, `--ds`) return exit code `2`.
 - The built-in default profile currently uses `resolver.defaults.parallel=8` and
   `resolver.defaults.unordered=true`.
 - For deterministic ordered behavior, use `--ordered --parallel 1`.
@@ -44,8 +46,25 @@ You can switch output modes:
 - `--json-stream` prints newline-delimited JSON objects (one per log entry).
 - `--raw` prints raw log lines (one per log entry).
 - `--dump-profile` prints the effective profile as pretty JSON and exits.
+- `--count` (human output only) appends count summaries by level and by message tag.
+- `--save PATH` writes the accumulated DNS packet cache after the run.
+- `--restore PATH` primes the DNS packet cache before the run.
 
 Use `--output PATH` to write the selected output to a file.
+
+### Machine-consumer args contract
+For machine consumption, use `--json` or `--json-stream`.
+
+For migrated coherent entries:
+- `args.ns` is nameserver name only (per-nameserver tags).
+- `args.address` is the nameserver IP address (per-nameserver tags).
+- `args.servers` is a structured array of `{ns, address}` objects (consolidated tags that report on multiple nameservers).
+- `args.asns` is a typed array of ASN integers when ASN data is emitted.
+
+Legacy keys can still appear on non-migrated tags during migration. Prefer the
+v1.1 keys above when they are present. See:
+- `docs/specifications/log-args-coherency.md`
+- `docs/specifications/log-args-key-glossary.md`
 
 ### Options
 
@@ -56,14 +75,19 @@ Use `--output PATH` to write the selected output to a file.
 | `--testcase TESTCASE` | string | Run a single testcase (optional). |
 | `--profile PATH` | string | Profile file in JSON or YAML (optional). |
 | `--min-level LEVEL` | string | Minimum log level (default `NOTICE`). One of `DEBUG3`, `DEBUG2`, `DEBUG`, `INFO`, `NOTICE`, `WARNING`, `ERROR`, `CRITICAL`. |
+| `--stop-level LEVEL` | string | Stop the run after the first log entry at `LEVEL` or higher. Same values as `--min-level`. |
 | `--output PATH` | string | Write output to a file instead of stdout. |
 | `--raw` | bool | Stream raw log entries. Incompatible with `--json` and `--json-stream`. |
 | `--json` | bool | Print a single JSON array. Incompatible with `--raw` and `--json-stream`. |
 | `--json-stream` | bool | Stream newline-delimited JSON entries. Incompatible with `--raw` and `--json`. Also incompatible with `--dump-profile`. |
 | `--dump-profile` | bool | Print the effective profile as JSON and exit. Incompatible with `--raw` and `--json-stream`. |
+| `--count` | bool | Append count summaries (level totals and level/tag totals). Human output only; incompatible with `--json`, `--json-stream`, `--raw`, and `--dump-profile`. |
+| `--save PATH` | string | Write DNS packet cache to file after the run. Valid only for test runs (not with `--version`, `--list-tests`, or `--dump-profile`). |
+| `--restore PATH` | string | Prime DNS packet cache from a previously saved cache file before the run. Valid only for test runs (not with `--version`, `--list-tests`, or `--dump-profile`). |
 | `--locale LOCALE` | string | Locale for translated output (defaults to environment, then `en`). |
 | `--no-ipv4` | bool | Disable IPv4 queries (overrides profile setting). |
 | `--no-ipv6` | bool | Disable IPv6 queries (overrides profile setting). |
+| `--ipv6` | bool | Force IPv6 queries (overrides profile setting). |
 | `--parallel N` | int | Override `resolver.defaults.parallel`. Must be `>= 1` when set. |
 | `--unordered` | bool | Allow unordered resolver behavior (overrides `resolver.defaults.unordered`). |
 | `--ordered` | bool | Force ordered resolver behavior (overrides `resolver.defaults.unordered`). |
@@ -72,9 +96,15 @@ Use `--output PATH` to write the selected output to a file.
 | `--retrans N` | int | Override `resolver.defaults.retrans` in seconds. Must be `>= 0` when set. |
 | `--fallback` | bool | Enable TCP fallback on UDP failure (overrides `resolver.defaults.fallback`). |
 | `--no-fallback` | bool | Disable TCP fallback on UDP failure (overrides `resolver.defaults.fallback`). |
+| `--sourceaddr4 IPADDR` | string | Override `resolver.source4` (IPv4 source address for outgoing queries). |
+| `--sourceaddr6 IPADDR` | string | Override `resolver.source6` (IPv6 source address for outgoing queries). |
 | `--error-cache-ttl N` | int | Seconds to skip queries after network errors. Must be `>= 0` when set. |
 | `--positive-cache-ttl N` | int | Seconds to cache positive DNS responses. Must be `>= 0` when set. |
 | `--negative-cache-ttl N` | int | Seconds to cache negative DNS responses. Must be `>= 0` when set. |
+| `--badkeys-path PATH` | string | Override badkeys blocklist directory path (`blocklist.dat` + `badkeysdata.json`). |
+| `--badkeys-update` | bool | Download/update badkeys blocklist data and exit. |
+| `--ns NAME[/IP]` | string (repeatable) | Undelegated nameserver input. `NAME` is required, `IP` is optional. May be repeated. Repeat the same `NAME` with different IPs to supply multiple addresses. |
+| `--ds KEYTAG,ALGORITHM,DIGTYPE,DIGEST` | string (repeatable) | Undelegated DS input. May be repeated. |
 | `--no-progress` | bool | Disable progress indicator/spinner. |
 | `--list-tests` | bool | List available test cases and exit. |
 | `--version` | bool | Print version information and exit. |
@@ -83,12 +113,12 @@ Use `--output PATH` to write the selected output to a file.
 
 Run a full test with human-readable output:
 ```
-gonemaster --domain example.com
+gonemaster example.com
 ```
 
 Run a single module and testcase:
 ```
-gonemaster --module address --testcase address01 --domain example.com
+gonemaster --module address --testcase address01 example.com
 ```
 
 JSON output, formatted with `jq`:
@@ -101,6 +131,16 @@ Stream JSON entries to a file:
 gonemaster --json-stream --output /tmp/gonemaster.jsonl --domain example.com
 ```
 
+Save DNS packet cache for later replay:
+```
+gonemaster --domain example.com --save /tmp/gonemaster-cache.json
+```
+
+Replay saved DNS packet cache:
+```
+gonemaster --domain example.com --restore /tmp/gonemaster-cache.json
+```
+
 Disable IPv6 and raise parallelism:
 ```
 gonemaster --no-ipv6 --parallel 4 --domain example.com
@@ -111,6 +151,16 @@ Dump the effective profile (no domain required):
 gonemaster --dump-profile --profile ./profile.yaml
 ```
 
+Download/update badkeys blocklist data for DNSSEC19 and exit:
+```
+gonemaster --badkeys-update
+```
+
+Download/update badkeys blocklist data into a custom directory and exit:
+```
+gonemaster --badkeys-update --badkeys-path /path/to/badkeys
+```
+
 List available test cases:
 ```
 gonemaster --list-tests
@@ -119,6 +169,53 @@ gonemaster --list-tests
 High performance test, translated to Swedish:
 ```
 gonemaster --unordered --parallel 8 --locale sv --domain example.com
+```
+
+Undelegated test with explicit nameservers and glue:
+```
+gonemaster --domain example.com \
+  --ns ns1.example.com/192.0.2.10 \
+  --ns ns2.example.net/2001:db8::10
+```
+
+Undelegated test with one nameserver and both IPv4 + IPv6:
+```
+gonemaster --domain example.com \
+  --ns ns1.example.com/192.0.2.10 \
+  --ns ns1.example.com/2001:db8::10
+```
+
+Undelegated DS-only test:
+```
+gonemaster --domain example.com \
+  --ds 12345,13,2,0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF
+```
+
+Extract coherent nameserver name/IP pairs from a local run:
+```
+gonemaster --json-stream --domain example.com \
+  | jq -r 'select(.args.ns and .args.address)
+           | [.args.ns, .args.address] | @tsv'
+```
+
+Extract ASN lists from a local run:
+```
+gonemaster --json --domain example.com \
+  | jq -r '.[]
+           | select(.args.asns != null)
+           | [.tag, (.args.asns | map(tostring) | join(","))] | @tsv'
+```
+
+### Badkeys blocklist setup (DNSSEC19)
+
+Update blocklist data in the default user data directory:
+```
+gonemaster --badkeys-update
+```
+
+For developers/packagers, update blocklist data in `share/badkeys/`:
+```
+make badkeys-update
 ```
 
 ## gonemaster-client (HTTP API client)
@@ -134,9 +231,10 @@ gonemaster-client [global options] <command> [command options] [args]
 | --- | --- | --- |
 | `--server URL` | string | Base API URL (default `http://localhost:8080/api/v1`). |
 | `--timeout DURATION` | string | HTTP timeout (default `30s`). |
-| `--format FORMAT` | string | Output format: `pretty`, `json`, `jsonl`. |
+| `--format FORMAT` | string | Output format: `pretty`, `json`, `jsonl` (or `json-stream`). |
 | `--output PATH` | string | Write output to a file instead of stdout. |
 | `--locale LOCALE` | string | Locale for translated result messages (default `en`). |
+| `--version` | bool | Print version information and exit. |
 | `--no-color` | bool | Disable ANSI colors in `pretty` output. |
 | `--header NAME:VALUE` | string | Extra HTTP header (repeatable). |
 
@@ -228,6 +326,19 @@ Options:
 - `--split-dir PATH` (write per-job results to files; filename includes job id)
 
 This command is the primary way to retrieve results from all jobs in a convenient way.
+
+#### jobs purge
+Delete completed jobs older than a given number of days, along with their results.
+```
+gonemaster-client jobs purge [--older-than DAYS]
+```
+Options:
+- `--older-than N` - delete jobs finished more than N days ago; `0` (default) uses the server's configured `retention_days`.
+
+Returns `400` if both `--older-than` and the server's `retention_days` are `0`.
+
+Pretty output: `Purged 42 jobs older than 90 days`
+JSON output (`--format json`): `{"purged_jobs": 42}`
 
 #### batches get
 Fetch a batch summary.
@@ -326,6 +437,22 @@ Fetch the full JSON result for a job:
 gonemaster-client jobs results job_123 --view full --format json
 ```
 
+Extract coherent nameserver name/IP pairs from client JSON output:
+```
+gonemaster-client jobs results job_123 --view raw --format json \
+  | jq -r '.entries[]
+           | select(.args.ns and .args.address)
+           | [.args.ns, .args.address] | @tsv'
+```
+
+Extract ASN lists from client JSON output:
+```
+gonemaster-client jobs results job_123 --view raw --format json \
+  | jq -r '.entries[]
+           | select(.args.asns != null)
+           | [.tag, (.args.asns | map(tostring) | join(","))] | @tsv'
+```
+
 Fetch translated, readable output (per module):
 ```
 gonemaster-client jobs results job_123 --view translated --locale sv
@@ -345,3 +472,9 @@ Cancel a job:
 ```
 gonemaster-client jobs cancel job_123
 ```
+
+## Further Reference
+
+- **Testcase specifications**: [`docs/specifications/tests/`](specifications/tests/) documents the algorithm, emitted tags, tag arguments, and severity levels for every implemented testcase.
+- **Tag catalogs**: [`docs/specifications/tags/`](specifications/tags/) lists all tags per module with default severity levels and i18n coverage status.
+- **`--list-tests`**: run `gonemaster --list-tests` to see available testcases and their IDs at runtime.

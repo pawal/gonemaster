@@ -8,12 +8,13 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/transport"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
@@ -34,7 +35,12 @@ func (n NSItem) String() string {
 
 type parentCacheEntry struct {
 	defined bool
-	servers []nameserver.Nameserver
+	servers []parentCacheServer
+}
+
+type parentCacheServer struct {
+	Name    string
+	Address string
 }
 
 var parentCache = struct {
@@ -73,7 +79,7 @@ func GetParentNSNamesAndIPs(ctx context.Context, z *zone.Zone) ([]nameserver.Nam
 		if !cached.defined {
 			return nil, nil
 		}
-		return copyNameservers(cached.servers), nil
+		return materializeParentServers(ctx, r.Client(), cached.servers), nil
 	}
 	parentCache.mu.Unlock()
 
@@ -261,7 +267,7 @@ func GetParentNSNamesAndIPs(ctx context.Context, z *zone.Zone) ([]nameserver.Nam
 
 	parentNS = uniqueSortedNameservers(parentNS)
 	cacheParent(key, parentNS, true)
-	return copyNameservers(parentNS), nil
+	return cloneNameservers(parentNS), nil
 }
 
 // GetParentNSIPs returns parent nameservers filtered to unique IPs.
@@ -320,7 +326,7 @@ func GetDelNSNamesAndIPs(ctx context.Context, z *zone.Zone) ([]NSItem, error) {
 
 	var out []NSItem
 	for _, item := range items {
-		if item.HasAddress {
+		if item.HasAddress || z.Name.IsInBailiwick(item.Name) {
 			out = append(out, item)
 		}
 	}
@@ -367,6 +373,13 @@ func GetDelNSIPs(ctx context.Context, z *zone.Zone) ([]string, error) {
 
 // GetZoneNSNames returns authoritative nameserver names from the zone apex.
 func GetZoneNSNames(ctx context.Context, z *zone.Zone) ([]dnsname.Name, error) {
+	if z == nil {
+		return nil, fmt.Errorf("zone is nil")
+	}
+	if r := z.Recursor(); r != nil && z.Name.String() != "." && r.HasFakeAddresses(z.Name.String()) {
+		return GetDelNSNames(ctx, z)
+	}
+
 	items, err := GetDelNSNamesAndIPs(ctx, z)
 	if err != nil || items == nil {
 		return nil, err
@@ -484,12 +497,13 @@ func getDelegation(ctx context.Context, z *zone.Zone) ([]NSItem, error) {
 		var out []NSItem
 		for _, nsName := range r.GetFakeNames(z.Name.String()) {
 			nameObj := dnsname.New(nsName)
-			if z.Name.IsInBailiwick(nameObj) {
-				for _, addr := range r.GetFakeAddresses(z.Name.String(), nsName) {
-					out = append(out, NSItem{Name: nameObj, Address: addr, HasAddress: true})
-				}
-			} else {
+			addrs := r.GetFakeAddresses(z.Name.String(), nsName)
+			if len(addrs) == 0 {
 				out = append(out, NSItem{Name: nameObj})
+				continue
+			}
+			for _, addr := range addrs {
+				out = append(out, NSItem{Name: nameObj, Address: addr, HasAddress: true})
 			}
 		}
 		return uniqueSortedItems(out), nil
@@ -714,6 +728,30 @@ func getIBAddrInZone(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver
 	if r == nil {
 		return nil, fmt.Errorf("missing recursor")
 	}
+	if z.Name.String() != "." && r.HasFakeAddresses(z.Name.String()) {
+		seen := map[string]nameserver.Nameserver{}
+		for _, item := range delItems {
+			if !item.HasAddress || !z.Name.IsInBailiwick(item.Name) {
+				continue
+			}
+			ns, ok := toNameserver(ctx, z, item)
+			if !ok {
+				continue
+			}
+			seen[strings.ToLower(ns.String())] = ns
+		}
+
+		keys := make([]string, 0, len(seen))
+		for key := range seen {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		out := make([]nameserver.Nameserver, 0, len(keys))
+		for _, key := range keys {
+			out = append(out, seen[key])
+		}
+		return out, nil
+	}
 
 	var delServers []nameserver.Nameserver
 	for _, item := range delItems {
@@ -727,17 +765,28 @@ func getIBAddrInZone(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver
 	}
 
 	ibNS := map[string][]netip.Addr{}
+	deadDel := map[string]bool{}
 	for _, nsName := range nsNames {
 		if !z.Name.IsInBailiwick(nsName) {
 			continue
 		}
 		for _, ns := range delServers {
+			if deadDel[ns.Address.String()] {
+				continue
+			}
 			for _, qtype := range []string{"A", "AAAA"} {
 				resp, err := r.RecurseWithNameservers(ctx, nsName.String(), qtype, "IN", []nameserver.Nameserver{ns})
-				if err != nil || resp.Msg == nil || resp.Rcode() != "NOERROR" || !resp.AA() {
+				if err != nil || resp.Msg == nil {
+					deadDel[ns.Address.String()] = true
+					break
+				}
+				if resp.Rcode() != "NOERROR" || !resp.AA() {
 					continue
 				}
 				ibNS[nsName.String()] = append(ibNS[nsName.String()], collectResolvedAddrs(resp, qtype, nsName)...)
+			}
+			if len(ibNS[nsName.String()]) > 0 {
+				break
 			}
 		}
 	}
@@ -821,11 +870,9 @@ func nsMapFromResponse(resp packet.Packet, owner dnsname.Name, section string) m
 func addrFromRR(rr dns.RR) (netip.Addr, bool) {
 	switch v := rr.(type) {
 	case *dns.A:
-		addr, err := netip.ParseAddr(v.A.String())
-		return addr, err == nil
+		return v.Addr, v.Addr.IsValid()
 	case *dns.AAAA:
-		addr, err := netip.ParseAddr(v.AAAA.String())
-		return addr, err == nil
+		return v.Addr, v.Addr.IsValid()
 	default:
 		return netip.Addr{}, false
 	}
@@ -866,7 +913,7 @@ func cnameFollowed(resp packet.Packet, nsName dnsname.Name) bool {
 	if len(questions) == 0 {
 		return false
 	}
-	owner := dnsname.New(questions[0].Name)
+	owner := dnsname.New(questions[0].Header().Name)
 	return !strings.EqualFold(owner.String(), nsName.String())
 }
 
@@ -875,7 +922,7 @@ func cnameTargetFromQuestion(resp packet.Packet) dnsname.Name {
 	if len(questions) == 0 {
 		return dnsname.Name{}
 	}
-	return dnsname.New(questions[0].Name)
+	return dnsname.New(questions[0].Header().Name)
 }
 
 func followCNAME(resp packet.Packet, start dnsname.Name) dnsname.Name {
@@ -982,11 +1029,47 @@ func firstKey(m map[string][]nameserver.Nameserver) string {
 
 func cacheParent(key string, servers []nameserver.Nameserver, defined bool) {
 	parentCache.mu.Lock()
-	parentCache.items[key] = parentCacheEntry{defined: defined, servers: copyNameservers(servers)}
+	parentCache.items[key] = parentCacheEntry{defined: defined, servers: snapshotParentServers(servers)}
 	parentCache.mu.Unlock()
 }
 
-func copyNameservers(list []nameserver.Nameserver) []nameserver.Nameserver {
+func snapshotParentServers(list []nameserver.Nameserver) []parentCacheServer {
+	if list == nil {
+		return nil
+	}
+	out := make([]parentCacheServer, 0, len(list))
+	for _, item := range list {
+		addr := item.Address.String()
+		if addr == "" {
+			continue
+		}
+		out = append(out, parentCacheServer{
+			Name:    item.Name.String(),
+			Address: addr,
+		})
+	}
+	return out
+}
+
+func materializeParentServers(ctx context.Context, client *transport.Client, list []parentCacheServer) []nameserver.Nameserver {
+	if len(list) == 0 {
+		return nil
+	}
+	out := make([]nameserver.Nameserver, 0, len(list))
+	for _, item := range list {
+		if strings.TrimSpace(item.Name) == "" || strings.TrimSpace(item.Address) == "" {
+			continue
+		}
+		ns, err := nameserver.NewWithContext(ctx, item.Name, item.Address, client)
+		if err != nil {
+			continue
+		}
+		out = append(out, ns)
+	}
+	return out
+}
+
+func cloneNameservers(list []nameserver.Nameserver) []nameserver.Nameserver {
 	if list == nil {
 		return nil
 	}

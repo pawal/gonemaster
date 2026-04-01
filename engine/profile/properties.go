@@ -351,6 +351,17 @@ var propertyDefs = map[string]propertyDef{
 			return p.ASNDB.Sources
 		},
 	},
+	"badkeys.path": {
+		typ:          propStr,
+		defaultValue: "",
+		hasDefault:   true,
+		setter: func(p *Profile, value any) {
+			p.Badkeys.Path = value.(string)
+		},
+		getter: func(p *Profile) any {
+			return p.Badkeys.Path
+		},
+	},
 	"logfilter": {
 		typ:          propMap,
 		defaultValue: map[string]map[string][]LogFilterRule{},
@@ -476,6 +487,18 @@ var propertyDefs = map[string]propertyDef{
 		},
 		getter: func(p *Profile) any {
 			return p.TestCasesVars.Zone06.SOADefaultTTLMinimumValue
+		},
+	},
+	"test_cases_vars.zone13.SPF_LOOKUP_LIMIT": {
+		typ:          propNum,
+		min:          intPtr(1),
+		defaultValue: 10,
+		hasDefault:   true,
+		setter: func(p *Profile, value any) {
+			p.TestCasesVars.Zone13.SPFLookupLimit = value.(int)
+		},
+		getter: func(p *Profile) any {
+			return p.TestCasesVars.Zone13.SPFLookupLimit
 		},
 	},
 }

@@ -3,11 +3,13 @@ package zone
 import (
 	"context"
 	"net/netip"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/logger"
@@ -151,23 +153,93 @@ func TestZone10ParallelQueries(t *testing.T) {
 	}
 
 	var order []string
+	var addresses []string
 	for _, entry := range entries {
 		if entry == nil || entry.Tag != "NO_RESPONSE" {
 			continue
 		}
+		if _, ok := entry.Args["arg_schema"]; ok {
+			t.Fatalf("did not expect arg_schema in args: %#v", entry.Args["arg_schema"])
+		}
 		if ns, ok := entry.Args["ns"].(string); ok {
+			if strings.Contains(ns, "/") {
+				t.Fatalf("expected nameserver-only ns argument, got %q", ns)
+			}
 			order = append(order, ns)
+		}
+		if address, ok := entry.Args["address"].(string); ok {
+			addresses = append(addresses, address)
 		}
 	}
 	if len(order) != 2 {
 		t.Fatalf("expected 2 no-response entries, got %v", order)
 	}
-	if order[0] != "ns1.example/192.0.2.1" || order[1] != "ns2.example/192.0.2.2" {
-		t.Fatalf("expected deterministic log order, got %v", order)
+	if order[0] != "ns1.example" || order[1] != "ns2.example" {
+		t.Fatalf("expected deterministic nameserver order, got %v", order)
+	}
+	if len(addresses) != 2 {
+		t.Fatalf("expected 2 no-response addresses, got %v", addresses)
+	}
+	if addresses[0] != "192.0.2.1" || addresses[1] != "192.0.2.2" {
+		t.Fatalf("expected deterministic address order, got %v", addresses)
 	}
 }
 
-func TestZone09MXQueryDoesNotForceFallback(t *testing.T) {
+func TestZone10WrongSOAUsesQueryName(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	ns := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		if qtype != "SOA" {
+			return packet.Packet{}
+		}
+		msg := new(dns.Msg)
+		msg.Authoritative = true
+		msg.Rcode = dns.RcodeSuccess
+		soa := &dns.SOA{Hdr: dns.Header{Name: "wrong.example.", Class: dns.ClassINET, TTL: 300}}
+		soa.Ns = "ns1.example."
+		soa.Mbox = "hostmaster.example."
+		soa.Serial = 1
+		soa.Refresh = 1
+		soa.Retry = 1
+		soa.Expire = 1
+		soa.Minttl = 1
+		msg.Answer = []dns.RR{soa}
+		return packet.Packet{Msg: msg}
+	})
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example.com")}
+	entries, err := Zone10(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone10: %v", err)
+	}
+	if !hasEntryTag(entries, "WRONG_SOA") {
+		t.Fatalf("expected WRONG_SOA")
+	}
+	var entry *logger.Entry
+	for _, e := range entries {
+		if e != nil && e.Tag == "WRONG_SOA" {
+			entry = e
+			break
+		}
+	}
+	if entry == nil {
+		t.Fatalf("missing WRONG_SOA")
+	}
+	if got, ok := entry.Args["query_name"].(string); !ok || got != "example.com." {
+		t.Fatalf("expected query_name=example.com., got %#v", entry.Args["query_name"])
+	}
+	if _, ok := entry.Args["name"]; ok {
+		t.Fatalf("legacy key name should not be present: %#v", entry.Args)
+	}
+}
+
+func TestZone09MXQueryDisablesFallback(t *testing.T) {
 	setupTest(t)
 
 	origMethod4and5 := method4and5
@@ -176,7 +248,7 @@ func TestZone09MXQueryDoesNotForceFallback(t *testing.T) {
 	profile.Effective().Resolver.Defaults.Parallel = 1
 
 	var mu sync.Mutex
-	var fallbackSet []bool
+	var fallbackValues []bool
 	var useVCValues []bool
 	mxCalls := 0
 
@@ -188,7 +260,11 @@ func TestZone09MXQueryDoesNotForceFallback(t *testing.T) {
 			mu.Lock()
 			mxCalls++
 			call := mxCalls
-			fallbackSet = append(fallbackSet, opts != nil && opts.Fallback != nil)
+			fallback := false
+			if opts != nil && opts.Fallback != nil {
+				fallback = *opts.Fallback
+			}
+			fallbackValues = append(fallbackValues, fallback)
 			if opts != nil && opts.UseVC != nil {
 				useVCValues = append(useVCValues, *opts.UseVC)
 			} else {
@@ -197,7 +273,7 @@ func TestZone09MXQueryDoesNotForceFallback(t *testing.T) {
 			mu.Unlock()
 
 			msg := new(dns.Msg)
-			msg.SetQuestion(dns.Fqdn("example"), dns.TypeMX)
+			dnsutil.SetQuestion(msg, dnsutil.Fqdn("example"), dns.TypeMX)
 			msg.Authoritative = true
 			msg.Rcode = dns.RcodeSuccess
 			if call == 1 {
@@ -221,16 +297,73 @@ func TestZone09MXQueryDoesNotForceFallback(t *testing.T) {
 	mu.Lock()
 	defer mu.Unlock()
 
-	if len(fallbackSet) == 0 {
+	if len(fallbackValues) == 0 {
 		t.Fatalf("expected MX query to be issued")
 	}
-	for _, forced := range fallbackSet {
-		if forced {
-			t.Fatalf("expected MX query to not force fallback")
+	for _, fallback := range fallbackValues {
+		if fallback {
+			t.Fatalf("expected MX query fallback to be disabled")
 		}
 	}
 	if len(useVCValues) < 2 || useVCValues[0] || !useVCValues[1] {
 		t.Fatalf("expected MX query to retry with UseVC after truncation, got %v", useVCValues)
+	}
+}
+
+func TestZone09MXDataUsesTypedMailTargets(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	ns := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		switch qtype {
+		case "SOA":
+			return soaPacket("example.com", 1, 1, 1, 1, 1)
+		case "MX":
+			msg := new(dns.Msg)
+			msg.Authoritative = true
+			msg.Rcode = dns.RcodeSuccess
+			mx := &dns.MX{Hdr: dns.Header{Name: "example.com.", Class: dns.ClassINET, TTL: 300}}
+			mx.Mx = "mail.example."
+			mx.Preference = 10
+			msg.Answer = []dns.RR{mx}
+			return packet.Packet{Msg: msg}
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example.com")}
+	entries, err := Zone09(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone09: %v", err)
+	}
+
+	var mxData *logger.Entry
+	for _, entry := range entries {
+		if entry != nil && entry.Tag == "Z09_MX_DATA" {
+			mxData = entry
+			break
+		}
+	}
+	if mxData == nil {
+		t.Fatalf("expected Z09_MX_DATA")
+	}
+	targets, ok := mxData.Args["mail_targets"].([]string)
+	if !ok || len(targets) != 1 || targets[0] != "mail.example" {
+		t.Fatalf("expected typed mail_targets [mail.example], got %#v", mxData.Args["mail_targets"])
+	}
+	addresses, ok := mxData.Args["addresses"].([]string)
+	if !ok || len(addresses) != 1 || addresses[0] != "192.0.2.1" {
+		t.Fatalf("expected typed addresses [192.0.2.1], got %#v", mxData.Args["addresses"])
+	}
+	if _, ok := mxData.Args["mailtarget_list"]; ok {
+		t.Fatalf("legacy key mailtarget_list should not be present: %#v", mxData.Args)
 	}
 }
 
@@ -276,6 +409,59 @@ func TestZone11SpfSyntaxError(t *testing.T) {
 	}
 }
 
+func TestZone11NoSpfNonMailDomain(t *testing.T) {
+	setupTest(t)
+
+	origDel := getDelNSNamesAndIPs
+	origZone := getZoneNSNamesAndIPs
+	t.Cleanup(func() {
+		getDelNSNamesAndIPs = origDel
+		getZoneNSNamesAndIPs = origZone
+	})
+
+	z, err := zonepkg.New("se")
+	if err != nil {
+		t.Fatalf("zone11: %v", err)
+	}
+
+	newNameserver(t, "ns1.se", "192.0.2.10", func(qname string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		msg := new(dns.Msg)
+		dnsutil.SetQuestion(msg, dnsutil.Fqdn(qname), dns.TypeTXT)
+		msg.Authoritative = true
+		msg.Rcode = dns.RcodeSuccess
+		return packet.Packet{Msg: msg}
+	})
+
+	getDelNSNamesAndIPs = func(_ context.Context, _ *zonepkg.Zone) ([]methodsv2.NSItem, error) {
+		return []methodsv2.NSItem{{
+			Name:       dnsname.New("ns1.se"),
+			Address:    netip.MustParseAddr("192.0.2.10"),
+			HasAddress: true,
+		}}, nil
+	}
+	getZoneNSNamesAndIPs = func(_ context.Context, _ *zonepkg.Zone) ([]methodsv2.NSItem, error) {
+		return nil, nil
+	}
+
+	entries, err := Zone11(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone11: %v", err)
+	}
+	var found *logger.Entry
+	for _, entry := range entries {
+		if entry != nil && entry.Tag == "Z11_NO_SPF_NON_MAIL_DOMAIN" {
+			found = entry
+			break
+		}
+	}
+	if found == nil {
+		t.Fatalf("expected Z11_NO_SPF_NON_MAIL_DOMAIN")
+	}
+	if domain, ok := found.Args["domain"].(string); !ok || domain != "se" {
+		t.Fatalf("expected domain=\"se\", got %v", found.Args["domain"])
+	}
+}
+
 func setupTest(t *testing.T) {
 	t.Helper()
 
@@ -307,44 +493,527 @@ func newNameserver(t *testing.T, name string, ip string, handler func(qname stri
 
 func soaPacket(owner string, serial uint32, refresh uint32, retry uint32, expire uint32, minimum uint32) packet.Packet {
 	msg := new(dns.Msg)
-	msg.SetQuestion(dns.Fqdn(owner), dns.TypeSOA)
+	dnsutil.SetQuestion(msg, dnsutil.Fqdn(owner), dns.TypeSOA)
 	msg.Authoritative = true
 	msg.Rcode = dns.RcodeSuccess
-	msg.Answer = []dns.RR{
-		&dns.SOA{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(owner),
-				Rrtype: dns.TypeSOA,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Ns:      dns.Fqdn("ns1.example"),
-			Mbox:    dns.Fqdn("hostmaster.example"),
-			Serial:  serial,
-			Refresh: refresh,
-			Retry:   retry,
-			Expire:  expire,
-			Minttl:  minimum,
-		},
-	}
+	soaRR := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
+	soaRR.Ns = dnsutil.Fqdn("ns1.example")
+	soaRR.Mbox = dnsutil.Fqdn("hostmaster.example")
+	soaRR.Serial = serial
+	soaRR.Refresh = refresh
+	soaRR.Retry = retry
+	soaRR.Expire = expire
+	soaRR.Minttl = minimum
+	msg.Answer = []dns.RR{soaRR}
 	return packet.Packet{Msg: msg}
 }
 
 func txtPacket(name string, value string) packet.Packet {
 	msg := new(dns.Msg)
-	msg.SetQuestion(dns.Fqdn(name), dns.TypeTXT)
+	dnsutil.SetQuestion(msg, dnsutil.Fqdn(name), dns.TypeTXT)
 	msg.Authoritative = true
 	msg.Rcode = dns.RcodeSuccess
-	msg.Answer = []dns.RR{
-		&dns.TXT{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(name),
-				Rrtype: dns.TypeTXT,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Txt: []string{value},
-		},
-	}
+	txtRR := &dns.TXT{Hdr: dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET, TTL: 60}}
+	txtRR.Txt = []string{value}
+	msg.Answer = []dns.RR{txtRR}
 	return packet.Packet{Msg: msg}
+}
+
+func csyncPacket(name string, serial uint32, flags uint16, types []uint16) packet.Packet {
+	msg := new(dns.Msg)
+	msg.Authoritative = true
+	msg.Rcode = dns.RcodeSuccess
+	csync := &dns.CSYNC{}
+	csync.Hdr = dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET, TTL: 300}
+	csync.CSYNC.Serial = serial
+	csync.CSYNC.Flags = flags
+	csync.CSYNC.TypeBitMap = types
+	msg.Answer = []dns.RR{csync}
+	return packet.Packet{Msg: msg}
+}
+
+func TestZone12CSYNCFound(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	const serial uint32 = 2024010101
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		switch qtype {
+		case "CSYNC":
+			return csyncPacket("example", serial, 0x0001, []uint16{dns.TypeNS, dns.TypeA, dns.TypeAAAA})
+		case "SOA":
+			return soaPacket("example", serial, 3600, 900, 604800, 300)
+		}
+		return packet.Packet{}
+	})
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example")}
+	entries, err := Zone12(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone12: %v", err)
+	}
+	if !hasEntryTag(entries, "Z12_CSYNC_FOUND") {
+		t.Fatalf("expected Z12_CSYNC_FOUND")
+	}
+}
+
+func TestZone12NoCSYNC(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		switch qtype {
+		case "CSYNC":
+			// Authoritative NOERROR with no CSYNC in answer.
+			msg := new(dns.Msg)
+			msg.Authoritative = true
+			msg.Rcode = dns.RcodeSuccess
+			return packet.Packet{Msg: msg}
+		case "SOA":
+			return soaPacket("example", 2024010101, 3600, 900, 604800, 300)
+		}
+		return packet.Packet{}
+	})
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example")}
+	entries, err := Zone12(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone12: %v", err)
+	}
+	if !hasEntryTag(entries, "Z12_NO_CSYNC") {
+		t.Fatalf("expected Z12_NO_CSYNC")
+	}
+}
+
+func TestZone12SerialMismatch(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		switch qtype {
+		case "CSYNC":
+			// CSYNC carries serial 100, but SOA has serial 200.
+			return csyncPacket("example", 100, 0, []uint16{dns.TypeNS})
+		case "SOA":
+			return soaPacket("example", 200, 3600, 900, 604800, 300)
+		}
+		return packet.Packet{}
+	})
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example")}
+	entries, err := Zone12(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone12: %v", err)
+	}
+	if !hasEntryTag(entries, "Z12_SERIAL_MISMATCH") {
+		t.Fatalf("expected Z12_SERIAL_MISMATCH")
+	}
+}
+
+func TestZone12SerialMismatchSoaMinimumNewerCSYNC(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		switch qtype {
+		case "CSYNC":
+			// soaminimum set, but CSYNC serial is newer than current SOA serial.
+			return csyncPacket("example", 300, csyncFlagSoaMinimum, []uint16{dns.TypeNS})
+		case "SOA":
+			return soaPacket("example", 200, 3600, 900, 604800, 300)
+		}
+		return packet.Packet{}
+	})
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example")}
+	entries, err := Zone12(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone12: %v", err)
+	}
+	if !hasEntryTag(entries, "Z12_SERIAL_MISMATCH") {
+		t.Fatalf("expected Z12_SERIAL_MISMATCH")
+	}
+}
+
+func TestZone12SerialMismatchSoaMinimumOlderCSYNCNotMismatch(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		switch qtype {
+		case "CSYNC":
+			// soaminimum set and SOA serial has advanced, which is valid.
+			return csyncPacket("example", 100, csyncFlagSoaMinimum, []uint16{dns.TypeNS})
+		case "SOA":
+			return soaPacket("example", 200, 3600, 900, 604800, 300)
+		}
+		return packet.Packet{}
+	})
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example")}
+	entries, err := Zone12(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone12: %v", err)
+	}
+	if hasEntryTag(entries, "Z12_SERIAL_MISMATCH") {
+		t.Fatalf("did not expect Z12_SERIAL_MISMATCH")
+	}
+}
+
+func TestZone12MultipleCSYNC(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		if qtype != "CSYNC" {
+			return packet.Packet{}
+		}
+		msg := new(dns.Msg)
+		msg.Authoritative = true
+		msg.Rcode = dns.RcodeSuccess
+		for i := range 2 {
+			csync := &dns.CSYNC{}
+			csync.Hdr = dns.Header{Name: "example.", Class: dns.ClassINET, TTL: 300}
+			csync.CSYNC.Serial = uint32(2024010100 + i)
+			csync.CSYNC.TypeBitMap = []uint16{dns.TypeNS}
+			msg.Answer = append(msg.Answer, csync)
+		}
+		return packet.Packet{Msg: msg}
+	})
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example")}
+	entries, err := Zone12(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone12: %v", err)
+	}
+	if !hasEntryTag(entries, "Z12_MULTIPLE_CSYNC") {
+		t.Fatalf("expected Z12_MULTIPLE_CSYNC")
+	}
+}
+
+func TestZone12InconsistentCSYNC(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	// ns1 and ns2 return CSYNC records with different serials.
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		if qtype == "CSYNC" {
+			return csyncPacket("example", 2024010101, 0, []uint16{dns.TypeNS})
+		}
+		return packet.Packet{}
+	})
+	ns2 := newNameserver(t, "ns2.example", "192.0.2.2", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		if qtype == "CSYNC" {
+			return csyncPacket("example", 2024010199, 0, []uint16{dns.TypeNS})
+		}
+		return packet.Packet{}
+	})
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1, ns2}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example")}
+	entries, err := Zone12(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone12: %v", err)
+	}
+	if !hasEntryTag(entries, "Z12_INCONSISTENT_CSYNC") {
+		t.Fatalf("expected Z12_INCONSISTENT_CSYNC")
+	}
+}
+
+func TestZone12MixedPresence(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	// ns1 returns CSYNC, ns2 returns authoritative NOERROR without CSYNC.
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		if qtype == "CSYNC" {
+			return csyncPacket("example", 2024010101, 0, []uint16{dns.TypeNS})
+		}
+		return packet.Packet{}
+	})
+	ns2 := newNameserver(t, "ns2.example", "192.0.2.2", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		if qtype == "CSYNC" {
+			msg := new(dns.Msg)
+			msg.Authoritative = true
+			msg.Rcode = dns.RcodeSuccess
+			return packet.Packet{Msg: msg}
+		}
+		return packet.Packet{}
+	})
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1, ns2}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example")}
+	entries, err := Zone12(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone12: %v", err)
+	}
+	if !hasEntryTag(entries, "Z12_MIXED_PRESENCE") {
+		t.Fatalf("expected Z12_MIXED_PRESENCE")
+	}
+}
+
+// --- Zone13 tests ---
+
+// spfTxtPacket creates an authoritative TXT response with an SPF record.
+func spfTxtPacket(name string, spf string) packet.Packet {
+	return txtPacket(name, spf)
+}
+
+// recurseTxtPacket creates a non-authoritative TXT response (for recursive lookups).
+func recurseTxtPacket(name string, value string) packet.Packet {
+	msg := new(dns.Msg)
+	dnsutil.SetQuestion(msg, dnsutil.Fqdn(name), dns.TypeTXT)
+	msg.Rcode = dns.RcodeSuccess
+	txtRR := &dns.TXT{Hdr: dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET, TTL: 60}}
+	txtRR.Txt = []string{value}
+	msg.Answer = []dns.RR{txtRR}
+	return packet.Packet{Msg: msg}
+}
+
+func setupZone13(t *testing.T) {
+	t.Helper()
+	setupTest(t)
+	origQueryAuth := queryAuth
+	origRecurse := recurse
+	t.Cleanup(func() {
+		queryAuth = origQueryAuth
+		recurse = origRecurse
+	})
+}
+
+func TestZone13LookupCountOK_NoLookups(t *testing.T) {
+	setupZone13(t)
+
+	queryAuth = func(_ context.Context, _ *zonepkg.Zone, _ string, _ string) (packet.Packet, error) {
+		return spfTxtPacket("example.com", "v=spf1 ip4:192.0.2.0/24 ip6:2001:db8::/32 -all"), nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example.com")}
+	entries, err := Zone13(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone13: %v", err)
+	}
+	if !hasEntryTag(entries, "Z13_SPF_LOOKUP_COUNT_OK") {
+		t.Fatalf("expected Z13_SPF_LOOKUP_COUNT_OK")
+	}
+	for _, e := range entries {
+		if e != nil && e.Tag == "Z13_SPF_LOOKUP_COUNT_OK" {
+			if count, ok := e.Args["count"].(int); !ok || count != 0 {
+				t.Fatalf("expected count=0, got %v", e.Args["count"])
+			}
+		}
+	}
+}
+
+func TestZone13LookupCountOK_Boundary(t *testing.T) {
+	setupZone13(t)
+
+	// SPF with exactly 10 mechanisms that require DNS: a, mx, include (with 7 mechanisms inside)
+	queryAuth = func(_ context.Context, _ *zonepkg.Zone, _ string, _ string) (packet.Packet, error) {
+		return spfTxtPacket("example.com", "v=spf1 a mx include:other.example.com -all"), nil
+	}
+	recurse = func(_ context.Context, _ *zonepkg.Zone, name string, _ string) (packet.Packet, error) {
+		if strings.HasPrefix(name, "other.example.com") {
+			// 7 more lookups inside: a mx exists:x1 exists:x2 exists:x3 exists:x4 exists:x5
+			return recurseTxtPacket("other.example.com", "v=spf1 a mx exists:x1.example.com exists:x2.example.com exists:x3.example.com exists:x4.example.com exists:x5.example.com -all"), nil
+		}
+		return packet.Packet{}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example.com")}
+	entries, err := Zone13(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone13: %v", err)
+	}
+	if !hasEntryTag(entries, "Z13_SPF_LOOKUP_COUNT_OK") {
+		t.Fatalf("expected Z13_SPF_LOOKUP_COUNT_OK, got tags: %v", entryTags(entries))
+	}
+	for _, e := range entries {
+		if e != nil && e.Tag == "Z13_SPF_LOOKUP_COUNT_OK" {
+			if count, ok := e.Args["count"].(int); !ok || count != 10 {
+				t.Fatalf("expected count=10, got %v", e.Args["count"])
+			}
+		}
+	}
+}
+
+func TestZone13LookupCountExceeded(t *testing.T) {
+	setupZone13(t)
+
+	// SPF with 11 mechanisms: a mx ptr exists:x1 ... exists:x8
+	queryAuth = func(_ context.Context, _ *zonepkg.Zone, _ string, _ string) (packet.Packet, error) {
+		return spfTxtPacket("example.com", "v=spf1 a mx ptr exists:x1.example.com exists:x2.example.com exists:x3.example.com exists:x4.example.com exists:x5.example.com exists:x6.example.com exists:x7.example.com exists:x8.example.com -all"), nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example.com")}
+	entries, err := Zone13(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone13: %v", err)
+	}
+	if !hasEntryTag(entries, "Z13_SPF_LOOKUP_COUNT_EXCEEDED") {
+		t.Fatalf("expected Z13_SPF_LOOKUP_COUNT_EXCEEDED, got tags: %v", entryTags(entries))
+	}
+	// Also should get ptr deprecated
+	if !hasEntryTag(entries, "Z13_SPF_PTR_DEPRECATED") {
+		t.Fatalf("expected Z13_SPF_PTR_DEPRECATED")
+	}
+}
+
+func TestZone13IncludeLoop(t *testing.T) {
+	setupZone13(t)
+
+	queryAuth = func(_ context.Context, _ *zonepkg.Zone, _ string, _ string) (packet.Packet, error) {
+		return spfTxtPacket("example.com", "v=spf1 include:loop.example.com -all"), nil
+	}
+	recurse = func(_ context.Context, _ *zonepkg.Zone, name string, _ string) (packet.Packet, error) {
+		if strings.HasPrefix(name, "loop.example.com") {
+			return recurseTxtPacket("loop.example.com", "v=spf1 include:loop.example.com -all"), nil
+		}
+		return packet.Packet{}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example.com")}
+	entries, err := Zone13(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone13: %v", err)
+	}
+	if !hasEntryTag(entries, "Z13_SPF_LOOKUP_LOOP") {
+		t.Fatalf("expected Z13_SPF_LOOKUP_LOOP, got tags: %v", entryTags(entries))
+	}
+}
+
+func TestZone13RecursiveError(t *testing.T) {
+	setupZone13(t)
+
+	queryAuth = func(_ context.Context, _ *zonepkg.Zone, _ string, _ string) (packet.Packet, error) {
+		return spfTxtPacket("example.com", "v=spf1 include:missing.example.com -all"), nil
+	}
+	recurse = func(_ context.Context, _ *zonepkg.Zone, _ string, _ string) (packet.Packet, error) {
+		return packet.Packet{}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example.com")}
+	entries, err := Zone13(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone13: %v", err)
+	}
+	if !hasEntryTag(entries, "Z13_SPF_RECURSIVE_ERROR") {
+		t.Fatalf("expected Z13_SPF_RECURSIVE_ERROR, got tags: %v", entryTags(entries))
+	}
+}
+
+func TestZone13PtrDeprecated(t *testing.T) {
+	setupZone13(t)
+
+	queryAuth = func(_ context.Context, _ *zonepkg.Zone, _ string, _ string) (packet.Packet, error) {
+		return spfTxtPacket("example.com", "v=spf1 ptr -all"), nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example.com")}
+	entries, err := Zone13(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone13: %v", err)
+	}
+	if !hasEntryTag(entries, "Z13_SPF_PTR_DEPRECATED") {
+		t.Fatalf("expected Z13_SPF_PTR_DEPRECATED")
+	}
+	if !hasEntryTag(entries, "Z13_SPF_LOOKUP_COUNT_OK") {
+		t.Fatalf("expected Z13_SPF_LOOKUP_COUNT_OK")
+	}
+}
+
+func TestZone13NoSpfFound(t *testing.T) {
+	setupZone13(t)
+
+	queryAuth = func(_ context.Context, _ *zonepkg.Zone, _ string, _ string) (packet.Packet, error) {
+		msg := new(dns.Msg)
+		dnsutil.SetQuestion(msg, "example.com.", dns.TypeTXT)
+		msg.Authoritative = true
+		msg.Rcode = dns.RcodeSuccess
+		return packet.Packet{Msg: msg}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example.com")}
+	entries, err := Zone13(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone13: %v", err)
+	}
+	if !hasEntryTag(entries, "Z13_NO_SPF_FOUND") {
+		t.Fatalf("expected Z13_NO_SPF_FOUND, got tags: %v", entryTags(entries))
+	}
+}
+
+func TestZone13CustomLimit(t *testing.T) {
+	setupZone13(t)
+
+	profile.Effective().TestCasesVars.Zone13.SPFLookupLimit = 5
+
+	// SPF with 6 mechanisms: a mx exists:x1 exists:x2 exists:x3 exists:x4
+	queryAuth = func(_ context.Context, _ *zonepkg.Zone, _ string, _ string) (packet.Packet, error) {
+		return spfTxtPacket("example.com", "v=spf1 a mx exists:x1.example.com exists:x2.example.com exists:x3.example.com exists:x4.example.com -all"), nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example.com")}
+	entries, err := Zone13(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone13: %v", err)
+	}
+	if !hasEntryTag(entries, "Z13_SPF_LOOKUP_COUNT_EXCEEDED") {
+		t.Fatalf("expected Z13_SPF_LOOKUP_COUNT_EXCEEDED with limit=5, got tags: %v", entryTags(entries))
+	}
+	for _, e := range entries {
+		if e != nil && e.Tag == "Z13_SPF_LOOKUP_COUNT_EXCEEDED" {
+			if limit, ok := e.Args["limit"].(int); !ok || limit != 5 {
+				t.Fatalf("expected limit=5, got %v", e.Args["limit"])
+			}
+		}
+	}
+}
+
+func entryTags(entries []*logger.Entry) []string {
+	var tags []string
+	for _, e := range entries {
+		if e != nil {
+			tags = append(tags, e.Tag)
+		}
+	}
+	return tags
 }

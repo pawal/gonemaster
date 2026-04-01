@@ -3,14 +3,15 @@ package delegation
 import (
 	"context"
 	"fmt"
-	"net"
 	"sort"
 	"strings"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/methods"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
@@ -158,6 +159,8 @@ func Metadata() map[string][]string {
 			"NO_RESPONSE",
 			"NS_IS_CNAME",
 			"UNEXPECTED_RCODE",
+			"IPV4_DISABLED",
+			"IPV6_DISABLED",
 			"TEST_CASE_END",
 			"TEST_CASE_START",
 		},
@@ -196,10 +199,10 @@ func Delegation01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	delNameStrings := namesToStrings(delNames)
 	sort.Strings(delNameStrings)
 	delArgs := map[string]any{
-		"count":       len(delNameStrings),
-		"minimum":     constants.MinimumNumberOfNameservers,
-		"nsname_list": strings.Join(delNameStrings, ";"),
+		"count":   len(delNameStrings),
+		"minimum": constants.MinimumNumberOfNameservers,
 	}
+	setTypedServersFromNames(delArgs, delNameStrings)
 	if len(delNameStrings) >= constants.MinimumNumberOfNameservers {
 		if err := appendLog(ctx, &results, testcase, "ENOUGH_NS_DEL", delArgs); err != nil {
 			return results, err
@@ -217,10 +220,10 @@ func Delegation01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	childNameStrings := namesToStrings(childNames)
 	sort.Strings(childNameStrings)
 	childArgs := map[string]any{
-		"count":       len(childNameStrings),
-		"minimum":     constants.MinimumNumberOfNameservers,
-		"nsname_list": strings.Join(childNameStrings, ";"),
+		"count":   len(childNameStrings),
+		"minimum": constants.MinimumNumberOfNameservers,
 	}
+	setTypedServersFromNames(childArgs, childNameStrings)
 	if len(childNameStrings) >= constants.MinimumNumberOfNameservers {
 		if err := appendLog(ctx, &results, testcase, "ENOUGH_NS_CHILD", childArgs); err != nil {
 			return results, err
@@ -242,8 +245,8 @@ func Delegation01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	childIPv4Args := map[string]any{
 		"count":   childIPv4Count,
 		"minimum": constants.MinimumNumberOfNameservers,
-		"ns_list": strings.Join(sortedNameserverStrings(childIPv4), ";"),
 	}
+	setTypedEndpointsFromNameservers(childIPv4Args, childIPv4)
 	if childIPv4Count >= constants.MinimumNumberOfNameservers {
 		if err := appendLog(ctx, &results, testcase, "ENOUGH_IPV4_NS_CHILD", childIPv4Args); err != nil {
 			return results, err
@@ -262,8 +265,8 @@ func Delegation01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	childIPv6Args := map[string]any{
 		"count":   childIPv6Count,
 		"minimum": constants.MinimumNumberOfNameservers,
-		"ns_list": strings.Join(sortedNameserverStrings(childIPv6), ";"),
 	}
+	setTypedEndpointsFromNameservers(childIPv6Args, childIPv6)
 	if childIPv6Count >= constants.MinimumNumberOfNameservers {
 		if err := appendLog(ctx, &results, testcase, "ENOUGH_IPV6_NS_CHILD", childIPv6Args); err != nil {
 			return results, err
@@ -289,8 +292,8 @@ func Delegation01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	delIPv4Args := map[string]any{
 		"count":   delIPv4Count,
 		"minimum": constants.MinimumNumberOfNameservers,
-		"ns_list": strings.Join(sortedNameserverStrings(delIPv4), ";"),
 	}
+	setTypedEndpointsFromNameservers(delIPv4Args, delIPv4)
 	if delIPv4Count >= constants.MinimumNumberOfNameservers {
 		if err := appendLog(ctx, &results, testcase, "ENOUGH_IPV4_NS_DEL", delIPv4Args); err != nil {
 			return results, err
@@ -309,8 +312,8 @@ func Delegation01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	delIPv6Args := map[string]any{
 		"count":   delIPv6Count,
 		"minimum": constants.MinimumNumberOfNameservers,
-		"ns_list": strings.Join(sortedNameserverStrings(delIPv6), ";"),
 	}
+	setTypedEndpointsFromNameservers(delIPv6Args, delIPv6)
 	if delIPv6Count >= constants.MinimumNumberOfNameservers {
 		if err := appendLog(ctx, &results, testcase, "ENOUGH_IPV6_NS_DEL", delIPv6Args); err != nil {
 			return results, err
@@ -396,53 +399,36 @@ func Delegation03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	msg := new(dns.Msg)
-	msg.SetQuestion(dns.Fqdn(longName), dns.TypeNS)
+	dnsutil.SetQuestion(msg, dnsutil.Fqdn(longName), dns.TypeNS)
 	for _, nsName := range nsNames {
-		msg.Ns = append(msg.Ns, &dns.NS{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(z.Name.String()),
-				Rrtype: dns.TypeNS,
-				Class:  dns.ClassINET,
-				Ttl:    0,
-			},
-			Ns: dns.Fqdn(nsName.String()),
-		})
+		nsRR := &dns.NS{}
+		nsRR.Hdr = dns.Header{Name: dnsutil.Fqdn(z.Name.String()), Class: dns.ClassINET}
+		nsRR.Ns = dnsutil.Fqdn(nsName.String())
+		msg.Ns = append(msg.Ns, nsRR)
 	}
 
 	nssV4 := filterByIPVersion(nss, constants.IPVersion4)
 	if len(nssV4) > 0 && allInBailiwick(parent.Name, nssV4) {
 		ns := nssV4[0]
-		msg.Extra = append(msg.Extra, &dns.A{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(ns.Name.String()),
-				Rrtype: dns.TypeA,
-				Class:  dns.ClassINET,
-				Ttl:    0,
-			},
-			A: net.IP(ns.Address.AsSlice()),
-		})
+		aRR := &dns.A{}
+		aRR.Hdr = dns.Header{Name: dnsutil.Fqdn(ns.Name.String()), Class: dns.ClassINET}
+		aRR.Addr = ns.Address
+		msg.Extra = append(msg.Extra, aRR)
 	}
 
 	nssV6 := filterByIPVersion(nss, constants.IPVersion6)
 	if len(nssV6) > 0 && allInBailiwick(parent.Name, nssV6) {
 		ns := nssV6[0]
-		msg.Extra = append(msg.Extra, &dns.AAAA{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(ns.Name.String()),
-				Rrtype: dns.TypeAAAA,
-				Class:  dns.ClassINET,
-				Ttl:    0,
-			},
-			AAAA: net.IP(ns.Address.AsSlice()),
-		})
+		aaaaRR := &dns.AAAA{}
+		aaaaRR.Hdr = dns.Header{Name: dnsutil.Fqdn(ns.Name.String()), Class: dns.ClassINET}
+		aaaaRR.Addr = ns.Address
+		msg.Extra = append(msg.Extra, aaaaRR)
 	}
 
-	msg.Compress = true
-	wire, err := msg.Pack()
-	if err != nil {
+	if err := msg.Pack(); err != nil {
 		return results, err
 	}
-	size := len(wire)
+	size := len(msg.Data)
 	if size > constants.UDPPayloadLimit {
 		if err := appendLog(ctx, &results, testcase, "REFERRAL_SIZE_TOO_LARGE", map[string]any{"size": size}); err != nil {
 			return results, err
@@ -526,10 +512,9 @@ func Delegation04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						continue
 					}
 					if !resp.AA() {
-						if _, err := buf.Add("IS_NOT_AUTHORITATIVE", map[string]any{
-							"ns":    task.ns.String(),
+						if _, err := buf.Add("IS_NOT_AUTHORITATIVE", withNameserverArgs(task.ns, map[string]any{
 							"proto": protoLabel(useVC),
-						}); err != nil {
+						})); err != nil {
 							return err
 						}
 					} else {
@@ -555,12 +540,12 @@ func Delegation04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	if (len(list4) > 0 || len(list5) > 0) && onlyTestCaseStart(results) && len(authoritatives) > 0 {
+	if (len(list4) > 0 || len(list5) > 0) && !hasTag(results, "IS_NOT_AUTHORITATIVE") && len(authoritatives) > 0 {
 		uniq := uniqueStrings(authoritatives)
 		sort.Strings(uniq)
-		if err := appendLog(ctx, &results, testcase, "ARE_AUTHORITATIVE", map[string]any{
-			"nsname_list": strings.Join(uniq, ";"),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, uniq)
+		if err := appendLog(ctx, &results, testcase, "ARE_AUTHORITATIVE", args); err != nil {
 			return results, err
 		}
 	}
@@ -610,11 +595,10 @@ func Delegation05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					ns := allNS[key]
 					tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 						buf := testlogger.Wrap(log, moduleName, testcase)
-						args := map[string]any{
-							"ns":         ns.String(),
+						args := withNameserverArgs(ns, map[string]any{
 							"query_name": nsName.String(),
-							"rrtype":     "A",
-						}
+							"query_type": "A",
+						})
 
 						disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "A")
 						if err != nil {
@@ -636,14 +620,14 @@ func Delegation05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 							return err
 						}
 						if len(resp.GetRecords("CNAME", "answer")) > 0 {
-							_, err := buf.Add("NS_IS_CNAME", map[string]any{"nsname": nsName.String()})
+							_, err := buf.Add("NS_IS_CNAME", map[string]any{"ns": logargs.EndpointName(nsName.String())})
 							return err
 						}
 						if resp.IsRedirect() {
 							recurseOn := true
 							recResp, err := ns.QueryWithOptions(ctx, nsName.String(), "A", &nameserver.QueryOptions{Recurse: &recurseOn})
 							if err == nil && recResp.Msg != nil && len(recResp.GetRecords("CNAME", "answer")) > 0 {
-								_, err := buf.Add("NS_IS_CNAME", map[string]any{"nsname": nsName.String()})
+								_, err := buf.Add("NS_IS_CNAME", map[string]any{"ns": logargs.EndpointName(nsName.String())})
 								return err
 							}
 						}
@@ -661,7 +645,7 @@ func Delegation05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		} else {
 			resp, err := recurse(ctx, z, nsName.String(), "A")
 			if err == nil && resp.Msg != nil && len(resp.GetRecords("CNAME", "answer")) > 0 {
-				if err := appendLog(ctx, &results, testcase, "NS_IS_CNAME", map[string]any{"nsname": nsName.String()}); err != nil {
+				if err := appendLog(ctx, &results, testcase, "NS_IS_CNAME", map[string]any{"ns": logargs.EndpointName(nsName.String())}); err != nil {
 					return results, err
 				}
 			}
@@ -740,7 +724,7 @@ func Delegation06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				resp, err := task.ns.QueryWithOptions(ctx, z.Name.String(), queryType, nil)
 				if err == nil && resp.Msg != nil && resp.Rcode() == "NOERROR" {
 					if len(resp.GetRecords(queryType, "answer")) == 0 {
-						_, err := buf.Add("SOA_NOT_EXISTS", map[string]any{"ns": task.ns.String()})
+						_, err := buf.Add("SOA_NOT_EXISTS", withNameserverArgs(task.ns, nil))
 						return err
 					}
 				}
@@ -756,7 +740,7 @@ func Delegation06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		results = append(results, entries...)
 	}
 
-	if (len(list4) > 0 || len(list5) > 0) && onlyTestCaseStart(results) {
+	if (len(list4) > 0 || len(list5) > 0) && !hasTag(results, "SOA_NOT_EXISTS") {
 		if err := appendLog(ctx, &results, testcase, "SOA_EXISTS", map[string]any{}); err != nil {
 			return results, err
 		}
@@ -819,7 +803,9 @@ func Delegation07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 	if len(extraParent) == 0 && len(extraChild) == 0 {
-		if err := appendLog(ctx, &results, testcase, "NAMES_MATCH", map[string]any{"names": strings.Join(sameNames, ";")}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, sameNames)
+		if err := appendLog(ctx, &results, testcase, "NAMES_MATCH", args); err != nil {
 			return results, err
 		}
 	}
@@ -856,13 +842,32 @@ func uniqueNamesCount(nss []nameserver.Nameserver) int {
 	return len(seen)
 }
 
-func sortedNameserverStrings(nss []nameserver.Nameserver) []string {
-	values := make([]string, 0, len(nss))
-	for _, ns := range nss {
-		values = append(values, ns.String())
+func setTypedEndpointsFromNameservers(args map[string]any, nss []nameserver.Nameserver) {
+	if args == nil || len(nss) == 0 {
+		return
 	}
-	sort.Strings(values)
-	return values
+
+	if typed, ok := logargs.ServersFromNameservers(nss)["servers"]; ok {
+		args["servers"] = typed
+	}
+
+	addressSet := map[string]bool{}
+	for _, ns := range nss {
+		address := strings.TrimSpace(ns.AddressString())
+		if address != "" {
+			addressSet[address] = true
+		}
+	}
+	if len(addressSet) == 0 {
+		return
+	}
+
+	addresses := make([]string, 0, len(addressSet))
+	for address := range addressSet {
+		addresses = append(addresses, address)
+	}
+	sort.Strings(addresses)
+	args["addresses"] = addresses
 }
 
 func namesToStrings(names []dnsname.Name) []string {
@@ -871,6 +876,21 @@ func namesToStrings(names []dnsname.Name) []string {
 		values = append(values, name.String())
 	}
 	return values
+}
+
+func setTypedServersFromNames(args map[string]any, values []string) {
+	if args == nil || len(values) == 0 {
+		return
+	}
+	raw, ok := logargs.ServersFromValues(values)["servers"]
+	if !ok {
+		return
+	}
+	servers, ok := raw.([]map[string]any)
+	if !ok || len(servers) == 0 {
+		return
+	}
+	args["servers"] = servers
 }
 
 func findDupNS(ctx context.Context, testcase string, duplicateTag string, distinctTag string, nsList []nameserver.Nameserver) ([]*logger.Entry, error) {
@@ -893,10 +913,11 @@ func findDupNS(ctx context.Context, testcase string, duplicateTag string, distin
 	sort.Strings(keys)
 	for _, ip := range keys {
 		if len(ips[ip]) > 1 {
-			entry, err := util.LoggerFromContext(ctx).Add(duplicateTag, map[string]any{
-				"nsname_list": strings.Join(ips[ip], ";"),
-				"ns_ip":       ip,
-			}, moduleName, testcase)
+			args := map[string]any{
+				"address": ip,
+			}
+			setTypedServersFromNames(args, ips[ip])
+			entry, err := util.LoggerFromContext(ctx).Add(duplicateTag, args, moduleName, testcase)
 			if err != nil {
 				return results, err
 			}
@@ -1010,13 +1031,21 @@ func appendLog(ctx context.Context, results *[]*logger.Entry, testcase string, t
 	return nil
 }
 
+func withNameserverArgs(ns nameserver.Nameserver, args map[string]any) map[string]any {
+	if args == nil {
+		args = map[string]any{}
+	}
+	logargs.NormalizeQueryIdentity(args)
+	logargs.SetNS(args, ns.NameString(), ns.AddressString())
+	return args
+}
+
 func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
 	if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 		for _, rrtype := range rrtypes {
-			if _, err := buf.Add("IPV6_DISABLED", map[string]any{
-				"ns":     ns.String(),
-				"rrtype": rrtype,
-			}); err != nil {
+			if _, err := buf.Add("IPV6_DISABLED", withNameserverArgs(ns, map[string]any{
+				"query_type": rrtype,
+			})); err != nil {
 				return true, err
 			}
 		}
@@ -1024,10 +1053,9 @@ func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, ns
 	}
 	if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
 		for _, rrtype := range rrtypes {
-			if _, err := buf.Add("IPV4_DISABLED", map[string]any{
-				"ns":     ns.String(),
-				"rrtype": rrtype,
-			}); err != nil {
+			if _, err := buf.Add("IPV4_DISABLED", withNameserverArgs(ns, map[string]any{
+				"query_type": rrtype,
+			})); err != nil {
 				return true, err
 			}
 		}

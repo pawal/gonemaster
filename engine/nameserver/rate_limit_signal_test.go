@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/packet"
 )
@@ -138,5 +138,7 @@ func TestIsServfailRefusedRatioSpike(t *testing.T) {
 }
 
 func packetWithRcode(rcode int) packet.Packet {
-	return packet.Packet{Msg: &dns.Msg{MsgHdr: dns.MsgHdr{Rcode: rcode}}}
+	msg := new(dns.Msg)
+	msg.Rcode = uint16(rcode)
+	return packet.Packet{Msg: msg}
 }

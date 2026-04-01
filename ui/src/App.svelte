@@ -1,16 +1,26 @@
 <script>
-  import { onDestroy } from "svelte";
+  import { onMount } from "svelte";
   import { fetchMetricsSnapshot, metricsWindowOptions } from "./metrics.js";
+  import { t, locale, loadCatalog } from "./i18n.js";
+
+  const logoSrc = `${import.meta.env.BASE_URL}gonemaster.svg`;
 
   let statusMessage = "";
   let statusTone = "";
   let statusDismissTimer = null;
 
   let singleDomain = "";
+  let singleTags = "";
   let singleSubmitting = false;
   let createdJobId = "";
+  let singleIPMode = "default";
+  let undelegatedNameservers = [];
+  let undelegatedDSInfo = [];
 
   let batchDomains = "";
+  let batchTags = "";
+  let batchFromTagMode = false;
+  let batchFromTag = "";
   let batchSubmitting = false;
   let createdBatchId = "";
 
@@ -33,6 +43,7 @@
   let selectedJobId = "";
   let selectedJob = null;
   let selectedJobResult = null;
+  let selectedRun = null;
   let resultLocale = "en";
   let jobLoading = false;
   let autoRefreshJob = true;
@@ -65,6 +76,55 @@
   let persistenceReady = false;
   let persistenceSignature = "";
   let initialized = false;
+  let undelegatedRowCounter = 0;
+  let notifyOnJobComplete = false;
+  let notifyOnBatchComplete = false;
+  let pendingPermission = null;
+
+  // Theme management: "system" follows OS preference via CSS media query;
+  // "light" and "dark" set data-theme on <html> explicitly.
+  // "system" is the default for first-time visitors and is never stored.
+  const themeKey = "gonemaster.ui.theme.v1";
+  let theme = "system";
+
+  const applyTheme = (t) => {
+    if (typeof document === "undefined") return;
+    const root = document.documentElement;
+    if (t === "light" || t === "dark") {
+      root.setAttribute("data-theme", t);
+    } else {
+      root.removeAttribute("data-theme");
+    }
+  };
+
+  const osDark = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+
+  const toggleTheme = () => {
+    const effectiveDark = theme === "dark" || (theme === "system" && osDark());
+    theme = effectiveDark ? "light" : "dark";
+    localStorage.setItem(themeKey, theme);
+    applyTheme(theme);
+  };
+
+  $: themeIcon = theme === "dark" || (theme === "system" && osDark()) ? "☾" : "☀";
+  $: themeTitle = $t("theme_toggle_title", { theme: theme === "dark" ? $t("theme_dark") : $t("theme_light") });
+
+  // Locale management: fetch available locales from the server, persist choice
+  // in localStorage, and auto-detect from the browser language on first visit.
+  const localeKey = "gonemaster.ui.locale.v1";
+  const localeDisplayNames = {
+    da: "Dansk",
+    en: "English",
+    es: "Español",
+    fi: "Suomi",
+    fr: "Français",
+    ja: "日本語",
+    nb: "Norsk bokmål",
+    sl: "Slovenščina",
+    sv: "Svenska"
+  };
+  let availableLocales = ["en"];
+  const localeLabel = (code) => localeDisplayNames[code] || code;
 
   const apiPrefix = "/api/v1";
   const persistedStateKey = "gonemaster.ui.state.v1";
@@ -88,11 +148,62 @@
   let lastResultJobId = "";
   let activeTab = "single";
   const tabs = [
-    { id: "single", label: "Single Job" },
-    { id: "recent", label: "Recent Tests" },
-    { id: "batches", label: "Batch Jobs" },
-    { id: "metrics", label: "Metrics" }
+    { id: "single", labelKey: "tab_single" },
+    { id: "recent", labelKey: "tab_recent" },
+    { id: "domains", labelKey: "tab_domains" },
+    { id: "tags", labelKey: "tab_tags" },
+    { id: "batches", labelKey: "tab_batches" },
+    { id: "metrics", labelKey: "tab_metrics" }
   ];
+
+  // Domains tab state.
+  let domains = [];
+  let domainsLoading = false;
+  let domainsTotal = 0;
+  let domainsOffset = 0;
+  let domainsLimit = 50;
+  let domainsNextCursor = "";
+  let domainsPrevCursor = "";
+  let domainNameFilter = "";
+  let domainTagFilter = "";
+  let domainLevelFilter = "";
+  let selectedDomain = null;
+  let domainRuns = [];
+  let domainRunsTotal = 0;
+  let domainRunsOffset = 0;
+  let domainRunsLimit = 20;
+  let domainRunsLoading = false;
+  let domainResubmitting = false;
+  let selectedDomainRunId = null;
+  let selectedDomainRunResult = null;
+  let domainRunResultLoading = false;
+  let domainModuleOpen = {};
+  let domainModuleGroups = [];
+  let availableTags = [];
+  let tagsLoaded = false;
+
+  // Tags tab state.
+  let tagsList = [];
+  let tagsListLoading = false;
+  let tagCreateName = "";
+  let tagCreateDescription = "";
+  let tagCreating = false;
+  let selectedTag = null;
+  let tagSummary = null;
+  let tagSummaryLoading = false;
+  let tagDomains = [];
+  let tagDomainsTotal = 0;
+  let tagDomainsOffset = 0;
+  let tagDomainsLimit = 50;
+  let tagDomainsLoading = false;
+  let tagDomainLevelFilter = "";
+  let tagAddDomainsInput = "";
+  let tagAddingDomains = false;
+  let tagRemoveDomainsInput = "";
+  let tagRemovingDomains = false;
+  let tagRunAllSubmitting = false;
+  let tagDeleteConfirm = false;
+  let tagDeleting = false;
 
   const clearStatus = () => {
     statusMessage = "";
@@ -139,29 +250,29 @@
 
   const summaryLevels = ["NOTICE", "WARNING", "ERROR", "CRITICAL"];
   const severityFilters = [
-    { id: "all", label: "All severities" },
-    { id: "warnings_plus", label: "Warnings+" },
-    { id: "errors_only", label: "Errors only" }
+    { id: "all", labelKey: "sev_all" },
+    { id: "warnings_plus", labelKey: "sev_warnings_plus" },
+    { id: "errors_only", labelKey: "sev_errors_only" }
   ];
   const jobSortOptions = [
-    { id: "started_at_desc", label: "Start time (newest)" },
-    { id: "started_at_asc", label: "Start time (oldest)" },
-    { id: "batch_id_asc", label: "Batch ID (A-Z)" },
-    { id: "batch_id_desc", label: "Batch ID (Z-A)" },
-    { id: "error_desc", label: "Errors + critical (high-low)" },
-    { id: "critical_desc", label: "Critical (high-low)" },
-    { id: "domain_asc", label: "Domain (A-Z)" },
-    { id: "domain_desc", label: "Domain (Z-A)" }
+    { id: "started_at_desc", labelKey: "sort_started_at_desc" },
+    { id: "started_at_asc", labelKey: "sort_started_at_asc" },
+    { id: "batch_id_asc", labelKey: "sort_batch_id_asc" },
+    { id: "batch_id_desc", labelKey: "sort_batch_id_desc" },
+    { id: "error_desc", labelKey: "sort_error_desc" },
+    { id: "critical_desc", labelKey: "sort_critical_desc" },
+    { id: "domain_asc", labelKey: "sort_domain_asc" },
+    { id: "domain_desc", labelKey: "sort_domain_desc" }
   ];
   const batchSortOptions = [
-    { id: "started_at_desc", label: "Start time (newest)" },
-    { id: "started_at_asc", label: "Start time (oldest)" },
-    { id: "error_desc", label: "Errors + critical (high-low)" },
-    { id: "critical_desc", label: "Critical (high-low)" },
-    { id: "domain_asc", label: "Domain (A-Z)" },
-    { id: "domain_desc", label: "Domain (Z-A)" },
-    { id: "created_at_desc", label: "Created (newest)" },
-    { id: "created_at_asc", label: "Created (oldest)" }
+    { id: "started_at_desc", labelKey: "sort_started_at_desc" },
+    { id: "started_at_asc", labelKey: "sort_started_at_asc" },
+    { id: "error_desc", labelKey: "sort_error_desc" },
+    { id: "critical_desc", labelKey: "sort_critical_desc" },
+    { id: "domain_asc", labelKey: "sort_domain_asc" },
+    { id: "domain_desc", labelKey: "sort_domain_desc" },
+    { id: "created_at_desc", labelKey: "sort_created_at_desc" },
+    { id: "created_at_asc", labelKey: "sort_created_at_asc" }
   ];
   const batchStatuses = ["", "queued", "running", "succeeded", "failed", "canceled", "expired", "paused"];
   const listPageSizes = [10, 20, 50, 100];
@@ -217,10 +328,13 @@
   };
   const formatRecentBatchOption = (option) => {
     if (!option || !option.id) return "";
-    if (!option.createdAt) return option.id;
-    const parsed = new Date(option.createdAt);
-    if (Number.isNaN(parsed.getTime())) return option.id;
-    return `${option.id} - ${parsed.toLocaleString()}`;
+    const parts = [option.id];
+    if (option.createdAt) {
+      const parsed = new Date(option.createdAt);
+      if (!Number.isNaN(parsed.getTime())) parts.push(parsed.toLocaleString());
+    }
+    if (option.tag) parts.push(`[${option.tag}]`);
+    return parts.join(" - ");
   };
 
   const hasPersistedURLState = (params) => persistedQueryKeys.some((key) => params.has(key));
@@ -338,6 +452,10 @@
   const persistState = () => {
     const params = new URLSearchParams(window.location.search);
     persistedQueryKeys.forEach((key) => params.delete(key));
+    const normalizedRecentPage = normalizeRecentPageSize(recentPageSize);
+    const normalizedRecentCursor = normalizeCursor(recentCursor);
+    const normalizedBatchPage = normalizeBatchPageSize(batchPageSize);
+    const normalizedBatchCursor = normalizeCursor(batchCursor);
 
     if (jobSort !== "started_at_desc") {
       params.set("r_sort", jobSort);
@@ -353,11 +471,11 @@
     if (normalizedRecentDomain) {
       params.set("r_domain", normalizedRecentDomain);
     }
-    if (normalizeRecentPageSize(recentPageSize) !== 20) {
-      params.set("r_limit", String(normalizeRecentPageSize(recentPageSize)));
+    if (normalizedRecentPage !== 20) {
+      params.set("r_limit", String(normalizedRecentPage));
     }
-    if (normalizeCursor(recentCursor) > 0) {
-      params.set("r_cursor", String(normalizeCursor(recentCursor)));
+    if (normalizedRecentCursor > 0) {
+      params.set("r_cursor", String(normalizedRecentCursor));
     }
     const normalizedBatchID = selectedBatchId.trim();
     if (normalizedBatchID) {
@@ -366,11 +484,11 @@
     if (batchSort !== "started_at_desc") {
       params.set("b_sort", batchSort);
     }
-    if (normalizeBatchPageSize(batchPageSize) !== 20) {
-      params.set("b_limit", String(normalizeBatchPageSize(batchPageSize)));
+    if (normalizedBatchPage !== 20) {
+      params.set("b_limit", String(normalizedBatchPage));
     }
-    if (normalizeCursor(batchCursor) > 0) {
-      params.set("b_cursor", String(normalizeCursor(batchCursor)));
+    if (normalizedBatchCursor > 0) {
+      params.set("b_cursor", String(normalizedBatchCursor));
     }
     if (batchStatusFilter) {
       params.set("b_status", batchStatusFilter);
@@ -382,7 +500,7 @@
 
     const hash = window.location.hash || `#/${activeTab}`;
     const search = params.toString();
-    window.history.replaceState(null, "", `${window.location.pathname}${search ? `?${search}` : ""}${hash}`);
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}${search ? `?${search}` : ""}${hash}`);
 
     try {
       const storage = typeof window === "undefined" ? null : window.localStorage;
@@ -392,12 +510,12 @@
         severityFilter,
         jobBatchFilter: normalizedJobBatch,
         recentDomainFilter: normalizedRecentDomain,
-        recentPageSize: normalizeRecentPageSize(recentPageSize),
-        recentCursor: normalizeCursor(recentCursor),
+        recentPageSize: normalizedRecentPage,
+        recentCursor: normalizedRecentCursor,
         selectedBatchId: normalizedBatchID,
         batchSort,
-        batchPageSize: normalizeBatchPageSize(batchPageSize),
-        batchCursor: normalizeCursor(batchCursor),
+        batchPageSize: normalizedBatchPage,
+        batchCursor: normalizedBatchCursor,
         batchStatusFilter,
         batchDomainFilter: normalizedBatchDomain
       };
@@ -479,20 +597,78 @@
     const hours = Math.floor((total % 86400) / 3600);
     return `${days}d ${hours}h`;
   };
-  const metricsCardHelp = {
-    queue_depth: "Current number of jobs waiting in the queue.",
-    in_flight_jobs: "Jobs currently being processed by workers.",
-    dns_queries_ipv4_total: "Total DNS queries sent over IPv4 across all processed jobs.",
-    dns_queries_ipv6_total: "Total DNS queries sent over IPv6 across all processed jobs.",
-    success_rate: "Share of completed jobs that succeeded.",
-    failed_rate: "Share of completed jobs that failed.",
-    api_p90: "Worst route-level 90th percentile API latency.",
-    avg_job_duration: "Average runtime of completed jobs.",
-    completed_total: "Total number of jobs that reached a terminal state.",
-    failed_total: "Total number of completed jobs with failed status."
+  const parseTimestamp = (value) => {
+    if (!value) return null;
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed;
   };
-  const severityCardHelp = (level) =>
-    `Total ${String(level || "").toUpperCase()} log entries aggregated across completed jobs.`;
+  const formatTimestampLocal = (value) => {
+    const parsed = parseTimestamp(value);
+    if (!parsed) return "unknown";
+    return parsed.toLocaleString();
+  };
+  const formatBatchTotalRuntime = (batch) => {
+    const created = parseTimestamp(batch?.created_at);
+    if (!created) return "unknown";
+    const finished = parseTimestamp(batch?.finished_at);
+    const end = finished || new Date();
+    const elapsedSeconds = Math.max(0, Math.floor((end.getTime() - created.getTime()) / 1000));
+    return `${formatUptime(elapsedSeconds)}${finished ? "" : " (running)"}`;
+  };
+  const formatJobTotalRuntime = (job) => {
+    const started = parseTimestamp(job?.started_at);
+    if (!started) return "not started";
+    const finished = parseTimestamp(job?.finished_at);
+    const end = finished || new Date();
+    const elapsedSeconds = Math.max(0, Math.floor((end.getTime() - started.getTime()) / 1000));
+    return `${formatUptime(elapsedSeconds)}${!finished && isActiveJobStatus(job?.status) ? " (running)" : ""}`;
+  };
+  const formatBatchStatusCounts = (statusCounts) => {
+    if (!statusCounts || typeof statusCounts !== "object") return "none";
+    const knownOrder = ["queued", "running", "succeeded", "failed", "canceled", "expired", "paused"];
+    const counts = new Map();
+    for (const [status, rawCount] of Object.entries(statusCounts)) {
+      const normalized = normalizeStatus(status);
+      if (!normalized) continue;
+      const numeric = Number(rawCount);
+      counts.set(normalized, Number.isFinite(numeric) ? numeric : 0);
+    }
+    if (counts.size === 0) return "none";
+
+    const orderedStatuses = [
+      ...knownOrder.filter((status) => counts.has(status)),
+      ...Array.from(counts.keys())
+        .filter((status) => !knownOrder.includes(status))
+        .sort()
+    ];
+    const orderedEntries = orderedStatuses.map((status) => [status, Number(counts.get(status) || 0)]);
+    const nonZeroEntries = orderedEntries.filter(([, count]) => count > 0);
+    const displayEntries = nonZeroEntries.length > 0 ? nonZeroEntries : orderedEntries;
+    return displayEntries.map(([status, count]) => `${status} ${formatInteger(count)}`).join(" · ");
+  };
+  const metricsCardHelp = {
+    queue_depth: "help_queue_depth",
+    in_flight_jobs: "help_in_flight_jobs",
+    dns_queries_ipv4_total: "help_ipv4_queries",
+    dns_queries_ipv6_total: "help_ipv6_queries",
+    success_rate: "help_success_rate",
+    failed_rate: "help_failed_rate",
+    api_p90: "help_api_p90",
+    avg_job_duration: "help_avg_duration",
+    completed_total: "help_completed",
+    failed_total: "help_failed",
+    dns_cache_hits: "help_cache_hits",
+    dns_cache_hit_rate: "help_cache_hit_rate",
+    dns_lookups_total: "help_dns_lookups"
+  };
+  const metricsCacheHitRate = (snapshot) => {
+    const hits = snapshot?.health?.dns_cache_hits || 0;
+    const misses = snapshot?.health?.dns_cache_misses || 0;
+    const total = hits + misses;
+    if (total === 0) return 0;
+    return hits / total;
+  };
   const lastLoadedLabel = (value) => {
     if (!value) return "never";
     const parsed = new Date(value);
@@ -589,8 +765,140 @@
     }
   };
 
+  const nextUndelegatedRowID = (prefix) => `${prefix}-${++undelegatedRowCounter}`;
+  const emptyUndelegatedNameserverRow = () => ({ id: nextUndelegatedRowID("ns"), ns: "", ip: "" });
+  const emptyUndelegatedDSRow = () => ({
+    id: nextUndelegatedRowID("ds"),
+    keytag: "",
+    algorithm: "",
+    digtype: "",
+    digest: ""
+  });
+  const trimUndelegatedNameserverRow = (row = {}) => ({
+    ns: String(row?.ns || "").trim(),
+    ip: String(row?.ip || "").trim()
+  });
+  const trimUndelegatedDSRow = (row = {}) => ({
+    keytag: String(row?.keytag || "").trim(),
+    algorithm: String(row?.algorithm || "").trim(),
+    digtype: String(row?.digtype || "").trim(),
+    digest: String(row?.digest || "").trim()
+  });
+  const isIPv4Address = (value) => {
+    const text = String(value || "").trim();
+    const parts = text.split(".");
+    if (parts.length !== 4) return false;
+    return parts.every((part) => /^\d{1,3}$/.test(part) && Number(part) >= 0 && Number(part) <= 255);
+  };
+  const isIPv6Address = (value) => {
+    const text = String(value || "").trim();
+    if (!text.includes(":")) return false;
+    try {
+      const parsed = new URL(`http://[${text}]`).hostname;
+      return parsed.startsWith("[") && parsed.endsWith("]");
+    } catch (error) {
+      return false;
+    }
+  };
+  const isIPAddress = (value) => isIPv4Address(value) || isIPv6Address(value);
+  const isUIntInRange = (value, min, max) => {
+    if (!/^\d+$/.test(value)) return false;
+    const numeric = Number(value);
+    return Number.isFinite(numeric) && numeric >= min && numeric <= max;
+  };
+  const isHexDigest = (value) => /^[0-9a-fA-F]+$/.test(value);
+
+  const addUndelegatedNameserverRow = () => {
+    undelegatedNameservers = [...undelegatedNameservers, emptyUndelegatedNameserverRow()];
+  };
+
+  const removeUndelegatedNameserverRow = (rowID) => {
+    undelegatedNameservers = undelegatedNameservers.filter((row) => row?.id !== rowID);
+  };
+
+  const addUndelegatedDSRow = () => {
+    undelegatedDSInfo = [...undelegatedDSInfo, emptyUndelegatedDSRow()];
+  };
+
+  const removeUndelegatedDSRow = (rowID) => {
+    undelegatedDSInfo = undelegatedDSInfo.filter((row) => row?.id !== rowID);
+  };
+
+  const buildUndelegatedPayload = () => {
+    const nameservers = [];
+    for (let i = 0; i < undelegatedNameservers.length; i += 1) {
+      const row = trimUndelegatedNameserverRow(undelegatedNameservers[i]);
+      if (!row.ns && !row.ip) continue;
+      if (!row.ns) {
+        return { error: $t("error_ns_row_ns_required", { row: i + 1 }) };
+      }
+      if (/\s/.test(row.ns)) {
+        return { error: $t("error_ns_row_ns_whitespace", { row: i + 1 }) };
+      }
+      if (row.ip && !isIPAddress(row.ip)) {
+        return { error: $t("error_ns_row_ip_invalid", { row: i + 1 }) };
+      }
+      const payloadRow = { ns: row.ns };
+      if (row.ip) payloadRow.ip = row.ip;
+      nameservers.push(payloadRow);
+    }
+
+    const dsInfo = [];
+    for (let i = 0; i < undelegatedDSInfo.length; i += 1) {
+      const row = trimUndelegatedDSRow(undelegatedDSInfo[i]);
+      const hasAny = row.keytag || row.algorithm || row.digtype || row.digest;
+      if (!hasAny) continue;
+      const hasAll = row.keytag && row.algorithm && row.digtype && row.digest;
+      if (!hasAll) {
+        return { error: $t("error_ds_row_all_required", { row: i + 1 }) };
+      }
+      if (!isUIntInRange(row.keytag, 0, 65535)) {
+        return { error: $t("error_ds_row_keytag_range", { row: i + 1, min: 0, max: 65535 }) };
+      }
+      if (!isUIntInRange(row.algorithm, 0, 255)) {
+        return { error: $t("error_ds_row_algorithm_range", { row: i + 1, min: 0, max: 255 }) };
+      }
+      if (!isUIntInRange(row.digtype, 0, 255)) {
+        return { error: $t("error_ds_row_digtype_range", { row: i + 1, min: 0, max: 255 }) };
+      }
+      if (!isHexDigest(row.digest)) {
+        return { error: $t("error_ds_row_digest_hex", { row: i + 1 }) };
+      }
+      dsInfo.push({
+        keytag: Number(row.keytag),
+        algorithm: Number(row.algorithm),
+        digtype: Number(row.digtype),
+        digest: row.digest.toUpperCase()
+      });
+    }
+
+    return { nameservers, dsInfo };
+  };
+
   const moduleLevels = ["NOTICE", "WARNING", "ERROR", "CRITICAL"];
+  const LEVEL_ORDER = ["DEBUG", "INFO", "NOTICE", "WARNING", "ERROR", "CRITICAL"];
   const normalizeLevel = (value) => (value || "INFO").toUpperCase();
+  // Returns the effective display level for a domain. The server only tracks
+  const domainLevel = (d) => d?.latest_level || "";
+  const worstLevel = (entries) => {
+    if (!entries?.length) return "INFO";
+    let worst = 0;
+    for (const e of entries) {
+      const idx = LEVEL_ORDER.indexOf(normalizeLevel(e.level));
+      if (idx > worst) worst = idx;
+    }
+    return LEVEL_ORDER[worst] ?? "INFO";
+  };
+  const bannerClass = (level) => {
+    const l = normalizeLevel(level);
+    if (l === "CRITICAL") return "critical";
+    if (l === "ERROR") return "error";
+    if (l === "WARNING") return "warning";
+    return "ok";
+  };
+  const isNoticeOrAbove = (level) => {
+    return LEVEL_ORDER.indexOf(normalizeLevel(level)) >= LEVEL_ORDER.indexOf("NOTICE");
+  };
   const formatSeconds = (value) => {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) return "0.00";
@@ -611,52 +919,83 @@
       const name = entry.module || "Unspecified";
       const key = name.toUpperCase();
       if (!modules.has(key)) {
-        modules.set(key, {
-          key,
-          name,
-          entries: [],
-          counts: {}
-        });
+        modules.set(key, { key, name, entries: [], testcases: new Map(), ungrouped: [], counts: {} });
       }
-      const current = modules.get(key);
-      current.entries.push(entry);
+      const mod = modules.get(key);
+      mod.entries.push(entry);
       const level = normalizeLevel(entry.level);
-      current.counts[level] = (current.counts[level] || 0) + 1;
+      mod.counts[level] = (mod.counts[level] || 0) + 1;
+      const tc = (entry.testcase && entry.testcase !== "Unspecified") ? entry.testcase : "";
+      if (tc) {
+        if (!mod.testcases.has(tc)) mod.testcases.set(tc, { tc, entries: [] });
+        mod.testcases.get(tc).entries.push(entry);
+      } else {
+        mod.ungrouped.push(entry);
+      }
     });
-    return Array.from(modules.values());
+    for (const mod of modules.values()) {
+      for (const tcg of mod.testcases.values()) tcg.level = worstLevel(tcg.entries);
+      mod.testcasesArr = Array.from(mod.testcases.values());
+    }
+    const arr = Array.from(modules.values());
+    arr.sort((a, b) => {
+      if (a.key === "SYSTEM") return -1;
+      if (b.key === "SYSTEM") return 1;
+      return 0;
+    });
+    return arr;
   };
   const toggleModule = (key) => {
     moduleOpen = { ...moduleOpen, [key]: !moduleOpen[key] };
   };
 
+  const toggleDomainModule = (key) => {
+    domainModuleOpen = { ...domainModuleOpen, [key]: !domainModuleOpen[key] };
+  };
+
+  const okTestcaseCount = (group) =>
+    group.testcasesArr.filter(tcg => !moduleLevels.includes(normalizeLevel(tcg.level))).length;
+
   const normalizeTab = (value) => {
     const tab = String(value || "").replace(/^\/+/, "").toLowerCase();
     if (tab === "single" || tab === "job" || tab === "jobs" || tab === "home") return "single";
     if (tab === "recent" || tab === "tests") return "recent";
+    if (tab === "domains" || tab === "domain") return "domains";
+    if (tab === "tags" || tab === "tag") return "tags";
     if (tab === "batches" || tab === "batch") return "batches";
     if (tab === "metrics" || tab === "metric") return "metrics";
     return "";
   };
 
-  const setTab = (tab) => {
+  const setTab = (tab, { replace = false } = {}) => {
     const next = normalizeTab(tab) || "single";
     const changed = activeTab !== next;
     activeTab = next;
     const nextHash = `#/${next}`;
-    if (window.location.hash !== nextHash) {
-      window.history.replaceState(
-        null,
-        "",
-        `${window.location.pathname}${window.location.search}${nextHash}`
-      );
+    const url = `${window.location.pathname}${window.location.search}${nextHash}`;
+    const state = { tab: next, domain: null, tag: null };
+    if (!changed || replace) {
+      if (window.location.hash !== nextHash) window.history.replaceState(state, "", url);
+    } else {
+      window.history.pushState(state, "", url);
     }
     if (changed && statusMessage) {
       clearStatus();
     }
     if (next === "recent") {
       loadJobs();
+    } else if (next === "domains") {
+      loadDomains();
+      if (!tagsLoaded) loadDomainTags();
+    } else if (next === "tags") {
+      loadTagsList();
+      if (selectedTag) {
+        loadTagDomains({ reset: true });
+        loadTagSummary();
+      }
     } else if (next === "batches") {
       loadRecentBatchOptions();
+      if (!tagsLoaded) loadDomainTags();
       if (selectedBatchId) {
         loadBatch(selectedBatchId);
       }
@@ -665,18 +1004,65 @@
     }
   };
 
+  const navigateToDomainDetail = (d) => {
+    activeTab = "domains";
+    selectedDomain = d;
+    domainRuns = [];
+    domainRunsOffset = 0;
+    selectedDomainRunResult = null;
+    selectedDomainRunId = null;
+    const hash = `#/domains/${encodeURIComponent(d.name)}`;
+    window.history.pushState({ tab: "domains", domain: d, tag: null }, "", `${window.location.pathname}${window.location.search}${hash}`);
+    if (statusMessage) clearStatus();
+    loadDomainRuns();
+  };
+
+  const navigateToTagDetail = (tag) => {
+    activeTab = "tags";
+    selectedTag = tag;
+    tagSummary = null;
+    tagDomains = [];
+    tagDomainsOffset = 0;
+    tagDomainLevelFilter = "";
+    tagDeleteConfirm = false;
+    const hash = `#/tags/${encodeURIComponent(tag.name)}`;
+    window.history.pushState({ tab: "tags", domain: null, tag }, "", `${window.location.pathname}${window.location.search}${hash}`);
+    if (statusMessage) clearStatus();
+    loadTagSummary();
+    loadTagDomains();
+  };
+
+  const onPopState = (e) => {
+    const state = e.state;
+    if (!state) { updateTabFromHash(); return; }
+    activeTab = state.tab || "single";
+    selectedDomain = state.domain ?? null;
+    selectedTag = state.tag ?? null;
+    if (!selectedDomain) {
+      domainRuns = [];
+      selectedDomainRunResult = null;
+      selectedDomainRunId = null;
+    } else {
+      loadDomainRuns();
+    }
+    if (!selectedTag) {
+      tagDeleteConfirm = false;
+    } else {
+      loadTagSummary();
+      loadTagDomains({ reset: true });
+    }
+  };
+
   const updateTabFromHash = () => {
     const hash = window.location.hash || "";
-    const value = hash.replace(/^#\/?/, "");
-    const next = normalizeTab(value) || "single";
+    const segment = hash.replace(/^#\/?/, "").split("/")[0];
+    const next = normalizeTab(segment) || "single";
     activeTab = next;
-    if (!hash) {
-      window.history.replaceState(
-        null,
-        "",
-        `${window.location.pathname}${window.location.search}#/${next}`
-      );
-    }
+    window.history.replaceState(
+      { tab: next, domain: null, tag: null },
+      "",
+      `${window.location.pathname}${window.location.search}#/${next}`
+    );
   };
 
   const loadJobs = async (options = {}) => {
@@ -715,7 +1101,7 @@
         autoRefreshRecent = false;
       }
     } catch (error) {
-      setStatus(`Failed to load jobs: ${error.message}`, "warn");
+      setStatus($t("error_load_jobs", { error: error.message }), "warn");
     } finally {
       jobsLoading = false;
     }
@@ -741,15 +1127,43 @@
   const submitSingle = async () => {
     const normalizedDomain = normalizeDomainInput(singleDomain);
     if (!normalizedDomain) {
-      setStatus("Domain is required.", "warn");
+      setStatus($t("error_domain_required"), "warn");
+      return;
+    }
+    const undelegatedPayload = buildUndelegatedPayload();
+    if (undelegatedPayload.error) {
+      setStatus(undelegatedPayload.error, "warn");
       return;
     }
     singleSubmitting = true;
     createdJobId = "";
     try {
+      const parsedTags = singleTags.split(/[,\s]+/).map((t) => t.trim()).filter(Boolean);
       const payload = {
-        domain: normalizedDomain
+        domain: normalizedDomain,
+        ...(parsedTags.length > 0 && { tags: parsedTags })
       };
+      if (singleIPMode === "disable_ipv4") {
+        payload.profile_overrides = {
+          net: {
+            ipv4: false,
+            ipv6: true
+          }
+        };
+      } else if (singleIPMode === "disable_ipv6") {
+        payload.profile_overrides = {
+          net: {
+            ipv4: true,
+            ipv6: false
+          }
+        };
+      }
+      if (undelegatedPayload.nameservers.length > 0) {
+        payload.nameservers = undelegatedPayload.nameservers;
+      }
+      if (undelegatedPayload.dsInfo.length > 0) {
+        payload.ds_info = undelegatedPayload.dsInfo;
+      }
 
       const job = await apiFetch("/jobs", {
         method: "POST",
@@ -758,6 +1172,8 @@
       createdJobId = job.id;
       selectedJobId = job.id;
       autoRefreshJob = true;
+      notifyOnJobComplete = true;
+      ensureNotificationPermission();
       jobInspectorHighlight = true;
       if (jobInspectorHighlightTimer) {
         clearTimeout(jobInspectorHighlightTimer);
@@ -766,44 +1182,57 @@
         jobInspectorHighlight = false;
         jobInspectorHighlightTimer = null;
       }, 6000);
-      setStatus(`Job ${job.id} created.`, "ok");
+      setStatus($t("job_created", { id: job.id }), "ok");
       recentCursor = 0;
       await loadJobs({ resetCursor: true });
       await loadJob(job.id);
     } catch (error) {
-      setStatus(`Failed to create job: ${error.message}`, "warn");
+      setStatus($t("error_create_job", { error: error.message }), "warn");
     } finally {
       singleSubmitting = false;
     }
   };
 
   const submitBatch = async () => {
-    const domains = batchDomains
-      .split(/\n/)
-      .map((entry) => normalizeDomainInput(entry))
-      .filter(Boolean);
-    if (!domains.length) {
-      setStatus("Provide at least one domain for the batch.", "warn");
-      return;
+    let payload;
+    if (batchFromTagMode) {
+      if (!batchFromTag) {
+        setStatus($t("error_batch_from_tag_required"), "warn");
+        return;
+      }
+      payload = { from_tag: batchFromTag };
+    } else {
+      const domains = batchDomains
+        .split(/\n/)
+        .map((entry) => normalizeDomainInput(entry))
+        .filter(Boolean);
+      if (!domains.length) {
+        setStatus($t("error_batch_empty"), "warn");
+        return;
+      }
+      payload = { domains };
     }
+    const parsedTags = batchTags.split(/[,\s]+/).map((t) => t.trim()).filter(Boolean);
+    if (parsedTags.length > 0) payload.tags = parsedTags;
     batchSubmitting = true;
     createdBatchId = "";
     try {
-      const payload = { domains };
-
       const response = await apiFetch("/jobs/batch", {
         method: "POST",
         body: JSON.stringify(payload)
       });
       createdBatchId = response.batch_id;
       selectedBatchId = response.batch_id;
-      setStatus(`Batch ${response.batch_id} accepted.`, "ok");
+      autoRefreshBatch = true;
+      notifyOnBatchComplete = true;
+      ensureNotificationPermission();
+      setStatus($t("batch_accepted", { id: response.batch_id }), "ok");
       recentCursor = 0;
       await loadJobs({ resetCursor: true });
       await loadRecentBatchOptions();
       await loadBatch(response.batch_id, { resetCursor: true });
     } catch (error) {
-      setStatus(`Failed to create batch: ${error.message}`, "warn");
+      setStatus($t("error_create_batch", { error: error.message }), "warn");
     } finally {
       batchSubmitting = false;
     }
@@ -819,13 +1248,20 @@
       const job = await apiFetch(`/jobs/${jobId}`);
       selectedJob = job;
       selectedJobResult = null;
+      selectedRun = null;
+      if (notifyOnJobComplete && isResultReadyStatus(job.status)) {
+        notifyOnJobComplete = false;
+        sendJobNotification(job);
+      }
       if (isResultReadyStatus(job.status)) {
         await loadJobResult(jobId);
+        await loadRun(jobId);
       }
     } catch (error) {
-      setStatus(`Failed to load job: ${error.message}`, "warn");
+      setStatus($t("error_load_job", { error: error.message }), "warn");
       selectedJob = null;
       selectedJobResult = null;
+      selectedRun = null;
     } finally {
       if (!silent) {
         jobLoading = false;
@@ -839,8 +1275,26 @@
       const locale = resultLocale ? `?locale=${encodeURIComponent(resultLocale)}` : "";
       selectedJobResult = await apiFetch(`/jobs/${jobId}/result${locale}`);
     } catch (error) {
-      setStatus(`Failed to load job result: ${error.message}`, "warn");
+      setStatus($t("error_load_result", { error: error.message }), "warn");
     }
+  };
+
+  const loadRun = async (jobId = selectedJobId) => {
+    if (!jobId) return;
+    try {
+      selectedRun = await apiFetch(`/runs/${jobId}`);
+    } catch (_) {
+      selectedRun = null;
+    }
+  };
+
+  const navigateToDomainByName = async (name) => {
+    try {
+      const data = await apiFetch(`/domains?name=${encodeURIComponent(name)}&limit=20`);
+      const match = (data?.items ?? []).find((d) => d.name === name);
+      if (!match) return;
+      navigateToDomainDetail(match);
+    } catch (_) {}
   };
 
   const batchQueryParams = () => {
@@ -910,7 +1364,7 @@
       recentBatchOptions = collected;
       syncSelectedRecentBatch();
     } catch (error) {
-      setStatus(`Failed to load recent batches: ${error.message}`, "warn");
+      setStatus($t("error_load_batches", { error: error.message }), "warn");
     } finally {
       recentBatchLoading = false;
     }
@@ -927,11 +1381,22 @@
       const params = batchQueryParams();
       const batch = await apiFetch(`/batches/${batchId}?${params.toString()}`);
       selectedBatch = batch;
+      // Propagate tag into recentBatchOptions so the dropdown can show it.
+      if (batch?.tag) {
+        const idx = recentBatchOptions.findIndex((o) => o.id === batchId);
+        if (idx >= 0 && !recentBatchOptions[idx].tag) {
+          recentBatchOptions = recentBatchOptions.map((o, i) => i === idx ? { ...o, tag: batch.tag } : o);
+        }
+      }
+      if (notifyOnBatchComplete && !hasActiveBatchJobs(batch)) {
+        notifyOnBatchComplete = false;
+        sendBatchNotification(batch);
+      }
       if (autoRefreshBatch && !hasActiveBatchJobs(batch)) {
         autoRefreshBatch = false;
       }
     } catch (error) {
-      setStatus(`Failed to load batch: ${error.message}`, "warn");
+      setStatus($t("error_load_batch", { error: error.message }), "warn");
       selectedBatch = null;
     } finally {
       batchLoading = false;
@@ -975,12 +1440,314 @@
     } catch (error) {
       metricsError = error.message || "unknown error";
       if (!metricsSnapshot) {
-        setStatus(`Failed to load metrics: ${metricsError}`, "warn");
+        setStatus($t("metrics_load_error", { error: metricsError }), "warn");
       }
     } finally {
       if (!silent) {
         metricsLoading = false;
       }
+    }
+  };
+
+  const loadDomains = async (options = {}) => {
+    const { reset = false } = options;
+    if (reset) domainsOffset = 0;
+    domainsLoading = true;
+    try {
+      const params = new URLSearchParams({ limit: String(domainsLimit), offset: String(domainsOffset) });
+      if (domainNameFilter) params.set("name", domainNameFilter);
+      if (domainTagFilter) params.set("tag", domainTagFilter);
+      if (domainLevelFilter) params.set("min_level", domainLevelFilter);
+      const data = await apiFetch(`/domains?${params}`);
+      domains = data?.items ?? [];
+      domainsTotal = data?.total ?? 0;
+    } catch (error) {
+      setStatus($t("domains_load_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      domainsLoading = false;
+    }
+  };
+
+  const loadDomainTags = async () => {
+    try {
+      const data = await apiFetch("/tags");
+      availableTags = Array.isArray(data) ? data : [];
+      tagsLoaded = true;
+    } catch (_) {
+      availableTags = [];
+      tagsLoaded = true;
+    }
+  };
+
+  const loadDomainRuns = async (options = {}) => {
+    if (!selectedDomain) return;
+    const { reset = false } = options;
+    if (reset) domainRunsOffset = 0;
+    domainRunsLoading = true;
+    try {
+      const params = new URLSearchParams({ limit: String(domainRunsLimit), offset: String(domainRunsOffset) });
+      const data = await apiFetch(`/domains/${selectedDomain.id}/runs?${params}`);
+      domainRuns = data?.items ?? [];
+      domainRunsTotal = data?.total ?? 0;
+      if (domainRuns.length > 0 && domainRunsOffset === 0) {
+        loadDomainRunResult(domainRuns[0].id);
+      }
+    } catch (error) {
+      setStatus($t("domain_runs_load_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      domainRunsLoading = false;
+    }
+  };
+
+  const loadDomainRunResult = async (runId) => {
+    selectedDomainRunId = runId;
+    selectedDomainRunResult = null;
+    domainModuleOpen = {};
+    domainRunResultLoading = true;
+    try {
+      const locale = resultLocale ? `?locale=${encodeURIComponent(resultLocale)}` : "";
+      selectedDomainRunResult = await apiFetch(`/jobs/${runId}/result${locale}`);
+    } catch (_) {
+      // result not available for this run
+    } finally {
+      domainRunResultLoading = false;
+    }
+  };
+
+  const retestDomain = async () => {
+    if (!selectedDomain) return;
+    domainResubmitting = true;
+    try {
+      const job = await apiFetch("/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domain: selectedDomain.name })
+      });
+      createdJobId = job.id;
+      selectedJobId = job.id;
+      setStatus($t("job_created", { id: job.id }), "ok");
+      setTab("single");
+      await loadJob(job.id);
+    } catch (error) {
+      setStatus($t("error_create_job", { error: error.message }), "warn");
+    } finally {
+      domainResubmitting = false;
+    }
+  };
+
+  const loadTagsList = async () => {
+    tagsListLoading = true;
+    try {
+      const data = await apiFetch("/tags");
+      tagsList = Array.isArray(data) ? data : [];
+    } catch (error) {
+      setStatus($t("tags_load_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      tagsListLoading = false;
+    }
+  };
+
+  const createTag = async () => {
+    const name = tagCreateName.trim();
+    if (!name) return;
+    tagCreating = true;
+    try {
+      await apiFetch("/tags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, description: tagCreateDescription.trim() })
+      });
+      tagCreateName = "";
+      tagCreateDescription = "";
+      setStatus($t("tag_created"), "ok");
+      await loadTagsList();
+      await loadDomainTags();
+    } catch (error) {
+      setStatus($t("tag_create_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      tagCreating = false;
+    }
+  };
+
+  const loadTagSummary = async () => {
+    if (!selectedTag) return;
+    tagSummaryLoading = true;
+    try {
+      tagSummary = await apiFetch(`/tags/${encodeURIComponent(selectedTag.name)}/summary`);
+    } catch (_) {
+      tagSummary = null;
+    } finally {
+      tagSummaryLoading = false;
+    }
+  };
+
+  const loadTagDomains = async (options = {}) => {
+    if (!selectedTag) return;
+    const { reset = false } = options;
+    if (reset) tagDomainsOffset = 0;
+    tagDomainsLoading = true;
+    try {
+      const params = new URLSearchParams({ limit: String(tagDomainsLimit), offset: String(tagDomainsOffset) });
+      if (tagDomainLevelFilter) params.set("min_level", tagDomainLevelFilter);
+      const data = await apiFetch(`/tags/${encodeURIComponent(selectedTag.name)}/domains?${params}`);
+      tagDomains = data?.items ?? [];
+      tagDomainsTotal = data?.total ?? 0;
+    } catch (error) {
+      setStatus($t("tag_domains_load_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      tagDomainsLoading = false;
+    }
+  };
+
+  const runAllFromTag = async () => {
+    if (!selectedTag) return;
+    tagRunAllSubmitting = true;
+    try {
+      const response = await apiFetch("/jobs/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ from_tag: selectedTag.name })
+      });
+      createdBatchId = response.batch_id || "";
+      selectedBatchId = response.batch_id || "";
+      setStatus($t("batch_accepted", { id: response.batch_id }), "ok");
+      await loadRecentBatchOptions();
+      await loadBatch(response.batch_id, { resetCursor: true });
+      setTab("batches");
+    } catch (error) {
+      setStatus($t("tag_run_all_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      tagRunAllSubmitting = false;
+    }
+  };
+
+  const addTagDomains = async () => {
+    if (!selectedTag || !tagAddDomainsInput.trim()) return;
+    const domains = tagAddDomainsInput.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
+    if (domains.length === 0) return;
+    tagAddingDomains = true;
+    try {
+      await apiFetch(`/tags/${encodeURIComponent(selectedTag.name)}/domains`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domains })
+      });
+      tagAddDomainsInput = "";
+      setStatus($t("tag_domains_added"), "ok");
+      await loadTagDomains({ reset: true });
+      await loadTagSummary();
+    } catch (error) {
+      setStatus($t("tag_domains_add_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      tagAddingDomains = false;
+    }
+  };
+
+  const removeTagDomains = async () => {
+    if (!selectedTag || !tagRemoveDomainsInput.trim()) return;
+    const domains = tagRemoveDomainsInput.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
+    if (domains.length === 0) return;
+    tagRemovingDomains = true;
+    try {
+      await apiFetch(`/tags/${encodeURIComponent(selectedTag.name)}/domains`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domains })
+      });
+      tagRemoveDomainsInput = "";
+      setStatus($t("tag_domains_removed"), "ok");
+      await loadTagDomains({ reset: true });
+      await loadTagSummary();
+    } catch (error) {
+      setStatus($t("tag_domains_remove_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      tagRemovingDomains = false;
+    }
+  };
+
+  const deleteTag = async () => {
+    if (!selectedTag) return;
+    tagDeleting = true;
+    try {
+      await apiFetch(`/tags/${encodeURIComponent(selectedTag.name)}`, { method: "DELETE" });
+      setStatus($t("tag_deleted"), "ok");
+      selectedTag = null;
+      tagDeleteConfirm = false;
+      await loadTagsList();
+      await loadDomainTags();
+    } catch (error) {
+      setStatus($t("tag_delete_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      tagDeleting = false;
+    }
+  };
+
+  const loadLocales = async () => {
+    try {
+      const data = await apiFetch("/locales");
+      if (Array.isArray(data?.locales) && data.locales.length > 0) {
+        availableLocales = data.locales;
+        // Re-validate current locale against what the server actually supports.
+        if (!availableLocales.includes(resultLocale)) {
+          resultLocale = "en";
+          try { localStorage.setItem(localeKey, resultLocale); } catch (_) {}
+        }
+        locale.set(resultLocale);
+        loadCatalog(resultLocale);
+      }
+    } catch (_) {
+      // Keep availableLocales as ["en"] default; locale select stays hidden.
+    }
+  };
+
+  const onLocaleChange = () => {
+    try { localStorage.setItem(localeKey, resultLocale); } catch (_) {}
+    locale.set(resultLocale);
+    loadCatalog(resultLocale);
+    if (selectedJobResult) {
+      loadJobResult(selectedJobId);
+    }
+    if (selectedDomainRunResult) {
+      loadDomainRunResult(selectedDomainRunId);
+    }
+  };
+
+  const ensureNotificationPermission = () => {
+    if (typeof Notification === "undefined") return Promise.resolve("denied");
+    const perm = Notification.permission;
+    if (perm === "granted" || perm === "denied") return Promise.resolve(perm);
+    if (!pendingPermission) {
+      pendingPermission = Notification.requestPermission().then((result) => {
+        pendingPermission = null;
+        return result;
+      });
+    }
+    return pendingPermission;
+  };
+
+  const sendJobNotification = async (job) => {
+    const permission = await ensureNotificationPermission();
+    console.debug("[notify] job done – permission=%s domain=%s status=%s", permission, job.domain, job.status);
+    if (permission !== "granted") return;
+    const title = $t("notify_job_done_title");
+    const body = $t("notify_job_done_body", { domain: job.domain, status: job.status });
+    try {
+      new Notification(title, { body });
+    } catch (err) {
+      console.warn("[notify] Notification constructor failed:", err);
+    }
+  };
+
+  const sendBatchNotification = async (batch) => {
+    const permission = await ensureNotificationPermission();
+    console.debug("[notify] batch done – permission=%s batch_id=%s", permission, batch.batch_id);
+    if (permission !== "granted") return;
+    const title = $t("notify_batch_done_title");
+    const body = $t("notify_batch_done_body", { id: batch.batch_id });
+    try {
+      new Notification(title, { body });
+    } catch (err) {
+      console.warn("[notify] Notification constructor failed:", err);
     }
   };
 
@@ -1017,7 +1784,6 @@
   $: {
     autoRefreshBatch;
     selectedBatchId;
-    batchLoading;
     startBatchPolling();
   }
 
@@ -1060,6 +1826,10 @@
     moduleGroups = groupRawEntries(selectedJobResult?.raw);
   }
 
+  $: {
+    domainModuleGroups = groupRawEntries(selectedDomainRunResult?.raw);
+  }
+
   $: if (selectedJobResult?.job_id !== lastResultJobId) {
     lastResultJobId = selectedJobResult?.job_id || "";
     moduleOpen = {};
@@ -1094,6 +1864,28 @@
   const initializeApp = () => {
     if (initialized || typeof window === "undefined") return;
     initialized = true;
+    const storedTheme = localStorage.getItem(themeKey);
+    if (storedTheme === "light" || storedTheme === "dark") {
+      theme = storedTheme;
+    }
+    applyTheme(theme);
+
+    // Locale: restore from localStorage, or auto-detect from browser language.
+    const storedLocale = (() => { try { return localStorage.getItem(localeKey); } catch (_) { return null; } })();
+    if (storedLocale) {
+      resultLocale = storedLocale;
+    } else {
+      const browserLang = (typeof navigator !== "undefined" ? navigator.language || "" : "")
+        .split("-")[0]
+        .toLowerCase();
+      if (browserLang) {
+        resultLocale = browserLang; // validated against available list after loadLocales()
+      }
+    }
+    locale.set(resultLocale);
+    loadCatalog(resultLocale);
+    loadLocales();
+
     updateTabFromHash();
     const urlState = readStateFromURL();
     if (urlState) {
@@ -1108,40 +1900,72 @@
     recentCursor = normalizeCursor(recentCursor);
     persistenceReady = true;
     window.addEventListener("hashchange", updateTabFromHash);
+    window.addEventListener("popstate", onPopState);
     loadJobs();
     if (activeTab === "batches") {
       loadRecentBatchOptions();
+      if (!tagsLoaded) loadDomainTags();
       if (selectedBatchId) {
         loadBatch(selectedBatchId);
       }
+    }
+    if (activeTab === "tags") {
+      loadTagsList();
+    }
+    if (activeTab === "domains") {
+      loadDomains();
+      if (!tagsLoaded) loadDomainTags();
     }
     if (activeTab === "metrics") {
       loadMetrics();
     }
   };
 
-  initializeApp();
-
-  onDestroy(() => {
-    if (jobPoller) clearInterval(jobPoller);
-    if (batchPoller) clearInterval(batchPoller);
-    if (recentPoller) clearInterval(recentPoller);
-    if (metricsPoller) clearInterval(metricsPoller);
-    if (jobInspectorHighlightTimer) clearTimeout(jobInspectorHighlightTimer);
-    if (statusDismissTimer) clearTimeout(statusDismissTimer);
-    window.removeEventListener("hashchange", updateTabFromHash);
+  onMount(() => {
+    initializeApp();
+    return () => {
+      if (jobPoller) clearInterval(jobPoller);
+      if (batchPoller) clearInterval(batchPoller);
+      if (recentPoller) clearInterval(recentPoller);
+      if (metricsPoller) clearInterval(metricsPoller);
+      if (jobInspectorHighlightTimer) clearTimeout(jobInspectorHighlightTimer);
+      if (statusDismissTimer) clearTimeout(statusDismissTimer);
+      window.removeEventListener("hashchange", updateTabFromHash);
+      window.removeEventListener("popstate", onPopState);
+    };
   });
 </script>
 
 <main>
   <header class="reveal" style="--d: 0.05s">
-    <h1>Gonemaster</h1>
-    <p class="subtitle">
-      Launch single or batch domain jobs, watch progress, and inspect results from the embedded server UI.
-    </p>
+    <div class="header-text">
+      <h1 class="brand-mark">
+        <img class="brand-logo" src={logoSrc} alt="gonemaster" />
+      </h1>
+      <p class="subtitle">{$t("app_subtitle")}</p>
+    </div>
+    <div class="header-controls">
+      {#if availableLocales.length > 1}
+        <select
+          bind:value={resultLocale}
+          on:change={onLocaleChange}
+          id="locale-select"
+          class="locale-select"
+          title={$t("locale_select_title")}
+          aria-label={$t("locale_select_aria")}
+        >
+          {#each availableLocales as code}
+            <option value={code}>{localeLabel(code)}</option>
+          {/each}
+        </select>
+      {/if}
+      <button class="theme-toggle" type="button" on:click={toggleTheme} title={themeTitle} aria-label={themeTitle}>
+        {themeIcon}
+      </button>
+    </div>
   </header>
 
-  <div class="tabs" role="tablist" aria-label="Job views">
+  <div class="tabs" role="tablist" aria-label={$t("tabs_aria_label")}>
     {#each tabs as tab}
       <button
         class={`tab ${activeTab === tab.id ? "active" : ""}`}
@@ -1152,7 +1976,7 @@
         aria-controls={`panel-${tab.id}`}
         on:click={() => setTab(tab.id)}
       >
-        {tab.label}
+        {$t(tab.labelKey)}
       </button>
     {/each}
   </div>
@@ -1160,9 +1984,9 @@
   {#if activeTab === "single"}
     <div class="grid" id="panel-single" role="tabpanel" aria-labelledby="tab-single" style="margin-top: 22px;">
       <div class="card reveal" style="--d: 0.18s">
-        <h2>Single Job</h2>
+        <h2>{$t("single_job_heading")}</h2>
         <div class="stack">
-          <label for="single-domain">Domain</label>
+          <label for="single-domain">{$t("single_domain_label")}</label>
           <input
             id="single-domain"
             type="text"
@@ -1176,50 +2000,147 @@
             }}
           />
         </div>
+        <div class="stack">
+          <label for="single-tags">{$t("single_tags_label")}</label>
+          <input
+            id="single-tags"
+            type="text"
+            placeholder={$t("single_tags_placeholder")}
+            bind:value={singleTags}
+          />
+          <div class="small">{$t("single_tags_hint")}</div>
+        </div>
+        <details class="advanced-options">
+          <summary>{$t("advanced_profile_summary")}</summary>
+          <div class="stack advanced-stack">
+            <label for="single-ip-mode">{$t("ip_transport_label")}</label>
+            <select id="single-ip-mode" bind:value={singleIPMode}>
+              <option value="default">{$t("ip_mode_default")}</option>
+              <option value="disable_ipv4">{$t("ip_mode_disable_ipv4")}</option>
+              <option value="disable_ipv6">{$t("ip_mode_disable_ipv6")}</option>
+            </select>
+            <div class="small">{$t("ip_mode_hint")}</div>
+          </div>
+        </details>
+        <details class="advanced-options">
+          <summary>{$t("undelegated_summary")}</summary>
+          <div class="stack advanced-stack">
+            <div class="field-label">{$t("ns_field_label")}</div>
+            {#if undelegatedNameservers.length === 0}
+              <div class="small">{$t("ns_none")}</div>
+            {:else}
+              <div class="undelegated-list">
+                {#each undelegatedNameservers as row, index (row.id)}
+                  <div class="undelegated-row">
+                    <input
+                      type="text"
+                      aria-label={$t("ns_aria_label", { n: index + 1 })}
+                      placeholder="ns1.example.com"
+                      bind:value={row.ns}
+                    />
+                    <input
+                      type="text"
+                      aria-label={$t("ns_ip_aria_label", { n: index + 1 })}
+                      placeholder="192.0.2.10 or 2001:db8::10"
+                      bind:value={row.ip}
+                    />
+                    <button class="ghost mini-button" type="button" on:click={() => removeUndelegatedNameserverRow(row.id)}>
+                      {$t("remove")}
+                    </button>
+                  </div>
+                {/each}
+              </div>
+            {/if}
+            <button class="ghost" type="button" on:click={addUndelegatedNameserverRow}>
+              {$t("add_nameserver")}
+            </button>
+
+            <div class="field-label">{$t("ds_field_label")}</div>
+            {#if undelegatedDSInfo.length === 0}
+              <div class="small">{$t("ds_none")}</div>
+            {:else}
+              <div class="undelegated-list">
+                {#each undelegatedDSInfo as row, index (row.id)}
+                  <div class="undelegated-ds-row">
+                    <input type="text" aria-label={$t("ds_keytag_aria_label", { n: index + 1 })} placeholder="12345" bind:value={row.keytag} />
+                    <input type="text" aria-label={$t("ds_algorithm_aria_label", { n: index + 1 })} placeholder="13" bind:value={row.algorithm} />
+                    <input type="text" aria-label={$t("ds_digtype_aria_label", { n: index + 1 })} placeholder="2" bind:value={row.digtype} />
+                    <input
+                      type="text"
+                      aria-label={$t("ds_digest_aria_label", { n: index + 1 })}
+                      placeholder="ABCD..."
+                      bind:value={row.digest}
+                    />
+                    <button class="ghost mini-button" type="button" on:click={() => removeUndelegatedDSRow(row.id)}>
+                      {$t("remove")}
+                    </button>
+                  </div>
+                {/each}
+              </div>
+            {/if}
+            <button class="ghost" type="button" on:click={addUndelegatedDSRow}>
+              {$t("add_ds_record")}
+            </button>
+            <div class="small">{$t("undelegated_validation_hint")}</div>
+          </div>
+        </details>
         <button on:click={submitSingle} disabled={singleSubmitting}>
-          {singleSubmitting ? "Submitting..." : "Run Single Job"}
+          {singleSubmitting ? $t("submitting") : $t("run_single_job")}
         </button>
         {#if createdJobId}
-          <div class="small">Created job: <span class="mono">{createdJobId}</span></div>
+          <div class="small">{$t("created_job_prefix")} <span class="mono">{createdJobId}</span></div>
         {/if}
       </div>
 
       <div class="card reveal" style="--d: 0.26s" class:highlight={jobInspectorHighlight}>
-        <h2>Job Inspector</h2>
+        <h2>{selectedJob && isResultReadyStatus(selectedJob.status) ? $t("run_inspector_heading") : $t("job_inspector_heading")}</h2>
         <div class="stack">
-          <label for="job-id">Job ID</label>
+          <label for="job-id">{$t("job_id_label")}</label>
           <input id="job-id" type="text" placeholder="job_123" bind:value={selectedJobId} on:change={() => loadJob()} />
         </div>
         <div class="row">
-          <button on:click={() => loadJob()} disabled={jobLoading}>{jobLoading ? "Loading..." : "Refresh"}</button>
+          <button on:click={() => loadJob()} disabled={jobLoading}>{jobLoading ? $t("loading") : $t("refresh")}</button>
           <button class="ghost" type="button" on:click={() => (autoRefreshJob = !autoRefreshJob)}>
-            {autoRefreshJob ? "Auto refresh: on" : "Auto refresh: off"}
+            {autoRefreshJob ? $t("auto_refresh_on") : $t("auto_refresh_off")}
           </button>
         </div>
         {#if selectedJob}
           <div class="kv">
-            <span>Status</span>
-            <strong>{selectedJob.status}</strong>
-            <span>Progress</span>
+            <span>{$t("status_label")}</span>
+            <strong>{selectedJob.status} · {formatJobTotalRuntime(selectedJob)}</strong>
+            <span>{$t("progress_label")}</span>
             <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={progressPercent(selectedJob)}>
               <div class="progress-bar" style={`width: ${progressPercent(selectedJob)}%`}></div>
               <span class="progress-value">{progressPercent(selectedJob)}%</span>
             </div>
-            <span>Domain</span>
-            <strong class="mono">{selectedJob.domain}</strong>
-            <span>Created</span>
-            <strong>{new Date(selectedJob.created_at).toLocaleString()}</strong>
+            <span>{$t("domain_label")}</span>
+            <button class="ghost" type="button" style="padding: 0; font-family: monospace; text-align: left; border: none;" on:click={() => navigateToDomainByName(selectedJob.domain)}>{selectedJob.domain}</button>
+            <span>{$t("created_label")}</span>
+            <strong>{formatTimestampLocal(selectedJob.created_at)}</strong>
+            {#if selectedRun}
+              <span>{$t("col_duration")}</span>
+              <strong>{selectedRun.duration_ms != null ? selectedRun.duration_ms + " ms" : "—"}</strong>
+              <span>{$t("col_entries")}</span>
+              <strong>{selectedRun.entry_count ?? 0}</strong>
+              <span>{$t("col_worst_level")}</span>
+              <strong><span class="badge level-{(selectedRun.worst_level || '').toLowerCase()}">{selectedRun.worst_level || "—"}</span></strong>
+            {/if}
           </div>
           {#if selectedJob.error}
-            <div class="notice">Error: {selectedJob.error}</div>
+            <div class="notice">{$t("error_prefix")} {selectedJob.error}</div>
           {/if}
         {/if}
         {#if selectedJobResult}
+          {@const allEntries = selectedJobResult?.raw?.entries ?? []}
+          {@const bannerCls = bannerClass(worstLevel(allEntries))}
           <div class="stack">
-            <div class="field-label">Result summary</div>
+            {#if allEntries.length}
+              <div class="status-banner {bannerCls}">{$t(`result_status_${bannerCls}`)}</div>
+            {/if}
+            <div class="field-label">{$t("result_summary_label")}</div>
             {#if summaryRows(selectedJobResult.summary).length}
               <div class="summary-grid">
-                {#each summaryRows(selectedJobResult.summary) as row}
+                {#each summaryRows(selectedJobResult.summary) as row (row.level)}
                   <div class={`summary-item severity-${row.level.toLowerCase()}`}>
                     <span class="summary-label">{row.level}</span>
                     <span class="summary-count">{row.count}</span>
@@ -1227,15 +2148,15 @@
                 {/each}
               </div>
             {:else}
-              <div class="summary-empty">No NOTICE/WARNING/ERROR entries.</div>
+              <div class="summary-empty">{$t("no_result_entries")}</div>
             {/if}
-            <div class="field-label">Result details</div>
+            <div class="field-label">{$t("result_details_label")}</div>
             {#if moduleGroups.length === 0}
-              <div class="summary-empty">No raw entries available.</div>
+              <div class="summary-empty">{$t("no_raw_entries")}</div>
             {:else}
-              <div class="small">Grouped by module. Click a module to expand.</div>
+              <div class="small">{$t("module_expand_hint")}</div>
               <div class="module-list">
-                {#each moduleGroups as group}
+                {#each moduleGroups as group (group.key)}
                   <div class="module-card">
                     <button
                       class="module-toggle"
@@ -1245,8 +2166,11 @@
                       on:click={() => toggleModule(group.key)}
                     >
                       <div class="module-title">{group.name}</div>
-                      <div class="module-meta">{group.entries.length} entries</div>
+                      <div class="module-meta">{group.testcasesArr.length > 0 ? `${group.testcasesArr.length} tests · ` : ""}{$t("entries_count", { count: group.entries.length })}</div>
                       <div class="module-badges">
+                        {#if okTestcaseCount(group) > 0}
+                          <span class="level-pill severity-info">INFO {okTestcaseCount(group)}</span>
+                        {/if}
                         {#each moduleLevels as level}
                           {#if group.counts[level]}
                             <span class={`level-pill severity-${level.toLowerCase()}`}>{level} {group.counts[level]}</span>
@@ -1257,23 +2181,56 @@
                     </button>
                     {#if moduleOpen[group.key]}
                       <div class="module-body" id={moduleId(group.key)}>
-                        <div class="result-header">
-                          <span>Seconds</span>
-                          <span>Level</span>
-                          <span>Message</span>
-                        </div>
-                        {#each group.entries as entry}
-                          {@const level = normalizeLevel(entry.level)}
-                          {@const meta = entryMeta(entry)}
-                          <div class="result-row">
-                            <span class="entry-time">{formatSeconds(entry.timestamp)}</span>
-                          <span class={`entry-level severity-${level.toLowerCase()}`}>{level}</span>
-                            <span class="entry-message">{entryMessage(entry)}</span>
-                          </div>
-                          {#if meta}
-                            <div class="entry-meta">{meta}</div>
-                          {/if}
+                        <!-- Test case sub-groups -->
+                        {#each group.testcasesArr as tcg (tcg.tc)}
+                          {@const tcKey = `tc.${tcg.tc.toLowerCase()}`}
+                          {@const tcDesc = $t(tcKey)}
+                          <details class="testcase-group" open={isNoticeOrAbove(tcg.level)}>
+                            <summary class="testcase-summary">
+                              <span class="testcase-chevron"></span>
+                              <span class="testcase-desc">{tcDesc !== tcKey ? tcDesc : tcg.tc}</span>
+                              <span class="testcase-badge">
+                                <span class={`level-pill severity-${normalizeLevel(tcg.level).toLowerCase()}`}>{normalizeLevel(tcg.level)}</span>
+                              </span>
+                            </summary>
+                            <div class="testcase-entries">
+                              {#each tcg.entries as entry}
+                                {@const level = normalizeLevel(entry.level)}
+                                <div class="result-row tc-row">
+                                  <span class={`entry-level severity-${level.toLowerCase()}`}>{level}</span>
+                                  <span class="entry-message">{entryMessage(entry)}</span>
+                                </div>
+                              {/each}
+                            </div>
+                          </details>
                         {/each}
+                        <!-- Ungrouped entries (no testcase, e.g. START_TIME, DEPENDENCY_VERSION) -->
+                        {#if group.ungrouped.length}
+                          {#if group.testcasesArr.length === 0}
+                            <!-- Module has only ungrouped entries (e.g. System): flat level+message rows -->
+                            {#each group.ungrouped as entry}
+                              {@const level = normalizeLevel(entry.level)}
+                              <div class="result-row tc-row">
+                                <span class={`entry-level severity-${level.toLowerCase()}`}>{level}</span>
+                                <span class="entry-message">{entryMessage(entry)}</span>
+                              </div>
+                            {/each}
+                          {:else}
+                            <div class="result-header ungrouped-header">
+                              <span>{$t("result_col_seconds")}</span>
+                              <span>{$t("result_col_level")}</span>
+                              <span>{$t("result_col_message")}</span>
+                            </div>
+                            {#each group.ungrouped as entry}
+                              {@const level = normalizeLevel(entry.level)}
+                              <div class="result-row">
+                                <span class="entry-time">{formatSeconds(entry.timestamp)}</span>
+                                <span class={`entry-level severity-${level.toLowerCase()}`}>{level}</span>
+                                <span class="entry-message">{entryMessage(entry)}</span>
+                              </div>
+                            {/each}
+                          {/if}
+                        {/if}
                       </div>
                     {/if}
                   </div>
@@ -1284,31 +2241,31 @@
         {/if}
         {#if selectedJob && !selectedJobResult && isResultReadyStatus(selectedJob.status)}
           <button class="ghost" type="button" on:click={() => loadJobResult()}>
-            Load result payload
+            {$t("load_result")}
           </button>
         {/if}
       </div>
     </div>
   {:else if activeTab === "recent"}
     <div class="card reveal" id="panel-recent" role="tabpanel" aria-labelledby="tab-recent" style="--d: 0.34s; margin-top: 22px;">
-      <h2>Recent Tests</h2>
+      <h2>{$t("recent_tests_heading")}</h2>
       <div class="row">
         <button class="ghost" type="button" on:click={loadJobs} disabled={jobsLoading}>
-          {jobsLoading ? "Refreshing..." : "Refresh list"}
+          {jobsLoading ? $t("refreshing") : $t("refresh_list")}
         </button>
         <button class="ghost" type="button" on:click={() => (autoRefreshRecent = !autoRefreshRecent)}>
-          {autoRefreshRecent ? "Auto refresh: on" : "Auto refresh: off"}
+          {autoRefreshRecent ? $t("auto_refresh_on") : $t("auto_refresh_off")}
         </button>
         <div class="sort-control">
-          <label for="recent-sort">Sort</label>
+          <label for="recent-sort">{$t("sort_label")}</label>
           <select id="recent-sort" bind:value={jobSort} on:change={applyRecentFilters}>
             {#each jobSortOptions as option}
-              <option value={option.id}>{option.label}</option>
+              <option value={option.id}>{$t(option.labelKey)}</option>
             {/each}
           </select>
         </div>
         <div class="sort-control">
-          <label for="recent-page-size">Page size</label>
+          <label for="recent-page-size">{$t("page_size_label")}</label>
           <select id="recent-page-size" bind:value={recentPageSize} on:change={applyRecentFilters}>
             {#each recentPageSizes as pageSize}
               <option value={pageSize}>{pageSize}</option>
@@ -1316,7 +2273,7 @@
           </select>
         </div>
         <div class="sort-control grow">
-          <label for="recent-domain-filter">Domain contains</label>
+          <label for="recent-domain-filter">{$t("domain_contains_label")}</label>
           <input
             id="recent-domain-filter"
             type="text"
@@ -1331,7 +2288,7 @@
           />
         </div>
         <div class="sort-control grow">
-          <label for="recent-batch-filter">Batch ID filter</label>
+          <label for="recent-batch-filter">{$t("batch_id_filter_label")}</label>
           <input
             id="recent-batch-filter"
             type="text"
@@ -1346,11 +2303,11 @@
           />
         </div>
         <div class="row">
-          <button class="ghost" type="button" on:click={applyRecentFilters} disabled={jobsLoading}>Apply filters</button>
-          <button class="ghost" type="button" on:click={clearRecentFilters} disabled={jobsLoading}>Clear</button>
+          <button class="ghost" type="button" on:click={applyRecentFilters} disabled={jobsLoading}>{$t("apply_filters")}</button>
+          <button class="ghost" type="button" on:click={clearRecentFilters} disabled={jobsLoading}>{$t("clear")}</button>
         </div>
       </div>
-      <div class="severity-filter-bar" role="group" aria-label="Severity filters">
+      <div class="severity-filter-bar" role="group" aria-label={$t("severity_filters_aria")}>
         {#each severityFilters as filter}
           <button
             type="button"
@@ -1360,7 +2317,7 @@
               await applyRecentFilters();
             }}
           >
-            {filter.label}
+            {$t(filter.labelKey)}
           </button>
         {/each}
       </div>
@@ -1371,7 +2328,7 @@
           on:click={() => goToRecentCursor(recentPrevCursor)}
           disabled={!recentPrevCursor || jobsLoading}
         >
-          Previous
+          {$t("previous")}
         </button>
         <button
           class="ghost"
@@ -1379,33 +2336,33 @@
           on:click={() => goToRecentCursor(recentNextCursor)}
           disabled={!recentNextCursor || jobsLoading}
         >
-          Next
+          {$t("next")}
         </button>
         <span class="small">
-          Showing {jobs.length} of {recentTotal} matching jobs (offset {recentOffset || 0})
+          {$t("showing_jobs", { shown: jobs.length, total: recentTotal, offset: recentOffset || 0 })}
         </span>
       </div>
       <div class="list">
         {#if jobs.length === 0}
-          <div class="small">No jobs yet. Run a single or batch job from the tabs above.</div>
+          <div class="small">{$t("no_jobs")}</div>
         {:else if filteredJobs.length === 0}
-          <div class="small">No jobs match the selected severity filter.</div>
+          <div class="small">{$t("no_jobs_severity")}</div>
         {:else}
-          {#each filteredJobs as job}
+          {#each filteredJobs as job (job.id)}
             <div class="list-item">
               <div class="list-item-main">
                 <div class="mono">{job.id}</div>
                 <div class="small">{job.domain} - {job.status}</div>
                 {#if job.batch_id}
-                  <div class="small mono">Batch: {job.batch_id}</div>
+                  <div class="small mono">{$t("batch_prefix")} {job.batch_id}</div>
                 {/if}
                 <div class="job-severity-tags">
                   {#if jobSeverityRows(job).length}
-                    {#each jobSeverityRows(job) as entry}
+                    {#each jobSeverityRows(job) as entry (entry.level)}
                       <span class={`level-pill severity-${entry.level.toLowerCase()}`}>{entry.level} {entry.count}</span>
                     {/each}
                   {:else}
-                    <span class="small">No severity entries.</span>
+                    <span class="small">{$t("no_severity_entries")}</span>
                   {/if}
                 </div>
                 <div class="progress compact list-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={progressPercent(job)}>
@@ -1417,37 +2374,498 @@
                 selectedJobId = job.id;
                 loadJob(job.id);
                 setTab("single");
-              }}>Inspect</button>
+              }}>{$t("inspect")}</button>
             </div>
           {/each}
         {/if}
       </div>
     </div>
+  {:else if activeTab === "domains"}
+    <div class="card reveal" id="panel-domains" role="tabpanel" aria-labelledby="tab-domains" style="--d: 0.34s; margin-top: 22px;">
+      {#if selectedDomain}
+        <div>
+          <button class="secondary small" on:click={() => { selectedDomain = null; setTab("domains"); }}>{$t("back_to_domains")}</button>
+          <div style="display:flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.5rem; margin-bottom: 0.75rem;">
+            <h2 class="mono" style="margin: 0;">{selectedDomain.name}</h2>
+            {#if selectedDomain.tags && selectedDomain.tags.length > 0}
+              {#each selectedDomain.tags as tag}
+                <span class="badge">{tag}</span>
+              {/each}
+            {/if}
+          </div>
+          <div class="kv" style="margin-bottom: 1rem;">
+            <span>{$t("col_latest_level")}</span>
+            <span>{#if domainLevel(selectedDomain)}<span class="badge level-{domainLevel(selectedDomain).toLowerCase()}">{domainLevel(selectedDomain)}</span>{:else}-{/if}</span>
+            <span>{$t("col_latest_run_at")}</span>
+            <strong>{selectedDomain.latest_run_at ? formatTimestampLocal(selectedDomain.latest_run_at) : "—"}</strong>
+            <span>{$t("col_run_count")}</span>
+            <strong>{selectedDomain.run_count ?? 0}</strong>
+          </div>
+          <button class="secondary" on:click={retestDomain} disabled={domainResubmitting}>
+            {domainResubmitting ? $t("submitting") : $t("retest_domain")}
+          </button>
+
+          <!-- Latest / selected run result -->
+          {#if domainRunResultLoading}
+            <p class="muted" style="margin-top: 1rem;">{$t("loading")}</p>
+          {:else if selectedDomainRunResult}
+            {@const allEntries = selectedDomainRunResult?.raw?.entries ?? []}
+            {@const bannerCls = bannerClass(worstLevel(allEntries))}
+            <div class="stack" style="margin-top: 1.25rem;">
+              {#if allEntries.length}
+                <div class="status-banner {bannerCls}">{$t(`result_status_${bannerCls}`)}</div>
+              {/if}
+              <div class="field-label">{$t("result_summary_label")}</div>
+              {#if summaryRows(selectedDomainRunResult.summary).length}
+                <div class="summary-grid">
+                  {#each summaryRows(selectedDomainRunResult.summary) as row (row.level)}
+                    <div class={`summary-item severity-${row.level.toLowerCase()}`}>
+                      <span class="summary-label">{row.level}</span>
+                      <span class="summary-count">{row.count}</span>
+                    </div>
+                  {/each}
+                </div>
+              {:else}
+                <div class="summary-empty">{$t("no_result_entries")}</div>
+              {/if}
+              <div class="field-label">{$t("result_details_label")}</div>
+              {#if domainModuleGroups.length === 0}
+                <div class="summary-empty">{$t("no_raw_entries")}</div>
+              {:else}
+                <div class="small">{$t("module_expand_hint")}</div>
+                <div class="module-list">
+                  {#each domainModuleGroups as group (group.key)}
+                    <div class="module-card">
+                      <button
+                        class="module-toggle"
+                        type="button"
+                        aria-expanded={!!domainModuleOpen[group.key]}
+                        aria-controls={"dm-" + moduleId(group.key)}
+                        on:click={() => toggleDomainModule(group.key)}
+                      >
+                        <div class="module-title">{group.name}</div>
+                        <div class="module-meta">{group.testcasesArr.length > 0 ? `${group.testcasesArr.length} tests · ` : ""}{$t("entries_count", { count: group.entries.length })}</div>
+                        <div class="module-badges">
+                          {#if okTestcaseCount(group) > 0}
+                            <span class="level-pill severity-info">INFO {okTestcaseCount(group)}</span>
+                          {/if}
+                          {#each moduleLevels as level}
+                            {#if group.counts[level]}
+                              <span class={`level-pill severity-${level.toLowerCase()}`}>{level} {group.counts[level]}</span>
+                            {/if}
+                          {/each}
+                        </div>
+                        <span class={`module-chevron ${domainModuleOpen[group.key] ? "open" : ""}`}></span>
+                      </button>
+                      {#if domainModuleOpen[group.key]}
+                        <div class="module-body" id={"dm-" + moduleId(group.key)}>
+                          {#each group.testcasesArr as tcg (tcg.tc)}
+                            {@const tcKey = `tc.${tcg.tc.toLowerCase()}`}
+                            {@const tcDesc = $t(tcKey)}
+                            <details class="testcase-group" open={isNoticeOrAbove(tcg.level)}>
+                              <summary class="testcase-summary">
+                                <span class="testcase-chevron"></span>
+                                <span class="testcase-desc">{tcDesc !== tcKey ? tcDesc : tcg.tc}</span>
+                                <span class="testcase-badge">
+                                  <span class={`level-pill severity-${normalizeLevel(tcg.level).toLowerCase()}`}>{normalizeLevel(tcg.level)}</span>
+                                </span>
+                              </summary>
+                              <div class="testcase-entries">
+                                {#each tcg.entries as entry}
+                                  {@const level = normalizeLevel(entry.level)}
+                                  <div class="result-row tc-row">
+                                    <span class={`entry-level severity-${level.toLowerCase()}`}>{level}</span>
+                                    <span class="entry-message">{entryMessage(entry)}</span>
+                                  </div>
+                                {/each}
+                              </div>
+                            </details>
+                          {/each}
+                          {#if group.ungrouped.length}
+                            {#if group.testcasesArr.length === 0}
+                              {#each group.ungrouped as entry}
+                                {@const level = normalizeLevel(entry.level)}
+                                <div class="result-row tc-row">
+                                  <span class={`entry-level severity-${level.toLowerCase()}`}>{level}</span>
+                                  <span class="entry-message">{entryMessage(entry)}</span>
+                                </div>
+                              {/each}
+                            {:else}
+                              <div class="result-header ungrouped-header">
+                                <span>{$t("result_col_seconds")}</span>
+                                <span>{$t("result_col_level")}</span>
+                                <span>{$t("result_col_message")}</span>
+                              </div>
+                              {#each group.ungrouped as entry}
+                                {@const level = normalizeLevel(entry.level)}
+                                <div class="result-row">
+                                  <span class="entry-time">{formatSeconds(entry.timestamp)}</span>
+                                  <span class={`entry-level severity-${level.toLowerCase()}`}>{level}</span>
+                                  <span class="entry-message">{entryMessage(entry)}</span>
+                                </div>
+                              {/each}
+                            {/if}
+                          {/if}
+                        </div>
+                      {/if}
+                    </div>
+                  {/each}
+                </div>
+              {/if}
+            </div>
+          {/if}
+
+          <!-- Run history -->
+          <h3 style="margin-top: 1.5rem;">{$t("domain_run_history_heading")}</h3>
+          {#if domainRunsLoading}
+            <p class="muted">{$t("loading")}</p>
+          {:else if domainRuns.length === 0}
+            <p class="muted">{$t("no_runs")}</p>
+          {:else}
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>{$t("col_run_id")}</th>
+                  <th>{$t("col_finished_at")}</th>
+                  <th>{$t("col_worst_level")}</th>
+                  <th>{$t("col_duration")}</th>
+                  <th>{$t("col_entries")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {#each domainRuns as run}
+                  <tr
+                    style="cursor: pointer;"
+                    class={selectedDomainRunId === run.id ? "run-row-selected" : ""}
+                    on:click={() => { selectedJobId = run.id; setTab("single"); loadJob(run.id); }}
+                    role="button"
+                    tabindex="0"
+                    on:keydown={(e) => { if (e.key === "Enter" || e.key === " ") { selectedJobId = run.id; setTab("single"); loadJob(run.id); } }}
+                  >
+                    <td class="run-id-cell" title={run.id}>{run.id}</td>
+                    <td>{run.finished_at ? run.finished_at.slice(0, 16).replace("T", " ") : "—"}</td>
+                    <td><span class="badge level-{(run.worst_level || '').toLowerCase()}">{run.worst_level || "—"}</span></td>
+                    <td>{run.duration_ms != null ? run.duration_ms + "ms" : "—"}</td>
+                    <td>{run.entry_count ?? 0}</td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+            <div class="pagination" style="margin-top: 0.5rem; display:flex; gap: 0.5rem; align-items: center;">
+              <button
+                class="secondary small"
+                disabled={domainRunsOffset === 0}
+                on:click={() => { domainRunsOffset = Math.max(0, domainRunsOffset - domainRunsLimit); loadDomainRuns(); }}
+              >{$t("prev_page")}</button>
+              <span class="muted small">{domainRunsOffset + 1}–{Math.min(domainRunsOffset + domainRunsLimit, domainRunsTotal)} / {domainRunsTotal}</span>
+              <button
+                class="secondary small"
+                disabled={domainRunsOffset + domainRunsLimit >= domainRunsTotal}
+                on:click={() => { domainRunsOffset += domainRunsLimit; loadDomainRuns(); }}
+              >{$t("next_page")}</button>
+            </div>
+          {/if}
+        </div>
+      {:else}
+        <h2>{$t("domains_tab_heading")}</h2>
+        <div class="toolbar" style="display:flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
+          <input
+            type="search"
+            placeholder={$t("domains_search_placeholder")}
+            bind:value={domainNameFilter}
+            on:input={() => loadDomains({ reset: true })}
+            style="flex: 1 1 180px;"
+          />
+          <select
+            bind:value={domainTagFilter}
+            on:change={() => loadDomains({ reset: true })}
+            style="flex: 0 1 180px;"
+            aria-label={$t("tag_filter_label")}
+          >
+            <option value="">{$t("tag_filter_all")}</option>
+            {#each availableTags as tag}
+              <option value={tag.name}>{tag.name}</option>
+            {/each}
+          </select>
+          <select
+            bind:value={domainLevelFilter}
+            on:change={() => loadDomains({ reset: true })}
+            style="flex: 0 1 160px;"
+            aria-label={$t("level_filter_label")}
+          >
+            <option value="">{$t("level_filter_all")}</option>
+            <option value="WARNING">{$t("level_filter_warning_plus")}</option>
+            <option value="ERROR">{$t("level_filter_error_plus")}</option>
+          </select>
+        </div>
+        {#if domainsLoading}
+          <p class="muted">{$t("loading")}</p>
+        {:else if domains.length === 0}
+          <p class="muted">{$t("no_domains")}</p>
+        {:else}
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>{$t("col_domain_name")}</th>
+                <th>{$t("col_tags")}</th>
+                <th>{$t("col_latest_level")}</th>
+                <th>{$t("col_latest_run_at")}</th>
+                <th>{$t("col_run_count")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each domains as d}
+                <tr
+                  style="cursor: pointer;"
+                  on:click={() => navigateToDomainDetail(d)}
+                  role="button"
+                  tabindex="0"
+                  on:keydown={(e) => { if (e.key === "Enter" || e.key === " ") navigateToDomainDetail(d); }}
+                >
+                  <td class="mono">{d.name}</td>
+                  <td>{d.tags ? d.tags.join(", ") : ""}</td>
+                  <td>{#if domainLevel(d)}<span class="badge level-{domainLevel(d).toLowerCase()}">{domainLevel(d)}</span>{:else}-{/if}</td>
+                  <td>{d.latest_run_at ? d.latest_run_at.slice(0, 10) : "—"}</td>
+                  <td>{d.run_count ?? 0}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+          <div class="pagination" style="margin-top: 0.5rem; display:flex; gap: 0.5rem; align-items: center;">
+            <button
+              class="secondary small"
+              disabled={domainsOffset === 0}
+              on:click={() => { domainsOffset = Math.max(0, domainsOffset - domainsLimit); loadDomains(); }}
+            >{$t("prev_page")}</button>
+            <span class="muted small">{domainsOffset + 1}–{Math.min(domainsOffset + domainsLimit, domainsTotal)} / {domainsTotal}</span>
+            <button
+              class="secondary small"
+              disabled={domainsOffset + domainsLimit >= domainsTotal}
+              on:click={() => { domainsOffset += domainsLimit; loadDomains(); }}
+            >{$t("next_page")}</button>
+          </div>
+        {/if}
+      {/if}
+    </div>
+  {:else if activeTab === "tags"}
+    <div class="card reveal" id="panel-tags" role="tabpanel" aria-labelledby="tab-tags" style="--d: 0.34s; margin-top: 22px;">
+      {#if selectedTag}
+        <button class="secondary small" on:click={() => { selectedTag = null; setTab("tags"); }}>{$t("back_to_tags")}</button>
+        <h2 style="margin-top: 0.5rem;">{selectedTag.name}</h2>
+        {#if selectedTag.description}
+          <p class="muted small">{selectedTag.description}</p>
+        {/if}
+
+        <!-- Severity summary -->
+        {#if tagSummaryLoading}
+          <p class="muted">{$t("loading")}</p>
+        {:else if tagSummary}
+          <div style="display:flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
+            <span>{$t("sev_ok")}: {tagSummary.ok}</span>
+            <span><span class="badge level-notice">{$t("sev_notice")}</span>: {tagSummary.notice}</span>
+            <span><span class="badge level-warning">{$t("sev_warning")}</span>: {tagSummary.warning}</span>
+            <span><span class="badge level-error">{$t("sev_error")}</span>: {tagSummary.error}</span>
+            <span><span class="badge level-critical">{$t("sev_critical")}</span>: {tagSummary.critical}</span>
+          </div>
+        {/if}
+
+        <!-- Run all + delete -->
+        <div style="display:flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
+          <button class="secondary" on:click={runAllFromTag} disabled={tagRunAllSubmitting}>
+            {tagRunAllSubmitting ? $t("submitting") : $t("tag_run_all_button")}
+          </button>
+          {#if tagDeleteConfirm}
+            <button class="warn" on:click={deleteTag} disabled={tagDeleting}>{tagDeleting ? $t("submitting") : $t("tag_delete_confirm_button")}</button>
+            <button class="ghost" on:click={() => { tagDeleteConfirm = false; }}>{$t("tag_delete_cancel_button")}</button>
+          {:else}
+            <button class="ghost" on:click={() => { tagDeleteConfirm = true; }}>{$t("tag_delete_button")}</button>
+          {/if}
+        </div>
+
+        <!-- Domain list with level filter -->
+        <h3>{$t("tag_domains_heading")}</h3>
+        <div style="display:flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem;">
+          <select
+            bind:value={tagDomainLevelFilter}
+            on:change={() => loadTagDomains({ reset: true })}
+            aria-label={$t("level_filter_label")}
+            style="flex: 0 1 180px;"
+          >
+            <option value="">{$t("level_filter_all")}</option>
+            <option value="WARNING">{$t("level_filter_warning_plus")}</option>
+            <option value="ERROR">{$t("level_filter_error_plus")}</option>
+          </select>
+        </div>
+        {#if tagDomainsLoading}
+          <p class="muted">{$t("loading")}</p>
+        {:else if tagDomains.length === 0}
+          <p class="muted">{$t("no_domains")}</p>
+        {:else}
+          <table class="data-table">
+            <thead><tr>
+              <th>{$t("col_domain_name")}</th>
+              <th>{$t("col_latest_level")}</th>
+              <th>{$t("col_latest_run_at")}</th>
+            </tr></thead>
+            <tbody>
+              {#each tagDomains as d}
+                <tr
+                  style="cursor: pointer;"
+                  on:click={() => navigateToDomainDetail(d)}
+                  role="button"
+                  tabindex="0"
+                  on:keydown={(e) => { if (e.key === "Enter" || e.key === " ") navigateToDomainDetail(d); }}
+                >
+                  <td class="mono">{d.name}</td>
+                  <td>{#if domainLevel(d)}<span class="badge level-{domainLevel(d).toLowerCase()}">{domainLevel(d)}</span>{:else}-{/if}</td>
+                  <td>{d.latest_run_at ? d.latest_run_at.slice(0, 10) : "—"}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+          <div class="pagination" style="margin-top: 0.5rem; display:flex; gap: 0.5rem; align-items: center;">
+            <button class="secondary small" disabled={tagDomainsOffset === 0}
+              on:click={() => { tagDomainsOffset = Math.max(0, tagDomainsOffset - tagDomainsLimit); loadTagDomains(); }}
+            >{$t("prev_page")}</button>
+            <span class="muted small">{tagDomainsOffset + 1}–{Math.min(tagDomainsOffset + tagDomainsLimit, tagDomainsTotal)} / {tagDomainsTotal}</span>
+            <button class="secondary small" disabled={tagDomainsOffset + tagDomainsLimit >= tagDomainsTotal}
+              on:click={() => { tagDomainsOffset += tagDomainsLimit; loadTagDomains(); }}
+            >{$t("next_page")}</button>
+          </div>
+        {/if}
+
+        <!-- Add domains -->
+        <h3 style="margin-top: 1.25rem;">{$t("tag_add_domains_heading")}</h3>
+        <textarea
+          bind:value={tagAddDomainsInput}
+          placeholder={$t("tag_domains_placeholder")}
+          rows="3"
+          style="width: 100%; box-sizing: border-box;"
+        ></textarea>
+        <button class="secondary" on:click={addTagDomains} disabled={tagAddingDomains}>
+          {tagAddingDomains ? $t("submitting") : $t("tag_add_domains_button")}
+        </button>
+
+        <!-- Remove domains -->
+        <h3 style="margin-top: 1.25rem;">{$t("tag_remove_domains_heading")}</h3>
+        <textarea
+          bind:value={tagRemoveDomainsInput}
+          placeholder={$t("tag_domains_placeholder")}
+          rows="3"
+          style="width: 100%; box-sizing: border-box;"
+        ></textarea>
+        <button class="ghost" on:click={removeTagDomains} disabled={tagRemovingDomains}>
+          {tagRemovingDomains ? $t("submitting") : $t("tag_remove_domains_button")}
+        </button>
+
+      {:else}
+        <h2>{$t("tags_tab_heading")}</h2>
+
+        <!-- Create tag form -->
+        <div style="display:flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; align-items: flex-end;">
+          <div class="stack" style="flex: 1 1 160px;">
+            <label for="tag-create-name">{$t("tag_name_label")}</label>
+            <input id="tag-create-name" type="text" bind:value={tagCreateName} placeholder="my-tag" />
+          </div>
+          <div class="stack" style="flex: 2 1 240px;">
+            <label for="tag-create-desc">{$t("tag_description_label")}</label>
+            <input id="tag-create-desc" type="text" bind:value={tagCreateDescription} placeholder={$t("tag_description_placeholder")} on:keydown={(e) => { if (e.key === 'Enter') createTag(); }} />
+          </div>
+          <button class="secondary" on:click={createTag} disabled={tagCreating || !tagCreateName.trim()}>
+            {tagCreating ? $t("submitting") : $t("tag_create_button")}
+          </button>
+        </div>
+
+        <!-- Tag list -->
+        {#if tagsListLoading}
+          <p class="muted">{$t("loading")}</p>
+        {:else if tagsList.length === 0}
+          <p class="muted">{$t("no_tags")}</p>
+        {:else}
+          <table class="data-table">
+            <thead><tr>
+              <th>{$t("tag_name_label")}</th>
+              <th>{$t("tag_description_label")}</th>
+              <th>{$t("col_domain_count")}</th>
+            </tr></thead>
+            <tbody>
+              {#each tagsList as tag}
+                <tr
+                  style="cursor: pointer;"
+                  on:click={() => navigateToTagDetail(tag)}
+                  role="button"
+                  tabindex="0"
+                  on:keydown={(e) => { if (e.key === "Enter" || e.key === " ") navigateToTagDetail(tag); }}
+                >
+                  <td class="mono">{tag.name}</td>
+                  <td>{tag.description || "—"}</td>
+                  <td>{tag.domain_count ?? 0}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        {/if}
+      {/if}
+    </div>
   {:else if activeTab === "batches"}
     <div class="grid" id="panel-batches" role="tabpanel" aria-labelledby="tab-batches" style="margin-top: 22px;">
       <div class="card reveal" style="--d: 0.22s">
-        <h2>Batch Jobs</h2>
-        <div class="stack">
-          <label for="batch-domains">Domains (one per line)</label>
-          <textarea
-            id="batch-domains"
-            placeholder={`example.com
+        <h2>{$t("batch_jobs_heading")}</h2>
+        <div style="display:flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+          <button
+            class={batchFromTagMode ? "ghost" : "secondary small"}
+            type="button"
+            on:click={() => { batchFromTagMode = false; }}
+          >{$t("batch_domains_mode_label")}</button>
+          <button
+            class={batchFromTagMode ? "secondary small" : "ghost"}
+            type="button"
+            on:click={() => { batchFromTagMode = true; }}
+          >{$t("batch_from_tag_mode_label")}</button>
+        </div>
+        {#if batchFromTagMode}
+          <div class="stack">
+            <label for="batch-from-tag">{$t("batch_from_tag_label")}</label>
+            <select id="batch-from-tag" bind:value={batchFromTag}>
+              <option value="">{$t("tag_filter_all")}</option>
+              {#each availableTags as tag}
+                <option value={tag.name}>{tag.name}{tag.domain_count ? ` (${tag.domain_count})` : ""}</option>
+              {/each}
+            </select>
+          </div>
+        {:else}
+          <div class="stack">
+            <label for="batch-domains">{$t("domains_label")}</label>
+            <textarea
+              id="batch-domains"
+              placeholder={`example.com
 example.org`}
-            bind:value={batchDomains}
-          ></textarea>
+              bind:value={batchDomains}
+            ></textarea>
+          </div>
+        {/if}
+        <div class="stack">
+          <label for="batch-tags">{$t("batch_tags_label")}</label>
+          <input
+            id="batch-tags"
+            type="text"
+            placeholder={$t("batch_tags_placeholder")}
+            bind:value={batchTags}
+          />
+          <div class="small">{$t("batch_tags_hint")}</div>
         </div>
         <button class="secondary" on:click={submitBatch} disabled={batchSubmitting}>
-          {batchSubmitting ? "Submitting..." : "Run Batch"}
+          {batchSubmitting ? $t("submitting") : $t("run_batch")}
         </button>
         {#if createdBatchId}
-          <div class="small">Created batch: <span class="mono">{createdBatchId}</span></div>
+          <div class="small">{$t("created_batch_prefix")} <span class="mono">{createdBatchId}</span></div>
         {/if}
       </div>
 
       <div class="card reveal" style="--d: 0.3s">
-        <h2>Batch Inspector</h2>
+        <h2>{$t("batch_inspector_heading")}</h2>
         <div class="stack">
-          <label for="batch-recent">Recent batches</label>
+          <label for="batch-recent">{$t("recent_batches_label")}</label>
           <select
             id="batch-recent"
             bind:value={selectedRecentBatch}
@@ -1459,13 +2877,13 @@ example.org`}
               await loadBatch(nextBatchID, { resetCursor: true });
             }}
           >
-            <option value="">{recentBatchLoading ? "Loading latest batches..." : "Select one of the latest 20 batches"}</option>
+            <option value="">{recentBatchLoading ? $t("loading_batches") : $t("select_recent_batch")}</option>
             {#each recentBatchOptions as option}
               <option value={option.id}>{formatRecentBatchOption(option)}</option>
             {/each}
           </select>
-          <div class="small">Latest 20 unique batch IDs, newest first.</div>
-          <label for="batch-id">Batch ID</label>
+          <div class="small">{$t("latest_batches_hint")}</div>
+          <label for="batch-id">{$t("batch_id_label")}</label>
           <input
             id="batch-id"
             type="text"
@@ -1482,23 +2900,23 @@ example.org`}
             }}
             disabled={batchLoading}
           >
-            {batchLoading ? "Loading..." : "Refresh"}
+            {batchLoading ? $t("loading") : $t("refresh")}
           </button>
           <button class="ghost" type="button" on:click={() => (autoRefreshBatch = !autoRefreshBatch)}>
-            {autoRefreshBatch ? "Auto refresh: on" : "Auto refresh: off"}
+            {autoRefreshBatch ? $t("auto_refresh_on") : $t("auto_refresh_off")}
           </button>
         </div>
         <div class="batch-controls">
           <div class="sort-control">
-            <label for="batch-sort">Sort</label>
+            <label for="batch-sort">{$t("sort_label")}</label>
             <select id="batch-sort" bind:value={batchSort} on:change={applyBatchFilters}>
               {#each batchSortOptions as option}
-                <option value={option.id}>{option.label}</option>
+                <option value={option.id}>{$t(option.labelKey)}</option>
               {/each}
             </select>
           </div>
           <div class="sort-control">
-            <label for="batch-page-size">Page size</label>
+            <label for="batch-page-size">{$t("page_size_label")}</label>
             <select id="batch-page-size" bind:value={batchPageSize} on:change={applyBatchFilters}>
               {#each batchPageSizes as pageSize}
                 <option value={pageSize}>{pageSize}</option>
@@ -1506,15 +2924,15 @@ example.org`}
             </select>
           </div>
           <div class="sort-control">
-            <label for="batch-status">Status</label>
+            <label for="batch-status">{$t("status_label")}</label>
             <select id="batch-status" bind:value={batchStatusFilter} on:change={applyBatchFilters}>
               {#each batchStatuses as status}
-                <option value={status}>{status || "all"}</option>
+                <option value={status}>{status || $t("batch_status_all")}</option>
               {/each}
             </select>
           </div>
           <div class="sort-control grow">
-            <label for="batch-domain-filter">Domain contains</label>
+            <label for="batch-domain-filter">{$t("domain_contains_label")}</label>
             <input
               id="batch-domain-filter"
               type="text"
@@ -1529,21 +2947,27 @@ example.org`}
             />
           </div>
           <div class="row">
-            <button class="ghost" type="button" on:click={applyBatchFilters} disabled={batchLoading}>Apply filters</button>
-            <button class="ghost" type="button" on:click={clearBatchFilters} disabled={batchLoading}>Clear</button>
+            <button class="ghost" type="button" on:click={applyBatchFilters} disabled={batchLoading}>{$t("apply_filters")}</button>
+            <button class="ghost" type="button" on:click={clearBatchFilters} disabled={batchLoading}>{$t("clear")}</button>
           </div>
         </div>
         {#if selectedBatch}
           <div class="kv">
-            <span>Total</span>
+            {#if selectedBatch.tag}
+              <span>{$t("batch_tag_label")}</span>
+              <strong class="mono">{selectedBatch.tag}</strong>
+            {/if}
+            <span>{$t("total_label")}</span>
             <strong>{selectedBatch.total}</strong>
-            <span>Created</span>
-            <strong>{new Date(selectedBatch.created_at).toLocaleString()}</strong>
-            <span>Status counts</span>
-            <strong class="mono">{JSON.stringify(selectedBatch.status_counts)}</strong>
+            <span>{$t("created_label")}</span>
+            <strong>{formatTimestampLocal(selectedBatch.created_at)}</strong>
+            <span>{$t("total_runtime_label")}</span>
+            <strong>{formatBatchTotalRuntime(selectedBatch)}</strong>
+            <span>{$t("status_counts_label")}</span>
+            <strong>{formatBatchStatusCounts(selectedBatch.status_counts)}</strong>
           </div>
           <div class="stack">
-            <div class="field-label">Jobs</div>
+            <div class="field-label">{$t("jobs_label")}</div>
             <div class="row batch-pagination">
               <button
                 class="ghost"
@@ -1551,7 +2975,7 @@ example.org`}
                 on:click={() => goToBatchCursor(selectedBatch.prev_cursor)}
                 disabled={!selectedBatch.prev_cursor || batchLoading}
               >
-                Previous
+                {$t("previous")}
               </button>
               <button
                 class="ghost"
@@ -1559,17 +2983,17 @@ example.org`}
                 on:click={() => goToBatchCursor(selectedBatch.next_cursor)}
                 disabled={!selectedBatch.next_cursor || batchLoading}
               >
-                Next
+                {$t("next")}
               </button>
               <span class="small">
-                Showing {selectedBatch.items.length} of {selectedBatch.total} matching jobs (offset {selectedBatch.offset || 0})
+                {$t("showing_jobs", { shown: selectedBatch.items.length, total: selectedBatch.total, offset: selectedBatch.offset || 0 })}
               </span>
             </div>
             <div class="list">
               {#if selectedBatch.items.length === 0}
-                <div class="small">No batch jobs match the current filters.</div>
+                <div class="small">{$t("no_batch_jobs")}</div>
               {:else}
-                {#each selectedBatch.items as item}
+                {#each selectedBatch.items as item (item.id)}
                   <div class="list-item">
                     <div class="list-item-main">
                       <div class="mono">{item.id}</div>
@@ -1583,7 +3007,7 @@ example.org`}
                       selectedJobId = item.id;
                       loadJob(item.id);
                       setTab("single");
-                    }}>Inspect</button>
+                    }}>{$t("inspect")}</button>
                   </div>
                 {/each}
               {/if}
@@ -1594,24 +3018,24 @@ example.org`}
     </div>
   {:else if activeTab === "metrics"}
     <div class="card reveal" id="panel-metrics" role="tabpanel" aria-labelledby="tab-metrics" style="--d: 0.38s; margin-top: 22px;">
-      <h2>Metrics</h2>
+      <h2>{$t("metrics_heading")}</h2>
       <div class="row">
         <button class="ghost" type="button" on:click={() => loadMetrics()} disabled={metricsLoading}>
-          {metricsLoading ? "Refreshing..." : "Refresh metrics"}
+          {metricsLoading ? $t("refreshing") : $t("refresh_metrics")}
         </button>
         <button class="ghost" type="button" on:click={() => (autoRefreshMetrics = !autoRefreshMetrics)}>
-          {autoRefreshMetrics ? "Auto refresh: on" : "Auto refresh: off"}
+          {autoRefreshMetrics ? $t("auto_refresh_on") : $t("auto_refresh_off")}
         </button>
         <div class="sort-control">
-          <label for="metrics-window">Trend window</label>
+          <label for="metrics-window">{$t("trend_window_label")}</label>
           <select id="metrics-window" bind:value={metricsWindow} on:change={() => loadMetrics()}>
             {#each metricsWindowOptions as option}
-              <option value={option.id}>{option.label}</option>
+              <option value={option.id}>{$t(option.labelKey)}</option>
             {/each}
           </select>
         </div>
         <div class="sort-control">
-          <label for="metrics-domain-limit">Top domains</label>
+          <label for="metrics-domain-limit">{$t("top_domains_label")}</label>
           <select id="metrics-domain-limit" bind:value={metricsDomainLimit} on:change={() => loadMetrics()}>
             {#each metricsLimitOptions as value}
               <option value={value}>{value}</option>
@@ -1619,7 +3043,7 @@ example.org`}
           </select>
         </div>
         <div class="sort-control">
-          <label for="metrics-batch-limit">Top batches</label>
+          <label for="metrics-batch-limit">{$t("top_batches_label")}</label>
           <select id="metrics-batch-limit" bind:value={metricsBatchLimit} on:change={() => loadMetrics()}>
             {#each metricsLimitOptions as value}
               <option value={value}>{value}</option>
@@ -1628,136 +3052,185 @@ example.org`}
         </div>
       </div>
       <div class="small">
-        Last loaded: {lastLoadedLabel(metricsLoadedAt)} | Server uptime: {formatUptime(metricsSnapshot?.health?.uptime_seconds)} | Server version: {metricsSnapshot?.server_version || "unknown"}
+        {$t("metrics_status_line", { time: lastLoadedLabel(metricsLoadedAt), uptime: formatUptime(metricsSnapshot?.health?.uptime_seconds), version: metricsSnapshot?.server_version || "unknown" })}
       </div>
 
       {#if metricsLoading && !hasMetricsData(metricsSnapshot)}
-        <div class="summary-empty">Loading metrics snapshot...</div>
+        <div class="summary-empty">{$t("loading_metrics")}</div>
       {:else if metricsError && !hasMetricsData(metricsSnapshot)}
-        <div class="notice">Failed to load metrics: {metricsError}</div>
-        <button type="button" on:click={() => loadMetrics()}>Retry</button>
+        <div class="notice">{$t("metrics_load_error", { error: metricsError })}</div>
+        <button type="button" on:click={() => loadMetrics()}>{$t("retry")}</button>
       {:else if hasMetricsData(metricsSnapshot)}
         {@const throughputSeries = metricsSeriesValues(metricsSnapshot, metricsWindow, "throughput")}
         {@const failedSeries = metricsSeriesValues(metricsSnapshot, metricsWindow, "failed")}
         {@const querySeriesIPv4 = metricsSeriesValues(metricsSnapshot, metricsWindow, "dns_queries_ipv4_per_second")}
         {@const querySeriesIPv6 = metricsSeriesValues(metricsSnapshot, metricsWindow, "dns_queries_ipv6_per_second")}
+        {@const cacheHitRateSeries = metricsSeriesValues(metricsSnapshot, metricsWindow, "dns_cache_hit_rate")}
         {@const queryBounds = sparklineBounds(querySeriesIPv4, querySeriesIPv6)}
         {@const severityTotals = metricsSnapshot?.quality?.severity?.totals || {}}
 
         {#if metricsError}
-          <div class="notice">Showing last snapshot. Latest refresh failed: {metricsError}</div>
+          <div class="notice">{$t("metrics_stale_error", { error: metricsError })}</div>
         {/if}
 
-        <div class="summary-grid metrics-summary-grid">
-          <div class="summary-item" title={metricsCardHelp.queue_depth}>
-            <span class="summary-label">Queue depth</span>
-            <span class="summary-count">{formatInteger(metricsSnapshot?.health?.queue_depth)}</span>
-          </div>
-          <div class="summary-item" title={metricsCardHelp.in_flight_jobs}>
-            <span class="summary-label">In-flight jobs</span>
-            <span class="summary-count">{formatInteger(metricsSnapshot?.health?.in_flight_jobs)}</span>
-          </div>
-          <div class="summary-item" title={metricsCardHelp.dns_queries_ipv4_total}>
-            <span class="summary-label">Total IPv4 queries</span>
-            <span class="summary-count">{formatCompactInteger(metricsSnapshot?.health?.dns_queries_ipv4_total)}</span>
-          </div>
-          <div class="summary-item" title={metricsCardHelp.dns_queries_ipv6_total}>
-            <span class="summary-label">Total IPv6 queries</span>
-            <span class="summary-count">{formatCompactInteger(metricsSnapshot?.health?.dns_queries_ipv6_total)}</span>
-          </div>
-          <div class="summary-item" title={metricsCardHelp.success_rate}>
-            <span class="summary-label">Success rate</span>
-            <span class="summary-count">{formatPercent(metricsSnapshot?.quality?.outcomes?.success_rate)}</span>
-          </div>
-          <div class="summary-item" title={metricsCardHelp.failed_rate}>
-            <span class="summary-label">Failure rate</span>
-            <span class="summary-count">{formatPercent(metricsSnapshot?.quality?.outcomes?.failed_rate)}</span>
-          </div>
-          <div class="summary-item" title={metricsCardHelp.api_p90}>
-            <span class="summary-label">API p90</span>
-            <span class="summary-count">{formatDurationMs(metricsTopAPIP90(metricsSnapshot))}</span>
-          </div>
-          <div class="summary-item" title={metricsCardHelp.avg_job_duration}>
-            <span class="summary-label">Avg job duration</span>
-            <span class="summary-count">{formatDurationMs(metricsSnapshot?.quality?.job_duration_ms?.avg)}</span>
-          </div>
-          <div class="summary-item jobs-finished" title={metricsCardHelp.completed_total}>
-            <span class="summary-label">Total jobs finished</span>
-            <span class="summary-count">{formatInteger(metricsSnapshot?.jobs?.completed_total)}</span>
-          </div>
-          <div class="summary-item failed-jobs" title={metricsCardHelp.failed_total}>
-            <span class="summary-label">Failed jobs</span>
-            <span class="summary-count">{formatInteger(metricsSnapshot?.quality?.outcomes?.failed_total)}</span>
-          </div>
-          {#each summaryLevels as level}
-            <div class={`summary-item severity-${level.toLowerCase()}`} title={severityCardHelp(level)}>
-              <span class="summary-label">{level}</span>
-              <span class="summary-count">{formatInteger(severityTotals[level])}</span>
+        <div class="metrics-card-group">
+          <h4 class="metrics-group-heading">{$t("metrics_group_queue")}</h4>
+          <div class="summary-grid metrics-summary-grid">
+            <div class="summary-item" title={$t(metricsCardHelp.queue_depth)}>
+              <span class="summary-label">{$t("metric_queue_depth")}</span>
+              <span class="summary-count">{formatInteger(metricsSnapshot?.health?.queue_depth)}</span>
             </div>
-          {/each}
+            <div class="summary-item" title={$t(metricsCardHelp.in_flight_jobs)}>
+              <span class="summary-label">{$t("metric_in_flight")}</span>
+              <span class="summary-count">{formatInteger(metricsSnapshot?.health?.in_flight_jobs)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="metrics-card-group">
+          <h4 class="metrics-group-heading">{$t("metrics_group_dns")}</h4>
+          <div class="summary-grid metrics-summary-grid">
+            <div class="summary-item" title={$t(metricsCardHelp.dns_lookups_total)}>
+              <span class="summary-label">{$t("metric_dns_lookups")}</span>
+              <span class="summary-count">{formatCompactInteger((metricsSnapshot?.health?.dns_cache_hits || 0) + (metricsSnapshot?.health?.dns_cache_misses || 0))}</span>
+            </div>
+            <div class="summary-item" title={$t(metricsCardHelp.dns_cache_hits)}>
+              <span class="summary-label">{$t("metric_cache_hits")}</span>
+              <span class="summary-count">{formatCompactInteger(metricsSnapshot?.health?.dns_cache_hits)}</span>
+            </div>
+            <div class="summary-item" title={$t(metricsCardHelp.dns_cache_hit_rate)}>
+              <span class="summary-label">{$t("metric_cache_hit_rate")}</span>
+              <span class="summary-count">{formatPercent(metricsCacheHitRate(metricsSnapshot))}</span>
+            </div>
+            <div class="summary-item" title={$t(metricsCardHelp.dns_queries_ipv4_total)}>
+              <span class="summary-label">{$t("metric_ipv4_queries")}</span>
+              <span class="summary-count">{formatCompactInteger(metricsSnapshot?.health?.dns_queries_ipv4_total)}</span>
+            </div>
+            <div class="summary-item" title={$t(metricsCardHelp.dns_queries_ipv6_total)}>
+              <span class="summary-label">{$t("metric_ipv6_queries")}</span>
+              <span class="summary-count">{formatCompactInteger(metricsSnapshot?.health?.dns_queries_ipv6_total)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="metrics-card-group">
+          <h4 class="metrics-group-heading">{$t("metrics_group_jobs")}</h4>
+          <div class="summary-grid metrics-summary-grid">
+            <div class="summary-item jobs-finished" title={$t(metricsCardHelp.completed_total)}>
+              <span class="summary-label">{$t("metric_completed")}</span>
+              <span class="summary-count">{formatInteger(metricsSnapshot?.jobs?.completed_total)}</span>
+            </div>
+            <div class="summary-item failed-jobs" title={$t(metricsCardHelp.failed_total)}>
+              <span class="summary-label">{$t("metric_failed")}</span>
+              <span class="summary-count">{formatInteger(metricsSnapshot?.quality?.outcomes?.failed_total)}</span>
+            </div>
+            <div class="summary-item" title={$t(metricsCardHelp.success_rate)}>
+              <span class="summary-label">{$t("metric_success_rate")}</span>
+              <span class="summary-count">{formatPercent(metricsSnapshot?.quality?.outcomes?.success_rate)}</span>
+            </div>
+            <div class="summary-item" title={$t(metricsCardHelp.failed_rate)}>
+              <span class="summary-label">{$t("metric_failure_rate")}</span>
+              <span class="summary-count">{formatPercent(metricsSnapshot?.quality?.outcomes?.failed_rate)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="metrics-card-group">
+          <h4 class="metrics-group-heading">{$t("metrics_group_performance")}</h4>
+          <div class="summary-grid metrics-summary-grid">
+            <div class="summary-item" title={$t(metricsCardHelp.avg_job_duration)}>
+              <span class="summary-label">{$t("metric_avg_duration")}</span>
+              <span class="summary-count">{formatDurationMs(metricsSnapshot?.quality?.job_duration_ms?.avg)}</span>
+            </div>
+            <div class="summary-item" title={$t(metricsCardHelp.api_p90)}>
+              <span class="summary-label">{$t("metric_api_p90")}</span>
+              <span class="summary-count">{formatDurationMs(metricsTopAPIP90(metricsSnapshot))}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="metrics-card-group">
+          <h4 class="metrics-group-heading">{$t("metrics_group_severity")}</h4>
+          <div class="summary-grid metrics-summary-grid">
+            {#each summaryLevels as level}
+              <div class={`summary-item severity-${level.toLowerCase()}`} title={$t("help_severity_card", { level })}>
+                <span class="summary-label">{level}</span>
+                <span class="summary-count">{formatInteger(severityTotals[level])}</span>
+              </div>
+            {/each}
+          </div>
         </div>
 
         <div class="metrics-trend-grid">
           <div class="metrics-trend-card">
             <div class="metrics-trend-head">
-              <strong>Throughput</strong>
-              <span>{formatInteger(seriesLast(throughputSeries))}/bucket</span>
+              <strong>{$t("metric_throughput")}</strong>
+              <span>{formatInteger(seriesLast(throughputSeries))}{$t("per_bucket")}</span>
             </div>
-            <svg class="sparkline" viewBox="0 0 260 66" role="img" aria-label="Throughput trend">
+            <svg class="sparkline" viewBox="0 0 260 66" role="img" aria-label={$t("aria_throughput_trend")}>
               <polyline points={sparklinePoints(throughputSeries)} />
             </svg>
           </div>
           <div class="metrics-trend-card">
             <div class="metrics-trend-head">
-              <strong>Failures</strong>
-              <span>{formatInteger(seriesLast(failedSeries))}/bucket</span>
+              <strong>{$t("metric_failures")}</strong>
+              <span>{formatInteger(seriesLast(failedSeries))}{$t("per_bucket")}</span>
             </div>
-            <svg class="sparkline sparkline-warn" viewBox="0 0 260 66" role="img" aria-label="Failure trend">
+            <svg class="sparkline sparkline-warn" viewBox="0 0 260 66" role="img" aria-label={$t("aria_failure_trend")}>
               <polyline points={sparklinePoints(failedSeries)} />
             </svg>
           </div>
           <div class="metrics-trend-card">
             <div class="metrics-trend-head">
-              <strong>DNS queries/s</strong>
+              <strong>{$t("metric_dns_rate")}</strong>
               <span>{formatRate(seriesLast(querySeriesIPv4) + seriesLast(querySeriesIPv6))}</span>
             </div>
-            <svg class="sparkline sparkline-queries" viewBox="0 0 260 66" role="img" aria-label="DNS query rates trend">
+            <svg class="sparkline sparkline-queries" viewBox="0 0 260 66" role="img" aria-label={$t("aria_dns_trend")}>
               <polyline class="sparkline-ipv4" points={sparklinePoints(querySeriesIPv4, 260, 66, 6, queryBounds)} />
               <polyline class="sparkline-ipv6" points={sparklinePoints(querySeriesIPv6, 260, 66, 6, queryBounds)} />
             </svg>
             <div class="sparkline-legend">
               <span class="sparkline-legend-item">
                 <span class="sparkline-legend-dot sparkline-legend-dot-ipv4" aria-hidden="true"></span>
-                IPv4 {formatRate(seriesLast(querySeriesIPv4))}
+                {$t("ipv4_label")} {formatRate(seriesLast(querySeriesIPv4))}
               </span>
               <span class="sparkline-legend-item">
                 <span class="sparkline-legend-dot sparkline-legend-dot-ipv6" aria-hidden="true"></span>
-                IPv6 {formatRate(seriesLast(querySeriesIPv6))}
+                {$t("ipv6_label")} {formatRate(seriesLast(querySeriesIPv6))}
               </span>
             </div>
+          </div>
+          <div class="metrics-trend-card">
+            <div class="metrics-trend-head">
+              <strong>{$t("metric_cache_hit_rate")}</strong>
+              <span>{formatPercent(seriesLast(cacheHitRateSeries))}</span>
+            </div>
+            <svg class="sparkline sparkline-cache" viewBox="0 0 260 66" role="img" aria-label={$t("aria_cache_hit_rate_trend")}>
+              <polyline points={sparklinePoints(cacheHitRateSeries)} />
+            </svg>
           </div>
         </div>
 
         <div class="metrics-tables">
           <div class="metrics-table-wrap">
-            <h3>Top domains</h3>
+            <h3>{$t("top_domains_heading")}</h3>
             {#if metricsDomainRows(metricsSnapshot).length === 0}
-              <div class="summary-empty">No domain insight data yet.</div>
+              <div class="summary-empty">{$t("no_domain_data")}</div>
             {:else}
               <table class="metrics-table">
                 <thead>
                   <tr>
-                    <th>Domain</th>
-                    <th>Runs</th>
-                    <th>Last status</th>
-                    <th>Avg duration</th>
-                    <th>Error+critical</th>
+                    <th>{$t("domain_col")}</th>
+                    <th>{$t("runs_col")}</th>
+                    <th>{$t("last_status_col")}</th>
+                    <th>{$t("avg_duration_col")}</th>
+                    <th>{$t("error_critical_col")}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {#each metricsDomainRows(metricsSnapshot) as row}
                     <tr>
-                      <td class="mono">{row.domain}</td>
+                      <td class="mono"><button class="ghost" type="button" style="padding: 0; font-family: monospace; text-align: left; border: none;" on:click={() => navigateToDomainByName(row.domain)}>{row.domain}</button></td>
                       <td>{formatInteger(row.runs_total)}</td>
                       <td>{row.last_status || "-"}</td>
                       <td>{formatDurationMs(row.avg_duration_ms)}</td>
@@ -1770,9 +3243,9 @@ example.org`}
           </div>
 
           <div class="metrics-table-wrap">
-            <h3>Error-heavy batches</h3>
+            <h3>{$t("error_heavy_batches_heading")}</h3>
             {#if metricsBatchRows(metricsSnapshot).length === 0}
-              <div class="summary-empty">No batch insight data yet.</div>
+              <div class="summary-empty">{$t("no_batch_data")}</div>
             {:else}
               <table class="metrics-table metrics-table-batches">
                 <colgroup>
@@ -1784,11 +3257,11 @@ example.org`}
                 </colgroup>
                 <thead>
                   <tr>
-                    <th>Batch ID</th>
-                    <th>Processed</th>
-                    <th>Failed+expired</th>
-                    <th>Canceled</th>
-                    <th>Error+critical</th>
+                    <th>{$t("batch_id_col")}</th>
+                    <th>{$t("processed_col")}</th>
+                    <th>{$t("failed_expired_col")}</th>
+                    <th>{$t("canceled_col")}</th>
+                    <th>{$t("error_critical_col")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1807,15 +3280,15 @@ example.org`}
           </div>
         </div>
       {:else}
-        <div class="summary-empty">No metrics data available yet.</div>
+        <div class="summary-empty">{$t("no_metrics_data")}</div>
       {/if}
     </div>
   {/if}
 
   {#if statusMessage}
     <div class={`status-toast status-${statusTone === "ok" ? "ok" : "warn"} reveal`} role="status" aria-live="polite" style="--d: 0.12s;">
-      <div><strong>{statusTone === "ok" ? "OK" : "Heads up"}:</strong> {statusMessage}</div>
-      <button class="status-toast-close" type="button" aria-label="Dismiss notification" on:click={clearStatus}>Dismiss</button>
+      <div><strong>{statusTone === "ok" ? $t("toast_ok") : $t("toast_warn")}:</strong> {statusMessage}</div>
+      <button class="status-toast-close" type="button" aria-label={$t("dismiss_notification_aria")} on:click={clearStatus}>{$t("dismiss")}</button>
     </div>
   {/if}
 </main>

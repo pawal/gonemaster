@@ -14,7 +14,7 @@ func BenchmarkInMemoryQueueEnqueueDequeue(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if err := q.Enqueue("job"); err != nil {
+		if err := q.Enqueue("job", PriorityNormal); err != nil {
 			b.Fatalf("enqueue: %v", err)
 		}
 		if _, err := q.Dequeue(ctx); err != nil {
@@ -31,7 +31,7 @@ func BenchmarkInMemoryQueueParallelRoundTrip(b *testing.B) {
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			if err := q.Enqueue("job"); err != nil {
+			if err := q.Enqueue("job", PriorityNormal); err != nil {
 				panic(err)
 			}
 			if _, err := q.Dequeue(ctx); err != nil {
@@ -76,7 +76,7 @@ func BenchmarkInMemoryQueueBlockedWakeup(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				if err := q.Enqueue("job"); err != nil {
+				if err := q.Enqueue("job", PriorityNormal); err != nil {
 					b.Fatalf("enqueue: %v", err)
 				}
 				<-results

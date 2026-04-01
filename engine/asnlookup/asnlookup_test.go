@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/packet"
@@ -26,30 +26,28 @@ func (f fakeResolver) Recurse(ctx context.Context, name string, qtype string, qc
 
 func packetFor(rcode int, answer []dns.RR, authority []dns.RR) packet.Packet {
 	msg := new(dns.Msg)
-	msg.Rcode = rcode
+	msg.Rcode = uint16(rcode)
 	msg.Answer = answer
 	msg.Ns = authority
 	return packet.New(msg)
 }
 
 func txtRR(name string, txt string) *dns.TXT {
-	return &dns.TXT{
-		Hdr: dns.RR_Header{Name: name, Rrtype: dns.TypeTXT, Class: dns.ClassINET, Ttl: 3600},
-		Txt: []string{txt},
-	}
+	rr := &dns.TXT{Hdr: dns.Header{Name: name, Class: dns.ClassINET, TTL: 3600}}
+	rr.Txt = []string{txt}
+	return rr
 }
 
 func soaRR(name string, mname string, rname string) *dns.SOA {
-	return &dns.SOA{
-		Hdr:     dns.RR_Header{Name: name, Rrtype: dns.TypeSOA, Class: dns.ClassINET, Ttl: 3600},
-		Ns:      mname,
-		Mbox:    rname,
-		Serial:  1,
-		Refresh: 2,
-		Retry:   3,
-		Expire:  4,
-		Minttl:  5,
-	}
+	rr := &dns.SOA{Hdr: dns.Header{Name: name, Class: dns.ClassINET, TTL: 3600}}
+	rr.Ns = mname
+	rr.Mbox = rname
+	rr.Serial = 1
+	rr.Refresh = 2
+	rr.Retry = 3
+	rr.Expire = 4
+	rr.Minttl = 5
+	return rr
 }
 
 func TestGetWithPrefixValidationErrors(t *testing.T) {
@@ -131,7 +129,7 @@ func TestLookupCymruNXDomainSOAEmpty(t *testing.T) {
 }
 
 func TestLookupCymruSelectsMostSpecificPrefix(t *testing.T) {
-	ctx, _, _ := testhelpers.Context(t)
+	ctx, _, log := testhelpers.Context(t)
 
 	ip := netip.MustParseAddr("192.0.2.1")
 	source := "asnlookup.zonemaster.net"
@@ -159,6 +157,22 @@ func TestLookupCymruSelectsMostSpecificPrefix(t *testing.T) {
 	}
 	if len(result.ASNs) != 2 || result.ASNs[0] != 64500 || result.ASNs[1] != 64501 {
 		t.Fatalf("unexpected ASN list: %v", result.ASNs)
+	}
+	var found bool
+	for _, entry := range log.Entries() {
+		if entry == nil || entry.Tag != "ASN_LOOKUP_SOURCE" {
+			continue
+		}
+		found = true
+		if sourceArg, ok := entry.Args["source"].(string); !ok || sourceArg != source {
+			t.Fatalf("expected source=%q in ASN_LOOKUP_SOURCE args, got %#v", source, entry.Args)
+		}
+		if _, ok := entry.Args["name"]; ok {
+			t.Fatalf("legacy key name should not be present: %#v", entry.Args)
+		}
+	}
+	if !found {
+		t.Fatalf("expected ASN_LOOKUP_SOURCE log entry")
 	}
 }
 

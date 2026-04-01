@@ -2,12 +2,15 @@ package transport
 
 import (
 	"context"
+	"encoding/binary"
 	"net"
+	"net/netip"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -18,8 +21,11 @@ func TestBuildQueryWithClass(t *testing.T) {
 	if len(msg.Question) != 1 {
 		t.Fatalf("expected 1 question")
 	}
-	if msg.Question[0].Qclass != dns.ClassCHAOS {
-		t.Fatalf("unexpected qclass: %d", msg.Question[0].Qclass)
+	if msg.Question[0].Header().Class != dns.ClassCHAOS {
+		t.Fatalf("unexpected qclass: %d", msg.Question[0].Header().Class)
+	}
+	if dns.RRToType(msg.Question[0]) != dns.TypeA {
+		t.Fatalf("unexpected qtype: %d", dns.RRToType(msg.Question[0]))
 	}
 	if msg.RecursionDesired {
 		t.Fatalf("expected recursion disabled by default")
@@ -92,7 +98,6 @@ func TestEnsurePort(t *testing.T) {
 func TestPrepareMessageWithEDNSDetails(t *testing.T) {
 	do := true
 	version := uint8(1)
-	z := uint16(3)
 	rcode := uint8(16)
 
 	client := &Client{
@@ -101,10 +106,9 @@ func TestPrepareMessageWithEDNSDetails(t *testing.T) {
 		EDNSDetails: &EDNSDetails{
 			Do:      &do,
 			Version: &version,
-			Z:       &z,
 			Rcode:   &rcode,
 			Data: []dns.EDNS0{
-				&dns.EDNS0_NSID{Code: dns.EDNS0NSID},
+				&dns.NSID{},
 			},
 		},
 	}
@@ -115,16 +119,257 @@ func TestPrepareMessageWithEDNSDetails(t *testing.T) {
 	if !prepared.RecursionDesired {
 		t.Fatalf("expected recursion desired to be true")
 	}
-
-	opt := prepared.IsEdns0()
+	if len(prepared.Pseudo) != 0 {
+		t.Fatalf("expected pseudo section to be empty when explicit OPT is used, got %d entries", len(prepared.Pseudo))
+	}
+	if prepared.UDPSize != 0 {
+		t.Fatalf("expected UDPSize to be moved into OPT record, got %d", prepared.UDPSize)
+	}
+	var opt *dns.OPT
+	for _, rr := range prepared.Extra {
+		if typed, ok := rr.(*dns.OPT); ok {
+			opt = typed
+			break
+		}
+	}
 	if opt == nil {
-		t.Fatalf("expected edns option")
+		t.Fatalf("expected explicit OPT record in additional section")
 	}
-	if !opt.Do() || opt.Version() != 1 || opt.Z() != 3 || opt.ExtendedRcode() != 16 {
-		t.Fatalf("unexpected edns values: do=%v version=%d z=%d rcode=%d", opt.Do(), opt.Version(), opt.Z(), opt.ExtendedRcode())
+	if got := opt.UDPSize(); got != 1232 {
+		t.Fatalf("unexpected OPT UDP size: got %d want 1232", got)
 	}
-	if len(opt.Option) != 1 {
-		t.Fatalf("expected edns option data")
+	if !opt.Security() {
+		t.Fatalf("expected OPT DO bit set")
+	}
+	if got := opt.Version(); got != 1 {
+		t.Fatalf("unexpected OPT version: got %d want 1", got)
+	}
+	if got := opt.Rcode(); got != 16 {
+		t.Fatalf("unexpected OPT extended rcode: got %d want 16", got)
+	}
+	if len(opt.Options) != 1 {
+		t.Fatalf("expected one EDNS option in OPT, got %d", len(opt.Options))
+	}
+
+	if err := prepared.Pack(); err != nil {
+		t.Fatalf("pack prepared query: %v", err)
+	}
+	var unpacked dns.Msg
+	unpacked.Data = append([]byte(nil), prepared.Data...)
+	if err := unpacked.Unpack(); err != nil {
+		t.Fatalf("unpack prepared query: %v", err)
+	}
+	if unpacked.UDPSize != 1232 || unpacked.Version != 1 || unpacked.Rcode != 16 {
+		t.Fatalf("unexpected unpacked EDNS fields: udp=%d version=%d rcode=%d", unpacked.UDPSize, unpacked.Version, unpacked.Rcode)
+	}
+}
+
+func TestPrepareMessageWithEDNSVersionAndDefaultSizeEncodesOPT(t *testing.T) {
+	version := uint8(1)
+	client := &Client{
+		EDNSDetails: &EDNSDetails{
+			Version: &version,
+		},
+	}
+
+	prepared := client.prepareMessage(BuildQuery("example.com", dns.TypeA))
+
+	var opt *dns.OPT
+	for _, rr := range prepared.Extra {
+		if typed, ok := rr.(*dns.OPT); ok {
+			opt = typed
+			break
+		}
+	}
+	if opt == nil {
+		t.Fatalf("expected explicit OPT record in additional section")
+	}
+	if got := opt.UDPSize(); got != dns.MinMsgSize {
+		t.Fatalf("unexpected OPT UDP size: got %d want %d", got, dns.MinMsgSize)
+	}
+	if got := opt.Version(); got != 1 {
+		t.Fatalf("unexpected OPT version: got %d want 1", got)
+	}
+
+	if err := prepared.Pack(); err != nil {
+		t.Fatalf("pack prepared query: %v", err)
+	}
+	var unpacked dns.Msg
+	unpacked.Data = append([]byte(nil), prepared.Data...)
+	if err := unpacked.Unpack(); err != nil {
+		t.Fatalf("unpack prepared query: %v", err)
+	}
+	if unpacked.UDPSize != dns.MinMsgSize || unpacked.Version != 1 {
+		t.Fatalf("unexpected unpacked EDNS fields: udp=%d version=%d", unpacked.UDPSize, unpacked.Version)
+	}
+}
+
+func TestPrepareMessageWithEDNSSize512EncodesOPT(t *testing.T) {
+	client := &Client{EDNSSize: dns.MinMsgSize}
+
+	prepared := client.prepareMessage(BuildQuery("example.com", dns.TypeA))
+
+	var opt *dns.OPT
+	for _, rr := range prepared.Extra {
+		if typed, ok := rr.(*dns.OPT); ok {
+			opt = typed
+			break
+		}
+	}
+	if opt == nil {
+		t.Fatalf("expected explicit OPT record in additional section")
+	}
+	if got := opt.UDPSize(); got != dns.MinMsgSize {
+		t.Fatalf("unexpected OPT UDP size: got %d want %d", got, dns.MinMsgSize)
+	}
+
+	if err := prepared.Pack(); err != nil {
+		t.Fatalf("pack prepared query: %v", err)
+	}
+	var unpacked dns.Msg
+	unpacked.Data = append([]byte(nil), prepared.Data...)
+	if err := unpacked.Unpack(); err != nil {
+		t.Fatalf("unpack prepared query: %v", err)
+	}
+	if unpacked.UDPSize != dns.MinMsgSize {
+		t.Fatalf("unexpected unpacked UDP size: got %d want %d", unpacked.UDPSize, dns.MinMsgSize)
+	}
+}
+
+func TestPrepareMessageWithEDNSZEncodesSingleOPT(t *testing.T) {
+	do := true
+	size := uint16(1232)
+	version := uint8(1)
+	z := uint16(0x1234)
+	rcode := uint8(16)
+
+	client := &Client{
+		EDNSDetails: &EDNSDetails{
+			Do:      &do,
+			Size:    &size,
+			Version: &version,
+			Z:       &z,
+			Rcode:   &rcode,
+			Data: []dns.EDNS0{
+				&dns.NSID{},
+			},
+		},
+	}
+
+	prepared := client.prepareMessage(BuildQuery("example.com", dns.TypeA))
+
+	if len(prepared.Pseudo) != 0 {
+		t.Fatalf("expected pseudo section to be empty when explicit OPT is used, got %d entries", len(prepared.Pseudo))
+	}
+	if prepared.UDPSize != 0 {
+		t.Fatalf("expected UDPSize to be moved into OPT record, got %d", prepared.UDPSize)
+	}
+
+	var opt *dns.OPT
+	for _, rr := range prepared.Extra {
+		if typed, ok := rr.(*dns.OPT); ok {
+			opt = typed
+			break
+		}
+	}
+	if opt == nil {
+		t.Fatalf("expected explicit OPT record in additional section")
+	}
+	if got := opt.Z(); got != (z & 0x1FFF) {
+		t.Fatalf("unexpected OPT Z value: got %d want %d", got, z&0x1FFF)
+	}
+	if got := opt.UDPSize(); got != size {
+		t.Fatalf("unexpected OPT UDP size: got %d want %d", got, size)
+	}
+	if got := opt.Version(); got != version {
+		t.Fatalf("unexpected OPT version: got %d want %d", got, version)
+	}
+	if !opt.Security() {
+		t.Fatalf("expected OPT DO bit set")
+	}
+	if got := opt.Rcode(); got != 16 {
+		t.Fatalf("unexpected OPT extended rcode: got %d want 16", got)
+	}
+	if len(opt.Options) != 1 {
+		t.Fatalf("expected one EDNS option in OPT, got %d", len(opt.Options))
+	}
+
+	if err := prepared.Pack(); err != nil {
+		t.Fatalf("pack prepared query: %v", err)
+	}
+	wireZ := extractSingleOptZFromWire(t, prepared.Data)
+	if wireZ != (z & 0x1FFF) {
+		t.Fatalf("wire OPT Z mismatch: got %d want %d", wireZ, z&0x1FFF)
+	}
+}
+
+func extractSingleOptZFromWire(t *testing.T, wire []byte) uint16 {
+	t.Helper()
+
+	if len(wire) < 12 {
+		t.Fatalf("wire message too short: %d", len(wire))
+	}
+	qd := binary.BigEndian.Uint16(wire[4:6])
+	an := binary.BigEndian.Uint16(wire[6:8])
+	ns := binary.BigEndian.Uint16(wire[8:10])
+	ar := binary.BigEndian.Uint16(wire[10:12])
+	if qd != 1 || an != 0 || ns != 0 || ar != 1 {
+		t.Fatalf("unexpected DNS section counts: qd=%d an=%d ns=%d ar=%d", qd, an, ns, ar)
+	}
+
+	offset, ok := skipName(wire, 12)
+	if !ok || offset+4 > len(wire) {
+		t.Fatalf("failed to parse question section")
+	}
+	offset += 4 // qtype + qclass
+
+	offset, ok = skipName(wire, offset)
+	if !ok || offset+10 > len(wire) {
+		t.Fatalf("failed to parse OPT owner name/header")
+	}
+	typ := binary.BigEndian.Uint16(wire[offset : offset+2])
+	offset += 2
+	_ = binary.BigEndian.Uint16(wire[offset : offset+2]) // class
+	offset += 2
+	ttl := binary.BigEndian.Uint32(wire[offset : offset+4])
+	offset += 4
+	rdlen := int(binary.BigEndian.Uint16(wire[offset : offset+2]))
+	offset += 2
+
+	if typ != dns.TypeOPT {
+		t.Fatalf("expected additional record type OPT, got %d", typ)
+	}
+	if offset+rdlen > len(wire) {
+		t.Fatalf("invalid OPT rdata length: rdlen=%d offset=%d total=%d", rdlen, offset, len(wire))
+	}
+
+	return uint16(ttl & 0x1FFF)
+}
+
+func skipName(wire []byte, offset int) (int, bool) {
+	for {
+		if offset >= len(wire) {
+			return 0, false
+		}
+		length := wire[offset]
+		offset++
+		switch length & 0xC0 {
+		case 0x00:
+			if length == 0 {
+				return offset, true
+			}
+			offset += int(length)
+			if offset > len(wire) {
+				return 0, false
+			}
+		case 0xC0:
+			if offset >= len(wire) {
+				return 0, false
+			}
+			return offset + 1, true
+		default:
+			return 0, false
+		}
 	}
 }
 
@@ -180,19 +425,27 @@ func startUDPDNSServer(t *testing.T, handler dns.HandlerFunc) (string, func()) {
 		t.Fatalf("listen udp: %v", err)
 	}
 
+	ready := make(chan struct{})
 	server := &dns.Server{
-		PacketConn: packetConn,
-		Handler:    handler,
+		PacketConn:        packetConn,
+		Handler:           handler,
+		NotifyStartedFunc: func(_ context.Context) { close(ready) },
 	}
 
 	done := make(chan struct{})
 	go func() {
-		_ = server.ActivateAndServe()
+		_ = server.ListenAndServe()
 		close(done)
 	}()
 
+	select {
+	case <-ready:
+	case <-time.After(2 * time.Second):
+		t.Fatal("udp dns server failed to start")
+	}
+
 	shutdown := func() {
-		_ = server.Shutdown()
+		server.Shutdown(context.Background())
 		_ = packetConn.Close()
 		select {
 		case <-done:
@@ -213,10 +466,12 @@ func startTCPDNSServer(t *testing.T, handler dns.HandlerFunc, configure func(*dn
 	}
 	counting := &acceptCountingListener{Listener: listener}
 
+	ready := make(chan struct{})
 	server := &dns.Server{
-		Net:      "tcp",
-		Listener: counting,
-		Handler:  handler,
+		Net:               "tcp",
+		Listener:          counting,
+		Handler:           handler,
+		NotifyStartedFunc: func(_ context.Context) { close(ready) },
 	}
 	if configure != nil {
 		configure(server)
@@ -224,12 +479,18 @@ func startTCPDNSServer(t *testing.T, handler dns.HandlerFunc, configure func(*dn
 
 	done := make(chan struct{})
 	go func() {
-		_ = server.ActivateAndServe()
+		_ = server.ListenAndServe()
 		close(done)
 	}()
 
+	select {
+	case <-ready:
+	case <-time.After(2 * time.Second):
+		t.Fatal("tcp dns server failed to start")
+	}
+
 	shutdown := func() {
-		_ = server.Shutdown()
+		server.Shutdown(context.Background())
 		_ = listener.Close()
 		select {
 		case <-done:
@@ -241,23 +502,62 @@ func startTCPDNSServer(t *testing.T, handler dns.HandlerFunc, configure func(*dn
 	return listener.Addr().String(), counting, shutdown
 }
 
-func writeSimpleAResponse(w dns.ResponseWriter, req *dns.Msg) {
-	resp := new(dns.Msg)
-	resp.SetReply(req)
-	if len(req.Question) > 0 {
-		resp.Answer = []dns.RR{
-			&dns.A{
-				Hdr: dns.RR_Header{
-					Name:   req.Question[0].Name,
-					Rrtype: dns.TypeA,
-					Class:  dns.ClassINET,
-					Ttl:    60,
-				},
-				A: net.IPv4(192, 0, 2, 10),
-			},
+// startUDPServerOnAddr binds a UDP DNS server to addr (typically the same
+// address as an already-started TCP server) and waits until the server is
+// ready before returning. Returns a shutdown function the caller must defer.
+func startUDPServerOnAddr(t *testing.T, addr string, handler dns.HandlerFunc) func() {
+	t.Helper()
+
+	packetConn, err := net.ListenPacket("udp", addr)
+	if err != nil {
+		t.Fatalf("listen udp on tcp addr: %v", err)
+	}
+
+	ready := make(chan struct{})
+	server := &dns.Server{
+		PacketConn:        packetConn,
+		Handler:           handler,
+		NotifyStartedFunc: func(_ context.Context) { close(ready) },
+	}
+
+	done := make(chan struct{})
+	go func() {
+		_ = server.ListenAndServe()
+		close(done)
+	}()
+
+	select {
+	case <-ready:
+	case <-time.After(2 * time.Second):
+		t.Fatal("udp dns server failed to start")
+	}
+
+	return func() {
+		server.Shutdown(context.Background())
+		_ = packetConn.Close()
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			t.Logf("udp dns server shutdown timed out")
 		}
 	}
-	_ = w.WriteMsg(resp)
+}
+
+func writeSimpleAResponse(w dns.ResponseWriter, req *dns.Msg) {
+	resp := new(dns.Msg)
+	dnsutil.SetReply(resp, req)
+	if len(req.Question) > 0 {
+		a := &dns.A{
+			Hdr: dns.Header{
+				Name:  req.Question[0].Header().Name,
+				Class: dns.ClassINET,
+				TTL:   60,
+			},
+		}
+		a.Addr = netip.AddrFrom4([4]byte{192, 0, 2, 10})
+		resp.Answer = []dns.RR{a}
+	}
+	_, _ = resp.WriteTo(w)
 }
 
 func TestEffectiveAttemptTimeoutUsesConfiguredTimeout(t *testing.T) {
@@ -284,7 +584,7 @@ func TestEffectiveAttemptTimeoutUsesRetransBudgetForUDP(t *testing.T) {
 	}
 }
 
-func TestEffectiveAttemptTimeoutCapsUDPFallbackWait(t *testing.T) {
+func TestEffectiveAttemptTimeoutDoesNotCapUDPForFallback(t *testing.T) {
 	client := &Client{
 		Timeout: 5 * time.Second,
 		Retrans: 3 * time.Second,
@@ -292,8 +592,8 @@ func TestEffectiveAttemptTimeoutCapsUDPFallbackWait(t *testing.T) {
 	client.SetFallback(true)
 
 	got := client.effectiveAttemptTimeout(context.Background(), false, false)
-	if got != udpFallbackWaitCap {
-		t.Fatalf("expected UDP fallback cap %v, got %v", udpFallbackWaitCap, got)
+	if got != 3*time.Second {
+		t.Fatalf("expected UDP timeout budget to stay at retrans 3s, got %v", got)
 	}
 }
 
@@ -325,7 +625,7 @@ func TestEffectiveAttemptTimeoutRespectsContextDeadline(t *testing.T) {
 }
 
 func TestExchangeTCPDoesNotClampTimeoutToRetrans(t *testing.T) {
-	serverAddr, _, shutdown := startTCPDNSServer(t, func(w dns.ResponseWriter, req *dns.Msg) {
+	serverAddr, _, shutdown := startTCPDNSServer(t, func(_ context.Context, w dns.ResponseWriter, req *dns.Msg) {
 		time.Sleep(120 * time.Millisecond)
 		writeSimpleAResponse(w, req)
 	}, nil)
@@ -349,12 +649,101 @@ func TestExchangeTCPDoesNotClampTimeoutToRetrans(t *testing.T) {
 	}
 }
 
-func TestExchangeFallbackTCPUsesRetransBudget(t *testing.T) {
-	serverAddr, listener, shutdown := startTCPDNSServer(t, func(w dns.ResponseWriter, req *dns.Msg) {
-		time.Sleep(120 * time.Millisecond)
+func TestExchangeFallbackTCPOnTruncatedUDP(t *testing.T) {
+	serverAddr, listener, shutdownTCP := startTCPDNSServer(t, func(_ context.Context, w dns.ResponseWriter, req *dns.Msg) {
 		writeSimpleAResponse(w, req)
 	}, nil)
-	defer shutdown()
+	defer shutdownTCP()
+
+	defer startUDPServerOnAddr(t, serverAddr, func(_ context.Context, w dns.ResponseWriter, req *dns.Msg) {
+		resp := new(dns.Msg)
+		dnsutil.SetReply(resp, req)
+		resp.Truncated = true
+		_, _ = resp.WriteTo(w)
+	})()
+
+	client := &Client{}
+	client.SetUseTCP(false)
+	client.SetFallback(true)
+	client.SetRetries(0)
+	client.SetTimeout(1 * time.Second)
+	client.SetRetrans(40 * time.Millisecond)
+
+	_, err := client.Exchange(context.Background(), serverAddr, BuildQuery("tcp-fallback-truncated.example", dns.TypeA))
+	if err != nil {
+		t.Fatalf("expected TCP fallback success after truncated UDP response, got %v", err)
+	}
+	if got := listener.accepts.Load(); got < 1 {
+		t.Fatalf("expected TCP fallback attempt, got %d TCP accepts", got)
+	}
+}
+
+func TestExchangeAcceptsOversizedUDPWithoutTCPFallback(t *testing.T) {
+	serverAddr, listener, shutdownTCP := startTCPDNSServer(t, func(_ context.Context, w dns.ResponseWriter, req *dns.Msg) {
+		writeSimpleAResponse(w, req)
+	}, nil)
+	defer shutdownTCP()
+
+	defer startUDPServerOnAddr(t, serverAddr, func(_ context.Context, w dns.ResponseWriter, req *dns.Msg) {
+		resp := new(dns.Msg)
+		dnsutil.SetReply(resp, req)
+		if len(req.Question) > 0 {
+			a := &dns.A{
+				Hdr: dns.Header{
+					Name:  req.Question[0].Header().Name,
+					Class: dns.ClassINET,
+					TTL:   60,
+				},
+			}
+			a.Addr = netip.AddrFrom4([4]byte{192, 0, 2, 10})
+			resp.Answer = append(resp.Answer, a)
+		}
+
+		// Keep the response valid but larger than the classic 512-byte UDP
+		// receive buffer used when the request has no EDNS.
+		for i := 0; i < 64; i++ {
+			additional := &dns.A{
+				Hdr: dns.Header{
+					Name:  "extra.example.",
+					Class: dns.ClassINET,
+					TTL:   60,
+				},
+			}
+			additional.Addr = netip.AddrFrom4([4]byte{192, 0, 2, byte(i + 1)})
+			resp.Extra = append(resp.Extra, additional)
+		}
+
+		_, _ = resp.WriteTo(w)
+	})()
+
+	client := &Client{}
+	client.SetUseTCP(false)
+	client.SetFallback(true)
+	client.SetRetries(0)
+	client.SetTimeout(1 * time.Second)
+	client.SetRetrans(40 * time.Millisecond)
+
+	resp, err := client.Exchange(context.Background(), serverAddr, BuildQuery("udp-oversized-response.example", dns.TypeA))
+	if err != nil {
+		t.Fatalf("expected successful UDP response, got %v", err)
+	}
+	if resp.Msg == nil || len(resp.Msg.Answer) == 0 {
+		t.Fatalf("expected answer records in UDP response, got %#v", resp.Msg)
+	}
+	if got := listener.accepts.Load(); got != 0 {
+		t.Fatalf("expected no TCP fallback attempt, got %d TCP accepts", got)
+	}
+}
+
+func TestExchangeDoesNotFallbackTCPOnUDPFailure(t *testing.T) {
+	serverAddr, listener, shutdownTCP := startTCPDNSServer(t, func(_ context.Context, w dns.ResponseWriter, req *dns.Msg) {
+		writeSimpleAResponse(w, req)
+	}, nil)
+	defer shutdownTCP()
+
+	defer startUDPServerOnAddr(t, serverAddr, func(_ context.Context, _ dns.ResponseWriter, _ *dns.Msg) {
+		// Intentionally blackhole UDP queries so fallback path is exercised.
+	})()
 
 	client := &Client{}
 	client.SetUseTCP(false)
@@ -364,68 +753,16 @@ func TestExchangeFallbackTCPUsesRetransBudget(t *testing.T) {
 	client.SetRetrans(40 * time.Millisecond)
 
 	start := time.Now()
-	_, err := client.Exchange(context.Background(), serverAddr, BuildQuery("tcp-fallback-retrans.example", dns.TypeA))
+	_, err := client.Exchange(context.Background(), serverAddr, BuildQuery("tcp-fallback-udp-cap.example", dns.TypeA))
 	elapsed := time.Since(start)
 	if err == nil {
-		t.Fatalf("expected fallback TCP timeout")
+		t.Fatalf("expected UDP failure without TCP fallback")
 	}
-	if got := listener.accepts.Load(); got < 1 {
-		t.Fatalf("expected TCP fallback attempt, got %d TCP accepts", got)
+	if got := listener.accepts.Load(); got != 0 {
+		t.Fatalf("expected no TCP fallback on UDP error, got %d TCP accepts", got)
 	}
-	if elapsed < 20*time.Millisecond || elapsed > 250*time.Millisecond {
-		t.Fatalf("expected fallback timeout near retrans budget, took %v", elapsed)
-	}
-}
-
-func TestExchangeFallbackTCPDoesNotWaitFullRetransOnUDPFailure(t *testing.T) {
-	serverAddr, listener, shutdownTCP := startTCPDNSServer(t, func(w dns.ResponseWriter, req *dns.Msg) {
-		writeSimpleAResponse(w, req)
-	}, nil)
-	defer shutdownTCP()
-
-	packetConn, err := net.ListenPacket("udp", serverAddr)
-	if err != nil {
-		t.Fatalf("listen udp on tcp addr: %v", err)
-	}
-	udpServer := &dns.Server{
-		PacketConn: packetConn,
-		Handler: dns.HandlerFunc(func(_ dns.ResponseWriter, _ *dns.Msg) {
-			// Intentionally blackhole UDP queries so fallback path is exercised.
-		}),
-	}
-	udpDone := make(chan struct{})
-	go func() {
-		_ = udpServer.ActivateAndServe()
-		close(udpDone)
-	}()
-	defer func() {
-		_ = udpServer.Shutdown()
-		_ = packetConn.Close()
-		select {
-		case <-udpDone:
-		case <-time.After(2 * time.Second):
-			t.Logf("udp dns server shutdown timed out")
-		}
-	}()
-
-	client := &Client{}
-	client.SetUseTCP(false)
-	client.SetFallback(true)
-	client.SetRetries(0)
-	client.SetTimeout(5 * time.Second)
-	client.SetRetrans(3 * time.Second)
-
-	start := time.Now()
-	_, err = client.Exchange(context.Background(), serverAddr, BuildQuery("tcp-fallback-udp-cap.example", dns.TypeA))
-	elapsed := time.Since(start)
-	if err != nil {
-		t.Fatalf("expected fallback TCP success, got %v", err)
-	}
-	if got := listener.accepts.Load(); got < 1 {
-		t.Fatalf("expected TCP fallback attempt, got %d TCP accepts", got)
-	}
-	if elapsed > 2*time.Second {
-		t.Fatalf("expected fallback path to avoid full 3s UDP wait, took %v", elapsed)
+	if elapsed < 20*time.Millisecond || elapsed > 300*time.Millisecond {
+		t.Fatalf("expected exchange to fail within UDP timeout budget, took %v", elapsed)
 	}
 }
 
@@ -442,7 +779,7 @@ func TestEffectiveAttemptTimeoutFallsBackToRetransWhenTimeoutUnset(t *testing.T)
 }
 
 func TestExchangeReturnsPromptlyOnContextCancel(t *testing.T) {
-	serverAddr, shutdown := startUDPDNSServer(t, func(_ dns.ResponseWriter, _ *dns.Msg) {
+	serverAddr, shutdown := startUDPDNSServer(t, func(_ context.Context, _ dns.ResponseWriter, _ *dns.Msg) {
 		// Intentionally return no response to force a client-side read wait.
 	})
 	defer shutdown()

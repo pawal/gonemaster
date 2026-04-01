@@ -12,7 +12,9 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
+	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
+	ns "codeberg.org/pawal/gonemaster/engine/nameserver"
 )
 
 type workerPool struct {
@@ -21,7 +23,8 @@ type workerPool struct {
 	wg     sync.WaitGroup
 }
 
-// Start launches background workers that consume queued jobs.
+// Start launches background workers that consume queued jobs. If
+// cfg.Database.RetentionDays > 0 the purge loop is also started.
 func (s *Server) Start() {
 	if s.workers.ctx != nil {
 		return
@@ -34,6 +37,27 @@ func (s *Server) Start() {
 	for i := 0; i < workerCount; i++ {
 		s.workers.wg.Add(1)
 		go s.workerLoop(i)
+	}
+
+	if s.cfg.Database.RetentionDays > 0 {
+		startPurgeLoop(ctx, s.store, s.cfg.Database.RetentionDays, func(format string, args ...any) {
+			log.Printf(format, args...)
+		})
+	}
+
+	if s.rateLimiter != nil {
+		go func() {
+			ticker := time.NewTicker(time.Minute)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					s.rateLimiter.Cleanup()
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
 	}
 }
 
@@ -110,52 +134,38 @@ func (s *Server) runJob(jobID string) error {
 	s.initProgressWriteState(job.ID, 0, now)
 	defer s.clearProgressWriteState(job.ID)
 
-	entries, ipv4Queries, ipv6Queries, runErr := s.runEngineForJob(job, jobCtx)
-	s.metrics.ObserveDNSQueries(ipv4Queries, ipv6Queries)
+	entries, qStats, runErr := s.runEngineForJob(job, jobCtx)
+	s.metrics.ObserveDNSQueries(qStats.ipv4, qStats.ipv6)
+	s.metrics.ObserveCacheMetrics(qStats.cacheHits, qStats.cacheMisses, qStats.cacheEvictions)
 	finishedAt := time.Now().UTC()
-
-	result := JobResult{
-		JobID:   job.ID,
-		BatchID: job.BatchID,
-		Status:  JobSucceeded,
-		Summary: summarizeEntries(entries),
-		Raw: &JobResultRaw{
-			Entries: buildResultEntries(entries),
-		},
-	}
 
 	if jobCtx.Err() != nil {
 		job.Status = JobCanceled
 		job.Error = "canceled"
-		result.Status = JobCanceled
-		result.Summary = map[string]any{
-			"error": "canceled",
-		}
 	} else if runErr != nil {
 		job.Status = JobFailed
 		job.Error = runErr.Error()
-		result.Status = JobFailed
-		result.Summary = map[string]any{
-			"error": runErr.Error(),
-		}
-		if len(entries) > 0 {
-			result.Raw = &JobResultRaw{
-				Entries: buildResultEntries(entries),
-			}
-		}
 	} else {
 		job.Status = JobSucceeded
 	}
 
 	job.Progress = 100
 	job.FinishedAt = finishedAt
-	_, _, becameTerminal, err := s.updateJobWithMetricsTransition(job)
-	if err != nil {
+
+	// Get previous status for metrics before graduation removes the job.
+	previous, prevOK := s.store.Get(job.ID)
+
+	if err := s.store.GraduateJob(job, entries); err != nil {
+		log.Printf("CRITICAL: job %s: failed to graduate: %v", job.ID, err)
 		return err
 	}
-	if err := s.store.SetResult(job.ID, result); err != nil {
-		return err
+
+	fromStatus := JobStatus("")
+	if prevOK {
+		fromStatus = previous.Status
 	}
+	s.metrics.ObserveJobStatusTransition(fromStatus, job.Status)
+	becameTerminal := !isTerminalMetricsStatus(fromStatus) && isTerminalMetricsStatus(job.Status)
 	if becameTerminal {
 		duration := time.Duration(-1)
 		if !job.StartedAt.IsZero() {
@@ -167,10 +177,18 @@ func (s *Server) runJob(jobID string) error {
 	return runErr
 }
 
-func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntry, int64, int64, error) {
+type jobQueryStats struct {
+	ipv4           int64
+	ipv6           int64
+	cacheHits      int64
+	cacheMisses    int64
+	cacheEvictions int64
+}
+
+func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntry, jobQueryStats, error) {
 	if s.engineLimiter != nil {
 		if err := s.engineLimiter.Acquire(ctx); err != nil {
-			return nil, 0, 0, err
+			return nil, jobQueryStats{}, err
 		}
 		defer s.engineLimiter.Release()
 	}
@@ -179,10 +197,15 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 	if job.MinLevel != "" {
 		minLevel = job.MinLevel
 	}
+	cacheStore := ns.NewCacheStore()
+	statsCache := cacheStore
 	req := engine.RunRequest{
-		Domain:   job.Domain,
-		MinLevel: minLevel,
-		Context:  ctx,
+		Domain:                 job.Domain,
+		UndelegatedNameservers: job.UndelegatedNS,
+		UndelegatedDSInfo:      job.UndelegatedDS,
+		MinLevel:               minLevel,
+		NameserverCache:        cacheStore,
+		Context:                ctx,
 	}
 	if s.cfg.PositiveCacheTTL != nil {
 		req.PositiveCacheTTL = s.cfg.PositiveCacheTTL
@@ -202,6 +225,12 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 	if s.cfg.Fallback != nil {
 		req.Fallback = s.cfg.Fallback
 	}
+	if s.cfg.SourceAddr4 != nil {
+		req.SourceAddr4 = s.cfg.SourceAddr4
+	}
+	if s.cfg.SourceAddr6 != nil {
+		req.SourceAddr6 = s.cfg.SourceAddr6
+	}
 
 	queryCounter := &dnsQueryCounter{}
 	callbacks := []func(*logger.Entry) error{
@@ -209,7 +238,7 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 	}
 	cleanup, err := applyProfileOverridesWithCache(&req, job.Overrides, s.cfg.ProfilePath, s.profileOverrideCache)
 	if err != nil {
-		return nil, 0, 0, err
+		return nil, jobQueryStats{}, err
 	}
 	if cleanup != nil {
 		defer cleanup()
@@ -225,11 +254,13 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 	if useSharedRunner {
 		runner, err := engine.BuildRunner(req)
 		if err != nil {
-			return nil, 0, 0, err
+			return nil, jobQueryStats{}, err
 		}
+		statsCache = runner.NameserverCache
 		if s.nameserverHotCache != nil {
 			cache, release := s.nameserverHotCache.Lease(nameserverHotCacheKey(req))
 			runner.NameserverCache = cache
+			statsCache = cache
 			if release != nil {
 				defer release()
 			}
@@ -237,28 +268,38 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 		req.Runner = runner
 	}
 
+	collectStats := func() jobQueryStats {
+		ipv4, ipv6 := queryCounter.Totals()
+		cm := statsCache.QueryMetrics()
+		return jobQueryStats{
+			ipv4:           ipv4,
+			ipv6:           ipv6,
+			cacheHits:      int64(cm.Hits),
+			cacheMisses:    int64(cm.Misses),
+			cacheEvictions: int64(cm.Evictions),
+		}
+	}
+
 	if len(job.Tests) == 1 {
 		req.Testcase = job.Tests[0]
 		entries, err := s.runEngine(req)
-		ipv4, ipv6 := queryCounter.Totals()
-		return entries, ipv4, ipv6, err
+		return entries, collectStats(), err
 	}
 	if len(job.Tests) == 0 {
 		entries, err := s.runEngine(req)
-		ipv4, ipv6 := queryCounter.Totals()
-		return entries, ipv4, ipv6, err
+		return entries, collectStats(), err
 	}
 	if s.effectiveJobTestParallelism() <= 1 {
-		return s.runJobTestcasesSequential(job.ID, req, job.Tests, queryCounter)
+		return s.runJobTestcasesSequential(job.ID, req, job.Tests, collectStats)
 	}
-	return s.runJobTestcasesParallel(job.ID, req, job.Tests, s.effectiveJobTestParallelism(), queryCounter)
+	return s.runJobTestcasesParallel(job.ID, req, job.Tests, s.effectiveJobTestParallelism(), collectStats)
 }
 
 func (s *Server) effectiveJobTestParallelism() int {
 	return s.cfg.EffectiveJobTestParallelism()
 }
 
-func (s *Server) runJobTestcasesSequential(jobID string, req engine.RunRequest, testcases []string, queryCounter *dnsQueryCounter) ([]engine.LogEntry, int64, int64, error) {
+func (s *Server) runJobTestcasesSequential(jobID string, req engine.RunRequest, testcases []string, collectStats func() jobQueryStats) ([]engine.LogEntry, jobQueryStats, error) {
 	var all []engine.LogEntry
 	total := len(testcases)
 	for i, testcase := range testcases {
@@ -271,13 +312,11 @@ func (s *Server) runJobTestcasesSequential(jobID string, req engine.RunRequest, 
 			s.updateJobProgress(jobID, progress)
 		}
 		if err != nil {
-			ipv4, ipv6 := queryCounter.Totals()
-			return all, ipv4, ipv6, err
+			return all, collectStats(), err
 		}
 		all = append(all, entries...)
 	}
-	ipv4, ipv6 := queryCounter.Totals()
-	return all, ipv4, ipv6, nil
+	return all, collectStats(), nil
 }
 
 type testcaseWorkItem struct {
@@ -295,10 +334,9 @@ type testcaseRunResultEvent struct {
 	result testcaseRunResult
 }
 
-func (s *Server) runJobTestcasesParallel(jobID string, req engine.RunRequest, testcases []string, parallelism int, queryCounter *dnsQueryCounter) ([]engine.LogEntry, int64, int64, error) {
+func (s *Server) runJobTestcasesParallel(jobID string, req engine.RunRequest, testcases []string, parallelism int, collectStats func() jobQueryStats) ([]engine.LogEntry, jobQueryStats, error) {
 	if len(testcases) == 0 {
-		ipv4, ipv6 := queryCounter.Totals()
-		return nil, ipv4, ipv6, nil
+		return nil, collectStats(), nil
 	}
 	if parallelism < 1 {
 		parallelism = 1
@@ -385,13 +423,11 @@ enqueueLoop:
 	failIdx, failErr := firstTestcaseError(results, parentCtx.Err())
 	if failIdx >= 0 {
 		all := mergeOrderedResults(results, failIdx)
-		ipv4, ipv6 := queryCounter.Totals()
-		return all, ipv4, ipv6, failErr
+		return all, collectStats(), failErr
 	}
 
 	all := mergeOrderedResults(results, len(results))
-	ipv4, ipv6 := queryCounter.Totals()
-	return all, ipv4, ipv6, nil
+	return all, collectStats(), nil
 }
 
 func firstTestcaseError(results []testcaseRunResult, parentCtxErr error) (int, error) {
@@ -519,23 +555,6 @@ func (s *Server) updateJobProgress(jobID string, progress int) {
 	_ = s.store.Update(job)
 }
 
-func summarizeEntries(entries []engine.LogEntry) map[string]any {
-	if len(entries) == 0 {
-		return map[string]any{
-			"total":  0,
-			"levels": map[string]int{},
-		}
-	}
-	levels := map[string]int{}
-	for _, entry := range entries {
-		levels[entry.Level]++
-	}
-	return map[string]any{
-		"total":  len(entries),
-		"levels": levels,
-	}
-}
-
 func severityTotalsFromEntries(entries []engine.LogEntry) map[string]int64 {
 	totals := zeroMetricsSeverityTotals()
 	for _, entry := range entries {
@@ -587,7 +606,7 @@ func dnsQueryAddrFromArgs(args map[string]any) (netip.Addr, bool) {
 	if len(args) == 0 {
 		return netip.Addr{}, false
 	}
-	value, ok := args["ip"]
+	value, ok := args[logargs.KeyAddress]
 	if !ok {
 		return netip.Addr{}, false
 	}

@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
 )
 
 // KeyParts defines the granularity for global DNS query caching.

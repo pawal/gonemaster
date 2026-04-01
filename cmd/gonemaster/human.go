@@ -6,28 +6,47 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/i18n"
 	"codeberg.org/pawal/gonemaster/engine/logger"
+	textwidth "golang.org/x/text/width"
 )
+
+const (
+	defaultSecondsColumnWidth = 7
+	defaultLevelColumnWidth   = 8
+)
+
+type humanLayout struct {
+	secondsLabel string
+	levelLabel   string
+	messageLabel string
+	secondsWidth int
+	levelWidth   int
+}
 
 func writeHuman(entries []engine.LogEntry, locale string, out io.Writer) error {
 	if out == nil {
 		return fmt.Errorf("missing output writer")
 	}
-	if _, err := fmt.Fprintln(out, "Seconds Level    Message"); err != nil {
+	layout := newHumanLayout(locale)
+	if err := writeHumanHeaderWithLayout(out, layout); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintln(out, "======= ======== ======="); err != nil {
-		return err
+	if len(entries) == 0 {
+		if _, err := fmt.Fprintln(out, "Looks OK."); err != nil {
+			return err
+		}
+		return nil
 	}
 	for _, entry := range entries {
 		message, found := i18n.TranslateWithStatus(locale, entry.Module, entry.Tag, entry.Args)
 		if !found {
 			message = rawEntryString(entry)
 		}
-		line := formatTranslatedLine(entry.Timestamp, entry.Level, message)
+		line := formatTranslatedLine(entry.Timestamp, entry.Level, message, layout)
 		if _, err := fmt.Fprintln(out, line); err != nil {
 			return err
 		}
@@ -47,6 +66,7 @@ type humanReporter struct {
 	spinnerDone   chan struct{}
 	spinnerTicker *time.Ticker
 	mu            sync.Mutex
+	layout        humanLayout
 }
 
 func newHumanReporter(out io.Writer, locale string, minLevel string, showSpinner bool) *humanReporter {
@@ -61,6 +81,7 @@ func newHumanReporter(out io.Writer, locale string, minLevel string, showSpinner
 		locale:   locale,
 		minLevel: minValue,
 		hasMin:   hasMin && minLevel != "",
+		layout:   newHumanLayout(locale),
 	}
 	if err := r.writeHeader(); err != nil {
 		return nil
@@ -83,7 +104,7 @@ func (r *humanReporter) Callback(entry *logger.Entry) error {
 	if !found {
 		message = entry.String()
 	}
-	line := formatTranslatedLine(entry.Timestamp, entry.Level(), message)
+	line := formatTranslatedLine(entry.Timestamp, entry.Level(), message, r.layout)
 	return r.printLine(line)
 }
 
@@ -95,14 +116,15 @@ func (r *humanReporter) Finish() {
 	r.stopSpinner()
 }
 
+func (r *humanReporter) PrintLooksOK() error {
+	if r == nil {
+		return nil
+	}
+	return r.printLine("Looks OK.")
+}
+
 func (r *humanReporter) writeHeader() error {
-	if _, err := fmt.Fprintln(r.out, "Seconds Level    Message"); err != nil {
-		return err
-	}
-	if _, err := fmt.Fprintln(r.out, "======= ======== ======="); err != nil {
-		return err
-	}
-	return nil
+	return writeHumanHeaderWithLayout(r.out, r.layout)
 }
 
 func (r *humanReporter) printLine(line string) error {
@@ -184,9 +206,9 @@ func (r *humanReporter) showCursor() {
 	r.cursorHidden = false
 }
 
-func formatTranslatedLine(timestamp float64, level string, message string) string {
-	seconds := fmt.Sprintf("%7.2f", timestamp)
-	level = fmt.Sprintf("%-8s", level)
+func formatTranslatedLine(timestamp float64, level string, message string, layout humanLayout) string {
+	seconds := fmt.Sprintf("%*.2f", layout.secondsWidth, timestamp)
+	level = padRightDisplay(strings.TrimSpace(level), layout.levelWidth)
 	message = strings.TrimSpace(message)
 	if message == "" {
 		return seconds + " " + level
@@ -215,6 +237,91 @@ func rawEntryString(entry engine.LogEntry) string {
 		}
 	}
 	return raw
+}
+
+func writeHumanHeader(out io.Writer, locale string) error {
+	return writeHumanHeaderWithLayout(out, newHumanLayout(locale))
+}
+
+func newHumanLayout(locale string) humanLayout {
+	seconds := translatedHeaderLabel(locale, "CLI_HEADER_SECONDS", "Seconds")
+	level := translatedHeaderLabel(locale, "CLI_HEADER_LEVEL", "Level")
+	message := translatedHeaderLabel(locale, "CLI_HEADER_MESSAGE", "Message")
+
+	return humanLayout{
+		secondsLabel: seconds,
+		levelLabel:   level,
+		messageLabel: message,
+		secondsWidth: maxInt(defaultSecondsColumnWidth, terminalCellWidth(seconds)),
+		levelWidth:   maxInt(defaultLevelColumnWidth, terminalCellWidth(level)),
+	}
+}
+
+func writeHumanHeaderWithLayout(out io.Writer, layout humanLayout) error {
+	header := padRightDisplay(layout.secondsLabel, layout.secondsWidth) +
+		" " + padRightDisplay(layout.levelLabel, layout.levelWidth) +
+		" " + layout.messageLabel
+	if _, err := fmt.Fprintln(out, header); err != nil {
+		return err
+	}
+
+	messageWidth := maxInt(7, terminalCellWidth(layout.messageLabel))
+	divider := strings.Repeat("=", layout.secondsWidth) +
+		" " + strings.Repeat("=", layout.levelWidth) +
+		" " + strings.Repeat("=", messageWidth)
+	if _, err := fmt.Fprintln(out, divider); err != nil {
+		return err
+	}
+	return nil
+}
+
+func translatedHeaderLabel(locale string, tag string, fallback string) string {
+	value, found := i18n.TranslateWithStatus(locale, "SYSTEM", tag, nil)
+	if !found {
+		return fallback
+	}
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return fallback
+	}
+	return value
+}
+
+func maxInt(a int, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func padRightDisplay(s string, width int) string {
+	diff := width - terminalCellWidth(s)
+	if diff <= 0 {
+		return s
+	}
+	return s + strings.Repeat(" ", diff)
+}
+
+func terminalCellWidth(s string) int {
+	total := 0
+	for _, r := range s {
+		switch {
+		case r == 0:
+			continue
+		case r < 0x20 || (r >= 0x7f && r < 0xa0):
+			continue
+		case unicode.Is(unicode.Mn, r) || unicode.Is(unicode.Me, r) || unicode.Is(unicode.Cf, r):
+			continue
+		}
+
+		kind := textwidth.LookupRune(r).Kind()
+		if kind == textwidth.EastAsianWide || kind == textwidth.EastAsianFullwidth {
+			total += 2
+			continue
+		}
+		total++
+	}
+	return total
 }
 
 type spinner struct {

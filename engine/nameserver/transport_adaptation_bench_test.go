@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/packet"
@@ -108,7 +108,6 @@ func mustBenchmarkNameserver(b *testing.B, name string, address string) Nameserv
 func benchmarkPacketWithRcode(rcode int) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Response = true
-	msg.Rcode = rcode
+	msg.Rcode = uint16(rcode)
 	return packet.Packet{Msg: msg}
 }
-

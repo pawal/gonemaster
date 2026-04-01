@@ -11,6 +11,10 @@ servers:
 tags:
   - name: Jobs
   - name: Batches
+  - name: Domains
+  - name: Tags
+  - name: Runs
+  - name: Entries
   - name: Queue
   - name: Ops
 
@@ -95,6 +99,7 @@ paths:
     post:
       tags: [Jobs]
       summary: Submit a batch of test jobs
+      description: "Submit multiple domains as a single batch. Each job is assigned priority=1 (batch) and will only be dequeued after all priority=0 (normal) jobs have been processed. Undelegated input (`nameservers`, `ds_info`) is not supported for batch submission."
       operationId: createJobBatch
       requestBody:
         required: true
@@ -222,6 +227,511 @@ paths:
         '404':
           $ref: '#/components/responses/ErrorResponse'
 
+  /domains:
+    get:
+      tags: [Domains]
+      summary: List domains
+      operationId: listDomains
+      parameters:
+        - name: tag
+          in: query
+          schema:
+            type: string
+          description: Filter to domains belonging to this tag.
+        - name: name
+          in: query
+          schema:
+            type: string
+          description: Substring filter on domain name.
+        - name: level
+          in: query
+          schema:
+            type: string
+          description: Exact `latest_level` filter (e.g. `ERROR`).
+        - name: min_level
+          in: query
+          schema:
+            type: string
+          description: Minimum severity threshold; `WARNING` matches WARNING/ERROR/CRITICAL.
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Domain list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DomainList'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /domains/{id}:
+    get:
+      tags: [Domains]
+      summary: Get domain by ID
+      operationId: getDomain
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Domain with tags populated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Domain'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /domains/{id}/runs:
+    get:
+      tags: [Domains]
+      summary: List run history for a domain
+      operationId: listDomainRuns
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Run list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunList'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /runs:
+    get:
+      tags: [Runs]
+      summary: List runs
+      operationId: listRuns
+      parameters:
+        - name: tag
+          in: query
+          schema:
+            type: string
+          description: Filter to runs for domains in this tag.
+        - name: domain
+          in: query
+          schema:
+            type: string
+          description: Filter by domain name substring.
+        - name: batch
+          in: query
+          schema:
+            type: string
+          description: Filter by batch ID.
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/JobStatus'
+        - name: level
+          in: query
+          schema:
+            type: string
+          description: Filter by `worst_level`.
+        - name: finished_after
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: finished_before
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Run list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunList'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /runs/{id}:
+    get:
+      tags: [Runs]
+      summary: Get run by ID
+      operationId: getRun
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Run
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Run'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /runs/{id}/result:
+    get:
+      tags: [Runs]
+      summary: Get run result (same shape as GET /jobs/{id}/result)
+      operationId: getRunResult
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: locale
+          in: query
+          description: Locale for translated messages (default en)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Run result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobResult'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /tags:
+    get:
+      tags: [Tags]
+      summary: List tags
+      operationId: listTags
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Tag array
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tag'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+    post:
+      tags: [Tags]
+      summary: Create a tag
+      operationId: createTag
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TagCreateRequest'
+      responses:
+        '201':
+          description: Tag created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          description: Tag already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /tags/{name}:
+    put:
+      tags: [Tags]
+      summary: Update tag description
+      operationId: updateTag
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                description:
+                  type: string
+      responses:
+        '200':
+          description: Updated tag
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+    delete:
+      tags: [Tags]
+      summary: Delete a tag
+      operationId: deleteTag
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Tag deleted
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /tags/{name}/domains:
+    get:
+      tags: [Tags]
+      summary: List domains in a tag
+      operationId: listTagDomains
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Domain list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DomainList'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+    post:
+      tags: [Tags]
+      summary: Add domains to a tag (creates domain records if needed)
+      operationId: addTagDomains
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TagDomainsRequest'
+      responses:
+        '204':
+          description: Domains added
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+    delete:
+      tags: [Tags]
+      summary: Remove domains from a tag
+      operationId: removeTagDomains
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TagDomainsRequest'
+      responses:
+        '204':
+          description: Domains removed
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /tags/{name}/summary:
+    get:
+      tags: [Tags]
+      summary: Get tag severity summary
+      operationId: getTagSummary
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Per-severity domain counts for the tag
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TagSummary'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /entries:
+    get:
+      tags: [Entries]
+      summary: Query engine log entries across runs
+      operationId: listEntries
+      parameters:
+        - name: run
+          in: query
+          schema:
+            type: string
+          description: Exact run ID.
+        - name: domain
+          in: query
+          schema:
+            type: integer
+            format: int64
+          description: Domain ID (integer).
+        - name: tag
+          in: query
+          schema:
+            type: string
+          description: Domain tag filter.
+        - name: module
+          in: query
+          schema:
+            type: string
+          description: Exact module name (e.g. `DNSSEC`).
+        - name: testcase
+          in: query
+          schema:
+            type: string
+          description: Exact testcase name (e.g. `dnssec01`).
+        - name: entry_tag
+          in: query
+          schema:
+            type: string
+          description: Log event tag (engine `tag` field, e.g. `DS_ALGO_NOT_SUPPORTED`).
+        - name: level
+          in: query
+          schema:
+            type: string
+          description: Exact severity level.
+        - name: latest
+          in: query
+          schema:
+            type: string
+            enum: ['1', 'true']
+          description: Restrict to each domain's latest run only.
+        - name: batch
+          in: query
+          schema:
+            type: string
+          description: Restrict to runs from this batch.
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [csv]
+          description: >
+            `csv` returns a CSV download with columns:
+            id, run_id, domain_id, domain, timestamp, module, testcase, tag, level, args.
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Entry list (JSON) or CSV download
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntryList'
+            text/csv:
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
   /queue/pause:
     post:
       tags: [Queue]
@@ -230,6 +740,14 @@ paths:
       responses:
         '200':
           description: Queue paused
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: paused
 
   /queue/resume:
     post:
@@ -239,11 +757,20 @@ paths:
       responses:
         '200':
           description: Queue resumed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: resumed
 
   /queue/reorder:
     post:
       tags: [Queue]
       summary: Reorder queued jobs
+      description: "Replaces the queued job order. The provided list must contain all currently queued job IDs. Reordering is within-tier only: all normal-priority jobs (priority=0) must appear before all batch-priority jobs (priority=1) in the list. Placing a batch job before a normal job returns 400."
       operationId: reorderQueue
       requestBody:
         required: true
@@ -285,6 +812,14 @@ paths:
       operationId: metrics
       parameters:
         - in: query
+          name: format
+          required: false
+          schema:
+            type: string
+            enum: [json, prom]
+            default: json
+          description: Response format. `prom` returns Prometheus text exposition; JSON-only query params are ignored.
+        - in: query
           name: window
           required: false
           schema:
@@ -315,13 +850,41 @@ paths:
           description: Max number of batch insight rows in the response.
       responses:
         '200':
-          description: Metrics JSON
+          description: Metrics snapshot or Prometheus text exposition
           content:
             application/json:
               schema:
                 type: object
+            text/plain:
+              schema:
+                type: string
         '400':
           $ref: '#/components/responses/ErrorResponse'
+
+  /locales:
+    get:
+      tags: [Ops]
+      summary: List available translation locales
+      operationId: listLocales
+      description: >
+        Returns the list of locale codes for which translated result messages
+        are available. The list always includes `en` (English). Pass one of
+        these codes as the `locale` query parameter on `GET /jobs/{id}/result`
+        to receive translated messages.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [locales]
+                properties:
+                  locales:
+                    type: array
+                    items:
+                      type: string
+                    example: [da, en, es, fi, fr, nb, sl, sv]
 
   /healthz:
     get:
@@ -378,8 +941,11 @@ components:
           minimum: 0
           maximum: 100
           description: Progress percentage (0-100).
-        result_url:
-          type: string
+        priority:
+          type: integer
+          format: int32
+          enum: [0, 1]
+          description: "Queue priority: 0=normal (interactive), 1=batch (background). Normal jobs are always dequeued before batch jobs."
         error:
           type: string
 
@@ -396,17 +962,37 @@ components:
         profile_overrides:
           type: object
           additionalProperties: true
+        nameservers:
+          type: array
+          description: Optional undelegated nameserver/glue input for single-job pre-delegation testing.
+          items:
+            $ref: '#/components/schemas/UndelegatedNameserverInput'
+        ds_info:
+          type: array
+          description: Optional undelegated DS input for single-job pre-delegation testing (DS-only mode allowed).
+          items:
+            $ref: '#/components/schemas/UndelegatedDSInput'
         min_level:
           type: string
+        tags:
+          type: array
+          description: Tag names to apply to the created domain (creates tags/domains if needed).
+          items:
+            type: string
 
     JobBatchRequest:
       type: object
-      required: [domains]
+      description: >
+        Either `domains` or `from_tag` (or both) must be provided.
+        Undelegated input (`nameservers`, `ds_info`) is rejected with `400 undelegated_not_supported_for_batch`.
       properties:
         domains:
           type: array
           items:
             type: string
+        from_tag:
+          type: string
+          description: Expand all domains currently in this tag into the batch.
         tests:
           type: array
           items:
@@ -416,6 +1002,45 @@ components:
           additionalProperties: true
         min_level:
           type: string
+        tags:
+          type: array
+          description: Tag names to apply to the batch (creates domain/tag records as needed).
+          items:
+            type: string
+        description:
+          type: string
+          description: Human-readable label stored on the batch record.
+
+    UndelegatedNameserverInput:
+      type: object
+      required: [ns]
+      properties:
+        ns:
+          type: string
+          description: Nameserver hostname (normalized/canonicalized server-side).
+        ip:
+          type: string
+          description: Optional IPv4 or IPv6 address for this nameserver row.
+
+    UndelegatedDSInput:
+      type: object
+      required: [keytag, algorithm, digtype, digest]
+      properties:
+        keytag:
+          type: integer
+          minimum: 0
+          maximum: 65535
+        algorithm:
+          type: integer
+          minimum: 0
+          maximum: 255
+        digtype:
+          type: integer
+          minimum: 0
+          maximum: 255
+        digest:
+          type: string
+          description: Hex-encoded DS digest.
 
     JobBatchResponse:
       type: object
@@ -506,6 +1131,22 @@ components:
           type: string
         args:
           type: object
+          description: |
+            Structured log arguments map.
+
+            Canonical key semantics/types/optionality for coherency-migrated
+            entries are defined in `docs/specifications/log-args-coherency.md`.
+
+            Schema `1.x` is additive-only; consumers should ignore unknown keys.
+          externalDocs:
+            description: Log argument coherency contract (v1.1)
+            url: ./specifications/log-args-coherency.md
+          example:
+            ns: ns1.example
+            address: 192.0.2.53
+            query_name: example
+            query_type: SOA
+            query_class: IN
           additionalProperties: true
         message:
           type: string
@@ -540,6 +1181,225 @@ components:
           type: array
           items:
             type: string
+
+    Domain:
+      type: object
+      required: [id, name, created_at, run_count]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        latest_run_id:
+          type: string
+        latest_run_at:
+          type: string
+          format: date-time
+        latest_status:
+          type: string
+        latest_level:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        run_count:
+          type: integer
+        tags:
+          type: array
+          items:
+            type: string
+
+    DomainList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Domain'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+        next_cursor:
+          type: string
+        prev_cursor:
+          type: string
+
+    Tag:
+      type: object
+      required: [name, created_at, domain_count]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        domain_count:
+          type: integer
+
+    TagCreateRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+
+    TagDomainsRequest:
+      type: object
+      required: [domains]
+      properties:
+        domains:
+          type: array
+          items:
+            type: string
+
+    TagSummary:
+      type: object
+      required: [tag, domain_count, ok, notice, warning, error, critical]
+      properties:
+        tag:
+          type: string
+        domain_count:
+          type: integer
+        ok:
+          type: integer
+        notice:
+          type: integer
+        warning:
+          type: integer
+        error:
+          type: integer
+        critical:
+          type: integer
+
+    Run:
+      type: object
+      required: [id, domain_id, domain, status, created_at, entry_count]
+      properties:
+        id:
+          type: string
+        domain_id:
+          type: integer
+          format: int64
+        domain:
+          type: string
+        batch_id:
+          type: string
+        status:
+          $ref: '#/components/schemas/JobStatus'
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+        duration_ms:
+          type: integer
+          format: int64
+          description: Wall-clock duration of the run in milliseconds.
+        sev_notice:
+          type: integer
+        sev_warning:
+          type: integer
+        sev_error:
+          type: integer
+        sev_critical:
+          type: integer
+        worst_level:
+          type: string
+        entry_count:
+          type: integer
+        profile:
+          type: string
+        public_id:
+          type: string
+        priority:
+          type: integer
+          format: int32
+          enum: [0, 1]
+          description: "Queue priority at the time of submission: 0=normal, 1=batch."
+        severity_totals:
+          type: object
+          additionalProperties:
+            type: integer
+
+    RunList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Run'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+        next_cursor:
+          type: string
+        prev_cursor:
+          type: string
+
+    Entry:
+      type: object
+      required: [id, run_id, domain_id, timestamp, module, testcase, tag, level]
+      properties:
+        id:
+          type: integer
+          format: int64
+        run_id:
+          type: string
+        domain_id:
+          type: integer
+          format: int64
+        domain:
+          type: string
+        timestamp:
+          type: number
+          format: float
+        module:
+          type: string
+        testcase:
+          type: string
+        tag:
+          type: string
+        level:
+          type: string
+        args:
+          type: object
+          additionalProperties: true
+
+    EntryList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Entry'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+        next_cursor:
+          type: string
+        prev_cursor:
+          type: string
 
     ErrorResponse:
       type: object

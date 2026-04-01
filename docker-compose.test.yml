@@ -1,0 +1,49 @@
+# docker-compose.test.yml — local integration test databases
+#
+# Starts PostgreSQL and MariaDB with health checks so the parameterized
+# store tests (server/store_sql_test.go) can run against all three backends.
+#
+# Usage:
+#   docker compose -f docker-compose.test.yml up -d --wait
+#   TEST_POSTGRES_DSN="postgres://gonemaster:gonemaster@localhost:5432/gonemaster_test?sslmode=disable" \
+#   TEST_MARIADB_DSN="gonemaster:gonemaster@tcp(localhost:3306)/gonemaster_test" \
+#   go test ./server/... -count=1 -timeout 120s
+#   docker compose -f docker-compose.test.yml down
+#
+# Or use: make test-integration
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: gonemaster
+      POSTGRES_PASSWORD: gonemaster
+      POSTGRES_DB: gonemaster_test
+    ports:
+      - "5432:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gonemaster -d gonemaster_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  mariadb:
+    image: mariadb:11
+    environment:
+      MARIADB_USER: gonemaster
+      MARIADB_PASSWORD: gonemaster
+      MARIADB_DATABASE: gonemaster_test
+      MARIADB_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s

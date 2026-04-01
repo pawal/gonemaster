@@ -2,12 +2,13 @@ package server
 
 import (
 	"context"
-	"net"
+	"net/netip"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/rdata"
 
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
@@ -173,13 +174,12 @@ func TestNameserverHotCacheLeasesCoalesceInflightQueries(t *testing.T) {
 			msg.Rcode = dns.RcodeSuccess
 			msg.Answer = []dns.RR{
 				&dns.A{
-					Hdr: dns.RR_Header{
-						Name:   "hot-cache.example.",
-						Rrtype: dns.TypeA,
-						Class:  dns.ClassINET,
-						Ttl:    60,
+					Hdr: dns.Header{
+						Name:  "hot-cache.example.",
+						Class: dns.ClassINET,
+						TTL:   60,
 					},
-					A: net.IPv4(192, 0, 2, 88),
+					A: rdata.A{Addr: netip.MustParseAddr("192.0.2.88")},
 				},
 			}
 			return packet.Packet{Msg: msg}, nil

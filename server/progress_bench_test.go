@@ -5,6 +5,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"codeberg.org/pawal/gonemaster/engine"
 )
 
 type countingJobStore struct {
@@ -26,6 +28,10 @@ func (s *countingJobStore) Get(id string) (Job, bool) {
 	return s.inner.Get(id)
 }
 
+func (s *countingJobStore) GetByPublicID(publicID string) (Job, bool) {
+	return s.inner.GetByPublicID(publicID)
+}
+
 func (s *countingJobStore) Update(job Job) error {
 	s.updateCount.Add(1)
 	return s.inner.Update(job)
@@ -35,12 +41,104 @@ func (s *countingJobStore) List(filter JobFilter) JobList {
 	return s.inner.List(filter)
 }
 
-func (s *countingJobStore) SetResult(jobID string, result JobResult) error {
-	return s.inner.SetResult(jobID, result)
+func (s *countingJobStore) GraduateJob(job Job, entries []engine.LogEntry) error {
+	return s.inner.GraduateJob(job, entries)
 }
 
 func (s *countingJobStore) GetResult(jobID string) (JobResult, bool) {
 	return s.inner.GetResult(jobID)
+}
+
+func (s *countingJobStore) GetOrCreateDomain(name string) (Domain, error) {
+	return s.inner.GetOrCreateDomain(name)
+}
+
+func (s *countingJobStore) GetDomain(id int64) (Domain, bool) {
+	return s.inner.GetDomain(id)
+}
+
+func (s *countingJobStore) GetDomainByName(name string) (Domain, bool) {
+	return s.inner.GetDomainByName(name)
+}
+
+func (s *countingJobStore) ListDomains(filter DomainFilter) DomainList {
+	return s.inner.ListDomains(filter)
+}
+
+func (s *countingJobStore) UpdateDomainLatest(domainID int64, runID string, finishedAt time.Time, status, level string) error {
+	return s.inner.UpdateDomainLatest(domainID, runID, finishedAt, status, level)
+}
+
+func (s *countingJobStore) CreateTag(name, description string) error {
+	return s.inner.CreateTag(name, description)
+}
+
+func (s *countingJobStore) GetTag(name string) (Tag, bool) {
+	return s.inner.GetTag(name)
+}
+
+func (s *countingJobStore) UpdateTag(name, description string) error {
+	return s.inner.UpdateTag(name, description)
+}
+
+func (s *countingJobStore) DeleteTag(name string) error {
+	return s.inner.DeleteTag(name)
+}
+
+func (s *countingJobStore) ListTags(limit, offset int) []Tag {
+	return s.inner.ListTags(limit, offset)
+}
+
+func (s *countingJobStore) TagDomains(tag string, domainIDs []int64) error {
+	return s.inner.TagDomains(tag, domainIDs)
+}
+
+func (s *countingJobStore) UntagDomains(tag string, domainIDs []int64) error {
+	return s.inner.UntagDomains(tag, domainIDs)
+}
+
+func (s *countingJobStore) GetDomainTags(domainID int64) []string {
+	return s.inner.GetDomainTags(domainID)
+}
+
+func (s *countingJobStore) ListDomainsByTag(tag string, filter DomainFilter) DomainList {
+	return s.inner.ListDomainsByTag(tag, filter)
+}
+
+func (s *countingJobStore) GetTagSummary(tag string) (TagSummary, bool) {
+	return s.inner.GetTagSummary(tag)
+}
+
+func (s *countingJobStore) GetRun(id string) (Run, bool) {
+	return s.inner.GetRun(id)
+}
+
+func (s *countingJobStore) GetRunByPublicID(publicID string) (Run, bool) {
+	return s.inner.GetRunByPublicID(publicID)
+}
+
+func (s *countingJobStore) ListRuns(filter RunFilter) RunList {
+	return s.inner.ListRuns(filter)
+}
+
+func (s *countingJobStore) ListRunsByDomain(domainID int64, limit, offset int) RunList {
+	return s.inner.ListRunsByDomain(domainID, limit, offset)
+}
+
+func (s *countingJobStore) QueryEntries(filter EntryFilter) EntryList {
+	return s.inner.QueryEntries(filter)
+}
+
+func (s *countingJobStore) CreateBatch(batch Batch) error {
+	return s.inner.CreateBatch(batch)
+}
+
+func (s *countingJobStore) GetBatch(id string) (Batch, bool) {
+	return s.inner.GetBatch(id)
+}
+
+func (s *countingJobStore) PurgeOlderThan(cutoff time.Time) (int64, error) {
+	return s.inner.PurgeOlderThan(cutoff)
 }
 
 func (s *countingJobStore) UpdateCount() int64 {

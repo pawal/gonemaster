@@ -2,12 +2,13 @@ package nameserver
 
 import (
 	"context"
-	"net"
+	"net/netip"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/rdata"
 
 	"codeberg.org/pawal/gonemaster/engine/packet"
 )
@@ -100,13 +101,12 @@ func TestCacheStoreSnapshotForRunCoalescesInflightAcrossSnapshots(t *testing.T) 
 			msg.Rcode = dns.RcodeSuccess
 			msg.Answer = []dns.RR{
 				&dns.A{
-					Hdr: dns.RR_Header{
-						Name:   "coalesce.example.",
-						Rrtype: dns.TypeA,
-						Class:  dns.ClassINET,
-						Ttl:    60,
+					Hdr: dns.Header{
+						Name:  "coalesce.example.",
+						Class: dns.ClassINET,
+						TTL:   60,
 					},
-					A: net.IPv4(192, 0, 2, 77),
+					A: rdata.A{Addr: netip.MustParseAddr("192.0.2.77")},
 				},
 			}
 			return packet.Packet{Msg: msg}, nil

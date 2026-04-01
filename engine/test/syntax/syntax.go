@@ -3,15 +3,16 @@ package syntax
 import (
 	"context"
 	"fmt"
-	"net"
 	"net/mail"
+	"net/netip"
 	"sort"
 	"strings"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/internal/parallel"
+	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/methods"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
@@ -161,6 +162,8 @@ func Metadata() map[string][]string {
 			"TEST_CASE_START",
 		},
 		"syntax06": {
+			"IPV4_DISABLED",
+			"IPV6_DISABLED",
 			"NO_RESPONSE",
 			"NO_RESPONSE_SOA_QUERY",
 			"RNAME_MAIL_DOMAIN_INVALID",
@@ -334,7 +337,25 @@ func Syntax04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		if err != nil {
 			return results, err
 		}
-		results = append(results, entries...)
+
+		// Consolidate NAMESERVER_SYNTAX_OK entries into a single message with servers list.
+		var okNames []string
+		for _, entry := range entries {
+			if entry != nil && entry.Tag == "NAMESERVER_SYNTAX_OK" {
+				if domain, ok := entry.Args["domain"].(string); ok {
+					okNames = append(okNames, domain)
+				}
+				continue
+			}
+			results = append(results, entry)
+		}
+		if len(okNames) > 0 {
+			sort.Strings(okNames)
+			args := logargs.ServersFromValues(okNames)
+			if err := appendLog(ctx, &results, testcase, "NAMESERVER_SYNTAX_OK", args); err != nil {
+				return results, err
+			}
+		}
 	}
 
 	return appendTestCaseEnd(ctx, results, testcase)
@@ -426,6 +447,7 @@ func Syntax06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	rnameCandidates := map[string]bool{}
 	seenMailServers := map[string]bool{}
 	invalidExchanges := -1
+	parentLog := util.LoggerFromContext(ctx)
 
 	type mailOutcome struct {
 		entries       []*logger.Entry
@@ -434,6 +456,8 @@ func Syntax06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	processMailServer := func(ctx context.Context, mailServer string) (mailOutcome, error) {
 		buf := logger.New()
+		buf.CopyConfigFrom(parentLog)
+		buf.CopyStartTimeFrom(parentLog)
 		tlog := testlogger.Wrap(buf, moduleName, testcase)
 		exchangeValid := false
 
@@ -510,10 +534,9 @@ func Syntax06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			UseVC:   &usevc,
 		})
 		if err != nil || resp.Msg == nil {
-			if err := appendLog(ctx, &results, testcase, "NO_RESPONSE", map[string]any{
-				"ns":     ns.String(),
+			if err := appendLog(ctx, &results, testcase, "NO_RESPONSE", withNameserverArgs(ns, map[string]any{
 				"domain": z.Name.String(),
-			}); err != nil {
+			})); err != nil {
 				return results, err
 			}
 			continue
@@ -563,7 +586,7 @@ func Syntax06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 
 		if q := pMX.Question(); len(q) > 0 {
-			qname := dnsname.New(q[0].Name)
+			qname := dnsname.New(q[0].Header().Name)
 			if !strings.EqualFold(qname.String(), domain.String()) {
 				domain = qname
 			} else if len(pMX.GetRecords("CNAME", "answer")) > 0 {
@@ -760,21 +783,28 @@ func appendLog(ctx context.Context, results *[]*logger.Entry, testcase string, t
 	return nil
 }
 
+func withNameserverArgs(ns nameserver.Nameserver, args map[string]any) map[string]any {
+	if args == nil {
+		args = map[string]any{}
+	}
+	logargs.NormalizeQueryIdentity(args)
+	logargs.SetNS(args, ns.NameString(), ns.AddressString())
+	return args
+}
+
 func ipDisabledMessage(ctx context.Context, results *[]*logger.Entry, testcase string, ns nameserver.Nameserver, rrtype string) (bool, error) {
 	if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
-		if err := appendLog(ctx, results, testcase, "IPV4_DISABLED", map[string]any{
-			"ns":     ns.String(),
-			"rrtype": rrtype,
-		}); err != nil {
+		if err := appendLog(ctx, results, testcase, "IPV4_DISABLED", withNameserverArgs(ns, map[string]any{
+			"query_type": rrtype,
+		})); err != nil {
 			return true, err
 		}
 		return true, nil
 	}
 	if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
-		if err := appendLog(ctx, results, testcase, "IPV6_DISABLED", map[string]any{
-			"ns":     ns.String(),
-			"rrtype": rrtype,
-		}); err != nil {
+		if err := appendLog(ctx, results, testcase, "IPV6_DISABLED", withNameserverArgs(ns, map[string]any{
+			"query_type": rrtype,
+		})); err != nil {
 			return true, err
 		}
 		return true, nil
@@ -930,7 +960,35 @@ func validEmailAddress(addr string) bool {
 	if err != nil {
 		return false
 	}
-	return parsed.Address == addr
+	if parsed.Address != addr {
+		return false
+	}
+
+	parts := strings.SplitN(addr, "@", 2)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return false
+	}
+	return validEmailDomain(parts[1])
+}
+
+func validEmailDomain(domain string) bool {
+	if strings.HasPrefix(domain, ".") || strings.HasSuffix(domain, ".") {
+		return false
+	}
+
+	labels := strings.Split(domain, ".")
+	if len(labels) < 2 {
+		return false
+	}
+	for _, label := range labels {
+		if !labelHasOnlyLegalCharacters(label) {
+			return false
+		}
+		if labelStartsWithHyphen(label) || labelEndsWithHyphen(label) {
+			return false
+		}
+	}
+	return true
 }
 
 func matchingARecords(resp packet.Packet, owner string) []*dns.A {
@@ -968,12 +1026,12 @@ func matchingAAAARecords(resp packet.Packet, owner string) []*dns.AAAA {
 }
 
 func hasIPv4Loopback(records []*dns.A) bool {
-	loopback := net.IPv4(127, 0, 0, 1)
+	loopback := netip.MustParseAddr("127.0.0.1")
 	for _, rr := range records {
 		if rr == nil {
 			continue
 		}
-		if rr.A.Equal(loopback) {
+		if rr.Addr == loopback {
 			return true
 		}
 	}
@@ -981,12 +1039,12 @@ func hasIPv4Loopback(records []*dns.A) bool {
 }
 
 func hasIPv6Loopback(records []*dns.AAAA) bool {
-	loopback := net.ParseIP("::1")
+	loopback := netip.MustParseAddr("::1")
 	for _, rr := range records {
 		if rr == nil {
 			continue
 		}
-		if rr.AAAA.Equal(loopback) {
+		if rr.Addr == loopback {
 			return true
 		}
 	}

@@ -4,7 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
@@ -18,15 +19,9 @@ func nsAnswerPacket(zoneName string, nsNames ...string) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
 	for _, nsName := range nsNames {
-		msg.Answer = append(msg.Answer, &dns.NS{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(zoneName),
-				Rrtype: dns.TypeNS,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Ns: dns.Fqdn(nsName),
-		})
+		nsRR := &dns.NS{Hdr: dns.Header{Name: dnsutil.Fqdn(zoneName), Class: dns.ClassINET, TTL: 60}}
+		nsRR.Ns = dnsutil.Fqdn(nsName)
+		msg.Answer = append(msg.Answer, nsRR)
 	}
 	return packet.Packet{Msg: msg}
 }
@@ -93,6 +88,65 @@ func TestMethod3DedupAndSort(t *testing.T) {
 	for i, name := range names {
 		if name.String() != want[i] {
 			t.Fatalf("expected %q at %d, got %q", want[i], i, name.String())
+		}
+	}
+}
+
+func TestMethod3UndelegatedUsesApexNSRecords(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.Net.IPv4 = true
+	prof.Net.IPv6 = true
+
+	r := newRootRecursor(t, map[string][]string{
+		"a.root": {"192.0.2.1"},
+		"b.root": {"192.0.2.2"},
+	})
+	if err := r.AddFakeAddresses("example.com", map[string][]string{
+		"ns1.example.com": {"192.0.2.11"},
+		"ns2.example.com": {"192.0.2.12"},
+		"ns3.example.com": {"192.0.2.13"},
+	}); err != nil {
+		t.Fatalf("add fake addresses: %v", err)
+	}
+
+	setNSHook(ctx, t, r, "ns1.example.com", "192.0.2.11", "example.com", "ns1.example.com", "ns4.example.com")
+	setNSHook(ctx, t, r, "ns2.example.com", "192.0.2.12", "example.com", "ns1.example.com", "ns5.example.com")
+	setNSHook(ctx, t, r, "ns3.example.com", "192.0.2.13", "example.com", "ns4.example.com")
+
+	z, err := zone.NewWithRecursor("example.com", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	parentNames, err := Method2(ctx, &z)
+	if err != nil {
+		t.Fatalf("method2: %v", err)
+	}
+	childNames, err := Method3(ctx, &z)
+	if err != nil {
+		t.Fatalf("method3: %v", err)
+	}
+
+	parentWant := []string{"ns1.example.com", "ns2.example.com", "ns3.example.com"}
+	if len(parentNames) != len(parentWant) {
+		t.Fatalf("expected %d parent names, got %d", len(parentWant), len(parentNames))
+	}
+	for i, name := range parentNames {
+		if name.String() != parentWant[i] {
+			t.Fatalf("expected parent %q at %d, got %q", parentWant[i], i, name.String())
+		}
+	}
+
+	childWant := []string{"ns1.example.com", "ns4.example.com", "ns5.example.com"}
+	if len(childNames) != len(childWant) {
+		t.Fatalf("expected %d child names, got %d", len(childWant), len(childNames))
+	}
+	for i, name := range childNames {
+		if name.String() != childWant[i] {
+			t.Fatalf("expected child %q at %d, got %q", childWant[i], i, name.String())
 		}
 	}
 }

@@ -7,14 +7,17 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/internal/parallel"
+	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 )
+
+var recurseCacheMaxEntries = 10000
 
 // Recurse performs a recursive lookup using root servers.
 func (r *Recursor) Recurse(ctx context.Context, name string, qtype string, qclass string) (packet.Packet, error) {
@@ -311,6 +314,7 @@ func (r *Recursor) getAddressesFor(ctx context.Context, name string, state *recu
 func (r *Recursor) ClearCache() {
 	r.cacheMu.Lock()
 	r.recurseCache = map[string]map[string]map[string]*packet.Packet{}
+	r.recurseCount = 0
 	r.cacheMu.Unlock()
 }
 
@@ -325,8 +329,10 @@ func (r *Recursor) recurseWithNameservers(ctx context.Context, name string, qtyp
 	qclass = strings.ToUpper(qclass)
 
 	nameObj := dnsname.New(name)
-	key := strings.ToLower(nameObj.String())
+	key := cacheNameKey(nameObj, ns)
+	runLog := logger.FromContext(ctx)
 	if cached, ok := r.cacheLookup(key, qtype, qclass); ok {
+		cached.Log = runLog
 		return cached, nil
 	}
 	if cached, cachedOK, inflight, wait := r.cacheLookupOrWaitOrRegister(key, qtype, qclass); wait {
@@ -335,18 +341,23 @@ func (r *Recursor) recurseWithNameservers(ctx context.Context, name string, qtyp
 			if inflight.resp == nil {
 				return packet.Packet{}, inflight.err
 			}
-			return *inflight.resp, inflight.err
+			copyResp := *inflight.resp
+			copyResp.Log = runLog
+			return copyResp, inflight.err
 		}
 		select {
 		case <-inflight.done:
 			if inflight.resp == nil {
 				return packet.Packet{}, inflight.err
 			}
-			return *inflight.resp, inflight.err
+			copyResp := *inflight.resp
+			copyResp.Log = runLog
+			return copyResp, inflight.err
 		case <-ctx.Done():
 			return packet.Packet{}, ctx.Err()
 		}
 	} else if cachedOK {
+		cached.Log = runLog
 		return cached, nil
 	}
 	defer func() {
@@ -379,6 +390,7 @@ func (r *Recursor) recurseWithNameservers(ctx context.Context, name string, qtyp
 	if err != nil {
 		return packet.Packet{}, err
 	}
+	resp.Log = runLog
 	r.cacheStore(key, qtype, qclass, resp)
 	return resp, nil
 }
@@ -387,6 +399,18 @@ type inflightLookup struct {
 	done chan struct{}
 	resp *packet.Packet
 	err  error
+}
+
+func cacheNameKey(name dnsname.Name, ns []nameserver.Nameserver) string {
+	if len(ns) == 0 {
+		return "root|" + strings.ToLower(name.String())
+	}
+	parts := make([]string, 0, len(ns))
+	for _, server := range ns {
+		parts = append(parts, strings.ToLower(server.Name.String())+"@"+server.Address.String())
+	}
+	sort.Strings(parts)
+	return "ns|" + strings.Join(parts, ",") + "|" + strings.ToLower(name.String())
 }
 
 func recurseLookupKey(name string, qtype string, qclass string) string {
@@ -401,7 +425,17 @@ func (r *Recursor) cacheLookupLocked(name string, qtype string, qclass string) (
 		if byClass, ok := byType[qtype]; ok {
 			if cached, ok := byClass[qclass]; ok {
 				if cached == nil {
-					return packet.Packet{}, true
+					delete(byClass, qclass)
+					if r.recurseCount > 0 {
+						r.recurseCount--
+					}
+					if len(byClass) == 0 {
+						delete(byType, qtype)
+					}
+					if len(byType) == 0 {
+						delete(r.recurseCache, name)
+					}
+					return packet.Packet{}, false
 				}
 				return *cached, true
 			}
@@ -453,6 +487,12 @@ func (r *Recursor) cacheStore(name string, qtype string, qclass string, resp pac
 	r.cacheMu.Lock()
 	defer r.cacheMu.Unlock()
 
+	// Do not cache indeterminate lookups (no packet). They are often transient
+	// cancellation/timeouts and should be retried on subsequent calls.
+	if resp.Msg == nil {
+		return
+	}
+
 	if r.recurseCache == nil {
 		r.recurseCache = map[string]map[string]map[string]*packet.Packet{}
 	}
@@ -462,13 +502,23 @@ func (r *Recursor) cacheStore(name string, qtype string, qclass string, resp pac
 	if r.recurseCache[name][qtype] == nil {
 		r.recurseCache[name][qtype] = map[string]*packet.Packet{}
 	}
+	copyResp := resp
 
-	if resp.Msg == nil {
-		r.recurseCache[name][qtype][qclass] = nil
+	if _, exists := r.recurseCache[name][qtype][qclass]; !exists {
+		r.recurseCount++
+	}
+	if recurseCacheMaxEntries > 0 && r.recurseCount > recurseCacheMaxEntries {
+		// Keep cache bounded for long-running processes.
+		r.recurseCache = map[string]map[string]map[string]*packet.Packet{}
+		r.recurseCount = 1
+		r.recurseCache[name] = map[string]map[string]*packet.Packet{
+			qtype: {
+				qclass: &copyResp,
+			},
+		}
 		return
 	}
 
-	copyResp := resp
 	r.recurseCache[name][qtype][qclass] = &copyResp
 }
 
@@ -489,6 +539,7 @@ func (r *Recursor) getNSFrom(ctx context.Context, resp packet.Packet, state *rec
 	state.unlock()
 
 	var names []string
+	glueAllowed := map[string]bool{}
 	for _, rr := range nsRecords {
 		nsRR, ok := rr.(*dns.NS)
 		if !ok {
@@ -496,6 +547,10 @@ func (r *Recursor) getNSFrom(ctx context.Context, resp packet.Packet, state *rec
 		}
 		nsName := dnsname.New(nsRR.Ns)
 		names = append(names, nsName.String())
+		zoneName := dnsname.New(nsRR.Hdr.Name)
+		if zoneName.IsInBailiwick(nsName) {
+			glueAllowed[strings.ToLower(nsName.String())] = true
+		}
 	}
 
 	state.lock()
@@ -503,11 +558,14 @@ func (r *Recursor) getNSFrom(ctx context.Context, resp packet.Packet, state *rec
 		if a, ok := rr.(*dns.A); ok {
 			ownerName := dnsname.New(rr.Header().Name)
 			owner := strings.ToLower(ownerName.String())
-			if addr, err := netip.ParseAddr(a.A.String()); err == nil {
+			if !glueAllowed[owner] {
+				continue
+			}
+			if a.Addr.IsValid() {
 				if state.glue[owner] == nil {
 					state.glue[owner] = map[netip.Addr]bool{}
 				}
-				state.glue[owner][addr] = true
+				state.glue[owner][a.Addr] = true
 			}
 		}
 	}
@@ -515,11 +573,14 @@ func (r *Recursor) getNSFrom(ctx context.Context, resp packet.Packet, state *rec
 		if aaaa, ok := rr.(*dns.AAAA); ok {
 			ownerName := dnsname.New(rr.Header().Name)
 			owner := strings.ToLower(ownerName.String())
-			if addr, err := netip.ParseAddr(aaaa.AAAA.String()); err == nil {
+			if !glueAllowed[owner] {
+				continue
+			}
+			if aaaa.Addr.IsValid() {
 				if state.glue[owner] == nil {
 					state.glue[owner] = map[netip.Addr]bool{}
 				}
-				state.glue[owner][addr] = true
+				state.glue[owner][aaaa.Addr] = true
 			}
 		}
 	}
@@ -707,8 +768,8 @@ func collectAddresses(resp packet.Packet, target dnsname.Name, cnames map[string
 			ownerName := dnsname.New(rr.Header().Name)
 			owner := strings.ToLower(ownerName.String())
 			if owner == targetKey || cnames[owner] {
-				if addr, err := netip.ParseAddr(a.A.String()); err == nil {
-					out = append(out, addr)
+				if a.Addr.IsValid() {
+					out = append(out, a.Addr)
 				}
 			}
 		}
@@ -718,8 +779,8 @@ func collectAddresses(resp packet.Packet, target dnsname.Name, cnames map[string
 			ownerName := dnsname.New(rr.Header().Name)
 			owner := strings.ToLower(ownerName.String())
 			if owner == targetKey || cnames[owner] {
-				if addr, err := netip.ParseAddr(aaaa.AAAA.String()); err == nil {
-					out = append(out, addr)
+				if aaaa.Addr.IsValid() {
+					out = append(out, aaaa.Addr)
 				}
 			}
 		}

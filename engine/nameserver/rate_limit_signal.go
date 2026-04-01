@@ -5,7 +5,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/packet"
 )

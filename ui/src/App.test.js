@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor, within, cleanup } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App.svelte";
+import { setCatalog, locale } from "./i18n.js";
 
 const jsonResponse = (data, ok = true) => ({
   ok,
@@ -43,7 +44,7 @@ describe("App", () => {
 
     const { container, unmount } = render(App);
 
-    expect(await screen.findByText("Gonemaster")).toBeInTheDocument();
+    expect(screen.getByAltText("gonemaster")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Single Job" })).toBeInTheDocument();
     expect(screen.getByRole("tablist", { name: "Job views" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Single Job" })).toBeInTheDocument();
@@ -354,6 +355,8 @@ describe("App", () => {
       health: {
         queue_depth: 3,
         in_flight_jobs: 2,
+        dns_cache_hits: 30,
+        dns_cache_misses: 10,
         dns_queries_ipv4_total: 11234,
         dns_queries_ipv6_total: 22000000
       },
@@ -428,6 +431,7 @@ describe("App", () => {
                 throughput: 1,
                 failed: 0,
                 queue_depth: 2,
+                dns_cache_hit_rate: 0.4,
                 dns_queries_per_second: 11.2,
                 dns_queries_ipv4_per_second: 7.1,
                 dns_queries_ipv6_per_second: 4.1
@@ -436,6 +440,7 @@ describe("App", () => {
                 throughput: 3,
                 failed: 1,
                 queue_depth: 4,
+                dns_cache_hit_rate: 0.75,
                 dns_queries_per_second: 18.6,
                 dns_queries_ipv4_per_second: 11.8,
                 dns_queries_ipv6_per_second: 6.8
@@ -462,13 +467,15 @@ describe("App", () => {
     const metricsPanel = getMetricsPanel();
 
     expect(await within(metricsPanel).findByLabelText("DNS query rates trend")).toBeInTheDocument();
+    expect(within(metricsPanel).getByLabelText("Cache hit rate trend")).toBeInTheDocument();
     expect(within(metricsPanel).getByText("In-flight jobs")).toBeInTheDocument();
-    expect(within(metricsPanel).getByText("Total IPv4 queries")).toBeInTheDocument();
-    expect(within(metricsPanel).getByText("Total IPv6 queries")).toBeInTheDocument();
+    expect(within(metricsPanel).getByText("External IPv4")).toBeInTheDocument();
+    expect(within(metricsPanel).getByText("External IPv6")).toBeInTheDocument();
     expect(within(metricsPanel).getByText("11,2K")).toBeInTheDocument();
     expect(within(metricsPanel).getByText("22M")).toBeInTheDocument();
     expect(within(metricsPanel).getByText("80.0%")).toBeInTheDocument();
     expect(within(metricsPanel).getByText("15.0%")).toBeInTheDocument();
+    expect(within(metricsPanel).getAllByText("75.0%")).toHaveLength(2);
     expect(within(metricsPanel).getByText("320 ms")).toBeInTheDocument();
     expect(within(metricsPanel).getByText("Total jobs finished")).toBeInTheDocument();
     expect(within(metricsPanel).getByText("Failed jobs")).toBeInTheDocument();
@@ -611,9 +618,11 @@ describe("App", () => {
     const job = {
       id: "job_1",
       domain: "example.com",
-      status: "queued",
+      status: "succeeded",
       created_at: "2026-02-03T00:00:00Z",
-      progress: 0
+      started_at: "2026-02-03T00:00:00Z",
+      finished_at: "2026-02-03T00:10:00Z",
+      progress: 100
     };
 
     global.fetch.mockImplementation((url, options = {}) => {
@@ -640,6 +649,7 @@ describe("App", () => {
     await waitFor(() => {
       expect(screen.getByText(/Created job:/)).toBeInTheDocument();
       expect(screen.getAllByText("job_1").length).toBeGreaterThan(0);
+      expect(screen.getByText("succeeded · 10m 0s")).toBeInTheDocument();
     });
 
     expect(global.fetch).toHaveBeenCalledWith(
@@ -650,6 +660,53 @@ describe("App", () => {
       })
     );
 
+    unmount();
+  });
+
+  it("includes tags in single job payload when tag field is filled", async () => {
+    const job = { id: "job_tagged", domain: "example.com", status: "pending" };
+    let capturedBody = null;
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (url === "/api/v1/jobs" && options.method === "POST") {
+        capturedBody = JSON.parse(options.body || "{}");
+        return jsonResponse(job);
+      }
+      if (url === `/api/v1/jobs/${job.id}`) return jsonResponse(job);
+      return jsonResponse({ items: [] });
+    });
+
+    const { unmount } = render(App);
+
+    await fireEvent.input(await screen.findByPlaceholderText("example.com"), { target: { value: "example.com" } });
+    await fireEvent.input(screen.getByLabelText("Tags"), { target: { value: "tld, ccTLD" } });
+    await fireEvent.click(screen.getByText("Run Single Job"));
+
+    await waitFor(() => {
+      expect(capturedBody?.tags).toEqual(["tld", "ccTLD"]);
+    });
+    unmount();
+  });
+
+  it("omits tags from single job payload when tag field is empty", async () => {
+    const job = { id: "job_notag", domain: "example.com", status: "pending" };
+    let capturedBody = null;
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (url === "/api/v1/jobs" && options.method === "POST") {
+        capturedBody = JSON.parse(options.body || "{}");
+        return jsonResponse(job);
+      }
+      if (url === `/api/v1/jobs/${job.id}`) return jsonResponse(job);
+      return jsonResponse({ items: [] });
+    });
+
+    const { unmount } = render(App);
+
+    await fireEvent.input(await screen.findByPlaceholderText("example.com"), { target: { value: "example.com" } });
+    await fireEvent.click(screen.getByText("Run Single Job"));
+
+    await waitFor(() => {
+      expect(capturedBody?.tags).toBeUndefined();
+    });
     unmount();
   });
 
@@ -697,6 +754,209 @@ describe("App", () => {
     unmount();
   });
 
+  it("submits single job with IPv6-only profile override when IPv4 is disabled", async () => {
+    const job = {
+      id: "job_v6_only",
+      domain: "example.com",
+      status: "queued",
+      created_at: "2026-02-03T00:00:00Z",
+      progress: 0
+    };
+
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (url === "/api/v1/jobs" && options.method === "POST") {
+        return jsonResponse(job);
+      }
+      if (url === `/api/v1/jobs/${job.id}`) {
+        return jsonResponse(job);
+      }
+      if (typeof url === "string" && url.startsWith("/api/v1/jobs?")) {
+        return jsonResponse({ items: [job] });
+      }
+      return jsonResponse({ items: [] });
+    });
+
+    const { unmount } = render(App);
+
+    const input = await screen.findByPlaceholderText("example.com");
+    await fireEvent.input(input, { target: { value: "example.com" } });
+    await fireEvent.click(screen.getByText("Advanced profile"));
+    await fireEvent.change(screen.getByLabelText("IP transport"), { target: { value: "disable_ipv4" } });
+
+    await fireEvent.click(screen.getByText("Run Single Job"));
+
+    await waitFor(() => {
+      const postCall = global.fetch.mock.calls.find(
+        ([url, options]) => url === "/api/v1/jobs" && options?.method === "POST"
+      );
+      expect(postCall).toBeTruthy();
+      const body = JSON.parse(postCall[1].body);
+      expect(body.domain).toBe("example.com");
+      expect(body.profile_overrides).toEqual({
+        net: {
+          ipv4: false,
+          ipv6: true
+        }
+      });
+    });
+
+    unmount();
+  });
+
+  it("submits single job with IPv4-only profile override when IPv6 is disabled", async () => {
+    const job = {
+      id: "job_v4_only",
+      domain: "example.com",
+      status: "queued",
+      created_at: "2026-02-03T00:00:00Z",
+      progress: 0
+    };
+
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (url === "/api/v1/jobs" && options.method === "POST") {
+        return jsonResponse(job);
+      }
+      if (url === `/api/v1/jobs/${job.id}`) {
+        return jsonResponse(job);
+      }
+      if (typeof url === "string" && url.startsWith("/api/v1/jobs?")) {
+        return jsonResponse({ items: [job] });
+      }
+      return jsonResponse({ items: [] });
+    });
+
+    const { unmount } = render(App);
+
+    const input = await screen.findByPlaceholderText("example.com");
+    await fireEvent.input(input, { target: { value: "example.com" } });
+    await fireEvent.click(screen.getByText("Advanced profile"));
+    await fireEvent.change(screen.getByLabelText("IP transport"), { target: { value: "disable_ipv6" } });
+
+    await fireEvent.click(screen.getByText("Run Single Job"));
+
+    await waitFor(() => {
+      const postCall = global.fetch.mock.calls.find(
+        ([url, options]) => url === "/api/v1/jobs" && options?.method === "POST"
+      );
+      expect(postCall).toBeTruthy();
+      const body = JSON.parse(postCall[1].body);
+      expect(body.domain).toBe("example.com");
+      expect(body.profile_overrides).toEqual({
+        net: {
+          ipv4: true,
+          ipv6: false
+        }
+      });
+    });
+
+    unmount();
+  });
+
+  it("includes undelegated nameservers and ds_info in single-job payload when configured", async () => {
+    const job = {
+      id: "job_undelegated",
+      domain: "example.com",
+      status: "queued",
+      created_at: "2026-02-03T00:00:00Z",
+      progress: 0
+    };
+
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (url === "/api/v1/jobs" && options.method === "POST") {
+        return jsonResponse(job);
+      }
+      if (url === `/api/v1/jobs/${job.id}`) {
+        return jsonResponse(job);
+      }
+      if (typeof url === "string" && url.startsWith("/api/v1/jobs?")) {
+        return jsonResponse({ items: [job] });
+      }
+      return jsonResponse({ items: [] });
+    });
+
+    const { unmount } = render(App);
+
+    await fireEvent.input(await screen.findByPlaceholderText("example.com"), {
+      target: { value: "example.com" }
+    });
+    await fireEvent.click(screen.getByText("Undelegated / Pre-delegation"));
+    await fireEvent.click(screen.getByRole("button", { name: "Add nameserver" }));
+    await fireEvent.input(screen.getByLabelText("Undelegated NS 1"), {
+      target: { value: "ns1.example.com" }
+    });
+    await fireEvent.input(screen.getByLabelText("Undelegated NS IP 1"), {
+      target: { value: "2001:db8::10" }
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "Add DS record" }));
+    await fireEvent.input(screen.getByLabelText("Undelegated DS keytag 1"), {
+      target: { value: "12345" }
+    });
+    await fireEvent.input(screen.getByLabelText("Undelegated DS algorithm 1"), {
+      target: { value: "13" }
+    });
+    await fireEvent.input(screen.getByLabelText("Undelegated DS digest type 1"), {
+      target: { value: "2" }
+    });
+    await fireEvent.input(screen.getByLabelText("Undelegated DS digest 1"), {
+      target: { value: "aabbccdd" }
+    });
+
+    await fireEvent.click(screen.getByText("Run Single Job"));
+
+    await waitFor(() => {
+      const postCall = global.fetch.mock.calls.find(
+        ([url, options]) => url === "/api/v1/jobs" && options?.method === "POST"
+      );
+      expect(postCall).toBeTruthy();
+      const body = JSON.parse(postCall[1].body);
+      expect(body).toEqual({
+        domain: "example.com",
+        nameservers: [{ ns: "ns1.example.com", ip: "2001:db8::10" }],
+        ds_info: [{ keytag: 12345, algorithm: 13, digtype: 2, digest: "AABBCCDD" }]
+      });
+    });
+
+    unmount();
+  });
+
+  it("blocks single-job submit when undelegated rows are invalid", async () => {
+    global.fetch.mockImplementation((url) => {
+      if (typeof url === "string" && url.startsWith("/api/v1/jobs?")) {
+        return jsonResponse({ items: [] });
+      }
+      return jsonResponse({ items: [] });
+    });
+
+    const { unmount } = render(App);
+
+    await fireEvent.input(await screen.findByPlaceholderText("example.com"), {
+      target: { value: "example.com" }
+    });
+    await fireEvent.click(screen.getByText("Undelegated / Pre-delegation"));
+    await fireEvent.click(screen.getByRole("button", { name: "Add nameserver" }));
+    await fireEvent.input(screen.getByLabelText("Undelegated NS 1"), {
+      target: { value: "ns1.example.com" }
+    });
+    await fireEvent.input(screen.getByLabelText("Undelegated NS IP 1"), {
+      target: { value: "not-an-ip" }
+    });
+
+    await fireEvent.click(screen.getByText("Run Single Job"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Undelegated nameserver row 1: IP must be a valid IPv4 or IPv6 address.")
+      ).toBeInTheDocument();
+    });
+
+    const postCalls = global.fetch.mock.calls.filter(
+      ([url, options]) => url === "/api/v1/jobs" && options?.method === "POST"
+    );
+    expect(postCalls).toHaveLength(0);
+
+    unmount();
+  });
+
   it("submits a batch job and displays the created batch id", async () => {
     const batch = {
       batch_id: "batch_1",
@@ -707,7 +967,8 @@ describe("App", () => {
       total: 1,
       status_counts: { queued: 1 },
       items: [],
-      created_at: "2026-02-03T00:00:00Z"
+      created_at: "2026-02-03T00:00:00Z",
+      finished_at: "2026-02-03T00:10:00Z"
     };
 
     global.fetch.mockImplementation((url, options = {}) => {
@@ -735,6 +996,9 @@ describe("App", () => {
     await waitFor(() => {
       expect(screen.getByText(/Created batch:/)).toBeInTheDocument();
       expect(screen.getByText("batch_1")).toBeInTheDocument();
+      expect(screen.getByText("Total runtime")).toBeInTheDocument();
+      expect(screen.getByText("10m 0s")).toBeInTheDocument();
+      expect(screen.getByText("queued 1")).toBeInTheDocument();
     });
 
     await waitFor(() => {
@@ -754,6 +1018,169 @@ describe("App", () => {
       })
     );
 
+    unmount();
+  });
+
+  it("keeps batch payload domains-only even when undelegated single-job fields are filled", async () => {
+    const batch = {
+      batch_id: "batch_domains_only",
+      job_ids: ["job_1"]
+    };
+    const summary = {
+      batch_id: "batch_domains_only",
+      total: 1,
+      status_counts: { queued: 1 },
+      items: [],
+      created_at: "2026-02-03T00:00:00Z"
+    };
+
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (url === "/api/v1/jobs/batch" && options.method === "POST") {
+        return jsonResponse(batch);
+      }
+      if (typeof url === "string" && url.startsWith("/api/v1/batches/batch_domains_only")) {
+        return jsonResponse(summary);
+      }
+      if (typeof url === "string" && url.startsWith("/api/v1/jobs?")) {
+        return jsonResponse({ items: [] });
+      }
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+
+    await fireEvent.click(screen.getByText("Undelegated / Pre-delegation"));
+    await fireEvent.click(screen.getByRole("button", { name: "Add nameserver" }));
+    await fireEvent.input(screen.getByLabelText("Undelegated NS 1"), {
+      target: { value: "ns1.example.com" }
+    });
+    await fireEvent.input(screen.getByLabelText("Undelegated NS IP 1"), {
+      target: { value: "192.0.2.10" }
+    });
+
+    await openBatchTab();
+    await fireEvent.input(await screen.findByLabelText("Domains (one per line)"), {
+      target: { value: "example.com\nexample.org" }
+    });
+    await fireEvent.click(screen.getByText("Run Batch"));
+
+    await waitFor(() => {
+      const postCall = global.fetch.mock.calls.find(
+        ([url, options]) => url === "/api/v1/jobs/batch" && options?.method === "POST"
+      );
+      expect(postCall).toBeTruthy();
+      const body = JSON.parse(postCall[1].body);
+      expect(body).toEqual({ domains: ["example.com", "example.org"] });
+      expect(body.nameservers).toBeUndefined();
+      expect(body.ds_info).toBeUndefined();
+    });
+
+    unmount();
+  });
+
+  it("includes tags in batch payload when tag field is filled", async () => {
+    let capturedBody = null;
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (url === "/api/v1/jobs/batch" && options.method === "POST") {
+        capturedBody = JSON.parse(options.body || "{}");
+        return jsonResponse({ batch_id: "batch_t" });
+      }
+      if (typeof url === "string" && url.startsWith("/api/v1/batches/")) return jsonResponse({ batch_id: "batch_t", total: 0, status_counts: {}, items: [], created_at: "2026-03-24T00:00:00Z" });
+      if (typeof url === "string" && url.startsWith("/api/v1/jobs?")) return jsonResponse({ items: [] });
+      if (url.includes("/api/v1/tags")) return jsonResponse([]);
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+    await openBatchTab();
+
+    await fireEvent.input(await screen.findByLabelText("Domains (one per line)"), { target: { value: "example.com" } });
+    await fireEvent.input(screen.getByLabelText("Tags"), { target: { value: "tld, ccTLD" } });
+    await fireEvent.click(screen.getByText("Run Batch"));
+
+    await waitFor(() => {
+      expect(capturedBody?.tags).toEqual(["tld", "ccTLD"]);
+      expect(capturedBody?.domains).toEqual(["example.com"]);
+    });
+    unmount();
+  });
+
+  it("from-tag mode sends from_tag in batch payload", async () => {
+    let capturedBody = null;
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (url === "/api/v1/jobs/batch" && options.method === "POST") {
+        capturedBody = JSON.parse(options.body || "{}");
+        return jsonResponse({ batch_id: "batch_ft" });
+      }
+      if (typeof url === "string" && url.startsWith("/api/v1/batches/")) return jsonResponse({ batch_id: "batch_ft", total: 0, status_counts: {}, items: [], created_at: "2026-03-24T00:00:00Z" });
+      if (typeof url === "string" && url.startsWith("/api/v1/jobs?")) return jsonResponse({ items: [] });
+      if (url.includes("/api/v1/tags")) return jsonResponse([{ name: "tld", description: "", domain_count: 3 }]);
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+    await openBatchTab();
+
+    await fireEvent.click(await screen.findByText("From tag"));
+    const tagSelect = await screen.findByLabelText("Run all domains in tag");
+    await fireEvent.change(tagSelect, { target: { value: "tld" } });
+    await fireEvent.click(screen.getByText("Run Batch"));
+
+    await waitFor(() => {
+      expect(capturedBody?.from_tag).toBe("tld");
+      expect(capturedBody?.domains).toBeUndefined();
+    });
+    unmount();
+  });
+
+  it("batch inspector shows tag when batch has a tag", async () => {
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (typeof url === "string" && url.startsWith("/api/v1/batches/batch_tagged")) {
+        return jsonResponse({ id: "batch_tagged", tag: "tld", total: 1, status_counts: { succeeded: 1 }, items: [], created_at: "2026-03-24T00:00:00Z" });
+      }
+      if (typeof url === "string" && url.startsWith("/api/v1/jobs?")) return jsonResponse({ items: [{ id: "j1", batch_id: "batch_tagged", created_at: "2026-03-24T00:00:00Z" }] });
+      if (url.includes("/api/v1/tags")) return jsonResponse([]);
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+    await openBatchTab();
+
+    await fireEvent.input(await screen.findByLabelText("Batch ID"), { target: { value: "batch_tagged" } });
+    await fireEvent.change(screen.getByLabelText("Batch ID"), {});
+
+    await waitFor(() => {
+      expect(screen.getByText("Tag")).toBeInTheDocument();
+      expect(screen.getByText("tld")).toBeInTheDocument();
+    });
+    unmount();
+  });
+
+  it("recent batch dropdown label includes tag when batch is loaded", async () => {
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (typeof url === "string" && url.startsWith("/api/v1/batches/batch_wtag")) {
+        return jsonResponse({ id: "batch_wtag", tag: "ccTLD", total: 1, status_counts: {}, items: [], created_at: "2026-03-24T00:00:00Z" });
+      }
+      if (typeof url === "string" && url.startsWith("/api/v1/jobs?")) {
+        return jsonResponse({ items: [{ id: "j1", batch_id: "batch_wtag", created_at: "2026-03-24T00:00:00Z" }] });
+      }
+      if (url.includes("/api/v1/tags")) return jsonResponse([]);
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+    await openBatchTab();
+
+    // Load the batch to populate the tag
+    const batchInput = await screen.findByLabelText("Batch ID");
+    await fireEvent.input(batchInput, { target: { value: "batch_wtag" } });
+    await fireEvent.change(batchInput, {});
+
+    await waitFor(() => {
+      const options = screen.getAllByRole("option");
+      const batchOption = options.find((o) => o.value === "batch_wtag");
+      expect(batchOption?.textContent).toContain("[ccTLD]");
+    });
     unmount();
   });
 
@@ -1684,5 +2111,928 @@ describe("App", () => {
     });
 
     unmount();
+  });
+
+  describe("locale selector", () => {
+    const mockFetchWithLocales = (locales) => {
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value.includes("/api/v1/locales")) {
+          return jsonResponse({ locales });
+        }
+        if (value.includes("/api/v1/jobs?")) {
+          return jsonResponse({ items: [], total: 0 });
+        }
+        return jsonResponse({});
+      });
+    };
+
+    it("shows language selector when server returns multiple locales", async () => {
+      mockFetchWithLocales(["da", "en", "fr", "sv"]);
+
+      const { unmount } = render(App);
+
+      await waitFor(() => {
+        expect(screen.getByRole("combobox", { name: "Result language" })).toBeInTheDocument();
+      });
+      const select = screen.getByRole("combobox", { name: "Result language" });
+      expect(within(select).getByRole("option", { name: "English" })).toBeInTheDocument();
+      expect(within(select).getByRole("option", { name: "Dansk" })).toBeInTheDocument();
+      expect(within(select).getByRole("option", { name: "Français" })).toBeInTheDocument();
+      expect(within(select).getByRole("option", { name: "Svenska" })).toBeInTheDocument();
+
+      unmount();
+    });
+
+    it("hides language selector when server returns only one locale", async () => {
+      mockFetchWithLocales(["en"]);
+
+      const { unmount } = render(App);
+
+      // Give the locales fetch time to resolve.
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalled();
+      });
+      // Wait a tick for Svelte to re-render.
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(screen.queryByRole("combobox", { name: "Result language" })).toBeNull();
+
+      unmount();
+    });
+
+    it("persists chosen locale to localStorage when changed", async () => {
+      mockFetchWithLocales(["en", "sv", "da"]);
+
+      const { unmount } = render(App);
+
+      const select = await screen.findByRole("combobox", { name: "Result language" });
+      await fireEvent.change(select, { target: { value: "sv" } });
+
+      expect(localStorage.getItem("gonemaster.ui.locale.v1")).toBe("sv");
+
+      unmount();
+    });
+
+    it("restores locale from localStorage on load", async () => {
+      localStorage.setItem("gonemaster.ui.locale.v1", "fr");
+      mockFetchWithLocales(["en", "fr", "sv"]);
+
+      const { unmount } = render(App);
+
+      const select = await screen.findByRole("combobox", { name: "Result language" });
+      expect(select.value).toBe("fr");
+
+      unmount();
+    });
+
+    it("falls back to English when stored locale is not in server list", async () => {
+      localStorage.setItem("gonemaster.ui.locale.v1", "ja");
+      mockFetchWithLocales(["en", "da", "sv"]);
+
+      const { unmount } = render(App);
+
+      const select = await screen.findByRole("combobox", { name: "Result language" });
+      await waitFor(() => {
+        expect(select.value).toBe("en");
+      });
+      expect(localStorage.getItem("gonemaster.ui.locale.v1")).toBe("en");
+
+      unmount();
+    });
+
+    it("switching locale selector updates UI chrome strings reactively", async () => {
+      // Inject a minimal Swedish catalog so we can observe a chrome string change.
+      setCatalog("sv", { run_single_job: "Kör enkeljobb" });
+
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value.includes("/api/v1/locales")) {
+          return jsonResponse({ locales: ["en", "sv"] });
+        }
+        if (value.includes("/api/v1/jobs?")) {
+          return jsonResponse({ items: [], total: 0 });
+        }
+        return jsonResponse({});
+      });
+
+      const { unmount } = render(App);
+
+      // Wait for the locale selector to appear (loadLocales must resolve first).
+      const select = await screen.findByRole("combobox", { name: "Result language" });
+
+      // Initially English.
+      expect(screen.getByRole("button", { name: "Run Single Job" })).toBeInTheDocument();
+
+      // Switch to Swedish.
+      await fireEvent.change(select, { target: { value: "sv" } });
+
+      // The chrome string should update reactively to the Swedish translation.
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Kör enkeljobb" })).toBeInTheDocument();
+      });
+
+      unmount();
+      // Reset locale store so subsequent tests start in English.
+      locale.set("en");
+    });
+  });
+
+  describe("Browser notifications", () => {
+    const makeNotificationMock = (permission) => {
+      const mock = vi.fn();
+      mock.permission = permission;
+      mock.requestPermission = vi.fn().mockResolvedValue(permission);
+      return mock;
+    };
+
+    const submitAndWaitForQueued = async (domain) => {
+      const input = await screen.findByPlaceholderText("example.com");
+      await fireEvent.input(input, { target: { value: domain } });
+      await fireEvent.click(screen.getByText("Run Single Job"));
+      await waitFor(() => {
+        expect(screen.getByText(/queued/)).toBeInTheDocument();
+      });
+    };
+
+    it("sends a browser notification when a watched single job completes", async () => {
+      const NotificationMock = makeNotificationMock("granted");
+      vi.stubGlobal("Notification", NotificationMock);
+
+      const intervalCallbacks = [];
+      vi.spyOn(global, "setInterval").mockImplementation((fn) => {
+        intervalCallbacks.push(fn);
+        return intervalCallbacks.length;
+      });
+      vi.spyOn(global, "clearInterval").mockImplementation(() => {});
+
+      let jobCallCount = 0;
+      const queuedJob = {
+        id: "job_notify",
+        domain: "notify.example",
+        status: "queued",
+        progress: 0,
+        created_at: "2026-02-03T00:00:00Z"
+      };
+      const doneJob = { ...queuedJob, status: "succeeded", progress: 100 };
+
+      global.fetch.mockImplementation((url, options = {}) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (url === "/api/v1/jobs" && options?.method === "POST") return jsonResponse(queuedJob);
+        if (value.includes(`/api/v1/jobs/${queuedJob.id}`)) {
+          jobCallCount++;
+          return jsonResponse(jobCallCount >= 2 ? doneJob : queuedJob);
+        }
+        if (value.includes("/api/v1/jobs?")) return jsonResponse({ items: [queuedJob], total: 1 });
+        return jsonResponse({});
+      });
+
+      const { unmount } = render(App);
+      await submitAndWaitForQueued("notify.example");
+
+      expect(intervalCallbacks.length).toBeGreaterThan(0);
+      const poller = intervalCallbacks[intervalCallbacks.length - 1];
+      await poller();
+
+      await waitFor(() => {
+        expect(NotificationMock).toHaveBeenCalledWith(
+          "Scan complete",
+          expect.objectContaining({ body: expect.stringContaining("notify.example") })
+        );
+      });
+
+      unmount();
+    });
+
+    it("requests notification permission when submitting a single job", async () => {
+      const NotificationMock = makeNotificationMock("default");
+      vi.stubGlobal("Notification", NotificationMock);
+
+      const queuedJob = {
+        id: "job_perm",
+        domain: "perm.example",
+        status: "queued",
+        progress: 0,
+        created_at: "2026-02-03T00:00:00Z"
+      };
+
+      global.fetch.mockImplementation((url, options = {}) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (url === "/api/v1/jobs" && options?.method === "POST") return jsonResponse(queuedJob);
+        if (value.includes(`/api/v1/jobs/${queuedJob.id}`)) return jsonResponse(queuedJob);
+        if (value.includes("/api/v1/jobs?")) return jsonResponse({ items: [], total: 0 });
+        return jsonResponse({});
+      });
+
+      const { unmount } = render(App);
+      await submitAndWaitForQueued("perm.example");
+
+      await waitFor(() => {
+        expect(NotificationMock.requestPermission).toHaveBeenCalled();
+      });
+
+      unmount();
+    });
+
+    it("does not send a notification when Notification permission is denied", async () => {
+      const NotificationMock = makeNotificationMock("denied");
+      vi.stubGlobal("Notification", NotificationMock);
+
+      const intervalCallbacks = [];
+      vi.spyOn(global, "setInterval").mockImplementation((fn) => {
+        intervalCallbacks.push(fn);
+        return intervalCallbacks.length;
+      });
+      vi.spyOn(global, "clearInterval").mockImplementation(() => {});
+
+      let jobCallCount = 0;
+      const queuedJob = {
+        id: "job_denied",
+        domain: "denied.example",
+        status: "queued",
+        progress: 0,
+        created_at: "2026-02-03T00:00:00Z"
+      };
+      const doneJob = { ...queuedJob, status: "succeeded", progress: 100 };
+
+      global.fetch.mockImplementation((url, options = {}) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (url === "/api/v1/jobs" && options?.method === "POST") return jsonResponse(queuedJob);
+        if (value.includes(`/api/v1/jobs/${queuedJob.id}`)) {
+          jobCallCount++;
+          return jsonResponse(jobCallCount >= 2 ? doneJob : queuedJob);
+        }
+        if (value.includes("/api/v1/jobs?")) return jsonResponse({ items: [], total: 0 });
+        return jsonResponse({});
+      });
+
+      const { unmount } = render(App);
+      await submitAndWaitForQueued("denied.example");
+
+      expect(intervalCallbacks.length).toBeGreaterThan(0);
+      const poller = intervalCallbacks[intervalCallbacks.length - 1];
+      await poller();
+
+      await waitFor(() => {
+        expect(screen.getByText(/succeeded/)).toBeInTheDocument();
+      });
+
+      // Notification constructor must not have been called.
+      expect(NotificationMock).not.toHaveBeenCalled();
+
+      unmount();
+    });
+
+    it("sends a browser notification when a batch finishes", async () => {
+      const NotificationMock = makeNotificationMock("granted");
+      vi.stubGlobal("Notification", NotificationMock);
+
+      const intervalCallbacks = [];
+      vi.spyOn(global, "setInterval").mockImplementation((fn) => {
+        intervalCallbacks.push(fn);
+        return intervalCallbacks.length;
+      });
+      vi.spyOn(global, "clearInterval").mockImplementation(() => {});
+
+      let batchCalls = 0;
+      const runningBatch = {
+        batch_id: "batch_notify",
+        total: 1,
+        status_counts: { running: 1 },
+        items: [
+          {
+            id: "job_bn",
+            domain: "bn.example",
+            status: "running",
+            created_at: "2026-02-03T00:00:00Z",
+            progress: 50
+          }
+        ],
+        created_at: "2026-02-03T00:00:00Z"
+      };
+      const doneBatch = {
+        ...runningBatch,
+        status_counts: { succeeded: 1 },
+        items: [{ ...runningBatch.items[0], status: "succeeded", progress: 100 }]
+      };
+
+      global.fetch.mockImplementation((url, options = {}) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (url === "/api/v1/jobs/batch" && options?.method === "POST") {
+          return jsonResponse({ batch_id: "batch_notify", job_ids: ["job_bn"] });
+        }
+        if (value.includes("/api/v1/batches/batch_notify")) {
+          batchCalls++;
+          return jsonResponse(batchCalls >= 2 ? doneBatch : runningBatch);
+        }
+        if (value.includes("/api/v1/jobs?")) return jsonResponse({ items: [], total: 0 });
+        return jsonResponse({});
+      });
+
+      const { unmount } = render(App);
+
+      await fireEvent.click(screen.getByRole("tab", { name: "Batch Jobs" }));
+      await fireEvent.input(await screen.findByLabelText("Domains (one per line)"), {
+        target: { value: "bn.example" }
+      });
+      await fireEvent.click(screen.getByText("Run Batch"));
+
+      await waitFor(() => {
+        expect(screen.getByText("job_bn")).toBeInTheDocument();
+      });
+
+      // Fire the batch poller
+      expect(intervalCallbacks.length).toBeGreaterThan(0);
+      const poller = intervalCallbacks[intervalCallbacks.length - 1];
+      await poller();
+
+      // Flush microtasks so the async sendBatchNotification completes
+      await new Promise((r) => setTimeout(r, 0));
+
+      await waitFor(() => {
+        expect(NotificationMock).toHaveBeenCalledWith(
+          "Batch complete",
+          expect.objectContaining({ body: expect.stringContaining("batch_notify") })
+        );
+      });
+
+      unmount();
+    });
+  });
+
+  describe("Domains tab", () => {
+    const openDomainsTab = async () => {
+      await fireEvent.click(screen.getByRole("tab", { name: "Domains" }));
+    };
+
+    it("renders Domains tab button", async () => {
+      global.fetch.mockImplementation(() => jsonResponse({ items: [], total: 0 }));
+      const { unmount } = render(App);
+      expect(screen.getByRole("tab", { name: "Domains" })).toBeInTheDocument();
+      unmount();
+    });
+
+    it("shows domain list when tab opened", async () => {
+      const calls = [];
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        calls.push(value);
+        if (value.includes("/api/v1/domains")) {
+          return jsonResponse({
+            items: [{ id: 1, name: "example.com", tags: ["tld"], latest_level: "WARNING", latest_run_at: "2026-03-15T10:00:00Z", run_count: 3 }],
+            total: 1
+          });
+        }
+        if (value.includes("/api/v1/tags")) {
+          return jsonResponse([{ name: "tld", description: "TLD", domain_count: 1 }]);
+        }
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openDomainsTab();
+
+      await waitFor(() => {
+        expect(calls.some((v) => v.includes("/api/v1/domains"))).toBe(true);
+      });
+      expect(await screen.findByText("example.com")).toBeInTheDocument();
+      expect(screen.getByText("WARNING")).toBeInTheDocument();
+
+      unmount();
+    });
+
+    it("shows placeholder when no domains", async () => {
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value.includes("/api/v1/domains")) return jsonResponse({ items: [], total: 0 });
+        if (value.includes("/api/v1/tags")) return jsonResponse([]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openDomainsTab();
+
+      expect(await screen.findByText("No domains found.")).toBeInTheDocument();
+      unmount();
+    });
+
+    it("tag filter dropdown is populated from /api/v1/tags", async () => {
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value.includes("/api/v1/domains")) return jsonResponse({ items: [], total: 0 });
+        if (value.includes("/api/v1/tags")) return jsonResponse([{ name: "ccTLD", description: "", domain_count: 5 }]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openDomainsTab();
+
+      await waitFor(() => {
+        expect(screen.getByRole("option", { name: "ccTLD" })).toBeInTheDocument();
+      });
+      unmount();
+    });
+
+    it("name filter triggers new domains request", async () => {
+      const calls = [];
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        calls.push(value);
+        if (value.includes("/api/v1/domains")) return jsonResponse({ items: [], total: 0 });
+        if (value.includes("/api/v1/tags")) return jsonResponse([]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openDomainsTab();
+      await waitFor(() => calls.some((v) => v.includes("/api/v1/domains")));
+      calls.length = 0;
+
+      const searchInput = await screen.findByPlaceholderText("Search by name…");
+      await fireEvent.input(searchInput, { target: { value: "example" } });
+
+      await waitFor(() => {
+        expect(calls.some((v) => v.includes("/api/v1/domains") && v.includes("name=example"))).toBe(true);
+      });
+      unmount();
+    });
+
+    it("level filter sends min_level param", async () => {
+      const calls = [];
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        calls.push(value);
+        if (value.includes("/api/v1/domains")) return jsonResponse({ items: [], total: 0 });
+        if (value.includes("/api/v1/tags")) return jsonResponse([]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openDomainsTab();
+      await waitFor(() => calls.some((v) => v.includes("/api/v1/domains")));
+      calls.length = 0;
+
+      const levelSelect = await screen.findByRole("combobox", { name: "Filter by level" });
+      await fireEvent.change(levelSelect, { target: { value: "WARNING" } });
+
+      await waitFor(() => {
+        expect(calls.some((v) => v.includes("/api/v1/domains") && v.includes("min_level=WARNING"))).toBe(true);
+      });
+      unmount();
+    });
+
+    it("clicking a domain row shows detail view and loads runs", async () => {
+      const calls = [];
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        calls.push(value);
+        if (value.includes("/runs")) return jsonResponse({ items: [], total: 0 });
+        if (value.includes("/api/v1/domains")) {
+          return jsonResponse({
+            items: [{ id: 7, name: "example.com", tags: ["tld"], latest_level: "WARNING", latest_run_at: "2026-03-15T10:00:00Z", run_count: 1 }],
+            total: 1
+          });
+        }
+        if (value.includes("/api/v1/tags")) return jsonResponse([]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openDomainsTab();
+
+      const row = await screen.findByText("example.com");
+      await fireEvent.click(row);
+
+      await waitFor(() => {
+        expect(screen.getByText("← Back to domains")).toBeInTheDocument();
+        expect(calls.some((v) => v.includes("/api/v1/domains/7/runs"))).toBe(true);
+      });
+      unmount();
+    });
+
+    it("back button returns to domain list", async () => {
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value.includes("/api/v1/domains")) {
+          return jsonResponse({
+            items: [{ id: 1, name: "example.com", tags: [], latest_level: "OK", latest_run_at: null, run_count: 0 }],
+            total: 1
+          });
+        }
+        if (value.includes("/api/v1/tags")) return jsonResponse([]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openDomainsTab();
+
+      await fireEvent.click(await screen.findByText("example.com"));
+      await waitFor(() => screen.getByText("← Back to domains"));
+
+      await fireEvent.click(screen.getByText("← Back to domains"));
+      await waitFor(() => {
+        expect(screen.queryByText("← Back to domains")).not.toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "Domains" })).toBeInTheDocument();
+      });
+      unmount();
+    });
+
+    it("detail view shows tags, level, run count, and run history table", async () => {
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value.includes("/runs")) {
+          return jsonResponse({
+            items: [{ id: "run-abc", finished_at: "2026-03-15T10:00:00Z", worst_level: "WARNING", duration_ms: 1200, entry_count: 5 }],
+            total: 1
+          });
+        }
+        if (value.includes("/api/v1/domains")) {
+          return jsonResponse({
+            items: [{ id: 3, name: "example.com", tags: ["tld", "ccTLD"], latest_level: "WARNING", latest_run_at: "2026-03-15T10:00:00Z", run_count: 4 }],
+            total: 1
+          });
+        }
+        if (value.includes("/api/v1/tags")) return jsonResponse([]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openDomainsTab();
+      await fireEvent.click(await screen.findByText("example.com"));
+
+      await waitFor(() => {
+        expect(screen.getByText("tld")).toBeInTheDocument();
+        expect(screen.getByText("ccTLD")).toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "Run History" })).toBeInTheDocument();
+        expect(screen.getByText("run-abc")).toBeInTheDocument();
+        expect(screen.getByText("1200ms")).toBeInTheDocument();
+      });
+      unmount();
+    });
+
+    it("clicking a run row navigates to job inspector", async () => {
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value.includes("/runs")) {
+          return jsonResponse({
+            items: [{ id: "run-xyz", finished_at: "2026-03-15T10:00:00Z", worst_level: "ERROR", duration_ms: 800, entry_count: 3 }],
+            total: 1
+          });
+        }
+        if (value.includes("/api/v1/domains")) {
+          return jsonResponse({ items: [{ id: 2, name: "test.com", tags: [], latest_level: "ERROR", run_count: 1 }], total: 1 });
+        }
+        if (value.includes("/api/v1/jobs/run-xyz")) return jsonResponse({ id: "run-xyz", status: "succeeded", domain: "test.com" });
+        if (value.includes("/api/v1/tags")) return jsonResponse([]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openDomainsTab();
+      await fireEvent.click(await screen.findByText("test.com"));
+      const runRow = await screen.findByText("run-xyz");
+      await fireEvent.click(runRow);
+
+      await waitFor(() => {
+        expect(screen.getByRole("tab", { name: "Single Job" })).toHaveAttribute("aria-selected", "true");
+      });
+      unmount();
+    });
+
+    it("re-test button creates a new job and navigates to inspector", async () => {
+      const calls = [];
+      global.fetch.mockImplementation((url, opts) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        calls.push({ url: value, method: opts?.method });
+        if (value.includes("/runs")) return jsonResponse({ items: [], total: 0 });
+        if (value.includes("/api/v1/domains")) {
+          return jsonResponse({ items: [{ id: 5, name: "retest.com", tags: [], latest_level: "OK", run_count: 1 }], total: 1 });
+        }
+        if (value.includes("/api/v1/jobs") && opts?.method === "POST") {
+          return jsonResponse({ id: "new-job-99", domain: "retest.com", status: "pending" });
+        }
+        if (value.includes("/api/v1/jobs/new-job-99")) {
+          return jsonResponse({ id: "new-job-99", status: "pending", domain: "retest.com" });
+        }
+        if (value.includes("/api/v1/tags")) return jsonResponse([]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openDomainsTab();
+      await fireEvent.click(await screen.findByText("retest.com"));
+      await waitFor(() => screen.getByText("Re-test"));
+      await fireEvent.click(screen.getByText("Re-test"));
+
+      await waitFor(() => {
+        expect(calls.some((c) => c.url.includes("/api/v1/jobs") && c.method === "POST")).toBe(true);
+        expect(screen.getByRole("tab", { name: "Single Job" })).toHaveAttribute("aria-selected", "true");
+      });
+      unmount();
+    });
+
+    it("pagination next/prev buttons appear when total exceeds limit", async () => {
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value.includes("/api/v1/domains")) {
+          return jsonResponse({
+            items: Array.from({ length: 50 }, (_, i) => ({
+              id: i + 1, name: `domain${i}.example`, tags: [], run_count: 0
+            })),
+            total: 120
+          });
+        }
+        if (value.includes("/api/v1/tags")) return jsonResponse([]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openDomainsTab();
+
+      await waitFor(() => {
+        expect(screen.getByText("Next →")).toBeInTheDocument();
+      });
+      expect(screen.getByText("1–50 / 120")).toBeInTheDocument();
+      unmount();
+    });
+  });
+
+  describe("Tags tab", () => {
+    const openTagsTab = async () => {
+      await fireEvent.click(screen.getByRole("tab", { name: "Tags" }));
+    };
+
+    const mockTagFetch = (tags = [], summary = null, domains = []) => {
+      global.fetch.mockImplementation((url, opts) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value.includes("/summary")) return jsonResponse(summary ?? { tag: "t", domain_count: 0, ok: 0, notice: 0, warning: 0, error: 0, critical: 0 });
+        if (value.includes("/domains") && value.includes("/tags/")) return jsonResponse({ items: domains, total: domains.length });
+        if (value.includes("/api/v1/tags") && opts?.method === "POST") return jsonResponse({ name: "new-tag", description: "", domain_count: 0 }, true);
+        if (value.includes("/api/v1/tags") && opts?.method === "DELETE") return { ok: true, status: 204, headers: { get: () => null }, json: async () => ({}), text: async () => "" };
+        if (value.includes("/api/v1/tags")) return jsonResponse(tags);
+        return jsonResponse({ items: [], total: 0 });
+      });
+    };
+
+    it("renders Tags tab button", async () => {
+      mockTagFetch();
+      const { unmount } = render(App);
+      expect(screen.getByRole("tab", { name: "Tags" })).toBeInTheDocument();
+      unmount();
+    });
+
+    it("shows tag list when tab opened", async () => {
+      mockTagFetch([{ name: "tld", description: "Top-level", domain_count: 5 }]);
+      const { unmount } = render(App);
+      await openTagsTab();
+      expect(await screen.findByText("tld")).toBeInTheDocument();
+      expect(screen.getByText("Top-level")).toBeInTheDocument();
+      unmount();
+    });
+
+    it("shows placeholder when no tags", async () => {
+      mockTagFetch([]);
+      const { unmount } = render(App);
+      await openTagsTab();
+      expect(await screen.findByText("No tags found.")).toBeInTheDocument();
+      unmount();
+    });
+
+    it("create tag form calls POST /api/v1/tags", async () => {
+      const calls = [];
+      global.fetch.mockImplementation((url, opts) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        calls.push({ url: value, method: opts?.method });
+        if (value.includes("/api/v1/tags") && opts?.method === "POST") return jsonResponse({ name: "newtag", description: "", domain_count: 0 });
+        if (value.includes("/api/v1/tags")) return jsonResponse([]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openTagsTab();
+
+      await fireEvent.input(screen.getByLabelText("Name"), { target: { value: "newtag" } });
+      await fireEvent.click(screen.getByText("Create"));
+
+      await waitFor(() => {
+        expect(calls.some((c) => c.url.includes("/api/v1/tags") && c.method === "POST")).toBe(true);
+      });
+      unmount();
+    });
+
+    it("pressing Enter in description field submits create tag form", async () => {
+      const calls = [];
+      global.fetch.mockImplementation((url, opts) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        calls.push({ url: value, method: opts?.method });
+        if (value.includes("/api/v1/tags") && opts?.method === "POST") return jsonResponse({ name: "newtag", description: "a desc", domain_count: 0 });
+        if (value.includes("/api/v1/tags")) return jsonResponse([]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openTagsTab();
+
+      await fireEvent.input(screen.getByLabelText("Name"), { target: { value: "newtag" } });
+      await fireEvent.input(screen.getByLabelText("Description"), { target: { value: "a desc" } });
+      await fireEvent.keyDown(screen.getByLabelText("Description"), { key: "Enter" });
+
+      await waitFor(() => {
+        expect(calls.some((c) => c.url.includes("/api/v1/tags") && c.method === "POST")).toBe(true);
+      });
+      unmount();
+    });
+
+    it("clicking a tag row opens detail view with summary and domains", async () => {
+      mockTagFetch(
+        [{ name: "ccTLD", description: "ccTLDs", domain_count: 2 }],
+        { tag: "ccTLD", domain_count: 2, ok: 0, notice: 0, warning: 1, error: 1, critical: 0 },
+        [{ id: 1, name: "example.com", latest_level: "WARNING", run_count: 1 }]
+      );
+      const { unmount } = render(App);
+      await openTagsTab();
+      await fireEvent.click(await screen.findByText("ccTLD"));
+
+      await waitFor(() => {
+        expect(screen.getByText("← Back to tags")).toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "Domains in this tag" })).toBeInTheDocument();
+        expect(screen.getByText("example.com")).toBeInTheDocument();
+      });
+      unmount();
+    });
+
+    it("back button returns to tag list", async () => {
+      mockTagFetch([{ name: "tld", description: "", domain_count: 0 }]);
+      const { unmount } = render(App);
+      await openTagsTab();
+      await fireEvent.click(await screen.findByText("tld"));
+      await waitFor(() => screen.getByText("← Back to tags"));
+      await fireEvent.click(screen.getByText("← Back to tags"));
+      await waitFor(() => {
+        expect(screen.queryByText("← Back to tags")).not.toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "Tags" })).toBeInTheDocument();
+      });
+      unmount();
+    });
+
+    it("Run all button POSTs batch with from_tag", async () => {
+      const calls = [];
+      global.fetch.mockImplementation((url, opts) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        calls.push({ url: value, method: opts?.method, body: opts?.body });
+        if (value.includes("/summary")) return jsonResponse({ tag: "t", domain_count: 0, ok: 0, notice: 0, warning: 0, error: 0, critical: 0 });
+        if (value.includes("/domains") && value.includes("/tags/")) return jsonResponse({ items: [], total: 0 });
+        if (value.includes("/api/v1/jobs/batch") && opts?.method === "POST") return jsonResponse({ batch_id: "batch-1" });
+        if (value.includes("/api/v1/tags")) return jsonResponse([{ name: "tld", description: "", domain_count: 3 }]);
+        if (value.includes("/api/v1/jobs")) return jsonResponse({ items: [], total: 0 });
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openTagsTab();
+      await fireEvent.click(await screen.findByText("tld"));
+      await waitFor(() => screen.getByText("Run all domains"));
+      await fireEvent.click(screen.getByText("Run all domains"));
+
+      await waitFor(() => {
+        const batchCall = calls.find((c) => c.url.includes("/api/v1/jobs/batch") && c.method === "POST");
+        expect(batchCall).toBeTruthy();
+        expect(batchCall.body).toContain("from_tag");
+      });
+      unmount();
+    });
+
+    it("delete tag button shows confirmation then calls DELETE", async () => {
+      const calls = [];
+      global.fetch.mockImplementation((url, opts) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        calls.push({ url: value, method: opts?.method });
+        if (value.includes("/summary")) return jsonResponse({ tag: "t", domain_count: 0, ok: 0, notice: 0, warning: 0, error: 0, critical: 0 });
+        if (value.includes("/domains") && value.includes("/tags/")) return jsonResponse({ items: [], total: 0 });
+        if (opts?.method === "DELETE" && value.includes("/api/v1/tags/")) return { ok: true, status: 204, headers: { get: () => null }, json: async () => ({}), text: async () => "" };
+        if (value.includes("/api/v1/tags")) return jsonResponse([{ name: "del-me", description: "", domain_count: 0 }]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openTagsTab();
+      await fireEvent.click(await screen.findByText("del-me"));
+      await waitFor(() => screen.getByText("Delete tag"));
+
+      await fireEvent.click(screen.getByText("Delete tag"));
+      await waitFor(() => screen.getByText("Confirm delete"));
+
+      await fireEvent.click(screen.getByText("Confirm delete"));
+      await waitFor(() => {
+        expect(calls.some((c) => c.method === "DELETE" && c.url.includes("/api/v1/tags/del-me"))).toBe(true);
+      });
+      unmount();
+    });
+
+    it("add domains calls POST tags/{name}/domains", async () => {
+      const calls = [];
+      global.fetch.mockImplementation((url, opts) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        calls.push({ url: value, method: opts?.method });
+        if (value.includes("/summary")) return jsonResponse({ tag: "t", domain_count: 0, ok: 0, notice: 0, warning: 0, error: 0, critical: 0 });
+        if (value.includes("/domains") && value.includes("/tags/") && opts?.method === "POST") return { ok: true, status: 204, headers: { get: () => null }, json: async () => ({}), text: async () => "" };
+        if (value.includes("/domains") && value.includes("/tags/")) return jsonResponse({ items: [], total: 0 });
+        if (value.includes("/api/v1/tags")) return jsonResponse([{ name: "mytag", description: "", domain_count: 0 }]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openTagsTab();
+      await fireEvent.click(await screen.findByText("mytag"));
+      await waitFor(() => screen.getByText("Add Domains"));
+
+      const textareas = screen.getAllByRole("textbox");
+      const addArea = textareas.find((el) => el.placeholder?.includes("example.com"));
+      await fireEvent.input(addArea, { target: { value: "new.example" } });
+      await fireEvent.click(screen.getByText("Add"));
+
+      await waitFor(() => {
+        expect(calls.some((c) => c.url.includes("/tags/mytag/domains") && c.method === "POST")).toBe(true);
+      });
+      unmount();
+    });
+  });
+
+  describe("Run Inspector", () => {
+    it("shows Run Inspector heading when viewing a completed job", async () => {
+      const job = { id: "run-done", domain: "example.com", status: "succeeded", created_at: "2026-01-01T00:00:00Z", progress: 100 };
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value.includes(`/api/v1/jobs/${job.id}/result`)) return jsonResponse({ job_id: job.id, status: "succeeded", summary: {}, raw: { entries: [] } });
+        if (value.includes(`/api/v1/jobs/${job.id}`)) return jsonResponse(job);
+        if (value.includes(`/api/v1/runs/${job.id}`)) return jsonResponse({ id: job.id, domain: "example.com", status: "succeeded", duration_ms: 3200, entry_count: 12, worst_level: "WARNING" });
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+
+      const jobIdInput = await screen.findByPlaceholderText("job_123");
+      await fireEvent.input(jobIdInput, { target: { value: job.id } });
+      await fireEvent.change(jobIdInput);
+
+      await waitFor(() => {
+        expect(screen.getByRole("heading", { name: "Run Inspector" })).toBeInTheDocument();
+      });
+      unmount();
+    });
+
+    it("shows run metadata (duration, entry count, worst level) when run is loaded", async () => {
+      const job = { id: "run-meta", domain: "meta.example.com", status: "succeeded", created_at: "2026-01-01T00:00:00Z", progress: 100 };
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value.includes(`/api/v1/jobs/${job.id}/result`)) return jsonResponse({ job_id: job.id, status: "succeeded", summary: {}, raw: { entries: [] } });
+        if (value.includes(`/api/v1/jobs/${job.id}`)) return jsonResponse(job);
+        if (value.includes(`/api/v1/runs/${job.id}`)) return jsonResponse({ id: job.id, domain: "meta.example.com", status: "succeeded", duration_ms: 4500, entry_count: 27, worst_level: "ERROR" });
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+
+      const jobIdInput = await screen.findByPlaceholderText("job_123");
+      await fireEvent.input(jobIdInput, { target: { value: job.id } });
+      await fireEvent.change(jobIdInput);
+
+      await waitFor(() => {
+        expect(screen.getByText("4500 ms")).toBeInTheDocument();
+        expect(screen.getByText("27")).toBeInTheDocument();
+        expect(screen.getByText("ERROR")).toBeInTheDocument();
+      });
+      unmount();
+    });
+
+    it("domain link in inspector navigates to domains tab on click", async () => {
+      const job = { id: "run-domlink", domain: "nav.example.com", status: "succeeded", created_at: "2026-01-01T00:00:00Z", progress: 100 };
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value.includes(`/api/v1/jobs/${job.id}/result`)) return jsonResponse({ job_id: job.id, status: "succeeded", summary: {}, raw: { entries: [] } });
+        if (value.includes(`/api/v1/jobs/${job.id}`)) return jsonResponse(job);
+        if (value.includes(`/api/v1/runs/${job.id}`)) return jsonResponse({ id: job.id, domain: "nav.example.com", status: "succeeded", duration_ms: 100, entry_count: 1, worst_level: "" });
+        if (value.includes("/api/v1/domains") && value.includes("nav.example.com")) return jsonResponse({ items: [{ id: 99, name: "nav.example.com", tags: [], latest_level: "", run_count: 1 }], total: 1 });
+        if (value.includes(`/api/v1/domains/99/runs`)) return jsonResponse({ items: [], total: 0 });
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+
+      const jobIdInput = await screen.findByPlaceholderText("job_123");
+      await fireEvent.input(jobIdInput, { target: { value: job.id } });
+      await fireEvent.change(jobIdInput);
+
+      await waitFor(() => screen.getByText("nav.example.com"));
+
+      const domainBtn = screen.getAllByText("nav.example.com").find((el) => el.tagName === "BUTTON");
+      expect(domainBtn).toBeTruthy();
+      await fireEvent.click(domainBtn);
+
+      await waitFor(() => {
+        expect(screen.getByRole("tab", { name: "Domains" })).toHaveAttribute("aria-selected", "true");
+      });
+      unmount();
+    });
   });
 });

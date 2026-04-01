@@ -8,9 +8,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/logargs"
+	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 )
 
@@ -48,15 +51,12 @@ func (ns *Nameserver) AddFakeDelegation(domain string, data map[string][]string)
 	var additional []dns.RR
 	for nsName, ips := range data {
 		nsObj := dnsname.New(nsName)
-		authority = append(authority, &dns.NS{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(domainName.String()),
-				Rrtype: dns.TypeNS,
-				Class:  dns.ClassINET,
-				Ttl:    0,
-			},
-			Ns: dns.Fqdn(nsObj.String()),
-		})
+		nsRR := &dns.NS{Hdr: dns.Header{
+			Name:  dnsutil.Fqdn(domainName.String()),
+			Class: dns.ClassINET,
+		}}
+		nsRR.Ns = dnsutil.Fqdn(nsObj.String())
+		authority = append(authority, nsRR)
 
 		for _, ip := range ips {
 			addr, err := netip.ParseAddr(ip)
@@ -64,29 +64,29 @@ func (ns *Nameserver) AddFakeDelegation(domain string, data map[string][]string)
 				return fmt.Errorf("invalid delegation IP %q: %w", ip, err)
 			}
 			if addr == ns.Address {
+				logArgs := map[string]any{
+					"domain": domainKey,
+					"data":   data,
+				}
+				logargs.SetNS(logArgs, ns.NameString(), ns.AddressString())
+				logSystemWithLogger(ns.log, "FAKE_DELEGATION_TO_SELF", logArgs)
 				return nil
 			}
 
 			if addr.Is6() {
-				additional = append(additional, &dns.AAAA{
-					Hdr: dns.RR_Header{
-						Name:   dns.Fqdn(nsObj.String()),
-						Rrtype: dns.TypeAAAA,
-						Class:  dns.ClassINET,
-						Ttl:    0,
-					},
-					AAAA: addr.AsSlice(),
-				})
+				aaaa := &dns.AAAA{Hdr: dns.Header{
+					Name:  dnsutil.Fqdn(nsObj.String()),
+					Class: dns.ClassINET,
+				}}
+				aaaa.Addr = addr
+				additional = append(additional, aaaa)
 			} else {
-				additional = append(additional, &dns.A{
-					Hdr: dns.RR_Header{
-						Name:   dns.Fqdn(nsObj.String()),
-						Rrtype: dns.TypeA,
-						Class:  dns.ClassINET,
-						Ttl:    0,
-					},
-					A: addr.AsSlice(),
-				})
+				a := &dns.A{Hdr: dns.Header{
+					Name:  dnsutil.Fqdn(nsObj.String()),
+					Class: dns.ClassINET,
+				}}
+				a.Addr = addr
+				additional = append(additional, a)
 			}
 		}
 	}
@@ -95,6 +95,12 @@ func (ns *Nameserver) AddFakeDelegation(domain string, data map[string][]string)
 		authority:  authority,
 		additional: additional,
 	}
+	logArgs := map[string]any{
+		"domain": domainKey,
+		"data":   data,
+	}
+	logargs.SetNS(logArgs, ns.NameString(), ns.AddressString())
+	logSystemWithLogger(ns.log, "FAKE_DELEGATION_ADDED", logArgs)
 	return nil
 }
 
@@ -115,20 +121,23 @@ func (ns *Nameserver) AddFakeDS(domain string, data []DSData) error {
 	domainKey := strings.ToLower(domainName.String())
 	var records []dns.RR
 	for _, ds := range data {
-		records = append(records, &dns.DS{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(domainName.String()),
-				Rrtype: dns.TypeDS,
-				Class:  dns.ClassINET,
-				Ttl:    0,
-			},
-			KeyTag:     ds.KeyTag,
-			Algorithm:  ds.Algorithm,
-			DigestType: ds.DigestType,
-			Digest:     ds.Digest,
-		})
+		dsRR := &dns.DS{Hdr: dns.Header{
+			Name:  dnsutil.Fqdn(domainName.String()),
+			Class: dns.ClassINET,
+		}}
+		dsRR.KeyTag = ds.KeyTag
+		dsRR.Algorithm = ds.Algorithm
+		dsRR.DigestType = ds.DigestType
+		dsRR.Digest = ds.Digest
+		records = append(records, dsRR)
 	}
 	ns.state.fakeDS[domainKey] = records
+	logArgs := map[string]any{
+		"domain": domainKey,
+		"data":   data,
+	}
+	logargs.SetNS(logArgs, ns.NameString(), ns.AddressString())
+	logSystemWithLogger(ns.log, "FAKE_DS_ADDED", logArgs)
 	return nil
 }
 
@@ -148,7 +157,7 @@ func (ns Nameserver) FakeDSRecords(domain string) []dns.RR {
 	return out
 }
 
-func (ns Nameserver) fakeDSResponse(name string, qtype string, qclass string, opts *QueryOptions) (packet.Packet, bool) {
+func (ns Nameserver) fakeDSResponse(name string, qtype string, qclass string, opts *QueryOptions, runLog *logger.Logger) (packet.Packet, bool) {
 	if ns.state == nil || qtype != "DS" || qclass != "IN" {
 		return packet.Packet{}, false
 	}
@@ -163,21 +172,29 @@ func (ns Nameserver) fakeDSResponse(name string, qtype string, qclass string, op
 	msg.Response = true
 	msg.Authoritative = true
 	msg.RecursionDesired = resolveRecurse(opts)
-	msg.Question = []dns.Question{{
-		Name:   dns.Fqdn(name),
-		Qtype:  dns.TypeDS,
-		Qclass: dns.ClassINET,
-	}}
+	dnsutil.SetQuestion(msg, dnsutil.Fqdn(name), dns.TypeDS)
 	msg.Answer = append(msg.Answer, records...)
 
 	dnssec := resolveDNSSEC(opts)
 	ednsSize := resolveEDNSSize(opts, dnssec)
 	setResponseEDNS(msg, dnssec, ednsSize, opts)
 
-	return packet.Packet{Msg: msg, AnswerFrom: ns.Address.String()}, true
+	resp := packet.Packet{Msg: msg, AnswerFrom: ns.Address.String(), Log: runLog}
+	logArgs := map[string]any{
+		"query_name":  nameObj.String(),
+		"query_type":  qtype,
+		"query_class": qclass,
+		"from":        ns.String(),
+	}
+	logargs.SetNS(logArgs, ns.NameString(), ns.AddressString())
+	logSystemWithLogger(runLog, "FAKE_DS_RETURNED", logArgs)
+	logSystemWithLogger(runLog, "FAKE_PACKET_RETURNED", map[string]any{
+		"packet": resp.String(),
+	})
+	return resp, true
 }
 
-func (ns Nameserver) fakeDelegationResponse(name string, qtype string, qclass string, opts *QueryOptions) (packet.Packet, bool) {
+func (ns Nameserver) fakeDelegationResponse(name string, qtype string, qclass string, opts *QueryOptions, runLog *logger.Logger) (packet.Packet, bool) {
 	if ns.state == nil {
 		return packet.Packet{}, false
 	}
@@ -199,11 +216,8 @@ func (ns Nameserver) fakeDelegationResponse(name string, qtype string, qclass st
 		msg.Response = true
 		msg.Authoritative = qtype == "DS"
 		msg.RecursionDesired = resolveRecurse(opts)
-		msg.Question = []dns.Question{{
-			Name:   dns.Fqdn(name),
-			Qtype:  dns.StringToType[qtype],
-			Qclass: dns.StringToClass[qclass],
-		}}
+		dnsutil.SetQuestion(msg, dnsutil.Fqdn(name), dns.StringToType[qtype])
+		msg.Question[0].Header().Class = dns.StringToClass[qclass]
 
 		if strings.EqualFold(nameKey, key) && qtype == "NS" {
 			msg.Answer = append(msg.Answer, del.authority...)
@@ -217,7 +231,19 @@ func (ns Nameserver) fakeDelegationResponse(name string, qtype string, qclass st
 		ednsSize := resolveEDNSSize(opts, dnssec)
 		setResponseEDNS(msg, dnssec, ednsSize, opts)
 
-		return packet.Packet{Msg: msg, AnswerFrom: ns.Address.String()}, true
+		resp := packet.Packet{Msg: msg, AnswerFrom: ns.Address.String(), Log: runLog}
+		logArgs := map[string]any{
+			"query_name":  nameObj.String(),
+			"query_type":  qtype,
+			"query_class": qclass,
+			"from":        ns.String(),
+		}
+		logargs.SetNS(logArgs, ns.NameString(), ns.AddressString())
+		logSystemWithLogger(runLog, "FAKE_DELEGATION_RETURNED", logArgs)
+		logSystemWithLogger(runLog, "FAKE_PACKET_RETURNED", map[string]any{
+			"packet": resp.String(),
+		})
+		return resp, true
 	}
 	return packet.Packet{}, false
 }
@@ -261,26 +287,72 @@ func setResponseEDNS(msg *dns.Msg, dnssec bool, size uint16, opts *QueryOptions)
 		return
 	}
 
-	msg.SetEdns0(size, dnssec)
-	opt := msg.IsEdns0()
-	if opt == nil || opts == nil || opts.EDNSDetails == nil {
+	msg.UDPSize = size
+	msg.Security = dnssec
+
+	if opts == nil || opts.EDNSDetails == nil {
 		return
 	}
 	if opts.EDNSDetails.Do != nil {
-		opt.SetDo(*opts.EDNSDetails.Do)
+		msg.Security = *opts.EDNSDetails.Do
 	}
 	if opts.EDNSDetails.Version != nil {
-		opt.SetVersion(*opts.EDNSDetails.Version)
-	}
-	if opts.EDNSDetails.Z != nil {
-		opt.SetZ(*opts.EDNSDetails.Z)
+		msg.Version = *opts.EDNSDetails.Version
 	}
 	if opts.EDNSDetails.Rcode != nil {
-		opt.SetExtendedRcode(uint16(*opts.EDNSDetails.Rcode))
+		msg.Rcode = uint16(*opts.EDNSDetails.Rcode)
 	}
-	if len(opts.EDNSDetails.Data) > 0 {
-		opt.Option = append(opt.Option, opts.EDNSDetails.Data...)
+	for _, opt := range opts.EDNSDetails.Data {
+		msg.Pseudo = append(msg.Pseudo, opt)
 	}
+	if opts.EDNSDetails.Z != nil {
+		setMessageEDNSZ(msg, *opts.EDNSDetails.Z)
+	}
+}
+
+func setMessageEDNSZ(msg *dns.Msg, z uint16) {
+	if msg == nil {
+		return
+	}
+
+	opt := &dns.OPT{Hdr: dns.Header{Name: "."}}
+	for _, rr := range msg.Pseudo {
+		edns, ok := rr.(dns.EDNS0)
+		if !ok {
+			return
+		}
+		opt.Options = append(opt.Options, edns)
+	}
+
+	udpSize := msg.UDPSize
+	if udpSize < dns.MinMsgSize {
+		udpSize = dns.MinMsgSize
+	}
+	opt.SetUDPSize(udpSize)
+	opt.SetVersion(msg.Version)
+	opt.SetSecurity(msg.Security)
+	opt.SetCompactAnswers(msg.CompactAnswers)
+	opt.SetDelegation(msg.Delegation)
+	opt.SetRcode(msg.Rcode)
+	opt.SetZ(z)
+
+	extra := make([]dns.RR, 0, len(msg.Extra)+1)
+	for _, rr := range msg.Extra {
+		if _, isOPT := rr.(*dns.OPT); isOPT {
+			continue
+		}
+		extra = append(extra, rr)
+	}
+	extra = append(extra, opt)
+	msg.Extra = extra
+
+	msg.Pseudo = nil
+	msg.UDPSize = 0
+	msg.Security = false
+	msg.CompactAnswers = false
+	msg.Delegation = false
+	msg.Version = 0
+	msg.Rcode &= 0xF
 }
 
 func buildCacheKey(name string, qtype string, qclass string, opts *QueryOptions) (string, uint16, bool, error) {

@@ -3,11 +3,13 @@ package syntax
 import (
 	"context"
 	"net"
+	"net/netip"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
@@ -177,10 +179,10 @@ func TestSyntax06ParallelMailServers(t *testing.T) {
 		case name == "." && kind == "NS":
 			return nsPacket(".", "a.root"), nil
 		case name == "." && kind == "SOA":
-			return soaPacket(".", "a.root", "hostmaster.example."), nil
-		case name == "example" && kind == "MX":
-			return mxPacketMulti("example", "mail1.example.", "mail2.example."), nil
-		case name == "mail1.example" && kind == "A":
+			return soaPacket(".", "a.root", "hostmaster.example.com."), nil
+		case name == "example.com" && kind == "MX":
+			return mxPacketMulti("example.com", "mail1.example.com.", "mail2.example.com."), nil
+		case name == "mail1.example.com" && kind == "A":
 			select {
 			case started <- "mail1":
 			default:
@@ -190,8 +192,8 @@ func TestSyntax06ParallelMailServers(t *testing.T) {
 			case <-ctx.Done():
 				return packet.Packet{}, ctx.Err()
 			}
-			return aPacket("mail1.example", net.IPv4(192, 0, 2, 10)), nil
-		case name == "mail2.example" && kind == "A":
+			return aPacket("mail1.example.com", net.IPv4(192, 0, 2, 10)), nil
+		case name == "mail2.example.com" && kind == "A":
 			select {
 			case started <- "mail2":
 			default:
@@ -201,10 +203,10 @@ func TestSyntax06ParallelMailServers(t *testing.T) {
 			case <-ctx.Done():
 				return packet.Packet{}, ctx.Err()
 			}
-			return aPacket("mail2.example", net.IPv4(192, 0, 2, 11)), nil
-		case name == "mail1.example" && kind == "AAAA":
+			return aPacket("mail2.example.com", net.IPv4(192, 0, 2, 11)), nil
+		case name == "mail1.example.com" && kind == "AAAA":
 			return packet.Packet{}, nil
-		case name == "mail2.example" && kind == "AAAA":
+		case name == "mail2.example.com" && kind == "AAAA":
 			return packet.Packet{}, nil
 		default:
 			return packet.Packet{}, nil
@@ -251,6 +253,138 @@ func TestSyntax06ParallelMailServers(t *testing.T) {
 
 	if !hasEntryTag(entries, "RNAME_RFC822_VALID") {
 		t.Fatalf("expected RNAME_RFC822_VALID")
+	}
+}
+
+func TestSyntax06MailDomainInvalidUsesProfileLevel(t *testing.T) {
+	ctx, prof, log := testhelpers.Context(t)
+	log.SetProfile(prof)
+
+	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
+		switch {
+		case strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "NS"):
+			return nsPacket(".", "a.root.")
+		case strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "SOA"):
+			return soaPacket(".", "a.root.", "hostmaster.example.com.")
+		case strings.EqualFold(qname, "example.com") && strings.EqualFold(qtype, "MX"):
+			return mxPacket("example.com", "mail.example.com.")
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	entries, err := Syntax06(ctx, z)
+	if err != nil {
+		t.Fatalf("syntax06: %v", err)
+	}
+
+	entry := firstEntryByTag(entries, "RNAME_MAIL_DOMAIN_INVALID")
+	if entry == nil {
+		t.Fatalf("expected RNAME_MAIL_DOMAIN_INVALID")
+	}
+
+	wantLevel := "NOTICE"
+	if moduleLevels := prof.TestLevels["SYNTAX"]; moduleLevels != nil {
+		if configured, ok := moduleLevels["RNAME_MAIL_DOMAIN_INVALID"]; ok {
+			wantLevel = strings.ToUpper(configured)
+		}
+	}
+	if entry.Level() != wantLevel {
+		t.Fatalf("RNAME_MAIL_DOMAIN_INVALID level=%s, want %s", entry.Level(), wantLevel)
+	}
+}
+
+func TestSyntax06RnameSingleLabelDomainInvalid(t *testing.T) {
+	ctx := testContext(t)
+	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
+		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "NS") {
+			return nsPacket(".", "a.root.")
+		}
+		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "SOA") {
+			return soaPacket(".", "a.root.", "dnsadmin.mo.")
+		}
+		return packet.Packet{}
+	})
+
+	entries, err := Syntax06(ctx, z)
+	if err != nil {
+		t.Fatalf("syntax06: %v", err)
+	}
+	if !hasEntryTag(entries, "RNAME_RFC822_INVALID") {
+		t.Fatalf("expected RNAME_RFC822_INVALID")
+	}
+	if hasEntryTag(entries, "RNAME_RFC822_VALID") {
+		t.Fatalf("did not expect RNAME_RFC822_VALID")
+	}
+}
+
+func TestSyntax06NoResponseArgsSplit(t *testing.T) {
+	ctx := testContext(t)
+	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
+		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "NS") {
+			return nsPacket(".", "a.root.")
+		}
+		return packet.Packet{}
+	})
+
+	entries, err := Syntax06(ctx, z)
+	if err != nil {
+		t.Fatalf("syntax06: %v", err)
+	}
+	entry := firstEntryByTag(entries, "NO_RESPONSE")
+	if entry == nil {
+		t.Fatalf("expected NO_RESPONSE")
+	}
+	if _, ok := entry.Args["arg_schema"]; ok {
+		t.Fatalf("did not expect arg_schema in args: %#v", entry.Args["arg_schema"])
+	}
+	if nsArg, ok := entry.Args["ns"].(string); !ok || nsArg != "a.root" {
+		t.Fatalf("expected ns=a.root, got %#v", entry.Args["ns"])
+	}
+	if address, ok := entry.Args["address"].(string); !ok || address != "192.0.2.1" {
+		t.Fatalf("expected address=192.0.2.1, got %#v", entry.Args["address"])
+	}
+	if nsArg, _ := entry.Args["ns"].(string); strings.Contains(nsArg, "/") {
+		t.Fatalf("expected nameserver-only ns argument, got %q", nsArg)
+	}
+}
+
+func TestSyntax06IPv4DisabledArgsSplit(t *testing.T) {
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.Net.IPv4 = false
+
+	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
+		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "NS") {
+			return nsPacket(".", "a.root.")
+		}
+		return packet.Packet{}
+	})
+
+	entries, err := Syntax06(ctx, z)
+	if err != nil {
+		t.Fatalf("syntax06: %v", err)
+	}
+	entry := firstEntryByTag(entries, "IPV4_DISABLED")
+	if entry == nil {
+		t.Fatalf("expected IPV4_DISABLED")
+	}
+	if _, ok := entry.Args["arg_schema"]; ok {
+		t.Fatalf("did not expect arg_schema in args: %#v", entry.Args["arg_schema"])
+	}
+	if nsArg, ok := entry.Args["ns"].(string); !ok || nsArg != "a.root" {
+		t.Fatalf("expected ns=a.root, got %#v", entry.Args["ns"])
+	}
+	if address, ok := entry.Args["address"].(string); !ok || address != "192.0.2.1" {
+		t.Fatalf("expected address=192.0.2.1, got %#v", entry.Args["address"])
+	}
+	if _, ok := entry.Args["rrtype"]; ok {
+		t.Fatalf("did not expect legacy rrtype in args: %#v", entry.Args["rrtype"])
+	}
+	if qtype, ok := entry.Args["query_type"].(string); !ok || qtype != "SOA" {
+		t.Fatalf("expected query_type=SOA, got %#v", entry.Args["query_type"])
+	}
+	if nsArg, _ := entry.Args["ns"].(string); strings.Contains(nsArg, "/") {
+		t.Fatalf("expected nameserver-only ns argument, got %q", nsArg)
 	}
 }
 
@@ -322,6 +456,15 @@ func TestRnameToEmailEscapedDots(t *testing.T) {
 	}
 }
 
+func TestValidEmailAddress(t *testing.T) {
+	if !validEmailAddress("hostmaster@example.com") {
+		t.Fatalf("expected hostmaster@example.com to be valid")
+	}
+	if validEmailAddress("dnsadmin@mo") {
+		t.Fatalf("expected dnsadmin@mo to be invalid")
+	}
+}
+
 func TestLabelNotACEHasDoubleHyphen(t *testing.T) {
 	if !labelNotACEHasDoubleHyphen("ab--cd") {
 		t.Fatalf("expected double hyphen to be discouraged")
@@ -365,17 +508,9 @@ func newRootZoneWithHook(ctx context.Context, t *testing.T, handler func(qname s
 func nsPacket(zoneName string, nsName string) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
-	msg.Answer = []dns.RR{
-		&dns.NS{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(zoneName),
-				Rrtype: dns.TypeNS,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Ns: dns.Fqdn(nsName),
-		},
-	}
+	nsRR := &dns.NS{Hdr: dns.Header{Name: dnsutil.Fqdn(zoneName), Class: dns.ClassINET, TTL: 60}}
+	nsRR.Ns = dnsutil.Fqdn(nsName)
+	msg.Answer = []dns.RR{nsRR}
 	return packet.Packet{Msg: msg}
 }
 
@@ -383,41 +518,25 @@ func soaPacket(zoneName string, mname string, rname string) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
 	msg.Authoritative = true
-	msg.Answer = []dns.RR{
-		&dns.SOA{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(zoneName),
-				Rrtype: dns.TypeSOA,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Ns:      dns.Fqdn(mname),
-			Mbox:    dns.Fqdn(rname),
-			Serial:  1,
-			Refresh: 3600,
-			Retry:   600,
-			Expire:  86400,
-			Minttl:  60,
-		},
-	}
+	soaRR := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn(zoneName), Class: dns.ClassINET, TTL: 60}}
+	soaRR.Ns = dnsutil.Fqdn(mname)
+	soaRR.Mbox = dnsutil.Fqdn(rname)
+	soaRR.Serial = 1
+	soaRR.Refresh = 3600
+	soaRR.Retry = 600
+	soaRR.Expire = 86400
+	soaRR.Minttl = 60
+	msg.Answer = []dns.RR{soaRR}
 	return packet.Packet{Msg: msg}
 }
 
 func mxPacket(zoneName string, exchange string) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
-	msg.Answer = []dns.RR{
-		&dns.MX{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(zoneName),
-				Rrtype: dns.TypeMX,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Preference: 10,
-			Mx:         dns.Fqdn(exchange),
-		},
-	}
+	mxRR := &dns.MX{Hdr: dns.Header{Name: dnsutil.Fqdn(zoneName), Class: dns.ClassINET, TTL: 60}}
+	mxRR.Preference = 10
+	mxRR.Mx = dnsutil.Fqdn(exchange)
+	msg.Answer = []dns.RR{mxRR}
 	return packet.Packet{Msg: msg}
 }
 
@@ -426,16 +545,10 @@ func mxPacketMulti(zoneName string, exchanges ...string) packet.Packet {
 	msg.Rcode = dns.RcodeSuccess
 	msg.Authoritative = true
 	for i, exchange := range exchanges {
-		msg.Answer = append(msg.Answer, &dns.MX{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(zoneName),
-				Rrtype: dns.TypeMX,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Preference: uint16(10 + i),
-			Mx:         dns.Fqdn(exchange),
-		})
+		mxRR := &dns.MX{Hdr: dns.Header{Name: dnsutil.Fqdn(zoneName), Class: dns.ClassINET, TTL: 60}}
+		mxRR.Preference = uint16(10 + i)
+		mxRR.Mx = dnsutil.Fqdn(exchange)
+		msg.Answer = append(msg.Answer, mxRR)
 	}
 	return packet.Packet{Msg: msg}
 }
@@ -444,17 +557,11 @@ func aPacket(owner string, addr net.IP) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
 	msg.Authoritative = true
-	msg.Answer = []dns.RR{
-		&dns.A{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(owner),
-				Rrtype: dns.TypeA,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			A: addr,
-		},
+	aRR := &dns.A{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
+	if ip4 := addr.To4(); ip4 != nil {
+		aRR.Addr = netip.AddrFrom4([4]byte(ip4))
 	}
+	msg.Answer = []dns.RR{aRR}
 	return packet.Packet{Msg: msg}
 }
 
@@ -469,4 +576,16 @@ func hasEntryTag(entries []*logger.Entry, tag string) bool {
 		}
 	}
 	return false
+}
+
+func firstEntryByTag(entries []*logger.Entry, tag string) *logger.Entry {
+	for _, entry := range entries {
+		if entry == nil {
+			continue
+		}
+		if entry.Tag == tag {
+			return entry
+		}
+	}
+	return nil
 }

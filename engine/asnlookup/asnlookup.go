@@ -11,7 +11,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/packet"
@@ -102,15 +103,11 @@ func GetWithPrefix(ctx context.Context, resolver Resolver, ip netip.Addr) (Resul
 }
 
 func lookupCymru(ctx context.Context, resolver Resolver, ip netip.Addr, source string) (Result, error) {
-	if _, err := util.LoggerFromContext(ctx).Add("ASN_LOOKUP_SOURCE", map[string]any{"name": source}, "", ""); err != nil {
+	if _, err := util.LoggerFromContext(ctx).Add("ASN_LOOKUP_SOURCE", map[string]any{"source": source}, "", ""); err != nil {
 		return Result{}, err
 	}
 
-	reverse, err := dns.ReverseAddr(ip.String())
-	if err != nil {
-		return Result{}, err
-	}
-	reverse = strings.ToLower(reverse)
+	reverse := strings.ToLower(dnsutil.ReverseAddr(ip))
 
 	suffix := ""
 	replacement := ""

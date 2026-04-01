@@ -1,8 +1,8 @@
 export const metricsWindowOptions = [
-  { id: "1h", label: "Last 1h" },
-  { id: "6h", label: "Last 6h" },
-  { id: "24h", label: "Last 24h" },
-  { id: "48h", label: "Last 48h" }
+  { id: "1h", labelKey: "metrics_window_1h" },
+  { id: "6h", labelKey: "metrics_window_6h" },
+  { id: "24h", labelKey: "metrics_window_24h" },
+  { id: "48h", labelKey: "metrics_window_48h" }
 ];
 
 const metricsIncludeDefault = ["health", "jobs", "api", "quality", "insights", "trends"];

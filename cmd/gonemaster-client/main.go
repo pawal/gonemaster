@@ -14,10 +14,12 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"syscall"
 	"time"
 
+	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/normalization"
 )
 
@@ -39,6 +41,7 @@ type globalOptions struct {
 	format  string
 	output  string
 	locale  string
+	version bool
 	noColor bool
 	headers headerList
 }
@@ -97,7 +100,6 @@ type job struct {
 	StartedAt  time.Time `json:"started_at,omitempty"`
 	FinishedAt time.Time `json:"finished_at,omitempty"`
 	Progress   int       `json:"progress"`
-	ResultURL  string    `json:"result_url,omitempty"`
 	Error      string    `json:"error,omitempty"`
 }
 
@@ -111,13 +113,16 @@ type jobCreateRequest struct {
 	Tests            []string       `json:"tests,omitempty"`
 	ProfileOverrides map[string]any `json:"profile_overrides,omitempty"`
 	MinLevel         string         `json:"min_level,omitempty"`
+	Tags             []string       `json:"tags,omitempty"`
 }
 
 type jobBatchRequest struct {
-	Domains          []string       `json:"domains"`
+	Domains          []string       `json:"domains,omitempty"`
 	Tests            []string       `json:"tests,omitempty"`
 	ProfileOverrides map[string]any `json:"profile_overrides,omitempty"`
 	MinLevel         string         `json:"min_level,omitempty"`
+	Tags             []string       `json:"tags,omitempty"`
+	FromTag          string         `json:"from_tag,omitempty"`
 }
 
 type jobBatchResponse struct {
@@ -235,6 +240,11 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		fmt.Fprintln(errOut, err.Error())
 		return 2
 	}
+	if opts.version {
+		fmt.Fprintf(out, "Gonemaster version %s\n", engine.VersionFull())
+		fmt.Fprintf(out, "Miekg DNS version %s\n", moduleVersion("codeberg.org/miekg/dns"))
+		return 0
+	}
 	if len(rest) == 0 {
 		printUsage(errOut)
 		return 2
@@ -262,6 +272,14 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		return runBatches(ctx, client, opts, rest, writer, errOut)
 	case "queue":
 		return runQueue(ctx, client, opts, rest, writer, errOut)
+	case "domains":
+		return runDomains(ctx, client, opts, rest, writer, errOut)
+	case "tags":
+		return runTags(ctx, client, opts, rest, writer, errOut)
+	case "runs":
+		return runRuns(ctx, client, opts, rest, writer, errOut)
+	case "entries":
+		return runEntries(ctx, client, opts, rest, writer, errOut)
 	case "help", "-h", "--help":
 		printUsage(writer)
 		return 0
@@ -281,13 +299,17 @@ func parseGlobalFlags(args []string, errOut io.Writer) (globalOptions, []string,
 	}
 	fs.StringVar(&opts.server, "server", "", "Base server URL (default http://localhost:8080/api/v1)")
 	fs.DurationVar(&opts.timeout, "timeout", 30*time.Second, "HTTP timeout (default 30s)")
-	fs.StringVar(&opts.format, "format", defaultFormat, "Output format: pretty, json, jsonl")
+	fs.StringVar(&opts.format, "format", defaultFormat, "Output format: pretty, json, jsonl (or json-stream)")
 	fs.StringVar(&opts.output, "output", "", "Write output to file instead of stdout")
 	fs.StringVar(&opts.locale, "locale", "en", "Locale for translated messages")
+	fs.BoolVar(&opts.version, "version", false, "Print version and exit")
 	fs.BoolVar(&opts.noColor, "no-color", false, "Disable ANSI colors in pretty output")
 	fs.Var(&opts.headers, "header", "Extra HTTP header (repeatable, NAME:VALUE)")
 	if err := fs.Parse(args); err != nil {
 		return opts, nil, err
+	}
+	if opts.format == "json-stream" {
+		opts.format = "jsonl"
 	}
 	if opts.server == "" {
 		opts.server = defaultServer
@@ -301,17 +323,37 @@ func printUsage(out io.Writer) {
 	fmt.Fprintln(out, "Global options:")
 	fmt.Fprintln(out, "  --server URL     Base API URL (default http://localhost:8080/api/v1)")
 	fmt.Fprintln(out, "  --timeout DURATION  HTTP timeout (default 30s)")
-	fmt.Fprintln(out, "  --format FORMAT  Output format: pretty, json, jsonl")
+	fmt.Fprintln(out, "  --format FORMAT  Output format: pretty, json, jsonl (or json-stream)")
 	fmt.Fprintln(out, "  --output PATH    Write output to file instead of stdout")
 	fmt.Fprintln(out, "  --locale LOCALE  Locale for translated messages (default en)")
+	fmt.Fprintln(out, "  --version        Print version information and exit")
 	fmt.Fprintln(out, "  --no-color       Disable ANSI colors in pretty output")
 	fmt.Fprintln(out, "  --header NAME:VALUE  Extra HTTP header (repeatable)")
 	fmt.Fprintln(out, "  (Options use double hyphens; short single-dash flags are not supported.)")
 	fmt.Fprintln(out, "")
 	fmt.Fprintln(out, "Commands:")
-	fmt.Fprintln(out, "  jobs create|batch|list|get|watch|cancel|results")
+	fmt.Fprintln(out, "  jobs create|batch|list|get|watch|cancel|results|purge")
 	fmt.Fprintln(out, "  batches get|watch|results|cancel|remove")
 	fmt.Fprintln(out, "  queue pause|resume|reorder|remove")
+	fmt.Fprintln(out, "  domains list|get|runs|tag|untag")
+	fmt.Fprintln(out, "  tags list|create|delete|domains|summary|add-domains")
+	fmt.Fprintln(out, "  runs list|get|results")
+	fmt.Fprintln(out, "  entries query")
+}
+
+func setSubcommandUsage(fs *flag.FlagSet) {
+	fs.Usage = func() {
+		out := fs.Output()
+		fmt.Fprintf(out, "Usage of %s:\n", fs.Name())
+		fs.VisitAll(func(f *flag.Flag) {
+			if bf, ok := f.Value.(boolFlag); ok && bf.IsBoolFlag() {
+				fmt.Fprintf(out, "  --%s\n    \t%s\n", f.Name, f.Usage)
+			} else {
+				name := strings.ToUpper(strings.ReplaceAll(f.Name, "-", "_"))
+				fmt.Fprintf(out, "  --%s %s\n    \t%s\n", f.Name, name, f.Usage)
+			}
+		})
+	}
 }
 
 func rejectSingleDashFlags(args []string) error {
@@ -320,7 +362,7 @@ func rejectSingleDashFlags(args []string) error {
 			continue
 		}
 		if strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") {
-			return fmt.Errorf("use double-hyphen options (e.g. --server), not %q", arg)
+			return fmt.Errorf("use double-hyphen options (e.g. --%s), not %q", strings.TrimPrefix(arg, "-"), arg)
 		}
 	}
 	return nil
@@ -398,6 +440,17 @@ func openOutput(path string, fallback io.Writer) (io.Writer, func(), error) {
 }
 
 func parseWithReorderedFlags(fs *flag.FlagSet, args []string) error {
+	setSubcommandUsage(fs)
+	for _, arg := range args {
+		if arg == "-" || arg == "--" {
+			break
+		}
+		if strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") {
+			err := fmt.Errorf("use double-hyphen options (e.g. --%s), not %q", strings.TrimPrefix(arg, "-"), arg)
+			fmt.Fprintln(fs.Output(), err.Error())
+			return err
+		}
+	}
 	return fs.Parse(reorderFlags(fs, args))
 }
 
@@ -526,6 +579,8 @@ func runJobs(ctx context.Context, client *apiClient, opts globalOptions, args []
 		return runJobsCancel(ctx, client, opts, args, out, errOut)
 	case "results":
 		return runJobsResults(ctx, client, opts, args, out, errOut)
+	case "purge":
+		return runJobsPurge(ctx, client, opts, args, out, errOut)
 	default:
 		fmt.Fprintf(errOut, "Unknown jobs command %q\n", cmd)
 		return 2
@@ -583,6 +638,7 @@ func runJobsCreate(ctx context.Context, client *apiClient, opts globalOptions, a
 		domain        string
 		minLevel      string
 		tests         stringList
+		tags          stringList
 		overridePairs stringList
 		overrideFile  string
 		wait          bool
@@ -593,6 +649,7 @@ func runJobsCreate(ctx context.Context, client *apiClient, opts globalOptions, a
 	fs.StringVar(&domain, "domain", "", "Domain to test (required)")
 	fs.StringVar(&minLevel, "min-level", "", "Minimum log level (optional)")
 	fs.Var(&tests, "tests", "Test name (repeatable)")
+	fs.Var(&tags, "tag", "Tag to apply to the domain (repeatable)")
 	fs.Var(&overridePairs, "profile-override", "Profile override KEY=VALUE (repeatable)")
 	fs.StringVar(&overrideFile, "profile-overrides-file", "", "Profile overrides JSON/YAML file")
 	fs.BoolVar(&wait, "wait", false, "Wait for completion and display results")
@@ -619,6 +676,7 @@ func runJobsCreate(ctx context.Context, client *apiClient, opts globalOptions, a
 		Tests:            tests,
 		ProfileOverrides: overrides,
 		MinLevel:         minLevel,
+		Tags:             []string(tags),
 	}
 	var created job
 	if err := client.doJSON(ctx, http.MethodPost, "/jobs", req, &created); err != nil {
@@ -657,6 +715,8 @@ func runJobsBatch(ctx context.Context, client *apiClient, opts globalOptions, ar
 		files         stringList
 		useStdin      bool
 		tests         stringList
+		tags          stringList
+		fromTag       string
 		minLevel      string
 		overridePairs stringList
 		overrideFile  string
@@ -670,6 +730,8 @@ func runJobsBatch(ctx context.Context, client *apiClient, opts globalOptions, ar
 	fs.Var(&files, "file", "File with domains (repeatable)")
 	fs.BoolVar(&useStdin, "stdin", false, "Read domains from stdin")
 	fs.Var(&tests, "tests", "Test name (repeatable)")
+	fs.Var(&tags, "tag", "Tag to apply to all domains (repeatable)")
+	fs.StringVar(&fromTag, "from-tag", "", "Re-run all domains in this tag")
 	fs.StringVar(&minLevel, "min-level", "", "Minimum log level (optional)")
 	fs.Var(&overridePairs, "profile-override", "Profile override KEY=VALUE (repeatable)")
 	fs.StringVar(&overrideFile, "profile-overrides-file", "", "Profile overrides JSON/YAML file")
@@ -679,25 +741,35 @@ func runJobsBatch(ctx context.Context, client *apiClient, opts globalOptions, ar
 	if err := parseWithReorderedFlags(fs, args); err != nil {
 		return 2
 	}
-	entries, err := collectDomains(domains, files, useStdin, errOut)
-	if err != nil {
-		fmt.Fprintln(errOut, err.Error())
-		return 2
-	}
-	if len(entries) == 0 {
-		fmt.Fprintln(errOut, "no domains provided")
-		return 2
-	}
 	overrides, err := parseOverrides(overridePairs, overrideFile)
 	if err != nil {
 		fmt.Fprintln(errOut, err.Error())
 		return 2
 	}
+	var domainEntries []string
+	if fromTag != "" {
+		if len(domains) > 0 || len(files) > 0 || useStdin {
+			fmt.Fprintln(errOut, "--from-tag and --domain/--file/--stdin are mutually exclusive")
+			return 2
+		}
+	} else {
+		domainEntries, err = collectDomains(domains, files, useStdin, errOut)
+		if err != nil {
+			fmt.Fprintln(errOut, err.Error())
+			return 2
+		}
+		if len(domainEntries) == 0 {
+			fmt.Fprintln(errOut, "no domains provided: use --domain, --file, --stdin, or --from-tag")
+			return 2
+		}
+	}
 	req := jobBatchRequest{
-		Domains:          entries,
+		Domains:          domainEntries,
 		Tests:            tests,
 		ProfileOverrides: overrides,
 		MinLevel:         minLevel,
+		Tags:             []string(tags),
+		FromTag:          fromTag,
 	}
 	var resp jobBatchResponse
 	if err := client.doJSON(ctx, http.MethodPost, "/jobs/batch", req, &resp); err != nil {
@@ -744,7 +816,7 @@ func runJobsList(ctx context.Context, client *apiClient, opts globalOptions, arg
 	)
 	fs := flag.NewFlagSet("jobs list", flag.ContinueOnError)
 	fs.SetOutput(errOut)
-	fs.StringVar(&status, "status", "", "Filter by status")
+	fs.StringVar(&status, "status", "", "Filter by status (in-flight only; use 'runs list' for completed jobs)")
 	fs.StringVar(&batchID, "batch-id", "", "Filter by batch id")
 	fs.StringVar(&createdAfter, "created-after", "", "Filter by created after timestamp (RFC3339)")
 	fs.IntVar(&limit, "limit", 100, "Limit (1-500)")
@@ -807,8 +879,21 @@ func runJobsGet(ctx context.Context, client *apiClient, opts globalOptions, args
 	jobID := strings.TrimSpace(args[0])
 	var info job
 	if err := client.doJSON(ctx, http.MethodGet, "/jobs/"+jobID, nil, &info); err != nil {
-		fmt.Fprintln(errOut, err.Error())
-		return 2
+		if !isNotFoundError(err) {
+			fmt.Fprintln(errOut, err.Error())
+			return 2
+		}
+		// Fall back to run lookup for graduated jobs.
+		var run runRecord
+		if err2 := client.doJSON(ctx, http.MethodGet, "/runs/"+jobID, nil, &run); err2 != nil {
+			fmt.Fprintln(errOut, err.Error())
+			return 2
+		}
+		if err := writeOutput(out, opts.format, run); err != nil {
+			fmt.Fprintln(errOut, err.Error())
+			return 2
+		}
+		return 0
 	}
 	if err := writeOutput(out, opts.format, info); err != nil {
 		fmt.Fprintln(errOut, err.Error())
@@ -862,6 +947,40 @@ func runJobsCancel(ctx context.Context, client *apiClient, opts globalOptions, a
 
 func runJobsResults(ctx context.Context, client *apiClient, opts globalOptions, args []string, out io.Writer, errOut io.Writer) int {
 	return runResults(ctx, client, opts, args, out, errOut, false)
+}
+
+func runJobsPurge(ctx context.Context, client *apiClient, opts globalOptions, args []string, out io.Writer, errOut io.Writer) int {
+	fs := flag.NewFlagSet("jobs purge", flag.ContinueOnError)
+	fs.SetOutput(errOut)
+	setSubcommandUsage(fs)
+	var olderThan int
+	fs.IntVar(&olderThan, "older-than", 0, "Delete jobs completed more than N days ago (0 = use server's configured retention)")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+
+	reqBody := map[string]int{"older_than_days": olderThan}
+	var resp map[string]int64
+	if err := client.doJSON(ctx, http.MethodPost, "/jobs/purge", reqBody, &resp); err != nil {
+		fmt.Fprintln(errOut, err.Error())
+		return 2
+	}
+
+	if opts.format == "json" {
+		if err := writeOutput(out, opts.format, resp); err != nil {
+			fmt.Fprintln(errOut, err.Error())
+			return 2
+		}
+		return 0
+	}
+
+	n := resp["purged_jobs"]
+	if olderThan > 0 {
+		fmt.Fprintf(out, "Purged %d jobs older than %d days\n", n, olderThan)
+	} else {
+		fmt.Fprintf(out, "Purged %d jobs\n", n)
+	}
+	return 0
 }
 
 func runBatchesGet(ctx context.Context, client *apiClient, opts globalOptions, args []string, out io.Writer, errOut io.Writer) int {
@@ -1297,36 +1416,62 @@ func fetchJobResult(ctx context.Context, client *apiClient, jobID string) (jobRe
 	if !isNotFoundError(err) {
 		return jobResult{}, err
 	}
-	info, err := fetchJobInfo(ctx, client, jobID)
-	if err != nil {
-		return jobResult{}, err
-	}
-	if !doneStatuses[info.Status] {
-		return jobResult{}, err
-	}
-	delay := 200 * time.Millisecond
-	for i := 0; i < 4; i++ {
-		select {
-		case <-ctx.Done():
-			return jobResult{}, ctx.Err()
-		case <-time.After(delay):
+	// Check whether the job itself exists; if it 404s, skip retries and go
+	// straight to the runs endpoint.
+	var jobNotFound bool
+	var info job
+	if jobErr := client.doJSON(ctx, http.MethodGet, "/jobs/"+jobID, nil, &info); jobErr != nil {
+		if !isNotFoundError(jobErr) {
+			return jobResult{}, jobErr
 		}
-		result, err = fetchJobResultOnce(ctx, client, jobID)
-		if err == nil {
-			return result, nil
-		}
-		if !isNotFoundError(err) {
+		jobNotFound = true
+	}
+	if !jobNotFound {
+		// Job exists but result is not ready yet — retry with backoff.
+		if !doneStatuses[info.Status] {
 			return jobResult{}, err
 		}
-		delay *= 2
+		delay := 200 * time.Millisecond
+		for i := 0; i < 4; i++ {
+			select {
+			case <-ctx.Done():
+				return jobResult{}, ctx.Err()
+			case <-time.After(delay):
+			}
+			result, err = fetchJobResultOnce(ctx, client, jobID)
+			if err == nil {
+				return result, nil
+			}
+			if !isNotFoundError(err) {
+				return jobResult{}, err
+			}
+			delay *= 2
+		}
 	}
-	return jobResult{}, err
+	// Final fallback: try the runs endpoint directly.
+	path := "/runs/" + jobID + "/result"
+	if client.locale != "" {
+		path += "?locale=" + url.QueryEscape(client.locale)
+	}
+	var runResult jobResult
+	if err2 := client.doJSON(ctx, http.MethodGet, path, nil, &runResult); err2 != nil {
+		return jobResult{}, err
+	}
+	return runResult, nil
 }
 
 func fetchJobInfo(ctx context.Context, client *apiClient, jobID string) (job, error) {
 	var info job
 	if err := client.doJSON(ctx, http.MethodGet, "/jobs/"+jobID, nil, &info); err != nil {
-		return job{}, err
+		if !isNotFoundError(err) {
+			return job{}, err
+		}
+		// Fall back to run lookup for graduated jobs.
+		var run runRecord
+		if err2 := client.doJSON(ctx, http.MethodGet, "/runs/"+jobID, nil, &run); err2 != nil {
+			return job{}, err
+		}
+		return job{ID: run.ID, BatchID: run.BatchID, Domain: run.Domain, Status: run.Status}, nil
 	}
 	return info, nil
 }
@@ -2189,4 +2334,34 @@ func outputExt(format string) string {
 	default:
 		return ".txt"
 	}
+}
+
+func moduleVersion(path string) string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok || info == nil {
+		return "unknown"
+	}
+	if info.Main.Path == path {
+		return normalizeVersion(info.Main.Version)
+	}
+	for _, dep := range info.Deps {
+		if dep == nil || dep.Path != path {
+			continue
+		}
+		if dep.Replace != nil {
+			if dep.Replace.Version != "" {
+				return normalizeVersion(dep.Replace.Version)
+			}
+			return dep.Replace.Path
+		}
+		return normalizeVersion(dep.Version)
+	}
+	return "unknown"
+}
+
+func normalizeVersion(version string) string {
+	if version == "" {
+		return "unknown"
+	}
+	return version
 }

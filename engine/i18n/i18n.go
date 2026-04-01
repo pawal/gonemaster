@@ -209,6 +209,20 @@ func parsePO(data string) (map[string]string, map[string]string) {
 			}
 			continue
 		}
+		if strings.HasPrefix(line, "msgctxt ") {
+			// msgctxt is the canonical key for this entry; it takes priority
+			// over any #. comment keys accumulated above.
+			if value, ok := parseQuoted(line); ok {
+				if parts := strings.SplitN(value, ":", 2); len(parts) == 2 {
+					module := strings.ToUpper(strings.TrimSpace(parts[0]))
+					msgTag := strings.ToUpper(strings.TrimSpace(parts[1]))
+					if module != "" && msgTag != "" {
+						pendingKeys = []string{module + ":" + msgTag}
+					}
+				}
+			}
+			continue
+		}
 		if strings.HasPrefix(line, "msgid ") {
 			if msgid.Len() > 0 || msgstr.Len() > 0 {
 				flush()
@@ -301,13 +315,70 @@ func formatValue(value any) string {
 			parts[i] = fmt.Sprint(item)
 		}
 		return strings.Join(parts, ",")
+	case []map[string]any:
+		return formatStructuredMaps(v)
 	case []any:
 		parts := make([]string, len(v))
 		for i, item := range v {
+			if text, ok := formatStructuredItem(item); ok {
+				parts[i] = text
+				continue
+			}
 			parts[i] = fmt.Sprint(item)
 		}
 		return strings.Join(parts, ",")
+	case map[string]any:
+		if text, ok := formatStructuredMap(v); ok {
+			return text
+		}
+		return fmt.Sprint(value)
 	default:
 		return fmt.Sprint(value)
 	}
+}
+
+func formatStructuredMaps(items []map[string]any) string {
+	if len(items) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(items))
+	for _, item := range items {
+		if text, ok := formatStructuredMap(item); ok {
+			parts = append(parts, text)
+			continue
+		}
+		parts = append(parts, fmt.Sprint(item))
+	}
+	return strings.Join(parts, ";")
+}
+
+func formatStructuredItem(item any) (string, bool) {
+	m, ok := item.(map[string]any)
+	if !ok {
+		return "", false
+	}
+	return formatStructuredMap(m)
+}
+
+func formatStructuredMap(item map[string]any) (string, bool) {
+	if len(item) == 0 {
+		return "", false
+	}
+	ns, hasNS := item["ns"].(string)
+	address, hasAddress := item["address"].(string)
+	if !hasNS && !hasAddress {
+		return "", false
+	}
+	ns = strings.TrimSpace(ns)
+	address = strings.TrimSpace(address)
+	if ns == "" && address == "" {
+		return "", true
+	}
+	if ns == "" {
+		return address, true
+	}
+	if address == "" {
+		return ns, true
+	}
+	return ns + "/" + address, true
 }

@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/packet"
 )
@@ -263,13 +263,18 @@ func NewCacheStore() *CacheStore {
 }
 
 func (c *CacheStore) cacheForAddress(addr string) *queryCache {
+	cache, _ := c.cacheForAddressWithStatus(addr)
+	return cache
+}
+
+func (c *CacheStore) cacheForAddressWithStatus(addr string) (*queryCache, bool) {
 	if c == nil {
-		return nil
+		return nil, false
 	}
 	c.mu.Lock()
 	if cache := c.cacheByAddress[addr]; cache != nil {
 		c.mu.Unlock()
-		return cache
+		return cache, false
 	}
 	parent := c.sharedParent
 	c.mu.Unlock()
@@ -282,15 +287,15 @@ func (c *CacheStore) cacheForAddress(addr string) *queryCache {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if cache := c.cacheByAddress[addr]; cache != nil {
-		return cache
+		return cache, false
 	}
 	if parentCache != nil {
 		c.cacheByAddress[addr] = parentCache
-		return parentCache
+		return parentCache, false
 	}
 	cache := &queryCache{data: map[string]*packet.Packet{}, met: &c.queryMetrics}
 	c.cacheByAddress[addr] = cache
-	return cache
+	return cache, true
 }
 
 func (c *CacheStore) errorCacheForAddress(addr string) *errorCache {
@@ -382,9 +387,6 @@ func (c *CacheStore) storeNameserver(nameKey string, addr string, ns *Nameserver
 
 // SnapshotForRun returns a run-local cache store that reuses warmed query/error
 // caches from c while starting with an empty nameserver object cache.
-//
-// This allows callers to reuse cached DNS answers across runs without sharing
-// mutable per-nameserver adaptation state.
 func (c *CacheStore) SnapshotForRun() *CacheStore {
 	if c == nil {
 		return NewCacheStore()

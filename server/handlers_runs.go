@@ -1,0 +1,94 @@
+package server
+
+import (
+	"net/http"
+	"strconv"
+	"strings"
+)
+
+// handleListRuns handles GET /api/v1/runs.
+// Accepts: tag, domain, batch, status, level, finished_after, finished_before, limit, offset.
+func (s *Server) handleListRuns(w http.ResponseWriter, r *http.Request) {
+	filter := RunFilter{Limit: 100}
+	q := r.URL.Query()
+	filter.Tag = strings.TrimSpace(q.Get("tag"))
+	filter.Domain = strings.TrimSpace(q.Get("domain"))
+	filter.BatchID = strings.TrimSpace(q.Get("batch"))
+	if v := strings.TrimSpace(q.Get("status")); v != "" {
+		filter.Status = JobStatus(v)
+	}
+	filter.WorstLevel = strings.TrimSpace(q.Get("level"))
+
+	if v := strings.TrimSpace(q.Get("finished_after")); v != "" {
+		t, err := parseTime(v)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_finished_after", "finished_after must be RFC3339", nil)
+			return
+		}
+		filter.FinishedAfter = t
+	}
+	if v := strings.TrimSpace(q.Get("finished_before")); v != "" {
+		t, err := parseTime(v)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_finished_before", "finished_before must be RFC3339", nil)
+			return
+		}
+		filter.FinishedBefore = t
+	}
+	if !filter.FinishedAfter.IsZero() && !filter.FinishedBefore.IsZero() && filter.FinishedBefore.Before(filter.FinishedAfter) {
+		writeError(w, http.StatusBadRequest, "invalid_time_range", "finished_before must be >= finished_after", nil)
+		return
+	}
+
+	if limitRaw := strings.TrimSpace(q.Get("limit")); limitRaw != "" {
+		v, err := strconv.Atoi(limitRaw)
+		if err != nil || v <= 0 || v > maxListLimit {
+			writeError(w, http.StatusBadRequest, "invalid_limit", "limit must be between 1 and 500", nil)
+			return
+		}
+		filter.Limit = v
+	}
+	if offsetRaw := strings.TrimSpace(q.Get("offset")); offsetRaw != "" {
+		v, err := strconv.Atoi(offsetRaw)
+		if err != nil || v < 0 {
+			writeError(w, http.StatusBadRequest, "invalid_offset", "offset must be a non-negative integer", nil)
+			return
+		}
+		filter.Offset = v
+	}
+
+	writeJSON(w, http.StatusOK, s.store.ListRuns(filter))
+}
+
+// handleGetRun handles GET /api/v1/runs/{id}.
+func (s *Server) handleGetRun(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	run, ok := s.store.GetRun(id)
+	if !ok {
+		writeError(w, http.StatusNotFound, "not_found", "run not found", nil)
+		return
+	}
+	writeJSON(w, http.StatusOK, run)
+}
+
+// handleGetRunResult handles GET /api/v1/runs/{id}/result.
+// Returns the same JSON shape as GET /api/v1/jobs/{id}/result.
+func (s *Server) handleGetRunResult(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	result, ok := s.store.GetResult(id)
+	if !ok {
+		writeError(w, http.StatusNotFound, "not_found", "run not found", nil)
+		return
+	}
+	if result.Raw != nil && len(result.Raw.Entries) > 0 {
+		locale := strings.TrimSpace(r.URL.Query().Get("locale"))
+		if locale == "" {
+			locale = "en"
+		}
+		raw := *result.Raw
+		raw.Locale = locale
+		raw.Entries = localizeResultEntries(result.Raw.Entries, locale)
+		result.Raw = &raw
+	}
+	writeJSON(w, http.StatusOK, result)
+}

@@ -2,15 +2,13 @@ package server
 
 import (
 	"context"
-	"errors"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
+	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
-	"codeberg.org/pawal/gonemaster/engine/nameserver"
 )
 
 type spyJobStore struct {
@@ -31,6 +29,10 @@ func (s *spyJobStore) Get(id string) (Job, bool) {
 	return s.inner.Get(id)
 }
 
+func (s *spyJobStore) GetByPublicID(publicID string) (Job, bool) {
+	return s.inner.GetByPublicID(publicID)
+}
+
 func (s *spyJobStore) Update(job Job) error {
 	s.mu.Lock()
 	s.progresses = append(s.progresses, job.Progress)
@@ -42,12 +44,104 @@ func (s *spyJobStore) List(filter JobFilter) JobList {
 	return s.inner.List(filter)
 }
 
-func (s *spyJobStore) SetResult(jobID string, result JobResult) error {
-	return s.inner.SetResult(jobID, result)
+func (s *spyJobStore) GraduateJob(job Job, entries []engine.LogEntry) error {
+	return s.inner.GraduateJob(job, entries)
 }
 
 func (s *spyJobStore) GetResult(jobID string) (JobResult, bool) {
 	return s.inner.GetResult(jobID)
+}
+
+func (s *spyJobStore) GetOrCreateDomain(name string) (Domain, error) {
+	return s.inner.GetOrCreateDomain(name)
+}
+
+func (s *spyJobStore) GetDomain(id int64) (Domain, bool) {
+	return s.inner.GetDomain(id)
+}
+
+func (s *spyJobStore) GetDomainByName(name string) (Domain, bool) {
+	return s.inner.GetDomainByName(name)
+}
+
+func (s *spyJobStore) ListDomains(filter DomainFilter) DomainList {
+	return s.inner.ListDomains(filter)
+}
+
+func (s *spyJobStore) UpdateDomainLatest(domainID int64, runID string, finishedAt time.Time, status, level string) error {
+	return s.inner.UpdateDomainLatest(domainID, runID, finishedAt, status, level)
+}
+
+func (s *spyJobStore) CreateTag(name, description string) error {
+	return s.inner.CreateTag(name, description)
+}
+
+func (s *spyJobStore) GetTag(name string) (Tag, bool) {
+	return s.inner.GetTag(name)
+}
+
+func (s *spyJobStore) UpdateTag(name, description string) error {
+	return s.inner.UpdateTag(name, description)
+}
+
+func (s *spyJobStore) DeleteTag(name string) error {
+	return s.inner.DeleteTag(name)
+}
+
+func (s *spyJobStore) ListTags(limit, offset int) []Tag {
+	return s.inner.ListTags(limit, offset)
+}
+
+func (s *spyJobStore) TagDomains(tag string, domainIDs []int64) error {
+	return s.inner.TagDomains(tag, domainIDs)
+}
+
+func (s *spyJobStore) UntagDomains(tag string, domainIDs []int64) error {
+	return s.inner.UntagDomains(tag, domainIDs)
+}
+
+func (s *spyJobStore) GetDomainTags(domainID int64) []string {
+	return s.inner.GetDomainTags(domainID)
+}
+
+func (s *spyJobStore) ListDomainsByTag(tag string, filter DomainFilter) DomainList {
+	return s.inner.ListDomainsByTag(tag, filter)
+}
+
+func (s *spyJobStore) GetTagSummary(tag string) (TagSummary, bool) {
+	return s.inner.GetTagSummary(tag)
+}
+
+func (s *spyJobStore) GetRun(id string) (Run, bool) {
+	return s.inner.GetRun(id)
+}
+
+func (s *spyJobStore) GetRunByPublicID(publicID string) (Run, bool) {
+	return s.inner.GetRunByPublicID(publicID)
+}
+
+func (s *spyJobStore) ListRuns(filter RunFilter) RunList {
+	return s.inner.ListRuns(filter)
+}
+
+func (s *spyJobStore) ListRunsByDomain(domainID int64, limit, offset int) RunList {
+	return s.inner.ListRunsByDomain(domainID, limit, offset)
+}
+
+func (s *spyJobStore) QueryEntries(filter EntryFilter) EntryList {
+	return s.inner.QueryEntries(filter)
+}
+
+func (s *spyJobStore) CreateBatch(batch Batch) error {
+	return s.inner.CreateBatch(batch)
+}
+
+func (s *spyJobStore) GetBatch(id string) (Batch, bool) {
+	return s.inner.GetBatch(id)
+}
+
+func (s *spyJobStore) PurgeOlderThan(cutoff time.Time) (int64, error) {
+	return s.inner.PurgeOlderThan(cutoff)
 }
 
 func (s *spyJobStore) Progresses() []int {
@@ -184,11 +278,11 @@ func TestRunEngineForJobParallel(t *testing.T) {
 
 	errs := make(chan error, 2)
 	go func() {
-		_, _, _, err := srv.runEngineForJob(job1, context.Background())
+		_, _, err := srv.runEngineForJob(job1, context.Background())
 		errs <- err
 	}()
 	go func() {
-		_, _, _, err := srv.runEngineForJob(job2, context.Background())
+		_, _, err := srv.runEngineForJob(job2, context.Background())
 		errs <- err
 	}()
 
@@ -226,11 +320,11 @@ func TestRunEngineForJobLimiter(t *testing.T) {
 
 	errs := make(chan error, 2)
 	go func() {
-		_, _, _, err := srv.runEngineForJob(job1, context.Background())
+		_, _, err := srv.runEngineForJob(job1, context.Background())
 		errs <- err
 	}()
 	go func() {
-		_, _, _, err := srv.runEngineForJob(job2, context.Background())
+		_, _, err := srv.runEngineForJob(job2, context.Background())
 		errs <- err
 	}()
 
@@ -253,446 +347,91 @@ func TestRunEngineForJobLimiter(t *testing.T) {
 	}
 }
 
-func TestRunEngineForJobTestcaseParallelismOrderedMerge(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.JobTestParallelism = 3
-	srv := New(cfg)
-
-	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
-		switch req.Testcase {
-		case "t1":
-			time.Sleep(30 * time.Millisecond)
-		case "t2":
-			time.Sleep(10 * time.Millisecond)
-		}
-		return []engine.LogEntry{
-			{Testcase: req.Testcase, Level: "NOTICE"},
-		}, nil
-	}
-
-	job := Job{
-		ID:     "job-ordered",
-		Domain: "example.com",
-		Tests:  []string{"t1", "t2", "t3"},
-	}
-	entries, _, _, err := srv.runEngineForJob(job, context.Background())
-	if err != nil {
-		t.Fatalf("run job: %v", err)
-	}
-	if len(entries) != 3 {
-		t.Fatalf("expected 3 entries, got %d", len(entries))
-	}
-	if entries[0].Testcase != "t1" || entries[1].Testcase != "t2" || entries[2].Testcase != "t3" {
-		t.Fatalf("expected ordered testcase merge [t1 t2 t3], got [%s %s %s]", entries[0].Testcase, entries[1].Testcase, entries[2].Testcase)
-	}
-}
-
-func TestRunEngineForJobSingleTestNoRunnerWithoutHotCache(t *testing.T) {
+func TestRunEngineForJobPassesUndelegatedInputs(t *testing.T) {
 	cfg := DefaultConfig()
 	srv := New(cfg)
 
+	var captured engine.RunRequest
 	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
-		if req.Runner != nil {
-			t.Fatalf("expected nil runner when hot cache is disabled and single testcase run is used")
-		}
+		captured = req
 		return nil, nil
 	}
 
 	job := Job{
-		ID:     "job-single-no-hot-cache",
-		Domain: "example.com",
-		Tests:  []string{"t1"},
-	}
-	if _, _, _, err := srv.runEngineForJob(job, context.Background()); err != nil {
-		t.Fatalf("run job: %v", err)
-	}
-}
-
-func TestRunEngineForJobCrossJobHotCacheReuse(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.CrossJobHotCache = true
-	cfg.CrossJobHotCacheTTLSeconds = 60
-	srv := New(cfg)
-
-	var (
-		mu         sync.Mutex
-		runIndex   int
-		preWarmCnt []int
-	)
-	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
-		if req.Runner == nil || req.Runner.NameserverCache == nil {
-			return nil, errors.New("expected runner with nameserver cache")
-		}
-		mu.Lock()
-		runIndex++
-		current := runIndex
-		preWarmCnt = append(preWarmCnt, req.Runner.NameserverCache.AddressCacheCount())
-		mu.Unlock()
-
-		if current == 1 {
-			if _, err := nameserver.NewWithCache(req.Runner.NameserverCache, "ns1.example", "192.0.2.90", nil); err != nil {
-				return nil, err
-			}
-		}
-		return nil, nil
-	}
-
-	job1 := Job{ID: "job-hot-1", Domain: "example.com", Tests: []string{"t1"}}
-	job2 := Job{ID: "job-hot-2", Domain: "example.net", Tests: []string{"t1"}}
-
-	if _, _, _, err := srv.runEngineForJob(job1, context.Background()); err != nil {
-		t.Fatalf("run job1: %v", err)
-	}
-	if _, _, _, err := srv.runEngineForJob(job2, context.Background()); err != nil {
-		t.Fatalf("run job2: %v", err)
-	}
-
-	if len(preWarmCnt) != 2 {
-		t.Fatalf("expected two runs, got %d", len(preWarmCnt))
-	}
-	if preWarmCnt[0] != 0 {
-		t.Fatalf("first run should be cold, got %d", preWarmCnt[0])
-	}
-	if preWarmCnt[1] < 1 {
-		t.Fatalf("second run should see warmed cache, got %d", preWarmCnt[1])
-	}
-}
-
-func TestRunEngineForJobCrossJobHotCacheKeyIsolation(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.CrossJobHotCache = true
-	cfg.CrossJobHotCacheTTLSeconds = 60
-	srv := New(cfg)
-
-	var preWarmCnt []int
-	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
-		if req.Runner == nil || req.Runner.NameserverCache == nil {
-			return nil, errors.New("expected runner with nameserver cache")
-		}
-		preWarmCnt = append(preWarmCnt, req.Runner.NameserverCache.AddressCacheCount())
-		if len(preWarmCnt) == 1 {
-			if _, err := nameserver.NewWithCache(req.Runner.NameserverCache, "ns1.example", "192.0.2.91", nil); err != nil {
-				return nil, err
-			}
-		}
-		return nil, nil
-	}
-
-	job1 := Job{
-		ID:        "job-hot-key-1",
+		ID:        "job-undel",
 		Domain:    "example.com",
-		Tests:     []string{"t1"},
-		Overrides: map[string]any{"resolver": map[string]any{"defaults": map[string]any{"retry": 1}}},
-	}
-	job2 := Job{
-		ID:        "job-hot-key-2",
-		Domain:    "example.net",
-		Tests:     []string{"t1"},
-		Overrides: map[string]any{"resolver": map[string]any{"defaults": map[string]any{"retry": 3}}},
-	}
-
-	if _, _, _, err := srv.runEngineForJob(job1, context.Background()); err != nil {
-		t.Fatalf("run job1: %v", err)
-	}
-	if _, _, _, err := srv.runEngineForJob(job2, context.Background()); err != nil {
-		t.Fatalf("run job2: %v", err)
-	}
-
-	if len(preWarmCnt) != 2 {
-		t.Fatalf("expected two runs, got %d", len(preWarmCnt))
-	}
-	if preWarmCnt[0] != 0 {
-		t.Fatalf("first run should be cold, got %d", preWarmCnt[0])
-	}
-	if preWarmCnt[1] != 0 {
-		t.Fatalf("second run should be cold due to different hot-cache key, got %d", preWarmCnt[1])
-	}
-}
-
-func TestRunEngineForJobTestcaseSequentialReusesRunner(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.JobTestParallelism = 1
-	srv := New(cfg)
-
-	var runners []*engine.Runner
-	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
-		if req.Runner == nil {
-			return nil, errors.New("missing shared runner")
-		}
-		runners = append(runners, req.Runner)
-		return []engine.LogEntry{{Testcase: req.Testcase, Level: "NOTICE"}}, nil
-	}
-
-	job := Job{
-		ID:     "job-runner-seq",
-		Domain: "example.com",
-		Tests:  []string{"t1", "t2", "t3"},
-	}
-	_, _, _, err := srv.runEngineForJob(job, context.Background())
-	if err != nil {
-		t.Fatalf("run job: %v", err)
-	}
-	if len(runners) != len(job.Tests) {
-		t.Fatalf("expected %d runner captures, got %d", len(job.Tests), len(runners))
-	}
-	first := runners[0]
-	if first.Logger == nil || first.Profile == nil || first.NameserverCache == nil {
-		t.Fatalf("shared runner should include logger, profile, and nameserver cache")
-	}
-	for idx, runner := range runners[1:] {
-		if runner != first {
-			t.Fatalf("expected runner reuse at call %d", idx+2)
-		}
-	}
-}
-
-func TestRunEngineForJobTestcaseParallelClonesRunnerWithSharedResources(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.JobTestParallelism = 3
-	srv := New(cfg)
-
-	var (
-		mu      sync.Mutex
-		runners []*engine.Runner
-	)
-	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
-		if req.Runner == nil {
-			return nil, errors.New("missing shared runner")
-		}
-		mu.Lock()
-		runners = append(runners, req.Runner)
-		mu.Unlock()
-		return []engine.LogEntry{{Testcase: req.Testcase, Level: "NOTICE"}}, nil
-	}
-
-	job := Job{
-		ID:     "job-runner-par",
-		Domain: "example.com",
-		Tests:  []string{"t1", "t2", "t3", "t4"},
-	}
-	_, _, _, err := srv.runEngineForJob(job, context.Background())
-	if err != nil {
-		t.Fatalf("run job: %v", err)
-	}
-	if len(runners) != len(job.Tests) {
-		t.Fatalf("expected %d runner captures, got %d", len(job.Tests), len(runners))
-	}
-	first := runners[0]
-	if first.Logger == nil || first.Profile == nil || first.NameserverCache == nil {
-		t.Fatalf("shared runner should include logger, profile, and nameserver cache")
-	}
-	for idx, runner := range runners[1:] {
-		if runner == first {
-			t.Fatalf("expected per-testcase runner clone at call %d", idx+2)
-		}
-		if runner.Profile != first.Profile {
-			t.Fatalf("expected shared profile pointer at call %d", idx+2)
-		}
-		if runner.Limiter != first.Limiter {
-			t.Fatalf("expected shared limiter pointer at call %d", idx+2)
-		}
-		if runner.NameserverCache != first.NameserverCache {
-			t.Fatalf("expected shared nameserver cache pointer at call %d", idx+2)
-		}
-		if runner.Logger == first.Logger {
-			t.Fatalf("expected distinct logger pointer at call %d", idx+2)
-		}
-	}
-}
-
-func TestRunEngineForJobTestcaseParallelismCap(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.JobTestParallelism = 2
-	srv := New(cfg)
-
-	var inFlight atomic.Int32
-	var maxInFlight atomic.Int32
-	started := make(chan struct{}, 8)
-	release := make(chan struct{})
-	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
-		current := inFlight.Add(1)
-		for {
-			previous := maxInFlight.Load()
-			if current <= previous {
-				break
-			}
-			if maxInFlight.CompareAndSwap(previous, current) {
-				break
-			}
-		}
-		started <- struct{}{}
-		<-release
-		inFlight.Add(-1)
-		return []engine.LogEntry{{Testcase: req.Testcase, Level: "NOTICE"}}, nil
-	}
-
-	job := Job{
-		ID:     "job-cap",
-		Domain: "example.com",
-		Tests:  []string{"t1", "t2", "t3", "t4"},
-	}
-	errs := make(chan error, 1)
-	go func() {
-		_, _, _, err := srv.runEngineForJob(job, context.Background())
-		errs <- err
-	}()
-
-	for i := 0; i < 2; i++ {
-		select {
-		case <-started:
-		case <-time.After(250 * time.Millisecond):
-			t.Fatalf("expected testcase run %d to start", i+1)
-		}
-	}
-	select {
-	case <-started:
-		t.Fatalf("expected no third concurrent testcase run with parallelism cap=2")
-	case <-time.After(150 * time.Millisecond):
-	}
-
-	close(release)
-	select {
-	case err := <-errs:
-		if err != nil {
-			t.Fatalf("run job: %v", err)
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatalf("timed out waiting for parallel run completion")
-	}
-
-	if got := maxInFlight.Load(); got > 2 {
-		t.Fatalf("max in-flight testcase runs = %d, want <= 2", got)
-	}
-}
-
-func TestRunEngineForJobTestcaseParallelismFirstError(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.JobTestParallelism = 3
-	srv := New(cfg)
-
-	boom := errors.New("testcase boom")
-	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
-		switch req.Testcase {
-		case "t1":
-			return []engine.LogEntry{{Testcase: "t1", Level: "NOTICE"}}, nil
-		case "t2":
-			return nil, boom
-		case "t3":
-			<-req.Context.Done()
-			return nil, req.Context.Err()
-		default:
-			return nil, nil
-		}
-	}
-
-	job := Job{
-		ID:     "job-error",
-		Domain: "example.com",
-		Tests:  []string{"t1", "t2", "t3"},
-	}
-	entries, _, _, err := srv.runEngineForJob(job, context.Background())
-	if !errors.Is(err, boom) {
-		t.Fatalf("expected boom error, got %v", err)
-	}
-	if len(entries) != 1 || entries[0].Testcase != "t1" {
-		t.Fatalf("expected only successful entries before first failing testcase, got %+v", entries)
-	}
-}
-
-func TestRunEngineForJobTestcaseParallelismFirstErrorPrefersLowerIndex(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.JobTestParallelism = 3
-	srv := New(cfg)
-
-	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
-		switch req.Testcase {
-		case "t1":
-			time.Sleep(20 * time.Millisecond)
-			return []engine.LogEntry{{Testcase: "t1", Level: "NOTICE"}}, nil
-		case "t2":
-			time.Sleep(40 * time.Millisecond)
-			return nil, errors.New("t2 boom")
-		case "t3":
-			time.Sleep(5 * time.Millisecond)
-			return nil, errors.New("t3 fast boom")
-		default:
-			<-req.Context.Done()
-			return nil, req.Context.Err()
-		}
-	}
-
-	job := Job{
-		ID:     "job-error-ordered",
-		Domain: "example.com",
-		Tests:  []string{"t1", "t2", "t3", "t4"},
-	}
-	entries, _, _, err := srv.runEngineForJob(job, context.Background())
-	if err == nil {
-		t.Fatalf("expected run error")
-	}
-	if err.Error() != "t2 boom" {
-		t.Fatalf("expected lower-index error, got %v", err)
-	}
-	if len(entries) != 1 || entries[0].Testcase != "t1" {
-		t.Fatalf("expected only successful entries before first failing testcase, got %+v", entries)
-	}
-}
-
-func TestProgressUpdatesForMultipleTestsParallel(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.JobTestParallelism = 3
-	srv := New(cfg)
-	spy := newSpyJobStore()
-	srv.store = spy
-
-	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
-		switch req.Testcase {
-		case "t1":
-			time.Sleep(20 * time.Millisecond)
-		case "t2":
-			time.Sleep(5 * time.Millisecond)
-		}
-		return nil, nil
-	}
-
-	job := Job{
-		ID:        "job-progress-par",
-		Domain:    "example.com",
-		Tests:     []string{"t1", "t2", "t3"},
 		Status:    JobQueued,
 		CreatedAt: time.Now().UTC(),
-		Progress:  0,
-	}
-	if _, err := srv.store.Create(job); err != nil {
-		t.Fatalf("create job: %v", err)
-	}
-	if err := srv.runJob(job.ID); err != nil {
-		t.Fatalf("run job: %v", err)
+		UndelegatedNS: []engine.UndelegatedNameserver{
+			{Name: "ns1.example.com", IP: "192.0.2.1"},
+			{Name: "ns1.example.com", IP: "2001:db8::1"},
+		},
+		UndelegatedDS: []engine.UndelegatedDSInfo{
+			{KeyTag: 12345, Algorithm: 13, DigestType: 2, Digest: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"},
+		},
 	}
 
-	progresses := spy.Progresses()
-	if len(progresses) == 0 {
-		t.Fatalf("expected progress updates")
+	_, _, err := srv.runEngineForJob(job, context.Background())
+	if err != nil {
+		t.Fatalf("runEngineForJob: %v", err)
 	}
-	last := -1
-	for _, value := range progresses {
-		if value < last {
-			t.Fatalf("expected monotonic progress updates, got %v", progresses)
-		}
-		last = value
+	if len(captured.UndelegatedNameservers) != 2 {
+		t.Fatalf("expected 2 undelegated nameservers, got %d", len(captured.UndelegatedNameservers))
 	}
-	if last != 100 {
-		t.Fatalf("expected final progress 100, got %d (all: %v)", last, progresses)
+	if captured.UndelegatedNameservers[0].Name != "ns1.example.com" || captured.UndelegatedNameservers[0].IP != "192.0.2.1" {
+		t.Fatalf("unexpected first nameserver: %+v", captured.UndelegatedNameservers[0])
+	}
+	if captured.UndelegatedNameservers[1].Name != "ns1.example.com" || captured.UndelegatedNameservers[1].IP != "2001:db8::1" {
+		t.Fatalf("unexpected second nameserver: %+v", captured.UndelegatedNameservers[1])
+	}
+	if len(captured.UndelegatedDSInfo) != 1 {
+		t.Fatalf("expected 1 undelegated DS record, got %d", len(captured.UndelegatedDSInfo))
+	}
+	if captured.UndelegatedDSInfo[0].KeyTag != 12345 {
+		t.Fatalf("unexpected DS key tag: %d", captured.UndelegatedDSInfo[0].KeyTag)
+	}
+}
+
+func TestRunEngineForJobPassesSourceAddrOverrides(t *testing.T) {
+	cfg := DefaultConfig()
+	source4 := "192.0.2.70"
+	source6 := "2001:db8::70"
+	cfg.SourceAddr4 = &source4
+	cfg.SourceAddr6 = &source6
+	srv := New(cfg)
+
+	var captured engine.RunRequest
+	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		captured = req
+		return nil, nil
+	}
+
+	job := Job{
+		ID:        "job-sourceaddr",
+		Domain:    "example.com",
+		Status:    JobQueued,
+		CreatedAt: time.Now().UTC(),
+	}
+
+	_, _, err := srv.runEngineForJob(job, context.Background())
+	if err != nil {
+		t.Fatalf("runEngineForJob: %v", err)
+	}
+	if captured.SourceAddr4 == nil || *captured.SourceAddr4 != source4 {
+		t.Fatalf("expected SourceAddr4 %q, got %#v", source4, captured.SourceAddr4)
+	}
+	if captured.SourceAddr6 == nil || *captured.SourceAddr6 != source6 {
+		t.Fatalf("expected SourceAddr6 %q, got %#v", source6, captured.SourceAddr6)
 	}
 }
 
 func TestDNSQueryCounterCallback(t *testing.T) {
 	counter := &dnsQueryCounter{}
 	entries := []*logger.Entry{
-		{Tag: "EXTERNAL_QUERY", Args: map[string]any{"ip": "192.0.2.10"}},
-		{Tag: "external_query", Args: map[string]any{"ip": "2001:db8::10"}},
-		{Tag: "EXTERNAL_QUERY", Args: map[string]any{"ip": "not-an-ip"}},
-		{Tag: "EXTERNAL_RESPONSE", Args: map[string]any{"ip": "198.51.100.20"}},
+		{Tag: "EXTERNAL_QUERY", Args: map[string]any{logargs.KeyAddress: "192.0.2.10"}},
+		{Tag: "external_query", Args: map[string]any{logargs.KeyAddress: "2001:db8::10"}},
+		{Tag: "EXTERNAL_QUERY", Args: map[string]any{logargs.KeyAddress: "not-an-ip"}},
+		{Tag: "EXTERNAL_RESPONSE", Args: map[string]any{logargs.KeyAddress: "198.51.100.20"}},
 	}
 	for _, entry := range entries {
 		if err := counter.Callback(entry); err != nil {
@@ -705,5 +444,36 @@ func TestDNSQueryCounterCallback(t *testing.T) {
 	}
 	if ipv6 != 1 {
 		t.Fatalf("ipv6 = %d, want 1", ipv6)
+	}
+}
+
+func TestRunEngineForJobPassesCacheStore(t *testing.T) {
+	cfg := DefaultConfig()
+	srv := New(cfg)
+
+	var captured engine.RunRequest
+	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		captured = req
+		return nil, nil
+	}
+
+	job := Job{
+		ID:        "job-cache",
+		Domain:    "example.com",
+		Status:    JobQueued,
+		CreatedAt: time.Now().UTC(),
+	}
+
+	_, stats, err := srv.runEngineForJob(job, context.Background())
+	if err != nil {
+		t.Fatalf("runEngineForJob: %v", err)
+	}
+	if captured.NameserverCache == nil {
+		t.Fatalf("expected NameserverCache to be set on RunRequest")
+	}
+	// With a stub engine that does no real queries, cache stats should be zero.
+	if stats.cacheHits != 0 || stats.cacheMisses != 0 || stats.cacheEvictions != 0 {
+		t.Fatalf("expected zero cache stats from stub engine, got hits=%d misses=%d evictions=%d",
+			stats.cacheHits, stats.cacheMisses, stats.cacheEvictions)
 	}
 }

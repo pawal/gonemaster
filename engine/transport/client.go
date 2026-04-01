@@ -6,7 +6,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/packet"
@@ -14,7 +15,6 @@ import (
 )
 
 const defaultTimeout = 5 * time.Second
-const udpFallbackWaitCap = 400 * time.Millisecond
 
 // Client performs DNS exchanges with configurable behavior.
 type Client struct {
@@ -44,9 +44,11 @@ type EDNSDetails struct {
 	Do      *bool
 	Size    *uint16
 	Version *uint8
-	Z       *uint16
-	Rcode   *uint8
-	Data    []dns.EDNS0
+	// Z carries the EDNS Z flags (low 15 bits). When set, prepareMessage encodes
+	// EDNS using an explicit OPT RR so Z is preserved on the wire.
+	Z     *uint16
+	Rcode *uint8
+	Data  []dns.EDNS0 // pseudo-section EDNS0 sub-options to append (e.g. *dns.NSID)
 }
 
 // BuildQuery constructs a query message with common defaults.
@@ -57,11 +59,14 @@ func BuildQuery(name string, qtype uint16) *dns.Msg {
 // BuildQueryWithClass constructs a query message for the given class.
 func BuildQueryWithClass(name string, qtype, qclass uint16) *dns.Msg {
 	msg := new(dns.Msg)
-	msg.Question = []dns.Question{{
-		Name:   dns.Fqdn(name),
-		Qtype:  qtype,
-		Qclass: qclass,
-	}}
+	newFn, ok := dns.TypeToRR[qtype]
+	if !ok {
+		return msg
+	}
+	rr := newFn()
+	rr.Header().Name = dnsutil.Fqdn(name)
+	rr.Header().Class = qclass
+	msg.Question = []dns.RR{rr}
 	msg.RecursionDesired = false
 	return msg
 }
@@ -176,25 +181,6 @@ func (c *Client) Exchange(ctx context.Context, server string, msg *dns.Msg) (pac
 					break
 				}
 			}
-			if !c.UseTCP && c.Fallback {
-				response, rtt, err = c.exchangeOnce(ctx, server, prepared, true, true)
-				if err == nil {
-					pkt := packet.New(response)
-					pkt.QueryTime = rtt
-					pkt.Timestamp = time.Now()
-					pkt.AnswerFrom = server
-					return pkt, nil
-				}
-				if ctx != nil {
-					if cerr := ctx.Err(); cerr != nil {
-						lastErr = cerr
-						break
-					}
-				}
-				lastErr = err
-				continue
-			}
-
 			lastErr = err
 			continue
 		}
@@ -227,33 +213,45 @@ func (c *Client) Exchange(ctx context.Context, server string, msg *dns.Msg) (pac
 }
 
 func (c *Client) exchangeOnce(ctx context.Context, server string, msg *dns.Msg, useTCP bool, fromUDPFallback bool) (*dns.Msg, time.Duration, error) {
-	client := dns.Client{Net: "udp", Timeout: c.effectiveAttemptTimeout(ctx, useTCP, fromUDPFallback)}
+	timeout := c.effectiveAttemptTimeout(ctx, useTCP, fromUDPFallback)
+	network := "udp"
 	if useTCP {
-		client.Net = "tcp"
+		network = "tcp"
 	}
 
-	dialer, err := c.buildDialer(client.Timeout, client.Net)
+	dialer, err := c.buildDialer(timeout, network)
 	if err != nil {
 		return nil, 0, err
 	}
-	client.Dialer = dialer
 
 	address := ensurePort(server)
-	conn, err := client.DialContext(ctx, address)
+	conn, err := dialer.DialContext(ctx, network, address)
 	if err != nil {
 		return nil, 0, err
 	}
 	defer conn.Close()
-	return c.exchangeWithConnCancelable(ctx, &client, msg, conn)
+
+	if timeout > 0 {
+		_ = conn.SetDeadline(time.Now().Add(timeout))
+	}
+
+	client := dns.NewClient()
+	client.Transport.ReadTimeout = timeout
+	return c.exchangeWithConnCancelable(ctx, client, msg, conn, useTCP)
 }
 
-func (c *Client) exchangeWithConnCancelable(ctx context.Context, client *dns.Client, msg *dns.Msg, conn *dns.Conn) (*dns.Msg, time.Duration, error) {
+func (c *Client) exchangeWithConnCancelable(ctx context.Context, client *dns.Client, msg *dns.Msg, conn net.Conn, useTCP bool) (*dns.Msg, time.Duration, error) {
 	if client == nil || conn == nil {
 		return nil, 0, fmt.Errorf("missing dns client or connection")
 	}
 
+	wireMsg, err := prepareWireMessage(msg, useTCP)
+	if err != nil {
+		return nil, 0, err
+	}
+
 	if ctx == nil || ctx.Done() == nil {
-		return client.ExchangeWithConnContext(ctx, msg.Copy(), conn)
+		return client.ExchangeWithConn(ctx, wireMsg, conn)
 	}
 
 	done := make(chan struct{})
@@ -267,12 +265,33 @@ func (c *Client) exchangeWithConnCancelable(ctx context.Context, client *dns.Cli
 		}
 	}()
 
-	resp, rtt, err := client.ExchangeWithConnContext(ctx, msg.Copy(), conn)
+	resp, rtt, err := client.ExchangeWithConn(ctx, wireMsg, conn)
 	close(done)
 	if cerr := ctx.Err(); cerr != nil {
 		return nil, 0, cerr
 	}
 	return resp, rtt, err
+}
+
+func prepareWireMessage(msg *dns.Msg, useTCP bool) (*dns.Msg, error) {
+	if msg == nil {
+		return nil, fmt.Errorf("nil DNS message")
+	}
+
+	wireMsg := msg.Copy()
+	if len(wireMsg.Data) == 0 {
+		if err := wireMsg.Pack(); err != nil {
+			return nil, err
+		}
+	}
+
+	if !useTCP && wireMsg.UDPSize < constants.EDNSUDPPayloadCommonLimit {
+		// Keep the outgoing query bytes untouched, but allow reception of UDP
+		// responses that exceed 512 bytes from authoritative servers.
+		wireMsg.UDPSize = constants.EDNSUDPPayloadCommonLimit
+	}
+
+	return wireMsg, nil
 }
 
 func (c *Client) effectiveAttemptTimeout(ctx context.Context, useTCP bool, fromUDPFallback bool) time.Duration {
@@ -287,10 +306,6 @@ func (c *Client) effectiveAttemptTimeout(ctx context.Context, useTCP bool, fromU
 		// UDP and fallback TCP attempts should use retrans pacing so a blocked
 		// path does not stall progression for the full timeout budget.
 		attempt = c.Retrans
-	}
-	if !useTCP && c.Fallback && attempt > udpFallbackWaitCap {
-		// Do not block on UDP for the full retrans budget before trying TCP.
-		attempt = udpFallbackWaitCap
 	}
 	if ctx != nil {
 		if deadline, ok := ctx.Deadline(); ok {
@@ -342,31 +357,94 @@ func (c *Client) prepareMessage(msg *dns.Msg) *dns.Msg {
 	}
 
 	if c.EDNSSize > 0 || c.EDNSDetails != nil {
-		prepared.SetEdns0(c.EDNSSize, c.DNSSEC)
-		opt := prepared.IsEdns0()
+		prepared.UDPSize = c.EDNSSize
+		prepared.Security = c.DNSSEC
+
+		var z *uint16
 		if c.EDNSDetails != nil {
-			if opt == nil {
-				return prepared
-			}
 			if c.EDNSDetails.Do != nil {
-				opt.SetDo(*c.EDNSDetails.Do)
+				prepared.Security = *c.EDNSDetails.Do
+			}
+			if c.EDNSDetails.Size != nil {
+				prepared.UDPSize = *c.EDNSDetails.Size
 			}
 			if c.EDNSDetails.Version != nil {
-				opt.SetVersion(*c.EDNSDetails.Version)
+				prepared.Version = *c.EDNSDetails.Version
 			}
 			if c.EDNSDetails.Z != nil {
-				opt.SetZ(*c.EDNSDetails.Z)
+				z = c.EDNSDetails.Z
 			}
 			if c.EDNSDetails.Rcode != nil {
-				opt.SetExtendedRcode(uint16(*c.EDNSDetails.Rcode))
+				// Extended rcode: lower 4 bits stay in header Rcode; upper 8 bits go in OPT.
+				// v2 encodes this transparently from m.Rcode (uint16).
+				prepared.Rcode = uint16(*c.EDNSDetails.Rcode)
 			}
 			if len(c.EDNSDetails.Data) > 0 {
-				opt.Option = append(opt.Option, c.EDNSDetails.Data...)
+				for _, opt := range c.EDNSDetails.Data {
+					prepared.Pseudo = append(prepared.Pseudo, opt)
+				}
 			}
+		}
+
+		// The dns v2 auto-OPT path ignores Version and omits OPT when UDPSize is 512.
+		// Force explicit OPT for EDNSDetails and 512-byte EDNS queries.
+		if c.EDNSDetails != nil || prepared.UDPSize <= dns.MinMsgSize {
+			applyExplicitEDNS(prepared, z)
 		}
 	}
 
 	return prepared
+}
+
+func applyExplicitEDNS(msg *dns.Msg, z *uint16) {
+	if msg == nil {
+		return
+	}
+
+	// If pseudo contains non-EDNS records (e.g. TSIG), keep default packing path
+	// to avoid changing section ordering semantics.
+	opt := &dns.OPT{Hdr: dns.Header{Name: "."}}
+	for _, rr := range msg.Pseudo {
+		edns, ok := rr.(dns.EDNS0)
+		if !ok {
+			return
+		}
+		opt.Options = append(opt.Options, edns)
+	}
+
+	udpSize := msg.UDPSize
+	if udpSize < dns.MinMsgSize {
+		udpSize = dns.MinMsgSize
+	}
+	opt.SetUDPSize(udpSize)
+	opt.SetVersion(msg.Version)
+	opt.SetSecurity(msg.Security)
+	opt.SetCompactAnswers(msg.CompactAnswers)
+	opt.SetDelegation(msg.Delegation)
+	opt.SetRcode(msg.Rcode)
+	if z != nil {
+		opt.SetZ(*z)
+	}
+
+	extra := make([]dns.RR, 0, len(msg.Extra)+1)
+	for _, rr := range msg.Extra {
+		if _, isOPT := rr.(*dns.OPT); isOPT {
+			continue
+		}
+		extra = append(extra, rr)
+	}
+	extra = append(extra, opt)
+	msg.Extra = extra
+
+	// Prevent Msg.Pack from auto-synthesizing a second OPT RR. The explicit OPT
+	// above now carries EDNS settings/options, with the base rcode kept in header.
+	msg.Pseudo = nil
+	msg.UDPSize = 0
+	msg.Security = false
+	msg.CompactAnswers = false
+	msg.Delegation = false
+	msg.Version = 0
+	msg.Rcode &= 0xF
 }
 
 func ensurePort(server string) string {

@@ -1,0 +1,276 @@
+# Changelog
+
+All notable changes to all gonemaster components will be documented in this file.
+
+## [v1.2.2] 2026-03-30
+
+### Added
+ - gonemaster-nagios: `--ns` and `--ds` flags for undelegated/split-DNS testing
+ - gonemaster-nagios: `--rrsig-warn-days` flag to warn when apex RRSIG expires within N days
+
+ ### Changed
+ - engine: Recover from DNS library panic in verifyRRSIG on oversized RRsets
+
+## [v1.2.1] - 2026-03-29
+
+### Added
+ - Server: security headers middleware sets `X-Content-Type-Options`, `X-Frame-Options`, `Content-Security-Policy`, `Referrer-Policy`, and `Permissions-Policy` on all responses
+ - Server: Two-tier queue priority — `POST /jobs` submits at priority 0 (normal, for single jobs and the public ui), `POST /jobs/batch` at priority 1 (batch); normal always drains first
+ - UI: Added logotype and favicon
+ - UI: Added more security headers
+
+## [v1.2.0] - 2026-03-26
+
+**Major changes:**
+  - New simple UI for end-users
+  - Database persistence with support for PostgreSQL, and MariaDB/MySQL
+  - Domain registry with tags, run history, and per-entry SQL analysis
+
+### Added
+
+ - Server: Domain registry — completed jobs graduate to persistent `domains` + `runs` + `entries` records; all three are queryable via the admin API and directly via SQL
+ - Server: Tags — named domain collections; `POST/GET /api/v1/tags`, `PUT/DELETE /api/v1/tags/{name}`, `POST/GET/DELETE /api/v1/tags/{name}/domains`, `GET /api/v1/tags/{name}/summary`
+ - Server: Domains API — `GET /api/v1/domains`, `GET /api/v1/domains/{id}`, `GET /api/v1/domains/{id}/runs`; filter by tag, name, level, min_level
+ - Server: Runs API — `GET /api/v1/runs`, `GET /api/v1/runs/{id}`, `GET /api/v1/runs/{id}/result`; filter by tag, domain, batch, status, level, time range
+ - Server: Entries API — `GET /api/v1/entries` with filters for run, domain, tag, module, testcase, entry tag, level, latest-per-domain, batch; CSV export via `?format=csv`
+ - Server: Batch `POST /api/v1/jobs/batch` now accepts `from_tag` (re-run all domains in a tag), `tags` (tag all created domains), and `description` fields
+ - Server: SQLite, PostgreSQL, and MariaDB/MySQL persistence backends with versioned schema migrations, startup recovery, and integration tests (`make test-integration`)
+ - Server: `--db-driver` / `--db-dsn` / `GONEMASTER_DB_*` env vars and JSON config file support
+ - Server: Data retention — `--db-retention-days` runs hourly background purge; `POST /api/v1/jobs/purge` and `gonemaster-client jobs purge` for on-demand purging
+ - Docs: `docs/data-analysis.md` — end-to-end guide for bulk analysis: backend selection, tag/batch workflows, API queries, direct SQL examples, CSV export, and deployment patterns
+ - Server: Public API at `/pub/api/v1/` — job submission and result lookup by short public ID, without leaking internal UUIDs; per-IP sliding-window rate limiting with `429`/`Retry-After`
+ - Server: Version endpoint at `/pub/api/v1/version` returning gonemaster and miekg/dns versions
+ - Admin UI: Domains tab — browse/filter the domain registry, drill into per-domain run history
+ - Admin UI: Tags tab — create/edit/delete tags, manage domain membership, per-tag severity summary
+ - Admin UI: Run inspector — shows duration, entry count, and worst level; domain name is a clickable link to the Domains tab; batch re-run support
+ - Admin UI: i18n — 75 new translation keys across 9 languages for all new UI sections
+ - Public UI: Svelte SPA at `/public/` — domain testing without admin access; user config IPv4/IPv6 transport, undelegated NS/DS input, shareable result URLs, and 9 languages
+ - Public UI: Test results grouped by test case with translated descriptions; auto-expand for warnings/errors; severity badges per group
+ - Public UI: NS/DS lookup and fetch-from-parent buttons; DS algo/digest-type dropdowns with IANA values; reset button; striped progress bar; version footer
+ - Admin UI: Job inspector shows test case sub-groups within modules, translated descriptions, auto-expand for warnings/errors, and an overall status banner
+ - Client: `domains` command group — `list`, `get`, `runs`, `tag`, `untag`
+ - Client: `tags` command group — `list`, `create`, `delete`, `domains`, `summary`, `add-domains`
+ - Client: `runs` command group — `list`, `get`, `results`
+ - Client: `entries` command group — `query` (with CSV export via `--format csv`)
+ - Client: `jobs batch` — new `--from-tag` (re-run all domains in a tag) and `--tag` (apply tag to batch) flags
+ - Engine: INFO-level success tags for DNSSEC02/06/08/09/11/13/18 (all-algorithms-signed, parent-DS-consistent, valid-RRSIGs, etc.)
+ - Engine: CN01_OK_UDP and CN02_OK_TCP summary INFO tags for passing connectivity tests
+
+### Changed
+
+ - Server: Job results are now assembled from `runs` + `entries` tables; the old `results` table and `result_url` field are removed
+ - SQL layer refactored for multi-dialect support
+ - Engine: Fixed delegation04/06 success tags suppressed by transport-disabled entries
+ - Public UI: Fixed DS lookup to try next resolver on empty answer
+ - Public UI: Fixed TLD lookup to use FQDN and wire DNS with public resolver fallbacks
+ - UI translations: corrected nameserver08/09 test case labels across all 9 languages; fixed "lim"→"glue" and "lösas upp"→"slås upp" in Nordic translations
+ - Engine: Always include System module with version entry first in results
+ - Bumped versions on dependencies (miekg/dns 0.6.70 etc.)
+ - Normalize domain names to lowercase ACE in GetOrCreateDomain
+ - Engine: Skip dead delegation servers and break early in getIBAddrInZone
+
+## [v1.1.3] - 2026-03-13
+
+### Added
+
+ - Added Prometheus adapter for gonemaster-server with documentation
+
+### Changed
+
+ - Nagios plugin: prefer `-H/--hostname`, add `-w/--warning`, `-c/--critical`, and `-t/--timeout`, and keep legacy network/source flag aliases for compatibility
+ - Better metrics view, with added query cache information
+ - Improvements in the Nagios CLI to better conform to the structure of Nagios plugins
+ - Updated npm dependencies for UI
+
+## [v1.1.2] 2026-03-07
+
+ **BREAKING CHANGE**: More spammy log entries consolidated
+
+### Added
+
+ - Zone13: New SPF test
+
+### Changed
+
+ - Zone12: Consolidated the CSYNC log messages
+ - Consolidated output from the logs in Nameserver01, 02, 07, and 08
+
+## [v1.1.1] - 2026-03-06
+
+### Added
+
+ - Added translations for tags with missing translations
+
+### Changed
+
+ - Lowered severity level of NAMESERVER_IP_WITHOUT_REVERSE to NOTICE
+ - Bump codeberg.org/miekg/dns to 0.6.68
+ - Fixed a bunch of regressions from logargs coherency
+ - RNAME_MAIL_DOMAIN_INVALID now logs according to configured severity level
+ - UDP can succeed even when a non-EDNS reply is slightly above 512 bytes (fixes BASIC tests)
+ - Removed a large amount of stale translations
+
+## [v1.1.0] - 2026-03-05
+
+**BREAKING CHANGE** - log.args in JSON logs are now coherent, read docs/MIGRATION-1.1.md
+
+### Added
+
+ - DNSSEC19, test for badkeys, work from Hanno Böck, https://badkeys.info/, requires extra config
+ - Added docs/MIGRATION-1.1.md to explain the new coherent log.args with mapping to legacy args
+
+### Changed
+
+ - **BREAKING CHANGE** - log.args in JSON logs are now coherent, read docs/MIGRATION-1.1.md
+ - log.args has a contract version - 1.1
+ - Updated tooling for automatic generation and verification of tags, and updated the tags documents
+ - Bump codeberg.org/miekg/dns to v0.6.66 to fix MNAME bug
+ - Use msgctxt for all translations
+ - Only run Zone12 if zone exists
+ - Swedish language updated, following upstream changes
+ - RRSIG Expiration formatted as RFC3339 UTC
+ - Removed stale translation and profile entries
+ - Changed resolveCNAME to use a fresh inProgress map - fixed a DNSSEC validation bug
+ - Update translation files with the new coherent tags
+
+## [v1.0.6] - 2026-03-02
+
+### Changed
+
+- Fixed resolveCNAME to use a fresh inProgress map instead of sharing the parent's
+
+## [v1.0.5] - 2026-03-01
+
+### Added
+
+ - Japanese translations to the engine and UI
+ - Translations of the UI, with language selector
+ - Dark mode / system, in the UI
+ - Added OpenAPI coverage test
+ - Browser notifications for finished jobs and batches
+
+### Changed
+ - Updated dependencies on Go and NPM
+ - OpenAPI matches handlers.go
+ - Use msgctxt for the translation tags, removed unneccessary comments form the po files
+ - Fixed erranous N11_N11_NO_DNS tag from upstream
+ - N16_HAS_NSID is now INFO instead of NOTICE
+
+## [v1.0.4] - 2026-02-26
+
+### Added
+
+ - Test: Added Nameserver16 test case specification and implementation, NSID
+
+### Changed
+
+ - Docs: More descriptive test case listings
+
+## [v1.0.3] - 2026-02-26
+
+### Added
+
+ - Test: Added Zone12 test case specification and implementation, CSYNC
+
+### Changed
+
+ - Test: Nameserver 13 queries DNSKEY instead of SOA (follow upstream change)
+ - UI: Refactored App.svelte to match Svelte 4
+ - Engine: Minor translation fixes
+ - Engine: Fixed encoding explicit OPT RR when Z is set, so Z flags are now preserved
+ - Engine: Fixed EDNS regression problem from migrating to DNS v2
+
+## [v1.0.2] - 2026-02-24
+
+### Added
+
+ - CC license text to test case specifications
+
+### Changed
+
+ - Test:  Z11_NO_SPF_NON_MAIL_DOMAIN now emits domain to follow upstream difference from test specification
+ - Engine: Now using miekg dns version 2
+ - Tests: Now using Golang 1.25
+
+## [v1.0.1] - 2026-02-22
+
+### Added
+
+ - Server: Fix parent cache memory retention in methodsv2
+ - Server: Added SQLite persistent job store, with configuration options
+ - Server: Startup recovery — "running" jobs are failed and "queued" jobs are re-enqueued on restart
+ - Server: Added versioned schema migration runner
+ - Server: `GONEMASTER_*` environment variable support for all configuration fields (override by CLI flags)
+ - Server: `--config` JSON file support for persistent configuration
+ - Docs: Canonical testcase specifications for all 73 implemented testcases under `docs/specifications/`
+ - Docs: Per-module tag catalogs in `docs/specifications/tags/` generated from live code metadata
+ - Tools: Spec validation tooling (`make spec-validate`, `make spec-check-tags`) for CI drift detection
+ - Recursor: Add bailiwick filtering for trusted glue addresses
+ - Recursor: Bound recurse cache growth to reduce long-run memory pressure
+ - Recursor: Scope recurse cache by resolver context (root vs custom NS set)
+ - Recursor: Add regression tests for cache isolation/limits and glue filtering
+
+### Changed
+
+ - Harmonized `--version` across programs
+ - Recursor: Do not cache empty recurse responses
+
+## [v1.0.0] - 2026-02-19
+
+### Added
+
+Initial release 1.0.0.
+
+- Added --stop-level to CLI
+- Added --sourceaddr and --sourceaddr6 options to CLI
+- Added CLI cache options to CLI
+- Added tag counters to CLI
+- Added undelegated testing to CLI and Web UI
+- Added the last needed DEBUG outputs from the engine
+
+### Changed
+
+ - Added the option to use the CLI without "--domain" if it is the last argument
+
+## [0.9.19] - 2026-02-18
+
+### Added
+
+- Server throughput/contestion work
+- Engine performance optimization
+- Zonemaster parity/correctness improvements
+- New performance toolkit for repeatable benchmarking
+- Documentation and GoDoc improvements
+
+### Changed
+
+- Minor UI improvements and changes
+
+## [0.9.18] - 2026-02-10
+
+### Added
+
+- Major performance improvements
+
+## [0.9.17] - 2026-02-07
+
+### Added
+
+ - Added separate IPv4 and IPv6 metrics
+ - Batch job dropdown added
+ - New notification method for UI
+
+### Changed
+
+ - Progress bars are the same length in Recent jobs
+
+## [0.9.16] - 2026-02-07
+
+### Added
+
+ - Added server metrics to UI and server API
+ - Added GoDocs
+
+### Changed
+
+ - Fixed ".arpa" delegation bug.

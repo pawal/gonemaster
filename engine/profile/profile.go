@@ -18,6 +18,7 @@ type Profile struct {
 	NoNetwork     bool                                  `json:"no_network"`
 	Cache         map[string]map[string]any             `json:"cache"`
 	ASNDB         ASNDBSettings                         `json:"asn_db"`
+	Badkeys       BadkeysSettings                       `json:"badkeys"`
 	LogFilter     map[string]map[string][]LogFilterRule `json:"logfilter"`
 	TestLevels    map[string]map[string]string          `json:"test_levels"`
 	TestCases     []any                                 `json:"test_cases"`
@@ -83,6 +84,11 @@ type ASNDBSettings struct {
 	Sources map[string][]string `json:"sources"`
 }
 
+// BadkeysSettings holds badkeys blocklist configuration.
+type BadkeysSettings struct {
+	Path string `json:"path"`
+}
+
 // TestCasesVars stores per-testcase tunables.
 type TestCasesVars struct {
 	DNSSEC04 DNSSEC04Vars `json:"dnssec04"`
@@ -90,6 +96,7 @@ type TestCasesVars struct {
 	Zone04   Zone04Vars   `json:"zone04"`
 	Zone05   Zone05Vars   `json:"zone05"`
 	Zone06   Zone06Vars   `json:"zone06"`
+	Zone13   Zone13Vars   `json:"zone13"`
 }
 
 // DNSSEC04Vars holds profile tunables for DNSSEC04 checks.
@@ -118,6 +125,11 @@ type Zone05Vars struct {
 type Zone06Vars struct {
 	SOADefaultTTLMaximumValue int `json:"SOA_DEFAULT_TTL_MAXIMUM_VALUE"`
 	SOADefaultTTLMinimumValue int `json:"SOA_DEFAULT_TTL_MINIMUM_VALUE"`
+}
+
+// Zone13Vars holds profile tunables for Zone13 (SPF DNS lookup count) checks.
+type Zone13Vars struct {
+	SPFLookupLimit int `json:"SPF_LOOKUP_LIMIT"`
 }
 
 // LogFilterRule mirrors the logfilter rule structure.

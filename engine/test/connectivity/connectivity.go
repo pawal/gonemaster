@@ -10,6 +10,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine/asnlookup"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/methods"
 	"codeberg.org/pawal/gonemaster/engine/methodsv2"
@@ -87,6 +88,7 @@ func Metadata() map[string][]string {
 			"CN01_NO_RESPONSE_SOA_QUERY_UDP",
 			"CN01_NO_RESPONSE_UDP",
 			"CN01_NS_RECORD_NOT_AA_UDP",
+			"CN01_OK_UDP",
 			"CN01_SOA_RECORD_NOT_AA_UDP",
 			"CN01_UNEXPECTED_RCODE_NS_QUERY_UDP",
 			"CN01_UNEXPECTED_RCODE_SOA_QUERY_UDP",
@@ -104,6 +106,7 @@ func Metadata() map[string][]string {
 			"CN02_NO_RESPONSE_SOA_QUERY_TCP",
 			"CN02_NO_RESPONSE_TCP",
 			"CN02_NS_RECORD_NOT_AA_TCP",
+			"CN02_OK_TCP",
 			"CN02_SOA_RECORD_NOT_AA_TCP",
 			"CN02_UNEXPECTED_RCODE_NS_QUERY_TCP",
 			"CN02_UNEXPECTED_RCODE_SOA_QUERY_TCP",
@@ -130,8 +133,8 @@ func Metadata() map[string][]string {
 			"TEST_CASE_START",
 		},
 		"connectivity04": {
-			"ASN_INFOS_RAW",
-			"ASN_INFOS_ANNOUNCE_IN",
+			"CN04_ASN_INFOS_RAW",
+			"CN04_ASN_INFOS_ANNOUNCE_IN",
 			"CN04_EMPTY_PREFIX_SET",
 			"CN04_ERROR_PREFIX_DATABASE",
 			"CN04_IPV4_DIFFERENT_PREFIX",
@@ -167,16 +170,16 @@ func Connectivity01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 
 	ipv4Disabled, ipv6Disabled := disabledNS(ctx, nsList)
 	if len(ipv4Disabled) > 0 {
-		if err := appendLog(ctx, &results, testcase, "CN01_IPV4_DISABLED", map[string]any{
-			"ns_list": strings.Join(ipv4Disabled, ";"),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, ipv4Disabled)
+		if err := appendLog(ctx, &results, testcase, "CN01_IPV4_DISABLED", args); err != nil {
 			return results, err
 		}
 	}
 	if len(ipv6Disabled) > 0 {
-		if err := appendLog(ctx, &results, testcase, "CN01_IPV6_DISABLED", map[string]any{
-			"ns_list": strings.Join(ipv6Disabled, ";"),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, ipv6Disabled)
+		if err := appendLog(ctx, &results, testcase, "CN01_IPV6_DISABLED", args); err != nil {
 			return results, err
 		}
 	}
@@ -263,36 +266,36 @@ func Connectivity03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 					return err
 				}
 				if res.Code == asnlookup.CodeError || res.Code == asnlookup.CodeEmpty {
-					if _, err := buf.Add(res.Code, map[string]any{"ns_ip": ip.String()}); err != nil {
+					if _, err := buf.Add(res.Code, map[string]any{"address": ip.String()}); err != nil {
 						return err
 					}
 					return nil
 				}
 				if res.Raw != "" {
 					if _, err := buf.Add("ASN_INFOS_RAW", map[string]any{
-						"ns_ip": ip.String(),
-						"data":  res.Raw,
+						"address": ip.String(),
+						"data":    res.Raw,
 					}); err != nil {
 						return err
 					}
 				}
 				if len(res.ASNs) > 0 {
-					asnStr := joinASNStrings(res.ASNs)
+					asns := uniqueSortedInts(append([]int{}, res.ASNs...))
 					if _, err := buf.Add("ASN_INFOS_ANNOUNCE_BY", map[string]any{
-						"ns_ip": ip.String(),
-						"asn":   asnStr,
+						"address": ip.String(),
+						"asns":    asns,
 					}); err != nil {
 						return err
 					}
 					outcomes[i] = asnOutcome{
-						asns:   append([]int{}, res.ASNs...),
-						asnset: joinASNNumeric(res.ASNs),
+						asns:   asns,
+						asnset: asnSetSignature(asns),
 					}
 				}
 				if res.Prefix != nil {
 					if _, err := buf.Add("ASN_INFOS_ANNOUNCE_IN", map[string]any{
-						"ns_ip":  ip.String(),
-						"prefix": res.Prefix.String(),
+						"address":  ip.String(),
+						"prefixes": []string{res.Prefix.String()},
 					}); err != nil {
 						return err
 					}
@@ -329,36 +332,36 @@ func Connectivity03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 					return err
 				}
 				if res.Code == asnlookup.CodeError || res.Code == asnlookup.CodeEmpty {
-					if _, err := buf.Add(res.Code, map[string]any{"ns_ip": ip.String()}); err != nil {
+					if _, err := buf.Add(res.Code, map[string]any{"address": ip.String()}); err != nil {
 						return err
 					}
 					return nil
 				}
 				if res.Raw != "" {
 					if _, err := buf.Add("ASN_INFOS_RAW", map[string]any{
-						"ns_ip": ip.String(),
-						"data":  res.Raw,
+						"address": ip.String(),
+						"data":    res.Raw,
 					}); err != nil {
 						return err
 					}
 				}
 				if len(res.ASNs) > 0 {
-					asnStr := joinASNStrings(res.ASNs)
+					asns := uniqueSortedInts(append([]int{}, res.ASNs...))
 					if _, err := buf.Add("ASN_INFOS_ANNOUNCE_BY", map[string]any{
-						"ns_ip": ip.String(),
-						"asn":   asnStr,
+						"address": ip.String(),
+						"asns":    asns,
 					}); err != nil {
 						return err
 					}
 					outcomes[i] = asnOutcome{
-						asns:   append([]int{}, res.ASNs...),
-						asnset: joinASNNumeric(res.ASNs),
+						asns:   asns,
+						asnset: asnSetSignature(asns),
 					}
 				}
 				if res.Prefix != nil {
 					if _, err := buf.Add("ASN_INFOS_ANNOUNCE_IN", map[string]any{
-						"ns_ip":  ip.String(),
-						"prefix": res.Prefix.String(),
+						"address":  ip.String(),
+						"prefixes": []string{res.Prefix.String()},
 					}); err != nil {
 						return err
 					}
@@ -396,13 +399,13 @@ func Connectivity03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 			}
 		} else if len(v4asnsets) == 1 {
 			if err := appendLog(ctx, &results, testcase, "IPV4_SAME_ASN", map[string]any{
-				"asn_list": v4asnsets[0],
+				"asns": v4asns,
 			}); err != nil {
 				return results, err
 			}
 		} else {
 			if err := appendLog(ctx, &results, testcase, "IPV4_DIFFERENT_ASN", map[string]any{
-				"asn_list": joinInts(v4asns),
+				"asns": v4asns,
 			}); err != nil {
 				return results, err
 			}
@@ -418,13 +421,13 @@ func Connectivity03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 			}
 		} else if len(v6asnsets) == 1 {
 			if err := appendLog(ctx, &results, testcase, "IPV6_SAME_ASN", map[string]any{
-				"asn_list": v6asnsets[0],
+				"asns": v6asns,
 			}); err != nil {
 				return results, err
 			}
 		} else {
 			if err := appendLog(ctx, &results, testcase, "IPV6_DIFFERENT_ASN", map[string]any{
-				"asn_list": joinInts(v6asns),
+				"asns": v6asns,
 			}); err != nil {
 				return results, err
 			}
@@ -513,7 +516,7 @@ func Connectivity04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 					} else if res.Code == asnlookup.CodeEmpty {
 						tag = "CN04_EMPTY_PREFIX_SET"
 					}
-					if _, err := buf.Add(tag, map[string]any{"ns_ip": ip.String()}); err != nil {
+					if _, err := buf.Add(tag, map[string]any{"address": ip.String()}); err != nil {
 						return err
 					}
 					return nil
@@ -521,8 +524,8 @@ func Connectivity04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 
 				if res.Raw != "" {
 					if _, err := buf.Add("CN04_ASN_INFOS_RAW", map[string]any{
-						"ns_ip": ip.String(),
-						"data":  res.Raw,
+						"address": ip.String(),
+						"data":    res.Raw,
 					}); err != nil {
 						return err
 					}
@@ -531,15 +534,15 @@ func Connectivity04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 				if res.Prefix != nil {
 					prefixStr := res.Prefix.String()
 					if _, err := buf.Add("CN04_ASN_INFOS_ANNOUNCE_IN", map[string]any{
-						"ns_ip":  ip.String(),
-						"prefix": prefixStr,
+						"address":  ip.String(),
+						"prefixes": []string{prefixStr},
 					}); err != nil {
 						return err
 					}
 					outcomes[i] = prefixOutcome{
 						version: entry.version,
 						prefix:  prefixStr,
-						item:    entry.item.String(),
+						item:    entry.item.Name.String() + "/" + entry.item.Address.String(),
 					}
 				}
 				return nil
@@ -591,10 +594,11 @@ func Connectivity04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 			}
 			if len(list) >= 2 {
 				tag := fmt.Sprintf("CN04_IPV%d_SAME_PREFIX", version)
-				if err := appendLog(ctx, &results, testcase, tag, map[string]any{
-					"ip_prefix": prefix,
-					"ns_list":   joinSorted(list),
-				}); err != nil {
+				args := map[string]any{
+					"prefixes": []string{prefix},
+				}
+				setTypedServersFromNames(args, list)
+				if err := appendLog(ctx, &results, testcase, tag, args); err != nil {
 					return results, err
 				}
 			}
@@ -602,9 +606,9 @@ func Connectivity04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 
 		if len(combined) > 0 {
 			tag := fmt.Sprintf("CN04_IPV%d_DIFFERENT_PREFIX", version)
-			if err := appendLog(ctx, &results, testcase, tag, map[string]any{
-				"ns_list": joinUniqueSorted(combined),
-			}); err != nil {
+			args := map[string]any{}
+			setTypedServersFromNames(args, combined)
+			if err := appendLog(ctx, &results, testcase, tag, args); err != nil {
 				return results, err
 			}
 		}
@@ -648,9 +652,10 @@ func connectivityLoop(ctx context.Context, testcase string, name dnsname.Name, n
 
 	if len(nsList) > 0 {
 		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
+		okNS := make([]string, len(nsList))
 		tasks := make([]runner.Task, len(nsList))
 		for i, ns := range nsList {
-			ns := ns
+			i, ns := i, ns
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "SOA", "NS")
@@ -667,14 +672,13 @@ func connectivityLoop(ctx context.Context, testcase string, name dnsname.Name, n
 				nsResp, _ := ns.QueryWithOptions(ctx, name.String(), "NS", opts)
 
 				if soaResp.Msg == nil && nsResp.Msg == nil {
-					if _, err := buf.Add(fmt.Sprintf("%s_NO_RESPONSE_%s", prefix, protocol), map[string]any{
-						"ns": ns.String(),
-					}); err != nil {
+					if _, err := buf.Add(fmt.Sprintf("%s_NO_RESPONSE_%s", prefix, protocol), withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					return nil
 				}
 
+				ok := true
 				for _, qtype := range []string{"SOA", "NS"} {
 					resp := soaResp
 					if qtype == "NS" {
@@ -682,55 +686,56 @@ func connectivityLoop(ctx context.Context, testcase string, name dnsname.Name, n
 					}
 
 					if resp.Msg == nil {
-						if _, err := buf.Add(fmt.Sprintf("%s_NO_RESPONSE_%s_QUERY_%s", prefix, qtype, protocol), map[string]any{
-							"ns": ns.String(),
-						}); err != nil {
+						if _, err := buf.Add(fmt.Sprintf("%s_NO_RESPONSE_%s_QUERY_%s", prefix, qtype, protocol), withNameserverArgs(ns, nil)); err != nil {
 							return err
 						}
+						ok = false
 						continue
 					}
 
 					if resp.Rcode() != "NOERROR" {
-						if _, err := buf.Add(fmt.Sprintf("%s_UNEXPECTED_RCODE_%s_QUERY_%s", prefix, qtype, protocol), map[string]any{
-							"ns":    ns.String(),
+						if _, err := buf.Add(fmt.Sprintf("%s_UNEXPECTED_RCODE_%s_QUERY_%s", prefix, qtype, protocol), withNameserverArgs(ns, map[string]any{
 							"rcode": resp.Rcode(),
-						}); err != nil {
+						})); err != nil {
 							return err
 						}
+						ok = false
 						continue
 					}
 
 					rrs := resp.GetRecords(qtype, "answer")
 					if len(rrs) == 0 {
-						if _, err := buf.Add(fmt.Sprintf("%s_MISSING_%s_RECORD_%s", prefix, qtype, protocol), map[string]any{
-							"ns": ns.String(),
-						}); err != nil {
+						if _, err := buf.Add(fmt.Sprintf("%s_MISSING_%s_RECORD_%s", prefix, qtype, protocol), withNameserverArgs(ns, nil)); err != nil {
 							return err
 						}
+						ok = false
 						continue
 					}
 
 					rrOwner := dnsname.New(rrs[0].Header().Name).FQDN()
 					expected := name.FQDN()
 					if !strings.EqualFold(rrOwner, expected) {
-						if _, err := buf.Add(fmt.Sprintf("%s_WRONG_%s_RECORD_%s", prefix, qtype, protocol), map[string]any{
-							"ns":              ns.String(),
+						if _, err := buf.Add(fmt.Sprintf("%s_WRONG_%s_RECORD_%s", prefix, qtype, protocol), withNameserverArgs(ns, map[string]any{
 							"domain_found":    strings.ToLower(rrOwner),
 							"domain_expected": strings.ToLower(expected),
-						}); err != nil {
+						})); err != nil {
 							return err
 						}
+						ok = false
 						continue
 					}
 
 					if !resp.AA() {
-						if _, err := buf.Add(fmt.Sprintf("%s_%s_RECORD_NOT_AA_%s", prefix, qtype, protocol), map[string]any{
-							"ns": ns.String(),
-						}); err != nil {
+						if _, err := buf.Add(fmt.Sprintf("%s_%s_RECORD_NOT_AA_%s", prefix, qtype, protocol), withNameserverArgs(ns, nil)); err != nil {
 							return err
 						}
+						ok = false
 						continue
 					}
+				}
+
+				if ok {
+					okNS[i] = ns.NameString() + "/" + ns.AddressString()
 				}
 
 				return nil
@@ -742,6 +747,20 @@ func connectivityLoop(ctx context.Context, testcase string, name dnsname.Name, n
 			return err
 		}
 		*results = append(*results, entries...)
+
+		var okList []string
+		for _, v := range okNS {
+			if v != "" {
+				okList = append(okList, v)
+			}
+		}
+		if len(okList) > 0 {
+			args := map[string]any{}
+			setTypedServersFromNames(args, okList)
+			if err := appendLog(ctx, results, testcase, fmt.Sprintf("%s_OK_%s", prefix, protocol), args); err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil
@@ -763,13 +782,21 @@ func appendLog(ctx context.Context, results *[]*logger.Entry, testcase string, t
 	return nil
 }
 
+func withNameserverArgs(ns nameserver.Nameserver, args map[string]any) map[string]any {
+	if args == nil {
+		args = map[string]any{}
+	}
+	logargs.NormalizeQueryIdentity(args)
+	logargs.SetNS(args, ns.NameString(), ns.AddressString())
+	return args
+}
+
 func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
 	if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 		for _, rrtype := range rrtypes {
-			if _, err := buf.Add("IPV6_DISABLED", map[string]any{
-				"ns":     ns.String(),
-				"rrtype": rrtype,
-			}); err != nil {
+			if _, err := buf.Add("IPV6_DISABLED", withNameserverArgs(ns, map[string]any{
+				"query_type": rrtype,
+			})); err != nil {
 				return true, err
 			}
 		}
@@ -777,10 +804,9 @@ func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, ns
 	}
 	if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
 		for _, rrtype := range rrtypes {
-			if _, err := buf.Add("IPV4_DISABLED", map[string]any{
-				"ns":     ns.String(),
-				"rrtype": rrtype,
-			}); err != nil {
+			if _, err := buf.Add("IPV4_DISABLED", withNameserverArgs(ns, map[string]any{
+				"query_type": rrtype,
+			})); err != nil {
 				return true, err
 			}
 		}
@@ -794,11 +820,11 @@ func disabledNS(ctx context.Context, nsList []nameserver.Nameserver) ([]string, 
 	var ipv6 []string
 	for _, ns := range nsList {
 		if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
-			ipv4 = append(ipv4, ns.String())
+			ipv4 = append(ipv4, ns.NameString())
 			continue
 		}
 		if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
-			ipv6 = append(ipv6, ns.String())
+			ipv6 = append(ipv6, ns.NameString())
 		}
 	}
 	return ipv4, ipv6
@@ -868,15 +894,7 @@ func uniqueSortedStrings(values []string) []string {
 	return out
 }
 
-func joinInts(values []int) string {
-	parts := make([]string, len(values))
-	for i, value := range values {
-		parts[i] = strconv.Itoa(value)
-	}
-	return strings.Join(parts, ",")
-}
-
-func joinASNStrings(values []int) string {
+func asnSetSignature(values []int) string {
 	if len(values) == 0 {
 		return ""
 	}
@@ -884,36 +902,20 @@ func joinASNStrings(values []int) string {
 	for i, value := range values {
 		parts[i] = strconv.Itoa(value)
 	}
-	sort.Strings(parts)
 	return strings.Join(parts, ",")
 }
 
-func joinASNNumeric(values []int) string {
-	if len(values) == 0 {
-		return ""
+func setTypedServersFromNames(args map[string]any, values []string) {
+	if args == nil || len(values) == 0 {
+		return
 	}
-	copyVals := append([]int{}, values...)
-	sort.Ints(copyVals)
-	return joinInts(copyVals)
-}
-
-func joinSorted(values []string) string {
-	copyVals := append([]string{}, values...)
-	sort.Strings(copyVals)
-	return strings.Join(copyVals, ";")
-}
-
-func joinUniqueSorted(values []string) string {
-	if len(values) == 0 {
-		return ""
+	raw, ok := logargs.ServersFromValues(values)["servers"]
+	if !ok {
+		return
 	}
-	copyVals := append([]string{}, values...)
-	sort.Strings(copyVals)
-	out := []string{copyVals[0]}
-	for _, value := range copyVals[1:] {
-		if value != out[len(out)-1] {
-			out = append(out, value)
-		}
+	servers, ok := raw.([]map[string]any)
+	if !ok || len(servers) == 0 {
+		return
 	}
-	return strings.Join(out, ";")
+	args["servers"] = servers
 }

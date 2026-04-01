@@ -3,7 +3,6 @@ package recursor
 import (
 	"context"
 	"errors"
-	"net"
 	"net/netip"
 	"strings"
 	"sync"
@@ -11,7 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
@@ -100,13 +100,120 @@ func TestCacheStoreLookupAndClear(t *testing.T) {
 	}
 
 	r.cacheStore("empty", "A", "IN", packet.Packet{})
-	if _, ok := r.cacheLookup("empty", "A", "IN"); !ok {
-		t.Fatalf("expected cached nil response")
+	if _, ok := r.cacheLookup("empty", "A", "IN"); ok {
+		t.Fatalf("expected empty response not to be cached")
 	}
 
 	r.ClearCache()
 	if _, ok := r.cacheLookup("example", "A", "IN"); ok {
 		t.Fatalf("expected cache cleared")
+	}
+}
+
+func TestCacheStoreBoundsCacheSize(t *testing.T) {
+	oldMax := recurseCacheMaxEntries
+	recurseCacheMaxEntries = 2
+	defer func() {
+		recurseCacheMaxEntries = oldMax
+	}()
+
+	r := &Recursor{}
+	msg := new(dns.Msg)
+	msg.Rcode = dns.RcodeSuccess
+	resp := packet.Packet{Msg: msg}
+
+	r.cacheStore("a", "A", "IN", resp)
+	r.cacheStore("b", "A", "IN", resp)
+	r.cacheStore("c", "A", "IN", resp)
+
+	if _, ok := r.cacheLookup("a", "A", "IN"); ok {
+		t.Fatalf("expected oldest entry evicted after cache cap")
+	}
+	if _, ok := r.cacheLookup("b", "A", "IN"); ok {
+		t.Fatalf("expected cache to reset once cap exceeded")
+	}
+	if _, ok := r.cacheLookup("c", "A", "IN"); !ok {
+		t.Fatalf("expected latest entry to remain after reset")
+	}
+	if r.recurseCount != 1 {
+		t.Fatalf("unexpected cache count after reset: %d", r.recurseCount)
+	}
+}
+
+func TestRecurseWithNameserversDoesNotPoisonRootCache(t *testing.T) {
+	nameserver.EmptyCache()
+	defer nameserver.EmptyCache()
+
+	r := &Recursor{
+		fakeAddresses: map[string]map[string][]netip.Addr{},
+		client:        &transport.Client{},
+		recurseCache:  map[string]map[string]map[string]*packet.Packet{},
+		inflight:      map[string]*inflightLookup{},
+	}
+	if err := r.AddFakeAddresses(".", map[string][]string{
+		"a.root.test": {"192.0.2.1"},
+	}); err != nil {
+		t.Fatalf("add fake root: %v", err)
+	}
+
+	var rootCalls int32
+	rootNS, err := nameserver.NewWithContext(context.Background(), "a.root.test", "192.0.2.1", r.client)
+	if err != nil {
+		t.Fatalf("new root nameserver: %v", err)
+	}
+	rootNS.SetQueryHook(func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		if dnsname.New(name).String() != "example" || strings.ToUpper(qtype) != "A" {
+			return packet.Packet{}, nil
+		}
+		atomic.AddInt32(&rootCalls, 1)
+		return packetWithA(name, netip.MustParseAddr("192.0.2.1")), nil
+	})
+
+	var customCalls int32
+	customNS, err := nameserver.NewWithContext(context.Background(), "custom.test", "192.0.2.2", r.client)
+	if err != nil {
+		t.Fatalf("new custom nameserver: %v", err)
+	}
+	customNS.SetQueryHook(func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		if dnsname.New(name).String() != "example" || strings.ToUpper(qtype) != "A" {
+			return packet.Packet{}, nil
+		}
+		atomic.AddInt32(&customCalls, 1)
+		return packetWithA(name, netip.MustParseAddr("192.0.2.2")), nil
+	})
+
+	ctx := context.Background()
+	respCustom, err := r.RecurseWithNameservers(ctx, "example", "A", "IN", []nameserver.Nameserver{customNS})
+	if err != nil {
+		t.Fatalf("custom recurse: %v", err)
+	}
+	recordsCustom := respCustom.GetRecords("A", "answer")
+	if len(recordsCustom) != 1 {
+		t.Fatalf("expected one custom A record, got %d", len(recordsCustom))
+	}
+	customA, ok := recordsCustom[0].(*dns.A)
+	if !ok || customA.Addr.String() != "192.0.2.2" {
+		t.Fatalf("unexpected custom response: %#v", recordsCustom[0])
+	}
+
+	respRoot, err := r.Recurse(ctx, "example", "A", "IN")
+	if err != nil {
+		t.Fatalf("root recurse: %v", err)
+	}
+	recordsRoot := respRoot.GetRecords("A", "answer")
+	if len(recordsRoot) != 1 {
+		t.Fatalf("expected one root A record, got %d", len(recordsRoot))
+	}
+	rootA, ok := recordsRoot[0].(*dns.A)
+	if !ok || rootA.Addr.String() != "192.0.2.1" {
+		t.Fatalf("unexpected root response: %#v", recordsRoot[0])
+	}
+
+	if atomic.LoadInt32(&customCalls) == 0 {
+		t.Fatalf("expected custom nameserver to be queried")
+	}
+	if atomic.LoadInt32(&rootCalls) == 0 {
+		t.Fatalf("expected root nameserver query, cache should not reuse custom result")
 	}
 }
 
@@ -295,26 +402,12 @@ func TestParentSingleLabelFallsBackToRoot(t *testing.T) {
 		case name == "arpa" && qtype == "SOA":
 			msg := new(dns.Msg)
 			msg.Rcode = dns.RcodeSuccess
-			msg.Ns = []dns.RR{
-				&dns.NS{
-					Hdr: dns.RR_Header{
-						Name:   "arpa.",
-						Rrtype: dns.TypeNS,
-						Class:  dns.ClassINET,
-					},
-					Ns: "ns.arpa.test.",
-				},
-			}
-			msg.Extra = []dns.RR{
-				&dns.A{
-					Hdr: dns.RR_Header{
-						Name:   "ns.arpa.test.",
-						Rrtype: dns.TypeA,
-						Class:  dns.ClassINET,
-					},
-					A: net.IPv4(192, 0, 2, 2),
-				},
-			}
+			nsRR1 := &dns.NS{Hdr: dns.Header{Name: "arpa.", Class: dns.ClassINET}}
+			nsRR1.Ns = "ns.arpa.test."
+			msg.Ns = []dns.RR{nsRR1}
+			aRR1 := &dns.A{Hdr: dns.Header{Name: "ns.arpa.test.", Class: dns.ClassINET}}
+			aRR1.Addr = netip.AddrFrom4([4]byte{192, 0, 2, 2})
+			msg.Extra = []dns.RR{aRR1}
 			return packet.Packet{Msg: msg}, nil
 		case name == "." && qtype == "SOA":
 			// Simulate a transient parent-check failure. Parent() should still
@@ -339,22 +432,15 @@ func TestParentSingleLabelFallsBackToRoot(t *testing.T) {
 
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
-		msg.Answer = []dns.RR{
-			&dns.SOA{
-				Hdr: dns.RR_Header{
-					Name:   "arpa.",
-					Rrtype: dns.TypeSOA,
-					Class:  dns.ClassINET,
-				},
-				Ns:      "ns.arpa.test.",
-				Mbox:    "hostmaster.arpa.",
-				Serial:  1,
-				Refresh: 3600,
-				Retry:   600,
-				Expire:  1209600,
-				Minttl:  3600,
-			},
-		}
+		soaRR2 := &dns.SOA{Hdr: dns.Header{Name: "arpa.", Class: dns.ClassINET}}
+		soaRR2.Ns = "ns.arpa.test."
+		soaRR2.Mbox = "hostmaster.arpa."
+		soaRR2.Serial = 1
+		soaRR2.Refresh = 3600
+		soaRR2.Retry = 600
+		soaRR2.Expire = 1209600
+		soaRR2.Minttl = 3600
+		msg.Answer = []dns.RR{soaRR2}
 		return packet.Packet{Msg: msg}, nil
 	})
 
@@ -397,22 +483,15 @@ func TestParentSingleLabelNoTraceFallsBackToRoot(t *testing.T) {
 		// referral trace. Parent() must still resolve arpa -> .
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
-		msg.Answer = []dns.RR{
-			&dns.SOA{
-				Hdr: dns.RR_Header{
-					Name:   "arpa.",
-					Rrtype: dns.TypeSOA,
-					Class:  dns.ClassINET,
-				},
-				Ns:      "ns.arpa.test.",
-				Mbox:    "hostmaster.arpa.",
-				Serial:  1,
-				Refresh: 3600,
-				Retry:   600,
-				Expire:  1209600,
-				Minttl:  3600,
-			},
-		}
+		soaRR3 := &dns.SOA{Hdr: dns.Header{Name: "arpa.", Class: dns.ClassINET}}
+		soaRR3.Ns = "ns.arpa.test."
+		soaRR3.Mbox = "hostmaster.arpa."
+		soaRR3.Serial = 1
+		soaRR3.Refresh = 3600
+		soaRR3.Retry = 600
+		soaRR3.Expire = 1209600
+		soaRR3.Minttl = 3600
+		msg.Answer = []dns.RR{soaRR3}
 		return packet.Packet{Msg: msg}, nil
 	})
 
@@ -430,34 +509,14 @@ func TestGetNSFromUsesGlueAndLazy(t *testing.T) {
 	defer nameserver.EmptyCache()
 
 	msg := new(dns.Msg)
-	msg.Ns = []dns.RR{
-		&dns.NS{
-			Hdr: dns.RR_Header{
-				Name:   "example.",
-				Rrtype: dns.TypeNS,
-				Class:  dns.ClassINET,
-			},
-			Ns: "ns2.example.",
-		},
-		&dns.NS{
-			Hdr: dns.RR_Header{
-				Name:   "example.",
-				Rrtype: dns.TypeNS,
-				Class:  dns.ClassINET,
-			},
-			Ns: "ns1.example.",
-		},
-	}
-	msg.Extra = []dns.RR{
-		&dns.A{
-			Hdr: dns.RR_Header{
-				Name:   "ns1.example.",
-				Rrtype: dns.TypeA,
-				Class:  dns.ClassINET,
-			},
-			A: net.IPv4(192, 0, 2, 53),
-		},
-	}
+	nsRR2 := &dns.NS{Hdr: dns.Header{Name: "example.", Class: dns.ClassINET}}
+	nsRR2.Ns = "ns2.example."
+	nsRR3 := &dns.NS{Hdr: dns.Header{Name: "example.", Class: dns.ClassINET}}
+	nsRR3.Ns = "ns1.example."
+	msg.Ns = []dns.RR{nsRR2, nsRR3}
+	aRR2 := &dns.A{Hdr: dns.Header{Name: "ns1.example.", Class: dns.ClassINET}}
+	aRR2.Addr = netip.AddrFrom4([4]byte{192, 0, 2, 53})
+	msg.Extra = []dns.RR{aRR2}
 
 	resp := packet.Packet{Msg: msg}
 	r := &Recursor{client: &transport.Client{}}
@@ -475,6 +534,55 @@ func TestGetNSFromUsesGlueAndLazy(t *testing.T) {
 	}
 	if _, ok := queryers[1].(lazyNameserver); !ok {
 		t.Fatalf("expected lazy nameserver, got %#v", queryers[1])
+	}
+}
+
+func TestGetNSFromIgnoresOutOfBailiwickAndUnrelatedGlue(t *testing.T) {
+	nameserver.EmptyCache()
+	defer nameserver.EmptyCache()
+
+	msg := new(dns.Msg)
+	nsRR4 := &dns.NS{Hdr: dns.Header{Name: "example.", Class: dns.ClassINET}}
+	nsRR4.Ns = "ns1.example."
+	nsRR5 := &dns.NS{Hdr: dns.Header{Name: "example.", Class: dns.ClassINET}}
+	nsRR5.Ns = "ns.outside.net."
+	msg.Ns = []dns.RR{nsRR4, nsRR5}
+	aRR3 := &dns.A{Hdr: dns.Header{Name: "ns1.example.", Class: dns.ClassINET}}
+	aRR3.Addr = netip.AddrFrom4([4]byte{192, 0, 2, 53})
+	aRR4 := &dns.A{Hdr: dns.Header{Name: "ns.outside.net.", Class: dns.ClassINET}}
+	aRR4.Addr = netip.AddrFrom4([4]byte{203, 0, 113, 9})
+	aRR5 := &dns.A{Hdr: dns.Header{Name: "attacker.example.", Class: dns.ClassINET}}
+	aRR5.Addr = netip.AddrFrom4([4]byte{198, 51, 100, 66})
+	msg.Extra = []dns.RR{aRR3, aRR4, aRR5}
+
+	resp := packet.Packet{Msg: msg}
+	r := &Recursor{client: &transport.Client{}}
+	state := &recurseState{}
+	queryers, err := r.getNSFrom(context.Background(), resp, state)
+	if err != nil {
+		t.Fatalf("getNSFrom: %v", err)
+	}
+	if len(queryers) != 2 {
+		t.Fatalf("expected 2 queryers, got %d", len(queryers))
+	}
+
+	first, ok := queryers[0].(nameserver.Nameserver)
+	if !ok || first.Name.String() != "ns1.example" || first.Address.String() != "192.0.2.53" {
+		t.Fatalf("unexpected first queryer: %#v", queryers[0])
+	}
+	second, ok := queryers[1].(lazyNameserver)
+	if !ok || second.name != "ns.outside.net" {
+		t.Fatalf("expected lazy queryer for out-of-bailiwick NS, got %#v", queryers[1])
+	}
+
+	state.ensureLock()
+	state.lock()
+	defer state.unlock()
+	if _, ok := state.glue["ns.outside.net"]; ok {
+		t.Fatalf("did not expect out-of-bailiwick glue to be trusted")
+	}
+	if _, ok := state.glue["attacker.example"]; ok {
+		t.Fatalf("did not expect unrelated additional address to be trusted")
 	}
 }
 
@@ -775,34 +883,14 @@ func TestGetNSFromConcurrentWithLazyNameserver(t *testing.T) {
 	})
 
 	msg := new(dns.Msg)
-	msg.Ns = []dns.RR{
-		&dns.NS{
-			Hdr: dns.RR_Header{
-				Name:   "example.",
-				Rrtype: dns.TypeNS,
-				Class:  dns.ClassINET,
-			},
-			Ns: "ns.example.",
-		},
-	}
-	msg.Extra = []dns.RR{
-		&dns.A{
-			Hdr: dns.RR_Header{
-				Name:   "ns.example.",
-				Rrtype: dns.TypeA,
-				Class:  dns.ClassINET,
-			},
-			A: net.IPv4(192, 0, 2, 40),
-		},
-		&dns.AAAA{
-			Hdr: dns.RR_Header{
-				Name:   "ns.example.",
-				Rrtype: dns.TypeAAAA,
-				Class:  dns.ClassINET,
-			},
-			AAAA: net.ParseIP("2001:db8::40"),
-		},
-	}
+	nsRR6 := &dns.NS{Hdr: dns.Header{Name: "example.", Class: dns.ClassINET}}
+	nsRR6.Ns = "ns.example."
+	msg.Ns = []dns.RR{nsRR6}
+	aRR6 := &dns.A{Hdr: dns.Header{Name: "ns.example.", Class: dns.ClassINET}}
+	aRR6.Addr = netip.AddrFrom4([4]byte{192, 0, 2, 40})
+	aaaa6 := &dns.AAAA{Hdr: dns.Header{Name: "ns.example.", Class: dns.ClassINET}}
+	aaaa6.Addr = netip.MustParseAddr("2001:db8::40")
+	msg.Extra = []dns.RR{aRR6, aaaa6}
 	resp := packet.Packet{Msg: msg}
 
 	state := &recurseState{glue: map[string]map[netip.Addr]bool{}}
@@ -855,32 +943,13 @@ func TestGetNSFromConcurrentWithLazyNameserver(t *testing.T) {
 
 func TestCollectCNAMEsAndAddresses(t *testing.T) {
 	msg := new(dns.Msg)
-	msg.Answer = []dns.RR{
-		&dns.CNAME{
-			Hdr: dns.RR_Header{
-				Name:   "www.example.",
-				Rrtype: dns.TypeCNAME,
-				Class:  dns.ClassINET,
-			},
-			Target: "alias.example.",
-		},
-		&dns.A{
-			Hdr: dns.RR_Header{
-				Name:   "alias.example.",
-				Rrtype: dns.TypeA,
-				Class:  dns.ClassINET,
-			},
-			A: net.IPv4(192, 0, 2, 55),
-		},
-		&dns.AAAA{
-			Hdr: dns.RR_Header{
-				Name:   "alias.example.",
-				Rrtype: dns.TypeAAAA,
-				Class:  dns.ClassINET,
-			},
-			AAAA: net.ParseIP("2001:db8::55"),
-		},
-	}
+	cnameRR3 := &dns.CNAME{Hdr: dns.Header{Name: "www.example.", Class: dns.ClassINET}}
+	cnameRR3.Target = "alias.example."
+	aRR7 := &dns.A{Hdr: dns.Header{Name: "alias.example.", Class: dns.ClassINET}}
+	aRR7.Addr = netip.AddrFrom4([4]byte{192, 0, 2, 55})
+	aaaa7 := &dns.AAAA{Hdr: dns.Header{Name: "alias.example.", Class: dns.ClassINET}}
+	aaaa7.Addr = netip.MustParseAddr("2001:db8::55")
+	msg.Answer = []dns.RR{cnameRR3, aRR7, aaaa7}
 
 	resp := packet.Packet{Msg: msg}
 	target := dnsname.New("www.example")
@@ -905,15 +974,8 @@ func TestCollectCNAMEsAndAddresses(t *testing.T) {
 
 func TestFirstSOAOwner(t *testing.T) {
 	msg := new(dns.Msg)
-	msg.Answer = []dns.RR{
-		&dns.SOA{
-			Hdr: dns.RR_Header{
-				Name:   "example.",
-				Rrtype: dns.TypeSOA,
-				Class:  dns.ClassINET,
-			},
-		},
-	}
+	soaRR4 := &dns.SOA{Hdr: dns.Header{Name: "example.", Class: dns.ClassINET}}
+	msg.Answer = []dns.RR{soaRR4}
 	resp := packet.Packet{Msg: msg}
 	if owner := firstSOAOwner(resp); owner != "example" {
 		t.Fatalf("unexpected owner %q", owner)
@@ -1511,17 +1573,9 @@ func TestSnapshotStateMapsConcurrentMutation(t *testing.T) {
 
 func packetWithA(name string, addr netip.Addr) packet.Packet {
 	msg := new(dns.Msg)
-	msg.Answer = []dns.RR{
-		&dns.A{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(name),
-				Rrtype: dns.TypeA,
-				Class:  dns.ClassINET,
-				Ttl:    0,
-			},
-			A: addr.AsSlice(),
-		},
-	}
+	aRR := &dns.A{Hdr: dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET}}
+	aRR.Addr = addr
+	msg.Answer = []dns.RR{aRR}
 	return packet.Packet{Msg: msg}
 }
 
@@ -1624,48 +1678,26 @@ func (q loggingQueryer) QueryWithClass(ctx context.Context, _ string, _ string, 
 
 func packetWithReferral(zone string, nsName string) packet.Packet {
 	msg := new(dns.Msg)
-	msg.Ns = []dns.RR{
-		&dns.NS{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(zone),
-				Rrtype: dns.TypeNS,
-				Class:  dns.ClassINET,
-				Ttl:    0,
-			},
-			Ns: dns.Fqdn(nsName),
-		},
-	}
+	nsRR := &dns.NS{Hdr: dns.Header{Name: dnsutil.Fqdn(zone), Class: dns.ClassINET}}
+	nsRR.Ns = dnsutil.Fqdn(nsName)
+	msg.Ns = []dns.RR{nsRR}
 	return packet.Packet{Msg: msg}
 }
 
 func packetWithAAAA(name string, addr netip.Addr) packet.Packet {
 	msg := new(dns.Msg)
-	msg.Answer = []dns.RR{
-		&dns.AAAA{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(name),
-				Rrtype: dns.TypeAAAA,
-				Class:  dns.ClassINET,
-				Ttl:    0,
-			},
-			AAAA: addr.AsSlice(),
-		},
-	}
+	aaaa := &dns.AAAA{Hdr: dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET}}
+	aaaa.Addr = addr
+	msg.Answer = []dns.RR{aaaa}
 	return packet.Packet{Msg: msg}
 }
 
 func packetWithARecords(name string, addrs []netip.Addr) packet.Packet {
 	msg := new(dns.Msg)
 	for _, addr := range addrs {
-		msg.Answer = append(msg.Answer, &dns.A{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(name),
-				Rrtype: dns.TypeA,
-				Class:  dns.ClassINET,
-				Ttl:    0,
-			},
-			A: addr.AsSlice(),
-		})
+		aRR := &dns.A{Hdr: dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET}}
+		aRR.Addr = addr
+		msg.Answer = append(msg.Answer, aRR)
 	}
 	return packet.Packet{Msg: msg}
 }

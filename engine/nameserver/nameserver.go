@@ -7,10 +7,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -24,6 +25,7 @@ type Nameserver struct {
 	Client  *transport.Client
 	state   *nsState
 	cache   *CacheStore
+	log     *logger.Logger
 }
 
 const systemModuleName = "System"
@@ -45,19 +47,24 @@ type QueryOptions struct {
 
 // New creates a Nameserver from a name and IP address.
 func New(name string, address string, client *transport.Client) (Nameserver, error) {
-	return NewWithCache(defaultCache, name, address, client)
+	return newWithCache(nil, defaultCache, name, address, client)
 }
 
 // NewWithContext creates a Nameserver using a cache store from ctx.
 func NewWithContext(ctx context.Context, name string, address string, client *transport.Client) (Nameserver, error) {
-	return NewWithCache(CacheFromContextOrDefault(ctx), name, address, client)
+	return newWithCache(ctx, CacheFromContextOrDefault(ctx), name, address, client)
 }
 
 // NewWithCache creates a Nameserver using the supplied cache store.
 func NewWithCache(cache *CacheStore, name string, address string, client *transport.Client) (Nameserver, error) {
+	return newWithCache(nil, cache, name, address, client)
+}
+
+func newWithCache(ctx context.Context, cache *CacheStore, name string, address string, client *transport.Client) (Nameserver, error) {
 	if cache == nil {
 		cache = defaultCache
 	}
+	runLog := logger.FromContext(ctx)
 	addr, err := netip.ParseAddr(address)
 	if err != nil {
 		return Nameserver{}, fmt.Errorf("invalid nameserver address %q: %w", address, err)
@@ -78,9 +85,15 @@ func NewWithCache(cache *CacheStore, name string, address string, client *transp
 	if cached := cache.cachedNameserver(nameKey, addrKey); cached != nil {
 		return *cached, nil
 	}
+	queryCache, cacheCreated := cache.cacheForAddressWithStatus(addrKey)
+	if cacheCreated {
+		logSystemWithLogger(runLog, "CACHE_CREATED", map[string]any{"address": addrKey})
+	} else {
+		logSystemWithLogger(runLog, "CACHE_FETCHED", map[string]any{"address": addrKey})
+	}
 
 	state := &nsState{
-		cache:           cache.cacheForAddress(addrKey),
+		cache:           queryCache,
 		errorCache:      cache.errorCacheForAddress(addrKey),
 		concurrencyCap:  cache.concurrencyCapForAddress(addrKey),
 		fakeDelegations: map[string]delegation{},
@@ -93,8 +106,14 @@ func NewWithCache(cache *CacheStore, name string, address string, client *transp
 		Client:  client,
 		state:   state,
 		cache:   cache,
+		log:     runLog,
 	}
 	cache.storeNameserver(nameKey, addrKey, ns)
+	nsName := nameObj.String()
+	logSystemWithLogger(runLog, "NS_CREATED", map[string]any{
+		"ns":      nsName,
+		"address": addrKey,
+	})
 	return *ns, nil
 }
 
@@ -114,6 +133,7 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	if ns.Client == nil {
 		return packet.Packet{}, fmt.Errorf("missing transport client")
 	}
+	runLog := loggerFromContextOrFallback(ctx, ns.log)
 
 	if qtype == "" {
 		qtype = "A"
@@ -128,16 +148,27 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 
 	prof := profile.FromContext(ctx)
 	if ns.Address.Is4() && !prof.Net.IPv4 {
+		logSystemWithLogger(runLog, "IPV4_BLOCKED", logargs.NS(ns.NameString(), ns.AddressString()))
 		return packet.Packet{}, nil
 	}
 	if ns.Address.Is6() && !prof.Net.IPv6 {
+		logSystemWithLogger(runLog, "IPV6_BLOCKED", logargs.NS(ns.NameString(), ns.AddressString()))
 		return packet.Packet{}, nil
 	}
+	queryArgs := map[string]any{
+		"query_name":  qname,
+		"query_type":  qtype,
+		"query_class": qclass,
+		"flags":       queryFlags(qclass, opts),
+		"address":     ns.Address.String(),
+	}
+	logargs.SetNS(queryArgs, ns.NameString(), ns.AddressString())
+	logSystemWithLogger(runLog, "QUERY", queryArgs)
 
-	if resp, ok := ns.fakeDSResponse(qname, qtype, qclass, opts); ok {
+	if resp, ok := ns.fakeDSResponse(qname, qtype, qclass, opts, runLog); ok {
 		return resp, nil
 	}
-	if resp, ok := ns.fakeDelegationResponse(qname, qtype, qclass, opts); ok {
+	if resp, ok := ns.fakeDelegationResponse(qname, qtype, qclass, opts, runLog); ok {
 		return resp, nil
 	}
 
@@ -148,9 +179,13 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	if ns.state != nil {
 		if cached, ok := ns.state.cache.get(cacheKey); ok {
 			if cached == nil {
+				logCachedReturnWithLogger(runLog, packet.Packet{})
 				return packet.Packet{}, nil
 			}
-			return *cached, nil
+			copyCached := *cached
+			copyCached.Log = runLog
+			logCachedReturnWithLogger(runLog, copyCached)
+			return copyCached, nil
 		}
 	}
 
@@ -167,42 +202,55 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	}
 	if ttl := resolveReachabilityTTL(prof, opts); ttl > 0 {
 		if skip, remaining := globalReachability.shouldSkip(ns.Address.String()); skip {
-			logSystem(ctx, "REACHABILITY_CACHE_SKIP", map[string]any{
-				"ip":          ns.Address.String(),
+			skipArgs := map[string]any{
+				"address":     ns.Address.String(),
 				"protocol":    errorCacheProtocol(usevc),
 				"ttl_seconds": int(remaining.Seconds()),
 				"query_name":  qname,
 				"query_type":  qtype,
 				"query_class": qclass,
-			})
+			}
+			logargs.SetNS(skipArgs, ns.NameString(), ns.AddressString())
+			logSystem(ctx, "REACHABILITY_CACHE_SKIP", skipArgs)
 			return packet.Packet{}, nil
 		}
 	}
 	if errorCacheTTL := resolveErrorCacheTTL(prof, opts); errorCacheTTL > 0 && ns.state != nil && ns.state.errorCache != nil {
 		if skip, remaining := ns.state.errorCache.shouldSkip(errorCacheKey(usevc)); skip {
-			logSystem(ctx, "ERROR_CACHE_SKIP", map[string]any{
-				"ip":          ns.Address.String(),
+			skipArgs := map[string]any{
+				"address":     ns.Address.String(),
 				"protocol":    errorCacheProtocol(usevc),
 				"ttl_seconds": int(remaining.Seconds()),
 				"query_name":  qname,
 				"query_type":  qtype,
 				"query_class": qclass,
-			})
+			}
+			logargs.SetNS(skipArgs, ns.NameString(), ns.AddressString())
+			logSystem(ctx, "ERROR_CACHE_SKIP", skipArgs)
 			return packet.Packet{}, nil
 		}
 	}
 	now := time.Now()
 	if constants.BlacklistingEnabled && ns.state != nil && ns.state.blacklist.isBlocked(usevc, now) {
-		return packet.Packet{}, nil
-	}
-	if ns.state != nil && ns.state.fastFail.shouldSkip(usevc, fastFailThreshold) {
-		logSystem(ctx, "FAST_FAIL_SKIP", map[string]any{
-			"ip":          ns.Address.String(),
-			"protocol":    errorCacheProtocol(usevc),
+		blArgs := map[string]any{
 			"query_name":  qname,
 			"query_type":  qtype,
 			"query_class": qclass,
-		})
+		}
+		logargs.SetNS(blArgs, ns.NameString(), ns.AddressString())
+		logSystemWithLogger(runLog, "IS_BLACKLISTED", blArgs)
+		return packet.Packet{}, nil
+	}
+	if ns.state != nil && ns.state.fastFail.shouldSkip(usevc, fastFailThreshold) {
+		skipArgs := map[string]any{
+			"query_name":  qname,
+			"query_type":  qtype,
+			"query_class": qclass,
+			"protocol":    errorCacheProtocol(usevc),
+			"address":     ns.Address.String(),
+		}
+		logargs.SetNS(skipArgs, ns.NameString(), ns.AddressString())
+		logSystemWithLogger(runLog, "FAST_FAIL_SKIP", skipArgs)
 		return packet.Packet{}, nil
 	}
 	pacingDecision, err := ns.applyRateLimitPacing(ctx, usevc, prof, opts, pacingPolicy)
@@ -211,10 +259,10 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	}
 	switch pacingDecision.Action {
 	case "skip":
-		logSystem(ctx, "RATE_LIMIT_PACING_SKIP", rateLimitPacingLogArgs(ns, usevc, qname, qtype, qclass, pacingDecision, "delay_exceeds_budget"))
+		logSystemWithLogger(runLog, "RATE_LIMIT_PACING_SKIP", rateLimitPacingLogArgs(ns, usevc, qname, qtype, qclass, pacingDecision, "delay_exceeds_budget"))
 		return packet.Packet{}, nil
 	case "delay":
-		logSystem(ctx, "RATE_LIMIT_PACING_DELAY", rateLimitPacingLogArgs(ns, usevc, qname, qtype, qclass, pacingDecision, "paced_wait"))
+		logSystemWithLogger(runLog, "RATE_LIMIT_PACING_DELAY", rateLimitPacingLogArgs(ns, usevc, qname, qtype, qclass, pacingDecision, "paced_wait"))
 	}
 
 	var inflight *inflightQuery
@@ -223,16 +271,24 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 			if ctx == nil {
 				<-existing.done
 				if existing.resp == nil {
+					logCachedReturnWithLogger(runLog, packet.Packet{})
 					return packet.Packet{}, existing.err
 				}
-				return *existing.resp, existing.err
+				copyResp := *existing.resp
+				copyResp.Log = runLog
+				logCachedReturnWithLogger(runLog, copyResp)
+				return copyResp, existing.err
 			}
 			select {
 			case <-existing.done:
 				if existing.resp == nil {
+					logCachedReturnWithLogger(runLog, packet.Packet{})
 					return packet.Packet{}, existing.err
 				}
-				return *existing.resp, existing.err
+				copyResp := *existing.resp
+				copyResp.Log = runLog
+				logCachedReturnWithLogger(runLog, copyResp)
+				return copyResp, existing.err
 			case <-ctx.Done():
 				return packet.Packet{}, ctx.Err()
 			}
@@ -263,7 +319,7 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 				Snapshot:  observation.Snapshot,
 			}, observation.Reason)
 			args["signal"] = rateLimitSignalString(observation.Signal)
-			logSystem(ctx, "RATE_LIMIT_PACING_DETECTED", args)
+			logSystemWithLogger(runLog, "RATE_LIMIT_PACING_DETECTED", args)
 		}
 	}
 	if ns.state != nil {
@@ -279,8 +335,15 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	blacklistingDisabled := opts != nil && opts.BlacklistingDisabled
 	if err != nil && (ctx == nil || ctx.Err() == nil) && qtype == "SOA" && ednsSize == 0 && !blacklistingDisabled {
 		if ns.state != nil {
+			blArgs := map[string]any{
+				"query_name":  qname,
+				"query_type":  qtype,
+				"query_class": qclass,
+			}
 			baseTTL := resolveQueryTimeout(prof, opts)
 			ns.state.blacklist.observeFailure(usevc, isTimeoutPatternError(err), baseTTL, now)
+			logargs.SetNS(blArgs, ns.NameString(), ns.AddressString())
+			logSystemWithLogger(runLog, "BLACKLISTING", blArgs)
 		}
 	}
 	if err != nil && (ctx == nil || ctx.Err() == nil) && ns.state != nil && ns.state.errorCache != nil {
@@ -307,6 +370,14 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 			ns.state.cache.finish(cacheKey, infResp, err)
 		}
 	}
+	if resp.Msg != nil && resp.Msg.Len() > 4096 {
+		bigArgs := map[string]any{
+			"size":    resp.Msg.Len(),
+			"command": fmt.Sprintf("dig @%s %s %s", ns.Address.String(), qname, qtype),
+		}
+		logSystemWithLogger(runLog, "PACKET_BIG", bigArgs)
+	}
+	logCachedReturnWithLogger(runLog, resp)
 	return resp, err
 }
 
@@ -448,7 +519,6 @@ func (ns Nameserver) applyRateLimitPacing(ctx context.Context, usevc bool, prof 
 
 	budget := resolveQueryTimeout(prof, opts)
 	if budget > 0 && remaining > budget {
-		// Skip this nameserver so callers can fall back to alternatives instead of stalling.
 		ns.state.rateLimitPacing.recordPacingSkip(usevc)
 		return rateLimitPacingDecision{
 			Action:    "skip",
@@ -457,6 +527,7 @@ func (ns Nameserver) applyRateLimitPacing(ctx context.Context, usevc bool, prof 
 			Snapshot:  ns.state.rateLimitPacing.snapshot(usevc),
 		}, nil
 	}
+
 	ns.state.rateLimitPacing.recordPacingDelay(usevc)
 	decision := rateLimitPacingDecision{
 		Action:    "delay",
@@ -481,11 +552,11 @@ func (ns Nameserver) applyRateLimitPacing(ctx context.Context, usevc bool, prof 
 
 func rateLimitPacingLogArgs(ns Nameserver, usevc bool, qname string, qtype string, qclass string, decision rateLimitPacingDecision, reason string) map[string]any {
 	args := map[string]any{
-		"ip":                   ns.Address.String(),
-		"protocol":             errorCacheProtocol(usevc),
 		"query_name":           qname,
 		"query_type":           qtype,
 		"query_class":          qclass,
+		"address":              ns.Address.String(),
+		"protocol":             errorCacheProtocol(usevc),
 		"reason":               reason,
 		"delay_ms":             decision.Remaining.Milliseconds(),
 		"budget_ms":            decision.Budget.Milliseconds(),
@@ -498,6 +569,7 @@ func rateLimitPacingLogArgs(ns Nameserver, usevc bool, qname string, qtype strin
 		"pacing_delays":        decision.Snapshot.PacingDelayCount,
 		"pacing_skips":         decision.Snapshot.PacingSkipCount,
 	}
+	logargs.SetNS(args, ns.NameString(), ns.AddressString())
 	return args
 }
 
@@ -514,7 +586,6 @@ func (ns Nameserver) applyAdaptiveTimeoutOptions(prof *profile.Profile, opts *Qu
 		return opts, false
 	}
 	if opts != nil && opts.Timeout != nil {
-		// Keep explicit timeout overrides untouched.
 		return opts, false
 	}
 
@@ -534,7 +605,9 @@ func (ns Nameserver) applyAdaptiveTimeoutOptions(prof *profile.Profile, opts *Qu
 
 func (ns Nameserver) queryNetwork(ctx context.Context, qname string, qtype string, qclass string, opts *QueryOptions) (packet.Packet, error) {
 	if ns.state != nil && ns.state.queryFunc != nil {
-		return ns.state.queryFunc(ctx, qname, qtype, qclass, opts)
+		resp, err := ns.state.queryFunc(ctx, qname, qtype, qclass, opts)
+		resp.Log = loggerFromContextOrFallback(ctx, ns.log)
+		return resp, err
 	}
 
 	client, err := ns.clientForOptions(ctx, opts)
@@ -556,21 +629,27 @@ func (ns Nameserver) queryNetwork(ctx context.Context, qname string, qtype strin
 	server := ns.Address.String()
 
 	// Emit EXTERNAL_QUERY log entry
-	logSystem(ctx, "EXTERNAL_QUERY", map[string]any{
-		"name":  qname,
-		"type":  qtype,
-		"ip":    ns.Address.String(),
-		"flags": fmt.Sprintf(`{"class":%q}`, qclass),
-	})
+	queryArgs := map[string]any{
+		"query_name":  qname,
+		"query_type":  qtype,
+		"query_class": qclass,
+		"address":     ns.Address.String(),
+		"flags":       fmt.Sprintf(`{"class":%q}`, qclass),
+	}
+	logargs.SetNS(queryArgs, ns.NameString(), ns.AddressString())
+	logSystem(ctx, "EXTERNAL_QUERY", queryArgs)
 
 	resp, err := client.Exchange(ctx, server, msg)
+	resp.Log = loggerFromContextOrFallback(ctx, ns.log)
 
 	args := map[string]any{
-		"name":  qname,
-		"type":  qtype,
-		"ip":    ns.Address.String(),
-		"flags": fmt.Sprintf(`{"class":%q}`, qclass),
+		"query_name":  qname,
+		"query_type":  qtype,
+		"query_class": qclass,
+		"address":     ns.Address.String(),
+		"flags":       fmt.Sprintf(`{"class":%q}`, qclass),
 	}
+	logargs.SetNS(args, ns.NameString(), ns.AddressString())
 	if resp.Msg != nil {
 		args["rcode"] = dns.RcodeToString[resp.Msg.Rcode]
 		args["answers"] = len(resp.Msg.Answer)
@@ -591,16 +670,73 @@ func (ns Nameserver) queryNetwork(ctx context.Context, qname string, qtype strin
 	} else {
 		logSystem(ctx, "EXTERNAL_RESPONSE", args)
 	}
-
 	return resp, err
 }
 
 func logSystem(ctx context.Context, tag string, args map[string]any) {
-	log := logger.FromContext(ctx)
+	logSystemWithLogger(loggerFromContextOrFallback(ctx, nil), tag, args)
+}
+
+func logSystemWithLogger(log *logger.Logger, tag string, args map[string]any) {
 	if log == nil {
 		return
 	}
+	if args == nil {
+		args = map[string]any{}
+	}
 	_, _ = log.Add(tag, args, systemModuleName, "")
+}
+
+func logCachedReturnWithLogger(log *logger.Logger, resp packet.Packet) {
+	if log == nil {
+		return
+	}
+	args := map[string]any{"packet": "undef"}
+	if resp.Msg != nil {
+		args["packet"] = packetStringForLog(resp)
+	}
+	_, _ = log.Add("CACHED_RETURN", args, systemModuleName, "")
+}
+
+func queryFlags(qclass string, opts *QueryOptions) map[string]any {
+	flags := map[string]any{
+		"class":   qclass,
+		"dnssec":  resolveDNSSEC(opts),
+		"usevc":   resolveUseVC(opts),
+		"recurse": resolveRecurse(opts),
+	}
+	if opts != nil {
+		if opts.Fallback != nil {
+			flags["fallback"] = *opts.Fallback
+		}
+		if opts.Retry != nil {
+			flags["retry"] = *opts.Retry
+		}
+		if opts.Retrans != nil {
+			flags["retrans"] = int(opts.Retrans.Seconds())
+		}
+		if opts.Timeout != nil {
+			flags["timeout"] = int(opts.Timeout.Seconds())
+		}
+	}
+	flags["edns_size"] = resolveEDNSSize(opts, flags["dnssec"].(bool))
+	return flags
+}
+
+func loggerFromContextOrFallback(ctx context.Context, fallback *logger.Logger) *logger.Logger {
+	if log := logger.FromContext(ctx); log != nil {
+		return log
+	}
+	return fallback
+}
+
+func packetStringForLog(resp packet.Packet) string {
+	if resp.Msg == nil {
+		return "undef"
+	}
+	clone := resp.Msg.Copy()
+	clone.ID = 0
+	return clone.String()
 }
 
 func (ns Nameserver) clientForOptions(ctx context.Context, opts *QueryOptions) (*transport.Client, error) {
@@ -646,8 +782,29 @@ func (ns Nameserver) clientForOptions(ctx context.Context, opts *QueryOptions) (
 		base.SetEDNSSize(constants.EDNSUDPPayloadDNSSECDefault)
 	}
 
-	base.ApplyProfileDefaults(profile.FromContext(ctx))
+	prof := profile.FromContext(ctx)
+	base.ApplyProfileDefaults(prof)
+	applyProfileSourceAddress(&base, ns.Address, prof)
 	return &base, nil
+}
+
+func applyProfileSourceAddress(client *transport.Client, target netip.Addr, prof *profile.Profile) {
+	if client == nil || client.SourceIP != "" {
+		return
+	}
+	if !target.IsValid() {
+		return
+	}
+	if prof == nil {
+		prof = profile.Effective()
+	}
+	if target.Is4() && prof.Resolver.Source4 != "" {
+		client.SourceIP = prof.Resolver.Source4
+		return
+	}
+	if target.Is6() && prof.Resolver.Source6 != "" {
+		client.SourceIP = prof.Resolver.Source6
+	}
 }
 
 func resolveEDNSSize(opts *QueryOptions, dnssec bool) uint16 {

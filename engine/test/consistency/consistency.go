@@ -7,10 +7,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/methods"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
@@ -161,6 +162,8 @@ func Metadata() map[string][]string {
 			"ONE_SOA_MNAME",
 			"MULTIPLE_SOA_MNAMES",
 			"SOA_MNAME",
+			"IPV4_DISABLED",
+			"IPV6_DISABLED",
 			"TEST_CASE_END",
 			"TEST_CASE_START",
 		},
@@ -226,7 +229,7 @@ func Consistency01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 				resp, err := ns.QueryWithOptions(ctx, z.Name.String(), queryType, nil)
 				if err != nil || resp.Msg == nil {
-					if _, err := buf.Add("NO_RESPONSE", map[string]any{"ns": ns.String()}); err != nil {
+					if _, err := buf.Add("NO_RESPONSE", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
@@ -235,7 +238,7 @@ func Consistency01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 				records := resp.GetRecordsForName(queryType, z.Name)
 				if len(records) == 0 {
-					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", map[string]any{"ns": ns.String()}); err != nil {
+					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
@@ -243,7 +246,7 @@ func Consistency01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				}
 				soa, ok := records[0].(*dns.SOA)
 				if !ok {
-					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", map[string]any{"ns": ns.String()}); err != nil {
+					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
@@ -278,12 +281,12 @@ func Consistency01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	sort.Strings(serialKeys)
 
 	for _, serial := range serialKeys {
-		nsList := append([]string{}, serials[serial]...)
-		sort.Strings(nsList)
-		if err := appendLog(ctx, &results, testcase, "SOA_SERIAL", map[string]any{
-			"serial":  serial,
-			"ns_list": strings.Join(nsList, ";"),
-		}); err != nil {
+		nsList := uniqueSortedValues(serials[serial])
+		args := map[string]any{
+			"serial": serial,
+		}
+		setTypedServersFromNames(args, strings.Join(nsList, ";"))
+		if err := appendLog(ctx, &results, testcase, "SOA_SERIAL", args); err != nil {
 			return results, err
 		}
 	}
@@ -379,7 +382,7 @@ func Consistency02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 				resp, err := ns.QueryWithOptions(ctx, z.Name.String(), queryType, nil)
 				if err != nil || resp.Msg == nil {
-					if _, err := buf.Add("NO_RESPONSE", map[string]any{"ns": ns.String()}); err != nil {
+					if _, err := buf.Add("NO_RESPONSE", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
@@ -388,7 +391,7 @@ func Consistency02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 				records := resp.GetRecordsForName(queryType, z.Name)
 				if len(records) == 0 {
-					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", map[string]any{"ns": ns.String()}); err != nil {
+					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
@@ -396,7 +399,7 @@ func Consistency02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				}
 				soa, ok := records[0].(*dns.SOA)
 				if !ok {
-					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", map[string]any{"ns": ns.String()}); err != nil {
+					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
@@ -440,10 +443,11 @@ func Consistency02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 		for _, rname := range order {
-			if err := appendLog(ctx, &results, testcase, "SOA_RNAME", map[string]any{
-				"rname":   rname,
-				"ns_list": strings.Join(rnames[rname], ";"),
-			}); err != nil {
+			args := map[string]any{
+				"rname": rname,
+			}
+			setTypedServersFromNames(args, strings.Join(uniqueSortedValues(rnames[rname]), ";"))
+			if err := appendLog(ctx, &results, testcase, "SOA_RNAME", args); err != nil {
 				return results, err
 			}
 		}
@@ -514,7 +518,7 @@ func Consistency03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 				resp, err := ns.QueryWithOptions(ctx, z.Name.String(), queryType, nil)
 				if err != nil || resp.Msg == nil {
-					if _, err := buf.Add("NO_RESPONSE", map[string]any{"ns": ns.String()}); err != nil {
+					if _, err := buf.Add("NO_RESPONSE", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
@@ -523,7 +527,7 @@ func Consistency03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 				records := resp.GetRecordsForName(queryType, z.Name)
 				if len(records) == 0 {
-					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", map[string]any{"ns": ns.String()}); err != nil {
+					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
@@ -531,7 +535,7 @@ func Consistency03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				}
 				soa, ok := records[0].(*dns.SOA)
 				if !ok {
-					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", map[string]any{"ns": ns.String()}); err != nil {
+					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
@@ -588,15 +592,15 @@ func Consistency03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 		for _, setKey := range order {
 			params := timeValues[setKey]
-			nsList := append([]string{}, timeSets[setKey]...)
-			sort.Strings(nsList)
-			if err := appendLog(ctx, &results, testcase, "SOA_TIME_PARAMETER_SET", map[string]any{
+			nsList := uniqueSortedValues(timeSets[setKey])
+			args := map[string]any{
 				"refresh": params.refresh,
 				"retry":   params.retry,
 				"expire":  params.expire,
 				"minimum": params.minimum,
-				"ns_list": strings.Join(nsList, ";"),
-			}); err != nil {
+			}
+			setTypedServersFromNames(args, strings.Join(nsList, ";"))
+			if err := appendLog(ctx, &results, testcase, "SOA_TIME_PARAMETER_SET", args); err != nil {
 				return results, err
 			}
 		}
@@ -665,7 +669,7 @@ func Consistency04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 				resp, err := ns.QueryWithOptions(ctx, z.Name.String(), queryType, nil)
 				if err != nil || resp.Msg == nil {
-					if _, err := buf.Add("NO_RESPONSE", map[string]any{"ns": ns.String()}); err != nil {
+					if _, err := buf.Add("NO_RESPONSE", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
@@ -674,7 +678,7 @@ func Consistency04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 				records := resp.GetRecordsForName(queryType, z.Name)
 				if len(records) == 0 {
-					if _, err := buf.Add("NO_RESPONSE_NS_QUERY", map[string]any{"ns": ns.String()}); err != nil {
+					if _, err := buf.Add("NO_RESPONSE_NS_QUERY", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
@@ -690,7 +694,7 @@ func Consistency04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					names = append(names, strings.ToLower(nsRR.Ns))
 				}
 				if len(names) == 0 {
-					if _, err := buf.Add("NO_RESPONSE_NS_QUERY", map[string]any{"ns": ns.String()}); err != nil {
+					if _, err := buf.Add("NO_RESPONSE_NS_QUERY", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
@@ -723,9 +727,9 @@ func Consistency04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(order) == 1 {
-		if err := appendLog(ctx, &results, testcase, "ONE_NS_SET", map[string]any{
-			"nsname_list": order[0],
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromNames(args, order[0])
+		if err := appendLog(ctx, &results, testcase, "ONE_NS_SET", args); err != nil {
 			return results, err
 		}
 	} else if len(order) > 0 {
@@ -735,10 +739,10 @@ func Consistency04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 		for _, setKey := range order {
-			if err := appendLog(ctx, &results, testcase, "NS_SET", map[string]any{
-				"nsname_list": setKey,
-				"servers":     strings.Join(nsSets[setKey], ";"),
-			}); err != nil {
+			args := map[string]any{}
+			setTypedServerListAtKey(args, "ns_set_servers", setKey)
+			setTypedServersFromNames(args, strings.Join(uniqueSortedValues(nsSets[setKey]), ";"))
+			if err := appendLog(ctx, &results, testcase, "NS_SET", args); err != nil {
 				return results, err
 			}
 		}
@@ -804,7 +808,7 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				if !ok {
 					continue
 				}
-				glueKey := strings.ToLower(rr.Header().Name) + "/" + aRR.A.String()
+				glueKey := strings.ToLower(rr.Header().Name) + "/" + aRR.Addr.String()
 				parentGlues[glueKey] = nsName
 			}
 		}
@@ -822,7 +826,7 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				if !ok {
 					continue
 				}
-				glueKey := strings.ToLower(rr.Header().Name) + "/" + AAAArr.AAAA.String()
+				glueKey := strings.ToLower(rr.Header().Name) + "/" + AAAArr.Addr.String()
 				parentGlues[glueKey] = nsName
 			}
 		}
@@ -913,18 +917,22 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(ibMismatch) > 0 {
-		if err := appendLog(ctx, &results, testcase, "IN_BAILIWICK_ADDR_MISMATCH", map[string]any{
-			"parent_addresses": strings.Join(sortedKeys(strictGlue), ";"),
-			"zone_addresses":   strings.Join(sortedKeys(childIBStrings), ";"),
-		}); err != nil {
+		args := map[string]any{}
+		setTypedServersFromAddrKeysAtKey(args, "parent_servers", sortedKeys(strictGlue))
+		setTypedServersFromAddrKeysAtKey(args, "zone_servers", sortedKeys(childIBStrings))
+		if err := appendLog(ctx, &results, testcase, "IN_BAILIWICK_ADDR_MISMATCH", args); err != nil {
 			return results, err
 		}
 	}
 
 	if len(ibExtraChild) > 0 {
-		sort.Strings(ibExtraChild)
+		addresses := addressesFromAddrKeys(ibExtraChild)
+		if len(addresses) == 0 {
+			addresses = append([]string(nil), ibExtraChild...)
+			sort.Strings(addresses)
+		}
 		if err := appendLog(ctx, &results, testcase, "EXTRA_ADDRESS_CHILD", map[string]any{
-			"ns_ip_list": strings.Join(ibExtraChild, ";"),
+			"addresses": addresses,
 		}); err != nil {
 			return results, err
 		}
@@ -966,10 +974,10 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 		if len(mismatchForGlue) > 0 {
 			sort.Strings(glueStrings)
-			if err := appendLog(ctx, &results, testcase, "OUT_OF_BAILIWICK_ADDR_MISMATCH", map[string]any{
-				"parent_addresses": strings.Join(glueStrings, ";"),
-				"zone_addresses":   strings.Join(sortedKeys(childOOB), ";"),
-			}); err != nil {
+			args := map[string]any{}
+			setTypedServersFromAddrKeysAtKey(args, "parent_servers", glueStrings)
+			setTypedServersFromAddrKeysAtKey(args, "zone_servers", sortedKeys(childOOB))
+			if err := appendLog(ctx, &results, testcase, "OUT_OF_BAILIWICK_ADDR_MISMATCH", args); err != nil {
 				return results, err
 			}
 		}
@@ -1044,7 +1052,7 @@ func Consistency06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 				resp, err := ns.QueryWithOptions(ctx, z.Name.String(), queryType, nil)
 				if err != nil || resp.Msg == nil {
-					if _, err := buf.Add("NO_RESPONSE", map[string]any{"ns": ns.String()}); err != nil {
+					if _, err := buf.Add("NO_RESPONSE", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
@@ -1053,7 +1061,7 @@ func Consistency06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 				records := resp.GetRecordsForName(queryType, z.Name)
 				if len(records) == 0 {
-					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", map[string]any{"ns": ns.String()}); err != nil {
+					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
@@ -1061,7 +1069,7 @@ func Consistency06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				}
 				soa, ok := records[0].(*dns.SOA)
 				if !ok {
-					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", map[string]any{"ns": ns.String()}); err != nil {
+					if _, err := buf.Add("NO_RESPONSE_SOA_QUERY", withNameserverArgs(ns, nil)); err != nil {
 						return err
 					}
 					outcomes[i] = outcome
@@ -1105,10 +1113,11 @@ func Consistency06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 		for _, mname := range order {
-			if err := appendLog(ctx, &results, testcase, "SOA_MNAME", map[string]any{
-				"mname":   mname,
-				"ns_list": strings.Join(mnames[mname], ";"),
-			}); err != nil {
+			args := map[string]any{
+				"mname": mname,
+			}
+			setTypedServersFromNames(args, strings.Join(uniqueSortedValues(mnames[mname]), ";"))
+			if err := appendLog(ctx, &results, testcase, "SOA_MNAME", args); err != nil {
 				return results, err
 			}
 		}
@@ -1147,7 +1156,7 @@ func getAddrRRs(ctx context.Context, ns nameserver.Nameserver, name dnsname.Name
 	opts := &nameserver.QueryOptions{Recurse: &recurseOff}
 	resp, err := ns.QueryWithOptions(ctx, name.String(), qtype, opts)
 	if err != nil || resp.Msg == nil {
-		entry, addErr := util.LoggerFromContext(ctx).Add("NO_RESPONSE", map[string]any{"ns": ns.String()}, moduleName, testcase)
+		entry, addErr := util.LoggerFromContext(ctx).Add("NO_RESPONSE", withNameserverArgs(ns, nil), moduleName, testcase)
 		if addErr != nil {
 			return nil, nil, addErr
 		}
@@ -1167,7 +1176,7 @@ func getAddrRRs(ctx context.Context, ns nameserver.Nameserver, name dnsname.Name
 	}
 
 	if !(resp.AA() && resp.Rcode() == "NXDOMAIN") {
-		entry, addErr := util.LoggerFromContext(ctx).Add("CHILD_NS_FAILED", map[string]any{"ns": ns.String()}, moduleName, testcase)
+		entry, addErr := util.LoggerFromContext(ctx).Add("CHILD_NS_FAILED", withNameserverArgs(ns, nil), moduleName, testcase)
 		if addErr != nil {
 			return nil, nil, addErr
 		}
@@ -1193,13 +1202,42 @@ func appendLog(ctx context.Context, results *[]*logger.Entry, testcase string, t
 	return nil
 }
 
+func withNameserverArgs(ns nameserver.Nameserver, args map[string]any) map[string]any {
+	if args == nil {
+		args = map[string]any{}
+	}
+	logargs.NormalizeQueryIdentity(args)
+	logargs.SetNS(args, ns.NameString(), ns.AddressString())
+	return args
+}
+
+func setTypedServersFromNames(args map[string]any, namesList string) {
+	setTypedServerListAtKey(args, "servers", namesList)
+}
+
+func setTypedServerListAtKey(args map[string]any, key string, namesList string) {
+	if args == nil || strings.TrimSpace(namesList) == "" {
+		return
+	}
+
+	parts := strings.Split(namesList, ";")
+	raw, ok := logargs.ServersFromValues(parts)["servers"]
+	if !ok {
+		return
+	}
+	servers, ok := raw.([]map[string]any)
+	if !ok || len(servers) == 0 {
+		return
+	}
+	args[key] = servers
+}
+
 func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, ns nameserver.Nameserver, rrtypes ...string) (bool, error) {
 	if ns.Address.Is6() && !profile.FromContext(ctx).Net.IPv6 {
 		for _, rrtype := range rrtypes {
-			if _, err := buf.Add("IPV6_DISABLED", map[string]any{
-				"ns":     ns.String(),
-				"rrtype": rrtype,
-			}); err != nil {
+			if _, err := buf.Add("IPV6_DISABLED", withNameserverArgs(ns, map[string]any{
+				"query_type": rrtype,
+			})); err != nil {
 				return true, err
 			}
 		}
@@ -1207,10 +1245,9 @@ func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, ns
 	}
 	if ns.Address.Is4() && !profile.FromContext(ctx).Net.IPv4 {
 		for _, rrtype := range rrtypes {
-			if _, err := buf.Add("IPV4_DISABLED", map[string]any{
-				"ns":     ns.String(),
-				"rrtype": rrtype,
-			}); err != nil {
+			if _, err := buf.Add("IPV4_DISABLED", withNameserverArgs(ns, map[string]any{
+				"query_type": rrtype,
+			})); err != nil {
 				return true, err
 			}
 		}
@@ -1223,9 +1260,9 @@ func addrKey(rr dns.RR) string {
 	owner := strings.ToLower(rr.Header().Name)
 	switch r := rr.(type) {
 	case *dns.A:
-		return owner + "/" + r.A.String()
+		return owner + "/" + r.Addr.String()
 	case *dns.AAAA:
-		return owner + "/" + r.AAAA.String()
+		return owner + "/" + r.Addr.String()
 	default:
 		return owner + "/" + rr.String()
 	}
@@ -1238,4 +1275,89 @@ func sortedKeys(m map[string]bool) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+func addressesFromAddrKeys(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	seen := map[string]bool{}
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		address := strings.TrimSpace(value)
+		sep := strings.LastIndex(address, "/")
+		if sep >= 0 && sep < len(address)-1 {
+			address = strings.TrimSpace(address[sep+1:])
+		}
+		if address == "" || seen[address] {
+			continue
+		}
+		seen[address] = true
+		out = append(out, address)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func uniqueSortedValues(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	seen := map[string]bool{}
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func parseAddrKey(value string) (string, string) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", ""
+	}
+	sep := strings.LastIndex(value, "/")
+	if sep < 1 || sep >= len(value)-1 {
+		return "", value
+	}
+	name := logargs.EndpointName(value[:sep])
+	address := strings.TrimSpace(value[sep+1:])
+	return name, address
+}
+
+func setTypedServersFromAddrKeysAtKey(args map[string]any, key string, values []string) {
+	if args == nil || key == "" || len(values) == 0 {
+		return
+	}
+	seen := map[string]bool{}
+	servers := make([]logargs.Server, 0, len(values))
+	for _, value := range values {
+		ns, address := parseAddrKey(value)
+		if ns == "" && address == "" {
+			continue
+		}
+		dedupe := ns + "|" + address
+		if seen[dedupe] {
+			continue
+		}
+		seen[dedupe] = true
+		servers = append(servers, logargs.Server{NS: ns, Address: address})
+	}
+	if len(servers) == 0 {
+		return
+	}
+	sort.Slice(servers, func(i, j int) bool {
+		left := servers[i].NS + "|" + servers[i].Address
+		right := servers[j].NS + "|" + servers[j].Address
+		return left < right
+	})
+	if typed, ok := logargs.Servers(servers)["servers"]; ok {
+		args[key] = typed
+	}
 }

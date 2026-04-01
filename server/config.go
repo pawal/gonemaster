@@ -9,37 +9,90 @@ import (
 
 const defaultCrossJobHotCacheTTLSeconds = 60
 
+// DatabaseConfig controls the persistence backend.
+type DatabaseConfig struct {
+	// Driver selects the storage backend: "memory" (default), "sqlite",
+	// "postgres", or "mariadb".
+	Driver string `json:"driver,omitempty"`
+	// DSN is the data source name. For sqlite this is a file path.
+	// For postgres/mariadb this is a connection string. Empty for memory.
+	DSN string `json:"dsn,omitempty"`
+	// RetentionDays is the number of days to keep completed jobs. Zero means
+	// keep forever (disabled).
+	RetentionDays int `json:"retention_days,omitempty"`
+}
+
+// PublicAPIConfig controls the behaviour of the public-facing API at /pub/api/v1/.
+type PublicAPIConfig struct {
+	// RateLimitEnabled enables per-IP rate limiting on POST /pub/api/v1/jobs.
+	RateLimitEnabled bool `json:"rate_limit_enabled"`
+	// RateLimitMax is the maximum number of job submissions per window per IP.
+	// Default: 10.
+	RateLimitMax int `json:"rate_limit_max,omitempty"`
+	// RateLimitWindow is the sliding window duration for rate limiting.
+	// Default: 5m.
+	RateLimitWindow Duration `json:"rate_limit_window,omitempty"`
+}
+
+// Duration is a time.Duration that marshals/unmarshals as a string (e.g. "5m").
+type Duration struct {
+	time.Duration
+}
+
+func (d Duration) MarshalJSON() ([]byte, error) {
+	return json.Marshal(d.Duration.String())
+}
+
+func (d *Duration) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	v, err := time.ParseDuration(s)
+	if err != nil {
+		return err
+	}
+	d.Duration = v
+	return nil
+}
+
 // Config controls HTTP server behavior.
 type Config struct {
-	ListenAddr  string
-	MaxBodySize int64
-	Debug       bool
-	WorkerCount int
+	ListenAddr  string `json:"listen_addr"`
+	MaxBodySize int64  `json:"max_body_size"`
+	Debug       bool   `json:"debug"`
+	WorkerCount int    `json:"worker_count"`
 	// AutoClampConcurrency enables safe clamping for pathological concurrency values.
-	AutoClampConcurrency bool
+	AutoClampConcurrency bool `json:"auto_clamp_concurrency"`
 	// JobTestParallelism controls parallel testcase execution inside one job.
 	// Values <1 are treated as 1.
-	JobTestParallelism int
+	JobTestParallelism int `json:"job_test_parallelism"`
 	// MaxConcurrentJobs caps engine runs across workers when >0.
-	MaxConcurrentJobs int
+	MaxConcurrentJobs int `json:"max_concurrent_jobs"`
 	// CrossJobHotCache enables short-lived warm cache reuse across jobs.
-	CrossJobHotCache bool
+	CrossJobHotCache bool `json:"cross_job_hot_cache"`
 	// CrossJobHotCacheTTLSeconds controls the hot-cache entry TTL.
-	CrossJobHotCacheTTLSeconds int
+	CrossJobHotCacheTTLSeconds int `json:"cross_job_hot_cache_ttl_seconds"`
 	// PositiveCacheTTL overrides resolver.defaults.positive_cache_ttl when set.
-	PositiveCacheTTL *int
+	PositiveCacheTTL *int `json:"positive_cache_ttl,omitempty"`
 	// NegativeCacheTTL overrides resolver.defaults.negative_cache_ttl when set.
-	NegativeCacheTTL *int
+	NegativeCacheTTL *int `json:"negative_cache_ttl,omitempty"`
 	// Timeout overrides resolver.defaults.timeout when set (seconds).
-	Timeout *int
+	Timeout *int `json:"timeout,omitempty"`
 	// Retry overrides resolver.defaults.retry when set.
-	Retry *int
+	Retry *int `json:"retry,omitempty"`
 	// Retrans overrides resolver.defaults.retrans when set (seconds).
-	Retrans *int
+	Retrans *int `json:"retrans,omitempty"`
 	// Fallback overrides resolver.defaults.fallback when set.
-	Fallback    *bool
-	MinLevel    string
-	ProfilePath string
+	Fallback *bool `json:"fallback,omitempty"`
+	// SourceAddr4 overrides resolver.source4 when set.
+	SourceAddr4 *string `json:"source_addr4,omitempty"`
+	// SourceAddr6 overrides resolver.source6 when set.
+	SourceAddr6 *string         `json:"source_addr6,omitempty"`
+	MinLevel    string          `json:"min_level"`
+	ProfilePath string          `json:"profile_path,omitempty"`
+	Database    DatabaseConfig  `json:"database,omitempty"`
+	PublicAPI   PublicAPIConfig `json:"public_api,omitempty"`
 }
 
 // EffectiveWorkerCount returns the worker count the server will actually use.
@@ -86,25 +139,44 @@ func (c Config) EffectiveCrossJobHotCacheTTL() time.Duration {
 	return time.Duration(seconds) * time.Second
 }
 
+// PublicAPIFileConfig holds optional public API configuration from JSON.
+type PublicAPIFileConfig struct {
+	RateLimitEnabled *bool   `json:"rate_limit_enabled,omitempty"`
+	RateLimitMax     *int    `json:"rate_limit_max,omitempty"`
+	RateLimitWindow  *string `json:"rate_limit_window,omitempty"`
+}
+
+// DatabaseFileConfig holds optional database configuration from JSON.
+// An empty string for Driver or DSN means "not set" (inherit from default).
+type DatabaseFileConfig struct {
+	Driver        string `json:"driver,omitempty"`
+	DSN           string `json:"dsn,omitempty"`
+	RetentionDays *int   `json:"retention_days,omitempty"`
+}
+
 // FileConfig captures optional configuration fields from JSON.
 type FileConfig struct {
-	ListenAddr           *string `json:"listen_addr"`
-	MaxBodySize          *int64  `json:"max_body_size"`
-	Debug                *bool   `json:"debug"`
-	WorkerCount          *int    `json:"worker_count"`
-	AutoClampConcurrency *bool   `json:"auto_clamp_concurrency"`
-	JobTestParallelism   *int    `json:"job_test_parallelism"`
-	MaxConcurrentJobs    *int    `json:"max_concurrent_jobs"`
-	CrossJobHotCache     *bool   `json:"cross_job_hot_cache"`
-	CrossJobHotCacheTTL  *int    `json:"cross_job_hot_cache_ttl_seconds"`
-	PositiveCacheTTL     *int    `json:"positive_cache_ttl"`
-	NegativeCacheTTL     *int    `json:"negative_cache_ttl"`
-	Timeout              *int    `json:"timeout"`
-	Retry                *int    `json:"retry"`
-	Retrans              *int    `json:"retrans"`
-	Fallback             *bool   `json:"fallback"`
-	MinLevel             *string `json:"min_level"`
-	ProfilePath          *string `json:"profile_path"`
+	ListenAddr           *string              `json:"listen_addr"`
+	MaxBodySize          *int64               `json:"max_body_size"`
+	Debug                *bool                `json:"debug"`
+	WorkerCount          *int                 `json:"worker_count"`
+	AutoClampConcurrency *bool                `json:"auto_clamp_concurrency"`
+	JobTestParallelism   *int                 `json:"job_test_parallelism"`
+	MaxConcurrentJobs    *int                 `json:"max_concurrent_jobs"`
+	CrossJobHotCache     *bool                `json:"cross_job_hot_cache"`
+	CrossJobHotCacheTTL  *int                 `json:"cross_job_hot_cache_ttl_seconds"`
+	PositiveCacheTTL     *int                 `json:"positive_cache_ttl"`
+	NegativeCacheTTL     *int                 `json:"negative_cache_ttl"`
+	Timeout              *int                 `json:"timeout"`
+	Retry                *int                 `json:"retry"`
+	Retrans              *int                 `json:"retrans"`
+	Fallback             *bool                `json:"fallback"`
+	SourceAddr4          *string              `json:"source_addr4"`
+	SourceAddr6          *string              `json:"source_addr6"`
+	MinLevel             *string              `json:"min_level"`
+	ProfilePath          *string              `json:"profile_path"`
+	Database             *DatabaseFileConfig  `json:"database,omitempty"`
+	PublicAPI            *PublicAPIFileConfig `json:"public_api,omitempty"`
 }
 
 // DefaultConfig returns baseline config values.
@@ -120,6 +192,11 @@ func DefaultConfig() Config {
 		CrossJobHotCache:           false,
 		CrossJobHotCacheTTLSeconds: defaultCrossJobHotCacheTTLSeconds,
 		MinLevel:                   "INFO",
+		PublicAPI: PublicAPIConfig{
+			RateLimitEnabled: false,
+			RateLimitMax:     10,
+			RateLimitWindow:  Duration{10 * time.Minute},
+		},
 	}
 }
 
@@ -183,11 +260,42 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 	if file.Fallback != nil {
 		c.Fallback = file.Fallback
 	}
+	if file.SourceAddr4 != nil {
+		c.SourceAddr4 = file.SourceAddr4
+	}
+	if file.SourceAddr6 != nil {
+		c.SourceAddr6 = file.SourceAddr6
+	}
 	if file.MinLevel != nil {
 		c.MinLevel = *file.MinLevel
 	}
 	if file.ProfilePath != nil {
 		c.ProfilePath = *file.ProfilePath
+	}
+	if file.Database != nil {
+		if file.Database.Driver != "" {
+			c.Database.Driver = file.Database.Driver
+		}
+		if file.Database.DSN != "" {
+			c.Database.DSN = file.Database.DSN
+		}
+		if file.Database.RetentionDays != nil {
+			c.Database.RetentionDays = *file.Database.RetentionDays
+		}
+	}
+	if file.PublicAPI != nil {
+		if file.PublicAPI.RateLimitEnabled != nil {
+			c.PublicAPI.RateLimitEnabled = *file.PublicAPI.RateLimitEnabled
+		}
+		if file.PublicAPI.RateLimitMax != nil {
+			c.PublicAPI.RateLimitMax = *file.PublicAPI.RateLimitMax
+		}
+		if file.PublicAPI.RateLimitWindow != nil {
+			d, err := time.ParseDuration(*file.PublicAPI.RateLimitWindow)
+			if err == nil {
+				c.PublicAPI.RateLimitWindow = Duration{d}
+			}
+		}
 	}
 }
 

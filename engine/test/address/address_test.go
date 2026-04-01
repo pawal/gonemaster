@@ -2,11 +2,14 @@ package address
 
 import (
 	"context"
+	"net/netip"
+	"sort"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/miekg/dns"
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/logger"
@@ -35,6 +38,17 @@ func TestAddress01DocumentationAddr(t *testing.T) {
 	if hasEntryTag(entries, "A01_GLOBALLY_REACHABLE_ADDR") {
 		t.Fatalf("did not expect A01_GLOBALLY_REACHABLE_ADDR")
 	}
+	entry := findEntry(entries, "A01_DOCUMENTATION_ADDR")
+	if entry == nil {
+		t.Fatalf("expected A01_DOCUMENTATION_ADDR entry")
+	}
+	if _, ok := entry.Args["ns_list"]; ok {
+		t.Fatalf("did not expect legacy ns_list key in args")
+	}
+	endpoints := serverEndpointsFromArgs(t, entry.Args)
+	if len(endpoints) != 1 || endpoints[0] != "ns1.example/192.0.2.1" {
+		t.Fatalf("expected typed servers [ns1.example/192.0.2.1], got %v", endpoints)
+	}
 }
 
 func TestAddress01NoNameServersFound(t *testing.T) {
@@ -54,10 +68,7 @@ func TestAddress01NoNameServersFound(t *testing.T) {
 
 func TestAddress02NameserversIPWithReverse(t *testing.T) {
 	ctx := testContext(t)
-	ptrName, err := dns.ReverseAddr("192.0.2.1")
-	if err != nil {
-		t.Fatalf("reverse addr: %v", err)
-	}
+	ptrName := dnsutil.ReverseAddr(netip.MustParseAddr("192.0.2.1"))
 
 	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
 		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "NS") {
@@ -80,10 +91,7 @@ func TestAddress02NameserversIPWithReverse(t *testing.T) {
 
 func TestAddress02NameserverIPWithoutReverse(t *testing.T) {
 	ctx := testContext(t)
-	ptrName, err := dns.ReverseAddr("192.0.2.1")
-	if err != nil {
-		t.Fatalf("reverse addr: %v", err)
-	}
+	ptrName := dnsutil.ReverseAddr(netip.MustParseAddr("192.0.2.1"))
 
 	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
 		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "NS") {
@@ -106,10 +114,7 @@ func TestAddress02NameserverIPWithoutReverse(t *testing.T) {
 
 func TestAddress03PTRMatch(t *testing.T) {
 	ctx := testContext(t)
-	ptrName, err := dns.ReverseAddr("192.0.2.1")
-	if err != nil {
-		t.Fatalf("reverse addr: %v", err)
-	}
+	ptrName := dnsutil.ReverseAddr(netip.MustParseAddr("192.0.2.1"))
 
 	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
 		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "NS") {
@@ -132,10 +137,7 @@ func TestAddress03PTRMatch(t *testing.T) {
 
 func TestAddress03PTRMismatch(t *testing.T) {
 	ctx := testContext(t)
-	ptrName, err := dns.ReverseAddr("192.0.2.1")
-	if err != nil {
-		t.Fatalf("reverse addr: %v", err)
-	}
+	ptrName := dnsutil.ReverseAddr(netip.MustParseAddr("192.0.2.1"))
 
 	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
 		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "NS") {
@@ -215,14 +217,8 @@ func TestAddress02ParallelPTRQueries(t *testing.T) {
 	}()
 
 	want := map[string]bool{}
-	ptr1, err := dns.ReverseAddr("192.0.2.1")
-	if err != nil {
-		t.Fatalf("reverse addr: %v", err)
-	}
-	ptr2, err := dns.ReverseAddr("192.0.2.2")
-	if err != nil {
-		t.Fatalf("reverse addr: %v", err)
-	}
+	ptr1 := dnsutil.ReverseAddr(netip.MustParseAddr("192.0.2.1"))
+	ptr2 := dnsutil.ReverseAddr(netip.MustParseAddr("192.0.2.2"))
 	want[ptr1] = true
 	want[ptr2] = true
 
@@ -259,7 +255,7 @@ func TestAddress02ParallelPTRQueries(t *testing.T) {
 		if entry == nil || entry.Tag != "NAMESERVER_IP_WITHOUT_REVERSE" {
 			continue
 		}
-		if ip, ok := entry.Args["ns_ip"].(string); ok {
+		if ip, ok := entry.Args["address"].(string); ok {
 			ips = append(ips, ip)
 		}
 	}
@@ -356,7 +352,7 @@ func TestAddress03ParallelPTRQueries(t *testing.T) {
 		if entry == nil || entry.Tag != "NAMESERVER_IP_PTR_MISMATCH" {
 			continue
 		}
-		if ip, ok := entry.Args["ns_ip"].(string); ok {
+		if ip, ok := entry.Args["address"].(string); ok {
 			ips = append(ips, ip)
 		}
 	}
@@ -419,17 +415,9 @@ func newZoneWithFakeAddresses(ctx context.Context, t *testing.T, zoneName string
 func nsPacket(zoneName string, nsName string) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
-	msg.Answer = []dns.RR{
-		&dns.NS{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(zoneName),
-				Rrtype: dns.TypeNS,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Ns: dns.Fqdn(nsName),
-		},
-	}
+	nsRR := &dns.NS{Hdr: dns.Header{Name: dnsutil.Fqdn(zoneName), Class: dns.ClassINET, TTL: 60}}
+	nsRR.Ns = dnsutil.Fqdn(nsName)
+	msg.Answer = []dns.RR{nsRR}
 	return packet.Packet{Msg: msg}
 }
 
@@ -437,15 +425,9 @@ func ptrPacket(owner string, targets ...string) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
 	for _, target := range targets {
-		msg.Answer = append(msg.Answer, &dns.PTR{
-			Hdr: dns.RR_Header{
-				Name:   dns.Fqdn(owner),
-				Rrtype: dns.TypePTR,
-				Class:  dns.ClassINET,
-				Ttl:    60,
-			},
-			Ptr: dns.Fqdn(target),
-		})
+		ptrRR := &dns.PTR{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
+		ptrRR.Ptr = dnsutil.Fqdn(target)
+		msg.Answer = append(msg.Answer, ptrRR)
 	}
 	return packet.Packet{Msg: msg}
 }
@@ -456,11 +438,7 @@ func noAnswerPacket(owner string, qtype string) packet.Packet {
 	if qtype == "" {
 		qtype = "A"
 	}
-	msg.Question = []dns.Question{{
-		Name:   dns.Fqdn(owner),
-		Qtype:  dns.StringToType[strings.ToUpper(qtype)],
-		Qclass: dns.ClassINET,
-	}}
+	dnsutil.SetQuestion(msg, dnsutil.Fqdn(owner), dns.StringToType[strings.ToUpper(qtype)])
 	return packet.Packet{Msg: msg}
 }
 
@@ -474,4 +452,62 @@ func hasEntryTag(entries []*logger.Entry, tag string) bool {
 		}
 	}
 	return false
+}
+
+func findEntry(entries []*logger.Entry, tag string) *logger.Entry {
+	for _, entry := range entries {
+		if entry == nil {
+			continue
+		}
+		if entry.Tag == tag {
+			return entry
+		}
+	}
+	return nil
+}
+
+func serverEndpointsFromArgs(t *testing.T, args map[string]any) []string {
+	t.Helper()
+	raw, ok := args["servers"]
+	if !ok {
+		t.Fatalf("expected servers key in args")
+	}
+
+	var endpoints []string
+	appendEndpoint := func(ns string, address string) {
+		ns = strings.TrimSpace(ns)
+		address = strings.TrimSpace(address)
+		switch {
+		case ns != "" && address != "":
+			endpoints = append(endpoints, ns+"/"+address)
+		case ns != "":
+			endpoints = append(endpoints, ns)
+		case address != "":
+			endpoints = append(endpoints, address)
+		}
+	}
+
+	switch items := raw.(type) {
+	case []map[string]any:
+		for _, item := range items {
+			ns, _ := item["ns"].(string)
+			address, _ := item["address"].(string)
+			appendEndpoint(ns, address)
+		}
+	case []any:
+		for _, item := range items {
+			m, ok := item.(map[string]any)
+			if !ok {
+				continue
+			}
+			ns, _ := m["ns"].(string)
+			address, _ := m["address"].(string)
+			appendEndpoint(ns, address)
+		}
+	default:
+		t.Fatalf("unexpected servers type: %T", raw)
+	}
+
+	sort.Strings(endpoints)
+	return endpoints
 }

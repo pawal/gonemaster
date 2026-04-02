@@ -89,6 +89,84 @@ func TestInMemoryJobStoreCRUD(t *testing.T) {
 	}
 }
 
+func TestInMemoryJobStoreUpdateKeepsImmutableCreateFields(t *testing.T) {
+	store := NewInMemoryJobStore()
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	job := Job{
+		ID:        "job-immut",
+		PublicID:  "pubimmut",
+		DomainID:  7,
+		BatchID:   "batch-1",
+		Domain:    "original.example",
+		Status:    JobQueued,
+		CreatedAt: now,
+		Priority:  PriorityBatch,
+		Profile:   "profiles/original.yaml",
+		Tests:     []string{"basic01", "zone01"},
+		Overrides: map[string]any{
+			"resolver": map[string]any{"timeout_ms": 1500},
+		},
+		UndelegatedNS: []engine.UndelegatedNameserver{
+			{Name: "ns1.example."},
+		},
+		UndelegatedDS: []engine.UndelegatedDSInfo{
+			{KeyTag: 12345, Algorithm: 8, DigestType: 2, Digest: "abcd"},
+		},
+		MinLevel: "WARNING",
+	}
+	if _, err := store.Create(job); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	updated := job
+	updated.Status = JobRunning
+	updated.StartedAt = now.Add(2 * time.Second)
+	updated.Progress = 55
+	updated.Error = "transient"
+	updated.DomainID = 99
+	updated.BatchID = "batch-2"
+	updated.Domain = "changed.example"
+	updated.Profile = "profiles/changed.yaml"
+	updated.Tests = []string{"changed01"}
+	updated.Overrides = map[string]any{"resolver": map[string]any{"timeout_ms": 2500}}
+	updated.UndelegatedNS = []engine.UndelegatedNameserver{{Name: "ns2.example."}}
+	updated.UndelegatedDS = []engine.UndelegatedDSInfo{{KeyTag: 54321, Algorithm: 13, DigestType: 4, Digest: "ffff"}}
+	updated.MinLevel = "ERROR"
+
+	if err := store.Update(updated); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+
+	got, ok := store.Get(job.ID)
+	if !ok {
+		t.Fatal("Get after Update: not found")
+	}
+	if got.Status != JobRunning || got.Progress != 55 || got.Error != "transient" {
+		t.Fatalf("mutable fields not updated as expected: %#v", got)
+	}
+	if !got.StartedAt.Equal(updated.StartedAt) {
+		t.Fatalf("StartedAt: got %v, want %v", got.StartedAt, updated.StartedAt)
+	}
+	if got.DomainID != job.DomainID || got.BatchID != job.BatchID || got.Domain != job.Domain {
+		t.Fatalf("immutable identity fields changed: got domain_id=%d batch=%q domain=%q", got.DomainID, got.BatchID, got.Domain)
+	}
+	if got.Profile != job.Profile || got.MinLevel != job.MinLevel {
+		t.Fatalf("immutable profile fields changed: got profile=%q min_level=%q", got.Profile, got.MinLevel)
+	}
+	if fmt.Sprintf("%v", got.Tests) != fmt.Sprintf("%v", job.Tests) {
+		t.Fatalf("Tests changed: got %v want %v", got.Tests, job.Tests)
+	}
+	if fmt.Sprintf("%v", got.Overrides) != fmt.Sprintf("%v", job.Overrides) {
+		t.Fatalf("Overrides changed: got %v want %v", got.Overrides, job.Overrides)
+	}
+	if fmt.Sprintf("%v", got.UndelegatedNS) != fmt.Sprintf("%v", job.UndelegatedNS) {
+		t.Fatalf("UndelegatedNS changed: got %v want %v", got.UndelegatedNS, job.UndelegatedNS)
+	}
+	if fmt.Sprintf("%v", got.UndelegatedDS) != fmt.Sprintf("%v", job.UndelegatedDS) {
+		t.Fatalf("UndelegatedDS changed: got %v want %v", got.UndelegatedDS, job.UndelegatedDS)
+	}
+}
+
 func TestInMemoryJobStoreFilters(t *testing.T) {
 	store := NewInMemoryJobStore()
 	base := time.Now().UTC().Add(-time.Minute)
@@ -1088,7 +1166,7 @@ func TestInMemoryJobStoreQueryEntries(t *testing.T) {
 
 	grad("run1", "alpha.example", "batch1", []engine.LogEntry{
 		{Module: "DNSSEC", Testcase: "DNSSEC01", Tag: "DS01_ALGO_SHA1", Level: "WARNING"},
-		{Module: "DNSSEC", Testcase: "DNSSEC02", Tag: "DS02_NO_DS",      Level: "ERROR"},
+		{Module: "DNSSEC", Testcase: "DNSSEC02", Tag: "DS02_NO_DS", Level: "ERROR"},
 	})
 	grad("run2", "beta.example", "batch1", []engine.LogEntry{
 		{Module: "DNSSEC", Testcase: "DNSSEC01", Tag: "DS01_ALGO_SHA1", Level: "NOTICE"},

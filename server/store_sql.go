@@ -235,33 +235,16 @@ func (s *SQLJobStore) GetByPublicID(publicID string) (Job, bool) {
 	return jobFromRun(run), true
 }
 
-// Update replaces a job's mutable fields for in-flight jobs.
+// Update replaces only a job's mutable in-flight fields.
 func (s *SQLJobStore) Update(job Job) error {
-	cfg := jobConfigJSON{
-		Tests:         job.Tests,
-		Overrides:     job.Overrides,
-		UndelegatedNS: job.UndelegatedNS,
-		UndelegatedDS: job.UndelegatedDS,
-		MinLevel:      job.MinLevel,
-	}
-	configJSON, err := toNullJSON(cfg)
-	if err != nil {
-		return fmt.Errorf("marshal config_json: %w", err)
-	}
-
 	res, err := s.db.Exec(
 		fmt.Sprintf(`UPDATE jobs SET
-			domain_id=%s, domain=%s, batch_id=%s, status=%s,
-			started_at=%s, progress=%s, error=%s, profile=%s,
-			config_json=%s
+			status=%s, started_at=%s, progress=%s, error=%s
 		 WHERE id=%s`,
 			s.ph(1), s.ph(2), s.ph(3), s.ph(4),
-			s.ph(5), s.ph(6), s.ph(7), s.ph(8),
-			s.ph(9),
-			s.ph(10)),
-		job.DomainID, job.Domain, job.BatchID, string(job.Status),
-		s.ts(job.StartedAt), job.Progress, job.Error, job.Profile,
-		configJSON,
+			s.ph(5)),
+		string(job.Status),
+		s.ts(job.StartedAt), job.Progress, job.Error,
 		job.ID,
 	)
 	if err != nil {
@@ -606,11 +589,11 @@ func (s *SQLJobStore) loadEntries(runID string) ([]Entry, error) {
 	var entries []Entry
 	for rows.Next() {
 		var (
-			id                                 int64
-			rid, module, testcase, tag, level  string
-			domainID                           int64
-			timestamp                          float64
-			argsJSON                           sql.NullString
+			id                                int64
+			rid, module, testcase, tag, level string
+			domainID                          int64
+			timestamp                         float64
+			argsJSON                          sql.NullString
 		)
 		if err := rows.Scan(&id, &rid, &domainID, &timestamp, &module, &testcase, &tag, &level, &argsJSON); err != nil {
 			return nil, err
@@ -669,11 +652,11 @@ func (s *SQLJobStore) GetOrCreateDomain(name string) (Domain, error) {
 
 func (s *SQLJobStore) scanDomain(row *sql.Row) (Domain, error) {
 	var (
-		id                       int64
-		domainName, createdAt    string
-		latestRunID, latestRunAt sql.NullString
+		id                        int64
+		domainName, createdAt     string
+		latestRunID, latestRunAt  sql.NullString
 		latestStatus, latestLevel sql.NullString
-		runCount                 int
+		runCount                  int
 	)
 	err := row.Scan(&id, &domainName, &latestRunID, &latestRunAt, &latestStatus,
 		&latestLevel, &createdAt, &runCount)
@@ -799,11 +782,11 @@ func (s *SQLJobStore) ListDomains(filter DomainFilter) DomainList {
 	var items []Domain
 	for rows.Next() {
 		var (
-			id                                int64
-			name, createdAt                   string
-			latestRunID, latestRunAt          sql.NullString
-			latestStatus, latestLevel         sql.NullString
-			runCount                          int
+			id                        int64
+			name, createdAt           string
+			latestRunID, latestRunAt  sql.NullString
+			latestStatus, latestLevel sql.NullString
+			runCount                  int
 		)
 		if err := rows.Scan(&id, &name, &latestRunID, &latestRunAt,
 			&latestStatus, &latestLevel, &createdAt, &runCount); err != nil {

@@ -31,7 +31,7 @@ func (d *spyDialect) IsDuplicateKey(err error) bool { return d.inner.IsDuplicate
 // testDollarDialect simulates PostgreSQL's $n placeholder style for testing.
 type testDollarDialect struct{}
 
-func (testDollarDialect) Placeholder(n int) string    { return fmt.Sprintf("$%d", n) }
+func (testDollarDialect) Placeholder(n int) string     { return fmt.Sprintf("$%d", n) }
 func (testDollarDialect) TimestampVal(t time.Time) any { return sqliteDialect{}.TimestampVal(t) }
 func (testDollarDialect) DriverName() string           { return "test-dollar" }
 func (testDollarDialect) IsDuplicateKey(err error) bool {
@@ -40,9 +40,9 @@ func (testDollarDialect) IsDuplicateKey(err error) bool {
 
 // testBackend describes a database backend for parameterized store tests.
 type testBackend struct {
-	name    string     // human-readable name used in t.Run
-	driver  string     // sql.DB driver name ("sqlite", "postgres", "mysql")
-	dsn     string     // data source name
+	name    string // human-readable name used in t.Run
+	driver  string // sql.DB driver name ("sqlite", "postgres", "mysql")
+	dsn     string // data source name
 	dialect sqlDialect
 }
 
@@ -454,6 +454,120 @@ func TestSQLJobStoreUpdate(t *testing.T) {
 	}
 }
 
+func TestSQLJobStoreUpdateKeepsImmutableCreateFields(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			now := time.Now().UTC().Truncate(time.Microsecond)
+			job := Job{
+				ID:        "j2-immut",
+				PublicID:  "pubimmut",
+				DomainID:  7,
+				BatchID:   "batch-1",
+				Domain:    "original.example",
+				Status:    JobQueued,
+				CreatedAt: now,
+				Priority:  PriorityBatch,
+				Profile:   "profiles/original.yaml",
+				Tests:     []string{"basic01", "zone01"},
+				Overrides: map[string]any{
+					"resolver": map[string]any{"timeout_ms": 1500},
+				},
+				UndelegatedNS: []engine.UndelegatedNameserver{
+					{Name: "ns1.example."},
+				},
+				UndelegatedDS: []engine.UndelegatedDSInfo{
+					{KeyTag: 12345, Algorithm: 8, DigestType: 2, Digest: "abcd"},
+				},
+				MinLevel: "WARNING",
+			}
+			if _, err := s.Create(job); err != nil {
+				t.Fatalf("Create: %v", err)
+			}
+
+			expectedConfig, err := toNullJSON(jobConfigJSON{
+				Tests:         job.Tests,
+				Overrides:     job.Overrides,
+				UndelegatedNS: job.UndelegatedNS,
+				UndelegatedDS: job.UndelegatedDS,
+				MinLevel:      job.MinLevel,
+			})
+			if err != nil {
+				t.Fatalf("toNullJSON: %v", err)
+			}
+
+			updated := job
+			updated.Status = JobRunning
+			updated.StartedAt = now.Add(2 * time.Second)
+			updated.Progress = 55
+			updated.Error = "transient"
+			updated.DomainID = 99
+			updated.BatchID = "batch-2"
+			updated.Domain = "changed.example"
+			updated.Profile = "profiles/changed.yaml"
+			updated.Tests = []string{"changed01"}
+			updated.Overrides = map[string]any{"resolver": map[string]any{"timeout_ms": 2500}}
+			updated.UndelegatedNS = []engine.UndelegatedNameserver{{Name: "ns2.example."}}
+			updated.UndelegatedDS = []engine.UndelegatedDSInfo{{KeyTag: 54321, Algorithm: 13, DigestType: 4, Digest: "ffff"}}
+			updated.MinLevel = "ERROR"
+
+			if err := s.Update(updated); err != nil {
+				t.Fatalf("Update: %v", err)
+			}
+
+			got, ok := s.Get(job.ID)
+			if !ok {
+				t.Fatal("Get after Update: not found")
+			}
+			if got.Status != JobRunning || got.Progress != 55 || got.Error != "transient" {
+				t.Fatalf("mutable fields not updated as expected: %#v", got)
+			}
+			if !got.StartedAt.Equal(updated.StartedAt) {
+				t.Fatalf("StartedAt: got %v, want %v", got.StartedAt, updated.StartedAt)
+			}
+			if got.DomainID != job.DomainID || got.BatchID != job.BatchID || got.Domain != job.Domain {
+				t.Fatalf("immutable identity fields changed: got domain_id=%d batch=%q domain=%q", got.DomainID, got.BatchID, got.Domain)
+			}
+			if got.Profile != job.Profile || got.MinLevel != job.MinLevel {
+				t.Fatalf("immutable profile fields changed: got profile=%q min_level=%q", got.Profile, got.MinLevel)
+			}
+			if fmt.Sprintf("%v", got.Tests) != fmt.Sprintf("%v", job.Tests) {
+				t.Fatalf("Tests changed: got %v want %v", got.Tests, job.Tests)
+			}
+			if fmt.Sprintf("%v", got.Overrides) != fmt.Sprintf("%v", job.Overrides) {
+				t.Fatalf("Overrides changed: got %v want %v", got.Overrides, job.Overrides)
+			}
+			if fmt.Sprintf("%v", got.UndelegatedNS) != fmt.Sprintf("%v", job.UndelegatedNS) {
+				t.Fatalf("UndelegatedNS changed: got %v want %v", got.UndelegatedNS, job.UndelegatedNS)
+			}
+			if fmt.Sprintf("%v", got.UndelegatedDS) != fmt.Sprintf("%v", job.UndelegatedDS) {
+				t.Fatalf("UndelegatedDS changed: got %v want %v", got.UndelegatedDS, job.UndelegatedDS)
+			}
+
+			var (
+				domainID   int64
+				domain     string
+				batchID    string
+				profile    string
+				configJSON sql.NullString
+			)
+			row := s.db.QueryRow(
+				fmt.Sprintf("SELECT domain_id, domain, batch_id, profile, config_json FROM jobs WHERE id = %s", s.ph(1)),
+				job.ID,
+			)
+			if err := row.Scan(&domainID, &domain, &batchID, &profile, &configJSON); err != nil {
+				t.Fatalf("scan raw job row: %v", err)
+			}
+			if domainID != job.DomainID || domain != job.Domain || batchID != job.BatchID || profile != job.Profile {
+				t.Fatalf("raw immutable columns changed: domain_id=%d domain=%q batch_id=%q profile=%q", domainID, domain, batchID, profile)
+			}
+			if configJSON != expectedConfig {
+				t.Fatalf("config_json changed: got %+v want %+v", configJSON, expectedConfig)
+			}
+		})
+	}
+}
+
 func TestSQLJobStoreUpdateMissing(t *testing.T) {
 	for _, b := range testBackends(t) {
 		t.Run(b.name, func(t *testing.T) {
@@ -475,14 +589,14 @@ func TestSQLJobStoreGraduateJobAndGetResult(t *testing.T) {
 			now := time.Now().UTC().Truncate(time.Millisecond)
 
 			job := Job{
-				ID:        "g1",
-				Domain:    "grad.test",
-				BatchID:   "batch1",
-				Status:    JobSucceeded,
-				CreatedAt: now,
-				StartedAt: now.Add(time.Second),
+				ID:         "g1",
+				Domain:     "grad.test",
+				BatchID:    "batch1",
+				Status:     JobSucceeded,
+				CreatedAt:  now,
+				StartedAt:  now.Add(time.Second),
 				FinishedAt: now.Add(2 * time.Second),
-				PublicID:  "pub00001",
+				PublicID:   "pub00001",
 			}
 			if _, err := s.Create(job); err != nil {
 				t.Fatalf("Create: %v", err)
@@ -1211,7 +1325,7 @@ func TestSQLJobStoreListPagination(t *testing.T) {
 			base := time.Now().UTC().Truncate(time.Millisecond)
 
 			for i := 0; i < 5; i++ {
-				id := string(rune('1'+i)) // "1".."5"
+				id := string(rune('1' + i)) // "1".."5"
 				_, err := s.Create(Job{
 					ID: "p" + id, Domain: "p" + id + ".test", Status: JobQueued,
 					CreatedAt: base.Add(time.Duration(i) * time.Second),
@@ -1736,7 +1850,10 @@ var _ sqlDialect = postgresDialect{}
 
 func TestPostgresDialectPlaceholder(t *testing.T) {
 	d := postgresDialect{}
-	for _, tc := range []struct{ n int; want string }{
+	for _, tc := range []struct {
+		n    int
+		want string
+	}{
 		{1, "$1"}, {2, "$2"}, {10, "$10"}, {15, "$15"},
 	} {
 		if got := d.Placeholder(tc.n); got != tc.want {
@@ -1815,12 +1932,12 @@ func TestDialectFor(t *testing.T) {
 		wantErr  bool
 		wantType string
 	}{
-		{"sqlite",   false, "sqliteDialect"},
+		{"sqlite", false, "sqliteDialect"},
 		{"postgres", false, "postgresDialect"},
-		{"mariadb",  false, "mariadbDialect"},
-		{"mysql",    false, "mariadbDialect"},
-		{"mongodb",  true,  ""},
-		{"",         true,  ""},
+		{"mariadb", false, "mariadbDialect"},
+		{"mysql", false, "mariadbDialect"},
+		{"mongodb", true, ""},
+		{"", true, ""},
 	}
 	for _, tc := range tests {
 		t.Run(tc.driver, func(t *testing.T) {

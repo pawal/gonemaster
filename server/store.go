@@ -35,10 +35,10 @@ func severityRank(level string) int {
 type JobStore interface {
 	// Job queue management (in-flight jobs only).
 	Create(job Job) (Job, error)
-	Get(id string) (Job, bool)            // checks jobs first, then reconstructs from runs
+	Get(id string) (Job, bool)                 // checks jobs first, then reconstructs from runs
 	GetByPublicID(publicID string) (Job, bool) // checks jobs then runs
-	Update(job Job) error                 // only for in-flight jobs
-	List(filter JobFilter) JobList        // only in-flight jobs
+	Update(job Job) error                      // only mutable in-flight fields
+	List(filter JobFilter) JobList             // only in-flight jobs
 
 	// GraduateJob atomically creates a run + entries, updates domain latest_*,
 	// and deletes the job from the queue. entries may be nil for canceled jobs.
@@ -84,6 +84,14 @@ type JobStore interface {
 	PurgeOlderThan(cutoff time.Time) (int64, error)
 }
 
+func mergeMutableJobFields(existing Job, update Job) Job {
+	existing.Status = update.Status
+	existing.StartedAt = update.StartedAt
+	existing.Progress = update.Progress
+	existing.Error = update.Error
+	return existing
+}
+
 // InMemoryJobStore stores all data in memory.
 type InMemoryJobStore struct {
 	mu sync.RWMutex
@@ -104,9 +112,9 @@ type InMemoryJobStore struct {
 	domainCounter int64
 
 	// Tags.
-	tags       map[string]Tag      // name → Tag
-	domainTags map[int64][]string  // domainID → []tagName
-	tagDomains map[string][]int64  // tagName → []domainID
+	tags       map[string]Tag     // name → Tag
+	domainTags map[int64][]string // domainID → []tagName
+	tagDomains map[string][]int64 // tagName → []domainID
 
 	// Batches.
 	batches map[string]Batch // batchID → Batch
@@ -181,10 +189,11 @@ func (s *InMemoryJobStore) GetByPublicID(publicID string) (Job, bool) {
 func (s *InMemoryJobStore) Update(job Job) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if _, exists := s.jobs[job.ID]; !exists {
+	existing, exists := s.jobs[job.ID]
+	if !exists {
 		return errors.New("job not found")
 	}
-	s.jobs[job.ID] = job
+	s.jobs[job.ID] = mergeMutableJobFields(existing, job)
 	return nil
 }
 
@@ -1017,12 +1026,12 @@ func (s *InMemoryJobStore) PurgeOlderThan(cutoff time.Time) (int64, error) {
 // jobFromRun reconstructs a Job from a graduated Run for API compatibility.
 func jobFromRun(r Run) Job {
 	return Job{
-		ID:       r.ID,
-		PublicID: r.PublicID,
-		BatchID:  r.BatchID,
-		DomainID: r.DomainID,
-		Domain:   r.Domain,
-		Status:   r.Status,
+		ID:         r.ID,
+		PublicID:   r.PublicID,
+		BatchID:    r.BatchID,
+		DomainID:   r.DomainID,
+		Domain:     r.Domain,
+		Status:     r.Status,
 		FinishedAt: r.FinishedAt,
 		SeverityTotals: map[string]int{
 			"NOTICE":   r.SevNotice,

@@ -244,6 +244,7 @@ type CacheStore struct {
 	errorCacheByAddr map[string]*errorCache
 	queryMetrics     cacheMetrics
 	errorMetrics     cacheMetrics
+	queryTimes       map[string][]time.Duration
 }
 
 // NewCacheStore creates an empty nameserver cache store.
@@ -252,7 +253,34 @@ func NewCacheStore() *CacheStore {
 		objectCache:      map[string]map[string]*Nameserver{},
 		cacheByAddress:   map[string]*queryCache{},
 		errorCacheByAddr: map[string]*errorCache{},
+		queryTimes:       map[string][]time.Duration{},
 	}
+}
+
+// RecordQueryTime appends a query duration for the given nameserver key.
+func (c *CacheStore) RecordQueryTime(key string, d time.Duration) {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	c.queryTimes[key] = append(c.queryTimes[key], d)
+	c.mu.Unlock()
+}
+
+// QueryTimings returns a copy of the accumulated per-nameserver query times.
+func (c *CacheStore) QueryTimings() map[string][]time.Duration {
+	if c == nil {
+		return nil
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	out := make(map[string][]time.Duration, len(c.queryTimes))
+	for k, v := range c.queryTimes {
+		cp := make([]time.Duration, len(v))
+		copy(cp, v)
+		out[k] = cp
+	}
+	return out
 }
 
 func (c *CacheStore) cacheForAddress(addr string) *queryCache {

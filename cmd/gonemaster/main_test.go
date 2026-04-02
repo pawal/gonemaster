@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	dns "codeberg.org/miekg/dns"
 	"codeberg.org/miekg/dns/dnsutil"
@@ -1049,5 +1050,50 @@ func TestRunVersion(t *testing.T) {
 	}
 	if errOut.Len() != 0 {
 		t.Fatalf("expected no stderr output, got %q", errOut.String())
+	}
+}
+
+func TestRunNSTimesCreatesCache(t *testing.T) {
+	var captured engine.RunRequest
+	stubRunEngine(t, &captured)
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+	code := run([]string{"--domain", "example.com", "--nstimes"}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d; stderr: %s", code, errOut.String())
+	}
+	if captured.NameserverCache == nil {
+		t.Fatal("expected NameserverCache to be created when --nstimes is used")
+	}
+}
+
+func TestRunNSTimesOutputsTable(t *testing.T) {
+	previous := runEngine
+	runEngine = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		// Simulate query timing data in the cache the CLI created.
+		if req.NameserverCache != nil {
+			req.NameserverCache.RecordQueryTime("ns1.example.com/192.0.2.1", 10*time.Millisecond)
+			req.NameserverCache.RecordQueryTime("ns1.example.com/192.0.2.1", 20*time.Millisecond)
+		}
+		return nil, nil
+	}
+	t.Cleanup(func() { runEngine = previous })
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+	code := run([]string{"--domain", "example.com", "--nstimes"}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d; stderr: %s", code, errOut.String())
+	}
+	output := out.String()
+	if !strings.Contains(output, "Name servers") {
+		t.Fatalf("expected nstimes header in output, got %q", output)
+	}
+	if !strings.Contains(output, "ns1.example.com/192.0.2.1") {
+		t.Fatalf("expected nameserver entry in output, got %q", output)
+	}
+	if !strings.Contains(output, "Grand total") {
+		t.Fatalf("expected grand total in output, got %q", output)
 	}
 }

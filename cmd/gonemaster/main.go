@@ -96,6 +96,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	var stopLevelSet bool
 	var undelegatedNSSpecs repeatableStringFlag
 	var undelegatedDSSpecs repeatableStringFlag
+	var nstimes bool
 	var badkeysUpdate bool
 	var badkeysPath string
 	var badkeysPathSet bool
@@ -121,6 +122,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 			{flag: "--json", detail: "Print a JSON array of log entries"},
 			{flag: "--json-stream", detail: "Stream JSON log entries"},
 			{flag: "--count", detail: "Print count summary by level and message tag"},
+			{flag: "--nstimes", detail: "Print per-nameserver query timing statistics"},
 			{flag: "--no-progress", detail: "Disable progress indicator"},
 		})
 		printUsageGroup(errOut, "Cache", []usageLine{
@@ -199,6 +201,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs.Var(&undelegatedDSSpecs, "ds", "Undelegated DS as keytag,algorithm,digtype,digest (repeatable)")
 	fs.BoolVar(&noProgress, "no-progress", false, "Disable progress indicator (optional)")
 	fs.BoolVar(&count, "count", false, "Print count summary by level and message tag (optional)")
+	fs.BoolVar(&nstimes, "nstimes", false, "Print per-nameserver query timing statistics (optional)")
 	fs.BoolVar(&listTests, "list-tests", false, "List all available test cases (optional)")
 	fs.BoolVar(&showVersion, "version", false, "Print version and exit (optional)")
 	fs.BoolVar(&badkeysUpdate, "badkeys-update", false, "Download badkeys blocklist and exit (optional)")
@@ -577,7 +580,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	}
 
 	var packetCacheStore *nameserver.CacheStore
-	if strings.TrimSpace(savePacketCachePath) != "" || strings.TrimSpace(restorePacketCachePath) != "" {
+	if strings.TrimSpace(savePacketCachePath) != "" || strings.TrimSpace(restorePacketCachePath) != "" || nstimes {
 		packetCacheStore = nameserver.NewCacheStore()
 		if strings.TrimSpace(restorePacketCachePath) != "" {
 			if restoreErr := packetCacheStore.RestorePacketCache(restorePacketCachePath); restoreErr != nil {
@@ -739,6 +742,12 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 					}
 				}
 			} else if writeErr := writeLines(humanWriter, countLines); writeErr != nil {
+				fmt.Fprintln(errOut, writeErr.Error())
+				return 2
+			}
+		}
+		if nstimes && packetCacheStore != nil {
+			if writeErr := writeNSTimes(humanWriter, packetCacheStore.QueryTimings()); writeErr != nil {
 				fmt.Fprintln(errOut, writeErr.Error())
 				return 2
 			}

@@ -442,6 +442,9 @@ func (ns Nameserver) queryNetwork(ctx context.Context, qname string, qtype strin
 
 	resp, err := client.Exchange(ctx, server, msg)
 	resp.Log = loggerFromContextOrFallback(ctx, ns.log)
+	if ns.cache != nil && resp.QueryTime > 0 {
+		ns.cache.RecordQueryTime(ns.NameString()+"/"+ns.AddressString(), resp.QueryTime)
+	}
 
 	args := map[string]any{
 		"query_name":  qname,

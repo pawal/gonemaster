@@ -55,11 +55,11 @@ func TestWriteNSTimesFormat(t *testing.T) {
 		t.Fatal("missing ns2 entry")
 	}
 
-	// Check sorted order (ns1 before ns2)
+	// Check sorted order: ns1 has 3 queries, ns2 has 1 → ns1 first (descending count)
 	idx1 := strings.Index(output, "ns1.example.com")
 	idx2 := strings.Index(output, "ns2.example.com")
 	if idx1 > idx2 {
-		t.Fatal("entries not sorted alphabetically")
+		t.Fatal("entries not sorted by descending query count")
 	}
 
 	// Check grand total

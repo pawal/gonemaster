@@ -33,6 +33,9 @@ func writeNSTimes(out io.Writer, timings map[string][]time.Duration) error {
 		})
 	}
 	sort.Slice(entries, func(i, j int) bool {
+		if entries[i].stats.Count != entries[j].stats.Count {
+			return entries[i].stats.Count > entries[j].stats.Count
+		}
 		return entries[i].key < entries[j].key
 	})
 

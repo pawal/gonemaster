@@ -22,7 +22,7 @@ Options:
   --profile FILE               Profile path passed to server (optional)
   --min-level LEVEL            Server min-level (default: INFO)
   --batch-poll-seconds N       Batch polling interval (default: 2)
-  --sample-seconds N           Sampling interval (default: 1)
+  --sample-seconds N           Sampling interval in seconds; 0 disables periodic sampling (default: 1)
   --batch-timeout-seconds N    Timeout per run (default: 5400)
   --worktree-root DIR          Worktree root (default: /tmp/gonemaster-perf-worktrees-<utc>)
   --go-cache DIR               GOCACHE (default: /tmp/gocache)
@@ -38,8 +38,38 @@ need_cmd() {
   fi
 }
 
+ensure_embed_dirs() {
+  local wt="$1"
+  mkdir -p "$wt/server/ui/dist" "$wt/server/public/dist"
+  : >"$wt/server/ui/dist/placeholder.txt"
+  : >"$wt/server/public/dist/placeholder.txt"
+}
+
 json_quote() {
   jq -Rsa . <<<"${1:-}"
+}
+
+sleep_with_stop() {
+  local stop_file="$1"
+  local seconds="$2"
+  local slept=0
+  local step
+
+  if [ "$seconds" -le 0 ]; then
+    return 0
+  fi
+
+  while [ "$slept" -lt "$seconds" ]; do
+    if [ -f "$stop_file" ]; then
+      return 1
+    fi
+    step=1
+    if [ $((seconds - slept)) -lt "$step" ]; then
+      step=$((seconds - slept))
+    fi
+    sleep "$step"
+    slept=$((slept + step))
+  done
 }
 
 wait_health() {
@@ -273,6 +303,7 @@ for i in "${!variant_names[@]}"; do
   ref="${variant_refs[$i]}"
   wt="$worktree_root/$name"
   git -C "$repo_root" worktree add --detach "$wt" "$ref" >/dev/null
+  ensure_embed_dirs "$wt"
   variant_worktrees+=("$wt")
   worktrees_created+=("$wt")
 done
@@ -392,41 +423,44 @@ while IFS=$'\t' read -r variant run_index warmup; do
   sampler_stop="$run_dir/.sampler.stop"
   rm -f "$sampler_stop"
 
-  (
-    while [ ! -f "$sampler_stop" ]; do
-      ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-      metrics="$(curl -fsS "$base_url/api/v1/metrics?include=health,jobs,quality" 2>/dev/null || true)"
-      if [ -n "$metrics" ] && jq -e . >/dev/null 2>&1 <<<"$metrics"; then
-        queue_depth="$(jq -r '.health.queue_depth // 0' <<<"$metrics")"
-        in_flight_jobs="$(jq -r '.health.in_flight_jobs // 0' <<<"$metrics")"
-        active_workers="$(jq -r '.health.active_workers // 0' <<<"$metrics")"
-        completed_total="$(jq -r '.jobs.completed_total // 0' <<<"$metrics")"
-        duration_p50="$(jq -r '.quality.job_duration_ms.percentiles.p50 // 0' <<<"$metrics")"
-        duration_p90="$(jq -r '.quality.job_duration_ms.percentiles.p90 // 0' <<<"$metrics")"
-        duration_p99="$(jq -r '.quality.job_duration_ms.percentiles.p99 // 0' <<<"$metrics")"
-      else
-        queue_depth=0
-        in_flight_jobs=0
-        active_workers=0
-        completed_total=0
-        duration_p50=0
-        duration_p90=0
-        duration_p99=0
-      fi
+  sampler_pid=""
+  if [ "$sample_seconds" -gt 0 ]; then
+    (
+      while [ ! -f "$sampler_stop" ]; do
+        ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        metrics="$(curl -fsS "$base_url/api/v1/metrics?include=health,jobs,quality" 2>/dev/null || true)"
+        if [ -n "$metrics" ] && jq -e . >/dev/null 2>&1 <<<"$metrics"; then
+          queue_depth="$(jq -r '.health.queue_depth // 0' <<<"$metrics")"
+          in_flight_jobs="$(jq -r '.health.in_flight_jobs // 0' <<<"$metrics")"
+          active_workers="$(jq -r '.health.active_workers // 0' <<<"$metrics")"
+          completed_total="$(jq -r '.jobs.completed_total // 0' <<<"$metrics")"
+          duration_p50="$(jq -r '.quality.job_duration_ms.percentiles.p50 // 0' <<<"$metrics")"
+          duration_p90="$(jq -r '.quality.job_duration_ms.percentiles.p90 // 0' <<<"$metrics")"
+          duration_p99="$(jq -r '.quality.job_duration_ms.percentiles.p99 // 0' <<<"$metrics")"
+        else
+          queue_depth=0
+          in_flight_jobs=0
+          active_workers=0
+          completed_total=0
+          duration_p50=0
+          duration_p90=0
+          duration_p99=0
+        fi
 
-      ps_line="$(ps -p "$server_pid" -o %cpu= -o rss= 2>/dev/null || true)"
-      if [ -n "$ps_line" ]; then
-        cpu="$(awk '{print $1}' <<<"$ps_line")"
-        rss="$(awk '{print $2}' <<<"$ps_line")"
-      else
-        cpu=0
-        rss=0
-      fi
-      echo "$ts,$queue_depth,$in_flight_jobs,$active_workers,$completed_total,$duration_p50,$duration_p90,$duration_p99,$cpu,$rss" >>"$samples_csv"
-      sleep "$sample_seconds"
-    done
-  ) &
-  sampler_pid="$!"
+        ps_line="$(ps -p "$server_pid" -o %cpu= -o rss= 2>/dev/null || true)"
+        if [ -n "$ps_line" ]; then
+          cpu="$(awk '{print $1}' <<<"$ps_line")"
+          rss="$(awk '{print $2}' <<<"$ps_line")"
+        else
+          cpu=0
+          rss=0
+        fi
+        echo "$ts,$queue_depth,$in_flight_jobs,$active_workers,$completed_total,$duration_p50,$duration_p90,$duration_p99,$cpu,$rss" >>"$samples_csv"
+        sleep_with_stop "$sampler_stop" "$sample_seconds" || exit 0
+      done
+    ) &
+    sampler_pid="$!"
+  fi
 
   deadline=$(( $(date +%s) + batch_timeout_seconds ))
   run_timed_out=0
@@ -458,7 +492,9 @@ while IFS=$'\t' read -r variant run_index warmup; do
   wall_seconds="$(awk -v s="$start_ns" -v e="$end_ns" 'BEGIN { printf "%.6f", (e - s) / 1000000000 }')"
 
   touch "$sampler_stop"
-  wait "$sampler_pid" >/dev/null 2>&1 || true
+  if [ -n "$sampler_pid" ]; then
+    wait "$sampler_pid" >/dev/null 2>&1 || true
+  fi
 
   curl -fsS "$base_url/api/v1/metrics?include=health,jobs,quality" >"$run_dir/metrics_final.json" 2>/dev/null || echo '{}' >"$run_dir/metrics_final.json"
 

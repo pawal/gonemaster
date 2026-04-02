@@ -56,6 +56,9 @@ Results are printed with severity levels and can be output in several formats.
 **--count**
 : Print a summary count by level and message tag.
 
+**--nstimes**
+: Print per-nameserver query timing statistics (max, min, avg, stddev, median, total, count).
+
 **--no-progress**
 : Disable the progress indicator.
 
@@ -168,6 +171,10 @@ Show all results including INFO level:
 Test an undelegated zone:
 
     gonemaster --ns ns1.example.com/192.0.2.1 example.com
+
+Show per-nameserver query timing statistics:
+
+    gonemaster --nstimes example.com
 
 Save and restore the DNS cache for faster re-runs:
 

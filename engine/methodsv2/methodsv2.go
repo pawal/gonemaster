@@ -57,6 +57,13 @@ func ClearCache() {
 	parentCache.mu.Unlock()
 }
 
+// CacheEntryCount returns the current number of cached parent-zone entries.
+func CacheEntryCount() int {
+	parentCache.mu.Lock()
+	defer parentCache.mu.Unlock()
+	return len(parentCache.items)
+}
+
 // GetParentNSNamesAndIPs returns nameservers for the parent zone.
 func GetParentNSNamesAndIPs(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver, error) {
 	if z == nil {

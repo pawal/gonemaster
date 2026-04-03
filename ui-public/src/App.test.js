@@ -165,6 +165,37 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: /theme/i })).toBeTruthy();
   });
 
+  // ── Document title ─────────────────────────────────────────────────────────
+
+  it("sets title to percentage while running", async () => {
+    window.location.hash = "#/result/abc12345";
+    fetchRouter([
+      ["/locales", localesResp],
+      ["/jobs/abc12345", jobResp("running", "example.com", 42)],
+    ]);
+    render(App);
+    await waitFor(() =>
+      expect(document.title).toBe("42% Gonemaster")
+    );
+  });
+
+  it("resets title to Gonemaster when job finishes", async () => {
+    window.location.hash = "#/result/abc12345";
+    fetchRouter([
+      ["/locales", localesResp],
+      ["jobs/abc12345/result", resultResp()],
+      ["/jobs/", jobResp("succeeded", "example.com", 100)],
+    ]);
+    render(App);
+    await waitFor(() => screen.getByTestId("results-view"));
+    expect(document.title).toBe("Gonemaster");
+  });
+
+  it("title is Gonemaster on initial idle state", () => {
+    render(App);
+    expect(document.title).toBe("Gonemaster");
+  });
+
   // ── Theme toggle ───────────────────────────────────────────────────────────
   // jsdom has no matchMedia, so isDark initialises to false → data-theme="light"
 

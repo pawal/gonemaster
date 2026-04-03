@@ -19,6 +19,9 @@
   let jobStatus = "";
   let jobDomain = "";
   let jobFinishedAt = null;
+  let jobProgress = 0;
+
+  $: document.title = phase === "running" ? `${jobProgress}% Gonemaster` : "Gonemaster";
 
   const TERMINAL = new Set(["succeeded", "failed", "canceled", "expired"]);
 
@@ -107,6 +110,7 @@
     jobStatus = "";
     jobDomain = "";
     jobFinishedAt = null;
+    jobProgress = 0;
     phase = "running";
     window.location.hash = hashFor("result", publicID).slice(1);
   }
@@ -188,6 +192,7 @@
   {#if phase === "running"}
     <Progress
       publicID={publicID}
+      bind:progress={jobProgress}
       on:jobdone={onJobDone}
     />
   {:else if phase === "done"}

@@ -11,7 +11,7 @@
 
   let domain = "";
   let status = "queued";
-  let progress = 0;
+  export let progress = 0;
   let errorKey = "";
   let timer;
 

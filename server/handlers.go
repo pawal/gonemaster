@@ -206,7 +206,7 @@ func (s *Server) handleBatchByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verify batch exists via the batches table or fallback to jobs/runs.
-	_, batchExists := s.store.GetBatch(batchID)
+	batchRecord, batchExists := s.store.GetBatch(batchID)
 	if !batchExists {
 		// Fallback: check if any jobs or runs have this batch_id.
 		probe := s.store.List(JobFilter{BatchID: batchID, Limit: 1})
@@ -332,6 +332,7 @@ func (s *Server) handleBatchByID(w http.ResponseWriter, r *http.Request) {
 
 	summary := BatchSummary{
 		BatchID:      batchID,
+		Tag:          batchRecord.Tag,
 		Total:        total,
 		StatusCounts: statusCounts,
 		Items:        pageItems,

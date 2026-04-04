@@ -357,6 +357,7 @@ type JobBatchResponse struct {
 // BatchSummary aggregates jobs for a batch.
 type BatchSummary struct {
 	BatchID      string         `json:"batch_id"`
+	Tag          string         `json:"tag,omitempty"`
 	Total        int            `json:"total"`
 	StatusCounts map[string]int `json:"status_counts"`
 	Items        []Job          `json:"items"`

@@ -611,6 +611,35 @@ func TestBatchSummary(t *testing.T) {
 	}
 }
 
+func TestBatchSummaryIncludesTag(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	// Create a batch record with a tag directly in the store.
+	batchID := "batch_tagged"
+	_ = srv.store.CreateBatch(Batch{
+		ID:          batchID,
+		Tag:         "se-domains",
+		DomainCount: 1,
+		CreatedAt:   time.Now(),
+	})
+	// Add a job to the batch so the summary has content.
+	srv.store.Create(Job{ID: "job_t1", Domain: "example.se", BatchID: batchID, Status: JobQueued, CreatedAt: time.Now()})
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/batches/"+batchID, nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var summary BatchSummary
+	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if summary.Tag != "se-domains" {
+		t.Fatalf("expected tag 'se-domains', got %q", summary.Tag)
+	}
+}
+
 func TestBatchSummaryPaginationAndSort(t *testing.T) {
 	srv := New(DefaultConfig())
 	base := time.Date(2026, 2, 3, 0, 0, 0, 0, time.UTC)

@@ -196,6 +196,17 @@ type StoredProfile struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
+// Profile is the API representation of a stored profile.
+type Profile struct {
+	ID          int64          `json:"id"`
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	Config      map[string]any `json:"config"`
+	Public      bool           `json:"public"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+}
+
 // ── Filter types ──────────────────────────────────────────────────────────────
 
 // JobFilter controls listing behavior.

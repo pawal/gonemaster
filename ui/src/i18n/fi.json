@@ -94,6 +94,8 @@
   "sort_created_at_asc": "Luotu (vanhin)",
   "batch_jobs_heading": "Erätyöt",
   "domains_label": "Verkkotunnukset (yksi per rivi)",
+  "active_batches_heading": "Aktiiviset erät",
+  "no_active_batches": "Ei aktiivisia eriä.",
   "batch_inspector_heading": "Erän tarkastin",
   "recent_batches_label": "Viimeisimmät erät",
   "loading_batches": "Ladataan uusimpia eriä...",

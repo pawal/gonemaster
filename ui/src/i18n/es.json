@@ -94,6 +94,8 @@
   "sort_created_at_asc": "Creado (más antiguo)",
   "batch_jobs_heading": "Tareas por lotes",
   "domains_label": "Dominios (uno por línea)",
+  "active_batches_heading": "Lotes activos",
+  "no_active_batches": "No hay lotes activos.",
   "batch_inspector_heading": "Inspector de lote",
   "recent_batches_label": "Lotes recientes",
   "loading_batches": "Cargando últimos lotes...",

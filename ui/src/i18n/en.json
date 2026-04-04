@@ -170,6 +170,8 @@
   "batch_tag_label": "Tag",
   "error_batch_from_tag_required": "Select a tag to run from.",
   "domains_label": "Domains (one per line)",
+  "active_batches_heading": "Active Batches",
+  "no_active_batches": "No active batches.",
   "batch_inspector_heading": "Batch Inspector",
   "recent_batches_label": "Recent batches",
   "loading_batches": "Loading latest batches...",

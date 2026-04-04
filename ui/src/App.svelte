@@ -64,6 +64,9 @@
   let recentBatchOptions = [];
   let recentBatchLoading = false;
   let selectedRecentBatch = "";
+  let activeBatches = [];
+  let activeBatchesLoading = false;
+  let activeBatchesPoller = null;
   let metricsSnapshot = null;
   let metricsLoading = false;
   let metricsError = "";
@@ -995,6 +998,7 @@
       }
     } else if (next === "batches") {
       loadRecentBatchOptions();
+      loadActiveBatches();
       if (!tagsLoaded) loadDomainTags();
       if (selectedBatchId) {
         loadBatch(selectedBatchId);
@@ -1403,6 +1407,51 @@
     }
   };
 
+  const loadActiveBatches = async () => {
+    activeBatchesLoading = true;
+    try {
+      // Discover recent batch IDs from the job list (same approach as loadRecentBatchOptions).
+      const batchIds = [];
+      const seen = new Set();
+      let cursor = 0;
+      let pages = 0;
+      while (batchIds.length < 10 && pages < 3) {
+        const params = new URLSearchParams({ limit: "100", sort: "created_at_desc" });
+        if (cursor > 0) params.set("cursor", String(cursor));
+        const list = await apiFetch(`/jobs?${params.toString()}`);
+        const items = list?.items || [];
+        for (const item of items) {
+          const bid = String(item?.batch_id || "").trim();
+          if (!bid || seen.has(bid)) continue;
+          seen.add(bid);
+          batchIds.push(bid);
+          if (batchIds.length >= 10) break;
+        }
+        if (!list?.next_cursor) break;
+        const next = normalizeCursor(list.next_cursor);
+        if (next <= cursor) break;
+        cursor = next;
+        pages++;
+      }
+
+      // Fetch summary for each batch and keep only active ones.
+      const summaries = await Promise.all(
+        batchIds.map(async (id) => {
+          try {
+            return await apiFetch(`/batches/${id}?limit=1&sort=started_at_desc`);
+          } catch (_) {
+            return null;
+          }
+        })
+      );
+      activeBatches = summaries.filter((b) => b && hasActiveBatchJobs(b));
+    } catch (_) {
+      // Silently ignore — active batches is supplementary.
+    } finally {
+      activeBatchesLoading = false;
+    }
+  };
+
   const applyBatchFilters = async () => {
     batchCursor = 0;
     await loadBatch(selectedBatchId, { resetCursor: true });
@@ -1769,6 +1818,12 @@
     recentPoller = setInterval(() => loadJobs(), 7000);
   };
 
+  const startActiveBatchesPolling = () => {
+    if (activeBatchesPoller) clearInterval(activeBatchesPoller);
+    if (activeTab !== "batches") return;
+    activeBatchesPoller = setInterval(() => loadActiveBatches(), 7000);
+  };
+
   const startMetricsPolling = () => {
     if (metricsPoller) clearInterval(metricsPoller);
     if (!autoRefreshMetrics || activeTab !== "metrics") return;
@@ -1797,6 +1852,11 @@
     autoRefreshRecent;
     activeTab;
     startRecentPolling();
+  }
+
+  $: {
+    activeTab;
+    startActiveBatchesPolling();
   }
 
   $: {
@@ -1904,6 +1964,7 @@
     loadJobs();
     if (activeTab === "batches") {
       loadRecentBatchOptions();
+      loadActiveBatches();
       if (!tagsLoaded) loadDomainTags();
       if (selectedBatchId) {
         loadBatch(selectedBatchId);
@@ -1926,6 +1987,7 @@
     return () => {
       if (jobPoller) clearInterval(jobPoller);
       if (batchPoller) clearInterval(batchPoller);
+      if (activeBatchesPoller) clearInterval(activeBatchesPoller);
       if (recentPoller) clearInterval(recentPoller);
       if (metricsPoller) clearInterval(metricsPoller);
       if (jobInspectorHighlightTimer) clearTimeout(jobInspectorHighlightTimer);
@@ -2859,6 +2921,39 @@ example.org`}
         </button>
         {#if createdBatchId}
           <div class="small">{$t("created_batch_prefix")} <span class="mono">{createdBatchId}</span></div>
+        {/if}
+      </div>
+
+      <div class="card reveal" style="--d: 0.26s" data-testid="active-batches-card">
+        <h2>{$t("active_batches_heading")}</h2>
+        {#if activeBatchesLoading && activeBatches.length === 0}
+          <div class="small">{$t("loading")}</div>
+        {:else if activeBatches.length === 0}
+          <div class="small">{$t("no_active_batches")}</div>
+        {:else}
+          <div class="list">
+            {#each activeBatches as batch (batch.batch_id)}
+              <div class="list-item clickable" on:click={() => {
+                selectedBatchId = batch.batch_id;
+                loadBatch(batch.batch_id, { resetCursor: true });
+              }} on:keydown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  selectedBatchId = batch.batch_id;
+                  loadBatch(batch.batch_id, { resetCursor: true });
+                }
+              }} role="button" tabindex="0">
+                <div class="list-item-main">
+                  <div class="mono">
+                    {batch.batch_id}{#if batch.tag} <span class="small">({batch.tag})</span>{/if}
+                  </div>
+                  <div class="small">
+                    {$t("total_label")}: {batch.total} · {formatBatchStatusCounts(batch.status_counts)} · {formatBatchTotalRuntime(batch)}
+                  </div>
+                </div>
+              </div>
+            {/each}
+          </div>
         {/if}
       </div>
 

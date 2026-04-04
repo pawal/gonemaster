@@ -94,6 +94,8 @@
   "sort_created_at_asc": "Skapad (äldsta)",
   "batch_jobs_heading": "Batchjobb",
   "domains_label": "Domäner (en per rad)",
+  "active_batches_heading": "Aktiva batcher",
+  "no_active_batches": "Inga aktiva batcher.",
   "batch_inspector_heading": "Batchinspektör",
   "recent_batches_label": "Senaste batchar",
   "loading_batches": "Laddar senaste batchar...",

@@ -94,6 +94,8 @@
   "sort_created_at_asc": "Ustvarjeno (najstarejše)",
   "batch_jobs_heading": "Paketna opravila",
   "domains_label": "Domene (ena na vrstico)",
+  "active_batches_heading": "Aktivne serije",
+  "no_active_batches": "Ni aktivnih serij.",
   "batch_inspector_heading": "Pregledovalnik serij",
   "recent_batches_label": "Nedavne serije",
   "loading_batches": "Nalaganje najnovejših serij...",

@@ -1184,6 +1184,116 @@ describe("App", () => {
     unmount();
   });
 
+  it("shows active batches card with empty state when no batches are active", async () => {
+    global.fetch.mockImplementation((url) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      if (value.includes("/api/v1/jobs?")) return jsonResponse({ items: [] });
+      if (value.includes("/api/v1/tags")) return jsonResponse([]);
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+    await openBatchTab();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("active-batches-card")).toBeInTheDocument();
+      expect(screen.getByText("Active Batches")).toBeInTheDocument();
+      expect(screen.getByText("No active batches.")).toBeInTheDocument();
+    });
+    unmount();
+  });
+
+  it("shows active batches with running jobs", async () => {
+    const jobsPage = {
+      items: [
+        { id: "job_1", batch_id: "batch_active", created_at: "2026-03-01T10:00:00Z" },
+        { id: "job_2", batch_id: "batch_done", created_at: "2026-03-01T09:00:00Z" }
+      ],
+      total: 2
+    };
+    const batchActive = {
+      batch_id: "batch_active",
+      tag: "se-domains",
+      total: 5,
+      status_counts: { running: 2, queued: 1, succeeded: 2 },
+      items: [{ id: "job_1", domain: "example.se", status: "running", progress: 40 }],
+      created_at: "2026-03-01T10:00:00Z"
+    };
+    const batchDone = {
+      batch_id: "batch_done",
+      total: 3,
+      status_counts: { succeeded: 3 },
+      items: [],
+      created_at: "2026-03-01T09:00:00Z"
+    };
+
+    global.fetch.mockImplementation((url) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      if (value.includes("/api/v1/batches/batch_active")) return jsonResponse(batchActive);
+      if (value.includes("/api/v1/batches/batch_done")) return jsonResponse(batchDone);
+      if (value.includes("/api/v1/jobs?")) return jsonResponse(jobsPage);
+      if (value.includes("/api/v1/tags")) return jsonResponse([]);
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+    await openBatchTab();
+
+    const card = await waitFor(() => screen.getByTestId("active-batches-card"));
+    await waitFor(() => {
+      expect(within(card).getByText(/batch_active/)).toBeInTheDocument();
+      expect(within(card).getByText("(se-domains)")).toBeInTheDocument();
+    });
+
+    // batch_done should NOT appear in the active batches card since it has no active jobs
+    expect(within(card).queryByText(/batch_done/)).not.toBeInTheDocument();
+
+    unmount();
+  });
+
+  it("clicking an active batch selects it in the batch inspector", async () => {
+    const jobsPage = {
+      items: [
+        { id: "job_1", batch_id: "batch_click", created_at: "2026-03-01T10:00:00Z" }
+      ],
+      total: 1
+    };
+    const batchClick = {
+      batch_id: "batch_click",
+      total: 2,
+      status_counts: { running: 1, queued: 1 },
+      items: [{ id: "job_1", domain: "click.example", status: "running", progress: 50 }],
+      created_at: "2026-03-01T10:00:00Z"
+    };
+
+    global.fetch.mockImplementation((url) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      if (value.includes("/api/v1/batches/batch_click")) return jsonResponse(batchClick);
+      if (value.includes("/api/v1/jobs?")) return jsonResponse(jobsPage);
+      if (value.includes("/api/v1/tags")) return jsonResponse([]);
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+    await openBatchTab();
+
+    // Wait for the active batch to appear
+    const batchRow = await waitFor(() => {
+      const card = screen.getByTestId("active-batches-card");
+      return within(card).getByText(/batch_click/);
+    });
+
+    // Click the row
+    await fireEvent.click(batchRow.closest("[role='button']"));
+
+    // The batch inspector should now show the batch job details
+    await waitFor(() => {
+      expect(screen.getByText("click.example - running")).toBeInTheDocument();
+    });
+
+    unmount();
+  });
+
   it("applies batch filters and pagination query params", async () => {
     const calls = [];
     const firstPage = {

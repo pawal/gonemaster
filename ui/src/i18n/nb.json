@@ -94,6 +94,8 @@
   "sort_created_at_asc": "Opprettet (eldste)",
   "batch_jobs_heading": "Batchjobber",
   "domains_label": "Domener (ett per linje)",
+  "active_batches_heading": "Aktive batcher",
+  "no_active_batches": "Ingen aktive batcher.",
   "batch_inspector_heading": "Batchinspektør",
   "recent_batches_label": "Siste batcher",
   "loading_batches": "Laster siste batcher...",

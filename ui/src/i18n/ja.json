@@ -94,6 +94,8 @@
   "sort_created_at_asc": "作成日時 (古い順)",
   "batch_jobs_heading": "バッチジョブ",
   "domains_label": "ドメイン (1行に1つ)",
+  "active_batches_heading": "実行中のバッチ",
+  "no_active_batches": "実行中のバッチはありません。",
   "batch_inspector_heading": "バッチインスペクター",
   "recent_batches_label": "最近のバッチ",
   "loading_batches": "最新のバッチを読み込み中...",

@@ -79,6 +79,14 @@ type JobStore interface {
 	CreateBatch(batch Batch) error
 	GetBatch(id string) (Batch, bool)
 
+	// Profile management.
+	CreateProfile(p StoredProfile) (StoredProfile, error)
+	GetProfile(id int64) (StoredProfile, bool)
+	GetProfileByName(name string) (StoredProfile, bool)
+	UpdateProfile(p StoredProfile) error
+	DeleteProfile(id int64) error
+	ListProfiles() []StoredProfile
+
 	// PurgeOlderThan deletes terminal runs whose finished_at is before cutoff,
 	// along with their entries. Returns the number of runs deleted.
 	PurgeOlderThan(cutoff time.Time) (int64, error)
@@ -110,6 +118,10 @@ type InMemoryJobStore struct {
 
 	// Batches.
 	batches map[string]Batch // batchID → Batch
+
+	// Profiles.
+	profiles       map[int64]StoredProfile // id → StoredProfile
+	profileCounter int64
 }
 
 // NewInMemoryJobStore creates an empty in-memory job store.
@@ -126,6 +138,7 @@ func NewInMemoryJobStore() *InMemoryJobStore {
 		domainTags:   map[int64][]string{},
 		tagDomains:   map[string][]int64{},
 		batches:      map[string]Batch{},
+		profiles:     map[int64]StoredProfile{},
 	}
 }
 
@@ -988,6 +1001,90 @@ func (s *InMemoryJobStore) GetBatch(id string) (Batch, bool) {
 	defer s.mu.RUnlock()
 	b, ok := s.batches[id]
 	return b, ok
+}
+
+// CreateProfile stores a new profile and assigns an auto-incremented ID.
+func (s *InMemoryJobStore) CreateProfile(p StoredProfile) (StoredProfile, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, existing := range s.profiles {
+		if existing.Name == p.Name {
+			return StoredProfile{}, fmt.Errorf("profile name %q already exists", p.Name)
+		}
+	}
+	s.profileCounter++
+	p.ID = s.profileCounter
+	now := time.Now().UTC()
+	if p.CreatedAt.IsZero() {
+		p.CreatedAt = now
+	}
+	if p.UpdatedAt.IsZero() {
+		p.UpdatedAt = now
+	}
+	s.profiles[p.ID] = p
+	return p, nil
+}
+
+// GetProfile returns a profile by ID.
+func (s *InMemoryJobStore) GetProfile(id int64) (StoredProfile, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	p, ok := s.profiles[id]
+	return p, ok
+}
+
+// GetProfileByName returns a profile by its unique name.
+func (s *InMemoryJobStore) GetProfileByName(name string) (StoredProfile, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, p := range s.profiles {
+		if p.Name == name {
+			return p, true
+		}
+	}
+	return StoredProfile{}, false
+}
+
+// UpdateProfile updates an existing profile.
+func (s *InMemoryJobStore) UpdateProfile(p StoredProfile) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.profiles[p.ID]; !ok {
+		return fmt.Errorf("profile %d not found", p.ID)
+	}
+	for _, existing := range s.profiles {
+		if existing.Name == p.Name && existing.ID != p.ID {
+			return fmt.Errorf("profile name %q already exists", p.Name)
+		}
+	}
+	p.UpdatedAt = time.Now().UTC()
+	s.profiles[p.ID] = p
+	return nil
+}
+
+// DeleteProfile removes a profile by ID.
+func (s *InMemoryJobStore) DeleteProfile(id int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.profiles[id]; !ok {
+		return fmt.Errorf("profile %d not found", id)
+	}
+	delete(s.profiles, id)
+	return nil
+}
+
+// ListProfiles returns all profiles ordered by name.
+func (s *InMemoryJobStore) ListProfiles() []StoredProfile {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make([]StoredProfile, 0, len(s.profiles))
+	for _, p := range s.profiles {
+		result = append(result, p)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Name < result[j].Name
+	})
+	return result
 }
 
 // PurgeOlderThan deletes terminal-status runs whose finished_at is before

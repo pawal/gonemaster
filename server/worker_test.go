@@ -140,6 +140,25 @@ func (s *spyJobStore) GetBatch(id string) (Batch, bool) {
 	return s.inner.GetBatch(id)
 }
 
+func (s *spyJobStore) CreateProfile(p StoredProfile) (StoredProfile, error) {
+	return s.inner.CreateProfile(p)
+}
+func (s *spyJobStore) GetProfile(id int64) (StoredProfile, bool) {
+	return s.inner.GetProfile(id)
+}
+func (s *spyJobStore) GetProfileByName(name string) (StoredProfile, bool) {
+	return s.inner.GetProfileByName(name)
+}
+func (s *spyJobStore) UpdateProfile(p StoredProfile) error {
+	return s.inner.UpdateProfile(p)
+}
+func (s *spyJobStore) DeleteProfile(id int64) error {
+	return s.inner.DeleteProfile(id)
+}
+func (s *spyJobStore) ListProfiles() []StoredProfile {
+	return s.inner.ListProfiles()
+}
+
 func (s *spyJobStore) PurgeOlderThan(cutoff time.Time) (int64, error) {
 	return s.inner.PurgeOlderThan(cutoff)
 }

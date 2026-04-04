@@ -159,6 +159,31 @@ var sqlMigrations = []sqlMigration{
 			`ALTER TABLE runs ADD COLUMN priority INTEGER NOT NULL DEFAULT 0`,
 		},
 	},
+	{
+		version: 3,
+		stmtsFn: func(d sqlDialect) []string {
+			var autoinc string
+			switch d.(type) {
+			case postgresDialect:
+				autoinc = "BIGSERIAL PRIMARY KEY"
+			case mariadbDialect:
+				autoinc = "BIGINT AUTO_INCREMENT PRIMARY KEY"
+			default:
+				autoinc = "INTEGER PRIMARY KEY"
+			}
+			return []string{
+				fmt.Sprintf(`CREATE TABLE IF NOT EXISTS profiles (
+					id          %s,
+					name        VARCHAR(255) NOT NULL UNIQUE,
+					description TEXT         NOT NULL DEFAULT '',
+					config      TEXT         NOT NULL DEFAULT '{}',
+					public      INTEGER      NOT NULL DEFAULT 0,
+					created_at  TEXT         NOT NULL,
+					updated_at  TEXT         NOT NULL
+				)`, autoinc),
+			}
+		},
+	},
 }
 
 // runMigrations creates the schema_migrations tracking table and applies any

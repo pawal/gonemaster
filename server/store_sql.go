@@ -1473,6 +1473,137 @@ func (s *SQLJobStore) GetBatch(id string) (Batch, bool) {
 	}, true
 }
 
+// ── Profiles ──────────────────────────────────────────────────────────────────
+
+// CreateProfile inserts a new profile and returns it with the assigned ID.
+func (s *SQLJobStore) CreateProfile(p StoredProfile) (StoredProfile, error) {
+	now := time.Now().UTC()
+	if p.CreatedAt.IsZero() {
+		p.CreatedAt = now
+	}
+	if p.UpdatedAt.IsZero() {
+		p.UpdatedAt = now
+	}
+	publicInt := 0
+	if p.Public {
+		publicInt = 1
+	}
+	result, err := s.db.Exec(
+		fmt.Sprintf(`INSERT INTO profiles (name, description, config, public, created_at, updated_at)
+			VALUES (%s, %s, %s, %s, %s, %s)`,
+			s.ph(1), s.ph(2), s.ph(3), s.ph(4), s.ph(5), s.ph(6)),
+		p.Name, p.Description, p.Config, publicInt,
+		formatSortableTimestamp(p.CreatedAt), formatSortableTimestamp(p.UpdatedAt))
+	if err != nil {
+		return StoredProfile{}, fmt.Errorf("create profile: %w", err)
+	}
+	id, err := result.LastInsertId()
+	if err != nil {
+		// PostgreSQL doesn't support LastInsertId; query for it.
+		err2 := s.db.QueryRow(
+			fmt.Sprintf(`SELECT id FROM profiles WHERE name = %s`, s.ph(1)), p.Name,
+		).Scan(&id)
+		if err2 != nil {
+			return StoredProfile{}, fmt.Errorf("create profile: get id: %w", err2)
+		}
+	}
+	p.ID = id
+	return p, nil
+}
+
+// GetProfile returns a profile by ID.
+func (s *SQLJobStore) GetProfile(id int64) (StoredProfile, bool) {
+	return s.scanProfile(
+		fmt.Sprintf(`SELECT id, name, description, config, public, created_at, updated_at FROM profiles WHERE id = %s`, s.ph(1)),
+		id)
+}
+
+// GetProfileByName returns a profile by its unique name.
+func (s *SQLJobStore) GetProfileByName(name string) (StoredProfile, bool) {
+	return s.scanProfile(
+		fmt.Sprintf(`SELECT id, name, description, config, public, created_at, updated_at FROM profiles WHERE name = %s`, s.ph(1)),
+		name)
+}
+
+func (s *SQLJobStore) scanProfile(query string, args ...any) (StoredProfile, bool) {
+	var (
+		p                          StoredProfile
+		publicInt                  int
+		createdAt, updatedAt       string
+	)
+	err := s.db.QueryRow(query, args...).Scan(
+		&p.ID, &p.Name, &p.Description, &p.Config, &publicInt, &createdAt, &updatedAt)
+	if err != nil {
+		return StoredProfile{}, false
+	}
+	p.Public = publicInt != 0
+	p.CreatedAt = parseTimestampStr(createdAt)
+	p.UpdatedAt = parseTimestampStr(updatedAt)
+	return p, true
+}
+
+// UpdateProfile updates an existing profile.
+func (s *SQLJobStore) UpdateProfile(p StoredProfile) error {
+	p.UpdatedAt = time.Now().UTC()
+	publicInt := 0
+	if p.Public {
+		publicInt = 1
+	}
+	result, err := s.db.Exec(
+		fmt.Sprintf(`UPDATE profiles SET name = %s, description = %s, config = %s, public = %s, updated_at = %s WHERE id = %s`,
+			s.ph(1), s.ph(2), s.ph(3), s.ph(4), s.ph(5), s.ph(6)),
+		p.Name, p.Description, p.Config, publicInt,
+		formatSortableTimestamp(p.UpdatedAt), p.ID)
+	if err != nil {
+		return fmt.Errorf("update profile: %w", err)
+	}
+	n, _ := result.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("profile %d not found", p.ID)
+	}
+	return nil
+}
+
+// DeleteProfile removes a profile by ID.
+func (s *SQLJobStore) DeleteProfile(id int64) error {
+	result, err := s.db.Exec(
+		fmt.Sprintf(`DELETE FROM profiles WHERE id = %s`, s.ph(1)), id)
+	if err != nil {
+		return fmt.Errorf("delete profile: %w", err)
+	}
+	n, _ := result.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("profile %d not found", id)
+	}
+	return nil
+}
+
+// ListProfiles returns all profiles ordered by name.
+func (s *SQLJobStore) ListProfiles() []StoredProfile {
+	rows, err := s.db.Query(
+		`SELECT id, name, description, config, public, created_at, updated_at FROM profiles ORDER BY name`)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var result []StoredProfile
+	for rows.Next() {
+		var (
+			p                    StoredProfile
+			publicInt            int
+			createdAt, updatedAt string
+		)
+		if err := rows.Scan(&p.ID, &p.Name, &p.Description, &p.Config, &publicInt, &createdAt, &updatedAt); err != nil {
+			continue
+		}
+		p.Public = publicInt != 0
+		p.CreatedAt = parseTimestampStr(createdAt)
+		p.UpdatedAt = parseTimestampStr(updatedAt)
+		result = append(result, p)
+	}
+	return result
+}
+
 // ── Purge ─────────────────────────────────────────────────────────────────────
 
 // PurgeOlderThan deletes terminal runs whose finished_at is before cutoff,

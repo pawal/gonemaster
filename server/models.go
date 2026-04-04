@@ -178,6 +178,17 @@ type Batch struct {
 	Description string    `json:"description,omitempty"`
 }
 
+// StoredProfile is a named, server-stored test configuration.
+type StoredProfile struct {
+	ID          int64     `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	Config      string    `json:"config"`  // JSON, same schema as profile_overrides
+	Public      bool      `json:"public"`  // visible in public UI dropdown
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
 // ── Filter types ──────────────────────────────────────────────────────────────
 
 // JobFilter controls listing behavior.

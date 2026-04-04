@@ -78,7 +78,7 @@ func testBackends(t *testing.T) []testBackend {
 // on persistent backends (PostgreSQL, MariaDB).
 func resetSchema(db *sql.DB) error {
 	for _, tbl := range []string{
-		"entries", "runs", "domain_tags", "domains", "tags", "jobs", "batches", "schema_migrations",
+		"entries", "runs", "domain_tags", "domains", "tags", "jobs", "batches", "profiles", "schema_migrations",
 	} {
 		if _, err := db.Exec("DROP TABLE IF EXISTS " + tbl); err != nil {
 			return fmt.Errorf("drop table %s: %w", tbl, err)
@@ -213,7 +213,7 @@ func TestRunMigrationsFresh(t *testing.T) {
 		t.Fatalf("second run (idempotent): %v", err)
 	}
 
-	for _, tbl := range []string{"jobs", "runs", "entries", "domains", "schema_migrations"} {
+	for _, tbl := range []string{"jobs", "runs", "entries", "domains", "profiles", "schema_migrations"} {
 		var name string
 		if err := db.QueryRow(
 			`SELECT name FROM sqlite_master WHERE type='table' AND name=?`, tbl,
@@ -270,8 +270,8 @@ func TestRunMigrationsRecordsVersion(t *testing.T) {
 		}
 		versions = append(versions, v)
 	}
-	if len(versions) != 2 || versions[0] != 1 || versions[1] != 2 {
-		t.Fatalf("expected versions [1 2], got %v", versions)
+	if len(versions) != 3 || versions[0] != 1 || versions[1] != 2 || versions[2] != 3 {
+		t.Fatalf("expected versions [1 2 3], got %v", versions)
 	}
 }
 
@@ -2220,6 +2220,154 @@ func TestSQLJobStorePriorityPersistedOnRun(t *testing.T) {
 			}
 			if run.Priority != PriorityBatch {
 				t.Fatalf("Priority: got %d, want %d", run.Priority, PriorityBatch)
+			}
+		})
+	}
+}
+
+// ---- Profile CRUD -----------------------------------------------------------
+
+func TestSQLJobStoreProfileCRUD(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			now := time.Now().UTC().Truncate(time.Microsecond)
+
+			// Create
+			p := StoredProfile{
+				Name:        "default",
+				Description: "Default profile",
+				Config:      `{"test_cases":["ALL"]}`,
+				Public:      true,
+				CreatedAt:   now,
+				UpdatedAt:   now,
+			}
+			created, err := s.CreateProfile(p)
+			if err != nil {
+				t.Fatalf("CreateProfile: %v", err)
+			}
+			if created.ID == 0 {
+				t.Fatal("expected non-zero ID after create")
+			}
+			if created.Name != "default" {
+				t.Fatalf("Name: got %q", created.Name)
+			}
+
+			// Get by ID
+			got, ok := s.GetProfile(created.ID)
+			if !ok {
+				t.Fatal("GetProfile: not found")
+			}
+			if got.Name != "default" {
+				t.Fatalf("Name: got %q", got.Name)
+			}
+			if got.Description != "Default profile" {
+				t.Fatalf("Description: got %q", got.Description)
+			}
+			if got.Config != `{"test_cases":["ALL"]}` {
+				t.Fatalf("Config: got %q", got.Config)
+			}
+			if !got.Public {
+				t.Fatal("expected Public=true")
+			}
+			if !got.CreatedAt.Equal(now) {
+				t.Fatalf("CreatedAt: got %v, want %v", got.CreatedAt, now)
+			}
+
+			// Get by name
+			got2, ok := s.GetProfileByName("default")
+			if !ok {
+				t.Fatal("GetProfileByName: not found")
+			}
+			if got2.ID != created.ID {
+				t.Fatalf("GetProfileByName ID: got %d, want %d", got2.ID, created.ID)
+			}
+
+			// Get missing
+			_, ok = s.GetProfile(9999)
+			if ok {
+				t.Fatal("expected ok=false for missing profile ID")
+			}
+			_, ok = s.GetProfileByName("nonexistent")
+			if ok {
+				t.Fatal("expected ok=false for missing profile name")
+			}
+
+			// Update
+			got.Description = "Updated description"
+			got.Public = false
+			got.UpdatedAt = now.Add(time.Hour)
+			if err := s.UpdateProfile(got); err != nil {
+				t.Fatalf("UpdateProfile: %v", err)
+			}
+			updated, ok := s.GetProfile(got.ID)
+			if !ok {
+				t.Fatal("GetProfile after update: not found")
+			}
+			if updated.Description != "Updated description" {
+				t.Fatalf("Description after update: got %q", updated.Description)
+			}
+			if updated.Public {
+				t.Fatal("expected Public=false after update")
+			}
+
+			// Duplicate name on create
+			dup := StoredProfile{
+				Name:      "default",
+				Config:    "{}",
+				CreatedAt: now,
+				UpdatedAt: now,
+			}
+			if _, err := s.CreateProfile(dup); err == nil {
+				t.Fatal("expected error on duplicate name create")
+			}
+
+			// Create second profile, then test duplicate name on update
+			p2 := StoredProfile{
+				Name:      "strict",
+				Config:    "{}",
+				CreatedAt: now,
+				UpdatedAt: now,
+			}
+			created2, err := s.CreateProfile(p2)
+			if err != nil {
+				t.Fatalf("CreateProfile(strict): %v", err)
+			}
+			created2.Name = "default" // try to rename to existing name
+			if err := s.UpdateProfile(created2); err == nil {
+				t.Fatal("expected error on duplicate name update")
+			}
+
+			// List (sorted by name)
+			profiles := s.ListProfiles()
+			if len(profiles) != 2 {
+				t.Fatalf("ListProfiles: got %d, want 2", len(profiles))
+			}
+			if profiles[0].Name != "default" || profiles[1].Name != "strict" {
+				t.Fatalf("ListProfiles order: got [%q, %q]", profiles[0].Name, profiles[1].Name)
+			}
+
+			// Delete
+			if err := s.DeleteProfile(created.ID); err != nil {
+				t.Fatalf("DeleteProfile: %v", err)
+			}
+			_, ok = s.GetProfile(created.ID)
+			if ok {
+				t.Fatal("expected profile to be deleted")
+			}
+			profiles = s.ListProfiles()
+			if len(profiles) != 1 {
+				t.Fatalf("ListProfiles after delete: got %d, want 1", len(profiles))
+			}
+
+			// Delete missing
+			if err := s.DeleteProfile(9999); err == nil {
+				t.Fatal("expected error on deleting non-existent profile")
+			}
+
+			// Update missing
+			if err := s.UpdateProfile(StoredProfile{ID: 9999, Name: "gone"}); err == nil {
+				t.Fatal("expected error on updating non-existent profile")
 			}
 		})
 	}

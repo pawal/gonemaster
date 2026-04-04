@@ -1233,3 +1233,107 @@ func TestInMemoryStorePriorityPersistedOnRun(t *testing.T) {
 		t.Fatalf("reconstructed Priority: got %d, want %d", reconstructed.Priority, PriorityBatch)
 	}
 }
+
+func TestInMemoryJobStoreProfileCRUD(t *testing.T) {
+	store := NewInMemoryJobStore()
+
+	// Create
+	p, err := store.CreateProfile(StoredProfile{
+		Name:        "strict-dnssec",
+		Description: "Strict DNSSEC validation",
+		Config:      `{"resolver.defaults.timeout": 10}`,
+		Public:      true,
+	})
+	if err != nil {
+		t.Fatalf("CreateProfile: %v", err)
+	}
+	if p.ID == 0 {
+		t.Fatal("expected non-zero ID")
+	}
+	if p.CreatedAt.IsZero() || p.UpdatedAt.IsZero() {
+		t.Fatal("expected timestamps to be set")
+	}
+
+	// Get by ID
+	got, ok := store.GetProfile(p.ID)
+	if !ok {
+		t.Fatal("GetProfile: not found")
+	}
+	if got.Name != "strict-dnssec" || got.Description != "Strict DNSSEC validation" || !got.Public {
+		t.Fatalf("unexpected profile: %+v", got)
+	}
+	if got.Config != `{"resolver.defaults.timeout": 10}` {
+		t.Fatalf("unexpected config: %s", got.Config)
+	}
+
+	// Get by name
+	got, ok = store.GetProfileByName("strict-dnssec")
+	if !ok {
+		t.Fatal("GetProfileByName: not found")
+	}
+	if got.ID != p.ID {
+		t.Fatalf("expected ID %d, got %d", p.ID, got.ID)
+	}
+
+	// Get missing
+	_, ok = store.GetProfile(999)
+	if ok {
+		t.Fatal("expected false for missing profile")
+	}
+	_, ok = store.GetProfileByName("missing")
+	if ok {
+		t.Fatal("expected false for missing profile name")
+	}
+
+	// Update
+	got.Description = "Updated description"
+	got.Public = false
+	if err := store.UpdateProfile(got); err != nil {
+		t.Fatalf("UpdateProfile: %v", err)
+	}
+	updated, _ := store.GetProfile(p.ID)
+	if updated.Description != "Updated description" || updated.Public {
+		t.Fatalf("update not reflected: %+v", updated)
+	}
+
+	// Duplicate name rejected on create
+	_, err = store.CreateProfile(StoredProfile{Name: "strict-dnssec", Config: "{}"})
+	if err == nil {
+		t.Fatal("expected error for duplicate name")
+	}
+
+	// Duplicate name rejected on update (rename collision)
+	p2, _ := store.CreateProfile(StoredProfile{Name: "quick", Config: "{}"})
+	p2.Name = "strict-dnssec"
+	if err := store.UpdateProfile(p2); err == nil {
+		t.Fatal("expected error for duplicate name on update")
+	}
+
+	// List returns sorted by name
+	profiles := store.ListProfiles()
+	if len(profiles) != 2 {
+		t.Fatalf("expected 2 profiles, got %d", len(profiles))
+	}
+	if profiles[0].Name != "quick" || profiles[1].Name != "strict-dnssec" {
+		t.Fatalf("expected sorted order: quick, strict-dnssec; got %s, %s", profiles[0].Name, profiles[1].Name)
+	}
+
+	// Delete
+	if err := store.DeleteProfile(p.ID); err != nil {
+		t.Fatalf("DeleteProfile: %v", err)
+	}
+	_, ok = store.GetProfile(p.ID)
+	if ok {
+		t.Fatal("expected profile to be deleted")
+	}
+
+	// Delete missing returns error
+	if err := store.DeleteProfile(999); err == nil {
+		t.Fatal("expected error for deleting missing profile")
+	}
+
+	// Update missing returns error
+	if err := store.UpdateProfile(StoredProfile{ID: 999, Name: "x", Config: "{}"}); err == nil {
+		t.Fatal("expected error for updating missing profile")
+	}
+}

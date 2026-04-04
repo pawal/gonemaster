@@ -1465,6 +1465,7 @@
   };
 
   const toggleQueuePause = async () => {
+    if (queuePauseToggling) return;
     queuePauseToggling = true;
     try {
       const endpoint = queuePaused ? "/queue/resume" : "/queue/pause";
@@ -2959,13 +2960,14 @@ example.org`}
             type="button"
             on:click={toggleQueuePause}
             disabled={queuePauseToggling}
+            aria-busy={queuePauseToggling}
             title={$t("queue_pause_tooltip")}
           >
             {queuePauseToggling ? $t("loading") : queuePaused ? $t("queue_resume_button") : $t("queue_pause_button")}
           </button>
         </div>
         {#if queuePaused}
-          <div class="status-banner warn" role="status">{$t("queue_paused_banner")}</div>
+          <div class="status-banner warn" role="status" aria-live="polite">{$t("queue_paused_banner")}</div>
         {/if}
         {#if activeBatchesLoading && activeBatches.length === 0}
           <div class="small">{$t("loading")}</div>
@@ -2974,16 +2976,18 @@ example.org`}
         {:else}
           <div class="list">
             {#each activeBatches as batch (batch.batch_id)}
-              <div class="list-item clickable" on:click={() => {
+              <div class="list-item clickable" class:disabled={batchLoading} on:click={() => {
+                if (batchLoading) return;
                 selectedBatchId = batch.batch_id;
                 loadBatch(batch.batch_id, { resetCursor: true });
               }} on:keydown={(e) => {
+                if (batchLoading) return;
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
                   selectedBatchId = batch.batch_id;
                   loadBatch(batch.batch_id, { resetCursor: true });
                 }
-              }} role="button" tabindex="0">
+              }} role="button" tabindex="0" aria-disabled={batchLoading}>
                 <div class="list-item-main">
                   <div class="mono">
                     {batch.batch_id}{#if batch.tag} <span class="small">({batch.tag})</span>{/if}

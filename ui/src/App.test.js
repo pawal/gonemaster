@@ -1378,6 +1378,80 @@ describe("App", () => {
     unmount();
   });
 
+  it("pause button has tooltip explaining what it does", async () => {
+    global.fetch.mockImplementation((url) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      if (value.includes("/api/v1/metrics")) return jsonResponse({ health: { queue_paused: false } });
+      if (value.includes("/api/v1/jobs?")) return jsonResponse({ items: [] });
+      if (value.includes("/api/v1/tags")) return jsonResponse([]);
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+    await openBatchTab();
+
+    const pauseBtn = await waitFor(() => screen.getByRole("button", { name: /pause queue/i }));
+    expect(pauseBtn.getAttribute("title")).toMatch(/pausing the queue stops workers/i);
+    unmount();
+  });
+
+  it("active batch rows have keyboard accessible attributes", async () => {
+    const jobsPage = {
+      items: [{ id: "job_1", batch_id: "batch_kb", created_at: "2026-03-01T10:00:00Z" }],
+      total: 1
+    };
+    const batchKb = {
+      batch_id: "batch_kb",
+      total: 2,
+      status_counts: { running: 1, queued: 1 },
+      items: [{ id: "job_1", domain: "kb.example", status: "running", progress: 20 }],
+      created_at: "2026-03-01T10:00:00Z"
+    };
+
+    global.fetch.mockImplementation((url) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      if (value.includes("/api/v1/batches/batch_kb")) return jsonResponse(batchKb);
+      if (value.includes("/api/v1/jobs?")) return jsonResponse(jobsPage);
+      if (value.includes("/api/v1/tags")) return jsonResponse([]);
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+    await openBatchTab();
+
+    const card = await waitFor(() => screen.getByTestId("active-batches-card"));
+    const batchText = await waitFor(() => within(card).getByText(/batch_kb/));
+    const row = batchText.closest("[role='button']");
+    expect(row).not.toBeNull();
+    expect(row.getAttribute("tabindex")).toBe("0");
+    unmount();
+  });
+
+  it("shows error toast when pause toggle fails", async () => {
+    global.fetch.mockImplementation((url, options = {}) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      if (value.includes("/api/v1/queue/pause")) {
+        return jsonResponse({ error: { message: "server error" } }, false);
+      }
+      if (value.includes("/api/v1/metrics")) return jsonResponse({ health: { queue_paused: false } });
+      if (value.includes("/api/v1/jobs?")) return jsonResponse({ items: [] });
+      if (value.includes("/api/v1/tags")) return jsonResponse([]);
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+    await openBatchTab();
+
+    const pauseBtn = await waitFor(() => screen.getByRole("button", { name: /pause queue/i }));
+    await fireEvent.click(pauseBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/failed to toggle queue/i)).toBeInTheDocument();
+    });
+
+    unmount();
+  });
+
   it("applies batch filters and pagination query params", async () => {
     const calls = [];
     const firstPage = {

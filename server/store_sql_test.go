@@ -31,7 +31,7 @@ func (d *spyDialect) IsDuplicateKey(err error) bool { return d.inner.IsDuplicate
 // testDollarDialect simulates PostgreSQL's $n placeholder style for testing.
 type testDollarDialect struct{}
 
-func (testDollarDialect) Placeholder(n int) string    { return fmt.Sprintf("$%d", n) }
+func (testDollarDialect) Placeholder(n int) string     { return fmt.Sprintf("$%d", n) }
 func (testDollarDialect) TimestampVal(t time.Time) any { return sqliteDialect{}.TimestampVal(t) }
 func (testDollarDialect) DriverName() string           { return "test-dollar" }
 func (testDollarDialect) IsDuplicateKey(err error) bool {
@@ -40,9 +40,9 @@ func (testDollarDialect) IsDuplicateKey(err error) bool {
 
 // testBackend describes a database backend for parameterized store tests.
 type testBackend struct {
-	name    string     // human-readable name used in t.Run
-	driver  string     // sql.DB driver name ("sqlite", "postgres", "mysql")
-	dsn     string     // data source name
+	name    string // human-readable name used in t.Run
+	driver  string // sql.DB driver name ("sqlite", "postgres", "mysql")
+	dsn     string // data source name
 	dialect sqlDialect
 }
 
@@ -275,6 +275,42 @@ func TestRunMigrationsRecordsVersion(t *testing.T) {
 	}
 }
 
+func TestRunMigrationsAddsProfileEditingColumns(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	db.SetMaxOpenConns(1)
+	defer db.Close()
+
+	if err := runMigrations(db, sqliteDialect{}); err != nil {
+		t.Fatalf("runMigrations: %v", err)
+	}
+
+	for _, tc := range []struct {
+		table  string
+		column string
+	}{
+		{table: "tags", column: "default_profile_id"},
+		{table: "jobs", column: "profile_id"},
+		{table: "jobs", column: "profile_name"},
+		{table: "runs", column: "profile_id"},
+		{table: "runs", column: "profile_name"},
+		{table: "runs", column: "effective_profile"},
+	} {
+		var name string
+		if err := db.QueryRow(
+			fmt.Sprintf(`SELECT name FROM pragma_table_info('%s') WHERE name = ?`, tc.table),
+			tc.column,
+		).Scan(&name); err != nil {
+			t.Fatalf("%s.%s not found after migration: %v", tc.table, tc.column, err)
+		}
+		if name != tc.column {
+			t.Fatalf("%s column mismatch: got %q, want %q", tc.table, name, tc.column)
+		}
+	}
+}
+
 // ---- Create / Get ----------------------------------------------------------
 
 func TestSQLJobStoreCreateGet(t *testing.T) {
@@ -475,14 +511,14 @@ func TestSQLJobStoreGraduateJobAndGetResult(t *testing.T) {
 			now := time.Now().UTC().Truncate(time.Millisecond)
 
 			job := Job{
-				ID:        "g1",
-				Domain:    "grad.test",
-				BatchID:   "batch1",
-				Status:    JobSucceeded,
-				CreatedAt: now,
-				StartedAt: now.Add(time.Second),
+				ID:         "g1",
+				Domain:     "grad.test",
+				BatchID:    "batch1",
+				Status:     JobSucceeded,
+				CreatedAt:  now,
+				StartedAt:  now.Add(time.Second),
 				FinishedAt: now.Add(2 * time.Second),
-				PublicID:  "pub00001",
+				PublicID:   "pub00001",
 			}
 			if _, err := s.Create(job); err != nil {
 				t.Fatalf("Create: %v", err)
@@ -751,6 +787,56 @@ func TestSQLJobStoreUpdateTag(t *testing.T) {
 			}
 
 			if err := s.UpdateTag("notexist", "x"); err == nil {
+				t.Fatal("expected error for missing tag")
+			}
+		})
+	}
+}
+
+func TestSQLJobStoreSetTagDefaultProfile(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			if err := s.CreateTag("beta", "profiled tag"); err != nil {
+				t.Fatalf("CreateTag: %v", err)
+			}
+			profile, err := s.CreateProfile(StoredProfile{Name: "default", Config: "{}"})
+			if err != nil {
+				t.Fatalf("CreateProfile: %v", err)
+			}
+
+			if err := s.SetTagDefaultProfile("beta", &profile.ID); err != nil {
+				t.Fatalf("SetTagDefaultProfile: %v", err)
+			}
+			tag, ok := s.GetTag("beta")
+			if !ok {
+				t.Fatal("GetTag: not found")
+			}
+			if tag.DefaultProfileID == nil || *tag.DefaultProfileID != profile.ID {
+				t.Fatalf("DefaultProfileID: got %v, want %d", tag.DefaultProfileID, profile.ID)
+			}
+
+			tags := s.ListTags(10, 0)
+			if len(tags) != 1 {
+				t.Fatalf("ListTags: got %d, want 1", len(tags))
+			}
+			if tags[0].DefaultProfileID == nil || *tags[0].DefaultProfileID != profile.ID {
+				t.Fatalf("ListTags DefaultProfileID: got %v, want %d", tags[0].DefaultProfileID, profile.ID)
+			}
+
+			if err := s.SetTagDefaultProfile("beta", nil); err != nil {
+				t.Fatalf("clear SetTagDefaultProfile: %v", err)
+			}
+			tag, _ = s.GetTag("beta")
+			if tag.DefaultProfileID != nil {
+				t.Fatalf("expected cleared DefaultProfileID, got %v", *tag.DefaultProfileID)
+			}
+
+			missingID := profile.ID + 1000
+			if err := s.SetTagDefaultProfile("beta", &missingID); err == nil {
+				t.Fatal("expected error for missing profile")
+			}
+			if err := s.SetTagDefaultProfile("missing-tag", &profile.ID); err == nil {
 				t.Fatal("expected error for missing tag")
 			}
 		})
@@ -1211,7 +1297,7 @@ func TestSQLJobStoreListPagination(t *testing.T) {
 			base := time.Now().UTC().Truncate(time.Millisecond)
 
 			for i := 0; i < 5; i++ {
-				id := string(rune('1'+i)) // "1".."5"
+				id := string(rune('1' + i)) // "1".."5"
 				_, err := s.Create(Job{
 					ID: "p" + id, Domain: "p" + id + ".test", Status: JobQueued,
 					CreatedAt: base.Add(time.Duration(i) * time.Second),
@@ -1736,7 +1822,10 @@ var _ sqlDialect = postgresDialect{}
 
 func TestPostgresDialectPlaceholder(t *testing.T) {
 	d := postgresDialect{}
-	for _, tc := range []struct{ n int; want string }{
+	for _, tc := range []struct {
+		n    int
+		want string
+	}{
 		{1, "$1"}, {2, "$2"}, {10, "$10"}, {15, "$15"},
 	} {
 		if got := d.Placeholder(tc.n); got != tc.want {
@@ -1815,12 +1904,12 @@ func TestDialectFor(t *testing.T) {
 		wantErr  bool
 		wantType string
 	}{
-		{"sqlite",   false, "sqliteDialect"},
+		{"sqlite", false, "sqliteDialect"},
 		{"postgres", false, "postgresDialect"},
-		{"mariadb",  false, "mariadbDialect"},
-		{"mysql",    false, "mariadbDialect"},
-		{"mongodb",  true,  ""},
-		{"",         true,  ""},
+		{"mariadb", false, "mariadbDialect"},
+		{"mysql", false, "mariadbDialect"},
+		{"mongodb", true, ""},
+		{"", true, ""},
 	}
 	for _, tc := range tests {
 		t.Run(tc.driver, func(t *testing.T) {
@@ -2368,6 +2457,119 @@ func TestSQLJobStoreProfileCRUD(t *testing.T) {
 			// Update missing
 			if err := s.UpdateProfile(StoredProfile{ID: 9999, Name: "gone"}); err == nil {
 				t.Fatal("expected error on updating non-existent profile")
+			}
+		})
+	}
+}
+
+func TestSQLJobStoreProfileReferencesPersist(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+
+			profile, err := s.CreateProfile(StoredProfile{
+				Name:   "strict",
+				Config: `{"resolver.defaults.timeout":10}`,
+			})
+			if err != nil {
+				t.Fatalf("CreateProfile: %v", err)
+			}
+			if err := s.CreateTag("ops", "operations"); err != nil {
+				t.Fatalf("CreateTag: %v", err)
+			}
+			if err := s.SetTagDefaultProfile("ops", &profile.ID); err != nil {
+				t.Fatalf("SetTagDefaultProfile: %v", err)
+			}
+
+			now := time.Now().UTC().Truncate(time.Microsecond)
+			queued := Job{
+				ID:               "job-profile-queued",
+				Domain:           "queued.example",
+				Status:           JobQueued,
+				CreatedAt:        now,
+				ProfileID:        &profile.ID,
+				ProfileName:      profile.Name,
+				EffectiveProfile: `{"resolver.defaults.timeout":10}`,
+			}
+			if _, err := s.Create(queued); err != nil {
+				t.Fatalf("Create queued: %v", err)
+			}
+			gotQueued, ok := s.Get(queued.ID)
+			if !ok {
+				t.Fatal("Get queued: not found")
+			}
+			if gotQueued.ProfileID == nil || *gotQueued.ProfileID != profile.ID {
+				t.Fatalf("queued ProfileID: got %v, want %d", gotQueued.ProfileID, profile.ID)
+			}
+			if gotQueued.ProfileName != profile.Name {
+				t.Fatalf("queued ProfileName: got %q, want %q", gotQueued.ProfileName, profile.Name)
+			}
+
+			running := Job{
+				ID:               "job-profile-run",
+				Domain:           "run.example",
+				Status:           JobSucceeded,
+				CreatedAt:        now,
+				StartedAt:        now,
+				FinishedAt:       now.Add(2 * time.Second),
+				ProfileID:        &profile.ID,
+				ProfileName:      profile.Name,
+				EffectiveProfile: `{"resolver.defaults.timeout":15}`,
+			}
+			if _, err := s.Create(running); err != nil {
+				t.Fatalf("Create running: %v", err)
+			}
+			graduateSQLJob(t, s, running, nil)
+
+			run, ok := s.GetRun(running.ID)
+			if !ok {
+				t.Fatal("GetRun: not found")
+			}
+			if run.ProfileID == nil || *run.ProfileID != profile.ID {
+				t.Fatalf("run ProfileID: got %v, want %d", run.ProfileID, profile.ID)
+			}
+			if run.ProfileName != profile.Name {
+				t.Fatalf("run ProfileName: got %q, want %q", run.ProfileName, profile.Name)
+			}
+			if run.EffectiveProfile != `{"resolver.defaults.timeout":15}` {
+				t.Fatalf("run EffectiveProfile: got %q", run.EffectiveProfile)
+			}
+
+			if err := s.DeleteProfile(profile.ID); err != nil {
+				t.Fatalf("DeleteProfile: %v", err)
+			}
+
+			tag, ok := s.GetTag("ops")
+			if !ok {
+				t.Fatal("GetTag after delete: not found")
+			}
+			if tag.DefaultProfileID != nil {
+				t.Fatalf("expected cleared tag DefaultProfileID, got %v", *tag.DefaultProfileID)
+			}
+
+			gotQueued, ok = s.Get(queued.ID)
+			if !ok {
+				t.Fatal("Get queued after delete: not found")
+			}
+			if gotQueued.ProfileID != nil {
+				t.Fatalf("expected queued ProfileID cleared, got %v", *gotQueued.ProfileID)
+			}
+			if gotQueued.ProfileName != profile.Name {
+				t.Fatalf("queued ProfileName after delete: got %q, want %q", gotQueued.ProfileName, profile.Name)
+			}
+
+			run, ok = s.GetRun(running.ID)
+			if !ok {
+				t.Fatal("GetRun after delete: not found")
+			}
+			if run.ProfileID != nil {
+				t.Fatalf("expected run ProfileID cleared, got %v", *run.ProfileID)
+			}
+			if run.ProfileName != profile.Name {
+				t.Fatalf("run ProfileName after delete: got %q, want %q", run.ProfileName, profile.Name)
+			}
+			if run.EffectiveProfile != `{"resolver.defaults.timeout":15}` {
+				t.Fatalf("run EffectiveProfile after delete: got %q", run.EffectiveProfile)
 			}
 		})
 	}

@@ -824,6 +824,52 @@ func TestInMemoryJobStoreUpdateTag(t *testing.T) {
 	}
 }
 
+func TestInMemoryJobStoreSetTagDefaultProfile(t *testing.T) {
+	store := NewInMemoryJobStore()
+	if err := store.CreateTag("beta", "profiled tag"); err != nil {
+		t.Fatalf("CreateTag: %v", err)
+	}
+	profile, err := store.CreateProfile(StoredProfile{Name: "default", Config: "{}"})
+	if err != nil {
+		t.Fatalf("CreateProfile: %v", err)
+	}
+
+	if err := store.SetTagDefaultProfile("beta", &profile.ID); err != nil {
+		t.Fatalf("SetTagDefaultProfile: %v", err)
+	}
+	tag, ok := store.GetTag("beta")
+	if !ok {
+		t.Fatal("GetTag: not found")
+	}
+	if tag.DefaultProfileID == nil || *tag.DefaultProfileID != profile.ID {
+		t.Fatalf("DefaultProfileID: got %v, want %d", tag.DefaultProfileID, profile.ID)
+	}
+
+	tags := store.ListTags(10, 0)
+	if len(tags) != 1 {
+		t.Fatalf("ListTags: got %d, want 1", len(tags))
+	}
+	if tags[0].DefaultProfileID == nil || *tags[0].DefaultProfileID != profile.ID {
+		t.Fatalf("ListTags DefaultProfileID: got %v, want %d", tags[0].DefaultProfileID, profile.ID)
+	}
+
+	if err := store.SetTagDefaultProfile("beta", nil); err != nil {
+		t.Fatalf("clear SetTagDefaultProfile: %v", err)
+	}
+	tag, _ = store.GetTag("beta")
+	if tag.DefaultProfileID != nil {
+		t.Fatalf("expected cleared DefaultProfileID, got %v", *tag.DefaultProfileID)
+	}
+
+	missingID := profile.ID + 1000
+	if err := store.SetTagDefaultProfile("beta", &missingID); err == nil {
+		t.Fatal("expected error for missing profile")
+	}
+	if err := store.SetTagDefaultProfile("missing-tag", &profile.ID); err == nil {
+		t.Fatal("expected error for missing tag")
+	}
+}
+
 func TestInMemoryJobStoreDeleteTag(t *testing.T) {
 	store := NewInMemoryJobStore()
 	d, _ := store.GetOrCreateDomain("example.com")
@@ -1088,7 +1134,7 @@ func TestInMemoryJobStoreQueryEntries(t *testing.T) {
 
 	grad("run1", "alpha.example", "batch1", []engine.LogEntry{
 		{Module: "DNSSEC", Testcase: "DNSSEC01", Tag: "DS01_ALGO_SHA1", Level: "WARNING"},
-		{Module: "DNSSEC", Testcase: "DNSSEC02", Tag: "DS02_NO_DS",      Level: "ERROR"},
+		{Module: "DNSSEC", Testcase: "DNSSEC02", Tag: "DS02_NO_DS", Level: "ERROR"},
 	})
 	grad("run2", "beta.example", "batch1", []engine.LogEntry{
 		{Module: "DNSSEC", Testcase: "DNSSEC01", Tag: "DS01_ALGO_SHA1", Level: "NOTICE"},
@@ -1335,5 +1381,115 @@ func TestInMemoryJobStoreProfileCRUD(t *testing.T) {
 	// Update missing returns error
 	if err := store.UpdateProfile(StoredProfile{ID: 999, Name: "x", Config: "{}"}); err == nil {
 		t.Fatal("expected error for updating missing profile")
+	}
+}
+
+func TestInMemoryJobStoreProfileReferencesPersist(t *testing.T) {
+	store := NewInMemoryJobStore()
+
+	profile, err := store.CreateProfile(StoredProfile{
+		Name:   "strict",
+		Config: `{"resolver.defaults.timeout":10}`,
+	})
+	if err != nil {
+		t.Fatalf("CreateProfile: %v", err)
+	}
+	if err := store.CreateTag("ops", "operations"); err != nil {
+		t.Fatalf("CreateTag: %v", err)
+	}
+	if err := store.SetTagDefaultProfile("ops", &profile.ID); err != nil {
+		t.Fatalf("SetTagDefaultProfile: %v", err)
+	}
+
+	now := time.Now().UTC()
+	queued := Job{
+		ID:               "job-profile-queued",
+		Domain:           "queued.example",
+		Status:           JobQueued,
+		CreatedAt:        now,
+		ProfileID:        &profile.ID,
+		ProfileName:      profile.Name,
+		EffectiveProfile: `{"resolver.defaults.timeout":10}`,
+	}
+	if _, err := store.Create(queued); err != nil {
+		t.Fatalf("Create queued: %v", err)
+	}
+	gotQueued, ok := store.Get(queued.ID)
+	if !ok {
+		t.Fatal("Get queued: not found")
+	}
+	if gotQueued.ProfileID == nil || *gotQueued.ProfileID != profile.ID {
+		t.Fatalf("queued ProfileID: got %v, want %d", gotQueued.ProfileID, profile.ID)
+	}
+	if gotQueued.ProfileName != profile.Name {
+		t.Fatalf("queued ProfileName: got %q, want %q", gotQueued.ProfileName, profile.Name)
+	}
+
+	runJob := Job{
+		ID:               "job-profile-run",
+		Domain:           "run.example",
+		Status:           JobSucceeded,
+		CreatedAt:        now,
+		StartedAt:        now,
+		FinishedAt:       now.Add(2 * time.Second),
+		ProfileID:        &profile.ID,
+		ProfileName:      profile.Name,
+		EffectiveProfile: `{"resolver.defaults.timeout":15}`,
+	}
+	if _, err := store.Create(runJob); err != nil {
+		t.Fatalf("Create run job: %v", err)
+	}
+	if err := store.GraduateJob(runJob, nil); err != nil {
+		t.Fatalf("GraduateJob: %v", err)
+	}
+	run, ok := store.GetRun(runJob.ID)
+	if !ok {
+		t.Fatal("GetRun: not found")
+	}
+	if run.ProfileID == nil || *run.ProfileID != profile.ID {
+		t.Fatalf("run ProfileID: got %v, want %d", run.ProfileID, profile.ID)
+	}
+	if run.ProfileName != profile.Name {
+		t.Fatalf("run ProfileName: got %q, want %q", run.ProfileName, profile.Name)
+	}
+	if run.EffectiveProfile != `{"resolver.defaults.timeout":15}` {
+		t.Fatalf("run EffectiveProfile: got %q", run.EffectiveProfile)
+	}
+
+	if err := store.DeleteProfile(profile.ID); err != nil {
+		t.Fatalf("DeleteProfile: %v", err)
+	}
+
+	tag, ok := store.GetTag("ops")
+	if !ok {
+		t.Fatal("GetTag after delete: not found")
+	}
+	if tag.DefaultProfileID != nil {
+		t.Fatalf("expected cleared tag DefaultProfileID, got %v", *tag.DefaultProfileID)
+	}
+
+	gotQueued, ok = store.Get(queued.ID)
+	if !ok {
+		t.Fatal("Get queued after delete: not found")
+	}
+	if gotQueued.ProfileID != nil {
+		t.Fatalf("expected queued ProfileID cleared, got %v", *gotQueued.ProfileID)
+	}
+	if gotQueued.ProfileName != profile.Name {
+		t.Fatalf("queued ProfileName after delete: got %q, want %q", gotQueued.ProfileName, profile.Name)
+	}
+
+	run, ok = store.GetRun(runJob.ID)
+	if !ok {
+		t.Fatal("GetRun after delete: not found")
+	}
+	if run.ProfileID != nil {
+		t.Fatalf("expected run ProfileID cleared, got %v", *run.ProfileID)
+	}
+	if run.ProfileName != profile.Name {
+		t.Fatalf("run ProfileName after delete: got %q, want %q", run.ProfileName, profile.Name)
+	}
+	if run.EffectiveProfile != `{"resolver.defaults.timeout":15}` {
+		t.Fatalf("run EffectiveProfile after delete: got %q", run.EffectiveProfile)
 	}
 }

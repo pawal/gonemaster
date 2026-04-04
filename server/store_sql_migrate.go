@@ -162,14 +162,17 @@ var sqlMigrations = []sqlMigration{
 	{
 		version: 3,
 		stmtsFn: func(d sqlDialect) []string {
-			var autoinc string
+			var autoinc, bigint string
 			switch d.(type) {
 			case postgresDialect:
 				autoinc = "BIGSERIAL PRIMARY KEY"
+				bigint = "BIGINT"
 			case mariadbDialect:
 				autoinc = "BIGINT AUTO_INCREMENT PRIMARY KEY"
+				bigint = "BIGINT"
 			default:
 				autoinc = "INTEGER PRIMARY KEY"
+				bigint = "INTEGER"
 			}
 			return []string{
 				fmt.Sprintf(`CREATE TABLE IF NOT EXISTS profiles (
@@ -181,6 +184,15 @@ var sqlMigrations = []sqlMigration{
 					created_at  TEXT         NOT NULL,
 					updated_at  TEXT         NOT NULL
 				)`, autoinc),
+				fmt.Sprintf(`ALTER TABLE tags ADD COLUMN default_profile_id %s REFERENCES profiles(id) ON DELETE SET NULL`, bigint),
+				`CREATE INDEX IF NOT EXISTS idx_tags_default_profile_id ON tags(default_profile_id)`,
+				fmt.Sprintf(`ALTER TABLE jobs ADD COLUMN profile_id %s REFERENCES profiles(id) ON DELETE SET NULL`, bigint),
+				`ALTER TABLE jobs ADD COLUMN profile_name TEXT NOT NULL DEFAULT ''`,
+				`CREATE INDEX IF NOT EXISTS idx_jobs_profile_id ON jobs(profile_id)`,
+				fmt.Sprintf(`ALTER TABLE runs ADD COLUMN profile_id %s REFERENCES profiles(id) ON DELETE SET NULL`, bigint),
+				`ALTER TABLE runs ADD COLUMN profile_name TEXT NOT NULL DEFAULT ''`,
+				`ALTER TABLE runs ADD COLUMN effective_profile TEXT NOT NULL DEFAULT ''`,
+				`CREATE INDEX IF NOT EXISTS idx_runs_profile_id ON runs(profile_id)`,
 			}
 		},
 	},

@@ -81,6 +81,10 @@ func (s *countingJobStore) UpdateTag(name, description string) error {
 	return s.inner.UpdateTag(name, description)
 }
 
+func (s *countingJobStore) SetTagDefaultProfile(name string, profileID *int64) error {
+	return s.inner.SetTagDefaultProfile(name, profileID)
+}
+
 func (s *countingJobStore) DeleteTag(name string) error {
 	return s.inner.DeleteTag(name)
 }

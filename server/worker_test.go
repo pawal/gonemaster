@@ -84,6 +84,10 @@ func (s *spyJobStore) UpdateTag(name, description string) error {
 	return s.inner.UpdateTag(name, description)
 }
 
+func (s *spyJobStore) SetTagDefaultProfile(name string, profileID *int64) error {
+	return s.inner.SetTagDefaultProfile(name, profileID)
+}
+
 func (s *spyJobStore) DeleteTag(name string) error {
 	return s.inner.DeleteTag(name)
 }

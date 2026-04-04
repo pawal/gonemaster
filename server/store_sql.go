@@ -97,10 +97,25 @@ func parseTimestampStr(str string) time.Time {
 	return t.UTC()
 }
 
+func nullInt64Ptr(ns sql.NullInt64) *int64 {
+	if !ns.Valid {
+		return nil
+	}
+	v := ns.Int64
+	return &v
+}
+
+func nullInt64Value(v *int64) sql.NullInt64 {
+	if v == nil {
+		return sql.NullInt64{}
+	}
+	return sql.NullInt64{Int64: *v, Valid: true}
+}
+
 // ── job column helpers ────────────────────────────────────────────────────────
 
 const jobCols = `id, domain_id, domain, batch_id, status, created_at, started_at,
-	progress, error, profile, config_json, public_id, priority`
+	progress, error, profile, profile_id, profile_name, config_json, public_id, priority`
 
 type jobConfigJSON struct {
 	Tests         []string                       `json:"tests,omitempty"`
@@ -112,21 +127,22 @@ type jobConfigJSON struct {
 
 func (s *SQLJobStore) scanJob(row rowScanner) (Job, error) {
 	var (
-		id, domain, batchID, status string
-		domainID                    int64
-		createdAt                   string
-		startedAt                   sql.NullString
-		progress                    int
-		jobError, profile           string
-		configJSON                  sql.NullString
-		publicID                    sql.NullString
-		priority                    int
+		id, domain, batchID, status    string
+		domainID                       int64
+		createdAt                      string
+		startedAt                      sql.NullString
+		progress                       int
+		jobError, profile, profileName string
+		profileID                      sql.NullInt64
+		configJSON                     sql.NullString
+		publicID                       sql.NullString
+		priority                       int
 	)
 	if err := row.Scan(
 		&id, &domainID, &domain, &batchID, &status,
 		&createdAt, &startedAt,
 		&progress, &jobError, &profile,
-		&configJSON, &publicID, &priority,
+		&profileID, &profileName, &configJSON, &publicID, &priority,
 	); err != nil {
 		return Job{}, err
 	}
@@ -150,6 +166,8 @@ func (s *SQLJobStore) scanJob(row rowScanner) (Job, error) {
 		Progress:      progress,
 		Error:         jobError,
 		Profile:       profile,
+		ProfileID:     nullInt64Ptr(profileID),
+		ProfileName:   profileName,
 		Priority:      JobPriority(priority),
 		Tests:         cfg.Tests,
 		Overrides:     cfg.Overrides,
@@ -179,11 +197,12 @@ func (s *SQLJobStore) Create(job Job) (Job, error) {
 
 	_, err = s.db.Exec(
 		fmt.Sprintf(`INSERT INTO jobs (id, domain_id, domain, batch_id, status,
-			created_at, started_at, progress, error, profile, config_json, public_id, priority
-		) VALUES (%s)`, s.phRange(1, 13)),
+			created_at, started_at, progress, error, profile, profile_id, profile_name,
+			config_json, public_id, priority
+		) VALUES (%s)`, s.phRange(1, 15)),
 		job.ID, job.DomainID, job.Domain, job.BatchID, string(job.Status),
 		s.ts(job.CreatedAt), s.ts(job.StartedAt),
-		job.Progress, job.Error, job.Profile,
+		job.Progress, job.Error, job.Profile, nullInt64Value(job.ProfileID), job.ProfileName,
 		configJSON,
 		sql.NullString{String: job.PublicID, Valid: job.PublicID != ""},
 		int(job.Priority),
@@ -253,15 +272,15 @@ func (s *SQLJobStore) Update(job Job) error {
 		fmt.Sprintf(`UPDATE jobs SET
 			domain_id=%s, domain=%s, batch_id=%s, status=%s,
 			started_at=%s, progress=%s, error=%s, profile=%s,
-			config_json=%s
+			profile_id=%s, profile_name=%s, config_json=%s
 		 WHERE id=%s`,
 			s.ph(1), s.ph(2), s.ph(3), s.ph(4),
 			s.ph(5), s.ph(6), s.ph(7), s.ph(8),
-			s.ph(9),
-			s.ph(10)),
+			s.ph(9), s.ph(10), s.ph(11),
+			s.ph(12)),
 		job.DomainID, job.Domain, job.BatchID, string(job.Status),
 		s.ts(job.StartedAt), job.Progress, job.Error, job.Profile,
-		configJSON,
+		nullInt64Value(job.ProfileID), job.ProfileName, configJSON,
 		job.ID,
 	)
 	if err != nil {
@@ -457,12 +476,14 @@ func (s *SQLJobStore) GraduateJob(job Job, engineEntries []engine.LogEntry) erro
 			id, domain_id, domain, batch_id, status,
 			created_at, started_at, finished_at, duration_ms,
 			sev_notice, sev_warning, sev_error, sev_critical,
-			worst_level, entry_count, profile, public_id, priority
-		) VALUES (%s)`, s.phRange(1, 18)),
+			worst_level, entry_count, profile, profile_id, profile_name,
+			effective_profile, public_id, priority
+		) VALUES (%s)`, s.phRange(1, 21)),
 		job.ID, domainID, job.Domain, job.BatchID, string(job.Status),
 		s.ts(job.CreatedAt), s.ts(job.StartedAt), s.ts(job.FinishedAt), durationMs,
 		sevNotice, sevWarning, sevError, sevCritical,
-		worstLevel, len(engineEntries), job.Profile,
+		worstLevel, len(engineEntries), job.Profile, nullInt64Value(job.ProfileID), job.ProfileName,
+		job.EffectiveProfile,
 		sql.NullString{String: job.PublicID, Valid: job.PublicID != ""},
 		int(job.Priority),
 	); err != nil {
@@ -606,11 +627,11 @@ func (s *SQLJobStore) loadEntries(runID string) ([]Entry, error) {
 	var entries []Entry
 	for rows.Next() {
 		var (
-			id                                 int64
-			rid, module, testcase, tag, level  string
-			domainID                           int64
-			timestamp                          float64
-			argsJSON                           sql.NullString
+			id                                int64
+			rid, module, testcase, tag, level string
+			domainID                          int64
+			timestamp                         float64
+			argsJSON                          sql.NullString
 		)
 		if err := rows.Scan(&id, &rid, &domainID, &timestamp, &module, &testcase, &tag, &level, &argsJSON); err != nil {
 			return nil, err
@@ -669,11 +690,11 @@ func (s *SQLJobStore) GetOrCreateDomain(name string) (Domain, error) {
 
 func (s *SQLJobStore) scanDomain(row *sql.Row) (Domain, error) {
 	var (
-		id                       int64
-		domainName, createdAt    string
-		latestRunID, latestRunAt sql.NullString
+		id                        int64
+		domainName, createdAt     string
+		latestRunID, latestRunAt  sql.NullString
 		latestStatus, latestLevel sql.NullString
-		runCount                 int
+		runCount                  int
 	)
 	err := row.Scan(&id, &domainName, &latestRunID, &latestRunAt, &latestStatus,
 		&latestLevel, &createdAt, &runCount)
@@ -799,11 +820,11 @@ func (s *SQLJobStore) ListDomains(filter DomainFilter) DomainList {
 	var items []Domain
 	for rows.Next() {
 		var (
-			id                                int64
-			name, createdAt                   string
-			latestRunID, latestRunAt          sql.NullString
-			latestStatus, latestLevel         sql.NullString
-			runCount                          int
+			id                        int64
+			name, createdAt           string
+			latestRunID, latestRunAt  sql.NullString
+			latestStatus, latestLevel sql.NullString
+			runCount                  int
 		)
 		if err := rows.Scan(&id, &name, &latestRunID, &latestRunAt,
 			&latestStatus, &latestLevel, &createdAt, &runCount); err != nil {
@@ -887,11 +908,11 @@ func (s *SQLJobStore) ListTags(limit, offset int) []Tag {
 		offset = 0
 	}
 	rows, err := s.db.Query(
-		fmt.Sprintf(`SELECT t.name, t.description, t.created_at,
+		fmt.Sprintf(`SELECT t.name, t.description, t.created_at, t.default_profile_id,
 			COUNT(dt.domain_id) AS domain_count
 		 FROM tags t
 		 LEFT JOIN domain_tags dt ON dt.tag = t.name
-		 GROUP BY t.name, t.description, t.created_at
+		 GROUP BY t.name, t.description, t.created_at, t.default_profile_id
 		 ORDER BY t.name ASC
 		 LIMIT %s OFFSET %s`, s.ph(1), s.ph(2)),
 		limit, offset,
@@ -905,16 +926,18 @@ func (s *SQLJobStore) ListTags(limit, offset int) []Tag {
 	for rows.Next() {
 		var (
 			name, description, createdAt string
+			defaultProfileID             sql.NullInt64
 			domainCount                  int
 		)
-		if err := rows.Scan(&name, &description, &createdAt, &domainCount); err != nil {
+		if err := rows.Scan(&name, &description, &createdAt, &defaultProfileID, &domainCount); err != nil {
 			continue
 		}
 		tags = append(tags, Tag{
-			Name:        name,
-			Description: description,
-			CreatedAt:   parseTimestampStr(createdAt),
-			DomainCount: domainCount,
+			Name:             name,
+			Description:      description,
+			CreatedAt:        parseTimestampStr(createdAt),
+			DomainCount:      domainCount,
+			DefaultProfileID: nullInt64Ptr(defaultProfileID),
 		})
 	}
 	return tags
@@ -954,25 +977,27 @@ func (s *SQLJobStore) TagDomains(tag string, domainIDs []int64) error {
 func (s *SQLJobStore) GetTag(name string) (Tag, bool) {
 	var (
 		tagName, description, createdAt string
+		defaultProfileID                sql.NullInt64
 		domainCount                     int
 	)
 	err := s.db.QueryRow(
-		fmt.Sprintf(`SELECT t.name, t.description, t.created_at,
+		fmt.Sprintf(`SELECT t.name, t.description, t.created_at, t.default_profile_id,
 			COUNT(dt.domain_id) AS domain_count
 		 FROM tags t
 		 LEFT JOIN domain_tags dt ON dt.tag = t.name
 		 WHERE t.name = %s
-		 GROUP BY t.name, t.description, t.created_at`, s.ph(1)),
+		 GROUP BY t.name, t.description, t.created_at, t.default_profile_id`, s.ph(1)),
 		name,
-	).Scan(&tagName, &description, &createdAt, &domainCount)
+	).Scan(&tagName, &description, &createdAt, &defaultProfileID, &domainCount)
 	if err != nil {
 		return Tag{}, false
 	}
 	return Tag{
-		Name:        tagName,
-		Description: description,
-		CreatedAt:   parseTimestampStr(createdAt),
-		DomainCount: domainCount,
+		Name:             tagName,
+		Description:      description,
+		CreatedAt:        parseTimestampStr(createdAt),
+		DomainCount:      domainCount,
+		DefaultProfileID: nullInt64Ptr(defaultProfileID),
 	}, true
 }
 
@@ -981,6 +1006,27 @@ func (s *SQLJobStore) UpdateTag(name, description string) error {
 	res, err := s.db.Exec(
 		fmt.Sprintf(`UPDATE tags SET description = %s WHERE name = %s`, s.ph(1), s.ph(2)),
 		description, name,
+	)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return errors.New("tag not found")
+	}
+	return nil
+}
+
+// SetTagDefaultProfile updates a tag's default stored profile reference.
+func (s *SQLJobStore) SetTagDefaultProfile(name string, profileID *int64) error {
+	if profileID != nil {
+		if _, ok := s.GetProfile(*profileID); !ok {
+			return fmt.Errorf("profile %d not found", *profileID)
+		}
+	}
+	res, err := s.db.Exec(
+		fmt.Sprintf(`UPDATE tags SET default_profile_id = %s WHERE name = %s`, s.ph(1), s.ph(2)),
+		nullInt64Value(profileID), name,
 	)
 	if err != nil {
 		return err
@@ -1091,46 +1137,52 @@ func (s *SQLJobStore) GetTagSummary(tag string) (TagSummary, bool) {
 const runCols = `id, domain_id, domain, batch_id, status,
 	created_at, started_at, finished_at, duration_ms,
 	sev_notice, sev_warning, sev_error, sev_critical,
-	worst_level, entry_count, profile, public_id, priority`
+	worst_level, entry_count, profile, profile_id, profile_name,
+	effective_profile, public_id, priority`
 
 func (s *SQLJobStore) scanRun(row rowScanner) (Run, error) {
 	var (
-		id, domain, batchID, status, worstLevel, profile string
-		domainID, durationMs                             int64
-		sevNotice, sevWarning, sevError, sevCritical     int
-		entryCount                                       int
-		createdAt                                        string
-		startedAt, finishedAt                            sql.NullString
-		publicID                                         sql.NullString
-		priority                                         int
+		id, domain, batchID, status, worstLevel, profile, profileName, effectiveProfile string
+		domainID, durationMs                                                            int64
+		profileID                                                                       sql.NullInt64
+		sevNotice, sevWarning, sevError, sevCritical                                    int
+		entryCount                                                                      int
+		createdAt                                                                       string
+		startedAt, finishedAt                                                           sql.NullString
+		publicID                                                                        sql.NullString
+		priority                                                                        int
 	)
 	if err := row.Scan(
 		&id, &domainID, &domain, &batchID, &status,
 		&createdAt, &startedAt, &finishedAt, &durationMs,
 		&sevNotice, &sevWarning, &sevError, &sevCritical,
-		&worstLevel, &entryCount, &profile, &publicID, &priority,
+		&worstLevel, &entryCount, &profile, &profileID, &profileName,
+		&effectiveProfile, &publicID, &priority,
 	); err != nil {
 		return Run{}, err
 	}
 	r := Run{
-		ID:          id,
-		DomainID:    domainID,
-		Domain:      domain,
-		BatchID:     batchID,
-		Status:      JobStatus(status),
-		CreatedAt:   parseTimestampStr(createdAt),
-		StartedAt:   parseTimestampNullStr(startedAt),
-		FinishedAt:  parseTimestampNullStr(finishedAt),
-		DurationMs:  durationMs,
-		SevNotice:   sevNotice,
-		SevWarning:  sevWarning,
-		SevError:    sevError,
-		SevCritical: sevCritical,
-		WorstLevel:  worstLevel,
-		EntryCount:  entryCount,
-		Profile:     profile,
-		PublicID:    publicID.String,
-		Priority:    JobPriority(priority),
+		ID:               id,
+		DomainID:         domainID,
+		Domain:           domain,
+		BatchID:          batchID,
+		Status:           JobStatus(status),
+		CreatedAt:        parseTimestampStr(createdAt),
+		StartedAt:        parseTimestampNullStr(startedAt),
+		FinishedAt:       parseTimestampNullStr(finishedAt),
+		DurationMs:       durationMs,
+		SevNotice:        sevNotice,
+		SevWarning:       sevWarning,
+		SevError:         sevError,
+		SevCritical:      sevCritical,
+		WorstLevel:       worstLevel,
+		EntryCount:       entryCount,
+		Profile:          profile,
+		ProfileID:        nullInt64Ptr(profileID),
+		ProfileName:      profileName,
+		EffectiveProfile: effectiveProfile,
+		PublicID:         publicID.String,
+		Priority:         JobPriority(priority),
 	}
 	r.SeverityTotals = map[string]int{
 		"NOTICE":   sevNotice,
@@ -1527,9 +1579,9 @@ func (s *SQLJobStore) GetProfileByName(name string) (StoredProfile, bool) {
 
 func (s *SQLJobStore) scanProfile(query string, args ...any) (StoredProfile, bool) {
 	var (
-		p                          StoredProfile
-		publicInt                  int
-		createdAt, updatedAt       string
+		p                    StoredProfile
+		publicInt            int
+		createdAt, updatedAt string
 	)
 	err := s.db.QueryRow(query, args...).Scan(
 		&p.ID, &p.Name, &p.Description, &p.Config, &publicInt, &createdAt, &updatedAt)
@@ -1566,14 +1618,33 @@ func (s *SQLJobStore) UpdateProfile(p StoredProfile) error {
 
 // DeleteProfile removes a profile by ID.
 func (s *SQLJobStore) DeleteProfile(id int64) error {
-	result, err := s.db.Exec(
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("delete profile begin tx: %w", err)
+	}
+	for _, query := range []string{
+		fmt.Sprintf(`UPDATE tags SET default_profile_id = NULL WHERE default_profile_id = %s`, s.ph(1)),
+		fmt.Sprintf(`UPDATE jobs SET profile_id = NULL WHERE profile_id = %s`, s.ph(1)),
+		fmt.Sprintf(`UPDATE runs SET profile_id = NULL WHERE profile_id = %s`, s.ph(1)),
+	} {
+		if _, err := tx.Exec(query, id); err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("delete profile clear references: %w", err)
+		}
+	}
+	result, err := tx.Exec(
 		fmt.Sprintf(`DELETE FROM profiles WHERE id = %s`, s.ph(1)), id)
 	if err != nil {
+		_ = tx.Rollback()
 		return fmt.Errorf("delete profile: %w", err)
 	}
 	n, _ := result.RowsAffected()
 	if n == 0 {
+		_ = tx.Rollback()
 		return fmt.Errorf("profile %d not found", id)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("delete profile commit: %w", err)
 	}
 	return nil
 }

@@ -67,6 +67,8 @@
   let activeBatches = [];
   let activeBatchesLoading = false;
   let activeBatchesPoller = null;
+  let queuePaused = false;
+  let queuePauseToggling = false;
   let metricsSnapshot = null;
   let metricsLoading = false;
   let metricsError = "";
@@ -999,6 +1001,7 @@
     } else if (next === "batches") {
       loadRecentBatchOptions();
       loadActiveBatches();
+      fetchQueueStatus();
       if (!tagsLoaded) loadDomainTags();
       if (selectedBatchId) {
         loadBatch(selectedBatchId);
@@ -1452,6 +1455,29 @@
     }
   };
 
+  const fetchQueueStatus = async () => {
+    try {
+      const snapshot = await apiFetch("/metrics?window=1h&include=health");
+      queuePaused = !!snapshot?.health?.queue_paused;
+    } catch (_) {
+      // Non-critical — silently ignore.
+    }
+  };
+
+  const toggleQueuePause = async () => {
+    queuePauseToggling = true;
+    try {
+      const endpoint = queuePaused ? "/queue/resume" : "/queue/pause";
+      await apiFetch(endpoint, { method: "POST" });
+      queuePaused = !queuePaused;
+      setStatus($t(queuePaused ? "queue_paused_status" : "queue_resumed_status"), "ok");
+    } catch (error) {
+      setStatus($t("error_queue_toggle", { error: error.message }), "warn");
+    } finally {
+      queuePauseToggling = false;
+    }
+  };
+
   const applyBatchFilters = async () => {
     batchCursor = 0;
     await loadBatch(selectedBatchId, { resetCursor: true });
@@ -1821,7 +1847,7 @@
   const startActiveBatchesPolling = () => {
     if (activeBatchesPoller) clearInterval(activeBatchesPoller);
     if (activeTab !== "batches") return;
-    activeBatchesPoller = setInterval(() => loadActiveBatches(), 7000);
+    activeBatchesPoller = setInterval(() => { loadActiveBatches(); fetchQueueStatus(); }, 7000);
   };
 
   const startMetricsPolling = () => {
@@ -1965,6 +1991,7 @@
     if (activeTab === "batches") {
       loadRecentBatchOptions();
       loadActiveBatches();
+      fetchQueueStatus();
       if (!tagsLoaded) loadDomainTags();
       if (selectedBatchId) {
         loadBatch(selectedBatchId);
@@ -2925,7 +2952,21 @@ example.org`}
       </div>
 
       <div class="card reveal" style="--d: 0.26s" data-testid="active-batches-card">
-        <h2>{$t("active_batches_heading")}</h2>
+        <div class="row" style="justify-content: space-between; align-items: center;">
+          <h2 style="margin: 0;">{$t("active_batches_heading")}</h2>
+          <button
+            class={queuePaused ? "secondary small" : "ghost small"}
+            type="button"
+            on:click={toggleQueuePause}
+            disabled={queuePauseToggling}
+            title={$t("queue_pause_tooltip")}
+          >
+            {queuePauseToggling ? $t("loading") : queuePaused ? $t("queue_resume_button") : $t("queue_pause_button")}
+          </button>
+        </div>
+        {#if queuePaused}
+          <div class="status-banner warn" role="status">{$t("queue_paused_banner")}</div>
+        {/if}
         {#if activeBatchesLoading && activeBatches.length === 0}
           <div class="small">{$t("loading")}</div>
         {:else if activeBatches.length === 0}

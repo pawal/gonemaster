@@ -1294,6 +1294,90 @@ describe("App", () => {
     unmount();
   });
 
+  it("shows pause queue button and sends POST to pause endpoint", async () => {
+    const calls = [];
+    global.fetch.mockImplementation((url, options = {}) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      calls.push({ url: value, method: options?.method || "GET" });
+      if (value.includes("/api/v1/metrics")) {
+        return jsonResponse({ health: { queue_paused: false } });
+      }
+      if (value.includes("/api/v1/queue/pause")) return jsonResponse({});
+      if (value.includes("/api/v1/jobs?")) return jsonResponse({ items: [] });
+      if (value.includes("/api/v1/tags")) return jsonResponse([]);
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+    await openBatchTab();
+
+    const pauseBtn = await waitFor(() => screen.getByRole("button", { name: /pause queue/i }));
+    expect(pauseBtn).toBeInTheDocument();
+
+    await fireEvent.click(pauseBtn);
+
+    await waitFor(() => {
+      expect(calls.some((c) => c.url.includes("/api/v1/queue/pause") && c.method === "POST")).toBe(true);
+    });
+
+    unmount();
+  });
+
+  it("shows resume button and paused banner when queue is paused", async () => {
+    global.fetch.mockImplementation((url, options = {}) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      if (value.includes("/api/v1/metrics")) {
+        return jsonResponse({ health: { queue_paused: true } });
+      }
+      if (value.includes("/api/v1/queue/resume")) return jsonResponse({});
+      if (value.includes("/api/v1/jobs?")) return jsonResponse({ items: [] });
+      if (value.includes("/api/v1/tags")) return jsonResponse([]);
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+    await openBatchTab();
+
+    await waitFor(() => {
+      expect(screen.getByText(/queue is paused/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /resume queue/i })).toBeInTheDocument();
+    });
+
+    unmount();
+  });
+
+  it("clicking resume sends POST to resume endpoint and hides banner", async () => {
+    const calls = [];
+    global.fetch.mockImplementation((url, options = {}) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      calls.push({ url: value, method: options?.method || "GET" });
+      if (value.includes("/api/v1/metrics")) {
+        return jsonResponse({ health: { queue_paused: true } });
+      }
+      if (value.includes("/api/v1/queue/resume")) return jsonResponse({});
+      if (value.includes("/api/v1/jobs?")) return jsonResponse({ items: [] });
+      if (value.includes("/api/v1/tags")) return jsonResponse([]);
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+    await openBatchTab();
+
+    const resumeBtn = await waitFor(() => screen.getByRole("button", { name: /resume queue/i }));
+    await fireEvent.click(resumeBtn);
+
+    await waitFor(() => {
+      expect(calls.some((c) => c.url.includes("/api/v1/queue/resume") && c.method === "POST")).toBe(true);
+    });
+
+    // After resume, banner should disappear
+    await waitFor(() => {
+      expect(screen.queryByText(/queue is paused/i)).not.toBeInTheDocument();
+    });
+
+    unmount();
+  });
+
   it("applies batch filters and pagination query params", async () => {
     const calls = [];
     const firstPage = {

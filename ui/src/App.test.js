@@ -37,6 +37,10 @@ describe("App", () => {
     await fireEvent.click(screen.getByRole("tab", { name: "Metrics" }));
   };
 
+  const openSettingsTab = async () => {
+    await fireEvent.click(screen.getByRole("tab", { name: "Settings" }));
+  };
+
   const getMetricsPanel = () => screen.getByRole("tabpanel", { name: "Metrics" });
 
   it("renders the main sections", async () => {
@@ -51,6 +55,7 @@ describe("App", () => {
     expect(screen.getByRole("tab", { name: "Recent Tests" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Batch Jobs" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Metrics" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Settings" })).toBeInTheDocument();
     expect(screen.getByText("Job Inspector")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Recent Tests" })).toBeNull();
     expect(screen.queryByText("Batch Inspector")).not.toBeInTheDocument();
@@ -59,6 +64,9 @@ describe("App", () => {
 
     await openBatchTab();
     expect(screen.getByText("Batch Inspector")).toBeInTheDocument();
+
+    await openSettingsTab();
+    expect(screen.getByText("Profile Library")).toBeInTheDocument();
 
     unmount();
   });

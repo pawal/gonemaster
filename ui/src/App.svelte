@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { fetchMetricsSnapshot, metricsWindowOptions } from "./metrics.js";
   import { t, locale, loadCatalog } from "./i18n.js";
+  import ProfileSettings from "./ProfileSettings.svelte";
 
   const logoSrc = `${import.meta.env.BASE_URL}gonemaster.svg`;
 
@@ -158,7 +159,8 @@
     { id: "domains", labelKey: "tab_domains" },
     { id: "tags", labelKey: "tab_tags" },
     { id: "batches", labelKey: "tab_batches" },
-    { id: "metrics", labelKey: "tab_metrics" }
+    { id: "metrics", labelKey: "tab_metrics" },
+    { id: "settings", labelKey: "tab_settings" }
   ];
 
   // Domains tab state.
@@ -969,6 +971,7 @@
     if (tab === "tags" || tab === "tag") return "tags";
     if (tab === "batches" || tab === "batch") return "batches";
     if (tab === "metrics" || tab === "metric") return "metrics";
+    if (tab === "settings" || tab === "setting") return "settings";
     return "";
   };
 
@@ -3422,6 +3425,17 @@ example.org`}
       {:else}
         <div class="summary-empty">{$t("no_metrics_data")}</div>
       {/if}
+    </div>
+  {:else if activeTab === "settings"}
+    <div class="grid" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" style="margin-top: 22px;">
+      <div class="card reveal" style="--d: 0.34s; grid-column: 1 / -1;">
+        <ProfileSettings />
+      </div>
+      <div class="card reveal" style="--d: 0.4s;">
+        <h2>{$t("settings_server_heading")}</h2>
+        <p>{$t("settings_server_placeholder")}</p>
+        <div class="small">{$t("settings_server_placeholder_note")}</div>
+      </div>
     </div>
   {/if}
 

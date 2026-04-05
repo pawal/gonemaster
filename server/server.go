@@ -32,6 +32,7 @@ type Server struct {
 	cancelMu                 sync.Mutex
 	cancels                  map[string]context.CancelFunc
 	rateLimiter              *RateLimiter
+	configSources            map[string]SettingSource
 }
 
 // New builds a server with in-memory components.
@@ -165,6 +166,7 @@ func (s *Server) routes() {
 	apiMux.HandleFunc("/profiles/{id}", s.handleProfileByID)
 	apiMux.HandleFunc("/profiles", s.handleProfiles)
 
+	apiMux.HandleFunc("/settings", s.handleSettings)
 	apiMux.HandleFunc("/locales", s.handleLocales)
 	apiMux.HandleFunc("/metrics", s.handleMetrics)
 	apiMux.HandleFunc("/healthz", s.handleHealth)

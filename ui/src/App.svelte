@@ -24,6 +24,7 @@
   let batchFromTag = "";
   let batchSubmitting = false;
   let createdBatchId = "";
+  let batchProfileId = "";
 
   let jobs = [];
   let jobsLoading = false;
@@ -188,6 +189,10 @@
   let domainModuleGroups = [];
   let availableTags = [];
   let tagsLoaded = false;
+  let availableProfiles = [];
+  let profilesLoaded = false;
+  let profilesLoading = false;
+  let singleProfileId = "";
 
   // Tags tab state.
   let tagsList = [];
@@ -211,6 +216,12 @@
   let tagRunAllSubmitting = false;
   let tagDeleteConfirm = false;
   let tagDeleting = false;
+  let tagProfileDraftId = "";
+  let tagProfileCurrentID = null;
+  let tagProfileSelectedID = null;
+  let tagProfileDirty = false;
+  let tagProfileUpdating = false;
+  let tagProfileClearing = false;
 
   const clearStatus = () => {
     statusMessage = "";
@@ -631,6 +642,33 @@
     const elapsedSeconds = Math.max(0, Math.floor((end.getTime() - started.getTime()) / 1000));
     return `${formatUptime(elapsedSeconds)}${!finished && isActiveJobStatus(job?.status) ? " (running)" : ""}`;
   };
+  const normalizeOptionalProfileID = (value) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed <= 0) return null;
+    return parsed;
+  };
+  const profileNameByID = (profileID) => {
+    const normalized = normalizeOptionalProfileID(profileID);
+    if (!normalized) return "";
+    const match = availableProfiles.find((profile) => profile.id === normalized);
+    return match?.name || `#${normalized}`;
+  };
+  const jobProfileName = (job, run = null) => {
+    const direct = String(job?.profile_name || run?.profile_name || "").trim();
+    if (direct) return direct;
+    return profileNameByID(job?.profile_id || run?.profile_id);
+  };
+  const prettyProfileJSON = (value) => {
+    if (!value) return "";
+    if (typeof value !== "string") {
+      return JSON.stringify(value, null, 2);
+    }
+    try {
+      return JSON.stringify(JSON.parse(value), null, 2);
+    } catch (_) {
+      return value;
+    }
+  };
   const formatBatchStatusCounts = (statusCounts) => {
     if (!statusCounts || typeof statusCounts !== "object") return "none";
     const knownOrder = ["queued", "running", "succeeded", "failed", "canceled", "expired", "paused"];
@@ -990,6 +1028,9 @@
     if (changed && statusMessage) {
       clearStatus();
     }
+    if ((next === "single" || next === "tags" || next === "batches") && !profilesLoaded) {
+      loadProfiles();
+    }
     if (next === "recent") {
       loadJobs();
     } else if (next === "domains") {
@@ -1030,6 +1071,7 @@
   const navigateToTagDetail = (tag) => {
     activeTab = "tags";
     selectedTag = tag;
+    tagProfileDraftId = tag?.default_profile_id ? String(tag.default_profile_id) : "";
     tagSummary = null;
     tagDomains = [];
     tagDomainsOffset = 0;
@@ -1048,6 +1090,7 @@
     activeTab = state.tab || "single";
     selectedDomain = state.domain ?? null;
     selectedTag = state.tag ?? null;
+    tagProfileDraftId = selectedTag?.default_profile_id ? String(selectedTag.default_profile_id) : "";
     if (!selectedDomain) {
       domainRuns = [];
       selectedDomainRunResult = null;
@@ -1149,8 +1192,10 @@
     createdJobId = "";
     try {
       const parsedTags = singleTags.split(/[,\s]+/).map((t) => t.trim()).filter(Boolean);
+      const selectedProfileID = normalizeOptionalProfileID(singleProfileId);
       const payload = {
         domain: normalizedDomain,
+        ...(selectedProfileID && { profile_id: selectedProfileID }),
         ...(parsedTags.length > 0 && { tags: parsedTags })
       };
       if (singleIPMode === "disable_ipv4") {
@@ -1223,7 +1268,9 @@
       payload = { domains };
     }
     const parsedTags = batchTags.split(/[,\s]+/).map((t) => t.trim()).filter(Boolean);
+    const selectedProfileID = normalizeOptionalProfileID(batchProfileId);
     if (parsedTags.length > 0) payload.tags = parsedTags;
+    if (selectedProfileID) payload.profile_id = selectedProfileID;
     batchSubmitting = true;
     createdBatchId = "";
     try {
@@ -1558,6 +1605,21 @@
     }
   };
 
+  const loadProfiles = async () => {
+    profilesLoading = true;
+    try {
+      const data = await apiFetch("/profiles");
+      availableProfiles = Array.isArray(data) ? data : [];
+      profilesLoaded = true;
+    } catch (error) {
+      availableProfiles = [];
+      profilesLoaded = false;
+      setStatus($t("profile_load_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      profilesLoading = false;
+    }
+  };
+
   const loadDomainRuns = async (options = {}) => {
     if (!selectedDomain) return;
     const { reset = false } = options;
@@ -1624,6 +1686,20 @@
     } finally {
       tagsListLoading = false;
     }
+  };
+
+  const syncTagProfileState = (tagName, profileID) => {
+    const nextValue = normalizeOptionalProfileID(profileID);
+    if (selectedTag?.name === tagName) {
+      selectedTag = { ...selectedTag, default_profile_id: nextValue };
+    }
+    tagsList = tagsList.map((tag) =>
+      tag.name === tagName ? { ...tag, default_profile_id: nextValue } : tag
+    );
+    availableTags = availableTags.map((tag) =>
+      tag.name === tagName ? { ...tag, default_profile_id: nextValue } : tag
+    );
+    tagProfileDraftId = nextValue ? String(nextValue) : "";
   };
 
   const createTag = async () => {
@@ -1700,6 +1776,43 @@
     }
   };
 
+  const saveTagProfile = async () => {
+    if (!selectedTag || !tagProfileSelectedID || !tagProfileDirty) return;
+    tagProfileUpdating = true;
+    try {
+      await apiFetch(`/tags/${encodeURIComponent(selectedTag.name)}/profile`, {
+        method: "PUT",
+        body: JSON.stringify({ profile_id: tagProfileSelectedID })
+      });
+      syncTagProfileState(selectedTag.name, tagProfileSelectedID);
+      setStatus($t("tag_profile_saved", { name: profileNameByID(tagProfileSelectedID) }), "ok");
+      await loadTagsList();
+      await loadDomainTags();
+    } catch (error) {
+      setStatus($t("tag_profile_save_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      tagProfileUpdating = false;
+    }
+  };
+
+  const clearTagProfile = async () => {
+    if (!selectedTag || !tagProfileCurrentID) return;
+    tagProfileClearing = true;
+    try {
+      await apiFetch(`/tags/${encodeURIComponent(selectedTag.name)}/profile`, {
+        method: "DELETE"
+      });
+      syncTagProfileState(selectedTag.name, null);
+      setStatus($t("tag_profile_cleared"), "ok");
+      await loadTagsList();
+      await loadDomainTags();
+    } catch (error) {
+      setStatus($t("tag_profile_clear_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      tagProfileClearing = false;
+    }
+  };
+
   const addTagDomains = async () => {
     if (!selectedTag || !tagAddDomainsInput.trim()) return;
     const domains = tagAddDomainsInput.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
@@ -1751,6 +1864,7 @@
       await apiFetch(`/tags/${encodeURIComponent(selectedTag.name)}`, { method: "DELETE" });
       setStatus($t("tag_deleted"), "ok");
       selectedTag = null;
+      tagProfileDraftId = "";
       tagDeleteConfirm = false;
       await loadTagsList();
       await loadDomainTags();
@@ -1931,6 +2045,10 @@
     filteredJobs = jobs.filter((job) => matchesSeverityFilter(job));
   }
 
+  $: tagProfileCurrentID = normalizeOptionalProfileID(selectedTag?.default_profile_id);
+  $: tagProfileSelectedID = normalizeOptionalProfileID(tagProfileDraftId);
+  $: tagProfileDirty = tagProfileCurrentID !== tagProfileSelectedID;
+
   $: persistenceSignature = [
     activeTab,
     jobSort,
@@ -1975,6 +2093,7 @@
     locale.set(resultLocale);
     loadCatalog(resultLocale);
     loadLocales();
+    loadProfiles();
 
     updateTabFromHash();
     const urlState = readStateFromURL();
@@ -2103,6 +2222,16 @@
           />
           <div class="small">{$t("single_tags_hint")}</div>
         </div>
+        <div class="stack">
+          <label for="single-profile">{$t("stored_profile_label")}</label>
+          <select id="single-profile" bind:value={singleProfileId} disabled={profilesLoading && availableProfiles.length === 0}>
+            <option value="">{$t("stored_profile_auto_option")}</option>
+            {#each availableProfiles as profile}
+              <option value={profile.id}>{profile.name}</option>
+            {/each}
+          </select>
+          <div class="small">{$t("stored_profile_hint")}</div>
+        </div>
         <details class="advanced-options">
           <summary>{$t("advanced_profile_summary")}</summary>
           <div class="stack advanced-stack">
@@ -2198,6 +2327,7 @@
           </button>
         </div>
         {#if selectedJob}
+          {@const selectedJobProfileName = jobProfileName(selectedJob, selectedRun)}
           <div class="kv">
             <span>{$t("status_label")}</span>
             <strong>{selectedJob.status} · {formatJobTotalRuntime(selectedJob)}</strong>
@@ -2208,6 +2338,10 @@
             </div>
             <span>{$t("domain_label")}</span>
             <button class="ghost" type="button" style="padding: 0; font-family: monospace; text-align: left; border: none;" on:click={() => navigateToDomainByName(selectedJob.domain)}>{selectedJob.domain}</button>
+            {#if selectedJobProfileName}
+              <span>{$t("job_profile_label")}</span>
+              <strong class="mono">{selectedJobProfileName}</strong>
+            {/if}
             <span>{$t("created_label")}</span>
             <strong>{formatTimestampLocal(selectedJob.created_at)}</strong>
             {#if selectedRun}
@@ -2221,6 +2355,12 @@
           </div>
           {#if selectedJob.error}
             <div class="notice">{$t("error_prefix")} {selectedJob.error}</div>
+          {/if}
+          {#if selectedRun?.effective_profile}
+            <details class="advanced-options">
+              <summary>{$t("run_effective_profile_summary")}</summary>
+              <pre>{prettyProfileJSON(selectedRun.effective_profile)}</pre>
+            </details>
           {/if}
         {/if}
         {#if selectedJobResult}
@@ -2448,6 +2588,9 @@
                 <div class="small">{job.domain} - {job.status}</div>
                 {#if job.batch_id}
                   <div class="small mono">{$t("batch_prefix")} {job.batch_id}</div>
+                {/if}
+                {#if jobProfileName(job)}
+                  <div class="small">{$t("job_profile_label")}: <span class="mono">{jobProfileName(job)}</span></div>
                 {/if}
                 <div class="job-severity-tags">
                   {#if jobSeverityRows(job).length}
@@ -2743,7 +2886,7 @@
   {:else if activeTab === "tags"}
     <div class="card reveal" id="panel-tags" role="tabpanel" aria-labelledby="tab-tags" style="--d: 0.34s; margin-top: 22px;">
       {#if selectedTag}
-        <button class="secondary small" on:click={() => { selectedTag = null; setTab("tags"); }}>{$t("back_to_tags")}</button>
+        <button class="secondary small" on:click={() => { selectedTag = null; tagProfileDraftId = ""; setTab("tags"); }}>{$t("back_to_tags")}</button>
         <h2 style="margin-top: 0.5rem;">{selectedTag.name}</h2>
         {#if selectedTag.description}
           <p class="muted small">{selectedTag.description}</p>
@@ -2773,6 +2916,41 @@
           {:else}
             <button class="ghost" on:click={() => { tagDeleteConfirm = true; }}>{$t("tag_delete_button")}</button>
           {/if}
+        </div>
+
+        <h3>{$t("tag_default_profile_heading")}</h3>
+        <div class="stack" style="max-width: 440px; margin-bottom: 1rem;">
+          <label for="tag-default-profile">{$t("tag_default_profile_label")}</label>
+          <select id="tag-default-profile" bind:value={tagProfileDraftId} disabled={profilesLoading && availableProfiles.length === 0}>
+            <option value="">{$t("tag_default_profile_none_option")}</option>
+            {#each availableProfiles as profile}
+              <option value={profile.id}>{profile.name}</option>
+            {/each}
+          </select>
+          <div class="small">{$t("tag_default_profile_hint")}</div>
+          <div class="small">
+            {#if tagProfileCurrentID}
+              {$t("tag_default_profile_current", { name: profileNameByID(tagProfileCurrentID) })}
+            {:else}
+              {$t("tag_default_profile_current_none")}
+            {/if}
+          </div>
+          <div class="row">
+            <button
+              class="secondary small"
+              on:click={saveTagProfile}
+              disabled={!tagProfileDirty || !tagProfileSelectedID || tagProfileUpdating || tagProfileClearing}
+            >
+              {tagProfileUpdating ? $t("submitting") : $t("tag_default_profile_save_button")}
+            </button>
+            <button
+              class="ghost small"
+              on:click={clearTagProfile}
+              disabled={!tagProfileCurrentID || tagProfileUpdating || tagProfileClearing}
+            >
+              {tagProfileClearing ? $t("submitting") : $t("tag_default_profile_clear_button")}
+            </button>
+          </div>
         </div>
 
         <!-- Domain list with level filter -->
@@ -2946,6 +3124,16 @@ example.org`}
             bind:value={batchTags}
           />
           <div class="small">{$t("batch_tags_hint")}</div>
+        </div>
+        <div class="stack">
+          <label for="batch-profile">{$t("stored_profile_label")}</label>
+          <select id="batch-profile" bind:value={batchProfileId} disabled={profilesLoading && availableProfiles.length === 0}>
+            <option value="">{$t("stored_profile_auto_option")}</option>
+            {#each availableProfiles as profile}
+              <option value={profile.id}>{profile.name}</option>
+            {/each}
+          </select>
+          <div class="small">{$t("stored_profile_hint")}</div>
         </div>
         <button class="secondary" on:click={submitBatch} disabled={batchSubmitting}>
           {batchSubmitting ? $t("submitting") : $t("run_batch")}
@@ -3141,6 +3329,9 @@ example.org`}
                     <div class="list-item-main">
                       <div class="mono">{item.id}</div>
                       <div class="small">{item.domain} - {item.status}</div>
+                      {#if jobProfileName(item)}
+                        <div class="small">{$t("job_profile_label")}: <span class="mono">{jobProfileName(item)}</span></div>
+                      {/if}
                       <div class="progress compact list-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={progressPercent(item)}>
                         <div class="progress-bar" style={`width: ${progressPercent(item)}%`}></div>
                         <span class="progress-value">{progressPercent(item)}%</span>

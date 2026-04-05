@@ -409,5 +409,22 @@
   "profile_preview_source_label": "Source",
   "profile_preview_source_new": "New unsaved profile",
   "profile_preview_source_duplicate": "Duplicated from {name}",
-  "profile_preview_no_description": "No description provided."
+  "profile_preview_no_description": "No description provided.",
+  "tag_default_profile_heading": "Default profile",
+  "tag_default_profile_label": "Profile for this tag",
+  "tag_default_profile_none_option": "No default profile",
+  "tag_default_profile_hint": "Jobs submitted from this tag inherit this stored profile unless they choose one explicitly.",
+  "tag_default_profile_current": "Current default: {name}",
+  "tag_default_profile_current_none": "Current default: none",
+  "tag_default_profile_save_button": "Save default",
+  "tag_default_profile_clear_button": "Clear default",
+  "tag_profile_saved": "Default profile set to {name}.",
+  "tag_profile_cleared": "Default profile cleared.",
+  "tag_profile_save_error": "Failed to save default profile: {error}",
+  "tag_profile_clear_error": "Failed to clear default profile: {error}",
+  "stored_profile_label": "Stored profile",
+  "stored_profile_auto_option": "Use tag default / server default",
+  "stored_profile_hint": "Optional stored profile. Leave blank to inherit tag or server defaults.",
+  "job_profile_label": "Profile",
+  "run_effective_profile_summary": "Effective profile"
 }

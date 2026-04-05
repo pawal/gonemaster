@@ -13,6 +13,37 @@ const jsonResponse = (data, ok = true) => ({
   text: async () => JSON.stringify(data)
 });
 
+const emptyResponse = () => ({
+  ok: true,
+  statusText: "No Content",
+  headers: {
+    get: () => ""
+  },
+  json: async () => ({}),
+  text: async () => ""
+});
+
+const sampleProfiles = () => ([
+  {
+    id: 11,
+    name: "baseline",
+    description: "Default baseline",
+    config: { net: { ipv4: true, ipv6: true } },
+    public: false,
+    created_at: "2026-04-01T10:00:00Z",
+    updated_at: "2026-04-02T10:00:00Z"
+  },
+  {
+    id: 12,
+    name: "strict",
+    description: "Strict DNS profile",
+    config: { resolver: { defaults: { timeout: 5 } } },
+    public: true,
+    created_at: "2026-04-01T11:00:00Z",
+    updated_at: "2026-04-03T09:30:00Z"
+  }
+]);
+
 describe("App", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -671,6 +702,44 @@ describe("App", () => {
     unmount();
   });
 
+  it("shows profile names in the recent job list and job inspector", async () => {
+    const job = {
+      id: "job_profile_name",
+      domain: "example.com",
+      status: "running",
+      created_at: "2026-02-03T00:00:00Z",
+      progress: 48,
+      profile_name: "strict job profile"
+    };
+
+    global.fetch.mockImplementation((url) => {
+      if (typeof url === "string" && url.startsWith("/api/v1/jobs?")) {
+        return jsonResponse({ items: [job], total: 1 });
+      }
+      if (url === `/api/v1/jobs/${job.id}`) {
+        return jsonResponse(job);
+      }
+      if (url === "/api/v1/profiles") {
+        return jsonResponse(sampleProfiles());
+      }
+      return jsonResponse({ items: [] });
+    });
+
+    const { unmount } = render(App);
+
+    await openRecentTab();
+    expect(await screen.findByText("strict job profile")).toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Inspect" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("tab", { name: "Single Job" })).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByText("strict job profile")).toBeInTheDocument();
+    });
+
+    unmount();
+  });
+
   it("includes tags in single job payload when tag field is filled", async () => {
     const job = { id: "job_tagged", domain: "example.com", status: "pending" };
     let capturedBody = null;
@@ -853,6 +922,68 @@ describe("App", () => {
         net: {
           ipv4: true,
           ipv6: false
+        }
+      });
+    });
+
+    unmount();
+  });
+
+  it("submits a single job with a selected stored profile and inline override", async () => {
+    const job = {
+      id: "job_profiled_single",
+      domain: "example.com",
+      status: "queued",
+      created_at: "2026-02-03T00:00:00Z",
+      progress: 0
+    };
+
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (url === "/api/v1/profiles") {
+        return jsonResponse(sampleProfiles());
+      }
+      if (url === "/api/v1/jobs" && options.method === "POST") {
+        return jsonResponse(job);
+      }
+      if (url === `/api/v1/jobs/${job.id}`) {
+        return jsonResponse(job);
+      }
+      if (typeof url === "string" && url.startsWith("/api/v1/jobs?")) {
+        return jsonResponse({ items: [job] });
+      }
+      return jsonResponse({ items: [] });
+    });
+
+    const { unmount } = render(App);
+
+    await fireEvent.input(await screen.findByPlaceholderText("example.com"), {
+      target: { value: "example.com" }
+    });
+    await screen.findByRole("option", { name: "strict" });
+    await fireEvent.change(screen.getByLabelText("Stored profile"), {
+      target: { value: "12" }
+    });
+    await fireEvent.click(screen.getByText("Advanced profile"));
+    await fireEvent.change(screen.getByLabelText("IP transport"), {
+      target: { value: "disable_ipv4" }
+    });
+
+    await fireEvent.click(screen.getByText("Run Single Job"));
+
+    await waitFor(() => {
+      const postCall = global.fetch.mock.calls.find(
+        ([url, options]) => url === "/api/v1/jobs" && options?.method === "POST"
+      );
+      expect(postCall).toBeTruthy();
+      const body = JSON.parse(postCall[1].body);
+      expect(body).toEqual({
+        domain: "example.com",
+        profile_id: 12,
+        profile_overrides: {
+          net: {
+            ipv4: false,
+            ipv6: true
+          }
         }
       });
     });
@@ -1089,6 +1220,7 @@ describe("App", () => {
   it("includes tags in batch payload when tag field is filled", async () => {
     let capturedBody = null;
     global.fetch.mockImplementation((url, options = {}) => {
+      if (url === "/api/v1/profiles") return jsonResponse(sampleProfiles());
       if (url === "/api/v1/jobs/batch" && options.method === "POST") {
         capturedBody = JSON.parse(options.body || "{}");
         return jsonResponse({ batch_id: "batch_t" });
@@ -1113,9 +1245,46 @@ describe("App", () => {
     unmount();
   });
 
+  it("includes the selected stored profile in batch payload", async () => {
+    let capturedBody = null;
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (url === "/api/v1/profiles") return jsonResponse(sampleProfiles());
+      if (url === "/api/v1/jobs/batch" && options.method === "POST") {
+        capturedBody = JSON.parse(options.body || "{}");
+        return jsonResponse({ batch_id: "batch_profiled" });
+      }
+      if (typeof url === "string" && url.startsWith("/api/v1/batches/batch_profiled")) {
+        return jsonResponse({ batch_id: "batch_profiled", total: 0, status_counts: {}, items: [], created_at: "2026-03-24T00:00:00Z" });
+      }
+      if (typeof url === "string" && url.startsWith("/api/v1/jobs?")) return jsonResponse({ items: [] });
+      if (url.includes("/api/v1/tags")) return jsonResponse([]);
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+    await openBatchTab();
+
+    await fireEvent.input(await screen.findByLabelText("Domains (one per line)"), {
+      target: { value: "example.com" }
+    });
+    await fireEvent.change(screen.getByLabelText("Stored profile"), {
+      target: { value: "11" }
+    });
+    await fireEvent.click(screen.getByText("Run Batch"));
+
+    await waitFor(() => {
+      expect(capturedBody).toEqual({
+        domains: ["example.com"],
+        profile_id: 11
+      });
+    });
+    unmount();
+  });
+
   it("from-tag mode sends from_tag in batch payload", async () => {
     let capturedBody = null;
     global.fetch.mockImplementation((url, options = {}) => {
+      if (url === "/api/v1/profiles") return jsonResponse(sampleProfiles());
       if (url === "/api/v1/jobs/batch" && options.method === "POST") {
         capturedBody = JSON.parse(options.body || "{}");
         return jsonResponse({ batch_id: "batch_ft" });
@@ -3151,6 +3320,53 @@ describe("App", () => {
       unmount();
     });
 
+    it("lets the user save and clear a tag default profile", async () => {
+      const calls = [];
+      let tags = [{ name: "ops", description: "Operations", domain_count: 2, default_profile_id: null }];
+
+      global.fetch.mockImplementation((url, opts = {}) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        calls.push({ url: value, method: opts?.method, body: opts?.body });
+        if (value === "/api/v1/profiles") return jsonResponse(sampleProfiles());
+        if (value.includes("/summary")) return jsonResponse({ tag: "ops", domain_count: 2, ok: 0, notice: 0, warning: 0, error: 0, critical: 0 });
+        if (value.includes("/domains") && value.includes("/tags/")) return jsonResponse({ items: [], total: 0 });
+        if (value.includes("/api/v1/tags/ops/profile") && opts?.method === "PUT") {
+          tags = [{ ...tags[0], default_profile_id: 12 }];
+          return emptyResponse();
+        }
+        if (value.includes("/api/v1/tags/ops/profile") && opts?.method === "DELETE") {
+          tags = [{ ...tags[0], default_profile_id: null }];
+          return emptyResponse();
+        }
+        if (value.includes("/api/v1/tags")) return jsonResponse(tags);
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openTagsTab();
+      await fireEvent.click(await screen.findByText("ops"));
+
+      const profileSelect = await screen.findByLabelText("Profile for this tag");
+      await fireEvent.change(profileSelect, { target: { value: "12" } });
+      await fireEvent.click(screen.getByRole("button", { name: "Save default" }));
+
+      await waitFor(() => {
+        const putCall = calls.find((call) => call.url.includes("/api/v1/tags/ops/profile") && call.method === "PUT");
+        expect(putCall).toBeTruthy();
+        expect(JSON.parse(putCall.body)).toEqual({ profile_id: 12 });
+        expect(screen.getByText("Current default: strict")).toBeInTheDocument();
+      });
+
+      await fireEvent.click(screen.getByRole("button", { name: "Clear default" }));
+
+      await waitFor(() => {
+        expect(calls.some((call) => call.url.includes("/api/v1/tags/ops/profile") && call.method === "DELETE")).toBe(true);
+        expect(screen.getByText("Current default: none")).toBeInTheDocument();
+      });
+
+      unmount();
+    });
+
     it("Run all button POSTs batch with from_tag", async () => {
       const calls = [];
       global.fetch.mockImplementation((url, opts) => {
@@ -3277,6 +3493,49 @@ describe("App", () => {
         expect(screen.getByText("4500 ms")).toBeInTheDocument();
         expect(screen.getByText("27")).toBeInTheDocument();
         expect(screen.getByText("ERROR")).toBeInTheDocument();
+      });
+      unmount();
+    });
+
+    it("shows the effective profile as a collapsible JSON block for completed runs", async () => {
+      const job = { id: "run-effective-profile", domain: "effective.example", status: "succeeded", created_at: "2026-01-01T00:00:00Z", progress: 100 };
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value.includes(`/api/v1/jobs/${job.id}/result`)) {
+          return jsonResponse({ job_id: job.id, status: "succeeded", summary: {}, raw: { entries: [] } });
+        }
+        if (value.includes(`/api/v1/jobs/${job.id}`)) {
+          return jsonResponse(job);
+        }
+        if (value.includes(`/api/v1/runs/${job.id}`)) {
+          return jsonResponse({
+            id: job.id,
+            domain: "effective.example",
+            status: "succeeded",
+            duration_ms: 2100,
+            entry_count: 6,
+            worst_level: "WARNING",
+            effective_profile: JSON.stringify({
+              net: { ipv6: false },
+              resolver: { defaults: { timeout: 5 } }
+            })
+          });
+        }
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+
+      const jobIdInput = await screen.findByPlaceholderText("job_123");
+      await fireEvent.input(jobIdInput, { target: { value: job.id } });
+      await fireEvent.change(jobIdInput);
+
+      const summary = await screen.findByText("Effective profile");
+      await fireEvent.click(summary);
+
+      await waitFor(() => {
+        expect(screen.getByText(/"ipv6": false/)).toBeInTheDocument();
+        expect(screen.getByText(/"timeout": 5/)).toBeInTheDocument();
       });
       unmount();
     });

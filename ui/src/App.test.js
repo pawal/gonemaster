@@ -1281,6 +1281,94 @@ describe("App", () => {
     unmount();
   });
 
+  it("refreshes admin profile selectors after creating a non-public profile in settings", async () => {
+    let profiles = [
+      {
+        id: 12,
+        name: "strict",
+        description: "Strict DNS profile",
+        config: { resolver: { defaults: { timeout: 5 } } },
+        public: true,
+        created_at: "2026-04-01T11:00:00Z",
+        updated_at: "2026-04-03T09:30:00Z"
+      }
+    ];
+    let tags = [{ name: "ops", description: "Operations", domain_count: 1, default_profile_id: null }];
+
+    global.fetch.mockImplementation((url, options = {}) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      if (typeof value === "string" && value.startsWith("/api/v1/jobs?")) {
+        return jsonResponse({ items: [], total: 0 });
+      }
+      if (value === "/api/v1/profiles/default") {
+        return jsonResponse({
+          id: 0,
+          name: "default",
+          description: "Server base profile",
+          config: { net: { ipv4: true, ipv6: true } },
+          public: false,
+          created_at: "0001-01-01T00:00:00Z",
+          updated_at: "0001-01-01T00:00:00Z"
+        });
+      }
+      if (value === "/api/v1/profiles" && (!options.method || options.method === "GET")) {
+        return jsonResponse(profiles);
+      }
+      if (value === "/api/v1/profiles" && options.method === "POST") {
+        const body = JSON.parse(options.body || "{}");
+        const created = {
+          id: 13,
+          ...body,
+          created_at: "2026-04-05T10:00:00Z",
+          updated_at: "2026-04-05T10:00:00Z"
+        };
+        profiles = [...profiles, created];
+        return jsonResponse(created);
+      }
+      if (value.includes("/api/v1/tags/ops/summary")) {
+        return jsonResponse({ tag: "ops", domain_count: 1, ok: 0, notice: 0, warning: 0, error: 0, critical: 0 });
+      }
+      if (value.includes("/api/v1/tags/ops/domains")) {
+        return jsonResponse({ items: [], total: 0 });
+      }
+      if (value === "/api/v1/tags?limit=500" || value === "/api/v1/tags") {
+        return jsonResponse(tags);
+      }
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+
+    await openSettingsTab();
+    await fireEvent.click(await screen.findByRole("button", { name: "New profile" }));
+    await fireEvent.input(screen.getByLabelText("Name"), { target: { value: "internal-only" } });
+    await fireEvent.input(screen.getByLabelText("Description"), { target: { value: "Admin profile" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("Profile created.")).toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole("tab", { name: "Single Job" }));
+    const singleSelect = await screen.findByLabelText("Stored profile");
+    await waitFor(() => {
+      expect(within(singleSelect).getByRole("option", { name: "internal-only" })).toBeInTheDocument();
+    });
+
+    await openBatchTab();
+    const batchSelect = await screen.findByLabelText("Stored profile");
+    await waitFor(() => {
+      expect(within(batchSelect).getByRole("option", { name: "internal-only" })).toBeInTheDocument();
+    });
+
+    await fireEvent.click(screen.getByRole("tab", { name: "Tags" }));
+    await fireEvent.click(await screen.findByText("ops"));
+    const tagSelect = await screen.findByLabelText("Profile for this tag");
+    await waitFor(() => {
+      expect(within(tagSelect).getByRole("option", { name: "internal-only" })).toBeInTheDocument();
+    });
+
+    unmount();
+  });
+
   it("from-tag mode sends from_tag in batch payload", async () => {
     let capturedBody = null;
     global.fetch.mockImplementation((url, options = {}) => {

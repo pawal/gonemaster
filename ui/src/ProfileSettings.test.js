@@ -77,21 +77,24 @@ describe("ProfileSettings", () => {
     { name: "prod", default_profile_id: 2 }
   ]);
 
-  const installProfileFetch = () => {
+  const installProfileFetch = (scenario = {}) => {
     let profiles = sampleProfiles();
     const tags = sampleTags();
     const createdBodies = [];
     const updatedBodies = [];
 
-    global.fetch.mockImplementation((url, options = {}) => {
+    global.fetch.mockImplementation((url, requestOptions = {}) => {
       const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
-      const method = options.method || "GET";
+      const method = requestOptions.method || "GET";
 
       if (value === "/api/v1/profiles/default") return jsonResponse(sampleDefaultProfile());
       if (value === "/api/v1/profiles" && method === "GET") return jsonResponse(profiles);
       if (value === "/api/v1/profiles" && method === "POST") {
-        const body = JSON.parse(options.body);
+        const body = JSON.parse(requestOptions.body);
         createdBodies.push(body);
+        if (scenario.createError) {
+          return jsonResponse({ error: { message: scenario.createError } }, false);
+        }
         const created = {
           id: 3,
           ...body,
@@ -102,8 +105,11 @@ describe("ProfileSettings", () => {
         return jsonResponse(created);
       }
       if (value === "/api/v1/profiles/2" && method === "PUT") {
-        const body = JSON.parse(options.body);
+        const body = JSON.parse(requestOptions.body);
         updatedBodies.push(body);
+        if (scenario.updateError) {
+          return jsonResponse({ error: { message: scenario.updateError } }, false);
+        }
         const updated = {
           id: 2,
           ...body,
@@ -184,6 +190,19 @@ describe("ProfileSettings", () => {
     });
     expect(await screen.findByText("Profile saved.")).toBeInTheDocument();
     expect(state.getProfiles().find((profile) => profile.id === 2)?.description).toBe("Updated strict resolver profile");
+  });
+
+  it("shows the server error message when saving fails", async () => {
+    installProfileFetch({ createError: "profile name already exists" });
+
+    render(ProfileSettings);
+
+    await findLibraryRow("default");
+    await fireEvent.click(screen.getByRole("button", { name: "New profile" }));
+    await fireEvent.input(screen.getByLabelText("Name"), { target: { value: "gamma" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("Failed to save profile: profile name already exists")).toBeInTheDocument();
   });
 
   it("creates a new profile from default and allows deleting it afterwards", async () => {

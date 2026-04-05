@@ -1,8 +1,9 @@
 <script>
-  import { onMount } from "svelte";
+  import { createEventDispatcher, onMount } from "svelte";
   import { t } from "./i18n.js";
 
   export let apiBase = "/api/v1";
+  const dispatch = createEventDispatcher();
 
   const defaultProfileKey = "__default__";
 
@@ -311,6 +312,7 @@
         "ok"
       );
       await loadProfiles({ selectKey: `profile:${saved.id}`, preserveNotice: true });
+      dispatch("profileschanged", { profiles: storedProfiles });
     } catch (error) {
       setNotice($t("profile_save_error", { error: error.message || "unknown error" }), "warn");
     } finally {
@@ -331,6 +333,7 @@
       }
       setNotice($t("profile_deleted"), "ok");
       await loadProfiles({ selectKey: defaultProfileKey, preserveNotice: true });
+      dispatch("profileschanged", { profiles: storedProfiles });
     } catch (error) {
       setNotice($t("profile_delete_error", { error: error.message || "unknown error" }), "warn");
     } finally {
@@ -567,8 +570,8 @@
         </div>
 
         <label class="checkbox-row" for="profile-editor-public">
-          <input id="profile-editor-public" type="checkbox" bind:checked={draft.public} />
           <span>{$t("profile_editor_public_label")}</span>
+          <input id="profile-editor-public" type="checkbox" bind:checked={draft.public} />
         </label>
         <div class="small">{$t("profile_editor_public_hint")}</div>
 
@@ -797,8 +800,17 @@
   .checkbox-row {
     display: flex;
     align-items: center;
+    justify-content: flex-start;
     gap: 10px;
     font-weight: 600;
+    width: fit-content;
+    cursor: pointer;
+  }
+
+  .checkbox-row input {
+    width: auto;
+    margin: 0;
+    flex: 0 0 auto;
   }
 
   .profile-config-textarea {

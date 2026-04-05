@@ -1028,7 +1028,7 @@
     if (changed && statusMessage) {
       clearStatus();
     }
-    if ((next === "single" || next === "tags" || next === "batches") && !profilesLoaded) {
+    if (next === "single" || next === "tags" || next === "batches") {
       loadProfiles();
     }
     if (next === "recent") {
@@ -1618,6 +1618,16 @@
     } finally {
       profilesLoading = false;
     }
+  };
+
+  const handleProfilesChanged = async (event) => {
+    const nextProfiles = event?.detail?.profiles;
+    if (Array.isArray(nextProfiles)) {
+      availableProfiles = nextProfiles;
+      profilesLoaded = true;
+      return;
+    }
+    await loadProfiles();
   };
 
   const loadDomainRuns = async (options = {}) => {
@@ -3620,7 +3630,7 @@ example.org`}
   {:else if activeTab === "settings"}
     <div class="grid" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" style="margin-top: 22px;">
       <div class="card reveal" style="--d: 0.34s; grid-column: 1 / -1;">
-        <ProfileSettings />
+        <ProfileSettings on:profileschanged={handleProfilesChanged} />
       </div>
       <div class="card reveal" style="--d: 0.4s;">
         <h2>{$t("settings_server_heading")}</h2>

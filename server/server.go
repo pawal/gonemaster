@@ -175,6 +175,7 @@ func (s *Server) routes() {
 
 	pubMux := http.NewServeMux()
 	pubMux.HandleFunc("POST /jobs", s.handlePublicCreateJob)
+	pubMux.HandleFunc("GET /profiles", s.handlePublicProfiles)
 	pubMux.HandleFunc("GET /jobs/{publicID}/result", s.handlePublicGetResult)
 	pubMux.HandleFunc("GET /jobs/{publicID}", s.handlePublicGetJob)
 	pubMux.HandleFunc("GET /locales", s.handleLocales)

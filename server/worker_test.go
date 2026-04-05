@@ -9,6 +9,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
+	"codeberg.org/pawal/gonemaster/engine/profile"
 )
 
 type spyJobStore struct {
@@ -301,11 +302,11 @@ func TestRunEngineForJobParallel(t *testing.T) {
 
 	errs := make(chan error, 2)
 	go func() {
-		_, _, err := srv.runEngineForJob(job1, context.Background())
+		_, _, _, err := srv.runEngineForJob(job1, context.Background())
 		errs <- err
 	}()
 	go func() {
-		_, _, err := srv.runEngineForJob(job2, context.Background())
+		_, _, _, err := srv.runEngineForJob(job2, context.Background())
 		errs <- err
 	}()
 
@@ -343,11 +344,11 @@ func TestRunEngineForJobLimiter(t *testing.T) {
 
 	errs := make(chan error, 2)
 	go func() {
-		_, _, err := srv.runEngineForJob(job1, context.Background())
+		_, _, _, err := srv.runEngineForJob(job1, context.Background())
 		errs <- err
 	}()
 	go func() {
-		_, _, err := srv.runEngineForJob(job2, context.Background())
+		_, _, _, err := srv.runEngineForJob(job2, context.Background())
 		errs <- err
 	}()
 
@@ -394,7 +395,7 @@ func TestRunEngineForJobPassesUndelegatedInputs(t *testing.T) {
 		},
 	}
 
-	_, _, err := srv.runEngineForJob(job, context.Background())
+	_, _, _, err := srv.runEngineForJob(job, context.Background())
 	if err != nil {
 		t.Fatalf("runEngineForJob: %v", err)
 	}
@@ -436,7 +437,7 @@ func TestRunEngineForJobPassesSourceAddrOverrides(t *testing.T) {
 		CreatedAt: time.Now().UTC(),
 	}
 
-	_, _, err := srv.runEngineForJob(job, context.Background())
+	_, _, _, err := srv.runEngineForJob(job, context.Background())
 	if err != nil {
 		t.Fatalf("runEngineForJob: %v", err)
 	}
@@ -487,7 +488,7 @@ func TestRunEngineForJobPassesCacheStore(t *testing.T) {
 		CreatedAt: time.Now().UTC(),
 	}
 
-	_, stats, err := srv.runEngineForJob(job, context.Background())
+	_, stats, _, err := srv.runEngineForJob(job, context.Background())
 	if err != nil {
 		t.Fatalf("runEngineForJob: %v", err)
 	}
@@ -498,5 +499,70 @@ func TestRunEngineForJobPassesCacheStore(t *testing.T) {
 	if stats.cacheHits != 0 || stats.cacheMisses != 0 || stats.cacheEvictions != 0 {
 		t.Fatalf("expected zero cache stats from stub engine, got hits=%d misses=%d evictions=%d",
 			stats.cacheHits, stats.cacheMisses, stats.cacheEvictions)
+	}
+}
+
+func TestRunJobSnapshotsEffectiveProfile(t *testing.T) {
+	srv := New(DefaultConfig())
+	spy := newSpyJobStore()
+	srv.store = spy
+
+	stored, err := srv.store.CreateProfile(StoredProfile{
+		Name:   "strict",
+		Config: `{"net":{"ipv4":false},"resolver":{"defaults":{"timeout":5}}}`,
+	})
+	if err != nil {
+		t.Fatalf("CreateProfile: %v", err)
+	}
+	srv.engineRunner = func(_ engine.RunRequest) ([]engine.LogEntry, error) {
+		return nil, nil
+	}
+
+	job := Job{
+		ID:        "job-effective-profile",
+		Domain:    "example.com",
+		Status:    JobQueued,
+		CreatedAt: time.Now().UTC(),
+		ProfileID: &stored.ID,
+		Overrides: map[string]any{
+			"resolver": map[string]any{
+				"defaults": map[string]any{
+					"timeout": 7,
+				},
+			},
+		},
+	}
+	if _, err := srv.store.Create(job); err != nil {
+		t.Fatalf("create job: %v", err)
+	}
+
+	if err := srv.runJob(job.ID); err != nil {
+		t.Fatalf("run job: %v", err)
+	}
+
+	run, ok := srv.store.GetRun(job.ID)
+	if !ok {
+		t.Fatal("expected run")
+	}
+	if run.EffectiveProfile == "" {
+		t.Fatal("expected effective_profile snapshot")
+	}
+	effective, err := profile.FromJSON(run.EffectiveProfile)
+	if err != nil {
+		t.Fatalf("parse effective profile: %v", err)
+	}
+	ipv4, err := effective.Get("net.ipv4")
+	if err != nil {
+		t.Fatalf("get net.ipv4: %v", err)
+	}
+	if value, ok := ipv4.(bool); !ok || value != false {
+		t.Fatalf("expected net.ipv4 false, got %v", ipv4)
+	}
+	timeout, err := effective.Get("resolver.defaults.timeout")
+	if err != nil {
+		t.Fatalf("get timeout: %v", err)
+	}
+	if value, ok := timeout.(int); !ok || value != 7 {
+		t.Fatalf("expected timeout 7, got %v", timeout)
 	}
 }

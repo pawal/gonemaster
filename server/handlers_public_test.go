@@ -146,6 +146,33 @@ func TestPublicCreateJobRejectsProfileOverrides(t *testing.T) {
 	}
 }
 
+func TestPublicProfilesReturnsOnlyPublicProfilesWithoutConfig(t *testing.T) {
+	srv := New(DefaultConfig())
+	createProfile(t, srv, `{"name":"public-profile","description":"Shown","config":{"net":{"ipv4":true}},"public":true}`)
+	createProfile(t, srv, `{"name":"private-profile","description":"Hidden","config":{"net":{"ipv6":false}},"public":false}`)
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/profiles", nil)
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
+	}
+	var views []map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&views); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(views) != 1 {
+		t.Fatalf("expected 1 public profile, got %d", len(views))
+	}
+	if views[0]["name"] != "public-profile" {
+		t.Fatalf("expected public-profile, got %#v", views[0])
+	}
+	if _, ok := views[0]["config"]; ok {
+		t.Fatalf("public profile payload must not expose config: %#v", views[0])
+	}
+}
+
 func TestPublicGetJobReturnsPublicIDNotUUID(t *testing.T) {
 	srv := New(DefaultConfig())
 

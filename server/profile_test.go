@@ -34,7 +34,7 @@ func TestApplyProfileOverridesWithBase(t *testing.T) {
 	}
 
 	req := engine.RunRequest{Domain: "example.com"}
-	cleanup, err := applyProfileOverrides(&req, overrides, baseFile.Name())
+	cleanup, err := applyProfileOverrides(&req, nil, nil, overrides, baseFile.Name())
 	if err != nil {
 		t.Fatalf("apply overrides: %v", err)
 	}
@@ -88,7 +88,7 @@ func TestApplyProfileOverridesBaseOnly(t *testing.T) {
 	defer os.Remove(baseFile.Name())
 
 	req := engine.RunRequest{Domain: "example.com"}
-	cleanup, err := applyProfileOverrides(&req, nil, baseFile.Name())
+	cleanup, err := applyProfileOverrides(&req, nil, nil, nil, baseFile.Name())
 	if err != nil {
 		t.Fatalf("apply overrides: %v", err)
 	}
@@ -97,5 +97,57 @@ func TestApplyProfileOverridesBaseOnly(t *testing.T) {
 	}
 	if req.Profile != baseFile.Name() {
 		t.Fatalf("expected profile path to be base file")
+	}
+}
+
+func TestApplyProfileOverridesWithStoredProfileAndOverrides(t *testing.T) {
+	store := NewInMemoryJobStore()
+	stored, err := store.CreateProfile(StoredProfile{
+		Name:   "strict",
+		Config: `{"net":{"ipv4":false},"resolver":{"defaults":{"timeout":5}}}`,
+	})
+	if err != nil {
+		t.Fatalf("CreateProfile: %v", err)
+	}
+
+	overrides := map[string]any{
+		"resolver": map[string]any{
+			"defaults": map[string]any{
+				"timeout": 7,
+			},
+		},
+	}
+
+	req := engine.RunRequest{Domain: "example.com"}
+	cleanup, err := applyProfileOverrides(&req, store, &stored.ID, overrides, "")
+	if err != nil {
+		t.Fatalf("apply overrides: %v", err)
+	}
+	if cleanup == nil {
+		t.Fatal("expected cleanup function")
+	}
+	defer cleanup()
+
+	payload, err := os.ReadFile(req.Profile)
+	if err != nil {
+		t.Fatalf("read profile: %v", err)
+	}
+	merged, err := profile.FromYAML(string(payload))
+	if err != nil {
+		t.Fatalf("parse merged: %v", err)
+	}
+	ipv4, err := merged.Get("net.ipv4")
+	if err != nil {
+		t.Fatalf("get net.ipv4: %v", err)
+	}
+	if value, ok := ipv4.(bool); !ok || value != false {
+		t.Fatalf("expected net.ipv4 false, got %v", ipv4)
+	}
+	timeout, err := merged.Get("resolver.defaults.timeout")
+	if err != nil {
+		t.Fatalf("get resolver.defaults.timeout: %v", err)
+	}
+	if value, ok := timeout.(int); !ok || value != 7 {
+		t.Fatalf("expected timeout 7, got %v", timeout)
 	}
 }

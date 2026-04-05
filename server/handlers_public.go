@@ -19,6 +19,12 @@ type PublicJobView struct {
 	FinishedAt *time.Time `json:"finished_at,omitempty"`
 }
 
+type PublicProfileView struct {
+	ID          int64  `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
 func publicJobView(job Job) PublicJobView {
 	view := PublicJobView{
 		PublicID: job.PublicID,
@@ -32,6 +38,14 @@ func publicJobView(job Job) PublicJobView {
 	return view
 }
 
+func publicProfileView(profile StoredProfile) PublicProfileView {
+	return PublicProfileView{
+		ID:          profile.ID,
+		Name:        profile.Name,
+		Description: profile.Description,
+	}
+}
+
 // handlePublicVersion handles GET /pub/api/v1/version.
 func (s *Server) handlePublicVersion(w http.ResponseWriter, r *http.Request) {
 	resp := map[string]string{"gonemaster": engine.VersionFull()}
@@ -39,6 +53,20 @@ func (s *Server) handlePublicVersion(w http.ResponseWriter, r *http.Request) {
 		resp["dns"] = dns
 	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// handlePublicProfiles handles GET /pub/api/v1/profiles.
+// Only public profiles are returned, without exposing config.
+func (s *Server) handlePublicProfiles(w http.ResponseWriter, r *http.Request) {
+	storedProfiles := s.store.ListProfiles()
+	views := make([]PublicProfileView, 0, len(storedProfiles))
+	for _, stored := range storedProfiles {
+		if !stored.Public {
+			continue
+		}
+		views = append(views, publicProfileView(stored))
+	}
+	writeJSON(w, http.StatusOK, views)
 }
 
 // handlePublicCreateJob handles POST /pub/api/v1/jobs.

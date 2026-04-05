@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"math"
 	"net/netip"
@@ -126,7 +127,7 @@ func (s *Server) runJob(jobID string) error {
 	s.initProgressWriteState(job.ID, 0, now)
 	defer s.clearProgressWriteState(job.ID)
 
-	entries, qStats, runErr := s.runEngineForJob(job, jobCtx)
+	entries, qStats, effectiveProfile, runErr := s.runEngineForJob(job, jobCtx)
 	s.metrics.ObserveDNSQueries(qStats.ipv4, qStats.ipv6)
 	s.metrics.ObserveCacheMetrics(qStats.cacheHits, qStats.cacheMisses, qStats.cacheEvictions)
 	finishedAt := time.Now().UTC()
@@ -143,6 +144,7 @@ func (s *Server) runJob(jobID string) error {
 
 	job.Progress = 100
 	job.FinishedAt = finishedAt
+	job.EffectiveProfile = effectiveProfile
 
 	// Get previous status for metrics before graduation removes the job.
 	previous, prevOK := s.store.Get(job.ID)
@@ -170,17 +172,17 @@ func (s *Server) runJob(jobID string) error {
 }
 
 type jobQueryStats struct {
-	ipv4       int64
-	ipv6       int64
-	cacheHits  int64
-	cacheMisses int64
+	ipv4           int64
+	ipv6           int64
+	cacheHits      int64
+	cacheMisses    int64
 	cacheEvictions int64
 }
 
-func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntry, jobQueryStats, error) {
+func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntry, jobQueryStats, string, error) {
 	if s.engineLimiter != nil {
 		if err := s.engineLimiter.Acquire(ctx); err != nil {
-			return nil, jobQueryStats{}, err
+			return nil, jobQueryStats{}, "", err
 		}
 		defer s.engineLimiter.Release()
 	}
@@ -227,12 +229,20 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 	callbacks := []func(*logger.Entry) error{
 		queryCounter.Callback,
 	}
-	cleanup, err := applyProfileOverrides(&req, job.Overrides, s.cfg.ProfilePath)
+	cleanup, err := applyProfileOverrides(&req, s.store, job.ProfileID, job.Overrides, s.cfg.ProfilePath)
 	if err != nil {
-		return nil, jobQueryStats{}, err
+		return nil, jobQueryStats{}, "", err
 	}
 	if cleanup != nil {
 		defer cleanup()
+	}
+	effectiveProfile, err := engine.EffectiveProfile(req)
+	if err != nil {
+		return nil, jobQueryStats{}, "", err
+	}
+	effectiveProfileJSON, err := effectiveProfile.ToJSON()
+	if err != nil {
+		return nil, jobQueryStats{}, "", err
 	}
 
 	if len(job.Tests) == 0 {
@@ -257,11 +267,11 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 	if len(job.Tests) == 1 {
 		req.Testcase = job.Tests[0]
 		entries, err := s.runEngine(req)
-		return entries, collectStats(), err
+		return entries, collectStats(), effectiveProfileJSON, err
 	}
 	if len(job.Tests) == 0 {
 		entries, err := s.runEngine(req)
-		return entries, collectStats(), err
+		return entries, collectStats(), effectiveProfileJSON, err
 	}
 
 	var all []engine.LogEntry
@@ -276,11 +286,11 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 			s.updateJobProgress(job.ID, progress)
 		}
 		if err != nil {
-			return all, collectStats(), err
+			return all, collectStats(), effectiveProfileJSON, err
 		}
 		all = append(all, entries...)
 	}
-	return all, collectStats(), nil
+	return all, collectStats(), effectiveProfileJSON, nil
 }
 
 func (s *Server) runEngine(req engine.RunRequest) ([]engine.LogEntry, error) {
@@ -401,16 +411,15 @@ func chainLogCallbacks(callbacks ...func(*logger.Entry) error) func(*logger.Entr
 	}
 }
 
-func applyProfileOverrides(req *engine.RunRequest, overrides map[string]any, baseProfile string) (func(), error) {
-	if req == nil || len(overrides) == 0 {
-		if req != nil && baseProfile != "" {
+func applyProfileOverrides(req *engine.RunRequest, store JobStore, profileID *int64, overrides map[string]any, baseProfile string) (func(), error) {
+	if req == nil {
+		return nil, nil
+	}
+	if profileID == nil && len(overrides) == 0 {
+		if baseProfile != "" {
 			req.Profile = baseProfile
 		}
 		return nil, nil
-	}
-	payload, err := json.Marshal(overrides)
-	if err != nil {
-		return nil, err
 	}
 	base := profile.New()
 	if baseProfile != "" {
@@ -423,12 +432,34 @@ func applyProfileOverrides(req *engine.RunRequest, overrides map[string]any, bas
 			return nil, err
 		}
 	}
-	overrideProfile, err := profile.FromJSON(string(payload))
-	if err != nil {
-		return nil, err
+	if profileID != nil {
+		if store == nil {
+			return nil, fmt.Errorf("profile %d not found", *profileID)
+		}
+		stored, ok := store.GetProfile(*profileID)
+		if !ok {
+			return nil, fmt.Errorf("profile %d not found", *profileID)
+		}
+		storedProfile, err := profile.FromJSON(stored.Config)
+		if err != nil {
+			return nil, err
+		}
+		if err := base.Merge(storedProfile); err != nil {
+			return nil, err
+		}
 	}
-	if err := base.Merge(overrideProfile); err != nil {
-		return nil, err
+	if len(overrides) > 0 {
+		payload, err := json.Marshal(overrides)
+		if err != nil {
+			return nil, err
+		}
+		overrideProfile, err := profile.FromJSON(string(payload))
+		if err != nil {
+			return nil, err
+		}
+		if err := base.Merge(overrideProfile); err != nil {
+			return nil, err
+		}
 	}
 	merged, err := base.ToJSON()
 	if err != nil {

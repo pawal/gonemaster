@@ -161,6 +161,7 @@ func (s *Server) routes() {
 	apiMux.HandleFunc("/tags/{name}/domains", s.handleTagDomains)
 	apiMux.HandleFunc("/tags/{name}", s.handleTagByName)
 	apiMux.HandleFunc("/tags", s.handleTags)
+	apiMux.HandleFunc("GET /profiles/default", s.handleDefaultProfile)
 	apiMux.HandleFunc("/profiles/{id}", s.handleProfileByID)
 	apiMux.HandleFunc("/profiles", s.handleProfiles)
 

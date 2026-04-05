@@ -232,6 +232,7 @@ func TestOpenAPIProfileSchemaIncludesStoredProfileFields(t *testing.T) {
 
 	requiredSnippets := []string{
 		"/profiles:",
+		"/profiles/default:",
 		"/profiles/{id}:",
 		"/tags/{name}/profile:",
 		"Profile:",

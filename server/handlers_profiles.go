@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
@@ -25,6 +26,19 @@ type tagProfileRequest struct {
 type resolvedProfileRef struct {
 	ID   *int64
 	Name string
+}
+
+func (s *Server) handleDefaultProfile(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
+		return
+	}
+	apiProfile, err := s.defaultAPIProfile()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
+		return
+	}
+	writeJSON(w, http.StatusOK, apiProfile)
 }
 
 func (s *Server) handleProfiles(w http.ResponseWriter, r *http.Request) {
@@ -76,6 +90,45 @@ func parseProfileID(w http.ResponseWriter, r *http.Request) (int64, bool) {
 		return 0, false
 	}
 	return id, true
+}
+
+func (s *Server) defaultAPIProfile() (Profile, error) {
+	base, err := engineprofile.Default()
+	if err != nil {
+		return Profile{}, err
+	}
+	if strings.TrimSpace(s.cfg.ProfilePath) != "" {
+		data, err := os.ReadFile(s.cfg.ProfilePath)
+		if err != nil {
+			return Profile{}, err
+		}
+		override, err := engineprofile.FromYAML(string(data))
+		if err != nil {
+			return Profile{}, err
+		}
+		if err := base.Merge(override); err != nil {
+			return Profile{}, err
+		}
+	}
+	configJSON, err := base.ToJSON()
+	if err != nil {
+		return Profile{}, err
+	}
+	var config map[string]any
+	if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
+		return Profile{}, err
+	}
+	description := "Server base profile"
+	if strings.TrimSpace(s.cfg.ProfilePath) != "" {
+		description = "Server base profile with config-file overrides"
+	}
+	return Profile{
+		ID:          0,
+		Name:        "default",
+		Description: description,
+		Config:      config,
+		Public:      false,
+	}, nil
 }
 
 func (s *Server) handleCreateProfile(w http.ResponseWriter, r *http.Request) {

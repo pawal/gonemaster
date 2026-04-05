@@ -722,6 +722,21 @@ paths:
         '409':
           $ref: '#/components/responses/ErrorResponse'
 
+  /profiles/default:
+    get:
+      tags: [Profiles]
+      summary: Get the server default profile
+      operationId: getDefaultProfile
+      responses:
+        '200':
+          description: The server base profile after config-file overrides are applied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
   /profiles/{id}:
     get:
       tags: [Profiles]

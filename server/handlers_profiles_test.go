@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 )
 
@@ -103,6 +104,68 @@ func TestListProfiles(t *testing.T) {
 	}
 	if profiles[0].Name != "alpha" || profiles[1].Name != "beta" {
 		t.Fatalf("unexpected order: %#v", profiles)
+	}
+}
+
+func TestGetDefaultProfile(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/profiles/default", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
+	}
+	var profile Profile
+	if err := json.NewDecoder(resp.Body).Decode(&profile); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if profile.ID != 0 {
+		t.Fatalf("ID: got %d, want 0", profile.ID)
+	}
+	if profile.Name != "default" {
+		t.Fatalf("Name: got %q", profile.Name)
+	}
+	netCfg, ok := profile.Config["net"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected net config, got %#v", profile.Config)
+	}
+	if _, ok := netCfg["ipv4"]; !ok {
+		t.Fatalf("expected ipv4 in net config, got %#v", netCfg)
+	}
+}
+
+func TestGetDefaultProfileAppliesConfigFileOverride(t *testing.T) {
+	cfg := DefaultConfig()
+	f, err := os.CreateTemp(t.TempDir(), "profile-override-*.json")
+	if err != nil {
+		t.Fatalf("CreateTemp: %v", err)
+	}
+	if _, err := f.WriteString(`{"net":{"ipv6":false}}`); err != nil {
+		t.Fatalf("WriteString: %v", err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	cfg.ProfilePath = f.Name()
+	srv := New(cfg)
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/profiles/default", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
+	}
+	var profile Profile
+	if err := json.NewDecoder(resp.Body).Decode(&profile); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	netCfg, ok := profile.Config["net"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected net config, got %#v", profile.Config)
+	}
+	if got := netCfg["ipv6"]; got != false {
+		t.Fatalf("expected ipv6=false from override, got %#v", got)
 	}
 }
 

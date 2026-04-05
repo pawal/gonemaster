@@ -12,6 +12,16 @@ const jsonResponse = (data, ok = true) => ({
   text: async () => JSON.stringify(data)
 });
 
+const emptyResponse = () => ({
+  ok: true,
+  statusText: "No Content",
+  headers: {
+    get: () => ""
+  },
+  json: async () => ({}),
+  text: async () => ""
+});
+
 describe("ProfileSettings", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -27,6 +37,19 @@ describe("ProfileSettings", () => {
     const rows = await screen.findAllByRole("listitem");
     return rows.find((row) => within(row).queryByText(name));
   };
+
+  const sampleDefaultProfile = () => ({
+    id: 0,
+    name: "default",
+    description: "Server base profile",
+    config: {
+      net: { ipv4: true, ipv6: false },
+      resolver: { defaults: { timeout: 7 } }
+    },
+    public: false,
+    created_at: "0001-01-01T00:00:00Z",
+    updated_at: "0001-01-01T00:00:00Z"
+  });
 
   const sampleProfiles = () => ([
     {
@@ -54,83 +77,148 @@ describe("ProfileSettings", () => {
     { name: "prod", default_profile_id: 2 }
   ]);
 
-  it("loads profile rows and filters by public and in-use state", async () => {
-    global.fetch.mockImplementation((url) => {
-      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
-      if (value.includes("/api/v1/profiles")) return jsonResponse(sampleProfiles());
-      if (value.includes("/api/v1/tags?limit=500")) return jsonResponse(sampleTags());
-      return jsonResponse({});
-    });
-
-    render(ProfileSettings);
-
-    const alphaRow = await findLibraryRow("alpha");
-    const betaRow = await findLibraryRow("beta");
-    expect(alphaRow).toBeTruthy();
-    expect(betaRow).toBeTruthy();
-    expect(screen.getByText("In use · 2")).toBeInTheDocument();
-    expect(within(alphaRow).getByText("Public")).toBeInTheDocument();
-
-    await fireEvent.change(screen.getByLabelText("Filter"), { target: { value: "in_use" } });
-    await waitFor(() => {
-      expect(screen.queryByRole("button", { name: /alpha/i })).not.toBeInTheDocument();
-    });
-    expect(screen.getByRole("button", { name: /beta/i })).toBeInTheDocument();
-
-    await fireEvent.change(screen.getByLabelText("Filter"), { target: { value: "public" } });
-    expect(screen.getByRole("button", { name: /alpha/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /beta/i })).not.toBeInTheDocument();
-  });
-
-  it("opens duplicate and new draft previews from the library entry points", async () => {
-    global.fetch.mockImplementation((url) => {
-      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
-      if (value.includes("/api/v1/profiles")) return jsonResponse(sampleProfiles());
-      if (value.includes("/api/v1/tags?limit=500")) return jsonResponse(sampleTags());
-      return jsonResponse({});
-    });
-
-    render(ProfileSettings);
-
-    const alphaListItem = await findLibraryRow("alpha");
-    await fireEvent.click(within(alphaListItem).getByRole("button", { name: "Duplicate" }));
-
-    expect(screen.getByRole("heading", { name: "Duplicate draft" })).toBeInTheDocument();
-    expect(screen.getByText("alpha copy")).toBeInTheDocument();
-    expect(screen.getByText("Duplicated from alpha")).toBeInTheDocument();
-    expect(screen.getByText(/"ipv4": true/)).toBeInTheDocument();
-
-    await fireEvent.click(screen.getByRole("button", { name: "New profile" }));
-    expect(screen.getByRole("heading", { name: "New profile draft" })).toBeInTheDocument();
-    expect(screen.getByText("New unsaved profile")).toBeInTheDocument();
-    expect(screen.getByText("{}")).toBeInTheDocument();
-  });
-
-  it("deletes a profile and refreshes the library", async () => {
+  const installProfileFetch = () => {
     let profiles = sampleProfiles();
-    let tags = sampleTags();
+    const tags = sampleTags();
+    const createdBodies = [];
+    const updatedBodies = [];
 
     global.fetch.mockImplementation((url, options = {}) => {
       const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
-      if (value.includes("/api/v1/profiles/2") && options.method === "DELETE") {
-        profiles = profiles.filter((profile) => profile.id !== 2);
-        tags = tags.map((tag) => ({ ...tag, default_profile_id: null }));
-        return jsonResponse("");
+      const method = options.method || "GET";
+
+      if (value === "/api/v1/profiles/default") return jsonResponse(sampleDefaultProfile());
+      if (value === "/api/v1/profiles" && method === "GET") return jsonResponse(profiles);
+      if (value === "/api/v1/profiles" && method === "POST") {
+        const body = JSON.parse(options.body);
+        createdBodies.push(body);
+        const created = {
+          id: 3,
+          ...body,
+          created_at: "2026-04-04T09:00:00Z",
+          updated_at: "2026-04-04T09:00:00Z"
+        };
+        profiles = [...profiles, created];
+        return jsonResponse(created);
       }
-      if (value.includes("/api/v1/profiles")) return jsonResponse(profiles);
-      if (value.includes("/api/v1/tags?limit=500")) return jsonResponse(tags);
+      if (value === "/api/v1/profiles/2" && method === "PUT") {
+        const body = JSON.parse(options.body);
+        updatedBodies.push(body);
+        const updated = {
+          id: 2,
+          ...body,
+          created_at: "2026-04-01T11:00:00Z",
+          updated_at: "2026-04-05T09:30:00Z"
+        };
+        profiles = profiles.map((profile) => profile.id === 2 ? updated : profile);
+        return jsonResponse(updated);
+      }
+      if (value === "/api/v1/profiles/3" && method === "DELETE") {
+        profiles = profiles.filter((profile) => profile.id !== 3);
+        return emptyResponse();
+      }
+      if (value === "/api/v1/tags?limit=500") return jsonResponse(tags);
       return jsonResponse({});
     });
 
+    return {
+      createdBodies,
+      updatedBodies,
+      getProfiles: () => profiles
+    };
+  };
+
+  it("loads the server default and stored profiles into the library", async () => {
+    installProfileFetch();
+
     render(ProfileSettings);
 
-    const betaListItem = await findLibraryRow("beta");
-    await fireEvent.click(within(betaListItem).getByRole("button", { name: "Delete" }));
+    const defaultRow = await findLibraryRow("default");
+    const alphaRow = await findLibraryRow("alpha");
+    const betaRow = await findLibraryRow("beta");
+    expect(defaultRow).toBeTruthy();
+    expect(alphaRow).toBeTruthy();
+    expect(betaRow).toBeTruthy();
+    expect(within(defaultRow).getByText("Default")).toBeInTheDocument();
+    expect(within(defaultRow).getByText("Server base profile")).toBeInTheDocument();
+    expect(screen.getByText("In use · 2")).toBeInTheDocument();
+    expect(within(alphaRow).getByText("Public")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "default" })).toBeInTheDocument();
+  });
+
+  it("seeds new drafts from the server default profile", async () => {
+    installProfileFetch();
+
+    render(ProfileSettings);
+    await findLibraryRow("default");
+
+    await fireEvent.click(screen.getByRole("button", { name: "New profile" }));
+
+    expect(screen.getByRole("heading", { name: "New profile draft" })).toBeInTheDocument();
+    expect(screen.getByText("Seeded from default")).toBeInTheDocument();
+    expect(screen.getByLabelText("Config JSON").value).toContain('"timeout": 7');
+    expect(screen.getByLabelText("Config JSON").value).toContain('"ipv6": false');
+  });
+
+  it("updates an existing profile from the editor", async () => {
+    const state = installProfileFetch();
+
+    render(ProfileSettings);
+
+    const betaRow = await findLibraryRow("beta");
+    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+
+    await fireEvent.input(screen.getByLabelText("Description"), {
+      target: { value: "Updated strict resolver profile" }
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
-      expect(screen.queryByText("beta")).not.toBeInTheDocument();
+      expect(state.updatedBodies).toHaveLength(1);
     });
-    expect(global.confirm).toHaveBeenCalledWith('Delete profile "beta"?');
+    expect(state.updatedBodies[0]).toEqual({
+      name: "beta",
+      description: "Updated strict resolver profile",
+      public: false,
+      config: { resolver: { defaults: { timeout: 5 } } }
+    });
+    expect(await screen.findByText("Profile saved.")).toBeInTheDocument();
+    expect(state.getProfiles().find((profile) => profile.id === 2)?.description).toBe("Updated strict resolver profile");
+  });
+
+  it("creates a new profile from default and allows deleting it afterwards", async () => {
+    const state = installProfileFetch();
+    const { container } = render(ProfileSettings);
+
+    await findLibraryRow("default");
+    await fireEvent.click(screen.getByRole("button", { name: "New profile" }));
+    await fireEvent.input(screen.getByLabelText("Name"), { target: { value: "gamma" } });
+    await fireEvent.input(screen.getByLabelText("Description"), { target: { value: "Created from default" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(state.createdBodies).toHaveLength(1);
+    });
+    expect(state.createdBodies[0]).toEqual({
+      name: "gamma",
+      description: "Created from default",
+      public: false,
+      config: sampleDefaultProfile().config
+    });
+    expect(await screen.findByText("Profile created.")).toBeInTheDocument();
+    expect(await findLibraryRow("gamma")).toBeTruthy();
+
+    const workspace = container.querySelector(".profile-workspace");
+    await fireEvent.click(within(workspace).getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => {
+      expect(state.getProfiles().some((profile) => profile.name === "gamma")).toBe(false);
+    });
+    await waitFor(() => {
+      expect(screen.queryByText("gamma")).not.toBeInTheDocument();
+    });
+    expect(global.confirm).toHaveBeenCalledWith('Delete profile "gamma"?');
     expect(screen.getByText("Profile deleted.")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "default" })).toBeInTheDocument();
   });
 });

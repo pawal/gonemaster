@@ -4,9 +4,13 @@
 
   export let apiBase = "/api/v1";
 
+  const defaultProfileKey = "__default__";
+
   let loading = false;
+  let saving = false;
   let deletingProfileId = null;
-  let profiles = [];
+  let defaultProfile = null;
+  let storedProfiles = [];
   let filteredProfiles = [];
   let usageCounts = {};
   let usageTags = {};
@@ -14,7 +18,17 @@
   let activeFilter = "all";
   let noticeMessage = "";
   let noticeTone = "";
+  let draft = emptyDraft();
   let workspace = { type: "empty" };
+
+  function emptyDraft(config = {}) {
+    return {
+      name: "",
+      description: "",
+      public: false,
+      configText: JSON.stringify(config || {}, null, 2)
+    };
+  }
 
   const apiFetch = async (path, options = {}) => {
     const url = path?.startsWith("/") ? `${apiBase}${path}` : `${apiBase}/${path}`;
@@ -61,8 +75,6 @@
     return base ? `${base} copy` : "copy";
   };
 
-  const prettyJSON = (value) => JSON.stringify(value || {}, null, 2);
-
   const formatTimestampLocal = (value) => {
     if (!value) return "unknown";
     const parsed = new Date(value);
@@ -73,40 +85,185 @@
   const usageCount = (profileId) => Number(usageCounts[profileId] || 0);
   const usageList = (profileId) => usageTags[profileId] || [];
 
-  const openFirstProfile = () => {
-    if (profiles.length > 0) {
-      workspace = { type: "profile", profileId: profiles[0].id };
-    } else {
-      workspace = { type: "empty" };
+  const rawDraftSignature = (candidate) => JSON.stringify({
+    name: String(candidate?.name || ""),
+    description: String(candidate?.description || ""),
+    public: !!candidate?.public,
+    configText: String(candidate?.configText || "")
+  });
+
+  const normalizeDraftPayload = (candidate, currentProfileId = null) => {
+    const name = String(candidate?.name || "").trim();
+    if (!name) {
+      return { error: $t("profile_editor_name_required") };
     }
+    const duplicate = storedProfiles.some((profile) =>
+      profile.id !== currentProfileId && profile.name.toLowerCase() === name.toLowerCase()
+    );
+    if (duplicate) {
+      return { error: $t("profile_editor_name_conflict") };
+    }
+
+    let parsedConfig;
+    try {
+      parsedConfig = JSON.parse(candidate?.configText || "{}");
+    } catch (_) {
+      return { error: $t("profile_editor_json_invalid") };
+    }
+    if (!parsedConfig || typeof parsedConfig !== "object" || Array.isArray(parsedConfig)) {
+      return { error: $t("profile_editor_json_object_required") };
+    }
+
+    const payload = {
+      name,
+      description: String(candidate?.description || "").trim(),
+      public: !!candidate?.public,
+      config: parsedConfig
+    };
+    return {
+      payload,
+      signature: JSON.stringify({
+        name: payload.name,
+        description: payload.description,
+        public: payload.public,
+        config: JSON.stringify(payload.config)
+      })
+    };
+  };
+
+  const draftFromProfile = (profile, overrides = {}) => ({
+    name: profile?.name || "",
+    description: profile?.description || "",
+    public: !!profile?.public,
+    configText: JSON.stringify(profile?.config || {}, null, 2),
+    ...overrides
+  });
+
+  const maybeDiscardChanges = () => {
+    if (!isEditableWorkspace || !hasDirtyChanges) return true;
+    return window.confirm($t("profile_editor_discard_confirm"));
+  };
+
+  const openDefaultProfile = ({ clear = true } = {}) => {
+    workspace = { type: "default" };
+    draft = emptyDraft(defaultProfile?.config || {});
+    if (clear) clearNotice();
+  };
+
+  const openStoredProfile = (profile, { clear = true } = {}) => {
+    if (!profile) return;
+    const nextDraft = draftFromProfile(profile);
+    const normalized = normalizeDraftPayload(nextDraft, profile.id);
+    workspace = {
+      type: "edit",
+      profileId: profile.id,
+      seedDraft: nextDraft,
+      savedSignature: normalized.signature || "",
+      savedRawSignature: rawDraftSignature(nextDraft)
+    };
+    draft = nextDraft;
+    if (clear) clearNotice();
+  };
+
+  const openNewDraft = ({ clear = true } = {}) => {
+    const seed = emptyDraft(defaultProfile?.config || {});
+    workspace = {
+      type: "new",
+      sourceName: defaultProfile?.name || "",
+      seedDraft: seed,
+      savedSignature: normalizeDraftPayload(seed).signature || "",
+      savedRawSignature: rawDraftSignature(seed)
+    };
+    draft = seed;
+    if (clear) clearNotice();
+  };
+
+  const duplicateProfile = (profile) => {
+    if (!profile || !maybeDiscardChanges()) return;
+    const seed = draftFromProfile(profile, { name: makeCopyName(profile.name) });
+    workspace = {
+      type: "duplicate",
+      sourceName: profile.name,
+      seedDraft: seed,
+      savedSignature: normalizeDraftPayload(seed).signature || "",
+      savedRawSignature: rawDraftSignature(seed)
+    };
+    draft = seed;
+    clearNotice();
+  };
+
+  const selectProfile = (profile) => {
+    if (!profile || !maybeDiscardChanges()) return;
+    if (profile.id === 0) {
+      openDefaultProfile();
+      return;
+    }
+    openStoredProfile(profile);
+  };
+
+  const selectProfileByKey = (profileKey) => {
+    if (profileKey === defaultProfileKey) {
+      openDefaultProfile({ clear: false });
+      return;
+    }
+    const profileId = Number(String(profileKey || "").replace(/^profile:/, ""));
+    if (!Number.isFinite(profileId) || profileId <= 0) {
+      openDefaultProfile({ clear: false });
+      return;
+    }
+    const match = storedProfiles.find((profile) => profile.id === profileId);
+    if (match) {
+      openStoredProfile(match, { clear: false });
+      return;
+    }
+    openDefaultProfile({ clear: false });
   };
 
   const reconcileWorkspace = () => {
-    if (workspace.type === "profile") {
-      const exists = profiles.some((profile) => profile.id === workspace.profileId);
-      if (!exists) {
-        openFirstProfile();
+    if (workspace.type === "edit") {
+      const current = storedProfiles.find((profile) => profile.id === workspace.profileId);
+      if (!current) {
+        openDefaultProfile({ clear: false });
+      }
+      return;
+    }
+    if (workspace.type === "default") {
+      if (!defaultProfile) {
+        workspace = { type: "empty" };
       }
       return;
     }
     if (workspace.type === "empty") {
-      openFirstProfile();
+      if (defaultProfile) {
+        openDefaultProfile({ clear: false });
+      }
     }
   };
 
-  const loadProfiles = async () => {
+  const loadProfiles = async (options = {}) => {
+    const { selectKey = null, preserveNotice = false } = options;
     loading = true;
     try {
-      const [profileData, tagData] = await Promise.all([
+      const [defaultData, profileData, tagData] = await Promise.all([
+        apiFetch("/profiles/default"),
         apiFetch("/profiles"),
         apiFetch("/tags?limit=500")
       ]);
-      profiles = Array.isArray(profileData) ? profileData : [];
+      defaultProfile = defaultData && typeof defaultData === "object" && Number(defaultData.id) === 0
+        ? defaultData
+        : null;
+      storedProfiles = Array.isArray(profileData) ? profileData : [];
       const usage = buildProfileUsage(Array.isArray(tagData) ? tagData : []);
       usageCounts = usage.counts;
       usageTags = usage.refs;
-      reconcileWorkspace();
-      clearNotice();
+      if (selectKey !== null) {
+        selectProfileByKey(selectKey);
+      } else {
+        reconcileWorkspace();
+      }
+      if (!preserveNotice) {
+        clearNotice();
+      }
     } catch (error) {
       setNotice($t("profile_load_error", { error: error.message || "unknown error" }), "warn");
     } finally {
@@ -114,52 +271,66 @@
     }
   };
 
-  const selectProfile = (profileId) => {
-    workspace = { type: "profile", profileId };
+  const formatDraftJSON = () => {
+    try {
+      draft = {
+        ...draft,
+        configText: JSON.stringify(JSON.parse(draft.configText || "{}"), null, 2)
+      };
+      clearNotice();
+    } catch (_) {
+      setNotice($t("profile_editor_json_invalid"), "warn");
+    }
+  };
+
+  const resetDraft = () => {
+    if (!workspace.seedDraft) return;
+    draft = { ...workspace.seedDraft };
     clearNotice();
   };
 
-  const createDraftPreview = () => {
-    workspace = {
-      type: "new",
-      draft: {
-        name: "",
-        description: "",
-        public: false,
-        config: {}
-      }
-    };
-    clearNotice();
-  };
-
-  const duplicateProfile = (profile) => {
-    if (!profile) return;
-    workspace = {
-      type: "duplicate",
-      sourceProfileId: profile.id,
-      draft: {
-        name: makeCopyName(profile.name),
-        description: profile.description || "",
-        public: !!profile.public,
-        config: profile.config || {}
-      }
-    };
-    clearNotice();
+  const saveProfile = async () => {
+    if (!isEditableWorkspace) return;
+    const normalized = normalizeDraftPayload(draft, editingProfileId);
+    if (normalized.error) {
+      setNotice(normalized.error, "warn");
+      return;
+    }
+    saving = true;
+    try {
+      const path = workspace.type === "edit" ? `/profiles/${workspace.profileId}` : "/profiles";
+      const method = workspace.type === "edit" ? "PUT" : "POST";
+      const saved = await apiFetch(path, {
+        method,
+        body: JSON.stringify(normalized.payload)
+      });
+      setNotice(
+        workspace.type === "edit"
+          ? $t("profile_saved")
+          : $t("profile_created"),
+        "ok"
+      );
+      await loadProfiles({ selectKey: `profile:${saved.id}`, preserveNotice: true });
+    } catch (error) {
+      setNotice($t("profile_save_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      saving = false;
+    }
   };
 
   const deleteProfile = async (profile) => {
-    if (!profile || deletingProfileId !== null) return;
+    if (!profile || profile.id <= 0 || deletingProfileId !== null) return;
     if (!window.confirm($t("profile_delete_confirm", { name: profile.name }))) {
       return;
     }
     deletingProfileId = profile.id;
     try {
       await apiFetch(`/profiles/${profile.id}`, { method: "DELETE" });
-      if (workspace.type === "profile" && workspace.profileId === profile.id) {
+      if (workspace.type === "edit" && workspace.profileId === profile.id) {
         workspace = { type: "empty" };
       }
       setNotice($t("profile_deleted"), "ok");
-      await loadProfiles();
+      await loadProfiles({ selectKey: defaultProfileKey, preserveNotice: true });
     } catch (error) {
       setNotice($t("profile_delete_error", { error: error.message || "unknown error" }), "warn");
     } finally {
@@ -178,16 +349,26 @@
     return true;
   };
 
-  $: {
-    profiles;
-    activeFilter;
-    searchQuery;
-    filteredProfiles = profiles.filter(profileMatchesFilter);
-  }
-  $: selectedProfile = workspace.type === "profile"
-    ? profiles.find((profile) => profile.id === workspace.profileId) || null
+  $: libraryProfiles = defaultProfile ? [defaultProfile, ...storedProfiles] : storedProfiles;
+  $: filteredProfiles = libraryProfiles.filter(profileMatchesFilter);
+  $: editingProfileId = workspace.type === "edit" ? workspace.profileId : null;
+  $: selectedStoredProfile = editingProfileId
+    ? storedProfiles.find((profile) => profile.id === editingProfileId) || null
     : null;
-  $: selectedUsageTags = selectedProfile ? usageList(selectedProfile.id) : [];
+  $: selectedUsageTags = selectedStoredProfile ? usageList(selectedStoredProfile.id) : [];
+  $: selectedLibraryKey = workspace.type === "edit"
+    ? `profile:${workspace.profileId}`
+    : workspace.type === "default"
+      ? defaultProfileKey
+      : "";
+  $: isEditableWorkspace = workspace.type === "edit" || workspace.type === "new" || workspace.type === "duplicate";
+  $: draftValidation = isEditableWorkspace
+    ? normalizeDraftPayload(draft, editingProfileId)
+    : { payload: null, signature: "" };
+  $: hasDirtyChanges = isEditableWorkspace
+    ? rawDraftSignature(draft) !== String(workspace.savedRawSignature || "")
+    : false;
+  $: canSave = isEditableWorkspace && hasDirtyChanges && !draftValidation.error && !saving;
 
   onMount(() => {
     loadProfiles();
@@ -215,7 +396,7 @@
           <h3>{$t("profile_library_heading")}</h3>
           <p>{$t("profile_library_subtitle")}</p>
         </div>
-        <button class="secondary" type="button" on:click={createDraftPreview}>
+        <button class="secondary" type="button" on:click={() => maybeDiscardChanges() && openNewDraft()}>
           {$t("profile_new_button")}
         </button>
       </div>
@@ -246,13 +427,16 @@
         <p class="small">{$t("profile_no_profiles")}</p>
       {:else}
         <div class="profile-list" role="list" aria-label={$t("profile_library_heading")}>
-          {#each filteredProfiles as profile (profile.id)}
-            <div class={`profile-row ${workspace.type === "profile" && workspace.profileId === profile.id ? "selected" : ""}`} role="listitem">
-              <button class="profile-row-select" type="button" on:click={() => selectProfile(profile.id)}>
+          {#each filteredProfiles as profile (profile.id === 0 ? defaultProfileKey : profile.id)}
+            <div class={`profile-row ${selectedLibraryKey === (profile.id === 0 ? defaultProfileKey : `profile:${profile.id}`) ? "selected" : ""}`} role="listitem">
+              <button class="profile-row-select" type="button" on:click={() => selectProfile(profile)}>
                 <div class="profile-row-main">
                   <div class="profile-row-title">
                     <strong>{profile.name}</strong>
                     <div class="profile-row-badges">
+                      {#if profile.id === 0}
+                        <span class="badge default-badge">{$t("profile_default_badge")}</span>
+                      {/if}
                       {#if profile.public}
                         <span class="badge">{$t("profile_public_badge")}</span>
                       {/if}
@@ -261,29 +445,33 @@
                       {/if}
                     </div>
                   </div>
-                  <div class="profile-row-description">{profile.description || "—"}</div>
-                  <div class="profile-row-meta">
-                    {$t("profile_updated_prefix", { time: formatTimestampLocal(profile.updated_at) })}
-                  </div>
+                  <div class="profile-row-description">{profile.description || $t("profile_preview_no_description")}</div>
+                  {#if profile.id > 0}
+                    <div class="profile-row-meta">
+                      {$t("profile_updated_prefix", { time: formatTimestampLocal(profile.updated_at) })}
+                    </div>
+                  {/if}
                 </div>
               </button>
-              <div class="profile-row-actions">
-                <button
-                  class="ghost mini-button"
-                  type="button"
-                  on:click|stopPropagation={() => duplicateProfile(profile)}
-                >
-                  {$t("profile_duplicate_button")}
-                </button>
-                <button
-                  class="ghost mini-button"
-                  type="button"
-                  disabled={deletingProfileId === profile.id}
-                  on:click|stopPropagation={() => deleteProfile(profile)}
-                >
-                  {deletingProfileId === profile.id ? $t("submitting") : $t("profile_delete_button")}
-                </button>
-              </div>
+              {#if profile.id > 0}
+                <div class="profile-row-actions">
+                  <button
+                    class="ghost mini-button"
+                    type="button"
+                    on:click|stopPropagation={() => duplicateProfile(profile)}
+                  >
+                    {$t("profile_duplicate_button")}
+                  </button>
+                  <button
+                    class="ghost mini-button"
+                    type="button"
+                    disabled={deletingProfileId === profile.id}
+                    on:click|stopPropagation={() => deleteProfile(profile)}
+                  >
+                    {deletingProfileId === profile.id ? $t("submitting") : $t("profile_delete_button")}
+                  </button>
+                </div>
+              {/if}
             </div>
           {/each}
         </div>
@@ -291,36 +479,73 @@
     </aside>
 
     <section class="profile-workspace">
-      {#if workspace.type === "profile" && selectedProfile}
+      {#if workspace.type === "default" && defaultProfile}
         <div class="workspace-head">
           <div>
-            <h3>{selectedProfile.name}</h3>
-            <p>{selectedProfile.description || $t("profile_preview_no_description")}</p>
+            <h3>{defaultProfile.name}</h3>
+            <p>{defaultProfile.description}</p>
           </div>
           <div class="profile-row-badges">
-            <span class="badge">{selectedProfile.public ? $t("profile_preview_visibility_public") : $t("profile_preview_visibility_private")}</span>
-            {#if usageCount(selectedProfile.id) > 0}
-              <span class="badge usage-badge">{$t("profile_in_use_badge", { count: usageCount(selectedProfile.id) })}</span>
-            {/if}
+            <span class="badge default-badge">{$t("profile_default_badge")}</span>
           </div>
         </div>
 
         <div class="workspace-summary">
           <div class="summary-item">
             <span class="summary-label">{$t("profile_preview_name_label")}</span>
-            <strong>{selectedProfile.name}</strong>
+            <strong>{defaultProfile.name}</strong>
           </div>
           <div class="summary-item">
             <span class="summary-label">{$t("profile_preview_description_label")}</span>
-            <strong>{selectedProfile.description || "—"}</strong>
+            <strong>{defaultProfile.description}</strong>
           </div>
           <div class="summary-item">
-            <span class="summary-label">{$t("profile_preview_updated_label")}</span>
-            <strong>{formatTimestampLocal(selectedProfile.updated_at)}</strong>
+            <span class="summary-label">{$t("profile_preview_source_label")}</span>
+            <strong>{$t("profile_default_source")}</strong>
           </div>
         </div>
 
-        {#if selectedUsageTags.length > 0}
+        <div class="row">
+          <button class="secondary" type="button" on:click={openNewDraft}>
+            {$t("profile_new_from_default_button")}
+          </button>
+        </div>
+
+        <div class="stack">
+          <div class="field-label">{$t("profile_preview_config_label")}</div>
+          <pre>{JSON.stringify(defaultProfile.config || {}, null, 2)}</pre>
+        </div>
+      {:else if isEditableWorkspace}
+        <div class="workspace-head">
+          <div>
+            <h3>
+              {#if workspace.type === "edit"}
+                {$t("profile_editor_edit_title")}
+              {:else if workspace.type === "duplicate"}
+                {$t("profile_preview_duplicate_title")}
+              {:else}
+                {$t("profile_preview_new_title")}
+              {/if}
+            </h3>
+            <p>
+              {#if workspace.type === "edit"}
+                {$t("profile_editor_edit_subtitle")}
+              {:else if workspace.type === "duplicate"}
+                {$t("profile_preview_source_duplicate", { name: workspace.sourceName || "" })}
+              {:else}
+                {$t("profile_editor_seeded_from_default")}
+              {/if}
+            </p>
+          </div>
+          <div class="profile-row-badges">
+            <span class="badge">{draft.public ? $t("profile_preview_visibility_public") : $t("profile_preview_visibility_private")}</span>
+            {#if workspace.type === "edit" && usageCount(workspace.profileId) > 0}
+              <span class="badge usage-badge">{$t("profile_in_use_badge", { count: usageCount(workspace.profileId) })}</span>
+            {/if}
+          </div>
+        </div>
+
+        {#if workspace.type === "edit" && selectedUsageTags.length > 0}
           <div class="stack">
             <div class="field-label">{$t("profile_used_by_heading")}</div>
             <div class="tag-ref-list">
@@ -332,64 +557,57 @@
         {/if}
 
         <div class="stack">
-          <div class="field-label">{$t("profile_preview_config_label")}</div>
-          <pre>{prettyJSON(selectedProfile.config)}</pre>
-        </div>
-      {:else if workspace.type === "new"}
-        <div class="workspace-head">
-          <div>
-            <h3>{$t("profile_preview_new_title")}</h3>
-            <p>{$t("profile_preview_mode_note")}</p>
-          </div>
-          <span class="badge">{$t("profile_preview_visibility_private")}</span>
-        </div>
-
-        <div class="workspace-summary">
-          <div class="summary-item">
-            <span class="summary-label">{$t("profile_preview_name_label")}</span>
-            <strong>—</strong>
-          </div>
-          <div class="summary-item">
-            <span class="summary-label">{$t("profile_preview_description_label")}</span>
-            <strong>—</strong>
-          </div>
-          <div class="summary-item">
-            <span class="summary-label">{$t("profile_preview_source_label")}</span>
-            <strong>{$t("profile_preview_source_new")}</strong>
-          </div>
+          <label for="profile-editor-name">{$t("profile_preview_name_label")}</label>
+          <input id="profile-editor-name" type="text" bind:value={draft.name} />
         </div>
 
         <div class="stack">
-          <div class="field-label">{$t("profile_preview_config_label")}</div>
-          <pre>{prettyJSON(workspace.draft.config)}</pre>
-        </div>
-      {:else if workspace.type === "duplicate"}
-        <div class="workspace-head">
-          <div>
-            <h3>{$t("profile_preview_duplicate_title")}</h3>
-            <p>{$t("profile_preview_mode_note")}</p>
-          </div>
-          <span class="badge">{workspace.draft.public ? $t("profile_preview_visibility_public") : $t("profile_preview_visibility_private")}</span>
+          <label for="profile-editor-description">{$t("profile_preview_description_label")}</label>
+          <input id="profile-editor-description" type="text" bind:value={draft.description} />
         </div>
 
-        <div class="workspace-summary">
-          <div class="summary-item">
-            <span class="summary-label">{$t("profile_preview_name_label")}</span>
-            <strong>{workspace.draft.name}</strong>
-          </div>
-          <div class="summary-item">
-            <span class="summary-label">{$t("profile_preview_description_label")}</span>
-            <strong>{workspace.draft.description || "—"}</strong>
-          </div>
-          <div class="summary-item">
-            <span class="summary-label">{$t("profile_preview_source_label")}</span>
-            <strong>{$t("profile_preview_source_duplicate", { name: profiles.find((profile) => profile.id === workspace.sourceProfileId)?.name || "" })}</strong>
-          </div>
-        </div>
+        <label class="checkbox-row" for="profile-editor-public">
+          <input id="profile-editor-public" type="checkbox" bind:checked={draft.public} />
+          <span>{$t("profile_editor_public_label")}</span>
+        </label>
+        <div class="small">{$t("profile_editor_public_hint")}</div>
 
         <div class="stack">
-          <div class="field-label">{$t("profile_preview_config_label")}</div>
-          <pre>{prettyJSON(workspace.draft.config)}</pre>
+          <label for="profile-editor-config">{$t("profile_preview_config_label")}</label>
+          <textarea
+            id="profile-editor-config"
+            class="profile-config-textarea"
+            rows="18"
+            bind:value={draft.configText}
+          ></textarea>
+        </div>
+
+        {#if draftValidation.error}
+          <div class="inline-notice inline-notice-warn" role="status">
+            {draftValidation.error}
+          </div>
+        {/if}
+
+        <div class="row editor-actions">
+          <button type="button" on:click={saveProfile} disabled={!canSave}>
+            {saving ? $t("submitting") : $t("profile_editor_save_button")}
+          </button>
+          <button class="ghost" type="button" on:click={formatDraftJSON}>
+            {$t("profile_editor_format_button")}
+          </button>
+          <button class="ghost" type="button" on:click={resetDraft} disabled={!hasDirtyChanges}>
+            {$t(workspace.type === "edit" ? "profile_editor_reset_button" : "profile_editor_cancel_button")}
+          </button>
+          {#if workspace.type === "edit" && selectedStoredProfile}
+            <button
+              class="ghost"
+              type="button"
+              disabled={deletingProfileId === selectedStoredProfile.id}
+              on:click={() => deleteProfile(selectedStoredProfile)}
+            >
+              {deletingProfileId === selectedStoredProfile.id ? $t("submitting") : $t("profile_delete_button")}
+            </button>
+          {/if}
         </div>
       {:else}
         <div class="workspace-empty">
@@ -559,6 +777,11 @@
     color: var(--accent-2);
   }
 
+  .default-badge {
+    background: rgba(18, 95, 54, 0.12);
+    color: #166534;
+  }
+
   .workspace-summary {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -568,6 +791,22 @@
   .tag-ref-list {
     display: flex;
     gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+  }
+
+  .profile-config-textarea {
+    min-height: 320px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
+  .editor-actions {
     flex-wrap: wrap;
   }
 

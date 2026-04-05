@@ -13,6 +13,7 @@ tags:
   - name: Batches
   - name: Domains
   - name: Tags
+  - name: Profiles
   - name: Runs
   - name: Entries
   - name: Queue
@@ -624,6 +625,46 @@ paths:
         '404':
           $ref: '#/components/responses/ErrorResponse'
 
+  /tags/{name}/profile:
+    put:
+      tags: [Tags]
+      summary: Set a tag's default stored profile
+      operationId: setTagProfile
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TagProfileRequest'
+      responses:
+        '204':
+          description: Tag default profile updated
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+    delete:
+      tags: [Tags]
+      summary: Clear a tag's default stored profile
+      operationId: deleteTagProfile
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Tag default profile removed
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
   /tags/{name}/summary:
     get:
       tags: [Tags]
@@ -642,6 +683,114 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TagSummary'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /profiles:
+    get:
+      tags: [Profiles]
+      summary: List stored profiles
+      operationId: listProfiles
+      responses:
+        '200':
+          description: Stored profile array
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Profile'
+    post:
+      tags: [Profiles]
+      summary: Create a stored profile
+      operationId: createProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileUpsertRequest'
+      responses:
+        '201':
+          description: Profile created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /profiles/{id}:
+    get:
+      tags: [Profiles]
+      summary: Get a stored profile
+      operationId: getProfile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Stored profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+    put:
+      tags: [Profiles]
+      summary: Update a stored profile
+      operationId: updateProfile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileUpsertRequest'
+      responses:
+        '200':
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+    delete:
+      tags: [Profiles]
+      summary: Delete a stored profile
+      operationId: deleteProfile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Profile deleted
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
         '404':
           $ref: '#/components/responses/ErrorResponse'
 
@@ -946,6 +1095,11 @@ components:
           format: int32
           enum: [0, 1]
           description: "Queue priority: 0=normal (interactive), 1=batch (background). Normal jobs are always dequeued before batch jobs."
+        profile_id:
+          type: integer
+          format: int64
+        profile_name:
+          type: string
         error:
           type: string
 
@@ -959,6 +1113,10 @@ components:
           type: array
           items:
             type: string
+        profile_id:
+          type: integer
+          format: int64
+          description: Optional stored profile reference. If set, the stored profile is loaded before applying any inline overrides.
         profile_overrides:
           type: object
           additionalProperties: true
@@ -997,6 +1155,10 @@ components:
           type: array
           items:
             type: string
+        profile_id:
+          type: integer
+          format: int64
+          description: Optional stored profile reference applied to every submitted job in the batch.
         profile_overrides:
           type: object
           additionalProperties: true
@@ -1242,6 +1404,9 @@ components:
           format: date-time
         domain_count:
           type: integer
+        default_profile_id:
+          type: integer
+          format: int64
 
     TagCreateRequest:
       type: object
@@ -1260,6 +1425,14 @@ components:
           type: array
           items:
             type: string
+
+    TagProfileRequest:
+      type: object
+      required: [profile_id]
+      properties:
+        profile_id:
+          type: integer
+          format: int64
 
     TagSummary:
       type: object
@@ -1329,10 +1502,57 @@ components:
           format: int32
           enum: [0, 1]
           description: "Queue priority at the time of submission: 0=normal, 1=batch."
+        profile_id:
+          type: integer
+          format: int64
+        profile_name:
+          type: string
+        effective_profile:
+          type: string
+          description: JSON snapshot of the fully merged profile used for execution.
         severity_totals:
           type: object
           additionalProperties:
             type: integer
+
+    Profile:
+      type: object
+      required: [id, name, description, config, public, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        description:
+          type: string
+        config:
+          type: object
+          additionalProperties: true
+          description: Stored engine profile JSON.
+        public:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ProfileUpsertRequest:
+      type: object
+      required: [name, config]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        config:
+          type: object
+          additionalProperties: true
+          description: Engine profile JSON validated server-side.
+        public:
+          type: boolean
 
     RunList:
       type: object

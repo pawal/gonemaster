@@ -56,6 +56,8 @@ func parseOpenAPIPaths(t *testing.T, data []byte) map[string][]string {
 // fixed dummy values so we can make a real HTTP request to the route.
 func substitutePathParams(path string) string {
 	replacer := strings.NewReplacer(
+		"{id}", "1",
+		"{name}", "default",
 		"{job_id}", "00000000-0000-0000-0000-000000000000",
 		"{batch_id}", "00000000-0000-0000-0000-000000000000",
 	)
@@ -129,8 +131,8 @@ components:
 	got := parseOpenAPIPaths(t, yaml)
 
 	expect := map[string][]string{
-		"/healthz":      {"GET"},
-		"/jobs":         {"GET", "POST"},
+		"/healthz":       {"GET"},
+		"/jobs":          {"GET", "POST"},
 		"/jobs/{job_id}": {"GET"},
 	}
 	for path, methods := range expect {
@@ -217,6 +219,32 @@ func TestOpenAPIJobSchemaIncludesPriority(t *testing.T) {
 		}
 		if int(batchJob["priority"].(float64)) != int(PriorityBatch) {
 			t.Fatalf("GET /jobs/%s priority: expected %d, got %v", jobID, PriorityBatch, batchJob["priority"])
+		}
+	}
+}
+
+func TestOpenAPIProfileSchemaIncludesStoredProfileFields(t *testing.T) {
+	data, err := os.ReadFile("../docs/openapi.yaml")
+	if err != nil {
+		t.Fatalf("read docs/openapi.yaml: %v", err)
+	}
+	spec := string(data)
+
+	requiredSnippets := []string{
+		"/profiles:",
+		"/profiles/{id}:",
+		"/tags/{name}/profile:",
+		"Profile:",
+		"ProfileUpsertRequest:",
+		"TagProfileRequest:",
+		"default_profile_id:",
+		"profile_id:",
+		"profile_name:",
+		"effective_profile:",
+	}
+	for _, snippet := range requiredSnippets {
+		if !strings.Contains(spec, snippet) {
+			t.Fatalf("docs/openapi.yaml is missing %q", snippet)
 		}
 	}
 }

@@ -3,6 +3,7 @@
   import { fetchMetricsSnapshot, metricsWindowOptions } from "./metrics.js";
   import { t, locale, loadCatalog } from "./i18n.js";
   import ProfileSettings from "./ProfileSettings.svelte";
+  import ServerSettings from "./ServerSettings.svelte";
 
   const logoSrc = `${import.meta.env.BASE_URL}gonemaster.svg`;
 
@@ -3630,9 +3631,7 @@ example.org`}
         <ProfileSettings on:profileschanged={handleProfilesChanged} />
       </div>
       <div class="card reveal" style="--d: 0.4s;">
-        <h2>{$t("settings_server_heading")}</h2>
-        <p>{$t("settings_server_placeholder")}</p>
-        <div class="small">{$t("settings_server_placeholder_note")}</div>
+        <ServerSettings />
       </div>
     </div>
   {/if}

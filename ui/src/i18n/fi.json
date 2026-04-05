@@ -325,7 +325,7 @@
   "tag_remove_domains_button": "Poista",
   "tag_domains_removed": "Verkkotunnukset poistettu.",
   "tag_domains_remove_error": "Verkkotunnusten poistaminen epäonnistui: {error}",
-  "sev_ok": "OK",
+  "sev_ok": "Info",
   "sev_notice": "Huomautus",
   "sev_warning": "Varoitus",
   "sev_error": "Virhe",

@@ -117,7 +117,7 @@
   "stored_profile_label": "Stored profile",
   "stored_profile_auto_option": "Use tag default / server default",
   "stored_profile_hint": "Optional stored profile. Leave blank to inherit tag or server defaults.",
-  "sev_ok": "OK",
+  "sev_ok": "Info",
   "sev_notice": "Notice",
   "sev_warning": "Warning",
   "sev_error": "Error",

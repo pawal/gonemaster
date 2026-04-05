@@ -325,7 +325,7 @@
   "tag_remove_domains_button": "Quitar",
   "tag_domains_removed": "Dominios quitados.",
   "tag_domains_remove_error": "Error al quitar dominios: {error}",
-  "sev_ok": "OK",
+  "sev_ok": "Información",
   "sev_notice": "Aviso",
   "sev_warning": "Advertencia",
   "sev_error": "Error",

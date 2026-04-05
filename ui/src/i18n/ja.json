@@ -325,7 +325,7 @@
   "tag_remove_domains_button": "削除",
   "tag_domains_removed": "ドメインを削除しました。",
   "tag_domains_remove_error": "ドメインの削除に失敗しました: {error}",
-  "sev_ok": "OK",
+  "sev_ok": "情報",
   "sev_notice": "通知",
   "sev_warning": "警告",
   "sev_error": "エラー",

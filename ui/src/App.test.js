@@ -3388,9 +3388,32 @@ describe("App", () => {
 
       await waitFor(() => {
         expect(screen.getByText("← Back to tags")).toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "Tag: ccTLD" })).toBeInTheDocument();
         expect(screen.getByRole("heading", { name: "Domains in this tag" })).toBeInTheDocument();
         expect(screen.getByText("example.com")).toBeInTheDocument();
       });
+      unmount();
+    });
+
+    it("renders tag severity counts inside level pills with Info styling", async () => {
+      mockTagFetch(
+        [{ name: "ccTLD", description: "ccTLDs", domain_count: 2 }],
+        { tag: "ccTLD", domain_count: 2, ok: 3, notice: 2, warning: 1, error: 4, critical: 0 },
+        [{ id: 1, name: "example.com", latest_level: "WARNING", run_count: 1 }]
+      );
+      const { unmount } = render(App);
+      await openTagsTab();
+      await fireEvent.click(await screen.findByText("ccTLD"));
+
+      await waitFor(() => {
+        expect(screen.getByText("Info 3")).toHaveClass("level-pill", "severity-info");
+        expect(screen.getByText("Notice 2")).toHaveClass("level-pill", "severity-notice");
+        expect(screen.getByText("Warning 1")).toHaveClass("level-pill", "severity-warning");
+        expect(screen.getByText("Error 4")).toHaveClass("level-pill", "severity-error");
+        expect(screen.getByText("Critical 0")).toHaveClass("level-pill", "severity-critical");
+      });
+      expect(screen.queryByText("OK: 3")).toBeNull();
+
       unmount();
     });
 

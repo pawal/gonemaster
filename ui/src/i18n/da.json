@@ -325,7 +325,7 @@
   "tag_remove_domains_button": "Fjern",
   "tag_domains_removed": "Domæner fjernet.",
   "tag_domains_remove_error": "Kunne ikke fjerne domæner: {error}",
-  "sev_ok": "OK",
+  "sev_ok": "Info",
   "sev_notice": "Bemærkning",
   "sev_warning": "Advarsel",
   "sev_error": "Fejl",

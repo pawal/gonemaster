@@ -325,7 +325,7 @@
   "tag_remove_domains_button": "Ta bort",
   "tag_domains_removed": "Domäner borttagna.",
   "tag_domains_remove_error": "Det gick inte att ta bort domäner: {error}",
-  "sev_ok": "OK",
+  "sev_ok": "Info",
   "sev_notice": "Notering",
   "sev_warning": "Varning",
   "sev_error": "Fel",

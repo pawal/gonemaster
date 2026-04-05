@@ -2897,21 +2897,18 @@
     <div class="card reveal" id="panel-tags" role="tabpanel" aria-labelledby="tab-tags" style="--d: 0.34s; margin-top: 22px;">
       {#if selectedTag}
         <button class="secondary small" on:click={() => { selectedTag = null; tagProfileDraftId = ""; setTab("tags"); }}>{$t("back_to_tags")}</button>
-        <h2 style="margin-top: 0.5rem;">{selectedTag.name}</h2>
-        {#if selectedTag.description}
-          <p class="muted small">{selectedTag.description}</p>
-        {/if}
+        <h2 style="margin-top: 0.5rem;">{$t("batch_tag_label")}: {selectedTag.name}</h2>
 
         <!-- Severity summary -->
         {#if tagSummaryLoading}
           <p class="muted">{$t("loading")}</p>
         {:else if tagSummary}
           <div style="display:flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
-            <span>{$t("sev_ok")}: {tagSummary.ok}</span>
-            <span><span class="badge level-notice">{$t("sev_notice")}</span>: {tagSummary.notice}</span>
-            <span><span class="badge level-warning">{$t("sev_warning")}</span>: {tagSummary.warning}</span>
-            <span><span class="badge level-error">{$t("sev_error")}</span>: {tagSummary.error}</span>
-            <span><span class="badge level-critical">{$t("sev_critical")}</span>: {tagSummary.critical}</span>
+            <span class="level-pill severity-info">{$t("sev_ok")} {tagSummary.ok}</span>
+            <span class="level-pill severity-notice">{$t("sev_notice")} {tagSummary.notice}</span>
+            <span class="level-pill severity-warning">{$t("sev_warning")} {tagSummary.warning}</span>
+            <span class="level-pill severity-error">{$t("sev_error")} {tagSummary.error}</span>
+            <span class="level-pill severity-critical">{$t("sev_critical")} {tagSummary.critical}</span>
           </div>
         {/if}
 

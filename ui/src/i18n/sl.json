@@ -325,7 +325,7 @@
   "tag_remove_domains_button": "Odstrani",
   "tag_domains_removed": "Domene odstranjene.",
   "tag_domains_remove_error": "Napaka pri odstranjevanju domen: {error}",
-  "sev_ok": "OK",
+  "sev_ok": "Informacije",
   "sev_notice": "Opomba",
   "sev_warning": "Opozorilo",
   "sev_error": "Napaka",

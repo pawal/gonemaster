@@ -66,18 +66,28 @@ func (s *Server) handlePublicCreateJob(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_undelegated", err.Error(), nil)
 		return
 	}
+	if len(req.ProfileOverrides) > 0 {
+		writeError(w, http.StatusBadRequest, "profile_overrides_not_allowed", "public API requests must use profile_id instead of profile_overrides", nil)
+		return
+	}
+	resolvedProfile, code, message := s.resolveStoredProfile(req.ProfileID, true)
+	if code != "" {
+		writeError(w, http.StatusBadRequest, code, message, nil)
+		return
+	}
 
 	job := Job{
 		ID:            newID("job"),
 		Domain:        domain,
 		Tests:         req.Tests,
-		Overrides:     req.ProfileOverrides,
 		UndelegatedNS: undelegatedNS,
 		UndelegatedDS: undelegatedDS,
 		MinLevel:      req.MinLevel,
 		Status:        JobQueued,
 		CreatedAt:     time.Now().UTC(),
 		Progress:      0,
+		ProfileID:     cloneInt64Ptr(resolvedProfile.ID),
+		ProfileName:   resolvedProfile.Name,
 	}
 	created, err := s.store.Create(job)
 	if err != nil {

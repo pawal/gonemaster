@@ -22,6 +22,11 @@ type tagProfileRequest struct {
 	ProfileID int64 `json:"profile_id"`
 }
 
+type resolvedProfileRef struct {
+	ID   *int64
+	Name string
+}
+
 func (s *Server) handleProfiles(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
@@ -301,4 +306,47 @@ func normalizeAndValidateProfileConfig(raw json.RawMessage) (string, map[string]
 		configMap = map[string]any{}
 	}
 	return canonical, configMap, nil
+}
+
+func (s *Server) resolveStoredProfile(profileID *int64, publicOnly bool) (resolvedProfileRef, string, string) {
+	if profileID == nil {
+		return resolvedProfileRef{}, "", ""
+	}
+	if *profileID <= 0 {
+		return resolvedProfileRef{}, "invalid_profile_id", "profile_id must be a positive integer"
+	}
+	stored, ok := s.store.GetProfile(*profileID)
+	if !ok {
+		return resolvedProfileRef{}, "profile_not_found", "profile not found"
+	}
+	if publicOnly && !stored.Public {
+		return resolvedProfileRef{}, "profile_not_public", "profile is not available in the public API"
+	}
+	return resolvedProfileRef{
+		ID:   &stored.ID,
+		Name: stored.Name,
+	}, "", ""
+}
+
+func (s *Server) resolveDefaultProfileFromTags(tagNames []string) (resolvedProfileRef, string, string) {
+	var selectedID int64
+	found := false
+	for _, tagName := range tagNames {
+		tag, ok := s.store.GetTag(tagName)
+		if !ok || tag.DefaultProfileID == nil {
+			continue
+		}
+		if !found {
+			selectedID = *tag.DefaultProfileID
+			found = true
+			continue
+		}
+		if selectedID != *tag.DefaultProfileID {
+			return resolvedProfileRef{}, "ambiguous_profile", "multiple tags define different default profiles; choose profile_id explicitly"
+		}
+	}
+	if !found {
+		return resolvedProfileRef{}, "", ""
+	}
+	return s.resolveStoredProfile(&selectedID, false)
 }

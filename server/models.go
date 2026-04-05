@@ -341,6 +341,7 @@ type JobResultEntry struct {
 type JobCreateRequest struct {
 	Domain           string                       `json:"domain"`
 	Tests            []string                     `json:"tests,omitempty"`
+	ProfileID        *int64                       `json:"profile_id,omitempty"`
 	ProfileOverrides map[string]any               `json:"profile_overrides,omitempty"`
 	Nameservers      []UndelegatedNameserverInput `json:"nameservers,omitempty"`
 	DSInfo           []UndelegatedDSInput         `json:"ds_info,omitempty"`
@@ -354,6 +355,7 @@ type JobBatchRequest struct {
 	Domains          []string                      `json:"domains,omitempty"`
 	FromTag          string                        `json:"from_tag,omitempty"`
 	Tests            []string                      `json:"tests,omitempty"`
+	ProfileID        *int64                        `json:"profile_id,omitempty"`
 	ProfileOverrides map[string]any                `json:"profile_overrides,omitempty"`
 	Nameservers      *[]UndelegatedNameserverInput `json:"nameservers,omitempty"`
 	DSInfo           *[]UndelegatedDSInput         `json:"ds_info,omitempty"`

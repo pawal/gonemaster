@@ -1675,6 +1675,75 @@ func (s *SQLJobStore) ListProfiles() []StoredProfile {
 	return result
 }
 
+// ── Settings ─────────────────────────────────────────────────────────────────
+
+// GetSetting returns a setting value by key.
+func (s *SQLJobStore) GetSetting(key string) (string, bool) {
+	var value string
+	err := s.db.QueryRow(
+		`SELECT value FROM settings WHERE key = `+s.ph(1), key,
+	).Scan(&value)
+	if err != nil {
+		return "", false
+	}
+	return value, true
+}
+
+// SetSetting creates or updates a setting.
+func (s *SQLJobStore) SetSetting(key, value string) error {
+	switch s.dialect.(type) {
+	case postgresDialect:
+		_, err := s.db.Exec(
+			`INSERT INTO settings(key, value) VALUES (`+s.ph(1)+`, `+s.ph(2)+`)
+			 ON CONFLICT(key) DO UPDATE SET value = `+s.ph(3),
+			key, value, value)
+		return err
+	case mariadbDialect:
+		_, err := s.db.Exec(
+			`INSERT INTO settings(` + "`key`" + `, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = ?`,
+			key, value, value)
+		return err
+	default: // sqlite
+		_, err := s.db.Exec(
+			`INSERT INTO settings(key, value) VALUES (?, ?)
+			 ON CONFLICT(key) DO UPDATE SET value = ?`,
+			key, value, value)
+		return err
+	}
+}
+
+// DeleteSetting removes a setting by key.
+func (s *SQLJobStore) DeleteSetting(key string) error {
+	res, err := s.db.Exec(
+		`DELETE FROM settings WHERE key = `+s.ph(1), key)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return errors.New("setting not found")
+	}
+	return nil
+}
+
+// ListSettings returns all settings as a map.
+func (s *SQLJobStore) ListSettings() map[string]string {
+	rows, err := s.db.Query(`SELECT key, value FROM settings ORDER BY key`)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	result := map[string]string{}
+	for rows.Next() {
+		var k, v string
+		if err := rows.Scan(&k, &v); err != nil {
+			continue
+		}
+		result[k] = v
+	}
+	return result
+}
+
 // ── Purge ─────────────────────────────────────────────────────────────────────
 
 // PurgeOlderThan deletes terminal runs whose finished_at is before cutoff,

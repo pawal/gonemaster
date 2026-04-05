@@ -164,6 +164,19 @@ func (s *spyJobStore) ListProfiles() []StoredProfile {
 	return s.inner.ListProfiles()
 }
 
+func (s *spyJobStore) GetSetting(key string) (string, bool) {
+	return s.inner.GetSetting(key)
+}
+func (s *spyJobStore) SetSetting(key, value string) error {
+	return s.inner.SetSetting(key, value)
+}
+func (s *spyJobStore) DeleteSetting(key string) error {
+	return s.inner.DeleteSetting(key)
+}
+func (s *spyJobStore) ListSettings() map[string]string {
+	return s.inner.ListSettings()
+}
+
 func (s *spyJobStore) PurgeOlderThan(cutoff time.Time) (int64, error) {
 	return s.inner.PurgeOlderThan(cutoff)
 }

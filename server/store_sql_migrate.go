@@ -193,6 +193,10 @@ var sqlMigrations = []sqlMigration{
 				`ALTER TABLE runs ADD COLUMN profile_name TEXT NOT NULL DEFAULT ''`,
 				`ALTER TABLE runs ADD COLUMN effective_profile TEXT NOT NULL DEFAULT ''`,
 				`CREATE INDEX IF NOT EXISTS idx_runs_profile_id ON runs(profile_id)`,
+				`CREATE TABLE IF NOT EXISTS settings (
+					key   VARCHAR(255) NOT NULL PRIMARY KEY,
+					value TEXT         NOT NULL
+				)`,
 			}
 		},
 	},

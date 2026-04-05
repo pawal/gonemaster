@@ -160,6 +160,19 @@ func (s *countingJobStore) ListProfiles() []StoredProfile {
 	return s.inner.ListProfiles()
 }
 
+func (s *countingJobStore) GetSetting(key string) (string, bool) {
+	return s.inner.GetSetting(key)
+}
+func (s *countingJobStore) SetSetting(key, value string) error {
+	return s.inner.SetSetting(key, value)
+}
+func (s *countingJobStore) DeleteSetting(key string) error {
+	return s.inner.DeleteSetting(key)
+}
+func (s *countingJobStore) ListSettings() map[string]string {
+	return s.inner.ListSettings()
+}
+
 func (s *countingJobStore) PurgeOlderThan(cutoff time.Time) (int64, error) {
 	return s.inner.PurgeOlderThan(cutoff)
 }

@@ -1493,3 +1493,62 @@ func TestInMemoryJobStoreProfileReferencesPersist(t *testing.T) {
 		t.Fatalf("run EffectiveProfile after delete: got %q", run.EffectiveProfile)
 	}
 }
+
+func TestInMemoryJobStoreSettingsCRUD(t *testing.T) {
+	store := NewInMemoryJobStore()
+
+	// Get missing
+	_, ok := store.GetSetting("worker_count")
+	if ok {
+		t.Fatal("expected ok=false for missing setting")
+	}
+
+	// Set and get
+	if err := store.SetSetting("worker_count", "8"); err != nil {
+		t.Fatalf("SetSetting: %v", err)
+	}
+	v, ok := store.GetSetting("worker_count")
+	if !ok {
+		t.Fatal("expected setting to exist")
+	}
+	if v != "8" {
+		t.Fatalf("got %q, want %q", v, "8")
+	}
+
+	// Overwrite
+	if err := store.SetSetting("worker_count", "12"); err != nil {
+		t.Fatalf("SetSetting overwrite: %v", err)
+	}
+	v, _ = store.GetSetting("worker_count")
+	if v != "12" {
+		t.Fatalf("got %q after overwrite, want %q", v, "12")
+	}
+
+	// Set another
+	if err := store.SetSetting("min_level", "WARNING"); err != nil {
+		t.Fatalf("SetSetting min_level: %v", err)
+	}
+
+	// List
+	all := store.ListSettings()
+	if len(all) != 2 {
+		t.Fatalf("ListSettings: got %d, want 2", len(all))
+	}
+	if all["worker_count"] != "12" || all["min_level"] != "WARNING" {
+		t.Fatalf("ListSettings: unexpected values: %v", all)
+	}
+
+	// Delete
+	if err := store.DeleteSetting("worker_count"); err != nil {
+		t.Fatalf("DeleteSetting: %v", err)
+	}
+	_, ok = store.GetSetting("worker_count")
+	if ok {
+		t.Fatal("expected setting deleted")
+	}
+
+	// Delete missing
+	if err := store.DeleteSetting("nonexistent"); err == nil {
+		t.Fatal("expected error on deleting missing setting")
+	}
+}

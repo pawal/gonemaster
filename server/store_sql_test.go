@@ -78,7 +78,7 @@ func testBackends(t *testing.T) []testBackend {
 // on persistent backends (PostgreSQL, MariaDB).
 func resetSchema(db *sql.DB) error {
 	for _, tbl := range []string{
-		"entries", "runs", "domain_tags", "domains", "tags", "jobs", "batches", "profiles", "schema_migrations",
+		"entries", "runs", "domain_tags", "domains", "tags", "jobs", "batches", "profiles", "settings", "schema_migrations",
 	} {
 		if _, err := db.Exec("DROP TABLE IF EXISTS " + tbl); err != nil {
 			return fmt.Errorf("drop table %s: %w", tbl, err)
@@ -213,7 +213,7 @@ func TestRunMigrationsFresh(t *testing.T) {
 		t.Fatalf("second run (idempotent): %v", err)
 	}
 
-	for _, tbl := range []string{"jobs", "runs", "entries", "domains", "profiles", "schema_migrations"} {
+	for _, tbl := range []string{"jobs", "runs", "entries", "domains", "profiles", "settings", "schema_migrations"} {
 		var name string
 		if err := db.QueryRow(
 			`SELECT name FROM sqlite_master WHERE type='table' AND name=?`, tbl,
@@ -2570,6 +2570,77 @@ func TestSQLJobStoreProfileReferencesPersist(t *testing.T) {
 			}
 			if run.EffectiveProfile != `{"resolver.defaults.timeout":15}` {
 				t.Fatalf("run EffectiveProfile after delete: got %q", run.EffectiveProfile)
+			}
+		})
+	}
+}
+
+// ---- Settings CRUD ----------------------------------------------------------
+
+func TestSQLJobStoreSettingsCRUD(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+
+			// Get missing
+			_, ok := s.GetSetting("worker_count")
+			if ok {
+				t.Fatal("expected ok=false for missing setting")
+			}
+
+			// Set and get
+			if err := s.SetSetting("worker_count", "8"); err != nil {
+				t.Fatalf("SetSetting: %v", err)
+			}
+			v, ok := s.GetSetting("worker_count")
+			if !ok {
+				t.Fatal("expected setting to exist")
+			}
+			if v != "8" {
+				t.Fatalf("got %q, want %q", v, "8")
+			}
+
+			// Overwrite (upsert)
+			if err := s.SetSetting("worker_count", "12"); err != nil {
+				t.Fatalf("SetSetting overwrite: %v", err)
+			}
+			v, _ = s.GetSetting("worker_count")
+			if v != "12" {
+				t.Fatalf("got %q after overwrite, want %q", v, "12")
+			}
+
+			// Set another
+			if err := s.SetSetting("min_level", "WARNING"); err != nil {
+				t.Fatalf("SetSetting min_level: %v", err)
+			}
+
+			// List
+			all := s.ListSettings()
+			if len(all) != 2 {
+				t.Fatalf("ListSettings: got %d, want 2", len(all))
+			}
+			if all["worker_count"] != "12" || all["min_level"] != "WARNING" {
+				t.Fatalf("ListSettings: unexpected values: %v", all)
+			}
+
+			// Delete
+			if err := s.DeleteSetting("worker_count"); err != nil {
+				t.Fatalf("DeleteSetting: %v", err)
+			}
+			_, ok = s.GetSetting("worker_count")
+			if ok {
+				t.Fatal("expected setting deleted")
+			}
+
+			// Delete missing
+			if err := s.DeleteSetting("nonexistent"); err == nil {
+				t.Fatal("expected error on deleting missing setting")
+			}
+
+			// List after delete
+			all = s.ListSettings()
+			if len(all) != 1 {
+				t.Fatalf("ListSettings after delete: got %d, want 1", len(all))
 			}
 		})
 	}

@@ -88,6 +88,12 @@ type JobStore interface {
 	DeleteProfile(id int64) error
 	ListProfiles() []StoredProfile
 
+	// Settings management.
+	GetSetting(key string) (string, bool)
+	SetSetting(key, value string) error
+	DeleteSetting(key string) error
+	ListSettings() map[string]string
+
 	// PurgeOlderThan deletes terminal runs whose finished_at is before cutoff,
 	// along with their entries. Returns the number of runs deleted.
 	PurgeOlderThan(cutoff time.Time) (int64, error)
@@ -123,6 +129,9 @@ type InMemoryJobStore struct {
 	// Profiles.
 	profiles       map[int64]StoredProfile // id → StoredProfile
 	profileCounter int64
+
+	// Settings.
+	settings map[string]string // key → value
 }
 
 // NewInMemoryJobStore creates an empty in-memory job store.
@@ -140,6 +149,7 @@ func NewInMemoryJobStore() *InMemoryJobStore {
 		tagDomains:   map[string][]int64{},
 		batches:      map[string]Batch{},
 		profiles:     map[int64]StoredProfile{},
+		settings:     map[string]string{},
 	}
 }
 
@@ -1130,6 +1140,46 @@ func (s *InMemoryJobStore) ListProfiles() []StoredProfile {
 	sort.Slice(result, func(i, j int) bool {
 		return result[i].Name < result[j].Name
 	})
+	return result
+}
+
+// ── Settings ──────────────────────────────────────────────────────────────────
+
+// GetSetting returns a setting value by key.
+func (s *InMemoryJobStore) GetSetting(key string) (string, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	v, ok := s.settings[key]
+	return v, ok
+}
+
+// SetSetting creates or updates a setting.
+func (s *InMemoryJobStore) SetSetting(key, value string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.settings[key] = value
+	return nil
+}
+
+// DeleteSetting removes a setting by key.
+func (s *InMemoryJobStore) DeleteSetting(key string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.settings[key]; !ok {
+		return errors.New("setting not found")
+	}
+	delete(s.settings, key)
+	return nil
+}
+
+// ListSettings returns all settings as a map.
+func (s *InMemoryJobStore) ListSettings() map[string]string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make(map[string]string, len(s.settings))
+	for k, v := range s.settings {
+		result[k] = v
+	}
 	return result
 }
 

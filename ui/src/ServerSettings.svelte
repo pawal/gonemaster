@@ -17,7 +17,7 @@
         { key: "listen_addr", type: "text", readonly: true },
         { key: "worker_count", type: "number" },
         { key: "max_concurrent_jobs", type: "number" },
-        { key: "min_level", type: "text" },
+        { key: "min_level", type: "select", options: ["INFO", "NOTICE", "WARNING", "ERROR", "CRITICAL"] },
         { key: "public_url", type: "text" },
       ],
     },
@@ -193,6 +193,17 @@
                 />
                 {val ? "Enabled" : "Disabled"}
               </label>
+            {:else if s.type === "select"}
+              <select
+                id="setting-{s.key}"
+                value={val ?? ""}
+                disabled={ro}
+                on:change={(e) => handleInput(s.key, e.target.value)}
+              >
+                {#each s.options as opt}
+                  <option value={opt}>{opt}</option>
+                {/each}
+              </select>
             {:else if s.type === "number"}
               <input
                 type="number"

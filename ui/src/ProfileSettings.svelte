@@ -516,7 +516,12 @@
 
         <div class="stack">
           <div class="field-label">{$t("profile_preview_config_label")}</div>
-          <pre>{JSON.stringify(defaultProfile.config || {}, null, 2)}</pre>
+          <textarea
+            class="profile-config-textarea"
+            rows="18"
+            readonly
+            value={JSON.stringify(defaultProfile.config || {}, null, 2)}
+          ></textarea>
         </div>
       {:else if isEditableWorkspace}
         <div class="workspace-head">

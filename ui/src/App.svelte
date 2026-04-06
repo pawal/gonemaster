@@ -3630,7 +3630,7 @@ example.org`}
       <div class="card reveal" style="--d: 0.34s; grid-column: 1 / -1;">
         <ProfileSettings on:profileschanged={handleProfilesChanged} />
       </div>
-      <div class="card reveal" style="--d: 0.4s;">
+      <div class="card reveal" style="--d: 0.4s; grid-column: 1 / -1;">
         <ServerSettings />
       </div>
     </div>

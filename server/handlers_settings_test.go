@@ -168,3 +168,139 @@ func TestSettingsMethodNotAllowed(t *testing.T) {
 		t.Fatalf("expected 405, got %d", resp.Code)
 	}
 }
+
+func TestApplyDatabaseSettingsOnStartup(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	// Simulate DB settings that were persisted from a previous session.
+	_ = srv.store.SetSetting("worker_count", "16")
+	_ = srv.store.SetSetting("min_level", "WARNING")
+	_ = srv.store.SetSetting("rate_limit_enabled", "true")
+	_ = srv.store.SetSetting("rate_limit_max", "20")
+
+	srv.ApplyDatabaseSettings()
+
+	if srv.cfg.WorkerCount != 16 {
+		t.Fatalf("WorkerCount: got %d, want 16", srv.cfg.WorkerCount)
+	}
+	if srv.cfg.MinLevel != "WARNING" {
+		t.Fatalf("MinLevel: got %q, want %q", srv.cfg.MinLevel, "WARNING")
+	}
+	if !srv.cfg.PublicAPI.RateLimitEnabled {
+		t.Fatal("expected RateLimitEnabled=true")
+	}
+	if srv.cfg.PublicAPI.RateLimitMax != 20 {
+		t.Fatalf("RateLimitMax: got %d, want 20", srv.cfg.PublicAPI.RateLimitMax)
+	}
+}
+
+func TestApplyDatabaseSettingsRespectsCliFlags(t *testing.T) {
+	srv := New(DefaultConfig())
+	srv.SetConfigSources(map[string]SettingSource{
+		"worker_count": SourceCLIFlag,
+	})
+
+	_ = srv.store.SetSetting("worker_count", "32")
+	_ = srv.store.SetSetting("min_level", "ERROR")
+
+	srv.ApplyDatabaseSettings()
+
+	// CLI flag should win — worker_count stays at default (4).
+	if srv.cfg.WorkerCount != 4 {
+		t.Fatalf("WorkerCount: got %d, want 4 (CLI flag should take precedence)", srv.cfg.WorkerCount)
+	}
+	// min_level has no CLI flag override, so DB value applies.
+	if srv.cfg.MinLevel != "ERROR" {
+		t.Fatalf("MinLevel: got %q, want %q", srv.cfg.MinLevel, "ERROR")
+	}
+}
+
+func TestPutSettingsHotReloadsRuntime(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	// Default: rate limiting disabled, worker_count=4.
+	if srv.rateLimiter != nil {
+		t.Fatal("expected rateLimiter=nil initially")
+	}
+	if srv.cfg.WorkerCount != 4 {
+		t.Fatalf("initial WorkerCount: got %d", srv.cfg.WorkerCount)
+	}
+
+	// PUT to change settings.
+	body := `{"worker_count": 8, "min_level": "ERROR", "rate_limit_enabled": true, "rate_limit_max": 5}`
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/settings", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
+	}
+
+	// Verify runtime config was updated.
+	if srv.cfg.WorkerCount != 8 {
+		t.Fatalf("WorkerCount after PUT: got %d, want 8", srv.cfg.WorkerCount)
+	}
+	if srv.cfg.MinLevel != "ERROR" {
+		t.Fatalf("MinLevel after PUT: got %q, want %q", srv.cfg.MinLevel, "ERROR")
+	}
+	if !srv.cfg.PublicAPI.RateLimitEnabled {
+		t.Fatal("expected RateLimitEnabled=true after PUT")
+	}
+	if srv.rateLimiter == nil {
+		t.Fatal("expected rateLimiter to be created after enabling rate limiting")
+	}
+
+	// Disable rate limiting.
+	body2 := `{"rate_limit_enabled": false}`
+	resp2 := httptest.NewRecorder()
+	req2 := httptest.NewRequest(http.MethodPut, "/api/v1/settings", bytes.NewBufferString(body2))
+	req2.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp2, req2)
+
+	if srv.rateLimiter != nil {
+		t.Fatal("expected rateLimiter=nil after disabling rate limiting")
+	}
+}
+
+func TestApplyDatabaseSettingsRetentionDays(t *testing.T) {
+	srv := New(DefaultConfig())
+	_ = srv.store.SetSetting("retention_days", "30")
+	srv.ApplyDatabaseSettings()
+
+	if srv.cfg.Database.RetentionDays != 30 {
+		t.Fatalf("RetentionDays: got %d, want 30", srv.cfg.Database.RetentionDays)
+	}
+}
+
+func TestApplyDatabaseSettingsPublicURL(t *testing.T) {
+	srv := New(DefaultConfig())
+	_ = srv.store.SetSetting("public_url", "https://dns.example.com")
+	srv.ApplyDatabaseSettings()
+
+	if srv.cfg.PublicURL != "https://dns.example.com" {
+		t.Fatalf("PublicURL: got %q", srv.cfg.PublicURL)
+	}
+}
+
+func TestApplyDatabaseSettingsRateLimitWindow(t *testing.T) {
+	srv := New(DefaultConfig())
+	_ = srv.store.SetSetting("rate_limit_window", "5m")
+	srv.ApplyDatabaseSettings()
+
+	if srv.cfg.PublicAPI.RateLimitWindow.Duration.String() != "5m0s" {
+		t.Fatalf("RateLimitWindow: got %q", srv.cfg.PublicAPI.RateLimitWindow.Duration.String())
+	}
+}
+
+func TestApplyDatabaseSettingsIgnoresInvalidValues(t *testing.T) {
+	srv := New(DefaultConfig())
+	_ = srv.store.SetSetting("worker_count", "not-a-number")
+	_ = srv.store.SetSetting("rate_limit_window", "invalid")
+	srv.ApplyDatabaseSettings()
+
+	// Should stay at defaults.
+	if srv.cfg.WorkerCount != 4 {
+		t.Fatalf("WorkerCount: got %d, want 4", srv.cfg.WorkerCount)
+	}
+}

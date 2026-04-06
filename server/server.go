@@ -79,7 +79,9 @@ func NewWithOptions(cfg Config) (*Server, error) {
 		return nil, fmt.Errorf("recover jobs: %w", err)
 	}
 
-	return newServer(cfg, store, queue), nil
+	srv := newServer(cfg, store, queue)
+	srv.ApplyDatabaseSettings()
+	return srv, nil
 }
 
 // newServer constructs a Server with the given store and queue.

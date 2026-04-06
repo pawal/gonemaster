@@ -3,6 +3,8 @@ package server
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
+	"time"
 )
 
 // SettingSource identifies where a config value was set.
@@ -47,6 +49,72 @@ func (s *Server) settingSource(key string) SettingSource {
 		}
 	}
 	return SourceDefault
+}
+
+// ApplyDatabaseSettings loads settings from the DB and merges them into s.cfg.
+// CLI flags (tracked in configSources) take precedence and are not overridden.
+func (s *Server) ApplyDatabaseSettings() {
+	dbSettings := s.store.ListSettings()
+	for key, val := range dbSettings {
+		if s.configSources != nil {
+			if s.configSources[key] == SourceCLIFlag {
+				continue
+			}
+		}
+		s.applySetting(key, val)
+	}
+}
+
+// applySetting writes a single setting value into s.cfg.
+func (s *Server) applySetting(key, val string) {
+	switch key {
+	case "worker_count":
+		if v, err := strconv.Atoi(val); err == nil && v >= 1 {
+			s.cfg.WorkerCount = v
+		}
+	case "max_concurrent_jobs":
+		if v, err := strconv.Atoi(val); err == nil && v >= 0 {
+			s.cfg.MaxConcurrentJobs = v
+		}
+	case "min_level":
+		s.cfg.MinLevel = val
+	case "retention_days":
+		if v, err := strconv.Atoi(val); err == nil && v >= 0 {
+			s.cfg.Database.RetentionDays = v
+		}
+	case "public_url":
+		s.cfg.PublicURL = val
+	case "rate_limit_enabled":
+		s.cfg.PublicAPI.RateLimitEnabled = val == "true"
+	case "rate_limit_max":
+		if v, err := strconv.Atoi(val); err == nil && v >= 1 {
+			s.cfg.PublicAPI.RateLimitMax = v
+		}
+	case "rate_limit_window":
+		if d, err := time.ParseDuration(val); err == nil && d > 0 {
+			s.cfg.PublicAPI.RateLimitWindow = Duration{d}
+		}
+	}
+}
+
+// applySettingsToRuntime updates live server components after settings change.
+// This handles hot-reload of mutable settings that affect runtime behavior.
+func (s *Server) applySettingsToRuntime() {
+	// Re-apply all DB settings to cfg (respecting CLI flag precedence).
+	s.ApplyDatabaseSettings()
+
+	// Update engine concurrency limiter.
+	s.engineLimiter = newEngineLimiter(s.cfg.MaxConcurrentJobs)
+
+	// Update rate limiter.
+	if s.cfg.PublicAPI.RateLimitEnabled {
+		s.rateLimiter = NewRateLimiter(
+			s.cfg.PublicAPI.RateLimitMax,
+			s.cfg.PublicAPI.RateLimitWindow.Duration,
+		)
+	} else {
+		s.rateLimiter = nil
+	}
 }
 
 func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
@@ -140,5 +208,6 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	s.applySettingsToRuntime()
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }

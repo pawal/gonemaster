@@ -1677,11 +1677,20 @@ func (s *SQLJobStore) ListProfiles() []StoredProfile {
 
 // ── Settings ─────────────────────────────────────────────────────────────────
 
+// qkey returns the quoted identifier for the "key" column in the settings
+// table. "key" is a reserved word in MariaDB and must be quoted.
+func (s *SQLJobStore) qkey() string {
+	if _, ok := s.dialect.(mariadbDialect); ok {
+		return "`key`"
+	}
+	return `"key"`
+}
+
 // GetSetting returns a setting value by key.
 func (s *SQLJobStore) GetSetting(key string) (string, bool) {
 	var value string
 	err := s.db.QueryRow(
-		`SELECT value FROM settings WHERE key = `+s.ph(1), key,
+		`SELECT value FROM settings WHERE `+s.qkey()+` = `+s.ph(1), key,
 	).Scan(&value)
 	if err != nil {
 		return "", false
@@ -1691,22 +1700,23 @@ func (s *SQLJobStore) GetSetting(key string) (string, bool) {
 
 // SetSetting creates or updates a setting.
 func (s *SQLJobStore) SetSetting(key, value string) error {
+	qk := s.qkey()
 	switch s.dialect.(type) {
 	case postgresDialect:
 		_, err := s.db.Exec(
-			`INSERT INTO settings(key, value) VALUES (`+s.ph(1)+`, `+s.ph(2)+`)
-			 ON CONFLICT(key) DO UPDATE SET value = `+s.ph(3),
+			`INSERT INTO settings(`+qk+`, value) VALUES (`+s.ph(1)+`, `+s.ph(2)+`)
+			 ON CONFLICT(`+qk+`) DO UPDATE SET value = `+s.ph(3),
 			key, value, value)
 		return err
 	case mariadbDialect:
 		_, err := s.db.Exec(
-			`INSERT INTO settings(` + "`key`" + `, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = ?`,
+			`INSERT INTO settings(`+qk+`, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = ?`,
 			key, value, value)
 		return err
 	default: // sqlite
 		_, err := s.db.Exec(
-			`INSERT INTO settings(key, value) VALUES (?, ?)
-			 ON CONFLICT(key) DO UPDATE SET value = ?`,
+			`INSERT INTO settings(`+qk+`, value) VALUES (?, ?)
+			 ON CONFLICT(`+qk+`) DO UPDATE SET value = ?`,
 			key, value, value)
 		return err
 	}
@@ -1715,7 +1725,7 @@ func (s *SQLJobStore) SetSetting(key, value string) error {
 // DeleteSetting removes a setting by key.
 func (s *SQLJobStore) DeleteSetting(key string) error {
 	res, err := s.db.Exec(
-		`DELETE FROM settings WHERE key = `+s.ph(1), key)
+		`DELETE FROM settings WHERE `+s.qkey()+` = `+s.ph(1), key)
 	if err != nil {
 		return err
 	}
@@ -1728,7 +1738,7 @@ func (s *SQLJobStore) DeleteSetting(key string) error {
 
 // ListSettings returns all settings as a map.
 func (s *SQLJobStore) ListSettings() map[string]string {
-	rows, err := s.db.Query(`SELECT key, value FROM settings ORDER BY key`)
+	rows, err := s.db.Query(`SELECT ` + s.qkey() + `, value FROM settings ORDER BY ` + s.qkey())
 	if err != nil {
 		return nil
 	}

@@ -136,6 +136,19 @@ func buildV1DDL(autoinc, bigint string) []string {
 	}
 }
 
+// settingsTableDDL returns the CREATE TABLE statement for the settings table.
+// "key" is a reserved word in MariaDB and must be quoted.
+func settingsTableDDL(d sqlDialect) string {
+	q := `"` // ANSI SQL quoting (SQLite, PostgreSQL)
+	if _, ok := d.(mariadbDialect); ok {
+		q = "`"
+	}
+	return fmt.Sprintf(`CREATE TABLE IF NOT EXISTS settings (
+		%skey%s   VARCHAR(255) NOT NULL PRIMARY KEY,
+		value  TEXT         NOT NULL
+	)`, q, q)
+}
+
 // sqlMigrations is the ordered list of schema migrations applied on startup.
 var sqlMigrations = []sqlMigration{
 	{
@@ -193,10 +206,7 @@ var sqlMigrations = []sqlMigration{
 				`ALTER TABLE runs ADD COLUMN profile_name TEXT NOT NULL DEFAULT ''`,
 				`ALTER TABLE runs ADD COLUMN effective_profile TEXT NOT NULL DEFAULT ''`,
 				`CREATE INDEX IF NOT EXISTS idx_runs_profile_id ON runs(profile_id)`,
-				`CREATE TABLE IF NOT EXISTS settings (
-					key   VARCHAR(255) NOT NULL PRIMARY KEY,
-					value TEXT         NOT NULL
-				)`,
+				settingsTableDDL(d),
 			}
 		},
 	},

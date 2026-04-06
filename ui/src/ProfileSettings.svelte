@@ -353,7 +353,12 @@
   };
 
   $: libraryProfiles = defaultProfile ? [defaultProfile, ...storedProfiles] : storedProfiles;
-  $: filteredProfiles = libraryProfiles.filter(profileMatchesFilter);
+  $: {
+    // Reference searchQuery and activeFilter so Svelte tracks them as dependencies.
+    void searchQuery;
+    void activeFilter;
+    filteredProfiles = libraryProfiles.filter(profileMatchesFilter);
+  }
   $: editingProfileId = workspace.type === "edit" ? workspace.profileId : null;
   $: selectedStoredProfile = editingProfileId
     ? storedProfiles.find((profile) => profile.id === editingProfileId) || null

@@ -86,13 +86,29 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, _ *http.Request) {
 	// Apply database overrides to the value display.
 	for key, val := range dbSettings {
 		if entry, ok := settings[key]; ok {
-			entry.Value = json.Number(val)
+			entry.Value = parseSettingValue(val)
 			entry.Source = SourceDatabase
 			settings[key] = entry
 		}
 	}
 
 	writeJSON(w, http.StatusOK, settings)
+}
+
+// parseSettingValue converts a stored string to a typed value for JSON output.
+// It tries JSON number, then JSON boolean, then falls back to string.
+func parseSettingValue(s string) any {
+	var n json.Number
+	if json.Unmarshal([]byte(s), &n) == nil {
+		return n
+	}
+	if s == "true" {
+		return true
+	}
+	if s == "false" {
+		return false
+	}
+	return s
 }
 
 func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {

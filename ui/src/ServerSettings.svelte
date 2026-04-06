@@ -287,7 +287,7 @@
     cursor: not-allowed;
   }
   .toggle-label {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 6px;
     font-size: 0.9em;

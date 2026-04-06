@@ -158,7 +158,7 @@
     workspace = {
       type: "edit",
       profileId: profile.id,
-      seedDraft: nextDraft,
+      seedDraft: { ...nextDraft },
       savedSignature: normalized.signature || "",
       savedRawSignature: rawDraftSignature(nextDraft)
     };
@@ -171,7 +171,7 @@
     workspace = {
       type: "new",
       sourceName: defaultProfile?.name || "",
-      seedDraft: seed,
+      seedDraft: { ...seed },
       savedSignature: normalizeDraftPayload(seed).signature || "",
       savedRawSignature: rawDraftSignature(seed)
     };
@@ -185,7 +185,7 @@
     workspace = {
       type: "duplicate",
       sourceName: profile.name,
-      seedDraft: seed,
+      seedDraft: { ...seed },
       savedSignature: normalizeDraftPayload(seed).signature || "",
       savedRawSignature: rawDraftSignature(seed)
     };

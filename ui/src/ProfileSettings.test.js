@@ -240,4 +240,271 @@ describe("ProfileSettings", () => {
     expect(screen.getByText("Profile deleted.")).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "default" })).toBeInTheDocument();
   });
+
+  it("disables save button until draft is dirty and valid", async () => {
+    installProfileFetch();
+
+    render(ProfileSettings);
+
+    const betaRow = await findLibraryRow("beta");
+    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+
+    // Save should be disabled with no changes.
+    const saveButton = screen.getByRole("button", { name: "Save" });
+    expect(saveButton.disabled).toBe(true);
+
+    // Make a change — save should become enabled.
+    await fireEvent.input(screen.getByLabelText("Description"), {
+      target: { value: "Changed description" }
+    });
+    expect(saveButton.disabled).toBe(false);
+  });
+
+  it("prompts to discard unsaved changes when switching profiles", async () => {
+    installProfileFetch();
+    global.confirm.mockReturnValue(false);
+
+    render(ProfileSettings);
+
+    const betaRow = await findLibraryRow("beta");
+    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+
+    // Make a change to create dirty state.
+    await fireEvent.input(screen.getByLabelText("Description"), {
+      target: { value: "Dirty change" }
+    });
+
+    // Try to switch to alpha — confirm should be called and switch blocked.
+    const alphaRow = await findLibraryRow("alpha");
+    await fireEvent.click(within(alphaRow).getByRole("button", { name: /alpha/i }));
+
+    expect(global.confirm).toHaveBeenCalledWith("Discard unsaved changes?");
+    // Editor should still show beta's edited description.
+    expect(screen.getByLabelText("Description").value).toBe("Dirty change");
+  });
+
+  it("formats JSON in the config editor", async () => {
+    installProfileFetch();
+
+    render(ProfileSettings);
+
+    await findLibraryRow("default");
+    await fireEvent.click(screen.getByRole("button", { name: "New profile" }));
+
+    // Set compact (unformatted) JSON.
+    await fireEvent.input(screen.getByLabelText("Config JSON"), {
+      target: { value: '{"a":1,"b":2}' }
+    });
+
+    await fireEvent.click(screen.getByRole("button", { name: "Format JSON" }));
+
+    const expected = JSON.stringify({ a: 1, b: 2 }, null, 2);
+    expect(screen.getByLabelText("Config JSON").value).toBe(expected);
+  });
+
+  it("resets changes for an existing profile", async () => {
+    installProfileFetch();
+
+    render(ProfileSettings);
+
+    const betaRow = await findLibraryRow("beta");
+    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+
+    // Save should be disabled (no changes yet).
+    expect(screen.getByRole("button", { name: "Save" }).disabled).toBe(true);
+
+    await fireEvent.input(screen.getByLabelText("Description"), { target: { value: "Changed" } });
+
+    // Save enabled after change — draft is dirty.
+    expect(screen.getByRole("button", { name: "Save" }).disabled).toBe(false);
+
+    // Reset button should be enabled when dirty.
+    const resetButton = screen.getByRole("button", { name: "Reset changes" });
+    expect(resetButton.disabled).toBe(false);
+
+    await fireEvent.click(resetButton);
+
+    // After reset, save should be disabled again (draft matches seed).
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Save" }).disabled).toBe(true);
+    });
+  });
+
+  it("shows cancel button for new drafts and reset button is disabled when clean", async () => {
+    installProfileFetch();
+
+    render(ProfileSettings);
+
+    await findLibraryRow("default");
+    await fireEvent.click(screen.getByRole("button", { name: "New profile" }));
+
+    // New draft: should show "Cancel new profile" instead of "Reset changes".
+    expect(screen.getByRole("button", { name: "Cancel new profile" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reset changes" })).not.toBeInTheDocument();
+  });
+
+  it("shows validation error for empty name", async () => {
+    installProfileFetch();
+
+    render(ProfileSettings);
+
+    await findLibraryRow("default");
+    await fireEvent.click(screen.getByRole("button", { name: "New profile" }));
+
+    // Leave name empty, type something in description to make draft dirty.
+    await fireEvent.input(screen.getByLabelText("Description"), {
+      target: { value: "Some description" }
+    });
+
+    // Validation error should appear for empty name.
+    expect(screen.getByText("Name is required.")).toBeInTheDocument();
+    // Save should be disabled because of validation error.
+    expect(screen.getByRole("button", { name: "Save" }).disabled).toBe(true);
+  });
+
+  it("shows validation error for duplicate profile name", async () => {
+    installProfileFetch();
+
+    render(ProfileSettings);
+
+    await findLibraryRow("default");
+    await fireEvent.click(screen.getByRole("button", { name: "New profile" }));
+
+    // Enter a name that already exists.
+    await fireEvent.input(screen.getByLabelText("Name"), {
+      target: { value: "alpha" }
+    });
+
+    expect(screen.getByText("A profile with that name already exists.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save" }).disabled).toBe(true);
+  });
+
+  it("shows validation error for malformed JSON", async () => {
+    installProfileFetch();
+
+    render(ProfileSettings);
+
+    await findLibraryRow("default");
+    await fireEvent.click(screen.getByRole("button", { name: "New profile" }));
+
+    await fireEvent.input(screen.getByLabelText("Name"), { target: { value: "new-profile" } });
+    await fireEvent.input(screen.getByLabelText("Config JSON"), {
+      target: { value: "not valid json" }
+    });
+
+    expect(screen.getByText("Config must be valid JSON.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save" }).disabled).toBe(true);
+  });
+
+  it("shows validation error when config is a JSON array instead of object", async () => {
+    installProfileFetch();
+
+    render(ProfileSettings);
+
+    await findLibraryRow("default");
+    await fireEvent.click(screen.getByRole("button", { name: "New profile" }));
+
+    await fireEvent.input(screen.getByLabelText("Name"), { target: { value: "arr-profile" } });
+    await fireEvent.input(screen.getByLabelText("Config JSON"), {
+      target: { value: "[1, 2, 3]" }
+    });
+
+    expect(screen.getByText("Config must be a JSON object.")).toBeInTheDocument();
+  });
+
+  it("deletes a profile from the library row action buttons", async () => {
+    const state = installProfileFetch();
+
+    render(ProfileSettings);
+
+    const alphaRow = await findLibraryRow("alpha");
+    await fireEvent.click(within(alphaRow).getByRole("button", { name: "Delete" }));
+
+    expect(global.confirm).toHaveBeenCalledWith('Delete profile "alpha"?');
+  });
+
+  it("duplicates a profile with a copy name", async () => {
+    installProfileFetch();
+
+    render(ProfileSettings);
+
+    const alphaRow = await findLibraryRow("alpha");
+    await fireEvent.click(within(alphaRow).getByRole("button", { name: "Duplicate" }));
+
+    expect(screen.getByRole("heading", { name: "Duplicate draft" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Name").value).toBe("alpha copy");
+    expect(screen.getByLabelText("Config JSON").value).toContain('"ipv4": true');
+  });
+
+  it("filters profiles by search query", async () => {
+    installProfileFetch();
+
+    render(ProfileSettings);
+
+    await findLibraryRow("alpha");
+    expect(await findLibraryRow("beta")).toBeTruthy();
+
+    await fireEvent.input(screen.getByLabelText("Search profiles"), {
+      target: { value: "strict" }
+    });
+
+    await waitFor(() => {
+      const rows = screen.getAllByRole("listitem");
+      expect(rows).toHaveLength(1);
+    });
+    expect(await findLibraryRow("beta")).toBeTruthy();
+    expect(screen.queryByText("alpha")).not.toBeInTheDocument();
+  });
+
+  it("filters profiles by public filter", async () => {
+    installProfileFetch();
+
+    render(ProfileSettings);
+
+    await findLibraryRow("alpha");
+
+    const filterSelect = screen.getByLabelText("Filter");
+    await fireEvent.change(filterSelect, { target: { value: "public" } });
+
+    await waitFor(() => {
+      const rows = screen.getAllByRole("listitem");
+      expect(rows).toHaveLength(1);
+    });
+    expect(await findLibraryRow("alpha")).toBeTruthy();
+  });
+
+  it("filters profiles by in-use filter", async () => {
+    installProfileFetch();
+
+    render(ProfileSettings);
+
+    await findLibraryRow("alpha");
+
+    const filterSelect = screen.getByLabelText("Filter");
+    await fireEvent.change(filterSelect, { target: { value: "in_use" } });
+
+    await waitFor(() => {
+      const rows = screen.getAllByRole("listitem");
+      expect(rows).toHaveLength(1);
+    });
+    expect(await findLibraryRow("beta")).toBeTruthy();
+  });
+
+  it("after save, editor stays on the saved profile", async () => {
+    const state = installProfileFetch();
+
+    render(ProfileSettings);
+
+    await findLibraryRow("default");
+    await fireEvent.click(screen.getByRole("button", { name: "New profile" }));
+    await fireEvent.input(screen.getByLabelText("Name"), { target: { value: "gamma" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(state.createdBodies).toHaveLength(1);
+    });
+
+    // After creation, the editor should show "Edit profile" for the newly created profile.
+    expect(await screen.findByRole("heading", { name: "Edit profile" })).toBeInTheDocument();
+  });
 });

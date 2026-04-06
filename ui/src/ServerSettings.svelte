@@ -285,15 +285,27 @@
     grid-column: 2;
     grid-row: 1;
   }
-  .setting-input input[type="text"],
-  .setting-input input[type="number"] {
+  .setting-input input[type="text"] {
     width: 100%;
     max-width: 300px;
     padding: 4px 6px;
     font-family: inherit;
     font-size: 0.9em;
   }
-  .setting-input input:disabled {
+  .setting-input input[type="number"] {
+    width: 8em;
+    padding: 4px 6px;
+    font-family: inherit;
+    font-size: 0.9em;
+  }
+  .setting-input select {
+    width: auto;
+    padding: 4px 6px;
+    font-family: inherit;
+    font-size: 0.9em;
+  }
+  .setting-input input:disabled,
+  .setting-input select:disabled {
     opacity: 0.5;
     cursor: not-allowed;
   }

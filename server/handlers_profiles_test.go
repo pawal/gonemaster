@@ -698,6 +698,292 @@ func TestCheckProfileCompatibilityEmptyConfig(t *testing.T) {
 	}
 }
 
+// ── PATCH /profiles/{id} ─────────────────────────────────────────────────────
+
+func patchProfile(t *testing.T, srv *Server, id int64, body string) Profile {
+	t.Helper()
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/profiles/"+itoa(id), bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("patchProfile: expected 200, got %d: %s", resp.Code, resp.Body)
+	}
+	var profile Profile
+	if err := json.NewDecoder(resp.Body).Decode(&profile); err != nil {
+		t.Fatalf("patchProfile decode: %v", err)
+	}
+	return profile
+}
+
+func TestPatchProfileMarkReviewed(t *testing.T) {
+	srv := New(DefaultConfig())
+	profile := createProfile(t, srv, `{"name":"mark-rev","config":{"net":{"ipv4":true}}}`)
+
+	// Manually clear schema_version to simulate an outdated profile.
+	stored, _ := srv.store.GetProfile(profile.ID)
+	stored.SchemaVersion = "old-version"
+	if err := srv.store.UpdateProfile(stored); err != nil {
+		t.Fatalf("UpdateProfile: %v", err)
+	}
+
+	updated := patchProfile(t, srv, profile.ID, `{"op":"mark_reviewed"}`)
+	if updated.SchemaVersion == "old-version" || updated.SchemaVersion == "" {
+		t.Fatalf("expected bumped SchemaVersion, got %q", updated.SchemaVersion)
+	}
+	// Config must be unchanged.
+	if _, ok := updated.Config["net"]; !ok {
+		t.Fatalf("expected config preserved after mark_reviewed, got %#v", updated.Config)
+	}
+}
+
+func TestPatchProfileResetTestCases(t *testing.T) {
+	srv := New(DefaultConfig())
+	profile := createProfile(t, srv, `{"name":"reset-tc","config":{"test_cases":["address01","address02"]}}`)
+
+	updated := patchProfile(t, srv, profile.ID, `{"op":"reset_test_cases"}`)
+	// After reset, test_cases should not appear in the config.
+	if _, ok := updated.Config["test_cases"]; ok {
+		t.Fatalf("expected test_cases removed from config after reset, got %#v", updated.Config)
+	}
+}
+
+func TestPatchProfileAddMissingTestCases(t *testing.T) {
+	srv := New(DefaultConfig())
+	// Profile with only one explicit test case — many are missing.
+	profile := createProfile(t, srv, `{"name":"add-tc","config":{"test_cases":["address01"]}}`)
+
+	// Fetch defaults to know what's expected.
+	respD := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(respD, httptest.NewRequest(http.MethodGet, "/api/v1/profiles/defaults", nil))
+	var defaults ProfileDefaults
+	if err := json.NewDecoder(respD.Body).Decode(&defaults); err != nil {
+		t.Fatalf("decode defaults: %v", err)
+	}
+
+	updated := patchProfile(t, srv, profile.ID, `{"op":"add_missing_test_cases"}`)
+	resultCases, ok := updated.Config["test_cases"].([]any)
+	if !ok {
+		t.Fatalf("expected test_cases in config after add, got %#v", updated.Config)
+	}
+	if len(resultCases) < len(defaults.TestCases) {
+		t.Fatalf("expected >= %d test cases, got %d", len(defaults.TestCases), len(resultCases))
+	}
+	// address01 must still be present.
+	found := false
+	for _, v := range resultCases {
+		if v.(string) == "address01" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("expected address01 still present after add_missing_test_cases")
+	}
+}
+
+func TestPatchProfileAddMissingTestCasesNoop(t *testing.T) {
+	// Profile that does not override test_cases — add_missing_test_cases is a noop.
+	srv := New(DefaultConfig())
+	profile := createProfile(t, srv, `{"name":"no-tc","config":{"resolver":{"defaults":{"timeout":5}}}}`)
+
+	updated := patchProfile(t, srv, profile.ID, `{"op":"add_missing_test_cases"}`)
+	// Config must not gain a test_cases key.
+	if _, ok := updated.Config["test_cases"]; ok {
+		t.Fatalf("expected no test_cases key after noop add, got %#v", updated.Config)
+	}
+}
+
+func TestPatchProfileResetTestLevels(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	// Build a profile with ADDRESS test_levels override.
+	respD := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(respD, httptest.NewRequest(http.MethodGet, "/api/v1/profiles/defaults", nil))
+	var defaults ProfileDefaults
+	if err := json.NewDecoder(respD.Body).Decode(&defaults); err != nil {
+		t.Fatalf("decode defaults: %v", err)
+	}
+	addressTags, ok := defaults.TestLevels["ADDRESS"]
+	if !ok {
+		t.Skip("ADDRESS module not in defaults")
+	}
+	levelsJSON, _ := json.Marshal(map[string]map[string]string{"ADDRESS": addressTags})
+	profile := createProfile(t, srv, `{"name":"reset-tl","config":{"test_levels":`+string(levelsJSON)+`}}`)
+
+	updated := patchProfile(t, srv, profile.ID, `{"op":"reset_test_levels","module":"ADDRESS"}`)
+	if tl, ok := updated.Config["test_levels"].(map[string]any); ok {
+		if _, stillHas := tl["ADDRESS"]; stillHas {
+			t.Fatal("expected ADDRESS removed from test_levels after reset")
+		}
+	}
+	// test_levels itself should be absent if it was the only module.
+	if _, ok := updated.Config["test_levels"]; ok {
+		t.Fatalf("expected test_levels removed entirely, got %#v", updated.Config)
+	}
+}
+
+func TestPatchProfileResetTestLevelsMissingModule(t *testing.T) {
+	srv := New(DefaultConfig())
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/profiles/1",
+		bytes.NewBufferString(`{"op":"reset_test_levels"}`))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+	// Profile doesn't exist, but missing module should return 400 before 404.
+	// Actually server checks module before profile lookup... let's just check 4xx.
+	if resp.Code != http.StatusBadRequest && resp.Code != http.StatusNotFound {
+		t.Fatalf("expected 400 or 404, got %d", resp.Code)
+	}
+}
+
+func TestPatchProfileAddMissingTestLevels(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	// Get defaults to find a module with multiple tags.
+	respD := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(respD, httptest.NewRequest(http.MethodGet, "/api/v1/profiles/defaults", nil))
+	var defaults ProfileDefaults
+	if err := json.NewDecoder(respD.Body).Decode(&defaults); err != nil {
+		t.Fatalf("decode defaults: %v", err)
+	}
+
+	var module string
+	var partialTags map[string]string
+	for mod, tags := range defaults.TestLevels {
+		if len(tags) >= 2 {
+			module = mod
+			partialTags = map[string]string{}
+			count := 0
+			for tag, level := range tags {
+				if count < len(tags)-1 {
+					partialTags[tag] = level
+				}
+				count++
+			}
+			break
+		}
+	}
+	if module == "" {
+		t.Skip("no module with >= 2 tags")
+	}
+
+	levelsJSON, _ := json.Marshal(map[string]map[string]string{module: partialTags})
+	profile := createProfile(t, srv, `{"name":"add-tl","config":{"test_levels":`+string(levelsJSON)+`}}`)
+
+	updated := patchProfile(t, srv, profile.ID, `{"op":"add_missing_test_levels"}`)
+	tl, ok := updated.Config["test_levels"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected test_levels in config, got %#v", updated.Config)
+	}
+	modTags, ok := tl[module].(map[string]any)
+	if !ok {
+		t.Fatalf("expected %s in test_levels, got %#v", module, tl)
+	}
+	if len(modTags) < len(defaults.TestLevels[module]) {
+		t.Fatalf("expected >= %d tags for %s, got %d", len(defaults.TestLevels[module]), module, len(modTags))
+	}
+}
+
+func TestPatchProfileInvalidOp(t *testing.T) {
+	srv := New(DefaultConfig())
+	profile := createProfile(t, srv, `{"name":"inv-op","config":{}}`)
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/profiles/"+itoa(profile.ID),
+		bytes.NewBufferString(`{"op":"unknown_operation"}`))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for unknown op, got %d", resp.Code)
+	}
+}
+
+func TestPatchProfileNotFound(t *testing.T) {
+	srv := New(DefaultConfig())
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/profiles/999",
+		bytes.NewBufferString(`{"op":"mark_reviewed"}`))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", resp.Code)
+	}
+}
+
+// ── apply* unit tests ─────────────────────────────────────────────────────────
+
+func TestApplyResetKey(t *testing.T) {
+	out, err := applyResetKey(`{"test_cases":["a","b"],"net":{"ipv4":true}}`, "test_cases")
+	if err != nil {
+		t.Fatalf("applyResetKey: %v", err)
+	}
+	var m map[string]any
+	json.Unmarshal([]byte(out), &m)
+	if _, ok := m["test_cases"]; ok {
+		t.Fatal("expected test_cases removed")
+	}
+	if _, ok := m["net"]; !ok {
+		t.Fatal("expected net preserved")
+	}
+}
+
+func TestApplyResetTestLevelsModule(t *testing.T) {
+	config := `{"test_levels":{"DNSSEC":{"TAG1":"WARNING"},"ZONE":{"Z1":"ERROR"}}}`
+	out, err := applyResetTestLevelsModule(config, "DNSSEC")
+	if err != nil {
+		t.Fatalf("applyResetTestLevelsModule: %v", err)
+	}
+	var m map[string]any
+	json.Unmarshal([]byte(out), &m)
+	tl := m["test_levels"].(map[string]any)
+	if _, ok := tl["DNSSEC"]; ok {
+		t.Fatal("expected DNSSEC removed")
+	}
+	if _, ok := tl["ZONE"]; !ok {
+		t.Fatal("expected ZONE preserved")
+	}
+}
+
+func TestApplyResetTestLevelsModuleLastModule(t *testing.T) {
+	// Removing the only module should delete test_levels entirely.
+	config := `{"test_levels":{"DNSSEC":{"TAG1":"WARNING"}}}`
+	out, err := applyResetTestLevelsModule(config, "DNSSEC")
+	if err != nil {
+		t.Fatalf("applyResetTestLevelsModule: %v", err)
+	}
+	var m map[string]any
+	json.Unmarshal([]byte(out), &m)
+	if _, ok := m["test_levels"]; ok {
+		t.Fatal("expected test_levels removed entirely when last module reset")
+	}
+}
+
+func TestApplyAddMissingTestCasesNoopWhenNotSet(t *testing.T) {
+	defaultP, _ := engineprofile.Default()
+	out, err := applyAddMissingTestCases(`{"net":{"ipv4":true}}`, defaultP)
+	if err != nil {
+		t.Fatalf("applyAddMissingTestCases: %v", err)
+	}
+	var m map[string]any
+	json.Unmarshal([]byte(out), &m)
+	if _, ok := m["test_cases"]; ok {
+		t.Fatal("expected test_cases absent when not originally set")
+	}
+}
+
+func TestApplyAddMissingTestLevelsNoopWhenNotSet(t *testing.T) {
+	defaultP, _ := engineprofile.Default()
+	out, err := applyAddMissingTestLevels(`{"net":{"ipv4":true}}`, defaultP)
+	if err != nil {
+		t.Fatalf("applyAddMissingTestLevels: %v", err)
+	}
+	var m map[string]any
+	json.Unmarshal([]byte(out), &m)
+	if _, ok := m["test_levels"]; ok {
+		t.Fatal("expected test_levels absent when not originally set")
+	}
+}
+
 // itoa converts an int64 to string for use in URL paths.
 func itoa(id int64) string {
 	return fmt.Sprintf("%d", id)

@@ -168,6 +168,7 @@ func (s *Server) routes() {
 	apiMux.HandleFunc("GET /profiles/defaults", s.handleProfileDefaults)
 	apiMux.HandleFunc("GET /profiles/compatibility", s.handleProfilesCompatibility)
 	apiMux.HandleFunc("GET /profiles/{id}/compatibility", s.handleProfileCompatibility)
+	apiMux.HandleFunc("PATCH /profiles/{id}", s.handlePatchProfile)
 	apiMux.HandleFunc("/profiles/{id}", s.handleProfileByID)
 	apiMux.HandleFunc("/profiles", s.handleProfiles)
 

@@ -77,11 +77,32 @@ describe("ProfileSettings", () => {
     { name: "prod", default_profile_id: 2 }
   ]);
 
+  const compatResultCompatible = () => ({
+    compatible: true,
+    schema_version: "v1.0.0",
+    current_version: "v1.0.0",
+    issues: []
+  });
+
+  const compatResultIncompatible = () => ({
+    compatible: false,
+    schema_version: "v0.9.0",
+    current_version: "v1.0.0",
+    issues: [
+      {
+        type: "missing_test_case",
+        detail: "Profile sets test_cases but is missing: zone14",
+        suggestion: "Add zone14 to test_cases, or remove test_cases to inherit all defaults."
+      }
+    ]
+  });
+
   const installProfileFetch = (scenario = {}) => {
     let profiles = sampleProfiles();
     const tags = sampleTags();
     const createdBodies = [];
     const updatedBodies = [];
+    const patchedBodies = [];
 
     global.fetch.mockImplementation((url, requestOptions = {}) => {
       const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
@@ -119,9 +140,28 @@ describe("ProfileSettings", () => {
         profiles = profiles.map((profile) => profile.id === 2 ? updated : profile);
         return jsonResponse(updated);
       }
+      if (value === "/api/v1/profiles/2" && method === "PATCH") {
+        const body = JSON.parse(requestOptions.body);
+        patchedBodies.push(body);
+        if (scenario.patchError) {
+          return jsonResponse({ error: { message: scenario.patchError } }, false);
+        }
+        const patched = { ...profiles.find((p) => p.id === 2), schema_version: "v1.0.0" };
+        profiles = profiles.map((p) => p.id === 2 ? patched : p);
+        return jsonResponse(patched);
+      }
       if (value === "/api/v1/profiles/3" && method === "DELETE") {
         profiles = profiles.filter((profile) => profile.id !== 3);
         return emptyResponse();
+      }
+      if (/\/api\/v1\/profiles\/\d+\/compatibility$/.test(value)) {
+        if (scenario.incompatibleProfileId) {
+          const id = parseInt(value.match(/\/profiles\/(\d+)\//)?.[1]);
+          return jsonResponse(id === scenario.incompatibleProfileId
+            ? compatResultIncompatible()
+            : compatResultCompatible());
+        }
+        return jsonResponse(compatResultCompatible());
       }
       if (value === "/api/v1/tags?limit=500") return jsonResponse(tags);
       return jsonResponse({});
@@ -130,6 +170,7 @@ describe("ProfileSettings", () => {
     return {
       createdBodies,
       updatedBodies,
+      patchedBodies,
       getProfiles: () => profiles
     };
   };
@@ -506,5 +547,130 @@ describe("ProfileSettings", () => {
 
     // After creation, the editor should show "Edit profile" for the newly created profile.
     expect(await screen.findByRole("heading", { name: "Edit profile" })).toBeInTheDocument();
+  });
+
+  // ── compatibility banner ───────────────────────────────────────────────────
+
+  it("shows no compatibility banner for a compatible profile", async () => {
+    installProfileFetch(); // all profiles return compatible by default
+
+    render(ProfileSettings);
+
+    const betaRow = await findLibraryRow("beta");
+    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+
+    // Banner should not be present.
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("shows compatibility banner with issue detail for an incompatible profile", async () => {
+    // beta (id=2) is incompatible
+    installProfileFetch({ incompatibleProfileId: 2 });
+
+    render(ProfileSettings);
+
+    const betaRow = await findLibraryRow("beta");
+    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.getByText(/1 compatibility issue/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/zone14/).length).toBeGreaterThan(0);
+  });
+
+  it("banner shows action buttons for missing_test_case issues", async () => {
+    installProfileFetch({ incompatibleProfileId: 2 });
+
+    render(ProfileSettings);
+
+    const betaRow = await findLibraryRow("beta");
+    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+
+    await screen.findByRole("alert");
+    expect(screen.getByRole("button", { name: "Add missing test cases" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reset test_cases to inherit" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Mark as reviewed" })).toBeInTheDocument();
+  });
+
+  it("compatibility banner disappears after switching to default profile", async () => {
+    installProfileFetch({ incompatibleProfileId: 2 });
+
+    render(ProfileSettings);
+
+    const betaRow = await findLibraryRow("beta");
+    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+    await screen.findByRole("alert");
+
+    // Switch to default profile — banner should disappear.
+    const defaultRow = await findLibraryRow("default");
+    await fireEvent.click(within(defaultRow).getByRole("button", { name: /default/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+  });
+
+  it("action buttons are disabled when draft has unsaved changes", async () => {
+    installProfileFetch({ incompatibleProfileId: 2 });
+
+    render(ProfileSettings);
+
+    const betaRow = await findLibraryRow("beta");
+    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+
+    await screen.findByRole("alert");
+
+    // Make a change in the editor.
+    await fireEvent.input(screen.getByLabelText("Description"), { target: { value: "changed" } });
+
+    expect(screen.getByRole("button", { name: "Mark as reviewed" }).disabled).toBe(true);
+    expect(screen.getByRole("button", { name: "Add missing test cases" }).disabled).toBe(true);
+  });
+
+  it("clicking 'Mark as reviewed' sends PATCH mark_reviewed op", async () => {
+    const state = installProfileFetch({ incompatibleProfileId: 2 });
+
+    render(ProfileSettings);
+
+    const betaRow = await findLibraryRow("beta");
+    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+
+    await screen.findByRole("alert");
+    await fireEvent.click(screen.getByRole("button", { name: "Mark as reviewed" }));
+
+    await waitFor(() => {
+      expect(state.patchedBodies).toHaveLength(1);
+    });
+    expect(state.patchedBodies[0]).toEqual({ op: "mark_reviewed" });
+  });
+
+  it("clicking 'Add missing test cases' sends PATCH add_missing_test_cases op", async () => {
+    const state = installProfileFetch({ incompatibleProfileId: 2 });
+
+    render(ProfileSettings);
+
+    const betaRow = await findLibraryRow("beta");
+    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+
+    await screen.findByRole("alert");
+    await fireEvent.click(screen.getByRole("button", { name: "Add missing test cases" }));
+
+    await waitFor(() => {
+      expect(state.patchedBodies).toHaveLength(1);
+    });
+    expect(state.patchedBodies[0]).toEqual({ op: "add_missing_test_cases" });
+  });
+
+  it("shows error notice when PATCH fix fails", async () => {
+    installProfileFetch({ incompatibleProfileId: 2, patchError: "server unavailable" });
+
+    render(ProfileSettings);
+
+    const betaRow = await findLibraryRow("beta");
+    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+
+    await screen.findByRole("alert");
+    await fireEvent.click(screen.getByRole("button", { name: "Mark as reviewed" }));
+
+    expect(await screen.findByText(/Failed to apply fix: server unavailable/i)).toBeInTheDocument();
   });
 });

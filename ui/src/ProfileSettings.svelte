@@ -9,8 +9,10 @@
 
   let loading = false;
   let saving = false;
+  let applyingFix = false;
   let deletingProfileId = null;
   let defaultProfile = null;
+  let compatibility = null;
   let storedProfiles = [];
   let filteredProfiles = [];
   let usageCounts = {};
@@ -140,6 +142,33 @@
     ...overrides
   });
 
+  const loadCompatibility = async (profileId) => {
+    compatibility = null;
+    try {
+      compatibility = await apiFetch(`/profiles/${profileId}/compatibility`);
+    } catch (_) {
+      // Ignore — compatibility is best-effort; don't surface load errors
+    }
+  };
+
+  const applyCompatFix = async (op, module = null) => {
+    if (!editingProfileId || applyingFix) return;
+    applyingFix = true;
+    try {
+      const body = module ? { op, module } : { op };
+      await apiFetch(`/profiles/${editingProfileId}`, {
+        method: "PATCH",
+        body: JSON.stringify(body)
+      });
+      await loadProfiles({ selectKey: `profile:${editingProfileId}`, preserveNotice: true });
+      dispatch("profileschanged", { profiles: storedProfiles });
+    } catch (error) {
+      setNotice($t("profile_compat_fix_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      applyingFix = false;
+    }
+  };
+
   const maybeDiscardChanges = () => {
     if (!isEditableWorkspace || !hasDirtyChanges) return true;
     return window.confirm($t("profile_editor_discard_confirm"));
@@ -148,6 +177,7 @@
   const openDefaultProfile = ({ clear = true } = {}) => {
     workspace = { type: "default" };
     draft = emptyDraft(defaultProfile?.config || {});
+    compatibility = null;
     if (clear) clearNotice();
   };
 
@@ -163,6 +193,7 @@
       savedRawSignature: rawDraftSignature(nextDraft)
     };
     draft = nextDraft;
+    loadCompatibility(profile.id);
     if (clear) clearNotice();
   };
 
@@ -176,6 +207,7 @@
       savedRawSignature: rawDraftSignature(seed)
     };
     draft = seed;
+    compatibility = null;
     if (clear) clearNotice();
   };
 
@@ -312,6 +344,9 @@
         "ok"
       );
       await loadProfiles({ selectKey: `profile:${saved.id}`, preserveNotice: true });
+      if (workspace.type === "edit") {
+        await loadCompatibility(saved.id);
+      }
       dispatch("profileschanged", { profiles: storedProfiles });
     } catch (error) {
       setNotice($t("profile_save_error", { error: error.message || "unknown error" }), "warn");
@@ -565,6 +600,52 @@
               {#each selectedUsageTags as tagName}
                 <span class="badge usage-badge">{tagName}</span>
               {/each}
+            </div>
+          </div>
+        {/if}
+
+        {#if workspace.type === "edit" && compatibility && !compatibility.compatible}
+          <div class="compat-banner" role="alert" aria-label={$t("profile_compat_banner_label")}>
+            <div class="compat-banner-summary">
+              <strong>{$t("profile_compat_issues_heading", { count: compatibility.issues.length })}</strong>
+            </div>
+            <ul class="compat-issue-list">
+              {#each compatibility.issues as issue}
+                <li class="compat-issue">
+                  <span class="compat-issue-detail">{issue.detail}</span>
+                  <span class="compat-issue-suggestion small">{issue.suggestion}</span>
+                </li>
+              {/each}
+            </ul>
+            <div class="row compat-actions">
+              {#if compatibility.issues.some(i => i.type === "missing_test_case")}
+                <button class="ghost" type="button" disabled={applyingFix || hasDirtyChanges}
+                  on:click={() => applyCompatFix("add_missing_test_cases")}>
+                  {$t("profile_compat_add_test_cases")}
+                </button>
+              {/if}
+              {#if compatibility.issues.some(i => i.type === "missing_test_levels")}
+                <button class="ghost" type="button" disabled={applyingFix || hasDirtyChanges}
+                  on:click={() => applyCompatFix("add_missing_test_levels")}>
+                  {$t("profile_compat_add_test_levels")}
+                </button>
+              {/if}
+              {#if compatibility.issues.some(i => i.type === "missing_test_case")}
+                <button class="ghost" type="button" disabled={applyingFix || hasDirtyChanges}
+                  on:click={() => applyCompatFix("reset_test_cases")}>
+                  {$t("profile_compat_reset_test_cases")}
+                </button>
+              {/if}
+              {#each compatibility.issues.filter(i => i.type === "missing_test_levels") as issue}
+                <button class="ghost" type="button" disabled={applyingFix || hasDirtyChanges}
+                  on:click={() => applyCompatFix("reset_test_levels", issue.module)}>
+                  {$t("profile_compat_reset_test_levels", { module: issue.module })}
+                </button>
+              {/each}
+              <button class="ghost" type="button" disabled={applyingFix || hasDirtyChanges}
+                on:click={() => applyCompatFix("mark_reviewed")}>
+                {$t("profile_compat_mark_reviewed")}
+              </button>
             </div>
           </div>
         {/if}
@@ -826,6 +907,43 @@
   .profile-config-textarea {
     min-height: 320px;
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
+  .compat-banner {
+    border: 1px solid #fcd34d;
+    border-radius: 10px;
+    background: #fef9ee;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .compat-issue-list {
+    margin: 0;
+    padding: 0 0 0 1.2em;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .compat-issue {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .compat-issue-detail {
+    font-size: 0.85rem;
+  }
+
+  .compat-issue-suggestion {
+    color: var(--muted);
+  }
+
+  .compat-actions {
+    flex-wrap: wrap;
+    gap: 6px;
   }
 
   .editor-actions {

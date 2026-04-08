@@ -20,6 +20,8 @@ Options:
   --max-concurrent-jobs N      Engine limiter (default: 8)
   --port N                     Listen port (default: 18080)
   --profile FILE               Profile path passed to server (optional)
+  --db-driver DRIVER           Storage backend passed to server (optional)
+  --db-dsn DSN                 Database DSN/path passed to server (optional)
   --min-level LEVEL            Server min-level (default: INFO)
   --batch-poll-seconds N       Batch polling interval (default: 2)
   --sample-seconds N           Sampling interval in seconds; 0 disables periodic sampling (default: 1)
@@ -142,7 +144,7 @@ compute_markdown_summary() {
     echo "- Domains file: \`$(jq -r '.domains_file' "$report_json")\` (\`$(jq -r '.domains_count' "$report_json")\` domains, sha256 \`$(jq -r '.domains_sha256' "$report_json")\`)"
     echo "- Warmups per variant: \`$(jq -r '.warmup_runs_per_variant' "$report_json")\`"
     echo "- Measured runs per variant: \`$(jq -r '.measured_runs_per_variant' "$report_json")\`"
-    echo "- Server settings: \`workers=$(jq -r '.workers' "$report_json")\`, \`max-concurrent-jobs=$(jq -r '.max_concurrent_jobs' "$report_json")\`"
+    echo "- Server settings: \`workers=$(jq -r '.workers' "$report_json")\`, \`max-concurrent-jobs=$(jq -r '.max_concurrent_jobs' "$report_json")\`, \`db-driver=$(jq -r '.db_driver' "$report_json")\`"
     echo
     echo "## Variant Provenance"
     echo
@@ -173,6 +175,8 @@ workers=8
 max_concurrent_jobs=8
 port=18080
 profile_file=""
+db_driver=""
+db_dsn=""
 min_level="INFO"
 batch_poll_seconds=2
 sample_seconds=1
@@ -192,6 +196,8 @@ while [ $# -gt 0 ]; do
     --max-concurrent-jobs) max_concurrent_jobs="$2"; shift 2 ;;
     --port) port="$2"; shift 2 ;;
     --profile) profile_file="$2"; shift 2 ;;
+    --db-driver) db_driver="$2"; shift 2 ;;
+    --db-dsn) db_dsn="$2"; shift 2 ;;
     --min-level) min_level="$2"; shift 2 ;;
     --batch-poll-seconds) batch_poll_seconds="$2"; shift 2 ;;
     --sample-seconds) sample_seconds="$2"; shift 2 ;;
@@ -224,6 +230,10 @@ if [ -n "$profile_file" ] && [ ! -f "$profile_file" ]; then
   echo "profile file not found: $profile_file" >&2
   exit 1
 fi
+if [ -n "$db_dsn" ] && [ -z "$db_driver" ]; then
+  echo "--db-dsn requires --db-driver" >&2
+  exit 1
+fi
 
 need_cmd git
 need_cmd go
@@ -238,6 +248,8 @@ repo_root="$(git rev-parse --show-toplevel)"
 run_ts="$(date -u +%Y%m%d-%H%M%S)"
 if [ -z "$out_dir" ]; then
   out_dir="$repo_root/perf-runs/server/tracks-$run_ts"
+elif [[ "$out_dir" != /* ]]; then
+  out_dir="$repo_root/$out_dir"
 fi
 if [ -z "$worktree_root" ]; then
   worktree_root="/tmp/gonemaster-perf-worktrees-$run_ts"
@@ -390,6 +402,16 @@ while IFS=$'\t' read -r variant run_index warmup; do
   server_cmd=("$binary_path" "--listen" "127.0.0.1:$port" "--workers" "$workers" "--max-concurrent-jobs" "$max_concurrent_jobs" "--min-level" "$min_level")
   if [ -n "$profile_file" ]; then
     server_cmd+=("--profile" "$profile_file")
+  fi
+  if [ -n "$db_driver" ]; then
+    server_cmd+=("--db-driver" "$db_driver")
+    run_db_dsn="$db_dsn"
+    if [ -z "$run_db_dsn" ] && [ "$db_driver" = "sqlite" ]; then
+      run_db_dsn="$run_dir/jobs.sqlite"
+    fi
+    if [ -n "$run_db_dsn" ]; then
+      server_cmd+=("--db-dsn" "$run_db_dsn")
+    fi
   fi
   "${server_cmd[@]}" >"$run_dir/server.stdout.log" 2>"$run_dir/server.stderr.log" &
   server_pid="$!"
@@ -604,6 +626,7 @@ jq -s \
   --argjson repeats "$repeats" \
   --argjson workers "$workers" \
   --argjson max_concurrent_jobs "$max_concurrent_jobs" \
+  --arg db_driver "${db_driver:-memory}" \
   --argjson variants "$(cat "$out_dir/variants.json")" \
   '
   def median(a):
@@ -631,6 +654,7 @@ jq -s \
     measured_runs_per_variant: $repeats,
     workers: $workers,
     max_concurrent_jobs: $max_concurrent_jobs,
+    db_driver: $db_driver,
     variants: $variants,
     runs: $runs,
     aggregate: (

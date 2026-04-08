@@ -319,6 +319,38 @@ func (s *Server) handlePatchProfile(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, apiProfile)
 }
 
+// MarkAllReviewedResult is the response body for POST /profiles/mark-all-reviewed.
+type MarkAllReviewedResult struct {
+	Updated int `json:"updated"`
+}
+
+// handleMarkAllProfilesReviewed handles POST /profiles/mark-all-reviewed.
+// Bumps schema_version to the current engine version for every stored profile.
+func (s *Server) handleMarkAllProfilesReviewed(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
+		return
+	}
+	if !enforceCSRF(w, r) {
+		return
+	}
+	profiles := s.store.ListProfiles()
+	currentVersion := engine.VersionFull()
+	updated := 0
+	for _, p := range profiles {
+		if p.SchemaVersion == currentVersion {
+			continue
+		}
+		p.SchemaVersion = currentVersion
+		if err := s.store.UpdateProfile(p); err != nil {
+			writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
+			return
+		}
+		updated++
+	}
+	writeJSON(w, http.StatusOK, MarkAllReviewedResult{Updated: updated})
+}
+
 // applyAddMissingTestCases returns updated configJSON with any default test
 // cases that are absent from the profile's test_cases list appended and sorted.
 // If the profile does not explicitly set test_cases, the original JSON is

@@ -988,3 +988,84 @@ func TestApplyAddMissingTestLevelsNoopWhenNotSet(t *testing.T) {
 func itoa(id int64) string {
 	return fmt.Sprintf("%d", id)
 }
+
+// ── POST /profiles/mark-all-reviewed ─────────────────────────────────────────
+
+func TestMarkAllProfilesReviewed(t *testing.T) {
+	srv := New(DefaultConfig())
+	p1 := createProfile(t, srv, `{"name":"p1","config":{}}`)
+	p2 := createProfile(t, srv, `{"name":"p2","config":{}}`)
+
+	// Manually set schema_version to old value so they appear out of date.
+	stored1, _ := srv.store.GetProfile(p1.ID)
+	stored1.SchemaVersion = "v0.9.0"
+	_ = srv.store.UpdateProfile(stored1)
+	stored2, _ := srv.store.GetProfile(p2.ID)
+	stored2.SchemaVersion = "v0.9.0"
+	_ = srv.store.UpdateProfile(stored2)
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/profiles/mark-all-reviewed", bytes.NewBufferString("{}"))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
+	}
+
+	var result MarkAllReviewedResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if result.Updated != 2 {
+		t.Fatalf("expected updated=2, got %d", result.Updated)
+	}
+
+	// Both profiles should now have the current engine version.
+	after1, _ := srv.store.GetProfile(p1.ID)
+	after2, _ := srv.store.GetProfile(p2.ID)
+	if after1.SchemaVersion == "v0.9.0" {
+		t.Fatal("p1 schema_version not bumped")
+	}
+	if after2.SchemaVersion == "v0.9.0" {
+		t.Fatal("p2 schema_version not bumped")
+	}
+}
+
+func TestMarkAllProfilesReviewedAlreadyCurrent(t *testing.T) {
+	srv := New(DefaultConfig())
+	// Create two profiles — both will have schema_version set to engine.VersionFull() by default.
+	createProfile(t, srv, `{"name":"p1","config":{}}`)
+	createProfile(t, srv, `{"name":"p2","config":{}}`)
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/profiles/mark-all-reviewed", bytes.NewBufferString("{}"))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
+	}
+
+	var result MarkAllReviewedResult
+	json.NewDecoder(resp.Body).Decode(&result)
+	if result.Updated != 0 {
+		t.Fatalf("expected updated=0 (already current), got %d", result.Updated)
+	}
+}
+
+func TestMarkAllProfilesReviewedEmptyStore(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/profiles/mark-all-reviewed", bytes.NewBufferString("{}"))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
+	}
+
+	var result MarkAllReviewedResult
+	json.NewDecoder(resp.Body).Decode(&result)
+	if result.Updated != 0 {
+		t.Fatalf("expected updated=0 for empty store, got %d", result.Updated)
+	}
+}

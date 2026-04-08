@@ -97,12 +97,21 @@ describe("ProfileSettings", () => {
     ]
   });
 
+  const sampleCompatSummaries = (incompatibleId = null) => sampleProfiles().map((p) => ({
+    id: p.id,
+    name: p.name,
+    compatible: p.id !== incompatibleId,
+    issue_count: p.id === incompatibleId ? 1 : 0
+  }));
+
   const installProfileFetch = (scenario = {}) => {
     let profiles = sampleProfiles();
+    let compatSummaries = sampleCompatSummaries(scenario.incompatibleProfileId || null);
     const tags = sampleTags();
     const createdBodies = [];
     const updatedBodies = [];
     const patchedBodies = [];
+    let markAllReviewedCalls = 0;
 
     global.fetch.mockImplementation((url, requestOptions = {}) => {
       const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
@@ -148,11 +157,24 @@ describe("ProfileSettings", () => {
         }
         const patched = { ...profiles.find((p) => p.id === 2), schema_version: "v1.0.0" };
         profiles = profiles.map((p) => p.id === 2 ? patched : p);
+        compatSummaries = sampleCompatSummaries(null);
         return jsonResponse(patched);
       }
       if (value === "/api/v1/profiles/3" && method === "DELETE") {
         profiles = profiles.filter((profile) => profile.id !== 3);
         return emptyResponse();
+      }
+      if (value === "/api/v1/profiles/compatibility" && method === "GET") {
+        return jsonResponse(compatSummaries);
+      }
+      if (value === "/api/v1/profiles/mark-all-reviewed" && method === "POST") {
+        markAllReviewedCalls++;
+        if (scenario.markAllError) {
+          return jsonResponse({ error: { message: scenario.markAllError } }, false);
+        }
+        const updated = compatSummaries.filter((s) => !s.compatible).length;
+        compatSummaries = sampleCompatSummaries(null);
+        return jsonResponse({ updated });
       }
       if (/\/api\/v1\/profiles\/\d+\/compatibility$/.test(value)) {
         if (scenario.incompatibleProfileId) {
@@ -171,6 +193,7 @@ describe("ProfileSettings", () => {
       createdBodies,
       updatedBodies,
       patchedBodies,
+      getMarkAllReviewedCalls: () => markAllReviewedCalls,
       getProfiles: () => profiles
     };
   };
@@ -672,5 +695,81 @@ describe("ProfileSettings", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Mark as reviewed" }));
 
     expect(await screen.findByText(/Failed to apply fix: server unavailable/i)).toBeInTheDocument();
+  });
+
+  // ── profile list: compat badges and summary ────────────────────────────────
+
+  it("shows no 'needs review' warning when all profiles are compatible", async () => {
+    installProfileFetch(); // no incompatibleProfileId — all compatible
+
+    render(ProfileSettings);
+    await findLibraryRow("alpha");
+
+    expect(screen.queryByText("Needs review")).not.toBeInTheDocument();
+    expect(screen.queryByText(/profile\(s\) need review/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /mark all as reviewed/i })).not.toBeInTheDocument();
+  });
+
+  it("shows 'Needs review' badge on incompatible profiles", async () => {
+    installProfileFetch({ incompatibleProfileId: 2 });
+
+    render(ProfileSettings);
+
+    const betaRow = await findLibraryRow("beta");
+    expect(await within(betaRow).findByText("Needs review")).toBeInTheDocument();
+
+    // alpha should not have the badge
+    const alphaRow = await findLibraryRow("alpha");
+    expect(within(alphaRow).queryByText("Needs review")).not.toBeInTheDocument();
+  });
+
+  it("shows summary line with count when profiles need review", async () => {
+    installProfileFetch({ incompatibleProfileId: 2 });
+
+    render(ProfileSettings);
+    await findLibraryRow("alpha");
+
+    expect(await screen.findByText(/1 profile\(s\) need review/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /mark all as reviewed/i })).toBeInTheDocument();
+  });
+
+  it("clicking 'Mark all as reviewed' calls POST /profiles/mark-all-reviewed", async () => {
+    const state = installProfileFetch({ incompatibleProfileId: 2 });
+
+    render(ProfileSettings);
+    await findLibraryRow("alpha");
+
+    const btn = await screen.findByRole("button", { name: /mark all as reviewed/i });
+    await fireEvent.click(btn);
+
+    await waitFor(() => {
+      expect(state.getMarkAllReviewedCalls()).toBe(1);
+    });
+  });
+
+  it("summary line disappears after mark all reviewed", async () => {
+    installProfileFetch({ incompatibleProfileId: 2 });
+
+    render(ProfileSettings);
+    await findLibraryRow("alpha");
+
+    await screen.findByText(/1 profile\(s\) need review/i);
+    await fireEvent.click(screen.getByRole("button", { name: /mark all as reviewed/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByText(/profile\(s\) need review/i)).not.toBeInTheDocument();
+    });
+  });
+
+  it("shows error notice when mark all reviewed fails", async () => {
+    installProfileFetch({ incompatibleProfileId: 2, markAllError: "db unavailable" });
+
+    render(ProfileSettings);
+    await findLibraryRow("alpha");
+
+    await screen.findByText(/1 profile\(s\) need review/i);
+    await fireEvent.click(screen.getByRole("button", { name: /mark all as reviewed/i }));
+
+    expect(await screen.findByText(/Failed to apply fix: db unavailable/i)).toBeInTheDocument();
   });
 });

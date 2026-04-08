@@ -13,6 +13,8 @@
   let deletingProfileId = null;
   let defaultProfile = null;
   let compatibility = null;
+  let compatSummaries = [];
+  let markingAllReviewed = false;
   let storedProfiles = [];
   let filteredProfiles = [];
   let usageCounts = {};
@@ -169,6 +171,20 @@
     }
   };
 
+  const markAllReviewed = async () => {
+    if (markingAllReviewed) return;
+    markingAllReviewed = true;
+    try {
+      await apiFetch("/profiles/mark-all-reviewed", { method: "POST", body: "{}" });
+      await loadProfiles({ preserveNotice: true });
+      dispatch("profileschanged", { profiles: storedProfiles });
+    } catch (error) {
+      setNotice($t("profile_compat_fix_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      markingAllReviewed = false;
+    }
+  };
+
   const maybeDiscardChanges = () => {
     if (!isEditableWorkspace || !hasDirtyChanges) return true;
     return window.confirm($t("profile_editor_discard_confirm"));
@@ -277,15 +293,17 @@
     const { selectKey = null, preserveNotice = false } = options;
     loading = true;
     try {
-      const [defaultData, profileData, tagData] = await Promise.all([
+      const [defaultData, profileData, tagData, compatData] = await Promise.all([
         apiFetch("/profiles/default"),
         apiFetch("/profiles"),
-        apiFetch("/tags?limit=500")
+        apiFetch("/tags?limit=500"),
+        apiFetch("/profiles/compatibility").catch(() => [])
       ]);
       defaultProfile = defaultData && typeof defaultData === "object" && Number(defaultData.id) === 0
         ? defaultData
         : null;
       storedProfiles = Array.isArray(profileData) ? profileData : [];
+      compatSummaries = Array.isArray(compatData) ? compatData : [];
       const usage = buildProfileUsage(Array.isArray(tagData) ? tagData : []);
       usageCounts = usage.counts;
       usageTags = usage.refs;
@@ -388,6 +406,8 @@
   };
 
   $: libraryProfiles = defaultProfile ? [defaultProfile, ...storedProfiles] : storedProfiles;
+  $: incompatibleIds = new Set(compatSummaries.filter(s => !s.compatible).map(s => s.id));
+  $: incompatibleCount = incompatibleIds.size;
   $: {
     // Reference searchQuery and activeFilter so Svelte tracks them as dependencies.
     void searchQuery;
@@ -464,6 +484,18 @@
         </div>
       </div>
 
+      {#if incompatibleCount > 0}
+        <div class="library-compat-warning" role="status">
+          <span class="small">{$t("profile_library_compat_warning", { count: incompatibleCount })}</span>
+          <button
+            class="ghost mini-button"
+            type="button"
+            disabled={markingAllReviewed}
+            on:click={markAllReviewed}
+          >{markingAllReviewed ? $t("submitting") : $t("profile_library_mark_all_reviewed")}</button>
+        </div>
+      {/if}
+
       {#if loading}
         <p class="small">{$t("loading")}</p>
       {:else if filteredProfiles.length === 0}
@@ -485,6 +517,9 @@
                       {/if}
                       {#if usageCount(profile.id) > 0}
                         <span class="badge usage-badge">{$t("profile_in_use_badge", { count: usageCount(profile.id) })}</span>
+                      {/if}
+                      {#if incompatibleIds.has(profile.id)}
+                        <span class="badge warn-badge">{$t("profile_compat_needs_review")}</span>
                       {/if}
                     </div>
                   </div>
@@ -874,6 +909,23 @@
   .default-badge {
     background: rgba(18, 95, 54, 0.12);
     color: #166534;
+  }
+
+  .warn-badge {
+    background: rgba(202, 138, 4, 0.15);
+    color: #92400e;
+  }
+
+  .library-compat-warning {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: rgba(202, 138, 4, 0.1);
+    border: 1px solid rgba(202, 138, 4, 0.3);
+    margin-bottom: 4px;
   }
 
   .workspace-summary {

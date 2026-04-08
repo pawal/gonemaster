@@ -165,6 +165,9 @@ func (s *Server) routes() {
 	apiMux.HandleFunc("/tags/{name}", s.handleTagByName)
 	apiMux.HandleFunc("/tags", s.handleTags)
 	apiMux.HandleFunc("GET /profiles/default", s.handleDefaultProfile)
+	apiMux.HandleFunc("GET /profiles/defaults", s.handleProfileDefaults)
+	apiMux.HandleFunc("GET /profiles/compatibility", s.handleProfilesCompatibility)
+	apiMux.HandleFunc("GET /profiles/{id}/compatibility", s.handleProfileCompatibility)
 	apiMux.HandleFunc("/profiles/{id}", s.handleProfileByID)
 	apiMux.HandleFunc("/profiles", s.handleProfiles)
 

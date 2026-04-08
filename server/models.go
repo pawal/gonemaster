@@ -187,24 +187,26 @@ type Batch struct {
 
 // StoredProfile is a named, server-stored test configuration.
 type StoredProfile struct {
-	ID          int64     `json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	Config      string    `json:"config"` // JSON, same schema as profile_overrides
-	Public      bool      `json:"public"` // visible in public UI dropdown
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID            int64     `json:"id"`
+	Name          string    `json:"name"`
+	Description   string    `json:"description"`
+	Config        string    `json:"config"` // JSON, same schema as profile_overrides
+	Public        bool      `json:"public"` // visible in public UI dropdown
+	SchemaVersion string    `json:"schema_version"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 // Profile is the API representation of a stored profile.
 type Profile struct {
-	ID          int64          `json:"id"`
-	Name        string         `json:"name"`
-	Description string         `json:"description"`
-	Config      map[string]any `json:"config"`
-	Public      bool           `json:"public"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
+	ID            int64          `json:"id"`
+	Name          string         `json:"name"`
+	Description   string         `json:"description"`
+	Config        map[string]any `json:"config"`
+	Public        bool           `json:"public"`
+	SchemaVersion string         `json:"schema_version"`
+	CreatedAt     time.Time      `json:"created_at"`
+	UpdatedAt     time.Time      `json:"updated_at"`
 }
 
 // ── Filter types ──────────────────────────────────────────────────────────────

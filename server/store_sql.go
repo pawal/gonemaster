@@ -1541,10 +1541,10 @@ func (s *SQLJobStore) CreateProfile(p StoredProfile) (StoredProfile, error) {
 		publicInt = 1
 	}
 	result, err := s.db.Exec(
-		fmt.Sprintf(`INSERT INTO profiles (name, description, config, public, created_at, updated_at)
-			VALUES (%s, %s, %s, %s, %s, %s)`,
-			s.ph(1), s.ph(2), s.ph(3), s.ph(4), s.ph(5), s.ph(6)),
-		p.Name, p.Description, p.Config, publicInt,
+		fmt.Sprintf(`INSERT INTO profiles (name, description, config, public, schema_version, created_at, updated_at)
+			VALUES (%s, %s, %s, %s, %s, %s, %s)`,
+			s.ph(1), s.ph(2), s.ph(3), s.ph(4), s.ph(5), s.ph(6), s.ph(7)),
+		p.Name, p.Description, p.Config, publicInt, p.SchemaVersion,
 		formatSortableTimestamp(p.CreatedAt), formatSortableTimestamp(p.UpdatedAt))
 	if err != nil {
 		return StoredProfile{}, fmt.Errorf("create profile: %w", err)
@@ -1566,14 +1566,14 @@ func (s *SQLJobStore) CreateProfile(p StoredProfile) (StoredProfile, error) {
 // GetProfile returns a profile by ID.
 func (s *SQLJobStore) GetProfile(id int64) (StoredProfile, bool) {
 	return s.scanProfile(
-		fmt.Sprintf(`SELECT id, name, description, config, public, created_at, updated_at FROM profiles WHERE id = %s`, s.ph(1)),
+		fmt.Sprintf(`SELECT id, name, description, config, public, schema_version, created_at, updated_at FROM profiles WHERE id = %s`, s.ph(1)),
 		id)
 }
 
 // GetProfileByName returns a profile by its unique name.
 func (s *SQLJobStore) GetProfileByName(name string) (StoredProfile, bool) {
 	return s.scanProfile(
-		fmt.Sprintf(`SELECT id, name, description, config, public, created_at, updated_at FROM profiles WHERE name = %s`, s.ph(1)),
+		fmt.Sprintf(`SELECT id, name, description, config, public, schema_version, created_at, updated_at FROM profiles WHERE name = %s`, s.ph(1)),
 		name)
 }
 
@@ -1584,7 +1584,7 @@ func (s *SQLJobStore) scanProfile(query string, args ...any) (StoredProfile, boo
 		createdAt, updatedAt string
 	)
 	err := s.db.QueryRow(query, args...).Scan(
-		&p.ID, &p.Name, &p.Description, &p.Config, &publicInt, &createdAt, &updatedAt)
+		&p.ID, &p.Name, &p.Description, &p.Config, &publicInt, &p.SchemaVersion, &createdAt, &updatedAt)
 	if err != nil {
 		return StoredProfile{}, false
 	}
@@ -1602,9 +1602,9 @@ func (s *SQLJobStore) UpdateProfile(p StoredProfile) error {
 		publicInt = 1
 	}
 	result, err := s.db.Exec(
-		fmt.Sprintf(`UPDATE profiles SET name = %s, description = %s, config = %s, public = %s, updated_at = %s WHERE id = %s`,
-			s.ph(1), s.ph(2), s.ph(3), s.ph(4), s.ph(5), s.ph(6)),
-		p.Name, p.Description, p.Config, publicInt,
+		fmt.Sprintf(`UPDATE profiles SET name = %s, description = %s, config = %s, public = %s, schema_version = %s, updated_at = %s WHERE id = %s`,
+			s.ph(1), s.ph(2), s.ph(3), s.ph(4), s.ph(5), s.ph(6), s.ph(7)),
+		p.Name, p.Description, p.Config, publicInt, p.SchemaVersion,
 		formatSortableTimestamp(p.UpdatedAt), p.ID)
 	if err != nil {
 		return fmt.Errorf("update profile: %w", err)
@@ -1652,7 +1652,7 @@ func (s *SQLJobStore) DeleteProfile(id int64) error {
 // ListProfiles returns all profiles ordered by name.
 func (s *SQLJobStore) ListProfiles() []StoredProfile {
 	rows, err := s.db.Query(
-		`SELECT id, name, description, config, public, created_at, updated_at FROM profiles ORDER BY name`)
+		`SELECT id, name, description, config, public, schema_version, created_at, updated_at FROM profiles ORDER BY name`)
 	if err != nil {
 		return nil
 	}
@@ -1664,7 +1664,7 @@ func (s *SQLJobStore) ListProfiles() []StoredProfile {
 			publicInt            int
 			createdAt, updatedAt string
 		)
-		if err := rows.Scan(&p.ID, &p.Name, &p.Description, &p.Config, &publicInt, &createdAt, &updatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.Name, &p.Description, &p.Config, &publicInt, &p.SchemaVersion, &createdAt, &updatedAt); err != nil {
 			continue
 		}
 		p.Public = publicInt != 0

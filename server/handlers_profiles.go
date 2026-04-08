@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"codeberg.org/pawal/gonemaster/engine"
 	engineprofile "codeberg.org/pawal/gonemaster/engine/profile"
 )
 
@@ -142,6 +143,8 @@ func (s *Server) handleCreateProfile(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_profile", err.Error(), nil)
 		return
 	}
+	stored.SchemaVersion = engine.VersionFull()
+	apiProfile.SchemaVersion = stored.SchemaVersion
 	if _, ok := s.store.GetProfileByName(stored.Name); ok {
 		writeError(w, http.StatusConflict, "profile_exists", "profile name already exists", nil)
 		return
@@ -209,6 +212,8 @@ func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request, id 
 
 	stored.ID = id
 	stored.CreatedAt = existing.CreatedAt
+	stored.SchemaVersion = engine.VersionFull()
+	apiProfile.SchemaVersion = stored.SchemaVersion
 	if err := s.store.UpdateProfile(stored); err != nil {
 		writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
 		return
@@ -328,13 +333,14 @@ func apiProfileFromStored(stored StoredProfile) (Profile, error) {
 		configMap = map[string]any{}
 	}
 	return Profile{
-		ID:          stored.ID,
-		Name:        stored.Name,
-		Description: stored.Description,
-		Config:      configMap,
-		Public:      stored.Public,
-		CreatedAt:   stored.CreatedAt,
-		UpdatedAt:   stored.UpdatedAt,
+		ID:            stored.ID,
+		Name:          stored.Name,
+		Description:   stored.Description,
+		Config:        configMap,
+		Public:        stored.Public,
+		SchemaVersion: stored.SchemaVersion,
+		CreatedAt:     stored.CreatedAt,
+		UpdatedAt:     stored.UpdatedAt,
 	}, nil
 }
 

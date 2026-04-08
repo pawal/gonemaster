@@ -189,13 +189,14 @@ var sqlMigrations = []sqlMigration{
 			}
 			return []string{
 				fmt.Sprintf(`CREATE TABLE IF NOT EXISTS profiles (
-					id          %s,
-					name        VARCHAR(255) NOT NULL UNIQUE,
-					description TEXT         NOT NULL DEFAULT '',
-					config      TEXT         NOT NULL DEFAULT '{}',
-					public      INTEGER      NOT NULL DEFAULT 0,
-					created_at  TEXT         NOT NULL,
-					updated_at  TEXT         NOT NULL
+					id             %s,
+					name           VARCHAR(255) NOT NULL UNIQUE,
+					description    TEXT         NOT NULL DEFAULT '',
+					config         TEXT         NOT NULL DEFAULT '{}',
+					public         INTEGER      NOT NULL DEFAULT 0,
+					schema_version TEXT         NOT NULL DEFAULT '',
+					created_at     TEXT         NOT NULL,
+					updated_at     TEXT         NOT NULL
 				)`, autoinc),
 				fmt.Sprintf(`ALTER TABLE tags ADD COLUMN default_profile_id %s REFERENCES profiles(id) ON DELETE SET NULL`, bigint),
 				`CREATE INDEX IF NOT EXISTS idx_tags_default_profile_id ON tags(default_profile_id)`,

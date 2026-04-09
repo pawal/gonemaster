@@ -156,6 +156,106 @@ resolver:
 ```
 These settings apply to all jobs unless a job overrides the profile.
 
+### Stored profiles
+
+Beyond the file pointed to by `profile_path`, the server can store named profiles
+in the database. Stored profiles can be referenced by id or by name from jobs,
+batches, and tags, and they are managed via the admin UI under
+**Settings → Profiles** or via the `/api/v1/profiles` endpoints.
+
+#### Override-only model
+
+Stored profiles are **sparse overrides** on top of the engine default profile,
+not full snapshots. A stored profile JSON only contains the keys you want to
+change; everything else is inherited from the built-in default at run time.
+
+For example, a stored profile that just shortens the resolver timeout looks
+like this:
+
+```json
+{
+  "resolver": { "defaults": { "timeout": 5 } }
+}
+```
+
+When this profile is used for a job, the engine starts from the default profile
+and applies these keys on top of it. Properties absent from the stored JSON —
+`net.ipv4`, `net.ipv6`, `test_cases`, `test_levels`, etc. — keep their default
+values automatically.
+
+This means you do **not** need to copy the full default profile into every
+stored profile. A common pattern is to keep stored profiles as small as
+possible: each one expresses *only* the difference from the default.
+
+The server validates the stored JSON against the engine profile schema on
+create and update, so invalid keys or types are rejected with a `400` error.
+
+#### `schema_version` and engine upgrades
+
+Each stored profile carries a `schema_version` field that records the
+gonemaster engine version that was current the last time the profile was
+created, edited, or explicitly marked reviewed. The server bumps it
+automatically on every successful create, update, or PATCH.
+
+When you upgrade gonemaster, the engine default profile may add new test
+cases, new test level tags for existing modules, or other new properties.
+A stored profile that explicitly sets one of these properties — for example,
+a custom `test_cases` array — will *not* automatically pick up new entries
+the upgraded engine introduces, because explicit overrides win over defaults.
+
+To make this visible, the server provides compatibility endpoints that
+compare each stored profile against the current engine default and report
+what is missing:
+
+- `GET /api/v1/profiles/compatibility` — batch summary of all stored profiles
+  (`compatible`, `issue_count` per profile).
+- `GET /api/v1/profiles/{id}/compatibility` — detailed issue list for one
+  profile, with one entry per missing test case set or per `test_levels`
+  module that is missing tags.
+- `GET /api/v1/profiles/defaults` — the current engine default `test_cases`
+  list and `test_levels` map, useful as a reference when editing.
+
+The admin UI surfaces this in three places:
+
+1. A **Needs review** badge on every profile row in the library that has
+   any compatibility issues.
+2. A summary line above the profile list — *N profile(s) need review* — with
+   a **Mark all as reviewed** button.
+3. A warning banner in the profile editor with action buttons to fix or
+   acknowledge the issues for the open profile.
+
+#### Upgrade workflow
+
+The recommended workflow after upgrading gonemaster is:
+
+1. Restart `gonemaster-server` against the new binary.
+2. Open the admin UI **Settings → Profiles** page. Profiles whose
+   `schema_version` no longer matches the new engine version and that have
+   actual gaps against the new defaults will show the **Needs review** badge.
+3. For each flagged profile, open it in the editor. The compatibility
+   banner lists the specific gaps (missing test cases, missing `test_levels`
+   tags) and offers fix actions:
+   - **Add missing test cases** — appends new defaults to the stored
+     `test_cases` array.
+   - **Add missing test level tags** — fills missing tags in already-overridden
+     `test_levels` modules using the new default severities.
+   - **Reset test_cases to inherit** — removes the `test_cases` override
+     entirely so the profile inherits whatever the engine default carries.
+   - **Reset {module} to inherit** — removes one module from the
+     `test_levels` override.
+   - **Mark as reviewed** — leaves the config alone but bumps `schema_version`
+     so the warning goes away. Use this when you have audited the gaps and
+     decided the existing override is intentional.
+4. If you have many profiles and want to acknowledge them all at once
+   without reading each in detail, use **Mark all as reviewed** from the
+   profile list summary bar. This bumps every stored profile's
+   `schema_version` to the current engine version.
+
+The compatibility check is purely a UI hint — gonemaster will continue to
+run jobs with the existing stored profile JSON until you change it. Nothing
+breaks if you ignore the warning; you just may not be exercising newer test
+cases the engine ships with.
+
 ### Database
 
 The server supports pluggable storage backends selected by `--db-driver`:
@@ -645,6 +745,130 @@ Get a run result (same shape as `GET /jobs/{id}/result`):
 ```
 GET /runs/{id}/result?locale=en
 ```
+
+### Profiles
+List stored profiles:
+```
+GET /profiles
+```
+Returns an array of stored profiles. Each profile carries a `schema_version`
+field recording the engine version that was current at the time of the last
+edit. See [Stored profiles](#stored-profiles) for the override-only model.
+
+Get a stored profile by id:
+```
+GET /profiles/{id}
+```
+
+Get the server default profile (built-in default after `profile_path`
+overrides are applied — id `0`):
+```
+GET /profiles/default
+```
+
+Get the engine default `test_cases` and `test_levels` (used as the reference
+for compatibility checks):
+```
+GET /profiles/defaults
+```
+Response shape:
+```json
+{
+  "test_cases": ["basic01", "basic02", "..."],
+  "test_levels": {
+    "DNSSEC": { "DS_ALGO_NOT_SUPPORTED": "ERROR", "...": "..." }
+  }
+}
+```
+
+Create a stored profile:
+```
+POST /profiles
+{
+  "name": "fast-resolver",
+  "description": "Shorter timeouts for known-good zones",
+  "config": { "resolver": { "defaults": { "timeout": 5 } } },
+  "public": false
+}
+```
+Returns `201` with the new profile. The server validates `config` against the
+engine profile schema and rejects invalid keys with `400`. Returns `409` with
+`error.code=name_exists` if `name` is taken. The new profile is created with
+`schema_version` set to the current engine version.
+
+Update a stored profile (full replacement of `config`):
+```
+PUT /profiles/{id}
+{
+  "name": "fast-resolver",
+  "description": "Shorter timeouts",
+  "config": { "resolver": { "defaults": { "timeout": 4 } } },
+  "public": false
+}
+```
+Bumps `schema_version` to the current engine version on success.
+
+Apply a targeted compatibility fix to a stored profile:
+```
+PATCH /profiles/{id}
+{ "op": "add_missing_test_cases" }
+```
+Supported operations:
+
+| `op` | Effect |
+|---|---|
+| `add_missing_test_cases` | Append any default test cases missing from the profile's `test_cases` array. No-op if the profile does not explicitly set `test_cases`. |
+| `add_missing_test_levels` | For each `test_levels` module the profile already overrides, fill any tags present in the default but missing in the override using the default severity. |
+| `reset_test_cases` | Remove the `test_cases` override entirely so the profile inherits all defaults. |
+| `reset_test_levels` | Remove one module from the `test_levels` override. Requires `"module": "DNSSEC"` (or whichever module). |
+| `mark_reviewed` | Leave the config unchanged but bump `schema_version` so the compatibility warning goes away. |
+
+All PATCH operations bump `schema_version` to the current engine version.
+Returns the updated profile on `200`.
+
+Get the compatibility status of one stored profile against the current engine
+default:
+```
+GET /profiles/{id}/compatibility
+```
+Response:
+```json
+{
+  "compatible": false,
+  "schema_version": "v0.9.0",
+  "current_version": "v1.0.0",
+  "issues": [
+    {
+      "type": "missing_test_case",
+      "detail": "Profile sets test_cases but is missing: zone14",
+      "suggestion": "Add the missing test case IDs to test_cases, or remove test_cases entirely to inherit all defaults."
+    }
+  ]
+}
+```
+Issue `type` is one of `missing_test_case`, `missing_test_levels` (with a
+`module` field), or `invalid_config`.
+
+Get a batch compatibility summary for all stored profiles:
+```
+GET /profiles/compatibility
+```
+Returns an array of `{id, name, compatible, issue_count}` entries — used by the
+admin UI to drive the **Needs review** badges and the *N profile(s) need
+review* summary line.
+
+Mark every stored profile as reviewed (bumps `schema_version` to the current
+engine version on every profile that is not already current):
+```
+POST /profiles/mark-all-reviewed
+```
+Returns `{"updated": N}` where `N` is the number of profiles that were bumped.
+
+Delete a stored profile:
+```
+DELETE /profiles/{id}
+```
+Returns `204 No Content`.
 
 ### Entries
 Query individual engine log entries across all runs:

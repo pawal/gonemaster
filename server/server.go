@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
@@ -33,6 +34,7 @@ type Server struct {
 	cancels                  map[string]context.CancelFunc
 	rateLimiter              *RateLimiter
 	configSources            map[string]SettingSource
+	retentionDays            atomic.Int64
 }
 
 // New builds a server with in-memory components.
@@ -103,6 +105,7 @@ func newServer(cfg Config, store JobStore, queue Queue) *Server {
 	if cfg.PublicAPI.RateLimitEnabled {
 		s.rateLimiter = NewRateLimiter(cfg.PublicAPI.RateLimitMax, cfg.PublicAPI.RateLimitWindow.Duration)
 	}
+	s.retentionDays.Store(int64(cfg.Database.RetentionDays))
 	s.routes()
 	return s
 }

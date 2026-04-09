@@ -81,6 +81,7 @@ func (s *Server) applySetting(key, val string) {
 	case "retention_days":
 		if v, err := strconv.Atoi(val); err == nil && v >= 0 {
 			s.cfg.Database.RetentionDays = v
+			s.retentionDays.Store(int64(v))
 		}
 	case "public_url":
 		s.cfg.PublicURL = val

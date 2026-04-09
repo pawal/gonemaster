@@ -48,7 +48,7 @@ func (s *Server) Start() {
 
 	// Always start the purge goroutine; it reads RetentionDays dynamically so
 	// changes via the settings API take effect without a restart.
-	startPurgeLoop(ctx, s.store, &s.cfg.Database.RetentionDays, func(format string, args ...any) {
+	startPurgeLoop(ctx, s.store, &s.retentionDays, func(format string, args ...any) {
 		log.Printf(format, args...)
 	})
 

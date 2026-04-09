@@ -2606,6 +2606,8 @@
                     {#each jobSeverityRows(job) as entry (entry.level)}
                       <span class={`level-pill severity-${entry.level.toLowerCase()}`}>{entry.level} {entry.count}</span>
                     {/each}
+                  {:else if job.severity_totals !== undefined}
+                    <span class="level-pill severity-info">OK</span>
                   {/if}
                 </div>
                 {#if job.batch_id}

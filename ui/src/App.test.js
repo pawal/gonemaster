@@ -2431,6 +2431,40 @@ describe("App", () => {
     unmount();
   });
 
+  it("shows OK pill for completed job with all-zero severity", async () => {
+    const cleanJob = {
+      id: "job_clean",
+      domain: "clean.example",
+      status: "succeeded",
+      created_at: "2026-02-03T00:00:00Z",
+      progress: 100,
+      severity_totals: { NOTICE: 0, WARNING: 0, ERROR: 0, CRITICAL: 0 }
+    };
+
+    global.fetch.mockImplementation((url) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      if (value.includes("/api/v1/jobs?")) {
+        return jsonResponse({ items: [cleanJob], total: 1 });
+      }
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+    await openRecentTab();
+    const refresh = await screen.findByRole("button", { name: /refresh list/i });
+    if (refresh.disabled) {
+      await waitFor(() => expect(refresh).not.toBeDisabled());
+    }
+    await fireEvent.click(refresh);
+
+    const row = (await screen.findByText(cleanJob.id)).closest(".list-item");
+    const headline = row.querySelector(".job-headline");
+    expect(within(headline).getByText("OK")).toBeInTheDocument();
+    expect(within(headline).getByText("OK").className).toContain("severity-info");
+
+    unmount();
+  });
+
   it("handles batch pagination edges on first and last pages", async () => {
     const firstPage = {
       batch_id: "batch_edge",

@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -70,6 +71,105 @@ func TestPublicCreateJobMissingDomainReturns400(t *testing.T) {
 
 	if resp.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", resp.Code)
+	}
+}
+
+func TestPublicCreateJobWithPublicProfileID(t *testing.T) {
+	srv := New(DefaultConfig())
+	profile := createProfile(t, srv, `{"name":"public-profile","config":{"net":{"ipv4":true}},"public":true}`)
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
+		bytes.NewBufferString(fmt.Sprintf(`{"domain":"example.com","profile_id":%d}`, profile.ID)))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", resp.Code, resp.Body.String())
+	}
+	var created PublicJobView
+	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	job, ok := srv.store.GetByPublicID(created.PublicID)
+	if !ok {
+		t.Fatal("expected stored public job")
+	}
+	if job.ProfileID == nil || *job.ProfileID != profile.ID {
+		t.Fatalf("ProfileID: got %v, want %d", job.ProfileID, profile.ID)
+	}
+	if job.ProfileName != "public-profile" {
+		t.Fatalf("ProfileName: got %q", job.ProfileName)
+	}
+}
+
+func TestPublicCreateJobRejectsPrivateProfile(t *testing.T) {
+	srv := New(DefaultConfig())
+	profile := createProfile(t, srv, `{"name":"private-profile","config":{"net":{"ipv4":true}},"public":false}`)
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
+		bytes.NewBufferString(fmt.Sprintf(`{"domain":"example.com","profile_id":%d}`, profile.ID)))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", resp.Code, resp.Body.String())
+	}
+	var out ErrorResponse
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out.Error.Code != "profile_not_public" {
+		t.Fatalf("expected profile_not_public, got %q", out.Error.Code)
+	}
+}
+
+func TestPublicCreateJobRejectsProfileOverrides(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
+		bytes.NewBufferString(`{"domain":"example.com","profile_overrides":{"net":{"ipv6":false}}}`))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", resp.Code, resp.Body.String())
+	}
+	var out ErrorResponse
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out.Error.Code != "profile_overrides_not_allowed" {
+		t.Fatalf("expected profile_overrides_not_allowed, got %q", out.Error.Code)
+	}
+}
+
+func TestPublicProfilesReturnsOnlyPublicProfilesWithoutConfig(t *testing.T) {
+	srv := New(DefaultConfig())
+	createProfile(t, srv, `{"name":"public-profile","description":"Shown","config":{"net":{"ipv4":true}},"public":true}`)
+	createProfile(t, srv, `{"name":"private-profile","description":"Hidden","config":{"net":{"ipv6":false}},"public":false}`)
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/profiles", nil)
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
+	}
+	var views []map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&views); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(views) != 1 {
+		t.Fatalf("expected 1 public profile, got %d", len(views))
+	}
+	if views[0]["name"] != "public-profile" {
+		t.Fatalf("expected public-profile, got %#v", views[0])
+	}
+	if _, ok := views[0]["config"]; ok {
+		t.Fatalf("public profile payload must not expose config: %#v", views[0])
 	}
 }
 

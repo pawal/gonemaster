@@ -83,14 +83,17 @@ type Job struct {
 	Domain   string    `json:"domain"`
 	Status   JobStatus `json:"status"`
 	// FinishedAt is populated from the Run after graduation; zero for in-flight jobs.
-	FinishedAt     time.Time      `json:"finished_at,omitempty"`
-	SeverityTotals map[string]int `json:"severity_totals,omitempty"`
-	CreatedAt      time.Time      `json:"created_at"`
-	StartedAt      time.Time      `json:"started_at,omitempty"`
-	Priority       JobPriority    `json:"priority"`
-	Progress       int            `json:"progress"`
-	Error          string         `json:"error,omitempty"`
-	Profile        string         `json:"-"`
+	FinishedAt       time.Time      `json:"finished_at,omitempty"`
+	SeverityTotals   map[string]int `json:"severity_totals,omitempty"`
+	CreatedAt        time.Time      `json:"created_at"`
+	StartedAt        time.Time      `json:"started_at,omitempty"`
+	Priority         JobPriority    `json:"priority"`
+	Progress         int            `json:"progress"`
+	Error            string         `json:"error,omitempty"`
+	Profile          string         `json:"-"`
+	ProfileID        *int64         `json:"profile_id,omitempty"`
+	ProfileName      string         `json:"profile_name,omitempty"`
+	EffectiveProfile string         `json:"-"`
 	// Config fields stored as config_json in the DB.
 	Tests         []string                       `json:"-"`
 	Overrides     map[string]any                 `json:"-"`
@@ -114,10 +117,11 @@ type Domain struct {
 
 // Tag is a named domain collection.
 type Tag struct {
-	Name        string    `json:"name"`
-	Description string    `json:"description,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
-	DomainCount int       `json:"domain_count"`
+	Name             string    `json:"name"`
+	Description      string    `json:"description,omitempty"`
+	CreatedAt        time.Time `json:"created_at"`
+	DomainCount      int       `json:"domain_count"`
+	DefaultProfileID *int64    `json:"default_profile_id,omitempty"`
 }
 
 // TagSummary holds per-severity domain counts for a tag.
@@ -133,24 +137,27 @@ type TagSummary struct {
 
 // Run is a completed execution, graduated from a Job.
 type Run struct {
-	ID          string         `json:"id"`
-	DomainID    int64          `json:"domain_id"`
-	Domain      string         `json:"domain"`
-	BatchID     string         `json:"batch_id,omitempty"`
-	Status      JobStatus      `json:"status"`
-	CreatedAt   time.Time      `json:"created_at"`
-	StartedAt   time.Time      `json:"started_at,omitempty"`
-	FinishedAt  time.Time      `json:"finished_at,omitempty"`
-	DurationMs  int64          `json:"duration_ms,omitempty"`
-	SevNotice   int            `json:"sev_notice"`
-	SevWarning  int            `json:"sev_warning"`
-	SevError    int            `json:"sev_error"`
-	SevCritical int            `json:"sev_critical"`
-	WorstLevel  string         `json:"worst_level,omitempty"`
-	EntryCount  int            `json:"entry_count"`
-	Priority    JobPriority    `json:"priority"`
-	Profile     string         `json:"profile,omitempty"`
-	PublicID    string         `json:"public_id,omitempty"`
+	ID               string      `json:"id"`
+	DomainID         int64       `json:"domain_id"`
+	Domain           string      `json:"domain"`
+	BatchID          string      `json:"batch_id,omitempty"`
+	Status           JobStatus   `json:"status"`
+	CreatedAt        time.Time   `json:"created_at"`
+	StartedAt        time.Time   `json:"started_at,omitempty"`
+	FinishedAt       time.Time   `json:"finished_at,omitempty"`
+	DurationMs       int64       `json:"duration_ms,omitempty"`
+	SevNotice        int         `json:"sev_notice"`
+	SevWarning       int         `json:"sev_warning"`
+	SevError         int         `json:"sev_error"`
+	SevCritical      int         `json:"sev_critical"`
+	WorstLevel       string      `json:"worst_level,omitempty"`
+	EntryCount       int         `json:"entry_count"`
+	Priority         JobPriority `json:"priority"`
+	Profile          string      `json:"profile,omitempty"`
+	ProfileID        *int64      `json:"profile_id,omitempty"`
+	ProfileName      string      `json:"profile_name,omitempty"`
+	EffectiveProfile string      `json:"effective_profile,omitempty"`
+	PublicID         string      `json:"public_id,omitempty"`
 	// SeverityTotals mirrors the sev_* columns as a map for API compat.
 	SeverityTotals map[string]int `json:"severity_totals,omitempty"`
 }
@@ -176,6 +183,30 @@ type Batch struct {
 	CreatedAt   time.Time `json:"created_at"`
 	DomainCount int       `json:"domain_count"`
 	Description string    `json:"description,omitempty"`
+}
+
+// StoredProfile is a named, server-stored test configuration.
+type StoredProfile struct {
+	ID            int64     `json:"id"`
+	Name          string    `json:"name"`
+	Description   string    `json:"description"`
+	Config        string    `json:"config"` // JSON, same schema as profile_overrides
+	Public        bool      `json:"public"` // visible in public UI dropdown
+	SchemaVersion string    `json:"schema_version"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+// Profile is the API representation of a stored profile.
+type Profile struct {
+	ID            int64          `json:"id"`
+	Name          string         `json:"name"`
+	Description   string         `json:"description"`
+	Config        map[string]any `json:"config"`
+	Public        bool           `json:"public"`
+	SchemaVersion string         `json:"schema_version"`
+	CreatedAt     time.Time      `json:"created_at"`
+	UpdatedAt     time.Time      `json:"updated_at"`
 }
 
 // ── Filter types ──────────────────────────────────────────────────────────────
@@ -205,17 +236,17 @@ type DomainFilter struct {
 
 // RunFilter filters run list queries.
 type RunFilter struct {
-	DomainID    int64
-	Domain      string
-	BatchID     string
-	Tag         string
-	Status      JobStatus
-	WorstLevel  string
+	DomainID       int64
+	Domain         string
+	BatchID        string
+	Tag            string
+	Status         JobStatus
+	WorstLevel     string
 	FinishedAfter  time.Time
 	FinishedBefore time.Time
-	Limit       int
-	Offset      int
-	Sort        JobSort
+	Limit          int
+	Offset         int
+	Sort           JobSort
 }
 
 // EntryFilter filters cross-run entry queries.
@@ -310,9 +341,10 @@ type JobResultEntry struct {
 
 // JobCreateRequest is the payload for a single job.
 type JobCreateRequest struct {
-	Domain           string                      `json:"domain"`
-	Tests            []string                    `json:"tests,omitempty"`
-	ProfileOverrides map[string]any              `json:"profile_overrides,omitempty"`
+	Domain           string                       `json:"domain"`
+	Tests            []string                     `json:"tests,omitempty"`
+	ProfileID        *int64                       `json:"profile_id,omitempty"`
+	ProfileOverrides map[string]any               `json:"profile_overrides,omitempty"`
 	Nameservers      []UndelegatedNameserverInput `json:"nameservers,omitempty"`
 	DSInfo           []UndelegatedDSInput         `json:"ds_info,omitempty"`
 	MinLevel         string                       `json:"min_level,omitempty"`
@@ -322,10 +354,11 @@ type JobCreateRequest struct {
 
 // JobBatchRequest is the payload for a batch submission.
 type JobBatchRequest struct {
-	Domains          []string                     `json:"domains,omitempty"`
-	FromTag          string                       `json:"from_tag,omitempty"`
-	Tests            []string                     `json:"tests,omitempty"`
-	ProfileOverrides map[string]any               `json:"profile_overrides,omitempty"`
+	Domains          []string                      `json:"domains,omitempty"`
+	FromTag          string                        `json:"from_tag,omitempty"`
+	Tests            []string                      `json:"tests,omitempty"`
+	ProfileID        *int64                        `json:"profile_id,omitempty"`
+	ProfileOverrides map[string]any                `json:"profile_overrides,omitempty"`
 	Nameservers      *[]UndelegatedNameserverInput `json:"nameservers,omitempty"`
 	DSInfo           *[]UndelegatedDSInput         `json:"ds_info,omitempty"`
 	MinLevel         string                        `json:"min_level,omitempty"`

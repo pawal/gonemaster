@@ -19,6 +19,12 @@ type PublicJobView struct {
 	FinishedAt *time.Time `json:"finished_at,omitempty"`
 }
 
+type PublicProfileView struct {
+	ID          int64  `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
 func publicJobView(job Job) PublicJobView {
 	view := PublicJobView{
 		PublicID: job.PublicID,
@@ -32,6 +38,14 @@ func publicJobView(job Job) PublicJobView {
 	return view
 }
 
+func publicProfileView(profile StoredProfile) PublicProfileView {
+	return PublicProfileView{
+		ID:          profile.ID,
+		Name:        profile.Name,
+		Description: profile.Description,
+	}
+}
+
 // handlePublicVersion handles GET /pub/api/v1/version.
 func (s *Server) handlePublicVersion(w http.ResponseWriter, r *http.Request) {
 	resp := map[string]string{"gonemaster": engine.VersionFull()}
@@ -39,6 +53,20 @@ func (s *Server) handlePublicVersion(w http.ResponseWriter, r *http.Request) {
 		resp["dns"] = dns
 	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// handlePublicProfiles handles GET /pub/api/v1/profiles.
+// Only public profiles are returned, without exposing config.
+func (s *Server) handlePublicProfiles(w http.ResponseWriter, r *http.Request) {
+	storedProfiles := s.store.ListProfiles()
+	views := make([]PublicProfileView, 0, len(storedProfiles))
+	for _, stored := range storedProfiles {
+		if !stored.Public {
+			continue
+		}
+		views = append(views, publicProfileView(stored))
+	}
+	writeJSON(w, http.StatusOK, views)
 }
 
 // handlePublicCreateJob handles POST /pub/api/v1/jobs.
@@ -66,18 +94,28 @@ func (s *Server) handlePublicCreateJob(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_undelegated", err.Error(), nil)
 		return
 	}
+	if len(req.ProfileOverrides) > 0 {
+		writeError(w, http.StatusBadRequest, "profile_overrides_not_allowed", "public API requests must use profile_id instead of profile_overrides", nil)
+		return
+	}
+	resolvedProfile, code, message := s.resolveStoredProfile(req.ProfileID, true)
+	if code != "" {
+		writeError(w, http.StatusBadRequest, code, message, nil)
+		return
+	}
 
 	job := Job{
 		ID:            newID("job"),
 		Domain:        domain,
 		Tests:         req.Tests,
-		Overrides:     req.ProfileOverrides,
 		UndelegatedNS: undelegatedNS,
 		UndelegatedDS: undelegatedDS,
 		MinLevel:      req.MinLevel,
 		Status:        JobQueued,
 		CreatedAt:     time.Now().UTC(),
 		Progress:      0,
+		ProfileID:     cloneInt64Ptr(resolvedProfile.ID),
+		ProfileName:   resolvedProfile.Name,
 	}
 	created, err := s.store.Create(job)
 	if err != nil {

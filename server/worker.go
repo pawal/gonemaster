@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"math"
 	"net/netip"
@@ -19,13 +20,16 @@ import (
 )
 
 type workerPool struct {
-	ctx    context.Context
-	cancel context.CancelFunc
-	wg     sync.WaitGroup
+	ctx     context.Context
+	cancel  context.CancelFunc
+	wg      sync.WaitGroup
+	mu      sync.Mutex
+	cancels []context.CancelFunc // one per live worker goroutine
 }
 
-// Start launches background workers that consume queued jobs. If
-// cfg.Database.RetentionDays > 0 the purge loop is also started.
+// Start launches background workers that consume queued jobs. The purge loop
+// is also started and checks cfg.Database.RetentionDays each tick, so changes
+// via the settings API take effect at the next purge cycle.
 func (s *Server) Start() {
 	if s.workers.ctx != nil {
 		return
@@ -39,15 +43,14 @@ func (s *Server) Start() {
 		workerCount = 1
 	}
 	for i := 0; i < workerCount; i++ {
-		s.workers.wg.Add(1)
-		go s.workerLoop(i)
+		s.startWorker()
 	}
 
-	if s.cfg.Database.RetentionDays > 0 {
-		startPurgeLoop(ctx, s.store, s.cfg.Database.RetentionDays, func(format string, args ...any) {
-			log.Printf(format, args...)
-		})
-	}
+	// Always start the purge goroutine; it reads RetentionDays dynamically so
+	// changes via the settings API take effect without a restart.
+	startPurgeLoop(ctx, s.store, &s.retentionDays, func(format string, args ...any) {
+		log.Printf(format, args...)
+	})
 
 	if s.rateLimiter != nil {
 		go func() {
@@ -62,6 +65,54 @@ func (s *Server) Start() {
 				}
 			}
 		}()
+	}
+}
+
+// startWorker starts one worker goroutine with its own cancellable context
+// derived from the pool context. It must be called with the pool context
+// already initialised (i.e. after Start has set s.workers.ctx).
+func (s *Server) startWorker() {
+	workerCtx, workerCancel := context.WithCancel(s.workers.ctx)
+	s.workers.mu.Lock()
+	s.workers.cancels = append(s.workers.cancels, workerCancel)
+	s.workers.mu.Unlock()
+	s.workers.wg.Add(1)
+	go s.workerLoop(workerCtx)
+}
+
+// resizeWorkerPool adjusts the number of live workers to match targetCount.
+// Scaling up starts new goroutines immediately. Scaling down cancels the
+// excess workers' contexts; they exit cleanly after their current job (if any)
+// finishes.
+func (s *Server) resizeWorkerPool(targetCount int) {
+	if s.workers.ctx == nil {
+		return
+	}
+	if targetCount < 1 {
+		targetCount = 1
+	}
+	s.workers.mu.Lock()
+	current := len(s.workers.cancels)
+	s.workers.mu.Unlock()
+
+	if targetCount == current {
+		return
+	}
+	if targetCount > current {
+		for i := current; i < targetCount; i++ {
+			s.startWorker()
+		}
+		return
+	}
+	// Scale down: cancel the last (current - targetCount) workers and remove
+	// them from the slice.
+	s.workers.mu.Lock()
+	toCancel := make([]context.CancelFunc, current-targetCount)
+	copy(toCancel, s.workers.cancels[targetCount:])
+	s.workers.cancels = s.workers.cancels[:targetCount]
+	s.workers.mu.Unlock()
+	for _, cancel := range toCancel {
+		cancel()
 	}
 }
 
@@ -87,15 +138,15 @@ func (s *Server) Stop(ctx context.Context) error {
 	}
 }
 
-func (s *Server) workerLoop(id int) {
+func (s *Server) workerLoop(ctx context.Context) {
 	defer s.workers.wg.Done()
 	for {
-		jobID, err := s.queue.Dequeue(s.workers.ctx)
+		jobID, err := s.queue.Dequeue(ctx)
 		if err != nil {
 			return
 		}
 		if err := s.runJob(jobID); err != nil && s.cfg.Debug {
-			log.Printf("worker %d: job %s error: %v", id, jobID, err)
+			log.Printf("worker: job %s error: %v", jobID, err)
 		}
 	}
 }
@@ -126,7 +177,7 @@ func (s *Server) runJob(jobID string) error {
 	s.initProgressWriteState(job.ID, 0, now)
 	defer s.clearProgressWriteState(job.ID)
 
-	entries, qStats, runErr := s.runEngineForJob(job, jobCtx)
+	entries, qStats, effectiveProfile, runErr := s.runEngineForJob(job, jobCtx)
 	s.metrics.ObserveDNSQueries(qStats.ipv4, qStats.ipv6)
 	s.metrics.ObserveCacheMetrics(qStats.cacheHits, qStats.cacheMisses, qStats.cacheEvictions)
 	finishedAt := time.Now().UTC()
@@ -143,6 +194,7 @@ func (s *Server) runJob(jobID string) error {
 
 	job.Progress = 100
 	job.FinishedAt = finishedAt
+	job.EffectiveProfile = effectiveProfile
 
 	// Get previous status for metrics before graduation removes the job.
 	previous, prevOK := s.store.Get(job.ID)
@@ -170,17 +222,17 @@ func (s *Server) runJob(jobID string) error {
 }
 
 type jobQueryStats struct {
-	ipv4       int64
-	ipv6       int64
-	cacheHits  int64
-	cacheMisses int64
+	ipv4           int64
+	ipv6           int64
+	cacheHits      int64
+	cacheMisses    int64
 	cacheEvictions int64
 }
 
-func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntry, jobQueryStats, error) {
+func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntry, jobQueryStats, string, error) {
 	if s.engineLimiter != nil {
 		if err := s.engineLimiter.Acquire(ctx); err != nil {
-			return nil, jobQueryStats{}, err
+			return nil, jobQueryStats{}, "", err
 		}
 		defer s.engineLimiter.Release()
 	}
@@ -227,12 +279,20 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 	callbacks := []func(*logger.Entry) error{
 		queryCounter.Callback,
 	}
-	cleanup, err := applyProfileOverrides(&req, job.Overrides, s.cfg.ProfilePath)
+	cleanup, err := applyProfileOverrides(&req, s.store, job.ProfileID, job.Overrides, s.cfg.ProfilePath)
 	if err != nil {
-		return nil, jobQueryStats{}, err
+		return nil, jobQueryStats{}, "", err
 	}
 	if cleanup != nil {
 		defer cleanup()
+	}
+	effectiveProfile, err := engine.EffectiveProfile(req)
+	if err != nil {
+		return nil, jobQueryStats{}, "", err
+	}
+	effectiveProfileJSON, err := effectiveProfile.ToJSON()
+	if err != nil {
+		return nil, jobQueryStats{}, "", err
 	}
 
 	if len(job.Tests) == 0 {
@@ -257,11 +317,11 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 	if len(job.Tests) == 1 {
 		req.Testcase = job.Tests[0]
 		entries, err := s.runEngine(req)
-		return entries, collectStats(), err
+		return entries, collectStats(), effectiveProfileJSON, err
 	}
 	if len(job.Tests) == 0 {
 		entries, err := s.runEngine(req)
-		return entries, collectStats(), err
+		return entries, collectStats(), effectiveProfileJSON, err
 	}
 
 	var all []engine.LogEntry
@@ -276,11 +336,11 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 			s.updateJobProgress(job.ID, progress)
 		}
 		if err != nil {
-			return all, collectStats(), err
+			return all, collectStats(), effectiveProfileJSON, err
 		}
 		all = append(all, entries...)
 	}
-	return all, collectStats(), nil
+	return all, collectStats(), effectiveProfileJSON, nil
 }
 
 func (s *Server) runEngine(req engine.RunRequest) ([]engine.LogEntry, error) {
@@ -401,16 +461,15 @@ func chainLogCallbacks(callbacks ...func(*logger.Entry) error) func(*logger.Entr
 	}
 }
 
-func applyProfileOverrides(req *engine.RunRequest, overrides map[string]any, baseProfile string) (func(), error) {
-	if req == nil || len(overrides) == 0 {
-		if req != nil && baseProfile != "" {
+func applyProfileOverrides(req *engine.RunRequest, store JobStore, profileID *int64, overrides map[string]any, baseProfile string) (func(), error) {
+	if req == nil {
+		return nil, nil
+	}
+	if profileID == nil && len(overrides) == 0 {
+		if baseProfile != "" {
 			req.Profile = baseProfile
 		}
 		return nil, nil
-	}
-	payload, err := json.Marshal(overrides)
-	if err != nil {
-		return nil, err
 	}
 	base := profile.New()
 	if baseProfile != "" {
@@ -423,12 +482,34 @@ func applyProfileOverrides(req *engine.RunRequest, overrides map[string]any, bas
 			return nil, err
 		}
 	}
-	overrideProfile, err := profile.FromJSON(string(payload))
-	if err != nil {
-		return nil, err
+	if profileID != nil {
+		if store == nil {
+			return nil, fmt.Errorf("profile %d not found", *profileID)
+		}
+		stored, ok := store.GetProfile(*profileID)
+		if !ok {
+			return nil, fmt.Errorf("profile %d not found", *profileID)
+		}
+		storedProfile, err := profile.FromJSON(stored.Config)
+		if err != nil {
+			return nil, err
+		}
+		if err := base.Merge(storedProfile); err != nil {
+			return nil, err
+		}
 	}
-	if err := base.Merge(overrideProfile); err != nil {
-		return nil, err
+	if len(overrides) > 0 {
+		payload, err := json.Marshal(overrides)
+		if err != nil {
+			return nil, err
+		}
+		overrideProfile, err := profile.FromJSON(string(payload))
+		if err != nil {
+			return nil, err
+		}
+		if err := base.Merge(overrideProfile); err != nil {
+			return nil, err
+		}
 	}
 	merged, err := base.ToJSON()
 	if err != nil {

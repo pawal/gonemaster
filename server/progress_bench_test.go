@@ -81,6 +81,10 @@ func (s *countingJobStore) UpdateTag(name, description string) error {
 	return s.inner.UpdateTag(name, description)
 }
 
+func (s *countingJobStore) SetTagDefaultProfile(name string, profileID *int64) error {
+	return s.inner.SetTagDefaultProfile(name, profileID)
+}
+
 func (s *countingJobStore) DeleteTag(name string) error {
 	return s.inner.DeleteTag(name)
 }
@@ -135,6 +139,38 @@ func (s *countingJobStore) CreateBatch(batch Batch) error {
 
 func (s *countingJobStore) GetBatch(id string) (Batch, bool) {
 	return s.inner.GetBatch(id)
+}
+
+func (s *countingJobStore) CreateProfile(p StoredProfile) (StoredProfile, error) {
+	return s.inner.CreateProfile(p)
+}
+func (s *countingJobStore) GetProfile(id int64) (StoredProfile, bool) {
+	return s.inner.GetProfile(id)
+}
+func (s *countingJobStore) GetProfileByName(name string) (StoredProfile, bool) {
+	return s.inner.GetProfileByName(name)
+}
+func (s *countingJobStore) UpdateProfile(p StoredProfile) error {
+	return s.inner.UpdateProfile(p)
+}
+func (s *countingJobStore) DeleteProfile(id int64) error {
+	return s.inner.DeleteProfile(id)
+}
+func (s *countingJobStore) ListProfiles() []StoredProfile {
+	return s.inner.ListProfiles()
+}
+
+func (s *countingJobStore) GetSetting(key string) (string, bool) {
+	return s.inner.GetSetting(key)
+}
+func (s *countingJobStore) SetSetting(key, value string) error {
+	return s.inner.SetSetting(key, value)
+}
+func (s *countingJobStore) DeleteSetting(key string) error {
+	return s.inner.DeleteSetting(key)
+}
+func (s *countingJobStore) ListSettings() map[string]string {
+	return s.inner.ListSettings()
 }
 
 func (s *countingJobStore) PurgeOlderThan(cutoff time.Time) (int64, error) {

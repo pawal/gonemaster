@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
@@ -32,6 +33,8 @@ type Server struct {
 	cancelMu                 sync.Mutex
 	cancels                  map[string]context.CancelFunc
 	rateLimiter              *RateLimiter
+	configSources            map[string]SettingSource
+	retentionDays            atomic.Int64
 }
 
 // New builds a server with in-memory components.
@@ -78,7 +81,9 @@ func NewWithOptions(cfg Config) (*Server, error) {
 		return nil, fmt.Errorf("recover jobs: %w", err)
 	}
 
-	return newServer(cfg, store, queue), nil
+	srv := newServer(cfg, store, queue)
+	srv.ApplyDatabaseSettings()
+	return srv, nil
 }
 
 // newServer constructs a Server with the given store and queue.
@@ -100,6 +105,7 @@ func newServer(cfg Config, store JobStore, queue Queue) *Server {
 	if cfg.PublicAPI.RateLimitEnabled {
 		s.rateLimiter = NewRateLimiter(cfg.PublicAPI.RateLimitMax, cfg.PublicAPI.RateLimitWindow.Duration)
 	}
+	s.retentionDays.Store(int64(cfg.Database.RetentionDays))
 	s.routes()
 	return s
 }
@@ -157,10 +163,20 @@ func (s *Server) routes() {
 	apiMux.HandleFunc("GET /runs", s.handleListRuns)
 
 	apiMux.HandleFunc("GET /tags/{name}/summary", s.handleTagSummary)
+	apiMux.HandleFunc("/tags/{name}/profile", s.handleTagProfile)
 	apiMux.HandleFunc("/tags/{name}/domains", s.handleTagDomains)
 	apiMux.HandleFunc("/tags/{name}", s.handleTagByName)
 	apiMux.HandleFunc("/tags", s.handleTags)
+	apiMux.HandleFunc("GET /profiles/default", s.handleDefaultProfile)
+	apiMux.HandleFunc("GET /profiles/defaults", s.handleProfileDefaults)
+	apiMux.HandleFunc("GET /profiles/compatibility", s.handleProfilesCompatibility)
+	apiMux.HandleFunc("POST /profiles/mark-all-reviewed", s.handleMarkAllProfilesReviewed)
+	apiMux.HandleFunc("GET /profiles/{id}/compatibility", s.handleProfileCompatibility)
+	apiMux.HandleFunc("PATCH /profiles/{id}", s.handlePatchProfile)
+	apiMux.HandleFunc("/profiles/{id}", s.handleProfileByID)
+	apiMux.HandleFunc("/profiles", s.handleProfiles)
 
+	apiMux.HandleFunc("/settings", s.handleSettings)
 	apiMux.HandleFunc("/locales", s.handleLocales)
 	apiMux.HandleFunc("/metrics", s.handleMetrics)
 	apiMux.HandleFunc("/healthz", s.handleHealth)
@@ -172,6 +188,7 @@ func (s *Server) routes() {
 
 	pubMux := http.NewServeMux()
 	pubMux.HandleFunc("POST /jobs", s.handlePublicCreateJob)
+	pubMux.HandleFunc("GET /profiles", s.handlePublicProfiles)
 	pubMux.HandleFunc("GET /jobs/{publicID}/result", s.handlePublicGetResult)
 	pubMux.HandleFunc("GET /jobs/{publicID}", s.handlePublicGetJob)
 	pubMux.HandleFunc("GET /locales", s.handleLocales)

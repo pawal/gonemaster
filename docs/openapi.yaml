@@ -13,6 +13,7 @@ tags:
   - name: Batches
   - name: Domains
   - name: Tags
+  - name: Profiles
   - name: Runs
   - name: Entries
   - name: Queue
@@ -624,6 +625,46 @@ paths:
         '404':
           $ref: '#/components/responses/ErrorResponse'
 
+  /tags/{name}/profile:
+    put:
+      tags: [Tags]
+      summary: Set a tag's default stored profile
+      operationId: setTagProfile
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TagProfileRequest'
+      responses:
+        '204':
+          description: Tag default profile updated
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+    delete:
+      tags: [Tags]
+      summary: Clear a tag's default stored profile
+      operationId: deleteTagProfile
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Tag default profile removed
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
   /tags/{name}/summary:
     get:
       tags: [Tags]
@@ -642,6 +683,241 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TagSummary'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /profiles:
+    get:
+      tags: [Profiles]
+      summary: List stored profiles
+      operationId: listProfiles
+      responses:
+        '200':
+          description: Stored profile array
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Profile'
+    post:
+      tags: [Profiles]
+      summary: Create a stored profile
+      operationId: createProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileUpsertRequest'
+      responses:
+        '201':
+          description: Profile created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /profiles/default:
+    get:
+      tags: [Profiles]
+      summary: Get the server default profile
+      operationId: getDefaultProfile
+      responses:
+        '200':
+          description: The server base profile after config-file overrides are applied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /profiles/defaults:
+    get:
+      tags: [Profiles]
+      summary: Get the engine default test_cases and test_levels
+      description: Returns the current engine default profile's `test_cases` and `test_levels`. Used by the admin UI as the canonical reference when checking stored profile compatibility.
+      operationId: getProfileDefaults
+      responses:
+        '200':
+          description: Engine default reference data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileDefaults'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /profiles/compatibility:
+    get:
+      tags: [Profiles]
+      summary: Batch compatibility summary for all stored profiles
+      description: Returns one entry per stored profile with its compatibility status against the current engine default. Used by the admin UI to drive the "Needs review" badges and the *N profile(s) need review* summary.
+      operationId: listProfileCompatibility
+      responses:
+        '200':
+          description: Array of compatibility summaries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CompatibilitySummary'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /profiles/mark-all-reviewed:
+    post:
+      tags: [Profiles]
+      summary: Mark every stored profile as reviewed
+      description: Bumps `schema_version` to the current engine version on every stored profile that is not already current. Returns the count of profiles that were updated.
+      operationId: markAllProfilesReviewed
+      responses:
+        '200':
+          description: Mark-all result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarkAllReviewedResult'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /profiles/{id}/compatibility:
+    get:
+      tags: [Profiles]
+      summary: Detailed compatibility result for one stored profile
+      description: Compares the stored profile against the current engine default and returns the list of gaps with suggested remediations. The profile is considered incompatible only when it explicitly overrides a key (`test_cases` or a `test_levels` module) in a way that no longer covers what the current default ships.
+      operationId: getProfileCompatibility
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Compatibility result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompatibilityResult'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /profiles/{id}:
+    get:
+      tags: [Profiles]
+      summary: Get a stored profile
+      operationId: getProfile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Stored profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+    put:
+      tags: [Profiles]
+      summary: Update a stored profile
+      operationId: updateProfile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileUpsertRequest'
+      responses:
+        '200':
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+    patch:
+      tags: [Profiles]
+      summary: Apply a targeted compatibility fix to a stored profile
+      description: |
+        Applies one of several targeted operations and bumps `schema_version` to
+        the current engine version. The supported operations are:
+
+        - `add_missing_test_cases` — append default test cases missing from the profile's `test_cases` array. No-op if the profile does not explicitly set `test_cases`.
+        - `add_missing_test_levels` — for each `test_levels` module already overridden by the profile, fill any tags present in the default but missing in the override.
+        - `reset_test_cases` — remove the `test_cases` override entirely so the profile inherits all defaults.
+        - `reset_test_levels` — remove one module from the `test_levels` override (requires `module`).
+        - `mark_reviewed` — leave the config unchanged but bump `schema_version` so the compatibility warning goes away.
+      operationId: patchProfile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfilePatchRequest'
+      responses:
+        '200':
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+    delete:
+      tags: [Profiles]
+      summary: Delete a stored profile
+      operationId: deleteProfile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Profile deleted
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
         '404':
           $ref: '#/components/responses/ErrorResponse'
 
@@ -946,6 +1222,11 @@ components:
           format: int32
           enum: [0, 1]
           description: "Queue priority: 0=normal (interactive), 1=batch (background). Normal jobs are always dequeued before batch jobs."
+        profile_id:
+          type: integer
+          format: int64
+        profile_name:
+          type: string
         error:
           type: string
 
@@ -959,6 +1240,10 @@ components:
           type: array
           items:
             type: string
+        profile_id:
+          type: integer
+          format: int64
+          description: Optional stored profile reference. If set, the stored profile is loaded before applying any inline overrides.
         profile_overrides:
           type: object
           additionalProperties: true
@@ -997,6 +1282,10 @@ components:
           type: array
           items:
             type: string
+        profile_id:
+          type: integer
+          format: int64
+          description: Optional stored profile reference applied to every submitted job in the batch.
         profile_overrides:
           type: object
           additionalProperties: true
@@ -1242,6 +1531,9 @@ components:
           format: date-time
         domain_count:
           type: integer
+        default_profile_id:
+          type: integer
+          format: int64
 
     TagCreateRequest:
       type: object
@@ -1260,6 +1552,14 @@ components:
           type: array
           items:
             type: string
+
+    TagProfileRequest:
+      type: object
+      required: [profile_id]
+      properties:
+        profile_id:
+          type: integer
+          format: int64
 
     TagSummary:
       type: object
@@ -1329,10 +1629,153 @@ components:
           format: int32
           enum: [0, 1]
           description: "Queue priority at the time of submission: 0=normal, 1=batch."
+        profile_id:
+          type: integer
+          format: int64
+        profile_name:
+          type: string
+        effective_profile:
+          type: string
+          description: JSON snapshot of the fully merged profile used for execution.
         severity_totals:
           type: object
           additionalProperties:
             type: integer
+
+    Profile:
+      type: object
+      required: [id, name, description, config, public, schema_version, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        description:
+          type: string
+        config:
+          type: object
+          additionalProperties: true
+          description: Stored engine profile JSON. A sparse override on top of the engine default profile — only the keys present here are applied; everything else is inherited.
+        public:
+          type: boolean
+        schema_version:
+          type: string
+          description: Engine version that was current when this profile was last created, updated, or marked reviewed. Used to drive compatibility checks against the running engine version.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ProfileUpsertRequest:
+      type: object
+      required: [name, config]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        config:
+          type: object
+          additionalProperties: true
+          description: Engine profile JSON validated server-side.
+        public:
+          type: boolean
+
+    ProfileDefaults:
+      type: object
+      required: [test_cases, test_levels]
+      description: Engine default profile reference data used by the admin UI when checking stored profile compatibility.
+      properties:
+        test_cases:
+          type: array
+          description: Sorted list of test case IDs the engine default profile selects.
+          items:
+            type: string
+        test_levels:
+          type: object
+          description: Per-module map of tag → severity level from the engine default profile.
+          additionalProperties:
+            type: object
+            additionalProperties:
+              type: string
+
+    CompatibilityIssue:
+      type: object
+      required: [type, detail, suggestion]
+      properties:
+        type:
+          type: string
+          enum: [missing_test_case, missing_test_levels, invalid_config]
+          description: Issue category.
+        module:
+          type: string
+          description: Module name. Set when `type` is `missing_test_levels`.
+        detail:
+          type: string
+          description: Human-readable summary of what is missing.
+        suggestion:
+          type: string
+          description: Suggested remediation, suitable for display to the operator.
+
+    CompatibilityResult:
+      type: object
+      required: [compatible, schema_version, current_version, issues]
+      properties:
+        compatible:
+          type: boolean
+          description: True when the profile has no compatibility issues against the current engine.
+        schema_version:
+          type: string
+          description: The profile's stored `schema_version`.
+        current_version:
+          type: string
+          description: The current engine version.
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/CompatibilityIssue'
+
+    CompatibilitySummary:
+      type: object
+      required: [id, name, compatible, issue_count]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        compatible:
+          type: boolean
+        issue_count:
+          type: integer
+
+    ProfilePatchRequest:
+      type: object
+      required: [op]
+      properties:
+        op:
+          type: string
+          enum:
+            - add_missing_test_cases
+            - add_missing_test_levels
+            - reset_test_cases
+            - reset_test_levels
+            - mark_reviewed
+          description: Targeted compatibility operation to apply to the stored profile.
+        module:
+          type: string
+          description: Required when `op` is `reset_test_levels`. Names the `test_levels` module to remove from the override.
+
+    MarkAllReviewedResult:
+      type: object
+      required: [updated]
+      properties:
+        updated:
+          type: integer
+          description: Number of stored profiles whose `schema_version` was bumped to the current engine version.
 
     RunList:
       type: object

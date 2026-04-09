@@ -136,6 +136,19 @@ func buildV1DDL(autoinc, bigint string) []string {
 	}
 }
 
+// settingsTableDDL returns the CREATE TABLE statement for the settings table.
+// "key" is a reserved word in MariaDB and must be quoted.
+func settingsTableDDL(d sqlDialect) string {
+	q := `"` // ANSI SQL quoting (SQLite, PostgreSQL)
+	if _, ok := d.(mariadbDialect); ok {
+		q = "`"
+	}
+	return fmt.Sprintf(`CREATE TABLE IF NOT EXISTS settings (
+		%skey%s   VARCHAR(255) NOT NULL PRIMARY KEY,
+		value  TEXT         NOT NULL
+	)`, q, q)
+}
+
 // sqlMigrations is the ordered list of schema migrations applied on startup.
 var sqlMigrations = []sqlMigration{
 	{
@@ -157,6 +170,45 @@ var sqlMigrations = []sqlMigration{
 		stmts: []string{
 			`ALTER TABLE jobs ADD COLUMN priority INTEGER NOT NULL DEFAULT 0`,
 			`ALTER TABLE runs ADD COLUMN priority INTEGER NOT NULL DEFAULT 0`,
+		},
+	},
+	{
+		version: 3,
+		stmtsFn: func(d sqlDialect) []string {
+			var autoinc, bigint string
+			switch d.(type) {
+			case postgresDialect:
+				autoinc = "BIGSERIAL PRIMARY KEY"
+				bigint = "BIGINT"
+			case mariadbDialect:
+				autoinc = "BIGINT AUTO_INCREMENT PRIMARY KEY"
+				bigint = "BIGINT"
+			default:
+				autoinc = "INTEGER PRIMARY KEY"
+				bigint = "INTEGER"
+			}
+			return []string{
+				fmt.Sprintf(`CREATE TABLE IF NOT EXISTS profiles (
+					id             %s,
+					name           VARCHAR(255) NOT NULL UNIQUE,
+					description    TEXT         NOT NULL DEFAULT '',
+					config         TEXT         NOT NULL DEFAULT '{}',
+					public         INTEGER      NOT NULL DEFAULT 0,
+					schema_version TEXT         NOT NULL DEFAULT '',
+					created_at     TEXT         NOT NULL,
+					updated_at     TEXT         NOT NULL
+				)`, autoinc),
+				fmt.Sprintf(`ALTER TABLE tags ADD COLUMN default_profile_id %s REFERENCES profiles(id) ON DELETE SET NULL`, bigint),
+				`CREATE INDEX IF NOT EXISTS idx_tags_default_profile_id ON tags(default_profile_id)`,
+				fmt.Sprintf(`ALTER TABLE jobs ADD COLUMN profile_id %s REFERENCES profiles(id) ON DELETE SET NULL`, bigint),
+				`ALTER TABLE jobs ADD COLUMN profile_name TEXT NOT NULL DEFAULT ''`,
+				`CREATE INDEX IF NOT EXISTS idx_jobs_profile_id ON jobs(profile_id)`,
+				fmt.Sprintf(`ALTER TABLE runs ADD COLUMN profile_id %s REFERENCES profiles(id) ON DELETE SET NULL`, bigint),
+				`ALTER TABLE runs ADD COLUMN profile_name TEXT NOT NULL DEFAULT ''`,
+				`ALTER TABLE runs ADD COLUMN effective_profile TEXT NOT NULL DEFAULT ''`,
+				`CREATE INDEX IF NOT EXISTS idx_runs_profile_id ON runs(profile_id)`,
+				settingsTableDDL(d),
+			}
 		},
 	},
 }

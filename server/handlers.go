@@ -72,6 +72,22 @@ func (s *Server) handleJobsBatch(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	resolvedProfile := resolvedProfileRef{}
+	if req.ProfileID != nil {
+		var code, message string
+		resolvedProfile, code, message = s.resolveStoredProfile(req.ProfileID, false)
+		if code != "" {
+			writeError(w, http.StatusBadRequest, code, message, nil)
+			return
+		}
+	} else if len(req.ProfileOverrides) == 0 && req.FromTag != "" {
+		var code, message string
+		resolvedProfile, code, message = s.resolveDefaultProfileFromTags([]string{req.FromTag})
+		if code != "" {
+			writeError(w, http.StatusBadRequest, code, message, nil)
+			return
+		}
+	}
 
 	batchID := newID("batch")
 	now := time.Now().UTC()
@@ -90,16 +106,18 @@ func (s *Server) handleJobsBatch(w http.ResponseWriter, r *http.Request) {
 			trimmed = normalized
 		}
 		job := Job{
-			ID:        newID("job"),
-			BatchID:   batchID,
-			Domain:    trimmed,
-			Tests:     req.Tests,
-			Overrides: req.ProfileOverrides,
-			MinLevel:  req.MinLevel,
-			Priority:  PriorityBatch,
-			Status:    JobQueued,
-			CreatedAt: now,
-			Progress:  0,
+			ID:          newID("job"),
+			BatchID:     batchID,
+			Domain:      trimmed,
+			Tests:       req.Tests,
+			Overrides:   req.ProfileOverrides,
+			MinLevel:    req.MinLevel,
+			Priority:    PriorityBatch,
+			Status:      JobQueued,
+			CreatedAt:   now,
+			Progress:    0,
+			ProfileID:   cloneInt64Ptr(resolvedProfile.ID),
+			ProfileName: resolvedProfile.Name,
 		}
 		created, err := s.store.Create(job)
 		if err != nil {
@@ -374,6 +392,22 @@ func (s *Server) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	resolvedProfile := resolvedProfileRef{}
+	if req.ProfileID != nil {
+		var code, message string
+		resolvedProfile, code, message = s.resolveStoredProfile(req.ProfileID, false)
+		if code != "" {
+			writeError(w, http.StatusBadRequest, code, message, nil)
+			return
+		}
+	} else if len(req.ProfileOverrides) == 0 {
+		var code, message string
+		resolvedProfile, code, message = s.resolveDefaultProfileFromTags(tagNames)
+		if code != "" {
+			writeError(w, http.StatusBadRequest, code, message, nil)
+			return
+		}
+	}
 
 	job := Job{
 		ID:            newID("job"),
@@ -386,6 +420,8 @@ func (s *Server) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 		Status:        JobQueued,
 		CreatedAt:     time.Now().UTC(),
 		Progress:      0,
+		ProfileID:     cloneInt64Ptr(resolvedProfile.ID),
+		ProfileName:   resolvedProfile.Name,
 	}
 	created, err := s.store.Create(job)
 	if err != nil {

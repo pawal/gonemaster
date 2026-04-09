@@ -824,6 +824,52 @@ func TestInMemoryJobStoreUpdateTag(t *testing.T) {
 	}
 }
 
+func TestInMemoryJobStoreSetTagDefaultProfile(t *testing.T) {
+	store := NewInMemoryJobStore()
+	if err := store.CreateTag("beta", "profiled tag"); err != nil {
+		t.Fatalf("CreateTag: %v", err)
+	}
+	profile, err := store.CreateProfile(StoredProfile{Name: "default", Config: "{}"})
+	if err != nil {
+		t.Fatalf("CreateProfile: %v", err)
+	}
+
+	if err := store.SetTagDefaultProfile("beta", &profile.ID); err != nil {
+		t.Fatalf("SetTagDefaultProfile: %v", err)
+	}
+	tag, ok := store.GetTag("beta")
+	if !ok {
+		t.Fatal("GetTag: not found")
+	}
+	if tag.DefaultProfileID == nil || *tag.DefaultProfileID != profile.ID {
+		t.Fatalf("DefaultProfileID: got %v, want %d", tag.DefaultProfileID, profile.ID)
+	}
+
+	tags := store.ListTags(10, 0)
+	if len(tags) != 1 {
+		t.Fatalf("ListTags: got %d, want 1", len(tags))
+	}
+	if tags[0].DefaultProfileID == nil || *tags[0].DefaultProfileID != profile.ID {
+		t.Fatalf("ListTags DefaultProfileID: got %v, want %d", tags[0].DefaultProfileID, profile.ID)
+	}
+
+	if err := store.SetTagDefaultProfile("beta", nil); err != nil {
+		t.Fatalf("clear SetTagDefaultProfile: %v", err)
+	}
+	tag, _ = store.GetTag("beta")
+	if tag.DefaultProfileID != nil {
+		t.Fatalf("expected cleared DefaultProfileID, got %v", *tag.DefaultProfileID)
+	}
+
+	missingID := profile.ID + 1000
+	if err := store.SetTagDefaultProfile("beta", &missingID); err == nil {
+		t.Fatal("expected error for missing profile")
+	}
+	if err := store.SetTagDefaultProfile("missing-tag", &profile.ID); err == nil {
+		t.Fatal("expected error for missing tag")
+	}
+}
+
 func TestInMemoryJobStoreDeleteTag(t *testing.T) {
 	store := NewInMemoryJobStore()
 	d, _ := store.GetOrCreateDomain("example.com")
@@ -1088,7 +1134,7 @@ func TestInMemoryJobStoreQueryEntries(t *testing.T) {
 
 	grad("run1", "alpha.example", "batch1", []engine.LogEntry{
 		{Module: "DNSSEC", Testcase: "DNSSEC01", Tag: "DS01_ALGO_SHA1", Level: "WARNING"},
-		{Module: "DNSSEC", Testcase: "DNSSEC02", Tag: "DS02_NO_DS",      Level: "ERROR"},
+		{Module: "DNSSEC", Testcase: "DNSSEC02", Tag: "DS02_NO_DS", Level: "ERROR"},
 	})
 	grad("run2", "beta.example", "batch1", []engine.LogEntry{
 		{Module: "DNSSEC", Testcase: "DNSSEC01", Tag: "DS01_ALGO_SHA1", Level: "NOTICE"},
@@ -1231,5 +1277,278 @@ func TestInMemoryStorePriorityPersistedOnRun(t *testing.T) {
 	}
 	if reconstructed.Priority != PriorityBatch {
 		t.Fatalf("reconstructed Priority: got %d, want %d", reconstructed.Priority, PriorityBatch)
+	}
+}
+
+func TestInMemoryJobStoreProfileCRUD(t *testing.T) {
+	store := NewInMemoryJobStore()
+
+	// Create
+	p, err := store.CreateProfile(StoredProfile{
+		Name:        "strict-dnssec",
+		Description: "Strict DNSSEC validation",
+		Config:      `{"resolver.defaults.timeout": 10}`,
+		Public:      true,
+	})
+	if err != nil {
+		t.Fatalf("CreateProfile: %v", err)
+	}
+	if p.ID == 0 {
+		t.Fatal("expected non-zero ID")
+	}
+	if p.CreatedAt.IsZero() || p.UpdatedAt.IsZero() {
+		t.Fatal("expected timestamps to be set")
+	}
+
+	// Get by ID
+	got, ok := store.GetProfile(p.ID)
+	if !ok {
+		t.Fatal("GetProfile: not found")
+	}
+	if got.Name != "strict-dnssec" || got.Description != "Strict DNSSEC validation" || !got.Public {
+		t.Fatalf("unexpected profile: %+v", got)
+	}
+	if got.Config != `{"resolver.defaults.timeout": 10}` {
+		t.Fatalf("unexpected config: %s", got.Config)
+	}
+
+	// Get by name
+	got, ok = store.GetProfileByName("strict-dnssec")
+	if !ok {
+		t.Fatal("GetProfileByName: not found")
+	}
+	if got.ID != p.ID {
+		t.Fatalf("expected ID %d, got %d", p.ID, got.ID)
+	}
+
+	// Get missing
+	_, ok = store.GetProfile(999)
+	if ok {
+		t.Fatal("expected false for missing profile")
+	}
+	_, ok = store.GetProfileByName("missing")
+	if ok {
+		t.Fatal("expected false for missing profile name")
+	}
+
+	// Update
+	got.Description = "Updated description"
+	got.Public = false
+	if err := store.UpdateProfile(got); err != nil {
+		t.Fatalf("UpdateProfile: %v", err)
+	}
+	updated, _ := store.GetProfile(p.ID)
+	if updated.Description != "Updated description" || updated.Public {
+		t.Fatalf("update not reflected: %+v", updated)
+	}
+
+	// Duplicate name rejected on create
+	_, err = store.CreateProfile(StoredProfile{Name: "strict-dnssec", Config: "{}"})
+	if err == nil {
+		t.Fatal("expected error for duplicate name")
+	}
+
+	// Duplicate name rejected on update (rename collision)
+	p2, _ := store.CreateProfile(StoredProfile{Name: "quick", Config: "{}"})
+	p2.Name = "strict-dnssec"
+	if err := store.UpdateProfile(p2); err == nil {
+		t.Fatal("expected error for duplicate name on update")
+	}
+
+	// List returns sorted by name
+	profiles := store.ListProfiles()
+	if len(profiles) != 2 {
+		t.Fatalf("expected 2 profiles, got %d", len(profiles))
+	}
+	if profiles[0].Name != "quick" || profiles[1].Name != "strict-dnssec" {
+		t.Fatalf("expected sorted order: quick, strict-dnssec; got %s, %s", profiles[0].Name, profiles[1].Name)
+	}
+
+	// Delete
+	if err := store.DeleteProfile(p.ID); err != nil {
+		t.Fatalf("DeleteProfile: %v", err)
+	}
+	_, ok = store.GetProfile(p.ID)
+	if ok {
+		t.Fatal("expected profile to be deleted")
+	}
+
+	// Delete missing returns error
+	if err := store.DeleteProfile(999); err == nil {
+		t.Fatal("expected error for deleting missing profile")
+	}
+
+	// Update missing returns error
+	if err := store.UpdateProfile(StoredProfile{ID: 999, Name: "x", Config: "{}"}); err == nil {
+		t.Fatal("expected error for updating missing profile")
+	}
+}
+
+func TestInMemoryJobStoreProfileReferencesPersist(t *testing.T) {
+	store := NewInMemoryJobStore()
+
+	profile, err := store.CreateProfile(StoredProfile{
+		Name:   "strict",
+		Config: `{"resolver.defaults.timeout":10}`,
+	})
+	if err != nil {
+		t.Fatalf("CreateProfile: %v", err)
+	}
+	if err := store.CreateTag("ops", "operations"); err != nil {
+		t.Fatalf("CreateTag: %v", err)
+	}
+	if err := store.SetTagDefaultProfile("ops", &profile.ID); err != nil {
+		t.Fatalf("SetTagDefaultProfile: %v", err)
+	}
+
+	now := time.Now().UTC()
+	queued := Job{
+		ID:               "job-profile-queued",
+		Domain:           "queued.example",
+		Status:           JobQueued,
+		CreatedAt:        now,
+		ProfileID:        &profile.ID,
+		ProfileName:      profile.Name,
+		EffectiveProfile: `{"resolver.defaults.timeout":10}`,
+	}
+	if _, err := store.Create(queued); err != nil {
+		t.Fatalf("Create queued: %v", err)
+	}
+	gotQueued, ok := store.Get(queued.ID)
+	if !ok {
+		t.Fatal("Get queued: not found")
+	}
+	if gotQueued.ProfileID == nil || *gotQueued.ProfileID != profile.ID {
+		t.Fatalf("queued ProfileID: got %v, want %d", gotQueued.ProfileID, profile.ID)
+	}
+	if gotQueued.ProfileName != profile.Name {
+		t.Fatalf("queued ProfileName: got %q, want %q", gotQueued.ProfileName, profile.Name)
+	}
+
+	runJob := Job{
+		ID:               "job-profile-run",
+		Domain:           "run.example",
+		Status:           JobSucceeded,
+		CreatedAt:        now,
+		StartedAt:        now,
+		FinishedAt:       now.Add(2 * time.Second),
+		ProfileID:        &profile.ID,
+		ProfileName:      profile.Name,
+		EffectiveProfile: `{"resolver.defaults.timeout":15}`,
+	}
+	if _, err := store.Create(runJob); err != nil {
+		t.Fatalf("Create run job: %v", err)
+	}
+	if err := store.GraduateJob(runJob, nil); err != nil {
+		t.Fatalf("GraduateJob: %v", err)
+	}
+	run, ok := store.GetRun(runJob.ID)
+	if !ok {
+		t.Fatal("GetRun: not found")
+	}
+	if run.ProfileID == nil || *run.ProfileID != profile.ID {
+		t.Fatalf("run ProfileID: got %v, want %d", run.ProfileID, profile.ID)
+	}
+	if run.ProfileName != profile.Name {
+		t.Fatalf("run ProfileName: got %q, want %q", run.ProfileName, profile.Name)
+	}
+	if run.EffectiveProfile != `{"resolver.defaults.timeout":15}` {
+		t.Fatalf("run EffectiveProfile: got %q", run.EffectiveProfile)
+	}
+
+	if err := store.DeleteProfile(profile.ID); err != nil {
+		t.Fatalf("DeleteProfile: %v", err)
+	}
+
+	tag, ok := store.GetTag("ops")
+	if !ok {
+		t.Fatal("GetTag after delete: not found")
+	}
+	if tag.DefaultProfileID != nil {
+		t.Fatalf("expected cleared tag DefaultProfileID, got %v", *tag.DefaultProfileID)
+	}
+
+	gotQueued, ok = store.Get(queued.ID)
+	if !ok {
+		t.Fatal("Get queued after delete: not found")
+	}
+	if gotQueued.ProfileID != nil {
+		t.Fatalf("expected queued ProfileID cleared, got %v", *gotQueued.ProfileID)
+	}
+	if gotQueued.ProfileName != profile.Name {
+		t.Fatalf("queued ProfileName after delete: got %q, want %q", gotQueued.ProfileName, profile.Name)
+	}
+
+	run, ok = store.GetRun(runJob.ID)
+	if !ok {
+		t.Fatal("GetRun after delete: not found")
+	}
+	if run.ProfileID != nil {
+		t.Fatalf("expected run ProfileID cleared, got %v", *run.ProfileID)
+	}
+	if run.ProfileName != profile.Name {
+		t.Fatalf("run ProfileName after delete: got %q, want %q", run.ProfileName, profile.Name)
+	}
+	if run.EffectiveProfile != `{"resolver.defaults.timeout":15}` {
+		t.Fatalf("run EffectiveProfile after delete: got %q", run.EffectiveProfile)
+	}
+}
+
+func TestInMemoryJobStoreSettingsCRUD(t *testing.T) {
+	store := NewInMemoryJobStore()
+
+	// Get missing
+	_, ok := store.GetSetting("worker_count")
+	if ok {
+		t.Fatal("expected ok=false for missing setting")
+	}
+
+	// Set and get
+	if err := store.SetSetting("worker_count", "8"); err != nil {
+		t.Fatalf("SetSetting: %v", err)
+	}
+	v, ok := store.GetSetting("worker_count")
+	if !ok {
+		t.Fatal("expected setting to exist")
+	}
+	if v != "8" {
+		t.Fatalf("got %q, want %q", v, "8")
+	}
+
+	// Overwrite
+	if err := store.SetSetting("worker_count", "12"); err != nil {
+		t.Fatalf("SetSetting overwrite: %v", err)
+	}
+	v, _ = store.GetSetting("worker_count")
+	if v != "12" {
+		t.Fatalf("got %q after overwrite, want %q", v, "12")
+	}
+
+	// Set another
+	if err := store.SetSetting("min_level", "WARNING"); err != nil {
+		t.Fatalf("SetSetting min_level: %v", err)
+	}
+
+	// List
+	all := store.ListSettings()
+	if len(all) != 2 {
+		t.Fatalf("ListSettings: got %d, want 2", len(all))
+	}
+	if all["worker_count"] != "12" || all["min_level"] != "WARNING" {
+		t.Fatalf("ListSettings: unexpected values: %v", all)
+	}
+
+	// Delete
+	if err := store.DeleteSetting("worker_count"); err != nil {
+		t.Fatalf("DeleteSetting: %v", err)
+	}
+	_, ok = store.GetSetting("worker_count")
+	if ok {
+		t.Fatal("expected setting deleted")
+	}
+
+	// Delete missing
+	if err := store.DeleteSetting("nonexistent"); err == nil {
+		t.Fatal("expected error on deleting missing setting")
 	}
 }

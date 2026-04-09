@@ -35,10 +35,10 @@ func severityRank(level string) int {
 type JobStore interface {
 	// Job queue management (in-flight jobs only).
 	Create(job Job) (Job, error)
-	Get(id string) (Job, bool)            // checks jobs first, then reconstructs from runs
+	Get(id string) (Job, bool)                 // checks jobs first, then reconstructs from runs
 	GetByPublicID(publicID string) (Job, bool) // checks jobs then runs
-	Update(job Job) error                 // only for in-flight jobs
-	List(filter JobFilter) JobList        // only in-flight jobs
+	Update(job Job) error                      // only for in-flight jobs
+	List(filter JobFilter) JobList             // only in-flight jobs
 
 	// GraduateJob atomically creates a run + entries, updates domain latest_*,
 	// and deletes the job from the queue. entries may be nil for canceled jobs.
@@ -58,6 +58,7 @@ type JobStore interface {
 	CreateTag(name, description string) error
 	GetTag(name string) (Tag, bool)
 	UpdateTag(name, description string) error
+	SetTagDefaultProfile(name string, profileID *int64) error
 	DeleteTag(name string) error
 	ListTags(limit, offset int) []Tag
 	TagDomains(tag string, domainIDs []int64) error
@@ -78,6 +79,20 @@ type JobStore interface {
 	// Batch management.
 	CreateBatch(batch Batch) error
 	GetBatch(id string) (Batch, bool)
+
+	// Profile management.
+	CreateProfile(p StoredProfile) (StoredProfile, error)
+	GetProfile(id int64) (StoredProfile, bool)
+	GetProfileByName(name string) (StoredProfile, bool)
+	UpdateProfile(p StoredProfile) error
+	DeleteProfile(id int64) error
+	ListProfiles() []StoredProfile
+
+	// Settings management.
+	GetSetting(key string) (string, bool)
+	SetSetting(key, value string) error
+	DeleteSetting(key string) error
+	ListSettings() map[string]string
 
 	// PurgeOlderThan deletes terminal runs whose finished_at is before cutoff,
 	// along with their entries. Returns the number of runs deleted.
@@ -104,12 +119,19 @@ type InMemoryJobStore struct {
 	domainCounter int64
 
 	// Tags.
-	tags       map[string]Tag      // name → Tag
-	domainTags map[int64][]string  // domainID → []tagName
-	tagDomains map[string][]int64  // tagName → []domainID
+	tags       map[string]Tag     // name → Tag
+	domainTags map[int64][]string // domainID → []tagName
+	tagDomains map[string][]int64 // tagName → []domainID
 
 	// Batches.
 	batches map[string]Batch // batchID → Batch
+
+	// Profiles.
+	profiles       map[int64]StoredProfile // id → StoredProfile
+	profileCounter int64
+
+	// Settings.
+	settings map[string]string // key → value
 }
 
 // NewInMemoryJobStore creates an empty in-memory job store.
@@ -126,6 +148,8 @@ func NewInMemoryJobStore() *InMemoryJobStore {
 		domainTags:   map[int64][]string{},
 		tagDomains:   map[string][]int64{},
 		batches:      map[string]Batch{},
+		profiles:     map[int64]StoredProfile{},
+		settings:     map[string]string{},
 	}
 }
 
@@ -299,24 +323,27 @@ func (s *InMemoryJobStore) GraduateJob(job Job, engineEntries []engine.LogEntry)
 	}
 
 	run := Run{
-		ID:          job.ID,
-		DomainID:    domain.ID,
-		Domain:      job.Domain,
-		BatchID:     job.BatchID,
-		Status:      job.Status,
-		CreatedAt:   job.CreatedAt,
-		StartedAt:   job.StartedAt,
-		FinishedAt:  job.FinishedAt,
-		DurationMs:  durationMs,
-		SevNotice:   sevNotice,
-		SevWarning:  sevWarning,
-		SevError:    sevError,
-		SevCritical: sevCritical,
-		WorstLevel:  worstLevel,
-		EntryCount:  len(engineEntries),
-		Priority:    job.Priority,
-		Profile:     job.Profile,
-		PublicID:    job.PublicID,
+		ID:               job.ID,
+		DomainID:         domain.ID,
+		Domain:           job.Domain,
+		BatchID:          job.BatchID,
+		Status:           job.Status,
+		CreatedAt:        job.CreatedAt,
+		StartedAt:        job.StartedAt,
+		FinishedAt:       job.FinishedAt,
+		DurationMs:       durationMs,
+		SevNotice:        sevNotice,
+		SevWarning:       sevWarning,
+		SevError:         sevError,
+		SevCritical:      sevCritical,
+		WorstLevel:       worstLevel,
+		EntryCount:       len(engineEntries),
+		Priority:         job.Priority,
+		Profile:          job.Profile,
+		ProfileID:        cloneInt64Ptr(job.ProfileID),
+		ProfileName:      job.ProfileName,
+		EffectiveProfile: job.EffectiveProfile,
+		PublicID:         job.PublicID,
 	}
 	run.SeverityTotals = map[string]int{
 		"NOTICE":   sevNotice,
@@ -530,6 +557,7 @@ func (s *InMemoryJobStore) ListTags(limit, offset int) []Tag {
 	tags := make([]Tag, 0, len(s.tags))
 	for _, t := range s.tags {
 		t.DomainCount = len(s.tagDomains[t.Name])
+		t.DefaultProfileID = cloneInt64Ptr(t.DefaultProfileID)
 		tags = append(tags, t)
 	}
 	sort.Slice(tags, func(i, j int) bool {
@@ -585,6 +613,7 @@ func (s *InMemoryJobStore) GetTag(name string) (Tag, bool) {
 		return Tag{}, false
 	}
 	t.DomainCount = len(s.tagDomains[name])
+	t.DefaultProfileID = cloneInt64Ptr(t.DefaultProfileID)
 	return t, true
 }
 
@@ -597,6 +626,25 @@ func (s *InMemoryJobStore) UpdateTag(name, description string) error {
 		return errors.New("tag not found")
 	}
 	t.Description = description
+	s.tags[name] = t
+	return nil
+}
+
+// SetTagDefaultProfile updates a tag's default stored profile reference.
+func (s *InMemoryJobStore) SetTagDefaultProfile(name string, profileID *int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	t, ok := s.tags[name]
+	if !ok {
+		return errors.New("tag not found")
+	}
+	if profileID != nil {
+		if _, ok := s.profiles[*profileID]; !ok {
+			return fmt.Errorf("profile %d not found", *profileID)
+		}
+	}
+	t.DefaultProfileID = cloneInt64Ptr(profileID)
 	s.tags[name] = t
 	return nil
 }
@@ -704,6 +752,7 @@ func (s *InMemoryJobStore) GetRun(id string) (Run, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	run, ok := s.runs[id]
+	run.ProfileID = cloneInt64Ptr(run.ProfileID)
 	return run, ok
 }
 
@@ -716,6 +765,7 @@ func (s *InMemoryJobStore) GetRunByPublicID(publicID string) (Run, bool) {
 		return Run{}, false
 	}
 	run, ok := s.runs[runID]
+	run.ProfileID = cloneInt64Ptr(run.ProfileID)
 	return run, ok
 }
 
@@ -724,6 +774,7 @@ func (s *InMemoryJobStore) ListRuns(filter RunFilter) RunList {
 	s.mu.RLock()
 	snapshot := make([]Run, 0, len(s.runs))
 	for _, r := range s.runs {
+		r.ProfileID = cloneInt64Ptr(r.ProfileID)
 		snapshot = append(snapshot, r)
 	}
 	var tagDomainIDs map[int64]struct{}
@@ -990,6 +1041,148 @@ func (s *InMemoryJobStore) GetBatch(id string) (Batch, bool) {
 	return b, ok
 }
 
+// CreateProfile stores a new profile and assigns an auto-incremented ID.
+func (s *InMemoryJobStore) CreateProfile(p StoredProfile) (StoredProfile, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, existing := range s.profiles {
+		if existing.Name == p.Name {
+			return StoredProfile{}, fmt.Errorf("profile name %q already exists", p.Name)
+		}
+	}
+	s.profileCounter++
+	p.ID = s.profileCounter
+	now := time.Now().UTC()
+	if p.CreatedAt.IsZero() {
+		p.CreatedAt = now
+	}
+	if p.UpdatedAt.IsZero() {
+		p.UpdatedAt = now
+	}
+	s.profiles[p.ID] = p
+	return p, nil
+}
+
+// GetProfile returns a profile by ID.
+func (s *InMemoryJobStore) GetProfile(id int64) (StoredProfile, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	p, ok := s.profiles[id]
+	return p, ok
+}
+
+// GetProfileByName returns a profile by its unique name.
+func (s *InMemoryJobStore) GetProfileByName(name string) (StoredProfile, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, p := range s.profiles {
+		if p.Name == name {
+			return p, true
+		}
+	}
+	return StoredProfile{}, false
+}
+
+// UpdateProfile updates an existing profile.
+func (s *InMemoryJobStore) UpdateProfile(p StoredProfile) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.profiles[p.ID]; !ok {
+		return fmt.Errorf("profile %d not found", p.ID)
+	}
+	for _, existing := range s.profiles {
+		if existing.Name == p.Name && existing.ID != p.ID {
+			return fmt.Errorf("profile name %q already exists", p.Name)
+		}
+	}
+	p.UpdatedAt = time.Now().UTC()
+	s.profiles[p.ID] = p
+	return nil
+}
+
+// DeleteProfile removes a profile by ID.
+func (s *InMemoryJobStore) DeleteProfile(id int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.profiles[id]; !ok {
+		return fmt.Errorf("profile %d not found", id)
+	}
+	delete(s.profiles, id)
+	for name, tag := range s.tags {
+		if tag.DefaultProfileID != nil && *tag.DefaultProfileID == id {
+			tag.DefaultProfileID = nil
+			s.tags[name] = tag
+		}
+	}
+	for jobID, job := range s.jobs {
+		if job.ProfileID != nil && *job.ProfileID == id {
+			job.ProfileID = nil
+			s.jobs[jobID] = job
+		}
+	}
+	for runID, run := range s.runs {
+		if run.ProfileID != nil && *run.ProfileID == id {
+			run.ProfileID = nil
+			s.runs[runID] = run
+		}
+	}
+	return nil
+}
+
+// ListProfiles returns all profiles ordered by name.
+func (s *InMemoryJobStore) ListProfiles() []StoredProfile {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make([]StoredProfile, 0, len(s.profiles))
+	for _, p := range s.profiles {
+		result = append(result, p)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Name < result[j].Name
+	})
+	return result
+}
+
+// ── Settings ──────────────────────────────────────────────────────────────────
+
+// GetSetting returns a setting value by key.
+func (s *InMemoryJobStore) GetSetting(key string) (string, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	v, ok := s.settings[key]
+	return v, ok
+}
+
+// SetSetting creates or updates a setting.
+func (s *InMemoryJobStore) SetSetting(key, value string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.settings[key] = value
+	return nil
+}
+
+// DeleteSetting removes a setting by key.
+func (s *InMemoryJobStore) DeleteSetting(key string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.settings[key]; !ok {
+		return errors.New("setting not found")
+	}
+	delete(s.settings, key)
+	return nil
+}
+
+// ListSettings returns all settings as a map.
+func (s *InMemoryJobStore) ListSettings() map[string]string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make(map[string]string, len(s.settings))
+	for k, v := range s.settings {
+		result[k] = v
+	}
+	return result
+}
+
 // PurgeOlderThan deletes terminal-status runs whose finished_at is before
 // cutoff, along with their entries. Returns the number of runs deleted.
 func (s *InMemoryJobStore) PurgeOlderThan(cutoff time.Time) (int64, error) {
@@ -1017,12 +1210,12 @@ func (s *InMemoryJobStore) PurgeOlderThan(cutoff time.Time) (int64, error) {
 // jobFromRun reconstructs a Job from a graduated Run for API compatibility.
 func jobFromRun(r Run) Job {
 	return Job{
-		ID:       r.ID,
-		PublicID: r.PublicID,
-		BatchID:  r.BatchID,
-		DomainID: r.DomainID,
-		Domain:   r.Domain,
-		Status:   r.Status,
+		ID:         r.ID,
+		PublicID:   r.PublicID,
+		BatchID:    r.BatchID,
+		DomainID:   r.DomainID,
+		Domain:     r.Domain,
+		Status:     r.Status,
 		FinishedAt: r.FinishedAt,
 		SeverityTotals: map[string]int{
 			"NOTICE":   r.SevNotice,
@@ -1030,12 +1223,23 @@ func jobFromRun(r Run) Job {
 			"ERROR":    r.SevError,
 			"CRITICAL": r.SevCritical,
 		},
-		CreatedAt: r.CreatedAt,
-		StartedAt: r.StartedAt,
-		Progress:  100,
-		Priority:  r.Priority,
-		Profile:   r.Profile,
+		CreatedAt:        r.CreatedAt,
+		StartedAt:        r.StartedAt,
+		Progress:         100,
+		Priority:         r.Priority,
+		Profile:          r.Profile,
+		ProfileID:        cloneInt64Ptr(r.ProfileID),
+		ProfileName:      r.ProfileName,
+		EffectiveProfile: r.EffectiveProfile,
 	}
+}
+
+func cloneInt64Ptr(v *int64) *int64 {
+	if v == nil {
+		return nil
+	}
+	cloned := *v
+	return &cloned
 }
 
 // buildJobResult constructs a JobResult from a run and its stored entries.

@@ -303,6 +303,13 @@ func run(args []string, out *os.File, errOut *os.File) int {
 		fmt.Fprintln(errOut, err.Error())
 		return 2
 	}
+
+	// Track where each setting value came from so the settings API
+	// can show the source and respect CLI flag precedence.
+	configSources := buildConfigSources(flagsSet, configPath != "")
+	srv.SetConfigSources(configSources)
+	srv.ApplyDatabaseSettings()
+
 	srv.Start()
 	httpServer := &http.Server{
 		Addr:              cfg.ListenAddr,
@@ -392,4 +399,33 @@ func normalizeVersion(version string) string {
 		return "unknown"
 	}
 	return version
+}
+
+// buildConfigSources maps setting keys to their origin so the settings API
+// can display sources and preserve CLI flag precedence.
+func buildConfigSources(flagsSet map[string]bool, hasConfigFile bool) map[string]server.SettingSource {
+	// Map CLI flag names to settings API keys.
+	flagToKey := map[string]string{
+		"listen":                       "listen_addr",
+		"workers":                      "worker_count",
+		"max-concurrent-jobs":          "max_concurrent_jobs",
+		"min-level":                    "min_level",
+		"profile":                      "profile_path",
+		"db-driver":                    "db_driver",
+		"db-dsn":                       "db_dsn",
+		"db-retention-days":            "retention_days",
+		"public-api-rate-limit-enabled": "rate_limit_enabled",
+		"public-api-rate-limit-max":    "rate_limit_max",
+		"public-api-rate-limit-window": "rate_limit_window",
+	}
+
+	sources := make(map[string]server.SettingSource)
+	for flag, key := range flagToKey {
+		if flagsSet[flag] {
+			sources[key] = server.SourceCLIFlag
+		} else if hasConfigFile {
+			sources[key] = server.SourceConfigFile
+		}
+	}
+	return sources
 }

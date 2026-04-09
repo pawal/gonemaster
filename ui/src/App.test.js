@@ -13,6 +13,37 @@ const jsonResponse = (data, ok = true) => ({
   text: async () => JSON.stringify(data)
 });
 
+const emptyResponse = () => ({
+  ok: true,
+  statusText: "No Content",
+  headers: {
+    get: () => ""
+  },
+  json: async () => ({}),
+  text: async () => ""
+});
+
+const sampleProfiles = () => ([
+  {
+    id: 11,
+    name: "baseline",
+    description: "Default baseline",
+    config: { net: { ipv4: true, ipv6: true } },
+    public: false,
+    created_at: "2026-04-01T10:00:00Z",
+    updated_at: "2026-04-02T10:00:00Z"
+  },
+  {
+    id: 12,
+    name: "strict",
+    description: "Strict DNS profile",
+    config: { resolver: { defaults: { timeout: 5 } } },
+    public: true,
+    created_at: "2026-04-01T11:00:00Z",
+    updated_at: "2026-04-03T09:30:00Z"
+  }
+]);
+
 describe("App", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -37,6 +68,10 @@ describe("App", () => {
     await fireEvent.click(screen.getByRole("tab", { name: "Metrics" }));
   };
 
+  const openSettingsTab = async () => {
+    await fireEvent.click(screen.getByRole("tab", { name: "Settings" }));
+  };
+
   const getMetricsPanel = () => screen.getByRole("tabpanel", { name: "Metrics" });
 
   it("renders the main sections", async () => {
@@ -51,6 +86,7 @@ describe("App", () => {
     expect(screen.getByRole("tab", { name: "Recent Tests" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Batch Jobs" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Metrics" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Settings" })).toBeInTheDocument();
     expect(screen.getByText("Job Inspector")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Recent Tests" })).toBeNull();
     expect(screen.queryByText("Batch Inspector")).not.toBeInTheDocument();
@@ -59,6 +95,9 @@ describe("App", () => {
 
     await openBatchTab();
     expect(screen.getByText("Batch Inspector")).toBeInTheDocument();
+
+    await openSettingsTab();
+    expect(screen.getByText("Profile Library")).toBeInTheDocument();
 
     unmount();
   });
@@ -663,6 +702,44 @@ describe("App", () => {
     unmount();
   });
 
+  it("shows profile names in the recent job list and job inspector", async () => {
+    const job = {
+      id: "job_profile_name",
+      domain: "example.com",
+      status: "running",
+      created_at: "2026-02-03T00:00:00Z",
+      progress: 48,
+      profile_name: "strict job profile"
+    };
+
+    global.fetch.mockImplementation((url) => {
+      if (typeof url === "string" && url.startsWith("/api/v1/jobs?")) {
+        return jsonResponse({ items: [job], total: 1 });
+      }
+      if (url === `/api/v1/jobs/${job.id}`) {
+        return jsonResponse(job);
+      }
+      if (url === "/api/v1/profiles") {
+        return jsonResponse(sampleProfiles());
+      }
+      return jsonResponse({ items: [] });
+    });
+
+    const { unmount } = render(App);
+
+    await openRecentTab();
+    expect(await screen.findByText("strict job profile")).toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Inspect" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("tab", { name: "Single Job" })).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByText("strict job profile")).toBeInTheDocument();
+    });
+
+    unmount();
+  });
+
   it("includes tags in single job payload when tag field is filled", async () => {
     const job = { id: "job_tagged", domain: "example.com", status: "pending" };
     let capturedBody = null;
@@ -845,6 +922,68 @@ describe("App", () => {
         net: {
           ipv4: true,
           ipv6: false
+        }
+      });
+    });
+
+    unmount();
+  });
+
+  it("submits a single job with a selected stored profile and inline override", async () => {
+    const job = {
+      id: "job_profiled_single",
+      domain: "example.com",
+      status: "queued",
+      created_at: "2026-02-03T00:00:00Z",
+      progress: 0
+    };
+
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (url === "/api/v1/profiles") {
+        return jsonResponse(sampleProfiles());
+      }
+      if (url === "/api/v1/jobs" && options.method === "POST") {
+        return jsonResponse(job);
+      }
+      if (url === `/api/v1/jobs/${job.id}`) {
+        return jsonResponse(job);
+      }
+      if (typeof url === "string" && url.startsWith("/api/v1/jobs?")) {
+        return jsonResponse({ items: [job] });
+      }
+      return jsonResponse({ items: [] });
+    });
+
+    const { unmount } = render(App);
+
+    await fireEvent.input(await screen.findByPlaceholderText("example.com"), {
+      target: { value: "example.com" }
+    });
+    await screen.findByRole("option", { name: "strict" });
+    await fireEvent.change(screen.getByLabelText("Stored profile"), {
+      target: { value: "12" }
+    });
+    await fireEvent.click(screen.getByText("Advanced profile"));
+    await fireEvent.change(screen.getByLabelText("IP transport"), {
+      target: { value: "disable_ipv4" }
+    });
+
+    await fireEvent.click(screen.getByText("Run Single Job"));
+
+    await waitFor(() => {
+      const postCall = global.fetch.mock.calls.find(
+        ([url, options]) => url === "/api/v1/jobs" && options?.method === "POST"
+      );
+      expect(postCall).toBeTruthy();
+      const body = JSON.parse(postCall[1].body);
+      expect(body).toEqual({
+        domain: "example.com",
+        profile_id: 12,
+        profile_overrides: {
+          net: {
+            ipv4: false,
+            ipv6: true
+          }
         }
       });
     });
@@ -1081,6 +1220,7 @@ describe("App", () => {
   it("includes tags in batch payload when tag field is filled", async () => {
     let capturedBody = null;
     global.fetch.mockImplementation((url, options = {}) => {
+      if (url === "/api/v1/profiles") return jsonResponse(sampleProfiles());
       if (url === "/api/v1/jobs/batch" && options.method === "POST") {
         capturedBody = JSON.parse(options.body || "{}");
         return jsonResponse({ batch_id: "batch_t" });
@@ -1105,9 +1245,134 @@ describe("App", () => {
     unmount();
   });
 
+  it("includes the selected stored profile in batch payload", async () => {
+    let capturedBody = null;
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (url === "/api/v1/profiles") return jsonResponse(sampleProfiles());
+      if (url === "/api/v1/jobs/batch" && options.method === "POST") {
+        capturedBody = JSON.parse(options.body || "{}");
+        return jsonResponse({ batch_id: "batch_profiled" });
+      }
+      if (typeof url === "string" && url.startsWith("/api/v1/batches/batch_profiled")) {
+        return jsonResponse({ batch_id: "batch_profiled", total: 0, status_counts: {}, items: [], created_at: "2026-03-24T00:00:00Z" });
+      }
+      if (typeof url === "string" && url.startsWith("/api/v1/jobs?")) return jsonResponse({ items: [] });
+      if (url.includes("/api/v1/tags")) return jsonResponse([]);
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+    await openBatchTab();
+
+    await fireEvent.input(await screen.findByLabelText("Domains (one per line)"), {
+      target: { value: "example.com" }
+    });
+    await fireEvent.change(screen.getByLabelText("Stored profile"), {
+      target: { value: "11" }
+    });
+    await fireEvent.click(screen.getByText("Run Batch"));
+
+    await waitFor(() => {
+      expect(capturedBody).toEqual({
+        domains: ["example.com"],
+        profile_id: 11
+      });
+    });
+    unmount();
+  });
+
+  it("refreshes admin profile selectors after creating a non-public profile in settings", async () => {
+    let profiles = [
+      {
+        id: 12,
+        name: "strict",
+        description: "Strict DNS profile",
+        config: { resolver: { defaults: { timeout: 5 } } },
+        public: true,
+        created_at: "2026-04-01T11:00:00Z",
+        updated_at: "2026-04-03T09:30:00Z"
+      }
+    ];
+    let tags = [{ name: "ops", description: "Operations", domain_count: 1, default_profile_id: null }];
+
+    global.fetch.mockImplementation((url, options = {}) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      if (typeof value === "string" && value.startsWith("/api/v1/jobs?")) {
+        return jsonResponse({ items: [], total: 0 });
+      }
+      if (value === "/api/v1/profiles/default") {
+        return jsonResponse({
+          id: 0,
+          name: "default",
+          description: "Server base profile",
+          config: { net: { ipv4: true, ipv6: true } },
+          public: false,
+          created_at: "0001-01-01T00:00:00Z",
+          updated_at: "0001-01-01T00:00:00Z"
+        });
+      }
+      if (value === "/api/v1/profiles" && (!options.method || options.method === "GET")) {
+        return jsonResponse(profiles);
+      }
+      if (value === "/api/v1/profiles" && options.method === "POST") {
+        const body = JSON.parse(options.body || "{}");
+        const created = {
+          id: 13,
+          ...body,
+          created_at: "2026-04-05T10:00:00Z",
+          updated_at: "2026-04-05T10:00:00Z"
+        };
+        profiles = [...profiles, created];
+        return jsonResponse(created);
+      }
+      if (value.includes("/api/v1/tags/ops/summary")) {
+        return jsonResponse({ tag: "ops", domain_count: 1, ok: 0, notice: 0, warning: 0, error: 0, critical: 0 });
+      }
+      if (value.includes("/api/v1/tags/ops/domains")) {
+        return jsonResponse({ items: [], total: 0 });
+      }
+      if (value === "/api/v1/tags?limit=500" || value === "/api/v1/tags") {
+        return jsonResponse(tags);
+      }
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+
+    await openSettingsTab();
+    await fireEvent.click(await screen.findByRole("button", { name: "New profile" }));
+    await fireEvent.input(screen.getByLabelText("Name"), { target: { value: "internal-only" } });
+    await fireEvent.input(screen.getByLabelText("Description"), { target: { value: "Admin profile" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("Profile created.")).toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole("tab", { name: "Single Job" }));
+    const singleSelect = await screen.findByLabelText("Stored profile");
+    await waitFor(() => {
+      expect(within(singleSelect).getByRole("option", { name: "internal-only" })).toBeInTheDocument();
+    });
+
+    await openBatchTab();
+    const batchSelect = await screen.findByLabelText("Stored profile");
+    await waitFor(() => {
+      expect(within(batchSelect).getByRole("option", { name: "internal-only" })).toBeInTheDocument();
+    });
+
+    await fireEvent.click(screen.getByRole("tab", { name: "Tags" }));
+    await fireEvent.click(await screen.findByText("ops"));
+    const tagSelect = await screen.findByLabelText("Profile for this tag");
+    await waitFor(() => {
+      expect(within(tagSelect).getByRole("option", { name: "internal-only" })).toBeInTheDocument();
+    });
+
+    unmount();
+  });
+
   it("from-tag mode sends from_tag in batch payload", async () => {
     let capturedBody = null;
     global.fetch.mockImplementation((url, options = {}) => {
+      if (url === "/api/v1/profiles") return jsonResponse(sampleProfiles());
       if (url === "/api/v1/jobs/batch" && options.method === "POST") {
         capturedBody = JSON.parse(options.body || "{}");
         return jsonResponse({ batch_id: "batch_ft" });
@@ -3123,9 +3388,32 @@ describe("App", () => {
 
       await waitFor(() => {
         expect(screen.getByText("← Back to tags")).toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "Tag: ccTLD" })).toBeInTheDocument();
         expect(screen.getByRole("heading", { name: "Domains in this tag" })).toBeInTheDocument();
         expect(screen.getByText("example.com")).toBeInTheDocument();
       });
+      unmount();
+    });
+
+    it("renders tag severity counts inside level pills with Info styling", async () => {
+      mockTagFetch(
+        [{ name: "ccTLD", description: "ccTLDs", domain_count: 2 }],
+        { tag: "ccTLD", domain_count: 2, ok: 3, notice: 2, warning: 1, error: 4, critical: 0 },
+        [{ id: 1, name: "example.com", latest_level: "WARNING", run_count: 1 }]
+      );
+      const { unmount } = render(App);
+      await openTagsTab();
+      await fireEvent.click(await screen.findByText("ccTLD"));
+
+      await waitFor(() => {
+        expect(screen.getByText("Info 3")).toHaveClass("level-pill", "severity-info");
+        expect(screen.getByText("Notice 2")).toHaveClass("level-pill", "severity-notice");
+        expect(screen.getByText("Warning 1")).toHaveClass("level-pill", "severity-warning");
+        expect(screen.getByText("Error 4")).toHaveClass("level-pill", "severity-error");
+        expect(screen.getByText("Critical 0")).toHaveClass("level-pill", "severity-critical");
+      });
+      expect(screen.queryByText("OK: 3")).toBeNull();
+
       unmount();
     });
 
@@ -3140,6 +3428,53 @@ describe("App", () => {
         expect(screen.queryByText("← Back to tags")).not.toBeInTheDocument();
         expect(screen.getByRole("heading", { name: "Tags" })).toBeInTheDocument();
       });
+      unmount();
+    });
+
+    it("lets the user save and clear a tag default profile", async () => {
+      const calls = [];
+      let tags = [{ name: "ops", description: "Operations", domain_count: 2, default_profile_id: null }];
+
+      global.fetch.mockImplementation((url, opts = {}) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        calls.push({ url: value, method: opts?.method, body: opts?.body });
+        if (value === "/api/v1/profiles") return jsonResponse(sampleProfiles());
+        if (value.includes("/summary")) return jsonResponse({ tag: "ops", domain_count: 2, ok: 0, notice: 0, warning: 0, error: 0, critical: 0 });
+        if (value.includes("/domains") && value.includes("/tags/")) return jsonResponse({ items: [], total: 0 });
+        if (value.includes("/api/v1/tags/ops/profile") && opts?.method === "PUT") {
+          tags = [{ ...tags[0], default_profile_id: 12 }];
+          return emptyResponse();
+        }
+        if (value.includes("/api/v1/tags/ops/profile") && opts?.method === "DELETE") {
+          tags = [{ ...tags[0], default_profile_id: null }];
+          return emptyResponse();
+        }
+        if (value.includes("/api/v1/tags")) return jsonResponse(tags);
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openTagsTab();
+      await fireEvent.click(await screen.findByText("ops"));
+
+      const profileSelect = await screen.findByLabelText("Profile for this tag");
+      await fireEvent.change(profileSelect, { target: { value: "12" } });
+      await fireEvent.click(screen.getByRole("button", { name: "Save default" }));
+
+      await waitFor(() => {
+        const putCall = calls.find((call) => call.url.includes("/api/v1/tags/ops/profile") && call.method === "PUT");
+        expect(putCall).toBeTruthy();
+        expect(JSON.parse(putCall.body)).toEqual({ profile_id: 12 });
+        expect(screen.getByText("Current default: strict")).toBeInTheDocument();
+      });
+
+      await fireEvent.click(screen.getByRole("button", { name: "Clear default" }));
+
+      await waitFor(() => {
+        expect(calls.some((call) => call.url.includes("/api/v1/tags/ops/profile") && call.method === "DELETE")).toBe(true);
+        expect(screen.getByText("Current default: none")).toBeInTheDocument();
+      });
+
       unmount();
     });
 
@@ -3273,6 +3608,49 @@ describe("App", () => {
       unmount();
     });
 
+    it("shows the effective profile as a collapsible JSON block for completed runs", async () => {
+      const job = { id: "run-effective-profile", domain: "effective.example", status: "succeeded", created_at: "2026-01-01T00:00:00Z", progress: 100 };
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value.includes(`/api/v1/jobs/${job.id}/result`)) {
+          return jsonResponse({ job_id: job.id, status: "succeeded", summary: {}, raw: { entries: [] } });
+        }
+        if (value.includes(`/api/v1/jobs/${job.id}`)) {
+          return jsonResponse(job);
+        }
+        if (value.includes(`/api/v1/runs/${job.id}`)) {
+          return jsonResponse({
+            id: job.id,
+            domain: "effective.example",
+            status: "succeeded",
+            duration_ms: 2100,
+            entry_count: 6,
+            worst_level: "WARNING",
+            effective_profile: JSON.stringify({
+              net: { ipv6: false },
+              resolver: { defaults: { timeout: 5 } }
+            })
+          });
+        }
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+
+      const jobIdInput = await screen.findByPlaceholderText("job_123");
+      await fireEvent.input(jobIdInput, { target: { value: job.id } });
+      await fireEvent.change(jobIdInput);
+
+      const summary = await screen.findByText("Effective profile");
+      await fireEvent.click(summary);
+
+      await waitFor(() => {
+        expect(screen.getByText(/"ipv6": false/)).toBeInTheDocument();
+        expect(screen.getByText(/"timeout": 5/)).toBeInTheDocument();
+      });
+      unmount();
+    });
+
     it("domain link in inspector navigates to domains tab on click", async () => {
       const job = { id: "run-domlink", domain: "nav.example.com", status: "succeeded", created_at: "2026-01-01T00:00:00Z", progress: 100 };
       global.fetch.mockImplementation((url) => {
@@ -3300,6 +3678,211 @@ describe("App", () => {
       await waitFor(() => {
         expect(screen.getByRole("tab", { name: "Domains" })).toHaveAttribute("aria-selected", "true");
       });
+      unmount();
+    });
+  });
+
+  describe("Server Settings", () => {
+    const sampleSettings = () => ({
+      listen_addr: { value: "127.0.0.1:8080", source: "default", readonly: true },
+      db_driver: { value: "", source: "default", readonly: true },
+      db_dsn: { value: "", source: "default", readonly: true },
+      profile_path: { value: "", source: "default", readonly: true },
+      worker_count: { value: 4, source: "default" },
+      max_concurrent_jobs: { value: 0, source: "default" },
+      min_level: { value: "INFO", source: "config_file" },
+      retention_days: { value: 0, source: "default" },
+      public_url: { value: "", source: "default" },
+      rate_limit_enabled: { value: false, source: "default" },
+      rate_limit_max: { value: 10, source: "default" },
+      rate_limit_window: { value: "10m0s", source: "default" },
+    });
+
+    const settingsMock = (url, options = {}) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      if (value.includes("/api/v1/settings") && (!options.method || options.method === "GET")) {
+        return jsonResponse(sampleSettings());
+      }
+      if (value.includes("/api/v1/settings") && options.method === "PUT") {
+        return jsonResponse({ status: "ok" });
+      }
+      if (value.includes("/api/v1/profiles/default")) {
+        return jsonResponse({ id: 0, name: "default", config: {}, public: false, created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z" });
+      }
+      if (value.includes("/api/v1/profiles")) {
+        return jsonResponse([]);
+      }
+      if (value.includes("/api/v1/tags")) {
+        return jsonResponse([]);
+      }
+      return jsonResponse({});
+    };
+
+    it("renders server settings with labels and values after loading", async () => {
+      global.fetch.mockImplementation(settingsMock);
+      const { unmount } = render(App);
+      await openSettingsTab();
+
+      await waitFor(() => {
+        expect(screen.getByText("Server Settings")).toBeInTheDocument();
+      });
+      await waitFor(() => {
+        expect(screen.getByLabelText(/Worker count/)).toBeInTheDocument();
+      });
+
+      const workerInput = screen.getByLabelText(/Worker count/);
+      expect(workerInput.value).toBe("4");
+      expect(workerInput.disabled).toBe(false);
+
+      const listenInput = screen.getByLabelText(/Listen address/);
+      expect(listenInput.value).toBe("127.0.0.1:8080");
+      expect(listenInput.disabled).toBe(true);
+
+      unmount();
+    });
+
+    it("shows source labels for settings", async () => {
+      global.fetch.mockImplementation(settingsMock);
+      const { unmount } = render(App);
+      await openSettingsTab();
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/Worker count/)).toBeInTheDocument();
+      });
+
+      expect(screen.getAllByText("(default)", { exact: false }).length).toBeGreaterThan(0);
+      expect(screen.getAllByText("(config file)", { exact: false }).length).toBeGreaterThan(0);
+
+      unmount();
+    });
+
+    it("disables save button when no changes are made", async () => {
+      global.fetch.mockImplementation(settingsMock);
+      const { unmount } = render(App);
+      await openSettingsTab();
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/Worker count/)).toBeInTheDocument();
+      });
+
+      const saveButton = screen.getByRole("button", { name: "Save changes" });
+      expect(saveButton.disabled).toBe(true);
+
+      unmount();
+    });
+
+    it("enables save button after editing a mutable setting", async () => {
+      global.fetch.mockImplementation(settingsMock);
+      const { unmount } = render(App);
+      await openSettingsTab();
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/Worker count/)).toBeInTheDocument();
+      });
+
+      const workerInput = screen.getByLabelText(/Worker count/);
+      await fireEvent.input(workerInput, { target: { value: "8" } });
+
+      const saveButton = screen.getByRole("button", { name: "Save changes" });
+      expect(saveButton.disabled).toBe(false);
+
+      unmount();
+    });
+
+    it("sends PUT request with changed values on save", async () => {
+      const calls = [];
+      global.fetch.mockImplementation((url, options = {}) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (options.method === "PUT") calls.push({ url: value, body: JSON.parse(options.body) });
+        return settingsMock(url, options);
+      });
+
+      const { unmount } = render(App);
+      await openSettingsTab();
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/Worker count/)).toBeInTheDocument();
+      });
+
+      const workerInput = screen.getByLabelText(/Worker count/);
+      await fireEvent.input(workerInput, { target: { value: "8" } });
+      await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+      await waitFor(() => {
+        expect(calls.length).toBe(1);
+      });
+      expect(calls[0].body.worker_count).toBe(8);
+
+      unmount();
+    });
+
+    it("shows success toast after saving settings", async () => {
+      global.fetch.mockImplementation(settingsMock);
+      const { unmount } = render(App);
+      await openSettingsTab();
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/Worker count/)).toBeInTheDocument();
+      });
+
+      await fireEvent.input(screen.getByLabelText(/Worker count/), { target: { value: "8" } });
+      await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+      await waitFor(() => {
+        expect(screen.getByText("Settings saved.")).toBeInTheDocument();
+      });
+
+      unmount();
+    });
+
+    it("shows error when settings fail to load", async () => {
+      global.fetch.mockImplementation((url, options = {}) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value.includes("/api/v1/settings")) {
+          return jsonResponse({ error: { message: "db connection lost" } }, false);
+        }
+        return settingsMock(url, options);
+      });
+
+      const { unmount } = render(App);
+      await openSettingsTab();
+
+      await waitFor(() => {
+        expect(screen.getByText(/Failed to load settings/)).toBeInTheDocument();
+      });
+
+      unmount();
+    });
+
+    it("renders readonly settings as disabled inputs", async () => {
+      global.fetch.mockImplementation(settingsMock);
+      const { unmount } = render(App);
+      await openSettingsTab();
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/Database driver/)).toBeInTheDocument();
+      });
+
+      expect(screen.getByLabelText(/Database driver/).disabled).toBe(true);
+      expect(screen.getByLabelText(/Database DSN/).disabled).toBe(true);
+      expect(screen.getByLabelText(/Profile path/).disabled).toBe(true);
+
+      unmount();
+    });
+
+    it("renders toggle inputs for boolean settings", async () => {
+      global.fetch.mockImplementation(settingsMock);
+      const { unmount } = render(App);
+      await openSettingsTab();
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/Rate limiting/)).toBeInTheDocument();
+      });
+
+      const toggle = screen.getByLabelText(/Rate limiting/);
+      expect(toggle.type).toBe("checkbox");
+      expect(toggle.checked).toBe(false);
+
       unmount();
     });
   });

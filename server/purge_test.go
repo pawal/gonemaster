@@ -16,7 +16,7 @@ func TestServerStartWiresPurgeLoop(t *testing.T) {
 }
 
 // TestNewWithOptionsRetentionDaysZeroNoPurge verifies that RetentionDays=0
-// leaves runs intact (purge loop is not started).
+// leaves runs intact (purge loop skips when retention is disabled).
 func TestNewWithOptionsRetentionDaysZeroNoPurge(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Database.RetentionDays = 0
@@ -67,7 +67,9 @@ func TestStartPurgeLoopPurgesOldJobs(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	startPurgeLoopWithInterval(ctx, store, cutoffAge, logger, 10*time.Millisecond)
+	var retDays atomic.Int64
+	retDays.Store(int64(cutoffAge))
+	startPurgeLoopWithInterval(ctx, store, &retDays, logger, 10*time.Millisecond)
 
 	var msg string
 	select {
@@ -95,7 +97,9 @@ func TestStartPurgeLoopNoLogWhenNothingPurged(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	startPurgeLoopWithInterval(ctx, store, 90, logger, 10*time.Millisecond)
+	var retDays atomic.Int64
+	retDays.Store(90)
+	startPurgeLoopWithInterval(ctx, store, &retDays, logger, 10*time.Millisecond)
 
 	// Let the loop tick a few times.
 	time.Sleep(50 * time.Millisecond)
@@ -112,7 +116,9 @@ func TestStartPurgeLoopStopsOnContextCancel(t *testing.T) {
 	logger := func(string, ...any) {}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	startPurgeLoopWithInterval(ctx, store, 90, logger, 10*time.Millisecond)
+	var retDays atomic.Int64
+	retDays.Store(90)
+	startPurgeLoopWithInterval(ctx, store, &retDays, logger, 10*time.Millisecond)
 
 	// Cancel immediately and verify the test completes without hanging.
 	cancel()
@@ -139,11 +145,58 @@ func TestStartPurgeLoopPreservesNewJobs(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	startPurgeLoopWithInterval(ctx, store, 90, logger, 10*time.Millisecond)
+	var retDays atomic.Int64
+	retDays.Store(90)
+	startPurgeLoopWithInterval(ctx, store, &retDays, logger, 10*time.Millisecond)
 
 	time.Sleep(50 * time.Millisecond)
 
 	if store.ListRuns(RunFilter{Limit: 1}).Total != 1 {
 		t.Fatal("expected recent run to be preserved by loop")
+	}
+}
+
+// TestPurgeLoopRetentionDaysDynamic verifies that changing retentionDays
+// while the loop is running takes effect at the next tick.
+func TestPurgeLoopRetentionDaysDynamic(t *testing.T) {
+	store := NewInMemoryJobStore()
+	var retDays atomic.Int64 // start disabled (0)
+	logger := func(string, ...any) {}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	startPurgeLoopWithInterval(ctx, store, &retDays, logger, 10*time.Millisecond)
+
+	// Create a very old job.
+	old := time.Now().UTC().Add(-180 * 24 * time.Hour)
+	job := Job{ID: "j1", Domain: "example.com", Status: JobSucceeded, CreatedAt: old, FinishedAt: old}
+	if _, err := store.Create(job); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if err := store.GraduateJob(job, nil); err != nil {
+		t.Fatalf("graduate: %v", err)
+	}
+
+	// With retention disabled the run should be preserved.
+	time.Sleep(40 * time.Millisecond)
+	if store.ListRuns(RunFilter{Limit: 1}).Total != 1 {
+		t.Fatal("expected run preserved while retention disabled")
+	}
+
+	// Enable retention by updating the atomic value.
+	retDays.Store(90)
+
+	// After the next tick the old run should be purged.
+	deadline := time.After(2 * time.Second)
+	for {
+		select {
+		case <-deadline:
+			t.Fatal("timeout waiting for purge after enabling retention")
+		case <-time.After(15 * time.Millisecond):
+			if store.ListRuns(RunFilter{Limit: 1}).Total == 0 {
+				return
+			}
+		}
 	}
 }

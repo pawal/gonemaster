@@ -873,6 +873,29 @@ button:hover:not(:disabled) {
   gap: 6px;
 }
 
+.job-headline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+
+.job-id-link {
+  font-weight: 500;
+}
+
+.list-item.clickable {
+  cursor: pointer;
+}
+
+.list-item.clickable:hover {
+  background: var(--hover);
+}
+
+.list-item.clickable:hover .job-id-link {
+  text-decoration: underline;
+}
+
 .metrics-summary-grid {
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
 }

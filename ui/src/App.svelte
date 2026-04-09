@@ -2593,35 +2593,32 @@
           <div class="small">{$t("no_jobs_severity")}</div>
         {:else}
           {#each filteredJobs as job (job.id)}
-            <div class="list-item">
+            <div class="list-item clickable" on:click={() => {
+              selectedJobId = job.id;
+              loadJob(job.id);
+              setTab("single");
+            }} role="button" tabindex="0">
               <div class="list-item-main">
-                <div class="mono">{job.id}</div>
-                <div class="small">{job.domain} - {job.status}</div>
+                <div class="job-headline">
+                  <span class="mono job-id-link">{job.id}</span>
+                  <span class="small">{job.domain} – {job.status}</span>
+                  {#if jobSeverityRows(job).length}
+                    {#each jobSeverityRows(job) as entry (entry.level)}
+                      <span class={`level-pill severity-${entry.level.toLowerCase()}`}>{entry.level} {entry.count}</span>
+                    {/each}
+                  {/if}
+                </div>
                 {#if job.batch_id}
                   <div class="small mono">{$t("batch_prefix")} {job.batch_id}</div>
                 {/if}
                 {#if jobProfileName(job)}
                   <div class="small">{$t("job_profile_label")}: <span class="mono">{jobProfileName(job)}</span></div>
                 {/if}
-                <div class="job-severity-tags">
-                  {#if jobSeverityRows(job).length}
-                    {#each jobSeverityRows(job) as entry (entry.level)}
-                      <span class={`level-pill severity-${entry.level.toLowerCase()}`}>{entry.level} {entry.count}</span>
-                    {/each}
-                  {:else}
-                    <span class="small">{$t("no_severity_entries")}</span>
-                  {/if}
-                </div>
                 <div class="progress compact list-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={progressPercent(job)}>
                   <div class="progress-bar" style={`width: ${progressPercent(job)}%`}></div>
                   <span class="progress-value">{progressPercent(job)}%</span>
                 </div>
               </div>
-              <button class="ghost" type="button" on:click={() => {
-                selectedJobId = job.id;
-                loadJob(job.id);
-                setTab("single");
-              }}>{$t("inspect")}</button>
             </div>
           {/each}
         {/if}

@@ -204,7 +204,7 @@ describe("App", () => {
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /auto refresh: off/i })).toBeInTheDocument();
       expect(screen.getByText("job_live")).toBeInTheDocument();
-      expect(screen.getByText("example.com - succeeded")).toBeInTheDocument();
+      expect(screen.getByText("example.com \u2013 succeeded")).toBeInTheDocument();
     });
     expect(jobsCallCount).toBeGreaterThanOrEqual(3);
 
@@ -730,7 +730,8 @@ describe("App", () => {
     await openRecentTab();
     expect(await screen.findByText("strict job profile")).toBeInTheDocument();
 
-    await fireEvent.click(screen.getByRole("button", { name: "Inspect" }));
+    const row = (await screen.findByText(job.id)).closest(".list-item");
+    await fireEvent.click(row);
 
     await waitFor(() => {
       expect(screen.getByRole("tab", { name: "Single Job" })).toHaveAttribute("aria-selected", "true");
@@ -2374,13 +2375,58 @@ describe("App", () => {
 
     const row = (await screen.findByText(job.id)).closest(".list-item");
     expect(row).not.toBeNull();
-    await fireEvent.click(within(row).getByRole("button", { name: "Inspect" }));
+    expect(row.getAttribute("role")).toBe("button");
+    await fireEvent.click(row);
 
     await waitFor(() => {
       expect(calls.some((value) => value === `/api/v1/jobs/${job.id}`)).toBe(true);
       expect(screen.getByRole("tab", { name: "Single Job" })).toHaveAttribute("aria-selected", "true");
       expect(screen.getByLabelText("Job ID")).toHaveValue(job.id);
     });
+
+    unmount();
+  });
+
+  it("renders recent job rows as clickable with job id, domain, and severity on one line", async () => {
+    const job = {
+      id: "job_inline",
+      domain: "inline.example",
+      status: "succeeded",
+      created_at: "2026-02-03T00:00:00Z",
+      progress: 100,
+      severity_totals: { NOTICE: 0, WARNING: 2, ERROR: 1, CRITICAL: 0 }
+    };
+
+    global.fetch.mockImplementation((url) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      if (value.includes("/api/v1/jobs?")) {
+        return jsonResponse({ items: [job], total: 1 });
+      }
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+    await openRecentTab();
+    const refresh = await screen.findByRole("button", { name: /refresh list/i });
+    if (refresh.disabled) {
+      await waitFor(() => expect(refresh).not.toBeDisabled());
+    }
+    await fireEvent.click(refresh);
+
+    const row = (await screen.findByText(job.id)).closest(".list-item");
+    expect(row).not.toBeNull();
+
+    // Row is clickable (role=button), no separate Inspect button
+    expect(row.getAttribute("role")).toBe("button");
+    expect(within(row).queryByRole("button", { name: "Inspect" })).toBeNull();
+
+    // Job ID, domain-status, and severity pills share the same .job-headline container
+    const headline = row.querySelector(".job-headline");
+    expect(headline).not.toBeNull();
+    expect(within(headline).getByText(job.id)).toBeInTheDocument();
+    expect(within(headline).getByText(/inline\.example/)).toBeInTheDocument();
+    expect(within(headline).getByText(/WARNING 2/)).toBeInTheDocument();
+    expect(within(headline).getByText(/ERROR 1/)).toBeInTheDocument();
 
     unmount();
   });

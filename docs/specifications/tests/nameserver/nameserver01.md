@@ -24,14 +24,15 @@ Status: Final
 2. Read nameserver list from `Method4and5`.
 3. For each nameserver (parallelized, input-order merged logs):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `A`, then skip this nameserver.
-   - Initialize counters: `responseCount`, `nxdomainCount`, `hasSeenRA`, and `isNoRecursor=true`.
+   - Initialize counters: `responseCount`, `nxdomainCount`, `hasSeenRA`, `allNxdomainAA=true`, and `isNoRecursor=true`.
    - For each probe name:
      - Query `A`.
      - If no DNS message is returned, emit `NO_RESPONSE` (`ns`, `domain`), set `isNoRecursor=false`, and continue.
      - Increment `responseCount`.
      - If response has `RA=1`, set `hasSeenRA=true`.
-     - If response `RCODE` is `NXDOMAIN`, increment `nxdomainCount`.
-   - If `hasSeenRA=true` or (`responseCount>0` and `nxdomainCount==responseCount`), record server as recursor and set `isNoRecursor=false`.
+     - If response `RCODE` is `NXDOMAIN`, increment `nxdomainCount`. If the response does not have `AA=1`, set `allNxdomainAA=false`.
+   - If `hasSeenRA=true`, record server as recursor and set `isNoRecursor=false`.
+   - Else if `responseCount>0` and `nxdomainCount==responseCount` and `allNxdomainAA==false`, record server as recursor and set `isNoRecursor=false`.
    - If `isNoRecursor` is still true, record server as non-recursor.
 4. After all parallel tasks, emit a single consolidated `IS_A_RECURSOR` with `servers` list (if any), and a single consolidated `NO_RECURSOR` with `servers` list (if any).
 5. Emit `TEST_CASE_END`.
@@ -41,7 +42,7 @@ Status: Final
 | --- | --- |
 | `IPV4_DISABLED` | IPv4 nameserver evaluation is skipped because IPv4 is disabled. |
 | `IPV6_DISABLED` | IPv6 nameserver evaluation is skipped because IPv6 is disabled. |
-| `IS_A_RECURSOR` | Nameserver set `RA=1` on at least one probe response, or all received probe responses were `NXDOMAIN`. |
+| `IS_A_RECURSOR` | Nameserver set `RA=1` on at least one probe response, or all received probe responses were `NXDOMAIN` without all having `AA=1`. |
 | `NO_RECURSOR` | Nameserver produced responses but did not match recursor criteria and had no `NO_RESPONSE` for probes. |
 | `NO_RESPONSE` | A probe query returned no DNS message. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
@@ -80,6 +81,7 @@ Status: Final
 - Differences (Upstream vs Gonemaster):
   - Upstream: describes evaluation over the retrieved nameserver IP set. Gonemaster: iterates the raw `Method4and5` list without testcase-local deduplication, so duplicate `name/ip` entries can be evaluated more than once.
   - Upstream: does not explicitly describe testcase boundary and transport-disabled debug emissions. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
+  - Upstream: classifies a server as a recursor when all probe responses are `NXDOMAIN`, regardless of the `AA` flag. Gonemaster: excludes servers from recursor classification when all `NXDOMAIN` responses also have `AA=1`, since this indicates the server claims authoritative knowledge (e.g. a fake root zone) rather than performing recursion. Reported upstream.
 - Potential upstream report:
   - `no`
 
@@ -87,3 +89,4 @@ Status: Final
 - A nameserver can emit both `NO_RESPONSE` (for one or more probes) and `IS_A_RECURSOR` (from other probe responses) in the same testcase run.
 - Up to three `NO_RESPONSE` entries can be emitted per nameserver (one per probe name).
 - If transport is disabled for a nameserver, no recursor classification tags are emitted for that nameserver.
+- A nameserver that claims to be authoritative for the root zone (responds with `AA=1` and `NXDOMAIN` to all probes) is not classified as a recursor, since the `NXDOMAIN` responses come from fake authoritative data rather than recursive resolution.

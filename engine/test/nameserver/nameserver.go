@@ -378,6 +378,7 @@ func Nameserver01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				nxdomainCount := 0
 				isNoRecursor := true
 				hasSeenRA := false
+				allNxdomainAA := true
 
 				for _, name := range nonExistentNames {
 					resp, err := server.QueryWithOptions(ctx, name, "A", nil)
@@ -397,10 +398,16 @@ func Nameserver01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					}
 					if resp.Rcode() == "NXDOMAIN" {
 						nxdomainCount++
+						if !resp.AA() {
+							allNxdomainAA = false
+						}
 					}
 				}
 
-				if hasSeenRA || (responseCount > 0 && nxdomainCount == responseCount) {
+				if hasSeenRA {
+					outcomes[i].isRecursor = true
+					isNoRecursor = false
+				} else if responseCount > 0 && nxdomainCount == responseCount && !allNxdomainAA {
 					outcomes[i].isRecursor = true
 					isNoRecursor = false
 				}

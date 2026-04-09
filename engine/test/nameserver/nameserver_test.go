@@ -55,6 +55,101 @@ func TestNameserver01RecursorAndNoRecursor(t *testing.T) {
 	}
 }
 
+func TestNameserver01NxdomainWithAANotRecursor(t *testing.T) {
+	setupTest(t)
+
+	origM4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origM4and5 })
+
+	// Server returns NXDOMAIN with AA=1 on all probes (fake root authority).
+	// This should NOT be classified as a recursor.
+	nsFakeRoot := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeNameError
+		msg.Authoritative = true
+		return packet.Packet{Msg: msg}
+	})
+
+	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{nsFakeRoot}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Nameserver01(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("nameserver01: %v", err)
+	}
+	if hasEntryTag(entries, "IS_A_RECURSOR") {
+		t.Fatalf("did not expect IS_A_RECURSOR for server with AA+NXDOMAIN")
+	}
+	if !hasEntryTag(entries, "NO_RECURSOR") {
+		t.Fatalf("expected NO_RECURSOR for server with AA+NXDOMAIN")
+	}
+}
+
+func TestNameserver01NxdomainWithRAAndAAIsRecursor(t *testing.T) {
+	setupTest(t)
+
+	origM4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origM4and5 })
+
+	// Server returns NXDOMAIN with both RA=1 and AA=1.
+	// RA takes precedence — should still be classified as a recursor.
+	nsRAandAA := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeNameError
+		msg.Authoritative = true
+		msg.RecursionAvailable = true
+		return packet.Packet{Msg: msg}
+	})
+
+	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{nsRAandAA}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Nameserver01(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("nameserver01: %v", err)
+	}
+	if !hasEntryTag(entries, "IS_A_RECURSOR") {
+		t.Fatalf("expected IS_A_RECURSOR when RA is set even with AA")
+	}
+}
+
+func TestNameserver01NxdomainMixedAAIsRecursor(t *testing.T) {
+	setupTest(t)
+
+	origM4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origM4and5 })
+
+	// Server returns NXDOMAIN on all probes, but only some have AA=1.
+	// Since not ALL NXDOMAIN responses are authoritative, classify as recursor.
+	queryCount := 0
+	nsMixed := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeNameError
+		queryCount++
+		if queryCount <= 2 {
+			msg.Authoritative = true
+		}
+		return packet.Packet{Msg: msg}
+	})
+
+	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{nsMixed}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Nameserver01(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("nameserver01: %v", err)
+	}
+	if !hasEntryTag(entries, "IS_A_RECURSOR") {
+		t.Fatalf("expected IS_A_RECURSOR when not all NXDOMAIN responses have AA")
+	}
+}
+
 func TestNameserver01ParallelQueries(t *testing.T) {
 	setupTest(t)
 

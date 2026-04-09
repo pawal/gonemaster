@@ -2,7 +2,7 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
-## [Unreleased]
+## [v1.2.3] - 2026-04-09
 
 ### Added
  - UI: Added profile editing
@@ -14,8 +14,11 @@ All notable changes to all gonemaster components will be documented in this file
 ### Changed
  - UI: Polished batch UI controls
  - UI: Completed UI string translations
+ - UI: Recent test rows are now fully clickable in the Admin UI
+ - Engine: Bumped miekg/dns to v0.6.73
+ - Engine: Nameserver01 fixed for false positive for some cases of open recursor
 
-## [v1.2.2] 2026-03-30
+## [v1.2.2] - 2026-03-30
 
 ### Added
  - gonemaster-nagios: `--ns` and `--ds` flags for undelegated/split-DNS testing

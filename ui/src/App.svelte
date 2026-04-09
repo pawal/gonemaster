@@ -2597,6 +2597,13 @@
               selectedJobId = job.id;
               loadJob(job.id);
               setTab("single");
+            }} on:keydown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                selectedJobId = job.id;
+                loadJob(job.id);
+                setTab("single");
+              }
             }} role="button" tabindex="0">
               <div class="list-item-main">
                 <div class="job-headline">

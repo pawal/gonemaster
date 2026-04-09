@@ -20,13 +20,16 @@ import (
 )
 
 type workerPool struct {
-	ctx    context.Context
-	cancel context.CancelFunc
-	wg     sync.WaitGroup
+	ctx     context.Context
+	cancel  context.CancelFunc
+	wg      sync.WaitGroup
+	mu      sync.Mutex
+	cancels []context.CancelFunc // one per live worker goroutine
 }
 
-// Start launches background workers that consume queued jobs. If
-// cfg.Database.RetentionDays > 0 the purge loop is also started.
+// Start launches background workers that consume queued jobs. The purge loop
+// is also started and checks cfg.Database.RetentionDays each tick, so changes
+// via the settings API take effect at the next purge cycle.
 func (s *Server) Start() {
 	if s.workers.ctx != nil {
 		return
@@ -40,15 +43,14 @@ func (s *Server) Start() {
 		workerCount = 1
 	}
 	for i := 0; i < workerCount; i++ {
-		s.workers.wg.Add(1)
-		go s.workerLoop(i)
+		s.startWorker()
 	}
 
-	if s.cfg.Database.RetentionDays > 0 {
-		startPurgeLoop(ctx, s.store, s.cfg.Database.RetentionDays, func(format string, args ...any) {
-			log.Printf(format, args...)
-		})
-	}
+	// Always start the purge goroutine; it reads RetentionDays dynamically so
+	// changes via the settings API take effect without a restart.
+	startPurgeLoop(ctx, s.store, &s.cfg.Database.RetentionDays, func(format string, args ...any) {
+		log.Printf(format, args...)
+	})
 
 	if s.rateLimiter != nil {
 		go func() {
@@ -63,6 +65,54 @@ func (s *Server) Start() {
 				}
 			}
 		}()
+	}
+}
+
+// startWorker starts one worker goroutine with its own cancellable context
+// derived from the pool context. It must be called with the pool context
+// already initialised (i.e. after Start has set s.workers.ctx).
+func (s *Server) startWorker() {
+	workerCtx, workerCancel := context.WithCancel(s.workers.ctx)
+	s.workers.mu.Lock()
+	s.workers.cancels = append(s.workers.cancels, workerCancel)
+	s.workers.mu.Unlock()
+	s.workers.wg.Add(1)
+	go s.workerLoop(workerCtx)
+}
+
+// resizeWorkerPool adjusts the number of live workers to match targetCount.
+// Scaling up starts new goroutines immediately. Scaling down cancels the
+// excess workers' contexts; they exit cleanly after their current job (if any)
+// finishes.
+func (s *Server) resizeWorkerPool(targetCount int) {
+	if s.workers.ctx == nil {
+		return
+	}
+	if targetCount < 1 {
+		targetCount = 1
+	}
+	s.workers.mu.Lock()
+	current := len(s.workers.cancels)
+	s.workers.mu.Unlock()
+
+	if targetCount == current {
+		return
+	}
+	if targetCount > current {
+		for i := current; i < targetCount; i++ {
+			s.startWorker()
+		}
+		return
+	}
+	// Scale down: cancel the last (current - targetCount) workers and remove
+	// them from the slice.
+	s.workers.mu.Lock()
+	toCancel := make([]context.CancelFunc, current-targetCount)
+	copy(toCancel, s.workers.cancels[targetCount:])
+	s.workers.cancels = s.workers.cancels[:targetCount]
+	s.workers.mu.Unlock()
+	for _, cancel := range toCancel {
+		cancel()
 	}
 }
 
@@ -88,15 +138,15 @@ func (s *Server) Stop(ctx context.Context) error {
 	}
 }
 
-func (s *Server) workerLoop(id int) {
+func (s *Server) workerLoop(ctx context.Context) {
 	defer s.workers.wg.Done()
 	for {
-		jobID, err := s.queue.Dequeue(s.workers.ctx)
+		jobID, err := s.queue.Dequeue(ctx)
 		if err != nil {
 			return
 		}
 		if err := s.runJob(jobID); err != nil && s.cfg.Debug {
-			log.Printf("worker %d: job %s error: %v", id, jobID, err)
+			log.Printf("worker: job %s error: %v", jobID, err)
 		}
 	}
 }

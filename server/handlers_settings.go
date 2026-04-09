@@ -103,6 +103,9 @@ func (s *Server) applySettingsToRuntime() {
 	// Re-apply all DB settings to cfg (respecting CLI flag precedence).
 	s.ApplyDatabaseSettings()
 
+	// Resize the worker pool to match the new worker_count.
+	s.resizeWorkerPool(s.cfg.WorkerCount)
+
 	// Update engine concurrency limiter.
 	s.engineLimiter = newEngineLimiter(s.cfg.MaxConcurrentJobs)
 

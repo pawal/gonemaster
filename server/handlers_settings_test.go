@@ -304,3 +304,53 @@ func TestApplyDatabaseSettingsIgnoresInvalidValues(t *testing.T) {
 		t.Fatalf("WorkerCount: got %d, want 4", srv.cfg.WorkerCount)
 	}
 }
+
+func TestPutSettingsResizesWorkerPool(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.WorkerCount = 2
+	srv := New(cfg)
+	srv.Start()
+	defer srv.Stop(t.Context())
+
+	// Confirm initial worker count.
+	srv.workers.mu.Lock()
+	initial := len(srv.workers.cancels)
+	srv.workers.mu.Unlock()
+	if initial != 2 {
+		t.Fatalf("expected 2 initial workers, got %d", initial)
+	}
+
+	// Scale up to 5 via the settings API.
+	body := `{"worker_count": 5}`
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/settings", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("PUT settings: expected 200, got %d: %s", resp.Code, resp.Body)
+	}
+
+	srv.workers.mu.Lock()
+	after := len(srv.workers.cancels)
+	srv.workers.mu.Unlock()
+	if after != 5 {
+		t.Fatalf("expected 5 workers after scale-up, got %d", after)
+	}
+
+	// Scale down to 3.
+	body = `{"worker_count": 3}`
+	resp = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPut, "/api/v1/settings", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("PUT settings: expected 200, got %d: %s", resp.Code, resp.Body)
+	}
+
+	srv.workers.mu.Lock()
+	after = len(srv.workers.cancels)
+	srv.workers.mu.Unlock()
+	if after != 3 {
+		t.Fatalf("expected 3 workers after scale-down, got %d", after)
+	}
+}

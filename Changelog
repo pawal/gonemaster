@@ -2,6 +2,18 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [Unreleased]
+
+### Added
+ - UI: Added profile editing
+ - UI: Added system settings
+ - Public UI: Show test progress percentage in browser tab title
+ - Public UI: Added robots.txt, sitemap.xml, og:url, and hreflang SEO support
+ - CLI: Added --nstimes flag for per-nameserver query timing statistics
+
+### Changed
+ - UI: Polished batch UI controls
+
 ## [v1.2.2] 2026-03-30
 
 ### Added

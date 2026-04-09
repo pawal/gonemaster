@@ -1,11 +1,11 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: 1.0.0\n"
-"Report-Msgid-Bugs-To: \n"
+"Report-Msgid-Bugs-To: pawal@amplitut.de\n"
 "POT-Creation-Date: 2024-12-09 19:27-0300\n"
-"PO-Revision-Date: 2024-12-12 23:34-0300\n"
-"Last-Translator: hsalgado@nic.cl\n"
-"Language-Team: Zonemaster Team\n"
+"PO-Revision-Date: 2026-04-09 00:00+0000\n"
+"Last-Translator: pawal@amplitut.de\n"
+"Language-Team: Gonemaster Team\n"
 "Language: es\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -3509,9 +3509,25 @@ msgstr ""
 #~ "Se agregó una delegación falsa para el dominio {domain} en el servidor de "
 #~ "nombres {ns}."
 
+msgctxt "ADDRESS:A01_ADDR_NOT_GLOBALLY_REACHABLE"
+msgid "IP address(es) not listed as globally reachable: \"{servers}\"."
+msgstr "Dirección(es) IP no listadas como accesibles globalmente: \"{servers}\"."
+
+msgctxt "ADDRESS:A01_DOCUMENTATION_ADDR"
+msgid "IP address(es) intended for documentation purposes: \"{servers}\"."
+msgstr "Dirección(es) IP destinadas a propósitos de documentación: \"{servers}\"."
+
 msgctxt "ADDRESS:A01_GLOBALLY_REACHABLE_ADDR"
 msgid "All tested nameservers in {servers} are globally reachable."
 msgstr "Todos los servidores de nombres probados en {servers} son accesibles globalmente."
+
+msgctxt "ADDRESS:A01_NO_GLOBALLY_REACHABLE_ADDR"
+msgid "None of the name servers IP addresses are listed as globally reachable."
+msgstr "Ninguna de las direcciones IP de los servidores de nombres está listada como accesible globalmente."
+
+msgctxt "ADDRESS:A01_NO_NAME_SERVERS_FOUND"
+msgid "No name servers found."
+msgstr "No se encontraron servidores de nombres."
 
 msgctxt "BASIC:B01_CHILD_NOT_EXIST"
 msgid "The zone \"{domain}\" does not exist as a zone."
@@ -3540,6 +3556,14 @@ msgstr "Los registros DS están publicados en la zona padre para la zona firmada
 msgctxt "DNSSEC:DS07_DS_ON_PARENT_SERVER"
 msgid "DS records found on parent name servers {servers}."
 msgstr "Registros DS encontrados en los servidores de nombres padre {servers}."
+
+msgctxt "DNSSEC:DS07_NOT_SIGNED"
+msgid "The zone is not signed."
+msgstr "La zona no está firmada."
+
+msgctxt "DNSSEC:DS07_NO_DS_FOR_SIGNED_ZONE"
+msgid "The parent zone has no DS record for the signed child zone."
+msgstr "La zona padre no tiene registro DS para la zona hijo firmada."
 
 msgctxt "DNSSEC:DS07_SIGNED"
 msgid "The zone is signed with DNSSEC."

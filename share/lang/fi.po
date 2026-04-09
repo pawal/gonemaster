@@ -1,11 +1,11 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: 1.0.0\n"
-"Report-Msgid-Bugs-To: \n"
+"Report-Msgid-Bugs-To: pawal@amplitut.de\n"
 "POT-Creation-Date: 2023-07-21 06:17+0000\n"
-"PO-Revision-Date: 2023-07-21 06:25+0000\n"
-"Last-Translator: sami.salmensuo@traficom.fi\n"
-"Language-Team: Traficom domain team\n"
+"PO-Revision-Date: 2026-04-09 21:25+0000\n"
+"Last-Translator: pawal@amplitut.de\n"
+"Language-Team: Gonemaster Team\n"
 "Language: fi\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -50,6 +50,22 @@ msgid ""
 msgstr ""
 "Verkkotunnuksen nimessä on liian pitkä tunniste (yli 63 merkkiä), "
 "\"{label}\"."
+
+msgctxt "ADDRESS:A01_ADDR_NOT_GLOBALLY_REACHABLE"
+msgid "IP address(es) not listed as globally reachable: \"{servers}\"."
+msgstr "IP-osoite(et) ei ole listattu globaalisti saavutettaviksi: \"{servers}\"."
+
+msgctxt "ADDRESS:A01_DOCUMENTATION_ADDR"
+msgid "IP address(es) intended for documentation purposes: \"{servers}\"."
+msgstr "IP-osoite(et) tarkoitettu dokumentaatiokäyttöön: \"{servers}\"."
+
+msgctxt "ADDRESS:A01_NO_GLOBALLY_REACHABLE_ADDR"
+msgid "None of the name servers IP addresses are listed as globally reachable."
+msgstr "Yhdenkään nimipalvelimen IP-osoitetta ei ole listattu globaalisti saavutettavaksi."
+
+msgctxt "ADDRESS:A01_NO_NAME_SERVERS_FOUND"
+msgid "No name servers found."
+msgstr "Nimipalvelimia ei löydetty."
 
 msgctxt "ADDRESS:NAMESERVER_IP_WITHOUT_REVERSE"
 msgid "Nameserver {ns} has an IP address ({address}) without PTR configured."
@@ -3346,6 +3362,14 @@ msgstr "DS-tietueet on julkaistu ylävyöhykkeessä allekirjoitetulle vyöhykkee
 msgctxt "DNSSEC:DS07_DS_ON_PARENT_SERVER"
 msgid "DS records found on parent name servers {servers}."
 msgstr "DS-tietueet löydetty ylänimipalvelimilta {servers}."
+
+msgctxt "DNSSEC:DS07_NOT_SIGNED"
+msgid "The zone is not signed."
+msgstr "Vyöhyke ei ole allekirjoitettu."
+
+msgctxt "DNSSEC:DS07_NO_DS_FOR_SIGNED_ZONE"
+msgid "The parent zone has no DS record for the signed child zone."
+msgstr "Ylävyöhykkeellä ei ole DS-tietuetta allekirjoitetulle alavyöhykkeelle."
 
 msgctxt "DNSSEC:DS07_SIGNED"
 msgid "The zone is signed with DNSSEC."

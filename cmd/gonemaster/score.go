@@ -10,10 +10,44 @@ import (
 	"codeberg.org/pawal/gonemaster/scoring"
 )
 
+// levelOrder lists all log levels from least to most severe.
+var levelOrder = []string{"DEBUG3", "DEBUG2", "DEBUG", "INFO", "NOTICE", "WARNING", "ERROR", "CRITICAL"}
+
+// levelIndex returns the position of level in levelOrder (case-insensitive).
+// Unknown levels map to len(levelOrder), treated as most severe.
+func levelIndex(level string) int {
+	for i, l := range levelOrder {
+		if strings.EqualFold(l, level) {
+			return i
+		}
+	}
+	return len(levelOrder)
+}
+
+// lowerLevel returns whichever of a or b is less severe. Case-insensitive.
+func lowerLevel(a, b string) string {
+	if levelIndex(a) <= levelIndex(b) {
+		return strings.ToUpper(a)
+	}
+	return strings.ToUpper(b)
+}
+
+// filterEntriesByLevel returns only entries whose Level is at or above minLevel.
+func filterEntriesByLevel(entries []engine.LogEntry, minLevel string) []engine.LogEntry {
+	threshold := levelIndex(minLevel)
+	out := make([]engine.LogEntry, 0, len(entries))
+	for _, e := range entries {
+		if levelIndex(e.Level) >= threshold {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
 // computeScore converts engine log entries to scoring entries and calls
-// scoring.Compute. Returns nil when entries is empty.
+// scoring.Compute. Returns nil when entries is nil (no run performed).
 func computeScore(domain string, entries []engine.LogEntry, cfg scoring.Config) *scoring.Result {
-	if len(entries) == 0 {
+	if entries == nil {
 		return nil
 	}
 	se := make([]scoring.Entry, 0, len(entries))

@@ -299,6 +299,16 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		scoreCfg = scoring.DefaultConfig()
 	}
 
+	// When scoring is active the engine must run at least at INFO level so that
+	// positive-outcome tags (e.g. DS07_SIGNED) are present for scoring. The
+	// display reporters all filter at the user's minLevel internally, so they
+	// are unaffected; only direct-array paths (--json encode, writeHuman) need
+	// an explicit filter step.
+	engineMinLevel := minLevel
+	if scoreEnabled {
+		engineMinLevel = lowerLevel(minLevel, "INFO")
+	}
+
 	hasPacketCacheFlags := strings.TrimSpace(savePacketCachePath) != "" || strings.TrimSpace(restorePacketCachePath) != ""
 	if hasPacketCacheFlags && showVersion {
 		fmt.Fprintln(errOut, "--save/--restore cannot be combined with --version")
@@ -482,7 +492,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		Module:           module,
 		Testcase:         testcase,
 		Profile:          profile,
-		MinLevel:         minLevel,
+		MinLevel:         engineMinLevel,
 		IPv4:             ipv4Override,
 		IPv6:             ipv6Override,
 		Parallel:         parallelOverride,
@@ -759,9 +769,16 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		return 0
 	}
 
+	// If the engine ran at a lower level than the user requested (for scoring),
+	// trim entries back to the user's display level before any direct-array output.
+	displayEntries := entries
+	if engineMinLevel != minLevel {
+		displayEntries = filterEntriesByLevel(entries, minLevel)
+	}
+
 	if !jsonOutput {
 		if !humanStreaming {
-			if writeErr := writeHuman(entries, locale, humanWriter); writeErr != nil {
+			if writeErr := writeHuman(displayEntries, locale, humanWriter); writeErr != nil {
 				fmt.Fprintln(errOut, writeErr.Error())
 				return 2
 			}
@@ -809,7 +826,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 
 	enc := json.NewEncoder(w)
 	enc.SetEscapeHTML(false)
-	if encodeErr := enc.Encode(entries); encodeErr != nil {
+	if encodeErr := enc.Encode(displayEntries); encodeErr != nil {
 		fmt.Fprintln(errOut, encodeErr.Error())
 		return 2
 	}

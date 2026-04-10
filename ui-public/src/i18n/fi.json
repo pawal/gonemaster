@@ -63,6 +63,13 @@
   "pub.score_aplus_criteria": "A+-kriteerit",
   "pub.score_aplus_achieved": "Saavutettu",
   "pub.score_aplus_missing": "{n} täyttämättä",
+  "pub.score_bonus_no_warnings_or_errors": "Ei varoituksia tai virheitä",
+  "pub.score_bonus_dnssec_enabled": "DNSSEC käytössä",
+  "pub.score_bonus_strong_algorithm": "Vahva algoritmi (ECDSA / Ed25519)",
+  "pub.score_bonus_nsec3_non_optout": "NSEC3 ilman opt-outia",
+  "pub.score_bonus_cds_cdnskey_published": "CDS / CDNSKEY julkaistu",
+  "pub.score_bonus_ipv6_all_nameservers": "IPv6 kaikissa nimipalvelimissa",
+  "pub.score_bonus_as_diversity": "Nimipalvelimien AS-monimuotoisuus",
 
   "pub.result_status_ok": "Ei ongelmia löydetty",
   "pub.result_status_notice": "Huomiot",

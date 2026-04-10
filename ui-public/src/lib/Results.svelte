@@ -111,16 +111,12 @@
     ? CAT_ORDER.filter(c => c in score.categories).map(c => [c, score.categories[c]])
     : [];
 
-  // Bonus criterion display labels.
-  const BONUS_LABELS = {
-    no_warnings_or_errors:  "No warnings or errors",
-    dnssec_enabled:         "DNSSEC enabled",
-    strong_algorithm:       "Strong algorithm (ECDSA / Ed25519)",
-    nsec3_non_optout:       "NSEC3 without opt-out",
-    cds_cdnskey_published:  "CDS / CDNSKEY published",
-    ipv6_all_nameservers:   "IPv6 on all nameservers",
-    as_diversity:           "Nameserver AS diversity",
-  };
+  // Translate a bonus criterion key via i18n, falling back to humanised key.
+  function bonusLabel(key) {
+    const k = `pub.score_bonus_${key}`;
+    const s = $t(k);
+    return s !== k ? s : key.replace(/_/g, " ");
+  }
 
   // Number of unmet bonus criteria (null = not applicable, counts as met).
   $: bonusMissing = score?.bonus?.criteria
@@ -188,7 +184,7 @@
             {#each Object.entries(score.bonus.criteria) as [key, val]}
               <div class="score-bonus-item" data-met={val === null ? "na" : val ? "yes" : "no"}>
                 <span class="score-bonus-icon">{val === null ? "–" : val ? "✓" : "✗"}</span>
-                <span>{BONUS_LABELS[key] ?? key.replace(/_/g, " ")}</span>
+                <span>{bonusLabel(key)}</span>
               </div>
             {/each}
           </div>

@@ -63,6 +63,13 @@
   "pub.score_aplus_criteria": "A+-kriterier",
   "pub.score_aplus_achieved": "Opnået",
   "pub.score_aplus_missing": "{n} mangler",
+  "pub.score_bonus_no_warnings_or_errors": "Ingen advarsler eller fejl",
+  "pub.score_bonus_dnssec_enabled": "DNSSEC aktiveret",
+  "pub.score_bonus_strong_algorithm": "Stærk algoritme (ECDSA / Ed25519)",
+  "pub.score_bonus_nsec3_non_optout": "NSEC3 uden opt-out",
+  "pub.score_bonus_cds_cdnskey_published": "CDS / CDNSKEY publiceret",
+  "pub.score_bonus_ipv6_all_nameservers": "IPv6 på alle navneservere",
+  "pub.score_bonus_as_diversity": "AS-diversitet for navneservere",
 
   "pub.result_status_ok": "Ingen problemer fundet",
   "pub.result_status_notice": "Bemærkninger",

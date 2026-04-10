@@ -63,6 +63,13 @@
   "pub.score_aplus_criteria": "Criterios A+",
   "pub.score_aplus_achieved": "Conseguido",
   "pub.score_aplus_missing": "{n} incumplido(s)",
+  "pub.score_bonus_no_warnings_or_errors": "Sin advertencias ni errores",
+  "pub.score_bonus_dnssec_enabled": "DNSSEC habilitado",
+  "pub.score_bonus_strong_algorithm": "Algoritmo fuerte (ECDSA / Ed25519)",
+  "pub.score_bonus_nsec3_non_optout": "NSEC3 sin opt-out",
+  "pub.score_bonus_cds_cdnskey_published": "CDS / CDNSKEY publicado",
+  "pub.score_bonus_ipv6_all_nameservers": "IPv6 en todos los servidores de nombres",
+  "pub.score_bonus_as_diversity": "Diversidad AS de servidores de nombres",
 
   "pub.result_status_ok": "No se encontraron problemas",
   "pub.result_status_notice": "Avisos",

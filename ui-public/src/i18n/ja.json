@@ -63,6 +63,13 @@
   "pub.score_aplus_criteria": "A+の基準",
   "pub.score_aplus_achieved": "達成",
   "pub.score_aplus_missing": "{n}件未達",
+  "pub.score_bonus_no_warnings_or_errors": "警告・エラーなし",
+  "pub.score_bonus_dnssec_enabled": "DNSSEC有効",
+  "pub.score_bonus_strong_algorithm": "強いアルゴリズム（ECDSA / Ed25519）",
+  "pub.score_bonus_nsec3_non_optout": "NSEC3（opt-outなし）",
+  "pub.score_bonus_cds_cdnskey_published": "CDS / CDNSKEY公開済み",
+  "pub.score_bonus_ipv6_all_nameservers": "全ネームサーバーでIPv6対応",
+  "pub.score_bonus_as_diversity": "ネームサーバーのAS多様性",
 
   "pub.result_status_ok": "問題は見つかりませんでした",
   "pub.result_status_notice": "通知",

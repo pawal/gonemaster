@@ -1114,9 +1114,10 @@ func (s *SQLJobStore) ListDomainsByTag(tag string, filter DomainFilter) DomainLi
 // GetTagSummary returns the severity distribution of latest runs for domains in tag.
 func (s *SQLJobStore) GetTagSummary(tag string) (TagSummary, bool) {
 	rows, err := s.db.Query(
-		fmt.Sprintf(`SELECT d.latest_level
+		fmt.Sprintf(`SELECT d.latest_level, r.grade
 		 FROM domains d
 		 JOIN domain_tags dt ON dt.domain_id = d.id
+		 LEFT JOIN runs r ON r.id = d.latest_run_id
 		 WHERE dt.tag = %s`, s.ph(1)),
 		tag,
 	)
@@ -1125,12 +1126,13 @@ func (s *SQLJobStore) GetTagSummary(tag string) (TagSummary, bool) {
 	}
 	defer rows.Close()
 
-	summary := TagSummary{Tag: tag}
+	summary := TagSummary{Tag: tag, Grades: map[string]int{}}
 	found := false
 	for rows.Next() {
 		found = true
 		var level sql.NullString
-		if err := rows.Scan(&level); err != nil {
+		var grade sql.NullString
+		if err := rows.Scan(&level, &grade); err != nil {
 			continue
 		}
 		summary.DomainCount++
@@ -1145,6 +1147,9 @@ func (s *SQLJobStore) GetTagSummary(tag string) (TagSummary, bool) {
 			summary.Notice++
 		default:
 			summary.OK++
+		}
+		if grade.Valid && grade.String != "" {
+			summary.Grades[grade.String]++
 		}
 	}
 	if !found {
@@ -1317,6 +1322,9 @@ func (s *SQLJobStore) ListRuns(filter RunFilter) RunList {
 	if filter.DomainID != 0 {
 		conds = append(conds, "domain_id = "+addArg(filter.DomainID))
 	}
+	if filter.Tag != "" {
+		conds = append(conds, "domain_id IN (SELECT domain_id FROM domain_tags WHERE tag = "+addArg(filter.Tag)+")")
+	}
 	if filter.Domain != "" {
 		conds = append(conds, "LOWER(domain) LIKE "+addArg("%"+strings.ToLower(filter.Domain)+"%"))
 	}
@@ -1328,6 +1336,9 @@ func (s *SQLJobStore) ListRuns(filter RunFilter) RunList {
 	}
 	if filter.WorstLevel != "" {
 		conds = append(conds, "worst_level = "+addArg(filter.WorstLevel))
+	}
+	if filter.Grade != "" {
+		conds = append(conds, "grade = "+addArg(filter.Grade))
 	}
 	if !filter.FinishedAfter.IsZero() {
 		conds = append(conds, "finished_at > "+addArg(formatSortableTimestamp(filter.FinishedAfter)))

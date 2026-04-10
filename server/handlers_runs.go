@@ -18,6 +18,7 @@ func (s *Server) handleListRuns(w http.ResponseWriter, r *http.Request) {
 		filter.Status = JobStatus(v)
 	}
 	filter.WorstLevel = strings.TrimSpace(q.Get("level"))
+	filter.Grade = strings.TrimSpace(q.Get("grade"))
 
 	if v := strings.TrimSpace(q.Get("finished_after")); v != "" {
 		t, err := parseTime(v)

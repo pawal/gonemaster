@@ -125,15 +125,16 @@ type Tag struct {
 	DefaultProfileID *int64    `json:"default_profile_id,omitempty"`
 }
 
-// TagSummary holds per-severity domain counts for a tag.
+// TagSummary holds per-severity and per-grade domain counts for a tag.
 type TagSummary struct {
-	Tag         string `json:"tag"`
-	DomainCount int    `json:"domain_count"`
-	OK          int    `json:"ok"`
-	Notice      int    `json:"notice"`
-	Warning     int    `json:"warning"`
-	Error       int    `json:"error"`
-	Critical    int    `json:"critical"`
+	Tag         string         `json:"tag"`
+	DomainCount int            `json:"domain_count"`
+	OK          int            `json:"ok"`
+	Notice      int            `json:"notice"`
+	Warning     int            `json:"warning"`
+	Error       int            `json:"error"`
+	Critical    int            `json:"critical"`
+	Grades      map[string]int `json:"grades,omitempty"`
 }
 
 // Run is a completed execution, graduated from a Job.
@@ -247,6 +248,7 @@ type RunFilter struct {
 	Tag            string
 	Status         JobStatus
 	WorstLevel     string
+	Grade          string
 	FinishedAfter  time.Time
 	FinishedBefore time.Time
 	Limit          int
@@ -401,6 +403,7 @@ type BatchSummary struct {
 	Tag          string         `json:"tag,omitempty"`
 	Total        int            `json:"total"`
 	StatusCounts map[string]int `json:"status_counts"`
+	Grades       map[string]int `json:"grades,omitempty"`
 	Items        []Job          `json:"items"`
 	Limit        int            `json:"limit,omitempty"`
 	Offset       int            `json:"offset,omitempty"`

@@ -353,3 +353,35 @@ func TestTagSummaryNotFound(t *testing.T) {
 		t.Fatalf("expected 404, got %d", resp.Code)
 	}
 }
+
+func TestTagSummaryIncludesGrades(t *testing.T) {
+	srv := New(DefaultConfig())
+	createTag(t, srv, "prod", "")
+
+	// Graduate one clean domain (gets a grade).
+	d := makeGraduatedJob(t, srv, "clean.example", JobSucceeded)
+	if err := srv.store.TagDomains("prod", []int64{d.ID}); err != nil {
+		t.Fatalf("tag domain: %v", err)
+	}
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/tags/prod/summary", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
+	}
+	var summary TagSummary
+	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(summary.Grades) == 0 {
+		t.Fatal("expected non-empty grades map in tag summary")
+	}
+	total := 0
+	for _, count := range summary.Grades {
+		total += count
+	}
+	if total != summary.DomainCount {
+		t.Fatalf("grades total %d != domain_count %d", total, summary.DomainCount)
+	}
+}

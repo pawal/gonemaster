@@ -743,8 +743,8 @@ func (s *InMemoryJobStore) ListDomainsByTag(tag string, filter DomainFilter) Dom
 	return s.ListDomains(filter)
 }
 
-// GetTagSummary returns the severity distribution for domains with the latest
-// run data in the given tag.
+// GetTagSummary returns the severity and grade distribution for domains with
+// the latest run data in the given tag.
 func (s *InMemoryJobStore) GetTagSummary(tag string) (TagSummary, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -752,7 +752,7 @@ func (s *InMemoryJobStore) GetTagSummary(tag string) (TagSummary, bool) {
 	if !ok {
 		return TagSummary{}, false
 	}
-	summary := TagSummary{Tag: tag, DomainCount: len(domainIDs)}
+	summary := TagSummary{Tag: tag, DomainCount: len(domainIDs), Grades: map[string]int{}}
 	for _, id := range domainIDs {
 		d, ok := s.domainsByID[id]
 		if !ok {
@@ -769,6 +769,11 @@ func (s *InMemoryJobStore) GetTagSummary(tag string) (TagSummary, bool) {
 			summary.Notice++
 		default:
 			summary.OK++
+		}
+		if d.LatestRunID != "" {
+			if run, ok := s.runs[d.LatestRunID]; ok && run.Grade != nil {
+				summary.Grades[*run.Grade]++
+			}
 		}
 	}
 	return summary, true
@@ -833,6 +838,9 @@ func (s *InMemoryJobStore) ListRuns(filter RunFilter) RunList {
 			continue
 		}
 		if filter.WorstLevel != "" && r.WorstLevel != filter.WorstLevel {
+			continue
+		}
+		if filter.Grade != "" && (r.Grade == nil || *r.Grade != filter.Grade) {
 			continue
 		}
 		if !filter.FinishedAfter.IsZero() && r.FinishedAt.Before(filter.FinishedAfter) {

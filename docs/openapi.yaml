@@ -364,6 +364,12 @@ paths:
           schema:
             type: string
           description: Filter by `worst_level`.
+        - name: grade
+          in: query
+          schema:
+            type: string
+            enum: ['A+', 'A', 'B', 'C', 'D', 'F']
+          description: Filter by letter grade.
         - name: finished_after
           in: query
           schema:
@@ -1363,6 +1369,11 @@ components:
           type: object
           additionalProperties:
             type: integer
+        grades:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Per-grade count of graduated runs in this batch. Absent when no runs have been scored.
         items:
           type: array
           items:
@@ -1391,6 +1402,20 @@ components:
         summary:
           type: object
           additionalProperties: true
+        score:
+          type: object
+          description: Full scoring result including numeric score, letter grade, per-category breakdown, and A+ bonus criteria. Absent when no entries are available.
+          properties:
+            score:
+              type: integer
+            grade:
+              type: string
+            categories:
+              type: object
+              additionalProperties: true
+            bonus:
+              type: object
+              additionalProperties: true
         raw:
           $ref: '#/components/schemas/JobResultRaw'
 
@@ -1579,6 +1604,11 @@ components:
           type: integer
         critical:
           type: integer
+        grades:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Per-grade count of domains (keyed by grade letter, e.g. "A", "B"). Absent when no runs have been scored.
 
     Run:
       type: object
@@ -1641,6 +1671,12 @@ components:
           type: object
           additionalProperties:
             type: integer
+        score:
+          type: integer
+          description: Numeric quality score in the range [0, 100].
+        grade:
+          type: string
+          description: Letter grade derived from score ("A+", "A", "B", "C", "D", or "F").
 
     Profile:
       type: object

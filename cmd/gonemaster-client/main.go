@@ -21,6 +21,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/normalization"
+	"codeberg.org/pawal/gonemaster/scoring"
 )
 
 const (
@@ -146,11 +147,12 @@ type batchSummary struct {
 }
 
 type jobResult struct {
-	JobID   string         `json:"job_id"`
-	BatchID string         `json:"batch_id,omitempty"`
-	Status  string         `json:"status"`
-	Summary map[string]any `json:"summary,omitempty"`
-	Raw     *jobResultRaw  `json:"raw,omitempty"`
+	JobID   string           `json:"job_id"`
+	BatchID string           `json:"batch_id,omitempty"`
+	Status  string           `json:"status"`
+	Summary map[string]any   `json:"summary,omitempty"`
+	Raw     *jobResultRaw    `json:"raw,omitempty"`
+	Score   *scoring.Result  `json:"score,omitempty"`
 }
 
 type jobResultRaw struct {
@@ -643,6 +645,9 @@ func runJobsCreate(ctx context.Context, client *apiClient, opts globalOptions, a
 		overrideFile  string
 		wait          bool
 		view          string
+		scoreFlag     bool
+		noScoreFlag   bool
+		scoringConfig string
 	)
 	fs := flag.NewFlagSet("jobs create", flag.ContinueOnError)
 	fs.SetOutput(errOut)
@@ -654,6 +659,9 @@ func runJobsCreate(ctx context.Context, client *apiClient, opts globalOptions, a
 	fs.StringVar(&overrideFile, "profile-overrides-file", "", "Profile overrides JSON/YAML file")
 	fs.BoolVar(&wait, "wait", false, "Wait for completion and display results")
 	fs.StringVar(&view, "view", "", "Result view: summary, modules, raw, json (aliases: translated, full)")
+	fs.BoolVar(&scoreFlag, "score", false, "Show scoring summary after results")
+	fs.BoolVar(&noScoreFlag, "no-score", false, "Suppress scoring output")
+	fs.StringVar(&scoringConfig, "scoring-config", "", "Path to JSON scoring config file (implies --score)")
 	if err := parseWithReorderedFlags(fs, args); err != nil {
 		return 2
 	}
@@ -702,7 +710,12 @@ func runJobsCreate(ctx context.Context, client *apiClient, opts globalOptions, a
 		fmt.Fprintln(errOut, err.Error())
 		return 2
 	}
-	if err := renderJobResults(ctx, client, opts, finalView, "", false, true, "", []string{jobInfo.ID}, out, errOut); err != nil {
+	scoreOpts, err := parseScoringOptions(scoreFlag, noScoreFlag, scoringConfig)
+	if err != nil {
+		fmt.Fprintln(errOut, err.Error())
+		return 2
+	}
+	if err := renderJobResults(ctx, client, opts, finalView, "", false, true, "", scoreOpts, []string{jobInfo.ID}, out, errOut); err != nil {
 		fmt.Fprintln(errOut, err.Error())
 		return 2
 	}
@@ -723,6 +736,9 @@ func runJobsBatch(ctx context.Context, client *apiClient, opts globalOptions, ar
 		wait          bool
 		view          string
 		perJob        bool
+		scoreFlag     bool
+		noScoreFlag   bool
+		scoringConfig string
 	)
 	fs := flag.NewFlagSet("jobs batch", flag.ContinueOnError)
 	fs.SetOutput(errOut)
@@ -738,6 +754,9 @@ func runJobsBatch(ctx context.Context, client *apiClient, opts globalOptions, ar
 	fs.BoolVar(&wait, "wait", false, "Wait for completion and display results")
 	fs.StringVar(&view, "view", "", "Result view: summary, modules, raw, json (aliases: translated, full)")
 	fs.BoolVar(&perJob, "per-job", false, "Show per-job results when waiting")
+	fs.BoolVar(&scoreFlag, "score", false, "Show scoring summary after results")
+	fs.BoolVar(&noScoreFlag, "no-score", false, "Suppress scoring output")
+	fs.StringVar(&scoringConfig, "scoring-config", "", "Path to JSON scoring config file (implies --score)")
 	if err := parseWithReorderedFlags(fs, args); err != nil {
 		return 2
 	}
@@ -799,7 +818,12 @@ func runJobsBatch(ctx context.Context, client *apiClient, opts globalOptions, ar
 		fmt.Fprintln(errOut, err.Error())
 		return 2
 	}
-	if err := renderJobResults(ctx, client, opts, finalView, "", !perJob, perJob, "", jobIDs, out, errOut); err != nil {
+	scoreOpts, err := parseScoringOptions(scoreFlag, noScoreFlag, scoringConfig)
+	if err != nil {
+		fmt.Fprintln(errOut, err.Error())
+		return 2
+	}
+	if err := renderJobResults(ctx, client, opts, finalView, "", !perJob, perJob, "", scoreOpts, jobIDs, out, errOut); err != nil {
 		fmt.Fprintln(errOut, err.Error())
 		return 2
 	}
@@ -1249,16 +1273,19 @@ func runQueueRemove(ctx context.Context, client *apiClient, opts globalOptions, 
 
 func runResults(ctx context.Context, client *apiClient, opts globalOptions, args []string, out io.Writer, errOut io.Writer, batchMode bool) int {
 	var (
-		jobIDs       stringList
-		batchID      string
-		all          bool
-		status       string
-		createdAfter string
-		view         string
-		levels       string
-		aggregate    bool
-		perJob       bool
-		splitDir     string
+		jobIDs        stringList
+		batchID       string
+		all           bool
+		status        string
+		createdAfter  string
+		view          string
+		levels        string
+		aggregate     bool
+		perJob        bool
+		splitDir      string
+		scoreFlag     bool
+		noScoreFlag   bool
+		scoringConfig string
 	)
 	fs := flag.NewFlagSet("results", flag.ContinueOnError)
 	fs.SetOutput(errOut)
@@ -1272,6 +1299,9 @@ func runResults(ctx context.Context, client *apiClient, opts globalOptions, args
 	fs.BoolVar(&aggregate, "aggregate", false, "Aggregate results across jobs")
 	fs.BoolVar(&perJob, "per-job", false, "Show per-job results")
 	fs.StringVar(&splitDir, "split-dir", "", "Write per-job results to files in this directory")
+	fs.BoolVar(&scoreFlag, "score", false, "Show scoring summary after results")
+	fs.BoolVar(&noScoreFlag, "no-score", false, "Suppress scoring output")
+	fs.StringVar(&scoringConfig, "scoring-config", "", "Path to JSON scoring config file (implies --score)")
 	if err := parseWithReorderedFlags(fs, args); err != nil {
 		return 2
 	}
@@ -1352,14 +1382,19 @@ func runResults(ctx context.Context, client *apiClient, opts globalOptions, args
 			perJob = true
 		}
 	}
-	if err := renderJobResults(ctx, client, opts, view, levels, aggregate, perJob, splitDir, ids, out, errOut); err != nil {
+	scoreOpts, err := parseScoringOptions(scoreFlag, noScoreFlag, scoringConfig)
+	if err != nil {
+		fmt.Fprintln(errOut, err.Error())
+		return 2
+	}
+	if err := renderJobResults(ctx, client, opts, view, levels, aggregate, perJob, splitDir, scoreOpts, ids, out, errOut); err != nil {
 		fmt.Fprintln(errOut, err.Error())
 		return 2
 	}
 	return 0
 }
 
-func renderJobResults(ctx context.Context, client *apiClient, opts globalOptions, view string, levels string, aggregate bool, perJob bool, splitDir string, ids []string, out io.Writer, errOut io.Writer) error {
+func renderJobResults(ctx context.Context, client *apiClient, opts globalOptions, view string, levels string, aggregate bool, perJob bool, splitDir string, scoreOpts scoringOptions, ids []string, out io.Writer, errOut io.Writer) error {
 	levelSet, err := parseLevels(levels)
 	if err != nil {
 		return err
@@ -1392,7 +1427,7 @@ func renderJobResults(ctx context.Context, client *apiClient, opts globalOptions
 			if err != nil {
 				return err
 			}
-			if err := renderResultsToWriter(opts, view, levelSet, false, true, []jobResult{result}, domains, file); err != nil {
+			if err := renderResultsToWriter(opts, view, levelSet, false, true, []jobResult{result}, domains, scoreOpts, file); err != nil {
 				_ = file.Close()
 				return err
 			}
@@ -1400,12 +1435,12 @@ func renderJobResults(ctx context.Context, client *apiClient, opts globalOptions
 			fmt.Fprintf(out, "Wrote %s\n", path)
 		}
 		if aggregate {
-			return renderResultsToWriter(opts, view, levelSet, true, false, results, domains, out)
+			return renderResultsToWriter(opts, view, levelSet, true, false, results, domains, scoreOpts, out)
 		}
 		return nil
 	}
 
-	return renderResultsToWriter(opts, view, levelSet, aggregate, perJob, results, domains, out)
+	return renderResultsToWriter(opts, view, levelSet, aggregate, perJob, results, domains, scoreOpts, out)
 }
 
 func fetchJobResult(ctx context.Context, client *apiClient, jobID string) (jobResult, error) {
@@ -1496,7 +1531,17 @@ func isNotFoundError(err error) bool {
 	return strings.Contains(msg, "code=not_found") || strings.Contains(msg, "not found")
 }
 
-func renderResultsToWriter(opts globalOptions, view string, levelSet map[string]bool, aggregate bool, perJob bool, results []jobResult, domains map[string]string, out io.Writer) error {
+func renderResultsToWriter(opts globalOptions, view string, levelSet map[string]bool, aggregate bool, perJob bool, results []jobResult, domains map[string]string, scoreOpts scoringOptions, out io.Writer) error {
+	// Pre-compute scores when enabled and attach to results (used for JSON output).
+	var scores []*scoring.Result
+	if scoreOpts.enabled {
+		scores = make([]*scoring.Result, len(results))
+		for i := range results {
+			scores[i] = computeScoreFromResult(results[i], domains[results[i].JobID], scoreOpts.cfg)
+			results[i].Score = scores[i]
+		}
+	}
+
 	switch view {
 	case "json":
 		if opts.format == "jsonl" {
@@ -1535,8 +1580,11 @@ func renderResultsToWriter(opts globalOptions, view string, levelSet map[string]
 			return nil
 		}
 		if perJob {
-			for _, view := range views {
-				printSummaryPretty(out, view)
+			for i, v := range views {
+				printSummaryPretty(out, v)
+				if scoreOpts.enabled {
+					printScorePretty(out, scores[i])
+				}
 			}
 		}
 		if aggregate {
@@ -1567,8 +1615,11 @@ func renderResultsToWriter(opts globalOptions, view string, levelSet map[string]
 			return nil
 		}
 		if perJob {
-			for _, view := range views {
-				printModulesPretty(out, view)
+			for i, v := range views {
+				printModulesPretty(out, v)
+				if scoreOpts.enabled {
+					printScorePretty(out, scores[i])
+				}
 			}
 		}
 		if aggregate {
@@ -1599,8 +1650,11 @@ func renderResultsToWriter(opts globalOptions, view string, levelSet map[string]
 			return nil
 		}
 		if perJob {
-			for _, view := range views {
-				printRawPretty(out, view)
+			for i, v := range views {
+				printRawPretty(out, v)
+				if scoreOpts.enabled {
+					printScorePretty(out, scores[i])
+				}
 			}
 		}
 		if aggregate {

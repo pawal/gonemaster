@@ -723,11 +723,19 @@ func runRunsGet(ctx context.Context, client *apiClient, opts globalOptions, args
 }
 
 func runRunsResults(ctx context.Context, client *apiClient, opts globalOptions, args []string, out io.Writer, errOut io.Writer) int {
-	var view string
+	var (
+		view          string
+		scoreFlag     bool
+		noScoreFlag   bool
+		scoringConfig string
+	)
 	fs := flag.NewFlagSet("runs results", flag.ContinueOnError)
 	fs.SetOutput(errOut)
 	setSubcommandUsage(fs)
 	fs.StringVar(&view, "view", "", "View: summary, modules, raw, json")
+	fs.BoolVar(&scoreFlag, "score", false, "Show scoring summary after results")
+	fs.BoolVar(&noScoreFlag, "no-score", false, "Suppress scoring output")
+	fs.StringVar(&scoringConfig, "scoring-config", "", "Path to JSON scoring config file (implies --score)")
 	if err := parseWithReorderedFlags(fs, args); err != nil {
 		return 2
 	}
@@ -761,8 +769,13 @@ func runRunsResults(ctx context.Context, client *apiClient, opts globalOptions, 
 		fmt.Fprintln(errOut, err.Error())
 		return 2
 	}
+	scoreOpts, err := parseScoringOptions(scoreFlag, noScoreFlag, scoringConfig)
+	if err != nil {
+		fmt.Fprintln(errOut, err.Error())
+		return 2
+	}
 	domains := map[string]string{result.JobID: r.Domain}
-	if err := renderResultsToWriter(opts, finalView, nil, false, true, []jobResult{result}, domains, out); err != nil {
+	if err := renderResultsToWriter(opts, finalView, nil, false, true, []jobResult{result}, domains, scoreOpts, out); err != nil {
 		fmt.Fprintln(errOut, err.Error())
 		return 2
 	}

@@ -4,45 +4,67 @@
 // plugin alike.
 package scoring
 
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+)
+
 // Config holds all tunable parameters for the scoring engine.
 // Call DefaultConfig to obtain a ready-to-use configuration.
 type Config struct {
 	// SeverityPenalties maps a severity level name to the point penalty
 	// applied for each entry at that level.
-	SeverityPenalties map[string]int
+	SeverityPenalties map[string]int `json:"severity_penalties"`
 
 	// CategoryWeights maps a category name to its relative weight when
 	// computing the aggregate score from per-category sub-scores.
-	CategoryWeights map[string]float64
+	CategoryWeights map[string]float64 `json:"category_weights"`
 
 	// ModuleCategories maps an engine module name (e.g. "DNSSEC") to a
 	// scoring category name (e.g. "dnssec").
-	ModuleCategories map[string]string
+	ModuleCategories map[string]string `json:"module_categories"`
 
 	// GradeBands defines the letter grade thresholds in descending order.
 	// The first band whose MinScore is ≤ the numeric score is used.
-	GradeBands []GradeBand
+	GradeBands []GradeBand `json:"grade_bands"`
 
 	// BonusCriteria controls which A+ bonus checks are evaluated.
-	BonusCriteria BonusCriteriaConfig
+	BonusCriteria BonusCriteriaConfig `json:"bonus_criteria"`
 }
 
 // GradeBand maps a minimum numeric score to a letter grade.
 type GradeBand struct {
-	Grade    string
-	MinScore int
+	Grade    string `json:"grade"`
+	MinScore int    `json:"min_score"`
 }
 
 // BonusCriteriaConfig selects which bonus checks are evaluated.
 // Disabled checks are omitted from the BonusResult entirely.
 type BonusCriteriaConfig struct {
-	NoWarningsOrErrors   bool
-	DNSSECEnabled        bool
-	StrongAlgorithm      bool
-	NSEC3NonOptout       bool
-	CDSCDNSKEYPublished  bool
-	IPv6AllNameservers   bool
-	ASDiversity          bool
+	NoWarningsOrErrors  bool `json:"no_warnings_or_errors"`
+	DNSSECEnabled       bool `json:"dnssec_enabled"`
+	StrongAlgorithm     bool `json:"strong_algorithm"`
+	NSEC3NonOptout      bool `json:"nsec3_non_optout"`
+	CDSCDNSKEYPublished bool `json:"cds_cdnskey_published"`
+	IPv6AllNameservers  bool `json:"ipv6_all_nameservers"`
+	ASDiversity         bool `json:"as_diversity"`
+}
+
+// LoadConfig reads a JSON scoring config file and returns the parsed Config.
+// Fields absent from the file retain the values from DefaultConfig.
+// Note: map fields (SeverityPenalties, CategoryWeights, ModuleCategories) are
+// replaced entirely when present in the file, not merged with defaults.
+func LoadConfig(path string) (Config, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return Config{}, fmt.Errorf("reading scoring config %q: %w", path, err)
+	}
+	cfg := DefaultConfig()
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return Config{}, fmt.Errorf("parsing scoring config %q: %w", path, err)
+	}
+	return cfg, nil
 }
 
 // DefaultConfig returns the recommended configuration suitable for public DNS

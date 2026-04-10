@@ -262,6 +262,9 @@ Options:
 - `--profile-overrides-file PATH` (JSON/YAML object to merge)
 - `--wait` (wait for completion and print results)
 - `--view summary|modules|raw|json` (aliases: `translated`, `full`) (when `--wait` is used)
+- `--score` (show score/grade after results; requires `--wait`)
+- `--no-score` (suppress scoring output)
+- `--scoring-config PATH` (load custom scoring config from JSON file; implies `--score`)
 
 #### jobs batch
 Submit a batch of jobs.
@@ -281,6 +284,9 @@ Options:
 - `--wait` (wait for batch completion)
 - `--view summary|modules|raw|json` (aliases: `translated`, `full`) (when `--wait` is used)
 - `--per-job` (when waiting, show per-job results instead of only batch summary)
+- `--score` (show score/grade after results; requires `--wait`)
+- `--no-score` (suppress scoring output)
+- `--scoring-config PATH` (load custom scoring config from JSON file; implies `--score`)
 
 #### jobs list
 List jobs with filters.
@@ -331,6 +337,9 @@ Options:
 - `--aggregate` (print a combined summary across all selected jobs)
 - `--per-job` (print per-job summaries/results)
 - `--split-dir PATH` (write per-job results to files; filename includes job id)
+- `--score` (show score/grade after each job's results)
+- `--no-score` (suppress scoring output)
+- `--scoring-config PATH` (load custom scoring config from JSON file; implies `--score`)
 
 This command is the primary way to retrieve results from all jobs in a convenient way.
 
@@ -369,6 +378,9 @@ Options:
 - `--levels NOTICE,WARNING,ERROR,CRITICAL`
 - `--aggregate` (combined summary across the batch)
 - `--per-job` (include per-job results)
+- `--score` (show score/grade after each job's results)
+- `--no-score` (suppress scoring output)
+- `--scoring-config PATH` (load custom scoring config from JSON file; implies `--score`)
 
 #### batches cancel
 Cancel all queued or running jobs in a batch.
@@ -387,6 +399,35 @@ gonemaster-client batches remove BATCH_ID [--cancel-running]
 Notes:
 - Uses the queue remove endpoint for queued jobs only.
 - With `--cancel-running`, running jobs are canceled via per-job cancel requests.
+
+#### runs list
+List completed runs.
+```
+gonemaster-client runs list [options]
+```
+Options:
+- `--tag NAME` (filter by domain tag)
+- `--domain SUBSTR` (filter by domain name substring)
+- `--batch ID` (filter by batch ID)
+- `--level LEVEL` (filter by worst level)
+- `--limit N` (default `100`)
+
+#### runs get
+Fetch metadata for a completed run.
+```
+gonemaster-client runs get RUN_ID
+```
+
+#### runs results
+Fetch test results for a completed run.
+```
+gonemaster-client runs results RUN_ID [options]
+```
+Options:
+- `--view summary|modules|raw|json`
+- `--score` (show score/grade after results)
+- `--no-score` (suppress scoring output)
+- `--scoring-config PATH` (load custom scoring config from JSON file; implies `--score`)
 
 #### queue pause
 Pause queue processing.
@@ -463,6 +504,16 @@ gonemaster-client jobs results job_123 --view raw --format json \
 Fetch translated, readable output (per module):
 ```
 gonemaster-client jobs results job_123 --view translated --locale sv
+```
+
+Show score and grade after fetching job results:
+```
+gonemaster-client jobs results job_123 --score
+```
+
+Use a custom scoring config:
+```
+gonemaster-client jobs results job_123 --scoring-config /etc/gonemaster/scoring.json
 ```
 
 Cancel all queued/running jobs in a batch:

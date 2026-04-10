@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
+	"codeberg.org/pawal/gonemaster/scoring"
 )
 
 const publicIDAlphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -160,6 +161,10 @@ type Run struct {
 	PublicID         string      `json:"public_id,omitempty"`
 	// SeverityTotals mirrors the sev_* columns as a map for API compat.
 	SeverityTotals map[string]int `json:"severity_totals,omitempty"`
+	// Score and Grade are computed by the scoring engine at graduation and
+	// cached in the runs table. Nil when scoring has not yet been computed.
+	Score *int    `json:"score,omitempty"`
+	Grade *string `json:"grade,omitempty"`
 }
 
 // Entry is a single engine log entry stored as a row for SQL analysis.
@@ -317,6 +322,9 @@ type JobResult struct {
 	Summary              map[string]any    `json:"summary,omitempty"`
 	Raw                  *JobResultRaw     `json:"raw,omitempty"`
 	TestcaseDescriptions map[string]string `json:"testcase_descriptions,omitempty"`
+	// Score holds the full scoring result. Populated by GetResult; nil when
+	// the run has no entries or scoring is not available.
+	Score *scoring.Result `json:"score,omitempty"`
 }
 
 // JobResultRaw contains the raw log entries for a job.

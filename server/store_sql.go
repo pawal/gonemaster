@@ -10,6 +10,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/normalization"
+	"codeberg.org/pawal/gonemaster/scoring"
 )
 
 // rowScanner is satisfied by both *sql.Row and *sql.Rows.
@@ -19,13 +20,19 @@ type rowScanner interface {
 
 // SQLJobStore implements JobStore using a SQL database.
 type SQLJobStore struct {
-	db      *sql.DB
-	dialect sqlDialect
+	db         *sql.DB
+	dialect    sqlDialect
+	scoringCfg scoring.Config
 }
 
 // NewSQLJobStore creates a SQLJobStore backed by db using dialect.
 func NewSQLJobStore(db *sql.DB, dialect sqlDialect) *SQLJobStore {
-	return &SQLJobStore{db: db, dialect: dialect}
+	return &SQLJobStore{db: db, dialect: dialect, scoringCfg: scoring.DefaultConfig()}
+}
+
+// SetScoringConfig sets the scoring configuration used when graduating jobs.
+func (s *SQLJobStore) SetScoringConfig(cfg scoring.Config) {
+	s.scoringCfg = cfg
 }
 
 // ph returns the n-th (1-based) placeholder for this dialect.
@@ -445,6 +452,15 @@ func (s *SQLJobStore) GraduateJob(job Job, engineEntries []engine.LogEntry) erro
 		durationMs = job.FinishedAt.Sub(job.StartedAt).Milliseconds()
 	}
 
+	// Compute score eagerly at graduation time.
+	scoringEntries := make([]scoring.Entry, len(engineEntries))
+	for i, e := range engineEntries {
+		scoringEntries[i] = scoring.Entry{Module: e.Module, Tag: e.Tag, Level: e.Level}
+	}
+	scoreResult := scoring.Compute(job.Domain, scoringEntries, s.scoringCfg)
+	scoreVal := sql.NullInt64{Int64: int64(scoreResult.Score), Valid: true}
+	gradeVal := sql.NullString{String: scoreResult.Grade, Valid: true}
+
 	tx, err := s.db.Begin()
 	if err != nil {
 		return fmt.Errorf("begin graduation tx: %w", err)
@@ -477,15 +493,15 @@ func (s *SQLJobStore) GraduateJob(job Job, engineEntries []engine.LogEntry) erro
 			created_at, started_at, finished_at, duration_ms,
 			sev_notice, sev_warning, sev_error, sev_critical,
 			worst_level, entry_count, profile, profile_id, profile_name,
-			effective_profile, public_id, priority
-		) VALUES (%s)`, s.phRange(1, 21)),
+			effective_profile, public_id, priority, score, grade
+		) VALUES (%s)`, s.phRange(1, 23)),
 		job.ID, domainID, job.Domain, job.BatchID, string(job.Status),
 		s.ts(job.CreatedAt), s.ts(job.StartedAt), s.ts(job.FinishedAt), durationMs,
 		sevNotice, sevWarning, sevError, sevCritical,
 		worstLevel, len(engineEntries), job.Profile, nullInt64Value(job.ProfileID), job.ProfileName,
 		job.EffectiveProfile,
 		sql.NullString{String: job.PublicID, Valid: job.PublicID != ""},
-		int(job.Priority),
+		int(job.Priority), scoreVal, gradeVal,
 	); err != nil {
 		_ = tx.Rollback()
 		return fmt.Errorf("insert run: %w", err)
@@ -609,7 +625,12 @@ func (s *SQLJobStore) GetResult(jobID string) (JobResult, bool) {
 	if err != nil {
 		return JobResult{}, false
 	}
-	return buildJobResult(run, entries), true
+	scoringEntries := make([]scoring.Entry, len(entries))
+	for i, e := range entries {
+		scoringEntries[i] = scoring.Entry{Module: e.Module, Tag: e.Tag, Level: e.Level}
+	}
+	sr := scoring.Compute(run.Domain, scoringEntries, s.scoringCfg)
+	return buildJobResult(run, entries, &sr), true
 }
 
 // loadEntries loads all entries for a run, ordered by timestamp.
@@ -1138,7 +1159,7 @@ const runCols = `id, domain_id, domain, batch_id, status,
 	created_at, started_at, finished_at, duration_ms,
 	sev_notice, sev_warning, sev_error, sev_critical,
 	worst_level, entry_count, profile, profile_id, profile_name,
-	effective_profile, public_id, priority`
+	effective_profile, public_id, priority, score, grade`
 
 func (s *SQLJobStore) scanRun(row rowScanner) (Run, error) {
 	var (
@@ -1151,13 +1172,15 @@ func (s *SQLJobStore) scanRun(row rowScanner) (Run, error) {
 		startedAt, finishedAt                                                           sql.NullString
 		publicID                                                                        sql.NullString
 		priority                                                                        int
+		score                                                                           sql.NullInt64
+		grade                                                                           sql.NullString
 	)
 	if err := row.Scan(
 		&id, &domainID, &domain, &batchID, &status,
 		&createdAt, &startedAt, &finishedAt, &durationMs,
 		&sevNotice, &sevWarning, &sevError, &sevCritical,
 		&worstLevel, &entryCount, &profile, &profileID, &profileName,
-		&effectiveProfile, &publicID, &priority,
+		&effectiveProfile, &publicID, &priority, &score, &grade,
 	); err != nil {
 		return Run{}, err
 	}
@@ -1184,6 +1207,13 @@ func (s *SQLJobStore) scanRun(row rowScanner) (Run, error) {
 		PublicID:         publicID.String,
 		Priority:         JobPriority(priority),
 	}
+	if score.Valid {
+		v := int(score.Int64)
+		r.Score = &v
+	}
+	if grade.Valid {
+		r.Grade = &grade.String
+	}
 	r.SeverityTotals = map[string]int{
 		"NOTICE":   sevNotice,
 		"WARNING":  sevWarning,
@@ -1193,6 +1223,30 @@ func (s *SQLJobStore) scanRun(row rowScanner) (Run, error) {
 	return r, nil
 }
 
+// lazyComputeScore loads entries for runID, computes the score, writes it back
+// to the DB, and sets Score/Grade on run. Used for pre-existing rows that have
+// a NULL score because they predate Phase 3.
+func (s *SQLJobStore) lazyComputeScore(run *Run) {
+	entries, err := s.loadEntries(run.ID)
+	if err != nil {
+		return
+	}
+	scoringEntries := make([]scoring.Entry, len(entries))
+	for i, e := range entries {
+		scoringEntries[i] = scoring.Entry{Module: e.Module, Tag: e.Tag, Level: e.Level}
+	}
+	sr := scoring.Compute(run.Domain, scoringEntries, s.scoringCfg)
+	scoreVal := int(sr.Score)
+	run.Score = &scoreVal
+	run.Grade = &sr.Grade
+	// Cache in DB; ignore errors — the in-memory value is still set.
+	_, _ = s.db.Exec(
+		fmt.Sprintf("UPDATE runs SET score = %s, grade = %s WHERE id = %s",
+			s.ph(1), s.ph(2), s.ph(3)),
+		sr.Score, sr.Grade, run.ID,
+	)
+}
+
 // GetRun returns a graduated run by ID.
 func (s *SQLJobStore) GetRun(id string) (Run, bool) {
 	row := s.db.QueryRow(
@@ -1200,6 +1254,9 @@ func (s *SQLJobStore) GetRun(id string) (Run, bool) {
 	run, err := s.scanRun(row)
 	if err != nil {
 		return Run{}, false
+	}
+	if run.Score == nil {
+		s.lazyComputeScore(&run)
 	}
 	return run, true
 }
@@ -1211,6 +1268,9 @@ func (s *SQLJobStore) GetRunByPublicID(publicID string) (Run, bool) {
 	run, err := s.scanRun(row)
 	if err != nil {
 		return Run{}, false
+	}
+	if run.Score == nil {
+		s.lazyComputeScore(&run)
 	}
 	return run, true
 }

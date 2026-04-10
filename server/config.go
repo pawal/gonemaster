@@ -86,6 +86,10 @@ type Config struct {
 	PublicURL   string  `json:"public_url,omitempty"`
 	Database    DatabaseConfig   `json:"database,omitempty"`
 	PublicAPI   PublicAPIConfig  `json:"public_api,omitempty"`
+	// ScoringConfigPath is an optional path to a JSON file that overrides the
+	// default scoring configuration (weights, penalties, tag overrides, etc.).
+	// When empty, scoring.DefaultConfig() is used.
+	ScoringConfigPath string `json:"scoring_config_path,omitempty"`
 }
 
 // PublicAPIFileConfig holds optional public API configuration from JSON.
@@ -123,6 +127,7 @@ type FileConfig struct {
 	PublicURL         *string             `json:"public_url,omitempty"`
 	Database          *DatabaseFileConfig  `json:"database,omitempty"`
 	PublicAPI         *PublicAPIFileConfig `json:"public_api,omitempty"`
+	ScoringConfigPath *string             `json:"scoring_config_path,omitempty"`
 }
 
 // DefaultConfig returns baseline config values.
@@ -204,6 +209,9 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 	}
 	if file.PublicURL != nil {
 		c.PublicURL = *file.PublicURL
+	}
+	if file.ScoringConfigPath != nil {
+		c.ScoringConfigPath = *file.ScoringConfigPath
 	}
 	if file.Database != nil {
 		if file.Database.Driver != "" {

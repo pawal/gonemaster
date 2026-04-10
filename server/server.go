@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
+	"codeberg.org/pawal/gonemaster/scoring"
 	serverpublic "codeberg.org/pawal/gonemaster/server/public"
 	serverui "codeberg.org/pawal/gonemaster/server/ui"
 )
@@ -37,12 +38,35 @@ type Server struct {
 	retentionDays            atomic.Int64
 }
 
+// setScoringConfig loads an optional scoring config file and sets it on the
+// store. Only *InMemoryJobStore and *SQLJobStore are supported; other
+// implementations are left unchanged.
+func setScoringConfig(store JobStore, path string) error {
+	if path == "" {
+		return nil
+	}
+	cfg, err := scoring.LoadConfig(path)
+	if err != nil {
+		return err
+	}
+	switch s := store.(type) {
+	case *InMemoryJobStore:
+		s.SetScoringConfig(cfg)
+	case *SQLJobStore:
+		s.SetScoringConfig(cfg)
+	}
+	return nil
+}
+
 // New builds a server with in-memory components.
 func New(cfg Config) *Server {
 	if cfg.ListenAddr == "" {
 		cfg = DefaultConfig()
 	}
-	return newServer(cfg, NewInMemoryJobStore(), NewInMemoryQueue())
+	store := NewInMemoryJobStore()
+	// Ignore scoring config load errors in the simple constructor.
+	_ = setScoringConfig(store, cfg.ScoringConfigPath)
+	return newServer(cfg, store, NewInMemoryQueue())
 }
 
 // NewWithOptions builds a server using the configured storage backend.
@@ -71,6 +95,12 @@ func NewWithOptions(cfg Config) (*Server, error) {
 			return nil, fmt.Errorf("run migrations: %w", err)
 		}
 		store = NewSQLJobStore(db, dialect)
+	}
+	if err := setScoringConfig(store, cfg.ScoringConfigPath); err != nil {
+		if sql, ok := store.(*SQLJobStore); ok {
+			_ = sql.db.Close()
+		}
+		return nil, fmt.Errorf("load scoring config: %w", err)
 	}
 
 	queue := NewInMemoryQueue()

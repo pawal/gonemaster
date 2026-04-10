@@ -58,6 +58,12 @@
   "pub.result_new_test": "Ny test",
   "pub.result_locale_label": "Meddelelsessprog",
 
+  "pub.score_label": "DNS Quality Score",
+  "pub.score_partial": "Delvis score — test af {stacks} var deaktiveret",
+  "pub.score_aplus_criteria": "A+-kriterier",
+  "pub.score_aplus_achieved": "Opnået",
+  "pub.score_aplus_missing": "{n} mangler",
+
   "pub.result_status_ok": "Ingen problemer fundet",
   "pub.result_status_notice": "Bemærkninger",
   "pub.result_status_warning": "Advarsler fundet",

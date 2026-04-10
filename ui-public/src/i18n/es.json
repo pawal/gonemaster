@@ -58,6 +58,12 @@
   "pub.result_new_test": "Nueva prueba",
   "pub.result_locale_label": "Idioma de los mensajes",
 
+  "pub.score_label": "DNS Quality Score",
+  "pub.score_partial": "Puntuación parcial — las pruebas de {stacks} estaban deshabilitadas",
+  "pub.score_aplus_criteria": "Criterios A+",
+  "pub.score_aplus_achieved": "Conseguido",
+  "pub.score_aplus_missing": "{n} incumplido(s)",
+
   "pub.result_status_ok": "No se encontraron problemas",
   "pub.result_status_notice": "Avisos",
   "pub.result_status_warning": "Advertencias encontradas",

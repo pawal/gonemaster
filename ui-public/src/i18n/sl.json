@@ -58,6 +58,12 @@
   "pub.result_new_test": "Nov preizkus",
   "pub.result_locale_label": "Jezik sporočil",
 
+  "pub.score_label": "DNS Quality Score",
+  "pub.score_partial": "Delna ocena — testiranje {stacks} je bilo onemogočeno",
+  "pub.score_aplus_criteria": "Merila A+",
+  "pub.score_aplus_achieved": "Doseženo",
+  "pub.score_aplus_missing": "{n} neizpolnjeno",
+
   "pub.result_status_ok": "Ni najdenih težav",
   "pub.result_status_notice": "Obvestila",
   "pub.result_status_warning": "Najdena opozorila",

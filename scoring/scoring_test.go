@@ -431,6 +431,41 @@ func TestCompute_TagPenaltyCanBeDisabledByZero(t *testing.T) {
 	}
 }
 
+func TestCompute_NoIPv6NSChildPenalty(t *testing.T) {
+	// NO_IPV6_NS_CHILD is NOTICE (1 pt) but must get 20 pts via TagPenalties.
+	entries := []Entry{
+		e("DELEGATION", "NO_IPV6_NS_CHILD", "NOTICE"),
+	}
+	r := Compute("example.se", entries, cfg)
+	cat := r.Categories["nameserver_health"]
+	if cat.Penalties != 20 {
+		t.Errorf("expected nameserver_health penalties 20, got %d", cat.Penalties)
+	}
+}
+
+func TestCompute_NoIPv6NSDelPenalty(t *testing.T) {
+	entries := []Entry{
+		e("DELEGATION", "NO_IPV6_NS_DEL", "NOTICE"),
+	}
+	r := Compute("example.se", entries, cfg)
+	cat := r.Categories["nameserver_health"]
+	if cat.Penalties != 20 {
+		t.Errorf("expected nameserver_health penalties 20, got %d", cat.Penalties)
+	}
+}
+
+func TestCompute_NotEnoughIPv6UsesErrorSeverity(t *testing.T) {
+	// NOT_ENOUGH_IPV6_NS_CHILD is already ERROR (20 pts by severity); no override needed.
+	entries := []Entry{
+		e("DELEGATION", "NOT_ENOUGH_IPV6_NS_CHILD", "ERROR"),
+	}
+	r := Compute("example.se", entries, cfg)
+	cat := r.Categories["nameserver_health"]
+	if cat.Penalties != 20 {
+		t.Errorf("expected nameserver_health penalties 20, got %d", cat.Penalties)
+	}
+}
+
 func TestCompute_TagPenaltyNotAffectingOtherTags(t *testing.T) {
 	// A regular WARNING tag should still use the severity penalty (5 pts).
 	entries := []Entry{

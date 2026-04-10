@@ -109,6 +109,11 @@ func DefaultConfig() Config {
 			// DS07_NO_DS_FOR_SIGNED_ZONE: zone is signed but has no DS record at
 			// the parent — breaks the chain of trust. Same severity as above.
 			"DS07_NO_DS_FOR_SIGNED_ZONE": 20,
+			// NO_IPV6_NS_CHILD / NO_IPV6_NS_DEL: zero nameservers have IPv6
+			// addresses — the zone is entirely unreachable over IPv6. Both are
+			// NOTICE (1 pt) by default but warrant the same weight as an ERROR.
+			"NO_IPV6_NS_CHILD": 20,
+			"NO_IPV6_NS_DEL":   20,
 		},
 		GradeBands: []GradeBand{
 			{Grade: "A", MinScore: 90},

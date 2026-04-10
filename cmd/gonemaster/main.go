@@ -19,6 +19,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/badkeys"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/normalization"
+	"codeberg.org/pawal/gonemaster/scoring"
 )
 
 var runEngine = engine.Run
@@ -100,6 +101,9 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	var badkeysUpdate bool
 	var badkeysPath string
 	var badkeysPathSet bool
+	var scoreFlag bool
+	var noScoreFlag bool
+	var scoringConfig string
 
 	fs := flag.NewFlagSet("gonemaster", flag.ContinueOnError)
 	fs.SetOutput(errOut)
@@ -124,6 +128,9 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 			{flag: "--count", detail: "Print count summary by level and message tag"},
 			{flag: "--nstimes", detail: "Print per-nameserver query timing statistics"},
 			{flag: "--no-progress", detail: "Disable progress indicator"},
+			{flag: "--score", detail: "Print score/grade summary after the run"},
+			{flag: "--no-score", detail: "Suppress score output"},
+			{flag: "--scoring-config PATH", detail: "Custom scoring config JSON file (implies --score)"},
 		})
 		printUsageGroup(errOut, "Cache", []usageLine{
 			{flag: "--save PATH", detail: "Write DNS packet cache to file after the run"},
@@ -206,6 +213,9 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs.BoolVar(&showVersion, "version", false, "Print version and exit (optional)")
 	fs.BoolVar(&badkeysUpdate, "badkeys-update", false, "Download badkeys blocklist and exit (optional)")
 	fs.StringVar(&badkeysPath, "badkeys-path", "", "Override badkeys blocklist directory path (optional)")
+	fs.BoolVar(&scoreFlag, "score", false, "Print score/grade summary after the run (optional)")
+	fs.BoolVar(&noScoreFlag, "no-score", false, "Suppress score output (optional)")
+	fs.StringVar(&scoringConfig, "scoring-config", "", "Custom scoring config JSON file; implies --score (optional)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -268,6 +278,26 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 			badkeysPathSet = true
 		}
 	})
+
+	// Resolve scoring options: --scoring-config implies --score; --no-score wins.
+	var scoreEnabled bool
+	var scoreCfg scoring.Config
+	if !noScoreFlag {
+		if scoringConfig != "" {
+			loaded, loadErr := scoring.LoadConfig(scoringConfig)
+			if loadErr != nil {
+				fmt.Fprintln(errOut, loadErr.Error())
+				return 2
+			}
+			scoreCfg = loaded
+			scoreEnabled = true
+		} else {
+			scoreCfg = scoring.DefaultConfig()
+			scoreEnabled = scoreFlag
+		}
+	} else {
+		scoreCfg = scoring.DefaultConfig()
+	}
 
 	hasPacketCacheFlags := strings.TrimSpace(savePacketCachePath) != "" || strings.TrimSpace(restorePacketCachePath) != ""
 	if hasPacketCacheFlags && showVersion {
@@ -715,6 +745,9 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 			fmt.Fprintln(errOut, err.Error())
 			return 2
 		}
+		if scoreEnabled {
+			printScore(out, computeScore(domain, entries, scoreCfg))
+		}
 		return 0
 	}
 	if jsonStream {
@@ -722,6 +755,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 			fmt.Fprintln(errOut, err.Error())
 			return 2
 		}
+		// --json-stream is a streaming format; scoring is not appended.
 		return 0
 	}
 
@@ -752,6 +786,9 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 				return 2
 			}
 		}
+		if scoreEnabled {
+			printScore(humanWriter, computeScore(domain, entries, scoreCfg))
+		}
 		if err != nil {
 			fmt.Fprintln(errOut, err.Error())
 			return 2
@@ -775,6 +812,10 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	if encodeErr := enc.Encode(entries); encodeErr != nil {
 		fmt.Fprintln(errOut, encodeErr.Error())
 		return 2
+	}
+	// For --json output, print score to stderr to avoid polluting the JSON.
+	if scoreEnabled {
+		printScore(errOut, computeScore(domain, entries, scoreCfg))
 	}
 
 	if err != nil {

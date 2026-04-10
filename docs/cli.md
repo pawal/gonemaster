@@ -107,6 +107,9 @@ v1.1 keys above when they are present. See:
 | `--badkeys-update` | bool | Download/update badkeys blocklist data and exit. |
 | `--ns NAME[/IP]` | string (repeatable) | Undelegated nameserver input. `NAME` is required, `IP` is optional. May be repeated. Repeat the same `NAME` with different IPs to supply multiple addresses. |
 | `--ds KEYTAG,ALGORITHM,DIGTYPE,DIGEST` | string (repeatable) | Undelegated DS input. May be repeated. |
+| `--score` | bool | Print score/grade summary after the run. |
+| `--no-score` | bool | Suppress score output (wins over `--score` and `--scoring-config`). |
+| `--scoring-config PATH` | string | Custom scoring config JSON file; implies `--score`. |
 | `--no-progress` | bool | Disable progress indicator/spinner. |
 | `--list-tests` | bool | List available test cases and exit. |
 | `--version` | bool | Print version information and exit. |
@@ -196,6 +199,21 @@ Undelegated DS-only test:
 ```
 gonemaster --domain example.com \
   --ds 12345,13,2,0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF
+```
+
+Run a test and display score/grade summary:
+```
+gonemaster --score example.com
+```
+
+Use a custom scoring config:
+```
+gonemaster --scoring-config /etc/gonemaster/scoring.json example.com
+```
+
+Score with JSON output (score goes to stderr to avoid polluting JSON):
+```
+gonemaster --json --score example.com | jq
 ```
 
 Extract coherent nameserver name/IP pairs from a local run:

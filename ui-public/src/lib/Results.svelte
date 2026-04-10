@@ -25,7 +25,6 @@
   })();
 
   let entries = [];
-  let tcDescs = {};
   let score = null;
   let loading = true;
   let errorKey = "";
@@ -50,7 +49,6 @@
       }
       const data = await res.json();
       entries = data.raw?.entries ?? [];
-      tcDescs = data.testcase_descriptions ?? {};
       score = data.score ?? null;
       loading = false;
     } catch (_) {
@@ -142,7 +140,7 @@
           <h2 class="result-heading">{$t("pub.result_heading", { domain })}</h2>
           {#if finishedStr}<p class="result-date small">{finishedStr}</p>{/if}
         </div>
-        <ShareButton {publicID} />
+        <ShareButton {publicID} {domain} {score} />
       </div>
     {/if}
 

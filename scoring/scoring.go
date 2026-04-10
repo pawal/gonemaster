@@ -23,6 +23,12 @@ type Result struct {
 
 	// Bonus contains the A+ eligibility result and per-criterion outcomes.
 	Bonus BonusResult `json:"bonus"`
+
+	// DisabledStacks lists IP stacks that were disabled in the test profile
+	// (e.g. "ipv4", "ipv6"). When non-empty the score is partial: tests for
+	// the disabled stack were not run, so penalties from those tests are
+	// absent and the score may be higher than a full run would produce.
+	DisabledStacks []string `json:"disabled_stacks,omitempty"`
 }
 
 // CategoryResult holds the scoring breakdown for a single category.
@@ -67,8 +73,16 @@ func Compute(domain string, entries []Entry, cfg Config) Result {
 	}
 
 	hasCritical := false
+	ipv4Disabled := false
+	ipv6Disabled := false
 
 	for _, e := range entries {
+		switch strings.ToUpper(e.Tag) {
+		case "IPV4_DISABLED", "CN01_IPV4_DISABLED":
+			ipv4Disabled = true
+		case "IPV6_DISABLED", "CN01_IPV6_DISABLED":
+			ipv6Disabled = true
+		}
 		if strings.ToUpper(e.Level) == "CRITICAL" {
 			hasCritical = true
 		}
@@ -128,11 +142,20 @@ func Compute(domain string, entries []Entry, cfg Config) Result {
 		grade = "A+"
 	}
 
+	var disabledStacks []string
+	if ipv4Disabled {
+		disabledStacks = append(disabledStacks, "ipv4")
+	}
+	if ipv6Disabled {
+		disabledStacks = append(disabledStacks, "ipv6")
+	}
+
 	return Result{
-		Score:      aggregate,
-		Grade:      grade,
-		Categories: categories,
-		Bonus:      bonus,
+		Score:          aggregate,
+		Grade:          grade,
+		Categories:     categories,
+		Bonus:          bonus,
+		DisabledStacks: disabledStacks,
 	}
 }
 

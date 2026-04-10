@@ -353,6 +353,31 @@ func TestBonus_ASDiversityNotRun(t *testing.T) {
 	}
 }
 
+func TestCompute_DisabledStacks(t *testing.T) {
+	entries := []Entry{
+		e("CONNECTIVITY", "IPV6_DISABLED", "INFO"),
+		e("CONNECTIVITY", "CN01_IPV4_DISABLED", "INFO"),
+	}
+	r := Compute("example.se", entries, cfg)
+	stacks := map[string]bool{}
+	for _, s := range r.DisabledStacks {
+		stacks[s] = true
+	}
+	if !stacks["ipv4"] {
+		t.Error("expected ipv4 in DisabledStacks")
+	}
+	if !stacks["ipv6"] {
+		t.Error("expected ipv6 in DisabledStacks")
+	}
+}
+
+func TestCompute_NoDisabledStacks(t *testing.T) {
+	r := Compute("example.se", nil, cfg)
+	if len(r.DisabledStacks) != 0 {
+		t.Errorf("expected no DisabledStacks, got %v", r.DisabledStacks)
+	}
+}
+
 func TestBonus_DisabledCriteriaNotInResult(t *testing.T) {
 	custom := DefaultConfig()
 	custom.BonusCriteria.CDSCDNSKEYPublished = false

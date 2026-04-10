@@ -63,7 +63,6 @@
   "pub.score_aplus_criteria": "Critères A+",
   "pub.score_aplus_achieved": "Obtenu",
   "pub.score_aplus_missing": "{n} non satisfait(s)",
-  "pub.score_bonus_no_warnings_or_errors": "Aucun avertissement ni erreur",
   "pub.score_bonus_dnssec_enabled": "DNSSEC activé",
   "pub.score_bonus_strong_algorithm": "Algorithme fort (ECDSA / Ed25519)",
   "pub.score_bonus_nsec3_non_optout": "NSEC3 sans opt-out",

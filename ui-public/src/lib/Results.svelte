@@ -181,7 +181,7 @@
             </span>
           </summary>
           <div class="score-bonus-list">
-            {#each Object.entries(score.bonus.criteria) as [key, val]}
+            {#each Object.entries(score.bonus.criteria).filter(([k]) => k !== "no_warnings_or_errors") as [key, val]}
               <div class="score-bonus-item" data-met={val === null ? "na" : val ? "yes" : "no"}>
                 <span class="score-bonus-icon">{val === null ? "–" : val ? "✓" : "✗"}</span>
                 <span>{bonusLabel(key)}</span>

@@ -63,7 +63,6 @@
   "pub.score_aplus_criteria": "A+-kriteerit",
   "pub.score_aplus_achieved": "Saavutettu",
   "pub.score_aplus_missing": "{n} täyttämättä",
-  "pub.score_bonus_no_warnings_or_errors": "Ei varoituksia tai virheitä",
   "pub.score_bonus_dnssec_enabled": "DNSSEC käytössä",
   "pub.score_bonus_strong_algorithm": "Vahva algoritmi (ECDSA / Ed25519)",
   "pub.score_bonus_nsec3_non_optout": "NSEC3 ilman opt-outia",

@@ -63,7 +63,6 @@
   "pub.score_aplus_criteria": "Merila A+",
   "pub.score_aplus_achieved": "Doseženo",
   "pub.score_aplus_missing": "{n} neizpolnjeno",
-  "pub.score_bonus_no_warnings_or_errors": "Brez opozoril ali napak",
   "pub.score_bonus_dnssec_enabled": "DNSSEC omogočen",
   "pub.score_bonus_strong_algorithm": "Močan algoritem (ECDSA / Ed25519)",
   "pub.score_bonus_nsec3_non_optout": "NSEC3 brez opt-out",

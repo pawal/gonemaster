@@ -63,7 +63,6 @@
   "pub.score_aplus_criteria": "A+-kriterier",
   "pub.score_aplus_achieved": "Opnået",
   "pub.score_aplus_missing": "{n} mangler",
-  "pub.score_bonus_no_warnings_or_errors": "Ingen advarsler eller fejl",
   "pub.score_bonus_dnssec_enabled": "DNSSEC aktiveret",
   "pub.score_bonus_strong_algorithm": "Stærk algoritme (ECDSA / Ed25519)",
   "pub.score_bonus_nsec3_non_optout": "NSEC3 uden opt-out",

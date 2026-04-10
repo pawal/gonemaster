@@ -95,8 +95,8 @@ func TestCompute_CriticalForcesF(t *testing.T) {
 	if r.Grade != "F" {
 		t.Errorf("expected grade F due to CRITICAL, got %s", r.Grade)
 	}
-	if r.Score > 35 {
-		t.Errorf("score should be ≤35 when CRITICAL present, got %d", r.Score)
+	if r.Score > 10 {
+		t.Errorf("score should be ≤10 when CRITICAL present, got %d", r.Score)
 	}
 }
 

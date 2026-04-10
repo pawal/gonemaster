@@ -135,8 +135,8 @@ func Compute(domain string, entries []Entry, cfg Config) Result {
 	}
 
 	// CRITICAL override: any CRITICAL entry forces an F.
-	if hasCritical && aggregate > 35 {
-		aggregate = 35
+	if hasCritical && aggregate > 10 {
+		aggregate = 10
 	}
 
 	grade := scoreToGrade(aggregate, cfg.GradeBands)

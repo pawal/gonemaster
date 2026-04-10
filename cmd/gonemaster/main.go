@@ -804,6 +804,9 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 			}
 		}
 		if scoreEnabled {
+			// Stop the spinner before writing score so no leftover spinner
+			// character prefixes the output.
+			humanReport.Finish()
 			printScore(humanWriter, computeScore(domain, entries, scoreCfg))
 		}
 		if err != nil {

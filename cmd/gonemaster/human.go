@@ -66,6 +66,7 @@ type humanReporter struct {
 	spinnerDone   chan struct{}
 	spinnerTicker *time.Ticker
 	mu            sync.Mutex
+	finishOnce    sync.Once
 	layout        humanLayout
 }
 
@@ -109,11 +110,12 @@ func (r *humanReporter) Callback(entry *logger.Entry) error {
 }
 
 // Finish stops spinner output and leaves the terminal in a clean state.
+// Safe to call multiple times.
 func (r *humanReporter) Finish() {
 	if r == nil {
 		return
 	}
-	r.stopSpinner()
+	r.finishOnce.Do(r.stopSpinner)
 }
 
 func (r *humanReporter) PrintLooksOK() error {

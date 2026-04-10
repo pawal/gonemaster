@@ -90,6 +90,7 @@ header {
   display: block;
   width: min(100%, 340px);
   height: auto;
+  transition: filter 0.4s ease;
 }
 
 .subtitle {
@@ -482,6 +483,10 @@ details[open] > .testcase-summary .testcase-chevron {
       linear-gradient(180deg, var(--bg), var(--bg-2));
   }
 
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .brand-logo {
+    filter: invert(1) sepia(1) saturate(3) hue-rotate(30deg) brightness(1.0);
+  }
+
   :root:not([data-theme="light"]):not([data-theme="dark"]) .level-pill.severity-notice   { background: #0c2233; color: #7dd3fc; }
   :root:not([data-theme="light"]):not([data-theme="dark"]) .level-pill.severity-warning  { background: #2a1f0a; color: #fbbf24; }
   :root:not([data-theme="light"]):not([data-theme="dark"]) .level-pill.severity-error    { background: #2a150a; color: #fb923c; }
@@ -511,6 +516,10 @@ details[open] > .testcase-summary .testcase-chevron {
     linear-gradient(90deg, rgba(200, 220, 255, 0.03) 1px, transparent 1px),
     linear-gradient(0deg, rgba(200, 220, 255, 0.03) 1px, transparent 1px),
     linear-gradient(180deg, var(--bg), var(--bg-2));
+}
+
+:root[data-theme="dark"] .brand-logo {
+  filter: invert(1) sepia(1) saturate(3) hue-rotate(30deg) brightness(1.0);
 }
 
 :root[data-theme="dark"] .level-pill.severity-notice   { background: #0c2233; color: #7dd3fc; }

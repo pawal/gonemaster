@@ -114,6 +114,10 @@ func DefaultConfig() Config {
 			// NOTICE (1 pt) by default but warrant the same weight as an ERROR.
 			"NO_IPV6_NS_CHILD": 20,
 			"NO_IPV6_NS_DEL":   20,
+			// N15_SOFTWARE_VERSION: nameserver reveals its software version string
+			// via version.bind. This is a cosmetic privacy/hardening notice — the
+			// zone works correctly. No penalty.
+			"N15_SOFTWARE_VERSION": 0,
 		},
 		GradeBands: []GradeBand{
 			{Grade: "A", MinScore: 90},

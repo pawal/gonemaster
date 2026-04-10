@@ -466,6 +466,19 @@ func TestCompute_NotEnoughIPv6UsesErrorSeverity(t *testing.T) {
 	}
 }
 
+func TestCompute_N15SoftwareVersionNopenalty(t *testing.T) {
+	// N15_SOFTWARE_VERSION is NOTICE but must carry zero penalty — it is a
+	// cosmetic privacy notice, not a zone health issue.
+	entries := []Entry{
+		e("NAMESERVER", "N15_SOFTWARE_VERSION", "NOTICE"),
+		e("NAMESERVER", "N15_SOFTWARE_VERSION", "NOTICE"),
+	}
+	r := Compute("example.se", entries, cfg)
+	if r.Score != 100 {
+		t.Errorf("expected score 100 with N15_SOFTWARE_VERSION entries, got %d", r.Score)
+	}
+}
+
 func TestCompute_TagPenaltyNotAffectingOtherTags(t *testing.T) {
 	// A regular WARNING tag should still use the severity penalty (5 pts).
 	entries := []Entry{

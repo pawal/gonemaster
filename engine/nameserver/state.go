@@ -247,7 +247,6 @@ type CacheStore struct {
 	cacheByAddress    map[string]*queryCache
 	errorCacheByAddr  map[string]*errorCache
 	concurrencyByAddr map[string]*nameserverConcurrencyCap
-	sharedParent      *CacheStore
 	queryMetrics      cacheMetrics
 	errorMetrics      cacheMetrics
 }
@@ -272,26 +271,9 @@ func (c *CacheStore) cacheForAddressWithStatus(addr string) (*queryCache, bool) 
 		return nil, false
 	}
 	c.mu.Lock()
-	if cache := c.cacheByAddress[addr]; cache != nil {
-		c.mu.Unlock()
-		return cache, false
-	}
-	parent := c.sharedParent
-	c.mu.Unlock()
-
-	var parentCache *queryCache
-	if parent != nil {
-		parentCache = parent.cacheForAddress(addr)
-	}
-
-	c.mu.Lock()
 	defer c.mu.Unlock()
 	if cache := c.cacheByAddress[addr]; cache != nil {
 		return cache, false
-	}
-	if parentCache != nil {
-		c.cacheByAddress[addr] = parentCache
-		return parentCache, false
 	}
 	cache := &queryCache{data: map[string]*packet.Packet{}, met: &c.queryMetrics}
 	c.cacheByAddress[addr] = cache
@@ -303,30 +285,11 @@ func (c *CacheStore) errorCacheForAddress(addr string) *errorCache {
 		return nil
 	}
 	c.mu.Lock()
-	if cache := c.errorCacheByAddr[addr]; cache != nil {
-		c.mu.Unlock()
-		return cache
-	}
-	parent := c.sharedParent
-	c.mu.Unlock()
-
-	var parentCache *errorCache
-	if parent != nil {
-		parentCache = parent.errorCacheForAddress(addr)
-	}
-
-	c.mu.Lock()
 	defer c.mu.Unlock()
-	if cache := c.errorCacheByAddr[addr]; cache != nil {
-		return cache
+	if c.errorCacheByAddr[addr] == nil {
+		c.errorCacheByAddr[addr] = &errorCache{data: map[string]time.Time{}, met: &c.errorMetrics}
 	}
-	if parentCache != nil {
-		c.errorCacheByAddr[addr] = parentCache
-		return parentCache
-	}
-	cache := &errorCache{data: map[string]time.Time{}, met: &c.errorMetrics}
-	c.errorCacheByAddr[addr] = cache
-	return cache
+	return c.errorCacheByAddr[addr]
 }
 
 func (c *CacheStore) concurrencyCapForAddress(addr string) *nameserverConcurrencyCap {
@@ -334,26 +297,9 @@ func (c *CacheStore) concurrencyCapForAddress(addr string) *nameserverConcurrenc
 		return nil
 	}
 	c.mu.Lock()
-	if cap := c.concurrencyByAddr[addr]; cap != nil {
-		c.mu.Unlock()
-		return cap
-	}
-	parent := c.sharedParent
-	c.mu.Unlock()
-
-	var parentCap *nameserverConcurrencyCap
-	if parent != nil {
-		parentCap = parent.concurrencyCapForAddress(addr)
-	}
-
-	c.mu.Lock()
 	defer c.mu.Unlock()
 	if cap := c.concurrencyByAddr[addr]; cap != nil {
 		return cap
-	}
-	if parentCap != nil {
-		c.concurrencyByAddr[addr] = parentCap
-		return parentCap
 	}
 	cap := &nameserverConcurrencyCap{}
 	c.concurrencyByAddr[addr] = cap
@@ -385,95 +331,14 @@ func (c *CacheStore) storeNameserver(nameKey string, addr string, ns *Nameserver
 	c.objectCache[nameKey][addr] = ns
 }
 
-// SnapshotForRun returns a run-local cache store that reuses warmed query/error
-// caches from c while starting with an empty nameserver object cache.
+// SnapshotForRun returns an independent run-local cache store.
+// Stub: snapshot/merge plumbing removed for ablation measurement.
 func (c *CacheStore) SnapshotForRun() *CacheStore {
-	if c == nil {
-		return NewCacheStore()
-	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	snapshot := &CacheStore{
-		objectCache:       map[string]map[string]*Nameserver{},
-		cacheByAddress:    make(map[string]*queryCache, len(c.cacheByAddress)),
-		errorCacheByAddr:  make(map[string]*errorCache, len(c.errorCacheByAddr)),
-		concurrencyByAddr: make(map[string]*nameserverConcurrencyCap, len(c.concurrencyByAddr)),
-		sharedParent:      c,
-	}
-	for addr, cache := range c.cacheByAddress {
-		snapshot.cacheByAddress[addr] = cache
-	}
-	for addr, cache := range c.errorCacheByAddr {
-		snapshot.errorCacheByAddr[addr] = cache
-	}
-	for addr, cap := range c.concurrencyByAddr {
-		snapshot.concurrencyByAddr[addr] = cap
-	}
-	return snapshot
+	return NewCacheStore()
 }
 
-// MergeWarmDataFrom merges warmed query/error caches from other into c.
-//
-// Nameserver object instances are intentionally not merged to avoid sharing
-// mutable adaptation state across runs.
-func (c *CacheStore) MergeWarmDataFrom(other *CacheStore) {
-	if c == nil || other == nil || c == other {
-		return
-	}
-
-	other.mu.Lock()
-	queryByAddress := make(map[string]*queryCache, len(other.cacheByAddress))
-	for addr, cache := range other.cacheByAddress {
-		queryByAddress[addr] = cache
-	}
-	errorByAddress := make(map[string]*errorCache, len(other.errorCacheByAddr))
-	for addr, cache := range other.errorCacheByAddr {
-		errorByAddress[addr] = cache
-	}
-	concurrencyByAddress := make(map[string]*nameserverConcurrencyCap, len(other.concurrencyByAddr))
-	for addr, cap := range other.concurrencyByAddr {
-		concurrencyByAddress[addr] = cap
-	}
-	other.mu.Unlock()
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	for addr, cache := range queryByAddress {
-		if cache == nil {
-			continue
-		}
-		if _, ok := c.cacheByAddress[addr]; ok {
-			continue
-		}
-		cache.mu.Lock()
-		cache.met = &c.queryMetrics
-		cache.mu.Unlock()
-		c.cacheByAddress[addr] = cache
-	}
-	for addr, cache := range errorByAddress {
-		if cache == nil {
-			continue
-		}
-		if _, ok := c.errorCacheByAddr[addr]; ok {
-			continue
-		}
-		cache.mu.Lock()
-		cache.met = &c.errorMetrics
-		cache.mu.Unlock()
-		c.errorCacheByAddr[addr] = cache
-	}
-	for addr, cap := range concurrencyByAddress {
-		if cap == nil {
-			continue
-		}
-		if _, ok := c.concurrencyByAddr[addr]; ok {
-			continue
-		}
-		c.concurrencyByAddr[addr] = cap
-	}
-}
+// MergeWarmDataFrom is a no-op stub; snapshot/merge plumbing removed for ablation measurement.
+func (c *CacheStore) MergeWarmDataFrom(_ *CacheStore) {}
 
 // AddressCacheCount returns the number of per-address query cache buckets.
 func (c *CacheStore) AddressCacheCount() int {

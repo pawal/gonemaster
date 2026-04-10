@@ -58,6 +58,12 @@
   "pub.result_new_test": "New test",
   "pub.result_locale_label": "Message language",
 
+  "pub.score_label": "DNS Quality Score",
+  "pub.score_partial": "Partial score — {stacks} testing was disabled",
+  "pub.score_aplus_criteria": "A+ criteria",
+  "pub.score_aplus_achieved": "Achieved",
+  "pub.score_aplus_missing": "{n} unmet",
+
   "pub.result_status_ok": "No issues found",
   "pub.result_status_notice": "Notices",
   "pub.result_status_warning": "Warnings found",

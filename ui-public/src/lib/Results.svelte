@@ -120,7 +120,8 @@
 
   // Number of unmet bonus criteria (null = not applicable, counts as met).
   $: bonusMissing = score?.bonus?.criteria
-    ? Object.values(score.bonus.criteria).filter(v => v === false).length
+    ? Object.entries(score.bonus.criteria)
+        .filter(([k, v]) => k !== "no_warnings_or_errors" && v === false).length
     : 0;
 </script>
 

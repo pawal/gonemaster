@@ -90,7 +90,11 @@ func Compute(domain string, entries []Entry, cfg Config) Result {
 		if !ok {
 			continue
 		}
-		penalty, ok := cfg.SeverityPenalties[strings.ToUpper(e.Level)]
+		// Tag-specific overrides take precedence over the severity table.
+		penalty, ok := cfg.TagPenalties[strings.ToUpper(e.Tag)]
+		if !ok {
+			penalty, ok = cfg.SeverityPenalties[strings.ToUpper(e.Level)]
+		}
 		if !ok || penalty == 0 {
 			continue
 		}

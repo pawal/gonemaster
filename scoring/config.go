@@ -25,6 +25,13 @@ type Config struct {
 	// scoring category name (e.g. "dnssec").
 	ModuleCategories map[string]string `json:"module_categories"`
 
+	// TagPenalties maps a specific tag name to a point penalty that overrides
+	// the SeverityPenalties lookup for that tag. Use this to assign penalties
+	// that are disproportionate to the tag's log level — for example to treat
+	// a WARNING-level tag as more serious than other warnings.
+	// Keys are matched case-insensitively.
+	TagPenalties map[string]int `json:"tag_penalties,omitempty"`
+
 	// GradeBands defines the letter grade thresholds in descending order.
 	// The first band whose MinScore is ≤ the numeric score is used.
 	GradeBands []GradeBand `json:"grade_bands"`
@@ -94,6 +101,14 @@ func DefaultConfig() Config {
 			"CONSISTENCY": "zone_consistency",
 			"ZONE":        "zone_consistency",
 			"SYNTAX":      "zone_consistency",
+		},
+		TagPenalties: map[string]int{
+			// DS07_NOT_SIGNED: zone has no DNSKEY records on any nameserver —
+			// entirely unsigned. Treated like an ERROR regardless of its WARNING level.
+			"DS07_NOT_SIGNED": 20,
+			// DS07_NO_DS_FOR_SIGNED_ZONE: zone is signed but has no DS record at
+			// the parent — breaks the chain of trust. Same severity as above.
+			"DS07_NO_DS_FOR_SIGNED_ZONE": 20,
 		},
 		GradeBands: []GradeBand{
 			{Grade: "A", MinScore: 90},

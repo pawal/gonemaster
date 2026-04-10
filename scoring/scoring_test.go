@@ -378,6 +378,71 @@ func TestCompute_NoDisabledStacks(t *testing.T) {
 	}
 }
 
+// ---- TagPenalties tests -----------------------------------------------------
+
+func TestCompute_TagPenaltyOverridesSeverity(t *testing.T) {
+	// DS07_NOT_SIGNED is WARNING (5 pts by severity) but gets 20 pts via TagPenalties.
+	entries := []Entry{
+		e("DNSSEC", "DS07_NOT_SIGNED", "WARNING"),
+	}
+	r := Compute("example.se", entries, cfg)
+	cat := r.Categories["dnssec"]
+	if cat.Penalties != 20 {
+		t.Errorf("expected dnssec penalties 20 (tag override), got %d", cat.Penalties)
+	}
+}
+
+func TestCompute_NoDSForSignedZonePenalty(t *testing.T) {
+	// DS07_NO_DS_FOR_SIGNED_ZONE is WARNING but gets 20 pts via TagPenalties.
+	entries := []Entry{
+		e("DNSSEC", "DS07_NO_DS_FOR_SIGNED_ZONE", "WARNING"),
+	}
+	r := Compute("example.se", entries, cfg)
+	cat := r.Categories["dnssec"]
+	if cat.Penalties != 20 {
+		t.Errorf("expected dnssec penalties 20 (tag override), got %d", cat.Penalties)
+	}
+}
+
+func TestCompute_TagPenaltyScoreImpact(t *testing.T) {
+	// DS07_NOT_SIGNED with 20-pt penalty: dnssec sub-score = 80.
+	// Weighted: (80*1.5 + 100*1.2 + 100*1.0 + 100*0.8) / 4.5
+	//         = (120 + 120 + 100 + 80) / 4.5 = 420/4.5 = 93
+	entries := []Entry{
+		e("DNSSEC", "DS07_NOT_SIGNED", "WARNING"),
+	}
+	r := Compute("example.se", entries, cfg)
+	if r.Score != 93 {
+		t.Errorf("expected score 93 with DS07_NOT_SIGNED penalty, got %d", r.Score)
+	}
+}
+
+func TestCompute_TagPenaltyCanBeDisabledByZero(t *testing.T) {
+	// Setting a tag penalty to 0 means no penalty even if severity would give one.
+	custom := DefaultConfig()
+	custom.TagPenalties["DS07_NOT_SIGNED"] = 0
+	entries := []Entry{
+		e("DNSSEC", "DS07_NOT_SIGNED", "WARNING"),
+	}
+	r := Compute("example.se", entries, custom)
+	cat := r.Categories["dnssec"]
+	if cat.Penalties != 0 {
+		t.Errorf("expected 0 penalty when tag penalty set to 0, got %d", cat.Penalties)
+	}
+}
+
+func TestCompute_TagPenaltyNotAffectingOtherTags(t *testing.T) {
+	// A regular WARNING tag should still use the severity penalty (5 pts).
+	entries := []Entry{
+		e("DNSSEC", "DS04_RRSIG_EXPIRY_SOON", "WARNING"),
+	}
+	r := Compute("example.se", entries, cfg)
+	cat := r.Categories["dnssec"]
+	if cat.Penalties != 5 {
+		t.Errorf("expected severity-based penalty 5 for unlisted tag, got %d", cat.Penalties)
+	}
+}
+
 func TestBonus_DisabledCriteriaNotInResult(t *testing.T) {
 	custom := DefaultConfig()
 	custom.BonusCriteria.CDSCDNSKEYPublished = false

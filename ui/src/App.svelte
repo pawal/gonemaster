@@ -2189,13 +2189,12 @@
   });
 </script>
 
-<main>
+<div class="app-header">
   <header class="reveal" style="--d: 0.05s">
     <div class="header-text">
       <h1 class="brand-mark">
         <img class="brand-logo" src={logoSrc} alt="gonemaster" />
       </h1>
-      <p class="subtitle">{$t("app_subtitle")}</p>
     </div>
     <div class="header-controls">
       {#if availableLocales.length > 1}
@@ -2217,23 +2216,52 @@
       </button>
     </div>
   </header>
+</div>
 
-  <div class="tabs" role="tablist" aria-label={$t("tabs_aria_label")}>
-    {#each tabs as tab}
+<div class="mobile-nav" role="tablist" aria-label={$t("tabs_aria_label")}>
+  {#each tabs as tab}
+    <button
+      class={`nav-item ${activeTab === tab.id ? "active" : ""}`}
+      type="button"
+      role="tab"
+      id={`tab-${tab.id}`}
+      aria-selected={activeTab === tab.id}
+      aria-controls={`panel-${tab.id}`}
+      on:click={() => setTab(tab.id)}
+    >
+      {$t(tab.labelKey)}
+    </button>
+  {/each}
+</div>
+
+<div class="app-layout">
+  <nav class="sidebar" aria-label={$t("tabs_aria_label")}>
+    <div class="nav-items">
+      {#each tabs.filter(t => t.id !== "settings") as tab}
+        <button
+          class={`nav-item ${activeTab === tab.id ? "active" : ""}`}
+          type="button"
+          aria-current={activeTab === tab.id ? "page" : undefined}
+          on:click={() => setTab(tab.id)}
+        >
+          {$t(tab.labelKey)}
+        </button>
+      {/each}
+    </div>
+    <div class="nav-bottom">
+      <hr class="nav-divider" />
       <button
-        class={`tab ${activeTab === tab.id ? "active" : ""}`}
+        class={`nav-item ${activeTab === "settings" ? "active" : ""}`}
         type="button"
-        role="tab"
-        id={`tab-${tab.id}`}
-        aria-selected={activeTab === tab.id}
-        aria-controls={`panel-${tab.id}`}
-        on:click={() => setTab(tab.id)}
+        aria-current={activeTab === "settings" ? "page" : undefined}
+        on:click={() => setTab("settings")}
       >
-        {$t(tab.labelKey)}
+        {$t("tab_settings")}
       </button>
-    {/each}
-  </div>
+    </div>
+  </nav>
 
+  <main>
   {#if activeTab === "single"}
     <div class="grid" id="panel-single" role="tabpanel" aria-labelledby="tab-single" style="margin-top: 22px;">
       <div class="card reveal" style="--d: 0.18s">
@@ -2467,7 +2495,8 @@
               <div class="small">{$t("module_expand_hint")}</div>
               <div class="module-list">
                 {#each moduleGroups as group (group.key)}
-                  <div class="module-card">
+                  {@const groupLevel = worstLevel(group.entries)}
+                  <div class="module-card" data-level={groupLevel.toLowerCase()}>
                     <button
                       class="module-toggle"
                       type="button"
@@ -2811,7 +2840,8 @@
                 <div class="small">{$t("module_expand_hint")}</div>
                 <div class="module-list">
                   {#each domainModuleGroups as group (group.key)}
-                    <div class="module-card">
+                    {@const groupLevel = worstLevel(group.entries)}
+                    <div class="module-card" data-level={groupLevel.toLowerCase()}>
                       <button
                         class="module-toggle"
                         type="button"
@@ -3777,4 +3807,5 @@ example.org`}
       <button class="status-toast-close" type="button" aria-label={$t("dismiss_notification_aria")} on:click={clearStatus}>{$t("dismiss")}</button>
     </div>
   {/if}
-</main>
+  </main>
+</div>

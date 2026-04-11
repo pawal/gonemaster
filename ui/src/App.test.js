@@ -90,7 +90,7 @@ describe("App", () => {
     expect(screen.getByText("Job Inspector")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Recent Tests" })).toBeNull();
     expect(screen.queryByText("Batch Inspector")).not.toBeInTheDocument();
-    expect(container.querySelector("nav[role='tablist']")).toBeNull();
+    expect(container.querySelector("nav.sidebar")).toBeInTheDocument();
     expect(container.querySelector("section[role='tabpanel']")).toBeNull();
 
     await openBatchTab();

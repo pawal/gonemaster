@@ -179,8 +179,8 @@ like this:
 ```
 
 When this profile is used for a job, the engine starts from the default profile
-and applies these keys on top of it. Properties absent from the stored JSON —
-`net.ipv4`, `net.ipv6`, `test_cases`, `test_levels`, etc. — keep their default
+and applies these keys on top of it. Properties absent from the stored JSON -
+`net.ipv4`, `net.ipv6`, `test_cases`, `test_levels`, etc. - keep their default
 values automatically.
 
 This means you do **not** need to copy the full default profile into every
@@ -199,27 +199,27 @@ automatically on every successful create, update, or PATCH.
 
 When you upgrade gonemaster, the engine default profile may add new test
 cases, new test level tags for existing modules, or other new properties.
-A stored profile that explicitly sets one of these properties — for example,
-a custom `test_cases` array — will *not* automatically pick up new entries
+A stored profile that explicitly sets one of these properties - for example,
+a custom `test_cases` array - will *not* automatically pick up new entries
 the upgraded engine introduces, because explicit overrides win over defaults.
 
 To make this visible, the server provides compatibility endpoints that
 compare each stored profile against the current engine default and report
 what is missing:
 
-- `GET /api/v1/profiles/compatibility` — batch summary of all stored profiles
+- `GET /api/v1/profiles/compatibility` - batch summary of all stored profiles
   (`compatible`, `issue_count` per profile).
-- `GET /api/v1/profiles/{id}/compatibility` — detailed issue list for one
+- `GET /api/v1/profiles/{id}/compatibility` - detailed issue list for one
   profile, with one entry per missing test case set or per `test_levels`
   module that is missing tags.
-- `GET /api/v1/profiles/defaults` — the current engine default `test_cases`
+- `GET /api/v1/profiles/defaults` - the current engine default `test_cases`
   list and `test_levels` map, useful as a reference when editing.
 
 The admin UI surfaces this in three places:
 
 1. A **Needs review** badge on every profile row in the library that has
    any compatibility issues.
-2. A summary line above the profile list — *N profile(s) need review* — with
+2. A summary line above the profile list - *N profile(s) need review* - with
    a **Mark all as reviewed** button.
 3. A warning banner in the profile editor with action buttons to fix or
    acknowledge the issues for the open profile.
@@ -235,15 +235,15 @@ The recommended workflow after upgrading gonemaster is:
 3. For each flagged profile, open it in the editor. The compatibility
    banner lists the specific gaps (missing test cases, missing `test_levels`
    tags) and offers fix actions:
-   - **Add missing test cases** — appends new defaults to the stored
+   - **Add missing test cases** - appends new defaults to the stored
      `test_cases` array.
-   - **Add missing test level tags** — fills missing tags in already-overridden
+   - **Add missing test level tags** - fills missing tags in already-overridden
      `test_levels` modules using the new default severities.
-   - **Reset test_cases to inherit** — removes the `test_cases` override
+   - **Reset test_cases to inherit** - removes the `test_cases` override
      entirely so the profile inherits whatever the engine default carries.
-   - **Reset {module} to inherit** — removes one module from the
+   - **Reset {module} to inherit** - removes one module from the
      `test_levels` override.
-   - **Mark as reviewed** — leaves the config alone but bumps `schema_version`
+   - **Mark as reviewed** - leaves the config alone but bumps `schema_version`
      so the warning goes away. Use this when you have audited the gaps and
      decided the existing override is intentional.
 4. If you have many profiles and want to acknowledge them all at once
@@ -251,7 +251,7 @@ The recommended workflow after upgrading gonemaster is:
    profile list summary bar. This bumps every stored profile's
    `schema_version` to the current engine version.
 
-The compatibility check is purely a UI hint — gonemaster will continue to
+The compatibility check is purely a UI hint - gonemaster will continue to
 run jobs with the existing stored profile JSON until you change it. Nothing
 breaks if you ignore the warning; you just may not be exercising newer test
 cases the engine ships with.
@@ -390,7 +390,7 @@ server {
     listen 443 ssl;
     server_name dns.example.com;
 
-    # HSTS — set at the proxy since the app may also serve plain HTTP internally
+    # HSTS - set at the proxy since the app may also serve plain HTTP internally
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 
     location /public/ {
@@ -761,7 +761,7 @@ GET /profiles/{id}
 ```
 
 Get the server default profile (built-in default after `profile_path`
-overrides are applied — id `0`):
+overrides are applied - id `0`):
 ```
 GET /profiles/default
 ```
@@ -853,7 +853,7 @@ Get a batch compatibility summary for all stored profiles:
 ```
 GET /profiles/compatibility
 ```
-Returns an array of `{id, name, compatible, issue_count}` entries — used by the
+Returns an array of `{id, name, compatible, issue_count}` entries - used by the
 admin UI to drive the **Needs review** badges and the *N profile(s) need
 review* summary line.
 
@@ -899,8 +899,8 @@ picking up any batch job.
 | Normal | `0` | `POST /jobs` (admin UI) and `POST /pub/api/v1/jobs` (public UI) |
 | Batch | `1` | `POST /jobs/batch` and `gonemaster-client jobs batch` |
 
-Interactive single-domain submissions — whether from the public UI or the admin
-UI — always get priority 0 and are served first. Bulk batch runs get priority 1
+Interactive single-domain submissions - whether from the public UI or the admin
+UI - always get priority 0 and are served first. Bulk batch runs get priority 1
 and never block a waiting user. Within each tier, jobs are served in FIFO order.
 
 The `priority` field is included in all job and run API responses.

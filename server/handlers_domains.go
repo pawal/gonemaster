@@ -33,7 +33,14 @@ func (s *Server) handleListDomains(w http.ResponseWriter, r *http.Request) {
 		filter.Offset = v
 	}
 
-	writeJSON(w, http.StatusOK, s.store.ListDomains(filter))
+	list := s.store.ListDomains(filter)
+	if !s.cfg.ShowScoreAdmin {
+		for i := range list.Items {
+			list.Items[i].LatestScore = nil
+			list.Items[i].LatestGrade = nil
+		}
+	}
+	writeJSON(w, http.StatusOK, list)
 }
 
 // handleGetDomain handles GET /api/v1/domains/{id}.
@@ -49,6 +56,10 @@ func (s *Server) handleGetDomain(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	domain.Tags = s.store.GetDomainTags(id)
+	if !s.cfg.ShowScoreAdmin {
+		domain.LatestScore = nil
+		domain.LatestGrade = nil
+	}
 	writeJSON(w, http.StatusOK, domain)
 }
 
@@ -84,7 +95,14 @@ func (s *Server) handleGetDomainRuns(w http.ResponseWriter, r *http.Request) {
 		offset = v
 	}
 
-	writeJSON(w, http.StatusOK, s.store.ListRunsByDomain(id, limit, offset))
+	list := s.store.ListRunsByDomain(id, limit, offset)
+	if !s.cfg.ShowScoreAdmin {
+		for i := range list.Items {
+			list.Items[i].Score = nil
+			list.Items[i].Grade = nil
+		}
+	}
+	writeJSON(w, http.StatusOK, list)
 }
 
 // parseDomainID extracts and validates the {id} path value as a positive int64.

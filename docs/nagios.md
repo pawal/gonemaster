@@ -96,7 +96,7 @@ result determines the exit code.
 # Warn if grade drops below B, critical if grade is F:
 gonemaster-nagios -H example.se --grade-warning B --grade-critical F
 
-# Grade check only — no severity threshold change:
+# Grade check only - no severity threshold change:
 gonemaster-nagios -H example.se --grade-warning C --grade-critical F
 
 # Combine grade check with a stricter severity threshold:

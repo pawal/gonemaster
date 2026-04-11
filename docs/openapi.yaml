@@ -878,11 +878,11 @@ paths:
         Applies one of several targeted operations and bumps `schema_version` to
         the current engine version. The supported operations are:
 
-        - `add_missing_test_cases` — append default test cases missing from the profile's `test_cases` array. No-op if the profile does not explicitly set `test_cases`.
-        - `add_missing_test_levels` — for each `test_levels` module already overridden by the profile, fill any tags present in the default but missing in the override.
-        - `reset_test_cases` — remove the `test_cases` override entirely so the profile inherits all defaults.
-        - `reset_test_levels` — remove one module from the `test_levels` override (requires `module`).
-        - `mark_reviewed` — leave the config unchanged but bump `schema_version` so the compatibility warning goes away.
+        - `add_missing_test_cases` - append default test cases missing from the profile's `test_cases` array. No-op if the profile does not explicitly set `test_cases`.
+        - `add_missing_test_levels` - for each `test_levels` module already overridden by the profile, fill any tags present in the default but missing in the override.
+        - `reset_test_cases` - remove the `test_cases` override entirely so the profile inherits all defaults.
+        - `reset_test_levels` - remove one module from the `test_levels` override (requires `module`).
+        - `mark_reviewed` - leave the config unchanged but bump `schema_version` so the compatibility warning goes away.
       operationId: patchProfile
       parameters:
         - name: id
@@ -1692,7 +1692,7 @@ components:
         config:
           type: object
           additionalProperties: true
-          description: Stored engine profile JSON. A sparse override on top of the engine default profile — only the keys present here are applied; everything else is inherited.
+          description: Stored engine profile JSON. A sparse override on top of the engine default profile - only the keys present here are applied; everything else is inherited.
         public:
           type: boolean
         schema_version:

@@ -696,6 +696,9 @@ func (s *Server) handleGetJobResult(w http.ResponseWriter, r *http.Request, jobI
 		raw.Entries = localizeResultEntries(result.Raw.Entries, locale)
 		result.Raw = &raw
 	}
+	if !s.cfg.ShowScoreAdmin {
+		result.Score = nil
+	}
 	writeJSON(w, http.StatusOK, result)
 }
 

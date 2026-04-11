@@ -388,3 +388,38 @@ func TestPublicAPIEndpointsUnreachableViaInternalPrefix(t *testing.T) {
 		}
 	}
 }
+
+func TestPublicResultOmitsScoreWhenPublicScoringDisabled(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.ShowScorePublic = false
+	srv := New(cfg)
+
+	job := Job{
+		ID:        newID("job"),
+		Domain:    "example.com",
+		Status:    JobSucceeded,
+		CreatedAt: time.Now().UTC(),
+		Progress:  100,
+	}
+	created, err := srv.store.Create(job)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if err := srv.store.GraduateJob(created, nil); err != nil {
+		t.Fatalf("GraduateJob: %v", err)
+	}
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/jobs/"+created.PublicID+"/result", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
+	}
+	var result JobResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if result.Score != nil {
+		t.Fatal("expected Score to be nil when ShowScorePublic=false")
+	}
+}

@@ -181,5 +181,8 @@ func (s *Server) handlePublicGetResult(w http.ResponseWriter, r *http.Request) {
 		result.Raw = &raw
 		result.TestcaseDescriptions = testcaseDescriptionsForEntries(raw.Entries)
 	}
+	if !s.cfg.ShowScorePublic {
+		result.Score = nil
+	}
 	writeJSON(w, http.StatusOK, result)
 }

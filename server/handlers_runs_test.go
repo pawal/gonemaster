@@ -305,3 +305,71 @@ func TestListRunsFilterByGrade(t *testing.T) {
 		t.Fatalf("grade=%s filter: expected run %q, got %q", gradeF, domF.LatestRunID, listF.Items[0].ID)
 	}
 }
+
+// --- Score omission when ShowScoreAdmin=false --------------------------------
+
+func TestRunResultOmitsScoreWhenAdminScoringDisabled(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.ShowScoreAdmin = false
+	srv := New(cfg)
+	d := makeGraduatedJob(t, srv, "example.com", JobSucceeded)
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/runs/%s/result", d.LatestRunID), nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
+	}
+	var result JobResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if result.Score != nil {
+		t.Fatal("expected Score to be nil when ShowScoreAdmin=false")
+	}
+}
+
+func TestListRunsOmitsScoreWhenAdminScoringDisabled(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.ShowScoreAdmin = false
+	srv := New(cfg)
+	makeGraduatedJob(t, srv, "example.com", JobSucceeded)
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/runs", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var list RunList
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(list.Items) == 0 {
+		t.Fatal("expected at least one run")
+	}
+	if list.Items[0].Score != nil || list.Items[0].Grade != nil {
+		t.Fatal("expected Score/Grade to be nil in run list when ShowScoreAdmin=false")
+	}
+}
+
+func TestGetRunOmitsScoreWhenAdminScoringDisabled(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.ShowScoreAdmin = false
+	srv := New(cfg)
+	d := makeGraduatedJob(t, srv, "example.com", JobSucceeded)
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/runs/%s", d.LatestRunID), nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
+	}
+	var run Run
+	if err := json.NewDecoder(resp.Body).Decode(&run); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if run.Score != nil || run.Grade != nil {
+		t.Fatal("expected Score/Grade to be nil when ShowScoreAdmin=false")
+	}
+}

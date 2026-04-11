@@ -144,7 +144,7 @@ Run only DNSSEC checks:
 
     gonemaster-nagios --domain example.com --module dnssec
 
-Grade-based monitoring — warn if grade C or worse, critical if grade F:
+Grade-based monitoring - warn if grade C or worse, critical if grade F:
 
     gonemaster-nagios -H example.com --grade-warning C --grade-critical F
 

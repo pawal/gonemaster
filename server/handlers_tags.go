@@ -195,7 +195,14 @@ func (s *Server) handleListTagDomains(w http.ResponseWriter, r *http.Request, ta
 		filter.Offset = v
 	}
 	filter.MinLevel = strings.ToUpper(strings.TrimSpace(q.Get("min_level")))
-	writeJSON(w, http.StatusOK, s.store.ListDomainsByTag(tag, filter))
+	list := s.store.ListDomainsByTag(tag, filter)
+	if !s.cfg.ShowScoreAdmin {
+		for i := range list.Items {
+			list.Items[i].LatestScore = nil
+			list.Items[i].LatestGrade = nil
+		}
+	}
+	writeJSON(w, http.StatusOK, list)
 }
 
 // handleTagSummary handles GET /api/v1/tags/{name}/summary.

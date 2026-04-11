@@ -121,6 +121,20 @@ func (s *Server) applySettingsToRuntime() {
 	}
 }
 
+// featuresResponse holds server-side feature flags exposed to the admin UI.
+type featuresResponse struct {
+	ShowScoreAdmin bool `json:"show_score_admin"`
+}
+
+// handleFeatures handles GET /api/v1/features.
+// Returns a lightweight set of feature flags the admin UI reads on startup
+// to decide which UI components to display.
+func (s *Server) handleFeatures(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, featuresResponse{
+		ShowScoreAdmin: s.cfg.ShowScoreAdmin,
+	})
+}
+
 func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:

@@ -354,3 +354,45 @@ func TestPutSettingsResizesWorkerPool(t *testing.T) {
 		t.Fatalf("expected 3 workers after scale-down, got %d", after)
 	}
 }
+
+func TestFeaturesEndpointDefault(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/features", nil)
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+
+	var feat featuresResponse
+	if err := json.NewDecoder(resp.Body).Decode(&feat); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if !feat.ShowScoreAdmin {
+		t.Fatal("expected show_score_admin=true by default")
+	}
+}
+
+func TestFeaturesEndpointReflectsConfig(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.ShowScoreAdmin = false
+	srv := New(cfg)
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/features", nil)
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+
+	var feat featuresResponse
+	if err := json.NewDecoder(resp.Body).Decode(&feat); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if feat.ShowScoreAdmin {
+		t.Fatal("expected show_score_admin=false when disabled in config")
+	}
+}

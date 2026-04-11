@@ -206,6 +206,7 @@ func (s *Server) routes() {
 	apiMux.HandleFunc("/profiles/{id}", s.handleProfileByID)
 	apiMux.HandleFunc("/profiles", s.handleProfiles)
 
+	apiMux.HandleFunc("GET /features", s.handleFeatures)
 	apiMux.HandleFunc("/settings", s.handleSettings)
 	apiMux.HandleFunc("/locales", s.handleLocales)
 	apiMux.HandleFunc("/metrics", s.handleMetrics)

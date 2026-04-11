@@ -42,6 +42,29 @@ func TestApplyFileConfigSourceAddrs(t *testing.T) {
 	}
 }
 
+func TestDefaultConfigShowScoreAdmin(t *testing.T) {
+	cfg := DefaultConfig()
+	if !cfg.ShowScoreAdmin {
+		t.Fatal("expected ShowScoreAdmin to default to true")
+	}
+}
+
+func TestApplyFileConfigShowScoreAdmin(t *testing.T) {
+	cfg := DefaultConfig()
+	f := false
+	cfg.ApplyFileConfig(FileConfig{ShowScoreAdmin: &f})
+	if cfg.ShowScoreAdmin {
+		t.Fatal("expected ShowScoreAdmin to be false after applying file config")
+	}
+
+	// Nil means "not set" — should not change the value.
+	cfg2 := DefaultConfig()
+	cfg2.ApplyFileConfig(FileConfig{ShowScoreAdmin: nil})
+	if !cfg2.ShowScoreAdmin {
+		t.Fatal("expected ShowScoreAdmin to stay true when file config has nil")
+	}
+}
+
 func TestApplyFileConfigDatabase(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.ApplyFileConfig(FileConfig{

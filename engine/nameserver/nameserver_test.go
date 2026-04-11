@@ -329,7 +329,7 @@ func TestContextCanceledDoesNotBlacklist(t *testing.T) {
 	if ns.state == nil {
 		t.Fatalf("expected state to be initialized")
 	}
-	if ns.state.blacklist.isBlocked(false, time.Now()) {
+	if ns.state.blacklisted[false] {
 		t.Fatalf("expected UDP not to be blacklisted on context cancellation")
 	}
 }
@@ -821,10 +821,9 @@ func TestBlacklistingEmitsTags(t *testing.T) {
 		return packet.Packet{}, fmt.Errorf("timeout")
 	})
 
-	// Two SOA timeouts trigger temporary blacklisting.
+	// One SOA timeout permanently blacklists the nameserver.
 	_, _ = ns.QueryWithOptions(ctx, "example", "SOA", nil)
-	_, _ = ns.QueryWithOptions(ctx, "example", "SOA", nil)
-	// Third query should be skipped via IS_BLACKLISTED.
+	// Second query should be skipped via IS_BLACKLISTED.
 	_, _ = ns.QueryWithOptions(ctx, "example", "SOA", nil)
 
 	var hasBlacklisting, hasIsBlacklisted bool

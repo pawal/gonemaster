@@ -98,6 +98,7 @@ func newWithCache(ctx context.Context, cache *CacheStore, name string, address s
 		concurrencyCap:  cache.concurrencyCapForAddress(addrKey),
 		fakeDelegations: map[string]delegation{},
 		fakeDS:          map[string][]dns.RR{},
+		blacklisted:     map[bool]bool{},
 	}
 
 	ns := &Nameserver{
@@ -230,8 +231,7 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 			return packet.Packet{}, nil
 		}
 	}
-	now := time.Now()
-	if constants.BlacklistingEnabled && ns.state != nil && ns.state.blacklist.isBlocked(usevc, now) {
+	if constants.BlacklistingEnabled && ns.state != nil && ns.state.blacklisted[usevc] {
 		blArgs := map[string]any{
 			"query_name":  qname,
 			"query_type":  qtype,
@@ -325,9 +325,6 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	if ns.state != nil {
 		ns.state.fastFail.observeResult(usevc, isTimeoutPatternError(err), fastFailThreshold)
 	}
-	if err == nil && ns.state != nil {
-		ns.state.blacklist.observeSuccess(usevc)
-	}
 	if trackAdaptive && ns.state != nil {
 		ns.state.adaptiveTimeout.observeResult(usevc, isTimeoutPatternError(err))
 	}
@@ -340,8 +337,7 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 				"query_type":  qtype,
 				"query_class": qclass,
 			}
-			baseTTL := resolveQueryTimeout(prof, opts)
-			ns.state.blacklist.observeFailure(usevc, isTimeoutPatternError(err), baseTTL, now)
+			ns.state.blacklisted[usevc] = true
 			logargs.SetNS(blArgs, ns.NameString(), ns.AddressString())
 			logSystemWithLogger(runLog, "BLACKLISTING", blArgs)
 		}

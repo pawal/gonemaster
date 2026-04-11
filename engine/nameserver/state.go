@@ -232,7 +232,7 @@ type nsState struct {
 	concurrencyCap  *nameserverConcurrencyCap
 	fakeDelegations map[string]delegation
 	fakeDS          map[string][]dns.RR
-	blacklist       blacklistTracker
+	blacklisted     map[bool]bool
 	adaptiveTimeout adaptiveTimeoutTracker
 	fastFail        fastFailTracker
 	rateLimitPacing rateLimitPacingTracker
@@ -571,6 +571,7 @@ func (ns *Nameserver) ensureState() {
 		concurrencyCap:  cache.concurrencyCapForAddress(ns.Address.String()),
 		fakeDelegations: map[string]delegation{},
 		fakeDS:          map[string][]dns.RR{},
+		blacklisted:     map[bool]bool{},
 	}
 }
 

@@ -16,14 +16,13 @@ import (
 
 func BenchmarkTransportAdaptationMixedNameservers(b *testing.B) {
 	cases := []struct {
-		name         string
-		adaptive     bool
-		fastFail     int
-		blacklistJit float64
+		name     string
+		adaptive bool
+		fastFail int
 	}{
-		{name: "baseline", adaptive: false, fastFail: 0, blacklistJit: 0.5},
-		{name: "adaptive_timeout", adaptive: true, fastFail: 0, blacklistJit: 0.5},
-		{name: "adaptive_and_fast_fail", adaptive: true, fastFail: 2, blacklistJit: 0.5},
+		{name: "baseline", adaptive: false, fastFail: 0},
+		{name: "adaptive_timeout", adaptive: true, fastFail: 0},
+		{name: "adaptive_and_fast_fail", adaptive: true, fastFail: 2},
 	}
 
 	for _, tc := range cases {
@@ -51,15 +50,6 @@ func BenchmarkTransportAdaptationMixedNameservers(b *testing.B) {
 			slow := mustBenchmarkNameserver(b, "ns-slow.example", "192.0.2.211")
 			rateLimited := mustBenchmarkNameserver(b, "ns-rate.example", "192.0.2.212")
 
-			if healthy.state != nil {
-				healthy.state.blacklist.jitterFn = func() float64 { return tc.blacklistJit }
-			}
-			if slow.state != nil {
-				slow.state.blacklist.jitterFn = func() float64 { return tc.blacklistJit }
-			}
-			if rateLimited.state != nil {
-				rateLimited.state.blacklist.jitterFn = func() float64 { return tc.blacklistJit }
-			}
 
 			healthy.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
 				networkCalls.Add(1)

@@ -495,5 +495,15 @@
   "profile_compat_fix_error": "Impossible d'appliquer le correctif : {error}",
   "profile_compat_needs_review": "Vérification nécessaire",
   "profile_library_compat_warning": "{count} profil(s) à vérifier",
-  "profile_library_mark_all_reviewed": "Tout marquer comme vérifié"
+  "profile_library_mark_all_reviewed": "Tout marquer comme vérifié",
+  "col_score": "Score",
+  "pub.score_aplus_criteria": "Critères A+",
+  "pub.score_aplus_achieved": "Obtenu",
+  "pub.score_aplus_missing": "{n} non satisfait(s)",
+  "pub.score_bonus_dnssec_enabled": "DNSSEC activé",
+  "pub.score_bonus_strong_algorithm": "Algorithme fort (ECDSA / Ed25519)",
+  "pub.score_bonus_nsec3_non_optout": "NSEC3 sans opt-out",
+  "pub.score_bonus_cds_cdnskey_published": "CDS / CDNSKEY publié",
+  "pub.score_bonus_ipv6_all_nameservers": "IPv6 sur tous les serveurs de noms",
+  "pub.score_bonus_as_diversity": "Diversité AS des serveurs de noms"
 }

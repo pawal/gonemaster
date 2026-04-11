@@ -218,6 +218,13 @@ var sqlMigrations = []sqlMigration{
 			`ALTER TABLE runs ADD COLUMN grade TEXT DEFAULT NULL`,
 		},
 	},
+	{
+		version: 5,
+		stmts: []string{
+			`ALTER TABLE domains ADD COLUMN latest_score INTEGER DEFAULT NULL`,
+			`ALTER TABLE domains ADD COLUMN latest_grade TEXT DEFAULT NULL`,
+		},
+	},
 }
 
 // runMigrations creates the schema_migrations tracking table and applies any

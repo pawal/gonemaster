@@ -519,11 +519,11 @@ func (s *SQLJobStore) GraduateJob(job Job, engineEntries []engine.LogEntry) erro
 	if _, err := tx.Exec(
 		fmt.Sprintf(`UPDATE domains SET
 			latest_run_id=%s, latest_run_at=%s, latest_status=%s,
-			latest_level=%s, run_count=run_count+1
+			latest_level=%s, latest_score=%s, latest_grade=%s, run_count=run_count+1
 		 WHERE id=%s`,
-			s.ph(1), s.ph(2), s.ph(3), s.ph(4), s.ph(5)),
+			s.ph(1), s.ph(2), s.ph(3), s.ph(4), s.ph(5), s.ph(6), s.ph(7)),
 		job.ID, s.ts(job.FinishedAt), string(job.Status),
-		worstLevel, domainID,
+		worstLevel, scoreVal, gradeVal, domainID,
 	); err != nil {
 		_ = tx.Rollback()
 		return fmt.Errorf("update domain: %w", err)
@@ -715,14 +715,16 @@ func (s *SQLJobStore) scanDomain(row *sql.Row) (Domain, error) {
 		domainName, createdAt     string
 		latestRunID, latestRunAt  sql.NullString
 		latestStatus, latestLevel sql.NullString
+		latestScore               sql.NullInt64
+		latestGrade               sql.NullString
 		runCount                  int
 	)
 	err := row.Scan(&id, &domainName, &latestRunID, &latestRunAt, &latestStatus,
-		&latestLevel, &createdAt, &runCount)
+		&latestLevel, &latestScore, &latestGrade, &createdAt, &runCount)
 	if err != nil {
 		return Domain{}, err
 	}
-	return Domain{
+	d := Domain{
 		ID:           id,
 		Name:         domainName,
 		LatestRunID:  latestRunID.String,
@@ -731,11 +733,19 @@ func (s *SQLJobStore) scanDomain(row *sql.Row) (Domain, error) {
 		LatestLevel:  latestLevel.String,
 		CreatedAt:    parseTimestampStr(createdAt),
 		RunCount:     runCount,
-	}, nil
+	}
+	if latestScore.Valid {
+		v := int(latestScore.Int64)
+		d.LatestScore = &v
+	}
+	if latestGrade.Valid {
+		d.LatestGrade = &latestGrade.String
+	}
+	return d, nil
 }
 
 const domainSelectCols = `SELECT id, name, latest_run_id, latest_run_at, latest_status,
-	latest_level, created_at, run_count FROM domains`
+	latest_level, latest_score, latest_grade, created_at, run_count FROM domains`
 
 func (s *SQLJobStore) getDomainByName(name string) (Domain, error) {
 	row := s.db.QueryRow(domainSelectCols+` WHERE name = `+s.ph(1), name)
@@ -829,7 +839,7 @@ func (s *SQLJobStore) ListDomains(filter DomainFilter) DomainList {
 	dataArgs := append(args, limit, offset)
 
 	query := `SELECT id, name, latest_run_id, latest_run_at, latest_status,
-		latest_level, created_at, run_count FROM domains` + where +
+		latest_level, latest_score, latest_grade, created_at, run_count FROM domains` + where +
 		" ORDER BY name ASC LIMIT " + limitPH + " OFFSET " + offsetPH
 	rows, err := s.db.Query(query, dataArgs...)
 	if err != nil {
@@ -845,13 +855,15 @@ func (s *SQLJobStore) ListDomains(filter DomainFilter) DomainList {
 			name, createdAt           string
 			latestRunID, latestRunAt  sql.NullString
 			latestStatus, latestLevel sql.NullString
+			latestScore               sql.NullInt64
+			latestGrade               sql.NullString
 			runCount                  int
 		)
 		if err := rows.Scan(&id, &name, &latestRunID, &latestRunAt,
-			&latestStatus, &latestLevel, &createdAt, &runCount); err != nil {
+			&latestStatus, &latestLevel, &latestScore, &latestGrade, &createdAt, &runCount); err != nil {
 			continue
 		}
-		items = append(items, Domain{
+		d := Domain{
 			ID:           id,
 			Name:         name,
 			LatestRunID:  latestRunID.String,
@@ -860,7 +872,15 @@ func (s *SQLJobStore) ListDomains(filter DomainFilter) DomainList {
 			LatestLevel:  latestLevel.String,
 			CreatedAt:    parseTimestampStr(createdAt),
 			RunCount:     runCount,
-		})
+		}
+		if latestScore.Valid {
+			v := int(latestScore.Int64)
+			d.LatestScore = &v
+		}
+		if latestGrade.Valid {
+			d.LatestGrade = &latestGrade.String
+		}
+		items = append(items, d)
 	}
 	rows.Close()
 

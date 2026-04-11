@@ -950,16 +950,9 @@
   const CAT_ORDER = ["dnssec", "nameserver_health", "connectivity", "zone_consistency"];
   const CAT_LABELS = { dnssec: "DNSSEC", nameserver_health: "Nameserver", connectivity: "Connectivity", zone_consistency: "Zone" };
   const BONUS_HIDDEN = new Set(["no_warnings_or_errors"]);
-  const BONUS_LABELS = {
-    dnssec_enabled:        "DNSSEC enabled",
-    strong_algorithm:      "Strong algorithm",
-    nsec3_non_optout:      "NSEC3 no opt-out",
-    cds_cdnskey_published: "CDS/CDNSKEY published",
-    ipv6_all_nameservers:  "IPv6 all nameservers",
-    as_diversity:          "AS diversity",
-  };
   // Returns true when a run/job has a score to display.
   const hasScore = (item) => item?.score != null && item?.grade != null;
+  const categoryColor = (s) => s >= 80 ? '#22c55e' : s >= 60 ? '#84cc16' : s >= 40 ? '#ca8a04' : '#dc2626';
   // Returns the full scoring result from either a run (score object) or a
   // job-list item where score is just an int and grade a string.
   const chipGrade  = (item) => item?.grade ?? null;
@@ -2408,7 +2401,7 @@
                               {#each bonusCriteria as [key, val]}
                                 <div class="grade-tip-criterion">
                                   <span class="grade-tip-icon {val === true ? 'met' : val === false ? 'unmet' : ''}">{val === true ? '✓' : val === false ? '✗' : '–'}</span>
-                                  <span>{BONUS_LABELS[key] ?? key.replace(/_/g, ' ')}</span>
+                                  <span>{$t(`pub.score_bonus_${key}`)}</span>
                                 </div>
                               {/each}
                             </div>
@@ -2727,7 +2720,58 @@
           {:else if selectedDomainRunResult}
             {@const allEntries = selectedDomainRunResult?.raw?.entries ?? []}
             {@const bannerCls = bannerClass(worstLevel(allEntries))}
+            {@const sc = selectedDomainRunResult?.score}
             <div class="stack" style="margin-top: 1.25rem;">
+              {#if sc}
+                {@const sortedCats = CAT_ORDER.filter(c => c in (sc.categories ?? {})).map(c => [c, sc.categories[c]])}
+                <div class="score-card">
+                  <div class="score-left">
+                    <div class="grade-badge" data-grade={sc.grade}>
+                      <span class="grade-letter">{sc.grade}</span>
+                    </div>
+                    <div class="score-meta">
+                      <div class="score-number">{sc.score}<span class="score-denom">/100</span></div>
+                      <div class="score-label">DNS Quality Score</div>
+                    </div>
+                  </div>
+                  {#if sortedCats.length}
+                    <div class="score-cats">
+                      {#each sortedCats as [cat, res], i}
+                        <div class="score-cat-row">
+                          <span class="score-cat-name">{CAT_LABELS[cat] ?? cat}</span>
+                          <div class="score-cat-bar-track">
+                            <div class="score-cat-bar" style="--bar-pct:{res.score}%; --bar-color:{categoryColor(res.score)}; animation-delay:{i * 60}ms"></div>
+                          </div>
+                          <span class="score-cat-num">{res.score}</span>
+                        </div>
+                      {/each}
+                    </div>
+                  {/if}
+                </div>
+                {#if sc.bonus?.criteria}
+                  {@const bonusCriteria = Object.entries(sc.bonus.criteria).filter(([k]) => !BONUS_HIDDEN.has(k))}
+                  {@const bonusMissing = bonusCriteria.filter(([, v]) => v === false).length}
+                  {#if bonusCriteria.length}
+                    <details class="score-bonus">
+                      <summary class="score-bonus-summary">
+                        <span class="score-bonus-chevron"></span>
+                        <span class="score-bonus-title">{$t("pub.score_aplus_criteria")}</span>
+                        <span class="score-bonus-status" data-met={sc.bonus.eligible ? "yes" : "no"}>
+                          {sc.bonus.eligible ? $t("pub.score_aplus_achieved") : $t("pub.score_aplus_missing", { n: bonusMissing })}
+                        </span>
+                      </summary>
+                      <div class="score-bonus-list">
+                        {#each bonusCriteria as [key, val]}
+                          <div class="score-bonus-item" data-met={val === null ? "na" : val ? "yes" : "no"}>
+                            <span class="score-bonus-icon">{val === null ? "–" : val ? "✓" : "✗"}</span>
+                            <span>{$t(`pub.score_bonus_${key}`)}</span>
+                          </div>
+                        {/each}
+                      </div>
+                    </details>
+                  {/if}
+                {/if}
+              {/if}
               {#if allEntries.length}
                 <div class="status-banner {bannerCls}">{$t(`result_status_${bannerCls}`)}</div>
               {/if}
@@ -2927,6 +2971,7 @@
                 <th>{$t("col_domain_name")}</th>
                 <th>{$t("col_tags")}</th>
                 <th>{$t("col_latest_level")}</th>
+                <th>{$t("col_score")}</th>
                 <th>{$t("col_latest_run_at")}</th>
                 <th>{$t("col_run_count")}</th>
               </tr>
@@ -2943,6 +2988,7 @@
                   <td class="mono">{d.name}</td>
                   <td>{d.tags ? d.tags.join(", ") : ""}</td>
                   <td>{#if domainLevel(d)}<span class="badge level-{domainLevel(d).toLowerCase()}">{domainLevel(d)}</span>{:else}-{/if}</td>
+                  <td>{#if d.latest_grade != null && d.latest_score != null}<span class="grade-chip"><span class="grade-chip-letter" data-grade={d.latest_grade}>{d.latest_grade}</span><span class="grade-chip-score">{d.latest_score}</span></span>{:else}—{/if}</td>
                   <td>{d.latest_run_at ? d.latest_run_at.slice(0, 10) : "—"}</td>
                   <td>{d.run_count ?? 0}</td>
                 </tr>
@@ -3055,6 +3101,7 @@
             <thead><tr>
               <th>{$t("col_domain_name")}</th>
               <th>{$t("col_latest_level")}</th>
+              <th>{$t("col_score")}</th>
               <th>{$t("col_latest_run_at")}</th>
             </tr></thead>
             <tbody>
@@ -3068,6 +3115,7 @@
                 >
                   <td class="mono">{d.name}</td>
                   <td>{#if domainLevel(d)}<span class="badge level-{domainLevel(d).toLowerCase()}">{domainLevel(d)}</span>{:else}-{/if}</td>
+                  <td>{#if d.latest_grade != null && d.latest_score != null}<span class="grade-chip"><span class="grade-chip-letter" data-grade={d.latest_grade}>{d.latest_grade}</span><span class="grade-chip-score">{d.latest_score}</span></span>{:else}—{/if}</td>
                   <td>{d.latest_run_at ? d.latest_run_at.slice(0, 10) : "—"}</td>
                 </tr>
               {/each}

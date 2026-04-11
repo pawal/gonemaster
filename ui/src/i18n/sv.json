@@ -495,5 +495,15 @@
   "profile_compat_fix_error": "Det gick inte att tillämpa korrigeringen: {error}",
   "profile_compat_needs_review": "Behöver granskning",
   "profile_library_compat_warning": "{count} profil(er) behöver granskning",
-  "profile_library_mark_all_reviewed": "Markera alla som granskade"
+  "profile_library_mark_all_reviewed": "Markera alla som granskade",
+  "col_score": "Betyg",
+  "pub.score_aplus_criteria": "A+-kriterier",
+  "pub.score_aplus_achieved": "Uppnått",
+  "pub.score_aplus_missing": "{n} saknas",
+  "pub.score_bonus_dnssec_enabled": "DNSSEC aktiverat",
+  "pub.score_bonus_strong_algorithm": "Starkt algoritm (ECDSA / Ed25519)",
+  "pub.score_bonus_nsec3_non_optout": "NSEC3 utan opt-out",
+  "pub.score_bonus_cds_cdnskey_published": "CDS / CDNSKEY publicerat",
+  "pub.score_bonus_ipv6_all_nameservers": "IPv6 på alla namnservrar",
+  "pub.score_bonus_as_diversity": "AS-mångfald för namnservrar"
 }

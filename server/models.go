@@ -114,6 +114,8 @@ type Domain struct {
 	LatestRunAt  time.Time `json:"latest_run_at,omitempty"`
 	LatestStatus string    `json:"latest_status,omitempty"`
 	LatestLevel  string    `json:"latest_level,omitempty"`
+	LatestScore  *int      `json:"latest_score,omitempty"`
+	LatestGrade  *string   `json:"latest_grade,omitempty"`
 	CreatedAt    time.Time `json:"created_at"`
 	RunCount     int       `json:"run_count"`
 	Tags         []string  `json:"tags,omitempty"`

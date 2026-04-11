@@ -495,5 +495,15 @@
   "profile_compat_fix_error": "Popravka ni bilo mogoče uporabiti: {error}",
   "profile_compat_needs_review": "Potreben pregled",
   "profile_library_compat_warning": "{count} profilov potrebuje pregled",
-  "profile_library_mark_all_reviewed": "Označi vse kot pregledano"
+  "profile_library_mark_all_reviewed": "Označi vse kot pregledano",
+  "col_score": "Ocena",
+  "pub.score_aplus_criteria": "Merila A+",
+  "pub.score_aplus_achieved": "Doseženo",
+  "pub.score_aplus_missing": "{n} neizpolnjeno",
+  "pub.score_bonus_dnssec_enabled": "DNSSEC omogočen",
+  "pub.score_bonus_strong_algorithm": "Močan algoritem (ECDSA / Ed25519)",
+  "pub.score_bonus_nsec3_non_optout": "NSEC3 brez opt-out",
+  "pub.score_bonus_cds_cdnskey_published": "CDS / CDNSKEY objavljeno",
+  "pub.score_bonus_ipv6_all_nameservers": "IPv6 na vseh imenskih strežnikih",
+  "pub.score_bonus_as_diversity": "AS-raznolikost imenskih strežnikov"
 }

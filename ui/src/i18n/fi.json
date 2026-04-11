@@ -495,5 +495,15 @@
   "profile_compat_fix_error": "Korjauksen käyttöönotto epäonnistui: {error}",
   "profile_compat_needs_review": "Tarkistettava",
   "profile_library_compat_warning": "{count} profiili(a) tarkistettavana",
-  "profile_library_mark_all_reviewed": "Merkitse kaikki tarkistetuiksi"
+  "profile_library_mark_all_reviewed": "Merkitse kaikki tarkistetuiksi",
+  "col_score": "Pisteet",
+  "pub.score_aplus_criteria": "A+-kriteerit",
+  "pub.score_aplus_achieved": "Saavutettu",
+  "pub.score_aplus_missing": "{n} täyttämättä",
+  "pub.score_bonus_dnssec_enabled": "DNSSEC käytössä",
+  "pub.score_bonus_strong_algorithm": "Vahva algoritmi (ECDSA / Ed25519)",
+  "pub.score_bonus_nsec3_non_optout": "NSEC3 ilman opt-outia",
+  "pub.score_bonus_cds_cdnskey_published": "CDS / CDNSKEY julkaistu",
+  "pub.score_bonus_ipv6_all_nameservers": "IPv6 kaikissa nimipalvelimissa",
+  "pub.score_bonus_as_diversity": "Nimipalvelimien AS-monimuotoisuus"
 }

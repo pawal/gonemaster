@@ -495,5 +495,15 @@
   "profile_compat_fix_error": "Kunne ikke bruke rettelsen: {error}",
   "profile_compat_needs_review": "Trenger gjennomgang",
   "profile_library_compat_warning": "{count} profil(er) trenger gjennomgang",
-  "profile_library_mark_all_reviewed": "Merk alle som gjennomgått"
+  "profile_library_mark_all_reviewed": "Merk alle som gjennomgått",
+  "col_score": "Score",
+  "pub.score_aplus_criteria": "A+-kriterier",
+  "pub.score_aplus_achieved": "Oppnådd",
+  "pub.score_aplus_missing": "{n} mangler",
+  "pub.score_bonus_dnssec_enabled": "DNSSEC aktivert",
+  "pub.score_bonus_strong_algorithm": "Sterk algoritme (ECDSA / Ed25519)",
+  "pub.score_bonus_nsec3_non_optout": "NSEC3 uten opt-out",
+  "pub.score_bonus_cds_cdnskey_published": "CDS / CDNSKEY publisert",
+  "pub.score_bonus_ipv6_all_nameservers": "IPv6 på alle navnetjenere",
+  "pub.score_bonus_as_diversity": "AS-mangfold for navnetjenere"
 }

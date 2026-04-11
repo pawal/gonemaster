@@ -396,6 +396,8 @@ func (s *InMemoryJobStore) GraduateJob(job Job, engineEntries []engine.LogEntry)
 	domain.LatestRunAt = run.FinishedAt
 	domain.LatestStatus = string(run.Status)
 	domain.LatestLevel = run.WorstLevel
+	domain.LatestScore = run.Score
+	domain.LatestGrade = run.Grade
 	domain.RunCount++
 
 	// Store run and entries.

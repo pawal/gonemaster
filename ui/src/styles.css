@@ -84,7 +84,7 @@ body {
   flex-direction: column;
   position: sticky;
   top: 0;
-  height: 100vh;
+  height: calc(100vh - 57px);
   overflow-y: auto;
 }
 
@@ -133,7 +133,7 @@ body {
 }
 
 .nav-bottom {
-  margin-top: auto;
+  margin-top: 0;
 }
 
 main {

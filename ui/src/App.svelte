@@ -925,7 +925,7 @@
   const LEVEL_ORDER = ["DEBUG", "INFO", "NOTICE", "WARNING", "ERROR", "CRITICAL"];
   const normalizeLevel = (value) => (value || "INFO").toUpperCase();
   // Returns the effective display level for a domain. The server only tracks
-  const domainLevel = (d) => d?.latest_level || "";
+  const domainLevel = (d) => d?.latest_level || (d?.latest_run_at ? "INFO" : "");
   const worstLevel = (entries) => {
     if (!entries?.length) return "INFO";
     let worst = 0;
@@ -2664,7 +2664,7 @@
                       <span class={`level-pill severity-${entry.level.toLowerCase()}`}>{entry.level} {entry.count}</span>
                     {/each}
                   {:else if job.severity_totals !== undefined}
-                    <span class="level-pill severity-info">OK</span>
+                    <span class="level-pill severity-info">INFO</span>
                   {/if}
                   {#if hasScore(job)}
                     <span class="grade-chip">
@@ -2905,7 +2905,7 @@
                   >
                     <td class="run-id-cell" title={run.id}>{run.id}</td>
                     <td>{run.finished_at ? run.finished_at.slice(0, 16).replace("T", " ") : "—"}</td>
-                    <td><span class="badge level-{(run.worst_level || '').toLowerCase()}">{run.worst_level || "—"}</span></td>
+                    <td><span class="badge level-{(run.worst_level || 'info').toLowerCase()}">{run.worst_level || "INFO"}</span></td>
                     <td>{#if hasScore(run)}<span class="grade-chip"><span class="grade-chip-letter" data-grade={chipGrade(run)}>{chipGrade(run)}</span><span class="grade-chip-score">{chipScore(run)}</span></span>{:else}—{/if}</td>
                     <td>{run.duration_ms != null ? run.duration_ms + "ms" : "—"}</td>
                     <td>{run.entry_count ?? 0}</td>

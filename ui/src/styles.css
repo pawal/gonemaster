@@ -315,6 +315,12 @@ button:hover:not(:disabled) {
   font-weight: 600;
 }
 
+.badge.level-info {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
 .badge.level-notice {
   background: #e0f2fe;
   color: #075985;

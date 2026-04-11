@@ -487,7 +487,7 @@ button:hover:not(:disabled) {
   font-size: var(--text-sm);
 }
 
-.kv span {
+.kv > span {
   color: var(--ink-2);
 }
 
@@ -1654,7 +1654,7 @@ pre {
   bottom: calc(100% + 6px);
   left: 50%;
   transform: translateX(-50%);
-  background: var(--ink);
+  background: #0f1923;
   color: #ffffff;
   border-radius: 7px;
   padding: 8px 11px;
@@ -1673,7 +1673,7 @@ pre {
   left: 50%;
   transform: translateX(-50%);
   border: 5px solid transparent;
-  border-top-color: var(--ink);
+  border-top-color: #0f1923;
 }
 
 .grade-chip-wrap:hover .grade-chip-tooltip,

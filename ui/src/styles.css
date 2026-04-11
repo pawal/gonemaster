@@ -71,7 +71,6 @@ body {
 
 .app-layout {
   display: flex;
-  min-height: calc(100vh - 73px); /* below header */
 }
 
 .sidebar {
@@ -82,9 +81,10 @@ body {
   padding: 16px 0;
   display: flex;
   flex-direction: column;
+  align-self: flex-start;
   position: sticky;
   top: 0;
-  height: calc(100vh - 57px);
+  max-height: 100vh;
   overflow-y: auto;
 }
 

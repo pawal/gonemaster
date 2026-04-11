@@ -113,11 +113,12 @@
     : [];
 
   // Translate a bonus criterion key via i18n, falling back to humanised key.
-  function bonusLabel(key) {
+  // Reactive so the template re-evaluates when $t changes (e.g. on locale switch).
+  $: bonusLabel = (key) => {
     const k = `pub.score_bonus_${key}`;
     const s = $t(k);
     return s !== k ? s : key.replace(/_/g, " ");
-  }
+  };
 
   // Number of unmet bonus criteria (null = not applicable, counts as met).
   $: bonusMissing = score?.bonus?.criteria

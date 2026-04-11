@@ -1630,7 +1630,7 @@ pre {
 .grade-chip-letter[data-grade="A+"] { background: var(--grade-aplus); border-color: var(--grade-aplus); }
 .grade-chip-letter[data-grade="A"]  { background: var(--grade-a);     border-color: var(--grade-a); }
 .grade-chip-letter[data-grade="B"]  { background: var(--grade-b);     border-color: var(--grade-b); color: #1a1a1a; }
-.grade-chip-letter[data-grade="C"]  { background: var(--grade-c);     border-color: var(--grade-c); }
+.grade-chip-letter[data-grade="C"]  { background: var(--grade-c);     border-color: var(--grade-c); color: #1a1a1a; }
 .grade-chip-letter[data-grade="D"]  { background: var(--grade-d);     border-color: var(--grade-d); }
 .grade-chip-letter[data-grade="F"]  { background: var(--grade-f);     border-color: var(--grade-f); }
 
@@ -1757,8 +1757,8 @@ pre {
 }
 .grade-badge[data-grade="A+"] { background: var(--grade-aplus); }
 .grade-badge[data-grade="A"]  { background: var(--grade-a); }
-.grade-badge[data-grade="B"]  { background: var(--grade-b); }
-.grade-badge[data-grade="C"]  { background: var(--grade-c); }
+.grade-badge[data-grade="B"]  { background: var(--grade-b); color: #1a1a1a; }
+.grade-badge[data-grade="C"]  { background: var(--grade-c); color: #1a1a1a; }
 .grade-badge[data-grade="D"]  { background: var(--grade-d); }
 .grade-badge[data-grade="F"]  { background: var(--grade-f); }
 

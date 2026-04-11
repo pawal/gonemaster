@@ -1826,8 +1826,8 @@ details[open] > .score-bonus-summary > .score-bonus-chevron { transform: rotate(
   font-size: 0.78rem;
   flex-shrink: 0;
 }
-.score-bonus-item[data-met="yes"] .score-bonus-icon { color: #16a34a; }
-.score-bonus-item[data-met="no"]  .score-bonus-icon { color: #dc2626; }
+.score-bonus-item[data-met="yes"] .score-bonus-icon { color: var(--grade-a); }
+.score-bonus-item[data-met="no"]  .score-bonus-icon { color: var(--grade-f); }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]):not([data-theme="dark"]) .score-bonus-status[data-met="yes"] {

@@ -955,7 +955,8 @@
   const BONUS_HIDDEN = new Set(["no_warnings_or_errors"]);
   // Returns true when a run/job has a score to display.
   const hasScore = (item) => item?.score != null && item?.grade != null;
-  const categoryColor = (s) => s >= 80 ? '#22c55e' : s >= 60 ? '#84cc16' : s >= 40 ? '#ca8a04' : '#dc2626';
+  const GRADE_COLORS = { "A+": "var(--grade-aplus)", "A": "var(--grade-a)", "B": "var(--grade-b)", "C": "var(--grade-c)", "D": "var(--grade-d)", "F": "var(--grade-f)" };
+  const gradeBarColor = (grade) => GRADE_COLORS[grade] ?? "var(--grade-a)";
   // Returns the full scoring result from either a run (score object) or a
   // job-list item where score is just an int and grade a string.
   const chipGrade  = (item) => item?.grade ?? null;
@@ -2755,7 +2756,7 @@
                         <div class="score-cat-row">
                           <span class="score-cat-name">{CAT_LABELS[cat] ?? cat}</span>
                           <div class="score-cat-bar-track">
-                            <div class="score-cat-bar" style="--bar-pct:{res.score}%; --bar-color:{categoryColor(res.score)}; animation-delay:{i * 60}ms"></div>
+                            <div class="score-cat-bar" style="--bar-pct:{res.score}%; --bar-color:{gradeBarColor(sc.grade)}; animation-delay:{i * 60}ms"></div>
                           </div>
                           <span class="score-cat-num">{res.score}</span>
                         </div>

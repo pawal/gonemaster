@@ -98,14 +98,14 @@
     return CAT_LABELS[cat] ?? cat.replace(/_/g, " ");
   }
 
-  // Returns a color for a category sub-score bar (0–100).
-  function categoryColor(s) {
-    if (s >= 90) return "#22c55e";
-    if (s >= 75) return "#84cc16";
-    if (s >= 60) return "#ca8a04";
-    if (s >= 40) return "#ea580c";
-    return "#dc2626";
-  }
+  // Maps a grade letter to a CSS variable name for consistent grade coloring.
+  const GRADE_COLORS = {
+    "A+": "var(--grade-aplus)", "A": "var(--grade-a)", "B": "var(--grade-b)",
+    "C": "var(--grade-c)", "D": "var(--grade-d)", "F": "var(--grade-f)",
+  };
+
+  // Single grade color for all category bars (cohesive, not per-bar).
+  $: gradeColor = GRADE_COLORS[score?.grade] ?? "var(--grade-a)";
 
   // Sorted category entries in display order.
   $: sortedCats = score?.categories
@@ -162,7 +162,7 @@
                 <div class="score-cat-bar-track">
                   <div
                     class="score-cat-bar"
-                    style="--bar-pct:{res.score}%; --bar-color:{categoryColor(res.score)}; animation-delay:{i * 60}ms"
+                    style="--bar-pct:{res.score}%; --bar-color:{gradeColor}; animation-delay:{i * 60}ms"
                   ></div>
                 </div>
                 <span class="score-cat-num">{res.score}</span>

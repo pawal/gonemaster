@@ -1462,6 +1462,130 @@ pre {
   color: #fbbf24;
 }
 
+/* ── Grade chip ──────────────────────────────────────────────────────────── */
+/*
+ * Compact inline grade display: [B] 82
+ * Used in job list, run inspector kv row, and domain run table.
+ * The .grade-chip-wrap adds a hover tooltip with category breakdown.
+ */
+
+.grade-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.grade-chip-letter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: #6b7280;
+  flex-shrink: 0;
+}
+.grade-chip-letter[data-grade="A+"] { background: #16a34a; }
+.grade-chip-letter[data-grade="A"]  { background: #22c55e; }
+.grade-chip-letter[data-grade="B"]  { background: #84cc16; color: #1a1a1a; }
+.grade-chip-letter[data-grade="C"]  { background: #ca8a04; }
+.grade-chip-letter[data-grade="D"]  { background: #ea580c; }
+.grade-chip-letter[data-grade="F"]  { background: #dc2626; }
+
+.grade-chip-score {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+}
+
+/* Tooltip wrapper — position: relative host */
+.grade-chip-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.grade-chip-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: var(--bg);
+  border-radius: 7px;
+  padding: 8px 11px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  z-index: 100;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  min-width: 160px;
+}
+
+.grade-chip-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--ink);
+}
+
+.grade-chip-wrap:hover .grade-chip-tooltip,
+.grade-chip-wrap:focus-within .grade-chip-tooltip {
+  display: block;
+}
+
+.grade-tip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  line-height: 1.7;
+}
+
+.grade-tip-cat {
+  color: rgba(255,255,255,0.6);
+  font-size: 0.72rem;
+}
+
+.grade-tip-score {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.grade-tip-divider {
+  border: none;
+  border-top: 1px solid rgba(255,255,255,0.15);
+  margin: 4px 0;
+}
+
+.grade-tip-bonus {
+  margin-top: 2px;
+}
+
+.grade-tip-criterion {
+  display: flex;
+  gap: 6px;
+  line-height: 1.7;
+}
+
+.grade-tip-icon {
+  width: 12px;
+  flex-shrink: 0;
+  font-size: 0.65rem;
+}
+.grade-tip-icon.met   { color: #4ade80; }
+.grade-tip-icon.unmet { color: #f87171; }
+
 :root[data-theme="dark"] .status-banner.ok {
   background: #0f2a1e;
   border-color: #166534;

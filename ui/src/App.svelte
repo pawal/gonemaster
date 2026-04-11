@@ -945,6 +945,27 @@
   const isNoticeOrAbove = (level) => {
     return LEVEL_ORDER.indexOf(normalizeLevel(level)) >= LEVEL_ORDER.indexOf("NOTICE");
   };
+
+  // ── Grade chip helpers ───────────────────────────────────────────────────
+  const CAT_ORDER = ["dnssec", "nameserver_health", "connectivity", "zone_consistency"];
+  const CAT_LABELS = { dnssec: "DNSSEC", nameserver_health: "Nameserver", connectivity: "Connectivity", zone_consistency: "Zone" };
+  const BONUS_HIDDEN = new Set(["no_warnings_or_errors"]);
+  const BONUS_LABELS = {
+    dnssec_enabled:        "DNSSEC enabled",
+    strong_algorithm:      "Strong algorithm",
+    nsec3_non_optout:      "NSEC3 no opt-out",
+    cds_cdnskey_published: "CDS/CDNSKEY published",
+    ipv6_all_nameservers:  "IPv6 all nameservers",
+    as_diversity:          "AS diversity",
+  };
+  // Returns true when a run/job has a score to display.
+  const hasScore = (item) => item?.score != null && item?.grade != null;
+  // Returns the full scoring result from either a run (score object) or a
+  // job-list item where score is just an int and grade a string.
+  const chipGrade  = (item) => item?.grade ?? null;
+  const chipScore  = (item) => item?.score ?? null;
+  // Full scoring result — only present on JobResult / selectedJobResult.
+  const resultScore = (result) => result?.score ?? null;
   const formatSeconds = (value) => {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) return "0.00";
@@ -2362,6 +2383,42 @@
               <strong>{selectedRun.entry_count ?? 0}</strong>
               <span>{$t("col_worst_level")}</span>
               <strong><span class="badge level-{(selectedRun.worst_level || '').toLowerCase()}">{selectedRun.worst_level || "—"}</span></strong>
+              {#if hasScore(selectedRun)}
+                {@const rs = resultScore(selectedJobResult)}
+                <span>{$t("col_score")}</span>
+                <strong>
+                  <span class="grade-chip-wrap">
+                    <span class="grade-chip">
+                      <span class="grade-chip-letter" data-grade={chipGrade(selectedRun)}>{chipGrade(selectedRun)}</span>
+                      <span class="grade-chip-score">{chipScore(selectedRun)}/100</span>
+                    </span>
+                    {#if rs}
+                      <span class="grade-chip-tooltip">
+                        {#each CAT_ORDER.filter(c => c in (rs.categories ?? {})) as cat}
+                          <div class="grade-tip-row">
+                            <span class="grade-tip-cat">{CAT_LABELS[cat]}</span>
+                            <span class="grade-tip-score">{rs.categories[cat].score}</span>
+                          </div>
+                        {/each}
+                        {#if rs.bonus?.criteria}
+                          {@const bonusCriteria = Object.entries(rs.bonus.criteria).filter(([k]) => !BONUS_HIDDEN.has(k))}
+                          {#if bonusCriteria.length}
+                            <hr class="grade-tip-divider">
+                            <div class="grade-tip-bonus">
+                              {#each bonusCriteria as [key, val]}
+                                <div class="grade-tip-criterion">
+                                  <span class="grade-tip-icon {val === true ? 'met' : val === false ? 'unmet' : ''}">{val === true ? '✓' : val === false ? '✗' : '–'}</span>
+                                  <span>{BONUS_LABELS[key] ?? key.replace(/_/g, ' ')}</span>
+                                </div>
+                              {/each}
+                            </div>
+                          {/if}
+                        {/if}
+                      </span>
+                    {/if}
+                  </span>
+                </strong>
+              {/if}
             {/if}
           </div>
           {#if selectedJob.error}
@@ -2616,6 +2673,12 @@
                   {:else if job.severity_totals !== undefined}
                     <span class="level-pill severity-info">OK</span>
                   {/if}
+                  {#if hasScore(job)}
+                    <span class="grade-chip">
+                      <span class="grade-chip-letter" data-grade={chipGrade(job)}>{chipGrade(job)}</span>
+                      <span class="grade-chip-score">{chipScore(job)}</span>
+                    </span>
+                  {/if}
                 </div>
                 {#if job.batch_id}
                   <div class="small mono">{$t("batch_prefix")} {job.batch_id}</div>
@@ -2781,6 +2844,7 @@
                   <th>{$t("col_run_id")}</th>
                   <th>{$t("col_finished_at")}</th>
                   <th>{$t("col_worst_level")}</th>
+                  <th>{$t("col_score")}</th>
                   <th>{$t("col_duration")}</th>
                   <th>{$t("col_entries")}</th>
                 </tr>
@@ -2798,6 +2862,7 @@
                     <td class="run-id-cell" title={run.id}>{run.id}</td>
                     <td>{run.finished_at ? run.finished_at.slice(0, 16).replace("T", " ") : "—"}</td>
                     <td><span class="badge level-{(run.worst_level || '').toLowerCase()}">{run.worst_level || "—"}</span></td>
+                    <td>{#if hasScore(run)}<span class="grade-chip"><span class="grade-chip-letter" data-grade={chipGrade(run)}>{chipGrade(run)}</span><span class="grade-chip-score">{chipScore(run)}</span></span>{:else}—{/if}</td>
                     <td>{run.duration_ms != null ? run.duration_ms + "ms" : "—"}</td>
                     <td>{run.entry_count ?? 0}</td>
                   </tr>

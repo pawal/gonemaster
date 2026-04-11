@@ -95,6 +95,9 @@ type Job struct {
 	ProfileID        *int64         `json:"profile_id,omitempty"`
 	ProfileName      string         `json:"profile_name,omitempty"`
 	EffectiveProfile string         `json:"-"`
+	// Score and Grade are copied from the Run after graduation.
+	Score *int    `json:"score,omitempty"`
+	Grade *string `json:"grade,omitempty"`
 	// Config fields stored as config_json in the DB.
 	Tests         []string                       `json:"-"`
 	Overrides     map[string]any                 `json:"-"`

@@ -189,6 +189,7 @@
   "col_run_id": "Run ID",
   "col_finished_at": "Finished",
   "col_worst_level": "Worst level",
+  "col_score": "Score",
   "col_duration": "Duration",
   "col_entries": "Entries",
   "no_domains": "No domains found.",

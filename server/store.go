@@ -1266,6 +1266,8 @@ func jobFromRun(r Run) Job {
 		ProfileID:        cloneInt64Ptr(r.ProfileID),
 		ProfileName:      r.ProfileName,
 		EffectiveProfile: r.EffectiveProfile,
+		Score:            r.Score,
+		Grade:            r.Grade,
 	}
 }
 

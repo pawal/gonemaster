@@ -225,6 +225,7 @@ func (s *Server) routes() {
 	pubMux.HandleFunc("GET /locales", s.handleLocales)
 	pubMux.HandleFunc("GET /lookup/{domain}", s.handlePublicLookupDomain)
 	pubMux.HandleFunc("GET /version", s.handlePublicVersion)
+	pubMux.HandleFunc("GET /info", s.handlePublicInfo)
 	var pubHandler http.Handler = http.StripPrefix("/pub/api/v1", pubMux)
 	if s.rateLimiter != nil {
 		pubHandler = rateLimitMiddleware(s.rateLimiter, pubHandler)

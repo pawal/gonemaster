@@ -416,6 +416,8 @@
   "settings_group_scoring": "Scoring",
   "settings_label_show_score_admin": "Vis scoring i admin-grænsefladen",
   "settings_help_show_score_admin": "Vis karaktermærker, scorevisninger og kategoriopdeling i admin-grænsefladen. Deaktivér for at skjule al scoring-UI.",
+  "settings_label_show_score_public": "Vis scoring i den offentlige brugergrænseflade",
+  "settings_help_show_score_public": "Vis karaktermærke og scorevisning på den offentlige resultatside. Deaktivér for at skjule scoring for besøgende.",
   "profile_load_error": "Kunne ikke indlæse profiler: {error}",
   "profile_deleted": "Profil slettet.",
   "profile_delete_error": "Kunne ikke slette profil: {error}",

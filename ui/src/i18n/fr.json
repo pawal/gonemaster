@@ -416,6 +416,8 @@
   "settings_group_scoring": "Score",
   "settings_label_show_score_admin": "Afficher le score dans l'interface d'administration",
   "settings_help_show_score_admin": "Afficher les badges de note, les cartes de score et les détails par catégorie dans l'interface d'administration. Désactiver pour masquer toute l'interface de notation.",
+  "settings_label_show_score_public": "Afficher le score dans l'interface publique",
+  "settings_help_show_score_public": "Afficher le badge de note et la carte de score sur la page de résultats publique. Désactiver pour masquer le score aux visiteurs.",
   "profile_load_error": "Impossible de charger les profils : {error}",
   "profile_deleted": "Profil supprimé.",
   "profile_delete_error": "Impossible de supprimer le profil : {error}",

@@ -416,6 +416,8 @@
   "settings_group_scoring": "Bedömning",
   "settings_label_show_score_admin": "Visa bedömning i admingränssnittet",
   "settings_help_show_score_admin": "Visa betyg, poängkort och kategoriuppdelningar i admingränssnittet. Avaktivera för att dölja all bedömnings-UI.",
+  "settings_label_show_score_public": "Visa bedömning i det publika gränssnittet",
+  "settings_help_show_score_public": "Visa betygsbricka och poängkort på den publika resultatsidan. Avaktivera för att dölja bedömning för besökare.",
   "profile_load_error": "Det gick inte att ladda profiler: {error}",
   "profile_deleted": "Profil borttagen.",
   "profile_delete_error": "Det gick inte att ta bort profil: {error}",

@@ -17,6 +17,7 @@
   export let domain = "";
   export let locale = "en";
   export let finishedAt = null;
+  export let scoringEnabled = false;
 
   $: finishedStr = (() => {
     if (!finishedAt) return "";
@@ -137,11 +138,11 @@
           <h2 class="result-heading">{$t("pub.result_heading", { domain })}</h2>
           {#if finishedStr}<p class="result-date small">{finishedStr}</p>{/if}
         </div>
-        <ShareButton {publicID} {domain} {score} />
+        <ShareButton {publicID} {domain} score={scoringEnabled ? score : null} />
       </div>
     {/if}
 
-    {#if score}
+    {#if scoringEnabled && score}
       <div class="score-card" data-testid="score-card">
         <div class="score-left">
           <div class="grade-badge" data-grade={score.grade}>

@@ -95,6 +95,10 @@ type Config struct {
 	// scores from admin users, e.g. when scoring is not meaningful for the
 	// deployment.
 	ShowScoreAdmin bool `json:"show_score_admin"`
+	// ShowScorePublic controls whether scoring-related UI elements are displayed
+	// in the public results interface. Defaults to true. Set to false to hide
+	// grades and scores from visitors.
+	ShowScorePublic bool `json:"show_score_public"`
 }
 
 // PublicAPIFileConfig holds optional public API configuration from JSON.
@@ -134,6 +138,7 @@ type FileConfig struct {
 	PublicAPI         *PublicAPIFileConfig `json:"public_api,omitempty"`
 	ScoringConfigPath *string             `json:"scoring_config_path,omitempty"`
 	ShowScoreAdmin    *bool               `json:"show_score_admin,omitempty"`
+	ShowScorePublic   *bool               `json:"show_score_public,omitempty"`
 }
 
 // DefaultConfig returns baseline config values.
@@ -146,6 +151,7 @@ func DefaultConfig() Config {
 		MaxConcurrentJobs: 0,
 		MinLevel:          "INFO",
 		ShowScoreAdmin:    true,
+		ShowScorePublic:   true,
 		PublicAPI: PublicAPIConfig{
 			RateLimitEnabled: false,
 			RateLimitMax:     10,
@@ -222,6 +228,9 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 	}
 	if file.ShowScoreAdmin != nil {
 		c.ShowScoreAdmin = *file.ShowScoreAdmin
+	}
+	if file.ShowScorePublic != nil {
+		c.ShowScorePublic = *file.ShowScorePublic
 	}
 	if file.Database != nil {
 		if file.Database.Driver != "" {

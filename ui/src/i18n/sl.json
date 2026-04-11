@@ -416,6 +416,8 @@
   "settings_group_scoring": "Ocenjevanje",
   "settings_label_show_score_admin": "Prikaži ocenjevanje v skrbniškem vmesniku",
   "settings_help_show_score_admin": "Prikaži oznake ocen, kartice z ocenami in razčlenitev po kategorijah v skrbniškem vmesniku. Onemogočite, da skrijete vse elemente ocenjevanja.",
+  "settings_label_show_score_public": "Prikaži ocenjevanje v javnem vmesniku",
+  "settings_help_show_score_public": "Prikaži značko ocene in kartico z oceno na javni strani rezultatov. Onemogočite, da skrijete ocenjevanje pred obiskovalci.",
   "profile_load_error": "Nalaganje profilov ni uspelo: {error}",
   "profile_deleted": "Profil izbrisan.",
   "profile_delete_error": "Brisanje profila ni uspelo: {error}",

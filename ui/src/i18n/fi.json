@@ -416,6 +416,8 @@
   "settings_group_scoring": "Pisteytys",
   "settings_label_show_score_admin": "Näytä pisteytys hallintanäkymässä",
   "settings_help_show_score_admin": "Näytä arvoleimat, pistekortit ja kategoriajako hallintanäkymässä. Poista käytöstä piilottaaksesi kaikki pisteytyselementit.",
+  "settings_label_show_score_public": "Näytä pisteytys julkisessa käyttöliittymässä",
+  "settings_help_show_score_public": "Näytä arvomerkki ja pistekortti julkisella tulossivulla. Poista käytöstä piilottaaksesi pisteytyksen vierailijoilta.",
   "profile_load_error": "Profiilien lataaminen epäonnistui: {error}",
   "profile_deleted": "Profiili poistettu.",
   "profile_delete_error": "Profiilin poistaminen epäonnistui: {error}",

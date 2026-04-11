@@ -97,6 +97,8 @@ func (s *Server) applySetting(key, val string) {
 		}
 	case "show_score_admin":
 		s.cfg.ShowScoreAdmin = val == "true"
+	case "show_score_public":
+		s.cfg.ShowScorePublic = val == "true"
 	}
 }
 
@@ -170,6 +172,7 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, _ *http.Request) {
 		"rate_limit_max":     {Value: cfg.PublicAPI.RateLimitMax, Source: s.settingSource("rate_limit_max")},
 		"rate_limit_window":  {Value: cfg.PublicAPI.RateLimitWindow.Duration.String(), Source: s.settingSource("rate_limit_window")},
 		"show_score_admin":   {Value: cfg.ShowScoreAdmin, Source: s.settingSource("show_score_admin")},
+		"show_score_public":  {Value: cfg.ShowScorePublic, Source: s.settingSource("show_score_public")},
 	}
 
 	// Apply database overrides to the value display.

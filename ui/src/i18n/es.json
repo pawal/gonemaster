@@ -416,6 +416,8 @@
   "settings_group_scoring": "Puntuación",
   "settings_label_show_score_admin": "Mostrar puntuación en la interfaz de administración",
   "settings_help_show_score_admin": "Mostrar insignias de nota, tarjetas de puntuación y desglose por categorías en la interfaz de administración. Deshabilitar para ocultar toda la interfaz de puntuación.",
+  "settings_label_show_score_public": "Mostrar puntuación en la interfaz pública",
+  "settings_help_show_score_public": "Mostrar la insignia de nota y la tarjeta de puntuación en la página de resultados pública. Deshabilitar para ocultar la puntuación a los visitantes.",
   "profile_load_error": "No se pudieron cargar los perfiles: {error}",
   "profile_deleted": "Perfil eliminado.",
   "profile_delete_error": "No se pudo eliminar el perfil: {error}",

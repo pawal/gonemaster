@@ -46,6 +46,21 @@ func publicProfileView(profile StoredProfile) PublicProfileView {
 	}
 }
 
+// publicInfoResponse holds public-facing server feature flags.
+type publicInfoResponse struct {
+	ShowScorePublic bool `json:"show_score_public"`
+}
+
+// handlePublicInfo handles GET /pub/api/v1/info.
+// Returns feature flags the public UI reads on startup to decide which UI
+// components to display. On fetch failure, the public UI defaults to hiding
+// scoring (fail-safe).
+func (s *Server) handlePublicInfo(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, publicInfoResponse{
+		ShowScorePublic: s.cfg.ShowScorePublic,
+	})
+}
+
 // handlePublicVersion handles GET /pub/api/v1/version.
 func (s *Server) handlePublicVersion(w http.ResponseWriter, r *http.Request) {
 	resp := map[string]string{"gonemaster": engine.VersionFull()}

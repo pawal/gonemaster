@@ -65,6 +65,29 @@ func TestApplyFileConfigShowScoreAdmin(t *testing.T) {
 	}
 }
 
+func TestDefaultConfigShowScorePublic(t *testing.T) {
+	cfg := DefaultConfig()
+	if !cfg.ShowScorePublic {
+		t.Fatal("expected ShowScorePublic to default to true")
+	}
+}
+
+func TestApplyFileConfigShowScorePublic(t *testing.T) {
+	cfg := DefaultConfig()
+	f := false
+	cfg.ApplyFileConfig(FileConfig{ShowScorePublic: &f})
+	if cfg.ShowScorePublic {
+		t.Fatal("expected ShowScorePublic to be false after applying file config")
+	}
+
+	// Nil means "not set" — should not change the value.
+	cfg2 := DefaultConfig()
+	cfg2.ApplyFileConfig(FileConfig{ShowScorePublic: nil})
+	if !cfg2.ShowScorePublic {
+		t.Fatal("expected ShowScorePublic to stay true when file config has nil")
+	}
+}
+
 func TestApplyFileConfigDatabase(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.ApplyFileConfig(FileConfig{

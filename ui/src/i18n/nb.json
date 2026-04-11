@@ -416,6 +416,8 @@
   "settings_group_scoring": "Poengsum",
   "settings_label_show_score_admin": "Vis poengsum i admin-grensesnittet",
   "settings_help_show_score_admin": "Vis karaktermerker, poengkort og kategorioversikter i admin-grensesnittet. Deaktiver for å skjule all poengsum-UI.",
+  "settings_label_show_score_public": "Vis poengsum i det offentlige grensesnittet",
+  "settings_help_show_score_public": "Vis karaktermerke og poengkort på den offentlige resultatsiden. Deaktiver for å skjule poengsum for besøkende.",
   "profile_load_error": "Kunne ikke laste profiler: {error}",
   "profile_deleted": "Profil slettet.",
   "profile_delete_error": "Kunne ikke slette profil: {error}",

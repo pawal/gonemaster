@@ -57,6 +57,18 @@ use with Nagios, Icinga, Sensu, and similar monitoring systems.
 **--source-addr6** *IPADDR*
 : Source IPv6 address for outgoing queries.
 
+**--grade-warning** *GRADE*
+: Grade that triggers Nagios WARNING. When the computed domain grade is at
+  or worse than *GRADE*, the plugin exits with status 1 (WARNING). Valid
+  values (best to worst): **A+**, **A**, **B**, **C**, **D**, **F**.
+  When set, grade and score are appended to the output line. The grade check
+  runs in addition to the severity check; the worst result wins.
+
+**--grade-critical** *GRADE*
+: Grade that triggers Nagios CRITICAL. When the computed domain grade is at
+  or worse than *GRADE*, the plugin exits with status 2 (CRITICAL). Must be
+  a worse grade than **--grade-warning** when both are supplied.
+
 **-v**, **--verbose**
 : Increase output verbosity (use **-v**, **-vv**, or **-vvv**).
 
@@ -132,6 +144,16 @@ Run only DNSSEC checks:
 
     gonemaster-nagios --domain example.com --module dnssec
 
+Grade-based monitoring — warn if grade C or worse, critical if grade F:
+
+    gonemaster-nagios -H example.com --grade-warning C --grade-critical F
+
+Grade and severity checks combined:
+
+    gonemaster-nagios -H example.com \
+        --warning WARNING --critical ERROR \
+        --grade-warning C --grade-critical F
+
 Nagios command definition:
 
     define command {
@@ -139,11 +161,23 @@ Nagios command definition:
         command_line    /usr/local/bin/gonemaster-nagios -H $ARG1$ -w WARNING -c ERROR -t 15 -v
     }
 
+    define command {
+        command_name    check_dns_zone_grade
+        command_line    /usr/local/bin/gonemaster-nagios -H $ARG1$ --grade-warning C --grade-critical F -t 30
+    }
+
 Icinga service example:
 
     apply Service "dns-zone" {
         check_command = "check_dns_zone"
         vars.zone = host.vars.dns_zone
+    }
+
+    apply Service "dns-zone-grade" {
+        import "generic-service"
+        check_command = "check_dns_zone_grade"
+        vars.zone = host.vars.dns_zone
+        assign where host.vars.dns_zone
     }
 
 ## SEE ALSO

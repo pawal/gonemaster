@@ -284,3 +284,51 @@ func TestListEntriesInvalidDomain(t *testing.T) {
 		t.Fatalf("expected 400, got %d", resp.Code)
 	}
 }
+
+func TestListEntriesCSVIncludesScoreAndGrade(t *testing.T) {
+	srv := New(DefaultConfig())
+	// Graduate a job with a WARNING entry — scoring will produce a non-trivial grade.
+	makeGraduatedJobWithEntries(t, srv, "example.com", []engine.LogEntry{
+		{Module: "DNSSEC", Testcase: "DS07", Tag: "DS07_NOT_SIGNED", Level: "WARNING"},
+	})
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/entries?format=csv", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	body := resp.Body.String()
+	// Header row must contain score and grade columns.
+	if !strings.Contains(body, "score") {
+		t.Fatalf("expected 'score' column in CSV header: %s", body)
+	}
+	if !strings.Contains(body, "grade") {
+		t.Fatalf("expected 'grade' column in CSV header: %s", body)
+	}
+	// Data row must have a non-empty grade value (the run was scored at graduation).
+	lines := strings.Split(strings.TrimSpace(body), "\n")
+	if len(lines) < 2 {
+		t.Fatalf("expected header + at least one data row, got: %s", body)
+	}
+	dataRow := lines[1]
+	if dataRow == "" {
+		t.Fatalf("expected non-empty data row")
+	}
+	// The grade column should not be empty — scoring runs at graduation.
+	fields := strings.Split(dataRow, ",")
+	gradeIdx := -1
+	headerFields := strings.Split(lines[0], ",")
+	for i, h := range headerFields {
+		if h == "grade" {
+			gradeIdx = i
+			break
+		}
+	}
+	if gradeIdx < 0 {
+		t.Fatalf("'grade' column not found in header: %s", lines[0])
+	}
+	if gradeIdx >= len(fields) || fields[gradeIdx] == "" {
+		t.Fatalf("expected non-empty grade in data row, got fields: %v", fields)
+	}
+}

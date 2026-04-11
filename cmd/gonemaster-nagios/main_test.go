@@ -497,3 +497,297 @@ func TestHelpIncludesRRSIGWarnDays(t *testing.T) {
 		t.Fatal("expected --rrsig-warn-days in usage output")
 	}
 }
+
+// --- Grade-based threshold tests -------------------------------------------
+
+func TestParseGradeThresholdsValid(t *testing.T) {
+	gt, err := parseGradeThresholds("C", "F")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !gt.isActive() {
+		t.Fatal("expected grade thresholds to be active")
+	}
+	if gt.warningGrade != "C" || gt.criticalGrade != "F" {
+		t.Fatalf("unexpected grades: warning=%q critical=%q", gt.warningGrade, gt.criticalGrade)
+	}
+}
+
+func TestParseGradeThresholdsEmpty(t *testing.T) {
+	gt, err := parseGradeThresholds("", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gt.isActive() {
+		t.Fatal("expected grade thresholds to be inactive when both are empty")
+	}
+}
+
+func TestParseGradeThresholdsOnlyWarning(t *testing.T) {
+	gt, err := parseGradeThresholds("B", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !gt.isActive() {
+		t.Fatal("expected grade thresholds active with only warning set")
+	}
+	if gt.criticalGrade != "" {
+		t.Fatalf("expected no critical grade, got %q", gt.criticalGrade)
+	}
+}
+
+func TestParseGradeThresholdsInvalidWarning(t *testing.T) {
+	_, err := parseGradeThresholds("Z", "F")
+	if err == nil || !strings.Contains(err.Error(), "--grade-warning") {
+		t.Fatalf("expected --grade-warning validation error, got %v", err)
+	}
+}
+
+func TestParseGradeThresholdsInvalidCritical(t *testing.T) {
+	_, err := parseGradeThresholds("C", "X")
+	if err == nil || !strings.Contains(err.Error(), "--grade-critical") {
+		t.Fatalf("expected --grade-critical validation error, got %v", err)
+	}
+}
+
+func TestParseGradeThresholdsWarnNotBetterThanCritical(t *testing.T) {
+	// F is worse than C — warning threshold must be a better grade than critical
+	_, err := parseGradeThresholds("F", "C")
+	if err == nil {
+		t.Fatal("expected error when grade-warning is not better than grade-critical")
+	}
+	if !strings.Contains(err.Error(), "--grade-warning must be a better grade") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestParseGradeThresholdsSameGrade(t *testing.T) {
+	_, err := parseGradeThresholds("C", "C")
+	if err == nil {
+		t.Fatal("expected error when grade-warning equals grade-critical")
+	}
+}
+
+func TestStatusForGradeOK(t *testing.T) {
+	gt, _ := parseGradeThresholds("C", "F")
+	// Grade A is better than C threshold → OK
+	s := statusForGrade("A", gt)
+	if s.code != 0 || s.text != "OK" {
+		t.Fatalf("expected OK for grade A, got %+v", s)
+	}
+}
+
+func TestStatusForGradeWarning(t *testing.T) {
+	gt, _ := parseGradeThresholds("C", "F")
+	// Grade C is at the warning threshold → WARNING
+	s := statusForGrade("C", gt)
+	if s.code != 1 || s.text != "WARNING" {
+		t.Fatalf("expected WARNING for grade C, got %+v", s)
+	}
+}
+
+func TestStatusForGradeWorseThanWarning(t *testing.T) {
+	gt, _ := parseGradeThresholds("C", "F")
+	// Grade D is between C and F thresholds → WARNING
+	s := statusForGrade("D", gt)
+	if s.code != 1 || s.text != "WARNING" {
+		t.Fatalf("expected WARNING for grade D, got %+v", s)
+	}
+}
+
+func TestStatusForGradeCritical(t *testing.T) {
+	gt, _ := parseGradeThresholds("C", "F")
+	// Grade F is at the critical threshold → CRITICAL
+	s := statusForGrade("F", gt)
+	if s.code != 2 || s.text != "CRITICAL" {
+		t.Fatalf("expected CRITICAL for grade F, got %+v", s)
+	}
+}
+
+func TestStatusForGradeOnlyWarningThreshold(t *testing.T) {
+	gt, _ := parseGradeThresholds("B", "")
+	// Grade B triggers WARNING; no CRITICAL threshold
+	if s := statusForGrade("B", gt); s.code != 1 {
+		t.Fatalf("expected WARNING for grade B, got %+v", s)
+	}
+	if s := statusForGrade("A", gt); s.code != 0 {
+		t.Fatalf("expected OK for grade A, got %+v", s)
+	}
+	// Even F only triggers WARNING when no critical threshold
+	if s := statusForGrade("F", gt); s.code != 1 {
+		t.Fatalf("expected WARNING (not CRITICAL) for grade F with no critical threshold, got %+v", s)
+	}
+}
+
+func TestStatusForGradeOnlyCriticalThreshold(t *testing.T) {
+	gt, _ := parseGradeThresholds("", "F")
+	if s := statusForGrade("F", gt); s.code != 2 {
+		t.Fatalf("expected CRITICAL for grade F, got %+v", s)
+	}
+	// D is worse than A but there's no warning threshold — should be OK
+	if s := statusForGrade("D", gt); s.code != 0 {
+		t.Fatalf("expected OK for grade D with only critical threshold, got %+v", s)
+	}
+}
+
+func TestWorstStatus(t *testing.T) {
+	ok := nagiosStatus{text: "OK", code: 0}
+	warn := nagiosStatus{text: "WARNING", code: 1}
+	crit := nagiosStatus{text: "CRITICAL", code: 2}
+
+	if worstStatus(ok, warn) != warn {
+		t.Fatal("expected WARNING > OK")
+	}
+	if worstStatus(crit, warn) != crit {
+		t.Fatal("expected CRITICAL > WARNING")
+	}
+	if worstStatus(ok, ok) != ok {
+		t.Fatal("expected OK when both OK")
+	}
+}
+
+func TestGradeModeExitCodeOK(t *testing.T) {
+	// Empty entries → score 100, grade A → OK with --grade-warning C --grade-critical F
+	stubRunEngineFunc(t, func(_ engine.RunRequest) ([]engine.LogEntry, error) {
+		return []engine.LogEntry{}, nil
+	})
+
+	var out, errOut bytes.Buffer
+	code := run([]string{
+		"-H", "example.com",
+		"--grade-warning", "C",
+		"--grade-critical", "F",
+	}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d (stderr=%q stdout=%q)", code, errOut.String(), out.String())
+	}
+	if !strings.Contains(out.String(), "ZONE OK") {
+		t.Fatalf("expected ZONE OK, got %q", out.String())
+	}
+}
+
+func TestGradeModeExitCodeCritical(t *testing.T) {
+	// CRITICAL entry → score forced to 10, grade F → CRITICAL with --grade-critical F
+	stubRunEngineFunc(t, func(_ engine.RunRequest) ([]engine.LogEntry, error) {
+		return []engine.LogEntry{
+			{Module: "BASIC", Tag: "NO_NS", Level: "CRITICAL"},
+		}, nil
+	})
+
+	var out, errOut bytes.Buffer
+	code := run([]string{
+		"-H", "example.com",
+		"--grade-warning", "C",
+		"--grade-critical", "F",
+	}, &out, &errOut)
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d (stdout=%q)", code, out.String())
+	}
+	if !strings.Contains(out.String(), "ZONE CRITICAL") {
+		t.Fatalf("expected ZONE CRITICAL, got %q", out.String())
+	}
+}
+
+func TestGradeModeOutputIncludesGradeAndScore(t *testing.T) {
+	stubRunEngineFunc(t, func(_ engine.RunRequest) ([]engine.LogEntry, error) {
+		return []engine.LogEntry{}, nil
+	})
+
+	var out, errOut bytes.Buffer
+	run([]string{
+		"-H", "example.com",
+		"--grade-warning", "C",
+		"--grade-critical", "F",
+	}, &out, &errOut)
+
+	output := out.String()
+	if !strings.Contains(output, "grade") {
+		t.Fatalf("expected 'grade' in output, got %q", output)
+	}
+	if !strings.Contains(output, "score") {
+		t.Fatalf("expected 'score' in output, got %q", output)
+	}
+}
+
+func TestGradeModeInvalidWarningFlagReturnsUnknown(t *testing.T) {
+	stubRunEngine(t, nil)
+
+	var out, errOut bytes.Buffer
+	code := run([]string{
+		"-H", "example.com",
+		"--grade-warning", "Z",
+	}, &out, &errOut)
+	if code != 3 {
+		t.Fatalf("expected exit code 3, got %d", code)
+	}
+	if !strings.Contains(errOut.String(), "--grade-warning") {
+		t.Fatalf("expected error mentioning --grade-warning, got %q", errOut.String())
+	}
+}
+
+func TestGradeModeInvalidCriticalFlagReturnsUnknown(t *testing.T) {
+	stubRunEngine(t, nil)
+
+	var out, errOut bytes.Buffer
+	code := run([]string{
+		"-H", "example.com",
+		"--grade-critical", "X",
+	}, &out, &errOut)
+	if code != 3 {
+		t.Fatalf("expected exit code 3, got %d", code)
+	}
+	if !strings.Contains(errOut.String(), "--grade-critical") {
+		t.Fatalf("expected error mentioning --grade-critical, got %q", errOut.String())
+	}
+}
+
+func TestGradeModeInvalidOrderingReturnsUnknown(t *testing.T) {
+	stubRunEngine(t, nil)
+
+	var out, errOut bytes.Buffer
+	code := run([]string{
+		"-H", "example.com",
+		"--grade-warning", "F",
+		"--grade-critical", "C",
+	}, &out, &errOut)
+	if code != 3 {
+		t.Fatalf("expected exit code 3, got %d", code)
+	}
+}
+
+func TestGradeModeWorstOfSeverityAndGrade(t *testing.T) {
+	// Severity check: ERROR → WARNING (--warning ERROR --critical CRITICAL)
+	// Grade check: grade A → OK (--grade-warning C --grade-critical F)
+	// Result should be WARNING (severity wins)
+	stubRunEngineFunc(t, func(_ engine.RunRequest) ([]engine.LogEntry, error) {
+		return []engine.LogEntry{
+			{Module: "NAMESERVER", Tag: "NS_NO_RESPONSE", Level: "ERROR"},
+		}, nil
+	})
+
+	var out, errOut bytes.Buffer
+	code := run([]string{
+		"-H", "example.com",
+		"--warning", "WARNING",
+		"--critical", "CRITICAL",
+		"--grade-warning", "C",
+		"--grade-critical", "F",
+	}, &out, &errOut)
+	if code != 1 {
+		t.Fatalf("expected exit code 1 (severity WARNING), got %d (stdout=%q)", code, out.String())
+	}
+}
+
+func TestHelpIncludesGradeFlags(t *testing.T) {
+	var out, errOut bytes.Buffer
+	code := run([]string{"--help"}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	help := errOut.String()
+	for _, fragment := range []string{"--grade-warning", "--grade-critical"} {
+		if !strings.Contains(help, fragment) {
+			t.Fatalf("expected %q in usage output", fragment)
+		}
+	}
+}

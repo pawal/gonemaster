@@ -49,7 +49,7 @@ Status: Final
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
-| `DS11_CONSISTENT_SIGNED` | Parent has DS and all child nameservers have DNSKEY — zone is consistently signed. |
+| `DS11_CONSISTENT_SIGNED` | Parent has DS and all child nameservers have DNSKEY - zone is consistently signed. |
 | `DS11_DS_BUT_UNSIGNED_ZONE` | Parent DS indicates signing expectation but child nameservers show no DNSKEY evidence. |
 | `DS11_INCONSISTENT_DS` | Parent nameservers disagree on DS existence. |
 | `DS11_INCONSISTENT_SIGNED_ZONE` | Child nameservers disagree on DNSKEY presence. |
@@ -58,7 +58,7 @@ Status: Final
 | `DS11_PARENT_WITHOUT_DS` | Parent nameservers without DS are listed in mixed-DS state. |
 | `DS11_PARENT_WITH_DS` | Parent nameservers with DS are listed in mixed-DS state. |
 | `DS11_UNDETERMINED_DS` | Parent DS state could not be determined at all. |
-| `DS11_NO_PARENT_DS` | All parent nameservers report no DS record — zone is unsigned from parent view. |
+| `DS11_NO_PARENT_DS` | All parent nameservers report no DS record - zone is unsigned from parent view. |
 | `DS11_UNDETERMINED_SIGNED_ZONE` | Child signed state could not be determined at all. |
 | `IPV4_DISABLED` | IPv4 transport is disabled for queried parent/child rrtypes. |
 | `IPV6_DISABLED` | IPv6 transport is disabled for queried parent/child rrtypes. |

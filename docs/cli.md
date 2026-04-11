@@ -107,6 +107,9 @@ v1.1 keys above when they are present. See:
 | `--badkeys-update` | bool | Download/update badkeys blocklist data and exit. |
 | `--ns NAME[/IP]` | string (repeatable) | Undelegated nameserver input. `NAME` is required, `IP` is optional. May be repeated. Repeat the same `NAME` with different IPs to supply multiple addresses. |
 | `--ds KEYTAG,ALGORITHM,DIGTYPE,DIGEST` | string (repeatable) | Undelegated DS input. May be repeated. |
+| `--score` | bool | Print score/grade summary after the run. |
+| `--no-score` | bool | Suppress score output (wins over `--score` and `--scoring-config`). |
+| `--scoring-config PATH` | string | Custom scoring config JSON file; implies `--score`. |
 | `--no-progress` | bool | Disable progress indicator/spinner. |
 | `--list-tests` | bool | List available test cases and exit. |
 | `--version` | bool | Print version information and exit. |
@@ -198,6 +201,21 @@ gonemaster --domain example.com \
   --ds 12345,13,2,0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF
 ```
 
+Run a test and display score/grade summary:
+```
+gonemaster --score example.com
+```
+
+Use a custom scoring config:
+```
+gonemaster --scoring-config /etc/gonemaster/scoring.json example.com
+```
+
+Score with JSON output (score goes to stderr to avoid polluting JSON):
+```
+gonemaster --json --score example.com | jq
+```
+
 Extract coherent nameserver name/IP pairs from a local run:
 ```
 gonemaster --json-stream --domain example.com \
@@ -262,6 +280,9 @@ Options:
 - `--profile-overrides-file PATH` (JSON/YAML object to merge)
 - `--wait` (wait for completion and print results)
 - `--view summary|modules|raw|json` (aliases: `translated`, `full`) (when `--wait` is used)
+- `--score` (show score/grade after results; requires `--wait`)
+- `--no-score` (suppress scoring output)
+- `--scoring-config PATH` (load custom scoring config from JSON file; implies `--score`)
 
 #### jobs batch
 Submit a batch of jobs.
@@ -281,6 +302,9 @@ Options:
 - `--wait` (wait for batch completion)
 - `--view summary|modules|raw|json` (aliases: `translated`, `full`) (when `--wait` is used)
 - `--per-job` (when waiting, show per-job results instead of only batch summary)
+- `--score` (show score/grade after results; requires `--wait`)
+- `--no-score` (suppress scoring output)
+- `--scoring-config PATH` (load custom scoring config from JSON file; implies `--score`)
 
 #### jobs list
 List jobs with filters.
@@ -331,6 +355,9 @@ Options:
 - `--aggregate` (print a combined summary across all selected jobs)
 - `--per-job` (print per-job summaries/results)
 - `--split-dir PATH` (write per-job results to files; filename includes job id)
+- `--score` (show score/grade after each job's results)
+- `--no-score` (suppress scoring output)
+- `--scoring-config PATH` (load custom scoring config from JSON file; implies `--score`)
 
 This command is the primary way to retrieve results from all jobs in a convenient way.
 
@@ -369,6 +396,9 @@ Options:
 - `--levels NOTICE,WARNING,ERROR,CRITICAL`
 - `--aggregate` (combined summary across the batch)
 - `--per-job` (include per-job results)
+- `--score` (show score/grade after each job's results)
+- `--no-score` (suppress scoring output)
+- `--scoring-config PATH` (load custom scoring config from JSON file; implies `--score`)
 
 #### batches cancel
 Cancel all queued or running jobs in a batch.
@@ -387,6 +417,35 @@ gonemaster-client batches remove BATCH_ID [--cancel-running]
 Notes:
 - Uses the queue remove endpoint for queued jobs only.
 - With `--cancel-running`, running jobs are canceled via per-job cancel requests.
+
+#### runs list
+List completed runs.
+```
+gonemaster-client runs list [options]
+```
+Options:
+- `--tag NAME` (filter by domain tag)
+- `--domain SUBSTR` (filter by domain name substring)
+- `--batch ID` (filter by batch ID)
+- `--level LEVEL` (filter by worst level)
+- `--limit N` (default `100`)
+
+#### runs get
+Fetch metadata for a completed run.
+```
+gonemaster-client runs get RUN_ID
+```
+
+#### runs results
+Fetch test results for a completed run.
+```
+gonemaster-client runs results RUN_ID [options]
+```
+Options:
+- `--view summary|modules|raw|json`
+- `--score` (show score/grade after results)
+- `--no-score` (suppress scoring output)
+- `--scoring-config PATH` (load custom scoring config from JSON file; implies `--score`)
 
 #### queue pause
 Pause queue processing.
@@ -463,6 +522,16 @@ gonemaster-client jobs results job_123 --view raw --format json \
 Fetch translated, readable output (per module):
 ```
 gonemaster-client jobs results job_123 --view translated --locale sv
+```
+
+Show score and grade after fetching job results:
+```
+gonemaster-client jobs results job_123 --score
+```
+
+Use a custom scoring config:
+```
+gonemaster-client jobs results job_123 --scoring-config /etc/gonemaster/scoring.json
 ```
 
 Cancel all queued/running jobs in a batch:

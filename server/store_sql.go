@@ -10,6 +10,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/normalization"
+	"codeberg.org/pawal/gonemaster/scoring"
 )
 
 // rowScanner is satisfied by both *sql.Row and *sql.Rows.
@@ -19,13 +20,19 @@ type rowScanner interface {
 
 // SQLJobStore implements JobStore using a SQL database.
 type SQLJobStore struct {
-	db      *sql.DB
-	dialect sqlDialect
+	db         *sql.DB
+	dialect    sqlDialect
+	scoringCfg scoring.Config
 }
 
 // NewSQLJobStore creates a SQLJobStore backed by db using dialect.
 func NewSQLJobStore(db *sql.DB, dialect sqlDialect) *SQLJobStore {
-	return &SQLJobStore{db: db, dialect: dialect}
+	return &SQLJobStore{db: db, dialect: dialect, scoringCfg: scoring.DefaultConfig()}
+}
+
+// SetScoringConfig sets the scoring configuration used when graduating jobs.
+func (s *SQLJobStore) SetScoringConfig(cfg scoring.Config) {
+	s.scoringCfg = cfg
 }
 
 // ph returns the n-th (1-based) placeholder for this dialect.
@@ -445,6 +452,15 @@ func (s *SQLJobStore) GraduateJob(job Job, engineEntries []engine.LogEntry) erro
 		durationMs = job.FinishedAt.Sub(job.StartedAt).Milliseconds()
 	}
 
+	// Compute score eagerly at graduation time.
+	scoringEntries := make([]scoring.Entry, len(engineEntries))
+	for i, e := range engineEntries {
+		scoringEntries[i] = scoring.Entry{Module: e.Module, Tag: e.Tag, Level: e.Level}
+	}
+	scoreResult := scoring.Compute(job.Domain, scoringEntries, s.scoringCfg)
+	scoreVal := sql.NullInt64{Int64: int64(scoreResult.Score), Valid: true}
+	gradeVal := sql.NullString{String: scoreResult.Grade, Valid: true}
+
 	tx, err := s.db.Begin()
 	if err != nil {
 		return fmt.Errorf("begin graduation tx: %w", err)
@@ -477,15 +493,15 @@ func (s *SQLJobStore) GraduateJob(job Job, engineEntries []engine.LogEntry) erro
 			created_at, started_at, finished_at, duration_ms,
 			sev_notice, sev_warning, sev_error, sev_critical,
 			worst_level, entry_count, profile, profile_id, profile_name,
-			effective_profile, public_id, priority
-		) VALUES (%s)`, s.phRange(1, 21)),
+			effective_profile, public_id, priority, score, grade
+		) VALUES (%s)`, s.phRange(1, 23)),
 		job.ID, domainID, job.Domain, job.BatchID, string(job.Status),
 		s.ts(job.CreatedAt), s.ts(job.StartedAt), s.ts(job.FinishedAt), durationMs,
 		sevNotice, sevWarning, sevError, sevCritical,
 		worstLevel, len(engineEntries), job.Profile, nullInt64Value(job.ProfileID), job.ProfileName,
 		job.EffectiveProfile,
 		sql.NullString{String: job.PublicID, Valid: job.PublicID != ""},
-		int(job.Priority),
+		int(job.Priority), scoreVal, gradeVal,
 	); err != nil {
 		_ = tx.Rollback()
 		return fmt.Errorf("insert run: %w", err)
@@ -503,11 +519,11 @@ func (s *SQLJobStore) GraduateJob(job Job, engineEntries []engine.LogEntry) erro
 	if _, err := tx.Exec(
 		fmt.Sprintf(`UPDATE domains SET
 			latest_run_id=%s, latest_run_at=%s, latest_status=%s,
-			latest_level=%s, run_count=run_count+1
+			latest_level=%s, latest_score=%s, latest_grade=%s, run_count=run_count+1
 		 WHERE id=%s`,
-			s.ph(1), s.ph(2), s.ph(3), s.ph(4), s.ph(5)),
+			s.ph(1), s.ph(2), s.ph(3), s.ph(4), s.ph(5), s.ph(6), s.ph(7)),
 		job.ID, s.ts(job.FinishedAt), string(job.Status),
-		worstLevel, domainID,
+		worstLevel, scoreVal, gradeVal, domainID,
 	); err != nil {
 		_ = tx.Rollback()
 		return fmt.Errorf("update domain: %w", err)
@@ -609,7 +625,12 @@ func (s *SQLJobStore) GetResult(jobID string) (JobResult, bool) {
 	if err != nil {
 		return JobResult{}, false
 	}
-	return buildJobResult(run, entries), true
+	scoringEntries := make([]scoring.Entry, len(entries))
+	for i, e := range entries {
+		scoringEntries[i] = scoring.Entry{Module: e.Module, Tag: e.Tag, Level: e.Level}
+	}
+	sr := scoring.Compute(run.Domain, scoringEntries, s.scoringCfg)
+	return buildJobResult(run, entries, &sr), true
 }
 
 // loadEntries loads all entries for a run, ordered by timestamp.
@@ -694,14 +715,16 @@ func (s *SQLJobStore) scanDomain(row *sql.Row) (Domain, error) {
 		domainName, createdAt     string
 		latestRunID, latestRunAt  sql.NullString
 		latestStatus, latestLevel sql.NullString
+		latestScore               sql.NullInt64
+		latestGrade               sql.NullString
 		runCount                  int
 	)
 	err := row.Scan(&id, &domainName, &latestRunID, &latestRunAt, &latestStatus,
-		&latestLevel, &createdAt, &runCount)
+		&latestLevel, &latestScore, &latestGrade, &createdAt, &runCount)
 	if err != nil {
 		return Domain{}, err
 	}
-	return Domain{
+	d := Domain{
 		ID:           id,
 		Name:         domainName,
 		LatestRunID:  latestRunID.String,
@@ -710,11 +733,19 @@ func (s *SQLJobStore) scanDomain(row *sql.Row) (Domain, error) {
 		LatestLevel:  latestLevel.String,
 		CreatedAt:    parseTimestampStr(createdAt),
 		RunCount:     runCount,
-	}, nil
+	}
+	if latestScore.Valid {
+		v := int(latestScore.Int64)
+		d.LatestScore = &v
+	}
+	if latestGrade.Valid {
+		d.LatestGrade = &latestGrade.String
+	}
+	return d, nil
 }
 
 const domainSelectCols = `SELECT id, name, latest_run_id, latest_run_at, latest_status,
-	latest_level, created_at, run_count FROM domains`
+	latest_level, latest_score, latest_grade, created_at, run_count FROM domains`
 
 func (s *SQLJobStore) getDomainByName(name string) (Domain, error) {
 	row := s.db.QueryRow(domainSelectCols+` WHERE name = `+s.ph(1), name)
@@ -808,7 +839,7 @@ func (s *SQLJobStore) ListDomains(filter DomainFilter) DomainList {
 	dataArgs := append(args, limit, offset)
 
 	query := `SELECT id, name, latest_run_id, latest_run_at, latest_status,
-		latest_level, created_at, run_count FROM domains` + where +
+		latest_level, latest_score, latest_grade, created_at, run_count FROM domains` + where +
 		" ORDER BY name ASC LIMIT " + limitPH + " OFFSET " + offsetPH
 	rows, err := s.db.Query(query, dataArgs...)
 	if err != nil {
@@ -824,13 +855,15 @@ func (s *SQLJobStore) ListDomains(filter DomainFilter) DomainList {
 			name, createdAt           string
 			latestRunID, latestRunAt  sql.NullString
 			latestStatus, latestLevel sql.NullString
+			latestScore               sql.NullInt64
+			latestGrade               sql.NullString
 			runCount                  int
 		)
 		if err := rows.Scan(&id, &name, &latestRunID, &latestRunAt,
-			&latestStatus, &latestLevel, &createdAt, &runCount); err != nil {
+			&latestStatus, &latestLevel, &latestScore, &latestGrade, &createdAt, &runCount); err != nil {
 			continue
 		}
-		items = append(items, Domain{
+		d := Domain{
 			ID:           id,
 			Name:         name,
 			LatestRunID:  latestRunID.String,
@@ -839,7 +872,15 @@ func (s *SQLJobStore) ListDomains(filter DomainFilter) DomainList {
 			LatestLevel:  latestLevel.String,
 			CreatedAt:    parseTimestampStr(createdAt),
 			RunCount:     runCount,
-		})
+		}
+		if latestScore.Valid {
+			v := int(latestScore.Int64)
+			d.LatestScore = &v
+		}
+		if latestGrade.Valid {
+			d.LatestGrade = &latestGrade.String
+		}
+		items = append(items, d)
 	}
 	rows.Close()
 
@@ -1093,9 +1134,10 @@ func (s *SQLJobStore) ListDomainsByTag(tag string, filter DomainFilter) DomainLi
 // GetTagSummary returns the severity distribution of latest runs for domains in tag.
 func (s *SQLJobStore) GetTagSummary(tag string) (TagSummary, bool) {
 	rows, err := s.db.Query(
-		fmt.Sprintf(`SELECT d.latest_level
+		fmt.Sprintf(`SELECT d.latest_level, r.grade
 		 FROM domains d
 		 JOIN domain_tags dt ON dt.domain_id = d.id
+		 LEFT JOIN runs r ON r.id = d.latest_run_id
 		 WHERE dt.tag = %s`, s.ph(1)),
 		tag,
 	)
@@ -1104,12 +1146,13 @@ func (s *SQLJobStore) GetTagSummary(tag string) (TagSummary, bool) {
 	}
 	defer rows.Close()
 
-	summary := TagSummary{Tag: tag}
+	summary := TagSummary{Tag: tag, Grades: map[string]int{}}
 	found := false
 	for rows.Next() {
 		found = true
 		var level sql.NullString
-		if err := rows.Scan(&level); err != nil {
+		var grade sql.NullString
+		if err := rows.Scan(&level, &grade); err != nil {
 			continue
 		}
 		summary.DomainCount++
@@ -1125,6 +1168,9 @@ func (s *SQLJobStore) GetTagSummary(tag string) (TagSummary, bool) {
 		default:
 			summary.OK++
 		}
+		if grade.Valid && grade.String != "" {
+			summary.Grades[grade.String]++
+		}
 	}
 	if !found {
 		return TagSummary{}, false
@@ -1138,7 +1184,7 @@ const runCols = `id, domain_id, domain, batch_id, status,
 	created_at, started_at, finished_at, duration_ms,
 	sev_notice, sev_warning, sev_error, sev_critical,
 	worst_level, entry_count, profile, profile_id, profile_name,
-	effective_profile, public_id, priority`
+	effective_profile, public_id, priority, score, grade`
 
 func (s *SQLJobStore) scanRun(row rowScanner) (Run, error) {
 	var (
@@ -1151,13 +1197,15 @@ func (s *SQLJobStore) scanRun(row rowScanner) (Run, error) {
 		startedAt, finishedAt                                                           sql.NullString
 		publicID                                                                        sql.NullString
 		priority                                                                        int
+		score                                                                           sql.NullInt64
+		grade                                                                           sql.NullString
 	)
 	if err := row.Scan(
 		&id, &domainID, &domain, &batchID, &status,
 		&createdAt, &startedAt, &finishedAt, &durationMs,
 		&sevNotice, &sevWarning, &sevError, &sevCritical,
 		&worstLevel, &entryCount, &profile, &profileID, &profileName,
-		&effectiveProfile, &publicID, &priority,
+		&effectiveProfile, &publicID, &priority, &score, &grade,
 	); err != nil {
 		return Run{}, err
 	}
@@ -1184,6 +1232,13 @@ func (s *SQLJobStore) scanRun(row rowScanner) (Run, error) {
 		PublicID:         publicID.String,
 		Priority:         JobPriority(priority),
 	}
+	if score.Valid {
+		v := int(score.Int64)
+		r.Score = &v
+	}
+	if grade.Valid {
+		r.Grade = &grade.String
+	}
 	r.SeverityTotals = map[string]int{
 		"NOTICE":   sevNotice,
 		"WARNING":  sevWarning,
@@ -1193,6 +1248,30 @@ func (s *SQLJobStore) scanRun(row rowScanner) (Run, error) {
 	return r, nil
 }
 
+// lazyComputeScore loads entries for runID, computes the score, writes it back
+// to the DB, and sets Score/Grade on run. Used for pre-existing rows that have
+// a NULL score because they predate Phase 3.
+func (s *SQLJobStore) lazyComputeScore(run *Run) {
+	entries, err := s.loadEntries(run.ID)
+	if err != nil {
+		return
+	}
+	scoringEntries := make([]scoring.Entry, len(entries))
+	for i, e := range entries {
+		scoringEntries[i] = scoring.Entry{Module: e.Module, Tag: e.Tag, Level: e.Level}
+	}
+	sr := scoring.Compute(run.Domain, scoringEntries, s.scoringCfg)
+	scoreVal := int(sr.Score)
+	run.Score = &scoreVal
+	run.Grade = &sr.Grade
+	// Cache in DB; ignore errors — the in-memory value is still set.
+	_, _ = s.db.Exec(
+		fmt.Sprintf("UPDATE runs SET score = %s, grade = %s WHERE id = %s",
+			s.ph(1), s.ph(2), s.ph(3)),
+		sr.Score, sr.Grade, run.ID,
+	)
+}
+
 // GetRun returns a graduated run by ID.
 func (s *SQLJobStore) GetRun(id string) (Run, bool) {
 	row := s.db.QueryRow(
@@ -1200,6 +1279,9 @@ func (s *SQLJobStore) GetRun(id string) (Run, bool) {
 	run, err := s.scanRun(row)
 	if err != nil {
 		return Run{}, false
+	}
+	if run.Score == nil {
+		s.lazyComputeScore(&run)
 	}
 	return run, true
 }
@@ -1211,6 +1293,9 @@ func (s *SQLJobStore) GetRunByPublicID(publicID string) (Run, bool) {
 	run, err := s.scanRun(row)
 	if err != nil {
 		return Run{}, false
+	}
+	if run.Score == nil {
+		s.lazyComputeScore(&run)
 	}
 	return run, true
 }
@@ -1257,6 +1342,9 @@ func (s *SQLJobStore) ListRuns(filter RunFilter) RunList {
 	if filter.DomainID != 0 {
 		conds = append(conds, "domain_id = "+addArg(filter.DomainID))
 	}
+	if filter.Tag != "" {
+		conds = append(conds, "domain_id IN (SELECT domain_id FROM domain_tags WHERE tag = "+addArg(filter.Tag)+")")
+	}
 	if filter.Domain != "" {
 		conds = append(conds, "LOWER(domain) LIKE "+addArg("%"+strings.ToLower(filter.Domain)+"%"))
 	}
@@ -1268,6 +1356,9 @@ func (s *SQLJobStore) ListRuns(filter RunFilter) RunList {
 	}
 	if filter.WorstLevel != "" {
 		conds = append(conds, "worst_level = "+addArg(filter.WorstLevel))
+	}
+	if filter.Grade != "" {
+		conds = append(conds, "grade = "+addArg(filter.Grade))
 	}
 	if !filter.FinishedAfter.IsZero() {
 		conds = append(conds, "finished_at > "+addArg(formatSortableTimestamp(filter.FinishedAfter)))

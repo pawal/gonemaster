@@ -750,6 +750,54 @@ func TestBatchSummarySupportsFiltersAndEmptyMatches(t *testing.T) {
 	}
 }
 
+func TestBatchSummaryIncludesGrades(t *testing.T) {
+	srv := New(DefaultConfig())
+	batchID := "batch_grades"
+
+	// Graduate two jobs in the same batch.
+	now := time.Now().UTC()
+	for _, domain := range []string{"alpha.example", "beta.example"} {
+		job := Job{
+			ID:         newID("job"),
+			BatchID:    batchID,
+			Domain:     domain,
+			Status:     JobSucceeded,
+			CreatedAt:  now,
+			StartedAt:  now,
+			FinishedAt: now,
+		}
+		if _, err := srv.store.Create(job); err != nil {
+			t.Fatalf("create job: %v", err)
+		}
+		if err := srv.store.GraduateJob(job, nil); err != nil {
+			t.Fatalf("graduate job: %v", err)
+		}
+		// Also record batch metadata so the handler finds it.
+		_ = srv.store.CreateBatch(Batch{ID: batchID, CreatedAt: now, DomainCount: 2})
+	}
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/batches/"+batchID, nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
+	}
+	var summary BatchSummary
+	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(summary.Grades) == 0 {
+		t.Fatal("expected non-empty grades map in batch summary")
+	}
+	total := 0
+	for _, count := range summary.Grades {
+		total += count
+	}
+	if total != 2 {
+		t.Fatalf("expected grades total=2 (one per graduated run), got %d", total)
+	}
+}
+
 func TestCancelJob(t *testing.T) {
 	srv := New(DefaultConfig())
 

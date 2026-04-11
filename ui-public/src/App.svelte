@@ -2,7 +2,7 @@
   import { onMount, onDestroy } from "svelte";
   import { t, locale, loadCatalog } from "./i18n.js";
   import { parseHash, hashFor } from "./router.js";
-  import { getLocales, getJob, getVersion } from "./api.js";
+  import { getLocales, getJob, getVersion, getInfo } from "./api.js";
   import TestForm from "./lib/TestForm.svelte";
   import Progress from "./lib/Progress.svelte";
   import Results from "./lib/Results.svelte";
@@ -51,6 +51,8 @@
   let resultLocale = "en";
   let versionGonemaster = "";
   let versionDNS = "";
+  // Fail-safe default: hide scoring until server confirms it is enabled.
+  let scoringEnabled = false;
 
   async function fetchLocales() {
     try {
@@ -132,6 +134,18 @@
   }
 
   // ── Lifecycle ───────────────────────────────────────────────────────────────
+  async function fetchInfo() {
+    try {
+      const res = await getInfo();
+      if (res.ok) {
+        const data = await res.json();
+        if (typeof data?.show_score_public === "boolean") {
+          scoringEnabled = data.show_score_public;
+        }
+      }
+    } catch (_) { /* keep false — fail-safe */ }
+  }
+
   async function fetchVersion() {
     try {
       const res = await getVersion();
@@ -148,6 +162,7 @@
     applyTheme();
     fetchLocales();
     fetchVersion();
+    fetchInfo();
     applyHash();
   });
 
@@ -202,6 +217,7 @@
         domain={jobDomain}
         locale={resultLocale}
         finishedAt={jobFinishedAt}
+        {scoringEnabled}
       />
     {:else}
       <ExpiredResult on:newtest={resetToIdle} />

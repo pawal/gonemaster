@@ -73,25 +73,53 @@ func (s *Server) handleListEntries(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if strings.TrimSpace(q.Get("format")) == "csv" {
-		writeEntriesCSV(w, result.Items)
+		runScores := make(map[string]runScoreData)
+		for _, e := range result.Items {
+			if _, seen := runScores[e.RunID]; !seen {
+				if run, ok := s.store.GetRun(e.RunID); ok {
+					runScores[e.RunID] = runScoreData{Score: run.Score, Grade: run.Grade}
+				} else {
+					runScores[e.RunID] = runScoreData{}
+				}
+			}
+		}
+		writeEntriesCSV(w, result.Items, runScores)
 		return
 	}
 	writeJSON(w, http.StatusOK, result)
 }
 
+// runScoreData holds the scored grade information for a single run, used when
+// building CSV exports that include per-run score and grade columns.
+type runScoreData struct {
+	Score *int
+	Grade *string
+}
+
 // writeEntriesCSV writes entries as a CSV response with columns:
-// id, run_id, domain_id, domain, timestamp, module, testcase, tag, level, args.
-func writeEntriesCSV(w http.ResponseWriter, entries []Entry) {
+// id, run_id, domain_id, domain, timestamp, module, testcase, tag, level, args, score, grade.
+// runScores maps run IDs to their score/grade; missing entries produce empty columns.
+func writeEntriesCSV(w http.ResponseWriter, entries []Entry, runScores map[string]runScoreData) {
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", `attachment; filename="entries.csv"`)
 	w.WriteHeader(http.StatusOK)
 	cw := csv.NewWriter(w)
-	_ = cw.Write([]string{"id", "run_id", "domain_id", "domain", "timestamp", "module", "testcase", "tag", "level", "args"})
+	_ = cw.Write([]string{"id", "run_id", "domain_id", "domain", "timestamp", "module", "testcase", "tag", "level", "args", "score", "grade"})
 	for _, e := range entries {
 		args := ""
 		if e.Args != nil {
 			b, _ := json.Marshal(e.Args)
 			args = string(b)
+		}
+		score := ""
+		grade := ""
+		if rs, ok := runScores[e.RunID]; ok {
+			if rs.Score != nil {
+				score = strconv.Itoa(*rs.Score)
+			}
+			if rs.Grade != nil {
+				grade = *rs.Grade
+			}
 		}
 		_ = cw.Write([]string{
 			strconv.FormatInt(e.ID, 10),
@@ -104,6 +132,8 @@ func writeEntriesCSV(w http.ResponseWriter, entries []Entry) {
 			e.Tag,
 			e.Level,
 			args,
+			score,
+			grade,
 		})
 	}
 	cw.Flush()

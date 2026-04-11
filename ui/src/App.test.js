@@ -2431,7 +2431,7 @@ describe("App", () => {
     unmount();
   });
 
-  it("shows OK pill for completed job with all-zero severity", async () => {
+  it("shows INFO pill for completed job with all-zero severity", async () => {
     const cleanJob = {
       id: "job_clean",
       domain: "clean.example",
@@ -2459,8 +2459,8 @@ describe("App", () => {
 
     const row = (await screen.findByText(cleanJob.id)).closest(".list-item");
     const headline = row.querySelector(".job-headline");
-    expect(within(headline).getByText("OK")).toBeInTheDocument();
-    expect(within(headline).getByText("OK").className).toContain("severity-info");
+    expect(within(headline).getByText("INFO")).toBeInTheDocument();
+    expect(within(headline).getByText("INFO").className).toContain("severity-info");
 
     unmount();
   });
@@ -3776,6 +3776,7 @@ describe("App", () => {
       rate_limit_enabled: { value: false, source: "default" },
       rate_limit_max: { value: 10, source: "default" },
       rate_limit_window: { value: "10m0s", source: "default" },
+      show_score_admin: { value: true, source: "default" },
     });
 
     const settingsMock = (url, options = {}) => {

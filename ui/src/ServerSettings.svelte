@@ -38,6 +38,13 @@
         { key: "rate_limit_window", type: "text" },
       ],
     },
+    {
+      key: "settings_group_scoring",
+      settings: [
+        { key: "show_score_admin", type: "toggle" },
+        { key: "show_score_public", type: "toggle" },
+      ],
+    },
   ];
 
   const apiFetch = async (path, options = {}) => {

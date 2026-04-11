@@ -58,6 +58,18 @@
   "pub.result_new_test": "Nytt test",
   "pub.result_locale_label": "Meddelandespråk",
 
+  "pub.score_label": "DNS Quality Score",
+  "pub.score_partial": "Partiellt resultat — testning av {stacks} inaktiverades",
+  "pub.score_aplus_criteria": "A+-kriterier",
+  "pub.score_aplus_achieved": "Uppnått",
+  "pub.score_aplus_missing": "{n} saknas",
+  "pub.score_bonus_dnssec_enabled": "DNSSEC aktiverat",
+  "pub.score_bonus_strong_algorithm": "Starkt algoritm (ECDSA / Ed25519)",
+  "pub.score_bonus_nsec3_non_optout": "NSEC3 utan opt-out",
+  "pub.score_bonus_cds_cdnskey_published": "CDS / CDNSKEY publicerat",
+  "pub.score_bonus_ipv6_all_nameservers": "IPv6 på alla namnservrar",
+  "pub.score_bonus_as_diversity": "AS-mångfald för namnservrar",
+
   "pub.result_status_ok": "Inga problem hittades",
   "pub.result_status_notice": "Noteringar",
   "pub.result_status_warning": "Varningar hittades",

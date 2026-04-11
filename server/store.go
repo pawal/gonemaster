@@ -11,6 +11,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/normalization"
+	"codeberg.org/pawal/gonemaster/scoring"
 )
 
 var severityLevels = []string{"NOTICE", "WARNING", "ERROR", "CRITICAL"}
@@ -103,6 +104,8 @@ type JobStore interface {
 type InMemoryJobStore struct {
 	mu sync.RWMutex
 
+	scoringCfg scoring.Config
+
 	// In-flight jobs.
 	jobs      map[string]Job    // jobID → Job
 	publicIDs map[string]string // publicID → jobID
@@ -134,9 +137,17 @@ type InMemoryJobStore struct {
 	settings map[string]string // key → value
 }
 
+// SetScoringConfig sets the scoring configuration used when graduating jobs.
+func (s *InMemoryJobStore) SetScoringConfig(cfg scoring.Config) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.scoringCfg = cfg
+}
+
 // NewInMemoryJobStore creates an empty in-memory job store.
 func NewInMemoryJobStore() *InMemoryJobStore {
 	return &InMemoryJobStore{
+		scoringCfg: scoring.DefaultConfig(),
 		jobs:         map[string]Job{},
 		publicIDs:    map[string]string{},
 		runs:         map[string]Run{},
@@ -322,6 +333,15 @@ func (s *InMemoryJobStore) GraduateJob(job Job, engineEntries []engine.LogEntry)
 		durationMs = job.FinishedAt.Sub(job.StartedAt).Milliseconds()
 	}
 
+	// Compute score eagerly at graduation time.
+	scoringEntries := make([]scoring.Entry, len(engineEntries))
+	for i, e := range engineEntries {
+		scoringEntries[i] = scoring.Entry{Module: e.Module, Tag: e.Tag, Level: e.Level}
+	}
+	scoreResult := scoring.Compute(job.Domain, scoringEntries, s.scoringCfg)
+	scoreVal := scoreResult.Score
+	gradeVal := scoreResult.Grade
+
 	run := Run{
 		ID:               job.ID,
 		DomainID:         domain.ID,
@@ -344,6 +364,8 @@ func (s *InMemoryJobStore) GraduateJob(job Job, engineEntries []engine.LogEntry)
 		ProfileName:      job.ProfileName,
 		EffectiveProfile: job.EffectiveProfile,
 		PublicID:         job.PublicID,
+		Score:            &scoreVal,
+		Grade:            &gradeVal,
 	}
 	run.SeverityTotals = map[string]int{
 		"NOTICE":   sevNotice,
@@ -374,6 +396,8 @@ func (s *InMemoryJobStore) GraduateJob(job Job, engineEntries []engine.LogEntry)
 	domain.LatestRunAt = run.FinishedAt
 	domain.LatestStatus = string(run.Status)
 	domain.LatestLevel = run.WorstLevel
+	domain.LatestScore = run.Score
+	domain.LatestGrade = run.Grade
 	domain.RunCount++
 
 	// Store run and entries.
@@ -399,7 +423,12 @@ func (s *InMemoryJobStore) GetResult(jobID string) (JobResult, bool) {
 		return JobResult{}, false
 	}
 	entries := s.entries[jobID]
-	return buildJobResult(run, entries), true
+	scoringEntries := make([]scoring.Entry, len(entries))
+	for i, e := range entries {
+		scoringEntries[i] = scoring.Entry{Module: e.Module, Tag: e.Tag, Level: e.Level}
+	}
+	sr := scoring.Compute(run.Domain, scoringEntries, s.scoringCfg)
+	return buildJobResult(run, entries, &sr), true
 }
 
 // GetOrCreateDomain returns the domain for name, creating it if necessary.
@@ -716,8 +745,8 @@ func (s *InMemoryJobStore) ListDomainsByTag(tag string, filter DomainFilter) Dom
 	return s.ListDomains(filter)
 }
 
-// GetTagSummary returns the severity distribution for domains with the latest
-// run data in the given tag.
+// GetTagSummary returns the severity and grade distribution for domains with
+// the latest run data in the given tag.
 func (s *InMemoryJobStore) GetTagSummary(tag string) (TagSummary, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -725,7 +754,7 @@ func (s *InMemoryJobStore) GetTagSummary(tag string) (TagSummary, bool) {
 	if !ok {
 		return TagSummary{}, false
 	}
-	summary := TagSummary{Tag: tag, DomainCount: len(domainIDs)}
+	summary := TagSummary{Tag: tag, DomainCount: len(domainIDs), Grades: map[string]int{}}
 	for _, id := range domainIDs {
 		d, ok := s.domainsByID[id]
 		if !ok {
@@ -742,6 +771,11 @@ func (s *InMemoryJobStore) GetTagSummary(tag string) (TagSummary, bool) {
 			summary.Notice++
 		default:
 			summary.OK++
+		}
+		if d.LatestRunID != "" {
+			if run, ok := s.runs[d.LatestRunID]; ok && run.Grade != nil {
+				summary.Grades[*run.Grade]++
+			}
 		}
 	}
 	return summary, true
@@ -806,6 +840,9 @@ func (s *InMemoryJobStore) ListRuns(filter RunFilter) RunList {
 			continue
 		}
 		if filter.WorstLevel != "" && r.WorstLevel != filter.WorstLevel {
+			continue
+		}
+		if filter.Grade != "" && (r.Grade == nil || *r.Grade != filter.Grade) {
 			continue
 		}
 		if !filter.FinishedAfter.IsZero() && r.FinishedAt.Before(filter.FinishedAfter) {
@@ -1231,6 +1268,8 @@ func jobFromRun(r Run) Job {
 		ProfileID:        cloneInt64Ptr(r.ProfileID),
 		ProfileName:      r.ProfileName,
 		EffectiveProfile: r.EffectiveProfile,
+		Score:            r.Score,
+		Grade:            r.Grade,
 	}
 }
 
@@ -1242,8 +1281,9 @@ func cloneInt64Ptr(v *int64) *int64 {
 	return &cloned
 }
 
-// buildJobResult constructs a JobResult from a run and its stored entries.
-func buildJobResult(r Run, entries []Entry) JobResult {
+// buildJobResult constructs a JobResult from a run, its stored entries, and a
+// pre-computed scoring result. scoreResult may be nil when scoring is unavailable.
+func buildJobResult(r Run, entries []Entry, scoreResult *scoring.Result) JobResult {
 	result := JobResult{
 		JobID:   r.ID,
 		BatchID: r.BatchID,
@@ -1257,6 +1297,7 @@ func buildJobResult(r Run, entries []Entry) JobResult {
 				"CRITICAL": r.SevCritical,
 			},
 		},
+		Score: scoreResult,
 	}
 	if len(entries) > 0 {
 		resultEntries := make([]JobResultEntry, len(entries))

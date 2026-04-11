@@ -58,6 +58,18 @@
   "pub.result_new_test": "Nouveau test",
   "pub.result_locale_label": "Langue des messages",
 
+  "pub.score_label": "DNS Quality Score",
+  "pub.score_partial": "Score partiel — le test {stacks} était désactivé",
+  "pub.score_aplus_criteria": "Critères A+",
+  "pub.score_aplus_achieved": "Obtenu",
+  "pub.score_aplus_missing": "{n} non satisfait(s)",
+  "pub.score_bonus_dnssec_enabled": "DNSSEC activé",
+  "pub.score_bonus_strong_algorithm": "Algorithme fort (ECDSA / Ed25519)",
+  "pub.score_bonus_nsec3_non_optout": "NSEC3 sans opt-out",
+  "pub.score_bonus_cds_cdnskey_published": "CDS / CDNSKEY publié",
+  "pub.score_bonus_ipv6_all_nameservers": "IPv6 sur tous les serveurs de noms",
+  "pub.score_bonus_as_diversity": "Diversité AS des serveurs de noms",
+
   "pub.result_status_ok": "Aucun problème détecté",
   "pub.result_status_notice": "Notices",
   "pub.result_status_warning": "Avertissements détectés",

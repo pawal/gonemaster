@@ -17,6 +17,7 @@
   export let domain = "";
   export let locale = "en";
   export let finishedAt = null;
+  export let scoringEnabled = false;
 
   $: finishedStr = (() => {
     if (!finishedAt) return "";
@@ -25,7 +26,7 @@
   })();
 
   let entries = [];
-  let tcDescs = {};
+  let score = null;
   let loading = true;
   let errorKey = "";
   const NOTICE_IDX = LEVELS.indexOf("NOTICE");
@@ -39,6 +40,7 @@
   async function fetchResult(pid, loc) {
     loading = true;
     errorKey = "";
+    score = null;
     try {
       const res = await getResult(pid, loc);
       if (!res.ok) {
@@ -48,7 +50,7 @@
       }
       const data = await res.json();
       entries = data.raw?.entries ?? [];
-      tcDescs = data.testcase_descriptions ?? {};
+      score = data.score ?? null;
       loading = false;
     } catch (_) {
       errorKey = "pub.error_network";
@@ -79,6 +81,50 @@
   $: overallLevel = worstLevel(entries);
   $: bannerCls = bannerClass(overallLevel);
   $: statusKey = `pub.result_status_${bannerCls}`;
+
+  // ── Scoring helpers ──────────────────────────────────────────────────────────
+
+  // Fixed display order for scoring categories.
+  const CAT_ORDER = ["dnssec", "nameserver_health", "connectivity", "zone_consistency"];
+
+  const CAT_LABELS = {
+    dnssec:             "DNSSEC",
+    nameserver_health:  "Nameserver",
+    connectivity:       "Connectivity",
+    zone_consistency:   "Zone",
+  };
+
+  function catLabel(cat) {
+    return CAT_LABELS[cat] ?? cat.replace(/_/g, " ");
+  }
+
+  // Returns a color for a category sub-score bar (0–100).
+  function categoryColor(s) {
+    if (s >= 90) return "#22c55e";
+    if (s >= 75) return "#84cc16";
+    if (s >= 60) return "#ca8a04";
+    if (s >= 40) return "#ea580c";
+    return "#dc2626";
+  }
+
+  // Sorted category entries in display order.
+  $: sortedCats = score?.categories
+    ? CAT_ORDER.filter(c => c in score.categories).map(c => [c, score.categories[c]])
+    : [];
+
+  // Translate a bonus criterion key via i18n, falling back to humanised key.
+  // Reactive so the template re-evaluates when $t changes (e.g. on locale switch).
+  $: bonusLabel = (key) => {
+    const k = `pub.score_bonus_${key}`;
+    const s = $t(k);
+    return s !== k ? s : key.replace(/_/g, " ");
+  };
+
+  // Number of unmet bonus criteria (null = not applicable, counts as met).
+  $: bonusMissing = score?.bonus?.criteria
+    ? Object.entries(score.bonus.criteria)
+        .filter(([k, v]) => k !== "no_warnings_or_errors" && v === false).length
+    : 0;
 </script>
 
 <div class="card stack" data-testid="results-view">
@@ -93,9 +139,62 @@
           <h2 class="result-heading">{$t("pub.result_heading", { domain })}</h2>
           {#if finishedStr}<p class="result-date small">{finishedStr}</p>{/if}
         </div>
-        <ShareButton {publicID} />
+        <ShareButton {publicID} {domain} score={scoringEnabled ? score : null} />
       </div>
     {/if}
+
+    {#if scoringEnabled && score}
+      <div class="score-card" data-testid="score-card">
+        <div class="score-left">
+          <div class="grade-badge" data-grade={score.grade}>
+            <span class="grade-letter">{score.grade}</span>
+          </div>
+          <div class="score-meta">
+            <div class="score-number">{score.score}<span class="score-denom">/100</span></div>
+            <div class="score-label">{$t("pub.score_label")}</div>
+          </div>
+        </div>
+        {#if sortedCats.length > 0}
+          <div class="score-cats">
+            {#each sortedCats as [cat, res], i}
+              <div class="score-cat-row">
+                <span class="score-cat-name">{catLabel(cat)}</span>
+                <div class="score-cat-bar-track">
+                  <div
+                    class="score-cat-bar"
+                    style="--bar-pct:{res.score}%; --bar-color:{categoryColor(res.score)}; animation-delay:{i * 60}ms"
+                  ></div>
+                </div>
+                <span class="score-cat-num">{res.score}</span>
+              </div>
+            {/each}
+          </div>
+        {/if}
+      </div>
+      {#if score.disabled_stacks?.length > 0}
+        <p class="score-partial-notice">{$t("pub.score_partial", { stacks: score.disabled_stacks.join(", ") })}</p>
+      {/if}
+      {#if score.bonus?.criteria && Object.keys(score.bonus.criteria).length > 0}
+        <details class="score-bonus">
+          <summary class="score-bonus-summary">
+            <span class="score-bonus-chevron"></span>
+            <span class="score-bonus-title">{$t("pub.score_aplus_criteria")}</span>
+            <span class="score-bonus-status" data-met={score.bonus.eligible ? "yes" : "no"}>
+              {score.bonus.eligible ? $t("pub.score_aplus_achieved") : $t("pub.score_aplus_missing", { n: bonusMissing })}
+            </span>
+          </summary>
+          <div class="score-bonus-list">
+            {#each Object.entries(score.bonus.criteria).filter(([k]) => k !== "no_warnings_or_errors") as [key, val]}
+              <div class="score-bonus-item" data-met={val === null ? "na" : val ? "yes" : "no"}>
+                <span class="score-bonus-icon">{val === null ? "–" : val ? "✓" : "✗"}</span>
+                <span>{bonusLabel(key)}</span>
+              </div>
+            {/each}
+          </div>
+        </details>
+      {/if}
+    {/if}
+
     <div class="status-banner {bannerCls}" data-testid="result-banner" role="status">
       {$t(statusKey)}
     </div>

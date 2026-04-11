@@ -242,6 +242,17 @@ func (s *Server) handleBatchByID(w http.ResponseWriter, r *http.Request) {
 	// Collect all graduated runs for this batch.
 	allRuns := s.store.ListRuns(RunFilter{BatchID: batchID, Limit: 10000})
 
+	// Build grade distribution from graduated runs.
+	grades := map[string]int{}
+	for _, run := range allRuns.Items {
+		if run.Grade != nil && *run.Grade != "" {
+			grades[*run.Grade]++
+		}
+	}
+	if len(grades) == 0 {
+		grades = nil
+	}
+
 	// Build combined item list (jobs + runs converted to jobs).
 	combined := make([]Job, 0, len(allJobs.Items)+len(allRuns.Items))
 	combined = append(combined, allJobs.Items...)
@@ -353,6 +364,7 @@ func (s *Server) handleBatchByID(w http.ResponseWriter, r *http.Request) {
 		Tag:          batchRecord.Tag,
 		Total:        total,
 		StatusCounts: statusCounts,
+		Grades:       grades,
 		Items:        pageItems,
 		Limit:        limit,
 		Offset:       offset,
@@ -683,6 +695,9 @@ func (s *Server) handleGetJobResult(w http.ResponseWriter, r *http.Request, jobI
 		raw.Locale = locale
 		raw.Entries = localizeResultEntries(result.Raw.Entries, locale)
 		result.Raw = &raw
+	}
+	if !s.cfg.ShowScoreAdmin {
+		result.Score = nil
 	}
 	writeJSON(w, http.StatusOK, result)
 }

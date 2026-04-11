@@ -413,6 +413,11 @@
   "settings_group_resolver": "Resolver og profil",
   "settings_group_database": "Database",
   "settings_group_public_api": "Offentlig API",
+  "settings_group_scoring": "Scoring",
+  "settings_label_show_score_admin": "Vis scoring i admin-grænsefladen",
+  "settings_help_show_score_admin": "Vis karaktermærker, scorevisninger og kategoriopdeling i admin-grænsefladen. Deaktivér for at skjule al scoring-UI.",
+  "settings_label_show_score_public": "Vis scoring i den offentlige brugergrænseflade",
+  "settings_help_show_score_public": "Vis karaktermærke og scorevisning på den offentlige resultatside. Deaktivér for at skjule scoring for besøgende.",
   "profile_load_error": "Kunne ikke indlæse profiler: {error}",
   "profile_deleted": "Profil slettet.",
   "profile_delete_error": "Kunne ikke slette profil: {error}",
@@ -495,5 +500,15 @@
   "profile_compat_fix_error": "Kunne ikke anvende rettelsen: {error}",
   "profile_compat_needs_review": "Kræver gennemgang",
   "profile_library_compat_warning": "{count} profil(er) kræver gennemgang",
-  "profile_library_mark_all_reviewed": "Marker alle som gennemgået"
+  "profile_library_mark_all_reviewed": "Marker alle som gennemgået",
+  "col_score": "Score",
+  "pub.score_aplus_criteria": "A+-kriterier",
+  "pub.score_aplus_achieved": "Opnået",
+  "pub.score_aplus_missing": "{n} mangler",
+  "pub.score_bonus_dnssec_enabled": "DNSSEC aktiveret",
+  "pub.score_bonus_strong_algorithm": "Stærk algoritme (ECDSA / Ed25519)",
+  "pub.score_bonus_nsec3_non_optout": "NSEC3 uden opt-out",
+  "pub.score_bonus_cds_cdnskey_published": "CDS / CDNSKEY publiceret",
+  "pub.score_bonus_ipv6_all_nameservers": "IPv6 på alle navneservere",
+  "pub.score_bonus_as_diversity": "AS-diversitet for navneservere"
 }

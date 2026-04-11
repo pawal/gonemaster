@@ -413,6 +413,11 @@
   "settings_group_resolver": "Resolver in profil",
   "settings_group_database": "Podatkovna baza",
   "settings_group_public_api": "Javni API",
+  "settings_group_scoring": "Ocenjevanje",
+  "settings_label_show_score_admin": "Prikaži ocenjevanje v skrbniškem vmesniku",
+  "settings_help_show_score_admin": "Prikaži oznake ocen, kartice z ocenami in razčlenitev po kategorijah v skrbniškem vmesniku. Onemogočite, da skrijete vse elemente ocenjevanja.",
+  "settings_label_show_score_public": "Prikaži ocenjevanje v javnem vmesniku",
+  "settings_help_show_score_public": "Prikaži značko ocene in kartico z oceno na javni strani rezultatov. Onemogočite, da skrijete ocenjevanje pred obiskovalci.",
   "profile_load_error": "Nalaganje profilov ni uspelo: {error}",
   "profile_deleted": "Profil izbrisan.",
   "profile_delete_error": "Brisanje profila ni uspelo: {error}",
@@ -495,5 +500,15 @@
   "profile_compat_fix_error": "Popravka ni bilo mogoče uporabiti: {error}",
   "profile_compat_needs_review": "Potreben pregled",
   "profile_library_compat_warning": "{count} profilov potrebuje pregled",
-  "profile_library_mark_all_reviewed": "Označi vse kot pregledano"
+  "profile_library_mark_all_reviewed": "Označi vse kot pregledano",
+  "col_score": "Ocena",
+  "pub.score_aplus_criteria": "Merila A+",
+  "pub.score_aplus_achieved": "Doseženo",
+  "pub.score_aplus_missing": "{n} neizpolnjeno",
+  "pub.score_bonus_dnssec_enabled": "DNSSEC omogočen",
+  "pub.score_bonus_strong_algorithm": "Močan algoritem (ECDSA / Ed25519)",
+  "pub.score_bonus_nsec3_non_optout": "NSEC3 brez opt-out",
+  "pub.score_bonus_cds_cdnskey_published": "CDS / CDNSKEY objavljeno",
+  "pub.score_bonus_ipv6_all_nameservers": "IPv6 na vseh imenskih strežnikih",
+  "pub.score_bonus_as_diversity": "AS-raznolikost imenskih strežnikov"
 }

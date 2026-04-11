@@ -3,18 +3,33 @@
   import { hashFor } from "../router.js";
 
   export let publicID;
+  export let domain = "";
+  export let score = null;
+
+  const GRADE_EMOJI = {
+    "A+": "🏆",
+    "A":  "✅",
+    "B":  "🟡",
+    "C":  "⚠️",
+    "D":  "🔴",
+    "F":  "❌",
+  };
 
   let copied = false;
   let timer;
 
   async function share() {
     const url = window.location.origin + window.location.pathname + hashFor("result", publicID);
+    let text = url;
+    if (score && domain) {
+      const emoji = GRADE_EMOJI[score.grade] ?? "🔵";
+      text = `${emoji} ${domain} — DNS grade ${score.grade} (${score.score}/100)\n${url}`;
+    }
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(text);
     } catch (_) {
-      // Fallback: create a temporary input element for environments without clipboard API
       const input = document.createElement("input");
-      input.value = url;
+      input.value = text;
       document.body.appendChild(input);
       input.select();
       document.execCommand("copy");

@@ -438,7 +438,7 @@ ORDER BY d.name;
 
 ### Find which domains use a nameserver IP across a tag
 
-Useful for impact analysis — e.g. finding all TLDs served by a given anycast address:
+Useful for impact analysis - e.g. finding all TLDs served by a given anycast address:
 
 ```sql
 SELECT DISTINCT d.name

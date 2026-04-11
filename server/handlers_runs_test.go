@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"codeberg.org/pawal/gonemaster/engine"
 )
 
 // --- GET /api/v1/runs --------------------------------------------------------
@@ -164,5 +166,210 @@ func TestGetRunResultNotFound(t *testing.T) {
 	srv.Handler().ServeHTTP(resp, req)
 	if resp.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", resp.Code)
+	}
+}
+
+// --- Scoring fields in run responses ----------------------------------------
+
+func TestListRunsIncludeScore(t *testing.T) {
+	srv := New(DefaultConfig())
+	makeGraduatedJob(t, srv, "example.com", JobSucceeded)
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/runs", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var list RunList
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if list.Total != 1 {
+		t.Fatalf("expected total=1, got %d", list.Total)
+	}
+	run := list.Items[0]
+	if run.Score == nil {
+		t.Fatal("run.Score is nil in list response")
+	}
+	if run.Grade == nil {
+		t.Fatal("run.Grade is nil in list response")
+	}
+}
+
+func TestGetRunIncludesScore(t *testing.T) {
+	srv := New(DefaultConfig())
+	d := makeGraduatedJob(t, srv, "example.com", JobSucceeded)
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/runs/"+d.LatestRunID, nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var run Run
+	if err := json.NewDecoder(resp.Body).Decode(&run); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if run.Score == nil {
+		t.Fatal("run.Score is nil in GET /runs/{id} response")
+	}
+	if run.Grade == nil {
+		t.Fatal("run.Grade is nil in GET /runs/{id} response")
+	}
+}
+
+func TestGetRunResultIncludesScore(t *testing.T) {
+	srv := New(DefaultConfig())
+	d := makeGraduatedJob(t, srv, "example.com", JobSucceeded)
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/runs/%s/result", d.LatestRunID), nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
+	}
+	var result JobResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if result.Score == nil {
+		t.Fatal("result.Score is nil in run result response")
+	}
+}
+
+// --- ?grade= filter ----------------------------------------------------------
+
+func TestListRunsFilterByGrade(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	// No-entry job → score 100, grade A (no bonus criteria met → not A+).
+	domA := makeGraduatedJobWithEntries(t, srv, "clean.example", nil)
+
+	// Job with a CRITICAL entry → automatic F.
+	domF := makeGraduatedJobWithEntries(t, srv, "broken.example", []engine.LogEntry{
+		{Module: "BASIC", Tag: "NO_DELEGATION", Level: "CRITICAL"},
+	})
+
+	// Fetch grades so the test isn't hard-coded to specific scoring config.
+	gradeOf := func(runID string) string {
+		run, ok := srv.store.GetRun(runID)
+		if !ok {
+			t.Fatalf("GetRun(%q) returned false", runID)
+		}
+		if run.Grade == nil {
+			t.Fatalf("run %q has nil Grade", runID)
+		}
+		return *run.Grade
+	}
+	gradeA := gradeOf(domA.LatestRunID)
+	gradeF := gradeOf(domF.LatestRunID)
+
+	if gradeA == gradeF {
+		t.Skipf("both runs have the same grade %q; skipping grade filter test", gradeA)
+	}
+
+	// Filter by gradeA — should return exactly the clean run.
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/runs?grade="+gradeA, nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var listA RunList
+	if err := json.NewDecoder(resp.Body).Decode(&listA); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if listA.Total != 1 {
+		t.Fatalf("grade=%s filter: expected total=1, got %d", gradeA, listA.Total)
+	}
+	if listA.Items[0].ID != domA.LatestRunID {
+		t.Fatalf("grade=%s filter: expected run %q, got %q", gradeA, domA.LatestRunID, listA.Items[0].ID)
+	}
+
+	// Filter by gradeF — should return exactly the broken run.
+	resp = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/runs?grade="+gradeF, nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var listF RunList
+	if err := json.NewDecoder(resp.Body).Decode(&listF); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if listF.Total != 1 {
+		t.Fatalf("grade=%s filter: expected total=1, got %d", gradeF, listF.Total)
+	}
+	if listF.Items[0].ID != domF.LatestRunID {
+		t.Fatalf("grade=%s filter: expected run %q, got %q", gradeF, domF.LatestRunID, listF.Items[0].ID)
+	}
+}
+
+// --- Score omission when ShowScoreAdmin=false --------------------------------
+
+func TestRunResultOmitsScoreWhenAdminScoringDisabled(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.ShowScoreAdmin = false
+	srv := New(cfg)
+	d := makeGraduatedJob(t, srv, "example.com", JobSucceeded)
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/runs/%s/result", d.LatestRunID), nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
+	}
+	var result JobResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if result.Score != nil {
+		t.Fatal("expected Score to be nil when ShowScoreAdmin=false")
+	}
+}
+
+func TestListRunsOmitsScoreWhenAdminScoringDisabled(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.ShowScoreAdmin = false
+	srv := New(cfg)
+	makeGraduatedJob(t, srv, "example.com", JobSucceeded)
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/runs", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var list RunList
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(list.Items) == 0 {
+		t.Fatal("expected at least one run")
+	}
+	if list.Items[0].Score != nil || list.Items[0].Grade != nil {
+		t.Fatal("expected Score/Grade to be nil in run list when ShowScoreAdmin=false")
+	}
+}
+
+func TestGetRunOmitsScoreWhenAdminScoringDisabled(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.ShowScoreAdmin = false
+	srv := New(cfg)
+	d := makeGraduatedJob(t, srv, "example.com", JobSucceeded)
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/runs/%s", d.LatestRunID), nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
+	}
+	var run Run
+	if err := json.NewDecoder(resp.Body).Decode(&run); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if run.Score != nil || run.Grade != nil {
+		t.Fatal("expected Score/Grade to be nil when ShowScoreAdmin=false")
 	}
 }

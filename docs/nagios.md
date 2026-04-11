@@ -47,6 +47,8 @@ gonemaster-nagios --domain example.com --profile ./profile.json
 - `--ns` Undelegated nameserver: `name` or `name/ip` (repeatable)
 - `--ds` Undelegated DS record: `keytag,algorithm,digtype,digest` (repeatable; requires `--ns`)
 - `--rrsig-warn-days` Emit WARNING if any apex RRSIG expires within N days (requires DNSSEC04 or dnssec module)
+- `--grade-warning` Grade that triggers Nagios WARNING (e.g. `C`). Valid values: `A+`, `A`, `B`, `C`, `D`, `F`
+- `--grade-critical` Grade that triggers Nagios CRITICAL (e.g. `F`). Valid values: `A+`, `A`, `B`, `C`, `D`, `F`
 
 ## Undelegated testing
 
@@ -68,6 +70,61 @@ gonemaster-nagios -H example.com \
 ```
 
 `--ds` is only valid together with `--ns`; specifying it alone returns exit code 3.
+
+## Grade-based monitoring
+
+Use `--grade-warning` and `--grade-critical` to trigger Nagios states based on
+the computed domain quality grade rather than (or in addition to) raw severity
+levels. The grade is derived from the scoring engine using the same weighted
+penalty model as the server and CLI.
+
+Valid grade values from best to worst: `A+`, `A`, `B`, `C`, `D`, `F`.
+
+When a grade threshold is set, the plugin computes the score after the run and
+appends grade and score information to the output line:
+
+```
+ZONE OK - grade A (score 96)
+ZONE WARNING - grade C (score 63)
+ZONE CRITICAL - grade F (score 8)
+```
+
+Grade-based and severity-based checks run simultaneously; the most critical
+result determines the exit code.
+
+```
+# Warn if grade drops below B, critical if grade is F:
+gonemaster-nagios -H example.se --grade-warning B --grade-critical F
+
+# Grade check only - no severity threshold change:
+gonemaster-nagios -H example.se --grade-warning C --grade-critical F
+
+# Combine grade check with a stricter severity threshold:
+gonemaster-nagios -H example.se \
+    --warning WARNING --critical ERROR \
+    --grade-warning C --grade-critical F
+
+# Full DNSSEC module check with grade monitoring:
+gonemaster-nagios -H example.se --module dnssec \
+    --grade-warning B --grade-critical D
+```
+
+The `--grade-warning` threshold must be a better grade than `--grade-critical`
+(e.g. `--grade-warning C --grade-critical F` is valid; the reverse is not).
+
+Example Icinga2 service with grade-based alerting:
+
+```
+apply Service "dns-grade" {
+    import "generic-service"
+    check_command   = "gonemaster-nagios"
+    vars.domain     = host.vars.dns_zone
+    vars.grade_warn = "C"
+    vars.grade_crit = "F"
+    vars.timeout    = 30
+    assign where host.vars.dns_zone
+}
+```
 
 ## RRSIG expiry monitoring
 

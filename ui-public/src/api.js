@@ -61,3 +61,11 @@ export async function lookupDomain(domain) {
 export async function getVersion() {
   return fetch(`${API_BASE}/version`);
 }
+
+/**
+ * Fetch public server feature flags (e.g. show_score_public).
+ * @returns {Promise<Response>}
+ */
+export async function getInfo() {
+  return fetch(`${API_BASE}/info`);
+}

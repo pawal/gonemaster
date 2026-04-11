@@ -354,3 +354,87 @@ func TestPutSettingsResizesWorkerPool(t *testing.T) {
 		t.Fatalf("expected 3 workers after scale-down, got %d", after)
 	}
 }
+
+func TestPublicInfoEndpointDefault(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/info", nil)
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+
+	var info publicInfoResponse
+	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if !info.ShowScorePublic {
+		t.Fatal("expected show_score_public=true by default")
+	}
+}
+
+func TestPublicInfoEndpointReflectsConfig(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.ShowScorePublic = false
+	srv := New(cfg)
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/info", nil)
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+
+	var info publicInfoResponse
+	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if info.ShowScorePublic {
+		t.Fatal("expected show_score_public=false when disabled in config")
+	}
+}
+
+func TestFeaturesEndpointDefault(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/features", nil)
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+
+	var feat featuresResponse
+	if err := json.NewDecoder(resp.Body).Decode(&feat); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if !feat.ShowScoreAdmin {
+		t.Fatal("expected show_score_admin=true by default")
+	}
+}
+
+func TestFeaturesEndpointReflectsConfig(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.ShowScoreAdmin = false
+	srv := New(cfg)
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/features", nil)
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+
+	var feat featuresResponse
+	if err := json.NewDecoder(resp.Body).Decode(&feat); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if feat.ShowScoreAdmin {
+		t.Fatal("expected show_score_admin=false when disabled in config")
+	}
+}

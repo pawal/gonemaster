@@ -18,6 +18,7 @@ func (s *Server) handleListRuns(w http.ResponseWriter, r *http.Request) {
 		filter.Status = JobStatus(v)
 	}
 	filter.WorstLevel = strings.TrimSpace(q.Get("level"))
+	filter.Grade = strings.TrimSpace(q.Get("grade"))
 
 	if v := strings.TrimSpace(q.Get("finished_after")); v != "" {
 		t, err := parseTime(v)
@@ -57,7 +58,14 @@ func (s *Server) handleListRuns(w http.ResponseWriter, r *http.Request) {
 		filter.Offset = v
 	}
 
-	writeJSON(w, http.StatusOK, s.store.ListRuns(filter))
+	list := s.store.ListRuns(filter)
+	if !s.cfg.ShowScoreAdmin {
+		for i := range list.Items {
+			list.Items[i].Score = nil
+			list.Items[i].Grade = nil
+		}
+	}
+	writeJSON(w, http.StatusOK, list)
 }
 
 // handleGetRun handles GET /api/v1/runs/{id}.
@@ -67,6 +75,10 @@ func (s *Server) handleGetRun(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		writeError(w, http.StatusNotFound, "not_found", "run not found", nil)
 		return
+	}
+	if !s.cfg.ShowScoreAdmin {
+		run.Score = nil
+		run.Grade = nil
 	}
 	writeJSON(w, http.StatusOK, run)
 }
@@ -89,6 +101,9 @@ func (s *Server) handleGetRunResult(w http.ResponseWriter, r *http.Request) {
 		raw.Locale = locale
 		raw.Entries = localizeResultEntries(result.Raw.Entries, locale)
 		result.Raw = &raw
+	}
+	if !s.cfg.ShowScoreAdmin {
+		result.Score = nil
 	}
 	writeJSON(w, http.StatusOK, result)
 }

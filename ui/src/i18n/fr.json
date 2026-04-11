@@ -413,6 +413,11 @@
   "settings_group_resolver": "Résolveur & profil",
   "settings_group_database": "Base de données",
   "settings_group_public_api": "API publique",
+  "settings_group_scoring": "Score",
+  "settings_label_show_score_admin": "Afficher le score dans l'interface d'administration",
+  "settings_help_show_score_admin": "Afficher les badges de note, les cartes de score et les détails par catégorie dans l'interface d'administration. Désactiver pour masquer toute l'interface de notation.",
+  "settings_label_show_score_public": "Afficher le score dans l'interface publique",
+  "settings_help_show_score_public": "Afficher le badge de note et la carte de score sur la page de résultats publique. Désactiver pour masquer le score aux visiteurs.",
   "profile_load_error": "Impossible de charger les profils : {error}",
   "profile_deleted": "Profil supprimé.",
   "profile_delete_error": "Impossible de supprimer le profil : {error}",
@@ -495,5 +500,15 @@
   "profile_compat_fix_error": "Impossible d'appliquer le correctif : {error}",
   "profile_compat_needs_review": "Vérification nécessaire",
   "profile_library_compat_warning": "{count} profil(s) à vérifier",
-  "profile_library_mark_all_reviewed": "Tout marquer comme vérifié"
+  "profile_library_mark_all_reviewed": "Tout marquer comme vérifié",
+  "col_score": "Score",
+  "pub.score_aplus_criteria": "Critères A+",
+  "pub.score_aplus_achieved": "Obtenu",
+  "pub.score_aplus_missing": "{n} non satisfait(s)",
+  "pub.score_bonus_dnssec_enabled": "DNSSEC activé",
+  "pub.score_bonus_strong_algorithm": "Algorithme fort (ECDSA / Ed25519)",
+  "pub.score_bonus_nsec3_non_optout": "NSEC3 sans opt-out",
+  "pub.score_bonus_cds_cdnskey_published": "CDS / CDNSKEY publié",
+  "pub.score_bonus_ipv6_all_nameservers": "IPv6 sur tous les serveurs de noms",
+  "pub.score_bonus_as_diversity": "Diversité AS des serveurs de noms"
 }

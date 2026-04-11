@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
+	"codeberg.org/pawal/gonemaster/scoring"
 )
 
 const publicIDAlphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -94,6 +95,9 @@ type Job struct {
 	ProfileID        *int64         `json:"profile_id,omitempty"`
 	ProfileName      string         `json:"profile_name,omitempty"`
 	EffectiveProfile string         `json:"-"`
+	// Score and Grade are copied from the Run after graduation.
+	Score *int    `json:"score,omitempty"`
+	Grade *string `json:"grade,omitempty"`
 	// Config fields stored as config_json in the DB.
 	Tests         []string                       `json:"-"`
 	Overrides     map[string]any                 `json:"-"`
@@ -110,6 +114,8 @@ type Domain struct {
 	LatestRunAt  time.Time `json:"latest_run_at,omitempty"`
 	LatestStatus string    `json:"latest_status,omitempty"`
 	LatestLevel  string    `json:"latest_level,omitempty"`
+	LatestScore  *int      `json:"latest_score,omitempty"`
+	LatestGrade  *string   `json:"latest_grade,omitempty"`
 	CreatedAt    time.Time `json:"created_at"`
 	RunCount     int       `json:"run_count"`
 	Tags         []string  `json:"tags,omitempty"`
@@ -124,15 +130,16 @@ type Tag struct {
 	DefaultProfileID *int64    `json:"default_profile_id,omitempty"`
 }
 
-// TagSummary holds per-severity domain counts for a tag.
+// TagSummary holds per-severity and per-grade domain counts for a tag.
 type TagSummary struct {
-	Tag         string `json:"tag"`
-	DomainCount int    `json:"domain_count"`
-	OK          int    `json:"ok"`
-	Notice      int    `json:"notice"`
-	Warning     int    `json:"warning"`
-	Error       int    `json:"error"`
-	Critical    int    `json:"critical"`
+	Tag         string         `json:"tag"`
+	DomainCount int            `json:"domain_count"`
+	OK          int            `json:"ok"`
+	Notice      int            `json:"notice"`
+	Warning     int            `json:"warning"`
+	Error       int            `json:"error"`
+	Critical    int            `json:"critical"`
+	Grades      map[string]int `json:"grades,omitempty"`
 }
 
 // Run is a completed execution, graduated from a Job.
@@ -160,6 +167,10 @@ type Run struct {
 	PublicID         string      `json:"public_id,omitempty"`
 	// SeverityTotals mirrors the sev_* columns as a map for API compat.
 	SeverityTotals map[string]int `json:"severity_totals,omitempty"`
+	// Score and Grade are computed by the scoring engine at graduation and
+	// cached in the runs table. Nil when scoring has not yet been computed.
+	Score *int    `json:"score,omitempty"`
+	Grade *string `json:"grade,omitempty"`
 }
 
 // Entry is a single engine log entry stored as a row for SQL analysis.
@@ -242,6 +253,7 @@ type RunFilter struct {
 	Tag            string
 	Status         JobStatus
 	WorstLevel     string
+	Grade          string
 	FinishedAfter  time.Time
 	FinishedBefore time.Time
 	Limit          int
@@ -317,6 +329,9 @@ type JobResult struct {
 	Summary              map[string]any    `json:"summary,omitempty"`
 	Raw                  *JobResultRaw     `json:"raw,omitempty"`
 	TestcaseDescriptions map[string]string `json:"testcase_descriptions,omitempty"`
+	// Score holds the full scoring result. Populated by GetResult; nil when
+	// the run has no entries or scoring is not available.
+	Score *scoring.Result `json:"score,omitempty"`
 }
 
 // JobResultRaw contains the raw log entries for a job.
@@ -393,6 +408,7 @@ type BatchSummary struct {
 	Tag          string         `json:"tag,omitempty"`
 	Total        int            `json:"total"`
 	StatusCounts map[string]int `json:"status_counts"`
+	Grades       map[string]int `json:"grades,omitempty"`
 	Items        []Job          `json:"items"`
 	Limit        int            `json:"limit,omitempty"`
 	Offset       int            `json:"offset,omitempty"`

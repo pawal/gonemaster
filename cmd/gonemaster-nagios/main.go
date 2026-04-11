@@ -18,6 +18,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/i18n"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/scoring"
 )
 
 // stringSliceFlag is a repeatable string flag.
@@ -59,6 +60,88 @@ type severityThresholds struct {
 
 var runEngine = engine.Run
 
+// gradeOrder maps letter grade strings to a numeric ordering (higher = better grade).
+var gradeOrder = map[string]int{
+	"F": 1, "D": 2, "C": 3, "B": 4, "A": 5, "A+": 6,
+}
+
+// gradeThresholds holds parsed grade-based Nagios thresholds.
+type gradeThresholds struct {
+	warningGrade  string
+	warningOrder  int
+	criticalGrade string
+	criticalOrder int
+}
+
+// isActive returns true when at least one grade threshold is set.
+func (g gradeThresholds) isActive() bool {
+	return g.warningGrade != "" || g.criticalGrade != ""
+}
+
+// parseGradeThresholds parses and validates --grade-warning / --grade-critical flag values.
+func parseGradeThresholds(warningGrade, criticalGrade string) (gradeThresholds, error) {
+	gt := gradeThresholds{}
+	if warningGrade != "" {
+		v := strings.ToUpper(strings.TrimSpace(warningGrade))
+		order, ok := gradeOrder[v]
+		if !ok {
+			return gt, fmt.Errorf("--grade-warning must be one of %s", strings.Join(validGradeNames(), ", "))
+		}
+		gt.warningGrade = v
+		gt.warningOrder = order
+	}
+	if criticalGrade != "" {
+		v := strings.ToUpper(strings.TrimSpace(criticalGrade))
+		order, ok := gradeOrder[v]
+		if !ok {
+			return gt, fmt.Errorf("--grade-critical must be one of %s", strings.Join(validGradeNames(), ", "))
+		}
+		gt.criticalGrade = v
+		gt.criticalOrder = order
+	}
+	if warningGrade != "" && criticalGrade != "" && gt.warningOrder <= gt.criticalOrder {
+		return gt, fmt.Errorf("--grade-warning must be a better grade than --grade-critical (e.g. --grade-warning C --grade-critical F)")
+	}
+	return gt, nil
+}
+
+// validGradeNames returns grade names in best-to-worst order for display.
+func validGradeNames() []string {
+	return []string{"A+", "A", "B", "C", "D", "F"}
+}
+
+// statusForGrade maps a domain grade to a Nagios status using the configured thresholds.
+func statusForGrade(grade string, gt gradeThresholds) nagiosStatus {
+	v, ok := gradeOrder[strings.ToUpper(strings.TrimSpace(grade))]
+	if !ok {
+		return nagiosStatus{text: "UNKNOWN", code: 3}
+	}
+	if gt.criticalGrade != "" && v <= gt.criticalOrder {
+		return nagiosStatus{text: "CRITICAL", code: 2}
+	}
+	if gt.warningGrade != "" && v <= gt.warningOrder {
+		return nagiosStatus{text: "WARNING", code: 1}
+	}
+	return nagiosStatus{text: "OK", code: 0}
+}
+
+// worstStatus returns the status with the highest Nagios exit code.
+func worstStatus(a, b nagiosStatus) nagiosStatus {
+	if b.code > a.code {
+		return b
+	}
+	return a
+}
+
+// toScoringEntries converts engine log entries to the scoring package's entry type.
+func toScoringEntries(entries []engine.LogEntry) []scoring.Entry {
+	out := make([]scoring.Entry, len(entries))
+	for i, e := range entries {
+		out[i] = scoring.Entry{Module: e.Module, Tag: e.Tag, Level: e.Level}
+	}
+	return out
+}
+
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 }
@@ -84,6 +167,8 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	var nsFlags stringSliceFlag
 	var dsFlags stringSliceFlag
 	var rrsigWarnDays int
+	var gradeWarningLevel string
+	var gradeCriticalLevel string
 	var showVersion bool
 	var showHelp bool
 	var verbose countFlag
@@ -115,6 +200,9 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		fmt.Fprintln(errOut, "  --ns              Undelegated nameserver: name or name/ip (repeatable)")
 		fmt.Fprintln(errOut, "  --ds              Undelegated DS record: keytag,algo,digtype,digest (repeatable)")
 		fmt.Fprintln(errOut, "  --rrsig-warn-days Warn if any apex RRSIG expires within N days (requires --testcase dnssec04 or --module dnssec)")
+		fmt.Fprintln(errOut, "  --grade-warning   Grade that triggers Nagios WARNING (e.g. C); implies --score")
+		fmt.Fprintln(errOut, "  --grade-critical  Grade that triggers Nagios CRITICAL (e.g. F); implies --score")
+		fmt.Fprintf(errOut, "Grade values: %s\n", strings.Join(validGradeNames(), ", "))
 		fmt.Fprintln(errOut, "")
 		fmt.Fprintln(errOut, "Compatibility aliases:")
 		fmt.Fprintln(errOut, "  --ipv6            Deprecated alias for --force-ipv6")
@@ -158,6 +246,8 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs.Var(&nsFlags, "ns", "Undelegated nameserver: name or name/ip (repeatable)")
 	fs.Var(&dsFlags, "ds", "Undelegated DS record: keytag,algo,digtype,digest (repeatable)")
 	fs.IntVar(&rrsigWarnDays, "rrsig-warn-days", 0, "Warn if any apex RRSIG expires within N days")
+	fs.StringVar(&gradeWarningLevel, "grade-warning", "", "Grade that triggers WARNING (e.g. C)")
+	fs.StringVar(&gradeCriticalLevel, "grade-critical", "", "Grade that triggers CRITICAL (e.g. F)")
 	fs.Var(&verbose, "verbose", "Increase verbosity (repeatable)")
 	fs.Var(&verbose, "v", "Increase verbosity (repeatable)")
 	fs.BoolVar(&showVersion, "version", false, "Print version and exit")
@@ -198,6 +288,11 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	thresholds, thresholdErr := parseSeverityThresholds(warningLevel, criticalLevel)
 	if thresholdErr != nil {
 		fmt.Fprintln(errOut, thresholdErr.Error())
+		return 3
+	}
+	gradeThreshs, gradeErr := parseGradeThresholds(gradeWarningLevel, gradeCriticalLevel)
+	if gradeErr != nil {
+		fmt.Fprintln(errOut, gradeErr.Error())
 		return 3
 	}
 	if timeoutSet && timeoutSeconds < 1 {
@@ -320,9 +415,17 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		return 3
 	}
 
-	status := statusForLevel(maxLevel(entries), thresholds)
+	severityStatus := statusForLevel(maxLevel(entries), thresholds)
+	status := severityStatus
+	gradeInfo := ""
+	if gradeThreshs.isActive() {
+		scoreResult := scoring.Compute(domain, toScoringEntries(entries), scoring.DefaultConfig())
+		gStatus := statusForGrade(scoreResult.Grade, gradeThreshs)
+		status = worstStatus(severityStatus, gStatus)
+		gradeInfo = fmt.Sprintf(" - grade %s (score %d)", scoreResult.Grade, scoreResult.Score)
+	}
 
-	fmt.Fprintf(out, "ZONE %s\n", status.text)
+	fmt.Fprintf(out, "ZONE %s%s\n", status.text, gradeInfo)
 	if verbose > 0 {
 		for _, entry := range entries {
 			if entry.Level == "" || !shouldPrintVerbose(entry.Level, int(verbose)) {

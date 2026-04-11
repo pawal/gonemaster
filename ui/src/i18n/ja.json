@@ -413,6 +413,11 @@
   "settings_group_resolver": "リゾルバーとプロファイル",
   "settings_group_database": "データベース",
   "settings_group_public_api": "公開API",
+  "settings_group_scoring": "スコアリング",
+  "settings_label_show_score_admin": "管理画面でスコアリングを表示",
+  "settings_help_show_score_admin": "管理画面でグレードチップ、スコアカード、カテゴリ別詳細を表示します。無効にするとすべてのスコアリングUIを非表示にします。",
+  "settings_label_show_score_public": "公開UIでスコアリングを表示",
+  "settings_help_show_score_public": "公開結果ページにグレードバッジとスコアカードを表示します。無効にすると訪問者からスコアリングを非表示にします。",
   "profile_load_error": "プロファイルの読み込みに失敗しました: {error}",
   "profile_deleted": "プロファイルを削除しました。",
   "profile_delete_error": "プロファイルの削除に失敗しました: {error}",
@@ -495,5 +500,15 @@
   "profile_compat_fix_error": "修正の適用に失敗しました: {error}",
   "profile_compat_needs_review": "確認が必要",
   "profile_library_compat_warning": "{count} 件のプロファイルの確認が必要です",
-  "profile_library_mark_all_reviewed": "すべて確認済みとしてマーク"
+  "profile_library_mark_all_reviewed": "すべて確認済みとしてマーク",
+  "col_score": "スコア",
+  "pub.score_aplus_criteria": "A+の基準",
+  "pub.score_aplus_achieved": "達成",
+  "pub.score_aplus_missing": "{n}件未達",
+  "pub.score_bonus_dnssec_enabled": "DNSSEC有効",
+  "pub.score_bonus_strong_algorithm": "強いアルゴリズム（ECDSA / Ed25519）",
+  "pub.score_bonus_nsec3_non_optout": "NSEC3（opt-outなし）",
+  "pub.score_bonus_cds_cdnskey_published": "CDS / CDNSKEY公開済み",
+  "pub.score_bonus_ipv6_all_nameservers": "全ネームサーバーでIPv6対応",
+  "pub.score_bonus_as_diversity": "ネームサーバーのAS多様性"
 }

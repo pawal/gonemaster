@@ -413,6 +413,11 @@
   "settings_group_resolver": "Resolver y perfil",
   "settings_group_database": "Base de datos",
   "settings_group_public_api": "API pública",
+  "settings_group_scoring": "Puntuación",
+  "settings_label_show_score_admin": "Mostrar puntuación en la interfaz de administración",
+  "settings_help_show_score_admin": "Mostrar insignias de nota, tarjetas de puntuación y desglose por categorías en la interfaz de administración. Deshabilitar para ocultar toda la interfaz de puntuación.",
+  "settings_label_show_score_public": "Mostrar puntuación en la interfaz pública",
+  "settings_help_show_score_public": "Mostrar la insignia de nota y la tarjeta de puntuación en la página de resultados pública. Deshabilitar para ocultar la puntuación a los visitantes.",
   "profile_load_error": "No se pudieron cargar los perfiles: {error}",
   "profile_deleted": "Perfil eliminado.",
   "profile_delete_error": "No se pudo eliminar el perfil: {error}",
@@ -495,5 +500,15 @@
   "profile_compat_fix_error": "No se pudo aplicar la corrección: {error}",
   "profile_compat_needs_review": "Requiere revisión",
   "profile_library_compat_warning": "{count} perfil(es) requieren revisión",
-  "profile_library_mark_all_reviewed": "Marcar todos como revisados"
+  "profile_library_mark_all_reviewed": "Marcar todos como revisados",
+  "col_score": "Puntuación",
+  "pub.score_aplus_criteria": "Criterios A+",
+  "pub.score_aplus_achieved": "Conseguido",
+  "pub.score_aplus_missing": "{n} incumplido(s)",
+  "pub.score_bonus_dnssec_enabled": "DNSSEC habilitado",
+  "pub.score_bonus_strong_algorithm": "Algoritmo fuerte (ECDSA / Ed25519)",
+  "pub.score_bonus_nsec3_non_optout": "NSEC3 sin opt-out",
+  "pub.score_bonus_cds_cdnskey_published": "CDS / CDNSKEY publicado",
+  "pub.score_bonus_ipv6_all_nameservers": "IPv6 en todos los servidores de nombres",
+  "pub.score_bonus_as_diversity": "Diversidad AS de servidores de nombres"
 }

@@ -270,8 +270,8 @@ func TestRunMigrationsRecordsVersion(t *testing.T) {
 		}
 		versions = append(versions, v)
 	}
-	if len(versions) != 3 || versions[0] != 1 || versions[1] != 2 || versions[2] != 3 {
-		t.Fatalf("expected versions [1 2 3], got %v", versions)
+	if len(versions) != 5 || versions[0] != 1 || versions[1] != 2 || versions[2] != 3 || versions[3] != 4 || versions[4] != 5 {
+		t.Fatalf("expected versions [1 2 3 4 5], got %v", versions)
 	}
 }
 
@@ -2641,6 +2641,128 @@ func TestSQLJobStoreSettingsCRUD(t *testing.T) {
 			all = s.ListSettings()
 			if len(all) != 1 {
 				t.Fatalf("ListSettings after delete: got %d, want 1", len(all))
+			}
+		})
+	}
+}
+
+// ---- Scoring integration tests ---------------------------------------------
+
+func TestGraduateJobStoresScore(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			now := time.Now().UTC()
+			job := Job{
+				ID:         "score-job-1",
+				Domain:     "example.com",
+				Status:     JobSucceeded,
+				CreatedAt:  now.Add(-time.Minute),
+				StartedAt:  now.Add(-30 * time.Second),
+				FinishedAt: now,
+			}
+			if _, err := s.Create(job); err != nil {
+				t.Fatalf("create job: %v", err)
+			}
+			entries := []engine.LogEntry{
+				{Module: "DNSSEC", Tag: "DS07_NOT_SIGNED", Level: "WARNING"},
+				{Module: "BASIC", Tag: "SOME_NOTICE", Level: "NOTICE"},
+			}
+			if err := s.GraduateJob(job, entries); err != nil {
+				t.Fatalf("GraduateJob: %v", err)
+			}
+
+			run, ok := s.GetRun(job.ID)
+			if !ok {
+				t.Fatal("GetRun returned false")
+			}
+			if run.Score == nil {
+				t.Fatal("run.Score is nil after graduation")
+			}
+			if run.Grade == nil {
+				t.Fatal("run.Grade is nil after graduation")
+			}
+
+			// Verify the score is also persisted in the DB (not just in memory).
+			var dbScore sql.NullInt64
+			var dbGrade sql.NullString
+			err := s.db.QueryRow("SELECT score, grade FROM runs WHERE id = ?", job.ID).Scan(&dbScore, &dbGrade)
+			if b.dialect.Placeholder(1) != "?" {
+				// PostgreSQL uses $1 style
+				err = s.db.QueryRow("SELECT score, grade FROM runs WHERE id = $1", job.ID).Scan(&dbScore, &dbGrade)
+			}
+			if err != nil {
+				t.Fatalf("query score/grade from DB: %v", err)
+			}
+			if !dbScore.Valid {
+				t.Fatal("score column is NULL in DB")
+			}
+			if !dbGrade.Valid {
+				t.Fatal("grade column is NULL in DB")
+			}
+			if int(dbScore.Int64) != *run.Score {
+				t.Fatalf("DB score %d != run.Score %d", dbScore.Int64, *run.Score)
+			}
+			if dbGrade.String != *run.Grade {
+				t.Fatalf("DB grade %q != run.Grade %q", dbGrade.String, *run.Grade)
+			}
+		})
+	}
+}
+
+func TestGetRunLazyScoreComputation(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			now := time.Now().UTC()
+			job := Job{
+				ID:         "lazy-score-job",
+				Domain:     "lazy.example",
+				Status:     JobSucceeded,
+				CreatedAt:  now.Add(-time.Minute),
+				StartedAt:  now.Add(-30 * time.Second),
+				FinishedAt: now,
+			}
+			if _, err := s.Create(job); err != nil {
+				t.Fatalf("create job: %v", err)
+			}
+			entries := []engine.LogEntry{
+				{Module: "DNSSEC", Tag: "DS_ALGO_OK", Level: "INFO"},
+				{Module: "BASIC", Tag: "SOME_WARNING", Level: "WARNING"},
+			}
+			if err := s.GraduateJob(job, entries); err != nil {
+				t.Fatalf("GraduateJob: %v", err)
+			}
+
+			// NULL out score/grade to simulate pre-Phase-3 rows.
+			ph := s.ph(1)
+			_, err := s.db.Exec("UPDATE runs SET score = NULL, grade = NULL WHERE id = "+ph, job.ID)
+			if err != nil {
+				t.Fatalf("null out score: %v", err)
+			}
+
+			// GetRun should recompute lazily.
+			run, ok := s.GetRun(job.ID)
+			if !ok {
+				t.Fatal("GetRun returned false")
+			}
+			if run.Score == nil {
+				t.Fatal("run.Score is nil after lazy computation")
+			}
+			if run.Grade == nil {
+				t.Fatal("run.Grade is nil after lazy computation")
+			}
+
+			// Score must have been cached back into the DB.
+			var dbScore sql.NullInt64
+			if err := s.db.QueryRow("SELECT score FROM runs WHERE id = "+ph, job.ID).Scan(&dbScore); err != nil {
+				t.Fatalf("query score from DB: %v", err)
+			}
+			if !dbScore.Valid {
+				t.Fatal("score not cached back to DB after lazy computation")
+			}
+			if int(dbScore.Int64) != *run.Score {
+				t.Fatalf("cached DB score %d != run.Score %d", dbScore.Int64, *run.Score)
 			}
 		})
 	}

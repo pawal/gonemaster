@@ -84,6 +84,9 @@
   let persistenceReady = false;
   let persistenceSignature = "";
   let initialized = false;
+  // Server-controlled feature flag: whether scoring UI is shown. Defaults to
+  // true so scoring is visible before the features response arrives.
+  let scoringEnabled = true;
   let undelegatedRowCounter = 0;
   let notifyOnJobComplete = false;
   let notifyOnBatchComplete = false;
@@ -925,7 +928,7 @@
   const LEVEL_ORDER = ["DEBUG", "INFO", "NOTICE", "WARNING", "ERROR", "CRITICAL"];
   const normalizeLevel = (value) => (value || "INFO").toUpperCase();
   // Returns the effective display level for a domain. The server only tracks
-  const domainLevel = (d) => d?.latest_level || "";
+  const domainLevel = (d) => d?.latest_level || (d?.latest_run_at ? "INFO" : "");
   const worstLevel = (entries) => {
     if (!entries?.length) return "INFO";
     let worst = 0;
@@ -945,6 +948,20 @@
   const isNoticeOrAbove = (level) => {
     return LEVEL_ORDER.indexOf(normalizeLevel(level)) >= LEVEL_ORDER.indexOf("NOTICE");
   };
+
+  // ── Grade chip helpers ───────────────────────────────────────────────────
+  const CAT_ORDER = ["dnssec", "nameserver_health", "connectivity", "zone_consistency"];
+  const CAT_LABELS = { dnssec: "DNSSEC", nameserver_health: "Nameserver", connectivity: "Connectivity", zone_consistency: "Zone" };
+  const BONUS_HIDDEN = new Set(["no_warnings_or_errors"]);
+  // Returns true when a run/job has a score to display.
+  const hasScore = (item) => item?.score != null && item?.grade != null;
+  const categoryColor = (s) => s >= 80 ? '#22c55e' : s >= 60 ? '#84cc16' : s >= 40 ? '#ca8a04' : '#dc2626';
+  // Returns the full scoring result from either a run (score object) or a
+  // job-list item where score is just an int and grade a string.
+  const chipGrade  = (item) => item?.grade ?? null;
+  const chipScore  = (item) => item?.score ?? null;
+  // Full scoring result — only present on JobResult / selectedJobResult.
+  const resultScore = (result) => result?.score ?? null;
   const formatSeconds = (value) => {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) return "0.00";
@@ -1886,6 +1903,17 @@
     }
   };
 
+  const loadFeatures = async () => {
+    try {
+      const data = await apiFetch("/features");
+      if (data && typeof data.show_score_admin === "boolean") {
+        scoringEnabled = data.show_score_admin;
+      }
+    } catch (_) {
+      // Keep scoringEnabled = true on failure (fail-open for admin UI).
+    }
+  };
+
   const loadLocales = async () => {
     try {
       const data = await apiFetch("/locales");
@@ -2105,6 +2133,7 @@
     loadCatalog(resultLocale);
     loadLocales();
     loadProfiles();
+    loadFeatures();
 
     updateTabFromHash();
     const urlState = readStateFromURL();
@@ -2362,6 +2391,42 @@
               <strong>{selectedRun.entry_count ?? 0}</strong>
               <span>{$t("col_worst_level")}</span>
               <strong><span class="badge level-{(selectedRun.worst_level || '').toLowerCase()}">{selectedRun.worst_level || "—"}</span></strong>
+              {#if scoringEnabled && hasScore(selectedRun)}
+                {@const rs = resultScore(selectedJobResult)}
+                <span>{$t("col_score")}</span>
+                <strong>
+                  <span class="grade-chip-wrap">
+                    <span class="grade-chip">
+                      <span class="grade-chip-letter" data-grade={chipGrade(selectedRun)}>{chipGrade(selectedRun)}</span>
+                      <span class="grade-chip-score">{chipScore(selectedRun)}/100</span>
+                    </span>
+                    {#if rs}
+                      <span class="grade-chip-tooltip">
+                        {#each CAT_ORDER.filter(c => c in (rs.categories ?? {})) as cat}
+                          <div class="grade-tip-row">
+                            <span class="grade-tip-cat">{CAT_LABELS[cat]}</span>
+                            <span class="grade-tip-score">{rs.categories[cat].score}</span>
+                          </div>
+                        {/each}
+                        {#if rs.bonus?.criteria}
+                          {@const bonusCriteria = Object.entries(rs.bonus.criteria).filter(([k]) => !BONUS_HIDDEN.has(k))}
+                          {#if bonusCriteria.length}
+                            <hr class="grade-tip-divider">
+                            <div class="grade-tip-bonus">
+                              {#each bonusCriteria as [key, val]}
+                                <div class="grade-tip-criterion">
+                                  <span class="grade-tip-icon {val === true ? 'met' : val === false ? 'unmet' : ''}">{val === true ? '✓' : val === false ? '✗' : '–'}</span>
+                                  <span>{$t(`pub.score_bonus_${key}`)}</span>
+                                </div>
+                              {/each}
+                            </div>
+                          {/if}
+                        {/if}
+                      </span>
+                    {/if}
+                  </span>
+                </strong>
+              {/if}
             {/if}
           </div>
           {#if selectedJob.error}
@@ -2614,7 +2679,13 @@
                       <span class={`level-pill severity-${entry.level.toLowerCase()}`}>{entry.level} {entry.count}</span>
                     {/each}
                   {:else if job.severity_totals !== undefined}
-                    <span class="level-pill severity-info">OK</span>
+                    <span class="level-pill severity-info">INFO</span>
+                  {/if}
+                  {#if scoringEnabled && hasScore(job)}
+                    <span class="grade-chip">
+                      <span class="grade-chip-letter" data-grade={chipGrade(job)}>{chipGrade(job)}</span>
+                      <span class="grade-chip-score">{chipScore(job)}</span>
+                    </span>
                   {/if}
                 </div>
                 {#if job.batch_id}
@@ -2664,7 +2735,58 @@
           {:else if selectedDomainRunResult}
             {@const allEntries = selectedDomainRunResult?.raw?.entries ?? []}
             {@const bannerCls = bannerClass(worstLevel(allEntries))}
+            {@const sc = selectedDomainRunResult?.score}
             <div class="stack" style="margin-top: 1.25rem;">
+              {#if scoringEnabled && sc}
+                {@const sortedCats = CAT_ORDER.filter(c => c in (sc.categories ?? {})).map(c => [c, sc.categories[c]])}
+                <div class="score-card">
+                  <div class="score-left">
+                    <div class="grade-badge" data-grade={sc.grade}>
+                      <span class="grade-letter">{sc.grade}</span>
+                    </div>
+                    <div class="score-meta">
+                      <div class="score-number">{sc.score}<span class="score-denom">/100</span></div>
+                      <div class="score-label">DNS Quality Score</div>
+                    </div>
+                  </div>
+                  {#if sortedCats.length}
+                    <div class="score-cats">
+                      {#each sortedCats as [cat, res], i}
+                        <div class="score-cat-row">
+                          <span class="score-cat-name">{CAT_LABELS[cat] ?? cat}</span>
+                          <div class="score-cat-bar-track">
+                            <div class="score-cat-bar" style="--bar-pct:{res.score}%; --bar-color:{categoryColor(res.score)}; animation-delay:{i * 60}ms"></div>
+                          </div>
+                          <span class="score-cat-num">{res.score}</span>
+                        </div>
+                      {/each}
+                    </div>
+                  {/if}
+                </div>
+                {#if sc.bonus?.criteria}
+                  {@const bonusCriteria = Object.entries(sc.bonus.criteria).filter(([k]) => !BONUS_HIDDEN.has(k))}
+                  {@const bonusMissing = bonusCriteria.filter(([, v]) => v === false).length}
+                  {#if bonusCriteria.length}
+                    <details class="score-bonus">
+                      <summary class="score-bonus-summary">
+                        <span class="score-bonus-chevron"></span>
+                        <span class="score-bonus-title">{$t("pub.score_aplus_criteria")}</span>
+                        <span class="score-bonus-status" data-met={sc.bonus.eligible ? "yes" : "no"}>
+                          {sc.bonus.eligible ? $t("pub.score_aplus_achieved") : $t("pub.score_aplus_missing", { n: bonusMissing })}
+                        </span>
+                      </summary>
+                      <div class="score-bonus-list">
+                        {#each bonusCriteria as [key, val]}
+                          <div class="score-bonus-item" data-met={val === null ? "na" : val ? "yes" : "no"}>
+                            <span class="score-bonus-icon">{val === null ? "–" : val ? "✓" : "✗"}</span>
+                            <span>{$t(`pub.score_bonus_${key}`)}</span>
+                          </div>
+                        {/each}
+                      </div>
+                    </details>
+                  {/if}
+                {/if}
+              {/if}
               {#if allEntries.length}
                 <div class="status-banner {bannerCls}">{$t(`result_status_${bannerCls}`)}</div>
               {/if}
@@ -2781,6 +2903,7 @@
                   <th>{$t("col_run_id")}</th>
                   <th>{$t("col_finished_at")}</th>
                   <th>{$t("col_worst_level")}</th>
+                  {#if scoringEnabled}<th>{$t("col_score")}</th>{/if}
                   <th>{$t("col_duration")}</th>
                   <th>{$t("col_entries")}</th>
                 </tr>
@@ -2797,7 +2920,8 @@
                   >
                     <td class="run-id-cell" title={run.id}>{run.id}</td>
                     <td>{run.finished_at ? run.finished_at.slice(0, 16).replace("T", " ") : "—"}</td>
-                    <td><span class="badge level-{(run.worst_level || '').toLowerCase()}">{run.worst_level || "—"}</span></td>
+                    <td><span class="badge level-{(run.worst_level || 'info').toLowerCase()}">{run.worst_level || "INFO"}</span></td>
+                    {#if scoringEnabled}<td>{#if hasScore(run)}<span class="grade-chip"><span class="grade-chip-letter" data-grade={chipGrade(run)}>{chipGrade(run)}</span><span class="grade-chip-score">{chipScore(run)}</span></span>{:else}—{/if}</td>{/if}
                     <td>{run.duration_ms != null ? run.duration_ms + "ms" : "—"}</td>
                     <td>{run.entry_count ?? 0}</td>
                   </tr>
@@ -2862,6 +2986,7 @@
                 <th>{$t("col_domain_name")}</th>
                 <th>{$t("col_tags")}</th>
                 <th>{$t("col_latest_level")}</th>
+                {#if scoringEnabled}<th>{$t("col_score")}</th>{/if}
                 <th>{$t("col_latest_run_at")}</th>
                 <th>{$t("col_run_count")}</th>
               </tr>
@@ -2878,6 +3003,7 @@
                   <td class="mono">{d.name}</td>
                   <td>{d.tags ? d.tags.join(", ") : ""}</td>
                   <td>{#if domainLevel(d)}<span class="badge level-{domainLevel(d).toLowerCase()}">{domainLevel(d)}</span>{:else}-{/if}</td>
+                  {#if scoringEnabled}<td>{#if d.latest_grade != null && d.latest_score != null}<span class="grade-chip"><span class="grade-chip-letter" data-grade={d.latest_grade}>{d.latest_grade}</span><span class="grade-chip-score">{d.latest_score}</span></span>{:else}—{/if}</td>{/if}
                   <td>{d.latest_run_at ? d.latest_run_at.slice(0, 10) : "—"}</td>
                   <td>{d.run_count ?? 0}</td>
                 </tr>
@@ -2990,6 +3116,7 @@
             <thead><tr>
               <th>{$t("col_domain_name")}</th>
               <th>{$t("col_latest_level")}</th>
+              {#if scoringEnabled}<th>{$t("col_score")}</th>{/if}
               <th>{$t("col_latest_run_at")}</th>
             </tr></thead>
             <tbody>
@@ -3003,6 +3130,7 @@
                 >
                   <td class="mono">{d.name}</td>
                   <td>{#if domainLevel(d)}<span class="badge level-{domainLevel(d).toLowerCase()}">{domainLevel(d)}</span>{:else}-{/if}</td>
+                  {#if scoringEnabled}<td>{#if d.latest_grade != null && d.latest_score != null}<span class="grade-chip"><span class="grade-chip-letter" data-grade={d.latest_grade}>{d.latest_grade}</span><span class="grade-chip-score">{d.latest_score}</span></span>{:else}—{/if}</td>{/if}
                   <td>{d.latest_run_at ? d.latest_run_at.slice(0, 10) : "—"}</td>
                 </tr>
               {/each}

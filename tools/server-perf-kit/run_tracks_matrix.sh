@@ -9,7 +9,7 @@ Usage:
   run_tracks_matrix.sh --variants FILE --domains FILE [options]
 
 Required:
-  --variants FILE              Variant file: "name ref" per line
+  --variants FILE              Variant file: "name ref [extra-server-flags...]" per line
   --domains FILE               Domain list (one domain per line)
 
 Options:
@@ -271,23 +271,27 @@ jq -n --rawfile lines "$domains_clean" '{domains: ($lines | split("\n") | map(se
 
 variant_names=()
 variant_refs=()
+variant_server_flags=()
 while IFS= read -r raw; do
   line="${raw%%#*}"
   line="$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
   [ -n "$line" ] || continue
   set -- $line
   if [ $# -lt 2 ]; then
-    echo "invalid variants line (need: name ref): $raw" >&2
+    echo "invalid variants line (need: name ref [server-flags...]): $raw" >&2
     exit 1
   fi
   name="$1"
   ref="$2"
+  shift 2
+  extra_flags="$*"
   if ! [[ "$name" =~ ^[A-Za-z0-9._-]+$ ]]; then
     echo "invalid variant name: $name" >&2
     exit 1
   fi
   variant_names+=("$name")
   variant_refs+=("$ref")
+  variant_server_flags+=("$extra_flags")
 done <"$variants_file"
 
 variant_count="${#variant_names[@]}"
@@ -332,6 +336,7 @@ for i in "${!variant_names[@]}"; do
     bin_path="$out_dir/bin/gonemaster-server-$name"
     GOCACHE="$go_cache" go -C "$wt" build -o "$bin_path" ./cmd/gonemaster-server
     bin_sha="$(sha256sum "$bin_path" | awk '{print $1}')"
+    extra_flags="${variant_server_flags[$i]}"
     jq -n \
       --arg name "$name" \
       --arg ref "$ref" \
@@ -339,7 +344,8 @@ for i in "${!variant_names[@]}"; do
       --arg commit_sha "$commit_sha" \
       --arg binary "$bin_path" \
       --arg binary_sha256 "$bin_sha" \
-      '{name:$name,ref:$ref,worktree:$worktree,commit_sha:$commit_sha,binary:$binary,binary_sha256:$binary_sha256}' \
+      --arg server_flags "$extra_flags" \
+      '{name:$name,ref:$ref,worktree:$worktree,commit_sha:$commit_sha,binary:$binary,binary_sha256:$binary_sha256,server_flags:$server_flags}' \
       >"$out_dir/variants/$name.json"
   ) &
   build_pids+=("$!")
@@ -397,9 +403,14 @@ while IFS=$'\t' read -r variant run_index warmup; do
     echo "binary not executable: $binary_path" >&2
     exit 1
   fi
+  variant_server_extra="$(jq -r '.server_flags // ""' "$variant_meta")"
 
   base_url="http://127.0.0.1:$port"
   server_cmd=("$binary_path" "--listen" "127.0.0.1:$port" "--workers" "$workers" "--max-concurrent-jobs" "$max_concurrent_jobs" "--min-level" "$min_level")
+  if [ -n "$variant_server_extra" ]; then
+    read -ra extra_args <<< "$variant_server_extra"
+    server_cmd+=("${extra_args[@]}")
+  fi
   if [ -n "$profile_file" ]; then
     server_cmd+=("--profile" "$profile_file")
   fi

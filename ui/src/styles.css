@@ -681,9 +681,7 @@ button:hover:not(:disabled) {
 }
 
 .module-body {
-  border-top: 1px solid var(--border);
-  padding: 12px 14px;
-  background: var(--surface);
+  padding: 6px 14px 12px;
 }
 
 .result-header {

@@ -444,9 +444,7 @@ details[open] > .module-summary > .module-chevron {
 }
 
 .module-entries {
-  border-top: 1px solid var(--border);
-  padding: 14px 18px;
-  background: var(--surface);
+  padding: 8px 18px 14px;
   display: flex;
   flex-direction: column;
   gap: 6px;

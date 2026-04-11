@@ -3776,6 +3776,7 @@ describe("App", () => {
       rate_limit_enabled: { value: false, source: "default" },
       rate_limit_max: { value: 10, source: "default" },
       rate_limit_window: { value: "10m0s", source: "default" },
+      show_score_admin: { value: true, source: "default" },
     });
 
     const settingsMock = (url, options = {}) => {

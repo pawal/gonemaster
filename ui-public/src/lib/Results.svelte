@@ -135,9 +135,14 @@
   {:else}
     {#if domain}
       <div class="result-heading-row">
-        <div>
-          <h2 class="result-heading">{$t("pub.result_heading", { domain })}</h2>
-          {#if finishedStr}<p class="result-date small">{finishedStr}</p>{/if}
+        <div class="result-meta-row">
+          {#if finishedStr}<span class="result-date">{finishedStr}</span>{/if}
+          {#if scoringEnabled && score}
+            <span class="result-grade-inline">
+              <span class="grade-chip-letter" data-grade={score.grade}>{score.grade}</span>
+              <span class="grade-chip-score-inline">{score.score}/100</span>
+            </span>
+          {/if}
         </div>
         <ShareButton {publicID} {domain} score={scoringEnabled ? score : null} />
       </div>
@@ -201,10 +206,12 @@
     {#each moduleNames as moduleName}
       {@const mod = modules[moduleName]}
       {@const modEntries = allModuleEntries(mod)}
+      {@const modLevel = worstLevel(modEntries)}
       {@const testcases = Object.keys(mod)}
       <details
         class="module-card"
         data-testid="module-group"
+        data-level={modLevel.toLowerCase()}
         open={openModules.has(moduleName)}
         on:toggle={(e) => { if (e.target.open) openModules.add(moduleName); else openModules.delete(moduleName); openModules = openModules; }}
       >

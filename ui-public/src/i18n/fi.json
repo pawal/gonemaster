@@ -50,6 +50,7 @@
   "pub.status_expired": "Vanhentunut",
 
   "pub.progress_testing": "Testataan {domain}…",
+  "pub.progress_testing_label": "Testataan",
   "pub.progress_queued": "Odotetaan jonossa…",
 
   "pub.result_heading": "Tulokset verkkotunnukselle {domain}",

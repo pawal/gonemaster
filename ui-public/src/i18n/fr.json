@@ -50,6 +50,7 @@
   "pub.status_expired": "Expiré",
 
   "pub.progress_testing": "Test de {domain}…",
+  "pub.progress_testing_label": "Test en cours",
   "pub.progress_queued": "En attente dans la file…",
 
   "pub.result_heading": "Résultats pour {domain}",

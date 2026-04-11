@@ -177,7 +177,9 @@
       <h1 class="brand-mark">
         <img class="brand-logo" src={logoSrc} alt="gonemaster" />
       </h1>
-      <p class="subtitle">{$t("pub.app_subtitle")}</p>
+      {#if phase === "done" && jobDomain}
+        <span class="header-domain">{jobDomain}</span>
+      {/if}
     </div>
     <div class="header-controls">
       {#if availableLocales.length > 1}

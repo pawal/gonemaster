@@ -50,6 +50,7 @@
   "pub.status_expired": "Utgången",
 
   "pub.progress_testing": "Testar {domain}…",
+  "pub.progress_testing_label": "Testar",
   "pub.progress_queued": "Väntar i kön…",
 
   "pub.result_heading": "Resultat för {domain}",

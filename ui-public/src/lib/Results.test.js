@@ -140,11 +140,11 @@ describe("Results", () => {
     expect(warnGroup.open).toBe(true);
   });
 
-  it("shows domain heading when domain prop is set", async () => {
+  it("shows share button when domain prop is set", async () => {
     global.fetch.mockResolvedValue(resultResp([]));
     render(Results, { props: { publicID: "abc12345", domain: "example.com" } });
     await waitFor(() =>
-      expect(screen.getByText(/example\.com/)).toBeTruthy()
+      expect(screen.getByTestId("share-button")).toBeTruthy()
     );
   });
 

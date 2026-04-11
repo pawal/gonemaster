@@ -48,19 +48,16 @@
 
   onDestroy(() => clearInterval(timer));
 
-  $: progressText =
-    status === "queued"
-      ? $t("pub.progress_queued")
-      : domain
-      ? $t("pub.progress_testing", { domain })
-      : "";
 </script>
 
 <div class="card stack" data-testid="progress-view">
   {#if errorKey}
     <p class="error-box" role="alert">{$t(errorKey)}</p>
   {:else}
-    <p class="progress-status">{progressText}</p>
+    <p class="progress-status">{status === "queued" ? $t("pub.progress_queued") : $t("pub.progress_testing_label")}</p>
+    {#if domain}
+      <span class="progress-domain">{domain}</span>
+    {/if}
     <div
       class="progress-bar-track"
       role="progressbar"

@@ -370,6 +370,7 @@ details[inert] > summary {
   gap: 12px;
 }
 
+.result-heading { margin: 0; font-size: var(--text-lg); font-weight: 700; }
 .result-date { font-family: var(--mono); font-size: var(--text-xs); color: var(--muted); }
 
 .result-grade-inline {
@@ -730,6 +731,21 @@ details[open] > .testcase-summary .testcase-chevron {
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+.score-domain {
+  font-family: var(--mono);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 2px;
+}
+
+.score-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 2px;
 }
 
 .score-number {

@@ -133,30 +133,19 @@
   {:else if loading}
     <p data-testid="results-loading">{$t("pub.progress_queued")}</p>
   {:else}
-    {#if domain}
-      <div class="result-heading-row">
-        <div class="result-meta-row">
-          {#if finishedStr}<span class="result-date">{finishedStr}</span>{/if}
-          {#if scoringEnabled && score}
-            <span class="result-grade-inline">
-              <span class="grade-chip-letter" data-grade={score.grade}>{score.grade}</span>
-              <span class="grade-chip-score-inline">{score.score}/100</span>
-            </span>
-          {/if}
-        </div>
-        <ShareButton {publicID} {domain} score={scoringEnabled ? score : null} />
-      </div>
-    {/if}
-
-    {#if scoringEnabled && score}
+    {#if scoringEnabled && score && domain}
       <div class="score-card" data-testid="score-card">
         <div class="score-left">
           <div class="grade-badge" data-grade={score.grade}>
             <span class="grade-letter">{score.grade}</span>
           </div>
           <div class="score-meta">
+            <div class="score-domain">{domain}</div>
             <div class="score-number">{score.score}<span class="score-denom">/100</span></div>
-            <div class="score-label">{$t("pub.score_label")}</div>
+            <div class="score-meta-row">
+              {#if finishedStr}<span class="result-date">{finishedStr}</span>{/if}
+              <ShareButton {publicID} {domain} score={scoringEnabled ? score : null} />
+            </div>
           </div>
         </div>
         {#if sortedCats.length > 0}
@@ -198,6 +187,14 @@
           </div>
         </details>
       {/if}
+    {:else if domain}
+      <div class="result-heading-row">
+        <div>
+          <h2 class="result-heading">{$t("pub.result_heading", { domain })}</h2>
+          {#if finishedStr}<p class="result-date small">{finishedStr}</p>{/if}
+        </div>
+        <ShareButton {publicID} {domain} />
+      </div>
     {/if}
 
     <div class="status-banner {bannerCls}" data-testid="result-banner" role="status">

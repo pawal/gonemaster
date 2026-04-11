@@ -401,7 +401,6 @@ details[inert] > summary {
 .module-card[data-level="warning"]  { border-left-color: #fbbf24; }
 .module-card[data-level="error"]    { border-left-color: #fb923c; }
 .module-card[data-level="critical"] { border-left-color: #f87171; }
-}
 
 .module-summary {
   display: flex;

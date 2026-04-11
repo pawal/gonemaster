@@ -283,7 +283,7 @@ details[inert] > summary {
 
 .progress-bar-track {
   position: relative;
-  height: 4px;
+  height: 8px;
   border-radius: 999px;
   background: var(--surface-2);
   overflow: hidden;
@@ -291,10 +291,33 @@ details[inert] > summary {
 
 .progress-bar-fill {
   height: 100%;
-  background: var(--accent-2);
+  background: linear-gradient(90deg, var(--accent) 0%, var(--accent-2) 100%);
   transition: width 0.3s ease;
-  min-width: 4px;
+  min-width: 8px;
   border-radius: 999px;
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-bar-fill::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -50%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.35) 50%,
+    transparent 100%
+  );
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0%   { left: -50%; }
+  100% { left: 150%; }
 }
 
 /* ── Status banner ───────────────────────────────────────────────────────── */

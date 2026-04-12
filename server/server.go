@@ -34,6 +34,7 @@ type Server struct {
 	cancelMu                 sync.Mutex
 	cancels                  map[string]context.CancelFunc
 	rateLimiter              *RateLimiter
+	hotCache                 *nameserverHotCache
 	configSources            map[string]SettingSource
 	retentionDays            atomic.Int64
 }
@@ -134,6 +135,9 @@ func newServer(cfg Config, store JobStore, queue Queue) *Server {
 	}
 	if cfg.PublicAPI.RateLimitEnabled {
 		s.rateLimiter = NewRateLimiter(cfg.PublicAPI.RateLimitMax, cfg.PublicAPI.RateLimitWindow.Duration)
+	}
+	if cfg.CrossJobHotCache {
+		s.hotCache = newNameserverHotCache(0, cfg.EffectiveCrossJobHotCacheTTL())
 	}
 	s.retentionDays.Store(int64(cfg.Database.RetentionDays))
 	s.routes()

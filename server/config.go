@@ -54,6 +54,8 @@ func (d *Duration) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+const defaultCrossJobHotCacheTTLSeconds = 60
+
 // Config controls HTTP server behavior.
 type Config struct {
 	ListenAddr  string `json:"listen_addr"`
@@ -62,6 +64,13 @@ type Config struct {
 	WorkerCount int    `json:"worker_count"`
 	// MaxConcurrentJobs caps engine runs across workers when >0.
 	MaxConcurrentJobs int `json:"max_concurrent_jobs"`
+	// CrossJobHotCache enables sharing of warmed nameserver query/error caches
+	// across consecutive jobs. Caches are keyed by profile and network settings
+	// so jobs with different resolver configs get independent stores.
+	CrossJobHotCache bool `json:"cross_job_hot_cache"`
+	// CrossJobHotCacheTTLSeconds sets how long a hot-cache entry is kept after
+	// its last use. Zero uses the built-in default (60 s).
+	CrossJobHotCacheTTLSeconds int `json:"cross_job_hot_cache_ttl_seconds,omitempty"`
 	// PositiveCacheTTL overrides resolver.defaults.positive_cache_ttl when set.
 	PositiveCacheTTL *int `json:"positive_cache_ttl,omitempty"`
 	// NegativeCacheTTL overrides resolver.defaults.negative_cache_ttl when set.
@@ -136,28 +145,41 @@ type FileConfig struct {
 	PublicURL         *string             `json:"public_url,omitempty"`
 	Database          *DatabaseFileConfig  `json:"database,omitempty"`
 	PublicAPI         *PublicAPIFileConfig `json:"public_api,omitempty"`
-	ScoringConfigPath *string             `json:"scoring_config_path,omitempty"`
-	ShowScoreAdmin    *bool               `json:"show_score_admin,omitempty"`
-	ShowScorePublic   *bool               `json:"show_score_public,omitempty"`
+	ScoringConfigPath          *string             `json:"scoring_config_path,omitempty"`
+	ShowScoreAdmin             *bool               `json:"show_score_admin,omitempty"`
+	ShowScorePublic            *bool               `json:"show_score_public,omitempty"`
+	CrossJobHotCache           *bool               `json:"cross_job_hot_cache,omitempty"`
+	CrossJobHotCacheTTLSeconds *int                `json:"cross_job_hot_cache_ttl_seconds,omitempty"`
 }
 
 // DefaultConfig returns baseline config values.
 func DefaultConfig() Config {
 	return Config{
-		ListenAddr:        "127.0.0.1:8080",
-		MaxBodySize:       1 << 20,
-		Debug:             false,
-		WorkerCount:       4,
-		MaxConcurrentJobs: 0,
-		MinLevel:          "INFO",
-		ShowScoreAdmin:    true,
-		ShowScorePublic:   true,
+		ListenAddr:                 "127.0.0.1:8080",
+		MaxBodySize:                1 << 20,
+		Debug:                      false,
+		WorkerCount:                16,
+		MaxConcurrentJobs:          0,
+		MinLevel:                   "INFO",
+		ShowScoreAdmin:             true,
+		ShowScorePublic:            true,
+		CrossJobHotCache:           true,
+		CrossJobHotCacheTTLSeconds: defaultCrossJobHotCacheTTLSeconds,
 		PublicAPI: PublicAPIConfig{
 			RateLimitEnabled: false,
 			RateLimitMax:     10,
 			RateLimitWindow:  Duration{10 * time.Minute},
 		},
 	}
+}
+
+// EffectiveCrossJobHotCacheTTL returns the hot-cache TTL as a time.Duration.
+func (c Config) EffectiveCrossJobHotCacheTTL() time.Duration {
+	secs := c.CrossJobHotCacheTTLSeconds
+	if secs <= 0 {
+		secs = defaultCrossJobHotCacheTTLSeconds
+	}
+	return time.Duration(secs) * time.Second
 }
 
 // LoadFileConfig loads configuration overrides from a JSON file.
@@ -231,6 +253,12 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 	}
 	if file.ShowScorePublic != nil {
 		c.ShowScorePublic = *file.ShowScorePublic
+	}
+	if file.CrossJobHotCache != nil {
+		c.CrossJobHotCache = *file.CrossJobHotCache
+	}
+	if file.CrossJobHotCacheTTLSeconds != nil {
+		c.CrossJobHotCacheTTLSeconds = *file.CrossJobHotCacheTTLSeconds
 	}
 	if file.Database != nil {
 		if file.Database.Driver != "" {

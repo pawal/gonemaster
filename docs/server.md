@@ -114,6 +114,8 @@ Configuration is applied in priority order (highest wins):
 | `GONEMASTER_PUBLIC_API_RATE_LIMIT_ENABLED` | `public_api.rate_limit_enabled` | `true`/`false`/`1`/`0` |
 | `GONEMASTER_PUBLIC_API_RATE_LIMIT_MAX` | `public_api.rate_limit_max` | integer; requests per window per IP |
 | `GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW` | `public_api.rate_limit_window` | Go duration string e.g. `10m` |
+| `GONEMASTER_CROSS_JOB_HOT_CACHE` | `cross_job_hot_cache` | `true`/`false`/`1`/`0` |
+| `GONEMASTER_CROSS_JOB_HOT_CACHE_TTL` | `cross_job_hot_cache_ttl_seconds` | integer; seconds |
 
 Invalid values for integer or boolean variables emit a warning and are ignored (the server continues with the lower-priority value).
 
@@ -126,22 +128,89 @@ You can do this in the profile used by `profile_path` (or `--profile`), and/or v
 per-job `profile_overrides`.
 
 ### Batch throughput tuning (8-core reference)
-For high-volume batch runs, `--workers` and `--max-concurrent-jobs` have large impact.
+For high-volume batch runs, `--workers` controls parallelism. The sweet spot is
+**2× core count** on typical DNS-testing workloads (mostly I/O-bound with short
+CPU bursts).
 
-Measured on an 8-core host with the fixed 600-domain corpus:
-- `workers=24`, `max-concurrent-jobs=24`: strong throughput gain with moderate tails.
-- `workers=32`, `max-concurrent-jobs=32`: best throughput, but worse p95/p99 tails than 24.
-- `workers>32`: throughput regressed and tail latency worsened.
+Measured on an 8-core host with a 100-domain corpus, three features enabled together
+(hot-cache + fast-fail + w16) deliver roughly **2.8× throughput** vs the old defaults
+(~85 s vs ~236 s for 100 domains):
 
-Recommended starting points for new users on 8-core machines:
-1. Balanced profile:
-   - `--workers 24 --max-concurrent-jobs 24`
-2. Throughput-max profile:
-   - `--workers 32 --max-concurrent-jobs 32`
+| workers | throughput gain vs w8 | p50 latency |
+|---------|-----------------------|-------------|
+| 8       | baseline              | ~1.2 s      |
+| 12      | +28%                  | ~0.9 s      |
+| 16      | +62%  ← recommended   | ~0.7 s      |
+| 24      | +65%                  | ~1.0 s      |
+| 32      | +63%                  | ~1.3 s      |
+| 48      | +55%                  | ~1.9 s      |
 
-If you are latency-sensitive, start at `24/24` and validate before increasing.
-If you are throughput-first, try `32/32` and monitor p95/p99.
-Always re-check on your own network/workload before finalizing defaults.
+The inflection is at w16→w24: only +2% more throughput at +45% higher p50 latency.
+
+The default is `--workers 16`, which is the right starting point for an 8-core host.
+Scale down on smaller machines (e.g. `--workers 4` on 2-core). Scale up only after
+measuring: effective concurrency is `min(workers, max-concurrent-jobs)`, so increasing
+workers beyond that cap has no effect.
+
+### Engine tuning (hot-cache and fast-fail)
+
+Two engine-level features ship enabled by default and are the largest throughput
+contributors. Both are transparent to job results — they affect only latency and
+resource use, not test correctness.
+
+#### Cross-job hot-cache
+
+The hot-cache shares warmed nameserver query/error caches across consecutive jobs.
+When a batch of domains shares the same authoritative nameservers, the second job hits
+the cache instead of repeating the same A/AAAA lookups to the same servers.
+
+Isolated gain over cold-cache baseline: **~+22% throughput, p50 latved by ~50%**.
+
+Configuration:
+
+| Flag / env var | Default | Effect |
+|----------------|---------|--------|
+| `--cross-job-hot-cache` / `GONEMASTER_CROSS_JOB_HOT_CACHE` | `true` | Enable shared cache |
+| `--no-cross-job-hot-cache` | — | Disable |
+| `--cross-job-hot-cache-ttl N` / `GONEMASTER_CROSS_JOB_HOT_CACHE_TTL` | `60` | Entry TTL in seconds |
+
+Caches are keyed by the effective resolver settings (profile path, cache TTLs,
+timeout/retry, source addresses), so jobs with different resolver configs get
+independent cache stores.
+
+In a JSON config file:
+```json
+{
+  "cross_job_hot_cache": true,
+  "cross_job_hot_cache_ttl_seconds": 60
+}
+```
+
+#### Fast-fail on nameserver timeouts
+
+When a nameserver returns consecutive network-timeout errors (not DNS SERVFAIL —
+actual transport timeouts), the engine stops sending queries to that server for the
+remainder of the job. This avoids burning the per-job deadline on a nameserver that
+has already proven unresponsive.
+
+Isolated cumulative gain with hot-cache: **~+74% throughput** vs cold-cache baseline.
+
+The threshold is set via the engine profile (`resolver.defaults.fast_fail_timeout_count`).
+The built-in default is **3** consecutive timeouts before blocking a nameserver.
+
+To adjust per-deployment, use a profile file (`--profile`):
+```json
+{
+  "resolver": {
+    "defaults": {
+      "fast_fail_timeout_count": 3
+    }
+  }
+}
+```
+
+Set to `0` to disable fast-fail entirely. The block is permanent within a single job
+and resets automatically between jobs.
 
 ### Tuning timeouts and retries
 `gonemaster-server` uses the profile defaults for query timing. To tune these,

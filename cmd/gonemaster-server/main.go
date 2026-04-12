@@ -53,6 +53,9 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	var pubAPIRateLimitEnabled bool
 	var pubAPIRateLimitMax int
 	var pubAPIRateLimitWindow time.Duration
+	var crossJobHotCache bool
+	var noCrossJobHotCache bool
+	var crossJobHotCacheTTL int
 	var showVersion bool
 	var dumpConfig bool
 	var shutdownTimeout time.Duration
@@ -74,8 +77,11 @@ func run(args []string, out *os.File, errOut *os.File) int {
 			{flag: "--shutdown-timeout DURATION", detail: "Graceful shutdown timeout (default 10s)"},
 		})
 		printUsageGroup(errOut, "Concurrency", []usageLine{
-			{flag: "--workers N", detail: "Number of worker goroutines (default 4)"},
+			{flag: "--workers N", detail: "Number of worker goroutines (default 16)"},
 			{flag: "--max-concurrent-jobs N", detail: "Max concurrent engine runs (0 = unlimited)"},
+			{flag: "--cross-job-hot-cache", detail: "Enable cross-job nameserver cache sharing (default true)"},
+			{flag: "--no-cross-job-hot-cache", detail: "Disable cross-job nameserver cache sharing"},
+			{flag: "--cross-job-hot-cache-ttl N", detail: "Hot-cache entry TTL in seconds (default 60)"},
 		})
 		printUsageGroup(errOut, "Resolver/Profile", []usageLine{
 			{flag: "--profile PATH", detail: "Profile JSON/YAML path"},
@@ -107,7 +113,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	fs.StringVar(&listen, "listen", "127.0.0.1:8080", "Address to listen on (default 127.0.0.1:8080)")
 	fs.Int64Var(&maxBodySize, "max-body-size", 0, "Max request body size in bytes (default 1048576)")
 	fs.BoolVar(&debug, "debug", false, "Enable request/response logging")
-	fs.IntVar(&workerCount, "workers", 0, "Number of worker goroutines (default 4)")
+	fs.IntVar(&workerCount, "workers", 0, "Number of worker goroutines (default 16)")
 	fs.IntVar(&maxConcurrentJobs, "max-concurrent-jobs", 0, "Max concurrent engine runs (0 = unlimited)")
 	fs.IntVar(&positiveCacheTTL, "positive-cache-ttl", 0, "Seconds to cache positive DNS responses (optional)")
 	fs.IntVar(&negativeCacheTTL, "negative-cache-ttl", 0, "Seconds to cache negative DNS responses (optional)")
@@ -126,6 +132,9 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	fs.BoolVar(&pubAPIRateLimitEnabled, "public-api-rate-limit-enabled", false, "Enable per-IP rate limiting on POST /pub/api/v1/jobs")
 	fs.IntVar(&pubAPIRateLimitMax, "public-api-rate-limit-max", 0, "Max job submissions per IP per window (default 10)")
 	fs.DurationVar(&pubAPIRateLimitWindow, "public-api-rate-limit-window", 0, "Rate limit sliding window e.g. 5m (default 10m)")
+	fs.BoolVar(&crossJobHotCache, "cross-job-hot-cache", false, "Enable cross-job nameserver cache sharing (default true)")
+	fs.BoolVar(&noCrossJobHotCache, "no-cross-job-hot-cache", false, "Disable cross-job nameserver cache sharing")
+	fs.IntVar(&crossJobHotCacheTTL, "cross-job-hot-cache-ttl", 0, "Hot-cache entry TTL in seconds (default 60)")
 	fs.BoolVar(&showVersion, "version", false, "Print version and exit (optional)")
 	fs.BoolVar(&dumpConfig, "dump-config", false, "Print effective config as JSON and exit")
 	fs.DurationVar(&shutdownTimeout, "shutdown-timeout", 10*time.Second, "Graceful shutdown timeout (default 10s)")
@@ -184,6 +193,10 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	}
 	if flagsSet["fallback"] && flagsSet["no-fallback"] {
 		fmt.Fprintln(errOut, "--fallback cannot be combined with --no-fallback")
+		return 2
+	}
+	if flagsSet["cross-job-hot-cache"] && flagsSet["no-cross-job-hot-cache"] {
+		fmt.Fprintln(errOut, "--cross-job-hot-cache cannot be combined with --no-cross-job-hot-cache")
 		return 2
 	}
 	if flagsSet["sourceaddr4"] {
@@ -254,6 +267,15 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	if flagsSet["no-fallback"] {
 		value := false
 		cfg.Fallback = &value
+	}
+	if flagsSet["cross-job-hot-cache"] {
+		cfg.CrossJobHotCache = true
+	}
+	if flagsSet["no-cross-job-hot-cache"] {
+		cfg.CrossJobHotCache = false
+	}
+	if flagsSet["cross-job-hot-cache-ttl"] {
+		cfg.CrossJobHotCacheTTLSeconds = crossJobHotCacheTTL
 	}
 	if flagsSet["sourceaddr4"] {
 		value := strings.TrimSpace(sourceAddr4)

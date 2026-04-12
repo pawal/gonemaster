@@ -229,31 +229,36 @@ type DSData struct {
 type nsState struct {
 	cache           *queryCache
 	errorCache      *errorCache
+	concurrencyCap  *nameserverConcurrencyCap
 	fakeDelegations map[string]delegation
 	fakeDS          map[string][]dns.RR
 	blacklisted     map[bool]bool
+	fastFail        fastFailTracker
 	queryFunc       func(ctx context.Context, name string, qtype string, qclass string, opts *QueryOptions) (packet.Packet, error)
 	axfrFunc        func(ctx context.Context, domain string, callback func(dns.RR) bool, class string) error
 }
 
 // CacheStore keeps nameserver objects and per-address query/error caches.
 type CacheStore struct {
-	mu               sync.Mutex
-	objectCache      map[string]map[string]*Nameserver
-	cacheByAddress   map[string]*queryCache
-	errorCacheByAddr map[string]*errorCache
-	queryMetrics     cacheMetrics
-	errorMetrics     cacheMetrics
-	queryTimes       map[string][]time.Duration
+	mu                sync.Mutex
+	objectCache       map[string]map[string]*Nameserver
+	cacheByAddress    map[string]*queryCache
+	errorCacheByAddr  map[string]*errorCache
+	concurrencyByAddr map[string]*nameserverConcurrencyCap
+	sharedParent      *CacheStore
+	queryMetrics      cacheMetrics
+	errorMetrics      cacheMetrics
+	queryTimes        map[string][]time.Duration
 }
 
 // NewCacheStore creates an empty nameserver cache store.
 func NewCacheStore() *CacheStore {
 	return &CacheStore{
-		objectCache:      map[string]map[string]*Nameserver{},
-		cacheByAddress:   map[string]*queryCache{},
-		errorCacheByAddr: map[string]*errorCache{},
-		queryTimes:       map[string][]time.Duration{},
+		objectCache:       map[string]map[string]*Nameserver{},
+		cacheByAddress:    map[string]*queryCache{},
+		errorCacheByAddr:  map[string]*errorCache{},
+		concurrencyByAddr: map[string]*nameserverConcurrencyCap{},
+		queryTimes:        map[string][]time.Duration{},
 	}
 }
 
@@ -293,13 +298,30 @@ func (c *CacheStore) cacheForAddressWithStatus(addr string) (*queryCache, bool) 
 		return nil, false
 	}
 	c.mu.Lock()
-	defer c.mu.Unlock()
-	created := false
-	if c.cacheByAddress[addr] == nil {
-		c.cacheByAddress[addr] = &queryCache{data: map[string]*packet.Packet{}, met: &c.queryMetrics}
-		created = true
+	if cache := c.cacheByAddress[addr]; cache != nil {
+		c.mu.Unlock()
+		return cache, false
 	}
-	return c.cacheByAddress[addr], created
+	parent := c.sharedParent
+	c.mu.Unlock()
+
+	var parentCache *queryCache
+	if parent != nil {
+		parentCache = parent.cacheForAddress(addr)
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if cache := c.cacheByAddress[addr]; cache != nil {
+		return cache, false
+	}
+	if parentCache != nil {
+		c.cacheByAddress[addr] = parentCache
+		return parentCache, false
+	}
+	cache := &queryCache{data: map[string]*packet.Packet{}, met: &c.queryMetrics}
+	c.cacheByAddress[addr] = cache
+	return cache, true
 }
 
 func (c *CacheStore) errorCacheForAddress(addr string) *errorCache {
@@ -307,11 +329,61 @@ func (c *CacheStore) errorCacheForAddress(addr string) *errorCache {
 		return nil
 	}
 	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.errorCacheByAddr[addr] == nil {
-		c.errorCacheByAddr[addr] = &errorCache{data: map[string]time.Time{}, met: &c.errorMetrics}
+	if cache := c.errorCacheByAddr[addr]; cache != nil {
+		c.mu.Unlock()
+		return cache
 	}
-	return c.errorCacheByAddr[addr]
+	parent := c.sharedParent
+	c.mu.Unlock()
+
+	var parentCache *errorCache
+	if parent != nil {
+		parentCache = parent.errorCacheForAddress(addr)
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if cache := c.errorCacheByAddr[addr]; cache != nil {
+		return cache
+	}
+	if parentCache != nil {
+		c.errorCacheByAddr[addr] = parentCache
+		return parentCache
+	}
+	cache := &errorCache{data: map[string]time.Time{}, met: &c.errorMetrics}
+	c.errorCacheByAddr[addr] = cache
+	return cache
+}
+
+func (c *CacheStore) concurrencyCapForAddress(addr string) *nameserverConcurrencyCap {
+	if c == nil {
+		return nil
+	}
+	c.mu.Lock()
+	if cap := c.concurrencyByAddr[addr]; cap != nil {
+		c.mu.Unlock()
+		return cap
+	}
+	parent := c.sharedParent
+	c.mu.Unlock()
+
+	var parentCap *nameserverConcurrencyCap
+	if parent != nil {
+		parentCap = parent.concurrencyCapForAddress(addr)
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if cap := c.concurrencyByAddr[addr]; cap != nil {
+		return cap
+	}
+	if parentCap != nil {
+		c.concurrencyByAddr[addr] = parentCap
+		return parentCap
+	}
+	cap := &nameserverConcurrencyCap{}
+	c.concurrencyByAddr[addr] = cap
+	return cap
 }
 
 func (c *CacheStore) cachedNameserver(nameKey string, addr string) *Nameserver {
@@ -337,6 +409,88 @@ func (c *CacheStore) storeNameserver(nameKey string, addr string, ns *Nameserver
 		c.objectCache[nameKey] = map[string]*Nameserver{}
 	}
 	c.objectCache[nameKey][addr] = ns
+}
+
+// SnapshotForRun returns a run-local cache store that reuses warmed query/error
+// caches from c while starting with an empty nameserver object cache.
+func (c *CacheStore) SnapshotForRun() *CacheStore {
+	if c == nil {
+		return NewCacheStore()
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	snapshot := &CacheStore{
+		objectCache:       map[string]map[string]*Nameserver{},
+		cacheByAddress:    make(map[string]*queryCache, len(c.cacheByAddress)),
+		errorCacheByAddr:  make(map[string]*errorCache, len(c.errorCacheByAddr)),
+		concurrencyByAddr: make(map[string]*nameserverConcurrencyCap, len(c.concurrencyByAddr)),
+		sharedParent:      c,
+		queryTimes:        map[string][]time.Duration{},
+	}
+	return snapshot
+}
+
+// MergeWarmDataFrom merges warmed query/error caches from other into c.
+//
+// Nameserver object instances are intentionally not merged to avoid sharing
+// mutable adaptation state across runs.
+func (c *CacheStore) MergeWarmDataFrom(other *CacheStore) {
+	if c == nil || other == nil || c == other {
+		return
+	}
+
+	other.mu.Lock()
+	queryByAddress := make(map[string]*queryCache, len(other.cacheByAddress))
+	for addr, cache := range other.cacheByAddress {
+		queryByAddress[addr] = cache
+	}
+	errorByAddress := make(map[string]*errorCache, len(other.errorCacheByAddr))
+	for addr, cache := range other.errorCacheByAddr {
+		errorByAddress[addr] = cache
+	}
+	concurrencyByAddress := make(map[string]*nameserverConcurrencyCap, len(other.concurrencyByAddr))
+	for addr, cap := range other.concurrencyByAddr {
+		concurrencyByAddress[addr] = cap
+	}
+	other.mu.Unlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	for addr, cache := range queryByAddress {
+		if cache == nil {
+			continue
+		}
+		if _, ok := c.cacheByAddress[addr]; ok {
+			continue
+		}
+		cache.mu.Lock()
+		cache.met = &c.queryMetrics
+		cache.mu.Unlock()
+		c.cacheByAddress[addr] = cache
+	}
+	for addr, cache := range errorByAddress {
+		if cache == nil {
+			continue
+		}
+		if _, ok := c.errorCacheByAddr[addr]; ok {
+			continue
+		}
+		cache.mu.Lock()
+		cache.met = &c.errorMetrics
+		cache.mu.Unlock()
+		c.errorCacheByAddr[addr] = cache
+	}
+	for addr, cap := range concurrencyByAddress {
+		if cap == nil {
+			continue
+		}
+		if _, ok := c.concurrencyByAddr[addr]; ok {
+			continue
+		}
+		c.concurrencyByAddr[addr] = cap
+	}
 }
 
 // Empty clears nameserver object caches and query caches.
@@ -373,6 +527,59 @@ func (c *CacheStore) ErrorMetrics() CacheMetrics {
 	return c.errorMetrics.snapshot()
 }
 
+// AddressCacheCount returns the number of per-address query caches accessible
+// from c, including those inherited from the parent chain.
+func (c *CacheStore) AddressCacheCount() int {
+	if c == nil {
+		return 0
+	}
+	seen := map[string]bool{}
+	for cur := c; cur != nil; {
+		cur.mu.Lock()
+		for addr := range cur.cacheByAddress {
+			seen[addr] = true
+		}
+		parent := cur.sharedParent
+		cur.mu.Unlock()
+		cur = parent
+	}
+	return len(seen)
+}
+
+// ErrorCacheCount returns the number of per-address error caches accessible
+// from c, including those inherited from the parent chain.
+func (c *CacheStore) ErrorCacheCount() int {
+	if c == nil {
+		return 0
+	}
+	seen := map[string]bool{}
+	for cur := c; cur != nil; {
+		cur.mu.Lock()
+		for addr := range cur.errorCacheByAddr {
+			seen[addr] = true
+		}
+		parent := cur.sharedParent
+		cur.mu.Unlock()
+		cur = parent
+	}
+	return len(seen)
+}
+
+// NameserverObjectCount returns the number of cached nameserver objects held by c
+// (does not include parent chain — object caches are per-run only).
+func (c *CacheStore) NameserverObjectCount() int {
+	if c == nil {
+		return 0
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	total := 0
+	for _, byAddr := range c.objectCache {
+		total += len(byAddr)
+	}
+	return total
+}
+
 var defaultCache = NewCacheStore()
 
 // DefaultCache returns the fallback cache store.
@@ -394,9 +601,11 @@ func (ns *Nameserver) ensureState() {
 		cache = defaultCache
 		ns.cache = cache
 	}
+	addrKey := ns.Address.String()
 	ns.state = &nsState{
-		cache:           cache.cacheForAddress(ns.Address.String()),
-		errorCache:      cache.errorCacheForAddress(ns.Address.String()),
+		cache:           cache.cacheForAddress(addrKey),
+		errorCache:      cache.errorCacheForAddress(addrKey),
+		concurrencyCap:  cache.concurrencyCapForAddress(addrKey),
 		fakeDelegations: map[string]delegation{},
 		fakeDS:          map[string][]dns.RR{},
 		blacklisted:     map[bool]bool{},

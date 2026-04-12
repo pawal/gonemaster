@@ -95,6 +95,7 @@ func newWithCache(ctx context.Context, cache *CacheStore, name string, address s
 	state := &nsState{
 		cache:           queryCache,
 		errorCache:      cache.errorCacheForAddress(addrKey),
+		concurrencyCap:  cache.concurrencyCapForAddress(addrKey),
 		fakeDelegations: map[string]delegation{},
 		fakeDS:          map[string][]dns.RR{},
 		blacklisted:     map[bool]bool{},
@@ -234,6 +235,20 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 		logSystemWithLogger(runLog, "IS_BLACKLISTED", blArgs)
 		return packet.Packet{}, nil
 	}
+	fastFailThreshold := resolveFastFailTimeoutCount(prof)
+	if ns.state != nil && ns.state.fastFail.shouldSkip(usevc, fastFailThreshold) {
+		skipArgs := map[string]any{
+			"query_name":  qname,
+			"query_type":  qtype,
+			"query_class": qclass,
+			"protocol":    errorCacheProtocol(usevc),
+			"address":     ns.Address.String(),
+		}
+		logargs.SetNS(skipArgs, ns.NameString(), ns.AddressString())
+		logSystemWithLogger(runLog, "FAST_FAIL_SKIP", skipArgs)
+		return packet.Packet{}, nil
+	}
+	nameserverConcurrencyLimit := resolveNameserverConcurrencyLimit(prof)
 
 	var inflight *inflightQuery
 	if ns.state != nil && ns.state.cache != nil {
@@ -267,7 +282,20 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 		}
 	}
 
+	if ns.state != nil && ns.state.concurrencyCap != nil && nameserverConcurrencyLimit > 0 {
+		if err := ns.state.concurrencyCap.acquire(ctx, nameserverConcurrencyLimit); err != nil {
+			if inflight != nil {
+				ns.state.cache.finish(cacheKey, nil, err)
+			}
+			return packet.Packet{}, err
+		}
+		defer ns.state.concurrencyCap.release()
+	}
+
 	resp, err := ns.queryNetwork(ctx, qname, qtype, qclass, opts)
+	if ns.state != nil {
+		ns.state.fastFail.observeResult(usevc, isTimeoutPatternError(err), fastFailThreshold)
+	}
 
 	blacklistingDisabled := opts != nil && opts.BlacklistingDisabled
 	if err != nil && (ctx == nil || ctx.Err() == nil) && qtype == "SOA" && ednsSize == 0 && !blacklistingDisabled {
@@ -631,4 +659,30 @@ func resolveEDNSSize(opts *QueryOptions, dnssec bool) uint16 {
 		return constants.EDNSUDPPayloadDNSSECDefault
 	}
 	return 0
+}
+
+func resolveFastFailTimeoutCount(prof *profile.Profile) int {
+	if prof == nil {
+		prof = profile.Effective()
+	}
+	if prof == nil {
+		return 0
+	}
+	if prof.Resolver.Defaults.FastFailTimeoutCount < 0 {
+		return 0
+	}
+	return prof.Resolver.Defaults.FastFailTimeoutCount
+}
+
+func resolveNameserverConcurrencyLimit(prof *profile.Profile) int {
+	if prof == nil {
+		prof = profile.Effective()
+	}
+	if prof == nil {
+		return 0
+	}
+	if prof.Resolver.Defaults.NameserverConcurrency < 0 {
+		return 0
+	}
+	return prof.Resolver.Defaults.NameserverConcurrency
 }

@@ -15,7 +15,6 @@ import (
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
-	ns "codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 )
 
@@ -241,13 +240,11 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 	if job.MinLevel != "" {
 		minLevel = job.MinLevel
 	}
-	cacheStore := ns.NewCacheStore()
 	req := engine.RunRequest{
 		Domain:                 job.Domain,
 		UndelegatedNameservers: job.UndelegatedNS,
 		UndelegatedDSInfo:      job.UndelegatedDS,
 		MinLevel:               minLevel,
-		NameserverCache:        cacheStore,
 		Context:                ctx,
 	}
 	if s.cfg.PositiveCacheTTL != nil {
@@ -274,6 +271,10 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 	if s.cfg.SourceAddr6 != nil {
 		req.SourceAddr6 = s.cfg.SourceAddr6
 	}
+	hotCacheKey := nameserverHotCacheKey(req)
+	cacheStore, releaseHotCache := s.hotCache.Lease(hotCacheKey)
+	defer releaseHotCache()
+	req.NameserverCache = cacheStore
 
 	queryCounter := &dnsQueryCounter{}
 	callbacks := []func(*logger.Entry) error{

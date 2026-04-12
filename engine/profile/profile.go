@@ -52,6 +52,11 @@ type ResolverDefaults struct {
 	PositiveCacheTTL int `json:"positive_cache_ttl"`
 	// NegativeCacheTTL sets the duration (seconds) to cache negative responses.
 	NegativeCacheTTL int `json:"negative_cache_ttl"`
+	// FastFailTimeoutCount sets how many consecutive timeout-pattern failures
+	// cause a nameserver to be skipped for the remainder of the job. 0 disables.
+	FastFailTimeoutCount int `json:"fast_fail_timeout_count"`
+	// NameserverConcurrency limits concurrent queries per nameserver address. 0 disables.
+	NameserverConcurrency int `json:"nameserver_concurrency"`
 }
 
 // NetSettings holds IP stack enablement flags.

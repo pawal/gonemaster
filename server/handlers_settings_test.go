@@ -205,9 +205,9 @@ func TestApplyDatabaseSettingsRespectsCliFlags(t *testing.T) {
 
 	srv.ApplyDatabaseSettings()
 
-	// CLI flag should win — worker_count stays at default (4).
-	if srv.cfg.WorkerCount != 4 {
-		t.Fatalf("WorkerCount: got %d, want 4 (CLI flag should take precedence)", srv.cfg.WorkerCount)
+	// CLI flag should win — worker_count stays at default (16).
+	if srv.cfg.WorkerCount != 16 {
+		t.Fatalf("WorkerCount: got %d, want 16 (CLI flag should take precedence)", srv.cfg.WorkerCount)
 	}
 	// min_level has no CLI flag override, so DB value applies.
 	if srv.cfg.MinLevel != "ERROR" {
@@ -218,11 +218,11 @@ func TestApplyDatabaseSettingsRespectsCliFlags(t *testing.T) {
 func TestPutSettingsHotReloadsRuntime(t *testing.T) {
 	srv := New(DefaultConfig())
 
-	// Default: rate limiting disabled, worker_count=4.
+	// Default: rate limiting disabled, worker_count=16.
 	if srv.rateLimiter != nil {
 		t.Fatal("expected rateLimiter=nil initially")
 	}
-	if srv.cfg.WorkerCount != 4 {
+	if srv.cfg.WorkerCount != 16 {
 		t.Fatalf("initial WorkerCount: got %d", srv.cfg.WorkerCount)
 	}
 
@@ -300,8 +300,8 @@ func TestApplyDatabaseSettingsIgnoresInvalidValues(t *testing.T) {
 	srv.ApplyDatabaseSettings()
 
 	// Should stay at defaults.
-	if srv.cfg.WorkerCount != 4 {
-		t.Fatalf("WorkerCount: got %d, want 4", srv.cfg.WorkerCount)
+	if srv.cfg.WorkerCount != 16 {
+		t.Fatalf("WorkerCount: got %d, want 16", srv.cfg.WorkerCount)
 	}
 }
 

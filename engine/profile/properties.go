@@ -192,6 +192,28 @@ var propertyDefs = map[string]propertyDef{
 			return p.Resolver.Defaults.NegativeCacheTTL
 		},
 	},
+	"resolver.defaults.fast_fail_timeout_count": {
+		typ: propNum,
+		min: intPtr(0),
+		max: intPtr(100),
+		setter: func(p *Profile, value any) {
+			p.Resolver.Defaults.FastFailTimeoutCount = value.(int)
+		},
+		getter: func(p *Profile) any {
+			return p.Resolver.Defaults.FastFailTimeoutCount
+		},
+	},
+	"resolver.defaults.nameserver_concurrency": {
+		typ: propNum,
+		min: intPtr(0),
+		max: intPtr(256),
+		setter: func(p *Profile, value any) {
+			p.Resolver.Defaults.NameserverConcurrency = value.(int)
+		},
+		getter: func(p *Profile) any {
+			return p.Resolver.Defaults.NameserverConcurrency
+		},
+	},
 	"resolver.source4": {
 		typ:          propStr,
 		defaultValue: "",

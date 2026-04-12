@@ -83,4 +83,6 @@ func applyEnvVars(cfg *server.Config, flagsSet map[string]bool, getenv func(stri
 	applyBool("public-api-rate-limit-enabled", "GONEMASTER_PUBLIC_API_RATE_LIMIT_ENABLED", &cfg.PublicAPI.RateLimitEnabled)
 	applyInt("public-api-rate-limit-max", "GONEMASTER_PUBLIC_API_RATE_LIMIT_MAX", &cfg.PublicAPI.RateLimitMax)
 	applyDuration("public-api-rate-limit-window", "GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW", &cfg.PublicAPI.RateLimitWindow)
+	applyBool("cross-job-hot-cache", "GONEMASTER_CROSS_JOB_HOT_CACHE", &cfg.CrossJobHotCache)
+	applyInt("cross-job-hot-cache-ttl", "GONEMASTER_CROSS_JOB_HOT_CACHE_TTL", &cfg.CrossJobHotCacheTTLSeconds)
 }

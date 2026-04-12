@@ -162,6 +162,18 @@ func (c *queryCache) clear() {
 	c.mu.Unlock()
 }
 
+// clearData evicts cached packets but keeps the inflight map so concurrent
+// query coalescing continues to work.
+func (c *queryCache) clearData() {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	c.observeEvictLocked(len(c.data))
+	c.data = map[string]*packet.Packet{}
+	c.mu.Unlock()
+}
+
 func (c *queryCache) addObserver(observer *cacheMetrics) {
 	if c == nil || observer == nil {
 		return
@@ -670,8 +682,10 @@ func (c *CacheStore) MergeWarmDataFrom(other *CacheStore) {
 	}
 }
 
-// evictStaleAddrsLocked removes addresses that haven't been accessed within
-// warmAddrTTL. Must be called with c.mu held.
+// evictStaleAddrsLocked clears cached packet data from addresses that haven't
+// been accessed within warmAddrTTL. The cache structures themselves are kept
+// alive so inflight coalescing and concurrency caps continue to work across
+// concurrent snapshots. Must be called with c.mu held.
 func (c *CacheStore) evictStaleAddrsLocked() {
 	if c.warmAddrTTL <= 0 || len(c.addrLastAccess) == 0 {
 		return
@@ -680,11 +694,11 @@ func (c *CacheStore) evictStaleAddrsLocked() {
 	for addr, lastAccess := range c.addrLastAccess {
 		if lastAccess.Before(cutoff) {
 			if cache := c.cacheByAddress[addr]; cache != nil {
+				cache.clearData()
+			}
+			if cache := c.errorCacheByAddr[addr]; cache != nil {
 				cache.clear()
 			}
-			delete(c.cacheByAddress, addr)
-			delete(c.errorCacheByAddr, addr)
-			delete(c.concurrencyByAddr, addr)
 			delete(c.addrLastAccess, addr)
 		}
 	}

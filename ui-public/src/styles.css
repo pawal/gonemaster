@@ -590,7 +590,9 @@ details[open] > .testcase-summary .testcase-chevron {
   header {
     height: auto;
     padding: 12px 16px;
-    margin: 0 -16px 0;
+    width: 100vw;
+    left: 50%;
+    transform: translateX(-50%);
   }
 
   .header-text {

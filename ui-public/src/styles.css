@@ -699,7 +699,7 @@ details[open] > .testcase-summary .testcase-chevron {
 
 .score-left {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 16px;
   min-width: 0;
 }

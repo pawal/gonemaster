@@ -159,7 +159,14 @@ func TestNameserverHotCacheLeasesCoalesceInflightQueries(t *testing.T) {
 	var callsA atomic.Int32
 	var callsB atomic.Int32
 	started := make(chan struct{}, 1)
+	waiterJoined := make(chan struct{})
 	releaseNetwork := make(chan struct{})
+
+	// Install a hook on the shared queryCache so we know the moment the second
+	// goroutine finds the inflight entry and joins the wait queue. This prevents
+	// the race where the leader goroutine could complete its network call before
+	// the waiter goroutine has called waitOrRegister.
+	runCacheA.SetWaiterJoinHookForAddr("192.0.2.88", func() { close(waiterJoined) })
 
 	queryHook := func(counter *atomic.Int32) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
 		return func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
@@ -199,10 +206,19 @@ func TestNameserverHotCacheLeasesCoalesceInflightQueries(t *testing.T) {
 		errCh <- err
 	}()
 
+	// Wait for the leader goroutine to enter the network hook.
 	select {
 	case <-started:
 	case <-time.After(500 * time.Millisecond):
 		t.Fatalf("expected one network query to start")
+	}
+	// Wait for the waiter goroutine to join the inflight queue. Only then is it
+	// safe to release the network — this prevents the leader from completing and
+	// removing the inflight entry before the waiter has a chance to find it.
+	select {
+	case <-waiterJoined:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatalf("expected inflight coalescing to occur")
 	}
 	close(releaseNetwork)
 

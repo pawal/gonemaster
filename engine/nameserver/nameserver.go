@@ -47,7 +47,7 @@ type QueryOptions struct {
 
 // New creates a Nameserver from a name and IP address.
 func New(name string, address string, client *transport.Client) (Nameserver, error) {
-	return newWithCache(nil, defaultCache, name, address, client)
+	return newWithCache(context.TODO(), defaultCache, name, address, client)
 }
 
 // NewWithContext creates a Nameserver using a cache store from ctx.
@@ -57,7 +57,7 @@ func NewWithContext(ctx context.Context, name string, address string, client *tr
 
 // NewWithCache creates a Nameserver using the supplied cache store.
 func NewWithCache(cache *CacheStore, name string, address string, client *transport.Client) (Nameserver, error) {
-	return newWithCache(nil, cache, name, address, client)
+	return newWithCache(context.TODO(), cache, name, address, client)
 }
 
 func newWithCache(ctx context.Context, cache *CacheStore, name string, address string, client *transport.Client) (Nameserver, error) {

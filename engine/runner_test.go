@@ -18,8 +18,8 @@ func TestRunnerContextRoundTrip(t *testing.T) {
 	}
 }
 
-func TestRunnerFromContextNil(t *testing.T) {
-	if got := RunnerFromContext(nil); got != nil {
+func TestRunnerFromContextMissing(t *testing.T) {
+	if got := RunnerFromContext(context.Background()); got != nil {
 		t.Fatalf("expected nil runner, got %v", got)
 	}
 }

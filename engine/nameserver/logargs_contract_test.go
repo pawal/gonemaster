@@ -36,13 +36,14 @@ func TestContract_IPV4BlockedArgs(t *testing.T) {
 }
 
 func TestContract_ExternalQueryArgs(t *testing.T) {
-	ns, err := New("ns.example", "127.0.0.1", nil)
+	log := logger.New()
+	ctx := logger.WithContext(context.Background(), log)
+	ctx = WithCache(ctx, NewCacheStore())
+
+	ns, err := NewWithContext(ctx, "ns.example", "127.0.0.1", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
-
-	log := logger.New()
-	ctx := logger.WithContext(context.Background(), log)
 
 	timeout := 10 * time.Millisecond
 	opts := &QueryOptions{Timeout: &timeout}

@@ -335,13 +335,13 @@ func TestFakeDelegationToSelf(t *testing.T) {
 	}
 
 	if !fakeDelegationToSelf(ns, map[string][]string{
-		"ns1.example.com": []string{"192.0.2.1"},
+		"ns1.example.com": {"192.0.2.1"},
 	}) {
 		t.Fatalf("expected self match")
 	}
 
 	if fakeDelegationToSelf(ns, map[string][]string{
-		"ns1.example.com": []string{"192.0.2.2"},
+		"ns1.example.com": {"192.0.2.2"},
 	}) {
 		t.Fatalf("did not expect self match")
 	}

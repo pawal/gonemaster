@@ -283,13 +283,13 @@ func TestErrorCacheTTLRespectsTimeoutBudget(t *testing.T) {
 }
 
 func TestQueryCacheDoesNotStoreErrors(t *testing.T) {
-	ns, err := New("ns.example", "192.0.2.250", nil)
+	ctx, prof := testContext(t)
+	prof.Resolver.Defaults.ErrorCacheTTL = 0
+
+	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.250", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
-
-	ctx, prof := testContext(t)
-	prof.Resolver.Defaults.ErrorCacheTTL = 0
 
 	var calls int
 	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {

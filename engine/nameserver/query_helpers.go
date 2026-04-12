@@ -367,10 +367,6 @@ func buildCacheKey(name string, qtype string, qclass string, opts *QueryOptions)
 	recurse := resolveRecurse(opts)
 	ednsSize := resolveEDNSSize(opts, dnssec)
 
-	if ednsSize > 65535 {
-		return "", 0, false, fmt.Errorf("edns_size must be between 0 and 65535")
-	}
-
 	nameObj := dnsname.New(name)
 	buf := cacheKeyBufferPool.Get().([]byte)[:0]
 	defer putCacheKeyBuffer(buf)

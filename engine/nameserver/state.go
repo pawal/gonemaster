@@ -12,10 +12,11 @@ import (
 )
 
 type queryCache struct {
-	mu       sync.Mutex
-	data     map[string]*packet.Packet
-	met      *cacheMetrics
-	inflight map[string]*inflightQuery
+	mu           sync.Mutex
+	data         map[string]*packet.Packet
+	met          *cacheMetrics
+	inflight     map[string]*inflightQuery
+	onWaiterJoin func() // optional; called without lock when a waiter joins an existing inflight entry
 }
 
 type errorCache struct {
@@ -186,15 +187,20 @@ func (c *queryCache) waitOrRegister(key string) (*inflightQuery, bool) {
 		return nil, false
 	}
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	if c.inflight == nil {
 		c.inflight = map[string]*inflightQuery{}
 	}
 	if inflight, ok := c.inflight[key]; ok {
+		hook := c.onWaiterJoin
+		c.mu.Unlock()
+		if hook != nil {
+			hook()
+		}
 		return inflight, true
 	}
 	inflight := &inflightQuery{done: make(chan struct{})}
 	c.inflight[key] = inflight
+	c.mu.Unlock()
 	return inflight, false
 }
 
@@ -578,6 +584,19 @@ func (c *CacheStore) NameserverObjectCount() int {
 		total += len(byAddr)
 	}
 	return total
+}
+
+// SetWaiterJoinHookForAddr installs a hook that is called (without lock) each
+// time waitOrRegister finds an existing inflight entry for the query cache
+// associated with addr. Intended for use in tests to detect inflight coalescing.
+func (c *CacheStore) SetWaiterJoinHookForAddr(addr string, f func()) {
+	qc := c.cacheForAddress(addr)
+	if qc == nil {
+		return
+	}
+	qc.mu.Lock()
+	qc.onWaiterJoin = f
+	qc.mu.Unlock()
 }
 
 var defaultCache = NewCacheStore()

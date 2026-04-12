@@ -395,13 +395,14 @@ describe("App", () => {
         queue_depth: 3,
         in_flight_jobs: 2,
         dns_cache_hits: 30,
-        dns_cache_misses: 10,
+        dns_cache_misses: 17,
         dns_queries_ipv4_total: 11234,
         dns_queries_ipv6_total: 22000000
       },
       jobs: {
         completed_total: 7,
         status_counts: {
+          failed: 4321,
           queued: 1,
           running: 1
         }
@@ -510,11 +511,14 @@ describe("App", () => {
     expect(within(metricsPanel).getByText("In-flight jobs")).toBeInTheDocument();
     expect(within(metricsPanel).getByText("External IPv4")).toBeInTheDocument();
     expect(within(metricsPanel).getByText("External IPv6")).toBeInTheDocument();
+    expect(within(metricsPanel).getByText("Cache misses")).toBeInTheDocument();
     expect(within(metricsPanel).getByText("11,2K")).toBeInTheDocument();
+    expect(within(metricsPanel).getByText("17")).toBeInTheDocument();
     expect(within(metricsPanel).getByText("22M")).toBeInTheDocument();
+    expect(within(metricsPanel).getByText("4,321")).toBeInTheDocument();
     expect(within(metricsPanel).getByText("80.0%")).toBeInTheDocument();
     expect(within(metricsPanel).getByText("15.0%")).toBeInTheDocument();
-    expect(within(metricsPanel).getAllByText("75.0%")).toHaveLength(2);
+    expect(within(metricsPanel).getAllByText("75.0%")).toHaveLength(1);
     expect(within(metricsPanel).getByText("320 ms")).toBeInTheDocument();
     expect(within(metricsPanel).getByText("Total jobs finished")).toBeInTheDocument();
     expect(within(metricsPanel).getByText("Failed jobs")).toBeInTheDocument();

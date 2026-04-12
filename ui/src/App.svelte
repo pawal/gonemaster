@@ -708,6 +708,7 @@
     completed_total: "help_completed",
     failed_total: "help_failed",
     dns_cache_hits: "help_cache_hits",
+    dns_cache_misses: "help_cache_misses",
     dns_cache_hit_rate: "help_cache_hit_rate",
     dns_lookups_total: "help_dns_lookups"
   };
@@ -717,6 +718,11 @@
     const total = hits + misses;
     if (total === 0) return 0;
     return hits / total;
+  };
+  const metricsFailedJobs = (snapshot) => {
+    const currentFailed = Number(snapshot?.jobs?.status_counts?.failed);
+    if (Number.isFinite(currentFailed)) return currentFailed;
+    return Number(snapshot?.quality?.outcomes?.failed_total || 0);
   };
   const lastLoadedLabel = (value) => {
     if (!value) return "never";
@@ -3605,6 +3611,10 @@ example.org`}
               <span class="summary-label">{$t("metric_cache_hits")}</span>
               <span class="summary-count">{formatCompactInteger(metricsSnapshot?.health?.dns_cache_hits)}</span>
             </div>
+            <div class="summary-item" title={$t(metricsCardHelp.dns_cache_misses)}>
+              <span class="summary-label">{$t("metric_cache_misses")}</span>
+              <span class="summary-count">{formatCompactInteger(metricsSnapshot?.health?.dns_cache_misses)}</span>
+            </div>
             <div class="summary-item" title={$t(metricsCardHelp.dns_cache_hit_rate)}>
               <span class="summary-label">{$t("metric_cache_hit_rate")}</span>
               <span class="summary-count">{formatPercent(metricsCacheHitRate(metricsSnapshot))}</span>
@@ -3629,7 +3639,7 @@ example.org`}
             </div>
             <div class="summary-item failed-jobs" title={$t(metricsCardHelp.failed_total)}>
               <span class="summary-label">{$t("metric_failed")}</span>
-              <span class="summary-count">{formatInteger(metricsSnapshot?.quality?.outcomes?.failed_total)}</span>
+              <span class="summary-count">{formatInteger(metricsFailedJobs(metricsSnapshot))}</span>
             </div>
             <div class="summary-item" title={$t(metricsCardHelp.success_rate)}>
               <span class="summary-label">{$t("metric_success_rate")}</span>

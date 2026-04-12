@@ -321,6 +321,16 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 		}
 	}
 
+	// Log oversized packets before releasing inflight waiters — both paths share
+	// the same *dns.Msg pointer, so Len() must not race with callers of the
+	// released goroutines (e.g. KeyTag() writing the cached keytag field).
+	if resp.Msg != nil && resp.Msg.Len() > 4096 {
+		bigArgs := map[string]any{
+			"size":    resp.Msg.Len(),
+			"command": fmt.Sprintf("dig @%s %s %s", ns.Address.String(), qname, qtype),
+		}
+		logSystemWithLogger(runLog, "PACKET_BIG", bigArgs)
+	}
 	if ns.state != nil {
 		var infResp *packet.Packet
 		if resp.Msg != nil {
@@ -333,13 +343,6 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 		if inflight != nil {
 			ns.state.cache.finish(cacheKey, infResp, err)
 		}
-	}
-	if resp.Msg != nil && resp.Msg.Len() > 4096 {
-		bigArgs := map[string]any{
-			"size":    resp.Msg.Len(),
-			"command": fmt.Sprintf("dig @%s %s %s", ns.Address.String(), qname, qtype),
-		}
-		logSystemWithLogger(runLog, "PACKET_BIG", bigArgs)
 	}
 	logCachedReturnWithLogger(runLog, resp)
 	return resp, err

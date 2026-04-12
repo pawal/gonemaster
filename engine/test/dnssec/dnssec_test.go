@@ -5324,7 +5324,11 @@ func dnskeyPacket(owner string, key *dns.DNSKEY) packet.Packet {
 	msg.Authoritative = true
 	msg.Rcode = dns.RcodeSuccess
 	if key != nil {
-		msg.Answer = append(msg.Answer, key)
+		// Clone so each caller gets its own copy; DNSKEY.KeyTag() lazily
+		// writes a cached field, which races with Len() when callers share
+		// the same pointer across goroutines.
+		keyCopy := *key
+		msg.Answer = append(msg.Answer, &keyCopy)
 	}
 	msg.UDPSize = 1232
 	msg.Security = true

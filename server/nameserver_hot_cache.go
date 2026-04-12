@@ -62,8 +62,10 @@ func (c *nameserverHotCache) Lease(key string) (*nameserver.CacheStore, func()) 
 	c.evictExpiredLocked(now)
 	entry, ok := c.entries[key]
 	if !ok {
+		base := nameserver.NewCacheStore()
+		base.SetWarmAddrTTL(c.ttl)
 		entry = nameserverHotCacheEntry{
-			cache: nameserver.NewCacheStore(),
+			cache: base,
 		}
 	}
 	entry.lastUsed = now
@@ -76,6 +78,7 @@ func (c *nameserverHotCache) Lease(key string) (*nameserver.CacheStore, func()) 
 	runCache := base.SnapshotForRun()
 	release := func() {
 		base.MergeWarmDataFrom(runCache)
+		runCache.DetachSharedMetricObservers()
 		c.touch(key, base)
 	}
 	return runCache, release

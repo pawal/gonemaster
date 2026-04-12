@@ -2,13 +2,20 @@ package server
 
 import (
 	"context"
+	"net/netip"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
+
+	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/rdata"
 
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
+	"codeberg.org/pawal/gonemaster/engine/nameserver"
+	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 )
 
@@ -512,6 +519,59 @@ func TestRunEngineForJobPassesCacheStore(t *testing.T) {
 	if stats.cacheHits != 0 || stats.cacheMisses != 0 || stats.cacheEvictions != 0 {
 		t.Fatalf("expected zero cache stats from stub engine, got hits=%d misses=%d evictions=%d",
 			stats.cacheHits, stats.cacheMisses, stats.cacheEvictions)
+	}
+}
+
+func TestRunEngineForJobHotCacheReportsWarmQueryMetrics(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.CrossJobHotCache = true
+	srv := New(cfg)
+
+	var networkCalls atomic.Int32
+	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		ns, err := nameserver.NewWithCache(req.NameserverCache, "ns.example", "192.0.2.60", nil)
+		if err != nil {
+			return nil, err
+		}
+		ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+			networkCalls.Add(1)
+			msg := new(dns.Msg)
+			msg.Rcode = dns.RcodeSuccess
+			msg.Answer = []dns.RR{
+				&dns.A{
+					Hdr: dns.Header{
+						Name:  "warm.example.",
+						Class: dns.ClassINET,
+						TTL:   60,
+					},
+					A: rdata.A{Addr: netip.MustParseAddr("192.0.2.60")},
+				},
+			}
+			return packet.Packet{Msg: msg}, nil
+		})
+		_, err = ns.QueryWithOptions(req.Context, "warm.example", "A", nil)
+		return nil, err
+	}
+
+	jobA := Job{ID: "job-hot-a", Domain: "example.com", Status: JobQueued, CreatedAt: time.Now().UTC()}
+	_, statsA, _, err := srv.runEngineForJob(jobA, context.Background())
+	if err != nil {
+		t.Fatalf("first runEngineForJob: %v", err)
+	}
+	if statsA.cacheHits != 0 || statsA.cacheMisses != 1 {
+		t.Fatalf("first run cache stats = hits=%d misses=%d, want hits=0 misses=1", statsA.cacheHits, statsA.cacheMisses)
+	}
+
+	jobB := Job{ID: "job-hot-b", Domain: "example.net", Status: JobQueued, CreatedAt: time.Now().UTC()}
+	_, statsB, _, err := srv.runEngineForJob(jobB, context.Background())
+	if err != nil {
+		t.Fatalf("second runEngineForJob: %v", err)
+	}
+	if statsB.cacheHits != 1 || statsB.cacheMisses != 0 {
+		t.Fatalf("second run cache stats = hits=%d misses=%d, want hits=1 misses=0", statsB.cacheHits, statsB.cacheMisses)
+	}
+	if got := networkCalls.Load(); got != 1 {
+		t.Fatalf("network calls = %d, want 1", got)
 	}
 }
 

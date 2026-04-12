@@ -16,13 +16,15 @@ type queryCache struct {
 	data         map[string]*packet.Packet
 	met          *cacheMetrics
 	inflight     map[string]*inflightQuery
+	observers    map[*cacheMetrics]struct{}
 	onWaiterJoin func() // optional; called without lock when a waiter joins an existing inflight entry
 }
 
 type errorCache struct {
-	mu   sync.Mutex
-	data map[string]time.Time
-	met  *cacheMetrics
+	mu        sync.Mutex
+	data      map[string]time.Time
+	met       *cacheMetrics
+	observers map[*cacheMetrics]struct{}
 }
 
 type cacheMetrics struct {
@@ -78,29 +80,21 @@ func (c *errorCache) shouldSkip(key string) (bool, time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.data == nil {
-		if c.met != nil {
-			c.met.miss()
-		}
+		c.observeMissLocked()
 		return false, 0
 	}
 	expiry, ok := c.data[key]
 	if !ok {
-		if c.met != nil {
-			c.met.miss()
-		}
+		c.observeMissLocked()
 		return false, 0
 	}
 	if now.After(expiry) {
 		delete(c.data, key)
-		if c.met != nil {
-			c.met.evict(1)
-			c.met.miss()
-		}
+		c.observeEvictLocked(1)
+		c.observeMissLocked()
 		return false, 0
 	}
-	if c.met != nil {
-		c.met.hit()
-	}
+	c.observeHitLocked()
 	return true, expiry.Sub(now)
 }
 
@@ -121,9 +115,7 @@ func (c *errorCache) clear() {
 		return
 	}
 	c.mu.Lock()
-	if c.met != nil {
-		c.met.evict(len(c.data))
-	}
+	c.observeEvictLocked(len(c.data))
 	c.data = map[string]time.Time{}
 	c.mu.Unlock()
 }
@@ -135,18 +127,14 @@ func (c *queryCache) get(key string) (*packet.Packet, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.data == nil {
-		if c.met != nil {
-			c.met.miss()
-		}
+		c.observeMissLocked()
 		return nil, false
 	}
 	value, ok := c.data[key]
-	if c.met != nil {
-		if ok {
-			c.met.hit()
-		} else {
-			c.met.miss()
-		}
+	if ok {
+		c.observeHitLocked()
+	} else {
+		c.observeMissLocked()
 	}
 	return value, ok
 }
@@ -168,12 +156,106 @@ func (c *queryCache) clear() {
 		return
 	}
 	c.mu.Lock()
-	if c.met != nil {
-		c.met.evict(len(c.data))
-	}
+	c.observeEvictLocked(len(c.data))
 	c.data = map[string]*packet.Packet{}
 	c.inflight = map[string]*inflightQuery{}
 	c.mu.Unlock()
+}
+
+func (c *queryCache) addObserver(observer *cacheMetrics) {
+	if c == nil || observer == nil {
+		return
+	}
+	c.mu.Lock()
+	if c.observers == nil {
+		c.observers = map[*cacheMetrics]struct{}{}
+	}
+	c.observers[observer] = struct{}{}
+	c.mu.Unlock()
+}
+
+func (c *queryCache) removeObserver(observer *cacheMetrics) {
+	if c == nil || observer == nil {
+		return
+	}
+	c.mu.Lock()
+	delete(c.observers, observer)
+	c.mu.Unlock()
+}
+
+func (c *queryCache) observeHitLocked() {
+	if c.met != nil {
+		c.met.hit()
+	}
+	for observer := range c.observers {
+		observer.hit()
+	}
+}
+
+func (c *queryCache) observeMissLocked() {
+	if c.met != nil {
+		c.met.miss()
+	}
+	for observer := range c.observers {
+		observer.miss()
+	}
+}
+
+func (c *queryCache) observeEvictLocked(n int) {
+	if c.met != nil {
+		c.met.evict(n)
+	}
+	for observer := range c.observers {
+		observer.evict(n)
+	}
+}
+
+func (c *errorCache) addObserver(observer *cacheMetrics) {
+	if c == nil || observer == nil {
+		return
+	}
+	c.mu.Lock()
+	if c.observers == nil {
+		c.observers = map[*cacheMetrics]struct{}{}
+	}
+	c.observers[observer] = struct{}{}
+	c.mu.Unlock()
+}
+
+func (c *errorCache) removeObserver(observer *cacheMetrics) {
+	if c == nil || observer == nil {
+		return
+	}
+	c.mu.Lock()
+	delete(c.observers, observer)
+	c.mu.Unlock()
+}
+
+func (c *errorCache) observeHitLocked() {
+	if c.met != nil {
+		c.met.hit()
+	}
+	for observer := range c.observers {
+		observer.hit()
+	}
+}
+
+func (c *errorCache) observeMissLocked() {
+	if c.met != nil {
+		c.met.miss()
+	}
+	for observer := range c.observers {
+		observer.miss()
+	}
+}
+
+func (c *errorCache) observeEvictLocked(n int) {
+	if c.met != nil {
+		c.met.evict(n)
+	}
+	for observer := range c.observers {
+		observer.evict(n)
+	}
 }
 
 type inflightQuery struct {
@@ -251,6 +333,10 @@ type CacheStore struct {
 	cacheByAddress    map[string]*queryCache
 	errorCacheByAddr  map[string]*errorCache
 	concurrencyByAddr map[string]*nameserverConcurrencyCap
+	observedQueries   map[string]*queryCache
+	observedErrors    map[string]*errorCache
+	addrLastAccess    map[string]time.Time // when each address was last used
+	warmAddrTTL       time.Duration        // evict addresses idle longer than this
 	sharedParent      *CacheStore
 	queryMetrics      cacheMetrics
 	errorMetrics      cacheMetrics
@@ -264,8 +350,22 @@ func NewCacheStore() *CacheStore {
 		cacheByAddress:    map[string]*queryCache{},
 		errorCacheByAddr:  map[string]*errorCache{},
 		concurrencyByAddr: map[string]*nameserverConcurrencyCap{},
+		observedQueries:   map[string]*queryCache{},
+		observedErrors:    map[string]*errorCache{},
+		addrLastAccess:    map[string]time.Time{},
 		queryTimes:        map[string][]time.Duration{},
 	}
+}
+
+// SetWarmAddrTTL sets the maximum idle time for warmed addresses. Addresses
+// not accessed within this duration are evicted during MergeWarmDataFrom.
+func (c *CacheStore) SetWarmAddrTTL(ttl time.Duration) {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	c.warmAddrTTL = ttl
+	c.mu.Unlock()
 }
 
 // RecordQueryTime appends a query duration for the given nameserver key.
@@ -294,6 +394,14 @@ func (c *CacheStore) QueryTimings() map[string][]time.Duration {
 	return out
 }
 
+// touchAddrLocked updates the last-access time for addr. Must be called with
+// c.mu held.
+func (c *CacheStore) touchAddrLocked(addr string) {
+	if c.addrLastAccess != nil {
+		c.addrLastAccess[addr] = time.Now()
+	}
+}
+
 func (c *CacheStore) cacheForAddress(addr string) *queryCache {
 	cache, _ := c.cacheForAddressWithStatus(addr)
 	return cache
@@ -305,6 +413,7 @@ func (c *CacheStore) cacheForAddressWithStatus(addr string) (*queryCache, bool) 
 	}
 	c.mu.Lock()
 	if cache := c.cacheByAddress[addr]; cache != nil {
+		c.touchAddrLocked(addr)
 		c.mu.Unlock()
 		return cache, false
 	}
@@ -319,14 +428,19 @@ func (c *CacheStore) cacheForAddressWithStatus(addr string) (*queryCache, bool) 
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if cache := c.cacheByAddress[addr]; cache != nil {
+		c.touchAddrLocked(addr)
 		return cache, false
 	}
 	if parentCache != nil {
+		parentCache.addObserver(&c.queryMetrics)
 		c.cacheByAddress[addr] = parentCache
+		c.observedQueries[addr] = parentCache
+		c.touchAddrLocked(addr)
 		return parentCache, false
 	}
 	cache := &queryCache{data: map[string]*packet.Packet{}, met: &c.queryMetrics}
 	c.cacheByAddress[addr] = cache
+	c.touchAddrLocked(addr)
 	return cache, true
 }
 
@@ -336,6 +450,7 @@ func (c *CacheStore) errorCacheForAddress(addr string) *errorCache {
 	}
 	c.mu.Lock()
 	if cache := c.errorCacheByAddr[addr]; cache != nil {
+		c.touchAddrLocked(addr)
 		c.mu.Unlock()
 		return cache
 	}
@@ -350,14 +465,19 @@ func (c *CacheStore) errorCacheForAddress(addr string) *errorCache {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if cache := c.errorCacheByAddr[addr]; cache != nil {
+		c.touchAddrLocked(addr)
 		return cache
 	}
 	if parentCache != nil {
+		parentCache.addObserver(&c.errorMetrics)
 		c.errorCacheByAddr[addr] = parentCache
+		c.observedErrors[addr] = parentCache
+		c.touchAddrLocked(addr)
 		return parentCache
 	}
 	cache := &errorCache{data: map[string]time.Time{}, met: &c.errorMetrics}
 	c.errorCacheByAddr[addr] = cache
+	c.touchAddrLocked(addr)
 	return cache
 }
 
@@ -431,16 +551,48 @@ func (c *CacheStore) SnapshotForRun() *CacheStore {
 		cacheByAddress:    make(map[string]*queryCache, len(c.cacheByAddress)),
 		errorCacheByAddr:  make(map[string]*errorCache, len(c.errorCacheByAddr)),
 		concurrencyByAddr: make(map[string]*nameserverConcurrencyCap, len(c.concurrencyByAddr)),
+		observedQueries:   map[string]*queryCache{},
+		observedErrors:    map[string]*errorCache{},
+		addrLastAccess:    map[string]time.Time{},
 		sharedParent:      c,
 		queryTimes:        map[string][]time.Duration{},
 	}
 	return snapshot
 }
 
+// DetachSharedMetricObservers stops forwarding shared-parent cache metrics into
+// this store. It should be called when a SnapshotForRun-derived store is no
+// longer in use.
+func (c *CacheStore) DetachSharedMetricObservers() {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	queryObservers := make([]*queryCache, 0, len(c.observedQueries))
+	for _, cache := range c.observedQueries {
+		queryObservers = append(queryObservers, cache)
+	}
+	errorObservers := make([]*errorCache, 0, len(c.observedErrors))
+	for _, cache := range c.observedErrors {
+		errorObservers = append(errorObservers, cache)
+	}
+	c.observedQueries = map[string]*queryCache{}
+	c.observedErrors = map[string]*errorCache{}
+	c.mu.Unlock()
+
+	for _, cache := range queryObservers {
+		cache.removeObserver(&c.queryMetrics)
+	}
+	for _, cache := range errorObservers {
+		cache.removeObserver(&c.errorMetrics)
+	}
+}
+
 // MergeWarmDataFrom merges warmed query/error caches from other into c.
 //
 // Nameserver object instances are intentionally not merged to avoid sharing
-// mutable adaptation state across runs.
+// mutable adaptation state across runs. Before merging, addresses in c that
+// have not been accessed within warmAddrTTL are evicted to bound memory.
 func (c *CacheStore) MergeWarmDataFrom(other *CacheStore) {
 	if c == nil || other == nil || c == other {
 		return
@@ -459,10 +611,25 @@ func (c *CacheStore) MergeWarmDataFrom(other *CacheStore) {
 	for addr, cap := range other.concurrencyByAddr {
 		concurrencyByAddress[addr] = cap
 	}
+	// Collect access times from the run cache so we can update the base.
+	otherAccess := make(map[string]time.Time, len(other.addrLastAccess))
+	for addr, t := range other.addrLastAccess {
+		otherAccess[addr] = t
+	}
 	other.mu.Unlock()
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
+	// Propagate access times from the run: take the latest of base vs run.
+	for addr, t := range otherAccess {
+		if existing, ok := c.addrLastAccess[addr]; !ok || t.After(existing) {
+			c.addrLastAccess[addr] = t
+		}
+	}
+
+	// Evict stale addresses from the base cache before merging new data.
+	c.evictStaleAddrsLocked()
 
 	for addr, cache := range queryByAddress {
 		if cache == nil {
@@ -475,6 +642,10 @@ func (c *CacheStore) MergeWarmDataFrom(other *CacheStore) {
 		cache.met = &c.queryMetrics
 		cache.mu.Unlock()
 		c.cacheByAddress[addr] = cache
+		// Ensure merged addresses have an access time.
+		if _, ok := c.addrLastAccess[addr]; !ok {
+			c.addrLastAccess[addr] = time.Now()
+		}
 	}
 	for addr, cache := range errorByAddress {
 		if cache == nil {
@@ -499,6 +670,26 @@ func (c *CacheStore) MergeWarmDataFrom(other *CacheStore) {
 	}
 }
 
+// evictStaleAddrsLocked removes addresses that haven't been accessed within
+// warmAddrTTL. Must be called with c.mu held.
+func (c *CacheStore) evictStaleAddrsLocked() {
+	if c.warmAddrTTL <= 0 || len(c.addrLastAccess) == 0 {
+		return
+	}
+	cutoff := time.Now().Add(-c.warmAddrTTL)
+	for addr, lastAccess := range c.addrLastAccess {
+		if lastAccess.Before(cutoff) {
+			if cache := c.cacheByAddress[addr]; cache != nil {
+				cache.clear()
+			}
+			delete(c.cacheByAddress, addr)
+			delete(c.errorCacheByAddr, addr)
+			delete(c.concurrencyByAddr, addr)
+			delete(c.addrLastAccess, addr)
+		}
+	}
+}
+
 // Empty clears nameserver object caches and query caches.
 func (c *CacheStore) Empty() {
 	if c == nil {
@@ -514,6 +705,7 @@ func (c *CacheStore) Empty() {
 	c.cacheByAddress = map[string]*queryCache{}
 	c.errorCacheByAddr = map[string]*errorCache{}
 	c.objectCache = map[string]map[string]*Nameserver{}
+	c.addrLastAccess = map[string]time.Time{}
 	c.mu.Unlock()
 }
 

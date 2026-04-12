@@ -1,18 +1,16 @@
 <script>
-  import { onMount, onDestroy, createEventDispatcher } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import { t } from "../i18n.js";
   import { getJob } from "../api.js";
 
-  export let publicID;
+  let { publicID, progress = $bindable(0), onjobdone } = $props();
 
-  const dispatch = createEventDispatcher();
   const TERMINAL = new Set(["succeeded", "failed", "canceled", "expired"]);
   const POLL_INTERVAL = 2000;
 
-  let domain = "";
-  let status = "queued";
-  export let progress = 0;
-  let errorKey = "";
+  let domain = $state("");
+  let status = $state("queued");
+  let errorKey = $state("");
   let timer;
 
   async function poll() {
@@ -21,7 +19,7 @@
       if (!res.ok) {
         clearInterval(timer);
         if (res.status === 404) {
-          dispatch("jobdone", { publicID, status: "expired" });
+          onjobdone?.({ publicID, status: "expired" });
         } else {
           errorKey = "pub.error_unknown";
         }
@@ -33,7 +31,7 @@
       progress = job.progress;
       if (TERMINAL.has(status)) {
         clearInterval(timer);
-        dispatch("jobdone", { publicID, status, domain, finishedAt: job.finished_at ?? null });
+        onjobdone?.({ publicID, status, domain, finishedAt: job.finished_at ?? null });
       }
     } catch (_) {
       clearInterval(timer);
@@ -47,7 +45,6 @@
   });
 
   onDestroy(() => clearInterval(timer));
-
 </script>
 
 <div class="card stack" data-testid="progress-view">

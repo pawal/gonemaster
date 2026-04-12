@@ -21,10 +21,10 @@ describe("ExpiredResult", () => {
     expect(screen.getByTestId("new-test-button")).toBeTruthy();
   });
 
-  it("dispatches newtest event when button is clicked", async () => {
-    const events = [];
-    render(ExpiredResult, { events: { newtest: (e) => events.push(e) } });
+  it("calls onnewtest callback when button is clicked", async () => {
+    const handler = vi.fn();
+    render(ExpiredResult, { props: { onnewtest: handler } });
     await fireEvent.click(screen.getByTestId("new-test-button"));
-    expect(events.length).toBe(1);
+    expect(handler).toHaveBeenCalledOnce();
   });
 });

@@ -46,35 +46,32 @@ describe("Progress", () => {
 
   it("dispatches jobdone with status=succeeded", async () => {
     global.fetch.mockResolvedValue(jobResp("succeeded", 100));
-    const events = [];
+    const handler = vi.fn();
     render(Progress, {
-      props: { publicID: "abc12345" },
-      events: { jobdone: (e) => events.push(e.detail) },
+      props: { publicID: "abc12345", onjobdone: handler },
     });
-    await waitFor(() => expect(events.length).toBe(1));
-    expect(events[0]).toMatchObject({ publicID: "abc12345", status: "succeeded", domain: "example.com" });
+    await waitFor(() => expect(handler).toHaveBeenCalledOnce());
+    expect(handler.mock.calls[0][0]).toMatchObject({ publicID: "abc12345", status: "succeeded", domain: "example.com" });
   });
 
   it("dispatches jobdone with status=failed", async () => {
     global.fetch.mockResolvedValue(jobResp("failed", 0));
-    const events = [];
+    const handler = vi.fn();
     render(Progress, {
-      props: { publicID: "abc12345" },
-      events: { jobdone: (e) => events.push(e.detail) },
+      props: { publicID: "abc12345", onjobdone: handler },
     });
-    await waitFor(() => expect(events.length).toBe(1));
-    expect(events[0].status).toBe("failed");
+    await waitFor(() => expect(handler).toHaveBeenCalledOnce());
+    expect(handler.mock.calls[0][0].status).toBe("failed");
   });
 
   it("dispatches jobdone with status=expired on 404", async () => {
     global.fetch.mockResolvedValue(errResp(404));
-    const events = [];
+    const handler = vi.fn();
     render(Progress, {
-      props: { publicID: "abc12345" },
-      events: { jobdone: (e) => events.push(e.detail) },
+      props: { publicID: "abc12345", onjobdone: handler },
     });
-    await waitFor(() => expect(events.length).toBe(1));
-    expect(events[0].status).toBe("expired");
+    await waitFor(() => expect(handler).toHaveBeenCalledOnce());
+    expect(handler.mock.calls[0][0].status).toBe("expired");
   });
 
   it("shows error on non-404 server error", async () => {

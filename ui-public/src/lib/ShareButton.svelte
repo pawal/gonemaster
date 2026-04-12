@@ -2,9 +2,7 @@
   import { t } from "../i18n.js";
   import { hashFor } from "../router.js";
 
-  export let publicID;
-  export let domain = "";
-  export let score = null;
+  let { publicID, domain = "", score = null } = $props();
 
   const GRADE_EMOJI = {
     "A+": "🏆",
@@ -15,7 +13,7 @@
     "F":  "❌",
   };
 
-  let copied = false;
+  let copied = $state(false);
   let timer;
 
   async function share() {
@@ -44,7 +42,7 @@
 <button
   type="button"
   class="ghost"
-  on:click={share}
+  onclick={share}
   data-testid="share-button"
 >
   {copied ? $t("pub.result_share_copied") : $t("pub.result_share")}

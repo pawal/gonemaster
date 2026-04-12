@@ -2,13 +2,13 @@
   import { onMount } from "svelte";
   import { t } from "./i18n.js";
 
-  export let apiBase = "/api/v1";
+  let { apiBase = "/api/v1" } = $props();
 
-  let loading = false;
-  let saving = false;
-  let settings = {};
-  let editedValues = {};
-  let loadError = "";
+  let loading = $state(false);
+  let saving = $state(false);
+  let settings = $state({});
+  let editedValues = $state({});
+  let loadError = $state("");
 
   const settingGroups = [
     {
@@ -65,8 +65,8 @@
     return payload;
   };
 
-  let noticeMessage = "";
-  let noticeTone = "";
+  let noticeMessage = $state("");
+  let noticeTone = $state("");
   const setNotice = (message, tone = "") => {
     noticeMessage = message;
     noticeTone = tone;
@@ -110,7 +110,7 @@
     editedValues = editedValues;
   }
 
-  $: hasChanges = Object.keys(editedValues).some((k) => isEdited(k));
+  let hasChanges = $derived(Object.keys(editedValues).some((k) => isEdited(k)));
 
   function sourceLabel(source) {
     const map = {
@@ -196,7 +196,7 @@
                   id="setting-{s.key}"
                   checked={!!val}
                   disabled={ro}
-                  on:change={() => handleToggle(s.key)}
+                  onchange={() => handleToggle(s.key)}
                 />
                 {val ? "Enabled" : "Disabled"}
               </label>
@@ -205,7 +205,7 @@
                 id="setting-{s.key}"
                 value={val ?? ""}
                 disabled={ro}
-                on:change={(e) => handleInput(s.key, e.target.value)}
+                onchange={(e) => handleInput(s.key, e.target.value)}
               >
                 {#each s.options as opt}
                   <option value={opt}>{opt}</option>
@@ -217,7 +217,7 @@
                 id="setting-{s.key}"
                 value={val}
                 disabled={ro}
-                on:input={(e) => handleInput(s.key, Number(e.target.value))}
+                oninput={(e) => handleInput(s.key, Number(e.target.value))}
               />
             {:else}
               <input
@@ -225,7 +225,7 @@
                 id="setting-{s.key}"
                 value={val ?? ""}
                 disabled={ro}
-                on:input={(e) => handleInput(s.key, e.target.value)}
+                oninput={(e) => handleInput(s.key, e.target.value)}
               />
             {/if}
           </div>
@@ -238,7 +238,7 @@
     <button
       type="button"
       disabled={!hasChanges || saving}
-      on:click={saveSettings}
+      onclick={saveSettings}
     >
       {saving ? $t("settings_server_saving") : $t("settings_server_save_button")}
     </button>

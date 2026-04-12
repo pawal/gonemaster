@@ -81,7 +81,7 @@ header {
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  height: 56px;
+  height: 72px;
   border-bottom: 1px solid var(--border);
   background: var(--card);
   padding: 0 24px;
@@ -94,17 +94,6 @@ header {
   align-items: center;
   gap: 12px;
   min-width: 0;
-}
-
-.header-domain {
-  font-family: var(--mono);
-  font-size: var(--text-sm);
-  color: var(--ink-2);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-  max-width: 40ch;
 }
 
 .header-controls {
@@ -130,7 +119,7 @@ header {
 
 .brand-logo {
   display: block;
-  width: min(100%, 200px);
+  width: min(100%, 320px);
   height: auto;
   transition: filter 0.4s ease;
 }

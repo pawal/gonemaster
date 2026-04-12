@@ -1,30 +1,29 @@
 <script>
-  import { createEventDispatcher, onMount } from "svelte";
+  import { onMount } from "svelte";
   import { t } from "./i18n.js";
 
-  export let apiBase = "/api/v1";
-  const dispatch = createEventDispatcher();
+  let { apiBase = "/api/v1", onprofileschanged } = $props();
 
   const defaultProfileKey = "__default__";
 
-  let loading = false;
-  let saving = false;
-  let applyingFix = false;
-  let deletingProfileId = null;
-  let defaultProfile = null;
-  let compatibility = null;
-  let compatSummaries = [];
-  let markingAllReviewed = false;
-  let storedProfiles = [];
-  let filteredProfiles = [];
-  let usageCounts = {};
-  let usageTags = {};
-  let searchQuery = "";
-  let activeFilter = "all";
-  let noticeMessage = "";
-  let noticeTone = "";
-  let draft = emptyDraft();
-  let workspace = { type: "empty" };
+  let loading = $state(false);
+  let saving = $state(false);
+  let applyingFix = $state(false);
+  let deletingProfileId = $state(null);
+  let defaultProfile = $state(null);
+  let compatibility = $state(null);
+  let compatSummaries = $state([]);
+  let markingAllReviewed = $state(false);
+  let storedProfiles = $state([]);
+  let filteredProfiles = $state([]);
+  let usageCounts = $state({});
+  let usageTags = $state({});
+  let searchQuery = $state("");
+  let activeFilter = $state("all");
+  let noticeMessage = $state("");
+  let noticeTone = $state("");
+  let draft = $state(emptyDraft());
+  let workspace = $state({ type: "empty" });
 
   function emptyDraft(config = {}) {
     return {
@@ -163,7 +162,7 @@
         body: JSON.stringify(body)
       });
       await loadProfiles({ selectKey: `profile:${editingProfileId}`, preserveNotice: true });
-      dispatch("profileschanged", { profiles: storedProfiles });
+      onprofileschanged?.({ profiles: storedProfiles });
     } catch (error) {
       setNotice($t("profile_compat_fix_error", { error: error.message || "unknown error" }), "warn");
     } finally {
@@ -177,7 +176,7 @@
     try {
       await apiFetch("/profiles/mark-all-reviewed", { method: "POST", body: "{}" });
       await loadProfiles({ preserveNotice: true });
-      dispatch("profileschanged", { profiles: storedProfiles });
+      onprofileschanged?.({ profiles: storedProfiles });
     } catch (error) {
       setNotice($t("profile_compat_fix_error", { error: error.message || "unknown error" }), "warn");
     } finally {
@@ -365,7 +364,7 @@
       if (workspace.type === "edit") {
         await loadCompatibility(saved.id);
       }
-      dispatch("profileschanged", { profiles: storedProfiles });
+      onprofileschanged?.({ profiles: storedProfiles });
     } catch (error) {
       setNotice($t("profile_save_error", { error: error.message || "unknown error" }), "warn");
     } finally {
@@ -386,7 +385,7 @@
       }
       setNotice($t("profile_deleted"), "ok");
       await loadProfiles({ selectKey: defaultProfileKey, preserveNotice: true });
-      dispatch("profileschanged", { profiles: storedProfiles });
+      onprofileschanged?.({ profiles: storedProfiles });
     } catch (error) {
       setNotice($t("profile_delete_error", { error: error.message || "unknown error" }), "warn");
     } finally {
@@ -405,33 +404,30 @@
     return true;
   };
 
-  $: libraryProfiles = defaultProfile ? [defaultProfile, ...storedProfiles] : storedProfiles;
-  $: incompatibleIds = new Set(compatSummaries.filter(s => !s.compatible).map(s => s.id));
-  $: incompatibleCount = incompatibleIds.size;
-  $: {
-    // Reference searchQuery and activeFilter so Svelte tracks them as dependencies.
-    void searchQuery;
-    void activeFilter;
+  let libraryProfiles = $derived(defaultProfile ? [defaultProfile, ...storedProfiles] : storedProfiles);
+  let incompatibleIds = $derived(new Set(compatSummaries.filter(s => !s.compatible).map(s => s.id)));
+  let incompatibleCount = $derived(incompatibleIds.size);
+  $effect(() => {
     filteredProfiles = libraryProfiles.filter(profileMatchesFilter);
-  }
-  $: editingProfileId = workspace.type === "edit" ? workspace.profileId : null;
-  $: selectedStoredProfile = editingProfileId
+  });
+  let editingProfileId = $derived(workspace.type === "edit" ? workspace.profileId : null);
+  let selectedStoredProfile = $derived(editingProfileId
     ? storedProfiles.find((profile) => profile.id === editingProfileId) || null
-    : null;
-  $: selectedUsageTags = selectedStoredProfile ? usageList(selectedStoredProfile.id) : [];
-  $: selectedLibraryKey = workspace.type === "edit"
+    : null);
+  let selectedUsageTags = $derived(selectedStoredProfile ? usageList(selectedStoredProfile.id) : []);
+  let selectedLibraryKey = $derived(workspace.type === "edit"
     ? `profile:${workspace.profileId}`
     : workspace.type === "default"
       ? defaultProfileKey
-      : "";
-  $: isEditableWorkspace = workspace.type === "edit" || workspace.type === "new" || workspace.type === "duplicate";
-  $: draftValidation = isEditableWorkspace
+      : "");
+  let isEditableWorkspace = $derived(workspace.type === "edit" || workspace.type === "new" || workspace.type === "duplicate");
+  let draftValidation = $derived(isEditableWorkspace
     ? normalizeDraftPayload(draft, editingProfileId)
-    : { payload: null, signature: "" };
-  $: hasDirtyChanges = isEditableWorkspace
+    : { payload: null, signature: "" });
+  let hasDirtyChanges = $derived(isEditableWorkspace
     ? rawDraftSignature(draft) !== String(workspace.savedRawSignature || "")
-    : false;
-  $: canSave = isEditableWorkspace && hasDirtyChanges && !draftValidation.error && !saving;
+    : false);
+  let canSave = $derived(isEditableWorkspace && hasDirtyChanges && !draftValidation.error && !saving);
 
   onMount(() => {
     loadProfiles();
@@ -459,7 +455,7 @@
           <h3>{$t("profile_library_heading")}</h3>
           <p>{$t("profile_library_subtitle")}</p>
         </div>
-        <button class="secondary" type="button" on:click={() => maybeDiscardChanges() && openNewDraft()}>
+        <button class="secondary" type="button" onclick={() => maybeDiscardChanges() && openNewDraft()}>
           {$t("profile_new_button")}
         </button>
       </div>
@@ -491,7 +487,7 @@
             class="ghost mini-button"
             type="button"
             disabled={markingAllReviewed}
-            on:click={markAllReviewed}
+            onclick={markAllReviewed}
           >{markingAllReviewed ? $t("submitting") : $t("profile_library_mark_all_reviewed")}</button>
         </div>
       {/if}
@@ -504,7 +500,7 @@
         <div class="profile-list" role="list" aria-label={$t("profile_library_heading")}>
           {#each filteredProfiles as profile (profile.id === 0 ? defaultProfileKey : profile.id)}
             <div class={`profile-row ${selectedLibraryKey === (profile.id === 0 ? defaultProfileKey : `profile:${profile.id}`) ? "selected" : ""}`} role="listitem">
-              <button class="profile-row-select" type="button" on:click={() => selectProfile(profile)}>
+              <button class="profile-row-select" type="button" onclick={() => selectProfile(profile)}>
                 <div class="profile-row-main">
                   <div class="profile-row-title">
                     <strong>{profile.name}</strong>
@@ -536,7 +532,7 @@
                   <button
                     class="ghost mini-button"
                     type="button"
-                    on:click|stopPropagation={() => duplicateProfile(profile)}
+                    onclick={(e) => { e.stopPropagation(); duplicateProfile(profile); }}
                   >
                     {$t("profile_duplicate_button")}
                   </button>
@@ -544,7 +540,7 @@
                     class="ghost mini-button"
                     type="button"
                     disabled={deletingProfileId === profile.id}
-                    on:click|stopPropagation={() => deleteProfile(profile)}
+                    onclick={(e) => { e.stopPropagation(); deleteProfile(profile); }}
                   >
                     {deletingProfileId === profile.id ? $t("submitting") : $t("profile_delete_button")}
                   </button>
@@ -584,7 +580,7 @@
         </div>
 
         <div class="row">
-          <button class="secondary" type="button" on:click={openNewDraft}>
+          <button class="secondary" type="button" onclick={openNewDraft}>
             {$t("profile_new_from_default_button")}
           </button>
         </div>
@@ -655,30 +651,30 @@
             <div class="row compat-actions">
               {#if compatibility.issues.some(i => i.type === "missing_test_case")}
                 <button class="ghost" type="button" disabled={applyingFix || hasDirtyChanges}
-                  on:click={() => applyCompatFix("add_missing_test_cases")}>
+                  onclick={() => applyCompatFix("add_missing_test_cases")}>
                   {$t("profile_compat_add_test_cases")}
                 </button>
               {/if}
               {#if compatibility.issues.some(i => i.type === "missing_test_levels")}
                 <button class="ghost" type="button" disabled={applyingFix || hasDirtyChanges}
-                  on:click={() => applyCompatFix("add_missing_test_levels")}>
+                  onclick={() => applyCompatFix("add_missing_test_levels")}>
                   {$t("profile_compat_add_test_levels")}
                 </button>
               {/if}
               {#if compatibility.issues.some(i => i.type === "missing_test_case")}
                 <button class="ghost" type="button" disabled={applyingFix || hasDirtyChanges}
-                  on:click={() => applyCompatFix("reset_test_cases")}>
+                  onclick={() => applyCompatFix("reset_test_cases")}>
                   {$t("profile_compat_reset_test_cases")}
                 </button>
               {/if}
               {#each compatibility.issues.filter(i => i.type === "missing_test_levels") as issue}
                 <button class="ghost" type="button" disabled={applyingFix || hasDirtyChanges}
-                  on:click={() => applyCompatFix("reset_test_levels", issue.module)}>
+                  onclick={() => applyCompatFix("reset_test_levels", issue.module)}>
                   {$t("profile_compat_reset_test_levels", { module: issue.module })}
                 </button>
               {/each}
               <button class="ghost" type="button" disabled={applyingFix || hasDirtyChanges}
-                on:click={() => applyCompatFix("mark_reviewed")}>
+                onclick={() => applyCompatFix("mark_reviewed")}>
                 {$t("profile_compat_mark_reviewed")}
               </button>
             </div>
@@ -718,13 +714,13 @@
         {/if}
 
         <div class="row editor-actions">
-          <button type="button" on:click={saveProfile} disabled={!canSave}>
+          <button type="button" onclick={saveProfile} disabled={!canSave}>
             {saving ? $t("submitting") : $t("profile_editor_save_button")}
           </button>
-          <button class="ghost" type="button" on:click={formatDraftJSON}>
+          <button class="ghost" type="button" onclick={formatDraftJSON}>
             {$t("profile_editor_format_button")}
           </button>
-          <button class="ghost" type="button" on:click={resetDraft} disabled={!hasDirtyChanges}>
+          <button class="ghost" type="button" onclick={resetDraft} disabled={!hasDirtyChanges}>
             {$t(workspace.type === "edit" ? "profile_editor_reset_button" : "profile_editor_cancel_button")}
           </button>
           {#if workspace.type === "edit" && selectedStoredProfile}
@@ -732,7 +728,7 @@
               class="ghost"
               type="button"
               disabled={deletingProfileId === selectedStoredProfile.id}
-              on:click={() => deleteProfile(selectedStoredProfile)}
+              onclick={() => deleteProfile(selectedStoredProfile)}
             >
               {deletingProfileId === selectedStoredProfile.id ? $t("submitting") : $t("profile_delete_button")}
             </button>

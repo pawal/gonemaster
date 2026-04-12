@@ -13,29 +13,25 @@
     return LEVELS.filter((l) => counts[l]).map((l) => ({ level: l, count: counts[l] }));
   }
 
-  export let publicID;
-  export let domain = "";
-  export let locale = "en";
-  export let finishedAt = null;
-  export let scoringEnabled = false;
+  let { publicID, domain = "", locale = "en", finishedAt = null, scoringEnabled = false } = $props();
 
-  $: finishedStr = (() => {
+  let finishedStr = $derived((() => {
     if (!finishedAt) return "";
     const d = new Date(finishedAt);
     return d.getFullYear() > 2000 ? d.toISOString().slice(0, 16) : "";
-  })();
+  })());
 
-  let entries = [];
-  let score = null;
-  let loading = true;
-  let errorKey = "";
+  let entries = $state([]);
+  let score = $state(null);
+  let loading = $state(true);
+  let errorKey = $state("");
   const NOTICE_IDX = LEVELS.indexOf("NOTICE");
   function isNoticeOrAbove(level) {
     return LEVELS.indexOf(level?.toUpperCase()) >= NOTICE_IDX;
   }
 
-  let openModules = new Set();
-  let openTestcases = new Set();
+  let openModules = $state(new Set());
+  let openTestcases = $state(new Set());
 
   async function fetchResult(pid, loc) {
     loading = true;
@@ -58,29 +54,31 @@
     }
   }
 
-  $: fetchResult(publicID, locale);
+  $effect(() => {
+    fetchResult(publicID, locale);
+  });
 
-  // Group entries by module → testcase, preserving insertion order.
-  $: modules = entries.reduce((acc, e) => {
+  // Group entries by module -> testcase, preserving insertion order.
+  let modules = $derived(entries.reduce((acc, e) => {
     if (!acc[e.module]) acc[e.module] = {};
     const tc = e.testcase || "Unspecified";
     if (!acc[e.module][tc]) acc[e.module][tc] = [];
     acc[e.module][tc].push(e);
     return acc;
-  }, {});
+  }, {}));
 
   function allModuleEntries(mod) {
     return Object.values(mod).flat();
   }
 
-  $: moduleNames = Object.keys(modules).sort((a, b) => {
+  let moduleNames = $derived(Object.keys(modules).sort((a, b) => {
     if (a === "System") return -1;
     if (b === "System") return 1;
     return 0;
-  });
-  $: overallLevel = worstLevel(entries);
-  $: bannerCls = bannerClass(overallLevel);
-  $: statusKey = `pub.result_status_${bannerCls}`;
+  }));
+  let overallLevel = $derived(worstLevel(entries));
+  let bannerCls = $derived(bannerClass(overallLevel));
+  let statusKey = $derived(`pub.result_status_${bannerCls}`);
 
   // ── Scoring helpers ──────────────────────────────────────────────────────────
 
@@ -98,33 +96,33 @@
     return CAT_LABELS[cat] ?? cat.replace(/_/g, " ");
   }
 
-  // Returns a color for a category sub-score bar (0–100).
-  function categoryColor(s) {
-    if (s >= 90) return "#22c55e";
-    if (s >= 75) return "#84cc16";
-    if (s >= 60) return "#ca8a04";
-    if (s >= 40) return "#ea580c";
-    return "#dc2626";
-  }
+  // Maps a grade letter to a CSS variable name for consistent grade coloring.
+  const GRADE_COLORS = {
+    "A+": "var(--grade-aplus)", "A": "var(--grade-a)", "B": "var(--grade-b)",
+    "C": "var(--grade-c)", "D": "var(--grade-d)", "F": "var(--grade-f)",
+  };
+
+  // Single grade color for all category bars (cohesive, not per-bar).
+  let gradeColor = $derived(GRADE_COLORS[score?.grade] ?? "var(--grade-a)");
 
   // Sorted category entries in display order.
-  $: sortedCats = score?.categories
+  let sortedCats = $derived(score?.categories
     ? CAT_ORDER.filter(c => c in score.categories).map(c => [c, score.categories[c]])
-    : [];
+    : []);
 
   // Translate a bonus criterion key via i18n, falling back to humanised key.
   // Reactive so the template re-evaluates when $t changes (e.g. on locale switch).
-  $: bonusLabel = (key) => {
+  let bonusLabel = $derived((key) => {
     const k = `pub.score_bonus_${key}`;
     const s = $t(k);
     return s !== k ? s : key.replace(/_/g, " ");
-  };
+  });
 
   // Number of unmet bonus criteria (null = not applicable, counts as met).
-  $: bonusMissing = score?.bonus?.criteria
+  let bonusMissing = $derived(score?.bonus?.criteria
     ? Object.entries(score.bonus.criteria)
         .filter(([k, v]) => k !== "no_warnings_or_errors" && v === false).length
-    : 0;
+    : 0);
 </script>
 
 <div class="card stack" data-testid="results-view">
@@ -133,25 +131,19 @@
   {:else if loading}
     <p data-testid="results-loading">{$t("pub.progress_queued")}</p>
   {:else}
-    {#if domain}
-      <div class="result-heading-row">
-        <div>
-          <h2 class="result-heading">{$t("pub.result_heading", { domain })}</h2>
-          {#if finishedStr}<p class="result-date small">{finishedStr}</p>{/if}
-        </div>
-        <ShareButton {publicID} {domain} score={scoringEnabled ? score : null} />
-      </div>
-    {/if}
-
-    {#if scoringEnabled && score}
+    {#if scoringEnabled && score && domain}
       <div class="score-card" data-testid="score-card">
         <div class="score-left">
           <div class="grade-badge" data-grade={score.grade}>
             <span class="grade-letter">{score.grade}</span>
           </div>
           <div class="score-meta">
+            <div class="score-domain">{domain}</div>
             <div class="score-number">{score.score}<span class="score-denom">/100</span></div>
-            <div class="score-label">{$t("pub.score_label")}</div>
+            <div class="score-meta-row">
+              {#if finishedStr}<span class="result-date">{finishedStr}</span>{/if}
+              <ShareButton {publicID} {domain} score={scoringEnabled ? score : null} />
+            </div>
           </div>
         </div>
         {#if sortedCats.length > 0}
@@ -162,7 +154,7 @@
                 <div class="score-cat-bar-track">
                   <div
                     class="score-cat-bar"
-                    style="--bar-pct:{res.score}%; --bar-color:{categoryColor(res.score)}; animation-delay:{i * 60}ms"
+                    style="--bar-pct:{res.score}%; --bar-color:{gradeColor}; animation-delay:{i * 60}ms"
                   ></div>
                 </div>
                 <span class="score-cat-num">{res.score}</span>
@@ -193,6 +185,14 @@
           </div>
         </details>
       {/if}
+    {:else if domain}
+      <div class="result-heading-row">
+        <div>
+          <h2 class="result-heading">{$t("pub.result_heading", { domain })}</h2>
+          {#if finishedStr}<p class="result-date small">{finishedStr}</p>{/if}
+        </div>
+        <ShareButton {publicID} {domain} />
+      </div>
     {/if}
 
     <div class="status-banner {bannerCls}" data-testid="result-banner" role="status">
@@ -201,12 +201,14 @@
     {#each moduleNames as moduleName}
       {@const mod = modules[moduleName]}
       {@const modEntries = allModuleEntries(mod)}
+      {@const modLevel = worstLevel(modEntries)}
       {@const testcases = Object.keys(mod)}
       <details
         class="module-card"
         data-testid="module-group"
+        data-level={modLevel.toLowerCase()}
         open={openModules.has(moduleName)}
-        on:toggle={(e) => { if (e.target.open) openModules.add(moduleName); else openModules.delete(moduleName); openModules = openModules; }}
+        ontoggle={(e) => { if (e.target.open) openModules.add(moduleName); else openModules.delete(moduleName); openModules = new Set(openModules); }}
       >
         <summary class="module-summary">
           <span class="module-chevron"></span>
@@ -228,7 +230,7 @@
                 class="testcase-group"
                 data-testid="testcase-group"
                 open={isNoticeOrAbove(tcLevel) || openTestcases.has(tc)}
-                on:toggle={(e) => { if (e.target.open) openTestcases.add(tc); else openTestcases.delete(tc); openTestcases = openTestcases; }}
+                ontoggle={(e) => { if (e.target.open) openTestcases.add(tc); else openTestcases.delete(tc); openTestcases = new Set(openTestcases); }}
               >
                 <summary class="testcase-summary">
                   <span class="testcase-chevron"></span>

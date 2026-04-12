@@ -50,6 +50,7 @@
   "pub.status_expired": "Poteklo",
 
   "pub.progress_testing": "Preizkušanje {domain}…",
+  "pub.progress_testing_label": "Testiranje",
   "pub.progress_queued": "Čakanje v vrsti…",
 
   "pub.result_heading": "Rezultati za {domain}",

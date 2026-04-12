@@ -1,12 +1,9 @@
 <script>
-  import { createEventDispatcher } from "svelte";
   import { t } from "../i18n.js";
   import { createJob, lookupDomain } from "../api.js";
   import { validateDomain, emptyNsRow, emptyDsRow, buildJobOpts } from "./validate.js";
 
-  const dispatch = createEventDispatcher();
-
-  export let disabled = false;
+  let { disabled = false, onjobcreated } = $props();
 
   const DNSSEC_ALGORITHMS = [
     { group: "Recommended", options: [
@@ -42,16 +39,17 @@
     ]},
   ];
 
-  let domain = "";
-  let submitting = false;
-  let errorKey = "";
-  let errorExtra = {};
+  let domain = $state("");
+  let submitting = $state(false);
+  let errorKey = $state("");
+  let errorExtra = $state({});
 
-  let ipMode = "default";
-  let nsRows = [];
-  let dsRows = [];
+  let ipMode = $state("default");
+  let nsRows = $state([]);
+  let dsRows = $state([]);
 
-  async function handleSubmit() {
+  async function handleSubmit(e) {
+    e.preventDefault();
     if (disabled) return;
     const err = validateDomain(domain);
     if (err) { errorKey = err; errorExtra = {}; return; }
@@ -76,7 +74,7 @@
         return;
       }
       const job = await res.json();
-      dispatch("jobcreated", { publicID: job.public_id });
+      onjobcreated?.({ publicID: job.public_id });
     } catch (_) {
       errorKey = "pub.error_network";
     } finally {
@@ -89,9 +87,9 @@
   function addDsRow() { dsRows = [...dsRows, emptyDsRow()]; }
   function removeDsRow(i) { dsRows = dsRows.filter((_, idx) => idx !== i); }
 
-  let optionsOpen = false;
-  let nsOpen = false;
-  let dsOpen = false;
+  let optionsOpen = $state(false);
+  let nsOpen = $state(false);
+  let dsOpen = $state(false);
 
   function resetForm() {
     domain = "";
@@ -105,7 +103,7 @@
     dsOpen = false;
   }
 
-  let fetching = false;
+  let fetching = $state(false);
 
   async function fetchFromParent() {
     const d = domain.trim();
@@ -135,7 +133,7 @@
 </script>
 
 <div class="card stack" data-testid="test-form">
-  <form on:submit|preventDefault={handleSubmit} novalidate>
+  <form onsubmit={handleSubmit} novalidate>
     <div class="stack">
       <label for="domain-input">{$t("pub.domain_label")}</label>
       <input
@@ -188,7 +186,7 @@
                   <button
                     type="button"
                     class="ghost mini-button"
-                    on:click={() => removeNsRow(i)}
+                    onclick={() => removeNsRow(i)}
                     disabled={submitting || disabled}
                   >{$t("pub.ns_remove")}</button>
                 </div>
@@ -197,14 +195,14 @@
                 <button
                   type="button"
                   class="ghost"
-                  on:click={addNsRow}
+                  onclick={addNsRow}
                   disabled={submitting || disabled}
                   data-testid="add-ns"
                 >{$t("pub.ns_add")}</button>
                 <button
                   type="button"
                   class="ghost"
-                  on:click={fetchFromParent}
+                  onclick={fetchFromParent}
                   disabled={submitting || disabled || fetching || !domain.trim()}
                   data-testid="fetch-ns"
                 >{fetching ? $t("pub.fetch_loading") : $t("pub.fetch_from_parent")}</button>
@@ -250,7 +248,7 @@
                   <button
                     type="button"
                     class="ghost mini-button"
-                    on:click={() => removeDsRow(i)}
+                    onclick={() => removeDsRow(i)}
                     disabled={submitting || disabled}
                   >{$t("pub.ds_remove")}</button>
                 </div>
@@ -259,14 +257,14 @@
                 <button
                   type="button"
                   class="ghost"
-                  on:click={addDsRow}
+                  onclick={addDsRow}
                   disabled={submitting || disabled}
                   data-testid="add-ds"
                 >{$t("pub.ds_add")}</button>
                 <button
                   type="button"
                   class="ghost"
-                  on:click={fetchFromParent}
+                  onclick={fetchFromParent}
                   disabled={submitting || disabled || fetching || !domain.trim()}
                   data-testid="fetch-ds"
                 >{fetching ? $t("pub.fetch_loading") : $t("pub.fetch_from_parent")}</button>
@@ -282,7 +280,7 @@
       <button
         type="button"
         class="ghost"
-        on:click={resetForm}
+        onclick={resetForm}
         disabled={submitting || disabled}
         data-testid="reset-form"
       >{$t("pub.reset_form")}</button>

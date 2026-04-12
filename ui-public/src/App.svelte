@@ -11,22 +11,24 @@
   const logoSrc = `${import.meta.env.BASE_URL}gonemaster.svg`;
 
   // ── Phase ───────────────────────────────────────────────────────────────────
-  // "idle"    — form shown, no results
-  // "running" — form disabled, Progress shown below
-  // "done"    — form enabled, Results/ExpiredResult shown below
-  let phase = "idle";
-  let publicID = null;
-  let jobStatus = "";
-  let jobDomain = "";
-  let jobFinishedAt = null;
-  let jobProgress = 0;
+  // "idle"    - form shown, no results
+  // "running" - form disabled, Progress shown below
+  // "done"    - form enabled, Results/ExpiredResult shown below
+  let phase = $state("idle");
+  let publicID = $state(null);
+  let jobStatus = $state("");
+  let jobDomain = $state("");
+  let jobFinishedAt = $state(null);
+  let jobProgress = $state(0);
 
-  $: document.title = phase === "running" ? `${jobProgress}% Gonemaster` : "Gonemaster";
+  $effect(() => {
+    document.title = phase === "running" ? `${jobProgress}% Gonemaster` : "Gonemaster";
+  });
 
   const TERMINAL = new Set(["succeeded", "failed", "canceled", "expired"]);
 
   // ── Theme ───────────────────────────────────────────────────────────────────
-  let isDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
+  let isDark = $state(window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false);
 
   function applyTheme() {
     document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
@@ -37,8 +39,8 @@
     applyTheme();
   }
 
-  $: themeLabel = isDark ? $t("pub.theme_dark") : $t("pub.theme_light");
-  $: themeIcon = isDark ? "☀" : "☽";
+  let themeLabel = $derived(isDark ? $t("pub.theme_dark") : $t("pub.theme_light"));
+  let themeIcon = $derived(isDark ? "☀" : "☽");
 
   // ── Locale ──────────────────────────────────────────────────────────────────
   const localeDisplayNames = {
@@ -47,12 +49,12 @@
   };
   const localeLabel = (code) => localeDisplayNames[code] || code;
 
-  let availableLocales = ["en"];
-  let resultLocale = "en";
-  let versionGonemaster = "";
-  let versionDNS = "";
+  let availableLocales = $state(["en"]);
+  let resultLocale = $state("en");
+  let versionGonemaster = $state("");
+  let versionDNS = $state("");
   // Fail-safe default: hide scoring until server confirms it is enabled.
-  let scoringEnabled = false;
+  let scoringEnabled = $state(false);
 
   async function fetchLocales() {
     try {
@@ -107,8 +109,8 @@
   }
 
   // ── Job handlers ────────────────────────────────────────────────────────────
-  function onJobCreated(e) {
-    publicID = e.detail.publicID;
+  function onJobCreated(detail) {
+    publicID = detail.publicID;
     jobStatus = "";
     jobDomain = "";
     jobFinishedAt = null;
@@ -117,10 +119,10 @@
     window.location.hash = hashFor("result", publicID).slice(1);
   }
 
-  function onJobDone(e) {
-    jobStatus = e.detail.status;
-    jobDomain = e.detail.domain ?? "";
-    jobFinishedAt = e.detail.finishedAt ?? null;
+  function onJobDone(detail) {
+    jobStatus = detail.status;
+    jobDomain = detail.domain ?? "";
+    jobFinishedAt = detail.finishedAt ?? null;
     phase = "done";
   }
 
@@ -143,7 +145,7 @@
           scoringEnabled = data.show_score_public;
         }
       }
-    } catch (_) { /* keep false — fail-safe */ }
+    } catch (_) { /* keep false - fail-safe */ }
   }
 
   async function fetchVersion() {
@@ -177,7 +179,6 @@
       <h1 class="brand-mark">
         <img class="brand-logo" src={logoSrc} alt="gonemaster" />
       </h1>
-      <p class="subtitle">{$t("pub.app_subtitle")}</p>
     </div>
     <div class="header-controls">
       {#if availableLocales.length > 1}
@@ -186,7 +187,7 @@
           aria-label={$t("pub.locale_select_aria")}
           title={$t("pub.locale_select_title")}
           bind:value={resultLocale}
-          on:change={onLocaleChange}
+          onchange={onLocaleChange}
         >
           {#each availableLocales as code}
             <option value={code}>{localeLabel(code)}</option>
@@ -197,18 +198,18 @@
         class="theme-toggle"
         title={$t("pub.theme_cycle_title", { theme: themeLabel })}
         aria-label={$t("pub.theme_cycle_title", { theme: themeLabel })}
-        on:click={toggleTheme}
+        onclick={toggleTheme}
       >{themeIcon}</button>
     </div>
   </header>
 
-  <TestForm disabled={phase === "running"} on:jobcreated={onJobCreated} />
+  <TestForm disabled={phase === "running"} onjobcreated={onJobCreated} />
 
   {#if phase === "running"}
     <Progress
       publicID={publicID}
       bind:progress={jobProgress}
-      on:jobdone={onJobDone}
+      onjobdone={onJobDone}
     />
   {:else if phase === "done"}
     {#if jobStatus === "succeeded"}
@@ -220,7 +221,7 @@
         {scoringEnabled}
       />
     {:else}
-      <ExpiredResult on:newtest={resetToIdle} />
+      <ExpiredResult onnewtest={resetToIdle} />
     {/if}
   {/if}
 

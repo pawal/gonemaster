@@ -955,7 +955,8 @@
   const BONUS_HIDDEN = new Set(["no_warnings_or_errors"]);
   // Returns true when a run/job has a score to display.
   const hasScore = (item) => item?.score != null && item?.grade != null;
-  const categoryColor = (s) => s >= 80 ? '#22c55e' : s >= 60 ? '#84cc16' : s >= 40 ? '#ca8a04' : '#dc2626';
+  const GRADE_COLORS = { "A+": "var(--grade-aplus)", "A": "var(--grade-a)", "B": "var(--grade-b)", "C": "var(--grade-c)", "D": "var(--grade-d)", "F": "var(--grade-f)" };
+  const gradeBarColor = (grade) => GRADE_COLORS[grade] ?? "var(--grade-a)";
   // Returns the full scoring result from either a run (score object) or a
   // job-list item where score is just an int and grade a string.
   const chipGrade  = (item) => item?.grade ?? null;
@@ -1638,8 +1639,8 @@
     }
   };
 
-  const handleProfilesChanged = async (event) => {
-    const nextProfiles = event?.detail?.profiles;
+  const handleProfilesChanged = async (detail) => {
+    const nextProfiles = detail?.profiles;
     if (Array.isArray(nextProfiles)) {
       availableProfiles = nextProfiles;
       profilesLoaded = true;
@@ -2188,19 +2189,18 @@
   });
 </script>
 
-<main>
+<div class="app-header">
   <header class="reveal" style="--d: 0.05s">
     <div class="header-text">
       <h1 class="brand-mark">
         <img class="brand-logo" src={logoSrc} alt="gonemaster" />
       </h1>
-      <p class="subtitle">{$t("app_subtitle")}</p>
     </div>
     <div class="header-controls">
       {#if availableLocales.length > 1}
         <select
           bind:value={resultLocale}
-          on:change={onLocaleChange}
+          onchange={onLocaleChange}
           id="locale-select"
           class="locale-select"
           title={$t("locale_select_title")}
@@ -2211,28 +2211,57 @@
           {/each}
         </select>
       {/if}
-      <button class="theme-toggle" type="button" on:click={toggleTheme} title={themeTitle} aria-label={themeTitle}>
+      <button class="theme-toggle" type="button" onclick={toggleTheme} title={themeTitle} aria-label={themeTitle}>
         {themeIcon}
       </button>
     </div>
   </header>
+</div>
 
-  <div class="tabs" role="tablist" aria-label={$t("tabs_aria_label")}>
-    {#each tabs as tab}
+<div class="mobile-nav" role="tablist" aria-label={$t("tabs_aria_label")}>
+  {#each tabs as tab}
+    <button
+      class={`nav-item ${activeTab === tab.id ? "active" : ""}`}
+      type="button"
+      role="tab"
+      id={`tab-${tab.id}`}
+      aria-selected={activeTab === tab.id}
+      aria-controls={`panel-${tab.id}`}
+      onclick={() => setTab(tab.id)}
+    >
+      {$t(tab.labelKey)}
+    </button>
+  {/each}
+</div>
+
+<div class="app-layout">
+  <nav class="sidebar" aria-label={$t("tabs_aria_label")}>
+    <div class="nav-items">
+      {#each tabs.filter(t => t.id !== "settings") as tab}
+        <button
+          class={`nav-item ${activeTab === tab.id ? "active" : ""}`}
+          type="button"
+          aria-current={activeTab === tab.id ? "page" : undefined}
+          onclick={() => setTab(tab.id)}
+        >
+          {$t(tab.labelKey)}
+        </button>
+      {/each}
+    </div>
+    <div class="nav-bottom">
+      <hr class="nav-divider" />
       <button
-        class={`tab ${activeTab === tab.id ? "active" : ""}`}
+        class={`nav-item ${activeTab === "settings" ? "active" : ""}`}
         type="button"
-        role="tab"
-        id={`tab-${tab.id}`}
-        aria-selected={activeTab === tab.id}
-        aria-controls={`panel-${tab.id}`}
-        on:click={() => setTab(tab.id)}
+        aria-current={activeTab === "settings" ? "page" : undefined}
+        onclick={() => setTab("settings")}
       >
-        {$t(tab.labelKey)}
+        {$t("tab_settings")}
       </button>
-    {/each}
-  </div>
+    </div>
+  </nav>
 
+  <main>
   {#if activeTab === "single"}
     <div class="grid" id="panel-single" role="tabpanel" aria-labelledby="tab-single" style="margin-top: 22px;">
       <div class="card reveal" style="--d: 0.18s">
@@ -2244,7 +2273,7 @@
             type="text"
             placeholder="example.com"
             bind:value={singleDomain}
-            on:keydown={(event) => {
+            onkeydown={(event) => {
               if (event.key === "Enter") {
                 event.preventDefault();
                 submitSingle();
@@ -2306,14 +2335,14 @@
                       placeholder="192.0.2.10 or 2001:db8::10"
                       bind:value={row.ip}
                     />
-                    <button class="ghost mini-button" type="button" on:click={() => removeUndelegatedNameserverRow(row.id)}>
+                    <button class="ghost mini-button" type="button" onclick={() => removeUndelegatedNameserverRow(row.id)}>
                       {$t("remove")}
                     </button>
                   </div>
                 {/each}
               </div>
             {/if}
-            <button class="ghost" type="button" on:click={addUndelegatedNameserverRow}>
+            <button class="ghost" type="button" onclick={addUndelegatedNameserverRow}>
               {$t("add_nameserver")}
             </button>
 
@@ -2333,20 +2362,20 @@
                       placeholder="ABCD..."
                       bind:value={row.digest}
                     />
-                    <button class="ghost mini-button" type="button" on:click={() => removeUndelegatedDSRow(row.id)}>
+                    <button class="ghost mini-button" type="button" onclick={() => removeUndelegatedDSRow(row.id)}>
                       {$t("remove")}
                     </button>
                   </div>
                 {/each}
               </div>
             {/if}
-            <button class="ghost" type="button" on:click={addUndelegatedDSRow}>
+            <button class="ghost" type="button" onclick={addUndelegatedDSRow}>
               {$t("add_ds_record")}
             </button>
             <div class="small">{$t("undelegated_validation_hint")}</div>
           </div>
         </details>
-        <button on:click={submitSingle} disabled={singleSubmitting}>
+        <button onclick={submitSingle} disabled={singleSubmitting}>
           {singleSubmitting ? $t("submitting") : $t("run_single_job")}
         </button>
         {#if createdJobId}
@@ -2358,11 +2387,11 @@
         <h2>{selectedJob && isResultReadyStatus(selectedJob.status) ? $t("run_inspector_heading") : $t("job_inspector_heading")}</h2>
         <div class="stack">
           <label for="job-id">{$t("job_id_label")}</label>
-          <input id="job-id" type="text" placeholder="job_123" bind:value={selectedJobId} on:change={() => loadJob()} />
+          <input id="job-id" type="text" placeholder="job_123" bind:value={selectedJobId} onchange={() => loadJob()} />
         </div>
         <div class="row">
-          <button on:click={() => loadJob()} disabled={jobLoading}>{jobLoading ? $t("loading") : $t("refresh")}</button>
-          <button class="ghost" type="button" on:click={() => (autoRefreshJob = !autoRefreshJob)}>
+          <button onclick={() => loadJob()} disabled={jobLoading}>{jobLoading ? $t("loading") : $t("refresh")}</button>
+          <button class="ghost" type="button" onclick={() => (autoRefreshJob = !autoRefreshJob)}>
             {autoRefreshJob ? $t("auto_refresh_on") : $t("auto_refresh_off")}
           </button>
         </div>
@@ -2377,7 +2406,7 @@
               <span class="progress-value">{progressPercent(selectedJob)}%</span>
             </div>
             <span>{$t("domain_label")}</span>
-            <button class="ghost" type="button" style="padding: 0; font-family: monospace; text-align: left; border: none;" on:click={() => navigateToDomainByName(selectedJob.domain)}>{selectedJob.domain}</button>
+            <button class="ghost" type="button" style="padding: 0; font-family: monospace; text-align: left; border: none;" onclick={() => navigateToDomainByName(selectedJob.domain)}>{selectedJob.domain}</button>
             {#if selectedJobProfileName}
               <span>{$t("job_profile_label")}</span>
               <strong class="mono">{selectedJobProfileName}</strong>
@@ -2466,13 +2495,14 @@
               <div class="small">{$t("module_expand_hint")}</div>
               <div class="module-list">
                 {#each moduleGroups as group (group.key)}
-                  <div class="module-card">
+                  {@const groupLevel = worstLevel(group.entries)}
+                  <div class="module-card" data-level={groupLevel.toLowerCase()}>
                     <button
                       class="module-toggle"
                       type="button"
                       aria-expanded={!!moduleOpen[group.key]}
                       aria-controls={moduleId(group.key)}
-                      on:click={() => toggleModule(group.key)}
+                      onclick={() => toggleModule(group.key)}
                     >
                       <div class="module-title">{group.name}</div>
                       <div class="module-meta">{group.testcasesArr.length > 0 ? `${group.testcasesArr.length} tests · ` : ""}{$t("entries_count", { count: group.entries.length })}</div>
@@ -2549,7 +2579,7 @@
           </div>
         {/if}
         {#if selectedJob && !selectedJobResult && isResultReadyStatus(selectedJob.status)}
-          <button class="ghost" type="button" on:click={() => loadJobResult()}>
+          <button class="ghost" type="button" onclick={() => loadJobResult()}>
             {$t("load_result")}
           </button>
         {/if}
@@ -2559,15 +2589,15 @@
     <div class="card reveal" id="panel-recent" role="tabpanel" aria-labelledby="tab-recent" style="--d: 0.34s; margin-top: 22px;">
       <h2>{$t("recent_tests_heading")}</h2>
       <div class="row">
-        <button class="ghost" type="button" on:click={loadJobs} disabled={jobsLoading}>
+        <button class="ghost" type="button" onclick={loadJobs} disabled={jobsLoading}>
           {jobsLoading ? $t("refreshing") : $t("refresh_list")}
         </button>
-        <button class="ghost" type="button" on:click={() => (autoRefreshRecent = !autoRefreshRecent)}>
+        <button class="ghost" type="button" onclick={() => (autoRefreshRecent = !autoRefreshRecent)}>
           {autoRefreshRecent ? $t("auto_refresh_on") : $t("auto_refresh_off")}
         </button>
         <div class="sort-control">
           <label for="recent-sort">{$t("sort_label")}</label>
-          <select id="recent-sort" bind:value={jobSort} on:change={applyRecentFilters}>
+          <select id="recent-sort" bind:value={jobSort} onchange={applyRecentFilters}>
             {#each jobSortOptions as option}
               <option value={option.id}>{$t(option.labelKey)}</option>
             {/each}
@@ -2575,7 +2605,7 @@
         </div>
         <div class="sort-control">
           <label for="recent-page-size">{$t("page_size_label")}</label>
-          <select id="recent-page-size" bind:value={recentPageSize} on:change={applyRecentFilters}>
+          <select id="recent-page-size" bind:value={recentPageSize} onchange={applyRecentFilters}>
             {#each recentPageSizes as pageSize}
               <option value={pageSize}>{pageSize}</option>
             {/each}
@@ -2588,7 +2618,7 @@
             type="text"
             placeholder="example.com"
             bind:value={recentDomainFilter}
-            on:keydown={(event) => {
+            onkeydown={(event) => {
               if (event.key === "Enter") {
                 event.preventDefault();
                 applyRecentFilters();
@@ -2603,7 +2633,7 @@
             type="text"
             placeholder="batch_123"
             bind:value={jobBatchFilter}
-            on:keydown={(event) => {
+            onkeydown={(event) => {
               if (event.key === "Enter") {
                 event.preventDefault();
                 applyRecentFilters();
@@ -2612,8 +2642,8 @@
           />
         </div>
         <div class="row">
-          <button class="ghost" type="button" on:click={applyRecentFilters} disabled={jobsLoading}>{$t("apply_filters")}</button>
-          <button class="ghost" type="button" on:click={clearRecentFilters} disabled={jobsLoading}>{$t("clear")}</button>
+          <button class="ghost" type="button" onclick={applyRecentFilters} disabled={jobsLoading}>{$t("apply_filters")}</button>
+          <button class="ghost" type="button" onclick={clearRecentFilters} disabled={jobsLoading}>{$t("clear")}</button>
         </div>
       </div>
       <div class="severity-filter-bar" role="group" aria-label={$t("severity_filters_aria")}>
@@ -2621,7 +2651,7 @@
           <button
             type="button"
             class={`severity-filter ${severityFilter === filter.id ? "active" : ""}`}
-            on:click={async () => {
+            onclick={async () => {
               severityFilter = filter.id;
               await applyRecentFilters();
             }}
@@ -2634,7 +2664,7 @@
         <button
           class="ghost"
           type="button"
-          on:click={() => goToRecentCursor(recentPrevCursor)}
+          onclick={() => goToRecentCursor(recentPrevCursor)}
           disabled={!recentPrevCursor || jobsLoading}
         >
           {$t("previous")}
@@ -2642,7 +2672,7 @@
         <button
           class="ghost"
           type="button"
-          on:click={() => goToRecentCursor(recentNextCursor)}
+          onclick={() => goToRecentCursor(recentNextCursor)}
           disabled={!recentNextCursor || jobsLoading}
         >
           {$t("next")}
@@ -2658,11 +2688,11 @@
           <div class="small">{$t("no_jobs_severity")}</div>
         {:else}
           {#each filteredJobs as job (job.id)}
-            <div class="list-item clickable" on:click={() => {
+            <div class="list-item clickable" onclick={() => {
               selectedJobId = job.id;
               loadJob(job.id);
               setTab("single");
-            }} on:keydown={(e) => {
+            }} onkeydown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
                 selectedJobId = job.id;
@@ -2708,7 +2738,7 @@
     <div class="card reveal" id="panel-domains" role="tabpanel" aria-labelledby="tab-domains" style="--d: 0.34s; margin-top: 22px;">
       {#if selectedDomain}
         <div>
-          <button class="secondary small" on:click={() => { selectedDomain = null; setTab("domains"); }}>{$t("back_to_domains")}</button>
+          <button class="secondary small" onclick={() => { selectedDomain = null; setTab("domains"); }}>{$t("back_to_domains")}</button>
           <div style="display:flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.5rem; margin-bottom: 0.75rem;">
             <h2 class="mono" style="margin: 0;">{selectedDomain.name}</h2>
             {#if selectedDomain.tags && selectedDomain.tags.length > 0}
@@ -2725,7 +2755,7 @@
             <span>{$t("col_run_count")}</span>
             <strong>{selectedDomain.run_count ?? 0}</strong>
           </div>
-          <button class="secondary" on:click={retestDomain} disabled={domainResubmitting}>
+          <button class="secondary" onclick={retestDomain} disabled={domainResubmitting}>
             {domainResubmitting ? $t("submitting") : $t("retest_domain")}
           </button>
 
@@ -2755,7 +2785,7 @@
                         <div class="score-cat-row">
                           <span class="score-cat-name">{CAT_LABELS[cat] ?? cat}</span>
                           <div class="score-cat-bar-track">
-                            <div class="score-cat-bar" style="--bar-pct:{res.score}%; --bar-color:{categoryColor(res.score)}; animation-delay:{i * 60}ms"></div>
+                            <div class="score-cat-bar" style="--bar-pct:{res.score}%; --bar-color:{gradeBarColor(sc.grade)}; animation-delay:{i * 60}ms"></div>
                           </div>
                           <span class="score-cat-num">{res.score}</span>
                         </div>
@@ -2810,13 +2840,14 @@
                 <div class="small">{$t("module_expand_hint")}</div>
                 <div class="module-list">
                   {#each domainModuleGroups as group (group.key)}
-                    <div class="module-card">
+                    {@const groupLevel = worstLevel(group.entries)}
+                    <div class="module-card" data-level={groupLevel.toLowerCase()}>
                       <button
                         class="module-toggle"
                         type="button"
                         aria-expanded={!!domainModuleOpen[group.key]}
                         aria-controls={"dm-" + moduleId(group.key)}
-                        on:click={() => toggleDomainModule(group.key)}
+                        onclick={() => toggleDomainModule(group.key)}
                       >
                         <div class="module-title">{group.name}</div>
                         <div class="module-meta">{group.testcasesArr.length > 0 ? `${group.testcasesArr.length} tests · ` : ""}{$t("entries_count", { count: group.entries.length })}</div>
@@ -2913,10 +2944,10 @@
                   <tr
                     style="cursor: pointer;"
                     class={selectedDomainRunId === run.id ? "run-row-selected" : ""}
-                    on:click={() => { selectedJobId = run.id; setTab("single"); loadJob(run.id); }}
+                    onclick={() => { selectedJobId = run.id; setTab("single"); loadJob(run.id); }}
                     role="button"
                     tabindex="0"
-                    on:keydown={(e) => { if (e.key === "Enter" || e.key === " ") { selectedJobId = run.id; setTab("single"); loadJob(run.id); } }}
+                    onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { selectedJobId = run.id; setTab("single"); loadJob(run.id); } }}
                   >
                     <td class="run-id-cell" title={run.id}>{run.id}</td>
                     <td>{run.finished_at ? run.finished_at.slice(0, 16).replace("T", " ") : "—"}</td>
@@ -2932,13 +2963,13 @@
               <button
                 class="secondary small"
                 disabled={domainRunsOffset === 0}
-                on:click={() => { domainRunsOffset = Math.max(0, domainRunsOffset - domainRunsLimit); loadDomainRuns(); }}
+                onclick={() => { domainRunsOffset = Math.max(0, domainRunsOffset - domainRunsLimit); loadDomainRuns(); }}
               >{$t("prev_page")}</button>
               <span class="muted small">{domainRunsOffset + 1}–{Math.min(domainRunsOffset + domainRunsLimit, domainRunsTotal)} / {domainRunsTotal}</span>
               <button
                 class="secondary small"
                 disabled={domainRunsOffset + domainRunsLimit >= domainRunsTotal}
-                on:click={() => { domainRunsOffset += domainRunsLimit; loadDomainRuns(); }}
+                onclick={() => { domainRunsOffset += domainRunsLimit; loadDomainRuns(); }}
               >{$t("next_page")}</button>
             </div>
           {/if}
@@ -2950,12 +2981,12 @@
             type="search"
             placeholder={$t("domains_search_placeholder")}
             bind:value={domainNameFilter}
-            on:input={() => loadDomains({ reset: true })}
+            oninput={() => loadDomains({ reset: true })}
             style="flex: 1 1 180px;"
           />
           <select
             bind:value={domainTagFilter}
-            on:change={() => loadDomains({ reset: true })}
+            onchange={() => loadDomains({ reset: true })}
             style="flex: 0 1 180px;"
             aria-label={$t("tag_filter_label")}
           >
@@ -2966,7 +2997,7 @@
           </select>
           <select
             bind:value={domainLevelFilter}
-            on:change={() => loadDomains({ reset: true })}
+            onchange={() => loadDomains({ reset: true })}
             style="flex: 0 1 160px;"
             aria-label={$t("level_filter_label")}
           >
@@ -2995,10 +3026,10 @@
               {#each domains as d}
                 <tr
                   style="cursor: pointer;"
-                  on:click={() => navigateToDomainDetail(d)}
+                  onclick={() => navigateToDomainDetail(d)}
                   role="button"
                   tabindex="0"
-                  on:keydown={(e) => { if (e.key === "Enter" || e.key === " ") navigateToDomainDetail(d); }}
+                  onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") navigateToDomainDetail(d); }}
                 >
                   <td class="mono">{d.name}</td>
                   <td>{d.tags ? d.tags.join(", ") : ""}</td>
@@ -3014,13 +3045,13 @@
             <button
               class="secondary small"
               disabled={domainsOffset === 0}
-              on:click={() => { domainsOffset = Math.max(0, domainsOffset - domainsLimit); loadDomains(); }}
+              onclick={() => { domainsOffset = Math.max(0, domainsOffset - domainsLimit); loadDomains(); }}
             >{$t("prev_page")}</button>
             <span class="muted small">{domainsOffset + 1}–{Math.min(domainsOffset + domainsLimit, domainsTotal)} / {domainsTotal}</span>
             <button
               class="secondary small"
               disabled={domainsOffset + domainsLimit >= domainsTotal}
-              on:click={() => { domainsOffset += domainsLimit; loadDomains(); }}
+              onclick={() => { domainsOffset += domainsLimit; loadDomains(); }}
             >{$t("next_page")}</button>
           </div>
         {/if}
@@ -3029,7 +3060,7 @@
   {:else if activeTab === "tags"}
     <div class="card reveal" id="panel-tags" role="tabpanel" aria-labelledby="tab-tags" style="--d: 0.34s; margin-top: 22px;">
       {#if selectedTag}
-        <button class="secondary small" on:click={() => { selectedTag = null; tagProfileDraftId = ""; setTab("tags"); }}>{$t("back_to_tags")}</button>
+        <button class="secondary small" onclick={() => { selectedTag = null; tagProfileDraftId = ""; setTab("tags"); }}>{$t("back_to_tags")}</button>
         <h2 style="margin-top: 0.5rem;">{$t("batch_tag_label")}: {selectedTag.name}</h2>
 
         <!-- Severity summary -->
@@ -3047,14 +3078,14 @@
 
         <!-- Run all + delete -->
         <div style="display:flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
-          <button class="secondary" on:click={runAllFromTag} disabled={tagRunAllSubmitting}>
+          <button class="secondary" onclick={runAllFromTag} disabled={tagRunAllSubmitting}>
             {tagRunAllSubmitting ? $t("submitting") : $t("tag_run_all_button")}
           </button>
           {#if tagDeleteConfirm}
-            <button class="warn" on:click={deleteTag} disabled={tagDeleting}>{tagDeleting ? $t("submitting") : $t("tag_delete_confirm_button")}</button>
-            <button class="ghost" on:click={() => { tagDeleteConfirm = false; }}>{$t("tag_delete_cancel_button")}</button>
+            <button class="warn" onclick={deleteTag} disabled={tagDeleting}>{tagDeleting ? $t("submitting") : $t("tag_delete_confirm_button")}</button>
+            <button class="ghost" onclick={() => { tagDeleteConfirm = false; }}>{$t("tag_delete_cancel_button")}</button>
           {:else}
-            <button class="ghost" on:click={() => { tagDeleteConfirm = true; }}>{$t("tag_delete_button")}</button>
+            <button class="ghost" onclick={() => { tagDeleteConfirm = true; }}>{$t("tag_delete_button")}</button>
           {/if}
         </div>
 
@@ -3078,14 +3109,14 @@
           <div class="row">
             <button
               class="secondary small"
-              on:click={saveTagProfile}
+              onclick={saveTagProfile}
               disabled={!tagProfileDirty || !tagProfileSelectedID || tagProfileUpdating || tagProfileClearing}
             >
               {tagProfileUpdating ? $t("submitting") : $t("tag_default_profile_save_button")}
             </button>
             <button
               class="ghost small"
-              on:click={clearTagProfile}
+              onclick={clearTagProfile}
               disabled={!tagProfileCurrentID || tagProfileUpdating || tagProfileClearing}
             >
               {tagProfileClearing ? $t("submitting") : $t("tag_default_profile_clear_button")}
@@ -3098,7 +3129,7 @@
         <div style="display:flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem;">
           <select
             bind:value={tagDomainLevelFilter}
-            on:change={() => loadTagDomains({ reset: true })}
+            onchange={() => loadTagDomains({ reset: true })}
             aria-label={$t("level_filter_label")}
             style="flex: 0 1 180px;"
           >
@@ -3123,10 +3154,10 @@
               {#each tagDomains as d}
                 <tr
                   style="cursor: pointer;"
-                  on:click={() => navigateToDomainDetail(d)}
+                  onclick={() => navigateToDomainDetail(d)}
                   role="button"
                   tabindex="0"
-                  on:keydown={(e) => { if (e.key === "Enter" || e.key === " ") navigateToDomainDetail(d); }}
+                  onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") navigateToDomainDetail(d); }}
                 >
                   <td class="mono">{d.name}</td>
                   <td>{#if domainLevel(d)}<span class="badge level-{domainLevel(d).toLowerCase()}">{domainLevel(d)}</span>{:else}-{/if}</td>
@@ -3138,11 +3169,11 @@
           </table>
           <div class="pagination" style="margin-top: 0.5rem; display:flex; gap: 0.5rem; align-items: center;">
             <button class="secondary small" disabled={tagDomainsOffset === 0}
-              on:click={() => { tagDomainsOffset = Math.max(0, tagDomainsOffset - tagDomainsLimit); loadTagDomains(); }}
+              onclick={() => { tagDomainsOffset = Math.max(0, tagDomainsOffset - tagDomainsLimit); loadTagDomains(); }}
             >{$t("prev_page")}</button>
             <span class="muted small">{tagDomainsOffset + 1}–{Math.min(tagDomainsOffset + tagDomainsLimit, tagDomainsTotal)} / {tagDomainsTotal}</span>
             <button class="secondary small" disabled={tagDomainsOffset + tagDomainsLimit >= tagDomainsTotal}
-              on:click={() => { tagDomainsOffset += tagDomainsLimit; loadTagDomains(); }}
+              onclick={() => { tagDomainsOffset += tagDomainsLimit; loadTagDomains(); }}
             >{$t("next_page")}</button>
           </div>
         {/if}
@@ -3155,7 +3186,7 @@
           rows="3"
           style="width: 100%; box-sizing: border-box;"
         ></textarea>
-        <button class="secondary" on:click={addTagDomains} disabled={tagAddingDomains}>
+        <button class="secondary" onclick={addTagDomains} disabled={tagAddingDomains}>
           {tagAddingDomains ? $t("submitting") : $t("tag_add_domains_button")}
         </button>
 
@@ -3167,7 +3198,7 @@
           rows="3"
           style="width: 100%; box-sizing: border-box;"
         ></textarea>
-        <button class="ghost" on:click={removeTagDomains} disabled={tagRemovingDomains}>
+        <button class="ghost" onclick={removeTagDomains} disabled={tagRemovingDomains}>
           {tagRemovingDomains ? $t("submitting") : $t("tag_remove_domains_button")}
         </button>
 
@@ -3182,9 +3213,9 @@
           </div>
           <div class="stack" style="flex: 2 1 240px;">
             <label for="tag-create-desc">{$t("tag_description_label")}</label>
-            <input id="tag-create-desc" type="text" bind:value={tagCreateDescription} placeholder={$t("tag_description_placeholder")} on:keydown={(e) => { if (e.key === 'Enter') createTag(); }} />
+            <input id="tag-create-desc" type="text" bind:value={tagCreateDescription} placeholder={$t("tag_description_placeholder")} onkeydown={(e) => { if (e.key === 'Enter') createTag(); }} />
           </div>
-          <button class="secondary" on:click={createTag} disabled={tagCreating || !tagCreateName.trim()}>
+          <button class="secondary" onclick={createTag} disabled={tagCreating || !tagCreateName.trim()}>
             {tagCreating ? $t("submitting") : $t("tag_create_button")}
           </button>
         </div>
@@ -3205,10 +3236,10 @@
               {#each tagsList as tag}
                 <tr
                   style="cursor: pointer;"
-                  on:click={() => navigateToTagDetail(tag)}
+                  onclick={() => navigateToTagDetail(tag)}
                   role="button"
                   tabindex="0"
-                  on:keydown={(e) => { if (e.key === "Enter" || e.key === " ") navigateToTagDetail(tag); }}
+                  onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") navigateToTagDetail(tag); }}
                 >
                   <td class="mono">{tag.name}</td>
                   <td>{tag.description || "—"}</td>
@@ -3228,12 +3259,12 @@
           <button
             class={batchFromTagMode ? "ghost" : "secondary small"}
             type="button"
-            on:click={() => { batchFromTagMode = false; }}
+            onclick={() => { batchFromTagMode = false; }}
           >{$t("batch_domains_mode_label")}</button>
           <button
             class={batchFromTagMode ? "secondary small" : "ghost"}
             type="button"
-            on:click={() => { batchFromTagMode = true; }}
+            onclick={() => { batchFromTagMode = true; }}
           >{$t("batch_from_tag_mode_label")}</button>
         </div>
         {#if batchFromTagMode}
@@ -3277,7 +3308,7 @@ example.org`}
           </select>
           <div class="small">{$t("stored_profile_hint")}</div>
         </div>
-        <button class="secondary" on:click={submitBatch} disabled={batchSubmitting}>
+        <button class="secondary" onclick={submitBatch} disabled={batchSubmitting}>
           {batchSubmitting ? $t("submitting") : $t("run_batch")}
         </button>
         {#if createdBatchId}
@@ -3291,7 +3322,7 @@ example.org`}
           <button
             class={queuePaused ? "secondary small" : "ghost small"}
             type="button"
-            on:click={toggleQueuePause}
+            onclick={toggleQueuePause}
             disabled={queuePauseToggling}
             aria-busy={queuePauseToggling}
             title={$t("queue_pause_tooltip")}
@@ -3309,11 +3340,11 @@ example.org`}
         {:else}
           <div class="list">
             {#each activeBatches as batch (batch.batch_id)}
-              <div class="list-item clickable" class:disabled={batchLoading} on:click={() => {
+              <div class="list-item clickable" class:disabled={batchLoading} onclick={() => {
                 if (batchLoading) return;
                 selectedBatchId = batch.batch_id;
                 loadBatch(batch.batch_id, { resetCursor: true });
-              }} on:keydown={(e) => {
+              }} onkeydown={(e) => {
                 if (batchLoading) return;
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
@@ -3343,7 +3374,7 @@ example.org`}
             id="batch-recent"
             bind:value={selectedRecentBatch}
             disabled={recentBatchLoading}
-            on:change={async () => {
+            onchange={async () => {
               const nextBatchID = selectedRecentBatch.trim();
               if (!nextBatchID) return;
               selectedBatchId = nextBatchID;
@@ -3362,12 +3393,12 @@ example.org`}
             type="text"
             placeholder="batch_123"
             bind:value={selectedBatchId}
-            on:change={() => loadBatch(selectedBatchId, { resetCursor: true })}
+            onchange={() => loadBatch(selectedBatchId, { resetCursor: true })}
           />
         </div>
         <div class="row">
           <button
-            on:click={async () => {
+            onclick={async () => {
               await loadRecentBatchOptions();
               await loadBatch();
             }}
@@ -3375,14 +3406,14 @@ example.org`}
           >
             {batchLoading ? $t("loading") : $t("refresh")}
           </button>
-          <button class="ghost" type="button" on:click={() => (autoRefreshBatch = !autoRefreshBatch)}>
+          <button class="ghost" type="button" onclick={() => (autoRefreshBatch = !autoRefreshBatch)}>
             {autoRefreshBatch ? $t("auto_refresh_on") : $t("auto_refresh_off")}
           </button>
         </div>
         <div class="batch-controls">
           <div class="sort-control">
             <label for="batch-sort">{$t("sort_label")}</label>
-            <select id="batch-sort" bind:value={batchSort} on:change={applyBatchFilters}>
+            <select id="batch-sort" bind:value={batchSort} onchange={applyBatchFilters}>
               {#each batchSortOptions as option}
                 <option value={option.id}>{$t(option.labelKey)}</option>
               {/each}
@@ -3390,7 +3421,7 @@ example.org`}
           </div>
           <div class="sort-control">
             <label for="batch-page-size">{$t("page_size_label")}</label>
-            <select id="batch-page-size" bind:value={batchPageSize} on:change={applyBatchFilters}>
+            <select id="batch-page-size" bind:value={batchPageSize} onchange={applyBatchFilters}>
               {#each batchPageSizes as pageSize}
                 <option value={pageSize}>{pageSize}</option>
               {/each}
@@ -3398,7 +3429,7 @@ example.org`}
           </div>
           <div class="sort-control">
             <label for="batch-status">{$t("status_label")}</label>
-            <select id="batch-status" bind:value={batchStatusFilter} on:change={applyBatchFilters}>
+            <select id="batch-status" bind:value={batchStatusFilter} onchange={applyBatchFilters}>
               {#each batchStatuses as status}
                 <option value={status}>{status || $t("batch_status_all")}</option>
               {/each}
@@ -3411,7 +3442,7 @@ example.org`}
               type="text"
               placeholder="example"
               bind:value={batchDomainFilter}
-              on:keydown={(event) => {
+              onkeydown={(event) => {
                 if (event.key === "Enter") {
                   event.preventDefault();
                   applyBatchFilters();
@@ -3420,8 +3451,8 @@ example.org`}
             />
           </div>
           <div class="row">
-            <button class="ghost" type="button" on:click={applyBatchFilters} disabled={batchLoading}>{$t("apply_filters")}</button>
-            <button class="ghost" type="button" on:click={clearBatchFilters} disabled={batchLoading}>{$t("clear")}</button>
+            <button class="ghost" type="button" onclick={applyBatchFilters} disabled={batchLoading}>{$t("apply_filters")}</button>
+            <button class="ghost" type="button" onclick={clearBatchFilters} disabled={batchLoading}>{$t("clear")}</button>
           </div>
         </div>
         {#if selectedBatch}
@@ -3445,7 +3476,7 @@ example.org`}
               <button
                 class="ghost"
                 type="button"
-                on:click={() => goToBatchCursor(selectedBatch.prev_cursor)}
+                onclick={() => goToBatchCursor(selectedBatch.prev_cursor)}
                 disabled={!selectedBatch.prev_cursor || batchLoading}
               >
                 {$t("previous")}
@@ -3453,7 +3484,7 @@ example.org`}
               <button
                 class="ghost"
                 type="button"
-                on:click={() => goToBatchCursor(selectedBatch.next_cursor)}
+                onclick={() => goToBatchCursor(selectedBatch.next_cursor)}
                 disabled={!selectedBatch.next_cursor || batchLoading}
               >
                 {$t("next")}
@@ -3479,7 +3510,7 @@ example.org`}
                         <span class="progress-value">{progressPercent(item)}%</span>
                       </div>
                     </div>
-                    <button class="ghost" type="button" on:click={() => {
+                    <button class="ghost" type="button" onclick={() => {
                       selectedJobId = item.id;
                       loadJob(item.id);
                       setTab("single");
@@ -3496,15 +3527,15 @@ example.org`}
     <div class="card reveal" id="panel-metrics" role="tabpanel" aria-labelledby="tab-metrics" style="--d: 0.38s; margin-top: 22px;">
       <h2>{$t("metrics_heading")}</h2>
       <div class="row">
-        <button class="ghost" type="button" on:click={() => loadMetrics()} disabled={metricsLoading}>
+        <button class="ghost" type="button" onclick={() => loadMetrics()} disabled={metricsLoading}>
           {metricsLoading ? $t("refreshing") : $t("refresh_metrics")}
         </button>
-        <button class="ghost" type="button" on:click={() => (autoRefreshMetrics = !autoRefreshMetrics)}>
+        <button class="ghost" type="button" onclick={() => (autoRefreshMetrics = !autoRefreshMetrics)}>
           {autoRefreshMetrics ? $t("auto_refresh_on") : $t("auto_refresh_off")}
         </button>
         <div class="sort-control">
           <label for="metrics-window">{$t("trend_window_label")}</label>
-          <select id="metrics-window" bind:value={metricsWindow} on:change={() => loadMetrics()}>
+          <select id="metrics-window" bind:value={metricsWindow} onchange={() => loadMetrics()}>
             {#each metricsWindowOptions as option}
               <option value={option.id}>{$t(option.labelKey)}</option>
             {/each}
@@ -3512,7 +3543,7 @@ example.org`}
         </div>
         <div class="sort-control">
           <label for="metrics-domain-limit">{$t("top_domains_label")}</label>
-          <select id="metrics-domain-limit" bind:value={metricsDomainLimit} on:change={() => loadMetrics()}>
+          <select id="metrics-domain-limit" bind:value={metricsDomainLimit} onchange={() => loadMetrics()}>
             {#each metricsLimitOptions as value}
               <option value={value}>{value}</option>
             {/each}
@@ -3520,7 +3551,7 @@ example.org`}
         </div>
         <div class="sort-control">
           <label for="metrics-batch-limit">{$t("top_batches_label")}</label>
-          <select id="metrics-batch-limit" bind:value={metricsBatchLimit} on:change={() => loadMetrics()}>
+          <select id="metrics-batch-limit" bind:value={metricsBatchLimit} onchange={() => loadMetrics()}>
             {#each metricsLimitOptions as value}
               <option value={value}>{value}</option>
             {/each}
@@ -3535,7 +3566,7 @@ example.org`}
         <div class="summary-empty">{$t("loading_metrics")}</div>
       {:else if metricsError && !hasMetricsData(metricsSnapshot)}
         <div class="notice">{$t("metrics_load_error", { error: metricsError })}</div>
-        <button type="button" on:click={() => loadMetrics()}>{$t("retry")}</button>
+        <button type="button" onclick={() => loadMetrics()}>{$t("retry")}</button>
       {:else if hasMetricsData(metricsSnapshot)}
         {@const throughputSeries = metricsSeriesValues(metricsSnapshot, metricsWindow, "throughput")}
         {@const failedSeries = metricsSeriesValues(metricsSnapshot, metricsWindow, "failed")}
@@ -3706,7 +3737,7 @@ example.org`}
                 <tbody>
                   {#each metricsDomainRows(metricsSnapshot) as row}
                     <tr>
-                      <td class="mono"><button class="ghost" type="button" style="padding: 0; font-family: monospace; text-align: left; border: none;" on:click={() => navigateToDomainByName(row.domain)}>{row.domain}</button></td>
+                      <td class="mono"><button class="ghost" type="button" style="padding: 0; font-family: monospace; text-align: left; border: none;" onclick={() => navigateToDomainByName(row.domain)}>{row.domain}</button></td>
                       <td>{formatInteger(row.runs_total)}</td>
                       <td>{row.last_status || "-"}</td>
                       <td>{formatDurationMs(row.avg_duration_ms)}</td>
@@ -3762,7 +3793,7 @@ example.org`}
   {:else if activeTab === "settings"}
     <div class="grid" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" style="margin-top: 22px;">
       <div class="card reveal" style="--d: 0.34s; grid-column: 1 / -1;">
-        <ProfileSettings on:profileschanged={handleProfilesChanged} />
+        <ProfileSettings onprofileschanged={handleProfilesChanged} />
       </div>
       <div class="card reveal" style="--d: 0.4s; grid-column: 1 / -1;">
         <ServerSettings />
@@ -3773,7 +3804,8 @@ example.org`}
   {#if statusMessage}
     <div class={`status-toast status-${statusTone === "ok" ? "ok" : "warn"} reveal`} role="status" aria-live="polite" style="--d: 0.12s;">
       <div><strong>{statusTone === "ok" ? $t("toast_ok") : $t("toast_warn")}:</strong> {statusMessage}</div>
-      <button class="status-toast-close" type="button" aria-label={$t("dismiss_notification_aria")} on:click={clearStatus}>{$t("dismiss")}</button>
+      <button class="status-toast-close" type="button" aria-label={$t("dismiss_notification_aria")} onclick={clearStatus}>{$t("dismiss")}</button>
     </div>
   {/if}
-</main>
+  </main>
+</div>

@@ -85,14 +85,14 @@ describe("TestForm", () => {
 
   it("dispatches jobcreated event with publicID on success", async () => {
     global.fetch.mockResolvedValue(okResponse({ public_id: "abc12345" }));
-    const events = [];
-    render(TestForm, { events: { jobcreated: (e) => events.push(e.detail) } });
+    const handler = vi.fn();
+    render(TestForm, { props: { onjobcreated: handler } });
     await fireEvent.input(screen.getByLabelText("Domain"), {
       target: { value: "example.com" },
     });
     await fireEvent.click(screen.getByRole("button", { name: "Test" }));
-    await waitFor(() => expect(events.length).toBe(1));
-    expect(events[0].publicID).toBe("abc12345");
+    await waitFor(() => expect(handler).toHaveBeenCalledOnce());
+    expect(handler.mock.calls[0][0].publicID).toBe("abc12345");
   });
 
   // ── Error responses ────────────────────────────────────────────────────────

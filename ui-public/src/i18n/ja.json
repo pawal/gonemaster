@@ -50,6 +50,7 @@
   "pub.status_expired": "期限切れ",
 
   "pub.progress_testing": "{domain} をテスト中…",
+  "pub.progress_testing_label": "テスト中",
   "pub.progress_queued": "キューで待機中…",
 
   "pub.result_heading": "{domain} の結果",

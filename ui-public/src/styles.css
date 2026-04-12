@@ -346,7 +346,7 @@ details[inert] > summary {
   width: max-content;
 }
 
-.level-pill.severity-debug    { background: #f1f5f9; color: #475467; }
+.level-pill.severity-debug    { background: var(--surface-2); color: var(--ink-2); }
 .level-pill.severity-info     { background: transparent; color: var(--ink-2); border: 1px solid var(--border); }
 .level-pill.severity-notice   { background: #e0f2fe; color: #075985; }
 .level-pill.severity-warning  { background: #fef3c7; color: #92400e; }
@@ -918,7 +918,7 @@ details[open] > .score-bonus-summary > .score-bonus-chevron {
 .score-bonus-icon {
   width: 18px;
   text-align: center;
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   flex-shrink: 0;
 }
 .score-bonus-item[data-met="yes"] .score-bonus-icon { color: var(--grade-a); }
@@ -1004,7 +1004,7 @@ details[open] > .score-bonus-summary > .score-bonus-chevron {
   flex-direction: column;
   gap: 2px;
   font-family: var(--mono);
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   color: var(--muted);
   background: var(--bg-2);
   border: 1px solid var(--border);

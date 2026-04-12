@@ -41,6 +41,13 @@ type CategoryResult struct {
 
 	// EntryCount is the number of entries that contributed a penalty.
 	EntryCount int `json:"entry_count"`
+
+	// Tested is true when the category received at least one entry from any
+	// module mapped to it, regardless of severity level. When false, the
+	// category's tests did not run (typically because a critical failure
+	// aborted the test run early) and the score of 0 reflects "not tested"
+	// rather than "tested and broken".
+	Tested bool `json:"tested"`
 }
 
 // BonusResult holds the A+ evaluation.
@@ -64,8 +71,10 @@ type BonusResult struct {
 func Compute(domain string, entries []Entry, cfg Config) Result {
 	// Build per-category penalty sums and entry counts.
 	type catAccum struct {
-		penalties  int
-		entryCount int
+		penalties    int
+		entryCount   int
+		totalEntries int  // all entries regardless of level (tracks whether category was tested)
+		hasCritical  bool // true if any CRITICAL entry landed in this category
 	}
 	cats := make(map[string]*catAccum)
 	for cat := range cfg.CategoryWeights {
@@ -83,12 +92,18 @@ func Compute(domain string, entries []Entry, cfg Config) Result {
 		case "IPV6_DISABLED", "CN01_IPV6_DISABLED":
 			ipv6Disabled = true
 		}
-		if strings.ToUpper(e.Level) == "CRITICAL" {
+		isCritical := strings.ToUpper(e.Level) == "CRITICAL"
+		if isCritical {
 			hasCritical = true
 		}
 		cat, ok := cfg.ModuleCategories[strings.ToUpper(e.Module)]
 		if !ok {
 			continue
+		}
+		accum := cats[cat]
+		accum.totalEntries++
+		if isCritical {
+			accum.hasCritical = true
 		}
 		// Tag-specific overrides take precedence over the severity table.
 		penalty, ok := cfg.TagPenalties[strings.ToUpper(e.Tag)]
@@ -98,7 +113,6 @@ func Compute(domain string, entries []Entry, cfg Config) Result {
 		if !ok || penalty == 0 {
 			continue
 		}
-		accum := cats[cat]
 		accum.penalties += penalty
 		accum.entryCount++
 	}
@@ -110,14 +124,27 @@ func Compute(domain string, entries []Entry, cfg Config) Result {
 
 	for cat, weight := range cfg.CategoryWeights {
 		accum := cats[cat]
+		tested := accum.totalEntries > 0
+
 		subScore := 100 - accum.penalties
 		if subScore < 0 {
 			subScore = 0
 		}
+
+		// When any CRITICAL entry is present in the run, the domain is
+		// fundamentally broken (non-existent, no delegation, etc.). All
+		// category scores are set to 0: untested categories were never
+		// evaluated, and tested categories produced results that are
+		// meaningless in the context of a non-functional domain.
+		if hasCritical {
+			subScore = 0
+		}
+
 		categories[cat] = CategoryResult{
 			Score:      subScore,
 			Penalties:  accum.penalties,
 			EntryCount: accum.entryCount,
+			Tested:     tested,
 		}
 		weightedSum += float64(subScore) * weight
 		totalWeight += weight

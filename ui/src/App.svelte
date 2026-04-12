@@ -2434,7 +2434,7 @@
                         {#each CAT_ORDER.filter(c => c in (rs.categories ?? {})) as cat}
                           <div class="grade-tip-row">
                             <span class="grade-tip-cat">{CAT_LABELS[cat]}</span>
-                            <span class="grade-tip-score">{rs.categories[cat].score}</span>
+                            <span class="grade-tip-score">{rs.categories[cat].tested === false ? "-" : rs.categories[cat].score}</span>
                           </div>
                         {/each}
                         {#if rs.bonus?.criteria}
@@ -2782,12 +2782,12 @@
                   {#if sortedCats.length}
                     <div class="score-cats">
                       {#each sortedCats as [cat, res], i}
-                        <div class="score-cat-row">
+                        <div class="score-cat-row" data-untested={res.tested === false ? "" : undefined}>
                           <span class="score-cat-name">{CAT_LABELS[cat] ?? cat}</span>
                           <div class="score-cat-bar-track">
-                            <div class="score-cat-bar" style="--bar-pct:{res.score}%; --bar-color:{gradeBarColor(sc.grade)}; animation-delay:{i * 60}ms"></div>
+                            <div class="score-cat-bar" style="--bar-pct:{res.tested === false ? 0 : res.score}%; --bar-color:{gradeBarColor(sc.grade)}; animation-delay:{i * 60}ms"></div>
                           </div>
-                          <span class="score-cat-num">{res.score}</span>
+                          <span class="score-cat-num">{res.tested === false ? "-" : res.score}</span>
                         </div>
                       {/each}
                     </div>

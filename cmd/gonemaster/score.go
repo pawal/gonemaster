@@ -83,11 +83,15 @@ func printScore(out io.Writer, r *scoring.Result) {
 			continue
 		}
 		printed[cat] = true
-		suffix := "penalties"
-		if res.EntryCount == 1 {
-			suffix = "penalty"
+		if !res.Tested {
+			fmt.Fprintf(out, "  %-20s   -  (not tested)\n", cat+":")
+		} else {
+			suffix := "penalties"
+			if res.EntryCount == 1 {
+				suffix = "penalty"
+			}
+			fmt.Fprintf(out, "  %-20s %3d  (%d %s)\n", cat+":", res.Score, res.EntryCount, suffix)
 		}
-		fmt.Fprintf(out, "  %-20s %3d  (%d %s)\n", cat+":", res.Score, res.EntryCount, suffix)
 	}
 	extra := []string{}
 	for cat := range r.Categories {
@@ -98,11 +102,15 @@ func printScore(out io.Writer, r *scoring.Result) {
 	sort.Strings(extra)
 	for _, cat := range extra {
 		res := r.Categories[cat]
-		suffix := "penalties"
-		if res.EntryCount == 1 {
-			suffix = "penalty"
+		if !res.Tested {
+			fmt.Fprintf(out, "  %-20s   -  (not tested)\n", cat+":")
+		} else {
+			suffix := "penalties"
+			if res.EntryCount == 1 {
+				suffix = "penalty"
+			}
+			fmt.Fprintf(out, "  %-20s %3d  (%d %s)\n", cat+":", res.Score, res.EntryCount, suffix)
 		}
-		fmt.Fprintf(out, "  %-20s %3d  (%d %s)\n", cat+":", res.Score, res.EntryCount, suffix)
 	}
 
 	if r.Score == 100 && r.Grade == "A" {

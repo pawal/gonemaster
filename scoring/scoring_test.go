@@ -98,6 +98,24 @@ func TestCompute_CriticalForcesF(t *testing.T) {
 	if r.Score > 10 {
 		t.Errorf("score should be ≤10 when CRITICAL present, got %d", r.Score)
 	}
+	// The category containing the CRITICAL should score 0 and be marked tested.
+	nh := r.Categories["nameserver_health"]
+	if nh.Score != 0 {
+		t.Errorf("expected nameserver_health score 0 (has CRITICAL), got %d", nh.Score)
+	}
+	if !nh.Tested {
+		t.Error("expected nameserver_health tested=true (it received the CRITICAL entry)")
+	}
+	// Categories with no entries should be 0 and untested.
+	for _, cat := range []string{"dnssec", "connectivity", "zone_consistency"} {
+		cr := r.Categories[cat]
+		if cr.Score != 0 {
+			t.Errorf("expected %s score 0 (untested due to CRITICAL), got %d", cat, cr.Score)
+		}
+		if cr.Tested {
+			t.Errorf("expected %s tested=false (no entries), got true", cat)
+		}
+	}
 }
 
 func TestCompute_CriticalWithOtherwiseGoodRun(t *testing.T) {
@@ -109,6 +127,80 @@ func TestCompute_CriticalWithOtherwiseGoodRun(t *testing.T) {
 	r := Compute("example.se", entries, cfg)
 	if r.Grade != "F" {
 		t.Errorf("expected grade F, got %s", r.Grade)
+	}
+}
+
+func TestCompute_CriticalAllCategoriesScoreZero(t *testing.T) {
+	// A non-existent domain: BASIC CRITICAL + some entries from modules that
+	// did run. ALL category scores must be 0 when CRITICAL is present —
+	// individual scores are meaningless for a non-functional domain.
+	entries := []Entry{
+		e("BASIC", "B01_NO_PARENT", "CRITICAL"),
+		e("DNSSEC", "DS07_NOT_SIGNED", "WARNING"),
+	}
+	r := Compute("example.se", entries, cfg)
+	if r.Grade != "F" {
+		t.Errorf("expected grade F, got %s", r.Grade)
+	}
+	if r.Score != 0 {
+		t.Errorf("expected aggregate score 0, got %d", r.Score)
+	}
+	// Every category should be score 0.
+	for cat, cr := range r.Categories {
+		if cr.Score != 0 {
+			t.Errorf("expected %s score 0 (CRITICAL present), got %d", cat, cr.Score)
+		}
+	}
+	// Tested should reflect whether entries were received.
+	if !r.Categories["nameserver_health"].Tested {
+		t.Error("expected nameserver_health tested=true (received CRITICAL entry)")
+	}
+	if !r.Categories["dnssec"].Tested {
+		t.Error("expected dnssec tested=true (received WARNING entry)")
+	}
+	for _, cat := range []string{"connectivity", "zone_consistency"} {
+		if r.Categories[cat].Tested {
+			t.Errorf("expected %s tested=false (no entries)", cat)
+		}
+	}
+}
+
+func TestCompute_NoCriticalUntestedCategoriesKeep100(t *testing.T) {
+	// Without CRITICAL, categories with no penalty entries keep their
+	// perfect score — this is the normal case where a category had no issues.
+	entries := []Entry{
+		e("DNSSEC", "DS04_RRSIG_EXPIRY_SOON", "WARNING"),
+	}
+	r := Compute("example.se", entries, cfg)
+	// Other categories should still be 100 even though they have no entries,
+	// because there is no CRITICAL to indicate an aborted run.
+	for _, cat := range []string{"nameserver_health", "connectivity", "zone_consistency"} {
+		cr := r.Categories[cat]
+		if cr.Score != 100 {
+			t.Errorf("expected %s score 100 (no CRITICAL, no penalties), got %d", cat, cr.Score)
+		}
+	}
+}
+
+func TestCompute_TestedFieldNormalRun(t *testing.T) {
+	// In a normal run, Tested reflects whether the category received entries.
+	entries := []Entry{
+		e("DNSSEC", "DS07_SIGNED", "INFO"),
+		e("NAMESERVER", "N15_SOFTWARE_VERSION", "NOTICE"),
+	}
+	r := Compute("example.se", entries, cfg)
+	if !r.Categories["dnssec"].Tested {
+		t.Error("expected dnssec tested=true")
+	}
+	if !r.Categories["nameserver_health"].Tested {
+		t.Error("expected nameserver_health tested=true")
+	}
+	// connectivity and zone_consistency got no entries.
+	if r.Categories["connectivity"].Tested {
+		t.Error("expected connectivity tested=false (no entries)")
+	}
+	if r.Categories["zone_consistency"].Tested {
+		t.Error("expected zone_consistency tested=false (no entries)")
 	}
 }
 

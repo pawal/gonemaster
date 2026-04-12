@@ -76,8 +76,12 @@ func printScorePretty(out io.Writer, r *scoring.Result) {
 			continue
 		}
 		printed[cat] = true
-		suffix := penaltySuffix(res.EntryCount)
-		fmt.Fprintf(out, "    %-20s %3d  (%d %s)\n", cat+":", res.Score, res.EntryCount, suffix)
+		if !res.Tested {
+			fmt.Fprintf(out, "    %-20s   -  (not tested)\n", cat+":")
+		} else {
+			suffix := penaltySuffix(res.EntryCount)
+			fmt.Fprintf(out, "    %-20s %3d  (%d %s)\n", cat+":", res.Score, res.EntryCount, suffix)
+		}
 	}
 	// Any categories not in the default order (custom configs).
 	extra := []string{}
@@ -89,8 +93,12 @@ func printScorePretty(out io.Writer, r *scoring.Result) {
 	sort.Strings(extra)
 	for _, cat := range extra {
 		res := r.Categories[cat]
-		suffix := penaltySuffix(res.EntryCount)
-		fmt.Fprintf(out, "    %-20s %3d  (%d %s)\n", cat+":", res.Score, res.EntryCount, suffix)
+		if !res.Tested {
+			fmt.Fprintf(out, "    %-20s   -  (not tested)\n", cat+":")
+		} else {
+			suffix := penaltySuffix(res.EntryCount)
+			fmt.Fprintf(out, "    %-20s %3d  (%d %s)\n", cat+":", res.Score, res.EntryCount, suffix)
+		}
 	}
 
 	// A+ criteria note when score is 100 but A+ was not awarded.

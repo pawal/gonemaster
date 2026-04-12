@@ -1842,6 +1842,11 @@ pre {
   text-align: right;
 }
 
+.score-cat-row[data-untested] .score-cat-name,
+.score-cat-row[data-untested] .score-cat-num {
+  opacity: 0.45;
+}
+
 .score-bonus {
   border: 1px solid var(--border);
   border-radius: 8px;

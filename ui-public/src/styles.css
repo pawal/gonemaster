@@ -606,6 +606,21 @@ details[open] > .testcase-summary .testcase-chevron {
   .result-row {
     grid-template-columns: 1fr;
   }
+
+  .score-left {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .score-meta-row {
+    flex-wrap: wrap;
+  }
+
+  .result-heading-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
 }
 
 /* ── Dark theme - system preference ─────────────────────────────────────── */

@@ -2,6 +2,19 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [v1.3.0] - 2026-04-12
+
+Major performance increase, and new admin and public UI layout, and new scoring engine!
+
+### Added
+ - Engine: Cross-job nameserver hot-cache, consecutive-timeout fast-fail, and per-nameserver concurrency cap are now on by default, raising batch throughput by ~2.8× on 8-core hosts compared to the previous defaults
+ - New scoring engine, implemented for public and admin UI, CLI, and Nagios command
+
+### Changed
+ - UI: Web UI layouts are improved
+ - UI: Migrated all components to Svelte 5 runes, modern events, callback props
+ - Engine: Finnish language update, updates for all languages
+
 ## [v1.2.3] - 2026-04-09
 
 ### Added

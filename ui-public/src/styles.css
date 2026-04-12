@@ -100,9 +100,11 @@ header {
   font-family: var(--mono);
   font-size: var(--text-sm);
   color: var(--ink-2);
-  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  max-width: 40ch;
 }
 
 .header-controls {
@@ -279,6 +281,8 @@ details[inert] > summary {
   font-weight: 600;
   color: var(--ink);
   margin: 4px 0 12px;
+  overflow-wrap: break-word;
+  word-break: break-all;
 }
 
 .progress-bar-track {
@@ -739,6 +743,8 @@ details[open] > .testcase-summary .testcase-chevron {
   font-weight: 600;
   color: var(--ink);
   margin-bottom: 2px;
+  overflow-wrap: break-word;
+  word-break: break-all;
 }
 
 .score-meta-row {

@@ -334,9 +334,13 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	if ns.state != nil {
 		var infResp *packet.Packet
 		if resp.Msg != nil {
-			copyResp := resp
-			ns.state.cache.set(cacheKey, &copyResp)
-			infResp = &copyResp
+			// Strip the per-run logger reference before caching: cached entries
+			// can outlive the job that produced them, so retaining Log would
+			// pin that job's Logger and all its accumulated entries.
+			cached := resp
+			cached.Log = nil
+			ns.state.cache.set(cacheKey, &cached)
+			infResp = &cached
 		} else if err == nil {
 			ns.state.cache.set(cacheKey, nil)
 		}

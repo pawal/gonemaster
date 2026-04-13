@@ -11,9 +11,15 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/packet"
 )
 
+// QueryCacheMaxEntries caps the number of cached DNS responses per nameserver
+// address. When the limit is reached, the oldest entries are evicted. 0 means
+// unbounded (not recommended for long-lived server processes).
+var QueryCacheMaxEntries = 256
+
 type queryCache struct {
 	mu           sync.Mutex
 	data         map[string]*packet.Packet
+	order        []string // FIFO insertion order for bounded eviction
 	met          *cacheMetrics
 	inflight     map[string]*inflightQuery
 	observers    map[*cacheMetrics]struct{}
@@ -148,7 +154,23 @@ func (c *queryCache) set(key string, value *packet.Packet) {
 	if c.data == nil {
 		c.data = map[string]*packet.Packet{}
 	}
+	if _, exists := c.data[key]; !exists {
+		c.order = append(c.order, key)
+	}
 	c.data[key] = value
+
+	// Evict oldest entries if over the cap.
+	if max := QueryCacheMaxEntries; max > 0 && len(c.data) > max {
+		drop := len(c.data) - max
+		for i := 0; i < drop && i < len(c.order); i++ {
+			oldKey := c.order[i]
+			if _, ok := c.data[oldKey]; ok {
+				delete(c.data, oldKey)
+			}
+		}
+		c.order = c.order[drop:]
+		c.observeEvictLocked(drop)
+	}
 }
 
 func (c *queryCache) clear() {
@@ -158,6 +180,7 @@ func (c *queryCache) clear() {
 	c.mu.Lock()
 	c.observeEvictLocked(len(c.data))
 	c.data = map[string]*packet.Packet{}
+	c.order = nil
 	c.inflight = map[string]*inflightQuery{}
 	c.mu.Unlock()
 }
@@ -171,6 +194,7 @@ func (c *queryCache) clearData() {
 	c.mu.Lock()
 	c.observeEvictLocked(len(c.data))
 	c.data = map[string]*packet.Packet{}
+	c.order = nil
 	c.mu.Unlock()
 }
 

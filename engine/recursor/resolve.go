@@ -390,8 +390,12 @@ func (r *Recursor) recurseWithNameservers(ctx context.Context, name string, qtyp
 	if err != nil {
 		return packet.Packet{}, err
 	}
+	// Cache without the per-run logger reference to avoid pinning the job's
+	// Logger across runs; reattach Log only on the returned copy.
+	cached := resp
+	cached.Log = nil
+	r.cacheStore(key, qtype, qclass, cached)
 	resp.Log = runLog
-	r.cacheStore(key, qtype, qclass, resp)
 	return resp, nil
 }
 

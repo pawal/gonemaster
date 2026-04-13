@@ -53,10 +53,10 @@ func RunOrdered[T any](ctx context.Context, tasks []Task[T], opts Options) []Res
 		go func() {
 			defer wg.Done()
 			for idx := range idxCh {
-				if ctx.Err() != nil {
-					results[idx].Err = ctx.Err()
-					continue
-				}
+				// Once a task is dispatched it must run; the task is responsible
+				// for honoring ctx cancellation. Skipping here would race with
+				// the dispatcher and could drop tasks that already passed the
+				// dispatcher's gate.
 				value, err := tasks[idx](ctx)
 				results[idx] = Result[T]{Value: value, Err: err}
 				if err != nil && opts.CancelOnError {

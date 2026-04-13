@@ -1154,6 +1154,11 @@ button:hover:not(:disabled) {
   white-space: nowrap;
 }
 
+.data-table th.sortable-column,
+.metrics-table th.sortable-column {
+  padding: 0;
+}
+
 .data-table td {
   text-align: left;
   border-bottom: 1px solid var(--border);
@@ -1197,6 +1202,40 @@ button:hover:not(:disabled) {
   letter-spacing: 0.06em;
   border-bottom: 1px solid var(--border);
   padding: 6px 4px;
+}
+
+.table-sort-button {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  padding: 6px 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+}
+
+.metrics-table .table-sort-button {
+  padding: 6px 4px;
+}
+
+.table-sort-button:hover {
+  color: var(--ink);
+}
+
+.table-sort-button:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: -2px;
+}
+
+.sort-indicator {
+  min-width: 1ch;
+  text-align: right;
 }
 
 .metrics-table td {

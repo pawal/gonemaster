@@ -185,6 +185,8 @@
   let domainRunsOffset = 0;
   let domainRunsLimit = 20;
   let domainRunsLoading = false;
+  let domainRunsSortState = { key: "", direction: "asc" };
+  let sortedDomainRuns = [];
   let domainResubmitting = false;
   let selectedDomainRunId = null;
   let selectedDomainRunResult = null;
@@ -212,6 +214,8 @@
   let tagDomainsOffset = 0;
   let tagDomainsLimit = 50;
   let tagDomainsLoading = false;
+  let tagDomainsSortState = { key: "", direction: "asc" };
+  let sortedTagDomains = [];
   let tagDomainLevelFilter = "";
   let tagAddDomainsInput = "";
   let tagAddingDomains = false;
@@ -226,6 +230,14 @@
   let tagProfileDirty = false;
   let tagProfileUpdating = false;
   let tagProfileClearing = false;
+  let domainsSortState = { key: "", direction: "asc" };
+  let sortedDomains = [];
+  let tagsListSortState = { key: "", direction: "asc" };
+  let sortedTagsList = [];
+  let metricsDomainsSortState = { key: "", direction: "asc" };
+  let sortedMetricsDomainRows = [];
+  let metricsBatchesSortState = { key: "failed_expired", direction: "desc" };
+  let sortedMetricsBatchRows = [];
 
   const clearStatus = () => {
     statusMessage = "";
@@ -777,16 +789,7 @@
   };
   const metricsDomainRows = (snapshot) => snapshot?.insights?.domains?.items || [];
   const batchErrorScore = (batch) => Number(batch?.outcomes?.failed || 0) + Number(batch?.outcomes?.expired || 0);
-  const metricsBatchRows = (snapshot) => {
-    const items = [...(snapshot?.insights?.batches?.items || [])];
-    return items.sort((left, right) => {
-      const scoreDelta = batchErrorScore(right) - batchErrorScore(left);
-      if (scoreDelta !== 0) return scoreDelta;
-      const processedDelta = Number(right?.processed_total || 0) - Number(left?.processed_total || 0);
-      if (processedDelta !== 0) return processedDelta;
-      return String(left?.batch_id || "").localeCompare(String(right?.batch_id || ""));
-    });
-  };
+  const metricsBatchRows = (snapshot) => snapshot?.insights?.batches?.items || [];
   const metricsTopAPIP90 = (snapshot) =>
     (snapshot?.api?.routes || []).reduce((highest, route) => {
       const value = Number(route?.latency_ms?.p90 || 0);
@@ -794,6 +797,42 @@
     }, 0);
   const hasMetricsData = (snapshot) => Boolean(snapshot && snapshot.generated_at);
   const seriesLast = (values = []) => (values.length ? Number(values[values.length - 1] || 0) : 0);
+  const textCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+  const compareText = (left, right) => textCollator.compare(String(left ?? ""), String(right ?? ""));
+  const compareNumber = (left, right) => Number(left || 0) - Number(right || 0);
+  const timestampValue = (value) => parseTimestamp(value)?.getTime() ?? -1;
+  const compareTimestamp = (left, right) => compareNumber(timestampValue(left), timestampValue(right));
+  const severityRank = (value) => {
+    if (!value) return -1;
+    const index = LEVEL_ORDER.indexOf(normalizeLevel(value));
+    return index >= 0 ? index : -1;
+  };
+  const compareSeverity = (left, right) => compareNumber(severityRank(left), severityRank(right));
+  const nextTableSort = (state, key, defaultDirection = "asc") =>
+    state.key === key
+      ? { key, direction: state.direction === "asc" ? "desc" : "asc" }
+      : { key, direction: defaultDirection };
+  const tableSortIndicator = (state, key) => {
+    if (state.key !== key) return "";
+    return state.direction === "asc" ? "▲" : "▼";
+  };
+  const tableSortAria = (state, key) => {
+    if (state.key !== key) return "none";
+    return state.direction === "asc" ? "ascending" : "descending";
+  };
+  const sortItems = (items, state, comparators, tieBreaker = null) => {
+    const list = Array.isArray(items) ? [...items] : [];
+    const comparator = comparators[state?.key];
+    if (!comparator) return list;
+    list.sort((left, right) => {
+      const primary = comparator(left, right);
+      if (primary !== 0) {
+        return state.direction === "asc" ? primary : -primary;
+      }
+      return tieBreaker ? tieBreaker(left, right) : 0;
+    });
+    return list;
+  };
   const matchesSeverityFilter = (job) => {
     if (severityFilter === "warnings_plus") {
       return (
@@ -2091,6 +2130,65 @@
     filteredJobs = jobs.filter((job) => matchesSeverityFilter(job));
   }
 
+  $: sortedDomainRuns = sortItems(domainRuns, domainRunsSortState, {
+    id: (left, right) => compareText(left?.id, right?.id),
+    finished_at: (left, right) => compareTimestamp(left?.finished_at, right?.finished_at),
+    worst_level: (left, right) => compareSeverity(left?.worst_level, right?.worst_level),
+    score: (left, right) => compareNumber(chipScore(left), chipScore(right)),
+    duration_ms: (left, right) => compareNumber(left?.duration_ms, right?.duration_ms),
+    entry_count: (left, right) => compareNumber(left?.entry_count, right?.entry_count)
+  }, (left, right) => compareText(left?.id, right?.id));
+
+  $: sortedDomains = sortItems(domains, domainsSortState, {
+    name: (left, right) => compareText(left?.name, right?.name),
+    tags: (left, right) => compareText(left?.tags?.join(", "), right?.tags?.join(", ")),
+    latest_level: (left, right) => compareSeverity(domainLevel(left), domainLevel(right)),
+    latest_score: (left, right) => compareNumber(left?.latest_score, right?.latest_score),
+    latest_run_at: (left, right) => compareTimestamp(left?.latest_run_at, right?.latest_run_at),
+    run_count: (left, right) => compareNumber(left?.run_count, right?.run_count)
+  }, (left, right) => compareText(left?.name, right?.name));
+
+  $: sortedTagDomains = sortItems(tagDomains, tagDomainsSortState, {
+    name: (left, right) => compareText(left?.name, right?.name),
+    latest_level: (left, right) => compareSeverity(domainLevel(left), domainLevel(right)),
+    latest_score: (left, right) => compareNumber(left?.latest_score, right?.latest_score),
+    latest_run_at: (left, right) => compareTimestamp(left?.latest_run_at, right?.latest_run_at)
+  }, (left, right) => compareText(left?.name, right?.name));
+
+  $: sortedTagsList = sortItems(tagsList, tagsListSortState, {
+    name: (left, right) => compareText(left?.name, right?.name),
+    description: (left, right) => compareText(left?.description, right?.description),
+    domain_count: (left, right) => compareNumber(left?.domain_count, right?.domain_count)
+  }, (left, right) => compareText(left?.name, right?.name));
+
+  $: sortedMetricsDomainRows = sortItems(metricsDomainRows(metricsSnapshot), metricsDomainsSortState, {
+    domain: (left, right) => compareText(left?.domain, right?.domain),
+    runs_total: (left, right) => compareNumber(left?.runs_total, right?.runs_total),
+    last_status: (left, right) => compareText(left?.last_status, right?.last_status),
+    avg_duration_ms: (left, right) => compareNumber(left?.avg_duration_ms, right?.avg_duration_ms),
+    error_critical: (left, right) =>
+      compareNumber(
+        Number(left?.severity_totals?.ERROR || 0) + Number(left?.severity_totals?.CRITICAL || 0),
+        Number(right?.severity_totals?.ERROR || 0) + Number(right?.severity_totals?.CRITICAL || 0)
+      )
+  }, (left, right) => compareText(left?.domain, right?.domain));
+
+  $: sortedMetricsBatchRows = sortItems(metricsBatchRows(metricsSnapshot), metricsBatchesSortState, {
+    batch_id: (left, right) => compareText(left?.batch_id, right?.batch_id),
+    processed_total: (left, right) => compareNumber(left?.processed_total, right?.processed_total),
+    failed_expired: (left, right) => compareNumber(batchErrorScore(left), batchErrorScore(right)),
+    canceled: (left, right) => compareNumber(left?.outcomes?.canceled, right?.outcomes?.canceled),
+    error_critical: (left, right) =>
+      compareNumber(
+        Number(left?.severity_totals?.ERROR || 0) + Number(left?.severity_totals?.CRITICAL || 0),
+        Number(right?.severity_totals?.ERROR || 0) + Number(right?.severity_totals?.CRITICAL || 0)
+      )
+  }, (left, right) => {
+    const processedDelta = compareNumber(left?.processed_total, right?.processed_total);
+    if (processedDelta !== 0) return -processedDelta;
+    return compareText(left?.batch_id, right?.batch_id);
+  });
+
   $: tagProfileCurrentID = normalizeOptionalProfileID(selectedTag?.default_profile_id);
   $: tagProfileSelectedID = normalizeOptionalProfileID(tagProfileDraftId);
   $: tagProfileDirty = tagProfileCurrentID !== tagProfileSelectedID;
@@ -2937,16 +3035,16 @@
             <table class="data-table">
               <thead>
                 <tr>
-                  <th>{$t("col_run_id")}</th>
-                  <th>{$t("col_finished_at")}</th>
-                  <th>{$t("col_worst_level")}</th>
-                  {#if scoringEnabled}<th>{$t("col_score")}</th>{/if}
-                  <th>{$t("col_duration")}</th>
-                  <th>{$t("col_entries")}</th>
+                  <th class="sortable-column" aria-sort={tableSortAria(domainRunsSortState, "id")}><button class="table-sort-button" type="button" onclick={() => { domainRunsSortState = nextTableSort(domainRunsSortState, "id"); }}><span>{$t("col_run_id")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(domainRunsSortState, "id")}</span></button></th>
+                  <th class="sortable-column" aria-sort={tableSortAria(domainRunsSortState, "finished_at")}><button class="table-sort-button" type="button" onclick={() => { domainRunsSortState = nextTableSort(domainRunsSortState, "finished_at", "desc"); }}><span>{$t("col_finished_at")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(domainRunsSortState, "finished_at")}</span></button></th>
+                  <th class="sortable-column" aria-sort={tableSortAria(domainRunsSortState, "worst_level")}><button class="table-sort-button" type="button" onclick={() => { domainRunsSortState = nextTableSort(domainRunsSortState, "worst_level", "desc"); }}><span>{$t("col_worst_level")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(domainRunsSortState, "worst_level")}</span></button></th>
+                  {#if scoringEnabled}<th class="sortable-column" aria-sort={tableSortAria(domainRunsSortState, "score")}><button class="table-sort-button" type="button" onclick={() => { domainRunsSortState = nextTableSort(domainRunsSortState, "score", "desc"); }}><span>{$t("col_score")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(domainRunsSortState, "score")}</span></button></th>{/if}
+                  <th class="sortable-column" aria-sort={tableSortAria(domainRunsSortState, "duration_ms")}><button class="table-sort-button" type="button" onclick={() => { domainRunsSortState = nextTableSort(domainRunsSortState, "duration_ms", "desc"); }}><span>{$t("col_duration")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(domainRunsSortState, "duration_ms")}</span></button></th>
+                  <th class="sortable-column" aria-sort={tableSortAria(domainRunsSortState, "entry_count")}><button class="table-sort-button" type="button" onclick={() => { domainRunsSortState = nextTableSort(domainRunsSortState, "entry_count", "desc"); }}><span>{$t("col_entries")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(domainRunsSortState, "entry_count")}</span></button></th>
                 </tr>
               </thead>
               <tbody>
-                {#each domainRuns as run}
+                {#each sortedDomainRuns as run}
                   <tr
                     style="cursor: pointer;"
                     class={selectedDomainRunId === run.id ? "run-row-selected" : ""}
@@ -3020,16 +3118,16 @@
           <table class="data-table">
             <thead>
               <tr>
-                <th>{$t("col_domain_name")}</th>
-                <th>{$t("col_tags")}</th>
-                <th>{$t("col_latest_level")}</th>
-                {#if scoringEnabled}<th>{$t("col_score")}</th>{/if}
-                <th>{$t("col_latest_run_at")}</th>
-                <th>{$t("col_run_count")}</th>
+                <th class="sortable-column" aria-sort={tableSortAria(domainsSortState, "name")}><button class="table-sort-button" type="button" onclick={() => { domainsSortState = nextTableSort(domainsSortState, "name"); }}><span>{$t("col_domain_name")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(domainsSortState, "name")}</span></button></th>
+                <th class="sortable-column" aria-sort={tableSortAria(domainsSortState, "tags")}><button class="table-sort-button" type="button" onclick={() => { domainsSortState = nextTableSort(domainsSortState, "tags"); }}><span>{$t("col_tags")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(domainsSortState, "tags")}</span></button></th>
+                <th class="sortable-column" aria-sort={tableSortAria(domainsSortState, "latest_level")}><button class="table-sort-button" type="button" onclick={() => { domainsSortState = nextTableSort(domainsSortState, "latest_level", "desc"); }}><span>{$t("col_latest_level")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(domainsSortState, "latest_level")}</span></button></th>
+                {#if scoringEnabled}<th class="sortable-column" aria-sort={tableSortAria(domainsSortState, "latest_score")}><button class="table-sort-button" type="button" onclick={() => { domainsSortState = nextTableSort(domainsSortState, "latest_score", "desc"); }}><span>{$t("col_score")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(domainsSortState, "latest_score")}</span></button></th>{/if}
+                <th class="sortable-column" aria-sort={tableSortAria(domainsSortState, "latest_run_at")}><button class="table-sort-button" type="button" onclick={() => { domainsSortState = nextTableSort(domainsSortState, "latest_run_at", "desc"); }}><span>{$t("col_latest_run_at")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(domainsSortState, "latest_run_at")}</span></button></th>
+                <th class="sortable-column" aria-sort={tableSortAria(domainsSortState, "run_count")}><button class="table-sort-button" type="button" onclick={() => { domainsSortState = nextTableSort(domainsSortState, "run_count", "desc"); }}><span>{$t("col_run_count")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(domainsSortState, "run_count")}</span></button></th>
               </tr>
             </thead>
             <tbody>
-              {#each domains as d}
+              {#each sortedDomains as d}
                 <tr
                   style="cursor: pointer;"
                   onclick={() => navigateToDomainDetail(d)}
@@ -3151,13 +3249,13 @@
         {:else}
           <table class="data-table">
             <thead><tr>
-              <th>{$t("col_domain_name")}</th>
-              <th>{$t("col_latest_level")}</th>
-              {#if scoringEnabled}<th>{$t("col_score")}</th>{/if}
-              <th>{$t("col_latest_run_at")}</th>
+              <th class="sortable-column" aria-sort={tableSortAria(tagDomainsSortState, "name")}><button class="table-sort-button" type="button" onclick={() => { tagDomainsSortState = nextTableSort(tagDomainsSortState, "name"); }}><span>{$t("col_domain_name")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(tagDomainsSortState, "name")}</span></button></th>
+              <th class="sortable-column" aria-sort={tableSortAria(tagDomainsSortState, "latest_level")}><button class="table-sort-button" type="button" onclick={() => { tagDomainsSortState = nextTableSort(tagDomainsSortState, "latest_level", "desc"); }}><span>{$t("col_latest_level")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(tagDomainsSortState, "latest_level")}</span></button></th>
+              {#if scoringEnabled}<th class="sortable-column" aria-sort={tableSortAria(tagDomainsSortState, "latest_score")}><button class="table-sort-button" type="button" onclick={() => { tagDomainsSortState = nextTableSort(tagDomainsSortState, "latest_score", "desc"); }}><span>{$t("col_score")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(tagDomainsSortState, "latest_score")}</span></button></th>{/if}
+              <th class="sortable-column" aria-sort={tableSortAria(tagDomainsSortState, "latest_run_at")}><button class="table-sort-button" type="button" onclick={() => { tagDomainsSortState = nextTableSort(tagDomainsSortState, "latest_run_at", "desc"); }}><span>{$t("col_latest_run_at")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(tagDomainsSortState, "latest_run_at")}</span></button></th>
             </tr></thead>
             <tbody>
-              {#each tagDomains as d}
+              {#each sortedTagDomains as d}
                 <tr
                   style="cursor: pointer;"
                   onclick={() => navigateToDomainDetail(d)}
@@ -3234,12 +3332,12 @@
         {:else}
           <table class="data-table">
             <thead><tr>
-              <th>{$t("tag_name_label")}</th>
-              <th>{$t("tag_description_label")}</th>
-              <th>{$t("col_domain_count")}</th>
+              <th class="sortable-column" aria-sort={tableSortAria(tagsListSortState, "name")}><button class="table-sort-button" type="button" onclick={() => { tagsListSortState = nextTableSort(tagsListSortState, "name"); }}><span>{$t("tag_name_label")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(tagsListSortState, "name")}</span></button></th>
+              <th class="sortable-column" aria-sort={tableSortAria(tagsListSortState, "description")}><button class="table-sort-button" type="button" onclick={() => { tagsListSortState = nextTableSort(tagsListSortState, "description"); }}><span>{$t("tag_description_label")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(tagsListSortState, "description")}</span></button></th>
+              <th class="sortable-column" aria-sort={tableSortAria(tagsListSortState, "domain_count")}><button class="table-sort-button" type="button" onclick={() => { tagsListSortState = nextTableSort(tagsListSortState, "domain_count", "desc"); }}><span>{$t("col_domain_count")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(tagsListSortState, "domain_count")}</span></button></th>
             </tr></thead>
             <tbody>
-              {#each tagsList as tag}
+              {#each sortedTagsList as tag}
                 <tr
                   style="cursor: pointer;"
                   onclick={() => navigateToTagDetail(tag)}
@@ -3737,15 +3835,15 @@ example.org`}
               <table class="metrics-table">
                 <thead>
                   <tr>
-                    <th>{$t("domain_col")}</th>
-                    <th>{$t("runs_col")}</th>
-                    <th>{$t("last_status_col")}</th>
-                    <th>{$t("avg_duration_col")}</th>
-                    <th>{$t("error_critical_col")}</th>
+                    <th class="sortable-column" aria-sort={tableSortAria(metricsDomainsSortState, "domain")}><button class="table-sort-button" type="button" onclick={() => { metricsDomainsSortState = nextTableSort(metricsDomainsSortState, "domain"); }}><span>{$t("domain_col")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(metricsDomainsSortState, "domain")}</span></button></th>
+                    <th class="sortable-column" aria-sort={tableSortAria(metricsDomainsSortState, "runs_total")}><button class="table-sort-button" type="button" onclick={() => { metricsDomainsSortState = nextTableSort(metricsDomainsSortState, "runs_total", "desc"); }}><span>{$t("runs_col")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(metricsDomainsSortState, "runs_total")}</span></button></th>
+                    <th class="sortable-column" aria-sort={tableSortAria(metricsDomainsSortState, "last_status")}><button class="table-sort-button" type="button" onclick={() => { metricsDomainsSortState = nextTableSort(metricsDomainsSortState, "last_status"); }}><span>{$t("last_status_col")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(metricsDomainsSortState, "last_status")}</span></button></th>
+                    <th class="sortable-column" aria-sort={tableSortAria(metricsDomainsSortState, "avg_duration_ms")}><button class="table-sort-button" type="button" onclick={() => { metricsDomainsSortState = nextTableSort(metricsDomainsSortState, "avg_duration_ms", "desc"); }}><span>{$t("avg_duration_col")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(metricsDomainsSortState, "avg_duration_ms")}</span></button></th>
+                    <th class="sortable-column" aria-sort={tableSortAria(metricsDomainsSortState, "error_critical")}><button class="table-sort-button" type="button" onclick={() => { metricsDomainsSortState = nextTableSort(metricsDomainsSortState, "error_critical", "desc"); }}><span>{$t("error_critical_col")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(metricsDomainsSortState, "error_critical")}</span></button></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {#each metricsDomainRows(metricsSnapshot) as row}
+                  {#each sortedMetricsDomainRows as row}
                     <tr>
                       <td class="mono"><button class="ghost" type="button" style="padding: 0; font-family: monospace; text-align: left; border: none;" onclick={() => navigateToDomainByName(row.domain)}>{row.domain}</button></td>
                       <td>{formatInteger(row.runs_total)}</td>
@@ -3774,15 +3872,15 @@ example.org`}
                 </colgroup>
                 <thead>
                   <tr>
-                    <th>{$t("batch_id_col")}</th>
-                    <th>{$t("processed_col")}</th>
-                    <th>{$t("failed_expired_col")}</th>
-                    <th>{$t("canceled_col")}</th>
-                    <th>{$t("error_critical_col")}</th>
+                    <th class="sortable-column" aria-sort={tableSortAria(metricsBatchesSortState, "batch_id")}><button class="table-sort-button" type="button" onclick={() => { metricsBatchesSortState = nextTableSort(metricsBatchesSortState, "batch_id"); }}><span>{$t("batch_id_col")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(metricsBatchesSortState, "batch_id")}</span></button></th>
+                    <th class="sortable-column" aria-sort={tableSortAria(metricsBatchesSortState, "processed_total")}><button class="table-sort-button" type="button" onclick={() => { metricsBatchesSortState = nextTableSort(metricsBatchesSortState, "processed_total", "desc"); }}><span>{$t("processed_col")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(metricsBatchesSortState, "processed_total")}</span></button></th>
+                    <th class="sortable-column" aria-sort={tableSortAria(metricsBatchesSortState, "failed_expired")}><button class="table-sort-button" type="button" onclick={() => { metricsBatchesSortState = nextTableSort(metricsBatchesSortState, "failed_expired", "desc"); }}><span>{$t("failed_expired_col")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(metricsBatchesSortState, "failed_expired")}</span></button></th>
+                    <th class="sortable-column" aria-sort={tableSortAria(metricsBatchesSortState, "canceled")}><button class="table-sort-button" type="button" onclick={() => { metricsBatchesSortState = nextTableSort(metricsBatchesSortState, "canceled", "desc"); }}><span>{$t("canceled_col")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(metricsBatchesSortState, "canceled")}</span></button></th>
+                    <th class="sortable-column" aria-sort={tableSortAria(metricsBatchesSortState, "error_critical")}><button class="table-sort-button" type="button" onclick={() => { metricsBatchesSortState = nextTableSort(metricsBatchesSortState, "error_critical", "desc"); }}><span>{$t("error_critical_col")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(metricsBatchesSortState, "error_critical")}</span></button></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {#each metricsBatchRows(metricsSnapshot) as row}
+                  {#each sortedMetricsBatchRows as row}
                     <tr>
                       <td class="mono metrics-batch-id" title={row.batch_id}>{row.batch_id}</td>
                       <td>{formatInteger(row.processed_total)}</td>

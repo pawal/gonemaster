@@ -73,6 +73,10 @@ describe("App", () => {
   };
 
   const getMetricsPanel = () => screen.getByRole("tabpanel", { name: "Metrics" });
+  const tableColumnValues = (table, columnIndex = 0) =>
+    Array.from(table.querySelectorAll("tbody tr")).map((row) =>
+      row.querySelectorAll("td")[columnIndex].textContent.replace(/\s+/g, " ").trim()
+    );
 
   it("renders the main sections", async () => {
     global.fetch.mockImplementation(() => jsonResponse({ items: [] }));
@@ -528,6 +532,79 @@ describe("App", () => {
     expect(within(metricsPanel).getByText("alpha.example")).toBeInTheDocument();
     expect(within(metricsPanel).getByRole("heading", { name: "Error-heavy batches" })).toBeInTheDocument();
     expect(within(metricsPanel).getByText("batch_a")).toBeInTheDocument();
+
+    unmount();
+  });
+
+  it("sorts metrics insight tables when clicking column headers", async () => {
+    const metricsPayload = {
+      generated_at: "2026-03-20T10:15:00Z",
+      server_version: "v1.2.3",
+      health: {
+        uptime_seconds: 5400,
+        queue_depth: 2,
+        in_flight_jobs: 1,
+        dns_queries_ipv4_total: 10,
+        dns_queries_ipv6_total: 5,
+        dns_cache_hits: 40,
+        dns_cache_misses: 10
+      },
+      jobs: {
+        completed_total: 12,
+        status_counts: { failed: 2 }
+      },
+      quality: {
+        outcomes: { success_rate: 0.8, failed_rate: 0.2, failed_total: 2 },
+        job_duration_ms: { avg: 250 },
+        severity: { totals: { NOTICE: 1, WARNING: 2, ERROR: 3, CRITICAL: 1 } }
+      },
+      api: {
+        routes: [{ latency_ms: { p90: 200 } }]
+      },
+      trends: {
+        windows: {
+          "1h": {
+            points: [{ throughput: 1, failed: 0, dns_queries_ipv4_per_second: 1, dns_queries_ipv6_per_second: 1, dns_cache_hit_rate: 0.8 }]
+          }
+        }
+      },
+      insights: {
+        domains: {
+          items: [
+            { domain: "zeta.example", runs_total: 2, last_status: "failed", avg_duration_ms: 900, severity_totals: { ERROR: 1, CRITICAL: 0 } },
+            { domain: "alpha.example", runs_total: 7, last_status: "ok", avg_duration_ms: 300, severity_totals: { ERROR: 0, CRITICAL: 0 } },
+            { domain: "beta.example", runs_total: 9, last_status: "warning", avg_duration_ms: 600, severity_totals: { ERROR: 2, CRITICAL: 1 } }
+          ]
+        },
+        batches: {
+          items: [
+            { batch_id: "batch_c", processed_total: 15, outcomes: { failed: 0, expired: 1, canceled: 0 }, severity_totals: { ERROR: 1, CRITICAL: 0 } },
+            { batch_id: "batch_a", processed_total: 10, outcomes: { failed: 4, expired: 2, canceled: 1 }, severity_totals: { ERROR: 3, CRITICAL: 1 } },
+            { batch_id: "batch_b", processed_total: 12, outcomes: { failed: 1, expired: 0, canceled: 2 }, severity_totals: { ERROR: 0, CRITICAL: 1 } }
+          ]
+        }
+      }
+    };
+
+    global.fetch.mockImplementation((url) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      if (value.includes("/api/v1/jobs?")) return jsonResponse({ items: [], total: 0 });
+      if (value.startsWith("/api/v1/metrics?")) return jsonResponse(metricsPayload);
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+    await openMetricsTab();
+
+    const metricsPanel = getMetricsPanel();
+    await within(metricsPanel).findByText("zeta.example");
+    const [domainsTable, batchesTable] = within(metricsPanel).getAllByRole("table");
+
+    await fireEvent.click(within(domainsTable).getByRole("button", { name: "Runs" }));
+    expect(tableColumnValues(domainsTable)).toEqual(["beta.example", "alpha.example", "zeta.example"]);
+
+    await fireEvent.click(within(batchesTable).getByRole("button", { name: "Batch ID" }));
+    expect(tableColumnValues(batchesTable)).toEqual(["batch_a", "batch_b", "batch_c"]);
 
     unmount();
   });
@@ -3372,6 +3449,39 @@ describe("App", () => {
       expect(screen.getByText("1–50 / 120")).toBeInTheDocument();
       unmount();
     });
+
+    it("sorts the domains table when clicking column headers", async () => {
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value.includes("/api/v1/domains")) {
+          return jsonResponse({
+            items: [
+              { id: 1, name: "zeta.example", tags: ["ops"], latest_level: "WARNING", latest_run_at: "2026-03-10T10:00:00Z", run_count: 2 },
+              { id: 2, name: "alpha.example", tags: ["core"], latest_level: "ERROR", latest_run_at: "2026-03-12T10:00:00Z", run_count: 4 },
+              { id: 3, name: "beta.example", tags: ["ops"], latest_level: "NOTICE", latest_run_at: "2026-03-11T10:00:00Z", run_count: 7 }
+            ],
+            total: 3
+          });
+        }
+        if (value.includes("/api/v1/tags")) return jsonResponse([]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openDomainsTab();
+
+      const domainsPanel = screen.getByRole("tabpanel", { name: "Domains" });
+      await within(domainsPanel).findByText("zeta.example");
+      const table = within(domainsPanel).getByRole("table");
+
+      await fireEvent.click(within(table).getByRole("button", { name: "Domain" }));
+      expect(tableColumnValues(table)).toEqual(["alpha.example", "beta.example", "zeta.example"]);
+
+      await fireEvent.click(within(table).getByRole("button", { name: "Runs" }));
+      expect(tableColumnValues(table)).toEqual(["beta.example", "alpha.example", "zeta.example"]);
+
+      unmount();
+    });
   });
 
   describe("Tags tab", () => {
@@ -3404,6 +3514,29 @@ describe("App", () => {
       await openTagsTab();
       expect(await screen.findByText("tld")).toBeInTheDocument();
       expect(screen.getByText("Top-level")).toBeInTheDocument();
+      unmount();
+    });
+
+    it("sorts the tag list when clicking column headers", async () => {
+      mockTagFetch([
+        { name: "zulu", description: "Last", domain_count: 1 },
+        { name: "alpha", description: "First", domain_count: 4 },
+        { name: "beta", description: "Middle", domain_count: 9 }
+      ]);
+
+      const { unmount } = render(App);
+      await openTagsTab();
+
+      const tagsPanel = screen.getByRole("tabpanel", { name: "Tags" });
+      await within(tagsPanel).findByText("zulu");
+      const table = within(tagsPanel).getByRole("table");
+
+      await fireEvent.click(within(table).getByRole("button", { name: "Domains" }));
+      expect(tableColumnValues(table)).toEqual(["beta", "alpha", "zulu"]);
+
+      await fireEvent.click(within(table).getByRole("button", { name: "Name" }));
+      expect(tableColumnValues(table)).toEqual(["alpha", "beta", "zulu"]);
+
       unmount();
     });
 

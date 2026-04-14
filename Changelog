@@ -2,6 +2,17 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [v1.3.1] - 2026-04-14
+
+### Added
+ - UI: Nameserver hot-cache configuration in the admin UI settings
+ - UI: Added jobs/min metric card to queue & workers section in the Metrics tab
+ - UI: Added sortable admin tables
+ - Engine: Added missing Godoc
+
+### Changed
+- Scoring: N16_HAS_NSID does not give penalty points
+
 ## [v1.3.0] - 2026-04-12
 
 Major performance increase, and new admin and public UI layout, and new scoring engine!

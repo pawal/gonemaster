@@ -139,6 +139,8 @@
   "metric_ipv6_queries": "Eksterne IPv6",
   "metric_cache_hits": "Hurtigbuffertreff",
   "metric_cache_misses": "Hurtigbuffermiss",
+  "metric_jobs_per_minute": "Jobber/min",
+  "help_jobs_per_minute": "Fullførte jobber per minutt basert på den siste trendperioden.",
   "metric_cache_hit_rate": "Hurtigbuffertreffrate",
   "metric_success_rate": "Suksessrate",
   "metric_failure_rate": "Feilrate",

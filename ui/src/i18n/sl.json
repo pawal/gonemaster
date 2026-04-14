@@ -139,6 +139,8 @@
   "metric_ipv6_queries": "Zunanje IPv6",
   "metric_cache_hits": "Zadetki predpomnilnika",
   "metric_cache_misses": "Zgrešitve predpomnilnika",
+  "metric_jobs_per_minute": "Opravil/min",
+  "help_jobs_per_minute": "Dokončana opravila na minuto glede na zadnje obdobje trenda.",
   "metric_cache_hit_rate": "Stopnja zadetkov",
   "metric_success_rate": "Stopnja uspešnosti",
   "metric_failure_rate": "Stopnja napak",

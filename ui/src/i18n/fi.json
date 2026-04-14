@@ -139,6 +139,8 @@
   "metric_ipv6_queries": "Ulkoiset IPv6",
   "metric_cache_hits": "Välimuistiosumat",
   "metric_cache_misses": "Välimuistihudit",
+  "metric_jobs_per_minute": "Työtä/min",
+  "help_jobs_per_minute": "Valmistuneet työt minuutissa viimeisimmän trendijakson perusteella.",
   "metric_cache_hit_rate": "Välimuistin osumaprosentti",
   "metric_success_rate": "Onnistumisaste",
   "metric_failure_rate": "Virheaste",

@@ -139,6 +139,8 @@
   "metric_ipv6_queries": "Externa IPv6",
   "metric_cache_hits": "Cacheträffar",
   "metric_cache_misses": "Cachemissar",
+  "metric_jobs_per_minute": "Jobb/min",
+  "help_jobs_per_minute": "Slutförda jobb per minut baserat på den senaste trendperioden.",
   "metric_cache_hit_rate": "Cacheträffsfrekvens",
   "metric_success_rate": "Framgångsfrekvens",
   "metric_failure_rate": "Felfrekvens",

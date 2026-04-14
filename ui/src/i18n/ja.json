@@ -139,6 +139,8 @@
   "metric_ipv6_queries": "外部IPv6",
   "metric_cache_hits": "キャッシュヒット",
   "metric_cache_misses": "キャッシュミス",
+  "metric_jobs_per_minute": "ジョブ/分",
+  "help_jobs_per_minute": "最新のトレンドバケットに基づく1分あたりの完了ジョブ数。",
   "metric_cache_hit_rate": "キャッシュヒット率",
   "metric_success_rate": "成功率",
   "metric_failure_rate": "失敗率",

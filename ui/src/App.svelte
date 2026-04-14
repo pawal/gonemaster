@@ -722,7 +722,19 @@
     dns_cache_hits: "help_cache_hits",
     dns_cache_misses: "help_cache_misses",
     dns_cache_hit_rate: "help_cache_hit_rate",
-    dns_lookups_total: "help_dns_lookups"
+    dns_lookups_total: "help_dns_lookups",
+    jobs_per_minute: "help_jobs_per_minute"
+  };
+  const metricsResolutionSeconds = (snapshot, window) => {
+    const windows = snapshot?.trends?.windows || {};
+    return windows[window]?.resolution_seconds || (windows[Object.keys(windows)[0]]?.resolution_seconds) || 60;
+  };
+  const metricsJobsPerMinute = (snapshot, window) => {
+    const points = metricsSeriesPoints(snapshot, window);
+    if (!points.length) return 0;
+    const last = Number(points[points.length - 1]?.throughput || 0);
+    const resSec = metricsResolutionSeconds(snapshot, window);
+    return last * (60 / resSec);
   };
   const metricsCacheHitRate = (snapshot) => {
     const hits = snapshot?.health?.dns_cache_hits || 0;
@@ -3694,6 +3706,10 @@ example.org`}
             <div class="summary-item" title={$t(metricsCardHelp.in_flight_jobs)}>
               <span class="summary-label">{$t("metric_in_flight")}</span>
               <span class="summary-count">{formatInteger(metricsSnapshot?.health?.in_flight_jobs)}</span>
+            </div>
+            <div class="summary-item" title={$t(metricsCardHelp.jobs_per_minute)}>
+              <span class="summary-label">{$t("metric_jobs_per_minute")}</span>
+              <span class="summary-count">{formatInteger(Math.round(metricsJobsPerMinute(metricsSnapshot, metricsWindow)))}</span>
             </div>
           </div>
         </div>

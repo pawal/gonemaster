@@ -139,6 +139,8 @@
   "metric_ipv6_queries": "Externas IPv6",
   "metric_cache_hits": "Aciertos de caché",
   "metric_cache_misses": "Fallos de caché",
+  "metric_jobs_per_minute": "Trabajos/min",
+  "help_jobs_per_minute": "Trabajos completados por minuto según el período de tendencia más reciente.",
   "metric_cache_hit_rate": "Tasa de aciertos",
   "metric_success_rate": "Tasa de éxito",
   "metric_failure_rate": "Tasa de error",

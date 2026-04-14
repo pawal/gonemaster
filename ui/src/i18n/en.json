@@ -351,6 +351,8 @@
   "metric_ipv6_queries": "External IPv6",
   "metric_cache_hits": "Cache hits",
   "metric_cache_misses": "Cache misses",
+  "metric_jobs_per_minute": "Jobs/min",
+  "help_jobs_per_minute": "Completed jobs per minute based on the most recent trend bucket.",
   "metric_cache_hit_rate": "Cache hit rate",
   "metric_success_rate": "Success rate",
   "metric_failure_rate": "Failure rate",

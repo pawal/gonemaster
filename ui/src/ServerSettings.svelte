@@ -39,6 +39,12 @@
       ],
     },
     {
+      key: "settings_group_cache",
+      settings: [
+        { key: "cross_job_hot_cache_ttl_seconds", type: "number" },
+      ],
+    },
+    {
       key: "settings_group_scoring",
       settings: [
         { key: "show_score_admin", type: "toggle" },

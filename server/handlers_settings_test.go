@@ -355,6 +355,73 @@ func TestPutSettingsResizesWorkerPool(t *testing.T) {
 	}
 }
 
+func TestApplyDatabaseSettingsHotCacheTTL(t *testing.T) {
+	srv := New(DefaultConfig())
+	_ = srv.store.SetSetting("cross_job_hot_cache_ttl_seconds", "120")
+	srv.ApplyDatabaseSettings()
+
+	if srv.cfg.CrossJobHotCacheTTLSeconds != 120 {
+		t.Fatalf("CrossJobHotCacheTTLSeconds: got %d, want 120", srv.cfg.CrossJobHotCacheTTLSeconds)
+	}
+}
+
+func TestApplyDatabaseSettingsHotCacheTTLIgnoresInvalid(t *testing.T) {
+	srv := New(DefaultConfig())
+	_ = srv.store.SetSetting("cross_job_hot_cache_ttl_seconds", "not-a-number")
+	srv.ApplyDatabaseSettings()
+
+	if srv.cfg.CrossJobHotCacheTTLSeconds != defaultCrossJobHotCacheTTLSeconds {
+		t.Fatalf("CrossJobHotCacheTTLSeconds: got %d, want %d", srv.cfg.CrossJobHotCacheTTLSeconds, defaultCrossJobHotCacheTTLSeconds)
+	}
+}
+
+func TestPutSettingsUpdatesHotCacheTTL(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	body := `{"cross_job_hot_cache_ttl_seconds": 300}`
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/settings", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
+	}
+
+	if srv.cfg.CrossJobHotCacheTTLSeconds != 300 {
+		t.Fatalf("CrossJobHotCacheTTLSeconds after PUT: got %d, want 300", srv.cfg.CrossJobHotCacheTTLSeconds)
+	}
+}
+
+func TestGetSettingsIncludesHotCacheTTL(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/settings", nil)
+	srv.Handler().ServeHTTP(resp, req)
+
+	var settings map[string]settingEntry
+	if err := json.NewDecoder(resp.Body).Decode(&settings); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	entry, ok := settings["cross_job_hot_cache_ttl_seconds"]
+	if !ok {
+		t.Fatal("missing setting cross_job_hot_cache_ttl_seconds")
+	}
+	// Default value should be 60.
+	val, ok2 := entry.Value.(float64)
+	if !ok2 {
+		t.Fatalf("expected float64 value, got %T", entry.Value)
+	}
+	if int(val) != defaultCrossJobHotCacheTTLSeconds {
+		t.Fatalf("value: got %v, want %d", val, defaultCrossJobHotCacheTTLSeconds)
+	}
+	if entry.Readonly {
+		t.Fatal("expected cross_job_hot_cache_ttl_seconds to be mutable")
+	}
+}
+
 func TestPublicInfoEndpointDefault(t *testing.T) {
 	srv := New(DefaultConfig())
 

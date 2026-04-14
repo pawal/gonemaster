@@ -99,6 +99,10 @@ func (s *Server) applySetting(key, val string) {
 		s.cfg.ShowScoreAdmin = val == "true"
 	case "show_score_public":
 		s.cfg.ShowScorePublic = val == "true"
+	case "cross_job_hot_cache_ttl_seconds":
+		if v, err := strconv.Atoi(val); err == nil && v >= 1 {
+			s.cfg.CrossJobHotCacheTTLSeconds = v
+		}
 	}
 }
 
@@ -113,6 +117,9 @@ func (s *Server) applySettingsToRuntime() {
 
 	// Update engine concurrency limiter.
 	s.engineLimiter = newEngineLimiter(s.cfg.MaxConcurrentJobs)
+
+	// Update hot cache TTL.
+	s.hotCache.SetTTL(s.cfg.EffectiveCrossJobHotCacheTTL())
 
 	// Update rate limiter.
 	if s.cfg.PublicAPI.RateLimitEnabled {
@@ -171,8 +178,9 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, _ *http.Request) {
 		"rate_limit_enabled": {Value: cfg.PublicAPI.RateLimitEnabled, Source: s.settingSource("rate_limit_enabled")},
 		"rate_limit_max":     {Value: cfg.PublicAPI.RateLimitMax, Source: s.settingSource("rate_limit_max")},
 		"rate_limit_window":  {Value: cfg.PublicAPI.RateLimitWindow.Duration.String(), Source: s.settingSource("rate_limit_window")},
-		"show_score_admin":   {Value: cfg.ShowScoreAdmin, Source: s.settingSource("show_score_admin")},
-		"show_score_public":  {Value: cfg.ShowScorePublic, Source: s.settingSource("show_score_public")},
+		"show_score_admin":               {Value: cfg.ShowScoreAdmin, Source: s.settingSource("show_score_admin")},
+		"show_score_public":              {Value: cfg.ShowScorePublic, Source: s.settingSource("show_score_public")},
+		"cross_job_hot_cache_ttl_seconds": {Value: cfg.CrossJobHotCacheTTLSeconds, Source: s.settingSource("cross_job_hot_cache_ttl_seconds")},
 	}
 
 	// Apply database overrides to the value display.

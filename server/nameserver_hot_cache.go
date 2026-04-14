@@ -134,6 +134,18 @@ func (c *nameserverHotCache) evictOverflowLocked() {
 	}
 }
 
+// SetTTL updates the TTL used for new and refreshed cache entries.
+// Existing entries keep their current expiration but will use the new TTL
+// on their next touch.
+func (c *nameserverHotCache) SetTTL(ttl time.Duration) {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	c.ttl = ttl
+	c.mu.Unlock()
+}
+
 func (c *nameserverHotCache) Close() {
 	if c == nil {
 		return

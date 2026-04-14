@@ -1095,7 +1095,7 @@
     activeTab = next;
     const nextHash = `#/${next}`;
     const url = `${window.location.pathname}${window.location.search}${nextHash}`;
-    const state = { tab: next, domain: null, tag: null };
+    const state = { tab: next, domain: null, tag: null, jobId: null };
     if (!changed || replace) {
       if (window.location.hash !== nextHash) window.history.replaceState(state, "", url);
     } else {
@@ -1131,6 +1131,15 @@
     }
   };
 
+  const navigateToJob = (jobId) => {
+    selectedJobId = jobId;
+    activeTab = "single";
+    const hash = `#/single/${encodeURIComponent(jobId)}`;
+    window.history.pushState({ tab: "single", domain: null, tag: null, jobId }, "", `${window.location.pathname}${window.location.search}${hash}`);
+    if (statusMessage) clearStatus();
+    loadJob(jobId);
+  };
+
   const navigateToDomainDetail = (d) => {
     activeTab = "domains";
     selectedDomain = d;
@@ -1139,7 +1148,7 @@
     selectedDomainRunResult = null;
     selectedDomainRunId = null;
     const hash = `#/domains/${encodeURIComponent(d.name)}`;
-    window.history.pushState({ tab: "domains", domain: d, tag: null }, "", `${window.location.pathname}${window.location.search}${hash}`);
+    window.history.pushState({ tab: "domains", domain: d, tag: null, jobId: null }, "", `${window.location.pathname}${window.location.search}${hash}`);
     if (statusMessage) clearStatus();
     loadDomainRuns();
   };
@@ -1154,19 +1163,30 @@
     tagDomainLevelFilter = "";
     tagDeleteConfirm = false;
     const hash = `#/tags/${encodeURIComponent(tag.name)}`;
-    window.history.pushState({ tab: "tags", domain: null, tag }, "", `${window.location.pathname}${window.location.search}${hash}`);
+    window.history.pushState({ tab: "tags", domain: null, tag, jobId: null }, "", `${window.location.pathname}${window.location.search}${hash}`);
     if (statusMessage) clearStatus();
     loadTagSummary();
     loadTagDomains();
   };
 
+  // Guard flag: when popstate fires, a hashchange event also fires for the
+  // same navigation.  updateTabFromHash must skip that duplicate because
+  // onPopState already restored the full state (domain, tag, jobId) from
+  // history — updateTabFromHash would clobber it with nulls.
+  let popStateHandled = false;
+
   const onPopState = (e) => {
+    popStateHandled = true;
     const state = e.state;
     if (!state) { updateTabFromHash(); return; }
     activeTab = state.tab || "single";
     selectedDomain = state.domain ?? null;
     selectedTag = state.tag ?? null;
     tagProfileDraftId = selectedTag?.default_profile_id ? String(selectedTag.default_profile_id) : "";
+    if (state.jobId) {
+      selectedJobId = state.jobId;
+      loadJob(state.jobId);
+    }
     if (!selectedDomain) {
       domainRuns = [];
       selectedDomainRunResult = null;
@@ -1183,14 +1203,24 @@
   };
 
   const updateTabFromHash = () => {
+    if (popStateHandled) {
+      popStateHandled = false;
+      return;
+    }
     const hash = window.location.hash || "";
-    const segment = hash.replace(/^#\/?/, "").split("/")[0];
+    const parts = hash.replace(/^#\/?/, "").split("/");
+    const segment = parts[0];
     const next = normalizeTab(segment) || "single";
     activeTab = next;
+    const jobId = (next === "single" && parts[1]) ? decodeURIComponent(parts[1]) : null;
+    if (jobId) {
+      selectedJobId = jobId;
+      loadJob(jobId);
+    }
     window.history.replaceState(
-      { tab: next, domain: null, tag: null },
+      { tab: next, domain: null, tag: null, jobId: jobId || undefined },
       "",
-      `${window.location.pathname}${window.location.search}#/${next}`
+      `${window.location.pathname}${window.location.search}${hash || `#/${next}`}`
     );
   };
 
@@ -1751,10 +1781,8 @@
         body: JSON.stringify({ domain: selectedDomain.name })
       });
       createdJobId = job.id;
-      selectedJobId = job.id;
       setStatus($t("job_created", { id: job.id }), "ok");
-      setTab("single");
-      await loadJob(job.id);
+      navigateToJob(job.id);
     } catch (error) {
       setStatus($t("error_create_job", { error: error.message }), "warn");
     } finally {
@@ -2805,15 +2833,11 @@
         {:else}
           {#each filteredJobs as job (job.id)}
             <div class="list-item clickable" onclick={() => {
-              selectedJobId = job.id;
-              loadJob(job.id);
-              setTab("single");
+              navigateToJob(job.id);
             }} onkeydown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
-                selectedJobId = job.id;
-                loadJob(job.id);
-                setTab("single");
+                navigateToJob(job.id);
               }
             }} role="button" tabindex="0">
               <div class="list-item-main">
@@ -3060,10 +3084,10 @@
                   <tr
                     style="cursor: pointer;"
                     class={selectedDomainRunId === run.id ? "run-row-selected" : ""}
-                    onclick={() => { selectedJobId = run.id; setTab("single"); loadJob(run.id); }}
+                    onclick={() => { navigateToJob(run.id); }}
                     role="button"
                     tabindex="0"
-                    onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { selectedJobId = run.id; setTab("single"); loadJob(run.id); } }}
+                    onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { navigateToJob(run.id); } }}
                   >
                     <td class="run-id-cell" title={run.id}>{run.id}</td>
                     <td>{run.finished_at ? run.finished_at.slice(0, 16).replace("T", " ") : "—"}</td>
@@ -3627,9 +3651,7 @@ example.org`}
                       </div>
                     </div>
                     <button class="ghost" type="button" onclick={() => {
-                      selectedJobId = item.id;
-                      loadJob(item.id);
-                      setTab("single");
+                      navigateToJob(item.id);
                     }}>{$t("inspect")}</button>
                   </div>
                 {/each}

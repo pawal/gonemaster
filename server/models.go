@@ -60,8 +60,18 @@ const (
 	JobSortDomainDesc    JobSort = "domain_desc"
 	JobSortBatchIDAsc    JobSort = "batch_id_asc"
 	JobSortBatchIDDesc   JobSort = "batch_id_desc"
-	JobSortErrorDesc     JobSort = "error_desc"
-	JobSortCriticalDesc  JobSort = "critical_desc"
+	JobSortErrorDesc       JobSort = "error_desc"
+	JobSortCriticalDesc    JobSort = "critical_desc"
+	JobSortFinishedAtDesc  JobSort = "finished_at_desc"
+	JobSortFinishedAtAsc   JobSort = "finished_at_asc"
+	JobSortWorstLevelDesc  JobSort = "worst_level_desc"
+	JobSortWorstLevelAsc   JobSort = "worst_level_asc"
+	JobSortScoreDesc       JobSort = "score_desc"
+	JobSortScoreAsc        JobSort = "score_asc"
+	JobSortDurationDesc    JobSort = "duration_desc"
+	JobSortDurationAsc     JobSort = "duration_asc"
+	JobSortEntryCountDesc  JobSort = "entry_count_desc"
+	JobSortEntryCountAsc   JobSort = "entry_count_asc"
 )
 
 // JobSeverityFilter controls severity-based list filtering.
@@ -235,6 +245,22 @@ type JobFilter struct {
 	Sort          JobSort
 }
 
+// DomainSort controls ordering for domain list queries.
+type DomainSort string
+
+const (
+	DomainSortNameAsc        DomainSort = "name_asc"
+	DomainSortNameDesc       DomainSort = "name_desc"
+	DomainSortLevelDesc      DomainSort = "latest_level_desc"
+	DomainSortLevelAsc       DomainSort = "latest_level_asc"
+	DomainSortScoreDesc      DomainSort = "latest_score_desc"
+	DomainSortScoreAsc       DomainSort = "latest_score_asc"
+	DomainSortLastRunDesc    DomainSort = "latest_run_at_desc"
+	DomainSortLastRunAsc     DomainSort = "latest_run_at_asc"
+	DomainSortRunCountDesc   DomainSort = "run_count_desc"
+	DomainSortRunCountAsc    DomainSort = "run_count_asc"
+)
+
 // DomainFilter filters domain list queries.
 type DomainFilter struct {
 	Tag         string
@@ -243,6 +269,7 @@ type DomainFilter struct {
 	MinLevel    string // minimum severity threshold (inclusive); "WARNING" matches WARNING/ERROR/CRITICAL
 	Limit       int
 	Offset      int
+	Sort        DomainSort
 }
 
 // RunFilter filters run list queries.

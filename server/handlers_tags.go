@@ -195,6 +195,7 @@ func (s *Server) handleListTagDomains(w http.ResponseWriter, r *http.Request, ta
 		filter.Offset = v
 	}
 	filter.MinLevel = strings.ToUpper(strings.TrimSpace(q.Get("min_level")))
+	filter.Sort = DomainSort(strings.TrimSpace(q.Get("sort")))
 	list := s.store.ListDomainsByTag(tag, filter)
 	if !s.cfg.ShowScoreAdmin {
 		for i := range list.Items {

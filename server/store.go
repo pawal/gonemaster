@@ -32,6 +32,85 @@ func severityRank(level string) int {
 	}
 }
 
+// sortDomainSlice sorts a domain slice in-place according to the given sort order.
+func sortDomainSlice(items []Domain, ds DomainSort) {
+	switch ds {
+	case DomainSortNameDesc:
+		sort.Slice(items, func(i, j int) bool { return items[i].Name > items[j].Name })
+	case DomainSortLevelDesc:
+		sort.Slice(items, func(i, j int) bool {
+			ri, rj := severityRank(items[i].LatestLevel), severityRank(items[j].LatestLevel)
+			if ri != rj {
+				return ri > rj
+			}
+			return items[i].Name < items[j].Name
+		})
+	case DomainSortLevelAsc:
+		sort.Slice(items, func(i, j int) bool {
+			ri, rj := severityRank(items[i].LatestLevel), severityRank(items[j].LatestLevel)
+			if ri != rj {
+				return ri < rj
+			}
+			return items[i].Name < items[j].Name
+		})
+	case DomainSortScoreDesc:
+		sort.Slice(items, func(i, j int) bool {
+			si := derefIntOr(items[i].LatestScore, -1)
+			sj := derefIntOr(items[j].LatestScore, -1)
+			if si != sj {
+				return si > sj
+			}
+			return items[i].Name < items[j].Name
+		})
+	case DomainSortScoreAsc:
+		sort.Slice(items, func(i, j int) bool {
+			si := derefIntOr(items[i].LatestScore, 9999)
+			sj := derefIntOr(items[j].LatestScore, 9999)
+			if si != sj {
+				return si < sj
+			}
+			return items[i].Name < items[j].Name
+		})
+	case DomainSortLastRunDesc:
+		sort.Slice(items, func(i, j int) bool {
+			if !items[i].LatestRunAt.Equal(items[j].LatestRunAt) {
+				return items[i].LatestRunAt.After(items[j].LatestRunAt)
+			}
+			return items[i].Name < items[j].Name
+		})
+	case DomainSortLastRunAsc:
+		sort.Slice(items, func(i, j int) bool {
+			if !items[i].LatestRunAt.Equal(items[j].LatestRunAt) {
+				return items[i].LatestRunAt.Before(items[j].LatestRunAt)
+			}
+			return items[i].Name < items[j].Name
+		})
+	case DomainSortRunCountDesc:
+		sort.Slice(items, func(i, j int) bool {
+			if items[i].RunCount != items[j].RunCount {
+				return items[i].RunCount > items[j].RunCount
+			}
+			return items[i].Name < items[j].Name
+		})
+	case DomainSortRunCountAsc:
+		sort.Slice(items, func(i, j int) bool {
+			if items[i].RunCount != items[j].RunCount {
+				return items[i].RunCount < items[j].RunCount
+			}
+			return items[i].Name < items[j].Name
+		})
+	default:
+		sort.Slice(items, func(i, j int) bool { return items[i].Name < items[j].Name })
+	}
+}
+
+func derefIntOr(p *int, fallback int) int {
+	if p != nil {
+		return *p
+	}
+	return fallback
+}
+
 // JobStore persists job metadata and results.
 type JobStore interface {
 	// Job queue management (in-flight jobs only).
@@ -535,9 +614,7 @@ func (s *InMemoryJobStore) ListDomains(filter DomainFilter) DomainList {
 		items = append(items, dc)
 	}
 
-	sort.Slice(items, func(i, j int) bool {
-		return items[i].Name < items[j].Name
-	})
+	sortDomainSlice(items, filter.Sort)
 
 	total := len(items)
 	limit := filter.Limit
@@ -891,6 +968,52 @@ func (s *InMemoryJobStore) ListRuns(filter RunFilter) RunList {
 		case JobSortCriticalDesc:
 			if l.SevCritical != r.SevCritical {
 				return l.SevCritical > r.SevCritical
+			}
+		case JobSortFinishedAtDesc:
+			if !l.FinishedAt.Equal(r.FinishedAt) {
+				return l.FinishedAt.After(r.FinishedAt)
+			}
+		case JobSortFinishedAtAsc:
+			if !l.FinishedAt.Equal(r.FinishedAt) {
+				return l.FinishedAt.Before(r.FinishedAt)
+			}
+		case JobSortWorstLevelDesc:
+			li, ri := severityRank(l.WorstLevel), severityRank(r.WorstLevel)
+			if li != ri {
+				return li > ri
+			}
+		case JobSortWorstLevelAsc:
+			li, ri := severityRank(l.WorstLevel), severityRank(r.WorstLevel)
+			if li != ri {
+				return li < ri
+			}
+		case JobSortScoreDesc:
+			ls, rs := derefIntOr(l.Score, -1), derefIntOr(r.Score, -1)
+			if ls != rs {
+				return ls > rs
+			}
+		case JobSortScoreAsc:
+			ls, rs := derefIntOr(l.Score, 9999), derefIntOr(r.Score, 9999)
+			if ls != rs {
+				return ls < rs
+			}
+		case JobSortDurationDesc:
+			ld, rd := l.DurationMs, r.DurationMs
+			if ld != rd {
+				return ld > rd
+			}
+		case JobSortDurationAsc:
+			ld, rd := l.DurationMs, r.DurationMs
+			if ld != rd {
+				return ld < rd
+			}
+		case JobSortEntryCountDesc:
+			if l.EntryCount != r.EntryCount {
+				return l.EntryCount > r.EntryCount
+			}
+		case JobSortEntryCountAsc:
+			if l.EntryCount != r.EntryCount {
+				return l.EntryCount < r.EntryCount
 			}
 		}
 		if !l.FinishedAt.Equal(r.FinishedAt) {

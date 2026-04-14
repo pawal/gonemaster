@@ -840,7 +840,7 @@ func (s *SQLJobStore) ListDomains(filter DomainFilter) DomainList {
 
 	query := `SELECT id, name, latest_run_id, latest_run_at, latest_status,
 		latest_level, latest_score, latest_grade, created_at, run_count FROM domains` + where +
-		" ORDER BY name ASC LIMIT " + limitPH + " OFFSET " + offsetPH
+		" ORDER BY " + sqlDomainOrderBy(filter.Sort) + " LIMIT " + limitPH + " OFFSET " + offsetPH
 	rows, err := s.db.Query(query, dataArgs...)
 	if err != nil {
 		return DomainList{Limit: limit}
@@ -1300,6 +1300,32 @@ func (s *SQLJobStore) GetRunByPublicID(publicID string) (Run, bool) {
 	return run, true
 }
 
+// sqlDomainOrderBy returns the ORDER BY clause for the domains table.
+func sqlDomainOrderBy(sort DomainSort) string {
+	switch sort {
+	case DomainSortNameDesc:
+		return "LOWER(name) DESC, id ASC"
+	case DomainSortLevelDesc:
+		return "CASE latest_level WHEN 'CRITICAL' THEN 4 WHEN 'ERROR' THEN 3 WHEN 'WARNING' THEN 2 WHEN 'NOTICE' THEN 1 ELSE 0 END DESC, LOWER(name) ASC, id ASC"
+	case DomainSortLevelAsc:
+		return "CASE latest_level WHEN 'CRITICAL' THEN 4 WHEN 'ERROR' THEN 3 WHEN 'WARNING' THEN 2 WHEN 'NOTICE' THEN 1 ELSE 0 END ASC, LOWER(name) ASC, id ASC"
+	case DomainSortScoreDesc:
+		return "COALESCE(latest_score, -1) DESC, LOWER(name) ASC, id ASC"
+	case DomainSortScoreAsc:
+		return "COALESCE(latest_score, 9999) ASC, LOWER(name) ASC, id ASC"
+	case DomainSortLastRunDesc:
+		return "COALESCE(latest_run_at, '') DESC, LOWER(name) ASC, id ASC"
+	case DomainSortLastRunAsc:
+		return "COALESCE(latest_run_at, '') ASC, LOWER(name) ASC, id ASC"
+	case DomainSortRunCountDesc:
+		return "run_count DESC, LOWER(name) ASC, id ASC"
+	case DomainSortRunCountAsc:
+		return "run_count ASC, LOWER(name) ASC, id ASC"
+	default:
+		return "LOWER(name) ASC, id ASC"
+	}
+}
+
 // sqlRunOrderBy returns the ORDER BY clause for the runs table.
 func sqlRunOrderBy(sort JobSort) string {
 	switch sort {
@@ -1323,6 +1349,26 @@ func sqlRunOrderBy(sort JobSort) string {
 		return "(sev_error + sev_critical) DESC, sev_critical DESC, finished_at DESC, id ASC"
 	case JobSortCriticalDesc:
 		return "sev_critical DESC, (sev_error + sev_critical) DESC, finished_at DESC, id ASC"
+	case JobSortFinishedAtDesc:
+		return "finished_at DESC, id ASC"
+	case JobSortFinishedAtAsc:
+		return "finished_at ASC, id ASC"
+	case JobSortWorstLevelDesc:
+		return "CASE worst_level WHEN 'CRITICAL' THEN 4 WHEN 'ERROR' THEN 3 WHEN 'WARNING' THEN 2 WHEN 'NOTICE' THEN 1 ELSE 0 END DESC, finished_at DESC, id ASC"
+	case JobSortWorstLevelAsc:
+		return "CASE worst_level WHEN 'CRITICAL' THEN 4 WHEN 'ERROR' THEN 3 WHEN 'WARNING' THEN 2 WHEN 'NOTICE' THEN 1 ELSE 0 END ASC, finished_at DESC, id ASC"
+	case JobSortScoreDesc:
+		return "COALESCE(score, -1) DESC, finished_at DESC, id ASC"
+	case JobSortScoreAsc:
+		return "COALESCE(score, 9999) ASC, finished_at DESC, id ASC"
+	case JobSortDurationDesc:
+		return "COALESCE(duration_ms, -1) DESC, finished_at DESC, id ASC"
+	case JobSortDurationAsc:
+		return "COALESCE(duration_ms, 9999999) ASC, finished_at DESC, id ASC"
+	case JobSortEntryCountDesc:
+		return "entry_count DESC, finished_at DESC, id ASC"
+	case JobSortEntryCountAsc:
+		return "entry_count ASC, finished_at DESC, id ASC"
 	default:
 		return "finished_at DESC, id ASC"
 	}

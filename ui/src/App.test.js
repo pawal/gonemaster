@@ -3451,8 +3451,10 @@ describe("App", () => {
     });
 
     it("sorts the domains table when clicking column headers", async () => {
+      const fetchedURLs = [];
       global.fetch.mockImplementation((url) => {
         const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        fetchedURLs.push(value);
         if (value.includes("/api/v1/domains")) {
           return jsonResponse({
             items: [
@@ -3474,11 +3476,21 @@ describe("App", () => {
       await within(domainsPanel).findByText("zeta.example");
       const table = within(domainsPanel).getByRole("table");
 
-      await fireEvent.click(within(table).getByRole("button", { name: "Domain" }));
-      expect(tableColumnValues(table)).toEqual(["alpha.example", "beta.example", "zeta.example"]);
+      const flushFetches = () => new Promise((r) => setTimeout(r, 10));
 
-      await fireEvent.click(within(table).getByRole("button", { name: "Runs" }));
-      expect(tableColumnValues(table)).toEqual(["beta.example", "alpha.example", "zeta.example"]);
+      // Click "Domain" column — should trigger a refetch with sort=name_asc.
+      fetchedURLs.length = 0;
+      await fireEvent.click(within(table).getByRole("button", { name: "Domain" }));
+      await flushFetches();
+      expect(fetchedURLs.some((u) => u.includes("sort=name_asc"))).toBe(true);
+
+      // Click "Runs" column — should trigger a refetch with sort=run_count_desc.
+      // Re-query the table in case re-render replaced DOM nodes.
+      const table2 = within(domainsPanel).getByRole("table");
+      fetchedURLs.length = 0;
+      await fireEvent.click(within(table2).getByRole("button", { name: "Runs" }));
+      await flushFetches();
+      expect(fetchedURLs.some((u) => u.includes("sort=run_count_desc"))).toBe(true);
 
       unmount();
     });

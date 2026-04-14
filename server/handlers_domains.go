@@ -7,7 +7,7 @@ import (
 )
 
 // handleListDomains handles GET /api/v1/domains.
-// Accepts query params: tag, name, level, limit, offset.
+// Accepts query params: tag, name, level, limit, offset, sort.
 func (s *Server) handleListDomains(w http.ResponseWriter, r *http.Request) {
 	filter := DomainFilter{Limit: 100}
 	q := r.URL.Query()
@@ -15,6 +15,7 @@ func (s *Server) handleListDomains(w http.ResponseWriter, r *http.Request) {
 	filter.Name = strings.TrimSpace(q.Get("name"))
 	filter.LatestLevel = strings.TrimSpace(q.Get("level"))
 	filter.MinLevel = strings.TrimSpace(q.Get("min_level"))
+	filter.Sort = DomainSort(strings.TrimSpace(q.Get("sort")))
 
 	if limitRaw := strings.TrimSpace(q.Get("limit")); limitRaw != "" {
 		v, err := strconv.Atoi(limitRaw)
@@ -65,6 +66,7 @@ func (s *Server) handleGetDomain(w http.ResponseWriter, r *http.Request) {
 
 // handleGetDomainRuns handles GET /api/v1/domains/{id}/runs.
 // Returns paginated run history for the domain.
+// Accepts query params: limit, offset, sort.
 func (s *Server) handleGetDomainRuns(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseDomainID(w, r)
 	if !ok {
@@ -75,16 +77,16 @@ func (s *Server) handleGetDomainRuns(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	limit := 100
-	offset := 0
+	filter := RunFilter{DomainID: id, Limit: 100}
 	q := r.URL.Query()
+	filter.Sort = JobSort(strings.TrimSpace(q.Get("sort")))
 	if limitRaw := strings.TrimSpace(q.Get("limit")); limitRaw != "" {
 		v, err := strconv.Atoi(limitRaw)
 		if err != nil || v <= 0 || v > maxListLimit {
 			writeError(w, http.StatusBadRequest, "invalid_limit", "limit must be between 1 and 500", nil)
 			return
 		}
-		limit = v
+		filter.Limit = v
 	}
 	if offsetRaw := strings.TrimSpace(q.Get("offset")); offsetRaw != "" {
 		v, err := strconv.Atoi(offsetRaw)
@@ -92,10 +94,10 @@ func (s *Server) handleGetDomainRuns(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, "invalid_offset", "offset must be a non-negative integer", nil)
 			return
 		}
-		offset = v
+		filter.Offset = v
 	}
 
-	list := s.store.ListRunsByDomain(id, limit, offset)
+	list := s.store.ListRuns(filter)
 	if !s.cfg.ShowScoreAdmin {
 		for i := range list.Items {
 			list.Items[i].Score = nil

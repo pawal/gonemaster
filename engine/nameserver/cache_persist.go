@@ -23,18 +23,26 @@ const (
 
 // PacketCacheFile is the portable representation of nameserver query cache data.
 type PacketCacheFile struct {
-	Format  string             `json:"format"`
-	Version int                `json:"version"`
+	// Format identifies the on-disk file format.
+	Format string `json:"format"`
+	// Version identifies the schema version for compatibility checks.
+	Version int `json:"version"`
+	// Entries contains the serialized per-query cache entries.
 	Entries []PacketCacheEntry `json:"entries"`
 }
 
 // PacketCacheEntry stores one cached query result for one nameserver address.
 type PacketCacheEntry struct {
-	Address    string `json:"address"`
-	Key        string `json:"key"`
-	Message    string `json:"message,omitempty"`
+	// Address is the nameserver address that owns the cache entry.
+	Address string `json:"address"`
+	// Key is the normalized packet cache lookup key.
+	Key string `json:"key"`
+	// Message is the base64-encoded wire-format DNS message.
+	Message string `json:"message,omitempty"`
+	// AnswerFrom records the responder address captured with the packet.
 	AnswerFrom string `json:"answer_from,omitempty"`
-	NoMessage  bool   `json:"no_message,omitempty"`
+	// NoMessage marks a cached nil response entry.
+	NoMessage bool `json:"no_message,omitempty"`
 }
 
 // ExportPacketCache returns a deterministic snapshot of query cache entries.

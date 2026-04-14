@@ -13,11 +13,16 @@ import (
 
 // Packet wraps a DNS message and exposes helpers mirroring the Perl engine API.
 type Packet struct {
-	Msg        *dns.Msg
+	// Msg is the decoded DNS message.
+	Msg *dns.Msg
+	// AnswerFrom records the responder address used for the reply.
 	AnswerFrom string
-	QueryTime  time.Duration
-	Timestamp  time.Time
-	Log        *logger.Logger
+	// QueryTime is the network round-trip time for the exchange.
+	QueryTime time.Duration
+	// Timestamp is when the packet was received or synthesized.
+	Timestamp time.Time
+	// Log is the logger associated with the query context.
+	Log *logger.Logger
 }
 
 // New wraps a dns.Msg into a Packet helper.

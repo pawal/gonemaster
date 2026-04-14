@@ -10,8 +10,10 @@ type Task[T any] func(context.Context) (T, error)
 
 // Result captures the outcome of a task.
 type Result[T any] struct {
+	// Value is the task result value.
 	Value T
-	Err   error
+	// Err is the task error, if any.
+	Err error
 }
 
 // Options controls task execution behavior.

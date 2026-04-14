@@ -12,7 +12,9 @@ type Task func(context.Context, *logger.Logger) error
 
 // Options controls execution behavior for Run.
 type Options struct {
-	Parallel      int
+	// Parallel bounds the number of concurrent task workers.
+	Parallel int
+	// CancelOnError stops scheduling more work after the first error.
 	CancelOnError bool
 }
 

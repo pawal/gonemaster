@@ -137,6 +137,7 @@ type BlocklistError struct {
 	msg string
 }
 
+// Error returns the human-readable blocklist format error.
 func (e *BlocklistError) Error() string { return e.msg }
 
 // BKHASH120 computes the badkeys truncated hash for a key's numeric value.
@@ -152,7 +153,9 @@ func BKHASH120(val *big.Int) [15]byte {
 
 // CheckResult holds the result of a blocklist lookup.
 type CheckResult struct {
-	SourceID   int
+	// SourceID is the badkeys source identifier encoded in the blocklist.
+	SourceID int
+	// SourceName is the resolved human-readable source name.
 	SourceName string
 }
 

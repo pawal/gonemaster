@@ -20,9 +20,12 @@ import (
 
 // Nameserver represents a DNS server endpoint.
 type Nameserver struct {
-	Name    dnsname.Name
+	// Name is the canonical nameserver host name.
+	Name dnsname.Name
+	// Address is the endpoint IP address.
 	Address netip.Addr
-	Client  *transport.Client
+	// Client performs network exchanges for this nameserver.
+	Client *transport.Client
 	state   *nsState
 	cache   *CacheStore
 	log     *logger.Logger
@@ -32,16 +35,27 @@ const systemModuleName = "System"
 
 // QueryOptions configures per-query settings that mirror Perl flags.
 type QueryOptions struct {
-	Class                string
-	UseVC                *bool
-	Recurse              *bool
-	Fallback             *bool
-	Retry                *int
-	Retrans              *time.Duration
-	Timeout              *time.Duration
-	DNSSEC               *bool
-	EDNSSize             *uint16
-	EDNSDetails          *transport.EDNSDetails
+	// Class sets the DNS query class, defaulting to IN.
+	Class string
+	// UseVC overrides whether the query uses TCP.
+	UseVC *bool
+	// Recurse overrides the RD bit.
+	Recurse *bool
+	// Fallback overrides UDP-to-TCP fallback on truncation.
+	Fallback *bool
+	// Retry overrides the retry count.
+	Retry *int
+	// Retrans overrides the retransmission interval.
+	Retrans *time.Duration
+	// Timeout overrides the per-query timeout.
+	Timeout *time.Duration
+	// DNSSEC overrides DNSSEC/DO-bit behavior.
+	DNSSEC *bool
+	// EDNSSize overrides the advertised EDNS UDP payload size.
+	EDNSSize *uint16
+	// EDNSDetails provides explicit EDNS header and option overrides.
+	EDNSDetails *transport.EDNSDetails
+	// BlacklistingDisabled bypasses temporary blacklisting for this query.
 	BlacklistingDisabled bool
 }
 

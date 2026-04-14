@@ -28,16 +28,22 @@ var undelegatedDigestLengths = map[int]bool{
 // UndelegatedNameserver represents one undelegated nameserver input row.
 // Name is required and IP is optional.
 type UndelegatedNameserver struct {
+	// Name is the authoritative nameserver host name.
 	Name string
-	IP   string
+	// IP optionally pins the nameserver to a specific address.
+	IP string
 }
 
 // UndelegatedDSInfo represents one undelegated DS input row.
 type UndelegatedDSInfo struct {
-	KeyTag     int
-	Algorithm  int
+	// KeyTag is the DS key tag value.
+	KeyTag int
+	// Algorithm is the DNSSEC algorithm number.
+	Algorithm int
+	// DigestType is the DS digest type number.
 	DigestType int
-	Digest     string
+	// Digest is the uppercase hexadecimal digest text.
+	Digest string
 }
 
 // ParseUndelegatedNameserver parses "name[/ip]" into an undelegated nameserver.

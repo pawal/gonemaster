@@ -9,14 +9,19 @@ import (
 type KeyType int
 
 const (
+	// KeyTypeRSA identifies RSA DNSKEY material.
 	KeyTypeRSA   KeyType = iota // Algorithms 1, 5, 7, 8, 10
+	// KeyTypeDSA identifies DSA DNSKEY material.
 	KeyTypeDSA                  // Algorithms 3, 6
+	// KeyTypeECDSA identifies ECDSA DNSKEY material.
 	KeyTypeECDSA                // Algorithms 13, 14
+	// KeyTypeEdDSA identifies EdDSA DNSKEY material.
 	KeyTypeEdDSA                // Algorithms 15, 16
 )
 
 // ParsedKey holds the extracted numeric values from a DNSKEY wire-format key.
 type ParsedKey struct {
+	// Type is the parsed key family.
 	Type KeyType
 	// N is the RSA modulus (RSA only).
 	N *big.Int

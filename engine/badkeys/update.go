@@ -24,9 +24,13 @@ const (
 
 // Metadata is the subset of badkeysdata.json needed for blocklist management.
 type Metadata struct {
-	BKFormat        int    `json:"bkformat"`
-	Deprecated      any    `json:"deprecated,omitempty"`
-	BlocklistURL    string `json:"blocklist_url"`
+	// BKFormat is the badkeys blocklist format version.
+	BKFormat int `json:"bkformat"`
+	// Deprecated carries upstream deprecation metadata when present.
+	Deprecated any `json:"deprecated,omitempty"`
+	// BlocklistURL is the download URL for the compressed blocklist.
+	BlocklistURL string `json:"blocklist_url"`
+	// BlocklistSHA256 is the expected SHA-256 of the uncompressed blocklist.
 	BlocklistSHA256 string `json:"blocklist_sha256"`
 }
 

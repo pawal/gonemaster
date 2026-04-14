@@ -7,7 +7,9 @@ import (
 
 // Error represents one domain-normalization validation issue.
 type Error struct {
-	Tag    string
+	// Tag is the stable normalization error code.
+	Tag string
+	// Params contains interpolation values for the error message template.
 	Params map[string]string
 }
 

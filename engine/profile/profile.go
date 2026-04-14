@@ -13,39 +13,62 @@ var defaultProfileJSON = share.ProfileJSON
 
 // Profile mirrors the Zonemaster profile data and tracks which properties are set.
 type Profile struct {
-	Resolver      ResolverSettings                      `json:"resolver"`
-	Net           NetSettings                           `json:"net"`
-	NoNetwork     bool                                  `json:"no_network"`
-	Cache         map[string]map[string]any             `json:"cache"`
-	ASNDB         ASNDBSettings                         `json:"asn_db"`
-	Badkeys       BadkeysSettings                       `json:"badkeys"`
-	LogFilter     map[string]map[string][]LogFilterRule `json:"logfilter"`
-	TestLevels    map[string]map[string]string          `json:"test_levels"`
-	TestCases     []any                                 `json:"test_cases"`
-	TestCasesVars TestCasesVars                         `json:"test_cases_vars"`
+	// Resolver contains resolver-specific profile settings.
+	Resolver ResolverSettings `json:"resolver"`
+	// Net controls IPv4 and IPv6 enablement.
+	Net NetSettings `json:"net"`
+	// NoNetwork blocks network access during a run when true.
+	NoNetwork bool `json:"no_network"`
+	// Cache stores cache-related profile settings keyed by cache area.
+	Cache map[string]map[string]any `json:"cache"`
+	// ASNDB configures ASN lookup behavior and upstream sources.
+	ASNDB ASNDBSettings `json:"asn_db"`
+	// Badkeys configures badkeys blocklist loading.
+	Badkeys BadkeysSettings `json:"badkeys"`
+	// LogFilter defines per-module/tag log filtering rules.
+	LogFilter map[string]map[string][]LogFilterRule `json:"logfilter"`
+	// TestLevels overrides log levels per module and tag.
+	TestLevels map[string]map[string]string `json:"test_levels"`
+	// TestCases limits the enabled testcase set when non-empty.
+	TestCases []any `json:"test_cases"`
+	// TestCasesVars holds testcase-specific numeric tunables.
+	TestCasesVars TestCasesVars `json:"test_cases_vars"`
 
 	set map[string]bool
 }
 
 // ResolverSettings holds resolver-specific profile settings.
 type ResolverSettings struct {
+	// Defaults contains default resolver behavior for queries.
 	Defaults ResolverDefaults `json:"defaults"`
-	Source4  string           `json:"source4"`
-	Source6  string           `json:"source6"`
+	// Source4 selects the IPv4 source address for outbound queries.
+	Source4 string `json:"source4"`
+	// Source6 selects the IPv6 source address for outbound queries.
+	Source6 string `json:"source6"`
 }
 
 // ResolverDefaults mirrors resolver defaults from the profile.
 type ResolverDefaults struct {
-	Debug     bool `json:"debug"`
-	IgnTC     bool `json:"igntc"`
-	Fallback  bool `json:"fallback"`
-	Recurse   bool `json:"recurse"`
-	Retrans   int  `json:"retrans"`
-	Retry     int  `json:"retry"`
-	Parallel  int  `json:"parallel"`
+	// Debug enables resolver debug behavior.
+	Debug bool `json:"debug"`
+	// IgnTC ignores TC and avoids retrying over TCP when true.
+	IgnTC bool `json:"igntc"`
+	// Fallback enables UDP-to-TCP fallback on truncation.
+	Fallback bool `json:"fallback"`
+	// Recurse sets the RD bit on outbound queries.
+	Recurse bool `json:"recurse"`
+	// Retrans sets the retransmission interval in seconds.
+	Retrans int `json:"retrans"`
+	// Retry sets the number of retry attempts.
+	Retry int `json:"retry"`
+	// Parallel sets the number of parallel resolver workers.
+	Parallel int `json:"parallel"`
+	// Unordered allows unordered resolver result handling.
 	Unordered bool `json:"unordered"`
-	UseVC     bool `json:"usevc"`
-	Timeout   int  `json:"timeout"`
+	// UseVC forces TCP queries by default.
+	UseVC bool `json:"usevc"`
+	// Timeout sets the per-query timeout in seconds.
+	Timeout int `json:"timeout"`
 	// ErrorCacheTTL sets the duration (seconds) to skip queries after network errors.
 	ErrorCacheTTL int `json:"error_cache_ttl"`
 	// PositiveCacheTTL sets the duration (seconds) to cache positive responses.
@@ -61,68 +84,90 @@ type ResolverDefaults struct {
 
 // NetSettings holds IP stack enablement flags.
 type NetSettings struct {
+	// IPv4 enables IPv4 transport when true.
 	IPv4 bool `json:"ipv4"`
+	// IPv6 enables IPv6 transport when true.
 	IPv6 bool `json:"ipv6"`
 }
 
 // ASNDBSettings holds ASN lookup defaults.
 type ASNDBSettings struct {
-	Style   string              `json:"style"`
+	// Style selects the ASN backend implementation.
+	Style string `json:"style"`
+	// Sources lists lookup endpoints per backend style.
 	Sources map[string][]string `json:"sources"`
 }
 
 // BadkeysSettings holds badkeys blocklist configuration.
 type BadkeysSettings struct {
+	// Path points to the badkeys data directory or file set.
 	Path string `json:"path"`
 }
 
 // TestCasesVars stores per-testcase tunables.
 type TestCasesVars struct {
+	// DNSSEC04 holds tunables for DNSSEC04.
 	DNSSEC04 DNSSEC04Vars `json:"dnssec04"`
-	Zone02   Zone02Vars   `json:"zone02"`
-	Zone04   Zone04Vars   `json:"zone04"`
-	Zone05   Zone05Vars   `json:"zone05"`
-	Zone06   Zone06Vars   `json:"zone06"`
-	Zone13   Zone13Vars   `json:"zone13"`
+	// Zone02 holds tunables for Zone02.
+	Zone02 Zone02Vars `json:"zone02"`
+	// Zone04 holds tunables for Zone04.
+	Zone04 Zone04Vars `json:"zone04"`
+	// Zone05 holds tunables for Zone05.
+	Zone05 Zone05Vars `json:"zone05"`
+	// Zone06 holds tunables for Zone06.
+	Zone06 Zone06Vars `json:"zone06"`
+	// Zone13 holds tunables for Zone13.
+	Zone13 Zone13Vars `json:"zone13"`
 }
 
 // DNSSEC04Vars holds profile tunables for DNSSEC04 checks.
 type DNSSEC04Vars struct {
+	// RemainingShort is the minimum acceptable remaining RRSIG lifetime.
 	RemainingShort int `json:"REMAINING_SHORT"`
-	RemainingLong  int `json:"REMAINING_LONG"`
-	DurationLong   int `json:"DURATION_LONG"`
+	// RemainingLong is the threshold for long remaining RRSIG lifetime.
+	RemainingLong int `json:"REMAINING_LONG"`
+	// DurationLong is the threshold for long total RRSIG validity.
+	DurationLong int `json:"DURATION_LONG"`
 }
 
 // Zone02Vars holds profile tunables for Zone02 checks.
 type Zone02Vars struct {
+	// SOARefreshMinimumValue is the minimum acceptable SOA refresh value.
 	SOARefreshMinimumValue int `json:"SOA_REFRESH_MINIMUM_VALUE"`
 }
 
 // Zone04Vars holds profile tunables for Zone04 checks.
 type Zone04Vars struct {
+	// SOARetryMinimumValue is the minimum acceptable SOA retry value.
 	SOARetryMinimumValue int `json:"SOA_RETRY_MINIMUM_VALUE"`
 }
 
 // Zone05Vars holds profile tunables for Zone05 checks.
 type Zone05Vars struct {
+	// SOAExpireMinimumValue is the minimum acceptable SOA expire value.
 	SOAExpireMinimumValue int `json:"SOA_EXPIRE_MINIMUM_VALUE"`
 }
 
 // Zone06Vars holds profile tunables for Zone06 checks.
 type Zone06Vars struct {
+	// SOADefaultTTLMaximumValue is the maximum allowed SOA default TTL.
 	SOADefaultTTLMaximumValue int `json:"SOA_DEFAULT_TTL_MAXIMUM_VALUE"`
+	// SOADefaultTTLMinimumValue is the minimum allowed SOA default TTL.
 	SOADefaultTTLMinimumValue int `json:"SOA_DEFAULT_TTL_MINIMUM_VALUE"`
 }
 
 // Zone13Vars holds profile tunables for Zone13 (SPF DNS lookup count) checks.
 type Zone13Vars struct {
+	// SPFLookupLimit is the maximum permitted SPF DNS lookup count.
 	SPFLookupLimit int `json:"SPF_LOOKUP_LIMIT"`
 }
 
 // LogFilterRule mirrors the logfilter rule structure.
 type LogFilterRule struct {
+	// When describes the match condition for the rule.
 	When map[string]any `json:"when"`
-	Set  string         `json:"set"`
+	// Set names the filter action to apply when the rule matches.
+	Set string `json:"set"`
 }
 
 var effective = mustDefault()

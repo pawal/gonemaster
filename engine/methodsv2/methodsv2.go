@@ -20,8 +20,11 @@ import (
 
 // NSItem represents either a nameserver with an address or a bare nameserver name.
 type NSItem struct {
-	Name       dnsname.Name
-	Address    netip.Addr
+	// Name is the canonical nameserver host name.
+	Name dnsname.Name
+	// Address is the nameserver IP address when available.
+	Address netip.Addr
+	// HasAddress reports whether Address is populated.
 	HasAddress bool
 }
 

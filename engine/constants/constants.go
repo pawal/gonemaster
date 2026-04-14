@@ -82,9 +82,13 @@ const (
 
 // SpecialIPBlock describes one IANA special-purpose IP prefix.
 type SpecialIPBlock struct {
-	Prefix            netip.Prefix
-	Name              string
-	Reference         string
+	// Prefix is the special-purpose network prefix.
+	Prefix netip.Prefix
+	// Name is the IANA registry name for the prefix.
+	Name string
+	// Reference is the registry reference text.
+	Reference string
+	// GloballyReachable mirrors the IANA globally reachable flag.
 	GloballyReachable string
 }
 

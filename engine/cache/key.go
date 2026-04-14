@@ -13,19 +13,31 @@ import (
 // The key is intentionally sensitive to transport and EDNS settings,
 // since they can affect response size, truncation, and DNSSEC behavior.
 type KeyParts struct {
+	// ServerAddr is the remote nameserver address.
 	ServerAddr string
-	Name       string
-	Qtype      string
-	Qclass     string
-	DNSSEC     bool
-	Recurse    bool
-	UseVC      bool
+	// Name is the queried owner name.
+	Name string
+	// Qtype is the queried RR type.
+	Qtype string
+	// Qclass is the queried RR class.
+	Qclass string
+	// DNSSEC records whether DNSSEC behavior was enabled.
+	DNSSEC bool
+	// Recurse records whether the RD bit was set.
+	Recurse bool
+	// UseVC records whether TCP transport was used.
+	UseVC bool
 
-	EDNSSize    int
+	// EDNSSize is the advertised EDNS UDP payload size.
+	EDNSSize int
+	// EDNSVersion is the EDNS version override.
 	EDNSVersion *uint8
-	EDNSZ       *uint16
-	EDNSRcode   *uint8
-	EDNSData    []dns.EDNS0
+	// EDNSZ is the raw EDNS Z flag value.
+	EDNSZ *uint16
+	// EDNSRcode is the EDNS extended response code.
+	EDNSRcode *uint8
+	// EDNSData is the EDNS0 option list affecting the response shape.
+	EDNSData []dns.EDNS0
 }
 
 // BuildKey returns a stable cache key string for the given parts.

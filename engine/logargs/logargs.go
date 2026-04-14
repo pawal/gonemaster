@@ -15,7 +15,9 @@ const KeyAddress = "address"
 
 // Server represents a nameserver endpoint using canonical key names.
 type Server struct {
-	NS      string
+	// NS is the normalized nameserver host name.
+	NS string
+	// Address is the endpoint IP address.
 	Address string
 }
 

@@ -30,8 +30,10 @@ const (
 // HasResponse means the resolver received a DNS response message.
 // ErrorKind classifies the error when HasResponse is false.
 type Result struct {
+	// HasResponse reports whether a DNS response message was received.
 	HasResponse bool
-	ErrorKind   ErrorKind
+	// ErrorKind classifies the failure when no response was received.
+	ErrorKind ErrorKind
 }
 
 // Decide applies the global caching strategy for DNS query outcomes.

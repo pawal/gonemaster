@@ -41,8 +41,11 @@ type cacheMetrics struct {
 
 // CacheMetrics exposes aggregate cache hit/miss/eviction counters.
 type CacheMetrics struct {
-	Hits      uint64
-	Misses    uint64
+	// Hits is the number of cache hits observed.
+	Hits uint64
+	// Misses is the number of cache misses observed.
+	Misses uint64
+	// Evictions is the number of cached entries evicted.
 	Evictions uint64
 }
 
@@ -344,10 +347,14 @@ type delegation struct {
 
 // DSData represents parameters for a fake DS record.
 type DSData struct {
-	KeyTag     uint16
-	Algorithm  uint8
+	// KeyTag is the DS key tag value.
+	KeyTag uint16
+	// Algorithm is the DNSSEC algorithm number.
+	Algorithm uint8
+	// DigestType is the DS digest type number.
 	DigestType uint8
-	Digest     string
+	// Digest is the uppercase hexadecimal digest text.
+	Digest string
 }
 
 type nsState struct {

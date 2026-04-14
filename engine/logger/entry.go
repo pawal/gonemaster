@@ -24,11 +24,16 @@ var defaultStartTime = time.Now()
 
 // Entry represents a single log entry.
 type Entry struct {
-	Tag       string
-	Args      map[string]any
+	// Tag is the message tag identifier.
+	Tag string
+	// Args holds structured arguments for the entry.
+	Args map[string]any
+	// Timestamp is seconds elapsed since the logger start time.
 	Timestamp float64
-	Testcase  string
-	Module    string
+	// Testcase is the testcase identifier that emitted the entry.
+	Testcase string
+	// Module is the engine module that emitted the entry.
+	Module string
 
 	level       string
 	levelSet    bool

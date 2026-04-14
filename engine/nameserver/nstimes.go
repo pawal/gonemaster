@@ -8,13 +8,20 @@ import (
 
 // NSTimingStats holds computed statistics for a single nameserver's query times.
 type NSTimingStats struct {
-	Max    float64
-	Min    float64
-	Avg    float64
+	// Max is the largest observed query time in milliseconds.
+	Max float64
+	// Min is the smallest observed query time in milliseconds.
+	Min float64
+	// Avg is the arithmetic mean query time in milliseconds.
+	Avg float64
+	// Stddev is the standard deviation of query times in milliseconds.
 	Stddev float64
+	// Median is the median query time in milliseconds.
 	Median float64
-	Total  float64
-	Count  int
+	// Total is the sum of all query times in milliseconds.
+	Total float64
+	// Count is the number of samples included in the statistics.
+	Count int
 }
 
 // ComputeTimingStats calculates timing statistics from a slice of durations.

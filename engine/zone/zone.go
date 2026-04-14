@@ -19,7 +19,8 @@ import (
 
 // Zone represents a DNS zone under test.
 type Zone struct {
-	Name     dnsname.Name
+	// Name is the canonical zone name.
+	Name dnsname.Name
 	recursor *recursor.Recursor
 
 	parent    *Zone

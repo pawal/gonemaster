@@ -18,17 +18,28 @@ const defaultTimeout = 5 * time.Second
 
 // Client performs DNS exchanges with configurable behavior.
 type Client struct {
-	Timeout          time.Duration
-	Retries          int
-	Retrans          time.Duration
-	UseTCP           bool
-	Fallback         bool
-	EDNSSize         uint16
-	DNSSEC           bool
-	EDNSDetails      *EDNSDetails
+	// Timeout is the per-attempt timeout.
+	Timeout time.Duration
+	// Retries is the number of retries after the initial attempt.
+	Retries int
+	// Retrans is the retransmission interval between retries.
+	Retrans time.Duration
+	// UseTCP forces queries over TCP.
+	UseTCP bool
+	// Fallback retries truncated UDP responses over TCP when true.
+	Fallback bool
+	// EDNSSize sets the advertised EDNS UDP payload size.
+	EDNSSize uint16
+	// DNSSEC enables EDNS DO handling.
+	DNSSEC bool
+	// EDNSDetails provides explicit EDNS header and option overrides.
+	EDNSDetails *EDNSDetails
+	// RecursionDesired controls the RD bit.
 	RecursionDesired bool
-	SourceIP         string
-	SourcePort       int
+	// SourceIP selects the local source IP address.
+	SourceIP string
+	// SourcePort selects the local source port.
+	SourcePort int
 
 	useTCPSpecified           bool
 	timeoutSpecified          bool
@@ -41,14 +52,19 @@ type Client struct {
 
 // EDNSDetails captures explicit EDNS settings and overrides.
 type EDNSDetails struct {
-	Do      *bool
-	Size    *uint16
+	// Do overrides the EDNS DO bit when non-nil.
+	Do *bool
+	// Size overrides the EDNS UDP payload size when non-nil.
+	Size *uint16
+	// Version overrides the EDNS version when non-nil.
 	Version *uint8
 	// Z carries the EDNS Z flags (low 15 bits). When set, prepareMessage encodes
 	// EDNS using an explicit OPT RR so Z is preserved on the wire.
-	Z     *uint16
+	Z *uint16
+	// Rcode overrides the EDNS extended response code when non-nil.
 	Rcode *uint8
-	Data  []dns.EDNS0 // pseudo-section EDNS0 sub-options to append (e.g. *dns.NSID)
+	// Data appends EDNS0 sub-options such as NSID or COOKIE.
+	Data []dns.EDNS0
 }
 
 // BuildQuery constructs a query message with common defaults.

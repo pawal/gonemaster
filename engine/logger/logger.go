@@ -20,7 +20,8 @@ var TestCaseName = "Unspecified"
 type Logger struct {
 	mu              sync.Mutex
 	entries         []*Entry
-	Callback        func(*Entry) error
+	// Callback is invoked for each appended entry when non-nil.
+	Callback func(*Entry) error
 	callbackRunning bool
 	pending         []*Entry
 	startTime       time.Time

@@ -27,10 +27,14 @@ type Resolver interface {
 
 // Result captures ASN lookup data and status.
 type Result struct {
-	ASNs   []int
+	// ASNs is the resolved ASN list for the queried address.
+	ASNs []int
+	// Prefix is the most specific routed prefix covering the address.
 	Prefix *netip.Prefix
-	Raw    string
-	Code   string
+	// Raw is the backend-specific raw response line used to build the result.
+	Raw string
+	// Code summarizes the lookup outcome.
+	Code string
 }
 
 const (

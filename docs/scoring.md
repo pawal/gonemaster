@@ -60,6 +60,7 @@ Some tags warrant a penalty disproportionate to their log level. The
 | `NO_IPV6_NS_CHILD`          | NOTICE  | **20**   | Zone unreachable over IPv6         |
 | `NO_IPV6_NS_DEL`            | NOTICE  | **20**   | Delegation has no IPv6 addresses   |
 | `N15_SOFTWARE_VERSION`       | NOTICE  | **0**    | Cosmetic - zone works correctly    |
+| `N16_HAS_NSID`               | NOTICE  | **0**    | Informational - explicit NSID reply|
 
 Setting a tag penalty to 0 suppresses it entirely.
 
@@ -223,7 +224,8 @@ or the `scoring_config_path` server config key.
     "DS07_NO_DS_FOR_SIGNED_ZONE": 20,
     "NO_IPV6_NS_CHILD":           20,
     "NO_IPV6_NS_DEL":             20,
-    "N15_SOFTWARE_VERSION":        0
+    "N15_SOFTWARE_VERSION":        0,
+    "N16_HAS_NSID":                0
   },
   "grade_bands": [
     { "grade": "A", "min_score": 90 },

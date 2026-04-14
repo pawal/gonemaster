@@ -118,6 +118,9 @@ func DefaultConfig() Config {
 			// via version.bind. This is a cosmetic privacy/hardening notice — the
 			// zone works correctly. No penalty.
 			"N15_SOFTWARE_VERSION": 0,
+			// N16_HAS_NSID: nameserver returns an NSID value when explicitly asked.
+			// This is informational only and should not affect the zone score.
+			"N16_HAS_NSID": 0,
 		},
 		GradeBands: []GradeBand{
 			{Grade: "A", MinScore: 90},

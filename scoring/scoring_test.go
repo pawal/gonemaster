@@ -571,6 +571,23 @@ func TestCompute_N15SoftwareVersionNopenalty(t *testing.T) {
 	}
 }
 
+func TestCompute_N16HasNSIDNopenalty(t *testing.T) {
+	// N16_HAS_NSID is NOTICE but should be informational only when a server
+	// returns NSID in response to an explicit NSID query.
+	entries := []Entry{
+		e("NAMESERVER", "N16_HAS_NSID", "NOTICE"),
+		e("NAMESERVER", "N16_HAS_NSID", "NOTICE"),
+	}
+	r := Compute("example.se", entries, cfg)
+	if r.Score != 100 {
+		t.Errorf("expected score 100 with N16_HAS_NSID entries, got %d", r.Score)
+	}
+	cat := r.Categories["nameserver_health"]
+	if cat.Penalties != 0 {
+		t.Errorf("expected nameserver_health penalties 0 for N16_HAS_NSID, got %d", cat.Penalties)
+	}
+}
+
 func TestCompute_TagPenaltyNotAffectingOtherTags(t *testing.T) {
 	// A regular WARNING tag should still use the severity penalty (5 pts).
 	entries := []Entry{

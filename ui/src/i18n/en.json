@@ -59,6 +59,7 @@
   "settings_group_public_api": "Public API",
   "settings_group_cache": "Cache",
   "settings_group_scoring": "Scoring",
+  "settings_group_nameserver_timings": "Nameserver Timings",
   "settings_label_cross_job_hot_cache_ttl_seconds": "Hot cache TTL (seconds)",
   "settings_help_cross_job_hot_cache_ttl_seconds": "How long warmed DNS caches are kept between jobs. Higher values improve cache hit rates but increase memory usage.",
   "settings_label_show_score_admin": "Show scoring in admin UI",

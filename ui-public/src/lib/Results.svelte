@@ -203,41 +203,6 @@
       </div>
     {/if}
 
-    {#if nameserverTimings.length > 0}
-      <section class="ns-timings-card" data-testid="nameserver-timings">
-        <div class="ns-timings-header">
-          <h3 class="ns-timings-title">{$t("pub.ns_timing_heading")}</h3>
-          <p class="ns-timings-subtitle">{$t("pub.ns_timing_subtitle")}</p>
-        </div>
-        <div class="ns-timings-table-wrap">
-          <table class="ns-timings-table">
-            <thead>
-              <tr>
-                <th scope="col">{$t("pub.ns_timing_nameserver")}</th>
-                <th scope="col">{$t("pub.ns_timing_ip")}</th>
-                <th scope="col" class="ns-timings-num">{$t("pub.ns_timing_avg_ms")}</th>
-                <th scope="col" class="ns-timings-num">{$t("pub.ns_timing_min_ms")}</th>
-                <th scope="col" class="ns-timings-num">{$t("pub.ns_timing_max_ms")}</th>
-                <th scope="col" class="ns-timings-num">{$t("pub.ns_timing_samples")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {#each nameserverTimings as item}
-                <tr data-testid="nameserver-timing-row">
-                  <td class="ns-timings-name">{item.nameserver}</td>
-                  <td class="ns-timings-ip">{item.address}</td>
-                  <td class="ns-timings-num ns-timings-avg">{formatTimingMs(item.avg_ms)}</td>
-                  <td class="ns-timings-num">{formatTimingMs(item.min_ms)}</td>
-                  <td class="ns-timings-num">{formatTimingMs(item.max_ms)}</td>
-                  <td class="ns-timings-num">{item.count}</td>
-                </tr>
-              {/each}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    {/if}
-
     <div class="status-banner {bannerCls}" data-testid="result-banner" role="status">
       {$t(statusKey)}
     </div>
@@ -303,5 +268,40 @@
         </div>
       </details>
     {/each}
+    {#if nameserverTimings.length > 0}
+      <details class="score-bonus ns-timings-card" data-testid="nameserver-timings">
+        <summary class="score-bonus-summary ns-timings-summary">
+          <span class="score-bonus-chevron"></span>
+          <span class="score-bonus-title">{$t("pub.ns_timing_heading")}</span>
+          <span class="ns-timings-summary-text">{$t("pub.ns_timing_subtitle")}</span>
+        </summary>
+        <div class="score-bonus-list ns-timings-content">
+          <table class="ns-timings-table">
+            <thead>
+              <tr>
+                <th scope="col">{$t("pub.ns_timing_nameserver")}</th>
+                <th scope="col">{$t("pub.ns_timing_ip")}</th>
+                <th scope="col" class="ns-timings-num">{$t("pub.ns_timing_avg_ms")}</th>
+                <th scope="col" class="ns-timings-num">{$t("pub.ns_timing_min_ms")}</th>
+                <th scope="col" class="ns-timings-num">{$t("pub.ns_timing_max_ms")}</th>
+                <th scope="col" class="ns-timings-num">{$t("pub.ns_timing_samples")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each nameserverTimings as item}
+                <tr data-testid="nameserver-timing-row">
+                  <td class="ns-timings-name">{item.nameserver}</td>
+                  <td class="ns-timings-ip">{item.address}</td>
+                  <td class="ns-timings-num ns-timings-avg">{formatTimingMs(item.avg_ms)}</td>
+                  <td class="ns-timings-num">{formatTimingMs(item.min_ms)}</td>
+                  <td class="ns-timings-num">{formatTimingMs(item.max_ms)}</td>
+                  <td class="ns-timings-num">{item.count}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    {/if}
   {/if}
 </div>

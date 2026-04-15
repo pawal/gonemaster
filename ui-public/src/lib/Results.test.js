@@ -186,6 +186,12 @@ describe("Results", () => {
     ]));
     render(Results, { props: { publicID: "abc12345", domain: "example.com" } });
     await waitFor(() => expect(screen.getByTestId("nameserver-timings")).toBeTruthy());
+    const timings = screen.getByTestId("nameserver-timings");
+    expect(timings.open).toBe(false);
+
+    timings.open = true;
+    await fireEvent(timings, new Event("toggle"));
+
     expect(screen.getAllByTestId("nameserver-timing-row")).toHaveLength(2);
     expect(screen.getByText("ns1.example.com")).toBeTruthy();
     expect(screen.getByText("192.0.2.10")).toBeTruthy();

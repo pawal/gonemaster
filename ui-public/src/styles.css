@@ -372,37 +372,23 @@ details[inert] > summary {
 
 /* ── Nameserver timings ─────────────────────────────────────────────────── */
 .ns-timings-card {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  padding: 16px 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  margin-top: 4px;
 }
 
-.ns-timings-header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px 12px;
+.ns-timings-summary {
+  align-items: center;
 }
 
-.ns-timings-title {
-  margin: 0;
-  font-size: var(--text-base);
-  font-weight: 700;
-}
-
-.ns-timings-subtitle {
-  margin: 0;
+.ns-timings-summary-text {
   font-size: var(--text-sm);
   color: var(--muted);
+  margin-left: auto;
+  text-align: right;
 }
 
-.ns-timings-table-wrap {
+.ns-timings-content {
   overflow-x: auto;
+  padding: 0;
 }
 
 .ns-timings-table {
@@ -414,7 +400,6 @@ details[inert] > summary {
 .ns-timings-table th,
 .ns-timings-table td {
   padding: 10px 12px;
-  border-bottom: 1px solid var(--border);
   font-size: var(--text-sm);
 }
 
@@ -422,6 +407,11 @@ details[inert] > summary {
   color: var(--ink-2);
   font-weight: 600;
   text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.ns-timings-table td {
+  border-bottom: 1px solid var(--border);
 }
 
 .ns-timings-table tbody tr:last-child td {
@@ -449,6 +439,17 @@ details[inert] > summary {
 .ns-timings-avg {
   font-weight: 700;
   color: var(--ink);
+}
+
+@media (max-width: 600px) {
+  .ns-timings-summary {
+    align-items: flex-start;
+  }
+
+  .ns-timings-summary-text {
+    margin-left: 0;
+    text-align: left;
+  }
 }
 
 .result-grade-inline {

@@ -4,7 +4,9 @@
 package cachefile
 
 import (
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -28,9 +30,10 @@ const (
 
 // File is the portable representation of the unified packet cache.
 type File struct {
-	Format  string  `json:"format"`
-	Version int     `json:"version"`
-	Entries []Entry `json:"entries"`
+	Format   string  `json:"format"`
+	Version  int     `json:"version"`
+	Checksum string  `json:"checksum,omitempty"`
+	Entries  []Entry `json:"entries"`
 }
 
 // Entry is a single cache record discriminated by Kind.
@@ -59,8 +62,44 @@ type NameserverRef struct {
 	Address string `json:"address"`
 }
 
-// Export collects entries from the supplied caches into a File.
-// Either cache may be nil.
+// Option configures Import/Restore behaviour.
+type Option func(*config)
+
+type config struct {
+	strict bool
+	warnf  func(string, ...any)
+}
+
+func newConfig(opts []Option) *config {
+	c := &config{}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
+}
+
+func (c *config) warn(format string, args ...any) {
+	if c.warnf != nil {
+		c.warnf(format, args...)
+	}
+}
+
+// WithStrict turns every non-fatal warning into an error. Useful in CI or
+// automated replay pipelines where silent acceptance of unknown fields or
+// missing checksums is undesirable.
+func WithStrict() Option {
+	return func(c *config) { c.strict = true }
+}
+
+// WithWarnf installs a callback that receives non-fatal warnings (unknown
+// fields, unknown kinds, missing checksum). In strict mode these become
+// errors instead.
+func WithWarnf(f func(string, ...any)) Option {
+	return func(c *config) { c.warnf = f }
+}
+
+// Export collects entries from the supplied caches into a File and stamps a
+// checksum covering the entries.
 func Export(ns *nameserver.CacheStore, rec *recursor.Recursor) (File, error) {
 	out := File{Format: Format, Version: Version, Entries: []Entry{}}
 
@@ -105,12 +144,19 @@ func Export(ns *nameserver.CacheStore, rec *recursor.Recursor) (File, error) {
 		}
 	}
 
+	sum, err := checksumFor(out)
+	if err != nil {
+		return File{}, err
+	}
+	out.Checksum = sum
 	return out, nil
 }
 
 // Import applies the supplied File to the caches. Either cache may be nil,
-// in which case entries of that kind are skipped.
-func Import(file File, ns *nameserver.CacheStore, rec *recursor.Recursor) error {
+// in which case entries of that kind trigger an error.
+func Import(file File, ns *nameserver.CacheStore, rec *recursor.Recursor, opts ...Option) error {
+	cfg := newConfig(opts)
+
 	if strings.TrimSpace(file.Format) == "" {
 		return fmt.Errorf("packet cache format is required")
 	}
@@ -119,6 +165,22 @@ func Import(file File, ns *nameserver.CacheStore, rec *recursor.Recursor) error 
 	}
 	if file.Version != Version {
 		return fmt.Errorf("unsupported packet cache version %d", file.Version)
+	}
+
+	if strings.TrimSpace(file.Checksum) == "" {
+		if cfg.strict {
+			return fmt.Errorf("packet cache checksum is missing")
+		}
+		cfg.warn("packet cache checksum is missing")
+	} else {
+		want := strings.ToLower(strings.TrimSpace(file.Checksum))
+		got, err := checksumFor(file)
+		if err != nil {
+			return err
+		}
+		if got != want {
+			return fmt.Errorf("packet cache checksum mismatch: want %s, got %s", want, got)
+		}
 	}
 
 	var nsEntries []nameserver.Entry
@@ -158,9 +220,17 @@ func Import(file File, ns *nameserver.CacheStore, rec *recursor.Recursor) error 
 				Message:     wire,
 			})
 		case "":
-			return fmt.Errorf("entry %d: kind is required", idx)
+			if cfg.strict {
+				return fmt.Errorf("entry %d: kind is required", idx)
+			}
+			cfg.warn("entry %d: kind is missing, skipping", idx)
+			continue
 		default:
-			return fmt.Errorf("entry %d: unknown kind %q", idx, entry.Kind)
+			if cfg.strict {
+				return fmt.Errorf("entry %d: unknown kind %q", idx, entry.Kind)
+			}
+			cfg.warn("entry %d: unknown kind %q, skipping", idx, entry.Kind)
+			continue
 		}
 	}
 
@@ -203,7 +273,9 @@ func Save(path string, ns *nameserver.CacheStore, rec *recursor.Recursor) error 
 }
 
 // Restore reads path and imports its entries into the caches.
-func Restore(path string, ns *nameserver.CacheStore, rec *recursor.Recursor) error {
+func Restore(path string, ns *nameserver.CacheStore, rec *recursor.Recursor, opts ...Option) error {
+	cfg := newConfig(opts)
+
 	source := strings.TrimSpace(path)
 	if source == "" {
 		return fmt.Errorf("packet cache restore path is required")
@@ -212,9 +284,84 @@ func Restore(path string, ns *nameserver.CacheStore, rec *recursor.Recursor) err
 	if err != nil {
 		return err
 	}
+
+	if err := reportUnknownFields(data, cfg); err != nil {
+		return err
+	}
+
 	var payload File
 	if err := json.Unmarshal(data, &payload); err != nil {
 		return err
 	}
-	return Import(payload, ns, rec)
+	return Import(payload, ns, rec, opts...)
+}
+
+// checksumFor computes the SHA-256 checksum of the file with Checksum blanked.
+// Output is lowercase hex.
+func checksumFor(file File) (string, error) {
+	file.Checksum = ""
+	data, err := json.Marshal(file)
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:]), nil
+}
+
+var knownFileFields = map[string]bool{
+	"format":   true,
+	"version":  true,
+	"checksum": true,
+	"entries":  true,
+}
+
+var knownEntryFields = map[string]bool{
+	"kind":        true,
+	"address":     true,
+	"key":         true,
+	"answer_from": true,
+	"name":        true,
+	"qtype":       true,
+	"qclass":      true,
+	"nameservers": true,
+	"message":     true,
+	"no_message":  true,
+}
+
+func reportUnknownFields(data []byte, cfg *config) error {
+	var fileMap map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fileMap); err != nil {
+		// Not a JSON object at the top level; let the struct decoder
+		// produce the canonical error.
+		return nil
+	}
+	for key := range fileMap {
+		if knownFileFields[key] {
+			continue
+		}
+		if cfg.strict {
+			return fmt.Errorf("unknown field %q", key)
+		}
+		cfg.warn("unknown field %q", key)
+	}
+	entriesRaw, ok := fileMap["entries"]
+	if !ok {
+		return nil
+	}
+	var entries []map[string]json.RawMessage
+	if err := json.Unmarshal(entriesRaw, &entries); err != nil {
+		return nil
+	}
+	for idx, entry := range entries {
+		for key := range entry {
+			if knownEntryFields[key] {
+				continue
+			}
+			if cfg.strict {
+				return fmt.Errorf("entry %d: unknown field %q", idx, key)
+			}
+			cfg.warn("entry %d: unknown field %q", idx, key)
+		}
+	}
+	return nil
 }

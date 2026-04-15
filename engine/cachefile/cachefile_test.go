@@ -3,9 +3,11 @@ package cachefile
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/netip"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	dns "codeberg.org/miekg/dns"
@@ -176,11 +178,11 @@ func TestCachefileImportValidationErrors(t *testing.T) {
 	if err := Import(File{Format: Format, Version: Version + 1}, ns, rec); err == nil {
 		t.Fatalf("expected unsupported version error")
 	}
-	if err := Import(File{Format: Format, Version: Version, Entries: []Entry{{Kind: "other"}}}, ns, rec); err == nil {
-		t.Fatalf("expected unknown kind error")
+	if err := Import(File{Format: Format, Version: Version, Entries: []Entry{{Kind: "other"}}}, ns, rec, WithStrict()); err == nil {
+		t.Fatalf("expected unknown kind error in strict mode")
 	}
-	if err := Import(File{Format: Format, Version: Version, Entries: []Entry{{}}}, ns, rec); err == nil {
-		t.Fatalf("expected missing kind error")
+	if err := Import(File{Format: Format, Version: Version, Entries: []Entry{{}}}, ns, rec, WithStrict()); err == nil {
+		t.Fatalf("expected missing kind error in strict mode")
 	}
 	badBase64 := File{Format: Format, Version: Version, Entries: []Entry{{
 		Kind:    KindNameserver,
@@ -285,4 +287,181 @@ func mustPack(t *testing.T, msg *dns.Msg) []byte {
 		t.Fatalf("pack: %v", err)
 	}
 	return msg.Data
+}
+
+func TestCachefileExportStampsChecksum(t *testing.T) {
+	ns := nameserver.NewCacheStore()
+	rec := &recursor.Recursor{}
+	seedNameserverCache(t, ns)
+	seedRecursorCache(t, rec)
+
+	file, err := Export(ns, rec)
+	if err != nil {
+		t.Fatalf("export: %v", err)
+	}
+	if len(file.Checksum) != 64 {
+		t.Fatalf("expected 64-char hex checksum, got %q", file.Checksum)
+	}
+	// Re-exporting the same caches yields the same checksum (deterministic).
+	again, err := Export(ns, rec)
+	if err != nil {
+		t.Fatalf("re-export: %v", err)
+	}
+	if again.Checksum != file.Checksum {
+		t.Fatalf("checksum not deterministic: %s vs %s", file.Checksum, again.Checksum)
+	}
+}
+
+func TestCachefileChecksumMismatchFails(t *testing.T) {
+	ns := nameserver.NewCacheStore()
+	rec := &recursor.Recursor{}
+	seedNameserverCache(t, ns)
+
+	file, err := Export(ns, rec)
+	if err != nil {
+		t.Fatalf("export: %v", err)
+	}
+	// Tamper with an entry but keep the old checksum.
+	file.Entries[0].AnswerFrom = "tampered"
+
+	err = Import(file, nameserver.NewCacheStore(), &recursor.Recursor{})
+	if err == nil {
+		t.Fatalf("expected checksum mismatch error")
+	}
+	if !strings.Contains(err.Error(), "checksum mismatch") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestCachefileMissingChecksum(t *testing.T) {
+	file := File{Format: Format, Version: Version, Entries: []Entry{}}
+
+	// Non-strict: missing checksum emits a warning but Import succeeds.
+	var warnings []string
+	if err := Import(file, nameserver.NewCacheStore(), &recursor.Recursor{}, WithWarnf(func(f string, a ...any) {
+		warnings = append(warnings, fmt.Sprintf(f, a...))
+	})); err != nil {
+		t.Fatalf("non-strict import with missing checksum: %v", err)
+	}
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "checksum is missing") {
+		t.Fatalf("expected missing-checksum warning, got %v", warnings)
+	}
+
+	// Strict: same file must now fail.
+	if err := Import(file, nameserver.NewCacheStore(), &recursor.Recursor{}, WithStrict()); err == nil {
+		t.Fatalf("expected strict-mode error for missing checksum")
+	}
+}
+
+func TestCachefileUnknownKindWarning(t *testing.T) {
+	file := File{Format: Format, Version: Version, Entries: []Entry{
+		{Kind: "future-kind"},
+	}}
+	sum, err := checksumFor(file)
+	if err != nil {
+		t.Fatalf("checksum: %v", err)
+	}
+	file.Checksum = sum
+
+	var warnings []string
+	if err := Import(file, nameserver.NewCacheStore(), &recursor.Recursor{}, WithWarnf(func(f string, a ...any) {
+		warnings = append(warnings, fmt.Sprintf(f, a...))
+	})); err != nil {
+		t.Fatalf("non-strict import with unknown kind: %v", err)
+	}
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "unknown kind") {
+		t.Fatalf("expected unknown-kind warning, got %v", warnings)
+	}
+
+	if err := Import(file, nameserver.NewCacheStore(), &recursor.Recursor{}, WithStrict()); err == nil {
+		t.Fatalf("expected strict-mode error for unknown kind")
+	}
+}
+
+func TestCachefileRestoreUnknownFieldWarning(t *testing.T) {
+	blob := []byte(`{
+  "format": "gonemaster.packet-cache",
+  "version": 2,
+  "mystery": "who cares",
+  "entries": [
+    {"kind": "nameserver", "address": "192.0.2.53", "key": "k", "no_message": true, "extra": true}
+  ]
+}`)
+	path := filepath.Join(t.TempDir(), "warn.json")
+	if err := os.WriteFile(path, blob, 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	var warnings []string
+	err := Restore(path, nameserver.NewCacheStore(), &recursor.Recursor{}, WithWarnf(func(f string, a ...any) {
+		warnings = append(warnings, fmt.Sprintf(f, a...))
+	}))
+	if err != nil {
+		t.Fatalf("restore: %v", err)
+	}
+
+	var sawFileField, sawEntryField, sawMissingChecksum bool
+	for _, w := range warnings {
+		if strings.Contains(w, `unknown field "mystery"`) {
+			sawFileField = true
+		}
+		if strings.Contains(w, `entry 0: unknown field "extra"`) {
+			sawEntryField = true
+		}
+		if strings.Contains(w, "checksum is missing") {
+			sawMissingChecksum = true
+		}
+	}
+	if !sawFileField {
+		t.Fatalf("expected file-level unknown-field warning, got %v", warnings)
+	}
+	if !sawEntryField {
+		t.Fatalf("expected entry-level unknown-field warning, got %v", warnings)
+	}
+	if !sawMissingChecksum {
+		t.Fatalf("expected missing-checksum warning, got %v", warnings)
+	}
+
+	// Strict mode fails on the first unknown field.
+	err = Restore(path, nameserver.NewCacheStore(), &recursor.Recursor{}, WithStrict())
+	if err == nil {
+		t.Fatalf("expected strict-mode error for unknown field")
+	}
+}
+
+func TestCachefileSaveRestoreChecksumRoundTrip(t *testing.T) {
+	ns := nameserver.NewCacheStore()
+	rec := &recursor.Recursor{}
+	seedNameserverCache(t, ns)
+	seedRecursorCache(t, rec)
+
+	path := filepath.Join(t.TempDir(), "cache.json")
+	if err := Save(path, ns, rec); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	// Strict restore must succeed on a freshly written file.
+	if err := Restore(path, nameserver.NewCacheStore(), &recursor.Recursor{}, WithStrict()); err != nil {
+		t.Fatalf("strict restore of freshly written file: %v", err)
+	}
+
+	// Corrupt the file and expect checksum mismatch on restore.
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	corrupted := strings.Replace(string(data), "192.0.2.53", "198.51.100.1", 1)
+	if corrupted == string(data) {
+		t.Fatalf("corruption substitution did not change file")
+	}
+	if err := os.WriteFile(path, []byte(corrupted), 0o644); err != nil {
+		t.Fatalf("write corrupted: %v", err)
+	}
+	err = Restore(path, nameserver.NewCacheStore(), &recursor.Recursor{})
+	if err == nil {
+		t.Fatalf("expected corruption to fail the checksum")
+	}
+	if !strings.Contains(err.Error(), "checksum mismatch") {
+		t.Fatalf("unexpected error: %v", err)
+	}
 }

@@ -51,6 +51,9 @@ You can switch output modes:
 - `--save PATH` writes the accumulated DNS packet cache after the run.
 - `--restore PATH` primes the DNS packet cache before the run.
 
+See [cache-format.md](cache-format.md) for the file schema, checksum
+contract, and strict-vs-lenient parsing rules.
+
 Use `--output PATH` to write the selected output to a file.
 
 ### Machine-consumer args contract
@@ -84,8 +87,8 @@ v1.1 keys above when they are present. See:
 | `--dump-profile` | bool | Print the effective profile as JSON and exit. Incompatible with `--raw` and `--json-stream`. |
 | `--count` | bool | Append count summaries (level totals and level/tag totals). Human output only; incompatible with `--json`, `--json-stream`, `--raw`, and `--dump-profile`. |
 | `--nstimes` | bool | Append per-nameserver query timing statistics table. |
-| `--save PATH` | string | Write DNS packet cache to file after the run. Valid only for test runs (not with `--version`, `--list-tests`, or `--dump-profile`). |
-| `--restore PATH` | string | Prime DNS packet cache from a previously saved cache file before the run. Valid only for test runs (not with `--version`, `--list-tests`, or `--dump-profile`). |
+| `--save PATH` | string | Write DNS packet cache to file after the run. Valid only for test runs (not with `--version`, `--list-tests`, or `--dump-profile`). File schema: see [cache-format.md](cache-format.md). |
+| `--restore PATH` | string | Prime DNS packet cache from a previously saved cache file before the run. Valid only for test runs (not with `--version`, `--list-tests`, or `--dump-profile`). File schema: see [cache-format.md](cache-format.md). |
 | `--locale LOCALE` | string | Locale for translated output (defaults to environment, then `en`). |
 | `--no-ipv4` | bool | Disable IPv4 queries (overrides profile setting). |
 | `--no-ipv6` | bool | Disable IPv6 queries (overrides profile setting). |
@@ -136,7 +139,8 @@ Stream JSON entries to a file:
 gonemaster --json-stream --output /tmp/gonemaster.jsonl --domain example.com
 ```
 
-Save DNS packet cache for later replay:
+Save DNS packet cache for later replay (file schema in
+[cache-format.md](cache-format.md)):
 ```
 gonemaster --domain example.com --save /tmp/gonemaster-cache.json
 ```

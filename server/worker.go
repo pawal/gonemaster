@@ -176,7 +176,7 @@ func (s *Server) runJob(jobID string) error {
 	s.initProgressWriteState(job.ID, 0, now)
 	defer s.clearProgressWriteState(job.ID)
 
-	entries, qStats, effectiveProfile, runErr := s.runEngineForJob(job, jobCtx)
+	entries, qStats, nsTimings, effectiveProfile, runErr := s.runEngineForJob(job, jobCtx)
 	s.metrics.ObserveDNSQueries(qStats.ipv4, qStats.ipv6)
 	s.metrics.ObserveCacheMetrics(qStats.cacheHits, qStats.cacheMisses, qStats.cacheEvictions)
 	finishedAt := time.Now().UTC()
@@ -194,6 +194,7 @@ func (s *Server) runJob(jobID string) error {
 	job.Progress = 100
 	job.FinishedAt = finishedAt
 	job.EffectiveProfile = effectiveProfile
+	job.NameserverTimings = nsTimings
 
 	// Get previous status for metrics before graduation removes the job.
 	previous, prevOK := s.store.Get(job.ID)
@@ -228,10 +229,10 @@ type jobQueryStats struct {
 	cacheEvictions int64
 }
 
-func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntry, jobQueryStats, string, error) {
+func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntry, jobQueryStats, []NameserverTiming, string, error) {
 	if s.engineLimiter != nil {
 		if err := s.engineLimiter.Acquire(ctx); err != nil {
-			return nil, jobQueryStats{}, "", err
+			return nil, jobQueryStats{}, nil, "", err
 		}
 		defer s.engineLimiter.Release()
 	}
@@ -282,18 +283,18 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 	}
 	cleanup, err := applyProfileOverrides(&req, s.store, job.ProfileID, job.Overrides, s.cfg.ProfilePath)
 	if err != nil {
-		return nil, jobQueryStats{}, "", err
+		return nil, jobQueryStats{}, nil, "", err
 	}
 	if cleanup != nil {
 		defer cleanup()
 	}
 	effectiveProfile, err := engine.EffectiveProfile(req)
 	if err != nil {
-		return nil, jobQueryStats{}, "", err
+		return nil, jobQueryStats{}, nil, "", err
 	}
 	effectiveProfileJSON, err := effectiveProfile.ToJSON()
 	if err != nil {
-		return nil, jobQueryStats{}, "", err
+		return nil, jobQueryStats{}, nil, "", err
 	}
 
 	if len(job.Tests) == 0 {
@@ -318,11 +319,11 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 	if len(job.Tests) == 1 {
 		req.Testcase = job.Tests[0]
 		entries, err := s.runEngine(req)
-		return entries, collectStats(), effectiveProfileJSON, err
+		return entries, collectStats(), s.collectNameserverTimings(job, cacheStore.QueryTimings()), effectiveProfileJSON, err
 	}
 	if len(job.Tests) == 0 {
 		entries, err := s.runEngine(req)
-		return entries, collectStats(), effectiveProfileJSON, err
+		return entries, collectStats(), s.collectNameserverTimings(job, cacheStore.QueryTimings()), effectiveProfileJSON, err
 	}
 
 	var all []engine.LogEntry
@@ -337,11 +338,11 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 			s.updateJobProgress(job.ID, progress)
 		}
 		if err != nil {
-			return all, collectStats(), effectiveProfileJSON, err
+			return all, collectStats(), s.collectNameserverTimings(job, cacheStore.QueryTimings()), effectiveProfileJSON, err
 		}
 		all = append(all, entries...)
 	}
-	return all, collectStats(), effectiveProfileJSON, nil
+	return all, collectStats(), s.collectNameserverTimings(job, cacheStore.QueryTimings()), effectiveProfileJSON, nil
 }
 
 func (s *Server) runEngine(req engine.RunRequest) ([]engine.LogEntry, error) {

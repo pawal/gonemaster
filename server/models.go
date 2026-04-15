@@ -52,26 +52,26 @@ const (
 type JobSort string
 
 const (
-	JobSortCreatedAtDesc JobSort = "created_at_desc"
-	JobSortCreatedAtAsc  JobSort = "created_at_asc"
-	JobSortStartedAtDesc JobSort = "started_at_desc"
-	JobSortStartedAtAsc  JobSort = "started_at_asc"
-	JobSortDomainAsc     JobSort = "domain_asc"
-	JobSortDomainDesc    JobSort = "domain_desc"
-	JobSortBatchIDAsc    JobSort = "batch_id_asc"
-	JobSortBatchIDDesc   JobSort = "batch_id_desc"
-	JobSortErrorDesc       JobSort = "error_desc"
-	JobSortCriticalDesc    JobSort = "critical_desc"
-	JobSortFinishedAtDesc  JobSort = "finished_at_desc"
-	JobSortFinishedAtAsc   JobSort = "finished_at_asc"
-	JobSortWorstLevelDesc  JobSort = "worst_level_desc"
-	JobSortWorstLevelAsc   JobSort = "worst_level_asc"
-	JobSortScoreDesc       JobSort = "score_desc"
-	JobSortScoreAsc        JobSort = "score_asc"
-	JobSortDurationDesc    JobSort = "duration_desc"
-	JobSortDurationAsc     JobSort = "duration_asc"
-	JobSortEntryCountDesc  JobSort = "entry_count_desc"
-	JobSortEntryCountAsc   JobSort = "entry_count_asc"
+	JobSortCreatedAtDesc  JobSort = "created_at_desc"
+	JobSortCreatedAtAsc   JobSort = "created_at_asc"
+	JobSortStartedAtDesc  JobSort = "started_at_desc"
+	JobSortStartedAtAsc   JobSort = "started_at_asc"
+	JobSortDomainAsc      JobSort = "domain_asc"
+	JobSortDomainDesc     JobSort = "domain_desc"
+	JobSortBatchIDAsc     JobSort = "batch_id_asc"
+	JobSortBatchIDDesc    JobSort = "batch_id_desc"
+	JobSortErrorDesc      JobSort = "error_desc"
+	JobSortCriticalDesc   JobSort = "critical_desc"
+	JobSortFinishedAtDesc JobSort = "finished_at_desc"
+	JobSortFinishedAtAsc  JobSort = "finished_at_asc"
+	JobSortWorstLevelDesc JobSort = "worst_level_desc"
+	JobSortWorstLevelAsc  JobSort = "worst_level_asc"
+	JobSortScoreDesc      JobSort = "score_desc"
+	JobSortScoreAsc       JobSort = "score_asc"
+	JobSortDurationDesc   JobSort = "duration_desc"
+	JobSortDurationAsc    JobSort = "duration_asc"
+	JobSortEntryCountDesc JobSort = "entry_count_desc"
+	JobSortEntryCountAsc  JobSort = "entry_count_asc"
 )
 
 // JobSeverityFilter controls severity-based list filtering.
@@ -114,6 +114,20 @@ type Job struct {
 	UndelegatedNS []engine.UndelegatedNameserver `json:"-"`
 	UndelegatedDS []engine.UndelegatedDSInfo     `json:"-"`
 	MinLevel      string                         `json:"-"`
+	// NameserverTimings carries per-run timing summaries into graduation.
+	NameserverTimings []NameserverTiming `json:"-"`
+}
+
+// NameserverTiming holds timing stats for one tested authoritative nameserver.
+type NameserverTiming struct {
+	Nameserver string  `json:"nameserver"`
+	Address    string  `json:"address"`
+	AvgMS      float64 `json:"avg_ms"`
+	MinMS      float64 `json:"min_ms"`
+	MaxMS      float64 `json:"max_ms"`
+	MedianMS   float64 `json:"median_ms"`
+	StddevMS   float64 `json:"stddev_ms"`
+	Count      int     `json:"count"`
 }
 
 // Domain is a persistent domain registry entry.
@@ -179,8 +193,9 @@ type Run struct {
 	SeverityTotals map[string]int `json:"severity_totals,omitempty"`
 	// Score and Grade are computed by the scoring engine at graduation and
 	// cached in the runs table. Nil when scoring has not yet been computed.
-	Score *int    `json:"score,omitempty"`
-	Grade *string `json:"grade,omitempty"`
+	Score             *int               `json:"score,omitempty"`
+	Grade             *string            `json:"grade,omitempty"`
+	NameserverTimings []NameserverTiming `json:"nameserver_timings,omitempty"`
 }
 
 // Entry is a single engine log entry stored as a row for SQL analysis.
@@ -249,16 +264,16 @@ type JobFilter struct {
 type DomainSort string
 
 const (
-	DomainSortNameAsc        DomainSort = "name_asc"
-	DomainSortNameDesc       DomainSort = "name_desc"
-	DomainSortLevelDesc      DomainSort = "latest_level_desc"
-	DomainSortLevelAsc       DomainSort = "latest_level_asc"
-	DomainSortScoreDesc      DomainSort = "latest_score_desc"
-	DomainSortScoreAsc       DomainSort = "latest_score_asc"
-	DomainSortLastRunDesc    DomainSort = "latest_run_at_desc"
-	DomainSortLastRunAsc     DomainSort = "latest_run_at_asc"
-	DomainSortRunCountDesc   DomainSort = "run_count_desc"
-	DomainSortRunCountAsc    DomainSort = "run_count_asc"
+	DomainSortNameAsc      DomainSort = "name_asc"
+	DomainSortNameDesc     DomainSort = "name_desc"
+	DomainSortLevelDesc    DomainSort = "latest_level_desc"
+	DomainSortLevelAsc     DomainSort = "latest_level_asc"
+	DomainSortScoreDesc    DomainSort = "latest_score_desc"
+	DomainSortScoreAsc     DomainSort = "latest_score_asc"
+	DomainSortLastRunDesc  DomainSort = "latest_run_at_desc"
+	DomainSortLastRunAsc   DomainSort = "latest_run_at_asc"
+	DomainSortRunCountDesc DomainSort = "run_count_desc"
+	DomainSortRunCountAsc  DomainSort = "run_count_asc"
 )
 
 // DomainFilter filters domain list queries.
@@ -350,12 +365,13 @@ type EntryList struct {
 
 // JobResult holds the assembled output for a job/run.
 type JobResult struct {
-	JobID                string            `json:"job_id"`
-	BatchID              string            `json:"batch_id,omitempty"`
-	Status               JobStatus         `json:"status"`
-	Summary              map[string]any    `json:"summary,omitempty"`
-	Raw                  *JobResultRaw     `json:"raw,omitempty"`
-	TestcaseDescriptions map[string]string `json:"testcase_descriptions,omitempty"`
+	JobID                string             `json:"job_id"`
+	BatchID              string             `json:"batch_id,omitempty"`
+	Status               JobStatus          `json:"status"`
+	Summary              map[string]any     `json:"summary,omitempty"`
+	NameserverTimings    []NameserverTiming `json:"nameserver_timings,omitempty"`
+	Raw                  *JobResultRaw      `json:"raw,omitempty"`
+	TestcaseDescriptions map[string]string  `json:"testcase_descriptions,omitempty"`
 	// Score holds the full scoring result. Populated by GetResult; nil when
 	// the run has no entries or scoring is not available.
 	Score *scoring.Result `json:"score,omitempty"`

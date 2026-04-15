@@ -35,6 +35,7 @@ type Server struct {
 	cancels                  map[string]context.CancelFunc
 	rateLimiter              *RateLimiter
 	hotCache                 *nameserverHotCache
+	delegationLookup         func(context.Context, string) DelegationInfo
 	configSources            map[string]SettingSource
 	retentionDays            atomic.Int64
 }
@@ -132,6 +133,7 @@ func newServer(cfg Config, store JobStore, queue Queue) *Server {
 		engineRunner:             engine.Run,
 		engineLimiter:            newEngineLimiter(cfg.MaxConcurrentJobs),
 		cancels:                  map[string]context.CancelFunc{},
+		delegationLookup:         lookupDelegation,
 	}
 	if cfg.PublicAPI.RateLimitEnabled {
 		s.rateLimiter = NewRateLimiter(cfg.PublicAPI.RateLimitMax, cfg.PublicAPI.RateLimitWindow.Duration)

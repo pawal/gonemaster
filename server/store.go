@@ -226,7 +226,7 @@ func (s *InMemoryJobStore) SetScoringConfig(cfg scoring.Config) {
 // NewInMemoryJobStore creates an empty in-memory job store.
 func NewInMemoryJobStore() *InMemoryJobStore {
 	return &InMemoryJobStore{
-		scoringCfg: scoring.DefaultConfig(),
+		scoringCfg:   scoring.DefaultConfig(),
 		jobs:         map[string]Job{},
 		publicIDs:    map[string]string{},
 		runs:         map[string]Run{},
@@ -422,29 +422,30 @@ func (s *InMemoryJobStore) GraduateJob(job Job, engineEntries []engine.LogEntry)
 	gradeVal := scoreResult.Grade
 
 	run := Run{
-		ID:               job.ID,
-		DomainID:         domain.ID,
-		Domain:           job.Domain,
-		BatchID:          job.BatchID,
-		Status:           job.Status,
-		CreatedAt:        job.CreatedAt,
-		StartedAt:        job.StartedAt,
-		FinishedAt:       job.FinishedAt,
-		DurationMs:       durationMs,
-		SevNotice:        sevNotice,
-		SevWarning:       sevWarning,
-		SevError:         sevError,
-		SevCritical:      sevCritical,
-		WorstLevel:       worstLevel,
-		EntryCount:       len(engineEntries),
-		Priority:         job.Priority,
-		Profile:          job.Profile,
-		ProfileID:        cloneInt64Ptr(job.ProfileID),
-		ProfileName:      job.ProfileName,
-		EffectiveProfile: job.EffectiveProfile,
-		PublicID:         job.PublicID,
-		Score:            &scoreVal,
-		Grade:            &gradeVal,
+		ID:                job.ID,
+		DomainID:          domain.ID,
+		Domain:            job.Domain,
+		BatchID:           job.BatchID,
+		Status:            job.Status,
+		CreatedAt:         job.CreatedAt,
+		StartedAt:         job.StartedAt,
+		FinishedAt:        job.FinishedAt,
+		DurationMs:        durationMs,
+		SevNotice:         sevNotice,
+		SevWarning:        sevWarning,
+		SevError:          sevError,
+		SevCritical:       sevCritical,
+		WorstLevel:        worstLevel,
+		EntryCount:        len(engineEntries),
+		Priority:          job.Priority,
+		Profile:           job.Profile,
+		ProfileID:         cloneInt64Ptr(job.ProfileID),
+		ProfileName:       job.ProfileName,
+		EffectiveProfile:  job.EffectiveProfile,
+		PublicID:          job.PublicID,
+		Score:             &scoreVal,
+		Grade:             &gradeVal,
+		NameserverTimings: cloneNameserverTimings(job.NameserverTimings),
 	}
 	run.SeverityTotals = map[string]int{
 		"NOTICE":   sevNotice,
@@ -864,6 +865,7 @@ func (s *InMemoryJobStore) GetRun(id string) (Run, bool) {
 	defer s.mu.RUnlock()
 	run, ok := s.runs[id]
 	run.ProfileID = cloneInt64Ptr(run.ProfileID)
+	run.NameserverTimings = cloneNameserverTimings(run.NameserverTimings)
 	return run, ok
 }
 
@@ -877,6 +879,7 @@ func (s *InMemoryJobStore) GetRunByPublicID(publicID string) (Run, bool) {
 	}
 	run, ok := s.runs[runID]
 	run.ProfileID = cloneInt64Ptr(run.ProfileID)
+	run.NameserverTimings = cloneNameserverTimings(run.NameserverTimings)
 	return run, ok
 }
 
@@ -886,6 +889,7 @@ func (s *InMemoryJobStore) ListRuns(filter RunFilter) RunList {
 	snapshot := make([]Run, 0, len(s.runs))
 	for _, r := range s.runs {
 		r.ProfileID = cloneInt64Ptr(r.ProfileID)
+		r.NameserverTimings = cloneNameserverTimings(r.NameserverTimings)
 		snapshot = append(snapshot, r)
 	}
 	var tagDomainIDs map[int64]struct{}
@@ -1383,16 +1387,17 @@ func jobFromRun(r Run) Job {
 			"ERROR":    r.SevError,
 			"CRITICAL": r.SevCritical,
 		},
-		CreatedAt:        r.CreatedAt,
-		StartedAt:        r.StartedAt,
-		Progress:         100,
-		Priority:         r.Priority,
-		Profile:          r.Profile,
-		ProfileID:        cloneInt64Ptr(r.ProfileID),
-		ProfileName:      r.ProfileName,
-		EffectiveProfile: r.EffectiveProfile,
-		Score:            r.Score,
-		Grade:            r.Grade,
+		CreatedAt:         r.CreatedAt,
+		StartedAt:         r.StartedAt,
+		Progress:          100,
+		Priority:          r.Priority,
+		Profile:           r.Profile,
+		ProfileID:         cloneInt64Ptr(r.ProfileID),
+		ProfileName:       r.ProfileName,
+		EffectiveProfile:  r.EffectiveProfile,
+		Score:             r.Score,
+		Grade:             r.Grade,
+		NameserverTimings: cloneNameserverTimings(r.NameserverTimings),
 	}
 }
 
@@ -1408,9 +1413,10 @@ func cloneInt64Ptr(v *int64) *int64 {
 // pre-computed scoring result. scoreResult may be nil when scoring is unavailable.
 func buildJobResult(r Run, entries []Entry, scoreResult *scoring.Result) JobResult {
 	result := JobResult{
-		JobID:   r.ID,
-		BatchID: r.BatchID,
-		Status:  r.Status,
+		JobID:             r.ID,
+		BatchID:           r.BatchID,
+		Status:            r.Status,
+		NameserverTimings: cloneNameserverTimings(r.NameserverTimings),
 		Summary: map[string]any{
 			"total": r.EntryCount,
 			"levels": map[string]int{

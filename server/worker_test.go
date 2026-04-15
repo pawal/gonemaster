@@ -322,11 +322,11 @@ func TestRunEngineForJobParallel(t *testing.T) {
 
 	errs := make(chan error, 2)
 	go func() {
-		_, _, _, err := srv.runEngineForJob(job1, context.Background())
+		_, _, _, _, err := srv.runEngineForJob(job1, context.Background())
 		errs <- err
 	}()
 	go func() {
-		_, _, _, err := srv.runEngineForJob(job2, context.Background())
+		_, _, _, _, err := srv.runEngineForJob(job2, context.Background())
 		errs <- err
 	}()
 
@@ -364,11 +364,11 @@ func TestRunEngineForJobLimiter(t *testing.T) {
 
 	errs := make(chan error, 2)
 	go func() {
-		_, _, _, err := srv.runEngineForJob(job1, context.Background())
+		_, _, _, _, err := srv.runEngineForJob(job1, context.Background())
 		errs <- err
 	}()
 	go func() {
-		_, _, _, err := srv.runEngineForJob(job2, context.Background())
+		_, _, _, _, err := srv.runEngineForJob(job2, context.Background())
 		errs <- err
 	}()
 
@@ -415,7 +415,7 @@ func TestRunEngineForJobPassesUndelegatedInputs(t *testing.T) {
 		},
 	}
 
-	_, _, _, err := srv.runEngineForJob(job, context.Background())
+	_, _, _, _, err := srv.runEngineForJob(job, context.Background())
 	if err != nil {
 		t.Fatalf("runEngineForJob: %v", err)
 	}
@@ -457,7 +457,7 @@ func TestRunEngineForJobPassesSourceAddrOverrides(t *testing.T) {
 		CreatedAt: time.Now().UTC(),
 	}
 
-	_, _, _, err := srv.runEngineForJob(job, context.Background())
+	_, _, _, _, err := srv.runEngineForJob(job, context.Background())
 	if err != nil {
 		t.Fatalf("runEngineForJob: %v", err)
 	}
@@ -508,7 +508,7 @@ func TestRunEngineForJobPassesCacheStore(t *testing.T) {
 		CreatedAt: time.Now().UTC(),
 	}
 
-	_, stats, _, err := srv.runEngineForJob(job, context.Background())
+	_, stats, _, _, err := srv.runEngineForJob(job, context.Background())
 	if err != nil {
 		t.Fatalf("runEngineForJob: %v", err)
 	}
@@ -554,7 +554,7 @@ func TestRunEngineForJobHotCacheReportsWarmQueryMetrics(t *testing.T) {
 	}
 
 	jobA := Job{ID: "job-hot-a", Domain: "example.com", Status: JobQueued, CreatedAt: time.Now().UTC()}
-	_, statsA, _, err := srv.runEngineForJob(jobA, context.Background())
+	_, statsA, _, _, err := srv.runEngineForJob(jobA, context.Background())
 	if err != nil {
 		t.Fatalf("first runEngineForJob: %v", err)
 	}
@@ -563,7 +563,7 @@ func TestRunEngineForJobHotCacheReportsWarmQueryMetrics(t *testing.T) {
 	}
 
 	jobB := Job{ID: "job-hot-b", Domain: "example.net", Status: JobQueued, CreatedAt: time.Now().UTC()}
-	_, statsB, _, err := srv.runEngineForJob(jobB, context.Background())
+	_, statsB, _, _, err := srv.runEngineForJob(jobB, context.Background())
 	if err != nil {
 		t.Fatalf("second runEngineForJob: %v", err)
 	}
@@ -637,5 +637,63 @@ func TestRunJobSnapshotsEffectiveProfile(t *testing.T) {
 	}
 	if value, ok := timeout.(int); !ok || value != 7 {
 		t.Fatalf("expected timeout 7, got %v", timeout)
+	}
+}
+
+func TestRunJobPersistsNameserverTimingsForDelegatedNameserversOnly(t *testing.T) {
+	srv := New(DefaultConfig())
+	spy := newSpyJobStore()
+	srv.store = spy
+	srv.delegationLookup = func(_ context.Context, domain string) DelegationInfo {
+		if domain != "example.com" {
+			t.Fatalf("unexpected domain %q", domain)
+		}
+		return DelegationInfo{
+			Nameservers: []DelegationNS{
+				{NS: "ns1.example.com", IP: "192.0.2.10"},
+				{NS: "ns2.example.com", IP: "192.0.2.20"},
+			},
+		}
+	}
+	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		req.NameserverCache.RecordQueryTime("ns1.example.com/192.0.2.10", 20*time.Millisecond)
+		req.NameserverCache.RecordQueryTime("ns1.example.com/192.0.2.10", 40*time.Millisecond)
+		req.NameserverCache.RecordQueryTime("ns2.example.com/192.0.2.20", 15*time.Millisecond)
+		req.NameserverCache.RecordQueryTime("a.gtld-servers.net/192.5.6.30", 100*time.Millisecond)
+		return []engine.LogEntry{{Module: "Nameserver", Testcase: "Nameserver01", Tag: "NO_RESPONSE", Level: "INFO"}}, nil
+	}
+
+	job := Job{
+		ID:        "job-ns-timings",
+		Domain:    "example.com",
+		Status:    JobQueued,
+		CreatedAt: time.Now().UTC(),
+	}
+	if _, err := srv.store.Create(job); err != nil {
+		t.Fatalf("create job: %v", err)
+	}
+
+	if err := srv.runJob(job.ID); err != nil {
+		t.Fatalf("runJob: %v", err)
+	}
+
+	result, ok := srv.store.GetResult(job.ID)
+	if !ok {
+		t.Fatal("expected result")
+	}
+	if len(result.NameserverTimings) != 2 {
+		t.Fatalf("nameserver timings len = %d, want 2", len(result.NameserverTimings))
+	}
+	if result.NameserverTimings[0].Nameserver != "ns1.example.com" {
+		t.Fatalf("first nameserver = %q, want ns1.example.com", result.NameserverTimings[0].Nameserver)
+	}
+	if result.NameserverTimings[0].Count != 2 {
+		t.Fatalf("first count = %d, want 2", result.NameserverTimings[0].Count)
+	}
+	if result.NameserverTimings[0].AvgMS != 30 {
+		t.Fatalf("first avg_ms = %v, want 30", result.NameserverTimings[0].AvgMS)
+	}
+	if result.NameserverTimings[1].Nameserver != "ns2.example.com" {
+		t.Fatalf("second nameserver = %q, want ns2.example.com", result.NameserverTimings[1].Nameserver)
 	}
 }

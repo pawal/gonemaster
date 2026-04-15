@@ -229,6 +229,18 @@ func TestPublicGetResultReturnsResultByPublicID(t *testing.T) {
 		Status:    JobSucceeded,
 		CreatedAt: time.Now().UTC(),
 		Progress:  100,
+		NameserverTimings: []NameserverTiming{
+			{
+				Nameserver: "ns1.example.com",
+				Address:    "192.0.2.10",
+				AvgMS:      24,
+				MinMS:      20,
+				MaxMS:      30,
+				MedianMS:   22,
+				StddevMS:   4,
+				Count:      3,
+			},
+		},
 	}
 	created, err := srv.store.Create(job)
 	if err != nil {
@@ -251,6 +263,9 @@ func TestPublicGetResultReturnsResultByPublicID(t *testing.T) {
 	}
 	if result.Status != JobSucceeded {
 		t.Fatalf("status: got %q, want %q", result.Status, JobSucceeded)
+	}
+	if len(result.NameserverTimings) != 1 {
+		t.Fatalf("nameserver timings len = %d, want 1", len(result.NameserverTimings))
 	}
 }
 

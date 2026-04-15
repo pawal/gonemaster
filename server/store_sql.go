@@ -460,6 +460,10 @@ func (s *SQLJobStore) GraduateJob(job Job, engineEntries []engine.LogEntry) erro
 	scoreResult := scoring.Compute(job.Domain, scoringEntries, s.scoringCfg)
 	scoreVal := sql.NullInt64{Int64: int64(scoreResult.Score), Valid: true}
 	gradeVal := sql.NullString{String: scoreResult.Grade, Valid: true}
+	nameserverTimingsJSON, err := toNullJSON(job.NameserverTimings)
+	if err != nil {
+		return fmt.Errorf("marshal nameserver timings: %w", err)
+	}
 
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -493,15 +497,15 @@ func (s *SQLJobStore) GraduateJob(job Job, engineEntries []engine.LogEntry) erro
 			created_at, started_at, finished_at, duration_ms,
 			sev_notice, sev_warning, sev_error, sev_critical,
 			worst_level, entry_count, profile, profile_id, profile_name,
-			effective_profile, public_id, priority, score, grade
-		) VALUES (%s)`, s.phRange(1, 23)),
+			effective_profile, public_id, priority, score, grade, nameserver_timings_json
+		) VALUES (%s)`, s.phRange(1, 24)),
 		job.ID, domainID, job.Domain, job.BatchID, string(job.Status),
 		s.ts(job.CreatedAt), s.ts(job.StartedAt), s.ts(job.FinishedAt), durationMs,
 		sevNotice, sevWarning, sevError, sevCritical,
 		worstLevel, len(engineEntries), job.Profile, nullInt64Value(job.ProfileID), job.ProfileName,
 		job.EffectiveProfile,
 		sql.NullString{String: job.PublicID, Valid: job.PublicID != ""},
-		int(job.Priority), scoreVal, gradeVal,
+		int(job.Priority), scoreVal, gradeVal, nameserverTimingsJSON,
 	); err != nil {
 		_ = tx.Rollback()
 		return fmt.Errorf("insert run: %w", err)
@@ -1184,7 +1188,7 @@ const runCols = `id, domain_id, domain, batch_id, status,
 	created_at, started_at, finished_at, duration_ms,
 	sev_notice, sev_warning, sev_error, sev_critical,
 	worst_level, entry_count, profile, profile_id, profile_name,
-	effective_profile, public_id, priority, score, grade`
+	effective_profile, public_id, priority, score, grade, nameserver_timings_json`
 
 func (s *SQLJobStore) scanRun(row rowScanner) (Run, error) {
 	var (
@@ -1199,13 +1203,14 @@ func (s *SQLJobStore) scanRun(row rowScanner) (Run, error) {
 		priority                                                                        int
 		score                                                                           sql.NullInt64
 		grade                                                                           sql.NullString
+		nameserverTimingsJSON                                                           sql.NullString
 	)
 	if err := row.Scan(
 		&id, &domainID, &domain, &batchID, &status,
 		&createdAt, &startedAt, &finishedAt, &durationMs,
 		&sevNotice, &sevWarning, &sevError, &sevCritical,
 		&worstLevel, &entryCount, &profile, &profileID, &profileName,
-		&effectiveProfile, &publicID, &priority, &score, &grade,
+		&effectiveProfile, &publicID, &priority, &score, &grade, &nameserverTimingsJSON,
 	); err != nil {
 		return Run{}, err
 	}
@@ -1232,6 +1237,11 @@ func (s *SQLJobStore) scanRun(row rowScanner) (Run, error) {
 		PublicID:         publicID.String,
 		Priority:         JobPriority(priority),
 	}
+	timings, err := unmarshalNullJSON[[]NameserverTiming](nameserverTimingsJSON)
+	if err != nil {
+		return Run{}, fmt.Errorf("unmarshal nameserver_timings_json: %w", err)
+	}
+	r.NameserverTimings = timings
 	if score.Valid {
 		v := int(score.Int64)
 		r.Score = &v

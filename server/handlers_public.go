@@ -48,7 +48,8 @@ func publicProfileView(profile StoredProfile) PublicProfileView {
 
 // publicInfoResponse holds public-facing server feature flags.
 type publicInfoResponse struct {
-	ShowScorePublic bool `json:"show_score_public"`
+	ShowScorePublic             bool `json:"show_score_public"`
+	ShowNameserverTimingsPublic bool `json:"show_nameserver_timings_public"`
 }
 
 // handlePublicInfo handles GET /pub/api/v1/info.
@@ -57,7 +58,8 @@ type publicInfoResponse struct {
 // scoring (fail-safe).
 func (s *Server) handlePublicInfo(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, publicInfoResponse{
-		ShowScorePublic: s.cfg.ShowScorePublic,
+		ShowScorePublic:             s.cfg.ShowScorePublic,
+		ShowNameserverTimingsPublic: s.cfg.ShowNameserverTimingsPublic,
 	})
 }
 
@@ -183,6 +185,9 @@ func (s *Server) handlePublicGetResult(w http.ResponseWriter, r *http.Request) {
 	}
 	if !s.cfg.ShowScorePublic {
 		result.Score = nil
+	}
+	if !s.cfg.ShowNameserverTimingsPublic {
+		result.NameserverTimings = nil
 	}
 	writeJSON(w, http.StatusOK, result)
 }

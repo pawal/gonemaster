@@ -407,6 +407,7 @@ func TestPublicAPIEndpointsUnreachableViaInternalPrefix(t *testing.T) {
 func TestPublicResultOmitsScoreWhenPublicScoringDisabled(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.ShowScorePublic = false
+	cfg.ShowNameserverTimingsPublic = false
 	srv := New(cfg)
 
 	job := Job{
@@ -415,6 +416,9 @@ func TestPublicResultOmitsScoreWhenPublicScoringDisabled(t *testing.T) {
 		Status:    JobSucceeded,
 		CreatedAt: time.Now().UTC(),
 		Progress:  100,
+		NameserverTimings: []NameserverTiming{
+			{Nameserver: "ns1.example.com", Address: "192.0.2.10", AvgMS: 24, MinMS: 20, MaxMS: 30, Count: 3},
+		},
 	}
 	created, err := srv.store.Create(job)
 	if err != nil {
@@ -436,5 +440,8 @@ func TestPublicResultOmitsScoreWhenPublicScoringDisabled(t *testing.T) {
 	}
 	if result.Score != nil {
 		t.Fatal("expected Score to be nil when ShowScorePublic=false")
+	}
+	if result.NameserverTimings != nil {
+		t.Fatal("expected NameserverTimings to be nil when ShowNameserverTimingsPublic=false")
 	}
 }

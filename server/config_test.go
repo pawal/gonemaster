@@ -72,6 +72,50 @@ func TestDefaultConfigShowScorePublic(t *testing.T) {
 	}
 }
 
+func TestDefaultConfigShowNameserverTimingsAdmin(t *testing.T) {
+	cfg := DefaultConfig()
+	if !cfg.ShowNameserverTimingsAdmin {
+		t.Fatal("expected ShowNameserverTimingsAdmin to default to true")
+	}
+}
+
+func TestApplyFileConfigShowNameserverTimingsAdmin(t *testing.T) {
+	cfg := DefaultConfig()
+	f := false
+	cfg.ApplyFileConfig(FileConfig{ShowNameserverTimingsAdmin: &f})
+	if cfg.ShowNameserverTimingsAdmin {
+		t.Fatal("expected ShowNameserverTimingsAdmin to be false after applying file config")
+	}
+
+	cfg2 := DefaultConfig()
+	cfg2.ApplyFileConfig(FileConfig{ShowNameserverTimingsAdmin: nil})
+	if !cfg2.ShowNameserverTimingsAdmin {
+		t.Fatal("expected ShowNameserverTimingsAdmin to stay true when file config has nil")
+	}
+}
+
+func TestDefaultConfigShowNameserverTimingsPublic(t *testing.T) {
+	cfg := DefaultConfig()
+	if !cfg.ShowNameserverTimingsPublic {
+		t.Fatal("expected ShowNameserverTimingsPublic to default to true")
+	}
+}
+
+func TestApplyFileConfigShowNameserverTimingsPublic(t *testing.T) {
+	cfg := DefaultConfig()
+	f := false
+	cfg.ApplyFileConfig(FileConfig{ShowNameserverTimingsPublic: &f})
+	if cfg.ShowNameserverTimingsPublic {
+		t.Fatal("expected ShowNameserverTimingsPublic to be false after applying file config")
+	}
+
+	cfg2 := DefaultConfig()
+	cfg2.ApplyFileConfig(FileConfig{ShowNameserverTimingsPublic: nil})
+	if !cfg2.ShowNameserverTimingsPublic {
+		t.Fatal("expected ShowNameserverTimingsPublic to stay true when file config has nil")
+	}
+}
+
 func TestApplyFileConfigShowScorePublic(t *testing.T) {
 	cfg := DefaultConfig()
 	f := false

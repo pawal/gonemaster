@@ -87,6 +87,7 @@
   // Server-controlled feature flag: whether scoring UI is shown. Defaults to
   // true so scoring is visible before the features response arrives.
   let scoringEnabled = true;
+  let nameserverTimingsEnabled = true;
   let undelegatedRowCounter = 0;
   let notifyOnJobComplete = false;
   let notifyOnBatchComplete = false;
@@ -2032,8 +2033,11 @@
       if (data && typeof data.show_score_admin === "boolean") {
         scoringEnabled = data.show_score_admin;
       }
+      if (data && typeof data.show_nameserver_timings_admin === "boolean") {
+        nameserverTimingsEnabled = data.show_nameserver_timings_admin;
+      }
     } catch (_) {
-      // Keep scoringEnabled = true on failure (fail-open for admin UI).
+      // Keep feature flags enabled on failure (fail-open for admin UI).
     }
   };
 
@@ -2758,7 +2762,7 @@
                 {/each}
               </div>
             {/if}
-            {#if nsTimings.length}
+            {#if nameserverTimingsEnabled && nsTimings.length}
               <details class="score-bonus ns-timings-card" data-testid="admin-nameserver-timings">
                 <summary class="score-bonus-summary ns-timings-summary">
                   <span class="score-bonus-chevron"></span>
@@ -3132,7 +3136,7 @@
                   {/each}
                 </div>
               {/if}
-              {#if nsTimings.length}
+              {#if nameserverTimingsEnabled && nsTimings.length}
                 <details class="score-bonus ns-timings-card" data-testid="admin-nameserver-timings">
                   <summary class="score-bonus-summary ns-timings-summary">
                     <span class="score-bonus-chevron"></span>

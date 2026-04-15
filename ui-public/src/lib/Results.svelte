@@ -13,7 +13,7 @@
     return LEVELS.filter((l) => counts[l]).map((l) => ({ level: l, count: counts[l] }));
   }
 
-  let { publicID, domain = "", locale = "en", finishedAt = null, scoringEnabled = false } = $props();
+  let { publicID, domain = "", locale = "en", finishedAt = null, scoringEnabled = false, nameserverTimingsEnabled = true } = $props();
 
   let finishedStr = $derived((() => {
     if (!finishedAt) return "";
@@ -268,7 +268,7 @@
         </div>
       </details>
     {/each}
-    {#if nameserverTimings.length > 0}
+    {#if nameserverTimingsEnabled && nameserverTimings.length > 0}
       <details class="score-bonus ns-timings-card" data-testid="nameserver-timings">
         <summary class="score-bonus-summary ns-timings-summary">
           <span class="score-bonus-chevron"></span>

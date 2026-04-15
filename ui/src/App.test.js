@@ -2858,6 +2858,54 @@ describe("App", () => {
     unmount();
   });
 
+  it("hides nameserver timings in run inspector when admin feature flag is disabled", async () => {
+    const job = {
+      id: "job_ns_timings_hidden",
+      domain: "example.com",
+      status: "succeeded",
+      created_at: "2026-02-03T00:00:00Z",
+      progress: 100
+    };
+    const result = {
+      summary: { levels: {} },
+      nameserver_timings: [
+        { nameserver: "ns1.example.com", address: "192.0.2.10", avg_ms: 24, min_ms: 20, max_ms: 30, count: 3 }
+      ],
+      raw: { locale: "en", entries: [] }
+    };
+
+    global.fetch.mockImplementation((url) => {
+      if (url === "/api/v1/features") {
+        return jsonResponse({ show_score_admin: true, show_nameserver_timings_admin: false });
+      }
+      if (typeof url === "string" && url.startsWith("/api/v1/jobs?")) {
+        return jsonResponse({ items: [] });
+      }
+      if (url === `/api/v1/jobs/${job.id}`) {
+        return jsonResponse(job);
+      }
+      if (typeof url === "string" && url.startsWith(`/api/v1/jobs/${job.id}/result`)) {
+        return jsonResponse(result);
+      }
+      if (typeof url === "string" && url.startsWith(`/api/v1/runs/${job.id}`)) {
+        return jsonResponse({ id: job.id, domain: "example.com", status: "succeeded", duration_ms: 1200, entry_count: 4, worst_level: "NOTICE" });
+      }
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+
+    const input = await screen.findByLabelText("Job ID");
+    await fireEvent.input(input, { target: { value: job.id } });
+    await fireEvent.change(input);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("admin-nameserver-timings")).toBeNull();
+    });
+
+    unmount();
+  });
+
   describe("locale selector", () => {
     const mockFetchWithLocales = (locales) => {
       global.fetch.mockImplementation((url) => {
@@ -3591,6 +3639,50 @@ describe("App", () => {
 
       unmount();
     });
+
+    it("hides nameserver timings in domain run results when admin feature flag is disabled", async () => {
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value === "/api/v1/features") {
+          return jsonResponse({ show_score_admin: true, show_nameserver_timings_admin: false });
+        }
+        if (value.includes("/api/v1/domains/8/runs")) {
+          return jsonResponse({
+            items: [{ id: "run-ns-hidden", finished_at: "2026-03-15T10:00:00Z", worst_level: "NOTICE", duration_ms: 900, entry_count: 2 }],
+            total: 1
+          });
+        }
+        if (value.includes("/api/v1/jobs/run-ns-hidden/result")) {
+          return jsonResponse({
+            job_id: "run-ns-hidden",
+            status: "succeeded",
+            summary: { levels: {} },
+            nameserver_timings: [
+              { nameserver: "ns1.example.com", address: "192.0.2.10", avg_ms: 24, min_ms: 20, max_ms: 30, count: 3 }
+            ],
+            raw: { locale: "en", entries: [] }
+          });
+        }
+        if (value.includes("/api/v1/domains")) {
+          return jsonResponse({
+            items: [{ id: 8, name: "example.com", tags: [], latest_level: "NOTICE", latest_run_at: "2026-03-15T10:00:00Z", run_count: 1 }],
+            total: 1
+          });
+        }
+        if (value.includes("/api/v1/tags")) return jsonResponse([]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openDomainsTab();
+      await fireEvent.click(await screen.findByText("example.com"));
+
+      await waitFor(() => {
+        expect(screen.queryByTestId("admin-nameserver-timings")).toBeNull();
+      });
+
+      unmount();
+    });
   });
 
   describe("Tags tab", () => {
@@ -4023,6 +4115,9 @@ describe("App", () => {
       rate_limit_max: { value: 10, source: "default" },
       rate_limit_window: { value: "10m0s", source: "default" },
       show_score_admin: { value: true, source: "default" },
+      show_score_public: { value: true, source: "default" },
+      show_nameserver_timings_admin: { value: true, source: "default" },
+      show_nameserver_timings_public: { value: true, source: "default" },
     });
 
     const settingsMock = (url, options = {}) => {
@@ -4064,6 +4159,9 @@ describe("App", () => {
       const listenInput = screen.getByLabelText(/Listen address/);
       expect(listenInput.value).toBe("127.0.0.1:8080");
       expect(listenInput.disabled).toBe(true);
+
+      expect(screen.getByLabelText(/Show nameserver timings in admin UI/)).toBeInTheDocument();
+      expect(screen.getByLabelText(/Show nameserver timings in public UI/)).toBeInTheDocument();
 
       unmount();
     });

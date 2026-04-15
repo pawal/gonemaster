@@ -101,6 +101,46 @@ func TestCreateAndGetJob(t *testing.T) {
 	}
 }
 
+func TestGetJobResultOmitsNameserverTimingsWhenAdminDisplayDisabled(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.ShowNameserverTimingsAdmin = false
+	srv := New(cfg)
+
+	now := time.Now().UTC()
+	job := Job{
+		ID:         newID("job"),
+		Domain:     "example.com",
+		Status:     JobSucceeded,
+		CreatedAt:  now,
+		StartedAt:  now,
+		FinishedAt: now,
+		NameserverTimings: []NameserverTiming{
+			{Nameserver: "ns1.example.com", Address: "192.0.2.10", AvgMS: 24, MinMS: 20, MaxMS: 30, Count: 3},
+		},
+	}
+	if _, err := srv.store.Create(job); err != nil {
+		t.Fatalf("create job: %v", err)
+	}
+	if err := srv.store.GraduateJob(job, nil); err != nil {
+		t.Fatalf("graduate job: %v", err)
+	}
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs/"+job.ID+"/result", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", resp.Code, resp.Body)
+	}
+
+	var result JobResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if result.NameserverTimings != nil {
+		t.Fatal("expected NameserverTimings to be nil when ShowNameserverTimingsAdmin=false")
+	}
+}
+
 func TestCreateJobCSRFRejectsMismatchedOrigin(t *testing.T) {
 	srv := New(DefaultConfig())
 

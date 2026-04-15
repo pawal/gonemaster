@@ -205,6 +205,22 @@ describe("Results", () => {
     expect(screen.queryByTestId("nameserver-timings")).toBeNull();
   });
 
+  it("hides nameserver timing table when display is disabled", async () => {
+    global.fetch.mockResolvedValue(resultResp([], {}, [
+      {
+        nameserver: "ns1.example.com",
+        address: "192.0.2.10",
+        avg_ms: 24,
+        min_ms: 20,
+        max_ms: 30,
+        count: 3,
+      },
+    ]));
+    render(Results, { props: { publicID: "abc12345", domain: "example.com", nameserverTimingsEnabled: false } });
+    await waitFor(() => expect(screen.getByTestId("result-banner")).toBeTruthy());
+    expect(screen.queryByTestId("nameserver-timings")).toBeNull();
+  });
+
   it("shows error on 404", async () => {
     global.fetch.mockResolvedValue(errResp(404));
     render(Results, { props: { publicID: "abc12345" } });

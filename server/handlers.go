@@ -699,6 +699,9 @@ func (s *Server) handleGetJobResult(w http.ResponseWriter, r *http.Request, jobI
 	if !s.cfg.ShowScoreAdmin {
 		result.Score = nil
 	}
+	if !s.cfg.ShowNameserverTimingsAdmin {
+		result.NameserverTimings = nil
+	}
 	writeJSON(w, http.StatusOK, result)
 }
 

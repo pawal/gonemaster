@@ -25,7 +25,7 @@ func TestGetSettings(t *testing.T) {
 	}
 
 	// Check a few known settings exist.
-	for _, key := range []string{"worker_count", "min_level", "listen_addr"} {
+	for _, key := range []string{"worker_count", "min_level", "listen_addr", "show_nameserver_timings_admin", "show_nameserver_timings_public"} {
 		if _, ok := settings[key]; !ok {
 			t.Errorf("missing setting %q", key)
 		}
@@ -94,7 +94,12 @@ func TestGetSettingsDatabaseOverride(t *testing.T) {
 func TestPutSettings(t *testing.T) {
 	srv := New(DefaultConfig())
 
-	body := `{"worker_count": 16, "min_level": "WARNING"}`
+	body := `{
+		"worker_count": 16,
+		"min_level": "WARNING",
+		"show_nameserver_timings_admin": false,
+		"show_nameserver_timings_public": false
+	}`
 	resp := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/settings", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -119,6 +124,29 @@ func TestPutSettings(t *testing.T) {
 	}
 	if v != "WARNING" {
 		t.Fatalf("min_level: got %q, want %q", v, "WARNING")
+	}
+
+	v, ok = srv.store.GetSetting("show_nameserver_timings_admin")
+	if !ok {
+		t.Fatal("show_nameserver_timings_admin not found in store")
+	}
+	if v != "false" {
+		t.Fatalf("show_nameserver_timings_admin: got %q, want %q", v, "false")
+	}
+
+	v, ok = srv.store.GetSetting("show_nameserver_timings_public")
+	if !ok {
+		t.Fatal("show_nameserver_timings_public not found in store")
+	}
+	if v != "false" {
+		t.Fatalf("show_nameserver_timings_public: got %q, want %q", v, "false")
+	}
+
+	if srv.cfg.ShowNameserverTimingsAdmin {
+		t.Fatal("expected ShowNameserverTimingsAdmin to be false after PUT")
+	}
+	if srv.cfg.ShowNameserverTimingsPublic {
+		t.Fatal("expected ShowNameserverTimingsPublic to be false after PUT")
 	}
 }
 
@@ -440,11 +468,15 @@ func TestPublicInfoEndpointDefault(t *testing.T) {
 	if !info.ShowScorePublic {
 		t.Fatal("expected show_score_public=true by default")
 	}
+	if !info.ShowNameserverTimingsPublic {
+		t.Fatal("expected show_nameserver_timings_public=true by default")
+	}
 }
 
 func TestPublicInfoEndpointReflectsConfig(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.ShowScorePublic = false
+	cfg.ShowNameserverTimingsPublic = false
 	srv := New(cfg)
 
 	resp := httptest.NewRecorder()
@@ -461,6 +493,9 @@ func TestPublicInfoEndpointReflectsConfig(t *testing.T) {
 	}
 	if info.ShowScorePublic {
 		t.Fatal("expected show_score_public=false when disabled in config")
+	}
+	if info.ShowNameserverTimingsPublic {
+		t.Fatal("expected show_nameserver_timings_public=false when disabled in config")
 	}
 }
 
@@ -482,11 +517,15 @@ func TestFeaturesEndpointDefault(t *testing.T) {
 	if !feat.ShowScoreAdmin {
 		t.Fatal("expected show_score_admin=true by default")
 	}
+	if !feat.ShowNameserverTimingsAdmin {
+		t.Fatal("expected show_nameserver_timings_admin=true by default")
+	}
 }
 
 func TestFeaturesEndpointReflectsConfig(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.ShowScoreAdmin = false
+	cfg.ShowNameserverTimingsAdmin = false
 	srv := New(cfg)
 
 	resp := httptest.NewRecorder()
@@ -503,5 +542,8 @@ func TestFeaturesEndpointReflectsConfig(t *testing.T) {
 	}
 	if feat.ShowScoreAdmin {
 		t.Fatal("expected show_score_admin=false when disabled in config")
+	}
+	if feat.ShowNameserverTimingsAdmin {
+		t.Fatal("expected show_nameserver_timings_admin=false when disabled in config")
 	}
 }

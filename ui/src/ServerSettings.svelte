@@ -51,6 +51,13 @@
         { key: "show_score_public", type: "toggle" },
       ],
     },
+    {
+      key: "settings_group_nameserver_timings",
+      settings: [
+        { key: "show_nameserver_timings_admin", type: "toggle" },
+        { key: "show_nameserver_timings_public", type: "toggle" },
+      ],
+    },
   ];
 
   const apiFetch = async (path, options = {}) => {

@@ -75,6 +75,9 @@ type RunRequest struct {
 	BadkeysPath *string
 	// NameserverCache optionally provides the per-run nameserver cache store.
 	NameserverCache *ns.CacheStore
+	// Recursor optionally supplies a prepared recursor. When set, the engine
+	// uses it instead of constructing a fresh one, preserving any seeded cache.
+	Recursor *recursor.Recursor
 	// LogCallback receives each log entry as it is created.
 	LogCallback func(*logger.Entry) error
 	// Context controls cancellation and timeouts for the run.
@@ -597,9 +600,13 @@ func runWithContext(ctx context.Context, req RunRequest, module string, testcase
 	req.UndelegatedNameservers = normalizedNameservers
 	req.UndelegatedDSInfo = normalizedDSInfo
 
-	r, err := recursor.New()
-	if err != nil {
-		return nil, err
+	r := req.Recursor
+	if r == nil {
+		var err error
+		r, err = recursor.New()
+		if err != nil {
+			return nil, err
+		}
 	}
 	z, err := zone.NewWithRecursor(req.Domain, r)
 	if err != nil {

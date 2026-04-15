@@ -99,6 +99,10 @@ func (s *Server) applySetting(key, val string) {
 		s.cfg.ShowScoreAdmin = val == "true"
 	case "show_score_public":
 		s.cfg.ShowScorePublic = val == "true"
+	case "show_nameserver_timings_admin":
+		s.cfg.ShowNameserverTimingsAdmin = val == "true"
+	case "show_nameserver_timings_public":
+		s.cfg.ShowNameserverTimingsPublic = val == "true"
 	case "cross_job_hot_cache_ttl_seconds":
 		if v, err := strconv.Atoi(val); err == nil && v >= 1 {
 			s.cfg.CrossJobHotCacheTTLSeconds = v
@@ -134,7 +138,8 @@ func (s *Server) applySettingsToRuntime() {
 
 // featuresResponse holds server-side feature flags exposed to the admin UI.
 type featuresResponse struct {
-	ShowScoreAdmin bool `json:"show_score_admin"`
+	ShowScoreAdmin             bool `json:"show_score_admin"`
+	ShowNameserverTimingsAdmin bool `json:"show_nameserver_timings_admin"`
 }
 
 // handleFeatures handles GET /api/v1/features.
@@ -142,7 +147,8 @@ type featuresResponse struct {
 // to decide which UI components to display.
 func (s *Server) handleFeatures(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, featuresResponse{
-		ShowScoreAdmin: s.cfg.ShowScoreAdmin,
+		ShowScoreAdmin:             s.cfg.ShowScoreAdmin,
+		ShowNameserverTimingsAdmin: s.cfg.ShowNameserverTimingsAdmin,
 	})
 }
 
@@ -166,20 +172,22 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, _ *http.Request) {
 
 	// Build the settings map with current effective values.
 	settings := map[string]settingEntry{
-		"listen_addr":        {Value: cfg.ListenAddr, Source: s.settingSource("listen_addr"), Readonly: true},
-		"db_driver":          {Value: cfg.Database.Driver, Source: s.settingSource("db_driver"), Readonly: true},
-		"db_dsn":             {Value: cfg.Database.DSN, Source: s.settingSource("db_dsn"), Readonly: true},
-		"profile_path":       {Value: cfg.ProfilePath, Source: s.settingSource("profile_path"), Readonly: true},
-		"worker_count":       {Value: cfg.WorkerCount, Source: s.settingSource("worker_count")},
-		"max_concurrent_jobs": {Value: cfg.MaxConcurrentJobs, Source: s.settingSource("max_concurrent_jobs")},
-		"min_level":          {Value: cfg.MinLevel, Source: s.settingSource("min_level")},
-		"retention_days":     {Value: cfg.Database.RetentionDays, Source: s.settingSource("retention_days")},
-		"public_url":         {Value: cfg.PublicURL, Source: s.settingSource("public_url")},
-		"rate_limit_enabled": {Value: cfg.PublicAPI.RateLimitEnabled, Source: s.settingSource("rate_limit_enabled")},
-		"rate_limit_max":     {Value: cfg.PublicAPI.RateLimitMax, Source: s.settingSource("rate_limit_max")},
-		"rate_limit_window":  {Value: cfg.PublicAPI.RateLimitWindow.Duration.String(), Source: s.settingSource("rate_limit_window")},
-		"show_score_admin":               {Value: cfg.ShowScoreAdmin, Source: s.settingSource("show_score_admin")},
-		"show_score_public":              {Value: cfg.ShowScorePublic, Source: s.settingSource("show_score_public")},
+		"listen_addr":                     {Value: cfg.ListenAddr, Source: s.settingSource("listen_addr"), Readonly: true},
+		"db_driver":                       {Value: cfg.Database.Driver, Source: s.settingSource("db_driver"), Readonly: true},
+		"db_dsn":                          {Value: cfg.Database.DSN, Source: s.settingSource("db_dsn"), Readonly: true},
+		"profile_path":                    {Value: cfg.ProfilePath, Source: s.settingSource("profile_path"), Readonly: true},
+		"worker_count":                    {Value: cfg.WorkerCount, Source: s.settingSource("worker_count")},
+		"max_concurrent_jobs":             {Value: cfg.MaxConcurrentJobs, Source: s.settingSource("max_concurrent_jobs")},
+		"min_level":                       {Value: cfg.MinLevel, Source: s.settingSource("min_level")},
+		"retention_days":                  {Value: cfg.Database.RetentionDays, Source: s.settingSource("retention_days")},
+		"public_url":                      {Value: cfg.PublicURL, Source: s.settingSource("public_url")},
+		"rate_limit_enabled":              {Value: cfg.PublicAPI.RateLimitEnabled, Source: s.settingSource("rate_limit_enabled")},
+		"rate_limit_max":                  {Value: cfg.PublicAPI.RateLimitMax, Source: s.settingSource("rate_limit_max")},
+		"rate_limit_window":               {Value: cfg.PublicAPI.RateLimitWindow.Duration.String(), Source: s.settingSource("rate_limit_window")},
+		"show_score_admin":                {Value: cfg.ShowScoreAdmin, Source: s.settingSource("show_score_admin")},
+		"show_score_public":               {Value: cfg.ShowScorePublic, Source: s.settingSource("show_score_public")},
+		"show_nameserver_timings_admin":   {Value: cfg.ShowNameserverTimingsAdmin, Source: s.settingSource("show_nameserver_timings_admin")},
+		"show_nameserver_timings_public":  {Value: cfg.ShowNameserverTimingsPublic, Source: s.settingSource("show_nameserver_timings_public")},
 		"cross_job_hot_cache_ttl_seconds": {Value: cfg.CrossJobHotCacheTTLSeconds, Source: s.settingSource("cross_job_hot_cache_ttl_seconds")},
 	}
 

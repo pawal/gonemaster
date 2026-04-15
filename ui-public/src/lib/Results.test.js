@@ -2,13 +2,14 @@ import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/sv
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Results from "./Results.svelte";
 
-const resultResp = (entries = [], testcase_descriptions = {}) => ({
+const resultResp = (entries = [], testcase_descriptions = {}, nameserver_timings = []) => ({
   ok: true,
   status: 200,
   json: async () => ({
     job_id: "test-id",
     status: "succeeded",
     raw: { locale: "en", entries },
+    nameserver_timings,
     testcase_descriptions,
   }),
 });
@@ -162,6 +163,62 @@ describe("Results", () => {
     render(Results, { props: { publicID: "abc12345", domain: "example.com", finishedAt: null } });
     await waitFor(() => screen.getByTestId("result-banner"));
     expect(document.querySelector(".result-date")).toBeNull();
+  });
+
+  it("renders nameserver timing table when data is present", async () => {
+    global.fetch.mockResolvedValue(resultResp([], {}, [
+      {
+        nameserver: "ns1.example.com",
+        address: "192.0.2.10",
+        avg_ms: 24,
+        min_ms: 20,
+        max_ms: 30,
+        count: 3,
+      },
+      {
+        nameserver: "ns2.example.com",
+        address: "192.0.2.20",
+        avg_ms: 12,
+        min_ms: 10,
+        max_ms: 14,
+        count: 2,
+      },
+    ]));
+    render(Results, { props: { publicID: "abc12345", domain: "example.com" } });
+    await waitFor(() => expect(screen.getByTestId("nameserver-timings")).toBeTruthy());
+    const timings = screen.getByTestId("nameserver-timings");
+    expect(timings.open).toBe(false);
+
+    timings.open = true;
+    await fireEvent(timings, new Event("toggle"));
+
+    expect(screen.getAllByTestId("nameserver-timing-row")).toHaveLength(2);
+    expect(screen.getByText("ns1.example.com")).toBeTruthy();
+    expect(screen.getByText("192.0.2.10")).toBeTruthy();
+    expect(screen.getByText("24")).toBeTruthy();
+  });
+
+  it("hides nameserver timing table when no data is present", async () => {
+    global.fetch.mockResolvedValue(resultResp([]));
+    render(Results, { props: { publicID: "abc12345", domain: "example.com" } });
+    await waitFor(() => expect(screen.getByTestId("result-banner")).toBeTruthy());
+    expect(screen.queryByTestId("nameserver-timings")).toBeNull();
+  });
+
+  it("hides nameserver timing table when display is disabled", async () => {
+    global.fetch.mockResolvedValue(resultResp([], {}, [
+      {
+        nameserver: "ns1.example.com",
+        address: "192.0.2.10",
+        avg_ms: 24,
+        min_ms: 20,
+        max_ms: 30,
+        count: 3,
+      },
+    ]));
+    render(Results, { props: { publicID: "abc12345", domain: "example.com", nameserverTimingsEnabled: false } });
+    await waitFor(() => expect(screen.getByTestId("result-banner")).toBeTruthy());
+    expect(screen.queryByTestId("nameserver-timings")).toBeNull();
   });
 
   it("shows error on 404", async () => {

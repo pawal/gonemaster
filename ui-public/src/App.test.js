@@ -126,6 +126,30 @@ describe("App", () => {
     await waitFor(() => screen.getByTestId("results-view"));
   });
 
+  it("hides nameserver timings when public info disables them", async () => {
+    window.location.hash = "#/result/abc12345";
+    fetchRouter([
+      ["/locales", localesResp],
+      ["/info", { ok: true, json: async () => ({ show_score_public: false, show_nameserver_timings_public: false }) }],
+      ["jobs/abc12345/result", {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          job_id: "x",
+          status: "succeeded",
+          nameserver_timings: [
+            { nameserver: "ns1.example.com", address: "192.0.2.10", avg_ms: 24, min_ms: 20, max_ms: 30, count: 3 },
+          ],
+          raw: { locale: "en", entries: [] },
+        }),
+      }],
+      ["/jobs/", jobResp("succeeded", "example.com", 100)],
+    ]);
+    render(App);
+    await waitFor(() => screen.getByTestId("results-view"));
+    expect(screen.queryByTestId("nameserver-timings")).toBeNull();
+  });
+
   it("shows ExpiredResult when job is expired", async () => {
     window.location.hash = "#/result/abc12345";
     fetchRouter([

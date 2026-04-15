@@ -182,3 +182,75 @@ func TestProfileIntegrationJobOverridesAppearInRunSnapshot(t *testing.T) {
 		t.Fatalf("expected timeout 7, got %v", timeout)
 	}
 }
+
+// TestPublicAPIDisableIPv6IntegrationReachesEngineAndEffectiveProfile exercises
+// the full pipeline the public UI uses: POST /pub/api/v1/jobs with
+// ipv6_disabled=true, worker picks up the job, engine-runner boundary sees
+// req.IPv6=false, and the snapshotted effective profile has net.ipv6=false.
+//
+// Regression test for the bug where public-UI "disable IPv6" runs returned
+// "The test run failed. Please try again." because JobCreateRequest lacked
+// the field and readJSON's DisallowUnknownFields rejected the payload.
+func TestPublicAPIDisableIPv6IntegrationReachesEngineAndEffectiveProfile(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	var capturedIPv4, capturedIPv6 *bool
+	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		capturedIPv4 = req.IPv4
+		capturedIPv6 = req.IPv6
+		return nil, nil
+	}
+
+	// POST the exact body shape the public UI sends.
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
+		bytes.NewBufferString(`{"domain":"example.com","ipv6_disabled":true}`))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", resp.Code, resp.Body.String())
+	}
+	var created PublicJobView
+	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	// Resolve internal job ID via the store so we can drive the worker.
+	stored, ok := srv.store.GetByPublicID(created.PublicID)
+	if !ok {
+		t.Fatal("expected stored job for public id")
+	}
+	if !stored.IPv6Disabled {
+		t.Fatal("expected stored Job.IPv6Disabled=true")
+	}
+
+	if err := srv.runJob(stored.ID); err != nil {
+		t.Fatalf("runJob: %v", err)
+	}
+
+	// Engine boundary: IPv6 pointer set to false, IPv4 untouched.
+	if capturedIPv6 == nil || *capturedIPv6 {
+		t.Fatalf("expected captured req.IPv6=false, got %#v", capturedIPv6)
+	}
+	if capturedIPv4 != nil {
+		t.Fatalf("expected captured req.IPv4=nil, got %#v", capturedIPv4)
+	}
+
+	// Effective profile snapshot on the Run should reflect the disable.
+	run := getRunByAPI(t, srv, stored.ID)
+	if run.EffectiveProfile == "" {
+		t.Fatal("expected effective_profile snapshot")
+	}
+	effective, err := engineprofile.FromJSON(run.EffectiveProfile)
+	if err != nil {
+		t.Fatalf("parse effective profile: %v", err)
+	}
+	ipv6, err := effective.Get("net.ipv6")
+	if err != nil {
+		t.Fatalf("get net.ipv6: %v", err)
+	}
+	if value, ok := ipv6.(bool); !ok || value {
+		t.Fatalf("expected net.ipv6 false in effective profile, got %v", ipv6)
+	}
+}

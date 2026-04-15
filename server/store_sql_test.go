@@ -270,8 +270,8 @@ func TestRunMigrationsRecordsVersion(t *testing.T) {
 		}
 		versions = append(versions, v)
 	}
-	if len(versions) != 5 || versions[0] != 1 || versions[1] != 2 || versions[2] != 3 || versions[3] != 4 || versions[4] != 5 {
-		t.Fatalf("expected versions [1 2 3 4 5], got %v", versions)
+	if len(versions) != 6 || versions[0] != 1 || versions[1] != 2 || versions[2] != 3 || versions[3] != 4 || versions[4] != 5 || versions[5] != 6 {
+		t.Fatalf("expected versions [1 2 3 4 5 6], got %v", versions)
 	}
 }
 
@@ -308,6 +308,30 @@ func TestRunMigrationsAddsProfileEditingColumns(t *testing.T) {
 		if name != tc.column {
 			t.Fatalf("%s column mismatch: got %q, want %q", tc.table, name, tc.column)
 		}
+	}
+}
+
+func TestRunMigrationsAddsNameserverTimingsColumn(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	db.SetMaxOpenConns(1)
+	defer db.Close()
+
+	if err := runMigrations(db, sqliteDialect{}); err != nil {
+		t.Fatalf("runMigrations: %v", err)
+	}
+
+	var name string
+	if err := db.QueryRow(
+		`SELECT name FROM pragma_table_info('runs') WHERE name = ?`,
+		"nameserver_timings_json",
+	).Scan(&name); err != nil {
+		t.Fatalf("runs.nameserver_timings_json not found after migration: %v", err)
+	}
+	if name != "nameserver_timings_json" {
+		t.Fatalf("column mismatch: got %q", name)
 	}
 }
 
@@ -519,6 +543,18 @@ func TestSQLJobStoreGraduateJobAndGetResult(t *testing.T) {
 				StartedAt:  now.Add(time.Second),
 				FinishedAt: now.Add(2 * time.Second),
 				PublicID:   "pub00001",
+				NameserverTimings: []NameserverTiming{
+					{
+						Nameserver: "ns1.grad.test",
+						Address:    "192.0.2.10",
+						AvgMS:      24,
+						MinMS:      20,
+						MaxMS:      30,
+						MedianMS:   22,
+						StddevMS:   4,
+						Count:      3,
+					},
+				},
 			}
 			if _, err := s.Create(job); err != nil {
 				t.Fatalf("Create: %v", err)
@@ -562,6 +598,12 @@ func TestSQLJobStoreGraduateJobAndGetResult(t *testing.T) {
 			if run.EntryCount != 3 {
 				t.Fatalf("EntryCount = %d, want 3", run.EntryCount)
 			}
+			if len(run.NameserverTimings) != 1 {
+				t.Fatalf("run.NameserverTimings len = %d, want 1", len(run.NameserverTimings))
+			}
+			if run.NameserverTimings[0].Nameserver != "ns1.grad.test" {
+				t.Fatalf("run nameserver = %q", run.NameserverTimings[0].Nameserver)
+			}
 
 			// GetResult must work.
 			result, ok := s.GetResult(job.ID)
@@ -579,6 +621,12 @@ func TestSQLJobStoreGraduateJobAndGetResult(t *testing.T) {
 			}
 			if len(result.Raw.Entries) != 3 {
 				t.Fatalf("result.Raw.Entries len = %d, want 3", len(result.Raw.Entries))
+			}
+			if len(result.NameserverTimings) != 1 {
+				t.Fatalf("result.NameserverTimings len = %d, want 1", len(result.NameserverTimings))
+			}
+			if result.NameserverTimings[0].Address != "192.0.2.10" {
+				t.Fatalf("result nameserver address = %q", result.NameserverTimings[0].Address)
 			}
 
 			// Get via job ID must reconstruct from runs.

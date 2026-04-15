@@ -105,5 +105,8 @@ func (s *Server) handleGetRunResult(w http.ResponseWriter, r *http.Request) {
 	if !s.cfg.ShowScoreAdmin {
 		result.Score = nil
 	}
+	if !s.cfg.ShowNameserverTimingsAdmin {
+		result.NameserverTimings = nil
+	}
 	writeJSON(w, http.StatusOK, result)
 }

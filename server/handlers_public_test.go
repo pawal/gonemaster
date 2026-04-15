@@ -229,6 +229,18 @@ func TestPublicGetResultReturnsResultByPublicID(t *testing.T) {
 		Status:    JobSucceeded,
 		CreatedAt: time.Now().UTC(),
 		Progress:  100,
+		NameserverTimings: []NameserverTiming{
+			{
+				Nameserver: "ns1.example.com",
+				Address:    "192.0.2.10",
+				AvgMS:      24,
+				MinMS:      20,
+				MaxMS:      30,
+				MedianMS:   22,
+				StddevMS:   4,
+				Count:      3,
+			},
+		},
 	}
 	created, err := srv.store.Create(job)
 	if err != nil {
@@ -251,6 +263,9 @@ func TestPublicGetResultReturnsResultByPublicID(t *testing.T) {
 	}
 	if result.Status != JobSucceeded {
 		t.Fatalf("status: got %q, want %q", result.Status, JobSucceeded)
+	}
+	if len(result.NameserverTimings) != 1 {
+		t.Fatalf("nameserver timings len = %d, want 1", len(result.NameserverTimings))
 	}
 }
 
@@ -392,6 +407,7 @@ func TestPublicAPIEndpointsUnreachableViaInternalPrefix(t *testing.T) {
 func TestPublicResultOmitsScoreWhenPublicScoringDisabled(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.ShowScorePublic = false
+	cfg.ShowNameserverTimingsPublic = false
 	srv := New(cfg)
 
 	job := Job{
@@ -400,6 +416,9 @@ func TestPublicResultOmitsScoreWhenPublicScoringDisabled(t *testing.T) {
 		Status:    JobSucceeded,
 		CreatedAt: time.Now().UTC(),
 		Progress:  100,
+		NameserverTimings: []NameserverTiming{
+			{Nameserver: "ns1.example.com", Address: "192.0.2.10", AvgMS: 24, MinMS: 20, MaxMS: 30, Count: 3},
+		},
 	}
 	created, err := srv.store.Create(job)
 	if err != nil {
@@ -421,5 +440,61 @@ func TestPublicResultOmitsScoreWhenPublicScoringDisabled(t *testing.T) {
 	}
 	if result.Score != nil {
 		t.Fatal("expected Score to be nil when ShowScorePublic=false")
+	}
+	if result.NameserverTimings != nil {
+		t.Fatal("expected NameserverTimings to be nil when ShowNameserverTimingsPublic=false")
+	}
+}
+
+func TestPublicCreateJobAcceptsIPv6Disabled(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
+		bytes.NewBufferString(`{"domain":"example.com","ipv6_disabled":true}`))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", resp.Code, resp.Body.String())
+	}
+	var view PublicJobView
+	if err := json.NewDecoder(resp.Body).Decode(&view); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	job, ok := srv.store.GetByPublicID(view.PublicID)
+	if !ok {
+		t.Fatal("expected stored public job")
+	}
+	if !job.IPv6Disabled {
+		t.Fatal("expected job.IPv6Disabled=true")
+	}
+	if job.IPv4Disabled {
+		t.Fatal("expected job.IPv4Disabled=false")
+	}
+}
+
+func TestPublicCreateJobAcceptsIPv4Disabled(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
+		bytes.NewBufferString(`{"domain":"example.com","ipv4_disabled":true}`))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", resp.Code, resp.Body.String())
+	}
+	var view PublicJobView
+	if err := json.NewDecoder(resp.Body).Decode(&view); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	job, ok := srv.store.GetByPublicID(view.PublicID)
+	if !ok {
+		t.Fatal("expected stored public job")
+	}
+	if !job.IPv4Disabled {
+		t.Fatal("expected job.IPv4Disabled=true")
 	}
 }

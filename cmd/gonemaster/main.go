@@ -17,8 +17,10 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/badkeys"
+	"codeberg.org/pawal/gonemaster/engine/cachefile"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/normalization"
+	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/scoring"
 )
 
@@ -620,15 +622,27 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	}
 
 	var packetCacheStore *nameserver.CacheStore
+	var packetCacheRecursor *recursor.Recursor
 	if strings.TrimSpace(savePacketCachePath) != "" || strings.TrimSpace(restorePacketCachePath) != "" || nstimes {
 		packetCacheStore = nameserver.NewCacheStore()
+		if strings.TrimSpace(savePacketCachePath) != "" || strings.TrimSpace(restorePacketCachePath) != "" {
+			rec, recErr := recursor.New()
+			if recErr != nil {
+				fmt.Fprintln(errOut, recErr.Error())
+				return 2
+			}
+			packetCacheRecursor = rec
+		}
 		if strings.TrimSpace(restorePacketCachePath) != "" {
-			if restoreErr := packetCacheStore.RestorePacketCache(restorePacketCachePath); restoreErr != nil {
+			if restoreErr := cachefile.Restore(restorePacketCachePath, packetCacheStore, packetCacheRecursor); restoreErr != nil {
 				fmt.Fprintln(errOut, restoreErr.Error())
 				return 2
 			}
 		}
 		req.NameserverCache = packetCacheStore
+		if packetCacheRecursor != nil {
+			req.Recursor = packetCacheRecursor
+		}
 	}
 
 	var rawWriter io.Writer
@@ -735,7 +749,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		}
 	}
 	if packetCacheStore != nil && strings.TrimSpace(savePacketCachePath) != "" {
-		if saveErr := packetCacheStore.SavePacketCache(savePacketCachePath); saveErr != nil {
+		if saveErr := cachefile.Save(savePacketCachePath, packetCacheStore, packetCacheRecursor); saveErr != nil {
 			fmt.Fprintln(errOut, saveErr.Error())
 			return 2
 		}

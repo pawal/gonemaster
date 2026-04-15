@@ -1,0 +1,367 @@
+// Package cachefile defines the on-disk schema for gonemaster's unified
+// packet cache save/restore format and orchestrates import/export against
+// the nameserver and recursor caches.
+package cachefile
+
+import (
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"os"
+	"strings"
+
+	"codeberg.org/pawal/gonemaster/engine/nameserver"
+	"codeberg.org/pawal/gonemaster/engine/recursor"
+)
+
+const (
+	// Format identifies the on-disk cache file format.
+	Format = "gonemaster.packet-cache"
+	// Version is the current schema version.
+	Version = 2
+
+	// KindNameserver tags per-nameserver cache entries.
+	KindNameserver = "nameserver"
+	// KindRecursor tags recursor cache entries.
+	KindRecursor = "recursor"
+)
+
+// File is the portable representation of the unified packet cache.
+type File struct {
+	Format   string  `json:"format"`
+	Version  int     `json:"version"`
+	Checksum string  `json:"checksum,omitempty"`
+	Entries  []Entry `json:"entries"`
+}
+
+// Entry is a single cache record discriminated by Kind.
+type Entry struct {
+	Kind string `json:"kind"`
+
+	// Nameserver-kind fields.
+	Address    string `json:"address,omitempty"`
+	Key        string `json:"key,omitempty"`
+	AnswerFrom string `json:"answer_from,omitempty"`
+
+	// Recursor-kind fields.
+	Name        string          `json:"name,omitempty"`
+	QType       string          `json:"qtype,omitempty"`
+	QClass      string          `json:"qclass,omitempty"`
+	Nameservers []NameserverRef `json:"nameservers,omitempty"`
+
+	// Common fields.
+	Message   string `json:"message,omitempty"`
+	NoMessage bool   `json:"no_message,omitempty"`
+}
+
+// NameserverRef identifies a nameserver for recursor-kind entries.
+type NameserverRef struct {
+	Name    string `json:"name"`
+	Address string `json:"address"`
+}
+
+// Option configures Import/Restore behaviour.
+type Option func(*config)
+
+type config struct {
+	strict bool
+	warnf  func(string, ...any)
+}
+
+func newConfig(opts []Option) *config {
+	c := &config{}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
+}
+
+func (c *config) warn(format string, args ...any) {
+	if c.warnf != nil {
+		c.warnf(format, args...)
+	}
+}
+
+// WithStrict turns every non-fatal warning into an error. Useful in CI or
+// automated replay pipelines where silent acceptance of unknown fields or
+// missing checksums is undesirable.
+func WithStrict() Option {
+	return func(c *config) { c.strict = true }
+}
+
+// WithWarnf installs a callback that receives non-fatal warnings (unknown
+// fields, unknown kinds, missing checksum). In strict mode these become
+// errors instead.
+func WithWarnf(f func(string, ...any)) Option {
+	return func(c *config) { c.warnf = f }
+}
+
+// Export collects entries from the supplied caches into a File and stamps a
+// checksum covering the entries.
+func Export(ns *nameserver.CacheStore, rec *recursor.Recursor) (File, error) {
+	out := File{Format: Format, Version: Version, Entries: []Entry{}}
+
+	if ns != nil {
+		nsEntries, err := ns.ExportEntries()
+		if err != nil {
+			return File{}, err
+		}
+		for _, e := range nsEntries {
+			entry := Entry{
+				Kind:       KindNameserver,
+				Address:    e.Address,
+				Key:        e.Key,
+				AnswerFrom: e.AnswerFrom,
+				NoMessage:  e.NoMessage,
+			}
+			if !e.NoMessage {
+				entry.Message = base64.StdEncoding.EncodeToString(e.Message)
+			}
+			out.Entries = append(out.Entries, entry)
+		}
+	}
+
+	if rec != nil {
+		recEntries, err := rec.ExportCacheEntries()
+		if err != nil {
+			return File{}, err
+		}
+		for _, e := range recEntries {
+			refs := make([]NameserverRef, 0, len(e.Nameservers))
+			for _, r := range e.Nameservers {
+				refs = append(refs, NameserverRef{Name: r.Name, Address: r.Address})
+			}
+			out.Entries = append(out.Entries, Entry{
+				Kind:        KindRecursor,
+				Name:        e.Name,
+				QType:       e.QType,
+				QClass:      e.QClass,
+				Nameservers: refs,
+				Message:     base64.StdEncoding.EncodeToString(e.Message),
+			})
+		}
+	}
+
+	sum, err := checksumFor(out)
+	if err != nil {
+		return File{}, err
+	}
+	out.Checksum = sum
+	return out, nil
+}
+
+// Import applies the supplied File to the caches. Either cache may be nil,
+// in which case entries of that kind trigger an error.
+func Import(file File, ns *nameserver.CacheStore, rec *recursor.Recursor, opts ...Option) error {
+	cfg := newConfig(opts)
+
+	if strings.TrimSpace(file.Format) == "" {
+		return fmt.Errorf("packet cache format is required")
+	}
+	if file.Format != Format {
+		return fmt.Errorf("unsupported packet cache format %q", file.Format)
+	}
+	if file.Version != Version {
+		return fmt.Errorf("unsupported packet cache version %d", file.Version)
+	}
+
+	if strings.TrimSpace(file.Checksum) == "" {
+		if cfg.strict {
+			return fmt.Errorf("packet cache checksum is missing")
+		}
+		cfg.warn("packet cache checksum is missing")
+	} else {
+		want := strings.ToLower(strings.TrimSpace(file.Checksum))
+		got, err := checksumFor(file)
+		if err != nil {
+			return err
+		}
+		if got != want {
+			return fmt.Errorf("packet cache checksum mismatch: want %s, got %s", want, got)
+		}
+	}
+
+	var nsEntries []nameserver.Entry
+	var recEntries []recursor.CacheEntry
+
+	for idx, entry := range file.Entries {
+		switch entry.Kind {
+		case KindNameserver:
+			nsEntry := nameserver.Entry{
+				Address:    entry.Address,
+				Key:        entry.Key,
+				AnswerFrom: entry.AnswerFrom,
+				NoMessage:  entry.NoMessage,
+			}
+			if !entry.NoMessage {
+				wire, err := base64.StdEncoding.DecodeString(entry.Message)
+				if err != nil {
+					return fmt.Errorf("entry %d: decode message: %w", idx, err)
+				}
+				nsEntry.Message = wire
+			}
+			nsEntries = append(nsEntries, nsEntry)
+		case KindRecursor:
+			wire, err := base64.StdEncoding.DecodeString(entry.Message)
+			if err != nil {
+				return fmt.Errorf("entry %d: decode message: %w", idx, err)
+			}
+			refs := make([]recursor.NameserverRef, 0, len(entry.Nameservers))
+			for _, r := range entry.Nameservers {
+				refs = append(refs, recursor.NameserverRef{Name: r.Name, Address: r.Address})
+			}
+			recEntries = append(recEntries, recursor.CacheEntry{
+				Name:        entry.Name,
+				QType:       entry.QType,
+				QClass:      entry.QClass,
+				Nameservers: refs,
+				Message:     wire,
+			})
+		case "":
+			if cfg.strict {
+				return fmt.Errorf("entry %d: kind is required", idx)
+			}
+			cfg.warn("entry %d: kind is missing, skipping", idx)
+			continue
+		default:
+			if cfg.strict {
+				return fmt.Errorf("entry %d: unknown kind %q", idx, entry.Kind)
+			}
+			cfg.warn("entry %d: unknown kind %q, skipping", idx, entry.Kind)
+			continue
+		}
+	}
+
+	if len(nsEntries) > 0 {
+		if ns == nil {
+			return fmt.Errorf("nameserver cache entries present but nameserver cache is nil")
+		}
+		if err := ns.ImportEntries(nsEntries); err != nil {
+			return err
+		}
+	}
+	if len(recEntries) > 0 {
+		if rec == nil {
+			return fmt.Errorf("recursor cache entries present but recursor is nil")
+		}
+		if err := rec.ImportCacheEntries(recEntries); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Save writes the caches to path as JSON.
+func Save(path string, ns *nameserver.CacheStore, rec *recursor.Recursor) error {
+	target := strings.TrimSpace(path)
+	if target == "" {
+		return fmt.Errorf("packet cache save path is required")
+	}
+	payload, err := Export(ns, rec)
+	if err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+	return os.WriteFile(target, data, 0o644)
+}
+
+// Restore reads path and imports its entries into the caches.
+func Restore(path string, ns *nameserver.CacheStore, rec *recursor.Recursor, opts ...Option) error {
+	cfg := newConfig(opts)
+
+	source := strings.TrimSpace(path)
+	if source == "" {
+		return fmt.Errorf("packet cache restore path is required")
+	}
+	data, err := os.ReadFile(source)
+	if err != nil {
+		return err
+	}
+
+	if err := reportUnknownFields(data, cfg); err != nil {
+		return err
+	}
+
+	var payload File
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return err
+	}
+	return Import(payload, ns, rec, opts...)
+}
+
+// checksumFor computes the SHA-256 checksum of the file with Checksum blanked.
+// Output is lowercase hex.
+func checksumFor(file File) (string, error) {
+	file.Checksum = ""
+	data, err := json.Marshal(file)
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:]), nil
+}
+
+var knownFileFields = map[string]bool{
+	"format":   true,
+	"version":  true,
+	"checksum": true,
+	"entries":  true,
+}
+
+var knownEntryFields = map[string]bool{
+	"kind":        true,
+	"address":     true,
+	"key":         true,
+	"answer_from": true,
+	"name":        true,
+	"qtype":       true,
+	"qclass":      true,
+	"nameservers": true,
+	"message":     true,
+	"no_message":  true,
+}
+
+func reportUnknownFields(data []byte, cfg *config) error {
+	var fileMap map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fileMap); err != nil {
+		// Not a JSON object at the top level; let the struct decoder
+		// produce the canonical error.
+		return nil
+	}
+	for key := range fileMap {
+		if knownFileFields[key] {
+			continue
+		}
+		if cfg.strict {
+			return fmt.Errorf("unknown field %q", key)
+		}
+		cfg.warn("unknown field %q", key)
+	}
+	entriesRaw, ok := fileMap["entries"]
+	if !ok {
+		return nil
+	}
+	var entries []map[string]json.RawMessage
+	if err := json.Unmarshal(entriesRaw, &entries); err != nil {
+		return nil
+	}
+	for idx, entry := range entries {
+		for key := range entry {
+			if knownEntryFields[key] {
+				continue
+			}
+			if cfg.strict {
+				return fmt.Errorf("entry %d: unknown field %q", idx, key)
+			}
+			cfg.warn("entry %d: unknown field %q", idx, key)
+		}
+	}
+	return nil
+}

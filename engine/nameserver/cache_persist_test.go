@@ -1,11 +1,7 @@
 package nameserver
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"net/netip"
-	"os"
-	"path/filepath"
 	"testing"
 
 	dns "codeberg.org/miekg/dns"
@@ -14,7 +10,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/packet"
 )
 
-func TestPacketCacheExportImportRoundTrip(t *testing.T) {
+func TestCacheStoreExportImportRoundTrip(t *testing.T) {
 	cache := NewCacheStore()
 
 	msg := new(dns.Msg)
@@ -30,23 +26,17 @@ func TestPacketCacheExportImportRoundTrip(t *testing.T) {
 	})
 	cache.cacheForAddress("192.0.2.53").set("k.empty", nil)
 
-	exported, err := cache.ExportPacketCache()
+	entries, err := cache.ExportEntries()
 	if err != nil {
-		t.Fatalf("export packet cache: %v", err)
+		t.Fatalf("export entries: %v", err)
 	}
-	if exported.Format != PacketCacheFileFormat {
-		t.Fatalf("unexpected format %q", exported.Format)
-	}
-	if exported.Version != PacketCacheFileVersion {
-		t.Fatalf("unexpected version %d", exported.Version)
-	}
-	if len(exported.Entries) != 2 {
-		t.Fatalf("expected 2 entries, got %d", len(exported.Entries))
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(entries))
 	}
 
 	restored := NewCacheStore()
-	if err := restored.ImportPacketCache(exported); err != nil {
-		t.Fatalf("import packet cache: %v", err)
+	if err := restored.ImportEntries(entries); err != nil {
+		t.Fatalf("import entries: %v", err)
 	}
 
 	loadedResponse, ok := restored.cacheForAddress("192.0.2.53").get("k.response")
@@ -69,130 +59,22 @@ func TestPacketCacheExportImportRoundTrip(t *testing.T) {
 	}
 }
 
-func TestPacketCacheSaveAndRestoreFile(t *testing.T) {
+func TestCacheStoreImportValidationErrors(t *testing.T) {
 	cache := NewCacheStore()
 
-	msg := new(dns.Msg)
-	dnsutil.SetQuestion(msg, "example.net.", dns.TypeAAAA)
-	msg.Response = true
-	if err := msg.Pack(); err != nil {
-		t.Fatalf("pack dns msg: %v", err)
-	}
-	wire := msg.Data
-
-	if err := cache.ImportPacketCache(PacketCacheFile{
-		Format:  PacketCacheFileFormat,
-		Version: PacketCacheFileVersion,
-		Entries: []PacketCacheEntry{
-			{
-				Address:    "2001:db8::53",
-				Key:        "k.ipv6",
-				Message:    base64.StdEncoding.EncodeToString(wire),
-				AnswerFrom: "2001:db8::53:53",
-			},
-		},
-	}); err != nil {
-		t.Fatalf("import packet cache fixture: %v", err)
-	}
-
-	path := filepath.Join(t.TempDir(), "cache.json")
-	if err := cache.SavePacketCache(path); err != nil {
-		t.Fatalf("save packet cache: %v", err)
-	}
-
-	restored := NewCacheStore()
-	if err := restored.RestorePacketCache(path); err != nil {
-		t.Fatalf("restore packet cache: %v", err)
-	}
-
-	exported, err := restored.ExportPacketCache()
-	if err != nil {
-		t.Fatalf("export restored cache: %v", err)
-	}
-	if len(exported.Entries) != 1 {
-		t.Fatalf("expected 1 entry, got %d", len(exported.Entries))
-	}
-	if exported.Entries[0].Address != "2001:db8::53" {
-		t.Fatalf("unexpected address %q", exported.Entries[0].Address)
-	}
-	if exported.Entries[0].Key != "k.ipv6" {
-		t.Fatalf("unexpected key %q", exported.Entries[0].Key)
-	}
-}
-
-func TestPacketCacheImportValidationErrors(t *testing.T) {
-	cache := NewCacheStore()
-	if err := cache.ImportPacketCache(PacketCacheFile{
-		Format:  PacketCacheFileFormat,
-		Version: PacketCacheFileVersion + 1,
-	}); err == nil {
-		t.Fatalf("expected unsupported version error")
-	}
-
-	if err := cache.ImportPacketCache(PacketCacheFile{
-		Format:  PacketCacheFileFormat,
-		Version: PacketCacheFileVersion,
-		Entries: []PacketCacheEntry{
-			{
-				Address: "not-an-ip",
-				Key:     "k1",
-			},
-		},
-	}); err == nil {
+	if err := cache.ImportEntries([]Entry{{Address: "not-an-ip", Key: "k1"}}); err == nil {
 		t.Fatalf("expected invalid address error")
 	}
 
-	if err := cache.ImportPacketCache(PacketCacheFile{
-		Format:  PacketCacheFileFormat,
-		Version: PacketCacheFileVersion,
-		Entries: []PacketCacheEntry{
-			{
-				Address: "192.0.2.53",
-				Key:     "k2",
-				Message: "!!!",
-			},
-		},
-	}); err == nil {
-		t.Fatalf("expected invalid base64 error")
-	}
-}
-
-func TestPacketCacheRestoreInvalidJSON(t *testing.T) {
-	cache := NewCacheStore()
-	path := filepath.Join(t.TempDir(), "broken.json")
-	if err := os.WriteFile(path, []byte("{"), 0o644); err != nil {
-		t.Fatalf("write broken file: %v", err)
-	}
-	if err := cache.RestorePacketCache(path); err == nil {
-		t.Fatalf("expected invalid JSON error")
-	}
-}
-
-func TestPacketCacheFileJSONShape(t *testing.T) {
-	cache := NewCacheStore()
-
-	msg := new(dns.Msg)
-	dnsutil.SetQuestion(msg, "example.org.", dns.TypeTXT)
-	msg.Response = true
-	cache.cacheForAddress("192.0.2.99").set("k.shape", &packet.Packet{Msg: msg})
-
-	path := filepath.Join(t.TempDir(), "shape.json")
-	if err := cache.SavePacketCache(path); err != nil {
-		t.Fatalf("save packet cache: %v", err)
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read saved file: %v", err)
+	if err := cache.ImportEntries([]Entry{{Address: "192.0.2.53", Key: ""}}); err == nil {
+		t.Fatalf("expected empty key error")
 	}
 
-	var payload map[string]any
-	if err := json.Unmarshal(data, &payload); err != nil {
-		t.Fatalf("unmarshal saved file: %v", err)
+	if err := cache.ImportEntries([]Entry{{Address: "192.0.2.53", Key: "k"}}); err == nil {
+		t.Fatalf("expected missing message error")
 	}
-	if payload["format"] != PacketCacheFileFormat {
-		t.Fatalf("unexpected format: %#v", payload["format"])
-	}
-	if int(payload["version"].(float64)) != PacketCacheFileVersion {
-		t.Fatalf("unexpected version: %#v", payload["version"])
+
+	if err := cache.ImportEntries([]Entry{{Address: "192.0.2.53", Key: "k", Message: []byte{0xff, 0xff}}}); err == nil {
+		t.Fatalf("expected unpack error for malformed message")
 	}
 }

@@ -55,6 +55,7 @@
   let versionDNS = $state("");
   // Fail-safe default: hide scoring until server confirms it is enabled.
   let scoringEnabled = $state(false);
+  let nameserverTimingsEnabled = $state(false);
 
   async function fetchLocales() {
     try {
@@ -144,6 +145,9 @@
         if (typeof data?.show_score_public === "boolean") {
           scoringEnabled = data.show_score_public;
         }
+        if (typeof data?.show_nameserver_timings_public === "boolean") {
+          nameserverTimingsEnabled = data.show_nameserver_timings_public;
+        }
       }
     } catch (_) { /* keep false - fail-safe */ }
   }
@@ -219,6 +223,7 @@
         locale={resultLocale}
         finishedAt={jobFinishedAt}
         {scoringEnabled}
+        {nameserverTimingsEnabled}
       />
     {:else}
       <ExpiredResult onnewtest={resetToIdle} />

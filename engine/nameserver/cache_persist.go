@@ -1,11 +1,8 @@
 package nameserver
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"net/netip"
-	"os"
 	"sort"
 	"strings"
 
@@ -14,46 +11,24 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/packet"
 )
 
-const (
-	// PacketCacheFileFormat identifies the on-disk packet cache file format.
-	PacketCacheFileFormat = "gonemaster.packet-cache"
-	// PacketCacheFileVersion is the current packet cache file version.
-	PacketCacheFileVersion = 1
-)
-
-// PacketCacheFile is the portable representation of nameserver query cache data.
-type PacketCacheFile struct {
-	// Format identifies the on-disk file format.
-	Format string `json:"format"`
-	// Version identifies the schema version for compatibility checks.
-	Version int `json:"version"`
-	// Entries contains the serialized per-query cache entries.
-	Entries []PacketCacheEntry `json:"entries"`
-}
-
-// PacketCacheEntry stores one cached query result for one nameserver address.
-type PacketCacheEntry struct {
-	// Address is the nameserver address that owns the cache entry.
-	Address string `json:"address"`
+// Entry is a portable representation of a single nameserver cache record.
+type Entry struct {
+	// Address is the nameserver address that owns the entry.
+	Address string
 	// Key is the normalized packet cache lookup key.
-	Key string `json:"key"`
-	// Message is the base64-encoded wire-format DNS message.
-	Message string `json:"message,omitempty"`
+	Key string
+	// Message is the wire-format DNS response packet.
+	Message []byte
 	// AnswerFrom records the responder address captured with the packet.
-	AnswerFrom string `json:"answer_from,omitempty"`
+	AnswerFrom string
 	// NoMessage marks a cached nil response entry.
-	NoMessage bool `json:"no_message,omitempty"`
+	NoMessage bool
 }
 
-// ExportPacketCache returns a deterministic snapshot of query cache entries.
-func (c *CacheStore) ExportPacketCache() (PacketCacheFile, error) {
-	out := PacketCacheFile{
-		Format:  PacketCacheFileFormat,
-		Version: PacketCacheFileVersion,
-		Entries: []PacketCacheEntry{},
-	}
+// ExportEntries returns a deterministic snapshot of the cache contents.
+func (c *CacheStore) ExportEntries() ([]Entry, error) {
 	if c == nil {
-		return out, nil
+		return nil, nil
 	}
 
 	c.mu.Lock()
@@ -69,6 +44,7 @@ func (c *CacheStore) ExportPacketCache() (PacketCacheFile, error) {
 	}
 	sort.Strings(addresses)
 
+	entries := make([]Entry, 0)
 	for _, address := range addresses {
 		cache := cacheByAddress[address]
 		if cache == nil {
@@ -81,49 +57,38 @@ func (c *CacheStore) ExportPacketCache() (PacketCacheFile, error) {
 		}
 		sort.Strings(keys)
 		for _, key := range keys {
-			entry := PacketCacheEntry{
+			entry := Entry{
 				Address: address,
 				Key:     key,
 			}
 			value := cache.data[key]
 			if value == nil || value.Msg == nil {
 				entry.NoMessage = true
-				out.Entries = append(out.Entries, entry)
+				entries = append(entries, entry)
 				continue
 			}
 			if err := value.Msg.Pack(); err != nil {
 				cache.mu.Unlock()
-				return PacketCacheFile{}, fmt.Errorf("pack packet cache entry (%s, %s): %w", address, key, err)
+				return nil, fmt.Errorf("pack nameserver cache entry (%s, %s): %w", address, key, err)
 			}
-			entry.Message = base64.StdEncoding.EncodeToString(value.Msg.Data)
-			if value.AnswerFrom != "" {
-				entry.AnswerFrom = value.AnswerFrom
-			}
-			out.Entries = append(out.Entries, entry)
+			entry.Message = append([]byte(nil), value.Msg.Data...)
+			entry.AnswerFrom = value.AnswerFrom
+			entries = append(entries, entry)
 		}
 		cache.mu.Unlock()
 	}
 
-	return out, nil
+	return entries, nil
 }
 
-// ImportPacketCache merges packet cache entries into the current cache store.
-func (c *CacheStore) ImportPacketCache(input PacketCacheFile) error {
+// ImportEntries merges the supplied entries into the cache store.
+func (c *CacheStore) ImportEntries(entries []Entry) error {
 	if c == nil {
 		return fmt.Errorf("cache store is nil")
 	}
-	if strings.TrimSpace(input.Format) == "" {
-		return fmt.Errorf("packet cache format is required")
-	}
-	if input.Format != PacketCacheFileFormat {
-		return fmt.Errorf("unsupported packet cache format %q", input.Format)
-	}
-	if input.Version != PacketCacheFileVersion {
-		return fmt.Errorf("unsupported packet cache version %d", input.Version)
-	}
 
-	for idx, entry := range input.Entries {
-		address, err := normalizePacketCacheAddress(entry.Address)
+	for idx, entry := range entries {
+		address, err := normalizeCacheAddress(entry.Address)
 		if err != nil {
 			return fmt.Errorf("entry %d: %w", idx, err)
 		}
@@ -140,15 +105,11 @@ func (c *CacheStore) ImportPacketCache(input PacketCacheFile) error {
 			cache.set(key, nil)
 			continue
 		}
-		if strings.TrimSpace(entry.Message) == "" {
+		if len(entry.Message) == 0 {
 			return fmt.Errorf("entry %d: message is required when no_message is false", idx)
 		}
-		wire, err := base64.StdEncoding.DecodeString(entry.Message)
-		if err != nil {
-			return fmt.Errorf("entry %d: decode message: %w", idx, err)
-		}
 		msg := new(dns.Msg)
-		msg.Data = wire
+		msg.Data = append([]byte(nil), entry.Message...)
 		if err := msg.Unpack(); err != nil {
 			return fmt.Errorf("entry %d: unpack message: %w", idx, err)
 		}
@@ -160,45 +121,7 @@ func (c *CacheStore) ImportPacketCache(input PacketCacheFile) error {
 	return nil
 }
 
-// SavePacketCache writes packet cache entries to path in JSON format.
-func (c *CacheStore) SavePacketCache(path string) error {
-	target := strings.TrimSpace(path)
-	if target == "" {
-		return fmt.Errorf("packet cache save path is required")
-	}
-	payload, err := c.ExportPacketCache()
-	if err != nil {
-		return err
-	}
-	data, err := json.MarshalIndent(payload, "", "  ")
-	if err != nil {
-		return err
-	}
-	data = append(data, '\n')
-	if err := os.WriteFile(target, data, 0o644); err != nil {
-		return err
-	}
-	return nil
-}
-
-// RestorePacketCache reads packet cache entries from path and imports them.
-func (c *CacheStore) RestorePacketCache(path string) error {
-	source := strings.TrimSpace(path)
-	if source == "" {
-		return fmt.Errorf("packet cache restore path is required")
-	}
-	data, err := os.ReadFile(source)
-	if err != nil {
-		return err
-	}
-	var payload PacketCacheFile
-	if err := json.Unmarshal(data, &payload); err != nil {
-		return err
-	}
-	return c.ImportPacketCache(payload)
-}
-
-func normalizePacketCacheAddress(value string) (string, error) {
+func normalizeCacheAddress(value string) (string, error) {
 	address := strings.TrimSpace(value)
 	if address == "" {
 		return "", fmt.Errorf("address is required")

@@ -92,9 +92,9 @@ type Config struct {
 	// PublicURL is the canonical base URL of the public UI (e.g. "https://example.com/").
 	// Used for og:url, hreflang, robots.txt, and sitemap.xml. When empty, the URL
 	// is auto-detected from the request's Host and X-Forwarded-Proto headers.
-	PublicURL   string  `json:"public_url,omitempty"`
-	Database    DatabaseConfig   `json:"database,omitempty"`
-	PublicAPI   PublicAPIConfig  `json:"public_api,omitempty"`
+	PublicURL string          `json:"public_url,omitempty"`
+	Database  DatabaseConfig  `json:"database,omitempty"`
+	PublicAPI PublicAPIConfig `json:"public_api,omitempty"`
 	// ScoringConfigPath is an optional path to a JSON file that overrides the
 	// default scoring configuration (weights, penalties, tag overrides, etc.).
 	// When empty, scoring.DefaultConfig() is used.
@@ -108,6 +108,12 @@ type Config struct {
 	// in the public results interface. Defaults to true. Set to false to hide
 	// grades and scores from visitors.
 	ShowScorePublic bool `json:"show_score_public"`
+	// ShowNameserverTimingsAdmin controls whether nameserver timing UI elements
+	// are displayed in the admin interface. Defaults to true.
+	ShowNameserverTimingsAdmin bool `json:"show_nameserver_timings_admin"`
+	// ShowNameserverTimingsPublic controls whether nameserver timing UI elements
+	// are displayed in the public results interface. Defaults to true.
+	ShowNameserverTimingsPublic bool `json:"show_nameserver_timings_public"`
 }
 
 // PublicAPIFileConfig holds optional public API configuration from JSON.
@@ -127,44 +133,48 @@ type DatabaseFileConfig struct {
 
 // FileConfig captures optional configuration fields from JSON.
 type FileConfig struct {
-	ListenAddr        *string             `json:"listen_addr"`
-	MaxBodySize       *int64              `json:"max_body_size"`
-	Debug             *bool               `json:"debug"`
-	WorkerCount       *int                `json:"worker_count"`
-	MaxConcurrentJobs *int                `json:"max_concurrent_jobs"`
-	PositiveCacheTTL  *int                `json:"positive_cache_ttl"`
-	NegativeCacheTTL  *int                `json:"negative_cache_ttl"`
-	Timeout           *int                `json:"timeout"`
-	Retry             *int                `json:"retry"`
-	Retrans           *int                `json:"retrans"`
-	Fallback          *bool               `json:"fallback"`
-	SourceAddr4       *string             `json:"source_addr4"`
-	SourceAddr6       *string             `json:"source_addr6"`
-	MinLevel          *string             `json:"min_level"`
-	ProfilePath       *string             `json:"profile_path"`
-	PublicURL         *string             `json:"public_url,omitempty"`
-	Database          *DatabaseFileConfig  `json:"database,omitempty"`
-	PublicAPI         *PublicAPIFileConfig `json:"public_api,omitempty"`
-	ScoringConfigPath          *string             `json:"scoring_config_path,omitempty"`
-	ShowScoreAdmin             *bool               `json:"show_score_admin,omitempty"`
-	ShowScorePublic            *bool               `json:"show_score_public,omitempty"`
-	CrossJobHotCache           *bool               `json:"cross_job_hot_cache,omitempty"`
-	CrossJobHotCacheTTLSeconds *int                `json:"cross_job_hot_cache_ttl_seconds,omitempty"`
+	ListenAddr                  *string              `json:"listen_addr"`
+	MaxBodySize                 *int64               `json:"max_body_size"`
+	Debug                       *bool                `json:"debug"`
+	WorkerCount                 *int                 `json:"worker_count"`
+	MaxConcurrentJobs           *int                 `json:"max_concurrent_jobs"`
+	PositiveCacheTTL            *int                 `json:"positive_cache_ttl"`
+	NegativeCacheTTL            *int                 `json:"negative_cache_ttl"`
+	Timeout                     *int                 `json:"timeout"`
+	Retry                       *int                 `json:"retry"`
+	Retrans                     *int                 `json:"retrans"`
+	Fallback                    *bool                `json:"fallback"`
+	SourceAddr4                 *string              `json:"source_addr4"`
+	SourceAddr6                 *string              `json:"source_addr6"`
+	MinLevel                    *string              `json:"min_level"`
+	ProfilePath                 *string              `json:"profile_path"`
+	PublicURL                   *string              `json:"public_url,omitempty"`
+	Database                    *DatabaseFileConfig  `json:"database,omitempty"`
+	PublicAPI                   *PublicAPIFileConfig `json:"public_api,omitempty"`
+	ScoringConfigPath           *string              `json:"scoring_config_path,omitempty"`
+	ShowScoreAdmin              *bool                `json:"show_score_admin,omitempty"`
+	ShowScorePublic             *bool                `json:"show_score_public,omitempty"`
+	ShowNameserverTimingsAdmin  *bool                `json:"show_nameserver_timings_admin,omitempty"`
+	ShowNameserverTimingsPublic *bool                `json:"show_nameserver_timings_public,omitempty"`
+	CrossJobHotCache            *bool                `json:"cross_job_hot_cache,omitempty"`
+	CrossJobHotCacheTTLSeconds  *int                 `json:"cross_job_hot_cache_ttl_seconds,omitempty"`
 }
 
 // DefaultConfig returns baseline config values.
 func DefaultConfig() Config {
 	return Config{
-		ListenAddr:                 "127.0.0.1:8080",
-		MaxBodySize:                1 << 20,
-		Debug:                      false,
-		WorkerCount:                16,
-		MaxConcurrentJobs:          0,
-		MinLevel:                   "INFO",
-		ShowScoreAdmin:             true,
-		ShowScorePublic:            true,
-		CrossJobHotCache:           true,
-		CrossJobHotCacheTTLSeconds: defaultCrossJobHotCacheTTLSeconds,
+		ListenAddr:                  "127.0.0.1:8080",
+		MaxBodySize:                 1 << 20,
+		Debug:                       false,
+		WorkerCount:                 16,
+		MaxConcurrentJobs:           0,
+		MinLevel:                    "INFO",
+		ShowScoreAdmin:              true,
+		ShowScorePublic:             true,
+		ShowNameserverTimingsAdmin:  true,
+		ShowNameserverTimingsPublic: true,
+		CrossJobHotCache:            true,
+		CrossJobHotCacheTTLSeconds:  defaultCrossJobHotCacheTTLSeconds,
 		PublicAPI: PublicAPIConfig{
 			RateLimitEnabled: false,
 			RateLimitMax:     10,
@@ -253,6 +263,12 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 	}
 	if file.ShowScorePublic != nil {
 		c.ShowScorePublic = *file.ShowScorePublic
+	}
+	if file.ShowNameserverTimingsAdmin != nil {
+		c.ShowNameserverTimingsAdmin = *file.ShowNameserverTimingsAdmin
+	}
+	if file.ShowNameserverTimingsPublic != nil {
+		c.ShowNameserverTimingsPublic = *file.ShowNameserverTimingsPublic
 	}
 	if file.CrossJobHotCache != nil {
 		c.CrossJobHotCache = *file.CrossJobHotCache

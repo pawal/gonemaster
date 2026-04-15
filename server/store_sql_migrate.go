@@ -225,6 +225,12 @@ var sqlMigrations = []sqlMigration{
 			`ALTER TABLE domains ADD COLUMN latest_grade TEXT DEFAULT NULL`,
 		},
 	},
+	{
+		version: 6,
+		stmts: []string{
+			`ALTER TABLE runs ADD COLUMN nameserver_timings_json TEXT DEFAULT NULL`,
+		},
+	},
 }
 
 // runMigrations creates the schema_migrations tracking table and applies any

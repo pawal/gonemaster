@@ -89,6 +89,49 @@ func TestInMemoryJobStoreCRUD(t *testing.T) {
 	}
 }
 
+func TestInMemoryJobStorePreservesNameserverTimingsInResult(t *testing.T) {
+	store := NewInMemoryJobStore()
+	now := time.Now().UTC()
+	job := Job{
+		ID:        "job-ns-timings",
+		Domain:    "example.com",
+		Status:    JobQueued,
+		CreatedAt: now,
+	}
+	created, err := store.Create(job)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	created.Status = JobSucceeded
+	created.StartedAt = now
+	created.FinishedAt = now.Add(2 * time.Second)
+	created.NameserverTimings = []NameserverTiming{
+		{
+			Nameserver: "ns1.example.com",
+			Address:    "192.0.2.10",
+			AvgMS:      24,
+			MinMS:      20,
+			MaxMS:      30,
+			MedianMS:   22,
+			StddevMS:   4,
+			Count:      3,
+		},
+	}
+	graduateTestJob(t, store, created, nil)
+
+	result, ok := store.GetResult(created.ID)
+	if !ok {
+		t.Fatal("expected result")
+	}
+	if len(result.NameserverTimings) != 1 {
+		t.Fatalf("nameserver timings len = %d, want 1", len(result.NameserverTimings))
+	}
+	if result.NameserverTimings[0].Nameserver != "ns1.example.com" {
+		t.Fatalf("nameserver = %q", result.NameserverTimings[0].Nameserver)
+	}
+}
+
 func TestInMemoryJobStoreFilters(t *testing.T) {
 	store := NewInMemoryJobStore()
 	base := time.Now().UTC().Add(-time.Minute)

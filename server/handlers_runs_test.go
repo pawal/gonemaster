@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
 )
@@ -142,7 +143,37 @@ func TestGetRunNotFound(t *testing.T) {
 
 func TestGetRunResult(t *testing.T) {
 	srv := New(DefaultConfig())
-	d := makeGraduatedJob(t, srv, "example.com", JobSucceeded)
+	now := time.Now().UTC()
+	job := Job{
+		ID:         newID("job"),
+		Domain:     "example.com",
+		Status:     JobSucceeded,
+		CreatedAt:  now,
+		StartedAt:  now,
+		FinishedAt: now,
+		NameserverTimings: []NameserverTiming{
+			{
+				Nameserver: "ns1.example.com",
+				Address:    "192.0.2.10",
+				AvgMS:      24,
+				MinMS:      20,
+				MaxMS:      30,
+				MedianMS:   22,
+				StddevMS:   4,
+				Count:      3,
+			},
+		},
+	}
+	if _, err := srv.store.Create(job); err != nil {
+		t.Fatalf("create job: %v", err)
+	}
+	if err := srv.store.GraduateJob(job, nil); err != nil {
+		t.Fatalf("graduate job: %v", err)
+	}
+	d, ok := srv.store.GetDomainByName("example.com")
+	if !ok {
+		t.Fatal("expected domain")
+	}
 
 	resp := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/runs/%s/result", d.LatestRunID), nil)
@@ -156,6 +187,9 @@ func TestGetRunResult(t *testing.T) {
 	}
 	if result.Status != JobSucceeded {
 		t.Fatalf("expected status=succeeded, got %q", result.Status)
+	}
+	if len(result.NameserverTimings) != 1 {
+		t.Fatalf("nameserver timings len = %d, want 1", len(result.NameserverTimings))
 	}
 }
 
@@ -311,8 +345,30 @@ func TestListRunsFilterByGrade(t *testing.T) {
 func TestRunResultOmitsScoreWhenAdminScoringDisabled(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.ShowScoreAdmin = false
+	cfg.ShowNameserverTimingsAdmin = false
 	srv := New(cfg)
-	d := makeGraduatedJob(t, srv, "example.com", JobSucceeded)
+	now := time.Now().UTC()
+	job := Job{
+		ID:         newID("job"),
+		Domain:     "example.com",
+		Status:     JobSucceeded,
+		CreatedAt:  now,
+		StartedAt:  now,
+		FinishedAt: now,
+		NameserverTimings: []NameserverTiming{
+			{Nameserver: "ns1.example.com", Address: "192.0.2.10", AvgMS: 24, MinMS: 20, MaxMS: 30, Count: 3},
+		},
+	}
+	if _, err := srv.store.Create(job); err != nil {
+		t.Fatalf("create job: %v", err)
+	}
+	if err := srv.store.GraduateJob(job, nil); err != nil {
+		t.Fatalf("graduate job: %v", err)
+	}
+	d, ok := srv.store.GetDomainByName("example.com")
+	if !ok {
+		t.Fatal("expected domain")
+	}
 
 	resp := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/runs/%s/result", d.LatestRunID), nil)
@@ -326,6 +382,9 @@ func TestRunResultOmitsScoreWhenAdminScoringDisabled(t *testing.T) {
 	}
 	if result.Score != nil {
 		t.Fatal("expected Score to be nil when ShowScoreAdmin=false")
+	}
+	if result.NameserverTimings != nil {
+		t.Fatal("expected NameserverTimings to be nil when ShowNameserverTimingsAdmin=false")
 	}
 }
 

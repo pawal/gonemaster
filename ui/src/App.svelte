@@ -1051,6 +1051,11 @@
     if (!Number.isFinite(numeric)) return "0.00";
     return numeric.toFixed(2);
   };
+  const formatTimingMs = (value) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return "0";
+    return Math.round(numeric).toString();
+  };
   const entryMessage = (entry) => {
     if (!entry) return "";
     if (entry.message) return entry.message;
@@ -2646,6 +2651,7 @@
         {/if}
         {#if selectedJobResult}
           {@const allEntries = selectedJobResult?.raw?.entries ?? []}
+          {@const nsTimings = selectedJobResult?.nameserver_timings ?? []}
           {@const bannerCls = bannerClass(worstLevel(allEntries))}
           <div class="stack">
             {#if allEntries.length}
@@ -2664,9 +2670,9 @@
             {:else}
               <div class="summary-empty">{$t("no_result_entries")}</div>
             {/if}
-            <div class="field-label">{$t("result_details_label")}</div>
-            {#if moduleGroups.length === 0}
-              <div class="summary-empty">{$t("no_raw_entries")}</div>
+              <div class="field-label">{$t("result_details_label")}</div>
+              {#if moduleGroups.length === 0}
+                <div class="summary-empty">{$t("no_raw_entries")}</div>
             {:else}
               <div class="small">{$t("module_expand_hint")}</div>
               <div class="module-list">
@@ -2751,6 +2757,41 @@
                   </div>
                 {/each}
               </div>
+            {/if}
+            {#if nsTimings.length}
+              <details class="score-bonus ns-timings-card" data-testid="admin-nameserver-timings">
+                <summary class="score-bonus-summary ns-timings-summary">
+                  <span class="score-bonus-chevron"></span>
+                  <span class="score-bonus-title">{$t("ns_timing_heading")}</span>
+                  <span class="ns-timings-summary-text">{$t("ns_timing_subtitle")}</span>
+                </summary>
+                <div class="score-bonus-list ns-timings-content">
+                  <table class="ns-timings-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">{$t("ns_timing_nameserver")}</th>
+                        <th scope="col">{$t("ns_timing_ip")}</th>
+                        <th scope="col" class="ns-timings-num">{$t("ns_timing_avg_ms")}</th>
+                        <th scope="col" class="ns-timings-num">{$t("ns_timing_min_ms")}</th>
+                        <th scope="col" class="ns-timings-num">{$t("ns_timing_max_ms")}</th>
+                        <th scope="col" class="ns-timings-num">{$t("ns_timing_samples")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {#each nsTimings as item}
+                        <tr data-testid="admin-nameserver-timing-row">
+                          <td class="ns-timings-name">{item.nameserver}</td>
+                          <td class="ns-timings-ip">{item.address}</td>
+                          <td class="ns-timings-num ns-timings-avg">{formatTimingMs(item.avg_ms)}</td>
+                          <td class="ns-timings-num">{formatTimingMs(item.min_ms)}</td>
+                          <td class="ns-timings-num">{formatTimingMs(item.max_ms)}</td>
+                          <td class="ns-timings-num">{item.count}</td>
+                        </tr>
+                      {/each}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
             {/if}
           </div>
         {/if}
@@ -2936,6 +2977,7 @@
             <p class="muted" style="margin-top: 1rem;">{$t("loading")}</p>
           {:else if selectedDomainRunResult}
             {@const allEntries = selectedDomainRunResult?.raw?.entries ?? []}
+            {@const nsTimings = selectedDomainRunResult?.nameserver_timings ?? []}
             {@const bannerCls = bannerClass(worstLevel(allEntries))}
             {@const sc = selectedDomainRunResult?.score}
             <div class="stack" style="margin-top: 1.25rem;">
@@ -3089,6 +3131,41 @@
                     </div>
                   {/each}
                 </div>
+              {/if}
+              {#if nsTimings.length}
+                <details class="score-bonus ns-timings-card" data-testid="admin-nameserver-timings">
+                  <summary class="score-bonus-summary ns-timings-summary">
+                    <span class="score-bonus-chevron"></span>
+                    <span class="score-bonus-title">{$t("ns_timing_heading")}</span>
+                    <span class="ns-timings-summary-text">{$t("ns_timing_subtitle")}</span>
+                  </summary>
+                  <div class="score-bonus-list ns-timings-content">
+                    <table class="ns-timings-table">
+                      <thead>
+                        <tr>
+                          <th scope="col">{$t("ns_timing_nameserver")}</th>
+                          <th scope="col">{$t("ns_timing_ip")}</th>
+                          <th scope="col" class="ns-timings-num">{$t("ns_timing_avg_ms")}</th>
+                          <th scope="col" class="ns-timings-num">{$t("ns_timing_min_ms")}</th>
+                          <th scope="col" class="ns-timings-num">{$t("ns_timing_max_ms")}</th>
+                          <th scope="col" class="ns-timings-num">{$t("ns_timing_samples")}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {#each nsTimings as item}
+                          <tr data-testid="admin-nameserver-timing-row">
+                            <td class="ns-timings-name">{item.nameserver}</td>
+                            <td class="ns-timings-ip">{item.address}</td>
+                            <td class="ns-timings-num ns-timings-avg">{formatTimingMs(item.avg_ms)}</td>
+                            <td class="ns-timings-num">{formatTimingMs(item.min_ms)}</td>
+                            <td class="ns-timings-num">{formatTimingMs(item.max_ms)}</td>
+                            <td class="ns-timings-num">{item.count}</td>
+                          </tr>
+                        {/each}
+                      </tbody>
+                    </table>
+                  </div>
+                </details>
               {/if}
             </div>
           {/if}

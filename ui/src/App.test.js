@@ -2807,6 +2807,57 @@ describe("App", () => {
     unmount();
   });
 
+  it("shows nameserver timings as a collapsed panel in run inspector", async () => {
+    const job = {
+      id: "job_ns_timings",
+      domain: "example.com",
+      status: "succeeded",
+      created_at: "2026-02-03T00:00:00Z",
+      progress: 100
+    };
+    const result = {
+      summary: { levels: {} },
+      nameserver_timings: [
+        { nameserver: "ns1.example.com", address: "192.0.2.10", avg_ms: 24, min_ms: 20, max_ms: 30, count: 3 }
+      ],
+      raw: { locale: "en", entries: [] }
+    };
+
+    global.fetch.mockImplementation((url) => {
+      if (typeof url === "string" && url.startsWith("/api/v1/jobs?")) {
+        return jsonResponse({ items: [] });
+      }
+      if (url === `/api/v1/jobs/${job.id}`) {
+        return jsonResponse(job);
+      }
+      if (typeof url === "string" && url.startsWith(`/api/v1/jobs/${job.id}/result`)) {
+        return jsonResponse(result);
+      }
+      if (typeof url === "string" && url.startsWith(`/api/v1/runs/${job.id}`)) {
+        return jsonResponse({ id: job.id, domain: "example.com", status: "succeeded", duration_ms: 1200, entry_count: 4, worst_level: "NOTICE" });
+      }
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+
+    const input = await screen.findByLabelText("Job ID");
+    await fireEvent.input(input, { target: { value: job.id } });
+    await fireEvent.change(input);
+
+    const timings = await screen.findByTestId("admin-nameserver-timings");
+    expect(timings.open).toBe(false);
+
+    timings.open = true;
+    await fireEvent(timings, new Event("toggle"));
+
+    expect(screen.getByText("ns1.example.com")).toBeInTheDocument();
+    expect(screen.getByText("192.0.2.10")).toBeInTheDocument();
+    expect(screen.getByText("24")).toBeInTheDocument();
+
+    unmount();
+  });
+
   describe("locale selector", () => {
     const mockFetchWithLocales = (locales) => {
       global.fetch.mockImplementation((url) => {
@@ -3491,6 +3542,52 @@ describe("App", () => {
       await fireEvent.click(within(table2).getByRole("button", { name: "Runs" }));
       await flushFetches();
       expect(fetchedURLs.some((u) => u.includes("sort=run_count_desc"))).toBe(true);
+
+      unmount();
+    });
+
+    it("shows nameserver timings as a collapsed panel in domain run results", async () => {
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value.includes("/api/v1/domains/8/runs")) {
+          return jsonResponse({
+            items: [{ id: "run-ns", finished_at: "2026-03-15T10:00:00Z", worst_level: "NOTICE", duration_ms: 900, entry_count: 2 }],
+            total: 1
+          });
+        }
+        if (value.includes("/api/v1/jobs/run-ns/result")) {
+          return jsonResponse({
+            job_id: "run-ns",
+            status: "succeeded",
+            summary: { levels: {} },
+            nameserver_timings: [
+              { nameserver: "ns1.example.com", address: "192.0.2.10", avg_ms: 24, min_ms: 20, max_ms: 30, count: 3 }
+            ],
+            raw: { locale: "en", entries: [] }
+          });
+        }
+        if (value.includes("/api/v1/domains")) {
+          return jsonResponse({
+            items: [{ id: 8, name: "example.com", tags: [], latest_level: "NOTICE", latest_run_at: "2026-03-15T10:00:00Z", run_count: 1 }],
+            total: 1
+          });
+        }
+        if (value.includes("/api/v1/tags")) return jsonResponse([]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+
+      const { unmount } = render(App);
+      await openDomainsTab();
+      await fireEvent.click(await screen.findByText("example.com"));
+
+      const timings = await screen.findByTestId("admin-nameserver-timings");
+      expect(timings.open).toBe(false);
+
+      timings.open = true;
+      await fireEvent(timings, new Event("toggle"));
+
+      expect(screen.getByText("ns1.example.com")).toBeInTheDocument();
+      expect(screen.getByText("192.0.2.10")).toBeInTheDocument();
 
       unmount();
     });

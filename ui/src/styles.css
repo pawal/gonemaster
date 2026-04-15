@@ -1956,6 +1956,87 @@ details[open] > .score-bonus-summary > .score-bonus-chevron { transform: rotate(
 .score-bonus-item[data-met="yes"] .score-bonus-icon { color: var(--grade-a); }
 .score-bonus-item[data-met="no"]  .score-bonus-icon { color: var(--grade-f); }
 
+.ns-timings-card {
+  margin-top: 0.25rem;
+}
+
+.ns-timings-summary {
+  align-items: center;
+}
+
+.ns-timings-summary-text {
+  font-size: var(--text-sm);
+  color: var(--muted);
+  margin-left: auto;
+  text-align: right;
+}
+
+.ns-timings-content {
+  overflow-x: auto;
+  padding: 0;
+}
+
+.ns-timings-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 560px;
+}
+
+.ns-timings-table th,
+.ns-timings-table td {
+  padding: 10px 12px;
+  font-size: var(--text-sm);
+}
+
+.ns-timings-table th {
+  color: var(--ink-2);
+  font-weight: 600;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.ns-timings-table td {
+  border-bottom: 1px solid var(--border);
+}
+
+.ns-timings-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.ns-timings-name,
+.ns-timings-ip,
+.ns-timings-num {
+  font-family: var(--mono);
+}
+
+.ns-timings-name {
+  color: var(--ink);
+}
+
+.ns-timings-ip {
+  color: var(--ink-2);
+}
+
+.ns-timings-num {
+  text-align: right;
+}
+
+.ns-timings-avg {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+@media (max-width: 640px) {
+  .ns-timings-summary {
+    align-items: flex-start;
+  }
+
+  .ns-timings-summary-text {
+    margin-left: 0;
+    text-align: left;
+  }
+}
+
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]):not([data-theme="dark"]) .score-bonus-status[data-met="yes"] {
     background: #052e16;

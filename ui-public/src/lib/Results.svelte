@@ -22,6 +22,7 @@
   })());
 
   let entries = $state([]);
+  let nameserverTimings = $state([]);
   let score = $state(null);
   let loading = $state(true);
   let errorKey = $state("");
@@ -41,15 +42,18 @@
       const res = await getResult(pid, loc);
       if (!res.ok) {
         errorKey = res.status === 404 ? "pub.expired_heading" : "pub.error_unknown";
+        nameserverTimings = [];
         loading = false;
         return;
       }
       const data = await res.json();
       entries = data.raw?.entries ?? [];
+      nameserverTimings = data.nameserver_timings ?? [];
       score = data.score ?? null;
       loading = false;
     } catch (_) {
       errorKey = "pub.error_network";
+      nameserverTimings = [];
       loading = false;
     }
   }
@@ -123,6 +127,10 @@
     ? Object.entries(score.bonus.criteria)
         .filter(([k, v]) => k !== "no_warnings_or_errors" && v === false).length
     : 0);
+
+  function formatTimingMs(value) {
+    return `${Math.round(value)}`;
+  }
 </script>
 
 <div class="card stack" data-testid="results-view">
@@ -193,6 +201,41 @@
         </div>
         <ShareButton {publicID} {domain} />
       </div>
+    {/if}
+
+    {#if nameserverTimings.length > 0}
+      <section class="ns-timings-card" data-testid="nameserver-timings">
+        <div class="ns-timings-header">
+          <h3 class="ns-timings-title">{$t("pub.ns_timing_heading")}</h3>
+          <p class="ns-timings-subtitle">{$t("pub.ns_timing_subtitle")}</p>
+        </div>
+        <div class="ns-timings-table-wrap">
+          <table class="ns-timings-table">
+            <thead>
+              <tr>
+                <th scope="col">{$t("pub.ns_timing_nameserver")}</th>
+                <th scope="col">{$t("pub.ns_timing_ip")}</th>
+                <th scope="col" class="ns-timings-num">{$t("pub.ns_timing_avg_ms")}</th>
+                <th scope="col" class="ns-timings-num">{$t("pub.ns_timing_min_ms")}</th>
+                <th scope="col" class="ns-timings-num">{$t("pub.ns_timing_max_ms")}</th>
+                <th scope="col" class="ns-timings-num">{$t("pub.ns_timing_samples")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each nameserverTimings as item}
+                <tr data-testid="nameserver-timing-row">
+                  <td class="ns-timings-name">{item.nameserver}</td>
+                  <td class="ns-timings-ip">{item.address}</td>
+                  <td class="ns-timings-num ns-timings-avg">{formatTimingMs(item.avg_ms)}</td>
+                  <td class="ns-timings-num">{formatTimingMs(item.min_ms)}</td>
+                  <td class="ns-timings-num">{formatTimingMs(item.max_ms)}</td>
+                  <td class="ns-timings-num">{item.count}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      </section>
     {/if}
 
     <div class="status-banner {bannerCls}" data-testid="result-banner" role="status">

@@ -130,6 +130,8 @@ type jobConfigJSON struct {
 	UndelegatedNS []engine.UndelegatedNameserver `json:"undelegated_ns,omitempty"`
 	UndelegatedDS []engine.UndelegatedDSInfo     `json:"undelegated_ds,omitempty"`
 	MinLevel      string                         `json:"min_level,omitempty"`
+	IPv4Disabled  bool                           `json:"ipv4_disabled,omitempty"`
+	IPv6Disabled  bool                           `json:"ipv6_disabled,omitempty"`
 }
 
 func (s *SQLJobStore) scanJob(row rowScanner) (Job, error) {
@@ -181,6 +183,8 @@ func (s *SQLJobStore) scanJob(row rowScanner) (Job, error) {
 		UndelegatedNS: cfg.UndelegatedNS,
 		UndelegatedDS: cfg.UndelegatedDS,
 		MinLevel:      cfg.MinLevel,
+		IPv4Disabled:  cfg.IPv4Disabled,
+		IPv6Disabled:  cfg.IPv6Disabled,
 	}, nil
 }
 
@@ -196,6 +200,8 @@ func (s *SQLJobStore) Create(job Job) (Job, error) {
 		UndelegatedNS: job.UndelegatedNS,
 		UndelegatedDS: job.UndelegatedDS,
 		MinLevel:      job.MinLevel,
+		IPv4Disabled:  job.IPv4Disabled,
+		IPv6Disabled:  job.IPv6Disabled,
 	}
 	configJSON, err := toNullJSON(cfg)
 	if err != nil {
@@ -269,6 +275,8 @@ func (s *SQLJobStore) Update(job Job) error {
 		UndelegatedNS: job.UndelegatedNS,
 		UndelegatedDS: job.UndelegatedDS,
 		MinLevel:      job.MinLevel,
+		IPv4Disabled:  job.IPv4Disabled,
+		IPv6Disabled:  job.IPv6Disabled,
 	}
 	configJSON, err := toNullJSON(cfg)
 	if err != nil {

@@ -469,6 +469,54 @@ func TestRunEngineForJobPassesSourceAddrOverrides(t *testing.T) {
 	}
 }
 
+func TestRunEngineForJobPassesIPDisableFlags(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	var captured engine.RunRequest
+	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		captured = req
+		return nil, nil
+	}
+
+	job := Job{
+		ID:           "job-ipv6-disabled",
+		Domain:       "example.com",
+		Status:       JobQueued,
+		CreatedAt:    time.Now().UTC(),
+		IPv6Disabled: true,
+	}
+
+	_, _, _, _, err := srv.runEngineForJob(job, context.Background())
+	if err != nil {
+		t.Fatalf("runEngineForJob: %v", err)
+	}
+	if captured.IPv6 == nil {
+		t.Fatal("expected captured.IPv6 pointer to be set")
+	}
+	if *captured.IPv6 {
+		t.Fatalf("expected captured.IPv6 == false, got true")
+	}
+	if captured.IPv4 != nil {
+		t.Fatalf("expected captured.IPv4 to stay nil, got %#v", captured.IPv4)
+	}
+
+	// IPv4-only path.
+	job2 := Job{
+		ID:           "job-ipv4-disabled",
+		Domain:       "example.com",
+		Status:       JobQueued,
+		CreatedAt:    time.Now().UTC(),
+		IPv4Disabled: true,
+	}
+	_, _, _, _, err = srv.runEngineForJob(job2, context.Background())
+	if err != nil {
+		t.Fatalf("runEngineForJob: %v", err)
+	}
+	if captured.IPv4 == nil || *captured.IPv4 {
+		t.Fatalf("expected captured.IPv4 == false, got %#v", captured.IPv4)
+	}
+}
+
 func TestDNSQueryCounterCallback(t *testing.T) {
 	counter := &dnsQueryCounter{}
 	entries := []*logger.Entry{

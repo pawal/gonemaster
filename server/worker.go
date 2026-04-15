@@ -248,6 +248,14 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 		MinLevel:               minLevel,
 		Context:                ctx,
 	}
+	if job.IPv4Disabled {
+		disabled := false
+		req.IPv4 = &disabled
+	}
+	if job.IPv6Disabled {
+		disabled := false
+		req.IPv6 = &disabled
+	}
 	if s.cfg.PositiveCacheTTL != nil {
 		req.PositiveCacheTTL = s.cfg.PositiveCacheTTL
 	}

@@ -114,6 +114,8 @@ type Job struct {
 	UndelegatedNS []engine.UndelegatedNameserver `json:"-"`
 	UndelegatedDS []engine.UndelegatedDSInfo     `json:"-"`
 	MinLevel      string                         `json:"-"`
+	IPv4Disabled  bool                           `json:"-"`
+	IPv6Disabled  bool                           `json:"-"`
 	// NameserverTimings carries per-run timing summaries into graduation.
 	NameserverTimings []NameserverTiming `json:"-"`
 }
@@ -408,6 +410,8 @@ type JobCreateRequest struct {
 	MinLevel         string                       `json:"min_level,omitempty"`
 	Tags             []string                     `json:"tags,omitempty"`
 	Profile          string                       `json:"profile,omitempty"`
+	IPv4Disabled     bool                         `json:"ipv4_disabled,omitempty"`
+	IPv6Disabled     bool                         `json:"ipv6_disabled,omitempty"`
 }
 
 // JobBatchRequest is the payload for a batch submission.

@@ -434,6 +434,8 @@ func (s *Server) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 		Progress:      0,
 		ProfileID:     cloneInt64Ptr(resolvedProfile.ID),
 		ProfileName:   resolvedProfile.Name,
+		IPv4Disabled:  req.IPv4Disabled,
+		IPv6Disabled:  req.IPv6Disabled,
 	}
 	created, err := s.store.Create(job)
 	if err != nil {

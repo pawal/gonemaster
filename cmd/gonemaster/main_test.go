@@ -15,8 +15,8 @@ import (
 	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine"
+	"codeberg.org/pawal/gonemaster/engine/cachefile"
 	"codeberg.org/pawal/gonemaster/engine/logger"
-	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 )
 
@@ -34,7 +34,7 @@ func stubRunEngine(t *testing.T, captured *engine.RunRequest) {
 	})
 }
 
-func samplePacketCacheFile(t *testing.T) nameserver.PacketCacheFile {
+func samplePacketCacheFile(t *testing.T) cachefile.File {
 	t.Helper()
 
 	msg := new(dns.Msg)
@@ -45,11 +45,12 @@ func samplePacketCacheFile(t *testing.T) nameserver.PacketCacheFile {
 	}
 	wire := msg.Data
 
-	return nameserver.PacketCacheFile{
-		Format:  nameserver.PacketCacheFileFormat,
-		Version: nameserver.PacketCacheFileVersion,
-		Entries: []nameserver.PacketCacheEntry{
+	return cachefile.File{
+		Format:  cachefile.Format,
+		Version: cachefile.Version,
+		Entries: []cachefile.Entry{
 			{
+				Kind:       cachefile.KindNameserver,
 				Address:    "192.0.2.53",
 				Key:        "fixture.key",
 				Message:    base64.StdEncoding.EncodeToString(wire),
@@ -363,15 +364,15 @@ func TestRunRestorePacketCacheLoadsRequestCache(t *testing.T) {
 		if req.NameserverCache == nil {
 			t.Fatalf("expected nameserver cache in request")
 		}
-		exported, exportErr := req.NameserverCache.ExportPacketCache()
+		exported, exportErr := req.NameserverCache.ExportEntries()
 		if exportErr != nil {
 			t.Fatalf("export request cache: %v", exportErr)
 		}
-		if len(exported.Entries) != 1 {
-			t.Fatalf("expected 1 restored cache entry, got %d", len(exported.Entries))
+		if len(exported) != 1 {
+			t.Fatalf("expected 1 restored cache entry, got %d", len(exported))
 		}
-		if exported.Entries[0].Address != "192.0.2.53" || exported.Entries[0].Key != "fixture.key" {
-			t.Fatalf("unexpected restored entry: %+v", exported.Entries[0])
+		if exported[0].Address != "192.0.2.53" || exported[0].Key != "fixture.key" {
+			t.Fatalf("unexpected restored entry: %+v", exported[0])
 		}
 		return nil, nil
 	}
@@ -400,7 +401,7 @@ func TestRunSavePacketCacheWritesFile(t *testing.T) {
 		if req.NameserverCache == nil {
 			t.Fatalf("expected nameserver cache in request")
 		}
-		if importErr := req.NameserverCache.ImportPacketCache(fixture); importErr != nil {
+		if importErr := cachefile.Import(fixture, req.NameserverCache, req.Recursor); importErr != nil {
 			t.Fatalf("import fixture into run cache: %v", importErr)
 		}
 		return nil, nil
@@ -420,17 +421,17 @@ func TestRunSavePacketCacheWritesFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read saved cache file: %v", err)
 	}
-	var payload nameserver.PacketCacheFile
+	var payload cachefile.File
 	if err := json.Unmarshal(payloadBytes, &payload); err != nil {
 		t.Fatalf("unmarshal saved cache: %v", err)
 	}
-	if payload.Format != nameserver.PacketCacheFileFormat || payload.Version != nameserver.PacketCacheFileVersion {
+	if payload.Format != cachefile.Format || payload.Version != cachefile.Version {
 		t.Fatalf("unexpected saved cache header: %+v", payload)
 	}
 	if len(payload.Entries) != 1 {
 		t.Fatalf("expected 1 saved entry, got %d", len(payload.Entries))
 	}
-	if payload.Entries[0].Key != "fixture.key" {
+	if payload.Entries[0].Kind != cachefile.KindNameserver || payload.Entries[0].Key != "fixture.key" {
 		t.Fatalf("unexpected saved entry: %+v", payload.Entries[0])
 	}
 }

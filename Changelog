@@ -2,6 +2,20 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [v1.3.2] - 2026-04-16
+
+New feature: show nameserver response times in result view
+
+### Added
+ - UI: show nameserver response times in result view (can be disabled in settings)
+ - cache: add ASN lookup caching with save/restore
+ - cache: persist recursor cache alongside nameserver cache
+
+### Changed
+ - dnssec10: handle NSEC-in-authority on NSEC query (RFC 4470)
+ - server: accept ipv4_disabled/ipv6_disabled on job create (bugfix)
+ - server+ui: add server-side sorting for domains, domain runs, and tag domains tables
+ 
 ## [v1.3.1] - 2026-04-14
 
 ### Added

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"codeberg.org/pawal/gonemaster/engine/asnlookup"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	ns "codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -78,6 +79,8 @@ type RunRequest struct {
 	// Recursor optionally supplies a prepared recursor. When set, the engine
 	// uses it instead of constructing a fresh one, preserving any seeded cache.
 	Recursor *recursor.Recursor
+	// ASNCache optionally provides a per-run ASN lookup cache.
+	ASNCache *asnlookup.Cache
 	// LogCallback receives each log entry as it is created.
 	LogCallback func(*logger.Entry) error
 	// Context controls cancellation and timeouts for the run.
@@ -490,6 +493,9 @@ func RunWithRunner(req RunRequest, runner *Runner) ([]LogEntry, error) {
 		ctx = transport.WithLimiter(ctx, runner.Limiter)
 	}
 	ctx = ns.WithCache(ctx, runner.NameserverCache)
+	if req.ASNCache != nil {
+		ctx = asnlookup.WithCache(ctx, req.ASNCache)
+	}
 	if runner.StartedAt.IsZero() {
 		runner.StartedAt = time.Now()
 	}

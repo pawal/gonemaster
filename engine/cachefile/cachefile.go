@@ -12,6 +12,7 @@ import (
 	"os"
 	"strings"
 
+	"codeberg.org/pawal/gonemaster/engine/asnlookup"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/recursor"
 )
@@ -26,6 +27,8 @@ const (
 	KindNameserver = "nameserver"
 	// KindRecursor tags recursor cache entries.
 	KindRecursor = "recursor"
+	// KindASN tags ASN lookup cache entries.
+	KindASN = "asn"
 )
 
 // File is the portable representation of the unified packet cache.
@@ -50,6 +53,14 @@ type Entry struct {
 	QType       string          `json:"qtype,omitempty"`
 	QClass      string          `json:"qclass,omitempty"`
 	Nameservers []NameserverRef `json:"nameservers,omitempty"`
+
+	// ASN-kind fields.
+	IP   string `json:"ip,omitempty"`
+	ASNs []int  `json:"asns,omitempty"`
+	// Prefix is shared: routed prefix for ASN-kind, unused for others.
+	Prefix string `json:"prefix,omitempty"`
+	Raw    string `json:"raw,omitempty"`
+	Code   string `json:"code,omitempty"`
 
 	// Common fields.
 	Message   string `json:"message,omitempty"`
@@ -100,7 +111,7 @@ func WithWarnf(f func(string, ...any)) Option {
 
 // Export collects entries from the supplied caches into a File and stamps a
 // checksum covering the entries.
-func Export(ns *nameserver.CacheStore, rec *recursor.Recursor) (File, error) {
+func Export(ns *nameserver.CacheStore, rec *recursor.Recursor, asn *asnlookup.Cache) (File, error) {
 	out := File{Format: Format, Version: Version, Entries: []Entry{}}
 
 	if ns != nil {
@@ -144,6 +155,19 @@ func Export(ns *nameserver.CacheStore, rec *recursor.Recursor) (File, error) {
 		}
 	}
 
+	if asn != nil {
+		for _, e := range asn.ExportEntries() {
+			out.Entries = append(out.Entries, Entry{
+				Kind:   KindASN,
+				IP:     e.IP,
+				ASNs:   e.ASNs,
+				Prefix: e.Prefix,
+				Raw:    e.Raw,
+				Code:   e.Code,
+			})
+		}
+	}
+
 	sum, err := checksumFor(out)
 	if err != nil {
 		return File{}, err
@@ -154,7 +178,7 @@ func Export(ns *nameserver.CacheStore, rec *recursor.Recursor) (File, error) {
 
 // Import applies the supplied File to the caches. Either cache may be nil,
 // in which case entries of that kind trigger an error.
-func Import(file File, ns *nameserver.CacheStore, rec *recursor.Recursor, opts ...Option) error {
+func Import(file File, ns *nameserver.CacheStore, rec *recursor.Recursor, asn *asnlookup.Cache, opts ...Option) error {
 	cfg := newConfig(opts)
 
 	if strings.TrimSpace(file.Format) == "" {
@@ -185,6 +209,7 @@ func Import(file File, ns *nameserver.CacheStore, rec *recursor.Recursor, opts .
 
 	var nsEntries []nameserver.Entry
 	var recEntries []recursor.CacheEntry
+	var asnEntries []asnlookup.CacheEntry
 
 	for idx, entry := range file.Entries {
 		switch entry.Kind {
@@ -219,6 +244,14 @@ func Import(file File, ns *nameserver.CacheStore, rec *recursor.Recursor, opts .
 				Nameservers: refs,
 				Message:     wire,
 			})
+		case KindASN:
+			asnEntries = append(asnEntries, asnlookup.CacheEntry{
+				IP:     entry.IP,
+				ASNs:   entry.ASNs,
+				Prefix: entry.Prefix,
+				Raw:    entry.Raw,
+				Code:   entry.Code,
+			})
 		case "":
 			if cfg.strict {
 				return fmt.Errorf("entry %d: kind is required", idx)
@@ -250,17 +283,25 @@ func Import(file File, ns *nameserver.CacheStore, rec *recursor.Recursor, opts .
 			return err
 		}
 	}
+	if len(asnEntries) > 0 {
+		if asn == nil {
+			return fmt.Errorf("asn cache entries present but asn cache is nil")
+		}
+		if err := asn.ImportEntries(asnEntries); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
 
 // Save writes the caches to path as JSON.
-func Save(path string, ns *nameserver.CacheStore, rec *recursor.Recursor) error {
+func Save(path string, ns *nameserver.CacheStore, rec *recursor.Recursor, asn *asnlookup.Cache) error {
 	target := strings.TrimSpace(path)
 	if target == "" {
 		return fmt.Errorf("packet cache save path is required")
 	}
-	payload, err := Export(ns, rec)
+	payload, err := Export(ns, rec, asn)
 	if err != nil {
 		return err
 	}
@@ -273,7 +314,7 @@ func Save(path string, ns *nameserver.CacheStore, rec *recursor.Recursor) error 
 }
 
 // Restore reads path and imports its entries into the caches.
-func Restore(path string, ns *nameserver.CacheStore, rec *recursor.Recursor, opts ...Option) error {
+func Restore(path string, ns *nameserver.CacheStore, rec *recursor.Recursor, asn *asnlookup.Cache, opts ...Option) error {
 	cfg := newConfig(opts)
 
 	source := strings.TrimSpace(path)
@@ -293,7 +334,7 @@ func Restore(path string, ns *nameserver.CacheStore, rec *recursor.Recursor, opt
 	if err := json.Unmarshal(data, &payload); err != nil {
 		return err
 	}
-	return Import(payload, ns, rec, opts...)
+	return Import(payload, ns, rec, asn, opts...)
 }
 
 // checksumFor computes the SHA-256 checksum of the file with Checksum blanked.
@@ -326,6 +367,11 @@ var knownEntryFields = map[string]bool{
 	"nameservers": true,
 	"message":     true,
 	"no_message":  true,
+	"ip":          true,
+	"asns":        true,
+	"prefix":      true,
+	"raw":         true,
+	"code":        true,
 }
 
 func reportUnknownFields(data []byte, cfg *config) error {

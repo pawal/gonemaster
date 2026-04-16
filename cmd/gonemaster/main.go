@@ -16,6 +16,7 @@ import (
 	"syscall"
 
 	"codeberg.org/pawal/gonemaster/engine"
+	"codeberg.org/pawal/gonemaster/engine/asnlookup"
 	"codeberg.org/pawal/gonemaster/engine/badkeys"
 	"codeberg.org/pawal/gonemaster/engine/cachefile"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
@@ -623,6 +624,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 
 	var packetCacheStore *nameserver.CacheStore
 	var packetCacheRecursor *recursor.Recursor
+	var asnCache *asnlookup.Cache
 	if strings.TrimSpace(savePacketCachePath) != "" || strings.TrimSpace(restorePacketCachePath) != "" || nstimes {
 		packetCacheStore = nameserver.NewCacheStore()
 		if strings.TrimSpace(savePacketCachePath) != "" || strings.TrimSpace(restorePacketCachePath) != "" {
@@ -632,9 +634,10 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 				return 2
 			}
 			packetCacheRecursor = rec
+			asnCache = asnlookup.NewCache()
 		}
 		if strings.TrimSpace(restorePacketCachePath) != "" {
-			if restoreErr := cachefile.Restore(restorePacketCachePath, packetCacheStore, packetCacheRecursor); restoreErr != nil {
+			if restoreErr := cachefile.Restore(restorePacketCachePath, packetCacheStore, packetCacheRecursor, asnCache); restoreErr != nil {
 				fmt.Fprintln(errOut, restoreErr.Error())
 				return 2
 			}
@@ -642,6 +645,9 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		req.NameserverCache = packetCacheStore
 		if packetCacheRecursor != nil {
 			req.Recursor = packetCacheRecursor
+		}
+		if asnCache != nil {
+			req.ASNCache = asnCache
 		}
 	}
 
@@ -749,7 +755,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		}
 	}
 	if packetCacheStore != nil && strings.TrimSpace(savePacketCachePath) != "" {
-		if saveErr := cachefile.Save(savePacketCachePath, packetCacheStore, packetCacheRecursor); saveErr != nil {
+		if saveErr := cachefile.Save(savePacketCachePath, packetCacheStore, packetCacheRecursor, asnCache); saveErr != nil {
 			fmt.Fprintln(errOut, saveErr.Error())
 			return 2
 		}

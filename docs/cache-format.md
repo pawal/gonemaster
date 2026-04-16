@@ -59,6 +59,7 @@ fields:
 
 - `"nameserver"` — one cached response for a specific nameserver IP.
 - `"recursor"`   — one cached response for the internal recursor.
+- `"asn"`        — one cached ASN lookup result for a queried IP.
 
 Unknown `kind` values are warnings in lenient mode (the entry is skipped)
 and errors in strict mode.
@@ -125,6 +126,31 @@ from the root servers.
 The recursor cache only stores non-empty responses; there is no
 `no_message` form for recursor entries.
 
+### `kind: "asn"`
+
+```json
+{
+  "kind": "asn",
+  "ip": "192.0.2.10",
+  "asns": [64496, 64497],
+  "prefix": "192.0.2.0/24",
+  "raw": "64496 64497 | 192.0.2.0/24 | US | arin | 2001-01-01",
+  "code": "AS_FOUND"
+}
+```
+
+| Field    | Type     | Required | Description                                                 |
+|----------|----------|----------|-------------------------------------------------------------|
+| `ip`     | string   | yes      | Queried IP address (IPv4 or IPv6). Parsed with `netip`.     |
+| `asns`   | array    | no       | List of AS numbers. Empty for `EMPTY_ASN_SET` / `ERROR_ASN_DATABASE`. |
+| `prefix` | string   | no       | Most-specific routed prefix (e.g., `192.0.2.0/24`). Parsed with `netip`. |
+| `raw`    | string   | no       | Backend response line, captured verbatim for debugging.     |
+| `code`   | string   | yes      | One of `AS_FOUND`, `EMPTY_ASN_SET`, `ERROR_ASN_DATABASE`.   |
+
+ASN entries are stored on hit and on miss (`EMPTY_ASN_SET`,
+`ERROR_ASN_DATABASE`), so a restored cache avoids both successful and
+failed lookups.
+
 ## Strict vs. lenient parsing
 
 `Import` and `Restore` accept functional options:
@@ -169,6 +195,13 @@ mismatch, or checksum mismatch is always a hard error regardless of mode.
         { "name": "ns1.example", "address": "192.0.2.1" }
       ],
       "message": "E+6BAAABAAAAAAAAB2V4YW1wbGUDbmV0AAACAAE="
+    },
+    {
+      "kind": "asn",
+      "ip": "192.0.2.53",
+      "asns": [64496],
+      "prefix": "192.0.2.0/24",
+      "code": "AS_FOUND"
     }
   ]
 }

@@ -62,12 +62,21 @@ func Get(ctx context.Context, resolver Resolver, ip netip.Addr) ([]int, error) {
 }
 
 // GetWithPrefix returns ASN list, prefix, raw response, and status code.
+// If an ASN cache is present in ctx, cached results are returned on hit and
+// new results are stored on miss.
 func GetWithPrefix(ctx context.Context, resolver Resolver, ip netip.Addr) (Result, error) {
-	if resolver == nil {
-		return Result{}, fmt.Errorf("missing resolver")
-	}
 	if !ip.IsValid() {
 		return Result{}, fmt.Errorf("invalid IP address")
+	}
+
+	if cache := CacheFromContext(ctx); cache != nil {
+		if r, ok := cache.get(ip); ok {
+			return r, nil
+		}
+	}
+
+	if resolver == nil {
+		return Result{}, fmt.Errorf("missing resolver")
 	}
 
 	prof := profile.FromContext(ctx)
@@ -93,17 +102,28 @@ func GetWithPrefix(ctx context.Context, resolver Resolver, ip netip.Addr) (Resul
 		}
 		if errors.Is(err, errTryNext) {
 			if idx == len(sources)-1 {
-				return Result{Code: CodeError}, nil
+				result = Result{Code: CodeError}
+				if cache := CacheFromContext(ctx); cache != nil {
+					cache.set(ip, result)
+				}
+				return result, nil
 			}
 			continue
 		}
 		if err != nil {
 			return Result{}, err
 		}
+		if cache := CacheFromContext(ctx); cache != nil {
+			cache.set(ip, result)
+		}
 		return result, nil
 	}
 
-	return Result{Code: CodeError}, nil
+	result := Result{Code: CodeError}
+	if cache := CacheFromContext(ctx); cache != nil {
+		cache.set(ip, result)
+	}
+	return result, nil
 }
 
 func lookupCymru(ctx context.Context, resolver Resolver, ip netip.Addr, source string) (Result, error) {

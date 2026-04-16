@@ -401,7 +401,7 @@ func TestRunSavePacketCacheWritesFile(t *testing.T) {
 		if req.NameserverCache == nil {
 			t.Fatalf("expected nameserver cache in request")
 		}
-		if importErr := cachefile.Import(fixture, req.NameserverCache, req.Recursor); importErr != nil {
+		if importErr := cachefile.Import(fixture, req.NameserverCache, req.Recursor, req.ASNCache); importErr != nil {
 			t.Fatalf("import fixture into run cache: %v", importErr)
 		}
 		return nil, nil

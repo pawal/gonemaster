@@ -56,6 +56,7 @@
   "pub.result_heading": "Resultat för {domain}",
   "pub.result_share": "Dela resultat",
   "pub.result_share_copied": "Kopierad!",
+  "pub.result_print": "Skriv ut",
   "pub.result_new_test": "Nytt test",
   "pub.result_locale_label": "Meddelandespråk",
   "pub.ns_timing_heading": "Svarstider för namnservrar",

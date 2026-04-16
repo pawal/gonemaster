@@ -56,6 +56,7 @@
   "pub.result_heading": "Resultater for {domain}",
   "pub.result_share": "Del resultat",
   "pub.result_share_copied": "Kopieret!",
+  "pub.result_print": "Udskriv",
   "pub.result_new_test": "Ny test",
   "pub.result_locale_label": "Meddelelsessprog",
   "pub.ns_timing_heading": "Navneserver-svartider",

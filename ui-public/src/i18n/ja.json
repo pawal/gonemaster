@@ -56,6 +56,7 @@
   "pub.result_heading": "{domain} の結果",
   "pub.result_share": "結果を共有",
   "pub.result_share_copied": "コピーしました！",
+  "pub.result_print": "印刷",
   "pub.result_new_test": "新しいテスト",
   "pub.result_locale_label": "メッセージの言語",
   "pub.ns_timing_heading": "ネームサーバー応答時間",

@@ -1,8 +1,28 @@
 <script>
+  import { onMount, onDestroy } from "svelte";
   import { t } from "../i18n.js";
   import { getResult } from "../api.js";
   import { LEVELS, levelClass, bannerClass, worstLevel } from "../severity.js";
   import ShareButton from "./ShareButton.svelte";
+
+  // Force all <details> open before printing, restore after.
+  let closedBeforePrint = [];
+  function onBeforePrint() {
+    closedBeforePrint = [...document.querySelectorAll("details:not([open])")];
+    closedBeforePrint.forEach(d => d.setAttribute("open", ""));
+  }
+  function onAfterPrint() {
+    closedBeforePrint.forEach(d => d.removeAttribute("open"));
+    closedBeforePrint = [];
+  }
+  onMount(() => {
+    window.addEventListener("beforeprint", onBeforePrint);
+    window.addEventListener("afterprint", onAfterPrint);
+  });
+  onDestroy(() => {
+    window.removeEventListener("beforeprint", onBeforePrint);
+    window.removeEventListener("afterprint", onAfterPrint);
+  });
 
   function levelCounts(arr) {
     const counts = {};
@@ -151,6 +171,7 @@
             <div class="score-meta-row">
               {#if finishedStr}<span class="result-date">{finishedStr}</span>{/if}
               <ShareButton {publicID} {domain} score={scoringEnabled ? score : null} />
+              <button type="button" class="print-button" onclick={() => window.print()}>{$t("pub.result_print")}</button>
             </div>
           </div>
         </div>
@@ -200,6 +221,7 @@
           {#if finishedStr}<p class="result-date small">{finishedStr}</p>{/if}
         </div>
         <ShareButton {publicID} {domain} />
+        <button type="button" class="print-button" onclick={() => window.print()}>{$t("pub.result_print")}</button>
       </div>
     {/if}
 

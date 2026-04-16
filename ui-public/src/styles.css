@@ -195,6 +195,8 @@ button.ghost {
   background: transparent;
   color: var(--ink-2);
   border: 1.5px solid var(--border);
+  font-size: var(--text-sm);
+  padding: 6px 14px;
 }
 
 button.ghost:hover:not(:disabled) {
@@ -1078,6 +1080,132 @@ details[open] > .score-bonus-summary > .score-bonus-chevron {
   top: auto;
   bottom: 3.23em;
   transform: rotate(-45deg);
+}
+
+/* ── Print button ───────────────────────────────────────────────────────── */
+.print-button {
+  background: transparent;
+  color: var(--ink-2);
+  border: 1.5px solid var(--border);
+  font-size: var(--text-sm);
+  padding: 6px 14px;
+}
+.print-button:hover:not(:disabled) {
+  background: var(--bg-2);
+}
+
+/* ── Print styles ───────────────────────────────────────────────────────── */
+@media print {
+  /* Force light theme: white background, black text */
+  :root, :root[data-theme="dark"] {
+    color-scheme: light !important;
+    --bg: #fff;
+    --bg-2: #f4f6f9;
+    --ink: #000;
+    --ink-2: #333;
+    --muted: #666;
+    --card: #fff;
+    --border: #ccc;
+    --surface: #fff;
+    --surface-2: #eee;
+    --on-surface-2: #333;
+  }
+
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  /* Hide interactive / chrome elements */
+  .header-controls,
+  [data-testid="test-form"],
+  .fork-ribbon,
+  .version-footer,
+  .print-button { display: none !important; }
+
+  header {
+    border-bottom: none;
+    background: transparent;
+  }
+
+  /* Remove outer results card chrome; inner elements provide their own borders */
+  [data-testid="results-view"].card {
+    border: none;
+    padding: 0;
+    background: transparent;
+  }
+
+  /* All <details> are forced open via beforeprint/afterprint JS in Results.svelte */
+  details > summary { list-style: none; }
+  details > summary::-webkit-details-marker { display: none; }
+
+  .module-chevron,
+  .testcase-chevron,
+  .score-bonus-chevron { display: none !important; }
+
+  .module-summary,
+  .testcase-summary,
+  .score-bonus-summary {
+    cursor: default;
+    pointer-events: none;
+  }
+
+  /* Page break control */
+  .module-card { break-inside: avoid; }
+  .testcase-group { break-inside: avoid; }
+  .score-card { break-inside: avoid; }
+  .ns-timings-card { break-inside: avoid; }
+
+  /* Level pills: use borders for ink saving */
+  .level-pill {
+    border: 1px solid currentColor !important;
+    background: transparent !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Status banner: border only */
+  .status-banner {
+    background: transparent !important;
+    border: 2px solid currentColor !important;
+  }
+
+  /* Score bar: print-safe */
+  .score-cat-bar {
+    background: #333 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    animation: none !important;
+  }
+  .score-cat-bar-track {
+    border: 1px solid #ccc;
+    background: #eee !important;
+  }
+
+  /* Grade badge: preserve color */
+  .grade-badge {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Module left border: preserve severity color */
+  .module-card {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Remove hover effects and transitions */
+  .module-summary:hover { background: transparent !important; }
+  .score-bonus-summary:hover { background: transparent !important; }
+
+  /* Remove animations */
+  * { animation: none !important; transition: none !important; }
+
+  /* Full width for print */
+  main { max-width: 100%; padding: 0; }
+
+  /* Share button hidden in print */
+  [data-testid="share-button"] { display: none !important; }
 }
 
 /* ── Version footer ──────────────────────────────────────────────────────── */

@@ -56,6 +56,7 @@
   "pub.result_heading": "Résultats pour {domain}",
   "pub.result_share": "Partager le résultat",
   "pub.result_share_copied": "Copié !",
+  "pub.result_print": "Imprimer",
   "pub.result_new_test": "Nouveau test",
   "pub.result_locale_label": "Langue des messages",
   "pub.ns_timing_heading": "Temps de réponse des serveurs de noms",

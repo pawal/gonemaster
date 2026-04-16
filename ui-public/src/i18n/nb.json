@@ -56,6 +56,7 @@
   "pub.result_heading": "Resultater for {domain}",
   "pub.result_share": "Del resultat",
   "pub.result_share_copied": "Kopiert!",
+  "pub.result_print": "Skriv ut",
   "pub.result_new_test": "Ny test",
   "pub.result_locale_label": "Meldingsspråk",
   "pub.ns_timing_heading": "Responstider for navneservere",

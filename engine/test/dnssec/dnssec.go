@@ -3135,6 +3135,7 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var nsecErroneousAnswer []string
 	var nsec3paramErroneousAnswer []string
 	var nsecNsec3Nodata []string
+	var nsecNsecNodata []string
 	var nsec3paramNsecNodata []string
 	nsecRRSIGVerifyError := map[uint16][]string{}
 	nsec3RRSIGVerifyError := map[uint16][]string{}
@@ -3192,6 +3193,7 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			nsecErroneousAnswer         bool
 			nsec3paramErroneousAnswer   bool
 			nsecNsec3Nodata             bool
+			nsecNsecNodata              bool
 			nsec3paramNsecNodata        bool
 			nsecRRSIGVerifyError        map[uint16]bool
 			nsec3RRSIGVerifyError       map[uint16]bool
@@ -3353,6 +3355,83 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 											outcome.algoNotSupportedByZM[key][dnskey.Algorithm] = true
 										} else {
 											outcome.nsec3RRSIGVerifyError[keytag] = true
+										}
+									}
+								}
+							}
+						}
+					}
+				} else if len(nsecResp.GetRecords(typeNSEC, "authority")) > 0 {
+					// RFC 4470: NSEC query returns NODATA with synthesized NSEC
+					// in authority. This is expected from white-lies / minimally
+					// covering NSEC implementations (e.g. AWS Route 53).
+					outcome.nsecNsecNodata = true
+
+					soaRRs := nsecResp.GetRecords(typeSOA, "authority")
+					if len(soaRRs) == 0 {
+						outcome.nsecNodataMissingSOA = true
+					} else if !rrOwnerMatchesZone(soaRRs[0], z.Name) {
+						outcome.nsecNodataWrongSOA = true
+					}
+
+					nsecRRsRaw := nsecResp.GetRecords(typeNSEC, "authority")
+					var nsecRRs []*dns.NSEC
+					for _, rr := range nsecRRsRaw {
+						if nsec, ok := rr.(*dns.NSEC); ok {
+							nsecRRs = append(nsecRRs, nsec)
+						}
+					}
+
+					if len(nsecRRs) > 1 {
+						outcome.erroneousMultipleNSEC = true
+					} else if len(nsecRRs) == 1 {
+						nsecRR := nsecRRs[0]
+						if !rrOwnerMatchesZone(nsecRR, z.Name) {
+							outcome.nsecMismatchesApex = true
+						}
+						// Type-list validation is skipped: RFC 4470 synthesized
+						// NSEC bitmaps exclude the queried type (NSEC) and may
+						// include normally-forbidden types (NSEC3PARAM).
+
+						rrsigRRs := filterRRSIGByType(nsecResp.GetRecordsForName("RRSIG", dnsname.New(nsecRR.Hdr.Name)), dns.TypeNSEC)
+						if len(rrsigRRs) == 0 {
+							outcome.nsecMissingSignature = true
+						} else {
+							rrset := rrsetForName(nsecRRsRaw, nsecRR.Hdr.Name)
+							for _, sig := range rrsigRRs {
+								keytag := sig.KeyTag
+								var matchingDNSKEYs []*dns.DNSKEY
+								for _, dnskey := range dnskeyRecords {
+									if dnskey.KeyTag() == keytag {
+										matchingDNSKEYs = append(matchingDNSKEYs, dnskey)
+									}
+								}
+								if len(matchingDNSKEYs) == 0 {
+									outcome.nsecRRSIGNoDNSKEY[keytag] = true
+									continue
+								}
+								if int64(sig.Expiration) < testingTimeUnix {
+									outcome.nsecRRSIGExpired[keytag] = true
+									continue
+								}
+								if int64(sig.Inception) > testingTimeUnix {
+									outcome.nsecRRSIGNotYetValid[keytag] = true
+									continue
+								}
+
+								for idx, dnskey := range matchingDNSKEYs {
+									if err := verifyRRSIG(sig, rrset, dnskey, testingTime); err == nil {
+										outcome.nsecRRSIGVerified = true
+										break
+									} else if idx == len(matchingDNSKEYs)-1 {
+										if errors.Is(err, dns.ErrAlg) {
+											key := dnskey.KeyTag()
+											if outcome.algoNotSupportedByZM[key] == nil {
+												outcome.algoNotSupportedByZM[key] = map[uint8]bool{}
+											}
+											outcome.algoNotSupportedByZM[key][dnskey.Algorithm] = true
+										} else {
+											outcome.nsecRRSIGVerifyError[keytag] = true
 										}
 									}
 								}
@@ -3539,6 +3618,9 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			if outcome.nsecNsec3Nodata {
 				nsecNsec3Nodata = append(nsecNsec3Nodata, outcome.groupList...)
 			}
+			if outcome.nsecNsecNodata {
+				nsecNsecNodata = append(nsecNsecNodata, outcome.groupList...)
+			}
 			if outcome.nsec3paramNsecNodata {
 				nsec3paramNsecNodata = append(nsec3paramNsecNodata, outcome.groupList...)
 			}
@@ -3610,6 +3692,11 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
+
+	// RFC 4470: merge NSEC-in-authority evidence from the NSEC query
+	// (white-lies) into nsecInAnswer so consistency checks treat them
+	// identically.
+	nsecInAnswer = uniqueStrings(append(nsecInAnswer, nsecNsecNodata...))
 
 	diff := symmetricDifferenceStrings(nsecInAnswer, nsec3paramNsecNodata)
 	union := uniqueStrings(append(nsec3paramInAnswer, nsecNsec3Nodata...))

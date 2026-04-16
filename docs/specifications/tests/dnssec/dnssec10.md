@@ -28,6 +28,7 @@ Status: Final
    - Non-empty answer with NSEC records => NSEC-in-answer path (multi-record, apex-owner checks).
    - Non-empty answer without NSEC => erroneous-answer set.
    - Empty answer with NSEC3 in authority => NSEC3-NODATA path (SOA presence/owner checks, NSEC3 owner/type-list checks, signature presence and verification checks).
+   - Empty answer with NSEC in authority (no NSEC3) => NSEC-NODATA path for RFC 4470 white-lies / minimally covering NSEC implementations (SOA presence/owner checks, NSEC count/apex-owner checks, signature presence and verification checks; type-list validation is skipped because the synthesized bitmap intentionally excludes the queried type). Treated as NSEC evidence equivalent to NSEC-in-answer for consistency checks.
 5. Run `NSEC3PARAM` query processing:
    - Response-shape failure => `NSEC3PARAM query response error` set.
    - Non-empty answer with NSEC3PARAM => NSEC3PARAM-in-answer path (multi-record, apex-owner checks).
@@ -190,16 +191,18 @@ Status: Final
   - Upstream: summary for `DS10_INCONSISTENT_NSEC_NSEC3` describes two separate lists (`ns_list_nsec`, `ns_list_nsec3`). Gonemaster: emits a single combined `servers` argument.
   - Upstream: most DS10 tags are documented with `servers`. Gonemaster: `DS10_ALGO_NOT_SUPPORTED_BY_ZM` uses `addresses` while other DS10 tags use `servers`.
   - Upstream: does not explicitly specify testcase boundary and per-query transport debug emissions in this testcase summary. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
+  - Upstream: does not handle the case where the NSEC query returns a NODATA response with NSEC in the authority section (RFC 4470 white-lies / minimally covering NSEC, as used by e.g. AWS Route 53). This causes a false positive `DS10_INCONSISTENT_NSEC` for zones using on-line signing. Gonemaster: treats NSEC-in-authority on the NSEC query as NSEC evidence equivalent to NSEC-in-answer for consistency checks, and skips type-list validation on the synthesized NSEC record (whose bitmap intentionally excludes the queried type).
 - Potential upstream report:
-  - `no`
+  - `yes` -- the upstream specification lacks a branch for NSEC-in-authority on the NSEC query, causing false `DS10_INCONSISTENT_NSEC` for RFC 4470 implementations (see [zonemaster/zonemaster#1424](https://github.com/zonemaster/zonemaster/issues/1424)).
 
 ## Implementation Notes
 
-The following behaviors are implementation choices, not mandated by RFC 4034/4035/5155:
+The following behaviors are implementation choices, not mandated by RFC 4034/4035/5155/4470:
 
 - **Reference time source**: RRSIG validity checks use wall-clock time (`time.Now().UTC()`) as the reference "now".  RFC 4034 requires checking whether signatures are currently valid; using wall-clock time rather than packet timestamps (as `dnssec04` does) is an implementation choice appropriate for aggregate multi-nameserver analysis where a single consistent reference point is preferred.
 - **Deduplication by IP**: The nameserver set is built by IP address; delegation and zone NS entries sharing the same IP are merged.  First-seen nameserver identity string (`name/ip`) is used in output arguments.  The protocol does not specify how to handle NS records for the same IP from different sources.
 - **`servers` vs `addresses` argument name**: Most DS10 tags use `servers` (nameserver identity strings) while `DS10_ALGO_NOT_SUPPORTED_BY_ZM` uses `addresses` (raw IPs from the signature verification path).  This asymmetry is an implementation-defined output format.
+- **RFC 4470 white-lies NSEC handling**: When the NSEC query returns a NODATA response with NSEC in the authority section (rather than NSEC in the answer section), this is recognized as NSEC evidence from an on-line signing / minimally covering NSEC implementation.  The synthesized NSEC record's type bitmap intentionally excludes the queried type (NSEC) and may include normally-forbidden types (NSEC3PARAM), so type-list validation is skipped for this record.  All other checks (SOA, count, apex owner, signature) are performed normally.  For consistency purposes this evidence is treated identically to NSEC-in-answer.
 
 ## Edge Cases And Limitations
 - Nameserver processing is deduplicated by IP; all DS10 output tags except `DS10_ALGO_NOT_SUPPORTED_BY_ZM` report `servers` as nameserver identity strings (`name/ip`) rather than raw IPs.

@@ -3362,9 +3362,10 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						}
 					}
 				} else if len(nsecResp.GetRecords(typeNSEC, "authority")) > 0 {
-					// RFC 4470: NSEC query returns NODATA with synthesized NSEC
-					// in authority. This is expected from white-lies / minimally
-					// covering NSEC implementations (e.g. AWS Route 53).
+					// RFC 4470 / RFC 9824: NSEC query returns NODATA with synthesized
+					// NSEC in authority. This is expected from white-lies / minimally
+					// covering NSEC (RFC 4470) and compact denial of existence
+					// (RFC 9824) implementations (e.g. AWS Route 53, Cloudflare).
 					outcome.nsecNsecNodata = true
 
 					soaRRs := nsecResp.GetRecords(typeSOA, "authority")
@@ -3389,9 +3390,9 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						if !rrOwnerMatchesZone(nsecRR, z.Name) {
 							outcome.nsecMismatchesApex = true
 						}
-						// Type-list validation is skipped: RFC 4470 synthesized
-						// NSEC bitmaps exclude the queried type (NSEC) and may
-						// include normally-forbidden types (NSEC3PARAM).
+						// Type-list validation is skipped: RFC 4470 / RFC 9824
+						// synthesized NSEC bitmaps exclude the queried type (NSEC)
+						// and may include normally-forbidden types (NSEC3PARAM).
 
 						rrsigRRs := filterRRSIGByType(nsecResp.GetRecordsForName("RRSIG", dnsname.New(nsecRR.Hdr.Name)), dns.TypeNSEC)
 						if len(rrsigRRs) == 0 {
@@ -3693,9 +3694,9 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	// RFC 4470: merge NSEC-in-authority evidence from the NSEC query
-	// (white-lies) into nsecInAnswer so consistency checks treat them
-	// identically.
+	// RFC 4470 / RFC 9824: merge NSEC-in-authority evidence from the
+	// NSEC query (white-lies / compact denial) into nsecInAnswer so
+	// consistency checks treat them identically.
 	nsecInAnswer = uniqueStrings(append(nsecInAnswer, nsecNsecNodata...))
 
 	diff := symmetricDifferenceStrings(nsecInAnswer, nsec3paramNsecNodata)

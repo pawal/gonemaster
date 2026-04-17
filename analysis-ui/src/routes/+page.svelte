@@ -38,9 +38,19 @@
     <p class="status-banner error">Failed to load catalog: {layoutData.catalogError}</p>
   </section>
 {:else if !data.datasetTag}
-  <section class="card">
-    <h2>Overview</h2>
-    <p class="status-banner warn">No public analysis cohorts are configured yet.</p>
+  <section class="card empty-state">
+    <h2>No public cohort is published yet</h2>
+    <p class="hint">
+      The analysis dashboard only shows cohorts that have been explicitly marked as public.
+      A freshly-created cohort defaults to <code>analysis_enabled: true</code>,
+      <code>public_enabled: false</code> — it will materialize data in the background but
+      stays hidden here until an admin publishes it.
+    </p>
+    <ol class="hint next-steps">
+      <li>Open the admin UI (Settings → Analysis).</li>
+      <li>Toggle <strong>Public</strong> on for the cohort you want to expose here.</li>
+      <li>Optionally click <strong>Make default</strong> so it becomes the default view.</li>
+    </ol>
   </section>
 {:else if data.detailError}
   <section class="card">
@@ -49,6 +59,7 @@
   </section>
 {:else if data.detail}
   {@const d = data.detail}
+  {@const isEmpty = (d.domain_count ?? 0) === 0}
   <section class="card overview-header">
     <div class="overview-title-row">
       <h2>{d.label}</h2>
@@ -70,14 +81,26 @@
     </dl>
   </section>
 
-  <section class="summary-grid" aria-label="Cohort summary counts">
-    {#each summaryCards as card (card.label)}
-      <a class="summary-card" href={`${base}${card.href}${query}`}>
-        <span class="summary-count">{formatCount(card.value)}</span>
-        <span class="summary-label">{card.label}</span>
-      </a>
-    {/each}
-  </section>
+  {#if isEmpty}
+    <section class="card empty-state">
+      <h3>No data has been materialized yet</h3>
+      <p class="hint">
+        This cohort is published but the projector hasn't seen any matching runs yet.
+        Run a job (or batch) tagged with <code>{d.dataset_tag}</code>, or trigger
+        <strong>Rebuild</strong> from the admin UI to project any existing runs that
+        already carry this tag.
+      </p>
+    </section>
+  {:else}
+    <section class="summary-grid" aria-label="Cohort summary counts">
+      {#each summaryCards as card (card.label)}
+        <a class="summary-card" href={`${base}${card.href}${query}`}>
+          <span class="summary-count">{formatCount(card.value)}</span>
+          <span class="summary-label">{card.label}</span>
+        </a>
+      {/each}
+    </section>
+  {/if}
 {/if}
 
 <style>
@@ -154,4 +177,27 @@
   .pill-status-ready  { background: #d6f1d0; color: #1e5b1e; }
   .pill-status-failed { background: #fee2e2; color: #991b1b; }
   .pill-status-pending { background: var(--surface-2); color: var(--on-surface-2); }
+
+  .empty-state h2,
+  .empty-state h3 {
+    margin: 0;
+    color: var(--ink);
+  }
+
+  .empty-state code {
+    font-family: var(--mono);
+    font-size: var(--text-sm);
+    background: var(--surface-2);
+    color: var(--on-surface-2);
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+
+  .next-steps {
+    padding-left: var(--space-5);
+    margin: var(--space-2) 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
 </style>

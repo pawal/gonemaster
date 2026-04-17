@@ -12,6 +12,10 @@ function stubResponse(body: unknown, ok = true): Response {
   } as unknown as Response;
 }
 
+function evt(fetchFn: ReturnType<typeof vi.fn>) {
+  return { fetch: fetchFn as unknown as typeof fetch } as Parameters<typeof load>[0];
+}
+
 describe("/cohorts +page.load", () => {
   it("returns the cohort list from the public API", async () => {
     const cohorts = [
@@ -19,7 +23,7 @@ describe("/cohorts +page.load", () => {
       { dataset_tag: "gov", label: "Government", is_default: false }
     ];
     const fetchFn = vi.fn().mockResolvedValue(stubResponse(cohorts));
-    const data = await load({ fetch: fetchFn as unknown as typeof fetch });
+    const data = await load(evt(fetchFn));
 
     expect(data.cohorts).toEqual(cohorts);
     expect(data.error).toBeNull();
@@ -28,7 +32,7 @@ describe("/cohorts +page.load", () => {
 
   it("returns an empty list with an error message when the fetch fails", async () => {
     const fetchFn = vi.fn().mockResolvedValue(stubResponse({}, false));
-    const data = await load({ fetch: fetchFn as unknown as typeof fetch });
+    const data = await load(evt(fetchFn));
     expect(data.cohorts).toEqual([]);
     expect(data.error).toMatch(/HTTP 500/);
   });

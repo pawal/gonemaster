@@ -205,279 +205,358 @@
 {/if}
 
 {#if loading}
-  <p>{$t("analysis_cohorts_loading")}</p>
+  <p class="small">{$t("analysis_cohorts_loading")}</p>
 {:else if loadError}
   <p class="error">{$t("analysis_cohorts_load_error", { error: loadError })}</p>
 {:else}
-  <h3>{$t("analysis_cohorts_existing_heading")}</h3>
-  {#if cohorts.length === 0}
-    <p class="small">{$t("analysis_cohorts_empty")}</p>
-  {:else}
-    <div class="table-scroll">
-      <table class="analysis-cohorts-table">
-        <thead>
-          <tr>
-            <th scope="col">{$t("analysis_cohorts_col_tag")}</th>
-            <th scope="col">{$t("analysis_cohorts_col_label")}</th>
-            <th scope="col">{$t("analysis_cohorts_col_analysis")}</th>
-            <th scope="col">{$t("analysis_cohorts_col_public")}</th>
-            <th scope="col">{$t("analysis_cohorts_col_default")}</th>
-            <th scope="col">{$t("analysis_cohorts_col_status")}</th>
-            <th scope="col">{$t("analysis_cohorts_col_last_materialized")}</th>
-            <th scope="col">{$t("analysis_cohorts_col_last_error")}</th>
-            <th scope="col">{$t("analysis_cohorts_col_actions")}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each cohorts as cohort (cohort.id)}
-            {@const busy = busyCohortId === cohort.id}
-            {@const tone = statusBadgeTone(cohort.materialization_status)}
+  <section class="cohort-section">
+    <h3>{$t("analysis_cohorts_existing_heading")}</h3>
+    {#if cohorts.length === 0}
+      <p class="small">{$t("analysis_cohorts_empty")}</p>
+    {:else}
+      <div class="cohort-table-wrap">
+        <table class="data-table cohort-table">
+          <thead>
             <tr>
-              <th scope="row">{cohort.source_tag}</th>
-              <td>{cohort.label || cohort.source_tag}</td>
-              <td>
-                <button
-                  type="button"
-                  class="toggle-pill"
-                  class:toggle-on={cohort.analysis_enabled}
-                  disabled={busy}
-                  onclick={() => toggleAnalysis(cohort)}
-                >
-                  {cohort.analysis_enabled ? $t("analysis_cohorts_toggle_on") : $t("analysis_cohorts_toggle_off")}
-                </button>
-              </td>
-              <td>
-                <button
-                  type="button"
-                  class="toggle-pill"
-                  class:toggle-on={cohort.public_enabled}
-                  disabled={busy || !cohort.analysis_enabled}
-                  onclick={() => togglePublic(cohort)}
-                >
-                  {cohort.public_enabled ? $t("analysis_cohorts_toggle_on") : $t("analysis_cohorts_toggle_off")}
-                </button>
-              </td>
-              <td>
-                {#if cohort.is_default}
-                  <span class="default-marker">{$t("analysis_cohorts_default_active")}</span>
-                {:else}
+              <th scope="col">{$t("analysis_cohorts_col_tag")}</th>
+              <th scope="col">{$t("analysis_cohorts_col_label")}</th>
+              <th scope="col" class="col-center">{$t("analysis_cohorts_col_analysis")}</th>
+              <th scope="col" class="col-center">{$t("analysis_cohorts_col_public")}</th>
+              <th scope="col" class="col-center">{$t("analysis_cohorts_col_default")}</th>
+              <th scope="col">{$t("analysis_cohorts_col_status")}</th>
+              <th scope="col">{$t("analysis_cohorts_col_last_materialized")}</th>
+              <th scope="col">{$t("analysis_cohorts_col_last_error")}</th>
+              <th scope="col" class="col-right">{$t("analysis_cohorts_col_actions")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each cohorts as cohort (cohort.id)}
+              {@const busy = busyCohortId === cohort.id}
+              {@const tone = statusBadgeTone(cohort.materialization_status)}
+              <tr>
+                <th scope="row" class="cohort-tag">{cohort.source_tag}</th>
+                <td>{cohort.label || cohort.source_tag}</td>
+                <td class="col-center">
                   <button
                     type="button"
-                    class="link-button"
-                    disabled={busy || !cohort.analysis_enabled || !cohort.public_enabled}
-                    onclick={() => setDefault(cohort)}
+                    class="toggle-pill"
+                    class:toggle-on={cohort.analysis_enabled}
+                    class:toggle-off={!cohort.analysis_enabled}
+                    disabled={busy}
+                    aria-pressed={cohort.analysis_enabled}
+                    onclick={() => toggleAnalysis(cohort)}
                   >
-                    {$t("analysis_cohorts_default_set_action")}
+                    {cohort.analysis_enabled ? $t("analysis_cohorts_toggle_on") : $t("analysis_cohorts_toggle_off")}
                   </button>
-                {/if}
-              </td>
-              <td>
-                <span class={`status-badge status-${tone}`}>{cohort.materialization_status || "pending"}</span>
-              </td>
-              <td>
-                {#if cohort.last_materialized_at}
-                  <time datetime={cohort.last_materialized_at}>{formatTimestamp(cohort.last_materialized_at)}</time>
-                {:else}
-                  <span class="small muted">—</span>
-                {/if}
-              </td>
-              <td>
-                {#if cohort.last_materialization_error}
-                  <span class="error-detail" title={cohort.last_materialization_error}>
-                    {cohort.last_materialization_error}
+                </td>
+                <td class="col-center">
+                  <button
+                    type="button"
+                    class="toggle-pill"
+                    class:toggle-on={cohort.public_enabled}
+                    class:toggle-off={!cohort.public_enabled}
+                    disabled={busy || !cohort.analysis_enabled}
+                    aria-pressed={cohort.public_enabled}
+                    onclick={() => togglePublic(cohort)}
+                  >
+                    {cohort.public_enabled ? $t("analysis_cohorts_toggle_on") : $t("analysis_cohorts_toggle_off")}
+                  </button>
+                </td>
+                <td class="col-center">
+                  {#if cohort.is_default}
+                    <span class="badge badge-default">{$t("analysis_cohorts_default_active")}</span>
+                  {:else}
+                    <button
+                      type="button"
+                      class="secondary small"
+                      disabled={busy || !cohort.analysis_enabled || !cohort.public_enabled}
+                      onclick={() => setDefault(cohort)}
+                    >
+                      {$t("analysis_cohorts_default_set_action")}
+                    </button>
+                  {/if}
+                </td>
+                <td>
+                  <span class={`badge badge-status badge-status-${tone}`}>
+                    {cohort.materialization_status || "pending"}
                   </span>
-                {:else}
-                  <span class="small muted">—</span>
-                {/if}
-              </td>
-              <td>
-                <div class="row-actions">
-                  <button type="button" disabled={busy || !cohort.analysis_enabled} onclick={() => rebuildCohort(cohort)}>
-                    {$t("analysis_cohorts_rebuild")}
-                  </button>
-                  <button type="button" disabled={busy} onclick={() => clearCohort(cohort)}>
-                    {$t("analysis_cohorts_clear")}
-                  </button>
-                </div>
-              </td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-    </div>
-  {/if}
+                </td>
+                <td>
+                  {#if cohort.last_materialized_at}
+                    <time class="small" datetime={cohort.last_materialized_at}>
+                      {formatTimestamp(cohort.last_materialized_at)}
+                    </time>
+                  {:else}
+                    <span class="small muted">—</span>
+                  {/if}
+                </td>
+                <td class="cohort-error">
+                  {#if cohort.last_materialization_error}
+                    <span class="error-detail" title={cohort.last_materialization_error}>
+                      {cohort.last_materialization_error}
+                    </span>
+                  {:else}
+                    <span class="small muted">—</span>
+                  {/if}
+                </td>
+                <td class="col-right">
+                  <div class="row-actions">
+                    <button type="button" class="ghost small" disabled={busy || !cohort.analysis_enabled} onclick={() => rebuildCohort(cohort)}>
+                      {$t("analysis_cohorts_rebuild")}
+                    </button>
+                    <button type="button" class="ghost small" disabled={busy} onclick={() => clearCohort(cohort)}>
+                      {$t("analysis_cohorts_clear")}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+    {/if}
+  </section>
 
-  <h3 style="margin-top: 24px;">{$t("analysis_cohorts_create_heading")}</h3>
-  <p class="small" style="margin-bottom: 12px;">{$t("analysis_cohorts_create_hint")}</p>
-  <div class="create-grid">
-    <label>
-      <span>{$t("analysis_cohorts_field_source_tag")}</span>
-      <input type="text" bind:value={draft.source_tag} placeholder="tld" />
-    </label>
-    <label>
-      <span>{$t("analysis_cohorts_field_label")}</span>
-      <input type="text" bind:value={draft.label} placeholder="TLD" />
-    </label>
-    <label class="full-width">
-      <span>{$t("analysis_cohorts_field_description")}</span>
-      <input type="text" bind:value={draft.description} />
-    </label>
-    <label>
-      <span>{$t("analysis_cohorts_field_sort_order")}</span>
-      <input type="number" bind:value={draft.sort_order} min="0" />
-    </label>
-    <label class="check-field">
-      <input type="checkbox" bind:checked={draft.analysis_enabled} />
-      <span>{$t("analysis_cohorts_field_analysis_enabled")}</span>
-    </label>
-    <label class="check-field">
-      <input type="checkbox" bind:checked={draft.public_enabled} />
-      <span>{$t("analysis_cohorts_field_public_enabled")}</span>
-    </label>
-    <label class="check-field">
-      <input type="checkbox" bind:checked={draft.is_default} />
-      <span>{$t("analysis_cohorts_field_is_default")}</span>
-    </label>
-  </div>
-  <div style="margin-top: 12px;">
-    <button type="button" disabled={creating} onclick={createCohort}>
-      {creating ? $t("analysis_cohorts_creating") : $t("analysis_cohorts_create_button")}
-    </button>
-  </div>
+  <section class="cohort-section cohort-create">
+    <h3>{$t("analysis_cohorts_create_heading")}</h3>
+    <p class="small cohort-create-hint">{$t("analysis_cohorts_create_hint")}</p>
+    <div class="cohort-form-grid">
+      <label class="field">
+        <span class="field-label">{$t("analysis_cohorts_field_source_tag")}</span>
+        <input type="text" bind:value={draft.source_tag} placeholder="tld" />
+      </label>
+      <label class="field">
+        <span class="field-label">{$t("analysis_cohorts_field_label")}</span>
+        <input type="text" bind:value={draft.label} placeholder="TLD" />
+      </label>
+      <label class="field">
+        <span class="field-label">{$t("analysis_cohorts_field_sort_order")}</span>
+        <input type="number" bind:value={draft.sort_order} min="0" />
+      </label>
+      <label class="field field-full">
+        <span class="field-label">{$t("analysis_cohorts_field_description")}</span>
+        <input type="text" bind:value={draft.description} />
+      </label>
+      <fieldset class="cohort-flags field-full">
+        <legend class="field-label">{$t("analysis_cohorts_col_status")}</legend>
+        <label class="check-field">
+          <input type="checkbox" bind:checked={draft.analysis_enabled} />
+          <span>{$t("analysis_cohorts_field_analysis_enabled")}</span>
+        </label>
+        <label class="check-field">
+          <input type="checkbox" bind:checked={draft.public_enabled} />
+          <span>{$t("analysis_cohorts_field_public_enabled")}</span>
+        </label>
+        <label class="check-field">
+          <input type="checkbox" bind:checked={draft.is_default} />
+          <span>{$t("analysis_cohorts_field_is_default")}</span>
+        </label>
+      </fieldset>
+    </div>
+    <div class="cohort-form-actions">
+      <button type="button" disabled={creating} onclick={createCohort}>
+        {creating ? $t("analysis_cohorts_creating") : $t("analysis_cohorts_create_button")}
+      </button>
+    </div>
+  </section>
 {/if}
 
 <style>
-  .table-scroll {
+  .cohort-section + .cohort-section {
+    margin-top: 28px;
+  }
+
+  .cohort-section h3 {
+    margin: 0 0 10px;
+  }
+
+  .cohort-create-hint {
+    margin: 0 0 14px;
+    color: var(--ink-2);
+  }
+
+  .cohort-table-wrap {
     overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
   }
 
-  .analysis-cohorts-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.94rem;
+  .cohort-table {
+    font-size: var(--text-sm);
   }
 
-  .analysis-cohorts-table th,
-  .analysis-cohorts-table td {
-    padding: 8px 10px;
-    text-align: left;
-    border-bottom: 1px solid var(--border-color, #ddd);
-    vertical-align: top;
+  .cohort-table td,
+  .cohort-table th[scope="row"] {
+    font-family: var(--sans, inherit);
   }
 
-  .analysis-cohorts-table thead th {
+  .cohort-tag {
+    font-family: var(--mono);
     font-weight: 600;
-    background: var(--surface-muted, transparent);
+    color: var(--ink);
   }
+
+  .col-center { text-align: center; }
+  .col-right  { text-align: right; }
 
   .toggle-pill {
-    border: 1px solid var(--border-color, #ccc);
-    background: transparent;
-    padding: 2px 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 54px;
+    padding: 3px 12px;
     border-radius: 999px;
-    font-size: 0.85rem;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--ink-2);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
     cursor: pointer;
-    min-width: 48px;
+    box-shadow: none;
+    transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
   }
 
-  .toggle-pill[disabled] {
-    opacity: 0.5;
-    cursor: not-allowed;
+  .toggle-pill:hover:not(:disabled) {
+    transform: none;
+    box-shadow: none;
+    background: var(--surface);
+    color: var(--ink);
   }
 
   .toggle-pill.toggle-on {
-    background: var(--accent, #2a6);
-    color: #fff;
-    border-color: var(--accent, #2a6);
+    background: #d6f1d0;
+    color: #1e5b1e;
+    border-color: #a6d6a0;
   }
 
-  .default-marker {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 4px;
-    background: var(--accent, #2a6);
-    color: #fff;
-    font-size: 0.8rem;
+  .toggle-pill.toggle-off {
+    background: var(--surface-2);
+    color: var(--ink-2);
+    border-color: var(--border);
   }
 
-  .link-button {
-    background: transparent;
-    border: none;
-    color: var(--link, #06c);
-    cursor: pointer;
-    padding: 0;
-    text-decoration: underline;
-    font: inherit;
-  }
-
-  .link-button[disabled] {
-    opacity: 0.5;
+  .toggle-pill:disabled {
+    opacity: 0.55;
     cursor: not-allowed;
-    text-decoration: none;
   }
 
-  .status-badge {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 0.8rem;
-    text-transform: lowercase;
+  .badge-default {
+    background: rgba(3, 105, 161, 0.12);
+    color: var(--accent-2);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: var(--text-xs);
   }
 
-  .status-ok {
+  .badge-status {
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: var(--text-xs);
+  }
+
+  .badge-status-ok {
     background: #d6f1d0;
     color: #1e5b1e;
   }
 
-  .status-warn {
-    background: #fbe3c8;
-    color: #7a3f05;
+  .badge-status-warn {
+    background: #fee2e2;
+    color: #991b1b;
   }
 
-  .status-neutral {
-    background: var(--surface-muted, #eee);
-    color: var(--text, #333);
+  .badge-status-neutral {
+    background: var(--surface-2);
+    color: var(--ink-2);
   }
 
   .error-detail {
-    color: var(--error, #b00020);
-    font-size: 0.85rem;
-    max-width: 18rem;
     display: inline-block;
+    max-width: 22ch;
+    color: #991b1b;
+    font-family: var(--mono);
+    font-size: var(--text-xs);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
+  .cohort-error {
+    max-width: 22ch;
+  }
+
   .row-actions {
-    display: flex;
+    display: inline-flex;
     gap: 6px;
-  }
-
-  .create-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 12px;
-  }
-
-  .create-grid label {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    font-size: 0.9rem;
-  }
-
-  .create-grid .full-width {
-    grid-column: 1 / -1;
-  }
-
-  .create-grid .check-field {
-    flex-direction: row;
-    align-items: center;
-    gap: 8px;
+    justify-content: flex-end;
   }
 
   .muted {
-    color: var(--text-muted, #888);
+    color: var(--ink-2);
+  }
+
+  .cohort-form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px 16px;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: var(--text-sm);
+  }
+
+  .field-full {
+    grid-column: 1 / -1;
+  }
+
+  .field-label {
+    color: var(--ink-2);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .field input[type="text"],
+  .field input[type="number"] {
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--ink);
+    font: inherit;
+  }
+
+  .cohort-flags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 22px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    margin: 0;
+  }
+
+  .cohort-flags legend {
+    padding: 0 6px;
+  }
+
+  .check-field {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--text-sm);
+    color: var(--ink);
+  }
+
+  .cohort-form-actions {
+    margin-top: 16px;
+    display: flex;
+    justify-content: flex-end;
   }
 </style>

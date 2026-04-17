@@ -1310,6 +1310,10 @@ button:hover:not(:disabled) {
   animation-delay: var(--d, 0s);
 }
 
+main.no-reveal .reveal {
+  animation: none;
+}
+
 @keyframes rise {
   from {
     opacity: 0;

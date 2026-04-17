@@ -2413,9 +2413,18 @@
     }
   };
 
+  let initialAnimationDone = false;
+
   onMount(() => {
     initializeApp();
+    // Reveal animations (CSS: .reveal @ 0.6s + staggered --d delays up to ~0.5s)
+    // are intentional on first paint but feel slow on every subsequent tab switch.
+    // Disable them once the initial intro has had a chance to play.
+    const revealTimer = setTimeout(() => {
+      initialAnimationDone = true;
+    }, 1200);
     return () => {
+      clearTimeout(revealTimer);
       if (jobPoller) clearInterval(jobPoller);
       if (batchPoller) clearInterval(batchPoller);
       if (activeBatchesPoller) clearInterval(activeBatchesPoller);
@@ -2501,7 +2510,7 @@
     </div>
   </nav>
 
-  <main>
+  <main class:no-reveal={initialAnimationDone}>
   {#if activeTab === "single"}
     <div class="grid" id="panel-single" role="tabpanel" aria-labelledby="tab-single" style="margin-top: 22px;">
       <div class="card reveal" style="--d: 0.18s">

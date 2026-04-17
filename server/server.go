@@ -243,6 +243,9 @@ func (s *Server) routes() {
 	pubMux.HandleFunc("GET /lookup/{domain}", s.handlePublicLookupDomain)
 	pubMux.HandleFunc("GET /version", s.handlePublicVersion)
 	pubMux.HandleFunc("GET /info", s.handlePublicInfo)
+	pubMux.HandleFunc("GET /analysis/catalog", s.handlePublicAnalysisCatalog)
+	pubMux.HandleFunc("GET /analysis/cohorts", s.handlePublicAnalysisCohorts)
+	pubMux.HandleFunc("GET /analysis/overview", s.handlePublicAnalysisOverview)
 	var pubHandler http.Handler = http.StripPrefix("/pub/api/v1", pubMux)
 	if s.rateLimiter != nil {
 		pubHandler = rateLimitMiddleware(s.rateLimiter, pubHandler)

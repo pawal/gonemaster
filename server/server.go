@@ -251,6 +251,8 @@ func (s *Server) routes() {
 	pubMux.HandleFunc("GET /analysis/endpoints", s.handlePublicAnalysisEndpoints)
 	pubMux.HandleFunc("GET /analysis/asns", s.handlePublicAnalysisASNs)
 	pubMux.HandleFunc("GET /analysis/prefixes", s.handlePublicAnalysisPrefixes)
+	pubMux.HandleFunc("GET /analysis/tags", s.handlePublicAnalysisTags)
+	pubMux.HandleFunc("GET /analysis/testcases", s.handlePublicAnalysisTestcases)
 	var pubHandler http.Handler = http.StripPrefix("/pub/api/v1", pubMux)
 	if s.rateLimiter != nil {
 		pubHandler = rateLimitMiddleware(s.rateLimiter, pubHandler)

@@ -4,6 +4,7 @@
   import { t, locale, loadCatalog } from "./i18n.js";
   import ProfileSettings from "./ProfileSettings.svelte";
   import ServerSettings from "./ServerSettings.svelte";
+  import AnalysisCohorts from "./AnalysisCohorts.svelte";
 
   const logoSrc = `${import.meta.env.BASE_URL}gonemaster.svg`;
 
@@ -4056,6 +4057,9 @@ example.org`}
       </div>
       <div class="card reveal" style="--d: 0.4s; grid-column: 1 / -1;">
         <ServerSettings />
+      </div>
+      <div class="card reveal" style="--d: 0.46s; grid-column: 1 / -1;">
+        <AnalysisCohorts />
       </div>
     </div>
   {/if}

@@ -78,6 +78,15 @@ func testBackends(t *testing.T) []testBackend {
 // on persistent backends (PostgreSQL, MariaDB).
 func resetSchema(db *sql.DB) error {
 	for _, tbl := range []string{
+		"analysis_projection_state",
+		"analysis_run_domain_summary",
+		"analysis_run_address_asns",
+		"analysis_run_ns_endpoints",
+		"analysis_asns",
+		"analysis_prefixes",
+		"analysis_addresses",
+		"analysis_nameservers",
+		"analysis_cohort_catalog",
 		"entries", "runs", "domain_tags", "domains", "tags", "jobs", "batches", "profiles", "settings", "schema_migrations",
 	} {
 		if _, err := db.Exec("DROP TABLE IF EXISTS " + tbl); err != nil {
@@ -213,7 +222,12 @@ func TestRunMigrationsFresh(t *testing.T) {
 		t.Fatalf("second run (idempotent): %v", err)
 	}
 
-	for _, tbl := range []string{"jobs", "runs", "entries", "domains", "profiles", "settings", "schema_migrations"} {
+	for _, tbl := range []string{
+		"jobs", "runs", "entries", "domains", "profiles", "settings", "schema_migrations",
+		"analysis_cohort_catalog", "analysis_nameservers", "analysis_addresses",
+		"analysis_prefixes", "analysis_asns", "analysis_run_ns_endpoints",
+		"analysis_run_address_asns", "analysis_run_domain_summary", "analysis_projection_state",
+	} {
 		var name string
 		if err := db.QueryRow(
 			`SELECT name FROM sqlite_master WHERE type='table' AND name=?`, tbl,
@@ -270,8 +284,8 @@ func TestRunMigrationsRecordsVersion(t *testing.T) {
 		}
 		versions = append(versions, v)
 	}
-	if len(versions) != 6 || versions[0] != 1 || versions[1] != 2 || versions[2] != 3 || versions[3] != 4 || versions[4] != 5 || versions[5] != 6 {
-		t.Fatalf("expected versions [1 2 3 4 5 6], got %v", versions)
+	if len(versions) != 7 || versions[0] != 1 || versions[1] != 2 || versions[2] != 3 || versions[3] != 4 || versions[4] != 5 || versions[5] != 6 || versions[6] != 7 {
+		t.Fatalf("expected versions [1 2 3 4 5 6 7], got %v", versions)
 	}
 }
 
@@ -332,6 +346,62 @@ func TestRunMigrationsAddsNameserverTimingsColumn(t *testing.T) {
 	}
 	if name != "nameserver_timings_json" {
 		t.Fatalf("column mismatch: got %q", name)
+	}
+}
+
+func TestRunMigrationsAddsAnalysisTables(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	db.SetMaxOpenConns(1)
+	defer db.Close()
+
+	if err := runMigrations(db, sqliteDialect{}); err != nil {
+		t.Fatalf("runMigrations: %v", err)
+	}
+
+	for _, tc := range []struct {
+		table   string
+		columns []string
+	}{
+		{
+			table: "analysis_cohort_catalog",
+			columns: []string{
+				"source_type", "source_tag", "analysis_enabled", "public_enabled",
+				"is_default", "materialization_status", "last_materialized_at",
+				"last_materialization_error",
+			},
+		},
+		{
+			table:   "analysis_run_ns_endpoints",
+			columns: []string{"cohort_id", "run_id", "domain_id", "nameserver_id", "address_id"},
+		},
+		{
+			table:   "analysis_run_address_asns",
+			columns: []string{"cohort_id", "run_id", "domain_id", "address_id", "prefix_id", "asn"},
+		},
+		{
+			table:   "analysis_run_domain_summary",
+			columns: []string{"cohort_id", "run_id", "domain_id", "score", "grade", "worst_level"},
+		},
+		{
+			table:   "analysis_projection_state",
+			columns: []string{"cohort_id", "run_id", "projector_version", "status", "projected_at", "error"},
+		},
+	} {
+		for _, col := range tc.columns {
+			var name string
+			if err := db.QueryRow(
+				fmt.Sprintf(`SELECT name FROM pragma_table_info('%s') WHERE name = ?`, tc.table),
+				col,
+			).Scan(&name); err != nil {
+				t.Fatalf("%s.%s not found after migration: %v", tc.table, col, err)
+			}
+			if name != col {
+				t.Fatalf("%s column mismatch: got %q, want %q", tc.table, name, col)
+			}
+		}
 	}
 }
 

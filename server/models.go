@@ -168,6 +168,32 @@ type TagSummary struct {
 	Grades      map[string]int `json:"grades,omitempty"`
 }
 
+const (
+	AnalysisMaterializationPending = "pending"
+	AnalysisMaterializationReady   = "ready"
+	AnalysisMaterializationFailed  = "failed"
+)
+
+// AnalysisCohort describes one admin-managed analysis cohort entry.
+// V1 cohorts are tag-backed, analysis-enabled/public-enabled independently,
+// and one public cohort may be marked as the default.
+type AnalysisCohort struct {
+	ID                       int64     `json:"id"`
+	SourceType               string    `json:"source_type"`
+	SourceTag                string    `json:"source_tag"`
+	Label                    string    `json:"label"`
+	Description              string    `json:"description,omitempty"`
+	AnalysisEnabled          bool      `json:"analysis_enabled"`
+	PublicEnabled            bool      `json:"public_enabled"`
+	IsDefault                bool      `json:"is_default"`
+	SortOrder                int       `json:"sort_order"`
+	MaterializationStatus    string    `json:"materialization_status"`
+	LastMaterializedAt       time.Time `json:"last_materialized_at,omitempty"`
+	LastMaterializationError string    `json:"last_materialization_error,omitempty"`
+	CreatedAt                time.Time `json:"created_at"`
+	UpdatedAt                time.Time `json:"updated_at"`
+}
+
 // Run is a completed execution, graduated from a Job.
 type Run struct {
 	ID               string      `json:"id"`

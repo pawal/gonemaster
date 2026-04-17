@@ -11,6 +11,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/scoring"
+	serveranalysisui "codeberg.org/pawal/gonemaster/server/analysisui"
 	serverpublic "codeberg.org/pawal/gonemaster/server/public"
 	serverui "codeberg.org/pawal/gonemaster/server/ui"
 )
@@ -270,5 +271,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /robots.txt", s.handleRobotsTxt)
 	s.mux.HandleFunc("GET /sitemap.xml", s.handleSitemap)
 	s.mux.Handle("/public/", http.StripPrefix("/public", serverpublic.Handler(s.cfg.PublicURL)))
+	s.mux.Handle("/analysis/", http.StripPrefix("/analysis", serveranalysisui.Handler()))
+	s.mux.HandleFunc("/analysis", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/analysis/", http.StatusMovedPermanently)
+	})
 	s.mux.Handle("/", serverui.Handler())
 }

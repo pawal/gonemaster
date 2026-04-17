@@ -14,6 +14,11 @@
 /ui-public/.vite/
 /server/public/dist/*
 !/server/public/dist/placeholder.txt
+/analysis-ui/node_modules/
+/analysis-ui/.vite/
+/analysis-ui/.svelte-kit/
+/server/analysisui/dist/*
+!/server/analysisui/dist/placeholder.txt
 
 # OS/editor files
 .DS_Store

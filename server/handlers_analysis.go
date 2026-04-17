@@ -62,6 +62,14 @@ func (s *Server) handleCreateAnalysisCohort(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusConflict, "cohort_exists", "analysis cohort already exists for that source", nil)
 		return
 	}
+	if req.SourceType == "tag" {
+		if _, tagExists := s.store.GetTag(req.SourceTag); !tagExists {
+			if err := s.store.CreateTag(req.SourceTag, ""); err != nil {
+				writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
+				return
+			}
+		}
+	}
 	beforeCatalog := s.store.ListAnalysisCohorts()
 	created, err := s.store.UpsertAnalysisCohort(AnalysisCohort{
 		SourceType:      req.SourceType,

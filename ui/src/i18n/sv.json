@@ -415,7 +415,7 @@
   "analysis_cohorts_update_error": "Failed to update cohort: {error}",
   "analysis_cohorts_action_error": "Cohort {action} failed: {error}",
   "analysis_cohorts_create_heading": "Create cohort",
-  "analysis_cohorts_create_hint": "Tag-backed cohort. The tag must already exist, or will be auto-created by future job submissions.",
+  "analysis_cohorts_create_hint": "Tag-backed cohort. The tag is created automatically if it does not already exist.",
   "analysis_cohorts_create_button": "Create cohort",
   "analysis_cohorts_creating": "Creating…",
   "analysis_cohorts_created": "Created cohort {tag}.",
@@ -584,5 +584,7 @@
   "pub.score_bonus_nsec3_non_optout": "NSEC3 utan opt-out",
   "pub.score_bonus_cds_cdnskey_published": "CDS / CDNSKEY publicerat",
   "pub.score_bonus_ipv6_all_nameservers": "IPv6 på alla namnservrar",
-  "pub.score_bonus_as_diversity": "AS-mångfald för namnservrar"
+  "pub.score_bonus_as_diversity": "AS-mångfald för namnservrar",
+  "analysis_cohorts_tag_match_existing": "✓ existing tag",
+  "analysis_cohorts_tag_match_new": "+ will be created"
 }

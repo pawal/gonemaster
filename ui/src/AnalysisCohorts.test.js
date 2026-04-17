@@ -53,6 +53,7 @@ describe("AnalysisCohorts", () => {
 
   const installFetch = (scenario = {}) => {
     let cohorts = scenario.initialCohorts || sampleCohorts();
+    const existingTags = scenario.existingTags || [];
     const patched = [];
     const created = [];
     const actions = [];
@@ -60,6 +61,9 @@ describe("AnalysisCohorts", () => {
       const value = typeof url === "string" ? url : String(url?.url || url);
       const method = requestOptions.method || "GET";
 
+      if (value === "/api/v1/tags?limit=500" && method === "GET") {
+        return jsonResponse(existingTags.map((name) => ({ name })));
+      }
       if (value === "/api/v1/analysis/cohorts" && method === "GET") {
         return jsonResponse(cohorts);
       }
@@ -198,6 +202,21 @@ describe("AnalysisCohorts", () => {
       public_enabled: false,
       is_default: false,
     });
+  });
+
+  it("shows an existing-tag indicator when the input matches a known tag", async () => {
+    installFetch({ existingTags: ["tld", "gov"] });
+    render(AnalysisCohorts);
+
+    await screen.findByRole("cell", { name: "TLD" });
+
+    const tagInput = screen.getByPlaceholderText("tld");
+    await fireEvent.input(tagInput, { target: { value: "anycast" } });
+    expect(screen.getByText(/will be created/i)).toBeInTheDocument();
+
+    await fireEvent.input(tagInput, { target: { value: "tld" } });
+    await waitFor(() => expect(screen.getByText(/existing tag/i)).toBeInTheDocument());
+    expect(screen.queryByText(/will be created/i)).toBeNull();
   });
 
   it("blocks creation when source_tag is empty and keeps the form local", async () => {

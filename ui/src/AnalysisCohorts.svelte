@@ -12,6 +12,7 @@
   let busyCohortId = $state(null);
   let creating = $state(false);
   let draft = $state(emptyDraft());
+  let existingTagNames = $state(new Set());
 
   function emptyDraft() {
     return {
@@ -67,6 +68,22 @@
     }
   }
 
+  async function loadExistingTags() {
+    try {
+      const tags = await apiFetch("/tags?limit=500");
+      if (Array.isArray(tags)) {
+        existingTagNames = new Set(tags.map((t) => String(t?.name || "")).filter(Boolean));
+      }
+    } catch (_) {
+      // Tag lookup is a soft hint; ignore failures.
+    }
+  }
+
+  const normalizedDraftTag = $derived(String(draft.source_tag || "").trim());
+  const draftTagExists = $derived(
+    normalizedDraftTag !== "" && existingTagNames.has(normalizedDraftTag)
+  );
+
   async function createCohort() {
     const tag = String(draft.source_tag || "").trim();
     if (!tag) {
@@ -97,7 +114,7 @@
         }),
       });
       draft = emptyDraft();
-      await loadCohorts({ preserveNotice: true });
+      await Promise.all([loadCohorts({ preserveNotice: true }), loadExistingTags()]);
       setNotice($t("analysis_cohorts_created", { tag }), "ok");
     } catch (error) {
       setNotice($t("analysis_cohorts_create_error", { error: error.message || "" }), "warn");
@@ -192,6 +209,7 @@
 
   onMount(() => {
     loadCohorts();
+    loadExistingTags();
   });
 </script>
 
@@ -324,6 +342,13 @@
       <label class="field">
         <span class="field-label">{$t("analysis_cohorts_field_source_tag")}</span>
         <input type="text" bind:value={draft.source_tag} placeholder="tld" />
+        {#if normalizedDraftTag}
+          <span class={`tag-match-indicator ${draftTagExists ? "tag-match-existing" : "tag-match-new"}`}>
+            {draftTagExists
+              ? $t("analysis_cohorts_tag_match_existing")
+              : $t("analysis_cohorts_tag_match_new")}
+          </span>
+        {/if}
       </label>
       <label class="field">
         <span class="field-label">{$t("analysis_cohorts_field_label")}</span>
@@ -519,6 +544,22 @@
     font-size: var(--text-xs);
     text-transform: uppercase;
     letter-spacing: 0.06em;
+  }
+
+  .tag-match-indicator {
+    display: inline-block;
+    margin-top: 4px;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  .tag-match-existing {
+    color: #1e5b1e;
+  }
+
+  .tag-match-new {
+    color: var(--ink-2);
   }
 
   .field input[type="text"],

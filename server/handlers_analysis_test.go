@@ -156,6 +156,29 @@ func TestCreateAnalysisCohortRejectsDefaultWithoutPublic(t *testing.T) {
 	}
 }
 
+func TestCreateAnalysisCohortAutoCreatesMissingTag(t *testing.T) {
+	srv, _ := newAnalysisAdminTestServer(t)
+	if _, exists := srv.store.GetTag("tld"); exists {
+		t.Fatal("precondition: tag should not exist yet")
+	}
+	createAnalysisCohort(t, srv, `{"source_tag":"tld"}`)
+	if _, exists := srv.store.GetTag("tld"); !exists {
+		t.Fatal("expected cohort creation to auto-create the backing tag")
+	}
+}
+
+func TestCreateAnalysisCohortReusesExistingTag(t *testing.T) {
+	srv, _ := newAnalysisAdminTestServer(t)
+	if err := srv.store.CreateTag("tld", "preexisting"); err != nil {
+		t.Fatalf("seed tag: %v", err)
+	}
+	createAnalysisCohort(t, srv, `{"source_tag":"tld"}`)
+	tag, _ := srv.store.GetTag("tld")
+	if tag.Description != "preexisting" {
+		t.Fatalf("expected existing tag description to be preserved, got %q", tag.Description)
+	}
+}
+
 func TestCreateAnalysisCohortRejectsDuplicateSource(t *testing.T) {
 	srv, _ := newAnalysisAdminTestServer(t)
 	createAnalysisCohort(t, srv, `{"source_tag":"tld"}`)

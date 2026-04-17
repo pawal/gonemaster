@@ -2,6 +2,7 @@ package server
 
 import (
 	"crypto/rand"
+	"encoding/json"
 	"math/big"
 	"time"
 
@@ -192,6 +193,23 @@ type AnalysisCohort struct {
 	LastMaterializationError string    `json:"last_materialization_error,omitempty"`
 	CreatedAt                time.Time `json:"created_at"`
 	UpdatedAt                time.Time `json:"updated_at"`
+}
+
+// MarshalJSON omits LastMaterializedAt when it is the zero time.
+// Without this override encoding/json serializes a zero time.Time as
+// "0001-01-01T00:00:00Z" regardless of the `omitempty` tag, which leaks into
+// the admin UI as a bogus "1/1/1" timestamp.
+func (c AnalysisCohort) MarshalJSON() ([]byte, error) {
+	type alias AnalysisCohort
+	aux := struct {
+		*alias
+		LastMaterializedAt *time.Time `json:"last_materialized_at,omitempty"`
+	}{alias: (*alias)(&c)}
+	if !c.LastMaterializedAt.IsZero() {
+		t := c.LastMaterializedAt
+		aux.LastMaterializedAt = &t
+	}
+	return json.Marshal(aux)
 }
 
 // AnalysisNameserver is one normalized nameserver hostname in the analysis layer.

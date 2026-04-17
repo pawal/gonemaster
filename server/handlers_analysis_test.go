@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -164,6 +165,25 @@ func TestCreateAnalysisCohortAutoCreatesMissingTag(t *testing.T) {
 	createAnalysisCohort(t, srv, `{"source_tag":"tld"}`)
 	if _, exists := srv.store.GetTag("tld"); !exists {
 		t.Fatal("expected cohort creation to auto-create the backing tag")
+	}
+}
+
+func TestAnalysisCohortJSONOmitsZeroLastMaterializedAt(t *testing.T) {
+	srv, _ := newAnalysisAdminTestServer(t)
+	createAnalysisCohort(t, srv, `{"source_tag":"tld"}`)
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/analysis/cohorts", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
+	}
+	body := resp.Body.String()
+	if strings.Contains(body, "last_materialized_at") {
+		t.Fatalf("expected last_materialized_at to be omitted when zero, got body: %s", body)
+	}
+	if strings.Contains(body, "0001-01-01") {
+		t.Fatalf("response leaked Go zero time: %s", body)
 	}
 }
 

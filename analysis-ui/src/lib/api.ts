@@ -101,6 +101,43 @@ export type TestcaseView = {
   unique_tags: number;
 };
 
+// ── Detail response shapes ─────────────────────────────────────────────────
+
+export type DomainDetailNameserver = {
+  nameserver: string;
+  ipv4_count: number;
+  ipv6_count: number;
+};
+
+export type DomainDetailAddress = {
+  address: string;
+  family: string;
+  asn?: number;
+  prefix?: string;
+};
+
+export type DomainDetailTag = {
+  tag: string;
+  module?: string;
+  testcase?: string;
+  level?: string;
+};
+
+export type DomainDetail = {
+  domain: string;
+  score?: number;
+  grade?: string;
+  worst_level?: string;
+  finished_at?: string;
+  nameserver_count: number;
+  endpoint_count: number;
+  asn_count: number;
+  prefix_count: number;
+  nameservers: DomainDetailNameserver[];
+  addresses: DomainDetailAddress[];
+  tags: DomainDetailTag[];
+};
+
 export type AnalysisFilter = {
   dataset_tag?: string;
   scope_mode?: string;
@@ -193,7 +230,7 @@ export const listTestcases = (filter: AnalysisFilter = {}, fetchFn: FetchLike = 
 // ── Detail endpoints ──────────────────────────────────────────────────────
 
 export const getDomainDetail = (domain: string, filter: AnalysisFilter = {}, fetchFn: FetchLike = fetch) =>
-  getJSON<unknown>(`/domains/${encodeURIComponent(domain)}`, filter, fetchFn);
+  getJSON<DomainDetail>(`/domains/${encodeURIComponent(domain)}`, filter, fetchFn);
 
 export const getNameserverDetail = (name: string, filter: AnalysisFilter = {}, fetchFn: FetchLike = fetch) =>
   getJSON<unknown>(`/nameservers/${encodeURIComponent(name)}`, filter, fetchFn);

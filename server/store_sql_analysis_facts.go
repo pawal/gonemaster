@@ -467,6 +467,35 @@ func (s *SQLJobStore) ListAnalysisRunNSEndpoints(cohortID int64, runID string) [
 	return out
 }
 
+// ListAnalysisRunNSEndpointsByCohort returns every nameserver endpoint row
+// materialized for the cohort, across all runs.
+func (s *SQLJobStore) ListAnalysisRunNSEndpointsByCohort(cohortID int64) []AnalysisRunNameserverEndpoint {
+	rows, err := s.db.Query(
+		fmt.Sprintf(`SELECT %s FROM analysis_run_ns_endpoints
+			WHERE cohort_id = %s
+			ORDER BY domain_id, nameserver_id, address_id, role, source`,
+			analysisRunNSEndCols, s.ph(1)),
+		cohortID,
+	)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	var out []AnalysisRunNameserverEndpoint
+	for rows.Next() {
+		var item AnalysisRunNameserverEndpoint
+		if err := rows.Scan(
+			&item.CohortID, &item.RunID, &item.DomainID, &item.NameserverID, &item.AddressID,
+			&item.Role, &item.Source, &item.Family, &item.AvgMS, &item.MinMS, &item.MaxMS, &item.QueryCount,
+		); err != nil {
+			return nil
+		}
+		out = append(out, item)
+	}
+	return out
+}
+
 // ReplaceAnalysisRunAddressASNs replaces all run+cohort address-to-ASN rows.
 func (s *SQLJobStore) ReplaceAnalysisRunAddressASNs(cohortID int64, runID string, items []AnalysisRunAddressASN) error {
 	if cohortID == 0 {
@@ -525,6 +554,79 @@ func (s *SQLJobStore) ListAnalysisRunAddressASNs(cohortID int64, runID string) [
 		}
 		item.PrefixID = nullInt64ScanPtr(prefixID)
 		item.ASN = nullInt64ScanPtr(asn)
+		out = append(out, item)
+	}
+	return out
+}
+
+// ListAnalysisRunAddressASNsByCohort returns every address-to-ASN row
+// materialized for the cohort, across all runs.
+func (s *SQLJobStore) ListAnalysisRunAddressASNsByCohort(cohortID int64) []AnalysisRunAddressASN {
+	rows, err := s.db.Query(
+		fmt.Sprintf(`SELECT %s FROM analysis_run_address_asns
+			WHERE cohort_id = %s
+			ORDER BY domain_id, address_id`,
+			analysisRunAddrASNCols, s.ph(1)),
+		cohortID,
+	)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	var out []AnalysisRunAddressASN
+	for rows.Next() {
+		var (
+			item     AnalysisRunAddressASN
+			prefixID sql.NullInt64
+			asn      sql.NullInt64
+		)
+		if err := rows.Scan(
+			&item.CohortID, &item.RunID, &item.DomainID, &item.AddressID,
+			&prefixID, &asn, &item.LookupStatus, &item.Source,
+		); err != nil {
+			return nil
+		}
+		item.PrefixID = nullInt64ScanPtr(prefixID)
+		item.ASN = nullInt64ScanPtr(asn)
+		out = append(out, item)
+	}
+	return out
+}
+
+// ListAnalysisRunDomainSummariesByCohort returns every run+domain summary row
+// materialized for the cohort.
+func (s *SQLJobStore) ListAnalysisRunDomainSummariesByCohort(cohortID int64) []AnalysisRunDomainSummary {
+	rows, err := s.db.Query(
+		fmt.Sprintf(`SELECT %s FROM analysis_run_domain_summary
+			WHERE cohort_id = %s
+			ORDER BY domain_id, run_id`,
+			analysisRunSummaryCols, s.ph(1)),
+		cohortID,
+	)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	var out []AnalysisRunDomainSummary
+	for rows.Next() {
+		var (
+			item  AnalysisRunDomainSummary
+			score sql.NullInt64
+			grade sql.NullString
+		)
+		if err := rows.Scan(
+			&item.CohortID, &item.RunID, &item.DomainID, &score, &grade,
+			&item.NameserverCount, &item.EndpointCount, &item.ASNCount, &item.PrefixCount, &item.WorstLevel,
+		); err != nil {
+			return nil
+		}
+		if score.Valid {
+			v := int(score.Int64)
+			item.Score = &v
+		}
+		item.Grade = nullStringScanPtr(grade)
 		out = append(out, item)
 	}
 	return out

@@ -130,8 +130,8 @@ describe("AnalysisCohorts", () => {
     installFetch();
     render(AnalysisCohorts);
 
-    expect(await screen.findByRole("cell", { name: "TLD" })).toBeInTheDocument();
-    expect(await screen.findByRole("cell", { name: "Government" })).toBeInTheDocument();
+    expect(await screen.findByText("tld")).toBeInTheDocument();
+    expect(await screen.findByText("gov")).toBeInTheDocument();
 
     expect(screen.getByText("default")).toBeInTheDocument();
     expect(screen.getByText("ready")).toBeInTheDocument();
@@ -143,7 +143,7 @@ describe("AnalysisCohorts", () => {
     const handles = installFetch();
     render(AnalysisCohorts);
 
-    const tldRow = (await screen.findByRole("cell", { name: "TLD" })).closest("tr");
+    const tldRow = (await screen.findByText("tld")).closest("tr");
     const toggles = within(tldRow).getAllByRole("button", { name: /^on$/ });
     await fireEvent.click(toggles[0]);
 
@@ -163,7 +163,7 @@ describe("AnalysisCohorts", () => {
     const handles = installFetch({ initialCohorts: govWithPublic });
     render(AnalysisCohorts);
 
-    const govRow = (await screen.findByRole("cell", { name: "Government" })).closest("tr");
+    const govRow = (await screen.findByText("gov")).closest("tr");
     const makeDefaultButton = within(govRow).getByRole("button", { name: /Make default/i });
     await fireEvent.click(makeDefaultButton);
 
@@ -178,7 +178,7 @@ describe("AnalysisCohorts", () => {
     const handles = installFetch();
     render(AnalysisCohorts);
 
-    const tldRow = (await screen.findByRole("cell", { name: "TLD" })).closest("tr");
+    const tldRow = (await screen.findByText("tld")).closest("tr");
     const rebuildButton = within(tldRow).getByRole("button", { name: /Rebuild/i });
     await fireEvent.click(rebuildButton);
     await waitFor(() => expect(handles.actions).toContainEqual({ id: 1, action: "rebuild" }));
@@ -192,7 +192,7 @@ describe("AnalysisCohorts", () => {
     const handles = installFetch();
     render(AnalysisCohorts);
 
-    await screen.findByRole("cell", { name: "TLD" });
+    await screen.findByText("tld");
 
     const tagInput = screen.getByPlaceholderText("tld");
     await fireEvent.input(tagInput, { target: { value: "anycast" } });
@@ -214,7 +214,7 @@ describe("AnalysisCohorts", () => {
     const handles = installFetch();
     render(AnalysisCohorts);
 
-    const tldRow = (await screen.findByRole("cell", { name: "TLD" })).closest("tr");
+    const tldRow = (await screen.findByText("tld")).closest("tr");
     const editButton = within(tldRow).getByRole("button", { name: /^Edit$/ });
     await fireEvent.click(editButton);
 
@@ -248,13 +248,13 @@ describe("AnalysisCohorts", () => {
     const handles = installFetch();
     render(AnalysisCohorts);
 
-    await screen.findByRole("cell", { name: "Government" });
-    const govRow = screen.getByRole("cell", { name: "Government" }).closest("tr");
+    await screen.findByText("gov");
+    const govRow = screen.getByText("gov").closest("tr");
     const deleteButton = within(govRow).getByRole("button", { name: /^Delete$/ });
     await fireEvent.click(deleteButton);
 
     await waitFor(() => {
-      expect(screen.queryByRole("cell", { name: "Government" })).toBeNull();
+      expect(screen.queryByText("gov")).toBeNull();
     });
     expect(global.confirm).toHaveBeenCalled();
     expect(handles.getCohorts().some((c) => c.source_tag === "gov")).toBe(false);
@@ -265,17 +265,17 @@ describe("AnalysisCohorts", () => {
     installFetch();
     render(AnalysisCohorts);
 
-    const govRow = (await screen.findByRole("cell", { name: "Government" })).closest("tr");
+    const govRow = (await screen.findByText("gov")).closest("tr");
     await fireEvent.click(within(govRow).getByRole("button", { name: /^Delete$/ }));
 
-    expect(await screen.findByRole("cell", { name: "Government" })).toBeInTheDocument();
+    expect(await screen.findByText("gov")).toBeInTheDocument();
   });
 
   it("shows an existing-tag indicator when the input matches a known tag", async () => {
     installFetch({ existingTags: ["tld", "gov"] });
     render(AnalysisCohorts);
 
-    await screen.findByRole("cell", { name: "TLD" });
+    await screen.findByText("tld");
 
     const tagInput = screen.getByPlaceholderText("tld");
     await fireEvent.input(tagInput, { target: { value: "anycast" } });
@@ -290,7 +290,7 @@ describe("AnalysisCohorts", () => {
     const handles = installFetch();
     render(AnalysisCohorts);
 
-    await screen.findByRole("cell", { name: "TLD" });
+    await screen.findByText("tld");
 
     const createButton = screen.getByRole("button", { name: /Create cohort/i });
     await fireEvent.click(createButton);

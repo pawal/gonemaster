@@ -598,5 +598,8 @@
   "analysis_cohorts_edit_error": "Failed to update cohort: {error}",
   "analysis_cohorts_delete_confirm": "Delete cohort {tag}? Materialized rows will be cleared and the catalog entry removed.",
   "analysis_cohorts_deleted": "Deleted cohort {tag}.",
-  "analysis_cohorts_delete_error": "Failed to delete cohort: {error}"
+  "analysis_cohorts_delete_error": "Failed to delete cohort: {error}",
+  "analysis_cohorts_col_cohort": "Cohort",
+  "analysis_cohorts_col_materialization": "Materialization",
+  "analysis_cohorts_never_materialized": "never materialized"
 }

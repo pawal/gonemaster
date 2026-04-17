@@ -314,14 +314,11 @@
         <table class="data-table cohort-table">
           <thead>
             <tr>
-              <th scope="col">{$t("analysis_cohorts_col_tag")}</th>
-              <th scope="col">{$t("analysis_cohorts_col_label")}</th>
+              <th scope="col">{$t("analysis_cohorts_col_cohort")}</th>
               <th scope="col" class="col-center">{$t("analysis_cohorts_col_analysis")}</th>
               <th scope="col" class="col-center">{$t("analysis_cohorts_col_public")}</th>
               <th scope="col" class="col-center">{$t("analysis_cohorts_col_default")}</th>
-              <th scope="col">{$t("analysis_cohorts_col_status")}</th>
-              <th scope="col">{$t("analysis_cohorts_col_last_materialized")}</th>
-              <th scope="col">{$t("analysis_cohorts_col_last_error")}</th>
+              <th scope="col">{$t("analysis_cohorts_col_materialization")}</th>
               <th scope="col" class="col-right">{$t("analysis_cohorts_col_actions")}</th>
             </tr>
           </thead>
@@ -329,9 +326,13 @@
             {#each cohorts as cohort (cohort.id)}
               {@const busy = busyCohortId === cohort.id}
               {@const tone = statusBadgeTone(cohort.materialization_status)}
-              <tr>
-                <th scope="row" class="cohort-tag">{cohort.source_tag}</th>
-                <td>{cohort.label || cohort.source_tag}</td>
+              <tr class:row-editing={editingCohortId === cohort.id}>
+                <th scope="row" class="cohort-cell">
+                  <span class="cohort-tag">{cohort.source_tag}</span>
+                  {#if cohort.label && cohort.label !== cohort.source_tag}
+                    <span class="cohort-label">{cohort.label}</span>
+                  {/if}
+                </th>
                 <td class="col-center">
                   <button
                     type="button"
@@ -364,7 +365,7 @@
                   {:else}
                     <button
                       type="button"
-                      class="secondary small"
+                      class="link-action"
                       disabled={busy || !cohort.analysis_enabled || !cohort.public_enabled}
                       onclick={() => setDefault(cohort)}
                     >
@@ -372,41 +373,37 @@
                     </button>
                   {/if}
                 </td>
-                <td>
-                  <span class={`badge badge-status badge-status-${tone}`}>
-                    {cohort.materialization_status || "pending"}
-                  </span>
-                </td>
-                <td>
-                  {#if cohort.last_materialized_at}
-                    <time class="small" datetime={cohort.last_materialized_at}>
-                      {formatTimestamp(cohort.last_materialized_at)}
-                    </time>
-                  {:else}
-                    <span class="small muted">—</span>
-                  {/if}
-                </td>
-                <td class="cohort-error">
+                <td class="materialization-cell">
+                  <div class="materialization-main">
+                    <span class={`badge badge-status badge-status-${tone}`}>
+                      {cohort.materialization_status || "pending"}
+                    </span>
+                    {#if cohort.last_materialized_at}
+                      <time class="materialization-when" datetime={cohort.last_materialized_at}>
+                        {formatTimestamp(cohort.last_materialized_at)}
+                      </time>
+                    {:else}
+                      <span class="materialization-when muted">{$t("analysis_cohorts_never_materialized")}</span>
+                    {/if}
+                  </div>
                   {#if cohort.last_materialization_error}
-                    <span class="error-detail" title={cohort.last_materialization_error}>
+                    <span class="materialization-error" title={cohort.last_materialization_error}>
                       {cohort.last_materialization_error}
                     </span>
-                  {:else}
-                    <span class="small muted">—</span>
                   {/if}
                 </td>
                 <td class="col-right">
                   <div class="row-actions">
-                    <button type="button" class="ghost small" disabled={busy || editingCohortId === cohort.id} onclick={() => startEdit(cohort)}>
+                    <button type="button" class="row-action" disabled={busy || editingCohortId === cohort.id} onclick={() => startEdit(cohort)}>
                       {$t("analysis_cohorts_edit")}
                     </button>
-                    <button type="button" class="ghost small" disabled={busy || !cohort.analysis_enabled} onclick={() => rebuildCohort(cohort)}>
+                    <button type="button" class="row-action" disabled={busy || !cohort.analysis_enabled} onclick={() => rebuildCohort(cohort)}>
                       {$t("analysis_cohorts_rebuild")}
                     </button>
-                    <button type="button" class="ghost small" disabled={busy} onclick={() => clearCohort(cohort)}>
+                    <button type="button" class="row-action" disabled={busy} onclick={() => clearCohort(cohort)}>
                       {$t("analysis_cohorts_clear")}
                     </button>
-                    <button type="button" class="ghost small danger" disabled={busy} onclick={() => deleteCohort(cohort)}>
+                    <button type="button" class="row-action row-action-danger" disabled={busy} onclick={() => deleteCohort(cohort)}>
                       {$t("analysis_cohorts_delete")}
                     </button>
                   </div>
@@ -522,12 +519,30 @@
   .cohort-table td,
   .cohort-table th[scope="row"] {
     font-family: var(--sans, inherit);
+    vertical-align: middle;
+  }
+
+  .cohort-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-top: 10px;
+    padding-bottom: 10px;
   }
 
   .cohort-tag {
     font-family: var(--mono);
     font-weight: 600;
     color: var(--ink);
+  }
+
+  .cohort-label {
+    font-size: var(--text-xs);
+    color: var(--ink-2);
+  }
+
+  .row-editing {
+    background: rgba(3, 105, 161, 0.06);
   }
 
   .col-center { text-align: center; }
@@ -605,9 +620,26 @@
     color: var(--ink-2);
   }
 
-  .error-detail {
+  .materialization-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .materialization-main {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .materialization-when {
+    font-size: var(--text-xs);
+    color: var(--ink-2);
+  }
+
+  .materialization-error {
     display: inline-block;
-    max-width: 22ch;
+    max-width: 28ch;
     color: #991b1b;
     font-family: var(--mono);
     font-size: var(--text-xs);
@@ -616,23 +648,67 @@
     white-space: nowrap;
   }
 
-  .cohort-error {
-    max-width: 22ch;
+  .link-action {
+    background: transparent;
+    border: none;
+    padding: 2px 4px;
+    font-size: var(--text-xs);
+    font-weight: 500;
+    color: var(--accent-2);
+    cursor: pointer;
+    box-shadow: none;
+  }
+
+  .link-action:hover:not(:disabled) {
+    text-decoration: underline;
+    transform: none;
+    box-shadow: none;
+    background: transparent;
+  }
+
+  .link-action:disabled {
+    color: var(--ink-2);
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 
   .row-actions {
     display: inline-flex;
-    flex-wrap: wrap;
-    gap: 6px;
+    flex-wrap: nowrap;
+    gap: 4px;
     justify-content: flex-end;
   }
 
-  .row-actions .danger:not(:disabled) {
-    color: #991b1b;
-    border-color: rgba(153, 27, 27, 0.4);
+  .row-action {
+    padding: 4px 10px;
+    font-size: var(--text-xs);
+    font-weight: 500;
+    color: var(--ink-2);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: none;
+    cursor: pointer;
   }
 
-  .row-actions .danger:not(:disabled):hover {
+  .row-action:hover:not(:disabled) {
+    background: var(--surface-2);
+    color: var(--ink);
+    transform: none;
+    box-shadow: none;
+  }
+
+  .row-action:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .row-action-danger:not(:disabled) {
+    color: #991b1b;
+    border-color: rgba(153, 27, 27, 0.35);
+  }
+
+  .row-action-danger:not(:disabled):hover {
     background: rgba(153, 27, 27, 0.08);
   }
 

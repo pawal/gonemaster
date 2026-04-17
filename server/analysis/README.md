@@ -43,3 +43,45 @@ Every materialized fact row is keyed by `cohort_id` so multiple analyzed tags
 can coexist safely. Public visibility is applied at query time from
 `analysis_cohort_catalog`; it is not implied by the presence of materialized
 rows alone.
+
+## Scope Semantics
+
+The public analysis layer should use these normalized scope modes:
+
+- `latest_global`
+  - default mode when no scope is supplied
+  - selects the latest run per domain within the active cohort
+  - does not allow `batch_id`, `from`, or `to`
+- `latest_in_batch`
+  - selects the latest run per domain within one batch
+  - requires `batch_id`
+  - does not allow `from` or `to`
+- `batch`
+  - selects all runs within one batch
+  - requires `batch_id`
+  - does not allow `from` or `to`
+- `time_window`
+  - selects all runs whose effective run timestamp falls within the given window
+  - requires at least one of `from` or `to`
+  - does not allow `batch_id`
+
+Reject invalid filter combinations rather than silently guessing.
+
+## Cohort Resolution Semantics
+
+Public cohort resolution should be explicit and server-controlled.
+
+- A cohort is selectable in the public dashboard only when:
+  - `analysis_enabled = true`
+  - `public_enabled = true`
+- `public_enabled = true` with `analysis_enabled = false` is invalid catalog state.
+- When `dataset_tag` is supplied:
+  - resolve it against selectable cohorts by `source_tag`
+  - fail if it does not match a selectable public cohort
+- When `dataset_tag` is omitted:
+  - resolve the single cohort marked `is_default = true`
+  - fail if multiple selectable cohorts are marked default
+  - fail if no default public cohort exists
+- `analysis_default_tag` may be used only as a temporary bootstrap fallback when
+  no catalog default exists. It should not override the catalog once the admin
+  cohort table is populated.

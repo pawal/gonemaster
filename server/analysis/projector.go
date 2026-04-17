@@ -3,7 +3,10 @@ package analysis
 import (
 	"errors"
 	"fmt"
+	"net/netip"
 	"sort"
+	"strings"
+	"time"
 
 	serverpkg "codeberg.org/pawal/gonemaster/server"
 )
@@ -12,6 +15,8 @@ var (
 	ErrRunNotFound = errors.New("analysis projector run not found")
 )
 
+const projectorVersion = "v1"
+
 // Store is the minimal backing store surface needed by the Phase 2 projector
 // loading and cohort-resolution logic.
 type Store interface {
@@ -19,6 +24,14 @@ type Store interface {
 	QueryEntries(filter serverpkg.EntryFilter) serverpkg.EntryList
 	GetDomainTags(domainID int64) []string
 	ListAnalysisCohorts() []serverpkg.AnalysisCohort
+	UpsertAnalysisNameserver(name string, seenAt time.Time) (serverpkg.AnalysisNameserver, error)
+	UpsertAnalysisAddress(address, family string, seenAt time.Time) (serverpkg.AnalysisAddress, error)
+	UpsertAnalysisPrefix(prefix, family string, seenAt time.Time) (serverpkg.AnalysisPrefix, error)
+	UpsertAnalysisASN(asn int64, label string, seenAt time.Time) (serverpkg.AnalysisASN, error)
+	ReplaceAnalysisRunNSEndpoints(cohortID int64, runID string, items []serverpkg.AnalysisRunNameserverEndpoint) error
+	ReplaceAnalysisRunAddressASNs(cohortID int64, runID string, items []serverpkg.AnalysisRunAddressASN) error
+	UpsertAnalysisRunDomainSummary(item serverpkg.AnalysisRunDomainSummary) error
+	SetAnalysisProjectionState(item serverpkg.AnalysisProjectionState) error
 }
 
 // Projector loads completed runs and resolves which analysis-enabled cohorts
@@ -70,6 +83,301 @@ func (p *Projector) LoadCompletedRun(runID string) (RunInput, error) {
 	}, nil
 }
 
+type extractedEndpoint struct {
+	nameserver string
+	address    string
+	role       string
+	source     string
+	family     string
+	avgMS      float64
+	minMS      float64
+	maxMS      float64
+	queryCount int
+}
+
+type extractedAddressFact struct {
+	address      string
+	family       string
+	prefix       string
+	prefixFamily string
+	asn          *int64
+	status       string
+	source       string
+}
+
+// ProjectRun extracts and persists all currently-implemented analysis facts for
+// one completed run. Re-running the same run is idempotent because the backing
+// store helpers upsert entities and replace per-run/per-cohort fact rows.
+func (p *Projector) ProjectRun(runID string) error {
+	input, err := p.LoadCompletedRun(runID)
+	if err != nil {
+		return err
+	}
+	if len(input.MatchingCohorts) == 0 {
+		return nil
+	}
+
+	endpoints := p.extractNameserverEndpoints(input)
+	addressFacts := p.extractAddressFacts(input)
+
+	nameserverIDs := map[string]int64{}
+	addressIDs := map[string]int64{}
+	prefixIDs := map[string]int64{}
+
+	for _, endpoint := range endpoints {
+		ns, err := p.store.UpsertAnalysisNameserver(endpoint.nameserver, input.Run.FinishedAt)
+		if err != nil {
+			return fmt.Errorf("upsert nameserver %q: %w", endpoint.nameserver, err)
+		}
+		addr, err := p.store.UpsertAnalysisAddress(endpoint.address, endpoint.family, input.Run.FinishedAt)
+		if err != nil {
+			return fmt.Errorf("upsert address %q: %w", endpoint.address, err)
+		}
+		nameserverIDs[endpoint.nameserver] = ns.ID
+		addressIDs[endpoint.address] = addr.ID
+	}
+	for _, fact := range addressFacts {
+		addr, err := p.store.UpsertAnalysisAddress(fact.address, fact.family, input.Run.FinishedAt)
+		if err != nil {
+			return fmt.Errorf("upsert address fact %q: %w", fact.address, err)
+		}
+		addressIDs[fact.address] = addr.ID
+		if fact.prefix != "" {
+			prefix, err := p.store.UpsertAnalysisPrefix(fact.prefix, fact.prefixFamily, input.Run.FinishedAt)
+			if err != nil {
+				return fmt.Errorf("upsert prefix %q: %w", fact.prefix, err)
+			}
+			prefixIDs[fact.prefix] = prefix.ID
+		}
+		if fact.asn != nil {
+			if _, err := p.store.UpsertAnalysisASN(*fact.asn, "", input.Run.FinishedAt); err != nil {
+				return fmt.Errorf("upsert asn %d: %w", *fact.asn, err)
+			}
+		}
+	}
+
+	summary := deriveRunDomainSummary(input, endpoints, addressFacts)
+
+	for _, cohort := range input.MatchingCohorts {
+		nsRows := make([]serverpkg.AnalysisRunNameserverEndpoint, 0, len(endpoints))
+		for _, endpoint := range endpoints {
+			nsRows = append(nsRows, serverpkg.AnalysisRunNameserverEndpoint{
+				CohortID:     cohort.ID,
+				RunID:        input.Run.ID,
+				DomainID:     input.Run.DomainID,
+				NameserverID: nameserverIDs[endpoint.nameserver],
+				AddressID:    addressIDs[endpoint.address],
+				Role:         endpoint.role,
+				Source:       endpoint.source,
+				Family:       endpoint.family,
+				AvgMS:        endpoint.avgMS,
+				MinMS:        endpoint.minMS,
+				MaxMS:        endpoint.maxMS,
+				QueryCount:   endpoint.queryCount,
+			})
+		}
+		if err := p.store.ReplaceAnalysisRunNSEndpoints(cohort.ID, input.Run.ID, nsRows); err != nil {
+			return fmt.Errorf("replace nameserver endpoints for cohort %d: %w", cohort.ID, err)
+		}
+
+		addrRows := make([]serverpkg.AnalysisRunAddressASN, 0, len(addressFacts))
+		for _, fact := range addressFacts {
+			var prefixID *int64
+			if fact.prefix != "" {
+				v := prefixIDs[fact.prefix]
+				prefixID = &v
+			}
+			addrRows = append(addrRows, serverpkg.AnalysisRunAddressASN{
+				CohortID:     cohort.ID,
+				RunID:        input.Run.ID,
+				DomainID:     input.Run.DomainID,
+				AddressID:    addressIDs[fact.address],
+				PrefixID:     prefixID,
+				ASN:          fact.asn,
+				LookupStatus: fact.status,
+				Source:       fact.source,
+			})
+		}
+		if err := p.store.ReplaceAnalysisRunAddressASNs(cohort.ID, input.Run.ID, addrRows); err != nil {
+			return fmt.Errorf("replace address facts for cohort %d: %w", cohort.ID, err)
+		}
+
+		summary.CohortID = cohort.ID
+		if err := p.store.UpsertAnalysisRunDomainSummary(summary); err != nil {
+			return fmt.Errorf("upsert summary for cohort %d: %w", cohort.ID, err)
+		}
+		if err := p.store.SetAnalysisProjectionState(serverpkg.AnalysisProjectionState{
+			CohortID:         cohort.ID,
+			RunID:            input.Run.ID,
+			ProjectorVersion: projectorVersion,
+			Status:           serverpkg.AnalysisMaterializationReady,
+			ProjectedAt:      input.Run.FinishedAt,
+		}); err != nil {
+			return fmt.Errorf("set projection state for cohort %d: %w", cohort.ID, err)
+		}
+	}
+
+	return nil
+}
+
+func deriveRunDomainSummary(input RunInput, endpoints []extractedEndpoint, addressFacts []extractedAddressFact) serverpkg.AnalysisRunDomainSummary {
+	nameservers := map[string]struct{}{}
+	endpointAddresses := map[string]struct{}{}
+	asns := map[int64]struct{}{}
+	prefixes := map[string]struct{}{}
+
+	for _, endpoint := range endpoints {
+		nameservers[endpoint.nameserver] = struct{}{}
+		endpointAddresses[endpoint.address] = struct{}{}
+	}
+	for _, fact := range addressFacts {
+		if fact.asn != nil {
+			asns[*fact.asn] = struct{}{}
+		}
+		if fact.prefix != "" {
+			prefixes[fact.prefix] = struct{}{}
+		}
+	}
+
+	return serverpkg.AnalysisRunDomainSummary{
+		RunID:           input.Run.ID,
+		DomainID:        input.Run.DomainID,
+		Score:           input.Run.Score,
+		Grade:           input.Run.Grade,
+		NameserverCount: len(nameservers),
+		EndpointCount:   len(endpointAddresses),
+		ASNCount:        len(asns),
+		PrefixCount:     len(prefixes),
+		WorstLevel:      input.Run.WorstLevel,
+	}
+}
+
+func (p *Projector) extractNameserverEndpoints(input RunInput) []extractedEndpoint {
+	seen := map[string]extractedEndpoint{}
+	add := func(item extractedEndpoint) {
+		if item.nameserver == "" || item.address == "" {
+			return
+		}
+		if item.family == "" {
+			item.family = familyForAddress(item.address)
+		}
+		if item.family == "" {
+			return
+		}
+		key := item.nameserver + "|" + item.address + "|" + item.role + "|" + item.source
+		if existing, ok := seen[key]; ok {
+			if existing.queryCount == 0 && item.queryCount > 0 {
+				existing.avgMS = item.avgMS
+				existing.minMS = item.minMS
+				existing.maxMS = item.maxMS
+				existing.queryCount = item.queryCount
+			}
+			seen[key] = existing
+			return
+		}
+		seen[key] = item
+	}
+
+	for _, timing := range input.NameserverTimings {
+		add(extractedEndpoint{
+			nameserver: normalizeNameserverName(timing.Nameserver),
+			address:    strings.TrimSpace(timing.Address),
+			role:       "authoritative",
+			source:     "timings",
+			family:     familyForAddress(timing.Address),
+			avgMS:      timing.AvgMS,
+			minMS:      timing.MinMS,
+			maxMS:      timing.MaxMS,
+			queryCount: timing.Count,
+		})
+	}
+
+	for _, entry := range input.Entries {
+		if ns, addr, ok := singularEndpointFromArgs(entry.Args); ok {
+			add(extractedEndpoint{
+				nameserver: ns,
+				address:    addr,
+				role:       roleForSource("entry"),
+				source:     "entry",
+			})
+		}
+		for _, sourceKey := range []string{"servers", "parent_servers", "child_servers", "zone_servers", "ns_set_servers"} {
+			for _, endpoint := range endpointsFromArgs(entry.Args[sourceKey]) {
+				endpoint.role = roleForSource(sourceKey)
+				endpoint.source = sourceKey
+				add(endpoint)
+			}
+		}
+	}
+
+	out := make([]extractedEndpoint, 0, len(seen))
+	for _, item := range seen {
+		out = append(out, item)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].nameserver != out[j].nameserver {
+			return out[i].nameserver < out[j].nameserver
+		}
+		if out[i].address != out[j].address {
+			return out[i].address < out[j].address
+		}
+		if out[i].role != out[j].role {
+			return out[i].role < out[j].role
+		}
+		return out[i].source < out[j].source
+	})
+	return out
+}
+
+func (p *Projector) extractAddressFacts(input RunInput) []extractedAddressFact {
+	facts := map[string]extractedAddressFact{}
+	for _, entry := range input.Entries {
+		address := stringArg(entry.Args, "address")
+		if address == "" {
+			continue
+		}
+		family := familyForAddress(address)
+		if family == "" {
+			continue
+		}
+		existing, ok := facts[address]
+		if !ok {
+			existing = extractedAddressFact{
+				address: address,
+				family:  family,
+			}
+		}
+		if prefixes := stringSliceArg(entry.Args, "prefixes"); len(prefixes) > 0 {
+			existing.prefix = prefixes[0]
+			existing.prefixFamily = familyForPrefix(prefixes[0])
+			if existing.prefixFamily == "" {
+				existing.prefixFamily = family
+			}
+			if existing.status == "" {
+				existing.status = "prefix_only"
+			}
+			existing.source = "entries"
+		}
+		asn, status := asnFromArgs(entry.Args)
+		if asn != nil {
+			existing.asn = asn
+			existing.status = status
+			existing.source = "entries"
+		}
+		if existing.status == "" {
+			existing.status = "unknown"
+		}
+		facts[address] = existing
+	}
+
+	out := make([]extractedAddressFact, 0, len(facts))
+	for _, item := range facts {
+		out = append(out, item)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].address < out[j].address })
+	return out
+}
+
 // MatchAnalysisEnabledCohorts returns the tag-backed cohorts that should be
 // populated for a run with the given domain tags.
 func MatchAnalysisEnabledCohorts(domainTags []string, cohorts []serverpkg.AnalysisCohort) []serverpkg.AnalysisCohort {
@@ -107,4 +415,195 @@ func MatchAnalysisEnabledCohorts(domainTags []string, cohorts []serverpkg.Analys
 	})
 
 	return matched
+}
+
+func normalizeNameserverName(name string) string {
+	return strings.TrimSuffix(strings.ToLower(strings.TrimSpace(name)), ".")
+}
+
+func stringArg(args map[string]any, key string) string {
+	if args == nil {
+		return ""
+	}
+	v, _ := args[key].(string)
+	return strings.TrimSpace(v)
+}
+
+func singularEndpointFromArgs(args map[string]any) (string, string, bool) {
+	ns := normalizeNameserverName(stringArg(args, "ns"))
+	addr := stringArg(args, "address")
+	if ns == "" || addr == "" {
+		return "", "", false
+	}
+	return ns, addr, true
+}
+
+func endpointsFromArgs(raw any) []extractedEndpoint {
+	var out []extractedEndpoint
+	list, ok := raw.([]any)
+	if !ok {
+		if typed, ok := raw.([]map[string]any); ok {
+			for _, item := range typed {
+				ns := normalizeNameserverName(stringArg(item, "ns"))
+				addr := stringArg(item, "address")
+				if ns == "" || addr == "" {
+					continue
+				}
+				out = append(out, extractedEndpoint{nameserver: ns, address: addr, family: familyForAddress(addr)})
+			}
+		}
+		return out
+	}
+	for _, item := range list {
+		m, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		ns := normalizeNameserverName(stringArg(m, "ns"))
+		addr := stringArg(m, "address")
+		if ns == "" || addr == "" {
+			continue
+		}
+		out = append(out, extractedEndpoint{nameserver: ns, address: addr, family: familyForAddress(addr)})
+	}
+	return out
+}
+
+func roleForSource(source string) string {
+	switch source {
+	case "parent_servers":
+		return "parent"
+	case "child_servers", "zone_servers", "servers", "ns_set_servers", "timings", "entry":
+		return "authoritative"
+	default:
+		return ""
+	}
+}
+
+func familyForAddress(address string) string {
+	addr, err := netip.ParseAddr(strings.TrimSpace(address))
+	if err != nil {
+		return ""
+	}
+	if addr.Is4() {
+		return "ipv4"
+	}
+	if addr.Is6() {
+		return "ipv6"
+	}
+	return ""
+}
+
+func familyForPrefix(prefix string) string {
+	p, err := netip.ParsePrefix(strings.TrimSpace(prefix))
+	if err != nil {
+		return ""
+	}
+	if p.Addr().Is4() {
+		return "ipv4"
+	}
+	if p.Addr().Is6() {
+		return "ipv6"
+	}
+	return ""
+}
+
+func stringSliceArg(args map[string]any, key string) []string {
+	if args == nil {
+		return nil
+	}
+	raw, ok := args[key]
+	if !ok {
+		return nil
+	}
+	switch v := raw.(type) {
+	case []string:
+		out := make([]string, 0, len(v))
+		for _, item := range v {
+			item = strings.TrimSpace(item)
+			if item != "" {
+				out = append(out, item)
+			}
+		}
+		return out
+	case []any:
+		out := make([]string, 0, len(v))
+		for _, item := range v {
+			str, ok := item.(string)
+			if !ok {
+				continue
+			}
+			str = strings.TrimSpace(str)
+			if str != "" {
+				out = append(out, str)
+			}
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
+func asnFromArgs(args map[string]any) (*int64, string) {
+	if args == nil {
+		return nil, ""
+	}
+	if raw, ok := args["asn"]; ok {
+		if asn, ok := numericToInt64(raw); ok {
+			return &asn, "ok"
+		}
+	}
+	values := numericSliceArg(args, "asns")
+	if len(values) == 0 {
+		return nil, ""
+	}
+	if len(values) == 1 {
+		return &values[0], "ok"
+	}
+	return &values[0], "multiple_asns"
+}
+
+func numericSliceArg(args map[string]any, key string) []int64 {
+	raw, ok := args[key]
+	if !ok {
+		return nil
+	}
+	switch v := raw.(type) {
+	case []any:
+		out := make([]int64, 0, len(v))
+		seen := map[int64]struct{}{}
+		for _, item := range v {
+			n, ok := numericToInt64(item)
+			if !ok {
+				continue
+			}
+			if _, ok := seen[n]; ok {
+				continue
+			}
+			seen[n] = struct{}{}
+			out = append(out, n)
+		}
+		sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+		return out
+	default:
+		if n, ok := numericToInt64(v); ok {
+			return []int64{n}
+		}
+		return nil
+	}
+}
+
+func numericToInt64(v any) (int64, bool) {
+	switch n := v.(type) {
+	case int:
+		return int64(n), true
+	case int64:
+		return n, true
+	case float64:
+		return int64(n), true
+	case float32:
+		return int64(n), true
+	default:
+		return 0, false
+	}
 }

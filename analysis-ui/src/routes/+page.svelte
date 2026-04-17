@@ -33,32 +33,41 @@
   });
 </script>
 
-<section class="page">
-  <h1>Cohort Analysis</h1>
+<section class="scope-bar" aria-label="Analysis scope">
+  <span class="scope-label">Cohort</span>
+  {#if loading}
+    <span class="scope-value">…</span>
+  {:else if catalog?.default_tag}
+    <span class="scope-value">{catalog.default_tag}</span>
+  {:else}
+    <span class="scope-value">(not configured)</span>
+  {/if}
+  <span class="scope-label">Scope</span>
+  <span class="scope-value">latest_global</span>
+  <span class="placeholder-note">· batch / time-window filters land in the next phase-4 task.</span>
+</section>
+
+<section class="card">
+  <h2>Overview</h2>
   <p class="hint">
-    This is the scaffold for the standalone analysis dashboard. Page structure, filter bar, and
-    entity pages arrive in the next phase-4 tasks.
+    Overview metrics (domain totals, top findings, infrastructure concentration) arrive in phase 5.
+    This scaffold confirms the public catalog endpoint is reachable from the embedded dashboard.
   </p>
 
   {#if loading}
-    <p class="status">Loading catalog…</p>
+    <p class="status-banner">Loading catalog…</p>
   {:else if loadError}
-    <p class="status error">Failed to load catalog: {loadError}</p>
+    <p class="status-banner error">Failed to load catalog: {loadError}</p>
   {:else if !catalog || catalog.cohorts.length === 0}
-    <p class="status">No public analysis cohorts are configured yet.</p>
+    <p class="status-banner warn">No public analysis cohorts are configured yet.</p>
   {:else}
-    <p class="status">
-      Default cohort:
-      <code>{catalog.default_tag ?? "(none)"}</code> · selector enabled:
-      <code>{String(catalog.selector_enabled)}</code>
-    </p>
     <ul class="cohort-list">
       {#each catalog.cohorts as cohort (cohort.dataset_tag)}
         <li>
           <strong>{cohort.label}</strong>
           <code>{cohort.dataset_tag}</code>
           {#if cohort.is_default}
-            <span class="pill">default</span>
+            <span class="pill default">default</span>
           {/if}
         </li>
       {/each}

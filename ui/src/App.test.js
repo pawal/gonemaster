@@ -68,8 +68,11 @@ describe("App", () => {
     await fireEvent.click(screen.getByRole("tab", { name: "Metrics" }));
   };
 
-  const openSettingsTab = async () => {
+  const openSettingsTab = async (subTab = null) => {
     await fireEvent.click(screen.getByRole("tab", { name: "Settings" }));
+    if (subTab) {
+      await fireEvent.click(await screen.findByRole("tab", { name: subTab }));
+    }
   };
 
   const getMetricsPanel = () => screen.getByRole("tabpanel", { name: "Metrics" });
@@ -100,7 +103,7 @@ describe("App", () => {
     await openBatchTab();
     expect(screen.getByText("Batch Inspector")).toBeInTheDocument();
 
-    await openSettingsTab();
+    await openSettingsTab("Profiles");
     expect(screen.getByText("Profile Library")).toBeInTheDocument();
 
     unmount();
@@ -1421,7 +1424,7 @@ describe("App", () => {
 
     const { unmount } = render(App);
 
-    await openSettingsTab();
+    await openSettingsTab("Profiles");
     await fireEvent.click(await screen.findByRole("button", { name: "New profile" }));
     await fireEvent.input(screen.getByLabelText("Name"), { target: { value: "internal-only" } });
     await fireEvent.input(screen.getByLabelText("Description"), { target: { value: "Admin profile" } });
@@ -4096,6 +4099,74 @@ describe("App", () => {
       await waitFor(() => {
         expect(screen.getByRole("tab", { name: "Domains" })).toHaveAttribute("aria-selected", "true");
       });
+      unmount();
+    });
+  });
+
+  describe("Settings sub-tabs", () => {
+    const subtabMock = (url, options = {}) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      if (value.includes("/api/v1/settings")) return jsonResponse({});
+      if (value.includes("/api/v1/profiles/default")) {
+        return jsonResponse({
+          id: 0, name: "default", config: {}, public: false,
+          created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z",
+        });
+      }
+      if (value.includes("/api/v1/profiles")) return jsonResponse([]);
+      if (value.includes("/api/v1/tags")) return jsonResponse([]);
+      if (value.includes("/api/v1/analysis/cohorts")) return jsonResponse([]);
+      return jsonResponse({});
+    };
+
+    it("defaults to System sub-tab and renders ServerSettings", async () => {
+      global.fetch.mockImplementation(subtabMock);
+      const { unmount } = render(App);
+      await openSettingsTab();
+
+      const systemTab = screen.getByRole("tab", { name: "System" });
+      expect(systemTab.getAttribute("aria-selected")).toBe("true");
+      await waitFor(() => {
+        expect(screen.getByRole("heading", { name: "Server Settings" })).toBeInTheDocument();
+      });
+      expect(screen.queryByRole("heading", { name: "Profile Library" })).toBeNull();
+      expect(screen.queryByRole("heading", { name: "Analysis Cohorts" })).toBeNull();
+      unmount();
+    });
+
+    it("switches to Profiles sub-tab and renders ProfileSettings", async () => {
+      global.fetch.mockImplementation(subtabMock);
+      const { unmount } = render(App);
+      await openSettingsTab("Profiles");
+
+      await waitFor(() => {
+        expect(screen.getByText("Profile Library")).toBeInTheDocument();
+      });
+      expect(screen.queryByRole("heading", { name: "Server Settings" })).toBeNull();
+      unmount();
+    });
+
+    it("switches to Analysis sub-tab and renders AnalysisCohorts", async () => {
+      global.fetch.mockImplementation(subtabMock);
+      const { unmount } = render(App);
+      await openSettingsTab("Analysis");
+
+      await waitFor(() => {
+        expect(screen.getByRole("heading", { name: "Analysis Cohorts" })).toBeInTheDocument();
+      });
+      expect(screen.queryByRole("heading", { name: "Server Settings" })).toBeNull();
+      unmount();
+    });
+
+    it("switches to Scoring sub-tab and renders the scoring placeholder", async () => {
+      global.fetch.mockImplementation(subtabMock);
+      const { unmount } = render(App);
+      await openSettingsTab("Scoring");
+
+      await waitFor(() => {
+        expect(screen.getByRole("heading", { name: "Scoring" })).toBeInTheDocument();
+      });
+      expect(screen.getByText(/Scoring configuration editor/i)).toBeInTheDocument();
       unmount();
     });
   });

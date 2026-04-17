@@ -170,6 +170,14 @@
     { id: "settings", labelKey: "tab_settings" }
   ];
 
+  let settingsSubTab = "system";
+  const settingsSubTabs = [
+    { id: "system", labelKey: "settings_subtab_system" },
+    { id: "profiles", labelKey: "settings_subtab_profiles" },
+    { id: "scoring", labelKey: "settings_subtab_scoring" },
+    { id: "analysis", labelKey: "settings_subtab_analysis" }
+  ];
+
   // Domains tab state.
   let domains = [];
   let domainsLoading = false;
@@ -4052,15 +4060,41 @@ example.org`}
     </div>
   {:else if activeTab === "settings"}
     <div class="grid" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" style="margin-top: 22px;">
-      <div class="card reveal" style="--d: 0.34s; grid-column: 1 / -1;">
-        <ProfileSettings onprofileschanged={handleProfilesChanged} />
+      <div class="card reveal" style="--d: 0.28s; grid-column: 1 / -1; padding: 0;">
+        <div class="settings-subtabs" role="tablist" aria-label={$t("settings_subtabs_aria")}>
+          {#each settingsSubTabs as subTab}
+            <button
+              class={`settings-subtab ${settingsSubTab === subTab.id ? "active" : ""}`}
+              type="button"
+              role="tab"
+              id={`settings-subtab-${subTab.id}`}
+              aria-selected={settingsSubTab === subTab.id}
+              aria-controls={`settings-subpanel-${subTab.id}`}
+              onclick={() => (settingsSubTab = subTab.id)}
+            >
+              {$t(subTab.labelKey)}
+            </button>
+          {/each}
+        </div>
       </div>
-      <div class="card reveal" style="--d: 0.4s; grid-column: 1 / -1;">
-        <ServerSettings />
-      </div>
-      <div class="card reveal" style="--d: 0.46s; grid-column: 1 / -1;">
-        <AnalysisCohorts />
-      </div>
+      {#if settingsSubTab === "system"}
+        <div class="card reveal" id="settings-subpanel-system" role="tabpanel" aria-labelledby="settings-subtab-system" style="--d: 0.34s; grid-column: 1 / -1;">
+          <ServerSettings />
+        </div>
+      {:else if settingsSubTab === "profiles"}
+        <div class="card reveal" id="settings-subpanel-profiles" role="tabpanel" aria-labelledby="settings-subtab-profiles" style="--d: 0.34s; grid-column: 1 / -1;">
+          <ProfileSettings onprofileschanged={handleProfilesChanged} />
+        </div>
+      {:else if settingsSubTab === "scoring"}
+        <div class="card reveal" id="settings-subpanel-scoring" role="tabpanel" aria-labelledby="settings-subtab-scoring" style="--d: 0.34s; grid-column: 1 / -1;">
+          <h2>{$t("settings_scoring_heading")}</h2>
+          <p class="small">{$t("settings_scoring_placeholder")}</p>
+        </div>
+      {:else if settingsSubTab === "analysis"}
+        <div class="card reveal" id="settings-subpanel-analysis" role="tabpanel" aria-labelledby="settings-subtab-analysis" style="--d: 0.34s; grid-column: 1 / -1;">
+          <AnalysisCohorts />
+        </div>
+      {/if}
     </div>
   {/if}
 

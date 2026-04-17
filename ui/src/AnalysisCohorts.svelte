@@ -525,9 +525,8 @@
   .cohort-cell {
     display: flex;
     flex-direction: column;
+    justify-content: center;
     gap: 2px;
-    padding-top: 10px;
-    padding-bottom: 10px;
   }
 
   .cohort-tag {
@@ -623,6 +622,7 @@
   .materialization-cell {
     display: flex;
     flex-direction: column;
+    justify-content: center;
     gap: 2px;
   }
 

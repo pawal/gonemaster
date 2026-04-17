@@ -103,7 +103,8 @@ func (s *Server) handleCreateAnalysisCohort(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, http.StatusCreated, created)
 }
 
-// handleAnalysisCohortByID routes GET and PATCH on /api/v1/analysis/cohorts/{id}.
+// handleAnalysisCohortByID routes GET, PATCH, and DELETE on
+// /api/v1/analysis/cohorts/{id}.
 func (s *Server) handleAnalysisCohortByID(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseCohortID(w, r)
 	if !ok {
@@ -122,9 +123,30 @@ func (s *Server) handleAnalysisCohortByID(w http.ResponseWriter, r *http.Request
 			return
 		}
 		s.handlePatchAnalysisCohort(w, r, cohort)
+	case http.MethodDelete:
+		if !enforceCSRF(w, r) {
+			return
+		}
+		s.handleDeleteAnalysisCohort(w, r, cohort)
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
 	}
+}
+
+// handleDeleteAnalysisCohort clears the cohort's materialized rows and removes
+// the catalog entry entirely.
+func (s *Server) handleDeleteAnalysisCohort(w http.ResponseWriter, r *http.Request, cohort AnalysisCohort) {
+	if s.analysis != nil {
+		if err := s.analysis.ClearCohort(r.Context(), cohort.ID); err != nil {
+			writeError(w, http.StatusInternalServerError, "clear_failed", err.Error(), nil)
+			return
+		}
+	}
+	if err := s.store.DeleteAnalysisCohort(cohort.ID); err != nil {
+		writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // handlePatchAnalysisCohort applies a partial update to one cohort catalog row

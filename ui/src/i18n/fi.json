@@ -586,5 +586,17 @@
   "pub.score_bonus_ipv6_all_nameservers": "IPv6 kaikissa nimipalvelimissa",
   "pub.score_bonus_as_diversity": "Nimipalvelimien AS-monimuotoisuus",
   "analysis_cohorts_tag_match_existing": "✓ existing tag",
-  "analysis_cohorts_tag_match_new": "+ will be created"
+  "analysis_cohorts_tag_match_new": "+ will be created",
+  "analysis_cohorts_edit": "Edit",
+  "analysis_cohorts_delete": "Delete",
+  "analysis_cohorts_save": "Save",
+  "analysis_cohorts_saving": "Saving…",
+  "analysis_cohorts_cancel": "Cancel",
+  "analysis_cohorts_edit_heading": "Edit cohort · {tag}",
+  "analysis_cohorts_edit_hint": "Source tag and flags are managed above. Update the label, description, and sort order here.",
+  "analysis_cohorts_edit_saved": "Updated cohort {tag}.",
+  "analysis_cohorts_edit_error": "Failed to update cohort: {error}",
+  "analysis_cohorts_delete_confirm": "Delete cohort {tag}? Materialized rows will be cleared and the catalog entry removed.",
+  "analysis_cohorts_deleted": "Deleted cohort {tag}.",
+  "analysis_cohorts_delete_error": "Failed to delete cohort: {error}"
 }

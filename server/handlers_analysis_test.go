@@ -386,6 +386,36 @@ func TestAnalysisCohortRebuildFailsWhenControllerMissing(t *testing.T) {
 	}
 }
 
+func TestDeleteAnalysisCohortRemovesCatalogAndClears(t *testing.T) {
+	srv, spy := newAnalysisAdminTestServer(t)
+	cohort := createAnalysisCohort(t, srv, `{"source_tag":"tld"}`)
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodDelete,
+		fmt.Sprintf("/api/v1/analysis/cohorts/%d", cohort.ID), nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", resp.Code, resp.Body)
+	}
+	if _, found := srv.store.GetAnalysisCohort(cohort.ID); found {
+		t.Fatal("expected cohort row to be removed from catalog")
+	}
+	snap := spy.snapshot()
+	if len(snap.clearCohorts) == 0 || snap.clearCohorts[len(snap.clearCohorts)-1] != cohort.ID {
+		t.Fatalf("expected controller.ClearCohort to be called for %d, got %+v", cohort.ID, snap.clearCohorts)
+	}
+}
+
+func TestDeleteAnalysisCohortNotFound(t *testing.T) {
+	srv, _ := newAnalysisAdminTestServer(t)
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/analysis/cohorts/999", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", resp.Code, resp.Body)
+	}
+}
+
 func TestAnalysisCohortRebuildNotFound(t *testing.T) {
 	srv, _ := newAnalysisAdminTestServer(t)
 	resp := httptest.NewRecorder()

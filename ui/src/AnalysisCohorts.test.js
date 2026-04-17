@@ -93,6 +93,12 @@ describe("AnalysisCohorts", () => {
         cohorts = cohorts.map((c) => (c.id === id ? { ...c, ...body } : c));
         return jsonResponse(cohorts.find((c) => c.id === id));
       }
+      const deleteMatch = value.match(/^\/api\/v1\/analysis\/cohorts\/(\d+)$/);
+      if (deleteMatch && method === "DELETE") {
+        const id = Number(deleteMatch[1]);
+        cohorts = cohorts.filter((c) => c.id !== id);
+        return { ok: true, statusText: "No Content", headers: { get: () => "" }, json: async () => ({}), text: async () => "" };
+      }
       const actionMatch = value.match(/^\/api\/v1\/analysis\/cohorts\/(\d+)\/(rebuild|clear)$/);
       if (actionMatch && method === "POST") {
         actions.push({ id: Number(actionMatch[1]), action: actionMatch[2] });
@@ -202,6 +208,67 @@ describe("AnalysisCohorts", () => {
       public_enabled: false,
       is_default: false,
     });
+  });
+
+  it("enters edit mode, PATCHes label and description, and exits", async () => {
+    const handles = installFetch();
+    render(AnalysisCohorts);
+
+    const tldRow = (await screen.findByRole("cell", { name: "TLD" })).closest("tr");
+    const editButton = within(tldRow).getByRole("button", { name: /^Edit$/ });
+    await fireEvent.click(editButton);
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: /Edit cohort/i })).toBeInTheDocument();
+    });
+
+    const labelInput = screen.getByDisplayValue("TLD");
+    await fireEvent.input(labelInput, { target: { value: "Top-Level Domains" } });
+    const descInput = screen.getByDisplayValue("Top-level domains");
+    await fireEvent.input(descInput, { target: { value: "All ICANN-managed TLDs" } });
+
+    await fireEvent.click(screen.getByRole("button", { name: /^Save$/ }));
+
+    await waitFor(() => expect(handles.patched).toHaveLength(1));
+    expect(handles.patched[0]).toEqual({
+      id: 1,
+      body: {
+        label: "Top-Level Domains",
+        description: "All ICANN-managed TLDs",
+        sort_order: 10,
+      },
+    });
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: /^Create cohort$/i })).toBeInTheDocument();
+    });
+  });
+
+  it("deletes a cohort after confirming and removes it from the table", async () => {
+    global.confirm = vi.fn(() => true);
+    const handles = installFetch();
+    render(AnalysisCohorts);
+
+    await screen.findByRole("cell", { name: "Government" });
+    const govRow = screen.getByRole("cell", { name: "Government" }).closest("tr");
+    const deleteButton = within(govRow).getByRole("button", { name: /^Delete$/ });
+    await fireEvent.click(deleteButton);
+
+    await waitFor(() => {
+      expect(screen.queryByRole("cell", { name: "Government" })).toBeNull();
+    });
+    expect(global.confirm).toHaveBeenCalled();
+    expect(handles.getCohorts().some((c) => c.source_tag === "gov")).toBe(false);
+  });
+
+  it("skips deletion when the confirm dialog is cancelled", async () => {
+    global.confirm = vi.fn(() => false);
+    installFetch();
+    render(AnalysisCohorts);
+
+    const govRow = (await screen.findByRole("cell", { name: "Government" })).closest("tr");
+    await fireEvent.click(within(govRow).getByRole("button", { name: /^Delete$/ }));
+
+    expect(await screen.findByRole("cell", { name: "Government" })).toBeInTheDocument();
   });
 
   it("shows an existing-tag indicator when the input matches a known tag", async () => {

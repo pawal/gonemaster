@@ -13,6 +13,9 @@
   let creating = $state(false);
   let draft = $state(emptyDraft());
   let existingTagNames = $state(new Set());
+  let editingCohortId = $state(null);
+  let editingSourceTag = $state("");
+  let saving = $state(false);
 
   function emptyDraft() {
     return {
@@ -83,6 +86,81 @@
   const draftTagExists = $derived(
     normalizedDraftTag !== "" && existingTagNames.has(normalizedDraftTag)
   );
+
+  function startEdit(cohort) {
+    editingCohortId = cohort.id;
+    editingSourceTag = cohort.source_tag;
+    draft = {
+      source_tag: cohort.source_tag,
+      label: cohort.label || "",
+      description: cohort.description || "",
+      analysis_enabled: !!cohort.analysis_enabled,
+      public_enabled: !!cohort.public_enabled,
+      is_default: !!cohort.is_default,
+      sort_order: cohort.sort_order || 0,
+    };
+    clearNotice();
+    if (typeof document !== "undefined") {
+      const target = document.getElementById("cohort-edit-form");
+      if (target && typeof target.scrollIntoView === "function") {
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
+  }
+
+  function cancelEdit() {
+    editingCohortId = null;
+    editingSourceTag = "";
+    draft = emptyDraft();
+    clearNotice();
+  }
+
+  async function saveEdit() {
+    if (editingCohortId == null) return;
+    saving = true;
+    try {
+      await apiFetch(`/analysis/cohorts/${editingCohortId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          label: String(draft.label || "").trim(),
+          description: String(draft.description || "").trim(),
+          sort_order: Number(draft.sort_order) || 0,
+        }),
+      });
+      await loadCohorts({ preserveNotice: true });
+      const tag = editingSourceTag;
+      editingCohortId = null;
+      editingSourceTag = "";
+      draft = emptyDraft();
+      setNotice($t("analysis_cohorts_edit_saved", { tag }), "ok");
+    } catch (error) {
+      setNotice($t("analysis_cohorts_edit_error", { error: error.message || "" }), "warn");
+    } finally {
+      saving = false;
+    }
+  }
+
+  async function deleteCohort(cohort) {
+    if (typeof window !== "undefined" &&
+        !window.confirm($t("analysis_cohorts_delete_confirm", { tag: cohort.source_tag }))) {
+      return;
+    }
+    busyCohortId = cohort.id;
+    try {
+      await apiFetch(`/analysis/cohorts/${cohort.id}`, { method: "DELETE" });
+      if (editingCohortId === cohort.id) {
+        editingCohortId = null;
+        editingSourceTag = "";
+        draft = emptyDraft();
+      }
+      await Promise.all([loadCohorts({ preserveNotice: true }), loadExistingTags()]);
+      setNotice($t("analysis_cohorts_deleted", { tag: cohort.source_tag }), "ok");
+    } catch (error) {
+      setNotice($t("analysis_cohorts_delete_error", { error: error.message || "" }), "warn");
+    } finally {
+      busyCohortId = null;
+    }
+  }
 
   async function createCohort() {
     const tag = String(draft.source_tag || "").trim();
@@ -319,11 +397,17 @@
                 </td>
                 <td class="col-right">
                   <div class="row-actions">
+                    <button type="button" class="ghost small" disabled={busy || editingCohortId === cohort.id} onclick={() => startEdit(cohort)}>
+                      {$t("analysis_cohorts_edit")}
+                    </button>
                     <button type="button" class="ghost small" disabled={busy || !cohort.analysis_enabled} onclick={() => rebuildCohort(cohort)}>
                       {$t("analysis_cohorts_rebuild")}
                     </button>
                     <button type="button" class="ghost small" disabled={busy} onclick={() => clearCohort(cohort)}>
                       {$t("analysis_cohorts_clear")}
+                    </button>
+                    <button type="button" class="ghost small danger" disabled={busy} onclick={() => deleteCohort(cohort)}>
+                      {$t("analysis_cohorts_delete")}
                     </button>
                   </div>
                 </td>
@@ -335,14 +419,27 @@
     {/if}
   </section>
 
-  <section class="cohort-section cohort-create">
-    <h3>{$t("analysis_cohorts_create_heading")}</h3>
-    <p class="small cohort-create-hint">{$t("analysis_cohorts_create_hint")}</p>
+  <section class="cohort-section cohort-create" id="cohort-edit-form">
+    <h3>
+      {editingCohortId
+        ? $t("analysis_cohorts_edit_heading", { tag: editingSourceTag })
+        : $t("analysis_cohorts_create_heading")}
+    </h3>
+    <p class="small cohort-create-hint">
+      {editingCohortId
+        ? $t("analysis_cohorts_edit_hint")
+        : $t("analysis_cohorts_create_hint")}
+    </p>
     <div class="cohort-form-grid">
       <label class="field">
         <span class="field-label">{$t("analysis_cohorts_field_source_tag")}</span>
-        <input type="text" bind:value={draft.source_tag} placeholder="tld" />
-        {#if normalizedDraftTag}
+        <input
+          type="text"
+          bind:value={draft.source_tag}
+          placeholder="tld"
+          disabled={editingCohortId != null}
+        />
+        {#if !editingCohortId && normalizedDraftTag}
           <span class={`tag-match-indicator ${draftTagExists ? "tag-match-existing" : "tag-match-new"}`}>
             {draftTagExists
               ? $t("analysis_cohorts_tag_match_existing")
@@ -362,26 +459,37 @@
         <span class="field-label">{$t("analysis_cohorts_field_description")}</span>
         <input type="text" bind:value={draft.description} />
       </label>
-      <fieldset class="cohort-flags field-full">
-        <legend class="field-label">{$t("analysis_cohorts_col_status")}</legend>
-        <label class="check-field">
-          <input type="checkbox" bind:checked={draft.analysis_enabled} />
-          <span>{$t("analysis_cohorts_field_analysis_enabled")}</span>
-        </label>
-        <label class="check-field">
-          <input type="checkbox" bind:checked={draft.public_enabled} />
-          <span>{$t("analysis_cohorts_field_public_enabled")}</span>
-        </label>
-        <label class="check-field">
-          <input type="checkbox" bind:checked={draft.is_default} />
-          <span>{$t("analysis_cohorts_field_is_default")}</span>
-        </label>
-      </fieldset>
+      {#if !editingCohortId}
+        <fieldset class="cohort-flags field-full">
+          <legend class="field-label">{$t("analysis_cohorts_col_status")}</legend>
+          <label class="check-field">
+            <input type="checkbox" bind:checked={draft.analysis_enabled} />
+            <span>{$t("analysis_cohorts_field_analysis_enabled")}</span>
+          </label>
+          <label class="check-field">
+            <input type="checkbox" bind:checked={draft.public_enabled} />
+            <span>{$t("analysis_cohorts_field_public_enabled")}</span>
+          </label>
+          <label class="check-field">
+            <input type="checkbox" bind:checked={draft.is_default} />
+            <span>{$t("analysis_cohorts_field_is_default")}</span>
+          </label>
+        </fieldset>
+      {/if}
     </div>
     <div class="cohort-form-actions">
-      <button type="button" disabled={creating} onclick={createCohort}>
-        {creating ? $t("analysis_cohorts_creating") : $t("analysis_cohorts_create_button")}
-      </button>
+      {#if editingCohortId}
+        <button type="button" class="ghost" disabled={saving} onclick={cancelEdit}>
+          {$t("analysis_cohorts_cancel")}
+        </button>
+        <button type="button" disabled={saving} onclick={saveEdit}>
+          {saving ? $t("analysis_cohorts_saving") : $t("analysis_cohorts_save")}
+        </button>
+      {:else}
+        <button type="button" disabled={creating} onclick={createCohort}>
+          {creating ? $t("analysis_cohorts_creating") : $t("analysis_cohorts_create_button")}
+        </button>
+      {/if}
     </div>
   </section>
 {/if}
@@ -514,8 +622,18 @@
 
   .row-actions {
     display: inline-flex;
+    flex-wrap: wrap;
     gap: 6px;
     justify-content: flex-end;
+  }
+
+  .row-actions .danger:not(:disabled) {
+    color: #991b1b;
+    border-color: rgba(153, 27, 27, 0.4);
+  }
+
+  .row-actions .danger:not(:disabled):hover {
+    background: rgba(153, 27, 27, 0.08);
   }
 
   .muted {

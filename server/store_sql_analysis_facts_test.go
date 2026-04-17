@@ -291,3 +291,136 @@ func TestSQLJobStoreAnalysisFactHelpers(t *testing.T) {
 		})
 	}
 }
+
+func TestSQLJobStoreClearAnalysisCohortMaterialization(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			cohort1, err := s.UpsertAnalysisCohort(AnalysisCohort{
+				SourceType:      "tag",
+				SourceTag:       "tld",
+				Label:           "TLD",
+				AnalysisEnabled: true,
+			})
+			if err != nil {
+				t.Fatalf("UpsertAnalysisCohort cohort1: %v", err)
+			}
+			cohort2, err := s.UpsertAnalysisCohort(AnalysisCohort{
+				SourceType:      "tag",
+				SourceTag:       "gov",
+				Label:           "Government",
+				AnalysisEnabled: true,
+			})
+			if err != nil {
+				t.Fatalf("UpsertAnalysisCohort cohort2: %v", err)
+			}
+
+			ns, _ := s.UpsertAnalysisNameserver("ns1.example.net", time.Now().UTC())
+			addr, _ := s.UpsertAnalysisAddress("192.0.2.1", "ipv4", time.Now().UTC())
+			pfx, _ := s.UpsertAnalysisPrefix("192.0.2.0/24", "ipv4", time.Now().UTC())
+
+			if err := s.ReplaceAnalysisRunNSEndpoints(cohort1.ID, "run-1", []AnalysisRunNameserverEndpoint{{
+				DomainID:     100,
+				NameserverID: ns.ID,
+				AddressID:    addr.ID,
+				Role:         "authoritative",
+				Source:       "timings",
+				Family:       "ipv4",
+			}}); err != nil {
+				t.Fatalf("ReplaceAnalysisRunNSEndpoints cohort1: %v", err)
+			}
+			if err := s.ReplaceAnalysisRunNSEndpoints(cohort2.ID, "run-1", []AnalysisRunNameserverEndpoint{{
+				DomainID:     200,
+				NameserverID: ns.ID,
+				AddressID:    addr.ID,
+				Role:         "authoritative",
+				Source:       "timings",
+				Family:       "ipv4",
+			}}); err != nil {
+				t.Fatalf("ReplaceAnalysisRunNSEndpoints cohort2: %v", err)
+			}
+			if err := s.ReplaceAnalysisRunAddressASNs(cohort1.ID, "run-1", []AnalysisRunAddressASN{{
+				DomainID:     100,
+				AddressID:    addr.ID,
+				PrefixID:     int64Ptr(pfx.ID),
+				ASN:          int64Ptr(64496),
+				LookupStatus: "ok",
+			}}); err != nil {
+				t.Fatalf("ReplaceAnalysisRunAddressASNs cohort1: %v", err)
+			}
+			if err := s.ReplaceAnalysisRunAddressASNs(cohort2.ID, "run-1", []AnalysisRunAddressASN{{
+				DomainID:     200,
+				AddressID:    addr.ID,
+				LookupStatus: "ok",
+			}}); err != nil {
+				t.Fatalf("ReplaceAnalysisRunAddressASNs cohort2: %v", err)
+			}
+			if err := s.UpsertAnalysisRunDomainSummary(AnalysisRunDomainSummary{
+				CohortID:        cohort1.ID,
+				RunID:           "run-1",
+				DomainID:        100,
+				NameserverCount: 1,
+				EndpointCount:   1,
+			}); err != nil {
+				t.Fatalf("UpsertAnalysisRunDomainSummary cohort1: %v", err)
+			}
+			if err := s.UpsertAnalysisRunDomainSummary(AnalysisRunDomainSummary{
+				CohortID:        cohort2.ID,
+				RunID:           "run-1",
+				DomainID:        200,
+				NameserverCount: 1,
+				EndpointCount:   1,
+			}); err != nil {
+				t.Fatalf("UpsertAnalysisRunDomainSummary cohort2: %v", err)
+			}
+			if err := s.SetAnalysisProjectionState(AnalysisProjectionState{
+				CohortID:         cohort1.ID,
+				RunID:            "run-1",
+				ProjectorVersion: "v1",
+				Status:           AnalysisMaterializationReady,
+				ProjectedAt:      time.Now().UTC(),
+			}); err != nil {
+				t.Fatalf("SetAnalysisProjectionState cohort1: %v", err)
+			}
+			if err := s.SetAnalysisProjectionState(AnalysisProjectionState{
+				CohortID:         cohort2.ID,
+				RunID:            "run-1",
+				ProjectorVersion: "v1",
+				Status:           AnalysisMaterializationReady,
+				ProjectedAt:      time.Now().UTC(),
+			}); err != nil {
+				t.Fatalf("SetAnalysisProjectionState cohort2: %v", err)
+			}
+
+			if err := s.ClearAnalysisCohortMaterialization(cohort1.ID); err != nil {
+				t.Fatalf("ClearAnalysisCohortMaterialization: %v", err)
+			}
+
+			if got := s.ListAnalysisRunNSEndpoints(cohort1.ID, "run-1"); len(got) != 0 {
+				t.Fatalf("expected cohort1 ns endpoints to be cleared, got %+v", got)
+			}
+			if got := s.ListAnalysisRunAddressASNs(cohort1.ID, "run-1"); len(got) != 0 {
+				t.Fatalf("expected cohort1 address facts to be cleared, got %+v", got)
+			}
+			if _, ok := s.GetAnalysisRunDomainSummary(cohort1.ID, "run-1", 100); ok {
+				t.Fatal("expected cohort1 summary to be cleared")
+			}
+			if _, ok := s.GetAnalysisProjectionState(cohort1.ID, "run-1"); ok {
+				t.Fatal("expected cohort1 projection state to be cleared")
+			}
+
+			if got := s.ListAnalysisRunNSEndpoints(cohort2.ID, "run-1"); len(got) != 1 {
+				t.Fatalf("expected cohort2 ns endpoints to remain, got %+v", got)
+			}
+			if got := s.ListAnalysisRunAddressASNs(cohort2.ID, "run-1"); len(got) != 1 {
+				t.Fatalf("expected cohort2 address facts to remain, got %+v", got)
+			}
+			if _, ok := s.GetAnalysisRunDomainSummary(cohort2.ID, "run-1", 200); !ok {
+				t.Fatal("expected cohort2 summary to remain")
+			}
+			if _, ok := s.GetAnalysisProjectionState(cohort2.ID, "run-1"); !ok {
+				t.Fatal("expected cohort2 projection state to remain")
+			}
+		})
+	}
+}

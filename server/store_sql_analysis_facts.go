@@ -701,3 +701,18 @@ func (s *SQLJobStore) GetAnalysisProjectionState(cohortID int64, runID string) (
 	item.ProjectedAt = parseTimestampNullStr(projectedAt)
 	return item, true
 }
+
+// ClearAnalysisCohortMaterialization removes all materialized rows for one cohort.
+func (s *SQLJobStore) ClearAnalysisCohortMaterialization(cohortID int64) error {
+	for _, query := range []string{
+		fmt.Sprintf(`DELETE FROM analysis_projection_state WHERE cohort_id = %s`, s.ph(1)),
+		fmt.Sprintf(`DELETE FROM analysis_run_domain_summary WHERE cohort_id = %s`, s.ph(1)),
+		fmt.Sprintf(`DELETE FROM analysis_run_address_asns WHERE cohort_id = %s`, s.ph(1)),
+		fmt.Sprintf(`DELETE FROM analysis_run_ns_endpoints WHERE cohort_id = %s`, s.ph(1)),
+	} {
+		if _, err := s.db.Exec(query, cohortID); err != nil {
+			return fmt.Errorf("clear analysis cohort %d materialization: %w", cohortID, err)
+		}
+	}
+	return nil
+}

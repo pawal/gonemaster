@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -16,6 +18,7 @@ type fakeStore struct {
 	tags    map[int64][]string
 	cohorts []serverpkg.AnalysisCohort
 
+	nextCohortID     int64
 	nextNameserverID int64
 	nextAddressID    int64
 	nextPrefixID     int64
@@ -55,6 +58,123 @@ func (s *fakeStore) GetDomainTags(domainID int64) []string {
 
 func (s *fakeStore) ListAnalysisCohorts() []serverpkg.AnalysisCohort {
 	return append([]serverpkg.AnalysisCohort(nil), s.cohorts...)
+}
+
+func (s *fakeStore) GetAnalysisCohort(id int64) (serverpkg.AnalysisCohort, bool) {
+	for _, cohort := range s.cohorts {
+		if cohort.ID == id {
+			return cohort, true
+		}
+	}
+	return serverpkg.AnalysisCohort{}, false
+}
+
+func (s *fakeStore) UpsertAnalysisCohort(cohort serverpkg.AnalysisCohort) (serverpkg.AnalysisCohort, error) {
+	now := time.Now().UTC()
+	for i, existing := range s.cohorts {
+		if cohort.ID != 0 && existing.ID == cohort.ID {
+			if cohort.CreatedAt.IsZero() {
+				cohort.CreatedAt = existing.CreatedAt
+			}
+			if cohort.UpdatedAt.IsZero() {
+				cohort.UpdatedAt = now
+			}
+			s.cohorts[i] = cohort
+			return cohort, nil
+		}
+		if existing.SourceType == cohort.SourceType && existing.SourceTag == cohort.SourceTag {
+			cohort.ID = existing.ID
+			if cohort.CreatedAt.IsZero() {
+				cohort.CreatedAt = existing.CreatedAt
+			}
+			if cohort.UpdatedAt.IsZero() {
+				cohort.UpdatedAt = now
+			}
+			s.cohorts[i] = cohort
+			return cohort, nil
+		}
+	}
+	if cohort.ID == 0 {
+		s.nextCohortID++
+		cohort.ID = s.nextCohortID
+	}
+	if cohort.CreatedAt.IsZero() {
+		cohort.CreatedAt = now
+	}
+	if cohort.UpdatedAt.IsZero() {
+		cohort.UpdatedAt = now
+	}
+	s.cohorts = append(s.cohorts, cohort)
+	return cohort, nil
+}
+
+func (s *fakeStore) ClearAnalysisCohortMaterialization(cohortID int64) error {
+	s.ensureMaterializedMaps()
+	prefix := fmt.Sprintf("%d/", cohortID)
+	for key := range s.nsEndpoints {
+		if strings.HasPrefix(key, prefix) {
+			delete(s.nsEndpoints, key)
+		}
+	}
+	for key := range s.addrFacts {
+		if strings.HasPrefix(key, prefix) {
+			delete(s.addrFacts, key)
+		}
+	}
+	for key := range s.summaries {
+		if strings.HasPrefix(key, prefix) {
+			delete(s.summaries, key)
+		}
+	}
+	for key := range s.states {
+		if strings.HasPrefix(key, prefix) {
+			delete(s.states, key)
+		}
+	}
+	return nil
+}
+
+func (s *fakeStore) ListRuns(filter serverpkg.RunFilter) serverpkg.RunList {
+	items := make([]serverpkg.Run, 0, len(s.runs))
+	for _, run := range s.runs {
+		if filter.DomainID != 0 && run.DomainID != filter.DomainID {
+			continue
+		}
+		if filter.Tag != "" {
+			if !containsString(s.tags[run.DomainID], filter.Tag) {
+				continue
+			}
+		}
+		items = append(items, run)
+	}
+	sort.Slice(items, func(i, j int) bool {
+		if !items[i].FinishedAt.Equal(items[j].FinishedAt) {
+			return items[i].FinishedAt.After(items[j].FinishedAt)
+		}
+		return items[i].ID < items[j].ID
+	})
+	total := len(items)
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = 100
+	}
+	offset := filter.Offset
+	if offset < 0 {
+		offset = 0
+	}
+	if offset > total {
+		offset = total
+	}
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	return serverpkg.RunList{
+		Items:  append([]serverpkg.Run(nil), items[offset:end]...),
+		Total:  total,
+		Limit:  limit,
+		Offset: offset,
+	}
 }
 
 func (s *fakeStore) UpsertAnalysisNameserver(name string, seenAt time.Time) (serverpkg.AnalysisNameserver, error) {
@@ -206,6 +326,15 @@ func maxTestTime(a, b time.Time) time.Time {
 
 func projectionKey(cohortID int64, runID string) string {
 	return fmt.Sprintf("%d/%s", cohortID, runID)
+}
+
+func containsString(items []string, want string) bool {
+	for _, item := range items {
+		if item == want {
+			return true
+		}
+	}
+	return false
 }
 
 func TestMatchAnalysisEnabledCohorts(t *testing.T) {

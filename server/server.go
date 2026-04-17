@@ -20,6 +20,7 @@ type Server struct {
 	cfg                      Config
 	mux                      *http.ServeMux
 	store                    JobStore
+	analysis                 AnalysisController
 	queue                    Queue
 	workers                  workerPool
 	metrics                  *MetricsCollector
@@ -152,6 +153,11 @@ func (s *Server) Handler() http.Handler {
 		return securityHeadersMiddleware(debugMiddleware(s.mux))
 	}
 	return securityHeadersMiddleware(s.mux)
+}
+
+// Store exposes the configured job store for optional integration layers.
+func (s *Server) Store() JobStore {
+	return s.store
 }
 
 // securityHeadersMiddleware sets defensive HTTP security headers on every

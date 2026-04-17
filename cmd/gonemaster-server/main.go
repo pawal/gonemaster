@@ -18,6 +18,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/server"
+	"codeberg.org/pawal/gonemaster/server/analysis"
 )
 
 type usageLine struct {
@@ -325,6 +326,9 @@ func run(args []string, out *os.File, errOut *os.File) int {
 		fmt.Fprintln(errOut, err.Error())
 		return 2
 	}
+	if ctrl, ok := analysis.NewControllerFromJobStore(srv.Store()); ok {
+		srv.SetAnalysisController(ctrl)
+	}
 
 	// Track where each setting value came from so the settings API
 	// can show the source and respect CLI flag precedence.
@@ -428,17 +432,17 @@ func normalizeVersion(version string) string {
 func buildConfigSources(flagsSet map[string]bool, hasConfigFile bool) map[string]server.SettingSource {
 	// Map CLI flag names to settings API keys.
 	flagToKey := map[string]string{
-		"listen":                       "listen_addr",
-		"workers":                      "worker_count",
-		"max-concurrent-jobs":          "max_concurrent_jobs",
-		"min-level":                    "min_level",
-		"profile":                      "profile_path",
-		"db-driver":                    "db_driver",
-		"db-dsn":                       "db_dsn",
-		"db-retention-days":            "retention_days",
+		"listen":                        "listen_addr",
+		"workers":                       "worker_count",
+		"max-concurrent-jobs":           "max_concurrent_jobs",
+		"min-level":                     "min_level",
+		"profile":                       "profile_path",
+		"db-driver":                     "db_driver",
+		"db-dsn":                        "db_dsn",
+		"db-retention-days":             "retention_days",
 		"public-api-rate-limit-enabled": "rate_limit_enabled",
-		"public-api-rate-limit-max":    "rate_limit_max",
-		"public-api-rate-limit-window": "rate_limit_window",
+		"public-api-rate-limit-max":     "rate_limit_max",
+		"public-api-rate-limit-window":  "rate_limit_window",
 	}
 
 	sources := make(map[string]server.SettingSource)

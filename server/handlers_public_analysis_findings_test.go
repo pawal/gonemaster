@@ -178,3 +178,39 @@ func TestPublicAnalysisFindingsFailWithoutReadStore(t *testing.T) {
 		}
 	}
 }
+
+func TestPublicAnalysisFindingListsLoadAllEntriesForRun(t *testing.T) {
+	f := newAnalysisAPITestFixture(t)
+	ts := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+	entries := make([]engine.LogEntry, 0, 10050)
+	for i := 0; i < 10050; i++ {
+		entries = append(entries, engine.LogEntry{
+			Module: "DNSSEC", Testcase: "bulk01", Tag: "BULK_TAG", Level: "ERROR",
+		})
+	}
+	f.seedGraduatedRun("alpha.example", ts, entries)
+
+	tagsResp := getPublic(t, f.srv, "/pub/api/v1/analysis/tags")
+	if tagsResp.Code != http.StatusOK {
+		t.Fatalf("expected 200 tags, got %d: %s", tagsResp.Code, tagsResp.Body)
+	}
+	var tags PublicAnalysisListResponse[PublicAnalysisTagView]
+	if err := json.NewDecoder(tagsResp.Body).Decode(&tags); err != nil {
+		t.Fatalf("decode tags: %v", err)
+	}
+	if len(tags.Items) != 1 || tags.Items[0].OccurrenceCount != 10050 {
+		t.Fatalf("expected full BULK_TAG count, got %+v", tags)
+	}
+
+	testcasesResp := getPublic(t, f.srv, "/pub/api/v1/analysis/testcases")
+	if testcasesResp.Code != http.StatusOK {
+		t.Fatalf("expected 200 testcases, got %d: %s", testcasesResp.Code, testcasesResp.Body)
+	}
+	var testcases PublicAnalysisListResponse[PublicAnalysisTestcaseView]
+	if err := json.NewDecoder(testcasesResp.Body).Decode(&testcases); err != nil {
+		t.Fatalf("decode testcases: %v", err)
+	}
+	if len(testcases.Items) != 1 || testcases.Items[0].EntryCount != 10050 {
+		t.Fatalf("expected full testcase count, got %+v", testcases)
+	}
+}

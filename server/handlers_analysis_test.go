@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -349,5 +350,45 @@ func TestAnalysisCohortRebuildNotFound(t *testing.T) {
 	srv.Handler().ServeHTTP(resp, req)
 	if resp.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d: %s", resp.Code, resp.Body)
+	}
+}
+
+func TestCreateAnalysisCohortRollsBackWhenRebuildFails(t *testing.T) {
+	srv, spy := newAnalysisAdminTestServer(t)
+	spy.rebuildErr = errors.New("boom")
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/analysis/cohorts",
+		bytes.NewBufferString(`{"source_tag":"tld","analysis_enabled":true}`))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d: %s", resp.Code, resp.Body)
+	}
+	if got := srv.store.ListAnalysisCohorts(); len(got) != 0 {
+		t.Fatalf("expected create rollback to remove cohort, got %+v", got)
+	}
+}
+
+func TestPatchAnalysisCohortRollsBackWhenReconcileFails(t *testing.T) {
+	srv, spy := newAnalysisAdminTestServer(t)
+	cohort := createAnalysisCohort(t, srv, `{"source_tag":"tld","label":"Before","analysis_enabled":true}`)
+	spy.reconcileErr = errors.New("boom")
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPatch,
+		fmt.Sprintf("/api/v1/analysis/cohorts/%d", cohort.ID),
+		bytes.NewBufferString(`{"label":"After","public_enabled":true}`))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d: %s", resp.Code, resp.Body)
+	}
+	reloaded, ok := srv.store.GetAnalysisCohort(cohort.ID)
+	if !ok {
+		t.Fatalf("expected cohort to remain after rollback")
+	}
+	if reloaded.Label != "Before" || reloaded.PublicEnabled {
+		t.Fatalf("expected cohort rollback to restore original row, got %+v", reloaded)
 	}
 }

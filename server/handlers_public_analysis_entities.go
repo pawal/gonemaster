@@ -9,13 +9,13 @@ import (
 
 // PublicAnalysisNameserverView aggregates one nameserver's footprint in the cohort.
 type PublicAnalysisNameserverView struct {
-	Nameserver      string `json:"nameserver"`
-	DomainCount     int    `json:"domain_count"`
-	EndpointCount   int    `json:"endpoint_count"`
-	IPv4Count       int    `json:"ipv4_count"`
-	IPv6Count       int    `json:"ipv6_count"`
-	ASNCount        int    `json:"asn_count"`
-	QueryCount      int    `json:"query_count,omitempty"`
+	Nameserver    string `json:"nameserver"`
+	DomainCount   int    `json:"domain_count"`
+	EndpointCount int    `json:"endpoint_count"`
+	IPv4Count     int    `json:"ipv4_count"`
+	IPv6Count     int    `json:"ipv6_count"`
+	ASNCount      int    `json:"asn_count"`
+	QueryCount    int    `json:"query_count,omitempty"`
 }
 
 // PublicAnalysisEndpointView is one (nameserver, address) pair in the cohort.
@@ -64,8 +64,9 @@ func (s *Server) handlePublicAnalysisNameservers(w http.ResponseWriter, r *http.
 		return
 	}
 
-	endpoints := readStore.ListAnalysisRunNSEndpointsByCohort(cohort.ID)
-	addressASNs := readStore.ListAnalysisRunAddressASNsByCohort(cohort.ID)
+	data := latestMaterializationForCohort(readStore, s.store, cohort.ID)
+	endpoints := data.endpoints
+	addressASNs := data.addressASNs
 
 	addressASN := map[int64]int64{} // address_id → asn
 	for _, fact := range addressASNs {
@@ -75,13 +76,13 @@ func (s *Server) handlePublicAnalysisNameservers(w http.ResponseWriter, r *http.
 	}
 
 	type nsAgg struct {
-		name        string
-		domains     map[int64]struct{}
-		addresses   map[int64]struct{}
-		ipv4        map[int64]struct{}
-		ipv6        map[int64]struct{}
-		asns        map[int64]struct{}
-		queryCount  int
+		name       string
+		domains    map[int64]struct{}
+		addresses  map[int64]struct{}
+		ipv4       map[int64]struct{}
+		ipv6       map[int64]struct{}
+		asns       map[int64]struct{}
+		queryCount int
 	}
 	buckets := map[int64]*nsAgg{}
 	for _, ep := range endpoints {
@@ -192,19 +193,9 @@ func (s *Server) handlePublicAnalysisEndpoints(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	endpoints := readStore.ListAnalysisRunNSEndpointsByCohort(cohort.ID)
-	addressASNs := readStore.ListAnalysisRunAddressASNsByCohort(cohort.ID)
-
-	addressASN := map[int64]int64{}
-	addressPrefix := map[int64]int64{}
-	for _, fact := range addressASNs {
-		if fact.ASN != nil {
-			addressASN[fact.AddressID] = *fact.ASN
-		}
-		if fact.PrefixID != nil {
-			addressPrefix[fact.AddressID] = *fact.PrefixID
-		}
-	}
+	data := latestMaterializationForCohort(readStore, s.store, cohort.ID)
+	endpoints := data.endpoints
+	addressASNs := data.addressASNs
 
 	type endpointKey struct {
 		nameserverID int64
@@ -245,12 +236,33 @@ func (s *Server) handlePublicAnalysisEndpoints(w http.ResponseWriter, r *http.Re
 			Family:      b.family,
 			DomainCount: len(b.domains),
 		}
-		if asn, has := addressASN[key.addressID]; has {
-			v.ASN = &asn
+		asnSet := map[int64]struct{}{}
+		prefixSet := map[string]struct{}{}
+		for _, fact := range addressASNs {
+			if fact.AddressID != key.addressID {
+				continue
+			}
+			if _, ok := b.domains[fact.DomainID]; !ok {
+				continue
+			}
+			if fact.ASN != nil {
+				asnSet[*fact.ASN] = struct{}{}
+			}
+			if fact.PrefixID != nil {
+				if prefix, ok := readStore.GetAnalysisPrefix(*fact.PrefixID); ok {
+					prefixSet[prefix.Prefix] = struct{}{}
+				}
+			}
 		}
-		if prefixID, has := addressPrefix[key.addressID]; has {
-			if prefix, ok := readStore.GetAnalysisPrefix(prefixID); ok {
-				v.Prefix = prefix.Prefix
+		if len(asnSet) == 1 {
+			for asn := range asnSet {
+				asnCopy := asn
+				v.ASN = &asnCopy
+			}
+		}
+		if len(prefixSet) == 1 {
+			for prefix := range prefixSet {
+				v.Prefix = prefix
 			}
 		}
 		items = append(items, v)
@@ -298,8 +310,9 @@ func (s *Server) handlePublicAnalysisASNs(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	endpoints := readStore.ListAnalysisRunNSEndpointsByCohort(cohort.ID)
-	addressASNs := readStore.ListAnalysisRunAddressASNsByCohort(cohort.ID)
+	data := latestMaterializationForCohort(readStore, s.store, cohort.ID)
+	endpoints := data.endpoints
+	addressASNs := data.addressASNs
 
 	addressInfo := map[int64]AnalysisAddress{}
 	for _, fact := range addressASNs {
@@ -439,7 +452,7 @@ func (s *Server) handlePublicAnalysisPrefixes(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	addressASNs := readStore.ListAnalysisRunAddressASNsByCohort(cohort.ID)
+	addressASNs := latestMaterializationForCohort(readStore, s.store, cohort.ID).addressASNs
 
 	type prefixAgg struct {
 		prefix    string
@@ -517,4 +530,3 @@ func (s *Server) handlePublicAnalysisPrefixes(w http.ResponseWriter, r *http.Req
 		Offset: filter.Offset,
 	})
 }
-

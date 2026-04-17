@@ -200,6 +200,9 @@ func (s *spyJobStore) GetAnalysisCohortBySource(sourceType, sourceTag string) (A
 func (s *spyJobStore) UpsertAnalysisCohort(cohort AnalysisCohort) (AnalysisCohort, error) {
 	return s.inner.UpsertAnalysisCohort(cohort)
 }
+func (s *spyJobStore) DeleteAnalysisCohort(id int64) error {
+	return s.inner.DeleteAnalysisCohort(id)
+}
 
 func (s *spyJobStore) Progresses() []int {
 	s.mu.Lock()

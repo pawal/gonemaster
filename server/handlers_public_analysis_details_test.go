@@ -283,3 +283,149 @@ func TestPublicAnalysisDetailsRedactInternalIDs(t *testing.T) {
 		}
 	}
 }
+
+func TestPublicAnalysisCohortAndDetailsUseLatestRunFacts(t *testing.T) {
+	f := newAnalysisAPITestFixture(t)
+	t1 := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+	t2 := t1.Add(time.Hour)
+
+	f.seedGraduatedRun("alpha.example", t1, []engine.LogEntry{
+		{Module: "DNSSEC", Testcase: "dnssec07", Tag: "OLD_TAG", Level: "ERROR"},
+	})
+	f.seedEndpoint("run-alpha.example-"+t1.Format("20060102150405"),
+		"alpha.example", "ns-old.example", "192.0.2.10", "ipv4", t1, 64500, "192.0.2.0/24")
+
+	f.seedGraduatedRun("alpha.example", t2, []engine.LogEntry{
+		{Module: "DNSSEC", Testcase: "dnssec07", Tag: "NEW_TAG", Level: "NOTICE"},
+	})
+	f.seedEndpoint("run-alpha.example-"+t2.Format("20060102150405"),
+		"alpha.example", "ns-new.example", "198.51.100.20", "ipv4", t2, 64501, "198.51.100.0/24")
+
+	cohortResp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/tld")
+	var cohort PublicAnalysisCohortDetail
+	if err := json.NewDecoder(cohortResp.Body).Decode(&cohort); err != nil {
+		t.Fatalf("decode cohort detail: %v", err)
+	}
+	if cohort.NameserverCount != 1 || cohort.EndpointCount != 1 || cohort.ASNCount != 1 || cohort.PrefixCount != 1 {
+		t.Fatalf("expected latest-only cohort counts, got %+v", cohort)
+	}
+
+	domainResp := getPublic(t, f.srv, "/pub/api/v1/analysis/domains/alpha.example")
+	var detail PublicAnalysisDomainDetail
+	if err := json.NewDecoder(domainResp.Body).Decode(&detail); err != nil {
+		t.Fatalf("decode domain detail: %v", err)
+	}
+	if len(detail.Nameservers) != 1 || detail.Nameservers[0].Nameserver != "ns-new.example" {
+		t.Fatalf("expected only latest nameserver, got %+v", detail.Nameservers)
+	}
+	if len(detail.Addresses) != 1 || detail.Addresses[0].Address != "198.51.100.20" {
+		t.Fatalf("expected only latest address, got %+v", detail.Addresses)
+	}
+	for _, tag := range detail.Tags {
+		if tag.Tag == "OLD_TAG" {
+			t.Fatalf("expected domain detail to exclude old run tags, got %+v", detail.Tags)
+		}
+	}
+
+	oldNS := getPublic(t, f.srv, "/pub/api/v1/analysis/nameservers/ns-old.example")
+	if oldNS.Code != http.StatusNotFound {
+		t.Fatalf("expected old nameserver to be absent, got %d: %s", oldNS.Code, oldNS.Body)
+	}
+
+	oldASN := getPublic(t, f.srv, "/pub/api/v1/analysis/asns/64500")
+	if oldASN.Code != http.StatusNotFound {
+		t.Fatalf("expected old ASN to be absent, got %d: %s", oldASN.Code, oldASN.Body)
+	}
+
+	oldPrefix := getPublic(t, f.srv, "/pub/api/v1/analysis/prefix?prefix=192.0.2.0/24")
+	if oldPrefix.Code != http.StatusNotFound {
+		t.Fatalf("expected old prefix to be absent, got %d: %s", oldPrefix.Code, oldPrefix.Body)
+	}
+}
+
+func TestPublicAnalysisEndpointDetailRequiresNameserverWhenAddressIsShared(t *testing.T) {
+	f := newAnalysisAPITestFixture(t)
+	ts := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+
+	f.seedGraduatedRun("alpha.example", ts, []engine.LogEntry{{Module: "BASIC", Testcase: "basic01", Tag: "A", Level: "NOTICE"}})
+	f.seedEndpoint("run-alpha.example-"+ts.Format("20060102150405"),
+		"alpha.example", "ns1.shared.example", "192.0.2.10", "ipv4", ts, 64500, "192.0.2.0/24")
+	f.seedGraduatedRun("beta.example", ts, []engine.LogEntry{{Module: "BASIC", Testcase: "basic01", Tag: "B", Level: "NOTICE"}})
+	f.seedEndpoint("run-beta.example-"+ts.Format("20060102150405"),
+		"beta.example", "ns2.shared.example", "192.0.2.10", "ipv4", ts, 64500, "192.0.2.0/24")
+
+	ambiguous := getPublic(t, f.srv, "/pub/api/v1/analysis/endpoints/192.0.2.10")
+	if ambiguous.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for ambiguous endpoint, got %d: %s", ambiguous.Code, ambiguous.Body)
+	}
+
+	selected := getPublic(t, f.srv, "/pub/api/v1/analysis/endpoints/192.0.2.10?nameserver=ns2.shared.example")
+	if selected.Code != http.StatusOK {
+		t.Fatalf("expected 200 for disambiguated endpoint, got %d: %s", selected.Code, selected.Body)
+	}
+	var detail PublicAnalysisEndpointDetail
+	if err := json.NewDecoder(selected.Body).Decode(&detail); err != nil {
+		t.Fatalf("decode endpoint detail: %v", err)
+	}
+	if detail.Nameserver != "ns2.shared.example" || detail.DomainCount != 1 || len(detail.Domains) != 1 || detail.Domains[0] != "beta.example" {
+		t.Fatalf("unexpected endpoint detail: %+v", detail)
+	}
+}
+
+func TestPublicAnalysisDetailHandlersLoadAllEntriesForRun(t *testing.T) {
+	f := newAnalysisAPITestFixture(t)
+	ts := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+	entries := make([]engine.LogEntry, 0, 10050)
+	for i := 0; i < 10049; i++ {
+		entries = append(entries, engine.LogEntry{
+			Module: "DNSSEC", Testcase: "bulk01", Tag: "BULK_TAG", Level: "NOTICE",
+		})
+	}
+	entries = append(entries, engine.LogEntry{
+		Module: "DNSSEC", Testcase: "bulk01", Tag: "LATE_TAG", Level: "ERROR",
+	})
+	f.seedGraduatedRun("alpha.example", ts, entries)
+
+	domainResp := getPublic(t, f.srv, "/pub/api/v1/analysis/domains/alpha.example")
+	if domainResp.Code != http.StatusOK {
+		t.Fatalf("expected 200 domain detail, got %d: %s", domainResp.Code, domainResp.Body)
+	}
+	var domainDetail PublicAnalysisDomainDetail
+	if err := json.NewDecoder(domainResp.Body).Decode(&domainDetail); err != nil {
+		t.Fatalf("decode domain detail: %v", err)
+	}
+	foundLateTag := false
+	for _, tag := range domainDetail.Tags {
+		if tag.Tag == "LATE_TAG" {
+			foundLateTag = true
+			break
+		}
+	}
+	if !foundLateTag {
+		t.Fatalf("expected domain detail to include tag after 10k entries, got %+v", domainDetail.Tags)
+	}
+
+	tagResp := getPublic(t, f.srv, "/pub/api/v1/analysis/tags/LATE_TAG")
+	if tagResp.Code != http.StatusOK {
+		t.Fatalf("expected 200 tag detail, got %d: %s", tagResp.Code, tagResp.Body)
+	}
+	var tagDetail PublicAnalysisTagDetail
+	if err := json.NewDecoder(tagResp.Body).Decode(&tagDetail); err != nil {
+		t.Fatalf("decode tag detail: %v", err)
+	}
+	if tagDetail.OccurrenceCount != 1 {
+		t.Fatalf("expected one LATE_TAG occurrence, got %+v", tagDetail)
+	}
+
+	testcaseResp := getPublic(t, f.srv, "/pub/api/v1/analysis/testcase?module=DNSSEC&testcase=bulk01")
+	if testcaseResp.Code != http.StatusOK {
+		t.Fatalf("expected 200 testcase detail, got %d: %s", testcaseResp.Code, testcaseResp.Body)
+	}
+	var testcaseDetail PublicAnalysisTestcaseDetail
+	if err := json.NewDecoder(testcaseResp.Body).Decode(&testcaseDetail); err != nil {
+		t.Fatalf("decode testcase detail: %v", err)
+	}
+	if testcaseDetail.EntryCount != 10050 {
+		t.Fatalf("expected 10050 testcase entries, got %+v", testcaseDetail)
+	}
+}

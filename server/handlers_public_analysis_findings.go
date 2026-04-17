@@ -17,12 +17,12 @@ type PublicAnalysisTagView struct {
 
 // PublicAnalysisTestcaseView aggregates one (module, testcase) pair's footprint.
 type PublicAnalysisTestcaseView struct {
-	Module       string `json:"module"`
-	Testcase     string `json:"testcase"`
-	DomainCount  int    `json:"domain_count"`
-	EntryCount   int    `json:"entry_count"`
-	WorstLevel   string `json:"worst_level,omitempty"`
-	UniqueTags   int    `json:"unique_tags"`
+	Module      string `json:"module"`
+	Testcase    string `json:"testcase"`
+	DomainCount int    `json:"domain_count"`
+	EntryCount  int    `json:"entry_count"`
+	WorstLevel  string `json:"worst_level,omitempty"`
+	UniqueTags  int    `json:"unique_tags"`
 }
 
 // handlePublicAnalysisTags handles GET /pub/api/v1/analysis/tags. It aggregates
@@ -41,8 +41,7 @@ func (s *Server) handlePublicAnalysisTags(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	summaries := readStore.ListAnalysisRunDomainSummariesByCohort(cohort.ID)
-	latest := latestSummariesByDomain(summaries, s.store)
+	latest := latestMaterializationForCohort(readStore, s.store, cohort.ID).latest
 
 	type tagAgg struct {
 		module      string
@@ -52,11 +51,7 @@ func (s *Server) handlePublicAnalysisTags(w http.ResponseWriter, r *http.Request
 	}
 	buckets := map[string]*tagAgg{}
 	for _, pair := range latest {
-		entries := s.store.QueryEntries(EntryFilter{
-			RunID: pair.summary.RunID,
-			Limit: 10000,
-		})
-		for _, entry := range entries.Items {
+		for _, entry := range s.loadAllEntriesForRun(pair.summary.RunID) {
 			tag := strings.TrimSpace(entry.Tag)
 			if tag == "" {
 				continue
@@ -144,8 +139,7 @@ func (s *Server) handlePublicAnalysisTestcases(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	summaries := readStore.ListAnalysisRunDomainSummariesByCohort(cohort.ID)
-	latest := latestSummariesByDomain(summaries, s.store)
+	latest := latestMaterializationForCohort(readStore, s.store, cohort.ID).latest
 
 	type testcaseKey struct {
 		module   string
@@ -159,11 +153,7 @@ func (s *Server) handlePublicAnalysisTestcases(w http.ResponseWriter, r *http.Re
 	}
 	buckets := map[testcaseKey]*testcaseAgg{}
 	for _, pair := range latest {
-		entries := s.store.QueryEntries(EntryFilter{
-			RunID: pair.summary.RunID,
-			Limit: 10000,
-		})
-		for _, entry := range entries.Items {
+		for _, entry := range s.loadAllEntriesForRun(pair.summary.RunID) {
 			if strings.TrimSpace(entry.Testcase) == "" {
 				continue
 			}

@@ -62,6 +62,7 @@ func (s *Server) handleCreateAnalysisCohort(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusConflict, "cohort_exists", "analysis cohort already exists for that source", nil)
 		return
 	}
+	beforeCatalog := s.store.ListAnalysisCohorts()
 	created, err := s.store.UpsertAnalysisCohort(AnalysisCohort{
 		SourceType:      req.SourceType,
 		SourceTag:       req.SourceTag,
@@ -78,13 +79,13 @@ func (s *Server) handleCreateAnalysisCohort(w http.ResponseWriter, r *http.Reque
 	}
 	if created.IsDefault {
 		if err := s.enforceSingleDefaultCohort(created.ID); err != nil {
-			writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
+			s.writeAnalysisCatalogRollbackError(w, beforeCatalog, err)
 			return
 		}
 	}
 	if s.analysis != nil && created.AnalysisEnabled {
 		if err := s.analysis.RebuildCohort(r.Context(), created.ID); err != nil {
-			writeError(w, http.StatusInternalServerError, "rebuild_failed", err.Error(), nil)
+			s.writeAnalysisCatalogRollbackError(w, beforeCatalog, err)
 			return
 		}
 	}
@@ -160,6 +161,7 @@ func (s *Server) handlePatchAnalysisCohort(w http.ResponseWriter, r *http.Reques
 		writeError(w, http.StatusBadRequest, "invalid_catalog", "is_default=true requires analysis_enabled and public_enabled", nil)
 		return
 	}
+	beforeCatalog := s.store.ListAnalysisCohorts()
 	updated, err := s.store.UpsertAnalysisCohort(desired)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
@@ -167,13 +169,13 @@ func (s *Server) handlePatchAnalysisCohort(w http.ResponseWriter, r *http.Reques
 	}
 	if updated.IsDefault {
 		if err := s.enforceSingleDefaultCohort(updated.ID); err != nil {
-			writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
+			s.writeAnalysisCatalogRollbackError(w, beforeCatalog, err)
 			return
 		}
 	}
 	if s.analysis != nil {
 		if err := s.analysis.ReconcileCohortChange(r.Context(), before, updated); err != nil {
-			writeError(w, http.StatusInternalServerError, "reconcile_failed", err.Error(), nil)
+			s.writeAnalysisCatalogRollbackError(w, beforeCatalog, err)
 			return
 		}
 	}
@@ -249,6 +251,34 @@ func (s *Server) enforceSingleDefaultCohort(keepID int64) error {
 		}
 	}
 	return nil
+}
+
+func (s *Server) restoreAnalysisCohortCatalog(snapshot []AnalysisCohort) error {
+	keep := make(map[int64]struct{}, len(snapshot))
+	for _, cohort := range snapshot {
+		keep[cohort.ID] = struct{}{}
+		if _, err := s.store.UpsertAnalysisCohort(cohort); err != nil {
+			return err
+		}
+	}
+	for _, cohort := range s.store.ListAnalysisCohorts() {
+		if _, ok := keep[cohort.ID]; ok {
+			continue
+		}
+		if err := s.store.DeleteAnalysisCohort(cohort.ID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Server) writeAnalysisCatalogRollbackError(w http.ResponseWriter, before []AnalysisCohort, cause error) {
+	if rollbackErr := s.restoreAnalysisCohortCatalog(before); rollbackErr != nil {
+		writeError(w, http.StatusInternalServerError, "analysis_rollback_failed",
+			cause.Error()+"; rollback failed: "+rollbackErr.Error(), nil)
+		return
+	}
+	writeError(w, http.StatusInternalServerError, "analysis_change_failed", cause.Error(), nil)
 }
 
 func parseCohortID(w http.ResponseWriter, r *http.Request) (int64, bool) {

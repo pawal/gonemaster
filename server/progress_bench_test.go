@@ -189,6 +189,9 @@ func (s *countingJobStore) GetAnalysisCohortBySource(sourceType, sourceTag strin
 func (s *countingJobStore) UpsertAnalysisCohort(cohort AnalysisCohort) (AnalysisCohort, error) {
 	return s.inner.UpsertAnalysisCohort(cohort)
 }
+func (s *countingJobStore) DeleteAnalysisCohort(id int64) error {
+	return s.inner.DeleteAnalysisCohort(id)
+}
 
 func (s *countingJobStore) UpdateCount() int64 {
 	return s.updateCount.Load()

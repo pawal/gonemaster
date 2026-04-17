@@ -24,6 +24,15 @@ func (f *analysisAPITestFixture) seedEndpoint(runID, domainName, nameserverName,
 			StartedAt: finishedAt.Add(-time.Minute), FinishedAt: finishedAt,
 		})
 	}
+	if _, ok := f.store.GetAnalysisRunDomainSummary(f.cohort.ID, runID, domain.ID); !ok {
+		if err := f.store.UpsertAnalysisRunDomainSummary(AnalysisRunDomainSummary{
+			CohortID: f.cohort.ID,
+			RunID:    runID,
+			DomainID: domain.ID,
+		}); err != nil {
+			f.t.Fatalf("upsert placeholder summary: %v", err)
+		}
+	}
 	ns, err := f.store.UpsertAnalysisNameserver(nameserverName, finishedAt)
 	if err != nil {
 		f.t.Fatalf("upsert nameserver: %v", err)
@@ -85,6 +94,39 @@ func (f *analysisAPITestFixture) seedEndpoint(runID, domainName, nameserverName,
 	}
 	if err := f.store.ReplaceAnalysisRunAddressASNs(f.cohort.ID, runID, existingASNs); err != nil {
 		f.t.Fatalf("replace address asns: %v", err)
+	}
+}
+
+func TestPublicAnalysisEntitiesUseLatestRunPerDomain(t *testing.T) {
+	f := newAnalysisAPITestFixture(t)
+	t1 := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+	t2 := t1.Add(time.Hour)
+
+	f.seedEndpoint("run-old", "alpha.example", "ns-old.example", "192.0.2.10", "ipv4", t1, 64500, "192.0.2.0/24")
+	f.seedEndpoint("run-new", "alpha.example", "ns-new.example", "198.51.100.20", "ipv4", t2, 64501, "198.51.100.0/24")
+
+	nameservers := decodeJSON[PublicAnalysisListResponse[PublicAnalysisNameserverView]](
+		t, getPublic(t, f.srv, "/pub/api/v1/analysis/nameservers"))
+	if nameservers.Total != 1 || nameservers.Items[0].Nameserver != "ns-new.example" {
+		t.Fatalf("expected only latest nameserver, got %+v", nameservers)
+	}
+
+	endpoints := decodeJSON[PublicAnalysisListResponse[PublicAnalysisEndpointView]](
+		t, getPublic(t, f.srv, "/pub/api/v1/analysis/endpoints"))
+	if endpoints.Total != 1 || endpoints.Items[0].Address != "198.51.100.20" {
+		t.Fatalf("expected only latest endpoint, got %+v", endpoints)
+	}
+
+	asns := decodeJSON[PublicAnalysisListResponse[PublicAnalysisASNView]](
+		t, getPublic(t, f.srv, "/pub/api/v1/analysis/asns"))
+	if asns.Total != 1 || asns.Items[0].ASN != 64501 {
+		t.Fatalf("expected only latest ASN, got %+v", asns)
+	}
+
+	prefixes := decodeJSON[PublicAnalysisListResponse[PublicAnalysisPrefixView]](
+		t, getPublic(t, f.srv, "/pub/api/v1/analysis/prefixes"))
+	if prefixes.Total != 1 || prefixes.Items[0].Prefix != "198.51.100.0/24" {
+		t.Fatalf("expected only latest prefix, got %+v", prefixes)
 	}
 }
 

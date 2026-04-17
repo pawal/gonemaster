@@ -114,7 +114,7 @@ type PublicAnalysisTagDetail struct {
 	Testcase        string   `json:"testcase,omitempty"`
 	Level           string   `json:"level,omitempty"`
 	DomainCount     int      `json:"domain_count"`
-	OccurrenceCount int     `json:"occurrence_count"`
+	OccurrenceCount int      `json:"occurrence_count"`
 	Domains         []string `json:"domains"`
 }
 
@@ -154,24 +154,21 @@ func (s *Server) handlePublicAnalysisCohortDetail(w http.ResponseWriter, r *http
 		detail.LastMaterializedAt = &t
 	}
 	if readStore, canRead := s.store.(AnalysisReadStore); canRead {
-		summaries := readStore.ListAnalysisRunDomainSummariesByCohort(cohort.ID)
-		latest := latestSummariesByDomain(summaries, s.store)
-		endpoints := readStore.ListAnalysisRunNSEndpointsByCohort(cohort.ID)
-		addressASNs := readStore.ListAnalysisRunAddressASNsByCohort(cohort.ID)
+		data := latestMaterializationForCohort(readStore, s.store, cohort.ID)
 
 		domainSet := map[int64]struct{}{}
 		nsSet := map[int64]struct{}{}
-		addrSet := map[int64]struct{}{}
+		endpointSet := map[[2]int64]struct{}{}
 		asnSet := map[int64]struct{}{}
 		prefixSet := map[int64]struct{}{}
-		for _, pair := range latest {
+		for _, pair := range data.latest {
 			domainSet[pair.summary.DomainID] = struct{}{}
 		}
-		for _, ep := range endpoints {
+		for _, ep := range data.endpoints {
 			nsSet[ep.NameserverID] = struct{}{}
-			addrSet[ep.AddressID] = struct{}{}
+			endpointSet[[2]int64{ep.NameserverID, ep.AddressID}] = struct{}{}
 		}
-		for _, fact := range addressASNs {
+		for _, fact := range data.addressASNs {
 			if fact.ASN != nil {
 				asnSet[*fact.ASN] = struct{}{}
 			}
@@ -181,7 +178,7 @@ func (s *Server) handlePublicAnalysisCohortDetail(w http.ResponseWriter, r *http
 		}
 		detail.DomainCount = len(domainSet)
 		detail.NameserverCount = len(nsSet)
-		detail.EndpointCount = len(addrSet)
+		detail.EndpointCount = len(endpointSet)
 		detail.ASNCount = len(asnSet)
 		detail.PrefixCount = len(prefixSet)
 	}
@@ -210,11 +207,10 @@ func (s *Server) handlePublicAnalysisDomainDetail(w http.ResponseWriter, r *http
 		return
 	}
 
-	summaries := readStore.ListAnalysisRunDomainSummariesByCohort(cohort.ID)
-	latest := latestSummariesByDomain(summaries, s.store)
+	data := latestMaterializationForCohort(readStore, s.store, cohort.ID)
 	var pair domainSummaryPair
 	haveSummary := false
-	for _, p := range latest {
+	for _, p := range data.latest {
 		if p.summary.DomainID == domain.ID {
 			pair = p
 			haveSummary = true
@@ -226,9 +222,6 @@ func (s *Server) handlePublicAnalysisDomainDetail(w http.ResponseWriter, r *http
 		return
 	}
 
-	endpoints := readStore.ListAnalysisRunNSEndpointsByCohort(cohort.ID)
-	addressASNs := readStore.ListAnalysisRunAddressASNsByCohort(cohort.ID)
-
 	type nsEntry struct {
 		name string
 		v4   map[int64]struct{}
@@ -236,8 +229,8 @@ func (s *Server) handlePublicAnalysisDomainDetail(w http.ResponseWriter, r *http
 	}
 	nsByID := map[int64]*nsEntry{}
 	addrIDs := map[int64]struct{}{}
-	for _, ep := range endpoints {
-		if ep.DomainID != domain.ID {
+	for _, ep := range data.endpoints {
+		if ep.RunID != pair.summary.RunID || ep.DomainID != domain.ID {
 			continue
 		}
 		addrIDs[ep.AddressID] = struct{}{}
@@ -274,8 +267,8 @@ func (s *Server) handlePublicAnalysisDomainDetail(w http.ResponseWriter, r *http
 			continue
 		}
 		view := PublicAnalysisDomainAddress{Address: addr.Address, Family: addr.Family}
-		for _, fact := range addressASNs {
-			if fact.DomainID != domain.ID || fact.AddressID != addrID {
+		for _, fact := range data.addressASNs {
+			if fact.RunID != pair.summary.RunID || fact.DomainID != domain.ID || fact.AddressID != addrID {
 				continue
 			}
 			if fact.ASN != nil {
@@ -293,9 +286,8 @@ func (s *Server) handlePublicAnalysisDomainDetail(w http.ResponseWriter, r *http
 	}
 	sort.Slice(addresses, func(i, j int) bool { return addresses[i].Address < addresses[j].Address })
 
-	entries := s.store.QueryEntries(EntryFilter{RunID: pair.summary.RunID, Limit: 10000})
 	tagsByKey := map[string]PublicAnalysisDomainTag{}
-	for _, entry := range entries.Items {
+	for _, entry := range s.loadAllEntriesForRun(pair.summary.RunID) {
 		if strings.TrimSpace(entry.Tag) == "" {
 			continue
 		}
@@ -362,11 +354,10 @@ func (s *Server) handlePublicAnalysisNameserverDetail(w http.ResponseWriter, r *
 		return
 	}
 
-	endpoints := readStore.ListAnalysisRunNSEndpointsByCohort(cohort.ID)
-	addressASNs := readStore.ListAnalysisRunAddressASNsByCohort(cohort.ID)
+	data := latestMaterializationForCohort(readStore, s.store, cohort.ID)
 
 	addressASN := map[int64]int64{}
-	for _, fact := range addressASNs {
+	for _, fact := range data.addressASNs {
 		if fact.ASN != nil {
 			addressASN[fact.AddressID] = *fact.ASN
 		}
@@ -380,7 +371,7 @@ func (s *Server) handlePublicAnalysisNameserverDetail(w http.ResponseWriter, r *
 	v4Set := map[int64]struct{}{}
 	v6Set := map[int64]struct{}{}
 	asnSet := map[int64]struct{}{}
-	for _, ep := range endpoints {
+	for _, ep := range data.endpoints {
 		ns, found := readStore.GetAnalysisNameserver(ep.NameserverID)
 		if !found || strings.ToLower(ns.Name) != target {
 			continue
@@ -458,17 +449,25 @@ func (s *Server) handlePublicAnalysisEndpointDetail(w http.ResponseWriter, r *ht
 		return
 	}
 
-	endpoints := readStore.ListAnalysisRunNSEndpointsByCohort(cohort.ID)
-	addressASNs := readStore.ListAnalysisRunAddressASNsByCohort(cohort.ID)
+	data := latestMaterializationForCohort(readStore, s.store, cohort.ID)
 
 	target := strings.ToLower(rawAddr)
+	selectedNameserver := strings.TrimSpace(r.URL.Query().Get("nameserver"))
+	selectedNameserverLower := strings.ToLower(selectedNameserver)
 	var addr AnalysisAddress
 	found := false
 	domainSet := map[int64]struct{}{}
 	nameservers := map[int64]struct{}{}
-	for _, ep := range endpoints {
+	for _, ep := range data.endpoints {
 		a, ok := readStore.GetAnalysisAddress(ep.AddressID)
 		if !ok || strings.ToLower(a.Address) != target {
+			continue
+		}
+		ns, ok := readStore.GetAnalysisNameserver(ep.NameserverID)
+		if !ok {
+			continue
+		}
+		if selectedNameserverLower != "" && strings.ToLower(ns.Name) != selectedNameserverLower {
 			continue
 		}
 		addr = a
@@ -480,23 +479,41 @@ func (s *Server) handlePublicAnalysisEndpointDetail(w http.ResponseWriter, r *ht
 		writeError(w, http.StatusNotFound, "not_found", "endpoint not found in cohort", nil)
 		return
 	}
+	if selectedNameserverLower == "" && len(nameservers) > 1 {
+		writeError(w, http.StatusBadRequest, "ambiguous_endpoint", "multiple nameservers use that address; provide nameserver query parameter", nil)
+		return
+	}
 
-	var asn *int64
-	var prefix string
-	for _, fact := range addressASNs {
+	asnSet := map[int64]struct{}{}
+	prefixSet := map[string]struct{}{}
+	for _, fact := range data.addressASNs {
 		if fact.AddressID != addr.ID {
 			continue
 		}
+		if _, ok := domainSet[fact.DomainID]; !ok {
+			continue
+		}
 		if fact.ASN != nil {
-			asnCopy := *fact.ASN
-			asn = &asnCopy
+			asnSet[*fact.ASN] = struct{}{}
 		}
 		if fact.PrefixID != nil {
 			if p, ok := readStore.GetAnalysisPrefix(*fact.PrefixID); ok {
-				prefix = p.Prefix
+				prefixSet[p.Prefix] = struct{}{}
 			}
 		}
-		break
+	}
+	var asn *int64
+	if len(asnSet) == 1 {
+		for value := range asnSet {
+			asnCopy := value
+			asn = &asnCopy
+		}
+	}
+	prefix := ""
+	if len(prefixSet) == 1 {
+		for value := range prefixSet {
+			prefix = value
+		}
 	}
 
 	domains := make([]string, 0, len(domainSet))
@@ -549,13 +566,12 @@ func (s *Server) handlePublicAnalysisASNDetail(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	endpoints := readStore.ListAnalysisRunNSEndpointsByCohort(cohort.ID)
-	addressASNs := readStore.ListAnalysisRunAddressASNsByCohort(cohort.ID)
+	data := latestMaterializationForCohort(readStore, s.store, cohort.ID)
 
 	domainSet := map[int64]struct{}{}
 	addrSet := map[int64]struct{}{}
 	prefixSet := map[int64]struct{}{}
-	for _, fact := range addressASNs {
+	for _, fact := range data.addressASNs {
 		if fact.ASN == nil || *fact.ASN != asn {
 			continue
 		}
@@ -571,7 +587,7 @@ func (s *Server) handlePublicAnalysisASNDetail(w http.ResponseWriter, r *http.Re
 	}
 
 	nsSet := map[int64]struct{}{}
-	for _, ep := range endpoints {
+	for _, ep := range data.endpoints {
 		if _, addrIn := addrSet[ep.AddressID]; addrIn {
 			nsSet[ep.NameserverID] = struct{}{}
 		}
@@ -643,10 +659,10 @@ func (s *Server) handlePublicAnalysisPrefixDetail(w http.ResponseWriter, r *http
 	_ = prefix
 	_ = found
 	// Walk address_asns to find the matching prefix_id by re-resolving via GetAnalysisPrefix.
-	addressASNs := readStore.ListAnalysisRunAddressASNsByCohort(cohort.ID)
 	var prefixID int64
 	var meta AnalysisPrefix
-	for _, fact := range addressASNs {
+	data := latestMaterializationForCohort(readStore, s.store, cohort.ID)
+	for _, fact := range data.addressASNs {
 		if fact.PrefixID == nil {
 			continue
 		}
@@ -664,7 +680,7 @@ func (s *Server) handlePublicAnalysisPrefixDetail(w http.ResponseWriter, r *http
 	domainSet := map[int64]struct{}{}
 	addrSet := map[int64]struct{}{}
 	asnSet := map[int64]struct{}{}
-	for _, fact := range addressASNs {
+	for _, fact := range data.addressASNs {
 		if fact.PrefixID == nil || *fact.PrefixID != prefixID {
 			continue
 		}
@@ -724,8 +740,7 @@ func (s *Server) handlePublicAnalysisTagDetail(w http.ResponseWriter, r *http.Re
 	if !ok {
 		return
 	}
-	summaries := readStore.ListAnalysisRunDomainSummariesByCohort(cohort.ID)
-	latest := latestSummariesByDomain(summaries, s.store)
+	latest := latestMaterializationForCohort(readStore, s.store, cohort.ID).latest
 
 	domainNames := map[int64]string{}
 	for _, pair := range latest {
@@ -738,8 +753,7 @@ func (s *Server) handlePublicAnalysisTagDetail(w http.ResponseWriter, r *http.Re
 	var occurrences int
 	var module, testcase, level string
 	for _, pair := range latest {
-		entries := s.store.QueryEntries(EntryFilter{RunID: pair.summary.RunID, Limit: 10000})
-		for _, entry := range entries.Items {
+		for _, entry := range s.loadAllEntriesForRun(pair.summary.RunID) {
 			if entry.Tag != tag {
 				continue
 			}
@@ -795,16 +809,14 @@ func (s *Server) handlePublicAnalysisTestcaseDetail(w http.ResponseWriter, r *ht
 	if !ok {
 		return
 	}
-	summaries := readStore.ListAnalysisRunDomainSummariesByCohort(cohort.ID)
-	latest := latestSummariesByDomain(summaries, s.store)
+	latest := latestMaterializationForCohort(readStore, s.store, cohort.ID).latest
 
 	domainSet := map[int64]struct{}{}
 	tagSet := map[string]struct{}{}
 	entryCount := 0
 	worstLevel := ""
 	for _, pair := range latest {
-		entries := s.store.QueryEntries(EntryFilter{RunID: pair.summary.RunID, Limit: 10000})
-		for _, entry := range entries.Items {
+		for _, entry := range s.loadAllEntriesForRun(pair.summary.RunID) {
 			if entry.Testcase != testcase {
 				continue
 			}

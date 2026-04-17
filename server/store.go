@@ -165,6 +165,7 @@ type JobStore interface {
 	GetAnalysisCohort(id int64) (AnalysisCohort, bool)
 	GetAnalysisCohortBySource(sourceType, sourceTag string) (AnalysisCohort, bool)
 	UpsertAnalysisCohort(cohort AnalysisCohort) (AnalysisCohort, error)
+	DeleteAnalysisCohort(id int64) error
 
 	// Profile management.
 	CreateProfile(p StoredProfile) (StoredProfile, error)
@@ -236,17 +237,17 @@ func (s *InMemoryJobStore) SetScoringConfig(cfg scoring.Config) {
 // NewInMemoryJobStore creates an empty in-memory job store.
 func NewInMemoryJobStore() *InMemoryJobStore {
 	return &InMemoryJobStore{
-		scoringCfg:   scoring.DefaultConfig(),
-		jobs:         map[string]Job{},
-		publicIDs:    map[string]string{},
-		runs:         map[string]Run{},
-		runPublicIDs: map[string]string{},
-		entries:      map[string][]Entry{},
-		domains:      map[string]*Domain{},
-		domainsByID:  map[int64]*Domain{},
-		tags:         map[string]Tag{},
-		domainTags:   map[int64][]string{},
-		tagDomains:   map[string][]int64{},
+		scoringCfg:      scoring.DefaultConfig(),
+		jobs:            map[string]Job{},
+		publicIDs:       map[string]string{},
+		runs:            map[string]Run{},
+		runPublicIDs:    map[string]string{},
+		entries:         map[string][]Entry{},
+		domains:         map[string]*Domain{},
+		domainsByID:     map[int64]*Domain{},
+		tags:            map[string]Tag{},
+		domainTags:      map[int64][]string{},
+		tagDomains:      map[string][]int64{},
 		batches:         map[string]Batch{},
 		analysisCohorts: map[int64]AnalysisCohort{},
 		profiles:        map[int64]StoredProfile{},
@@ -338,6 +339,14 @@ func (s *InMemoryJobStore) UpsertAnalysisCohort(cohort AnalysisCohort) (Analysis
 	}
 	s.analysisCohorts[cohort.ID] = cohort
 	return cohort, nil
+}
+
+// DeleteAnalysisCohort removes one cohort catalog row.
+func (s *InMemoryJobStore) DeleteAnalysisCohort(id int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.analysisCohorts, id)
+	return nil
 }
 
 // Create inserts a new in-flight job. A PublicID is generated if not set.

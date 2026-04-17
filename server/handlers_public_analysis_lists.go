@@ -180,6 +180,13 @@ type domainSummaryPair struct {
 	finishedAt time.Time
 }
 
+type latestCohortMaterialization struct {
+	latest      []domainSummaryPair
+	latestRuns  map[string]struct{}
+	endpoints   []AnalysisRunNameserverEndpoint
+	addressASNs []AnalysisRunAddressASN
+}
+
 // latestSummariesByDomain collapses multiple materialized summaries per domain
 // into the latest one, using the run's finished_at timestamp as the tiebreaker.
 func latestSummariesByDomain(summaries []AnalysisRunDomainSummary, runLookup interface {
@@ -201,6 +208,76 @@ func latestSummariesByDomain(summaries []AnalysisRunDomainSummary, runLookup int
 		out = append(out, pair)
 	}
 	return out
+}
+
+func latestMaterializationForCohort(readStore AnalysisReadStore, runLookup interface {
+	GetRun(id string) (Run, bool)
+}, cohortID int64) latestCohortMaterialization {
+	latest := latestSummariesByDomain(readStore.ListAnalysisRunDomainSummariesByCohort(cohortID), runLookup)
+	runIDs := make(map[string]struct{}, len(latest))
+	for _, pair := range latest {
+		runIDs[pair.summary.RunID] = struct{}{}
+	}
+	return latestCohortMaterialization{
+		latest:      latest,
+		latestRuns:  runIDs,
+		endpoints:   filterAnalysisRunNSEndpointsByRunIDs(readStore.ListAnalysisRunNSEndpointsByCohort(cohortID), runIDs),
+		addressASNs: filterAnalysisRunAddressASNsByRunIDs(readStore.ListAnalysisRunAddressASNsByCohort(cohortID), runIDs),
+	}
+}
+
+func filterAnalysisRunNSEndpointsByRunIDs(items []AnalysisRunNameserverEndpoint, runIDs map[string]struct{}) []AnalysisRunNameserverEndpoint {
+	if len(runIDs) == 0 {
+		return nil
+	}
+	out := make([]AnalysisRunNameserverEndpoint, 0, len(items))
+	for _, item := range items {
+		if _, ok := runIDs[item.RunID]; !ok {
+			continue
+		}
+		out = append(out, item)
+	}
+	return out
+}
+
+func filterAnalysisRunAddressASNsByRunIDs(items []AnalysisRunAddressASN, runIDs map[string]struct{}) []AnalysisRunAddressASN {
+	if len(runIDs) == 0 {
+		return nil
+	}
+	out := make([]AnalysisRunAddressASN, 0, len(items))
+	for _, item := range items {
+		if _, ok := runIDs[item.RunID]; !ok {
+			continue
+		}
+		out = append(out, item)
+	}
+	return out
+}
+
+const analysisEntryPageSize = 1000
+
+func (s *Server) loadAllEntriesForRun(runID string) []Entry {
+	if strings.TrimSpace(runID) == "" {
+		return nil
+	}
+	offset := 0
+	entries := make([]Entry, 0, analysisEntryPageSize)
+	for {
+		page := s.store.QueryEntries(EntryFilter{
+			RunID:  runID,
+			Limit:  analysisEntryPageSize,
+			Offset: offset,
+		})
+		if len(page.Items) == 0 {
+			break
+		}
+		entries = append(entries, page.Items...)
+		offset += len(page.Items)
+		if offset >= page.Total {
+			break
+		}
+	}
+	return entries
 }
 
 // sortAnalysisDomainViews sorts by the requested order. "domain_asc" is the

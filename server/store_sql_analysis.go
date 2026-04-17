@@ -208,3 +208,19 @@ func (s *SQLJobStore) UpsertAnalysisCohort(cohort AnalysisCohort) (AnalysisCohor
 	}
 	return created, nil
 }
+
+// DeleteAnalysisCohort removes one cohort catalog row and any materialized data
+// attached to it.
+func (s *SQLJobStore) DeleteAnalysisCohort(id int64) error {
+	if err := s.ClearAnalysisCohortMaterialization(id); err != nil {
+		return err
+	}
+	_, err := s.db.Exec(
+		fmt.Sprintf(`DELETE FROM analysis_cohort_catalog WHERE id = %s`, s.ph(1)),
+		id,
+	)
+	if err != nil {
+		return fmt.Errorf("delete analysis cohort: %w", err)
+	}
+	return nil
+}

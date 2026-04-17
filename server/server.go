@@ -218,6 +218,11 @@ func (s *Server) routes() {
 	apiMux.HandleFunc("/profiles/{id}", s.handleProfileByID)
 	apiMux.HandleFunc("/profiles", s.handleProfiles)
 
+	apiMux.HandleFunc("POST /analysis/cohorts/{id}/rebuild", s.handleAnalysisCohortRebuild)
+	apiMux.HandleFunc("POST /analysis/cohorts/{id}/clear", s.handleAnalysisCohortClear)
+	apiMux.HandleFunc("/analysis/cohorts/{id}", s.handleAnalysisCohortByID)
+	apiMux.HandleFunc("/analysis/cohorts", s.handleAnalysisCohorts)
+
 	apiMux.HandleFunc("GET /features", s.handleFeatures)
 	apiMux.HandleFunc("/settings", s.handleSettings)
 	apiMux.HandleFunc("/locales", s.handleLocales)

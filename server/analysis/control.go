@@ -57,7 +57,7 @@ func (c *Controller) ProjectRun(runID string) error {
 	if len(input.MatchingCohorts) == 0 {
 		return nil
 	}
-	if err := c.projector.ProjectRun(runID); err != nil {
+	if err := c.projector.ProjectLoaded(input); err != nil {
 		for _, cohort := range input.MatchingCohorts {
 			_ = c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationFailed, time.Time{}, err.Error())
 		}
@@ -131,7 +131,15 @@ func (c *Controller) RebuildCohort(ctx context.Context, cohortID int64) error {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
-			if err := c.ProjectRun(run.ID); err != nil {
+			input, err := c.projector.LoadCompletedRun(run.ID)
+			if err != nil {
+				_ = c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationFailed, time.Time{}, err.Error())
+				return fmt.Errorf("load run %s for cohort %d: %w", run.ID, cohort.ID, err)
+			}
+			if len(input.MatchingCohorts) == 0 {
+				continue
+			}
+			if err := c.projector.ProjectLoaded(input); err != nil {
 				_ = c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationFailed, time.Time{}, err.Error())
 				return fmt.Errorf("project run %s for cohort %d: %w", run.ID, cohort.ID, err)
 			}

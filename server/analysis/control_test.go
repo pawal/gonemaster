@@ -136,6 +136,17 @@ func TestControllerRebuildCohortClearsStaleRowsAndBackfillsTaggedRuns(t *testing
 	if cohort.LastMaterializedAt.IsZero() {
 		t.Fatal("expected non-zero LastMaterializedAt after rebuild")
 	}
+
+	other, ok := store.GetAnalysisCohort(20)
+	if !ok {
+		t.Fatal("expected overlapping cohort 20 to remain")
+	}
+	if other.MaterializationStatus != serverpkg.AnalysisMaterializationPending {
+		t.Fatalf("rebuild of cohort 10 must not change cohort 20 status, got %q", other.MaterializationStatus)
+	}
+	if !other.LastMaterializedAt.IsZero() {
+		t.Fatalf("rebuild of cohort 10 must not set cohort 20 LastMaterializedAt, got %s", other.LastMaterializedAt)
+	}
 }
 
 func TestControllerRepairAllAndDisableChangeClearMaterializedRows(t *testing.T) {

@@ -105,14 +105,21 @@ type extractedAddressFact struct {
 	source       string
 }
 
-// ProjectRun extracts and persists all currently-implemented analysis facts for
-// one completed run. Re-running the same run is idempotent because the backing
-// store helpers upsert entities and replace per-run/per-cohort fact rows.
+// ProjectRun loads a completed run and projects its facts. Callers that already
+// hold a RunInput should use ProjectLoaded to avoid reloading the run.
 func (p *Projector) ProjectRun(runID string) error {
 	input, err := p.LoadCompletedRun(runID)
 	if err != nil {
 		return err
 	}
+	return p.ProjectLoaded(input)
+}
+
+// ProjectLoaded extracts and persists all currently-implemented analysis facts
+// for one completed run using pre-loaded input. Re-running the same run is
+// idempotent because the backing store helpers upsert entities and replace
+// per-run/per-cohort fact rows.
+func (p *Projector) ProjectLoaded(input RunInput) error {
 	if len(input.MatchingCohorts) == 0 {
 		return nil
 	}

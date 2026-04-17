@@ -1130,13 +1130,30 @@
     return "";
   };
 
+  const normalizeSettingsSubTab = (value) => {
+    const sub = String(value || "").toLowerCase();
+    if (sub === "system" || sub === "profiles" || sub === "scoring" || sub === "analysis") return sub;
+    return "system";
+  };
+
+  const settingsHash = (subTab) => {
+    const sub = normalizeSettingsSubTab(subTab);
+    return sub === "system" ? "#/settings" : `#/settings/${sub}`;
+  };
+
   const setTab = (tab, { replace = false } = {}) => {
     const next = normalizeTab(tab) || "single";
     const changed = activeTab !== next;
     activeTab = next;
-    const nextHash = `#/${next}`;
+    const nextHash = next === "settings" ? settingsHash(settingsSubTab) : `#/${next}`;
     const url = `${window.location.pathname}${window.location.search}${nextHash}`;
-    const state = { tab: next, domain: null, tag: null, jobId: null };
+    const state = {
+      tab: next,
+      settingsSubTab: next === "settings" ? settingsSubTab : null,
+      domain: null,
+      tag: null,
+      jobId: null,
+    };
     if (!changed || replace) {
       if (window.location.hash !== nextHash) window.history.replaceState(state, "", url);
     } else {
@@ -1216,11 +1233,29 @@
   // history — updateTabFromHash would clobber it with nulls.
   let popStateHandled = false;
 
+  const setSettingsSubTab = (subTab) => {
+    const next = normalizeSettingsSubTab(subTab);
+    const changed = settingsSubTab !== next;
+    settingsSubTab = next;
+    if (activeTab !== "settings") return;
+    const nextHash = settingsHash(next);
+    const url = `${window.location.pathname}${window.location.search}${nextHash}`;
+    const state = { tab: "settings", settingsSubTab: next, domain: null, tag: null, jobId: null };
+    if (!changed) {
+      if (window.location.hash !== nextHash) window.history.replaceState(state, "", url);
+    } else {
+      window.history.pushState(state, "", url);
+    }
+  };
+
   const onPopState = (e) => {
     popStateHandled = true;
     const state = e.state;
     if (!state) { updateTabFromHash(); return; }
     activeTab = state.tab || "single";
+    if (activeTab === "settings") {
+      settingsSubTab = normalizeSettingsSubTab(state.settingsSubTab);
+    }
     selectedDomain = state.domain ?? null;
     selectedTag = state.tag ?? null;
     tagProfileDraftId = selectedTag?.default_profile_id ? String(selectedTag.default_profile_id) : "";
@@ -1258,8 +1293,19 @@
       selectedJobId = jobId;
       loadJob(jobId);
     }
+    let settingsSub = null;
+    if (next === "settings") {
+      settingsSub = normalizeSettingsSubTab(parts[1]);
+      settingsSubTab = settingsSub;
+    }
     window.history.replaceState(
-      { tab: next, domain: null, tag: null, jobId: jobId || undefined },
+      {
+        tab: next,
+        settingsSubTab: settingsSub,
+        domain: null,
+        tag: null,
+        jobId: jobId || undefined,
+      },
       "",
       `${window.location.pathname}${window.location.search}${hash || `#/${next}`}`
     );
@@ -4059,23 +4105,21 @@ example.org`}
       {/if}
     </div>
   {:else if activeTab === "settings"}
-    <div class="grid" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" style="margin-top: 22px;">
-      <div class="card reveal" style="--d: 0.28s; grid-column: 1 / -1; padding: 0;">
-        <div class="settings-subtabs" role="tablist" aria-label={$t("settings_subtabs_aria")}>
-          {#each settingsSubTabs as subTab}
-            <button
-              class={`settings-subtab ${settingsSubTab === subTab.id ? "active" : ""}`}
-              type="button"
-              role="tab"
-              id={`settings-subtab-${subTab.id}`}
-              aria-selected={settingsSubTab === subTab.id}
-              aria-controls={`settings-subpanel-${subTab.id}`}
-              onclick={() => (settingsSubTab = subTab.id)}
-            >
-              {$t(subTab.labelKey)}
-            </button>
-          {/each}
-        </div>
+    <div class="grid" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" style="margin-top: 0; gap: 10px;">
+      <div class="settings-subtabs" role="tablist" aria-label={$t("settings_subtabs_aria")}>
+        {#each settingsSubTabs as subTab}
+          <button
+            class={`settings-subtab ${settingsSubTab === subTab.id ? "active" : ""}`}
+            type="button"
+            role="tab"
+            id={`settings-subtab-${subTab.id}`}
+            aria-selected={settingsSubTab === subTab.id}
+            aria-controls={`settings-subpanel-${subTab.id}`}
+            onclick={() => setSettingsSubTab(subTab.id)}
+          >
+            {$t(subTab.labelKey)}
+          </button>
+        {/each}
       </div>
       {#if settingsSubTab === "system"}
         <div class="card reveal" id="settings-subpanel-system" role="tabpanel" aria-labelledby="settings-subtab-system" style="--d: 0.34s; grid-column: 1 / -1;">

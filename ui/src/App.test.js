@@ -4169,6 +4169,37 @@ describe("App", () => {
       expect(screen.getByText(/Scoring configuration editor/i)).toBeInTheDocument();
       unmount();
     });
+
+    it("pushes sub-tab changes to history and restores them on popstate", async () => {
+      global.fetch.mockImplementation(subtabMock);
+      const { unmount } = render(App);
+
+      await openSettingsTab();
+      expect(window.location.hash).toBe("#/settings");
+
+      await fireEvent.click(await screen.findByRole("tab", { name: "Profiles" }));
+      await waitFor(() => expect(window.location.hash).toBe("#/settings/profiles"));
+
+      await fireEvent.click(await screen.findByRole("tab", { name: "Analysis" }));
+      await waitFor(() => expect(window.location.hash).toBe("#/settings/analysis"));
+      await waitFor(() => {
+        expect(screen.getByRole("heading", { name: "Analysis Cohorts" })).toBeInTheDocument();
+      });
+
+      window.history.back();
+      await waitFor(() => {
+        expect(screen.getByRole("tab", { name: "Profiles" }).getAttribute("aria-selected")).toBe("true");
+      });
+      expect(window.location.hash).toBe("#/settings/profiles");
+
+      window.history.back();
+      await waitFor(() => {
+        expect(screen.getByRole("tab", { name: "System" }).getAttribute("aria-selected")).toBe("true");
+      });
+      expect(window.location.hash).toBe("#/settings");
+
+      unmount();
+    });
   });
 
   describe("Server Settings", () => {

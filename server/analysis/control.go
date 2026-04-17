@@ -115,6 +115,7 @@ func (c *Controller) RebuildCohort(ctx context.Context, cohortID int64) error {
 		return fmt.Errorf("clear cohort %d before rebuild: %w", cohort.ID, err)
 	}
 
+	var lastMaterializedAt time.Time
 	for offset := 0; ; {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -143,6 +144,9 @@ func (c *Controller) RebuildCohort(ctx context.Context, cohortID int64) error {
 				_ = c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationFailed, time.Time{}, err.Error())
 				return fmt.Errorf("project run %s for cohort %d: %w", run.ID, cohort.ID, err)
 			}
+			if input.Run.FinishedAt.After(lastMaterializedAt) {
+				lastMaterializedAt = input.Run.FinishedAt
+			}
 		}
 		offset += len(list.Items)
 		if offset >= list.Total {
@@ -150,7 +154,7 @@ func (c *Controller) RebuildCohort(ctx context.Context, cohortID int64) error {
 		}
 	}
 
-	return c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationReady, time.Now().UTC(), "")
+	return c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationReady, lastMaterializedAt, "")
 }
 
 // ClearCohort removes all materialized rows for one cohort and leaves it in a

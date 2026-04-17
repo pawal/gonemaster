@@ -149,6 +149,38 @@ func TestControllerRebuildCohortClearsStaleRowsAndBackfillsTaggedRuns(t *testing
 	}
 }
 
+func TestControllerRebuildCohortWithNoMatchingRunsLeavesLastMaterializedEmpty(t *testing.T) {
+	store := &fakeStore{
+		runs: map[string]serverpkg.Run{},
+		cohorts: []serverpkg.AnalysisCohort{
+			{
+				ID:                    10,
+				SourceType:            "tag",
+				SourceTag:             "empty-cohort",
+				Label:                 "Empty",
+				AnalysisEnabled:       true,
+				MaterializationStatus: serverpkg.AnalysisMaterializationPending,
+			},
+		},
+	}
+
+	controller := NewController(store)
+	if err := controller.RebuildCohort(context.Background(), 10); err != nil {
+		t.Fatalf("RebuildCohort: %v", err)
+	}
+
+	cohort, ok := store.GetAnalysisCohort(10)
+	if !ok {
+		t.Fatal("expected cohort 10")
+	}
+	if cohort.MaterializationStatus != serverpkg.AnalysisMaterializationReady {
+		t.Fatalf("expected ready after empty rebuild, got %q", cohort.MaterializationStatus)
+	}
+	if !cohort.LastMaterializedAt.IsZero() {
+		t.Fatalf("empty rebuild must leave LastMaterializedAt zero, got %s", cohort.LastMaterializedAt)
+	}
+}
+
 func TestControllerRepairAllAndDisableChangeClearMaterializedRows(t *testing.T) {
 	run := testAnalysisRun("run-repair", 100, "alpha.example", time.Date(2026, 4, 17, 9, 0, 0, 0, time.UTC), "192.0.2.10", "2001:db8::10")
 	store := &fakeStore{

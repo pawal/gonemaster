@@ -214,6 +214,81 @@ func sortNameserverViews(items []PublicAnalysisNameserverView, mode string) {
 	}
 }
 
+// sortEndpointViews orders the (nameserver, address) endpoint rows by the
+// caller's sort token. The default (empty or unknown token) keeps the
+// historical nameserver-then-address ordering. All comparators fall back to
+// the same lexical pair so results are stable across repeated calls.
+func sortEndpointViews(items []PublicAnalysisEndpointView, mode string) {
+	less := func(keys [][2]string) func(i, j int) bool {
+		return func(i, j int) bool {
+			for _, k := range keys {
+				switch k[0] {
+				case "nameserver":
+					if items[i].Nameserver != items[j].Nameserver {
+						if k[1] == "desc" {
+							return items[i].Nameserver > items[j].Nameserver
+						}
+						return items[i].Nameserver < items[j].Nameserver
+					}
+				case "address":
+					if items[i].Address != items[j].Address {
+						if k[1] == "desc" {
+							return items[i].Address > items[j].Address
+						}
+						return items[i].Address < items[j].Address
+					}
+				case "domain_count":
+					if items[i].DomainCount != items[j].DomainCount {
+						if k[1] == "desc" {
+							return items[i].DomainCount > items[j].DomainCount
+						}
+						return items[i].DomainCount < items[j].DomainCount
+					}
+				case "prefix":
+					if items[i].Prefix != items[j].Prefix {
+						if k[1] == "desc" {
+							return items[i].Prefix > items[j].Prefix
+						}
+						return items[i].Prefix < items[j].Prefix
+					}
+				case "operator":
+					if items[i].ASNLabel != items[j].ASNLabel {
+						if k[1] == "desc" {
+							return items[i].ASNLabel > items[j].ASNLabel
+						}
+						return items[i].ASNLabel < items[j].ASNLabel
+					}
+				}
+			}
+			return false
+		}
+	}
+	var keys [][2]string
+	switch mode {
+	case "nameserver_desc":
+		keys = [][2]string{{"nameserver", "desc"}, {"address", "asc"}}
+	case "address_asc":
+		keys = [][2]string{{"address", "asc"}, {"nameserver", "asc"}}
+	case "address_desc":
+		keys = [][2]string{{"address", "desc"}, {"nameserver", "asc"}}
+	case "domain_count_asc":
+		keys = [][2]string{{"domain_count", "asc"}, {"nameserver", "asc"}, {"address", "asc"}}
+	case "domain_count_desc":
+		keys = [][2]string{{"domain_count", "desc"}, {"nameserver", "asc"}, {"address", "asc"}}
+	case "prefix_asc":
+		keys = [][2]string{{"prefix", "asc"}, {"nameserver", "asc"}, {"address", "asc"}}
+	case "prefix_desc":
+		keys = [][2]string{{"prefix", "desc"}, {"nameserver", "asc"}, {"address", "asc"}}
+	case "operator_asc":
+		keys = [][2]string{{"operator", "asc"}, {"nameserver", "asc"}, {"address", "asc"}}
+	case "operator_desc":
+		keys = [][2]string{{"operator", "desc"}, {"nameserver", "asc"}, {"address", "asc"}}
+	default:
+		keys = [][2]string{{"nameserver", "asc"}, {"address", "asc"}}
+	}
+	sort.Slice(items, less(keys))
+}
+
 // handlePublicAnalysisEndpoints handles GET /pub/api/v1/analysis/endpoints.
 func (s *Server) handlePublicAnalysisEndpoints(w http.ResponseWriter, r *http.Request) {
 	cohort, ok := s.resolvePublicAnalysisCohort(w, r)
@@ -318,12 +393,7 @@ func (s *Server) handlePublicAnalysisEndpoints(w http.ResponseWriter, r *http.Re
 		}
 		items = kept
 	}
-	sort.Slice(items, func(i, j int) bool {
-		if items[i].Nameserver != items[j].Nameserver {
-			return items[i].Nameserver < items[j].Nameserver
-		}
-		return items[i].Address < items[j].Address
-	})
+	sortEndpointViews(items, filter.Sort)
 	total := len(items)
 	start, end := clampPage(filter.Limit, filter.Offset, total)
 	writeJSON(w, http.StatusOK, PublicAnalysisListResponse[PublicAnalysisEndpointView]{

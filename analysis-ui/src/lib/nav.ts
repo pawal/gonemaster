@@ -14,9 +14,12 @@ export const navItems: NavItem[] = [
   { href: "/cohorts", label: "Cohorts", end: false },
   { href: "/domains", label: "Domains", end: false },
   { href: "/nameservers", label: "Nameservers", end: false },
-  { href: "/endpoints", label: "Endpoints", end: false },
+  // One unified "Addresses" tab replaces the old Endpoints + Prefixes.
+  // The /endpoints route stays so bookmarks keep working; the /prefixes
+  // list is gone from the nav (detail pages are still reachable from
+  // per-address prefix links).
+  { href: "/endpoints", label: "Addresses", end: false },
   { href: "/asns", label: "ASNs", end: false },
-  { href: "/prefixes", label: "Prefixes", end: false },
   { href: "/tags", label: "Tags", end: false },
   { href: "/testcases", label: "Testcases", end: false }
 ];

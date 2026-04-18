@@ -3,6 +3,7 @@
   import { base } from "$app/paths";
   import { page } from "$app/state";
   import FilterBar from "$lib/FilterBar.svelte";
+  import SortHeader from "$lib/SortHeader.svelte";
   import { asnHref, endpointHref, nameserverHref, prefixHref } from "$lib/entityLinks";
   import { formatCount } from "$lib/format";
   import { searchToString } from "$lib/filters";
@@ -43,6 +44,15 @@
   const hasNext = $derived(currentOffset + currentLimit < total);
 
   const rows = $derived((data.list?.items ?? []) as EndpointView[]);
+  const currentSort = $derived(page.url.searchParams.get("sort") ?? "");
+
+  const sortSpecs = {
+    nameserver: { desc: "nameserver_desc" },
+    address: { asc: "address_asc", desc: "address_desc" },
+    domainCount: { asc: "domain_count_asc", desc: "domain_count_desc" },
+    operator: { asc: "operator_asc", desc: "operator_desc" },
+    prefix: { asc: "prefix_asc", desc: "prefix_desc" }
+  } as const;
 
   const exportColumns: ExportColumn<EndpointView>[] = [
     { key: "nameserver", label: "Nameserver", value: (r) => r.nameserver },
@@ -84,7 +94,7 @@
 
 <section class="card">
   <div class="list-head">
-    <h2>Endpoints</h2>
+    <h2>Addresses</h2>
     <div class="list-toolbar">
       <label class="inline-field">
         <span>Page size</span>
@@ -112,11 +122,21 @@
       <table class="data-table">
         <thead>
           <tr>
-            <th scope="col">Nameserver</th>
-            <th scope="col">Address</th>
-            <th scope="col" class="col-num">Domains</th>
-            <th scope="col">Operator</th>
-            <th scope="col">Prefix</th>
+            <th scope="col">
+              <SortHeader label="Nameserver" spec={sortSpecs.nameserver} {currentSort} onsort={(v: string) => updateParam("sort", v)} />
+            </th>
+            <th scope="col">
+              <SortHeader label="Address" spec={sortSpecs.address} {currentSort} onsort={(v: string) => updateParam("sort", v)} />
+            </th>
+            <th scope="col" class="col-num">
+              <SortHeader label="Domains" spec={sortSpecs.domainCount} align="right" {currentSort} onsort={(v: string) => updateParam("sort", v)} />
+            </th>
+            <th scope="col">
+              <SortHeader label="Operator" spec={sortSpecs.operator} {currentSort} onsort={(v: string) => updateParam("sort", v)} />
+            </th>
+            <th scope="col">
+              <SortHeader label="Prefix" spec={sortSpecs.prefix} {currentSort} onsort={(v: string) => updateParam("sort", v)} />
+            </th>
           </tr>
         </thead>
         <tbody>

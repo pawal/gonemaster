@@ -47,10 +47,11 @@ type PublicAnalysisDomainNameserver struct {
 }
 
 type PublicAnalysisDomainAddress struct {
-	Address string `json:"address"`
-	Family  string `json:"family"`
-	ASN     *int64 `json:"asn,omitempty"`
-	Prefix  string `json:"prefix,omitempty"`
+	Address  string `json:"address"`
+	Family   string `json:"family"`
+	ASN      *int64 `json:"asn,omitempty"`
+	ASNLabel string `json:"asn_label,omitempty"`
+	Prefix   string `json:"prefix,omitempty"`
 }
 
 type PublicAnalysisDomainTag struct {
@@ -78,6 +79,7 @@ type PublicAnalysisEndpointDetail struct {
 	Address     string   `json:"address"`
 	Family      string   `json:"family"`
 	ASN         *int64   `json:"asn,omitempty"`
+	ASNLabel    string   `json:"asn_label,omitempty"`
 	Prefix      string   `json:"prefix,omitempty"`
 	DomainCount int      `json:"domain_count"`
 	Domains     []string `json:"domains"`
@@ -277,6 +279,9 @@ func (s *Server) handlePublicAnalysisDomainDetail(w http.ResponseWriter, r *http
 			if fact.ASN != nil {
 				asn := *fact.ASN
 				view.ASN = &asn
+				if meta, ok := readStore.GetAnalysisASN(asn); ok {
+					view.ASNLabel = meta.Label
+				}
 			}
 			if fact.PrefixID != nil {
 				if prefix, ok := readStore.GetAnalysisPrefix(*fact.PrefixID); ok {
@@ -539,11 +544,18 @@ func (s *Server) handlePublicAnalysisEndpointDetail(w http.ResponseWriter, r *ht
 		primaryNS = nsNames[0]
 	}
 
+	asnLabel := ""
+	if asn != nil {
+		if meta, ok := readStore.GetAnalysisASN(*asn); ok {
+			asnLabel = meta.Label
+		}
+	}
 	writeJSON(w, http.StatusOK, PublicAnalysisEndpointDetail{
 		Nameserver:  primaryNS,
 		Address:     addr.Address,
 		Family:      addr.Family,
 		ASN:         asn,
+		ASNLabel:    asnLabel,
 		Prefix:      prefix,
 		DomainCount: len(domainSet),
 		Domains:     domains,

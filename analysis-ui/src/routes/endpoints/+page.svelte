@@ -133,7 +133,8 @@
               <td class="col-num">{formatCount(row.domain_count)}</td>
               <td class="row-ident">
                 {#if row.asn !== undefined && row.asn !== null}
-                  <a class="cell-link" href={asnHref(base, row.asn, search)}>{row.asn}</a>
+                  <a class="cell-link" href={asnHref(base, row.asn, search)} title={row.asn_label ?? undefined}>{row.asn}</a>
+                  {#if row.asn_label}<span class="asn-label"> {row.asn_label}</span>{/if}
                 {:else}—{/if}
               </td>
               <td class="row-ident">
@@ -186,6 +187,7 @@
     font-size: var(--text-sm);
   }
   .row-clickable { cursor: pointer; }
+  .asn-label { color: var(--ink-2); font-size: var(--text-xs); }
   .cell-link {
     color: inherit;
     text-decoration: none;

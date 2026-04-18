@@ -93,7 +93,7 @@
             <EndpointChip address={addr.address} />
             <span class="hint">{addr.family}</span>
             {#if addr.asn !== undefined && addr.asn !== null}
-              <ASNChip asn={addr.asn} />
+              <ASNChip asn={addr.asn} label={addr.asn_label} />
             {/if}
             {#if addr.prefix}
               <PrefixChip prefix={addr.prefix} />

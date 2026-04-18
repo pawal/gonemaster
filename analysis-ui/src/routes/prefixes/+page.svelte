@@ -137,7 +137,8 @@
               <td class="col-num">{formatCount(row.address_count)}</td>
               <td class="row-ident">
                 {#if row.asn !== undefined && row.asn !== null}
-                  <a class="cell-link" href={asnHref(base, row.asn, search)}>{row.asn}</a>
+                  <a class="cell-link" href={asnHref(base, row.asn, search)} title={row.asn_label ?? undefined}>{row.asn}</a>
+                  {#if row.asn_label}<span class="asn-label"> {row.asn_label}</span>{/if}
                 {:else}—{/if}
               </td>
             </tr>
@@ -177,6 +178,7 @@
   .data-table tbody tr:last-child td { border-bottom: none; }
   .data-table tbody tr:hover { background: rgba(3, 105, 161, 0.04); }
   .row-clickable { cursor: pointer; }
+  .asn-label { color: var(--ink-2); font-size: var(--text-xs); }
   .cell-link { color: inherit; text-decoration: none; }
   .cell-link:hover { text-decoration: underline; }
   .cell-link:focus-visible {

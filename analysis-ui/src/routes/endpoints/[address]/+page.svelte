@@ -44,7 +44,7 @@
         <NameserverChip nameserver={d.nameserver} />
         <span class="family-pill">{d.family}</span>
         {#if d.asn !== undefined && d.asn !== null}
-          <ASNChip asn={d.asn} />
+          <ASNChip asn={d.asn} label={d.asn_label} />
         {/if}
         {#if d.prefix}
           <PrefixChip prefix={d.prefix} />

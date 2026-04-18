@@ -63,6 +63,7 @@ export type EndpointView = {
   family: string;
   domain_count: number;
   asn?: number;
+  asn_label?: string;
   prefix?: string;
 };
 
@@ -83,6 +84,7 @@ export type PrefixView = {
   domain_count: number;
   address_count: number;
   asn?: number;
+  asn_label?: string;
 };
 
 export type TagView = {
@@ -114,6 +116,7 @@ export type DomainDetailAddress = {
   address: string;
   family: string;
   asn?: number;
+  asn_label?: string;
   prefix?: string;
 };
 
@@ -144,6 +147,7 @@ export type EndpointDetail = {
   address: string;
   family: string;
   asn?: number;
+  asn_label?: string;
   prefix?: string;
   domain_count: number;
   domains: string[];

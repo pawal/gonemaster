@@ -25,6 +25,7 @@ type PublicAnalysisEndpointView struct {
 	Family      string `json:"family"`
 	DomainCount int    `json:"domain_count"`
 	ASN         *int64 `json:"asn,omitempty"`
+	ASNLabel    string `json:"asn_label,omitempty"`
 	Prefix      string `json:"prefix,omitempty"`
 }
 
@@ -47,6 +48,7 @@ type PublicAnalysisPrefixView struct {
 	DomainCount  int    `json:"domain_count"`
 	AddressCount int    `json:"address_count"`
 	ASN          *int64 `json:"asn,omitempty"`
+	ASNLabel     string `json:"asn_label,omitempty"`
 }
 
 // handlePublicAnalysisNameservers handles GET /pub/api/v1/analysis/nameservers.
@@ -272,6 +274,9 @@ func (s *Server) handlePublicAnalysisEndpoints(w http.ResponseWriter, r *http.Re
 			for asn := range asnSet {
 				asnCopy := asn
 				v.ASN = &asnCopy
+				if meta, ok := readStore.GetAnalysisASN(asn); ok {
+					v.ASNLabel = meta.Label
+				}
 			}
 		}
 		if len(prefixSet) == 1 {
@@ -544,6 +549,9 @@ func (s *Server) handlePublicAnalysisPrefixes(w http.ResponseWriter, r *http.Req
 			for asn := range b.asns {
 				copy := asn
 				v.ASN = &copy
+				if meta, ok := readStore.GetAnalysisASN(asn); ok {
+					v.ASNLabel = meta.Label
+				}
 			}
 		}
 		items = append(items, v)

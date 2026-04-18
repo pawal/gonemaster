@@ -4146,18 +4146,6 @@ describe("App", () => {
       unmount();
     });
 
-    it("switches to Analysis sub-tab and renders AnalysisCohorts", async () => {
-      global.fetch.mockImplementation(subtabMock);
-      const { unmount } = render(App);
-      await openSettingsTab("Analysis");
-
-      await waitFor(() => {
-        expect(screen.getByRole("heading", { name: "Analysis Cohorts" })).toBeInTheDocument();
-      });
-      expect(screen.queryByRole("heading", { name: "Server Settings" })).toBeNull();
-      unmount();
-    });
-
     it("switches to Scoring sub-tab and renders the scoring placeholder", async () => {
       global.fetch.mockImplementation(subtabMock);
       const { unmount } = render(App);
@@ -4180,11 +4168,8 @@ describe("App", () => {
       await fireEvent.click(await screen.findByRole("tab", { name: "Profiles" }));
       await waitFor(() => expect(window.location.hash).toBe("#/settings/profiles"));
 
-      await fireEvent.click(await screen.findByRole("tab", { name: "Analysis" }));
-      await waitFor(() => expect(window.location.hash).toBe("#/settings/analysis"));
-      await waitFor(() => {
-        expect(screen.getByRole("heading", { name: "Analysis Cohorts" })).toBeInTheDocument();
-      });
+      await fireEvent.click(await screen.findByRole("tab", { name: "Scoring" }));
+      await waitFor(() => expect(window.location.hash).toBe("#/settings/scoring"));
 
       window.history.back();
       await waitFor(() => {

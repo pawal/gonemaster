@@ -165,6 +165,7 @@
     { id: "recent", labelKey: "tab_recent" },
     { id: "domains", labelKey: "tab_domains" },
     { id: "tags", labelKey: "tab_tags" },
+    { id: "cohorts", labelKey: "tab_cohorts" },
     { id: "batches", labelKey: "tab_batches" },
     { id: "metrics", labelKey: "tab_metrics" },
     { id: "settings", labelKey: "tab_settings" }
@@ -174,8 +175,7 @@
   const settingsSubTabs = [
     { id: "system", labelKey: "settings_subtab_system" },
     { id: "profiles", labelKey: "settings_subtab_profiles" },
-    { id: "scoring", labelKey: "settings_subtab_scoring" },
-    { id: "analysis", labelKey: "settings_subtab_analysis" }
+    { id: "scoring", labelKey: "settings_subtab_scoring" }
   ];
 
   // Domains tab state.
@@ -1124,6 +1124,7 @@
     if (tab === "recent" || tab === "tests") return "recent";
     if (tab === "domains" || tab === "domain") return "domains";
     if (tab === "tags" || tab === "tag") return "tags";
+    if (tab === "cohorts" || tab === "cohort" || tab === "analysis") return "cohorts";
     if (tab === "batches" || tab === "batch") return "batches";
     if (tab === "metrics" || tab === "metric") return "metrics";
     if (tab === "settings" || tab === "setting") return "settings";
@@ -1132,7 +1133,7 @@
 
   const normalizeSettingsSubTab = (value) => {
     const sub = String(value || "").toLowerCase();
-    if (sub === "system" || sub === "profiles" || sub === "scoring" || sub === "analysis") return sub;
+    if (sub === "system" || sub === "profiles" || sub === "scoring") return sub;
     return "system";
   };
 
@@ -1286,7 +1287,15 @@
     const hash = window.location.hash || "";
     const parts = hash.replace(/^#\/?/, "").split("/");
     const segment = parts[0];
-    const next = normalizeTab(segment) || "single";
+    // Legacy redirect: cohort management used to live under
+    // #/settings/analysis. The sub-tab is now a top-level tab, so map
+    // stale bookmarks forward.
+    let next;
+    if (segment === "settings" && (parts[1] || "").toLowerCase() === "analysis") {
+      next = "cohorts";
+    } else {
+      next = normalizeTab(segment) || "single";
+    }
     activeTab = next;
     const jobId = (next === "single" && parts[1]) ? decodeURIComponent(parts[1]) : null;
     if (jobId) {
@@ -3568,6 +3577,12 @@
         {/if}
       {/if}
     </div>
+  {:else if activeTab === "cohorts"}
+    <div class="grid" id="panel-cohorts" role="tabpanel" aria-labelledby="tab-cohorts" style="margin-top: 22px;">
+      <div class="card reveal" style="--d: 0.22s; grid-column: 1 / -1;">
+        <AnalysisCohorts />
+      </div>
+    </div>
   {:else if activeTab === "batches"}
     <div class="grid" id="panel-batches" role="tabpanel" aria-labelledby="tab-batches" style="margin-top: 22px;">
       <div class="card reveal" style="--d: 0.22s">
@@ -4142,10 +4157,6 @@ example.org`}
         <div class="card reveal" id="settings-subpanel-scoring" role="tabpanel" aria-labelledby="settings-subtab-scoring" style="--d: 0.34s; grid-column: 1 / -1;">
           <h2>{$t("settings_scoring_heading")}</h2>
           <p class="small">{$t("settings_scoring_placeholder")}</p>
-        </div>
-      {:else if settingsSubTab === "analysis"}
-        <div class="card reveal" id="settings-subpanel-analysis" role="tabpanel" aria-labelledby="settings-subtab-analysis" style="--d: 0.34s; grid-column: 1 / -1;">
-          <AnalysisCohorts />
         </div>
       {/if}
     </div>

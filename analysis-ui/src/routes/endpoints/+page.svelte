@@ -3,7 +3,7 @@
   import { base } from "$app/paths";
   import { page } from "$app/state";
   import FilterBar from "$lib/FilterBar.svelte";
-  import { endpointHref } from "$lib/entityLinks";
+  import { asnHref, endpointHref, nameserverHref, prefixHref } from "$lib/entityLinks";
   import { formatCount } from "$lib/format";
   import { searchToString } from "$lib/filters";
   import { downloadCSV, downloadJSON, type ExportColumn } from "$lib/exporters";
@@ -68,20 +68,7 @@
     downloadJSON(`${filenamePrefix()}.json`, data.list.items, exportColumns);
   }
 
-  function rowHref(row: EndpointView): string {
-    return endpointHref(base, row.address, row.nameserver, page.url.search);
-  }
-
-  function openRow(row: EndpointView) {
-    goto(rowHref(row));
-  }
-
-  function onRowKey(event: KeyboardEvent, row: EndpointView) {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      openRow(row);
-    }
-  }
+  const search = $derived(page.url.search);
 </script>
 
 <FilterBar
@@ -129,20 +116,25 @@
         </thead>
         <tbody>
           {#each rows as row (`${row.nameserver}|${row.address}`)}
-            <tr
-              class="row-link"
-              role="link"
-              tabindex="0"
-              aria-label={`Open endpoint ${row.nameserver} ${row.address}`}
-              onclick={() => openRow(row)}
-              onkeydown={(e: KeyboardEvent) => onRowKey(e, row)}
-            >
-              <th scope="row" class="row-ident">{row.nameserver}</th>
-              <td class="row-ident">{row.address}</td>
+            <tr>
+              <th scope="row" class="row-ident">
+                <a class="cell-link" href={nameserverHref(base, row.nameserver, search)}>{row.nameserver}</a>
+              </th>
+              <td class="row-ident">
+                <a class="cell-link" href={endpointHref(base, row.address, row.nameserver, search)}>{row.address}</a>
+              </td>
               <td>{row.family}</td>
               <td class="col-num">{formatCount(row.domain_count)}</td>
-              <td class="row-ident">{row.asn ?? "—"}</td>
-              <td class="row-ident">{row.prefix ?? "—"}</td>
+              <td class="row-ident">
+                {#if row.asn !== undefined && row.asn !== null}
+                  <a class="cell-link" href={asnHref(base, row.asn, search)}>{row.asn}</a>
+                {:else}—{/if}
+              </td>
+              <td class="row-ident">
+                {#if row.prefix}
+                  <a class="cell-link" href={prefixHref(base, row.prefix, search)}>{row.prefix}</a>
+                {:else}—{/if}
+              </td>
             </tr>
           {/each}
         </tbody>
@@ -179,8 +171,6 @@
   .data-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
   .data-table tbody tr:last-child td { border-bottom: none; }
   .data-table tbody tr:hover { background: rgba(3, 105, 161, 0.04); }
-  .data-table tbody tr.row-link { cursor: pointer; }
-  .data-table tbody tr.row-link:focus-visible { outline: 2px solid var(--accent-2); outline-offset: -2px; }
   .row-ident {
     font-family: var(--mono);
     font-weight: 500;
@@ -188,6 +178,16 @@
     text-transform: none;
     letter-spacing: normal;
     font-size: var(--text-sm);
+  }
+  .cell-link {
+    color: inherit;
+    text-decoration: none;
+  }
+  .cell-link:hover { text-decoration: underline; }
+  .cell-link:focus-visible {
+    outline: 2px solid var(--accent-2);
+    outline-offset: 2px;
+    border-radius: 2px;
   }
   .col-num { text-align: right; font-variant-numeric: tabular-nums; }
   .pagination { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); flex-wrap: wrap; margin-top: var(--space-3); }

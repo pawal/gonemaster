@@ -41,9 +41,10 @@ type PublicAnalysisDomainDetail struct {
 }
 
 type PublicAnalysisDomainNameserver struct {
-	Nameserver string `json:"nameserver"`
-	IPv4Count  int    `json:"ipv4_count"`
-	IPv6Count  int    `json:"ipv6_count"`
+	Nameserver string                        `json:"nameserver"`
+	IPv4Count  int                           `json:"ipv4_count"`
+	IPv6Count  int                           `json:"ipv6_count"`
+	Addresses  []PublicAnalysisDomainAddress `json:"addresses"`
 }
 
 type PublicAnalysisDomainAddress struct {
@@ -231,6 +232,11 @@ func (s *Server) handlePublicAnalysisDomainDetail(w http.ResponseWriter, r *http
 		name string
 		v4   map[int64]struct{}
 		v6   map[int64]struct{}
+		// addrs preserves the ordered set of (addressID, family) this
+		// nameserver serves, so we can later hang per-address facts off
+		// each nameserver rather than duplicating them into a flat list.
+		addrs []int64
+		seen  map[int64]struct{}
 	}
 	nsByID := map[int64]*nsEntry{}
 	addrIDs := map[int64]struct{}{}
@@ -245,7 +251,12 @@ func (s *Server) handlePublicAnalysisDomainDetail(w http.ResponseWriter, r *http
 			if !found {
 				continue
 			}
-			n = &nsEntry{name: ns.Name, v4: map[int64]struct{}{}, v6: map[int64]struct{}{}}
+			n = &nsEntry{
+				name: ns.Name,
+				v4:   map[int64]struct{}{},
+				v6:   map[int64]struct{}{},
+				seen: map[int64]struct{}{},
+			}
 			nsByID[ep.NameserverID] = n
 		}
 		switch ep.Family {
@@ -254,18 +265,14 @@ func (s *Server) handlePublicAnalysisDomainDetail(w http.ResponseWriter, r *http
 		case "ipv6":
 			n.v6[ep.AddressID] = struct{}{}
 		}
+		if _, ok := n.seen[ep.AddressID]; !ok {
+			n.seen[ep.AddressID] = struct{}{}
+			n.addrs = append(n.addrs, ep.AddressID)
+		}
 	}
-	nameservers := make([]PublicAnalysisDomainNameserver, 0, len(nsByID))
-	for _, n := range nsByID {
-		nameservers = append(nameservers, PublicAnalysisDomainNameserver{
-			Nameserver: n.name,
-			IPv4Count:  len(n.v4),
-			IPv6Count:  len(n.v6),
-		})
-	}
-	sort.Slice(nameservers, func(i, j int) bool { return nameservers[i].Nameserver < nameservers[j].Nameserver })
 
-	addresses := make([]PublicAnalysisDomainAddress, 0, len(addrIDs))
+	// Build per-address facts once, then reuse per nameserver.
+	addressView := make(map[int64]PublicAnalysisDomainAddress, len(addrIDs))
 	for addrID := range addrIDs {
 		addr, found := readStore.GetAnalysisAddress(addrID)
 		if !found {
@@ -290,6 +297,35 @@ func (s *Server) handlePublicAnalysisDomainDetail(w http.ResponseWriter, r *http
 			}
 			break
 		}
+		addressView[addrID] = view
+	}
+
+	nameservers := make([]PublicAnalysisDomainNameserver, 0, len(nsByID))
+	for _, n := range nsByID {
+		nsAddrs := make([]PublicAnalysisDomainAddress, 0, len(n.addrs))
+		for _, addrID := range n.addrs {
+			if view, ok := addressView[addrID]; ok {
+				nsAddrs = append(nsAddrs, view)
+			}
+		}
+		sort.Slice(nsAddrs, func(i, j int) bool {
+			if nsAddrs[i].Family != nsAddrs[j].Family {
+				// Keep IPv4 before IPv6 for a predictable reading order.
+				return nsAddrs[i].Family < nsAddrs[j].Family
+			}
+			return nsAddrs[i].Address < nsAddrs[j].Address
+		})
+		nameservers = append(nameservers, PublicAnalysisDomainNameserver{
+			Nameserver: n.name,
+			IPv4Count:  len(n.v4),
+			IPv6Count:  len(n.v6),
+			Addresses:  nsAddrs,
+		})
+	}
+	sort.Slice(nameservers, func(i, j int) bool { return nameservers[i].Nameserver < nameservers[j].Nameserver })
+
+	addresses := make([]PublicAnalysisDomainAddress, 0, len(addressView))
+	for _, view := range addressView {
 		addresses = append(addresses, view)
 	}
 	sort.Slice(addresses, func(i, j int) bool { return addresses[i].Address < addresses[j].Address })

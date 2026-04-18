@@ -44,6 +44,8 @@ export type DomainView = {
   endpoint_count: number;
   asn_count: number;
   prefix_count: number;
+  operator?: string;
+  operator_asn?: number;
   finished_at?: string;
 };
 
@@ -54,6 +56,8 @@ export type NameserverView = {
   ipv4_count: number;
   ipv6_count: number;
   asn_count: number;
+  operator?: string;
+  operator_asn?: number;
   query_count?: number;
 };
 
@@ -110,6 +114,7 @@ export type DomainDetailNameserver = {
   nameserver: string;
   ipv4_count: number;
   ipv6_count: number;
+  addresses: DomainDetailAddress[];
 };
 
 export type DomainDetailAddress = {

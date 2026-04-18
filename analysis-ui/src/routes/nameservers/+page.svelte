@@ -4,7 +4,7 @@
   import { page } from "$app/state";
   import FilterBar from "$lib/FilterBar.svelte";
   import SortHeader from "$lib/SortHeader.svelte";
-  import { nameserverHref } from "$lib/entityLinks";
+  import { asnHref, nameserverHref } from "$lib/entityLinks";
   import { formatCount } from "$lib/format";
   import { searchToString } from "$lib/filters";
   import { downloadCSV, downloadJSON, type ExportColumn } from "$lib/exporters";
@@ -61,6 +61,8 @@
 
   const exportColumns: ExportColumn<NameserverView>[] = [
     { key: "nameserver", label: "Nameserver", value: (r) => r.nameserver },
+    { key: "operator", label: "Operator", value: (r) => r.operator ?? "" },
+    { key: "operator_asn", label: "Operator ASN", value: (r) => r.operator_asn ?? "" },
     { key: "domain_count", label: "Domains", value: (r) => r.domain_count },
     { key: "endpoint_count", label: "Endpoints", value: (r) => r.endpoint_count },
     { key: "ipv4_count", label: "IPv4", value: (r) => r.ipv4_count },
@@ -122,6 +124,7 @@
             <th scope="col">
               <SortHeader label="Nameserver" spec={sortSpecs.name} {currentSort} onsort={(v: string) => updateParam("sort", v)} />
             </th>
+            <th scope="col">Operator</th>
             <th scope="col" class="col-num">
               <SortHeader label="Domains" spec={sortSpecs.domainCount} align="right" {currentSort} onsort={(v: string) => updateParam("sort", v)} />
             </th>
@@ -130,7 +133,6 @@
             </th>
             <th scope="col" class="col-num">IPv4</th>
             <th scope="col" class="col-num">IPv6</th>
-            <th scope="col" class="col-num">ASNs</th>
           </tr>
         </thead>
         <tbody>
@@ -139,11 +141,24 @@
               <th scope="row" class="row-ident">
                 <a class="cell-link" href={nameserverHref(base, row.nameserver, search)}>{row.nameserver}</a>
               </th>
+              <td class="row-ident">
+                {#if row.operator === "Multiple"}
+                  <span class="operator-multi">Multiple ({row.asn_count})</span>
+                {:else if row.operator_asn !== undefined && row.operator_asn !== null}
+                  <a class="cell-link" href={asnHref(base, row.operator_asn, search)} title={row.operator ? `AS${row.operator_asn} · ${row.operator}` : `AS${row.operator_asn}`}>
+                    {#if row.operator}
+                      <span class="operator-label">{row.operator}</span>
+                      <span class="operator-asn">AS{row.operator_asn}</span>
+                    {:else}
+                      AS{row.operator_asn}
+                    {/if}
+                  </a>
+                {:else}—{/if}
+              </td>
               <td class="col-num">{formatCount(row.domain_count)}</td>
               <td class="col-num">{formatCount(row.endpoint_count)}</td>
               <td class="col-num">{formatCount(row.ipv4_count)}</td>
               <td class="col-num">{formatCount(row.ipv6_count)}</td>
-              <td class="col-num">{formatCount(row.asn_count)}</td>
             </tr>
           {/each}
         </tbody>
@@ -240,6 +255,9 @@
   .data-table tbody tr:last-child td { border-bottom: none; }
   .data-table tbody tr:hover { background: rgba(3, 105, 161, 0.04); }
   .row-clickable { cursor: pointer; }
+  .operator-label { font-family: var(--sans); font-weight: 500; }
+  .operator-asn { margin-left: 6px; color: var(--ink-2); font-size: var(--text-xs); }
+  .operator-multi { color: var(--ink-2); font-family: var(--sans); font-style: italic; }
   .cell-link { color: inherit; text-decoration: none; }
   .cell-link:hover { text-decoration: underline; }
   .cell-link:focus-visible {

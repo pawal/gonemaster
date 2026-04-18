@@ -15,7 +15,12 @@ type PublicAnalysisNameserverView struct {
 	IPv4Count     int    `json:"ipv4_count"`
 	IPv6Count     int    `json:"ipv6_count"`
 	ASNCount      int    `json:"asn_count"`
-	QueryCount    int    `json:"query_count,omitempty"`
+	// Operator is the ASN label when every endpoint on this nameserver
+	// resolves to a single ASN. Empty string when unknown; set to
+	// "Multiple" when endpoints span more than one ASN.
+	Operator    string `json:"operator,omitempty"`
+	OperatorASN *int64 `json:"operator_asn,omitempty"`
+	QueryCount  int    `json:"query_count,omitempty"`
 }
 
 // PublicAnalysisEndpointView is one (nameserver, address) pair in the cohort.
@@ -120,7 +125,7 @@ func (s *Server) handlePublicAnalysisNameservers(w http.ResponseWriter, r *http.
 
 	items := make([]PublicAnalysisNameserverView, 0, len(buckets))
 	for _, b := range buckets {
-		items = append(items, PublicAnalysisNameserverView{
+		view := PublicAnalysisNameserverView{
 			Nameserver:    b.name,
 			DomainCount:   len(b.domains),
 			EndpointCount: len(b.addresses),
@@ -128,7 +133,22 @@ func (s *Server) handlePublicAnalysisNameservers(w http.ResponseWriter, r *http.
 			IPv6Count:     len(b.ipv6),
 			ASNCount:      len(b.asns),
 			QueryCount:    b.queryCount,
-		})
+		}
+		switch len(b.asns) {
+		case 0:
+			// No ASN linkage — leave Operator empty.
+		case 1:
+			for asn := range b.asns {
+				asnCopy := asn
+				view.OperatorASN = &asnCopy
+				if meta, ok := readStore.GetAnalysisASN(asn); ok {
+					view.Operator = meta.Label
+				}
+			}
+		default:
+			view.Operator = "Multiple"
+		}
+		items = append(items, view)
 	}
 
 	items = applyNameserverFilter(items, filter)

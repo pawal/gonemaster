@@ -88,61 +88,59 @@
   </section>
 
   <section class="card">
-    <h3>Nameservers</h3>
+    <h3>Authoritative servers</h3>
     {#if d.nameservers.length === 0}
       <p class="hint">No authoritative nameservers materialized.</p>
-    {:else}
-      <ul class="chip-list" role="list">
-        {#each d.nameservers as ns (ns.nameserver)}
-          <li>
-            <NameserverChip nameserver={ns.nameserver} />
-            {#if ns.ipv4_count > 0}<span class="family-badge family-ipv4">{ns.ipv4_count} v4</span>{/if}
-            {#if ns.ipv6_count > 0}<span class="family-badge family-ipv6">{ns.ipv6_count} v6</span>{/if}
-          </li>
-        {/each}
-      </ul>
-    {/if}
-  </section>
-
-  <section class="card">
-    <h3>Addresses</h3>
-    {#if d.addresses.length === 0}
-      <p class="hint">No addresses materialized.</p>
     {:else}
       <div class="table-wrap">
         <table class="data-table">
           <thead>
             <tr>
+              <th scope="col">Nameserver</th>
               <th scope="col">Address</th>
               <th scope="col">Operator</th>
               <th scope="col">Prefix</th>
             </tr>
           </thead>
           <tbody>
-            {#each d.addresses as addr (addr.address)}
-              <tr>
-                <th scope="row" class="row-ident">
-                  <EndpointChip address={addr.address} />
-                  <span class={`family-badge family-${addr.family}`}>{addr.family === "ipv6" ? "v6" : "v4"}</span>
-                </th>
-                <td class="row-ident">
-                  {#if addr.asn !== undefined && addr.asn !== null}
-                    <a class="cell-link" href={asnHref(base, addr.asn, query)} title={addr.asn_label ? `AS${addr.asn} · ${addr.asn_label}` : `AS${addr.asn}`}>
-                      {#if addr.asn_label}
-                        <span class="operator-label">{addr.asn_label}</span>
-                        <span class="operator-asn">AS{addr.asn}</span>
-                      {:else}
-                        AS{addr.asn}
-                      {/if}
-                    </a>
-                  {:else}—{/if}
-                </td>
-                <td class="row-ident">
-                  {#if addr.prefix}
-                    <a class="cell-link" href={prefixHref(base, addr.prefix, query)}>{addr.prefix}</a>
-                  {:else}—{/if}
-                </td>
-              </tr>
+            {#each d.nameservers as ns (ns.nameserver)}
+              {#each ns.addresses as addr, addrIdx (`${ns.nameserver}|${addr.address}`)}
+                <tr class={addrIdx === 0 ? "ns-group-start" : "ns-group-cont"}>
+                  <th scope="row" class="row-ident ns-cell">
+                    {#if addrIdx === 0}
+                      <NameserverChip nameserver={ns.nameserver} />
+                    {/if}
+                  </th>
+                  <td class="row-ident">
+                    <EndpointChip address={addr.address} nameserver={ns.nameserver} />
+                    <span class={`family-badge family-${addr.family}`}>{addr.family === "ipv6" ? "v6" : "v4"}</span>
+                  </td>
+                  <td class="row-ident">
+                    {#if addr.asn !== undefined && addr.asn !== null}
+                      <a class="cell-link" href={asnHref(base, addr.asn, query)} title={addr.asn_label ? `AS${addr.asn} · ${addr.asn_label}` : `AS${addr.asn}`}>
+                        {#if addr.asn_label}
+                          <span class="operator-label">{addr.asn_label}</span>
+                          <span class="operator-asn">AS{addr.asn}</span>
+                        {:else}
+                          AS{addr.asn}
+                        {/if}
+                      </a>
+                    {:else}—{/if}
+                  </td>
+                  <td class="row-ident">
+                    {#if addr.prefix}
+                      <a class="cell-link" href={prefixHref(base, addr.prefix, query)}>{addr.prefix}</a>
+                    {:else}—{/if}
+                  </td>
+                </tr>
+              {:else}
+                <tr>
+                  <th scope="row" class="row-ident ns-cell">
+                    <NameserverChip nameserver={ns.nameserver} />
+                  </th>
+                  <td colspan="3" class="hint">No materialized addresses.</td>
+                </tr>
+              {/each}
             {/each}
           </tbody>
         </table>
@@ -304,6 +302,15 @@
     vertical-align: middle;
   }
   .data-table tbody tr:last-child td { border-bottom: none; }
+  .data-table tbody tr.ns-group-cont .ns-cell { border-top: none; }
+  .data-table tbody tr.ns-group-cont td { border-top: 1px dashed transparent; }
+  .data-table tbody tr.ns-group-start:not(:first-child) th,
+  .data-table tbody tr.ns-group-start:not(:first-child) td {
+    border-top: 1px solid var(--border);
+  }
+  .data-table tbody tr.ns-group-cont th,
+  .data-table tbody tr.ns-group-cont td { border-top: none; border-bottom: 1px dashed var(--border); }
+  .data-table tbody tr.ns-group-cont:last-child td { border-bottom: none; }
   .row-ident {
     font-family: var(--mono);
     font-weight: 500;

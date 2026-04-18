@@ -4,7 +4,7 @@
   import { page } from "$app/state";
   import FilterBar from "$lib/FilterBar.svelte";
   import SortHeader from "$lib/SortHeader.svelte";
-  import { domainHref } from "$lib/entityLinks";
+  import { asnHref, domainHref } from "$lib/entityLinks";
   import { formatCount, formatTimestamp, gradeTone, levelTone } from "$lib/format";
   import { searchToString } from "$lib/filters";
   import { downloadCSV, downloadJSON, type ExportColumn } from "$lib/exporters";
@@ -57,6 +57,8 @@
     { key: "score", label: "Score", value: (r) => r.score ?? "" },
     { key: "grade", label: "Grade", value: (r) => r.grade ?? "" },
     { key: "worst_level", label: "Worst level", value: (r) => r.worst_level ?? "" },
+    { key: "operator", label: "Operator", value: (r) => r.operator ?? "" },
+    { key: "operator_asn", label: "Operator ASN", value: (r) => r.operator_asn ?? "" },
     { key: "nameserver_count", label: "Nameservers", value: (r) => r.nameserver_count },
     { key: "endpoint_count", label: "Endpoints", value: (r) => r.endpoint_count },
     { key: "asn_count", label: "ASNs", value: (r) => r.asn_count },
@@ -133,11 +135,12 @@
             <th scope="col">
               <SortHeader label="Worst" spec={sortSpecs.worst} {currentSort} onsort={(v: string) => updateParam("sort", v)} />
             </th>
+            <th scope="col">Operator</th>
             <th scope="col" class="col-num">Nameservers</th>
             <th scope="col" class="col-num">Endpoints</th>
             <th scope="col" class="col-num">ASNs</th>
             <th scope="col" class="col-num">Prefixes</th>
-            <th scope="col">Last run</th>
+            <th scope="col">Last analyzed</th>
           </tr>
         </thead>
         <tbody>
@@ -155,6 +158,20 @@
               <td>
                 {#if row.worst_level}
                   <span class={`level level-${levelTone(row.worst_level)}`}>{row.worst_level}</span>
+                {:else}—{/if}
+              </td>
+              <td class="row-ident">
+                {#if row.operator === "Multiple"}
+                  <span class="operator-multi">Multiple ({row.asn_count})</span>
+                {:else if row.operator_asn !== undefined && row.operator_asn !== null}
+                  <a class="cell-link" href={asnHref(base, row.operator_asn, search)} title={row.operator ? `AS${row.operator_asn} · ${row.operator}` : `AS${row.operator_asn}`}>
+                    {#if row.operator}
+                      <span class="operator-label">{row.operator}</span>
+                      <span class="operator-asn">AS{row.operator_asn}</span>
+                    {:else}
+                      AS{row.operator_asn}
+                    {/if}
+                  </a>
                 {:else}—{/if}
               </td>
               <td class="col-num">{formatCount(row.nameserver_count)}</td>
@@ -255,6 +272,9 @@
   .data-table tbody tr:last-child td { border-bottom: none; }
   .data-table tbody tr:hover { background: rgba(3, 105, 161, 0.04); }
   .row-clickable { cursor: pointer; }
+  .operator-label { font-family: var(--sans); font-weight: 500; }
+  .operator-asn { margin-left: 6px; color: var(--ink-2); font-size: var(--text-xs); }
+  .operator-multi { color: var(--ink-2); font-family: var(--sans); font-style: italic; }
   .cell-link { color: inherit; text-decoration: none; }
   .cell-link:hover { text-decoration: underline; }
   .cell-link:focus-visible {

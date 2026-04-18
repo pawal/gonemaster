@@ -106,7 +106,13 @@ type PublicAnalysisDomainView struct {
 	EndpointCount   int        `json:"endpoint_count"`
 	ASNCount        int        `json:"asn_count"`
 	PrefixCount     int        `json:"prefix_count"`
-	FinishedAt      *time.Time `json:"finished_at,omitempty"`
+	// Operator is the ASN label when every authoritative address for the
+	// domain shares a single ASN. Empty when unknown; "Multiple" when
+	// spread across multiple ASNs. Gives operators at-a-glance without
+	// clicking into the detail view.
+	Operator    string     `json:"operator,omitempty"`
+	OperatorASN *int64     `json:"operator_asn,omitempty"`
+	FinishedAt  *time.Time `json:"finished_at,omitempty"`
 }
 
 // PublicAnalysisListResponse is the shared envelope for paginated public list
@@ -137,6 +143,30 @@ func (s *Server) handlePublicAnalysisDomains(w http.ResponseWriter, r *http.Requ
 	summaries := readStore.ListAnalysisRunDomainSummariesByCohort(cohort.ID)
 	latest := latestSummariesByDomain(summaries, s.store)
 
+	// Pre-compute the ASNs each domain's authoritative addresses resolve
+	// to, so we can show an Operator column without paying the ASN lookup
+	// cost per row.
+	runIDs := make(map[string]struct{}, len(latest))
+	for _, pair := range latest {
+		runIDs[pair.summary.RunID] = struct{}{}
+	}
+	addressASNs := filterAnalysisRunAddressASNsByRunIDs(
+		readStore.ListAnalysisRunAddressASNsByCohort(cohort.ID),
+		runIDs,
+	)
+	domainASNs := map[int64]map[int64]struct{}{}
+	for _, fact := range addressASNs {
+		if fact.ASN == nil {
+			continue
+		}
+		set, ok := domainASNs[fact.DomainID]
+		if !ok {
+			set = map[int64]struct{}{}
+			domainASNs[fact.DomainID] = set
+		}
+		set[*fact.ASN] = struct{}{}
+	}
+
 	items := make([]PublicAnalysisDomainView, 0, len(latest))
 	for _, pair := range latest {
 		sum := pair.summary
@@ -153,6 +183,17 @@ func (s *Server) handlePublicAnalysisDomains(w http.ResponseWriter, r *http.Requ
 			EndpointCount:   sum.EndpointCount,
 			ASNCount:        sum.ASNCount,
 			PrefixCount:     sum.PrefixCount,
+		}
+		if asns := domainASNs[sum.DomainID]; len(asns) == 1 {
+			for asn := range asns {
+				asnCopy := asn
+				v.OperatorASN = &asnCopy
+				if meta, ok := readStore.GetAnalysisASN(asn); ok {
+					v.Operator = meta.Label
+				}
+			}
+		} else if len(asns) > 1 {
+			v.Operator = "Multiple"
 		}
 		if !pair.finishedAt.IsZero() {
 			fa := pair.finishedAt

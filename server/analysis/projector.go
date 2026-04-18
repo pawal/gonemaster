@@ -338,43 +338,64 @@ func (p *Projector) extractNameserverEndpoints(input RunInput) []extractedEndpoi
 
 func (p *Projector) extractAddressFacts(input RunInput) []extractedAddressFact {
 	facts := map[string]extractedAddressFact{}
-	for _, entry := range input.Entries {
-		address := stringArg(entry.Args, "address")
-		if address == "" {
-			continue
-		}
+	upsert := func(address string) *extractedAddressFact {
 		family := familyForAddress(address)
 		if family == "" {
-			continue
+			return nil
 		}
 		existing, ok := facts[address]
 		if !ok {
-			existing = extractedAddressFact{
-				address: address,
-				family:  family,
-			}
-		}
-		if prefixes := stringSliceArg(entry.Args, "prefixes"); len(prefixes) > 0 {
-			existing.prefix = prefixes[0]
-			existing.prefixFamily = familyForPrefix(prefixes[0])
-			if existing.prefixFamily == "" {
-				existing.prefixFamily = family
-			}
-			if existing.status == "" {
-				existing.status = "prefix_only"
-			}
-			existing.source = "entries"
-		}
-		asn, status := asnFromArgs(entry.Args)
-		if asn != nil {
-			existing.asn = asn
-			existing.status = status
-			existing.source = "entries"
-		}
-		if existing.status == "" {
-			existing.status = "unknown"
+			existing = extractedAddressFact{address: address, family: family}
 		}
 		facts[address] = existing
+		ref := facts[address]
+		return &ref
+	}
+	store := func(fact extractedAddressFact) {
+		if fact.status == "" {
+			fact.status = "unknown"
+		}
+		facts[fact.address] = fact
+	}
+
+	for _, entry := range input.Entries {
+		// Per-address entries (DNSSEC key lookups, authoritative queries, etc.)
+		// carry the address at the top level. Apply any prefix/ASN args found
+		// alongside them to that single address.
+		if address := stringArg(entry.Args, "address"); address != "" {
+			fact := upsert(address)
+			if fact == nil {
+				continue
+			}
+			if prefixes := stringSliceArg(entry.Args, "prefixes"); len(prefixes) > 0 {
+				applyPrefix(fact, prefixes[0])
+			}
+			if asn, status := asnFromArgs(entry.Args); asn != nil {
+				fact.asn = asn
+				fact.status = status
+				fact.source = "entries"
+			}
+			store(*fact)
+		}
+		// CN04_*_SAME_PREFIX entries carry a single prefix at the top level
+		// and the set of addresses that share it in a nested `servers` list.
+		// The gonemaster engine never emits (address, prefix) in one flat row,
+		// so unpack the nested structure here. See plans/tld-analysis.md.
+		prefixes := stringSliceArg(entry.Args, "prefixes")
+		if len(prefixes) == 0 {
+			continue
+		}
+		for _, endpoint := range endpointsFromArgs(entry.Args["servers"]) {
+			if endpoint.address == "" {
+				continue
+			}
+			fact := upsert(endpoint.address)
+			if fact == nil {
+				continue
+			}
+			applyPrefix(fact, prefixes[0])
+			store(*fact)
+		}
 	}
 
 	out := make([]extractedAddressFact, 0, len(facts))
@@ -383,6 +404,21 @@ func (p *Projector) extractAddressFacts(input RunInput) []extractedAddressFact {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].address < out[j].address })
 	return out
+}
+
+func applyPrefix(fact *extractedAddressFact, prefix string) {
+	if fact == nil || prefix == "" || fact.prefix != "" {
+		return
+	}
+	fact.prefix = prefix
+	fact.prefixFamily = familyForPrefix(prefix)
+	if fact.prefixFamily == "" {
+		fact.prefixFamily = fact.family
+	}
+	if fact.status == "" {
+		fact.status = "prefix_only"
+	}
+	fact.source = "entries"
 }
 
 // MatchAnalysisEnabledCohorts returns the tag-backed cohorts that should be

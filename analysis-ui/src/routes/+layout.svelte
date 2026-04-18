@@ -35,8 +35,8 @@
 <div class="app-shell">
   <header class="app-header">
     <a class="brand" href="{base}/">
-      <span class="brand-kicker">Gonemaster</span>
-      <span>Analysis</span>
+      <img class="brand-logo" src={`${base}/gonemaster.svg`} alt="Gonemaster" />
+      <span class="brand-kicker">Analysis</span>
     </a>
     <div class="header-controls">
       <button

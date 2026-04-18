@@ -80,11 +80,19 @@ body {
 .brand {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-3);
   font-weight: 600;
   font-size: var(--text-lg);
   color: var(--ink);
   text-decoration: none;
+  line-height: 0;
+}
+
+.brand .brand-logo {
+  display: block;
+  width: auto;
+  height: 28px;
+  transition: filter 0.2s ease;
 }
 
 .brand .brand-kicker {
@@ -93,6 +101,17 @@ body {
   font-size: var(--text-sm);
   letter-spacing: 0.02em;
   text-transform: uppercase;
+  line-height: 1;
+}
+
+:root[data-theme="dark"] .brand-logo {
+  filter: invert(1) sepia(1) saturate(3) hue-rotate(30deg) brightness(1.0);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .brand-logo {
+    filter: invert(1) sepia(1) saturate(3) hue-rotate(30deg) brightness(1.0);
+  }
 }
 
 .header-controls {

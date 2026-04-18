@@ -50,17 +50,7 @@
   const hasNext = $derived(currentOffset + currentLimit < total);
 
   const rows = $derived((data.list?.items ?? []) as TagView[]);
-
-  function openRow(tag: string) {
-    goto(tagHref(base, tag, page.url.search));
-  }
-
-  function onRowKey(event: KeyboardEvent, tag: string) {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      openRow(tag);
-    }
-  }
+  const search = $derived(page.url.search);
 
   const exportColumns: ExportColumn<TagView>[] = [
     { key: "tag", label: "Tag", value: (r) => r.tag },
@@ -138,15 +128,10 @@
         </thead>
         <tbody>
           {#each rows as row (row.tag)}
-            <tr
-              class="row-link"
-              role="link"
-              tabindex="0"
-              aria-label={`Open tag ${row.tag}`}
-              onclick={() => openRow(row.tag)}
-              onkeydown={(e: KeyboardEvent) => onRowKey(e, row.tag)}
-            >
-              <th scope="row" class="row-ident">{row.tag}</th>
+            <tr>
+              <th scope="row" class="row-ident">
+                <a class="cell-link" href={tagHref(base, row.tag, search)}>{row.tag}</a>
+              </th>
               <td>{row.module ?? "—"}</td>
               <td>
                 {#if row.level}
@@ -247,10 +232,12 @@
   }
   .data-table tbody tr:last-child td { border-bottom: none; }
   .data-table tbody tr:hover { background: rgba(3, 105, 161, 0.04); }
-  .data-table tbody tr.row-link { cursor: pointer; }
-  .data-table tbody tr.row-link:focus-visible {
+  .cell-link { color: inherit; text-decoration: none; }
+  .cell-link:hover { text-decoration: underline; }
+  .cell-link:focus-visible {
     outline: 2px solid var(--accent-2);
-    outline-offset: -2px;
+    outline-offset: 2px;
+    border-radius: 2px;
   }
   .row-ident {
     font-family: var(--mono);

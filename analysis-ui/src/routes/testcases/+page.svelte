@@ -49,17 +49,7 @@
   const hasNext = $derived(currentOffset + currentLimit < total);
 
   const rows = $derived((data.list?.items ?? []) as TestcaseView[]);
-
-  function openRow(row: TestcaseView) {
-    goto(testcaseHref(base, row.testcase, row.module, page.url.search));
-  }
-
-  function onRowKey(event: KeyboardEvent, row: TestcaseView) {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      openRow(row);
-    }
-  }
+  const search = $derived(page.url.search);
 
   const exportColumns: ExportColumn<TestcaseView>[] = [
     { key: "module", label: "Module", value: (r) => r.module },
@@ -138,15 +128,12 @@
         </thead>
         <tbody>
           {#each rows as row (`${row.module}/${row.testcase}`)}
-            <tr
-              class="row-link"
-              role="link"
-              tabindex="0"
-              aria-label={`Open testcase ${row.module}/${row.testcase}`}
-              onclick={() => openRow(row)}
-              onkeydown={(e: KeyboardEvent) => onRowKey(e, row)}
-            >
-              <th scope="row" class="row-ident">{row.module}/{row.testcase}</th>
+            <tr>
+              <th scope="row" class="row-ident">
+                <a class="cell-link" href={testcaseHref(base, row.testcase, row.module, search)}>
+                  {row.module}/{row.testcase}
+                </a>
+              </th>
               <td>
                 {#if row.worst_level}
                   <span class={`level level-${levelTone(row.worst_level)}`}>{row.worst_level}</span>
@@ -247,10 +234,12 @@
   }
   .data-table tbody tr:last-child td { border-bottom: none; }
   .data-table tbody tr:hover { background: rgba(3, 105, 161, 0.04); }
-  .data-table tbody tr.row-link { cursor: pointer; }
-  .data-table tbody tr.row-link:focus-visible {
+  .cell-link { color: inherit; text-decoration: none; }
+  .cell-link:hover { text-decoration: underline; }
+  .cell-link:focus-visible {
     outline: 2px solid var(--accent-2);
-    outline-offset: -2px;
+    outline-offset: 2px;
+    border-radius: 2px;
   }
   .row-ident {
     font-family: var(--mono);

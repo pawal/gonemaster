@@ -50,17 +50,7 @@
   const hasNext = $derived(currentOffset + currentLimit < total);
 
   const rows = $derived((data.list?.items ?? []) as ASNView[]);
-
-  function openRow(asn: number) {
-    goto(asnHref(base, asn, page.url.search));
-  }
-
-  function onRowKey(event: KeyboardEvent, asn: number) {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      openRow(asn);
-    }
-  }
+  const search = $derived(page.url.search);
 
   const exportColumns: ExportColumn<ASNView>[] = [
     { key: "asn", label: "ASN", value: (r) => r.asn },
@@ -144,15 +134,10 @@
         </thead>
         <tbody>
           {#each rows as row (row.asn)}
-            <tr
-              class="row-link"
-              role="link"
-              tabindex="0"
-              aria-label={`Open ASN AS${row.asn}`}
-              onclick={() => openRow(row.asn)}
-              onkeydown={(e: KeyboardEvent) => onRowKey(e, row.asn)}
-            >
-              <th scope="row" class="row-ident">AS{row.asn}</th>
+            <tr>
+              <th scope="row" class="row-ident">
+                <a class="cell-link" href={asnHref(base, row.asn, search)}>AS{row.asn}</a>
+              </th>
               <td class="asn-label">{row.label ?? "—"}</td>
               <td class="col-num">{formatCount(row.domain_count)}</td>
               <td class="col-num">{formatCount(row.address_count)}</td>
@@ -252,10 +237,12 @@
   }
   .data-table tbody tr:last-child td { border-bottom: none; }
   .data-table tbody tr:hover { background: rgba(3, 105, 161, 0.04); }
-  .data-table tbody tr.row-link { cursor: pointer; }
-  .data-table tbody tr.row-link:focus-visible {
+  .cell-link { color: inherit; text-decoration: none; }
+  .cell-link:hover { text-decoration: underline; }
+  .cell-link:focus-visible {
     outline: 2px solid var(--accent-2);
-    outline-offset: -2px;
+    outline-offset: 2px;
+    border-radius: 2px;
   }
   .row-ident {
     font-family: var(--mono);

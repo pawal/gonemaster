@@ -81,20 +81,7 @@
     downloadJSON(`${filenamePrefix()}.json`, data.list.items, exportColumns);
   }
 
-  function rowHref(domain: string): string {
-    return domainHref(base, domain, page.url.search);
-  }
-
-  function openRow(domain: string) {
-    goto(rowHref(domain));
-  }
-
-  function onRowKey(event: KeyboardEvent, domain: string) {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      openRow(domain);
-    }
-  }
+  const search = $derived(page.url.search);
 </script>
 
 <FilterBar
@@ -153,15 +140,10 @@
         </thead>
         <tbody>
           {#each rows as row (row.domain)}
-            <tr
-              class="row-link"
-              role="link"
-              tabindex="0"
-              aria-label={`Open domain ${row.domain}`}
-              onclick={() => openRow(row.domain)}
-              onkeydown={(e: KeyboardEvent) => onRowKey(e, row.domain)}
-            >
-              <th scope="row" class="row-ident">{row.domain}</th>
+            <tr>
+              <th scope="row" class="row-ident">
+                <a class="cell-link" href={domainHref(base, row.domain, search)}>{row.domain}</a>
+              </th>
               <td class="col-num">{row.score ?? "—"}</td>
               <td>
                 {#if row.grade}
@@ -270,10 +252,12 @@
   }
   .data-table tbody tr:last-child td { border-bottom: none; }
   .data-table tbody tr:hover { background: rgba(3, 105, 161, 0.04); }
-  .data-table tbody tr.row-link { cursor: pointer; }
-  .data-table tbody tr.row-link:focus-visible {
+  .cell-link { color: inherit; text-decoration: none; }
+  .cell-link:hover { text-decoration: underline; }
+  .cell-link:focus-visible {
     outline: 2px solid var(--accent-2);
-    outline-offset: -2px;
+    outline-offset: 2px;
+    border-radius: 2px;
   }
   .row-ident {
     font-family: var(--mono);

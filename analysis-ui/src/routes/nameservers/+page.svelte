@@ -51,21 +51,7 @@
   const hasNext = $derived(currentOffset + currentLimit < total);
 
   const rows = $derived((data.list?.items ?? []) as NameserverView[]);
-
-  function rowHref(nameserver: string): string {
-    return nameserverHref(base, nameserver, page.url.search);
-  }
-
-  function openRow(nameserver: string) {
-    goto(rowHref(nameserver));
-  }
-
-  function onRowKey(event: KeyboardEvent, nameserver: string) {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      openRow(nameserver);
-    }
-  }
+  const search = $derived(page.url.search);
 
   const exportColumns: ExportColumn<NameserverView>[] = [
     { key: "nameserver", label: "Nameserver", value: (r) => r.nameserver },
@@ -145,15 +131,10 @@
         </thead>
         <tbody>
           {#each rows as row (row.nameserver)}
-            <tr
-              class="row-link"
-              role="link"
-              tabindex="0"
-              aria-label={`Open nameserver ${row.nameserver}`}
-              onclick={() => openRow(row.nameserver)}
-              onkeydown={(e: KeyboardEvent) => onRowKey(e, row.nameserver)}
-            >
-              <th scope="row" class="row-ident">{row.nameserver}</th>
+            <tr>
+              <th scope="row" class="row-ident">
+                <a class="cell-link" href={nameserverHref(base, row.nameserver, search)}>{row.nameserver}</a>
+              </th>
               <td class="col-num">{formatCount(row.domain_count)}</td>
               <td class="col-num">{formatCount(row.endpoint_count)}</td>
               <td class="col-num">{formatCount(row.ipv4_count)}</td>
@@ -254,10 +235,12 @@
   }
   .data-table tbody tr:last-child td { border-bottom: none; }
   .data-table tbody tr:hover { background: rgba(3, 105, 161, 0.04); }
-  .data-table tbody tr.row-link { cursor: pointer; }
-  .data-table tbody tr.row-link:focus-visible {
+  .cell-link { color: inherit; text-decoration: none; }
+  .cell-link:hover { text-decoration: underline; }
+  .cell-link:focus-visible {
     outline: 2px solid var(--accent-2);
-    outline-offset: -2px;
+    outline-offset: 2px;
+    border-radius: 2px;
   }
   .row-ident {
     font-family: var(--mono);

@@ -3,7 +3,7 @@
   import { base } from "$app/paths";
   import { page } from "$app/state";
   import FilterBar from "$lib/FilterBar.svelte";
-  import { prefixHref } from "$lib/entityLinks";
+  import { asnHref, prefixHref } from "$lib/entityLinks";
   import { formatCount } from "$lib/format";
   import { searchToString } from "$lib/filters";
   import { downloadCSV, downloadJSON, type ExportColumn } from "$lib/exporters";
@@ -49,6 +49,7 @@
   const hasNext = $derived(currentOffset + currentLimit < total);
 
   const rows = $derived((data.list?.items ?? []) as PrefixView[]);
+  const search = $derived(page.url.search);
 
   const exportColumns: ExportColumn<PrefixView>[] = [
     { key: "prefix", label: "Prefix", value: (r) => r.prefix },
@@ -73,20 +74,6 @@
     downloadJSON(`${filenamePrefix()}.json`, data.list.items, exportColumns);
   }
 
-  function rowHref(prefix: string): string {
-    return prefixHref(base, prefix, page.url.search);
-  }
-
-  function openRow(prefix: string) {
-    goto(rowHref(prefix));
-  }
-
-  function onRowKey(event: KeyboardEvent, prefix: string) {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      openRow(prefix);
-    }
-  }
 </script>
 
 <FilterBar
@@ -141,19 +128,18 @@
         </thead>
         <tbody>
           {#each rows as row (row.prefix)}
-            <tr
-              class="row-link"
-              role="link"
-              tabindex="0"
-              aria-label={`Open prefix ${row.prefix}`}
-              onclick={() => openRow(row.prefix)}
-              onkeydown={(e: KeyboardEvent) => onRowKey(e, row.prefix)}
-            >
-              <th scope="row" class="row-ident">{row.prefix}</th>
+            <tr>
+              <th scope="row" class="row-ident">
+                <a class="cell-link" href={prefixHref(base, row.prefix, search)}>{row.prefix}</a>
+              </th>
               <td>{row.family}</td>
               <td class="col-num">{formatCount(row.domain_count)}</td>
               <td class="col-num">{formatCount(row.address_count)}</td>
-              <td class="row-ident">{row.asn ?? "—"}</td>
+              <td class="row-ident">
+                {#if row.asn !== undefined && row.asn !== null}
+                  <a class="cell-link" href={asnHref(base, row.asn, search)}>{row.asn}</a>
+                {:else}—{/if}
+              </td>
             </tr>
           {/each}
         </tbody>
@@ -190,8 +176,13 @@
   .data-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
   .data-table tbody tr:last-child td { border-bottom: none; }
   .data-table tbody tr:hover { background: rgba(3, 105, 161, 0.04); }
-  .data-table tbody tr.row-link { cursor: pointer; }
-  .data-table tbody tr.row-link:focus-visible { outline: 2px solid var(--accent-2); outline-offset: -2px; }
+  .cell-link { color: inherit; text-decoration: none; }
+  .cell-link:hover { text-decoration: underline; }
+  .cell-link:focus-visible {
+    outline: 2px solid var(--accent-2);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
   .row-ident {
     font-family: var(--mono);
     font-weight: 500;

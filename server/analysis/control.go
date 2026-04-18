@@ -123,7 +123,7 @@ func (c *Controller) RebuildCohort(ctx context.Context, cohortID int64) error {
 		return fmt.Errorf("clear cohort %d before rebuild: %w", cohort.ID, err)
 	}
 
-	var lastMaterializedAt time.Time
+	projected := 0
 	for offset := 0; ; {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -152,9 +152,7 @@ func (c *Controller) RebuildCohort(ctx context.Context, cohortID int64) error {
 				_ = c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationFailed, time.Time{}, err.Error())
 				return fmt.Errorf("project run %s for cohort %d: %w", run.ID, cohort.ID, err)
 			}
-			if input.Run.FinishedAt.After(lastMaterializedAt) {
-				lastMaterializedAt = input.Run.FinishedAt
-			}
+			projected++
 		}
 		offset += len(list.Items)
 		if offset >= list.Total {
@@ -162,7 +160,17 @@ func (c *Controller) RebuildCohort(ctx context.Context, cohortID int64) error {
 		}
 	}
 
-	return c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationReady, lastMaterializedAt, "")
+	// Stamp the cohort's last_materialized_at with the time the rebuild
+	// actually ran — that's what the "Last analyzed" label shows in the
+	// UI. Keeping the latest run's FinishedAt would surprise users who
+	// click Rebuild and see the timestamp not move. If no matching runs
+	// were projected at all, leave the timestamp zero so the UI can tell
+	// the cohort has no data.
+	var completedAt time.Time
+	if projected > 0 {
+		completedAt = time.Now().UTC()
+	}
+	return c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationReady, completedAt, "")
 }
 
 // ClearCohort removes all materialized rows for one cohort and leaves it in a

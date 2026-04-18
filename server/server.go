@@ -167,15 +167,21 @@ func (s *Server) Store() JobStore {
 func securityHeadersMiddleware(next http.Handler) http.Handler {
 	const apiCSP = "default-src 'none'"
 	const uiCSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'"
+	// The analysis SPA is a SvelteKit adapter-static build whose index.html
+	// includes an inline bootstrap <script>, so script-src must allow it.
+	const analysisCSP = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'"
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("X-Frame-Options", "DENY")
 		h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		h.Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
-		if strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/pub/api/") {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/pub/api/"):
 			h.Set("Content-Security-Policy", apiCSP)
-		} else {
+		case strings.HasPrefix(r.URL.Path, "/analysis/") || r.URL.Path == "/analysis":
+			h.Set("Content-Security-Policy", analysisCSP)
+		default:
 			h.Set("Content-Security-Policy", uiCSP)
 		}
 		next.ServeHTTP(w, r)

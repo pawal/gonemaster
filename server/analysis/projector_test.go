@@ -772,12 +772,13 @@ func TestProjectorProjectRunPersistsFactsIdempotently(t *testing.T) {
 	if len(store.prefixesByValue) != 2 {
 		t.Fatalf("expected 2 normalized prefixes, got %d", len(store.prefixesByValue))
 	}
-	// 2 ASNs surface from per-address args (64510 from entry 1's asns[0], 64520
-	// from entry 2's asn). The aggregate-ASN projection adds 64500 from
-	// entry 1's asns list — we now upsert every ASN the engine emitted,
-	// whether or not it pairs with a specific address.
-	if len(store.asnsByValue) != 3 {
-		t.Fatalf("expected 3 normalized ASNs, got %d", len(store.asnsByValue))
+	// 2 ASNs surface from per-address args (64510 from entry 1's asns[0] and
+	// 64520 from entry 2's asn). Entry 1's aggregate `asns` list also names
+	// 64500, but restrictDomainASNsToAuthoritative drops aggregate ASNs
+	// that have no address-level backing (e.g. parent-side registry ASNs
+	// the engine traversed during delegation).
+	if len(store.asnsByValue) != 2 {
+		t.Fatalf("expected 2 normalized ASNs, got %d", len(store.asnsByValue))
 	}
 
 	for _, cohortID := range []int64{10, 20} {

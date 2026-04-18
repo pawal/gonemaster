@@ -140,8 +140,15 @@ func (p *Projector) ProjectLoaded(input RunInput) error {
 
 	endpoints := p.extractNameserverEndpoints(input)
 	addressFacts := p.extractAddressFacts(input)
-	domainASNs := p.extractDomainASNs(input)
 	addressFacts = p.applyEnrichment(endpoints, addressFacts)
+	domainASNs := p.extractDomainASNs(input)
+	// The aggregate IPV4_/IPV6_*_ASN engine entries carry every ASN the
+	// delegation chain touched — including parent-side registry ASNs
+	// that have no authoritative address in this cohort. Drop those so
+	// the ASN list never shows ASNs with zero address / nameserver
+	// linkage. This filter only kicks in when address-level enrichment
+	// is populated; otherwise we still need the aggregate for coverage.
+	domainASNs = restrictDomainASNsToAuthoritative(domainASNs, addressFacts)
 	asnLabels := p.resolveASNLabels(addressFacts, domainASNs)
 
 	nameserverIDs := map[string]int64{}
@@ -546,6 +553,14 @@ func (p *Projector) applyEnrichment(endpoints []extractedEndpoint, addressFacts 
 		if endpoint.address == "" {
 			continue
 		}
+		// Skip parent-role endpoints (root servers for a TLD, or the
+		// TLD's own servers when a zone below is under test). These are
+		// already filtered from the public views, so enriching them
+		// here would only add orphaned address/ASN/prefix facts that
+		// can never be reached from the authoritative-endpoint graph.
+		if endpoint.role == "parent" {
+			continue
+		}
 		if _, ok := seenAddr[endpoint.address]; ok {
 			continue
 		}
@@ -635,6 +650,33 @@ func (p *Projector) resolveASNLabels(addressFacts []extractedAddressFact, domain
 		addASN(da.asn)
 	}
 	return labels
+}
+
+// restrictDomainASNsToAuthoritative keeps only the aggregate-ASN rows whose
+// ASN also shows up as a per-address fact for the same run. That filters
+// out parent-side ASNs the engine mentions while traversing delegation
+// (e.g. root / TLD registry ASNs) but which own no authoritative address
+// in the cohort. If no per-address ASN facts were resolved (enrichment
+// disabled or offline), the aggregate list is returned untouched so the
+// ASN view still has coverage.
+func restrictDomainASNsToAuthoritative(domainASNs []extractedDomainASN, addressFacts []extractedAddressFact) []extractedDomainASN {
+	authoritative := map[int64]struct{}{}
+	for _, fact := range addressFacts {
+		if fact.asn != nil {
+			authoritative[*fact.asn] = struct{}{}
+		}
+	}
+	if len(authoritative) == 0 {
+		return domainASNs
+	}
+	out := domainASNs[:0]
+	for _, da := range domainASNs {
+		if _, ok := authoritative[da.asn]; !ok {
+			continue
+		}
+		out = append(out, da)
+	}
+	return out
 }
 
 // familyFromASNTag maps tags like IPV4_DIFFERENT_ASN / IPV6_ONE_ASN to a

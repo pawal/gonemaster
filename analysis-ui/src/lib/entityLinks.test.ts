@@ -24,7 +24,7 @@ describe("entity link builders", () => {
     expect(testcaseHref(BASE, "dnssec07", "DNSSEC", QUERY)).toBe(
       "/analysis/testcases/dnssec07?dataset_tag=tld&module=DNSSEC"
     );
-    expect(cohortHref(BASE, "tld")).toBe("/analysis/cohorts/tld");
+    expect(cohortHref(BASE, "tld")).toBe("/analysis/?dataset_tag=tld");
   });
 
   it("preserves the caller's query string", () => {

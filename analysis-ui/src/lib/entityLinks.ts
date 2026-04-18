@@ -13,7 +13,13 @@ export type EntityType =
   | "testcase";
 
 export function cohortHref(base: string, datasetTag: string, query = ""): string {
-  return `${base}/cohorts/${encodeURIComponent(datasetTag)}${query}`;
+  // The analysis dashboard has no standalone per-cohort page; clicking a
+  // cohort chip rescopes the overview via the dataset_tag query parameter.
+  // Any existing query is replaced so the chip doesn't accidentally carry
+  // over an unrelated dataset_tag from the current URL.
+  const params = new URLSearchParams(query);
+  params.set("dataset_tag", datasetTag);
+  return `${base}/?${params.toString()}`;
 }
 
 export function domainHref(base: string, domain: string, query = ""): string {

@@ -164,10 +164,24 @@ func sortNameserverViews(items []PublicAnalysisNameserverView, mode string) {
 			}
 			return items[i].Nameserver < items[j].Nameserver
 		})
+	case "domain_count_asc":
+		sort.Slice(items, func(i, j int) bool {
+			if items[i].DomainCount != items[j].DomainCount {
+				return items[i].DomainCount < items[j].DomainCount
+			}
+			return items[i].Nameserver < items[j].Nameserver
+		})
 	case "endpoint_count_desc":
 		sort.Slice(items, func(i, j int) bool {
 			if items[i].EndpointCount != items[j].EndpointCount {
 				return items[i].EndpointCount > items[j].EndpointCount
+			}
+			return items[i].Nameserver < items[j].Nameserver
+		})
+	case "endpoint_count_asc":
+		sort.Slice(items, func(i, j int) bool {
+			if items[i].EndpointCount != items[j].EndpointCount {
+				return items[i].EndpointCount < items[j].EndpointCount
 			}
 			return items[i].Nameserver < items[j].Nameserver
 		})
@@ -442,9 +456,17 @@ func (s *Server) handlePublicAnalysisASNs(w http.ResponseWriter, r *http.Request
 			if items[i].DomainCount != items[j].DomainCount {
 				return items[i].DomainCount > items[j].DomainCount
 			}
+		case "domain_count_asc":
+			if items[i].DomainCount != items[j].DomainCount {
+				return items[i].DomainCount < items[j].DomainCount
+			}
 		case "address_count_desc":
 			if items[i].AddressCount != items[j].AddressCount {
 				return items[i].AddressCount > items[j].AddressCount
+			}
+		case "address_count_asc":
+			if items[i].AddressCount != items[j].AddressCount {
+				return items[i].AddressCount < items[j].AddressCount
 			}
 		}
 		return items[i].ASN < items[j].ASN
@@ -538,8 +560,15 @@ func (s *Server) handlePublicAnalysisPrefixes(w http.ResponseWriter, r *http.Req
 		items = kept
 	}
 	sort.Slice(items, func(i, j int) bool {
-		if filter.Sort == "domain_count_desc" && items[i].DomainCount != items[j].DomainCount {
-			return items[i].DomainCount > items[j].DomainCount
+		switch filter.Sort {
+		case "domain_count_desc":
+			if items[i].DomainCount != items[j].DomainCount {
+				return items[i].DomainCount > items[j].DomainCount
+			}
+		case "domain_count_asc":
+			if items[i].DomainCount != items[j].DomainCount {
+				return items[i].DomainCount < items[j].DomainCount
+			}
 		}
 		return items[i].Prefix < items[j].Prefix
 	})

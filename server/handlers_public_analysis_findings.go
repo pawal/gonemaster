@@ -101,14 +101,27 @@ func (s *Server) handlePublicAnalysisTags(w http.ResponseWriter, r *http.Request
 			if items[i].DomainCount != items[j].DomainCount {
 				return items[i].DomainCount > items[j].DomainCount
 			}
+		case "domain_count_asc":
+			if items[i].DomainCount != items[j].DomainCount {
+				return items[i].DomainCount < items[j].DomainCount
+			}
 		case "occurrence_count_desc":
 			if items[i].OccurrenceCount != items[j].OccurrenceCount {
 				return items[i].OccurrenceCount > items[j].OccurrenceCount
+			}
+		case "occurrence_count_asc":
+			if items[i].OccurrenceCount != items[j].OccurrenceCount {
+				return items[i].OccurrenceCount < items[j].OccurrenceCount
 			}
 		case "level_desc":
 			li, lj := severityRank(items[i].Level), severityRank(items[j].Level)
 			if li != lj {
 				return li > lj
+			}
+		case "level_asc":
+			li, lj := severityRank(items[i].Level), severityRank(items[j].Level)
+			if li != lj {
+				return li < lj
 			}
 		}
 		return items[i].Tag < items[j].Tag
@@ -204,10 +217,19 @@ func (s *Server) handlePublicAnalysisTestcases(w http.ResponseWriter, r *http.Re
 			if items[i].DomainCount != items[j].DomainCount {
 				return items[i].DomainCount > items[j].DomainCount
 			}
+		case "domain_count_asc":
+			if items[i].DomainCount != items[j].DomainCount {
+				return items[i].DomainCount < items[j].DomainCount
+			}
 		case "level_desc":
 			li, lj := severityRank(items[i].WorstLevel), severityRank(items[j].WorstLevel)
 			if li != lj {
 				return li > lj
+			}
+		case "level_asc":
+			li, lj := severityRank(items[i].WorstLevel), severityRank(items[j].WorstLevel)
+			if li != lj {
+				return li < lj
 			}
 		}
 		if items[i].Module != items[j].Module {

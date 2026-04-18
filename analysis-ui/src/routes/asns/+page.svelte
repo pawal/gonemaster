@@ -17,8 +17,8 @@
   const layoutData = $derived(page.data as LayoutData);
 
   const sortSpecs = {
-    domainCount: { desc: "domain_count_desc" },
-    addressCount: { desc: "address_count_desc" }
+    domainCount: { asc: "domain_count_asc", desc: "domain_count_desc" },
+    addressCount: { asc: "address_count_asc", desc: "address_count_desc" }
   } as const;
 
   const currentSort = $derived(page.url.searchParams.get("sort") ?? "");

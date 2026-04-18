@@ -18,8 +18,8 @@
 
   const sortSpecs = {
     name: { desc: "name_desc" },
-    domainCount: { desc: "domain_count_desc" },
-    endpointCount: { desc: "endpoint_count_desc" }
+    domainCount: { asc: "domain_count_asc", desc: "domain_count_desc" },
+    endpointCount: { asc: "endpoint_count_asc", desc: "endpoint_count_desc" }
   } as const;
 
   const currentSort = $derived(page.url.searchParams.get("sort") ?? "");

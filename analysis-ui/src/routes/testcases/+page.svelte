@@ -18,8 +18,8 @@
 
   const sortSpecs = {
     // server default when sort is empty is already domain_count_desc.
-    domainCount: { desc: "domain_count_desc" },
-    level: { desc: "level_desc" }
+    domainCount: { asc: "domain_count_asc", desc: "domain_count_desc" },
+    level: { asc: "level_asc", desc: "level_desc" }
   } as const;
 
   const currentSort = $derived(page.url.searchParams.get("sort") ?? "");

@@ -20,9 +20,9 @@
     // server default when sort is empty is already domain_count_desc; the
     // Domains header still needs desc as the active token so the arrow
     // visibly matches the default ordering.
-    domainCount: { desc: "domain_count_desc" },
-    occurrenceCount: { desc: "occurrence_count_desc" },
-    level: { desc: "level_desc" }
+    domainCount: { asc: "domain_count_asc", desc: "domain_count_desc" },
+    occurrenceCount: { asc: "occurrence_count_asc", desc: "occurrence_count_desc" },
+    level: { asc: "level_asc", desc: "level_desc" }
   } as const;
 
   const currentSort = $derived(page.url.searchParams.get("sort") ?? "");

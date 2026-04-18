@@ -1164,22 +1164,30 @@
     if (changed && statusMessage) {
       clearStatus();
     }
-    if (next === "single" || next === "tags" || next === "batches") {
+    loadDataForTab(next);
+  };
+
+  // Single source of truth for per-tab data loading. Called from both setTab
+  // (tab click) and initializeApp (first mount / page reload) so the two
+  // entry points can't drift — all new per-tab loads go here, not at the
+  // call sites.
+  const loadDataForTab = (tab) => {
+    if (tab === "single" || tab === "tags" || tab === "batches") {
       loadProfiles();
     }
-    if (next === "recent") {
+    if (tab === "recent") {
       loadJobs();
-    } else if (next === "domains") {
+    } else if (tab === "domains") {
       loadDomains();
       if (!tagsLoaded) loadDomainTags();
-    } else if (next === "tags") {
+    } else if (tab === "tags") {
       loadTagsList();
       loadTagCohortMap();
       if (selectedTag) {
         loadTagDomains({ reset: true });
         loadTagSummary();
       }
-    } else if (next === "batches") {
+    } else if (tab === "batches") {
       loadRecentBatchOptions();
       loadActiveBatches();
       fetchQueueStatus();
@@ -1187,7 +1195,7 @@
       if (selectedBatchId) {
         loadBatch(selectedBatchId);
       }
-    } else if (next === "metrics") {
+    } else if (tab === "metrics") {
       loadMetrics();
     }
   };
@@ -2413,26 +2421,7 @@
     window.addEventListener("hashchange", updateTabFromHash);
     window.addEventListener("popstate", onPopState);
     loadJobs();
-    if (activeTab === "batches") {
-      loadRecentBatchOptions();
-      loadActiveBatches();
-      fetchQueueStatus();
-      if (!tagsLoaded) loadDomainTags();
-      if (selectedBatchId) {
-        loadBatch(selectedBatchId);
-      }
-    }
-    if (activeTab === "tags") {
-      loadTagsList();
-      loadTagCohortMap();
-    }
-    if (activeTab === "domains") {
-      loadDomains();
-      if (!tagsLoaded) loadDomainTags();
-    }
-    if (activeTab === "metrics") {
-      loadMetrics();
-    }
+    loadDataForTab(activeTab);
   };
 
   let initialAnimationDone = false;

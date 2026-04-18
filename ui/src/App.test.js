@@ -4398,4 +4398,64 @@ describe("App", () => {
       unmount();
     });
   });
+
+  // Regression tests: both entry points into per-tab data loading
+  // (setTab on click, initializeApp on mount) must go through the shared
+  // loadDataForTab helper so they can't drift. We previously had a bug
+  // where /analysis/cohorts loaded on tab-click but not on page reload.
+  describe("per-tab data loading parity", () => {
+    const setupTagsFetchTracking = () => {
+      const calls = [];
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        calls.push(value);
+        if (value === "/api/v1/analysis/cohorts") {
+          return jsonResponse([{ id: 1, source_tag: "tld", label: "TLD", analysis_enabled: true, public_enabled: true }]);
+        }
+        if (value.includes("/api/v1/tags")) {
+          return jsonResponse([{ name: "tld", description: "TLDs cohort source", domain_count: 3, default_profile_id: null }]);
+        }
+        return jsonResponse({});
+      });
+      return calls;
+    };
+
+    it("fetches /analysis/cohorts on page reload with #/tags", async () => {
+      window.history.replaceState(null, "", "/#/tags");
+      const calls = setupTagsFetchTracking();
+
+      const { unmount } = render(App);
+
+      await waitFor(() => {
+        expect(calls).toContain("/api/v1/analysis/cohorts");
+      });
+      unmount();
+    });
+
+    it("fetches /analysis/cohorts when clicking the Tags tab", async () => {
+      const calls = setupTagsFetchTracking();
+
+      const { unmount } = render(App);
+      await fireEvent.click(screen.getByRole("tab", { name: "Tags" }));
+
+      await waitFor(() => {
+        expect(calls).toContain("/api/v1/analysis/cohorts");
+      });
+      unmount();
+    });
+
+    it("shows the cohort label in the tags list for tags used as cohort source", async () => {
+      setupTagsFetchTracking();
+
+      const { container, unmount } = render(App);
+      await fireEvent.click(screen.getByRole("tab", { name: "Tags" }));
+
+      await waitFor(() => {
+        const chip = container.querySelector(".tag-cohort-chip");
+        expect(chip).not.toBeNull();
+        expect(chip.textContent.trim()).toBe("TLD");
+      });
+      unmount();
+    });
+  });
 });

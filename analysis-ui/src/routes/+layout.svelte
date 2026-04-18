@@ -30,6 +30,29 @@
     }
     return url || "/";
   });
+
+  // Forward the active cohort (and any other filters that feed
+  // latestMaterializationForCohort) across nav-bar clicks so navigating
+  // between tabs doesn't drop the user back to the default cohort.
+  // Page-specific params like `sort`, `limit`, `offset` are intentionally
+  // not propagated — they only make sense within one list page.
+  const FORWARDED_PARAMS = ["dataset_tag", "scope_mode", "batch_id", "from", "to", "family", "level"];
+
+  const navQuery = $derived.by(() => {
+    const source = page.url.searchParams;
+    const params = new URLSearchParams();
+    for (const key of FORWARDED_PARAMS) {
+      const value = source.get(key);
+      if (value) params.set(key, value);
+    }
+    const str = params.toString();
+    return str ? `?${str}` : "";
+  });
+
+  function navHref(href: string): string {
+    const path = `${base}${href === "/" ? "" : href}`;
+    return `${path}${navQuery}`;
+  }
 </script>
 
 <div class="app-shell">
@@ -57,7 +80,7 @@
         <a
           class="nav-link"
           class:active={isActive(currentPath, item)}
-          href={`${base}${item.href === "/" ? "" : item.href}`}
+          href={navHref(item.href)}
         >
           {item.label}
         </a>

@@ -2424,6 +2424,7 @@
     }
     if (activeTab === "tags") {
       loadTagsList();
+      loadTagCohortMap();
     }
     if (activeTab === "domains") {
       loadDomains();

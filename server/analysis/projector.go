@@ -307,6 +307,34 @@ func (p *Projector) extractNameserverEndpoints(input RunInput) []extractedEndpoi
 		seen[key] = item
 	}
 
+	// nameserver_timings is the gonemaster engine's own record of the
+	// authoritative nameservers it actually queried for the tested zone, so
+	// we treat it as ground truth for "this (ns, address) is authoritative
+	// for the domain". When it's populated, any (ns, address) NOT in that
+	// set is treated as parent-side (delegation / DS queries, etc.) and
+	// downgraded to role="parent" — those rows are filtered out of the
+	// public views, so the domain detail page shows only the zone's own
+	// servers.
+	timingSet := make(map[string]struct{}, len(input.NameserverTimings))
+	for _, timing := range input.NameserverTimings {
+		ns := normalizeNameserverName(timing.Nameserver)
+		addr := strings.TrimSpace(timing.Address)
+		if ns == "" || addr == "" {
+			continue
+		}
+		timingSet[ns+"|"+addr] = struct{}{}
+	}
+	haveTimings := len(timingSet) > 0
+	classify := func(candidateRole, ns, addr string) string {
+		if !haveTimings {
+			return candidateRole
+		}
+		if _, ok := timingSet[ns+"|"+addr]; ok {
+			return "authoritative"
+		}
+		return "parent"
+	}
+
 	for _, timing := range input.NameserverTimings {
 		add(extractedEndpoint{
 			nameserver: normalizeNameserverName(timing.Nameserver),
@@ -326,13 +354,13 @@ func (p *Projector) extractNameserverEndpoints(input RunInput) []extractedEndpoi
 			add(extractedEndpoint{
 				nameserver: ns,
 				address:    addr,
-				role:       roleForSource("entry"),
+				role:       classify(roleForSource("entry"), ns, addr),
 				source:     "entry",
 			})
 		}
 		for _, sourceKey := range []string{"servers", "parent_servers", "child_servers", "zone_servers", "ns_set_servers"} {
 			for _, endpoint := range endpointsFromArgs(entry.Args[sourceKey]) {
-				endpoint.role = roleForSource(sourceKey)
+				endpoint.role = classify(roleForSource(sourceKey), endpoint.nameserver, endpoint.address)
 				endpoint.source = sourceKey
 				add(endpoint)
 			}

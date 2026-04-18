@@ -568,14 +568,63 @@ func TestProjectorExtractNameserverEndpoints(t *testing.T) {
 	if timing := byKey["ns1.example.test|timings"]; timing.queryCount != 3 || timing.avgMS != 11 || timing.family != "ipv4" || timing.role != "authoritative" {
 		t.Fatalf("unexpected timing endpoint: %+v", timing)
 	}
-	if server := byKey["ns2.example.test|servers"]; server.address != "2001:db8::20" || server.family != "ipv6" || server.role != "authoritative" {
+	// NameserverTimings is treated as the authoritative whitelist for the
+	// run. ns2 (from a generic `servers` list) and ns3 (from a top-level
+	// ns/address pair) are not in timings, so they are downgraded to the
+	// "parent" role and filtered out of public views downstream.
+	if server := byKey["ns2.example.test|servers"]; server.address != "2001:db8::20" || server.family != "ipv6" || server.role != "parent" {
 		t.Fatalf("unexpected server endpoint: %+v", server)
 	}
 	if parent := byKey["pns.example.test|parent_servers"]; parent.role != "parent" || parent.family != "ipv4" {
 		t.Fatalf("unexpected parent endpoint: %+v", parent)
 	}
-	if single := byKey["ns3.example.test|entry"]; single.address != "192.0.2.30" || single.role != "authoritative" {
+	if single := byKey["ns3.example.test|entry"]; single.address != "192.0.2.30" || single.role != "parent" {
 		t.Fatalf("unexpected singular endpoint: %+v", single)
+	}
+}
+
+// TestProjectorExtractNameserverEndpointsFallbackWithoutTimings verifies the
+// legacy behavior: when NameserverTimings is empty, entry-derived endpoints
+// still inherit the role tied to their source key.
+func TestProjectorExtractNameserverEndpointsFallbackWithoutTimings(t *testing.T) {
+	input := RunInput{
+		Entries: []serverpkg.Entry{
+			{
+				Args: map[string]any{
+					"servers": []any{
+						map[string]any{"ns": "ns2.example.test.", "address": "2001:db8::20"},
+					},
+				},
+			},
+			{
+				Args: map[string]any{
+					"parent_servers": []any{
+						map[string]any{"ns": "PNS.EXAMPLE.TEST.", "address": "198.51.100.53"},
+					},
+				},
+			},
+			{
+				Args: map[string]any{
+					"ns":      "ns3.example.test.",
+					"address": "192.0.2.30",
+				},
+			},
+		},
+	}
+
+	got := NewProjector(&fakeStore{}).extractNameserverEndpoints(input)
+	byKey := map[string]extractedEndpoint{}
+	for _, item := range got {
+		byKey[item.nameserver+"|"+item.source] = item
+	}
+	if server := byKey["ns2.example.test|servers"]; server.role != "authoritative" {
+		t.Fatalf("expected servers-sourced endpoint to default to authoritative without timings: %+v", server)
+	}
+	if single := byKey["ns3.example.test|entry"]; single.role != "authoritative" {
+		t.Fatalf("expected entry-sourced endpoint to default to authoritative without timings: %+v", single)
+	}
+	if parent := byKey["pns.example.test|parent_servers"]; parent.role != "parent" {
+		t.Fatalf("expected parent_servers endpoint to stay parent without timings: %+v", parent)
 	}
 }
 

@@ -29,15 +29,6 @@
     patch({ [key]: value });
   }
 
-  function clearAll() {
-    goto(`${page.url.pathname}`, {
-      replaceState: true,
-      noScroll: true,
-      keepFocus: true
-    });
-  }
-
-  const hasActiveFilters = $derived(params.toString().length > 0);
   const showCohort = $derived(selectorEnabled && cohorts.length > 1);
   const visible = $derived(showCohort || showSearch);
 </script>
@@ -69,10 +60,6 @@
           onchange={(e) => onChange("search", e.currentTarget.value.trim())}
         />
       </label>
-    {/if}
-
-    {#if hasActiveFilters}
-      <button type="button" class="ghost filter-clear" onclick={clearAll}>Clear</button>
     {/if}
   </section>
 {/if}
@@ -120,9 +107,5 @@
     font-size: var(--text-sm);
     letter-spacing: normal;
     text-transform: none;
-  }
-
-  .filter-clear {
-    margin-left: auto;
   }
 </style>

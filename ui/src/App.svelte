@@ -213,6 +213,7 @@
   // Tags tab state.
   let tagsList = [];
   let tagsListLoading = false;
+  let tagCohortByName = new Map();
   let tagCreateName = "";
   let tagCreateDescription = "";
   let tagCreating = false;
@@ -1173,6 +1174,7 @@
       if (!tagsLoaded) loadDomainTags();
     } else if (next === "tags") {
       loadTagsList();
+      loadTagCohortMap();
       if (selectedTag) {
         loadTagDomains({ reset: true });
         loadTagSummary();
@@ -1899,6 +1901,16 @@
       setStatus($t("tags_load_error", { error: error.message || "unknown error" }), "warn");
     } finally {
       tagsListLoading = false;
+    }
+  };
+
+  const loadTagCohortMap = async () => {
+    try {
+      const data = await apiFetch("/analysis/cohorts");
+      const cohorts = Array.isArray(data) ? data : [];
+      tagCohortByName = new Map(cohorts.map((c) => [c.source_tag, c]));
+    } catch (_) {
+      tagCohortByName = new Map();
     }
   };
 
@@ -3388,6 +3400,14 @@
       {#if selectedTag}
         <button class="secondary small" onclick={() => { selectedTag = null; tagProfileDraftId = ""; setTab("tags"); }}>{$t("back_to_tags")}</button>
         <h2 style="margin-top: 0.5rem;">{$t("batch_tag_label")}: {selectedTag.name}</h2>
+        {#if tagCohortByName.has(selectedTag.name)}
+          <p class="small" style="margin-top: -0.25rem; margin-bottom: 0.75rem;">
+            {$t("tag_cohort_source_prefix")}
+            <button type="button" class="link-button" onclick={() => setTab("cohorts")}>
+              {tagCohortByName.get(selectedTag.name).label || tagCohortByName.get(selectedTag.name).source_tag}
+            </button>
+          </p>
+        {/if}
 
         <!-- Severity summary -->
         {#if tagSummaryLoading}
@@ -3555,6 +3575,7 @@
           <table class="data-table">
             <thead><tr>
               <th class="sortable-column" aria-sort={tableSortAria(tagsListSortState, "name")}><button class="table-sort-button" type="button" onclick={() => { tagsListSortState = nextTableSort(tagsListSortState, "name"); }}><span>{$t("tag_name_label")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(tagsListSortState, "name")}</span></button></th>
+              <th>{$t("tag_cohort_col_header")}</th>
               <th class="sortable-column" aria-sort={tableSortAria(tagsListSortState, "description")}><button class="table-sort-button" type="button" onclick={() => { tagsListSortState = nextTableSort(tagsListSortState, "description"); }}><span>{$t("tag_description_label")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(tagsListSortState, "description")}</span></button></th>
               <th class="sortable-column" aria-sort={tableSortAria(tagsListSortState, "domain_count")}><button class="table-sort-button" type="button" onclick={() => { tagsListSortState = nextTableSort(tagsListSortState, "domain_count", "desc"); }}><span>{$t("col_domain_count")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(tagsListSortState, "domain_count")}</span></button></th>
             </tr></thead>
@@ -3568,6 +3589,20 @@
                   onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") navigateToTagDetail(tag); }}
                 >
                   <td class="mono">{tag.name}</td>
+                  <td>
+                    {#if tagCohortByName.has(tag.name)}
+                      <button
+                        type="button"
+                        class="tag-cohort-chip"
+                        title={$t("tag_cohort_link_title", { cohort: tagCohortByName.get(tag.name).label || tagCohortByName.get(tag.name).source_tag })}
+                        onclick={(e) => { e.stopPropagation(); setTab("cohorts"); }}
+                      >
+                        {tagCohortByName.get(tag.name).label || tagCohortByName.get(tag.name).source_tag}
+                      </button>
+                    {:else}
+                      -
+                    {/if}
+                  </td>
                   <td>{tag.description || "—"}</td>
                   <td>{tag.domain_count ?? 0}</td>
                 </tr>

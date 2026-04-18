@@ -545,20 +545,20 @@
     vertical-align: middle;
   }
 
-  .cohort-cell {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 2px;
+  .cohort-table tbody tr:last-child th[scope="row"] {
+    border-bottom: none;
   }
 
   .cohort-tag {
+    display: block;
     font-family: var(--mono);
     font-weight: 600;
     color: var(--ink);
   }
 
   .cohort-label {
+    display: block;
+    margin-top: 2px;
     font-size: var(--text-xs);
     color: var(--ink-2);
   }
@@ -571,19 +571,13 @@
   .col-right  { text-align: right; }
 
   .toggle-pill {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 54px;
-    padding: 3px 12px;
-    border-radius: 999px;
+    padding: 4px 10px;
+    border-radius: 6px;
     border: 1px solid var(--border);
     background: var(--surface-2);
     color: var(--ink-2);
     font-size: var(--text-xs);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    font-weight: 500;
     cursor: pointer;
     box-shadow: none;
     transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
@@ -616,12 +610,14 @@
   .badge-default {
     background: rgba(3, 105, 161, 0.12);
     color: var(--accent-2);
+    border-radius: 6px;
     text-transform: uppercase;
     letter-spacing: 0.04em;
     font-size: var(--text-xs);
   }
 
   .badge-status {
+    border-radius: 6px;
     text-transform: uppercase;
     letter-spacing: 0.04em;
     font-size: var(--text-xs);
@@ -640,13 +636,6 @@
   .badge-status-neutral {
     background: var(--surface-2);
     color: var(--ink-2);
-  }
-
-  .materialization-cell {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 2px;
   }
 
   .materialization-main {

@@ -1,9 +1,11 @@
-import { getCohortDetail } from "$lib/api";
+import { getCohortDetail, listTags, type TagView } from "$lib/api";
 
 export type OverviewPageData = {
   datasetTag: string | null;
   detail: CohortDetail | null;
   detailError: string | null;
+  topTags: TagView[];
+  topTagsError: string | null;
 };
 
 export type CohortDetail = {
@@ -25,16 +27,26 @@ export async function load({ parent, fetch }): Promise<OverviewPageData> {
   const layout = await parent();
   const datasetTag = layout.resolvedCohort ?? null;
   if (!datasetTag) {
-    return { datasetTag: null, detail: null, detailError: null };
-  }
-  try {
-    const detail = (await getCohortDetail(datasetTag, fetch)) as CohortDetail;
-    return { datasetTag, detail, detailError: null };
-  } catch (error) {
     return {
-      datasetTag,
+      datasetTag: null,
       detail: null,
-      detailError: error instanceof Error ? error.message : String(error)
+      detailError: null,
+      topTags: [],
+      topTagsError: null
     };
   }
+  const [detailResult, tagsResult] = await Promise.allSettled([
+    getCohortDetail(datasetTag, fetch),
+    listTags({ dataset_tag: datasetTag, limit: 10, min_level: "WARNING" }, fetch)
+  ]);
+  const errorMessage = (r: PromiseRejectedResult): string =>
+    r.reason instanceof Error ? r.reason.message : String(r.reason);
+  return {
+    datasetTag,
+    detail:
+      detailResult.status === "fulfilled" ? (detailResult.value as CohortDetail) : null,
+    detailError: detailResult.status === "rejected" ? errorMessage(detailResult) : null,
+    topTags: tagsResult.status === "fulfilled" ? tagsResult.value.items : [],
+    topTagsError: tagsResult.status === "rejected" ? errorMessage(tagsResult) : null
+  };
 }

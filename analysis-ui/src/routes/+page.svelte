@@ -2,7 +2,8 @@
   import { base } from "$app/paths";
   import { page } from "$app/state";
   import FilterBar from "$lib/FilterBar.svelte";
-  import { formatCount, formatTimestamp } from "$lib/format";
+  import { tagHref } from "$lib/entityLinks";
+  import { formatCount, formatTimestamp, levelTone } from "$lib/format";
   import type { LayoutData } from "./+layout";
   import type { OverviewPageData } from "./+page";
 
@@ -45,6 +46,21 @@
         pct: Math.round((count / total) * 100)
       };
     }).filter((b) => b.count > 0);
+  });
+
+  // Scale each top-tag bar against the widest bar, so the leader is 100%
+  // wide and the rest are proportional within the top-N.
+  const topTagRows = $derived.by(() => {
+    const tags = data.topTags ?? [];
+    if (tags.length === 0) return [];
+    const max = tags.reduce((m, t) => (t.domain_count > m ? t.domain_count : m), 0);
+    return tags.map((t) => ({
+      tag: t.tag,
+      level: t.level ?? "",
+      tone: levelTone(t.level),
+      count: t.domain_count,
+      widthPct: max > 0 ? Math.max(4, Math.round((t.domain_count / max) * 100)) : 0
+    }));
   });
 
   const query = $derived(page.url.search);
@@ -131,6 +147,42 @@
         </div>
       </section>
     {/if}
+    {#if topTagRows.length > 0}
+      <section class="card top-tags-section">
+        <h3>Top issues</h3>
+        <p class="hint">
+          Most common finding tags at WARNING level or worse, ranked by
+          how many domains they affect. NOTICE-level tags are excluded so
+          universal "zone exists" chatter doesn't crowd out the
+          actionable findings.
+        </p>
+        <ol class="top-tags-list">
+          {#each topTagRows as row (row.tag)}
+            <li>
+              <a class="top-tag-row" href={tagHref(base, row.tag, query)}>
+                <span class="top-tag-name">{row.tag}</span>
+                <span class="top-tag-bar-track" aria-hidden="true">
+                  <span
+                    class="top-tag-bar tone-{row.tone}"
+                    style:width="{row.widthPct}%"
+                  ></span>
+                </span>
+                <span class="top-tag-count">{formatCount(row.count)}</span>
+                {#if row.level}
+                  <span class="level level-{row.tone}">{row.level}</span>
+                {:else}
+                  <span class="level level-neutral">-</span>
+                {/if}
+              </a>
+            </li>
+          {/each}
+        </ol>
+      </section>
+    {:else if data.topTagsError}
+      <section class="card">
+        <p class="status-banner error">Failed to load top tags: {data.topTagsError}</p>
+      </section>
+    {/if}
     <section class="summary-grid" aria-label="Cohort summary counts">
       {#each summaryCards as card (card.label)}
         <a class="summary-card" href={`${base}${card.href}${query}`}>
@@ -209,6 +261,86 @@
   .tone-warning { background: #fef3c7; color: #92400e; }
   .tone-error { background: #ffedd5; color: #9a3412; }
   .tone-critical { background: #fee2e2; color: #991b1b; }
+  .tone-neutral { background: var(--surface-2); color: var(--on-surface-2); }
+
+  .top-tags-section {
+    gap: var(--space-2);
+  }
+  .top-tags-section h3 {
+    margin: 0;
+  }
+  .top-tags-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .top-tag-row {
+    display: grid;
+    grid-template-columns: minmax(10rem, 18rem) 1fr minmax(4rem, auto) minmax(4.5rem, auto);
+    align-items: center;
+    gap: var(--space-3);
+    padding: 6px var(--space-3);
+    border-radius: var(--radius);
+    text-decoration: none;
+    color: var(--ink);
+    border: 1px solid transparent;
+  }
+  .top-tag-row:hover {
+    border-color: var(--accent-2);
+    background: var(--surface-2);
+  }
+  .top-tag-name {
+    font-family: var(--mono);
+    font-size: var(--text-sm);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .top-tag-bar-track {
+    display: block;
+    width: 100%;
+    height: 10px;
+    background: var(--surface-2);
+    border-radius: 5px;
+    overflow: hidden;
+  }
+  .top-tag-bar {
+    display: block;
+    height: 100%;
+    border-radius: 5px;
+  }
+  /* Solid bars need their own fills; the pastel .tone-* used by the health
+     bar's labelled segments doesn't provide enough contrast against the
+     white card in light mode. --bar-* is defined per theme in app.css. */
+  .top-tag-bar.tone-ok { background: var(--bar-ok); }
+  .top-tag-bar.tone-notice { background: var(--bar-notice); }
+  .top-tag-bar.tone-warning { background: var(--bar-warning); }
+  .top-tag-bar.tone-error { background: var(--bar-error); }
+  .top-tag-bar.tone-critical { background: var(--bar-critical); }
+  .top-tag-bar.tone-neutral { background: var(--bar-neutral); }
+  .top-tag-count {
+    font-family: var(--mono);
+    font-size: var(--text-sm);
+    text-align: right;
+  }
+  .level {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 999px;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    text-align: center;
+  }
+  .level-critical { background: #fee2e2; color: #991b1b; }
+  .level-error { background: #ffedd5; color: #9a3412; }
+  .level-warning { background: #fef3c7; color: #92400e; }
+  .level-notice { background: #e0f2fe; color: #075985; }
+  .level-neutral { background: var(--surface-2); color: var(--on-surface-2); }
 
   .summary-grid {
     display: grid;

@@ -42,6 +42,17 @@
   --surface-2: #e4e7ec;
   --on-surface-2: #344054;
   --btn-fg: #ffffff;
+
+  /* Chart bar fills. Solid bars (no text inside) need real contrast against
+     the card, which pastel pill-fills don't provide in light mode. These
+     tokens are overridden in dark mode below with the familiar pastels,
+     which read well against the dark background. */
+  --bar-ok:       #16a34a;
+  --bar-notice:   #2563eb;
+  --bar-warning:  #d97706;
+  --bar-error:    #ea580c;
+  --bar-critical: #dc2626;
+  --bar-neutral:  #6b7280;
 }
 
 /* ── Reset ───────────────────────────────────────────────────────────────── */
@@ -375,6 +386,13 @@ button:hover:not(:disabled) {
     --surface-2: #2d3748;
     --on-surface-2: #8b98a7;
     --btn-fg: #0d1117;
+
+    --bar-ok:       #dcfce7;
+    --bar-notice:   #e0f2fe;
+    --bar-warning:  #fef3c7;
+    --bar-error:    #ffedd5;
+    --bar-critical: #fee2e2;
+    --bar-neutral:  #9ca3af;
   }
 }
 
@@ -394,6 +412,13 @@ button:hover:not(:disabled) {
   --surface-2: #2d3748;
   --on-surface-2: #8b98a7;
   --btn-fg: #0d1117;
+
+  --bar-ok:       #dcfce7;
+  --bar-notice:   #e0f2fe;
+  --bar-warning:  #fef3c7;
+  --bar-error:    #ffedd5;
+  --bar-critical: #fee2e2;
+  --bar-neutral:  #9ca3af;
 }
 
 /* ── Responsive ──────────────────────────────────────────────────────────── */

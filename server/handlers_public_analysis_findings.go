@@ -39,6 +39,15 @@ func (s *Server) handlePublicAnalysisTags(w http.ResponseWriter, r *http.Request
 	if !ok {
 		return
 	}
+	minLevelRank := 0
+	if raw := strings.TrimSpace(r.URL.Query().Get("min_level")); raw != "" {
+		minLevelRank = severityRank(raw)
+		if minLevelRank == 0 {
+			writeError(w, http.StatusBadRequest, "invalid_min_level",
+				"min_level must be one of NOTICE, WARNING, ERROR, CRITICAL", nil)
+			return
+		}
+	}
 
 	latest := s.latestMaterializationForCohort(cohort).latest
 
@@ -83,6 +92,15 @@ func (s *Server) handlePublicAnalysisTags(w http.ResponseWriter, r *http.Request
 		})
 	}
 
+	if minLevelRank > 0 {
+		kept := items[:0]
+		for _, it := range items {
+			if severityRank(it.Level) >= minLevelRank {
+				kept = append(kept, it)
+			}
+		}
+		items = kept
+	}
 	if filter.Search != "" {
 		needle := strings.ToLower(filter.Search)
 		kept := items[:0]

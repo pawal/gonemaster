@@ -217,6 +217,7 @@ export type AnalysisFilter = {
   limit?: number;
   offset?: number;
   sort?: string;
+  min_level?: string;
 };
 
 export type FetchLike = typeof fetch;

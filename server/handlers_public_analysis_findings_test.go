@@ -100,6 +100,45 @@ func TestPublicAnalysisTagsSearch(t *testing.T) {
 	}
 }
 
+func TestPublicAnalysisTagsMinLevel(t *testing.T) {
+	f := newAnalysisAPITestFixture(t)
+	ts := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+	f.seedGraduatedRun("alpha.example", ts, []engine.LogEntry{
+		{Module: "BASIC", Tag: "B01_OK", Level: "NOTICE"},
+		{Module: "DELEGATION", Tag: "REFERRAL_SLOW", Level: "WARNING"},
+		{Module: "DNSSEC", Tag: "DS07_NOT_SIGNED", Level: "ERROR"},
+	})
+
+	// min_level=WARNING drops NOTICE-only tags and keeps WARNING and ERROR.
+	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/tags?min_level=WARNING")
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
+	}
+	var got PublicAnalysisListResponse[PublicAnalysisTagView]
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	tags := map[string]PublicAnalysisTagView{}
+	for _, v := range got.Items {
+		tags[v.Tag] = v
+	}
+	if _, ok := tags["B01_OK"]; ok {
+		t.Fatalf("min_level=WARNING should drop NOTICE tags, got %+v", tags)
+	}
+	if _, ok := tags["REFERRAL_SLOW"]; !ok {
+		t.Fatalf("min_level=WARNING should keep WARNING tags, got %+v", tags)
+	}
+	if _, ok := tags["DS07_NOT_SIGNED"]; !ok {
+		t.Fatalf("min_level=WARNING should keep ERROR tags, got %+v", tags)
+	}
+
+	// Invalid level is a 400.
+	bad := getPublic(t, f.srv, "/pub/api/v1/analysis/tags?min_level=nonsense")
+	if bad.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid min_level, got %d: %s", bad.Code, bad.Body)
+	}
+}
+
 func TestPublicAnalysisTestcasesAggregates(t *testing.T) {
 	f := newAnalysisAPITestFixture(t)
 	ts := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)

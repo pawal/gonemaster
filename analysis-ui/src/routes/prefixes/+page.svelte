@@ -3,6 +3,7 @@
   import { base } from "$app/paths";
   import { page } from "$app/state";
   import FilterBar from "$lib/FilterBar.svelte";
+  import SortHeader from "$lib/SortHeader.svelte";
   import { asnHref, prefixHref } from "$lib/entityLinks";
   import { formatCount } from "$lib/format";
   import { searchToString } from "$lib/filters";
@@ -15,10 +16,9 @@
 
   const layoutData = $derived(page.data as LayoutData);
 
-  const sortOptions: { value: string; label: string }[] = [
-    { value: "", label: "Prefix ↑ (default)" },
-    { value: "domain_count_desc", label: "Domain count ↓" }
-  ];
+  const sortSpecs = {
+    domainCount: { desc: "domain_count_desc" }
+  } as const;
 
   const currentSort = $derived(page.url.searchParams.get("sort") ?? "");
   const currentLimit = $derived(data.limit);
@@ -92,14 +92,6 @@
     <h2>Prefixes</h2>
     <div class="list-toolbar">
       <label class="inline-field">
-        <span>Sort</span>
-        <select value={currentSort} onchange={(e) => updateParam("sort", e.currentTarget.value)}>
-          {#each sortOptions as opt}
-            <option value={opt.value}>{opt.label}</option>
-          {/each}
-        </select>
-      </label>
-      <label class="inline-field">
         <span>Page size</span>
         <select value={String(currentLimit)} onchange={(e) => updateParam("limit", e.currentTarget.value)}>
           {#each [25, 50, 100, 250, 500] as n}
@@ -127,7 +119,9 @@
           <tr>
             <th scope="col">Prefix</th>
             <th scope="col">Family</th>
-            <th scope="col" class="col-num">Domains</th>
+            <th scope="col" class="col-num">
+              <SortHeader label="Domains" spec={sortSpecs.domainCount} align="right" {currentSort} onsort={(v: string) => updateParam("sort", v)} />
+            </th>
             <th scope="col" class="col-num">Addresses</th>
             <th scope="col">ASN</th>
           </tr>

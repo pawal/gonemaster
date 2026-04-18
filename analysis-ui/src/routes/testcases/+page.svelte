@@ -3,6 +3,7 @@
   import { base } from "$app/paths";
   import { page } from "$app/state";
   import FilterBar from "$lib/FilterBar.svelte";
+  import SortHeader from "$lib/SortHeader.svelte";
   import { testcaseHref } from "$lib/entityLinks";
   import { formatCount, levelTone } from "$lib/format";
   import { searchToString } from "$lib/filters";
@@ -15,10 +16,11 @@
 
   const layoutData = $derived(page.data as LayoutData);
 
-  const sortOptions: { value: string; label: string }[] = [
-    { value: "", label: "Domain count ↓ (default)" },
-    { value: "level_desc", label: "Severity ↓" }
-  ];
+  const sortSpecs = {
+    // server default when sort is empty is already domain_count_desc.
+    domainCount: { desc: "domain_count_desc" },
+    level: { desc: "level_desc" }
+  } as const;
 
   const currentSort = $derived(page.url.searchParams.get("sort") ?? "");
   const currentLimit = $derived(data.limit);
@@ -92,14 +94,6 @@
     <h2>Testcases</h2>
     <div class="list-toolbar">
       <label class="inline-field">
-        <span>Sort</span>
-        <select value={currentSort} onchange={(e) => updateParam("sort", e.currentTarget.value)}>
-          {#each sortOptions as opt}
-            <option value={opt.value}>{opt.label}</option>
-          {/each}
-        </select>
-      </label>
-      <label class="inline-field">
         <span>Page size</span>
         <select value={String(currentLimit)} onchange={(e) => updateParam("limit", e.currentTarget.value)}>
           {#each [25, 50, 100, 250, 500] as n}
@@ -126,8 +120,12 @@
         <thead>
           <tr>
             <th scope="col">Module / Testcase</th>
-            <th scope="col">Worst level</th>
-            <th scope="col" class="col-num">Domains</th>
+            <th scope="col">
+              <SortHeader label="Worst level" spec={sortSpecs.level} {currentSort} onsort={(v: string) => updateParam("sort", v)} />
+            </th>
+            <th scope="col" class="col-num">
+              <SortHeader label="Domains" spec={sortSpecs.domainCount} align="right" {currentSort} onsort={(v: string) => updateParam("sort", v)} />
+            </th>
             <th scope="col" class="col-num">Entries</th>
             <th scope="col" class="col-num">Unique tags</th>
           </tr>

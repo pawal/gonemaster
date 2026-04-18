@@ -3,6 +3,7 @@
   import { base } from "$app/paths";
   import { page } from "$app/state";
   import FilterBar from "$lib/FilterBar.svelte";
+  import SortHeader from "$lib/SortHeader.svelte";
   import { domainHref } from "$lib/entityLinks";
   import { formatCount, formatTimestamp, gradeTone, levelTone } from "$lib/format";
   import { searchToString } from "$lib/filters";
@@ -15,14 +16,11 @@
 
   const layoutData = $derived(page.data as LayoutData);
 
-  const sortOptions: { value: string; label: string }[] = [
-    { value: "", label: "Name ↑ (default)" },
-    { value: "domain_asc", label: "Name ↑" },
-    { value: "domain_desc", label: "Name ↓" },
-    { value: "score_desc", label: "Score ↓" },
-    { value: "score_asc", label: "Score ↑" },
-    { value: "worst_level_desc", label: "Worst severity" }
-  ];
+  const sortSpecs = {
+    domain: { asc: "domain_asc", desc: "domain_desc" },
+    score: { asc: "score_asc", desc: "score_desc" },
+    worst: { desc: "worst_level_desc" }
+  } as const;
 
   const currentSort = $derived(page.url.searchParams.get("sort") ?? "");
   const currentLimit = $derived(data.limit);
@@ -100,14 +98,6 @@
     <h2>Domains</h2>
     <div class="list-toolbar">
       <label class="inline-field">
-        <span>Sort</span>
-        <select value={currentSort} onchange={(e) => updateParam("sort", e.currentTarget.value)}>
-          {#each sortOptions as opt}
-            <option value={opt.value}>{opt.label}</option>
-          {/each}
-        </select>
-      </label>
-      <label class="inline-field">
         <span>Page size</span>
         <select value={String(currentLimit)} onchange={(e) => updateParam("limit", e.currentTarget.value)}>
           {#each [25, 50, 100, 250, 500] as n}
@@ -133,10 +123,16 @@
       <table class="data-table">
         <thead>
           <tr>
-            <th scope="col">Domain</th>
-            <th scope="col" class="col-num">Score</th>
+            <th scope="col">
+              <SortHeader label="Domain" spec={sortSpecs.domain} {currentSort} onsort={(v: string) => updateParam("sort", v)} />
+            </th>
+            <th scope="col" class="col-num">
+              <SortHeader label="Score" spec={sortSpecs.score} align="right" {currentSort} onsort={(v: string) => updateParam("sort", v)} />
+            </th>
             <th scope="col">Grade</th>
-            <th scope="col">Worst</th>
+            <th scope="col">
+              <SortHeader label="Worst" spec={sortSpecs.worst} {currentSort} onsort={(v: string) => updateParam("sort", v)} />
+            </th>
             <th scope="col" class="col-num">Nameservers</th>
             <th scope="col" class="col-num">Endpoints</th>
             <th scope="col" class="col-num">ASNs</th>

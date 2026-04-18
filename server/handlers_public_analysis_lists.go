@@ -14,6 +14,7 @@ type AnalysisReadStore interface {
 	ListAnalysisRunDomainSummariesByCohort(cohortID int64) []AnalysisRunDomainSummary
 	ListAnalysisRunNSEndpointsByCohort(cohortID int64) []AnalysisRunNameserverEndpoint
 	ListAnalysisRunAddressASNsByCohort(cohortID int64) []AnalysisRunAddressASN
+	ListAnalysisRunDomainASNsByCohort(cohortID int64) []AnalysisRunDomainASN
 	GetAnalysisNameserver(id int64) (AnalysisNameserver, bool)
 	GetAnalysisAddress(id int64) (AnalysisAddress, bool)
 	GetAnalysisPrefix(id int64) (AnalysisPrefix, bool)
@@ -193,6 +194,7 @@ type latestCohortMaterialization struct {
 	latestRuns  map[string]struct{}
 	endpoints   []AnalysisRunNameserverEndpoint
 	addressASNs []AnalysisRunAddressASN
+	domainASNs  []AnalysisRunDomainASN
 }
 
 // latestSummariesByDomain collapses multiple materialized summaries per domain
@@ -243,7 +245,22 @@ func latestMaterializationForCohort(readStore AnalysisReadStore, runLookup inter
 		latestRuns:  runIDs,
 		endpoints:   authoritative,
 		addressASNs: filterAnalysisRunAddressASNsByRunIDs(readStore.ListAnalysisRunAddressASNsByCohort(cohortID), runIDs),
+		domainASNs:  filterAnalysisRunDomainASNsByRunIDs(readStore.ListAnalysisRunDomainASNsByCohort(cohortID), runIDs),
 	}
+}
+
+func filterAnalysisRunDomainASNsByRunIDs(items []AnalysisRunDomainASN, runIDs map[string]struct{}) []AnalysisRunDomainASN {
+	if len(runIDs) == 0 {
+		return nil
+	}
+	out := make([]AnalysisRunDomainASN, 0, len(items))
+	for _, item := range items {
+		if _, ok := runIDs[item.RunID]; !ok {
+			continue
+		}
+		out = append(out, item)
+	}
+	return out
 }
 
 func filterAnalysisRunNSEndpointsByRunIDs(items []AnalysisRunNameserverEndpoint, runIDs map[string]struct{}) []AnalysisRunNameserverEndpoint {

@@ -30,6 +30,7 @@ type fakeStore struct {
 
 	nsEndpoints map[string][]serverpkg.AnalysisRunNameserverEndpoint
 	addrFacts   map[string][]serverpkg.AnalysisRunAddressASN
+	domainASNs  map[string][]serverpkg.AnalysisRunDomainASN
 	summaries   map[string]serverpkg.AnalysisRunDomainSummary
 	states      map[string]serverpkg.AnalysisProjectionState
 }
@@ -119,6 +120,11 @@ func (s *fakeStore) ClearAnalysisCohortMaterialization(cohortID int64) error {
 	for key := range s.addrFacts {
 		if strings.HasPrefix(key, prefix) {
 			delete(s.addrFacts, key)
+		}
+	}
+	for key := range s.domainASNs {
+		if strings.HasPrefix(key, prefix) {
+			delete(s.domainASNs, key)
 		}
 	}
 	for key := range s.summaries {
@@ -271,6 +277,12 @@ func (s *fakeStore) ReplaceAnalysisRunAddressASNs(cohortID int64, runID string, 
 	return nil
 }
 
+func (s *fakeStore) ReplaceAnalysisRunDomainASNs(cohortID int64, runID string, items []serverpkg.AnalysisRunDomainASN) error {
+	s.ensureMaterializedMaps()
+	s.domainASNs[projectionKey(cohortID, runID)] = append([]serverpkg.AnalysisRunDomainASN(nil), items...)
+	return nil
+}
+
 func (s *fakeStore) UpsertAnalysisRunDomainSummary(item serverpkg.AnalysisRunDomainSummary) error {
 	s.ensureMaterializedMaps()
 	s.summaries[projectionKey(item.CohortID, item.RunID)] = item
@@ -301,6 +313,9 @@ func (s *fakeStore) ensureMaterializedMaps() {
 	}
 	if s.addrFacts == nil {
 		s.addrFacts = map[string][]serverpkg.AnalysisRunAddressASN{}
+	}
+	if s.domainASNs == nil {
+		s.domainASNs = map[string][]serverpkg.AnalysisRunDomainASN{}
 	}
 	if s.summaries == nil {
 		s.summaries = map[string]serverpkg.AnalysisRunDomainSummary{}
@@ -708,8 +723,12 @@ func TestProjectorProjectRunPersistsFactsIdempotently(t *testing.T) {
 	if len(store.prefixesByValue) != 2 {
 		t.Fatalf("expected 2 normalized prefixes, got %d", len(store.prefixesByValue))
 	}
-	if len(store.asnsByValue) != 2 {
-		t.Fatalf("expected 2 normalized ASNs, got %d", len(store.asnsByValue))
+	// 2 ASNs surface from per-address args (64510 from entry 1's asns[0], 64520
+	// from entry 2's asn). The aggregate-ASN projection adds 64500 from
+	// entry 1's asns list — we now upsert every ASN the engine emitted,
+	// whether or not it pairs with a specific address.
+	if len(store.asnsByValue) != 3 {
+		t.Fatalf("expected 3 normalized ASNs, got %d", len(store.asnsByValue))
 	}
 
 	for _, cohortID := range []int64{10, 20} {

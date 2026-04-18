@@ -30,6 +30,7 @@ type Store interface {
 	UpsertAnalysisASN(asn int64, label string, seenAt time.Time) (serverpkg.AnalysisASN, error)
 	ReplaceAnalysisRunNSEndpoints(cohortID int64, runID string, items []serverpkg.AnalysisRunNameserverEndpoint) error
 	ReplaceAnalysisRunAddressASNs(cohortID int64, runID string, items []serverpkg.AnalysisRunAddressASN) error
+	ReplaceAnalysisRunDomainASNs(cohortID int64, runID string, items []serverpkg.AnalysisRunDomainASN) error
 	UpsertAnalysisRunDomainSummary(item serverpkg.AnalysisRunDomainSummary) error
 	SetAnalysisProjectionState(item serverpkg.AnalysisProjectionState) error
 }
@@ -126,6 +127,7 @@ func (p *Projector) ProjectLoaded(input RunInput) error {
 
 	endpoints := p.extractNameserverEndpoints(input)
 	addressFacts := p.extractAddressFacts(input)
+	domainASNs := p.extractDomainASNs(input)
 
 	nameserverIDs := map[string]int64{}
 	addressIDs := map[string]int64{}
@@ -160,6 +162,11 @@ func (p *Projector) ProjectLoaded(input RunInput) error {
 			if _, err := p.store.UpsertAnalysisASN(*fact.asn, "", input.Run.FinishedAt); err != nil {
 				return fmt.Errorf("upsert asn %d: %w", *fact.asn, err)
 			}
+		}
+	}
+	for _, da := range domainASNs {
+		if _, err := p.store.UpsertAnalysisASN(da.asn, "", input.Run.FinishedAt); err != nil {
+			return fmt.Errorf("upsert asn %d: %w", da.asn, err)
 		}
 	}
 
@@ -207,6 +214,21 @@ func (p *Projector) ProjectLoaded(input RunInput) error {
 		}
 		if err := p.store.ReplaceAnalysisRunAddressASNs(cohort.ID, input.Run.ID, addrRows); err != nil {
 			return fmt.Errorf("replace address facts for cohort %d: %w", cohort.ID, err)
+		}
+
+		domainASNRows := make([]serverpkg.AnalysisRunDomainASN, 0, len(domainASNs))
+		for _, da := range domainASNs {
+			domainASNRows = append(domainASNRows, serverpkg.AnalysisRunDomainASN{
+				CohortID: cohort.ID,
+				RunID:    input.Run.ID,
+				DomainID: input.Run.DomainID,
+				ASN:      da.asn,
+				Family:   da.family,
+				Source:   da.source,
+			})
+		}
+		if err := p.store.ReplaceAnalysisRunDomainASNs(cohort.ID, input.Run.ID, domainASNRows); err != nil {
+			return fmt.Errorf("replace domain asns for cohort %d: %w", cohort.ID, err)
 		}
 
 		summary.CohortID = cohort.ID
@@ -404,6 +426,63 @@ func (p *Projector) extractAddressFacts(input RunInput) []extractedAddressFact {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].address < out[j].address })
 	return out
+}
+
+// extractedDomainASN is one (ASN, family) observation the engine emitted for
+// the tested domain without pairing to a specific address.
+type extractedDomainASN struct {
+	asn    int64
+	family string
+	source string
+}
+
+// extractDomainASNs pulls the aggregate ASN sets the engine emits per family
+// (IPV4_*_ASN / IPV6_*_ASN tags with an `asns` argument). These tell us which
+// ASNs the domain's nameserver set spans without tying each ASN to an
+// individual address. Deduplicated by (asn, family).
+func (p *Projector) extractDomainASNs(input RunInput) []extractedDomainASN {
+	seen := map[[2]string]extractedDomainASN{}
+	for _, entry := range input.Entries {
+		values := numericSliceArg(entry.Args, "asns")
+		if len(values) == 0 {
+			continue
+		}
+		family := familyFromASNTag(entry.Tag)
+		for _, asn := range values {
+			if asn == 0 {
+				continue
+			}
+			key := [2]string{family, fmt.Sprintf("%d", asn)}
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = extractedDomainASN{asn: asn, family: family, source: "entries"}
+		}
+	}
+	out := make([]extractedDomainASN, 0, len(seen))
+	for _, v := range seen {
+		out = append(out, v)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].asn != out[j].asn {
+			return out[i].asn < out[j].asn
+		}
+		return out[i].family < out[j].family
+	})
+	return out
+}
+
+// familyFromASNTag maps tags like IPV4_DIFFERENT_ASN / IPV6_ONE_ASN to a
+// family label. Returns "" when the tag doesn't carry a family hint.
+func familyFromASNTag(tag string) string {
+	upper := strings.ToUpper(tag)
+	if strings.HasPrefix(upper, "IPV4_") {
+		return "ipv4"
+	}
+	if strings.HasPrefix(upper, "IPV6_") {
+		return "ipv6"
+	}
+	return ""
 }
 
 func applyPrefix(fact *extractedAddressFact, prefix string) {

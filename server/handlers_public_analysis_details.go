@@ -176,6 +176,9 @@ func (s *Server) handlePublicAnalysisCohortDetail(w http.ResponseWriter, r *http
 				prefixSet[*fact.PrefixID] = struct{}{}
 			}
 		}
+		for _, da := range data.domainASNs {
+			asnSet[da.ASN] = struct{}{}
+		}
 		detail.DomainCount = len(domainSet)
 		detail.NameserverCount = len(nsSet)
 		detail.EndpointCount = len(endpointSet)
@@ -580,6 +583,12 @@ func (s *Server) handlePublicAnalysisASNDetail(w http.ResponseWriter, r *http.Re
 		if fact.PrefixID != nil {
 			prefixSet[*fact.PrefixID] = struct{}{}
 		}
+	}
+	for _, da := range data.domainASNs {
+		if da.ASN != asn {
+			continue
+		}
+		domainSet[da.DomainID] = struct{}{}
 	}
 	if len(domainSet) == 0 {
 		writeError(w, http.StatusNotFound, "not_found", "asn not found in cohort", nil)

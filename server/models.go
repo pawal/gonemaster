@@ -262,6 +262,19 @@ type AnalysisRunNameserverEndpoint struct {
 	QueryCount   int     `json:"query_count"`
 }
 
+// AnalysisRunDomainASN is an aggregate (domain, ASN) row derived from the
+// per-family ASN sets gonemaster logs expose (e.g. IPV4_DIFFERENT_ASN). The
+// engine does not pair ASNs with specific addresses, so this table carries
+// the domain-level ASN footprint without an address column.
+type AnalysisRunDomainASN struct {
+	CohortID int64  `json:"cohort_id"`
+	RunID    string `json:"run_id"`
+	DomainID int64  `json:"domain_id"`
+	ASN      int64  `json:"asn"`
+	Family   string `json:"family,omitempty"`
+	Source   string `json:"source,omitempty"`
+}
+
 // AnalysisRunAddressASN is one materialized address/prefix/ASN row for a run+cohort.
 type AnalysisRunAddressASN struct {
 	CohortID     int64  `json:"cohort_id"`

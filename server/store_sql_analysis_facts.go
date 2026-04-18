@@ -14,7 +14,8 @@ const (
 	analysisASNCols        = `asn, label, first_seen_at, last_seen_at`
 	analysisRunNSEndCols   = `cohort_id, run_id, domain_id, nameserver_id, address_id,
 		role, source, family, avg_ms, min_ms, max_ms, query_count`
-	analysisRunAddrASNCols = `cohort_id, run_id, domain_id, address_id, prefix_id, asn, lookup_status, source`
+	analysisRunAddrASNCols  = `cohort_id, run_id, domain_id, address_id, prefix_id, asn, lookup_status, source`
+	analysisRunDomainASNCols = `cohort_id, run_id, domain_id, asn, family, source`
 	analysisRunSummaryCols = `cohort_id, run_id, domain_id, score, grade, nameserver_count,
 		endpoint_count, asn_count, prefix_count, worst_level`
 	analysisProjStateCols = `cohort_id, run_id, projector_version, status, projected_at, error`
@@ -594,6 +595,62 @@ func (s *SQLJobStore) ListAnalysisRunAddressASNsByCohort(cohortID int64) []Analy
 	return out
 }
 
+// ReplaceAnalysisRunDomainASNs replaces all run+cohort domain-to-ASN rows.
+func (s *SQLJobStore) ReplaceAnalysisRunDomainASNs(cohortID int64, runID string, items []AnalysisRunDomainASN) error {
+	if cohortID == 0 {
+		return errors.New("cohort_id is required")
+	}
+	if runID == "" {
+		return errors.New("run_id is required")
+	}
+	rows := make([][]any, 0, len(items))
+	for _, item := range items {
+		rows = append(rows, []any{
+			cohortID, runID, item.DomainID, item.ASN, item.Family, item.Source,
+		})
+	}
+	err := s.replaceAnalysisRows(
+		fmt.Sprintf(`DELETE FROM analysis_run_domain_asns WHERE cohort_id = %s AND run_id = %s`, s.ph(1), s.ph(2)),
+		[]any{cohortID, runID},
+		fmt.Sprintf(`INSERT INTO analysis_run_domain_asns (
+			cohort_id, run_id, domain_id, asn, family, source
+		) VALUES (%s)`, s.phRange(1, 6)),
+		rows,
+	)
+	if err != nil {
+		return fmt.Errorf("replace analysis run domain asns: %w", err)
+	}
+	return nil
+}
+
+// ListAnalysisRunDomainASNsByCohort returns every domain-to-ASN row
+// materialized for the cohort, across all runs.
+func (s *SQLJobStore) ListAnalysisRunDomainASNsByCohort(cohortID int64) []AnalysisRunDomainASN {
+	rows, err := s.db.Query(
+		fmt.Sprintf(`SELECT %s FROM analysis_run_domain_asns
+			WHERE cohort_id = %s
+			ORDER BY domain_id, asn, family`,
+			analysisRunDomainASNCols, s.ph(1)),
+		cohortID,
+	)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	var out []AnalysisRunDomainASN
+	for rows.Next() {
+		var item AnalysisRunDomainASN
+		if err := rows.Scan(
+			&item.CohortID, &item.RunID, &item.DomainID, &item.ASN, &item.Family, &item.Source,
+		); err != nil {
+			return nil
+		}
+		out = append(out, item)
+	}
+	return out
+}
+
 // ListAnalysisRunDomainSummariesByCohort returns every run+domain summary row
 // materialized for the cohort.
 func (s *SQLJobStore) ListAnalysisRunDomainSummariesByCohort(cohortID int64) []AnalysisRunDomainSummary {
@@ -810,6 +867,7 @@ func (s *SQLJobStore) ClearAnalysisCohortMaterialization(cohortID int64) error {
 		fmt.Sprintf(`DELETE FROM analysis_projection_state WHERE cohort_id = %s`, s.ph(1)),
 		fmt.Sprintf(`DELETE FROM analysis_run_domain_summary WHERE cohort_id = %s`, s.ph(1)),
 		fmt.Sprintf(`DELETE FROM analysis_run_address_asns WHERE cohort_id = %s`, s.ph(1)),
+		fmt.Sprintf(`DELETE FROM analysis_run_domain_asns WHERE cohort_id = %s`, s.ph(1)),
 		fmt.Sprintf(`DELETE FROM analysis_run_ns_endpoints WHERE cohort_id = %s`, s.ph(1)),
 	} {
 		if _, err := s.db.Exec(query, cohortID); err != nil {

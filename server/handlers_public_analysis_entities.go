@@ -384,6 +384,28 @@ func (s *Server) handlePublicAnalysisASNs(w http.ResponseWriter, r *http.Request
 		_ = asn
 	}
 
+	// Domain-level ASN aggregates (IPV4_*_ASN / IPV6_*_ASN tags without an
+	// address pairing) surface here too. They only contribute domain_count
+	// and the per-family presence flag — there is no address/nameserver/
+	// prefix linkage to populate from these rows.
+	for _, da := range data.domainASNs {
+		b, exists := buckets[da.ASN]
+		if !exists {
+			asn, _ := readStore.GetAnalysisASN(da.ASN)
+			b = &asnAgg{
+				label:       asn.Label,
+				domains:     map[int64]struct{}{},
+				addresses:   map[int64]struct{}{},
+				prefixes:    map[int64]struct{}{},
+				nameservers: map[int64]struct{}{},
+				ipv4:        map[int64]struct{}{},
+				ipv6:        map[int64]struct{}{},
+			}
+			buckets[da.ASN] = b
+		}
+		b.domains[da.DomainID] = struct{}{}
+	}
+
 	items := make([]PublicAnalysisASNView, 0, len(buckets))
 	for asn, b := range buckets {
 		items = append(items, PublicAnalysisASNView{

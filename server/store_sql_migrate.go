@@ -245,6 +245,20 @@ func buildV7DDL(autoinc, bigint string) []string {
 		`CREATE INDEX IF NOT EXISTS idx_analysis_run_address_asns_address_id ON analysis_run_address_asns(address_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_analysis_run_address_asns_asn ON analysis_run_address_asns(asn)`,
 
+		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS analysis_run_domain_asns (
+			cohort_id  %s           NOT NULL,
+			run_id     VARCHAR(255) NOT NULL,
+			domain_id  %s           NOT NULL,
+			asn        BIGINT       NOT NULL,
+			family     VARCHAR(8)   NOT NULL DEFAULT '',
+			source     VARCHAR(32)  NOT NULL DEFAULT '',
+			PRIMARY KEY (cohort_id, run_id, domain_id, asn, family)
+		)`, bigint, bigint),
+		`CREATE INDEX IF NOT EXISTS idx_analysis_run_domain_asns_cohort_id ON analysis_run_domain_asns(cohort_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_analysis_run_domain_asns_run_id ON analysis_run_domain_asns(run_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_analysis_run_domain_asns_domain_id ON analysis_run_domain_asns(domain_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_analysis_run_domain_asns_asn ON analysis_run_domain_asns(asn)`,
+
 		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS analysis_run_domain_summary (
 			cohort_id         %s          NOT NULL,
 			run_id            VARCHAR(255) NOT NULL,

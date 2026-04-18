@@ -3,8 +3,6 @@
   import { base } from "$app/paths";
   import { page } from "$app/state";
   import FilterBar from "$lib/FilterBar.svelte";
-  import ASNChip from "$lib/chips/ASNChip.svelte";
-  import PrefixChip from "$lib/chips/PrefixChip.svelte";
   import { prefixHref } from "$lib/entityLinks";
   import { formatCount } from "$lib/format";
   import { searchToString } from "$lib/filters";
@@ -151,15 +149,11 @@
               onclick={() => openRow(row.prefix)}
               onkeydown={(e: KeyboardEvent) => onRowKey(e, row.prefix)}
             >
-              <th scope="row"><PrefixChip prefix={row.prefix} /></th>
+              <th scope="row" class="row-ident">{row.prefix}</th>
               <td>{row.family}</td>
               <td class="col-num">{formatCount(row.domain_count)}</td>
               <td class="col-num">{formatCount(row.address_count)}</td>
-              <td>
-                {#if row.asn !== undefined && row.asn !== null}
-                  <ASNChip asn={row.asn} />
-                {:else}—{/if}
-              </td>
+              <td class="row-ident">{row.asn ?? "—"}</td>
             </tr>
           {/each}
         </tbody>
@@ -198,6 +192,14 @@
   .data-table tbody tr:hover { background: rgba(3, 105, 161, 0.04); }
   .data-table tbody tr.row-link { cursor: pointer; }
   .data-table tbody tr.row-link:focus-visible { outline: 2px solid var(--accent-2); outline-offset: -2px; }
+  .row-ident {
+    font-family: var(--mono);
+    font-weight: 500;
+    color: var(--ink);
+    text-transform: none;
+    letter-spacing: normal;
+    font-size: var(--text-sm);
+  }
   .col-num { text-align: right; font-variant-numeric: tabular-nums; }
   .pagination { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); flex-wrap: wrap; margin-top: var(--space-3); }
   .pagination-controls { display: flex; gap: var(--space-2); }

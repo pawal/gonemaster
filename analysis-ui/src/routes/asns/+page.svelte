@@ -3,7 +3,6 @@
   import { base } from "$app/paths";
   import { page } from "$app/state";
   import FilterBar from "$lib/FilterBar.svelte";
-  import ASNChip from "$lib/chips/ASNChip.svelte";
   import { asnHref } from "$lib/entityLinks";
   import { formatCount } from "$lib/format";
   import { searchToString } from "$lib/filters";
@@ -153,7 +152,7 @@
               onclick={() => openRow(row.asn)}
               onkeydown={(e: KeyboardEvent) => onRowKey(e, row.asn)}
             >
-              <th scope="row"><ASNChip asn={row.asn} /></th>
+              <th scope="row" class="row-ident">AS{row.asn}</th>
               <td class="asn-label">{row.label ?? "—"}</td>
               <td class="col-num">{formatCount(row.domain_count)}</td>
               <td class="col-num">{formatCount(row.address_count)}</td>
@@ -257,6 +256,14 @@
   .data-table tbody tr.row-link:focus-visible {
     outline: 2px solid var(--accent-2);
     outline-offset: -2px;
+  }
+  .row-ident {
+    font-family: var(--mono);
+    font-weight: 500;
+    color: var(--ink);
+    text-transform: none;
+    letter-spacing: normal;
+    font-size: var(--text-sm);
   }
   .col-num { text-align: right; font-variant-numeric: tabular-nums; }
   .asn-label { color: var(--ink-2); }

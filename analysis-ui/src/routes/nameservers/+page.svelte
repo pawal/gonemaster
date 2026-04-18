@@ -3,7 +3,6 @@
   import { base } from "$app/paths";
   import { page } from "$app/state";
   import FilterBar from "$lib/FilterBar.svelte";
-  import NameserverChip from "$lib/chips/NameserverChip.svelte";
   import { nameserverHref } from "$lib/entityLinks";
   import { formatCount } from "$lib/format";
   import { searchToString } from "$lib/filters";
@@ -154,7 +153,7 @@
               onclick={() => openRow(row.nameserver)}
               onkeydown={(e: KeyboardEvent) => onRowKey(e, row.nameserver)}
             >
-              <th scope="row"><NameserverChip nameserver={row.nameserver} /></th>
+              <th scope="row" class="row-ident">{row.nameserver}</th>
               <td class="col-num">{formatCount(row.domain_count)}</td>
               <td class="col-num">{formatCount(row.endpoint_count)}</td>
               <td class="col-num">{formatCount(row.ipv4_count)}</td>
@@ -259,6 +258,14 @@
   .data-table tbody tr.row-link:focus-visible {
     outline: 2px solid var(--accent-2);
     outline-offset: -2px;
+  }
+  .row-ident {
+    font-family: var(--mono);
+    font-weight: 500;
+    color: var(--ink);
+    text-transform: none;
+    letter-spacing: normal;
+    font-size: var(--text-sm);
   }
   .col-num { text-align: right; font-variant-numeric: tabular-nums; }
 

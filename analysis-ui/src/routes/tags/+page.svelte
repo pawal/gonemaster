@@ -3,7 +3,6 @@
   import { base } from "$app/paths";
   import { page } from "$app/state";
   import FilterBar from "$lib/FilterBar.svelte";
-  import TagChip from "$lib/chips/TagChip.svelte";
   import { tagHref } from "$lib/entityLinks";
   import { formatCount, levelTone } from "$lib/format";
   import { searchToString } from "$lib/filters";
@@ -147,7 +146,7 @@
               onclick={() => openRow(row.tag)}
               onkeydown={(e: KeyboardEvent) => onRowKey(e, row.tag)}
             >
-              <th scope="row"><TagChip tag={row.tag} /></th>
+              <th scope="row" class="row-ident">{row.tag}</th>
               <td>{row.module ?? "—"}</td>
               <td>
                 {#if row.level}
@@ -252,6 +251,14 @@
   .data-table tbody tr.row-link:focus-visible {
     outline: 2px solid var(--accent-2);
     outline-offset: -2px;
+  }
+  .row-ident {
+    font-family: var(--mono);
+    font-weight: 500;
+    color: var(--ink);
+    text-transform: none;
+    letter-spacing: normal;
+    font-size: var(--text-sm);
   }
   .col-num { text-align: right; font-variant-numeric: tabular-nums; }
 

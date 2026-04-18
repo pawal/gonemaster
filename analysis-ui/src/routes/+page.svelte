@@ -22,6 +22,31 @@
     ];
   });
 
+  // Ordered lowest → highest severity so the bar reads left to right as
+  // "how much is fine" → "how much is broken".
+  const SEVERITY_BUCKETS = [
+    { key: "OK", label: "OK", tone: "ok" },
+    { key: "NOTICE", label: "Notice", tone: "notice" },
+    { key: "WARNING", label: "Warning", tone: "warning" },
+    { key: "ERROR", label: "Error", tone: "error" },
+    { key: "CRITICAL", label: "Critical", tone: "critical" }
+  ] as const;
+
+  const healthSegments = $derived.by(() => {
+    const dist = data.detail?.severity_distribution;
+    if (!dist) return [];
+    const total = Object.values(dist).reduce((sum, n) => sum + (n ?? 0), 0);
+    if (total === 0) return [];
+    return SEVERITY_BUCKETS.map((b) => {
+      const count = dist[b.key] ?? 0;
+      return {
+        ...b,
+        count,
+        pct: Math.round((count / total) * 100)
+      };
+    }).filter((b) => b.count > 0);
+  });
+
   const query = $derived(page.url.search);
 </script>
 
@@ -85,6 +110,27 @@
       </p>
     </section>
   {:else}
+    {#if healthSegments.length > 0}
+      <section class="card health-bar-section">
+        <h3>Domain health</h3>
+        <p class="hint">
+          Each domain counted by the worst severity in its latest run.
+        </p>
+        <div class="health-bar" role="list" aria-label="Severity distribution">
+          {#each healthSegments as seg (seg.key)}
+            <div
+              class="health-bar-segment tone-{seg.tone}"
+              role="listitem"
+              style:flex-grow={seg.count}
+              title="{seg.label}: {formatCount(seg.count)} domains ({seg.pct}%)"
+            >
+              <span class="health-bar-label">{seg.label}</span>
+              <span class="health-bar-count">{formatCount(seg.count)}</span>
+            </div>
+          {/each}
+        </div>
+      </section>
+    {/if}
     <section class="summary-grid" aria-label="Cohort summary counts">
       {#each summaryCards as card (card.label)}
         <a class="summary-card" href={`${base}${card.href}${query}`}>
@@ -124,6 +170,45 @@
     margin: 0;
     font-size: var(--text-sm);
   }
+
+  .health-bar-section {
+    gap: var(--space-2);
+  }
+  .health-bar-section h3 {
+    margin: 0;
+  }
+  .health-bar {
+    display: flex;
+    width: 100%;
+    min-height: 36px;
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .health-bar-segment {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0 var(--space-3);
+    min-width: 3rem;
+    font-size: var(--text-xs);
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .health-bar-label {
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+  }
+  .health-bar-count {
+    font-family: var(--mono);
+  }
+  .tone-ok { background: #dcfce7; color: #166534; }
+  .tone-notice { background: #e0f2fe; color: #075985; }
+  .tone-warning { background: #fef3c7; color: #92400e; }
+  .tone-error { background: #ffedd5; color: #9a3412; }
+  .tone-critical { background: #fee2e2; color: #991b1b; }
 
   .summary-grid {
     display: grid;

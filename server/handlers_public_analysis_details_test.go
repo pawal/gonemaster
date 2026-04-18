@@ -61,6 +61,47 @@ func TestPublicAnalysisCohortDetail(t *testing.T) {
 	}
 }
 
+func TestPublicAnalysisCohortDetailSeverityDistribution(t *testing.T) {
+	f := newAnalysisAPITestFixture(t)
+	ts := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+
+	// Three domains with distinct worst_level outcomes so each landing bucket
+	// is exercised: ERROR, WARNING, and OK (no entries above INFO).
+	f.seedGraduatedRun("err.example", ts, []engine.LogEntry{
+		{Module: "DNSSEC", Testcase: "dnssec07", Tag: "DS07_NOT_SIGNED", Level: "ERROR"},
+	})
+	f.seedGraduatedRun("warn.example", ts, []engine.LogEntry{
+		{Module: "DELEGATION", Testcase: "delegation02", Tag: "REFERRAL_SIZE_OK", Level: "WARNING"},
+	})
+	f.seedGraduatedRun("ok.example", ts, []engine.LogEntry{
+		{Module: "BASIC", Testcase: "basic01", Tag: "B01_OK", Level: "INFO"},
+	})
+
+	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/tld")
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
+	}
+	var got PublicAnalysisCohortDetail
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got.DomainCount != 3 {
+		t.Fatalf("expected 3 domains, got %d", got.DomainCount)
+	}
+	want := map[string]int{"ERROR": 1, "WARNING": 1, "OK": 1}
+	for level, wantCount := range want {
+		if got.SeverityDistribution[level] != wantCount {
+			t.Fatalf("severity[%s] = %d, want %d (full map: %+v)",
+				level, got.SeverityDistribution[level], wantCount, got.SeverityDistribution)
+		}
+	}
+	for _, level := range []string{"NOTICE", "CRITICAL"} {
+		if _, present := got.SeverityDistribution[level]; present {
+			t.Fatalf("severity[%s] should be absent, got %+v", level, got.SeverityDistribution)
+		}
+	}
+}
+
 func TestPublicAnalysisCohortDetailNotFound(t *testing.T) {
 	f := seedDetailFixture(t)
 	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/unknown")

@@ -261,7 +261,11 @@ func latestSummariesByDomain(summaries []AnalysisRunDomainSummary, runLookup int
 	return out
 }
 
-func latestMaterializationForCohort(readStore AnalysisReadStore, runLookup interface {
+// computeLatestMaterializationForCohort runs the uncached four-table scan for a
+// cohort and collapses multiple runs per domain into the latest. Callers should
+// prefer (*Server).latestMaterializationForCohort, which wraps this with a
+// stamp-keyed cache.
+func computeLatestMaterializationForCohort(readStore AnalysisReadStore, runLookup interface {
 	GetRun(id string) (Run, bool)
 }, cohortID int64) latestCohortMaterialization {
 	latest := latestSummariesByDomain(readStore.ListAnalysisRunDomainSummariesByCohort(cohortID), runLookup)

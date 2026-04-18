@@ -32,8 +32,7 @@ func (s *Server) handlePublicAnalysisTags(w http.ResponseWriter, r *http.Request
 	if !ok {
 		return
 	}
-	readStore, ok := s.analysisReadStore(w)
-	if !ok {
+	if _, ok := s.analysisReadStore(w); !ok {
 		return
 	}
 	filter, ok := parseAnalysisListFilter(w, r)
@@ -41,7 +40,7 @@ func (s *Server) handlePublicAnalysisTags(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	latest := latestMaterializationForCohort(readStore, s.store, cohort.ID).latest
+	latest := s.latestMaterializationForCohort(cohort).latest
 
 	type tagAgg struct {
 		module      string
@@ -143,8 +142,7 @@ func (s *Server) handlePublicAnalysisTestcases(w http.ResponseWriter, r *http.Re
 	if !ok {
 		return
 	}
-	readStore, ok := s.analysisReadStore(w)
-	if !ok {
+	if _, ok := s.analysisReadStore(w); !ok {
 		return
 	}
 	filter, ok := parseAnalysisListFilter(w, r)
@@ -152,7 +150,7 @@ func (s *Server) handlePublicAnalysisTestcases(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	latest := latestMaterializationForCohort(readStore, s.store, cohort.ID).latest
+	latest := s.latestMaterializationForCohort(cohort).latest
 
 	type testcaseKey struct {
 		module   string

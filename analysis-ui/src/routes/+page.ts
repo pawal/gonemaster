@@ -18,6 +18,7 @@ export type CohortDetail = {
   endpoint_count?: number;
   asn_count?: number;
   prefix_count?: number;
+  severity_distribution?: Record<string, number>;
 };
 
 export async function load({ parent, fetch }): Promise<OverviewPageData> {

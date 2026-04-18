@@ -11,17 +11,37 @@ import (
 
 // PublicAnalysisCohortDetail describes one cohort plus its top-level counts.
 type PublicAnalysisCohortDetail struct {
-	DatasetTag            string     `json:"dataset_tag"`
-	Label                 string     `json:"label"`
-	Description           string     `json:"description,omitempty"`
-	IsDefault             bool       `json:"is_default"`
-	MaterializationStatus string     `json:"materialization_status"`
-	LastMaterializedAt    *time.Time `json:"last_materialized_at,omitempty"`
-	DomainCount           int        `json:"domain_count"`
-	NameserverCount       int        `json:"nameserver_count"`
-	EndpointCount         int        `json:"endpoint_count"`
-	ASNCount              int        `json:"asn_count"`
-	PrefixCount           int        `json:"prefix_count"`
+	DatasetTag            string         `json:"dataset_tag"`
+	Label                 string         `json:"label"`
+	Description           string         `json:"description,omitempty"`
+	IsDefault             bool           `json:"is_default"`
+	MaterializationStatus string         `json:"materialization_status"`
+	LastMaterializedAt    *time.Time     `json:"last_materialized_at,omitempty"`
+	DomainCount           int            `json:"domain_count"`
+	NameserverCount       int            `json:"nameserver_count"`
+	EndpointCount         int            `json:"endpoint_count"`
+	ASNCount              int            `json:"asn_count"`
+	PrefixCount           int            `json:"prefix_count"`
+	SeverityDistribution  map[string]int `json:"severity_distribution,omitempty"`
+}
+
+// severityBucket normalizes a run worst_level into one of the five buckets
+// used by the cohort health chart. Anything below NOTICE (including the
+// empty string the projector stores for runs with no findings above INFO)
+// collapses into OK.
+func severityBucket(level string) string {
+	switch strings.ToUpper(level) {
+	case "CRITICAL":
+		return "CRITICAL"
+	case "ERROR":
+		return "ERROR"
+	case "WARNING":
+		return "WARNING"
+	case "NOTICE":
+		return "NOTICE"
+	default:
+		return "OK"
+	}
 }
 
 // PublicAnalysisDomainDetail is the per-domain detail view.
@@ -156,16 +176,18 @@ func (s *Server) handlePublicAnalysisCohortDetail(w http.ResponseWriter, r *http
 		t := cohort.LastMaterializedAt
 		detail.LastMaterializedAt = &t
 	}
-	if readStore, canRead := s.store.(AnalysisReadStore); canRead {
-		data := latestMaterializationForCohort(readStore, s.store, cohort.ID)
+	if _, canRead := s.store.(AnalysisReadStore); canRead {
+		data := s.latestMaterializationForCohort(cohort)
 
 		domainSet := map[int64]struct{}{}
 		nsSet := map[int64]struct{}{}
 		endpointSet := map[[2]int64]struct{}{}
 		asnSet := map[int64]struct{}{}
 		prefixSet := map[int64]struct{}{}
+		severity := map[string]int{}
 		for _, pair := range data.latest {
 			domainSet[pair.summary.DomainID] = struct{}{}
+			severity[severityBucket(pair.summary.WorstLevel)]++
 		}
 		for _, ep := range data.endpoints {
 			nsSet[ep.NameserverID] = struct{}{}
@@ -187,6 +209,9 @@ func (s *Server) handlePublicAnalysisCohortDetail(w http.ResponseWriter, r *http
 		detail.EndpointCount = len(endpointSet)
 		detail.ASNCount = len(asnSet)
 		detail.PrefixCount = len(prefixSet)
+		if len(severity) > 0 {
+			detail.SeverityDistribution = severity
+		}
 	}
 	writeJSON(w, http.StatusOK, detail)
 }
@@ -213,7 +238,7 @@ func (s *Server) handlePublicAnalysisDomainDetail(w http.ResponseWriter, r *http
 		return
 	}
 
-	data := latestMaterializationForCohort(readStore, s.store, cohort.ID)
+	data := s.latestMaterializationForCohort(cohort)
 	var pair domainSummaryPair
 	haveSummary := false
 	for _, p := range data.latest {
@@ -398,7 +423,7 @@ func (s *Server) handlePublicAnalysisNameserverDetail(w http.ResponseWriter, r *
 		return
 	}
 
-	data := latestMaterializationForCohort(readStore, s.store, cohort.ID)
+	data := s.latestMaterializationForCohort(cohort)
 
 	addressASN := map[int64]int64{}
 	for _, fact := range data.addressASNs {
@@ -493,7 +518,7 @@ func (s *Server) handlePublicAnalysisEndpointDetail(w http.ResponseWriter, r *ht
 		return
 	}
 
-	data := latestMaterializationForCohort(readStore, s.store, cohort.ID)
+	data := s.latestMaterializationForCohort(cohort)
 
 	target := strings.ToLower(rawAddr)
 	selectedNameserver := strings.TrimSpace(r.URL.Query().Get("nameserver"))
@@ -617,7 +642,7 @@ func (s *Server) handlePublicAnalysisASNDetail(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	data := latestMaterializationForCohort(readStore, s.store, cohort.ID)
+	data := s.latestMaterializationForCohort(cohort)
 
 	domainSet := map[int64]struct{}{}
 	addrSet := map[int64]struct{}{}
@@ -718,7 +743,7 @@ func (s *Server) handlePublicAnalysisPrefixDetail(w http.ResponseWriter, r *http
 	// Walk address_asns to find the matching prefix_id by re-resolving via GetAnalysisPrefix.
 	var prefixID int64
 	var meta AnalysisPrefix
-	data := latestMaterializationForCohort(readStore, s.store, cohort.ID)
+	data := s.latestMaterializationForCohort(cohort)
 	for _, fact := range data.addressASNs {
 		if fact.PrefixID == nil {
 			continue
@@ -793,11 +818,10 @@ func (s *Server) handlePublicAnalysisTagDetail(w http.ResponseWriter, r *http.Re
 	if !ok {
 		return
 	}
-	readStore, ok := s.analysisReadStore(w)
-	if !ok {
+	if _, ok := s.analysisReadStore(w); !ok {
 		return
 	}
-	latest := latestMaterializationForCohort(readStore, s.store, cohort.ID).latest
+	latest := s.latestMaterializationForCohort(cohort).latest
 
 	domainNames := map[int64]string{}
 	for _, pair := range latest {
@@ -862,11 +886,10 @@ func (s *Server) handlePublicAnalysisTestcaseDetail(w http.ResponseWriter, r *ht
 	if !ok {
 		return
 	}
-	readStore, ok := s.analysisReadStore(w)
-	if !ok {
+	if _, ok := s.analysisReadStore(w); !ok {
 		return
 	}
-	latest := latestMaterializationForCohort(readStore, s.store, cohort.ID).latest
+	latest := s.latestMaterializationForCohort(cohort).latest
 
 	domainSet := map[int64]struct{}{}
 	tagSet := map[string]struct{}{}

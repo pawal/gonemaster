@@ -71,7 +71,7 @@ func (s *Server) handlePublicAnalysisNameservers(w http.ResponseWriter, r *http.
 		return
 	}
 
-	data := latestMaterializationForCohort(readStore, s.store, cohort.ID)
+	data := s.latestMaterializationForCohort(cohort)
 	endpoints := data.endpoints
 	addressASNs := data.addressASNs
 
@@ -304,7 +304,7 @@ func (s *Server) handlePublicAnalysisEndpoints(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	data := latestMaterializationForCohort(readStore, s.store, cohort.ID)
+	data := s.latestMaterializationForCohort(cohort)
 	endpoints := data.endpoints
 	addressASNs := data.addressASNs
 
@@ -419,7 +419,7 @@ func (s *Server) handlePublicAnalysisASNs(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	data := latestMaterializationForCohort(readStore, s.store, cohort.ID)
+	data := s.latestMaterializationForCohort(cohort)
 	endpoints := data.endpoints
 	addressASNs := data.addressASNs
 
@@ -591,7 +591,7 @@ func (s *Server) handlePublicAnalysisPrefixes(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	addressASNs := latestMaterializationForCohort(readStore, s.store, cohort.ID).addressASNs
+	addressASNs := s.latestMaterializationForCohort(cohort).addressASNs
 
 	type prefixAgg struct {
 		prefix    string

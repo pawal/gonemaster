@@ -1,8 +1,10 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
+  import { base } from "$app/paths";
   import { page } from "$app/state";
   import FilterBar from "$lib/FilterBar.svelte";
   import DomainChip from "$lib/chips/DomainChip.svelte";
+  import { domainHref } from "$lib/entityLinks";
   import { formatCount, formatTimestamp, gradeTone, levelTone } from "$lib/format";
   import { searchToString } from "$lib/filters";
   import { downloadCSV, downloadJSON, type ExportColumn } from "$lib/exporters";
@@ -51,6 +53,8 @@
   const hasPrev = $derived(currentOffset > 0);
   const hasNext = $derived(currentOffset + currentLimit < total);
 
+  const rows = $derived((data.list?.items ?? []) as DomainView[]);
+
   const exportColumns: ExportColumn<DomainView>[] = [
     { key: "domain", label: "Domain", value: (r) => r.domain },
     { key: "score", label: "Score", value: (r) => r.score ?? "" },
@@ -76,6 +80,21 @@
   function exportJSONFile() {
     if (!data.list) return;
     downloadJSON(`${filenamePrefix()}.json`, data.list.items, exportColumns);
+  }
+
+  function rowHref(domain: string): string {
+    return domainHref(base, domain, page.url.search);
+  }
+
+  function openRow(domain: string) {
+    goto(rowHref(domain));
+  }
+
+  function onRowKey(event: KeyboardEvent, domain: string) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openRow(domain);
+    }
   }
 </script>
 
@@ -134,8 +153,15 @@
           </tr>
         </thead>
         <tbody>
-          {#each data.list.items as row (row.domain)}
-            <tr>
+          {#each rows as row (row.domain)}
+            <tr
+              class="row-link"
+              role="link"
+              tabindex="0"
+              aria-label={`Open domain ${row.domain}`}
+              onclick={() => openRow(row.domain)}
+              onkeydown={(e: KeyboardEvent) => onRowKey(e, row.domain)}
+            >
               <th scope="row"><DomainChip domain={row.domain} /></th>
               <td class="col-num">{row.score ?? "—"}</td>
               <td>
@@ -245,6 +271,11 @@
   }
   .data-table tbody tr:last-child td { border-bottom: none; }
   .data-table tbody tr:hover { background: rgba(3, 105, 161, 0.04); }
+  .data-table tbody tr.row-link { cursor: pointer; }
+  .data-table tbody tr.row-link:focus-visible {
+    outline: 2px solid var(--accent-2);
+    outline-offset: -2px;
+  }
   .col-num { text-align: right; font-variant-numeric: tabular-nums; }
 
   .grade, .level {

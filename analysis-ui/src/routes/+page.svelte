@@ -2,7 +2,7 @@
   import { base } from "$app/paths";
   import { page } from "$app/state";
   import FilterBar from "$lib/FilterBar.svelte";
-  import { tagHref } from "$lib/entityLinks";
+  import { asnHref, nameserverHref, tagHref } from "$lib/entityLinks";
   import { formatCount, formatTimestamp, levelTone } from "$lib/format";
   import type { LayoutData } from "./+layout";
   import type { OverviewPageData } from "./+page";
@@ -60,6 +60,31 @@
       tone: levelTone(t.level),
       count: t.domain_count,
       widthPct: max > 0 ? Math.max(4, Math.round((t.domain_count / max) * 100)) : 0
+    }));
+  });
+
+  // Same scaling for the infrastructure bars. No severity here, so all
+  // bars share one neutral fill; concentration is read from the length.
+  const topNameserverRows = $derived.by(() => {
+    const items = data.topNameservers ?? [];
+    if (items.length === 0) return [];
+    const max = items.reduce((m, n) => (n.domain_count > m ? n.domain_count : m), 0);
+    return items.map((n) => ({
+      name: n.nameserver,
+      count: n.domain_count,
+      widthPct: max > 0 ? Math.max(4, Math.round((n.domain_count / max) * 100)) : 0
+    }));
+  });
+
+  const topASNRows = $derived.by(() => {
+    const items = data.topASNs ?? [];
+    if (items.length === 0) return [];
+    const max = items.reduce((m, a) => (a.domain_count > m ? a.domain_count : m), 0);
+    return items.map((a) => ({
+      asn: a.asn,
+      label: a.label ?? "",
+      count: a.domain_count,
+      widthPct: max > 0 ? Math.max(4, Math.round((a.domain_count / max) * 100)) : 0
     }));
   });
 
@@ -181,6 +206,68 @@
     {:else if data.topTagsError}
       <section class="card">
         <p class="status-banner error">Failed to load top tags: {data.topTagsError}</p>
+      </section>
+    {/if}
+    {#if topNameserverRows.length > 0 || topASNRows.length > 0}
+      <div class="infra-grid">
+        {#if topNameserverRows.length > 0}
+          <section class="card infra-card">
+            <h3>Top nameservers</h3>
+            <p class="hint">
+              Nameservers hosting the most domains in this cohort.
+              Showing top {topNameserverRows.length} of {formatCount(data.topNameserversTotal)}.
+            </p>
+            <ol class="infra-list">
+              {#each topNameserverRows as row (row.name)}
+                <li>
+                  <a class="infra-row" href={nameserverHref(base, row.name, query)}>
+                    <span class="infra-name">{row.name}</span>
+                    <span class="infra-bar-track" aria-hidden="true">
+                      <span class="infra-bar" style:width="{row.widthPct}%"></span>
+                    </span>
+                    <span class="infra-count">{formatCount(row.count)}</span>
+                  </a>
+                </li>
+              {/each}
+            </ol>
+          </section>
+        {/if}
+        {#if topASNRows.length > 0}
+          <section class="card infra-card">
+            <h3>Top ASNs</h3>
+            <p class="hint">
+              ASNs hosting the most domains in this cohort. Showing top
+              {topASNRows.length} of {formatCount(data.topASNsTotal)}.
+            </p>
+            <ol class="infra-list">
+              {#each topASNRows as row (row.asn)}
+                <li>
+                  <a class="infra-row" href={asnHref(base, row.asn, query)}>
+                    <span class="infra-name">
+                      <span class="infra-asn">AS{row.asn}</span>
+                      {#if row.label}
+                        <span class="infra-asn-label">{row.label}</span>
+                      {/if}
+                    </span>
+                    <span class="infra-bar-track" aria-hidden="true">
+                      <span class="infra-bar" style:width="{row.widthPct}%"></span>
+                    </span>
+                    <span class="infra-count">{formatCount(row.count)}</span>
+                  </a>
+                </li>
+              {/each}
+            </ol>
+          </section>
+        {/if}
+      </div>
+    {:else if data.topNameserversError || data.topASNsError}
+      <section class="card">
+        {#if data.topNameserversError}
+          <p class="status-banner error">Failed to load top nameservers: {data.topNameserversError}</p>
+        {/if}
+        {#if data.topASNsError}
+          <p class="status-banner error">Failed to load top ASNs: {data.topASNsError}</p>
+        {/if}
       </section>
     {/if}
     <section class="summary-grid" aria-label="Cohort summary counts">
@@ -341,6 +428,81 @@
   .level-warning { background: #fef3c7; color: #92400e; }
   .level-notice { background: #e0f2fe; color: #075985; }
   .level-neutral { background: var(--surface-2); color: var(--on-surface-2); }
+
+  .infra-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(24rem, 1fr));
+    gap: var(--space-3);
+  }
+  .infra-card {
+    gap: var(--space-2);
+  }
+  .infra-card h3 {
+    margin: 0;
+  }
+  .infra-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .infra-row {
+    display: grid;
+    grid-template-columns: minmax(8rem, 14rem) 1fr minmax(4rem, auto);
+    align-items: center;
+    gap: var(--space-3);
+    padding: 6px var(--space-3);
+    border-radius: var(--radius);
+    text-decoration: none;
+    color: var(--ink);
+    border: 1px solid transparent;
+  }
+  .infra-row:hover {
+    border-color: var(--accent-2);
+    background: var(--surface-2);
+  }
+  .infra-name {
+    font-family: var(--mono);
+    font-size: var(--text-sm);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+  }
+  .infra-asn {
+    font-weight: 600;
+  }
+  .infra-asn-label {
+    color: var(--ink-2);
+    font-family: var(--sans);
+    font-size: var(--text-xs);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .infra-bar-track {
+    display: block;
+    width: 100%;
+    height: 10px;
+    background: var(--surface-2);
+    border-radius: 5px;
+    overflow: hidden;
+  }
+  .infra-bar {
+    display: block;
+    height: 100%;
+    border-radius: 5px;
+    background: var(--accent-2);
+  }
+  .infra-count {
+    font-family: var(--mono);
+    font-size: var(--text-sm);
+    text-align: right;
+  }
 
   .summary-grid {
     display: grid;

@@ -1,4 +1,12 @@
-import { getCohortDetail, listTags, type TagView } from "$lib/api";
+import {
+  getCohortDetail,
+  listASNs,
+  listNameservers,
+  listTags,
+  type ASNView,
+  type NameserverView,
+  type TagView
+} from "$lib/api";
 
 export type OverviewPageData = {
   datasetTag: string | null;
@@ -6,6 +14,12 @@ export type OverviewPageData = {
   detailError: string | null;
   topTags: TagView[];
   topTagsError: string | null;
+  topNameservers: NameserverView[];
+  topNameserversTotal: number;
+  topNameserversError: string | null;
+  topASNs: ASNView[];
+  topASNsTotal: number;
+  topASNsError: string | null;
 };
 
 export type CohortDetail = {
@@ -32,12 +46,21 @@ export async function load({ parent, fetch }): Promise<OverviewPageData> {
       detail: null,
       detailError: null,
       topTags: [],
-      topTagsError: null
+      topTagsError: null,
+      topNameservers: [],
+      topNameserversTotal: 0,
+      topNameserversError: null,
+      topASNs: [],
+      topASNsTotal: 0,
+      topASNsError: null
     };
   }
-  const [detailResult, tagsResult] = await Promise.allSettled([
+  const infraFilter = { dataset_tag: datasetTag, limit: 10, sort: "domain_count_desc" };
+  const [detailResult, tagsResult, nsResult, asnResult] = await Promise.allSettled([
     getCohortDetail(datasetTag, fetch),
-    listTags({ dataset_tag: datasetTag, limit: 10, min_level: "WARNING" }, fetch)
+    listTags({ dataset_tag: datasetTag, limit: 10, min_level: "WARNING" }, fetch),
+    listNameservers(infraFilter, fetch),
+    listASNs(infraFilter, fetch)
   ]);
   const errorMessage = (r: PromiseRejectedResult): string =>
     r.reason instanceof Error ? r.reason.message : String(r.reason);
@@ -47,6 +70,12 @@ export async function load({ parent, fetch }): Promise<OverviewPageData> {
       detailResult.status === "fulfilled" ? (detailResult.value as CohortDetail) : null,
     detailError: detailResult.status === "rejected" ? errorMessage(detailResult) : null,
     topTags: tagsResult.status === "fulfilled" ? tagsResult.value.items : [],
-    topTagsError: tagsResult.status === "rejected" ? errorMessage(tagsResult) : null
+    topTagsError: tagsResult.status === "rejected" ? errorMessage(tagsResult) : null,
+    topNameservers: nsResult.status === "fulfilled" ? nsResult.value.items : [],
+    topNameserversTotal: nsResult.status === "fulfilled" ? nsResult.value.total : 0,
+    topNameserversError: nsResult.status === "rejected" ? errorMessage(nsResult) : null,
+    topASNs: asnResult.status === "fulfilled" ? asnResult.value.items : [],
+    topASNsTotal: asnResult.status === "fulfilled" ? asnResult.value.total : 0,
+    topASNsError: asnResult.status === "rejected" ? errorMessage(asnResult) : null
   };
 }

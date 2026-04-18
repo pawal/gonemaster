@@ -1,18 +1,39 @@
 <script lang="ts">
   import { base } from "$app/paths";
   import { page } from "$app/state";
-  import ASNChip from "$lib/chips/ASNChip.svelte";
   import EndpointChip from "$lib/chips/EndpointChip.svelte";
   import NameserverChip from "$lib/chips/NameserverChip.svelte";
-  import PrefixChip from "$lib/chips/PrefixChip.svelte";
   import TagChip from "$lib/chips/TagChip.svelte";
   import TestcaseChip from "$lib/chips/TestcaseChip.svelte";
+  import { asnHref, prefixHref } from "$lib/entityLinks";
   import { formatCount, formatTimestamp, gradeTone, levelTone } from "$lib/format";
   import type { DomainDetailPageData } from "./+page";
 
   let { data }: { data: DomainDetailPageData } = $props();
 
   const query = $derived(page.url.search);
+
+  // Severity ordering so the most critical tags surface at the top.
+  const SEVERITY_RANK: Record<string, number> = {
+    CRITICAL: 5,
+    ERROR: 4,
+    WARNING: 3,
+    NOTICE: 2,
+    INFO: 1
+  };
+  function severityRank(level: string | undefined): number {
+    if (!level) return 0;
+    return SEVERITY_RANK[level.toUpperCase()] ?? 0;
+  }
+
+  const sortedTags = $derived.by(() => {
+    if (!data.detail) return [];
+    return [...data.detail.tags].sort((a, b) => {
+      const rd = severityRank(b.level) - severityRank(a.level);
+      if (rd !== 0) return rd;
+      return a.tag.localeCompare(b.tag);
+    });
+  });
 </script>
 
 <nav class="breadcrumbs" aria-label="Breadcrumb">
@@ -41,7 +62,7 @@
       <div>
         <h2>{d.domain}</h2>
         <p class="hint">
-          Last run:
+          Last analyzed:
           {formatTimestamp(d.finished_at) || "—"}
         </p>
       </div>
@@ -75,7 +96,8 @@
         {#each d.nameservers as ns (ns.nameserver)}
           <li>
             <NameserverChip nameserver={ns.nameserver} />
-            <span class="hint">{ns.ipv4_count} IPv4 · {ns.ipv6_count} IPv6</span>
+            {#if ns.ipv4_count > 0}<span class="family-badge family-ipv4">{ns.ipv4_count} v4</span>{/if}
+            {#if ns.ipv6_count > 0}<span class="family-badge family-ipv6">{ns.ipv6_count} v6</span>{/if}
           </li>
         {/each}
       </ul>
@@ -87,35 +109,59 @@
     {#if d.addresses.length === 0}
       <p class="hint">No addresses materialized.</p>
     {:else}
-      <ul class="chip-list" role="list">
-        {#each d.addresses as addr (addr.address)}
-          <li>
-            <EndpointChip address={addr.address} />
-            <span class="hint">{addr.family}</span>
-            {#if addr.asn !== undefined && addr.asn !== null}
-              <ASNChip asn={addr.asn} label={addr.asn_label} />
-            {/if}
-            {#if addr.prefix}
-              <PrefixChip prefix={addr.prefix} />
-            {/if}
-          </li>
-        {/each}
-      </ul>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th scope="col">Address</th>
+              <th scope="col">Operator</th>
+              <th scope="col">Prefix</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each d.addresses as addr (addr.address)}
+              <tr>
+                <th scope="row" class="row-ident">
+                  <EndpointChip address={addr.address} />
+                  <span class={`family-badge family-${addr.family}`}>{addr.family === "ipv6" ? "v6" : "v4"}</span>
+                </th>
+                <td class="row-ident">
+                  {#if addr.asn !== undefined && addr.asn !== null}
+                    <a class="cell-link" href={asnHref(base, addr.asn, query)} title={addr.asn_label ? `AS${addr.asn} · ${addr.asn_label}` : `AS${addr.asn}`}>
+                      {#if addr.asn_label}
+                        <span class="operator-label">{addr.asn_label}</span>
+                        <span class="operator-asn">AS{addr.asn}</span>
+                      {:else}
+                        AS{addr.asn}
+                      {/if}
+                    </a>
+                  {:else}—{/if}
+                </td>
+                <td class="row-ident">
+                  {#if addr.prefix}
+                    <a class="cell-link" href={prefixHref(base, addr.prefix, query)}>{addr.prefix}</a>
+                  {:else}—{/if}
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
     {/if}
   </section>
 
   <section class="card">
     <h3>Tags</h3>
-    {#if d.tags.length === 0}
+    {#if sortedTags.length === 0}
       <p class="hint">No finding tags observed in the latest run.</p>
     {:else}
       <ul class="chip-list" role="list">
-        {#each d.tags as tag (tag.tag)}
+        {#each sortedTags as tag (tag.tag)}
           <li>
-            <TagChip tag={tag.tag} />
             {#if tag.level}
               <span class={`level level-${levelTone(tag.level)}`}>{tag.level}</span>
             {/if}
+            <TagChip tag={tag.tag} />
             {#if tag.module && tag.testcase}
               <TestcaseChip module={tag.module} testcase={tag.testcase} />
             {/if}
@@ -217,4 +263,57 @@
     align-items: center;
     gap: var(--space-2);
   }
+
+  .family-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    font-family: var(--sans);
+    letter-spacing: 0.04em;
+  }
+  .family-ipv4 { background: #e0f2fe; color: #075985; }
+  .family-ipv6 { background: #ede9fe; color: #5b21b6; }
+
+  .table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--text-sm);
+  }
+  .data-table th {
+    text-align: left;
+    padding: 8px 10px;
+    background: var(--surface-2);
+    color: var(--ink-2);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .data-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  .data-table tbody tr:last-child td { border-bottom: none; }
+  .row-ident {
+    font-family: var(--mono);
+    font-weight: 500;
+    color: var(--ink);
+    text-transform: none;
+    letter-spacing: normal;
+    font-size: var(--text-sm);
+  }
+  .cell-link { color: inherit; text-decoration: none; }
+  .cell-link:hover { text-decoration: underline; }
+  .operator-label { font-family: var(--sans); font-weight: 500; }
+  .operator-asn { margin-left: 6px; color: var(--ink-2); font-size: var(--text-xs); }
 </style>

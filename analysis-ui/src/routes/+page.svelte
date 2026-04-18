@@ -2,7 +2,6 @@
   import { base } from "$app/paths";
   import { page } from "$app/state";
   import FilterBar from "$lib/FilterBar.svelte";
-  import CohortChip from "$lib/chips/CohortChip.svelte";
   import { formatCount, formatTimestamp } from "$lib/format";
   import type { LayoutData } from "./+layout";
   import type { OverviewPageData } from "./+page";
@@ -61,24 +60,18 @@
   {@const d = data.detail}
   {@const isEmpty = (d.domain_count ?? 0) === 0}
   <section class="card overview-header">
-    <div class="overview-title-row">
-      <h2>{d.label}</h2>
-      <CohortChip datasetTag={d.dataset_tag} label={d.dataset_tag} />
-      {#if d.is_default}<span class="pill default">default</span>{/if}
-    </div>
+    <h2>{d.label}</h2>
     {#if d.description}
       <p class="hint">{d.description}</p>
     {/if}
-    <dl class="overview-meta">
-      <div>
-        <dt>Materialization</dt>
-        <dd><span class={`pill pill-status-${d.materialization_status}`}>{d.materialization_status}</span></dd>
-      </div>
-      <div>
-        <dt>Last materialized</dt>
-        <dd>{formatTimestamp(d.last_materialized_at) || "—"}</dd>
-      </div>
-    </dl>
+    {#if formatTimestamp(d.last_materialized_at)}
+      <dl class="overview-meta">
+        <div>
+          <dt>Last analyzed</dt>
+          <dd>{formatTimestamp(d.last_materialized_at)}</dd>
+        </div>
+      </dl>
+    {/if}
   </section>
 
   {#if isEmpty}
@@ -107,13 +100,7 @@
   .overview-header {
     gap: var(--space-2);
   }
-  .overview-title-row {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    flex-wrap: wrap;
-  }
-  .overview-title-row h2 {
+  .overview-header h2 {
     margin: 0;
   }
   .overview-meta {
@@ -173,10 +160,6 @@
     text-transform: uppercase;
     letter-spacing: 0.06em;
   }
-
-  .pill-status-ready  { background: #d6f1d0; color: #1e5b1e; }
-  .pill-status-failed { background: #fee2e2; color: #991b1b; }
-  .pill-status-pending { background: var(--surface-2); color: var(--on-surface-2); }
 
   .empty-state h2,
   .empty-state h3 {

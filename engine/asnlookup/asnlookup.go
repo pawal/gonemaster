@@ -333,6 +333,7 @@ func LookupASNInfo(ctx context.Context, resolver Resolver, asn int) (Info, error
 		// caller can ignore missing labels.
 		return Info{ASN: asn, Code: CodeEmpty}, nil
 	}
+	var lastEmpty *Info
 	for _, source := range sources {
 		info, err := lookupCymruASN(ctx, resolver, asn, source)
 		if errors.Is(err, errTryNext) {
@@ -341,7 +342,18 @@ func LookupASNInfo(ctx context.Context, resolver Resolver, asn int) (Info, error
 		if err != nil {
 			return Info{}, err
 		}
+		if info.Code == CodeEmpty {
+			// Some cymru mirrors (e.g. asnlookup.zonemaster.net) don't
+			// answer AS<N>.<zone> queries and return NOERROR/empty. Keep
+			// looking in the remaining sources before giving up.
+			copy := info
+			lastEmpty = &copy
+			continue
+		}
 		return info, nil
+	}
+	if lastEmpty != nil {
+		return *lastEmpty, nil
 	}
 	return Info{ASN: asn, Code: CodeError}, nil
 }

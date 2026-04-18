@@ -356,19 +356,32 @@
   .top-tags-section h3 {
     margin: 0;
   }
+  /* Single grid at the list level so all rows share the same column widths;
+     otherwise each row's tag-name column sizes to its own content and the
+     bar tracks end up at slightly different lengths. display:contents on
+     the <li> keeps the list semantics while letting <a> participate
+     directly in the parent grid via subgrid. */
   .top-tags-list {
     list-style: none;
     margin: 0;
     padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+    display: grid;
+    grid-template-columns:
+      minmax(10rem, 18rem)
+      1fr
+      minmax(4rem, auto)
+      minmax(4.5rem, auto);
+    column-gap: var(--space-3);
+    row-gap: 6px;
+  }
+  .top-tags-list > li {
+    display: contents;
   }
   .top-tag-row {
     display: grid;
-    grid-template-columns: minmax(10rem, 18rem) 1fr minmax(4rem, auto) minmax(4.5rem, auto);
+    grid-template-columns: subgrid;
+    grid-column: 1 / -1;
     align-items: center;
-    gap: var(--space-3);
     padding: 6px var(--space-3);
     border-radius: var(--radius);
     text-decoration: none;
@@ -444,15 +457,22 @@
     list-style: none;
     margin: 0;
     padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+    display: grid;
+    grid-template-columns:
+      minmax(8rem, 14rem)
+      1fr
+      minmax(4rem, auto);
+    column-gap: var(--space-3);
+    row-gap: 6px;
+  }
+  .infra-list > li {
+    display: contents;
   }
   .infra-row {
     display: grid;
-    grid-template-columns: minmax(8rem, 14rem) 1fr minmax(4rem, auto);
+    grid-template-columns: subgrid;
+    grid-column: 1 / -1;
     align-items: center;
-    gap: var(--space-3);
     padding: 6px var(--space-3);
     border-radius: var(--radius);
     text-decoration: none;

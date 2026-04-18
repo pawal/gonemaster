@@ -16,6 +16,7 @@
   let editingCohortId = $state(null);
   let editingSourceTag = $state("");
   let saving = $state(false);
+  let backendStatus = $state({ backend_supported: true, unsupported_message: "" });
 
   function emptyDraft() {
     return {
@@ -68,6 +69,18 @@
       loadError = error.message || $t("analysis_cohorts_load_error_generic");
     } finally {
       loading = false;
+    }
+  }
+
+  async function loadBackendStatus() {
+    try {
+      const status = await apiFetch("/analysis/status");
+      backendStatus = {
+        backend_supported: status?.backend_supported !== false,
+        unsupported_message: status?.unsupported_message || "",
+      };
+    } catch (_) {
+      // Soft hint; don't block the cohort panel on this lookup.
     }
   }
 
@@ -288,11 +301,21 @@
   onMount(() => {
     loadCohorts();
     loadExistingTags();
+    loadBackendStatus();
   });
 </script>
 
 <h2>{$t("analysis_cohorts_heading")}</h2>
 <div class="small" style="margin-bottom: 12px;">{$t("analysis_cohorts_subtitle")}</div>
+
+{#if !backendStatus.backend_supported}
+  <div class="notice notice-warn" role="alert">
+    <strong>{$t("analysis_cohorts_backend_warning_title")}</strong>
+    <div class="small" style="margin-top: 4px;">
+      {backendStatus.unsupported_message || $t("analysis_cohorts_backend_warning_body")}
+    </div>
+  </div>
+{/if}
 
 {#if noticeMessage}
   <div class={`notice notice-${noticeTone === "ok" ? "ok" : "warn"}`} role="status" aria-live="polite">

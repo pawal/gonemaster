@@ -16,6 +16,7 @@ export type CatalogResponse = {
   default_tag?: string;
   cohorts: Cohort[];
   selector_enabled: boolean;
+  backend_supported: boolean;
 };
 
 export type OverviewResponse = {

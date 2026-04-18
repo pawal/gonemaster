@@ -30,7 +30,8 @@ describe("+layout.load", () => {
         { dataset_tag: "tld", label: "TLD", is_default: true },
         { dataset_tag: "gov", label: "Government", is_default: false }
       ],
-      selector_enabled: true
+      selector_enabled: true,
+      backend_supported: true
     };
     const fetch = vi.fn().mockResolvedValue(stubResponse(catalog));
 
@@ -48,7 +49,8 @@ describe("+layout.load", () => {
         { dataset_tag: "tld", label: "TLD", is_default: true },
         { dataset_tag: "gov", label: "Government", is_default: false }
       ],
-      selector_enabled: true
+      selector_enabled: true,
+      backend_supported: true
     };
     const fetch = vi.fn().mockResolvedValue(stubResponse(catalog));
 
@@ -61,7 +63,8 @@ describe("+layout.load", () => {
       cohorts: [
         { dataset_tag: "gov", label: "Government", is_default: false }
       ],
-      selector_enabled: false
+      selector_enabled: false,
+      backend_supported: true
     };
     const fetch = vi.fn().mockResolvedValue(stubResponse(catalog));
 
@@ -72,7 +75,7 @@ describe("+layout.load", () => {
   it("returns null resolvedCohort and no error when the catalog is empty", async () => {
     const fetch = vi
       .fn()
-      .mockResolvedValue(stubResponse({ cohorts: [], selector_enabled: false }));
+      .mockResolvedValue(stubResponse({ cohorts: [], selector_enabled: false, backend_supported: true }));
     const data = await load(event(fetch));
     expect(data.resolvedCohort).toBeNull();
     expect(data.catalog?.cohorts).toHaveLength(0);

@@ -20,9 +20,10 @@ type PublicAnalysisCohortView struct {
 
 // PublicAnalysisCatalogResponse is the response for GET /pub/api/v1/analysis/catalog.
 type PublicAnalysisCatalogResponse struct {
-	DefaultTag      string                     `json:"default_tag,omitempty"`
-	Cohorts         []PublicAnalysisCohortView `json:"cohorts"`
-	SelectorEnabled bool                       `json:"selector_enabled"`
+	DefaultTag       string                     `json:"default_tag,omitempty"`
+	Cohorts          []PublicAnalysisCohortView `json:"cohorts"`
+	SelectorEnabled  bool                       `json:"selector_enabled"`
+	BackendSupported bool                       `json:"backend_supported"`
 }
 
 // PublicAnalysisOverviewResponse is the minimal overview payload for
@@ -63,9 +64,10 @@ func (s *Server) handlePublicAnalysisCatalog(w http.ResponseWriter, r *http.Requ
 		}
 	}
 	writeJSON(w, http.StatusOK, PublicAnalysisCatalogResponse{
-		DefaultTag:      defaultTag,
-		Cohorts:         views,
-		SelectorEnabled: len(views) > 1,
+		DefaultTag:       defaultTag,
+		Cohorts:          views,
+		SelectorEnabled:  len(views) > 1,
+		BackendSupported: s.analysisBackendSupported(),
 	})
 }
 

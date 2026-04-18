@@ -86,6 +86,14 @@ func (s *Server) analysisReadStore(w http.ResponseWriter) (AnalysisReadStore, bo
 	return readStore, true
 }
 
+// analysisBackendSupported reports whether the configured store implements the
+// analysis fact-query surface. The in-memory store does not, so analysis
+// materialization has nowhere to persist in that configuration.
+func (s *Server) analysisBackendSupported() bool {
+	_, ok := s.store.(AnalysisReadStore)
+	return ok
+}
+
 // PublicAnalysisDomainView is the redacted public shape for a domain row in
 // the cohort's member list.
 type PublicAnalysisDomainView struct {

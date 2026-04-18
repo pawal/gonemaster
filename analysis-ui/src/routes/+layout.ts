@@ -10,6 +10,7 @@ export type LayoutData = {
   catalog: CatalogResponse | null;
   catalogError: string | null;
   resolvedCohort: string | null;
+  backendSupported: boolean;
 };
 
 // Bootstrap: resolve the cohort catalog before any page renders. Pages
@@ -25,12 +26,18 @@ export async function load({ fetch, url }): Promise<LayoutData> {
       catalog.default_tag ||
       catalog.cohorts[0]?.dataset_tag ||
       null;
-    return { catalog, catalogError: null, resolvedCohort };
+    return {
+      catalog,
+      catalogError: null,
+      resolvedCohort,
+      backendSupported: catalog.backend_supported !== false
+    };
   } catch (error) {
     return {
       catalog: null,
       catalogError: error instanceof Error ? error.message : String(error),
-      resolvedCohort: null
+      resolvedCohort: null,
+      backendSupported: true
     };
   }
 }

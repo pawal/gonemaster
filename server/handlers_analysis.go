@@ -7,6 +7,32 @@ import (
 	"strings"
 )
 
+// AnalysisStatusResponse reports whether the server is configured with a
+// storage backend that supports analysis materialization.
+type AnalysisStatusResponse struct {
+	BackendSupported   bool   `json:"backend_supported"`
+	ControllerEnabled  bool   `json:"controller_enabled"`
+	UnsupportedMessage string `json:"unsupported_message,omitempty"`
+}
+
+// handleAnalysisStatus reports the configuration state of the analysis
+// subsystem so the admin UI can warn when the current backend cannot persist
+// materialized facts (e.g. the in-memory store).
+func (s *Server) handleAnalysisStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
+		return
+	}
+	resp := AnalysisStatusResponse{
+		BackendSupported:  s.analysisBackendSupported(),
+		ControllerEnabled: s.analysis != nil,
+	}
+	if !resp.BackendSupported {
+		resp.UnsupportedMessage = "The current storage backend does not persist analysis facts. Start the server with --db-driver sqlite (or another SQL backend) to enable cohort materialization."
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
 // handleAnalysisCohorts routes GET and POST on /api/v1/analysis/cohorts.
 func (s *Server) handleAnalysisCohorts(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {

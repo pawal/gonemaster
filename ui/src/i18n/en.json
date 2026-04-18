@@ -28,6 +28,8 @@
   "analysis_cohorts_loading": "Loading analysis cohorts…",
   "analysis_cohorts_load_error": "Failed to load analysis cohorts: {error}",
   "analysis_cohorts_load_error_generic": "failed to load analysis cohorts",
+  "analysis_cohorts_backend_warning_title": "Analysis backend not configured",
+  "analysis_cohorts_backend_warning_body": "The current storage backend does not persist analysis facts. Start the server with --db-driver sqlite (or another SQL backend) so cohorts can materialize.",
   "analysis_cohorts_empty": "No analysis cohorts are configured yet. Create one below to start materializing data.",
   "analysis_cohorts_existing_heading": "Existing cohorts",
   "analysis_cohorts_col_tag": "Source tag",

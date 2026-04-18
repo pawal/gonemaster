@@ -533,15 +533,17 @@ func (p *Projector) applyEnrichment(endpoints []extractedEndpoint, addressFacts 
 	}
 	ctx := context.Background()
 
-	byAddr := make(map[string]*extractedAddressFact, len(addressFacts)+len(endpoints))
-	for i := range addressFacts {
-		addressFacts[i] = addressFacts[i] // no-op, keeps linter happy
-	}
-	for i := range addressFacts {
-		byAddr[addressFacts[i].address] = &addressFacts[i]
+	// Collect the ordered set of unique addresses we want to enrich:
+	// every existing address-fact, plus any authoritative endpoint
+	// address that doesn't already have a fact. Parent-role endpoints
+	// are skipped — they live outside the cohort's authoritative graph
+	// and enriching them would only create orphan ASN/prefix rows.
+	byIndex := make(map[string]int, len(addressFacts))
+	for i, fact := range addressFacts {
+		byIndex[fact.address] = i
 	}
 	addresses := make([]string, 0, len(addressFacts)+len(endpoints))
-	seenAddr := map[string]struct{}{}
+	seenAddr := make(map[string]struct{}, len(addressFacts)+len(endpoints))
 	for _, fact := range addressFacts {
 		if _, ok := seenAddr[fact.address]; ok {
 			continue
@@ -550,15 +552,7 @@ func (p *Projector) applyEnrichment(endpoints []extractedEndpoint, addressFacts 
 		addresses = append(addresses, fact.address)
 	}
 	for _, endpoint := range endpoints {
-		if endpoint.address == "" {
-			continue
-		}
-		// Skip parent-role endpoints (root servers for a TLD, or the
-		// TLD's own servers when a zone below is under test). These are
-		// already filtered from the public views, so enriching them
-		// here would only add orphaned address/ASN/prefix facts that
-		// can never be reached from the authoritative-endpoint graph.
-		if endpoint.role == "parent" {
+		if endpoint.address == "" || endpoint.role == "parent" {
 			continue
 		}
 		if _, ok := seenAddr[endpoint.address]; ok {
@@ -567,14 +561,13 @@ func (p *Projector) applyEnrichment(endpoints []extractedEndpoint, addressFacts 
 		seenAddr[endpoint.address] = struct{}{}
 		addresses = append(addresses, endpoint.address)
 	}
-	sort.Strings(addresses)
 
 	for _, address := range addresses {
 		info, ok := p.enricher.EnrichAddress(ctx, address)
 		if !ok {
 			continue
 		}
-		fact, exists := byAddr[address]
+		idx, exists := byIndex[address]
 		if !exists {
 			family := info.Family
 			if family == "" {
@@ -584,9 +577,13 @@ func (p *Projector) applyEnrichment(endpoints []extractedEndpoint, addressFacts 
 				address: address,
 				family:  family,
 			})
-			fact = &addressFacts[len(addressFacts)-1]
-			byAddr[address] = fact
+			idx = len(addressFacts) - 1
+			byIndex[address] = idx
 		}
+		// Mutate via slice index rather than a stored pointer — a prior
+		// append may have reallocated the backing array, which would
+		// orphan any *extractedAddressFact captured before the growth.
+		fact := &addressFacts[idx]
 		if fact.family == "" {
 			if info.Family != "" {
 				fact.family = info.Family

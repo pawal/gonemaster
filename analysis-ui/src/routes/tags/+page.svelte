@@ -52,6 +52,12 @@
   const rows = $derived((data.list?.items ?? []) as TagView[]);
   const search = $derived(page.url.search);
 
+  function rowClick(event: MouseEvent, href: string) {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("a")) return;
+    goto(href);
+  }
+
   const exportColumns: ExportColumn<TagView>[] = [
     { key: "tag", label: "Tag", value: (r) => r.tag },
     { key: "module", label: "Module", value: (r) => r.module ?? "" },
@@ -128,7 +134,7 @@
         </thead>
         <tbody>
           {#each rows as row (row.tag)}
-            <tr>
+            <tr class="row-clickable" onclick={(e: MouseEvent) => rowClick(e, tagHref(base, row.tag, search))}>
               <th scope="row" class="row-ident">
                 <a class="cell-link" href={tagHref(base, row.tag, search)}>{row.tag}</a>
               </th>
@@ -232,6 +238,7 @@
   }
   .data-table tbody tr:last-child td { border-bottom: none; }
   .data-table tbody tr:hover { background: rgba(3, 105, 161, 0.04); }
+  .row-clickable { cursor: pointer; }
   .cell-link { color: inherit; text-decoration: none; }
   .cell-link:hover { text-decoration: underline; }
   .cell-link:focus-visible {

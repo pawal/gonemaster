@@ -51,6 +51,12 @@
   const rows = $derived((data.list?.items ?? []) as PrefixView[]);
   const search = $derived(page.url.search);
 
+  function rowClick(event: MouseEvent, href: string) {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("a")) return;
+    goto(href);
+  }
+
   const exportColumns: ExportColumn<PrefixView>[] = [
     { key: "prefix", label: "Prefix", value: (r) => r.prefix },
     { key: "family", label: "Family", value: (r) => r.family },
@@ -128,7 +134,7 @@
         </thead>
         <tbody>
           {#each rows as row (row.prefix)}
-            <tr>
+            <tr class="row-clickable" onclick={(e: MouseEvent) => rowClick(e, prefixHref(base, row.prefix, search))}>
               <th scope="row" class="row-ident">
                 <a class="cell-link" href={prefixHref(base, row.prefix, search)}>{row.prefix}</a>
               </th>
@@ -176,6 +182,7 @@
   .data-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
   .data-table tbody tr:last-child td { border-bottom: none; }
   .data-table tbody tr:hover { background: rgba(3, 105, 161, 0.04); }
+  .row-clickable { cursor: pointer; }
   .cell-link { color: inherit; text-decoration: none; }
   .cell-link:hover { text-decoration: underline; }
   .cell-link:focus-visible {

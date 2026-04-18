@@ -51,6 +51,12 @@
   const rows = $derived((data.list?.items ?? []) as TestcaseView[]);
   const search = $derived(page.url.search);
 
+  function rowClick(event: MouseEvent, href: string) {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("a")) return;
+    goto(href);
+  }
+
   const exportColumns: ExportColumn<TestcaseView>[] = [
     { key: "module", label: "Module", value: (r) => r.module },
     { key: "testcase", label: "Testcase", value: (r) => r.testcase },
@@ -128,7 +134,7 @@
         </thead>
         <tbody>
           {#each rows as row (`${row.module}/${row.testcase}`)}
-            <tr>
+            <tr class="row-clickable" onclick={(e: MouseEvent) => rowClick(e, testcaseHref(base, row.testcase, row.module, search))}>
               <th scope="row" class="row-ident">
                 <a class="cell-link" href={testcaseHref(base, row.testcase, row.module, search)}>
                   {row.module}/{row.testcase}
@@ -234,6 +240,7 @@
   }
   .data-table tbody tr:last-child td { border-bottom: none; }
   .data-table tbody tr:hover { background: rgba(3, 105, 161, 0.04); }
+  .row-clickable { cursor: pointer; }
   .cell-link { color: inherit; text-decoration: none; }
   .cell-link:hover { text-decoration: underline; }
   .cell-link:focus-visible {

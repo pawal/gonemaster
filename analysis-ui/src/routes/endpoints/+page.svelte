@@ -69,6 +69,12 @@
   }
 
   const search = $derived(page.url.search);
+
+  function rowClick(event: MouseEvent, href: string) {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("a")) return;
+    goto(href);
+  }
 </script>
 
 <FilterBar
@@ -116,7 +122,7 @@
         </thead>
         <tbody>
           {#each rows as row (`${row.nameserver}|${row.address}`)}
-            <tr>
+            <tr class="row-clickable" onclick={(e: MouseEvent) => rowClick(e, endpointHref(base, row.address, row.nameserver, search))}>
               <th scope="row" class="row-ident">
                 <a class="cell-link" href={nameserverHref(base, row.nameserver, search)}>{row.nameserver}</a>
               </th>
@@ -179,6 +185,7 @@
     letter-spacing: normal;
     font-size: var(--text-sm);
   }
+  .row-clickable { cursor: pointer; }
   .cell-link {
     color: inherit;
     text-decoration: none;

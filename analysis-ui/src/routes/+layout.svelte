@@ -31,12 +31,11 @@
     return url || "/";
   });
 
-  // Forward the active cohort (and any other filters that feed
-  // latestMaterializationForCohort) across nav-bar clicks so navigating
-  // between tabs doesn't drop the user back to the default cohort.
-  // Page-specific params like `sort`, `limit`, `offset` are intentionally
-  // not propagated — they only make sense within one list page.
-  const FORWARDED_PARAMS = ["dataset_tag", "scope_mode", "batch_id", "from", "to", "family", "level"];
+  // Forward the active cohort across nav-bar clicks so navigating between
+  // tabs doesn't drop the user back to the default cohort. Page-specific
+  // params like `sort`, `limit`, `offset`, `search` are intentionally not
+  // propagated — they only make sense within one list page.
+  const FORWARDED_PARAMS = ["dataset_tag"];
 
   const navQuery = $derived.by(() => {
     const source = page.url.searchParams;

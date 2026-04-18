@@ -51,7 +51,6 @@ describe("analysis API client", () => {
     expect(
       buildQuery({
         dataset_tag: "tld",
-        scope_mode: "latest_global",
         limit: 50,
         offset: 0
       })

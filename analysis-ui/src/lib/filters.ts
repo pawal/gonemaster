@@ -1,27 +1,21 @@
 // URL-sync helpers for the shared filter bar. The source of truth for the
 // active filter is the current URL's search params; mutating the filter goes
-// through `navigateWithFilter` so the URL stays canonical and the back
+// through `applyFilterToParams` so the URL stays canonical and the back
 // button works as expected.
+//
+// Only the filter keys that actually reach the server are kept here:
+//   - dataset_tag: pins the cohort across tab changes.
+//   - search:      substring match on list endpoints.
+//
+// Other knobs (scope_mode, batch_id, from/to, family, level) were scaffolded
+// in Phase 4 anticipating server-side filtering that never landed. They were
+// removed to avoid affordances that do nothing. Re-introduce them alongside
+// the matching server support.
 
 import type { AnalysisFilter } from "$lib/api";
 
-export const SCOPE_MODES = ["latest_global", "latest_in_batch", "batch", "time_window"] as const;
-export type ScopeMode = (typeof SCOPE_MODES)[number];
-
-export const FAMILIES = ["", "ipv4", "ipv6"] as const;
-export type Family = (typeof FAMILIES)[number];
-
-export const LEVELS = ["", "NOTICE", "WARNING", "ERROR", "CRITICAL"] as const;
-export type Level = (typeof LEVELS)[number];
-
 const FILTER_KEYS = [
   "dataset_tag",
-  "scope_mode",
-  "batch_id",
-  "from",
-  "to",
-  "family",
-  "level",
   "search"
 ] as const satisfies readonly (keyof AnalysisFilter)[];
 
@@ -49,18 +43,6 @@ export function applyFilterToParams(
     } else {
       next.set(key, value);
     }
-  }
-  // Dependent-field cleanup so the URL can't hold contradictory combinations.
-  const scope = next.get("scope_mode") ?? "latest_global";
-  if (scope === "latest_global") {
-    next.delete("batch_id");
-    next.delete("from");
-    next.delete("to");
-  } else if (scope === "latest_in_batch" || scope === "batch") {
-    next.delete("from");
-    next.delete("to");
-  } else if (scope === "time_window") {
-    next.delete("batch_id");
   }
   return next;
 }

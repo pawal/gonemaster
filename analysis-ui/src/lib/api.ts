@@ -204,12 +204,6 @@ export type TestcaseDetail = {
 
 export type AnalysisFilter = {
   dataset_tag?: string;
-  scope_mode?: string;
-  batch_id?: string;
-  from?: string;
-  to?: string;
-  family?: string;
-  level?: string;
   search?: string;
   limit?: number;
   offset?: number;

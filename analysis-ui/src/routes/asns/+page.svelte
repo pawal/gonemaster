@@ -1,8 +1,10 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
+  import { base } from "$app/paths";
   import { page } from "$app/state";
   import FilterBar from "$lib/FilterBar.svelte";
   import ASNChip from "$lib/chips/ASNChip.svelte";
+  import { asnHref } from "$lib/entityLinks";
   import { formatCount } from "$lib/format";
   import { searchToString } from "$lib/filters";
   import { downloadCSV, downloadJSON, type ExportColumn } from "$lib/exporters";
@@ -47,6 +49,19 @@
 
   const hasPrev = $derived(currentOffset > 0);
   const hasNext = $derived(currentOffset + currentLimit < total);
+
+  const rows = $derived((data.list?.items ?? []) as ASNView[]);
+
+  function openRow(asn: number) {
+    goto(asnHref(base, asn, page.url.search));
+  }
+
+  function onRowKey(event: KeyboardEvent, asn: number) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openRow(asn);
+    }
+  }
 
   const exportColumns: ExportColumn<ASNView>[] = [
     { key: "asn", label: "ASN", value: (r) => r.asn },
@@ -129,8 +144,15 @@
           </tr>
         </thead>
         <tbody>
-          {#each data.list.items as row (row.asn)}
-            <tr>
+          {#each rows as row (row.asn)}
+            <tr
+              class="row-link"
+              role="link"
+              tabindex="0"
+              aria-label={`Open ASN AS${row.asn}`}
+              onclick={() => openRow(row.asn)}
+              onkeydown={(e: KeyboardEvent) => onRowKey(e, row.asn)}
+            >
               <th scope="row"><ASNChip asn={row.asn} /></th>
               <td class="asn-label">{row.label ?? "—"}</td>
               <td class="col-num">{formatCount(row.domain_count)}</td>
@@ -231,6 +253,11 @@
   }
   .data-table tbody tr:last-child td { border-bottom: none; }
   .data-table tbody tr:hover { background: rgba(3, 105, 161, 0.04); }
+  .data-table tbody tr.row-link { cursor: pointer; }
+  .data-table tbody tr.row-link:focus-visible {
+    outline: 2px solid var(--accent-2);
+    outline-offset: -2px;
+  }
   .col-num { text-align: right; font-variant-numeric: tabular-nums; }
   .asn-label { color: var(--ink-2); }
 

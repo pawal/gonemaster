@@ -1,8 +1,10 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
+  import { base } from "$app/paths";
   import { page } from "$app/state";
   import FilterBar from "$lib/FilterBar.svelte";
   import TagChip from "$lib/chips/TagChip.svelte";
+  import { tagHref } from "$lib/entityLinks";
   import { formatCount, levelTone } from "$lib/format";
   import { searchToString } from "$lib/filters";
   import { downloadCSV, downloadJSON, type ExportColumn } from "$lib/exporters";
@@ -47,6 +49,19 @@
 
   const hasPrev = $derived(currentOffset > 0);
   const hasNext = $derived(currentOffset + currentLimit < total);
+
+  const rows = $derived((data.list?.items ?? []) as TagView[]);
+
+  function openRow(tag: string) {
+    goto(tagHref(base, tag, page.url.search));
+  }
+
+  function onRowKey(event: KeyboardEvent, tag: string) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openRow(tag);
+    }
+  }
 
   const exportColumns: ExportColumn<TagView>[] = [
     { key: "tag", label: "Tag", value: (r) => r.tag },
@@ -123,8 +138,15 @@
           </tr>
         </thead>
         <tbody>
-          {#each data.list.items as row (row.tag)}
-            <tr>
+          {#each rows as row (row.tag)}
+            <tr
+              class="row-link"
+              role="link"
+              tabindex="0"
+              aria-label={`Open tag ${row.tag}`}
+              onclick={() => openRow(row.tag)}
+              onkeydown={(e: KeyboardEvent) => onRowKey(e, row.tag)}
+            >
               <th scope="row"><TagChip tag={row.tag} /></th>
               <td>{row.module ?? "—"}</td>
               <td>
@@ -226,6 +248,11 @@
   }
   .data-table tbody tr:last-child td { border-bottom: none; }
   .data-table tbody tr:hover { background: rgba(3, 105, 161, 0.04); }
+  .data-table tbody tr.row-link { cursor: pointer; }
+  .data-table tbody tr.row-link:focus-visible {
+    outline: 2px solid var(--accent-2);
+    outline-offset: -2px;
+  }
   .col-num { text-align: right; font-variant-numeric: tabular-nums; }
 
   .level {

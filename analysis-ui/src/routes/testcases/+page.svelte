@@ -1,8 +1,10 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
+  import { base } from "$app/paths";
   import { page } from "$app/state";
   import FilterBar from "$lib/FilterBar.svelte";
   import TestcaseChip from "$lib/chips/TestcaseChip.svelte";
+  import { testcaseHref } from "$lib/entityLinks";
   import { formatCount, levelTone } from "$lib/format";
   import { searchToString } from "$lib/filters";
   import { downloadCSV, downloadJSON, type ExportColumn } from "$lib/exporters";
@@ -46,6 +48,19 @@
 
   const hasPrev = $derived(currentOffset > 0);
   const hasNext = $derived(currentOffset + currentLimit < total);
+
+  const rows = $derived((data.list?.items ?? []) as TestcaseView[]);
+
+  function openRow(row: TestcaseView) {
+    goto(testcaseHref(base, row.testcase, row.module, page.url.search));
+  }
+
+  function onRowKey(event: KeyboardEvent, row: TestcaseView) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openRow(row);
+    }
+  }
 
   const exportColumns: ExportColumn<TestcaseView>[] = [
     { key: "module", label: "Module", value: (r) => r.module },
@@ -123,8 +138,15 @@
           </tr>
         </thead>
         <tbody>
-          {#each data.list.items as row (`${row.module}/${row.testcase}`)}
-            <tr>
+          {#each rows as row (`${row.module}/${row.testcase}`)}
+            <tr
+              class="row-link"
+              role="link"
+              tabindex="0"
+              aria-label={`Open testcase ${row.module}/${row.testcase}`}
+              onclick={() => openRow(row)}
+              onkeydown={(e: KeyboardEvent) => onRowKey(e, row)}
+            >
               <th scope="row"><TestcaseChip module={row.module} testcase={row.testcase} /></th>
               <td>
                 {#if row.worst_level}
@@ -226,6 +248,11 @@
   }
   .data-table tbody tr:last-child td { border-bottom: none; }
   .data-table tbody tr:hover { background: rgba(3, 105, 161, 0.04); }
+  .data-table tbody tr.row-link { cursor: pointer; }
+  .data-table tbody tr.row-link:focus-visible {
+    outline: 2px solid var(--accent-2);
+    outline-offset: -2px;
+  }
   .col-num { text-align: right; font-variant-numeric: tabular-nums; }
 
   .level {

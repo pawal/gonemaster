@@ -226,10 +226,22 @@ func latestMaterializationForCohort(readStore AnalysisReadStore, runLookup inter
 	for _, pair := range latest {
 		runIDs[pair.summary.RunID] = struct{}{}
 	}
+	// Drop parent-role endpoints (e.g. root servers recorded while traversing
+	// the delegation chain for a TLD). They are not the cohort zones' own
+	// authoritative servers and only pollute the nameserver/endpoint/ASN
+	// views. Role tagging happens at projection time in projector.go.
+	endpoints := filterAnalysisRunNSEndpointsByRunIDs(readStore.ListAnalysisRunNSEndpointsByCohort(cohortID), runIDs)
+	authoritative := make([]AnalysisRunNameserverEndpoint, 0, len(endpoints))
+	for _, ep := range endpoints {
+		if ep.Role == "parent" {
+			continue
+		}
+		authoritative = append(authoritative, ep)
+	}
 	return latestCohortMaterialization{
 		latest:      latest,
 		latestRuns:  runIDs,
-		endpoints:   filterAnalysisRunNSEndpointsByRunIDs(readStore.ListAnalysisRunNSEndpointsByCohort(cohortID), runIDs),
+		endpoints:   authoritative,
 		addressASNs: filterAnalysisRunAddressASNsByRunIDs(readStore.ListAnalysisRunAddressASNsByCohort(cohortID), runIDs),
 	}
 }

@@ -139,6 +139,26 @@ export type DomainDetail = {
   tags: DomainDetailTag[];
 };
 
+export type EndpointDetail = {
+  nameserver: string;
+  address: string;
+  family: string;
+  asn?: number;
+  prefix?: string;
+  domain_count: number;
+  domains: string[];
+};
+
+export type PrefixDetail = {
+  prefix: string;
+  family: string;
+  domain_count: number;
+  address_count: number;
+  asns: number[];
+  domains: string[];
+  addresses: string[];
+};
+
 export type NameserverDetail = {
   nameserver: string;
   domain_count: number;
@@ -280,7 +300,7 @@ export const getNameserverDetail = (name: string, filter: AnalysisFilter = {}, f
   getJSON<NameserverDetail>(`/nameservers/${encodeURIComponent(name)}`, filter, fetchFn);
 
 export const getEndpointDetail = (address: string, filter: AnalysisFilter = {}, fetchFn: FetchLike = fetch) =>
-  getJSON<unknown>(`/endpoints/${encodeURIComponent(address)}`, filter, fetchFn);
+  getJSON<EndpointDetail>(`/endpoints/${encodeURIComponent(address)}`, filter, fetchFn);
 
 export const getASNDetail = (asn: number | string, filter: AnalysisFilter = {}, fetchFn: FetchLike = fetch) =>
   getJSON<ASNDetail>(`/asns/${encodeURIComponent(String(asn))}`, filter, fetchFn);
@@ -288,7 +308,7 @@ export const getASNDetail = (asn: number | string, filter: AnalysisFilter = {}, 
 // Prefix and testcase detail use query parameters because the identifiers
 // contain characters ("/" in prefixes) that fight with path routing.
 export const getPrefixDetail = (prefix: string, filter: AnalysisFilter = {}, fetchFn: FetchLike = fetch) =>
-  getJSON<unknown>("/prefix", { ...filter, prefix } as AnalysisFilter & { prefix: string }, fetchFn);
+  getJSON<PrefixDetail>("/prefix", { ...filter, prefix } as AnalysisFilter & { prefix: string }, fetchFn);
 
 export const getTagDetail = (tag: string, filter: AnalysisFilter = {}, fetchFn: FetchLike = fetch) =>
   getJSON<TagDetail>(`/tags/${encodeURIComponent(tag)}`, filter, fetchFn);

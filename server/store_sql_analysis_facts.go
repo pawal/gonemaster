@@ -345,17 +345,24 @@ func (s *SQLJobStore) UpsertAnalysisASN(asn int64, label string, seenAt time.Tim
 	}
 	seenAt = normalizeSeenAt(seenAt)
 	row := s.db.QueryRow(
-		fmt.Sprintf(`SELECT first_seen_at, last_seen_at FROM analysis_asns WHERE asn = %s`, s.ph(1)),
+		fmt.Sprintf(`SELECT label, first_seen_at, last_seen_at FROM analysis_asns WHERE asn = %s`, s.ph(1)),
 		asn,
 	)
-	var firstSeen, lastSeen string
-	err := row.Scan(&firstSeen, &lastSeen)
+	var existingLabel, firstSeen, lastSeen string
+	err := row.Scan(&existingLabel, &firstSeen, &lastSeen)
 	switch {
 	case err == nil:
+		// An empty label from the caller shouldn't blank out a previously
+		// resolved one — that would happen every time an enricher fails
+		// to reach the registry. Keep the existing label instead.
+		effectiveLabel := label
+		if effectiveLabel == "" {
+			effectiveLabel = existingLabel
+		}
 		_, err = s.db.Exec(
 			fmt.Sprintf(`UPDATE analysis_asns SET label = %s, first_seen_at = %s, last_seen_at = %s WHERE asn = %s`,
 				s.ph(1), s.ph(2), s.ph(3), s.ph(4)),
-			label, s.ts(minTime(parseTimestampStr(firstSeen), seenAt)), s.ts(maxTime(parseTimestampStr(lastSeen), seenAt)), asn,
+			effectiveLabel, s.ts(minTime(parseTimestampStr(firstSeen), seenAt)), s.ts(maxTime(parseTimestampStr(lastSeen), seenAt)), asn,
 		)
 	case errors.Is(err, sql.ErrNoRows):
 		_, err = s.db.Exec(

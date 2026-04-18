@@ -37,6 +37,14 @@ func NewController(store ControlStore) *Controller {
 	}
 }
 
+// SetEnricher forwards an optional enricher to the underlying projector.
+func (c *Controller) SetEnricher(enricher Enricher) {
+	if c == nil {
+		return
+	}
+	c.projector.SetEnricher(enricher)
+}
+
 // NewControllerFromJobStore returns a controller only when the given job store
 // also exposes the analysis control/store surface.
 func NewControllerFromJobStore(store serverpkg.JobStore) (*Controller, bool) {

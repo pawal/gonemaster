@@ -1,6 +1,7 @@
 package analysis
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/netip"
@@ -38,7 +39,19 @@ type Store interface {
 // Projector loads completed runs and resolves which analysis-enabled cohorts
 // should receive projected facts for those runs.
 type Projector struct {
-	store Store
+	store    Store
+	enricher Enricher
+}
+
+// SetEnricher installs an optional per-address / per-ASN enrichment source.
+// Enrichment runs during ProjectLoaded and fills in fields the engine logs
+// do not carry (per-address ASN + prefix, per-ASN label). Passing nil
+// disables enrichment.
+func (p *Projector) SetEnricher(enricher Enricher) {
+	if p == nil {
+		return
+	}
+	p.enricher = enricher
 }
 
 // RunInput is the fully loaded source material for projecting one completed run.
@@ -128,6 +141,8 @@ func (p *Projector) ProjectLoaded(input RunInput) error {
 	endpoints := p.extractNameserverEndpoints(input)
 	addressFacts := p.extractAddressFacts(input)
 	domainASNs := p.extractDomainASNs(input)
+	addressFacts = p.applyEnrichment(endpoints, addressFacts)
+	asnLabels := p.resolveASNLabels(addressFacts, domainASNs)
 
 	nameserverIDs := map[string]int64{}
 	addressIDs := map[string]int64{}
@@ -159,13 +174,13 @@ func (p *Projector) ProjectLoaded(input RunInput) error {
 			prefixIDs[fact.prefix] = prefix.ID
 		}
 		if fact.asn != nil {
-			if _, err := p.store.UpsertAnalysisASN(*fact.asn, "", input.Run.FinishedAt); err != nil {
+			if _, err := p.store.UpsertAnalysisASN(*fact.asn, asnLabels[*fact.asn], input.Run.FinishedAt); err != nil {
 				return fmt.Errorf("upsert asn %d: %w", *fact.asn, err)
 			}
 		}
 	}
 	for _, da := range domainASNs {
-		if _, err := p.store.UpsertAnalysisASN(da.asn, "", input.Run.FinishedAt); err != nil {
+		if _, err := p.store.UpsertAnalysisASN(da.asn, asnLabels[da.asn], input.Run.FinishedAt); err != nil {
 			return fmt.Errorf("upsert asn %d: %w", da.asn, err)
 		}
 	}
@@ -498,6 +513,128 @@ func (p *Projector) extractDomainASNs(input RunInput) []extractedDomainASN {
 		return out[i].family < out[j].family
 	})
 	return out
+}
+
+// applyEnrichment asks the enricher for (asn, prefix) for every unique
+// address the engine mentioned (via endpoints or existing address facts)
+// and merges those answers into addressFacts. Facts that already carry
+// engine-derived prefix/asn values are left untouched so projection stays
+// deterministic when enrichment is disabled or the backend returns nothing.
+func (p *Projector) applyEnrichment(endpoints []extractedEndpoint, addressFacts []extractedAddressFact) []extractedAddressFact {
+	if p == nil || p.enricher == nil {
+		return addressFacts
+	}
+	ctx := context.Background()
+
+	byAddr := make(map[string]*extractedAddressFact, len(addressFacts)+len(endpoints))
+	for i := range addressFacts {
+		addressFacts[i] = addressFacts[i] // no-op, keeps linter happy
+	}
+	for i := range addressFacts {
+		byAddr[addressFacts[i].address] = &addressFacts[i]
+	}
+	addresses := make([]string, 0, len(addressFacts)+len(endpoints))
+	seenAddr := map[string]struct{}{}
+	for _, fact := range addressFacts {
+		if _, ok := seenAddr[fact.address]; ok {
+			continue
+		}
+		seenAddr[fact.address] = struct{}{}
+		addresses = append(addresses, fact.address)
+	}
+	for _, endpoint := range endpoints {
+		if endpoint.address == "" {
+			continue
+		}
+		if _, ok := seenAddr[endpoint.address]; ok {
+			continue
+		}
+		seenAddr[endpoint.address] = struct{}{}
+		addresses = append(addresses, endpoint.address)
+	}
+	sort.Strings(addresses)
+
+	for _, address := range addresses {
+		info, ok := p.enricher.EnrichAddress(ctx, address)
+		if !ok {
+			continue
+		}
+		fact, exists := byAddr[address]
+		if !exists {
+			family := info.Family
+			if family == "" {
+				family = familyForAddress(address)
+			}
+			addressFacts = append(addressFacts, extractedAddressFact{
+				address: address,
+				family:  family,
+			})
+			fact = &addressFacts[len(addressFacts)-1]
+			byAddr[address] = fact
+		}
+		if fact.family == "" {
+			if info.Family != "" {
+				fact.family = info.Family
+			} else {
+				fact.family = familyForAddress(address)
+			}
+		}
+		if fact.prefix == "" && info.Prefix != "" {
+			fact.prefix = info.Prefix
+			fact.prefixFamily = familyForPrefix(info.Prefix)
+			if fact.prefixFamily == "" {
+				fact.prefixFamily = fact.family
+			}
+			fact.source = "enricher"
+		}
+		if fact.asn == nil && info.ASN != nil {
+			v := *info.ASN
+			fact.asn = &v
+			if fact.status == "" || fact.status == "unknown" {
+				fact.status = "ok"
+			}
+			if fact.source == "" {
+				fact.source = "enricher"
+			}
+		}
+	}
+	sort.Slice(addressFacts, func(i, j int) bool { return addressFacts[i].address < addressFacts[j].address })
+	return addressFacts
+}
+
+// resolveASNLabels collects every ASN referenced in this projection and
+// asks the enricher for a human-readable label. Cached by the enricher, so
+// the cost is one lookup per unique ASN across the entire cohort rebuild.
+// Returns an empty map when no enricher is configured — callers must still
+// upsert ASNs with an empty label in that case.
+func (p *Projector) resolveASNLabels(addressFacts []extractedAddressFact, domainASNs []extractedDomainASN) map[int64]string {
+	labels := map[int64]string{}
+	if p == nil || p.enricher == nil {
+		return labels
+	}
+	ctx := context.Background()
+	seen := map[int64]struct{}{}
+	addASN := func(asn int64) {
+		if asn == 0 {
+			return
+		}
+		if _, ok := seen[asn]; ok {
+			return
+		}
+		seen[asn] = struct{}{}
+		if label, ok := p.enricher.EnrichASNLabel(ctx, asn); ok && label != "" {
+			labels[asn] = label
+		}
+	}
+	for _, fact := range addressFacts {
+		if fact.asn != nil {
+			addASN(*fact.asn)
+		}
+	}
+	for _, da := range domainASNs {
+		addASN(da.asn)
+	}
+	return labels
 }
 
 // familyFromASNTag maps tags like IPV4_DIFFERENT_ASN / IPV6_ONE_ASN to a

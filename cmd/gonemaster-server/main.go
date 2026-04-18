@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
+	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/server"
 	"codeberg.org/pawal/gonemaster/server/analysis"
 )
@@ -327,6 +328,15 @@ func run(args []string, out *os.File, errOut *os.File) int {
 		return 2
 	}
 	if ctrl, ok := analysis.NewControllerFromJobStore(srv.Store()); ok {
+		// Best-effort enrichment of per-address ASN/prefix and per-ASN
+		// label via the engine's cymru/ripe backends. A failure to build
+		// the recursor (e.g. network misconfiguration at startup) just
+		// leaves projection un-enriched instead of refusing to run.
+		if rec, err := recursor.New(); err == nil {
+			ctrl.SetEnricher(analysis.NewAsnlookupEnricher(rec, 0))
+		} else {
+			fmt.Fprintf(errOut, "analysis: enrichment disabled: %v\n", err)
+		}
 		srv.SetAnalysisController(ctrl)
 	}
 

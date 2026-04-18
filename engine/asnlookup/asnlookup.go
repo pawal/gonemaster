@@ -37,6 +37,18 @@ type Result struct {
 	Code string
 }
 
+// Info carries the human-readable metadata for one ASN.
+type Info struct {
+	// ASN is the autonomous system number the lookup was for.
+	ASN int
+	// Label is the registry-provided free-text description, e.g. "CLOUDFLARENET, US".
+	Label string
+	// Raw is the unparsed backend response used to produce Label.
+	Raw string
+	// Code summarizes the lookup outcome (CodeFound / CodeEmpty / CodeError).
+	Code string
+}
+
 const (
 	// CodeFound indicates that one or more ASNs were found for the query IP.
 	CodeFound = "AS_FOUND"
@@ -292,6 +304,85 @@ func lookupRipe(ctx context.Context, ip netip.Addr, source string) (Result, erro
 	prefix = prefix.Masked()
 
 	return Result{ASNs: asns, Prefix: &prefix, Raw: line, Code: CodeFound}, nil
+}
+
+// LookupASNInfo resolves the human-readable description for an ASN. It uses
+// the same cymru DNS whois backends as GetWithPrefix — the query name is
+// "AS<number>.<cymru-source>" and the last pipe-separated field in the TXT
+// answer is the org label (e.g. "CLOUDFLARENET, US"). RIPE riswhois is not a
+// supported backend for this direction.
+func LookupASNInfo(ctx context.Context, resolver Resolver, asn int) (Info, error) {
+	if asn <= 0 {
+		return Info{}, fmt.Errorf("invalid asn %d", asn)
+	}
+	if resolver == nil {
+		return Info{}, fmt.Errorf("missing resolver")
+	}
+	prof := profile.FromContext(ctx)
+	style := prof.ASNDB.Style
+	if style == "" {
+		return Info{}, fmt.Errorf("asn database style undefined")
+	}
+	sources := prof.ASNDB.Sources[style]
+	if len(sources) == 0 {
+		return Info{}, fmt.Errorf("asn database sources undefined")
+	}
+	if style != "cymru" {
+		// Only cymru DNS whois exposes ASN-to-label. RIPE riswhois is
+		// IP-oriented. Fall back to "not available" without erroring so the
+		// caller can ignore missing labels.
+		return Info{ASN: asn, Code: CodeEmpty}, nil
+	}
+	for _, source := range sources {
+		info, err := lookupCymruASN(ctx, resolver, asn, source)
+		if errors.Is(err, errTryNext) {
+			continue
+		}
+		if err != nil {
+			return Info{}, err
+		}
+		return info, nil
+	}
+	return Info{ASN: asn, Code: CodeError}, nil
+}
+
+func lookupCymruASN(ctx context.Context, resolver Resolver, asn int, source string) (Info, error) {
+	query := fmt.Sprintf("AS%d.%s", asn, source)
+	resp, err := resolver.Recurse(ctx, query, "TXT", "IN")
+	if err != nil || resp.Msg == nil {
+		return Info{}, errTryNext
+	}
+	rcode := strings.ToUpper(resp.Rcode())
+	switch rcode {
+	case "NXDOMAIN":
+		return Info{ASN: asn, Code: CodeEmpty}, nil
+	case "NOERROR":
+		if len(resp.Answer()) == 0 {
+			return Info{ASN: asn, Code: CodeEmpty}, nil
+		}
+		txtRecords := resp.GetRecords("TXT", "answer")
+		if len(txtRecords) == 0 {
+			return Info{ASN: asn, Code: CodeError}, nil
+		}
+		for _, rr := range txtRecords {
+			txt, ok := rr.(*dns.TXT)
+			if !ok {
+				continue
+			}
+			raw := strings.Join(txt.Txt, "")
+			fields := cymruSplit.Split(raw, -1)
+			if len(fields) == 0 {
+				continue
+			}
+			// Cymru ASN-by-number answer shape:
+			//   "13335 | US | arin | 2010-07-14 | CLOUDFLARENET, US"
+			label := strings.TrimSpace(fields[len(fields)-1])
+			return Info{ASN: asn, Label: label, Raw: raw, Code: CodeFound}, nil
+		}
+		return Info{ASN: asn, Code: CodeEmpty}, nil
+	default:
+		return Info{}, errTryNext
+	}
 }
 
 func parseASNList(value string) ([]int, error) {

@@ -20,6 +20,10 @@ describe("entity link builders", () => {
     expect(asnHref(BASE, 64500)).toBe("/analysis/asns/64500");
     expect(tagHref(BASE, "DS07_NOT_SIGNED")).toBe("/analysis/tags/DS07_NOT_SIGNED");
     expect(testcaseHref(BASE, "dnssec07")).toBe("/analysis/testcases/dnssec07");
+    expect(testcaseHref(BASE, "dnssec07", "DNSSEC")).toBe("/analysis/testcases/dnssec07?module=DNSSEC");
+    expect(testcaseHref(BASE, "dnssec07", "DNSSEC", QUERY)).toBe(
+      "/analysis/testcases/dnssec07?dataset_tag=tld&module=DNSSEC"
+    );
     expect(cohortHref(BASE, "tld")).toBe("/analysis/cohorts/tld");
   });
 

@@ -7,7 +7,9 @@
   type Props = { testcase: string; module?: string; preserveQuery?: boolean };
   let { testcase, module, preserveQuery = true }: Props = $props();
 
-  const href = $derived(testcaseHref(base, testcase, preserveQuery ? page.url.search : ""));
+  const href = $derived(
+    testcaseHref(base, testcase, module ?? null, preserveQuery ? page.url.search : "")
+  );
   const display = $derived(module ? `${module}/${testcase}` : testcase);
 </script>
 

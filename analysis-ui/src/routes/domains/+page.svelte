@@ -5,6 +5,8 @@
   import DomainChip from "$lib/chips/DomainChip.svelte";
   import { formatCount, formatTimestamp, gradeTone, levelTone } from "$lib/format";
   import { searchToString } from "$lib/filters";
+  import { downloadCSV, downloadJSON, type ExportColumn } from "$lib/exporters";
+  import type { DomainView } from "$lib/api";
   import type { LayoutData } from "../+layout";
   import type { DomainsPageData } from "./+page";
 
@@ -48,6 +50,33 @@
 
   const hasPrev = $derived(currentOffset > 0);
   const hasNext = $derived(currentOffset + currentLimit < total);
+
+  const exportColumns: ExportColumn<DomainView>[] = [
+    { key: "domain", label: "Domain", value: (r) => r.domain },
+    { key: "score", label: "Score", value: (r) => r.score ?? "" },
+    { key: "grade", label: "Grade", value: (r) => r.grade ?? "" },
+    { key: "worst_level", label: "Worst level", value: (r) => r.worst_level ?? "" },
+    { key: "nameserver_count", label: "Nameservers", value: (r) => r.nameserver_count },
+    { key: "endpoint_count", label: "Endpoints", value: (r) => r.endpoint_count },
+    { key: "asn_count", label: "ASNs", value: (r) => r.asn_count },
+    { key: "prefix_count", label: "Prefixes", value: (r) => r.prefix_count },
+    { key: "finished_at", label: "Last run", value: (r) => r.finished_at ?? "" }
+  ];
+
+  function filenamePrefix(): string {
+    const tag = data.datasetTag ?? "cohort";
+    return `${tag}-domains`;
+  }
+
+  function exportCSV() {
+    if (!data.list) return;
+    downloadCSV(`${filenamePrefix()}.csv`, data.list.items, exportColumns);
+  }
+
+  function exportJSONFile() {
+    if (!data.list) return;
+    downloadJSON(`${filenamePrefix()}.json`, data.list.items, exportColumns);
+  }
 </script>
 
 <FilterBar
@@ -75,6 +104,10 @@
           {/each}
         </select>
       </label>
+      <div class="export-group">
+        <button type="button" class="ghost" onclick={exportCSV} disabled={!data.list?.items.length}>CSV</button>
+        <button type="button" class="ghost" onclick={exportJSONFile} disabled={!data.list?.items.length}>JSON</button>
+      </div>
     </div>
   </div>
 
@@ -156,7 +189,10 @@
     display: flex;
     gap: var(--space-3);
     flex-wrap: wrap;
+    align-items: flex-end;
   }
+
+  .export-group { display: flex; gap: var(--space-2); }
 
   .inline-field {
     display: flex;

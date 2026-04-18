@@ -118,12 +118,11 @@
         <thead>
           <tr>
             <th scope="col">Prefix</th>
-            <th scope="col">Family</th>
             <th scope="col" class="col-num">
               <SortHeader label="Domains" spec={sortSpecs.domainCount} align="right" {currentSort} onsort={(v: string) => updateParam("sort", v)} />
             </th>
             <th scope="col" class="col-num">Addresses</th>
-            <th scope="col">ASN</th>
+            <th scope="col">Operator</th>
           </tr>
         </thead>
         <tbody>
@@ -131,14 +130,20 @@
             <tr class="row-clickable" onclick={(e: MouseEvent) => rowClick(e, prefixHref(base, row.prefix, search))}>
               <th scope="row" class="row-ident">
                 <a class="cell-link" href={prefixHref(base, row.prefix, search)}>{row.prefix}</a>
+                <span class={`family-badge family-${row.family}`}>{row.family === "ipv6" ? "v6" : "v4"}</span>
               </th>
-              <td>{row.family}</td>
               <td class="col-num">{formatCount(row.domain_count)}</td>
               <td class="col-num">{formatCount(row.address_count)}</td>
               <td class="row-ident">
                 {#if row.asn !== undefined && row.asn !== null}
-                  <a class="cell-link" href={asnHref(base, row.asn, search)} title={row.asn_label ?? undefined}>{row.asn}</a>
-                  {#if row.asn_label}<span class="asn-label"> {row.asn_label}</span>{/if}
+                  <a class="cell-link" href={asnHref(base, row.asn, search)} title={row.asn_label ? `AS${row.asn} · ${row.asn_label}` : `AS${row.asn}`}>
+                    {#if row.asn_label}
+                      <span class="operator-label">{row.asn_label}</span>
+                      <span class="operator-asn">AS{row.asn}</span>
+                    {:else}
+                      AS{row.asn}
+                    {/if}
+                  </a>
                 {:else}—{/if}
               </td>
             </tr>
@@ -178,7 +183,20 @@
   .data-table tbody tr:last-child td { border-bottom: none; }
   .data-table tbody tr:hover { background: rgba(3, 105, 161, 0.04); }
   .row-clickable { cursor: pointer; }
-  .asn-label { color: var(--ink-2); font-size: var(--text-xs); }
+  .family-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    font-family: var(--sans);
+    letter-spacing: 0.04em;
+  }
+  .family-ipv4 { background: #e0f2fe; color: #075985; }
+  .family-ipv6 { background: #ede9fe; color: #5b21b6; }
+  .operator-label { font-family: var(--sans); font-weight: 500; }
+  .operator-asn { margin-left: 6px; color: var(--ink-2); font-size: var(--text-xs); }
   .cell-link { color: inherit; text-decoration: none; }
   .cell-link:hover { text-decoration: underline; }
   .cell-link:focus-visible {

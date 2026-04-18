@@ -13,9 +13,25 @@
   let { asn, label, preserveQuery = true }: Props = $props();
 
   const href = $derived(asnHref(base, asn, preserveQuery ? page.url.search : ""));
-  const display = $derived(`AS${asn}`);
+  const tooltip = $derived(label ? `AS${asn} · ${label}` : `AS${asn}`);
 </script>
 
-<EntityChip {href} variant="asn" title={label ?? display}>
-  {display}
+<EntityChip {href} variant="asn" title={tooltip}>
+  {#if label}
+    <span class="asn-num">AS{asn}</span>
+    <span class="asn-label">{label}</span>
+  {:else}
+    AS{asn}
+  {/if}
 </EntityChip>
+
+<style>
+  .asn-num {
+    opacity: 0.7;
+    margin-right: 4px;
+  }
+  .asn-label {
+    font-family: var(--sans);
+    font-weight: 500;
+  }
+</style>

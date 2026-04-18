@@ -114,9 +114,8 @@
           <tr>
             <th scope="col">Nameserver</th>
             <th scope="col">Address</th>
-            <th scope="col">Family</th>
             <th scope="col" class="col-num">Domains</th>
-            <th scope="col">ASN</th>
+            <th scope="col">Operator</th>
             <th scope="col">Prefix</th>
           </tr>
         </thead>
@@ -128,13 +127,19 @@
               </th>
               <td class="row-ident">
                 <a class="cell-link" href={endpointHref(base, row.address, row.nameserver, search)}>{row.address}</a>
+                <span class={`family-badge family-${row.family}`}>{row.family === "ipv6" ? "v6" : "v4"}</span>
               </td>
-              <td>{row.family}</td>
               <td class="col-num">{formatCount(row.domain_count)}</td>
               <td class="row-ident">
                 {#if row.asn !== undefined && row.asn !== null}
-                  <a class="cell-link" href={asnHref(base, row.asn, search)} title={row.asn_label ?? undefined}>{row.asn}</a>
-                  {#if row.asn_label}<span class="asn-label"> {row.asn_label}</span>{/if}
+                  <a class="cell-link" href={asnHref(base, row.asn, search)} title={row.asn_label ? `AS${row.asn} · ${row.asn_label}` : `AS${row.asn}`}>
+                    {#if row.asn_label}
+                      <span class="operator-label">{row.asn_label}</span>
+                      <span class="operator-asn">AS{row.asn}</span>
+                    {:else}
+                      AS{row.asn}
+                    {/if}
+                  </a>
                 {:else}—{/if}
               </td>
               <td class="row-ident">
@@ -187,7 +192,27 @@
     font-size: var(--text-sm);
   }
   .row-clickable { cursor: pointer; }
-  .asn-label { color: var(--ink-2); font-size: var(--text-xs); }
+  .family-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    font-family: var(--sans);
+    letter-spacing: 0.04em;
+  }
+  .family-ipv4 { background: #e0f2fe; color: #075985; }
+  .family-ipv6 { background: #ede9fe; color: #5b21b6; }
+  .operator-label {
+    font-family: var(--sans);
+    font-weight: 500;
+  }
+  .operator-asn {
+    margin-left: 6px;
+    color: var(--ink-2);
+    font-size: var(--text-xs);
+  }
   .cell-link {
     color: inherit;
     text-decoration: none;

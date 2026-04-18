@@ -120,8 +120,7 @@
       <table class="data-table">
         <thead>
           <tr>
-            <th scope="col">ASN</th>
-            <th scope="col">Label</th>
+            <th scope="col">Operator</th>
             <th scope="col" class="col-num">
               <SortHeader label="Domains" spec={sortSpecs.domainCount} align="right" {currentSort} onsort={(v: string) => updateParam("sort", v)} />
             </th>
@@ -130,23 +129,30 @@
             </th>
             <th scope="col" class="col-num">Nameservers</th>
             <th scope="col" class="col-num">Prefixes</th>
-            <th scope="col" class="col-num">IPv4</th>
-            <th scope="col" class="col-num">IPv6</th>
           </tr>
         </thead>
         <tbody>
           {#each rows as row (row.asn)}
             <tr class="row-clickable" onclick={(e: MouseEvent) => rowClick(e, asnHref(base, row.asn, search))}>
               <th scope="row" class="row-ident">
-                <a class="cell-link" href={asnHref(base, row.asn, search)}>AS{row.asn}</a>
+                <a class="cell-link" href={asnHref(base, row.asn, search)} title={row.label ? `AS${row.asn} · ${row.label}` : `AS${row.asn}`}>
+                  {#if row.label}
+                    <span class="operator-label">{row.label}</span>
+                    <span class="operator-asn">AS{row.asn}</span>
+                  {:else}
+                    AS{row.asn}
+                  {/if}
+                </a>
               </th>
-              <td class="asn-label">{row.label ?? "—"}</td>
               <td class="col-num">{formatCount(row.domain_count)}</td>
-              <td class="col-num">{formatCount(row.address_count)}</td>
+              <td class="col-num">
+                {formatCount(row.address_count)}
+                {#if row.ipv4_count > 0 || row.ipv6_count > 0}
+                  <span class="family-mix">{row.ipv4_count}v4 · {row.ipv6_count}v6</span>
+                {/if}
+              </td>
               <td class="col-num">{formatCount(row.nameserver_count)}</td>
               <td class="col-num">{formatCount(row.prefix_count)}</td>
-              <td class="col-num">{formatCount(row.ipv4_count)}</td>
-              <td class="col-num">{formatCount(row.ipv6_count)}</td>
             </tr>
           {/each}
         </tbody>
@@ -256,7 +262,9 @@
     font-size: var(--text-sm);
   }
   .col-num { text-align: right; font-variant-numeric: tabular-nums; }
-  .asn-label { color: var(--ink-2); }
+  .operator-label { font-family: var(--sans); font-weight: 500; }
+  .operator-asn { margin-left: 6px; color: var(--ink-2); font-size: var(--text-xs); }
+  .family-mix { display: block; color: var(--ink-2); font-size: var(--text-xs); font-family: var(--sans); }
 
   .pagination {
     display: flex;

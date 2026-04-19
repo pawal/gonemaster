@@ -85,23 +85,92 @@ func (c *Controller) ProjectRun(runID string) error {
 }
 
 // RepairAllCohorts reconciles the materialized analysis state for every cohort
-// in the catalog. Enabled cohorts are rebuilt; disabled cohorts are cleared.
+// in the catalog. Disabled cohorts are cleared. Enabled cohorts are either
+// left untouched (already Ready and up to date), caught up incrementally
+// (Ready with only newer runs to project), or fully rebuilt (any other
+// state). Incremental catch-up avoids the clear-and-reproject blast radius
+// at startup when all that changed is a handful of runs completing while
+// the server was down.
 func (c *Controller) RepairAllCohorts(ctx context.Context) error {
 	for _, cohort := range c.store.ListAnalysisCohorts() {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		if cohort.AnalysisEnabled {
-			if err := c.RebuildCohort(ctx, cohort.ID); err != nil {
+		if !cohort.AnalysisEnabled {
+			if err := c.ClearCohort(ctx, cohort.ID); err != nil {
 				return err
 			}
 			continue
 		}
-		if err := c.ClearCohort(ctx, cohort.ID); err != nil {
+		if err := c.repairEnabledCohort(ctx, cohort); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// repairEnabledCohort brings one enabled cohort back to a Ready state using
+// the cheapest path that still guarantees correctness. A cohort that is not
+// already Ready (Pending/Failed) falls back to a full rebuild; a Ready
+// cohort with any runs finished after its stamp is caught up by projecting
+// only those runs.
+func (c *Controller) repairEnabledCohort(ctx context.Context, cohort serverpkg.AnalysisCohort) error {
+	if cohort.MaterializationStatus != serverpkg.AnalysisMaterializationReady {
+		return c.RebuildCohort(ctx, cohort.ID)
+	}
+	return c.catchUpCohort(ctx, cohort)
+}
+
+// catchUpCohort projects runs whose FinishedAt is strictly after the
+// cohort's LastMaterializedAt stamp, without clearing existing materialized
+// rows. Returns immediately when no such runs exist — the common case after
+// a clean restart.
+func (c *Controller) catchUpCohort(ctx context.Context, cohort serverpkg.AnalysisCohort) error {
+	latest := cohort.LastMaterializedAt
+	projected := 0
+	for offset := 0; ; {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		list := c.store.ListRuns(serverpkg.RunFilter{
+			Tag:           cohort.SourceTag,
+			FinishedAfter: cohort.LastMaterializedAt,
+			Limit:         rebuildPageSize,
+			Offset:        offset,
+		})
+		if len(list.Items) == 0 {
+			break
+		}
+		for _, run := range list.Items {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			input, err := c.projector.LoadCompletedRun(run.ID)
+			if err != nil {
+				_ = c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationFailed, cohort.LastMaterializedAt, err.Error())
+				return fmt.Errorf("load run %s for cohort %d: %w", run.ID, cohort.ID, err)
+			}
+			if len(input.MatchingCohorts) == 0 {
+				continue
+			}
+			if err := c.projector.ProjectLoaded(input); err != nil {
+				_ = c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationFailed, cohort.LastMaterializedAt, err.Error())
+				return fmt.Errorf("project run %s for cohort %d: %w", run.ID, cohort.ID, err)
+			}
+			if run.FinishedAt.After(latest) {
+				latest = run.FinishedAt
+			}
+			projected++
+		}
+		offset += len(list.Items)
+		if offset >= list.Total {
+			break
+		}
+	}
+	if projected == 0 {
+		return nil
+	}
+	return c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationReady, latest, "")
 }
 
 // RebuildCohort clears and backfills one cohort from all existing runs whose

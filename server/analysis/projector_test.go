@@ -151,6 +151,9 @@ func (s *fakeStore) ListRuns(filter serverpkg.RunFilter) serverpkg.RunList {
 				continue
 			}
 		}
+		if !filter.FinishedAfter.IsZero() && !run.FinishedAt.After(filter.FinishedAfter) {
+			continue
+		}
 		items = append(items, run)
 	}
 	sort.Slice(items, func(i, j int) bool {

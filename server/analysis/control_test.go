@@ -181,6 +181,144 @@ func TestControllerRebuildCohortWithNoMatchingRunsLeavesLastMaterializedEmpty(t 
 	}
 }
 
+func TestControllerRepairAllSkipsReadyCohortWithNoMissedRuns(t *testing.T) {
+	finishedAt := time.Date(2026, 4, 17, 10, 0, 0, 0, time.UTC)
+	run := testAnalysisRun("run-ready", 100, "alpha.example", finishedAt, "192.0.2.10", "2001:db8::10")
+	// Pre-populate a marker row under a fabricated run ID. A full rebuild
+	// would clear the cohort's materialization wholesale and wipe this
+	// marker; a correct incremental repair leaves other runs' rows alone.
+	markerKey := projectionKey(10, "pre-existing-run")
+	store := &fakeStore{
+		runs:    map[string]serverpkg.Run{run.ID: run},
+		entries: map[string][]serverpkg.Entry{run.ID: testAnalysisEntries(run)},
+		tags:    map[int64][]string{run.DomainID: {"tld"}},
+		cohorts: []serverpkg.AnalysisCohort{
+			{
+				ID:                    10,
+				SourceType:            "tag",
+				SourceTag:             "tld",
+				Label:                 "TLD",
+				AnalysisEnabled:       true,
+				MaterializationStatus: serverpkg.AnalysisMaterializationReady,
+				LastMaterializedAt:    finishedAt,
+			},
+		},
+		summaries: map[string]serverpkg.AnalysisRunDomainSummary{
+			markerKey: {CohortID: 10, RunID: "pre-existing-run"},
+		},
+	}
+
+	controller := NewController(store)
+	if err := controller.RepairAllCohorts(context.Background()); err != nil {
+		t.Fatalf("RepairAllCohorts: %v", err)
+	}
+
+	if _, ok := store.summaries[markerKey]; !ok {
+		t.Fatal("expected pre-existing summary to be preserved (no rebuild should have run)")
+	}
+	if got := countProjectionKeysWithPrefix(store.summaries, "10/"); got != 1 {
+		t.Fatalf("expected only the pre-existing summary, got %d", got)
+	}
+
+	cohort, ok := store.GetAnalysisCohort(10)
+	if !ok {
+		t.Fatal("expected cohort 10")
+	}
+	if !cohort.LastMaterializedAt.Equal(finishedAt) {
+		t.Fatalf("expected LastMaterializedAt unchanged, got %s", cohort.LastMaterializedAt)
+	}
+	if cohort.MaterializationStatus != serverpkg.AnalysisMaterializationReady {
+		t.Fatalf("expected status Ready, got %q", cohort.MaterializationStatus)
+	}
+}
+
+func TestControllerRepairAllProjectsMissedRunsIncrementally(t *testing.T) {
+	oldStamp := time.Date(2026, 4, 17, 10, 0, 0, 0, time.UTC)
+	newFinishedAt := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+	missedRun := testAnalysisRun("run-missed", 101, "beta.example", newFinishedAt, "192.0.2.20", "2001:db8::20")
+	markerKey := projectionKey(10, "pre-existing-run")
+	store := &fakeStore{
+		runs:    map[string]serverpkg.Run{missedRun.ID: missedRun},
+		entries: map[string][]serverpkg.Entry{missedRun.ID: testAnalysisEntries(missedRun)},
+		tags:    map[int64][]string{missedRun.DomainID: {"tld"}},
+		cohorts: []serverpkg.AnalysisCohort{
+			{
+				ID:                    10,
+				SourceType:            "tag",
+				SourceTag:             "tld",
+				Label:                 "TLD",
+				AnalysisEnabled:       true,
+				MaterializationStatus: serverpkg.AnalysisMaterializationReady,
+				LastMaterializedAt:    oldStamp,
+			},
+		},
+		summaries: map[string]serverpkg.AnalysisRunDomainSummary{
+			markerKey: {CohortID: 10, RunID: "pre-existing-run"},
+		},
+	}
+
+	controller := NewController(store)
+	if err := controller.RepairAllCohorts(context.Background()); err != nil {
+		t.Fatalf("RepairAllCohorts: %v", err)
+	}
+
+	if _, ok := store.summaries[markerKey]; !ok {
+		t.Fatal("expected pre-existing summary to be preserved (incremental repair must not clear other runs)")
+	}
+	if _, ok := store.summaries[projectionKey(10, missedRun.ID)]; !ok {
+		t.Fatal("expected missed run to be projected into cohort")
+	}
+
+	cohort, ok := store.GetAnalysisCohort(10)
+	if !ok {
+		t.Fatal("expected cohort 10")
+	}
+	if !cohort.LastMaterializedAt.Equal(newFinishedAt) {
+		t.Fatalf("expected LastMaterializedAt to advance to %s, got %s", newFinishedAt, cohort.LastMaterializedAt)
+	}
+	if cohort.MaterializationStatus != serverpkg.AnalysisMaterializationReady {
+		t.Fatalf("expected status Ready, got %q", cohort.MaterializationStatus)
+	}
+}
+
+func TestControllerRepairAllFailedCohortFallsBackToFullRebuild(t *testing.T) {
+	finishedAt := time.Date(2026, 4, 17, 10, 0, 0, 0, time.UTC)
+	run := testAnalysisRun("run-fresh", 100, "alpha.example", finishedAt, "192.0.2.10", "2001:db8::10")
+	// A cohort stuck in Failed state should be reconciled from scratch —
+	// its materialized rows may be partial or inconsistent.
+	staleKey := projectionKey(10, "stale-run")
+	store := &fakeStore{
+		runs:    map[string]serverpkg.Run{run.ID: run},
+		entries: map[string][]serverpkg.Entry{run.ID: testAnalysisEntries(run)},
+		tags:    map[int64][]string{run.DomainID: {"tld"}},
+		cohorts: []serverpkg.AnalysisCohort{
+			{
+				ID:                    10,
+				SourceType:            "tag",
+				SourceTag:             "tld",
+				Label:                 "TLD",
+				AnalysisEnabled:       true,
+				MaterializationStatus: serverpkg.AnalysisMaterializationFailed,
+			},
+		},
+		summaries: map[string]serverpkg.AnalysisRunDomainSummary{
+			staleKey: {CohortID: 10, RunID: "stale-run"},
+		},
+	}
+
+	controller := NewController(store)
+	if err := controller.RepairAllCohorts(context.Background()); err != nil {
+		t.Fatalf("RepairAllCohorts: %v", err)
+	}
+
+	if _, ok := store.summaries[staleKey]; ok {
+		t.Fatal("expected Failed cohort to be cleared-and-rebuilt, removing stale rows")
+	}
+	if _, ok := store.summaries[projectionKey(10, run.ID)]; !ok {
+		t.Fatal("expected run to be projected after full rebuild")
+	}
+}
+
 func TestControllerRepairAllAndDisableChangeClearMaterializedRows(t *testing.T) {
 	run := testAnalysisRun("run-repair", 100, "alpha.example", time.Date(2026, 4, 17, 9, 0, 0, 0, time.UTC), "192.0.2.10", "2001:db8::10")
 	store := &fakeStore{

@@ -1,9 +1,11 @@
 <script lang="ts">
   import { base } from "$app/paths";
   import { page } from "$app/state";
+  import ASNChip from "$lib/chips/ASNChip.svelte";
   import EndpointChip from "$lib/chips/EndpointChip.svelte";
   import NameserverChip from "$lib/chips/NameserverChip.svelte";
-  import { asnHref, prefixHref, tagHref, testcaseHref } from "$lib/entityLinks";
+  import PrefixChip from "$lib/chips/PrefixChip.svelte";
+  import { tagHref, testcaseHref } from "$lib/entityLinks";
   import { formatCount, formatTimestamp, gradeTone, levelTone } from "$lib/format";
   import type { DomainDetailEntry } from "$lib/api";
   import type { DomainDetailPageData } from "./+page";
@@ -168,23 +170,15 @@
                   </th>
                   <td class="row-ident">
                     <EndpointChip address={addr.address} nameserver={ns.nameserver} />
-                    <span class={`family-badge family-${addr.family}`}>{addr.family === "ipv6" ? "v6" : "v4"}</span>
                   </td>
                   <td class="row-ident">
                     {#if addr.asn !== undefined && addr.asn !== null}
-                      <a class="cell-link" href={asnHref(base, addr.asn, query)} title={addr.asn_label ? `AS${addr.asn} · ${addr.asn_label}` : `AS${addr.asn}`}>
-                        {#if addr.asn_label}
-                          <span class="operator-label">{addr.asn_label}</span>
-                          <span class="operator-asn">AS{addr.asn}</span>
-                        {:else}
-                          AS{addr.asn}
-                        {/if}
-                      </a>
+                      <ASNChip asn={addr.asn} label={addr.asn_label ?? undefined} />
                     {:else}—{/if}
                   </td>
                   <td class="row-ident">
                     {#if addr.prefix}
-                      <a class="cell-link" href={prefixHref(base, addr.prefix, query)}>{addr.prefix}</a>
+                      <PrefixChip prefix={addr.prefix} />
                     {:else}—{/if}
                   </td>
                 </tr>
@@ -252,7 +246,7 @@
                       {#each tcRows as entry, i (i)}
                         <li class="result-row">
                           <span class="level level-{levelTone(entry.level)}">{entry.level}</span>
-                          <a class="entry-tag" href={tagHref(base, entry.tag, query)}>{entry.tag}</a>
+                          <a class="entry-tag" href={tagHref(base, entry.tag, query)} title={entry.tag}>{entry.tag}</a>
                           <span class="result-message">{entry.message}</span>
                         </li>
                       {/each}
@@ -264,7 +258,7 @@
                   {#each tcRows as entry, i (i)}
                     <li class="result-row">
                       <span class="level level-{levelTone(entry.level)}">{entry.level}</span>
-                      <a class="entry-tag" href={tagHref(base, entry.tag, query)}>{entry.tag}</a>
+                      <a class="entry-tag" href={tagHref(base, entry.tag, query)} title={entry.tag}>{entry.tag}</a>
                       <span class="result-message">{entry.message}</span>
                     </li>
                   {/each}
@@ -482,6 +476,10 @@
     overflow: hidden;
     text-overflow: ellipsis;
     justify-self: start;
+    /* Without an explicit max-width the intrinsic (nowrap) width wins and
+       the tag spills out of its grid column into the message cell. */
+    max-width: 100%;
+    display: inline-block;
   }
   .entry-tag:hover {
     background: var(--accent-2);
@@ -497,18 +495,6 @@
     padding: 4px var(--space-3) var(--space-2);
     font-style: italic;
   }
-
-  .family-badge {
-    display: inline-block;
-    padding: 1px 6px;
-    border-radius: 4px;
-    font-size: var(--text-xs);
-    font-weight: 600;
-    font-family: var(--sans);
-    letter-spacing: 0.04em;
-  }
-  .family-ipv4 { background: #e0f2fe; color: #075985; }
-  .family-ipv6 { background: #ede9fe; color: #5b21b6; }
 
   .table-wrap {
     overflow-x: auto;
@@ -537,6 +523,12 @@
     border-bottom: 1px solid var(--border);
     vertical-align: middle;
   }
+  /* Long operator labels would otherwise force horizontal scroll. Let the
+     ASN chip wrap; break anywhere so labels without spaces still fit. */
+  .data-table :global(.entity-chip-asn) {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
   .data-table tbody tr:last-child td { border-bottom: none; }
   .data-table tbody tr.ns-group-cont .ns-cell { border-top: none; }
   .data-table tbody tr.ns-group-cont td { border-top: 1px dashed transparent; }
@@ -555,8 +547,4 @@
     letter-spacing: normal;
     font-size: var(--text-sm);
   }
-  .cell-link { color: inherit; text-decoration: none; }
-  .cell-link:hover { color: var(--accent-2); }
-  .operator-label { font-family: var(--sans); font-weight: 500; }
-  .operator-asn { margin-left: 6px; color: var(--ink-2); font-size: var(--text-xs); }
 </style>

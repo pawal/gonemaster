@@ -147,7 +147,6 @@
               </th>
               <td class="row-ident">
                 <a class="cell-link" href={endpointHref(base, row.address, row.nameserver, search)}>{row.address}</a>
-                <span class={`family-badge family-${row.family}`}>{row.family === "ipv6" ? "v6" : "v4"}</span>
               </td>
               <td class="col-num">{formatCount(row.domain_count)}</td>
               <td class="row-ident">
@@ -212,18 +211,6 @@
     font-size: var(--text-sm);
   }
   .row-clickable { cursor: pointer; }
-  .family-badge {
-    display: inline-block;
-    margin-left: 6px;
-    padding: 1px 6px;
-    border-radius: 4px;
-    font-size: var(--text-xs);
-    font-weight: 600;
-    font-family: var(--sans);
-    letter-spacing: 0.04em;
-  }
-  .family-ipv4 { background: #e0f2fe; color: #075985; }
-  .family-ipv6 { background: #ede9fe; color: #5b21b6; }
   .operator-label {
     font-family: var(--sans);
     font-weight: 500;

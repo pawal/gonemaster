@@ -57,7 +57,7 @@ type PublicAnalysisDomainDetail struct {
 	PrefixCount     int                              `json:"prefix_count"`
 	Nameservers     []PublicAnalysisDomainNameserver `json:"nameservers"`
 	Addresses       []PublicAnalysisDomainAddress    `json:"addresses"`
-	Tags            []PublicAnalysisDomainTag        `json:"tags"`
+	Entries         []PublicAnalysisDomainEntry      `json:"entries"`
 }
 
 type PublicAnalysisDomainNameserver struct {
@@ -75,11 +75,17 @@ type PublicAnalysisDomainAddress struct {
 	Prefix   string `json:"prefix,omitempty"`
 }
 
-type PublicAnalysisDomainTag struct {
-	Tag      string `json:"tag"`
-	Module   string `json:"module,omitempty"`
-	Testcase string `json:"testcase,omitempty"`
-	Level    string `json:"level,omitempty"`
+// PublicAnalysisDomainEntry is one log entry emitted by a Zonemaster testcase
+// run, carried through with a translated human-readable message so the UI can
+// render a results view instead of just a bag of tags.
+type PublicAnalysisDomainEntry struct {
+	Timestamp float64 `json:"timestamp"`
+	Module    string  `json:"module,omitempty"`
+	Testcase  string  `json:"testcase,omitempty"`
+	Tag       string  `json:"tag"`
+	Level     string  `json:"level,omitempty"`
+	Message   string  `json:"message,omitempty"`
+	Raw       string  `json:"raw,omitempty"`
 }
 
 // PublicAnalysisNameserverDetail is the per-nameserver detail view.
@@ -355,32 +361,39 @@ func (s *Server) handlePublicAnalysisDomainDetail(w http.ResponseWriter, r *http
 	}
 	sort.Slice(addresses, func(i, j int) bool { return addresses[i].Address < addresses[j].Address })
 
-	tagsByKey := map[string]PublicAnalysisDomainTag{}
-	for _, entry := range s.loadAllEntriesForRun(pair.summary.RunID) {
-		if strings.TrimSpace(entry.Tag) == "" {
+	// Build one entry per observed log row so the UI can render a grouped
+	// module/testcase results view with per-entry translated messages, the
+	// same shape the public UI's Results view consumes. Entries with an
+	// empty tag are logger metadata noise and are skipped here.
+	locale := strings.TrimSpace(r.URL.Query().Get("locale"))
+	loaded := s.loadAllEntriesForRun(pair.summary.RunID)
+	resultEntries := make([]JobResultEntry, 0, len(loaded))
+	for _, e := range loaded {
+		if strings.TrimSpace(e.Tag) == "" {
 			continue
 		}
-		existing, seen := tagsByKey[entry.Tag]
-		if !seen || severityRank(entry.Level) > severityRank(existing.Level) {
-			tagsByKey[entry.Tag] = PublicAnalysisDomainTag{
-				Tag:      entry.Tag,
-				Module:   entry.Module,
-				Testcase: entry.Testcase,
-				Level:    entry.Level,
-			}
-		}
+		resultEntries = append(resultEntries, JobResultEntry{
+			Timestamp: e.Timestamp,
+			Module:    e.Module,
+			Testcase:  e.Testcase,
+			Tag:       e.Tag,
+			Level:     e.Level,
+			Args:      e.Args,
+		})
 	}
-	tags := make([]PublicAnalysisDomainTag, 0, len(tagsByKey))
-	for _, v := range tagsByKey {
-		tags = append(tags, v)
+	localized := localizeResultEntries(resultEntries, locale)
+	entries := make([]PublicAnalysisDomainEntry, 0, len(localized))
+	for _, e := range localized {
+		entries = append(entries, PublicAnalysisDomainEntry{
+			Timestamp: e.Timestamp,
+			Module:    e.Module,
+			Testcase:  e.Testcase,
+			Tag:       e.Tag,
+			Level:     e.Level,
+			Message:   e.Message,
+			Raw:       e.Raw,
+		})
 	}
-	sort.Slice(tags, func(i, j int) bool {
-		li, lj := severityRank(tags[i].Level), severityRank(tags[j].Level)
-		if li != lj {
-			return li > lj
-		}
-		return tags[i].Tag < tags[j].Tag
-	})
 
 	detail := PublicAnalysisDomainDetail{
 		Domain:          domain.Name,
@@ -393,7 +406,7 @@ func (s *Server) handlePublicAnalysisDomainDetail(w http.ResponseWriter, r *http
 		PrefixCount:     pair.summary.PrefixCount,
 		Nameservers:     nameservers,
 		Addresses:       addresses,
-		Tags:            tags,
+		Entries:         entries,
 	}
 	if !pair.finishedAt.IsZero() {
 		ft := pair.finishedAt

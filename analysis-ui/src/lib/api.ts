@@ -125,11 +125,14 @@ export type DomainDetailAddress = {
   prefix?: string;
 };
 
-export type DomainDetailTag = {
-  tag: string;
+export type DomainDetailEntry = {
+  timestamp: number;
   module?: string;
   testcase?: string;
+  tag: string;
   level?: string;
+  message?: string;
+  raw?: string;
 };
 
 export type DomainDetail = {
@@ -144,7 +147,7 @@ export type DomainDetail = {
   prefix_count: number;
   nameservers: DomainDetailNameserver[];
   addresses: DomainDetailAddress[];
-  tags: DomainDetailTag[];
+  entries: DomainDetailEntry[];
 };
 
 export type EndpointDetail = {

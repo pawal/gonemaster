@@ -132,15 +132,22 @@ func TestPublicAnalysisDomainDetail(t *testing.T) {
 	if len(got.Addresses) != 2 {
 		t.Fatalf("expected 2 addresses, got %+v", got.Addresses)
 	}
-	tags := map[string]PublicAnalysisDomainTag{}
-	for _, tag := range got.Tags {
-		tags[tag.Tag] = tag
+	entriesByTag := map[string]PublicAnalysisDomainEntry{}
+	for _, e := range got.Entries {
+		entriesByTag[e.Tag] = e
 	}
-	if _, ok := tags["DS07_NOT_SIGNED"]; !ok {
-		t.Fatalf("expected DS07_NOT_SIGNED tag, got %+v", got.Tags)
+	ds07, ok := entriesByTag["DS07_NOT_SIGNED"]
+	if !ok {
+		t.Fatalf("expected DS07_NOT_SIGNED entry, got %+v", got.Entries)
 	}
-	if got.Tags[0].Level != "ERROR" {
-		t.Fatalf("expected ERROR-level tag first, got %+v", got.Tags)
+	if ds07.Level != "ERROR" {
+		t.Fatalf("expected DS07_NOT_SIGNED entry at ERROR level, got %+v", ds07)
+	}
+	if ds07.Module != "DNSSEC" || ds07.Testcase != "dnssec07" {
+		t.Fatalf("expected DS07_NOT_SIGNED under DNSSEC/dnssec07, got %+v", ds07)
+	}
+	if ds07.Raw == "" {
+		t.Fatalf("expected non-empty raw fallback on entry, got %+v", ds07)
 	}
 }
 
@@ -362,9 +369,9 @@ func TestPublicAnalysisCohortAndDetailsUseLatestRunFacts(t *testing.T) {
 	if len(detail.Addresses) != 1 || detail.Addresses[0].Address != "198.51.100.20" {
 		t.Fatalf("expected only latest address, got %+v", detail.Addresses)
 	}
-	for _, tag := range detail.Tags {
-		if tag.Tag == "OLD_TAG" {
-			t.Fatalf("expected domain detail to exclude old run tags, got %+v", detail.Tags)
+	for _, e := range detail.Entries {
+		if e.Tag == "OLD_TAG" {
+			t.Fatalf("expected domain detail to exclude old run entries, got %+v", detail.Entries)
 		}
 	}
 
@@ -436,14 +443,14 @@ func TestPublicAnalysisDetailHandlersLoadAllEntriesForRun(t *testing.T) {
 		t.Fatalf("decode domain detail: %v", err)
 	}
 	foundLateTag := false
-	for _, tag := range domainDetail.Tags {
-		if tag.Tag == "LATE_TAG" {
+	for _, e := range domainDetail.Entries {
+		if e.Tag == "LATE_TAG" {
 			foundLateTag = true
 			break
 		}
 	}
 	if !foundLateTag {
-		t.Fatalf("expected domain detail to include tag after 10k entries, got %+v", domainDetail.Tags)
+		t.Fatalf("expected domain detail to include entry after 10k entries, got %d entries", len(domainDetail.Entries))
 	}
 
 	tagResp := getPublic(t, f.srv, "/pub/api/v1/analysis/tags/LATE_TAG")

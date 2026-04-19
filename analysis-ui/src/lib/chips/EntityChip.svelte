@@ -44,8 +44,9 @@
   }
 
   .entity-chip:hover {
-    background: var(--bg-2);
-    text-decoration: underline;
+    background: var(--accent-2);
+    color: var(--btn-fg);
+    border-color: var(--accent-2);
   }
 
   .entity-chip-cohort,

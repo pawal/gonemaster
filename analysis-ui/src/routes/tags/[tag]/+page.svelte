@@ -68,7 +68,7 @@
 <style>
   .breadcrumbs { font-size: var(--text-sm); }
   .breadcrumbs a { color: var(--ink-2); text-decoration: none; }
-  .breadcrumbs a:hover { color: var(--ink); text-decoration: underline; }
+  .breadcrumbs a:hover { color: var(--accent-2); }
 
   .detail-header {
     display: flex;

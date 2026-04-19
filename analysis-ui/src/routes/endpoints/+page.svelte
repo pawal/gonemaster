@@ -237,7 +237,7 @@
     color: inherit;
     text-decoration: none;
   }
-  .cell-link:hover { text-decoration: underline; }
+  .cell-link:hover { color: var(--accent-2); }
   .cell-link:focus-visible {
     outline: 2px solid var(--accent-2);
     outline-offset: 2px;

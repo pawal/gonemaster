@@ -99,15 +99,6 @@ export type TagView = {
   occurrence_count: number;
 };
 
-export type TestcaseView = {
-  module: string;
-  testcase: string;
-  domain_count: number;
-  entry_count: number;
-  worst_level?: string;
-  unique_tags: number;
-};
-
 // ── Detail response shapes ─────────────────────────────────────────────────
 
 export type DomainDetailNameserver = {
@@ -204,16 +195,6 @@ export type TagDetail = {
   domains: string[];
 };
 
-export type TestcaseDetail = {
-  module: string;
-  testcase: string;
-  domain_count: number;
-  entry_count: number;
-  worst_level?: string;
-  tags: string[];
-  domains: string[];
-};
-
 export type AnalysisFilter = {
   dataset_tag?: string;
   search?: string;
@@ -295,9 +276,6 @@ export const listPrefixes = (filter: AnalysisFilter = {}, fetchFn: FetchLike = f
 export const listTags = (filter: AnalysisFilter = {}, fetchFn: FetchLike = fetch) =>
   getJSON<ListResponse<TagView>>("/tags", filter, fetchFn);
 
-export const listTestcases = (filter: AnalysisFilter = {}, fetchFn: FetchLike = fetch) =>
-  getJSON<ListResponse<TestcaseView>>("/testcases", filter, fetchFn);
-
 // ── Detail endpoints ──────────────────────────────────────────────────────
 
 export const getDomainDetail = (domain: string, filter: AnalysisFilter = {}, fetchFn: FetchLike = fetch) =>
@@ -312,22 +290,10 @@ export const getEndpointDetail = (address: string, filter: AnalysisFilter = {}, 
 export const getASNDetail = (asn: number | string, filter: AnalysisFilter = {}, fetchFn: FetchLike = fetch) =>
   getJSON<ASNDetail>(`/asns/${encodeURIComponent(String(asn))}`, filter, fetchFn);
 
-// Prefix and testcase detail use query parameters because the identifiers
-// contain characters ("/" in prefixes) that fight with path routing.
+// Prefix detail uses a query parameter because the identifier contains
+// characters ("/" in CIDRs) that fight with path routing.
 export const getPrefixDetail = (prefix: string, filter: AnalysisFilter = {}, fetchFn: FetchLike = fetch) =>
   getJSON<PrefixDetail>("/prefix", { ...filter, prefix } as AnalysisFilter & { prefix: string }, fetchFn);
 
 export const getTagDetail = (tag: string, filter: AnalysisFilter = {}, fetchFn: FetchLike = fetch) =>
   getJSON<TagDetail>(`/tags/${encodeURIComponent(tag)}`, filter, fetchFn);
-
-export const getTestcaseDetail = (
-  module: string,
-  testcase: string,
-  filter: AnalysisFilter = {},
-  fetchFn: FetchLike = fetch
-) =>
-  getJSON<TestcaseDetail>(
-    "/testcase",
-    { ...filter, module, testcase } as AnalysisFilter & { module: string; testcase: string },
-    fetchFn
-  );

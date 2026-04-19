@@ -5,7 +5,7 @@
   import EndpointChip from "$lib/chips/EndpointChip.svelte";
   import NameserverChip from "$lib/chips/NameserverChip.svelte";
   import PrefixChip from "$lib/chips/PrefixChip.svelte";
-  import { tagHref, testcaseHref } from "$lib/entityLinks";
+  import { tagHref } from "$lib/entityLinks";
   import { formatCount, formatTimestamp, gradeTone, levelTone } from "$lib/format";
   import type { DomainDetailEntry } from "$lib/api";
   import type { DomainDetailPageData } from "./+page";
@@ -83,13 +83,6 @@
 
   function allModuleEntries(mod: Record<string, DomainDetailEntry[]>): DomainDetailEntry[] {
     return Object.values(mod).flat();
-  }
-
-  // Stop summary click-to-toggle when the user intends to navigate via an
-  // anchor inside the summary. Without this, clicking the testcase link
-  // both navigates and flips the disclosure state.
-  function stopToggle(event: MouseEvent) {
-    event.stopPropagation();
   }
 </script>
 
@@ -230,11 +223,7 @@
                 <details class="testcase-group" open={isNoticeOrAbove(tcLevel)}>
                   <summary class="testcase-summary">
                     <span class="testcase-chevron" aria-hidden="true"></span>
-                    <a
-                      class="testcase-link"
-                      href={testcaseHref(base, tc, moduleName, query)}
-                      onclick={stopToggle}
-                    >{tc}</a>
+                    <span class="testcase-name">{tc}</span>
                     <span class="testcase-badge">
                       <span class="level level-{levelTone(tcLevel)}">{tcLevel}</span>
                     </span>
@@ -429,14 +418,10 @@
   .testcase-group[open] > .testcase-summary .testcase-chevron {
     transform: rotate(0deg);
   }
-  .testcase-link {
+  .testcase-name {
     font-family: var(--mono);
     font-size: var(--text-sm);
     color: var(--ink);
-    text-decoration: none;
-  }
-  .testcase-link:hover {
-    color: var(--accent-2);
   }
   .testcase-badge {
     margin-left: auto;

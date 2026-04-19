@@ -7,14 +7,12 @@ import {
   getDomainDetail,
   getOverview,
   getPrefixDetail,
-  getTestcaseDetail,
   listASNs,
   listDomains,
   listEndpoints,
   listNameservers,
   listPrefixes,
-  listTags,
-  listTestcases
+  listTags
 } from "./api";
 
 type FetchCall = { url: string; method: string | undefined };
@@ -72,10 +70,8 @@ describe("analysis API client", () => {
     await listASNs({}, stub);
     await listPrefixes({}, stub);
     await listTags({}, stub);
-    await listTestcases({}, stub);
     await getDomainDetail("example.com", {}, stub);
     await getPrefixDetail("192.0.2.0/24", {}, stub);
-    await getTestcaseDetail("DNSSEC", "dnssec07", {}, stub);
 
     expect(calls.length).toBeGreaterThan(0);
     for (const { url } of calls) {
@@ -87,9 +83,7 @@ describe("analysis API client", () => {
   it("url-encodes path parameters", async () => {
     const { stub, calls } = recorder();
     await getDomainDetail("alpha.example", {}, stub);
-    await getTestcaseDetail("DNSSEC", "dnssec07", {}, stub);
     expect(calls.some((c) => c.url.includes("/domains/alpha.example"))).toBe(true);
-    expect(calls.some((c) => c.url.includes("/testcase?"))).toBe(true);
   });
 
   it("prefix detail uses the /prefix query endpoint so CIDR slashes survive", async () => {

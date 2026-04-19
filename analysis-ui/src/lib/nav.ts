@@ -20,8 +20,7 @@ export const navItems: NavItem[] = [
   // per-address prefix links).
   { href: "/endpoints", label: "Addresses", end: false },
   { href: "/asns", label: "ASNs", end: false },
-  { href: "/tags", label: "Tags", end: false },
-  { href: "/testcases", label: "Testcases", end: false }
+  { href: "/tags", label: "Tags", end: false }
 ];
 
 export function isActive(pathname: string, item: NavItem): boolean {

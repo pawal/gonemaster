@@ -63,19 +63,3 @@ export function asnHref(base: string, asn: number | string, query = ""): string 
 export function tagHref(base: string, tag: string, query = ""): string {
   return `${base}/tags/${encodeURIComponent(tag)}${query}`;
 }
-
-export function testcaseHref(
-  base: string,
-  testcase: string,
-  module: string | null = null,
-  query = ""
-): string {
-  let url = `${base}/testcases/${encodeURIComponent(testcase)}`;
-  if (module) {
-    const separator = query ? "&" : "?";
-    url += `${query}${separator}module=${encodeURIComponent(module)}`;
-  } else if (query) {
-    url += query;
-  }
-  return url;
-}

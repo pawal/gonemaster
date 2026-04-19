@@ -15,13 +15,20 @@
     href: string;
     variant: Variant;
     title?: string;
+    external?: boolean;
     children?: Snippet;
   };
 
-  let { href, variant, title, children }: Props = $props();
+  let { href, variant, title, external = false, children }: Props = $props();
 </script>
 
-<a class={`entity-chip entity-chip-${variant}`} {href} title={title ?? undefined}>
+<a
+  class={`entity-chip entity-chip-${variant}`}
+  {href}
+  title={title ?? undefined}
+  target={external ? "_blank" : undefined}
+  rel={external ? "noopener noreferrer" : undefined}
+>
   {@render children?.()}
 </a>
 

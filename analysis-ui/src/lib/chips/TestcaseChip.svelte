@@ -1,18 +1,17 @@
 <script lang="ts">
-  import { base } from "$app/paths";
-  import { page } from "$app/state";
-  import { testcaseHref } from "$lib/entityLinks";
   import EntityChip from "./EntityChip.svelte";
 
-  type Props = { testcase: string; module?: string; preserveQuery?: boolean };
-  let { testcase, module, preserveQuery = true }: Props = $props();
+  type Props = { testcase: string; module: string };
+  let { testcase, module }: Props = $props();
 
+  // Link to the upstream specification markdown on codeberg. Paths are
+  // lowercase: docs/specifications/tests/<module>/<testcase>.md.
   const href = $derived(
-    testcaseHref(base, testcase, module ?? null, preserveQuery ? page.url.search : "")
+    `https://codeberg.org/pawal/gonemaster/src/branch/main/docs/specifications/tests/${module.toLowerCase()}/${testcase.toLowerCase()}.md`
   );
-  const display = $derived(module ? `${module}/${testcase}` : testcase);
+  const display = $derived(`${module}/${testcase}`);
 </script>
 
-<EntityChip {href} variant="testcase" title={display}>
+<EntityChip {href} variant="testcase" title={`${display} specification`} external>
   {display}
 </EntityChip>

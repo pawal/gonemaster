@@ -4,6 +4,7 @@
   import { page } from "$app/state";
   import FilterBar from "$lib/FilterBar.svelte";
   import SortHeader from "$lib/SortHeader.svelte";
+  import TagChip from "$lib/chips/TagChip.svelte";
   import { tagHref } from "$lib/entityLinks";
   import { formatCount, levelTone } from "$lib/format";
   import { searchToString } from "$lib/filters";
@@ -138,7 +139,7 @@
           {#each rows as row (row.tag)}
             <tr class="row-clickable" onclick={(e: MouseEvent) => rowClick(e, tagHref(base, row.tag, search))}>
               <th scope="row" class="row-ident">
-                <a class="cell-link" href={tagHref(base, row.tag, search)}>{row.tag}</a>
+                <TagChip tag={row.tag} />
               </th>
               <td>{row.module ?? "—"}</td>
               <td>
@@ -241,13 +242,6 @@
   .data-table tbody tr:last-child td { border-bottom: none; }
   .data-table tbody tr:hover { background: rgba(3, 105, 161, 0.04); }
   .row-clickable { cursor: pointer; }
-  .cell-link { color: inherit; text-decoration: none; }
-  .cell-link:hover { color: var(--accent-2); }
-  .cell-link:focus-visible {
-    outline: 2px solid var(--accent-2);
-    outline-offset: 2px;
-    border-radius: 2px;
-  }
   .row-ident {
     font-family: var(--mono);
     font-weight: 500;

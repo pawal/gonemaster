@@ -72,4 +72,12 @@
     color: #334155;
     border-color: #c8d3e0;
   }
+
+  /* Mark chips that open in a new tab. Kept as ::after so it stays out of
+     the accessibility tree; target="_blank" already conveys the semantics. */
+  .entity-chip[target="_blank"]::after {
+    content: "↗";
+    font-size: 0.9em;
+    opacity: 0.7;
+  }
 </style>

@@ -131,12 +131,7 @@
       <p class="hint">{d.description}</p>
     {/if}
     {#if formatTimestamp(d.last_materialized_at)}
-      <dl class="overview-meta">
-        <div>
-          <dt>Last analyzed</dt>
-          <dd>{formatTimestamp(d.last_materialized_at)}</dd>
-        </div>
-      </dl>
+      <p class="hint">Last analyzed: {formatTimestamp(d.last_materialized_at)}</p>
     {/if}
   </section>
 
@@ -288,28 +283,6 @@
   .overview-header h2 {
     margin: 0;
   }
-  .overview-meta {
-    display: flex;
-    gap: var(--space-6);
-    flex-wrap: wrap;
-    margin: 0;
-  }
-  .overview-meta > div {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-  .overview-meta dt {
-    font-size: var(--text-xs);
-    color: var(--ink-2);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-  .overview-meta dd {
-    margin: 0;
-    font-size: var(--text-sm);
-  }
-
   .health-bar-section {
     gap: var(--space-2);
   }

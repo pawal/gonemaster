@@ -2,12 +2,24 @@
 // pure functions lets us unit test them without touching the SvelteKit
 // runtime.
 
+// ISO 8601 (local time), e.g. "2026-04-19 11:53:26". The "sv-SE" locale
+// happens to produce this canonical shape, which avoids the American
+// m/d/yyyy default of toLocaleString() on most systems.
+const ISO_LOCAL = new Intl.DateTimeFormat("sv-SE", {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit"
+});
+
 export function formatTimestamp(value: string | null | undefined): string {
   if (!value) return "";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "";
   if (parsed.getUTCFullYear() < 1970) return ""; // Go zero-time guard.
-  return parsed.toLocaleString();
+  return ISO_LOCAL.format(parsed);
 }
 
 export function formatCount(n: number | null | undefined): string {

@@ -376,7 +376,7 @@
     const parts = [option.id];
     if (option.createdAt) {
       const parsed = new Date(option.createdAt);
-      if (!Number.isNaN(parsed.getTime())) parts.push(parsed.toLocaleString());
+      if (!Number.isNaN(parsed.getTime())) parts.push(parsed.toLocaleString("sv-SE"));
     }
     if (option.tag) parts.push(`[${option.tag}]`);
     return parts.join(" - ");
@@ -651,7 +651,7 @@
   const formatTimestampLocal = (value) => {
     const parsed = parseTimestamp(value);
     if (!parsed) return "unknown";
-    return parsed.toLocaleString();
+    return parsed.toLocaleString("sv-SE");
   };
   const formatBatchTotalRuntime = (batch) => {
     const created = parseTimestamp(batch?.created_at);
@@ -763,7 +763,7 @@
     if (!value) return "never";
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) return "never";
-    return parsed.toLocaleTimeString();
+    return parsed.toLocaleTimeString("sv-SE");
   };
   const metricsSeriesPoints = (snapshot, window) => {
     const windows = snapshot?.trends?.windows || {};

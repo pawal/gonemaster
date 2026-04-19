@@ -4,6 +4,7 @@
   import { page } from "$app/state";
   import FilterBar from "$lib/FilterBar.svelte";
   import SortHeader from "$lib/SortHeader.svelte";
+  import ASNChip from "$lib/chips/ASNChip.svelte";
   import { asnHref } from "$lib/entityLinks";
   import { formatCount } from "$lib/format";
   import { searchToString } from "$lib/filters";
@@ -135,14 +136,7 @@
           {#each rows as row (row.asn)}
             <tr class="row-clickable" onclick={(e: MouseEvent) => rowClick(e, asnHref(base, row.asn, search))}>
               <th scope="row" class="row-ident">
-                <a class="cell-link" href={asnHref(base, row.asn, search)} title={row.label ? `AS${row.asn} · ${row.label}` : `AS${row.asn}`}>
-                  {#if row.label}
-                    <span class="operator-label">{row.label}</span>
-                    <span class="operator-asn">AS{row.asn}</span>
-                  {:else}
-                    AS{row.asn}
-                  {/if}
-                </a>
+                <ASNChip asn={row.asn} label={row.label ?? undefined} />
               </th>
               <td class="col-num">{formatCount(row.domain_count)}</td>
               <td class="col-num">
@@ -243,16 +237,15 @@
     border-bottom: 1px solid var(--border);
     vertical-align: middle;
   }
+  /* Long operator labels would otherwise force horizontal scroll. Let the
+     ASN chip wrap; break anywhere so labels without spaces still fit. */
+  .data-table :global(.entity-chip-asn) {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
   .data-table tbody tr:last-child td { border-bottom: none; }
   .data-table tbody tr:hover { background: rgba(3, 105, 161, 0.04); }
   .row-clickable { cursor: pointer; }
-  .cell-link { color: inherit; text-decoration: none; }
-  .cell-link:hover { color: var(--accent-2); }
-  .cell-link:focus-visible {
-    outline: 2px solid var(--accent-2);
-    outline-offset: 2px;
-    border-radius: 2px;
-  }
   .row-ident {
     font-family: var(--mono);
     font-weight: 500;
@@ -262,8 +255,6 @@
     font-size: var(--text-sm);
   }
   .col-num { text-align: right; font-variant-numeric: tabular-nums; }
-  .operator-label { font-family: var(--sans); font-weight: 500; }
-  .operator-asn { margin-left: 6px; color: var(--ink-2); font-size: var(--text-xs); }
   .family-mix { display: block; color: var(--ink-2); font-size: var(--text-xs); font-family: var(--sans); }
 
   .pagination {

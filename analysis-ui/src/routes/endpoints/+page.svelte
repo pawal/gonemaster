@@ -4,7 +4,11 @@
   import { page } from "$app/state";
   import FilterBar from "$lib/FilterBar.svelte";
   import SortHeader from "$lib/SortHeader.svelte";
-  import { asnHref, endpointHref, nameserverHref, prefixHref } from "$lib/entityLinks";
+  import ASNChip from "$lib/chips/ASNChip.svelte";
+  import EndpointChip from "$lib/chips/EndpointChip.svelte";
+  import NameserverChip from "$lib/chips/NameserverChip.svelte";
+  import PrefixChip from "$lib/chips/PrefixChip.svelte";
+  import { endpointHref } from "$lib/entityLinks";
   import { formatCount } from "$lib/format";
   import { searchToString } from "$lib/filters";
   import { downloadCSV, downloadJSON, type ExportColumn } from "$lib/exporters";
@@ -143,27 +147,20 @@
           {#each rows as row (`${row.nameserver}|${row.address}`)}
             <tr class="row-clickable" onclick={(e: MouseEvent) => rowClick(e, endpointHref(base, row.address, row.nameserver, search))}>
               <th scope="row" class="row-ident">
-                <a class="cell-link" href={nameserverHref(base, row.nameserver, search)}>{row.nameserver}</a>
+                <NameserverChip nameserver={row.nameserver} />
               </th>
               <td class="row-ident">
-                <a class="cell-link" href={endpointHref(base, row.address, row.nameserver, search)}>{row.address}</a>
+                <EndpointChip address={row.address} nameserver={row.nameserver} />
               </td>
               <td class="col-num">{formatCount(row.domain_count)}</td>
               <td class="row-ident">
                 {#if row.asn !== undefined && row.asn !== null}
-                  <a class="cell-link" href={asnHref(base, row.asn, search)} title={row.asn_label ? `AS${row.asn} · ${row.asn_label}` : `AS${row.asn}`}>
-                    {#if row.asn_label}
-                      <span class="operator-label">{row.asn_label}</span>
-                      <span class="operator-asn">AS{row.asn}</span>
-                    {:else}
-                      AS{row.asn}
-                    {/if}
-                  </a>
+                  <ASNChip asn={row.asn} label={row.asn_label ?? undefined} />
                 {:else}—{/if}
               </td>
               <td class="row-ident">
                 {#if row.prefix}
-                  <a class="cell-link" href={prefixHref(base, row.prefix, search)}>{row.prefix}</a>
+                  <PrefixChip prefix={row.prefix} />
                 {:else}—{/if}
               </td>
             </tr>
@@ -200,6 +197,12 @@
   .data-table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
   .data-table th { text-align: left; padding: 8px 10px; background: var(--surface-2); color: var(--ink-2); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid var(--border); white-space: nowrap; }
   .data-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  /* Long operator labels would otherwise force horizontal scroll. Let the
+     ASN chip wrap; break anywhere so labels without spaces still fit. */
+  .data-table :global(.entity-chip-asn) {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
   .data-table tbody tr:last-child td { border-bottom: none; }
   .data-table tbody tr:hover { background: rgba(3, 105, 161, 0.04); }
   .row-ident {
@@ -211,25 +214,6 @@
     font-size: var(--text-sm);
   }
   .row-clickable { cursor: pointer; }
-  .operator-label {
-    font-family: var(--sans);
-    font-weight: 500;
-  }
-  .operator-asn {
-    margin-left: 6px;
-    color: var(--ink-2);
-    font-size: var(--text-xs);
-  }
-  .cell-link {
-    color: inherit;
-    text-decoration: none;
-  }
-  .cell-link:hover { color: var(--accent-2); }
-  .cell-link:focus-visible {
-    outline: 2px solid var(--accent-2);
-    outline-offset: 2px;
-    border-radius: 2px;
-  }
   .col-num { text-align: right; font-variant-numeric: tabular-nums; }
   .pagination { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); flex-wrap: wrap; margin-top: var(--space-3); }
   .pagination-controls { display: flex; gap: var(--space-2); }

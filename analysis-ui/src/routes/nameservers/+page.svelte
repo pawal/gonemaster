@@ -4,7 +4,9 @@
   import { page } from "$app/state";
   import FilterBar from "$lib/FilterBar.svelte";
   import SortHeader from "$lib/SortHeader.svelte";
-  import { asnHref, nameserverHref } from "$lib/entityLinks";
+  import ASNChip from "$lib/chips/ASNChip.svelte";
+  import NameserverChip from "$lib/chips/NameserverChip.svelte";
+  import { nameserverHref } from "$lib/entityLinks";
   import { formatCount } from "$lib/format";
   import { searchToString } from "$lib/filters";
   import { downloadCSV, downloadJSON, type ExportColumn } from "$lib/exporters";
@@ -139,20 +141,13 @@
           {#each rows as row (row.nameserver)}
             <tr class="row-clickable" onclick={(e: MouseEvent) => rowClick(e, nameserverHref(base, row.nameserver, search))}>
               <th scope="row" class="row-ident">
-                <a class="cell-link" href={nameserverHref(base, row.nameserver, search)}>{row.nameserver}</a>
+                <NameserverChip nameserver={row.nameserver} />
               </th>
               <td class="row-ident">
                 {#if row.operator === "Multiple"}
                   <span class="operator-multi">Multiple ({row.asn_count})</span>
                 {:else if row.operator_asn !== undefined && row.operator_asn !== null}
-                  <a class="cell-link" href={asnHref(base, row.operator_asn, search)} title={row.operator ? `AS${row.operator_asn} · ${row.operator}` : `AS${row.operator_asn}`}>
-                    {#if row.operator}
-                      <span class="operator-label">{row.operator}</span>
-                      <span class="operator-asn">AS{row.operator_asn}</span>
-                    {:else}
-                      AS{row.operator_asn}
-                    {/if}
-                  </a>
+                  <ASNChip asn={row.operator_asn} label={row.operator ?? undefined} />
                 {:else}—{/if}
               </td>
               <td class="col-num">{formatCount(row.domain_count)}</td>
@@ -252,19 +247,16 @@
     border-bottom: 1px solid var(--border);
     vertical-align: middle;
   }
+  /* Long operator labels would otherwise force horizontal scroll. Let the
+     ASN chip wrap; break anywhere so labels without spaces still fit. */
+  .data-table :global(.entity-chip-asn) {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
   .data-table tbody tr:last-child td { border-bottom: none; }
   .data-table tbody tr:hover { background: rgba(3, 105, 161, 0.04); }
   .row-clickable { cursor: pointer; }
-  .operator-label { font-family: var(--sans); font-weight: 500; }
-  .operator-asn { margin-left: 6px; color: var(--ink-2); font-size: var(--text-xs); }
   .operator-multi { color: var(--ink-2); font-family: var(--sans); font-style: italic; }
-  .cell-link { color: inherit; text-decoration: none; }
-  .cell-link:hover { color: var(--accent-2); }
-  .cell-link:focus-visible {
-    outline: 2px solid var(--accent-2);
-    outline-offset: 2px;
-    border-radius: 2px;
-  }
   .row-ident {
     font-family: var(--mono);
     font-weight: 500;

@@ -27,6 +27,11 @@ func (d *spyDialect) Placeholder(n int) string      { d.placeholderCalls++; retu
 func (d *spyDialect) TimestampVal(t time.Time) any  { return d.inner.TimestampVal(t) }
 func (d *spyDialect) DriverName() string            { return d.inner.DriverName() }
 func (d *spyDialect) IsDuplicateKey(err error) bool { return d.inner.IsDuplicateKey(err) }
+func (d *spyDialect) SupportsOnConflictReturning() bool {
+	return d.inner.SupportsOnConflictReturning()
+}
+func (d *spyDialect) Least(a, b string) string    { return d.inner.Least(a, b) }
+func (d *spyDialect) Greatest(a, b string) string { return d.inner.Greatest(a, b) }
 
 // testDollarDialect simulates PostgreSQL's $n placeholder style for testing.
 type testDollarDialect struct{}
@@ -37,6 +42,9 @@ func (testDollarDialect) DriverName() string           { return "test-dollar" }
 func (testDollarDialect) IsDuplicateKey(err error) bool {
 	return strings.Contains(err.Error(), "duplicate key value violates unique constraint")
 }
+func (testDollarDialect) SupportsOnConflictReturning() bool { return true }
+func (testDollarDialect) Least(a, b string) string          { return fmt.Sprintf("LEAST(%s, %s)", a, b) }
+func (testDollarDialect) Greatest(a, b string) string       { return fmt.Sprintf("GREATEST(%s, %s)", a, b) }
 
 // testBackend describes a database backend for parameterized store tests.
 type testBackend struct {

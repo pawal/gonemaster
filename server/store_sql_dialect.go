@@ -32,6 +32,17 @@ type sqlDialect interface {
 	// IsDuplicateKey returns true when err represents a unique-constraint
 	// violation. Each driver surfaces this differently.
 	IsDuplicateKey(err error) bool
+	// SupportsOnConflictReturning reports whether this dialect supports
+	// `INSERT ... ON CONFLICT (col) DO UPDATE ... RETURNING`. Postgres and
+	// modern SQLite do; MySQL/MariaDB uses a different syntax and returns
+	// false so the analysis upsert helpers fall back to the legacy
+	// SELECT-then-INSERT-or-UPDATE pattern.
+	SupportsOnConflictReturning() bool
+	// Least returns a dialect-appropriate scalar-min expression over two
+	// text columns. Postgres uses LEAST; SQLite uses min() as a scalar.
+	Least(a, b string) string
+	// Greatest is the dual of Least using GREATEST / max().
+	Greatest(a, b string) string
 }
 
 // sqliteDialect is the dialect for modernc.org/sqlite (driver name "sqlite").
@@ -48,6 +59,9 @@ func (sqliteDialect) DriverName() string { return "sqlite" }
 func (sqliteDialect) IsDuplicateKey(err error) bool {
 	return strings.Contains(err.Error(), "UNIQUE constraint failed")
 }
+func (sqliteDialect) SupportsOnConflictReturning() bool { return true }
+func (sqliteDialect) Least(a, b string) string          { return fmt.Sprintf("min(%s, %s)", a, b) }
+func (sqliteDialect) Greatest(a, b string) string       { return fmt.Sprintf("max(%s, %s)", a, b) }
 
 // postgresDialect is the dialect for github.com/lib/pq (driver name "postgres").
 type postgresDialect struct{}
@@ -67,6 +81,9 @@ func (postgresDialect) IsDuplicateKey(err error) bool {
 	var pqErr *pq.Error
 	return errors.As(err, &pqErr) && pqErr.Code == "23505"
 }
+func (postgresDialect) SupportsOnConflictReturning() bool { return true }
+func (postgresDialect) Least(a, b string) string          { return fmt.Sprintf("LEAST(%s, %s)", a, b) }
+func (postgresDialect) Greatest(a, b string) string       { return fmt.Sprintf("GREATEST(%s, %s)", a, b) }
 
 // mariadbDialect is the dialect for github.com/go-sql-driver/mysql (driver
 // name "mysql"), which also covers MariaDB.
@@ -86,6 +103,13 @@ func (mariadbDialect) IsDuplicateKey(err error) bool {
 	var mysqlErr *mysql.MySQLError
 	return errors.As(err, &mysqlErr) && mysqlErr.Number == 1062
 }
+
+// MariaDB uses INSERT ... ON DUPLICATE KEY UPDATE and does not support
+// RETURNING on that form, so the analysis upsert helpers take the legacy
+// SELECT-then-INSERT-or-UPDATE fallback path.
+func (mariadbDialect) SupportsOnConflictReturning() bool { return false }
+func (mariadbDialect) Least(a, b string) string          { return fmt.Sprintf("LEAST(%s, %s)", a, b) }
+func (mariadbDialect) Greatest(a, b string) string       { return fmt.Sprintf("GREATEST(%s, %s)", a, b) }
 
 // dialectFor returns the dialect for a given driver name.
 func dialectFor(driver string) (sqlDialect, error) {

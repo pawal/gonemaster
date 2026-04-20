@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -160,6 +161,26 @@ func (s *SQLJobStore) upsertAnalysisNameserverIn(q sqlQuerier, name string, seen
 		return AnalysisNameserver{}, errors.New("nameserver name is required")
 	}
 	seenAt = normalizeSeenAt(seenAt)
+	if s.dialect.SupportsOnConflictReturning() {
+		query := fmt.Sprintf(
+			`INSERT INTO analysis_nameservers (name, first_seen_at, last_seen_at) VALUES (%s, %s, %s)
+			 ON CONFLICT (name) DO UPDATE SET
+			   first_seen_at = %s,
+			   last_seen_at = %s
+			 RETURNING id, first_seen_at, last_seen_at`,
+			s.ph(1), s.ph(2), s.ph(3),
+			s.dialect.Least("analysis_nameservers.first_seen_at", "EXCLUDED.first_seen_at"),
+			s.dialect.Greatest("analysis_nameservers.last_seen_at", "EXCLUDED.last_seen_at"),
+		)
+		item := AnalysisNameserver{Name: name}
+		var firstSeen, lastSeen string
+		if err := q.QueryRow(query, name, s.ts(seenAt), s.ts(seenAt)).Scan(&item.ID, &firstSeen, &lastSeen); err != nil {
+			return AnalysisNameserver{}, fmt.Errorf("upsert analysis nameserver: %w", err)
+		}
+		item.FirstSeenAt = parseTimestampStr(firstSeen)
+		item.LastSeenAt = parseTimestampStr(lastSeen)
+		return item, nil
+	}
 	id, err := s.upsertSeenEntityIn(
 		q,
 		fmt.Sprintf(`SELECT id, first_seen_at, last_seen_at FROM analysis_nameservers WHERE name = %s`, s.ph(1)),
@@ -233,6 +254,27 @@ func (s *SQLJobStore) upsertAnalysisAddressIn(q sqlQuerier, address, family stri
 		return AnalysisAddress{}, errors.New("address family is required")
 	}
 	seenAt = normalizeSeenAt(seenAt)
+	if s.dialect.SupportsOnConflictReturning() {
+		query := fmt.Sprintf(
+			`INSERT INTO analysis_addresses (address, family, first_seen_at, last_seen_at) VALUES (%s, %s, %s, %s)
+			 ON CONFLICT (address) DO UPDATE SET
+			   family = EXCLUDED.family,
+			   first_seen_at = %s,
+			   last_seen_at = %s
+			 RETURNING id, family, first_seen_at, last_seen_at`,
+			s.ph(1), s.ph(2), s.ph(3), s.ph(4),
+			s.dialect.Least("analysis_addresses.first_seen_at", "EXCLUDED.first_seen_at"),
+			s.dialect.Greatest("analysis_addresses.last_seen_at", "EXCLUDED.last_seen_at"),
+		)
+		item := AnalysisAddress{Address: address}
+		var firstSeen, lastSeen string
+		if err := q.QueryRow(query, address, family, s.ts(seenAt), s.ts(seenAt)).Scan(&item.ID, &item.Family, &firstSeen, &lastSeen); err != nil {
+			return AnalysisAddress{}, fmt.Errorf("upsert analysis address: %w", err)
+		}
+		item.FirstSeenAt = parseTimestampStr(firstSeen)
+		item.LastSeenAt = parseTimestampStr(lastSeen)
+		return item, nil
+	}
 	id, err := s.upsertSeenEntityIn(
 		q,
 		fmt.Sprintf(`SELECT id, first_seen_at, last_seen_at FROM analysis_addresses WHERE address = %s`, s.ph(1)),
@@ -306,6 +348,27 @@ func (s *SQLJobStore) upsertAnalysisPrefixIn(q sqlQuerier, prefix, family string
 		return AnalysisPrefix{}, errors.New("prefix family is required")
 	}
 	seenAt = normalizeSeenAt(seenAt)
+	if s.dialect.SupportsOnConflictReturning() {
+		query := fmt.Sprintf(
+			`INSERT INTO analysis_prefixes (prefix, family, first_seen_at, last_seen_at) VALUES (%s, %s, %s, %s)
+			 ON CONFLICT (prefix) DO UPDATE SET
+			   family = EXCLUDED.family,
+			   first_seen_at = %s,
+			   last_seen_at = %s
+			 RETURNING id, family, first_seen_at, last_seen_at`,
+			s.ph(1), s.ph(2), s.ph(3), s.ph(4),
+			s.dialect.Least("analysis_prefixes.first_seen_at", "EXCLUDED.first_seen_at"),
+			s.dialect.Greatest("analysis_prefixes.last_seen_at", "EXCLUDED.last_seen_at"),
+		)
+		item := AnalysisPrefix{Prefix: prefix}
+		var firstSeen, lastSeen string
+		if err := q.QueryRow(query, prefix, family, s.ts(seenAt), s.ts(seenAt)).Scan(&item.ID, &item.Family, &firstSeen, &lastSeen); err != nil {
+			return AnalysisPrefix{}, fmt.Errorf("upsert analysis prefix: %w", err)
+		}
+		item.FirstSeenAt = parseTimestampStr(firstSeen)
+		item.LastSeenAt = parseTimestampStr(lastSeen)
+		return item, nil
+	}
 	id, err := s.upsertSeenEntityIn(
 		q,
 		fmt.Sprintf(`SELECT id, first_seen_at, last_seen_at FROM analysis_prefixes WHERE prefix = %s`, s.ph(1)),
@@ -376,6 +439,29 @@ func (s *SQLJobStore) upsertAnalysisASNIn(q sqlQuerier, asn int64, label string,
 		return AnalysisASN{}, errors.New("asn is required")
 	}
 	seenAt = normalizeSeenAt(seenAt)
+	if s.dialect.SupportsOnConflictReturning() {
+		// Keep an already-resolved label rather than clobbering it with an
+		// empty one from a caller that hadn't resolved a label yet.
+		query := fmt.Sprintf(
+			`INSERT INTO analysis_asns (asn, label, first_seen_at, last_seen_at) VALUES (%s, %s, %s, %s)
+			 ON CONFLICT (asn) DO UPDATE SET
+			   label = CASE WHEN EXCLUDED.label = '' THEN analysis_asns.label ELSE EXCLUDED.label END,
+			   first_seen_at = %s,
+			   last_seen_at = %s
+			 RETURNING asn, label, first_seen_at, last_seen_at`,
+			s.ph(1), s.ph(2), s.ph(3), s.ph(4),
+			s.dialect.Least("analysis_asns.first_seen_at", "EXCLUDED.first_seen_at"),
+			s.dialect.Greatest("analysis_asns.last_seen_at", "EXCLUDED.last_seen_at"),
+		)
+		var item AnalysisASN
+		var firstSeen, lastSeen string
+		if err := q.QueryRow(query, asn, label, s.ts(seenAt), s.ts(seenAt)).Scan(&item.ASN, &item.Label, &firstSeen, &lastSeen); err != nil {
+			return AnalysisASN{}, fmt.Errorf("upsert analysis asn: %w", err)
+		}
+		item.FirstSeenAt = parseTimestampStr(firstSeen)
+		item.LastSeenAt = parseTimestampStr(lastSeen)
+		return item, nil
+	}
 	row := q.QueryRow(
 		fmt.Sprintf(`SELECT label, first_seen_at, last_seen_at FROM analysis_asns WHERE asn = %s`, s.ph(1)),
 		asn,
@@ -430,25 +516,41 @@ func (s *SQLJobStore) getAnalysisASNIn(q sqlQuerier, asn int64) (AnalysisASN, bo
 	return AnalysisASN{}, false
 }
 
-// replaceAnalysisRowsIn runs the DELETE + row-by-row INSERTs against q. The
-// caller is responsible for transactional framing: the public autocommit
-// path wraps one tx around it; the per-run projection path reuses its
-// outer ProjectLoaded tx so a mid-batch failure rolls back with everything
-// else.
+// replaceAnalysisRowsIn runs DELETE followed by a single multi-row INSERT
+// against q. The caller passes the INSERT prefix (`INSERT INTO t (cols)
+// VALUES `) and one []any per row; this helper stitches together the
+// `($1,$2,...),($N+1,...)` placeholder groups so an N-row replace takes
+// two round-trips instead of N+1. The caller is responsible for
+// transactional framing: the public autocommit path wraps one tx around
+// it; the per-run projection path reuses its outer ProjectLoaded tx so a
+// mid-batch failure rolls back with everything else.
 func (s *SQLJobStore) replaceAnalysisRowsIn(
 	q sqlQuerier,
 	deleteQuery string,
 	deleteArgs []any,
-	insertQuery string,
+	insertPrefix string,
 	rows [][]any,
 ) error {
 	if _, err := q.Exec(deleteQuery, deleteArgs...); err != nil {
 		return err
 	}
-	for _, row := range rows {
-		if _, err := q.Exec(insertQuery, row...); err != nil {
-			return err
+	if len(rows) == 0 {
+		return nil
+	}
+	cols := len(rows[0])
+	groups := make([]string, len(rows))
+	args := make([]any, 0, len(rows)*cols)
+	for i, row := range rows {
+		placeholders := make([]string, cols)
+		for j := 0; j < cols; j++ {
+			placeholders[j] = s.ph(i*cols + j + 1)
 		}
+		groups[i] = "(" + strings.Join(placeholders, ", ") + ")"
+		args = append(args, row...)
+	}
+	query := insertPrefix + " VALUES " + strings.Join(groups, ", ")
+	if _, err := q.Exec(query, args...); err != nil {
+		return err
 	}
 	return nil
 }
@@ -477,10 +579,10 @@ func (s *SQLJobStore) replaceAnalysisRunNSEndpointsIn(q sqlQuerier, cohortID int
 	err := s.replaceAnalysisRowsIn(q,
 		fmt.Sprintf(`DELETE FROM analysis_run_ns_endpoints WHERE cohort_id = %s AND run_id = %s`, s.ph(1), s.ph(2)),
 		[]any{cohortID, runID},
-		fmt.Sprintf(`INSERT INTO analysis_run_ns_endpoints (
+		`INSERT INTO analysis_run_ns_endpoints (
 			cohort_id, run_id, domain_id, nameserver_id, address_id, role, source, family,
 			avg_ms, min_ms, max_ms, query_count
-		) VALUES (%s)`, s.phRange(1, 12)),
+		)`,
 		rows,
 	)
 	if err != nil {
@@ -585,9 +687,9 @@ func (s *SQLJobStore) replaceAnalysisRunAddressASNsIn(q sqlQuerier, cohortID int
 	err := s.replaceAnalysisRowsIn(q,
 		fmt.Sprintf(`DELETE FROM analysis_run_address_asns WHERE cohort_id = %s AND run_id = %s`, s.ph(1), s.ph(2)),
 		[]any{cohortID, runID},
-		fmt.Sprintf(`INSERT INTO analysis_run_address_asns (
+		`INSERT INTO analysis_run_address_asns (
 			cohort_id, run_id, domain_id, address_id, prefix_id, asn, lookup_status, source
-		) VALUES (%s)`, s.phRange(1, 8)),
+		)`,
 		rows,
 	)
 	if err != nil {
@@ -688,9 +790,9 @@ func (s *SQLJobStore) replaceAnalysisRunDomainASNsIn(q sqlQuerier, cohortID int6
 	err := s.replaceAnalysisRowsIn(q,
 		fmt.Sprintf(`DELETE FROM analysis_run_domain_asns WHERE cohort_id = %s AND run_id = %s`, s.ph(1), s.ph(2)),
 		[]any{cohortID, runID},
-		fmt.Sprintf(`INSERT INTO analysis_run_domain_asns (
+		`INSERT INTO analysis_run_domain_asns (
 			cohort_id, run_id, domain_id, asn, family, source
-		) VALUES (%s)`, s.phRange(1, 6)),
+		)`,
 		rows,
 	)
 	if err != nil {
@@ -779,6 +881,39 @@ func (s *SQLJobStore) upsertAnalysisRunDomainSummaryIn(q sqlQuerier, item Analys
 	}
 	if item.DomainID == 0 {
 		return errors.New("domain_id is required")
+	}
+
+	if s.dialect.SupportsOnConflictReturning() {
+		query := fmt.Sprintf(
+			`INSERT INTO analysis_run_domain_summary (
+				cohort_id, run_id, domain_id, score, grade, nameserver_count,
+				endpoint_count, asn_count, prefix_count, worst_level
+			) VALUES (%s)
+			 ON CONFLICT (cohort_id, run_id, domain_id) DO UPDATE SET
+			   score = EXCLUDED.score,
+			   grade = EXCLUDED.grade,
+			   nameserver_count = EXCLUDED.nameserver_count,
+			   endpoint_count = EXCLUDED.endpoint_count,
+			   asn_count = EXCLUDED.asn_count,
+			   prefix_count = EXCLUDED.prefix_count,
+			   worst_level = EXCLUDED.worst_level`,
+			s.phRange(1, 10),
+		)
+		if _, err := q.Exec(query,
+			item.CohortID,
+			item.RunID,
+			item.DomainID,
+			nullIntValue(item.Score),
+			nullStringPtr(item.Grade),
+			item.NameserverCount,
+			item.EndpointCount,
+			item.ASNCount,
+			item.PrefixCount,
+			item.WorstLevel,
+		); err != nil {
+			return fmt.Errorf("upsert analysis run domain summary: %w", err)
+		}
+		return nil
 	}
 
 	row := q.QueryRow(
@@ -889,6 +1024,26 @@ func (s *SQLJobStore) setAnalysisProjectionStateIn(q sqlQuerier, item AnalysisPr
 	}
 	if item.Status == "" {
 		return errors.New("status is required")
+	}
+
+	if s.dialect.SupportsOnConflictReturning() {
+		query := fmt.Sprintf(
+			`INSERT INTO analysis_projection_state (
+				cohort_id, run_id, projector_version, status, projected_at, error
+			) VALUES (%s)
+			 ON CONFLICT (cohort_id, run_id) DO UPDATE SET
+			   projector_version = EXCLUDED.projector_version,
+			   status = EXCLUDED.status,
+			   projected_at = EXCLUDED.projected_at,
+			   error = EXCLUDED.error`,
+			s.phRange(1, 6),
+		)
+		if _, err := q.Exec(query,
+			item.CohortID, item.RunID, item.ProjectorVersion, item.Status, s.ts(item.ProjectedAt), item.Error,
+		); err != nil {
+			return fmt.Errorf("upsert analysis projection state: %w", err)
+		}
+		return nil
 	}
 
 	row := q.QueryRow(

@@ -28,11 +28,12 @@ type fakeStore struct {
 	prefixesByValue   map[string]serverpkg.AnalysisPrefix
 	asnsByValue       map[int64]serverpkg.AnalysisASN
 
-	nsEndpoints map[string][]serverpkg.AnalysisRunNameserverEndpoint
-	addrFacts   map[string][]serverpkg.AnalysisRunAddressASN
-	domainASNs  map[string][]serverpkg.AnalysisRunDomainASN
-	summaries   map[string]serverpkg.AnalysisRunDomainSummary
-	states      map[string]serverpkg.AnalysisProjectionState
+	nsEndpoints  map[string][]serverpkg.AnalysisRunNameserverEndpoint
+	addrFacts    map[string][]serverpkg.AnalysisRunAddressASN
+	domainASNs   map[string][]serverpkg.AnalysisRunDomainASN
+	tagSummaries map[string][]serverpkg.AnalysisRunTagSummary
+	summaries    map[string]serverpkg.AnalysisRunDomainSummary
+	states       map[string]serverpkg.AnalysisProjectionState
 }
 
 func (s *fakeStore) GetRun(id string) (serverpkg.Run, bool) {
@@ -136,6 +137,11 @@ func (s *fakeStore) ClearAnalysisCohortMaterialization(cohortID int64) error {
 	for key := range s.domainASNs {
 		if strings.HasPrefix(key, prefix) {
 			delete(s.domainASNs, key)
+		}
+	}
+	for key := range s.tagSummaries {
+		if strings.HasPrefix(key, prefix) {
+			delete(s.tagSummaries, key)
 		}
 	}
 	for key := range s.summaries {
@@ -297,6 +303,12 @@ func (s *fakeStore) ReplaceAnalysisRunDomainASNs(cohortID int64, runID string, i
 	return nil
 }
 
+func (s *fakeStore) ReplaceAnalysisRunTagSummaries(cohortID int64, runID string, items []serverpkg.AnalysisRunTagSummary) error {
+	s.ensureMaterializedMaps()
+	s.tagSummaries[projectionKey(cohortID, runID)] = append([]serverpkg.AnalysisRunTagSummary(nil), items...)
+	return nil
+}
+
 func (s *fakeStore) UpsertAnalysisRunDomainSummary(item serverpkg.AnalysisRunDomainSummary) error {
 	s.ensureMaterializedMaps()
 	s.summaries[projectionKey(item.CohortID, item.RunID)] = item
@@ -330,6 +342,9 @@ func (s *fakeStore) ensureMaterializedMaps() {
 	}
 	if s.domainASNs == nil {
 		s.domainASNs = map[string][]serverpkg.AnalysisRunDomainASN{}
+	}
+	if s.tagSummaries == nil {
+		s.tagSummaries = map[string][]serverpkg.AnalysisRunTagSummary{}
 	}
 	if s.summaries == nil {
 		s.summaries = map[string]serverpkg.AnalysisRunDomainSummary{}
@@ -655,6 +670,41 @@ func TestProjectorExtractNameserverEndpointsFallbackWithoutTimings(t *testing.T)
 	}
 	if child := byKey["ns4.example.test|child_servers"]; child.role != "authoritative" {
 		t.Fatalf("expected child_servers endpoint to stay authoritative without timings: %+v", child)
+	}
+}
+
+func TestExtractTagSummariesBucketsByTagAndTestcase(t *testing.T) {
+	input := RunInput{
+		Entries: []serverpkg.Entry{
+			{Module: "DNSSEC", Testcase: "dnssec07", Tag: "DS07_NOT_SIGNED", Level: "ERROR"},
+			{Module: "DNSSEC", Testcase: "dnssec07", Tag: "DS07_NOT_SIGNED", Level: "WARNING"},
+			{Module: "DNSSEC", Testcase: "dnssec01", Tag: "DS01_SIGNED", Level: "NOTICE"},
+			// Same tag, different testcase: a separate bucket.
+			{Module: "OTHER", Testcase: "other01", Tag: "DS01_SIGNED", Level: "INFO"},
+			// Empty tag: skipped.
+			{Module: "X", Testcase: "x", Tag: "  ", Level: "INFO"},
+		},
+	}
+
+	got := extractTagSummaries(input)
+	if len(got) != 3 {
+		t.Fatalf("expected 3 buckets, got %d (%+v)", len(got), got)
+	}
+	byKey := map[string]tagSummary{}
+	for _, ts := range got {
+		byKey[ts.tag+"|"+ts.testcase] = ts
+	}
+	ds07 := byKey["DS07_NOT_SIGNED|dnssec07"]
+	if ds07.occurrences != 2 || ds07.level != "ERROR" || ds07.module != "DNSSEC" {
+		t.Fatalf("unexpected DS07 bucket: %+v", ds07)
+	}
+	ds01 := byKey["DS01_SIGNED|dnssec01"]
+	if ds01.occurrences != 1 || ds01.level != "NOTICE" {
+		t.Fatalf("unexpected DS01 bucket: %+v", ds01)
+	}
+	other := byKey["DS01_SIGNED|other01"]
+	if other.occurrences != 1 || other.module != "OTHER" {
+		t.Fatalf("unexpected DS01/other01 bucket: %+v", other)
 	}
 }
 

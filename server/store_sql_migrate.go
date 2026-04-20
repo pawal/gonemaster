@@ -396,6 +396,39 @@ var sqlMigrations = []sqlMigration{
 			`ALTER TABLE analysis_cohort_catalog ADD COLUMN materialization_total INTEGER NOT NULL DEFAULT 0`,
 		},
 	},
+	{
+		// Per-run tag aggregates so the /tags landing-page endpoint
+		// does not have to scan the entries table once per domain on
+		// every request. Populated by the projector from each run's
+		// entries; served via the in-memory materialization cache.
+		version: 9,
+		stmtsFn: func(d sqlDialect) []string {
+			var bigint string
+			switch d.(type) {
+			case postgresDialect, mariadbDialect:
+				bigint = "BIGINT"
+			default:
+				bigint = "INTEGER"
+			}
+			return []string{
+				fmt.Sprintf(`CREATE TABLE IF NOT EXISTS analysis_run_tag_summary (
+					cohort_id        %s          NOT NULL,
+					run_id           VARCHAR(255) NOT NULL,
+					domain_id        %s          NOT NULL,
+					tag              VARCHAR(128) NOT NULL,
+					module           VARCHAR(64)  NOT NULL DEFAULT '',
+					testcase         VARCHAR(64)  NOT NULL DEFAULT '',
+					level            VARCHAR(16)  NOT NULL DEFAULT '',
+					occurrence_count INTEGER      NOT NULL DEFAULT 0,
+					PRIMARY KEY (cohort_id, run_id, domain_id, tag, testcase)
+				)`, bigint, bigint),
+				`CREATE INDEX IF NOT EXISTS idx_analysis_run_tag_summary_cohort_id ON analysis_run_tag_summary(cohort_id)`,
+				`CREATE INDEX IF NOT EXISTS idx_analysis_run_tag_summary_run_id ON analysis_run_tag_summary(run_id)`,
+				`CREATE INDEX IF NOT EXISTS idx_analysis_run_tag_summary_tag ON analysis_run_tag_summary(tag)`,
+				`CREATE INDEX IF NOT EXISTS idx_analysis_run_tag_summary_level ON analysis_run_tag_summary(level)`,
+			}
+		},
+	},
 }
 
 // runMigrations creates the schema_migrations tracking table and applies any

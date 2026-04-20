@@ -15,6 +15,7 @@ type AnalysisReadStore interface {
 	ListAnalysisRunNSEndpointsByCohort(cohortID int64) []AnalysisRunNameserverEndpoint
 	ListAnalysisRunAddressASNsByCohort(cohortID int64) []AnalysisRunAddressASN
 	ListAnalysisRunDomainASNsByCohort(cohortID int64) []AnalysisRunDomainASN
+	ListAnalysisRunTagSummariesByCohort(cohortID int64) []AnalysisRunTagSummary
 	GetAnalysisNameserver(id int64) (AnalysisNameserver, bool)
 	GetAnalysisAddress(id int64) (AnalysisAddress, bool)
 	GetAnalysisPrefix(id int64) (AnalysisPrefix, bool)
@@ -231,11 +232,12 @@ type domainSummaryPair struct {
 }
 
 type latestCohortMaterialization struct {
-	latest      []domainSummaryPair
-	latestRuns  map[string]struct{}
-	endpoints   []AnalysisRunNameserverEndpoint
-	addressASNs []AnalysisRunAddressASN
-	domainASNs  []AnalysisRunDomainASN
+	latest       []domainSummaryPair
+	latestRuns   map[string]struct{}
+	endpoints    []AnalysisRunNameserverEndpoint
+	addressASNs  []AnalysisRunAddressASN
+	domainASNs   []AnalysisRunDomainASN
+	tagSummaries []AnalysisRunTagSummary
 }
 
 // latestSummariesByDomain collapses multiple materialized summaries per domain
@@ -286,12 +288,27 @@ func computeLatestMaterializationForCohort(readStore AnalysisReadStore, runLooku
 		authoritative = append(authoritative, ep)
 	}
 	return latestCohortMaterialization{
-		latest:      latest,
-		latestRuns:  runIDs,
-		endpoints:   authoritative,
-		addressASNs: filterAnalysisRunAddressASNsByRunIDs(readStore.ListAnalysisRunAddressASNsByCohort(cohortID), runIDs),
-		domainASNs:  filterAnalysisRunDomainASNsByRunIDs(readStore.ListAnalysisRunDomainASNsByCohort(cohortID), runIDs),
+		latest:       latest,
+		latestRuns:   runIDs,
+		endpoints:    authoritative,
+		addressASNs:  filterAnalysisRunAddressASNsByRunIDs(readStore.ListAnalysisRunAddressASNsByCohort(cohortID), runIDs),
+		domainASNs:   filterAnalysisRunDomainASNsByRunIDs(readStore.ListAnalysisRunDomainASNsByCohort(cohortID), runIDs),
+		tagSummaries: filterAnalysisRunTagSummariesByRunIDs(readStore.ListAnalysisRunTagSummariesByCohort(cohortID), runIDs),
 	}
+}
+
+func filterAnalysisRunTagSummariesByRunIDs(items []AnalysisRunTagSummary, runIDs map[string]struct{}) []AnalysisRunTagSummary {
+	if len(runIDs) == 0 {
+		return nil
+	}
+	out := make([]AnalysisRunTagSummary, 0, len(items))
+	for _, item := range items {
+		if _, ok := runIDs[item.RunID]; !ok {
+			continue
+		}
+		out = append(out, item)
+	}
+	return out
 }
 
 func filterAnalysisRunDomainASNsByRunIDs(items []AnalysisRunDomainASN, runIDs map[string]struct{}) []AnalysisRunDomainASN {

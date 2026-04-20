@@ -41,6 +41,42 @@ func (f *analysisAPITestFixture) seedGraduatedRun(domainName string, finishedAt 
 	}); err != nil {
 		f.t.Fatalf("upsert summary: %v", err)
 	}
+	// Tag aggregates — mirror what the real projector persists so the
+	// /tags + /testcases handlers (which now read from the materialized
+	// tag_summary table) see the test's findings.
+	type tagKey struct{ tag, testcase string }
+	type bucket struct {
+		module, level string
+		count         int
+	}
+	buckets := map[tagKey]*bucket{}
+	for _, e := range entries {
+		tag := strings.TrimSpace(e.Tag)
+		if tag == "" {
+			continue
+		}
+		k := tagKey{tag: tag, testcase: e.Testcase}
+		b, ok := buckets[k]
+		if !ok {
+			b = &bucket{module: e.Module, level: e.Level}
+			buckets[k] = b
+		}
+		if severityRank(e.Level) > severityRank(b.level) {
+			b.level = e.Level
+		}
+		b.count++
+	}
+	rows := make([]AnalysisRunTagSummary, 0, len(buckets))
+	for k, b := range buckets {
+		rows = append(rows, AnalysisRunTagSummary{
+			CohortID: f.cohort.ID, RunID: runID, DomainID: domain.ID,
+			Tag: k.tag, Module: b.module, Testcase: k.testcase,
+			Level: b.level, OccurrenceCount: b.count,
+		})
+	}
+	if err := f.store.ReplaceAnalysisRunTagSummaries(f.cohort.ID, runID, rows); err != nil {
+		f.t.Fatalf("replace tag summaries: %v", err)
+	}
 	return run
 }
 

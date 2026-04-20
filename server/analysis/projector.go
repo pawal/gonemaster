@@ -186,6 +186,81 @@ type preparedRun struct {
 	addressFacts []extractedAddressFact
 	domainASNs   []extractedDomainASN
 	asnLabels    map[int64]string
+	tagSummaries []tagSummary
+}
+
+// tagSummary is a per-(tag, testcase) aggregate for one run. Rendered by
+// writePrepared into serverpkg.AnalysisRunTagSummary rows — one per
+// matching cohort.
+type tagSummary struct {
+	tag         string
+	module      string
+	testcase    string
+	level       string
+	occurrences int
+}
+
+// extractTagSummaries groups run entries by (tag, testcase) so the
+// landing page's top-findings panel can be served from a materialized
+// table instead of rescanning the entries table per domain on every
+// request. Level is the worst severity observed for the bucket.
+func extractTagSummaries(input RunInput) []tagSummary {
+	type key struct {
+		tag      string
+		testcase string
+	}
+	buckets := map[key]*tagSummary{}
+	for _, entry := range input.Entries {
+		tag := strings.TrimSpace(entry.Tag)
+		if tag == "" {
+			continue
+		}
+		k := key{tag: tag, testcase: entry.Testcase}
+		b, ok := buckets[k]
+		if !ok {
+			b = &tagSummary{
+				tag:      tag,
+				module:   entry.Module,
+				testcase: entry.Testcase,
+				level:    entry.Level,
+			}
+			buckets[k] = b
+		}
+		if severityRank(entry.Level) > severityRank(b.level) {
+			b.level = entry.Level
+		}
+		b.occurrences++
+	}
+	out := make([]tagSummary, 0, len(buckets))
+	for _, b := range buckets {
+		out = append(out, *b)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].tag != out[j].tag {
+			return out[i].tag < out[j].tag
+		}
+		return out[i].testcase < out[j].testcase
+	})
+	return out
+}
+
+// severityRank mirrors the helper used by handlers_public_analysis_*;
+// kept private here so the projector can fold per-entry levels into a
+// per-bucket worst-seen level without importing the server package.
+func severityRank(level string) int {
+	switch strings.ToUpper(strings.TrimSpace(level)) {
+	case "CRITICAL":
+		return 5
+	case "ERROR":
+		return 4
+	case "WARNING":
+		return 3
+	case "NOTICE":
+		return 2
+	case "INFO":
+		return 1
+	}
+	return 0
 }
 
 // prepareRun does all the pure-Go extraction and all the external
@@ -203,12 +278,14 @@ func (p *Projector) prepareRun(input RunInput) preparedRun {
 	// is populated; otherwise we still need the aggregate for coverage.
 	domainASNs = restrictDomainASNsToAuthoritative(domainASNs, addressFacts)
 	asnLabels := p.resolveASNLabels(addressFacts, domainASNs)
+	tagSummaries := extractTagSummaries(input)
 	return preparedRun{
 		input:        input,
 		endpoints:    endpoints,
 		addressFacts: addressFacts,
 		domainASNs:   domainASNs,
 		asnLabels:    asnLabels,
+		tagSummaries: tagSummaries,
 	}
 }
 
@@ -221,6 +298,7 @@ func (p *Projector) writePrepared(pr preparedRun, w WriteStore) error {
 	addressFacts := pr.addressFacts
 	domainASNs := pr.domainASNs
 	asnLabels := pr.asnLabels
+	tagSummaries := pr.tagSummaries
 
 	nameserverIDs := map[string]int64{}
 	addressIDs := map[string]int64{}
@@ -322,6 +400,23 @@ func (p *Projector) writePrepared(pr preparedRun, w WriteStore) error {
 		}
 		if err := w.ReplaceAnalysisRunDomainASNs(cohort.ID, input.Run.ID, domainASNRows); err != nil {
 			return fmt.Errorf("replace domain asns for cohort %d: %w", cohort.ID, err)
+		}
+
+		tagRows := make([]serverpkg.AnalysisRunTagSummary, 0, len(tagSummaries))
+		for _, ts := range tagSummaries {
+			tagRows = append(tagRows, serverpkg.AnalysisRunTagSummary{
+				CohortID:        cohort.ID,
+				RunID:           input.Run.ID,
+				DomainID:        input.Run.DomainID,
+				Tag:             ts.tag,
+				Module:          ts.module,
+				Testcase:        ts.testcase,
+				Level:           ts.level,
+				OccurrenceCount: ts.occurrences,
+			})
+		}
+		if err := w.ReplaceAnalysisRunTagSummaries(cohort.ID, input.Run.ID, tagRows); err != nil {
+			return fmt.Errorf("replace tag summaries for cohort %d: %w", cohort.ID, err)
 		}
 
 		summary.CohortID = cohort.ID

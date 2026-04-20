@@ -49,8 +49,11 @@ func (s *Server) handlePublicAnalysisTags(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	latest := s.latestMaterializationForCohort(cohort).latest
+	data := s.latestMaterializationForCohort(cohort)
 
+	// Aggregates come from the materialized analysis_run_tag_summary
+	// table via the cohort cache — no per-run entries scan. One bucket
+	// per distinct tag across all latest-per-domain runs.
 	type tagAgg struct {
 		module      string
 		level       string
@@ -58,27 +61,28 @@ func (s *Server) handlePublicAnalysisTags(w http.ResponseWriter, r *http.Request
 		occurrences int
 	}
 	buckets := map[string]*tagAgg{}
-	for _, pair := range latest {
-		for _, entry := range s.loadAllEntriesForRun(pair.summary.RunID) {
-			tag := strings.TrimSpace(entry.Tag)
-			if tag == "" {
-				continue
-			}
-			b, exists := buckets[tag]
-			if !exists {
-				b = &tagAgg{
-					module:  entry.Module,
-					level:   entry.Level,
-					domains: map[int64]struct{}{},
-				}
-				buckets[tag] = b
-			}
-			if severityRank(entry.Level) > severityRank(b.level) {
-				b.level = entry.Level
-			}
-			b.domains[pair.summary.DomainID] = struct{}{}
-			b.occurrences++
+	for _, ts := range data.tagSummaries {
+		tag := strings.TrimSpace(ts.Tag)
+		if tag == "" {
+			continue
 		}
+		b, exists := buckets[tag]
+		if !exists {
+			b = &tagAgg{
+				module:  ts.Module,
+				level:   ts.Level,
+				domains: map[int64]struct{}{},
+			}
+			buckets[tag] = b
+		}
+		if severityRank(ts.Level) > severityRank(b.level) {
+			b.level = ts.Level
+		}
+		if b.module == "" && ts.Module != "" {
+			b.module = ts.Module
+		}
+		b.domains[ts.DomainID] = struct{}{}
+		b.occurrences += ts.OccurrenceCount
 	}
 
 	items := make([]PublicAnalysisTagView, 0, len(buckets))
@@ -168,8 +172,12 @@ func (s *Server) handlePublicAnalysisTestcases(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	latest := s.latestMaterializationForCohort(cohort).latest
+	data := s.latestMaterializationForCohort(cohort)
 
+	// Same move as /tags: aggregate from the cached per-run tag summary
+	// table instead of rescanning entries per domain. The tag summary
+	// row carries (module, testcase, level, occurrence_count); summing
+	// occurrence_count over all runs yields entry_count.
 	type testcaseKey struct {
 		module   string
 		testcase string
@@ -181,26 +189,24 @@ func (s *Server) handlePublicAnalysisTestcases(w http.ResponseWriter, r *http.Re
 		worstLevel string
 	}
 	buckets := map[testcaseKey]*testcaseAgg{}
-	for _, pair := range latest {
-		for _, entry := range s.loadAllEntriesForRun(pair.summary.RunID) {
-			if strings.TrimSpace(entry.Testcase) == "" {
-				continue
+	for _, ts := range data.tagSummaries {
+		if strings.TrimSpace(ts.Testcase) == "" {
+			continue
+		}
+		key := testcaseKey{module: ts.Module, testcase: ts.Testcase}
+		b, exists := buckets[key]
+		if !exists {
+			b = &testcaseAgg{
+				domains: map[int64]struct{}{},
+				tags:    map[string]struct{}{},
 			}
-			key := testcaseKey{module: entry.Module, testcase: entry.Testcase}
-			b, exists := buckets[key]
-			if !exists {
-				b = &testcaseAgg{
-					domains: map[int64]struct{}{},
-					tags:    map[string]struct{}{},
-				}
-				buckets[key] = b
-			}
-			b.domains[pair.summary.DomainID] = struct{}{}
-			b.tags[entry.Tag] = struct{}{}
-			b.entries++
-			if severityRank(entry.Level) > severityRank(b.worstLevel) {
-				b.worstLevel = entry.Level
-			}
+			buckets[key] = b
+		}
+		b.domains[ts.DomainID] = struct{}{}
+		b.tags[ts.Tag] = struct{}{}
+		b.entries += ts.OccurrenceCount
+		if severityRank(ts.Level) > severityRank(b.worstLevel) {
+			b.worstLevel = ts.Level
 		}
 	}
 

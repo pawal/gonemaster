@@ -303,6 +303,21 @@ type AnalysisRunDomainSummary struct {
 	WorstLevel      string  `json:"worst_level,omitempty"`
 }
 
+// AnalysisRunTagSummary is one materialized (tag, testcase) aggregate for a
+// run+cohort. Counts entries emitted with that tag so the landing page's
+// "top findings" panel can be served from one cached SELECT instead of
+// issuing a per-domain QueryEntries scan on every request.
+type AnalysisRunTagSummary struct {
+	CohortID        int64  `json:"cohort_id"`
+	RunID           string `json:"run_id"`
+	DomainID        int64  `json:"domain_id"`
+	Tag             string `json:"tag"`
+	Module          string `json:"module,omitempty"`
+	Testcase        string `json:"testcase,omitempty"`
+	Level           string `json:"level,omitempty"`
+	OccurrenceCount int    `json:"occurrence_count"`
+}
+
 // AnalysisProjectionState tracks projection status for one run+cohort pair.
 type AnalysisProjectionState struct {
 	CohortID         int64     `json:"cohort_id"`

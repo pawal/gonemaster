@@ -9,6 +9,7 @@ import (
 
 const analysisCohortCols = `id, source_type, source_tag, label, description,
 	analysis_enabled, public_enabled, is_default, sort_order, materialization_status,
+	materialization_done, materialization_total,
 	last_materialized_at, last_materialization_error, created_at, updated_at`
 
 func boolToInt(v bool) int {
@@ -42,6 +43,8 @@ func (s *SQLJobStore) scanAnalysisCohort(row rowScanner) (AnalysisCohort, error)
 		&isDefault,
 		&cohort.SortOrder,
 		&cohort.MaterializationStatus,
+		&cohort.MaterializationDone,
+		&cohort.MaterializationTotal,
 		&lastMaterializedAt,
 		&lastMaterializationErr,
 		&createdAt,
@@ -143,12 +146,14 @@ func (s *SQLJobStore) UpsertAnalysisCohort(cohort AnalysisCohort) (AnalysisCohor
 				is_default = %s,
 				sort_order = %s,
 				materialization_status = %s,
+				materialization_done = %s,
+				materialization_total = %s,
 				last_materialized_at = %s,
 				last_materialization_error = %s,
 				updated_at = %s
 			WHERE id = %s`,
 				s.ph(1), s.ph(2), s.ph(3), s.ph(4), s.ph(5),
-				s.ph(6), s.ph(7), s.ph(8), s.ph(9), s.ph(10), s.ph(11),
+				s.ph(6), s.ph(7), s.ph(8), s.ph(9), s.ph(10), s.ph(11), s.ph(12), s.ph(13),
 			),
 			cohort.Label,
 			cohort.Description,
@@ -157,6 +162,8 @@ func (s *SQLJobStore) UpsertAnalysisCohort(cohort AnalysisCohort) (AnalysisCohor
 			boolToInt(cohort.IsDefault),
 			cohort.SortOrder,
 			cohort.MaterializationStatus,
+			cohort.MaterializationDone,
+			cohort.MaterializationTotal,
 			s.ts(cohort.LastMaterializedAt),
 			cohort.LastMaterializationError,
 			s.ts(cohort.UpdatedAt),
@@ -182,8 +189,9 @@ func (s *SQLJobStore) UpsertAnalysisCohort(cohort AnalysisCohort) (AnalysisCohor
 		fmt.Sprintf(`INSERT INTO analysis_cohort_catalog (
 			source_type, source_tag, label, description, analysis_enabled,
 			public_enabled, is_default, sort_order, materialization_status,
+			materialization_done, materialization_total,
 			last_materialized_at, last_materialization_error, created_at, updated_at
-		) VALUES (%s)`, s.phRange(1, 13)),
+		) VALUES (%s)`, s.phRange(1, 15)),
 		cohort.SourceType,
 		cohort.SourceTag,
 		cohort.Label,
@@ -193,6 +201,8 @@ func (s *SQLJobStore) UpsertAnalysisCohort(cohort AnalysisCohort) (AnalysisCohor
 		boolToInt(cohort.IsDefault),
 		cohort.SortOrder,
 		cohort.MaterializationStatus,
+		cohort.MaterializationDone,
+		cohort.MaterializationTotal,
 		s.ts(cohort.LastMaterializedAt),
 		cohort.LastMaterializationError,
 		s.ts(cohort.CreatedAt),
@@ -207,6 +217,25 @@ func (s *SQLJobStore) UpsertAnalysisCohort(cohort AnalysisCohort) (AnalysisCohor
 		return AnalysisCohort{}, errors.New("analysis cohort inserted but not readable")
 	}
 	return created, nil
+}
+
+// SetAnalysisCohortProgress writes just the materialization_done /
+// materialization_total counters for one cohort. Called often during a
+// rebuild so the admin UI can poll and render a progress bar; kept as a
+// narrow UPDATE so each progress bump is a single column write, not a
+// full cohort row rewrite.
+func (s *SQLJobStore) SetAnalysisCohortProgress(id int64, done, total int) error {
+	_, err := s.db.Exec(
+		fmt.Sprintf(`UPDATE analysis_cohort_catalog SET
+			materialization_done = %s,
+			materialization_total = %s
+		WHERE id = %s`, s.ph(1), s.ph(2), s.ph(3)),
+		done, total, id,
+	)
+	if err != nil {
+		return fmt.Errorf("update analysis cohort progress: %w", err)
+	}
+	return nil
 }
 
 // DeleteAnalysisCohort removes one cohort catalog row and any materialized data

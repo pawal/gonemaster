@@ -189,6 +189,8 @@ type AnalysisCohort struct {
 	IsDefault                bool      `json:"is_default"`
 	SortOrder                int       `json:"sort_order"`
 	MaterializationStatus    string    `json:"materialization_status"`
+	MaterializationDone      int       `json:"materialization_done,omitempty"`
+	MaterializationTotal     int       `json:"materialization_total,omitempty"`
 	LastMaterializedAt       time.Time `json:"last_materialized_at,omitempty"`
 	LastMaterializationError string    `json:"last_materialization_error,omitempty"`
 	CreatedAt                time.Time `json:"created_at"`

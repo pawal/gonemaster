@@ -42,6 +42,12 @@ type Server struct {
 	delegationLookup         func(context.Context, string) DelegationInfo
 	configSources            map[string]SettingSource
 	retentionDays            atomic.Int64
+	// cohortRebuildsInFlight guards against overlapping rebuilds of the
+	// same cohort. Async-dispatched rebuilds record their cohort ID here;
+	// a second request for the same cohort is refused until the first
+	// clears the set.
+	cohortRebuildsMu       sync.Mutex
+	cohortRebuildsInFlight map[int64]struct{}
 }
 
 // setScoringConfig loads an optional scoring config file and sets it on the
@@ -135,6 +141,7 @@ func newServer(cfg Config, store JobStore, queue Queue) *Server {
 		progressWrites:           map[string]progressWriteState{},
 		progressWriteMinStep:     defaultProgressWriteMinStep,
 		progressWriteMinInterval: defaultProgressWriteMinInterval,
+		cohortRebuildsInFlight:   map[int64]struct{}{},
 		engineRunner:             engine.Run,
 		engineLimiter:            newEngineLimiter(cfg.MaxConcurrentJobs),
 		cancels:                  map[string]context.CancelFunc{},

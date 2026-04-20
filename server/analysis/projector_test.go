@@ -70,6 +70,17 @@ func (s *fakeStore) GetAnalysisCohort(id int64) (serverpkg.AnalysisCohort, bool)
 	return serverpkg.AnalysisCohort{}, false
 }
 
+func (s *fakeStore) SetAnalysisCohortProgress(cohortID int64, done, total int) error {
+	for i, existing := range s.cohorts {
+		if existing.ID == cohortID {
+			s.cohorts[i].MaterializationDone = done
+			s.cohorts[i].MaterializationTotal = total
+			return nil
+		}
+	}
+	return nil
+}
+
 func (s *fakeStore) UpsertAnalysisCohort(cohort serverpkg.AnalysisCohort) (serverpkg.AnalysisCohort, error) {
 	now := time.Now().UTC()
 	for i, existing := range s.cohorts {

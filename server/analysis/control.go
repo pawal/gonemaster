@@ -10,6 +10,12 @@ import (
 
 const rebuildPageSize = 100
 
+// progressWriteInterval is how often the rebuild loop persists the
+// in-memory done/total counters to the cohort row. Chosen to keep the
+// per-run overhead small while still giving the UI a visibly-moving
+// progress bar on a 1400-run rebuild.
+const progressWriteInterval = 500 * time.Millisecond
+
 // ControlStore is the store surface needed for cohort-wide repair, rebuild,
 // and clear operations.
 type ControlStore interface {
@@ -18,6 +24,10 @@ type ControlStore interface {
 	UpsertAnalysisCohort(cohort serverpkg.AnalysisCohort) (serverpkg.AnalysisCohort, error)
 	ListRuns(filter serverpkg.RunFilter) serverpkg.RunList
 	ClearAnalysisCohortMaterialization(cohortID int64) error
+	// SetAnalysisCohortProgress writes just the materialization_done /
+	// materialization_total counters. Called from the rebuild loop so the
+	// admin UI can render a progress bar via polling.
+	SetAnalysisCohortProgress(cohortID int64, done, total int) error
 }
 
 // Controller coordinates per-run projection with cohort-wide rebuild and clear
@@ -129,6 +139,7 @@ func (c *Controller) catchUpCohort(ctx context.Context, cohort serverpkg.Analysi
 	latest := cohort.LastMaterializedAt
 	projected := 0
 	catalog := c.store.ListAnalysisCohorts()
+	progress := newProgressTracker(c.store, cohort.ID)
 	for offset := 0; ; {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -142,6 +153,9 @@ func (c *Controller) catchUpCohort(ctx context.Context, cohort serverpkg.Analysi
 		if len(list.Items) == 0 {
 			break
 		}
+		if offset == 0 {
+			progress.setTotal(list.Total)
+		}
 		for _, run := range list.Items {
 			if err := ctx.Err(); err != nil {
 				return err
@@ -152,6 +166,7 @@ func (c *Controller) catchUpCohort(ctx context.Context, cohort serverpkg.Analysi
 				return fmt.Errorf("load run %s for cohort %d: %w", run.ID, cohort.ID, err)
 			}
 			if len(input.MatchingCohorts) == 0 {
+				progress.increment()
 				continue
 			}
 			if err := c.projector.ProjectLoaded(input); err != nil {
@@ -162,12 +177,14 @@ func (c *Controller) catchUpCohort(ctx context.Context, cohort serverpkg.Analysi
 				latest = run.FinishedAt
 			}
 			projected++
+			progress.increment()
 		}
 		offset += len(list.Items)
 		if offset >= list.Total {
 			break
 		}
 	}
+	progress.flush()
 	if projected == 0 {
 		return nil
 	}
@@ -195,6 +212,10 @@ func (c *Controller) RebuildCohort(ctx context.Context, cohortID int64) error {
 
 	projected := 0
 	catalog := c.store.ListAnalysisCohorts()
+	progress := newProgressTracker(c.store, cohort.ID)
+	// Reset the persisted counters at the start so a retry after a
+	// partial rebuild doesn't show stale done/total numbers.
+	_ = c.store.SetAnalysisCohortProgress(cohort.ID, 0, 0)
 	for offset := 0; ; {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -207,6 +228,12 @@ func (c *Controller) RebuildCohort(ctx context.Context, cohortID int64) error {
 		if len(list.Items) == 0 {
 			break
 		}
+		if offset == 0 {
+			// Use the first page's Total as the denominator for the UI
+			// progress bar. ListRuns re-counts on every call, but we only
+			// need the count once per rebuild.
+			progress.setTotal(list.Total)
+		}
 		for _, run := range list.Items {
 			if err := ctx.Err(); err != nil {
 				return err
@@ -217,6 +244,7 @@ func (c *Controller) RebuildCohort(ctx context.Context, cohortID int64) error {
 				return fmt.Errorf("load run %s for cohort %d: %w", run.ID, cohort.ID, err)
 			}
 			if len(input.MatchingCohorts) == 0 {
+				progress.increment()
 				continue
 			}
 			if err := c.projector.ProjectLoaded(input); err != nil {
@@ -224,12 +252,14 @@ func (c *Controller) RebuildCohort(ctx context.Context, cohortID int64) error {
 				return fmt.Errorf("project run %s for cohort %d: %w", run.ID, cohort.ID, err)
 			}
 			projected++
+			progress.increment()
 		}
 		offset += len(list.Items)
 		if offset >= list.Total {
 			break
 		}
 	}
+	progress.flush()
 
 	// Stamp the cohort's last_materialized_at with the time the rebuild
 	// actually ran — that's what the "Last analyzed" label shows in the
@@ -280,6 +310,67 @@ func (c *Controller) lookupCohort(cohortID int64) (serverpkg.AnalysisCohort, err
 		return serverpkg.AnalysisCohort{}, fmt.Errorf("%w: %d", serverpkg.ErrAnalysisCohortNotFound, cohortID)
 	}
 	return cohort, nil
+}
+
+// progressTracker buffers materialization_done / materialization_total
+// counters in memory and flushes them to the cohort row at a bounded
+// rate. Writing per-run would add one UPDATE round-trip to every
+// projection; once per ~500ms is plenty for the UI poll cadence.
+type progressTracker struct {
+	store        ControlStore
+	cohortID     int64
+	total        int
+	done         int
+	persistedAt  time.Time
+	persistedDue bool
+}
+
+func newProgressTracker(store ControlStore, cohortID int64) *progressTracker {
+	return &progressTracker{store: store, cohortID: cohortID}
+}
+
+func (p *progressTracker) setTotal(total int) {
+	if p == nil {
+		return
+	}
+	p.total = total
+	p.persistedDue = true
+	p.maybePersist()
+}
+
+func (p *progressTracker) increment() {
+	if p == nil {
+		return
+	}
+	p.done++
+	p.persistedDue = true
+	p.maybePersist()
+}
+
+func (p *progressTracker) maybePersist() {
+	if !p.persistedDue {
+		return
+	}
+	now := time.Now()
+	if !p.persistedAt.IsZero() && now.Sub(p.persistedAt) < progressWriteInterval {
+		return
+	}
+	if err := p.store.SetAnalysisCohortProgress(p.cohortID, p.done, p.total); err == nil {
+		p.persistedAt = now
+		p.persistedDue = false
+	}
+}
+
+// flush forces a final write so the terminal counters land in the cohort
+// row regardless of the last throttle window.
+func (p *progressTracker) flush() {
+	if p == nil || !p.persistedDue {
+		return
+	}
+	if err := p.store.SetAnalysisCohortProgress(p.cohortID, p.done, p.total); err == nil {
+		p.persistedAt = time.Now()
+		p.persistedDue = false
+	}
 }
 
 func (c *Controller) setCohortMaterialization(cohort serverpkg.AnalysisCohort, status string, at time.Time, materializationErr string) error {

@@ -1,7 +1,9 @@
 package server
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -118,15 +120,18 @@ func (s *Server) handleCreateAnalysisCohort(w http.ResponseWriter, r *http.Reque
 		}
 	}
 	if s.analysis != nil && created.AnalysisEnabled {
-		if err := s.analysis.RebuildCohort(r.Context(), created.ID); err != nil {
-			s.writeAnalysisCatalogRollbackError(w, beforeCatalog, err)
-			return
-		}
+		// Rebuild runs in a goroutine with a detached context so the
+		// client's request doesn't have to wait (a large tag can take
+		// seconds to minutes), and closing the connection can't cancel
+		// a partially-applied projection. The cohort is returned in
+		// pending state; the admin UI polls materialization_done /
+		// materialization_total to render progress.
+		s.dispatchCohortRebuild(created.ID)
 	}
 	if latest, ok := s.store.GetAnalysisCohort(created.ID); ok {
 		created = latest
 	}
-	writeJSON(w, http.StatusCreated, created)
+	writeJSON(w, http.StatusAccepted, created)
 }
 
 // handleAnalysisCohortByID routes GET, PATCH, and DELETE on
@@ -258,16 +263,53 @@ func (s *Server) handleAnalysisCohortRebuild(w http.ResponseWriter, r *http.Requ
 		writeError(w, http.StatusServiceUnavailable, "analysis_unavailable", "analysis controller not configured", nil)
 		return
 	}
-	if err := s.analysis.RebuildCohort(r.Context(), id); err != nil {
-		if errors.Is(err, ErrAnalysisCohortNotFound) {
-			writeError(w, http.StatusNotFound, "not_found", "cohort not found", nil)
-			return
-		}
-		writeError(w, http.StatusInternalServerError, "rebuild_failed", err.Error(), nil)
+	s.dispatchCohortRebuild(id)
+	cohort, _ := s.store.GetAnalysisCohort(id)
+	writeJSON(w, http.StatusAccepted, cohort)
+}
+
+// dispatchCohortRebuild runs s.analysis.RebuildCohort in a goroutine so the
+// client's HTTP request returns immediately. A per-cohort in-flight guard
+// drops duplicate requests: if a rebuild of the same cohort is already
+// running, the second call is a no-op. The detached context means closing
+// the client connection does not cancel a rebuild midway; RepairAllCohorts
+// on the next server start resumes any cohort that ends up non-Ready.
+func (s *Server) dispatchCohortRebuild(cohortID int64) {
+	if s == nil || s.analysis == nil {
 		return
 	}
-	cohort, _ := s.store.GetAnalysisCohort(id)
-	writeJSON(w, http.StatusOK, cohort)
+	s.cohortRebuildsMu.Lock()
+	if _, running := s.cohortRebuildsInFlight[cohortID]; running {
+		s.cohortRebuildsMu.Unlock()
+		return
+	}
+	s.cohortRebuildsInFlight[cohortID] = struct{}{}
+	s.cohortRebuildsMu.Unlock()
+
+	go func() {
+		defer func() {
+			s.cohortRebuildsMu.Lock()
+			delete(s.cohortRebuildsInFlight, cohortID)
+			s.cohortRebuildsMu.Unlock()
+		}()
+		if err := s.analysis.RebuildCohort(context.Background(), cohortID); err != nil {
+			// The cohort row's materialization_status / error fields
+			// are set inside RebuildCohort on failure, so this is only
+			// a last-ditch log. Nothing to return to the caller — the
+			// client has already got its 202.
+			s.logAnalysisRebuildError(cohortID, err)
+		}
+	}()
+}
+
+func (s *Server) logAnalysisRebuildError(cohortID int64, err error) {
+	if s == nil {
+		return
+	}
+	if errors.Is(err, ErrAnalysisCohortNotFound) {
+		return
+	}
+	fmt.Printf("analysis: async rebuild of cohort %d failed: %v\n", cohortID, err)
 }
 
 // handleAnalysisCohortClear removes all materialized rows for one cohort.

@@ -11,7 +11,23 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
+
+// waitForCond polls until cond returns true or one second elapses. Used
+// by handler tests to observe side effects of cohort rebuilds that now
+// run in a goroutine instead of synchronously inside the request.
+func waitForCond(t *testing.T, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		if cond() {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatal("condition not met within timeout")
+}
 
 type recordingAnalysisController struct {
 	mu              sync.Mutex
@@ -93,8 +109,8 @@ func createAnalysisCohort(t *testing.T, srv *Server, body string) AnalysisCohort
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/analysis/cohorts", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("create cohort: expected 201, got %d: %s", resp.Code, resp.Body)
+	if resp.Code != http.StatusAccepted {
+		t.Fatalf("create cohort: expected 202, got %d: %s", resp.Code, resp.Body)
 	}
 	return decodeCohort(t, resp.Body)
 }
@@ -344,13 +360,15 @@ func TestAnalysisCohortRebuildInvokesController(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost,
 		fmt.Sprintf("/api/v1/analysis/cohorts/%d/rebuild", cohort.ID), nil)
 	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
+	if resp.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d: %s", resp.Code, resp.Body)
 	}
-	snap := spy.snapshot()
-	if len(snap.rebuildCohorts) != 1 || snap.rebuildCohorts[0] != cohort.ID {
-		t.Fatalf("expected one rebuild call for cohort %d, got %+v", cohort.ID, snap.rebuildCohorts)
-	}
+	// Rebuild is dispatched in a goroutine, so poll until the spy
+	// observes the call instead of asserting synchronously.
+	waitForCond(t, func() bool {
+		snap := spy.snapshot()
+		return len(snap.rebuildCohorts) == 1 && snap.rebuildCohorts[0] == cohort.ID
+	})
 }
 
 func TestAnalysisCohortClearInvokesController(t *testing.T) {
@@ -426,7 +444,12 @@ func TestAnalysisCohortRebuildNotFound(t *testing.T) {
 	}
 }
 
-func TestCreateAnalysisCohortRollsBackWhenRebuildFails(t *testing.T) {
+func TestCreateAnalysisCohortKeepsCatalogWhenAsyncRebuildFails(t *testing.T) {
+	// Rebuilds now run in a detached goroutine after the handler has
+	// already returned 202, so a rebuild failure cannot unwind the
+	// catalog row. The failure is recorded in the cohort's
+	// materialization_status / last_materialization_error fields by
+	// Controller.RebuildCohort; here the spy just logs the error.
 	srv, spy := newAnalysisAdminTestServer(t)
 	spy.rebuildErr = errors.New("boom")
 
@@ -435,11 +458,15 @@ func TestCreateAnalysisCohortRollsBackWhenRebuildFails(t *testing.T) {
 		bytes.NewBufferString(`{"source_tag":"tld","analysis_enabled":true}`))
 	req.Header.Set("Content-Type", "application/json")
 	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusInternalServerError {
-		t.Fatalf("expected 500, got %d: %s", resp.Code, resp.Body)
+	if resp.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d: %s", resp.Code, resp.Body)
 	}
-	if got := srv.store.ListAnalysisCohorts(); len(got) != 0 {
-		t.Fatalf("expected create rollback to remove cohort, got %+v", got)
+	waitForCond(t, func() bool {
+		snap := spy.snapshot()
+		return len(snap.rebuildCohorts) == 1
+	})
+	if got := srv.store.ListAnalysisCohorts(); len(got) != 1 {
+		t.Fatalf("expected cohort to remain after async rebuild failure, got %+v", got)
 	}
 }
 

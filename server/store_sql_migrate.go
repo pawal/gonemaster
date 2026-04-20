@@ -386,6 +386,16 @@ var sqlMigrations = []sqlMigration{
 			}
 		},
 	},
+	{
+		// Progress counters for cohort materialization. Written by the
+		// projector during rebuild so the admin UI can poll and render a
+		// "Materializing N / M" progress indicator instead of a hang.
+		version: 8,
+		stmts: []string{
+			`ALTER TABLE analysis_cohort_catalog ADD COLUMN materialization_done INTEGER NOT NULL DEFAULT 0`,
+			`ALTER TABLE analysis_cohort_catalog ADD COLUMN materialization_total INTEGER NOT NULL DEFAULT 0`,
+		},
+	},
 }
 
 // runMigrations creates the schema_migrations tracking table and applies any

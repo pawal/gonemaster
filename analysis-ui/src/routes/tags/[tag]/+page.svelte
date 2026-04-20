@@ -38,16 +38,18 @@
     <div class="detail-header">
       <div class="detail-title">
         <h2>{d.tag}</h2>
-        {#if tcTitle}
-          <p class="detail-subtitle">{tcTitle}</p>
+        {#if d.module && d.testcase}
+          <div class="detail-subtitle">
+            <TestcaseChip module={d.module} testcase={d.testcase} />
+            {#if tcTitle}<span class="detail-subtitle-text">{tcTitle}</span>{/if}
+          </div>
+        {:else if tcTitle}
+          <p class="detail-subtitle detail-subtitle-text">{tcTitle}</p>
         {/if}
       </div>
       <div class="detail-scorecard">
         {#if d.level}
           <span class={`level level-${levelTone(d.level)}`}>{d.level}</span>
-        {/if}
-        {#if d.module && d.testcase}
-          <TestcaseChip module={d.module} testcase={d.testcase} />
         {/if}
       </div>
     </div>
@@ -93,9 +95,14 @@
   }
   .detail-subtitle {
     margin: 0;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-2);
     color: var(--ink-2);
     font-size: var(--text-sm);
   }
+  .detail-subtitle-text { min-width: 0; }
   .detail-scorecard {
     display: inline-flex;
     align-items: center;

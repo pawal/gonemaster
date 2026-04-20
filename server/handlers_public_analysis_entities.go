@@ -308,6 +308,28 @@ func (s *Server) handlePublicAnalysisEndpoints(w http.ResponseWriter, r *http.Re
 	endpoints := data.endpoints
 	addressASNs := data.addressASNs
 
+	// Index addressASNs by AddressID once so the per-bucket facts
+	// lookup below is O(k) per bucket instead of O(M). Before this the
+	// inner loop was O(N * M) and dominated wall-clock for large
+	// cohorts. Same idea for prefix IDs: collect all distinct IDs and
+	// resolve them in a single pass, not per-fact inside the bucket
+	// loop. Replaces what used to be one GetAnalysisPrefix DB call per
+	// matching fact.
+	factsByAddr := map[int64][]AnalysisRunAddressASN{}
+	prefixIDs := map[int64]struct{}{}
+	for _, fact := range addressASNs {
+		factsByAddr[fact.AddressID] = append(factsByAddr[fact.AddressID], fact)
+		if fact.PrefixID != nil {
+			prefixIDs[*fact.PrefixID] = struct{}{}
+		}
+	}
+	prefixByID := make(map[int64]string, len(prefixIDs))
+	for id := range prefixIDs {
+		if prefix, ok := readStore.GetAnalysisPrefix(id); ok {
+			prefixByID[id] = prefix.Prefix
+		}
+	}
+
 	type endpointKey struct {
 		nameserverID int64
 		addressID    int64
@@ -349,10 +371,7 @@ func (s *Server) handlePublicAnalysisEndpoints(w http.ResponseWriter, r *http.Re
 		}
 		asnSet := map[int64]struct{}{}
 		prefixSet := map[string]struct{}{}
-		for _, fact := range addressASNs {
-			if fact.AddressID != key.addressID {
-				continue
-			}
+		for _, fact := range factsByAddr[key.addressID] {
 			if _, ok := b.domains[fact.DomainID]; !ok {
 				continue
 			}
@@ -360,8 +379,8 @@ func (s *Server) handlePublicAnalysisEndpoints(w http.ResponseWriter, r *http.Re
 				asnSet[*fact.ASN] = struct{}{}
 			}
 			if fact.PrefixID != nil {
-				if prefix, ok := readStore.GetAnalysisPrefix(*fact.PrefixID); ok {
-					prefixSet[prefix.Prefix] = struct{}{}
+				if prefix, ok := prefixByID[*fact.PrefixID]; ok {
+					prefixSet[prefix] = struct{}{}
 				}
 			}
 		}

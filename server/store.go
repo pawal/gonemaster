@@ -131,6 +131,7 @@ type JobStore interface {
 	GetOrCreateDomain(name string) (Domain, error)
 	GetDomain(id int64) (Domain, bool)
 	GetDomainByName(name string) (Domain, bool)
+	GetDomainNamesByIDs(ids []int64) map[int64]string
 	ListDomains(filter DomainFilter) DomainList
 	UpdateDomainLatest(domainID int64, runID string, finishedAt time.Time, status, level string) error
 
@@ -654,6 +655,24 @@ func (s *InMemoryJobStore) GetDomainByName(name string) (Domain, bool) {
 	dc := *d
 	dc.Tags = append([]string(nil), s.domainTags[d.ID]...)
 	return dc, true
+}
+
+// GetDomainNamesByIDs returns a map of id to domain name for the given
+// ids. Mirrors SQLJobStore.GetDomainNamesByIDs so callers can bulk-load
+// domain names off the list path.
+func (s *InMemoryJobStore) GetDomainNamesByIDs(ids []int64) map[int64]string {
+	out := make(map[int64]string, len(ids))
+	if len(ids) == 0 {
+		return out
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, id := range ids {
+		if d, ok := s.domainsByID[id]; ok {
+			out[id] = d.Name
+		}
+	}
+	return out
 }
 
 // UpdateDomainLatest updates the latest_* denormalized fields on a domain.

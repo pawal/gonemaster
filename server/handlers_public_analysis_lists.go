@@ -141,22 +141,17 @@ func (s *Server) handlePublicAnalysisDomains(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	summaries := readStore.ListAnalysisRunDomainSummariesByCohort(cohort.ID)
-	latest := latestSummariesByDomain(summaries, s.store)
+	// Go through the cohort materialization cache so /domains
+	// inherits the same bulk preload the landing page gets: one IN
+	// query for all domain names instead of a per-row GetDomain.
+	data := s.latestMaterializationForCohort(cohort)
+	latest := data.latest
 
 	// Pre-compute the ASNs each domain's authoritative addresses resolve
 	// to, so we can show an Operator column without paying the ASN lookup
 	// cost per row.
-	runIDs := make(map[string]struct{}, len(latest))
-	for _, pair := range latest {
-		runIDs[pair.summary.RunID] = struct{}{}
-	}
-	addressASNs := filterAnalysisRunAddressASNsByRunIDs(
-		readStore.ListAnalysisRunAddressASNsByCohort(cohort.ID),
-		runIDs,
-	)
 	domainASNs := map[int64]map[int64]struct{}{}
-	for _, fact := range addressASNs {
+	for _, fact := range data.addressASNs {
 		if fact.ASN == nil {
 			continue
 		}
@@ -171,12 +166,12 @@ func (s *Server) handlePublicAnalysisDomains(w http.ResponseWriter, r *http.Requ
 	items := make([]PublicAnalysisDomainView, 0, len(latest))
 	for _, pair := range latest {
 		sum := pair.summary
-		domain, found := s.store.GetDomain(sum.DomainID)
+		name, found := data.domainNames[sum.DomainID]
 		if !found {
 			continue
 		}
 		v := PublicAnalysisDomainView{
-			Domain:          domain.Name,
+			Domain:          name,
 			Score:           sum.Score,
 			Grade:           sum.Grade,
 			WorstLevel:      sum.WorstLevel,
@@ -238,6 +233,10 @@ type latestCohortMaterialization struct {
 	addressASNs  []AnalysisRunAddressASN
 	domainASNs   []AnalysisRunDomainASN
 	tagSummaries []AnalysisRunTagSummary
+	// domainNames is the id -> name map for every domain in `latest`,
+	// preloaded once during cache compute so list handlers don't have
+	// to issue one GetDomain DB round-trip per row.
+	domainNames map[int64]string
 }
 
 // latestSummariesByDomain collapses multiple materialized summaries per domain
@@ -263,18 +262,28 @@ func latestSummariesByDomain(summaries []AnalysisRunDomainSummary, runLookup int
 	return out
 }
 
+// cohortMaterializationLookup is the subset of the job store that
+// computeLatestMaterializationForCohort needs beyond the analysis read
+// surface: run metadata (finished_at) and bulk domain-name lookup, both
+// kept narrow so test fakes don't have to implement the whole store.
+type cohortMaterializationLookup interface {
+	GetRun(id string) (Run, bool)
+	GetDomainNamesByIDs(ids []int64) map[int64]string
+}
+
 // computeLatestMaterializationForCohort runs the uncached four-table scan for a
 // cohort and collapses multiple runs per domain into the latest. Callers should
 // prefer (*Server).latestMaterializationForCohort, which wraps this with a
 // stamp-keyed cache.
-func computeLatestMaterializationForCohort(readStore AnalysisReadStore, runLookup interface {
-	GetRun(id string) (Run, bool)
-}, cohortID int64) latestCohortMaterialization {
+func computeLatestMaterializationForCohort(readStore AnalysisReadStore, runLookup cohortMaterializationLookup, cohortID int64) latestCohortMaterialization {
 	latest := latestSummariesByDomain(readStore.ListAnalysisRunDomainSummariesByCohort(cohortID), runLookup)
 	runIDs := make(map[string]struct{}, len(latest))
+	domainIDs := make([]int64, 0, len(latest))
 	for _, pair := range latest {
 		runIDs[pair.summary.RunID] = struct{}{}
+		domainIDs = append(domainIDs, pair.summary.DomainID)
 	}
+	domainNames := runLookup.GetDomainNamesByIDs(domainIDs)
 	// Drop parent-role endpoints (e.g. root servers recorded while traversing
 	// the delegation chain for a TLD). They are not the cohort zones' own
 	// authoritative servers and only pollute the nameserver/endpoint/ASN
@@ -294,6 +303,7 @@ func computeLatestMaterializationForCohort(readStore AnalysisReadStore, runLooku
 		addressASNs:  filterAnalysisRunAddressASNsByRunIDs(readStore.ListAnalysisRunAddressASNsByCohort(cohortID), runIDs),
 		domainASNs:   filterAnalysisRunDomainASNsByRunIDs(readStore.ListAnalysisRunDomainASNsByCohort(cohortID), runIDs),
 		tagSummaries: filterAnalysisRunTagSummariesByRunIDs(readStore.ListAnalysisRunTagSummariesByCohort(cohortID), runIDs),
+		domainNames:  domainNames,
 	}
 }
 

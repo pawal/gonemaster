@@ -774,6 +774,40 @@ func (s *SQLJobStore) GetDomain(id int64) (Domain, bool) {
 	return d, true
 }
 
+// GetDomainNamesByIDs returns a map of id to domain name for the given
+// ids in a single SELECT. Used by the cohort materialization preload
+// path to replace a per-domain GetDomain N+1 inside the /domains list
+// handler.
+func (s *SQLJobStore) GetDomainNamesByIDs(ids []int64) map[int64]string {
+	out := map[int64]string{}
+	if len(ids) == 0 {
+		return out
+	}
+	placeholders := make([]string, len(ids))
+	args := make([]any, len(ids))
+	for i, id := range ids {
+		placeholders[i] = s.ph(i + 1)
+		args[i] = id
+	}
+	query := `SELECT id, name FROM domains WHERE id IN (` + strings.Join(placeholders, ", ") + `)`
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var (
+			id   int64
+			name string
+		)
+		if err := rows.Scan(&id, &name); err != nil {
+			return out
+		}
+		out[id] = name
+	}
+	return out
+}
+
 // GetDomainByName returns a domain by its name.
 func (s *SQLJobStore) GetDomainByName(name string) (Domain, bool) {
 	d, err := s.getDomainByName(name)

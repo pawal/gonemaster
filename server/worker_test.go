@@ -72,6 +72,10 @@ func (s *spyJobStore) GetDomainByName(name string) (Domain, bool) {
 	return s.inner.GetDomainByName(name)
 }
 
+func (s *spyJobStore) GetDomainNamesByIDs(ids []int64) map[int64]string {
+	return s.inner.GetDomainNamesByIDs(ids)
+}
+
 func (s *spyJobStore) ListDomains(filter DomainFilter) DomainList {
 	return s.inner.ListDomains(filter)
 }

@@ -61,6 +61,10 @@ func (s *countingJobStore) GetDomainByName(name string) (Domain, bool) {
 	return s.inner.GetDomainByName(name)
 }
 
+func (s *countingJobStore) GetDomainNamesByIDs(ids []int64) map[int64]string {
+	return s.inner.GetDomainNamesByIDs(ids)
+}
+
 func (s *countingJobStore) ListDomains(filter DomainFilter) DomainList {
 	return s.inner.ListDomains(filter)
 }

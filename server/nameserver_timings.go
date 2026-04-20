@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"codeberg.org/pawal/gonemaster/engine"
 	enginenameserver "codeberg.org/pawal/gonemaster/engine/nameserver"
 )
 
@@ -128,7 +129,7 @@ func cloneNameserverTimings(items []NameserverTiming) []NameserverTiming {
 	return out
 }
 
-func (s *Server) collectNameserverTimings(job Job, queryTimings map[string][]time.Duration) []NameserverTiming {
+func (s *Server) collectNameserverTimings(job Job, queryTimings map[string][]time.Duration, entries []engine.LogEntry) []NameserverTiming {
 	if len(queryTimings) == 0 {
 		return nil
 	}
@@ -139,5 +140,74 @@ func (s *Server) collectNameserverTimings(job Job, queryTimings map[string][]tim
 		defer cancel()
 		targets = nameserverTimingTargets(job, s.delegationLookup(ctx, job.Domain))
 	}
+	if len(targets) == 0 {
+		// Last-ditch fallback: pull the child zone's own NSes out of
+		// the engine's own log entries. The engine already discovered
+		// them during the test; the external delegation lookup can
+		// then fail without silently dropping all timings. Fixes the
+		// case where ~1.6% of TLDs had no timings because
+		// lookupDelegation happened to hit a DNS hiccup at test time.
+		targets = childNameserversFromEntries(entries)
+	}
 	return summarizeNameserverTimings(queryTimings, targets)
+}
+
+// childNameserversFromEntries collects (ns, address) pairs from engine
+// log entries that unambiguously name the child zone's own authoritative
+// NSes. Only the explicit child-side argument keys are trusted —
+// generic `servers` / `parent_servers` lists are not, since they also
+// carry parent-side data (root servers etc.) that would end up in the
+// timings list otherwise.
+func childNameserversFromEntries(entries []engine.LogEntry) []nameserverTimingTarget {
+	if len(entries) == 0 {
+		return nil
+	}
+	seen := map[string]struct{}{}
+	var targets []nameserverTimingTarget
+	add := func(ns, addr string) {
+		ns = normalizeNameserverName(ns)
+		addr = strings.TrimSpace(addr)
+		if ns == "" {
+			return
+		}
+		key := ns + "/" + addr
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		targets = append(targets, nameserverTimingTarget{name: ns, address: addr})
+	}
+	for _, entry := range entries {
+		for _, key := range []string{"child_servers", "zone_servers", "ns_set_servers"} {
+			raw, ok := entry.Args[key]
+			if !ok {
+				continue
+			}
+			list, ok := raw.([]any)
+			if !ok {
+				// Some callers materialize the list as []map[string]any
+				// instead of []any; handle that shape too.
+				typed, ok := raw.([]map[string]any)
+				if !ok {
+					continue
+				}
+				for _, item := range typed {
+					ns, _ := item["ns"].(string)
+					addr, _ := item["address"].(string)
+					add(ns, addr)
+				}
+				continue
+			}
+			for _, item := range list {
+				m, ok := item.(map[string]any)
+				if !ok {
+					continue
+				}
+				ns, _ := m["ns"].(string)
+				addr, _ := m["address"].(string)
+				add(ns, addr)
+			}
+		}
+	}
+	return targets
 }

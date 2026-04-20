@@ -8,8 +8,16 @@ import (
 	"sort"
 	"strings"
 
+	"golang.org/x/sync/errgroup"
+
 	serverpkg "codeberg.org/pawal/gonemaster/server"
 )
+
+// enrichmentConcurrency caps the number of in-flight external enricher
+// lookups per run. Cymru / whois backends are DNS- or TCP-bound and don't
+// benefit from unlimited fanout; 16 is comfortable for a single run
+// without hammering upstream servers.
+const enrichmentConcurrency = 16
 
 var (
 	ErrRunNotFound = errors.New("analysis projector run not found")
@@ -151,22 +159,38 @@ func (p *Projector) ProjectRun(runID string) error {
 // per-run/per-cohort fact rows. When the backing store supports it, the
 // whole run's writes are batched into a single transaction so the projector
 // pays one commit per run instead of one per upsert.
+//
+// Enrichment (DNS / whois lookups) runs *before* the transaction opens so
+// the DB connection is never held open waiting on an external network
+// call. That keeps the write transaction short and non-blocking for
+// concurrent work on the same connection pool.
 func (p *Projector) ProjectLoaded(input RunInput) error {
 	if len(input.MatchingCohorts) == 0 {
 		return nil
 	}
+	prepared := p.prepareRun(input)
 	if tx, ok := p.store.(txCapableStore); ok {
 		return tx.WithAnalysisWriteTx(func(writer WriteStore) error {
-			return p.projectLoadedWith(input, writer)
+			return p.writePrepared(prepared, writer)
 		})
 	}
-	return p.projectLoadedWith(input, p.store)
+	return p.writePrepared(prepared, p.store)
 }
 
-// projectLoadedWith performs the actual write sequence against any WriteStore.
-// Split out of ProjectLoaded so the per-run transaction wrapper can reuse the
-// same body against a tx-bound writer.
-func (p *Projector) projectLoadedWith(input RunInput, w WriteStore) error {
+// preparedRun is the output of the extract + enrich phase, ready to be
+// written inside one transaction. Computed outside the tx so the tx only
+// covers database work.
+type preparedRun struct {
+	input        RunInput
+	endpoints    []extractedEndpoint
+	addressFacts []extractedAddressFact
+	domainASNs   []extractedDomainASN
+	asnLabels    map[int64]string
+}
+
+// prepareRun does all the pure-Go extraction and all the external
+// enrichment lookups for one run. Must run outside any DB transaction.
+func (p *Projector) prepareRun(input RunInput) preparedRun {
 	endpoints := p.extractNameserverEndpoints(input)
 	addressFacts := p.extractAddressFacts(input)
 	addressFacts = p.applyEnrichment(endpoints, addressFacts)
@@ -179,6 +203,24 @@ func (p *Projector) projectLoadedWith(input RunInput, w WriteStore) error {
 	// is populated; otherwise we still need the aggregate for coverage.
 	domainASNs = restrictDomainASNsToAuthoritative(domainASNs, addressFacts)
 	asnLabels := p.resolveASNLabels(addressFacts, domainASNs)
+	return preparedRun{
+		input:        input,
+		endpoints:    endpoints,
+		addressFacts: addressFacts,
+		domainASNs:   domainASNs,
+		asnLabels:    asnLabels,
+	}
+}
+
+// writePrepared executes the DB writes for a prepared run. All enrichment
+// has already happened in prepareRun, so this runs entirely against the
+// transaction with no outbound network calls.
+func (p *Projector) writePrepared(pr preparedRun, w WriteStore) error {
+	input := pr.input
+	endpoints := pr.endpoints
+	addressFacts := pr.addressFacts
+	domainASNs := pr.domainASNs
+	asnLabels := pr.asnLabels
 
 	nameserverIDs := map[string]int64{}
 	addressIDs := map[string]int64{}
@@ -591,9 +633,29 @@ func (p *Projector) applyEnrichment(endpoints []extractedEndpoint, addressFacts 
 		addresses = append(addresses, endpoint.address)
 	}
 
-	for _, address := range addresses {
-		info, ok := p.enricher.EnrichAddress(ctx, address)
-		if !ok {
+	// Fan the lookups out concurrently — for a cold enricher cache each
+	// EnrichAddress is a network round-trip (DNS to cymru or whois TCP).
+	// Doing them serially would dominate wall-clock time for a cohort
+	// rebuild. Results are written into position-indexed slots so the
+	// merge-into-addressFacts step below runs in deterministic order.
+	enrichments := make([]*AddressEnrichment, len(addresses))
+	g, gctx := errgroup.WithContext(ctx)
+	g.SetLimit(enrichmentConcurrency)
+	for i, address := range addresses {
+		i, address := i, address
+		g.Go(func() error {
+			info, ok := p.enricher.EnrichAddress(gctx, address)
+			if ok {
+				enrichments[i] = &info
+			}
+			return nil
+		})
+	}
+	_ = g.Wait()
+
+	for i, address := range addresses {
+		info := enrichments[i]
+		if info == nil {
 			continue
 		}
 		idx, exists := byIndex[address]
@@ -655,6 +717,7 @@ func (p *Projector) resolveASNLabels(addressFacts []extractedAddressFact, domain
 	}
 	ctx := context.Background()
 	seen := map[int64]struct{}{}
+	var uniqueASNs []int64
 	addASN := func(asn int64) {
 		if asn == 0 {
 			return
@@ -663,9 +726,7 @@ func (p *Projector) resolveASNLabels(addressFacts []extractedAddressFact, domain
 			return
 		}
 		seen[asn] = struct{}{}
-		if label, ok := p.enricher.EnrichASNLabel(ctx, asn); ok && label != "" {
-			labels[asn] = label
-		}
+		uniqueASNs = append(uniqueASNs, asn)
 	}
 	for _, fact := range addressFacts {
 		if fact.asn != nil {
@@ -674,6 +735,33 @@ func (p *Projector) resolveASNLabels(addressFacts []extractedAddressFact, domain
 	}
 	for _, da := range domainASNs {
 		addASN(da.asn)
+	}
+	if len(uniqueASNs) == 0 {
+		return labels
+	}
+
+	// Same fanout pattern as address enrichment — ASN label lookups are
+	// external (cymru DNS or RIPE whois) and trivially parallelizable.
+	resolved := make([]string, len(uniqueASNs))
+	hits := make([]bool, len(uniqueASNs))
+	g, gctx := errgroup.WithContext(ctx)
+	g.SetLimit(enrichmentConcurrency)
+	for i, asn := range uniqueASNs {
+		i, asn := i, asn
+		g.Go(func() error {
+			if label, ok := p.enricher.EnrichASNLabel(gctx, asn); ok && label != "" {
+				resolved[i] = label
+				hits[i] = true
+			}
+			return nil
+		})
+	}
+	_ = g.Wait()
+
+	for i, asn := range uniqueASNs {
+		if hits[i] {
+			labels[asn] = resolved[i]
+		}
 	}
 	return labels
 }

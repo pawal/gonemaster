@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import { t } from "./i18n.js";
 
   let { apiBase = "/api/v1" } = $props();
@@ -17,6 +17,12 @@
   let editingSourceTag = $state("");
   let saving = $state(false);
   let backendStatus = $state({ backend_supported: true, unsupported_message: "" });
+  // Poll handle kept outside state so we can clear it without reactively
+  // re-triggering. Rebuilds now run server-side in a goroutine and report
+  // materialization_done / materialization_total on the cohort row; while
+  // any cohort is pending we poll once per second to animate progress.
+  let pollTimer = null;
+  const POLL_INTERVAL_MS = 1000;
 
   function emptyDraft() {
     return {
@@ -298,10 +304,51 @@
     return parsed.toLocaleString("sv-SE");
   }
 
+  // Any cohort still projecting -> keep polling. Ready + failed rows are
+  // stable and don't need refreshing until the user clicks Rebuild again.
+  const anyPending = $derived(cohorts.some((c) => c.materialization_status === "pending"));
+
+  function progressPercent(cohort) {
+    const total = Number(cohort?.materialization_total) || 0;
+    const done = Number(cohort?.materialization_done) || 0;
+    if (total <= 0) return 0;
+    if (done >= total) return 100;
+    return Math.floor((done / total) * 100);
+  }
+
+  async function pollCohortsQuietly() {
+    try {
+      const result = await apiFetch("/analysis/cohorts");
+      if (Array.isArray(result)) cohorts = result;
+    } catch (_) {
+      // Silent: a transient fetch error shouldn't overwrite the visible
+      // notice area while a rebuild is running.
+    }
+  }
+
+  $effect(() => {
+    // Start the poll only while something is pending; stop as soon as
+    // every cohort is ready or failed so the UI isn't hitting the API
+    // in steady state.
+    if (anyPending && pollTimer == null) {
+      pollTimer = setInterval(pollCohortsQuietly, POLL_INTERVAL_MS);
+    } else if (!anyPending && pollTimer != null) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+  });
+
   onMount(() => {
     loadCohorts();
     loadExistingTags();
     loadBackendStatus();
+  });
+
+  onDestroy(() => {
+    if (pollTimer != null) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
   });
 </script>
 
@@ -401,7 +448,11 @@
                     <span class={`badge badge-status badge-status-${tone}`}>
                       {cohort.materialization_status || "pending"}
                     </span>
-                    {#if cohort.last_materialized_at}
+                    {#if cohort.materialization_status === "pending" && cohort.materialization_total > 0}
+                      <span class="materialization-when">
+                        {cohort.materialization_done || 0} / {cohort.materialization_total} ({progressPercent(cohort)}%)
+                      </span>
+                    {:else if cohort.last_materialized_at}
                       <time class="materialization-when" datetime={cohort.last_materialized_at}>
                         {formatTimestamp(cohort.last_materialized_at)}
                       </time>
@@ -409,6 +460,13 @@
                       <span class="materialization-when muted">{$t("analysis_cohorts_never_materialized")}</span>
                     {/if}
                   </div>
+                  {#if cohort.materialization_status === "pending" && cohort.materialization_total > 0}
+                    <div class="materialization-progress" role="progressbar"
+                         aria-valuenow={progressPercent(cohort)}
+                         aria-valuemin="0" aria-valuemax="100">
+                      <div class="materialization-progress-fill" style:width={`${progressPercent(cohort)}%`}></div>
+                    </div>
+                  {/if}
                   {#if cohort.last_materialization_error}
                     <span class="materialization-error" title={cohort.last_materialization_error}>
                       {cohort.last_materialization_error}
@@ -658,6 +716,21 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .materialization-progress {
+    margin-top: 4px;
+    width: 140px;
+    height: 4px;
+    background: var(--surface-2);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .materialization-progress-fill {
+    height: 100%;
+    background: var(--accent-1, #4c9bff);
+    transition: width 0.2s ease;
   }
 
   .link-action {

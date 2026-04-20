@@ -4,11 +4,13 @@
   import DomainChip from "$lib/chips/DomainChip.svelte";
   import TestcaseChip from "$lib/chips/TestcaseChip.svelte";
   import { formatCount, levelTone } from "$lib/format";
+  import { testcaseTitle } from "$lib/testcaseTitles";
   import type { TagDetailPageData } from "./+page";
 
   let { data }: { data: TagDetailPageData } = $props();
 
   const query = $derived(page.url.search);
+  const tcTitle = $derived(testcaseTitle(data.detail?.testcase));
 </script>
 
 <nav class="breadcrumbs" aria-label="Breadcrumb">
@@ -34,7 +36,12 @@
   {@const d = data.detail}
   <section class="card">
     <div class="detail-header">
-      <h2>{d.tag}</h2>
+      <div class="detail-title">
+        <h2>{d.tag}</h2>
+        {#if tcTitle}
+          <p class="detail-subtitle">{tcTitle}</p>
+        {/if}
+      </div>
       <div class="detail-scorecard">
         {#if d.level}
           <span class={`level level-${levelTone(d.level)}`}>{d.level}</span>
@@ -78,6 +85,17 @@
     flex-wrap: wrap;
   }
   .detail-header h2 { margin: 0; font-family: var(--mono); }
+  .detail-title {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .detail-subtitle {
+    margin: 0;
+    color: var(--ink-2);
+    font-size: var(--text-sm);
+  }
   .detail-scorecard {
     display: inline-flex;
     align-items: center;

@@ -408,6 +408,16 @@ func (p *Projector) extractNameserverEndpoints(input RunInput) []extractedEndpoi
 	// downgraded to role="parent" — those rows are filtered out of the
 	// public views, so the domain detail page shows only the zone's own
 	// servers.
+	//
+	// When timings is missing (rare — delegation lookup failed, older
+	// runs, etc.) we can't fall back to "trust whatever source flagged
+	// the endpoint": zonemaster's generic `servers` and singleton
+	// ns+address args often carry parent-side data (e.g. root servers
+	// encountered during delegation traversal for a TLD). The only
+	// sources that unambiguously name the child zone's own NSes are the
+	// explicit child-side keys below; everything else defaults to
+	// parent so root servers and similar parent-side artefacts don't
+	// leak into the cohort's authoritative view.
 	timingSet := make(map[string]struct{}, len(input.NameserverTimings))
 	for _, timing := range input.NameserverTimings {
 		ns := normalizeNameserverName(timing.Nameserver)
@@ -418,11 +428,21 @@ func (p *Projector) extractNameserverEndpoints(input RunInput) []extractedEndpoi
 		timingSet[ns+"|"+addr] = struct{}{}
 	}
 	haveTimings := len(timingSet) > 0
-	classify := func(candidateRole, ns, addr string) string {
-		if !haveTimings {
-			return candidateRole
+	childSide := func(source string) bool {
+		switch source {
+		case "child_servers", "zone_servers", "ns_set_servers":
+			return true
 		}
-		if _, ok := timingSet[ns+"|"+addr]; ok {
+		return false
+	}
+	classify := func(source, ns, addr string) string {
+		if haveTimings {
+			if _, ok := timingSet[ns+"|"+addr]; ok {
+				return "authoritative"
+			}
+			return "parent"
+		}
+		if childSide(source) {
 			return "authoritative"
 		}
 		return "parent"
@@ -447,13 +467,13 @@ func (p *Projector) extractNameserverEndpoints(input RunInput) []extractedEndpoi
 			add(extractedEndpoint{
 				nameserver: ns,
 				address:    addr,
-				role:       classify(roleForSource("entry"), ns, addr),
+				role:       classify("entry", ns, addr),
 				source:     "entry",
 			})
 		}
 		for _, sourceKey := range []string{"servers", "parent_servers", "child_servers", "zone_servers", "ns_set_servers"} {
 			for _, endpoint := range endpointsFromArgs(entry.Args[sourceKey]) {
-				endpoint.role = classify(roleForSource(sourceKey), endpoint.nameserver, endpoint.address)
+				endpoint.role = classify(sourceKey, endpoint.nameserver, endpoint.address)
 				endpoint.source = sourceKey
 				add(endpoint)
 			}
@@ -910,17 +930,6 @@ func endpointsFromArgs(raw any) []extractedEndpoint {
 		out = append(out, extractedEndpoint{nameserver: ns, address: addr, family: familyForAddress(addr)})
 	}
 	return out
-}
-
-func roleForSource(source string) string {
-	switch source {
-	case "parent_servers":
-		return "parent"
-	case "child_servers", "zone_servers", "servers", "ns_set_servers", "timings", "entry":
-		return "authoritative"
-	default:
-		return ""
-	}
 }
 
 func familyForAddress(address string) string {

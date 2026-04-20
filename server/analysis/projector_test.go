@@ -599,7 +599,13 @@ func TestProjectorExtractNameserverEndpoints(t *testing.T) {
 
 // TestProjectorExtractNameserverEndpointsFallbackWithoutTimings verifies the
 // legacy behavior: when NameserverTimings is empty, entry-derived endpoints
-// still inherit the role tied to their source key.
+// still inherit the role tied to their source key. Without
+// nameserver_timings we can't trust the generic `servers` list or a
+// singleton {ns, address} entry as authoritative — zonemaster uses those
+// same shapes for parent-side delegation traversal, and trusting them
+// leaks root-server entries into TLD cohort analyses. Only the explicit
+// child-side keys (child_servers / zone_servers / ns_set_servers) name
+// the zone's own NSes; everything else defaults to parent.
 func TestProjectorExtractNameserverEndpointsFallbackWithoutTimings(t *testing.T) {
 	input := RunInput{
 		Entries: []serverpkg.Entry{
@@ -619,6 +625,13 @@ func TestProjectorExtractNameserverEndpointsFallbackWithoutTimings(t *testing.T)
 			},
 			{
 				Args: map[string]any{
+					"child_servers": []any{
+						map[string]any{"ns": "ns4.example.test.", "address": "192.0.2.40"},
+					},
+				},
+			},
+			{
+				Args: map[string]any{
 					"ns":      "ns3.example.test.",
 					"address": "192.0.2.30",
 				},
@@ -631,14 +644,17 @@ func TestProjectorExtractNameserverEndpointsFallbackWithoutTimings(t *testing.T)
 	for _, item := range got {
 		byKey[item.nameserver+"|"+item.source] = item
 	}
-	if server := byKey["ns2.example.test|servers"]; server.role != "authoritative" {
-		t.Fatalf("expected servers-sourced endpoint to default to authoritative without timings: %+v", server)
+	if server := byKey["ns2.example.test|servers"]; server.role != "parent" {
+		t.Fatalf("expected servers-sourced endpoint to fall back to parent without timings: %+v", server)
 	}
-	if single := byKey["ns3.example.test|entry"]; single.role != "authoritative" {
-		t.Fatalf("expected entry-sourced endpoint to default to authoritative without timings: %+v", single)
+	if single := byKey["ns3.example.test|entry"]; single.role != "parent" {
+		t.Fatalf("expected entry-sourced endpoint to fall back to parent without timings: %+v", single)
 	}
 	if parent := byKey["pns.example.test|parent_servers"]; parent.role != "parent" {
 		t.Fatalf("expected parent_servers endpoint to stay parent without timings: %+v", parent)
+	}
+	if child := byKey["ns4.example.test|child_servers"]; child.role != "authoritative" {
+		t.Fatalf("expected child_servers endpoint to stay authoritative without timings: %+v", child)
 	}
 }
 

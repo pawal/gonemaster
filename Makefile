@@ -7,6 +7,7 @@ BIN_DIR ?= bin
 UI_DIR := ui
 UI_BUILD_DIR := $(UI_DIR)/dist
 UI_PUBLIC_DIR := ui-public
+UI_ANALYSIS_DIR := analysis-ui
 NODE_MIN ?= 20
 NPM_MIN ?= 9
 
@@ -14,7 +15,8 @@ CMDS := gonemaster gonemaster-server gonemaster-client gonemaster-nagios
 CMD ?= all
 
 .PHONY: help build build-all test install ui-build ui-install ui-dev ui-test \
-	ui-public-build ui-public-install ui-public-dev ui-public-test clean \
+	ui-public-build ui-public-install ui-public-dev ui-public-test \
+	ui-analysis-build ui-analysis-install ui-analysis-dev ui-analysis-test clean \
 	build-gonemaster build-gonemaster-badkeys-embed build-gonemaster-server build-gonemaster-server-noui \
 	build-gonemaster-server-badkeys-embed build-gonemaster-server-noui-badkeys-embed build-gonemaster-client \
 	build-gonemaster-nagios install-gonemaster install-gonemaster-badkeys-embed install-gonemaster-server install-gonemaster-client \
@@ -34,13 +36,17 @@ help:
 	@echo "  install          Install all commands (override CMD=gonemaster-server)"
 	@echo "  ui-check              Verify node/npm availability"
 	@echo "  ui-install            Install admin UI dependencies"
-	@echo "  ui-build              Build both admin and public embedded UIs"
+	@echo "  ui-build              Build admin, public, and analysis embedded UIs"
 	@echo "  ui-dev                Run the admin UI dev server"
 	@echo "  ui-test               Run admin UI tests"
 	@echo "  ui-public-install     Install public UI dependencies"
 	@echo "  ui-public-build       Build the public embedded UI"
 	@echo "  ui-public-dev         Run the public UI dev server"
 	@echo "  ui-public-test        Run public UI tests"
+	@echo "  ui-analysis-install   Install analysis UI dependencies"
+	@echo "  ui-analysis-build     Build the analysis embedded UI"
+	@echo "  ui-analysis-dev       Run the analysis UI dev server"
+	@echo "  ui-analysis-test      Run analysis UI tests"
 	@echo "  build-gonemaster-badkeys-embed  Build CLI with embedded badkeys blocklist"
 	@echo "  build-gonemaster-server-noui  Build API-only server (no npm/UI embed)"
 	@echo "  build-gonemaster-server-badkeys-embed  Build server with embedded badkeys blocklist (with UI)"
@@ -93,7 +99,7 @@ ui-check:
 ui-install: ui-check
 	$(NPM) --prefix $(UI_DIR) install
 
-ui-build: ui-install ui-public-build
+ui-build: ui-install ui-public-build ui-analysis-build
 	$(NPM) --prefix $(UI_DIR) run build
 	@mkdir -p server/ui/dist
 	@printf '%s\n' \
@@ -123,6 +129,23 @@ ui-public-dev: ui-public-install
 
 ui-public-test: ui-public-install
 	$(NPM) --prefix $(UI_PUBLIC_DIR) run test
+
+ui-analysis-install: ui-check
+	$(NPM) --prefix $(UI_ANALYSIS_DIR) install
+
+ui-analysis-build: ui-analysis-install
+	$(NPM) --prefix $(UI_ANALYSIS_DIR) run build
+	@mkdir -p server/analysisui/dist
+	@printf '%s\n' \
+		'This placeholder keeps the dist directory embeddable when built UI assets are not present.' \
+		'Run `make ui-build` before building the default server binary to embed the analysis dashboard.' \
+		> server/analysisui/dist/placeholder.txt
+
+ui-analysis-dev: ui-analysis-install
+	$(NPM) --prefix $(UI_ANALYSIS_DIR) run dev
+
+ui-analysis-test: ui-analysis-install
+	$(NPM) --prefix $(UI_ANALYSIS_DIR) run test
 
 build: $(BIN_DIR)
 	@if [ "$(CMD)" = "all" ]; then \

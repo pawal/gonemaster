@@ -47,6 +47,11 @@ Using gonemaster as a bulk DNS analysis platform — running large domain sets
 via the batch API, tracking results over time, and querying data through the
 REST API or directly via SQL.
 
+### [analysis-ui.md](analysis-ui.md)
+The public analysis UI at `/analysis/` — creating tags, wiring them to
+cohorts, running batches, and exposing materialized per-cohort results to
+end users.
+
 ---
 
 ## Reference

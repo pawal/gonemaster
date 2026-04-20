@@ -83,7 +83,7 @@
     if (!value) return "unknown";
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) return "unknown";
-    return parsed.toLocaleString();
+    return parsed.toLocaleString("sv-SE");
   };
 
   const usageCount = (profileId) => Number(usageCounts[profileId] || 0);

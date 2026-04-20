@@ -65,6 +65,14 @@ func (s *Server) Start() {
 			}
 		}()
 	}
+
+	if s.analysis != nil {
+		go func() {
+			if err := s.analysis.RepairAllCohorts(ctx); err != nil && ctx.Err() == nil {
+				log.Printf("analysis: startup repair failed: %v", err)
+			}
+		}()
+	}
 }
 
 // startWorker starts one worker goroutine with its own cancellable context
@@ -216,6 +224,12 @@ func (s *Server) runJob(jobID string) error {
 			duration = finishedAt.Sub(job.StartedAt)
 		}
 		s.metrics.ObserveJobCompletionWithContext(job.BatchID, job.Domain, job.Status, duration, severityTotalsFromEntries(entries))
+	}
+
+	if s.analysis != nil {
+		if err := s.analysis.ProjectRun(job.ID); err != nil {
+			log.Printf("analysis: project run %s: %v", job.ID, err)
+		}
 	}
 
 	return runErr

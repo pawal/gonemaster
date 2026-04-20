@@ -68,8 +68,11 @@ describe("App", () => {
     await fireEvent.click(screen.getByRole("tab", { name: "Metrics" }));
   };
 
-  const openSettingsTab = async () => {
+  const openSettingsTab = async (subTab = null) => {
     await fireEvent.click(screen.getByRole("tab", { name: "Settings" }));
+    if (subTab) {
+      await fireEvent.click(await screen.findByRole("tab", { name: subTab }));
+    }
   };
 
   const getMetricsPanel = () => screen.getByRole("tabpanel", { name: "Metrics" });
@@ -100,7 +103,7 @@ describe("App", () => {
     await openBatchTab();
     expect(screen.getByText("Batch Inspector")).toBeInTheDocument();
 
-    await openSettingsTab();
+    await openSettingsTab("Profiles");
     expect(screen.getByText("Profile Library")).toBeInTheDocument();
 
     unmount();
@@ -1421,7 +1424,7 @@ describe("App", () => {
 
     const { unmount } = render(App);
 
-    await openSettingsTab();
+    await openSettingsTab("Profiles");
     await fireEvent.click(await screen.findByRole("button", { name: "New profile" }));
     await fireEvent.input(screen.getByLabelText("Name"), { target: { value: "internal-only" } });
     await fireEvent.input(screen.getByLabelText("Description"), { target: { value: "Admin profile" } });
@@ -4100,6 +4103,90 @@ describe("App", () => {
     });
   });
 
+  describe("Settings sub-tabs", () => {
+    const subtabMock = (url, options = {}) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      if (value.includes("/api/v1/settings")) return jsonResponse({});
+      if (value.includes("/api/v1/profiles/default")) {
+        return jsonResponse({
+          id: 0, name: "default", config: {}, public: false,
+          created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z",
+        });
+      }
+      if (value.includes("/api/v1/profiles")) return jsonResponse([]);
+      if (value.includes("/api/v1/tags")) return jsonResponse([]);
+      if (value.includes("/api/v1/analysis/cohorts")) return jsonResponse([]);
+      return jsonResponse({});
+    };
+
+    it("defaults to System sub-tab and renders ServerSettings", async () => {
+      global.fetch.mockImplementation(subtabMock);
+      const { unmount } = render(App);
+      await openSettingsTab();
+
+      const systemTab = screen.getByRole("tab", { name: "System" });
+      expect(systemTab.getAttribute("aria-selected")).toBe("true");
+      await waitFor(() => {
+        expect(screen.getByRole("heading", { name: "Server Settings" })).toBeInTheDocument();
+      });
+      expect(screen.queryByRole("heading", { name: "Profile Library" })).toBeNull();
+      expect(screen.queryByRole("heading", { name: "Analysis Cohorts" })).toBeNull();
+      unmount();
+    });
+
+    it("switches to Profiles sub-tab and renders ProfileSettings", async () => {
+      global.fetch.mockImplementation(subtabMock);
+      const { unmount } = render(App);
+      await openSettingsTab("Profiles");
+
+      await waitFor(() => {
+        expect(screen.getByText("Profile Library")).toBeInTheDocument();
+      });
+      expect(screen.queryByRole("heading", { name: "Server Settings" })).toBeNull();
+      unmount();
+    });
+
+    it("switches to Scoring sub-tab and renders the scoring placeholder", async () => {
+      global.fetch.mockImplementation(subtabMock);
+      const { unmount } = render(App);
+      await openSettingsTab("Scoring");
+
+      await waitFor(() => {
+        expect(screen.getByRole("heading", { name: "Scoring" })).toBeInTheDocument();
+      });
+      expect(screen.getByText(/Scoring configuration editor/i)).toBeInTheDocument();
+      unmount();
+    });
+
+    it("pushes sub-tab changes to history and restores them on popstate", async () => {
+      global.fetch.mockImplementation(subtabMock);
+      const { unmount } = render(App);
+
+      await openSettingsTab();
+      expect(window.location.hash).toBe("#/settings");
+
+      await fireEvent.click(await screen.findByRole("tab", { name: "Profiles" }));
+      await waitFor(() => expect(window.location.hash).toBe("#/settings/profiles"));
+
+      await fireEvent.click(await screen.findByRole("tab", { name: "Scoring" }));
+      await waitFor(() => expect(window.location.hash).toBe("#/settings/scoring"));
+
+      window.history.back();
+      await waitFor(() => {
+        expect(screen.getByRole("tab", { name: "Profiles" }).getAttribute("aria-selected")).toBe("true");
+      });
+      expect(window.location.hash).toBe("#/settings/profiles");
+
+      window.history.back();
+      await waitFor(() => {
+        expect(screen.getByRole("tab", { name: "System" }).getAttribute("aria-selected")).toBe("true");
+      });
+      expect(window.location.hash).toBe("#/settings");
+
+      unmount();
+    });
+  });
+
   describe("Server Settings", () => {
     const sampleSettings = () => ({
       listen_addr: { value: "127.0.0.1:8080", source: "default", readonly: true },
@@ -4308,6 +4395,66 @@ describe("App", () => {
       expect(toggle.type).toBe("checkbox");
       expect(toggle.checked).toBe(false);
 
+      unmount();
+    });
+  });
+
+  // Regression tests: both entry points into per-tab data loading
+  // (setTab on click, initializeApp on mount) must go through the shared
+  // loadDataForTab helper so they can't drift. We previously had a bug
+  // where /analysis/cohorts loaded on tab-click but not on page reload.
+  describe("per-tab data loading parity", () => {
+    const setupTagsFetchTracking = () => {
+      const calls = [];
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        calls.push(value);
+        if (value === "/api/v1/analysis/cohorts") {
+          return jsonResponse([{ id: 1, source_tag: "tld", label: "TLD", analysis_enabled: true, public_enabled: true }]);
+        }
+        if (value.includes("/api/v1/tags")) {
+          return jsonResponse([{ name: "tld", description: "TLDs cohort source", domain_count: 3, default_profile_id: null }]);
+        }
+        return jsonResponse({});
+      });
+      return calls;
+    };
+
+    it("fetches /analysis/cohorts on page reload with #/tags", async () => {
+      window.history.replaceState(null, "", "/#/tags");
+      const calls = setupTagsFetchTracking();
+
+      const { unmount } = render(App);
+
+      await waitFor(() => {
+        expect(calls).toContain("/api/v1/analysis/cohorts");
+      });
+      unmount();
+    });
+
+    it("fetches /analysis/cohorts when clicking the Tags tab", async () => {
+      const calls = setupTagsFetchTracking();
+
+      const { unmount } = render(App);
+      await fireEvent.click(screen.getByRole("tab", { name: "Tags" }));
+
+      await waitFor(() => {
+        expect(calls).toContain("/api/v1/analysis/cohorts");
+      });
+      unmount();
+    });
+
+    it("shows the cohort label in the tags list for tags used as cohort source", async () => {
+      setupTagsFetchTracking();
+
+      const { container, unmount } = render(App);
+      await fireEvent.click(screen.getByRole("tab", { name: "Tags" }));
+
+      await waitFor(() => {
+        const chip = container.querySelector(".tag-cohort-chip");
+        expect(chip).not.toBeNull();
+        expect(chip.textContent.trim()).toBe("TLD");
+      });
       unmount();
     });
   });

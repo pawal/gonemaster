@@ -149,6 +149,148 @@ func settingsTableDDL(d sqlDialect) string {
 	)`, q, q)
 }
 
+func buildV7DDL(autoinc, bigint string) []string {
+	return []string{
+		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS analysis_cohort_catalog (
+			id                         %s,
+			source_type                VARCHAR(32)  NOT NULL,
+			source_tag                 VARCHAR(255) NOT NULL,
+			label                      TEXT         NOT NULL DEFAULT '',
+			description                TEXT         NOT NULL DEFAULT '',
+			analysis_enabled           INTEGER      NOT NULL DEFAULT 0,
+			public_enabled             INTEGER      NOT NULL DEFAULT 0,
+			is_default                 INTEGER      NOT NULL DEFAULT 0,
+			sort_order                 INTEGER      NOT NULL DEFAULT 0,
+			materialization_status     VARCHAR(32)  NOT NULL DEFAULT 'pending',
+			last_materialized_at       TEXT,
+			last_materialization_error TEXT         NOT NULL DEFAULT '',
+			created_at                 TEXT         NOT NULL,
+			updated_at                 TEXT         NOT NULL
+		)`, autoinc),
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_analysis_cohort_catalog_source ON analysis_cohort_catalog(source_type, source_tag)`,
+		`CREATE INDEX IF NOT EXISTS idx_analysis_cohort_catalog_sort_order ON analysis_cohort_catalog(sort_order)`,
+		`CREATE INDEX IF NOT EXISTS idx_analysis_cohort_catalog_analysis_enabled ON analysis_cohort_catalog(analysis_enabled)`,
+		`CREATE INDEX IF NOT EXISTS idx_analysis_cohort_catalog_public_enabled ON analysis_cohort_catalog(public_enabled)`,
+
+		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS analysis_nameservers (
+			id            %s,
+			name          VARCHAR(255) NOT NULL UNIQUE,
+			first_seen_at TEXT         NOT NULL,
+			last_seen_at  TEXT         NOT NULL
+		)`, autoinc),
+		`CREATE INDEX IF NOT EXISTS idx_analysis_nameservers_name ON analysis_nameservers(name)`,
+
+		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS analysis_addresses (
+			id            %s,
+			address       VARCHAR(255) NOT NULL UNIQUE,
+			family        VARCHAR(16)  NOT NULL,
+			first_seen_at TEXT         NOT NULL,
+			last_seen_at  TEXT         NOT NULL
+		)`, autoinc),
+		`CREATE INDEX IF NOT EXISTS idx_analysis_addresses_address ON analysis_addresses(address)`,
+		`CREATE INDEX IF NOT EXISTS idx_analysis_addresses_family ON analysis_addresses(family)`,
+
+		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS analysis_prefixes (
+			id            %s,
+			prefix        VARCHAR(255) NOT NULL UNIQUE,
+			family        VARCHAR(16)  NOT NULL,
+			first_seen_at TEXT         NOT NULL,
+			last_seen_at  TEXT         NOT NULL
+		)`, autoinc),
+		`CREATE INDEX IF NOT EXISTS idx_analysis_prefixes_prefix ON analysis_prefixes(prefix)`,
+		`CREATE INDEX IF NOT EXISTS idx_analysis_prefixes_family ON analysis_prefixes(family)`,
+
+		`CREATE TABLE IF NOT EXISTS analysis_asns (
+			asn           BIGINT       NOT NULL PRIMARY KEY,
+			label         TEXT         NOT NULL DEFAULT '',
+			first_seen_at TEXT         NOT NULL,
+			last_seen_at  TEXT         NOT NULL
+		)`,
+
+		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS analysis_run_ns_endpoints (
+			cohort_id      %s          NOT NULL,
+			run_id         VARCHAR(255) NOT NULL,
+			domain_id      %s          NOT NULL,
+			nameserver_id  %s          NOT NULL,
+			address_id     %s          NOT NULL,
+			role           VARCHAR(32) NOT NULL DEFAULT '',
+			source         VARCHAR(32) NOT NULL DEFAULT '',
+			family         VARCHAR(16) NOT NULL DEFAULT '',
+			avg_ms         REAL,
+			min_ms         REAL,
+			max_ms         REAL,
+			query_count    INTEGER     NOT NULL DEFAULT 0,
+			PRIMARY KEY (cohort_id, run_id, domain_id, nameserver_id, address_id, role, source)
+		)`, bigint, bigint, bigint, bigint),
+		`CREATE INDEX IF NOT EXISTS idx_analysis_run_ns_endpoints_cohort_id ON analysis_run_ns_endpoints(cohort_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_analysis_run_ns_endpoints_run_id ON analysis_run_ns_endpoints(run_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_analysis_run_ns_endpoints_domain_id ON analysis_run_ns_endpoints(domain_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_analysis_run_ns_endpoints_nameserver_id ON analysis_run_ns_endpoints(nameserver_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_analysis_run_ns_endpoints_address_id ON analysis_run_ns_endpoints(address_id)`,
+
+		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS analysis_run_address_asns (
+			cohort_id     %s          NOT NULL,
+			run_id        VARCHAR(255) NOT NULL,
+			domain_id     %s          NOT NULL,
+			address_id    %s          NOT NULL,
+			prefix_id     %s,
+			asn           BIGINT,
+			lookup_status VARCHAR(32) NOT NULL DEFAULT '',
+			source        VARCHAR(32) NOT NULL DEFAULT '',
+			PRIMARY KEY (cohort_id, run_id, domain_id, address_id)
+		)`, bigint, bigint, bigint, bigint),
+		`CREATE INDEX IF NOT EXISTS idx_analysis_run_address_asns_cohort_id ON analysis_run_address_asns(cohort_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_analysis_run_address_asns_run_id ON analysis_run_address_asns(run_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_analysis_run_address_asns_domain_id ON analysis_run_address_asns(domain_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_analysis_run_address_asns_address_id ON analysis_run_address_asns(address_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_analysis_run_address_asns_asn ON analysis_run_address_asns(asn)`,
+
+		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS analysis_run_domain_asns (
+			cohort_id  %s           NOT NULL,
+			run_id     VARCHAR(255) NOT NULL,
+			domain_id  %s           NOT NULL,
+			asn        BIGINT       NOT NULL,
+			family     VARCHAR(8)   NOT NULL DEFAULT '',
+			source     VARCHAR(32)  NOT NULL DEFAULT '',
+			PRIMARY KEY (cohort_id, run_id, domain_id, asn, family)
+		)`, bigint, bigint),
+		`CREATE INDEX IF NOT EXISTS idx_analysis_run_domain_asns_cohort_id ON analysis_run_domain_asns(cohort_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_analysis_run_domain_asns_run_id ON analysis_run_domain_asns(run_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_analysis_run_domain_asns_domain_id ON analysis_run_domain_asns(domain_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_analysis_run_domain_asns_asn ON analysis_run_domain_asns(asn)`,
+
+		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS analysis_run_domain_summary (
+			cohort_id         %s          NOT NULL,
+			run_id            VARCHAR(255) NOT NULL,
+			domain_id         %s          NOT NULL,
+			score             INTEGER,
+			grade             TEXT,
+			nameserver_count  INTEGER     NOT NULL DEFAULT 0,
+			endpoint_count    INTEGER     NOT NULL DEFAULT 0,
+			asn_count         INTEGER     NOT NULL DEFAULT 0,
+			prefix_count      INTEGER     NOT NULL DEFAULT 0,
+			worst_level       VARCHAR(16) NOT NULL DEFAULT '',
+			PRIMARY KEY (cohort_id, run_id, domain_id)
+		)`, bigint, bigint),
+		`CREATE INDEX IF NOT EXISTS idx_analysis_run_domain_summary_cohort_id ON analysis_run_domain_summary(cohort_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_analysis_run_domain_summary_run_id ON analysis_run_domain_summary(run_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_analysis_run_domain_summary_domain_id ON analysis_run_domain_summary(domain_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_analysis_run_domain_summary_worst_level ON analysis_run_domain_summary(worst_level)`,
+
+		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS analysis_projection_state (
+			cohort_id          %s           NOT NULL,
+			run_id             VARCHAR(255) NOT NULL,
+			projector_version  VARCHAR(64)  NOT NULL,
+			status             VARCHAR(32)  NOT NULL,
+			projected_at       TEXT,
+			error              TEXT         NOT NULL DEFAULT '',
+			PRIMARY KEY (cohort_id, run_id)
+		)`, bigint),
+		`CREATE INDEX IF NOT EXISTS idx_analysis_projection_state_status ON analysis_projection_state(status)`,
+		`CREATE INDEX IF NOT EXISTS idx_analysis_projection_state_projected_at ON analysis_projection_state(projected_at)`,
+	}
+}
+
 // sqlMigrations is the ordered list of schema migrations applied on startup.
 var sqlMigrations = []sqlMigration{
 	{
@@ -229,6 +371,19 @@ var sqlMigrations = []sqlMigration{
 		version: 6,
 		stmts: []string{
 			`ALTER TABLE runs ADD COLUMN nameserver_timings_json TEXT DEFAULT NULL`,
+		},
+	},
+	{
+		version: 7,
+		stmtsFn: func(d sqlDialect) []string {
+			switch d.(type) {
+			case postgresDialect:
+				return buildV7DDL("BIGSERIAL PRIMARY KEY", "BIGINT")
+			case mariadbDialect:
+				return buildV7DDL("BIGINT AUTO_INCREMENT PRIMARY KEY", "BIGINT")
+			default:
+				return buildV7DDL("INTEGER PRIMARY KEY", "INTEGER")
+			}
 		},
 	},
 }

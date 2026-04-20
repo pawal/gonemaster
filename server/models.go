@@ -2,6 +2,7 @@ package server
 
 import (
 	"crypto/rand"
+	"encoding/json"
 	"math/big"
 	"time"
 
@@ -166,6 +167,148 @@ type TagSummary struct {
 	Error       int            `json:"error"`
 	Critical    int            `json:"critical"`
 	Grades      map[string]int `json:"grades,omitempty"`
+}
+
+const (
+	AnalysisMaterializationPending = "pending"
+	AnalysisMaterializationReady   = "ready"
+	AnalysisMaterializationFailed  = "failed"
+)
+
+// AnalysisCohort describes one admin-managed analysis cohort entry.
+// V1 cohorts are tag-backed, analysis-enabled/public-enabled independently,
+// and one public cohort may be marked as the default.
+type AnalysisCohort struct {
+	ID                       int64     `json:"id"`
+	SourceType               string    `json:"source_type"`
+	SourceTag                string    `json:"source_tag"`
+	Label                    string    `json:"label"`
+	Description              string    `json:"description,omitempty"`
+	AnalysisEnabled          bool      `json:"analysis_enabled"`
+	PublicEnabled            bool      `json:"public_enabled"`
+	IsDefault                bool      `json:"is_default"`
+	SortOrder                int       `json:"sort_order"`
+	MaterializationStatus    string    `json:"materialization_status"`
+	LastMaterializedAt       time.Time `json:"last_materialized_at,omitempty"`
+	LastMaterializationError string    `json:"last_materialization_error,omitempty"`
+	CreatedAt                time.Time `json:"created_at"`
+	UpdatedAt                time.Time `json:"updated_at"`
+}
+
+// MarshalJSON omits LastMaterializedAt when it is the zero time.
+// Without this override encoding/json serializes a zero time.Time as
+// "0001-01-01T00:00:00Z" regardless of the `omitempty` tag, which leaks into
+// the admin UI as a bogus "1/1/1" timestamp.
+func (c AnalysisCohort) MarshalJSON() ([]byte, error) {
+	type alias AnalysisCohort
+	aux := struct {
+		*alias
+		LastMaterializedAt *time.Time `json:"last_materialized_at,omitempty"`
+	}{alias: (*alias)(&c)}
+	if !c.LastMaterializedAt.IsZero() {
+		t := c.LastMaterializedAt
+		aux.LastMaterializedAt = &t
+	}
+	return json.Marshal(aux)
+}
+
+// AnalysisNameserver is one normalized nameserver hostname in the analysis layer.
+type AnalysisNameserver struct {
+	ID          int64     `json:"id"`
+	Name        string    `json:"name"`
+	FirstSeenAt time.Time `json:"first_seen_at"`
+	LastSeenAt  time.Time `json:"last_seen_at"`
+}
+
+// AnalysisAddress is one normalized IP address in the analysis layer.
+type AnalysisAddress struct {
+	ID          int64     `json:"id"`
+	Address     string    `json:"address"`
+	Family      string    `json:"family"`
+	FirstSeenAt time.Time `json:"first_seen_at"`
+	LastSeenAt  time.Time `json:"last_seen_at"`
+}
+
+// AnalysisPrefix is one normalized announced prefix in the analysis layer.
+type AnalysisPrefix struct {
+	ID          int64     `json:"id"`
+	Prefix      string    `json:"prefix"`
+	Family      string    `json:"family"`
+	FirstSeenAt time.Time `json:"first_seen_at"`
+	LastSeenAt  time.Time `json:"last_seen_at"`
+}
+
+// AnalysisASN is one normalized ASN in the analysis layer.
+type AnalysisASN struct {
+	ASN         int64     `json:"asn"`
+	Label       string    `json:"label,omitempty"`
+	FirstSeenAt time.Time `json:"first_seen_at"`
+	LastSeenAt  time.Time `json:"last_seen_at"`
+}
+
+// AnalysisRunNameserverEndpoint is one materialized nameserver/address row for a run+cohort.
+type AnalysisRunNameserverEndpoint struct {
+	CohortID     int64   `json:"cohort_id"`
+	RunID        string  `json:"run_id"`
+	DomainID     int64   `json:"domain_id"`
+	NameserverID int64   `json:"nameserver_id"`
+	AddressID    int64   `json:"address_id"`
+	Role         string  `json:"role"`
+	Source       string  `json:"source"`
+	Family       string  `json:"family"`
+	AvgMS        float64 `json:"avg_ms,omitempty"`
+	MinMS        float64 `json:"min_ms,omitempty"`
+	MaxMS        float64 `json:"max_ms,omitempty"`
+	QueryCount   int     `json:"query_count"`
+}
+
+// AnalysisRunDomainASN is an aggregate (domain, ASN) row derived from the
+// per-family ASN sets gonemaster logs expose (e.g. IPV4_DIFFERENT_ASN). The
+// engine does not pair ASNs with specific addresses, so this table carries
+// the domain-level ASN footprint without an address column.
+type AnalysisRunDomainASN struct {
+	CohortID int64  `json:"cohort_id"`
+	RunID    string `json:"run_id"`
+	DomainID int64  `json:"domain_id"`
+	ASN      int64  `json:"asn"`
+	Family   string `json:"family,omitempty"`
+	Source   string `json:"source,omitempty"`
+}
+
+// AnalysisRunAddressASN is one materialized address/prefix/ASN row for a run+cohort.
+type AnalysisRunAddressASN struct {
+	CohortID     int64  `json:"cohort_id"`
+	RunID        string `json:"run_id"`
+	DomainID     int64  `json:"domain_id"`
+	AddressID    int64  `json:"address_id"`
+	PrefixID     *int64 `json:"prefix_id,omitempty"`
+	ASN          *int64 `json:"asn,omitempty"`
+	LookupStatus string `json:"lookup_status,omitempty"`
+	Source       string `json:"source,omitempty"`
+}
+
+// AnalysisRunDomainSummary is one materialized summary row for a run+cohort.
+type AnalysisRunDomainSummary struct {
+	CohortID        int64   `json:"cohort_id"`
+	RunID           string  `json:"run_id"`
+	DomainID        int64   `json:"domain_id"`
+	Score           *int    `json:"score,omitempty"`
+	Grade           *string `json:"grade,omitempty"`
+	NameserverCount int     `json:"nameserver_count"`
+	EndpointCount   int     `json:"endpoint_count"`
+	ASNCount        int     `json:"asn_count"`
+	PrefixCount     int     `json:"prefix_count"`
+	WorstLevel      string  `json:"worst_level,omitempty"`
+}
+
+// AnalysisProjectionState tracks projection status for one run+cohort pair.
+type AnalysisProjectionState struct {
+	CohortID         int64     `json:"cohort_id"`
+	RunID            string    `json:"run_id"`
+	ProjectorVersion string    `json:"projector_version"`
+	Status           string    `json:"status"`
+	ProjectedAt      time.Time `json:"projected_at,omitempty"`
+	Error            string    `json:"error,omitempty"`
 }
 
 // Run is a completed execution, graduated from a Job.

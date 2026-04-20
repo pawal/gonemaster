@@ -4,6 +4,7 @@
   import { t, locale, loadCatalog } from "./i18n.js";
   import ProfileSettings from "./ProfileSettings.svelte";
   import ServerSettings from "./ServerSettings.svelte";
+  import AnalysisCohorts from "./AnalysisCohorts.svelte";
 
   const logoSrc = `${import.meta.env.BASE_URL}gonemaster.svg`;
 
@@ -164,9 +165,17 @@
     { id: "recent", labelKey: "tab_recent" },
     { id: "domains", labelKey: "tab_domains" },
     { id: "tags", labelKey: "tab_tags" },
+    { id: "cohorts", labelKey: "tab_cohorts" },
     { id: "batches", labelKey: "tab_batches" },
     { id: "metrics", labelKey: "tab_metrics" },
     { id: "settings", labelKey: "tab_settings" }
+  ];
+
+  let settingsSubTab = "system";
+  const settingsSubTabs = [
+    { id: "system", labelKey: "settings_subtab_system" },
+    { id: "profiles", labelKey: "settings_subtab_profiles" },
+    { id: "scoring", labelKey: "settings_subtab_scoring" }
   ];
 
   // Domains tab state.
@@ -204,6 +213,7 @@
   // Tags tab state.
   let tagsList = [];
   let tagsListLoading = false;
+  let tagCohortByName = new Map();
   let tagCreateName = "";
   let tagCreateDescription = "";
   let tagCreating = false;
@@ -366,7 +376,7 @@
     const parts = [option.id];
     if (option.createdAt) {
       const parsed = new Date(option.createdAt);
-      if (!Number.isNaN(parsed.getTime())) parts.push(parsed.toLocaleString());
+      if (!Number.isNaN(parsed.getTime())) parts.push(parsed.toLocaleString("sv-SE"));
     }
     if (option.tag) parts.push(`[${option.tag}]`);
     return parts.join(" - ");
@@ -641,7 +651,7 @@
   const formatTimestampLocal = (value) => {
     const parsed = parseTimestamp(value);
     if (!parsed) return "unknown";
-    return parsed.toLocaleString();
+    return parsed.toLocaleString("sv-SE");
   };
   const formatBatchTotalRuntime = (batch) => {
     const created = parseTimestamp(batch?.created_at);
@@ -753,7 +763,7 @@
     if (!value) return "never";
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) return "never";
-    return parsed.toLocaleTimeString();
+    return parsed.toLocaleTimeString("sv-SE");
   };
   const metricsSeriesPoints = (snapshot, window) => {
     const windows = snapshot?.trends?.windows || {};
@@ -1115,19 +1125,37 @@
     if (tab === "recent" || tab === "tests") return "recent";
     if (tab === "domains" || tab === "domain") return "domains";
     if (tab === "tags" || tab === "tag") return "tags";
+    if (tab === "cohorts" || tab === "cohort" || tab === "analysis") return "cohorts";
     if (tab === "batches" || tab === "batch") return "batches";
     if (tab === "metrics" || tab === "metric") return "metrics";
     if (tab === "settings" || tab === "setting") return "settings";
     return "";
   };
 
+  const normalizeSettingsSubTab = (value) => {
+    const sub = String(value || "").toLowerCase();
+    if (sub === "system" || sub === "profiles" || sub === "scoring") return sub;
+    return "system";
+  };
+
+  const settingsHash = (subTab) => {
+    const sub = normalizeSettingsSubTab(subTab);
+    return sub === "system" ? "#/settings" : `#/settings/${sub}`;
+  };
+
   const setTab = (tab, { replace = false } = {}) => {
     const next = normalizeTab(tab) || "single";
     const changed = activeTab !== next;
     activeTab = next;
-    const nextHash = `#/${next}`;
+    const nextHash = next === "settings" ? settingsHash(settingsSubTab) : `#/${next}`;
     const url = `${window.location.pathname}${window.location.search}${nextHash}`;
-    const state = { tab: next, domain: null, tag: null, jobId: null };
+    const state = {
+      tab: next,
+      settingsSubTab: next === "settings" ? settingsSubTab : null,
+      domain: null,
+      tag: null,
+      jobId: null,
+    };
     if (!changed || replace) {
       if (window.location.hash !== nextHash) window.history.replaceState(state, "", url);
     } else {
@@ -1136,21 +1164,30 @@
     if (changed && statusMessage) {
       clearStatus();
     }
-    if (next === "single" || next === "tags" || next === "batches") {
+    loadDataForTab(next);
+  };
+
+  // Single source of truth for per-tab data loading. Called from both setTab
+  // (tab click) and initializeApp (first mount / page reload) so the two
+  // entry points can't drift — all new per-tab loads go here, not at the
+  // call sites.
+  const loadDataForTab = (tab) => {
+    if (tab === "single" || tab === "tags" || tab === "batches") {
       loadProfiles();
     }
-    if (next === "recent") {
+    if (tab === "recent") {
       loadJobs();
-    } else if (next === "domains") {
+    } else if (tab === "domains") {
       loadDomains();
       if (!tagsLoaded) loadDomainTags();
-    } else if (next === "tags") {
+    } else if (tab === "tags") {
       loadTagsList();
+      loadTagCohortMap();
       if (selectedTag) {
         loadTagDomains({ reset: true });
         loadTagSummary();
       }
-    } else if (next === "batches") {
+    } else if (tab === "batches") {
       loadRecentBatchOptions();
       loadActiveBatches();
       fetchQueueStatus();
@@ -1158,7 +1195,7 @@
       if (selectedBatchId) {
         loadBatch(selectedBatchId);
       }
-    } else if (next === "metrics") {
+    } else if (tab === "metrics") {
       loadMetrics();
     }
   };
@@ -1207,11 +1244,29 @@
   // history — updateTabFromHash would clobber it with nulls.
   let popStateHandled = false;
 
+  const setSettingsSubTab = (subTab) => {
+    const next = normalizeSettingsSubTab(subTab);
+    const changed = settingsSubTab !== next;
+    settingsSubTab = next;
+    if (activeTab !== "settings") return;
+    const nextHash = settingsHash(next);
+    const url = `${window.location.pathname}${window.location.search}${nextHash}`;
+    const state = { tab: "settings", settingsSubTab: next, domain: null, tag: null, jobId: null };
+    if (!changed) {
+      if (window.location.hash !== nextHash) window.history.replaceState(state, "", url);
+    } else {
+      window.history.pushState(state, "", url);
+    }
+  };
+
   const onPopState = (e) => {
     popStateHandled = true;
     const state = e.state;
     if (!state) { updateTabFromHash(); return; }
     activeTab = state.tab || "single";
+    if (activeTab === "settings") {
+      settingsSubTab = normalizeSettingsSubTab(state.settingsSubTab);
+    }
     selectedDomain = state.domain ?? null;
     selectedTag = state.tag ?? null;
     tagProfileDraftId = selectedTag?.default_profile_id ? String(selectedTag.default_profile_id) : "";
@@ -1242,15 +1297,34 @@
     const hash = window.location.hash || "";
     const parts = hash.replace(/^#\/?/, "").split("/");
     const segment = parts[0];
-    const next = normalizeTab(segment) || "single";
+    // Legacy redirect: cohort management used to live under
+    // #/settings/analysis. The sub-tab is now a top-level tab, so map
+    // stale bookmarks forward.
+    let next;
+    if (segment === "settings" && (parts[1] || "").toLowerCase() === "analysis") {
+      next = "cohorts";
+    } else {
+      next = normalizeTab(segment) || "single";
+    }
     activeTab = next;
     const jobId = (next === "single" && parts[1]) ? decodeURIComponent(parts[1]) : null;
     if (jobId) {
       selectedJobId = jobId;
       loadJob(jobId);
     }
+    let settingsSub = null;
+    if (next === "settings") {
+      settingsSub = normalizeSettingsSubTab(parts[1]);
+      settingsSubTab = settingsSub;
+    }
     window.history.replaceState(
-      { tab: next, domain: null, tag: null, jobId: jobId || undefined },
+      {
+        tab: next,
+        settingsSubTab: settingsSub,
+        domain: null,
+        tag: null,
+        jobId: jobId || undefined,
+      },
       "",
       `${window.location.pathname}${window.location.search}${hash || `#/${next}`}`
     );
@@ -1838,6 +1912,16 @@
     }
   };
 
+  const loadTagCohortMap = async () => {
+    try {
+      const data = await apiFetch("/analysis/cohorts");
+      const cohorts = Array.isArray(data) ? data : [];
+      tagCohortByName = new Map(cohorts.map((c) => [c.source_tag, c]));
+    } catch (_) {
+      tagCohortByName = new Map();
+    }
+  };
+
   const syncTagProfileState = (tagName, profileID) => {
     const nextValue = normalizeOptionalProfileID(profileID);
     if (selectedTag?.name === tagName) {
@@ -2337,30 +2421,21 @@
     window.addEventListener("hashchange", updateTabFromHash);
     window.addEventListener("popstate", onPopState);
     loadJobs();
-    if (activeTab === "batches") {
-      loadRecentBatchOptions();
-      loadActiveBatches();
-      fetchQueueStatus();
-      if (!tagsLoaded) loadDomainTags();
-      if (selectedBatchId) {
-        loadBatch(selectedBatchId);
-      }
-    }
-    if (activeTab === "tags") {
-      loadTagsList();
-    }
-    if (activeTab === "domains") {
-      loadDomains();
-      if (!tagsLoaded) loadDomainTags();
-    }
-    if (activeTab === "metrics") {
-      loadMetrics();
-    }
+    loadDataForTab(activeTab);
   };
+
+  let initialAnimationDone = false;
 
   onMount(() => {
     initializeApp();
+    // Reveal animations (CSS: .reveal @ 0.6s + staggered --d delays up to ~0.5s)
+    // are intentional on first paint but feel slow on every subsequent tab switch.
+    // Disable them once the initial intro has had a chance to play.
+    const revealTimer = setTimeout(() => {
+      initialAnimationDone = true;
+    }, 1200);
     return () => {
+      clearTimeout(revealTimer);
       if (jobPoller) clearInterval(jobPoller);
       if (batchPoller) clearInterval(batchPoller);
       if (activeBatchesPoller) clearInterval(activeBatchesPoller);
@@ -2446,7 +2521,7 @@
     </div>
   </nav>
 
-  <main>
+  <main class:no-reveal={initialAnimationDone}>
   {#if activeTab === "single"}
     <div class="grid" id="panel-single" role="tabpanel" aria-labelledby="tab-single" style="margin-top: 22px;">
       <div class="card reveal" style="--d: 0.18s">
@@ -3315,6 +3390,14 @@
       {#if selectedTag}
         <button class="secondary small" onclick={() => { selectedTag = null; tagProfileDraftId = ""; setTab("tags"); }}>{$t("back_to_tags")}</button>
         <h2 style="margin-top: 0.5rem;">{$t("batch_tag_label")}: {selectedTag.name}</h2>
+        {#if tagCohortByName.has(selectedTag.name)}
+          <p class="small" style="margin-top: -0.25rem; margin-bottom: 0.75rem;">
+            {$t("tag_cohort_source_prefix")}
+            <button type="button" class="link-button" onclick={() => setTab("cohorts")}>
+              {tagCohortByName.get(selectedTag.name).label || tagCohortByName.get(selectedTag.name).source_tag}
+            </button>
+          </p>
+        {/if}
 
         <!-- Severity summary -->
         {#if tagSummaryLoading}
@@ -3482,6 +3565,7 @@
           <table class="data-table">
             <thead><tr>
               <th class="sortable-column" aria-sort={tableSortAria(tagsListSortState, "name")}><button class="table-sort-button" type="button" onclick={() => { tagsListSortState = nextTableSort(tagsListSortState, "name"); }}><span>{$t("tag_name_label")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(tagsListSortState, "name")}</span></button></th>
+              <th>{$t("tag_cohort_col_header")}</th>
               <th class="sortable-column" aria-sort={tableSortAria(tagsListSortState, "description")}><button class="table-sort-button" type="button" onclick={() => { tagsListSortState = nextTableSort(tagsListSortState, "description"); }}><span>{$t("tag_description_label")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(tagsListSortState, "description")}</span></button></th>
               <th class="sortable-column" aria-sort={tableSortAria(tagsListSortState, "domain_count")}><button class="table-sort-button" type="button" onclick={() => { tagsListSortState = nextTableSort(tagsListSortState, "domain_count", "desc"); }}><span>{$t("col_domain_count")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(tagsListSortState, "domain_count")}</span></button></th>
             </tr></thead>
@@ -3495,6 +3579,20 @@
                   onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") navigateToTagDetail(tag); }}
                 >
                   <td class="mono">{tag.name}</td>
+                  <td>
+                    {#if tagCohortByName.has(tag.name)}
+                      <button
+                        type="button"
+                        class="tag-cohort-chip"
+                        title={$t("tag_cohort_link_title", { cohort: tagCohortByName.get(tag.name).label || tagCohortByName.get(tag.name).source_tag })}
+                        onclick={(e) => { e.stopPropagation(); setTab("cohorts"); }}
+                      >
+                        {tagCohortByName.get(tag.name).label || tagCohortByName.get(tag.name).source_tag}
+                      </button>
+                    {:else}
+                      -
+                    {/if}
+                  </td>
                   <td>{tag.description || "—"}</td>
                   <td>{tag.domain_count ?? 0}</td>
                 </tr>
@@ -3503,6 +3601,12 @@
           </table>
         {/if}
       {/if}
+    </div>
+  {:else if activeTab === "cohorts"}
+    <div class="grid" id="panel-cohorts" role="tabpanel" aria-labelledby="tab-cohorts" style="margin-top: 22px;">
+      <div class="card reveal" style="--d: 0.22s; grid-column: 1 / -1;">
+        <AnalysisCohorts />
+      </div>
     </div>
   {:else if activeTab === "batches"}
     <div class="grid" id="panel-batches" role="tabpanel" aria-labelledby="tab-batches" style="margin-top: 22px;">
@@ -4050,13 +4154,36 @@ example.org`}
       {/if}
     </div>
   {:else if activeTab === "settings"}
-    <div class="grid" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" style="margin-top: 22px;">
-      <div class="card reveal" style="--d: 0.34s; grid-column: 1 / -1;">
-        <ProfileSettings onprofileschanged={handleProfilesChanged} />
+    <div class="grid" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" style="margin-top: 0; gap: 10px;">
+      <div class="settings-subtabs" role="tablist" aria-label={$t("settings_subtabs_aria")}>
+        {#each settingsSubTabs as subTab}
+          <button
+            class={`settings-subtab ${settingsSubTab === subTab.id ? "active" : ""}`}
+            type="button"
+            role="tab"
+            id={`settings-subtab-${subTab.id}`}
+            aria-selected={settingsSubTab === subTab.id}
+            aria-controls={`settings-subpanel-${subTab.id}`}
+            onclick={() => setSettingsSubTab(subTab.id)}
+          >
+            {$t(subTab.labelKey)}
+          </button>
+        {/each}
       </div>
-      <div class="card reveal" style="--d: 0.4s; grid-column: 1 / -1;">
-        <ServerSettings />
-      </div>
+      {#if settingsSubTab === "system"}
+        <div class="card reveal" id="settings-subpanel-system" role="tabpanel" aria-labelledby="settings-subtab-system" style="--d: 0.34s; grid-column: 1 / -1;">
+          <ServerSettings />
+        </div>
+      {:else if settingsSubTab === "profiles"}
+        <div class="card reveal" id="settings-subpanel-profiles" role="tabpanel" aria-labelledby="settings-subtab-profiles" style="--d: 0.34s; grid-column: 1 / -1;">
+          <ProfileSettings onprofileschanged={handleProfilesChanged} />
+        </div>
+      {:else if settingsSubTab === "scoring"}
+        <div class="card reveal" id="settings-subpanel-scoring" role="tabpanel" aria-labelledby="settings-subtab-scoring" style="--d: 0.34s; grid-column: 1 / -1;">
+          <h2>{$t("settings_scoring_heading")}</h2>
+          <p class="small">{$t("settings_scoring_placeholder")}</p>
+        </div>
+      {/if}
     </div>
   {/if}
 

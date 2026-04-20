@@ -197,6 +197,51 @@ func TestGetReturnsNilOnEmpty(t *testing.T) {
 	}
 }
 
+func TestLookupASNInfoCymruReturnsLabel(t *testing.T) {
+	ctx, _, _ := testhelpers.Context(t)
+	source := "asnlookup.zonemaster.net"
+
+	resolver := fakeResolver{
+		handler: func(ctx context.Context, name, qtype, qclass string) (packet.Packet, error) {
+			if qtype != "TXT" {
+				t.Fatalf("expected TXT query, got %s", qtype)
+			}
+			if !strings.HasPrefix(name, "AS13335.") {
+				t.Fatalf("expected AS13335.* query, got %q", name)
+			}
+			answer := []dns.RR{
+				txtRR(name, "13335 | US | arin | 2010-07-14 | CLOUDFLARENET, US"),
+			}
+			return packetFor(dns.RcodeSuccess, answer, nil), nil
+		},
+	}
+
+	info, err := LookupASNInfo(ctx, resolver, 13335)
+	if err != nil {
+		t.Fatalf("LookupASNInfo error: %v", err)
+	}
+	if info.Code != CodeFound {
+		t.Fatalf("expected %s, got %s", CodeFound, info.Code)
+	}
+	if info.Label != "CLOUDFLARENET, US" {
+		t.Fatalf("unexpected label: %q", info.Label)
+	}
+	_ = source
+}
+
+func TestLookupASNInfoValidation(t *testing.T) {
+	ctx, _, _ := testhelpers.Context(t)
+	if _, err := LookupASNInfo(ctx, nil, 13335); err == nil || !strings.Contains(err.Error(), "missing resolver") {
+		t.Fatalf("expected missing resolver, got %v", err)
+	}
+	resolver := fakeResolver{handler: func(context.Context, string, string, string) (packet.Packet, error) {
+		return packet.Packet{}, errors.New("boom")
+	}}
+	if _, err := LookupASNInfo(ctx, resolver, 0); err == nil {
+		t.Fatalf("expected error for asn=0")
+	}
+}
+
 func TestParseASNList(t *testing.T) {
 	asns, err := parseASNList("64500 64501")
 	if err != nil {

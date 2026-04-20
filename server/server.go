@@ -11,6 +11,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/scoring"
+	serveranalysisui "codeberg.org/pawal/gonemaster/server/analysisui"
 	serverpublic "codeberg.org/pawal/gonemaster/server/public"
 	serverui "codeberg.org/pawal/gonemaster/server/ui"
 )
@@ -20,11 +21,14 @@ type Server struct {
 	cfg                      Config
 	mux                      *http.ServeMux
 	store                    JobStore
+	analysis                 AnalysisController
 	queue                    Queue
 	workers                  workerPool
 	metrics                  *MetricsCollector
 	metricsCache             map[string]metricsCacheEntry
 	metricsCacheMu           sync.Mutex
+	analysisMatCache         map[int64]analysisMatCacheEntry
+	analysisMatCacheMu       sync.Mutex
 	progressWriteMu          sync.Mutex
 	progressWrites           map[string]progressWriteState
 	progressWriteMinStep     int
@@ -127,6 +131,7 @@ func newServer(cfg Config, store JobStore, queue Queue) *Server {
 		queue:                    queue,
 		metrics:                  NewMetricsCollector(cfg),
 		metricsCache:             map[string]metricsCacheEntry{},
+		analysisMatCache:         map[int64]analysisMatCacheEntry{},
 		progressWrites:           map[string]progressWriteState{},
 		progressWriteMinStep:     defaultProgressWriteMinStep,
 		progressWriteMinInterval: defaultProgressWriteMinInterval,
@@ -154,21 +159,32 @@ func (s *Server) Handler() http.Handler {
 	return securityHeadersMiddleware(s.mux)
 }
 
+// Store exposes the configured job store for optional integration layers.
+func (s *Server) Store() JobStore {
+	return s.store
+}
+
 // securityHeadersMiddleware sets defensive HTTP security headers on every
 // response. API paths get a restrictive CSP; UI/static paths get one that
 // allows same-origin scripts, styles, and data URIs.
 func securityHeadersMiddleware(next http.Handler) http.Handler {
 	const apiCSP = "default-src 'none'"
 	const uiCSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'"
+	// The analysis SPA is a SvelteKit adapter-static build whose index.html
+	// includes an inline bootstrap <script>, so script-src must allow it.
+	const analysisCSP = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'"
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("X-Frame-Options", "DENY")
 		h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		h.Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
-		if strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/pub/api/") {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/pub/api/"):
 			h.Set("Content-Security-Policy", apiCSP)
-		} else {
+		case strings.HasPrefix(r.URL.Path, "/analysis/") || r.URL.Path == "/analysis":
+			h.Set("Content-Security-Policy", analysisCSP)
+		default:
 			h.Set("Content-Security-Policy", uiCSP)
 		}
 		next.ServeHTTP(w, r)
@@ -212,6 +228,12 @@ func (s *Server) routes() {
 	apiMux.HandleFunc("/profiles/{id}", s.handleProfileByID)
 	apiMux.HandleFunc("/profiles", s.handleProfiles)
 
+	apiMux.HandleFunc("POST /analysis/cohorts/{id}/rebuild", s.handleAnalysisCohortRebuild)
+	apiMux.HandleFunc("POST /analysis/cohorts/{id}/clear", s.handleAnalysisCohortClear)
+	apiMux.HandleFunc("/analysis/cohorts/{id}", s.handleAnalysisCohortByID)
+	apiMux.HandleFunc("/analysis/cohorts", s.handleAnalysisCohorts)
+	apiMux.HandleFunc("/analysis/status", s.handleAnalysisStatus)
+
 	apiMux.HandleFunc("GET /features", s.handleFeatures)
 	apiMux.HandleFunc("/settings", s.handleSettings)
 	apiMux.HandleFunc("/locales", s.handleLocales)
@@ -232,6 +254,24 @@ func (s *Server) routes() {
 	pubMux.HandleFunc("GET /lookup/{domain}", s.handlePublicLookupDomain)
 	pubMux.HandleFunc("GET /version", s.handlePublicVersion)
 	pubMux.HandleFunc("GET /info", s.handlePublicInfo)
+	pubMux.HandleFunc("GET /analysis/catalog", s.handlePublicAnalysisCatalog)
+	pubMux.HandleFunc("GET /analysis/cohorts", s.handlePublicAnalysisCohorts)
+	pubMux.HandleFunc("GET /analysis/overview", s.handlePublicAnalysisOverview)
+	pubMux.HandleFunc("GET /analysis/domains", s.handlePublicAnalysisDomains)
+	pubMux.HandleFunc("GET /analysis/nameservers", s.handlePublicAnalysisNameservers)
+	pubMux.HandleFunc("GET /analysis/endpoints", s.handlePublicAnalysisEndpoints)
+	pubMux.HandleFunc("GET /analysis/asns", s.handlePublicAnalysisASNs)
+	pubMux.HandleFunc("GET /analysis/prefixes", s.handlePublicAnalysisPrefixes)
+	pubMux.HandleFunc("GET /analysis/tags", s.handlePublicAnalysisTags)
+	pubMux.HandleFunc("GET /analysis/testcases", s.handlePublicAnalysisTestcases)
+	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}", s.handlePublicAnalysisCohortDetail)
+	pubMux.HandleFunc("GET /analysis/domains/{domain}", s.handlePublicAnalysisDomainDetail)
+	pubMux.HandleFunc("GET /analysis/nameservers/{name}", s.handlePublicAnalysisNameserverDetail)
+	pubMux.HandleFunc("GET /analysis/endpoints/{address}", s.handlePublicAnalysisEndpointDetail)
+	pubMux.HandleFunc("GET /analysis/asns/{asn}", s.handlePublicAnalysisASNDetail)
+	pubMux.HandleFunc("GET /analysis/prefix", s.handlePublicAnalysisPrefixDetail)
+	pubMux.HandleFunc("GET /analysis/tags/{tag}", s.handlePublicAnalysisTagDetail)
+	pubMux.HandleFunc("GET /analysis/testcase", s.handlePublicAnalysisTestcaseDetail)
 	var pubHandler http.Handler = http.StripPrefix("/pub/api/v1", pubMux)
 	if s.rateLimiter != nil {
 		pubHandler = rateLimitMiddleware(s.rateLimiter, pubHandler)
@@ -241,5 +281,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /robots.txt", s.handleRobotsTxt)
 	s.mux.HandleFunc("GET /sitemap.xml", s.handleSitemap)
 	s.mux.Handle("/public/", http.StripPrefix("/public", serverpublic.Handler(s.cfg.PublicURL)))
+	s.mux.Handle("/analysis/", http.StripPrefix("/analysis", serveranalysisui.Handler()))
+	s.mux.HandleFunc("/analysis", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/analysis/", http.StatusMovedPermanently)
+	})
 	s.mux.Handle("/", serverui.Handler())
 }

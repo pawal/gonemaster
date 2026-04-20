@@ -160,6 +160,13 @@ type JobStore interface {
 	CreateBatch(batch Batch) error
 	GetBatch(id string) (Batch, bool)
 
+	// Analysis cohort catalog.
+	ListAnalysisCohorts() []AnalysisCohort
+	GetAnalysisCohort(id int64) (AnalysisCohort, bool)
+	GetAnalysisCohortBySource(sourceType, sourceTag string) (AnalysisCohort, bool)
+	UpsertAnalysisCohort(cohort AnalysisCohort) (AnalysisCohort, error)
+	DeleteAnalysisCohort(id int64) error
+
 	// Profile management.
 	CreateProfile(p StoredProfile) (StoredProfile, error)
 	GetProfile(id int64) (StoredProfile, bool)
@@ -208,6 +215,10 @@ type InMemoryJobStore struct {
 	// Batches.
 	batches map[string]Batch // batchID → Batch
 
+	// Analysis cohort catalog.
+	analysisCohorts       map[int64]AnalysisCohort
+	analysisCohortCounter int64
+
 	// Profiles.
 	profiles       map[int64]StoredProfile // id → StoredProfile
 	profileCounter int64
@@ -226,21 +237,116 @@ func (s *InMemoryJobStore) SetScoringConfig(cfg scoring.Config) {
 // NewInMemoryJobStore creates an empty in-memory job store.
 func NewInMemoryJobStore() *InMemoryJobStore {
 	return &InMemoryJobStore{
-		scoringCfg:   scoring.DefaultConfig(),
-		jobs:         map[string]Job{},
-		publicIDs:    map[string]string{},
-		runs:         map[string]Run{},
-		runPublicIDs: map[string]string{},
-		entries:      map[string][]Entry{},
-		domains:      map[string]*Domain{},
-		domainsByID:  map[int64]*Domain{},
-		tags:         map[string]Tag{},
-		domainTags:   map[int64][]string{},
-		tagDomains:   map[string][]int64{},
-		batches:      map[string]Batch{},
-		profiles:     map[int64]StoredProfile{},
-		settings:     map[string]string{},
+		scoringCfg:      scoring.DefaultConfig(),
+		jobs:            map[string]Job{},
+		publicIDs:       map[string]string{},
+		runs:            map[string]Run{},
+		runPublicIDs:    map[string]string{},
+		entries:         map[string][]Entry{},
+		domains:         map[string]*Domain{},
+		domainsByID:     map[int64]*Domain{},
+		tags:            map[string]Tag{},
+		domainTags:      map[int64][]string{},
+		tagDomains:      map[string][]int64{},
+		batches:         map[string]Batch{},
+		analysisCohorts: map[int64]AnalysisCohort{},
+		profiles:        map[int64]StoredProfile{},
+		settings:        map[string]string{},
 	}
+}
+
+// ListAnalysisCohorts returns all analysis cohort catalog entries ordered by
+// sort_order, label, source_tag.
+func (s *InMemoryJobStore) ListAnalysisCohorts() []AnalysisCohort {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]AnalysisCohort, 0, len(s.analysisCohorts))
+	for _, c := range s.analysisCohorts {
+		out = append(out, c)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].SortOrder != out[j].SortOrder {
+			return out[i].SortOrder < out[j].SortOrder
+		}
+		if out[i].Label != out[j].Label {
+			return out[i].Label < out[j].Label
+		}
+		return out[i].SourceTag < out[j].SourceTag
+	})
+	return out
+}
+
+// GetAnalysisCohort returns one analysis cohort catalog entry by numeric id.
+func (s *InMemoryJobStore) GetAnalysisCohort(id int64) (AnalysisCohort, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	c, ok := s.analysisCohorts[id]
+	return c, ok
+}
+
+// GetAnalysisCohortBySource returns one analysis cohort catalog entry by source key.
+func (s *InMemoryJobStore) GetAnalysisCohortBySource(sourceType, sourceTag string) (AnalysisCohort, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, c := range s.analysisCohorts {
+		if c.SourceType == sourceType && c.SourceTag == sourceTag {
+			return c, true
+		}
+	}
+	return AnalysisCohort{}, false
+}
+
+// UpsertAnalysisCohort inserts a new cohort or updates the existing row for
+// the same source_type/source_tag pair.
+func (s *InMemoryJobStore) UpsertAnalysisCohort(cohort AnalysisCohort) (AnalysisCohort, error) {
+	if cohort.SourceType == "" {
+		return AnalysisCohort{}, errors.New("source_type is required")
+	}
+	if cohort.SourceTag == "" {
+		return AnalysisCohort{}, errors.New("source_tag is required")
+	}
+	if cohort.Label == "" {
+		cohort.Label = cohort.SourceTag
+	}
+	if cohort.MaterializationStatus == "" {
+		cohort.MaterializationStatus = AnalysisMaterializationPending
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := time.Now().UTC()
+	for id, existing := range s.analysisCohorts {
+		if existing.SourceType == cohort.SourceType && existing.SourceTag == cohort.SourceTag {
+			cohort.ID = id
+			if cohort.CreatedAt.IsZero() {
+				cohort.CreatedAt = existing.CreatedAt
+			}
+			if cohort.UpdatedAt.IsZero() {
+				cohort.UpdatedAt = now
+			}
+			s.analysisCohorts[id] = cohort
+			return cohort, nil
+		}
+	}
+	if cohort.ID == 0 {
+		s.analysisCohortCounter++
+		cohort.ID = s.analysisCohortCounter
+	}
+	if cohort.CreatedAt.IsZero() {
+		cohort.CreatedAt = now
+	}
+	if cohort.UpdatedAt.IsZero() {
+		cohort.UpdatedAt = cohort.CreatedAt
+	}
+	s.analysisCohorts[cohort.ID] = cohort
+	return cohort, nil
+}
+
+// DeleteAnalysisCohort removes one cohort catalog row.
+func (s *InMemoryJobStore) DeleteAnalysisCohort(id int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.analysisCohorts, id)
+	return nil
 }
 
 // Create inserts a new in-flight job. A PublicID is generated if not set.

@@ -128,6 +128,7 @@ func (c *Controller) repairEnabledCohort(ctx context.Context, cohort serverpkg.A
 func (c *Controller) catchUpCohort(ctx context.Context, cohort serverpkg.AnalysisCohort) error {
 	latest := cohort.LastMaterializedAt
 	projected := 0
+	catalog := c.store.ListAnalysisCohorts()
 	for offset := 0; ; {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -145,7 +146,7 @@ func (c *Controller) catchUpCohort(ctx context.Context, cohort serverpkg.Analysi
 			if err := ctx.Err(); err != nil {
 				return err
 			}
-			input, err := c.projector.LoadCompletedRun(run.ID)
+			input, err := c.projector.LoadCompletedRunWithCatalog(run.ID, catalog)
 			if err != nil {
 				_ = c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationFailed, cohort.LastMaterializedAt, err.Error())
 				return fmt.Errorf("load run %s for cohort %d: %w", run.ID, cohort.ID, err)
@@ -193,6 +194,7 @@ func (c *Controller) RebuildCohort(ctx context.Context, cohortID int64) error {
 	}
 
 	projected := 0
+	catalog := c.store.ListAnalysisCohorts()
 	for offset := 0; ; {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -209,7 +211,7 @@ func (c *Controller) RebuildCohort(ctx context.Context, cohortID int64) error {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
-			input, err := c.projector.LoadCompletedRun(run.ID)
+			input, err := c.projector.LoadCompletedRunWithCatalog(run.ID, catalog)
 			if err != nil {
 				_ = c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationFailed, time.Time{}, err.Error())
 				return fmt.Errorf("load run %s for cohort %d: %w", run.ID, cohort.ID, err)

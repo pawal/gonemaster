@@ -7,7 +7,6 @@ import (
 	"net/netip"
 	"sort"
 	"strings"
-	"time"
 
 	serverpkg "codeberg.org/pawal/gonemaster/server"
 )
@@ -18,6 +17,12 @@ var (
 
 const projectorVersion = "v1"
 
+// WriteStore is the subset of the store surface used to persist one run's
+// projected facts. Aliased to serverpkg.AnalysisWriteStore so this package
+// does not have to re-declare the same method set; the alias also keeps
+// server free of any import on this package (which would cycle).
+type WriteStore = serverpkg.AnalysisWriteStore
+
 // Store is the minimal backing store surface needed by the Phase 2 projector
 // loading and cohort-resolution logic.
 type Store interface {
@@ -25,15 +30,16 @@ type Store interface {
 	QueryEntries(filter serverpkg.EntryFilter) serverpkg.EntryList
 	GetDomainTags(domainID int64) []string
 	ListAnalysisCohorts() []serverpkg.AnalysisCohort
-	UpsertAnalysisNameserver(name string, seenAt time.Time) (serverpkg.AnalysisNameserver, error)
-	UpsertAnalysisAddress(address, family string, seenAt time.Time) (serverpkg.AnalysisAddress, error)
-	UpsertAnalysisPrefix(prefix, family string, seenAt time.Time) (serverpkg.AnalysisPrefix, error)
-	UpsertAnalysisASN(asn int64, label string, seenAt time.Time) (serverpkg.AnalysisASN, error)
-	ReplaceAnalysisRunNSEndpoints(cohortID int64, runID string, items []serverpkg.AnalysisRunNameserverEndpoint) error
-	ReplaceAnalysisRunAddressASNs(cohortID int64, runID string, items []serverpkg.AnalysisRunAddressASN) error
-	ReplaceAnalysisRunDomainASNs(cohortID int64, runID string, items []serverpkg.AnalysisRunDomainASN) error
-	UpsertAnalysisRunDomainSummary(item serverpkg.AnalysisRunDomainSummary) error
-	SetAnalysisProjectionState(item serverpkg.AnalysisProjectionState) error
+	WriteStore
+}
+
+// txCapableStore is the optional capability a Store may implement to let
+// ProjectLoaded batch one run's writes into a single transaction. When the
+// backing store satisfies this interface the projector runs the whole set
+// of upserts + replace-blocks for one run as one atomic commit; otherwise
+// it falls back to running the writes against the plain Store.
+type txCapableStore interface {
+	WithAnalysisWriteTx(fn func(WriteStore) error) error
 }
 
 // Projector loads completed runs and resolves which analysis-enabled cohorts
@@ -69,8 +75,18 @@ func NewProjector(store Store) *Projector {
 }
 
 // LoadCompletedRun loads the completed run, all of its entries, its domain tags,
-// and the analysis-enabled cohorts that match those tags.
+// and the analysis-enabled cohorts that match those tags. Callers that are
+// looping over many runs should use LoadCompletedRunWithCatalog and hoist the
+// ListAnalysisCohorts call out of the hot loop.
 func (p *Projector) LoadCompletedRun(runID string) (RunInput, error) {
+	return p.LoadCompletedRunWithCatalog(runID, p.store.ListAnalysisCohorts())
+}
+
+// LoadCompletedRunWithCatalog is LoadCompletedRun but uses a caller-supplied
+// cohort catalog instead of fetching it. Rebuild loops reuse one catalog
+// across all runs — that cohort list does not change during a rebuild, and
+// re-reading it per run dominates the query count on large tags.
+func (p *Projector) LoadCompletedRunWithCatalog(runID string, catalog []serverpkg.AnalysisCohort) (RunInput, error) {
 	run, ok := p.store.GetRun(runID)
 	if !ok {
 		return RunInput{}, fmt.Errorf("%w: %s", ErrRunNotFound, runID)
@@ -86,7 +102,7 @@ func (p *Projector) LoadCompletedRun(runID string) (RunInput, error) {
 		Offset: 0,
 	})
 	tags := p.store.GetDomainTags(run.DomainID)
-	cohorts := MatchAnalysisEnabledCohorts(tags, p.store.ListAnalysisCohorts())
+	cohorts := MatchAnalysisEnabledCohorts(tags, catalog)
 
 	return RunInput{
 		Run:               run,
@@ -132,12 +148,25 @@ func (p *Projector) ProjectRun(runID string) error {
 // ProjectLoaded extracts and persists all currently-implemented analysis facts
 // for one completed run using pre-loaded input. Re-running the same run is
 // idempotent because the backing store helpers upsert entities and replace
-// per-run/per-cohort fact rows.
+// per-run/per-cohort fact rows. When the backing store supports it, the
+// whole run's writes are batched into a single transaction so the projector
+// pays one commit per run instead of one per upsert.
 func (p *Projector) ProjectLoaded(input RunInput) error {
 	if len(input.MatchingCohorts) == 0 {
 		return nil
 	}
+	if tx, ok := p.store.(txCapableStore); ok {
+		return tx.WithAnalysisWriteTx(func(writer WriteStore) error {
+			return p.projectLoadedWith(input, writer)
+		})
+	}
+	return p.projectLoadedWith(input, p.store)
+}
 
+// projectLoadedWith performs the actual write sequence against any WriteStore.
+// Split out of ProjectLoaded so the per-run transaction wrapper can reuse the
+// same body against a tx-bound writer.
+func (p *Projector) projectLoadedWith(input RunInput, w WriteStore) error {
 	endpoints := p.extractNameserverEndpoints(input)
 	addressFacts := p.extractAddressFacts(input)
 	addressFacts = p.applyEnrichment(endpoints, addressFacts)
@@ -156,11 +185,11 @@ func (p *Projector) ProjectLoaded(input RunInput) error {
 	prefixIDs := map[string]int64{}
 
 	for _, endpoint := range endpoints {
-		ns, err := p.store.UpsertAnalysisNameserver(endpoint.nameserver, input.Run.FinishedAt)
+		ns, err := w.UpsertAnalysisNameserver(endpoint.nameserver, input.Run.FinishedAt)
 		if err != nil {
 			return fmt.Errorf("upsert nameserver %q: %w", endpoint.nameserver, err)
 		}
-		addr, err := p.store.UpsertAnalysisAddress(endpoint.address, endpoint.family, input.Run.FinishedAt)
+		addr, err := w.UpsertAnalysisAddress(endpoint.address, endpoint.family, input.Run.FinishedAt)
 		if err != nil {
 			return fmt.Errorf("upsert address %q: %w", endpoint.address, err)
 		}
@@ -168,26 +197,26 @@ func (p *Projector) ProjectLoaded(input RunInput) error {
 		addressIDs[endpoint.address] = addr.ID
 	}
 	for _, fact := range addressFacts {
-		addr, err := p.store.UpsertAnalysisAddress(fact.address, fact.family, input.Run.FinishedAt)
+		addr, err := w.UpsertAnalysisAddress(fact.address, fact.family, input.Run.FinishedAt)
 		if err != nil {
 			return fmt.Errorf("upsert address fact %q: %w", fact.address, err)
 		}
 		addressIDs[fact.address] = addr.ID
 		if fact.prefix != "" {
-			prefix, err := p.store.UpsertAnalysisPrefix(fact.prefix, fact.prefixFamily, input.Run.FinishedAt)
+			prefix, err := w.UpsertAnalysisPrefix(fact.prefix, fact.prefixFamily, input.Run.FinishedAt)
 			if err != nil {
 				return fmt.Errorf("upsert prefix %q: %w", fact.prefix, err)
 			}
 			prefixIDs[fact.prefix] = prefix.ID
 		}
 		if fact.asn != nil {
-			if _, err := p.store.UpsertAnalysisASN(*fact.asn, asnLabels[*fact.asn], input.Run.FinishedAt); err != nil {
+			if _, err := w.UpsertAnalysisASN(*fact.asn, asnLabels[*fact.asn], input.Run.FinishedAt); err != nil {
 				return fmt.Errorf("upsert asn %d: %w", *fact.asn, err)
 			}
 		}
 	}
 	for _, da := range domainASNs {
-		if _, err := p.store.UpsertAnalysisASN(da.asn, asnLabels[da.asn], input.Run.FinishedAt); err != nil {
+		if _, err := w.UpsertAnalysisASN(da.asn, asnLabels[da.asn], input.Run.FinishedAt); err != nil {
 			return fmt.Errorf("upsert asn %d: %w", da.asn, err)
 		}
 	}
@@ -212,7 +241,7 @@ func (p *Projector) ProjectLoaded(input RunInput) error {
 				QueryCount:   endpoint.queryCount,
 			})
 		}
-		if err := p.store.ReplaceAnalysisRunNSEndpoints(cohort.ID, input.Run.ID, nsRows); err != nil {
+		if err := w.ReplaceAnalysisRunNSEndpoints(cohort.ID, input.Run.ID, nsRows); err != nil {
 			return fmt.Errorf("replace nameserver endpoints for cohort %d: %w", cohort.ID, err)
 		}
 
@@ -234,7 +263,7 @@ func (p *Projector) ProjectLoaded(input RunInput) error {
 				Source:       fact.source,
 			})
 		}
-		if err := p.store.ReplaceAnalysisRunAddressASNs(cohort.ID, input.Run.ID, addrRows); err != nil {
+		if err := w.ReplaceAnalysisRunAddressASNs(cohort.ID, input.Run.ID, addrRows); err != nil {
 			return fmt.Errorf("replace address facts for cohort %d: %w", cohort.ID, err)
 		}
 
@@ -249,15 +278,15 @@ func (p *Projector) ProjectLoaded(input RunInput) error {
 				Source:   da.source,
 			})
 		}
-		if err := p.store.ReplaceAnalysisRunDomainASNs(cohort.ID, input.Run.ID, domainASNRows); err != nil {
+		if err := w.ReplaceAnalysisRunDomainASNs(cohort.ID, input.Run.ID, domainASNRows); err != nil {
 			return fmt.Errorf("replace domain asns for cohort %d: %w", cohort.ID, err)
 		}
 
 		summary.CohortID = cohort.ID
-		if err := p.store.UpsertAnalysisRunDomainSummary(summary); err != nil {
+		if err := w.UpsertAnalysisRunDomainSummary(summary); err != nil {
 			return fmt.Errorf("upsert summary for cohort %d: %w", cohort.ID, err)
 		}
-		if err := p.store.SetAnalysisProjectionState(serverpkg.AnalysisProjectionState{
+		if err := w.SetAnalysisProjectionState(serverpkg.AnalysisProjectionState{
 			CohortID:         cohort.ID,
 			RunID:            input.Run.ID,
 			ProjectorVersion: projectorVersion,

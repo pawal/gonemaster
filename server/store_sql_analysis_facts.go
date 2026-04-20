@@ -117,7 +117,8 @@ func scanAnalysisASNRow(row rowScanner) (AnalysisASN, error) {
 	return item, nil
 }
 
-func (s *SQLJobStore) upsertSeenEntity(
+func (s *SQLJobStore) upsertSeenEntityIn(
+	q sqlQuerier,
 	selectQuery string,
 	selectArgs []any,
 	insertQuery string,
@@ -126,11 +127,11 @@ func (s *SQLJobStore) upsertSeenEntity(
 	updateArgsFn func(id int64, existingFirst, existingLast time.Time) []any,
 	scan func(row rowScanner) (int64, time.Time, time.Time, error),
 ) (int64, error) {
-	row := s.db.QueryRow(selectQuery, selectArgs...)
+	row := q.QueryRow(selectQuery, selectArgs...)
 	id, firstSeen, lastSeen, err := scan(row)
 	if err == nil {
 		args := updateArgsFn(id, firstSeen, lastSeen)
-		if _, err := s.db.Exec(updateQuery, args...); err != nil {
+		if _, err := q.Exec(updateQuery, args...); err != nil {
 			return 0, err
 		}
 		return id, nil
@@ -138,10 +139,10 @@ func (s *SQLJobStore) upsertSeenEntity(
 	if !errors.Is(err, sql.ErrNoRows) {
 		return 0, err
 	}
-	if _, err := s.db.Exec(insertQuery, insertArgs...); err != nil {
+	if _, err := q.Exec(insertQuery, insertArgs...); err != nil {
 		return 0, err
 	}
-	row = s.db.QueryRow(selectQuery, selectArgs...)
+	row = q.QueryRow(selectQuery, selectArgs...)
 	id, _, _, err = scan(row)
 	if err != nil {
 		return 0, err
@@ -151,11 +152,16 @@ func (s *SQLJobStore) upsertSeenEntity(
 
 // UpsertAnalysisNameserver inserts or updates one normalized nameserver row.
 func (s *SQLJobStore) UpsertAnalysisNameserver(name string, seenAt time.Time) (AnalysisNameserver, error) {
+	return s.upsertAnalysisNameserverIn(s.db, name, seenAt)
+}
+
+func (s *SQLJobStore) upsertAnalysisNameserverIn(q sqlQuerier, name string, seenAt time.Time) (AnalysisNameserver, error) {
 	if name == "" {
 		return AnalysisNameserver{}, errors.New("nameserver name is required")
 	}
 	seenAt = normalizeSeenAt(seenAt)
-	id, err := s.upsertSeenEntity(
+	id, err := s.upsertSeenEntityIn(
+		q,
 		fmt.Sprintf(`SELECT id, first_seen_at, last_seen_at FROM analysis_nameservers WHERE name = %s`, s.ph(1)),
 		[]any{name},
 		fmt.Sprintf(`INSERT INTO analysis_nameservers (name, first_seen_at, last_seen_at) VALUES (%s)`, s.phRange(1, 3)),
@@ -177,16 +183,15 @@ func (s *SQLJobStore) UpsertAnalysisNameserver(name string, seenAt time.Time) (A
 	if err != nil {
 		return AnalysisNameserver{}, fmt.Errorf("upsert analysis nameserver: %w", err)
 	}
-	item, ok := s.GetAnalysisNameserver(id)
+	item, ok := s.getAnalysisNameserverIn(q, id)
 	if !ok {
 		return AnalysisNameserver{}, errors.New("analysis nameserver written but not readable")
 	}
 	return item, nil
 }
 
-// GetAnalysisNameserver returns a normalized nameserver row by id.
-func (s *SQLJobStore) GetAnalysisNameserver(id int64) (AnalysisNameserver, bool) {
-	row := s.db.QueryRow(
+func (s *SQLJobStore) getAnalysisNameserverIn(q sqlQuerier, id int64) (AnalysisNameserver, bool) {
+	row := q.QueryRow(
 		fmt.Sprintf(`SELECT %s FROM analysis_nameservers WHERE id = %s`, analysisNameserverCols, s.ph(1)),
 		id,
 	)
@@ -195,6 +200,11 @@ func (s *SQLJobStore) GetAnalysisNameserver(id int64) (AnalysisNameserver, bool)
 		return item, true
 	}
 	return AnalysisNameserver{}, false
+}
+
+// GetAnalysisNameserver returns a normalized nameserver row by id.
+func (s *SQLJobStore) GetAnalysisNameserver(id int64) (AnalysisNameserver, bool) {
+	return s.getAnalysisNameserverIn(s.db, id)
 }
 
 // GetAnalysisNameserverByName returns a normalized nameserver row by natural key.
@@ -212,6 +222,10 @@ func (s *SQLJobStore) GetAnalysisNameserverByName(name string) (AnalysisNameserv
 
 // UpsertAnalysisAddress inserts or updates one normalized address row.
 func (s *SQLJobStore) UpsertAnalysisAddress(address, family string, seenAt time.Time) (AnalysisAddress, error) {
+	return s.upsertAnalysisAddressIn(s.db, address, family, seenAt)
+}
+
+func (s *SQLJobStore) upsertAnalysisAddressIn(q sqlQuerier, address, family string, seenAt time.Time) (AnalysisAddress, error) {
 	if address == "" {
 		return AnalysisAddress{}, errors.New("address is required")
 	}
@@ -219,7 +233,8 @@ func (s *SQLJobStore) UpsertAnalysisAddress(address, family string, seenAt time.
 		return AnalysisAddress{}, errors.New("address family is required")
 	}
 	seenAt = normalizeSeenAt(seenAt)
-	id, err := s.upsertSeenEntity(
+	id, err := s.upsertSeenEntityIn(
+		q,
 		fmt.Sprintf(`SELECT id, first_seen_at, last_seen_at FROM analysis_addresses WHERE address = %s`, s.ph(1)),
 		[]any{address},
 		fmt.Sprintf(`INSERT INTO analysis_addresses (address, family, first_seen_at, last_seen_at) VALUES (%s)`, s.phRange(1, 4)),
@@ -241,7 +256,7 @@ func (s *SQLJobStore) UpsertAnalysisAddress(address, family string, seenAt time.
 	if err != nil {
 		return AnalysisAddress{}, fmt.Errorf("upsert analysis address: %w", err)
 	}
-	item, ok := s.GetAnalysisAddress(id)
+	item, ok := s.getAnalysisAddressIn(q, id)
 	if !ok {
 		return AnalysisAddress{}, errors.New("analysis address written but not readable")
 	}
@@ -250,7 +265,11 @@ func (s *SQLJobStore) UpsertAnalysisAddress(address, family string, seenAt time.
 
 // GetAnalysisAddress returns a normalized address row by id.
 func (s *SQLJobStore) GetAnalysisAddress(id int64) (AnalysisAddress, bool) {
-	row := s.db.QueryRow(
+	return s.getAnalysisAddressIn(s.db, id)
+}
+
+func (s *SQLJobStore) getAnalysisAddressIn(q sqlQuerier, id int64) (AnalysisAddress, bool) {
+	row := q.QueryRow(
 		fmt.Sprintf(`SELECT %s FROM analysis_addresses WHERE id = %s`, analysisAddressCols, s.ph(1)),
 		id,
 	)
@@ -276,6 +295,10 @@ func (s *SQLJobStore) GetAnalysisAddressByAddress(address string) (AnalysisAddre
 
 // UpsertAnalysisPrefix inserts or updates one normalized prefix row.
 func (s *SQLJobStore) UpsertAnalysisPrefix(prefix, family string, seenAt time.Time) (AnalysisPrefix, error) {
+	return s.upsertAnalysisPrefixIn(s.db, prefix, family, seenAt)
+}
+
+func (s *SQLJobStore) upsertAnalysisPrefixIn(q sqlQuerier, prefix, family string, seenAt time.Time) (AnalysisPrefix, error) {
 	if prefix == "" {
 		return AnalysisPrefix{}, errors.New("prefix is required")
 	}
@@ -283,7 +306,8 @@ func (s *SQLJobStore) UpsertAnalysisPrefix(prefix, family string, seenAt time.Ti
 		return AnalysisPrefix{}, errors.New("prefix family is required")
 	}
 	seenAt = normalizeSeenAt(seenAt)
-	id, err := s.upsertSeenEntity(
+	id, err := s.upsertSeenEntityIn(
+		q,
 		fmt.Sprintf(`SELECT id, first_seen_at, last_seen_at FROM analysis_prefixes WHERE prefix = %s`, s.ph(1)),
 		[]any{prefix},
 		fmt.Sprintf(`INSERT INTO analysis_prefixes (prefix, family, first_seen_at, last_seen_at) VALUES (%s)`, s.phRange(1, 4)),
@@ -305,7 +329,7 @@ func (s *SQLJobStore) UpsertAnalysisPrefix(prefix, family string, seenAt time.Ti
 	if err != nil {
 		return AnalysisPrefix{}, fmt.Errorf("upsert analysis prefix: %w", err)
 	}
-	item, ok := s.GetAnalysisPrefix(id)
+	item, ok := s.getAnalysisPrefixIn(q, id)
 	if !ok {
 		return AnalysisPrefix{}, errors.New("analysis prefix written but not readable")
 	}
@@ -314,7 +338,11 @@ func (s *SQLJobStore) UpsertAnalysisPrefix(prefix, family string, seenAt time.Ti
 
 // GetAnalysisPrefix returns a normalized prefix row by id.
 func (s *SQLJobStore) GetAnalysisPrefix(id int64) (AnalysisPrefix, bool) {
-	row := s.db.QueryRow(
+	return s.getAnalysisPrefixIn(s.db, id)
+}
+
+func (s *SQLJobStore) getAnalysisPrefixIn(q sqlQuerier, id int64) (AnalysisPrefix, bool) {
+	row := q.QueryRow(
 		fmt.Sprintf(`SELECT %s FROM analysis_prefixes WHERE id = %s`, analysisPrefixCols, s.ph(1)),
 		id,
 	)
@@ -340,11 +368,15 @@ func (s *SQLJobStore) GetAnalysisPrefixByPrefix(prefix string) (AnalysisPrefix, 
 
 // UpsertAnalysisASN inserts or updates one normalized ASN row.
 func (s *SQLJobStore) UpsertAnalysisASN(asn int64, label string, seenAt time.Time) (AnalysisASN, error) {
+	return s.upsertAnalysisASNIn(s.db, asn, label, seenAt)
+}
+
+func (s *SQLJobStore) upsertAnalysisASNIn(q sqlQuerier, asn int64, label string, seenAt time.Time) (AnalysisASN, error) {
 	if asn == 0 {
 		return AnalysisASN{}, errors.New("asn is required")
 	}
 	seenAt = normalizeSeenAt(seenAt)
-	row := s.db.QueryRow(
+	row := q.QueryRow(
 		fmt.Sprintf(`SELECT label, first_seen_at, last_seen_at FROM analysis_asns WHERE asn = %s`, s.ph(1)),
 		asn,
 	)
@@ -359,13 +391,13 @@ func (s *SQLJobStore) UpsertAnalysisASN(asn int64, label string, seenAt time.Tim
 		if effectiveLabel == "" {
 			effectiveLabel = existingLabel
 		}
-		_, err = s.db.Exec(
+		_, err = q.Exec(
 			fmt.Sprintf(`UPDATE analysis_asns SET label = %s, first_seen_at = %s, last_seen_at = %s WHERE asn = %s`,
 				s.ph(1), s.ph(2), s.ph(3), s.ph(4)),
 			effectiveLabel, s.ts(minTime(parseTimestampStr(firstSeen), seenAt)), s.ts(maxTime(parseTimestampStr(lastSeen), seenAt)), asn,
 		)
 	case errors.Is(err, sql.ErrNoRows):
-		_, err = s.db.Exec(
+		_, err = q.Exec(
 			fmt.Sprintf(`INSERT INTO analysis_asns (asn, label, first_seen_at, last_seen_at) VALUES (%s)`,
 				s.phRange(1, 4)),
 			asn, label, s.ts(seenAt), s.ts(seenAt),
@@ -374,7 +406,7 @@ func (s *SQLJobStore) UpsertAnalysisASN(asn int64, label string, seenAt time.Tim
 	if err != nil {
 		return AnalysisASN{}, fmt.Errorf("upsert analysis asn: %w", err)
 	}
-	item, ok := s.GetAnalysisASN(asn)
+	item, ok := s.getAnalysisASNIn(q, asn)
 	if !ok {
 		return AnalysisASN{}, errors.New("analysis asn written but not readable")
 	}
@@ -383,7 +415,11 @@ func (s *SQLJobStore) UpsertAnalysisASN(asn int64, label string, seenAt time.Tim
 
 // GetAnalysisASN returns a normalized ASN row by primary key.
 func (s *SQLJobStore) GetAnalysisASN(asn int64) (AnalysisASN, bool) {
-	row := s.db.QueryRow(
+	return s.getAnalysisASNIn(s.db, asn)
+}
+
+func (s *SQLJobStore) getAnalysisASNIn(q sqlQuerier, asn int64) (AnalysisASN, bool) {
+	row := q.QueryRow(
 		fmt.Sprintf(`SELECT %s FROM analysis_asns WHERE asn = %s`, analysisASNCols, s.ph(1)),
 		asn,
 	)
@@ -394,31 +430,37 @@ func (s *SQLJobStore) GetAnalysisASN(asn int64) (AnalysisASN, bool) {
 	return AnalysisASN{}, false
 }
 
-func (s *SQLJobStore) replaceAnalysisRows(
+// replaceAnalysisRowsIn runs the DELETE + row-by-row INSERTs against q. The
+// caller is responsible for transactional framing: the public autocommit
+// path wraps one tx around it; the per-run projection path reuses its
+// outer ProjectLoaded tx so a mid-batch failure rolls back with everything
+// else.
+func (s *SQLJobStore) replaceAnalysisRowsIn(
+	q sqlQuerier,
 	deleteQuery string,
 	deleteArgs []any,
 	insertQuery string,
 	rows [][]any,
 ) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	if _, err := tx.Exec(deleteQuery, deleteArgs...); err != nil {
+	if _, err := q.Exec(deleteQuery, deleteArgs...); err != nil {
 		return err
 	}
 	for _, row := range rows {
-		if _, err := tx.Exec(insertQuery, row...); err != nil {
+		if _, err := q.Exec(insertQuery, row...); err != nil {
 			return err
 		}
 	}
-	return tx.Commit()
+	return nil
 }
 
 // ReplaceAnalysisRunNSEndpoints replaces all run+cohort nameserver endpoint rows.
 func (s *SQLJobStore) ReplaceAnalysisRunNSEndpoints(cohortID int64, runID string, items []AnalysisRunNameserverEndpoint) error {
+	return s.inOwnTx(func(tx *sql.Tx) error {
+		return s.replaceAnalysisRunNSEndpointsIn(tx, cohortID, runID, items)
+	})
+}
+
+func (s *SQLJobStore) replaceAnalysisRunNSEndpointsIn(q sqlQuerier, cohortID int64, runID string, items []AnalysisRunNameserverEndpoint) error {
 	if cohortID == 0 {
 		return errors.New("cohort_id is required")
 	}
@@ -432,7 +474,7 @@ func (s *SQLJobStore) ReplaceAnalysisRunNSEndpoints(cohortID int64, runID string
 			item.Role, item.Source, item.Family, item.AvgMS, item.MinMS, item.MaxMS, item.QueryCount,
 		})
 	}
-	err := s.replaceAnalysisRows(
+	err := s.replaceAnalysisRowsIn(q,
 		fmt.Sprintf(`DELETE FROM analysis_run_ns_endpoints WHERE cohort_id = %s AND run_id = %s`, s.ph(1), s.ph(2)),
 		[]any{cohortID, runID},
 		fmt.Sprintf(`INSERT INTO analysis_run_ns_endpoints (
@@ -445,6 +487,21 @@ func (s *SQLJobStore) ReplaceAnalysisRunNSEndpoints(cohortID int64, runID string
 		return fmt.Errorf("replace analysis run ns endpoints: %w", err)
 	}
 	return nil
+}
+
+// inOwnTx wraps fn in a fresh transaction for an autocommit-safe public
+// entry point. Per-run projection paths bypass this because they share one
+// ProjectLoaded-wide transaction — see WithAnalysisWriteTx.
+func (s *SQLJobStore) inOwnTx(fn func(*sql.Tx) error) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := fn(tx); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // ListAnalysisRunNSEndpoints returns run+cohort nameserver endpoint rows in stable order.
@@ -506,6 +563,12 @@ func (s *SQLJobStore) ListAnalysisRunNSEndpointsByCohort(cohortID int64) []Analy
 
 // ReplaceAnalysisRunAddressASNs replaces all run+cohort address-to-ASN rows.
 func (s *SQLJobStore) ReplaceAnalysisRunAddressASNs(cohortID int64, runID string, items []AnalysisRunAddressASN) error {
+	return s.inOwnTx(func(tx *sql.Tx) error {
+		return s.replaceAnalysisRunAddressASNsIn(tx, cohortID, runID, items)
+	})
+}
+
+func (s *SQLJobStore) replaceAnalysisRunAddressASNsIn(q sqlQuerier, cohortID int64, runID string, items []AnalysisRunAddressASN) error {
 	if cohortID == 0 {
 		return errors.New("cohort_id is required")
 	}
@@ -519,7 +582,7 @@ func (s *SQLJobStore) ReplaceAnalysisRunAddressASNs(cohortID int64, runID string
 			nullInt64Value(item.ASN), item.LookupStatus, item.Source,
 		})
 	}
-	err := s.replaceAnalysisRows(
+	err := s.replaceAnalysisRowsIn(q,
 		fmt.Sprintf(`DELETE FROM analysis_run_address_asns WHERE cohort_id = %s AND run_id = %s`, s.ph(1), s.ph(2)),
 		[]any{cohortID, runID},
 		fmt.Sprintf(`INSERT INTO analysis_run_address_asns (
@@ -604,6 +667,12 @@ func (s *SQLJobStore) ListAnalysisRunAddressASNsByCohort(cohortID int64) []Analy
 
 // ReplaceAnalysisRunDomainASNs replaces all run+cohort domain-to-ASN rows.
 func (s *SQLJobStore) ReplaceAnalysisRunDomainASNs(cohortID int64, runID string, items []AnalysisRunDomainASN) error {
+	return s.inOwnTx(func(tx *sql.Tx) error {
+		return s.replaceAnalysisRunDomainASNsIn(tx, cohortID, runID, items)
+	})
+}
+
+func (s *SQLJobStore) replaceAnalysisRunDomainASNsIn(q sqlQuerier, cohortID int64, runID string, items []AnalysisRunDomainASN) error {
 	if cohortID == 0 {
 		return errors.New("cohort_id is required")
 	}
@@ -616,7 +685,7 @@ func (s *SQLJobStore) ReplaceAnalysisRunDomainASNs(cohortID int64, runID string,
 			cohortID, runID, item.DomainID, item.ASN, item.Family, item.Source,
 		})
 	}
-	err := s.replaceAnalysisRows(
+	err := s.replaceAnalysisRowsIn(q,
 		fmt.Sprintf(`DELETE FROM analysis_run_domain_asns WHERE cohort_id = %s AND run_id = %s`, s.ph(1), s.ph(2)),
 		[]any{cohortID, runID},
 		fmt.Sprintf(`INSERT INTO analysis_run_domain_asns (
@@ -698,6 +767,10 @@ func (s *SQLJobStore) ListAnalysisRunDomainSummariesByCohort(cohortID int64) []A
 
 // UpsertAnalysisRunDomainSummary inserts or updates one run+cohort summary row.
 func (s *SQLJobStore) UpsertAnalysisRunDomainSummary(item AnalysisRunDomainSummary) error {
+	return s.upsertAnalysisRunDomainSummaryIn(s.db, item)
+}
+
+func (s *SQLJobStore) upsertAnalysisRunDomainSummaryIn(q sqlQuerier, item AnalysisRunDomainSummary) error {
 	if item.CohortID == 0 {
 		return errors.New("cohort_id is required")
 	}
@@ -708,7 +781,7 @@ func (s *SQLJobStore) UpsertAnalysisRunDomainSummary(item AnalysisRunDomainSumma
 		return errors.New("domain_id is required")
 	}
 
-	row := s.db.QueryRow(
+	row := q.QueryRow(
 		fmt.Sprintf(`SELECT COUNT(*) FROM analysis_run_domain_summary
 			WHERE cohort_id = %s AND run_id = %s AND domain_id = %s`,
 			s.ph(1), s.ph(2), s.ph(3)),
@@ -719,7 +792,7 @@ func (s *SQLJobStore) UpsertAnalysisRunDomainSummary(item AnalysisRunDomainSumma
 		return fmt.Errorf("check analysis run domain summary: %w", err)
 	}
 	if count > 0 {
-		_, err := s.db.Exec(
+		_, err := q.Exec(
 			fmt.Sprintf(`UPDATE analysis_run_domain_summary SET
 				score = %s, grade = %s, nameserver_count = %s, endpoint_count = %s,
 				asn_count = %s, prefix_count = %s, worst_level = %s
@@ -743,7 +816,7 @@ func (s *SQLJobStore) UpsertAnalysisRunDomainSummary(item AnalysisRunDomainSumma
 		return nil
 	}
 
-	_, err := s.db.Exec(
+	_, err := q.Exec(
 		fmt.Sprintf(`INSERT INTO analysis_run_domain_summary (
 			cohort_id, run_id, domain_id, score, grade, nameserver_count,
 			endpoint_count, asn_count, prefix_count, worst_level
@@ -801,6 +874,10 @@ func (s *SQLJobStore) GetAnalysisRunDomainSummary(cohortID int64, runID string, 
 
 // SetAnalysisProjectionState inserts or updates projection bookkeeping for one run+cohort.
 func (s *SQLJobStore) SetAnalysisProjectionState(item AnalysisProjectionState) error {
+	return s.setAnalysisProjectionStateIn(s.db, item)
+}
+
+func (s *SQLJobStore) setAnalysisProjectionStateIn(q sqlQuerier, item AnalysisProjectionState) error {
 	if item.CohortID == 0 {
 		return errors.New("cohort_id is required")
 	}
@@ -814,7 +891,7 @@ func (s *SQLJobStore) SetAnalysisProjectionState(item AnalysisProjectionState) e
 		return errors.New("status is required")
 	}
 
-	row := s.db.QueryRow(
+	row := q.QueryRow(
 		fmt.Sprintf(`SELECT COUNT(*) FROM analysis_projection_state WHERE cohort_id = %s AND run_id = %s`,
 			s.ph(1), s.ph(2)),
 		item.CohortID, item.RunID,
@@ -824,7 +901,7 @@ func (s *SQLJobStore) SetAnalysisProjectionState(item AnalysisProjectionState) e
 		return fmt.Errorf("check analysis projection state: %w", err)
 	}
 	if count > 0 {
-		_, err := s.db.Exec(
+		_, err := q.Exec(
 			fmt.Sprintf(`UPDATE analysis_projection_state SET projector_version = %s, status = %s,
 				projected_at = %s, error = %s WHERE cohort_id = %s AND run_id = %s`,
 				s.ph(1), s.ph(2), s.ph(3), s.ph(4), s.ph(5), s.ph(6)),
@@ -836,7 +913,7 @@ func (s *SQLJobStore) SetAnalysisProjectionState(item AnalysisProjectionState) e
 		return nil
 	}
 
-	_, err := s.db.Exec(
+	_, err := q.Exec(
 		fmt.Sprintf(`INSERT INTO analysis_projection_state (
 			cohort_id, run_id, projector_version, status, projected_at, error
 		) VALUES (%s)`, s.phRange(1, 6)),

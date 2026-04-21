@@ -96,8 +96,18 @@ func (e *AsnlookupEnricher) EnrichAddress(ctx context.Context, ip string) (Addre
 				out.Family = "ipv6"
 			}
 		}
-		if len(result.ASNs) == 1 {
-			asn := int64(result.ASNs[0])
+		if len(result.ASNs) > 0 {
+			// Multi-origin prefixes (common for anycast DNS fleets) return
+			// several origin ASes; pick the numerically smallest to keep
+			// projection deterministic without losing ASN attribution.
+			// A richer multi-valued model is tracked in plans/tld-analysis.md.
+			smallest := result.ASNs[0]
+			for _, a := range result.ASNs[1:] {
+				if a < smallest {
+					smallest = a
+				}
+			}
+			asn := int64(smallest)
 			out.ASN = &asn
 		}
 	}

@@ -163,5 +163,8 @@
   "pub.tc.zone13": "SPF DNS lookup limit compliance",
   "pub.tc_desc.delegation01": "A domain should be served by at least two authoritative name servers so it stays reachable if one of them has a problem. Fewer than two is a resilience risk: when the single server has any outage the domain effectively disappears from the internet.",
   "pub.tag.delegation.NOT_ENOUGH_NS_DEL.header": "Not enough nameservers",
-  "pub.tag.delegation.NOT_ENOUGH_NS_DEL.desc": "The parent zone's delegation lists fewer nameservers than the recommended minimum. With too few servers, a single outage can make your domain unreachable - visitors, mail, and other services that depend on DNS stop working until the server comes back."
+  "pub.tag.delegation.NOT_ENOUGH_NS_DEL.desc": "The parent zone's delegation lists fewer nameservers than the recommended minimum. With too few servers, a single outage can make your domain unreachable - visitors, mail, and other services that depend on DNS stop working until the server comes back.",
+  "pub.tc_desc.basic01": "This check walks the global DNS from the root servers down to your domain to confirm that the parent zone exists and that the child zone is delegated consistently. Problems here mean your domain cannot be located reliably on the public internet before the other tests even run.",
+  "pub.tag.basic.B01_INCONSISTENT_DELEGATION.header": "Inconsistent parent delegation",
+  "pub.tag.basic.B01_INCONSISTENT_DELEGATION.desc": "The nameservers for your parent zone disagree about how your domain is delegated - different parent servers returned different answers to the same questions. Some resolvers will get one answer and others will get a different one, so the domain may be reachable from some places on the internet but not from others. The usual cause is a delegation change that was not applied consistently across all servers of the parent zone."
 }

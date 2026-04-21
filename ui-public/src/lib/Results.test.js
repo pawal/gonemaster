@@ -281,7 +281,7 @@ describe("Results", () => {
     expect(screen.getByText(/some message/i)).toBeTruthy();
   });
 
-  it("renders the About-this-finding disclosure when pub.tag.<module>.<TAG>.desc exists", async () => {
+  it("renders the About-this-finding disclosure with both the testcase description and the tag description when both keys exist", async () => {
     global.fetch.mockResolvedValue(resultResp([
       { timestamp: 0, module: "DELEGATION", testcase: "delegation01", tag: "NOT_ENOUGH_NS_DEL", level: "WARNING", message: "x" },
     ]));
@@ -290,35 +290,43 @@ describe("Results", () => {
     const disclosure = screen.getByTestId("result-explanation");
     expect(disclosure).toBeTruthy();
     expect(disclosure.textContent).toMatch(/About this finding/i);
-    expect(disclosure.textContent).toMatch(/parent zone's delegation lists fewer/i);
+    // Testcase description renders first (general context).
+    expect(screen.getByTestId("result-explanation-test").textContent)
+      .toMatch(/at least two authoritative name servers/i);
+    // Tag description follows (finding-specific).
+    expect(screen.getByTestId("result-explanation-tag").textContent)
+      .toMatch(/parent zone's delegation lists fewer/i);
   });
 
-  it("does not render the About disclosure when pub.tag.<module>.<TAG>.desc is missing", async () => {
+  it("shows only the testcase paragraph in the disclosure when the tag description is missing", async () => {
     global.fetch.mockResolvedValue(resultResp([
       { timestamp: 0, module: "DELEGATION", testcase: "delegation01", tag: "NO_SUCH_TAG_XYZ", level: "WARNING", message: "x" },
     ]));
     render(Results, { props: { publicID: "abc12345" } });
     await waitFor(() => expect(screen.getByTestId("result-row")).toBeTruthy());
+    expect(screen.getByTestId("result-explanation")).toBeTruthy();
+    expect(screen.getByTestId("result-explanation-test")).toBeTruthy();
+    expect(screen.queryByTestId("result-explanation-tag")).toBeNull();
+  });
+
+  it("shows only the tag paragraph in the disclosure when the testcase description is missing", async () => {
+    global.fetch.mockResolvedValue(resultResp([
+      { timestamp: 0, module: "DELEGATION", testcase: "UnknownTC", tag: "NOT_ENOUGH_NS_DEL", level: "WARNING", message: "x" },
+    ]));
+    render(Results, { props: { publicID: "abc12345" } });
+    await waitFor(() => expect(screen.getByTestId("result-row")).toBeTruthy());
+    expect(screen.getByTestId("result-explanation")).toBeTruthy();
+    expect(screen.queryByTestId("result-explanation-test")).toBeNull();
+    expect(screen.getByTestId("result-explanation-tag")).toBeTruthy();
+  });
+
+  it("does not render the About disclosure when neither description key exists", async () => {
+    global.fetch.mockResolvedValue(resultResp([
+      { timestamp: 0, module: "DELEGATION", testcase: "UnknownTC", tag: "NO_SUCH_TAG_XYZ", level: "WARNING", message: "x" },
+    ]));
+    render(Results, { props: { publicID: "abc12345" } });
+    await waitFor(() => expect(screen.getByTestId("result-row")).toBeTruthy());
     expect(screen.queryByTestId("result-explanation")).toBeNull();
-  });
-
-  it("renders the per-testcase description when pub.tc_desc.<testcase> exists", async () => {
-    global.fetch.mockResolvedValue(resultResp([
-      { timestamp: 0, module: "DELEGATION", testcase: "delegation01", tag: "NOT_ENOUGH_NS_DEL", level: "WARNING", message: "x" },
-    ]));
-    render(Results, { props: { publicID: "abc12345" } });
-    await waitFor(() => expect(screen.getByTestId("testcase-explanation")).toBeTruthy());
-    expect(screen.getByTestId("testcase-explanation").textContent)
-      .toMatch(/at least two authoritative name servers/i);
-  });
-
-  it("does not render a testcase description when pub.tc_desc.<testcase> is missing", async () => {
-    global.fetch.mockResolvedValue(resultResp([
-      { timestamp: 0, module: "DELEGATION", testcase: "UnknownTC", tag: "TAG", level: "WARNING", message: "x" },
-    ]));
-    render(Results, { props: { publicID: "abc12345" } });
-    await waitFor(() => expect(screen.getByTestId("testcase-group")).toBeTruthy());
-    expect(screen.queryByTestId("testcase-explanation")).toBeNull();
   });
 
   it("renders a per-row testcase-title caption above each finding", async () => {

@@ -258,6 +258,7 @@
             {@const tcLongKey = `pub.tc_desc.${tc.toLowerCase()}`}
             {@const tcLong = $t(tcLongKey)}
             {@const tcTitle = tcDesc !== tcKey ? tcDesc : tc}
+            {@const tcLongText = tcLong !== tcLongKey ? tcLong : null}
             {#if tc !== "Unspecified"}
               <details
                 class="testcase-group"
@@ -272,9 +273,6 @@
                     <span class="level-pill {levelClass(tcLevel)}">{tcLevel}</span>
                   </span>
                 </summary>
-                {#if tcLong !== tcLongKey}
-                  <p class="testcase-explanation" data-testid="testcase-explanation">{tcLong}</p>
-                {/if}
                 <div class="testcase-entries">
                   {#each tcEntries.filter(e => e.message && e.message !== e.raw) as entry}
                     {@const modKey = (entry.module ?? "").toLowerCase()}
@@ -284,6 +282,7 @@
                     {@const descText = descKey ? $t(descKey) : null}
                     {@const tagHeader = headerText && headerText !== headerKey ? headerText : null}
                     {@const tagDesc = descText && descText !== descKey ? descText : null}
+                    {@const hasExplanation = tcLongText || tagDesc}
                     <div class="result-row" data-testid="result-row">
                       <span class="result-row-caption" data-testid="result-row-caption">{tcTitle}</span>
                       <div class="result-row-main">
@@ -292,13 +291,20 @@
                           {#if tagHeader}<strong class="result-tag-header" data-testid="result-tag-header">{tagHeader}</strong>{" — "}{/if}{entry.message}
                         </span>
                       </div>
-                      {#if tagDesc}
+                      {#if hasExplanation}
                         <details class="result-explanation" data-testid="result-explanation">
                           <summary class="result-explanation-summary">
                             <span class="result-explanation-chevron"></span>
                             <span>{$t("pub.about_finding")}</span>
                           </summary>
-                          <p class="result-explanation-body">{tagDesc}</p>
+                          <div class="result-explanation-body">
+                            {#if tcLongText}
+                              <p class="result-explanation-para result-explanation-para-test" data-testid="result-explanation-test">{tcLongText}</p>
+                            {/if}
+                            {#if tagDesc}
+                              <p class="result-explanation-para result-explanation-para-tag" data-testid="result-explanation-tag">{tagDesc}</p>
+                            {/if}
+                          </div>
                         </details>
                       {/if}
                     </div>
@@ -314,6 +320,7 @@
                 {@const descText = descKey ? $t(descKey) : null}
                 {@const tagHeader = headerText && headerText !== headerKey ? headerText : null}
                 {@const tagDesc = descText && descText !== descKey ? descText : null}
+                {@const hasExplanation = tcLongText || tagDesc}
                 <div class="result-row" data-testid="result-row">
                   <div class="result-row-main">
                     <span class="level-pill {levelClass(entry.level)}">{entry.level}</span>
@@ -321,13 +328,20 @@
                       {#if tagHeader}<strong class="result-tag-header" data-testid="result-tag-header">{tagHeader}</strong>{" — "}{/if}{entry.message}
                     </span>
                   </div>
-                  {#if tagDesc}
+                  {#if hasExplanation}
                     <details class="result-explanation" data-testid="result-explanation">
                       <summary class="result-explanation-summary">
                         <span class="result-explanation-chevron"></span>
                         <span>{$t("pub.about_finding")}</span>
                       </summary>
-                      <p class="result-explanation-body">{tagDesc}</p>
+                      <div class="result-explanation-body">
+                        {#if tcLongText}
+                          <p class="result-explanation-para result-explanation-para-test" data-testid="result-explanation-test">{tcLongText}</p>
+                        {/if}
+                        {#if tagDesc}
+                          <p class="result-explanation-para result-explanation-para-tag" data-testid="result-explanation-tag">{tagDesc}</p>
+                        {/if}
+                      </div>
                     </details>
                   {/if}
                 </div>

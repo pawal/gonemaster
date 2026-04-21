@@ -632,14 +632,6 @@ details[open] > .testcase-summary .testcase-chevron {
   word-break: break-word;
 }
 
-.testcase-explanation {
-  margin: 0;
-  padding: 8px 12px 0;
-  color: var(--ink);
-  font-size: var(--text-sm);
-  line-height: 1.5;
-}
-
 .result-explanation {
   margin-top: 4px;
   padding-left: 100px; /* align body under the message column (90px pill + 10px gap) */
@@ -674,10 +666,24 @@ details[open] > .result-explanation-summary .result-explanation-chevron {
 }
 
 .result-explanation-body {
-  margin: 6px 0 0;
+  margin-top: 6px;
   color: var(--ink);
   font-size: var(--text-sm);
   line-height: 1.5;
+}
+
+.result-explanation-para {
+  margin: 0;
+}
+
+.result-explanation-para + .result-explanation-para {
+  /* Subtle separation between the testcase context paragraph and the
+     tag-specific explanation when both are present. */
+  margin-top: 6px;
+}
+
+.result-explanation-para-test {
+  color: var(--muted);
 }
 
 .entry-level   { font-family: var(--mono); font-size: var(--text-xs); }

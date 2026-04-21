@@ -30,3 +30,13 @@ export function isActive(pathname: string, item: NavItem): boolean {
   if (item.end) return normalized === target;
   return normalized === target || normalized.startsWith(target + "/");
 }
+
+// Hide the "Cohorts" tab when only a single cohort is selectable: the
+// chooser dropdown already hides in that case, the cohort detail lives
+// on the overview, and a one-item list view adds nothing. The threshold
+// matches FilterBar's `cohorts.length > 1` rule so the two collapse in
+// lockstep.
+export function visibleNavItems(items: NavItem[], cohortCount: number): NavItem[] {
+  if (cohortCount > 1) return items;
+  return items.filter((i) => i.href !== "/cohorts");
+}

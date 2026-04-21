@@ -3,7 +3,8 @@
   import { onMount } from "svelte";
   import { page } from "$app/state";
   import { base } from "$app/paths";
-  import { navItems, isActive } from "$lib/nav";
+  import { navItems, isActive, visibleNavItems } from "$lib/nav";
+  import type { LayoutData } from "./+layout";
   import { applyTheme, initialTheme, persistTheme, type Theme } from "$lib/theme";
 
   let { children } = $props();
@@ -20,6 +21,16 @@
     applyTheme(theme);
     persistTheme(theme);
   }
+
+  // Hide the "Cohorts" tab when there's only one cohort to pick from: the
+  // FilterBar chooser disappears under the same rule, and the overview
+  // page already surfaces the single cohort's summary. Falls back to the
+  // full nav set when the catalog couldn't be loaded.
+  const visibleItems = $derived.by(() => {
+    const cohorts = (page.data as LayoutData | undefined)?.catalog?.cohorts;
+    if (!cohorts) return navItems;
+    return visibleNavItems(navItems, cohorts.length);
+  });
 
   // Strip the base prefix so the isActive() helper can compare against
   // relative hrefs declared in nav.ts.
@@ -75,7 +86,7 @@
 
   <nav class="app-nav" aria-label="Dashboard sections">
     <div class="app-nav-inner">
-      {#each navItems as item (item.href)}
+      {#each visibleItems as item (item.href)}
         <a
           class="nav-link"
           class:active={isActive(currentPath, item)}

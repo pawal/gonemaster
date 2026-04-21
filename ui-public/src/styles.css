@@ -600,18 +600,84 @@ details[open] > .testcase-summary .testcase-chevron {
 
 /* ── Result rows ─────────────────────────────────────────────────────────── */
 .result-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 0;
+  min-width: 0;
+}
+
+.result-row-caption {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.result-row-main {
   display: grid;
   grid-template-columns: 90px 1fr;
   gap: 10px;
   align-items: flex-start;
-  padding: 6px 0;
   min-width: 0;
+}
+
+.result-tag-header {
+  font-weight: 600;
 }
 
 .result-message {
   min-width: 0;
   overflow-wrap: break-word;
   word-break: break-word;
+}
+
+.testcase-explanation {
+  margin: 0;
+  padding: 8px 12px 0;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.result-explanation {
+  margin-top: 4px;
+  padding-left: 100px; /* align body under the message column (90px pill + 10px gap) */
+}
+
+.result-explanation-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  list-style: none;
+  font-size: var(--text-sm);
+  color: var(--muted);
+  user-select: none;
+}
+
+.result-explanation-summary::-webkit-details-marker { display: none; }
+
+.result-explanation-chevron {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid currentColor;
+  transform: rotate(-90deg);
+  transition: transform 0.15s ease;
+}
+
+details[open] > .result-explanation-summary .result-explanation-chevron {
+  transform: rotate(0deg);
+}
+
+.result-explanation-body {
+  margin: 6px 0 0;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  line-height: 1.5;
 }
 
 .entry-level   { font-family: var(--mono); font-size: var(--text-xs); }
@@ -689,8 +755,12 @@ details[open] > .testcase-summary .testcase-chevron {
     width: min(100%, 180px);
   }
 
-  .result-row {
+  .result-row-main {
     grid-template-columns: 1fr;
+  }
+
+  .result-explanation {
+    padding-left: 0;
   }
 
   .score-left {

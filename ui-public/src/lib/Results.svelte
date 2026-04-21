@@ -255,6 +255,9 @@
             {@const tcLevel = worstLevel(tcEntries)}
             {@const tcKey = `pub.tc.${tc.toLowerCase()}`}
             {@const tcDesc = $t(tcKey)}
+            {@const tcLongKey = `pub.tc_desc.${tc.toLowerCase()}`}
+            {@const tcLong = $t(tcLongKey)}
+            {@const tcTitle = tcDesc !== tcKey ? tcDesc : tc}
             {#if tc !== "Unspecified"}
               <details
                 class="testcase-group"
@@ -264,25 +267,69 @@
               >
                 <summary class="testcase-summary">
                   <span class="testcase-chevron"></span>
-                  <span class="testcase-desc">{tcDesc !== tcKey ? tcDesc : tc}</span>
+                  <span class="testcase-desc">{tcTitle}</span>
                   <span class="testcase-badge">
                     <span class="level-pill {levelClass(tcLevel)}">{tcLevel}</span>
                   </span>
                 </summary>
+                {#if tcLong !== tcLongKey}
+                  <p class="testcase-explanation" data-testid="testcase-explanation">{tcLong}</p>
+                {/if}
                 <div class="testcase-entries">
                   {#each tcEntries.filter(e => e.message && e.message !== e.raw) as entry}
+                    {@const modKey = (entry.module ?? "").toLowerCase()}
+                    {@const headerKey = entry.tag && modKey ? `pub.tag.${modKey}.${entry.tag}.header` : null}
+                    {@const descKey = entry.tag && modKey ? `pub.tag.${modKey}.${entry.tag}.desc` : null}
+                    {@const headerText = headerKey ? $t(headerKey) : null}
+                    {@const descText = descKey ? $t(descKey) : null}
+                    {@const tagHeader = headerText && headerText !== headerKey ? headerText : null}
+                    {@const tagDesc = descText && descText !== descKey ? descText : null}
                     <div class="result-row" data-testid="result-row">
-                      <span class="level-pill {levelClass(entry.level)}">{entry.level}</span>
-                      <span class="result-message">{entry.message}</span>
+                      <span class="result-row-caption" data-testid="result-row-caption">{tcTitle}</span>
+                      <div class="result-row-main">
+                        <span class="level-pill {levelClass(entry.level)}">{entry.level}</span>
+                        <span class="result-message">
+                          {#if tagHeader}<strong class="result-tag-header" data-testid="result-tag-header">{tagHeader}</strong>{" — "}{/if}{entry.message}
+                        </span>
+                      </div>
+                      {#if tagDesc}
+                        <details class="result-explanation" data-testid="result-explanation">
+                          <summary class="result-explanation-summary">
+                            <span class="result-explanation-chevron"></span>
+                            <span>{$t("pub.about_finding")}</span>
+                          </summary>
+                          <p class="result-explanation-body">{tagDesc}</p>
+                        </details>
+                      {/if}
                     </div>
                   {/each}
                 </div>
               </details>
             {:else}
               {#each tcEntries.filter(e => e.message && e.message !== e.raw) as entry}
+                {@const modKey = (entry.module ?? "").toLowerCase()}
+                {@const headerKey = entry.tag && modKey ? `pub.tag.${modKey}.${entry.tag}.header` : null}
+                {@const descKey = entry.tag && modKey ? `pub.tag.${modKey}.${entry.tag}.desc` : null}
+                {@const headerText = headerKey ? $t(headerKey) : null}
+                {@const descText = descKey ? $t(descKey) : null}
+                {@const tagHeader = headerText && headerText !== headerKey ? headerText : null}
+                {@const tagDesc = descText && descText !== descKey ? descText : null}
                 <div class="result-row" data-testid="result-row">
-                  <span class="level-pill {levelClass(entry.level)}">{entry.level}</span>
-                  <span class="result-message">{entry.message}</span>
+                  <div class="result-row-main">
+                    <span class="level-pill {levelClass(entry.level)}">{entry.level}</span>
+                    <span class="result-message">
+                      {#if tagHeader}<strong class="result-tag-header" data-testid="result-tag-header">{tagHeader}</strong>{" — "}{/if}{entry.message}
+                    </span>
+                  </div>
+                  {#if tagDesc}
+                    <details class="result-explanation" data-testid="result-explanation">
+                      <summary class="result-explanation-summary">
+                        <span class="result-explanation-chevron"></span>
+                        <span>{$t("pub.about_finding")}</span>
+                      </summary>
+                      <p class="result-explanation-body">{tagDesc}</p>
+                    </details>
+                  {/if}
                 </div>
               {/each}
             {/if}

@@ -119,9 +119,11 @@ describe("Results", () => {
     await waitFor(() =>
       expect(screen.getAllByTestId("testcase-group")).toHaveLength(2)
     );
-    // Descriptions come from i18n (en.json pub.tc.address01 / pub.tc.address02)
-    expect(screen.getByText(/globally routable/i)).toBeTruthy();
-    expect(screen.getByText(/Reverse DNS entry/i)).toBeTruthy();
+    // Descriptions come from i18n (en.json pub.tc.address01 / pub.tc.address02).
+    // The title appears both in the testcase <summary> and as a small
+    // per-row caption above each finding, so use getAllByText.
+    expect(screen.getAllByText(/globally routable/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Reverse DNS entry/i).length).toBeGreaterThan(0);
   });
 
   it("testcase groups default closed for INFO/NOTICE, open for WARNING+", async () => {
@@ -253,6 +255,80 @@ describe("Results", () => {
 
     // Module group should still be open
     expect(screen.getByTestId("module-group").open).toBe(true);
+  });
+
+  it("renders tag header inline when pub.tag.<module>.<TAG>.header exists", async () => {
+    global.fetch.mockResolvedValue(resultResp([
+      { timestamp: 0, module: "DELEGATION", testcase: "delegation01", tag: "NOT_ENOUGH_NS_DEL", level: "WARNING", message: "Delegation does not list enough (1) nameservers." },
+    ]));
+    render(Results, { props: { publicID: "abc12345" } });
+    await waitFor(() => expect(screen.getByTestId("result-row")).toBeTruthy());
+    const header = screen.getByTestId("result-tag-header");
+    expect(header.textContent.trim()).toBe("Not enough nameservers");
+    // Header is rendered inside the same message span as the templated
+    // engine text, so both are on screen.
+    expect(screen.getByText(/Delegation does not list enough/i)).toBeTruthy();
+  });
+
+  it("does not render a tag header when the i18n key is missing", async () => {
+    global.fetch.mockResolvedValue(resultResp([
+      { timestamp: 0, module: "DELEGATION", testcase: "delegation01", tag: "NO_SUCH_TAG_XYZ", level: "WARNING", message: "some message" },
+    ]));
+    render(Results, { props: { publicID: "abc12345" } });
+    await waitFor(() => expect(screen.getByTestId("result-row")).toBeTruthy());
+    expect(screen.queryByTestId("result-tag-header")).toBeNull();
+    // The engine message still renders.
+    expect(screen.getByText(/some message/i)).toBeTruthy();
+  });
+
+  it("renders the About-this-finding disclosure when pub.tag.<module>.<TAG>.desc exists", async () => {
+    global.fetch.mockResolvedValue(resultResp([
+      { timestamp: 0, module: "DELEGATION", testcase: "delegation01", tag: "NOT_ENOUGH_NS_DEL", level: "WARNING", message: "x" },
+    ]));
+    render(Results, { props: { publicID: "abc12345" } });
+    await waitFor(() => expect(screen.getByTestId("result-row")).toBeTruthy());
+    const disclosure = screen.getByTestId("result-explanation");
+    expect(disclosure).toBeTruthy();
+    expect(disclosure.textContent).toMatch(/About this finding/i);
+    expect(disclosure.textContent).toMatch(/parent zone's delegation lists fewer/i);
+  });
+
+  it("does not render the About disclosure when pub.tag.<module>.<TAG>.desc is missing", async () => {
+    global.fetch.mockResolvedValue(resultResp([
+      { timestamp: 0, module: "DELEGATION", testcase: "delegation01", tag: "NO_SUCH_TAG_XYZ", level: "WARNING", message: "x" },
+    ]));
+    render(Results, { props: { publicID: "abc12345" } });
+    await waitFor(() => expect(screen.getByTestId("result-row")).toBeTruthy());
+    expect(screen.queryByTestId("result-explanation")).toBeNull();
+  });
+
+  it("renders the per-testcase description when pub.tc_desc.<testcase> exists", async () => {
+    global.fetch.mockResolvedValue(resultResp([
+      { timestamp: 0, module: "DELEGATION", testcase: "delegation01", tag: "NOT_ENOUGH_NS_DEL", level: "WARNING", message: "x" },
+    ]));
+    render(Results, { props: { publicID: "abc12345" } });
+    await waitFor(() => expect(screen.getByTestId("testcase-explanation")).toBeTruthy());
+    expect(screen.getByTestId("testcase-explanation").textContent)
+      .toMatch(/at least two authoritative name servers/i);
+  });
+
+  it("does not render a testcase description when pub.tc_desc.<testcase> is missing", async () => {
+    global.fetch.mockResolvedValue(resultResp([
+      { timestamp: 0, module: "DELEGATION", testcase: "UnknownTC", tag: "TAG", level: "WARNING", message: "x" },
+    ]));
+    render(Results, { props: { publicID: "abc12345" } });
+    await waitFor(() => expect(screen.getByTestId("testcase-group")).toBeTruthy());
+    expect(screen.queryByTestId("testcase-explanation")).toBeNull();
+  });
+
+  it("renders a per-row testcase-title caption above each finding", async () => {
+    global.fetch.mockResolvedValue(resultResp([
+      { timestamp: 0, module: "DELEGATION", testcase: "delegation01", tag: "NOT_ENOUGH_NS_DEL", level: "WARNING", message: "x" },
+    ]));
+    render(Results, { props: { publicID: "abc12345" } });
+    await waitFor(() => expect(screen.getByTestId("result-row-caption")).toBeTruthy());
+    expect(screen.getByTestId("result-row-caption").textContent.trim())
+      .toBe("Minimum number of name servers");
   });
 
   it("re-fetches with new locale when locale prop changes", async () => {

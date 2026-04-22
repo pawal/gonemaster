@@ -170,6 +170,90 @@ func TestPublicAnalysisCohortDetailFactDistributions(t *testing.T) {
 	}
 }
 
+// TestPublicAnalysisDomainDetailSurfacesNameserverStatus pins the .ck
+// "circa" and "downstage" shapes on the domain detail response. Each
+// nameserver is rendered with an explicit status so the UI can draw a
+// red badge for unreachable / unresolved NSes instead of silently
+// dropping them.
+func TestPublicAnalysisDomainDetailSurfacesNameserverStatus(t *testing.T) {
+	f := newAnalysisAPITestFixture(t)
+	ts := time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)
+
+	// ok.example + 192.0.2.10 → reachable (has samples).
+	f.seedEndpoint("run-ck", "ck.example", "ok.example", "192.0.2.10", "ipv4", ts, 64500, "192.0.2.0/24")
+
+	// dead.example + 192.0.2.99 → unreachable (address present, zero samples).
+	dead, err := f.store.UpsertAnalysisAddress("192.0.2.99", "ipv4", ts)
+	if err != nil {
+		t.Fatalf("upsert dead address: %v", err)
+	}
+	deadNS, err := f.store.UpsertAnalysisNameserver("dead.example", ts)
+	if err != nil {
+		t.Fatalf("upsert dead ns: %v", err)
+	}
+	domain, _ := f.store.GetDomainByName("ck.example")
+	// ghost.example → unresolved (synthetic delegation endpoint with
+	// AddressID=0 — the projector's "no address for this NS" marker).
+	ghostNS, err := f.store.UpsertAnalysisNameserver("ghost.example", ts)
+	if err != nil {
+		t.Fatalf("upsert ghost ns: %v", err)
+	}
+
+	existing := f.store.ListAnalysisRunNSEndpoints(f.cohort.ID, "run-ck")
+	existing = append(existing,
+		AnalysisRunNameserverEndpoint{
+			CohortID: f.cohort.ID, RunID: "run-ck", DomainID: domain.ID,
+			NameserverID: deadNS.ID, AddressID: dead.ID,
+			Role: "authoritative", Source: "timings", Family: "ipv4", QueryCount: 0,
+		},
+		AnalysisRunNameserverEndpoint{
+			CohortID: f.cohort.ID, RunID: "run-ck", DomainID: domain.ID,
+			NameserverID: ghostNS.ID, AddressID: 0,
+			Role: "authoritative", Source: "delegation",
+		},
+	)
+	if err := f.store.ReplaceAnalysisRunNSEndpoints(f.cohort.ID, "run-ck", existing); err != nil {
+		t.Fatalf("replace endpoints: %v", err)
+	}
+
+	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/domains/ck.example")
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
+	}
+	var got PublicAnalysisDomainDetail
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	byName := map[string]PublicAnalysisDomainNameserver{}
+	for _, ns := range got.Nameservers {
+		byName[ns.Nameserver] = ns
+	}
+	ok := byName["ok.example"]
+	if len(ok.Addresses) != 1 {
+		t.Fatalf("expected one ok address, got %+v", ok)
+	}
+	if ok.Addresses[0].Status != "" {
+		t.Fatalf("expected reachable address to have no status, got %q", ok.Addresses[0].Status)
+	}
+	if ok.Status != "" {
+		t.Fatalf("expected reachable NS to have no status, got %q", ok.Status)
+	}
+	dead2 := byName["dead.example"]
+	if len(dead2.Addresses) != 1 {
+		t.Fatalf("expected one address for unreachable NS, got %+v", dead2)
+	}
+	if dead2.Addresses[0].Status != "unreachable" {
+		t.Fatalf("expected unreachable address status, got %q", dead2.Addresses[0].Status)
+	}
+	ghost := byName["ghost.example"]
+	if len(ghost.Addresses) != 0 {
+		t.Fatalf("expected no addresses for unresolved NS, got %+v", ghost)
+	}
+	if ghost.Status != "unresolved" {
+		t.Fatalf("expected unresolved NS status, got %q", ghost.Status)
+	}
+}
+
 func TestPublicAnalysisCohortDetailNotFound(t *testing.T) {
 	f := seedDetailFixture(t)
 	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/unknown")

@@ -106,6 +106,8 @@ export type DomainDetailNameserver = {
   ipv4_count: number;
   ipv6_count: number;
   addresses: DomainDetailAddress[];
+  // "unresolved" when no real address is materialized for this NS.
+  status?: string;
 };
 
 export type DomainDetailAddress = {
@@ -114,6 +116,8 @@ export type DomainDetailAddress = {
   asn?: number;
   asn_label?: string;
   prefix?: string;
+  // "unreachable" when the engine got no samples for this endpoint.
+  status?: string;
 };
 
 export type DomainDetailEntry = {

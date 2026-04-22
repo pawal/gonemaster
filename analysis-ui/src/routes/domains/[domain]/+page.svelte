@@ -155,7 +155,10 @@
           <tbody>
             {#each d.nameservers as ns (ns.nameserver)}
               {#each ns.addresses as addr, addrIdx (`${ns.nameserver}|${addr.address}`)}
-                <tr class={addrIdx === 0 ? "ns-group-start" : "ns-group-cont"}>
+                <tr
+                  class={addrIdx === 0 ? "ns-group-start" : "ns-group-cont"}
+                  class:ns-row-unreachable={addr.status === "unreachable"}
+                >
                   <th scope="row" class="row-ident ns-cell">
                     {#if addrIdx === 0}
                       <NameserverChip nameserver={ns.nameserver} />
@@ -163,6 +166,9 @@
                   </th>
                   <td class="row-ident">
                     <EndpointChip address={addr.address} nameserver={ns.nameserver} />
+                    {#if addr.status === "unreachable"}
+                      <span class="ns-status-badge">No response</span>
+                    {/if}
                   </td>
                   <td class="row-ident">
                     {#if addr.asn !== undefined && addr.asn !== null}
@@ -176,11 +182,13 @@
                   </td>
                 </tr>
               {:else}
-                <tr>
+                <tr class="ns-row-unresolved">
                   <th scope="row" class="row-ident ns-cell">
                     <NameserverChip nameserver={ns.nameserver} />
                   </th>
-                  <td colspan="3" class="hint">No materialized addresses.</td>
+                  <td colspan="3">
+                    <span class="ns-status-badge">Does not resolve</span>
+                  </td>
                 </tr>
               {/each}
             {/each}
@@ -531,5 +539,29 @@
     text-transform: none;
     letter-spacing: normal;
     font-size: var(--text-sm);
+  }
+
+  .ns-row-unreachable,
+  .ns-row-unresolved {
+    background: #fef2f2;
+  }
+  .ns-row-unreachable td,
+  .ns-row-unreachable th,
+  .ns-row-unresolved td,
+  .ns-row-unresolved th {
+    color: #7f1d1d;
+  }
+  .ns-status-badge {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 1px 8px;
+    border-radius: 999px;
+    font-size: var(--text-xs);
+    font-family: var(--sans);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    background: #fee2e2;
+    color: #991b1b;
   }
 </style>

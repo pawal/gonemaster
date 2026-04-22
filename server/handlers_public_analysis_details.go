@@ -66,6 +66,8 @@ type PublicAnalysisDomainNameserver struct {
 	IPv4Count  int                           `json:"ipv4_count"`
 	IPv6Count  int                           `json:"ipv6_count"`
 	Addresses  []PublicAnalysisDomainAddress `json:"addresses"`
+	// "unresolved" when no real address is materialized for this NS.
+	Status string `json:"status,omitempty"`
 }
 
 type PublicAnalysisDomainAddress struct {
@@ -74,6 +76,8 @@ type PublicAnalysisDomainAddress struct {
 	ASN      *int64 `json:"asn,omitempty"`
 	ASNLabel string `json:"asn_label,omitempty"`
 	Prefix   string `json:"prefix,omitempty"`
+	// "unreachable" when the engine got no samples for this endpoint.
+	Status string `json:"status,omitempty"`
 }
 
 // PublicAnalysisDomainEntry is one log entry emitted by a Zonemaster testcase
@@ -275,6 +279,10 @@ func (s *Server) handlePublicAnalysisDomainDetail(w http.ResponseWriter, r *http
 	}
 	nsByID := map[int64]*nsEntry{}
 	addrIDs := map[int64]struct{}{}
+	// addrStatus tracks reachability per address. "ok" wins over
+	// "unreachable" when the same address appears in multiple endpoint
+	// rows with different query counts.
+	addrStatus := map[int64]string{}
 	for _, ep := range data.endpoints {
 		if ep.RunID != pair.summary.RunID || ep.DomainID != domain.ID {
 			continue
@@ -304,6 +312,13 @@ func (s *Server) handlePublicAnalysisDomainDetail(w http.ResponseWriter, r *http
 			n.seen[ep.AddressID] = struct{}{}
 			n.addrs = append(n.addrs, ep.AddressID)
 		}
+		if ep.AddressID != 0 {
+			if ep.QueryCount > 0 {
+				addrStatus[ep.AddressID] = "ok"
+			} else if _, set := addrStatus[ep.AddressID]; !set {
+				addrStatus[ep.AddressID] = "unreachable"
+			}
+		}
 	}
 
 	// Build per-address facts once, then reuse per nameserver.
@@ -314,6 +329,9 @@ func (s *Server) handlePublicAnalysisDomainDetail(w http.ResponseWriter, r *http
 			continue
 		}
 		view := PublicAnalysisDomainAddress{Address: addr.Address, Family: addr.Family}
+		if s := addrStatus[addrID]; s == "unreachable" {
+			view.Status = "unreachable"
+		}
 		for _, fact := range data.addressASNs {
 			if fact.RunID != pair.summary.RunID || fact.DomainID != domain.ID || fact.AddressID != addrID {
 				continue
@@ -350,12 +368,16 @@ func (s *Server) handlePublicAnalysisDomainDetail(w http.ResponseWriter, r *http
 			}
 			return nsAddrs[i].Address < nsAddrs[j].Address
 		})
-		nameservers = append(nameservers, PublicAnalysisDomainNameserver{
+		nsView := PublicAnalysisDomainNameserver{
 			Nameserver: n.name,
 			IPv4Count:  len(n.v4),
 			IPv6Count:  len(n.v6),
 			Addresses:  nsAddrs,
-		})
+		}
+		if len(nsAddrs) == 0 {
+			nsView.Status = "unresolved"
+		}
+		nameservers = append(nameservers, nsView)
 	}
 	sort.Slice(nameservers, func(i, j int) bool { return nameservers[i].Nameserver < nameservers[j].Nameserver })
 

@@ -19,7 +19,9 @@
 
   const sortSpecs = {
     domainCount: { asc: "domain_count_asc", desc: "domain_count_desc" },
-    addressCount: { asc: "address_count_asc", desc: "address_count_desc" }
+    addressCount: { asc: "address_count_asc", desc: "address_count_desc" },
+    nameserverCount: { asc: "nameserver_count_asc", desc: "nameserver_count_desc" },
+    prefixCount: { asc: "prefix_count_asc", desc: "prefix_count_desc" }
   } as const;
 
   const currentSort = $derived(page.url.searchParams.get("sort") ?? "");
@@ -128,8 +130,12 @@
             <th scope="col" class="col-num">
               <SortHeader label="Addresses" spec={sortSpecs.addressCount} align="right" {currentSort} onsort={(v: string) => updateParam("sort", v)} />
             </th>
-            <th scope="col" class="col-num">Nameservers</th>
-            <th scope="col" class="col-num">Prefixes</th>
+            <th scope="col" class="col-num">
+              <SortHeader label="Nameservers" spec={sortSpecs.nameserverCount} align="right" {currentSort} onsort={(v: string) => updateParam("sort", v)} />
+            </th>
+            <th scope="col" class="col-num">
+              <SortHeader label="Prefixes" spec={sortSpecs.prefixCount} align="right" {currentSort} onsort={(v: string) => updateParam("sort", v)} />
+            </th>
           </tr>
         </thead>
         <tbody>

@@ -582,6 +582,22 @@ func (s *Server) handlePublicAnalysisASNs(w http.ResponseWriter, r *http.Request
 			if items[i].AddressCount != items[j].AddressCount {
 				return items[i].AddressCount < items[j].AddressCount
 			}
+		case "nameserver_count_desc":
+			if items[i].NameserverCount != items[j].NameserverCount {
+				return items[i].NameserverCount > items[j].NameserverCount
+			}
+		case "nameserver_count_asc":
+			if items[i].NameserverCount != items[j].NameserverCount {
+				return items[i].NameserverCount < items[j].NameserverCount
+			}
+		case "prefix_count_desc":
+			if items[i].PrefixCount != items[j].PrefixCount {
+				return items[i].PrefixCount > items[j].PrefixCount
+			}
+		case "prefix_count_asc":
+			if items[i].PrefixCount != items[j].PrefixCount {
+				return items[i].PrefixCount < items[j].PrefixCount
+			}
 		}
 		return items[i].ASN < items[j].ASN
 	})

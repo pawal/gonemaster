@@ -236,6 +236,43 @@ func TestPublicAnalysisASNsAggregates(t *testing.T) {
 	}
 }
 
+func TestPublicAnalysisASNsSortByNameserverAndPrefixCounts(t *testing.T) {
+	f := newAnalysisAPITestFixture(t)
+	ts := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+	// AS64500: one nameserver, one prefix.
+	f.seedEndpoint("r1", "a.example", "ns1.example", "192.0.2.10", "ipv4", ts, 64500, "192.0.2.0/24")
+	// AS64600: two nameservers, two prefixes.
+	f.seedEndpoint("r2", "b.example", "ns2.example", "198.51.100.10", "ipv4", ts, 64600, "198.51.100.0/24")
+	f.seedEndpoint("r3", "c.example", "ns3.example", "203.0.113.10", "ipv4", ts, 64600, "203.0.113.0/24")
+
+	cases := []struct {
+		name     string
+		sort     string
+		wantTop  int64
+	}{
+		{"nameserver_count_desc", "nameserver_count_desc", 64600},
+		{"nameserver_count_asc", "nameserver_count_asc", 64500},
+		{"prefix_count_desc", "prefix_count_desc", 64600},
+		{"prefix_count_asc", "prefix_count_asc", 64500},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			resp := getPublic(t, f.srv, "/pub/api/v1/analysis/asns?sort="+c.sort)
+			if resp.Code != http.StatusOK {
+				t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
+			}
+			got := decodeJSON[PublicAnalysisListResponse[PublicAnalysisASNView]](t, resp)
+			if len(got.Items) != 2 {
+				t.Fatalf("expected 2 ASN rows, got %+v", got.Items)
+			}
+			if got.Items[0].ASN != c.wantTop {
+				t.Fatalf("%s: top ASN = %d, want %d (items=%+v)",
+					c.name, got.Items[0].ASN, c.wantTop, got.Items)
+			}
+		})
+	}
+}
+
 func TestPublicAnalysisASNsSearchByNumber(t *testing.T) {
 	f := newAnalysisAPITestFixture(t)
 	ts := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)

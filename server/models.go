@@ -131,7 +131,16 @@ type NameserverTiming struct {
 	MedianMS   float64 `json:"median_ms"`
 	StddevMS   float64 `json:"stddev_ms"`
 	Count      int     `json:"count"`
+	// Empty on rows written before this field existed; treat as "ok".
+	Status string `json:"status,omitempty"`
 }
+
+// Status values for NameserverTiming.
+const (
+	NameserverTimingStatusOK          = "ok"
+	NameserverTimingStatusUnreachable = "unreachable"
+	NameserverTimingStatusUnresolved  = "unresolved"
+)
 
 // Domain is a persistent domain registry entry.
 type Domain struct {

@@ -64,24 +64,19 @@ func uniqueNameserverTimingTargets(items []nameserverTimingTarget) []nameserverT
 }
 
 func summarizeNameserverTimings(queryTimings map[string][]time.Duration, targets []nameserverTimingTarget) []NameserverTiming {
-	if len(queryTimings) == 0 || len(targets) == 0 {
+	if len(targets) == 0 {
 		return nil
 	}
 
-	nameOnly := map[string]bool{}
-	pairs := map[string]bool{}
-	for _, target := range targets {
-		if target.name == "" {
-			continue
-		}
-		if target.address == "" {
-			nameOnly[target.name] = true
-			continue
-		}
-		pairs[target.name+"/"+target.address] = true
+	// Index queryTimings by (name, address) and by name alone so a
+	// name-only target can discover the addresses the engine actually
+	// probed.
+	type sampleEntry struct {
+		name, address string
+		samples       []time.Duration
 	}
-
-	out := make([]NameserverTiming, 0, len(queryTimings))
+	samplesByKey := map[string]sampleEntry{}
+	samplesByName := map[string][]sampleEntry{}
 	for key, samples := range queryTimings {
 		name, address, ok := strings.Cut(key, "/")
 		if !ok {
@@ -89,26 +84,61 @@ func summarizeNameserverTimings(queryTimings map[string][]time.Duration, targets
 		}
 		name = normalizeNameserverName(name)
 		address = strings.TrimSpace(address)
-		if !pairs[name+"/"+address] && !nameOnly[name] {
+		entry := sampleEntry{name: name, address: address, samples: samples}
+		samplesByKey[name+"/"+address] = entry
+		samplesByName[name] = append(samplesByName[name], entry)
+	}
+
+	out := make([]NameserverTiming, 0, len(targets))
+	seen := map[string]bool{}
+	emit := func(t NameserverTiming) {
+		key := t.Nameserver + "/" + t.Address
+		if seen[key] {
+			return
+		}
+		seen[key] = true
+		out = append(out, t)
+	}
+
+	for _, target := range targets {
+		if target.name == "" {
 			continue
 		}
-		stats := enginenameserver.ComputeTimingStats(samples)
-		if stats.Count == 0 {
+		if target.address == "" {
+			// Name-only target: use whatever addresses the engine probed
+			// for the name. Zero matches → the NS hostname never
+			// resolved, emit a single "unresolved" marker row.
+			matches := samplesByName[target.name]
+			if len(matches) == 0 {
+				emit(NameserverTiming{
+					Nameserver: target.name,
+					Status:     NameserverTimingStatusUnresolved,
+				})
+				continue
+			}
+			for _, m := range matches {
+				emit(timingFromSamples(m.name, m.address, m.samples))
+			}
 			continue
 		}
-		out = append(out, NameserverTiming{
-			Nameserver: name,
-			Address:    address,
-			AvgMS:      stats.Avg,
-			MinMS:      stats.Min,
-			MaxMS:      stats.Max,
-			MedianMS:   stats.Median,
-			StddevMS:   stats.Stddev,
-			Count:      stats.Count,
-		})
+
+		m, ok := samplesByKey[target.name+"/"+target.address]
+		if !ok {
+			emit(NameserverTiming{
+				Nameserver: target.name,
+				Address:    target.address,
+				Status:     NameserverTimingStatusUnreachable,
+			})
+			continue
+		}
+		emit(timingFromSamples(m.name, m.address, m.samples))
 	}
 
 	sort.Slice(out, func(i, j int) bool {
+		pi, pj := timingStatusPriority(out[i].Status), timingStatusPriority(out[j].Status)
+		if pi != pj {
+			return pi < pj
+		}
 		if out[i].AvgMS != out[j].AvgMS {
 			return out[i].AvgMS > out[j].AvgMS
 		}
@@ -118,6 +148,44 @@ func summarizeNameserverTimings(queryTimings map[string][]time.Duration, targets
 		return out[i].Address < out[j].Address
 	})
 	return out
+}
+
+// timingFromSamples builds an "ok" row from samples, or downgrades to
+// "unreachable" when stats computation yields zero count (defensive: the
+// caller should already have filtered empty samples).
+func timingFromSamples(name, address string, samples []time.Duration) NameserverTiming {
+	stats := enginenameserver.ComputeTimingStats(samples)
+	if stats.Count == 0 {
+		return NameserverTiming{
+			Nameserver: name,
+			Address:    address,
+			Status:     NameserverTimingStatusUnreachable,
+		}
+	}
+	return NameserverTiming{
+		Nameserver: name,
+		Address:    address,
+		AvgMS:      stats.Avg,
+		MinMS:      stats.Min,
+		MaxMS:      stats.Max,
+		MedianMS:   stats.Median,
+		StddevMS:   stats.Stddev,
+		Count:      stats.Count,
+		Status:     NameserverTimingStatusOK,
+	}
+}
+
+// timingStatusPriority orders "worst first" so operators see problems at
+// the top: unresolved, unreachable, then ok rows (sorted slowest first).
+func timingStatusPriority(status string) int {
+	switch status {
+	case NameserverTimingStatusUnresolved:
+		return 0
+	case NameserverTimingStatusUnreachable:
+		return 1
+	default:
+		return 2
+	}
 }
 
 func cloneNameserverTimings(items []NameserverTiming) []NameserverTiming {

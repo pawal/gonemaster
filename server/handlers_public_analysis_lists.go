@@ -338,7 +338,13 @@ func computeLatestMaterializationForCohort(readStore AnalysisReadStore, runLooku
 			continue
 		}
 		authoritative = append(authoritative, ep)
-		authoritativeAddrIDs[ep.AddressID] = struct{}{}
+		// Synthetic delegation-only endpoints carry AddressID=0 (no
+		// matching analysis_addresses row). Don't fold that sentinel
+		// into the authoritative-address set used to filter
+		// addressASNs; it has no prefix/ASN linkage to carry anyway.
+		if ep.AddressID != 0 {
+			authoritativeAddrIDs[ep.AddressID] = struct{}{}
+		}
 	}
 	// Restrict addressASNs to the same authoritative-address set so the
 	// prefix / ASN views agree with the nameserver / endpoint views on

@@ -110,6 +110,14 @@ func (s *Server) handlePublicAnalysisNameservers(w http.ResponseWriter, r *http.
 			buckets[ep.NameserverID] = b
 		}
 		b.domains[ep.DomainID] = struct{}{}
+		// Synthetic delegation-only endpoints carry AddressID=0 (no
+		// resolved address). They still tell us the NS serves this
+		// domain, so keep the domain in the set above, but skip the
+		// address / family / ASN / query-count tallies that only make
+		// sense for real (ns, addr) pairs.
+		if ep.AddressID == 0 {
+			continue
+		}
 		b.addresses[ep.AddressID] = struct{}{}
 		switch ep.Family {
 		case "ipv4":

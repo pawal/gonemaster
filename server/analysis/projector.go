@@ -313,11 +313,19 @@ func (p *Projector) writePrepared(pr preparedRun, w WriteStore) error {
 		if err != nil {
 			return fmt.Errorf("upsert nameserver %q: %w", endpoint.nameserver, err)
 		}
+		nameserverIDs[endpoint.nameserver] = ns.ID
+		if endpoint.address == "" {
+			// Synthetic delegation-only endpoint: the NS name is part of
+			// the zone's authoritative set but the engine never produced
+			// an address for it. Leave AddressID at the zero sentinel so
+			// the fact row records the nameserver membership without a
+			// spurious analysis_addresses entry for "".
+			continue
+		}
 		addr, err := w.UpsertAnalysisAddress(endpoint.address, endpoint.family, input.Run.FinishedAt)
 		if err != nil {
 			return fmt.Errorf("upsert address %q: %w", endpoint.address, err)
 		}
-		nameserverIDs[endpoint.nameserver] = ns.ID
 		addressIDs[endpoint.address] = addr.ID
 	}
 	for _, fact := range addressFacts {
@@ -463,7 +471,13 @@ func deriveRunDomainSummary(input RunInput, endpoints []extractedEndpoint, addre
 			continue
 		}
 		nameservers[endpoint.nameserver] = struct{}{}
-		endpointPairs[nsAddrKey{endpoint.nameserver, endpoint.address}] = struct{}{}
+		// Synthetic delegation-only endpoints carry no address. The NS
+		// still counts toward NameserverCount (so CAN_NOT_BE_RESOLVED
+		// nameservers are visible on /domains), but nothing to add to
+		// the endpoint-pair tally.
+		if endpoint.address != "" {
+			endpointPairs[nsAddrKey{endpoint.nameserver, endpoint.address}] = struct{}{}
+		}
 	}
 	for _, fact := range addressFacts {
 		if fact.asn != nil {
@@ -490,14 +504,25 @@ func deriveRunDomainSummary(input RunInput, endpoints []extractedEndpoint, addre
 func (p *Projector) extractNameserverEndpoints(input RunInput) []extractedEndpoint {
 	seen := map[string]extractedEndpoint{}
 	add := func(item extractedEndpoint) {
-		if item.nameserver == "" || item.address == "" {
+		if item.nameserver == "" {
 			return
 		}
-		if item.family == "" {
-			item.family = familyForAddress(item.address)
-		}
-		if item.family == "" {
+		// Address may be empty when this is a synthetic delegation-only
+		// endpoint (NS name appears in the zone's NS set but the engine
+		// never produced an address for it — unresolvable, or the
+		// address was filtered out). Allow those through so the
+		// nameserver shows up on the domain detail; all other sources
+		// still require an address.
+		if item.address == "" && item.source != "delegation" {
 			return
+		}
+		if item.address != "" {
+			if item.family == "" {
+				item.family = familyForAddress(item.address)
+			}
+			if item.family == "" {
+				return
+			}
 		}
 		key := item.nameserver + "|" + item.address + "|" + item.role + "|" + item.source
 		if existing, ok := seen[key]; ok {
@@ -513,24 +538,20 @@ func (p *Projector) extractNameserverEndpoints(input RunInput) []extractedEndpoi
 		seen[key] = item
 	}
 
-	// nameserver_timings is the gonemaster engine's own record of the
-	// authoritative nameservers it actually queried for the tested zone, so
-	// we treat it as ground truth for "this (ns, address) is authoritative
-	// for the domain". When it's populated, any (ns, address) NOT in that
-	// set is treated as parent-side (delegation / DS queries, etc.) and
-	// downgraded to role="parent" — those rows are filtered out of the
-	// public views, so the domain detail page shows only the zone's own
-	// servers.
-	//
-	// When timings is missing (rare — delegation lookup failed, older
-	// runs, etc.) we can't fall back to "trust whatever source flagged
-	// the endpoint": zonemaster's generic `servers` and singleton
-	// ns+address args often carry parent-side data (e.g. root servers
-	// encountered during delegation traversal for a TLD). The only
-	// sources that unambiguously name the child zone's own NSes are the
-	// explicit child-side keys below; everything else defaults to
-	// parent so root servers and similar parent-side artefacts don't
-	// leak into the cohort's authoritative view.
+	// Canonical authoritative NS set for the zone under test. Parsed from
+	// the Delegation01 tags (ENOUGH_NS_CHILD / ENOUGH_NS_DEL and their
+	// NOT_ENOUGH_ variants), which list every NS name the zone is
+	// delegated at regardless of whether the engine could resolve or
+	// reach them. Using delegation rather than reachability keeps
+	// unresolvable or unreachable NSes visible on the domain detail
+	// page; they are still authoritative for the zone and an operator
+	// dashboard should surface them, not hide them.
+	authoritativeNSSet := delegationNSSet(input.Entries)
+
+	// nameserver_timings is still useful — it tells us which (ns, addr)
+	// pairs the engine successfully probed, which is what we use to
+	// populate avg/min/max/count on the endpoint row. It's no longer a
+	// classification gate.
 	timingSet := make(map[string]struct{}, len(input.NameserverTimings))
 	for _, timing := range input.NameserverTimings {
 		ns := normalizeNameserverName(timing.Nameserver)
@@ -549,6 +570,21 @@ func (p *Projector) extractNameserverEndpoints(input RunInput) []extractedEndpoi
 		return false
 	}
 	classify := func(source, ns, addr string) string {
+		// Preferred rule: delegation-driven. If we have the authoritative
+		// NS name set from the engine's delegation entries, anything
+		// named there is authoritative even if the engine couldn't time
+		// it (e.g. CN01/CN02_NO_RESPONSE); anything else is parent.
+		if len(authoritativeNSSet) > 0 {
+			if _, ok := authoritativeNSSet[ns]; ok {
+				return "authoritative"
+			}
+			return "parent"
+		}
+		// Fallback for runs that pre-date the delegation tag emission or
+		// where the engine never ran Delegation01 (rare): trust the
+		// timings whitelist when populated, and otherwise only trust
+		// the explicit child-side argument keys. Keeps existing older
+		// runs projectable without pulling in root-server noise.
 		if haveTimings {
 			if _, ok := timingSet[ns+"|"+addr]; ok {
 				return "authoritative"
@@ -590,6 +626,31 @@ func (p *Projector) extractNameserverEndpoints(input RunInput) []extractedEndpoi
 				endpoint.source = sourceKey
 				add(endpoint)
 			}
+		}
+	}
+
+	// Emit one synthetic endpoint per authoritative NS name that never
+	// produced an (ns, addr) pair. These are typically
+	// CAN_NOT_BE_RESOLVED cases (no A/AAAA for the NS hostname). The
+	// address is empty, the source is "delegation", and downstream
+	// readers render them as NS-without-address rows.
+	if len(authoritativeNSSet) > 0 {
+		covered := map[string]struct{}{}
+		for _, ep := range seen {
+			if ep.role == "authoritative" && ep.address != "" {
+				covered[ep.nameserver] = struct{}{}
+			}
+		}
+		for ns := range authoritativeNSSet {
+			if _, done := covered[ns]; done {
+				continue
+			}
+			add(extractedEndpoint{
+				nameserver: ns,
+				address:    "",
+				role:       "authoritative",
+				source:     "delegation",
+			})
 		}
 	}
 
@@ -1012,6 +1073,68 @@ func singularEndpointFromArgs(args map[string]any) (string, string, bool) {
 		return "", "", false
 	}
 	return ns, addr, true
+}
+
+// delegationNSSet parses the canonical authoritative NS name set from the
+// run's Delegation01 entries. Prefers the child-side tag
+// (ENOUGH_NS_CHILD / NOT_ENOUGH_NS_CHILD), which reflects what the zone
+// itself publishes; falls back to the parent-side
+// (ENOUGH_NS_DEL / NOT_ENOUGH_NS_DEL) when no child-side entry was
+// emitted. Returns an empty map when the run predates Delegation01
+// tagging or the tags carry no usable servers list.
+func delegationNSSet(entries []serverpkg.Entry) map[string]struct{} {
+	child := map[string]struct{}{}
+	parent := map[string]struct{}{}
+	for _, entry := range entries {
+		var bucket map[string]struct{}
+		switch entry.Tag {
+		case "ENOUGH_NS_CHILD", "NOT_ENOUGH_NS_CHILD":
+			bucket = child
+		case "ENOUGH_NS_DEL", "NOT_ENOUGH_NS_DEL":
+			bucket = parent
+		default:
+			continue
+		}
+		for _, name := range nsNamesFromServersArg(entry.Args["servers"]) {
+			bucket[name] = struct{}{}
+		}
+	}
+	if len(child) > 0 {
+		return child
+	}
+	return parent
+}
+
+// nsNamesFromServersArg extracts just the `ns` field from a servers=[{ns:...}]
+// args value. Used for delegation-level NS lists where no address is
+// carried on the entry.
+func nsNamesFromServersArg(raw any) []string {
+	if raw == nil {
+		return nil
+	}
+	take := func(items []map[string]any) []string {
+		out := make([]string, 0, len(items))
+		for _, m := range items {
+			name := normalizeNameserverName(stringArg(m, "ns"))
+			if name != "" {
+				out = append(out, name)
+			}
+		}
+		return out
+	}
+	switch list := raw.(type) {
+	case []map[string]any:
+		return take(list)
+	case []any:
+		converted := make([]map[string]any, 0, len(list))
+		for _, item := range list {
+			if m, ok := item.(map[string]any); ok {
+				converted = append(converted, m)
+			}
+		}
+		return take(converted)
+	}
+	return nil
 }
 
 func endpointsFromArgs(raw any) []extractedEndpoint {

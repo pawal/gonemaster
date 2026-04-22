@@ -736,6 +736,226 @@ func TestProjectorExtractNameserverEndpointsFallbackWithoutTimings(t *testing.T)
 	}
 }
 
+// TestDelegationNSSetPrefersChild pins the extractor against the real
+// Delegation01 tag shape the engine emits (`servers=[{ns:...}]`), both
+// with the child-side and parent-side tags. Child-side wins when both
+// are present; parent-side is the fallback.
+func TestDelegationNSSetPrefersChild(t *testing.T) {
+	entries := []serverpkg.Entry{
+		{
+			Module: "Delegation", Testcase: "Delegation01", Tag: "ENOUGH_NS_DEL",
+			Args: map[string]any{
+				"servers": []any{
+					map[string]any{"ns": "parent1.example"},
+					map[string]any{"ns": "PARENT2.EXAMPLE."},
+				},
+			},
+		},
+		{
+			Module: "Delegation", Testcase: "Delegation01", Tag: "ENOUGH_NS_CHILD",
+			Args: map[string]any{
+				"servers": []any{
+					map[string]any{"ns": "child1.example"},
+					map[string]any{"ns": "child2.example."},
+				},
+			},
+		},
+	}
+	got := delegationNSSet(entries)
+	if len(got) != 2 {
+		t.Fatalf("expected 2 child-side names, got %+v", got)
+	}
+	if _, ok := got["child1.example"]; !ok {
+		t.Fatalf("expected child1.example in set, got %+v", got)
+	}
+	if _, ok := got["parent1.example"]; ok {
+		t.Fatalf("child-side should take precedence, but parent1 leaked in: %+v", got)
+	}
+}
+
+func TestDelegationNSSetFallsBackToParent(t *testing.T) {
+	entries := []serverpkg.Entry{
+		{
+			Module: "Delegation", Testcase: "Delegation01", Tag: "NOT_ENOUGH_NS_DEL",
+			Args: map[string]any{
+				"servers": []any{map[string]any{"ns": "ns1.example"}},
+			},
+		},
+	}
+	got := delegationNSSet(entries)
+	if len(got) != 1 {
+		t.Fatalf("expected parent fallback with one name, got %+v", got)
+	}
+}
+
+func TestDelegationNSSetEmptyWhenTagsMissing(t *testing.T) {
+	entries := []serverpkg.Entry{
+		{Module: "Basic", Testcase: "basic01", Tag: "B01_OK"},
+	}
+	if got := delegationNSSet(entries); len(got) != 0 {
+		t.Fatalf("expected empty set for non-delegation entries, got %+v", got)
+	}
+}
+
+// TestExtractNameserverEndpointsDelegationDrivesClassify exercises the
+// new rule: an NS listed by the delegation is authoritative even when
+// its (ns, addr) pair didn't make it into nameserver_timings (the .ck
+// "circa" case — resolves but CN01/CN02_NO_RESPONSE).
+func TestExtractNameserverEndpointsDelegationDrivesClassify(t *testing.T) {
+	input := RunInput{
+		NameserverTimings: []serverpkg.NameserverTiming{
+			// Only parau is in timings.
+			{Nameserver: "parau.oyster.net.ck", Address: "202.65.32.128", AvgMS: 10, Count: 3},
+		},
+		Entries: []serverpkg.Entry{
+			// Delegation lists both.
+			{
+				Module: "Delegation", Testcase: "Delegation01", Tag: "ENOUGH_NS_CHILD",
+				Args: map[string]any{
+					"servers": []any{
+						map[string]any{"ns": "parau.oyster.net.ck"},
+						map[string]any{"ns": "circa.mcs.vuw.ac.nz"},
+					},
+				},
+			},
+			// circa's (ns, addr) pair shows up via a generic "servers" key.
+			{
+				Module: "Address", Testcase: "Address01", Tag: "A01_GLOBALLY_REACHABLE_ADDR",
+				Args: map[string]any{
+					"servers": []any{
+						map[string]any{"ns": "circa.mcs.vuw.ac.nz", "address": "130.195.5.12"},
+						map[string]any{"ns": "parau.oyster.net.ck", "address": "202.65.32.128"},
+					},
+				},
+			},
+		},
+	}
+
+	got := NewProjector(&fakeStore{}).extractNameserverEndpoints(input)
+	byNS := map[string]extractedEndpoint{}
+	for _, ep := range got {
+		// Prefer the entry-sourced classification (over the timings
+		// duplicate) when more than one per NS exists.
+		if ep.source != "timings" {
+			byNS[ep.nameserver] = ep
+		} else if _, seen := byNS[ep.nameserver]; !seen {
+			byNS[ep.nameserver] = ep
+		}
+	}
+	if byNS["circa.mcs.vuw.ac.nz"].role != "authoritative" {
+		t.Fatalf("circa should be authoritative by delegation even without timings, got %+v", byNS["circa.mcs.vuw.ac.nz"])
+	}
+	if byNS["parau.oyster.net.ck"].role != "authoritative" {
+		t.Fatalf("parau should be authoritative, got %+v", byNS["parau.oyster.net.ck"])
+	}
+}
+
+// TestExtractNameserverEndpointsEmitsSyntheticForUnresolvedNS covers the
+// .ck "downstage" case — NS name in delegation but no (ns, addr) pair
+// anywhere in the run. A synthetic empty-address endpoint must be
+// emitted so the NS still shows up on the domain detail page.
+func TestExtractNameserverEndpointsEmitsSyntheticForUnresolvedNS(t *testing.T) {
+	input := RunInput{
+		Entries: []serverpkg.Entry{
+			{
+				Module: "Delegation", Testcase: "Delegation01", Tag: "ENOUGH_NS_CHILD",
+				Args: map[string]any{
+					"servers": []any{
+						map[string]any{"ns": "resolved.example"},
+						map[string]any{"ns": "ghost.example"},
+					},
+				},
+			},
+			{
+				Module: "Address", Testcase: "Address01", Tag: "A01_GLOBALLY_REACHABLE_ADDR",
+				Args: map[string]any{
+					"servers": []any{
+						map[string]any{"ns": "resolved.example", "address": "192.0.2.10"},
+					},
+				},
+			},
+			{
+				Module: "Nameserver", Testcase: "Nameserver06", Tag: "CAN_NOT_BE_RESOLVED",
+				Args: map[string]any{
+					"servers": []any{
+						map[string]any{"ns": "ghost.example"},
+					},
+				},
+			},
+		},
+	}
+
+	got := NewProjector(&fakeStore{}).extractNameserverEndpoints(input)
+	var synthetic *extractedEndpoint
+	for i := range got {
+		if got[i].nameserver == "ghost.example" {
+			synthetic = &got[i]
+			break
+		}
+	}
+	if synthetic == nil {
+		t.Fatalf("expected a synthetic endpoint for ghost.example, got %+v", got)
+	}
+	if synthetic.address != "" {
+		t.Fatalf("synthetic endpoint should carry no address, got %+v", synthetic)
+	}
+	if synthetic.role != "authoritative" || synthetic.source != "delegation" {
+		t.Fatalf("synthetic endpoint should be authoritative+delegation, got %+v", synthetic)
+	}
+}
+
+// TestExtractNameserverEndpointsLegacyFallbackStillWorks ensures runs
+// without Delegation01 entries (old runs, non-DNSSEC tests) keep the
+// legacy classification path so they don't silently reclassify every
+// NS as parent and go dark.
+func TestExtractNameserverEndpointsLegacyFallbackStillWorks(t *testing.T) {
+	input := RunInput{
+		NameserverTimings: []serverpkg.NameserverTiming{
+			{Nameserver: "ns1.example", Address: "192.0.2.10", Count: 1},
+		},
+		Entries: []serverpkg.Entry{
+			{
+				Args: map[string]any{
+					"servers": []any{
+						map[string]any{"ns": "ns1.example", "address": "192.0.2.10"},
+						map[string]any{"ns": "other.example", "address": "192.0.2.20"},
+					},
+				},
+			},
+		},
+	}
+	got := NewProjector(&fakeStore{}).extractNameserverEndpoints(input)
+	byNS := map[string]string{}
+	for _, ep := range got {
+		if ep.source != "timings" {
+			byNS[ep.nameserver] = ep.role
+		}
+	}
+	if byNS["ns1.example"] != "authoritative" {
+		t.Fatalf("timings-matched ns1 should be authoritative in fallback path, got %+v", byNS)
+	}
+	if byNS["other.example"] != "parent" {
+		t.Fatalf("non-timings-matched other should be parent in fallback path, got %+v", byNS)
+	}
+}
+
+func TestDeriveRunDomainSummarySkipsSyntheticEndpointsInCounts(t *testing.T) {
+	input := RunInput{Run: serverpkg.Run{ID: "r", DomainID: 1}}
+	endpoints := []extractedEndpoint{
+		{nameserver: "ns1.example", address: "192.0.2.1", family: "ipv4", role: "authoritative"},
+		// Synthetic delegation-only endpoint should bump NameserverCount but
+		// NOT EndpointCount.
+		{nameserver: "ghost.example", address: "", role: "authoritative", source: "delegation"},
+	}
+	got := deriveRunDomainSummary(input, endpoints, nil)
+	if got.NameserverCount != 2 {
+		t.Fatalf("NameserverCount: expected 2 (including synthetic), got %d", got.NameserverCount)
+	}
+	if got.EndpointCount != 1 {
+		t.Fatalf("EndpointCount: synthetic should not count, got %d", got.EndpointCount)
+	}
+}
+
 func TestExtractTagSummariesBucketsByTagAndTestcase(t *testing.T) {
 	input := RunInput{
 		Entries: []serverpkg.Entry{

@@ -200,6 +200,57 @@ describe("Results", () => {
     expect(screen.getByText("24")).toBeTruthy();
   });
 
+  it("renders unreachable and unresolved nameserver rows with status badges", async () => {
+    global.fetch.mockResolvedValue(resultResp([], {}, [
+      // ok row: has samples.
+      {
+        nameserver: "ns1.example.com",
+        address: "192.0.2.10",
+        avg_ms: 24,
+        min_ms: 20,
+        max_ms: 30,
+        count: 3,
+        status: "ok",
+      },
+      // unreachable: has address, no samples.
+      {
+        nameserver: "dead.example.com",
+        address: "192.0.2.99",
+        avg_ms: 0,
+        min_ms: 0,
+        max_ms: 0,
+        count: 0,
+        status: "unreachable",
+      },
+      // unresolved: no address at all.
+      {
+        nameserver: "ghost.example.com",
+        address: "",
+        avg_ms: 0,
+        min_ms: 0,
+        max_ms: 0,
+        count: 0,
+        status: "unresolved",
+      },
+    ]));
+    render(Results, { props: { publicID: "abc12345", domain: "example.com" } });
+    await waitFor(() => expect(screen.getByTestId("nameserver-timings")).toBeTruthy());
+    const timings = screen.getByTestId("nameserver-timings");
+    timings.open = true;
+    await fireEvent(timings, new Event("toggle"));
+
+    const rows = screen.getAllByTestId("nameserver-timing-row");
+    expect(rows).toHaveLength(3);
+    // Problem rows expose their status via data-status and have a visible
+    // badge so operators can see which nameservers are broken.
+    const statuses = rows.map((r) => r.getAttribute("data-status"));
+    expect(statuses).toEqual(expect.arrayContaining(["ok", "unreachable", "unresolved"]));
+    expect(screen.getByText("No response")).toBeTruthy();
+    expect(screen.getByText("Does not resolve")).toBeTruthy();
+    // Unreachable row shows ∞ in timing cells; unresolved shows — and no address.
+    expect(screen.getAllByText("∞").length).toBeGreaterThanOrEqual(3);
+  });
+
   it("hides nameserver timing table when no data is present", async () => {
     global.fetch.mockResolvedValue(resultResp([]));
     render(Results, { props: { publicID: "abc12345", domain: "example.com" } });

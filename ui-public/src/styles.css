@@ -443,6 +443,41 @@ details[inert] > summary {
   color: var(--ink);
 }
 
+/* Unreachable / unresolved rows visually recede into a muted, warning-tinted
+   shade so an operator can scan the table and immediately spot them. */
+.ns-timings-row-unreachable,
+.ns-timings-row-unresolved {
+  background: #fef2f2;
+  color: #7f1d1d;
+}
+.ns-timings-row-unreachable .ns-timings-name,
+.ns-timings-row-unresolved .ns-timings-name,
+.ns-timings-row-unreachable .ns-timings-avg,
+.ns-timings-row-unresolved .ns-timings-avg {
+  color: inherit;
+}
+.ns-timings-row-unreachable .ns-timings-num,
+.ns-timings-row-unresolved .ns-timings-num {
+  font-style: italic;
+}
+.ns-timings-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-family: var(--sans);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+.ns-timings-badge-unreachable,
+.ns-timings-badge-unresolved {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
 @media (max-width: 600px) {
   .ns-timings-summary {
     align-items: flex-start;

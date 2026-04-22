@@ -67,6 +67,8 @@
   "pub.ns_timing_min_ms": "最小",
   "pub.ns_timing_max_ms": "最大",
   "pub.ns_timing_samples": "サンプル数",
+  "pub.ns_timing_status_unreachable": "応答なし",
+  "pub.ns_timing_status_unresolved": "名前解決できません",
 
   "pub.score_label": "DNS Quality Score",
   "pub.score_partial": "部分スコア — {stacks}のテストが無効でした",

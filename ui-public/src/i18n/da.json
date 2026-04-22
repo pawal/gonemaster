@@ -67,6 +67,8 @@
   "pub.ns_timing_min_ms": "Min",
   "pub.ns_timing_max_ms": "Maks",
   "pub.ns_timing_samples": "Målinger",
+  "pub.ns_timing_status_unreachable": "Svarer ikke",
+  "pub.ns_timing_status_unresolved": "Intet DNS-opslag",
 
   "pub.score_label": "DNS Quality Score",
   "pub.score_partial": "Delvis score — test af {stacks} var deaktiveret",

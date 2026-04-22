@@ -151,6 +151,45 @@
   function formatTimingMs(value) {
     return `${Math.round(value)}`;
   }
+
+  // rowStatus treats any status other than "unreachable"/"unresolved" as
+  // ok so old rows (Status unset) keep rendering as they did.
+  function rowStatus(item) {
+    if (item.status === "unreachable" || item.status === "unresolved") {
+      return item.status;
+    }
+    return "ok";
+  }
+
+  // formatTimingCell picks the cell content based on row status.
+  // "∞" signals timeout (reachable address, engine never got an answer).
+  // "—" signals there's nothing to measure (name never resolved).
+  function formatTimingCell(item, value) {
+    const s = rowStatus(item);
+    if (s === "unreachable") return "∞";
+    if (s === "unresolved") return "—";
+    return formatTimingMs(value);
+  }
+
+  function formatSamplesCell(item) {
+    const s = rowStatus(item);
+    if (s === "unreachable") return "0";
+    if (s === "unresolved") return "—";
+    return `${item.count}`;
+  }
+
+  function formatAddressCell(item) {
+    if (item.address) return item.address;
+    return "—";
+  }
+
+  function statusLabelKey(item) {
+    switch (rowStatus(item)) {
+      case "unreachable": return "pub.ns_timing_status_unreachable";
+      case "unresolved":  return "pub.ns_timing_status_unresolved";
+      default:            return "";
+    }
+  }
 </script>
 
 <div class="card stack" data-testid="results-view">
@@ -372,13 +411,19 @@
             </thead>
             <tbody>
               {#each nameserverTimings as item}
-                <tr data-testid="nameserver-timing-row">
-                  <td class="ns-timings-name">{item.nameserver}</td>
-                  <td class="ns-timings-ip">{item.address}</td>
-                  <td class="ns-timings-num ns-timings-avg">{formatTimingMs(item.avg_ms)}</td>
-                  <td class="ns-timings-num">{formatTimingMs(item.min_ms)}</td>
-                  <td class="ns-timings-num">{formatTimingMs(item.max_ms)}</td>
-                  <td class="ns-timings-num">{item.count}</td>
+                {@const status = rowStatus(item)}
+                <tr data-testid="nameserver-timing-row" class="ns-timings-row ns-timings-row-{status}" data-status={status}>
+                  <td class="ns-timings-name">
+                    <span>{item.nameserver}</span>
+                    {#if statusLabelKey(item)}
+                      <span class="ns-timings-badge ns-timings-badge-{status}">{$t(statusLabelKey(item))}</span>
+                    {/if}
+                  </td>
+                  <td class="ns-timings-ip">{formatAddressCell(item)}</td>
+                  <td class="ns-timings-num ns-timings-avg">{formatTimingCell(item, item.avg_ms)}</td>
+                  <td class="ns-timings-num">{formatTimingCell(item, item.min_ms)}</td>
+                  <td class="ns-timings-num">{formatTimingCell(item, item.max_ms)}</td>
+                  <td class="ns-timings-num">{formatSamplesCell(item)}</td>
                 </tr>
               {/each}
             </tbody>

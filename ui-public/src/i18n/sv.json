@@ -67,6 +67,8 @@
   "pub.ns_timing_min_ms": "Min",
   "pub.ns_timing_max_ms": "Max",
   "pub.ns_timing_samples": "Mätningar",
+  "pub.ns_timing_status_unreachable": "Svarar inte",
+  "pub.ns_timing_status_unresolved": "Inget DNS-uppslag",
 
   "pub.score_label": "DNS Quality Score",
   "pub.score_partial": "Partiellt resultat — testning av {stacks} inaktiverades",

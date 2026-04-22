@@ -56,6 +56,8 @@
   "pub.ns_timing_min_ms": "Min",
   "pub.ns_timing_max_ms": "Max",
   "pub.ns_timing_samples": "Samples",
+  "pub.ns_timing_status_unreachable": "No response",
+  "pub.ns_timing_status_unresolved": "Does not resolve",
   "pub.score_label": "DNS Quality Score",
   "pub.score_partial": "Partial score — {stacks} testing was disabled",
   "pub.score_aplus_criteria": "A+ criteria",

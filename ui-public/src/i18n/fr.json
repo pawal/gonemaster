@@ -67,6 +67,8 @@
   "pub.ns_timing_min_ms": "Min",
   "pub.ns_timing_max_ms": "Max",
   "pub.ns_timing_samples": "Échantillons",
+  "pub.ns_timing_status_unreachable": "Ne répond pas",
+  "pub.ns_timing_status_unresolved": "Nom non résolu",
 
   "pub.score_label": "DNS Quality Score",
   "pub.score_partial": "Score partiel — le test {stacks} était désactivé",

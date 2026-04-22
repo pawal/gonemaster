@@ -67,6 +67,8 @@
   "pub.ns_timing_min_ms": "Min",
   "pub.ns_timing_max_ms": "Maks",
   "pub.ns_timing_samples": "Mittauksia",
+  "pub.ns_timing_status_unreachable": "Ei vastaa",
+  "pub.ns_timing_status_unresolved": "Ei nimen selvitystä",
 
   "pub.score_label": "DNS Quality Score",
   "pub.score_partial": "Osittaiset pisteet — {stacks}-testaus oli poistettu käytöstä",

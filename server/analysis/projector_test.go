@@ -846,6 +846,65 @@ func TestExtractNameserverEndpointsTimingsDrivesClassify(t *testing.T) {
 	}
 }
 
+// TestExtractNameserverEndpointsSuppressesStaleGlueForUnresolvedNS
+// pins the .ck "downstage" mismatch: Nameserver06 says the NS can't be
+// resolved, but CN04 still lists a stale (ns, addr) pair for it.
+// Trusting the CN04 address would make the analysis UI show a bogus IP
+// with "No response" while the public UI (which uses live lookupNS)
+// correctly says "Does not resolve". The projector trusts Nameserver06
+// and drops the stale pair; the synthetic delegation-only endpoint
+// represents the NS without an address.
+func TestExtractNameserverEndpointsSuppressesStaleGlueForUnresolvedNS(t *testing.T) {
+	input := RunInput{
+		Entries: []serverpkg.Entry{
+			{
+				Module: "Delegation", Testcase: "Delegation01", Tag: "ENOUGH_NS_CHILD",
+				Args: map[string]any{
+					"servers": []any{
+						map[string]any{"ns": "downstage.mcs.vuw.ac.nz"},
+					},
+				},
+			},
+			// Nameserver06 flags downstage as unresolvable.
+			{
+				Module: "Nameserver", Testcase: "Nameserver06", Tag: "CAN_NOT_BE_RESOLVED",
+				Args: map[string]any{
+					"servers": []any{
+						map[string]any{"ns": "downstage.mcs.vuw.ac.nz"},
+					},
+				},
+			},
+			// CN04 still carries a stale-glue address for it.
+			{
+				Module: "Connectivity", Testcase: "Connectivity04", Tag: "CN04_IPV4_SAME_PREFIX",
+				Args: map[string]any{
+					"servers": []any{
+						map[string]any{"ns": "downstage.mcs.vuw.ac.nz", "address": "130.195.6.10"},
+					},
+				},
+			},
+		},
+	}
+	got := NewProjector(&fakeStore{}).extractNameserverEndpoints(input)
+	for _, ep := range got {
+		if ep.nameserver == "downstage.mcs.vuw.ac.nz" && ep.address == "130.195.6.10" {
+			t.Fatalf("stale-glue address leaked through to endpoint list: %+v", ep)
+		}
+	}
+	// The synthetic delegation-only endpoint should still be present
+	// so the NS itself shows up on the domain detail page.
+	var synth *extractedEndpoint
+	for i := range got {
+		if got[i].nameserver == "downstage.mcs.vuw.ac.nz" && got[i].address == "" {
+			synth = &got[i]
+			break
+		}
+	}
+	if synth == nil || synth.role != "authoritative" || synth.source != "delegation" {
+		t.Fatalf("expected synthetic delegation-only endpoint for downstage, got %+v", got)
+	}
+}
+
 // TestExtractNameserverEndpointsMergesDelegationTagsIntoTimings covers
 // the legacy-data rollout: a run whose nameserver_timings_json predates
 // the worker's per-target emission (so timings lists only the NSes the

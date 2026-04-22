@@ -502,6 +502,7 @@ func deriveRunDomainSummary(input RunInput, endpoints []extractedEndpoint, addre
 }
 
 func (p *Projector) extractNameserverEndpoints(input RunInput) []extractedEndpoint {
+	unresolvedNSSet := unresolvedNSNames(input.Entries)
 	seen := map[string]extractedEndpoint{}
 	add := func(item extractedEndpoint) {
 		if item.nameserver == "" {
@@ -515,6 +516,15 @@ func (p *Projector) extractNameserverEndpoints(input RunInput) []extractedEndpoi
 		// still require an address.
 		if item.address == "" && item.source != "delegation" {
 			return
+		}
+		// Stale-glue suppression: Nameserver06 says this name has no
+		// address. Drop any (ns, addr) pair the engine emitted for it
+		// (CN04 and friends carry stale glue). The synthetic
+		// delegation-only endpoint below still represents the NS.
+		if item.address != "" {
+			if _, unresolved := unresolvedNSSet[item.nameserver]; unresolved {
+				return
+			}
 		}
 		if item.address != "" {
 			if item.family == "" {
@@ -1105,6 +1115,26 @@ func delegationNSSet(entries []serverpkg.Entry) map[string]struct{} {
 		return child
 	}
 	return parent
+}
+
+// unresolvedNSNames returns the set of NS hostnames the engine's
+// Nameserver06 testcase flagged as address-less: CAN_NOT_BE_RESOLVED
+// (some delegated NSes failed resolution) and NO_RESOLUTION (none of
+// them did). Used to suppress stale-glue (ns, addr) pairs that leak
+// through CN04 and similar tags for the same hostnames.
+func unresolvedNSNames(entries []serverpkg.Entry) map[string]struct{} {
+	out := map[string]struct{}{}
+	for _, entry := range entries {
+		switch entry.Tag {
+		case "CAN_NOT_BE_RESOLVED", "NO_RESOLUTION":
+		default:
+			continue
+		}
+		for _, name := range nsNamesFromServersArg(entry.Args["servers"]) {
+			out[name] = struct{}{}
+		}
+	}
+	return out
 }
 
 // nsNamesFromServersArg extracts just the `ns` field from a servers=[{ns:...}]

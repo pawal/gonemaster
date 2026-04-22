@@ -206,6 +206,50 @@ func TestPublicAnalysisDomainsFilterByWorstLevel(t *testing.T) {
 	}
 }
 
+func TestPublicAnalysisDomainsFilterByGrade(t *testing.T) {
+	f := newAnalysisAPITestFixture(t)
+	ts := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+	f.seedDomainSummary("a1.example", "run-a1", ts, 95, "A", "NOTICE")
+	f.seedDomainSummary("a2.example", "run-a2", ts, 93, "A", "NOTICE")
+	f.seedDomainSummary("b1.example", "run-b1", ts, 80, "B", "NOTICE")
+	f.seedDomainSummary("f1.example", "run-f1", ts, 10, "F", "CRITICAL")
+
+	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/domains?grade=A")
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
+	}
+	got := decodeDomainList(t, resp)
+	if got.Total != 2 {
+		t.Fatalf("expected 2 A-grade domains, got %d (items=%+v)", got.Total, got.Items)
+	}
+	for _, v := range got.Items {
+		if v.Grade == nil || *v.Grade != "A" {
+			t.Fatalf("grade filter leaked non-A: %+v", v)
+		}
+	}
+
+	// Case-sensitive exact match — grades are stored canonical. "a" must
+	// not match "A" because custom scoring profiles may legitimately use
+	// distinct labels differing only in case.
+	resp = getPublic(t, f.srv, "/pub/api/v1/analysis/domains?grade=a")
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
+	}
+	if got := decodeDomainList(t, resp); got.Total != 0 {
+		t.Fatalf("lowercase filter should not match uppercase grades, got %d", got.Total)
+	}
+
+	// Unknown grade returns empty without 400 — the filter is
+	// pluggable-config-friendly, not enum-validated.
+	resp = getPublic(t, f.srv, "/pub/api/v1/analysis/domains?grade=Z")
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200 on unknown grade, got %d: %s", resp.Code, resp.Body)
+	}
+	if got := decodeDomainList(t, resp); got.Total != 0 {
+		t.Fatalf("unknown grade should match zero domains, got %d", got.Total)
+	}
+}
+
 func TestPublicAnalysisDomainsRejectsInvalidWorstLevel(t *testing.T) {
 	f := newAnalysisAPITestFixture(t)
 	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/domains?worst_level=bogus")

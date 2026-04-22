@@ -106,7 +106,7 @@ func TestPublicAnalysisCohortDetailFactDistributions(t *testing.T) {
 	f := newAnalysisAPITestFixture(t)
 	ts := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
 
-	// signed.example: signed zone publishing algo 13.
+	// signed.example: signed zone publishing algo 13, grade A.
 	run1 := f.seedGraduatedRun("signed.example", ts, []engine.LogEntry{
 		{Module: "DNSSEC", Testcase: "dnssec05", Tag: "DS05_ALGO_OK", Level: "INFO"},
 	})
@@ -115,17 +115,19 @@ func TestPublicAnalysisCohortDetailFactDistributions(t *testing.T) {
 	if err := f.store.ReplaceAnalysisRunDomainFacts(f.cohort.ID, run1.ID, []AnalysisRunDomainFact{
 		{CohortID: f.cohort.ID, RunID: run1.ID, DomainID: d1.ID, Category: FactCategorySigned, Key: FactKeySigned},
 		{CohortID: f.cohort.ID, RunID: run1.ID, DomainID: d1.ID, Category: FactCategoryDNSKEYAlgorithm, Key: "13", ValueNum: &one},
+		{CohortID: f.cohort.ID, RunID: run1.ID, DomainID: d1.ID, Category: FactCategoryGrade, Key: "A"},
 	}); err != nil {
 		t.Fatalf("replace domain facts: %v", err)
 	}
 
-	// unsigned.example: unsigned zone.
+	// unsigned.example: unsigned zone, grade F.
 	run2 := f.seedGraduatedRun("unsigned.example", ts, []engine.LogEntry{
 		{Module: "DNSSEC", Testcase: "dnssec07", Tag: "DS07_NOT_SIGNED", Level: "ERROR"},
 	})
 	d2, _ := f.store.GetDomainByName("unsigned.example")
 	if err := f.store.ReplaceAnalysisRunDomainFacts(f.cohort.ID, run2.ID, []AnalysisRunDomainFact{
 		{CohortID: f.cohort.ID, RunID: run2.ID, DomainID: d2.ID, Category: FactCategorySigned, Key: FactKeyUnsigned},
+		{CohortID: f.cohort.ID, RunID: run2.ID, DomainID: d2.ID, Category: FactCategoryGrade, Key: "F"},
 	}); err != nil {
 		t.Fatalf("replace domain facts: %v", err)
 	}
@@ -151,6 +153,20 @@ func TestPublicAnalysisCohortDetailFactDistributions(t *testing.T) {
 	}
 	if len(algo.Buckets) != 1 || algo.Buckets[0].Key != "13" || algo.Buckets[0].Count != 1 {
 		t.Fatalf("expected single algo=13 bucket with count 1, got %+v", algo.Buckets)
+	}
+	grade, ok := got.FactDistributions[FactCategoryGrade]
+	if !ok {
+		t.Fatalf("expected grade distribution, got %+v", got.FactDistributions)
+	}
+	if len(grade.Buckets) != 2 {
+		t.Fatalf("expected A + F grade buckets, got %+v", grade.Buckets)
+	}
+	// A before F (gradeOrder registry).
+	if grade.Buckets[0].Key != "A" || grade.Buckets[1].Key != "F" {
+		t.Fatalf("expected A,F ordering, got %+v", grade.Buckets)
+	}
+	if grade.Buckets[0].Tone != "ok" || grade.Buckets[1].Tone != "critical" {
+		t.Fatalf("unexpected grade tones: %+v", grade.Buckets)
 	}
 }
 

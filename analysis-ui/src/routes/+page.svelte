@@ -5,6 +5,7 @@
   import FilterBar from "$lib/FilterBar.svelte";
   import {
     asnHref,
+    domainsGradeHref,
     domainsSeverityHref,
     nameserverHref,
     tagHref
@@ -195,6 +196,9 @@
         description={dist.description}
         buckets={dist.buckets}
         multiPerDomain={multiBucketCategories.has(dist.category)}
+        hrefForKey={dist.category === "grade"
+          ? (k) => domainsGradeHref(base, k, query)
+          : undefined}
       />
     {/each}
     {#if topTagRows.length > 0}

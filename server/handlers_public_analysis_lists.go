@@ -168,6 +168,12 @@ func (s *Server) handlePublicAnalysisDomains(w http.ResponseWriter, r *http.Requ
 		worstLevelFilter = normalized
 	}
 
+	// Grade filter — exact string match on the stored grade. Not
+	// enum-validated because scoring is configurable and custom profiles
+	// may emit labels outside the default A+/A/B/C/D/F set. Unknown
+	// grades simply return zero results.
+	gradeFilter := strings.TrimSpace(r.URL.Query().Get("grade"))
+
 	// Go through the cohort materialization cache so /domains
 	// inherits the same bulk preload the landing page gets: one IN
 	// query for all domain names instead of a per-row GetDomain.
@@ -199,6 +205,11 @@ func (s *Server) handlePublicAnalysisDomains(w http.ResponseWriter, r *http.Requ
 		}
 		if worstLevelFilter != "" && severityBucket(sum.WorstLevel) != worstLevelFilter {
 			continue
+		}
+		if gradeFilter != "" {
+			if sum.Grade == nil || *sum.Grade != gradeFilter {
+				continue
+			}
 		}
 		v := PublicAnalysisDomainView{
 			Domain:          name,

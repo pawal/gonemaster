@@ -203,6 +203,7 @@ export type AnalysisFilter = {
   sort?: string;
   min_level?: string;
   worst_level?: string;
+  grade?: string;
 };
 
 export type FetchLike = typeof fetch;

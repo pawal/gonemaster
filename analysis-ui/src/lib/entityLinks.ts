@@ -74,3 +74,12 @@ export function domainsSeverityHref(base: string, bucket: string, query = ""): s
   params.set("worst_level", bucket);
   return `${base}/domains?${params.toString()}`;
 }
+
+// domainsGradeHref links to the domains list filtered by an exact grade
+// label. Grade values are pass-through strings because scoring is
+// configurable — we don't normalize or validate on the client.
+export function domainsGradeHref(base: string, grade: string, query = ""): string {
+  const params = new URLSearchParams(query);
+  params.set("grade", grade);
+  return `${base}/domains?${params.toString()}`;
+}

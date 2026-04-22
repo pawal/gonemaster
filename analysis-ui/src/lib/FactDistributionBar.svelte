@@ -9,9 +9,19 @@
     // Caption shown below bars when a domain can legitimately land in
     // multiple buckets (e.g. zones publishing two DNSKEY algorithms).
     multiPerDomain?: boolean;
+    // Optional href builder. When provided, each segment becomes a link
+    // into a filtered view (e.g. /domains?grade=B). Omit for bars that
+    // are purely informational.
+    hrefForKey?: (key: string) => string;
   };
 
-  let { title, description, buckets, multiPerDomain = false }: Props = $props();
+  let {
+    title,
+    description,
+    buckets,
+    multiPerDomain = false,
+    hrefForKey
+  }: Props = $props();
 
   const totalCount = $derived(buckets.reduce((sum, b) => sum + b.count, 0));
   // flex-grow uses the raw count so a 50-domain segment is 10x as wide
@@ -25,19 +35,36 @@
     {#if description}
       <p class="hint">{description}</p>
     {/if}
-    <div class="fact-dist-bar" role="list" aria-label={title}>
-      {#each visible as b (b.key)}
-        <div
-          class="fact-dist-segment tone-{b.tone}"
-          role="listitem"
-          style:flex-grow={b.count}
-          title="{b.label}: {formatCount(b.count)}{multiPerDomain ? ' domains' : ''}"
-        >
-          <span class="fact-dist-label">{b.label}</span>
-          <span class="fact-dist-count">{formatCount(b.count)}</span>
-        </div>
-      {/each}
-    </div>
+    {#if hrefForKey}
+      <ul class="fact-dist-bar" aria-label={title}>
+        {#each visible as b (b.key)}
+          <li class="fact-dist-item" style:flex-grow={b.count}>
+            <a
+              class="fact-dist-segment fact-dist-link tone-{b.tone}"
+              href={hrefForKey(b.key)}
+              title="{b.label}: {formatCount(b.count)}{multiPerDomain ? ' domains' : ''}. Click to filter the domains list."
+            >
+              <span class="fact-dist-label">{b.label}</span>
+              <span class="fact-dist-count">{formatCount(b.count)}</span>
+            </a>
+          </li>
+        {/each}
+      </ul>
+    {:else}
+      <div class="fact-dist-bar" role="list" aria-label={title}>
+        {#each visible as b (b.key)}
+          <div
+            class="fact-dist-segment tone-{b.tone}"
+            role="listitem"
+            style:flex-grow={b.count}
+            title="{b.label}: {formatCount(b.count)}{multiPerDomain ? ' domains' : ''}"
+          >
+            <span class="fact-dist-label">{b.label}</span>
+            <span class="fact-dist-count">{formatCount(b.count)}</span>
+          </div>
+        {/each}
+      </div>
+    {/if}
     {#if multiPerDomain && totalCount > 0}
       <p class="hint fact-dist-caption">
         Domains can publish multiple algorithms, so segments sum to more than the
@@ -61,9 +88,17 @@
     border-radius: var(--radius);
     overflow: hidden;
     border: 1px solid var(--border);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .fact-dist-item {
+    display: flex;
+    min-width: 3rem;
   }
   .fact-dist-segment {
     display: flex;
+    flex: 1 1 auto;
     align-items: center;
     justify-content: center;
     gap: 8px;
@@ -72,6 +107,15 @@
     font-size: var(--text-xs);
     white-space: nowrap;
     overflow: hidden;
+  }
+  .fact-dist-link {
+    text-decoration: none;
+    color: inherit;
+    transition: filter 0.15s ease;
+  }
+  .fact-dist-link:hover,
+  .fact-dist-link:focus-visible {
+    filter: brightness(0.95);
   }
   .fact-dist-label {
     font-weight: 600;

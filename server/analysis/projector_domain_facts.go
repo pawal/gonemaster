@@ -14,6 +14,7 @@ import (
 const (
 	factCategoryDNSKEYAlgorithm = serverpkg.FactCategoryDNSKEYAlgorithm
 	factCategorySigned          = serverpkg.FactCategorySigned
+	factCategoryGrade           = serverpkg.FactCategoryGrade
 
 	factKeySigned   = serverpkg.FactKeySigned
 	factKeyUnsigned = serverpkg.FactKeyUnsigned
@@ -35,7 +36,25 @@ func extractDomainFacts(input RunInput) []extractedDomainFact {
 	var out []extractedDomainFact
 	out = append(out, extractDNSKEYAlgorithms(input)...)
 	out = append(out, extractSignedStatus(input)...)
+	out = append(out, extractGrade(input)...)
 	return dedupeDomainFacts(out)
+}
+
+// extractGrade emits one fact row per run carrying the letter grade the
+// scoring engine assigned at graduation time. The grade set is not
+// hard-coded because scoring is configurable — a cohort scored under a
+// custom profile may produce labels outside the default A+/A/B/C/D/F
+// set. The registry handles display; this extractor just records
+// whatever label the run carries.
+func extractGrade(input RunInput) []extractedDomainFact {
+	if input.Run.Grade == nil {
+		return nil
+	}
+	grade := strings.TrimSpace(*input.Run.Grade)
+	if grade == "" {
+		return nil
+	}
+	return []extractedDomainFact{{category: factCategoryGrade, key: grade}}
 }
 
 func dedupeDomainFacts(in []extractedDomainFact) []extractedDomainFact {

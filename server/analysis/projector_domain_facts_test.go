@@ -177,6 +177,35 @@ func TestExtractDomainFactsDedupesAcrossExtractors(t *testing.T) {
 	}
 }
 
+func TestExtractGrade(t *testing.T) {
+	grade := "B"
+	got := extractGrade(RunInput{
+		Run: serverpkg.Run{Grade: &grade},
+	})
+	if len(got) != 1 || got[0].category != factCategoryGrade || got[0].key != "B" {
+		t.Fatalf("expected one grade=B fact, got %+v", got)
+	}
+
+	// Nil grade → no fact.
+	if got := extractGrade(RunInput{}); len(got) != 0 {
+		t.Fatalf("nil grade should emit nothing, got %+v", got)
+	}
+
+	// Empty/whitespace grade → no fact.
+	empty := "   "
+	if got := extractGrade(RunInput{Run: serverpkg.Run{Grade: &empty}}); len(got) != 0 {
+		t.Fatalf("whitespace grade should emit nothing, got %+v", got)
+	}
+
+	// Custom scoring profile grade passes through verbatim — no
+	// hard-coded letter set.
+	custom := "Gold"
+	got = extractGrade(RunInput{Run: serverpkg.Run{Grade: &custom}})
+	if len(got) != 1 || got[0].key != "Gold" {
+		t.Fatalf("expected custom grade to pass through, got %+v", got)
+	}
+}
+
 func TestBuildDomainFactRowsAttachesRunCohortDomain(t *testing.T) {
 	v := int64(2)
 	facts := []extractedDomainFact{

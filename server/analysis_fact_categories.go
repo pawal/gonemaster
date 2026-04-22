@@ -13,6 +13,7 @@ import (
 const (
 	FactCategoryDNSKEYAlgorithm = "dnskey_algo"
 	FactCategorySigned          = "signed"
+	FactCategoryGrade           = "grade"
 
 	FactKeySigned   = "signed"
 	FactKeyUnsigned = "unsigned"
@@ -57,6 +58,18 @@ var factCategoryDisplays = map[string]factCategoryDisplay{
 		KeyLabel:    dnskeyAlgorithmKeyLabel,
 		KeyTone:     dnskeyAlgorithmKeyTone,
 		KeyOrder:    dnskeyAlgorithmKeyOrder,
+	},
+	FactCategoryGrade: {
+		Label: "Grade distribution",
+		// Grades come from the scoring config that was active when the
+		// run graduated, so the set of labels can vary across runs if a
+		// cohort was scored under different configs. The display falls
+		// back to neutral tone and lexical ordering for unknown labels.
+		Description: "Letter grade assigned by the scoring engine at run time.",
+		Order:       15,
+		KeyLabel:    gradeKeyLabel,
+		KeyTone:     gradeKeyTone,
+		KeyOrder:    gradeKeyOrder,
 	},
 }
 
@@ -155,6 +168,46 @@ func dnskeyAlgorithmKeyOrder(key string) int {
 		return 1 << 30
 	}
 	return n
+}
+
+// gradeTones maps the default scoring config's letter grades to bar
+// tones. A+ and A are ok (green), B is notice, C is warning, D is error,
+// F is critical. Custom scoring configs that emit different labels
+// fall back to neutral.
+var gradeTones = map[string]string{
+	"A+": "ok",
+	"A":  "ok",
+	"B":  "notice",
+	"C":  "warning",
+	"D":  "error",
+	"F":  "critical",
+}
+
+// gradeOrder pins A+/A/B/C/D/F in the expected display order. Unknown
+// grades sort lexically after the known set.
+var gradeOrder = map[string]int{
+	"A+": 0,
+	"A":  1,
+	"B":  2,
+	"C":  3,
+	"D":  4,
+	"F":  5,
+}
+
+func gradeKeyLabel(key string) string { return key }
+
+func gradeKeyTone(key string) string {
+	if tone, ok := gradeTones[key]; ok {
+		return tone
+	}
+	return "neutral"
+}
+
+func gradeKeyOrder(key string) int {
+	if n, ok := gradeOrder[key]; ok {
+		return n
+	}
+	return 1 << 30
 }
 
 // PublicAnalysisFactBucket is one (key, count) bar segment inside a

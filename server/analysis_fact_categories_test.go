@@ -84,6 +84,62 @@ func TestBuildFactDistributionsEmpty(t *testing.T) {
 	}
 }
 
+func TestGradeDistributionKnownLettersUseSeverityTones(t *testing.T) {
+	facts := []AnalysisRunDomainFact{
+		{CohortID: 1, RunID: "r1", DomainID: 1, Category: FactCategoryGrade, Key: "A+"},
+		{CohortID: 1, RunID: "r2", DomainID: 2, Category: FactCategoryGrade, Key: "A"},
+		{CohortID: 1, RunID: "r3", DomainID: 3, Category: FactCategoryGrade, Key: "B"},
+		{CohortID: 1, RunID: "r4", DomainID: 4, Category: FactCategoryGrade, Key: "C"},
+		{CohortID: 1, RunID: "r5", DomainID: 5, Category: FactCategoryGrade, Key: "D"},
+		{CohortID: 1, RunID: "r6", DomainID: 6, Category: FactCategoryGrade, Key: "F"},
+	}
+	dist, ok := buildFactDistributions(facts)[FactCategoryGrade]
+	if !ok {
+		t.Fatalf("expected grade distribution, got %+v", buildFactDistributions(facts))
+	}
+	if len(dist.Buckets) != 6 {
+		t.Fatalf("expected 6 buckets, got %+v", dist.Buckets)
+	}
+	want := []struct {
+		key, tone string
+	}{
+		{"A+", "ok"},
+		{"A", "ok"},
+		{"B", "notice"},
+		{"C", "warning"},
+		{"D", "error"},
+		{"F", "critical"},
+	}
+	for i, w := range want {
+		got := dist.Buckets[i]
+		if got.Key != w.key || got.Tone != w.tone {
+			t.Fatalf("bucket %d: got %+v, want key=%q tone=%q", i, got, w.key, w.tone)
+		}
+	}
+}
+
+func TestGradeDistributionUnknownLabelFallsBackToNeutral(t *testing.T) {
+	facts := []AnalysisRunDomainFact{
+		{CohortID: 1, RunID: "r1", DomainID: 1, Category: FactCategoryGrade, Key: "Gold"},
+		{CohortID: 1, RunID: "r2", DomainID: 2, Category: FactCategoryGrade, Key: "A"},
+	}
+	dist := buildFactDistributions(facts)[FactCategoryGrade]
+	byKey := map[string]PublicAnalysisFactBucket{}
+	for _, b := range dist.Buckets {
+		byKey[b.Key] = b
+	}
+	if byKey["Gold"].Tone != "neutral" {
+		t.Fatalf("custom grade should be neutral, got %q", byKey["Gold"].Tone)
+	}
+	if byKey["A"].Tone != "ok" {
+		t.Fatalf("default grade should keep its tone, got %q", byKey["A"].Tone)
+	}
+	// Unknown grades sort after known ones, but A comes first.
+	if dist.Buckets[0].Key != "A" {
+		t.Fatalf("expected A first, got %+v", dist.Buckets)
+	}
+}
+
 func TestDNSKEYAlgorithmKeyLabelFallback(t *testing.T) {
 	if got := dnskeyAlgorithmKeyLabel("999"); got != "ALGO 999" {
 		t.Fatalf("unknown algo number should render as ALGO <n>, got %q", got)

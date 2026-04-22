@@ -10,6 +10,18 @@ describe("filters", () => {
     });
   });
 
+  it("filterFromURL forwards worst_level and grade to the API call", () => {
+    // Overview health-bar segments deep-link with worst_level; grade-bar
+    // segments deep-link with grade. The loader must include both so the
+    // filter actually reaches the server.
+    const url = new URL("http://x/?dataset_tag=tld&worst_level=ERROR&grade=B");
+    expect(filterFromURL(url)).toEqual({
+      dataset_tag: "tld",
+      worst_level: "ERROR",
+      grade: "B"
+    });
+  });
+
   it("filterFromURL drops empty values", () => {
     const url = new URL("http://x/?dataset_tag=tld&search=");
     expect(filterFromURL(url)).toEqual({ dataset_tag: "tld" });

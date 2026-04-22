@@ -3,20 +3,24 @@
 // through `applyFilterToParams` so the URL stays canonical and the back
 // button works as expected.
 //
-// Only the filter keys that actually reach the server are kept here:
+// Only the filter keys that actually reach the server are kept here. Adding
+// a key here without matching server support silently does nothing; adding
+// server support without listing the key here drops the filter on page
+// load. The list and the server must agree.
 //   - dataset_tag: pins the cohort across tab changes.
 //   - search:      substring match on list endpoints.
-//
-// Other knobs (scope_mode, batch_id, from/to, family, level) were scaffolded
-// in Phase 4 anticipating server-side filtering that never landed. They were
-// removed to avoid affordances that do nothing. Re-introduce them alongside
-// the matching server support.
+//   - worst_level: exact severity bucket filter on /domains (linked from
+//                  the overview health bar).
+//   - grade:       exact grade filter on /domains (linked from the
+//                  overview grade distribution bar).
 
 import type { AnalysisFilter } from "$lib/api";
 
 const FILTER_KEYS = [
   "dataset_tag",
-  "search"
+  "search",
+  "worst_level",
+  "grade"
 ] as const satisfies readonly (keyof AnalysisFilter)[];
 
 export type FilterKey = (typeof FILTER_KEYS)[number];

@@ -22,6 +22,22 @@ export type OverviewPageData = {
   topASNsError: string | null;
 };
 
+export type FactBucket = {
+  key: string;
+  label: string;
+  tone: string;
+  count: number;
+  order: number;
+};
+
+export type FactDistribution = {
+  category: string;
+  label: string;
+  description?: string;
+  order: number;
+  buckets: FactBucket[];
+};
+
 export type CohortDetail = {
   dataset_tag: string;
   label: string;
@@ -35,6 +51,7 @@ export type CohortDetail = {
   asn_count?: number;
   prefix_count?: number;
   severity_distribution?: Record<string, number>;
+  fact_distributions?: Record<string, FactDistribution>;
 };
 
 export async function load({ parent, fetch }): Promise<OverviewPageData> {

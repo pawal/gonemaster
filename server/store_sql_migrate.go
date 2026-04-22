@@ -429,6 +429,36 @@ var sqlMigrations = []sqlMigration{
 			}
 		},
 	},
+	{
+		// Generic per-(cohort, run, domain) fact store for small
+		// distribution-shaped statistics (DNSKEY algorithm, signed
+		// posture, NSEC mode, ...). One row per (category, key).
+		version: 10,
+		stmtsFn: func(d sqlDialect) []string {
+			var bigint string
+			switch d.(type) {
+			case postgresDialect, mariadbDialect:
+				bigint = "BIGINT"
+			default:
+				bigint = "INTEGER"
+			}
+			return []string{
+				fmt.Sprintf(`CREATE TABLE IF NOT EXISTS analysis_run_domain_facts (
+					cohort_id %s           NOT NULL,
+					run_id    VARCHAR(255) NOT NULL,
+					domain_id %s           NOT NULL,
+					category  VARCHAR(64)  NOT NULL,
+					fact_key  VARCHAR(128) NOT NULL,
+					value_num BIGINT       NULL,
+					PRIMARY KEY (cohort_id, run_id, domain_id, category, fact_key)
+				)`, bigint, bigint),
+				`CREATE INDEX IF NOT EXISTS idx_analysis_run_domain_facts_cohort_id ON analysis_run_domain_facts(cohort_id)`,
+				`CREATE INDEX IF NOT EXISTS idx_analysis_run_domain_facts_run_id ON analysis_run_domain_facts(run_id)`,
+				`CREATE INDEX IF NOT EXISTS idx_analysis_run_domain_facts_category ON analysis_run_domain_facts(cohort_id, category)`,
+				`CREATE INDEX IF NOT EXISTS idx_analysis_run_domain_facts_category_key ON analysis_run_domain_facts(cohort_id, category, fact_key)`,
+			}
+		},
+	},
 }
 
 // runMigrations creates the schema_migrations tracking table and applies any

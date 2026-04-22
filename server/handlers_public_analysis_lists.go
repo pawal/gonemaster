@@ -16,6 +16,7 @@ type AnalysisReadStore interface {
 	ListAnalysisRunAddressASNsByCohort(cohortID int64) []AnalysisRunAddressASN
 	ListAnalysisRunDomainASNsByCohort(cohortID int64) []AnalysisRunDomainASN
 	ListAnalysisRunTagSummariesByCohort(cohortID int64) []AnalysisRunTagSummary
+	ListAnalysisRunDomainFactsByCohort(cohortID int64) []AnalysisRunDomainFact
 	GetAnalysisNameserver(id int64) (AnalysisNameserver, bool)
 	GetAnalysisAddress(id int64) (AnalysisAddress, bool)
 	GetAnalysisPrefix(id int64) (AnalysisPrefix, bool)
@@ -233,6 +234,7 @@ type latestCohortMaterialization struct {
 	addressASNs  []AnalysisRunAddressASN
 	domainASNs   []AnalysisRunDomainASN
 	tagSummaries []AnalysisRunTagSummary
+	domainFacts  []AnalysisRunDomainFact
 	// domainNames is the id -> name map for every domain in `latest`,
 	// preloaded once during cache compute so list handlers don't have
 	// to issue one GetDomain DB round-trip per row.
@@ -303,8 +305,23 @@ func computeLatestMaterializationForCohort(readStore AnalysisReadStore, runLooku
 		addressASNs:  filterAnalysisRunAddressASNsByRunIDs(readStore.ListAnalysisRunAddressASNsByCohort(cohortID), runIDs),
 		domainASNs:   filterAnalysisRunDomainASNsByRunIDs(readStore.ListAnalysisRunDomainASNsByCohort(cohortID), runIDs),
 		tagSummaries: filterAnalysisRunTagSummariesByRunIDs(readStore.ListAnalysisRunTagSummariesByCohort(cohortID), runIDs),
+		domainFacts:  filterAnalysisRunDomainFactsByRunIDs(readStore.ListAnalysisRunDomainFactsByCohort(cohortID), runIDs),
 		domainNames:  domainNames,
 	}
+}
+
+func filterAnalysisRunDomainFactsByRunIDs(items []AnalysisRunDomainFact, runIDs map[string]struct{}) []AnalysisRunDomainFact {
+	if len(runIDs) == 0 {
+		return nil
+	}
+	out := make([]AnalysisRunDomainFact, 0, len(items))
+	for _, item := range items {
+		if _, ok := runIDs[item.RunID]; !ok {
+			continue
+		}
+		out = append(out, item)
+	}
+	return out
 }
 
 func filterAnalysisRunTagSummariesByRunIDs(items []AnalysisRunTagSummary, runIDs map[string]struct{}) []AnalysisRunTagSummary {

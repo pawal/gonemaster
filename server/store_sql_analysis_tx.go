@@ -19,6 +19,7 @@ type AnalysisWriteStore interface {
 	ReplaceAnalysisRunAddressASNs(cohortID int64, runID string, items []AnalysisRunAddressASN) error
 	ReplaceAnalysisRunDomainASNs(cohortID int64, runID string, items []AnalysisRunDomainASN) error
 	ReplaceAnalysisRunTagSummaries(cohortID int64, runID string, items []AnalysisRunTagSummary) error
+	ReplaceAnalysisRunDomainFacts(cohortID int64, runID string, items []AnalysisRunDomainFact) error
 	UpsertAnalysisRunDomainSummary(item AnalysisRunDomainSummary) error
 	SetAnalysisProjectionState(item AnalysisProjectionState) error
 }
@@ -73,6 +74,10 @@ func (t *analysisWriteTxStore) ReplaceAnalysisRunDomainASNs(cohortID int64, runI
 
 func (t *analysisWriteTxStore) ReplaceAnalysisRunTagSummaries(cohortID int64, runID string, items []AnalysisRunTagSummary) error {
 	return t.parent.replaceAnalysisRunTagSummariesIn(t.tx, cohortID, runID, items)
+}
+
+func (t *analysisWriteTxStore) ReplaceAnalysisRunDomainFacts(cohortID int64, runID string, items []AnalysisRunDomainFact) error {
+	return t.parent.replaceAnalysisRunDomainFactsIn(t.tx, cohortID, runID, items)
 }
 
 func (t *analysisWriteTxStore) UpsertAnalysisRunDomainSummary(item AnalysisRunDomainSummary) error {

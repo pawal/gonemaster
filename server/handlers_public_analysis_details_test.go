@@ -102,6 +102,58 @@ func TestPublicAnalysisCohortDetailSeverityDistribution(t *testing.T) {
 	}
 }
 
+func TestPublicAnalysisCohortDetailFactDistributions(t *testing.T) {
+	f := newAnalysisAPITestFixture(t)
+	ts := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+
+	// signed.example: signed zone publishing algo 13.
+	run1 := f.seedGraduatedRun("signed.example", ts, []engine.LogEntry{
+		{Module: "DNSSEC", Testcase: "dnssec05", Tag: "DS05_ALGO_OK", Level: "INFO"},
+	})
+	d1, _ := f.store.GetDomainByName("signed.example")
+	one := int64(1)
+	if err := f.store.ReplaceAnalysisRunDomainFacts(f.cohort.ID, run1.ID, []AnalysisRunDomainFact{
+		{CohortID: f.cohort.ID, RunID: run1.ID, DomainID: d1.ID, Category: FactCategorySigned, Key: FactKeySigned},
+		{CohortID: f.cohort.ID, RunID: run1.ID, DomainID: d1.ID, Category: FactCategoryDNSKEYAlgorithm, Key: "13", ValueNum: &one},
+	}); err != nil {
+		t.Fatalf("replace domain facts: %v", err)
+	}
+
+	// unsigned.example: unsigned zone.
+	run2 := f.seedGraduatedRun("unsigned.example", ts, []engine.LogEntry{
+		{Module: "DNSSEC", Testcase: "dnssec07", Tag: "DS07_NOT_SIGNED", Level: "ERROR"},
+	})
+	d2, _ := f.store.GetDomainByName("unsigned.example")
+	if err := f.store.ReplaceAnalysisRunDomainFacts(f.cohort.ID, run2.ID, []AnalysisRunDomainFact{
+		{CohortID: f.cohort.ID, RunID: run2.ID, DomainID: d2.ID, Category: FactCategorySigned, Key: FactKeyUnsigned},
+	}); err != nil {
+		t.Fatalf("replace domain facts: %v", err)
+	}
+
+	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/tld")
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
+	}
+	var got PublicAnalysisCohortDetail
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	signed, ok := got.FactDistributions[FactCategorySigned]
+	if !ok {
+		t.Fatalf("expected %q distribution, got %+v", FactCategorySigned, got.FactDistributions)
+	}
+	if len(signed.Buckets) != 2 {
+		t.Fatalf("expected signed+unsigned buckets, got %+v", signed.Buckets)
+	}
+	algo, ok := got.FactDistributions[FactCategoryDNSKEYAlgorithm]
+	if !ok {
+		t.Fatalf("expected dnskey_algo distribution, got %+v", got.FactDistributions)
+	}
+	if len(algo.Buckets) != 1 || algo.Buckets[0].Key != "13" || algo.Buckets[0].Count != 1 {
+		t.Fatalf("expected single algo=13 bucket with count 1, got %+v", algo.Buckets)
+	}
+}
+
 func TestPublicAnalysisCohortDetailNotFound(t *testing.T) {
 	f := seedDetailFixture(t)
 	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/unknown")

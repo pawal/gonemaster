@@ -32,6 +32,7 @@ type fakeStore struct {
 	addrFacts    map[string][]serverpkg.AnalysisRunAddressASN
 	domainASNs   map[string][]serverpkg.AnalysisRunDomainASN
 	tagSummaries map[string][]serverpkg.AnalysisRunTagSummary
+	domainFacts  map[string][]serverpkg.AnalysisRunDomainFact
 	summaries    map[string]serverpkg.AnalysisRunDomainSummary
 	states       map[string]serverpkg.AnalysisProjectionState
 }
@@ -142,6 +143,11 @@ func (s *fakeStore) ClearAnalysisCohortMaterialization(cohortID int64) error {
 	for key := range s.tagSummaries {
 		if strings.HasPrefix(key, prefix) {
 			delete(s.tagSummaries, key)
+		}
+	}
+	for key := range s.domainFacts {
+		if strings.HasPrefix(key, prefix) {
+			delete(s.domainFacts, key)
 		}
 	}
 	for key := range s.summaries {
@@ -309,6 +315,12 @@ func (s *fakeStore) ReplaceAnalysisRunTagSummaries(cohortID int64, runID string,
 	return nil
 }
 
+func (s *fakeStore) ReplaceAnalysisRunDomainFacts(cohortID int64, runID string, items []serverpkg.AnalysisRunDomainFact) error {
+	s.ensureMaterializedMaps()
+	s.domainFacts[projectionKey(cohortID, runID)] = append([]serverpkg.AnalysisRunDomainFact(nil), items...)
+	return nil
+}
+
 func (s *fakeStore) UpsertAnalysisRunDomainSummary(item serverpkg.AnalysisRunDomainSummary) error {
 	s.ensureMaterializedMaps()
 	s.summaries[projectionKey(item.CohortID, item.RunID)] = item
@@ -345,6 +357,9 @@ func (s *fakeStore) ensureMaterializedMaps() {
 	}
 	if s.tagSummaries == nil {
 		s.tagSummaries = map[string][]serverpkg.AnalysisRunTagSummary{}
+	}
+	if s.domainFacts == nil {
+		s.domainFacts = map[string][]serverpkg.AnalysisRunDomainFact{}
 	}
 	if s.summaries == nil {
 		s.summaries = map[string]serverpkg.AnalysisRunDomainSummary{}

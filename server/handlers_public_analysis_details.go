@@ -11,18 +11,19 @@ import (
 
 // PublicAnalysisCohortDetail describes one cohort plus its top-level counts.
 type PublicAnalysisCohortDetail struct {
-	DatasetTag            string         `json:"dataset_tag"`
-	Label                 string         `json:"label"`
-	Description           string         `json:"description,omitempty"`
-	IsDefault             bool           `json:"is_default"`
-	MaterializationStatus string         `json:"materialization_status"`
-	LastMaterializedAt    *time.Time     `json:"last_materialized_at,omitempty"`
-	DomainCount           int            `json:"domain_count"`
-	NameserverCount       int            `json:"nameserver_count"`
-	EndpointCount         int            `json:"endpoint_count"`
-	ASNCount              int            `json:"asn_count"`
-	PrefixCount           int            `json:"prefix_count"`
-	SeverityDistribution  map[string]int `json:"severity_distribution,omitempty"`
+	DatasetTag            string                                    `json:"dataset_tag"`
+	Label                 string                                    `json:"label"`
+	Description           string                                    `json:"description,omitempty"`
+	IsDefault             bool                                      `json:"is_default"`
+	MaterializationStatus string                                    `json:"materialization_status"`
+	LastMaterializedAt    *time.Time                                `json:"last_materialized_at,omitempty"`
+	DomainCount           int                                       `json:"domain_count"`
+	NameserverCount       int                                       `json:"nameserver_count"`
+	EndpointCount         int                                       `json:"endpoint_count"`
+	ASNCount              int                                       `json:"asn_count"`
+	PrefixCount           int                                       `json:"prefix_count"`
+	SeverityDistribution  map[string]int                            `json:"severity_distribution,omitempty"`
+	FactDistributions     map[string]PublicAnalysisFactDistribution `json:"fact_distributions,omitempty"`
 }
 
 // severityBucket normalizes a run worst_level into one of the five buckets
@@ -217,6 +218,9 @@ func (s *Server) handlePublicAnalysisCohortDetail(w http.ResponseWriter, r *http
 		detail.PrefixCount = len(prefixSet)
 		if len(severity) > 0 {
 			detail.SeverityDistribution = severity
+		}
+		if dist := buildFactDistributions(data.domainFacts); len(dist) > 0 {
+			detail.FactDistributions = dist
 		}
 	}
 	writeJSON(w, http.StatusOK, detail)

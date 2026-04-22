@@ -1,0 +1,250 @@
+package server
+
+import (
+	"sort"
+	"strconv"
+)
+
+// Fact-category identifiers materialized by the projector and rendered on
+// the overview. Kept as string constants here so the projector (which
+// imports this package) and the display registry below agree on the
+// wire-format tokens. Adding a new statistic means adding one constant
+// plus one entry in factCategoryDisplay below.
+const (
+	FactCategoryDNSKEYAlgorithm = "dnskey_algo"
+	FactCategorySigned          = "signed"
+
+	FactKeySigned   = "signed"
+	FactKeyUnsigned = "unsigned"
+)
+
+// factCategoryDisplay carries the UI-side metadata for one category:
+// human-readable label, short description, default bar tone, and per-key
+// helpers. None of this is stored in the database; all of it lives next
+// to the projector extractor so changing a label is a code change
+// reviewed like any other.
+type factCategoryDisplay struct {
+	Label       string
+	Description string
+	// Order controls the section order on the overview. Lower first.
+	Order int
+	// KeyLabel maps the stable key token to the human label shown on a
+	// bar segment (e.g. "8" -> "RSASHA256"). Return the raw key when no
+	// friendly label is known.
+	KeyLabel func(key string) string
+	// KeyTone maps a key to one of the tone tokens the UI understands
+	// ("ok", "notice", "warning", "error", "critical", "neutral").
+	KeyTone func(key string) string
+	// KeyOrder returns a sort index within the category. Lower first.
+	KeyOrder func(key string) int
+}
+
+// factCategoryDisplays is the registry consumed by the cohort detail
+// handler to build fact_distributions response payloads.
+var factCategoryDisplays = map[string]factCategoryDisplay{
+	FactCategorySigned: {
+		Label:       "DNSSEC posture",
+		Description: "Signed vs unsigned domains in the cohort.",
+		Order:       10,
+		KeyLabel:    signedKeyLabel,
+		KeyTone:     signedKeyTone,
+		KeyOrder:    signedKeyOrder,
+	},
+	FactCategoryDNSKEYAlgorithm: {
+		Label:       "DNSKEY algorithms",
+		Description: "Signing algorithms published by the cohort's signed domains.",
+		Order:       20,
+		KeyLabel:    dnskeyAlgorithmKeyLabel,
+		KeyTone:     dnskeyAlgorithmKeyTone,
+		KeyOrder:    dnskeyAlgorithmKeyOrder,
+	},
+}
+
+func signedKeyLabel(key string) string {
+	switch key {
+	case FactKeySigned:
+		return "Signed"
+	case FactKeyUnsigned:
+		return "Unsigned"
+	}
+	return key
+}
+
+func signedKeyTone(key string) string {
+	switch key {
+	case FactKeySigned:
+		return "ok"
+	case FactKeyUnsigned:
+		return "warning"
+	}
+	return "neutral"
+}
+
+func signedKeyOrder(key string) int {
+	switch key {
+	case FactKeySigned:
+		return 0
+	case FactKeyUnsigned:
+		return 1
+	}
+	return 99
+}
+
+// dnskeyAlgorithmMnemonics mirrors the engine's algoProperties table for
+// the algorithms a TLD cohort is realistically going to see. Kept local
+// so this package does not pull in engine imports for one string table.
+// Unknown algo numbers render as "ALGO <n>".
+var dnskeyAlgorithmMnemonics = map[int]string{
+	1:  "RSAMD5",
+	3:  "DSA",
+	5:  "RSASHA1",
+	6:  "DSA-NSEC3-SHA1",
+	7:  "RSASHA1-NSEC3-SHA1",
+	8:  "RSASHA256",
+	10: "RSASHA512",
+	12: "ECC-GOST",
+	13: "ECDSAP256SHA256",
+	14: "ECDSAP384SHA384",
+	15: "ED25519",
+	16: "ED448",
+}
+
+// dnskeyAlgorithmTones colors each algorithm by current best-practice:
+// modern curves green, SHA-256 RSA blue (acceptable), SHA-1 family red
+// (deprecated), unknown/private neutral.
+var dnskeyAlgorithmTones = map[int]string{
+	1:  "error",
+	3:  "error",
+	5:  "error",
+	6:  "error",
+	7:  "warning",
+	8:  "notice",
+	10: "notice",
+	12: "warning",
+	13: "ok",
+	14: "ok",
+	15: "ok",
+	16: "ok",
+}
+
+func dnskeyAlgorithmKeyLabel(key string) string {
+	n, err := strconv.Atoi(key)
+	if err != nil {
+		return key
+	}
+	if label, ok := dnskeyAlgorithmMnemonics[n]; ok {
+		return label
+	}
+	return "ALGO " + key
+}
+
+func dnskeyAlgorithmKeyTone(key string) string {
+	n, err := strconv.Atoi(key)
+	if err != nil {
+		return "neutral"
+	}
+	if tone, ok := dnskeyAlgorithmTones[n]; ok {
+		return tone
+	}
+	return "neutral"
+}
+
+func dnskeyAlgorithmKeyOrder(key string) int {
+	n, err := strconv.Atoi(key)
+	if err != nil {
+		return 1 << 30
+	}
+	return n
+}
+
+// PublicAnalysisFactBucket is one (key, count) bar segment inside a
+// category distribution on the overview response.
+type PublicAnalysisFactBucket struct {
+	Key   string `json:"key"`
+	Label string `json:"label"`
+	Tone  string `json:"tone"`
+	Count int    `json:"count"`
+	Order int    `json:"order"`
+}
+
+// PublicAnalysisFactDistribution is one category's payload inside
+// fact_distributions on the cohort detail response.
+type PublicAnalysisFactDistribution struct {
+	Category    string                     `json:"category"`
+	Label       string                     `json:"label"`
+	Description string                     `json:"description,omitempty"`
+	Order       int                        `json:"order"`
+	Buckets     []PublicAnalysisFactBucket `json:"buckets"`
+}
+
+// buildFactDistributions aggregates the cached domain-fact rows into
+// per-category bar data suitable for the public overview. Counts are
+// distinct domains per key — a domain can appear in multiple buckets
+// within a category (e.g. a zone publishing two DNSKEY algorithms).
+func buildFactDistributions(facts []AnalysisRunDomainFact) map[string]PublicAnalysisFactDistribution {
+	if len(facts) == 0 {
+		return nil
+	}
+	type bucketKey struct {
+		category, key string
+	}
+	domainsByBucket := map[bucketKey]map[int64]struct{}{}
+	for _, f := range facts {
+		k := bucketKey{category: f.Category, key: f.Key}
+		set, ok := domainsByBucket[k]
+		if !ok {
+			set = map[int64]struct{}{}
+			domainsByBucket[k] = set
+		}
+		set[f.DomainID] = struct{}{}
+	}
+	byCategory := map[string][]PublicAnalysisFactBucket{}
+	for k, domains := range domainsByBucket {
+		display, known := factCategoryDisplays[k.category]
+		label := k.key
+		tone := "neutral"
+		order := 1 << 30
+		if known {
+			if display.KeyLabel != nil {
+				label = display.KeyLabel(k.key)
+			}
+			if display.KeyTone != nil {
+				tone = display.KeyTone(k.key)
+			}
+			if display.KeyOrder != nil {
+				order = display.KeyOrder(k.key)
+			}
+		}
+		byCategory[k.category] = append(byCategory[k.category], PublicAnalysisFactBucket{
+			Key:   k.key,
+			Label: label,
+			Tone:  tone,
+			Count: len(domains),
+			Order: order,
+		})
+	}
+	out := make(map[string]PublicAnalysisFactDistribution, len(byCategory))
+	for category, buckets := range byCategory {
+		sort.Slice(buckets, func(i, j int) bool {
+			if buckets[i].Order != buckets[j].Order {
+				return buckets[i].Order < buckets[j].Order
+			}
+			return buckets[i].Key < buckets[j].Key
+		})
+		display, known := factCategoryDisplays[category]
+		entry := PublicAnalysisFactDistribution{
+			Category: category,
+			Buckets:  buckets,
+		}
+		if known {
+			entry.Label = display.Label
+			entry.Description = display.Description
+			entry.Order = display.Order
+		} else {
+			entry.Label = category
+			entry.Order = 1 << 30
+		}
+		out[category] = entry
+	}
+	return out
+}

@@ -318,6 +318,19 @@ type AnalysisRunTagSummary struct {
 	OccurrenceCount int    `json:"occurrence_count"`
 }
 
+// AnalysisRunDomainFact is one (category, key) fact observed for a domain in
+// one run+cohort. Categories are small, distribution-shaped statistics such
+// as DNSKEY algorithm or signed/unsigned posture; the registry in
+// analysis_fact_categories.go defines their display metadata.
+type AnalysisRunDomainFact struct {
+	CohortID int64  `json:"cohort_id"`
+	RunID    string `json:"run_id"`
+	DomainID int64  `json:"domain_id"`
+	Category string `json:"category"`
+	Key      string `json:"key"`
+	ValueNum *int64 `json:"value_num,omitempty"`
+}
+
 // AnalysisProjectionState tracks projection status for one run+cohort pair.
 type AnalysisProjectionState struct {
 	CohortID         int64     `json:"cohort_id"`

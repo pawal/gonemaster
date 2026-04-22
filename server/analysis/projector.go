@@ -187,6 +187,7 @@ type preparedRun struct {
 	domainASNs   []extractedDomainASN
 	asnLabels    map[int64]string
 	tagSummaries []tagSummary
+	domainFacts  []extractedDomainFact
 }
 
 // tagSummary is a per-(tag, testcase) aggregate for one run. Rendered by
@@ -279,6 +280,7 @@ func (p *Projector) prepareRun(input RunInput) preparedRun {
 	domainASNs = restrictDomainASNsToAuthoritative(domainASNs, addressFacts)
 	asnLabels := p.resolveASNLabels(addressFacts, domainASNs)
 	tagSummaries := extractTagSummaries(input)
+	domainFacts := extractDomainFacts(input)
 	return preparedRun{
 		input:        input,
 		endpoints:    endpoints,
@@ -286,6 +288,7 @@ func (p *Projector) prepareRun(input RunInput) preparedRun {
 		domainASNs:   domainASNs,
 		asnLabels:    asnLabels,
 		tagSummaries: tagSummaries,
+		domainFacts:  domainFacts,
 	}
 }
 
@@ -299,6 +302,7 @@ func (p *Projector) writePrepared(pr preparedRun, w WriteStore) error {
 	domainASNs := pr.domainASNs
 	asnLabels := pr.asnLabels
 	tagSummaries := pr.tagSummaries
+	domainFacts := pr.domainFacts
 
 	nameserverIDs := map[string]int64{}
 	addressIDs := map[string]int64{}
@@ -417,6 +421,11 @@ func (p *Projector) writePrepared(pr preparedRun, w WriteStore) error {
 		}
 		if err := w.ReplaceAnalysisRunTagSummaries(cohort.ID, input.Run.ID, tagRows); err != nil {
 			return fmt.Errorf("replace tag summaries for cohort %d: %w", cohort.ID, err)
+		}
+
+		factRows := buildDomainFactRows(cohort.ID, input.Run.ID, input.Run.DomainID, domainFacts)
+		if err := w.ReplaceAnalysisRunDomainFacts(cohort.ID, input.Run.ID, factRows); err != nil {
+			return fmt.Errorf("replace domain facts for cohort %d: %w", cohort.ID, err)
 		}
 
 		summary.CohortID = cohort.ID

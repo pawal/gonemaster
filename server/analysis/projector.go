@@ -538,30 +538,24 @@ func (p *Projector) extractNameserverEndpoints(input RunInput) []extractedEndpoi
 		seen[key] = item
 	}
 
-	// Canonical authoritative NS set for the zone under test. Parsed from
-	// the Delegation01 tags (ENOUGH_NS_CHILD / ENOUGH_NS_DEL and their
-	// NOT_ENOUGH_ variants), which list every NS name the zone is
-	// delegated at regardless of whether the engine could resolve or
-	// reach them. Using delegation rather than reachability keeps
-	// unresolvable or unreachable NSes visible on the domain detail
-	// page; they are still authoritative for the zone and an operator
-	// dashboard should surface them, not hide them.
-	authoritativeNSSet := delegationNSSet(input.Entries)
-
-	// nameserver_timings is still useful — it tells us which (ns, addr)
-	// pairs the engine successfully probed, which is what we use to
-	// populate avg/min/max/count on the endpoint row. It's no longer a
-	// classification gate.
-	timingSet := make(map[string]struct{}, len(input.NameserverTimings))
+	// Authoritative NS name set for the zone under test. Primary source
+	// is NameserverTiming: the worker emits one row per delegated target
+	// including unreachable / unresolved ones, so reading the names off
+	// those rows gives us the complete delegation set. Falls back to the
+	// Delegation01 tag parser for legacy runs written before the worker
+	// emitted status-bearing rows.
+	authoritativeNSSet := map[string]struct{}{}
 	for _, timing := range input.NameserverTimings {
 		ns := normalizeNameserverName(timing.Nameserver)
-		addr := strings.TrimSpace(timing.Address)
-		if ns == "" || addr == "" {
+		if ns == "" {
 			continue
 		}
-		timingSet[ns+"|"+addr] = struct{}{}
+		authoritativeNSSet[ns] = struct{}{}
 	}
-	haveTimings := len(timingSet) > 0
+	if len(authoritativeNSSet) == 0 {
+		authoritativeNSSet = delegationNSSet(input.Entries)
+	}
+
 	childSide := func(source string) bool {
 		switch source {
 		case "child_servers", "zone_servers", "ns_set_servers":
@@ -570,27 +564,16 @@ func (p *Projector) extractNameserverEndpoints(input RunInput) []extractedEndpoi
 		return false
 	}
 	classify := func(source, ns, addr string) string {
-		// Preferred rule: delegation-driven. If we have the authoritative
-		// NS name set from the engine's delegation entries, anything
-		// named there is authoritative even if the engine couldn't time
-		// it (e.g. CN01/CN02_NO_RESPONSE); anything else is parent.
 		if len(authoritativeNSSet) > 0 {
 			if _, ok := authoritativeNSSet[ns]; ok {
 				return "authoritative"
 			}
 			return "parent"
 		}
-		// Fallback for runs that pre-date the delegation tag emission or
-		// where the engine never ran Delegation01 (rare): trust the
-		// timings whitelist when populated, and otherwise only trust
-		// the explicit child-side argument keys. Keeps existing older
-		// runs projectable without pulling in root-server noise.
-		if haveTimings {
-			if _, ok := timingSet[ns+"|"+addr]; ok {
-				return "authoritative"
-			}
-			return "parent"
-		}
+		// Last-resort fallback: no timings, no delegation entries —
+		// trust only the explicit child-side source keys, everything
+		// else defaults to parent so root-server traversal doesn't
+		// leak into the authoritative view.
 		if childSide(source) {
 			return "authoritative"
 		}
@@ -598,12 +581,28 @@ func (p *Projector) extractNameserverEndpoints(input RunInput) []extractedEndpoi
 	}
 
 	for _, timing := range input.NameserverTimings {
+		ns := normalizeNameserverName(timing.Nameserver)
+		addr := strings.TrimSpace(timing.Address)
+		if ns == "" {
+			continue
+		}
+		if addr == "" {
+			// Unresolved target — surface the NS name without an
+			// address so the domain detail page still lists it.
+			add(extractedEndpoint{
+				nameserver: ns,
+				address:    "",
+				role:       "authoritative",
+				source:     "delegation",
+			})
+			continue
+		}
 		add(extractedEndpoint{
-			nameserver: normalizeNameserverName(timing.Nameserver),
-			address:    strings.TrimSpace(timing.Address),
+			nameserver: ns,
+			address:    addr,
 			role:       "authoritative",
 			source:     "timings",
-			family:     familyForAddress(timing.Address),
+			family:     familyForAddress(addr),
 			avgMS:      timing.AvgMS,
 			minMS:      timing.MinMS,
 			maxMS:      timing.MaxMS,

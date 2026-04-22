@@ -1,11 +1,12 @@
 <script lang="ts">
   import { base } from "$app/paths";
   import { page } from "$app/state";
+  import FactDistributionBar from "$lib/FactDistributionBar.svelte";
   import FilterBar from "$lib/FilterBar.svelte";
   import { asnHref, nameserverHref, tagHref } from "$lib/entityLinks";
   import { formatCount, formatTimestamp, levelTone } from "$lib/format";
   import type { LayoutData } from "./+layout";
-  import type { OverviewPageData } from "./+page";
+  import type { FactDistribution, OverviewPageData } from "./+page";
 
   let { data }: { data: OverviewPageData } = $props();
 
@@ -32,6 +33,21 @@
     { key: "ERROR", label: "Error", tone: "error" },
     { key: "CRITICAL", label: "Critical", tone: "critical" }
   ] as const;
+
+  const factDistributions = $derived.by<FactDistribution[]>(() => {
+    const map = data.detail?.fact_distributions;
+    if (!map) return [];
+    return Object.values(map).sort((a, b) => {
+      if (a.order !== b.order) return a.order - b.order;
+      return a.category.localeCompare(b.category);
+    });
+  });
+
+  // DNSKEY algorithm bar is the one category where a domain can legitimately
+  // contribute to multiple buckets (dual-algo rollovers, emergency keys).
+  // Rendering needs a caption so readers don't interpret the bar as a
+  // partition of the cohort.
+  const multiBucketCategories = new Set(["dnskey_algo"]);
 
   const healthSegments = $derived.by(() => {
     const dist = data.detail?.severity_distribution;
@@ -167,6 +183,14 @@
         </div>
       </section>
     {/if}
+    {#each factDistributions as dist (dist.category)}
+      <FactDistributionBar
+        title={dist.label}
+        description={dist.description}
+        buckets={dist.buckets}
+        multiPerDomain={multiBucketCategories.has(dist.category)}
+      />
+    {/each}
     {#if topTagRows.length > 0}
       <section class="card top-tags-section">
         <h3>Top issues</h3>

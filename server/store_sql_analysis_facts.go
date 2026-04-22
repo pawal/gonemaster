@@ -18,6 +18,7 @@ const (
 	analysisRunAddrASNCols   = `cohort_id, run_id, domain_id, address_id, prefix_id, asn, lookup_status, source`
 	analysisRunDomainASNCols = `cohort_id, run_id, domain_id, asn, family, source`
 	analysisRunTagCols       = `cohort_id, run_id, domain_id, tag, module, testcase, level, occurrence_count`
+	analysisRunDomainFactCols = `cohort_id, run_id, domain_id, category, fact_key, value_num`
 	analysisRunSummaryCols = `cohort_id, run_id, domain_id, score, grade, nameserver_count,
 		endpoint_count, asn_count, prefix_count, worst_level`
 	analysisProjStateCols = `cohort_id, run_id, projector_version, status, projected_at, error`
@@ -889,6 +890,77 @@ func (s *SQLJobStore) ListAnalysisRunTagSummariesByCohort(cohortID int64) []Anal
 		); err != nil {
 			return nil
 		}
+		out = append(out, item)
+	}
+	return out
+}
+
+// ReplaceAnalysisRunDomainFacts replaces all run+cohort domain-fact rows.
+func (s *SQLJobStore) ReplaceAnalysisRunDomainFacts(cohortID int64, runID string, items []AnalysisRunDomainFact) error {
+	return s.inOwnTx(func(tx *sql.Tx) error {
+		return s.replaceAnalysisRunDomainFactsIn(tx, cohortID, runID, items)
+	})
+}
+
+func (s *SQLJobStore) replaceAnalysisRunDomainFactsIn(q sqlQuerier, cohortID int64, runID string, items []AnalysisRunDomainFact) error {
+	if cohortID == 0 {
+		return errors.New("cohort_id is required")
+	}
+	if runID == "" {
+		return errors.New("run_id is required")
+	}
+	rows := make([][]any, 0, len(items))
+	for _, item := range items {
+		var valueNum any
+		if item.ValueNum != nil {
+			valueNum = *item.ValueNum
+		}
+		rows = append(rows, []any{
+			cohortID, runID, item.DomainID, item.Category, item.Key, valueNum,
+		})
+	}
+	err := s.replaceAnalysisRowsIn(q,
+		fmt.Sprintf(`DELETE FROM analysis_run_domain_facts WHERE cohort_id = %s AND run_id = %s`, s.ph(1), s.ph(2)),
+		[]any{cohortID, runID},
+		`INSERT INTO analysis_run_domain_facts (
+			cohort_id, run_id, domain_id, category, fact_key, value_num
+		)`,
+		rows,
+	)
+	if err != nil {
+		return fmt.Errorf("replace analysis run domain facts: %w", err)
+	}
+	return nil
+}
+
+// ListAnalysisRunDomainFactsByCohort returns every domain-fact row
+// materialized for the cohort, across all runs.
+func (s *SQLJobStore) ListAnalysisRunDomainFactsByCohort(cohortID int64) []AnalysisRunDomainFact {
+	rows, err := s.db.Query(
+		fmt.Sprintf(`SELECT %s FROM analysis_run_domain_facts
+			WHERE cohort_id = %s
+			ORDER BY run_id, category, fact_key`,
+			analysisRunDomainFactCols, s.ph(1)),
+		cohortID,
+	)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	var out []AnalysisRunDomainFact
+	for rows.Next() {
+		var (
+			item     AnalysisRunDomainFact
+			valueNum sql.NullInt64
+		)
+		if err := rows.Scan(
+			&item.CohortID, &item.RunID, &item.DomainID,
+			&item.Category, &item.Key, &valueNum,
+		); err != nil {
+			return nil
+		}
+		item.ValueNum = nullInt64ScanPtr(valueNum)
 		out = append(out, item)
 	}
 	return out

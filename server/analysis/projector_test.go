@@ -846,42 +846,44 @@ func TestExtractNameserverEndpointsTimingsDrivesClassify(t *testing.T) {
 	}
 }
 
-// TestExtractNameserverEndpointsDelegationTagFallback covers the
-// legacy-data path: a run whose nameserver_timings_json predates the
-// worker's per-target emission. Timings is a strict subset of the
-// delegation set, so the Delegation01 tag parser takes over and keeps
-// the unreachable NS visible.
-func TestExtractNameserverEndpointsDelegationTagFallback(t *testing.T) {
+// TestExtractNameserverEndpointsMergesDelegationTagsIntoTimings covers
+// the legacy-data rollout: a run whose nameserver_timings_json predates
+// the worker's per-target emission (so timings lists only the NSes the
+// engine successfully probed). The Delegation01 tag parser supplements
+// the timings-derived set so a pure cohort rebuild — no re-running of
+// the DNS tests — still surfaces unreachable and unresolved NSes.
+func TestExtractNameserverEndpointsMergesDelegationTagsIntoTimings(t *testing.T) {
 	input := RunInput{
 		NameserverTimings: []serverpkg.NameserverTiming{
+			// Legacy timings: only the reachable NS made it in.
 			{Nameserver: "parau.oyster.net.ck", Address: "202.65.32.128", AvgMS: 10, Count: 3},
 		},
 		Entries: []serverpkg.Entry{
+			// Delegation entry lists all four, including the unreachable
+			// circa and the unresolved downstage.
 			{
 				Module: "Delegation", Testcase: "Delegation01", Tag: "ENOUGH_NS_CHILD",
 				Args: map[string]any{
 					"servers": []any{
 						map[string]any{"ns": "parau.oyster.net.ck"},
 						map[string]any{"ns": "circa.mcs.vuw.ac.nz"},
+						map[string]any{"ns": "downstage.mcs.vuw.ac.nz"},
 					},
 				},
 			},
+			// circa's (ns, addr) pair surfaces via generic "servers"
+			// entries (resolved but no response, so it's not in timings).
 			{
 				Module: "Address", Testcase: "Address01", Tag: "A01_GLOBALLY_REACHABLE_ADDR",
 				Args: map[string]any{
 					"servers": []any{
 						map[string]any{"ns": "circa.mcs.vuw.ac.nz", "address": "130.195.5.12"},
-						map[string]any{"ns": "parau.oyster.net.ck", "address": "202.65.32.128"},
 					},
 				},
 			},
 		},
 	}
 
-	// When timings names cover the delegation set, the fallback parser
-	// is never consulted. For this legacy-data test the timings names
-	// must be a proper subset of the delegation set so the fallback
-	// actually runs — that's the whole point of the fallback.
 	got := NewProjector(&fakeStore{}).extractNameserverEndpoints(input)
 	byNS := map[string]extractedEndpoint{}
 	for _, ep := range got {
@@ -891,24 +893,16 @@ func TestExtractNameserverEndpointsDelegationTagFallback(t *testing.T) {
 			byNS[ep.nameserver] = ep
 		}
 	}
-	// Timings already contains parau. circa is only in the delegation
-	// fallback — it should still be authoritative. Here the legacy
-	// path doesn't kick in because timings is non-empty, so circa
-	// stays parent. This pins the fallback's actual scope: it only
-	// applies when timings is entirely absent.
-	if byNS["circa.mcs.vuw.ac.nz"].role != "parent" {
-		t.Fatalf("legacy-data path only activates when timings is empty; circa with non-empty timings should be parent, got %+v", byNS["circa.mcs.vuw.ac.nz"])
-	}
-
-	// Now drop the timings to confirm the tag parser takes over.
-	input.NameserverTimings = nil
-	got = NewProjector(&fakeStore{}).extractNameserverEndpoints(input)
-	byNS = map[string]extractedEndpoint{}
-	for _, ep := range got {
-		byNS[ep.nameserver] = ep
-	}
+	// circa gets promoted to authoritative via the merged delegation
+	// set even though timings doesn't know about it.
 	if byNS["circa.mcs.vuw.ac.nz"].role != "authoritative" {
-		t.Fatalf("with no timings, Delegation01 fallback should classify circa as authoritative, got %+v", byNS["circa.mcs.vuw.ac.nz"])
+		t.Fatalf("expected circa authoritative via merged delegation set, got %+v", byNS["circa.mcs.vuw.ac.nz"])
+	}
+	// downstage has no (ns, addr) pair anywhere, so it comes through
+	// as a synthetic delegation-only endpoint.
+	downstage := byNS["downstage.mcs.vuw.ac.nz"]
+	if downstage.role != "authoritative" || downstage.source != "delegation" || downstage.address != "" {
+		t.Fatalf("expected downstage synthetic authoritative endpoint, got %+v", downstage)
 	}
 }
 

@@ -538,12 +538,15 @@ func (p *Projector) extractNameserverEndpoints(input RunInput) []extractedEndpoi
 		seen[key] = item
 	}
 
-	// Authoritative NS name set for the zone under test. Primary source
-	// is NameserverTiming: the worker emits one row per delegated target
-	// including unreachable / unresolved ones, so reading the names off
-	// those rows gives us the complete delegation set. Falls back to the
-	// Delegation01 tag parser for legacy runs written before the worker
-	// emitted status-bearing rows.
+	// Authoritative NS name set for the zone under test. We merge two
+	// sources so a cohort rebuild against historical runs doesn't drop
+	// unreachable/unresolved NSes:
+	//   - NameserverTiming names (primary on fresh runs; the worker
+	//     emits one row per delegated target, including unreachable
+	//     and unresolved).
+	//   - Delegation01 tag parser (supplement for legacy runs whose
+	//     timings JSON pre-dates status-bearing rows, where timings
+	//     only contains NSes the engine successfully probed).
 	authoritativeNSSet := map[string]struct{}{}
 	for _, timing := range input.NameserverTimings {
 		ns := normalizeNameserverName(timing.Nameserver)
@@ -552,8 +555,8 @@ func (p *Projector) extractNameserverEndpoints(input RunInput) []extractedEndpoi
 		}
 		authoritativeNSSet[ns] = struct{}{}
 	}
-	if len(authoritativeNSSet) == 0 {
-		authoritativeNSSet = delegationNSSet(input.Entries)
+	for ns := range delegationNSSet(input.Entries) {
+		authoritativeNSSet[ns] = struct{}{}
 	}
 
 	childSide := func(source string) bool {

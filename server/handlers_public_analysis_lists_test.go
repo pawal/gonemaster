@@ -320,6 +320,47 @@ func TestPublicAnalysisDomainsSortScoreDesc(t *testing.T) {
 	}
 }
 
+func TestSortAnalysisDomainViewsByCountColumns(t *testing.T) {
+	base := []PublicAnalysisDomainView{
+		{Domain: "a.example", NameserverCount: 2, EndpointCount: 4, ASNCount: 1, PrefixCount: 2},
+		{Domain: "b.example", NameserverCount: 6, EndpointCount: 12, ASNCount: 3, PrefixCount: 8},
+		{Domain: "c.example", NameserverCount: 4, EndpointCount: 8, ASNCount: 2, PrefixCount: 4},
+		// Tie on nameserver_count with b.example so we can assert the
+		// domain-name tiebreaker kicks in deterministically.
+		{Domain: "d.example", NameserverCount: 6, EndpointCount: 9, ASNCount: 3, PrefixCount: 6},
+	}
+	clone := func() []PublicAnalysisDomainView {
+		out := make([]PublicAnalysisDomainView, len(base))
+		copy(out, base)
+		return out
+	}
+
+	cases := []struct {
+		mode     string
+		wantOrder []string
+	}{
+		{"nameserver_count_asc", []string{"a.example", "c.example", "b.example", "d.example"}},
+		{"nameserver_count_desc", []string{"b.example", "d.example", "c.example", "a.example"}},
+		{"endpoint_count_asc", []string{"a.example", "c.example", "d.example", "b.example"}},
+		{"endpoint_count_desc", []string{"b.example", "d.example", "c.example", "a.example"}},
+		{"asn_count_asc", []string{"a.example", "c.example", "b.example", "d.example"}},
+		{"asn_count_desc", []string{"b.example", "d.example", "c.example", "a.example"}},
+		{"prefix_count_asc", []string{"a.example", "c.example", "d.example", "b.example"}},
+		{"prefix_count_desc", []string{"b.example", "d.example", "c.example", "a.example"}},
+	}
+	for _, c := range cases {
+		t.Run(c.mode, func(t *testing.T) {
+			got := clone()
+			sortAnalysisDomainViews(got, c.mode)
+			for i, want := range c.wantOrder {
+				if got[i].Domain != want {
+					t.Fatalf("%s: position %d = %q, want %q (full order=%+v)", c.mode, i, got[i].Domain, want, got)
+				}
+			}
+		})
+	}
+}
+
 func TestPublicAnalysisDomainsRedactsInternalIDs(t *testing.T) {
 	f := newAnalysisAPITestFixture(t)
 	finishedAt := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)

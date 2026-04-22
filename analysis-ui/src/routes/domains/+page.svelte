@@ -19,7 +19,11 @@
   const sortSpecs = {
     domain: { asc: "domain_asc", desc: "domain_desc" },
     score: { asc: "score_asc", desc: "score_desc" },
-    worst: { desc: "worst_level_desc" }
+    worst: { desc: "worst_level_desc" },
+    nameservers: { asc: "nameserver_count_asc", desc: "nameserver_count_desc" },
+    endpoints: { asc: "endpoint_count_asc", desc: "endpoint_count_desc" },
+    asns: { asc: "asn_count_asc", desc: "asn_count_desc" },
+    prefixes: { asc: "prefix_count_asc", desc: "prefix_count_desc" }
   } as const;
 
   const currentSort = $derived(page.url.searchParams.get("sort") ?? "");
@@ -136,10 +140,18 @@
               <SortHeader label="Worst" spec={sortSpecs.worst} {currentSort} onsort={(v: string) => updateParam("sort", v)} />
             </th>
             <th scope="col">Operator</th>
-            <th scope="col" class="col-num">Nameservers</th>
-            <th scope="col" class="col-num">Endpoints</th>
-            <th scope="col" class="col-num">ASNs</th>
-            <th scope="col" class="col-num">Prefixes</th>
+            <th scope="col" class="col-num">
+              <SortHeader label="Nameservers" spec={sortSpecs.nameservers} align="right" {currentSort} onsort={(v: string) => updateParam("sort", v)} />
+            </th>
+            <th scope="col" class="col-num">
+              <SortHeader label="Endpoints" spec={sortSpecs.endpoints} align="right" {currentSort} onsort={(v: string) => updateParam("sort", v)} />
+            </th>
+            <th scope="col" class="col-num">
+              <SortHeader label="ASNs" spec={sortSpecs.asns} align="right" {currentSort} onsort={(v: string) => updateParam("sort", v)} />
+            </th>
+            <th scope="col" class="col-num">
+              <SortHeader label="Prefixes" spec={sortSpecs.prefixes} align="right" {currentSort} onsort={(v: string) => updateParam("sort", v)} />
+            </th>
             <th scope="col">Last analyzed</th>
           </tr>
         </thead>

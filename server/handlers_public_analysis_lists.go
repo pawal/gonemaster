@@ -480,9 +480,40 @@ func sortAnalysisDomainViews(items []PublicAnalysisDomainView, mode string) {
 			}
 			return items[i].Domain < items[j].Domain
 		})
+	case "nameserver_count_asc":
+		sortByDomainCount(items, func(v PublicAnalysisDomainView) int { return v.NameserverCount }, true)
+	case "nameserver_count_desc":
+		sortByDomainCount(items, func(v PublicAnalysisDomainView) int { return v.NameserverCount }, false)
+	case "endpoint_count_asc":
+		sortByDomainCount(items, func(v PublicAnalysisDomainView) int { return v.EndpointCount }, true)
+	case "endpoint_count_desc":
+		sortByDomainCount(items, func(v PublicAnalysisDomainView) int { return v.EndpointCount }, false)
+	case "asn_count_asc":
+		sortByDomainCount(items, func(v PublicAnalysisDomainView) int { return v.ASNCount }, true)
+	case "asn_count_desc":
+		sortByDomainCount(items, func(v PublicAnalysisDomainView) int { return v.ASNCount }, false)
+	case "prefix_count_asc":
+		sortByDomainCount(items, func(v PublicAnalysisDomainView) int { return v.PrefixCount }, true)
+	case "prefix_count_desc":
+		sortByDomainCount(items, func(v PublicAnalysisDomainView) int { return v.PrefixCount }, false)
 	default:
 		sort.Slice(items, func(i, j int) bool { return items[i].Domain < items[j].Domain })
 	}
+}
+
+// sortByDomainCount sorts items by an integer extractor with the domain
+// name as a stable tiebreaker. Shared by the count-column sort modes.
+func sortByDomainCount(items []PublicAnalysisDomainView, get func(PublicAnalysisDomainView) int, asc bool) {
+	sort.Slice(items, func(i, j int) bool {
+		a, b := get(items[i]), get(items[j])
+		if a != b {
+			if asc {
+				return a < b
+			}
+			return a > b
+		}
+		return items[i].Domain < items[j].Domain
+	})
 }
 
 func intFromPtr(p *int, fallback int) int {

@@ -448,13 +448,22 @@ func (p *Projector) writePrepared(pr preparedRun, w WriteStore) error {
 
 func deriveRunDomainSummary(input RunInput, endpoints []extractedEndpoint, addressFacts []extractedAddressFact) serverpkg.AnalysisRunDomainSummary {
 	nameservers := map[string]struct{}{}
-	endpointAddresses := map[string]struct{}{}
+	type nsAddrKey struct{ ns, addr string }
+	endpointPairs := map[nsAddrKey]struct{}{}
 	asns := map[int64]struct{}{}
 	prefixes := map[string]struct{}{}
 
+	// Skip parent-role endpoints (root/registry servers seen while traversing
+	// the delegation chain). They are not the domain's own authoritative
+	// nameservers, and every downstream /domains and /nameservers view
+	// filters them out — counting them in the summary inflated TLD rows by
+	// the 13 root servers and their 26 addresses.
 	for _, endpoint := range endpoints {
+		if endpoint.role == "parent" {
+			continue
+		}
 		nameservers[endpoint.nameserver] = struct{}{}
-		endpointAddresses[endpoint.address] = struct{}{}
+		endpointPairs[nsAddrKey{endpoint.nameserver, endpoint.address}] = struct{}{}
 	}
 	for _, fact := range addressFacts {
 		if fact.asn != nil {
@@ -471,7 +480,7 @@ func deriveRunDomainSummary(input RunInput, endpoints []extractedEndpoint, addre
 		Score:           input.Run.Score,
 		Grade:           input.Run.Grade,
 		NameserverCount: len(nameservers),
-		EndpointCount:   len(endpointAddresses),
+		EndpointCount:   len(endpointPairs),
 		ASNCount:        len(asns),
 		PrefixCount:     len(prefixes),
 		WorstLevel:      input.Run.WorstLevel,

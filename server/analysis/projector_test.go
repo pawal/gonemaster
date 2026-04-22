@@ -563,6 +563,54 @@ func TestProjectorLoadCompletedRunUsesRunEntryCountAsLimit(t *testing.T) {
 	}
 }
 
+// TestDeriveRunDomainSummaryExcludesParentRoleEndpoints pins the fix for
+// the bug where a TLD's per-domain nameserver_count included the 13 root
+// servers seen while traversing the delegation chain. deriveRunDomainSummary
+// must filter out parent-role endpoints so the stored summary matches the
+// authoritative-only view the /domains detail and /nameservers list
+// render from the materialization cache.
+func TestDeriveRunDomainSummaryExcludesParentRoleEndpoints(t *testing.T) {
+	input := RunInput{
+		Run: serverpkg.Run{ID: "run-x", DomainID: 1, WorstLevel: "NOTICE"},
+	}
+	endpoints := []extractedEndpoint{
+		{nameserver: "ns1.example", address: "192.0.2.1", family: "ipv4", role: "authoritative"},
+		{nameserver: "ns1.example", address: "2001:db8::1", family: "ipv6", role: "authoritative"},
+		{nameserver: "ns2.example", address: "192.0.2.2", family: "ipv4", role: "authoritative"},
+		// Two parent-role endpoints that must NOT be counted.
+		{nameserver: "a.root-servers.net", address: "198.41.0.4", family: "ipv4", role: "parent"},
+		{nameserver: "b.root-servers.net", address: "170.247.170.2", family: "ipv4", role: "parent"},
+	}
+	got := deriveRunDomainSummary(input, endpoints, nil)
+	if got.NameserverCount != 2 {
+		t.Fatalf("NameserverCount: expected 2 authoritative, got %d (endpoints=%+v)", got.NameserverCount, endpoints)
+	}
+	// Three distinct (ns, addr) pairs among authoritative endpoints.
+	if got.EndpointCount != 3 {
+		t.Fatalf("EndpointCount: expected 3 authoritative pairs, got %d", got.EndpointCount)
+	}
+}
+
+// TestDeriveRunDomainSummaryEndpointCountUsesPairs makes sure the count
+// collapses by (nameserver, address), matching the cohort-level
+// definition on /cohorts/{tag}. Counting distinct addresses alone would
+// undercount when one IP is reached by two nameserver hostnames.
+func TestDeriveRunDomainSummaryEndpointCountUsesPairs(t *testing.T) {
+	input := RunInput{Run: serverpkg.Run{ID: "run-x", DomainID: 1}}
+	endpoints := []extractedEndpoint{
+		// Same address, two nameserver hostnames → two endpoints.
+		{nameserver: "ns1.example", address: "192.0.2.1", family: "ipv4", role: "authoritative"},
+		{nameserver: "ns2.example", address: "192.0.2.1", family: "ipv4", role: "authoritative"},
+	}
+	got := deriveRunDomainSummary(input, endpoints, nil)
+	if got.NameserverCount != 2 {
+		t.Fatalf("NameserverCount: expected 2, got %d", got.NameserverCount)
+	}
+	if got.EndpointCount != 2 {
+		t.Fatalf("EndpointCount: expected 2 distinct (ns,addr) pairs, got %d", got.EndpointCount)
+	}
+}
+
 func TestProjectorExtractNameserverEndpoints(t *testing.T) {
 	input := RunInput{
 		NameserverTimings: []serverpkg.NameserverTiming{
@@ -889,7 +937,11 @@ func TestProjectorProjectRunPersistsFactsIdempotently(t *testing.T) {
 		if summary.CohortID != cohortID || summary.RunID != run.ID || summary.DomainID != run.DomainID {
 			t.Fatalf("cohort %d unexpected summary identity: %+v", cohortID, summary)
 		}
-		if summary.NameserverCount != 3 || summary.EndpointCount != 3 || summary.ASNCount != 2 || summary.PrefixCount != 2 {
+		// Nameserver/endpoint counts exclude the parent-role entry
+		// (pns.example.test), so 2 authoritative nameservers / 2
+		// authoritative (ns, addr) pairs even though the fact table
+		// retains 5 endpoint rows and 3 normalized nameservers.
+		if summary.NameserverCount != 2 || summary.EndpointCount != 2 || summary.ASNCount != 2 || summary.PrefixCount != 2 {
 			t.Fatalf("cohort %d unexpected summary counts: %+v", cohortID, summary)
 		}
 		if summary.Score == nil || *summary.Score != score || summary.Grade == nil || *summary.Grade != grade || summary.WorstLevel != "ERROR" {

@@ -332,22 +332,54 @@ func computeLatestMaterializationForCohort(readStore AnalysisReadStore, runLooku
 	// views. Role tagging happens at projection time in projector.go.
 	endpoints := filterAnalysisRunNSEndpointsByRunIDs(readStore.ListAnalysisRunNSEndpointsByCohort(cohortID), runIDs)
 	authoritative := make([]AnalysisRunNameserverEndpoint, 0, len(endpoints))
+	authoritativeAddrIDs := map[int64]struct{}{}
 	for _, ep := range endpoints {
 		if ep.Role == "parent" {
 			continue
 		}
 		authoritative = append(authoritative, ep)
+		authoritativeAddrIDs[ep.AddressID] = struct{}{}
 	}
+	// Restrict addressASNs to the same authoritative-address set so the
+	// prefix / ASN views agree with the nameserver / endpoint views on
+	// what counts as "in the cohort". Without this filter the engine's
+	// parent-side address observations (root-server addresses, registry
+	// glue) leak into prefix-list / ASN-list counts and the prefix detail
+	// page produces chips that 404 on click (the endpoint detail handler
+	// only resolves authoritative endpoints). Matches the spirit of
+	// restrictDomainASNsToAuthoritative on the projector side.
+	addressASNs := filterAnalysisRunAddressASNsByRunIDs(readStore.ListAnalysisRunAddressASNsByCohort(cohortID), runIDs)
+	addressASNs = filterAnalysisRunAddressASNsToAuthoritative(addressASNs, authoritativeAddrIDs)
 	return latestCohortMaterialization{
 		latest:       latest,
 		latestRuns:   runIDs,
 		endpoints:    authoritative,
-		addressASNs:  filterAnalysisRunAddressASNsByRunIDs(readStore.ListAnalysisRunAddressASNsByCohort(cohortID), runIDs),
+		addressASNs:  addressASNs,
 		domainASNs:   filterAnalysisRunDomainASNsByRunIDs(readStore.ListAnalysisRunDomainASNsByCohort(cohortID), runIDs),
 		tagSummaries: filterAnalysisRunTagSummariesByRunIDs(readStore.ListAnalysisRunTagSummariesByCohort(cohortID), runIDs),
 		domainFacts:  filterAnalysisRunDomainFactsByRunIDs(readStore.ListAnalysisRunDomainFactsByCohort(cohortID), runIDs),
 		domainNames:  domainNames,
 	}
+}
+
+// filterAnalysisRunAddressASNsToAuthoritative drops any fact whose address
+// has no authoritative endpoint in the cohort. authoritativeAddrIDs is the
+// AddressID set assembled from the post-role-filter endpoint slice.
+func filterAnalysisRunAddressASNsToAuthoritative(items []AnalysisRunAddressASN, authoritativeAddrIDs map[int64]struct{}) []AnalysisRunAddressASN {
+	if len(items) == 0 {
+		return items
+	}
+	if len(authoritativeAddrIDs) == 0 {
+		return nil
+	}
+	out := make([]AnalysisRunAddressASN, 0, len(items))
+	for _, fact := range items {
+		if _, ok := authoritativeAddrIDs[fact.AddressID]; !ok {
+			continue
+		}
+		out = append(out, fact)
+	}
+	return out
 }
 
 func filterAnalysisRunDomainFactsByRunIDs(items []AnalysisRunDomainFact, runIDs map[string]struct{}) []AnalysisRunDomainFact {

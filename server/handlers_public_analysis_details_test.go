@@ -321,6 +321,72 @@ func TestPublicAnalysisPrefixDetail(t *testing.T) {
 	}
 }
 
+// TestPublicAnalysisPrefixDetailHidesNonAuthoritativeAddresses pins the fix
+// for the "404 on endpoint detail from prefix page" bug. An address whose
+// only trace is in the address-fact table (no authoritative endpoint)
+// would previously show up as a clickable chip on /prefix/<...> and then
+// 404 when the user clicked through to /endpoints/<addr>. The
+// cache-level filter restricts addressASNs to the authoritative-address
+// set, so the prefix detail and the endpoint detail agree on what's in
+// the cohort.
+func TestPublicAnalysisPrefixDetailHidesNonAuthoritativeAddresses(t *testing.T) {
+	f := newAnalysisAPITestFixture(t)
+	ts := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+
+	// alpha.example: authoritative endpoint 192.0.2.10 in prefix 192.0.2.0/24.
+	f.seedGraduatedRun("alpha.example", ts, nil)
+	f.seedEndpoint("run-alpha.example-"+ts.Format("20060102150405"),
+		"alpha.example", "ns.alpha.example", "192.0.2.10", "ipv4", ts, 64500, "192.0.2.0/24")
+
+	// Inject a second address-fact row for the SAME prefix but a
+	// different address (192.0.2.99) with NO endpoint. Mirrors what the
+	// engine emits when it notes a parent-side address inside a CN04 or
+	// DNSSEC entry without recording an authoritative (ns, addr) pair.
+	alpha, _ := f.store.GetDomainByName("alpha.example")
+	ghost, err := f.store.UpsertAnalysisAddress("192.0.2.99", "ipv4", ts)
+	if err != nil {
+		t.Fatalf("upsert ghost address: %v", err)
+	}
+	prefix, err := f.store.UpsertAnalysisPrefix("192.0.2.0/24", "ipv4", ts)
+	if err != nil {
+		t.Fatalf("upsert prefix: %v", err)
+	}
+	runID := "run-alpha.example-" + ts.Format("20060102150405")
+	existing := f.store.ListAnalysisRunAddressASNs(f.cohort.ID, runID)
+	pfxID := prefix.ID
+	asn := int64(64500)
+	ghostFact := AnalysisRunAddressASN{
+		CohortID: f.cohort.ID, RunID: runID, DomainID: alpha.ID,
+		AddressID: ghost.ID, PrefixID: &pfxID, ASN: &asn,
+	}
+	if err := f.store.ReplaceAnalysisRunAddressASNs(f.cohort.ID, runID, append(existing, ghostFact)); err != nil {
+		t.Fatalf("seed ghost address fact: %v", err)
+	}
+
+	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/prefix?prefix=192.0.2.0/24")
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
+	}
+	var got PublicAnalysisPrefixDetail
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(got.Addresses) != 1 || got.Addresses[0] != "192.0.2.10" {
+		t.Fatalf("prefix detail should list only authoritative address, got %+v", got.Addresses)
+	}
+	if got.AddressCount != 1 {
+		t.Fatalf("address_count should reflect filtered set, got %d", got.AddressCount)
+	}
+
+	// And the mirror check: endpoint detail for the ghost address still
+	// 404s (nothing to resolve), but that's fine because the UI no longer
+	// generates a link to it.
+	resp = getPublic(t, f.srv, "/pub/api/v1/analysis/endpoints/192.0.2.99")
+	if resp.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for non-authoritative address, got %d: %s", resp.Code, resp.Body)
+	}
+}
+
 func TestPublicAnalysisPrefixDetailMissingParam(t *testing.T) {
 	f := seedDetailFixture(t)
 	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/prefix")

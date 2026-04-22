@@ -1,11 +1,42 @@
 package server
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
 )
+
+func TestFilterAnalysisRunAddressASNsToAuthoritativeDropsNonAuthoritativeAddresses(t *testing.T) {
+	auth := map[int64]struct{}{1: {}, 2: {}}
+	facts := []AnalysisRunAddressASN{
+		{CohortID: 1, RunID: "r1", DomainID: 1, AddressID: 1},
+		// AddressID 99 is not in the authoritative set — simulates a
+		// parent-side address observed in entry args.
+		{CohortID: 1, RunID: "r1", DomainID: 1, AddressID: 99},
+		{CohortID: 1, RunID: "r2", DomainID: 2, AddressID: 2},
+	}
+	got := filterAnalysisRunAddressASNsToAuthoritative(facts, auth)
+	want := []AnalysisRunAddressASN{
+		{CohortID: 1, RunID: "r1", DomainID: 1, AddressID: 1},
+		{CohortID: 1, RunID: "r2", DomainID: 2, AddressID: 2},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("filtered facts = %+v, want %+v", got, want)
+	}
+}
+
+func TestFilterAnalysisRunAddressASNsToAuthoritativeEmptySetDropsEverything(t *testing.T) {
+	// If no endpoint was classified authoritative (e.g. a run where
+	// nameserver_timings was missing and every (ns, addr) pair defaulted
+	// to parent), the cohort has no authoritative addresses and no fact
+	// should leak through.
+	facts := []AnalysisRunAddressASN{{CohortID: 1, RunID: "r", AddressID: 1}}
+	if got := filterAnalysisRunAddressASNsToAuthoritative(facts, map[int64]struct{}{}); got != nil {
+		t.Fatalf("expected nil with empty authoritative set, got %+v", got)
+	}
+}
 
 // sameBacking reports whether a and b share the same backing array, which is
 // a cheap proxy for "this slice was returned from the same computation."

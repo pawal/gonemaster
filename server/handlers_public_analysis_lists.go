@@ -126,6 +126,17 @@ type PublicAnalysisListResponse[T any] struct {
 	Offset int `json:"offset"`
 }
 
+// validWorstLevelBuckets pins the set of accepted worst_level filter values
+// to the same buckets rendered by the health bar on the overview. Kept in
+// one place so the filter, the docs, and the UI stay in sync.
+var validWorstLevelBuckets = map[string]struct{}{
+	"OK":       {},
+	"NOTICE":   {},
+	"WARNING":  {},
+	"ERROR":    {},
+	"CRITICAL": {},
+}
+
 // handlePublicAnalysisDomains handles GET /pub/api/v1/analysis/domains. It
 // returns the latest run per domain in the resolved cohort.
 func (s *Server) handlePublicAnalysisDomains(w http.ResponseWriter, r *http.Request) {
@@ -140,6 +151,21 @@ func (s *Server) handlePublicAnalysisDomains(w http.ResponseWriter, r *http.Requ
 	filter, ok := parseAnalysisListFilter(w, r)
 	if !ok {
 		return
+	}
+
+	// Exact-bucket filter so overview health-bar segments can deep-link to
+	// the matching subset of domains. Buckets mirror severityBucket's output
+	// (empty / INFO / unknown collapse into OK), which is how the bar itself
+	// counts them.
+	worstLevelFilter := ""
+	if raw := strings.TrimSpace(r.URL.Query().Get("worst_level")); raw != "" {
+		normalized := strings.ToUpper(raw)
+		if _, ok := validWorstLevelBuckets[normalized]; !ok {
+			writeError(w, http.StatusBadRequest, "invalid_worst_level",
+				"worst_level must be one of OK, NOTICE, WARNING, ERROR, CRITICAL", nil)
+			return
+		}
+		worstLevelFilter = normalized
 	}
 
 	// Go through the cohort materialization cache so /domains
@@ -169,6 +195,9 @@ func (s *Server) handlePublicAnalysisDomains(w http.ResponseWriter, r *http.Requ
 		sum := pair.summary
 		name, found := data.domainNames[sum.DomainID]
 		if !found {
+			continue
+		}
+		if worstLevelFilter != "" && severityBucket(sum.WorstLevel) != worstLevelFilter {
 			continue
 		}
 		v := PublicAnalysisDomainView{

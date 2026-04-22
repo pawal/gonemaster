@@ -3,7 +3,12 @@
   import { page } from "$app/state";
   import FactDistributionBar from "$lib/FactDistributionBar.svelte";
   import FilterBar from "$lib/FilterBar.svelte";
-  import { asnHref, nameserverHref, tagHref } from "$lib/entityLinks";
+  import {
+    asnHref,
+    domainsSeverityHref,
+    nameserverHref,
+    tagHref
+  } from "$lib/entityLinks";
   import { formatCount, formatTimestamp, levelTone } from "$lib/format";
   import type { LayoutData } from "./+layout";
   import type { FactDistribution, OverviewPageData } from "./+page";
@@ -168,19 +173,20 @@
         <p class="hint">
           Each domain counted by the worst severity in its latest run.
         </p>
-        <div class="health-bar" role="list" aria-label="Severity distribution">
+        <ul class="health-bar" aria-label="Severity distribution">
           {#each healthSegments as seg (seg.key)}
-            <div
-              class="health-bar-segment tone-{seg.tone}"
-              role="listitem"
-              style:flex-grow={seg.count}
-              title="{seg.label}: {formatCount(seg.count)} domains ({seg.pct}%)"
-            >
-              <span class="health-bar-label">{seg.label}</span>
-              <span class="health-bar-count">{formatCount(seg.count)}</span>
-            </div>
+            <li class="health-bar-item" style:flex-grow={seg.count}>
+              <a
+                class="health-bar-segment tone-{seg.tone}"
+                href={domainsSeverityHref(base, seg.key, query)}
+                title="{seg.label}: {formatCount(seg.count)} domains ({seg.pct}%). Click to filter the domains list."
+              >
+                <span class="health-bar-label">{seg.label}</span>
+                <span class="health-bar-count">{formatCount(seg.count)}</span>
+              </a>
+            </li>
           {/each}
-        </div>
+        </ul>
       </section>
     {/if}
     {#each factDistributions as dist (dist.category)}
@@ -320,17 +326,31 @@
     border-radius: var(--radius);
     overflow: hidden;
     border: 1px solid var(--border);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .health-bar-item {
+    display: flex;
+    min-width: 3rem;
   }
   .health-bar-segment {
     display: flex;
+    flex: 1 1 auto;
     align-items: center;
     justify-content: center;
     gap: 8px;
     padding: 0 var(--space-3);
-    min-width: 3rem;
     font-size: var(--text-xs);
     white-space: nowrap;
     overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    transition: filter 0.15s ease;
+  }
+  .health-bar-segment:hover,
+  .health-bar-segment:focus-visible {
+    filter: brightness(0.95);
   }
   .health-bar-label {
     text-transform: uppercase;

@@ -63,3 +63,14 @@ export function asnHref(base: string, asn: number | string, query = ""): string 
 export function tagHref(base: string, tag: string, query = ""): string {
   return `${base}/tags/${encodeURIComponent(tag)}${query}`;
 }
+
+// domainsSeverityHref links to the domains list filtered by an exact
+// worst_level bucket. Used by the overview's health bar so every segment
+// deep-links into the matching subset without losing the cohort scope.
+// Exact match (not threshold) — clicking "ERROR" shows only ERROR
+// domains, not "ERROR and worse".
+export function domainsSeverityHref(base: string, bucket: string, query = ""): string {
+  const params = new URLSearchParams(query);
+  params.set("worst_level", bucket);
+  return `${base}/domains?${params.toString()}`;
+}

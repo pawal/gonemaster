@@ -152,6 +152,71 @@ func TestPublicAnalysisDomainsReturnsLatestPerDomain(t *testing.T) {
 	}
 }
 
+func TestPublicAnalysisDomainsFilterByWorstLevel(t *testing.T) {
+	f := newAnalysisAPITestFixture(t)
+	ts := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+	// Two ERROR domains, one WARNING, one NOTICE, one with an empty
+	// worst_level (collapses into the OK bucket).
+	f.seedDomainSummary("err1.example", "run-err1", ts, 10, "F", "ERROR")
+	f.seedDomainSummary("err2.example", "run-err2", ts, 20, "E", "ERROR")
+	f.seedDomainSummary("warn.example", "run-warn", ts, 60, "C", "WARNING")
+	f.seedDomainSummary("notice.example", "run-notice", ts, 80, "B", "NOTICE")
+	f.seedDomainSummary("ok.example", "run-ok", ts, 95, "A", "")
+
+	cases := []struct {
+		bucket  string
+		domains []string
+	}{
+		{"ERROR", []string{"err1.example", "err2.example"}},
+		{"WARNING", []string{"warn.example"}},
+		{"NOTICE", []string{"notice.example"}},
+		{"OK", []string{"ok.example"}},
+		{"CRITICAL", nil},
+	}
+	for _, c := range cases {
+		t.Run(c.bucket, func(t *testing.T) {
+			resp := getPublic(t, f.srv, "/pub/api/v1/analysis/domains?worst_level="+c.bucket)
+			if resp.Code != http.StatusOK {
+				t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
+			}
+			got := decodeDomainList(t, resp)
+			if got.Total != len(c.domains) {
+				t.Fatalf("bucket %q: expected %d, got %d (items=%+v)",
+					c.bucket, len(c.domains), got.Total, got.Items)
+			}
+			seen := map[string]struct{}{}
+			for _, v := range got.Items {
+				seen[v.Domain] = struct{}{}
+			}
+			for _, want := range c.domains {
+				if _, ok := seen[want]; !ok {
+					t.Fatalf("bucket %q: expected %q in result, got %+v", c.bucket, want, got.Items)
+				}
+			}
+		})
+	}
+
+	// Lowercase input is accepted and normalized to the same bucket.
+	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/domains?worst_level=error")
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200 on lowercase filter, got %d: %s", resp.Code, resp.Body)
+	}
+	if got := decodeDomainList(t, resp); got.Total != 2 {
+		t.Fatalf("expected lowercase filter to match 2 ERROR domains, got %d", got.Total)
+	}
+}
+
+func TestPublicAnalysisDomainsRejectsInvalidWorstLevel(t *testing.T) {
+	f := newAnalysisAPITestFixture(t)
+	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/domains?worst_level=bogus")
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", resp.Code, resp.Body)
+	}
+	if !strings.Contains(resp.Body.String(), "invalid_worst_level") {
+		t.Fatalf("expected invalid_worst_level error code, got %s", resp.Body)
+	}
+}
+
 func TestPublicAnalysisDomainsSearchAndPagination(t *testing.T) {
 	f := newAnalysisAPITestFixture(t)
 	finishedAt := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)

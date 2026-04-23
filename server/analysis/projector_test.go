@@ -1,6 +1,7 @@
 package analysis
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -17,6 +18,12 @@ type fakeStore struct {
 	entries map[string][]serverpkg.Entry
 	tags    map[int64][]string
 	cohorts []serverpkg.AnalysisCohort
+
+	// Queue + batch catalog used by the Phase 2 snapshot lifecycle tests.
+	// These are intentionally simple maps — the unit tests exercise
+	// controller logic, not storage semantics.
+	queuedJobs map[string][]string // batchID → []jobID (only in-flight jobs)
+	batches    map[string]serverpkg.Batch
 
 	nextCohortID     int64
 	nextNameserverID int64
@@ -35,6 +42,17 @@ type fakeStore struct {
 	domainFacts  map[string][]serverpkg.AnalysisRunDomainFact
 	summaries    map[string]serverpkg.AnalysisRunDomainSummary
 	states       map[string]serverpkg.AnalysisProjectionState
+
+	// Snapshot state keyed by (cohortID, batchID).
+	snapshots      map[snapshotKey]serverpkg.AnalysisCohortSnapshot
+	snapshotByID   map[int64]snapshotKey
+	snapshotAggs   map[int64][]serverpkg.AnalysisCohortSnapshotAggregate
+	nextSnapshotID int64
+}
+
+type snapshotKey struct {
+	cohortID int64
+	batchID  string
 }
 
 func (s *fakeStore) GetRun(id string) (serverpkg.Run, bool) {
@@ -331,6 +349,163 @@ func (s *fakeStore) SetAnalysisProjectionState(item serverpkg.AnalysisProjection
 	s.ensureMaterializedMaps()
 	s.states[projectionKey(item.CohortID, item.RunID)] = item
 	return nil
+}
+
+func (s *fakeStore) GetBatch(id string) (serverpkg.Batch, bool) {
+	b, ok := s.batches[id]
+	return b, ok
+}
+
+func (s *fakeStore) UpsertAnalysisCohortSnapshot(snap serverpkg.AnalysisCohortSnapshot) (serverpkg.AnalysisCohortSnapshot, error) {
+	s.ensureSnapshotMaps()
+	now := time.Now().UTC()
+	key := snapshotKey{cohortID: snap.CohortID, batchID: snap.BatchID}
+	if existing, ok := s.snapshots[key]; ok {
+		snap.ID = existing.ID
+		if snap.CreatedAt.IsZero() {
+			snap.CreatedAt = existing.CreatedAt
+		}
+		if snap.UpdatedAt.IsZero() {
+			snap.UpdatedAt = now
+		}
+		s.snapshots[key] = snap
+		s.snapshotByID[snap.ID] = key
+		return snap, nil
+	}
+	s.nextSnapshotID++
+	snap.ID = s.nextSnapshotID
+	if snap.CreatedAt.IsZero() {
+		snap.CreatedAt = now
+	}
+	if snap.UpdatedAt.IsZero() {
+		snap.UpdatedAt = snap.CreatedAt
+	}
+	s.snapshots[key] = snap
+	s.snapshotByID[snap.ID] = key
+	return snap, nil
+}
+
+func (s *fakeStore) GetAnalysisCohortSnapshotByBatch(cohortID int64, batchID string) (serverpkg.AnalysisCohortSnapshot, bool) {
+	s.ensureSnapshotMaps()
+	snap, ok := s.snapshots[snapshotKey{cohortID: cohortID, batchID: batchID}]
+	return snap, ok
+}
+
+func (s *fakeStore) ListPendingAnalysisCohortSnapshots() []serverpkg.AnalysisCohortSnapshot {
+	s.ensureSnapshotMaps()
+	out := make([]serverpkg.AnalysisCohortSnapshot, 0)
+	for _, snap := range s.snapshots {
+		if snap.Status == serverpkg.AnalysisSnapshotStatusPending {
+			out = append(out, snap)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].CohortID != out[j].CohortID {
+			return out[i].CohortID < out[j].CohortID
+		}
+		return out[i].CreatedAt.Before(out[j].CreatedAt)
+	})
+	return out
+}
+
+func (s *fakeStore) ClearAnalysisCohortSnapshots(cohortID int64) error {
+	s.ensureSnapshotMaps()
+	for key, snap := range s.snapshots {
+		if key.cohortID != cohortID {
+			continue
+		}
+		delete(s.snapshots, key)
+		delete(s.snapshotByID, snap.ID)
+		delete(s.snapshotAggs, snap.ID)
+	}
+	return nil
+}
+
+func (s *fakeStore) CountBatchSnapshotRuns(cohortID int64, batchID string) (int, int, time.Time, time.Time, error) {
+	runs := map[string]struct{}{}
+	domains := map[int64]struct{}{}
+	var first, last time.Time
+	for _, run := range s.runs {
+		if run.BatchID != batchID {
+			continue
+		}
+		// Require the run to have produced a summary row for the target
+		// cohort — otherwise rebuild scenarios would double-count runs that
+		// belong to a different tag.
+		if _, ok := s.summaries[projectionKey(cohortID, run.ID)]; !ok {
+			continue
+		}
+		runs[run.ID] = struct{}{}
+		domains[run.DomainID] = struct{}{}
+		if first.IsZero() || run.FinishedAt.Before(first) {
+			first = run.FinishedAt
+		}
+		if last.IsZero() || run.FinishedAt.After(last) {
+			last = run.FinishedAt
+		}
+	}
+	return len(runs), len(domains), first, last, nil
+}
+
+func (s *fakeStore) CountOutstandingJobsForBatch(batchID string) (int, error) {
+	return len(s.queuedJobs[batchID]), nil
+}
+
+func (s *fakeStore) ComputeSnapshotAggregates(cohortID int64, batchID string) ([]serverpkg.AnalysisCohortSnapshotAggregate, error) {
+	now := time.Now().UTC()
+	// Minimal but non-empty payload so tests can observe that the capture
+	// path wrote aggregates — real fact-based payloads live in the SQL
+	// store's dedicated test file.
+	grades := map[string]int{}
+	prefix := fmt.Sprintf("%d/", cohortID)
+	for key, summary := range s.summaries {
+		if !strings.HasPrefix(key, prefix) {
+			continue
+		}
+		run, ok := s.runs[summary.RunID]
+		if !ok || run.BatchID != batchID {
+			continue
+		}
+		if summary.Grade != nil && *summary.Grade != "" {
+			grades[*summary.Grade]++
+		}
+	}
+	payload, err := json.Marshal(grades)
+	if err != nil {
+		return nil, err
+	}
+	return []serverpkg.AnalysisCohortSnapshotAggregate{
+		{SnapshotID: 0, Category: serverpkg.SnapshotAggregateGradeDistribution, PayloadJSON: string(payload), ComputedAt: now},
+	}, nil
+}
+
+func (s *fakeStore) ReplaceSnapshotAggregates(snapshotID int64, aggs []serverpkg.AnalysisCohortSnapshotAggregate) error {
+	s.ensureSnapshotMaps()
+	out := make([]serverpkg.AnalysisCohortSnapshotAggregate, 0, len(aggs))
+	for _, agg := range aggs {
+		agg.SnapshotID = snapshotID
+		out = append(out, agg)
+	}
+	s.snapshotAggs[snapshotID] = out
+	return nil
+}
+
+func (s *fakeStore) ensureSnapshotMaps() {
+	if s.snapshots == nil {
+		s.snapshots = map[snapshotKey]serverpkg.AnalysisCohortSnapshot{}
+	}
+	if s.snapshotByID == nil {
+		s.snapshotByID = map[int64]snapshotKey{}
+	}
+	if s.snapshotAggs == nil {
+		s.snapshotAggs = map[int64][]serverpkg.AnalysisCohortSnapshotAggregate{}
+	}
+	if s.batches == nil {
+		s.batches = map[string]serverpkg.Batch{}
+	}
+	if s.queuedJobs == nil {
+		s.queuedJobs = map[string][]string{}
+	}
 }
 
 func (s *fakeStore) ensureMaterializedMaps() {

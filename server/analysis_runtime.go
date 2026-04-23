@@ -11,6 +11,11 @@ type AnalysisController interface {
 	RebuildCohort(ctx context.Context, cohortID int64) error
 	ClearCohort(ctx context.Context, cohortID int64) error
 	ReconcileCohortChange(ctx context.Context, before, after AnalysisCohort) error
+	// CaptureCompletedSnapshots walks pending snapshots and promotes any
+	// whose batches have drained. Called periodically by the server's
+	// snapshot capture goroutine and once at startup so a server restart
+	// promotes batches that finished while the process was down.
+	CaptureCompletedSnapshots(ctx context.Context) error
 }
 
 // SetAnalysisController installs the runtime controller used for startup

@@ -20,6 +20,7 @@ func TestControllerProjectRunUpdatesCohortMaterialization(t *testing.T) {
 		tags: map[int64][]string{
 			run.DomainID: {"tld"},
 		},
+		batches: testAnalysisBatches(),
 		cohorts: []serverpkg.AnalysisCohort{
 			{
 				ID:                    10,
@@ -72,6 +73,7 @@ func TestControllerRebuildCohortClearsStaleRowsAndBackfillsTaggedRuns(t *testing
 			run2.DomainID:     {"tld", "signed"},
 			runOther.DomainID: {"gov"},
 		},
+		batches: testAnalysisBatches(),
 		cohorts: []serverpkg.AnalysisCohort{
 			{
 				ID:                    10,
@@ -192,6 +194,7 @@ func TestControllerRepairAllSkipsReadyCohortWithNoMissedRuns(t *testing.T) {
 		runs:    map[string]serverpkg.Run{run.ID: run},
 		entries: map[string][]serverpkg.Entry{run.ID: testAnalysisEntries(run)},
 		tags:    map[int64][]string{run.DomainID: {"tld"}},
+		batches: testAnalysisBatches(),
 		cohorts: []serverpkg.AnalysisCohort{
 			{
 				ID:                    10,
@@ -241,6 +244,7 @@ func TestControllerRepairAllProjectsMissedRunsIncrementally(t *testing.T) {
 		runs:    map[string]serverpkg.Run{missedRun.ID: missedRun},
 		entries: map[string][]serverpkg.Entry{missedRun.ID: testAnalysisEntries(missedRun)},
 		tags:    map[int64][]string{missedRun.DomainID: {"tld"}},
+		batches: testAnalysisBatches(),
 		cohorts: []serverpkg.AnalysisCohort{
 			{
 				ID:                    10,
@@ -291,6 +295,7 @@ func TestControllerRepairAllFailedCohortFallsBackToFullRebuild(t *testing.T) {
 		runs:    map[string]serverpkg.Run{run.ID: run},
 		entries: map[string][]serverpkg.Entry{run.ID: testAnalysisEntries(run)},
 		tags:    map[int64][]string{run.DomainID: {"tld"}},
+		batches: testAnalysisBatches(),
 		cohorts: []serverpkg.AnalysisCohort{
 			{
 				ID:                    10,
@@ -331,6 +336,7 @@ func TestControllerRepairAllAndDisableChangeClearMaterializedRows(t *testing.T) 
 		tags: map[int64][]string{
 			run.DomainID: {"tld"},
 		},
+		batches: testAnalysisBatches(),
 		cohorts: []serverpkg.AnalysisCohort{
 			{
 				ID:                    10,
@@ -411,6 +417,13 @@ func TestControllerRepairAllAndDisableChangeClearMaterializedRows(t *testing.T) 
 	}
 }
 
+// testAnalysisRunBatchID is the batch id every existing
+// testAnalysisRun-seeded run is scoped under. Phase 2's pollution gates
+// refuse to project a run with no batch_id or whose batch is not
+// snapshot-intent, so the default test helper pins a single intent-true
+// batch and buildBatches below wires it into the fakeStore.
+const testAnalysisRunBatchID = "batch-test"
+
 func testAnalysisRun(id string, domainID int64, domain string, finishedAt time.Time, ipv4Address, ipv6Address string) serverpkg.Run {
 	score := 95
 	grade := "A"
@@ -418,6 +431,7 @@ func testAnalysisRun(id string, domainID int64, domain string, finishedAt time.T
 		ID:         id,
 		DomainID:   domainID,
 		Domain:     domain,
+		BatchID:    testAnalysisRunBatchID,
 		Status:     serverpkg.JobSucceeded,
 		EntryCount: 2,
 		FinishedAt: finishedAt,
@@ -427,6 +441,20 @@ func testAnalysisRun(id string, domainID int64, domain string, finishedAt time.T
 		NameserverTimings: []serverpkg.NameserverTiming{
 			{Nameserver: "ns1." + domain, Address: ipv4Address, AvgMS: 11, MinMS: 10, MaxMS: 12, Count: 3},
 			{Nameserver: "ns2." + domain, Address: ipv6Address, AvgMS: 18, MinMS: 17, MaxMS: 19, Count: 2},
+		},
+	}
+}
+
+// testAnalysisBatches returns a snapshot-intent batch catalog suitable for
+// seeding fakeStore.batches in the ProjectRun / rebuild / repair tests.
+func testAnalysisBatches() map[string]serverpkg.Batch {
+	return map[string]serverpkg.Batch{
+		testAnalysisRunBatchID: {
+			ID:             testAnalysisRunBatchID,
+			Tag:            "tld",
+			CreatedAt:      time.Date(2026, 4, 17, 9, 0, 0, 0, time.UTC),
+			DomainCount:    3,
+			SnapshotIntent: true,
 		},
 	}
 }

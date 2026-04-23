@@ -70,6 +70,10 @@ func (s *spyAnalysisController) ReconcileCohortChange(_ context.Context, _, _ An
 	return nil
 }
 
+func (s *spyAnalysisController) CaptureCompletedSnapshots(_ context.Context) error {
+	return nil
+}
+
 func TestServerStartTriggersAnalysisRepair(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.WorkerCount = 1

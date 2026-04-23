@@ -72,7 +72,32 @@ func (s *Server) Start() {
 				log.Printf("analysis: startup repair failed: %v", err)
 			}
 		}()
+		startSnapshotCaptureLoop(ctx, s.analysis)
 	}
+}
+
+// startSnapshotCaptureLoop runs one immediate capture pass plus a ticker
+// that re-scans pending snapshots every 30 seconds. Pulled out of Start()
+// so analysis_runtime_test.go can exercise the loop without standing up a
+// full server.
+func startSnapshotCaptureLoop(ctx context.Context, ctrl AnalysisController) {
+	go func() {
+		if err := ctrl.CaptureCompletedSnapshots(ctx); err != nil && ctx.Err() == nil {
+			log.Printf("analysis: snapshot capture (initial): %v", err)
+		}
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if err := ctrl.CaptureCompletedSnapshots(ctx); err != nil && ctx.Err() == nil {
+					log.Printf("analysis: snapshot capture: %v", err)
+				}
+			}
+		}
+	}()
 }
 
 // startWorker starts one worker goroutine with its own cancellable context

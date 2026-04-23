@@ -75,6 +75,10 @@ func (c *recordingAnalysisController) ReconcileCohortChange(_ context.Context, b
 	return c.reconcileErr
 }
 
+func (c *recordingAnalysisController) CaptureCompletedSnapshots(context.Context) error {
+	return nil
+}
+
 func (c *recordingAnalysisController) snapshot() recordingAnalysisController {
 	c.mu.Lock()
 	defer c.mu.Unlock()

@@ -103,9 +103,10 @@ func (s *SQLJobStore) GetAnalysisCohortSnapshotBySlug(cohortID int64, slug strin
 	return AnalysisCohortSnapshot{}, false
 }
 
-// getAnalysisCohortSnapshotByBatch looks up the (cohort, batch) natural-key
-// row so UpsertAnalysisCohortSnapshot is idempotent per rebuild.
-func (s *SQLJobStore) getAnalysisCohortSnapshotByBatch(cohortID int64, batchID string) (AnalysisCohortSnapshot, bool) {
+// GetAnalysisCohortSnapshotByBatch looks up the (cohort, batch) natural-key
+// row so UpsertAnalysisCohortSnapshot is idempotent per rebuild and the
+// projector can check whether a snapshot for one batch already exists.
+func (s *SQLJobStore) GetAnalysisCohortSnapshotByBatch(cohortID int64, batchID string) (AnalysisCohortSnapshot, bool) {
 	row := s.db.QueryRow(
 		fmt.Sprintf(`SELECT %s FROM analysis_cohort_snapshots
 			WHERE cohort_id = %s AND batch_id = %s`,
@@ -194,7 +195,7 @@ func (s *SQLJobStore) UpsertAnalysisCohortSnapshot(snap AnalysisCohortSnapshot) 
 	}
 
 	now := time.Now().UTC()
-	existing, found := s.getAnalysisCohortSnapshotByBatch(snap.CohortID, snap.BatchID)
+	existing, found := s.GetAnalysisCohortSnapshotByBatch(snap.CohortID, snap.BatchID)
 	if found {
 		if snap.CreatedAt.IsZero() {
 			snap.CreatedAt = existing.CreatedAt
@@ -284,7 +285,7 @@ func (s *SQLJobStore) UpsertAnalysisCohortSnapshot(snap AnalysisCohortSnapshot) 
 		return AnalysisCohortSnapshot{}, fmt.Errorf("insert cohort snapshot: %w", err)
 	}
 
-	created, ok := s.getAnalysisCohortSnapshotByBatch(snap.CohortID, snap.BatchID)
+	created, ok := s.GetAnalysisCohortSnapshotByBatch(snap.CohortID, snap.BatchID)
 	if !ok {
 		return AnalysisCohortSnapshot{}, errors.New("cohort snapshot inserted but not readable")
 	}
@@ -319,6 +320,59 @@ func (s *SQLJobStore) ListSnapshotAggregates(snapshotID int64) []AnalysisCohortS
 		out = append(out, agg)
 	}
 	return out
+}
+
+// ListPendingAnalysisCohortSnapshots returns every snapshot still in pending
+// state across all cohorts. Used by the capture poller to check whether each
+// such snapshot's batch has finished so the snapshot can be promoted to
+// captured.
+func (s *SQLJobStore) ListPendingAnalysisCohortSnapshots() []AnalysisCohortSnapshot {
+	rows, err := s.db.Query(
+		fmt.Sprintf(`SELECT %s FROM analysis_cohort_snapshots
+			WHERE status = %s
+			ORDER BY cohort_id, created_at, id`,
+			analysisCohortSnapshotCols, s.ph(1)),
+		AnalysisSnapshotStatusPending,
+	)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	var out []AnalysisCohortSnapshot
+	for rows.Next() {
+		snap, err := s.scanAnalysisCohortSnapshot(rows)
+		if err != nil {
+			return nil
+		}
+		out = append(out, snap)
+	}
+	return out
+}
+
+// ClearAnalysisCohortSnapshots removes all snapshot rows and their aggregates
+// for one cohort. Paired with ClearAnalysisCohortMaterialization so a cohort
+// rebuild starts with no stale snapshots pointing at facts that were just
+// deleted.
+func (s *SQLJobStore) ClearAnalysisCohortSnapshots(cohortID int64) error {
+	// Aggregates reference snapshots by ID; delete them first so the parent
+	// row removal does not leave orphan aggregate rows behind.
+	if _, err := s.db.Exec(
+		fmt.Sprintf(`DELETE FROM analysis_cohort_snapshot_aggregates
+			WHERE snapshot_id IN (
+				SELECT id FROM analysis_cohort_snapshots WHERE cohort_id = %s
+			)`, s.ph(1)),
+		cohortID,
+	); err != nil {
+		return fmt.Errorf("clear snapshot aggregates for cohort %d: %w", cohortID, err)
+	}
+	if _, err := s.db.Exec(
+		fmt.Sprintf(`DELETE FROM analysis_cohort_snapshots WHERE cohort_id = %s`, s.ph(1)),
+		cohortID,
+	); err != nil {
+		return fmt.Errorf("clear snapshots for cohort %d: %w", cohortID, err)
+	}
+	return nil
 }
 
 // ReplaceSnapshotAggregates atomically swaps the aggregate rows for one

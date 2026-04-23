@@ -3,6 +3,7 @@ package analysis
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	serverpkg "codeberg.org/pawal/gonemaster/server"
@@ -28,6 +29,17 @@ type ControlStore interface {
 	// materialization_total counters. Called from the rebuild loop so the
 	// admin UI can render a progress bar via polling.
 	SetAnalysisCohortProgress(cohortID int64, done, total int) error
+
+	// Batch + snapshot surface used by the cohort-snapshot lifecycle.
+	GetBatch(id string) (serverpkg.Batch, bool)
+	UpsertAnalysisCohortSnapshot(snap serverpkg.AnalysisCohortSnapshot) (serverpkg.AnalysisCohortSnapshot, error)
+	GetAnalysisCohortSnapshotByBatch(cohortID int64, batchID string) (serverpkg.AnalysisCohortSnapshot, bool)
+	ListPendingAnalysisCohortSnapshots() []serverpkg.AnalysisCohortSnapshot
+	ClearAnalysisCohortSnapshots(cohortID int64) error
+	CountBatchSnapshotRuns(cohortID int64, batchID string) (runCount, domainCount int, firstFinished, lastFinished time.Time, err error)
+	CountOutstandingJobsForBatch(batchID string) (int, error)
+	ComputeSnapshotAggregates(cohortID int64, batchID string) ([]serverpkg.AnalysisCohortSnapshotAggregate, error)
+	ReplaceSnapshotAggregates(snapshotID int64, aggs []serverpkg.AnalysisCohortSnapshotAggregate) error
 }
 
 // Controller coordinates per-run projection with cohort-wide rebuild and clear
@@ -66,8 +78,29 @@ func NewControllerFromJobStore(store serverpkg.JobStore) (*Controller, bool) {
 }
 
 // ProjectRun materializes one completed run and updates cohort-level
-// materialization state for the matched cohorts.
+// materialization state for the matched cohorts. Two pollution gates run
+// before any write:
+//  1. A run with an empty batch_id never enters the analysis layer — public
+//     UI one-offs and unbatched admin retests are excluded entirely.
+//  2. A run whose batch carries snapshot_intent = false is also skipped;
+//     that flag is the admin-UI checkbox's switch for "this batch becomes a
+//     cohort snapshot".
+//
+// Both gates return nil so the worker's graduation path does not treat a
+// deliberately-excluded run as a projection error.
 func (c *Controller) ProjectRun(runID string) error {
+	run, ok := c.store.GetRun(runID)
+	if !ok {
+		return fmt.Errorf("%w: %s", ErrRunNotFound, runID)
+	}
+	if run.BatchID == "" {
+		return nil
+	}
+	batch, ok := c.store.GetBatch(run.BatchID)
+	if !ok || !batch.SnapshotIntent {
+		return nil
+	}
+
 	input, err := c.projector.LoadCompletedRun(runID)
 	if err != nil {
 		return err
@@ -87,11 +120,107 @@ func (c *Controller) ProjectRun(runID string) error {
 		projectedAt = time.Now().UTC()
 	}
 	for _, cohort := range input.MatchingCohorts {
+		if err := c.accumulateSnapshot(cohort, batch, input.Run); err != nil {
+			return err
+		}
 		if err := c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationReady, projectedAt, ""); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// accumulateSnapshot find-or-creates the pending snapshot for one
+// (cohort, batch) pair and refreshes its denormalized counters / timestamps
+// from the projected run. The first run to touch the snapshot denormalizes
+// the profile; a subsequent run with a different profile trips the
+// failed_mixed_profiles state so the snapshot is surfaced as broken rather
+// than silently averaging two scoring configs together.
+func (c *Controller) accumulateSnapshot(cohort serverpkg.AnalysisCohort, batch serverpkg.Batch, run serverpkg.Run) error {
+	existing, found := c.store.GetAnalysisCohortSnapshotByBatch(cohort.ID, batch.ID)
+	runCount, domainCount, firstRunAt, lastRunAt, err := c.store.CountBatchSnapshotRuns(cohort.ID, batch.ID)
+	if err != nil {
+		return fmt.Errorf("count snapshot runs for cohort %d batch %s: %w", cohort.ID, batch.ID, err)
+	}
+
+	snap := serverpkg.AnalysisCohortSnapshot{
+		CohortID:    cohort.ID,
+		BatchID:     batch.ID,
+		RunCount:    runCount,
+		DomainCount: domainCount,
+		FirstRunAt:  firstRunAt,
+		LastRunAt:   lastRunAt,
+	}
+	if found {
+		snap.ID = existing.ID
+		snap.Slug = existing.Slug
+		snap.Label = existing.Label
+		snap.Description = existing.Description
+		snap.ProfileID = existing.ProfileID
+		snap.ProfileName = existing.ProfileName
+		snap.CapturedAt = existing.CapturedAt
+		snap.Status = existing.Status
+		snap.IsDefault = existing.IsDefault
+		snap.IsPublic = existing.IsPublic
+		snap.CreatedAt = existing.CreatedAt
+	} else {
+		snap.Slug = defaultSnapshotSlug(batch)
+		snap.Status = serverpkg.AnalysisSnapshotStatusPending
+		snap.IsPublic = true
+		snap.ProfileID = cloneInt64Ptr(run.ProfileID)
+		snap.ProfileName = run.ProfileName
+	}
+
+	if snap.Status != serverpkg.AnalysisSnapshotStatusFailedMixedProfiles {
+		if mixedProfiles(snap.ProfileID, snap.ProfileName, run.ProfileID, run.ProfileName) {
+			snap.Status = serverpkg.AnalysisSnapshotStatusFailedMixedProfiles
+			snap.IsPublic = false
+		}
+	}
+
+	if _, err := c.store.UpsertAnalysisCohortSnapshot(snap); err != nil {
+		return fmt.Errorf("upsert snapshot for cohort %d batch %s: %w", cohort.ID, batch.ID, err)
+	}
+	return nil
+}
+
+// defaultSnapshotSlug renders the date-first slug the plan specifies. The
+// 8-character batch-id suffix keeps the slug unique across two batches
+// that land on the same day, including same-day retries of the same cohort.
+func defaultSnapshotSlug(batch serverpkg.Batch) string {
+	date := batch.CreatedAt.UTC().Format("2006-01-02")
+	suffix := batch.ID
+	if len(suffix) > 8 {
+		suffix = suffix[:8]
+	}
+	if suffix == "" {
+		return date
+	}
+	return date + "-" + suffix
+}
+
+// mixedProfiles returns true when the snapshot's denormalized profile
+// disagrees with the run's profile. ID comparison wins when both are set;
+// otherwise the name comparison catches the common case where the same
+// profile is present under different IDs (e.g. after a profile rename).
+func mixedProfiles(snapID *int64, snapName string, runID *int64, runName string) bool {
+	if snapID != nil && runID != nil {
+		return *snapID != *runID
+	}
+	snap := strings.TrimSpace(snapName)
+	run := strings.TrimSpace(runName)
+	if snap != "" && run != "" {
+		return snap != run
+	}
+	return false
+}
+
+func cloneInt64Ptr(v *int64) *int64 {
+	if v == nil {
+		return nil
+	}
+	copy := *v
+	return &copy
 }
 
 // RepairAllCohorts reconciles the materialized analysis state for every cohort
@@ -160,23 +289,17 @@ func (c *Controller) catchUpCohort(ctx context.Context, cohort serverpkg.Analysi
 			if err := ctx.Err(); err != nil {
 				return err
 			}
-			input, err := c.projector.LoadCompletedRunWithCatalog(run.ID, catalog)
+			projectedThisRun, err := c.projectAndAccumulate(run.ID, catalog)
 			if err != nil {
-				_ = c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationFailed, cohort.LastMaterializedAt, err.Error())
-				return fmt.Errorf("load run %s for cohort %d: %w", run.ID, cohort.ID, err)
-			}
-			if len(input.MatchingCohorts) == 0 {
-				progress.increment()
-				continue
-			}
-			if err := c.projector.ProjectLoaded(input); err != nil {
 				_ = c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationFailed, cohort.LastMaterializedAt, err.Error())
 				return fmt.Errorf("project run %s for cohort %d: %w", run.ID, cohort.ID, err)
 			}
-			if run.FinishedAt.After(latest) {
-				latest = run.FinishedAt
+			if projectedThisRun {
+				if run.FinishedAt.After(latest) {
+					latest = run.FinishedAt
+				}
+				projected++
 			}
-			projected++
 			progress.increment()
 		}
 		offset += len(list.Items)
@@ -209,6 +332,14 @@ func (c *Controller) RebuildCohort(ctx context.Context, cohortID int64) error {
 		_ = c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationFailed, time.Time{}, err.Error())
 		return fmt.Errorf("clear cohort %d before rebuild: %w", cohort.ID, err)
 	}
+	// Drop any stale snapshot rows for this cohort — their aggregates
+	// reference facts we just deleted. The per-run graduation path below
+	// will recreate pending snapshots keyed on (cohort_id, batch_id), so
+	// rebuild ends up idempotent.
+	if err := c.store.ClearAnalysisCohortSnapshots(cohort.ID); err != nil {
+		_ = c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationFailed, time.Time{}, err.Error())
+		return fmt.Errorf("clear cohort %d snapshots before rebuild: %w", cohort.ID, err)
+	}
 
 	projected := 0
 	catalog := c.store.ListAnalysisCohorts()
@@ -238,20 +369,14 @@ func (c *Controller) RebuildCohort(ctx context.Context, cohortID int64) error {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
-			input, err := c.projector.LoadCompletedRunWithCatalog(run.ID, catalog)
+			projectedThisRun, err := c.projectAndAccumulate(run.ID, catalog)
 			if err != nil {
-				_ = c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationFailed, time.Time{}, err.Error())
-				return fmt.Errorf("load run %s for cohort %d: %w", run.ID, cohort.ID, err)
-			}
-			if len(input.MatchingCohorts) == 0 {
-				progress.increment()
-				continue
-			}
-			if err := c.projector.ProjectLoaded(input); err != nil {
 				_ = c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationFailed, time.Time{}, err.Error())
 				return fmt.Errorf("project run %s for cohort %d: %w", run.ID, cohort.ID, err)
 			}
-			projected++
+			if projectedThisRun {
+				projected++
+			}
 			progress.increment()
 		}
 		offset += len(list.Items)
@@ -288,7 +413,166 @@ func (c *Controller) ClearCohort(ctx context.Context, cohortID int64) error {
 		_ = c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationFailed, time.Time{}, err.Error())
 		return fmt.Errorf("clear cohort %d: %w", cohort.ID, err)
 	}
+	if err := c.store.ClearAnalysisCohortSnapshots(cohort.ID); err != nil {
+		_ = c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationFailed, time.Time{}, err.Error())
+		return fmt.Errorf("clear cohort %d snapshots: %w", cohort.ID, err)
+	}
 	return c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationPending, time.Time{}, "")
+}
+
+// projectAndAccumulate is the rebuild-friendly counterpart of ProjectRun:
+// it loads one run against a pre-fetched catalog, applies the two
+// pollution gates, projects, and accumulates pending snapshots for every
+// matching cohort. Returns (true, nil) when the run actually contributed
+// facts; (false, nil) when a gate skipped it or no cohort matched.
+func (c *Controller) projectAndAccumulate(runID string, catalog []serverpkg.AnalysisCohort) (bool, error) {
+	run, ok := c.store.GetRun(runID)
+	if !ok {
+		return false, fmt.Errorf("%w: %s", ErrRunNotFound, runID)
+	}
+	if run.BatchID == "" {
+		return false, nil
+	}
+	batch, ok := c.store.GetBatch(run.BatchID)
+	if !ok || !batch.SnapshotIntent {
+		return false, nil
+	}
+	input, err := c.projector.LoadCompletedRunWithCatalog(runID, catalog)
+	if err != nil {
+		return false, fmt.Errorf("load run %s: %w", runID, err)
+	}
+	if len(input.MatchingCohorts) == 0 {
+		return false, nil
+	}
+	if err := c.projector.ProjectLoaded(input); err != nil {
+		return false, fmt.Errorf("project run %s: %w", runID, err)
+	}
+	for _, cohort := range input.MatchingCohorts {
+		if err := c.accumulateSnapshot(cohort, batch, input.Run); err != nil {
+			return false, err
+		}
+	}
+	return true, nil
+}
+
+// CaptureCompletedSnapshots walks the pending-snapshot table and promotes
+// any snapshot whose batch has zero outstanding jobs. Promotion computes
+// the aggregate payloads, writes them, and flips the row to captured so
+// the read path can serve it. Safe to call concurrently with graduation
+// — the upsert in accumulateSnapshot is keyed on (cohort, batch) and
+// captured snapshots are not re-upserted by projection.
+func (c *Controller) CaptureCompletedSnapshots(ctx context.Context) error {
+	for _, snap := range c.store.ListPendingAnalysisCohortSnapshots() {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if err := c.captureSnapshot(snap); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *Controller) captureSnapshot(snap serverpkg.AnalysisCohortSnapshot) error {
+	outstanding, err := c.store.CountOutstandingJobsForBatch(snap.BatchID)
+	if err != nil {
+		return fmt.Errorf("count outstanding jobs for batch %s: %w", snap.BatchID, err)
+	}
+	if outstanding > 0 {
+		return nil
+	}
+
+	// Failed snapshots stay pending-free too, but we don't want to emit
+	// aggregates for a known-broken mix of profiles. Flip to captured only
+	// when the projection sequence did not trip the mixed-profile error.
+	if snap.Status == serverpkg.AnalysisSnapshotStatusFailedMixedProfiles {
+		return nil
+	}
+
+	runCount, domainCount, firstRunAt, lastRunAt, err := c.store.CountBatchSnapshotRuns(snap.CohortID, snap.BatchID)
+	if err != nil {
+		return fmt.Errorf("count snapshot runs: %w", err)
+	}
+	if runCount == 0 {
+		// Batch terminated with zero graduated runs for this cohort — nothing
+		// to materialize. Leave the snapshot pending so a later rebuild can
+		// retry; hiding it would drop a real operational condition the
+		// admin should see.
+		return nil
+	}
+
+	aggregates, err := c.store.ComputeSnapshotAggregates(snap.CohortID, snap.BatchID)
+	if err != nil {
+		return fmt.Errorf("compute aggregates for snapshot %d: %w", snap.ID, err)
+	}
+	if err := c.store.ReplaceSnapshotAggregates(snap.ID, aggregates); err != nil {
+		return fmt.Errorf("write aggregates for snapshot %d: %w", snap.ID, err)
+	}
+
+	snap.RunCount = runCount
+	snap.DomainCount = domainCount
+	snap.FirstRunAt = firstRunAt
+	snap.LastRunAt = lastRunAt
+	snap.CapturedAt = time.Now().UTC()
+	snap.Status = serverpkg.AnalysisSnapshotStatusCaptured
+	if _, err := c.store.UpsertAnalysisCohortSnapshot(snap); err != nil {
+		return fmt.Errorf("promote snapshot %d to captured: %w", snap.ID, err)
+	}
+	return nil
+}
+
+// snapshotCaptureInterval is how often the polling goroutine wakes up.
+// Every 30 seconds is plenty for operator-scale cohorts; the loop is a
+// pure read of the pending snapshot list plus one COUNT(*) per pending
+// row, so it is cheap even on larger installations.
+const snapshotCaptureInterval = 30 * time.Second
+
+// StartSnapshotCaptureLoop launches a background goroutine that calls
+// CaptureCompletedSnapshots on a fixed interval until ctx is done. Safe
+// to call once at server startup; the returned channel is closed when
+// the loop exits so tests can wait for a clean shutdown.
+func (c *Controller) StartSnapshotCaptureLoop(ctx context.Context) <-chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		ticker := time.NewTicker(snapshotCaptureInterval)
+		defer ticker.Stop()
+		// Tick once immediately so a server restart promotes batches that
+		// finished while the process was down, without waiting a full
+		// interval.
+		if err := c.CaptureCompletedSnapshots(ctx); err != nil && ctx.Err() == nil {
+			logSnapshotCaptureError(err)
+		}
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if err := c.CaptureCompletedSnapshots(ctx); err != nil && ctx.Err() == nil {
+					logSnapshotCaptureError(err)
+				}
+			}
+		}
+	}()
+	return done
+}
+
+// logSnapshotCaptureError keeps the capture loop's error-reporting behind
+// a single hook so tests can substitute without pulling in the log pkg.
+var logSnapshotCaptureError = func(err error) {
+	// Default implementation intentionally no-op; production callers
+	// install a logging variant via ReplaceSnapshotCaptureErrorLogger.
+}
+
+// ReplaceSnapshotCaptureErrorLogger installs a custom error sink for the
+// capture loop. The server startup wiring uses this to forward errors to
+// the server's structured logger; tests can use it to assert on failures.
+func ReplaceSnapshotCaptureErrorLogger(fn func(err error)) {
+	if fn == nil {
+		logSnapshotCaptureError = func(error) {}
+		return
+	}
+	logSnapshotCaptureError = fn
 }
 
 // ReconcileCohortChange applies the materialization side effect for one cohort

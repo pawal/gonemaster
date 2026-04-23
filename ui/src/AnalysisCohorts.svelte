@@ -17,6 +17,15 @@
   let editingSourceTag = $state("");
   let saving = $state(false);
   let backendStatus = $state({ backend_supported: true, unsupported_message: "" });
+
+  // Snapshots are loaded lazily per-cohort (expand toggled by admin).
+  let snapshotsByCohortId = $state({});
+  let snapshotsLoadingIds = $state(new Set());
+  let expandedSnapshotCohortId = $state(null);
+  let busySnapshotKey = $state("");
+  let editingLabelKey = $state("");
+  let editingLabelValue = $state("");
+  let submittingSnapshotCohortId = $state(null);
   // Poll handle kept outside state so we can clear it without reactively
   // re-triggering. Rebuilds now run server-side in a goroutine and report
   // materialization_done / materialization_total on the cohort row; while
@@ -285,6 +294,131 @@
   const rebuildCohort = (cohort) => triggerAction(cohort, "rebuild", "analysis_cohorts_rebuild_ok");
   const clearCohort = (cohort) => triggerAction(cohort, "clear", "analysis_cohorts_clear_ok");
 
+  const snapshotKey = (cohortId, slug) => `${cohortId}/${slug}`;
+
+  async function loadSnapshots(cohort, { refresh = false } = {}) {
+    if (!cohort) return;
+    if (!refresh && snapshotsByCohortId[cohort.id]) return;
+    snapshotsLoadingIds.add(cohort.id);
+    snapshotsLoadingIds = new Set(snapshotsLoadingIds);
+    try {
+      const result = await apiFetch(`/analysis/cohorts/${cohort.id}/snapshots`);
+      snapshotsByCohortId = { ...snapshotsByCohortId, [cohort.id]: Array.isArray(result) ? result : [] };
+    } catch (_) {
+      snapshotsByCohortId = { ...snapshotsByCohortId, [cohort.id]: [] };
+    } finally {
+      snapshotsLoadingIds.delete(cohort.id);
+      snapshotsLoadingIds = new Set(snapshotsLoadingIds);
+    }
+  }
+
+  function toggleSnapshots(cohort) {
+    if (expandedSnapshotCohortId === cohort.id) {
+      expandedSnapshotCohortId = null;
+      return;
+    }
+    expandedSnapshotCohortId = cohort.id;
+    loadSnapshots(cohort);
+  }
+
+  async function patchSnapshot(cohort, snap, patch, successKey) {
+    const key = snapshotKey(cohort.id, snap.slug);
+    busySnapshotKey = key;
+    try {
+      await apiFetch(`/analysis/cohorts/${cohort.id}/snapshots/${encodeURIComponent(snap.slug)}`, {
+        method: "POST",
+        body: JSON.stringify(patch),
+      });
+      await loadSnapshots(cohort, { refresh: true });
+      if (successKey) setNotice($t(successKey, { slug: snap.slug }), "ok");
+    } catch (error) {
+      setNotice($t("analysis_snapshots_action_error", { error: error.message || "" }), "warn");
+    } finally {
+      busySnapshotKey = "";
+    }
+  }
+
+  const setSnapshotDefault = (cohort, snap) =>
+    patchSnapshot(cohort, snap, { is_default: true }, "analysis_snapshots_default_set");
+
+  const retireSnapshot = async (cohort, snap) => {
+    if (typeof window !== "undefined" &&
+        !window.confirm($t("analysis_snapshots_retire_confirm", { slug: snap.slug }))) return;
+    await patchSnapshot(cohort, snap, { status: "retired", is_public: false }, "analysis_snapshots_retired");
+  };
+
+  const restoreSnapshot = (cohort, snap) =>
+    patchSnapshot(cohort, snap, { status: "captured", is_public: true }, "analysis_snapshots_restored");
+
+  async function purgeSnapshot(cohort, snap) {
+    if (typeof window !== "undefined" &&
+        !window.confirm($t("analysis_snapshots_purge_confirm", { slug: snap.slug }))) return;
+    const key = snapshotKey(cohort.id, snap.slug);
+    busySnapshotKey = key;
+    try {
+      await apiFetch(
+        `/analysis/cohorts/${cohort.id}/snapshots/${encodeURIComponent(snap.slug)}?purge=true`,
+        { method: "DELETE" }
+      );
+      await loadSnapshots(cohort, { refresh: true });
+      setNotice($t("analysis_snapshots_purged", { slug: snap.slug }), "ok");
+    } catch (error) {
+      setNotice($t("analysis_snapshots_action_error", { error: error.message || "" }), "warn");
+    } finally {
+      busySnapshotKey = "";
+    }
+  }
+
+  function startLabelEdit(cohort, snap) {
+    editingLabelKey = snapshotKey(cohort.id, snap.slug);
+    editingLabelValue = snap.label || "";
+  }
+
+  function cancelLabelEdit() {
+    editingLabelKey = "";
+    editingLabelValue = "";
+  }
+
+  async function saveLabelEdit(cohort, snap) {
+    await patchSnapshot(cohort, snap, { label: editingLabelValue.trim() }, "analysis_snapshots_label_saved");
+    cancelLabelEdit();
+  }
+
+  // "Run new snapshot" → POST /jobs/batch with from_tag + snapshot_intent.
+  async function runSnapshot(cohort) {
+    submittingSnapshotCohortId = cohort.id;
+    try {
+      const payload = { from_tag: cohort.source_tag, snapshot_intent: true };
+      const response = await apiFetch("/jobs/batch", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      setNotice(
+        $t("analysis_cohorts_snapshot_submitted", { id: response.batch_id, tag: cohort.source_tag }),
+        "ok"
+      );
+      expandedSnapshotCohortId = cohort.id;
+      await loadSnapshots(cohort, { refresh: true });
+    } catch (error) {
+      setNotice(
+        $t("analysis_cohorts_snapshot_submit_error", { error: error.message || "" }),
+        "warn"
+      );
+    } finally {
+      submittingSnapshotCohortId = null;
+    }
+  }
+
+  function snapshotStatusTone(status) {
+    switch (status) {
+      case "captured": return "ok";
+      case "pending": return "neutral";
+      case "retired": return "neutral";
+      case "failed_mixed_profiles": return "warn";
+      default: return "neutral";
+    }
+  }
+
   function statusBadgeTone(status) {
     switch (status) {
       case "ready":
@@ -475,6 +609,15 @@
                 </td>
                 <td class="col-right">
                   <div class="row-actions">
+                    <button type="button" class="row-action row-action-primary"
+                            disabled={busy || !cohort.analysis_enabled || submittingSnapshotCohortId === cohort.id}
+                            title={$t("analysis_cohorts_run_snapshot_title")}
+                            onclick={() => runSnapshot(cohort)}>
+                      {$t("analysis_cohorts_run_snapshot")}
+                    </button>
+                    <button type="button" class="row-action" disabled={busy} onclick={() => toggleSnapshots(cohort)}>
+                      {$t("analysis_snapshots_heading")}
+                    </button>
                     <button type="button" class="row-action" disabled={busy || editingCohortId === cohort.id} onclick={() => startEdit(cohort)}>
                       {$t("analysis_cohorts_edit")}
                     </button>
@@ -490,6 +633,99 @@
                   </div>
                 </td>
               </tr>
+              {#if expandedSnapshotCohortId === cohort.id}
+                {@const snaps = snapshotsByCohortId[cohort.id] ?? []}
+                {@const mixed = snaps.some((s) => s.status === "failed_mixed_profiles")}
+                <tr class="snapshot-subrow">
+                  <td colspan="6">
+                    {#if snapshotsLoadingIds.has(cohort.id) && snaps.length === 0}
+                      <p class="small">{$t("analysis_cohorts_loading")}</p>
+                    {:else if snaps.length === 0}
+                      <p class="small">{$t("analysis_snapshots_empty")}</p>
+                    {:else}
+                      {#if mixed}
+                        <div class="notice notice-warn" role="alert">
+                          {$t("analysis_snapshots_mixed_profile_banner")}
+                        </div>
+                      {/if}
+                      <table class="data-table snapshot-table">
+                        <thead>
+                          <tr>
+                            <th>{$t("analysis_snapshots_col_slug")}</th>
+                            <th>{$t("analysis_snapshots_col_label")}</th>
+                            <th>{$t("analysis_snapshots_col_captured_at")}</th>
+                            <th>{$t("analysis_snapshots_col_profile")}</th>
+                            <th>{$t("analysis_snapshots_col_counts")}</th>
+                            <th>{$t("analysis_snapshots_col_status")}</th>
+                            <th class="col-right">{$t("analysis_snapshots_col_actions")}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {#each snaps as snap (snap.id)}
+                            {@const snapKey = snapshotKey(cohort.id, snap.slug)}
+                            {@const snapBusy = busySnapshotKey === snapKey}
+                            {@const editing = editingLabelKey === snapKey}
+                            <tr>
+                              <td class="mono">{snap.slug}</td>
+                              <td>
+                                {#if editing}
+                                  <input type="text" bind:value={editingLabelValue} />
+                                {:else}
+                                  {snap.label || ""}
+                                {/if}
+                              </td>
+                              <td>{formatTimestamp(snap.captured_at)}</td>
+                              <td>{snap.profile_name || ""}</td>
+                              <td>{snap.run_count} / {snap.domain_count}</td>
+                              <td>
+                                <span class={`badge badge-status badge-status-${snapshotStatusTone(snap.status)}`}>
+                                  {snap.status}
+                                </span>
+                                {#if snap.is_default}
+                                  <span class="badge badge-default">{$t("analysis_cohorts_default_active")}</span>
+                                {/if}
+                              </td>
+                              <td class="col-right">
+                                <div class="row-actions">
+                                  {#if editing}
+                                    <button type="button" class="row-action" disabled={snapBusy} onclick={() => saveLabelEdit(cohort, snap)}>
+                                      {$t("analysis_snapshots_save_label")}
+                                    </button>
+                                    <button type="button" class="row-action" disabled={snapBusy} onclick={cancelLabelEdit}>
+                                      {$t("analysis_cohorts_cancel")}
+                                    </button>
+                                  {:else}
+                                    <button type="button" class="row-action" disabled={snapBusy} onclick={() => startLabelEdit(cohort, snap)}>
+                                      {$t("analysis_snapshots_edit_label")}
+                                    </button>
+                                    {#if snap.status === "captured" && !snap.is_default}
+                                      <button type="button" class="row-action" disabled={snapBusy} onclick={() => setSnapshotDefault(cohort, snap)}>
+                                        {$t("analysis_snapshots_set_default")}
+                                      </button>
+                                    {/if}
+                                    {#if snap.status === "retired"}
+                                      <button type="button" class="row-action" disabled={snapBusy} onclick={() => restoreSnapshot(cohort, snap)}>
+                                        {$t("analysis_snapshots_restore")}
+                                      </button>
+                                    {:else if snap.status !== "pending"}
+                                      <button type="button" class="row-action" disabled={snapBusy} onclick={() => retireSnapshot(cohort, snap)}>
+                                        {$t("analysis_snapshots_retire")}
+                                      </button>
+                                    {/if}
+                                    <button type="button" class="row-action row-action-danger" disabled={snapBusy} onclick={() => purgeSnapshot(cohort, snap)}>
+                                      {$t("analysis_snapshots_purge")}
+                                    </button>
+                                  {/if}
+                                </div>
+                              </td>
+                            </tr>
+                          {/each}
+                        </tbody>
+                      </table>
+                    {/if}
+                  </td>
+                </tr>
+              {/if}
             {/each}
           </tbody>
         </table>
@@ -796,6 +1032,33 @@
   .row-action-danger:not(:disabled):hover {
     background: rgba(153, 27, 27, 0.08);
   }
+
+  .row-action-primary:not(:disabled) {
+    color: var(--accent-2);
+    border-color: color-mix(in srgb, var(--accent-2) 45%, var(--border));
+    font-weight: 600;
+  }
+
+  .row-action-primary:not(:disabled):hover {
+    background: color-mix(in srgb, var(--accent-2) 8%, var(--surface-2));
+  }
+
+  .snapshot-subrow > td {
+    padding: 12px 14px;
+    background: var(--surface-2);
+  }
+
+  .snapshot-table {
+    width: 100%;
+    font-size: var(--text-sm);
+  }
+
+  .snapshot-table th,
+  .snapshot-table td {
+    padding: 6px 8px;
+  }
+
+  .mono { font-family: var(--mono); }
 
   .muted {
     color: var(--ink-2);

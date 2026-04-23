@@ -56,6 +56,36 @@ func adminAnalysisSnapshotView(snap AnalysisCohortSnapshot) AdminAnalysisSnapsho
 	return AdminAnalysisSnapshotView(snap)
 }
 
+// handleAnalysisCohortSnapshots handles GET on
+// /api/v1/analysis/cohorts/{id}/snapshots. Returns every snapshot for
+// the cohort — including retired and mixed-profile rows the public
+// API hides — so the admin UI can render its full management list.
+func (s *Server) handleAnalysisCohortSnapshots(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
+		return
+	}
+	id, ok := parseCohortID(w, r)
+	if !ok {
+		return
+	}
+	cohort, found := s.store.GetAnalysisCohort(id)
+	if !found {
+		writeError(w, http.StatusNotFound, "not_found", "cohort not found", nil)
+		return
+	}
+	store, ok := s.adminSnapshotStore(w)
+	if !ok {
+		return
+	}
+	snapshots := store.ListAnalysisCohortSnapshots(cohort.ID)
+	out := make([]AdminAnalysisSnapshotView, 0, len(snapshots))
+	for _, snap := range snapshots {
+		out = append(out, adminAnalysisSnapshotView(snap))
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
 // handleAnalysisCohortSnapshotByID routes POST and DELETE on
 // /api/v1/analysis/cohorts/{id}/snapshots/{slug}. POST edits the
 // snapshot's admin-facing fields (label, description, is_public,
@@ -142,6 +172,11 @@ func (s *Server) handlePatchAnalysisCohortSnapshot(w http.ResponseWriter, r *htt
 		Description *string `json:"description,omitempty"`
 		IsPublic    *bool   `json:"is_public,omitempty"`
 		IsDefault   *bool   `json:"is_default,omitempty"`
+		// Status lets the admin UI restore a retired snapshot. Only
+		// `captured` (restore) and `retired` (re-retire) are honoured;
+		// the pending and failed_mixed_profiles lifecycle states are
+		// projector-owned and not admin-writable.
+		Status *string `json:"status,omitempty"`
 	}
 	if err := readJSON(r, s.cfg.MaxBodySize, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_json", err.Error(), nil)
@@ -173,6 +208,17 @@ func (s *Server) handlePatchAnalysisCohortSnapshot(w http.ResponseWriter, r *htt
 	}
 	if req.IsDefault != nil {
 		desired.IsDefault = *req.IsDefault
+	}
+	if req.Status != nil {
+		next := strings.ToLower(strings.TrimSpace(*req.Status))
+		switch next {
+		case AnalysisSnapshotStatusCaptured, AnalysisSnapshotStatusRetired:
+			desired.Status = next
+		default:
+			writeError(w, http.StatusBadRequest, "invalid_status",
+				"status must be one of captured, retired", nil)
+			return
+		}
 	}
 
 	if _, err := store.UpsertAnalysisCohortSnapshot(desired); err != nil {

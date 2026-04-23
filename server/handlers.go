@@ -142,11 +142,12 @@ func (s *Server) handleJobsBatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_ = s.store.CreateBatch(Batch{
-		ID:          batchID,
-		Tag:         req.FromTag,
-		Description: req.Description,
-		DomainCount: len(jobIDs),
-		CreatedAt:   now,
+		ID:             batchID,
+		Tag:            req.FromTag,
+		Description:    req.Description,
+		DomainCount:    len(jobIDs),
+		CreatedAt:      now,
+		SnapshotIntent: req.SnapshotIntent,
 	})
 
 	writeJSON(w, http.StatusAccepted, JobBatchResponse{BatchID: batchID, JobIDs: jobIDs})

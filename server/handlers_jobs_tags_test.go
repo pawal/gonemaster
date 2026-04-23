@@ -212,6 +212,53 @@ func TestBatchJobWithTags(t *testing.T) {
 	}
 }
 
+// TestBatchJobAcceptsSnapshotIntent pins the Phase 6 admin-UI flow: the
+// "Capture as cohort snapshot" checkbox is a flag on the POST /jobs/batch
+// payload, and the server stores it on the batch record so the projector
+// can gate snapshot accumulation on it.
+func TestBatchJobAcceptsSnapshotIntent(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/batch",
+		bytes.NewBufferString(`{"domains":["example.com"],"snapshot_intent":true}`))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d: %s", resp.Code, resp.Body)
+	}
+	var batchResp JobBatchResponse
+	if err := json.NewDecoder(resp.Body).Decode(&batchResp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	batch, ok := srv.store.GetBatch(batchResp.BatchID)
+	if !ok {
+		t.Fatalf("batch not found: %s", batchResp.BatchID)
+	}
+	if !batch.SnapshotIntent {
+		t.Fatal("SnapshotIntent should round-trip as true on the batch record")
+	}
+
+	// Default (flag omitted) must stay false so ad-hoc batches never
+	// become snapshot-intent by accident.
+	resp = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/jobs/batch",
+		bytes.NewBufferString(`{"domains":["example.net"]}`))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d: %s", resp.Code, resp.Body)
+	}
+	batchResp = JobBatchResponse{}
+	if err := json.NewDecoder(resp.Body).Decode(&batchResp); err != nil {
+		t.Fatalf("decode default: %v", err)
+	}
+	batch, _ = srv.store.GetBatch(batchResp.BatchID)
+	if batch.SnapshotIntent {
+		t.Fatal("SnapshotIntent defaulted to true without the request flag")
+	}
+}
+
 func TestBatchJobWithUnknownTag(t *testing.T) {
 	srv := New(DefaultConfig())
 

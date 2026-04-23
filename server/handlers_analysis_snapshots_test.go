@@ -337,6 +337,67 @@ func TestAdminSnapshotNotFound(t *testing.T) {
 	}
 }
 
+// TestAdminSnapshotListReturnsAllStatuses covers the admin list endpoint
+// added in Phase 6: unlike the public list, it includes retired and
+// failed_mixed_profiles rows so the cohort panel can manage them.
+func TestAdminSnapshotListReturnsAllStatuses(t *testing.T) {
+	f := newAdminSnapshotFixture(t)
+	// Seed a retired snapshot in addition to the fixture's captured one.
+	if _, err := f.store.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{
+		CohortID: f.cohort.ID, BatchID: "batch-retired", Slug: "2026-03-01-retired",
+		Status: AnalysisSnapshotStatusRetired, IsPublic: false,
+	}); err != nil {
+		t.Fatalf("seed retired: %v", err)
+	}
+	path := fmt.Sprintf("/api/v1/analysis/cohorts/%d/snapshots", f.cohort.ID)
+	resp := f.call(http.MethodGet, path, "")
+	if resp.Code != http.StatusOK {
+		t.Fatalf("list: got %d, want 200: %s", resp.Code, resp.Body)
+	}
+	var list []AdminAnalysisSnapshotView
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(list) != 2 {
+		t.Fatalf("expected 2 snapshots (captured + retired), got %d", len(list))
+	}
+}
+
+// TestAdminSnapshotRestoreViaStatus covers the status=captured restore
+// path added in Phase 6 so retired snapshots can be un-retired without a
+// separate endpoint.
+func TestAdminSnapshotRestoreViaStatus(t *testing.T) {
+	f := newAdminSnapshotFixture(t)
+	// Retire the fixture snapshot first.
+	path := fmt.Sprintf("/api/v1/analysis/cohorts/%d/snapshots/%s", f.cohort.ID, f.snapshot.Slug)
+	if resp := f.call(http.MethodDelete, path, ""); resp.Code != http.StatusNoContent {
+		t.Fatalf("retire: got %d: %s", resp.Code, resp.Body)
+	}
+	// Restore via status=captured.
+	resp := f.call(http.MethodPost, path, `{"status":"captured","is_public":true}`)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("restore: got %d: %s", resp.Code, resp.Body)
+	}
+	snap, _ := f.store.GetAnalysisCohortSnapshotBySlug(f.cohort.ID, f.snapshot.Slug)
+	if snap.Status != AnalysisSnapshotStatusCaptured {
+		t.Fatalf("Status after restore = %q, want captured", snap.Status)
+	}
+	if !snap.IsPublic {
+		t.Fatal("restored snapshot must be public again")
+	}
+}
+
+// TestAdminSnapshotPatchRejectsInvalidStatus pins the status whitelist
+// so lifecycle states like "pending" aren't admin-writable.
+func TestAdminSnapshotPatchRejectsInvalidStatus(t *testing.T) {
+	f := newAdminSnapshotFixture(t)
+	path := fmt.Sprintf("/api/v1/analysis/cohorts/%d/snapshots/%s", f.cohort.ID, f.snapshot.Slug)
+	resp := f.call(http.MethodPost, path, `{"status":"pending"}`)
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid status, got %d: %s", resp.Code, resp.Body)
+	}
+}
+
 // TestAdminSnapshotMethodNotAllowed pins GET/PUT as not allowed on the
 // snapshot resource — the shape is POST/DELETE only.
 func TestAdminSnapshotMethodNotAllowed(t *testing.T) {

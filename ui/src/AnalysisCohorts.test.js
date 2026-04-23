@@ -298,4 +298,162 @@ describe("AnalysisCohorts", () => {
     expect(handles.created).toHaveLength(0);
     expect(screen.getByText(/source_tag is required/i)).toBeInTheDocument();
   });
+
+  // ── Snapshot sub-panel (Phase 6) ─────────────────────────────────────────
+
+  const installSnapshotFetch = (scenario = {}) => {
+    let cohorts = scenario.initialCohorts || sampleCohorts();
+    let snapshotsByCohort = scenario.snapshotsByCohort || {};
+    const submittedBatches = [];
+    const snapshotPatches = [];
+    const snapshotDeletes = [];
+    global.fetch.mockImplementation((url, requestOptions = {}) => {
+      const value = typeof url === "string" ? url : String(url?.url || url);
+      const method = requestOptions.method || "GET";
+      if (value === "/api/v1/tags?limit=500" && method === "GET") return jsonResponse([]);
+      if (value === "/api/v1/analysis/cohorts" && method === "GET") return jsonResponse(cohorts);
+      if (value === "/api/v1/analysis/status" && method === "GET") {
+        return jsonResponse({ backend_supported: true });
+      }
+      const listSnaps = value.match(/^\/api\/v1\/analysis\/cohorts\/(\d+)\/snapshots$/);
+      if (listSnaps && method === "GET") {
+        return jsonResponse(snapshotsByCohort[Number(listSnaps[1])] || []);
+      }
+      const snapPatch = value.match(/^\/api\/v1\/analysis\/cohorts\/(\d+)\/snapshots\/([^/?]+)$/);
+      if (snapPatch && method === "POST") {
+        const id = Number(snapPatch[1]);
+        const slug = decodeURIComponent(snapPatch[2]);
+        snapshotPatches.push({ id, slug, body: JSON.parse(requestOptions.body) });
+        snapshotsByCohort[id] = (snapshotsByCohort[id] || []).map((s) =>
+          s.slug === slug ? { ...s, ...JSON.parse(requestOptions.body) } : s
+        );
+        return jsonResponse(snapshotsByCohort[id].find((s) => s.slug === slug));
+      }
+      const snapDelete = value.match(/^\/api\/v1\/analysis\/cohorts\/(\d+)\/snapshots\/([^/?]+)/);
+      if (snapDelete && method === "DELETE") {
+        const id = Number(snapDelete[1]);
+        const slug = decodeURIComponent(snapDelete[2]);
+        const purge = value.includes("purge=true");
+        snapshotDeletes.push({ id, slug, purge });
+        snapshotsByCohort[id] = (snapshotsByCohort[id] || []).filter((s) => s.slug !== slug);
+        return {
+          ok: true, statusText: "No Content", headers: { get: () => "" },
+          json: async () => ({}), text: async () => ""
+        };
+      }
+      if (value === "/api/v1/jobs/batch" && method === "POST") {
+        submittedBatches.push(JSON.parse(requestOptions.body));
+        return jsonResponse({ batch_id: "batch-new", job_ids: [] });
+      }
+      return jsonResponse({});
+    });
+    return {
+      submittedBatches,
+      snapshotPatches,
+      snapshotDeletes,
+      getSnapshots: (id) => snapshotsByCohort[id] || [],
+    };
+  };
+
+  it("submits a snapshot-intent batch when Run new snapshot is clicked", async () => {
+    const handles = installSnapshotFetch();
+    render(AnalysisCohorts);
+
+    const tldRow = (await screen.findByText("tld")).closest("tr");
+    await fireEvent.click(within(tldRow).getByRole("button", { name: /Run new snapshot/i }));
+
+    await waitFor(() => expect(handles.submittedBatches).toHaveLength(1));
+    expect(handles.submittedBatches[0]).toEqual({
+      from_tag: "tld",
+      snapshot_intent: true,
+    });
+  });
+
+  it("lists snapshots with a mixed-profile banner when one is flagged", async () => {
+    const snapshotsByCohort = {
+      1: [
+        {
+          id: 100, slug: "2026-04-20-a", label: "", captured_at: "2026-04-20T12:00:00Z",
+          profile_name: "strict", run_count: 3, domain_count: 3,
+          status: "captured", is_public: true, is_default: false
+        },
+        {
+          id: 101, slug: "2026-04-10-mixed", label: "", captured_at: "",
+          profile_name: "", run_count: 0, domain_count: 0,
+          status: "failed_mixed_profiles", is_public: false, is_default: false
+        },
+      ],
+    };
+    installSnapshotFetch({ snapshotsByCohort });
+    render(AnalysisCohorts);
+
+    const tldRow = (await screen.findByText("tld")).closest("tr");
+    await fireEvent.click(within(tldRow).getByRole("button", { name: /Snapshots/i }));
+
+    expect(await screen.findByText("2026-04-20-a")).toBeInTheDocument();
+    expect(screen.getByText("2026-04-10-mixed")).toBeInTheDocument();
+    expect(screen.getByText(/mixed profiles/i)).toBeInTheDocument();
+  });
+
+  it("sets a snapshot as default via POST is_default=true", async () => {
+    const snapshotsByCohort = {
+      1: [{
+        id: 100, slug: "2026-04-20", label: "", captured_at: "2026-04-20T12:00:00Z",
+        profile_name: "strict", run_count: 3, domain_count: 3,
+        status: "captured", is_public: true, is_default: false
+      }],
+    };
+    const handles = installSnapshotFetch({ snapshotsByCohort });
+    render(AnalysisCohorts);
+
+    const tldRow = (await screen.findByText("tld")).closest("tr");
+    await fireEvent.click(within(tldRow).getByRole("button", { name: /Snapshots/i }));
+
+    const snapRow = (await screen.findByText("2026-04-20")).closest("tr");
+    await fireEvent.click(within(snapRow).getByRole("button", { name: /Make default/i }));
+    await waitFor(() => expect(handles.snapshotPatches).toHaveLength(1));
+    expect(handles.snapshotPatches[0]).toMatchObject({
+      id: 1, slug: "2026-04-20", body: { is_default: true }
+    });
+  });
+
+  it("retires a snapshot via POST status=retired after confirming", async () => {
+    global.confirm = vi.fn(() => true);
+    const snapshotsByCohort = {
+      1: [{
+        id: 100, slug: "2026-04-20", label: "", captured_at: "2026-04-20T12:00:00Z",
+        profile_name: "strict", run_count: 3, domain_count: 3,
+        status: "captured", is_public: true, is_default: false
+      }],
+    };
+    const handles = installSnapshotFetch({ snapshotsByCohort });
+    render(AnalysisCohorts);
+
+    const tldRow = (await screen.findByText("tld")).closest("tr");
+    await fireEvent.click(within(tldRow).getByRole("button", { name: /Snapshots/i }));
+    await fireEvent.click(await screen.findByRole("button", { name: /^Retire$/i }));
+
+    await waitFor(() => expect(handles.snapshotPatches).toHaveLength(1));
+    expect(handles.snapshotPatches[0].body).toEqual({ status: "retired", is_public: false });
+  });
+
+  it("purges a snapshot via DELETE?purge=true after confirming", async () => {
+    global.confirm = vi.fn(() => true);
+    const snapshotsByCohort = {
+      1: [{
+        id: 100, slug: "2026-04-20", label: "", captured_at: "2026-04-20T12:00:00Z",
+        profile_name: "strict", run_count: 3, domain_count: 3,
+        status: "captured", is_public: true, is_default: false
+      }],
+    };
+    const handles = installSnapshotFetch({ snapshotsByCohort });
+    render(AnalysisCohorts);
+
+    const tldRow = (await screen.findByText("tld")).closest("tr");
+    await fireEvent.click(within(tldRow).getByRole("button", { name: /Snapshots/i }));
+    await fireEvent.click(await screen.findByRole("button", { name: /^Purge$/i }));
+
+    await waitFor(() => expect(handles.snapshotDeletes).toHaveLength(1));
+    expect(handles.snapshotDeletes[0]).toEqual({ id: 1, slug: "2026-04-20", purge: true });
+  });
 });

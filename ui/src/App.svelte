@@ -27,6 +27,10 @@
   let batchSubmitting = false;
   let createdBatchId = "";
   let batchProfileId = "";
+  // Snapshot-intent batch flag; `touched` suppresses auto-defaulting
+  // once the admin has chosen.
+  let batchSnapshotIntent = false;
+  let batchSnapshotIntentTouched = false;
 
   let jobs = [];
   let jobsLoading = false;
@@ -121,6 +125,21 @@
 
   $: themeIcon = theme === "dark" || (theme === "system" && osDark()) ? "☾" : "☀";
   $: themeTitle = $t("theme_toggle_title", { theme: theme === "dark" ? $t("theme_dark") : $t("theme_light") });
+
+  // Snapshot checkbox visibility + auto-default.
+  $: batchCohortForTag = batchFromTag ? tagCohortByName.get(batchFromTag) : null;
+  $: snapshotCheckboxVisible = !!(batchCohortForTag && batchCohortForTag.analysis_enabled);
+  $: if (!snapshotCheckboxVisible && batchSnapshotIntent) {
+    batchSnapshotIntent = false;
+    batchSnapshotIntentTouched = false;
+  }
+  $: if (snapshotCheckboxVisible && !batchSnapshotIntentTouched) {
+    batchSnapshotIntent = batchFromTagMode;
+  }
+  $: batchSnapshotPartial = batchSnapshotIntent && !batchFromTagMode;
+  $: batchSnapshotSlugPreview = snapshotCheckboxVisible && batchSnapshotIntent
+    ? formatSnapshotSlugPreview(batchProfileId)
+    : "";
 
   // Locale management: fetch available locales from the server, persist choice
   // in localStorage, and auto-detect from the browser language on first visit.
@@ -679,6 +698,14 @@
     if (!normalized) return "";
     const match = availableProfiles.find((profile) => profile.id === normalized);
     return match?.name || `#${normalized}`;
+  };
+
+  // Mirrors server defaultSnapshotSlug; batch id not yet known, so "*".
+  const formatSnapshotSlugPreview = (profileID) => {
+    const today = new Date().toISOString().slice(0, 10);
+    const profile = profileNameByID(profileID);
+    const suffix = profile ? `-${profile}` : "-*";
+    return `${today}${suffix}`;
   };
   const jobProfileName = (job, run = null) => {
     const direct = String(job?.profile_name || run?.profile_name || "").trim();
@@ -1483,6 +1510,7 @@
     const selectedProfileID = normalizeOptionalProfileID(batchProfileId);
     if (parsedTags.length > 0) payload.tags = parsedTags;
     if (selectedProfileID) payload.profile_id = selectedProfileID;
+    if (batchSnapshotIntent) payload.snapshot_intent = true;
     batchSubmitting = true;
     createdBatchId = "";
     try {
@@ -3665,6 +3693,29 @@ example.org`}
           </select>
           <div class="small">{$t("stored_profile_hint")}</div>
         </div>
+        {#if snapshotCheckboxVisible}
+          <div class="stack batch-snapshot-field">
+            <label class="batch-snapshot-check">
+              <input
+                type="checkbox"
+                bind:checked={batchSnapshotIntent}
+                onchange={() => { batchSnapshotIntentTouched = true; }}
+              />
+              <span>{$t("batch_snapshot_label")}</span>
+            </label>
+            <div class="small">{$t("batch_snapshot_hint")}</div>
+            {#if batchSnapshotIntent}
+              <div class="small mono">
+                {$t("batch_snapshot_slug_preview", { slug: batchSnapshotSlugPreview })}
+              </div>
+            {/if}
+            {#if batchSnapshotPartial}
+              <div class="notice notice-warn" role="status" aria-live="polite">
+                {$t("batch_snapshot_partial_warning")}
+              </div>
+            {/if}
+          </div>
+        {/if}
         <button class="secondary" onclick={submitBatch} disabled={batchSubmitting}>
           {batchSubmitting ? $t("submitting") : $t("run_batch")}
         </button>

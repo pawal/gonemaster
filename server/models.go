@@ -661,6 +661,11 @@ type JobBatchRequest struct {
 	Tags             []string                      `json:"tags,omitempty"`
 	Profile          string                        `json:"profile,omitempty"`
 	Description      string                        `json:"description,omitempty"`
+	// SnapshotIntent flags this batch as intended to become a cohort
+	// snapshot. Defaults to false so ad-hoc retests and partial-cohort
+	// repairs never enter the cohort series by accident; the admin UI's
+	// "Capture as cohort snapshot" checkbox is what sets it to true.
+	SnapshotIntent bool `json:"snapshot_intent,omitempty"`
 }
 
 // UndelegatedNameserverInput represents one undelegated nameserver row.

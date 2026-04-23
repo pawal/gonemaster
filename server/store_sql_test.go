@@ -86,6 +86,8 @@ func testBackends(t *testing.T) []testBackend {
 // on persistent backends (PostgreSQL, MariaDB).
 func resetSchema(db *sql.DB) error {
 	for _, tbl := range []string{
+		"analysis_cohort_snapshot_aggregates",
+		"analysis_cohort_snapshots",
 		"analysis_projection_state",
 		"analysis_run_domain_summary",
 		"analysis_run_address_asns",
@@ -292,8 +294,14 @@ func TestRunMigrationsRecordsVersion(t *testing.T) {
 		}
 		versions = append(versions, v)
 	}
-	if len(versions) != 10 || versions[0] != 1 || versions[1] != 2 || versions[2] != 3 || versions[3] != 4 || versions[4] != 5 || versions[5] != 6 || versions[6] != 7 || versions[7] != 8 || versions[8] != 9 || versions[9] != 10 {
-		t.Fatalf("expected versions [1 2 3 4 5 6 7 8 9 10], got %v", versions)
+	want := []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}
+	if len(versions) != len(want) {
+		t.Fatalf("expected %d versions, got %d: %v", len(want), len(versions), versions)
+	}
+	for i, v := range want {
+		if versions[i] != v {
+			t.Fatalf("expected versions %v, got %v", want, versions)
+		}
 	}
 }
 

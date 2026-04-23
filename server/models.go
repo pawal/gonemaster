@@ -184,6 +184,20 @@ const (
 	AnalysisMaterializationFailed  = "failed"
 )
 
+// Snapshot lifecycle states for analysis_cohort_snapshots.status.
+const (
+	AnalysisSnapshotStatusPending             = "pending"
+	AnalysisSnapshotStatusCaptured            = "captured"
+	AnalysisSnapshotStatusRetired             = "retired"
+	AnalysisSnapshotStatusFailedMixedProfiles = "failed_mixed_profiles"
+)
+
+// Per-cohort default snapshot resolution policies.
+const (
+	DefaultSnapshotPolicyAutoLatest = "auto_latest"
+	DefaultSnapshotPolicyPinned     = "pinned"
+)
+
 // AnalysisCohort describes one admin-managed analysis cohort entry.
 // V1 cohorts are tag-backed, analysis-enabled/public-enabled independently,
 // and one public cohort may be marked as the default.
@@ -202,6 +216,8 @@ type AnalysisCohort struct {
 	MaterializationTotal     int       `json:"materialization_total,omitempty"`
 	LastMaterializedAt       time.Time `json:"last_materialized_at,omitempty"`
 	LastMaterializationError string    `json:"last_materialization_error,omitempty"`
+	DefaultSnapshotPolicy    string    `json:"default_snapshot_policy,omitempty"`
+	DefaultSnapshotID        *int64    `json:"default_snapshot_id,omitempty"`
 	CreatedAt                time.Time `json:"created_at"`
 	UpdatedAt                time.Time `json:"updated_at"`
 }
@@ -398,11 +414,47 @@ type Entry struct {
 
 // Batch is metadata for a batch submission.
 type Batch struct {
-	ID          string    `json:"id"`
-	Tag         string    `json:"tag,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
-	DomainCount int       `json:"domain_count"`
+	ID             string    `json:"id"`
+	Tag            string    `json:"tag,omitempty"`
+	CreatedAt      time.Time `json:"created_at"`
+	DomainCount    int       `json:"domain_count"`
+	Description    string    `json:"description,omitempty"`
+	SnapshotIntent bool      `json:"snapshot_intent,omitempty"`
+}
+
+// AnalysisCohortSnapshot is one point-in-time materialization of a cohort,
+// backed by exactly one snapshot-intent batch. Snapshots are identified by
+// (cohort_id, batch_id); the slug is a separate human-readable handle that
+// is unique within a cohort.
+type AnalysisCohortSnapshot struct {
+	ID          int64     `json:"id"`
+	CohortID    int64     `json:"cohort_id"`
+	BatchID     string    `json:"batch_id"`
+	Slug        string    `json:"slug"`
+	Label       string    `json:"label,omitempty"`
 	Description string    `json:"description,omitempty"`
+	ProfileID   *int64    `json:"profile_id,omitempty"`
+	ProfileName string    `json:"profile_name,omitempty"`
+	CapturedAt  time.Time `json:"captured_at,omitempty"`
+	FirstRunAt  time.Time `json:"first_run_at,omitempty"`
+	LastRunAt   time.Time `json:"last_run_at,omitempty"`
+	RunCount    int       `json:"run_count"`
+	DomainCount int       `json:"domain_count"`
+	Status      string    `json:"status"`
+	IsDefault   bool      `json:"is_default"`
+	IsPublic    bool      `json:"is_public"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// AnalysisCohortSnapshotAggregate is one pre-computed aggregate row attached
+// to a captured snapshot. The payload shape is category-specific; see
+// plans/cohort-snapshots.md for the catalogue of categories.
+type AnalysisCohortSnapshotAggregate struct {
+	SnapshotID  int64     `json:"snapshot_id"`
+	Category    string    `json:"category"`
+	PayloadJSON string    `json:"payload_json"`
+	ComputedAt  time.Time `json:"computed_at"`
 }
 
 // StoredProfile is a named, server-stored test configuration.

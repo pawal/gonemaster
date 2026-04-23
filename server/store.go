@@ -312,6 +312,9 @@ func (s *InMemoryJobStore) UpsertAnalysisCohort(cohort AnalysisCohort) (Analysis
 	if cohort.MaterializationStatus == "" {
 		cohort.MaterializationStatus = AnalysisMaterializationPending
 	}
+	if cohort.DefaultSnapshotPolicy == "" {
+		cohort.DefaultSnapshotPolicy = DefaultSnapshotPolicyAutoLatest
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := time.Now().UTC()

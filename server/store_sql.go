@@ -1670,24 +1670,28 @@ func (s *SQLJobStore) QueryEntries(filter EntryFilter) EntryList {
 
 // CreateBatch inserts a batch record.
 func (s *SQLJobStore) CreateBatch(batch Batch) error {
+	snapshotIntent := boolToInt(batch.SnapshotIntent)
 	switch s.dialect.(type) {
 	case postgresDialect:
 		_, err := s.db.Exec(
-			`INSERT INTO batches (id, tag, created_at, domain_count, description)
-			 VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO NOTHING`,
-			batch.ID, batch.Tag, formatSortableTimestamp(batch.CreatedAt), batch.DomainCount, batch.Description)
+			`INSERT INTO batches (id, tag, created_at, domain_count, description, snapshot_intent)
+			 VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO NOTHING`,
+			batch.ID, batch.Tag, formatSortableTimestamp(batch.CreatedAt),
+			batch.DomainCount, batch.Description, snapshotIntent)
 		return err
 	case mariadbDialect:
 		_, err := s.db.Exec(
-			`INSERT IGNORE INTO batches (id, tag, created_at, domain_count, description)
-			 VALUES (?, ?, ?, ?, ?)`,
-			batch.ID, batch.Tag, formatSortableTimestamp(batch.CreatedAt), batch.DomainCount, batch.Description)
+			`INSERT IGNORE INTO batches (id, tag, created_at, domain_count, description, snapshot_intent)
+			 VALUES (?, ?, ?, ?, ?, ?)`,
+			batch.ID, batch.Tag, formatSortableTimestamp(batch.CreatedAt),
+			batch.DomainCount, batch.Description, snapshotIntent)
 		return err
 	default:
 		_, err := s.db.Exec(
-			`INSERT OR IGNORE INTO batches (id, tag, created_at, domain_count, description)
-			 VALUES (?, ?, ?, ?, ?)`,
-			batch.ID, batch.Tag, formatSortableTimestamp(batch.CreatedAt), batch.DomainCount, batch.Description)
+			`INSERT OR IGNORE INTO batches (id, tag, created_at, domain_count, description, snapshot_intent)
+			 VALUES (?, ?, ?, ?, ?, ?)`,
+			batch.ID, batch.Tag, formatSortableTimestamp(batch.CreatedAt),
+			batch.DomainCount, batch.Description, snapshotIntent)
 		return err
 	}
 }
@@ -1697,20 +1701,22 @@ func (s *SQLJobStore) GetBatch(id string) (Batch, bool) {
 	var (
 		batchID, tag, createdAt, description string
 		domainCount                          int
+		snapshotIntent                       int
 	)
 	err := s.db.QueryRow(
-		fmt.Sprintf(`SELECT id, tag, created_at, domain_count, description FROM batches WHERE id = %s`, s.ph(1)),
+		fmt.Sprintf(`SELECT id, tag, created_at, domain_count, description, snapshot_intent FROM batches WHERE id = %s`, s.ph(1)),
 		id,
-	).Scan(&batchID, &tag, &createdAt, &domainCount, &description)
+	).Scan(&batchID, &tag, &createdAt, &domainCount, &description, &snapshotIntent)
 	if err != nil {
 		return Batch{}, false
 	}
 	return Batch{
-		ID:          batchID,
-		Tag:         tag,
-		CreatedAt:   parseTimestampStr(createdAt),
-		DomainCount: domainCount,
-		Description: description,
+		ID:             batchID,
+		Tag:            tag,
+		CreatedAt:      parseTimestampStr(createdAt),
+		DomainCount:    domainCount,
+		Description:    description,
+		SnapshotIntent: intToBool(snapshotIntent),
 	}, true
 }
 

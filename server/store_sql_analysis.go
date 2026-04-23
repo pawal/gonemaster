@@ -10,7 +10,9 @@ import (
 const analysisCohortCols = `id, source_type, source_tag, label, description,
 	analysis_enabled, public_enabled, is_default, sort_order, materialization_status,
 	materialization_done, materialization_total,
-	last_materialized_at, last_materialization_error, created_at, updated_at`
+	last_materialized_at, last_materialization_error,
+	default_snapshot_policy, default_snapshot_id,
+	created_at, updated_at`
 
 func boolToInt(v bool) int {
 	if v {
@@ -29,6 +31,8 @@ func (s *SQLJobStore) scanAnalysisCohort(row rowScanner) (AnalysisCohort, error)
 		isDefault              int
 		lastMaterializedAt     sql.NullString
 		lastMaterializationErr string
+		defaultSnapshotPolicy  string
+		defaultSnapshotID      sql.NullInt64
 		createdAt              string
 		updatedAt              string
 	)
@@ -47,6 +51,8 @@ func (s *SQLJobStore) scanAnalysisCohort(row rowScanner) (AnalysisCohort, error)
 		&cohort.MaterializationTotal,
 		&lastMaterializedAt,
 		&lastMaterializationErr,
+		&defaultSnapshotPolicy,
+		&defaultSnapshotID,
 		&createdAt,
 		&updatedAt,
 	); err != nil {
@@ -57,6 +63,8 @@ func (s *SQLJobStore) scanAnalysisCohort(row rowScanner) (AnalysisCohort, error)
 	cohort.IsDefault = intToBool(isDefault)
 	cohort.LastMaterializedAt = parseTimestampNullStr(lastMaterializedAt)
 	cohort.LastMaterializationError = lastMaterializationErr
+	cohort.DefaultSnapshotPolicy = defaultSnapshotPolicy
+	cohort.DefaultSnapshotID = nullInt64Ptr(defaultSnapshotID)
 	cohort.CreatedAt = parseTimestampStr(createdAt)
 	cohort.UpdatedAt = parseTimestampStr(updatedAt)
 	return cohort, nil
@@ -128,6 +136,10 @@ func (s *SQLJobStore) UpsertAnalysisCohort(cohort AnalysisCohort) (AnalysisCohor
 		cohort.MaterializationStatus = AnalysisMaterializationPending
 	}
 
+	if cohort.DefaultSnapshotPolicy == "" {
+		cohort.DefaultSnapshotPolicy = DefaultSnapshotPolicyAutoLatest
+	}
+
 	now := time.Now().UTC()
 	existing, found := s.GetAnalysisCohortBySource(cohort.SourceType, cohort.SourceTag)
 	if found {
@@ -150,10 +162,13 @@ func (s *SQLJobStore) UpsertAnalysisCohort(cohort AnalysisCohort) (AnalysisCohor
 				materialization_total = %s,
 				last_materialized_at = %s,
 				last_materialization_error = %s,
+				default_snapshot_policy = %s,
+				default_snapshot_id = %s,
 				updated_at = %s
 			WHERE id = %s`,
 				s.ph(1), s.ph(2), s.ph(3), s.ph(4), s.ph(5),
-				s.ph(6), s.ph(7), s.ph(8), s.ph(9), s.ph(10), s.ph(11), s.ph(12), s.ph(13),
+				s.ph(6), s.ph(7), s.ph(8), s.ph(9), s.ph(10), s.ph(11),
+				s.ph(12), s.ph(13), s.ph(14), s.ph(15),
 			),
 			cohort.Label,
 			cohort.Description,
@@ -166,6 +181,8 @@ func (s *SQLJobStore) UpsertAnalysisCohort(cohort AnalysisCohort) (AnalysisCohor
 			cohort.MaterializationTotal,
 			s.ts(cohort.LastMaterializedAt),
 			cohort.LastMaterializationError,
+			cohort.DefaultSnapshotPolicy,
+			nullInt64Value(cohort.DefaultSnapshotID),
 			s.ts(cohort.UpdatedAt),
 			existing.ID,
 		)
@@ -190,8 +207,10 @@ func (s *SQLJobStore) UpsertAnalysisCohort(cohort AnalysisCohort) (AnalysisCohor
 			source_type, source_tag, label, description, analysis_enabled,
 			public_enabled, is_default, sort_order, materialization_status,
 			materialization_done, materialization_total,
-			last_materialized_at, last_materialization_error, created_at, updated_at
-		) VALUES (%s)`, s.phRange(1, 15)),
+			last_materialized_at, last_materialization_error,
+			default_snapshot_policy, default_snapshot_id,
+			created_at, updated_at
+		) VALUES (%s)`, s.phRange(1, 17)),
 		cohort.SourceType,
 		cohort.SourceTag,
 		cohort.Label,
@@ -205,6 +224,8 @@ func (s *SQLJobStore) UpsertAnalysisCohort(cohort AnalysisCohort) (AnalysisCohor
 		cohort.MaterializationTotal,
 		s.ts(cohort.LastMaterializedAt),
 		cohort.LastMaterializationError,
+		cohort.DefaultSnapshotPolicy,
+		nullInt64Value(cohort.DefaultSnapshotID),
 		s.ts(cohort.CreatedAt),
 		s.ts(cohort.UpdatedAt),
 	)

@@ -149,6 +149,57 @@ func settingsTableDDL(d sqlDialect) string {
 	)`, q, q)
 }
 
+// buildV11DDL returns the migration 11 DDL statements for the cohort snapshot
+// tables, plus the column additions on `batches` and `analysis_cohort_catalog`
+// that Phase 1 of the cohort-snapshots plan requires.
+func buildV11DDL(autoinc, bigint string) []string {
+	return []string{
+		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS analysis_cohort_snapshots (
+			id                         %s,
+			cohort_id                  %s           NOT NULL,
+			batch_id                   VARCHAR(255) NOT NULL,
+			slug                       VARCHAR(64)  NOT NULL,
+			label                      TEXT         NOT NULL DEFAULT '',
+			description                TEXT         NOT NULL DEFAULT '',
+			profile_id                 %s,
+			profile_name               VARCHAR(255) NOT NULL DEFAULT '',
+			captured_at                TEXT         NOT NULL DEFAULT '',
+			first_run_at               TEXT         NOT NULL DEFAULT '',
+			last_run_at                TEXT         NOT NULL DEFAULT '',
+			run_count                  INTEGER      NOT NULL DEFAULT 0,
+			domain_count               INTEGER      NOT NULL DEFAULT 0,
+			status                     VARCHAR(32)  NOT NULL DEFAULT 'pending',
+			is_default                 INTEGER      NOT NULL DEFAULT 0,
+			is_public                  INTEGER      NOT NULL DEFAULT 1,
+			created_at                 TEXT         NOT NULL,
+			updated_at                 TEXT         NOT NULL
+		)`, autoinc, bigint, bigint),
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_analysis_cohort_snapshots_cohort_batch ON analysis_cohort_snapshots(cohort_id, batch_id)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_analysis_cohort_snapshots_cohort_slug  ON analysis_cohort_snapshots(cohort_id, slug)`,
+		`CREATE INDEX IF NOT EXISTS idx_analysis_cohort_snapshots_lookup ON analysis_cohort_snapshots(cohort_id, status, captured_at)`,
+
+		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS analysis_cohort_snapshot_aggregates (
+			snapshot_id  %s           NOT NULL,
+			category     VARCHAR(64)  NOT NULL,
+			payload_json TEXT         NOT NULL,
+			computed_at  TEXT         NOT NULL,
+			PRIMARY KEY (snapshot_id, category)
+		)`, bigint),
+		`CREATE INDEX IF NOT EXISTS idx_analysis_cohort_snapshot_aggregates_snapshot_id ON analysis_cohort_snapshot_aggregates(snapshot_id)`,
+
+		// Snapshot-intent gate on batches. Default 0 for batches created after
+		// the upgrade; the follow-up UPDATE retrofits every pre-existing batch
+		// as snapshot-intent so historical data remains part of the cohort
+		// series.
+		`ALTER TABLE batches ADD COLUMN snapshot_intent INTEGER NOT NULL DEFAULT 0`,
+		`UPDATE batches SET snapshot_intent = 1`,
+
+		// Per-cohort default-snapshot resolution.
+		`ALTER TABLE analysis_cohort_catalog ADD COLUMN default_snapshot_policy VARCHAR(32) NOT NULL DEFAULT 'auto_latest'`,
+		fmt.Sprintf(`ALTER TABLE analysis_cohort_catalog ADD COLUMN default_snapshot_id %s`, bigint),
+	}
+}
+
 func buildV7DDL(autoinc, bigint string) []string {
 	return []string{
 		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS analysis_cohort_catalog (
@@ -456,6 +507,23 @@ var sqlMigrations = []sqlMigration{
 				`CREATE INDEX IF NOT EXISTS idx_analysis_run_domain_facts_run_id ON analysis_run_domain_facts(run_id)`,
 				`CREATE INDEX IF NOT EXISTS idx_analysis_run_domain_facts_category ON analysis_run_domain_facts(cohort_id, category)`,
 				`CREATE INDEX IF NOT EXISTS idx_analysis_run_domain_facts_category_key ON analysis_run_domain_facts(cohort_id, category, fact_key)`,
+			}
+		},
+	},
+	{
+		// Cohort snapshot tables (one row per snapshot-intent batch plus a
+		// pre-computed aggregates table) and the batch-level snapshot_intent
+		// flag. Phase 1 of plans/cohort-snapshots.md: data model only, no
+		// projector or read-path wiring yet.
+		version: 11,
+		stmtsFn: func(d sqlDialect) []string {
+			switch d.(type) {
+			case postgresDialect:
+				return buildV11DDL("BIGSERIAL PRIMARY KEY", "BIGINT")
+			case mariadbDialect:
+				return buildV11DDL("BIGINT AUTO_INCREMENT PRIMARY KEY", "BIGINT")
+			default:
+				return buildV11DDL("INTEGER PRIMARY KEY", "INTEGER")
 			}
 		},
 	},

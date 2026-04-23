@@ -1076,6 +1076,88 @@ func TestInMemoryJobStoreCreateBatchGetBatch(t *testing.T) {
 	}
 }
 
+func TestInMemoryJobStoreListBatchesByTag(t *testing.T) {
+	store := NewInMemoryJobStore()
+	base := time.Now().UTC()
+	for i, entry := range []struct {
+		id  string
+		tag string
+	}{
+		{"b1", "tld"},
+		{"b2", "tld"},
+		{"b3", "muni"},
+	} {
+		if err := store.CreateBatch(Batch{
+			ID:        entry.id,
+			Tag:       entry.tag,
+			CreatedAt: base.Add(time.Duration(i) * time.Minute),
+		}); err != nil {
+			t.Fatalf("CreateBatch %s: %v", entry.id, err)
+		}
+	}
+	list := store.ListBatchesByTag("tld", 10, 0)
+	if list.Total != 2 {
+		t.Fatalf("Total = %d, want 2", list.Total)
+	}
+	if list.Items[0].ID != "b2" || list.Items[1].ID != "b1" {
+		t.Fatalf("order = %v, want [b2 b1]", []string{list.Items[0].ID, list.Items[1].ID})
+	}
+}
+
+func TestInMemoryJobStoreDeleteBatchRemovesEverything(t *testing.T) {
+	store := NewInMemoryJobStore()
+	now := time.Now().UTC()
+	if err := store.CreateBatch(Batch{ID: "b1", Tag: "tld", CreatedAt: now}); err != nil {
+		t.Fatalf("CreateBatch: %v", err)
+	}
+	if err := seedJob(store, "j1", "b1", now, JobSucceeded); err != nil {
+		t.Fatalf("seedJob: %v", err)
+	}
+	job, _ := store.Get("j1")
+	job.FinishedAt = now
+	if err := store.GraduateJob(job, nil); err != nil {
+		t.Fatalf("GraduateJob: %v", err)
+	}
+
+	if _, err := store.DeleteBatch("b1"); err != nil {
+		t.Fatalf("DeleteBatch: %v", err)
+	}
+	if _, ok := store.GetBatch("b1"); ok {
+		t.Fatal("batch still present")
+	}
+	if _, ok := store.GetRun("j1"); ok {
+		t.Fatal("run still present")
+	}
+}
+
+func TestInMemoryJobStoreBatchDeletePreviewStats(t *testing.T) {
+	store := NewInMemoryJobStore()
+	now := time.Now().UTC()
+	if err := store.CreateBatch(Batch{ID: "b1", Tag: "tld", CreatedAt: now, SnapshotIntent: true}); err != nil {
+		t.Fatalf("CreateBatch: %v", err)
+	}
+	if err := seedJob(store, "j1", "b1", now, JobQueued); err != nil {
+		t.Fatalf("seedJob queued: %v", err)
+	}
+	if err := seedJob(store, "j2", "b1", now, JobRunning); err != nil {
+		t.Fatalf("seedJob running: %v", err)
+	}
+
+	preview, err := store.BatchDeletePreviewStats("b1")
+	if err != nil {
+		t.Fatalf("BatchDeletePreviewStats: %v", err)
+	}
+	if !preview.Exists {
+		t.Fatal("Exists should be true")
+	}
+	if preview.QueuedJobs != 1 || preview.RunningJobs != 1 {
+		t.Fatalf("queued=%d running=%d", preview.QueuedJobs, preview.RunningJobs)
+	}
+	if !preview.SnapshotIntent {
+		t.Fatal("SnapshotIntent should round-trip")
+	}
+}
+
 func seedJob(store *InMemoryJobStore, id, batch string, created time.Time, status JobStatus) error {
 	job := Job{
 		ID:        id,

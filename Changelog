@@ -8,8 +8,10 @@ All notable changes to all gonemaster components will be documented in this file
  - Analysis: immutable cohort snapshots, one per snapshot-intent batch
  - Analysis: new per-cohort snapshots list / detail / trends / diff endpoints on the public API; every existing endpoint accepts `?snapshot=<slug>`
  - Admin UI: snapshot-intent checkbox, per-cohort "Run new snapshot", snapshots sub-panel with set-default / retire / restore / purge
+ - Admin UI: manual batch deletion with impact preview and typed confirmation from the Batch inspector, the tag detail "Earlier batches" panel, and the cohort snapshot row
+ - API: `GET /api/v1/tags/{name}/batches`, `GET /api/v1/batches/{id}/delete-preview`, `DELETE /api/v1/batches/{id}` cascades the batch row, runs, entries, fact tables and snapshots in one transaction
  - Analysis UI: snapshot selector, overview pill, Trends and Diff tabs
- - Docs: [docs/cohort-snapshots.md](docs/cohort-snapshots.md)
+ - Docs: [docs/cohort-snapshots.md](docs/cohort-snapshots.md), [docs/batch-deletion.md](docs/batch-deletion.md)
 
 ### Changed
  - Analysis: public read path now pins to a resolved snapshot; latest-per-domain collapsing is gone, old bookmarks auto-resolve to the newest captured snapshot

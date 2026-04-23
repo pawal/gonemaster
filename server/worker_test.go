@@ -156,6 +156,18 @@ func (s *spyJobStore) GetBatch(id string) (Batch, bool) {
 	return s.inner.GetBatch(id)
 }
 
+func (s *spyJobStore) ListBatchesByTag(tag string, limit, offset int) BatchList {
+	return s.inner.ListBatchesByTag(tag, limit, offset)
+}
+
+func (s *spyJobStore) BatchDeletePreviewStats(batchID string) (BatchDeletePreview, error) {
+	return s.inner.BatchDeletePreviewStats(batchID)
+}
+
+func (s *spyJobStore) DeleteBatch(batchID string) ([]int64, error) {
+	return s.inner.DeleteBatch(batchID)
+}
+
 func (s *spyJobStore) CreateProfile(p StoredProfile) (StoredProfile, error) {
 	return s.inner.CreateProfile(p)
 }

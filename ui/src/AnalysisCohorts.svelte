@@ -2,7 +2,7 @@
   import { onMount, onDestroy } from "svelte";
   import { t } from "./i18n.js";
 
-  let { apiBase = "/api/v1" } = $props();
+  let { apiBase = "/api/v1", onDeleteBatch = null, refreshSignal = 0 } = $props();
 
   let loading = $state(false);
   let loadError = $state("");
@@ -295,6 +295,22 @@
   const clearCohort = (cohort) => triggerAction(cohort, "clear", "analysis_cohorts_clear_ok");
 
   const snapshotKey = (cohortId, slug) => `${cohortId}/${slug}`;
+
+  // External batch deletions invalidate the cached snapshot list for every
+  // cohort. Re-fetch the snapshot list for cohorts we have already loaded so
+  // the UI reflects the new state without requiring the admin to collapse
+  // and re-expand each row.
+  let lastRefreshSignal = 0;
+  $effect(() => {
+    if (refreshSignal === lastRefreshSignal) return;
+    lastRefreshSignal = refreshSignal;
+    if (!cohorts || cohorts.length === 0) return;
+    const loadedIds = Object.keys(snapshotsByCohortId).map((id) => Number(id));
+    for (const id of loadedIds) {
+      const cohort = cohorts.find((c) => c.id === id);
+      if (cohort) loadSnapshots(cohort, { refresh: true });
+    }
+  });
 
   async function loadSnapshots(cohort, { refresh = false } = {}) {
     if (!cohort) return;
@@ -715,6 +731,11 @@
                                     <button type="button" class="row-action row-action-danger" disabled={snapBusy} onclick={() => purgeSnapshot(cohort, snap)}>
                                       {$t("analysis_snapshots_purge")}
                                     </button>
+                                    {#if onDeleteBatch && snap.batch_id}
+                                      <button type="button" class="row-action row-action-danger" disabled={snapBusy} onclick={() => onDeleteBatch(snap.batch_id)}>
+                                        {$t("batch_delete_button")}
+                                      </button>
+                                    {/if}
                                   {/if}
                                 </div>
                               </td>

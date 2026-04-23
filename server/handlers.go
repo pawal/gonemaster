@@ -207,12 +207,16 @@ func (s *Server) handleBatchByID(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
 		return
 	}
-	path := strings.TrimPrefix(r.URL.Path, "/batches/")
-	if path == "" || path == r.URL.Path {
-		writeError(w, http.StatusNotFound, "not_found", "not found", nil)
-		return
+	batchID := strings.TrimSpace(r.PathValue("id"))
+	if batchID == "" {
+		// Fallback for the legacy prefix-based route registration.
+		path := strings.TrimPrefix(r.URL.Path, "/batches/")
+		if path == "" || path == r.URL.Path {
+			writeError(w, http.StatusNotFound, "not_found", "not found", nil)
+			return
+		}
+		batchID = strings.TrimSpace(path)
 	}
-	batchID := strings.TrimSpace(path)
 	if batchID == "" {
 		writeError(w, http.StatusNotFound, "not_found", "not found", nil)
 		return

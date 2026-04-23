@@ -204,7 +204,9 @@ func (s *Server) routes() {
 	apiMux.HandleFunc("/jobs/purge", s.handleJobsPurge)
 	apiMux.HandleFunc("/jobs/", s.handleJobByID)
 	apiMux.HandleFunc("/jobs", s.handleJobs)
-	apiMux.HandleFunc("/batches/", s.handleBatchByID)
+	apiMux.HandleFunc("GET /batches/{id}/delete-preview", s.handleBatchDeletePreview)
+	apiMux.HandleFunc("DELETE /batches/{id}", s.handleDeleteBatch)
+	apiMux.HandleFunc("GET /batches/{id}", s.handleBatchByID)
 
 	apiMux.HandleFunc("/queue/pause", s.handleQueuePause)
 	apiMux.HandleFunc("/queue/resume", s.handleQueueResume)
@@ -222,6 +224,7 @@ func (s *Server) routes() {
 	apiMux.HandleFunc("GET /runs", s.handleListRuns)
 
 	apiMux.HandleFunc("GET /tags/{name}/summary", s.handleTagSummary)
+	apiMux.HandleFunc("GET /tags/{name}/batches", s.handleTagBatches)
 	apiMux.HandleFunc("/tags/{name}/profile", s.handleTagProfile)
 	apiMux.HandleFunc("/tags/{name}/domains", s.handleTagDomains)
 	apiMux.HandleFunc("/tags/{name}", s.handleTagByName)

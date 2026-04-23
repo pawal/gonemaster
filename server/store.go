@@ -160,6 +160,9 @@ type JobStore interface {
 	// Batch management.
 	CreateBatch(batch Batch) error
 	GetBatch(id string) (Batch, bool)
+	ListBatchesByTag(tag string, limit, offset int) BatchList
+	BatchDeletePreviewStats(batchID string) (BatchDeletePreview, error)
+	DeleteBatch(batchID string) ([]int64, error)
 
 	// Analysis cohort catalog.
 	ListAnalysisCohorts() []AnalysisCohort
@@ -1331,6 +1334,164 @@ func (s *InMemoryJobStore) GetBatch(id string) (Batch, bool) {
 	defer s.mu.RUnlock()
 	b, ok := s.batches[id]
 	return b, ok
+}
+
+// ListBatchesByTag returns batches whose Tag matches, newest first.
+func (s *InMemoryJobStore) ListBatchesByTag(tag string, limit, offset int) BatchList {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if limit <= 0 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	items := make([]Batch, 0)
+	for _, b := range s.batches {
+		if b.Tag == tag {
+			items = append(items, b)
+		}
+	}
+	sort.Slice(items, func(i, j int) bool {
+		if !items[i].CreatedAt.Equal(items[j].CreatedAt) {
+			return items[i].CreatedAt.After(items[j].CreatedAt)
+		}
+		return items[i].ID > items[j].ID
+	})
+	total := len(items)
+	start := offset
+	if start > total {
+		start = total
+	}
+	end := start + limit
+	if end > total {
+		end = total
+	}
+	return BatchList{
+		Items:  items[start:end],
+		Total:  total,
+		Limit:  limit,
+		Offset: offset,
+	}
+}
+
+// BatchDeletePreviewStats returns per-batch row counts for the admin
+// confirmation modal. Snapshot list is left to the handler.
+func (s *InMemoryJobStore) BatchDeletePreviewStats(batchID string) (BatchDeletePreview, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := BatchDeletePreview{BatchID: batchID}
+	if b, ok := s.batches[batchID]; ok {
+		out.Exists = true
+		out.Tag = b.Tag
+		out.CreatedAt = b.CreatedAt
+		out.SnapshotIntent = b.SnapshotIntent
+	}
+	for _, job := range s.jobs {
+		if job.BatchID != batchID {
+			continue
+		}
+		out.Exists = true
+		switch job.Status {
+		case JobQueued:
+			out.QueuedJobs++
+		case JobRunning:
+			out.RunningJobs++
+		}
+	}
+	for _, r := range s.runs {
+		if r.BatchID != batchID {
+			continue
+		}
+		out.Exists = true
+		out.CompletedRuns++
+		out.Entries += len(s.entries[r.ID])
+	}
+	return out, nil
+}
+
+// DeleteBatch removes the batch metadata plus every in-memory row
+// derived from it: queued/graduated runs for the batch, their entries,
+// and domain latest_* pointers that referenced a deleted run.
+func (s *InMemoryJobStore) DeleteBatch(batchID string) ([]int64, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if batchID == "" {
+		return nil, errors.New("batch id is required")
+	}
+	deletedRunIDs := map[string]struct{}{}
+	affectedDomains := map[int64]struct{}{}
+	for id, r := range s.runs {
+		if r.BatchID != batchID {
+			continue
+		}
+		deletedRunIDs[id] = struct{}{}
+		if r.DomainID != 0 {
+			affectedDomains[r.DomainID] = struct{}{}
+		}
+		if r.PublicID != "" {
+			delete(s.runPublicIDs, r.PublicID)
+		}
+		delete(s.entries, id)
+		delete(s.runs, id)
+	}
+	for id, job := range s.jobs {
+		if job.BatchID != batchID {
+			continue
+		}
+		if job.PublicID != "" {
+			delete(s.publicIDs, job.PublicID)
+		}
+		delete(s.jobs, id)
+	}
+	delete(s.batches, batchID)
+	for domainID := range affectedDomains {
+		d, ok := s.domainsByID[domainID]
+		if !ok || d == nil {
+			continue
+		}
+		if _, stale := deletedRunIDs[d.LatestRunID]; !stale {
+			continue
+		}
+		d.LatestRunID = ""
+		d.LatestRunAt = time.Time{}
+		d.LatestStatus = ""
+		d.LatestLevel = ""
+		d.LatestScore = nil
+		d.LatestGrade = nil
+		var best *Run
+		for _, r := range s.runs {
+			if r.DomainID != domainID {
+				continue
+			}
+			if best == nil || r.FinishedAt.After(best.FinishedAt) {
+				runCopy := r
+				best = &runCopy
+			}
+		}
+		if best != nil {
+			d.LatestRunID = best.ID
+			d.LatestRunAt = best.FinishedAt
+			d.LatestStatus = string(best.Status)
+			d.LatestLevel = best.WorstLevel
+			if best.Score != nil {
+				score := *best.Score
+				d.LatestScore = &score
+			}
+			if best.Grade != nil {
+				grade := *best.Grade
+				d.LatestGrade = &grade
+			}
+		}
+		remaining := 0
+		for _, r := range s.runs {
+			if r.DomainID == domainID {
+				remaining++
+			}
+		}
+		d.RunCount = remaining
+	}
+	return nil, nil
 }
 
 // CreateProfile stores a new profile and assigns an auto-incremented ID.

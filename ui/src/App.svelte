@@ -5,6 +5,7 @@
   import ProfileSettings from "./ProfileSettings.svelte";
   import ServerSettings from "./ServerSettings.svelte";
   import AnalysisCohorts from "./AnalysisCohorts.svelte";
+  import BatchDeleteModal from "./BatchDeleteModal.svelte";
 
   const logoSrc = `${import.meta.env.BASE_URL}gonemaster.svg`;
 
@@ -72,6 +73,9 @@
   let recentBatchOptions = [];
   let recentBatchLoading = false;
   let selectedRecentBatch = "";
+  let batchDeleteModalOpen = false;
+  let batchDeleteModalId = "";
+  let batchDeletedCounter = 0;
   let activeBatches = [];
   let activeBatchesLoading = false;
   let activeBatchesPoller = null;
@@ -254,6 +258,11 @@
   let tagRunAllSubmitting = false;
   let tagDeleteConfirm = false;
   let tagDeleting = false;
+  let tagBatches = [];
+  let tagBatchesTotal = 0;
+  let tagBatchesOffset = 0;
+  let tagBatchesLimit = 20;
+  let tagBatchesLoading = false;
   let tagProfileDraftId = "";
   let tagProfileCurrentID = null;
   let tagProfileSelectedID = null;
@@ -1258,11 +1267,15 @@
     tagDomainsOffset = 0;
     tagDomainLevelFilter = "";
     tagDeleteConfirm = false;
+    tagBatches = [];
+    tagBatchesTotal = 0;
+    tagBatchesOffset = 0;
     const hash = `#/tags/${encodeURIComponent(tag.name)}`;
     window.history.pushState({ tab: "tags", domain: null, tag, jobId: null }, "", `${window.location.pathname}${window.location.search}${hash}`);
     if (statusMessage) clearStatus();
     loadTagSummary();
     loadTagDomains();
+    loadTagBatches({ reset: true });
   };
 
   // Guard flag: when popstate fires, a hashchange event also fires for the
@@ -1998,6 +2011,34 @@
     }
   };
 
+  const loadTagBatches = async (options = {}) => {
+    if (!selectedTag) return;
+    const { reset = false } = options;
+    if (reset) tagBatchesOffset = 0;
+    tagBatchesLoading = true;
+    try {
+      const params = new URLSearchParams({
+        limit: String(tagBatchesLimit),
+        offset: String(tagBatchesOffset),
+      });
+      const data = await apiFetch(`/tags/${encodeURIComponent(selectedTag.name)}/batches?${params}`);
+      tagBatches = data?.items ?? [];
+      tagBatchesTotal = data?.total ?? 0;
+    } catch (error) {
+      setStatus($t("tag_domains_load_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      tagBatchesLoading = false;
+    }
+  };
+
+  const openBatchFromTagRow = async (batchId) => {
+    const id = (batchId || "").trim();
+    if (!id) return;
+    selectedBatchId = id;
+    await setTab("batches");
+    await loadBatch(id, { resetCursor: true });
+  };
+
   const loadTagDomains = async (options = {}) => {
     if (!selectedTag) return;
     const { reset = false } = options;
@@ -2118,6 +2159,34 @@
       setStatus($t("tag_domains_remove_error", { error: error.message || "unknown error" }), "warn");
     } finally {
       tagRemovingDomains = false;
+    }
+  };
+
+  const openBatchDelete = (batchId) => {
+    const id = (batchId || "").trim();
+    if (!id) return;
+    batchDeleteModalId = id;
+    batchDeleteModalOpen = true;
+  };
+
+  const closeBatchDelete = () => {
+    batchDeleteModalOpen = false;
+    batchDeleteModalId = "";
+  };
+
+  const handleBatchDeleted = async (deletedId) => {
+    if (selectedBatchId === deletedId) {
+      selectedBatchId = "";
+      selectedBatch = null;
+    }
+    if (selectedRecentBatch === deletedId) {
+      selectedRecentBatch = "";
+    }
+    batchDeletedCounter += 1;
+    await loadRecentBatchOptions();
+    await loadActiveBatches();
+    if (selectedTag && typeof loadTagBatches === "function") {
+      await loadTagBatches({ reset: true });
     }
   };
 
@@ -3453,6 +3522,62 @@
           {/if}
         </div>
 
+        <h3>{$t("earlier_batches_heading")}</h3>
+        {#if tagBatchesLoading}
+          <p class="muted">{$t("loading")}</p>
+        {:else if tagBatches.length === 0}
+          <p class="muted">{$t("earlier_batches_empty")}</p>
+        {:else}
+          <table class="data-table">
+            <thead><tr>
+              <th>{$t("batch_id_label")}</th>
+              <th>{$t("col_created_at")}</th>
+              <th>{$t("col_domain_count")}</th>
+              <th></th>
+            </tr></thead>
+            <tbody>
+              {#each tagBatches as b (b.id)}
+                <tr
+                  style="cursor: pointer;"
+                  onclick={() => openBatchFromTagRow(b.id)}
+                  onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") openBatchFromTagRow(b.id); }}
+                  role="button"
+                  tabindex="0"
+                >
+                  <td class="mono">
+                    {b.id}
+                    {#if b.snapshot_intent}<span class="pill snapshot-intent" style="margin-left: 0.25rem;">{$t("batch_snapshot_intent_pill")}</span>{/if}
+                  </td>
+                  <td>{b.created_at ? b.created_at.slice(0, 19).replace("T", " ") : "—"}</td>
+                  <td>{b.domain_count ?? "—"}</td>
+                  <td style="text-align: right;">
+                    <button
+                      class="ghost small warn"
+                      type="button"
+                      onclick={(e) => { e.stopPropagation(); openBatchDelete(b.id); }}
+                    >{$t("batch_delete_button")}</button>
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+          <div class="pagination" style="margin-top: 0.5rem; display:flex; gap: 0.5rem; align-items: center;">
+            <button class="secondary small" disabled={tagBatchesOffset === 0}
+              onclick={() => { tagBatchesOffset = Math.max(0, tagBatchesOffset - tagBatchesLimit); loadTagBatches(); }}
+            >{$t("prev_page")}</button>
+            <span class="muted small">
+              {$t("earlier_batches_pagination_label", {
+                from: tagBatchesOffset + 1,
+                to: Math.min(tagBatchesOffset + tagBatchesLimit, tagBatchesTotal),
+                total: tagBatchesTotal,
+              })}
+            </span>
+            <button class="secondary small" disabled={tagBatchesOffset + tagBatchesLimit >= tagBatchesTotal}
+              onclick={() => { tagBatchesOffset += tagBatchesLimit; loadTagBatches(); }}
+            >{$t("next_page")}</button>
+          </div>
+        {/if}
+
         <h3>{$t("tag_default_profile_heading")}</h3>
         <div class="stack" style="max-width: 440px; margin-bottom: 1rem;">
           <label for="tag-default-profile">{$t("tag_default_profile_label")}</label>
@@ -3633,7 +3758,7 @@
   {:else if activeTab === "cohorts"}
     <div class="grid" id="panel-cohorts" role="tabpanel" aria-labelledby="tab-cohorts" style="margin-top: 22px;">
       <div class="card reveal" style="--d: 0.22s; grid-column: 1 / -1;">
-        <AnalysisCohorts />
+        <AnalysisCohorts onDeleteBatch={openBatchDelete} refreshSignal={batchDeletedCounter} />
       </div>
     </div>
   {:else if activeTab === "batches"}
@@ -3816,6 +3941,14 @@ example.org`}
           </button>
           <button class="ghost" type="button" onclick={() => (autoRefreshBatch = !autoRefreshBatch)}>
             {autoRefreshBatch ? $t("auto_refresh_on") : $t("auto_refresh_off")}
+          </button>
+          <button
+            class="warn"
+            type="button"
+            onclick={() => openBatchDelete(selectedBatchId)}
+            disabled={!selectedBatchId || batchLoading}
+          >
+            {$t("batch_delete_button")}
           </button>
         </div>
         <div class="batch-controls">
@@ -4246,3 +4379,11 @@ example.org`}
   {/if}
   </main>
 </div>
+
+<BatchDeleteModal
+  open={batchDeleteModalOpen}
+  batchId={batchDeleteModalId}
+  onClose={closeBatchDelete}
+  onDeleted={handleBatchDeleted}
+  setStatus={setStatus}
+/>

@@ -596,6 +596,40 @@ type EntryList struct {
 	PrevCursor string  `json:"prev_cursor,omitempty"`
 }
 
+// BatchList represents paginated batch results.
+type BatchList struct {
+	Items  []Batch `json:"items"`
+	Total  int     `json:"total"`
+	Limit  int     `json:"limit,omitempty"`
+	Offset int     `json:"offset,omitempty"`
+}
+
+// BatchDeletePreviewSnapshot names one cohort snapshot that will vanish
+// if the batch is deleted.
+type BatchDeletePreviewSnapshot struct {
+	CohortID      int64  `json:"cohort_id"`
+	CohortLabel   string `json:"cohort_label,omitempty"`
+	SnapshotSlug  string `json:"snapshot_slug"`
+	SnapshotLabel string `json:"snapshot_label,omitempty"`
+	IsDefault     bool   `json:"is_default,omitempty"`
+}
+
+// BatchDeletePreview is the impact summary rendered in the admin
+// confirmation modal before a batch deletion is confirmed.
+type BatchDeletePreview struct {
+	BatchID        string                       `json:"batch_id"`
+	Tag            string                       `json:"tag,omitempty"`
+	CreatedAt      time.Time                    `json:"created_at,omitempty"`
+	SnapshotIntent bool                         `json:"snapshot_intent,omitempty"`
+	Exists         bool                         `json:"exists"`
+	QueuedJobs     int                          `json:"queued_jobs"`
+	RunningJobs    int                          `json:"running_jobs"`
+	CompletedRuns  int                          `json:"completed_runs"`
+	Entries        int                          `json:"entries"`
+	FactRows       int                          `json:"fact_rows"`
+	Snapshots      []BatchDeletePreviewSnapshot `json:"snapshots,omitempty"`
+}
+
 // ── Result types (unchanged shape for API compat) ────────────────────────────
 
 // JobResult holds the assembled output for a job/run.

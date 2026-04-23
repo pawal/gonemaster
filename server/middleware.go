@@ -216,6 +216,10 @@ func apiRouteTemplate(path string) string {
 	}
 	if strings.HasPrefix(path, "/api/v1/batches/") {
 		tail := strings.TrimPrefix(path, "/api/v1/batches/")
+		parts := strings.Split(strings.Trim(tail, "/"), "/")
+		if len(parts) >= 2 && parts[1] == "delete-preview" {
+			return "/api/v1/batches/{batch_id}/delete-preview"
+		}
 		if strings.TrimSpace(tail) != "" {
 			return "/api/v1/batches/{batch_id}"
 		}

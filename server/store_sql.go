@@ -1696,6 +1696,333 @@ func (s *SQLJobStore) CreateBatch(batch Batch) error {
 	}
 }
 
+// ListBatchesByTag returns batches whose tag matches, newest first.
+func (s *SQLJobStore) ListBatchesByTag(tag string, limit, offset int) BatchList {
+	if limit <= 0 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	out := BatchList{Limit: limit, Offset: offset}
+	if err := s.db.QueryRow(
+		fmt.Sprintf(`SELECT COUNT(*) FROM batches WHERE tag = %s`, s.ph(1)),
+		tag,
+	).Scan(&out.Total); err != nil {
+		return out
+	}
+	rows, err := s.db.Query(
+		fmt.Sprintf(`SELECT id, tag, created_at, domain_count, description, snapshot_intent
+			FROM batches WHERE tag = %s
+			ORDER BY created_at DESC, id DESC
+			LIMIT %s OFFSET %s`, s.ph(1), s.ph(2), s.ph(3)),
+		tag, limit, offset,
+	)
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var (
+			b              Batch
+			createdAt      string
+			snapshotIntent int
+		)
+		if err := rows.Scan(&b.ID, &b.Tag, &createdAt, &b.DomainCount, &b.Description, &snapshotIntent); err != nil {
+			return out
+		}
+		b.CreatedAt = parseTimestampStr(createdAt)
+		b.SnapshotIntent = intToBool(snapshotIntent)
+		out.Items = append(out.Items, b)
+	}
+	return out
+}
+
+// BatchDeletePreviewStats counts the rows that a DeleteBatch call
+// would remove. Snapshot list is left to the handler to fill in.
+func (s *SQLJobStore) BatchDeletePreviewStats(batchID string) (BatchDeletePreview, error) {
+	out := BatchDeletePreview{BatchID: batchID}
+	if b, ok := s.GetBatch(batchID); ok {
+		out.Exists = true
+		out.Tag = b.Tag
+		out.CreatedAt = b.CreatedAt
+		out.SnapshotIntent = b.SnapshotIntent
+	}
+
+	queryCount := func(q string, args ...any) (int, error) {
+		var n int
+		if err := s.db.QueryRow(q, args...).Scan(&n); err != nil {
+			return 0, err
+		}
+		return n, nil
+	}
+
+	n, err := queryCount(
+		fmt.Sprintf(`SELECT COUNT(*) FROM jobs WHERE batch_id = %s AND status = 'queued'`, s.ph(1)),
+		batchID,
+	)
+	if err != nil {
+		return out, fmt.Errorf("count queued jobs: %w", err)
+	}
+	out.QueuedJobs = n
+	if n > 0 {
+		out.Exists = true
+	}
+
+	n, err = queryCount(
+		fmt.Sprintf(`SELECT COUNT(*) FROM jobs WHERE batch_id = %s AND status = 'running'`, s.ph(1)),
+		batchID,
+	)
+	if err != nil {
+		return out, fmt.Errorf("count running jobs: %w", err)
+	}
+	out.RunningJobs = n
+	if n > 0 {
+		out.Exists = true
+	}
+
+	n, err = queryCount(
+		fmt.Sprintf(`SELECT COUNT(*) FROM runs WHERE batch_id = %s`, s.ph(1)),
+		batchID,
+	)
+	if err != nil {
+		return out, fmt.Errorf("count runs: %w", err)
+	}
+	out.CompletedRuns = n
+	if n > 0 {
+		out.Exists = true
+	}
+
+	n, err = queryCount(
+		fmt.Sprintf(`SELECT COUNT(*) FROM entries WHERE run_id IN (SELECT id FROM runs WHERE batch_id = %s)`, s.ph(1)),
+		batchID,
+	)
+	if err != nil {
+		return out, fmt.Errorf("count entries: %w", err)
+	}
+	out.Entries = n
+
+	factTables := []string{
+		"analysis_run_domain_summary",
+		"analysis_run_ns_endpoints",
+		"analysis_run_address_asns",
+		"analysis_run_domain_asns",
+		"analysis_run_tag_summary",
+		"analysis_run_domain_facts",
+	}
+	for _, tbl := range factTables {
+		n, err := queryCount(
+			fmt.Sprintf(`SELECT COUNT(*) FROM %s WHERE run_id IN (SELECT id FROM runs WHERE batch_id = %s)`, tbl, s.ph(1)),
+			batchID,
+		)
+		if err != nil {
+			return out, fmt.Errorf("count %s: %w", tbl, err)
+		}
+		out.FactRows += n
+	}
+
+	return out, nil
+}
+
+// DeleteBatch removes a batch and every row derived from it inside a
+// single transaction: snapshot aggregates, snapshots, analysis_run_*
+// fact rows, entries, runs, and jobs whose batch_id matches. Returns
+// the snapshot IDs that were removed so callers can evict the
+// materialization cache.
+func (s *SQLJobStore) DeleteBatch(batchID string) ([]int64, error) {
+	if batchID == "" {
+		return nil, errors.New("batch id is required")
+	}
+	ph := s.ph(1)
+
+	snapshotRows, err := s.db.Query(
+		fmt.Sprintf(`SELECT id FROM analysis_cohort_snapshots WHERE batch_id = %s`, ph),
+		batchID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list snapshots for batch: %w", err)
+	}
+	var snapshotIDs []int64
+	for snapshotRows.Next() {
+		var id int64
+		if err := snapshotRows.Scan(&id); err != nil {
+			snapshotRows.Close()
+			return nil, fmt.Errorf("scan snapshot id: %w", err)
+		}
+		snapshotIDs = append(snapshotIDs, id)
+	}
+	snapshotRows.Close()
+
+	runRows, err := s.db.Query(
+		fmt.Sprintf(`SELECT id, domain_id FROM runs WHERE batch_id = %s`, ph),
+		batchID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list runs for batch: %w", err)
+	}
+	var runIDs []string
+	affectedDomains := map[int64]struct{}{}
+	for runRows.Next() {
+		var (
+			id       string
+			domainID int64
+		)
+		if err := runRows.Scan(&id, &domainID); err != nil {
+			runRows.Close()
+			return nil, fmt.Errorf("scan run id: %w", err)
+		}
+		runIDs = append(runIDs, id)
+		if domainID != 0 {
+			affectedDomains[domainID] = struct{}{}
+		}
+	}
+	runRows.Close()
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("delete batch begin tx: %w", err)
+	}
+	rollback := func(cause error) ([]int64, error) {
+		_ = tx.Rollback()
+		return nil, cause
+	}
+
+	runSetSubquery := fmt.Sprintf(`SELECT id FROM runs WHERE batch_id = %s`, ph)
+	steps := []struct {
+		label string
+		query string
+	}{
+		{"snapshot aggregates", fmt.Sprintf(
+			`DELETE FROM analysis_cohort_snapshot_aggregates
+			  WHERE snapshot_id IN (SELECT id FROM analysis_cohort_snapshots WHERE batch_id = %s)`, ph)},
+		{"snapshots", fmt.Sprintf(`DELETE FROM analysis_cohort_snapshots WHERE batch_id = %s`, ph)},
+		{"analysis_run_ns_endpoints", fmt.Sprintf(`DELETE FROM analysis_run_ns_endpoints WHERE run_id IN (%s)`, runSetSubquery)},
+		{"analysis_run_address_asns", fmt.Sprintf(`DELETE FROM analysis_run_address_asns WHERE run_id IN (%s)`, runSetSubquery)},
+		{"analysis_run_domain_asns", fmt.Sprintf(`DELETE FROM analysis_run_domain_asns WHERE run_id IN (%s)`, runSetSubquery)},
+		{"analysis_run_tag_summary", fmt.Sprintf(`DELETE FROM analysis_run_tag_summary WHERE run_id IN (%s)`, runSetSubquery)},
+		{"analysis_run_domain_facts", fmt.Sprintf(`DELETE FROM analysis_run_domain_facts WHERE run_id IN (%s)`, runSetSubquery)},
+		{"analysis_run_domain_summary", fmt.Sprintf(`DELETE FROM analysis_run_domain_summary WHERE run_id IN (%s)`, runSetSubquery)},
+		{"entries", fmt.Sprintf(`DELETE FROM entries WHERE run_id IN (%s)`, runSetSubquery)},
+		{"runs", fmt.Sprintf(`DELETE FROM runs WHERE batch_id = %s`, ph)},
+		{"jobs", fmt.Sprintf(`DELETE FROM jobs WHERE batch_id = %s`, ph)},
+		{"batches", fmt.Sprintf(`DELETE FROM batches WHERE id = %s`, ph)},
+	}
+	for _, step := range steps {
+		if _, err := tx.Exec(step.query, batchID); err != nil {
+			return rollback(fmt.Errorf("delete batch %s step %s: %w", batchID, step.label, err))
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("delete batch commit: %w", err)
+	}
+
+	if err := s.refreshDomainsAfterBatchDelete(affectedDomains, runIDs); err != nil {
+		return snapshotIDs, fmt.Errorf("refresh domain latest after delete: %w", err)
+	}
+	return snapshotIDs, nil
+}
+
+// refreshDomainsAfterBatchDelete re-derives domains.latest_* for every
+// domain whose prior latest_run_id was among the batch's deleted runs
+// and recomputes its run_count. Runs outside the deleted set are
+// authoritative; the new latest is the most-recent remaining run for
+// that domain, or empty when no runs remain.
+func (s *SQLJobStore) refreshDomainsAfterBatchDelete(domainIDs map[int64]struct{}, deletedRunIDs []string) error {
+	if len(domainIDs) == 0 {
+		return nil
+	}
+	deletedSet := make(map[string]struct{}, len(deletedRunIDs))
+	for _, id := range deletedRunIDs {
+		deletedSet[id] = struct{}{}
+	}
+	for domainID := range domainIDs {
+		var latestRunID sql.NullString
+		if err := s.db.QueryRow(
+			fmt.Sprintf(`SELECT latest_run_id FROM domains WHERE id = %s`, s.ph(1)),
+			domainID,
+		).Scan(&latestRunID); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				continue
+			}
+			return err
+		}
+		if latestRunID.Valid && latestRunID.String != "" {
+			if _, stale := deletedSet[latestRunID.String]; !stale {
+				continue
+			}
+		}
+		var (
+			newRunID     sql.NullString
+			newFinished  sql.NullString
+			newStatus    sql.NullString
+			newLevel     sql.NullString
+			newScore     sql.NullInt64
+			newGrade     sql.NullString
+			remainingRow int
+		)
+		err := s.db.QueryRow(
+			fmt.Sprintf(`SELECT id, finished_at, status, worst_level, score, grade FROM runs
+				WHERE domain_id = %s
+				ORDER BY finished_at DESC, id DESC
+				LIMIT 1`, s.ph(1)),
+			domainID,
+		).Scan(&newRunID, &newFinished, &newStatus, &newLevel, &newScore, &newGrade)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		if err := s.db.QueryRow(
+			fmt.Sprintf(`SELECT COUNT(*) FROM runs WHERE domain_id = %s`, s.ph(1)),
+			domainID,
+		).Scan(&remainingRow); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(
+			fmt.Sprintf(`UPDATE domains SET
+				latest_run_id = %s,
+				latest_run_at = %s,
+				latest_status = %s,
+				latest_level  = %s,
+				latest_score  = %s,
+				latest_grade  = %s,
+				run_count     = %s
+				WHERE id = %s`,
+				s.ph(1), s.ph(2), s.ph(3), s.ph(4), s.ph(5), s.ph(6), s.ph(7), s.ph(8)),
+			nullStringOrEmpty(newRunID),
+			nullStringOrNil(newFinished),
+			nullStringOrEmpty(newStatus),
+			nullStringOrEmpty(newLevel),
+			nullInt64Or(newScore),
+			nullStringOrNil(newGrade),
+			remainingRow,
+			domainID,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func nullStringOrEmpty(ns sql.NullString) any {
+	if !ns.Valid {
+		return ""
+	}
+	return ns.String
+}
+
+func nullStringOrNil(ns sql.NullString) any {
+	if !ns.Valid {
+		return nil
+	}
+	return ns.String
+}
+
+func nullInt64Or(ni sql.NullInt64) any {
+	if !ni.Valid {
+		return nil
+	}
+	return ni.Int64
+}
+
 // GetBatch returns a batch by ID.
 func (s *SQLJobStore) GetBatch(id string) (Batch, bool) {
 	var (

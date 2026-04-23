@@ -52,6 +52,11 @@ The public analysis UI at `/analysis/` — creating tags, wiring them to
 cohorts, running batches, and exposing materialized per-cohort results to
 end users.
 
+### [cohort-snapshots.md](cohort-snapshots.md)
+Operator guide for cohort snapshots — capturing a new snapshot, sharing
+pinned URLs, comparing snapshots with the Trends and Diff views, and
+retiring or purging stale snapshots.
+
 ---
 
 ## Reference

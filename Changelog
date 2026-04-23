@@ -2,6 +2,19 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [Unreleased]
+
+### Added
+ - Analysis: immutable cohort snapshots, one per snapshot-intent batch
+ - Analysis: new per-cohort snapshots list / detail / trends / diff endpoints on the public API; every existing endpoint accepts `?snapshot=<slug>`
+ - Admin UI: snapshot-intent checkbox, per-cohort "Run new snapshot", snapshots sub-panel with set-default / retire / restore / purge
+ - Analysis UI: snapshot selector, overview pill, Trends and Diff tabs
+ - Docs: [docs/cohort-snapshots.md](docs/cohort-snapshots.md)
+
+### Changed
+ - Analysis: public read path now pins to a resolved snapshot; latest-per-domain collapsing is gone, old bookmarks auto-resolve to the newest captured snapshot
+ - Analysis: first-boot backfill creates one snapshot per historical (cohort, batch) pair
+
 ## [v1.3.2] - 2026-04-16
 
 New feature: show nameserver response times in result view

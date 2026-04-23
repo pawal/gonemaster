@@ -85,3 +85,41 @@ Public cohort resolution should be explicit and server-controlled.
 - `analysis_default_tag` may be used only as a temporary bootstrap fallback when
   no catalog default exists. It should not override the catalog once the admin
   cohort table is populated.
+
+## Snapshot Model (V2)
+
+The public analysis layer pins to immutable **cohort snapshots** instead of
+collapsing runs to "latest per domain" on every request.
+
+- Every snapshot is keyed by `(cohort_id, batch_id)`; one batch with
+  `snapshot_intent = true` produces exactly one snapshot.
+- A snapshot starts as `pending`, accumulates runs as its jobs graduate,
+  and promotes to `captured` once every job in the batch has finished.
+  Once captured, the snapshot is immutable — rematerialize explicitly to
+  rebuild its aggregates.
+- `analysis_cohort_catalog.default_snapshot_policy` is `auto_latest` by
+  default (the newest captured public snapshot wins) or `pinned`
+  (`default_snapshot_id`). Admin UI's "Make default" action pins.
+- Non-snapshot-intent batches still run and their jobs graduate normally,
+  but the projector never writes fact rows or snapshot rows for them —
+  ad-hoc retests stay out of the cohort series entirely.
+- Mixed-profile batches land in `status = 'failed_mixed_profiles'` with
+  `is_public = false` so a broken batch does not leak into the public
+  path. Admins see a banner in the cohort panel.
+
+### First-boot backfill (Phase 7)
+
+On the first server start after the snapshot model ships the runtime
+enumerates every `(cohort_id, batch_id)` pair with materialized
+`analysis_run_domain_summary` rows and creates one `captured` snapshot
+per pair. The migration is idempotent, gated by the
+`analysis_snapshot_backfill_v1` setting, and emits a one-line log banner
+summarising what it did:
+
+```
+analysis: snapshot backfill complete — cohorts=2 created=17 skipped=0
+```
+
+Existing `/pub/api/v1/analysis/` bookmarks keep working because
+auto-latest resolution picks the newest captured snapshot, which after
+backfill is the most recent historical batch.

@@ -79,6 +79,10 @@ func (c *recordingAnalysisController) CaptureCompletedSnapshots(context.Context)
 	return nil
 }
 
+func (c *recordingAnalysisController) BackfillSnapshotsFromFacts(context.Context) (AnalysisSnapshotBackfillReport, error) {
+	return AnalysisSnapshotBackfillReport{}, nil
+}
+
 func (c *recordingAnalysisController) snapshot() recordingAnalysisController {
 	c.mu.Lock()
 	defer c.mu.Unlock()

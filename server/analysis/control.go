@@ -40,6 +40,11 @@ type ControlStore interface {
 	CountOutstandingJobsForBatch(batchID string) (int, error)
 	ComputeSnapshotAggregates(cohortID int64, batchID string) ([]serverpkg.AnalysisCohortSnapshotAggregate, error)
 	ReplaceSnapshotAggregates(snapshotID int64, aggs []serverpkg.AnalysisCohortSnapshotAggregate) error
+
+	// First-boot backfill surface.
+	ListCohortBatchesWithFacts() ([]serverpkg.CohortBatchFactStats, error)
+	GetSetting(key string) (string, bool)
+	SetSetting(key, value string) error
 }
 
 // Controller coordinates per-run projection with cohort-wide rebuild and clear
@@ -562,6 +567,79 @@ func (c *Controller) StartSnapshotCaptureLoop(ctx context.Context) <-chan struct
 var logSnapshotCaptureError = func(err error) {
 	// Default implementation intentionally no-op; production callers
 	// install a logging variant via ReplaceSnapshotCaptureErrorLogger.
+}
+
+// SnapshotBackfillDoneSettingKey gates the one-time Phase 7 retroactive
+// snapshot creation. Presence (any value) means the migration has
+// already run; absence triggers a single pass on the next server start.
+const SnapshotBackfillDoneSettingKey = "analysis_snapshot_backfill_v1"
+
+// SnapshotBackfillReport aliases the server-package type so callers in
+// analysis tests can use either import without duplicating the struct.
+type SnapshotBackfillReport = serverpkg.AnalysisSnapshotBackfillReport
+
+// BackfillSnapshotsFromFacts is the Phase 7 retroactive migration: for
+// every (cohort, batch) pair with materialized domain_summary rows it
+// upserts a captured snapshot row plus its aggregates. Skips pairs
+// already covered by an existing snapshot so the migration is
+// idempotent; callers gate the whole thing behind
+// SnapshotBackfillDoneSettingKey to keep it a one-shot on first boot.
+func (c *Controller) BackfillSnapshotsFromFacts(ctx context.Context) (serverpkg.AnalysisSnapshotBackfillReport, error) {
+	report := serverpkg.AnalysisSnapshotBackfillReport{}
+	stats, err := c.store.ListCohortBatchesWithFacts()
+	if err != nil {
+		return report, fmt.Errorf("list cohort batches: %w", err)
+	}
+	seenCohorts := map[int64]struct{}{}
+	for _, pair := range stats {
+		if err := ctx.Err(); err != nil {
+			return report, err
+		}
+		seenCohorts[pair.CohortID] = struct{}{}
+		if _, exists := c.store.GetAnalysisCohortSnapshotByBatch(pair.CohortID, pair.BatchID); exists {
+			report.SnapshotsSkipped++
+			continue
+		}
+		batch, _ := c.store.GetBatch(pair.BatchID)
+		if batch.ID == "" {
+			batch = serverpkg.Batch{
+				ID:        pair.BatchID,
+				CreatedAt: pair.FirstFinished,
+			}
+		}
+		snap := serverpkg.AnalysisCohortSnapshot{
+			CohortID:    pair.CohortID,
+			BatchID:     pair.BatchID,
+			Slug:        defaultSnapshotSlug(batch),
+			Status:      serverpkg.AnalysisSnapshotStatusCaptured,
+			IsPublic:    true,
+			RunCount:    pair.RunCount,
+			DomainCount: pair.DomainCount,
+			FirstRunAt:  pair.FirstFinished,
+			LastRunAt:   pair.LastFinished,
+			CapturedAt:  pair.LastFinished,
+		}
+		if batch.SnapshotIntent || batch.ID == pair.BatchID {
+			// Aggregate computation only works when the fact tables are
+			// there; fail soft so one broken pair does not abort the
+			// whole migration.
+			aggs, err := c.store.ComputeSnapshotAggregates(pair.CohortID, pair.BatchID)
+			if err == nil {
+				upserted, upsertErr := c.store.UpsertAnalysisCohortSnapshot(snap)
+				if upsertErr != nil {
+					continue
+				}
+				_ = c.store.ReplaceSnapshotAggregates(upserted.ID, aggs)
+				report.SnapshotsMade++
+				continue
+			}
+		}
+		if _, upsertErr := c.store.UpsertAnalysisCohortSnapshot(snap); upsertErr == nil {
+			report.SnapshotsMade++
+		}
+	}
+	report.CohortsScanned = len(seenCohorts)
+	return report, nil
 }
 
 // ReplaceSnapshotCaptureErrorLogger installs a custom error sink for the

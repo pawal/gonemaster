@@ -71,8 +71,37 @@ func (s *Server) Start() {
 			if err := s.analysis.RepairAllCohorts(ctx); err != nil && ctx.Err() == nil {
 				log.Printf("analysis: startup repair failed: %v", err)
 			}
+			runSnapshotBackfillOnce(ctx, s.store, s.analysis)
 		}()
 		startSnapshotCaptureLoop(ctx, s.analysis)
+	}
+}
+
+// snapshotBackfillDoneSettingKey marks the one-time Phase 7 retroactive
+// snapshot creation as complete so a server restart does not rerun it.
+const snapshotBackfillDoneSettingKey = "analysis_snapshot_backfill_v1"
+
+// runSnapshotBackfillOnce executes the first-boot retroactive snapshot
+// migration exactly once. Gated by a setting so long-running installs
+// don't rescan their fact tables on every restart.
+func runSnapshotBackfillOnce(ctx context.Context, store JobStore, ctrl AnalysisController) {
+	if store == nil || ctrl == nil {
+		return
+	}
+	if _, done := store.GetSetting(snapshotBackfillDoneSettingKey); done {
+		return
+	}
+	report, err := ctrl.BackfillSnapshotsFromFacts(ctx)
+	if err != nil {
+		if ctx.Err() == nil {
+			log.Printf("analysis: snapshot backfill failed: %v", err)
+		}
+		return
+	}
+	_ = store.SetSetting(snapshotBackfillDoneSettingKey, time.Now().UTC().Format(time.RFC3339))
+	if report.SnapshotsMade > 0 || report.SnapshotsSkipped > 0 {
+		log.Printf("analysis: snapshot backfill complete — cohorts=%d created=%d skipped=%d",
+			report.CohortsScanned, report.SnapshotsMade, report.SnapshotsSkipped)
 	}
 }
 

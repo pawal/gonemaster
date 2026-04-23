@@ -1,8 +1,6 @@
 import { getTrends, type TrendPoint } from "$lib/api";
 
-// Categories the trends page offers. Matches the set of aggregate
-// categories the projector writes at capture time
-// (see plans/cohort-snapshots.md and server/store_sql_analysis_snapshot_aggregates.go).
+// Trend categories; matches the projector's capture-time aggregates.
 export const TREND_CATEGORIES = [
   { key: "severity_distribution", label: "Severity distribution" },
   { key: "grade_distribution", label: "Grade distribution" },

@@ -513,8 +513,7 @@ var sqlMigrations = []sqlMigration{
 	{
 		// Cohort snapshot tables (one row per snapshot-intent batch plus a
 		// pre-computed aggregates table) and the batch-level snapshot_intent
-		// flag. Phase 1 of plans/cohort-snapshots.md: data model only, no
-		// projector or read-path wiring yet.
+		// flag — data model only; projector and read path wired later.
 		version: 11,
 		stmtsFn: func(d sqlDialect) []string {
 			switch d.(type) {

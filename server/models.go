@@ -447,9 +447,8 @@ type AnalysisCohortSnapshot struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
-// AnalysisCohortSnapshotAggregate is one pre-computed aggregate row attached
-// to a captured snapshot. The payload shape is category-specific; see
-// plans/cohort-snapshots.md for the catalogue of categories.
+// AnalysisCohortSnapshotAggregate is one pre-computed aggregate row
+// attached to a captured snapshot. The payload shape is category-specific.
 type AnalysisCohortSnapshotAggregate struct {
 	SnapshotID  int64     `json:"snapshot_id"`
 	Category    string    `json:"category"`

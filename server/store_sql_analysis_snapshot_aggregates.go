@@ -7,8 +7,7 @@ import (
 )
 
 // Aggregate category tokens written to analysis_cohort_snapshot_aggregates.
-// Must stay stable across releases — the UI keys on them when diffing
-// snapshots. Payload shapes are documented in plans/cohort-snapshots.md.
+// Stable across releases — the UI keys on them when diffing snapshots.
 const (
 	SnapshotAggregateSeverityDistribution = "severity_distribution"
 	SnapshotAggregateGradeDistribution    = "grade_distribution"
@@ -43,13 +42,9 @@ type TopASNEntry struct {
 
 // ComputeSnapshotAggregates renders every aggregate category for one
 // (cohort, batch) snapshot into serializable rows ready to be passed to
-// ReplaceSnapshotAggregates. The payload shapes match plans/cohort-snapshots.md
-// so the trends and diff views can consume them without special-casing.
-//
-// Runs carrying an empty batch_id are ignored (consistent with the
-// projector's first pollution gate); counts are collapsed to distinct
-// domains per bucket so a batch with multiple runs per domain is not
-// double-counted.
+// ReplaceSnapshotAggregates. Runs with an empty batch_id are excluded;
+// counts collapse to distinct domains per bucket so a batch with
+// multiple runs per domain is not double-counted.
 func (s *SQLJobStore) ComputeSnapshotAggregates(cohortID int64, batchID string) ([]AnalysisCohortSnapshotAggregate, error) {
 	if batchID == "" {
 		return nil, fmt.Errorf("compute snapshot aggregates: batch_id is required")
@@ -337,6 +332,54 @@ func (s *SQLJobStore) CountBatchSnapshotRuns(cohortID int64, batchID string) (ru
 	firstFinished = parseTimestampStr(minStr)
 	lastFinished = parseTimestampStr(maxStr)
 	return runCount, domainCount, firstFinished, lastFinished, nil
+}
+
+// CohortBatchFactStats is one (cohort, batch) pair that has materialized
+// fact rows. The projector's first-boot backfill enumerates these to
+// reconstruct snapshot rows for historical data.
+type CohortBatchFactStats struct {
+	CohortID      int64
+	BatchID       string
+	RunCount      int
+	DomainCount   int
+	FirstFinished time.Time
+	LastFinished  time.Time
+}
+
+// ListCohortBatchesWithFacts returns every (cohort, batch) pair that has
+// at least one materialized domain_summary row, along with run / domain
+// counts and the finished_at span. Used by the Phase 7 first-boot
+// snapshot backfill so historical batches get one captured snapshot
+// each without reprojecting.
+func (s *SQLJobStore) ListCohortBatchesWithFacts() ([]CohortBatchFactStats, error) {
+	rows, err := s.db.Query(
+		`SELECT ards.cohort_id, r.batch_id,
+			COUNT(DISTINCT ards.run_id),
+			COUNT(DISTINCT ards.domain_id),
+			COALESCE(MIN(r.finished_at), ''),
+			COALESCE(MAX(r.finished_at), '')
+			FROM analysis_run_domain_summary ards
+			JOIN runs r ON r.id = ards.run_id
+			WHERE r.batch_id <> ''
+			GROUP BY ards.cohort_id, r.batch_id
+			ORDER BY ards.cohort_id, r.batch_id`,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list cohort batches with facts: %w", err)
+	}
+	defer rows.Close()
+	var out []CohortBatchFactStats
+	for rows.Next() {
+		var stats CohortBatchFactStats
+		var minStr, maxStr string
+		if err := rows.Scan(&stats.CohortID, &stats.BatchID, &stats.RunCount, &stats.DomainCount, &minStr, &maxStr); err != nil {
+			return nil, fmt.Errorf("scan cohort batch stats: %w", err)
+		}
+		stats.FirstFinished = parseTimestampStr(minStr)
+		stats.LastFinished = parseTimestampStr(maxStr)
+		out = append(out, stats)
+	}
+	return out, rows.Err()
 }
 
 // CountOutstandingJobsForBatch returns the number of in-flight (queued /

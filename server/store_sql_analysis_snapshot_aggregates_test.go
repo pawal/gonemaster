@@ -107,6 +107,76 @@ func TestComputeSnapshotAggregatesSeverityAndGrade(t *testing.T) {
 	}
 }
 
+// TestListCohortBatchesWithFacts pins the Phase 7 backfill query: every
+// (cohort, batch) pair with at least one domain_summary row shows up
+// with its run/domain counts and finished_at span.
+func TestListCohortBatchesWithFacts(t *testing.T) {
+	s := testStoreForBackend(t, testBackends(t)[0])
+	now := time.Date(2026, 4, 20, 10, 0, 0, 0, time.UTC)
+
+	cohort, err := s.UpsertAnalysisCohort(AnalysisCohort{
+		SourceType:      "tag",
+		SourceTag:       "tld",
+		AnalysisEnabled: true,
+	})
+	if err != nil {
+		t.Fatalf("seed cohort: %v", err)
+	}
+	for i, rec := range []struct {
+		runID    string
+		domainID int64
+		batchID  string
+		finished time.Time
+	}{
+		{"run-1", 100, "batch-a", now},
+		{"run-2", 101, "batch-a", now.Add(time.Hour)},
+		{"run-3", 102, "batch-b", now.Add(-24 * time.Hour)},
+		{"run-orphan", 103, "", now}, // batch-less run must be excluded.
+	} {
+		if _, err := s.GetOrCreateDomain(rec.runID + ".example"); err != nil {
+			t.Fatalf("seed domain %d: %v", i, err)
+		}
+		job := Job{
+			ID: rec.runID, DomainID: rec.domainID, Domain: rec.runID + ".example",
+			BatchID: rec.batchID, Status: JobSucceeded,
+			CreatedAt: rec.finished, StartedAt: rec.finished, FinishedAt: rec.finished,
+		}
+		if _, err := s.Create(job); err != nil {
+			t.Fatalf("create job: %v", err)
+		}
+		if err := s.GraduateJob(job, nil); err != nil {
+			t.Fatalf("graduate: %v", err)
+		}
+		if err := s.UpsertAnalysisRunDomainSummary(AnalysisRunDomainSummary{
+			CohortID: cohort.ID, RunID: rec.runID, DomainID: rec.domainID,
+		}); err != nil {
+			t.Fatalf("upsert summary: %v", err)
+		}
+	}
+
+	stats, err := s.ListCohortBatchesWithFacts()
+	if err != nil {
+		t.Fatalf("ListCohortBatchesWithFacts: %v", err)
+	}
+	if len(stats) != 2 {
+		t.Fatalf("expected 2 (cohort, batch) pairs, got %d: %+v", len(stats), stats)
+	}
+	// batch-a and batch-b; the batch-less run must not show up.
+	byBatch := map[string]CohortBatchFactStats{}
+	for _, st := range stats {
+		byBatch[st.BatchID] = st
+	}
+	if byBatch["batch-a"].RunCount != 2 || byBatch["batch-a"].DomainCount != 2 {
+		t.Fatalf("batch-a counts: %+v", byBatch["batch-a"])
+	}
+	if byBatch["batch-b"].RunCount != 1 {
+		t.Fatalf("batch-b counts: %+v", byBatch["batch-b"])
+	}
+	if _, leaked := byBatch[""]; leaked {
+		t.Fatal("batch-less run leaked into the fact-stats list")
+	}
+}
+
 // TestCountOutstandingJobsForBatch verifies the capture gate query. The
 // capture poller promotes pending snapshots only once their batch has
 // drained; this test pins the query's scoping to the right batch.

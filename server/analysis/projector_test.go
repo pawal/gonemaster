@@ -48,6 +48,8 @@ type fakeStore struct {
 	snapshotByID   map[int64]snapshotKey
 	snapshotAggs   map[int64][]serverpkg.AnalysisCohortSnapshotAggregate
 	nextSnapshotID int64
+
+	settings map[string]string
 }
 
 type snapshotKey struct {
@@ -354,6 +356,68 @@ func (s *fakeStore) SetAnalysisProjectionState(item serverpkg.AnalysisProjection
 func (s *fakeStore) GetBatch(id string) (serverpkg.Batch, bool) {
 	b, ok := s.batches[id]
 	return b, ok
+}
+
+// Backfill support — Phase 7 tests drive these directly.
+func (s *fakeStore) ListCohortBatchesWithFacts() ([]serverpkg.CohortBatchFactStats, error) {
+	type key struct {
+		cohortID int64
+		batchID  string
+	}
+	agg := map[key]*serverpkg.CohortBatchFactStats{}
+	for k, summary := range s.summaries {
+		parts := strings.SplitN(k, "/", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		run, ok := s.runs[summary.RunID]
+		if !ok || run.BatchID == "" {
+			continue
+		}
+		var cohortID int64
+		fmt.Sscanf(parts[0], "%d", &cohortID)
+		gk := key{cohortID, run.BatchID}
+		stat, ok := agg[gk]
+		if !ok {
+			stat = &serverpkg.CohortBatchFactStats{CohortID: cohortID, BatchID: run.BatchID}
+			agg[gk] = stat
+		}
+		stat.RunCount++
+		stat.DomainCount++
+		if stat.FirstFinished.IsZero() || run.FinishedAt.Before(stat.FirstFinished) {
+			stat.FirstFinished = run.FinishedAt
+		}
+		if run.FinishedAt.After(stat.LastFinished) {
+			stat.LastFinished = run.FinishedAt
+		}
+	}
+	out := make([]serverpkg.CohortBatchFactStats, 0, len(agg))
+	for _, v := range agg {
+		out = append(out, *v)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].CohortID != out[j].CohortID {
+			return out[i].CohortID < out[j].CohortID
+		}
+		return out[i].BatchID < out[j].BatchID
+	})
+	return out, nil
+}
+
+func (s *fakeStore) GetSetting(key string) (string, bool) {
+	if s.settings == nil {
+		return "", false
+	}
+	v, ok := s.settings[key]
+	return v, ok
+}
+
+func (s *fakeStore) SetSetting(key, value string) error {
+	if s.settings == nil {
+		s.settings = map[string]string{}
+	}
+	s.settings[key] = value
+	return nil
 }
 
 func (s *fakeStore) UpsertAnalysisCohortSnapshot(snap serverpkg.AnalysisCohortSnapshot) (serverpkg.AnalysisCohortSnapshot, error) {

@@ -24,6 +24,13 @@ type PublicAnalysisCohortDetail struct {
 	PrefixCount           int                                       `json:"prefix_count"`
 	SeverityDistribution  map[string]int                            `json:"severity_distribution,omitempty"`
 	FactDistributions     map[string]PublicAnalysisFactDistribution `json:"fact_distributions,omitempty"`
+	// Snapshot is the specific materialization being described when the
+	// cohort has a captured snapshot; nil for cohorts awaiting their first
+	// snapshot.
+	Snapshot *PublicAnalysisSnapshotView `json:"snapshot,omitempty"`
+	// Status is "no_snapshot" when the cohort has no captured public
+	// snapshot and the UI should render an empty-state panel.
+	Status string `json:"status,omitempty"`
 }
 
 // severityBucket normalizes a run worst_level into one of the five buckets
@@ -187,8 +194,31 @@ func (s *Server) handlePublicAnalysisCohortDetail(w http.ResponseWriter, r *http
 		t := cohort.LastMaterializedAt
 		detail.LastMaterializedAt = &t
 	}
+	// Snapshot resolution: use the ?snapshot= slug when present, else the
+	// cohort's auto-latest default. Detail counts are scoped to the
+	// resolved snapshot so the page always describes a specific
+	// materialization rather than averaging across batches.
+	snapshot := s.resolvePublicSnapshotOrNone(w, r, cohort)
+	if w.Header().Get("Content-Type") != "" {
+		// resolvePublicSnapshotOrNone already wrote a 404 for a bad slug.
+		return
+	}
+	if readStore, canRead := s.store.(AnalysisReadStore); canRead && snapshot.ID != 0 {
+		aggregates := readStore.ListSnapshotAggregates(snapshot.ID)
+		detail.Snapshot = &PublicAnalysisSnapshotView{
+			Slug:        snapshot.Slug,
+			Label:       snapshot.Label,
+			CapturedAt:  snapshot.CapturedAt,
+			RunCount:    snapshot.RunCount,
+			DomainCount: snapshot.DomainCount,
+			ProfileName: snapshot.ProfileName,
+		}
+		_ = aggregates // reserved for future trend surface
+	} else if snapshot.ID == 0 {
+		detail.Status = PublicAnalysisStatusNoSnapshot
+	}
 	if _, canRead := s.store.(AnalysisReadStore); canRead {
-		data := s.latestMaterializationForCohort(cohort)
+		data := s.latestMaterializationForSnapshot(cohort, snapshot)
 
 		domainSet := map[int64]struct{}{}
 		nsSet := map[int64]struct{}{}
@@ -238,7 +268,7 @@ func (s *Server) handlePublicAnalysisDomainDetail(w http.ResponseWriter, r *http
 	if !ok {
 		return
 	}
-	cohort, ok := s.resolvePublicAnalysisCohort(w, r)
+	cohort, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
 	if !ok {
 		return
 	}
@@ -252,7 +282,7 @@ func (s *Server) handlePublicAnalysisDomainDetail(w http.ResponseWriter, r *http
 		return
 	}
 
-	data := s.latestMaterializationForCohort(cohort)
+	data := s.latestMaterializationForSnapshot(cohort, snapshot)
 	var pair domainSummaryPair
 	haveSummary := false
 	for _, p := range data.latest {
@@ -453,7 +483,7 @@ func (s *Server) handlePublicAnalysisNameserverDetail(w http.ResponseWriter, r *
 	if err == nil {
 		name = decoded
 	}
-	cohort, ok := s.resolvePublicAnalysisCohort(w, r)
+	cohort, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
 	if !ok {
 		return
 	}
@@ -462,7 +492,7 @@ func (s *Server) handlePublicAnalysisNameserverDetail(w http.ResponseWriter, r *
 		return
 	}
 
-	data := s.latestMaterializationForCohort(cohort)
+	data := s.latestMaterializationForSnapshot(cohort, snapshot)
 
 	addressASN := map[int64]int64{}
 	for _, fact := range data.addressASNs {
@@ -548,7 +578,7 @@ func (s *Server) handlePublicAnalysisEndpointDetail(w http.ResponseWriter, r *ht
 	if decoded, err := url.PathUnescape(rawAddr); err == nil {
 		rawAddr = decoded
 	}
-	cohort, ok := s.resolvePublicAnalysisCohort(w, r)
+	cohort, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
 	if !ok {
 		return
 	}
@@ -557,7 +587,7 @@ func (s *Server) handlePublicAnalysisEndpointDetail(w http.ResponseWriter, r *ht
 		return
 	}
 
-	data := s.latestMaterializationForCohort(cohort)
+	data := s.latestMaterializationForSnapshot(cohort, snapshot)
 
 	target := strings.ToLower(rawAddr)
 	selectedNameserver := strings.TrimSpace(r.URL.Query().Get("nameserver"))
@@ -672,7 +702,7 @@ func (s *Server) handlePublicAnalysisASNDetail(w http.ResponseWriter, r *http.Re
 		writeError(w, http.StatusNotFound, "not_found", "asn not found", nil)
 		return
 	}
-	cohort, ok := s.resolvePublicAnalysisCohort(w, r)
+	cohort, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
 	if !ok {
 		return
 	}
@@ -681,7 +711,7 @@ func (s *Server) handlePublicAnalysisASNDetail(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	data := s.latestMaterializationForCohort(cohort)
+	data := s.latestMaterializationForSnapshot(cohort, snapshot)
 
 	domainSet := map[int64]struct{}{}
 	addrSet := map[int64]struct{}{}
@@ -767,7 +797,7 @@ func (s *Server) handlePublicAnalysisPrefixDetail(w http.ResponseWriter, r *http
 		writeError(w, http.StatusBadRequest, "missing_prefix", "prefix query parameter is required", nil)
 		return
 	}
-	cohort, ok := s.resolvePublicAnalysisCohort(w, r)
+	cohort, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
 	if !ok {
 		return
 	}
@@ -782,7 +812,7 @@ func (s *Server) handlePublicAnalysisPrefixDetail(w http.ResponseWriter, r *http
 	// Walk address_asns to find the matching prefix_id by re-resolving via GetAnalysisPrefix.
 	var prefixID int64
 	var meta AnalysisPrefix
-	data := s.latestMaterializationForCohort(cohort)
+	data := s.latestMaterializationForSnapshot(cohort, snapshot)
 	for _, fact := range data.addressASNs {
 		if fact.PrefixID == nil {
 			continue
@@ -853,14 +883,14 @@ func (s *Server) handlePublicAnalysisTagDetail(w http.ResponseWriter, r *http.Re
 	if !ok {
 		return
 	}
-	cohort, ok := s.resolvePublicAnalysisCohort(w, r)
+	cohort, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
 	if !ok {
 		return
 	}
 	if _, ok := s.analysisReadStore(w); !ok {
 		return
 	}
-	latest := s.latestMaterializationForCohort(cohort).latest
+	latest := s.latestMaterializationForSnapshot(cohort, snapshot).latest
 
 	domainNames := map[int64]string{}
 	for _, pair := range latest {
@@ -921,14 +951,14 @@ func (s *Server) handlePublicAnalysisTestcaseDetail(w http.ResponseWriter, r *ht
 		writeError(w, http.StatusBadRequest, "missing_testcase", "testcase query parameter is required", nil)
 		return
 	}
-	cohort, ok := s.resolvePublicAnalysisCohort(w, r)
+	cohort, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
 	if !ok {
 		return
 	}
 	if _, ok := s.analysisReadStore(w); !ok {
 		return
 	}
-	latest := s.latestMaterializationForCohort(cohort).latest
+	latest := s.latestMaterializationForSnapshot(cohort, snapshot).latest
 
 	domainSet := map[int64]struct{}{}
 	tagSet := map[string]struct{}{}

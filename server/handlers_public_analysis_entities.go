@@ -58,7 +58,7 @@ type PublicAnalysisPrefixView struct {
 
 // handlePublicAnalysisNameservers handles GET /pub/api/v1/analysis/nameservers.
 func (s *Server) handlePublicAnalysisNameservers(w http.ResponseWriter, r *http.Request) {
-	cohort, ok := s.resolvePublicAnalysisCohort(w, r)
+	cohort, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
 	if !ok {
 		return
 	}
@@ -71,7 +71,7 @@ func (s *Server) handlePublicAnalysisNameservers(w http.ResponseWriter, r *http.
 		return
 	}
 
-	data := s.latestMaterializationForCohort(cohort)
+	data := s.latestMaterializationForSnapshot(cohort, snapshot)
 	endpoints := data.endpoints
 	addressASNs := data.addressASNs
 
@@ -299,7 +299,7 @@ func sortEndpointViews(items []PublicAnalysisEndpointView, mode string) {
 
 // handlePublicAnalysisEndpoints handles GET /pub/api/v1/analysis/endpoints.
 func (s *Server) handlePublicAnalysisEndpoints(w http.ResponseWriter, r *http.Request) {
-	cohort, ok := s.resolvePublicAnalysisCohort(w, r)
+	cohort, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
 	if !ok {
 		return
 	}
@@ -312,7 +312,7 @@ func (s *Server) handlePublicAnalysisEndpoints(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	data := s.latestMaterializationForCohort(cohort)
+	data := s.latestMaterializationForSnapshot(cohort, snapshot)
 	endpoints := data.endpoints
 	addressASNs := data.addressASNs
 
@@ -433,7 +433,7 @@ func (s *Server) handlePublicAnalysisEndpoints(w http.ResponseWriter, r *http.Re
 
 // handlePublicAnalysisASNs handles GET /pub/api/v1/analysis/asns.
 func (s *Server) handlePublicAnalysisASNs(w http.ResponseWriter, r *http.Request) {
-	cohort, ok := s.resolvePublicAnalysisCohort(w, r)
+	cohort, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
 	if !ok {
 		return
 	}
@@ -446,7 +446,7 @@ func (s *Server) handlePublicAnalysisASNs(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	data := s.latestMaterializationForCohort(cohort)
+	data := s.latestMaterializationForSnapshot(cohort, snapshot)
 	endpoints := data.endpoints
 	addressASNs := data.addressASNs
 
@@ -621,7 +621,7 @@ func (s *Server) handlePublicAnalysisASNs(w http.ResponseWriter, r *http.Request
 
 // handlePublicAnalysisPrefixes handles GET /pub/api/v1/analysis/prefixes.
 func (s *Server) handlePublicAnalysisPrefixes(w http.ResponseWriter, r *http.Request) {
-	cohort, ok := s.resolvePublicAnalysisCohort(w, r)
+	cohort, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
 	if !ok {
 		return
 	}
@@ -634,7 +634,7 @@ func (s *Server) handlePublicAnalysisPrefixes(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	addressASNs := s.latestMaterializationForCohort(cohort).addressASNs
+	addressASNs := s.latestMaterializationForSnapshot(cohort, snapshot).addressASNs
 
 	type prefixAgg struct {
 		prefix    string

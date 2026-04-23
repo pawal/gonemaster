@@ -3,7 +3,6 @@ package server
 import (
 	"errors"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -16,6 +15,14 @@ type PublicAnalysisCohortView struct {
 	Description string `json:"description,omitempty"`
 	IsDefault   bool   `json:"is_default"`
 	SortOrder   int    `json:"sort_order,omitempty"`
+	// DefaultSnapshot carries the slug + captured_at of the snapshot
+	// auto-latest resolution picks for this cohort. Nil for cohorts with
+	// no captured public snapshot yet.
+	DefaultSnapshot *PublicAnalysisSnapshotView `json:"default_snapshot,omitempty"`
+	// SnapshotCount is the total number of captured public snapshots in
+	// the cohort. Used by the UI to decide whether to render the
+	// snapshot selector chip.
+	SnapshotCount int `json:"snapshot_count"`
 }
 
 // PublicAnalysisCatalogResponse is the response for GET /pub/api/v1/analysis/catalog.
@@ -27,25 +34,48 @@ type PublicAnalysisCatalogResponse struct {
 }
 
 // PublicAnalysisOverviewResponse is the minimal overview payload for
-// GET /pub/api/v1/analysis/overview. Aggregated counts and charts are added
-// later once the materialized query surface is in place.
+// GET /pub/api/v1/analysis/overview. Carries the resolved snapshot so the
+// UI can anchor its breadcrumbs and links to a specific materialization.
 type PublicAnalysisOverviewResponse struct {
-	DatasetTag            string     `json:"dataset_tag"`
-	Label                 string     `json:"label"`
-	Description           string     `json:"description,omitempty"`
-	MaterializationStatus string     `json:"materialization_status"`
-	LastMaterializedAt    *time.Time `json:"last_materialized_at,omitempty"`
-	IsDefault             bool       `json:"is_default"`
+	DatasetTag            string                      `json:"dataset_tag"`
+	Label                 string                      `json:"label"`
+	Description           string                      `json:"description,omitempty"`
+	MaterializationStatus string                      `json:"materialization_status"`
+	LastMaterializedAt    *time.Time                  `json:"last_materialized_at,omitempty"`
+	IsDefault             bool                        `json:"is_default"`
+	Snapshot              *PublicAnalysisSnapshotView `json:"snapshot,omitempty"`
+	Status                string                      `json:"status,omitempty"`
 }
 
-func publicAnalysisCohortView(cohort AnalysisCohort) PublicAnalysisCohortView {
-	return PublicAnalysisCohortView{
+func (s *Server) publicAnalysisCohortView(cohort AnalysisCohort) PublicAnalysisCohortView {
+	view := PublicAnalysisCohortView{
 		DatasetTag:  cohort.SourceTag,
 		Label:       cohort.Label,
 		Description: cohort.Description,
 		IsDefault:   cohort.IsDefault,
 		SortOrder:   cohort.SortOrder,
 	}
+	if readStore, ok := s.store.(AnalysisReadStore); ok {
+		snapshots := readStore.ListAnalysisCohortSnapshots(cohort.ID)
+		publicCount := 0
+		for _, snap := range snapshots {
+			if isPublicSnapshot(snap) {
+				publicCount++
+			}
+		}
+		view.SnapshotCount = publicCount
+		if def, found := readStore.GetDefaultSnapshotForCohort(cohort.ID); found {
+			view.DefaultSnapshot = &PublicAnalysisSnapshotView{
+				Slug:        def.Slug,
+				Label:       def.Label,
+				CapturedAt:  def.CapturedAt,
+				RunCount:    def.RunCount,
+				DomainCount: def.DomainCount,
+				ProfileName: def.ProfileName,
+			}
+		}
+	}
+	return view
 }
 
 // handlePublicAnalysisCatalog handles GET /pub/api/v1/analysis/catalog.
@@ -58,7 +88,7 @@ func (s *Server) handlePublicAnalysisCatalog(w http.ResponseWriter, r *http.Requ
 	views := make([]PublicAnalysisCohortView, 0, len(selectable))
 	var defaultTag string
 	for _, c := range selectable {
-		views = append(views, publicAnalysisCohortView(c))
+		views = append(views, s.publicAnalysisCohortView(c))
 		if c.IsDefault {
 			defaultTag = c.SourceTag
 		}
@@ -81,18 +111,18 @@ func (s *Server) handlePublicAnalysisCohorts(w http.ResponseWriter, r *http.Requ
 	}
 	views := make([]PublicAnalysisCohortView, 0, len(selectable))
 	for _, c := range selectable {
-		views = append(views, publicAnalysisCohortView(c))
+		views = append(views, s.publicAnalysisCohortView(c))
 	}
 	writeJSON(w, http.StatusOK, views)
 }
 
 // handlePublicAnalysisOverview handles GET /pub/api/v1/analysis/overview.
-// When dataset_tag is missing the default public cohort is resolved server-side.
+// When dataset_tag is missing the default public cohort is resolved
+// server-side; when ?snapshot= is missing the cohort's auto-latest
+// captured snapshot is used.
 func (s *Server) handlePublicAnalysisOverview(w http.ResponseWriter, r *http.Request) {
-	datasetTag := strings.TrimSpace(r.URL.Query().Get("dataset_tag"))
-	cohort, err := ResolveAnalysisCohort(s.store.ListAnalysisCohorts(), datasetTag, "")
-	if err != nil {
-		writePublicAnalysisResolutionError(w, err)
+	cohort, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
+	if !ok {
 		return
 	}
 	resp := PublicAnalysisOverviewResponse{
@@ -105,6 +135,18 @@ func (s *Server) handlePublicAnalysisOverview(w http.ResponseWriter, r *http.Req
 	if !cohort.LastMaterializedAt.IsZero() {
 		t := cohort.LastMaterializedAt
 		resp.LastMaterializedAt = &t
+	}
+	if snapshot.ID == 0 {
+		resp.Status = PublicAnalysisStatusNoSnapshot
+	} else {
+		resp.Snapshot = &PublicAnalysisSnapshotView{
+			Slug:        snapshot.Slug,
+			Label:       snapshot.Label,
+			CapturedAt:  snapshot.CapturedAt,
+			RunCount:    snapshot.RunCount,
+			DomainCount: snapshot.DomainCount,
+			ProfileName: snapshot.ProfileName,
+		}
 	}
 	writeJSON(w, http.StatusOK, resp)
 }

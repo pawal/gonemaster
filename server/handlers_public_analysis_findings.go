@@ -28,7 +28,7 @@ type PublicAnalysisTestcaseView struct {
 // handlePublicAnalysisTags handles GET /pub/api/v1/analysis/tags. It aggregates
 // finding tags observed across the latest run per domain in the cohort.
 func (s *Server) handlePublicAnalysisTags(w http.ResponseWriter, r *http.Request) {
-	cohort, ok := s.resolvePublicAnalysisCohort(w, r)
+	cohort, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
 	if !ok {
 		return
 	}
@@ -49,7 +49,7 @@ func (s *Server) handlePublicAnalysisTags(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	data := s.latestMaterializationForCohort(cohort)
+	data := s.latestMaterializationForSnapshot(cohort, snapshot)
 
 	// Aggregates come from the materialized analysis_run_tag_summary
 	// table via the cohort cache — no per-run entries scan. One bucket
@@ -160,7 +160,7 @@ func (s *Server) handlePublicAnalysisTags(w http.ResponseWriter, r *http.Request
 // handlePublicAnalysisTestcases handles GET /pub/api/v1/analysis/testcases. It
 // aggregates (module, testcase) pairs across the latest run per domain.
 func (s *Server) handlePublicAnalysisTestcases(w http.ResponseWriter, r *http.Request) {
-	cohort, ok := s.resolvePublicAnalysisCohort(w, r)
+	cohort, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
 	if !ok {
 		return
 	}
@@ -172,7 +172,7 @@ func (s *Server) handlePublicAnalysisTestcases(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	data := s.latestMaterializationForCohort(cohort)
+	data := s.latestMaterializationForSnapshot(cohort, snapshot)
 
 	// Same move as /tags: aggregate from the cached per-run tag summary
 	// table instead of rescanning entries per domain. The tag summary

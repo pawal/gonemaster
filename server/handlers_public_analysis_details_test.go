@@ -550,15 +550,21 @@ func TestPublicAnalysisDetailsRedactInternalIDs(t *testing.T) {
 	}
 }
 
-func TestPublicAnalysisCohortAndDetailsUseLatestRunFacts(t *testing.T) {
+// TestPublicAnalysisCohortAndDetailsScopedToSnapshot verifies that the
+// cohort and domain detail handlers scope their counts and entries to
+// the resolved snapshot: old-batch facts are not exposed under the
+// auto-latest default, and old-batch-only entities 404 without the
+// ?snapshot= override.
+func TestPublicAnalysisCohortAndDetailsScopedToSnapshot(t *testing.T) {
 	f := newAnalysisAPITestFixture(t)
 	t1 := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
 	t2 := t1.Add(time.Hour)
 
-	f.seedGraduatedRun("alpha.example", t1, []engine.LogEntry{
+	older := f.seedAlternateSnapshot("batch-old", "2026-04-17-old", t1.Add(-time.Hour))
+	f.seedGraduatedRunInBatch(older.BatchID, "alpha.example", t1, []engine.LogEntry{
 		{Module: "DNSSEC", Testcase: "dnssec07", Tag: "OLD_TAG", Level: "ERROR"},
 	})
-	f.seedEndpoint("run-alpha.example-"+t1.Format("20060102150405"),
+	f.seedEndpointInBatch(older.BatchID, "run-alpha.example-"+t1.Format("20060102150405"),
 		"alpha.example", "ns-old.example", "192.0.2.10", "ipv4", t1, 64500, "192.0.2.0/24")
 
 	f.seedGraduatedRun("alpha.example", t2, []engine.LogEntry{
@@ -573,7 +579,10 @@ func TestPublicAnalysisCohortAndDetailsUseLatestRunFacts(t *testing.T) {
 		t.Fatalf("decode cohort detail: %v", err)
 	}
 	if cohort.NameserverCount != 1 || cohort.EndpointCount != 1 || cohort.ASNCount != 1 || cohort.PrefixCount != 1 {
-		t.Fatalf("expected latest-only cohort counts, got %+v", cohort)
+		t.Fatalf("expected auto-latest snapshot counts, got %+v", cohort)
+	}
+	if cohort.Snapshot == nil || cohort.Snapshot.Slug != "2026-04-20-fixture" {
+		t.Fatalf("expected cohort detail to carry fixture snapshot, got %+v", cohort.Snapshot)
 	}
 
 	domainResp := getPublic(t, f.srv, "/pub/api/v1/analysis/domains/alpha.example")
@@ -582,30 +591,36 @@ func TestPublicAnalysisCohortAndDetailsUseLatestRunFacts(t *testing.T) {
 		t.Fatalf("decode domain detail: %v", err)
 	}
 	if len(detail.Nameservers) != 1 || detail.Nameservers[0].Nameserver != "ns-new.example" {
-		t.Fatalf("expected only latest nameserver, got %+v", detail.Nameservers)
+		t.Fatalf("expected only new snapshot's nameserver, got %+v", detail.Nameservers)
 	}
 	if len(detail.Addresses) != 1 || detail.Addresses[0].Address != "198.51.100.20" {
-		t.Fatalf("expected only latest address, got %+v", detail.Addresses)
+		t.Fatalf("expected only new snapshot's address, got %+v", detail.Addresses)
 	}
 	for _, e := range detail.Entries {
 		if e.Tag == "OLD_TAG" {
-			t.Fatalf("expected domain detail to exclude old run entries, got %+v", detail.Entries)
+			t.Fatalf("expected domain detail to exclude older-snapshot entries, got %+v", detail.Entries)
 		}
 	}
 
 	oldNS := getPublic(t, f.srv, "/pub/api/v1/analysis/nameservers/ns-old.example")
 	if oldNS.Code != http.StatusNotFound {
-		t.Fatalf("expected old nameserver to be absent, got %d: %s", oldNS.Code, oldNS.Body)
+		t.Fatalf("expected older nameserver to be hidden under auto-latest, got %d: %s", oldNS.Code, oldNS.Body)
 	}
 
 	oldASN := getPublic(t, f.srv, "/pub/api/v1/analysis/asns/64500")
 	if oldASN.Code != http.StatusNotFound {
-		t.Fatalf("expected old ASN to be absent, got %d: %s", oldASN.Code, oldASN.Body)
+		t.Fatalf("expected older ASN to be hidden under auto-latest, got %d: %s", oldASN.Code, oldASN.Body)
 	}
 
 	oldPrefix := getPublic(t, f.srv, "/pub/api/v1/analysis/prefix?prefix=192.0.2.0/24")
 	if oldPrefix.Code != http.StatusNotFound {
-		t.Fatalf("expected old prefix to be absent, got %d: %s", oldPrefix.Code, oldPrefix.Body)
+		t.Fatalf("expected older prefix to be hidden under auto-latest, got %d: %s", oldPrefix.Code, oldPrefix.Body)
+	}
+
+	// With ?snapshot= the older snapshot is visible again.
+	oldNSExplicit := getPublic(t, f.srv, "/pub/api/v1/analysis/nameservers/ns-old.example?snapshot=2026-04-17-old")
+	if oldNSExplicit.Code != http.StatusOK {
+		t.Fatalf("expected older nameserver visible with explicit slug, got %d: %s", oldNSExplicit.Code, oldNSExplicit.Body)
 	}
 }
 

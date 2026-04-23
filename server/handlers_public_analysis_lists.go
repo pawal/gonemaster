@@ -21,6 +21,12 @@ type AnalysisReadStore interface {
 	GetAnalysisAddress(id int64) (AnalysisAddress, bool)
 	GetAnalysisPrefix(id int64) (AnalysisPrefix, bool)
 	GetAnalysisASN(asn int64) (AnalysisASN, bool)
+	// Snapshot-side read surface used by the public snapshot selector and
+	// the snapshot-scoped materialization cache.
+	ListAnalysisCohortSnapshots(cohortID int64) []AnalysisCohortSnapshot
+	GetAnalysisCohortSnapshotBySlug(cohortID int64, slug string) (AnalysisCohortSnapshot, bool)
+	GetDefaultSnapshotForCohort(cohortID int64) (AnalysisCohortSnapshot, bool)
+	ListSnapshotAggregates(snapshotID int64) []AnalysisCohortSnapshotAggregate
 }
 
 // analysisListFilter captures the shared query parameters used by public list
@@ -76,6 +82,106 @@ func (s *Server) resolvePublicAnalysisCohort(w http.ResponseWriter, r *http.Requ
 		return AnalysisCohort{}, false
 	}
 	return cohort, true
+}
+
+// PublicAnalysisStatusNoSnapshot is the status token handlers emit when a
+// cohort has no captured public snapshot yet. The UI keys on this to
+// render a helpful empty state instead of treating the empty payload as
+// a transient failure.
+const PublicAnalysisStatusNoSnapshot = "no_snapshot"
+
+// resolvePublicAnalysisCohortAndSnapshot resolves (cohort, snapshot) for a
+// public request. The resolution rules:
+//
+//  1. dataset_tag selects the cohort (or the admin default when omitted).
+//  2. An explicit ?snapshot=<slug> pins that snapshot. Retired, non-public,
+//     or failed_mixed_profiles snapshots are hidden: looking them up by slug
+//     returns 404 so an operator sharing a link to a broken snapshot does
+//     not leak it through the public path.
+//  3. Without an explicit slug, the cohort's auto-latest default snapshot
+//     is used; it is always the most recent captured public snapshot.
+//  4. When no captured public snapshot exists for the cohort, snapshot.ID
+//     is zero and the caller should render the no_snapshot state.
+func (s *Server) resolvePublicAnalysisCohortAndSnapshot(w http.ResponseWriter, r *http.Request) (AnalysisCohort, AnalysisCohortSnapshot, bool) {
+	cohort, ok := s.resolvePublicAnalysisCohort(w, r)
+	if !ok {
+		return AnalysisCohort{}, AnalysisCohortSnapshot{}, false
+	}
+	readStore, ok := s.store.(AnalysisReadStore)
+	if !ok {
+		// Non-SQL stores do not carry the snapshot tables; fall back to
+		// the empty-snapshot state so the page still renders.
+		return cohort, AnalysisCohortSnapshot{}, true
+	}
+	slug := strings.TrimSpace(r.URL.Query().Get("snapshot"))
+	if slug != "" {
+		snap, found := readStore.GetAnalysisCohortSnapshotBySlug(cohort.ID, slug)
+		if !found || !isPublicSnapshot(snap) {
+			writeError(w, http.StatusNotFound, "snapshot_not_found",
+				"requested snapshot is not available on the public path", nil)
+			return AnalysisCohort{}, AnalysisCohortSnapshot{}, false
+		}
+		return cohort, snap, true
+	}
+	snap, found := readStore.GetDefaultSnapshotForCohort(cohort.ID)
+	if !found {
+		return cohort, AnalysisCohortSnapshot{}, true
+	}
+	return cohort, snap, true
+}
+
+// isPublicSnapshot returns true when a snapshot is eligible for the public
+// read path: captured (aggregates written), public (admin-visible flag),
+// and not in the failed_mixed_profiles state. Retired snapshots are
+// hidden by the status gate.
+func isPublicSnapshot(snap AnalysisCohortSnapshot) bool {
+	if snap.ID == 0 {
+		return false
+	}
+	if !snap.IsPublic {
+		return false
+	}
+	return snap.Status == AnalysisSnapshotStatusCaptured
+}
+
+// resolvePublicSnapshotOrNone is a cohort-scoped variant of
+// resolvePublicAnalysisCohortAndSnapshot used by handlers that have
+// already resolved the cohort themselves (e.g. the cohort detail
+// endpoint with dataset_tag in the URL path). Writes a 404 when the
+// slug is invalid; returns a zero snapshot when the cohort has no
+// captured public snapshot so callers can render the empty state.
+func (s *Server) resolvePublicSnapshotOrNone(w http.ResponseWriter, r *http.Request, cohort AnalysisCohort) AnalysisCohortSnapshot {
+	readStore, ok := s.store.(AnalysisReadStore)
+	if !ok {
+		return AnalysisCohortSnapshot{}
+	}
+	slug := strings.TrimSpace(r.URL.Query().Get("snapshot"))
+	if slug != "" {
+		snap, found := readStore.GetAnalysisCohortSnapshotBySlug(cohort.ID, slug)
+		if !found || !isPublicSnapshot(snap) {
+			writeError(w, http.StatusNotFound, "snapshot_not_found",
+				"requested snapshot is not available on the public path", nil)
+			return AnalysisCohortSnapshot{}
+		}
+		return snap
+	}
+	snap, found := readStore.GetDefaultSnapshotForCohort(cohort.ID)
+	if !found {
+		return AnalysisCohortSnapshot{}
+	}
+	return snap
+}
+
+// PublicAnalysisSnapshotView is the redacted shape handlers embed to
+// tell the reader which snapshot is being served. Keyed on slug, which
+// is the stable URL-safe identifier.
+type PublicAnalysisSnapshotView struct {
+	Slug        string    `json:"slug"`
+	Label       string    `json:"label,omitempty"`
+	CapturedAt  time.Time `json:"captured_at,omitempty"`
+	RunCount    int       `json:"run_count"`
+	DomainCount int       `json:"domain_count"`
+	ProfileName string    `json:"profile_name,omitempty"`
 }
 
 // analysisReadStore returns the analysis read-store when the configured store
@@ -140,7 +246,7 @@ var validWorstLevelBuckets = map[string]struct{}{
 // handlePublicAnalysisDomains handles GET /pub/api/v1/analysis/domains. It
 // returns the latest run per domain in the resolved cohort.
 func (s *Server) handlePublicAnalysisDomains(w http.ResponseWriter, r *http.Request) {
-	cohort, ok := s.resolvePublicAnalysisCohort(w, r)
+	cohort, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
 	if !ok {
 		return
 	}
@@ -177,7 +283,7 @@ func (s *Server) handlePublicAnalysisDomains(w http.ResponseWriter, r *http.Requ
 	// Go through the cohort materialization cache so /domains
 	// inherits the same bulk preload the landing page gets: one IN
 	// query for all domain names instead of a per-row GetDomain.
-	data := s.latestMaterializationForCohort(cohort)
+	data := s.latestMaterializationForSnapshot(cohort, snapshot)
 	latest := data.latest
 
 	// Pre-compute the ASNs each domain's authoritative addresses resolve
@@ -281,13 +387,96 @@ type latestCohortMaterialization struct {
 	domainNames map[int64]string
 }
 
-// latestSummariesByDomain collapses multiple materialized summaries per domain
-// into the latest one, using the run's finished_at timestamp as the tiebreaker.
-func latestSummariesByDomain(summaries []AnalysisRunDomainSummary, runLookup interface {
+// cohortMaterializationLookup is the subset of the job store that
+// computeSnapshotMaterialization needs beyond the analysis read surface:
+// run metadata (finished_at / batch_id) and bulk domain-name lookup, both
+// kept narrow so test fakes don't have to implement the whole store.
+type cohortMaterializationLookup interface {
+	GetRun(id string) (Run, bool)
+	GetDomainNamesByIDs(ids []int64) map[int64]string
+	ListRuns(filter RunFilter) RunList
+}
+
+// computeSnapshotMaterialization is the snapshot-scoped counterpart of
+// the old cohort-wide compute: instead of collapsing every run into
+// "latest per domain", it starts from the exact set of runs attached to
+// the snapshot's batch. The resulting set has at most one run per
+// (cohort, domain) pair because the batch catalog enforces one run per
+// domain per batch.
+func computeSnapshotMaterialization(readStore AnalysisReadStore, runLookup cohortMaterializationLookup, cohortID int64, batchID string) latestCohortMaterialization {
+	runSet := runIDsForBatch(runLookup, batchID)
+	latest := collapseSummariesForRuns(readStore.ListAnalysisRunDomainSummariesByCohort(cohortID), runSet, runLookup)
+	domainIDs := make([]int64, 0, len(latest))
+	for _, pair := range latest {
+		domainIDs = append(domainIDs, pair.summary.DomainID)
+	}
+	domainNames := runLookup.GetDomainNamesByIDs(domainIDs)
+	// Drop parent-role endpoints (e.g. root servers recorded while traversing
+	// the delegation chain for a TLD). They are not the cohort zones' own
+	// authoritative servers and only pollute the nameserver/endpoint/ASN
+	// views. Role tagging happens at projection time in projector.go.
+	endpoints := filterAnalysisRunNSEndpointsByRunIDs(readStore.ListAnalysisRunNSEndpointsByCohort(cohortID), runSet)
+	authoritative := make([]AnalysisRunNameserverEndpoint, 0, len(endpoints))
+	authoritativeAddrIDs := map[int64]struct{}{}
+	for _, ep := range endpoints {
+		if ep.Role == "parent" {
+			continue
+		}
+		authoritative = append(authoritative, ep)
+		if ep.AddressID != 0 {
+			authoritativeAddrIDs[ep.AddressID] = struct{}{}
+		}
+	}
+	addressASNs := filterAnalysisRunAddressASNsByRunIDs(readStore.ListAnalysisRunAddressASNsByCohort(cohortID), runSet)
+	addressASNs = filterAnalysisRunAddressASNsToAuthoritative(addressASNs, authoritativeAddrIDs)
+	return latestCohortMaterialization{
+		latest:       latest,
+		latestRuns:   runSet,
+		endpoints:    authoritative,
+		addressASNs:  addressASNs,
+		domainASNs:   filterAnalysisRunDomainASNsByRunIDs(readStore.ListAnalysisRunDomainASNsByCohort(cohortID), runSet),
+		tagSummaries: filterAnalysisRunTagSummariesByRunIDs(readStore.ListAnalysisRunTagSummariesByCohort(cohortID), runSet),
+		domainFacts:  filterAnalysisRunDomainFactsByRunIDs(readStore.ListAnalysisRunDomainFactsByCohort(cohortID), runSet),
+		domainNames:  domainNames,
+	}
+}
+
+// runIDsForBatch returns the set of graduated run ids that belong to the
+// given batch, loaded in pages so a large batch doesn't blow the 100-row
+// default limit.
+func runIDsForBatch(runLookup cohortMaterializationLookup, batchID string) map[string]struct{} {
+	out := map[string]struct{}{}
+	if batchID == "" {
+		return out
+	}
+	offset := 0
+	for {
+		list := runLookup.ListRuns(RunFilter{BatchID: batchID, Limit: 500, Offset: offset})
+		for _, run := range list.Items {
+			out[run.ID] = struct{}{}
+		}
+		if len(list.Items) == 0 || offset+len(list.Items) >= list.Total {
+			break
+		}
+		offset += len(list.Items)
+	}
+	return out
+}
+
+// collapseSummariesForRuns filters cohort summaries down to the
+// snapshot's batch run set, then collapses any accidental
+// multiple-summary-per-domain rows to the freshest one. A batch has at
+// most one run per domain by construction, so this is typically
+// identity-on-filter; the collapse guards against historical data with
+// reprojected runs.
+func collapseSummariesForRuns(summaries []AnalysisRunDomainSummary, runSet map[string]struct{}, runLookup interface {
 	GetRun(id string) (Run, bool)
 }) []domainSummaryPair {
 	byDomain := map[int64]domainSummaryPair{}
 	for _, sum := range summaries {
+		if _, ok := runSet[sum.RunID]; !ok {
+			continue
+		}
 		var finishedAt time.Time
 		if run, ok := runLookup.GetRun(sum.RunID); ok {
 			finishedAt = run.FinishedAt
@@ -304,69 +493,6 @@ func latestSummariesByDomain(summaries []AnalysisRunDomainSummary, runLookup int
 	return out
 }
 
-// cohortMaterializationLookup is the subset of the job store that
-// computeLatestMaterializationForCohort needs beyond the analysis read
-// surface: run metadata (finished_at) and bulk domain-name lookup, both
-// kept narrow so test fakes don't have to implement the whole store.
-type cohortMaterializationLookup interface {
-	GetRun(id string) (Run, bool)
-	GetDomainNamesByIDs(ids []int64) map[int64]string
-}
-
-// computeLatestMaterializationForCohort runs the uncached four-table scan for a
-// cohort and collapses multiple runs per domain into the latest. Callers should
-// prefer (*Server).latestMaterializationForCohort, which wraps this with a
-// stamp-keyed cache.
-func computeLatestMaterializationForCohort(readStore AnalysisReadStore, runLookup cohortMaterializationLookup, cohortID int64) latestCohortMaterialization {
-	latest := latestSummariesByDomain(readStore.ListAnalysisRunDomainSummariesByCohort(cohortID), runLookup)
-	runIDs := make(map[string]struct{}, len(latest))
-	domainIDs := make([]int64, 0, len(latest))
-	for _, pair := range latest {
-		runIDs[pair.summary.RunID] = struct{}{}
-		domainIDs = append(domainIDs, pair.summary.DomainID)
-	}
-	domainNames := runLookup.GetDomainNamesByIDs(domainIDs)
-	// Drop parent-role endpoints (e.g. root servers recorded while traversing
-	// the delegation chain for a TLD). They are not the cohort zones' own
-	// authoritative servers and only pollute the nameserver/endpoint/ASN
-	// views. Role tagging happens at projection time in projector.go.
-	endpoints := filterAnalysisRunNSEndpointsByRunIDs(readStore.ListAnalysisRunNSEndpointsByCohort(cohortID), runIDs)
-	authoritative := make([]AnalysisRunNameserverEndpoint, 0, len(endpoints))
-	authoritativeAddrIDs := map[int64]struct{}{}
-	for _, ep := range endpoints {
-		if ep.Role == "parent" {
-			continue
-		}
-		authoritative = append(authoritative, ep)
-		// Synthetic delegation-only endpoints carry AddressID=0 (no
-		// matching analysis_addresses row). Don't fold that sentinel
-		// into the authoritative-address set used to filter
-		// addressASNs; it has no prefix/ASN linkage to carry anyway.
-		if ep.AddressID != 0 {
-			authoritativeAddrIDs[ep.AddressID] = struct{}{}
-		}
-	}
-	// Restrict addressASNs to the same authoritative-address set so the
-	// prefix / ASN views agree with the nameserver / endpoint views on
-	// what counts as "in the cohort". Without this filter the engine's
-	// parent-side address observations (root-server addresses, registry
-	// glue) leak into prefix-list / ASN-list counts and the prefix detail
-	// page produces chips that 404 on click (the endpoint detail handler
-	// only resolves authoritative endpoints). Matches the spirit of
-	// restrictDomainASNsToAuthoritative on the projector side.
-	addressASNs := filterAnalysisRunAddressASNsByRunIDs(readStore.ListAnalysisRunAddressASNsByCohort(cohortID), runIDs)
-	addressASNs = filterAnalysisRunAddressASNsToAuthoritative(addressASNs, authoritativeAddrIDs)
-	return latestCohortMaterialization{
-		latest:       latest,
-		latestRuns:   runIDs,
-		endpoints:    authoritative,
-		addressASNs:  addressASNs,
-		domainASNs:   filterAnalysisRunDomainASNsByRunIDs(readStore.ListAnalysisRunDomainASNsByCohort(cohortID), runIDs),
-		tagSummaries: filterAnalysisRunTagSummariesByRunIDs(readStore.ListAnalysisRunTagSummariesByCohort(cohortID), runIDs),
-		domainFacts:  filterAnalysisRunDomainFactsByRunIDs(readStore.ListAnalysisRunDomainFactsByCohort(cohortID), runIDs),
-		domainNames:  domainNames,
-	}
-}
 
 // filterAnalysisRunAddressASNsToAuthoritative drops any fact whose address
 // has no authoritative endpoint in the cohort. authoritativeAddrIDs is the

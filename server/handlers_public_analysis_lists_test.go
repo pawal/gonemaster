@@ -16,11 +16,19 @@ import (
 // analysisAPITestFixture bundles a server backed by a real SQL store plus
 // helpers for seeding analysis data.
 type analysisAPITestFixture struct {
-	t      *testing.T
-	srv    *Server
-	store  *SQLJobStore
-	cohort AnalysisCohort
+	t        *testing.T
+	srv      *Server
+	store    *SQLJobStore
+	cohort   AnalysisCohort
+	batchID  string
+	snapshot AnalysisCohortSnapshot
 }
+
+// testAnalysisFixtureBatchID is the snapshot-intent batch every fixture
+// seeds on construction. All graduated runs through the fixture attach to
+// this batch so the snapshot-scoped read path returns the seeded data
+// under the default auto-latest snapshot.
+const testAnalysisFixtureBatchID = "batch-fixture"
 
 func newAnalysisAPITestFixture(t *testing.T) *analysisAPITestFixture {
 	t.Helper()
@@ -48,7 +56,68 @@ func newAnalysisAPITestFixture(t *testing.T) *analysisAPITestFixture {
 	if err != nil {
 		t.Fatalf("upsert cohort: %v", err)
 	}
-	return &analysisAPITestFixture{t: t, srv: srv, store: store, cohort: cohort}
+	now := time.Date(2026, 4, 20, 12, 0, 0, 0, time.UTC)
+	if err := store.CreateBatch(Batch{
+		ID:             testAnalysisFixtureBatchID,
+		Tag:            "tld",
+		CreatedAt:      now,
+		SnapshotIntent: true,
+	}); err != nil {
+		t.Fatalf("create fixture batch: %v", err)
+	}
+	snap, err := store.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{
+		CohortID:    cohort.ID,
+		BatchID:     testAnalysisFixtureBatchID,
+		Slug:        "2026-04-20-fixture",
+		Label:       "Fixture",
+		CapturedAt:  now,
+		FirstRunAt:  now,
+		LastRunAt:   now,
+		Status:      AnalysisSnapshotStatusCaptured,
+		IsPublic:    true,
+		RunCount:    0,
+		DomainCount: 0,
+	})
+	if err != nil {
+		t.Fatalf("upsert fixture snapshot: %v", err)
+	}
+	return &analysisAPITestFixture{
+		t: t, srv: srv, store: store, cohort: cohort,
+		batchID:  testAnalysisFixtureBatchID,
+		snapshot: snap,
+	}
+}
+
+// seedAlternateSnapshot creates a second snapshot-intent batch plus a
+// captured public snapshot with a capturedAt older than the fixture
+// default, so the fixture snapshot stays auto-latest. Tests use it to
+// scope old vs. new runs into separate snapshots and verify that
+// ?snapshot= and auto-latest both pin to a specific materialization.
+func (f *analysisAPITestFixture) seedAlternateSnapshot(batchID, slug string, capturedAt time.Time) AnalysisCohortSnapshot {
+	f.t.Helper()
+	if err := f.store.CreateBatch(Batch{
+		ID:             batchID,
+		Tag:            "tld",
+		CreatedAt:      capturedAt,
+		SnapshotIntent: true,
+	}); err != nil {
+		f.t.Fatalf("create alternate batch: %v", err)
+	}
+	snap, err := f.store.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{
+		CohortID:   f.cohort.ID,
+		BatchID:    batchID,
+		Slug:       slug,
+		Label:      slug,
+		CapturedAt: capturedAt,
+		FirstRunAt: capturedAt,
+		LastRunAt:  capturedAt,
+		Status:     AnalysisSnapshotStatusCaptured,
+		IsPublic:   true,
+	})
+	if err != nil {
+		f.t.Fatalf("upsert alternate snapshot: %v", err)
+	}
+	return snap
 }
 
 // seedDomainSummary writes one analysis_run_domain_summary row and ensures
@@ -61,7 +130,8 @@ func (f *analysisAPITestFixture) seedDomainSummary(domainName, runID string, fin
 	}
 	insertTestRun(f.t, f.store, Run{
 		ID: runID, DomainID: domain.ID, Domain: domainName,
-		Status: JobSucceeded, CreatedAt: finishedAt.Add(-time.Minute),
+		BatchID: f.batchID,
+		Status:  JobSucceeded, CreatedAt: finishedAt.Add(-time.Minute),
 		StartedAt: finishedAt.Add(-time.Minute), FinishedAt: finishedAt,
 		WorstLevel: worstLevel,
 	})

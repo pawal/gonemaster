@@ -12,6 +12,12 @@ import (
 // seedEndpoint inserts one (run, domain, nameserver, address) endpoint row
 // plus the normalized entity rows. Runs and domains are upserted as needed.
 func (f *analysisAPITestFixture) seedEndpoint(runID, domainName, nameserverName, address, family string, finishedAt time.Time, asn int64, prefix string) {
+	f.seedEndpointInBatch(f.batchID, runID, domainName, nameserverName, address, family, finishedAt, asn, prefix)
+}
+
+// seedEndpointInBatch is seedEndpoint with an explicit batch id. Used by
+// tests that need to scope runs into different snapshots.
+func (f *analysisAPITestFixture) seedEndpointInBatch(batchID, runID, domainName, nameserverName, address, family string, finishedAt time.Time, asn int64, prefix string) {
 	f.t.Helper()
 	domain, err := f.store.GetOrCreateDomain(domainName)
 	if err != nil {
@@ -20,7 +26,8 @@ func (f *analysisAPITestFixture) seedEndpoint(runID, domainName, nameserverName,
 	if _, ok := f.store.GetRun(runID); !ok {
 		insertTestRun(f.t, f.store, Run{
 			ID: runID, DomainID: domain.ID, Domain: domainName,
-			Status: JobSucceeded, CreatedAt: finishedAt.Add(-time.Minute),
+			BatchID: batchID,
+			Status:  JobSucceeded, CreatedAt: finishedAt.Add(-time.Minute),
 			StartedAt: finishedAt.Add(-time.Minute), FinishedAt: finishedAt,
 		})
 	}
@@ -97,36 +104,53 @@ func (f *analysisAPITestFixture) seedEndpoint(runID, domainName, nameserverName,
 	}
 }
 
-func TestPublicAnalysisEntitiesUseLatestRunPerDomain(t *testing.T) {
+// TestPublicAnalysisEntitiesScopedToSnapshot verifies that the public
+// read path is pinned to the resolved snapshot: the fixture's default
+// (auto-latest captured) snapshot shows only its own batch's facts, and
+// an explicit ?snapshot=<older-slug> flips to the older snapshot.
+func TestPublicAnalysisEntitiesScopedToSnapshot(t *testing.T) {
 	f := newAnalysisAPITestFixture(t)
 	t1 := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
 	t2 := t1.Add(time.Hour)
 
-	f.seedEndpoint("run-old", "alpha.example", "ns-old.example", "192.0.2.10", "ipv4", t1, 64500, "192.0.2.0/24")
-	f.seedEndpoint("run-new", "alpha.example", "ns-new.example", "198.51.100.20", "ipv4", t2, 64501, "198.51.100.0/24")
+	// Older snapshot: captured earlier, not auto-latest.
+	older := f.seedAlternateSnapshot("batch-old", "2026-04-17-old", t1.Add(-time.Hour))
+	f.seedEndpointInBatch(older.BatchID, "run-old", "alpha.example", "ns-old.example",
+		"192.0.2.10", "ipv4", t1, 64500, "192.0.2.0/24")
+
+	// Default snapshot (auto-latest): the fixture's own batch.
+	f.seedEndpointInBatch(f.batchID, "run-new", "alpha.example", "ns-new.example",
+		"198.51.100.20", "ipv4", t2, 64501, "198.51.100.0/24")
 
 	nameservers := decodeJSON[PublicAnalysisListResponse[PublicAnalysisNameserverView]](
 		t, getPublic(t, f.srv, "/pub/api/v1/analysis/nameservers"))
 	if nameservers.Total != 1 || nameservers.Items[0].Nameserver != "ns-new.example" {
-		t.Fatalf("expected only latest nameserver, got %+v", nameservers)
+		t.Fatalf("auto-latest should expose only the newer snapshot, got %+v", nameservers)
+	}
+
+	// Explicit ?snapshot= flips to the older snapshot.
+	oldNameservers := decodeJSON[PublicAnalysisListResponse[PublicAnalysisNameserverView]](
+		t, getPublic(t, f.srv, "/pub/api/v1/analysis/nameservers?snapshot=2026-04-17-old"))
+	if oldNameservers.Total != 1 || oldNameservers.Items[0].Nameserver != "ns-old.example" {
+		t.Fatalf("explicit slug should pin to older snapshot, got %+v", oldNameservers)
 	}
 
 	endpoints := decodeJSON[PublicAnalysisListResponse[PublicAnalysisEndpointView]](
 		t, getPublic(t, f.srv, "/pub/api/v1/analysis/endpoints"))
 	if endpoints.Total != 1 || endpoints.Items[0].Address != "198.51.100.20" {
-		t.Fatalf("expected only latest endpoint, got %+v", endpoints)
+		t.Fatalf("auto-latest endpoints: got %+v", endpoints)
 	}
 
 	asns := decodeJSON[PublicAnalysisListResponse[PublicAnalysisASNView]](
 		t, getPublic(t, f.srv, "/pub/api/v1/analysis/asns"))
 	if asns.Total != 1 || asns.Items[0].ASN != 64501 {
-		t.Fatalf("expected only latest ASN, got %+v", asns)
+		t.Fatalf("auto-latest ASNs: got %+v", asns)
 	}
 
 	prefixes := decodeJSON[PublicAnalysisListResponse[PublicAnalysisPrefixView]](
 		t, getPublic(t, f.srv, "/pub/api/v1/analysis/prefixes"))
 	if prefixes.Total != 1 || prefixes.Items[0].Prefix != "198.51.100.0/24" {
-		t.Fatalf("expected only latest prefix, got %+v", prefixes)
+		t.Fatalf("auto-latest prefixes: got %+v", prefixes)
 	}
 }
 

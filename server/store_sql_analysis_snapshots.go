@@ -350,6 +350,26 @@ func (s *SQLJobStore) ListPendingAnalysisCohortSnapshots() []AnalysisCohortSnaps
 	return out
 }
 
+// DeleteAnalysisCohortSnapshot hard-deletes one snapshot row and its
+// aggregates by id. Used by the admin purge action; a regular retire
+// goes through UpsertAnalysisCohortSnapshot with status=retired and
+// leaves the fact rows untouched for undo.
+func (s *SQLJobStore) DeleteAnalysisCohortSnapshot(id int64) error {
+	if _, err := s.db.Exec(
+		fmt.Sprintf(`DELETE FROM analysis_cohort_snapshot_aggregates WHERE snapshot_id = %s`, s.ph(1)),
+		id,
+	); err != nil {
+		return fmt.Errorf("delete aggregates for snapshot %d: %w", id, err)
+	}
+	if _, err := s.db.Exec(
+		fmt.Sprintf(`DELETE FROM analysis_cohort_snapshots WHERE id = %s`, s.ph(1)),
+		id,
+	); err != nil {
+		return fmt.Errorf("delete snapshot %d: %w", id, err)
+	}
+	return nil
+}
+
 // ClearAnalysisCohortSnapshots removes all snapshot rows and their aggregates
 // for one cohort. Paired with ClearAnalysisCohortMaterialization so a cohort
 // rebuild starts with no stale snapshots pointing at facts that were just

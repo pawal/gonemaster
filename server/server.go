@@ -237,6 +237,8 @@ func (s *Server) routes() {
 
 	apiMux.HandleFunc("POST /analysis/cohorts/{id}/rebuild", s.handleAnalysisCohortRebuild)
 	apiMux.HandleFunc("POST /analysis/cohorts/{id}/clear", s.handleAnalysisCohortClear)
+	apiMux.HandleFunc("POST /analysis/cohorts/{id}/snapshots/{slug}/rematerialize", s.handleAnalysisCohortSnapshotRematerialize)
+	apiMux.HandleFunc("/analysis/cohorts/{id}/snapshots/{slug}", s.handleAnalysisCohortSnapshotByID)
 	apiMux.HandleFunc("/analysis/cohorts/{id}", s.handleAnalysisCohortByID)
 	apiMux.HandleFunc("/analysis/cohorts", s.handleAnalysisCohorts)
 	apiMux.HandleFunc("/analysis/status", s.handleAnalysisStatus)

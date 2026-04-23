@@ -726,10 +726,12 @@ func (p *Projector) extractAddressFacts(input RunInput) []extractedAddressFact {
 			}
 			store(*fact)
 		}
-		// CN04_*_SAME_PREFIX entries carry a single prefix at the top level
-		// and the set of addresses that share it in a nested `servers` list.
-		// The gonemaster engine never emits (address, prefix) in one flat row,
-		// so unpack the nested structure here. See plans/tld-analysis.md.
+		// CN04_*_SAME_PREFIX entries carry a single prefix at the top
+		// level and the set of addresses that share it in a nested
+		// `servers` list. The engine never emits (address, prefix) in
+		// one flat row, so unpack the nested structure here: each
+		// server address in the list inherits the top-level prefix,
+		// which is how per-address prefix facts land in the projection.
 		prefixes := stringSliceArg(entry.Args, "prefixes")
 		if len(prefixes) == 0 {
 			continue

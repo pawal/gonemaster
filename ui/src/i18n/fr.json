@@ -384,7 +384,7 @@
   "settings_subtab_profiles": "Profils",
   "settings_subtab_scoring": "Notation",
   "settings_scoring_heading": "Notation",
-  "settings_scoring_placeholder": "L'éditeur de configuration de notation sera ici. Déploiement prévu : voir plans/scoring-settings.md.",
+  "settings_scoring_placeholder": "L'éditeur de configuration de notation sera ici.",
   "settings_profiles_heading": "Profils",
   "settings_profiles_subtitle": "Parcourir le profil par défaut du serveur et les profils enregistrés, voir où ils sont utilisés et modifier les brouillons en toute sécurité.",
   "analysis_cohorts_heading": "Cohortes d'analyse",

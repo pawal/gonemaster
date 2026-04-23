@@ -20,7 +20,7 @@
   "settings_subtab_profiles": "Profiles",
   "settings_subtab_scoring": "Scoring",
   "settings_scoring_heading": "Scoring",
-  "settings_scoring_placeholder": "Scoring configuration editor will live here. Planned rollout: see plans/scoring-settings.md.",
+  "settings_scoring_placeholder": "Scoring configuration editor will live here.",
   "settings_profiles_heading": "Profiles",
   "settings_profiles_subtitle": "Browse the server default and stored profiles, see where they are used, and edit drafts safely.",
   "analysis_cohorts_heading": "Analysis Cohorts",

@@ -384,7 +384,7 @@
   "settings_subtab_profiles": "Profiler",
   "settings_subtab_scoring": "Poängsättning",
   "settings_scoring_heading": "Poängsättning",
-  "settings_scoring_placeholder": "Redigerare för poängkonfiguration kommer att finnas här. Planerad utrullning: se plans/scoring-settings.md.",
+  "settings_scoring_placeholder": "Redigerare för poängkonfiguration kommer att finnas här.",
   "settings_profiles_heading": "Profiler",
   "settings_profiles_subtitle": "Bläddra bland serverns defaultprofil och lagrade profiler, se var de används och redigera utkast säkert.",
   "analysis_cohorts_heading": "Analyskohorter",

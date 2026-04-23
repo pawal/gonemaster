@@ -384,7 +384,7 @@
   "settings_subtab_profiles": "Profiilit",
   "settings_subtab_scoring": "Pisteytys",
   "settings_scoring_heading": "Pisteytys",
-  "settings_scoring_placeholder": "Pisteytysasetusten editori tulee tähän. Suunniteltu julkaisu: katso plans/scoring-settings.md.",
+  "settings_scoring_placeholder": "Pisteytysasetusten editori tulee tähän.",
   "settings_profiles_heading": "Profiilit",
   "settings_profiles_subtitle": "Selaa palvelimen oletusprofiilia ja tallennettuja profiileja, katso missä niitä käytetään ja muokkaa luonnoksia turvallisesti.",
   "analysis_cohorts_heading": "Analyysikohortit",

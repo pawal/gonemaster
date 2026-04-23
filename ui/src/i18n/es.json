@@ -384,7 +384,7 @@
   "settings_subtab_profiles": "Perfiles",
   "settings_subtab_scoring": "Puntuación",
   "settings_scoring_heading": "Puntuación",
-  "settings_scoring_placeholder": "El editor de configuración de puntuación irá aquí. Despliegue previsto: consulta plans/scoring-settings.md.",
+  "settings_scoring_placeholder": "El editor de configuración de puntuación irá aquí.",
   "settings_profiles_heading": "Perfiles",
   "settings_profiles_subtitle": "Explorar el perfil predeterminado del servidor y los perfiles almacenados, ver dónde se utilizan y editar borradores de forma segura.",
   "analysis_cohorts_heading": "Cohortes de análisis",

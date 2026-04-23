@@ -384,7 +384,7 @@
   "settings_subtab_profiles": "プロファイル",
   "settings_subtab_scoring": "スコアリング",
   "settings_scoring_heading": "スコアリング",
-  "settings_scoring_placeholder": "スコアリング設定エディタはここに配置されます。ロールアウト予定: plans/scoring-settings.md を参照してください。",
+  "settings_scoring_placeholder": "スコアリング設定エディタはここに配置されます。",
   "settings_profiles_heading": "プロファイル",
   "settings_profiles_subtitle": "サーバーのデフォルトプロファイルと保存済みプロファイルを閲覧し、使用状況を確認し、安全に下書きを編集できます。",
   "analysis_cohorts_heading": "分析コホート",

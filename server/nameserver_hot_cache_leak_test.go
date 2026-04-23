@@ -96,10 +96,10 @@ func TestHotCacheMemoryBounded(t *testing.T) {
 	}
 }
 
-// TestHotCacheHeapGrowthWithForcedGC mirrors the memprobe pattern from
-// plans/server-memleak.md: run many jobs sequentially, call runtime.GC() after
-// each, and check whether HeapInuse stabilises. If the heap grows linearly
-// with job count, we have a true retention leak (not GC lag).
+// TestHotCacheHeapGrowthWithForcedGC mirrors a memprobe pattern: run
+// many jobs sequentially, call runtime.GC() after each, and check
+// whether HeapInuse stabilises. If the heap grows linearly with job
+// count, we have a true retention leak (not GC lag).
 func TestHotCacheHeapGrowthWithForcedGC(t *testing.T) {
 	if testing.Short() {
 		t.Skip("long-running memprobe")

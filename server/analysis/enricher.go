@@ -100,7 +100,10 @@ func (e *AsnlookupEnricher) EnrichAddress(ctx context.Context, ip string) (Addre
 			// Multi-origin prefixes (common for anycast DNS fleets) return
 			// several origin ASes; pick the numerically smallest to keep
 			// projection deterministic without losing ASN attribution.
-			// A richer multi-valued model is tracked in plans/tld-analysis.md.
+			// A richer multi-valued model (one fact row per origin AS,
+			// with a "multi_origin" marker on the per-address fact) is a
+			// follow-up once the read path can render multi-AS endpoints
+			// without cluttering the single-AS common case.
 			smallest := result.ASNs[0]
 			for _, a := range result.ASNs[1:] {
 				if a < smallest {

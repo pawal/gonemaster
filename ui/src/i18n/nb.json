@@ -384,7 +384,7 @@
   "settings_subtab_profiles": "Profiler",
   "settings_subtab_scoring": "Poengsetting",
   "settings_scoring_heading": "Poengsetting",
-  "settings_scoring_placeholder": "Redigering av poengkonfigurasjon kommer her. Planlagt utrulling: se plans/scoring-settings.md.",
+  "settings_scoring_placeholder": "Redigering av poengkonfigurasjon kommer her.",
   "settings_profiles_heading": "Profiler",
   "settings_profiles_subtitle": "Bla gjennom serverens defaultprofil og lagrede profiler, se hvor de brukes, og rediger utkast trygt.",
   "analysis_cohorts_heading": "Analysekohorter",

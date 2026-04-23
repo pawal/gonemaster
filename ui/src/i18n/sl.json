@@ -384,7 +384,7 @@
   "settings_subtab_profiles": "Profili",
   "settings_subtab_scoring": "Točkovanje",
   "settings_scoring_heading": "Točkovanje",
-  "settings_scoring_placeholder": "Urejevalnik konfiguracije točkovanja bo tukaj. Načrtovana uvedba: glejte plans/scoring-settings.md.",
+  "settings_scoring_placeholder": "Urejevalnik konfiguracije točkovanja bo tukaj.",
   "settings_profiles_heading": "Profili",
   "settings_profiles_subtitle": "Pregledujte shranjene profile, preverite, kje se uporabljajo, ter pripravite ustvarjanje, podvajanje ali brisanje.",
   "analysis_cohorts_heading": "Analitične kohorte",

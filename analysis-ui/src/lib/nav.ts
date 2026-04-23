@@ -20,7 +20,13 @@ export const navItems: NavItem[] = [
   // per-address prefix links).
   { href: "/endpoints", label: "Addresses", end: false },
   { href: "/asns", label: "ASNs", end: false },
-  { href: "/tags", label: "Tags", end: false }
+  { href: "/tags", label: "Tags", end: false },
+  // Trends and diff live alongside the list views — both are cohort-
+  // scoped and snapshot-aware. The snapshot-intent batch model makes
+  // the time-series dimension meaningful for the first time, so these
+  // tabs are first-class navigation rather than buried settings.
+  { href: "/trends", label: "Trends", end: false },
+  { href: "/diff", label: "Diff", end: false }
 ];
 
 export function isActive(pathname: string, item: NavItem): boolean {

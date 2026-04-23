@@ -1,19 +1,28 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
-  import type { Cohort } from "$lib/api";
+  import type { Cohort, SnapshotListEntry } from "$lib/api";
   import { applyFilterToParams, searchToString, type FilterKey } from "$lib/filters";
 
   type Props = {
     cohorts?: Cohort[];
     selectorEnabled?: boolean;
     showSearch?: boolean;
+    snapshots?: SnapshotListEntry[];
+    defaultSnapshotSlug?: string;
   };
 
-  let { cohorts = [], selectorEnabled = false, showSearch = true }: Props = $props();
+  let {
+    cohorts = [],
+    selectorEnabled = false,
+    showSearch = true,
+    snapshots = [],
+    defaultSnapshotSlug = ""
+  }: Props = $props();
 
   const params = $derived(page.url.searchParams);
   const datasetTag = $derived(params.get("dataset_tag") ?? "");
+  const snapshot = $derived(params.get("snapshot") ?? "");
   const search = $derived(params.get("search") ?? "");
 
   function patch(updates: Partial<Record<FilterKey, string>>) {
@@ -29,22 +38,54 @@
     patch({ [key]: value });
   }
 
+  // Changing the cohort drops any snapshot pin — slugs are scoped to one
+  // cohort, and carrying the old slug across cohort changes would either
+  // 404 or silently fall back to the new cohort's auto-latest. Neither
+  // is useful, so clear the pin deliberately.
+  function onCohortChange(value: string) {
+    patch({ dataset_tag: value, snapshot: "" });
+  }
+
   const showCohort = $derived(selectorEnabled && cohorts.length > 1);
-  const visible = $derived(showCohort || showSearch);
+  // Only render the snapshot selector when the cohort has more than one
+  // captured snapshot to pick from. A single-snapshot cohort already has
+  // an obvious "current" view; adding a selector with one option just
+  // clutters the filter bar.
+  const showSnapshot = $derived(snapshots.length > 1);
+  const visible = $derived(showCohort || showSnapshot || showSearch);
 </script>
 
 {#if visible}
-  <section class="filter-bar" aria-label="Cohort and search">
+  <section class="filter-bar" aria-label="Cohort, snapshot, and search">
     {#if showCohort}
       <label class="filter-field">
         <span>Cohort</span>
         <select
           value={datasetTag}
-          onchange={(e) => onChange("dataset_tag", e.currentTarget.value)}
+          onchange={(e) => onCohortChange(e.currentTarget.value)}
         >
           <option value="">Default</option>
           {#each cohorts as cohort (cohort.dataset_tag)}
             <option value={cohort.dataset_tag}>{cohort.label}</option>
+          {/each}
+        </select>
+      </label>
+    {/if}
+
+    {#if showSnapshot}
+      <label class="filter-field">
+        <span>Snapshot</span>
+        <select
+          value={snapshot}
+          onchange={(e) => onChange("snapshot", e.currentTarget.value)}
+        >
+          <option value="">
+            {defaultSnapshotSlug ? `Latest (${defaultSnapshotSlug})` : "Latest"}
+          </option>
+          {#each snapshots as snap (snap.slug)}
+            <option value={snap.slug}>
+              {snap.label ? `${snap.label} — ${snap.slug}` : snap.slug}
+            </option>
           {/each}
         </select>
       </label>

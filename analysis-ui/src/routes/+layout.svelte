@@ -42,11 +42,12 @@
     return url || "/";
   });
 
-  // Forward the active cohort across nav-bar clicks so navigating between
-  // tabs doesn't drop the user back to the default cohort. Page-specific
-  // params like `sort`, `limit`, `offset`, `search` are intentionally not
-  // propagated — they only make sense within one list page.
-  const FORWARDED_PARAMS = ["dataset_tag"];
+  // Forward the active cohort and snapshot pin across nav-bar clicks so
+  // navigating between tabs doesn't drop the user back to auto-latest of
+  // the default cohort. Page-specific params like `sort`, `limit`,
+  // `offset`, `search` are intentionally not propagated — they only make
+  // sense within one list page.
+  const FORWARDED_PARAMS = ["dataset_tag", "snapshot"];
 
   const navQuery = $derived.by(() => {
     const source = page.url.searchParams;

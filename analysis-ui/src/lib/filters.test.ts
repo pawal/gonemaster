@@ -27,6 +27,27 @@ describe("filters", () => {
     expect(filterFromURL(url)).toEqual({ dataset_tag: "tld" });
   });
 
+  it("filterFromURL picks up snapshot so ?snapshot= reaches the API", () => {
+    // Every entity chip preserves the snapshot pin across navigation;
+    // the filter loader is where that slug actually becomes a server
+    // filter. Dropping it would silently flip the page back to
+    // auto-latest and hide the bug until an operator noticed the
+    // numbers drifting.
+    const url = new URL("http://x/?dataset_tag=tld&snapshot=2026-04-20");
+    expect(filterFromURL(url)).toEqual({
+      dataset_tag: "tld",
+      snapshot: "2026-04-20"
+    });
+  });
+
+  it("applyFilterToParams round-trips snapshot alongside dataset_tag", () => {
+    const initial = new URLSearchParams("dataset_tag=tld");
+    const next = applyFilterToParams(initial, { snapshot: "2026-04-20" });
+    expect(next.get("snapshot")).toBe("2026-04-20");
+    const cleared = applyFilterToParams(next, { snapshot: "" });
+    expect(cleared.get("snapshot")).toBeNull();
+  });
+
   it("applyFilterToParams sets and deletes keys", () => {
     const initial = new URLSearchParams("dataset_tag=tld&search=nic");
     const next = applyFilterToParams(initial, { dataset_tag: "media", search: "" });

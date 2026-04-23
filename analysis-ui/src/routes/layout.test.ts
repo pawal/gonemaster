@@ -89,4 +89,41 @@ describe("+layout.load", () => {
     expect(data.resolvedCohort).toBeNull();
     expect(data.catalogError).toMatch(/HTTP 500/);
   });
+
+  it("loads the resolved cohort's snapshot list for the FilterBar selector", async () => {
+    const catalog: CatalogResponse = {
+      default_tag: "tld",
+      cohorts: [
+        {
+          dataset_tag: "tld",
+          label: "TLD",
+          is_default: true,
+          default_snapshot: { slug: "2026-04-20", run_count: 1, domain_count: 1 },
+          snapshot_count: 2
+        }
+      ],
+      selector_enabled: true,
+      backend_supported: true
+    };
+    const fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : (input as URL).toString();
+      if (url.endsWith("/catalog")) return stubResponse(catalog);
+      if (url.includes("/cohorts/tld/snapshots")) {
+        return stubResponse({
+          dataset_tag: "tld",
+          label: "TLD",
+          snapshots: [
+            { slug: "2026-04-20", captured_at: "2026-04-20T00:00:00Z", run_count: 1, domain_count: 1, is_default: true },
+            { slug: "2026-03-20", captured_at: "2026-03-20T00:00:00Z", run_count: 1, domain_count: 1 }
+          ]
+        });
+      }
+      return stubResponse({ error: "unrouted" }, false);
+    }) as unknown as typeof globalThis.fetch;
+
+    const data = await load(event(fetch as unknown as FetchMock));
+    expect(data.snapshots.length).toBe(2);
+    expect(data.snapshots[0].slug).toBe("2026-04-20");
+    expect(data.defaultSnapshotSlug).toBe("2026-04-20");
+  });
 });

@@ -8,6 +8,8 @@
 // server support without listing the key here drops the filter on page
 // load. The list and the server must agree.
 //   - dataset_tag: pins the cohort across tab changes.
+//   - snapshot:    pins the cohort snapshot across tab changes so a
+//                  shared URL always resolves to the same materialization.
 //   - search:      substring match on list endpoints.
 //   - worst_level: exact severity bucket filter on /domains (linked from
 //                  the overview health bar).
@@ -18,6 +20,7 @@ import type { AnalysisFilter } from "$lib/api";
 
 const FILTER_KEYS = [
   "dataset_tag",
+  "snapshot",
   "search",
   "worst_level",
   "grade"

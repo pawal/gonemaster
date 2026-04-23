@@ -4,12 +4,28 @@
 
 export const PUBLIC_BASE = "/pub/api/v1/analysis";
 
+export type SnapshotView = {
+  slug: string;
+  label?: string;
+  captured_at?: string;
+  run_count: number;
+  domain_count: number;
+  profile_name?: string;
+};
+
 export type Cohort = {
   dataset_tag: string;
   label: string;
   description?: string;
   is_default: boolean;
   sort_order?: number;
+  // default_snapshot is the slug auto-latest resolution picks when
+  // ?snapshot= is omitted; undefined for cohorts with no captured
+  // public snapshot yet (UI renders the no_snapshot empty state).
+  default_snapshot?: SnapshotView;
+  // Total number of captured public snapshots in the cohort. Drives
+  // whether the snapshot selector chip is worth rendering.
+  snapshot_count?: number;
 };
 
 export type CatalogResponse = {
@@ -26,7 +42,17 @@ export type OverviewResponse = {
   materialization_status: string;
   last_materialized_at?: string;
   is_default: boolean;
+  // Snapshot resolution tokens: snapshot carries the current pin's
+  // metadata; status = "no_snapshot" when the cohort has no captured
+  // public snapshot so the UI renders an empty-state panel.
+  snapshot?: SnapshotView;
+  status?: string;
 };
+
+// Status token emitted by the public analysis API when a cohort has no
+// captured public snapshot yet. Centralised here so UI code keys on a
+// constant instead of a loose string comparison.
+export const ANALYSIS_STATUS_NO_SNAPSHOT = "no_snapshot";
 
 export type ListResponse<T> = {
   items: T[];
@@ -201,6 +227,7 @@ export type TagDetail = {
 
 export type AnalysisFilter = {
   dataset_tag?: string;
+  snapshot?: string;
   search?: string;
   limit?: number;
   offset?: number;
@@ -208,6 +235,73 @@ export type AnalysisFilter = {
   min_level?: string;
   worst_level?: string;
   grade?: string;
+};
+
+// Snapshot-specific response shapes consumed by the snapshot selector,
+// trends line charts, and diff tables.
+export type SnapshotListEntry = {
+  slug: string;
+  label?: string;
+  description?: string;
+  captured_at: string;
+  first_run_at?: string;
+  last_run_at?: string;
+  run_count: number;
+  domain_count: number;
+  profile_name?: string;
+  is_default?: boolean;
+};
+
+export type SnapshotListResponse = {
+  dataset_tag: string;
+  label: string;
+  snapshots: SnapshotListEntry[];
+};
+
+export type SnapshotDetail = {
+  dataset_tag: string;
+  slug: string;
+  label?: string;
+  description?: string;
+  captured_at: string;
+  first_run_at?: string;
+  last_run_at?: string;
+  run_count: number;
+  domain_count: number;
+  profile_name?: string;
+  is_default: boolean;
+  aggregates?: Record<string, unknown>;
+};
+
+export type TrendPoint = {
+  slug: string;
+  captured_at: string;
+  payload: unknown;
+};
+
+export type TrendResponse = {
+  dataset_tag: string;
+  category: string;
+  points: TrendPoint[];
+};
+
+export type DiffEntry = {
+  domain: string;
+  from_grade?: string;
+  to_grade?: string;
+  from_level?: string;
+  to_level?: string;
+  worst_level?: string;
+};
+
+export type DiffResponse = {
+  dataset_tag: string;
+  from_slug: string;
+  to_slug: string;
+  added: DiffEntry[];
+  removed: DiffEntry[];
+  grade_changed: DiffEntry[];
+  level_changed: DiffEntry[];
 };
 
 export type FetchLike = typeof fetch;
@@ -303,3 +397,42 @@ export const getPrefixDetail = (prefix: string, filter: AnalysisFilter = {}, fet
 
 export const getTagDetail = (tag: string, filter: AnalysisFilter = {}, fetchFn: FetchLike = fetch) =>
   getJSON<TagDetail>(`/tags/${encodeURIComponent(tag)}`, filter, fetchFn);
+
+// ── Snapshot surface ──────────────────────────────────────────────────────
+
+export const listSnapshots = (datasetTag: string, fetchFn: FetchLike = fetch) =>
+  getJSON<SnapshotListResponse>(`/cohorts/${encodeURIComponent(datasetTag)}/snapshots`, {}, fetchFn);
+
+export const getSnapshotDetail = (datasetTag: string, slug: string, fetchFn: FetchLike = fetch) =>
+  getJSON<SnapshotDetail>(
+    `/cohorts/${encodeURIComponent(datasetTag)}/snapshots/${encodeURIComponent(slug)}`,
+    {},
+    fetchFn
+  );
+
+// getTrends fetches one time series of aggregate payloads across the
+// cohort's captured public snapshots. Category defaults to
+// severity_distribution server-side; passing an explicit category lets
+// the UI switch charts (grade_distribution, signed, dnskey_algo, …).
+export const getTrends = (
+  datasetTag: string,
+  filter: { category?: string; from?: string; to?: string } = {},
+  fetchFn: FetchLike = fetch
+) =>
+  getJSON<TrendResponse>(
+    `/cohorts/${encodeURIComponent(datasetTag)}/trends`,
+    filter as AnalysisFilter,
+    fetchFn
+  );
+
+export const getDiff = (
+  datasetTag: string,
+  from: string,
+  to: string,
+  fetchFn: FetchLike = fetch
+) =>
+  getJSON<DiffResponse>(
+    `/cohorts/${encodeURIComponent(datasetTag)}/diff`,
+    { from, to } as AnalysisFilter & { from: string; to: string },
+    fetchFn
+  );

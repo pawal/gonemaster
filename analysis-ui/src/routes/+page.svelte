@@ -116,8 +116,23 @@
 <FilterBar
   cohorts={layoutData.catalog?.cohorts ?? []}
   selectorEnabled={layoutData.catalog?.selector_enabled ?? false}
+  snapshots={layoutData.snapshots ?? []}
+  defaultSnapshotSlug={layoutData.defaultSnapshotSlug ?? ""}
   showSearch={false}
 />
+
+{#if data.snapshot}
+  <p class="snapshot-pill" aria-label="Active snapshot">
+    Snapshot:
+    <span class="snapshot-slug">{data.snapshot.slug}</span>
+    {#if data.snapshot.label}
+      <span class="snapshot-label">({data.snapshot.label})</span>
+    {/if}
+    {#if formatTimestamp(data.snapshot.captured_at)}
+      <span class="snapshot-captured">Captured {formatTimestamp(data.snapshot.captured_at)}</span>
+    {/if}
+  </p>
+{/if}
 
 {#if layoutData.catalogError}
   <section class="card">
@@ -138,6 +153,17 @@
       <li>Toggle <strong>Public</strong> on for the cohort you want to expose here.</li>
       <li>Optionally click <strong>Make default</strong> so it becomes the default view.</li>
     </ol>
+  </section>
+{:else if data.noSnapshot}
+  <section class="card empty-state">
+    <h2>No snapshot has been captured yet</h2>
+    <p class="hint">
+      This cohort is published but the projector hasn't captured a snapshot yet.
+      A snapshot is formed when an admin submits a snapshot-intent batch and
+      every job in the batch graduates. Run a snapshot from the admin UI
+      (<strong>Settings - Analysis - Cohorts</strong>) to create the first
+      snapshot, or wait for the next scheduled rollover.
+    </p>
   </section>
 {:else if data.detailError}
   <section class="card">
@@ -602,5 +628,31 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
+  }
+
+  .snapshot-pill {
+    margin: 0;
+    padding: 6px var(--space-3);
+    background: var(--surface-2);
+    color: var(--on-surface-2);
+    border-radius: 999px;
+    font-size: var(--text-sm);
+    display: inline-flex;
+    align-items: baseline;
+    gap: 8px;
+    align-self: flex-start;
+  }
+  .snapshot-slug {
+    font-family: var(--mono);
+    font-weight: 600;
+  }
+  .snapshot-label {
+    color: var(--ink-2);
+  }
+  .snapshot-captured {
+    color: var(--ink-2);
+    font-size: var(--text-xs);
+    border-left: 1px solid var(--border);
+    padding-left: 8px;
   }
 </style>

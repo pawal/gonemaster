@@ -4,14 +4,18 @@ import {
   buildQuery,
   getCatalog,
   getCohortDetail,
+  getDiff,
   getDomainDetail,
   getOverview,
   getPrefixDetail,
+  getSnapshotDetail,
+  getTrends,
   listASNs,
   listDomains,
   listEndpoints,
   listNameservers,
   listPrefixes,
+  listSnapshots,
   listTags
 } from "./api";
 
@@ -72,12 +76,41 @@ describe("analysis API client", () => {
     await listTags({}, stub);
     await getDomainDetail("example.com", {}, stub);
     await getPrefixDetail("192.0.2.0/24", {}, stub);
+    await listSnapshots("tld", stub);
+    await getSnapshotDetail("tld", "2026-04-20", stub);
+    await getTrends("tld", {}, stub);
+    await getDiff("tld", "2026-03-01", "2026-04-01", stub);
 
     expect(calls.length).toBeGreaterThan(0);
     for (const { url } of calls) {
       expect(url.startsWith(PUBLIC_BASE), `leaked non-public URL: ${url}`).toBe(true);
       expect(url.startsWith("/api/v1/"), `leaked admin URL: ${url}`).toBe(false);
     }
+  });
+
+  it("forwards ?snapshot= through list helpers so entity links preserve pins", async () => {
+    const { stub, calls } = recorder();
+    await listDomains({ dataset_tag: "tld", snapshot: "2026-04-20" }, stub);
+    await getDomainDetail("example.com", { snapshot: "2026-04-20" }, stub);
+    expect(calls.length).toBe(2);
+    for (const { url } of calls) {
+      expect(url).toContain("snapshot=2026-04-20");
+    }
+  });
+
+  it("snapshot endpoints target the cohort-scoped paths", async () => {
+    const { stub, calls } = recorder();
+    await listSnapshots("tld", stub);
+    await getSnapshotDetail("tld", "2026-04-20", stub);
+    await getTrends("tld", { category: "grade_distribution" }, stub);
+    await getDiff("tld", "2026-03-01", "2026-04-01", stub);
+    expect(calls[0].url).toContain("/cohorts/tld/snapshots");
+    expect(calls[1].url).toContain("/cohorts/tld/snapshots/2026-04-20");
+    expect(calls[2].url).toContain("/cohorts/tld/trends");
+    expect(calls[2].url).toContain("category=grade_distribution");
+    expect(calls[3].url).toContain("/cohorts/tld/diff");
+    expect(calls[3].url).toContain("from=2026-03-01");
+    expect(calls[3].url).toContain("to=2026-04-01");
   });
 
   it("url-encodes path parameters", async () => {

@@ -29,3 +29,38 @@ gonemaster-client entries query \
 ```sh
 gonemaster-client batches results batch_123 --view json --per-job
 ```
+
+## Fetch Results Since a Timestamp
+
+```sh
+gonemaster-client jobs results \
+  --all \
+  --status succeeded \
+  --created-after 2026-02-01T00:00:00Z \
+  --aggregate
+```
+
+## Split Per-Job Result Files
+
+```sh
+gonemaster-client batches results \
+  batch_123 \
+  --view json \
+  --per-job \
+  --split-dir /tmp/gonemaster-results
+```
+
+## Extract Nameserver Pairs
+
+```sh
+gonemaster-client jobs results job_123 --view raw --format json \
+  | jq -r '.entries[]
+           | select(.args.ns and .args.address)
+           | [.args.ns, .args.address] | @tsv'
+```
+
+## Fetch Translated Results
+
+```sh
+gonemaster-client jobs results job_123 --view translated --locale sv
+```

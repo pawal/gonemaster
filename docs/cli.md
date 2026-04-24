@@ -1,560 +1,265 @@
-# Gonemaster CLI Specification
+# Gonemaster CLI
 
-This document defines the CLI contracts for two tools:
+This page documents `gonemaster`, the direct local test runner. It runs the
+engine in the current process without `gonemaster-server`.
 
-- `gonemaster`: run the engine locally.
-- `gonemaster-client`: talk to `gonemaster-server` over HTTP for jobs, batches, and results.
+For the HTTP client that talks to `gonemaster-server`, see
+[client/](client/README.md).
 
-Both commands normalize IDN domains to IDNA A-labels (punycode) before use.
+`gonemaster` normalizes IDN domains to IDNA A-labels before use.
 
-## Common conventions
+## Synopsis
 
-### Output formats
-- `pretty` (default): human-friendly text suitable for terminals.
-- `json`: a single JSON document.
-- `jsonl` / `json-stream`: newline-delimited JSON (one object per line). The client uses `jsonl` via `--format jsonl`; the engine uses `--json-stream`.
-
-### Exit codes
-- `0`: success
-- `2`: usage or runtime error (invalid args, I/O, HTTP errors, engine errors)
-- `130`: interrupted (SIGINT/SIGTERM)
-
-## gonemaster (local engine)
-
-### Synopsis
-```
+```sh
 gonemaster [flags] [DOMAIN]
 ```
 
 Notes:
-- `DOMAIN` can be provided as a positional argument or via `--domain`.
-- `--domain` (or positional `DOMAIN`) is required for test runs.
-- `--version` and `--list-tests` do not require `--domain`.
-- `--dump-profile` can be used without `--domain`.
-- malformed undelegated inputs (`--ns`, `--ds`) return exit code `2`.
-- The built-in default profile currently uses `resolver.defaults.parallel=8` and
+
+- `DOMAIN` can be provided as a positional argument or with `--domain`.
+- `--domain` or positional `DOMAIN` is required for test runs.
+- `--version`, `--list-tests`, and `--dump-profile` do not require a domain.
+- Malformed undelegated inputs such as `--ns` or `--ds` return exit code `2`.
+- The built-in profile uses `resolver.defaults.parallel=8` and
   `resolver.defaults.unordered=true`.
 - For deterministic ordered behavior, use `--ordered --parallel 1`.
 
-### Output modes
-By default, output is translated, human-readable text on stdout with a small
-progress spinner when stdout is a terminal. Errors and progress information are
-written to stderr.
+## Exit Codes
 
-You can switch output modes:
-- `--json` prints a single JSON array of log entries.
-- `--json-stream` prints newline-delimited JSON objects (one per log entry).
-- `--raw` prints raw log lines (one per log entry).
-- `--dump-profile` prints the effective profile as pretty JSON and exits.
-- `--count` (human output only) appends count summaries by level and by message tag.
-- `--nstimes` appends per-nameserver query timing statistics (max, min, avg, stddev, median, total, count).
-- `--save PATH` writes the accumulated DNS packet cache after the run.
+- `0`: success
+- `2`: usage or runtime error
+- `130`: interrupted by signal
+
+## Output Modes
+
+Default output is translated human-readable text on stdout. Progress goes to
+stderr when stdout is a terminal.
+
+| Mode | Flag |
+|---|---|
+| Human-readable text | default |
+| Single JSON array | `--json` |
+| Newline-delimited JSON | `--json-stream` |
+| Raw log lines | `--raw` |
+| Effective profile JSON | `--dump-profile` |
+
+Additional output controls:
+
+- `--count` appends human-readable level and tag counts.
+- `--nstimes` appends per-nameserver timing statistics.
+- `--output PATH` writes selected output to a file.
+- `--save PATH` writes the DNS packet cache after the run.
 - `--restore PATH` primes the DNS packet cache before the run.
 
-See [cache-format.md](cache-format.md) for the file schema, checksum
-contract, and strict-vs-lenient parsing rules.
+See [cache-format.md](cache-format.md) for the packet cache file schema.
 
-Use `--output PATH` to write the selected output to a file.
+## Machine-Consumer Result Contract
 
-### Machine-consumer args contract
-For machine consumption, use `--json` or `--json-stream`.
+Use `--json` or `--json-stream` for machine consumption.
 
 For migrated coherent entries:
-- `args.ns` is nameserver name only (per-nameserver tags).
-- `args.address` is the nameserver IP address (per-nameserver tags).
-- `args.servers` is a structured array of `{ns, address}` objects (consolidated tags that report on multiple nameservers).
-- `args.asns` is a typed array of ASN integers when ASN data is emitted.
+
+- `args.ns` is the nameserver name.
+- `args.address` is the nameserver IP address.
+- `args.servers` is an array of `{ns, address}` objects.
+- `args.asns` is an array of ASN integers when ASN data is emitted.
 
 Legacy keys can still appear on non-migrated tags during migration. Prefer the
-v1.1 keys above when they are present. See:
-- `docs/specifications/log-args-coherency.md`
-- `docs/specifications/log-args-key-glossary.md`
+v1.1 keys when they are present.
 
-### Options
+Reference:
+
+- [specifications/log-args-coherency.md](specifications/log-args-coherency.md)
+- [specifications/log-args-key-glossary.md](specifications/log-args-key-glossary.md)
+
+## Options
 
 | Flag | Type | Details |
-| --- | --- | --- |
-| `--domain DOMAIN` | string | Zone name to test (required for runs). |
-| `--module MODULE` | string | Run a single module (optional). |
-| `--testcase TESTCASE` | string | Run a single testcase (optional). |
-| `--profile PATH` | string | Profile file in JSON or YAML (optional). |
-| `--min-level LEVEL` | string | Minimum log level (default `NOTICE`). One of `DEBUG3`, `DEBUG2`, `DEBUG`, `INFO`, `NOTICE`, `WARNING`, `ERROR`, `CRITICAL`. |
-| `--stop-level LEVEL` | string | Stop the run after the first log entry at `LEVEL` or higher. Same values as `--min-level`. |
-| `--output PATH` | string | Write output to a file instead of stdout. |
-| `--raw` | bool | Stream raw log entries. Incompatible with `--json` and `--json-stream`. |
-| `--json` | bool | Print a single JSON array. Incompatible with `--raw` and `--json-stream`. |
-| `--json-stream` | bool | Stream newline-delimited JSON entries. Incompatible with `--raw` and `--json`. Also incompatible with `--dump-profile`. |
-| `--dump-profile` | bool | Print the effective profile as JSON and exit. Incompatible with `--raw` and `--json-stream`. |
-| `--count` | bool | Append count summaries (level totals and level/tag totals). Human output only; incompatible with `--json`, `--json-stream`, `--raw`, and `--dump-profile`. |
-| `--nstimes` | bool | Append per-nameserver query timing statistics table. |
-| `--save PATH` | string | Write DNS packet cache to file after the run. Valid only for test runs (not with `--version`, `--list-tests`, or `--dump-profile`). File schema: see [cache-format.md](cache-format.md). |
-| `--restore PATH` | string | Prime DNS packet cache from a previously saved cache file before the run. Valid only for test runs (not with `--version`, `--list-tests`, or `--dump-profile`). File schema: see [cache-format.md](cache-format.md). |
-| `--locale LOCALE` | string | Locale for translated output (defaults to environment, then `en`). |
-| `--no-ipv4` | bool | Disable IPv4 queries (overrides profile setting). |
-| `--no-ipv6` | bool | Disable IPv6 queries (overrides profile setting). |
-| `--ipv6` | bool | Force IPv6 queries (overrides profile setting). |
-| `--parallel N` | int | Override `resolver.defaults.parallel`. Must be `>= 1` when set. |
-| `--unordered` | bool | Allow unordered resolver behavior (overrides `resolver.defaults.unordered`). |
-| `--ordered` | bool | Force ordered resolver behavior (overrides `resolver.defaults.unordered`). |
-| `--timeout N` | int | Override `resolver.defaults.timeout` in seconds. Must be `>= 0` when set. |
-| `--retry N` | int | Override `resolver.defaults.retry`. Must be `>= 0` when set. |
-| `--retrans N` | int | Override `resolver.defaults.retrans` in seconds. Must be `>= 0` when set. |
-| `--fallback` | bool | Enable TCP fallback on UDP failure (overrides `resolver.defaults.fallback`). |
-| `--no-fallback` | bool | Disable TCP fallback on UDP failure (overrides `resolver.defaults.fallback`). |
-| `--sourceaddr4 IPADDR` | string | Override `resolver.source4` (IPv4 source address for outgoing queries). |
-| `--sourceaddr6 IPADDR` | string | Override `resolver.source6` (IPv6 source address for outgoing queries). |
-| `--error-cache-ttl N` | int | Seconds to skip queries after network errors. Must be `>= 0` when set. |
-| `--positive-cache-ttl N` | int | Seconds to cache positive DNS responses. Must be `>= 0` when set. |
-| `--negative-cache-ttl N` | int | Seconds to cache negative DNS responses. Must be `>= 0` when set. |
-| `--badkeys-path PATH` | string | Override badkeys blocklist directory path (`blocklist.dat` + `badkeysdata.json`). |
-| `--badkeys-update` | bool | Download/update badkeys blocklist data and exit. |
-| `--ns NAME[/IP]` | string (repeatable) | Undelegated nameserver input. `NAME` is required, `IP` is optional. May be repeated. Repeat the same `NAME` with different IPs to supply multiple addresses. |
-| `--ds KEYTAG,ALGORITHM,DIGTYPE,DIGEST` | string (repeatable) | Undelegated DS input. May be repeated. |
-| `--score` | bool | Print score/grade summary after the run. |
-| `--no-score` | bool | Suppress score output (wins over `--score` and `--scoring-config`). |
-| `--scoring-config PATH` | string | Custom scoring config JSON file; implies `--score`. |
-| `--no-progress` | bool | Disable progress indicator/spinner. |
-| `--list-tests` | bool | List available test cases and exit. |
+|---|---|---|
+| `--domain DOMAIN` | string | Zone name to test. |
+| `--module MODULE` | string | Run one module. |
+| `--testcase TESTCASE` | string | Run one testcase. |
+| `--profile PATH` | string | Profile file in JSON or YAML. |
+| `--min-level LEVEL` | string | Minimum log level. Default `NOTICE`. |
+| `--stop-level LEVEL` | string | Stop after the first entry at this level or higher. |
+| `--output PATH` | string | Write output to a file. |
+| `--raw` | bool | Stream raw log entries. |
+| `--json` | bool | Print one JSON array. |
+| `--json-stream` | bool | Stream newline-delimited JSON entries. |
+| `--dump-profile` | bool | Print effective profile JSON and exit. |
+| `--count` | bool | Append count summaries in human output. |
+| `--nstimes` | bool | Append per-nameserver timing statistics. |
+| `--save PATH` | string | Save DNS packet cache after the run. |
+| `--restore PATH` | string | Restore DNS packet cache before the run. |
+| `--locale LOCALE` | string | Locale for translated output. |
+| `--no-ipv4` | bool | Disable IPv4 queries. |
+| `--no-ipv6` | bool | Disable IPv6 queries. |
+| `--ipv6` | bool | Force IPv6 queries. |
+| `--parallel N` | int | Override resolver parallelism. |
+| `--unordered` | bool | Allow unordered resolver behavior. |
+| `--ordered` | bool | Force ordered resolver behavior. |
+| `--timeout N` | int | Override resolver timeout in seconds. |
+| `--retry N` | int | Override resolver retry count. |
+| `--retrans N` | int | Override resolver retransmit interval in seconds. |
+| `--fallback` | bool | Enable TCP fallback on UDP failure. |
+| `--no-fallback` | bool | Disable TCP fallback on UDP failure. |
+| `--sourceaddr4 IPADDR` | string | IPv4 source address for outgoing queries. |
+| `--sourceaddr6 IPADDR` | string | IPv6 source address for outgoing queries. |
+| `--error-cache-ttl N` | int | Seconds to skip queries after network errors. |
+| `--positive-cache-ttl N` | int | Seconds to cache positive DNS responses. |
+| `--negative-cache-ttl N` | int | Seconds to cache negative DNS responses. |
+| `--badkeys-path PATH` | string | Badkeys blocklist directory path. |
+| `--badkeys-update` | bool | Download or update badkeys blocklist data and exit. |
+| `--ns NAME[/IP]` | repeatable | Undelegated nameserver input. |
+| `--ds KEYTAG,ALGORITHM,DIGTYPE,DIGEST` | repeatable | Undelegated DS input. |
+| `--score` | bool | Print score and grade summary after the run. |
+| `--no-score` | bool | Suppress score output. |
+| `--scoring-config PATH` | string | Custom scoring config JSON file. Implies `--score`. |
+| `--no-progress` | bool | Disable progress indicator. |
+| `--list-tests` | bool | List available testcases and exit. |
 | `--version` | bool | Print version information and exit. |
 
-### Examples
+`--raw`, `--json`, and `--json-stream` are mutually exclusive.
+`--count` is human-output only.
 
-Run a full test with human-readable output:
-```
+## Examples
+
+Run a full test:
+
+```sh
 gonemaster example.com
 ```
 
-Run a single module and testcase:
-```
+Run one module and testcase:
+
+```sh
 gonemaster --module address --testcase address01 example.com
 ```
 
-JSON output, formatted with `jq`:
-```
+Print JSON:
+
+```sh
 gonemaster --json --domain example.com | jq
 ```
 
 Stream JSON entries to a file:
-```
+
+```sh
 gonemaster --json-stream --output /tmp/gonemaster.jsonl --domain example.com
 ```
 
-Save DNS packet cache for later replay (file schema in
-[cache-format.md](cache-format.md)):
-```
-gonemaster --domain example.com --save /tmp/gonemaster-cache.json
-```
+Save and replay a DNS packet cache:
 
-Replay saved DNS packet cache:
-```
+```sh
+gonemaster --domain example.com --save /tmp/gonemaster-cache.json
 gonemaster --domain example.com --restore /tmp/gonemaster-cache.json
 ```
 
 Show per-nameserver query timing statistics:
-```
+
+```sh
 gonemaster --nstimes example.com
 ```
 
 Disable IPv6 and raise parallelism:
-```
+
+```sh
 gonemaster --no-ipv6 --parallel 4 --domain example.com
 ```
 
-Dump the effective profile (no domain required):
-```
+Dump the effective profile:
+
+```sh
 gonemaster --dump-profile --profile ./profile.yaml
 ```
 
-Download/update badkeys blocklist data for DNSSEC19 and exit:
-```
-gonemaster --badkeys-update
-```
-
-Download/update badkeys blocklist data into a custom directory and exit:
-```
-gonemaster --badkeys-update --badkeys-path /path/to/badkeys
-```
-
 List available test cases:
-```
+
+```sh
 gonemaster --list-tests
 ```
 
-High performance test, translated to Swedish:
-```
+High-performance test with Swedish output:
+
+```sh
 gonemaster --unordered --parallel 8 --locale sv --domain example.com
 ```
 
 Undelegated test with explicit nameservers and glue:
-```
+
+```sh
 gonemaster --domain example.com \
   --ns ns1.example.com/192.0.2.10 \
   --ns ns2.example.net/2001:db8::10
 ```
 
-Undelegated test with one nameserver and both IPv4 + IPv6:
-```
+Undelegated test with one nameserver and both IPv4 and IPv6:
+
+```sh
 gonemaster --domain example.com \
   --ns ns1.example.com/192.0.2.10 \
   --ns ns1.example.com/2001:db8::10
 ```
 
 Undelegated DS-only test:
-```
+
+```sh
 gonemaster --domain example.com \
   --ds 12345,13,2,0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF
 ```
 
-Run a test and display score/grade summary:
-```
+Run a test and display score and grade:
+
+```sh
 gonemaster --score example.com
 ```
 
 Use a custom scoring config:
-```
+
+```sh
 gonemaster --scoring-config /etc/gonemaster/scoring.json example.com
 ```
 
-Score with JSON output (score goes to stderr to avoid polluting JSON):
-```
+Score with JSON output. The score goes to stderr to keep stdout valid JSON.
+
+```sh
 gonemaster --json --score example.com | jq
 ```
 
-Extract coherent nameserver name/IP pairs from a local run:
-```
+Extract coherent nameserver name and IP pairs:
+
+```sh
 gonemaster --json-stream --domain example.com \
   | jq -r 'select(.args.ns and .args.address)
            | [.args.ns, .args.address] | @tsv'
 ```
 
-Extract ASN lists from a local run:
-```
+Extract ASN lists:
+
+```sh
 gonemaster --json --domain example.com \
   | jq -r '.[]
            | select(.args.asns != null)
            | [.tag, (.args.asns | map(tostring) | join(","))] | @tsv'
 ```
 
-### Badkeys blocklist setup (DNSSEC19)
+## Badkeys Blocklist Setup
 
 Update blocklist data in the default user data directory:
-```
+
+```sh
 gonemaster --badkeys-update
 ```
 
-For developers/packagers, update blocklist data in `share/badkeys/`:
-```
+For developers and packagers, update blocklist data in `share/badkeys/`:
+
+```sh
 make badkeys-update
-```
-
-## gonemaster-client (HTTP API client)
-
-### Synopsis
-```
-gonemaster-client [global options] <command> [command options] [args]
-```
-
-### Global options
-
-| Flag | Type | Details |
-| --- | --- | --- |
-| `--server URL` | string | Base API URL (default `http://localhost:8080/api/v1`). |
-| `--timeout DURATION` | string | HTTP timeout (default `30s`). |
-| `--format FORMAT` | string | Output format: `pretty`, `json`, `jsonl` (or `json-stream`). |
-| `--output PATH` | string | Write output to a file instead of stdout. |
-| `--locale LOCALE` | string | Locale for translated result messages (default `en`). |
-| `--version` | bool | Print version information and exit. |
-| `--no-color` | bool | Disable ANSI colors in `pretty` output. |
-| `--header NAME:VALUE` | string | Extra HTTP header (repeatable). |
-
-### Commands
-Notes:
-- Subcommand flags may be placed before or after positional arguments (for example, `jobs results JOB_ID --view translated`).
-
-#### jobs create
-Submit a single job.
-```
-gonemaster-client jobs create --domain example.com [options]
-```
-Options:
-- `--domain DOMAIN` (required)
-- `--tests NAME` (repeatable, optional)
-- `--min-level LEVEL` (optional)
-- `--profile-override KEY=VALUE` (repeatable; merged into `profile_overrides`)
-- `--profile-overrides-file PATH` (JSON/YAML object to merge)
-- `--wait` (wait for completion and print results)
-- `--view summary|modules|raw|json` (aliases: `translated`, `full`) (when `--wait` is used)
-- `--score` (show score/grade after results; requires `--wait`)
-- `--no-score` (suppress scoring output)
-- `--scoring-config PATH` (load custom scoring config from JSON file; implies `--score`)
-
-#### jobs batch
-Submit a batch of jobs.
-```
-gonemaster-client jobs batch [input options] [options]
-```
-Input options (one or more):
-- `--domain DOMAIN` (repeatable)
-- `--file PATH` (one domain per line)
-- `--stdin` (read domains from stdin)
-
-Options:
-- `--tests NAME` (repeatable)
-- `--min-level LEVEL`
-- `--profile-override KEY=VALUE` (repeatable)
-- `--profile-overrides-file PATH`
-- `--wait` (wait for batch completion)
-- `--view summary|modules|raw|json` (aliases: `translated`, `full`) (when `--wait` is used)
-- `--per-job` (when waiting, show per-job results instead of only batch summary)
-- `--score` (show score/grade after results; requires `--wait`)
-- `--no-score` (suppress scoring output)
-- `--scoring-config PATH` (load custom scoring config from JSON file; implies `--score`)
-
-#### jobs list
-List jobs with filters.
-```
-gonemaster-client jobs list [options]
-```
-Options:
-- `--status STATUS` (`queued`, `running`, `succeeded`, `failed`, `canceled`, `expired`, `paused`)
-- `--batch-id ID`
-- `--created-after RFC3339`
-- `--limit N` (default `100`, max `500`)
-- `--offset N`
-
-#### jobs get
-Fetch job status.
-```
-gonemaster-client jobs get JOB_ID
-```
-
-#### jobs watch
-Stream job status until completion.
-```
-gonemaster-client jobs watch JOB_ID [--poll DURATION]
-```
-Notes:
-- Uses SSE events if available; falls back to polling.
-- Stops when status is `succeeded`, `failed`, `canceled`, or `expired`.
-
-#### jobs cancel
-Cancel a queued or running job.
-```
-gonemaster-client jobs cancel JOB_ID
-```
-
-#### jobs results
-Fetch results for one or more jobs (including all jobs).
-```
-gonemaster-client jobs results [JOB_ID] [options]
-```
-Options:
-- `--job-id ID` (repeatable; alternative to positional)
-- `--batch-id ID` (fetch results for all jobs in a batch)
-- `--all` (fetch results for all jobs)
-- `--status STATUS` (when using `--all`)
-- `--created-after RFC3339` (when using `--all`)
-- `--view summary|modules|raw|json` (aliases: `translated`, `full`; default `summary` for `pretty`, `json` for `--format json`)
-- `--levels NOTICE,WARNING,ERROR,CRITICAL` (filter)
-- `--aggregate` (print a combined summary across all selected jobs)
-- `--per-job` (print per-job summaries/results)
-- `--split-dir PATH` (write per-job results to files; filename includes job id)
-- `--score` (show score/grade after each job's results)
-- `--no-score` (suppress scoring output)
-- `--scoring-config PATH` (load custom scoring config from JSON file; implies `--score`)
-
-This command is the primary way to retrieve results from all jobs in a convenient way.
-
-#### jobs purge
-Delete completed jobs older than a given number of days, along with their results.
-```
-gonemaster-client jobs purge [--older-than DAYS]
-```
-Options:
-- `--older-than N` - delete jobs finished more than N days ago; `0` (default) uses the server's configured `retention_days`.
-
-Returns `400` if both `--older-than` and the server's `retention_days` are `0`.
-
-Pretty output: `Purged 42 jobs older than 90 days`
-JSON output (`--format json`): `{"purged_jobs": 42}`
-
-#### batches get
-Fetch a batch summary.
-```
-gonemaster-client batches get BATCH_ID
-```
-
-#### batches watch
-Poll or stream a batch until completion.
-```
-gonemaster-client batches watch BATCH_ID [--poll DURATION]
-```
-
-#### batches results
-Fetch results for all jobs in a batch.
-```
-gonemaster-client batches results BATCH_ID [options]
-```
-Options:
-- `--view summary|modules|raw|json`
-- `--levels NOTICE,WARNING,ERROR,CRITICAL`
-- `--aggregate` (combined summary across the batch)
-- `--per-job` (include per-job results)
-- `--score` (show score/grade after each job's results)
-- `--no-score` (suppress scoring output)
-- `--scoring-config PATH` (load custom scoring config from JSON file; implies `--score`)
-
-#### batches cancel
-Cancel all queued or running jobs in a batch.
-```
-gonemaster-client batches cancel BATCH_ID
-```
-Notes:
-- Jobs already completed are skipped.
-- Uses the per-job cancel endpoint for each eligible job.
-
-#### batches remove
-Remove queued jobs from a batch (running jobs are skipped).
-```
-gonemaster-client batches remove BATCH_ID [--cancel-running]
-```
-Notes:
-- Uses the queue remove endpoint for queued jobs only.
-- With `--cancel-running`, running jobs are canceled via per-job cancel requests.
-
-#### runs list
-List completed runs.
-```
-gonemaster-client runs list [options]
-```
-Options:
-- `--tag NAME` (filter by domain tag)
-- `--domain SUBSTR` (filter by domain name substring)
-- `--batch ID` (filter by batch ID)
-- `--level LEVEL` (filter by worst level)
-- `--limit N` (default `100`)
-
-#### runs get
-Fetch metadata for a completed run.
-```
-gonemaster-client runs get RUN_ID
-```
-
-#### runs results
-Fetch test results for a completed run.
-```
-gonemaster-client runs results RUN_ID [options]
-```
-Options:
-- `--view summary|modules|raw|json`
-- `--score` (show score/grade after results)
-- `--no-score` (suppress scoring output)
-- `--scoring-config PATH` (load custom scoring config from JSON file; implies `--score`)
-
-#### queue pause
-Pause queue processing.
-```
-gonemaster-client queue pause
-```
-
-#### queue resume
-Resume queue processing.
-```
-gonemaster-client queue resume
-```
-
-#### queue reorder
-Reorder queued jobs.
-```
-gonemaster-client queue reorder --job-id ID [--job-id ID...]
-```
-
-#### queue remove
-Remove queued jobs.
-```
-gonemaster-client queue remove --job-id ID [--job-id ID...]
-```
-
-### Examples
-
-Submit a batch from file and wait for completion:
-```
-gonemaster-client jobs batch --file domains.txt --wait --view summary
-```
-
-Submit a batch from stdin:
-```
-cat domains.txt | gonemaster-client jobs batch --stdin --wait --view modules
-```
-
-List only failed jobs:
-```
-gonemaster-client jobs list --status failed
-```
-
-Fetch results for all completed jobs since a timestamp:
-```
-gonemaster-client jobs results --all --status succeeded --created-after 2026-02-01T00:00:00Z --aggregate
-```
-
-Fetch full results for a batch and write per-job files:
-```
-gonemaster-client batches results batch_123 --view json --split-dir /tmp/gonemaster-results
-```
-
-Fetch the full JSON result for a job:
-```
-gonemaster-client jobs results job_123 --view full --format json
-```
-
-Extract coherent nameserver name/IP pairs from client JSON output:
-```
-gonemaster-client jobs results job_123 --view raw --format json \
-  | jq -r '.entries[]
-           | select(.args.ns and .args.address)
-           | [.args.ns, .args.address] | @tsv'
-```
-
-Extract ASN lists from client JSON output:
-```
-gonemaster-client jobs results job_123 --view raw --format json \
-  | jq -r '.entries[]
-           | select(.args.asns != null)
-           | [.tag, (.args.asns | map(tostring) | join(","))] | @tsv'
-```
-
-Fetch translated, readable output (per module):
-```
-gonemaster-client jobs results job_123 --view translated --locale sv
-```
-
-Show score and grade after fetching job results:
-```
-gonemaster-client jobs results job_123 --score
-```
-
-Use a custom scoring config:
-```
-gonemaster-client jobs results job_123 --scoring-config /etc/gonemaster/scoring.json
-```
-
-Cancel all queued/running jobs in a batch:
-```
-gonemaster-client batches cancel batch_123
-```
-
-Remove queued jobs from a batch:
-```
-gonemaster-client batches remove batch_123
-```
-
-Cancel a job:
-```
-gonemaster-client jobs cancel job_123
 ```
 
 ## Further Reference
 
-- **Testcase specifications**: [`docs/specifications/tests/`](specifications/tests/) documents the algorithm, emitted tags, tag arguments, and severity levels for every implemented testcase.
-- **Tag catalogs**: [`docs/specifications/tags/`](specifications/tags/) lists all tags per module with default severity levels and i18n coverage status.
-- **`--list-tests`**: run `gonemaster --list-tests` to see available testcases and their IDs at runtime.
+- Testcase specifications: [specifications/tests/](specifications/tests/)
+- Tag catalogs: [specifications/tags/](specifications/tags/)
+- Cache format: [cache-format.md](cache-format.md)
+- Scoring: [scoring.md](scoring.md)

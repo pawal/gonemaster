@@ -11,6 +11,18 @@ API.
 - `domains tag DOMAIN TAG...`: add a domain to tags.
 - `domains untag DOMAIN TAG...`: remove a domain from tags.
 
+Examples:
+
+```sh
+gonemaster-client domains list --tag tld --level ERROR
+gonemaster-client domains get example.com
+gonemaster-client domains runs example.com --limit 20
+gonemaster-client domains tag example.com tld monitored
+gonemaster-client domains untag example.com monitored
+```
+
+`domains list` filters include `--tag`, `--name`, `--level`, and `--limit`.
+
 ## Tags
 
 - `tags list`: list tags.
@@ -20,11 +32,34 @@ API.
 - `tags summary TAG`: count latest domain severity by bucket.
 - `tags add-domains TAG`: bulk-add domains to a tag.
 
+Examples:
+
+```sh
+gonemaster-client tags create tld --description "Top-level domains"
+gonemaster-client tags add-domains tld --file tlds.txt
+gonemaster-client tags domains tld --limit 100
+gonemaster-client tags summary tld
+gonemaster-client tags delete old-tag
+```
+
+Deleting a tag removes tag memberships. It does not delete domains, runs,
+entries, batches, or cohort snapshots.
+
 ## Runs
 
 Runs are completed job records. Use `runs list`, `runs get`, and
 `runs results` when you want historical completed work instead of currently
 queued or running jobs.
+
+Examples:
+
+```sh
+gonemaster-client runs list --tag tld --level WARNING --limit 100
+gonemaster-client runs get run_123
+gonemaster-client runs results run_123 --view raw --format json
+```
+
+Filters include `--tag`, `--domain`, `--batch`, `--level`, and `--limit`.
 
 ## Entries
 
@@ -37,3 +72,22 @@ queued or running jobs.
 - `--latest`
 
 Use `--format csv` for spreadsheet and pandas workflows.
+
+Examples:
+
+```sh
+gonemaster-client entries query --tag tld --module DNSSEC --latest
+gonemaster-client entries query --tag tld --entry-tag DS_ALGO_NOT_SUPPORTED --format csv
+```
+
+Common filters:
+
+- `--run`
+- `--domain`
+- `--tag`
+- `--module`
+- `--testcase`
+- `--entry-tag`
+- `--level`
+- `--latest`
+- `--batch`

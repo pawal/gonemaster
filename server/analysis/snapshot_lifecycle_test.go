@@ -253,6 +253,52 @@ func TestControllerCaptureCompletedSnapshotsPromotesOnBatchDrain(t *testing.T) {
 	}
 }
 
+func TestControllerCaptureWaitsForProjectionDrain(t *testing.T) {
+	store, _ := snapshotLifecycleStore(t)
+	seedSnapshotBatch(store, "batch-projecting", true)
+
+	runA := testAnalysisRun("run-projected", 100, "alpha.example", time.Date(2026, 4, 20, 10, 0, 0, 0, time.UTC), "192.0.2.10", "2001:db8::10")
+	runA.BatchID = "batch-projecting"
+	store.runs[runA.ID] = runA
+	store.entries[runA.ID] = testAnalysisEntries(runA)
+	store.tags[runA.DomainID] = []string{"tld"}
+
+	runB := testAnalysisRun("run-waiting", 101, "bravo.example", time.Date(2026, 4, 20, 10, 1, 0, 0, time.UTC), "192.0.2.11", "2001:db8::11")
+	runB.BatchID = "batch-projecting"
+	store.runs[runB.ID] = runB
+	store.entries[runB.ID] = testAnalysisEntries(runB)
+	store.tags[runB.DomainID] = []string{"tld"}
+
+	controller := NewController(store)
+	if err := controller.ProjectRun(runA.ID); err != nil {
+		t.Fatalf("ProjectRun A: %v", err)
+	}
+	if err := controller.CaptureCompletedSnapshots(context.Background()); err != nil {
+		t.Fatalf("CaptureCompletedSnapshots: %v", err)
+	}
+	snap, ok := store.GetAnalysisCohortSnapshotByBatch(10, "batch-projecting")
+	if !ok {
+		t.Fatal("expected snapshot")
+	}
+	if snap.Status != serverpkg.AnalysisSnapshotStatusPending {
+		t.Fatalf("capture before projection drain: status = %q", snap.Status)
+	}
+
+	if err := controller.ProjectRun(runB.ID); err != nil {
+		t.Fatalf("ProjectRun B: %v", err)
+	}
+	if err := controller.CaptureCompletedSnapshots(context.Background()); err != nil {
+		t.Fatalf("CaptureCompletedSnapshots after projection drain: %v", err)
+	}
+	snap, _ = store.GetAnalysisCohortSnapshotByBatch(10, "batch-projecting")
+	if snap.Status != serverpkg.AnalysisSnapshotStatusCaptured {
+		t.Fatalf("Status = %q, want captured", snap.Status)
+	}
+	if snap.RunCount != 2 || snap.DomainCount != 2 {
+		t.Fatalf("snapshot counts = %d/%d, want 2/2", snap.RunCount, snap.DomainCount)
+	}
+}
+
 // TestControllerCaptureSkipsMixedProfileSnapshot verifies a broken
 // (mixed-profile) snapshot is not promoted to captured even once its
 // batch has drained — flipping it to captured would hide the error from

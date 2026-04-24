@@ -208,3 +208,89 @@ func TestCountOutstandingJobsForBatch(t *testing.T) {
 		t.Fatalf("outstanding jobs = %d, want 2", count)
 	}
 }
+
+func TestCountUnprojectedSnapshotRuns(t *testing.T) {
+	s := testStoreForBackend(t, testBackends(t)[0])
+	now := time.Date(2026, 4, 20, 10, 0, 0, 0, time.UTC)
+	cohort, err := s.UpsertAnalysisCohort(AnalysisCohort{
+		SourceType:      "tag",
+		SourceTag:       "tld",
+		AnalysisEnabled: true,
+	})
+	if err != nil {
+		t.Fatalf("seed cohort: %v", err)
+	}
+
+	for i, rec := range []struct {
+		runID string
+		tag   string
+		ready bool
+	}{
+		{"run-ready", "tld", true},
+		{"run-waiting", "tld", false},
+		{"run-other-tag", "other", false},
+	} {
+		domain, err := s.GetOrCreateDomain(rec.runID + ".example")
+		if err != nil {
+			t.Fatalf("seed domain %d: %v", i, err)
+		}
+		if err := s.CreateTag(rec.tag, ""); err != nil {
+			t.Fatalf("create tag %s: %v", rec.tag, err)
+		}
+		if err := s.TagDomains(rec.tag, []int64{domain.ID}); err != nil {
+			t.Fatalf("tag domain %d: %v", i, err)
+		}
+		job := Job{
+			ID:         rec.runID,
+			DomainID:   domain.ID,
+			Domain:     domain.Name,
+			BatchID:    "batch-x",
+			Status:     JobSucceeded,
+			CreatedAt:  now,
+			StartedAt:  now,
+			FinishedAt: now.Add(time.Duration(i) * time.Minute),
+		}
+		if _, err := s.Create(job); err != nil {
+			t.Fatalf("create job %d: %v", i, err)
+		}
+		if err := s.GraduateJob(job, nil); err != nil {
+			t.Fatalf("graduate job %d: %v", i, err)
+		}
+		if rec.ready {
+			if err := s.SetAnalysisProjectionState(AnalysisProjectionState{
+				CohortID:         cohort.ID,
+				RunID:            rec.runID,
+				ProjectorVersion: "test",
+				Status:           AnalysisMaterializationReady,
+				ProjectedAt:      now,
+			}); err != nil {
+				t.Fatalf("set ready state %d: %v", i, err)
+			}
+		}
+	}
+
+	count, err := s.CountUnprojectedSnapshotRuns(cohort.ID, "batch-x")
+	if err != nil {
+		t.Fatalf("CountUnprojectedSnapshotRuns: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("unprojected runs = %d, want 1", count)
+	}
+
+	if err := s.SetAnalysisProjectionState(AnalysisProjectionState{
+		CohortID:         cohort.ID,
+		RunID:            "run-waiting",
+		ProjectorVersion: "test",
+		Status:           AnalysisMaterializationReady,
+		ProjectedAt:      now,
+	}); err != nil {
+		t.Fatalf("set waiting ready: %v", err)
+	}
+	count, err = s.CountUnprojectedSnapshotRuns(cohort.ID, "batch-x")
+	if err != nil {
+		t.Fatalf("CountUnprojectedSnapshotRuns after ready: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("unprojected runs after ready = %d, want 0", count)
+	}
+}

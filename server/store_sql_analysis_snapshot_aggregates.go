@@ -396,3 +396,34 @@ func (s *SQLJobStore) CountOutstandingJobsForBatch(batchID string) (int, error) 
 	}
 	return count, nil
 }
+
+// CountUnprojectedSnapshotRuns returns completed runs in a snapshot-intent
+// batch that belong to the cohort's source tag but do not yet have a ready
+// analysis projection row. Snapshot capture must wait for this to reach zero;
+// otherwise aggregates can be computed from a partial materialization even
+// after the queue itself has drained.
+func (s *SQLJobStore) CountUnprojectedSnapshotRuns(cohortID int64, batchID string) (int, error) {
+	if batchID == "" {
+		return 0, fmt.Errorf("count unprojected snapshot runs: batch_id is required")
+	}
+	var count int
+	row := s.db.QueryRow(
+		fmt.Sprintf(`SELECT COUNT(*)
+			FROM runs r
+			JOIN analysis_cohort_catalog c ON c.id = %s
+			JOIN domain_tags dt ON dt.domain_id = r.domain_id AND dt.tag = c.source_tag
+			LEFT JOIN analysis_projection_state ps
+				ON ps.cohort_id = c.id
+				AND ps.run_id = r.id
+				AND ps.status = %s
+			WHERE r.batch_id = %s
+			  AND c.source_type = 'tag'
+			  AND ps.run_id IS NULL`,
+			s.ph(1), s.ph(2), s.ph(3)),
+		cohortID, AnalysisMaterializationReady, batchID,
+	)
+	if err := row.Scan(&count); err != nil {
+		return 0, fmt.Errorf("count unprojected snapshot runs for cohort %d batch %s: %w", cohortID, batchID, err)
+	}
+	return count, nil
+}

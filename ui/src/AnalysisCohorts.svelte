@@ -366,6 +366,23 @@
   const restoreSnapshot = (cohort, snap) =>
     patchSnapshot(cohort, snap, { status: "captured", is_public: true }, "analysis_snapshots_restored");
 
+  async function rebuildSnapshotAggregates(cohort, snap) {
+    const key = snapshotKey(cohort.id, snap.slug);
+    busySnapshotKey = key;
+    try {
+      await apiFetch(
+        `/analysis/cohorts/${cohort.id}/snapshots/${encodeURIComponent(snap.slug)}/rematerialize`,
+        { method: "POST" }
+      );
+      await loadSnapshots(cohort, { refresh: true });
+      setNotice($t("analysis_snapshots_rebuilt", { slug: snap.slug }), "ok");
+    } catch (error) {
+      setNotice($t("analysis_snapshots_action_error", { error: error.message || "" }), "warn");
+    } finally {
+      busySnapshotKey = "";
+    }
+  }
+
   async function purgeSnapshot(cohort, snap) {
     if (typeof window !== "undefined" &&
         !window.confirm($t("analysis_snapshots_purge_confirm", { slug: snap.slug }))) return;
@@ -760,6 +777,17 @@
                                     {#if snap.status === "captured" && !snap.is_default}
                                       <button type="button" class="row-action" disabled={snapBusy} onclick={() => setSnapshotDefault(cohort, snap)}>
                                         {$t("analysis_snapshots_set_default")}
+                                      </button>
+                                    {/if}
+                                    {#if snap.status === "captured"}
+                                      <button
+                                        type="button"
+                                        class="row-action"
+                                        title={$t("analysis_snapshots_rebuild_title")}
+                                        disabled={snapBusy}
+                                        onclick={() => rebuildSnapshotAggregates(cohort, snap)}
+                                      >
+                                        {$t("analysis_snapshots_rebuild")}
                                       </button>
                                     {/if}
                                     {#if snap.status === "retired"}

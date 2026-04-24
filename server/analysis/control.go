@@ -40,6 +40,7 @@ type ControlStore interface {
 	ClearAnalysisCohortSnapshots(cohortID int64) error
 	CountBatchSnapshotRuns(cohortID int64, batchID string) (runCount, domainCount int, firstFinished, lastFinished time.Time, err error)
 	CountOutstandingJobsForBatch(batchID string) (int, error)
+	CountUnprojectedSnapshotRuns(cohortID int64, batchID string) (int, error)
 	ComputeSnapshotAggregates(cohortID int64, batchID string) ([]serverpkg.AnalysisCohortSnapshotAggregate, error)
 	ReplaceSnapshotAggregates(snapshotID int64, aggs []serverpkg.AnalysisCohortSnapshotAggregate) error
 
@@ -187,6 +188,15 @@ func (c *Controller) accumulateSnapshot(cohort serverpkg.AnalysisCohort, batch s
 
 	if _, err := c.store.UpsertAnalysisCohortSnapshot(snap); err != nil {
 		return fmt.Errorf("upsert snapshot for cohort %d batch %s: %w", cohort.ID, batch.ID, err)
+	}
+	if found && existing.Status == serverpkg.AnalysisSnapshotStatusCaptured {
+		aggregates, err := c.store.ComputeSnapshotAggregates(snap.CohortID, snap.BatchID)
+		if err != nil {
+			return fmt.Errorf("refresh aggregates for captured snapshot %d: %w", snap.ID, err)
+		}
+		if err := c.store.ReplaceSnapshotAggregates(snap.ID, aggregates); err != nil {
+			return fmt.Errorf("write refreshed aggregates for captured snapshot %d: %w", snap.ID, err)
+		}
 	}
 	return nil
 }
@@ -463,9 +473,9 @@ func (c *Controller) projectAndAccumulate(runID string, catalog []serverpkg.Anal
 // CaptureCompletedSnapshots walks the pending-snapshot table and promotes
 // any snapshot whose batch has zero outstanding jobs. Promotion computes
 // the aggregate payloads, writes them, and flips the row to captured so
-// the read path can serve it. Safe to call concurrently with graduation
-// — the upsert in accumulateSnapshot is keyed on (cohort, batch) and
-// captured snapshots are not re-upserted by projection.
+// the read path can serve it. Safe to call concurrently with graduation:
+// capture waits for both the job queue and the analysis projection state
+// for the snapshot's cohort and batch.
 func (c *Controller) CaptureCompletedSnapshots(ctx context.Context) error {
 	for _, snap := range c.store.ListPendingAnalysisCohortSnapshots() {
 		if err := ctx.Err(); err != nil {
@@ -484,6 +494,13 @@ func (c *Controller) captureSnapshot(snap serverpkg.AnalysisCohortSnapshot) erro
 		return fmt.Errorf("count outstanding jobs for batch %s: %w", snap.BatchID, err)
 	}
 	if outstanding > 0 {
+		return nil
+	}
+	unprojected, err := c.store.CountUnprojectedSnapshotRuns(snap.CohortID, snap.BatchID)
+	if err != nil {
+		return fmt.Errorf("count unprojected runs for snapshot %d: %w", snap.ID, err)
+	}
+	if unprojected > 0 {
 		return nil
 	}
 

@@ -515,6 +515,27 @@ func (s *fakeStore) CountOutstandingJobsForBatch(batchID string) (int, error) {
 	return len(s.queuedJobs[batchID]), nil
 }
 
+func (s *fakeStore) CountUnprojectedSnapshotRuns(cohortID int64, batchID string) (int, error) {
+	var count int
+	var sourceTag string
+	for _, cohort := range s.cohorts {
+		if cohort.ID == cohortID {
+			sourceTag = cohort.SourceTag
+			break
+		}
+	}
+	for _, run := range s.runs {
+		if run.BatchID != batchID || !containsString(s.tags[run.DomainID], sourceTag) {
+			continue
+		}
+		state, ok := s.states[projectionKey(cohortID, run.ID)]
+		if !ok || state.Status != serverpkg.AnalysisMaterializationReady {
+			count++
+		}
+	}
+	return count, nil
+}
+
 func (s *fakeStore) ComputeSnapshotAggregates(cohortID int64, batchID string) ([]serverpkg.AnalysisCohortSnapshotAggregate, error) {
 	now := time.Now().UTC()
 	// Minimal but non-empty payload so tests can observe that the capture

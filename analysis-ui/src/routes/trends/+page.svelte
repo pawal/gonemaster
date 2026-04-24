@@ -107,8 +107,8 @@
 <FilterBar
   cohorts={layoutData.catalog?.cohorts ?? []}
   selectorEnabled={layoutData.catalog?.selector_enabled ?? false}
-  snapshots={layoutData.snapshots ?? []}
-  defaultSnapshotSlug={layoutData.defaultSnapshotSlug ?? ""}
+  snapshots={[]}
+  defaultSnapshotSlug=""
   showSearch={false}
 />
 

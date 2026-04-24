@@ -1,88 +1,58 @@
 # Documentation
 
-## Getting Started
+Start with the path that matches what you are doing. The older top-level pages
+remain in place while the documentation is being split into narrower guides.
 
-| If you want to… | Start here |
+## Common Paths
+
+| I want to... | Start here |
 |---|---|
-| Run DNS checks from the command line | [cli.md](cli.md) |
-| Stand up the HTTP server | [server.md](server.md) |
-| Set up PostgreSQL, MariaDB, or SQLite | [database-setup.md](database-setup.md) |
-| Integrate with Nagios / Icinga | [nagios.md](nagios.md) |
+| Run one DNS check locally | [cli.md](cli.md) |
+| Start and operate the HTTP server | [server/](server/README.md) |
+| Automate the server from a shell or script | [client/](client/README.md) |
+| Manage domain tags and batch runs | [analysis/tags.md](analysis/tags.md) |
+| Publish public cohort analysis | [analysis/](analysis/README.md) |
+| Integrate with Nagios or Icinga | [nagios.md](nagios.md) |
+| Call the engine from Go | [dev.md](dev.md) |
 
----
+## Server
 
-## User Guides
+- [server/README.md](server/README.md): server overview, API boundaries, job lifecycle.
+- [server/configuration.md](server/configuration.md): flags, environment variables, config files, profiles.
+- [server/database.md](server/database.md): storage backends, DSNs, retention, backups.
+- [server/operations.md](server/operations.md): jobs, batches, queue controls, purge, deletion, health.
+- [server/public-api-and-proxy.md](server/public-api-and-proxy.md): public endpoints, rate limiting, reverse proxies.
+- [server/performance.md](server/performance.md): worker sizing, hot-cache, resolver tuning.
+- [server/ui.md](server/ui.md): embedded admin UI, public UI, analysis UI.
 
-### [cli.md](cli.md)
-Running `gonemaster` and `gonemaster-client` from the command line — flags,
-output formats (text, JSON, JSON-stream), undelegated testing, and packet
-cache recording/replay with `--save` / `--restore`.
+The older [server.md](server.md) page is kept as a compatibility entry point
+during the split.
 
-### [server.md](server.md)
-Configuring and operating `gonemaster-server` — DSN formats, connection pool
-tuning, all REST API endpoints (jobs, batches, queue management, locale
-discovery, metrics), and result localization via `?locale=`.
+## Client
 
-### [database-setup.md](database-setup.md)
-Choosing and setting up a storage backend (SQLite, PostgreSQL, MariaDB/MySQL)
-— installation, recommended settings, connection strings, backup procedures,
-and when to use each backend.
+- [client/README.md](client/README.md): `gonemaster-client` overview.
+- [client/jobs.md](client/jobs.md): submit, watch, cancel, purge, and fetch job results.
+- [client/batches.md](client/batches.md): run many domains and manage batch results.
+- [client/domains-tags-runs-entries.md](client/domains-tags-runs-entries.md): query stored analysis data.
+- [client/examples.md](client/examples.md): common command sequences.
 
-### [nagios.md](nagios.md)
-The `gonemaster-nagios` plugin — exit codes, `--testcase` / `--module` filters,
-undelegated nameserver testing with `--ns` / `--ds`, RRSIG expiry warnings with
-`--rrsig-warn-days`, and Icinga2 service examples.
+Direct local tests with the `gonemaster` binary stay in [cli.md](cli.md).
 
-### [metrics.md](metrics.md)
-Prometheus metrics exposed at `/metrics` — job counts by status, queue depth,
-queue pause state, worker utilisation, purge stats, and HTTP request histograms.
+## Analysis
 
-### [scoring.md](scoring.md)
-How gonemaster computes numeric quality scores (0–100) and letter grades
-(A+ through F) from test log entries — grade thresholds, penalty weights per
-severity, and the rationale behind the model.
-
-### [data-analysis.md](data-analysis.md)
-Using gonemaster as a bulk DNS analysis platform — running large domain sets
-via the batch API, tracking results over time, and querying data through the
-REST API or directly via SQL.
-
-### [analysis-ui.md](analysis-ui.md)
-The public analysis UI at `/analysis/` — creating tags, wiring them to
-cohorts, running batches, and exposing materialized per-cohort results to
-end users.
-
-### [cohort-snapshots.md](cohort-snapshots.md)
-Operator guide for cohort snapshots — capturing a new snapshot, sharing
-pinned URLs, comparing snapshots with the Trends and Diff views, and
-retiring or purging stale snapshots.
-
----
+- [analysis/README.md](analysis/README.md): analysis model and workflow.
+- [analysis/tags.md](analysis/tags.md): domain collections, tag membership, default profiles.
+- [analysis/cohorts.md](analysis/cohorts.md): curated public datasets backed by tags.
+- [analysis/snapshots.md](analysis/snapshots.md): immutable cohort snapshots, trends, diff views.
+- [analysis/querying.md](analysis/querying.md): API, client, SQL, and CSV analysis patterns.
+- [analysis/public-ui.md](analysis/public-ui.md): public analysis UI at `/analysis/`.
 
 ## Reference
 
-### [cache-format.md](cache-format.md)
-On-disk format for packet cache files produced by `--save` and consumed by
-`--restore` — JSON schema, checksum contract, cache kinds (nameserver, recursor,
-ASN), and strict vs. lenient parsing behaviour.
-
-### [MIGRATION-1.1.md](MIGRATION-1.1.md)
-Upgrade guide for consumers of gonemaster JSON output migrating from pre-1.1
-to the v1.1 log-args contract — what changed in `raw.entries[].args`, CLI JSON
-flags, and server result payloads.
-
-### [openapi.yaml](openapi.yaml)
-OpenAPI 3.0 specification for the full `gonemaster-server` REST API.
-
----
-
-## Developer
-
-### [dev.md](dev.md)
-Calling the engine directly from Go — the `RunRequest` struct, pre-seeding
-nameserver/recursor/ASN caches, running test modules or individual test cases,
-and interpreting log entries.
-
-### [specifications/](specifications/README.md)
-Canonical per-testcase specifications — exact behaviour, emitted tags, RFC
-references, and the workflow for keeping documentation aligned with code.
+- [reference/api.md](reference/api.md): API conventions and links to OpenAPI.
+- [openapi.yaml](openapi.yaml): OpenAPI 3.0 specification for `gonemaster-server`.
+- [metrics.md](metrics.md): Prometheus and JSON metrics.
+- [scoring.md](scoring.md): numeric scores and letter grades.
+- [cache-format.md](cache-format.md): packet cache save/restore file format.
+- [MIGRATION-1.1.md](MIGRATION-1.1.md): JSON output migration guide.
+- [specifications/](specifications/README.md): canonical testcase and tag specifications.

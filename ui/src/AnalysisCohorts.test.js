@@ -139,6 +139,21 @@ describe("AnalysisCohorts", () => {
     expect(screen.getByText("boom happened")).toBeInTheDocument();
   });
 
+  it("labels a ready cohort without rows as never materialized", async () => {
+    installFetch({
+      initialCohorts: [{
+        ...sampleCohorts()[0],
+        materialization_status: "ready",
+        last_materialized_at: "",
+      }],
+    });
+    render(AnalysisCohorts);
+
+    const row = (await screen.findByText("tld")).closest("tr");
+    expect(within(row).getByText("never materialized")).toBeInTheDocument();
+    expect(within(row).queryByText("ready")).toBeNull();
+  });
+
   it("patches analysis_enabled when clicking the analysis toggle and clears dependent flags on disable", async () => {
     const handles = installFetch();
     render(AnalysisCohorts);

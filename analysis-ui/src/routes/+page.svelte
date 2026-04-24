@@ -158,11 +158,11 @@
   <section class="card empty-state">
     <h2>No snapshot has been captured yet</h2>
     <p class="hint">
-      This cohort is published but the projector hasn't captured a snapshot yet.
-      A snapshot is formed when an admin submits a snapshot-intent batch and
-      every job in the batch graduates. Run a snapshot from the admin UI
-      (<strong>Settings - Analysis - Cohorts</strong>) to create the first
-      snapshot, or wait for the next scheduled rollover.
+      This cohort is published, but this dashboard reads captured snapshots
+      and the cohort does not have one yet. In the admin UI, click
+      <strong>Run new snapshot</strong> for the cohort and wait for the batch
+      to finish. <strong>Rebuild</strong> updates materialized rows, but it
+      does not create a public snapshot by itself.
     </p>
   </section>
 {:else if data.detailError}

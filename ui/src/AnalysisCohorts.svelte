@@ -447,6 +447,22 @@
     }
   }
 
+  function isReadyWithoutMaterialization(cohort) {
+    return cohort?.materialization_status === "ready" && !cohort?.last_materialized_at;
+  }
+
+  function materializationBadgeTone(cohort) {
+    if (isReadyWithoutMaterialization(cohort)) return "neutral";
+    return statusBadgeTone(cohort?.materialization_status);
+  }
+
+  function materializationStatusLabel(cohort) {
+    if (isReadyWithoutMaterialization(cohort)) {
+      return $t("analysis_cohorts_never_materialized");
+    }
+    return cohort?.materialization_status || "pending";
+  }
+
   function formatTimestamp(value) {
     if (!value) return "";
     const parsed = new Date(value);
@@ -545,7 +561,7 @@
           <tbody>
             {#each cohorts as cohort (cohort.id)}
               {@const busy = busyCohortId === cohort.id}
-              {@const tone = statusBadgeTone(cohort.materialization_status)}
+              {@const tone = materializationBadgeTone(cohort)}
               <tr class:row-editing={editingCohortId === cohort.id}>
                 <th scope="row" class="cohort-cell">
                   <span class="cohort-tag">{cohort.source_tag}</span>
@@ -596,7 +612,7 @@
                 <td class="materialization-cell">
                   <div class="materialization-main">
                     <span class={`badge badge-status badge-status-${tone}`}>
-                      {cohort.materialization_status || "pending"}
+                      {materializationStatusLabel(cohort)}
                     </span>
                     {#if cohort.materialization_status === "pending" && cohort.materialization_total > 0}
                       <span class="materialization-when">
@@ -606,7 +622,7 @@
                       <time class="materialization-when" datetime={cohort.last_materialized_at}>
                         {formatTimestamp(cohort.last_materialized_at)}
                       </time>
-                    {:else}
+                    {:else if cohort.materialization_status !== "ready"}
                       <span class="materialization-when muted">{$t("analysis_cohorts_never_materialized")}</span>
                     {/if}
                   </div>

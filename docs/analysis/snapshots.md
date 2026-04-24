@@ -45,8 +45,8 @@ Every public analysis URL can carry `?snapshot=<slug>`.
 
 ```text
 /analysis/
-/analysis/?snapshot=2026-04-20-strict
-/analysis/domains/example.se?snapshot=2026-04-20-strict
+/analysis/?snapshot=2026-04-20-a1b2c3d4e5f6
+/analysis/domains/example.se?snapshot=2026-04-20-a1b2c3d4e5f6
 ```
 
 Without `snapshot`, the cohort resolves according to its default snapshot

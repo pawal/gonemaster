@@ -2,6 +2,7 @@ package analysis
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -39,6 +40,30 @@ func snapshotLifecycleStore(t *testing.T) (*fakeStore, serverpkg.AnalysisCohort)
 	}
 	store.ensureSnapshotMaps()
 	return store, cohort
+}
+
+func TestDefaultSnapshotSlugUsesFullBatchIDHash(t *testing.T) {
+	createdAt := time.Date(2026, 4, 24, 15, 30, 0, 0, time.UTC)
+	first := defaultSnapshotSlug(serverpkg.Batch{
+		ID:        "batch_1777044617680247000_5",
+		CreatedAt: createdAt,
+	})
+	second := defaultSnapshotSlug(serverpkg.Batch{
+		ID:        "batch_1777044617685621000_8",
+		CreatedAt: createdAt,
+	})
+
+	for _, slug := range []string{first, second} {
+		if !strings.HasPrefix(slug, "2026-04-24-") {
+			t.Fatalf("slug %q does not carry the expected date prefix", slug)
+		}
+		if len(slug) != len("2026-04-24-")+12 {
+			t.Fatalf("slug %q has length %d, want %d", slug, len(slug), len("2026-04-24-")+12)
+		}
+	}
+	if first == second {
+		t.Fatalf("same-day batch IDs produced the same slug %q", first)
+	}
 }
 
 // TestControllerProjectRunSkipsEmptyBatchID covers the plan's first

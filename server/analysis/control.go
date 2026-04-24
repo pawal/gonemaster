@@ -2,6 +2,8 @@ package analysis
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
@@ -189,19 +191,17 @@ func (c *Controller) accumulateSnapshot(cohort serverpkg.AnalysisCohort, batch s
 	return nil
 }
 
-// defaultSnapshotSlug renders the date-first slug the plan specifies. The
-// 8-character batch-id suffix keeps the slug unique across two batches
-// that land on the same day, including same-day retries of the same cohort.
+// defaultSnapshotSlug renders a date-first slug with a stable hash suffix
+// derived from the full batch ID. Generated batch IDs share a long prefix, so
+// truncating the raw ID is not enough to keep same-day snapshots distinct.
 func defaultSnapshotSlug(batch serverpkg.Batch) string {
 	date := batch.CreatedAt.UTC().Format("2006-01-02")
-	suffix := batch.ID
-	if len(suffix) > 8 {
-		suffix = suffix[:8]
-	}
-	if suffix == "" {
+	batchID := strings.TrimSpace(batch.ID)
+	if batchID == "" {
 		return date
 	}
-	return date + "-" + suffix
+	sum := sha1.Sum([]byte(batchID))
+	return date + "-" + hex.EncodeToString(sum[:])[:12]
 }
 
 // mixedProfiles returns true when the snapshot's denormalized profile

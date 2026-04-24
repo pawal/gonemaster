@@ -142,7 +142,7 @@
   }
   $: batchSnapshotPartial = batchSnapshotIntent && !batchFromTagMode;
   $: batchSnapshotSlugPreview = snapshotCheckboxVisible && batchSnapshotIntent
-    ? formatSnapshotSlugPreview(batchProfileId)
+    ? formatSnapshotSlugPreview()
     : "";
 
   // Locale management: fetch available locales from the server, persist choice
@@ -709,12 +709,11 @@
     return match?.name || `#${normalized}`;
   };
 
-  // Mirrors server defaultSnapshotSlug; batch id not yet known, so "*".
-  const formatSnapshotSlugPreview = (profileID) => {
+  // Mirrors server defaultSnapshotSlug shape; the batch-id hash is not known
+  // until the server accepts the batch.
+  const formatSnapshotSlugPreview = () => {
     const today = new Date().toISOString().slice(0, 10);
-    const profile = profileNameByID(profileID);
-    const suffix = profile ? `-${profile}` : "-*";
-    return `${today}${suffix}`;
+    return `${today}-<batch-hash>`;
   };
   const jobProfileName = (job, run = null) => {
     const direct = String(job?.profile_name || run?.profile_name || "").trim();

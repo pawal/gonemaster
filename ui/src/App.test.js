@@ -3980,6 +3980,122 @@ describe("App", () => {
       });
       unmount();
     });
+
+    describe("Earlier batches panel", () => {
+      const mockTagBatchesFetch = (batches = [], extra = {}) => {
+        const calls = [];
+        global.fetch.mockImplementation((url, opts) => {
+          const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+          const method = opts?.method || "GET";
+          calls.push({ url: value, method });
+          if (value.includes("/summary")) {
+            return jsonResponse({ tag: "tld", domain_count: 0, ok: 0, notice: 0, warning: 0, error: 0, critical: 0 });
+          }
+          if (value.match(/\/tags\/[^/]+\/batches/)) {
+            return jsonResponse({ items: batches, total: batches.length });
+          }
+          if (value.includes("/domains") && value.includes("/tags/")) {
+            return jsonResponse({ items: [], total: 0 });
+          }
+          if (value.match(/\/batches\/[^/]+\/delete-preview/)) {
+            return jsonResponse(extra.preview || {
+              batch_id: "batch_a",
+              tag: "tld",
+              exists: true,
+              queued_jobs: 0,
+              running_jobs: 0,
+              completed_runs: 3,
+              entries: 50,
+              fact_rows: 20,
+              snapshots: [],
+            });
+          }
+          if (value.match(/\/batches\/[^/]+$/) && method === "GET") {
+            return jsonResponse({
+              batch_id: "batch_a",
+              total: 1,
+              status_counts: { succeeded: 1 },
+              items: [{ id: "job_a", domain: "a.example", status: "succeeded", created_at: "2026-04-10T12:00:00Z", progress: 100 }],
+              created_at: "2026-04-10T12:00:00Z",
+            });
+          }
+          if (value.includes("/api/v1/tags") && opts?.method !== "POST") {
+            return jsonResponse([{ name: "tld", description: "", domain_count: 2 }]);
+          }
+          return jsonResponse({ items: [], total: 0 });
+        });
+        return calls;
+      };
+
+      it("loads and renders batches for the selected tag", async () => {
+        mockTagBatchesFetch([
+          { id: "batch_a", tag: "tld", created_at: "2026-04-10T12:00:00Z", domain_count: 3, snapshot_intent: true },
+          { id: "batch_b", tag: "tld", created_at: "2026-04-01T09:00:00Z", domain_count: 2, snapshot_intent: false },
+        ]);
+
+        const { unmount } = render(App);
+        await openTagsTab();
+        await fireEvent.click(await screen.findByText("tld"));
+
+        expect(await screen.findByText("batch_a")).toBeInTheDocument();
+        expect(screen.getByText("batch_b")).toBeInTheDocument();
+        expect(screen.getByText("snapshot-intent")).toBeInTheDocument();
+        unmount();
+      });
+
+      it("shows empty state when tag has no batches", async () => {
+        mockTagBatchesFetch([]);
+
+        const { unmount } = render(App);
+        await openTagsTab();
+        await fireEvent.click(await screen.findByText("tld"));
+
+        expect(
+          await screen.findByText("No batches have been run for this tag yet."),
+        ).toBeInTheDocument();
+        unmount();
+      });
+
+      it("row click navigates to the batches tab with the batch pre-loaded", async () => {
+        mockTagBatchesFetch([
+          { id: "batch_a", tag: "tld", created_at: "2026-04-10T12:00:00Z", domain_count: 3, snapshot_intent: false },
+        ]);
+
+        const { unmount } = render(App);
+        await openTagsTab();
+        await fireEvent.click(await screen.findByText("tld"));
+
+        const row = (await screen.findByText("batch_a")).closest("tr");
+        await fireEvent.click(row);
+
+        await waitFor(() => {
+          expect(screen.getByRole("tab", { name: "Batch Jobs", selected: true })).toBeInTheDocument();
+        });
+        const input = await screen.findByLabelText("Batch ID");
+        expect(input.value).toBe("batch_a");
+        unmount();
+      });
+
+      it("per-row delete button opens the modal", async () => {
+        mockTagBatchesFetch([
+          { id: "batch_a", tag: "tld", created_at: "2026-04-10T12:00:00Z", domain_count: 3, snapshot_intent: false },
+        ]);
+
+        const { container, unmount } = render(App);
+        await openTagsTab();
+        await fireEvent.click(await screen.findByText("tld"));
+        await screen.findByText("batch_a");
+
+        const rowDelete = container.querySelector("tr [data-row-action] button");
+        expect(rowDelete).not.toBeNull();
+        await fireEvent.click(rowDelete);
+
+        await waitFor(() => {
+          expect(container.querySelector(".modal-backdrop")).not.toBeNull();
+        });
+        unmount();
+      });
+    });
   });
 
   describe("Run Inspector", () => {

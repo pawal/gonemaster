@@ -3539,7 +3539,7 @@
               {#each tagBatches as b (b.id)}
                 <tr
                   style="cursor: pointer;"
-                  onclick={() => openBatchFromTagRow(b.id)}
+                  onclick={(e) => { if (e.target.closest("[data-row-action]")) return; openBatchFromTagRow(b.id); }}
                   onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") openBatchFromTagRow(b.id); }}
                   role="button"
                   tabindex="0"
@@ -3550,11 +3550,12 @@
                   </td>
                   <td>{b.created_at ? b.created_at.slice(0, 19).replace("T", " ") : "—"}</td>
                   <td>{b.domain_count ?? "—"}</td>
-                  <td style="text-align: right;">
+                  <td style="text-align: right;" data-row-action>
                     <button
                       class="ghost small warn"
                       type="button"
-                      onclick={(e) => { e.stopPropagation(); openBatchDelete(b.id); }}
+                      data-row-action
+                      onclick={() => openBatchDelete(b.id)}
                     >{$t("batch_delete_button")}</button>
                   </td>
                 </tr>

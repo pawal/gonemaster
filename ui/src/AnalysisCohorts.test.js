@@ -456,4 +456,77 @@ describe("AnalysisCohorts", () => {
     await waitFor(() => expect(handles.snapshotDeletes).toHaveLength(1));
     expect(handles.snapshotDeletes[0]).toEqual({ id: 1, slug: "2026-04-20", purge: true });
   });
+
+  // ── Delete-batch action ──────────────────────────────────────────────────
+
+  it("renders a Delete batch button per snapshot row when onDeleteBatch is provided", async () => {
+    const snapshotsByCohort = {
+      1: [{
+        id: 100, batch_id: "batch_abc", slug: "2026-04-20", label: "",
+        captured_at: "2026-04-20T12:00:00Z", profile_name: "strict",
+        run_count: 3, domain_count: 3, status: "captured",
+        is_public: true, is_default: false,
+      }],
+    };
+    installSnapshotFetch({ snapshotsByCohort });
+    const onDeleteBatch = vi.fn();
+    render(AnalysisCohorts, { props: { onDeleteBatch } });
+
+    const tldRow = (await screen.findByText("tld")).closest("tr");
+    await fireEvent.click(within(tldRow).getByRole("button", { name: /Snapshots/i }));
+
+    const deleteBatchButton = await screen.findByRole("button", { name: /^Delete batch$/i });
+    await fireEvent.click(deleteBatchButton);
+
+    expect(onDeleteBatch).toHaveBeenCalledWith("batch_abc");
+  });
+
+  it("hides the Delete batch button when onDeleteBatch is not provided", async () => {
+    const snapshotsByCohort = {
+      1: [{
+        id: 100, batch_id: "batch_abc", slug: "2026-04-20", label: "",
+        captured_at: "2026-04-20T12:00:00Z", profile_name: "strict",
+        run_count: 3, domain_count: 3, status: "captured",
+        is_public: true, is_default: false,
+      }],
+    };
+    installSnapshotFetch({ snapshotsByCohort });
+    render(AnalysisCohorts);
+
+    const tldRow = (await screen.findByText("tld")).closest("tr");
+    await fireEvent.click(within(tldRow).getByRole("button", { name: /Snapshots/i }));
+    await screen.findByText("2026-04-20");
+
+    expect(screen.queryByRole("button", { name: /^Delete batch$/i })).toBeNull();
+  });
+
+  it("refetches snapshots for expanded cohorts when refreshSignal changes", async () => {
+    const snapshotsByCohort = {
+      1: [{
+        id: 100, batch_id: "batch_abc", slug: "2026-04-20", label: "",
+        captured_at: "2026-04-20T12:00:00Z", profile_name: "strict",
+        run_count: 3, domain_count: 3, status: "captured",
+        is_public: true, is_default: false,
+      }],
+    };
+    installSnapshotFetch({ snapshotsByCohort });
+    const { rerender } = render(AnalysisCohorts, { props: { refreshSignal: 0 } });
+
+    const tldRow = (await screen.findByText("tld")).closest("tr");
+    await fireEvent.click(within(tldRow).getByRole("button", { name: /Snapshots/i }));
+    await screen.findByText("2026-04-20");
+
+    const beforeCalls = global.fetch.mock.calls.filter(
+      (args) => typeof args[0] === "string" && args[0].endsWith("/snapshots"),
+    ).length;
+
+    await rerender({ refreshSignal: 1 });
+
+    await waitFor(() => {
+      const afterCalls = global.fetch.mock.calls.filter(
+        (args) => typeof args[0] === "string" && args[0].endsWith("/snapshots"),
+      ).length;
+      expect(afterCalls).toBeGreaterThan(beforeCalls);
+    });
+  });
 });

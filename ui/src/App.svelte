@@ -3722,6 +3722,7 @@
               <th>{$t("tag_cohort_col_header")}</th>
               <th class="sortable-column" aria-sort={tableSortAria(tagsListSortState, "description")}><button class="table-sort-button" type="button" onclick={() => { tagsListSortState = nextTableSort(tagsListSortState, "description"); }}><span>{$t("tag_description_label")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(tagsListSortState, "description")}</span></button></th>
               <th class="sortable-column" aria-sort={tableSortAria(tagsListSortState, "domain_count")}><button class="table-sort-button" type="button" onclick={() => { tagsListSortState = nextTableSort(tagsListSortState, "domain_count", "desc"); }}><span>{$t("col_domain_count")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(tagsListSortState, "domain_count")}</span></button></th>
+              <th>{$t("analysis_cohorts_col_actions")}</th>
             </tr></thead>
             <tbody>
               {#each sortedTagsList as tag}
@@ -3749,6 +3750,15 @@
                   </td>
                   <td>{tag.description || "—"}</td>
                   <td>{tag.domain_count ?? 0}</td>
+                  <td style="text-align: right;">
+                    <button
+                      class="secondary small"
+                      type="button"
+                      onclick={(e) => { e.stopPropagation(); navigateToTagDetail(tag); }}
+                    >
+                      {$t("earlier_batches_heading")}
+                    </button>
+                  </td>
                 </tr>
               {/each}
             </tbody>

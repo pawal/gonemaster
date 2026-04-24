@@ -3698,6 +3698,7 @@ describe("App", () => {
         const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
         if (value.includes("/summary")) return jsonResponse(summary ?? { tag: "t", domain_count: 0, ok: 0, notice: 0, warning: 0, error: 0, critical: 0 });
         if (value.includes("/domains") && value.includes("/tags/")) return jsonResponse({ items: domains, total: domains.length });
+        if (value.match(/\/tags\/[^/]+\/batches/)) return jsonResponse({ items: [], total: 0 });
         if (value.includes("/api/v1/tags") && opts?.method === "POST") return jsonResponse({ name: "new-tag", description: "", domain_count: 0 }, true);
         if (value.includes("/api/v1/tags") && opts?.method === "DELETE") return { ok: true, status: 204, headers: { get: () => null }, json: async () => ({}), text: async () => "" };
         if (value.includes("/api/v1/tags")) return jsonResponse(tags);
@@ -3718,6 +3719,23 @@ describe("App", () => {
       await openTagsTab();
       expect(await screen.findByText("tld")).toBeInTheDocument();
       expect(screen.getByText("Top-level")).toBeInTheDocument();
+      unmount();
+    });
+
+    it("shows a visible earlier-batches action for each tag row", async () => {
+      mockTagFetch([{ name: "tld", description: "Top-level", domain_count: 5 }]);
+      const { unmount } = render(App);
+      await openTagsTab();
+
+      const tagsPanel = screen.getByRole("tabpanel", { name: "Tags" });
+      const table = await within(tagsPanel).findByRole("table");
+      const action = within(table).getByRole("button", { name: "Earlier batches" });
+      await fireEvent.click(action);
+
+      await waitFor(() => {
+        expect(screen.getByRole("heading", { name: "Tag: tld" })).toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "Earlier batches" })).toBeInTheDocument();
+      });
       unmount();
     });
 

@@ -2,7 +2,9 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
-## [Unreleased]
+## [v1.4.0] - 2026-04-24
+
+New **Analysis UI** with cohorts from tags in the Admin UI! Also test case explanations in the Public UI. 
 
 ### Added
  - Analysis: immutable cohort snapshots, one per snapshot-intent batch
@@ -12,10 +14,14 @@ All notable changes to all gonemaster components will be documented in this file
  - API: `GET /api/v1/tags/{name}/batches`, `GET /api/v1/batches/{id}/delete-preview`, `DELETE /api/v1/batches/{id}` cascades the batch row, runs, entries, fact tables and snapshots in one transaction
  - Analysis UI: snapshot selector, overview pill, Trends and Diff tabs
  - Docs: [docs/cohort-snapshots.md](docs/cohort-snapshots.md), [docs/batch-deletion.md](docs/batch-deletion.md)
+ - Public UI: Explanations for WARNINGS, ERRORS, and CRITICAL
+ - Analysis UI: A link to the test case specification from the test module pill
 
 ### Changed
  - Analysis: public read path now pins to a resolved snapshot; latest-per-domain collapsing is gone, old bookmarks auto-resolve to the newest captured snapshot
  - Analysis: first-boot backfill creates one snapshot per historical (cohort, batch) pair
+ - Docs: Reorganized the documentation structure
+ - Public UI: Show unresolvable and unreachable nameservers in nameserver response times
 
 ## [v1.3.2] - 2026-04-16
 

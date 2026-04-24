@@ -3,7 +3,7 @@
 This guide covers choosing and configuring a storage backend for `gonemaster-server`,
 including setup, recommended settings, tuning, and backup procedures.
 For DSN formats and connection pool defaults, see
-[server.md - Database](server.md#database).
+[server/database.md](server/database.md).
 
 ---
 
@@ -36,7 +36,7 @@ long-term to prevent unbounded memory growth.
 
 | Setting | Recommended value | Notes |
 |---|---|---|
-| `--db-retention-days` | `1`–`7` for long-running services | Prevents unbounded RAM growth; omit for short-lived processes |
+| `--db-retention-days` | `1 to 7` for long-running services | Prevents unbounded RAM growth; omit for short-lived processes |
 
 **When to use:**
 - Development and local testing.

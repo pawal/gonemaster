@@ -8,6 +8,20 @@ For the HTTP client that talks to `gonemaster-server`, see
 
 `gonemaster` normalizes IDN domains to IDNA A-labels before use.
 
+## Installation
+
+Install the CLI with Go:
+
+```sh
+go install codeberg.org/pawal/gonemaster/cmd/gonemaster@latest
+```
+
+For local development from a checkout:
+
+```sh
+go build -o gonemaster ./cmd/gonemaster
+```
+
 ## Synopsis
 
 ```sh

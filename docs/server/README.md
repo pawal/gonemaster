@@ -30,6 +30,73 @@ Completed jobs graduate into immutable `runs` and `entries` rows. Domain rows
 store a denormalized latest result so common filters do not need to scan all
 historical runs.
 
+## Build
+
+Build the server with the embedded UI:
+
+```sh
+go build -o ./gonemaster-server ./cmd/gonemaster-server
+```
+
+Rebuild embedded UI assets before a normal UI-enabled build:
+
+```sh
+make ui-build
+```
+
+Build an API-only binary when `npm` is not available:
+
+```sh
+make build-gonemaster-server-noui
+```
+
+or:
+
+```sh
+go build -tags nogui -o ./gonemaster-server ./cmd/gonemaster-server
+```
+
+With the `nogui` tag, API routes are unchanged. UI routes return a short
+informational page or `404 ui not available`.
+
+## Quick Start
+
+Start the server:
+
+```sh
+./gonemaster-server
+```
+
+Submit a job:
+
+```sh
+JOB_ID=$(curl -s http://localhost:8080/api/v1/jobs \
+  -H 'Content-Type: application/json' \
+  -d '{"domain":"example.com"}' | jq -r .id)
+```
+
+Poll status:
+
+```sh
+while true; do
+  STATUS=$(curl -s "http://localhost:8080/api/v1/jobs/$JOB_ID" | jq -r .status)
+  echo "status=$STATUS"
+  case "$STATUS" in
+    succeeded|failed|canceled|expired) break ;;
+  esac
+  sleep 2
+done
+```
+
+Fetch the result:
+
+```sh
+curl -s "http://localhost:8080/api/v1/jobs/$JOB_ID/result?locale=en" | jq .
+```
+
+For shell automation, prefer [../client/](../client/README.md) over hand-written
+`curl` loops.
+
 ## Next Steps
 
 - Configure the server: [configuration.md](configuration.md)

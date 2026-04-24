@@ -28,6 +28,12 @@ of internal job IDs.
 - List endpoints use `limit` and `offset` where pagination is available.
 - Result endpoints often accept `locale`.
 
+## Domain Normalization
+
+Domain input is normalized to IDNA A-labels before execution and storage. For
+example, `räksmörgås.se` becomes `xn--rksmrgs-5wao1o.se`. Invalid domains
+return `400` with `error.code=invalid_domain`.
+
 ## OpenAPI
 
 The endpoint contract lives in [../openapi.yaml](../openapi.yaml). Narrative

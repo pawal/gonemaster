@@ -1,8 +1,6 @@
 # Server Configuration
 
-This page owns the `gonemaster-server` configuration model. The older
-[../server.md](../server.md) page still contains the full current reference
-while the server docs are being split.
+This page owns the `gonemaster-server` configuration model.
 
 ## Precedence
 
@@ -15,16 +13,116 @@ Configuration is applied in this order:
 
 Use environment variables for secrets such as database connection strings.
 
+Print the effective config and exit:
+
+```sh
+gonemaster-server --dump-config
+```
+
 ## Core Settings
 
 | Setting | Purpose |
 |---|---|
 | `listen_addr` | Address and port for the HTTP listener. |
+| `max_body_size` | Maximum request body size. |
 | `worker_count` | Number of workers that dequeue jobs. |
 | `max_concurrent_jobs` | Maximum number of engine runs at once. |
+| `cross_job_hot_cache` | Enables cross-job nameserver cache sharing. |
+| `cross_job_hot_cache_ttl_seconds` | TTL for cross-job hot-cache entries. |
 | `min_level` | Minimum log level stored and returned in results. |
 | `profile_path` | Default engine profile file. |
+| `public_url` | Canonical public base URL for public pages, robots, and sitemap. |
+| `scoring_config_path` | Optional JSON scoring configuration file. |
 | `debug` | Enables more verbose server logging. |
+
+## Environment Variables
+
+| Variable | Config field |
+|---|---|
+| `GONEMASTER_LISTEN` | `listen_addr` |
+| `GONEMASTER_WORKER_COUNT` | `worker_count` |
+| `GONEMASTER_MAX_CONCURRENT_JOBS` | `max_concurrent_jobs` |
+| `GONEMASTER_MIN_LEVEL` | `min_level` |
+| `GONEMASTER_PROFILE` | `profile_path` |
+| `GONEMASTER_DEBUG` | `debug` |
+| `GONEMASTER_DB_DRIVER` | `database.driver` |
+| `GONEMASTER_DB_DSN` | `database.dsn` |
+| `GONEMASTER_DB_RETENTION_DAYS` | `database.retention_days` |
+| `GONEMASTER_PUBLIC_API_RATE_LIMIT_ENABLED` | `public_api.rate_limit_enabled` |
+| `GONEMASTER_PUBLIC_API_RATE_LIMIT_MAX` | `public_api.rate_limit_max` |
+| `GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW` | `public_api.rate_limit_window` |
+| `GONEMASTER_CROSS_JOB_HOT_CACHE` | `cross_job_hot_cache` |
+| `GONEMASTER_CROSS_JOB_HOT_CACHE_TTL` | `cross_job_hot_cache_ttl_seconds` |
+
+Invalid integer, boolean, or duration values emit a warning and are ignored.
+
+## Flags
+
+Common flags:
+
+```text
+--config PATH
+--listen ADDR
+--max-body-size BYTES
+--debug
+--dump-config
+--version
+--shutdown-timeout DURATION
+--workers N
+--max-concurrent-jobs N
+--cross-job-hot-cache
+--no-cross-job-hot-cache
+--cross-job-hot-cache-ttl N
+--profile PATH
+--min-level LEVEL
+```
+
+Resolver override flags:
+
+```text
+--positive-cache-ttl N
+--negative-cache-ttl N
+--timeout N
+--retry N
+--retrans N
+--fallback
+--no-fallback
+--sourceaddr4 IPADDR
+--sourceaddr6 IPADDR
+```
+
+Database and public API flags are covered in [database.md](database.md) and
+[public-api-and-proxy.md](public-api-and-proxy.md).
+
+## Config File Example
+
+```json
+{
+  "listen_addr": "127.0.0.1:8080",
+  "max_body_size": 1048576,
+  "debug": false,
+  "worker_count": 16,
+  "max_concurrent_jobs": 16,
+  "cross_job_hot_cache": true,
+  "cross_job_hot_cache_ttl_seconds": 60,
+  "timeout": 5,
+  "retry": 2,
+  "retrans": 3,
+  "fallback": true,
+  "min_level": "INFO",
+  "profile_path": "/etc/gonemaster/profile.json",
+  "database": {
+    "driver": "sqlite",
+    "dsn": "/var/lib/gonemaster/gonemaster.db",
+    "retention_days": 90
+  },
+  "public_api": {
+    "rate_limit_enabled": true,
+    "rate_limit_max": 10,
+    "rate_limit_window": "10m"
+  }
+}
+```
 
 ## Profiles
 
@@ -36,6 +134,66 @@ The server has two profile sources:
 
 Stored profiles are sparse overrides. They contain only the settings that
 differ from the engine default.
+
+Example stored profile config:
+
+```json
+{
+  "resolver": {
+    "defaults": {
+      "timeout": 5
+    }
+  }
+}
+```
+
+Stored profiles can be referenced from jobs, batches, public profiles, and tag
+defaults. The server validates stored profile JSON on create and update.
+
+## Profile Compatibility
+
+Stored profiles record the engine schema version used when they were last
+edited. When engine defaults gain new test cases or test-level tags, the
+compatibility endpoints and admin UI can show profiles that need review.
+
+Available repair operations include:
+
+- add missing test cases
+- add missing test-level tags
+- reset test cases to inherited defaults
+- reset one test-level module
+- mark a profile as reviewed
+
+## Deterministic Resolver Behavior
+
+The built-in profile uses parallel and unordered resolver behavior for speed.
+For deterministic ordered output, use a profile with:
+
+```json
+{
+  "resolver": {
+    "defaults": {
+      "unordered": false,
+      "parallel": 1
+    }
+  }
+}
+```
+
+## Result Display Settings
+
+The config file can hide score and nameserver timing UI elements:
+
+```json
+{
+  "show_score_admin": true,
+  "show_score_public": true,
+  "show_nameserver_timings_admin": true,
+  "show_nameserver_timings_public": true
+}
+```
+
+These settings affect UI display. They do not remove stored data.
 
 ## Related Pages
 

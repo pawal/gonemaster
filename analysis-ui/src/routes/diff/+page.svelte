@@ -3,6 +3,7 @@
   import { page } from "$app/state";
   import FilterBar from "$lib/FilterBar.svelte";
   import type { DiffEntry } from "$lib/api";
+  import { snapshotOptionLabel } from "$lib/format";
   import type { LayoutData } from "../+layout";
   import type { DiffPageData } from "./+page";
 
@@ -82,7 +83,7 @@
       <select value={data.fromSlug} onchange={(e) => setSide("from", e.currentTarget.value)}>
         <option value="">Pick snapshot…</option>
         {#each layoutData.snapshots ?? [] as snap (snap.slug)}
-          <option value={snap.slug}>{snap.label ? `${snap.label} — ${snap.slug}` : snap.slug}</option>
+          <option value={snap.slug}>{snapshotOptionLabel(snap)}</option>
         {/each}
       </select>
     </label>
@@ -91,7 +92,7 @@
       <select value={data.toSlug} onchange={(e) => setSide("to", e.currentTarget.value)}>
         <option value="">Pick snapshot…</option>
         {#each layoutData.snapshots ?? [] as snap (snap.slug)}
-          <option value={snap.slug}>{snap.label ? `${snap.label} — ${snap.slug}` : snap.slug}</option>
+          <option value={snap.slug}>{snapshotOptionLabel(snap)}</option>
         {/each}
       </select>
     </label>

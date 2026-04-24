@@ -3054,7 +3054,15 @@ components:
             properties:
               slug:
                 type: string
+              label:
+                type: string
               captured_at:
+                type: string
+                format: date-time
+              first_run_at:
+                type: string
+                format: date-time
+              last_run_at:
                 type: string
                 format: date-time
               payload:

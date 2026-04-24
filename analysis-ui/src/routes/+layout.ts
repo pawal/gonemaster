@@ -1,5 +1,6 @@
 import type { CatalogResponse, Cohort, SnapshotListEntry } from "$lib/api";
 import { getCatalog, listSnapshots } from "$lib/api";
+import { snapshotSourceDate } from "$lib/format";
 
 // The analysis UI is a pure client-side SPA embedded in the Go server.
 export const ssr = false;
@@ -45,7 +46,11 @@ export async function load({ fetch, url }): Promise<LayoutData> {
     if (resolvedCohort) {
       try {
         const list = await listSnapshots(resolvedCohort, fetch);
-        snapshots = list.snapshots ?? [];
+        snapshots = [...(list.snapshots ?? [])].sort((a, b) => {
+          const bySourceDate = snapshotSourceDate(b).localeCompare(snapshotSourceDate(a));
+          if (bySourceDate !== 0) return bySourceDate;
+          return b.slug.localeCompare(a.slug);
+        });
       } catch {
         // Snapshot list failure is non-fatal — the selector just hides
         // and the rest of the UI continues to work against auto-latest.

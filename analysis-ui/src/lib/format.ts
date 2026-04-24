@@ -14,12 +14,62 @@ const ISO_LOCAL = new Intl.DateTimeFormat("sv-SE", {
   second: "2-digit"
 });
 
+const ISO_DATE = new Intl.DateTimeFormat("sv-SE", {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit"
+});
+
+export type SnapshotDisplayFields = {
+  slug?: string;
+  label?: string;
+  first_run_at?: string;
+  last_run_at?: string;
+  captured_at?: string;
+};
+
 export function formatTimestamp(value: string | null | undefined): string {
   if (!value) return "";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "";
   if (parsed.getUTCFullYear() < 1970) return ""; // Go zero-time guard.
   return ISO_LOCAL.format(parsed);
+}
+
+export function formatDate(value: string | null | undefined): string {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  if (parsed.getUTCFullYear() < 1970) return "";
+  return ISO_DATE.format(parsed);
+}
+
+export function snapshotSlugDate(slug: string | null | undefined): string {
+  const match = String(slug ?? "").match(/^(\d{4}-\d{2}-\d{2})(?:-|$)/);
+  return match?.[1] ?? "";
+}
+
+export function snapshotSourceDate(snapshot: SnapshotDisplayFields | null | undefined): string {
+  if (!snapshot) return "";
+  return (
+    formatDate(snapshot.last_run_at) ||
+    formatDate(snapshot.first_run_at) ||
+    snapshotSlugDate(snapshot.slug)
+  );
+}
+
+export function snapshotDisplayLabel(snapshot: SnapshotDisplayFields | null | undefined): string {
+  if (!snapshot) return "Snapshot";
+  const explicit = String(snapshot.label ?? "").trim();
+  if (explicit) return explicit;
+  return snapshotSourceDate(snapshot) || snapshot.slug || "Snapshot";
+}
+
+export function snapshotOptionLabel(snapshot: SnapshotDisplayFields | null | undefined): string {
+  const primary = snapshotDisplayLabel(snapshot);
+  const sourceDate = snapshotSourceDate(snapshot);
+  if (snapshot?.label?.trim() && sourceDate) return `${primary} (${sourceDate})`;
+  return primary;
 }
 
 export function formatCount(n: number | null | undefined): string {

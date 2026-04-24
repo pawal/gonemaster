@@ -50,7 +50,10 @@ type PublicAnalysisSnapshotDetail struct {
 // PublicAnalysisTrendPoint is one (snapshot, payload) pair in a trend series.
 type PublicAnalysisTrendPoint struct {
 	Slug       string          `json:"slug"`
+	Label      string          `json:"label,omitempty"`
 	CapturedAt time.Time       `json:"captured_at"`
+	FirstRunAt time.Time       `json:"first_run_at,omitempty"`
+	LastRunAt  time.Time       `json:"last_run_at,omitempty"`
 	Payload    json.RawMessage `json:"payload"`
 }
 
@@ -203,9 +206,15 @@ func (s *Server) handlePublicAnalysisTrends(w http.ResponseWriter, r *http.Reque
 	toSlug := strings.TrimSpace(r.URL.Query().Get("to"))
 
 	all := readStore.ListAnalysisCohortSnapshots(cohort.ID)
-	// Order oldest-first for natural time-series rendering.
-	sort.Slice(all, func(i, j int) bool {
-		return all[i].CapturedAt.Before(all[j].CapturedAt)
+	// Order oldest-first by the source batch's run window, not by the later
+	// moment when analysis aggregates were written.
+	sort.SliceStable(all, func(i, j int) bool {
+		left := analysisSnapshotSourceTime(all[i])
+		right := analysisSnapshotSourceTime(all[j])
+		if left.Equal(right) {
+			return all[i].ID < all[j].ID
+		}
+		return left.Before(right)
 	})
 	points := make([]PublicAnalysisTrendPoint, 0, len(all))
 	inRange := fromSlug == ""
@@ -226,7 +235,10 @@ func (s *Server) handlePublicAnalysisTrends(w http.ResponseWriter, r *http.Reque
 			}
 			points = append(points, PublicAnalysisTrendPoint{
 				Slug:       snap.Slug,
+				Label:      snap.Label,
 				CapturedAt: snap.CapturedAt,
+				FirstRunAt: snap.FirstRunAt,
+				LastRunAt:  snap.LastRunAt,
 				Payload:    json.RawMessage(agg.PayloadJSON),
 			})
 			break

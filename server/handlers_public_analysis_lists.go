@@ -179,9 +179,34 @@ type PublicAnalysisSnapshotView struct {
 	Slug        string    `json:"slug"`
 	Label       string    `json:"label,omitempty"`
 	CapturedAt  time.Time `json:"captured_at,omitempty"`
+	FirstRunAt  time.Time `json:"first_run_at,omitempty"`
+	LastRunAt   time.Time `json:"last_run_at,omitempty"`
 	RunCount    int       `json:"run_count"`
 	DomainCount int       `json:"domain_count"`
 	ProfileName string    `json:"profile_name,omitempty"`
+}
+
+func publicAnalysisSnapshotView(snap AnalysisCohortSnapshot) PublicAnalysisSnapshotView {
+	return PublicAnalysisSnapshotView{
+		Slug:        snap.Slug,
+		Label:       snap.Label,
+		CapturedAt:  snap.CapturedAt,
+		FirstRunAt:  snap.FirstRunAt,
+		LastRunAt:   snap.LastRunAt,
+		RunCount:    snap.RunCount,
+		DomainCount: snap.DomainCount,
+		ProfileName: snap.ProfileName,
+	}
+}
+
+func analysisSnapshotSourceTime(snap AnalysisCohortSnapshot) time.Time {
+	if !snap.LastRunAt.IsZero() {
+		return snap.LastRunAt
+	}
+	if !snap.FirstRunAt.IsZero() {
+		return snap.FirstRunAt
+	}
+	return snap.CapturedAt
 }
 
 // analysisReadStore returns the analysis read-store when the configured store
@@ -206,14 +231,14 @@ func (s *Server) analysisBackendSupported() bool {
 // PublicAnalysisDomainView is the redacted public shape for a domain row in
 // the cohort's member list.
 type PublicAnalysisDomainView struct {
-	Domain          string     `json:"domain"`
-	Score           *int       `json:"score,omitempty"`
-	Grade           *string    `json:"grade,omitempty"`
-	WorstLevel      string     `json:"worst_level,omitempty"`
-	NameserverCount int        `json:"nameserver_count"`
-	EndpointCount   int        `json:"endpoint_count"`
-	ASNCount        int        `json:"asn_count"`
-	PrefixCount     int        `json:"prefix_count"`
+	Domain          string  `json:"domain"`
+	Score           *int    `json:"score,omitempty"`
+	Grade           *string `json:"grade,omitempty"`
+	WorstLevel      string  `json:"worst_level,omitempty"`
+	NameserverCount int     `json:"nameserver_count"`
+	EndpointCount   int     `json:"endpoint_count"`
+	ASNCount        int     `json:"asn_count"`
+	PrefixCount     int     `json:"prefix_count"`
 	// Operator is the ASN label when every authoritative address for the
 	// domain shares a single ASN. Empty when unknown; "Multiple" when
 	// spread across multiple ASNs. Gives operators at-a-glance without
@@ -492,7 +517,6 @@ func collapseSummariesForRuns(summaries []AnalysisRunDomainSummary, runSet map[s
 	}
 	return out
 }
-
 
 // filterAnalysisRunAddressASNsToAuthoritative drops any fact whose address
 // has no authoritative endpoint in the cohort. authoritativeAddrIDs is the

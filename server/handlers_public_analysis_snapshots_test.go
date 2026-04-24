@@ -134,6 +134,61 @@ func TestPublicAnalysisSnapshotsListReturnsCapturedOnly(t *testing.T) {
 	if !payload.Snapshots[0].IsDefault {
 		t.Fatal("expected fixture snapshot to be flagged is_default")
 	}
+	if payload.Snapshots[0].LastRunAt.IsZero() {
+		t.Fatal("expected snapshot list to carry source run timing")
+	}
+}
+
+func TestPublicAnalysisTrendsUseSourceRunOrderAndMetadata(t *testing.T) {
+	f := newAnalysisAPITestFixture(t)
+	newSource := time.Date(2026, 4, 20, 12, 0, 0, 0, time.UTC)
+	oldSource := time.Date(2026, 3, 26, 12, 0, 0, 0, time.UTC)
+
+	f.snapshot.CapturedAt = time.Date(2026, 4, 24, 18, 14, 0, 0, time.UTC)
+	f.snapshot.FirstRunAt = newSource
+	f.snapshot.LastRunAt = newSource
+	updated, err := f.store.UpsertAnalysisCohortSnapshot(f.snapshot)
+	if err != nil {
+		t.Fatalf("update fixture snapshot: %v", err)
+	}
+	f.snapshot = updated
+	older := f.seedAlternateSnapshot("batch-old-source", "2026-03-26-old", time.Date(2026, 4, 24, 18, 19, 30, 0, time.UTC))
+	older.FirstRunAt = oldSource
+	older.LastRunAt = oldSource
+	older, err = f.store.UpsertAnalysisCohortSnapshot(older)
+	if err != nil {
+		t.Fatalf("update older snapshot source time: %v", err)
+	}
+
+	for _, snap := range []AnalysisCohortSnapshot{f.snapshot, older} {
+		if err := f.store.ReplaceSnapshotAggregates(snap.ID, []AnalysisCohortSnapshotAggregate{
+			{SnapshotID: snap.ID, Category: SnapshotAggregateSeverityDistribution, PayloadJSON: `{"OK":1}`},
+		}); err != nil {
+			t.Fatalf("seed aggregate for %s: %v", snap.Slug, err)
+		}
+	}
+
+	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/tld/trends?category=severity_distribution")
+	if resp.Code != http.StatusOK {
+		t.Fatalf("trends: got %d, want 200: %s", resp.Code, resp.Body)
+	}
+	var payload PublicAnalysisTrendResponse
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode trends: %v", err)
+	}
+	if len(payload.Points) != 2 {
+		t.Fatalf("expected 2 trend points, got %d: %+v", len(payload.Points), payload.Points)
+	}
+	if payload.Points[0].Slug != older.Slug || payload.Points[1].Slug != f.snapshot.Slug {
+		t.Fatalf("trend order = [%s, %s], want source-date order [%s, %s]",
+			payload.Points[0].Slug, payload.Points[1].Slug, older.Slug, f.snapshot.Slug)
+	}
+	if !payload.Points[0].LastRunAt.Equal(oldSource) {
+		t.Fatalf("older point last_run_at = %s, want %s", payload.Points[0].LastRunAt, oldSource)
+	}
+	if payload.Points[1].Label != f.snapshot.Label {
+		t.Fatalf("trend point label = %q, want %q", payload.Points[1].Label, f.snapshot.Label)
+	}
 }
 
 // TestPublicAnalysisSnapshotDetailHiddenForRetired verifies that an

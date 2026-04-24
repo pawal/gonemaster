@@ -205,14 +205,8 @@ func (s *Server) handlePublicAnalysisCohortDetail(w http.ResponseWriter, r *http
 	}
 	if readStore, canRead := s.store.(AnalysisReadStore); canRead && snapshot.ID != 0 {
 		aggregates := readStore.ListSnapshotAggregates(snapshot.ID)
-		detail.Snapshot = &PublicAnalysisSnapshotView{
-			Slug:        snapshot.Slug,
-			Label:       snapshot.Label,
-			CapturedAt:  snapshot.CapturedAt,
-			RunCount:    snapshot.RunCount,
-			DomainCount: snapshot.DomainCount,
-			ProfileName: snapshot.ProfileName,
-		}
+		snapshotView := publicAnalysisSnapshotView(snapshot)
+		detail.Snapshot = &snapshotView
 		_ = aggregates // reserved for future trend surface
 	} else if snapshot.ID == 0 {
 		detail.Status = PublicAnalysisStatusNoSnapshot

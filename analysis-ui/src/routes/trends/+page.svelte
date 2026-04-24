@@ -2,7 +2,7 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import FilterBar from "$lib/FilterBar.svelte";
-  import { formatTimestamp } from "$lib/format";
+  import { snapshotDisplayLabel, snapshotSourceDate } from "$lib/format";
   import type { LayoutData } from "../+layout";
   import {
     TREND_CATEGORIES,
@@ -29,18 +29,33 @@
   // are handled in a later pass.
   type Series = {
     label: string;
+    slug: string;
+    sourceDate: string;
     buckets: Array<{ key: string; count: number }>;
-    capturedAt: string;
   };
 
   const series = $derived.by<Series[]>(() => {
+    const snapshotBySlug = new Map((layoutData.snapshots ?? []).map((snap) => [snap.slug, snap]));
     return data.points.map((point) => {
+      const meta = snapshotBySlug.get(point.slug);
+      const snapshot = {
+        slug: point.slug,
+        label: point.label ?? meta?.label,
+        first_run_at: point.first_run_at ?? meta?.first_run_at,
+        last_run_at: point.last_run_at ?? meta?.last_run_at,
+        captured_at: point.captured_at
+      };
       const payload = point.payload as Record<string, number> | undefined;
       const buckets = payload
         ? Object.entries(payload).map(([key, count]) => ({ key, count: Number(count) || 0 }))
         : [];
       buckets.sort((a, b) => a.key.localeCompare(b.key));
-      return { label: point.slug, buckets, capturedAt: point.captured_at };
+      return {
+        label: snapshotDisplayLabel(snapshot),
+        slug: point.slug,
+        sourceDate: snapshotSourceDate(snapshot),
+        buckets
+      };
     });
   });
 
@@ -137,12 +152,12 @@
   <section class="card">
     <h3>{TREND_CATEGORIES.find((c) => c.key === data.category)?.label}</h3>
     <ol class="trend-list" aria-label="Stacked distribution per snapshot">
-      {#each series as s (s.label)}
+      {#each series as s (s.slug)}
         <li class="trend-row">
           <div class="trend-meta">
-            <span class="trend-slug">{s.label}</span>
-            {#if formatTimestamp(s.capturedAt)}
-              <span class="trend-captured">{formatTimestamp(s.capturedAt)}</span>
+            <span class="trend-slug" title={`Snapshot ${s.slug}`}>{s.label}</span>
+            {#if s.sourceDate && s.sourceDate !== s.label}
+              <span class="trend-captured">{s.sourceDate}</span>
             {/if}
           </div>
           <div class="trend-bar" aria-hidden="true">
@@ -221,7 +236,6 @@
     gap: 2px;
   }
   .trend-slug {
-    font-family: var(--mono);
     font-weight: 600;
   }
   .trend-captured {

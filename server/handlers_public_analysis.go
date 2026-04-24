@@ -15,9 +15,9 @@ type PublicAnalysisCohortView struct {
 	Description string `json:"description,omitempty"`
 	IsDefault   bool   `json:"is_default"`
 	SortOrder   int    `json:"sort_order,omitempty"`
-	// DefaultSnapshot carries the slug + captured_at of the snapshot
-	// auto-latest resolution picks for this cohort. Nil for cohorts with
-	// no captured public snapshot yet.
+	// DefaultSnapshot carries the source timing and counts for the snapshot
+	// auto-latest resolution picks for this cohort. Nil for cohorts with no
+	// captured public snapshot yet.
 	DefaultSnapshot *PublicAnalysisSnapshotView `json:"default_snapshot,omitempty"`
 	// SnapshotCount is the total number of captured public snapshots in
 	// the cohort. Used by the UI to decide whether to render the
@@ -65,14 +65,8 @@ func (s *Server) publicAnalysisCohortView(cohort AnalysisCohort) PublicAnalysisC
 		}
 		view.SnapshotCount = publicCount
 		if def, found := readStore.GetDefaultSnapshotForCohort(cohort.ID); found {
-			view.DefaultSnapshot = &PublicAnalysisSnapshotView{
-				Slug:        def.Slug,
-				Label:       def.Label,
-				CapturedAt:  def.CapturedAt,
-				RunCount:    def.RunCount,
-				DomainCount: def.DomainCount,
-				ProfileName: def.ProfileName,
-			}
+			snapshotView := publicAnalysisSnapshotView(def)
+			view.DefaultSnapshot = &snapshotView
 		}
 	}
 	return view
@@ -139,14 +133,8 @@ func (s *Server) handlePublicAnalysisOverview(w http.ResponseWriter, r *http.Req
 	if snapshot.ID == 0 {
 		resp.Status = PublicAnalysisStatusNoSnapshot
 	} else {
-		resp.Snapshot = &PublicAnalysisSnapshotView{
-			Slug:        snapshot.Slug,
-			Label:       snapshot.Label,
-			CapturedAt:  snapshot.CapturedAt,
-			RunCount:    snapshot.RunCount,
-			DomainCount: snapshot.DomainCount,
-			ProfileName: snapshot.ProfileName,
-		}
+		snapshotView := publicAnalysisSnapshotView(snapshot)
+		resp.Snapshot = &snapshotView
 	}
 	writeJSON(w, http.StatusOK, resp)
 }

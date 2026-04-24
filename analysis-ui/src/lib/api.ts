@@ -8,6 +8,8 @@ export type SnapshotView = {
   slug: string;
   label?: string;
   captured_at?: string;
+  first_run_at?: string;
+  last_run_at?: string;
   run_count: number;
   domain_count: number;
   profile_name?: string;
@@ -275,7 +277,10 @@ export type SnapshotDetail = {
 
 export type TrendPoint = {
   slug: string;
+  label?: string;
   captured_at: string;
+  first_run_at?: string;
+  last_run_at?: string;
   payload: unknown;
 };
 

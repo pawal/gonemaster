@@ -3,6 +3,7 @@
   import { page } from "$app/state";
   import type { Cohort, SnapshotListEntry } from "$lib/api";
   import { applyFilterToParams, searchToString, type FilterKey } from "$lib/filters";
+  import { snapshotOptionLabel } from "$lib/format";
 
   type Props = {
     cohorts?: Cohort[];
@@ -53,6 +54,10 @@
   // clutters the filter bar.
   const showSnapshot = $derived(snapshots.length > 1);
   const visible = $derived(showCohort || showSnapshot || showSearch);
+  const defaultSnapshot = $derived(snapshots.find((snap) => snap.slug === defaultSnapshotSlug));
+  const latestOptionLabel = $derived(
+    defaultSnapshot ? `Latest (${snapshotOptionLabel(defaultSnapshot)})` : "Latest"
+  );
 </script>
 
 {#if visible}
@@ -79,13 +84,9 @@
           value={snapshot}
           onchange={(e) => onChange("snapshot", e.currentTarget.value)}
         >
-          <option value="">
-            {defaultSnapshotSlug ? `Latest (${defaultSnapshotSlug})` : "Latest"}
-          </option>
+          <option value="">{latestOptionLabel}</option>
           {#each snapshots as snap (snap.slug)}
-            <option value={snap.slug}>
-              {snap.label ? `${snap.label} — ${snap.slug}` : snap.slug}
-            </option>
+            <option value={snap.slug}>{snapshotOptionLabel(snap)}</option>
           {/each}
         </select>
       </label>

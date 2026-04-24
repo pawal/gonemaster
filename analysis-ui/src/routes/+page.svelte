@@ -10,7 +10,13 @@
     nameserverHref,
     tagHref
   } from "$lib/entityLinks";
-  import { formatCount, formatTimestamp, levelTone } from "$lib/format";
+  import {
+    formatCount,
+    formatTimestamp,
+    levelTone,
+    snapshotDisplayLabel,
+    snapshotSourceDate
+  } from "$lib/format";
   import type { LayoutData } from "./+layout";
   import type { FactDistribution, OverviewPageData } from "./+page";
 
@@ -124,12 +130,14 @@
 {#if data.snapshot}
   <p class="snapshot-pill" aria-label="Active snapshot">
     Snapshot:
-    <span class="snapshot-slug">{data.snapshot.slug}</span>
-    {#if data.snapshot.label}
-      <span class="snapshot-label">({data.snapshot.label})</span>
+    <span class="snapshot-slug" title={`Snapshot ${data.snapshot.slug}`}>
+      {snapshotDisplayLabel(data.snapshot)}
+    </span>
+    {#if data.snapshot.label && snapshotSourceDate(data.snapshot)}
+      <span class="snapshot-label">({snapshotSourceDate(data.snapshot)})</span>
     {/if}
     {#if formatTimestamp(data.snapshot.captured_at)}
-      <span class="snapshot-captured">Captured {formatTimestamp(data.snapshot.captured_at)}</span>
+      <span class="snapshot-captured">Built {formatTimestamp(data.snapshot.captured_at)}</span>
     {/if}
   </p>
 {/if}
@@ -643,7 +651,6 @@
     align-self: flex-start;
   }
   .snapshot-slug {
-    font-family: var(--mono);
     font-weight: 600;
   }
   .snapshot-label {

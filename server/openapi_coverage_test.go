@@ -60,8 +60,22 @@ func substitutePathParams(path string) string {
 		"{name}", "default",
 		"{job_id}", "00000000-0000-0000-0000-000000000000",
 		"{batch_id}", "00000000-0000-0000-0000-000000000000",
+		"{public_id}", "public123",
+		"{dataset_tag}", "default",
+		"{slug}", "snapshot",
+		"{domain}", "example.com",
+		"{address}", "192.0.2.1",
+		"{asn}", "64500",
+		"{tag}", "DNSSEC",
 	)
 	return replacer.Replace(path)
+}
+
+func openAPITestRequestPath(specPath string) string {
+	if strings.HasPrefix(specPath, "/pub/api/v1/") {
+		return specPath
+	}
+	return "/api/v1" + specPath
 }
 
 // TestOpenAPIPathCoverage verifies that every path+method defined in
@@ -69,7 +83,7 @@ func substitutePathParams(path string) string {
 // application/json response rather than falling through to the UI handler or
 // returning a plain 404 from the mux for an unregistered route).
 //
-// It does NOT validate response schemas — it only checks that routes exist.
+// It does NOT validate response schemas. It only checks that routes exist.
 func TestOpenAPIPathCoverage(t *testing.T) {
 	data, err := os.ReadFile("../docs/openapi.yaml")
 	if err != nil {
@@ -78,7 +92,7 @@ func TestOpenAPIPathCoverage(t *testing.T) {
 
 	specPaths := parseOpenAPIPaths(t, data)
 	if len(specPaths) == 0 {
-		t.Fatal("no paths parsed from openapi.yaml — check the parser")
+		t.Fatal("no paths parsed from openapi.yaml; check the parser")
 	}
 
 	srv := New(DefaultConfig())
@@ -87,7 +101,7 @@ func TestOpenAPIPathCoverage(t *testing.T) {
 		concretePath := substitutePathParams(specPath)
 		for _, method := range methods {
 			t.Run(method+" "+specPath, func(t *testing.T) {
-				req := httptest.NewRequest(method, "/api/v1"+concretePath, nil)
+				req := httptest.NewRequest(method, openAPITestRequestPath(concretePath), nil)
 				// POST/PUT/PATCH need a content-type header so we don't get a
 				// parse error before the route is even matched.
 				if method == http.MethodPost || method == http.MethodPut || method == http.MethodPatch {
@@ -99,7 +113,7 @@ func TestOpenAPIPathCoverage(t *testing.T) {
 				ct := resp.Header().Get("Content-Type")
 				if !strings.HasPrefix(ct, "application/json") {
 					t.Errorf(
-						"route %s %s returned Content-Type %q (status %d) — route may not be registered",
+						"route %s %s returned Content-Type %q (status %d); route may not be registered",
 						method, specPath, ct, resp.Code,
 					)
 				}
@@ -242,6 +256,45 @@ func TestOpenAPIProfileSchemaIncludesStoredProfileFields(t *testing.T) {
 		"profile_id:",
 		"profile_name:",
 		"effective_profile:",
+	}
+	for _, snippet := range requiredSnippets {
+		if !strings.Contains(spec, snippet) {
+			t.Fatalf("docs/openapi.yaml is missing %q", snippet)
+		}
+	}
+}
+
+func TestOpenAPICoversRecentServerRoutes(t *testing.T) {
+	data, err := os.ReadFile("../docs/openapi.yaml")
+	if err != nil {
+		t.Fatalf("read docs/openapi.yaml: %v", err)
+	}
+	spec := string(data)
+
+	requiredSnippets := []string{
+		"/jobs/purge:",
+		"/batches/{batch_id}/delete-preview:",
+		"/tags/{name}/batches:",
+		"/analysis/status:",
+		"/analysis/cohorts:",
+		"/analysis/cohorts/{id}/snapshots:",
+		"/features:",
+		"/settings:",
+		"/pub/api/v1/jobs:",
+		"/pub/api/v1/profiles:",
+		"/pub/api/v1/lookup/{domain}:",
+		"/pub/api/v1/info:",
+		"/pub/api/v1/version:",
+		"/pub/api/v1/analysis/catalog:",
+		"/pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots:",
+		"/pub/api/v1/analysis/cohorts/{dataset_tag}/trends:",
+		"/pub/api/v1/analysis/cohorts/{dataset_tag}/diff:",
+		"snapshot_intent:",
+		"AnalysisCohort:",
+		"AnalysisCohortSnapshot:",
+		"PublicJob:",
+		"PublicProfile:",
+		"BatchDeletePreview:",
 	}
 	for _, snippet := range requiredSnippets {
 		if !strings.Contains(spec, snippet) {

@@ -18,6 +18,8 @@ tags:
   - name: Entries
   - name: Queue
   - name: Ops
+  - name: Analysis
+  - name: Public
 
 paths:
   /jobs:
@@ -118,6 +120,27 @@ paths:
         '400':
           $ref: '#/components/responses/ErrorResponse'
 
+  /jobs/purge:
+    post:
+      tags: [Jobs]
+      summary: Purge completed jobs older than a retention window
+      operationId: purgeJobs
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobPurgeRequest'
+      responses:
+        '200':
+          description: Purge count
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobPurgeResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
   /batches/{batch_id}:
     get:
       tags: [Batches]
@@ -136,6 +159,44 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BatchSummary'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+    delete:
+      tags: [Batches]
+      summary: Delete a batch and derived records
+      operationId: deleteBatch
+      parameters:
+        - name: batch_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Batch deleted
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /batches/{batch_id}/delete-preview:
+    get:
+      tags: [Batches]
+      summary: Preview batch deletion impact
+      operationId: getBatchDeletePreview
+      parameters:
+        - name: batch_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Batch deletion impact
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchDeletePreview'
         '404':
           $ref: '#/components/responses/ErrorResponse'
 
@@ -692,6 +753,40 @@ paths:
         '404':
           $ref: '#/components/responses/ErrorResponse'
 
+  /tags/{name}/batches:
+    get:
+      tags: [Tags]
+      summary: List batches for a tag
+      operationId: listTagBatches
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Batch list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchList'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
   /profiles:
     get:
       tags: [Profiles]
@@ -1185,7 +1280,820 @@ paths:
                     type: string
                     example: ok
 
+  /features:
+    get:
+      tags: [Ops]
+      summary: Admin UI feature flags
+      operationId: getFeatures
+      responses:
+        '200':
+          description: Feature flags
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeatureFlags'
+
+  /settings:
+    get:
+      tags: [Ops]
+      summary: Get runtime settings
+      operationId: getSettings
+      responses:
+        '200':
+          description: Settings map
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  $ref: '#/components/schemas/SettingEntry'
+    put:
+      tags: [Ops]
+      summary: Update mutable runtime settings
+      operationId: updateSettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Settings updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /analysis/status:
+    get:
+      tags: [Analysis]
+      summary: Get analysis subsystem status
+      operationId: getAnalysisStatus
+      responses:
+        '200':
+          description: Analysis status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisStatusResponse'
+
+  /analysis/cohorts:
+    get:
+      tags: [Analysis]
+      summary: List analysis cohorts
+      operationId: listAnalysisCohorts
+      responses:
+        '200':
+          description: Cohort array
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AnalysisCohort'
+    post:
+      tags: [Analysis]
+      summary: Create an analysis cohort
+      operationId: createAnalysisCohort
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalysisCohortUpsertRequest'
+      responses:
+        '202':
+          description: Cohort accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisCohort'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /analysis/cohorts/{id}:
+    get:
+      tags: [Analysis]
+      summary: Get an analysis cohort
+      operationId: getAnalysisCohort
+      parameters:
+        - $ref: '#/components/parameters/IDPath'
+      responses:
+        '200':
+          description: Cohort
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisCohort'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+    patch:
+      tags: [Analysis]
+      summary: Patch an analysis cohort
+      operationId: patchAnalysisCohort
+      parameters:
+        - $ref: '#/components/parameters/IDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalysisCohortPatchRequest'
+      responses:
+        '200':
+          description: Updated cohort
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisCohort'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+    delete:
+      tags: [Analysis]
+      summary: Delete an analysis cohort
+      operationId: deleteAnalysisCohort
+      parameters:
+        - $ref: '#/components/parameters/IDPath'
+      responses:
+        '204':
+          description: Cohort deleted
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /analysis/cohorts/{id}/rebuild:
+    post:
+      tags: [Analysis]
+      summary: Rebuild one analysis cohort
+      operationId: rebuildAnalysisCohort
+      parameters:
+        - $ref: '#/components/parameters/IDPath'
+      responses:
+        '202':
+          description: Rebuild started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisCohort'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /analysis/cohorts/{id}/clear:
+    post:
+      tags: [Analysis]
+      summary: Clear one analysis cohort
+      operationId: clearAnalysisCohort
+      parameters:
+        - $ref: '#/components/parameters/IDPath'
+      responses:
+        '200':
+          description: Cohort cleared
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisCohort'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /analysis/cohorts/{id}/snapshots:
+    get:
+      tags: [Analysis]
+      summary: List snapshots for an analysis cohort
+      operationId: listAnalysisCohortSnapshots
+      parameters:
+        - $ref: '#/components/parameters/IDPath'
+      responses:
+        '200':
+          description: Snapshot array
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AnalysisCohortSnapshot'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /analysis/cohorts/{id}/snapshots/{slug}:
+    post:
+      tags: [Analysis]
+      summary: Patch an analysis cohort snapshot
+      operationId: patchAnalysisCohortSnapshot
+      parameters:
+        - $ref: '#/components/parameters/IDPath'
+        - $ref: '#/components/parameters/SlugPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalysisCohortSnapshotPatchRequest'
+      responses:
+        '200':
+          description: Updated snapshot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisCohortSnapshot'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+    delete:
+      tags: [Analysis]
+      summary: Retire or purge an analysis cohort snapshot
+      operationId: deleteAnalysisCohortSnapshot
+      parameters:
+        - $ref: '#/components/parameters/IDPath'
+        - $ref: '#/components/parameters/SlugPath'
+        - name: purge
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '204':
+          description: Snapshot retired or purged
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /analysis/cohorts/{id}/snapshots/{slug}/rematerialize:
+    post:
+      tags: [Analysis]
+      summary: Recompute snapshot aggregates
+      operationId: rematerializeAnalysisCohortSnapshot
+      parameters:
+        - $ref: '#/components/parameters/IDPath'
+        - $ref: '#/components/parameters/SlugPath'
+      responses:
+        '200':
+          description: Refreshed snapshot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisCohortSnapshot'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /pub/api/v1/jobs:
+    post:
+      tags: [Public]
+      summary: Submit a public job
+      operationId: createPublicJob
+      description: Public jobs return opaque public IDs. `profile_id` is allowed only for public stored profiles. `profile_overrides` is rejected.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobCreateRequest'
+      responses:
+        '201':
+          description: Public job created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicJob'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /pub/api/v1/jobs/{public_id}:
+    get:
+      tags: [Public]
+      summary: Get public job status
+      operationId: getPublicJob
+      parameters:
+        - $ref: '#/components/parameters/PublicIDPath'
+      responses:
+        '200':
+          description: Public job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicJob'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /pub/api/v1/jobs/{public_id}/result:
+    get:
+      tags: [Public]
+      summary: Get public job result
+      operationId: getPublicJobResult
+      parameters:
+        - $ref: '#/components/parameters/PublicIDPath'
+        - name: locale
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobResult'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /pub/api/v1/locales:
+    get:
+      tags: [Public]
+      summary: List public locales
+      operationId: listPublicLocales
+      responses:
+        '200':
+          description: Locale list
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /pub/api/v1/profiles:
+    get:
+      tags: [Public]
+      summary: List public stored profiles
+      operationId: listPublicProfiles
+      responses:
+        '200':
+          description: Public profiles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PublicProfile'
+
+  /pub/api/v1/lookup/{domain}:
+    get:
+      tags: [Public]
+      summary: Lookup delegation information for a domain
+      operationId: publicLookupDomain
+      parameters:
+        - $ref: '#/components/parameters/DomainPath'
+      responses:
+        '200':
+          description: Delegation information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DelegationInfo'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /pub/api/v1/version:
+    get:
+      tags: [Public]
+      summary: Public version metadata
+      operationId: publicVersion
+      responses:
+        '200':
+          description: Version map
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+
+  /pub/api/v1/info:
+    get:
+      tags: [Public]
+      summary: Public UI feature flags
+      operationId: publicInfo
+      responses:
+        '200':
+          description: Public info
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicInfo'
+
+  /pub/api/v1/analysis/catalog:
+    get:
+      tags: [Public]
+      summary: Public analysis catalog
+      operationId: publicAnalysisCatalog
+      responses:
+        '200':
+          description: Public analysis catalog
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /pub/api/v1/analysis/cohorts:
+    get:
+      tags: [Public]
+      summary: List public analysis cohorts
+      operationId: publicAnalysisCohorts
+      responses:
+        '200':
+          description: Public cohorts
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /pub/api/v1/analysis/overview:
+    get:
+      tags: [Public]
+      summary: Public analysis overview
+      operationId: publicAnalysisOverview
+      responses:
+        '200':
+          description: Public analysis overview
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /pub/api/v1/analysis/domains:
+    get:
+      tags: [Public]
+      summary: Public analysis domain list
+      operationId: publicAnalysisDomains
+      responses:
+        '200':
+          description: Public analysis domains
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /pub/api/v1/analysis/domains/{domain}:
+    get:
+      tags: [Public]
+      summary: Public analysis domain detail
+      operationId: publicAnalysisDomainDetail
+      parameters:
+        - $ref: '#/components/parameters/DomainPath'
+      responses:
+        '200':
+          description: Public analysis domain detail
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /pub/api/v1/analysis/nameservers:
+    get:
+      tags: [Public]
+      summary: Public analysis nameserver list
+      operationId: publicAnalysisNameservers
+      responses:
+        '200':
+          description: Public analysis nameservers
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /pub/api/v1/analysis/nameservers/{name}:
+    get:
+      tags: [Public]
+      summary: Public analysis nameserver detail
+      operationId: publicAnalysisNameserverDetail
+      parameters:
+        - $ref: '#/components/parameters/NamePath'
+      responses:
+        '200':
+          description: Public analysis nameserver detail
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /pub/api/v1/analysis/endpoints:
+    get:
+      tags: [Public]
+      summary: Public analysis endpoint list
+      operationId: publicAnalysisEndpoints
+      responses:
+        '200':
+          description: Public analysis endpoints
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /pub/api/v1/analysis/endpoints/{address}:
+    get:
+      tags: [Public]
+      summary: Public analysis endpoint detail
+      operationId: publicAnalysisEndpointDetail
+      parameters:
+        - $ref: '#/components/parameters/AddressPath'
+      responses:
+        '200':
+          description: Public analysis endpoint detail
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /pub/api/v1/analysis/asns:
+    get:
+      tags: [Public]
+      summary: Public analysis ASN list
+      operationId: publicAnalysisASNs
+      responses:
+        '200':
+          description: Public analysis ASNs
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /pub/api/v1/analysis/asns/{asn}:
+    get:
+      tags: [Public]
+      summary: Public analysis ASN detail
+      operationId: publicAnalysisASNDetail
+      parameters:
+        - $ref: '#/components/parameters/ASNPath'
+      responses:
+        '200':
+          description: Public analysis ASN detail
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /pub/api/v1/analysis/prefixes:
+    get:
+      tags: [Public]
+      summary: Public analysis prefix list
+      operationId: publicAnalysisPrefixes
+      responses:
+        '200':
+          description: Public analysis prefixes
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /pub/api/v1/analysis/prefix:
+    get:
+      tags: [Public]
+      summary: Public analysis prefix detail
+      operationId: publicAnalysisPrefixDetail
+      responses:
+        '200':
+          description: Public analysis prefix detail
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /pub/api/v1/analysis/tags:
+    get:
+      tags: [Public]
+      summary: Public analysis finding tag list
+      operationId: publicAnalysisTags
+      responses:
+        '200':
+          description: Public analysis tags
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /pub/api/v1/analysis/tags/{tag}:
+    get:
+      tags: [Public]
+      summary: Public analysis finding tag detail
+      operationId: publicAnalysisTagDetail
+      parameters:
+        - $ref: '#/components/parameters/TagPath'
+      responses:
+        '200':
+          description: Public analysis tag detail
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /pub/api/v1/analysis/testcases:
+    get:
+      tags: [Public]
+      summary: Public analysis testcase list
+      operationId: publicAnalysisTestcases
+      responses:
+        '200':
+          description: Public analysis testcases
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /pub/api/v1/analysis/testcase:
+    get:
+      tags: [Public]
+      summary: Public analysis testcase detail
+      operationId: publicAnalysisTestcaseDetail
+      responses:
+        '200':
+          description: Public analysis testcase detail
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /pub/api/v1/analysis/cohorts/{dataset_tag}:
+    get:
+      tags: [Public]
+      summary: Public analysis cohort detail
+      operationId: publicAnalysisCohortDetail
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+      responses:
+        '200':
+          description: Public cohort detail
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots:
+    get:
+      tags: [Public]
+      summary: List public cohort snapshots
+      operationId: publicAnalysisSnapshots
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+      responses:
+        '200':
+          description: Public snapshot list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicAnalysisSnapshotListResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}:
+    get:
+      tags: [Public]
+      summary: Get public cohort snapshot detail
+      operationId: publicAnalysisSnapshotDetail
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - $ref: '#/components/parameters/SlugPath'
+      responses:
+        '200':
+          description: Public snapshot detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicAnalysisSnapshotDetail'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/trends:
+    get:
+      tags: [Public]
+      summary: Public cohort snapshot trend
+      operationId: publicAnalysisTrends
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Trend response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicAnalysisTrendResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/diff:
+    get:
+      tags: [Public]
+      summary: Public cohort snapshot diff
+      operationId: publicAnalysisDiff
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Diff response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicAnalysisDiffResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
 components:
+  parameters:
+    IDPath:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    PublicIDPath:
+      name: public_id
+      in: path
+      required: true
+      schema:
+        type: string
+    DatasetTagPath:
+      name: dataset_tag
+      in: path
+      required: true
+      schema:
+        type: string
+    SlugPath:
+      name: slug
+      in: path
+      required: true
+      schema:
+        type: string
+    DomainPath:
+      name: domain
+      in: path
+      required: true
+      schema:
+        type: string
+    NamePath:
+      name: name
+      in: path
+      required: true
+      schema:
+        type: string
+    AddressPath:
+      name: address
+      in: path
+      required: true
+      schema:
+        type: string
+    ASNPath:
+      name: asn
+      in: path
+      required: true
+      schema:
+        type: integer
+    TagPath:
+      name: tag
+      in: path
+      required: true
+      schema:
+        type: string
+
   schemas:
     JobStatus:
       type: string
@@ -1305,6 +2213,9 @@ components:
         description:
           type: string
           description: Human-readable label stored on the batch record.
+        snapshot_intent:
+          type: boolean
+          description: When true, the batch is intended to become a cohort snapshot.
 
     UndelegatedNameserverInput:
       type: object
@@ -1348,6 +2259,40 @@ components:
           items:
             type: string
 
+    JobPurgeRequest:
+      type: object
+      properties:
+        older_than_days:
+          type: integer
+          minimum: 0
+          description: Days before now. Zero uses the server retention setting.
+
+    JobPurgeResponse:
+      type: object
+      required: [purged_jobs]
+      properties:
+        purged_jobs:
+          type: integer
+          format: int64
+
+    Batch:
+      type: object
+      required: [id, created_at, domain_count]
+      properties:
+        id:
+          type: string
+        tag:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        domain_count:
+          type: integer
+        description:
+          type: string
+        snapshot_intent:
+          type: boolean
+
     BatchSummary:
       type: object
       required: [batch_id, total, status_counts, items, created_at]
@@ -1378,6 +2323,66 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Job'
+
+    BatchList:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Batch'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    BatchDeletePreviewSnapshot:
+      type: object
+      properties:
+        cohort_id:
+          type: integer
+          format: int64
+        cohort_label:
+          type: string
+        snapshot_slug:
+          type: string
+        snapshot_label:
+          type: string
+        is_default:
+          type: boolean
+
+    BatchDeletePreview:
+      type: object
+      required: [batch_id, exists, queued_jobs, running_jobs, completed_runs, entries, fact_rows]
+      properties:
+        batch_id:
+          type: string
+        tag:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        snapshot_intent:
+          type: boolean
+        exists:
+          type: boolean
+        queued_jobs:
+          type: integer
+        running_jobs:
+          type: integer
+        completed_runs:
+          type: integer
+        entries:
+          type: integer
+        fact_rows:
+          type: integer
+        snapshots:
+          type: array
+          items:
+            $ref: '#/components/schemas/BatchDeletePreviewSnapshot'
 
     JobList:
       type: object
@@ -1719,6 +2724,386 @@ components:
           description: Engine profile JSON validated server-side.
         public:
           type: boolean
+
+    PublicProfile:
+      type: object
+      required: [id, name, description]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        description:
+          type: string
+
+    PublicJob:
+      type: object
+      required: [public_id, domain, status, progress]
+      properties:
+        public_id:
+          type: string
+        domain:
+          type: string
+        status:
+          $ref: '#/components/schemas/JobStatus'
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+        finished_at:
+          type: string
+          format: date-time
+
+    PublicInfo:
+      type: object
+      required: [show_score_public, show_nameserver_timings_public]
+      properties:
+        show_score_public:
+          type: boolean
+        show_nameserver_timings_public:
+          type: boolean
+
+    FeatureFlags:
+      type: object
+      required: [show_score_admin, show_nameserver_timings_admin]
+      properties:
+        show_score_admin:
+          type: boolean
+        show_nameserver_timings_admin:
+          type: boolean
+
+    SettingEntry:
+      type: object
+      required: [value, source]
+      properties:
+        value:
+          description: Current effective setting value.
+          oneOf:
+            - type: string
+            - type: number
+            - type: integer
+            - type: boolean
+        source:
+          type: string
+          enum: [default, config_file, database, cli_flag]
+        readonly:
+          type: boolean
+
+    DelegationInfo:
+      type: object
+      required: [nameservers, ds_records]
+      properties:
+        nameservers:
+          type: array
+          items:
+            type: object
+            required: [ns]
+            properties:
+              ns:
+                type: string
+              ip:
+                type: string
+        ds_records:
+          type: array
+          items:
+            type: object
+            required: [keytag, algorithm, digtype, digest]
+            properties:
+              keytag:
+                type: integer
+              algorithm:
+                type: integer
+              digtype:
+                type: integer
+              digest:
+                type: string
+
+    AnalysisStatusResponse:
+      type: object
+      required: [backend_supported, controller_enabled]
+      properties:
+        backend_supported:
+          type: boolean
+        controller_enabled:
+          type: boolean
+        unsupported_message:
+          type: string
+
+    AnalysisCohort:
+      type: object
+      required: [id, source_type, source_tag, label, analysis_enabled, public_enabled, is_default, sort_order, materialization_status, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        source_type:
+          type: string
+          enum: [tag]
+        source_tag:
+          type: string
+        label:
+          type: string
+        description:
+          type: string
+        analysis_enabled:
+          type: boolean
+        public_enabled:
+          type: boolean
+        is_default:
+          type: boolean
+        sort_order:
+          type: integer
+        materialization_status:
+          type: string
+          enum: [pending, ready, failed]
+        materialization_done:
+          type: integer
+        materialization_total:
+          type: integer
+        last_materialized_at:
+          type: string
+          format: date-time
+        last_materialization_error:
+          type: string
+        default_snapshot_policy:
+          type: string
+          enum: [auto_latest, pinned]
+        default_snapshot_id:
+          type: integer
+          format: int64
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    AnalysisCohortUpsertRequest:
+      type: object
+      required: [source_tag]
+      properties:
+        source_type:
+          type: string
+          enum: [tag]
+          default: tag
+        source_tag:
+          type: string
+        label:
+          type: string
+        description:
+          type: string
+        analysis_enabled:
+          type: boolean
+        public_enabled:
+          type: boolean
+        is_default:
+          type: boolean
+        sort_order:
+          type: integer
+
+    AnalysisCohortPatchRequest:
+      type: object
+      properties:
+        label:
+          type: string
+        description:
+          type: string
+        analysis_enabled:
+          type: boolean
+        public_enabled:
+          type: boolean
+        is_default:
+          type: boolean
+        sort_order:
+          type: integer
+
+    AnalysisCohortSnapshot:
+      type: object
+      required: [id, cohort_id, batch_id, slug, run_count, domain_count, status, is_default, is_public, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        cohort_id:
+          type: integer
+          format: int64
+        batch_id:
+          type: string
+        slug:
+          type: string
+        label:
+          type: string
+        description:
+          type: string
+        profile_id:
+          type: integer
+          format: int64
+        profile_name:
+          type: string
+        captured_at:
+          type: string
+          format: date-time
+        first_run_at:
+          type: string
+          format: date-time
+        last_run_at:
+          type: string
+          format: date-time
+        run_count:
+          type: integer
+        domain_count:
+          type: integer
+        status:
+          type: string
+          enum: [pending, captured, retired, failed_mixed_profiles]
+        is_default:
+          type: boolean
+        is_public:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    AnalysisCohortSnapshotPatchRequest:
+      type: object
+      properties:
+        slug:
+          type: string
+        label:
+          type: string
+        description:
+          type: string
+        is_public:
+          type: boolean
+        is_default:
+          type: boolean
+        status:
+          type: string
+          enum: [captured, retired]
+
+    PublicAnalysisSnapshotListEntry:
+      type: object
+      required: [slug, captured_at, run_count, domain_count]
+      properties:
+        slug:
+          type: string
+        label:
+          type: string
+        description:
+          type: string
+        captured_at:
+          type: string
+          format: date-time
+        first_run_at:
+          type: string
+          format: date-time
+        last_run_at:
+          type: string
+          format: date-time
+        run_count:
+          type: integer
+        domain_count:
+          type: integer
+        profile_name:
+          type: string
+        is_default:
+          type: boolean
+
+    PublicAnalysisSnapshotListResponse:
+      type: object
+      required: [dataset_tag, label, snapshots]
+      properties:
+        dataset_tag:
+          type: string
+        label:
+          type: string
+        snapshots:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisSnapshotListEntry'
+
+    PublicAnalysisSnapshotDetail:
+      allOf:
+        - $ref: '#/components/schemas/PublicAnalysisSnapshotListEntry'
+        - type: object
+          required: [dataset_tag, is_default]
+          properties:
+            dataset_tag:
+              type: string
+            aggregates:
+              type: object
+              additionalProperties: true
+
+    PublicAnalysisTrendResponse:
+      type: object
+      required: [dataset_tag, category, points]
+      properties:
+        dataset_tag:
+          type: string
+        category:
+          type: string
+        points:
+          type: array
+          items:
+            type: object
+            required: [slug, captured_at, payload]
+            properties:
+              slug:
+                type: string
+              captured_at:
+                type: string
+                format: date-time
+              payload:
+                type: object
+                additionalProperties: true
+
+    PublicAnalysisDiffResponse:
+      type: object
+      required: [dataset_tag, from_slug, to_slug, added, removed, grade_changed, level_changed]
+      properties:
+        dataset_tag:
+          type: string
+        from_slug:
+          type: string
+        to_slug:
+          type: string
+        added:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisDiffEntry'
+        removed:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisDiffEntry'
+        grade_changed:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisDiffEntry'
+        level_changed:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisDiffEntry'
+
+    PublicAnalysisDiffEntry:
+      type: object
+      required: [domain]
+      properties:
+        domain:
+          type: string
+        from_grade:
+          type: string
+        to_grade:
+          type: string
+        from_level:
+          type: string
+        to_level:
+          type: string
+        worst_level:
+          type: string
 
     ProfileDefaults:
       type: object

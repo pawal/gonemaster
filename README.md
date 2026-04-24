@@ -1,23 +1,61 @@
 # Gonemaster
 
-Gonemaster is a Go implementation of the DNS test framework Zonemaster engine and CLI.
+Gonemaster is a Go implementation of the Zonemaster DNS test engine, with a
+local CLI, an HTTP server, a server automation client, and public analysis
+views for tagged domain cohorts.
 
-Key features:
-1. Parallel-safe engine runs with per-run state isolation
-2. Streaming output with JSON, JSONL, and raw log modes
-3. Built-in API server with job queueing, batches, and progress tracking
-4. Tunable resolver behavior (timeouts, retries, fallback, caching)
-5. Minimal external dependencies (focused, standard Go libraries)
+## Common Paths
 
-## Installation
+### Run One Local Test
 
+```sh
+gonemaster example.com
+gonemaster --json --domain example.com | jq
+gonemaster --module dnssec --testcase dnssec01 example.com
 ```
+
+Direct CLI documentation: [docs/cli.md](docs/cli.md)
+
+### Start the Server
+
+```sh
+go build -o ./gonemaster-server ./cmd/gonemaster-server
+./gonemaster-server
+```
+
+Server documentation: [docs/server/](docs/server/README.md)
+
+### Automate the Server
+
+```sh
+gonemaster-client jobs create --domain example.com --wait --view summary
+gonemaster-client jobs batch --file domains.txt --tag tld --wait
+gonemaster-client entries query --tag tld --module DNSSEC --latest
+```
+
+Client documentation: [docs/client/](docs/client/README.md)
+
+### Publish Analysis Cohorts
+
+```sh
+gonemaster-client tags create tld --description "Top-level domains"
+gonemaster-client tags add-domains tld --file tlds.txt
+gonemaster-client jobs batch --from-tag tld --tag tld --wait
+```
+
+Analysis documentation: [docs/analysis/](docs/analysis/README.md)
+
+## Install
+
+Install the local CLI:
+
+```sh
 go install codeberg.org/pawal/gonemaster/cmd/gonemaster@latest
 ```
 
-Or build from source:
+Build from source:
 
-```
+```sh
 git clone https://codeberg.org/pawal/gonemaster.git
 cd gonemaster
 make help
@@ -26,65 +64,42 @@ go build -o gonemaster ./cmd/gonemaster
 sudo install -m 0755 gonemaster /usr/local/bin/gonemaster
 ```
 
-The project includes a Makefile with common targets like `build`, `test`, and
-`ui-build`. Run `make help` to see the full list.
+The Makefile includes common targets such as `build`, `test`, `ui-build`, and
+documentation/specification checks. Run `make help` for the current list.
 
-## CLI
+## Documentation
 
-The CLI runs Zonemaster tests and can output human‑readable text, JSON, or raw
-log streams. See [docs/cli.md](docs/cli.md) for full usage, options, and examples.
+- Documentation home: [docs/README.md](docs/README.md)
+- Direct CLI: [docs/cli.md](docs/cli.md)
+- Server: [docs/server/](docs/server/README.md)
+- Server client: [docs/client/](docs/client/README.md)
+- Tags, cohorts, and snapshots: [docs/analysis/](docs/analysis/README.md)
+- API conventions: [docs/reference/api.md](docs/reference/api.md)
+- OpenAPI: [docs/openapi.yaml](docs/openapi.yaml)
+- Developer engine API: [docs/dev.md](docs/dev.md)
+- Testcase specifications: [docs/specifications/](docs/specifications/README.md)
+- Nagios plugin: [docs/nagios.md](docs/nagios.md)
 
-Quick examples:
+## Highlights
 
-```
-gonemaster --domain example.com
-gonemaster --json --domain example.com | jq
-gonemaster --domain example.com --ns ns1.example.com/192.0.2.10 --ns ns2.example.net
-gonemaster --domain example.com --ns ns1.example.com/192.0.2.10 --ns ns1.example.com/2001:db8::10
-```
+- Parallel-safe engine runs with per-run state isolation.
+- Text, JSON, JSON stream, and raw log output.
+- Undelegated testing with explicit nameserver and DS input.
+- HTTP server with persistent queue, batches, tags, profiles, and metrics.
+- Public API and public UI that avoid exposing internal job IDs.
+- Public cohort analysis with immutable snapshots.
+- Stored packet cache save/restore for reproducible runs.
+
+## Screenshots
+
+CLI output:
 
 ![ascii animation](docs/demo.gif)
 
-## API Server and UI
-
-Gonemaster includes an API server with an included Web User Interface.
-Please read the documentation in [docs/server.md](docs/server.md) to know more.
+Admin UI:
 
 ![UI screenshot](docs/ui-screenshot.png)
 
-There is also a CLI for testing domains through the API - [gonemaster-client](docs/cli.md)
-also has support for batch operations.
-
-The API also has extensive metrics endpoints that can be used for server and jobs monitoring,
-and the Web UI includes this in a separated tab.
+Metrics view:
 
 ![Metrics screenshot](docs/metrics.png)
-
-## Nagios plugin
-
-Nagios documentation has moved to [docs/nagios.md](docs/nagios.md).
-
-## Engine usage
-
-Developer usage (engine APIs, callbacks, profiles, and localization) is covered
-in [docs/dev.md](docs/dev.md).
-
-## Testcase Specifications
-
-Canonical specifications for all 73 implemented testcases are in
-[`docs/specifications/`](docs/specifications/).
-
-- [`docs/specifications/tests/`](docs/specifications/tests/) — per-testcase specs
-  (algorithm, emitted tags, tag arguments, severity levels, upstream differences).
-- [`docs/specifications/tags/`](docs/specifications/tags/) — per-module tag catalogs
-  with severity levels and i18n coverage.
-
-The `make spec-validate` and `make spec-check-tags` targets verify that specs and
-code metadata stay in sync.
-
-## Development
-
-Run test coverage:
-```
-go test --cover ./...
-```

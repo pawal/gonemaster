@@ -85,10 +85,14 @@ If the batch has queued or running jobs at delete time:
   `canceled` with `error = "deleted_by_admin"`.
 - Running jobs are cancelled via their context. The worker drains
   and graduates them as canceled.
+- Stale running rows with no live cancellation hook are graduated as
+  `canceled` immediately.
+- Terminal job rows left behind by recovery do not block deletion;
+  the delete transaction removes them with the rest of the batch.
 
 The server polls for up to five seconds waiting for all jobs to
-reach a terminal status before starting the delete transaction. If
-a worker is stuck and the timeout fires, the API returns HTTP 409
+leave the active queue before starting the delete transaction. If a
+live worker is stuck and the timeout fires, the API returns HTTP 409
 with `"jobs_not_terminal"`. Cancel the jobs manually, or try the
 delete again once they drain.
 

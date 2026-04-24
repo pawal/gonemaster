@@ -96,6 +96,77 @@ func TestHandleDeleteBatchReturns204AndPurges(t *testing.T) {
 	}
 }
 
+func TestHandleDeleteBatchIgnoresTerminalJobRows(t *testing.T) {
+	srv := New(DefaultConfig())
+	now := time.Now().UTC()
+	if err := srv.store.CreateBatch(Batch{
+		ID:        "batch_terminal_jobs",
+		Tag:       "tld",
+		CreatedAt: now,
+	}); err != nil {
+		t.Fatalf("CreateBatch: %v", err)
+	}
+	if _, err := srv.store.Create(Job{
+		ID:         "job-terminal",
+		BatchID:    "batch_terminal_jobs",
+		Domain:     "example.com",
+		Status:     JobFailed,
+		Error:      "server restarted during job",
+		CreatedAt:  now,
+		FinishedAt: now,
+	}); err != nil {
+		t.Fatalf("Create failed job: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/batches/batch_terminal_jobs", nil)
+	resp := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", resp.Code, resp.Body.String())
+	}
+	if _, ok := srv.store.GetBatch("batch_terminal_jobs"); ok {
+		t.Fatal("batch should be gone")
+	}
+	if _, ok := srv.store.Get("job-terminal"); ok {
+		t.Fatal("terminal job row should be gone")
+	}
+}
+
+func TestHandleDeleteBatchCancelsStaleRunningJobRows(t *testing.T) {
+	srv := New(DefaultConfig())
+	now := time.Now().UTC()
+	if err := srv.store.CreateBatch(Batch{
+		ID:        "batch_stale_running",
+		Tag:       "tld",
+		CreatedAt: now,
+	}); err != nil {
+		t.Fatalf("CreateBatch: %v", err)
+	}
+	if _, err := srv.store.Create(Job{
+		ID:        "job-stale-running",
+		BatchID:   "batch_stale_running",
+		Domain:    "example.com",
+		Status:    JobRunning,
+		CreatedAt: now,
+		StartedAt: now,
+	}); err != nil {
+		t.Fatalf("Create running job: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/batches/batch_stale_running", nil)
+	resp := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", resp.Code, resp.Body.String())
+	}
+	if _, ok := srv.store.GetBatch("batch_stale_running"); ok {
+		t.Fatal("batch should be gone")
+	}
+	if _, ok := srv.store.Get("job-stale-running"); ok {
+		t.Fatal("stale running job should be gone")
+	}
+}
+
 func TestHandleDeleteBatchMissingReturns404(t *testing.T) {
 	srv := New(DefaultConfig())
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/batches/missing", nil)

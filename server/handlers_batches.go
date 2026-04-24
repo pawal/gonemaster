@@ -135,7 +135,7 @@ func (s *Server) cancelBatchJobs(batchID string) error {
 	list := s.store.List(JobFilter{BatchID: batchID, Limit: 10000})
 	for _, job := range list.Items {
 		switch job.Status {
-		case JobQueued:
+		case JobQueued, JobPaused:
 			_ = s.queue.Remove(job.ID)
 			updated := job
 			updated.Status = JobCanceled
@@ -146,20 +146,33 @@ func (s *Server) cancelBatchJobs(batchID string) error {
 				return err
 			}
 		case JobRunning:
-			_ = s.cancelJob(job.ID)
+			if s.cancelJob(job.ID) {
+				continue
+			}
+			// A running row without a registered cancel function is stale
+			// in this server process. Graduate it synchronously so delete
+			// can continue instead of timing out forever.
+			updated := job
+			updated.Status = JobCanceled
+			updated.Error = "deleted_by_admin"
+			updated.FinishedAt = time.Now().UTC()
+			updated.Progress = 100
+			if err := s.store.GraduateJob(updated, nil); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
-// waitForBatchJobsTerminal polls until every job row with the matching
-// batch_id has drained from the in-flight jobs table or timeout
-// elapses. Returns true on a clean drain.
+// waitForBatchJobsTerminal polls until non-terminal job rows with the
+// matching batch_id have drained from the in-flight jobs table or
+// timeout elapses. Terminal rows can remain in jobs after recovery and
+// are removed by the delete transaction itself.
 func (s *Server) waitForBatchJobsTerminal(batchID string, timeout time.Duration) bool {
 	deadline := time.Now().Add(timeout)
 	for {
-		list := s.store.List(JobFilter{BatchID: batchID, Limit: 1})
-		if list.Total == 0 {
+		if s.countActiveBatchJobs(batchID) == 0 {
 			return true
 		}
 		if time.Now().After(deadline) {
@@ -167,6 +180,18 @@ func (s *Server) waitForBatchJobsTerminal(batchID string, timeout time.Duration)
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
+}
+
+func (s *Server) countActiveBatchJobs(batchID string) int {
+	total := 0
+	for _, status := range []JobStatus{JobQueued, JobRunning, JobPaused} {
+		total += s.store.List(JobFilter{
+			BatchID: batchID,
+			Status:  status,
+			Limit:   1,
+		}).Total
+	}
+	return total
 }
 
 // evictSnapshotMatCache removes the materialization cache entries for

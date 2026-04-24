@@ -74,24 +74,47 @@ Reference:
 
 ## Options
 
+The flag groups below follow `gonemaster --help`.
+
+### Target
+
 | Flag | Type | Details |
 |---|---|---|
-| `--domain DOMAIN` | string | Zone name to test. |
+| `DOMAIN` | positional | Zone name to test. Alternative to `--domain`. |
+| `--domain DOMAIN` | string | Zone name to test. Required for runs when positional `DOMAIN` is not provided. |
 | `--module MODULE` | string | Run one module. |
 | `--testcase TESTCASE` | string | Run one testcase. |
 | `--profile PATH` | string | Profile file in JSON or YAML. |
+
+### Output
+
+| Flag | Type | Details |
+|---|---|---|
 | `--min-level LEVEL` | string | Minimum log level. Default `NOTICE`. |
 | `--stop-level LEVEL` | string | Stop after the first entry at this level or higher. |
+| `--locale LOCALE` | string | Locale for translated output. |
 | `--output PATH` | string | Write output to a file. |
 | `--raw` | bool | Stream raw log entries. |
 | `--json` | bool | Print one JSON array. |
 | `--json-stream` | bool | Stream newline-delimited JSON entries. |
-| `--dump-profile` | bool | Print effective profile JSON and exit. |
 | `--count` | bool | Append count summaries in human output. |
 | `--nstimes` | bool | Append per-nameserver timing statistics. |
+| `--no-progress` | bool | Disable progress indicator. |
+| `--score` | bool | Print score and grade summary after the run. |
+| `--no-score` | bool | Suppress score output. |
+| `--scoring-config PATH` | string | Custom scoring config JSON file. Implies `--score`. |
+
+### Cache
+
+| Flag | Type | Details |
+|---|---|---|
 | `--save PATH` | string | Save DNS packet cache after the run. |
 | `--restore PATH` | string | Restore DNS packet cache before the run. |
-| `--locale LOCALE` | string | Locale for translated output. |
+
+### Resolver/Profile Overrides
+
+| Flag | Type | Details |
+|---|---|---|
 | `--no-ipv4` | bool | Disable IPv4 queries. |
 | `--no-ipv6` | bool | Disable IPv6 queries. |
 | `--ipv6` | bool | Force IPv6 queries. |
@@ -109,13 +132,20 @@ Reference:
 | `--positive-cache-ttl N` | int | Seconds to cache positive DNS responses. |
 | `--negative-cache-ttl N` | int | Seconds to cache negative DNS responses. |
 | `--badkeys-path PATH` | string | Badkeys blocklist directory path. |
-| `--badkeys-update` | bool | Download or update badkeys blocklist data and exit. |
+
+### Undelegated
+
+| Flag | Type | Details |
+|---|---|---|
 | `--ns NAME[/IP]` | repeatable | Undelegated nameserver input. |
 | `--ds KEYTAG,ALGORITHM,DIGTYPE,DIGEST` | repeatable | Undelegated DS input. |
-| `--score` | bool | Print score and grade summary after the run. |
-| `--no-score` | bool | Suppress score output. |
-| `--scoring-config PATH` | string | Custom scoring config JSON file. Implies `--score`. |
-| `--no-progress` | bool | Disable progress indicator. |
+
+### Utility
+
+| Flag | Type | Details |
+|---|---|---|
+| `--badkeys-update` | bool | Download or update badkeys blocklist data and exit. |
+| `--dump-profile` | bool | Print effective profile JSON and exit. |
 | `--list-tests` | bool | List available testcases and exit. |
 | `--version` | bool | Print version information and exit. |
 

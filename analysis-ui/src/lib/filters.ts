@@ -1,7 +1,7 @@
-// URL-sync helpers for the shared filter bar. The source of truth for the
-// active filter is the current URL's search params; mutating the filter goes
-// through `applyFilterToParams` so the URL stays canonical and the back
-// button works as expected.
+// URL-sync helpers for the shared filter bar and list-page navigation. The
+// source of truth for the active filter is the current URL's search params;
+// mutating the filter goes through `applyFilterToParams` so the URL stays
+// canonical and the back button works as expected.
 //
 // Only the filter keys that actually reach the server are kept here. Adding
 // a key here without matching server support silently does nothing; adding
@@ -16,6 +16,7 @@
 //   - grade:       exact grade filter on /domains (linked from the
 //                  overview grade distribution bar).
 
+import { goto } from "$app/navigation";
 import type { AnalysisFilter } from "$lib/api";
 
 const FILTER_KEYS = [
@@ -57,4 +58,19 @@ export function applyFilterToParams(
 export function searchToString(params: URLSearchParams): string {
   const s = params.toString();
   return s ? `?${s}` : "";
+}
+
+// Navigate to the current path with one URL param set or cleared. Used by
+// list pages to update sort, limit, and other non-filter params without
+// losing the existing filter state. `keepFocus` + `noScroll` prevents the
+// page from jumping when the user changes page size mid-list.
+export function updateURLParam(url: URL, key: string, value: string): void {
+  const params = new URLSearchParams(url.searchParams);
+  if (value) params.set(key, value);
+  else params.delete(key);
+  goto(`${url.pathname}${searchToString(params)}`, {
+    replaceState: false,
+    noScroll: false,
+    keepFocus: true
+  });
 }

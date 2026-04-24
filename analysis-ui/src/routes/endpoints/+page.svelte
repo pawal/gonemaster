@@ -10,7 +10,7 @@
   import PrefixChip from "$lib/chips/PrefixChip.svelte";
   import { endpointHref } from "$lib/entityLinks";
   import { formatCount } from "$lib/format";
-  import { searchToString } from "$lib/filters";
+  import { searchToString, updateURLParam } from "$lib/filters";
   import { downloadCSV, downloadJSON, type ExportColumn } from "$lib/exporters";
   import type { EndpointView } from "$lib/api";
   import type { LayoutData } from "../+layout";
@@ -27,14 +27,7 @@
   const pageEnd = $derived(Math.min(currentOffset + (data.list?.items.length ?? 0), total));
 
   function updateParam(key: string, value: string) {
-    const params = new URLSearchParams(page.url.searchParams);
-    if (value) params.set(key, value);
-    else params.delete(key);
-    goto(`${page.url.pathname}${searchToString(params)}`, {
-      replaceState: false,
-      noScroll: false,
-      keepFocus: true
-    });
+    updateURLParam(page.url, key, value);
   }
 
   function gotoPage(nextOffset: number) {

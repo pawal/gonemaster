@@ -1,5 +1,7 @@
-import { describe, expect, it } from "vitest";
-import { applyFilterToParams, filterFromURL, searchToString } from "./filters";
+import { describe, expect, it, vi } from "vitest";
+import { applyFilterToParams, filterFromURL, searchToString, updateURLParam } from "./filters";
+
+vi.mock("$app/navigation", () => ({ goto: vi.fn() }));
 
 describe("filters", () => {
   it("filterFromURL picks up dataset_tag and search, ignores other keys", () => {
@@ -58,5 +60,40 @@ describe("filters", () => {
   it("searchToString returns '' for empty params and a leading ? otherwise", () => {
     expect(searchToString(new URLSearchParams())).toBe("");
     expect(searchToString(new URLSearchParams("a=1"))).toBe("?a=1");
+  });
+});
+
+describe("updateURLParam", () => {
+  it("sets a new param and calls goto with keepFocus options", async () => {
+    const { goto } = await import("$app/navigation");
+    updateURLParam(new URL("http://localhost/domains?dataset_tag=tld"), "sort", "name_asc");
+    expect(goto).toHaveBeenCalledWith("/domains?dataset_tag=tld&sort=name_asc", {
+      replaceState: false,
+      noScroll: false,
+      keepFocus: true
+    });
+  });
+
+  it("removes the param when value is empty", async () => {
+    const { goto } = await import("$app/navigation");
+    updateURLParam(new URL("http://localhost/domains?dataset_tag=tld&sort=name_asc"), "sort", "");
+    expect(goto).toHaveBeenCalledWith("/domains?dataset_tag=tld", {
+      replaceState: false,
+      noScroll: false,
+      keepFocus: true
+    });
+  });
+
+  it("preserves unrelated params when setting a new one", async () => {
+    const { goto } = await import("$app/navigation");
+    updateURLParam(
+      new URL("http://localhost/domains?dataset_tag=tld&snapshot=2026-04-20"),
+      "limit",
+      "50"
+    );
+    expect(goto).toHaveBeenCalledWith(
+      "/domains?dataset_tag=tld&snapshot=2026-04-20&limit=50",
+      expect.any(Object)
+    );
   });
 });

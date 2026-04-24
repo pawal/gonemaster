@@ -467,7 +467,27 @@
     if (!value) return "";
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) return "";
+    if (parsed.getUTCFullYear() <= 1) return "";
     return parsed.toLocaleString("sv-SE");
+  }
+
+  function formatSnapshotCapturedAt(snap) {
+    if (snap?.status === "pending") return $t("analysis_snapshots_not_captured");
+    return formatTimestamp(snap?.captured_at) || $t("analysis_snapshots_not_captured");
+  }
+
+  function snapshotDisplayName(snap) {
+    const label = String(snap?.label || "").trim();
+    if (label) return label;
+    const slug = String(snap?.slug || "");
+    const match = slug.match(/^(\d{4}-\d{2}-\d{2})-/);
+    return match?.[1] || $t("analysis_snapshots_unlabeled");
+  }
+
+  function shortID(value) {
+    const id = String(value || "");
+    if (id.length <= 28) return id;
+    return `${id.slice(0, 14)}...${id.slice(-8)}`;
   }
 
   // Any cohort still projecting -> keep polling. Ready + failed rows are
@@ -683,11 +703,11 @@
                       <table class="data-table snapshot-table">
                         <thead>
                           <tr>
-                            <th>{$t("analysis_snapshots_col_slug")}</th>
-                            <th>{$t("analysis_snapshots_col_label")}</th>
+                            <th>{$t("analysis_snapshots_col_snapshot")}</th>
                             <th>{$t("analysis_snapshots_col_captured_at")}</th>
                             <th>{$t("analysis_snapshots_col_profile")}</th>
                             <th>{$t("analysis_snapshots_col_counts")}</th>
+                            <th>{$t("analysis_snapshots_col_source_batch")}</th>
                             <th>{$t("analysis_snapshots_col_status")}</th>
                             <th class="col-right">{$t("analysis_snapshots_col_actions")}</th>
                           </tr>
@@ -698,17 +718,24 @@
                             {@const snapBusy = busySnapshotKey === snapKey}
                             {@const editing = editingLabelKey === snapKey}
                             <tr>
-                              <td class="mono">{snap.slug}</td>
                               <td>
                                 {#if editing}
                                   <input type="text" bind:value={editingLabelValue} />
                                 {:else}
-                                  {snap.label || ""}
+                                  <div class="snapshot-name">{snapshotDisplayName(snap)}</div>
+                                  <div class="snapshot-id mono" title={snap.slug}>{snap.slug}</div>
                                 {/if}
                               </td>
-                              <td>{formatTimestamp(snap.captured_at)}</td>
+                              <td>{formatSnapshotCapturedAt(snap)}</td>
                               <td>{snap.profile_name || ""}</td>
                               <td>{snap.run_count} / {snap.domain_count}</td>
+                              <td>
+                                {#if snap.batch_id}
+                                  <span class="mono source-batch-id" title={snap.batch_id}>{shortID(snap.batch_id)}</span>
+                                {:else}
+                                  <span class="muted">—</span>
+                                {/if}
+                              </td>
                               <td>
                                 <span class={`badge badge-status badge-status-${snapshotStatusTone(snap.status)}`}>
                                   {snap.status}
@@ -744,12 +771,24 @@
                                         {$t("analysis_snapshots_retire")}
                                       </button>
                                     {/if}
-                                    <button type="button" class="row-action row-action-danger" disabled={snapBusy} onclick={() => purgeSnapshot(cohort, snap)}>
+                                    <button
+                                      type="button"
+                                      class="row-action row-action-danger"
+                                      title={$t("analysis_snapshots_purge_title")}
+                                      disabled={snapBusy}
+                                      onclick={() => purgeSnapshot(cohort, snap)}
+                                    >
                                       {$t("analysis_snapshots_purge")}
                                     </button>
                                     {#if onDeleteBatch && snap.batch_id}
-                                      <button type="button" class="row-action row-action-danger" disabled={snapBusy} onclick={() => onDeleteBatch(snap.batch_id)}>
-                                        {$t("batch_delete_button")}
+                                      <button
+                                        type="button"
+                                        class="row-action row-action-danger"
+                                        title={$t("analysis_snapshots_delete_source_batch_title", { id: snap.batch_id })}
+                                        disabled={snapBusy}
+                                        onclick={() => onDeleteBatch(snap.batch_id)}
+                                      >
+                                        {$t("analysis_snapshots_delete_source_batch")}
                                       </button>
                                     {/if}
                                   {/if}
@@ -1093,6 +1132,16 @@
   .snapshot-table th,
   .snapshot-table td {
     padding: 6px 8px;
+  }
+
+  .snapshot-name {
+    font-weight: 650;
+  }
+
+  .snapshot-id,
+  .source-batch-id {
+    color: var(--ink-2);
+    font-size: var(--text-xs);
   }
 
   .mono { font-family: var(--mono); }

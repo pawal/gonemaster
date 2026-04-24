@@ -164,6 +164,8 @@
           {/if}
         {/if}
 
+        <p class="status-banner warn">{$t("batch_delete_scope_notice")}</p>
+
         <p class="irreversible">{$t("batch_delete_irreversible_notice")}</p>
 
         <label for="batch-delete-typed">

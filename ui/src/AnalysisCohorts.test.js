@@ -466,7 +466,7 @@ describe("AnalysisCohorts", () => {
 
     const tldRow = (await screen.findByText("tld")).closest("tr");
     await fireEvent.click(within(tldRow).getByRole("button", { name: /Snapshots/i }));
-    await fireEvent.click(await screen.findByRole("button", { name: /^Purge$/i }));
+    await fireEvent.click(await screen.findByRole("button", { name: /^Purge snapshot$/i }));
 
     await waitFor(() => expect(handles.snapshotDeletes).toHaveLength(1));
     expect(handles.snapshotDeletes[0]).toEqual({ id: 1, slug: "2026-04-20", purge: true });
@@ -474,7 +474,7 @@ describe("AnalysisCohorts", () => {
 
   // ── Delete-batch action ──────────────────────────────────────────────────
 
-  it("renders a Delete batch button per snapshot row when onDeleteBatch is provided", async () => {
+  it("renders a Delete source batch button per snapshot row when onDeleteBatch is provided", async () => {
     const snapshotsByCohort = {
       1: [{
         id: 100, batch_id: "batch_abc", slug: "2026-04-20", label: "",
@@ -490,13 +490,16 @@ describe("AnalysisCohorts", () => {
     const tldRow = (await screen.findByText("tld")).closest("tr");
     await fireEvent.click(within(tldRow).getByRole("button", { name: /Snapshots/i }));
 
-    const deleteBatchButton = await screen.findByRole("button", { name: /^Delete batch$/i });
+    await screen.findByText("Source batch");
+    await screen.findByText("batch_abc");
+
+    const deleteBatchButton = await screen.findByRole("button", { name: /^Delete source batch$/i });
     await fireEvent.click(deleteBatchButton);
 
     expect(onDeleteBatch).toHaveBeenCalledWith("batch_abc");
   });
 
-  it("hides the Delete batch button when onDeleteBatch is not provided", async () => {
+  it("hides the Delete source batch button when onDeleteBatch is not provided", async () => {
     const snapshotsByCohort = {
       1: [{
         id: 100, batch_id: "batch_abc", slug: "2026-04-20", label: "",
@@ -512,7 +515,7 @@ describe("AnalysisCohorts", () => {
     await fireEvent.click(within(tldRow).getByRole("button", { name: /Snapshots/i }));
     await screen.findByText("2026-04-20");
 
-    expect(screen.queryByRole("button", { name: /^Delete batch$/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Delete source batch$/i })).toBeNull();
   });
 
   it("refetches snapshots for expanded cohorts when refreshSignal changes", async () => {

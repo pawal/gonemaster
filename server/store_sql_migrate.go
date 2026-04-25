@@ -526,6 +526,77 @@ var sqlMigrations = []sqlMigration{
 			}
 		},
 	},
+	{
+		// Per-snapshot read views: one paginatable, indexed row set per
+		// entity tab (nameservers, endpoints, ASNs). Written at snapshot
+		// capture time so the public read path is one indexed SELECT
+		// instead of a full-cohort fact-row scan with N+1 lookups.
+		version: 12,
+		stmtsFn: func(d sqlDialect) []string {
+			var bigint string
+			switch d.(type) {
+			case postgresDialect, mariadbDialect:
+				bigint = "BIGINT"
+			default:
+				bigint = "INTEGER"
+			}
+			return buildV12DDL(bigint)
+		},
+	},
+}
+
+// buildV12DDL returns migration 12: per-snapshot entity-view tables that
+// shape a captured snapshot's nameservers/endpoints/ASNs into rows the
+// public read path can paginate at SQL.
+func buildV12DDL(bigint string) []string {
+	return []string{
+		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS analysis_snapshot_nameserver_view (
+			snapshot_id     %s          NOT NULL,
+			nameserver_id   %s          NOT NULL,
+			nameserver_name VARCHAR(255) NOT NULL DEFAULT '',
+			domain_count    INTEGER     NOT NULL DEFAULT 0,
+			endpoint_count  INTEGER     NOT NULL DEFAULT 0,
+			ipv4_count      INTEGER     NOT NULL DEFAULT 0,
+			ipv6_count      INTEGER     NOT NULL DEFAULT 0,
+			asn_count       INTEGER     NOT NULL DEFAULT 0,
+			operator        VARCHAR(255) NOT NULL DEFAULT '',
+			operator_asn    BIGINT,
+			query_count     INTEGER     NOT NULL DEFAULT 0,
+			PRIMARY KEY (snapshot_id, nameserver_id)
+		)`, bigint, bigint),
+		`CREATE INDEX IF NOT EXISTS idx_analysis_snapshot_nameserver_view_snapshot_dc ON analysis_snapshot_nameserver_view(snapshot_id, domain_count)`,
+		`CREATE INDEX IF NOT EXISTS idx_analysis_snapshot_nameserver_view_snapshot_name ON analysis_snapshot_nameserver_view(snapshot_id, nameserver_name)`,
+
+		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS analysis_snapshot_endpoint_view (
+			snapshot_id     %s          NOT NULL,
+			nameserver_id   %s          NOT NULL,
+			address_id      %s          NOT NULL,
+			nameserver_name VARCHAR(255) NOT NULL DEFAULT '',
+			address         VARCHAR(64)  NOT NULL DEFAULT '',
+			family          VARCHAR(8)   NOT NULL DEFAULT '',
+			domain_count    INTEGER      NOT NULL DEFAULT 0,
+			asn             BIGINT,
+			asn_label       VARCHAR(255) NOT NULL DEFAULT '',
+			prefix          VARCHAR(64)  NOT NULL DEFAULT '',
+			PRIMARY KEY (snapshot_id, nameserver_id, address_id)
+		)`, bigint, bigint, bigint),
+		`CREATE INDEX IF NOT EXISTS idx_analysis_snapshot_endpoint_view_snapshot_dc ON analysis_snapshot_endpoint_view(snapshot_id, domain_count)`,
+		`CREATE INDEX IF NOT EXISTS idx_analysis_snapshot_endpoint_view_snapshot_asn ON analysis_snapshot_endpoint_view(snapshot_id, asn)`,
+
+		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS analysis_snapshot_asn_view (
+			snapshot_id      %s          NOT NULL,
+			asn              BIGINT       NOT NULL,
+			label            VARCHAR(255) NOT NULL DEFAULT '',
+			domain_count     INTEGER      NOT NULL DEFAULT 0,
+			address_count    INTEGER      NOT NULL DEFAULT 0,
+			nameserver_count INTEGER      NOT NULL DEFAULT 0,
+			prefix_count     INTEGER      NOT NULL DEFAULT 0,
+			ipv4_count       INTEGER      NOT NULL DEFAULT 0,
+			ipv6_count       INTEGER      NOT NULL DEFAULT 0,
+			PRIMARY KEY (snapshot_id, asn)
+		)`, bigint),
+		`CREATE INDEX IF NOT EXISTS idx_analysis_snapshot_asn_view_snapshot_dc ON analysis_snapshot_asn_view(snapshot_id, domain_count)`,
+	}
 }
 
 // runMigrations creates the schema_migrations tracking table and applies any

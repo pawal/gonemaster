@@ -1895,6 +1895,15 @@ func (s *SQLJobStore) DeleteBatch(batchID string) ([]int64, error) {
 		{"snapshot aggregates", fmt.Sprintf(
 			`DELETE FROM analysis_cohort_snapshot_aggregates
 			  WHERE snapshot_id IN (SELECT id FROM analysis_cohort_snapshots WHERE batch_id = %s)`, ph)},
+		{"analysis_snapshot_nameserver_view", fmt.Sprintf(
+			`DELETE FROM analysis_snapshot_nameserver_view
+			  WHERE snapshot_id IN (SELECT id FROM analysis_cohort_snapshots WHERE batch_id = %s)`, ph)},
+		{"analysis_snapshot_endpoint_view", fmt.Sprintf(
+			`DELETE FROM analysis_snapshot_endpoint_view
+			  WHERE snapshot_id IN (SELECT id FROM analysis_cohort_snapshots WHERE batch_id = %s)`, ph)},
+		{"analysis_snapshot_asn_view", fmt.Sprintf(
+			`DELETE FROM analysis_snapshot_asn_view
+			  WHERE snapshot_id IN (SELECT id FROM analysis_cohort_snapshots WHERE batch_id = %s)`, ph)},
 		{"snapshots", fmt.Sprintf(`DELETE FROM analysis_cohort_snapshots WHERE batch_id = %s`, ph)},
 		{"analysis_run_ns_endpoints", fmt.Sprintf(`DELETE FROM analysis_run_ns_endpoints WHERE run_id IN (%s)`, runSetSubquery)},
 		{"analysis_run_address_asns", fmt.Sprintf(`DELETE FROM analysis_run_address_asns WHERE run_id IN (%s)`, runSetSubquery)},

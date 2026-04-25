@@ -43,6 +43,8 @@ type ControlStore interface {
 	CountUnprojectedSnapshotRuns(cohortID int64, batchID string) (int, error)
 	ComputeSnapshotAggregates(cohortID int64, batchID string) ([]serverpkg.AnalysisCohortSnapshotAggregate, error)
 	ReplaceSnapshotAggregates(snapshotID int64, aggs []serverpkg.AnalysisCohortSnapshotAggregate) error
+	ComputeSnapshotEntityViews(cohortID int64, batchID string) (serverpkg.SnapshotEntityViews, error)
+	ReplaceSnapshotEntityViews(snapshotID int64, views serverpkg.SnapshotEntityViews) error
 
 	// First-boot backfill surface.
 	ListCohortBatchesWithFacts() ([]serverpkg.CohortBatchFactStats, error)
@@ -190,13 +192,29 @@ func (c *Controller) accumulateSnapshot(cohort serverpkg.AnalysisCohort, batch s
 		return fmt.Errorf("upsert snapshot for cohort %d batch %s: %w", cohort.ID, batch.ID, err)
 	}
 	if found && existing.Status == serverpkg.AnalysisSnapshotStatusCaptured {
-		aggregates, err := c.store.ComputeSnapshotAggregates(snap.CohortID, snap.BatchID)
-		if err != nil {
-			return fmt.Errorf("refresh aggregates for captured snapshot %d: %w", snap.ID, err)
+		if err := c.materializeSnapshot(snap); err != nil {
+			return fmt.Errorf("refresh captured snapshot %d: %w", snap.ID, err)
 		}
-		if err := c.store.ReplaceSnapshotAggregates(snap.ID, aggregates); err != nil {
-			return fmt.Errorf("write refreshed aggregates for captured snapshot %d: %w", snap.ID, err)
-		}
+	}
+	return nil
+}
+
+// materializeSnapshot writes both the aggregate blobs and the entity-view
+// rows for one snapshot in sequence.
+func (c *Controller) materializeSnapshot(snap serverpkg.AnalysisCohortSnapshot) error {
+	aggregates, err := c.store.ComputeSnapshotAggregates(snap.CohortID, snap.BatchID)
+	if err != nil {
+		return fmt.Errorf("compute aggregates: %w", err)
+	}
+	if err := c.store.ReplaceSnapshotAggregates(snap.ID, aggregates); err != nil {
+		return fmt.Errorf("write aggregates: %w", err)
+	}
+	views, err := c.store.ComputeSnapshotEntityViews(snap.CohortID, snap.BatchID)
+	if err != nil {
+		return fmt.Errorf("compute entity views: %w", err)
+	}
+	if err := c.store.ReplaceSnapshotEntityViews(snap.ID, views); err != nil {
+		return fmt.Errorf("write entity views: %w", err)
 	}
 	return nil
 }
@@ -523,12 +541,8 @@ func (c *Controller) captureSnapshot(snap serverpkg.AnalysisCohortSnapshot) erro
 		return nil
 	}
 
-	aggregates, err := c.store.ComputeSnapshotAggregates(snap.CohortID, snap.BatchID)
-	if err != nil {
-		return fmt.Errorf("compute aggregates for snapshot %d: %w", snap.ID, err)
-	}
-	if err := c.store.ReplaceSnapshotAggregates(snap.ID, aggregates); err != nil {
-		return fmt.Errorf("write aggregates for snapshot %d: %w", snap.ID, err)
+	if err := c.materializeSnapshot(snap); err != nil {
+		return fmt.Errorf("materialize snapshot %d: %w", snap.ID, err)
 	}
 
 	snap.RunCount = runCount
@@ -647,6 +661,9 @@ func (c *Controller) BackfillSnapshotsFromFacts(ctx context.Context) (serverpkg.
 					continue
 				}
 				_ = c.store.ReplaceSnapshotAggregates(upserted.ID, aggs)
+				if views, viewsErr := c.store.ComputeSnapshotEntityViews(pair.CohortID, pair.BatchID); viewsErr == nil {
+					_ = c.store.ReplaceSnapshotEntityViews(upserted.ID, views)
+				}
 				report.SnapshotsMade++
 				continue
 			}

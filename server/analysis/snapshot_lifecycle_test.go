@@ -251,6 +251,9 @@ func TestControllerCaptureCompletedSnapshotsPromotesOnBatchDrain(t *testing.T) {
 	if len(aggs) == 0 {
 		t.Fatal("expected aggregates to be written on capture")
 	}
+	if _, ok := store.snapshotViews[snap.ID]; !ok {
+		t.Fatal("expected entity-view replace to be called on capture")
+	}
 }
 
 func TestControllerCaptureWaitsForProjectionDrain(t *testing.T) {

@@ -456,6 +456,50 @@ type AnalysisCohortSnapshotAggregate struct {
 	ComputedAt  time.Time `json:"computed_at"`
 }
 
+// AnalysisSnapshotNameserverView is one pre-computed nameserver row for a
+// captured snapshot, ready to serve the Nameservers tab without scanning facts.
+type AnalysisSnapshotNameserverView struct {
+	SnapshotID     int64  `json:"snapshot_id"`
+	NameserverID   int64  `json:"nameserver_id"`
+	NameserverName string `json:"nameserver_name"`
+	DomainCount    int    `json:"domain_count"`
+	EndpointCount  int    `json:"endpoint_count"`
+	IPv4Count      int    `json:"ipv4_count"`
+	IPv6Count      int    `json:"ipv6_count"`
+	ASNCount       int    `json:"asn_count"`
+	Operator       string `json:"operator,omitempty"`
+	OperatorASN    *int64 `json:"operator_asn,omitempty"`
+	QueryCount     int    `json:"query_count,omitempty"`
+}
+
+// AnalysisSnapshotEndpointView is one pre-computed (nameserver, address) row
+// for a captured snapshot.
+type AnalysisSnapshotEndpointView struct {
+	SnapshotID     int64  `json:"snapshot_id"`
+	NameserverID   int64  `json:"nameserver_id"`
+	AddressID      int64  `json:"address_id"`
+	NameserverName string `json:"nameserver_name"`
+	Address        string `json:"address"`
+	Family         string `json:"family"`
+	DomainCount    int    `json:"domain_count"`
+	ASN            *int64 `json:"asn,omitempty"`
+	ASNLabel       string `json:"asn_label,omitempty"`
+	Prefix         string `json:"prefix,omitempty"`
+}
+
+// AnalysisSnapshotASNView is one pre-computed ASN row for a captured snapshot.
+type AnalysisSnapshotASNView struct {
+	SnapshotID      int64  `json:"snapshot_id"`
+	ASN             int64  `json:"asn"`
+	Label           string `json:"label,omitempty"`
+	DomainCount     int    `json:"domain_count"`
+	AddressCount    int    `json:"address_count"`
+	NameserverCount int    `json:"nameserver_count"`
+	PrefixCount     int    `json:"prefix_count"`
+	IPv4Count       int    `json:"ipv4_count"`
+	IPv6Count       int    `json:"ipv6_count"`
+}
+
 // StoredProfile is a named, server-stored test configuration.
 type StoredProfile struct {
 	ID            int64     `json:"id"`

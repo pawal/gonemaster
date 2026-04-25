@@ -26,6 +26,8 @@ type adminSnapshotPurger interface {
 type adminSnapshotAggregator interface {
 	ComputeSnapshotAggregates(cohortID int64, batchID string) ([]AnalysisCohortSnapshotAggregate, error)
 	ReplaceSnapshotAggregates(snapshotID int64, aggs []AnalysisCohortSnapshotAggregate) error
+	ComputeSnapshotEntityViews(cohortID int64, batchID string) (SnapshotEntityViews, error)
+	ReplaceSnapshotEntityViews(snapshotID int64, views SnapshotEntityViews) error
 }
 
 // AdminAnalysisSnapshotView is the admin shape for one snapshot row. It
@@ -148,6 +150,15 @@ func (s *Server) handleAnalysisCohortSnapshotRematerialize(w http.ResponseWriter
 		return
 	}
 	if err := aggWriter.ReplaceSnapshotAggregates(snap.ID, aggs); err != nil {
+		writeError(w, http.StatusInternalServerError, "write_failed", err.Error(), nil)
+		return
+	}
+	views, err := aggWriter.ComputeSnapshotEntityViews(cohort.ID, snap.BatchID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "compute_failed", err.Error(), nil)
+		return
+	}
+	if err := aggWriter.ReplaceSnapshotEntityViews(snap.ID, views); err != nil {
 		writeError(w, http.StatusInternalServerError, "write_failed", err.Error(), nil)
 		return
 	}

@@ -47,6 +47,7 @@ type fakeStore struct {
 	snapshots      map[snapshotKey]serverpkg.AnalysisCohortSnapshot
 	snapshotByID   map[int64]snapshotKey
 	snapshotAggs   map[int64][]serverpkg.AnalysisCohortSnapshotAggregate
+	snapshotViews  map[int64]serverpkg.SnapshotEntityViews
 	nextSnapshotID int64
 
 	settings map[string]string
@@ -575,6 +576,16 @@ func (s *fakeStore) ReplaceSnapshotAggregates(snapshotID int64, aggs []serverpkg
 	return nil
 }
 
+func (s *fakeStore) ComputeSnapshotEntityViews(cohortID int64, batchID string) (serverpkg.SnapshotEntityViews, error) {
+	return serverpkg.SnapshotEntityViews{}, nil
+}
+
+func (s *fakeStore) ReplaceSnapshotEntityViews(snapshotID int64, views serverpkg.SnapshotEntityViews) error {
+	s.ensureSnapshotMaps()
+	s.snapshotViews[snapshotID] = views
+	return nil
+}
+
 func (s *fakeStore) ensureSnapshotMaps() {
 	if s.snapshots == nil {
 		s.snapshots = map[snapshotKey]serverpkg.AnalysisCohortSnapshot{}
@@ -584,6 +595,9 @@ func (s *fakeStore) ensureSnapshotMaps() {
 	}
 	if s.snapshotAggs == nil {
 		s.snapshotAggs = map[int64][]serverpkg.AnalysisCohortSnapshotAggregate{}
+	}
+	if s.snapshotViews == nil {
+		s.snapshotViews = map[int64]serverpkg.SnapshotEntityViews{}
 	}
 	if s.batches == nil {
 		s.batches = map[string]serverpkg.Batch{}

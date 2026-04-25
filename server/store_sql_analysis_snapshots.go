@@ -361,6 +361,18 @@ func (s *SQLJobStore) DeleteAnalysisCohortSnapshot(id int64) error {
 	); err != nil {
 		return fmt.Errorf("delete aggregates for snapshot %d: %w", id, err)
 	}
+	for _, table := range []string{
+		"analysis_snapshot_nameserver_view",
+		"analysis_snapshot_endpoint_view",
+		"analysis_snapshot_asn_view",
+	} {
+		if _, err := s.db.Exec(
+			fmt.Sprintf(`DELETE FROM %s WHERE snapshot_id = %s`, table, s.ph(1)),
+			id,
+		); err != nil {
+			return fmt.Errorf("delete %s for snapshot %d: %w", table, id, err)
+		}
+	}
 	if _, err := s.db.Exec(
 		fmt.Sprintf(`DELETE FROM analysis_cohort_snapshots WHERE id = %s`, s.ph(1)),
 		id,
@@ -385,6 +397,21 @@ func (s *SQLJobStore) ClearAnalysisCohortSnapshots(cohortID int64) error {
 		cohortID,
 	); err != nil {
 		return fmt.Errorf("clear snapshot aggregates for cohort %d: %w", cohortID, err)
+	}
+	for _, table := range []string{
+		"analysis_snapshot_nameserver_view",
+		"analysis_snapshot_endpoint_view",
+		"analysis_snapshot_asn_view",
+	} {
+		if _, err := s.db.Exec(
+			fmt.Sprintf(`DELETE FROM %s
+				WHERE snapshot_id IN (
+					SELECT id FROM analysis_cohort_snapshots WHERE cohort_id = %s
+				)`, table, s.ph(1)),
+			cohortID,
+		); err != nil {
+			return fmt.Errorf("clear %s for cohort %d: %w", table, cohortID, err)
+		}
 	}
 	if _, err := s.db.Exec(
 		fmt.Sprintf(`DELETE FROM analysis_cohort_snapshots WHERE cohort_id = %s`, s.ph(1)),

@@ -151,6 +151,13 @@ func TestSQLJobStoreDeleteBatchRemovesSnapshotAndAggregates(t *testing.T) {
 			}); err != nil {
 				t.Fatalf("ReplaceSnapshotAggregates: %v", err)
 			}
+			if err := s.ReplaceSnapshotEntityViews(snap.ID, SnapshotEntityViews{
+				Nameservers: []AnalysisSnapshotNameserverView{{NameserverID: 1, NameserverName: "ns1.example", DomainCount: 1}},
+				Endpoints:   []AnalysisSnapshotEndpointView{{NameserverID: 1, AddressID: 1, NameserverName: "ns1.example", Address: "192.0.2.1", Family: "ipv4", DomainCount: 1}},
+				ASNs:        []AnalysisSnapshotASNView{{ASN: 64496, Label: "Example AS", DomainCount: 1}},
+			}); err != nil {
+				t.Fatalf("ReplaceSnapshotEntityViews: %v", err)
+			}
 
 			removed, err := s.DeleteBatch("batch_del_3")
 			if err != nil {
@@ -167,6 +174,18 @@ func TestSQLJobStoreDeleteBatchRemovesSnapshotAndAggregates(t *testing.T) {
 				snap.ID,
 			); n != 0 {
 				t.Fatalf("aggregates remain: %d", n)
+			}
+			for _, table := range []string{
+				"analysis_snapshot_nameserver_view",
+				"analysis_snapshot_endpoint_view",
+				"analysis_snapshot_asn_view",
+			} {
+				if n := countRows(t, s,
+					"SELECT COUNT(*) FROM "+table+" WHERE snapshot_id = "+s.ph(1),
+					snap.ID,
+				); n != 0 {
+					t.Fatalf("%s rows remain: %d", table, n)
+				}
 			}
 		})
 	}

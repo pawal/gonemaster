@@ -181,6 +181,23 @@ func (s *Server) apiMetricsMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// analysisTimeoutMiddleware caps the wall time of /analysis/* requests
+// so slow handlers do not pile up under load.
+func analysisTimeoutMiddleware(d time.Duration, next http.Handler) http.Handler {
+	if d <= 0 {
+		return next
+	}
+	const body = `{"error":"request_timeout","message":"analysis request timed out"}`
+	timed := http.TimeoutHandler(next, d, body)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/pub/api/v1/analysis/") || r.URL.Path == "/pub/api/v1/analysis" {
+			timed.ServeHTTP(w, r)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func apiRouteTemplate(path string) string {
 	const apiPrefix = "/api/v1"
 

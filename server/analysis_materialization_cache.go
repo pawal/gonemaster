@@ -1,6 +1,11 @@
 package server
 
-import "time"
+import (
+	"strconv"
+	"time"
+
+	"golang.org/x/sync/singleflight"
+)
 
 // analysisMatCacheEntry is one cached snapshot materialization stamped with
 // the snapshot's CapturedAt. Captured snapshots are immutable, so the
@@ -13,15 +18,10 @@ type analysisMatCacheEntry struct {
 }
 
 // latestMaterializationForSnapshot returns the cached materialization for
-// one (cohort, snapshot) pair, computing on first access. The cache key is
-// the snapshot ID so every addressable snapshot has exactly one cached
-// materialization, and auto-latest resolution naturally shares cache
-// entries with explicit-slug requests for the same snapshot.
-//
-// Callers must first resolve the snapshot via
-// (*Server).resolvePublicAnalysisCohortAndSnapshot so the empty-snapshot
-// (no captured snapshot yet) state renders a helpful response instead of
-// silently returning zero data.
+// one (cohort, snapshot) pair. Concurrent requests for the same snapshot
+// share one in-flight compute via singleflight; concurrent requests for
+// different snapshots run in parallel. The map mutation lock is only held
+// for the slot read/write, never across the compute.
 func (s *Server) latestMaterializationForSnapshot(cohort AnalysisCohort, snapshot AnalysisCohortSnapshot) latestCohortMaterialization {
 	readStore, ok := s.store.(AnalysisReadStore)
 	if !ok {
@@ -30,15 +30,43 @@ func (s *Server) latestMaterializationForSnapshot(cohort AnalysisCohort, snapsho
 	if snapshot.ID == 0 {
 		return latestCohortMaterialization{}
 	}
-	s.analysisMatCacheMu.Lock()
-	defer s.analysisMatCacheMu.Unlock()
-	if entry, hit := s.analysisMatCache[snapshot.ID]; hit && entry.stamp.Equal(snapshot.CapturedAt) {
+
+	if entry, hit := s.lookupAnalysisMatCache(snapshot.ID); hit && entry.stamp.Equal(snapshot.CapturedAt) {
 		return entry.data
 	}
-	data := computeSnapshotMaterialization(readStore, s.store, cohort.ID, snapshot.BatchID)
-	s.analysisMatCache[snapshot.ID] = analysisMatCacheEntry{
-		stamp: snapshot.CapturedAt,
-		data:  data,
-	}
-	return data
+
+	key := matCacheKey(snapshot.ID, snapshot.CapturedAt)
+	v, _, _ := s.analysisMatGroup.Do(key, func() (any, error) {
+		if entry, hit := s.lookupAnalysisMatCache(snapshot.ID); hit && entry.stamp.Equal(snapshot.CapturedAt) {
+			return entry.data, nil
+		}
+		data := computeSnapshotMaterialization(readStore, s.store, cohort.ID, snapshot.BatchID)
+		s.storeAnalysisMatCache(snapshot.ID, analysisMatCacheEntry{stamp: snapshot.CapturedAt, data: data})
+		return data, nil
+	})
+	return v.(latestCohortMaterialization)
 }
+
+func (s *Server) lookupAnalysisMatCache(snapshotID int64) (analysisMatCacheEntry, bool) {
+	s.analysisMatCacheMu.Lock()
+	defer s.analysisMatCacheMu.Unlock()
+	entry, ok := s.analysisMatCache[snapshotID]
+	return entry, ok
+}
+
+func (s *Server) storeAnalysisMatCache(snapshotID int64, entry analysisMatCacheEntry) {
+	s.analysisMatCacheMu.Lock()
+	defer s.analysisMatCacheMu.Unlock()
+	s.analysisMatCache[snapshotID] = entry
+}
+
+// matCacheKey scopes the singleflight by (snapshot, captured_at) so a
+// re-materialization (which bumps captured_at) does not coalesce with
+// in-flight requests holding the older payload.
+func matCacheKey(snapshotID int64, capturedAt time.Time) string {
+	return strconv.FormatInt(snapshotID, 10) + ":" + strconv.FormatInt(capturedAt.Unix(), 10)
+}
+
+// matSingleflightGroup aliases the singleflight type so the Server fields
+// stay narrow.
+type matSingleflightGroup = singleflight.Group

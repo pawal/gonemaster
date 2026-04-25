@@ -129,13 +129,35 @@ func dialectFor(driver string) (sqlDialect, error) {
 // SQLite must use a single connection to serialise writes; client/server
 // databases use a bounded pool.
 func configurePool(db *sql.DB, driver string) {
+	configurePoolWith(db, driver, DatabaseConfig{})
+}
+
+// configurePoolWith is configurePool with operator overrides. Zero
+// values fall back to the driver-appropriate default.
+func configurePoolWith(db *sql.DB, driver string, cfg DatabaseConfig) {
 	switch driver {
 	case "sqlite":
-		db.SetMaxOpenConns(1)
+		max := cfg.MaxOpenConns
+		if max <= 0 {
+			max = 1
+		}
+		db.SetMaxOpenConns(max)
 	case "postgres", "mariadb", "mysql":
-		db.SetMaxOpenConns(25)
-		db.SetMaxIdleConns(5)
-		db.SetConnMaxLifetime(5 * time.Minute)
+		maxOpen := cfg.MaxOpenConns
+		if maxOpen <= 0 {
+			maxOpen = 25
+		}
+		maxIdle := cfg.MaxIdleConns
+		if maxIdle <= 0 {
+			maxIdle = 5
+		}
+		lifetime := time.Duration(cfg.ConnMaxLifetimeSeconds) * time.Second
+		if lifetime <= 0 {
+			lifetime = 5 * time.Minute
+		}
+		db.SetMaxOpenConns(maxOpen)
+		db.SetMaxIdleConns(maxIdle)
+		db.SetConnMaxLifetime(lifetime)
 	}
 }
 
@@ -154,6 +176,11 @@ func mariadbDSN(dsn string) string {
 
 // openSQLDB opens and configures a *sql.DB for the given driver and DSN.
 func openSQLDB(driver, dsn string) (*sql.DB, error) {
+	return openSQLDBWith(driver, dsn, DatabaseConfig{})
+}
+
+// openSQLDBWith is openSQLDB with explicit pool overrides from cfg.
+func openSQLDBWith(driver, dsn string, cfg DatabaseConfig) (*sql.DB, error) {
 	if dsn == "" {
 		return nil, fmt.Errorf("database DSN is required for driver %q", driver)
 	}
@@ -166,7 +193,7 @@ func openSQLDB(driver, dsn string) (*sql.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open %s database: %w", driver, err)
 	}
-	configurePool(db, driver)
+	configurePoolWith(db, driver, cfg)
 	if err := db.Ping(); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("ping %s database: %w", driver, err)

@@ -29,6 +29,7 @@ type Server struct {
 	metricsCacheMu           sync.Mutex
 	analysisMatCache         map[int64]analysisMatCacheEntry
 	analysisMatCacheMu       sync.Mutex
+	analysisMatGroup         matSingleflightGroup
 	progressWriteMu          sync.Mutex
 	progressWrites           map[string]progressWriteState
 	progressWriteMinStep     int
@@ -98,7 +99,7 @@ func NewWithOptions(cfg Config) (*Server, error) {
 		if err != nil {
 			return nil, err
 		}
-		db, err := openSQLDB(cfg.Database.Driver, cfg.Database.DSN)
+		db, err := openSQLDBWith(cfg.Database.Driver, cfg.Database.DSN, cfg.Database)
 		if err != nil {
 			return nil, err
 		}
@@ -290,6 +291,9 @@ func (s *Server) routes() {
 	pubMux.HandleFunc("GET /analysis/tags/{tag}", s.handlePublicAnalysisTagDetail)
 	pubMux.HandleFunc("GET /analysis/testcase", s.handlePublicAnalysisTestcaseDetail)
 	var pubHandler http.Handler = http.StripPrefix("/pub/api/v1", pubMux)
+	if d := s.cfg.PublicAPI.AnalysisRequestTimeout.Duration; d > 0 {
+		pubHandler = analysisTimeoutMiddleware(d, pubHandler)
+	}
 	if s.rateLimiter != nil {
 		pubHandler = rateLimitMiddleware(s.rateLimiter, pubHandler)
 	}

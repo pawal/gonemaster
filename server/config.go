@@ -18,6 +18,15 @@ type DatabaseConfig struct {
 	// RetentionDays is the number of days to keep completed jobs. Zero means
 	// keep forever (disabled).
 	RetentionDays int `json:"retention_days,omitempty"`
+	// MaxOpenConns caps the connection pool size. Zero uses the
+	// driver-appropriate default (1 for sqlite, 25 otherwise).
+	MaxOpenConns int `json:"max_open_conns,omitempty"`
+	// MaxIdleConns caps idle connections held in the pool. Zero uses
+	// the default (5 for client/server drivers).
+	MaxIdleConns int `json:"max_idle_conns,omitempty"`
+	// ConnMaxLifetimeSeconds rotates pooled connections after this many
+	// seconds. Zero uses the default (300s).
+	ConnMaxLifetimeSeconds int `json:"conn_max_lifetime_seconds,omitempty"`
 }
 
 // PublicAPIConfig controls the behaviour of the public-facing API at /pub/api/v1/.
@@ -30,6 +39,9 @@ type PublicAPIConfig struct {
 	// RateLimitWindow is the sliding window duration for rate limiting.
 	// Default: 5m.
 	RateLimitWindow Duration `json:"rate_limit_window,omitempty"`
+	// AnalysisRequestTimeout caps the wall time of a public analysis
+	// request. Zero disables. Default: 10s.
+	AnalysisRequestTimeout Duration `json:"analysis_request_timeout,omitempty"`
 }
 
 // Duration is a time.Duration that marshals/unmarshals as a string (e.g. "5m").
@@ -118,17 +130,21 @@ type Config struct {
 
 // PublicAPIFileConfig holds optional public API configuration from JSON.
 type PublicAPIFileConfig struct {
-	RateLimitEnabled *bool   `json:"rate_limit_enabled,omitempty"`
-	RateLimitMax     *int    `json:"rate_limit_max,omitempty"`
-	RateLimitWindow  *string `json:"rate_limit_window,omitempty"`
+	RateLimitEnabled       *bool   `json:"rate_limit_enabled,omitempty"`
+	RateLimitMax           *int    `json:"rate_limit_max,omitempty"`
+	RateLimitWindow        *string `json:"rate_limit_window,omitempty"`
+	AnalysisRequestTimeout *string `json:"analysis_request_timeout,omitempty"`
 }
 
 // DatabaseFileConfig holds optional database configuration from JSON.
 // An empty string for Driver or DSN means "not set" (inherit from default).
 type DatabaseFileConfig struct {
-	Driver        string `json:"driver,omitempty"`
-	DSN           string `json:"dsn,omitempty"`
-	RetentionDays *int   `json:"retention_days,omitempty"`
+	Driver                 string `json:"driver,omitempty"`
+	DSN                    string `json:"dsn,omitempty"`
+	RetentionDays          *int   `json:"retention_days,omitempty"`
+	MaxOpenConns           *int   `json:"max_open_conns,omitempty"`
+	MaxIdleConns           *int   `json:"max_idle_conns,omitempty"`
+	ConnMaxLifetimeSeconds *int   `json:"conn_max_lifetime_seconds,omitempty"`
 }
 
 // FileConfig captures optional configuration fields from JSON.
@@ -176,9 +192,10 @@ func DefaultConfig() Config {
 		CrossJobHotCache:            true,
 		CrossJobHotCacheTTLSeconds:  defaultCrossJobHotCacheTTLSeconds,
 		PublicAPI: PublicAPIConfig{
-			RateLimitEnabled: false,
-			RateLimitMax:     10,
-			RateLimitWindow:  Duration{10 * time.Minute},
+			RateLimitEnabled:       false,
+			RateLimitMax:           10,
+			RateLimitWindow:        Duration{10 * time.Minute},
+			AnalysisRequestTimeout: Duration{10 * time.Second},
 		},
 	}
 }
@@ -286,6 +303,15 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 		if file.Database.RetentionDays != nil {
 			c.Database.RetentionDays = *file.Database.RetentionDays
 		}
+		if file.Database.MaxOpenConns != nil {
+			c.Database.MaxOpenConns = *file.Database.MaxOpenConns
+		}
+		if file.Database.MaxIdleConns != nil {
+			c.Database.MaxIdleConns = *file.Database.MaxIdleConns
+		}
+		if file.Database.ConnMaxLifetimeSeconds != nil {
+			c.Database.ConnMaxLifetimeSeconds = *file.Database.ConnMaxLifetimeSeconds
+		}
 	}
 	if file.PublicAPI != nil {
 		if file.PublicAPI.RateLimitEnabled != nil {
@@ -298,6 +324,12 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 			d, err := time.ParseDuration(*file.PublicAPI.RateLimitWindow)
 			if err == nil {
 				c.PublicAPI.RateLimitWindow = Duration{d}
+			}
+		}
+		if file.PublicAPI.AnalysisRequestTimeout != nil {
+			d, err := time.ParseDuration(*file.PublicAPI.AnalysisRequestTimeout)
+			if err == nil {
+				c.PublicAPI.AnalysisRequestTimeout = Duration{d}
 			}
 		}
 	}

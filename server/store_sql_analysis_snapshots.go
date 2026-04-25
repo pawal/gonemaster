@@ -147,9 +147,12 @@ func (s *SQLJobStore) ListAnalysisCohortSnapshots(cohortID int64) []AnalysisCoho
 	return out
 }
 
-// GetDefaultSnapshotForCohort resolves the cohort's default snapshot using the
-// catalog's policy: `pinned` honours default_snapshot_id, `auto_latest` picks
-// the most recent captured public snapshot.
+// GetDefaultSnapshotForCohort resolves the cohort's default snapshot using
+// the catalog's policy. `pinned` honours default_snapshot_id and falls back
+// to auto-latest when the pin is dangling or resolves to a non-public
+// snapshot, so a stale pointer left behind by a wipe does not hide every
+// remaining captured snapshot from the public path. `auto_latest` (and the
+// fallback) picks the most recent captured public snapshot.
 func (s *SQLJobStore) GetDefaultSnapshotForCohort(cohortID int64) (AnalysisCohortSnapshot, bool) {
 	cohort, ok := s.GetAnalysisCohort(cohortID)
 	if !ok {
@@ -160,7 +163,9 @@ func (s *SQLJobStore) GetDefaultSnapshotForCohort(cohortID int64) (AnalysisCohor
 		policy = DefaultSnapshotPolicyAutoLatest
 	}
 	if policy == DefaultSnapshotPolicyPinned && cohort.DefaultSnapshotID != nil {
-		return s.GetAnalysisCohortSnapshot(*cohort.DefaultSnapshotID)
+		if snap, found := s.GetAnalysisCohortSnapshot(*cohort.DefaultSnapshotID); found && isPublicSnapshot(snap) {
+			return snap, true
+		}
 	}
 	row := s.db.QueryRow(
 		fmt.Sprintf(`SELECT %s FROM analysis_cohort_snapshots
@@ -418,6 +423,18 @@ func (s *SQLJobStore) ClearAnalysisCohortSnapshots(cohortID int64) error {
 		cohortID,
 	); err != nil {
 		return fmt.Errorf("clear snapshots for cohort %d: %w", cohortID, err)
+	}
+	// A pinned default_snapshot_id now points at a row that no longer
+	// exists, which would make GetDefaultSnapshotForCohort return false
+	// even after the cohort captures a new snapshot. Revert to
+	// auto_latest so the next captured snapshot resolves automatically.
+	if _, err := s.db.Exec(
+		fmt.Sprintf(`UPDATE analysis_cohort_catalog
+			SET default_snapshot_policy = %s, default_snapshot_id = NULL
+			WHERE id = %s`, s.ph(1), s.ph(2)),
+		DefaultSnapshotPolicyAutoLatest, cohortID,
+	); err != nil {
+		return fmt.Errorf("reset default snapshot pin for cohort %d: %w", cohortID, err)
 	}
 	return nil
 }

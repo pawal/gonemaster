@@ -274,6 +274,78 @@ func TestSQLJobStoreGetDefaultSnapshotForCohort(t *testing.T) {
 			if def.ID != older.ID {
 				t.Fatalf("pinned default: got id=%d want %d", def.ID, older.ID)
 			}
+
+			// Dangling pin: pinned ID points at a snapshot that no longer
+			// exists. Resolver must fall back to auto-latest so a stale
+			// pointer left behind by a wipe does not hide every remaining
+			// captured snapshot from the public path.
+			ghostID := older.ID + newer.ID + 999
+			if _, err := s.UpsertAnalysisCohort(AnalysisCohort{
+				SourceType:            "tag",
+				SourceTag:             "tld",
+				DefaultSnapshotPolicy: DefaultSnapshotPolicyPinned,
+				DefaultSnapshotID:     &ghostID,
+			}); err != nil {
+				t.Fatalf("dangling pin: %v", err)
+			}
+			def, ok = s.GetDefaultSnapshotForCohort(cohortID)
+			if !ok {
+				t.Fatal("dangling pin must fall back to auto-latest, not return false")
+			}
+			if def.ID != newer.ID {
+				t.Fatalf("dangling pin fallback: got id=%d want %d (newest captured public)", def.ID, newer.ID)
+			}
+		})
+	}
+}
+
+// TestClearAnalysisCohortSnapshotsResetsPin pins down the regression that
+// left an operator's cohort stuck on the no_snapshot empty state after
+// rebuild: clearing the snapshot rows must also reset the cohort's
+// pinned default_snapshot_id, otherwise GetDefaultSnapshotForCohort
+// resolves to a row that no longer exists.
+func TestClearAnalysisCohortSnapshotsResetsPin(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			cohortID := seedCohortForSnapshotTest(t, s, "tld")
+			now := time.Now().UTC().Truncate(time.Microsecond)
+
+			snap, err := s.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{
+				CohortID:   cohortID,
+				BatchID:    "batch-pinned",
+				Slug:       "2026-04-26",
+				Status:     AnalysisSnapshotStatusCaptured,
+				IsPublic:   true,
+				CapturedAt: now,
+			})
+			if err != nil {
+				t.Fatalf("seed snapshot: %v", err)
+			}
+			snapID := snap.ID
+			if _, err := s.UpsertAnalysisCohort(AnalysisCohort{
+				SourceType:            "tag",
+				SourceTag:             "tld",
+				DefaultSnapshotPolicy: DefaultSnapshotPolicyPinned,
+				DefaultSnapshotID:     &snapID,
+			}); err != nil {
+				t.Fatalf("pin default: %v", err)
+			}
+
+			if err := s.ClearAnalysisCohortSnapshots(cohortID); err != nil {
+				t.Fatalf("clear: %v", err)
+			}
+
+			cohort, ok := s.GetAnalysisCohort(cohortID)
+			if !ok {
+				t.Fatal("cohort should survive clear")
+			}
+			if cohort.DefaultSnapshotPolicy != DefaultSnapshotPolicyAutoLatest {
+				t.Errorf("policy = %q, want auto_latest after clear", cohort.DefaultSnapshotPolicy)
+			}
+			if cohort.DefaultSnapshotID != nil {
+				t.Errorf("DefaultSnapshotID = %d, want nil after clear", *cohort.DefaultSnapshotID)
+			}
 		})
 	}
 }

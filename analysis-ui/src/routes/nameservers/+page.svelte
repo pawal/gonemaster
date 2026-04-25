@@ -147,94 +147,11 @@
 </section>
 
 <style>
-  .list-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-    gap: var(--space-3);
-    flex-wrap: wrap;
-  }
-  .list-head h2 { margin: 0; }
-
-  .list-toolbar {
-    display: flex;
-    gap: var(--space-3);
-    flex-wrap: wrap;
-    align-items: flex-end;
-  }
-
-  .inline-field {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    font-size: var(--text-xs);
-    color: var(--ink-2);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-  .inline-field span { font-weight: 600; }
-  .inline-field select {
-    padding: 6px 10px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--surface);
-    color: var(--ink);
-    font: inherit;
-    font-size: var(--text-sm);
-    text-transform: none;
-    letter-spacing: normal;
-  }
-
-  .export-group {
-    display: flex;
-    gap: var(--space-2);
-  }
-
-  .table-wrap {
-    overflow-x: auto;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--surface);
-  }
-  .data-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: var(--text-sm);
-  }
-  .data-table th {
-    text-align: left;
-    padding: 8px 10px;
-    background: var(--surface-2);
-    color: var(--ink-2);
-    font-size: var(--text-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    border-bottom: 1px solid var(--border);
-    white-space: nowrap;
-  }
-  .data-table td {
-    padding: 8px 10px;
-    border-bottom: 1px solid var(--border);
-    vertical-align: middle;
-  }
   /* Long operator labels would otherwise force horizontal scroll. Let the
      ASN chip wrap; break anywhere so labels without spaces still fit. */
   .data-table :global(.entity-chip-asn) {
     white-space: normal;
     overflow-wrap: anywhere;
   }
-  .data-table tbody tr:last-child td { border-bottom: none; }
-  .data-table tbody tr:hover { background: rgba(3, 105, 161, 0.04); }
-  .row-clickable { cursor: pointer; }
   .operator-multi { color: var(--ink-2); font-family: var(--sans); font-style: italic; }
-  .row-ident {
-    font-family: var(--mono);
-    font-weight: 500;
-    color: var(--ink);
-    text-transform: none;
-    letter-spacing: normal;
-    font-size: var(--text-sm);
-  }
-  .col-num { text-align: right; font-variant-numeric: tabular-nums; }
-
 </style>

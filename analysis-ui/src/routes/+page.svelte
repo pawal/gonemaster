@@ -491,11 +491,6 @@
     text-transform: uppercase;
     text-align: center;
   }
-  .level-critical { background: #fee2e2; color: #991b1b; }
-  .level-error { background: #ffedd5; color: #9a3412; }
-  .level-warning { background: #fef3c7; color: #92400e; }
-  .level-notice { background: #e0f2fe; color: #075985; }
-  .level-neutral { background: var(--surface-2); color: var(--on-surface-2); }
 
   .infra-grid {
     display: grid;

@@ -3,10 +3,11 @@
   import { base } from "$app/paths";
   import { page } from "$app/state";
   import FilterBar from "$lib/FilterBar.svelte";
+  import Pagination from "$lib/Pagination.svelte";
   import SortHeader from "$lib/SortHeader.svelte";
   import { asnHref, domainHref } from "$lib/entityLinks";
   import { formatCount, formatTimestamp, gradeTone, levelTone } from "$lib/format";
-  import { searchToString, updateURLParam } from "$lib/filters";
+  import { updateURLParam } from "$lib/filters";
   import { downloadCSV, downloadJSON, type ExportColumn } from "$lib/exporters";
   import type { DomainView } from "$lib/api";
   import type { LayoutData } from "../+layout";
@@ -30,22 +31,10 @@
   const currentLimit = $derived(data.limit);
   const currentOffset = $derived(data.offset);
   const total = $derived(data.list?.total ?? 0);
-  const pageStart = $derived(total === 0 ? 0 : currentOffset + 1);
-  const pageEnd = $derived(Math.min(currentOffset + (data.list?.items.length ?? 0), total));
 
   function updateParam(key: string, value: string) {
     updateURLParam(page.url, key, value);
   }
-
-  function gotoPage(nextOffset: number) {
-    const params = new URLSearchParams(page.url.searchParams);
-    if (nextOffset > 0) params.set("offset", String(nextOffset));
-    else params.delete("offset");
-    goto(`${page.url.pathname}${searchToString(params)}`);
-  }
-
-  const hasPrev = $derived(currentOffset > 0);
-  const hasNext = $derived(currentOffset + currentLimit < total);
 
   const rows = $derived((data.list?.items ?? []) as DomainView[]);
 
@@ -190,19 +179,7 @@
       </table>
     </div>
 
-    <div class="pagination">
-      <span class="hint">
-        Showing {pageStart}–{pageEnd} of {formatCount(total)}
-      </span>
-      <div class="pagination-controls">
-        <button type="button" class="ghost" disabled={!hasPrev} onclick={() => gotoPage(Math.max(0, currentOffset - currentLimit))}>
-          ← Previous
-        </button>
-        <button type="button" class="ghost" disabled={!hasNext} onclick={() => gotoPage(currentOffset + currentLimit)}>
-          Next →
-        </button>
-      </div>
-    </div>
+    <Pagination {total} offset={currentOffset} limit={currentLimit} itemCount={data.list?.items.length ?? 0} />
   {/if}
 </section>
 
@@ -320,13 +297,4 @@
   .level-notice { background: #e0f2fe; color: #075985; }
   .level-neutral { background: var(--surface-2); color: var(--on-surface-2); }
 
-  .pagination {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: var(--space-3);
-    flex-wrap: wrap;
-    margin-top: var(--space-3);
-  }
-  .pagination-controls { display: flex; gap: var(--space-2); }
 </style>

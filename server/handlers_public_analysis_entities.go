@@ -58,7 +58,7 @@ type PublicAnalysisPrefixView struct {
 
 // handlePublicAnalysisNameservers handles GET /pub/api/v1/analysis/nameservers.
 func (s *Server) handlePublicAnalysisNameservers(w http.ResponseWriter, r *http.Request) {
-	cohort, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
+	_, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
 	if !ok {
 		return
 	}
@@ -71,90 +71,22 @@ func (s *Server) handlePublicAnalysisNameservers(w http.ResponseWriter, r *http.
 		return
 	}
 
-	data := s.latestMaterializationForSnapshot(cohort, snapshot)
-	endpoints := data.endpoints
-	addressASNs := data.addressASNs
-
-	addressASN := map[int64]int64{} // address_id → asn
-	for _, fact := range addressASNs {
-		if fact.ASN != nil {
-			addressASN[fact.AddressID] = *fact.ASN
-		}
-	}
-
-	type nsAgg struct {
-		name       string
-		domains    map[int64]struct{}
-		addresses  map[int64]struct{}
-		ipv4       map[int64]struct{}
-		ipv6       map[int64]struct{}
-		asns       map[int64]struct{}
-		queryCount int
-	}
-	buckets := map[int64]*nsAgg{}
-	for _, ep := range endpoints {
-		b, ok := buckets[ep.NameserverID]
-		if !ok {
-			ns, found := readStore.GetAnalysisNameserver(ep.NameserverID)
-			if !found {
-				continue
-			}
-			b = &nsAgg{
-				name:      ns.Name,
-				domains:   map[int64]struct{}{},
-				addresses: map[int64]struct{}{},
-				ipv4:      map[int64]struct{}{},
-				ipv6:      map[int64]struct{}{},
-				asns:      map[int64]struct{}{},
-			}
-			buckets[ep.NameserverID] = b
-		}
-		b.domains[ep.DomainID] = struct{}{}
-		// Synthetic delegation-only endpoints carry AddressID=0 (no
-		// resolved address). They still tell us the NS serves this
-		// domain, so keep the domain in the set above, but skip the
-		// address / family / ASN / query-count tallies that only make
-		// sense for real (ns, addr) pairs.
-		if ep.AddressID == 0 {
-			continue
-		}
-		b.addresses[ep.AddressID] = struct{}{}
-		switch ep.Family {
-		case "ipv4":
-			b.ipv4[ep.AddressID] = struct{}{}
-		case "ipv6":
-			b.ipv6[ep.AddressID] = struct{}{}
-		}
-		if asn, has := addressASN[ep.AddressID]; has {
-			b.asns[asn] = struct{}{}
-		}
-		b.queryCount += ep.QueryCount
-	}
-
-	items := make([]PublicAnalysisNameserverView, 0, len(buckets))
-	for _, b := range buckets {
+	rows := readStore.ListSnapshotNameserverViews(snapshot.ID)
+	items := make([]PublicAnalysisNameserverView, 0, len(rows))
+	for _, row := range rows {
 		view := PublicAnalysisNameserverView{
-			Nameserver:    b.name,
-			DomainCount:   len(b.domains),
-			EndpointCount: len(b.addresses),
-			IPv4Count:     len(b.ipv4),
-			IPv6Count:     len(b.ipv6),
-			ASNCount:      len(b.asns),
-			QueryCount:    b.queryCount,
+			Nameserver:    row.NameserverName,
+			DomainCount:   row.DomainCount,
+			EndpointCount: row.EndpointCount,
+			IPv4Count:     row.IPv4Count,
+			IPv6Count:     row.IPv6Count,
+			ASNCount:      row.ASNCount,
+			Operator:      row.Operator,
+			QueryCount:    row.QueryCount,
 		}
-		switch len(b.asns) {
-		case 0:
-			// No ASN linkage — leave Operator empty.
-		case 1:
-			for asn := range b.asns {
-				asnCopy := asn
-				view.OperatorASN = &asnCopy
-				if meta, ok := readStore.GetAnalysisASN(asn); ok {
-					view.Operator = meta.Label
-				}
-			}
-		default:
-			view.Operator = "Multiple"
+		if row.OperatorASN != nil {
+			asnCopy := *row.OperatorASN
+			view.OperatorASN = &asnCopy
 		}
 		items = append(items, view)
 	}
@@ -162,6 +94,7 @@ func (s *Server) handlePublicAnalysisNameservers(w http.ResponseWriter, r *http.
 	items = applyNameserverFilter(items, filter)
 	total := len(items)
 	start, end := clampPage(filter.Limit, filter.Offset, total)
+	writeSnapshotCacheHeaders(w, r, snapshot)
 	writeJSON(w, http.StatusOK, PublicAnalysisListResponse[PublicAnalysisNameserverView]{
 		Items:  items[start:end],
 		Total:  total,
@@ -299,7 +232,7 @@ func sortEndpointViews(items []PublicAnalysisEndpointView, mode string) {
 
 // handlePublicAnalysisEndpoints handles GET /pub/api/v1/analysis/endpoints.
 func (s *Server) handlePublicAnalysisEndpoints(w http.ResponseWriter, r *http.Request) {
-	cohort, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
+	_, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
 	if !ok {
 		return
 	}
@@ -312,99 +245,20 @@ func (s *Server) handlePublicAnalysisEndpoints(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	data := s.latestMaterializationForSnapshot(cohort, snapshot)
-	endpoints := data.endpoints
-	addressASNs := data.addressASNs
-
-	// Index addressASNs by AddressID once so the per-bucket facts
-	// lookup below is O(k) per bucket instead of O(M). Before this the
-	// inner loop was O(N * M) and dominated wall-clock for large
-	// cohorts. Same idea for prefix IDs: collect all distinct IDs and
-	// resolve them in a single pass, not per-fact inside the bucket
-	// loop. Replaces what used to be one GetAnalysisPrefix DB call per
-	// matching fact.
-	factsByAddr := map[int64][]AnalysisRunAddressASN{}
-	prefixIDs := map[int64]struct{}{}
-	for _, fact := range addressASNs {
-		factsByAddr[fact.AddressID] = append(factsByAddr[fact.AddressID], fact)
-		if fact.PrefixID != nil {
-			prefixIDs[*fact.PrefixID] = struct{}{}
-		}
-	}
-	prefixByID := make(map[int64]string, len(prefixIDs))
-	for id := range prefixIDs {
-		if prefix, ok := readStore.GetAnalysisPrefix(id); ok {
-			prefixByID[id] = prefix.Prefix
-		}
-	}
-
-	type endpointKey struct {
-		nameserverID int64
-		addressID    int64
-	}
-	type endpointAgg struct {
-		nameserver string
-		address    string
-		family     string
-		domains    map[int64]struct{}
-	}
-	buckets := map[endpointKey]*endpointAgg{}
-	for _, ep := range endpoints {
-		key := endpointKey{nameserverID: ep.NameserverID, addressID: ep.AddressID}
-		b, exists := buckets[key]
-		if !exists {
-			ns, nsOk := readStore.GetAnalysisNameserver(ep.NameserverID)
-			addr, addrOk := readStore.GetAnalysisAddress(ep.AddressID)
-			if !nsOk || !addrOk {
-				continue
-			}
-			b = &endpointAgg{
-				nameserver: ns.Name,
-				address:    addr.Address,
-				family:     addr.Family,
-				domains:    map[int64]struct{}{},
-			}
-			buckets[key] = b
-		}
-		b.domains[ep.DomainID] = struct{}{}
-	}
-
-	items := make([]PublicAnalysisEndpointView, 0, len(buckets))
-	for key, b := range buckets {
+	rows := readStore.ListSnapshotEndpointViews(snapshot.ID)
+	items := make([]PublicAnalysisEndpointView, 0, len(rows))
+	for _, row := range rows {
 		v := PublicAnalysisEndpointView{
-			Nameserver:  b.nameserver,
-			Address:     b.address,
-			Family:      b.family,
-			DomainCount: len(b.domains),
+			Nameserver:  row.NameserverName,
+			Address:     row.Address,
+			Family:      row.Family,
+			DomainCount: row.DomainCount,
+			ASNLabel:    row.ASNLabel,
+			Prefix:      row.Prefix,
 		}
-		asnSet := map[int64]struct{}{}
-		prefixSet := map[string]struct{}{}
-		for _, fact := range factsByAddr[key.addressID] {
-			if _, ok := b.domains[fact.DomainID]; !ok {
-				continue
-			}
-			if fact.ASN != nil {
-				asnSet[*fact.ASN] = struct{}{}
-			}
-			if fact.PrefixID != nil {
-				if prefix, ok := prefixByID[*fact.PrefixID]; ok {
-					prefixSet[prefix] = struct{}{}
-				}
-			}
-		}
-		if len(asnSet) == 1 {
-			for asn := range asnSet {
-				asnCopy := asn
-				v.ASN = &asnCopy
-				if meta, ok := readStore.GetAnalysisASN(asn); ok {
-					v.ASNLabel = meta.Label
-				}
-			}
-		}
-		if len(prefixSet) == 1 {
-			for prefix := range prefixSet {
-				v.Prefix = prefix
-			}
+		if row.ASN != nil {
+			asnCopy := *row.ASN
+			v.ASN = &asnCopy
 		}
 		items = append(items, v)
 	}
@@ -423,6 +277,7 @@ func (s *Server) handlePublicAnalysisEndpoints(w http.ResponseWriter, r *http.Re
 	sortEndpointViews(items, filter.Sort)
 	total := len(items)
 	start, end := clampPage(filter.Limit, filter.Offset, total)
+	writeSnapshotCacheHeaders(w, r, snapshot)
 	writeJSON(w, http.StatusOK, PublicAnalysisListResponse[PublicAnalysisEndpointView]{
 		Items:  items[start:end],
 		Total:  total,
@@ -433,7 +288,7 @@ func (s *Server) handlePublicAnalysisEndpoints(w http.ResponseWriter, r *http.Re
 
 // handlePublicAnalysisASNs handles GET /pub/api/v1/analysis/asns.
 func (s *Server) handlePublicAnalysisASNs(w http.ResponseWriter, r *http.Request) {
-	cohort, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
+	_, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
 	if !ok {
 		return
 	}
@@ -446,113 +301,18 @@ func (s *Server) handlePublicAnalysisASNs(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	data := s.latestMaterializationForSnapshot(cohort, snapshot)
-	endpoints := data.endpoints
-	addressASNs := data.addressASNs
-
-	addressInfo := map[int64]AnalysisAddress{}
-	for _, fact := range addressASNs {
-		if _, ok := addressInfo[fact.AddressID]; ok {
-			continue
-		}
-		if addr, found := readStore.GetAnalysisAddress(fact.AddressID); found {
-			addressInfo[fact.AddressID] = addr
-		}
-	}
-
-	type asnAgg struct {
-		label       string
-		domains     map[int64]struct{}
-		addresses   map[int64]struct{}
-		prefixes    map[int64]struct{}
-		nameservers map[int64]struct{}
-		ipv4        map[int64]struct{}
-		ipv6        map[int64]struct{}
-	}
-	buckets := map[int64]*asnAgg{}
-	for _, fact := range addressASNs {
-		if fact.ASN == nil {
-			continue
-		}
-		b, exists := buckets[*fact.ASN]
-		if !exists {
-			asn, _ := readStore.GetAnalysisASN(*fact.ASN)
-			b = &asnAgg{
-				label:       asn.Label,
-				domains:     map[int64]struct{}{},
-				addresses:   map[int64]struct{}{},
-				prefixes:    map[int64]struct{}{},
-				nameservers: map[int64]struct{}{},
-				ipv4:        map[int64]struct{}{},
-				ipv6:        map[int64]struct{}{},
-			}
-			buckets[*fact.ASN] = b
-		}
-		b.domains[fact.DomainID] = struct{}{}
-		b.addresses[fact.AddressID] = struct{}{}
-		if fact.PrefixID != nil {
-			b.prefixes[*fact.PrefixID] = struct{}{}
-		}
-		if addr, ok := addressInfo[fact.AddressID]; ok {
-			switch addr.Family {
-			case "ipv4":
-				b.ipv4[fact.AddressID] = struct{}{}
-			case "ipv6":
-				b.ipv6[fact.AddressID] = struct{}{}
-			}
-		}
-	}
-	addressToNameservers := map[int64]map[int64]struct{}{}
-	for _, ep := range endpoints {
-		set, ok := addressToNameservers[ep.AddressID]
-		if !ok {
-			set = map[int64]struct{}{}
-			addressToNameservers[ep.AddressID] = set
-		}
-		set[ep.NameserverID] = struct{}{}
-	}
-	for asn, b := range buckets {
-		for addrID := range b.addresses {
-			for nsID := range addressToNameservers[addrID] {
-				b.nameservers[nsID] = struct{}{}
-			}
-		}
-		_ = asn
-	}
-
-	// Domain-level ASN aggregates (IPV4_*_ASN / IPV6_*_ASN tags without an
-	// address pairing) surface here too. They only contribute domain_count
-	// and the per-family presence flag — there is no address/nameserver/
-	// prefix linkage to populate from these rows.
-	for _, da := range data.domainASNs {
-		b, exists := buckets[da.ASN]
-		if !exists {
-			asn, _ := readStore.GetAnalysisASN(da.ASN)
-			b = &asnAgg{
-				label:       asn.Label,
-				domains:     map[int64]struct{}{},
-				addresses:   map[int64]struct{}{},
-				prefixes:    map[int64]struct{}{},
-				nameservers: map[int64]struct{}{},
-				ipv4:        map[int64]struct{}{},
-				ipv6:        map[int64]struct{}{},
-			}
-			buckets[da.ASN] = b
-		}
-		b.domains[da.DomainID] = struct{}{}
-	}
-
-	items := make([]PublicAnalysisASNView, 0, len(buckets))
-	for asn, b := range buckets {
+	rows := readStore.ListSnapshotASNViews(snapshot.ID)
+	items := make([]PublicAnalysisASNView, 0, len(rows))
+	for _, row := range rows {
 		items = append(items, PublicAnalysisASNView{
-			ASN:             asn,
-			Label:           b.label,
-			DomainCount:     len(b.domains),
-			AddressCount:    len(b.addresses),
-			NameserverCount: len(b.nameservers),
-			PrefixCount:     len(b.prefixes),
-			IPv4Count:       len(b.ipv4),
-			IPv6Count:       len(b.ipv6),
+			ASN:             row.ASN,
+			Label:           row.Label,
+			DomainCount:     row.DomainCount,
+			AddressCount:    row.AddressCount,
+			NameserverCount: row.NameserverCount,
+			PrefixCount:     row.PrefixCount,
+			IPv4Count:       row.IPv4Count,
+			IPv6Count:       row.IPv6Count,
 		})
 	}
 
@@ -611,6 +371,7 @@ func (s *Server) handlePublicAnalysisASNs(w http.ResponseWriter, r *http.Request
 	})
 	total := len(items)
 	start, end := clampPage(filter.Limit, filter.Offset, total)
+	writeSnapshotCacheHeaders(w, r, snapshot)
 	writeJSON(w, http.StatusOK, PublicAnalysisListResponse[PublicAnalysisASNView]{
 		Items:  items[start:end],
 		Total:  total,

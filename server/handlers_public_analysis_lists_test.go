@@ -120,6 +120,32 @@ func (f *analysisAPITestFixture) seedAlternateSnapshot(batchID, slug string, cap
 	return snap
 }
 
+// refreshSnapshotViews mirrors the production capture-time materializer:
+// computes and writes both the aggregate blobs and the per-snapshot
+// entity views from the seeded fact rows. Seed helpers call this after
+// each insert so the view-backed handlers see consistent data.
+func (f *analysisAPITestFixture) refreshSnapshotViews(batchID string) {
+	f.t.Helper()
+	snap, ok := f.store.GetAnalysisCohortSnapshotByBatch(f.cohort.ID, batchID)
+	if !ok {
+		return
+	}
+	aggs, err := f.store.ComputeSnapshotAggregates(f.cohort.ID, batchID)
+	if err != nil {
+		f.t.Fatalf("compute aggregates for batch %q: %v", batchID, err)
+	}
+	if err := f.store.ReplaceSnapshotAggregates(snap.ID, aggs); err != nil {
+		f.t.Fatalf("replace aggregates for batch %q: %v", batchID, err)
+	}
+	views, err := f.store.ComputeSnapshotEntityViews(f.cohort.ID, batchID)
+	if err != nil {
+		f.t.Fatalf("compute entity views for batch %q: %v", batchID, err)
+	}
+	if err := f.store.ReplaceSnapshotEntityViews(snap.ID, views); err != nil {
+		f.t.Fatalf("replace entity views for batch %q: %v", batchID, err)
+	}
+}
+
 // seedDomainSummary writes one analysis_run_domain_summary row and ensures
 // the backing domain and run rows exist.
 func (f *analysisAPITestFixture) seedDomainSummary(domainName, runID string, finishedAt time.Time, score int, grade, worstLevel string) {
@@ -144,6 +170,7 @@ func (f *analysisAPITestFixture) seedDomainSummary(domainName, runID string, fin
 	}); err != nil {
 		f.t.Fatalf("upsert summary: %v", err)
 	}
+	f.refreshSnapshotViews(f.batchID)
 }
 
 // insertTestRun directly inserts a minimal runs row for tests. The analysis

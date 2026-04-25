@@ -102,6 +102,7 @@ func (f *analysisAPITestFixture) seedEndpointInBatch(batchID, runID, domainName,
 	if err := f.store.ReplaceAnalysisRunAddressASNs(f.cohort.ID, runID, existingASNs); err != nil {
 		f.t.Fatalf("replace address asns: %v", err)
 	}
+	f.refreshSnapshotViews(batchID)
 }
 
 // TestPublicAnalysisEntitiesScopedToSnapshot verifies that the public

@@ -16,6 +16,9 @@ const (
 	SnapshotAggregateTopTags              = "top_tags"
 	SnapshotAggregateTopNameservers       = "top_nameservers"
 	SnapshotAggregateTopASNs              = "top_asns"
+	// SnapshotAggregateOverviewV2 is the consolidated payload that the
+	// /overview endpoint reads in one row instead of fanning out to four.
+	SnapshotAggregateOverviewV2 = "overview_v2"
 )
 
 const snapshotTopN = 20
@@ -38,6 +41,29 @@ type TopASNEntry struct {
 	ASN         int64  `json:"asn"`
 	Label       string `json:"label,omitempty"`
 	DomainCount int    `json:"domain_count"`
+}
+
+// SnapshotOverviewTotals carries the cohort-wide counts the overview tab's
+// header cards display.
+type SnapshotOverviewTotals struct {
+	DomainCount     int `json:"domain_count"`
+	NameserverCount int `json:"nameserver_count"`
+	EndpointCount   int `json:"endpoint_count"`
+	ASNCount        int `json:"asn_count"`
+	PrefixCount     int `json:"prefix_count"`
+}
+
+// SnapshotOverviewV2 is the consolidated overview payload bundled into one
+// aggregate row so the overview tab can render with a single read.
+type SnapshotOverviewV2 struct {
+	Totals               SnapshotOverviewTotals `json:"totals"`
+	SeverityDistribution map[string]int         `json:"severity_distribution"`
+	GradeDistribution    map[string]int         `json:"grade_distribution"`
+	Signed               map[string]int         `json:"signed"`
+	DNSKEYAlgo           map[string]int         `json:"dnskey_algo"`
+	TopTags              []TopTagEntry          `json:"top_tags"`
+	TopNameservers       []TopNameserverEntry   `json:"top_nameservers"`
+	TopASNs              []TopASNEntry          `json:"top_asns"`
 }
 
 // ComputeSnapshotAggregates renders every aggregate category for one
@@ -121,7 +147,101 @@ func (s *SQLJobStore) ComputeSnapshotAggregates(cohortID int64, batchID string) 
 		return nil, err
 	}
 
+	totals, err := s.queryBatchTotals(cohortID, batchID)
+	if err != nil {
+		return nil, err
+	}
+	overview := SnapshotOverviewV2{
+		Totals:               totals,
+		SeverityDistribution: severity,
+		GradeDistribution:    grades,
+		Signed:               signed,
+		DNSKEYAlgo:           dnskey,
+		TopTags:              topTags,
+		TopNameservers:       topNameservers,
+		TopASNs:              topASNs,
+	}
+	if out, err = addCategory(out, SnapshotAggregateOverviewV2, overview); err != nil {
+		return nil, err
+	}
+
 	return out, nil
+}
+
+// queryBatchTotals returns the cohort-wide totals (distinct domains,
+// nameservers, endpoints, ASNs, prefixes) for one snapshot's batch.
+// Parent-role endpoints are excluded from nameserver/endpoint counts so
+// the totals match the entity tabs.
+func (s *SQLJobStore) queryBatchTotals(cohortID int64, batchID string) (SnapshotOverviewTotals, error) {
+	var totals SnapshotOverviewTotals
+
+	domainRow := s.db.QueryRow(
+		fmt.Sprintf(`SELECT COUNT(DISTINCT ards.domain_id)
+			FROM analysis_run_domain_summary ards
+			JOIN runs r ON r.id = ards.run_id
+			WHERE ards.cohort_id = %s AND r.batch_id = %s`, s.ph(1), s.ph(2)),
+		cohortID, batchID,
+	)
+	if err := domainRow.Scan(&totals.DomainCount); err != nil {
+		return totals, fmt.Errorf("totals domain_count: %w", err)
+	}
+
+	nsRow := s.db.QueryRow(
+		fmt.Sprintf(`SELECT COUNT(DISTINCT e.nameserver_id)
+			FROM analysis_run_ns_endpoints e
+			JOIN runs r ON r.id = e.run_id
+			WHERE e.cohort_id = %s AND r.batch_id = %s AND e.role <> 'parent'`,
+			s.ph(1), s.ph(2)),
+		cohortID, batchID,
+	)
+	if err := nsRow.Scan(&totals.NameserverCount); err != nil {
+		return totals, fmt.Errorf("totals nameserver_count: %w", err)
+	}
+
+	epRow := s.db.QueryRow(
+		fmt.Sprintf(`SELECT COUNT(*) FROM (
+			SELECT e.nameserver_id, e.address_id
+			FROM analysis_run_ns_endpoints e
+			JOIN runs r ON r.id = e.run_id
+			WHERE e.cohort_id = %s AND r.batch_id = %s AND e.role <> 'parent' AND e.address_id <> 0
+			GROUP BY e.nameserver_id, e.address_id
+		) AS pairs`, s.ph(1), s.ph(2)),
+		cohortID, batchID,
+	)
+	if err := epRow.Scan(&totals.EndpointCount); err != nil {
+		return totals, fmt.Errorf("totals endpoint_count: %w", err)
+	}
+
+	asnRow := s.db.QueryRow(
+		fmt.Sprintf(`SELECT COUNT(DISTINCT asn) FROM (
+			SELECT da.asn
+			FROM analysis_run_address_asns da
+			JOIN runs r ON r.id = da.run_id
+			WHERE da.cohort_id = %s AND r.batch_id = %s AND da.asn IS NOT NULL
+			UNION
+			SELECT da.asn
+			FROM analysis_run_domain_asns da
+			JOIN runs r ON r.id = da.run_id
+			WHERE da.cohort_id = %s AND r.batch_id = %s
+		) AS combined`, s.ph(1), s.ph(2), s.ph(3), s.ph(4)),
+		cohortID, batchID, cohortID, batchID,
+	)
+	if err := asnRow.Scan(&totals.ASNCount); err != nil {
+		return totals, fmt.Errorf("totals asn_count: %w", err)
+	}
+
+	pfxRow := s.db.QueryRow(
+		fmt.Sprintf(`SELECT COUNT(DISTINCT da.prefix_id)
+			FROM analysis_run_address_asns da
+			JOIN runs r ON r.id = da.run_id
+			WHERE da.cohort_id = %s AND r.batch_id = %s AND da.prefix_id IS NOT NULL`,
+			s.ph(1), s.ph(2)),
+		cohortID, batchID,
+	)
+	if err := pfxRow.Scan(&totals.PrefixCount); err != nil {
+		return totals, fmt.Errorf("totals prefix_count: %w", err)
+	}
+	return totals, nil
 }
 
 // queryBatchSeverityDistribution returns the per-severity domain counts for

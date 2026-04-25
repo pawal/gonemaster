@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"time"
@@ -33,9 +34,10 @@ type PublicAnalysisCatalogResponse struct {
 	BackendSupported bool                       `json:"backend_supported"`
 }
 
-// PublicAnalysisOverviewResponse is the minimal overview payload for
-// GET /pub/api/v1/analysis/overview. Carries the resolved snapshot so the
-// UI can anchor its breadcrumbs and links to a specific materialization.
+// PublicAnalysisOverviewResponse is the consolidated overview payload for
+// GET /pub/api/v1/analysis/overview. The Overview field carries the
+// totals/distributions/top-N lists the overview tab renders, so the page
+// loads with one read instead of fanning out to four endpoints.
 type PublicAnalysisOverviewResponse struct {
 	DatasetTag            string                      `json:"dataset_tag"`
 	Label                 string                      `json:"label"`
@@ -45,6 +47,7 @@ type PublicAnalysisOverviewResponse struct {
 	IsDefault             bool                        `json:"is_default"`
 	Snapshot              *PublicAnalysisSnapshotView `json:"snapshot,omitempty"`
 	Status                string                      `json:"status,omitempty"`
+	Overview              *SnapshotOverviewV2         `json:"overview,omitempty"`
 }
 
 func (s *Server) publicAnalysisCohortView(cohort AnalysisCohort) PublicAnalysisCohortView {
@@ -135,8 +138,32 @@ func (s *Server) handlePublicAnalysisOverview(w http.ResponseWriter, r *http.Req
 	} else {
 		snapshotView := publicAnalysisSnapshotView(snapshot)
 		resp.Snapshot = &snapshotView
+		if readStore, canRead := s.store.(AnalysisReadStore); canRead {
+			if overview, ok := loadSnapshotOverviewV2(readStore, snapshot.ID); ok {
+				resp.Overview = &overview
+			}
+		}
 	}
+	writeSnapshotCacheHeaders(w, r, snapshot)
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// loadSnapshotOverviewV2 reads the consolidated overview payload from the
+// snapshot's aggregate row set. Returns ok=false when the row is missing
+// (e.g. snapshot captured before overview_v2 shipped) so callers can fall
+// back to the rest of the response without the Overview field.
+func loadSnapshotOverviewV2(store AnalysisReadStore, snapshotID int64) (SnapshotOverviewV2, bool) {
+	for _, agg := range store.ListSnapshotAggregates(snapshotID) {
+		if agg.Category != SnapshotAggregateOverviewV2 {
+			continue
+		}
+		var out SnapshotOverviewV2
+		if err := json.Unmarshal([]byte(agg.PayloadJSON), &out); err != nil {
+			return SnapshotOverviewV2{}, false
+		}
+		return out, true
+	}
+	return SnapshotOverviewV2{}, false
 }
 
 // writePublicAnalysisResolutionError maps cohort-resolution sentinels to

@@ -27,6 +27,9 @@ type AnalysisReadStore interface {
 	GetAnalysisCohortSnapshotBySlug(cohortID int64, slug string) (AnalysisCohortSnapshot, bool)
 	GetDefaultSnapshotForCohort(cohortID int64) (AnalysisCohortSnapshot, bool)
 	ListSnapshotAggregates(snapshotID int64) []AnalysisCohortSnapshotAggregate
+	ListSnapshotNameserverViews(snapshotID int64) []AnalysisSnapshotNameserverView
+	ListSnapshotEndpointViews(snapshotID int64) []AnalysisSnapshotEndpointView
+	ListSnapshotASNViews(snapshotID int64) []AnalysisSnapshotASNView
 }
 
 // analysisListFilter captures the shared query parameters used by public list
@@ -128,6 +131,27 @@ func (s *Server) resolvePublicAnalysisCohortAndSnapshot(w http.ResponseWriter, r
 		return cohort, AnalysisCohortSnapshot{}, true
 	}
 	return cohort, snap, true
+}
+
+// writeSnapshotCacheHeaders sets Cache-Control and ETag based on the
+// resolution mode. Explicit ?snapshot= → immutable for a day; auto-latest
+// or no-snapshot → must revalidate so a new default takes effect promptly.
+func writeSnapshotCacheHeaders(w http.ResponseWriter, r *http.Request, snap AnalysisCohortSnapshot) {
+	if snap.ID == 0 {
+		w.Header().Set("Cache-Control", "no-cache, must-revalidate")
+		return
+	}
+	explicit := strings.TrimSpace(r.URL.Query().Get("snapshot")) != ""
+	if explicit && snap.Status == AnalysisSnapshotStatusCaptured {
+		w.Header().Set("Cache-Control", "public, max-age=86400, immutable")
+	} else {
+		w.Header().Set("Cache-Control", "no-cache, must-revalidate")
+	}
+	w.Header().Set("ETag", snapshotETag(snap))
+}
+
+func snapshotETag(snap AnalysisCohortSnapshot) string {
+	return `"` + strconv.FormatInt(snap.ID, 10) + "-" + strconv.FormatInt(snap.CapturedAt.Unix(), 10) + `"`
 }
 
 // isPublicSnapshot returns true when a snapshot is eligible for the public

@@ -139,10 +139,10 @@ func TestCreateAnalysisCohortTagDefaults(t *testing.T) {
 	if cohort.MaterializationStatus != AnalysisMaterializationPending {
 		t.Fatalf("expected pending materialization, got %q", cohort.MaterializationStatus)
 	}
-	snap := spy.snapshot()
-	if len(snap.rebuildCohorts) != 1 || snap.rebuildCohorts[0] != cohort.ID {
-		t.Fatalf("expected one rebuild for created cohort, got %+v", snap.rebuildCohorts)
-	}
+	waitForCond(t, func() bool {
+		snap := spy.snapshot()
+		return len(snap.rebuildCohorts) == 1 && snap.rebuildCohorts[0] == cohort.ID
+	})
 }
 
 func TestCreateAnalysisCohortRejectsMissingSourceTag(t *testing.T) {

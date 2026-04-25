@@ -163,7 +163,7 @@ func buildV11DDL(autoinc, bigint string) []string {
 			description                TEXT         NOT NULL DEFAULT '',
 			profile_id                 %s,
 			profile_name               VARCHAR(255) NOT NULL DEFAULT '',
-			captured_at                TEXT         NOT NULL DEFAULT '',
+			captured_at                VARCHAR(64)  NOT NULL DEFAULT '',
 			first_run_at               TEXT         NOT NULL DEFAULT '',
 			last_run_at                TEXT         NOT NULL DEFAULT '',
 			run_count                  INTEGER      NOT NULL DEFAULT 0,

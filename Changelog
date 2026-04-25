@@ -23,6 +23,9 @@ New **Analysis UI** with cohorts from tags in the Admin UI! Also test case expla
  - Docs: Reorganized the documentation structure
  - Public UI: Show unresolvable and unreachable nameservers in nameserver response times
 
+### Fixed
+ - Admin: deleting the batch behind a cohort's pinned default snapshot reverts the cohort to auto_latest instead of leaving a dangling default pointer that hid every remaining snapshot from the analysis UI
+
 ## [v1.3.2] - 2026-04-16
 
 New feature: show nameserver response times in result view

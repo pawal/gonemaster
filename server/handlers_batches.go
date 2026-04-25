@@ -90,9 +90,44 @@ func (s *Server) handleDeleteBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.evictSnapshotMatCache(snapshotIDs)
+	if err := s.unpinCohortsForDeletedSnapshots(snapshotIDs); err != nil {
+		writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
+		return
+	}
 	log.Printf("batch_delete: id=%s tag=%s runs=%d entries=%d snapshots=%d",
 		batchID, preview.Tag, preview.CompletedRuns, preview.Entries, len(snapshotIDs))
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// unpinCohortsForDeletedSnapshots reverts any cohort whose pinned
+// default snapshot was just hard-deleted back to auto_latest. Without
+// this the cohort retains a dangling default_snapshot_id and
+// GetDefaultSnapshotForCohort returns nothing, hiding any remaining
+// captured snapshots from the analysis UI.
+func (s *Server) unpinCohortsForDeletedSnapshots(deletedIDs []int64) error {
+	if len(deletedIDs) == 0 {
+		return nil
+	}
+	store, ok := s.store.(adminSnapshotStore)
+	if !ok {
+		return nil
+	}
+	deleted := make(map[int64]struct{}, len(deletedIDs))
+	for _, id := range deletedIDs {
+		deleted[id] = struct{}{}
+	}
+	for _, cohort := range s.store.ListAnalysisCohorts() {
+		if cohort.DefaultSnapshotID == nil {
+			continue
+		}
+		if _, hit := deleted[*cohort.DefaultSnapshotID]; !hit {
+			continue
+		}
+		if err := s.unpinCohortDefaultSnapshot(store, cohort, 0); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // snapshotImpactForBatch returns the list of cohort snapshots that

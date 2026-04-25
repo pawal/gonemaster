@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -164,6 +165,34 @@ func TestHandleDeleteBatchCancelsStaleRunningJobRows(t *testing.T) {
 	}
 	if _, ok := srv.store.Get("job-stale-running"); ok {
 		t.Fatal("stale running job should be gone")
+	}
+}
+
+// TestHandleDeleteBatchUnpinsCohortDefault covers the regression where
+// deleting the batch behind a cohort's pinned default snapshot left a
+// dangling default_snapshot_id, hiding any remaining captured snapshots
+// from the analysis UI. The handler must revert the cohort to
+// auto_latest the same way snapshot retire/purge does.
+func TestHandleDeleteBatchUnpinsCohortDefault(t *testing.T) {
+	f := newAdminSnapshotFixture(t)
+	pinPath := fmt.Sprintf("/api/v1/analysis/cohorts/%d/snapshots/%s", f.cohort.ID, f.snapshot.Slug)
+	if resp := f.call(http.MethodPost, pinPath, `{"is_default":true}`); resp.Code != http.StatusOK {
+		t.Fatalf("pin: got %d: %s", resp.Code, resp.Body)
+	}
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/batches/"+f.snapshot.BatchID, nil)
+	resp := httptest.NewRecorder()
+	f.srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusNoContent {
+		t.Fatalf("delete batch: got %d, want 204: %s", resp.Code, resp.Body)
+	}
+
+	cohort, _ := f.store.GetAnalysisCohort(f.cohort.ID)
+	if cohort.DefaultSnapshotPolicy != DefaultSnapshotPolicyAutoLatest {
+		t.Fatalf("policy = %q, want auto_latest after deleting pinned snapshot's batch", cohort.DefaultSnapshotPolicy)
+	}
+	if cohort.DefaultSnapshotID != nil {
+		t.Fatalf("expected default_snapshot_id cleared, got %v", cohort.DefaultSnapshotID)
 	}
 }
 

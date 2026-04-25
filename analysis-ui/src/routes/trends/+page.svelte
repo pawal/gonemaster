@@ -4,11 +4,7 @@
   import FilterBar from "$lib/FilterBar.svelte";
   import { snapshotDisplayLabel, snapshotSourceDate } from "$lib/format";
   import type { LayoutData } from "../+layout";
-  import {
-    TREND_CATEGORIES,
-    type TrendCategoryKey,
-    type TrendsPageData
-  } from "./+page";
+  import { TREND_CATEGORIES, type TrendsPageData } from "./+page";
 
   let { data }: { data: TrendsPageData } = $props();
 
@@ -23,10 +19,36 @@
     });
   }
 
-  // Turn each trend point's payload into a flat [{label, count}] list so
-  // one category-agnostic renderer can draw every chart. Distribution
-  // payloads are `{bucket: count}` maps; the list-shaped top_* payloads
-  // are handled in a later pass.
+  // Severity buckets get fixed tones and canonical order so the bar
+  // reads OK→CRITICAL and matches the overview tab's health bar.
+  const SEVERITY_TONE: Record<string, string> = {
+    OK: "ok",
+    NOTICE: "notice",
+    WARNING: "warning",
+    ERROR: "error",
+    CRITICAL: "critical"
+  };
+  const SEVERITY_ORDER: Record<string, number> = {
+    OK: 0,
+    NOTICE: 1,
+    WARNING: 2,
+    ERROR: 3,
+    CRITICAL: 4
+  };
+
+  function severityRank(key: string): number {
+    const r = SEVERITY_ORDER[key.toUpperCase()];
+    return r === undefined ? 99 : r;
+  }
+
+  function compareBuckets(category: string, a: string, b: string): number {
+    if (category === "severity_distribution") {
+      const diff = severityRank(a) - severityRank(b);
+      if (diff !== 0) return diff;
+    }
+    return a.localeCompare(b);
+  }
+
   type Series = {
     label: string;
     slug: string;
@@ -49,7 +71,7 @@
       const buckets = payload
         ? Object.entries(payload).map(([key, count]) => ({ key, count: Number(count) || 0 }))
         : [];
-      buckets.sort((a, b) => a.key.localeCompare(b.key));
+      buckets.sort((a, b) => compareBuckets(data.category, a.key, b.key));
       return {
         label: snapshotDisplayLabel(snapshot),
         slug: point.slug,
@@ -59,9 +81,8 @@
     });
   });
 
-  // Unique bucket keys across all points, in first-seen order. Drives
-  // the legend and the stacked-bar column order so the same key is the
-  // same color across snapshots.
+  // Unique bucket keys, sorted by category-aware order so legend and
+  // stacked columns line up the same way every render.
   const bucketKeys = $derived.by<string[]>(() => {
     const seen = new Set<string>();
     const out: string[] = [];
@@ -73,22 +94,27 @@
         }
       }
     }
+    out.sort((a, b) => compareBuckets(data.category, a, b));
     return out;
   });
 
-  // One palette shared across every bucket-keyed chart so colors stay
-  // stable as the reader switches category.
+  // Positional fallback palette for categories without a semantic
+  // key→tone mapping (grade, signed, dnskey_algo).
   const palette = [
-    "var(--bar-ok, #16a34a)",
-    "var(--bar-notice, #0ea5e9)",
-    "var(--bar-warning, #d97706)",
-    "var(--bar-error, #ea580c)",
-    "var(--bar-critical, #dc2626)",
-    "var(--bar-neutral, #6b7280)"
+    "var(--bar-ok)",
+    "var(--bar-notice)",
+    "var(--bar-warning)",
+    "var(--bar-error)",
+    "var(--bar-critical)",
+    "var(--bar-neutral)"
   ];
 
-  function colorForIndex(i: number): string {
-    return palette[i % palette.length];
+  function colorForBucket(category: string, key: string, fallbackIndex: number): string {
+    if (category === "severity_distribution") {
+      const tone = SEVERITY_TONE[key.toUpperCase()];
+      if (tone) return `var(--bar-${tone})`;
+    }
+    return palette[fallbackIndex % palette.length];
   }
 
   function totalFor(s: Series): number {
@@ -167,7 +193,7 @@
                 <span
                   class="trend-segment"
                   style:width="{pct}%"
-                  style:background={colorForIndex(i)}
+                  style:background={colorForBucket(data.category, key, i)}
                   title="{key}: {pct}%"
                 ></span>
               {/if}
@@ -180,7 +206,7 @@
     <ul class="trend-legend" aria-label="Buckets">
       {#each bucketKeys as key, i (key)}
         <li class="trend-legend-item">
-          <span class="legend-swatch" style:background={colorForIndex(i)}></span>
+          <span class="legend-swatch" style:background={colorForBucket(data.category, key, i)}></span>
           <span class="legend-label">{key}</span>
         </li>
       {/each}

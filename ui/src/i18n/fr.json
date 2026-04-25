@@ -408,6 +408,8 @@
   "analysis_cohorts_toggle_on": "activé",
   "analysis_cohorts_toggle_off": "désactivé",
   "analysis_cohorts_default_active": "par défaut",
+  "analysis_cohorts_default_cohort_tooltip": "Default cohort: shown on the public dashboard when no dataset_tag is in the URL.",
+  "analysis_cohorts_default_snapshot_tooltip": "Default snapshot: served when no ?snapshot= is in the URL. Distinct from the cohort-level default.",
   "analysis_cohorts_default_set_action": "Définir par défaut",
   "analysis_cohorts_rebuild": "Reconstruire",
   "analysis_cohorts_clear": "Effacer",

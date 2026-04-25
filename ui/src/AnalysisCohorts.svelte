@@ -634,7 +634,7 @@
                 </td>
                 <td class="col-center">
                   {#if cohort.is_default}
-                    <span class="badge badge-default">{$t("analysis_cohorts_default_active")}</span>
+                    <span class="badge badge-default" title={$t("analysis_cohorts_default_cohort_tooltip")}>{$t("analysis_cohorts_default_active")}</span>
                   {:else}
                     <button
                       type="button"
@@ -758,7 +758,7 @@
                                   {snap.status}
                                 </span>
                                 {#if snap.is_default}
-                                  <span class="badge badge-default">{$t("analysis_cohorts_default_active")}</span>
+                                  <span class="badge badge-default" title={$t("analysis_cohorts_default_snapshot_tooltip")}>{$t("analysis_cohorts_default_active")}</span>
                                 {/if}
                               </td>
                               <td class="col-right">

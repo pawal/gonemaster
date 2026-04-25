@@ -408,6 +408,8 @@
   "analysis_cohorts_toggle_on": "på",
   "analysis_cohorts_toggle_off": "av",
   "analysis_cohorts_default_active": "standard",
+  "analysis_cohorts_default_cohort_tooltip": "Default cohort: shown on the public dashboard when no dataset_tag is in the URL.",
+  "analysis_cohorts_default_snapshot_tooltip": "Default snapshot: served when no ?snapshot= is in the URL. Distinct from the cohort-level default.",
   "analysis_cohorts_default_set_action": "Gör till standard",
   "analysis_cohorts_rebuild": "Bygg om",
   "analysis_cohorts_clear": "Rensa",

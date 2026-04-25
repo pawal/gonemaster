@@ -346,8 +346,11 @@ func (s *SQLJobStore) queryBatchFactDistribution(cohortID int64, batchID, catego
 	return out, rows.Err()
 }
 
-// queryBatchTopTags returns the top-N tags by distinct domain count in one
-// (cohort, batch) snapshot. The level column carries the worst level the
+// queryBatchTopTags returns the top-N tags by distinct domain count in
+// one (cohort, batch) snapshot. Only WARNING / ERROR / CRITICAL tags
+// surface — INFO and NOTICE chatter ("zone exists", DNSSEC OK) would
+// otherwise crowd out the actionable findings the overview tab is
+// trying to highlight. The level column carries the worst level the
 // projector observed for that tag so the UI can tone the row.
 func (s *SQLJobStore) queryBatchTopTags(cohortID int64, batchID string, limit int) ([]TopTagEntry, error) {
 	rows, err := s.db.Query(
@@ -355,6 +358,7 @@ func (s *SQLJobStore) queryBatchTopTags(cohortID int64, batchID string, limit in
 			FROM analysis_run_tag_summary t
 			JOIN runs r ON r.id = t.run_id
 			WHERE t.cohort_id = %s AND r.batch_id = %s
+			AND t.level IN ('WARNING', 'ERROR', 'CRITICAL')
 			GROUP BY t.tag, t.level
 			ORDER BY dc DESC, t.tag ASC
 			LIMIT %d`, s.ph(1), s.ph(2), limit),

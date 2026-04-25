@@ -107,6 +107,96 @@ func TestComputeSnapshotAggregatesSeverityAndGrade(t *testing.T) {
 	}
 }
 
+// TestComputeSnapshotAggregatesTopTagsExcludesInfoAndNotice pins the
+// "Top issues" filter: the overview panel advertises WARNING-and-worse
+// only, so INFO / NOTICE / blank-level tag rows must not surface even
+// when they dominate by domain count.
+func TestComputeSnapshotAggregatesTopTagsExcludesInfoAndNotice(t *testing.T) {
+	s := testStoreForBackend(t, testBackends(t)[0])
+	now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
+
+	cohort, err := s.UpsertAnalysisCohort(AnalysisCohort{
+		SourceType: "tag", SourceTag: "tld", AnalysisEnabled: true,
+	})
+	if err != nil {
+		t.Fatalf("seed cohort: %v", err)
+	}
+	if err := s.CreateBatch(Batch{
+		ID: "batch-tags", Tag: "tld", CreatedAt: now, DomainCount: 4, SnapshotIntent: true,
+	}); err != nil {
+		t.Fatalf("create batch: %v", err)
+	}
+
+	// Four runs in batch-tags with one tag each at varying levels. The
+	// INFO and NOTICE tags would dominate the unfiltered top-N because
+	// they hit the most domains; the filter must drop them.
+	for i, rec := range []struct {
+		runID    string
+		domainID int64
+		tag      string
+		level    string
+	}{
+		{"run-info-1", 100, "MODULE_OK", "INFO"},
+		{"run-info-2", 101, "MODULE_OK", "INFO"},
+		{"run-info-3", 102, "MODULE_OK", "INFO"},
+		{"run-notice-1", 103, "ZONE_EXISTS", "NOTICE"},
+		{"run-notice-2", 104, "ZONE_EXISTS", "NOTICE"},
+		{"run-warn", 105, "DS07_NOT_SIGNED", "WARNING"},
+		{"run-err", 106, "BROKEN_DNSSEC", "ERROR"},
+	} {
+		if _, err := s.GetOrCreateDomain(rec.runID + ".example"); err != nil {
+			t.Fatalf("seed domain %d: %v", i, err)
+		}
+		job := Job{
+			ID: rec.runID, DomainID: rec.domainID, Domain: rec.runID + ".example",
+			BatchID: "batch-tags", Status: JobSucceeded,
+			CreatedAt: now, StartedAt: now, FinishedAt: now.Add(time.Duration(i) * time.Minute),
+		}
+		if _, err := s.Create(job); err != nil {
+			t.Fatalf("create job %d: %v", i, err)
+		}
+		if err := s.GraduateJob(job, nil); err != nil {
+			t.Fatalf("graduate %d: %v", i, err)
+		}
+		if err := s.UpsertAnalysisRunDomainSummary(AnalysisRunDomainSummary{
+			CohortID: cohort.ID, RunID: rec.runID, DomainID: rec.domainID,
+		}); err != nil {
+			t.Fatalf("summary %d: %v", i, err)
+		}
+		if err := s.ReplaceAnalysisRunTagSummaries(cohort.ID, rec.runID, []AnalysisRunTagSummary{{
+			CohortID: cohort.ID, RunID: rec.runID, DomainID: rec.domainID,
+			Tag: rec.tag, Level: rec.level, OccurrenceCount: 1,
+		}}); err != nil {
+			t.Fatalf("tag summary %d: %v", i, err)
+		}
+	}
+
+	aggs, err := s.ComputeSnapshotAggregates(cohort.ID, "batch-tags")
+	if err != nil {
+		t.Fatalf("ComputeSnapshotAggregates: %v", err)
+	}
+
+	var top []TopTagEntry
+	for _, agg := range aggs {
+		if agg.Category != SnapshotAggregateTopTags {
+			continue
+		}
+		if err := json.Unmarshal([]byte(agg.PayloadJSON), &top); err != nil {
+			t.Fatalf("unmarshal top_tags: %v", err)
+		}
+	}
+	if len(top) != 2 {
+		t.Fatalf("top_tags = %d entries, want 2 (one WARNING + one ERROR): %+v", len(top), top)
+	}
+	for _, entry := range top {
+		switch entry.Level {
+		case "WARNING", "ERROR", "CRITICAL":
+		default:
+			t.Errorf("top_tags includes %q at level %q; only WARNING+ should surface", entry.Tag, entry.Level)
+		}
+	}
+}
+
 // TestListCohortBatchesWithFacts pins the Phase 7 backfill query: every
 // (cohort, batch) pair with at least one domain_summary row shows up
 // with its run/domain counts and finished_at span.

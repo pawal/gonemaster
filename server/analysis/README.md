@@ -123,3 +123,72 @@ analysis: snapshot backfill complete — cohorts=2 created=17 skipped=0
 Existing `/pub/api/v1/analysis/` bookmarks keep working because
 auto-latest resolution picks the newest captured snapshot, which after
 backfill is the most recent historical batch.
+
+## Per-snapshot read-view tables
+
+The public Overview, Nameservers, Endpoints, and ASNs tabs serve from
+three pre-shaped tables written once at snapshot capture time:
+
+- `analysis_snapshot_nameserver_view` — one row per (snapshot,
+  nameserver). Drives the Nameservers tab and the top-N nameservers
+  card on Overview.
+- `analysis_snapshot_endpoint_view` — one row per (snapshot,
+  nameserver, address). Drives the Addresses tab.
+- `analysis_snapshot_asn_view` — one row per (snapshot, asn). Drives
+  the ASNs tab and the top-N ASNs card.
+
+Plus one consolidated aggregate row in
+`analysis_cohort_snapshot_aggregates` keyed by category =
+`overview_v2` carrying totals + severity / grade / signed /
+dnskey_algo distributions + top-N tags / nameservers / ASNs +
+fact_distributions. The /overview endpoint reads it directly so the
+overview tab loads with one read.
+
+### When the rows are written
+
+- **Snapshot capture.** When the projector promotes a pending
+  snapshot to `captured`, it computes both the aggregate blobs and
+  the three view-row sets and writes them in sequence. Idempotent
+  on re-run.
+- **`POST /api/v1/analysis/cohorts/{id}/snapshots/{slug}/rematerialize`.**
+  Recomputes everything for one snapshot. Use after a fact-table
+  fix, projector change, or fact backfill so the read views catch
+  up.
+- **`POST /api/v1/analysis/cohorts/{id}/rebuild`.** Reproject and
+  re-capture every snapshot for a cohort. The view rows for each
+  snapshot are written by the per-snapshot capture path that
+  rebuild drives, so no separate step is needed.
+
+### When the rows go away
+
+- **Admin snapshot purge.** `DELETE
+  /api/v1/analysis/cohorts/{id}/snapshots/{slug}?purge=true` and
+  `ClearAnalysisCohortSnapshots` (cohort rebuild) cascade through
+  all three view tables.
+- **Manual batch delete.** `DELETE /api/v1/batches/{id}` removes the
+  view rows for every snapshot the batch backed.
+- **Retention purge** (`POST /jobs/purge` / hourly loop) does **not**
+  touch view rows. View rows are denormalized and self-contained, so
+  old runs disappearing does not invalidate them.
+
+### HTTP cache headers
+
+Captured-snapshot responses for the rewritten handlers and
+`/overview` carry `Cache-Control: public, max-age=86400, immutable`
+plus an ETag of `"<snapshot_id>-<captured_at_unix>"`. Auto-latest
+resolution (no `?snapshot=` on the request) gets `no-cache,
+must-revalidate` so a freshly-captured snapshot replaces the
+previous default without stale-content delay.
+
+### Concurrency knobs
+
+- `public_api.analysis_request_timeout` (default `10s`) wraps every
+  `/pub/api/v1/analysis/*` request with `http.TimeoutHandler` so a
+  slow handler can not pile up under load. Zero disables.
+- `database.max_open_conns`, `database.max_idle_conns`,
+  `database.conn_max_lifetime_seconds` tune the connection pool.
+  Defaults: 25 / 5 / 300s for client/server drivers, 1 for sqlite.
+- The legacy `latestMaterializationForSnapshot` cache (still used by
+  `/domains`, `/findings`, `/diff`, prefix detail, per-domain detail,
+  per-tag detail) coalesces concurrent computes with a per-snapshot
+  `singleflight` so different snapshots run in parallel.

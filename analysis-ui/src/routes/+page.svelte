@@ -18,21 +18,21 @@
     snapshotSourceDate
   } from "$lib/format";
   import type { LayoutData } from "./+layout";
-  import type { FactDistribution, OverviewPageData } from "./+page";
+  import type { OverviewPageData } from "./+page";
 
   let { data }: { data: OverviewPageData } = $props();
 
   const layoutData = $derived(page.data as LayoutData);
 
   const summaryCards = $derived.by(() => {
-    const d = data.detail;
-    if (!d) return [];
+    const t = data.totals;
+    if (!t) return [];
     return [
-      { label: "Domains", value: d.domain_count, href: "/domains" },
-      { label: "Nameservers", value: d.nameserver_count, href: "/nameservers" },
-      { label: "Endpoints", value: d.endpoint_count, href: "/endpoints" },
-      { label: "ASNs", value: d.asn_count, href: "/asns" },
-      { label: "Prefixes", value: d.prefix_count, href: "/prefixes" }
+      { label: "Domains", value: t.domain_count, href: "/domains" },
+      { label: "Nameservers", value: t.nameserver_count, href: "/nameservers" },
+      { label: "Endpoints", value: t.endpoint_count, href: "/endpoints" },
+      { label: "ASNs", value: t.asn_count, href: "/asns" },
+      { label: "Prefixes", value: t.prefix_count, href: "/prefixes" }
     ];
   });
 
@@ -46,8 +46,8 @@
     { key: "CRITICAL", label: "Critical", tone: "critical" }
   ] as const;
 
-  const factDistributions = $derived.by<FactDistribution[]>(() => {
-    const map = data.detail?.fact_distributions;
+  const factDistributions = $derived.by(() => {
+    const map = data.factDistributions;
     if (!map) return [];
     return Object.values(map).sort((a, b) => {
       if (a.order !== b.order) return a.order - b.order;
@@ -62,7 +62,7 @@
   const multiBucketCategories = new Set(["dnskey_algo"]);
 
   const healthSegments = $derived.by(() => {
-    const dist = data.detail?.severity_distribution;
+    const dist = data.severityDistribution;
     if (!dist) return [];
     const total = Object.values(dist).reduce((sum, n) => sum + (n ?? 0), 0);
     if (total === 0) return [];
@@ -117,6 +117,7 @@
   });
 
   const query = $derived(page.url.search);
+  const isEmpty = $derived((data.totals?.domain_count ?? 0) === 0);
 </script>
 
 <FilterBar
@@ -173,21 +174,19 @@
       does not create a public snapshot by itself.
     </p>
   </section>
-{:else if data.detailError}
+{:else if data.loadError}
   <section class="card">
     <h2>Overview</h2>
-    <p class="status-banner error">Failed to load cohort: {data.detailError}</p>
+    <p class="status-banner error">Failed to load cohort: {data.loadError}</p>
   </section>
-{:else if data.detail}
-  {@const d = data.detail}
-  {@const isEmpty = (d.domain_count ?? 0) === 0}
+{:else}
   <section class="card overview-header">
-    <h2>{d.label}</h2>
-    {#if d.description}
-      <p class="hint">{d.description}</p>
+    <h2>{data.label}</h2>
+    {#if data.description}
+      <p class="hint">{data.description}</p>
     {/if}
-    {#if formatTimestamp(d.last_materialized_at)}
-      <p class="hint">Last analyzed: {formatTimestamp(d.last_materialized_at)}</p>
+    {#if formatTimestamp(data.lastMaterializedAt)}
+      <p class="hint">Last analyzed: {formatTimestamp(data.lastMaterializedAt)}</p>
     {/if}
   </section>
 
@@ -196,7 +195,7 @@
       <h3>No data has been materialized yet</h3>
       <p class="hint">
         This cohort is published but the projector hasn't seen any matching runs yet.
-        Run a job (or batch) tagged with <code>{d.dataset_tag}</code>, or trigger
+        Run a job (or batch) tagged with <code>{data.datasetTag}</code>, or trigger
         <strong>Rebuild</strong> from the admin UI to project any existing runs that
         already carry this tag.
       </p>
@@ -266,10 +265,6 @@
           {/each}
         </ol>
       </section>
-    {:else if data.topTagsError}
-      <section class="card">
-        <p class="status-banner error">Failed to load top tags: {data.topTagsError}</p>
-      </section>
     {/if}
     {#if topNameserverRows.length > 0 || topASNRows.length > 0}
       <div class="infra-grid">
@@ -278,7 +273,7 @@
             <h3>Top nameservers</h3>
             <p class="hint">
               Nameservers hosting the most domains in this cohort.
-              Showing top {topNameserverRows.length} of {formatCount(data.topNameserversTotal)}.
+              Showing top {topNameserverRows.length}.
             </p>
             <ol class="infra-list">
               {#each topNameserverRows as row (row.name)}
@@ -300,7 +295,7 @@
             <h3>Top ASNs</h3>
             <p class="hint">
               ASNs hosting the most domains in this cohort. Showing top
-              {topASNRows.length} of {formatCount(data.topASNsTotal)}.
+              {topASNRows.length}.
             </p>
             <ol class="infra-list">
               {#each topASNRows as row (row.asn)}
@@ -323,15 +318,6 @@
           </section>
         {/if}
       </div>
-    {:else if data.topNameserversError || data.topASNsError}
-      <section class="card">
-        {#if data.topNameserversError}
-          <p class="status-banner error">Failed to load top nameservers: {data.topNameserversError}</p>
-        {/if}
-        {#if data.topASNsError}
-          <p class="status-banner error">Failed to load top ASNs: {data.topASNsError}</p>
-        {/if}
-      </section>
     {/if}
     <section class="summary-grid" aria-label="Cohort summary counts">
       {#each summaryCards as card (card.label)}

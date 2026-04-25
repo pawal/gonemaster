@@ -37,6 +37,59 @@ export type CatalogResponse = {
   backend_supported: boolean;
 };
 
+export type OverviewTotals = {
+  domain_count: number;
+  nameserver_count: number;
+  endpoint_count: number;
+  asn_count: number;
+  prefix_count: number;
+};
+
+export type TopTagEntry = {
+  tag: string;
+  level?: string;
+  domain_count: number;
+};
+
+export type TopNameserverEntry = {
+  nameserver: string;
+  domain_count: number;
+};
+
+export type TopASNEntry = {
+  asn: number;
+  label?: string;
+  domain_count: number;
+};
+
+export type FactBucket = {
+  key: string;
+  label: string;
+  tone: string;
+  count: number;
+  order: number;
+};
+
+export type FactDistribution = {
+  category: string;
+  label: string;
+  description?: string;
+  order: number;
+  buckets: FactBucket[];
+};
+
+export type SnapshotOverviewV2 = {
+  totals: OverviewTotals;
+  severity_distribution: Record<string, number>;
+  grade_distribution: Record<string, number>;
+  signed: Record<string, number>;
+  dnskey_algo: Record<string, number>;
+  top_tags: TopTagEntry[];
+  top_nameservers: TopNameserverEntry[];
+  top_asns: TopASNEntry[];
+  fact_distributions?: Record<string, FactDistribution>;
+};
+
 export type OverviewResponse = {
   dataset_tag: string;
   label: string;
@@ -49,6 +102,9 @@ export type OverviewResponse = {
   // public snapshot so the UI renders an empty-state panel.
   snapshot?: SnapshotView;
   status?: string;
+  // Consolidated overview payload bundled at capture time. Drives the
+  // overview tab without fanning out to /tags, /nameservers, /asns.
+  overview?: SnapshotOverviewV2;
 };
 
 // Status token emitted by the public analysis API when a cohort has no

@@ -56,14 +56,15 @@ type SnapshotOverviewTotals struct {
 // SnapshotOverviewV2 is the consolidated overview payload bundled into one
 // aggregate row so the overview tab can render with a single read.
 type SnapshotOverviewV2 struct {
-	Totals               SnapshotOverviewTotals `json:"totals"`
-	SeverityDistribution map[string]int         `json:"severity_distribution"`
-	GradeDistribution    map[string]int         `json:"grade_distribution"`
-	Signed               map[string]int         `json:"signed"`
-	DNSKEYAlgo           map[string]int         `json:"dnskey_algo"`
-	TopTags              []TopTagEntry          `json:"top_tags"`
-	TopNameservers       []TopNameserverEntry   `json:"top_nameservers"`
-	TopASNs              []TopASNEntry          `json:"top_asns"`
+	Totals               SnapshotOverviewTotals                    `json:"totals"`
+	SeverityDistribution map[string]int                            `json:"severity_distribution"`
+	GradeDistribution    map[string]int                            `json:"grade_distribution"`
+	Signed               map[string]int                            `json:"signed"`
+	DNSKEYAlgo           map[string]int                            `json:"dnskey_algo"`
+	TopTags              []TopTagEntry                             `json:"top_tags"`
+	TopNameservers       []TopNameserverEntry                      `json:"top_nameservers"`
+	TopASNs              []TopASNEntry                             `json:"top_asns"`
+	FactDistributions    map[string]PublicAnalysisFactDistribution `json:"fact_distributions,omitempty"`
 }
 
 // ComputeSnapshotAggregates renders every aggregate category for one
@@ -151,6 +152,16 @@ func (s *SQLJobStore) ComputeSnapshotAggregates(cohortID int64, batchID string) 
 	if err != nil {
 		return nil, err
 	}
+	factDistributions := map[string]PublicAnalysisFactDistribution{}
+	if len(grades) > 0 {
+		factDistributions[FactCategoryGrade] = factDistributionFromCounts(FactCategoryGrade, grades)
+	}
+	if len(signed) > 0 {
+		factDistributions[FactCategorySigned] = factDistributionFromCounts(FactCategorySigned, signed)
+	}
+	if len(dnskey) > 0 {
+		factDistributions[FactCategoryDNSKEYAlgorithm] = factDistributionFromCounts(FactCategoryDNSKEYAlgorithm, dnskey)
+	}
 	overview := SnapshotOverviewV2{
 		Totals:               totals,
 		SeverityDistribution: severity,
@@ -160,6 +171,7 @@ func (s *SQLJobStore) ComputeSnapshotAggregates(cohortID int64, batchID string) 
 		TopTags:              topTags,
 		TopNameservers:       topNameservers,
 		TopASNs:              topASNs,
+		FactDistributions:    factDistributions,
 	}
 	if out, err = addCategory(out, SnapshotAggregateOverviewV2, overview); err != nil {
 		return nil, err

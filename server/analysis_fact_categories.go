@@ -230,6 +230,53 @@ type PublicAnalysisFactDistribution struct {
 	Buckets     []PublicAnalysisFactBucket `json:"buckets"`
 }
 
+// factDistributionFromCounts wraps a per-key count map in the rich
+// display shape the overview tab consumes. Used at capture time when
+// the per-category counts are already in scope.
+func factDistributionFromCounts(category string, counts map[string]int) PublicAnalysisFactDistribution {
+	display, known := factCategoryDisplays[category]
+	buckets := make([]PublicAnalysisFactBucket, 0, len(counts))
+	for key, count := range counts {
+		label := key
+		tone := "neutral"
+		order := 1 << 30
+		if known {
+			if display.KeyLabel != nil {
+				label = display.KeyLabel(key)
+			}
+			if display.KeyTone != nil {
+				tone = display.KeyTone(key)
+			}
+			if display.KeyOrder != nil {
+				order = display.KeyOrder(key)
+			}
+		}
+		buckets = append(buckets, PublicAnalysisFactBucket{
+			Key:   key,
+			Label: label,
+			Tone:  tone,
+			Count: count,
+			Order: order,
+		})
+	}
+	sort.Slice(buckets, func(i, j int) bool {
+		if buckets[i].Order != buckets[j].Order {
+			return buckets[i].Order < buckets[j].Order
+		}
+		return buckets[i].Key < buckets[j].Key
+	})
+	out := PublicAnalysisFactDistribution{Category: category, Buckets: buckets}
+	if known {
+		out.Label = display.Label
+		out.Description = display.Description
+		out.Order = display.Order
+	} else {
+		out.Label = category
+		out.Order = 1 << 30
+	}
+	return out
+}
+
 // buildFactDistributions aggregates the cached domain-fact rows into
 // per-category bar data suitable for the public overview. Counts are
 // distinct domains per key — a domain can appear in multiple buckets

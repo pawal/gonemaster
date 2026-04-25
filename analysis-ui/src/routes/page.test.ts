@@ -12,10 +12,6 @@ function stubResponse(body: unknown, ok = true): Response {
   } as unknown as Response;
 }
 
-// fetchRouter dispatches stub responses based on the request URL so a
-// single mock covers the several parallel fetches the overview loader
-// triggers. Unmatched URLs fall through to `defaultResponse`, which
-// defaults to a 500 so unexpected calls surface as loud test failures.
 function fetchRouter(
   routes: Array<{ match: (url: string) => boolean; body: unknown; ok?: boolean }>,
   defaultResponse: { body: unknown; ok: boolean } = { body: { error: "unrouted" }, ok: false }
@@ -51,6 +47,35 @@ function evt(overrides: {
   } as Parameters<typeof load>[0];
 }
 
+const sampleOverview = {
+  totals: {
+    domain_count: 12,
+    nameserver_count: 5,
+    endpoint_count: 8,
+    asn_count: 3,
+    prefix_count: 2
+  },
+  severity_distribution: { OK: 8, WARNING: 4 },
+  grade_distribution: { A: 6, B: 4, C: 2 },
+  signed: { signed: 8, unsigned: 4 },
+  dnskey_algo: { "8": 6, "13": 2 },
+  top_tags: [{ tag: "DS07_NOT_SIGNED", level: "ERROR", domain_count: 4 }],
+  top_nameservers: [{ nameserver: "ns1.example", domain_count: 7 }],
+  top_asns: [{ asn: 64500, label: "Example AS", domain_count: 5 }],
+  fact_distributions: {
+    grade: {
+      category: "grade",
+      label: "Grade distribution",
+      order: 15,
+      buckets: [
+        { key: "A", label: "A", tone: "ok", count: 6, order: 1 },
+        { key: "B", label: "B", tone: "notice", count: 4, order: 2 },
+        { key: "C", label: "C", tone: "warning", count: 2, order: 3 }
+      ]
+    }
+  }
+};
+
 describe("+page.load (overview)", () => {
   it("returns datasetTag=null when no cohort has been resolved", async () => {
     const fetchFn = vi.fn();
@@ -58,7 +83,7 @@ describe("+page.load (overview)", () => {
       evt({ resolvedCohort: null, fetchImpl: fetchFn as unknown as typeof fetch })
     );
     expect(data.datasetTag).toBeNull();
-    expect(data.detail).toBeNull();
+    expect(data.totals).toBeNull();
     expect(data.noSnapshot).toBe(false);
     expect(fetchFn).not.toHaveBeenCalled();
   });
@@ -67,25 +92,31 @@ describe("+page.load (overview)", () => {
     const { impl, calls } = fetchRouter([
       {
         match: (url) => url.includes("/overview"),
-        body: { dataset_tag: "tld", label: "TLD", materialization_status: "pending", status: "no_snapshot", is_default: true }
+        body: {
+          dataset_tag: "tld",
+          label: "TLD",
+          materialization_status: "pending",
+          status: "no_snapshot",
+          is_default: true
+        }
       }
     ]);
     const data = await load(evt({ resolvedCohort: "tld", fetchImpl: impl }));
     expect(data.noSnapshot).toBe(true);
-    expect(data.detail).toBeNull();
+    expect(data.totals).toBeNull();
     expect(data.snapshot).toBeNull();
-    // No downstream loaders fire once we know the cohort is empty.
-    expect(calls.some((u) => u.includes("/cohorts/tld?"))).toBe(false);
-    expect(calls.some((u) => u.includes("/tags"))).toBe(false);
+    // Only the /overview call fires; the legacy 4-call fan-out is gone.
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toContain("/overview");
   });
 
-  it("passes through the resolved snapshot metadata", async () => {
+  it("collapses to a single /overview call and reads totals + top-N from the payload", async () => {
     const snapshot = {
-      slug: "2026-04-20-fixture",
+      slug: "2026-04-26-fixture",
       label: "Fixture",
-      captured_at: "2026-04-20T12:00:00Z",
-      run_count: 1,
-      domain_count: 1
+      captured_at: "2026-04-26T12:00:00Z",
+      run_count: 12,
+      domain_count: 12
     };
     const { impl, calls } = fetchRouter([
       {
@@ -95,31 +126,28 @@ describe("+page.load (overview)", () => {
           label: "TLD",
           materialization_status: "ready",
           is_default: true,
-          snapshot
+          snapshot,
+          overview: sampleOverview
         }
-      },
-      { match: (url) => url.includes("/cohorts/tld"), body: { dataset_tag: "tld", label: "TLD", materialization_status: "ready", domain_count: 1 } },
-      { match: (url) => url.includes("/tags"), body: { items: [], total: 0, limit: 10, offset: 0 } },
-      { match: (url) => url.includes("/nameservers"), body: { items: [], total: 0, limit: 10, offset: 0 } },
-      { match: (url) => url.includes("/asns"), body: { items: [], total: 0, limit: 10, offset: 0 } }
+      }
     ]);
     const data = await load(evt({ resolvedCohort: "tld", fetchImpl: impl }));
-    expect(data.snapshot?.slug).toBe("2026-04-20-fixture");
-    expect(data.noSnapshot).toBe(false);
-    expect(data.detailError).toBeNull();
-    // The snapshot filter must not creep onto the overview itself in
-    // this auto-latest call (no ?snapshot= on the URL).
-    const overviewCall = calls.find((u) => u.includes("/overview"));
-    expect(overviewCall).toBeDefined();
-    expect(overviewCall).not.toContain("snapshot=");
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toContain("/overview");
+    expect(data.snapshot?.slug).toBe("2026-04-26-fixture");
+    expect(data.totals?.domain_count).toBe(12);
+    expect(data.totals?.nameserver_count).toBe(5);
+    expect(data.severityDistribution?.OK).toBe(8);
+    expect(data.topTags[0].tag).toBe("DS07_NOT_SIGNED");
+    expect(data.topNameservers[0].nameserver).toBe("ns1.example");
+    expect(data.topASNs[0].asn).toBe(64500);
+    expect(data.factDistributions?.grade.buckets).toHaveLength(3);
+    expect(data.loadError).toBeNull();
   });
 
-  it("forwards ?snapshot= through to the scoped list loaders", async () => {
-    const snapshot = {
-      slug: "2026-04-17-old",
-      run_count: 1,
-      domain_count: 1
-    };
+  it("forwards ?snapshot= to the overview call only", async () => {
+    const snapshot = { slug: "2026-04-17-old", run_count: 1, domain_count: 1 };
     const { impl, calls } = fetchRouter([
       {
         match: (url) => url.includes("/overview"),
@@ -128,20 +156,47 @@ describe("+page.load (overview)", () => {
           label: "TLD",
           materialization_status: "ready",
           is_default: false,
-          snapshot
+          snapshot,
+          overview: sampleOverview
         }
-      },
-      { match: (url) => url.includes("/cohorts/tld"), body: { dataset_tag: "tld", label: "TLD", materialization_status: "ready", domain_count: 1 } },
-      { match: (url) => url.includes("/tags"), body: { items: [], total: 0, limit: 10, offset: 0 } },
-      { match: (url) => url.includes("/nameservers"), body: { items: [], total: 0, limit: 10, offset: 0 } },
-      { match: (url) => url.includes("/asns"), body: { items: [], total: 0, limit: 10, offset: 0 } }
+      }
     ]);
     const data = await load(
       evt({ resolvedCohort: "tld", fetchImpl: impl, search: "?snapshot=2026-04-17-old" })
     );
     expect(data.snapshot?.slug).toBe("2026-04-17-old");
-    const scoped = calls.filter((u) => u.includes("snapshot=2026-04-17-old"));
-    // overview + cohort detail + tags + nameservers + asns all carry it.
-    expect(scoped.length).toBeGreaterThanOrEqual(5);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toContain("snapshot=2026-04-17-old");
+  });
+
+  it("surfaces a load error when /overview fails", async () => {
+    const { impl } = fetchRouter([
+      { match: (url) => url.includes("/overview"), body: { error: "boom" }, ok: false }
+    ]);
+    const data = await load(evt({ resolvedCohort: "tld", fetchImpl: impl }));
+    expect(data.loadError).toMatch(/HTTP 500/);
+    expect(data.totals).toBeNull();
+  });
+
+  it("renders without overview payload when the snapshot has no aggregate row yet", async () => {
+    const { impl } = fetchRouter([
+      {
+        match: (url) => url.includes("/overview"),
+        body: {
+          dataset_tag: "tld",
+          label: "TLD",
+          materialization_status: "ready",
+          is_default: true,
+          snapshot: { slug: "x", run_count: 0, domain_count: 0 }
+          // No `overview` field — pre-overview_v2 snapshot.
+        }
+      }
+    ]);
+    const data = await load(evt({ resolvedCohort: "tld", fetchImpl: impl }));
+    expect(data.snapshot?.slug).toBe("x");
+    expect(data.totals).toBeNull();
+    expect(data.topTags).toEqual([]);
+    expect(data.factDistributions).toBeNull();
+    expect(data.loadError).toBeNull();
   });
 });

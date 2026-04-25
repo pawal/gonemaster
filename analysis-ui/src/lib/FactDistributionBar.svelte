@@ -1,6 +1,6 @@
 <script lang="ts">
   import { formatCount } from "$lib/format";
-  import type { FactBucket } from "../routes/+page";
+  import type { FactBucket } from "$lib/api";
 
   type Props = {
     title: string;

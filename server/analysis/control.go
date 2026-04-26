@@ -6,12 +6,19 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 
 	serverpkg "codeberg.org/pawal/gonemaster/server"
 )
 
 const rebuildPageSize = 100
+
+// rebuildWorkers caps in-flight run projections during RebuildCohort.
+// prepareRun parallelises freely; writes serialise on the DB writer.
+const rebuildWorkers = 4
 
 // progressWriteInterval is how often the rebuild loop persists the
 // in-memory done/total counters to the cohort row. Chosen to keep the
@@ -396,10 +403,16 @@ func (c *Controller) RebuildCohort(ctx context.Context, cohortID int64) error {
 		mixed  bool
 	}
 	pending := map[pendingKey]*pendingSnap{}
+	var pendingMu sync.Mutex
+	var projectedMu sync.Mutex
 
+	g, gctx := errgroup.WithContext(ctx)
+	g.SetLimit(rebuildWorkers)
+
+pages:
 	for offset := 0; ; {
-		if err := ctx.Err(); err != nil {
-			return err
+		if err := gctx.Err(); err != nil {
+			break
 		}
 		list := c.store.ListRuns(serverpkg.RunFilter{
 			Tag:    cohort.SourceTag,
@@ -413,33 +426,48 @@ func (c *Controller) RebuildCohort(ctx context.Context, cohortID int64) error {
 			progress.setTotal(list.Total)
 		}
 		for _, run := range list.Items {
-			if err := ctx.Err(); err != nil {
-				return err
+			if err := gctx.Err(); err != nil {
+				break pages
 			}
-			input, batch, contributed, err := c.projectRunForRebuild(run, catalog)
-			if err != nil {
-				_ = c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationFailed, time.Time{}, err.Error())
-				return fmt.Errorf("project run %s for cohort %d: %w", run.ID, cohort.ID, err)
-			}
-			if contributed {
-				for _, mc := range input.MatchingCohorts {
-					key := pendingKey{cohortID: mc.ID, batchID: batch.ID}
-					if ps, ok := pending[key]; ok {
-						if !ps.mixed && mixedProfiles(ps.sample.ProfileID, ps.sample.ProfileName, run.ProfileID, run.ProfileName) {
-							ps.mixed = true
-						}
-					} else {
-						pending[key] = &pendingSnap{cohort: mc, batch: batch, sample: run}
-					}
+			run := run
+			g.Go(func() error {
+				if err := gctx.Err(); err != nil {
+					return err
 				}
-				projected++
-			}
-			progress.increment()
+				input, batch, contributed, err := c.projectRunForRebuild(run, catalog)
+				if err != nil {
+					return fmt.Errorf("project run %s for cohort %d: %w", run.ID, cohort.ID, err)
+				}
+				if contributed {
+					pendingMu.Lock()
+					for _, mc := range input.MatchingCohorts {
+						key := pendingKey{cohortID: mc.ID, batchID: batch.ID}
+						if ps, ok := pending[key]; ok {
+							if !ps.mixed && mixedProfiles(ps.sample.ProfileID, ps.sample.ProfileName, run.ProfileID, run.ProfileName) {
+								ps.mixed = true
+							}
+						} else {
+							pending[key] = &pendingSnap{cohort: mc, batch: batch, sample: run}
+						}
+					}
+					pendingMu.Unlock()
+
+					projectedMu.Lock()
+					projected++
+					projectedMu.Unlock()
+				}
+				progress.increment()
+				return nil
+			})
 		}
 		offset += len(list.Items)
 		if offset >= list.Total {
 			break
 		}
+	}
+	if err := g.Wait(); err != nil {
+		_ = c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationFailed, time.Time{}, err.Error())
+		return err
 	}
 	progress.flush()
 
@@ -687,9 +715,11 @@ func (c *Controller) lookupCohort(cohortID int64) (serverpkg.AnalysisCohort, err
 // counters in memory and flushes them to the cohort row at a bounded
 // rate. Writing per-run would add one UPDATE round-trip to every
 // projection; once per ~500ms is plenty for the UI poll cadence.
+// Safe to call from multiple goroutines.
 type progressTracker struct {
 	store        ControlStore
 	cohortID     int64
+	mu           sync.Mutex
 	total        int
 	done         int
 	persistedAt  time.Time
@@ -704,8 +734,10 @@ func (p *progressTracker) setTotal(total int) {
 	if p == nil {
 		return
 	}
+	p.mu.Lock()
 	p.total = total
 	p.persistedDue = true
+	p.mu.Unlock()
 	p.maybePersist()
 }
 
@@ -713,34 +745,52 @@ func (p *progressTracker) increment() {
 	if p == nil {
 		return
 	}
+	p.mu.Lock()
 	p.done++
 	p.persistedDue = true
+	p.mu.Unlock()
 	p.maybePersist()
 }
 
 func (p *progressTracker) maybePersist() {
+	p.mu.Lock()
 	if !p.persistedDue {
+		p.mu.Unlock()
 		return
 	}
 	now := time.Now()
 	if !p.persistedAt.IsZero() && now.Sub(p.persistedAt) < progressWriteInterval {
+		p.mu.Unlock()
 		return
 	}
-	if err := p.store.SetAnalysisCohortProgress(p.cohortID, p.done, p.total); err == nil {
+	done, total := p.done, p.total
+	p.mu.Unlock()
+	if err := p.store.SetAnalysisCohortProgress(p.cohortID, done, total); err == nil {
+		p.mu.Lock()
 		p.persistedAt = now
 		p.persistedDue = false
+		p.mu.Unlock()
 	}
 }
 
 // flush forces a final write so the terminal counters land in the cohort
 // row regardless of the last throttle window.
 func (p *progressTracker) flush() {
-	if p == nil || !p.persistedDue {
+	if p == nil {
 		return
 	}
-	if err := p.store.SetAnalysisCohortProgress(p.cohortID, p.done, p.total); err == nil {
+	p.mu.Lock()
+	if !p.persistedDue {
+		p.mu.Unlock()
+		return
+	}
+	done, total := p.done, p.total
+	p.mu.Unlock()
+	if err := p.store.SetAnalysisCohortProgress(p.cohortID, done, total); err == nil {
+		p.mu.Lock()
 		p.persistedAt = time.Now()
 		p.persistedDue = false
+		p.mu.Unlock()
 	}
 }
 

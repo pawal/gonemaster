@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,6 +14,11 @@ import (
 )
 
 type fakeStore struct {
+	// mu guards every map below. Locked at the top of each fakeStore
+	// method so concurrent rebuild workers can hit the same fixture
+	// without tripping the race detector.
+	mu sync.Mutex
+
 	runs    map[string]serverpkg.Run
 	entries map[string][]serverpkg.Entry
 	tags    map[int64][]string
@@ -58,11 +64,15 @@ type snapshotKey struct {
 }
 
 func (s *fakeStore) GetRun(id string) (serverpkg.Run, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	run, ok := s.runs[id]
 	return run, ok
 }
 
 func (s *fakeStore) QueryEntries(filter serverpkg.EntryFilter) serverpkg.EntryList {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	items := append([]serverpkg.Entry(nil), s.entries[filter.RunID]...)
 	if filter.Limit > 0 && len(items) > filter.Limit {
 		items = items[:filter.Limit]
@@ -76,14 +86,20 @@ func (s *fakeStore) QueryEntries(filter serverpkg.EntryFilter) serverpkg.EntryLi
 }
 
 func (s *fakeStore) GetDomainTags(domainID int64) []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	return append([]string(nil), s.tags[domainID]...)
 }
 
 func (s *fakeStore) ListAnalysisCohorts() []serverpkg.AnalysisCohort {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	return append([]serverpkg.AnalysisCohort(nil), s.cohorts...)
 }
 
 func (s *fakeStore) GetAnalysisCohort(id int64) (serverpkg.AnalysisCohort, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	for _, cohort := range s.cohorts {
 		if cohort.ID == id {
 			return cohort, true
@@ -93,6 +109,8 @@ func (s *fakeStore) GetAnalysisCohort(id int64) (serverpkg.AnalysisCohort, bool)
 }
 
 func (s *fakeStore) SetAnalysisCohortProgress(cohortID int64, done, total int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	for i, existing := range s.cohorts {
 		if existing.ID == cohortID {
 			s.cohorts[i].MaterializationDone = done
@@ -104,6 +122,8 @@ func (s *fakeStore) SetAnalysisCohortProgress(cohortID int64, done, total int) e
 }
 
 func (s *fakeStore) UpsertAnalysisCohort(cohort serverpkg.AnalysisCohort) (serverpkg.AnalysisCohort, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	now := time.Now().UTC()
 	for i, existing := range s.cohorts {
 		if cohort.ID != 0 && existing.ID == cohort.ID {
@@ -143,6 +163,8 @@ func (s *fakeStore) UpsertAnalysisCohort(cohort serverpkg.AnalysisCohort) (serve
 }
 
 func (s *fakeStore) ClearAnalysisCohortMaterialization(cohortID int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.ensureMaterializedMaps()
 	prefix := fmt.Sprintf("%d/", cohortID)
 	for key := range s.nsEndpoints {
@@ -184,6 +206,8 @@ func (s *fakeStore) ClearAnalysisCohortMaterialization(cohortID int64) error {
 }
 
 func (s *fakeStore) ListRuns(filter serverpkg.RunFilter) serverpkg.RunList {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	items := make([]serverpkg.Run, 0, len(s.runs))
 	for _, run := range s.runs {
 		if filter.DomainID != 0 && run.DomainID != filter.DomainID {
@@ -230,6 +254,8 @@ func (s *fakeStore) ListRuns(filter serverpkg.RunFilter) serverpkg.RunList {
 }
 
 func (s *fakeStore) UpsertAnalysisNameserver(name string, seenAt time.Time) (serverpkg.AnalysisNameserver, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.ensureMaterializedMaps()
 	if item, ok := s.nameserversByName[name]; ok {
 		item.FirstSeenAt = minTestTime(item.FirstSeenAt, seenAt)
@@ -249,6 +275,8 @@ func (s *fakeStore) UpsertAnalysisNameserver(name string, seenAt time.Time) (ser
 }
 
 func (s *fakeStore) UpsertAnalysisAddress(address, family string, seenAt time.Time) (serverpkg.AnalysisAddress, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.ensureMaterializedMaps()
 	if item, ok := s.addressesByValue[address]; ok {
 		item.Family = family
@@ -270,6 +298,8 @@ func (s *fakeStore) UpsertAnalysisAddress(address, family string, seenAt time.Ti
 }
 
 func (s *fakeStore) UpsertAnalysisPrefix(prefix, family string, seenAt time.Time) (serverpkg.AnalysisPrefix, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.ensureMaterializedMaps()
 	if item, ok := s.prefixesByValue[prefix]; ok {
 		item.Family = family
@@ -291,6 +321,8 @@ func (s *fakeStore) UpsertAnalysisPrefix(prefix, family string, seenAt time.Time
 }
 
 func (s *fakeStore) UpsertAnalysisASN(asn int64, label string, seenAt time.Time) (serverpkg.AnalysisASN, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.ensureMaterializedMaps()
 	if item, ok := s.asnsByValue[asn]; ok {
 		if label != "" {
@@ -312,53 +344,71 @@ func (s *fakeStore) UpsertAnalysisASN(asn int64, label string, seenAt time.Time)
 }
 
 func (s *fakeStore) ReplaceAnalysisRunNSEndpoints(cohortID int64, runID string, items []serverpkg.AnalysisRunNameserverEndpoint) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.ensureMaterializedMaps()
 	s.nsEndpoints[projectionKey(cohortID, runID)] = append([]serverpkg.AnalysisRunNameserverEndpoint(nil), items...)
 	return nil
 }
 
 func (s *fakeStore) ReplaceAnalysisRunAddressASNs(cohortID int64, runID string, items []serverpkg.AnalysisRunAddressASN) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.ensureMaterializedMaps()
 	s.addrFacts[projectionKey(cohortID, runID)] = append([]serverpkg.AnalysisRunAddressASN(nil), items...)
 	return nil
 }
 
 func (s *fakeStore) ReplaceAnalysisRunDomainASNs(cohortID int64, runID string, items []serverpkg.AnalysisRunDomainASN) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.ensureMaterializedMaps()
 	s.domainASNs[projectionKey(cohortID, runID)] = append([]serverpkg.AnalysisRunDomainASN(nil), items...)
 	return nil
 }
 
 func (s *fakeStore) ReplaceAnalysisRunTagSummaries(cohortID int64, runID string, items []serverpkg.AnalysisRunTagSummary) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.ensureMaterializedMaps()
 	s.tagSummaries[projectionKey(cohortID, runID)] = append([]serverpkg.AnalysisRunTagSummary(nil), items...)
 	return nil
 }
 
 func (s *fakeStore) ReplaceAnalysisRunDomainFacts(cohortID int64, runID string, items []serverpkg.AnalysisRunDomainFact) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.ensureMaterializedMaps()
 	s.domainFacts[projectionKey(cohortID, runID)] = append([]serverpkg.AnalysisRunDomainFact(nil), items...)
 	return nil
 }
 
 func (s *fakeStore) UpsertAnalysisRunDomainSummary(item serverpkg.AnalysisRunDomainSummary) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.ensureMaterializedMaps()
 	s.summaries[projectionKey(item.CohortID, item.RunID)] = item
 	return nil
 }
 
 func (s *fakeStore) SetAnalysisProjectionState(item serverpkg.AnalysisProjectionState) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.ensureMaterializedMaps()
 	s.states[projectionKey(item.CohortID, item.RunID)] = item
 	return nil
 }
 
 func (s *fakeStore) GetBatch(id string) (serverpkg.Batch, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	b, ok := s.batches[id]
 	return b, ok
 }
 
 func (s *fakeStore) GetSetting(key string) (string, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.settings == nil {
 		return "", false
 	}
@@ -367,6 +417,8 @@ func (s *fakeStore) GetSetting(key string) (string, bool) {
 }
 
 func (s *fakeStore) SetSetting(key, value string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.settings == nil {
 		s.settings = map[string]string{}
 	}
@@ -375,6 +427,8 @@ func (s *fakeStore) SetSetting(key, value string) error {
 }
 
 func (s *fakeStore) UpsertAnalysisCohortSnapshot(snap serverpkg.AnalysisCohortSnapshot) (serverpkg.AnalysisCohortSnapshot, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.ensureSnapshotMaps()
 	now := time.Now().UTC()
 	key := snapshotKey{cohortID: snap.CohortID, batchID: snap.BatchID}
@@ -404,12 +458,16 @@ func (s *fakeStore) UpsertAnalysisCohortSnapshot(snap serverpkg.AnalysisCohortSn
 }
 
 func (s *fakeStore) GetAnalysisCohortSnapshotByBatch(cohortID int64, batchID string) (serverpkg.AnalysisCohortSnapshot, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.ensureSnapshotMaps()
 	snap, ok := s.snapshots[snapshotKey{cohortID: cohortID, batchID: batchID}]
 	return snap, ok
 }
 
 func (s *fakeStore) ListPendingAnalysisCohortSnapshots() []serverpkg.AnalysisCohortSnapshot {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.ensureSnapshotMaps()
 	out := make([]serverpkg.AnalysisCohortSnapshot, 0)
 	for _, snap := range s.snapshots {
@@ -427,6 +485,8 @@ func (s *fakeStore) ListPendingAnalysisCohortSnapshots() []serverpkg.AnalysisCoh
 }
 
 func (s *fakeStore) ClearAnalysisCohortSnapshots(cohortID int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.ensureSnapshotMaps()
 	for key, snap := range s.snapshots {
 		if key.cohortID != cohortID {
@@ -440,6 +500,8 @@ func (s *fakeStore) ClearAnalysisCohortSnapshots(cohortID int64) error {
 }
 
 func (s *fakeStore) CountBatchSnapshotRuns(cohortID int64, batchID string) (int, int, time.Time, time.Time, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	runs := map[string]struct{}{}
 	domains := map[int64]struct{}{}
 	var first, last time.Time
@@ -466,10 +528,14 @@ func (s *fakeStore) CountBatchSnapshotRuns(cohortID int64, batchID string) (int,
 }
 
 func (s *fakeStore) CountOutstandingJobsForBatch(batchID string) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	return len(s.queuedJobs[batchID]), nil
 }
 
 func (s *fakeStore) CountUnprojectedSnapshotRuns(cohortID int64, batchID string) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	var count int
 	var sourceTag string
 	for _, cohort := range s.cohorts {
@@ -491,6 +557,8 @@ func (s *fakeStore) CountUnprojectedSnapshotRuns(cohortID int64, batchID string)
 }
 
 func (s *fakeStore) ComputeSnapshotOverview(cohortID int64, batchID string) (serverpkg.SnapshotOverviewV2, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	// Minimal but observable payload so tests see the capture path wrote
 	// the overview row; fact-based payloads live in the SQL store tests.
 	grades := map[string]int{}
@@ -511,16 +579,22 @@ func (s *fakeStore) ComputeSnapshotOverview(cohortID int64, batchID string) (ser
 }
 
 func (s *fakeStore) ReplaceSnapshotOverview(snapshotID int64, overview serverpkg.SnapshotOverviewV2) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.ensureSnapshotMaps()
 	s.snapshotOverviews[snapshotID] = overview
 	return nil
 }
 
 func (s *fakeStore) ComputeSnapshotEntityViews(cohortID int64, batchID string) (serverpkg.SnapshotEntityViews, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	return serverpkg.SnapshotEntityViews{}, nil
 }
 
 func (s *fakeStore) ReplaceSnapshotEntityViews(snapshotID int64, views serverpkg.SnapshotEntityViews) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.ensureSnapshotMaps()
 	s.snapshotViews[snapshotID] = views
 	return nil

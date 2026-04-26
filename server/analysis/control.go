@@ -139,13 +139,19 @@ func (c *Controller) ProjectRun(runID string) error {
 	return nil
 }
 
-// accumulateSnapshot find-or-creates the pending snapshot for one
-// (cohort, batch) pair and refreshes its denormalized counters / timestamps
-// from the projected run. The first run to touch the snapshot denormalizes
-// the profile; a subsequent run with a different profile trips the
-// failed_mixed_profiles state so the snapshot is surfaced as broken rather
-// than silently averaging two scoring configs together.
+// accumulateSnapshot is the per-run wrapper around applySnapshotState used
+// by the realtime ProjectRun path; mixed-profile detection compares one
+// run against the snapshot's stored profile.
 func (c *Controller) accumulateSnapshot(cohort serverpkg.AnalysisCohort, batch serverpkg.Batch, run serverpkg.Run) error {
+	return c.applySnapshotState(cohort, batch, run, false)
+}
+
+// applySnapshotState find-or-creates the pending snapshot for one
+// (cohort, batch) and refreshes its denormalized counters/timestamps.
+// forceMixed lets callers that have observed multiple runs across the
+// rebuild loop record the failed_mixed_profiles state without needing
+// this helper to see every run individually.
+func (c *Controller) applySnapshotState(cohort serverpkg.AnalysisCohort, batch serverpkg.Batch, sampleRun serverpkg.Run, forceMixed bool) error {
 	existing, found := c.store.GetAnalysisCohortSnapshotByBatch(cohort.ID, batch.ID)
 	runCount, domainCount, firstRunAt, lastRunAt, err := c.store.CountBatchSnapshotRuns(cohort.ID, batch.ID)
 	if err != nil {
@@ -176,12 +182,12 @@ func (c *Controller) accumulateSnapshot(cohort serverpkg.AnalysisCohort, batch s
 		snap.Slug = defaultSnapshotSlug(batch)
 		snap.Status = serverpkg.AnalysisSnapshotStatusPending
 		snap.IsPublic = true
-		snap.ProfileID = cloneInt64Ptr(run.ProfileID)
-		snap.ProfileName = run.ProfileName
+		snap.ProfileID = cloneInt64Ptr(sampleRun.ProfileID)
+		snap.ProfileName = sampleRun.ProfileName
 	}
 
 	if snap.Status != serverpkg.AnalysisSnapshotStatusFailedMixedProfiles {
-		if mixedProfiles(snap.ProfileID, snap.ProfileName, run.ProfileID, run.ProfileName) {
+		if forceMixed || mixedProfiles(snap.ProfileID, snap.ProfileName, sampleRun.ProfileID, sampleRun.ProfileName) {
 			snap.Status = serverpkg.AnalysisSnapshotStatusFailedMixedProfiles
 			snap.IsPublic = false
 		}
@@ -364,10 +370,7 @@ func (c *Controller) RebuildCohort(ctx context.Context, cohortID int64) error {
 		_ = c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationFailed, time.Time{}, err.Error())
 		return fmt.Errorf("clear cohort %d before rebuild: %w", cohort.ID, err)
 	}
-	// Drop any stale snapshot rows for this cohort — their aggregates
-	// reference facts we just deleted. The per-run graduation path below
-	// will recreate pending snapshots keyed on (cohort_id, batch_id), so
-	// rebuild ends up idempotent.
+	// Snapshots are recreated by the post-loop reconciliation pass.
 	if err := c.store.ClearAnalysisCohortSnapshots(cohort.ID); err != nil {
 		_ = c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationFailed, time.Time{}, err.Error())
 		return fmt.Errorf("clear cohort %d snapshots before rebuild: %w", cohort.ID, err)
@@ -376,9 +379,24 @@ func (c *Controller) RebuildCohort(ctx context.Context, cohortID int64) error {
 	projected := 0
 	catalog := c.store.ListAnalysisCohorts()
 	progress := newProgressTracker(c.store, cohort.ID)
-	// Reset the persisted counters at the start so a retry after a
-	// partial rebuild doesn't show stale done/total numbers.
 	_ = c.store.SetAnalysisCohortProgress(cohort.ID, 0, 0)
+
+	// Defer per-(cohort, batch) snapshot accumulation: the per-run path
+	// runs CountBatchSnapshotRuns + upsert for every run, and the count
+	// scales with snapshot size. One pass at the end issues exactly one
+	// count + upsert per snapshot regardless of contributing run count.
+	type pendingKey struct {
+		cohortID int64
+		batchID  string
+	}
+	type pendingSnap struct {
+		cohort serverpkg.AnalysisCohort
+		batch  serverpkg.Batch
+		sample serverpkg.Run
+		mixed  bool
+	}
+	pending := map[pendingKey]*pendingSnap{}
+
 	for offset := 0; ; {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -392,21 +410,28 @@ func (c *Controller) RebuildCohort(ctx context.Context, cohortID int64) error {
 			break
 		}
 		if offset == 0 {
-			// Use the first page's Total as the denominator for the UI
-			// progress bar. ListRuns re-counts on every call, but we only
-			// need the count once per rebuild.
 			progress.setTotal(list.Total)
 		}
 		for _, run := range list.Items {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
-			projectedThisRun, err := c.projectAndAccumulate(run.ID, catalog)
+			input, batch, contributed, err := c.projectRunForRebuild(run, catalog)
 			if err != nil {
 				_ = c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationFailed, time.Time{}, err.Error())
 				return fmt.Errorf("project run %s for cohort %d: %w", run.ID, cohort.ID, err)
 			}
-			if projectedThisRun {
+			if contributed {
+				for _, mc := range input.MatchingCohorts {
+					key := pendingKey{cohortID: mc.ID, batchID: batch.ID}
+					if ps, ok := pending[key]; ok {
+						if !ps.mixed && mixedProfiles(ps.sample.ProfileID, ps.sample.ProfileName, run.ProfileID, run.ProfileName) {
+							ps.mixed = true
+						}
+					} else {
+						pending[key] = &pendingSnap{cohort: mc, batch: batch, sample: run}
+					}
+				}
 				projected++
 			}
 			progress.increment()
@@ -418,17 +443,44 @@ func (c *Controller) RebuildCohort(ctx context.Context, cohortID int64) error {
 	}
 	progress.flush()
 
-	// Stamp the cohort's last_materialized_at with the time the rebuild
-	// actually ran — that's what the "Last analyzed" label shows in the
-	// UI. Keeping the latest run's FinishedAt would surprise users who
-	// click Rebuild and see the timestamp not move. If no matching runs
-	// were projected at all, leave the timestamp zero so the UI can tell
-	// the cohort has no data.
+	for _, ps := range pending {
+		if err := c.applySnapshotState(ps.cohort, ps.batch, ps.sample, ps.mixed); err != nil {
+			_ = c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationFailed, time.Time{}, err.Error())
+			return fmt.Errorf("finalize snapshot for cohort %d batch %s: %w", ps.cohort.ID, ps.batch.ID, err)
+		}
+	}
+
+	// Stamp last_materialized_at with the rebuild time — clicking
+	// Rebuild without a moving timestamp would surprise users.
 	var completedAt time.Time
 	if projected > 0 {
 		completedAt = time.Now().UTC()
 	}
 	return c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationReady, completedAt, "")
+}
+
+// projectRunForRebuild applies the same snapshot-intent gates as the
+// realtime path and projects one run, deferring the per-(cohort, batch)
+// snapshot upsert to the reconciliation pass.
+func (c *Controller) projectRunForRebuild(run serverpkg.Run, catalog []serverpkg.AnalysisCohort) (RunInput, serverpkg.Batch, bool, error) {
+	if run.BatchID == "" {
+		return RunInput{}, serverpkg.Batch{}, false, nil
+	}
+	batch, ok := c.store.GetBatch(run.BatchID)
+	if !ok || !batch.SnapshotIntent {
+		return RunInput{}, serverpkg.Batch{}, false, nil
+	}
+	input, err := c.projector.LoadCompletedRunWithCatalog(run.ID, catalog)
+	if err != nil {
+		return RunInput{}, serverpkg.Batch{}, false, fmt.Errorf("load run %s: %w", run.ID, err)
+	}
+	if len(input.MatchingCohorts) == 0 {
+		return RunInput{}, serverpkg.Batch{}, false, nil
+	}
+	if err := c.projector.ProjectLoaded(input); err != nil {
+		return RunInput{}, serverpkg.Batch{}, false, fmt.Errorf("project run %s: %w", run.ID, err)
+	}
+	return input, batch, true, nil
 }
 
 // ClearCohort removes all materialized rows for one cohort and leaves it in a

@@ -476,3 +476,46 @@ func TestControllerRebuildCohortSkipsNonIntentBatches(t *testing.T) {
 		t.Fatal("rebuild must not project a non-intent batch into cohort summaries")
 	}
 }
+
+// TestControllerRebuildCohortFlagsMixedProfilesAcrossRuns confirms that
+// the deferred-snapshot reconciliation pass still detects mixed
+// profiles even though it sees only a sample run per (cohort, batch)
+// instead of every run.
+func TestControllerRebuildCohortFlagsMixedProfilesAcrossRuns(t *testing.T) {
+	store, _ := snapshotLifecycleStore(t)
+	seedSnapshotBatch(store, "batch-mixed", true)
+
+	profileA := int64(1)
+	runA := testAnalysisRun("run-a", 100, "alpha.example", time.Date(2026, 4, 20, 10, 0, 0, 0, time.UTC), "192.0.2.10", "2001:db8::10")
+	runA.BatchID = "batch-mixed"
+	runA.ProfileID = &profileA
+	runA.ProfileName = "strict"
+	store.runs[runA.ID] = runA
+	store.entries[runA.ID] = testAnalysisEntries(runA)
+	store.tags[runA.DomainID] = []string{"tld"}
+
+	profileB := int64(2)
+	runB := testAnalysisRun("run-b", 101, "beta.example", time.Date(2026, 4, 20, 10, 5, 0, 0, time.UTC), "192.0.2.20", "2001:db8::20")
+	runB.BatchID = "batch-mixed"
+	runB.ProfileID = &profileB
+	runB.ProfileName = "lenient"
+	store.runs[runB.ID] = runB
+	store.entries[runB.ID] = testAnalysisEntries(runB)
+	store.tags[runB.DomainID] = []string{"tld"}
+
+	controller := NewController(store)
+	if err := controller.RebuildCohort(context.Background(), 10); err != nil {
+		t.Fatalf("RebuildCohort: %v", err)
+	}
+
+	snap, ok := store.GetAnalysisCohortSnapshotByBatch(10, "batch-mixed")
+	if !ok {
+		t.Fatal("expected snapshot for mixed-profile rebuild")
+	}
+	if snap.Status != serverpkg.AnalysisSnapshotStatusFailedMixedProfiles {
+		t.Fatalf("Status = %q, want failed_mixed_profiles", snap.Status)
+	}
+	if snap.IsPublic {
+		t.Fatal("mixed-profile snapshot must be hidden from public path")
+	}
+}

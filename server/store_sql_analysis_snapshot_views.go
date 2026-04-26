@@ -44,7 +44,7 @@ func (s *SQLJobStore) ComputeSnapshotEntityViews(cohortID int64, batchID string)
 	domainNames := s.collectDomainNames(endpoints, addrFacts, domainASNs)
 	return SnapshotEntityViews{
 		Nameservers: buildNameserverViews(endpoints, addrFacts, asnByID, domainNames),
-		Endpoints:   buildEndpointViews(endpoints, addrFacts, asnByID, prefixByID),
+		Endpoints:   buildEndpointViews(endpoints, addrFacts, asnByID, prefixByID, domainNames),
 		ASNs:        buildASNViews(endpoints, addrFacts, domainASNs, asnByID),
 	}, nil
 }
@@ -360,7 +360,7 @@ func buildNameserverViews(endpoints []batchEndpointRow, addrFacts []AnalysisRunA
 	return out
 }
 
-func buildEndpointViews(endpoints []batchEndpointRow, addrFacts []AnalysisRunAddressASN, asnByID map[int64]string, prefixByID map[int64]string) []AnalysisSnapshotEndpointView {
+func buildEndpointViews(endpoints []batchEndpointRow, addrFacts []AnalysisRunAddressASN, asnByID map[int64]string, prefixByID map[int64]string, domainNames map[int64]string) []AnalysisSnapshotEndpointView {
 	factsByAddr := map[int64][]AnalysisRunAddressASN{}
 	for _, f := range addrFacts {
 		factsByAddr[f.AddressID] = append(factsByAddr[f.AddressID], f)
@@ -430,6 +430,16 @@ func buildEndpointViews(endpoints []batchEndpointRow, addrFacts []AnalysisRunAdd
 				v.Prefix = p
 			}
 		}
+
+		domains := make([]string, 0, len(b.domains))
+		for id := range b.domains {
+			if name, ok := domainNames[id]; ok && name != "" {
+				domains = append(domains, name)
+			}
+		}
+		sort.Strings(domains)
+		v.Domains = domains
+
 		out = append(out, v)
 	}
 	return out
@@ -576,13 +586,18 @@ func (s *SQLJobStore) ReplaceSnapshotEntityViews(snapshotID int64, views Snapsho
 		}
 	}
 	for _, v := range views.Endpoints {
+		domainsJSON, err := marshalStringList(v.Domains)
+		if err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("marshal endpoint domains ns=%d addr=%d: %w", v.NameserverID, v.AddressID, err)
+		}
 		if _, err := tx.Exec(
 			fmt.Sprintf(`INSERT INTO analysis_snapshot_endpoint_view
 				(snapshot_id, nameserver_id, address_id, nameserver_name, address, family,
-				 domain_count, asn, asn_label, prefix)
-				VALUES (%s)`, s.phRange(1, 10)),
+				 domain_count, asn, asn_label, prefix, domains_json)
+				VALUES (%s)`, s.phRange(1, 11)),
 			snapshotID, v.NameserverID, v.AddressID, v.NameserverName, v.Address, v.Family,
-			v.DomainCount, nullInt64Value(v.ASN), v.ASNLabel, v.Prefix,
+			v.DomainCount, nullInt64Value(v.ASN), v.ASNLabel, v.Prefix, domainsJSON,
 		); err != nil {
 			_ = tx.Rollback()
 			return fmt.Errorf("insert endpoint view ns=%d addr=%d: %w", v.NameserverID, v.AddressID, err)
@@ -679,15 +694,34 @@ func (s *SQLJobStore) GetSnapshotNameserverViewByName(snapshotID int64, name str
 	return v, true
 }
 
+const analysisSnapshotEndpointViewCols = `snapshot_id, nameserver_id, address_id, nameserver_name,
+	address, family, domain_count, asn, asn_label, prefix, domains_json`
+
+func scanSnapshotEndpointView(row rowScanner) (AnalysisSnapshotEndpointView, error) {
+	var (
+		v           AnalysisSnapshotEndpointView
+		asn         sql.NullInt64
+		domainsJSON string
+	)
+	if err := row.Scan(
+		&v.SnapshotID, &v.NameserverID, &v.AddressID, &v.NameserverName,
+		&v.Address, &v.Family, &v.DomainCount, &asn, &v.ASNLabel, &v.Prefix, &domainsJSON,
+	); err != nil {
+		return AnalysisSnapshotEndpointView{}, err
+	}
+	v.ASN = nullInt64Ptr(asn)
+	v.Domains = unmarshalStringList(domainsJSON)
+	return v, nil
+}
+
 // ListSnapshotEndpointViews returns every endpoint view row for one snapshot.
 func (s *SQLJobStore) ListSnapshotEndpointViews(snapshotID int64) []AnalysisSnapshotEndpointView {
 	rows, err := s.db.Query(
-		fmt.Sprintf(`SELECT snapshot_id, nameserver_id, address_id, nameserver_name,
-				address, family, domain_count, asn, asn_label, prefix
+		fmt.Sprintf(`SELECT %s
 			FROM analysis_snapshot_endpoint_view
 			WHERE snapshot_id = %s
 			ORDER BY domain_count DESC, nameserver_name ASC, address ASC`,
-			s.ph(1)),
+			analysisSnapshotEndpointViewCols, s.ph(1)),
 		snapshotID,
 	)
 	if err != nil {
@@ -696,17 +730,42 @@ func (s *SQLJobStore) ListSnapshotEndpointViews(snapshotID int64) []AnalysisSnap
 	defer rows.Close()
 	var out []AnalysisSnapshotEndpointView
 	for rows.Next() {
-		var (
-			v   AnalysisSnapshotEndpointView
-			asn sql.NullInt64
-		)
-		if err := rows.Scan(
-			&v.SnapshotID, &v.NameserverID, &v.AddressID, &v.NameserverName,
-			&v.Address, &v.Family, &v.DomainCount, &asn, &v.ASNLabel, &v.Prefix,
-		); err != nil {
+		v, err := scanSnapshotEndpointView(rows)
+		if err != nil {
 			return nil
 		}
-		v.ASN = nullInt64Ptr(asn)
+		out = append(out, v)
+	}
+	return out
+}
+
+// ListSnapshotEndpointViewsByAddress returns every endpoint view row for
+// one snapshot matching a case-insensitive IP literal. Optional nameserver
+// (also case-insensitive) narrows to a single nameserver when the address
+// is shared across more than one. Used by the per-IP detail page.
+func (s *SQLJobStore) ListSnapshotEndpointViewsByAddress(snapshotID int64, address, nameserver string) []AnalysisSnapshotEndpointView {
+	args := []any{snapshotID, address}
+	query := fmt.Sprintf(`SELECT %s
+		FROM analysis_snapshot_endpoint_view
+		WHERE snapshot_id = %s AND LOWER(address) = LOWER(%s)`,
+		analysisSnapshotEndpointViewCols, s.ph(1), s.ph(2))
+	if nameserver != "" {
+		query += " AND LOWER(nameserver_name) = LOWER(" + s.ph(3) + ")"
+		args = append(args, nameserver)
+	}
+	query += " ORDER BY nameserver_name ASC"
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var out []AnalysisSnapshotEndpointView
+	for rows.Next() {
+		v, err := scanSnapshotEndpointView(rows)
+		if err != nil {
+			return nil
+		}
 		out = append(out, v)
 	}
 	return out

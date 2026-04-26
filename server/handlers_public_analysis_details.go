@@ -515,7 +515,7 @@ func (s *Server) handlePublicAnalysisEndpointDetail(w http.ResponseWriter, r *ht
 	if decoded, err := url.PathUnescape(rawAddr); err == nil {
 		rawAddr = decoded
 	}
-	cohort, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
+	_, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
 	if !ok {
 		return
 	}
@@ -524,108 +524,28 @@ func (s *Server) handlePublicAnalysisEndpointDetail(w http.ResponseWriter, r *ht
 		return
 	}
 
-	data := s.latestMaterializationForSnapshot(cohort, snapshot)
-
-	target := strings.ToLower(rawAddr)
 	selectedNameserver := strings.TrimSpace(r.URL.Query().Get("nameserver"))
-	selectedNameserverLower := strings.ToLower(selectedNameserver)
-	var addr AnalysisAddress
-	found := false
-	domainSet := map[int64]struct{}{}
-	nameservers := map[int64]struct{}{}
-	for _, ep := range data.endpoints {
-		a, ok := readStore.GetAnalysisAddress(ep.AddressID)
-		if !ok || strings.ToLower(a.Address) != target {
-			continue
-		}
-		ns, ok := readStore.GetAnalysisNameserver(ep.NameserverID)
-		if !ok {
-			continue
-		}
-		if selectedNameserverLower != "" && strings.ToLower(ns.Name) != selectedNameserverLower {
-			continue
-		}
-		addr = a
-		found = true
-		domainSet[ep.DomainID] = struct{}{}
-		nameservers[ep.NameserverID] = struct{}{}
-	}
-	if !found {
+	rows := readStore.ListSnapshotEndpointViewsByAddress(snapshot.ID, rawAddr, selectedNameserver)
+	if len(rows) == 0 {
 		writeError(w, http.StatusNotFound, "not_found", "endpoint not found in cohort", nil)
 		return
 	}
-	if selectedNameserverLower == "" && len(nameservers) > 1 {
+	if selectedNameserver == "" && len(rows) > 1 {
 		writeError(w, http.StatusBadRequest, "ambiguous_endpoint", "multiple nameservers use that address; provide nameserver query parameter", nil)
 		return
 	}
+	view := rows[0]
 
-	asnSet := map[int64]struct{}{}
-	prefixSet := map[string]struct{}{}
-	for _, fact := range data.addressASNs {
-		if fact.AddressID != addr.ID {
-			continue
-		}
-		if _, ok := domainSet[fact.DomainID]; !ok {
-			continue
-		}
-		if fact.ASN != nil {
-			asnSet[*fact.ASN] = struct{}{}
-		}
-		if fact.PrefixID != nil {
-			if p, ok := readStore.GetAnalysisPrefix(*fact.PrefixID); ok {
-				prefixSet[p.Prefix] = struct{}{}
-			}
-		}
-	}
-	var asn *int64
-	if len(asnSet) == 1 {
-		for value := range asnSet {
-			asnCopy := value
-			asn = &asnCopy
-		}
-	}
-	prefix := ""
-	if len(prefixSet) == 1 {
-		for value := range prefixSet {
-			prefix = value
-		}
-	}
-
-	domains := make([]string, 0, len(domainSet))
-	for domainID := range domainSet {
-		if d, ok := s.store.GetDomain(domainID); ok {
-			domains = append(domains, d.Name)
-		}
-	}
-	sort.Strings(domains)
-
-	nsNames := make([]string, 0, len(nameservers))
-	for nsID := range nameservers {
-		if ns, ok := readStore.GetAnalysisNameserver(nsID); ok {
-			nsNames = append(nsNames, ns.Name)
-		}
-	}
-	sort.Strings(nsNames)
-	primaryNS := ""
-	if len(nsNames) > 0 {
-		primaryNS = nsNames[0]
-	}
-
-	asnLabel := ""
-	if asn != nil {
-		if meta, ok := readStore.GetAnalysisASN(*asn); ok {
-			asnLabel = meta.Label
-		}
-	}
+	writeSnapshotCacheHeaders(w, r, snapshot)
 	writeJSON(w, http.StatusOK, PublicAnalysisEndpointDetail{
-		Nameserver:  primaryNS,
-		Address:     addr.Address,
-		Family:      addr.Family,
-		ASN:         asn,
-		ASNLabel:    asnLabel,
-		Prefix:      prefix,
-		DomainCount: len(domainSet),
-		Domains:     domains,
+		Nameserver:  view.NameserverName,
+		Address:     view.Address,
+		Family:      view.Family,
+		ASN:         view.ASN,
+		ASNLabel:    view.ASNLabel,
+		Prefix:      view.Prefix,
+		DomainCount: view.DomainCount,
+		Domains:     view.Domains,
 	})
 }
 

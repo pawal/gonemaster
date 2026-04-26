@@ -479,16 +479,17 @@ type AnalysisSnapshotNameserverView struct {
 // AnalysisSnapshotEndpointView is one pre-computed (nameserver, address) row
 // for a captured snapshot.
 type AnalysisSnapshotEndpointView struct {
-	SnapshotID     int64  `json:"snapshot_id"`
-	NameserverID   int64  `json:"nameserver_id"`
-	AddressID      int64  `json:"address_id"`
-	NameserverName string `json:"nameserver_name"`
-	Address        string `json:"address"`
-	Family         string `json:"family"`
-	DomainCount    int    `json:"domain_count"`
-	ASN            *int64 `json:"asn,omitempty"`
-	ASNLabel       string `json:"asn_label,omitempty"`
-	Prefix         string `json:"prefix,omitempty"`
+	SnapshotID     int64    `json:"snapshot_id"`
+	NameserverID   int64    `json:"nameserver_id"`
+	AddressID      int64    `json:"address_id"`
+	NameserverName string   `json:"nameserver_name"`
+	Address        string   `json:"address"`
+	Family         string   `json:"family"`
+	DomainCount    int      `json:"domain_count"`
+	ASN            *int64   `json:"asn,omitempty"`
+	ASNLabel       string   `json:"asn_label,omitempty"`
+	Prefix         string   `json:"prefix,omitempty"`
+	Domains        []string `json:"domains,omitempty"`
 }
 
 // AnalysisSnapshotASNView is one pre-computed ASN row for a captured snapshot.

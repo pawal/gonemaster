@@ -27,7 +27,7 @@ export const setCatalog = (code, catalog) => {
 };
 
 // All locale JSON files except en (which is already statically bundled).
-const localeModules = import.meta.glob("./i18n/!(en).json");
+const localeModules = import.meta.glob(["./i18n/*.json", "!./i18n/en.json"]);
 
 /**
  * Asynchronously loads `ui-public/src/i18n/<code>.json` if it has not been

@@ -427,12 +427,17 @@ func (s *SQLJobStore) CountBatchSnapshotRuns(cohortID int64, batchID string) (ru
 }
 
 // CountOutstandingJobsForBatch returns in-flight (queued/running/paused)
-// jobs still attached to a batch.
+// jobs still attached to a batch. Terminal statuses left in the jobs
+// table (e.g. an orphaned succeeded/failed row that never made it
+// through GraduateJob cleanly) must not block snapshot capture.
 func (s *SQLJobStore) CountOutstandingJobsForBatch(batchID string) (int, error) {
 	var count int
 	row := s.db.QueryRow(
-		fmt.Sprintf(`SELECT COUNT(*) FROM jobs WHERE batch_id = %s`, s.ph(1)),
-		batchID,
+		fmt.Sprintf(
+			`SELECT COUNT(*) FROM jobs WHERE batch_id = %s AND status IN (%s, %s, %s)`,
+			s.ph(1), s.ph(2), s.ph(3), s.ph(4),
+		),
+		batchID, string(JobQueued), string(JobRunning), string(JobPaused),
 	)
 	if err := row.Scan(&count); err != nil {
 		return 0, fmt.Errorf("count outstanding jobs for batch %s: %w", batchID, err)

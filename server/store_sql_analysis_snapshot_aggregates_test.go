@@ -205,6 +205,28 @@ func TestCountOutstandingJobsForBatch(t *testing.T) {
 	if count != 2 {
 		t.Fatalf("outstanding jobs = %d, want 2", count)
 	}
+
+	// Orphan rows in the jobs table — terminal statuses that never made it
+	// through GraduateJob cleanly — must not be counted as outstanding,
+	// otherwise the snapshot capture gate stays closed forever.
+	if _, err := s.Create(Job{
+		ID: "job-orphan-ok", Domain: "ok.example", BatchID: "batch-x", Status: JobSucceeded, CreatedAt: now,
+	}); err != nil {
+		t.Fatalf("create orphan succeeded: %v", err)
+	}
+	if _, err := s.Create(Job{
+		ID: "job-orphan-fail", Domain: "fail.example", BatchID: "batch-x", Status: JobFailed, CreatedAt: now,
+	}); err != nil {
+		t.Fatalf("create orphan failed: %v", err)
+	}
+
+	count, err = s.CountOutstandingJobsForBatch("batch-x")
+	if err != nil {
+		t.Fatalf("CountOutstandingJobsForBatch after orphans: %v", err)
+	}
+	if count != 2 {
+		t.Fatalf("outstanding jobs after orphans = %d, want 2", count)
+	}
 }
 
 func TestCountUnprojectedSnapshotRuns(t *testing.T) {

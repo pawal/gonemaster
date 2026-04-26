@@ -395,15 +395,26 @@ const snapshotScopedPaths = new Set([
   "/testcase"
 ]);
 
+// Thrown when a snapshot-scoped read is attempted for a cohort that has
+// no captured public snapshot. Loaders catch this and render an empty
+// state instead of letting the request fall through to a 404.
+export class NoSnapshotError extends Error {
+  constructor(message = "No content available yet for this cohort.") {
+    super(message);
+    this.name = "NoSnapshotError";
+  }
+}
+
 // liftToSnapshotPath rewrites `/path` into
 // `/cohorts/{tag}/snapshots/{slug}/path` when both are set.
 function liftToSnapshotPath(path: string, filter: AnalysisFilter): { path: string; filter: AnalysisFilter } {
   const tag = filter.dataset_tag;
   const slug = filter.snapshot;
-  if (!tag || !slug) return { path, filter };
+  if (!tag) return { path, filter };
   const slash = path.indexOf("/", 1);
   const head = slash === -1 ? path : path.slice(0, slash);
   if (!snapshotScopedPaths.has(head)) return { path, filter };
+  if (!slug) throw new NoSnapshotError();
   const next: AnalysisFilter = { ...filter };
   delete next.dataset_tag;
   delete next.snapshot;

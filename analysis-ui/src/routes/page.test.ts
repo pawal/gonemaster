@@ -88,26 +88,16 @@ describe("+page.load (overview)", () => {
     expect(fetchFn).not.toHaveBeenCalled();
   });
 
-  it("renders no_snapshot state when the overview returns status=no_snapshot", async () => {
-    const { impl, calls } = fetchRouter([
-      {
-        match: (url) => url.includes("/overview"),
-        body: {
-          dataset_tag: "tld",
-          label: "TLD",
-          materialization_status: "pending",
-          status: "no_snapshot",
-          is_default: true
-        }
-      }
-    ]);
+  it("renders no_snapshot state when the cohort has no captured snapshot to query", async () => {
+    const { impl, calls } = fetchRouter([]);
     const data = await load(evt({ resolvedCohort: "tld", fetchImpl: impl }));
     expect(data.noSnapshot).toBe(true);
     expect(data.totals).toBeNull();
     expect(data.snapshot).toBeNull();
-    // Only the /overview call fires; the legacy 4-call fan-out is gone.
-    expect(calls).toHaveLength(1);
-    expect(calls[0]).toContain("/overview");
+    expect(data.loadError).toBeNull();
+    // Client-side detection: no request should fire when there is no
+    // snapshot slug to anchor against.
+    expect(calls).toHaveLength(0);
   });
 
   it("collapses to a single /overview call and reads totals + top-N from the payload", async () => {
@@ -131,10 +121,12 @@ describe("+page.load (overview)", () => {
         }
       }
     ]);
-    const data = await load(evt({ resolvedCohort: "tld", fetchImpl: impl }));
+    const data = await load(
+      evt({ resolvedCohort: "tld", fetchImpl: impl, search: "?snapshot=2026-04-26-fixture" })
+    );
 
     expect(calls).toHaveLength(1);
-    expect(calls[0]).toContain("/overview");
+    expect(calls[0]).toContain("/cohorts/tld/snapshots/2026-04-26-fixture/overview");
     expect(data.snapshot?.slug).toBe("2026-04-26-fixture");
     expect(data.totals?.domain_count).toBe(12);
     expect(data.totals?.nameserver_count).toBe(5);
@@ -173,7 +165,9 @@ describe("+page.load (overview)", () => {
     const { impl } = fetchRouter([
       { match: (url) => url.includes("/overview"), body: { error: "boom" }, ok: false }
     ]);
-    const data = await load(evt({ resolvedCohort: "tld", fetchImpl: impl }));
+    const data = await load(
+      evt({ resolvedCohort: "tld", fetchImpl: impl, search: "?snapshot=2026-04-26-fixture" })
+    );
     expect(data.loadError).toMatch(/HTTP 500/);
     expect(data.totals).toBeNull();
   });
@@ -192,7 +186,7 @@ describe("+page.load (overview)", () => {
         }
       }
     ]);
-    const data = await load(evt({ resolvedCohort: "tld", fetchImpl: impl }));
+    const data = await load(evt({ resolvedCohort: "tld", fetchImpl: impl, search: "?snapshot=x" }));
     expect(data.snapshot?.slug).toBe("x");
     expect(data.totals).toBeNull();
     expect(data.topTags).toEqual([]);

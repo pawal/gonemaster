@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  NoSnapshotError,
   PUBLIC_BASE,
   buildQuery,
   getCatalog,
@@ -65,17 +66,18 @@ describe("analysis API client", () => {
   it("every helper only calls URLs under /pub/api/v1/analysis", async () => {
     const { stub, calls } = recorder();
 
+    const pin = { dataset_tag: "tld", snapshot: "2026-04-20" };
     await getCatalog(stub);
-    await getOverview({ dataset_tag: "tld" }, stub);
+    await getOverview(pin, stub);
     await getCohortDetail("tld", stub);
-    await listDomains({ limit: 25 }, stub);
-    await listNameservers({}, stub);
-    await listEndpoints({}, stub);
-    await listASNs({}, stub);
-    await listPrefixes({}, stub);
-    await listTags({}, stub);
-    await getDomainDetail("example.com", {}, stub);
-    await getPrefixDetail("192.0.2.0/24", {}, stub);
+    await listDomains({ ...pin, limit: 25 }, stub);
+    await listNameservers(pin, stub);
+    await listEndpoints(pin, stub);
+    await listASNs(pin, stub);
+    await listPrefixes(pin, stub);
+    await listTags(pin, stub);
+    await getDomainDetail("example.com", pin, stub);
+    await getPrefixDetail("192.0.2.0/24", pin, stub);
     await listSnapshots("tld", stub);
     await getSnapshotDetail("tld", "2026-04-20", stub);
     await getTrends("tld", {}, stub);
@@ -100,12 +102,14 @@ describe("analysis API client", () => {
     }
   });
 
-  it("keeps the legacy URL when snapshot is unpinned so the server can 307 to auto-latest", async () => {
+  it("throws NoSnapshotError without making a request when a snapshot-scoped path has no slug", async () => {
     const { stub, calls } = recorder();
-    await listDomains({ dataset_tag: "tld" }, stub);
-    expect(calls.length).toBe(1);
-    expect(calls[0].url).toContain("/domains?dataset_tag=tld");
-    expect(calls[0].url).not.toContain("/snapshots/");
+    await expect(listDomains({ dataset_tag: "tld" }, stub)).rejects.toBeInstanceOf(NoSnapshotError);
+    await expect(getOverview({ dataset_tag: "tld" }, stub)).rejects.toBeInstanceOf(NoSnapshotError);
+    await expect(getDomainDetail("example.com", { dataset_tag: "tld" }, stub)).rejects.toBeInstanceOf(
+      NoSnapshotError
+    );
+    expect(calls.length).toBe(0);
   });
 
   it("snapshot endpoints target the cohort-scoped paths", async () => {

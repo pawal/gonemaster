@@ -46,7 +46,7 @@ describe("/domains +page.load", () => {
       evt({
         resolvedCohort: "tld",
         fetchImpl: fetchFn,
-        search: "?limit=25&offset=100&search=alpha&sort=score_desc"
+        search: "?snapshot=2026-04-26&limit=25&offset=100&search=alpha&sort=score_desc"
       })
     );
 
@@ -54,8 +54,7 @@ describe("/domains +page.load", () => {
     expect(data.offset).toBe(100);
     expect(fetchFn).toHaveBeenCalledTimes(1);
     const urlCalled = fetchFn.mock.calls[0][0] as string;
-    expect(urlCalled).toMatch(/^\/pub\/api\/v1\/analysis\/domains\?/);
-    expect(urlCalled).toContain("dataset_tag=tld");
+    expect(urlCalled).toMatch(/^\/pub\/api\/v1\/analysis\/cohorts\/tld\/snapshots\/2026-04-26\/domains\?/);
     expect(urlCalled).toContain("limit=25");
     expect(urlCalled).toContain("offset=100");
     expect(urlCalled).toContain("search=alpha");
@@ -67,7 +66,11 @@ describe("/domains +page.load", () => {
       .fn()
       .mockResolvedValue(stubResponse({ items: [], total: 0, limit: 50, offset: 0 }));
     const data = await load(
-      evt({ resolvedCohort: "tld", fetchImpl: fetchFn, search: "?limit=abc&offset=-5" })
+      evt({
+        resolvedCohort: "tld",
+        fetchImpl: fetchFn,
+        search: "?snapshot=2026-04-26&limit=abc&offset=-5"
+      })
     );
     expect(data.limit).toBe(50);
     expect(data.offset).toBe(0);
@@ -75,7 +78,9 @@ describe("/domains +page.load", () => {
 
   it("captures fetch errors without throwing", async () => {
     const fetchFn = vi.fn().mockResolvedValue(stubResponse({}, false));
-    const data = await load(evt({ resolvedCohort: "tld", fetchImpl: fetchFn }));
+    const data = await load(
+      evt({ resolvedCohort: "tld", fetchImpl: fetchFn, search: "?snapshot=2026-04-26" })
+    );
     expect(data.list).toBeNull();
     expect(data.error).toMatch(/HTTP 500/);
   });

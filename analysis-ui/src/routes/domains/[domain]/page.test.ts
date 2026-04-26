@@ -16,6 +16,7 @@ function evt(options: {
   domain: string;
   resolvedCohort: string | null;
   fetchImpl: ReturnType<typeof vi.fn>;
+  search?: string;
 }) {
   return {
     parent: async () => ({
@@ -24,7 +25,10 @@ function evt(options: {
       resolvedCohort: options.resolvedCohort
     }),
     fetch: options.fetchImpl as unknown as typeof fetch,
-    params: { domain: options.domain }
+    params: { domain: options.domain },
+    url: new URL(
+      `http://localhost/domains/${encodeURIComponent(options.domain)}${options.search ?? ""}`
+    )
   } as Parameters<typeof load>[0];
 }
 
@@ -36,7 +40,7 @@ describe("/domains/[domain] +page.load", () => {
     expect(fetchFn).not.toHaveBeenCalled();
   });
 
-  it("fetches domain detail using the resolved cohort as dataset_tag", async () => {
+  it("fetches domain detail using the resolved cohort and pinned snapshot", async () => {
     const detail = {
       domain: "alpha.example",
       nameserver_count: 2,
@@ -49,20 +53,29 @@ describe("/domains/[domain] +page.load", () => {
     };
     const fetchFn = vi.fn().mockResolvedValue(stubResponse(detail));
     const data = await load(
-      evt({ domain: "alpha.example", resolvedCohort: "tld", fetchImpl: fetchFn })
+      evt({
+        domain: "alpha.example",
+        resolvedCohort: "tld",
+        fetchImpl: fetchFn,
+        search: "?snapshot=2026-04-26"
+      })
     );
 
     expect(data.detail?.domain).toBe("alpha.example");
     expect(data.error).toBeNull();
     const urlCalled = fetchFn.mock.calls[0][0] as string;
-    expect(urlCalled).toMatch(/^\/pub\/api\/v1\/analysis\/domains\/alpha\.example/);
-    expect(urlCalled).toContain("dataset_tag=tld");
+    expect(urlCalled).toContain("/cohorts/tld/snapshots/2026-04-26/domains/alpha.example");
   });
 
   it("URL-encodes tricky domain labels", async () => {
     const fetchFn = vi.fn().mockResolvedValue(stubResponse({}));
     await load(
-      evt({ domain: "xn--bücher-kva.example", resolvedCohort: "tld", fetchImpl: fetchFn })
+      evt({
+        domain: "xn--bücher-kva.example",
+        resolvedCohort: "tld",
+        fetchImpl: fetchFn,
+        search: "?snapshot=2026-04-26"
+      })
     );
     const urlCalled = fetchFn.mock.calls[0][0] as string;
     expect(urlCalled).toMatch(/xn--b%C3%BCcher-kva\.example/);
@@ -71,7 +84,12 @@ describe("/domains/[domain] +page.load", () => {
   it("captures fetch errors without throwing", async () => {
     const fetchFn = vi.fn().mockResolvedValue(stubResponse({}, false));
     const data = await load(
-      evt({ domain: "alpha.example", resolvedCohort: "tld", fetchImpl: fetchFn })
+      evt({
+        domain: "alpha.example",
+        resolvedCohort: "tld",
+        fetchImpl: fetchFn,
+        search: "?snapshot=2026-04-26"
+      })
     );
     expect(data.detail).toBeNull();
     expect(data.error).toMatch(/HTTP 500/);

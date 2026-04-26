@@ -18,6 +18,8 @@ Warning: No backwards compatibility for old databases.
  - Analysis: Nameservers / Endpoints / ASNs / Overview tabs serve from view tables instead of scanning fact rows
  - Analysis: per-snapshot `singleflight` replaces the global cache mutex so different snapshots compute in parallel
  - Analysis: `DeleteBatch` cascades through the new view tables
+ - Public UI: Fixed locale chunk emission so non-en translations actually load
+ - Analysis UI: Replace raw 404 page-not-found with a clear no-content-yet message when a public cohort has no captured snapshot
 
 ## [v1.4.0] - 2026-04-24
 

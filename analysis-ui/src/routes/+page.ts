@@ -1,5 +1,6 @@
 import {
   ANALYSIS_STATUS_NO_SNAPSHOT,
+  NoSnapshotError,
   getOverview,
   type FactDistribution,
   type OverviewResponse,
@@ -44,6 +45,9 @@ export async function load({ parent, fetch, url }): Promise<OverviewPageData> {
   try {
     overview = await getOverview(filter, fetch);
   } catch (err) {
+    if (err instanceof NoSnapshotError) {
+      return { ...emptyPageData(datasetTag), noSnapshot: true };
+    }
     return {
       ...emptyPageData(datasetTag),
       loadError: err instanceof Error ? err.message : String(err)

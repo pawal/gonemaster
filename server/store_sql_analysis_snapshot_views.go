@@ -17,6 +17,7 @@ type SnapshotEntityViews struct {
 	ASNs        []AnalysisSnapshotASNView
 	Tags        []AnalysisSnapshotTagView
 	Domains     []AnalysisSnapshotDomainView
+	Prefixes    []AnalysisSnapshotPrefixView
 }
 
 // ComputeSnapshotEntityViews builds the three entity-view row sets for one
@@ -59,13 +60,44 @@ func (s *SQLJobStore) ComputeSnapshotEntityViews(cohortID int64, batchID string)
 			domainNames = mergeDomainNames(domainNames, s.GetDomainNamesByIDs([]int64{sm.DomainID}))
 		}
 	}
+	nameserverNames := s.collectNameserverNames(endpoints)
+	addressLiterals := s.collectAddressLiterals(endpoints, addrFacts)
 	return SnapshotEntityViews{
 		Nameservers: buildNameserverViews(endpoints, addrFacts, asnByID, domainNames),
 		Endpoints:   buildEndpointViews(endpoints, addrFacts, asnByID, prefixByID, domainNames),
-		ASNs:        buildASNViews(endpoints, addrFacts, domainASNs, asnByID),
+		ASNs:        buildASNViews(endpoints, addrFacts, domainASNs, asnByID, prefixByID, domainNames, nameserverNames),
 		Tags:        buildTagViews(tagSummaries, domainNames, s.tagViewMinLevel),
 		Domains:     buildDomainViews(summaries, finishedAt, endpoints, addrFacts, asnByID, prefixByID, domainNames, tagSummaries, s.tagViewMinLevel),
+		Prefixes:    buildPrefixViews(addrFacts, prefixByID, asnByID, domainNames, addressLiterals),
 	}, nil
+}
+
+func (s *SQLJobStore) collectNameserverNames(endpoints []batchEndpointRow) map[int64]string {
+	out := map[int64]string{}
+	for _, ep := range endpoints {
+		if ep.NameserverName != "" {
+			out[ep.NameserverID] = ep.NameserverName
+		}
+	}
+	return out
+}
+
+func (s *SQLJobStore) collectAddressLiterals(endpoints []batchEndpointRow, addrFacts []AnalysisRunAddressASN) map[int64]string {
+	out := map[int64]string{}
+	for _, ep := range endpoints {
+		if ep.AddressID != 0 && ep.Address != "" {
+			out[ep.AddressID] = ep.Address
+		}
+	}
+	for _, f := range addrFacts {
+		if _, ok := out[f.AddressID]; ok {
+			continue
+		}
+		if addr, found := s.GetAnalysisAddress(f.AddressID); found {
+			out[f.AddressID] = addr.Address
+		}
+	}
+	return out
 }
 
 func mergeDomainNames(base, extra map[int64]string) map[int64]string {
@@ -863,7 +895,12 @@ func buildEndpointViews(endpoints []batchEndpointRow, addrFacts []AnalysisRunAdd
 	return out
 }
 
-func buildASNViews(endpoints []batchEndpointRow, addrFacts []AnalysisRunAddressASN, domainASNs []AnalysisRunDomainASN, asnByID map[int64]string) []AnalysisSnapshotASNView {
+func buildASNViews(
+	endpoints []batchEndpointRow,
+	addrFacts []AnalysisRunAddressASN,
+	domainASNs []AnalysisRunDomainASN,
+	asnByID, prefixByID, domainNames, nameserverNames map[int64]string,
+) []AnalysisSnapshotASNView {
 	addrFamily := map[int64]string{}
 	for _, ep := range endpoints {
 		if ep.AddressID != 0 && ep.Family != "" {
@@ -939,7 +976,7 @@ func buildASNViews(endpoints []batchEndpointRow, addrFacts []AnalysisRunAddressA
 	}
 	out := make([]AnalysisSnapshotASNView, 0, len(buckets))
 	for asn, b := range buckets {
-		out = append(out, AnalysisSnapshotASNView{
+		v := AnalysisSnapshotASNView{
 			ASN:             asn,
 			Label:           asnByID[asn],
 			DomainCount:     len(b.domains),
@@ -948,8 +985,134 @@ func buildASNViews(endpoints []batchEndpointRow, addrFacts []AnalysisRunAddressA
 			PrefixCount:     len(b.prefixes),
 			IPv4Count:       len(b.ipv4),
 			IPv6Count:       len(b.ipv6),
-		})
+		}
+		domains := make([]string, 0, len(b.domains))
+		for id := range b.domains {
+			if name, ok := domainNames[id]; ok && name != "" {
+				domains = append(domains, name)
+			}
+		}
+		sort.Strings(domains)
+		v.Domains = domains
+
+		nsNames := make([]string, 0, len(b.nameservers))
+		for id := range b.nameservers {
+			if name, ok := nameserverNames[id]; ok && name != "" {
+				nsNames = append(nsNames, name)
+			}
+		}
+		sort.Strings(nsNames)
+		v.Nameservers = nsNames
+
+		prefixes := make([]string, 0, len(b.prefixes))
+		for id := range b.prefixes {
+			if p, ok := prefixByID[id]; ok && p != "" {
+				prefixes = append(prefixes, p)
+			}
+		}
+		sort.Strings(prefixes)
+		v.Prefixes = prefixes
+
+		out = append(out, v)
 	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ASN < out[j].ASN })
+	return out
+}
+
+// buildPrefixViews aggregates one row per CIDR prefix observed in the
+// snapshot's authoritative-address fact set, baking the ASN/domain/
+// address rosters as JSON columns so the prefix detail and listing
+// handlers serve from one indexed read.
+func buildPrefixViews(
+	addrFacts []AnalysisRunAddressASN,
+	prefixByID map[int64]string,
+	asnByID map[int64]string,
+	domainNames map[int64]string,
+	addressLiterals map[int64]string,
+) []AnalysisSnapshotPrefixView {
+	type bucket struct {
+		prefix    string
+		family    string
+		domains   map[int64]struct{}
+		addresses map[int64]struct{}
+		asns      map[int64]struct{}
+	}
+	buckets := map[int64]*bucket{}
+	prefixFamily := map[string]string{}
+	for _, f := range addrFacts {
+		if f.PrefixID == nil {
+			continue
+		}
+		prefixID := *f.PrefixID
+		prefix, ok := prefixByID[prefixID]
+		if !ok || prefix == "" {
+			continue
+		}
+		b, exists := buckets[prefixID]
+		if !exists {
+			family := "ipv4"
+			if strings.Contains(prefix, ":") {
+				family = "ipv6"
+			}
+			b = &bucket{
+				prefix:    prefix,
+				family:    family,
+				domains:   map[int64]struct{}{},
+				addresses: map[int64]struct{}{},
+				asns:      map[int64]struct{}{},
+			}
+			buckets[prefixID] = b
+			prefixFamily[prefix] = family
+		}
+		b.domains[f.DomainID] = struct{}{}
+		b.addresses[f.AddressID] = struct{}{}
+		if f.ASN != nil {
+			b.asns[*f.ASN] = struct{}{}
+		}
+	}
+	out := make([]AnalysisSnapshotPrefixView, 0, len(buckets))
+	for _, b := range buckets {
+		v := AnalysisSnapshotPrefixView{
+			Prefix:       b.prefix,
+			Family:       b.family,
+			DomainCount:  len(b.domains),
+			AddressCount: len(b.addresses),
+		}
+		if len(b.asns) == 1 {
+			for asn := range b.asns {
+				asnCopy := asn
+				v.ASN = &asnCopy
+				v.ASNLabel = asnByID[asn]
+			}
+		}
+		asns := make([]int64, 0, len(b.asns))
+		for asn := range b.asns {
+			asns = append(asns, asn)
+		}
+		sort.Slice(asns, func(i, j int) bool { return asns[i] < asns[j] })
+		v.ASNs = asns
+
+		domains := make([]string, 0, len(b.domains))
+		for id := range b.domains {
+			if name, ok := domainNames[id]; ok && name != "" {
+				domains = append(domains, name)
+			}
+		}
+		sort.Strings(domains)
+		v.Domains = domains
+
+		addrs := make([]string, 0, len(b.addresses))
+		for id := range b.addresses {
+			if lit, ok := addressLiterals[id]; ok && lit != "" {
+				addrs = append(addrs, lit)
+			}
+		}
+		sort.Strings(addrs)
+		v.Addresses = addrs
+
+		out = append(out, v)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Prefix < out[j].Prefix })
 	return out
 }
 
@@ -966,6 +1129,7 @@ func (s *SQLJobStore) ReplaceSnapshotEntityViews(snapshotID int64, views Snapsho
 		"analysis_snapshot_asn_view",
 		"analysis_snapshot_tag_view",
 		"analysis_snapshot_domain_view",
+		"analysis_snapshot_prefix_view",
 	} {
 		if _, err := tx.Exec(
 			fmt.Sprintf(`DELETE FROM %s WHERE snapshot_id = %s`, table, s.ph(1)),
@@ -1024,16 +1188,61 @@ func (s *SQLJobStore) ReplaceSnapshotEntityViews(snapshotID int64, views Snapsho
 		}
 	}
 	for _, v := range views.ASNs {
+		domainsJSON, err := marshalStringList(v.Domains)
+		if err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("marshal asn domains asn=%d: %w", v.ASN, err)
+		}
+		nsJSON, err := marshalStringList(v.Nameservers)
+		if err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("marshal asn nameservers asn=%d: %w", v.ASN, err)
+		}
+		prefixesJSON, err := marshalStringList(v.Prefixes)
+		if err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("marshal asn prefixes asn=%d: %w", v.ASN, err)
+		}
 		if _, err := tx.Exec(
 			fmt.Sprintf(`INSERT INTO analysis_snapshot_asn_view
 				(snapshot_id, asn, label, domain_count, address_count, nameserver_count,
-				 prefix_count, ipv4_count, ipv6_count)
-				VALUES (%s)`, s.phRange(1, 9)),
+				 prefix_count, ipv4_count, ipv6_count,
+				 domains_json, nameservers_json, prefixes_json)
+				VALUES (%s)`, s.phRange(1, 12)),
 			snapshotID, v.ASN, v.Label, v.DomainCount, v.AddressCount, v.NameserverCount,
 			v.PrefixCount, v.IPv4Count, v.IPv6Count,
+			domainsJSON, nsJSON, prefixesJSON,
 		); err != nil {
 			_ = tx.Rollback()
 			return fmt.Errorf("insert asn view asn=%d: %w", v.ASN, err)
+		}
+	}
+	for _, v := range views.Prefixes {
+		asnsJSON, err := marshalInt64List(v.ASNs)
+		if err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("marshal prefix asns prefix=%s: %w", v.Prefix, err)
+		}
+		domainsJSON, err := marshalStringList(v.Domains)
+		if err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("marshal prefix domains prefix=%s: %w", v.Prefix, err)
+		}
+		addrsJSON, err := marshalStringList(v.Addresses)
+		if err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("marshal prefix addresses prefix=%s: %w", v.Prefix, err)
+		}
+		if _, err := tx.Exec(
+			fmt.Sprintf(`INSERT INTO analysis_snapshot_prefix_view
+				(snapshot_id, prefix, family, domain_count, address_count,
+				 asn, asn_label, asns_json, domains_json, addresses_json)
+				VALUES (%s)`, s.phRange(1, 10)),
+			snapshotID, v.Prefix, v.Family, v.DomainCount, v.AddressCount,
+			nullInt64Value(v.ASN), v.ASNLabel, asnsJSON, domainsJSON, addrsJSON,
+		); err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("insert prefix view prefix=%s: %w", v.Prefix, err)
 		}
 	}
 	for _, v := range views.Tags {
@@ -1313,15 +1522,38 @@ func (s *SQLJobStore) ListSnapshotEndpointViewsByAddress(snapshotID int64, addre
 	return out
 }
 
+const analysisSnapshotASNViewCols = `snapshot_id, asn, label, domain_count, address_count,
+	nameserver_count, prefix_count, ipv4_count, ipv6_count,
+	domains_json, nameservers_json, prefixes_json`
+
+func scanSnapshotASNView(row rowScanner) (AnalysisSnapshotASNView, error) {
+	var (
+		v           AnalysisSnapshotASNView
+		domainsJSON string
+		nsJSON      string
+		prefixJSON  string
+	)
+	if err := row.Scan(
+		&v.SnapshotID, &v.ASN, &v.Label, &v.DomainCount, &v.AddressCount,
+		&v.NameserverCount, &v.PrefixCount, &v.IPv4Count, &v.IPv6Count,
+		&domainsJSON, &nsJSON, &prefixJSON,
+	); err != nil {
+		return AnalysisSnapshotASNView{}, err
+	}
+	v.Domains = unmarshalStringList(domainsJSON)
+	v.Nameservers = unmarshalStringList(nsJSON)
+	v.Prefixes = unmarshalStringList(prefixJSON)
+	return v, nil
+}
+
 // ListSnapshotASNViews returns every ASN view row for one snapshot.
 func (s *SQLJobStore) ListSnapshotASNViews(snapshotID int64) []AnalysisSnapshotASNView {
 	rows, err := s.db.Query(
-		fmt.Sprintf(`SELECT snapshot_id, asn, label, domain_count, address_count,
-				nameserver_count, prefix_count, ipv4_count, ipv6_count
+		fmt.Sprintf(`SELECT %s
 			FROM analysis_snapshot_asn_view
 			WHERE snapshot_id = %s
 			ORDER BY domain_count DESC, asn ASC`,
-			s.ph(1)),
+			analysisSnapshotASNViewCols, s.ph(1)),
 		snapshotID,
 	)
 	if err != nil {
@@ -1330,16 +1562,96 @@ func (s *SQLJobStore) ListSnapshotASNViews(snapshotID int64) []AnalysisSnapshotA
 	defer rows.Close()
 	var out []AnalysisSnapshotASNView
 	for rows.Next() {
-		var v AnalysisSnapshotASNView
-		if err := rows.Scan(
-			&v.SnapshotID, &v.ASN, &v.Label, &v.DomainCount, &v.AddressCount,
-			&v.NameserverCount, &v.PrefixCount, &v.IPv4Count, &v.IPv6Count,
-		); err != nil {
+		v, err := scanSnapshotASNView(rows)
+		if err != nil {
 			return nil
 		}
 		out = append(out, v)
 	}
 	return out
+}
+
+// GetSnapshotASNView looks up a single ASN view row by exact ASN match.
+func (s *SQLJobStore) GetSnapshotASNView(snapshotID, asn int64) (AnalysisSnapshotASNView, bool) {
+	row := s.db.QueryRow(
+		fmt.Sprintf(`SELECT %s
+			FROM analysis_snapshot_asn_view
+			WHERE snapshot_id = %s AND asn = %s
+			LIMIT 1`,
+			analysisSnapshotASNViewCols, s.ph(1), s.ph(2)),
+		snapshotID, asn,
+	)
+	v, err := scanSnapshotASNView(row)
+	if err != nil {
+		return AnalysisSnapshotASNView{}, false
+	}
+	return v, true
+}
+
+const analysisSnapshotPrefixViewCols = `snapshot_id, prefix, family, domain_count, address_count,
+	asn, asn_label, asns_json, domains_json, addresses_json`
+
+func scanSnapshotPrefixView(row rowScanner) (AnalysisSnapshotPrefixView, error) {
+	var (
+		v           AnalysisSnapshotPrefixView
+		asn         sql.NullInt64
+		asnsJSON    string
+		domainsJSON string
+		addrsJSON   string
+	)
+	if err := row.Scan(
+		&v.SnapshotID, &v.Prefix, &v.Family, &v.DomainCount, &v.AddressCount,
+		&asn, &v.ASNLabel, &asnsJSON, &domainsJSON, &addrsJSON,
+	); err != nil {
+		return AnalysisSnapshotPrefixView{}, err
+	}
+	v.ASN = nullInt64Ptr(asn)
+	v.ASNs = unmarshalInt64List(asnsJSON)
+	v.Domains = unmarshalStringList(domainsJSON)
+	v.Addresses = unmarshalStringList(addrsJSON)
+	return v, nil
+}
+
+// ListSnapshotPrefixViews returns every prefix view row for one snapshot.
+func (s *SQLJobStore) ListSnapshotPrefixViews(snapshotID int64) []AnalysisSnapshotPrefixView {
+	rows, err := s.db.Query(
+		fmt.Sprintf(`SELECT %s
+			FROM analysis_snapshot_prefix_view
+			WHERE snapshot_id = %s
+			ORDER BY domain_count DESC, prefix ASC`,
+			analysisSnapshotPrefixViewCols, s.ph(1)),
+		snapshotID,
+	)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var out []AnalysisSnapshotPrefixView
+	for rows.Next() {
+		v, err := scanSnapshotPrefixView(rows)
+		if err != nil {
+			return nil
+		}
+		out = append(out, v)
+	}
+	return out
+}
+
+// GetSnapshotPrefixView looks up a single prefix view row by exact match.
+func (s *SQLJobStore) GetSnapshotPrefixView(snapshotID int64, prefix string) (AnalysisSnapshotPrefixView, bool) {
+	row := s.db.QueryRow(
+		fmt.Sprintf(`SELECT %s
+			FROM analysis_snapshot_prefix_view
+			WHERE snapshot_id = %s AND prefix = %s
+			LIMIT 1`,
+			analysisSnapshotPrefixViewCols, s.ph(1), s.ph(2)),
+		snapshotID, prefix,
+	)
+	v, err := scanSnapshotPrefixView(row)
+	if err != nil {
+		return AnalysisSnapshotPrefixView{}, false
+	}
+	return v, true
 }
 
 const analysisSnapshotTagViewCols = `snapshot_id, tag, module, testcase, level,

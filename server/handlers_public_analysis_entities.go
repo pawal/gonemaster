@@ -382,7 +382,7 @@ func (s *Server) handlePublicAnalysisASNs(w http.ResponseWriter, r *http.Request
 
 // handlePublicAnalysisPrefixes handles GET /pub/api/v1/analysis/prefixes.
 func (s *Server) handlePublicAnalysisPrefixes(w http.ResponseWriter, r *http.Request) {
-	cohort, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
+	_, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
 	if !ok {
 		return
 	}
@@ -395,52 +395,18 @@ func (s *Server) handlePublicAnalysisPrefixes(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	addressASNs := s.latestMaterializationForSnapshot(cohort, snapshot).addressASNs
+	rows := readStore.ListSnapshotPrefixViews(snapshot.ID)
 
-	type prefixAgg struct {
-		prefix    string
-		family    string
-		domains   map[int64]struct{}
-		addresses map[int64]struct{}
-		asns      map[int64]struct{}
-	}
-	buckets := map[int64]*prefixAgg{}
-	for _, fact := range addressASNs {
-		if fact.PrefixID == nil {
-			continue
-		}
-		b, exists := buckets[*fact.PrefixID]
-		if !exists {
-			prefix, found := readStore.GetAnalysisPrefix(*fact.PrefixID)
-			if !found {
-				continue
-			}
-			b = &prefixAgg{
-				prefix:    prefix.Prefix,
-				family:    prefix.Family,
-				domains:   map[int64]struct{}{},
-				addresses: map[int64]struct{}{},
-				asns:      map[int64]struct{}{},
-			}
-			buckets[*fact.PrefixID] = b
-		}
-		b.domains[fact.DomainID] = struct{}{}
-		b.addresses[fact.AddressID] = struct{}{}
-		if fact.ASN != nil {
-			b.asns[*fact.ASN] = struct{}{}
-		}
-	}
-
-	items := make([]PublicAnalysisPrefixView, 0, len(buckets))
-	for _, b := range buckets {
+	items := make([]PublicAnalysisPrefixView, 0, len(rows))
+	for _, b := range rows {
 		v := PublicAnalysisPrefixView{
-			Prefix:       b.prefix,
-			Family:       b.family,
-			DomainCount:  len(b.domains),
-			AddressCount: len(b.addresses),
+			Prefix:       b.Prefix,
+			Family:       b.Family,
+			DomainCount:  b.DomainCount,
+			AddressCount: b.AddressCount,
 		}
-		if len(b.asns) == 1 {
-			for asn := range b.asns {
+		if len(b.ASNs) == 1 {
+			for _, asn := range b.ASNs {
 				copy := asn
 				v.ASN = &copy
 				if meta, ok := readStore.GetAnalysisASN(asn); ok {

@@ -27,9 +27,6 @@ type Server struct {
 	metrics                  *MetricsCollector
 	metricsCache             map[string]metricsCacheEntry
 	metricsCacheMu           sync.Mutex
-	analysisMatCache         map[int64]analysisMatCacheEntry
-	analysisMatCacheMu       sync.Mutex
-	analysisMatGroup         matSingleflightGroup
 	progressWriteMu          sync.Mutex
 	progressWrites           map[string]progressWriteState
 	progressWriteMinStep     int
@@ -147,7 +144,6 @@ func newServer(cfg Config, store JobStore, queue Queue) *Server {
 		queue:                    queue,
 		metrics:                  NewMetricsCollector(cfg),
 		metricsCache:             map[string]metricsCacheEntry{},
-		analysisMatCache:         map[int64]analysisMatCacheEntry{},
 		progressWrites:           map[string]progressWriteState{},
 		progressWriteMinStep:     defaultProgressWriteMinStep,
 		progressWriteMinInterval: defaultProgressWriteMinInterval,

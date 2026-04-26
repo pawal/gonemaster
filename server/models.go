@@ -554,15 +554,33 @@ type DomainViewTag struct {
 
 // AnalysisSnapshotASNView is one pre-computed ASN row for a captured snapshot.
 type AnalysisSnapshotASNView struct {
-	SnapshotID      int64  `json:"snapshot_id"`
-	ASN             int64  `json:"asn"`
-	Label           string `json:"label,omitempty"`
-	DomainCount     int    `json:"domain_count"`
-	AddressCount    int    `json:"address_count"`
-	NameserverCount int    `json:"nameserver_count"`
-	PrefixCount     int    `json:"prefix_count"`
-	IPv4Count       int    `json:"ipv4_count"`
-	IPv6Count       int    `json:"ipv6_count"`
+	SnapshotID      int64    `json:"snapshot_id"`
+	ASN             int64    `json:"asn"`
+	Label           string   `json:"label,omitempty"`
+	DomainCount     int      `json:"domain_count"`
+	AddressCount    int      `json:"address_count"`
+	NameserverCount int      `json:"nameserver_count"`
+	PrefixCount     int      `json:"prefix_count"`
+	IPv4Count       int      `json:"ipv4_count"`
+	IPv6Count       int      `json:"ipv6_count"`
+	Domains         []string `json:"domains,omitempty"`
+	Nameservers     []string `json:"nameservers,omitempty"`
+	Prefixes        []string `json:"prefixes,omitempty"`
+}
+
+// AnalysisSnapshotPrefixView is one pre-computed prefix row for a
+// captured snapshot, serving the prefix detail and listing pages.
+type AnalysisSnapshotPrefixView struct {
+	SnapshotID   int64    `json:"snapshot_id"`
+	Prefix       string   `json:"prefix"`
+	Family       string   `json:"family,omitempty"`
+	DomainCount  int      `json:"domain_count"`
+	AddressCount int      `json:"address_count"`
+	ASN          *int64   `json:"asn,omitempty"`
+	ASNLabel     string   `json:"asn_label,omitempty"`
+	ASNs         []int64  `json:"asns,omitempty"`
+	Domains      []string `json:"domains,omitempty"`
+	Addresses    []string `json:"addresses,omitempty"`
 }
 
 // StoredProfile is a named, server-stored test configuration.

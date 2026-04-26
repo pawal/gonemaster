@@ -126,13 +126,14 @@ func (s *Server) handlePublicAnalysisTags(w http.ResponseWriter, r *http.Request
 }
 
 // handlePublicAnalysisTestcases handles GET /pub/api/v1/analysis/testcases. It
-// aggregates (module, testcase) pairs across the latest run per domain.
+// aggregates (module, testcase) pairs across the snapshot's tag view.
 func (s *Server) handlePublicAnalysisTestcases(w http.ResponseWriter, r *http.Request) {
-	cohort, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
+	_, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
 	if !ok {
 		return
 	}
-	if _, ok := s.analysisReadStore(w); !ok {
+	readStore, ok := s.analysisReadStore(w)
+	if !ok {
 		return
 	}
 	filter, ok := parseAnalysisListFilter(w, r)
@@ -140,41 +141,37 @@ func (s *Server) handlePublicAnalysisTestcases(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	data := s.latestMaterializationForSnapshot(cohort, snapshot)
-
-	// Same move as /tags: aggregate from the cached per-run tag summary
-	// table instead of rescanning entries per domain. The tag summary
-	// row carries (module, testcase, level, occurrence_count); summing
-	// occurrence_count over all runs yields entry_count.
 	type testcaseKey struct {
 		module   string
 		testcase string
 	}
 	type testcaseAgg struct {
-		domains    map[int64]struct{}
+		domains    map[string]struct{}
 		tags       map[string]struct{}
 		entries    int
 		worstLevel string
 	}
 	buckets := map[testcaseKey]*testcaseAgg{}
-	for _, ts := range data.tagSummaries {
-		if strings.TrimSpace(ts.Testcase) == "" {
+	for _, row := range readStore.ListSnapshotTagViews(snapshot.ID) {
+		if strings.TrimSpace(row.Testcase) == "" {
 			continue
 		}
-		key := testcaseKey{module: ts.Module, testcase: ts.Testcase}
+		key := testcaseKey{module: row.Module, testcase: row.Testcase}
 		b, exists := buckets[key]
 		if !exists {
 			b = &testcaseAgg{
-				domains: map[int64]struct{}{},
+				domains: map[string]struct{}{},
 				tags:    map[string]struct{}{},
 			}
 			buckets[key] = b
 		}
-		b.domains[ts.DomainID] = struct{}{}
-		b.tags[ts.Tag] = struct{}{}
-		b.entries += ts.OccurrenceCount
-		if severityRank(ts.Level) > severityRank(b.worstLevel) {
-			b.worstLevel = ts.Level
+		for _, d := range row.Domains {
+			b.domains[d] = struct{}{}
+		}
+		b.tags[row.Tag] = struct{}{}
+		b.entries += row.OccurrenceCount
+		if severityRank(row.Level) > severityRank(b.worstLevel) {
+			b.worstLevel = row.Level
 		}
 	}
 

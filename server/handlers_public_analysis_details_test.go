@@ -119,6 +119,14 @@ func TestPublicAnalysisCohortDetailFactDistributions(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("replace domain facts: %v", err)
 	}
+	gradeA := "A"
+	scoreA := 95
+	if err := f.store.UpsertAnalysisRunDomainSummary(AnalysisRunDomainSummary{
+		CohortID: f.cohort.ID, RunID: run1.ID, DomainID: d1.ID,
+		Score: &scoreA, Grade: &gradeA, WorstLevel: "OK",
+	}); err != nil {
+		t.Fatalf("upsert grade-A summary: %v", err)
+	}
 
 	// unsigned.example: unsigned zone, grade F.
 	run2 := f.seedGraduatedRun("unsigned.example", ts, []engine.LogEntry{
@@ -131,6 +139,15 @@ func TestPublicAnalysisCohortDetailFactDistributions(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("replace domain facts: %v", err)
 	}
+	gradeF := "F"
+	scoreF := 10
+	if err := f.store.UpsertAnalysisRunDomainSummary(AnalysisRunDomainSummary{
+		CohortID: f.cohort.ID, RunID: run2.ID, DomainID: d2.ID,
+		Score: &scoreF, Grade: &gradeF, WorstLevel: "ERROR",
+	}); err != nil {
+		t.Fatalf("upsert grade-F summary: %v", err)
+	}
+	f.refreshSnapshotViews(f.batchID)
 
 	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/tld")
 	if resp.Code != http.StatusOK {

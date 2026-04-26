@@ -291,73 +291,55 @@ func (s *Server) handlePublicAnalysisDiff(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	fromData := s.latestMaterializationForSnapshot(cohort, fromSnap)
-	toData := s.latestMaterializationForSnapshot(cohort, toSnap)
-
-	type domainKey struct {
-		id int64
-	}
-	fromByID := map[int64]AnalysisRunDomainSummary{}
-	for _, pair := range fromData.latest {
-		fromByID[pair.summary.DomainID] = pair.summary
-	}
-	toByID := map[int64]AnalysisRunDomainSummary{}
-	for _, pair := range toData.latest {
-		toByID[pair.summary.DomainID] = pair.summary
-	}
-	nameFor := func(id int64) string {
-		if name, ok := fromData.domainNames[id]; ok {
-			return name
-		}
-		return toData.domainNames[id]
-	}
+	fromByName := indexDomainViewsByName(readStore.ListSnapshotDomainViews(fromSnap.ID))
+	toByName := indexDomainViewsByName(readStore.ListSnapshotDomainViews(toSnap.ID))
 
 	added := []PublicAnalysisDiffEntry{}
 	removed := []PublicAnalysisDiffEntry{}
 	gradeChanged := []PublicAnalysisDiffEntry{}
 	levelChanged := []PublicAnalysisDiffEntry{}
-	for id, toSum := range toByID {
-		if _, ok := fromByID[id]; ok {
+	for name, to := range toByName {
+		if _, ok := fromByName[name]; ok {
 			continue
 		}
 		added = append(added, PublicAnalysisDiffEntry{
-			Domain:     nameFor(id),
-			ToGrade:    toSum.Grade,
-			ToLevel:    toSum.WorstLevel,
-			WorstLevel: toSum.WorstLevel,
+			Domain:     name,
+			ToGrade:    optionalString(to.Grade),
+			ToLevel:    to.WorstLevel,
+			WorstLevel: to.WorstLevel,
 		})
 	}
-	for id, fromSum := range fromByID {
-		if _, ok := toByID[id]; ok {
+	for name, from := range fromByName {
+		if _, ok := toByName[name]; ok {
 			continue
 		}
 		removed = append(removed, PublicAnalysisDiffEntry{
-			Domain:     nameFor(id),
-			FromGrade:  fromSum.Grade,
-			FromLevel:  fromSum.WorstLevel,
-			WorstLevel: fromSum.WorstLevel,
+			Domain:     name,
+			FromGrade:  optionalString(from.Grade),
+			FromLevel:  from.WorstLevel,
+			WorstLevel: from.WorstLevel,
 		})
 	}
-	for id, toSum := range toByID {
-		fromSum, ok := fromByID[id]
+	for name, to := range toByName {
+		from, ok := fromByName[name]
 		if !ok {
 			continue
 		}
-		if stringPtrEqual(fromSum.Grade, toSum.Grade) && strings.EqualFold(fromSum.WorstLevel, toSum.WorstLevel) {
+		if from.Grade == to.Grade && strings.EqualFold(from.WorstLevel, to.WorstLevel) {
 			continue
 		}
 		entry := PublicAnalysisDiffEntry{
-			Domain:     nameFor(id),
-			FromGrade:  fromSum.Grade,
-			ToGrade:    toSum.Grade,
-			FromLevel:  fromSum.WorstLevel,
-			ToLevel:    toSum.WorstLevel,
-			WorstLevel: toSum.WorstLevel,
+			Domain:     name,
+			FromGrade:  optionalString(from.Grade),
+			ToGrade:    optionalString(to.Grade),
+			FromLevel:  from.WorstLevel,
+			ToLevel:    to.WorstLevel,
+			WorstLevel: to.WorstLevel,
 		}
-		if !stringPtrEqual(fromSum.Grade, toSum.Grade) {
+		if from.Grade != to.Grade {
 			gradeChanged = append(gradeChanged, entry)
 		}
-		if !strings.EqualFold(fromSum.WorstLevel, toSum.WorstLevel) {
+		if !strings.EqualFold(from.WorstLevel, to.WorstLevel) {
 			levelChanged = append(levelChanged, entry)
 		}
 	}
@@ -376,6 +358,25 @@ func (s *Server) handlePublicAnalysisDiff(w http.ResponseWriter, r *http.Request
 		GradeChanged: gradeChanged,
 		LevelChanged: levelChanged,
 	})
+}
+
+func indexDomainViewsByName(rows []AnalysisSnapshotDomainView) map[string]AnalysisSnapshotDomainView {
+	out := make(map[string]AnalysisSnapshotDomainView, len(rows))
+	for _, row := range rows {
+		if row.DomainName == "" {
+			continue
+		}
+		out[row.DomainName] = row
+	}
+	return out
+}
+
+func optionalString(v string) *string {
+	if v == "" {
+		return nil
+	}
+	out := v
+	return &out
 }
 
 func sortDiffEntries(items []PublicAnalysisDiffEntry) {

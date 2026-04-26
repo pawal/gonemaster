@@ -36,6 +36,9 @@ type AnalysisReadStore interface {
 	GetSnapshotTagView(snapshotID int64, tag string) (AnalysisSnapshotTagView, bool)
 	ListSnapshotDomainViews(snapshotID int64) []AnalysisSnapshotDomainView
 	GetSnapshotDomainViewByName(snapshotID int64, name string) (AnalysisSnapshotDomainView, bool)
+	GetSnapshotASNView(snapshotID, asn int64) (AnalysisSnapshotASNView, bool)
+	ListSnapshotPrefixViews(snapshotID int64) []AnalysisSnapshotPrefixView
+	GetSnapshotPrefixView(snapshotID int64, prefix string) (AnalysisSnapshotPrefixView, bool)
 }
 
 // analysisListFilter captures the shared query parameters used by public list
@@ -287,9 +290,25 @@ type PublicAnalysisListResponse[T any] struct {
 	Offset int `json:"offset"`
 }
 
-// validWorstLevelBuckets pins the set of accepted worst_level filter values
-// to the same buckets rendered by the health bar on the overview. Kept in
-// one place so the filter, the docs, and the UI stay in sync.
+// domainViewASNSet returns the distinct ASN set across the row's
+// per-NS and flat address rosters.
+func domainViewASNSet(row AnalysisSnapshotDomainView) map[int64]struct{} {
+	out := map[int64]struct{}{}
+	for _, ns := range row.Nameservers {
+		for _, a := range ns.Addresses {
+			if a.ASN != nil {
+				out[*a.ASN] = struct{}{}
+			}
+		}
+	}
+	for _, a := range row.Addresses {
+		if a.ASN != nil {
+			out[*a.ASN] = struct{}{}
+		}
+	}
+	return out
+}
+
 var validWorstLevelBuckets = map[string]struct{}{
 	"OK":       {},
 	"NOTICE":   {},
@@ -301,7 +320,7 @@ var validWorstLevelBuckets = map[string]struct{}{
 // handlePublicAnalysisDomains handles GET /pub/api/v1/analysis/domains. It
 // returns the latest run per domain in the resolved cohort.
 func (s *Server) handlePublicAnalysisDomains(w http.ResponseWriter, r *http.Request) {
-	cohort, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
+	_, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
 	if !ok {
 		return
 	}
@@ -314,10 +333,6 @@ func (s *Server) handlePublicAnalysisDomains(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Exact-bucket filter so overview health-bar segments can deep-link to
-	// the matching subset of domains. Buckets mirror severityBucket's output
-	// (empty / INFO / unknown collapse into OK), which is how the bar itself
-	// counts them.
 	worstLevelFilter := ""
 	if raw := strings.TrimSpace(r.URL.Query().Get("worst_level")); raw != "" {
 		normalized := strings.ToUpper(raw)
@@ -328,61 +343,36 @@ func (s *Server) handlePublicAnalysisDomains(w http.ResponseWriter, r *http.Requ
 		}
 		worstLevelFilter = normalized
 	}
-
-	// Grade filter — exact string match on the stored grade. Not
-	// enum-validated because scoring is configurable and custom profiles
-	// may emit labels outside the default A+/A/B/C/D/F set. Unknown
-	// grades simply return zero results.
 	gradeFilter := strings.TrimSpace(r.URL.Query().Get("grade"))
 
-	// Go through the cohort materialization cache so /domains
-	// inherits the same bulk preload the landing page gets: one IN
-	// query for all domain names instead of a per-row GetDomain.
-	data := s.latestMaterializationForSnapshot(cohort, snapshot)
-	latest := data.latest
-
-	// Pre-compute the ASNs each domain's authoritative addresses resolve
-	// to, so we can show an Operator column without paying the ASN lookup
-	// cost per row.
-	domainASNs := map[int64]map[int64]struct{}{}
-	for _, fact := range data.addressASNs {
-		if fact.ASN == nil {
+	rows := readStore.ListSnapshotDomainViews(snapshot.ID)
+	items := make([]PublicAnalysisDomainView, 0, len(rows))
+	for _, row := range rows {
+		if worstLevelFilter != "" && severityBucket(row.WorstLevel) != worstLevelFilter {
 			continue
 		}
-		set, ok := domainASNs[fact.DomainID]
-		if !ok {
-			set = map[int64]struct{}{}
-			domainASNs[fact.DomainID] = set
-		}
-		set[*fact.ASN] = struct{}{}
-	}
-
-	items := make([]PublicAnalysisDomainView, 0, len(latest))
-	for _, pair := range latest {
-		sum := pair.summary
-		name, found := data.domainNames[sum.DomainID]
-		if !found {
+		if gradeFilter != "" && row.Grade != gradeFilter {
 			continue
-		}
-		if worstLevelFilter != "" && severityBucket(sum.WorstLevel) != worstLevelFilter {
-			continue
-		}
-		if gradeFilter != "" {
-			if sum.Grade == nil || *sum.Grade != gradeFilter {
-				continue
-			}
 		}
 		v := PublicAnalysisDomainView{
-			Domain:          name,
-			Score:           sum.Score,
-			Grade:           sum.Grade,
-			WorstLevel:      sum.WorstLevel,
-			NameserverCount: sum.NameserverCount,
-			EndpointCount:   sum.EndpointCount,
-			ASNCount:        sum.ASNCount,
-			PrefixCount:     sum.PrefixCount,
+			Domain:          row.DomainName,
+			Score:           row.Score,
+			WorstLevel:      row.WorstLevel,
+			NameserverCount: row.NameserverCount,
+			EndpointCount:   row.EndpointCount,
+			ASNCount:        row.ASNCount,
+			PrefixCount:     row.PrefixCount,
 		}
-		if asns := domainASNs[sum.DomainID]; len(asns) == 1 {
+		if row.Grade != "" {
+			g := row.Grade
+			v.Grade = &g
+		}
+		if row.FinishedAt != nil && !row.FinishedAt.IsZero() {
+			fa := *row.FinishedAt
+			v.FinishedAt = &fa
+		}
+		asns := domainViewASNSet(row)
+		if len(asns) == 1 {
 			for asn := range asns {
 				asnCopy := asn
 				v.OperatorASN = &asnCopy
@@ -392,10 +382,6 @@ func (s *Server) handlePublicAnalysisDomains(w http.ResponseWriter, r *http.Requ
 			}
 		} else if len(asns) > 1 {
 			v.Operator = "Multiple"
-		}
-		if !pair.finishedAt.IsZero() {
-			fa := pair.finishedAt
-			v.FinishedAt = &fa
 		}
 		items = append(items, v)
 	}
@@ -421,247 +407,6 @@ func (s *Server) handlePublicAnalysisDomains(w http.ResponseWriter, r *http.Requ
 		Limit:  filter.Limit,
 		Offset: filter.Offset,
 	})
-}
-
-type domainSummaryPair struct {
-	summary    AnalysisRunDomainSummary
-	finishedAt time.Time
-}
-
-type latestCohortMaterialization struct {
-	latest       []domainSummaryPair
-	latestRuns   map[string]struct{}
-	endpoints    []AnalysisRunNameserverEndpoint
-	addressASNs  []AnalysisRunAddressASN
-	domainASNs   []AnalysisRunDomainASN
-	tagSummaries []AnalysisRunTagSummary
-	domainFacts  []AnalysisRunDomainFact
-	// domainNames is the id -> name map for every domain in `latest`,
-	// preloaded once during cache compute so list handlers don't have
-	// to issue one GetDomain DB round-trip per row.
-	domainNames map[int64]string
-}
-
-// cohortMaterializationLookup is the subset of the job store that
-// computeSnapshotMaterialization needs beyond the analysis read surface:
-// run metadata (finished_at / batch_id) and bulk domain-name lookup, both
-// kept narrow so test fakes don't have to implement the whole store.
-type cohortMaterializationLookup interface {
-	GetRun(id string) (Run, bool)
-	GetDomainNamesByIDs(ids []int64) map[int64]string
-	ListRuns(filter RunFilter) RunList
-}
-
-// computeSnapshotMaterialization is the snapshot-scoped counterpart of
-// the old cohort-wide compute: instead of collapsing every run into
-// "latest per domain", it starts from the exact set of runs attached to
-// the snapshot's batch. The resulting set has at most one run per
-// (cohort, domain) pair because the batch catalog enforces one run per
-// domain per batch.
-func computeSnapshotMaterialization(readStore AnalysisReadStore, runLookup cohortMaterializationLookup, cohortID int64, batchID string) latestCohortMaterialization {
-	runSet := runIDsForBatch(runLookup, batchID)
-	latest := collapseSummariesForRuns(readStore.ListAnalysisRunDomainSummariesByCohort(cohortID), runSet, runLookup)
-	domainIDs := make([]int64, 0, len(latest))
-	for _, pair := range latest {
-		domainIDs = append(domainIDs, pair.summary.DomainID)
-	}
-	domainNames := runLookup.GetDomainNamesByIDs(domainIDs)
-	// Drop parent-role endpoints (e.g. root servers recorded while traversing
-	// the delegation chain for a TLD). They are not the cohort zones' own
-	// authoritative servers and only pollute the nameserver/endpoint/ASN
-	// views. Role tagging happens at projection time in projector.go.
-	endpoints := filterAnalysisRunNSEndpointsByRunIDs(readStore.ListAnalysisRunNSEndpointsByCohort(cohortID), runSet)
-	authoritative := make([]AnalysisRunNameserverEndpoint, 0, len(endpoints))
-	authoritativeAddrIDs := map[int64]struct{}{}
-	for _, ep := range endpoints {
-		if ep.Role == "parent" {
-			continue
-		}
-		authoritative = append(authoritative, ep)
-		if ep.AddressID != 0 {
-			authoritativeAddrIDs[ep.AddressID] = struct{}{}
-		}
-	}
-	addressASNs := filterAnalysisRunAddressASNsByRunIDs(readStore.ListAnalysisRunAddressASNsByCohort(cohortID), runSet)
-	addressASNs = filterAnalysisRunAddressASNsToAuthoritative(addressASNs, authoritativeAddrIDs)
-	return latestCohortMaterialization{
-		latest:       latest,
-		latestRuns:   runSet,
-		endpoints:    authoritative,
-		addressASNs:  addressASNs,
-		domainASNs:   filterAnalysisRunDomainASNsByRunIDs(readStore.ListAnalysisRunDomainASNsByCohort(cohortID), runSet),
-		tagSummaries: filterAnalysisRunTagSummariesByRunIDs(readStore.ListAnalysisRunTagSummariesByCohort(cohortID), runSet),
-		domainFacts:  filterAnalysisRunDomainFactsByRunIDs(readStore.ListAnalysisRunDomainFactsByCohort(cohortID), runSet),
-		domainNames:  domainNames,
-	}
-}
-
-// runIDsForBatch returns the set of graduated run ids that belong to the
-// given batch, loaded in pages so a large batch doesn't blow the 100-row
-// default limit.
-func runIDsForBatch(runLookup cohortMaterializationLookup, batchID string) map[string]struct{} {
-	out := map[string]struct{}{}
-	if batchID == "" {
-		return out
-	}
-	offset := 0
-	for {
-		list := runLookup.ListRuns(RunFilter{BatchID: batchID, Limit: 500, Offset: offset})
-		for _, run := range list.Items {
-			out[run.ID] = struct{}{}
-		}
-		if len(list.Items) == 0 || offset+len(list.Items) >= list.Total {
-			break
-		}
-		offset += len(list.Items)
-	}
-	return out
-}
-
-// collapseSummariesForRuns filters cohort summaries down to the
-// snapshot's batch run set, then collapses any accidental
-// multiple-summary-per-domain rows to the freshest one. A batch has at
-// most one run per domain by construction, so this is typically
-// identity-on-filter; the collapse guards against historical data with
-// reprojected runs.
-func collapseSummariesForRuns(summaries []AnalysisRunDomainSummary, runSet map[string]struct{}, runLookup interface {
-	GetRun(id string) (Run, bool)
-}) []domainSummaryPair {
-	byDomain := map[int64]domainSummaryPair{}
-	for _, sum := range summaries {
-		if _, ok := runSet[sum.RunID]; !ok {
-			continue
-		}
-		var finishedAt time.Time
-		if run, ok := runLookup.GetRun(sum.RunID); ok {
-			finishedAt = run.FinishedAt
-		}
-		existing, seen := byDomain[sum.DomainID]
-		if !seen || finishedAt.After(existing.finishedAt) {
-			byDomain[sum.DomainID] = domainSummaryPair{summary: sum, finishedAt: finishedAt}
-		}
-	}
-	out := make([]domainSummaryPair, 0, len(byDomain))
-	for _, pair := range byDomain {
-		out = append(out, pair)
-	}
-	return out
-}
-
-// filterAnalysisRunAddressASNsToAuthoritative drops any fact whose address
-// has no authoritative endpoint in the cohort. authoritativeAddrIDs is the
-// AddressID set assembled from the post-role-filter endpoint slice.
-func filterAnalysisRunAddressASNsToAuthoritative(items []AnalysisRunAddressASN, authoritativeAddrIDs map[int64]struct{}) []AnalysisRunAddressASN {
-	if len(items) == 0 {
-		return items
-	}
-	if len(authoritativeAddrIDs) == 0 {
-		return nil
-	}
-	out := make([]AnalysisRunAddressASN, 0, len(items))
-	for _, fact := range items {
-		if _, ok := authoritativeAddrIDs[fact.AddressID]; !ok {
-			continue
-		}
-		out = append(out, fact)
-	}
-	return out
-}
-
-func filterAnalysisRunDomainFactsByRunIDs(items []AnalysisRunDomainFact, runIDs map[string]struct{}) []AnalysisRunDomainFact {
-	if len(runIDs) == 0 {
-		return nil
-	}
-	out := make([]AnalysisRunDomainFact, 0, len(items))
-	for _, item := range items {
-		if _, ok := runIDs[item.RunID]; !ok {
-			continue
-		}
-		out = append(out, item)
-	}
-	return out
-}
-
-func filterAnalysisRunTagSummariesByRunIDs(items []AnalysisRunTagSummary, runIDs map[string]struct{}) []AnalysisRunTagSummary {
-	if len(runIDs) == 0 {
-		return nil
-	}
-	out := make([]AnalysisRunTagSummary, 0, len(items))
-	for _, item := range items {
-		if _, ok := runIDs[item.RunID]; !ok {
-			continue
-		}
-		out = append(out, item)
-	}
-	return out
-}
-
-func filterAnalysisRunDomainASNsByRunIDs(items []AnalysisRunDomainASN, runIDs map[string]struct{}) []AnalysisRunDomainASN {
-	if len(runIDs) == 0 {
-		return nil
-	}
-	out := make([]AnalysisRunDomainASN, 0, len(items))
-	for _, item := range items {
-		if _, ok := runIDs[item.RunID]; !ok {
-			continue
-		}
-		out = append(out, item)
-	}
-	return out
-}
-
-func filterAnalysisRunNSEndpointsByRunIDs(items []AnalysisRunNameserverEndpoint, runIDs map[string]struct{}) []AnalysisRunNameserverEndpoint {
-	if len(runIDs) == 0 {
-		return nil
-	}
-	out := make([]AnalysisRunNameserverEndpoint, 0, len(items))
-	for _, item := range items {
-		if _, ok := runIDs[item.RunID]; !ok {
-			continue
-		}
-		out = append(out, item)
-	}
-	return out
-}
-
-func filterAnalysisRunAddressASNsByRunIDs(items []AnalysisRunAddressASN, runIDs map[string]struct{}) []AnalysisRunAddressASN {
-	if len(runIDs) == 0 {
-		return nil
-	}
-	out := make([]AnalysisRunAddressASN, 0, len(items))
-	for _, item := range items {
-		if _, ok := runIDs[item.RunID]; !ok {
-			continue
-		}
-		out = append(out, item)
-	}
-	return out
-}
-
-const analysisEntryPageSize = 1000
-
-func (s *Server) loadAllEntriesForRun(runID string) []Entry {
-	if strings.TrimSpace(runID) == "" {
-		return nil
-	}
-	offset := 0
-	entries := make([]Entry, 0, analysisEntryPageSize)
-	for {
-		page := s.store.QueryEntries(EntryFilter{
-			RunID:  runID,
-			Limit:  analysisEntryPageSize,
-			Offset: offset,
-		})
-		if len(page.Items) == 0 {
-			break
-		}
-		entries = append(entries, page.Items...)
-		offset += len(page.Items)
-		if offset >= page.Total {
-			break
-		}
-	}
-	return entries
 }
 
 // sortAnalysisDomainViews sorts by the requested order. "domain_asc" is the

@@ -89,7 +89,6 @@ func (s *Server) handleDeleteBatch(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
 		return
 	}
-	s.evictSnapshotMatCache(snapshotIDs)
 	if err := s.unpinCohortsForDeletedSnapshots(snapshotIDs); err != nil {
 		writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
 		return
@@ -227,20 +226,6 @@ func (s *Server) countActiveBatchJobs(batchID string) int {
 		}).Total
 	}
 	return total
-}
-
-// evictSnapshotMatCache removes the materialization cache entries for
-// snapshots that were just deleted so public analysis requests can not
-// serve stale data.
-func (s *Server) evictSnapshotMatCache(snapshotIDs []int64) {
-	if len(snapshotIDs) == 0 {
-		return
-	}
-	s.analysisMatCacheMu.Lock()
-	defer s.analysisMatCacheMu.Unlock()
-	for _, id := range snapshotIDs {
-		delete(s.analysisMatCache, id)
-	}
 }
 
 // parseLimitOffset reads ?limit= and ?offset= from the request,

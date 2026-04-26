@@ -212,54 +212,37 @@ func (s *Server) handlePublicAnalysisCohortDetail(w http.ResponseWriter, r *http
 		return
 	}
 	if readStore, canRead := s.store.(AnalysisReadStore); canRead && snapshot.ID != 0 {
-		aggregates := readStore.ListSnapshotAggregates(snapshot.ID)
 		snapshotView := publicAnalysisSnapshotView(snapshot)
 		detail.Snapshot = &snapshotView
-		_ = aggregates // reserved for future trend surface
+		populateCohortDetailFromViews(&detail, readStore, snapshot.ID)
 	} else if snapshot.ID == 0 {
 		detail.Status = PublicAnalysisStatusNoSnapshot
 	}
-	if _, canRead := s.store.(AnalysisReadStore); canRead {
-		data := s.latestMaterializationForSnapshot(cohort, snapshot)
-
-		domainSet := map[int64]struct{}{}
-		nsSet := map[int64]struct{}{}
-		endpointSet := map[[2]int64]struct{}{}
-		asnSet := map[int64]struct{}{}
-		prefixSet := map[int64]struct{}{}
-		severity := map[string]int{}
-		for _, pair := range data.latest {
-			domainSet[pair.summary.DomainID] = struct{}{}
-			severity[severityBucket(pair.summary.WorstLevel)]++
-		}
-		for _, ep := range data.endpoints {
-			nsSet[ep.NameserverID] = struct{}{}
-			endpointSet[[2]int64{ep.NameserverID, ep.AddressID}] = struct{}{}
-		}
-		for _, fact := range data.addressASNs {
-			if fact.ASN != nil {
-				asnSet[*fact.ASN] = struct{}{}
-			}
-			if fact.PrefixID != nil {
-				prefixSet[*fact.PrefixID] = struct{}{}
-			}
-		}
-		for _, da := range data.domainASNs {
-			asnSet[da.ASN] = struct{}{}
-		}
-		detail.DomainCount = len(domainSet)
-		detail.NameserverCount = len(nsSet)
-		detail.EndpointCount = len(endpointSet)
-		detail.ASNCount = len(asnSet)
-		detail.PrefixCount = len(prefixSet)
-		if len(severity) > 0 {
-			detail.SeverityDistribution = severity
-		}
-		if dist := buildFactDistributions(data.domainFacts); len(dist) > 0 {
-			detail.FactDistributions = dist
-		}
-	}
 	writeJSON(w, http.StatusOK, detail)
+}
+
+// populateCohortDetailFromViews fills totals + distributions from the
+// overview_v2 aggregate and the per-snapshot view tables.
+func populateCohortDetailFromViews(detail *PublicAnalysisCohortDetail, readStore AnalysisReadStore, snapshotID int64) {
+	if overview, ok := loadSnapshotOverviewV2(readStore, snapshotID); ok {
+		detail.DomainCount = overview.Totals.DomainCount
+		detail.NameserverCount = overview.Totals.NameserverCount
+		detail.EndpointCount = overview.Totals.EndpointCount
+		detail.ASNCount = overview.Totals.ASNCount
+		detail.PrefixCount = overview.Totals.PrefixCount
+		if len(overview.SeverityDistribution) > 0 {
+			detail.SeverityDistribution = overview.SeverityDistribution
+		}
+		if len(overview.FactDistributions) > 0 {
+			detail.FactDistributions = overview.FactDistributions
+		}
+		return
+	}
+	detail.DomainCount = len(readStore.ListSnapshotDomainViews(snapshotID))
+	detail.NameserverCount = len(readStore.ListSnapshotNameserverViews(snapshotID))
+	detail.EndpointCount = len(readStore.ListSnapshotEndpointViews(snapshotID))
+	detail.ASNCount = len(readStore.ListSnapshotASNViews(snapshotID))
+	detail.PrefixCount = len(readStore.ListSnapshotPrefixViews(snapshotID))
 }
 
 // ── domain detail ──────────────────────────────────────────────────────────────
@@ -447,7 +430,7 @@ func (s *Server) handlePublicAnalysisASNDetail(w http.ResponseWriter, r *http.Re
 		writeError(w, http.StatusNotFound, "not_found", "asn not found", nil)
 		return
 	}
-	cohort, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
+	_, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
 	if !ok {
 		return
 	}
@@ -456,78 +439,23 @@ func (s *Server) handlePublicAnalysisASNDetail(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	data := s.latestMaterializationForSnapshot(cohort, snapshot)
-
-	domainSet := map[int64]struct{}{}
-	addrSet := map[int64]struct{}{}
-	prefixSet := map[int64]struct{}{}
-	for _, fact := range data.addressASNs {
-		if fact.ASN == nil || *fact.ASN != asn {
-			continue
-		}
-		domainSet[fact.DomainID] = struct{}{}
-		addrSet[fact.AddressID] = struct{}{}
-		if fact.PrefixID != nil {
-			prefixSet[*fact.PrefixID] = struct{}{}
-		}
-	}
-	for _, da := range data.domainASNs {
-		if da.ASN != asn {
-			continue
-		}
-		domainSet[da.DomainID] = struct{}{}
-	}
-	if len(domainSet) == 0 {
+	view, found := readStore.GetSnapshotASNView(snapshot.ID, asn)
+	if !found {
 		writeError(w, http.StatusNotFound, "not_found", "asn not found in cohort", nil)
 		return
 	}
 
-	nsSet := map[int64]struct{}{}
-	for _, ep := range data.endpoints {
-		if _, addrIn := addrSet[ep.AddressID]; addrIn {
-			nsSet[ep.NameserverID] = struct{}{}
-		}
-	}
-
-	domains := make([]string, 0, len(domainSet))
-	for domainID := range domainSet {
-		if d, ok := s.store.GetDomain(domainID); ok {
-			domains = append(domains, d.Name)
-		}
-	}
-	sort.Strings(domains)
-
-	nsNames := make([]string, 0, len(nsSet))
-	for nsID := range nsSet {
-		if ns, ok := readStore.GetAnalysisNameserver(nsID); ok {
-			nsNames = append(nsNames, ns.Name)
-		}
-	}
-	sort.Strings(nsNames)
-
-	prefixes := make([]string, 0, len(prefixSet))
-	for prefixID := range prefixSet {
-		if p, ok := readStore.GetAnalysisPrefix(prefixID); ok {
-			prefixes = append(prefixes, p.Prefix)
-		}
-	}
-	sort.Strings(prefixes)
-
-	label := ""
-	if meta, ok := readStore.GetAnalysisASN(asn); ok {
-		label = meta.Label
-	}
-
+	writeSnapshotCacheHeaders(w, r, snapshot)
 	writeJSON(w, http.StatusOK, PublicAnalysisASNDetail{
-		ASN:             asn,
-		Label:           label,
-		DomainCount:     len(domainSet),
-		AddressCount:    len(addrSet),
-		NameserverCount: len(nsSet),
-		PrefixCount:     len(prefixSet),
-		Domains:         domains,
-		Nameservers:     nsNames,
-		Prefixes:        prefixes,
+		ASN:             view.ASN,
+		Label:           view.Label,
+		DomainCount:     view.DomainCount,
+		AddressCount:    view.AddressCount,
+		NameserverCount: view.NameserverCount,
+		PrefixCount:     view.PrefixCount,
+		Domains:         view.Domains,
+		Nameservers:     view.Nameservers,
+		Prefixes:        view.Prefixes,
 	})
 }
 
@@ -542,7 +470,7 @@ func (s *Server) handlePublicAnalysisPrefixDetail(w http.ResponseWriter, r *http
 		writeError(w, http.StatusBadRequest, "missing_prefix", "prefix query parameter is required", nil)
 		return
 	}
-	cohort, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
+	_, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
 	if !ok {
 		return
 	}
@@ -551,72 +479,21 @@ func (s *Server) handlePublicAnalysisPrefixDetail(w http.ResponseWriter, r *http
 		return
 	}
 
-	prefix, found := readStore.GetAnalysisPrefix(0) // placeholder; overridden below
-	_ = prefix
-	_ = found
-	// Walk address_asns to find the matching prefix_id by re-resolving via GetAnalysisPrefix.
-	var prefixID int64
-	var meta AnalysisPrefix
-	data := s.latestMaterializationForSnapshot(cohort, snapshot)
-	for _, fact := range data.addressASNs {
-		if fact.PrefixID == nil {
-			continue
-		}
-		if p, ok := readStore.GetAnalysisPrefix(*fact.PrefixID); ok && p.Prefix == raw {
-			prefixID = p.ID
-			meta = p
-			break
-		}
-	}
-	if prefixID == 0 {
+	view, found := readStore.GetSnapshotPrefixView(snapshot.ID, raw)
+	if !found {
 		writeError(w, http.StatusNotFound, "not_found", "prefix not found in cohort", nil)
 		return
 	}
 
-	domainSet := map[int64]struct{}{}
-	addrSet := map[int64]struct{}{}
-	asnSet := map[int64]struct{}{}
-	for _, fact := range data.addressASNs {
-		if fact.PrefixID == nil || *fact.PrefixID != prefixID {
-			continue
-		}
-		domainSet[fact.DomainID] = struct{}{}
-		addrSet[fact.AddressID] = struct{}{}
-		if fact.ASN != nil {
-			asnSet[*fact.ASN] = struct{}{}
-		}
-	}
-
-	domains := make([]string, 0, len(domainSet))
-	for domainID := range domainSet {
-		if d, ok := s.store.GetDomain(domainID); ok {
-			domains = append(domains, d.Name)
-		}
-	}
-	sort.Strings(domains)
-
-	addresses := make([]string, 0, len(addrSet))
-	for addrID := range addrSet {
-		if a, ok := readStore.GetAnalysisAddress(addrID); ok {
-			addresses = append(addresses, a.Address)
-		}
-	}
-	sort.Strings(addresses)
-
-	asns := make([]int64, 0, len(asnSet))
-	for asn := range asnSet {
-		asns = append(asns, asn)
-	}
-	sort.Slice(asns, func(i, j int) bool { return asns[i] < asns[j] })
-
+	writeSnapshotCacheHeaders(w, r, snapshot)
 	writeJSON(w, http.StatusOK, PublicAnalysisPrefixDetail{
-		Prefix:       meta.Prefix,
-		Family:       meta.Family,
-		DomainCount:  len(domainSet),
-		AddressCount: len(addrSet),
-		ASNs:         asns,
-		Domains:      domains,
-		Addresses:    addresses,
+		Prefix:       view.Prefix,
+		Family:       view.Family,
+		DomainCount:  view.DomainCount,
+		AddressCount: view.AddressCount,
+		ASNs:         view.ASNs,
+		Domains:      view.Domains,
+		Addresses:    view.Addresses,
 	})
 }
 
@@ -666,45 +543,43 @@ func (s *Server) handlePublicAnalysisTestcaseDetail(w http.ResponseWriter, r *ht
 		writeError(w, http.StatusBadRequest, "missing_testcase", "testcase query parameter is required", nil)
 		return
 	}
-	cohort, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
+	_, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
 	if !ok {
 		return
 	}
-	if _, ok := s.analysisReadStore(w); !ok {
+	readStore, ok := s.analysisReadStore(w)
+	if !ok {
 		return
 	}
-	latest := s.latestMaterializationForSnapshot(cohort, snapshot).latest
 
-	domainSet := map[int64]struct{}{}
+	domainSet := map[string]struct{}{}
 	tagSet := map[string]struct{}{}
 	entryCount := 0
 	worstLevel := ""
-	for _, pair := range latest {
-		for _, entry := range s.loadAllEntriesForRun(pair.summary.RunID) {
-			if entry.Testcase != testcase {
-				continue
-			}
-			if module != "" && entry.Module != module {
-				continue
-			}
-			domainSet[pair.summary.DomainID] = struct{}{}
-			tagSet[entry.Tag] = struct{}{}
-			entryCount++
-			if severityRank(entry.Level) > severityRank(worstLevel) {
-				worstLevel = entry.Level
-			}
+	for _, row := range readStore.ListSnapshotTagViews(snapshot.ID) {
+		if row.Testcase != testcase {
+			continue
+		}
+		if module != "" && row.Module != module {
+			continue
+		}
+		tagSet[row.Tag] = struct{}{}
+		entryCount += row.OccurrenceCount
+		for _, d := range row.Domains {
+			domainSet[d] = struct{}{}
+		}
+		if severityRank(row.Level) > severityRank(worstLevel) {
+			worstLevel = row.Level
 		}
 	}
-	if entryCount == 0 {
+	if len(tagSet) == 0 {
 		writeError(w, http.StatusNotFound, "not_found", "testcase not found in cohort", nil)
 		return
 	}
 
 	domains := make([]string, 0, len(domainSet))
-	for id := range domainSet {
-		if d, ok := s.store.GetDomain(id); ok {
-			domains = append(domains, d.Name)
-		}
+	for d := range domainSet {
+		domains = append(domains, d)
 	}
 	sort.Strings(domains)
 
@@ -714,6 +589,7 @@ func (s *Server) handlePublicAnalysisTestcaseDetail(w http.ResponseWriter, r *ht
 	}
 	sort.Strings(tags)
 
+	writeSnapshotCacheHeaders(w, r, snapshot)
 	writeJSON(w, http.StatusOK, PublicAnalysisTestcaseDetail{
 		Module:      module,
 		Testcase:    testcase,

@@ -580,9 +580,11 @@ var sqlMigrations = []sqlMigration{
 	},
 }
 
-// buildV14DDL returns migration 14: the per-domain snapshot view that
-// replaces handlePublicAnalysisDomainDetail's legacy materialization
-// load + entries-table walk with a single keyed lookup.
+// buildV14DDL returns migration 14: the per-domain snapshot view, the
+// per-snapshot prefix view, and ASN-view roster columns. Together these
+// retire the last fact-row callers of the legacy materialization cache
+// so /domains, /asns/{asn}, /prefix(es), /testcases, /diff, and the
+// cohort detail handler all serve from indexed reads.
 func buildV14DDL(bigint string) []string {
 	return []string{
 		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS analysis_snapshot_domain_view (
@@ -604,6 +606,25 @@ func buildV14DDL(bigint string) []string {
 		)`, bigint, bigint),
 		`CREATE INDEX IF NOT EXISTS idx_analysis_snapshot_domain_view_snapshot_name ON analysis_snapshot_domain_view(snapshot_id, domain_name)`,
 		`CREATE INDEX IF NOT EXISTS idx_analysis_snapshot_domain_view_snapshot_worst ON analysis_snapshot_domain_view(snapshot_id, worst_level, grade)`,
+
+		`ALTER TABLE analysis_snapshot_asn_view ADD COLUMN domains_json     TEXT NOT NULL DEFAULT '[]'`,
+		`ALTER TABLE analysis_snapshot_asn_view ADD COLUMN nameservers_json TEXT NOT NULL DEFAULT '[]'`,
+		`ALTER TABLE analysis_snapshot_asn_view ADD COLUMN prefixes_json    TEXT NOT NULL DEFAULT '[]'`,
+
+		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS analysis_snapshot_prefix_view (
+			snapshot_id    %s           NOT NULL,
+			prefix         VARCHAR(64)  NOT NULL,
+			family         VARCHAR(8)   NOT NULL DEFAULT '',
+			domain_count   INTEGER      NOT NULL DEFAULT 0,
+			address_count  INTEGER      NOT NULL DEFAULT 0,
+			asn            BIGINT,
+			asn_label      VARCHAR(255) NOT NULL DEFAULT '',
+			asns_json      TEXT         NOT NULL DEFAULT '[]',
+			domains_json   TEXT         NOT NULL DEFAULT '[]',
+			addresses_json TEXT         NOT NULL DEFAULT '[]',
+			PRIMARY KEY (snapshot_id, prefix)
+		)`, bigint),
+		`CREATE INDEX IF NOT EXISTS idx_analysis_snapshot_prefix_view_snapshot_dc ON analysis_snapshot_prefix_view(snapshot_id, domain_count)`,
 	}
 }
 

@@ -2,7 +2,11 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
-## [Unreleased]
+## [v1.4.1] - 2026-04-26
+
+Speed optimizations for the Analysis UI.
+
+Warning: No backwards compatibility for old databases.
 
 ### Added
  - Analysis: per-snapshot view tables for nameservers, endpoints, and ASNs, populated at capture time

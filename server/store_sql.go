@@ -20,19 +20,29 @@ type rowScanner interface {
 
 // SQLJobStore implements JobStore using a SQL database.
 type SQLJobStore struct {
-	db         *sql.DB
-	dialect    sqlDialect
-	scoringCfg scoring.Config
+	db              *sql.DB
+	dialect         sqlDialect
+	scoringCfg      scoring.Config
+	tagViewMinLevel string
 }
 
 // NewSQLJobStore creates a SQLJobStore backed by db using dialect.
 func NewSQLJobStore(db *sql.DB, dialect sqlDialect) *SQLJobStore {
-	return &SQLJobStore{db: db, dialect: dialect, scoringCfg: scoring.DefaultConfig()}
+	return &SQLJobStore{db: db, dialect: dialect, scoringCfg: scoring.DefaultConfig(), tagViewMinLevel: "NOTICE"}
 }
 
 // SetScoringConfig sets the scoring configuration used when graduating jobs.
 func (s *SQLJobStore) SetScoringConfig(cfg scoring.Config) {
 	s.scoringCfg = cfg
+}
+
+// SetTagViewMinLevel sets the capture-time floor for the snapshot tag view.
+// Invalid input is ignored.
+func (s *SQLJobStore) SetTagViewMinLevel(level string) {
+	switch strings.ToUpper(strings.TrimSpace(level)) {
+	case "INFO", "NOTICE", "WARNING", "ERROR", "CRITICAL":
+		s.tagViewMinLevel = strings.ToUpper(strings.TrimSpace(level))
+	}
 }
 
 // ph returns the n-th (1-based) placeholder for this dialect.
@@ -1903,6 +1913,9 @@ func (s *SQLJobStore) DeleteBatch(batchID string) ([]int64, error) {
 			  WHERE snapshot_id IN (SELECT id FROM analysis_cohort_snapshots WHERE batch_id = %s)`, ph)},
 		{"analysis_snapshot_asn_view", fmt.Sprintf(
 			`DELETE FROM analysis_snapshot_asn_view
+			  WHERE snapshot_id IN (SELECT id FROM analysis_cohort_snapshots WHERE batch_id = %s)`, ph)},
+		{"analysis_snapshot_tag_view", fmt.Sprintf(
+			`DELETE FROM analysis_snapshot_tag_view
 			  WHERE snapshot_id IN (SELECT id FROM analysis_cohort_snapshots WHERE batch_id = %s)`, ph)},
 		{"snapshots", fmt.Sprintf(`DELETE FROM analysis_cohort_snapshots WHERE batch_id = %s`, ph)},
 		{"analysis_run_ns_endpoints", fmt.Sprintf(`DELETE FROM analysis_run_ns_endpoints WHERE run_id IN (%s)`, runSetSubquery)},

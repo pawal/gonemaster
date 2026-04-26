@@ -71,6 +71,13 @@ func setScoringConfig(store JobStore, path string) error {
 	return nil
 }
 
+// applyAnalysisConfig pushes capture-time analysis settings onto the store.
+func applyAnalysisConfig(store JobStore, cfg AnalysisConfig) {
+	if sql, ok := store.(*SQLJobStore); ok && cfg.TagViewMinLevel != "" {
+		sql.SetTagViewMinLevel(cfg.TagViewMinLevel)
+	}
+}
+
 // New builds a server with in-memory components.
 func New(cfg Config) *Server {
 	if cfg.ListenAddr == "" {
@@ -79,6 +86,7 @@ func New(cfg Config) *Server {
 	store := NewInMemoryJobStore()
 	// Ignore scoring config load errors in the simple constructor.
 	_ = setScoringConfig(store, cfg.ScoringConfigPath)
+	applyAnalysisConfig(store, cfg.Analysis)
 	return newServer(cfg, store, NewInMemoryQueue())
 }
 
@@ -115,6 +123,7 @@ func NewWithOptions(cfg Config) (*Server, error) {
 		}
 		return nil, fmt.Errorf("load scoring config: %w", err)
 	}
+	applyAnalysisConfig(store, cfg.Analysis)
 
 	queue := NewInMemoryQueue()
 	if err := RecoverJobs(store, queue); err != nil {

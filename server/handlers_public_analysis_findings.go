@@ -25,14 +25,16 @@ type PublicAnalysisTestcaseView struct {
 	UniqueTags  int    `json:"unique_tags"`
 }
 
-// handlePublicAnalysisTags handles GET /pub/api/v1/analysis/tags. It aggregates
-// finding tags observed across the latest run per domain in the cohort.
+// handlePublicAnalysisTags handles GET /pub/api/v1/analysis/tags. Reads
+// from the per-snapshot tag view, which already excludes tags below the
+// capture-time floor; the optional min_level query param tightens further.
 func (s *Server) handlePublicAnalysisTags(w http.ResponseWriter, r *http.Request) {
-	cohort, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
+	_, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
 	if !ok {
 		return
 	}
-	if _, ok := s.analysisReadStore(w); !ok {
+	readStore, ok := s.analysisReadStore(w)
+	if !ok {
 		return
 	}
 	filter, ok := parseAnalysisListFilter(w, r)
@@ -49,50 +51,15 @@ func (s *Server) handlePublicAnalysisTags(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	data := s.latestMaterializationForSnapshot(cohort, snapshot)
-
-	// Aggregates come from the materialized analysis_run_tag_summary
-	// table via the cohort cache — no per-run entries scan. One bucket
-	// per distinct tag across all latest-per-domain runs.
-	type tagAgg struct {
-		module      string
-		level       string
-		domains     map[int64]struct{}
-		occurrences int
-	}
-	buckets := map[string]*tagAgg{}
-	for _, ts := range data.tagSummaries {
-		tag := strings.TrimSpace(ts.Tag)
-		if tag == "" {
-			continue
-		}
-		b, exists := buckets[tag]
-		if !exists {
-			b = &tagAgg{
-				module:  ts.Module,
-				level:   ts.Level,
-				domains: map[int64]struct{}{},
-			}
-			buckets[tag] = b
-		}
-		if severityRank(ts.Level) > severityRank(b.level) {
-			b.level = ts.Level
-		}
-		if b.module == "" && ts.Module != "" {
-			b.module = ts.Module
-		}
-		b.domains[ts.DomainID] = struct{}{}
-		b.occurrences += ts.OccurrenceCount
-	}
-
-	items := make([]PublicAnalysisTagView, 0, len(buckets))
-	for tag, b := range buckets {
+	rows := readStore.ListSnapshotTagViews(snapshot.ID)
+	items := make([]PublicAnalysisTagView, 0, len(rows))
+	for _, row := range rows {
 		items = append(items, PublicAnalysisTagView{
-			Tag:             tag,
-			Module:          b.module,
-			Level:           b.level,
-			DomainCount:     len(b.domains),
-			OccurrenceCount: b.occurrences,
+			Tag:             row.Tag,
+			Module:          row.Module,
+			Level:           row.Level,
+			DomainCount:     row.DomainCount,
+			OccurrenceCount: row.OccurrenceCount,
 		})
 	}
 
@@ -149,6 +116,7 @@ func (s *Server) handlePublicAnalysisTags(w http.ResponseWriter, r *http.Request
 	})
 	total := len(items)
 	start, end := clampPage(filter.Limit, filter.Offset, total)
+	writeSnapshotCacheHeaders(w, r, snapshot)
 	writeJSON(w, http.StatusOK, PublicAnalysisListResponse[PublicAnalysisTagView]{
 		Items:  items[start:end],
 		Total:  total,

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -27,6 +28,16 @@ type DatabaseConfig struct {
 	// ConnMaxLifetimeSeconds rotates pooled connections after this many
 	// seconds. Zero uses the default (300s).
 	ConnMaxLifetimeSeconds int `json:"conn_max_lifetime_seconds,omitempty"`
+}
+
+// AnalysisConfig controls capture-time policy for the analysis layer.
+type AnalysisConfig struct {
+	// TagViewMinLevel is the floor for tags written to
+	// analysis_snapshot_tag_view at capture time. Tags whose worst-level
+	// in the snapshot is below this threshold get no row, no detail
+	// page, and do not appear in the listing. Default "NOTICE".
+	// Valid: INFO, NOTICE, WARNING, ERROR, CRITICAL.
+	TagViewMinLevel string `json:"tag_view_min_level,omitempty"`
 }
 
 // PublicAPIConfig controls the behaviour of the public-facing API at /pub/api/v1/.
@@ -107,6 +118,7 @@ type Config struct {
 	PublicURL string          `json:"public_url,omitempty"`
 	Database  DatabaseConfig  `json:"database,omitempty"`
 	PublicAPI PublicAPIConfig `json:"public_api,omitempty"`
+	Analysis  AnalysisConfig  `json:"analysis,omitempty"`
 	// ScoringConfigPath is an optional path to a JSON file that overrides the
 	// default scoring configuration (weights, penalties, tag overrides, etc.).
 	// When empty, scoring.DefaultConfig() is used.
@@ -147,6 +159,11 @@ type DatabaseFileConfig struct {
 	ConnMaxLifetimeSeconds *int   `json:"conn_max_lifetime_seconds,omitempty"`
 }
 
+// AnalysisFileConfig holds optional analysis-layer configuration from JSON.
+type AnalysisFileConfig struct {
+	TagViewMinLevel *string `json:"tag_view_min_level,omitempty"`
+}
+
 // FileConfig captures optional configuration fields from JSON.
 type FileConfig struct {
 	ListenAddr                  *string              `json:"listen_addr"`
@@ -167,6 +184,7 @@ type FileConfig struct {
 	PublicURL                   *string              `json:"public_url,omitempty"`
 	Database                    *DatabaseFileConfig  `json:"database,omitempty"`
 	PublicAPI                   *PublicAPIFileConfig `json:"public_api,omitempty"`
+	Analysis                    *AnalysisFileConfig  `json:"analysis,omitempty"`
 	ScoringConfigPath           *string              `json:"scoring_config_path,omitempty"`
 	ShowScoreAdmin              *bool                `json:"show_score_admin,omitempty"`
 	ShowScorePublic             *bool                `json:"show_score_public,omitempty"`
@@ -196,6 +214,9 @@ func DefaultConfig() Config {
 			RateLimitMax:           10,
 			RateLimitWindow:        Duration{10 * time.Minute},
 			AnalysisRequestTimeout: Duration{10 * time.Second},
+		},
+		Analysis: AnalysisConfig{
+			TagViewMinLevel: "NOTICE",
 		},
 	}
 }
@@ -333,4 +354,23 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 			}
 		}
 	}
+	if file.Analysis != nil {
+		if file.Analysis.TagViewMinLevel != nil {
+			level := strings.ToUpper(strings.TrimSpace(*file.Analysis.TagViewMinLevel))
+			if isValidTagViewMinLevel(level) {
+				c.Analysis.TagViewMinLevel = level
+			}
+		}
+	}
+}
+
+// isValidTagViewMinLevel returns true when level is one of the levels the
+// projector can stamp on a tag-summary row. Anything else is treated as a
+// no-op so a typo in the config file does not silently disable filtering.
+func isValidTagViewMinLevel(level string) bool {
+	switch level {
+	case "INFO", "NOTICE", "WARNING", "ERROR", "CRITICAL":
+		return true
+	}
+	return false
 }

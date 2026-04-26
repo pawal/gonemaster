@@ -492,6 +492,19 @@ type AnalysisSnapshotEndpointView struct {
 	Domains        []string `json:"domains,omitempty"`
 }
 
+// AnalysisSnapshotTagView is one pre-computed tag row for a captured
+// snapshot, ready to serve the tag detail and listing pages.
+type AnalysisSnapshotTagView struct {
+	SnapshotID      int64    `json:"snapshot_id"`
+	Tag             string   `json:"tag"`
+	Module          string   `json:"module,omitempty"`
+	Testcase        string   `json:"testcase,omitempty"`
+	Level           string   `json:"level,omitempty"`
+	DomainCount     int      `json:"domain_count"`
+	OccurrenceCount int      `json:"occurrence_count"`
+	Domains         []string `json:"domains,omitempty"`
+}
+
 // AnalysisSnapshotASNView is one pre-computed ASN row for a captured snapshot.
 type AnalysisSnapshotASNView struct {
 	SnapshotID      int64  `json:"snapshot_id"`

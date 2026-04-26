@@ -740,60 +740,30 @@ func (s *Server) handlePublicAnalysisTagDetail(w http.ResponseWriter, r *http.Re
 	if !ok {
 		return
 	}
-	cohort, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
+	_, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
 	if !ok {
 		return
 	}
-	if _, ok := s.analysisReadStore(w); !ok {
+	readStore, ok := s.analysisReadStore(w)
+	if !ok {
 		return
 	}
-	latest := s.latestMaterializationForSnapshot(cohort, snapshot).latest
 
-	domainNames := map[int64]string{}
-	for _, pair := range latest {
-		if d, ok := s.store.GetDomain(pair.summary.DomainID); ok {
-			domainNames[pair.summary.DomainID] = d.Name
-		}
-	}
-
-	domainSet := map[int64]struct{}{}
-	var occurrences int
-	var module, testcase, level string
-	for _, pair := range latest {
-		for _, entry := range s.loadAllEntriesForRun(pair.summary.RunID) {
-			if entry.Tag != tag {
-				continue
-			}
-			domainSet[pair.summary.DomainID] = struct{}{}
-			occurrences++
-			module = entry.Module
-			testcase = entry.Testcase
-			if severityRank(entry.Level) > severityRank(level) {
-				level = entry.Level
-			}
-		}
-	}
-	if occurrences == 0 {
+	view, found := readStore.GetSnapshotTagView(snapshot.ID, tag)
+	if !found {
 		writeError(w, http.StatusNotFound, "not_found", "tag not found in cohort", nil)
 		return
 	}
 
-	domains := make([]string, 0, len(domainSet))
-	for id := range domainSet {
-		if name, ok := domainNames[id]; ok {
-			domains = append(domains, name)
-		}
-	}
-	sort.Strings(domains)
-
+	writeSnapshotCacheHeaders(w, r, snapshot)
 	writeJSON(w, http.StatusOK, PublicAnalysisTagDetail{
-		Tag:             tag,
-		Module:          module,
-		Testcase:        testcase,
-		Level:           level,
-		DomainCount:     len(domainSet),
-		OccurrenceCount: occurrences,
-		Domains:         domains,
+		Tag:             view.Tag,
+		Module:          view.Module,
+		Testcase:        view.Testcase,
+		Level:           view.Level,
+		DomainCount:     view.DomainCount,
+		OccurrenceCount: view.OccurrenceCount,
+		Domains:         view.Domains,
 	})
 }
 

@@ -85,6 +85,7 @@ func (f *analysisAPITestFixture) seedGraduatedRunInBatch(batchID, domainName str
 	if err := f.store.ReplaceAnalysisRunTagSummaries(f.cohort.ID, runID, rows); err != nil {
 		f.t.Fatalf("replace tag summaries: %v", err)
 	}
+	f.refreshSnapshotViews(batchID)
 	return run
 }
 

@@ -370,6 +370,7 @@ func (s *SQLJobStore) DeleteAnalysisCohortSnapshot(id int64) error {
 		"analysis_snapshot_nameserver_view",
 		"analysis_snapshot_endpoint_view",
 		"analysis_snapshot_asn_view",
+		"analysis_snapshot_tag_view",
 	} {
 		if _, err := s.db.Exec(
 			fmt.Sprintf(`DELETE FROM %s WHERE snapshot_id = %s`, table, s.ph(1)),
@@ -407,6 +408,7 @@ func (s *SQLJobStore) ClearAnalysisCohortSnapshots(cohortID int64) error {
 		"analysis_snapshot_nameserver_view",
 		"analysis_snapshot_endpoint_view",
 		"analysis_snapshot_asn_view",
+		"analysis_snapshot_tag_view",
 	} {
 		if _, err := s.db.Exec(
 			fmt.Sprintf(`DELETE FROM %s

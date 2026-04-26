@@ -7,12 +7,13 @@ import (
 	"sort"
 )
 
-// SnapshotEntityViews is the bundle of three per-snapshot view-row sets
-// computed at capture time and written together by ReplaceSnapshotEntityViews.
+// SnapshotEntityViews is the bundle of per-snapshot view-row sets computed
+// at capture time and written together by ReplaceSnapshotEntityViews.
 type SnapshotEntityViews struct {
 	Nameservers []AnalysisSnapshotNameserverView
 	Endpoints   []AnalysisSnapshotEndpointView
 	ASNs        []AnalysisSnapshotASNView
+	Tags        []AnalysisSnapshotTagView
 }
 
 // ComputeSnapshotEntityViews builds the three entity-view row sets for one
@@ -41,12 +42,112 @@ func (s *SQLJobStore) ComputeSnapshotEntityViews(cohortID int64, batchID string)
 	if err != nil {
 		return SnapshotEntityViews{}, err
 	}
-	domainNames := s.collectDomainNames(endpoints, addrFacts, domainASNs)
+	tagSummaries, err := s.queryBatchTagSummaries(cohortID, batchID)
+	if err != nil {
+		return SnapshotEntityViews{}, err
+	}
+	domainNames := s.collectDomainNames(endpoints, addrFacts, domainASNs, tagSummaries)
 	return SnapshotEntityViews{
 		Nameservers: buildNameserverViews(endpoints, addrFacts, asnByID, domainNames),
 		Endpoints:   buildEndpointViews(endpoints, addrFacts, asnByID, prefixByID, domainNames),
 		ASNs:        buildASNViews(endpoints, addrFacts, domainASNs, asnByID),
+		Tags:        buildTagViews(tagSummaries, domainNames, s.tagViewMinLevel),
 	}, nil
+}
+
+// queryBatchTagSummaries returns every analysis_run_tag_summary row joined
+// to runs in the snapshot's batch.
+func (s *SQLJobStore) queryBatchTagSummaries(cohortID int64, batchID string) ([]AnalysisRunTagSummary, error) {
+	rows, err := s.db.Query(
+		fmt.Sprintf(`SELECT t.cohort_id, t.run_id, t.domain_id, t.tag, t.module, t.testcase, t.level, t.occurrence_count
+			FROM analysis_run_tag_summary t
+			JOIN runs r ON r.id = t.run_id
+			WHERE t.cohort_id = %s AND r.batch_id = %s`,
+			s.ph(1), s.ph(2)),
+		cohortID, batchID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("query batch tag summaries: %w", err)
+	}
+	defer rows.Close()
+
+	var out []AnalysisRunTagSummary
+	for rows.Next() {
+		var t AnalysisRunTagSummary
+		if err := rows.Scan(
+			&t.CohortID, &t.RunID, &t.DomainID, &t.Tag, &t.Module, &t.Testcase, &t.Level, &t.OccurrenceCount,
+		); err != nil {
+			return nil, fmt.Errorf("scan batch tag summary: %w", err)
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+
+// buildTagViews collapses per-(run, domain) tag summaries into one row per
+// tag for the snapshot. Tags whose worst level falls below minLevel are
+// dropped — INFO/NOTICE-only chatter never gets a detail page.
+func buildTagViews(rows []AnalysisRunTagSummary, domainNames map[int64]string, minLevel string) []AnalysisSnapshotTagView {
+	floor := severityRank(minLevel)
+	type bucket struct {
+		module      string
+		testcase    string
+		level       string
+		domains     map[int64]struct{}
+		occurrences int
+	}
+	buckets := map[string]*bucket{}
+	for _, ts := range rows {
+		tag := ts.Tag
+		if tag == "" {
+			continue
+		}
+		b, ok := buckets[tag]
+		if !ok {
+			b = &bucket{
+				module:   ts.Module,
+				testcase: ts.Testcase,
+				level:    ts.Level,
+				domains:  map[int64]struct{}{},
+			}
+			buckets[tag] = b
+		}
+		if severityRank(ts.Level) > severityRank(b.level) {
+			b.level = ts.Level
+		}
+		if b.module == "" && ts.Module != "" {
+			b.module = ts.Module
+		}
+		if b.testcase == "" && ts.Testcase != "" {
+			b.testcase = ts.Testcase
+		}
+		b.domains[ts.DomainID] = struct{}{}
+		b.occurrences += ts.OccurrenceCount
+	}
+	out := make([]AnalysisSnapshotTagView, 0, len(buckets))
+	for tag, b := range buckets {
+		if severityRank(b.level) < floor {
+			continue
+		}
+		domains := make([]string, 0, len(b.domains))
+		for id := range b.domains {
+			if name, ok := domainNames[id]; ok && name != "" {
+				domains = append(domains, name)
+			}
+		}
+		sort.Strings(domains)
+		out = append(out, AnalysisSnapshotTagView{
+			Tag:             tag,
+			Module:          b.module,
+			Testcase:        b.testcase,
+			Level:           b.level,
+			DomainCount:     len(b.domains),
+			OccurrenceCount: b.occurrences,
+			Domains:         domains,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Tag < out[j].Tag })
+	return out
 }
 
 // marshalStringList encodes nil as `[]` so the column never holds NULL.
@@ -97,7 +198,7 @@ func unmarshalInt64List(raw string) []int64 {
 
 // collectDomainNames batches the domain id→name lookup for every
 // distinct domain referenced by the snapshot's facts.
-func (s *SQLJobStore) collectDomainNames(endpoints []batchEndpointRow, addrFacts []AnalysisRunAddressASN, domainASNs []AnalysisRunDomainASN) map[int64]string {
+func (s *SQLJobStore) collectDomainNames(endpoints []batchEndpointRow, addrFacts []AnalysisRunAddressASN, domainASNs []AnalysisRunDomainASN, tagSummaries []AnalysisRunTagSummary) map[int64]string {
 	idSet := map[int64]struct{}{}
 	for _, ep := range endpoints {
 		idSet[ep.DomainID] = struct{}{}
@@ -107,6 +208,9 @@ func (s *SQLJobStore) collectDomainNames(endpoints []batchEndpointRow, addrFacts
 	}
 	for _, d := range domainASNs {
 		idSet[d.DomainID] = struct{}{}
+	}
+	for _, t := range tagSummaries {
+		idSet[t.DomainID] = struct{}{}
 	}
 	ids := make([]int64, 0, len(idSet))
 	for id := range idSet {
@@ -546,6 +650,7 @@ func (s *SQLJobStore) ReplaceSnapshotEntityViews(snapshotID int64, views Snapsho
 		"analysis_snapshot_nameserver_view",
 		"analysis_snapshot_endpoint_view",
 		"analysis_snapshot_asn_view",
+		"analysis_snapshot_tag_view",
 	} {
 		if _, err := tx.Exec(
 			fmt.Sprintf(`DELETE FROM %s WHERE snapshot_id = %s`, table, s.ph(1)),
@@ -614,6 +719,22 @@ func (s *SQLJobStore) ReplaceSnapshotEntityViews(snapshotID int64, views Snapsho
 		); err != nil {
 			_ = tx.Rollback()
 			return fmt.Errorf("insert asn view asn=%d: %w", v.ASN, err)
+		}
+	}
+	for _, v := range views.Tags {
+		domainsJSON, err := marshalStringList(v.Domains)
+		if err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("marshal tag domains tag=%s: %w", v.Tag, err)
+		}
+		if _, err := tx.Exec(
+			fmt.Sprintf(`INSERT INTO analysis_snapshot_tag_view
+				(snapshot_id, tag, module, testcase, level, domain_count, occurrence_count, domains_json)
+				VALUES (%s)`, s.phRange(1, 8)),
+			snapshotID, v.Tag, v.Module, v.Testcase, v.Level, v.DomainCount, v.OccurrenceCount, domainsJSON,
+		); err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("insert tag view tag=%s: %w", v.Tag, err)
 		}
 	}
 	if err := tx.Commit(); err != nil {
@@ -798,4 +919,65 @@ func (s *SQLJobStore) ListSnapshotASNViews(snapshotID int64) []AnalysisSnapshotA
 		out = append(out, v)
 	}
 	return out
+}
+
+const analysisSnapshotTagViewCols = `snapshot_id, tag, module, testcase, level,
+	domain_count, occurrence_count, domains_json`
+
+func scanSnapshotTagView(row rowScanner) (AnalysisSnapshotTagView, error) {
+	var (
+		v           AnalysisSnapshotTagView
+		domainsJSON string
+	)
+	if err := row.Scan(
+		&v.SnapshotID, &v.Tag, &v.Module, &v.Testcase, &v.Level,
+		&v.DomainCount, &v.OccurrenceCount, &domainsJSON,
+	); err != nil {
+		return AnalysisSnapshotTagView{}, err
+	}
+	v.Domains = unmarshalStringList(domainsJSON)
+	return v, nil
+}
+
+// ListSnapshotTagViews returns every tag view row for one snapshot.
+// Default order is domain_count desc with tag asc as a stable secondary.
+func (s *SQLJobStore) ListSnapshotTagViews(snapshotID int64) []AnalysisSnapshotTagView {
+	rows, err := s.db.Query(
+		fmt.Sprintf(`SELECT %s
+			FROM analysis_snapshot_tag_view
+			WHERE snapshot_id = %s
+			ORDER BY domain_count DESC, tag ASC`,
+			analysisSnapshotTagViewCols, s.ph(1)),
+		snapshotID,
+	)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var out []AnalysisSnapshotTagView
+	for rows.Next() {
+		v, err := scanSnapshotTagView(rows)
+		if err != nil {
+			return nil
+		}
+		out = append(out, v)
+	}
+	return out
+}
+
+// GetSnapshotTagView looks up a single tag view row by exact tag match.
+func (s *SQLJobStore) GetSnapshotTagView(snapshotID int64, tag string) (AnalysisSnapshotTagView, bool) {
+	row := s.db.QueryRow(
+		fmt.Sprintf(`SELECT %s
+			FROM analysis_snapshot_tag_view
+			WHERE snapshot_id = %s AND tag = %s
+			LIMIT 1`,
+			analysisSnapshotTagViewCols, s.ph(1), s.ph(2)),
+		snapshotID, tag,
+	)
+	v, err := scanSnapshotTagView(row)
+	if err != nil {
+		return AnalysisSnapshotTagView{}, false
+	}
+	return v, true
 }

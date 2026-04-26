@@ -544,18 +544,47 @@ var sqlMigrations = []sqlMigration{
 		},
 	},
 	{
-		// Per-entity detail rosters baked into the existing nameserver
-		// and endpoint view rows. Detail handlers read these directly
-		// so they do not need to fall back to the cohort-wide fact
-		// load + N+1 lookups.
+		// Per-entity detail rosters baked into the nameserver and
+		// endpoint view rows, plus a dedicated per-snapshot tag view
+		// that replaces the legacy "load every entry of every run"
+		// path the tag detail and listing handlers used to walk.
 		version: 13,
-		stmts: []string{
-			`ALTER TABLE analysis_snapshot_nameserver_view ADD COLUMN addresses_json TEXT NOT NULL DEFAULT '[]'`,
-			`ALTER TABLE analysis_snapshot_nameserver_view ADD COLUMN asns_json TEXT NOT NULL DEFAULT '[]'`,
-			`ALTER TABLE analysis_snapshot_nameserver_view ADD COLUMN domains_json TEXT NOT NULL DEFAULT '[]'`,
-			`ALTER TABLE analysis_snapshot_endpoint_view ADD COLUMN domains_json TEXT NOT NULL DEFAULT '[]'`,
+		stmtsFn: func(d sqlDialect) []string {
+			var bigint string
+			switch d.(type) {
+			case postgresDialect, mariadbDialect:
+				bigint = "BIGINT"
+			default:
+				bigint = "INTEGER"
+			}
+			return buildV13DDL(bigint)
 		},
 	},
+}
+
+// buildV13DDL returns the v13 schema changes: detail-roster columns on
+// the nameserver and endpoint views, plus the new analysis_snapshot_tag_view
+// table that powers tag detail + listing without scanning the entries
+// table per run.
+func buildV13DDL(bigint string) []string {
+	return []string{
+		`ALTER TABLE analysis_snapshot_nameserver_view ADD COLUMN addresses_json TEXT NOT NULL DEFAULT '[]'`,
+		`ALTER TABLE analysis_snapshot_nameserver_view ADD COLUMN asns_json TEXT NOT NULL DEFAULT '[]'`,
+		`ALTER TABLE analysis_snapshot_nameserver_view ADD COLUMN domains_json TEXT NOT NULL DEFAULT '[]'`,
+		`ALTER TABLE analysis_snapshot_endpoint_view ADD COLUMN domains_json TEXT NOT NULL DEFAULT '[]'`,
+		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS analysis_snapshot_tag_view (
+			snapshot_id      %s           NOT NULL,
+			tag              VARCHAR(128) NOT NULL,
+			module           VARCHAR(64)  NOT NULL DEFAULT '',
+			testcase         VARCHAR(64)  NOT NULL DEFAULT '',
+			level            VARCHAR(16)  NOT NULL DEFAULT '',
+			domain_count     INTEGER      NOT NULL DEFAULT 0,
+			occurrence_count INTEGER      NOT NULL DEFAULT 0,
+			domains_json     TEXT         NOT NULL DEFAULT '[]',
+			PRIMARY KEY (snapshot_id, tag)
+		)`, bigint),
+		`CREATE INDEX IF NOT EXISTS idx_analysis_snapshot_tag_view_snapshot_oc ON analysis_snapshot_tag_view(snapshot_id, occurrence_count)`,
+	}
 }
 
 // buildV12DDL returns migration 12: per-snapshot entity-view tables that

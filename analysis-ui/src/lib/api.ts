@@ -211,6 +211,16 @@ export type DomainDetailTag = {
   level?: string;
 };
 
+export type DomainDetailEntry = {
+  timestamp: number;
+  module?: string;
+  testcase?: string;
+  tag: string;
+  level?: string;
+  message?: string;
+  raw?: string;
+};
+
 export type DomainDetail = {
   domain: string;
   score?: number;
@@ -224,6 +234,9 @@ export type DomainDetail = {
   nameservers: DomainDetailNameserver[];
   addresses: DomainDetailAddress[];
   tags?: DomainDetailTag[];
+  // Localized log entries from the originating run; absent when the
+  // run has been purged and the UI falls back to tags.
+  entries?: DomainDetailEntry[];
 };
 
 export type EndpointDetail = {

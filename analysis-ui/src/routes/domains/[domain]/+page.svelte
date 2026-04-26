@@ -7,14 +7,24 @@
   import PrefixChip from "$lib/chips/PrefixChip.svelte";
   import { tagHref } from "$lib/entityLinks";
   import { formatCount, formatTimestamp, gradeTone, levelTone } from "$lib/format";
-  import type { DomainDetailTag } from "$lib/api";
+  import type { DomainDetailEntry, DomainDetailTag } from "$lib/api";
   import type { DomainDetailPageData } from "./+page";
 
   let { data }: { data: DomainDetailPageData } = $props();
 
   const query = $derived(page.url.search);
 
-  // Severity ordering, matching the server-side severityRank.
+  // Unified row covering both detail sources: per-entry rows (run still
+  // present) carry message+raw; tag-floor rows (run purged) don't.
+  type Row = {
+    level?: string;
+    tag: string;
+    module?: string;
+    testcase?: string;
+    message?: string;
+    raw?: string;
+  };
+
   const SEVERITY_RANK: Record<string, number> = {
     CRITICAL: 5,
     ERROR: 4,
@@ -26,17 +36,17 @@
     if (!level) return 0;
     return SEVERITY_RANK[level.toUpperCase()] ?? 0;
   }
-  function worstLevel(tags: DomainDetailTag[]): string {
+  function worstLevel(rows: Row[]): string {
     let worst = "";
-    for (const t of tags) {
-      if (severityRank(t.level) > severityRank(worst)) worst = t.level ?? "";
+    for (const r of rows) {
+      if (severityRank(r.level) > severityRank(worst)) worst = r.level ?? "";
     }
     return worst;
   }
-  function levelCounts(tags: DomainDetailTag[]) {
+  function levelCounts(rows: Row[]) {
     const counts: Record<string, number> = {};
-    for (const t of tags) {
-      const l = (t.level ?? "").toUpperCase();
+    for (const r of rows) {
+      const l = (r.level ?? "").toUpperCase();
       if (!l) continue;
       counts[l] = (counts[l] ?? 0) + 1;
     }
@@ -48,23 +58,26 @@
     return severityRank(level) >= severityRank("NOTICE");
   }
 
-  // Group tags by module → testcase. Snapshot views deliver the tag
-  // floor only; the per-entry message and raw are not materialized,
-  // so the rendered rows show level + tag link with no body text.
+  // Prefer the run's localized entries; fall back to the tag floor
+  // when the run has been purged.
+  const rows = $derived<Row[]>(
+    (data.detail?.entries?.length ?? 0) > 0
+      ? (data.detail?.entries as DomainDetailEntry[])
+      : ((data.detail?.tags ?? []) as DomainDetailTag[])
+  );
+
   const grouped = $derived.by(() => {
-    const byModule: Record<string, Record<string, DomainDetailTag[]>> = {};
-    const tags = data.detail?.tags ?? [];
-    for (const t of tags) {
-      const mod = t.module || "Unspecified";
-      const tc = t.testcase || "Unspecified";
+    const byModule: Record<string, Record<string, Row[]>> = {};
+    for (const r of rows) {
+      const mod = r.module || "Unspecified";
+      const tc = r.testcase || "Unspecified";
       if (!byModule[mod]) byModule[mod] = {};
       if (!byModule[mod][tc]) byModule[mod][tc] = [];
-      byModule[mod][tc].push(t);
+      byModule[mod][tc].push(r);
     }
     return byModule;
   });
 
-  // System module first, rest in insertion order.
   const moduleNames = $derived.by(() =>
     Object.keys(grouped).sort((a, b) => {
       if (a === "System") return -1;
@@ -73,7 +86,7 @@
     })
   );
 
-  function allModuleTags(mod: Record<string, DomainDetailTag[]>): DomainDetailTag[] {
+  function allModuleRows(mod: Record<string, Row[]>): Row[] {
     return Object.values(mod).flat();
   }
 </script>
@@ -199,13 +212,13 @@
 
   <section class="card results-card">
     <h3>Findings</h3>
-    {#if (d.tags?.length ?? 0) === 0}
+    {#if rows.length === 0}
       <p class="hint">No findings observed in the latest run.</p>
     {:else}
       {#each moduleNames as moduleName (moduleName)}
         {@const mod = grouped[moduleName]}
-        {@const modTags = allModuleTags(mod)}
-        {@const modLevel = worstLevel(modTags)}
+        {@const modRows = allModuleRows(mod)}
+        {@const modLevel = worstLevel(modRows)}
         {@const testcases = Object.keys(mod)}
         <details
           class="module-card"
@@ -216,15 +229,15 @@
             <span class="module-chevron" aria-hidden="true"></span>
             <span class="module-name">{moduleName}</span>
             <span class="module-badges">
-              {#each levelCounts(modTags) as { level, count } (level)}
+              {#each levelCounts(modRows) as { level, count } (level)}
                 <span class="level level-{levelTone(level)}">{level} {count}</span>
               {/each}
             </span>
           </summary>
           <div class="module-entries">
             {#each testcases as tc (tc)}
-              {@const tcTags = mod[tc]}
-              {@const tcLevel = worstLevel(tcTags)}
+              {@const tcRows = mod[tc]}
+              {@const tcLevel = worstLevel(tcRows)}
               {#if tc !== "Unspecified"}
                 <details class="testcase-group" open={isNoticeOrAbove(tcLevel)}>
                   <summary class="testcase-summary">
@@ -235,20 +248,26 @@
                     </span>
                   </summary>
                   <ul class="result-rows" role="list">
-                    {#each tcTags as t (t.tag)}
+                    {#each tcRows as r, i (i)}
                       <li class="result-row">
-                        <span class="level level-{levelTone(t.level)}">{t.level}</span>
-                        <a class="entry-tag" href={tagHref(base, t.tag, query)} title={t.tag}>{t.tag}</a>
+                        <span class="level level-{levelTone(r.level)}">{r.level}</span>
+                        <a class="entry-tag" href={tagHref(base, r.tag, query)} title={r.tag}>{r.tag}</a>
+                        {#if r.message && r.message !== r.raw}
+                          <span class="result-message">{r.message}</span>
+                        {/if}
                       </li>
                     {/each}
                   </ul>
                 </details>
               {:else}
                 <ul class="result-rows" role="list">
-                  {#each tcTags as t (t.tag)}
+                  {#each tcRows as r, i (i)}
                     <li class="result-row">
-                      <span class="level level-{levelTone(t.level)}">{t.level}</span>
-                      <a class="entry-tag" href={tagHref(base, t.tag, query)} title={t.tag}>{t.tag}</a>
+                      <span class="level level-{levelTone(r.level)}">{r.level}</span>
+                      <a class="entry-tag" href={tagHref(base, r.tag, query)} title={r.tag}>{r.tag}</a>
+                      {#if r.message && r.message !== r.raw}
+                        <span class="result-message">{r.message}</span>
+                      {/if}
                     </li>
                   {/each}
                 </ul>

@@ -66,6 +66,8 @@ type PublicAnalysisDomainDetail struct {
 	Nameservers     []PublicAnalysisDomainNameserver `json:"nameservers"`
 	Addresses       []PublicAnalysisDomainAddress    `json:"addresses"`
 	Tags            []PublicAnalysisDomainTag        `json:"tags,omitempty"`
+	// Localized log entries from the run; empty when the run was purged.
+	Entries []PublicAnalysisDomainEntry `json:"entries,omitempty"`
 }
 
 // PublicAnalysisDomainTag is one tag observed at the capture-time floor.
@@ -271,8 +273,47 @@ func (s *Server) handlePublicAnalysisDomainDetail(w http.ResponseWriter, r *http
 		return
 	}
 
+	detail := domainViewToDetail(view)
+	if entries, ok := s.lookupSnapshotDomainEntries(snapshot.BatchID, view.DomainID, r.URL.Query().Get("locale")); ok {
+		detail.Entries = entries
+	}
+
 	writeSnapshotCacheHeaders(w, r, snapshot)
-	writeJSON(w, http.StatusOK, domainViewToDetail(view))
+	writeJSON(w, http.StatusOK, detail)
+}
+
+// lookupSnapshotDomainEntries returns localized log entries for the
+// run that materialized this snapshot's (batch, domain), or ok=false
+// when the run has been purged.
+func (s *Server) lookupSnapshotDomainEntries(batchID string, domainID int64, locale string) ([]PublicAnalysisDomainEntry, bool) {
+	if batchID == "" || domainID == 0 {
+		return nil, false
+	}
+	list := s.store.ListRuns(RunFilter{BatchID: batchID, DomainID: domainID, Limit: 1})
+	if len(list.Items) == 0 {
+		return nil, false
+	}
+	result, ok := s.store.GetResult(list.Items[0].ID)
+	if !ok || result.Raw == nil || len(result.Raw.Entries) == 0 {
+		return nil, false
+	}
+	if strings.TrimSpace(locale) == "" {
+		locale = "en"
+	}
+	localized := localizeResultEntries(result.Raw.Entries, locale)
+	out := make([]PublicAnalysisDomainEntry, 0, len(localized))
+	for _, e := range localized {
+		out = append(out, PublicAnalysisDomainEntry{
+			Timestamp: e.Timestamp,
+			Module:    e.Module,
+			Testcase:  e.Testcase,
+			Tag:       e.Tag,
+			Level:     e.Level,
+			Message:   e.Message,
+			Raw:       e.Raw,
+		})
+	}
+	return out, true
 }
 
 // domainViewToDetail rehydrates the per-snapshot domain view into the

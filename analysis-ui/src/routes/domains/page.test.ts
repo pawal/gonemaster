@@ -16,12 +16,14 @@ function evt(options: {
   resolvedCohort: string | null;
   fetchImpl: ReturnType<typeof vi.fn>;
   search?: string;
+  effectiveSnapshotSlug?: string | null;
 }) {
   return {
     parent: async () => ({
       catalog: null,
       catalogError: null,
-      resolvedCohort: options.resolvedCohort
+      resolvedCohort: options.resolvedCohort,
+      effectiveSnapshotSlug: options.effectiveSnapshotSlug ?? null
     }),
     fetch: options.fetchImpl as unknown as typeof fetch,
     url: new URL(`http://localhost/domains${options.search ?? ""}`)
@@ -46,7 +48,8 @@ describe("/domains +page.load", () => {
       evt({
         resolvedCohort: "tld",
         fetchImpl: fetchFn,
-        search: "?snapshot=2026-04-26&limit=25&offset=100&search=alpha&sort=score_desc"
+        effectiveSnapshotSlug: "2026-04-26",
+        search: "?limit=25&offset=100&search=alpha&sort=score_desc"
       })
     );
 
@@ -69,7 +72,8 @@ describe("/domains +page.load", () => {
       evt({
         resolvedCohort: "tld",
         fetchImpl: fetchFn,
-        search: "?snapshot=2026-04-26&limit=abc&offset=-5"
+        effectiveSnapshotSlug: "2026-04-26",
+        search: "?limit=abc&offset=-5"
       })
     );
     expect(data.limit).toBe(50);
@@ -79,7 +83,7 @@ describe("/domains +page.load", () => {
   it("captures fetch errors without throwing", async () => {
     const fetchFn = vi.fn().mockResolvedValue(stubResponse({}, false));
     const data = await load(
-      evt({ resolvedCohort: "tld", fetchImpl: fetchFn, search: "?snapshot=2026-04-26" })
+      evt({ resolvedCohort: "tld", fetchImpl: fetchFn, effectiveSnapshotSlug: "2026-04-26" })
     );
     expect(data.list).toBeNull();
     expect(data.error).toMatch(/HTTP 500/);

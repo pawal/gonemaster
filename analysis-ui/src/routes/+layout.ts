@@ -17,6 +17,11 @@ export type LayoutData = {
   // captured public snapshot exists or the list couldn't be loaded.
   snapshots: SnapshotListEntry[];
   defaultSnapshotSlug: string | null;
+  // Snapshot to anchor snapshot-scoped reads against. URL `?snapshot=`
+  // wins; falls back to the cohort's auto-latest. Null when the cohort
+  // has no captured public snapshot, in which case loaders show an
+  // empty state instead of issuing a request.
+  effectiveSnapshotSlug: string | null;
 };
 
 function resolveDefaultSnapshotSlug(
@@ -33,6 +38,7 @@ function resolveDefaultSnapshotSlug(
 // `page.data` and can fall back to sensible messaging when the catalog is
 // empty or the server couldn't be reached.
 export async function load({ fetch, url }): Promise<LayoutData> {
+  const urlSnapshot = url.searchParams.get("snapshot") || "";
   try {
     const catalog = await getCatalog(fetch);
     const requested = url.searchParams.get("dataset_tag") || "";
@@ -58,13 +64,15 @@ export async function load({ fetch, url }): Promise<LayoutData> {
       }
     }
 
+    const defaultSnapshotSlug = resolveDefaultSnapshotSlug(catalog, resolvedCohort);
     return {
       catalog,
       catalogError: null,
       resolvedCohort,
       backendSupported: catalog.backend_supported !== false,
       snapshots,
-      defaultSnapshotSlug: resolveDefaultSnapshotSlug(catalog, resolvedCohort)
+      defaultSnapshotSlug,
+      effectiveSnapshotSlug: urlSnapshot || defaultSnapshotSlug
     };
   } catch (error) {
     return {
@@ -73,7 +81,8 @@ export async function load({ fetch, url }): Promise<LayoutData> {
       resolvedCohort: null,
       backendSupported: true,
       snapshots: [],
-      defaultSnapshotSlug: null
+      defaultSnapshotSlug: null,
+      effectiveSnapshotSlug: urlSnapshot || null
     };
   }
 }

@@ -125,5 +125,51 @@ describe("+layout.load", () => {
     expect(data.snapshots.length).toBe(2);
     expect(data.snapshots[0].slug).toBe("2026-04-20");
     expect(data.defaultSnapshotSlug).toBe("2026-04-20");
+    // Auto-latest fallback: no `?snapshot=` in URL means loaders anchor
+    // against the cohort's default snapshot.
+    expect(data.effectiveSnapshotSlug).toBe("2026-04-20");
+  });
+
+  it("effectiveSnapshotSlug prefers ?snapshot= over the cohort default", async () => {
+    const catalog: CatalogResponse = {
+      default_tag: "tld",
+      cohorts: [
+        {
+          dataset_tag: "tld",
+          label: "TLD",
+          is_default: true,
+          default_snapshot: { slug: "2026-04-20", run_count: 1, domain_count: 1 }
+        }
+      ],
+      selector_enabled: false,
+      backend_supported: true
+    };
+    const fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : (input as URL).toString();
+      if (url.endsWith("/catalog")) return stubResponse(catalog);
+      return stubResponse({ dataset_tag: "tld", label: "TLD", snapshots: [] });
+    }) as unknown as typeof globalThis.fetch;
+
+    const data = await load(event(fetch as unknown as FetchMock, "?snapshot=2026-03-01-pinned"));
+    expect(data.effectiveSnapshotSlug).toBe("2026-03-01-pinned");
+    expect(data.defaultSnapshotSlug).toBe("2026-04-20");
+  });
+
+  it("effectiveSnapshotSlug is null when the cohort has no captured snapshot", async () => {
+    const catalog: CatalogResponse = {
+      default_tag: "tld",
+      cohorts: [{ dataset_tag: "tld", label: "TLD", is_default: true }],
+      selector_enabled: false,
+      backend_supported: true
+    };
+    const fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : (input as URL).toString();
+      if (url.endsWith("/catalog")) return stubResponse(catalog);
+      return stubResponse({ dataset_tag: "tld", label: "TLD", snapshots: [] });
+    }) as unknown as typeof globalThis.fetch;
+
+    const data = await load(event(fetch as unknown as FetchMock));
+    expect(data.defaultSnapshotSlug).toBeNull();
+    expect(data.effectiveSnapshotSlug).toBeNull();
   });
 });

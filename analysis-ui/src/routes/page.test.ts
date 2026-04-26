@@ -34,16 +34,17 @@ function fetchRouter(
 function evt(overrides: {
   resolvedCohort: string | null;
   fetchImpl: typeof fetch;
-  search?: string;
+  effectiveSnapshotSlug?: string | null;
 }) {
   return {
     parent: async () => ({
       catalog: null,
       catalogError: null,
-      resolvedCohort: overrides.resolvedCohort
+      resolvedCohort: overrides.resolvedCohort,
+      effectiveSnapshotSlug: overrides.effectiveSnapshotSlug ?? null
     }),
     fetch: overrides.fetchImpl,
-    url: new URL(`http://localhost/analysis${overrides.search ?? ""}`)
+    url: new URL("http://localhost/analysis")
   } as Parameters<typeof load>[0];
 }
 
@@ -122,7 +123,7 @@ describe("+page.load (overview)", () => {
       }
     ]);
     const data = await load(
-      evt({ resolvedCohort: "tld", fetchImpl: impl, search: "?snapshot=2026-04-26-fixture" })
+      evt({ resolvedCohort: "tld", fetchImpl: impl, effectiveSnapshotSlug: "2026-04-26-fixture" })
     );
 
     expect(calls).toHaveLength(1);
@@ -154,7 +155,7 @@ describe("+page.load (overview)", () => {
       }
     ]);
     const data = await load(
-      evt({ resolvedCohort: "tld", fetchImpl: impl, search: "?snapshot=2026-04-17-old" })
+      evt({ resolvedCohort: "tld", fetchImpl: impl, effectiveSnapshotSlug: "2026-04-17-old" })
     );
     expect(data.snapshot?.slug).toBe("2026-04-17-old");
     expect(calls).toHaveLength(1);
@@ -166,7 +167,7 @@ describe("+page.load (overview)", () => {
       { match: (url) => url.includes("/overview"), body: { error: "boom" }, ok: false }
     ]);
     const data = await load(
-      evt({ resolvedCohort: "tld", fetchImpl: impl, search: "?snapshot=2026-04-26-fixture" })
+      evt({ resolvedCohort: "tld", fetchImpl: impl, effectiveSnapshotSlug: "2026-04-26-fixture" })
     );
     expect(data.loadError).toMatch(/HTTP 500/);
     expect(data.totals).toBeNull();
@@ -186,7 +187,7 @@ describe("+page.load (overview)", () => {
         }
       }
     ]);
-    const data = await load(evt({ resolvedCohort: "tld", fetchImpl: impl, search: "?snapshot=x" }));
+    const data = await load(evt({ resolvedCohort: "tld", fetchImpl: impl, effectiveSnapshotSlug: "x" }));
     expect(data.snapshot?.slug).toBe("x");
     expect(data.totals).toBeNull();
     expect(data.topTags).toEqual([]);

@@ -30,14 +30,14 @@ export type OverviewPageData = {
   loadError: string | null;
 };
 
-export async function load({ parent, fetch, url }): Promise<OverviewPageData> {
+export async function load({ parent, fetch }): Promise<OverviewPageData> {
   const layout = await parent();
   const datasetTag = layout.resolvedCohort ?? null;
   if (!datasetTag) {
     return emptyPageData(null);
   }
 
-  const snapshotSlug = url.searchParams.get("snapshot") || "";
+  const snapshotSlug = layout.effectiveSnapshotSlug ?? "";
   const filter: Record<string, string> = { dataset_tag: datasetTag };
   if (snapshotSlug) filter.snapshot = snapshotSlug;
 

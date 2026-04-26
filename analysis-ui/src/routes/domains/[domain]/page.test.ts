@@ -16,19 +16,17 @@ function evt(options: {
   domain: string;
   resolvedCohort: string | null;
   fetchImpl: ReturnType<typeof vi.fn>;
-  search?: string;
+  effectiveSnapshotSlug?: string | null;
 }) {
   return {
     parent: async () => ({
       catalog: null,
       catalogError: null,
-      resolvedCohort: options.resolvedCohort
+      resolvedCohort: options.resolvedCohort,
+      effectiveSnapshotSlug: options.effectiveSnapshotSlug ?? null
     }),
     fetch: options.fetchImpl as unknown as typeof fetch,
-    params: { domain: options.domain },
-    url: new URL(
-      `http://localhost/domains/${encodeURIComponent(options.domain)}${options.search ?? ""}`
-    )
+    params: { domain: options.domain }
   } as Parameters<typeof load>[0];
 }
 
@@ -57,7 +55,7 @@ describe("/domains/[domain] +page.load", () => {
         domain: "alpha.example",
         resolvedCohort: "tld",
         fetchImpl: fetchFn,
-        search: "?snapshot=2026-04-26"
+        effectiveSnapshotSlug: "2026-04-26"
       })
     );
 
@@ -74,7 +72,7 @@ describe("/domains/[domain] +page.load", () => {
         domain: "xn--bücher-kva.example",
         resolvedCohort: "tld",
         fetchImpl: fetchFn,
-        search: "?snapshot=2026-04-26"
+        effectiveSnapshotSlug: "2026-04-26"
       })
     );
     const urlCalled = fetchFn.mock.calls[0][0] as string;
@@ -88,7 +86,7 @@ describe("/domains/[domain] +page.load", () => {
         domain: "alpha.example",
         resolvedCohort: "tld",
         fetchImpl: fetchFn,
-        search: "?snapshot=2026-04-26"
+        effectiveSnapshotSlug: "2026-04-26"
       })
     );
     expect(data.detail).toBeNull();

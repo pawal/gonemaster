@@ -1,4 +1,4 @@
-import { getPrefixDetail, type PrefixDetail } from "$lib/api";
+import { getPrefixDetail, type AnalysisFilter, type PrefixDetail } from "$lib/api";
 
 export type PrefixDetailPageData = {
   prefix: string;
@@ -16,8 +16,12 @@ export async function load({ parent, fetch, params }): Promise<PrefixDetailPageD
     return { prefix, datasetTag, detail: null, error: null };
   }
 
+  const snapshot = layout.effectiveSnapshotSlug ?? "";
+
   try {
-    const detail = await getPrefixDetail(prefix, { dataset_tag: datasetTag }, fetch);
+    const filter: AnalysisFilter = { dataset_tag: datasetTag };
+    if (snapshot) filter.snapshot = snapshot;
+    const detail = await getPrefixDetail(prefix, filter, fetch);
     return { prefix, datasetTag, detail, error: null };
   } catch (error) {
     return {

@@ -1,4 +1,4 @@
-import { getTagDetail, type TagDetail } from "$lib/api";
+import { getTagDetail, type AnalysisFilter, type TagDetail } from "$lib/api";
 
 export type TagDetailPageData = {
   tag: string;
@@ -16,8 +16,12 @@ export async function load({ parent, fetch, params }): Promise<TagDetailPageData
     return { tag, datasetTag, detail: null, error: null };
   }
 
+  const snapshot = layout.effectiveSnapshotSlug ?? "";
+
   try {
-    const detail = await getTagDetail(tag, { dataset_tag: datasetTag }, fetch);
+    const filter: AnalysisFilter = { dataset_tag: datasetTag };
+    if (snapshot) filter.snapshot = snapshot;
+    const detail = await getTagDetail(tag, filter, fetch);
     return { tag, datasetTag, detail, error: null };
   } catch (error) {
     return {

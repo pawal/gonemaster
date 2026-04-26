@@ -24,9 +24,11 @@ export async function load({ parent, fetch, url }): Promise<DomainsPageData> {
     return { datasetTag: null, list: null, error: null, limit, offset };
   }
 
+  const snapshot = layout.effectiveSnapshotSlug ?? undefined;
+
   try {
     const list = await listDomains(
-      { ...filter, dataset_tag: datasetTag, limit, offset, sort: sort || undefined },
+      { ...filter, dataset_tag: datasetTag, snapshot, limit, offset, sort: sort || undefined },
       fetch
     );
     return { datasetTag, list, error: null, limit, offset };

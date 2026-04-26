@@ -7,15 +7,16 @@ export type DomainDetailPageData = {
   error: string | null;
 };
 
-export async function load({ parent, fetch, params, url }): Promise<DomainDetailPageData> {
+export async function load({ parent, fetch, params }): Promise<DomainDetailPageData> {
   const layout = await parent();
   const datasetTag = layout.resolvedCohort ?? null;
   const domain = params.domain ?? "";
-  const snapshot = url.searchParams.get("snapshot") ?? "";
 
   if (!datasetTag || !domain) {
     return { domain, datasetTag, detail: null, error: null };
   }
+
+  const snapshot = layout.effectiveSnapshotSlug ?? "";
 
   try {
     const filter: AnalysisFilter = { dataset_tag: datasetTag };

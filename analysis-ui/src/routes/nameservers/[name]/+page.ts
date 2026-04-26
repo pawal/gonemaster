@@ -1,4 +1,4 @@
-import { getNameserverDetail, type NameserverDetail } from "$lib/api";
+import { getNameserverDetail, type AnalysisFilter, type NameserverDetail } from "$lib/api";
 
 export type NameserverDetailPageData = {
   nameserver: string;
@@ -16,8 +16,12 @@ export async function load({ parent, fetch, params }): Promise<NameserverDetailP
     return { nameserver, datasetTag, detail: null, error: null };
   }
 
+  const snapshot = layout.effectiveSnapshotSlug ?? "";
+
   try {
-    const detail = await getNameserverDetail(nameserver, { dataset_tag: datasetTag }, fetch);
+    const filter: AnalysisFilter = { dataset_tag: datasetTag };
+    if (snapshot) filter.snapshot = snapshot;
+    const detail = await getNameserverDetail(nameserver, filter, fetch);
     return { nameserver, datasetTag, detail, error: null };
   } catch (error) {
     return {

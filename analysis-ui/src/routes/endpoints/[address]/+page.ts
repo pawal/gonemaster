@@ -18,8 +18,11 @@ export async function load({ parent, fetch, params, url }): Promise<EndpointDeta
     return { address, nameserver, datasetTag, detail: null, error: null };
   }
 
+  const snapshot = layout.effectiveSnapshotSlug ?? "";
+
   try {
     const filter: Record<string, string> = { dataset_tag: datasetTag };
+    if (snapshot) filter.snapshot = snapshot;
     if (nameserver) filter.nameserver = nameserver;
     const detail = await getEndpointDetail(address, filter, fetch);
     return { address, nameserver, datasetTag, detail, error: null };

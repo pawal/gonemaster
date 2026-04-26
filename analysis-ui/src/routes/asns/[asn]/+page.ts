@@ -1,4 +1,4 @@
-import { getASNDetail, type ASNDetail } from "$lib/api";
+import { getASNDetail, type AnalysisFilter, type ASNDetail } from "$lib/api";
 
 export type ASNDetailPageData = {
   asn: string;
@@ -16,8 +16,12 @@ export async function load({ parent, fetch, params }): Promise<ASNDetailPageData
     return { asn, datasetTag, detail: null, error: null };
   }
 
+  const snapshot = layout.effectiveSnapshotSlug ?? "";
+
   try {
-    const detail = await getASNDetail(asn, { dataset_tag: datasetTag }, fetch);
+    const filter: AnalysisFilter = { dataset_tag: datasetTag };
+    if (snapshot) filter.snapshot = snapshot;
+    const detail = await getASNDetail(asn, filter, fetch);
     return { asn, datasetTag, detail, error: null };
   } catch (error) {
     return {

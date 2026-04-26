@@ -74,10 +74,6 @@ func (s *spyAnalysisController) CaptureCompletedSnapshots(_ context.Context) err
 	return nil
 }
 
-func (s *spyAnalysisController) BackfillSnapshotsFromFacts(_ context.Context) (AnalysisSnapshotBackfillReport, error) {
-	return AnalysisSnapshotBackfillReport{}, nil
-}
-
 func TestServerStartTriggersAnalysisRepair(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.WorkerCount = 1

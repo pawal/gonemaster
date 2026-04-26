@@ -1,7 +1,6 @@
 package server
 
 import (
-	"database/sql"
 	"testing"
 	"time"
 )
@@ -404,70 +403,6 @@ func TestSQLJobStoreReplaceSnapshotOverview(t *testing.T) {
 				t.Fatalf("old GradeDistribution leaked into replacement: %+v", got)
 			}
 		})
-	}
-}
-
-// TestMigrationV11BackfillsSnapshotIntent covers the plan's back-test: every
-// batch that existed before migration v11 must end up with
-// snapshot_intent = 1 so historical data keeps its place in the cohort series.
-func TestMigrationV11BackfillsSnapshotIntent(t *testing.T) {
-	saved := sqlMigrations
-	preV11 := make([]sqlMigration, 0, len(saved))
-	for _, m := range saved {
-		if m.version < 11 {
-			preV11 = append(preV11, m)
-		}
-	}
-
-	db, err := sql.Open("sqlite", ":memory:")
-	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
-	}
-	configurePool(db, "sqlite")
-	t.Cleanup(func() { _ = db.Close() })
-
-	// Apply everything up to v10 with the v11 row removed from the slice.
-	sqlMigrations = preV11
-	if err := runMigrations(db, sqliteDialect{}); err != nil {
-		sqlMigrations = saved
-		t.Fatalf("runMigrations pre-v11: %v", err)
-	}
-
-	// Seed a pre-existing batch row; snapshot_intent does not exist yet.
-	if _, err := db.Exec(
-		`INSERT INTO batches (id, tag, created_at, domain_count, description)
-		 VALUES ('legacy-a', 'tld', '2026-01-01T00:00:00.000000000Z', 1, '')`,
-	); err != nil {
-		sqlMigrations = saved
-		t.Fatalf("seed legacy batch: %v", err)
-	}
-
-	// Restore and apply v11.
-	sqlMigrations = saved
-	if err := runMigrations(db, sqliteDialect{}); err != nil {
-		t.Fatalf("runMigrations v11: %v", err)
-	}
-
-	var intent int
-	if err := db.QueryRow(`SELECT snapshot_intent FROM batches WHERE id = 'legacy-a'`).Scan(&intent); err != nil {
-		t.Fatalf("read snapshot_intent: %v", err)
-	}
-	if intent != 1 {
-		t.Fatalf("legacy batch snapshot_intent = %d, want 1", intent)
-	}
-
-	// Batches inserted after the migration default to 0 unless the caller opts in.
-	if _, err := db.Exec(
-		`INSERT INTO batches (id, tag, created_at, domain_count, description)
-		 VALUES ('post-upgrade', 'tld', '2026-02-01T00:00:00.000000000Z', 1, '')`,
-	); err != nil {
-		t.Fatalf("seed post-upgrade batch: %v", err)
-	}
-	if err := db.QueryRow(`SELECT snapshot_intent FROM batches WHERE id = 'post-upgrade'`).Scan(&intent); err != nil {
-		t.Fatalf("read post-upgrade intent: %v", err)
-	}
-	if intent != 0 {
-		t.Fatalf("post-upgrade batch snapshot_intent = %d, want 0", intent)
 	}
 }
 

@@ -47,7 +47,6 @@ type ControlStore interface {
 	ReplaceSnapshotEntityViews(snapshotID int64, views serverpkg.SnapshotEntityViews) error
 
 	// First-boot backfill surface.
-	ListCohortBatchesWithFacts() ([]serverpkg.CohortBatchFactStats, error)
 	GetSetting(key string) (string, bool)
 	SetSetting(key, value string) error
 }
@@ -598,81 +597,6 @@ func (c *Controller) StartSnapshotCaptureLoop(ctx context.Context) <-chan struct
 var logSnapshotCaptureError = func(err error) {
 	// Default implementation intentionally no-op; production callers
 	// install a logging variant via ReplaceSnapshotCaptureErrorLogger.
-}
-
-// SnapshotBackfillDoneSettingKey gates the one-time retroactive snapshot
-// creation. Presence (any value) means the migration has already run;
-// absence triggers a single pass on the next server start.
-const SnapshotBackfillDoneSettingKey = "analysis_snapshot_backfill_v1"
-
-// SnapshotBackfillReport aliases the server-package type so callers in
-// analysis tests can use either import without duplicating the struct.
-type SnapshotBackfillReport = serverpkg.AnalysisSnapshotBackfillReport
-
-// BackfillSnapshotsFromFacts upserts a captured snapshot row plus its
-// overview and entity views for every (cohort, batch) pair with
-// materialized domain_summary rows. Idempotent: pairs already covered
-// by an existing snapshot are skipped. Gated by
-// SnapshotBackfillDoneSettingKey so it runs once on first boot.
-func (c *Controller) BackfillSnapshotsFromFacts(ctx context.Context) (serverpkg.AnalysisSnapshotBackfillReport, error) {
-	report := serverpkg.AnalysisSnapshotBackfillReport{}
-	stats, err := c.store.ListCohortBatchesWithFacts()
-	if err != nil {
-		return report, fmt.Errorf("list cohort batches: %w", err)
-	}
-	seenCohorts := map[int64]struct{}{}
-	for _, pair := range stats {
-		if err := ctx.Err(); err != nil {
-			return report, err
-		}
-		seenCohorts[pair.CohortID] = struct{}{}
-		if _, exists := c.store.GetAnalysisCohortSnapshotByBatch(pair.CohortID, pair.BatchID); exists {
-			report.SnapshotsSkipped++
-			continue
-		}
-		batch, _ := c.store.GetBatch(pair.BatchID)
-		if batch.ID == "" {
-			batch = serverpkg.Batch{
-				ID:        pair.BatchID,
-				CreatedAt: pair.FirstFinished,
-			}
-		}
-		snap := serverpkg.AnalysisCohortSnapshot{
-			CohortID:    pair.CohortID,
-			BatchID:     pair.BatchID,
-			Slug:        defaultSnapshotSlug(batch),
-			Status:      serverpkg.AnalysisSnapshotStatusCaptured,
-			IsPublic:    true,
-			RunCount:    pair.RunCount,
-			DomainCount: pair.DomainCount,
-			FirstRunAt:  pair.FirstFinished,
-			LastRunAt:   pair.LastFinished,
-			CapturedAt:  pair.LastFinished,
-		}
-		if batch.SnapshotIntent || batch.ID == pair.BatchID {
-			// Overview computation only works when the fact tables are
-			// there; fail soft so one broken pair does not abort the
-			// whole migration.
-			overview, err := c.store.ComputeSnapshotOverview(pair.CohortID, pair.BatchID)
-			if err == nil {
-				upserted, upsertErr := c.store.UpsertAnalysisCohortSnapshot(snap)
-				if upsertErr != nil {
-					continue
-				}
-				_ = c.store.ReplaceSnapshotOverview(upserted.ID, overview)
-				if views, viewsErr := c.store.ComputeSnapshotEntityViews(pair.CohortID, pair.BatchID); viewsErr == nil {
-					_ = c.store.ReplaceSnapshotEntityViews(upserted.ID, views)
-				}
-				report.SnapshotsMade++
-				continue
-			}
-		}
-		if _, upsertErr := c.store.UpsertAnalysisCohortSnapshot(snap); upsertErr == nil {
-			report.SnapshotsMade++
-		}
-	}
-	report.CohortsScanned = len(seenCohorts)
-	return report, nil
 }
 
 // ReplaceSnapshotCaptureErrorLogger installs a custom error sink for the

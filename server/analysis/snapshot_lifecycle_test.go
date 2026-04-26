@@ -442,60 +442,6 @@ func TestControllerRebuildCohortRegeneratesSnapshotsPerBatch(t *testing.T) {
 	}
 }
 
-// TestControllerBackfillSnapshotsFromFacts covers Phase 7's first-boot
-// retroactive migration: historical (cohort, batch) pairs with
-// materialized summaries get one captured snapshot each, and re-running
-// the backfill is idempotent.
-func TestControllerBackfillSnapshotsFromFacts(t *testing.T) {
-	store, _ := snapshotLifecycleStore(t)
-	seedSnapshotBatch(store, "batch-old", true)
-	seedSnapshotBatch(store, "batch-new", true)
-
-	runA := testAnalysisRun("run-a", 100, "alpha.example", time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC), "192.0.2.10", "2001:db8::10")
-	runA.BatchID = "batch-old"
-	runB := testAnalysisRun("run-b", 101, "beta.example", time.Date(2026, 4, 15, 10, 0, 0, 0, time.UTC), "192.0.2.20", "2001:db8::20")
-	runB.BatchID = "batch-new"
-	store.runs[runA.ID] = runA
-	store.runs[runB.ID] = runB
-	store.ensureMaterializedMaps()
-	store.summaries[projectionKey(10, runA.ID)] = serverpkg.AnalysisRunDomainSummary{
-		CohortID: 10, RunID: runA.ID, DomainID: runA.DomainID,
-	}
-	store.summaries[projectionKey(10, runB.ID)] = serverpkg.AnalysisRunDomainSummary{
-		CohortID: 10, RunID: runB.ID, DomainID: runB.DomainID,
-	}
-
-	controller := NewController(store)
-	report, err := controller.BackfillSnapshotsFromFacts(context.Background())
-	if err != nil {
-		t.Fatalf("BackfillSnapshotsFromFacts: %v", err)
-	}
-	if report.SnapshotsMade != 2 {
-		t.Fatalf("SnapshotsMade = %d, want 2", report.SnapshotsMade)
-	}
-	if report.CohortsScanned != 1 {
-		t.Fatalf("CohortsScanned = %d, want 1", report.CohortsScanned)
-	}
-	for _, batchID := range []string{"batch-old", "batch-new"} {
-		snap, ok := store.GetAnalysisCohortSnapshotByBatch(10, batchID)
-		if !ok {
-			t.Fatalf("missing backfilled snapshot for %s", batchID)
-		}
-		if snap.Status != serverpkg.AnalysisSnapshotStatusCaptured {
-			t.Fatalf("%s Status = %q, want captured", batchID, snap.Status)
-		}
-	}
-
-	// Re-running is idempotent: every pair is now skipped.
-	report, err = controller.BackfillSnapshotsFromFacts(context.Background())
-	if err != nil {
-		t.Fatalf("second BackfillSnapshotsFromFacts: %v", err)
-	}
-	if report.SnapshotsMade != 0 || report.SnapshotsSkipped != 2 {
-		t.Fatalf("re-run: made=%d skipped=%d, want 0/2", report.SnapshotsMade, report.SnapshotsSkipped)
-	}
-}
-
 // TestControllerRebuildCohortSkipsNonIntentBatches confirms that a
 // rebuild encountering a batch whose snapshot_intent = false never
 // materializes facts or snapshot rows for that batch.

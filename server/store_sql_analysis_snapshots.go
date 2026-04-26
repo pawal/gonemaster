@@ -426,51 +426,6 @@ func (s *SQLJobStore) CountBatchSnapshotRuns(cohortID int64, batchID string) (ru
 	return runCount, domainCount, firstFinished, lastFinished, nil
 }
 
-// CohortBatchFactStats is one (cohort, batch) pair with materialized
-// fact rows. Used by the first-boot snapshot backfill.
-type CohortBatchFactStats struct {
-	CohortID      int64
-	BatchID       string
-	RunCount      int
-	DomainCount   int
-	FirstFinished time.Time
-	LastFinished  time.Time
-}
-
-// ListCohortBatchesWithFacts enumerates (cohort, batch) pairs with at
-// least one materialized domain summary so the boot-time backfill can
-// reconstruct one snapshot per historical batch.
-func (s *SQLJobStore) ListCohortBatchesWithFacts() ([]CohortBatchFactStats, error) {
-	rows, err := s.db.Query(
-		`SELECT ards.cohort_id, r.batch_id,
-			COUNT(DISTINCT ards.run_id),
-			COUNT(DISTINCT ards.domain_id),
-			COALESCE(MIN(r.finished_at), ''),
-			COALESCE(MAX(r.finished_at), '')
-			FROM analysis_run_domain_summary ards
-			JOIN runs r ON r.id = ards.run_id
-			WHERE r.batch_id <> ''
-			GROUP BY ards.cohort_id, r.batch_id
-			ORDER BY ards.cohort_id, r.batch_id`,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("list cohort batches with facts: %w", err)
-	}
-	defer rows.Close()
-	var out []CohortBatchFactStats
-	for rows.Next() {
-		var stats CohortBatchFactStats
-		var minStr, maxStr string
-		if err := rows.Scan(&stats.CohortID, &stats.BatchID, &stats.RunCount, &stats.DomainCount, &minStr, &maxStr); err != nil {
-			return nil, fmt.Errorf("scan cohort batch stats: %w", err)
-		}
-		stats.FirstFinished = parseTimestampStr(minStr)
-		stats.LastFinished = parseTimestampStr(maxStr)
-		out = append(out, stats)
-	}
-	return out, rows.Err()
-}
-
 // CountOutstandingJobsForBatch returns in-flight (queued/running/paused)
 // jobs still attached to a batch.
 func (s *SQLJobStore) CountOutstandingJobsForBatch(batchID string) (int, error) {

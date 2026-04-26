@@ -396,6 +396,8 @@ type Run struct {
 	Score             *int               `json:"score,omitempty"`
 	Grade             *string            `json:"grade,omitempty"`
 	NameserverTimings []NameserverTiming `json:"nameserver_timings,omitempty"`
+	// Failure reason carried over from the originating job at graduation.
+	Error string `json:"error,omitempty"`
 }
 
 // Entry is a single engine log entry stored as a row for SQL analysis.

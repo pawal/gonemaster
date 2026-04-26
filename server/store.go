@@ -1703,6 +1703,7 @@ func jobFromRun(r Run) Job {
 		Score:             r.Score,
 		Grade:             r.Grade,
 		NameserverTimings: cloneNameserverTimings(r.NameserverTimings),
+		Error:             r.Error,
 	}
 }
 

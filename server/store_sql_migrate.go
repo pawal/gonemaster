@@ -509,6 +509,13 @@ var sqlMigrations = []sqlMigration{
 			}
 		},
 	},
+	{
+		// Carry job.error onto the graduated run.
+		version: 2,
+		stmts: []string{
+			`ALTER TABLE runs ADD COLUMN error TEXT NOT NULL DEFAULT ''`,
+		},
+	},
 }
 
 // runMigrations creates the schema_migrations tracking table and applies

@@ -515,8 +515,9 @@ func (s *SQLJobStore) GraduateJob(job Job, engineEntries []engine.LogEntry) erro
 			created_at, started_at, finished_at, duration_ms,
 			sev_notice, sev_warning, sev_error, sev_critical,
 			worst_level, entry_count, profile, profile_id, profile_name,
-			effective_profile, public_id, priority, score, grade, nameserver_timings_json
-		) VALUES (%s)`, s.phRange(1, 24)),
+			effective_profile, public_id, priority, score, grade, nameserver_timings_json,
+			error
+		) VALUES (%s)`, s.phRange(1, 25)),
 		job.ID, domainID, job.Domain, job.BatchID, string(job.Status),
 		s.ts(job.CreatedAt), s.ts(job.StartedAt), s.ts(job.FinishedAt), durationMs,
 		sevNotice, sevWarning, sevError, sevCritical,
@@ -524,6 +525,7 @@ func (s *SQLJobStore) GraduateJob(job Job, engineEntries []engine.LogEntry) erro
 		job.EffectiveProfile,
 		sql.NullString{String: job.PublicID, Valid: job.PublicID != ""},
 		int(job.Priority), scoreVal, gradeVal, nameserverTimingsJSON,
+		job.Error,
 	); err != nil {
 		_ = tx.Rollback()
 		return fmt.Errorf("insert run: %w", err)
@@ -1240,7 +1242,8 @@ const runCols = `id, domain_id, domain, batch_id, status,
 	created_at, started_at, finished_at, duration_ms,
 	sev_notice, sev_warning, sev_error, sev_critical,
 	worst_level, entry_count, profile, profile_id, profile_name,
-	effective_profile, public_id, priority, score, grade, nameserver_timings_json`
+	effective_profile, public_id, priority, score, grade, nameserver_timings_json,
+	error`
 
 func (s *SQLJobStore) scanRun(row rowScanner) (Run, error) {
 	var (
@@ -1256,6 +1259,7 @@ func (s *SQLJobStore) scanRun(row rowScanner) (Run, error) {
 		score                                                                           sql.NullInt64
 		grade                                                                           sql.NullString
 		nameserverTimingsJSON                                                           sql.NullString
+		runError                                                                        string
 	)
 	if err := row.Scan(
 		&id, &domainID, &domain, &batchID, &status,
@@ -1263,6 +1267,7 @@ func (s *SQLJobStore) scanRun(row rowScanner) (Run, error) {
 		&sevNotice, &sevWarning, &sevError, &sevCritical,
 		&worstLevel, &entryCount, &profile, &profileID, &profileName,
 		&effectiveProfile, &publicID, &priority, &score, &grade, &nameserverTimingsJSON,
+		&runError,
 	); err != nil {
 		return Run{}, err
 	}
@@ -1288,6 +1293,7 @@ func (s *SQLJobStore) scanRun(row rowScanner) (Run, error) {
 		EffectiveProfile: effectiveProfile,
 		PublicID:         publicID.String,
 		Priority:         JobPriority(priority),
+		Error:            runError,
 	}
 	timings, err := unmarshalNullJSON[[]NameserverTiming](nameserverTimingsJSON)
 	if err != nil {

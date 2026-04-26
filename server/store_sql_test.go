@@ -294,7 +294,7 @@ func TestRunMigrationsRecordsVersion(t *testing.T) {
 		}
 		versions = append(versions, v)
 	}
-	want := []int{1}
+	want := []int{1, 2}
 	if len(versions) != len(want) {
 		t.Fatalf("expected %d versions, got %d: %v", len(want), len(versions), versions)
 	}
@@ -1821,6 +1821,78 @@ func TestRecoverJobsNoopInMemory(t *testing.T) {
 	queue := NewInMemoryQueue()
 	if err := RecoverJobs(store, queue); err != nil {
 		t.Fatalf("RecoverJobs on in-memory store: %v", err)
+	}
+}
+
+// TestRecoverJobsGraduatesRunningAndOrphans confirms that a running job
+// killed by a prior shutdown lands in the runs table as a failed run
+// (carrying its error), and that orphan terminal-status rows already
+// sitting in the jobs table are likewise moved out so they can't keep
+// snapshot capture blocked.
+func TestRecoverJobsGraduatesRunningAndOrphans(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			base := time.Now().UTC().Truncate(time.Second)
+
+			for _, job := range []Job{
+				{ID: "running-1", Domain: "r.test", Status: JobRunning, CreatedAt: base, StartedAt: base.Add(time.Second)},
+				{ID: "orphan-failed", Domain: "f.test", Status: JobFailed, Error: "earlier crash", CreatedAt: base, FinishedAt: base.Add(2 * time.Second)},
+				{ID: "orphan-succeeded", Domain: "s.test", Status: JobSucceeded, CreatedAt: base, FinishedAt: base.Add(3 * time.Second)},
+				{ID: "queued-1", Domain: "q.test", Status: JobQueued, CreatedAt: base},
+				{ID: "paused-1", Domain: "p.test", Status: JobPaused, CreatedAt: base},
+			} {
+				if _, err := s.Create(job); err != nil {
+					t.Fatalf("Create %q: %v", job.ID, err)
+				}
+			}
+
+			q := NewInMemoryQueue()
+			if err := RecoverJobs(s, q); err != nil {
+				t.Fatalf("RecoverJobs: %v", err)
+			}
+
+			jobsByID := map[string]Job{}
+			for _, j := range s.List(JobFilter{Limit: 100}).Items {
+				jobsByID[j.ID] = j
+			}
+
+			for _, id := range []string{"running-1", "orphan-failed", "orphan-succeeded"} {
+				if _, stillThere := jobsByID[id]; stillThere {
+					t.Fatalf("%s should have been graduated out of the jobs table", id)
+				}
+				run, ok := s.GetRun(id)
+				if !ok {
+					t.Fatalf("%s missing from runs table after recovery", id)
+				}
+				if run.Status != JobFailed {
+					t.Fatalf("%s status = %q, want failed", id, run.Status)
+				}
+				if run.Error == "" {
+					t.Fatalf("%s graduated without an error message", id)
+				}
+			}
+
+			if got, ok := s.GetRun("running-1"); !ok || got.Error != "server restarted during job" {
+				t.Fatalf("running-1 error = %q, want server-restarted", got.Error)
+			}
+			if got, ok := s.GetRun("orphan-failed"); !ok || got.Error != "earlier crash" {
+				t.Fatalf("orphan-failed error = %q, want preserved 'earlier crash'", got.Error)
+			}
+
+			for _, id := range []string{"queued-1", "paused-1"} {
+				job, ok := jobsByID[id]
+				if !ok {
+					t.Fatalf("%s should still be in the jobs table", id)
+				}
+				if id == "queued-1" && job.Status != JobQueued {
+					t.Fatalf("queued-1 status = %q, want queued", job.Status)
+				}
+				if id == "paused-1" && job.Status != JobPaused {
+					t.Fatalf("paused-1 status = %q, want paused", job.Status)
+				}
+			}
+		})
 	}
 }
 

@@ -24,8 +24,8 @@ type adminSnapshotPurger interface {
 // adminSnapshotAggregator is the optional surface the rematerialize
 // action needs.
 type adminSnapshotAggregator interface {
-	ComputeSnapshotAggregates(cohortID int64, batchID string) ([]AnalysisCohortSnapshotAggregate, error)
-	ReplaceSnapshotAggregates(snapshotID int64, aggs []AnalysisCohortSnapshotAggregate) error
+	ComputeSnapshotOverview(cohortID int64, batchID string) (SnapshotOverviewV2, error)
+	ReplaceSnapshotOverview(snapshotID int64, overview SnapshotOverviewV2) error
 	ComputeSnapshotEntityViews(cohortID int64, batchID string) (SnapshotEntityViews, error)
 	ReplaceSnapshotEntityViews(snapshotID int64, views SnapshotEntityViews) error
 }
@@ -119,10 +119,9 @@ func (s *Server) handleAnalysisCohortSnapshotByID(w http.ResponseWriter, r *http
 }
 
 // handleAnalysisCohortSnapshotRematerialize handles POST on
-// /api/v1/analysis/cohorts/{id}/snapshots/{slug}/rematerialize. Recomputes
-// the snapshot's aggregate payloads from the current fact rows, bumps
-// CapturedAt so the materialization cache invalidates, and returns the
-// refreshed snapshot row.
+// /api/v1/analysis/cohorts/{id}/snapshots/{slug}/rematerialize. Rebuilds
+// the overview row and entity views from current facts, bumps
+// CapturedAt, and returns the refreshed snapshot row.
 func (s *Server) handleAnalysisCohortSnapshotRematerialize(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
@@ -144,12 +143,12 @@ func (s *Server) handleAnalysisCohortSnapshotRematerialize(w http.ResponseWriter
 		writeError(w, http.StatusServiceUnavailable, "analysis_unavailable", "analysis store does not support rematerialize", nil)
 		return
 	}
-	aggs, err := aggWriter.ComputeSnapshotAggregates(cohort.ID, snap.BatchID)
+	overview, err := aggWriter.ComputeSnapshotOverview(cohort.ID, snap.BatchID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "compute_failed", err.Error(), nil)
 		return
 	}
-	if err := aggWriter.ReplaceSnapshotAggregates(snap.ID, aggs); err != nil {
+	if err := aggWriter.ReplaceSnapshotOverview(snap.ID, overview); err != nil {
 		writeError(w, http.StatusInternalServerError, "write_failed", err.Error(), nil)
 		return
 	}

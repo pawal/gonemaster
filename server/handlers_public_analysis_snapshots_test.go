@@ -161,10 +161,10 @@ func TestPublicAnalysisTrendsUseSourceRunOrderAndMetadata(t *testing.T) {
 	}
 
 	for _, snap := range []AnalysisCohortSnapshot{f.snapshot, older} {
-		if err := f.store.ReplaceSnapshotAggregates(snap.ID, []AnalysisCohortSnapshotAggregate{
-			{SnapshotID: snap.ID, Category: SnapshotAggregateSeverityDistribution, PayloadJSON: `{"OK":1}`},
+		if err := f.store.ReplaceSnapshotOverview(snap.ID, SnapshotOverviewV2{
+			SeverityDistribution: map[string]int{"OK": 1},
 		}); err != nil {
-			t.Fatalf("seed aggregate for %s: %v", snap.Slug, err)
+			t.Fatalf("seed overview for %s: %v", snap.Slug, err)
 		}
 	}
 

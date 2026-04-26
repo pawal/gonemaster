@@ -447,15 +447,6 @@ type AnalysisCohortSnapshot struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
-// AnalysisCohortSnapshotAggregate is one pre-computed aggregate row
-// attached to a captured snapshot. The payload shape is category-specific.
-type AnalysisCohortSnapshotAggregate struct {
-	SnapshotID  int64     `json:"snapshot_id"`
-	Category    string    `json:"category"`
-	PayloadJSON string    `json:"payload_json"`
-	ComputedAt  time.Time `json:"computed_at"`
-}
-
 // AnalysisSnapshotNameserverView is one pre-computed nameserver row for a
 // captured snapshot, ready to serve the Nameservers tab and the per-
 // nameserver detail page without scanning facts.

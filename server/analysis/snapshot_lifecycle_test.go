@@ -247,9 +247,8 @@ func TestControllerCaptureCompletedSnapshotsPromotesOnBatchDrain(t *testing.T) {
 	if snap.CapturedAt.IsZero() {
 		t.Fatal("expected CapturedAt to be stamped on promotion")
 	}
-	aggs := store.snapshotAggs[snap.ID]
-	if len(aggs) == 0 {
-		t.Fatal("expected aggregates to be written on capture")
+	if _, ok := store.snapshotOverviews[snap.ID]; !ok {
+		t.Fatal("expected overview row to be written on capture")
 	}
 	if _, ok := store.snapshotViews[snap.ID]; !ok {
 		t.Fatal("expected entity-view replace to be called on capture")

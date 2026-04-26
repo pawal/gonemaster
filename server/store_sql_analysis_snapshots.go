@@ -297,36 +297,6 @@ func (s *SQLJobStore) UpsertAnalysisCohortSnapshot(snap AnalysisCohortSnapshot) 
 	return created, nil
 }
 
-// ListSnapshotAggregates returns every pre-computed aggregate row attached to
-// one snapshot, ordered by category for stable API payloads.
-func (s *SQLJobStore) ListSnapshotAggregates(snapshotID int64) []AnalysisCohortSnapshotAggregate {
-	rows, err := s.db.Query(
-		fmt.Sprintf(`SELECT snapshot_id, category, payload_json, computed_at
-			FROM analysis_cohort_snapshot_aggregates
-			WHERE snapshot_id = %s
-			ORDER BY category ASC`, s.ph(1)),
-		snapshotID,
-	)
-	if err != nil {
-		return nil
-	}
-	defer rows.Close()
-
-	var out []AnalysisCohortSnapshotAggregate
-	for rows.Next() {
-		var (
-			agg        AnalysisCohortSnapshotAggregate
-			computedAt string
-		)
-		if err := rows.Scan(&agg.SnapshotID, &agg.Category, &agg.PayloadJSON, &computedAt); err != nil {
-			return nil
-		}
-		agg.ComputedAt = parseTimestampStr(computedAt)
-		out = append(out, agg)
-	}
-	return out
-}
-
 // ListPendingAnalysisCohortSnapshots returns every snapshot still in pending
 // state across all cohorts. Used by the capture poller to check whether each
 // such snapshot's batch has finished so the snapshot can be promoted to
@@ -356,21 +326,18 @@ func (s *SQLJobStore) ListPendingAnalysisCohortSnapshots() []AnalysisCohortSnaps
 }
 
 // DeleteAnalysisCohortSnapshot hard-deletes one snapshot row and its
-// aggregates by id. Used by the admin purge action; a regular retire
+// view rows by id. Used by the admin purge action; a regular retire
 // goes through UpsertAnalysisCohortSnapshot with status=retired and
 // leaves the fact rows untouched for undo.
 func (s *SQLJobStore) DeleteAnalysisCohortSnapshot(id int64) error {
-	if _, err := s.db.Exec(
-		fmt.Sprintf(`DELETE FROM analysis_cohort_snapshot_aggregates WHERE snapshot_id = %s`, s.ph(1)),
-		id,
-	); err != nil {
-		return fmt.Errorf("delete aggregates for snapshot %d: %w", id, err)
-	}
 	for _, table := range []string{
+		"analysis_snapshot_overview_view",
 		"analysis_snapshot_nameserver_view",
 		"analysis_snapshot_endpoint_view",
 		"analysis_snapshot_asn_view",
 		"analysis_snapshot_tag_view",
+		"analysis_snapshot_domain_view",
+		"analysis_snapshot_prefix_view",
 	} {
 		if _, err := s.db.Exec(
 			fmt.Sprintf(`DELETE FROM %s WHERE snapshot_id = %s`, table, s.ph(1)),
@@ -388,27 +355,19 @@ func (s *SQLJobStore) DeleteAnalysisCohortSnapshot(id int64) error {
 	return nil
 }
 
-// ClearAnalysisCohortSnapshots removes all snapshot rows and their aggregates
-// for one cohort. Paired with ClearAnalysisCohortMaterialization so a cohort
-// rebuild starts with no stale snapshots pointing at facts that were just
-// deleted.
+// ClearAnalysisCohortSnapshots removes all snapshot rows and their view
+// rows for one cohort. Paired with ClearAnalysisCohortMaterialization so
+// a cohort rebuild starts with no stale snapshots pointing at facts that
+// were just deleted.
 func (s *SQLJobStore) ClearAnalysisCohortSnapshots(cohortID int64) error {
-	// Aggregates reference snapshots by ID; delete them first so the parent
-	// row removal does not leave orphan aggregate rows behind.
-	if _, err := s.db.Exec(
-		fmt.Sprintf(`DELETE FROM analysis_cohort_snapshot_aggregates
-			WHERE snapshot_id IN (
-				SELECT id FROM analysis_cohort_snapshots WHERE cohort_id = %s
-			)`, s.ph(1)),
-		cohortID,
-	); err != nil {
-		return fmt.Errorf("clear snapshot aggregates for cohort %d: %w", cohortID, err)
-	}
 	for _, table := range []string{
+		"analysis_snapshot_overview_view",
 		"analysis_snapshot_nameserver_view",
 		"analysis_snapshot_endpoint_view",
 		"analysis_snapshot_asn_view",
 		"analysis_snapshot_tag_view",
+		"analysis_snapshot_domain_view",
+		"analysis_snapshot_prefix_view",
 	} {
 		if _, err := s.db.Exec(
 			fmt.Sprintf(`DELETE FROM %s
@@ -441,39 +400,117 @@ func (s *SQLJobStore) ClearAnalysisCohortSnapshots(cohortID int64) error {
 	return nil
 }
 
-// ReplaceSnapshotAggregates atomically swaps the aggregate rows for one
-// snapshot. Writing is all-or-nothing so partial failures leave the prior set
-// intact.
-func (s *SQLJobStore) ReplaceSnapshotAggregates(snapshotID int64, aggs []AnalysisCohortSnapshotAggregate) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return fmt.Errorf("begin replace aggregates: %w", err)
+// CountBatchSnapshotRuns returns run/domain counts and the finished_at
+// span for one (cohort, batch) snapshot.
+func (s *SQLJobStore) CountBatchSnapshotRuns(cohortID int64, batchID string) (runCount, domainCount int, firstFinished, lastFinished time.Time, err error) {
+	if batchID == "" {
+		return 0, 0, time.Time{}, time.Time{}, fmt.Errorf("count batch snapshot runs: batch_id is required")
 	}
-	if _, err := tx.Exec(
-		fmt.Sprintf(`DELETE FROM analysis_cohort_snapshot_aggregates WHERE snapshot_id = %s`, s.ph(1)),
-		snapshotID,
-	); err != nil {
-		_ = tx.Rollback()
-		return fmt.Errorf("delete aggregates for snapshot %d: %w", snapshotID, err)
+	row := s.db.QueryRow(
+		fmt.Sprintf(`SELECT
+			COUNT(DISTINCT ards.run_id),
+			COUNT(DISTINCT ards.domain_id),
+			COALESCE(MIN(r.finished_at), ''),
+			COALESCE(MAX(r.finished_at), '')
+			FROM analysis_run_domain_summary ards
+			JOIN runs r ON r.id = ards.run_id
+			WHERE ards.cohort_id = %s AND r.batch_id = %s`, s.ph(1), s.ph(2)),
+		cohortID, batchID,
+	)
+	var minStr, maxStr string
+	if err := row.Scan(&runCount, &domainCount, &minStr, &maxStr); err != nil {
+		return 0, 0, time.Time{}, time.Time{}, fmt.Errorf("count batch snapshot runs: %w", err)
 	}
-	now := time.Now().UTC()
-	for _, agg := range aggs {
-		computedAt := agg.ComputedAt
-		if computedAt.IsZero() {
-			computedAt = now
-		}
-		if _, err := tx.Exec(
-			fmt.Sprintf(`INSERT INTO analysis_cohort_snapshot_aggregates
-				(snapshot_id, category, payload_json, computed_at)
-				VALUES (%s)`, s.phRange(1, 4)),
-			snapshotID, agg.Category, agg.PayloadJSON, s.ts(computedAt),
-		); err != nil {
-			_ = tx.Rollback()
-			return fmt.Errorf("insert aggregate %s for snapshot %d: %w", agg.Category, snapshotID, err)
-		}
-	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit replace aggregates: %w", err)
-	}
-	return nil
+	firstFinished = parseTimestampStr(minStr)
+	lastFinished = parseTimestampStr(maxStr)
+	return runCount, domainCount, firstFinished, lastFinished, nil
 }
+
+// CohortBatchFactStats is one (cohort, batch) pair with materialized
+// fact rows. Used by the first-boot snapshot backfill.
+type CohortBatchFactStats struct {
+	CohortID      int64
+	BatchID       string
+	RunCount      int
+	DomainCount   int
+	FirstFinished time.Time
+	LastFinished  time.Time
+}
+
+// ListCohortBatchesWithFacts enumerates (cohort, batch) pairs with at
+// least one materialized domain summary so the boot-time backfill can
+// reconstruct one snapshot per historical batch.
+func (s *SQLJobStore) ListCohortBatchesWithFacts() ([]CohortBatchFactStats, error) {
+	rows, err := s.db.Query(
+		`SELECT ards.cohort_id, r.batch_id,
+			COUNT(DISTINCT ards.run_id),
+			COUNT(DISTINCT ards.domain_id),
+			COALESCE(MIN(r.finished_at), ''),
+			COALESCE(MAX(r.finished_at), '')
+			FROM analysis_run_domain_summary ards
+			JOIN runs r ON r.id = ards.run_id
+			WHERE r.batch_id <> ''
+			GROUP BY ards.cohort_id, r.batch_id
+			ORDER BY ards.cohort_id, r.batch_id`,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list cohort batches with facts: %w", err)
+	}
+	defer rows.Close()
+	var out []CohortBatchFactStats
+	for rows.Next() {
+		var stats CohortBatchFactStats
+		var minStr, maxStr string
+		if err := rows.Scan(&stats.CohortID, &stats.BatchID, &stats.RunCount, &stats.DomainCount, &minStr, &maxStr); err != nil {
+			return nil, fmt.Errorf("scan cohort batch stats: %w", err)
+		}
+		stats.FirstFinished = parseTimestampStr(minStr)
+		stats.LastFinished = parseTimestampStr(maxStr)
+		out = append(out, stats)
+	}
+	return out, rows.Err()
+}
+
+// CountOutstandingJobsForBatch returns in-flight (queued/running/paused)
+// jobs still attached to a batch.
+func (s *SQLJobStore) CountOutstandingJobsForBatch(batchID string) (int, error) {
+	var count int
+	row := s.db.QueryRow(
+		fmt.Sprintf(`SELECT COUNT(*) FROM jobs WHERE batch_id = %s`, s.ph(1)),
+		batchID,
+	)
+	if err := row.Scan(&count); err != nil {
+		return 0, fmt.Errorf("count outstanding jobs for batch %s: %w", batchID, err)
+	}
+	return count, nil
+}
+
+// CountUnprojectedSnapshotRuns returns completed runs in a
+// snapshot-intent batch with no ready projection. Capture must wait for
+// this to reach zero or aggregates would come from a partial fact set.
+func (s *SQLJobStore) CountUnprojectedSnapshotRuns(cohortID int64, batchID string) (int, error) {
+	if batchID == "" {
+		return 0, fmt.Errorf("count unprojected snapshot runs: batch_id is required")
+	}
+	var count int
+	row := s.db.QueryRow(
+		fmt.Sprintf(`SELECT COUNT(*)
+			FROM runs r
+			JOIN analysis_cohort_catalog c ON c.id = %s
+			JOIN domain_tags dt ON dt.domain_id = r.domain_id AND dt.tag = c.source_tag
+			LEFT JOIN analysis_projection_state ps
+				ON ps.cohort_id = c.id
+				AND ps.run_id = r.id
+				AND ps.status = %s
+			WHERE r.batch_id = %s
+			  AND c.source_type = 'tag'
+			  AND ps.run_id IS NULL`,
+			s.ph(1), s.ph(2), s.ph(3)),
+		cohortID, AnalysisMaterializationReady, batchID,
+	)
+	if err := row.Scan(&count); err != nil {
+		return 0, fmt.Errorf("count unprojected snapshot runs for cohort %d batch %s: %w", cohortID, batchID, err)
+	}
+	return count, nil
+}
+

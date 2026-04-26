@@ -130,12 +130,12 @@ func (f *analysisAPITestFixture) refreshSnapshotViews(batchID string) {
 	if !ok {
 		return
 	}
-	aggs, err := f.store.ComputeSnapshotAggregates(f.cohort.ID, batchID)
+	overview, err := f.store.ComputeSnapshotOverview(f.cohort.ID, batchID)
 	if err != nil {
-		f.t.Fatalf("compute aggregates for batch %q: %v", batchID, err)
+		f.t.Fatalf("compute overview for batch %q: %v", batchID, err)
 	}
-	if err := f.store.ReplaceSnapshotAggregates(snap.ID, aggs); err != nil {
-		f.t.Fatalf("replace aggregates for batch %q: %v", batchID, err)
+	if err := f.store.ReplaceSnapshotOverview(snap.ID, overview); err != nil {
+		f.t.Fatalf("replace overview for batch %q: %v", batchID, err)
 	}
 	views, err := f.store.ComputeSnapshotEntityViews(f.cohort.ID, batchID)
 	if err != nil {

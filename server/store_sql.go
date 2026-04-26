@@ -1902,8 +1902,14 @@ func (s *SQLJobStore) DeleteBatch(batchID string) ([]int64, error) {
 		label string
 		query string
 	}{
-		{"snapshot aggregates", fmt.Sprintf(
-			`DELETE FROM analysis_cohort_snapshot_aggregates
+		{"analysis_snapshot_overview_view", fmt.Sprintf(
+			`DELETE FROM analysis_snapshot_overview_view
+			  WHERE snapshot_id IN (SELECT id FROM analysis_cohort_snapshots WHERE batch_id = %s)`, ph)},
+		{"analysis_snapshot_domain_view", fmt.Sprintf(
+			`DELETE FROM analysis_snapshot_domain_view
+			  WHERE snapshot_id IN (SELECT id FROM analysis_cohort_snapshots WHERE batch_id = %s)`, ph)},
+		{"analysis_snapshot_prefix_view", fmt.Sprintf(
+			`DELETE FROM analysis_snapshot_prefix_view
 			  WHERE snapshot_id IN (SELECT id FROM analysis_cohort_snapshots WHERE batch_id = %s)`, ph)},
 		{"analysis_snapshot_nameserver_view", fmt.Sprintf(
 			`DELETE FROM analysis_snapshot_nameserver_view

@@ -1,7 +1,6 @@
 package analysis
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -44,11 +43,11 @@ type fakeStore struct {
 	states       map[string]serverpkg.AnalysisProjectionState
 
 	// Snapshot state keyed by (cohortID, batchID).
-	snapshots      map[snapshotKey]serverpkg.AnalysisCohortSnapshot
-	snapshotByID   map[int64]snapshotKey
-	snapshotAggs   map[int64][]serverpkg.AnalysisCohortSnapshotAggregate
-	snapshotViews  map[int64]serverpkg.SnapshotEntityViews
-	nextSnapshotID int64
+	snapshots         map[snapshotKey]serverpkg.AnalysisCohortSnapshot
+	snapshotByID      map[int64]snapshotKey
+	snapshotOverviews map[int64]serverpkg.SnapshotOverviewV2
+	snapshotViews     map[int64]serverpkg.SnapshotEntityViews
+	nextSnapshotID    int64
 
 	settings map[string]string
 }
@@ -481,7 +480,7 @@ func (s *fakeStore) ClearAnalysisCohortSnapshots(cohortID int64) error {
 		}
 		delete(s.snapshots, key)
 		delete(s.snapshotByID, snap.ID)
-		delete(s.snapshotAggs, snap.ID)
+		delete(s.snapshotOverviews, snap.ID)
 	}
 	return nil
 }
@@ -537,11 +536,9 @@ func (s *fakeStore) CountUnprojectedSnapshotRuns(cohortID int64, batchID string)
 	return count, nil
 }
 
-func (s *fakeStore) ComputeSnapshotAggregates(cohortID int64, batchID string) ([]serverpkg.AnalysisCohortSnapshotAggregate, error) {
-	now := time.Now().UTC()
-	// Minimal but non-empty payload so tests can observe that the capture
-	// path wrote aggregates — real fact-based payloads live in the SQL
-	// store's dedicated test file.
+func (s *fakeStore) ComputeSnapshotOverview(cohortID int64, batchID string) (serverpkg.SnapshotOverviewV2, error) {
+	// Minimal but observable payload so tests see the capture path wrote
+	// the overview row; fact-based payloads live in the SQL store tests.
 	grades := map[string]int{}
 	prefix := fmt.Sprintf("%d/", cohortID)
 	for key, summary := range s.summaries {
@@ -556,23 +553,12 @@ func (s *fakeStore) ComputeSnapshotAggregates(cohortID int64, batchID string) ([
 			grades[*summary.Grade]++
 		}
 	}
-	payload, err := json.Marshal(grades)
-	if err != nil {
-		return nil, err
-	}
-	return []serverpkg.AnalysisCohortSnapshotAggregate{
-		{SnapshotID: 0, Category: serverpkg.SnapshotAggregateGradeDistribution, PayloadJSON: string(payload), ComputedAt: now},
-	}, nil
+	return serverpkg.SnapshotOverviewV2{GradeDistribution: grades}, nil
 }
 
-func (s *fakeStore) ReplaceSnapshotAggregates(snapshotID int64, aggs []serverpkg.AnalysisCohortSnapshotAggregate) error {
+func (s *fakeStore) ReplaceSnapshotOverview(snapshotID int64, overview serverpkg.SnapshotOverviewV2) error {
 	s.ensureSnapshotMaps()
-	out := make([]serverpkg.AnalysisCohortSnapshotAggregate, 0, len(aggs))
-	for _, agg := range aggs {
-		agg.SnapshotID = snapshotID
-		out = append(out, agg)
-	}
-	s.snapshotAggs[snapshotID] = out
+	s.snapshotOverviews[snapshotID] = overview
 	return nil
 }
 
@@ -593,8 +579,8 @@ func (s *fakeStore) ensureSnapshotMaps() {
 	if s.snapshotByID == nil {
 		s.snapshotByID = map[int64]snapshotKey{}
 	}
-	if s.snapshotAggs == nil {
-		s.snapshotAggs = map[int64][]serverpkg.AnalysisCohortSnapshotAggregate{}
+	if s.snapshotOverviews == nil {
+		s.snapshotOverviews = map[int64]serverpkg.SnapshotOverviewV2{}
 	}
 	if s.snapshotViews == nil {
 		s.snapshotViews = map[int64]serverpkg.SnapshotEntityViews{}

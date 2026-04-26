@@ -159,8 +159,10 @@ func (s *Server) handlePublicAnalysisSnapshotDetail(w http.ResponseWriter, r *ht
 		return
 	}
 	aggregates := map[string]json.RawMessage{}
-	for _, agg := range readStore.ListSnapshotAggregates(snap.ID) {
-		aggregates[agg.Category] = json.RawMessage(agg.PayloadJSON)
+	if overview, ok := readStore.GetSnapshotOverview(snap.ID); ok {
+		if payloads, err := overview.AsCategoryPayloads(); err == nil {
+			aggregates = payloads
+		}
 	}
 	def, _ := readStore.GetDefaultSnapshotForCohort(cohort.ID)
 	resp := PublicAnalysisSnapshotDetail{
@@ -181,9 +183,9 @@ func (s *Server) handlePublicAnalysisSnapshotDetail(w http.ResponseWriter, r *ht
 }
 
 // handlePublicAnalysisTrends handles GET /pub/api/v1/analysis/cohorts/{dataset_tag}/trends?category=&from=&to=.
-// Returns one time series of aggregate payloads spanning captured public
-// snapshots. Missing category defaults to severity_distribution so the
-// common landing-page chart works without a parameter.
+// Returns one time series of overview payloads, sliced to the requested
+// category. Defaults to severity_distribution so the landing-page chart
+// works without a parameter.
 func (s *Server) handlePublicAnalysisTrends(w http.ResponseWriter, r *http.Request) {
 	datasetTag, ok := pathValueNonEmpty(w, r, "dataset_tag", "cohort")
 	if !ok {
@@ -206,8 +208,8 @@ func (s *Server) handlePublicAnalysisTrends(w http.ResponseWriter, r *http.Reque
 	toSlug := strings.TrimSpace(r.URL.Query().Get("to"))
 
 	all := readStore.ListAnalysisCohortSnapshots(cohort.ID)
-	// Order oldest-first by the source batch's run window, not by the later
-	// moment when analysis aggregates were written.
+	// Order oldest-first by the source batch's run window, not by the
+	// later moment the snapshot row was captured.
 	sort.SliceStable(all, func(i, j int) bool {
 		left := analysisSnapshotSourceTime(all[i])
 		right := analysisSnapshotSourceTime(all[j])
@@ -216,6 +218,13 @@ func (s *Server) handlePublicAnalysisTrends(w http.ResponseWriter, r *http.Reque
 		}
 		return left.Before(right)
 	})
+	snapshotIDs := make([]int64, 0, len(all))
+	for _, snap := range all {
+		if isPublicSnapshot(snap) {
+			snapshotIDs = append(snapshotIDs, snap.ID)
+		}
+	}
+	overviews := readStore.ListSnapshotOverviewsByIDs(snapshotIDs)
 	points := make([]PublicAnalysisTrendPoint, 0, len(all))
 	inRange := fromSlug == ""
 	for _, snap := range all {
@@ -229,20 +238,35 @@ func (s *Server) handlePublicAnalysisTrends(w http.ResponseWriter, r *http.Reque
 				continue
 			}
 		}
-		for _, agg := range readStore.ListSnapshotAggregates(snap.ID) {
-			if agg.Category != category {
-				continue
+		overview, ok := overviews[snap.ID]
+		if !ok {
+			if toSlug != "" && snap.Slug == toSlug {
+				break
 			}
-			points = append(points, PublicAnalysisTrendPoint{
-				Slug:       snap.Slug,
-				Label:      snap.Label,
-				CapturedAt: snap.CapturedAt,
-				FirstRunAt: snap.FirstRunAt,
-				LastRunAt:  snap.LastRunAt,
-				Payload:    json.RawMessage(agg.PayloadJSON),
-			})
-			break
+			continue
 		}
+		payloads, err := overview.AsCategoryPayloads()
+		if err != nil {
+			if toSlug != "" && snap.Slug == toSlug {
+				break
+			}
+			continue
+		}
+		payload, has := payloads[category]
+		if !has {
+			if toSlug != "" && snap.Slug == toSlug {
+				break
+			}
+			continue
+		}
+		points = append(points, PublicAnalysisTrendPoint{
+			Slug:       snap.Slug,
+			Label:      snap.Label,
+			CapturedAt: snap.CapturedAt,
+			FirstRunAt: snap.FirstRunAt,
+			LastRunAt:  snap.LastRunAt,
+			Payload:    payload,
+		})
 		if toSlug != "" && snap.Slug == toSlug {
 			break
 		}

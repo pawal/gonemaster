@@ -580,11 +580,9 @@ var sqlMigrations = []sqlMigration{
 	},
 }
 
-// buildV14DDL returns migration 14: the per-domain snapshot view, the
-// per-snapshot prefix view, and ASN-view roster columns. Together these
-// retire the last fact-row callers of the legacy materialization cache
-// so /domains, /asns/{asn}, /prefix(es), /testcases, /diff, and the
-// cohort detail handler all serve from indexed reads.
+// buildV14DDL is the consolidated view-table migration: per-domain and
+// per-prefix views, ASN-view rosters, and a single overview row that
+// replaces the legacy per-category aggregates table.
 func buildV14DDL(bigint string) []string {
 	return []string{
 		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS analysis_snapshot_domain_view (
@@ -625,6 +623,25 @@ func buildV14DDL(bigint string) []string {
 			PRIMARY KEY (snapshot_id, prefix)
 		)`, bigint),
 		`CREATE INDEX IF NOT EXISTS idx_analysis_snapshot_prefix_view_snapshot_dc ON analysis_snapshot_prefix_view(snapshot_id, domain_count)`,
+
+		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS analysis_snapshot_overview_view (
+			snapshot_id                %s      NOT NULL PRIMARY KEY,
+			domain_count               INTEGER NOT NULL DEFAULT 0,
+			nameserver_count           INTEGER NOT NULL DEFAULT 0,
+			endpoint_count             INTEGER NOT NULL DEFAULT 0,
+			asn_count                  INTEGER NOT NULL DEFAULT 0,
+			prefix_count               INTEGER NOT NULL DEFAULT 0,
+			severity_distribution_json TEXT    NOT NULL DEFAULT '{}',
+			grade_distribution_json    TEXT    NOT NULL DEFAULT '{}',
+			signed_json                TEXT    NOT NULL DEFAULT '{}',
+			dnskey_algo_json           TEXT    NOT NULL DEFAULT '{}',
+			top_tags_json              TEXT    NOT NULL DEFAULT '[]',
+			top_nameservers_json       TEXT    NOT NULL DEFAULT '[]',
+			top_asns_json              TEXT    NOT NULL DEFAULT '[]',
+			fact_distributions_json    TEXT    NOT NULL DEFAULT '{}'
+		)`, bigint),
+
+		`DROP TABLE IF EXISTS analysis_cohort_snapshot_aggregates`,
 	}
 }
 

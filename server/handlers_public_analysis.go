@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"time"
@@ -148,22 +147,10 @@ func (s *Server) handlePublicAnalysisOverview(w http.ResponseWriter, r *http.Req
 	writeJSON(w, http.StatusOK, resp)
 }
 
-// loadSnapshotOverviewV2 reads the consolidated overview payload from the
-// snapshot's aggregate row set. Returns ok=false when the row is missing
-// (e.g. snapshot captured before overview_v2 shipped) so callers can fall
-// back to the rest of the response without the Overview field.
+// loadSnapshotOverviewV2 reads the per-snapshot overview row. Returns
+// ok=false when the row is missing so callers can fall back gracefully.
 func loadSnapshotOverviewV2(store AnalysisReadStore, snapshotID int64) (SnapshotOverviewV2, bool) {
-	for _, agg := range store.ListSnapshotAggregates(snapshotID) {
-		if agg.Category != SnapshotAggregateOverviewV2 {
-			continue
-		}
-		var out SnapshotOverviewV2
-		if err := json.Unmarshal([]byte(agg.PayloadJSON), &out); err != nil {
-			return SnapshotOverviewV2{}, false
-		}
-		return out, true
-	}
-	return SnapshotOverviewV2{}, false
+	return store.GetSnapshotOverview(snapshotID)
 }
 
 // writePublicAnalysisResolutionError maps cohort-resolution sentinels to

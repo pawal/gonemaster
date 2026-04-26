@@ -31,8 +31,8 @@ const projectorVersion = "v1"
 // server free of any import on this package (which would cycle).
 type WriteStore = serverpkg.AnalysisWriteStore
 
-// Store is the minimal backing store surface needed by the Phase 2 projector
-// loading and cohort-resolution logic.
+// Store is the minimal backing surface the projector needs for run
+// loading and cohort resolution.
 type Store interface {
 	GetRun(id string) (serverpkg.Run, bool)
 	QueryEntries(filter serverpkg.EntryFilter) serverpkg.EntryList

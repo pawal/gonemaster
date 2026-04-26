@@ -1,13 +1,13 @@
 package server
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
-	"time"
 )
 
-// Aggregate category tokens written to analysis_cohort_snapshot_aggregates.
-// Stable across releases — the UI keys on them when diffing snapshots.
+// Trend payload keys, kept stable so the analysis-ui's trend chart
+// switches behave identically before and after the overview-view move.
 const (
 	SnapshotAggregateSeverityDistribution = "severity_distribution"
 	SnapshotAggregateGradeDistribution    = "grade_distribution"
@@ -16,27 +16,25 @@ const (
 	SnapshotAggregateTopTags              = "top_tags"
 	SnapshotAggregateTopNameservers       = "top_nameservers"
 	SnapshotAggregateTopASNs              = "top_asns"
-	// SnapshotAggregateOverviewV2 is the consolidated payload that the
-	// /overview endpoint reads in one row instead of fanning out to four.
-	SnapshotAggregateOverviewV2 = "overview_v2"
+	SnapshotAggregateOverviewV2           = "overview_v2"
 )
 
 const snapshotTopN = 20
 
-// TopTagEntry is one row of the top_tags aggregate payload.
+// TopTagEntry is one row of the top_tags overview payload.
 type TopTagEntry struct {
 	Tag         string `json:"tag"`
 	Level       string `json:"level,omitempty"`
 	DomainCount int    `json:"domain_count"`
 }
 
-// TopNameserverEntry is one row of the top_nameservers aggregate payload.
+// TopNameserverEntry is one row of the top_nameservers overview payload.
 type TopNameserverEntry struct {
 	Nameserver  string `json:"nameserver"`
 	DomainCount int    `json:"domain_count"`
 }
 
-// TopASNEntry is one row of the top_asns aggregate payload.
+// TopASNEntry is one row of the top_asns overview payload.
 type TopASNEntry struct {
 	ASN         int64  `json:"asn"`
 	Label       string `json:"label,omitempty"`
@@ -53,8 +51,8 @@ type SnapshotOverviewTotals struct {
 	PrefixCount     int `json:"prefix_count"`
 }
 
-// SnapshotOverviewV2 is the consolidated overview payload bundled into one
-// aggregate row so the overview tab can render with a single read.
+// SnapshotOverviewV2 is the consolidated overview payload baked into one
+// per-snapshot row at capture time.
 type SnapshotOverviewV2 struct {
 	Totals               SnapshotOverviewTotals                    `json:"totals"`
 	SeverityDistribution map[string]int                            `json:"severity_distribution"`
@@ -67,90 +65,85 @@ type SnapshotOverviewV2 struct {
 	FactDistributions    map[string]PublicAnalysisFactDistribution `json:"fact_distributions,omitempty"`
 }
 
-// ComputeSnapshotAggregates renders every aggregate category for one
-// (cohort, batch) snapshot into serializable rows ready to be passed to
-// ReplaceSnapshotAggregates. Runs with an empty batch_id are excluded;
-// counts collapse to distinct domains per bucket so a batch with
-// multiple runs per domain is not double-counted.
-func (s *SQLJobStore) ComputeSnapshotAggregates(cohortID int64, batchID string) ([]AnalysisCohortSnapshotAggregate, error) {
-	if batchID == "" {
-		return nil, fmt.Errorf("compute snapshot aggregates: batch_id is required")
-	}
-	now := time.Now().UTC()
-	base := AnalysisCohortSnapshotAggregate{ComputedAt: now}
-
-	addCategory := func(out []AnalysisCohortSnapshotAggregate, category string, payload any) ([]AnalysisCohortSnapshotAggregate, error) {
+// AsCategoryPayloads returns the legacy category->raw-JSON map shape that
+// the trend handler and snapshot detail expose. Categories with empty
+// payloads are still emitted so the trend chart sees a continuous
+// timeline.
+func (o SnapshotOverviewV2) AsCategoryPayloads() (map[string]json.RawMessage, error) {
+	out := make(map[string]json.RawMessage, 8)
+	emit := func(category string, payload any) error {
 		b, err := json.Marshal(payload)
 		if err != nil {
-			return nil, fmt.Errorf("marshal %s: %w", category, err)
+			return fmt.Errorf("marshal %s: %w", category, err)
 		}
-		agg := base
-		agg.Category = category
-		agg.PayloadJSON = string(b)
-		return append(out, agg), nil
+		out[category] = json.RawMessage(b)
+		return nil
 	}
+	if err := emit(SnapshotAggregateSeverityDistribution, o.SeverityDistribution); err != nil {
+		return nil, err
+	}
+	if err := emit(SnapshotAggregateGradeDistribution, o.GradeDistribution); err != nil {
+		return nil, err
+	}
+	if err := emit(SnapshotAggregateSigned, o.Signed); err != nil {
+		return nil, err
+	}
+	if err := emit(SnapshotAggregateDNSKEYAlgo, o.DNSKEYAlgo); err != nil {
+		return nil, err
+	}
+	if err := emit(SnapshotAggregateTopTags, o.TopTags); err != nil {
+		return nil, err
+	}
+	if err := emit(SnapshotAggregateTopNameservers, o.TopNameservers); err != nil {
+		return nil, err
+	}
+	if err := emit(SnapshotAggregateTopASNs, o.TopASNs); err != nil {
+		return nil, err
+	}
+	if err := emit(SnapshotAggregateOverviewV2, o); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
 
-	var out []AnalysisCohortSnapshotAggregate
-
+// ComputeSnapshotOverview builds the per-snapshot overview payload from
+// the (cohort, batch) fact rows. Caller persists it via
+// ReplaceSnapshotOverview at capture time.
+func (s *SQLJobStore) ComputeSnapshotOverview(cohortID int64, batchID string) (SnapshotOverviewV2, error) {
+	if batchID == "" {
+		return SnapshotOverviewV2{}, fmt.Errorf("compute snapshot overview: batch_id is required")
+	}
 	severity, err := s.queryBatchSeverityDistribution(cohortID, batchID)
 	if err != nil {
-		return nil, err
+		return SnapshotOverviewV2{}, err
 	}
-	if out, err = addCategory(out, SnapshotAggregateSeverityDistribution, severity); err != nil {
-		return nil, err
-	}
-
 	grades, err := s.queryBatchGradeDistribution(cohortID, batchID)
 	if err != nil {
-		return nil, err
+		return SnapshotOverviewV2{}, err
 	}
-	if out, err = addCategory(out, SnapshotAggregateGradeDistribution, grades); err != nil {
-		return nil, err
-	}
-
 	signed, err := s.queryBatchFactDistribution(cohortID, batchID, FactCategorySigned)
 	if err != nil {
-		return nil, err
+		return SnapshotOverviewV2{}, err
 	}
-	if out, err = addCategory(out, SnapshotAggregateSigned, signed); err != nil {
-		return nil, err
-	}
-
 	dnskey, err := s.queryBatchFactDistribution(cohortID, batchID, FactCategoryDNSKEYAlgorithm)
 	if err != nil {
-		return nil, err
+		return SnapshotOverviewV2{}, err
 	}
-	if out, err = addCategory(out, SnapshotAggregateDNSKEYAlgo, dnskey); err != nil {
-		return nil, err
-	}
-
 	topTags, err := s.queryBatchTopTags(cohortID, batchID, snapshotTopN)
 	if err != nil {
-		return nil, err
+		return SnapshotOverviewV2{}, err
 	}
-	if out, err = addCategory(out, SnapshotAggregateTopTags, topTags); err != nil {
-		return nil, err
-	}
-
 	topNameservers, err := s.queryBatchTopNameservers(cohortID, batchID, snapshotTopN)
 	if err != nil {
-		return nil, err
+		return SnapshotOverviewV2{}, err
 	}
-	if out, err = addCategory(out, SnapshotAggregateTopNameservers, topNameservers); err != nil {
-		return nil, err
-	}
-
 	topASNs, err := s.queryBatchTopASNs(cohortID, batchID, snapshotTopN)
 	if err != nil {
-		return nil, err
+		return SnapshotOverviewV2{}, err
 	}
-	if out, err = addCategory(out, SnapshotAggregateTopASNs, topASNs); err != nil {
-		return nil, err
-	}
-
 	totals, err := s.queryBatchTotals(cohortID, batchID)
 	if err != nil {
-		return nil, err
+		return SnapshotOverviewV2{}, err
 	}
 	factDistributions := map[string]PublicAnalysisFactDistribution{}
 	if len(grades) > 0 {
@@ -162,7 +155,7 @@ func (s *SQLJobStore) ComputeSnapshotAggregates(cohortID int64, batchID string) 
 	if len(dnskey) > 0 {
 		factDistributions[FactCategoryDNSKEYAlgorithm] = factDistributionFromCounts(FactCategoryDNSKEYAlgorithm, dnskey)
 	}
-	overview := SnapshotOverviewV2{
+	return SnapshotOverviewV2{
 		Totals:               totals,
 		SeverityDistribution: severity,
 		GradeDistribution:    grades,
@@ -172,18 +165,268 @@ func (s *SQLJobStore) ComputeSnapshotAggregates(cohortID int64, batchID string) 
 		TopNameservers:       topNameservers,
 		TopASNs:              topASNs,
 		FactDistributions:    factDistributions,
-	}
-	if out, err = addCategory(out, SnapshotAggregateOverviewV2, overview); err != nil {
-		return nil, err
-	}
-
-	return out, nil
+	}, nil
 }
 
-// queryBatchTotals returns the cohort-wide totals (distinct domains,
-// nameservers, endpoints, ASNs, prefixes) for one snapshot's batch.
-// Parent-role endpoints are excluded from nameserver/endpoint counts so
-// the totals match the entity tabs.
+// ReplaceSnapshotOverview swaps the row for one snapshot. Idempotent on
+// re-run via DELETE+INSERT.
+func (s *SQLJobStore) ReplaceSnapshotOverview(snapshotID int64, overview SnapshotOverviewV2) error {
+	severityJSON, err := marshalCountMap(overview.SeverityDistribution)
+	if err != nil {
+		return fmt.Errorf("marshal severity_distribution: %w", err)
+	}
+	gradeJSON, err := marshalCountMap(overview.GradeDistribution)
+	if err != nil {
+		return fmt.Errorf("marshal grade_distribution: %w", err)
+	}
+	signedJSON, err := marshalCountMap(overview.Signed)
+	if err != nil {
+		return fmt.Errorf("marshal signed: %w", err)
+	}
+	dnskeyJSON, err := marshalCountMap(overview.DNSKEYAlgo)
+	if err != nil {
+		return fmt.Errorf("marshal dnskey_algo: %w", err)
+	}
+	tagsJSON, err := json.Marshal(overview.TopTags)
+	if err != nil {
+		return fmt.Errorf("marshal top_tags: %w", err)
+	}
+	if len(overview.TopTags) == 0 {
+		tagsJSON = []byte("[]")
+	}
+	nsJSON, err := json.Marshal(overview.TopNameservers)
+	if err != nil {
+		return fmt.Errorf("marshal top_nameservers: %w", err)
+	}
+	if len(overview.TopNameservers) == 0 {
+		nsJSON = []byte("[]")
+	}
+	asnsJSON, err := json.Marshal(overview.TopASNs)
+	if err != nil {
+		return fmt.Errorf("marshal top_asns: %w", err)
+	}
+	if len(overview.TopASNs) == 0 {
+		asnsJSON = []byte("[]")
+	}
+	factJSON, err := marshalFactDistributions(overview.FactDistributions)
+	if err != nil {
+		return fmt.Errorf("marshal fact_distributions: %w", err)
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin replace snapshot overview: %w", err)
+	}
+	if _, err := tx.Exec(
+		fmt.Sprintf(`DELETE FROM analysis_snapshot_overview_view WHERE snapshot_id = %s`, s.ph(1)),
+		snapshotID,
+	); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("clear overview view for snapshot %d: %w", snapshotID, err)
+	}
+	if _, err := tx.Exec(
+		fmt.Sprintf(`INSERT INTO analysis_snapshot_overview_view
+			(snapshot_id, domain_count, nameserver_count, endpoint_count, asn_count, prefix_count,
+			 severity_distribution_json, grade_distribution_json, signed_json, dnskey_algo_json,
+			 top_tags_json, top_nameservers_json, top_asns_json, fact_distributions_json)
+			VALUES (%s)`, s.phRange(1, 14)),
+		snapshotID,
+		overview.Totals.DomainCount, overview.Totals.NameserverCount, overview.Totals.EndpointCount,
+		overview.Totals.ASNCount, overview.Totals.PrefixCount,
+		string(severityJSON), string(gradeJSON), string(signedJSON), string(dnskeyJSON),
+		string(tagsJSON), string(nsJSON), string(asnsJSON), string(factJSON),
+	); err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("insert overview view for snapshot %d: %w", snapshotID, err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit replace snapshot overview: %w", err)
+	}
+	return nil
+}
+
+func marshalCountMap(m map[string]int) ([]byte, error) {
+	if m == nil {
+		return []byte("{}"), nil
+	}
+	return json.Marshal(m)
+}
+
+func marshalFactDistributions(m map[string]PublicAnalysisFactDistribution) ([]byte, error) {
+	if m == nil {
+		return []byte("{}"), nil
+	}
+	return json.Marshal(m)
+}
+
+const analysisSnapshotOverviewViewCols = `snapshot_id, domain_count, nameserver_count,
+	endpoint_count, asn_count, prefix_count,
+	severity_distribution_json, grade_distribution_json, signed_json, dnskey_algo_json,
+	top_tags_json, top_nameservers_json, top_asns_json, fact_distributions_json`
+
+func scanSnapshotOverviewView(row rowScanner) (int64, SnapshotOverviewV2, error) {
+	var (
+		snapshotID                                                      int64
+		domainCount, nsCount, epCount, asnCount, prefixCount             int
+		severityJSON, gradeJSON, signedJSON, dnskeyJSON                  string
+		topTagsJSON, topNSJSON, topASNsJSON, factJSON                    string
+	)
+	if err := row.Scan(
+		&snapshotID, &domainCount, &nsCount, &epCount, &asnCount, &prefixCount,
+		&severityJSON, &gradeJSON, &signedJSON, &dnskeyJSON,
+		&topTagsJSON, &topNSJSON, &topASNsJSON, &factJSON,
+	); err != nil {
+		return 0, SnapshotOverviewV2{}, err
+	}
+	out := SnapshotOverviewV2{
+		Totals: SnapshotOverviewTotals{
+			DomainCount:     domainCount,
+			NameserverCount: nsCount,
+			EndpointCount:   epCount,
+			ASNCount:        asnCount,
+			PrefixCount:     prefixCount,
+		},
+		SeverityDistribution: unmarshalCountMap(severityJSON),
+		GradeDistribution:    unmarshalCountMap(gradeJSON),
+		Signed:               unmarshalCountMap(signedJSON),
+		DNSKEYAlgo:           unmarshalCountMap(dnskeyJSON),
+		TopTags:              unmarshalTopTags(topTagsJSON),
+		TopNameservers:       unmarshalTopNameservers(topNSJSON),
+		TopASNs:              unmarshalTopASNs(topASNsJSON),
+		FactDistributions:    unmarshalFactDistributions(factJSON),
+	}
+	return snapshotID, out, nil
+}
+
+func unmarshalCountMap(raw string) map[string]int {
+	if raw == "" {
+		return map[string]int{}
+	}
+	var out map[string]int
+	if err := json.Unmarshal([]byte(raw), &out); err != nil {
+		return map[string]int{}
+	}
+	if out == nil {
+		return map[string]int{}
+	}
+	return out
+}
+
+func unmarshalTopTags(raw string) []TopTagEntry {
+	if raw == "" {
+		return nil
+	}
+	var out []TopTagEntry
+	if err := json.Unmarshal([]byte(raw), &out); err != nil {
+		return nil
+	}
+	return out
+}
+
+func unmarshalTopNameservers(raw string) []TopNameserverEntry {
+	if raw == "" {
+		return nil
+	}
+	var out []TopNameserverEntry
+	if err := json.Unmarshal([]byte(raw), &out); err != nil {
+		return nil
+	}
+	return out
+}
+
+func unmarshalTopASNs(raw string) []TopASNEntry {
+	if raw == "" {
+		return nil
+	}
+	var out []TopASNEntry
+	if err := json.Unmarshal([]byte(raw), &out); err != nil {
+		return nil
+	}
+	return out
+}
+
+func unmarshalFactDistributions(raw string) map[string]PublicAnalysisFactDistribution {
+	if raw == "" {
+		return nil
+	}
+	var out map[string]PublicAnalysisFactDistribution
+	if err := json.Unmarshal([]byte(raw), &out); err != nil {
+		return nil
+	}
+	return out
+}
+
+// GetSnapshotOverview returns the captured overview row for one snapshot.
+func (s *SQLJobStore) GetSnapshotOverview(snapshotID int64) (SnapshotOverviewV2, bool) {
+	row := s.db.QueryRow(
+		fmt.Sprintf(`SELECT %s
+			FROM analysis_snapshot_overview_view
+			WHERE snapshot_id = %s
+			LIMIT 1`,
+			analysisSnapshotOverviewViewCols, s.ph(1)),
+		snapshotID,
+	)
+	_, overview, err := scanSnapshotOverviewView(row)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return SnapshotOverviewV2{}, false
+		}
+		return SnapshotOverviewV2{}, false
+	}
+	return overview, true
+}
+
+// ListSnapshotOverviewsByIDs returns the overview rows for a set of
+// snapshots, keyed by snapshot id. Missing rows are simply absent from
+// the map. Used by the trends endpoint to drive a category time series
+// off one indexed scan.
+func (s *SQLJobStore) ListSnapshotOverviewsByIDs(snapshotIDs []int64) map[int64]SnapshotOverviewV2 {
+	out := map[int64]SnapshotOverviewV2{}
+	if len(snapshotIDs) == 0 {
+		return out
+	}
+	placeholders := make([]string, len(snapshotIDs))
+	args := make([]any, len(snapshotIDs))
+	for i, id := range snapshotIDs {
+		placeholders[i] = s.ph(i + 1)
+		args[i] = id
+	}
+	query := fmt.Sprintf(`SELECT %s
+		FROM analysis_snapshot_overview_view
+		WHERE snapshot_id IN (%s)`,
+		analysisSnapshotOverviewViewCols, joinPlaceholders(placeholders))
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		id, overview, err := scanSnapshotOverviewView(rows)
+		if err != nil {
+			return out
+		}
+		out[id] = overview
+	}
+	return out
+}
+
+func joinPlaceholders(items []string) string {
+	switch len(items) {
+	case 0:
+		return ""
+	case 1:
+		return items[0]
+	}
+	out := items[0]
+	for _, p := range items[1:] {
+		out += ", " + p
+	}
+	return out
+}
+
+// queryBatchTotals returns the cohort-wide counts (distinct domains,
+// nameservers, endpoints, ASNs, prefixes) for one batch. Parent-role
+// endpoints are excluded so the counts match what the entity tabs show.
 func (s *SQLJobStore) queryBatchTotals(cohortID int64, batchID string) (SnapshotOverviewTotals, error) {
 	var totals SnapshotOverviewTotals
 
@@ -256,10 +499,9 @@ func (s *SQLJobStore) queryBatchTotals(cohortID int64, batchID string) (Snapshot
 	return totals, nil
 }
 
-// queryBatchSeverityDistribution returns the per-severity domain counts for
-// one (cohort, batch) snapshot. Domains with no severity (no findings at
-// all) fall into the "OK" bucket so the distribution always covers the
-// full cohort membership.
+// queryBatchSeverityDistribution returns per-severity domain counts.
+// Domains with no findings collapse into the "OK" bucket so the
+// distribution always covers the full cohort membership.
 func (s *SQLJobStore) queryBatchSeverityDistribution(cohortID int64, batchID string) (map[string]int, error) {
 	rows, err := s.db.Query(
 		fmt.Sprintf(`SELECT ards.worst_level, COUNT(DISTINCT ards.domain_id)
@@ -289,9 +531,9 @@ func (s *SQLJobStore) queryBatchSeverityDistribution(cohortID int64, batchID str
 	return out, rows.Err()
 }
 
-// queryBatchGradeDistribution returns the per-grade domain counts. Runs
-// whose grade has not been computed are excluded so the payload stays
-// clean; the catch-all lives under severity_distribution instead.
+// queryBatchGradeDistribution returns per-grade domain counts. Domains
+// without a computed grade are excluded; the catch-all sits under the
+// severity distribution.
 func (s *SQLJobStore) queryBatchGradeDistribution(cohortID int64, batchID string) (map[string]int, error) {
 	rows, err := s.db.Query(
 		fmt.Sprintf(`SELECT ards.grade, COUNT(DISTINCT ards.domain_id)
@@ -318,8 +560,8 @@ func (s *SQLJobStore) queryBatchGradeDistribution(cohortID int64, batchID string
 	return out, rows.Err()
 }
 
-// queryBatchFactDistribution returns the per-key distinct-domain count for
-// one fact category (e.g. "signed" or "dnskey_algo") scoped to a batch.
+// queryBatchFactDistribution returns per-key distinct-domain counts for
+// one fact category (signed / dnskey_algo) scoped to a batch.
 func (s *SQLJobStore) queryBatchFactDistribution(cohortID int64, batchID, category string) (map[string]int, error) {
 	rows, err := s.db.Query(
 		fmt.Sprintf(`SELECT f.fact_key, COUNT(DISTINCT f.domain_id)
@@ -346,12 +588,8 @@ func (s *SQLJobStore) queryBatchFactDistribution(cohortID int64, batchID, catego
 	return out, rows.Err()
 }
 
-// queryBatchTopTags returns the top-N tags by distinct domain count in
-// one (cohort, batch) snapshot. Only WARNING / ERROR / CRITICAL tags
-// surface — INFO and NOTICE chatter ("zone exists", DNSSEC OK) would
-// otherwise crowd out the actionable findings the overview tab is
-// trying to highlight. The level column carries the worst level the
-// projector observed for that tag so the UI can tone the row.
+// queryBatchTopTags returns the top-N tags by distinct domain count.
+// INFO/NOTICE chatter is excluded so actionable findings dominate.
 func (s *SQLJobStore) queryBatchTopTags(cohortID int64, batchID string, limit int) ([]TopTagEntry, error) {
 	rows, err := s.db.Query(
 		fmt.Sprintf(`SELECT t.tag, t.level, COUNT(DISTINCT t.domain_id) AS dc
@@ -380,9 +618,8 @@ func (s *SQLJobStore) queryBatchTopTags(cohortID int64, batchID string, limit in
 	return out, rows.Err()
 }
 
-// queryBatchTopNameservers returns the top-N authoritative nameservers by
-// distinct domain count. Parent-role endpoints are excluded so root / TLD
-// registry servers don't dominate the chart.
+// queryBatchTopNameservers returns the top-N authoritative nameservers
+// by distinct domain count. Parent-role endpoints are excluded.
 func (s *SQLJobStore) queryBatchTopNameservers(cohortID int64, batchID string, limit int) ([]TopNameserverEntry, error) {
 	rows, err := s.db.Query(
 		fmt.Sprintf(`SELECT n.name, COUNT(DISTINCT e.domain_id) AS dc
@@ -412,8 +649,7 @@ func (s *SQLJobStore) queryBatchTopNameservers(cohortID int64, batchID string, l
 }
 
 // queryBatchTopASNs returns the top-N ASNs by distinct domain count,
-// resolving each ASN's label from analysis_asns so the UI has a display
-// name without a second round-trip per row.
+// resolving each ASN's display label from analysis_asns.
 func (s *SQLJobStore) queryBatchTopASNs(cohortID int64, batchID string, limit int) ([]TopASNEntry, error) {
 	rows, err := s.db.Query(
 		fmt.Sprintf(`SELECT da.asn, COALESCE(a.label, ''), COUNT(DISTINCT da.domain_id) AS dc
@@ -440,126 +676,4 @@ func (s *SQLJobStore) queryBatchTopASNs(cohortID int64, batchID string, limit in
 		out = append(out, entry)
 	}
 	return out, rows.Err()
-}
-
-// CountBatchSnapshotRuns returns the number of distinct runs and domains
-// materialized for a (cohort, batch) snapshot so the projector can keep
-// the snapshot row's counters accurate without bookkeeping on every
-// graduation. Timestamps cover the span of finished_at across those runs.
-func (s *SQLJobStore) CountBatchSnapshotRuns(cohortID int64, batchID string) (runCount, domainCount int, firstFinished, lastFinished time.Time, err error) {
-	if batchID == "" {
-		return 0, 0, time.Time{}, time.Time{}, fmt.Errorf("count batch snapshot runs: batch_id is required")
-	}
-	row := s.db.QueryRow(
-		fmt.Sprintf(`SELECT
-			COUNT(DISTINCT ards.run_id),
-			COUNT(DISTINCT ards.domain_id),
-			COALESCE(MIN(r.finished_at), ''),
-			COALESCE(MAX(r.finished_at), '')
-			FROM analysis_run_domain_summary ards
-			JOIN runs r ON r.id = ards.run_id
-			WHERE ards.cohort_id = %s AND r.batch_id = %s`, s.ph(1), s.ph(2)),
-		cohortID, batchID,
-	)
-	var minStr, maxStr string
-	if err := row.Scan(&runCount, &domainCount, &minStr, &maxStr); err != nil {
-		return 0, 0, time.Time{}, time.Time{}, fmt.Errorf("count batch snapshot runs: %w", err)
-	}
-	firstFinished = parseTimestampStr(minStr)
-	lastFinished = parseTimestampStr(maxStr)
-	return runCount, domainCount, firstFinished, lastFinished, nil
-}
-
-// CohortBatchFactStats is one (cohort, batch) pair that has materialized
-// fact rows. The projector's first-boot backfill enumerates these to
-// reconstruct snapshot rows for historical data.
-type CohortBatchFactStats struct {
-	CohortID      int64
-	BatchID       string
-	RunCount      int
-	DomainCount   int
-	FirstFinished time.Time
-	LastFinished  time.Time
-}
-
-// ListCohortBatchesWithFacts returns every (cohort, batch) pair that has
-// at least one materialized domain_summary row, along with run / domain
-// counts and the finished_at span. Used by the Phase 7 first-boot
-// snapshot backfill so historical batches get one captured snapshot
-// each without reprojecting.
-func (s *SQLJobStore) ListCohortBatchesWithFacts() ([]CohortBatchFactStats, error) {
-	rows, err := s.db.Query(
-		`SELECT ards.cohort_id, r.batch_id,
-			COUNT(DISTINCT ards.run_id),
-			COUNT(DISTINCT ards.domain_id),
-			COALESCE(MIN(r.finished_at), ''),
-			COALESCE(MAX(r.finished_at), '')
-			FROM analysis_run_domain_summary ards
-			JOIN runs r ON r.id = ards.run_id
-			WHERE r.batch_id <> ''
-			GROUP BY ards.cohort_id, r.batch_id
-			ORDER BY ards.cohort_id, r.batch_id`,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("list cohort batches with facts: %w", err)
-	}
-	defer rows.Close()
-	var out []CohortBatchFactStats
-	for rows.Next() {
-		var stats CohortBatchFactStats
-		var minStr, maxStr string
-		if err := rows.Scan(&stats.CohortID, &stats.BatchID, &stats.RunCount, &stats.DomainCount, &minStr, &maxStr); err != nil {
-			return nil, fmt.Errorf("scan cohort batch stats: %w", err)
-		}
-		stats.FirstFinished = parseTimestampStr(minStr)
-		stats.LastFinished = parseTimestampStr(maxStr)
-		out = append(out, stats)
-	}
-	return out, rows.Err()
-}
-
-// CountOutstandingJobsForBatch returns the number of in-flight (queued /
-// running / paused) jobs still attached to a batch. Callers use this to
-// decide whether a pending snapshot is safe to promote to captured.
-func (s *SQLJobStore) CountOutstandingJobsForBatch(batchID string) (int, error) {
-	var count int
-	row := s.db.QueryRow(
-		fmt.Sprintf(`SELECT COUNT(*) FROM jobs WHERE batch_id = %s`, s.ph(1)),
-		batchID,
-	)
-	if err := row.Scan(&count); err != nil {
-		return 0, fmt.Errorf("count outstanding jobs for batch %s: %w", batchID, err)
-	}
-	return count, nil
-}
-
-// CountUnprojectedSnapshotRuns returns completed runs in a snapshot-intent
-// batch that belong to the cohort's source tag but do not yet have a ready
-// analysis projection row. Snapshot capture must wait for this to reach zero;
-// otherwise aggregates can be computed from a partial materialization even
-// after the queue itself has drained.
-func (s *SQLJobStore) CountUnprojectedSnapshotRuns(cohortID int64, batchID string) (int, error) {
-	if batchID == "" {
-		return 0, fmt.Errorf("count unprojected snapshot runs: batch_id is required")
-	}
-	var count int
-	row := s.db.QueryRow(
-		fmt.Sprintf(`SELECT COUNT(*)
-			FROM runs r
-			JOIN analysis_cohort_catalog c ON c.id = %s
-			JOIN domain_tags dt ON dt.domain_id = r.domain_id AND dt.tag = c.source_tag
-			LEFT JOIN analysis_projection_state ps
-				ON ps.cohort_id = c.id
-				AND ps.run_id = r.id
-				AND ps.status = %s
-			WHERE r.batch_id = %s
-			  AND c.source_type = 'tag'
-			  AND ps.run_id IS NULL`,
-			s.ph(1), s.ph(2), s.ph(3)),
-		cohortID, AnalysisMaterializationReady, batchID,
-	)
-	if err := row.Scan(&count); err != nil {
-		return 0, fmt.Errorf("count unprojected snapshot runs for cohort %d batch %s: %w", cohortID, batchID, err)
-	}
-	return count, nil
 }

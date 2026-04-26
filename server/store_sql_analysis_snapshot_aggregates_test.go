@@ -1,15 +1,14 @@
 package server
 
 import (
-	"encoding/json"
 	"testing"
 	"time"
 )
 
-// TestComputeSnapshotAggregatesSeverityAndGrade checks that the severity
-// and grade distribution aggregates are keyed on distinct domains scoped
-// to the batch, not all runs in the cohort.
-func TestComputeSnapshotAggregatesSeverityAndGrade(t *testing.T) {
+// TestComputeSnapshotOverviewSeverityAndGrade checks that the severity
+// and grade distributions are keyed on distinct domains scoped to the
+// batch, not all runs in the cohort.
+func TestComputeSnapshotOverviewSeverityAndGrade(t *testing.T) {
 	s := testStoreForBackend(t, testBackends(t)[0])
 	now := time.Date(2026, 4, 20, 10, 0, 0, 0, time.UTC)
 
@@ -75,43 +74,31 @@ func TestComputeSnapshotAggregatesSeverityAndGrade(t *testing.T) {
 		}
 	}
 
-	aggs, err := s.ComputeSnapshotAggregates(cohort.ID, "batch-x")
+	overview, err := s.ComputeSnapshotOverview(cohort.ID, "batch-x")
 	if err != nil {
-		t.Fatalf("ComputeSnapshotAggregates: %v", err)
+		t.Fatalf("ComputeSnapshotOverview: %v", err)
 	}
-	byCategory := map[string]string{}
-	for _, agg := range aggs {
-		byCategory[agg.Category] = agg.PayloadJSON
-	}
-
-	var severity map[string]int
-	if err := json.Unmarshal([]byte(byCategory[SnapshotAggregateSeverityDistribution]), &severity); err != nil {
-		t.Fatalf("unmarshal severity: %v", err)
-	}
+	severity := overview.SeverityDistribution
 	if severity["NOTICE"] != 1 || severity["WARNING"] != 1 {
 		t.Fatalf("severity counts = %v", severity)
 	}
 	if _, ok := severity["CRITICAL"]; ok {
-		t.Fatalf("severity payload leaked the out-of-batch CRITICAL row: %v", severity)
+		t.Fatalf("severity leaked the out-of-batch CRITICAL row: %v", severity)
 	}
-
-	var grades map[string]int
-	if err := json.Unmarshal([]byte(byCategory[SnapshotAggregateGradeDistribution]), &grades); err != nil {
-		t.Fatalf("unmarshal grades: %v", err)
-	}
+	grades := overview.GradeDistribution
 	if grades["A"] != 1 || grades["B"] != 1 {
 		t.Fatalf("grade counts = %v", grades)
 	}
 	if _, ok := grades["F"]; ok {
-		t.Fatalf("grade payload leaked the out-of-batch F row: %v", grades)
+		t.Fatalf("grade leaked the out-of-batch F row: %v", grades)
 	}
 }
 
-// TestComputeSnapshotAggregatesTopTagsExcludesInfoAndNotice pins the
+// TestComputeSnapshotOverviewTopTagsExcludesInfoAndNotice pins the
 // "Top issues" filter: the overview panel advertises WARNING-and-worse
 // only, so INFO / NOTICE / blank-level tag rows must not surface even
 // when they dominate by domain count.
-func TestComputeSnapshotAggregatesTopTagsExcludesInfoAndNotice(t *testing.T) {
+func TestComputeSnapshotOverviewTopTagsExcludesInfoAndNotice(t *testing.T) {
 	s := testStoreForBackend(t, testBackends(t)[0])
 	now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
 
@@ -171,20 +158,11 @@ func TestComputeSnapshotAggregatesTopTagsExcludesInfoAndNotice(t *testing.T) {
 		}
 	}
 
-	aggs, err := s.ComputeSnapshotAggregates(cohort.ID, "batch-tags")
+	overview, err := s.ComputeSnapshotOverview(cohort.ID, "batch-tags")
 	if err != nil {
-		t.Fatalf("ComputeSnapshotAggregates: %v", err)
+		t.Fatalf("ComputeSnapshotOverview: %v", err)
 	}
-
-	var top []TopTagEntry
-	for _, agg := range aggs {
-		if agg.Category != SnapshotAggregateTopTags {
-			continue
-		}
-		if err := json.Unmarshal([]byte(agg.PayloadJSON), &top); err != nil {
-			t.Fatalf("unmarshal top_tags: %v", err)
-		}
-	}
+	top := overview.TopTags
 	if len(top) != 2 {
 		t.Fatalf("top_tags = %d entries, want 2 (one WARNING + one ERROR): %+v", len(top), top)
 	}

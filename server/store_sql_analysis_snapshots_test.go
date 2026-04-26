@@ -350,7 +350,7 @@ func TestClearAnalysisCohortSnapshotsResetsPin(t *testing.T) {
 	}
 }
 
-func TestSQLJobStoreReplaceSnapshotAggregates(t *testing.T) {
+func TestSQLJobStoreReplaceSnapshotOverview(t *testing.T) {
 	for _, b := range testBackends(t) {
 		t.Run(b.name, func(t *testing.T) {
 			s := testStoreForBackend(t, b)
@@ -366,45 +366,42 @@ func TestSQLJobStoreReplaceSnapshotAggregates(t *testing.T) {
 				t.Fatalf("seed snapshot: %v", err)
 			}
 
-			initial := []AnalysisCohortSnapshotAggregate{
-				{SnapshotID: snap.ID, Category: "grade_distribution", PayloadJSON: `{"A":1}`},
-				{SnapshotID: snap.ID, Category: "signed", PayloadJSON: `{"signed":1,"unsigned":0}`},
+			initial := SnapshotOverviewV2{
+				Totals:               SnapshotOverviewTotals{DomainCount: 2},
+				GradeDistribution:    map[string]int{"A": 1},
+				Signed:               map[string]int{"signed": 1, "unsigned": 0},
+				SeverityDistribution: map[string]int{"OK": 2},
 			}
-			if err := s.ReplaceSnapshotAggregates(snap.ID, initial); err != nil {
+			if err := s.ReplaceSnapshotOverview(snap.ID, initial); err != nil {
 				t.Fatalf("Replace initial: %v", err)
 			}
-			list := s.ListSnapshotAggregates(snap.ID)
-			if len(list) != 2 {
-				t.Fatalf("len list = %d, want 2", len(list))
+			got, ok := s.GetSnapshotOverview(snap.ID)
+			if !ok {
+				t.Fatal("expected overview row after replace")
 			}
-			if list[0].Category != "grade_distribution" || list[1].Category != "signed" {
-				t.Fatalf("list order: %+v", list)
+			if got.Totals.DomainCount != 2 {
+				t.Fatalf("DomainCount = %d, want 2", got.Totals.DomainCount)
 			}
-			if list[0].ComputedAt.IsZero() {
-				t.Fatal("ComputedAt should be stamped automatically when left zero")
+			if got.GradeDistribution["A"] != 1 || got.Signed["signed"] != 1 {
+				t.Fatalf("payload mismatch: %+v", got)
 			}
 
-			// Replacement must atomically swap — old rows disappear.
-			replacement := []AnalysisCohortSnapshotAggregate{
-				{SnapshotID: snap.ID, Category: "signed", PayloadJSON: `{"signed":2,"unsigned":0}`},
+			// Replacement must atomically swap.
+			replacement := SnapshotOverviewV2{
+				Signed: map[string]int{"signed": 2, "unsigned": 0},
 			}
-			if err := s.ReplaceSnapshotAggregates(snap.ID, replacement); err != nil {
+			if err := s.ReplaceSnapshotOverview(snap.ID, replacement); err != nil {
 				t.Fatalf("Replace second: %v", err)
 			}
-			list = s.ListSnapshotAggregates(snap.ID)
-			if len(list) != 1 {
-				t.Fatalf("len list = %d, want 1 after replacement", len(list))
+			got, ok = s.GetSnapshotOverview(snap.ID)
+			if !ok {
+				t.Fatal("expected overview row after second replace")
 			}
-			if list[0].Category != "signed" || list[0].PayloadJSON != `{"signed":2,"unsigned":0}` {
-				t.Fatalf("replacement payload not stored: %+v", list[0])
+			if got.Signed["signed"] != 2 {
+				t.Fatalf("replacement payload not stored: %+v", got)
 			}
-
-			// Empty input clears the set entirely.
-			if err := s.ReplaceSnapshotAggregates(snap.ID, nil); err != nil {
-				t.Fatalf("Replace empty: %v", err)
-			}
-			if list := s.ListSnapshotAggregates(snap.ID); len(list) != 0 {
-				t.Fatalf("len list = %d, want 0 after empty replace", len(list))
+			if len(got.GradeDistribution) != 0 {
+				t.Fatalf("old GradeDistribution leaked into replacement: %+v", got)
 			}
 		})
 	}

@@ -146,10 +146,10 @@ func TestSQLJobStoreDeleteBatchRemovesSnapshotAndAggregates(t *testing.T) {
 			if err != nil {
 				t.Fatalf("UpsertAnalysisCohortSnapshot: %v", err)
 			}
-			if err := s.ReplaceSnapshotAggregates(snap.ID, []AnalysisCohortSnapshotAggregate{
-				{SnapshotID: snap.ID, Category: "grade_distribution", PayloadJSON: `{"A":1}`, ComputedAt: now},
+			if err := s.ReplaceSnapshotOverview(snap.ID, SnapshotOverviewV2{
+				GradeDistribution: map[string]int{"A": 1},
 			}); err != nil {
-				t.Fatalf("ReplaceSnapshotAggregates: %v", err)
+				t.Fatalf("ReplaceSnapshotOverview: %v", err)
 			}
 			if err := s.ReplaceSnapshotEntityViews(snap.ID, SnapshotEntityViews{
 				Nameservers: []AnalysisSnapshotNameserverView{{NameserverID: 1, NameserverName: "ns1.example", DomainCount: 1}},
@@ -170,15 +170,17 @@ func TestSQLJobStoreDeleteBatchRemovesSnapshotAndAggregates(t *testing.T) {
 				t.Fatal("snapshot still present")
 			}
 			if n := countRows(t, s,
-				"SELECT COUNT(*) FROM analysis_cohort_snapshot_aggregates WHERE snapshot_id = "+s.ph(1),
+				"SELECT COUNT(*) FROM analysis_snapshot_overview_view WHERE snapshot_id = "+s.ph(1),
 				snap.ID,
 			); n != 0 {
-				t.Fatalf("aggregates remain: %d", n)
+				t.Fatalf("overview view rows remain: %d", n)
 			}
 			for _, table := range []string{
 				"analysis_snapshot_nameserver_view",
 				"analysis_snapshot_endpoint_view",
 				"analysis_snapshot_asn_view",
+				"analysis_snapshot_domain_view",
+				"analysis_snapshot_prefix_view",
 			} {
 				if n := countRows(t, s,
 					"SELECT COUNT(*) FROM "+table+" WHERE snapshot_id = "+s.ph(1),

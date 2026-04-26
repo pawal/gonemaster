@@ -97,27 +97,13 @@ func TestPublicAnalysisCacheHeadersAutoLatest(t *testing.T) {
 	}
 }
 
-func TestComputeSnapshotAggregatesIncludesOverviewV2(t *testing.T) {
+func TestComputeSnapshotOverviewProducesTotals(t *testing.T) {
 	s := testStoreForBackend(t, testBackends(t)[0])
 	cohortID, _ := snapshotViewFixture(t, s)
 
-	aggs, err := s.ComputeSnapshotAggregates(cohortID, "batch-x")
+	got, err := s.ComputeSnapshotOverview(cohortID, "batch-x")
 	if err != nil {
-		t.Fatalf("ComputeSnapshotAggregates: %v", err)
-	}
-	var overview *AnalysisCohortSnapshotAggregate
-	for i := range aggs {
-		if aggs[i].Category == SnapshotAggregateOverviewV2 {
-			overview = &aggs[i]
-			break
-		}
-	}
-	if overview == nil {
-		t.Fatalf("overview_v2 row missing from aggregates: %+v", aggs)
-	}
-	var got SnapshotOverviewV2
-	if err := json.Unmarshal([]byte(overview.PayloadJSON), &got); err != nil {
-		t.Fatalf("unmarshal overview_v2: %v", err)
+		t.Fatalf("ComputeSnapshotOverview: %v", err)
 	}
 	if got.Totals.DomainCount != 2 {
 		t.Errorf("totals.domain_count = %d, want 2", got.Totals.DomainCount)

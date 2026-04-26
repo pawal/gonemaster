@@ -223,13 +223,13 @@ func TestAdminSnapshotRetireSoftDeletes(t *testing.T) {
 }
 
 // TestAdminSnapshotPurgeHardDeletes verifies the ?purge=true query
-// parameter: the snapshot row and its aggregates are removed entirely.
+// parameter: the snapshot row and its overview view are removed.
 func TestAdminSnapshotPurgeHardDeletes(t *testing.T) {
 	f := newAdminSnapshotFixture(t)
-	if err := f.store.ReplaceSnapshotAggregates(f.snapshot.ID, []AnalysisCohortSnapshotAggregate{
-		{SnapshotID: f.snapshot.ID, Category: SnapshotAggregateSigned, PayloadJSON: `{"signed":1}`},
+	if err := f.store.ReplaceSnapshotOverview(f.snapshot.ID, SnapshotOverviewV2{
+		Signed: map[string]int{"signed": 1},
 	}); err != nil {
-		t.Fatalf("seed aggregates: %v", err)
+		t.Fatalf("seed overview: %v", err)
 	}
 	path := fmt.Sprintf("/api/v1/analysis/cohorts/%d/snapshots/%s?purge=true", f.cohort.ID, f.snapshot.Slug)
 	resp := f.call(http.MethodDelete, path, "")
@@ -239,8 +239,8 @@ func TestAdminSnapshotPurgeHardDeletes(t *testing.T) {
 	if _, found := f.store.GetAnalysisCohortSnapshotBySlug(f.cohort.ID, f.snapshot.Slug); found {
 		t.Fatal("expected snapshot row to be hard-deleted")
 	}
-	if aggs := f.store.ListSnapshotAggregates(f.snapshot.ID); len(aggs) != 0 {
-		t.Fatalf("expected aggregates to be purged, got %d", len(aggs))
+	if _, ok := f.store.GetSnapshotOverview(f.snapshot.ID); ok {
+		t.Fatal("expected overview view row to be purged")
 	}
 }
 
@@ -268,7 +268,7 @@ func TestAdminSnapshotRetireUnpinsCohort(t *testing.T) {
 }
 
 // TestAdminSnapshotRematerialize verifies the rematerialize action
-// recomputes aggregates and bumps CapturedAt.
+// rewrites the overview view and bumps CapturedAt.
 func TestAdminSnapshotRematerialize(t *testing.T) {
 	f := newAdminSnapshotFixture(t)
 	originalCaptured := f.snapshot.CapturedAt
@@ -284,9 +284,8 @@ func TestAdminSnapshotRematerialize(t *testing.T) {
 	if !snap.CapturedAt.After(originalCaptured) {
 		t.Fatalf("CapturedAt = %s, want advanced from %s", snap.CapturedAt, originalCaptured)
 	}
-	aggs := f.store.ListSnapshotAggregates(snap.ID)
-	if len(aggs) == 0 {
-		t.Fatal("expected aggregates to be written by rematerialize")
+	if _, ok := f.store.GetSnapshotOverview(snap.ID); !ok {
+		t.Fatal("expected overview view row to be written by rematerialize")
 	}
 }
 

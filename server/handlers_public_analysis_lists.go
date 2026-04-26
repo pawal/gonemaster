@@ -21,12 +21,11 @@ type AnalysisReadStore interface {
 	GetAnalysisAddress(id int64) (AnalysisAddress, bool)
 	GetAnalysisPrefix(id int64) (AnalysisPrefix, bool)
 	GetAnalysisASN(asn int64) (AnalysisASN, bool)
-	// Snapshot-side read surface used by the public snapshot selector and
-	// the snapshot-scoped materialization cache.
 	ListAnalysisCohortSnapshots(cohortID int64) []AnalysisCohortSnapshot
 	GetAnalysisCohortSnapshotBySlug(cohortID int64, slug string) (AnalysisCohortSnapshot, bool)
 	GetDefaultSnapshotForCohort(cohortID int64) (AnalysisCohortSnapshot, bool)
-	ListSnapshotAggregates(snapshotID int64) []AnalysisCohortSnapshotAggregate
+	GetSnapshotOverview(snapshotID int64) (SnapshotOverviewV2, bool)
+	ListSnapshotOverviewsByIDs(snapshotIDs []int64) map[int64]SnapshotOverviewV2
 	ListSnapshotNameserverViews(snapshotID int64) []AnalysisSnapshotNameserverView
 	ListSnapshotEndpointViews(snapshotID int64) []AnalysisSnapshotEndpointView
 	ListSnapshotASNViews(snapshotID int64) []AnalysisSnapshotASNView

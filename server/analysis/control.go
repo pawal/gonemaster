@@ -41,8 +41,8 @@ type ControlStore interface {
 	CountBatchSnapshotRuns(cohortID int64, batchID string) (runCount, domainCount int, firstFinished, lastFinished time.Time, err error)
 	CountOutstandingJobsForBatch(batchID string) (int, error)
 	CountUnprojectedSnapshotRuns(cohortID int64, batchID string) (int, error)
-	ComputeSnapshotAggregates(cohortID int64, batchID string) ([]serverpkg.AnalysisCohortSnapshotAggregate, error)
-	ReplaceSnapshotAggregates(snapshotID int64, aggs []serverpkg.AnalysisCohortSnapshotAggregate) error
+	ComputeSnapshotOverview(cohortID int64, batchID string) (serverpkg.SnapshotOverviewV2, error)
+	ReplaceSnapshotOverview(snapshotID int64, overview serverpkg.SnapshotOverviewV2) error
 	ComputeSnapshotEntityViews(cohortID int64, batchID string) (serverpkg.SnapshotEntityViews, error)
 	ReplaceSnapshotEntityViews(snapshotID int64, views serverpkg.SnapshotEntityViews) error
 
@@ -199,15 +199,15 @@ func (c *Controller) accumulateSnapshot(cohort serverpkg.AnalysisCohort, batch s
 	return nil
 }
 
-// materializeSnapshot writes both the aggregate blobs and the entity-view
-// rows for one snapshot in sequence.
+// materializeSnapshot writes the per-snapshot overview row and the
+// entity-view rows in sequence.
 func (c *Controller) materializeSnapshot(snap serverpkg.AnalysisCohortSnapshot) error {
-	aggregates, err := c.store.ComputeSnapshotAggregates(snap.CohortID, snap.BatchID)
+	overview, err := c.store.ComputeSnapshotOverview(snap.CohortID, snap.BatchID)
 	if err != nil {
-		return fmt.Errorf("compute aggregates: %w", err)
+		return fmt.Errorf("compute overview: %w", err)
 	}
-	if err := c.store.ReplaceSnapshotAggregates(snap.ID, aggregates); err != nil {
-		return fmt.Errorf("write aggregates: %w", err)
+	if err := c.store.ReplaceSnapshotOverview(snap.ID, overview); err != nil {
+		return fmt.Errorf("write overview: %w", err)
 	}
 	views, err := c.store.ComputeSnapshotEntityViews(snap.CohortID, snap.BatchID)
 	if err != nil {
@@ -600,21 +600,20 @@ var logSnapshotCaptureError = func(err error) {
 	// install a logging variant via ReplaceSnapshotCaptureErrorLogger.
 }
 
-// SnapshotBackfillDoneSettingKey gates the one-time Phase 7 retroactive
-// snapshot creation. Presence (any value) means the migration has
-// already run; absence triggers a single pass on the next server start.
+// SnapshotBackfillDoneSettingKey gates the one-time retroactive snapshot
+// creation. Presence (any value) means the migration has already run;
+// absence triggers a single pass on the next server start.
 const SnapshotBackfillDoneSettingKey = "analysis_snapshot_backfill_v1"
 
 // SnapshotBackfillReport aliases the server-package type so callers in
 // analysis tests can use either import without duplicating the struct.
 type SnapshotBackfillReport = serverpkg.AnalysisSnapshotBackfillReport
 
-// BackfillSnapshotsFromFacts is the Phase 7 retroactive migration: for
-// every (cohort, batch) pair with materialized domain_summary rows it
-// upserts a captured snapshot row plus its aggregates. Skips pairs
-// already covered by an existing snapshot so the migration is
-// idempotent; callers gate the whole thing behind
-// SnapshotBackfillDoneSettingKey to keep it a one-shot on first boot.
+// BackfillSnapshotsFromFacts upserts a captured snapshot row plus its
+// overview and entity views for every (cohort, batch) pair with
+// materialized domain_summary rows. Idempotent: pairs already covered
+// by an existing snapshot are skipped. Gated by
+// SnapshotBackfillDoneSettingKey so it runs once on first boot.
 func (c *Controller) BackfillSnapshotsFromFacts(ctx context.Context) (serverpkg.AnalysisSnapshotBackfillReport, error) {
 	report := serverpkg.AnalysisSnapshotBackfillReport{}
 	stats, err := c.store.ListCohortBatchesWithFacts()
@@ -651,16 +650,16 @@ func (c *Controller) BackfillSnapshotsFromFacts(ctx context.Context) (serverpkg.
 			CapturedAt:  pair.LastFinished,
 		}
 		if batch.SnapshotIntent || batch.ID == pair.BatchID {
-			// Aggregate computation only works when the fact tables are
+			// Overview computation only works when the fact tables are
 			// there; fail soft so one broken pair does not abort the
 			// whole migration.
-			aggs, err := c.store.ComputeSnapshotAggregates(pair.CohortID, pair.BatchID)
+			overview, err := c.store.ComputeSnapshotOverview(pair.CohortID, pair.BatchID)
 			if err == nil {
 				upserted, upsertErr := c.store.UpsertAnalysisCohortSnapshot(snap)
 				if upsertErr != nil {
 					continue
 				}
-				_ = c.store.ReplaceSnapshotAggregates(upserted.ID, aggs)
+				_ = c.store.ReplaceSnapshotOverview(upserted.ID, overview)
 				if views, viewsErr := c.store.ComputeSnapshotEntityViews(pair.CohortID, pair.BatchID); viewsErr == nil {
 					_ = c.store.ReplaceSnapshotEntityViews(upserted.ID, views)
 				}

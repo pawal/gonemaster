@@ -16,9 +16,9 @@ type AnalysisController interface {
 	// snapshot capture goroutine and once at startup so a server restart
 	// promotes batches that finished while the process was down.
 	CaptureCompletedSnapshots(ctx context.Context) error
-	// BackfillSnapshotsFromFacts is the Phase 7 retroactive migration
-	// that creates a captured snapshot row per historical (cohort,
-	// batch) pair. Server startup calls it once, gated by a setting.
+	// BackfillSnapshotsFromFacts creates a captured snapshot row per
+	// historical (cohort, batch) pair. Server startup calls it once,
+	// gated by a setting.
 	BackfillSnapshotsFromFacts(ctx context.Context) (AnalysisSnapshotBackfillReport, error)
 }
 

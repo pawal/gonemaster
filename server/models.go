@@ -457,19 +457,23 @@ type AnalysisCohortSnapshotAggregate struct {
 }
 
 // AnalysisSnapshotNameserverView is one pre-computed nameserver row for a
-// captured snapshot, ready to serve the Nameservers tab without scanning facts.
+// captured snapshot, ready to serve the Nameservers tab and the per-
+// nameserver detail page without scanning facts.
 type AnalysisSnapshotNameserverView struct {
-	SnapshotID     int64  `json:"snapshot_id"`
-	NameserverID   int64  `json:"nameserver_id"`
-	NameserverName string `json:"nameserver_name"`
-	DomainCount    int    `json:"domain_count"`
-	EndpointCount  int    `json:"endpoint_count"`
-	IPv4Count      int    `json:"ipv4_count"`
-	IPv6Count      int    `json:"ipv6_count"`
-	ASNCount       int    `json:"asn_count"`
-	Operator       string `json:"operator,omitempty"`
-	OperatorASN    *int64 `json:"operator_asn,omitempty"`
-	QueryCount     int    `json:"query_count,omitempty"`
+	SnapshotID     int64    `json:"snapshot_id"`
+	NameserverID   int64    `json:"nameserver_id"`
+	NameserverName string   `json:"nameserver_name"`
+	DomainCount    int      `json:"domain_count"`
+	EndpointCount  int      `json:"endpoint_count"`
+	IPv4Count      int      `json:"ipv4_count"`
+	IPv6Count      int      `json:"ipv6_count"`
+	ASNCount       int      `json:"asn_count"`
+	Operator       string   `json:"operator,omitempty"`
+	OperatorASN    *int64   `json:"operator_asn,omitempty"`
+	QueryCount     int      `json:"query_count,omitempty"`
+	Addresses      []string `json:"addresses,omitempty"`
+	ASNs           []int64  `json:"asns,omitempty"`
+	Domains        []string `json:"domains,omitempty"`
 }
 
 // AnalysisSnapshotEndpointView is one pre-computed (nameserver, address) row

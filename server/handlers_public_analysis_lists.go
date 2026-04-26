@@ -30,6 +30,7 @@ type AnalysisReadStore interface {
 	ListSnapshotNameserverViews(snapshotID int64) []AnalysisSnapshotNameserverView
 	ListSnapshotEndpointViews(snapshotID int64) []AnalysisSnapshotEndpointView
 	ListSnapshotASNViews(snapshotID int64) []AnalysisSnapshotASNView
+	GetSnapshotNameserverViewByName(snapshotID int64, name string) (AnalysisSnapshotNameserverView, bool)
 }
 
 // analysisListFilter captures the shared query parameters used by public list

@@ -473,11 +473,10 @@ func (s *Server) handlePublicAnalysisNameserverDetail(w http.ResponseWriter, r *
 	if !ok {
 		return
 	}
-	decoded, err := url.PathUnescape(name)
-	if err == nil {
+	if decoded, err := url.PathUnescape(name); err == nil {
 		name = decoded
 	}
-	cohort, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
+	_, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
 	if !ok {
 		return
 	}
@@ -486,78 +485,22 @@ func (s *Server) handlePublicAnalysisNameserverDetail(w http.ResponseWriter, r *
 		return
 	}
 
-	data := s.latestMaterializationForSnapshot(cohort, snapshot)
-
-	addressASN := map[int64]int64{}
-	for _, fact := range data.addressASNs {
-		if fact.ASN != nil {
-			addressASN[fact.AddressID] = *fact.ASN
-		}
-	}
-
-	target := strings.ToLower(name)
-	var nsID int64
-	foundName := ""
-	addrSet := map[int64]struct{}{}
-	domainSet := map[int64]struct{}{}
-	v4Set := map[int64]struct{}{}
-	v6Set := map[int64]struct{}{}
-	asnSet := map[int64]struct{}{}
-	for _, ep := range data.endpoints {
-		ns, found := readStore.GetAnalysisNameserver(ep.NameserverID)
-		if !found || strings.ToLower(ns.Name) != target {
-			continue
-		}
-		nsID = ep.NameserverID
-		foundName = ns.Name
-		addrSet[ep.AddressID] = struct{}{}
-		domainSet[ep.DomainID] = struct{}{}
-		switch ep.Family {
-		case "ipv4":
-			v4Set[ep.AddressID] = struct{}{}
-		case "ipv6":
-			v6Set[ep.AddressID] = struct{}{}
-		}
-		if asn, has := addressASN[ep.AddressID]; has {
-			asnSet[asn] = struct{}{}
-		}
-	}
-	if nsID == 0 {
+	view, found := readStore.GetSnapshotNameserverViewByName(snapshot.ID, name)
+	if !found {
 		writeError(w, http.StatusNotFound, "not_found", "nameserver not found in cohort", nil)
 		return
 	}
 
-	addresses := make([]string, 0, len(addrSet))
-	for addrID := range addrSet {
-		if addr, ok := readStore.GetAnalysisAddress(addrID); ok {
-			addresses = append(addresses, addr.Address)
-		}
-	}
-	sort.Strings(addresses)
-
-	domains := make([]string, 0, len(domainSet))
-	for domainID := range domainSet {
-		if d, ok := s.store.GetDomain(domainID); ok {
-			domains = append(domains, d.Name)
-		}
-	}
-	sort.Strings(domains)
-
-	asns := make([]int64, 0, len(asnSet))
-	for asn := range asnSet {
-		asns = append(asns, asn)
-	}
-	sort.Slice(asns, func(i, j int) bool { return asns[i] < asns[j] })
-
+	writeSnapshotCacheHeaders(w, r, snapshot)
 	writeJSON(w, http.StatusOK, PublicAnalysisNameserverDetail{
-		Nameserver:    foundName,
-		DomainCount:   len(domainSet),
-		EndpointCount: len(addrSet),
-		IPv4Count:     len(v4Set),
-		IPv6Count:     len(v6Set),
-		Addresses:     addresses,
-		Domains:       domains,
-		ASNs:          asns,
+		Nameserver:    view.NameserverName,
+		DomainCount:   view.DomainCount,
+		EndpointCount: view.EndpointCount,
+		IPv4Count:     view.IPv4Count,
+		IPv6Count:     view.IPv6Count,
+		Addresses:     view.Addresses,
+		Domains:       view.Domains,
+		ASNs:          view.ASNs,
 	})
 }
 

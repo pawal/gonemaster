@@ -543,6 +543,18 @@ var sqlMigrations = []sqlMigration{
 			return buildV12DDL(bigint)
 		},
 	},
+	{
+		// Per-nameserver detail rosters baked into the existing
+		// nameserver view row: addresses, ASNs, and the served-domain
+		// list. The detail handler reads these directly so it does not
+		// need to fall back to the cohort-wide fact load + N+1 lookups.
+		version: 13,
+		stmts: []string{
+			`ALTER TABLE analysis_snapshot_nameserver_view ADD COLUMN addresses_json TEXT NOT NULL DEFAULT '[]'`,
+			`ALTER TABLE analysis_snapshot_nameserver_view ADD COLUMN asns_json TEXT NOT NULL DEFAULT '[]'`,
+			`ALTER TABLE analysis_snapshot_nameserver_view ADD COLUMN domains_json TEXT NOT NULL DEFAULT '[]'`,
+		},
+	},
 }
 
 // buildV12DDL returns migration 12: per-snapshot entity-view tables that

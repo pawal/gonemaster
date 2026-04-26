@@ -204,14 +204,11 @@ export type DomainDetailAddress = {
   status?: string;
 };
 
-export type DomainDetailEntry = {
-  timestamp: number;
+export type DomainDetailTag = {
+  tag: string;
   module?: string;
   testcase?: string;
-  tag: string;
   level?: string;
-  message?: string;
-  raw?: string;
 };
 
 export type DomainDetail = {
@@ -226,7 +223,7 @@ export type DomainDetail = {
   prefix_count: number;
   nameservers: DomainDetailNameserver[];
   addresses: DomainDetailAddress[];
-  entries: DomainDetailEntry[];
+  tags?: DomainDetailTag[];
 };
 
 export type EndpointDetail = {

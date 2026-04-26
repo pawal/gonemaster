@@ -87,13 +87,13 @@ func TestPublicAnalysisCacheHeadersAutoLatest(t *testing.T) {
 	f.seedDomainSummary("a.example", "run-a", now, 90, "A", "OK")
 	f.seedEndpoint("run-a", "a.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/nameservers")
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
+	resp := getPublicNoRedirect(t, f.srv, "/pub/api/v1/analysis/nameservers")
+	if resp.Code != http.StatusTemporaryRedirect {
+		t.Fatalf("expected 307, got %d: %s", resp.Code, resp.Body)
 	}
 	cc := resp.Header().Get("Cache-Control")
 	if !strings.Contains(cc, "no-cache") {
-		t.Errorf("auto-latest Cache-Control = %q, want no-cache", cc)
+		t.Errorf("auto-latest redirect Cache-Control = %q, want no-cache", cc)
 	}
 }
 

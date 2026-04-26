@@ -166,7 +166,7 @@ describe("+page.load (overview)", () => {
     );
     expect(data.snapshot?.slug).toBe("2026-04-17-old");
     expect(calls).toHaveLength(1);
-    expect(calls[0]).toContain("snapshot=2026-04-17-old");
+    expect(calls[0]).toContain("/cohorts/tld/snapshots/2026-04-17-old/overview");
   });
 
   it("surfaces a load error when /overview fails", async () => {

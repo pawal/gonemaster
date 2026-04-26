@@ -183,12 +183,12 @@ func TestTagDetailCacheHeadersAutoLatest(t *testing.T) {
 		{Module: "DNSSEC", Testcase: "dnssec07", Tag: "DS07_NOT_SIGNED", Level: "ERROR"},
 	})
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/tags/DS07_NOT_SIGNED")
-	if resp.Code != http.StatusOK {
-		t.Fatalf("status = %d", resp.Code)
+	resp := getPublicNoRedirect(t, f.srv, "/pub/api/v1/analysis/tags/DS07_NOT_SIGNED")
+	if resp.Code != http.StatusTemporaryRedirect {
+		t.Fatalf("status = %d, want 307", resp.Code)
 	}
 	if cc := resp.Header().Get("Cache-Control"); !strings.Contains(cc, "no-cache") {
-		t.Errorf("auto-latest Cache-Control = %q, want no-cache", cc)
+		t.Errorf("auto-latest redirect Cache-Control = %q, want no-cache", cc)
 	}
 }
 

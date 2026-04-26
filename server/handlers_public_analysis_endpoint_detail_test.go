@@ -134,12 +134,12 @@ func TestEndpointDetailCacheHeadersAutoLatest(t *testing.T) {
 	now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
 	f.seedEndpoint("run-a", "a.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/endpoints/192.0.2.1")
-	if resp.Code != http.StatusOK {
-		t.Fatalf("status = %d", resp.Code)
+	resp := getPublicNoRedirect(t, f.srv, "/pub/api/v1/analysis/endpoints/192.0.2.1")
+	if resp.Code != http.StatusTemporaryRedirect {
+		t.Fatalf("status = %d, want 307", resp.Code)
 	}
 	if cc := resp.Header().Get("Cache-Control"); !strings.Contains(cc, "no-cache") {
-		t.Errorf("auto-latest Cache-Control = %q, want no-cache", cc)
+		t.Errorf("auto-latest redirect Cache-Control = %q, want no-cache", cc)
 	}
 }
 

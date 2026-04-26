@@ -88,14 +88,24 @@ describe("analysis API client", () => {
     }
   });
 
-  it("forwards ?snapshot= through list helpers so entity links preserve pins", async () => {
+  it("lifts dataset_tag+snapshot into path-segmented URLs when both pinned", async () => {
     const { stub, calls } = recorder();
     await listDomains({ dataset_tag: "tld", snapshot: "2026-04-20" }, stub);
-    await getDomainDetail("example.com", { snapshot: "2026-04-20" }, stub);
+    await getDomainDetail("example.com", { dataset_tag: "tld", snapshot: "2026-04-20" }, stub);
     expect(calls.length).toBe(2);
     for (const { url } of calls) {
-      expect(url).toContain("snapshot=2026-04-20");
+      expect(url).toContain("/cohorts/tld/snapshots/2026-04-20/");
+      expect(url).not.toContain("snapshot=2026-04-20");
+      expect(url).not.toContain("dataset_tag=tld");
     }
+  });
+
+  it("keeps the legacy URL when snapshot is unpinned so the server can 307 to auto-latest", async () => {
+    const { stub, calls } = recorder();
+    await listDomains({ dataset_tag: "tld" }, stub);
+    expect(calls.length).toBe(1);
+    expect(calls[0].url).toContain("/domains?dataset_tag=tld");
+    expect(calls[0].url).not.toContain("/snapshots/");
   });
 
   it("snapshot endpoints target the cohort-scoped paths", async () => {

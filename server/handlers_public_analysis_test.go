@@ -17,12 +17,40 @@ func seedCohort(t *testing.T, srv *Server, cohort AnalysisCohort) AnalysisCohort
 	return created
 }
 
+// getPublic follows 3xx redirects up to a small bound, matching what
+// browsers do.
 func getPublic(t *testing.T, srv *Server, path string) *httptest.ResponseRecorder {
 	t.Helper()
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, path, nil)
-	srv.Handler().ServeHTTP(resp, req)
-	return resp
+	return getPublicNoFollow(t, srv, path, 5)
+}
+
+// getPublicNoRedirect returns the first response untouched.
+func getPublicNoRedirect(t *testing.T, srv *Server, path string) *httptest.ResponseRecorder {
+	t.Helper()
+	return getPublicNoFollow(t, srv, path, 0)
+}
+
+func getPublicNoFollow(t *testing.T, srv *Server, path string, maxHops int) *httptest.ResponseRecorder {
+	t.Helper()
+	for hop := 0; ; hop++ {
+		resp := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		srv.Handler().ServeHTTP(resp, req)
+		if hop >= maxHops {
+			return resp
+		}
+		switch resp.Code {
+		case http.StatusMovedPermanently, http.StatusFound, http.StatusSeeOther,
+			http.StatusTemporaryRedirect, http.StatusPermanentRedirect:
+			loc := resp.Header().Get("Location")
+			if loc == "" {
+				return resp
+			}
+			path = loc
+			continue
+		}
+		return resp
+	}
 }
 
 func TestPublicAnalysisCatalogEmpty(t *testing.T) {

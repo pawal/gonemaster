@@ -381,12 +381,43 @@ export function buildQuery(filter: AnalysisFilter = {}): string {
   return serialized ? `?${serialized}` : "";
 }
 
-// buildURL forbids crossing into /api/v1 (admin surface). Any caller that
-// tries to pass an absolute path outside /pub/ is rejected. This is the
-// single enforcement point for "public API only".
+// Read endpoints that lift dataset_tag + snapshot into a path segment.
+const snapshotScopedPaths = new Set([
+  "/overview",
+  "/domains",
+  "/nameservers",
+  "/endpoints",
+  "/asns",
+  "/prefixes",
+  "/prefix",
+  "/tags",
+  "/testcases",
+  "/testcase"
+]);
+
+// liftToSnapshotPath rewrites `/path` into
+// `/cohorts/{tag}/snapshots/{slug}/path` when both are set.
+function liftToSnapshotPath(path: string, filter: AnalysisFilter): { path: string; filter: AnalysisFilter } {
+  const tag = filter.dataset_tag;
+  const slug = filter.snapshot;
+  if (!tag || !slug) return { path, filter };
+  const slash = path.indexOf("/", 1);
+  const head = slash === -1 ? path : path.slice(0, slash);
+  if (!snapshotScopedPaths.has(head)) return { path, filter };
+  const next: AnalysisFilter = { ...filter };
+  delete next.dataset_tag;
+  delete next.snapshot;
+  return {
+    path: `/cohorts/${encodeURIComponent(tag)}/snapshots/${encodeURIComponent(slug)}${path}`,
+    filter: next
+  };
+}
+
+// buildURL forbids crossing into /api/v1 (admin surface).
 function buildURL(path: string, filter: AnalysisFilter = {}): string {
   if (!path.startsWith("/")) path = `/${path}`;
-  const full = `${PUBLIC_BASE}${path}${buildQuery(filter)}`;
+  const lifted = liftToSnapshotPath(path, filter);
+  const full = `${PUBLIC_BASE}${lifted.path}${buildQuery(lifted.filter)}`;
   if (!full.startsWith(PUBLIC_BASE)) {
     throw new Error(`analysis API client refused non-public URL: ${full}`);
   }

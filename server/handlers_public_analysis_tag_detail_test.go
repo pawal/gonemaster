@@ -27,7 +27,7 @@ func TestTagDetailReadsFromViewTable(t *testing.T) {
 		t.Fatalf("clear entries: %v", err)
 	}
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/tags/DS07_NOT_SIGNED")
+	resp := getPublic(t, f.srv, f.publicURL("tags/DS07_NOT_SIGNED"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
 	}
@@ -56,7 +56,7 @@ func TestTagDetail404OnUnknownTag(t *testing.T) {
 		{Module: "DNSSEC", Testcase: "dnssec07", Tag: "DS07_NOT_SIGNED", Level: "ERROR"},
 	})
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/tags/UNKNOWN_TAG")
+	resp := getPublic(t, f.srv, f.publicURL("tags/UNKNOWN_TAG"))
 	if resp.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404", resp.Code)
 	}
@@ -70,7 +70,7 @@ func TestTagDetailFloorExcludesInfoTags(t *testing.T) {
 		{Module: "BASIC", Testcase: "basic01", Tag: "MODULE_OK", Level: "INFO"},
 	})
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/tags/MODULE_OK")
+	resp := getPublic(t, f.srv, f.publicURL("tags/MODULE_OK"))
 	if resp.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404 (INFO tags must not get a detail page)", resp.Code)
 	}
@@ -87,11 +87,11 @@ func TestTagDetailFloorHonorsConfigOverride(t *testing.T) {
 		{Module: "DNSSEC", Testcase: "dnssec07", Tag: "DS07_NOT_SIGNED", Level: "ERROR"},
 	})
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/tags/B01_OK")
+	resp := getPublic(t, f.srv, f.publicURL("tags/B01_OK"))
 	if resp.Code != http.StatusNotFound {
 		t.Fatalf("NOTICE tag with floor=WARNING: status = %d, want 404", resp.Code)
 	}
-	resp = getPublic(t, f.srv, "/pub/api/v1/analysis/tags/DS07_NOT_SIGNED")
+	resp = getPublic(t, f.srv, f.publicURL("tags/DS07_NOT_SIGNED"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("ERROR tag with floor=WARNING: status = %d, want 200", resp.Code)
 	}
@@ -106,7 +106,7 @@ func TestTagListingReadsFromViewTable(t *testing.T) {
 		{Module: "BASIC", Testcase: "basic01", Tag: "MODULE_OK", Level: "INFO"},
 	})
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/tags")
+	resp := getPublic(t, f.srv, f.publicURL("tags"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
 	}
@@ -137,7 +137,7 @@ func TestTagListingMinLevelTightens(t *testing.T) {
 		{Module: "BASIC", Testcase: "basic01", Tag: "B01_OK", Level: "NOTICE"},
 	})
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/tags?min_level=WARNING")
+	resp := getPublic(t, f.srv, f.publicURL("tags?min_level=WARNING"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("status = %d", resp.Code)
 	}
@@ -164,7 +164,7 @@ func TestTagDetailCacheHeadersExplicitSnapshot(t *testing.T) {
 		{Module: "DNSSEC", Testcase: "dnssec07", Tag: "DS07_NOT_SIGNED", Level: "ERROR"},
 	})
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/tags/DS07_NOT_SIGNED?snapshot="+f.snapshot.Slug)
+	resp := getPublic(t, f.srv, f.publicURL("tags/DS07_NOT_SIGNED"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("status = %d", resp.Code)
 	}
@@ -173,22 +173,6 @@ func TestTagDetailCacheHeadersExplicitSnapshot(t *testing.T) {
 	}
 	if etag := resp.Header().Get("ETag"); etag == "" {
 		t.Error("explicit-snapshot must set ETag")
-	}
-}
-
-func TestTagDetailCacheHeadersAutoLatest(t *testing.T) {
-	f := newAnalysisAPITestFixture(t)
-	ts := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
-	f.seedGraduatedRun("alpha.example", ts, []engine.LogEntry{
-		{Module: "DNSSEC", Testcase: "dnssec07", Tag: "DS07_NOT_SIGNED", Level: "ERROR"},
-	})
-
-	resp := getPublicNoRedirect(t, f.srv, "/pub/api/v1/analysis/tags/DS07_NOT_SIGNED")
-	if resp.Code != http.StatusTemporaryRedirect {
-		t.Fatalf("status = %d, want 307", resp.Code)
-	}
-	if cc := resp.Header().Get("Cache-Control"); !strings.Contains(cc, "no-cache") {
-		t.Errorf("auto-latest redirect Cache-Control = %q, want no-cache", cc)
 	}
 }
 

@@ -33,7 +33,7 @@ func TestASNDetailReadsFromViewTable(t *testing.T) {
 		}
 	}
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/asns/64500")
+	resp := getPublic(t, f.srv, f.publicURL("asns/64500"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
 	}
@@ -65,7 +65,7 @@ func TestASNDetailNotFoundOnUnknownASN(t *testing.T) {
 	f.seedEndpoint("run-alpha.example-"+now.Format("20060102150405"),
 		"alpha.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/asns/9999")
+	resp := getPublic(t, f.srv, f.publicURL("asns/9999"))
 	if resp.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404", resp.Code)
 	}
@@ -78,7 +78,7 @@ func TestASNDetailCacheHeadersExplicitSnapshot(t *testing.T) {
 	f.seedEndpoint("run-alpha.example-"+now.Format("20060102150405"),
 		"alpha.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/asns/64500?snapshot="+f.snapshot.Slug)
+	resp := getPublic(t, f.srv, f.publicURL("asns/64500"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
 	}
@@ -108,7 +108,7 @@ func TestPrefixDetailReadsFromViewTable(t *testing.T) {
 		}
 	}
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/prefix?prefix=192.0.2.0/24")
+	resp := getPublic(t, f.srv, f.publicURL("prefix?prefix=192.0.2.0/24"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
 	}
@@ -134,7 +134,7 @@ func TestPrefixDetailNotFoundOnUnknownPrefix(t *testing.T) {
 	f.seedEndpoint("run-alpha.example-"+now.Format("20060102150405"),
 		"alpha.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/prefix?prefix=10.0.0.0/8")
+	resp := getPublic(t, f.srv, f.publicURL("prefix?prefix=10.0.0.0/8"))
 	if resp.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404", resp.Code)
 	}
@@ -152,7 +152,7 @@ func TestPrefixListingReadsFromViewTable(t *testing.T) {
 	f.seedEndpoint("run-beta.example-"+now.Format("20060102150405"),
 		"beta.example", "ns1.example", "2001:db8::1", "ipv6", now, 64500, "2001:db8::/32")
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/prefixes")
+	resp := getPublic(t, f.srv, f.publicURL("prefixes"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
 	}
@@ -198,7 +198,7 @@ func TestDomainsListingReadsFromViewTable(t *testing.T) {
 		}
 	}
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/domains")
+	resp := getPublic(t, f.srv, f.publicURL("domains"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
 	}
@@ -237,7 +237,7 @@ func TestTestcaseDetailReadsFromTagView(t *testing.T) {
 		{Module: "DNSSEC", Testcase: "dnssec07", Tag: "DS07_NOT_SIGNED", Level: "ERROR"},
 	})
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/testcase?module=DNSSEC&testcase=dnssec07")
+	resp := getPublic(t, f.srv, f.publicURL("testcase?module=DNSSEC&testcase=dnssec07"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
 	}
@@ -420,15 +420,15 @@ func TestPublicReadsAreFactRowIndependent(t *testing.T) {
 
 	for _, path := range []string{
 		"/pub/api/v1/analysis/cohorts/tld",
-		"/pub/api/v1/analysis/domains",
-		"/pub/api/v1/analysis/asns/64500",
-		"/pub/api/v1/analysis/prefix?prefix=192.0.2.0/24",
-		"/pub/api/v1/analysis/prefixes",
-		"/pub/api/v1/analysis/nameservers/ns1.example",
-		"/pub/api/v1/analysis/endpoints/192.0.2.1",
-		"/pub/api/v1/analysis/domains/alpha.example",
-		"/pub/api/v1/analysis/tags/DS07_NOT_SIGNED",
-		"/pub/api/v1/analysis/testcase?module=DNSSEC&testcase=dnssec07",
+		f.publicURL("domains"),
+		f.publicURL("asns/64500"),
+		f.publicURL("prefix?prefix=192.0.2.0/24"),
+		f.publicURL("prefixes"),
+		f.publicURL("nameservers/ns1.example"),
+		f.publicURL("endpoints/192.0.2.1"),
+		f.publicURL("domains/alpha.example"),
+		f.publicURL("tags/DS07_NOT_SIGNED"),
+		f.publicURL("testcase?module=DNSSEC&testcase=dnssec07"),
 	} {
 		resp := getPublic(t, f.srv, path)
 		if resp.Code != http.StatusOK {

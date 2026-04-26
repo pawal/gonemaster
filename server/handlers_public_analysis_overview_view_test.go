@@ -20,7 +20,7 @@ func TestOverviewReadsFromViewTable(t *testing.T) {
 	f.seedEndpoint("run-alpha.example-"+now.Format("20060102150405"),
 		"alpha.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/overview")
+	resp := getPublic(t, f.srv, f.publicURL("overview"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
 	}
@@ -59,7 +59,7 @@ func TestOverviewSurvivesFactWipe(t *testing.T) {
 		t.Fatalf("clear address asns: %v", err)
 	}
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/overview")
+	resp := getPublic(t, f.srv, f.publicURL("overview"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
 	}

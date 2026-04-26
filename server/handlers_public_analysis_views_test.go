@@ -16,7 +16,7 @@ func TestPublicAnalysisOverviewIncludesOverviewV2(t *testing.T) {
 	f.seedEndpoint("run-a", "a.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
 	f.seedEndpoint("run-b", "b.example", "ns2.example", "192.0.2.2", "ipv4", now.Add(time.Minute), 64501, "192.0.2.0/24")
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/overview")
+	resp := getPublic(t, f.srv, f.publicURL("overview"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
 	}
@@ -49,7 +49,7 @@ func TestPublicAnalysisOverviewIncludesOverviewV2(t *testing.T) {
 
 func TestPublicAnalysisOverviewWithoutSnapshotHasNoOverview(t *testing.T) {
 	f := newAnalysisAPITestFixture(t)
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/overview")
+	resp := getPublic(t, f.srv, f.publicURL("overview"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
 	}
@@ -68,7 +68,7 @@ func TestPublicAnalysisCacheHeadersExplicitSnapshot(t *testing.T) {
 	f.seedDomainSummary("a.example", "run-a", now, 90, "A", "OK")
 	f.seedEndpoint("run-a", "a.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/nameservers?snapshot="+f.snapshot.Slug)
+	resp := getPublic(t, f.srv, f.publicURL("nameservers"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
 	}
@@ -78,22 +78,6 @@ func TestPublicAnalysisCacheHeadersExplicitSnapshot(t *testing.T) {
 	}
 	if etag := resp.Header().Get("ETag"); etag == "" {
 		t.Error("explicit snapshot must set ETag")
-	}
-}
-
-func TestPublicAnalysisCacheHeadersAutoLatest(t *testing.T) {
-	f := newAnalysisAPITestFixture(t)
-	now := time.Date(2026, 4, 25, 10, 0, 0, 0, time.UTC)
-	f.seedDomainSummary("a.example", "run-a", now, 90, "A", "OK")
-	f.seedEndpoint("run-a", "a.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
-
-	resp := getPublicNoRedirect(t, f.srv, "/pub/api/v1/analysis/nameservers")
-	if resp.Code != http.StatusTemporaryRedirect {
-		t.Fatalf("expected 307, got %d: %s", resp.Code, resp.Body)
-	}
-	cc := resp.Header().Get("Cache-Control")
-	if !strings.Contains(cc, "no-cache") {
-		t.Errorf("auto-latest redirect Cache-Control = %q, want no-cache", cc)
 	}
 }
 
@@ -137,7 +121,7 @@ func TestPublicAnalysisNameserversReadsFromViewTable(t *testing.T) {
 		t.Fatalf("clear address asns: %v", err)
 	}
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/nameservers")
+	resp := getPublic(t, f.srv, f.publicURL("nameservers"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
 	}

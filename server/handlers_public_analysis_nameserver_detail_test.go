@@ -26,7 +26,7 @@ func TestNameserverDetailReadsFromViewTable(t *testing.T) {
 		}
 	}
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/nameservers/ns1.example")
+	resp := getPublic(t, f.srv, f.publicURL("nameservers/ns1.example"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
 	}
@@ -62,7 +62,7 @@ func TestNameserverDetailCaseInsensitiveLookup(t *testing.T) {
 	now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
 	f.seedEndpoint("run-a", "a.example", "NS1.MIXED.Example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/nameservers/ns1.mixed.example")
+	resp := getPublic(t, f.srv, f.publicURL("nameservers/ns1.mixed.example"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("lower-case lookup: status = %d, body = %s", resp.Code, resp.Body)
 	}
@@ -80,7 +80,7 @@ func TestNameserverDetailNotFoundOnUnknownName(t *testing.T) {
 	now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
 	f.seedEndpoint("run-a", "a.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/nameservers/does-not-exist.example")
+	resp := getPublic(t, f.srv, f.publicURL("nameservers/does-not-exist.example"))
 	if resp.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404", resp.Code)
 	}
@@ -91,7 +91,7 @@ func TestNameserverDetailCacheHeadersExplicitSnapshot(t *testing.T) {
 	now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
 	f.seedEndpoint("run-a", "a.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/nameservers/ns1.example?snapshot="+f.snapshot.Slug)
+	resp := getPublic(t, f.srv, f.publicURL("nameservers/ns1.example"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("status = %d", resp.Code)
 	}
@@ -100,20 +100,6 @@ func TestNameserverDetailCacheHeadersExplicitSnapshot(t *testing.T) {
 	}
 	if etag := resp.Header().Get("ETag"); etag == "" {
 		t.Error("explicit-snapshot must set ETag")
-	}
-}
-
-func TestNameserverDetailCacheHeadersAutoLatest(t *testing.T) {
-	f := newAnalysisAPITestFixture(t)
-	now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
-	f.seedEndpoint("run-a", "a.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
-
-	resp := getPublicNoRedirect(t, f.srv, "/pub/api/v1/analysis/nameservers/ns1.example")
-	if resp.Code != http.StatusTemporaryRedirect {
-		t.Fatalf("status = %d, want 307", resp.Code)
-	}
-	if cc := resp.Header().Get("Cache-Control"); !strings.Contains(cc, "no-cache") {
-		t.Errorf("auto-latest redirect Cache-Control = %q, want no-cache", cc)
 	}
 }
 

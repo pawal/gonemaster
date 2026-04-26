@@ -1705,11 +1705,14 @@ paths:
                 type: object
                 additionalProperties: true
 
-  /pub/api/v1/analysis/overview:
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/overview:
     get:
       tags: [Public]
       summary: Public analysis overview
       operationId: publicAnalysisOverview
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - $ref: '#/components/parameters/SlugPath'
       responses:
         '200':
           description: Public analysis overview
@@ -1719,11 +1722,14 @@ paths:
                 type: object
                 additionalProperties: true
 
-  /pub/api/v1/analysis/domains:
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/domains:
     get:
       tags: [Public]
       summary: Public analysis domain list
       operationId: publicAnalysisDomains
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - $ref: '#/components/parameters/SlugPath'
       responses:
         '200':
           description: Public analysis domains
@@ -1733,12 +1739,14 @@ paths:
                 type: object
                 additionalProperties: true
 
-  /pub/api/v1/analysis/domains/{domain}:
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/domains/{domain}:
     get:
       tags: [Public]
       summary: Public analysis domain detail
       operationId: publicAnalysisDomainDetail
       parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - $ref: '#/components/parameters/SlugPath'
         - $ref: '#/components/parameters/DomainPath'
       responses:
         '200':
@@ -1751,11 +1759,14 @@ paths:
         '404':
           $ref: '#/components/responses/ErrorResponse'
 
-  /pub/api/v1/analysis/nameservers:
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/nameservers:
     get:
       tags: [Public]
       summary: Public analysis nameserver list
       operationId: publicAnalysisNameservers
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - $ref: '#/components/parameters/SlugPath'
       responses:
         '200':
           description: Public analysis nameservers
@@ -1765,12 +1776,14 @@ paths:
                 type: object
                 additionalProperties: true
 
-  /pub/api/v1/analysis/nameservers/{name}:
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/nameservers/{name}:
     get:
       tags: [Public]
       summary: Public analysis nameserver detail
       operationId: publicAnalysisNameserverDetail
       parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - $ref: '#/components/parameters/SlugPath'
         - $ref: '#/components/parameters/NamePath'
       responses:
         '200':
@@ -1781,11 +1794,14 @@ paths:
                 type: object
                 additionalProperties: true
 
-  /pub/api/v1/analysis/endpoints:
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/endpoints:
     get:
       tags: [Public]
       summary: Public analysis endpoint list
       operationId: publicAnalysisEndpoints
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - $ref: '#/components/parameters/SlugPath'
       responses:
         '200':
           description: Public analysis endpoints
@@ -1795,12 +1811,14 @@ paths:
                 type: object
                 additionalProperties: true
 
-  /pub/api/v1/analysis/endpoints/{address}:
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/endpoints/{address}:
     get:
       tags: [Public]
       summary: Public analysis endpoint detail
       operationId: publicAnalysisEndpointDetail
       parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - $ref: '#/components/parameters/SlugPath'
         - $ref: '#/components/parameters/AddressPath'
       responses:
         '200':
@@ -1811,11 +1829,14 @@ paths:
                 type: object
                 additionalProperties: true
 
-  /pub/api/v1/analysis/asns:
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/asns:
     get:
       tags: [Public]
       summary: Public analysis ASN list
       operationId: publicAnalysisASNs
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - $ref: '#/components/parameters/SlugPath'
       responses:
         '200':
           description: Public analysis ASNs
@@ -1825,12 +1846,14 @@ paths:
                 type: object
                 additionalProperties: true
 
-  /pub/api/v1/analysis/asns/{asn}:
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/asns/{asn}:
     get:
       tags: [Public]
       summary: Public analysis ASN detail
       operationId: publicAnalysisASNDetail
       parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - $ref: '#/components/parameters/SlugPath'
         - $ref: '#/components/parameters/ASNPath'
       responses:
         '200':
@@ -1841,11 +1864,14 @@ paths:
                 type: object
                 additionalProperties: true
 
-  /pub/api/v1/analysis/prefixes:
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/prefixes:
     get:
       tags: [Public]
       summary: Public analysis prefix list
       operationId: publicAnalysisPrefixes
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - $ref: '#/components/parameters/SlugPath'
       responses:
         '200':
           description: Public analysis prefixes
@@ -1855,11 +1881,14 @@ paths:
                 type: object
                 additionalProperties: true
 
-  /pub/api/v1/analysis/prefix:
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/prefix:
     get:
       tags: [Public]
       summary: Public analysis prefix detail
       operationId: publicAnalysisPrefixDetail
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - $ref: '#/components/parameters/SlugPath'
       responses:
         '200':
           description: Public analysis prefix detail
@@ -1869,11 +1898,14 @@ paths:
                 type: object
                 additionalProperties: true
 
-  /pub/api/v1/analysis/tags:
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/tags:
     get:
       tags: [Public]
       summary: Public analysis finding tag list
       operationId: publicAnalysisTags
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - $ref: '#/components/parameters/SlugPath'
       responses:
         '200':
           description: Public analysis tags
@@ -1883,12 +1915,14 @@ paths:
                 type: object
                 additionalProperties: true
 
-  /pub/api/v1/analysis/tags/{tag}:
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/tags/{tag}:
     get:
       tags: [Public]
       summary: Public analysis finding tag detail
       operationId: publicAnalysisTagDetail
       parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - $ref: '#/components/parameters/SlugPath'
         - $ref: '#/components/parameters/TagPath'
       responses:
         '200':
@@ -1899,11 +1933,14 @@ paths:
                 type: object
                 additionalProperties: true
 
-  /pub/api/v1/analysis/testcases:
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/testcases:
     get:
       tags: [Public]
       summary: Public analysis testcase list
       operationId: publicAnalysisTestcases
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - $ref: '#/components/parameters/SlugPath'
       responses:
         '200':
           description: Public analysis testcases
@@ -1913,11 +1950,14 @@ paths:
                 type: object
                 additionalProperties: true
 
-  /pub/api/v1/analysis/testcase:
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/testcase:
     get:
       tags: [Public]
       summary: Public analysis testcase detail
       operationId: publicAnalysisTestcaseDetail
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - $ref: '#/components/parameters/SlugPath'
       responses:
         '200':
           description: Public analysis testcase detail

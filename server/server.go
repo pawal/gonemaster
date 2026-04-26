@@ -310,24 +310,6 @@ func (s *Server) routes() {
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/snapshots/{slug}/testcase",
 		pubAnalysisSnapshotPath(s.handlePublicAnalysisTestcaseDetail))
 
-	// Legacy query-param reads. Auto-latest 307s to the path-segmented
-	// URL above; explicit ?snapshot= keeps serving inline.
-	pubMux.HandleFunc("GET /analysis/overview", s.maybeRedirectToSnapshotPath(s.handlePublicAnalysisOverview))
-	pubMux.HandleFunc("GET /analysis/domains", s.maybeRedirectToSnapshotPath(s.handlePublicAnalysisDomains))
-	pubMux.HandleFunc("GET /analysis/nameservers", s.maybeRedirectToSnapshotPath(s.handlePublicAnalysisNameservers))
-	pubMux.HandleFunc("GET /analysis/endpoints", s.maybeRedirectToSnapshotPath(s.handlePublicAnalysisEndpoints))
-	pubMux.HandleFunc("GET /analysis/asns", s.maybeRedirectToSnapshotPath(s.handlePublicAnalysisASNs))
-	pubMux.HandleFunc("GET /analysis/prefixes", s.maybeRedirectToSnapshotPath(s.handlePublicAnalysisPrefixes))
-	pubMux.HandleFunc("GET /analysis/tags", s.maybeRedirectToSnapshotPath(s.handlePublicAnalysisTags))
-	pubMux.HandleFunc("GET /analysis/testcases", s.maybeRedirectToSnapshotPath(s.handlePublicAnalysisTestcases))
-	pubMux.HandleFunc("GET /analysis/domains/{domain}", s.maybeRedirectToSnapshotPath(s.handlePublicAnalysisDomainDetail))
-	pubMux.HandleFunc("GET /analysis/nameservers/{name}", s.maybeRedirectToSnapshotPath(s.handlePublicAnalysisNameserverDetail))
-	pubMux.HandleFunc("GET /analysis/endpoints/{address}", s.maybeRedirectToSnapshotPath(s.handlePublicAnalysisEndpointDetail))
-	pubMux.HandleFunc("GET /analysis/asns/{asn}", s.maybeRedirectToSnapshotPath(s.handlePublicAnalysisASNDetail))
-	pubMux.HandleFunc("GET /analysis/prefix", s.maybeRedirectToSnapshotPath(s.handlePublicAnalysisPrefixDetail))
-	pubMux.HandleFunc("GET /analysis/tags/{tag}", s.maybeRedirectToSnapshotPath(s.handlePublicAnalysisTagDetail))
-	pubMux.HandleFunc("GET /analysis/testcase", s.maybeRedirectToSnapshotPath(s.handlePublicAnalysisTestcaseDetail))
-
 	// Cohort/snapshot-list/diff/trends are inherently multi-snapshot or
 	// auto-latest by URL design, so they stay as-is.
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/snapshots", s.handlePublicAnalysisSnapshots)

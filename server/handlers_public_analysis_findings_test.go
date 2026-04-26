@@ -103,7 +103,7 @@ func TestPublicAnalysisTagsAggregates(t *testing.T) {
 		{Module: "BASIC", Testcase: "basic01", Tag: "B01_OK", Level: "NOTICE"},
 	})
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/tags")
+	resp := getPublic(t, f.srv, f.publicURL("tags"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
 	}
@@ -137,7 +137,7 @@ func TestPublicAnalysisTagsSearch(t *testing.T) {
 		{Module: "BASIC", Tag: "B01_OK", Level: "NOTICE"},
 	})
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/tags?search=dnssec")
+	resp := getPublic(t, f.srv, f.publicURL("tags?search=dnssec"))
 	var got PublicAnalysisListResponse[PublicAnalysisTagView]
 	_ = json.NewDecoder(resp.Body).Decode(&got)
 	if got.Total != 1 || got.Items[0].Tag != "DS07_NOT_SIGNED" {
@@ -155,7 +155,7 @@ func TestPublicAnalysisTagsMinLevel(t *testing.T) {
 	})
 
 	// min_level=WARNING drops NOTICE-only tags and keeps WARNING and ERROR.
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/tags?min_level=WARNING")
+	resp := getPublic(t, f.srv, f.publicURL("tags?min_level=WARNING"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
 	}
@@ -178,7 +178,7 @@ func TestPublicAnalysisTagsMinLevel(t *testing.T) {
 	}
 
 	// Invalid level is a 400.
-	bad := getPublic(t, f.srv, "/pub/api/v1/analysis/tags?min_level=nonsense")
+	bad := getPublic(t, f.srv, f.publicURL("tags?min_level=nonsense"))
 	if bad.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400 for invalid min_level, got %d: %s", bad.Code, bad.Body)
 	}
@@ -196,7 +196,7 @@ func TestPublicAnalysisTestcasesAggregates(t *testing.T) {
 		{Module: "BASIC", Testcase: "basic01", Tag: "B01_OK", Level: "NOTICE"},
 	})
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/testcases")
+	resp := getPublic(t, f.srv, f.publicURL("testcases"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
 	}
@@ -246,23 +246,6 @@ func TestPublicAnalysisFindingsRedactInternalIDs(t *testing.T) {
 	}
 }
 
-func TestPublicAnalysisFindingsFailWithoutReadStore(t *testing.T) {
-	srv := New(DefaultConfig())
-	seedCohort(t, srv, AnalysisCohort{
-		SourceType: "tag", SourceTag: "tld",
-		AnalysisEnabled: true, PublicEnabled: true, IsDefault: true,
-	})
-	for _, path := range []string{
-		"/pub/api/v1/analysis/tags",
-		"/pub/api/v1/analysis/testcases",
-	} {
-		resp := getPublic(t, srv, path)
-		if resp.Code != http.StatusServiceUnavailable {
-			t.Fatalf("%s: expected 503 without read store, got %d", path, resp.Code)
-		}
-	}
-}
-
 func TestPublicAnalysisFindingListsLoadAllEntriesForRun(t *testing.T) {
 	f := newAnalysisAPITestFixture(t)
 	ts := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
@@ -274,7 +257,7 @@ func TestPublicAnalysisFindingListsLoadAllEntriesForRun(t *testing.T) {
 	}
 	f.seedGraduatedRun("alpha.example", ts, entries)
 
-	tagsResp := getPublic(t, f.srv, "/pub/api/v1/analysis/tags")
+	tagsResp := getPublic(t, f.srv, f.publicURL("tags"))
 	if tagsResp.Code != http.StatusOK {
 		t.Fatalf("expected 200 tags, got %d: %s", tagsResp.Code, tagsResp.Body)
 	}
@@ -286,7 +269,7 @@ func TestPublicAnalysisFindingListsLoadAllEntriesForRun(t *testing.T) {
 		t.Fatalf("expected full BULK_TAG count, got %+v", tags)
 	}
 
-	testcasesResp := getPublic(t, f.srv, "/pub/api/v1/analysis/testcases")
+	testcasesResp := getPublic(t, f.srv, f.publicURL("testcases"))
 	if testcasesResp.Code != http.StatusOK {
 		t.Fatalf("expected 200 testcases, got %d: %s", testcasesResp.Code, testcasesResp.Body)
 	}

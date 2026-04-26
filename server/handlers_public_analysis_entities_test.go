@@ -124,32 +124,32 @@ func TestPublicAnalysisEntitiesScopedToSnapshot(t *testing.T) {
 		"198.51.100.20", "ipv4", t2, 64501, "198.51.100.0/24")
 
 	nameservers := decodeJSON[PublicAnalysisListResponse[PublicAnalysisNameserverView]](
-		t, getPublic(t, f.srv, "/pub/api/v1/analysis/nameservers"))
+		t, getPublic(t, f.srv, f.publicURL("nameservers")))
 	if nameservers.Total != 1 || nameservers.Items[0].Nameserver != "ns-new.example" {
 		t.Fatalf("auto-latest should expose only the newer snapshot, got %+v", nameservers)
 	}
 
-	// Explicit ?snapshot= flips to the older snapshot.
+	// Pinning the older slug in the path flips to the older snapshot.
 	oldNameservers := decodeJSON[PublicAnalysisListResponse[PublicAnalysisNameserverView]](
-		t, getPublic(t, f.srv, "/pub/api/v1/analysis/nameservers?snapshot=2026-04-17-old"))
+		t, getPublic(t, f.srv, f.publicURLForSnapshot("2026-04-17-old", "nameservers")))
 	if oldNameservers.Total != 1 || oldNameservers.Items[0].Nameserver != "ns-old.example" {
 		t.Fatalf("explicit slug should pin to older snapshot, got %+v", oldNameservers)
 	}
 
 	endpoints := decodeJSON[PublicAnalysisListResponse[PublicAnalysisEndpointView]](
-		t, getPublic(t, f.srv, "/pub/api/v1/analysis/endpoints"))
+		t, getPublic(t, f.srv, f.publicURL("endpoints")))
 	if endpoints.Total != 1 || endpoints.Items[0].Address != "198.51.100.20" {
 		t.Fatalf("auto-latest endpoints: got %+v", endpoints)
 	}
 
 	asns := decodeJSON[PublicAnalysisListResponse[PublicAnalysisASNView]](
-		t, getPublic(t, f.srv, "/pub/api/v1/analysis/asns"))
+		t, getPublic(t, f.srv, f.publicURL("asns")))
 	if asns.Total != 1 || asns.Items[0].ASN != 64501 {
 		t.Fatalf("auto-latest ASNs: got %+v", asns)
 	}
 
 	prefixes := decodeJSON[PublicAnalysisListResponse[PublicAnalysisPrefixView]](
-		t, getPublic(t, f.srv, "/pub/api/v1/analysis/prefixes"))
+		t, getPublic(t, f.srv, f.publicURL("prefixes")))
 	if prefixes.Total != 1 || prefixes.Items[0].Prefix != "198.51.100.0/24" {
 		t.Fatalf("auto-latest prefixes: got %+v", prefixes)
 	}
@@ -172,7 +172,7 @@ func TestPublicAnalysisNameserversAggregates(t *testing.T) {
 	f.seedEndpoint("run-2", "beta.example", "ns1.shared.example", "2001:db8::10", "ipv6", ts, 64500, "2001:db8::/32")
 	f.seedEndpoint("run-3", "gamma.example", "ns2.other.example", "192.0.2.20", "ipv4", ts, 64600, "192.0.2.0/24")
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/nameservers")
+	resp := getPublic(t, f.srv, f.publicURL("nameservers"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
 	}
@@ -205,7 +205,7 @@ func TestPublicAnalysisNameserversSearch(t *testing.T) {
 	f.seedEndpoint("r1", "a.example", "ns1.shared.example", "192.0.2.1", "ipv4", ts, 64500, "")
 	f.seedEndpoint("r2", "b.example", "ns2.other.example", "192.0.2.2", "ipv4", ts, 64500, "")
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/nameservers?search=shared")
+	resp := getPublic(t, f.srv, f.publicURL("nameservers?search=shared"))
 	got := decodeJSON[PublicAnalysisListResponse[PublicAnalysisNameserverView]](t, resp)
 	if got.Total != 1 || got.Items[0].Nameserver != "ns1.shared.example" {
 		t.Fatalf("unexpected search result: %+v", got)
@@ -218,7 +218,7 @@ func TestPublicAnalysisEndpointsAggregates(t *testing.T) {
 	f.seedEndpoint("r1", "a.example", "ns.example", "192.0.2.10", "ipv4", ts, 64500, "192.0.2.0/24")
 	f.seedEndpoint("r2", "b.example", "ns.example", "192.0.2.10", "ipv4", ts, 64500, "192.0.2.0/24")
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/endpoints")
+	resp := getPublic(t, f.srv, f.publicURL("endpoints"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
 	}
@@ -245,7 +245,7 @@ func TestPublicAnalysisASNsAggregates(t *testing.T) {
 	f.seedEndpoint("r2", "b.example", "ns2.example", "192.0.2.20", "ipv4", ts, 64500, "192.0.2.0/24")
 	f.seedEndpoint("r3", "c.example", "ns3.example", "2001:db8::30", "ipv6", ts, 64600, "2001:db8::/32")
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/asns?sort=domain_count_desc")
+	resp := getPublic(t, f.srv, f.publicURL("asns?sort=domain_count_desc"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
 	}
@@ -282,7 +282,7 @@ func TestPublicAnalysisASNsSortByNameserverAndPrefixCounts(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			resp := getPublic(t, f.srv, "/pub/api/v1/analysis/asns?sort="+c.sort)
+			resp := getPublic(t, f.srv, f.publicURL("asns?sort=")+c.sort)
 			if resp.Code != http.StatusOK {
 				t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
 			}
@@ -304,7 +304,7 @@ func TestPublicAnalysisASNsSearchByNumber(t *testing.T) {
 	f.seedEndpoint("r1", "a.example", "ns.example", "192.0.2.10", "ipv4", ts, 64500, "192.0.2.0/24")
 	f.seedEndpoint("r2", "b.example", "ns.example", "192.0.2.20", "ipv4", ts, 64600, "192.0.2.0/24")
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/asns?search=64500")
+	resp := getPublic(t, f.srv, f.publicURL("asns?search=64500"))
 	got := decodeJSON[PublicAnalysisListResponse[PublicAnalysisASNView]](t, resp)
 	if got.Total != 1 || got.Items[0].ASN != 64500 {
 		t.Fatalf("expected only AS64500, got %+v", got)
@@ -318,7 +318,7 @@ func TestPublicAnalysisPrefixesAggregates(t *testing.T) {
 	f.seedEndpoint("r2", "b.example", "ns.example", "192.0.2.11", "ipv4", ts, 64500, "192.0.2.0/24")
 	f.seedEndpoint("r3", "c.example", "ns.example", "2001:db8::10", "ipv6", ts, 64500, "2001:db8::/32")
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/prefixes")
+	resp := getPublic(t, f.srv, f.publicURL("prefixes"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
 	}
@@ -366,21 +366,3 @@ func TestPublicAnalysisListEndpointsRedactsInternalIDs(t *testing.T) {
 	}
 }
 
-func TestPublicAnalysisListEndpointsFailWithoutReadStore(t *testing.T) {
-	srv := New(DefaultConfig())
-	seedCohort(t, srv, AnalysisCohort{
-		SourceType: "tag", SourceTag: "tld",
-		AnalysisEnabled: true, PublicEnabled: true, IsDefault: true,
-	})
-	for _, path := range []string{
-		"/pub/api/v1/analysis/nameservers",
-		"/pub/api/v1/analysis/endpoints",
-		"/pub/api/v1/analysis/asns",
-		"/pub/api/v1/analysis/prefixes",
-	} {
-		resp := getPublic(t, srv, path)
-		if resp.Code != http.StatusServiceUnavailable {
-			t.Fatalf("%s: expected 503 without read store, got %d", path, resp.Code)
-		}
-	}
-}

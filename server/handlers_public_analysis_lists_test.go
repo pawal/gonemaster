@@ -88,6 +88,19 @@ func newAnalysisAPITestFixture(t *testing.T) *analysisAPITestFixture {
 	}
 }
 
+// publicURL builds a path-segmented public read URL anchored to the
+// fixture's auto-latest snapshot. sub is the analysis sub-path (e.g.
+// "domains", "nameservers/ns1.example", or "prefix?prefix=...").
+func (f *analysisAPITestFixture) publicURL(sub string) string {
+	return f.publicURLForSnapshot(f.snapshot.Slug, sub)
+}
+
+// publicURLForSnapshot is publicURL with an explicit snapshot slug.
+func (f *analysisAPITestFixture) publicURLForSnapshot(slug, sub string) string {
+	return "/pub/api/v1/analysis/cohorts/" + f.cohort.SourceTag +
+		"/snapshots/" + slug + "/" + sub
+}
+
 // seedAlternateSnapshot creates a second snapshot-intent batch plus a
 // captured public snapshot with a capturedAt older than the fixture
 // default, so the fixture snapshot stays auto-latest. Tests use it to
@@ -208,7 +221,7 @@ func decodeDomainList(t *testing.T, body *httptest.ResponseRecorder) PublicAnaly
 
 func TestPublicAnalysisDomainsEmpty(t *testing.T) {
 	f := newAnalysisAPITestFixture(t)
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/domains")
+	resp := getPublic(t, f.srv, f.publicURL("domains"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
 	}
@@ -229,7 +242,7 @@ func TestPublicAnalysisDomainsReturnsLatestPerDomain(t *testing.T) {
 	f.seedDomainSummary("alpha.example", "run-alpha-2", t2, 95, "A", "NOTICE")
 	f.seedDomainSummary("beta.example", "run-beta-1", t1, 80, "B", "WARNING")
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/domains")
+	resp := getPublic(t, f.srv, f.publicURL("domains"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
 	}
@@ -272,7 +285,7 @@ func TestPublicAnalysisDomainsFilterByWorstLevel(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.bucket, func(t *testing.T) {
-			resp := getPublic(t, f.srv, "/pub/api/v1/analysis/domains?worst_level="+c.bucket)
+			resp := getPublic(t, f.srv, f.publicURL("domains?worst_level=")+c.bucket)
 			if resp.Code != http.StatusOK {
 				t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
 			}
@@ -294,7 +307,7 @@ func TestPublicAnalysisDomainsFilterByWorstLevel(t *testing.T) {
 	}
 
 	// Lowercase input is accepted and normalized to the same bucket.
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/domains?worst_level=error")
+	resp := getPublic(t, f.srv, f.publicURL("domains?worst_level=error"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200 on lowercase filter, got %d: %s", resp.Code, resp.Body)
 	}
@@ -311,7 +324,7 @@ func TestPublicAnalysisDomainsFilterByGrade(t *testing.T) {
 	f.seedDomainSummary("b1.example", "run-b1", ts, 80, "B", "NOTICE")
 	f.seedDomainSummary("f1.example", "run-f1", ts, 10, "F", "CRITICAL")
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/domains?grade=A")
+	resp := getPublic(t, f.srv, f.publicURL("domains?grade=A"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
 	}
@@ -328,7 +341,7 @@ func TestPublicAnalysisDomainsFilterByGrade(t *testing.T) {
 	// Case-sensitive exact match — grades are stored canonical. "a" must
 	// not match "A" because custom scoring profiles may legitimately use
 	// distinct labels differing only in case.
-	resp = getPublic(t, f.srv, "/pub/api/v1/analysis/domains?grade=a")
+	resp = getPublic(t, f.srv, f.publicURL("domains?grade=a"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
 	}
@@ -338,7 +351,7 @@ func TestPublicAnalysisDomainsFilterByGrade(t *testing.T) {
 
 	// Unknown grade returns empty without 400 — the filter is
 	// pluggable-config-friendly, not enum-validated.
-	resp = getPublic(t, f.srv, "/pub/api/v1/analysis/domains?grade=Z")
+	resp = getPublic(t, f.srv, f.publicURL("domains?grade=Z"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200 on unknown grade, got %d: %s", resp.Code, resp.Body)
 	}
@@ -349,7 +362,7 @@ func TestPublicAnalysisDomainsFilterByGrade(t *testing.T) {
 
 func TestPublicAnalysisDomainsRejectsInvalidWorstLevel(t *testing.T) {
 	f := newAnalysisAPITestFixture(t)
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/domains?worst_level=bogus")
+	resp := getPublic(t, f.srv, f.publicURL("domains?worst_level=bogus"))
 	if resp.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d: %s", resp.Code, resp.Body)
 	}
@@ -368,7 +381,7 @@ func TestPublicAnalysisDomainsSearchAndPagination(t *testing.T) {
 			fmt.Sprintf("run-b-%d", i), finishedAt, 50+i, "C", "ERROR")
 	}
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/domains?search=alpha")
+	resp := getPublic(t, f.srv, f.publicURL("domains?search=alpha"))
 	got := decodeDomainList(t, resp)
 	if got.Total != 5 {
 		t.Fatalf("expected 5 alpha matches, got %d", got.Total)
@@ -379,7 +392,7 @@ func TestPublicAnalysisDomainsSearchAndPagination(t *testing.T) {
 		}
 	}
 
-	resp = getPublic(t, f.srv, "/pub/api/v1/analysis/domains?limit=3&offset=2")
+	resp = getPublic(t, f.srv, f.publicURL("domains?limit=3&offset=2"))
 	got = decodeDomainList(t, resp)
 	if got.Total != 10 {
 		t.Fatalf("expected total=10, got %d", got.Total)
@@ -394,7 +407,7 @@ func TestPublicAnalysisDomainsSearchAndPagination(t *testing.T) {
 
 func TestPublicAnalysisDomainsRejectsInvalidLimit(t *testing.T) {
 	f := newAnalysisAPITestFixture(t)
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/domains?limit=99999")
+	resp := getPublic(t, f.srv, f.publicURL("domains?limit=99999"))
 	if resp.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", resp.Code)
 	}
@@ -407,7 +420,7 @@ func TestPublicAnalysisDomainsSortScoreDesc(t *testing.T) {
 	f.seedDomainSummary("high.example", "run-high", finishedAt, 95, "A", "NOTICE")
 	f.seedDomainSummary("mid.example", "run-mid", finishedAt, 70, "B", "WARNING")
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/domains?sort=score_desc")
+	resp := getPublic(t, f.srv, f.publicURL("domains?sort=score_desc"))
 	got := decodeDomainList(t, resp)
 	if len(got.Items) != 3 {
 		t.Fatalf("expected 3 items, got %d", len(got.Items))
@@ -463,7 +476,7 @@ func TestPublicAnalysisDomainsRedactsInternalIDs(t *testing.T) {
 	finishedAt := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
 	f.seedDomainSummary("alpha.example", "run-alpha", finishedAt, 95, "A", "NOTICE")
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/domains")
+	resp := getPublic(t, f.srv, f.publicURL("domains"))
 	raw := resp.Body.String()
 	for _, needle := range []string{
 		`"domain_id"`, `"run_id"`, `"cohort_id"`, `"public_id"`,
@@ -474,34 +487,3 @@ func TestPublicAnalysisDomainsRedactsInternalIDs(t *testing.T) {
 	}
 }
 
-func TestPublicAnalysisDomainsFailsWhenNoCohort(t *testing.T) {
-	db, err := sql.Open("sqlite", ":memory:")
-	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
-	}
-	configurePool(db, "sqlite")
-	t.Cleanup(func() { _ = db.Close() })
-	if err := runMigrations(db, sqliteDialect{}); err != nil {
-		t.Fatalf("runMigrations: %v", err)
-	}
-	store := NewSQLJobStore(db, sqliteDialect{})
-	srv := newServer(DefaultConfig(), store, NewInMemoryQueue())
-
-	resp := getPublic(t, srv, "/pub/api/v1/analysis/domains")
-	if resp.Code != http.StatusServiceUnavailable {
-		t.Fatalf("expected 503 with no cohorts, got %d: %s", resp.Code, resp.Body)
-	}
-}
-
-func TestPublicAnalysisDomainsFailsWhenStoreNotReadable(t *testing.T) {
-	srv := New(DefaultConfig())
-	seedCohort(t, srv, AnalysisCohort{
-		SourceType: "tag", SourceTag: "tld", Label: "TLD",
-		AnalysisEnabled: true, PublicEnabled: true, IsDefault: true,
-	})
-
-	resp := getPublic(t, srv, "/pub/api/v1/analysis/domains")
-	if resp.Code != http.StatusServiceUnavailable {
-		t.Fatalf("expected 503 when store lacks analysis read surface, got %d: %s", resp.Code, resp.Body)
-	}
-}

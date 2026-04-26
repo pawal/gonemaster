@@ -7,39 +7,36 @@ import (
 	"time"
 )
 
-// TestPublicAnalysisOverviewNoSnapshotState covers the empty cohort case:
-// a cohort with no captured public snapshot must return status =
-// "no_snapshot" so the UI renders a helpful panel instead of treating
-// the empty payload as a 500.
-func TestPublicAnalysisOverviewNoSnapshotState(t *testing.T) {
+// TestPublicAnalysisCohortDetailNoSnapshotState covers the empty
+// cohort case: a cohort with no captured public snapshot returns
+// status = "no_snapshot" so the UI can render a helpful panel.
+func TestPublicAnalysisCohortDetailNoSnapshotState(t *testing.T) {
 	db, store, srv := newIsolatedAnalysisTestServer(t)
 	_ = db
-	cohort, err := store.UpsertAnalysisCohort(AnalysisCohort{
+	if _, err := store.UpsertAnalysisCohort(AnalysisCohort{
 		SourceType:      "tag",
 		SourceTag:       "tld",
 		Label:           "TLD",
 		AnalysisEnabled: true,
 		PublicEnabled:   true,
 		IsDefault:       true,
-	})
-	if err != nil {
+	}); err != nil {
 		t.Fatalf("upsert cohort: %v", err)
 	}
-	_ = cohort
 
-	resp := getPublic(t, srv, "/pub/api/v1/analysis/overview")
+	resp := getPublic(t, srv, "/pub/api/v1/analysis/cohorts/tld")
 	if resp.Code != http.StatusOK {
-		t.Fatalf("overview: got %d, want 200: %s", resp.Code, resp.Body)
+		t.Fatalf("cohort detail: got %d, want 200: %s", resp.Code, resp.Body)
 	}
-	var payload PublicAnalysisOverviewResponse
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-		t.Fatalf("decode overview: %v", err)
+	var detail PublicAnalysisCohortDetail
+	if err := json.NewDecoder(resp.Body).Decode(&detail); err != nil {
+		t.Fatalf("decode cohort detail: %v", err)
 	}
-	if payload.Status != PublicAnalysisStatusNoSnapshot {
-		t.Fatalf("Status = %q, want no_snapshot", payload.Status)
+	if detail.Status != PublicAnalysisStatusNoSnapshot {
+		t.Fatalf("Status = %q, want no_snapshot", detail.Status)
 	}
-	if payload.Snapshot != nil {
-		t.Fatalf("expected Snapshot nil on no_snapshot response, got %+v", payload.Snapshot)
+	if detail.Snapshot != nil {
+		t.Fatalf("expected Snapshot nil on no_snapshot response, got %+v", detail.Snapshot)
 	}
 }
 
@@ -210,9 +207,9 @@ func TestPublicAnalysisSnapshotDetailHiddenForRetired(t *testing.T) {
 		t.Fatalf("retired slug: got %d, want 404: %s", resp.Code, resp.Body)
 	}
 
-	resp = getPublic(t, f.srv, "/pub/api/v1/analysis/overview?snapshot=2026-03-01-retired")
+	resp = getPublic(t, f.srv, f.publicURLForSnapshot("2026-03-01-retired", "overview"))
 	if resp.Code != http.StatusNotFound {
-		t.Fatalf("retired ?snapshot=: got %d, want 404: %s", resp.Code, resp.Body)
+		t.Fatalf("retired path-segmented: got %d, want 404: %s", resp.Code, resp.Body)
 	}
 }
 
@@ -235,14 +232,13 @@ func TestPublicAnalysisSnapshotDetailHiddenForMixedProfile(t *testing.T) {
 	}
 }
 
-// TestPublicAnalysisOverviewAutoLatestAndExplicitSlug verifies that
-// overview resolves to auto-latest by default and to the explicit slug
-// when ?snapshot= is supplied.
-func TestPublicAnalysisOverviewAutoLatestAndExplicitSlug(t *testing.T) {
+// TestPublicAnalysisOverviewSlugInPath verifies that the overview
+// handler returns the snapshot pinned by the URL path.
+func TestPublicAnalysisOverviewSlugInPath(t *testing.T) {
 	f := newAnalysisAPITestFixture(t)
 	older := f.seedAlternateSnapshot("batch-old", "2026-04-01-older", time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC))
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/overview")
+	resp := getPublic(t, f.srv, f.publicURL("overview"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("overview: got %d: %s", resp.Code, resp.Body)
 	}
@@ -251,18 +247,18 @@ func TestPublicAnalysisOverviewAutoLatestAndExplicitSlug(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 	if payload.Snapshot == nil || payload.Snapshot.Slug != f.snapshot.Slug {
-		t.Fatalf("auto-latest slug: got %+v, want fixture", payload.Snapshot)
+		t.Fatalf("fixture slug: got %+v, want fixture", payload.Snapshot)
 	}
 
-	resp = getPublic(t, f.srv, "/pub/api/v1/analysis/overview?snapshot=2026-04-01-older")
+	resp = getPublic(t, f.srv, f.publicURLForSnapshot("2026-04-01-older", "overview"))
 	if resp.Code != http.StatusOK {
-		t.Fatalf("explicit overview: got %d: %s", resp.Code, resp.Body)
+		t.Fatalf("older overview: got %d: %s", resp.Code, resp.Body)
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-		t.Fatalf("decode explicit: %v", err)
+		t.Fatalf("decode older: %v", err)
 	}
 	if payload.Snapshot == nil || payload.Snapshot.Slug != older.Slug {
-		t.Fatalf("explicit slug: got %+v, want %q", payload.Snapshot, older.Slug)
+		t.Fatalf("older slug: got %+v, want %q", payload.Snapshot, older.Slug)
 	}
 }
 

@@ -35,7 +35,7 @@ func TestDomainDetailReadsFromViewTable(t *testing.T) {
 		t.Fatalf("clear tag summaries: %v", err)
 	}
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/domains/alpha.example")
+	resp := getPublic(t, f.srv, f.publicURL("domains/alpha.example"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
 	}
@@ -78,7 +78,7 @@ func TestDomainDetailCaseInsensitiveLookup(t *testing.T) {
 		{Module: "BASIC", Testcase: "basic01", Tag: "B01_OK", Level: "NOTICE"},
 	})
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/domains/alpha.example")
+	resp := getPublic(t, f.srv, f.publicURL("domains/alpha.example"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("lower-case lookup status = %d, body = %s", resp.Code, resp.Body)
 	}
@@ -98,7 +98,7 @@ func TestDomainDetailNotFoundOnUnknownName(t *testing.T) {
 	now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
 	f.seedGraduatedRun("alpha.example", now, nil)
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/domains/does-not-exist.example")
+	resp := getPublic(t, f.srv, f.publicURL("domains/does-not-exist.example"))
 	if resp.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404 (body %s)", resp.Code, resp.Body)
 	}
@@ -116,7 +116,7 @@ func TestDomainDetailTagFloorFiltersBelowFloor(t *testing.T) {
 		{Module: "DNSSEC", Testcase: "dnssec07", Tag: "DS07_NOT_SIGNED", Level: "ERROR"},
 	})
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/domains/alpha.example")
+	resp := getPublic(t, f.srv, f.publicURL("domains/alpha.example"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
 	}
@@ -152,7 +152,7 @@ func TestDomainDetailTagFloorHonorsWarningOverride(t *testing.T) {
 		{Module: "DNSSEC", Testcase: "dnssec07", Tag: "DS07_NOT_SIGNED", Level: "ERROR"},
 	})
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/domains/alpha.example")
+	resp := getPublic(t, f.srv, f.publicURL("domains/alpha.example"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
 	}
@@ -182,7 +182,7 @@ func TestDomainDetailCacheHeadersExplicitSnapshot(t *testing.T) {
 	now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
 	f.seedGraduatedRun("alpha.example", now, nil)
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/domains/alpha.example?snapshot="+f.snapshot.Slug)
+	resp := getPublic(t, f.srv, f.publicURL("domains/alpha.example"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
 	}
@@ -191,22 +191,6 @@ func TestDomainDetailCacheHeadersExplicitSnapshot(t *testing.T) {
 	}
 	if etag := resp.Header().Get("ETag"); etag == "" {
 		t.Error("explicit-snapshot must set ETag")
-	}
-}
-
-// TestDomainDetailCacheHeadersAutoLatest confirms the legacy auto-latest
-// URL 307s with no-cache to the path-segmented form.
-func TestDomainDetailCacheHeadersAutoLatest(t *testing.T) {
-	f := newAnalysisAPITestFixture(t)
-	now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
-	f.seedGraduatedRun("alpha.example", now, nil)
-
-	resp := getPublicNoRedirect(t, f.srv, "/pub/api/v1/analysis/domains/alpha.example")
-	if resp.Code != http.StatusTemporaryRedirect {
-		t.Fatalf("status = %d, want 307", resp.Code)
-	}
-	if cc := resp.Header().Get("Cache-Control"); !strings.Contains(cc, "no-cache") {
-		t.Errorf("auto-latest redirect Cache-Control = %q, want no-cache", cc)
 	}
 }
 

@@ -24,7 +24,7 @@ func TestEndpointDetailReadsFromViewTable(t *testing.T) {
 		}
 	}
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/endpoints/192.0.2.1")
+	resp := getPublic(t, f.srv, f.publicURL("endpoints/192.0.2.1"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
 	}
@@ -59,7 +59,7 @@ func TestEndpointDetailAmbiguousWithoutNameserverFilter(t *testing.T) {
 	f.seedEndpoint("run-a", "a.example", "ns1.shared.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
 	f.seedEndpoint("run-b", "b.example", "ns2.shared.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/endpoints/192.0.2.1")
+	resp := getPublic(t, f.srv, f.publicURL("endpoints/192.0.2.1"))
 	if resp.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400 (ambiguous endpoint)", resp.Code)
 	}
@@ -74,7 +74,7 @@ func TestEndpointDetailWithNameserverDisambiguator(t *testing.T) {
 	f.seedEndpoint("run-a", "a.example", "ns1.shared.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
 	f.seedEndpoint("run-b", "b.example", "ns2.shared.example", "192.0.2.1", "ipv4", now, 64501, "192.0.2.0/24")
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/endpoints/192.0.2.1?nameserver=ns2.shared.example")
+	resp := getPublic(t, f.srv, f.publicURL("endpoints/192.0.2.1?nameserver=ns2.shared.example"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
 	}
@@ -95,7 +95,7 @@ func TestEndpointDetailNotFound(t *testing.T) {
 	now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
 	f.seedEndpoint("run-a", "a.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/endpoints/198.51.100.99")
+	resp := getPublic(t, f.srv, f.publicURL("endpoints/198.51.100.99"))
 	if resp.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404", resp.Code)
 	}
@@ -106,7 +106,7 @@ func TestEndpointDetailCaseInsensitiveAddressLookup(t *testing.T) {
 	now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
 	f.seedEndpoint("run-a", "a.example", "ns1.example", "2001:DB8::1", "ipv6", now, 64500, "2001:db8::/32")
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/endpoints/2001:db8::1")
+	resp := getPublic(t, f.srv, f.publicURL("endpoints/2001:db8::1"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
 	}
@@ -117,7 +117,7 @@ func TestEndpointDetailCacheHeadersExplicitSnapshot(t *testing.T) {
 	now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
 	f.seedEndpoint("run-a", "a.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/endpoints/192.0.2.1?snapshot="+f.snapshot.Slug)
+	resp := getPublic(t, f.srv, f.publicURL("endpoints/192.0.2.1"))
 	if resp.Code != http.StatusOK {
 		t.Fatalf("status = %d", resp.Code)
 	}
@@ -126,20 +126,6 @@ func TestEndpointDetailCacheHeadersExplicitSnapshot(t *testing.T) {
 	}
 	if etag := resp.Header().Get("ETag"); etag == "" {
 		t.Error("explicit-snapshot must set ETag")
-	}
-}
-
-func TestEndpointDetailCacheHeadersAutoLatest(t *testing.T) {
-	f := newAnalysisAPITestFixture(t)
-	now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
-	f.seedEndpoint("run-a", "a.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
-
-	resp := getPublicNoRedirect(t, f.srv, "/pub/api/v1/analysis/endpoints/192.0.2.1")
-	if resp.Code != http.StatusTemporaryRedirect {
-		t.Fatalf("status = %d, want 307", resp.Code)
-	}
-	if cc := resp.Header().Get("Cache-Control"); !strings.Contains(cc, "no-cache") {
-		t.Errorf("auto-latest redirect Cache-Control = %q, want no-cache", cc)
 	}
 }
 

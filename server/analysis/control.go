@@ -20,11 +20,11 @@ const rebuildPageSize = 100
 // prepareRun parallelises freely; writes serialise on the DB writer.
 const rebuildWorkers = 4
 
-// progressWriteInterval is how often the rebuild loop persists the
-// in-memory done/total counters to the cohort row. Chosen to keep the
-// per-run overhead small while still giving the UI a visibly-moving
-// progress bar on a 1400-run rebuild.
-const progressWriteInterval = 500 * time.Millisecond
+// progressWriteInterval throttles how often the rebuild loop persists
+// the in-memory done/total counters to the cohort row. Tight enough that
+// the admin UI's poll always sees fresh data; the writes are a single
+// narrow UPDATE, so 100ms is fine even for 4 concurrent workers.
+const progressWriteInterval = 100 * time.Millisecond
 
 // ControlStore is the store surface needed for cohort-wide repair, rebuild,
 // and clear operations.
@@ -370,6 +370,12 @@ func (c *Controller) RebuildCohort(ctx context.Context, cohortID int64) error {
 		return c.ClearCohort(ctx, cohortID)
 	}
 
+	// Zero progress on the in-memory cohort so the initial Pending write
+	// doesn't carry the previous rebuild's done/total — otherwise the
+	// admin UI's progress bar briefly shows 100% under a "pending" badge
+	// until the first SetAnalysisCohortProgress lands.
+	cohort.MaterializationDone = 0
+	cohort.MaterializationTotal = 0
 	if err := c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationPending, time.Time{}, ""); err != nil {
 		return err
 	}

@@ -27,11 +27,12 @@
   let editingLabelValue = $state("");
   let submittingSnapshotCohortId = $state(null);
   // Poll handle kept outside state so we can clear it without reactively
-  // re-triggering. Rebuilds now run server-side in a goroutine and report
+  // re-triggering. Rebuilds run server-side in a goroutine and report
   // materialization_done / materialization_total on the cohort row; while
-  // any cohort is pending we poll once per second to animate progress.
+  // any cohort is pending we poll a few times per second so the bar
+  // animates and small/fast rebuilds don't slip past unobserved.
   let pollTimer = null;
-  const POLL_INTERVAL_MS = 1000;
+  const POLL_INTERVAL_MS = 250;
 
   function emptyDraft() {
     return {
@@ -526,6 +527,15 @@
     } catch (_) {
       // Silent: a transient fetch error shouldn't overwrite the visible
       // notice area while a rebuild is running.
+    }
+    // While a cohort with its snapshots panel expanded is mid-rebuild,
+    // refresh that cohort's snapshot list too — otherwise the per-snapshot
+    // run/domain counts go stale until the user collapses and re-expands.
+    if (expandedSnapshotCohortId != null) {
+      const cohort = cohorts.find((c) => c.id === expandedSnapshotCohortId);
+      if (cohort?.materialization_status === "pending") {
+        loadSnapshots(cohort, { refresh: true });
+      }
     }
   }
 

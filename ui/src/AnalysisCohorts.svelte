@@ -783,8 +783,10 @@
                                       <button
                                         type="button"
                                         class="row-action"
-                                        title={$t("analysis_snapshots_rebuild_title")}
-                                        disabled={snapBusy}
+                                        title={snap.source_runs_available === false
+                                          ? $t("analysis_snapshots_rebuild_unavailable_title")
+                                          : $t("analysis_snapshots_rebuild_title")}
+                                        disabled={snapBusy || snap.source_runs_available === false}
                                         onclick={() => rebuildSnapshotAggregates(cohort, snap)}
                                       >
                                         {$t("analysis_snapshots_rebuild")}

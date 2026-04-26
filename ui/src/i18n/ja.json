@@ -636,6 +636,7 @@
   "analysis_snapshots_restore": "復元",
   "analysis_snapshots_rebuild": "集計を再構築",
   "analysis_snapshots_rebuild_title": "既存の分析行からトレンドと差分の集計を再計算します",
+  "analysis_snapshots_rebuild_unavailable_title": "元のジョブデータはパージされました。再構築には元の実行が必要で、このスナップショットでは実行できません。",
   "analysis_snapshots_purge": "スナップショットを完全削除",
   "analysis_snapshots_purge_title": "このスナップショットとその集計のみを削除します",
   "analysis_snapshots_delete_source_batch": "ソースバッチを削除",

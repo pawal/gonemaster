@@ -103,7 +103,14 @@
 {:else if !data.detail}
   <section class="card">
     <h2>{data.domain}</h2>
-    <p class="status-banner">Domain not materialized for this cohort.</p>
+    <p class="status-banner">No results for this domain in the current cohort snapshot.</p>
+    <p class="hint">
+      A cohort snapshot is a point-in-time picture of analysis results. This page is
+      empty when the snapshot does not include this domain — typically because the
+      domain was not part of the cohort when the snapshot was captured, or because
+      the snapshot has since been retired. Try a different snapshot from the
+      selector, or pick a cohort this domain belongs to.
+    </p>
   </section>
 {:else}
   {@const d = data.detail}

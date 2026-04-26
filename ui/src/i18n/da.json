@@ -636,6 +636,7 @@
   "analysis_snapshots_restore": "Gendan",
   "analysis_snapshots_rebuild": "Genopbyg aggregater",
   "analysis_snapshots_rebuild_title": "Genberegn trend- og diffaggregater fra eksisterende analyserækker",
+  "analysis_snapshots_rebuild_unavailable_title": "Kildejobdata er blevet renset. Genopbygning kræver de oprindelige kørsler og er ikke længere mulig for dette snapshot.",
   "analysis_snapshots_purge": "Slet øjebliksbillede",
   "analysis_snapshots_purge_title": "Fjern kun dette øjebliksbillede og dets aggregater",
   "analysis_snapshots_delete_source_batch": "Slet kildebatch",

@@ -163,6 +163,7 @@ type JobStore interface {
 	ListBatchesByTag(tag string, limit, offset int) BatchList
 	BatchDeletePreviewStats(batchID string) (BatchDeletePreview, error)
 	DeleteBatch(batchID string) ([]int64, error)
+	BatchHasRuns(batchID string) bool
 
 	// Analysis cohort catalog.
 	ListAnalysisCohorts() []AnalysisCohort
@@ -1408,6 +1409,21 @@ func (s *InMemoryJobStore) BatchDeletePreviewStats(batchID string) (BatchDeleteP
 		out.Entries += len(s.entries[r.ID])
 	}
 	return out, nil
+}
+
+// BatchHasRuns reports whether any run row still exists for batchID.
+func (s *InMemoryJobStore) BatchHasRuns(batchID string) bool {
+	if batchID == "" {
+		return false
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, r := range s.runs {
+		if r.BatchID == batchID {
+			return true
+		}
+	}
+	return false
 }
 
 // DeleteBatch removes the batch metadata plus every in-memory row

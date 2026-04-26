@@ -58,6 +58,16 @@ func newAdminSnapshotFixture(t *testing.T) *adminSnapshotFixture {
 	}); err != nil {
 		t.Fatalf("create batch: %v", err)
 	}
+	insertTestRun(t, store, Run{
+		ID:         "run-admin-1",
+		DomainID:   1,
+		Domain:     "example.test",
+		BatchID:    "batch-admin",
+		Status:     JobSucceeded,
+		CreatedAt:  now,
+		StartedAt:  now,
+		FinishedAt: now,
+	})
 	snap, err := store.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{
 		CohortID:   cohort.ID,
 		BatchID:    "batch-admin",
@@ -286,6 +296,61 @@ func TestAdminSnapshotRematerialize(t *testing.T) {
 	}
 	if _, ok := f.store.GetSnapshotOverview(snap.ID); !ok {
 		t.Fatal("expected overview view row to be written by rematerialize")
+	}
+}
+
+// TestAdminSnapshotRematerializeRejectsPurgedSource verifies that once
+// the source runs for a snapshot's batch are gone (purge has happened),
+// the rematerialize endpoint returns 409 source_runs_purged instead of
+// silently producing empty views.
+func TestAdminSnapshotRematerializeRejectsPurgedSource(t *testing.T) {
+	f := newAdminSnapshotFixture(t)
+	if _, err := f.store.db.Exec("DELETE FROM runs WHERE batch_id = ?", "batch-admin"); err != nil {
+		t.Fatalf("delete runs: %v", err)
+	}
+	path := fmt.Sprintf("/api/v1/analysis/cohorts/%d/snapshots/%s/rematerialize", f.cohort.ID, f.snapshot.Slug)
+	resp := f.call(http.MethodPost, path, "")
+	if resp.Code != http.StatusConflict {
+		t.Fatalf("got %d, want 409: %s", resp.Code, resp.Body)
+	}
+	if !strings.Contains(resp.Body.String(), "source_runs_purged") {
+		t.Fatalf("expected source_runs_purged error code, got %s", resp.Body)
+	}
+}
+
+// TestAdminSnapshotListExposesSourceRunsAvailable verifies the snapshot
+// list reports source_runs_available per snapshot so the admin UI can
+// disable the rematerialize button on snapshots whose runs have been
+// purged.
+func TestAdminSnapshotListExposesSourceRunsAvailable(t *testing.T) {
+	f := newAdminSnapshotFixture(t)
+	if err := f.store.CreateBatch(Batch{ID: "batch-orphan", Tag: "tld", CreatedAt: time.Now().UTC()}); err != nil {
+		t.Fatalf("create orphan batch: %v", err)
+	}
+	if _, err := f.store.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{
+		CohortID: f.cohort.ID, BatchID: "batch-orphan", Slug: "2026-04-21-orphan",
+		Status: AnalysisSnapshotStatusCaptured, IsPublic: true,
+	}); err != nil {
+		t.Fatalf("seed orphan snapshot: %v", err)
+	}
+	path := fmt.Sprintf("/api/v1/analysis/cohorts/%d/snapshots", f.cohort.ID)
+	resp := f.call(http.MethodGet, path, "")
+	if resp.Code != http.StatusOK {
+		t.Fatalf("list: got %d, want 200: %s", resp.Code, resp.Body)
+	}
+	var list []AdminAnalysisSnapshotView
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	got := map[string]bool{}
+	for _, snap := range list {
+		got[snap.Slug] = snap.SourceRunsAvailable
+	}
+	if v, ok := got[f.snapshot.Slug]; !ok || !v {
+		t.Fatalf("fixture snapshot source_runs_available = %v (ok=%v), want true", v, ok)
+	}
+	if v, ok := got["2026-04-21-orphan"]; !ok || v {
+		t.Fatalf("orphan snapshot source_runs_available = %v (ok=%v), want false", v, ok)
 	}
 }
 

@@ -157,6 +157,10 @@ func (s *countingJobStore) DeleteBatch(batchID string) ([]int64, error) {
 	return s.inner.DeleteBatch(batchID)
 }
 
+func (s *countingJobStore) BatchHasRuns(batchID string) bool {
+	return s.inner.BatchHasRuns(batchID)
+}
+
 func (s *countingJobStore) CreateProfile(p StoredProfile) (StoredProfile, error) {
 	return s.inner.CreateProfile(p)
 }

@@ -1834,6 +1834,22 @@ func (s *SQLJobStore) BatchDeletePreviewStats(batchID string) (BatchDeletePrevie
 	return out, nil
 }
 
+// BatchHasRuns reports whether any run row still exists for batchID.
+func (s *SQLJobStore) BatchHasRuns(batchID string) bool {
+	if batchID == "" {
+		return false
+	}
+	var present int
+	err := s.db.QueryRow(
+		fmt.Sprintf(`SELECT 1 FROM runs WHERE batch_id = %s LIMIT 1`, s.ph(1)),
+		batchID,
+	).Scan(&present)
+	if err != nil {
+		return false
+	}
+	return present == 1
+}
+
 // DeleteBatch removes a batch and every row derived from it inside a
 // single transaction: snapshot aggregates, snapshots, analysis_run_*
 // fact rows, entries, runs, and jobs whose batch_id matches. Returns

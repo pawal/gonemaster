@@ -636,6 +636,7 @@
   "analysis_snapshots_restore": "Gjenopprett",
   "analysis_snapshots_rebuild": "Bygg aggregater på nytt",
   "analysis_snapshots_rebuild_title": "Beregn trend- og diffaggregater på nytt fra eksisterende analyserader",
+  "analysis_snapshots_rebuild_unavailable_title": "Kildejobbdata er fjernet. Gjenoppbygging krever de opprinnelige kjøringene og er ikke lenger mulig for dette øyeblikksbildet.",
   "analysis_snapshots_purge": "Slett øyeblikksbilde",
   "analysis_snapshots_purge_title": "Fjern bare dette øyeblikksbildet og aggregatene",
   "analysis_snapshots_delete_source_batch": "Slett kildebatch",

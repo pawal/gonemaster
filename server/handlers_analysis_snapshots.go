@@ -34,28 +34,49 @@ type adminSnapshotAggregator interface {
 // carries the internal id and the lifecycle flags the admin UI edits;
 // the public surface redacts these via PublicAnalysisSnapshotView.
 type AdminAnalysisSnapshotView struct {
-	ID          int64     `json:"id"`
-	CohortID    int64     `json:"cohort_id"`
-	BatchID     string    `json:"batch_id"`
-	Slug        string    `json:"slug"`
-	Label       string    `json:"label,omitempty"`
-	Description string    `json:"description,omitempty"`
-	ProfileID   *int64    `json:"profile_id,omitempty"`
-	ProfileName string    `json:"profile_name,omitempty"`
-	CapturedAt  time.Time `json:"captured_at,omitempty"`
-	FirstRunAt  time.Time `json:"first_run_at,omitempty"`
-	LastRunAt   time.Time `json:"last_run_at,omitempty"`
-	RunCount    int       `json:"run_count"`
-	DomainCount int       `json:"domain_count"`
-	Status      string    `json:"status"`
-	IsDefault   bool      `json:"is_default"`
-	IsPublic    bool      `json:"is_public"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID                  int64     `json:"id"`
+	CohortID            int64     `json:"cohort_id"`
+	BatchID             string    `json:"batch_id"`
+	Slug                string    `json:"slug"`
+	Label               string    `json:"label,omitempty"`
+	Description         string    `json:"description,omitempty"`
+	ProfileID           *int64    `json:"profile_id,omitempty"`
+	ProfileName         string    `json:"profile_name,omitempty"`
+	CapturedAt          time.Time `json:"captured_at,omitempty"`
+	FirstRunAt          time.Time `json:"first_run_at,omitempty"`
+	LastRunAt           time.Time `json:"last_run_at,omitempty"`
+	RunCount            int       `json:"run_count"`
+	DomainCount         int       `json:"domain_count"`
+	Status              string    `json:"status"`
+	IsDefault           bool      `json:"is_default"`
+	IsPublic            bool      `json:"is_public"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
+	SourceRunsAvailable bool      `json:"source_runs_available"`
 }
 
-func adminAnalysisSnapshotView(snap AnalysisCohortSnapshot) AdminAnalysisSnapshotView {
-	return AdminAnalysisSnapshotView(snap)
+func adminAnalysisSnapshotView(snap AnalysisCohortSnapshot, sourceRunsAvailable bool) AdminAnalysisSnapshotView {
+	return AdminAnalysisSnapshotView{
+		ID:                  snap.ID,
+		CohortID:            snap.CohortID,
+		BatchID:             snap.BatchID,
+		Slug:                snap.Slug,
+		Label:               snap.Label,
+		Description:         snap.Description,
+		ProfileID:           snap.ProfileID,
+		ProfileName:         snap.ProfileName,
+		CapturedAt:          snap.CapturedAt,
+		FirstRunAt:          snap.FirstRunAt,
+		LastRunAt:           snap.LastRunAt,
+		RunCount:            snap.RunCount,
+		DomainCount:         snap.DomainCount,
+		Status:              snap.Status,
+		IsDefault:           snap.IsDefault,
+		IsPublic:            snap.IsPublic,
+		CreatedAt:           snap.CreatedAt,
+		UpdatedAt:           snap.UpdatedAt,
+		SourceRunsAvailable: sourceRunsAvailable,
+	}
 }
 
 // handleAnalysisCohortSnapshots handles GET on
@@ -83,7 +104,7 @@ func (s *Server) handleAnalysisCohortSnapshots(w http.ResponseWriter, r *http.Re
 	snapshots := store.ListAnalysisCohortSnapshots(cohort.ID)
 	out := make([]AdminAnalysisSnapshotView, 0, len(snapshots))
 	for _, snap := range snapshots {
-		out = append(out, adminAnalysisSnapshotView(snap))
+		out = append(out, adminAnalysisSnapshotView(snap, s.store.BatchHasRuns(snap.BatchID)))
 	}
 	writeJSON(w, http.StatusOK, out)
 }
@@ -138,6 +159,11 @@ func (s *Server) handleAnalysisCohortSnapshotRematerialize(w http.ResponseWriter
 	if !ok {
 		return
 	}
+	if !s.store.BatchHasRuns(snap.BatchID) {
+		writeError(w, http.StatusConflict, "source_runs_purged",
+			"source job data for this snapshot has been purged; rematerialize is no longer possible", nil)
+		return
+	}
 	aggWriter, ok := s.store.(adminSnapshotAggregator)
 	if !ok {
 		writeError(w, http.StatusServiceUnavailable, "analysis_unavailable", "analysis store does not support rematerialize", nil)
@@ -168,7 +194,7 @@ func (s *Server) handleAnalysisCohortSnapshotRematerialize(w http.ResponseWriter
 		return
 	}
 	refreshed, _ := store.GetAnalysisCohortSnapshotBySlug(cohort.ID, snap.Slug)
-	writeJSON(w, http.StatusOK, adminAnalysisSnapshotView(refreshed))
+	writeJSON(w, http.StatusOK, adminAnalysisSnapshotView(refreshed, s.store.BatchHasRuns(refreshed.BatchID)))
 }
 
 // handlePatchAnalysisCohortSnapshot applies a partial update to one
@@ -249,7 +275,7 @@ func (s *Server) handlePatchAnalysisCohortSnapshot(w http.ResponseWriter, r *htt
 		}
 	}
 	refreshed, _ := store.GetAnalysisCohortSnapshotBySlug(cohort.ID, desired.Slug)
-	writeJSON(w, http.StatusOK, adminAnalysisSnapshotView(refreshed))
+	writeJSON(w, http.StatusOK, adminAnalysisSnapshotView(refreshed, s.store.BatchHasRuns(refreshed.BatchID)))
 }
 
 // handleRetireAnalysisCohortSnapshot soft-deletes a snapshot by default

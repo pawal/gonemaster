@@ -636,6 +636,7 @@
   "analysis_snapshots_restore": "Obnovi",
   "analysis_snapshots_rebuild": "Obnovi agregate",
   "analysis_snapshots_rebuild_title": "Ponovno izračuna agregate trendov in razlik iz obstoječih analiznih vrstic",
+  "analysis_snapshots_rebuild_unavailable_title": "Izvorni podatki opravil so bili počiščeni. Ponovna izgradnja potrebuje izvorne zagone in za ta posnetek ni več mogoča.",
   "analysis_snapshots_purge": "Trajno izbriši posnetek",
   "analysis_snapshots_purge_title": "Odstrani samo ta posnetek in njegove agregate",
   "analysis_snapshots_delete_source_batch": "Izbriši izvorni paket",

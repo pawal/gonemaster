@@ -168,6 +168,10 @@ func (s *spyJobStore) DeleteBatch(batchID string) ([]int64, error) {
 	return s.inner.DeleteBatch(batchID)
 }
 
+func (s *spyJobStore) BatchHasRuns(batchID string) bool {
+	return s.inner.BatchHasRuns(batchID)
+}
+
 func (s *spyJobStore) CreateProfile(p StoredProfile) (StoredProfile, error) {
 	return s.inner.CreateProfile(p)
 }

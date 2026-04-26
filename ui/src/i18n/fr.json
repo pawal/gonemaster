@@ -636,6 +636,7 @@
   "analysis_snapshots_restore": "Restaurer",
   "analysis_snapshots_rebuild": "Reconstruire les agrégats",
   "analysis_snapshots_rebuild_title": "Recalculer les agrégats de tendance et de diff à partir des lignes d'analyse existantes",
+  "analysis_snapshots_rebuild_unavailable_title": "Les données du job source ont été purgées. La reconstruction nécessite les exécutions d'origine et n'est plus possible pour cet instantané.",
   "analysis_snapshots_purge": "Purger l'instantané",
   "analysis_snapshots_purge_title": "Supprimer uniquement cet instantané et ses agrégats",
   "analysis_snapshots_delete_source_batch": "Supprimer le lot source",

@@ -164,11 +164,17 @@ func (s *SQLJobStore) upsertAnalysisNameserverIn(q sqlQuerier, name string, seen
 	}
 	seenAt = normalizeSeenAt(seenAt)
 	if s.dialect.SupportsOnConflictReturning() {
+		// WHERE skips the UPDATE when seenAt is already inside the
+		// stored window — avoids the per-tuple write (and its row
+		// lock) that otherwise dominates a concurrent rebuild on
+		// PostgreSQL's MVCC.
 		query := fmt.Sprintf(
 			`INSERT INTO analysis_nameservers (name, first_seen_at, last_seen_at) VALUES (%s, %s, %s)
 			 ON CONFLICT (name) DO UPDATE SET
 			   first_seen_at = %s,
 			   last_seen_at = %s
+			 WHERE analysis_nameservers.first_seen_at > EXCLUDED.first_seen_at
+			    OR analysis_nameservers.last_seen_at < EXCLUDED.last_seen_at
 			 RETURNING id, first_seen_at, last_seen_at`,
 			s.ph(1), s.ph(2), s.ph(3),
 			s.dialect.Least("analysis_nameservers.first_seen_at", "EXCLUDED.first_seen_at"),
@@ -176,12 +182,27 @@ func (s *SQLJobStore) upsertAnalysisNameserverIn(q sqlQuerier, name string, seen
 		)
 		item := AnalysisNameserver{Name: name}
 		var firstSeen, lastSeen string
-		if err := q.QueryRow(query, name, s.ts(seenAt), s.ts(seenAt)).Scan(&item.ID, &firstSeen, &lastSeen); err != nil {
+		err := q.QueryRow(query, name, s.ts(seenAt), s.ts(seenAt)).Scan(&item.ID, &firstSeen, &lastSeen)
+		switch {
+		case err == nil:
+			item.FirstSeenAt = parseTimestampStr(firstSeen)
+			item.LastSeenAt = parseTimestampStr(lastSeen)
+			return item, nil
+		case errors.Is(err, sql.ErrNoRows):
+			// WHERE filtered the UPDATE — row already covers seenAt.
+			row := q.QueryRow(
+				fmt.Sprintf(`SELECT id, first_seen_at, last_seen_at FROM analysis_nameservers WHERE name = %s`, s.ph(1)),
+				name,
+			)
+			if err := row.Scan(&item.ID, &firstSeen, &lastSeen); err != nil {
+				return AnalysisNameserver{}, fmt.Errorf("read analysis nameserver after no-op upsert: %w", err)
+			}
+			item.FirstSeenAt = parseTimestampStr(firstSeen)
+			item.LastSeenAt = parseTimestampStr(lastSeen)
+			return item, nil
+		default:
 			return AnalysisNameserver{}, fmt.Errorf("upsert analysis nameserver: %w", err)
 		}
-		item.FirstSeenAt = parseTimestampStr(firstSeen)
-		item.LastSeenAt = parseTimestampStr(lastSeen)
-		return item, nil
 	}
 	id, err := s.upsertSeenEntityIn(
 		q,
@@ -257,12 +278,16 @@ func (s *SQLJobStore) upsertAnalysisAddressIn(q sqlQuerier, address, family stri
 	}
 	seenAt = normalizeSeenAt(seenAt)
 	if s.dialect.SupportsOnConflictReturning() {
+		// See upsertAnalysisNameserverIn for why the WHERE clause matters.
 		query := fmt.Sprintf(
 			`INSERT INTO analysis_addresses (address, family, first_seen_at, last_seen_at) VALUES (%s, %s, %s, %s)
 			 ON CONFLICT (address) DO UPDATE SET
 			   family = EXCLUDED.family,
 			   first_seen_at = %s,
 			   last_seen_at = %s
+			 WHERE analysis_addresses.first_seen_at > EXCLUDED.first_seen_at
+			    OR analysis_addresses.last_seen_at < EXCLUDED.last_seen_at
+			    OR analysis_addresses.family <> EXCLUDED.family
 			 RETURNING id, family, first_seen_at, last_seen_at`,
 			s.ph(1), s.ph(2), s.ph(3), s.ph(4),
 			s.dialect.Least("analysis_addresses.first_seen_at", "EXCLUDED.first_seen_at"),
@@ -270,12 +295,26 @@ func (s *SQLJobStore) upsertAnalysisAddressIn(q sqlQuerier, address, family stri
 		)
 		item := AnalysisAddress{Address: address}
 		var firstSeen, lastSeen string
-		if err := q.QueryRow(query, address, family, s.ts(seenAt), s.ts(seenAt)).Scan(&item.ID, &item.Family, &firstSeen, &lastSeen); err != nil {
+		err := q.QueryRow(query, address, family, s.ts(seenAt), s.ts(seenAt)).Scan(&item.ID, &item.Family, &firstSeen, &lastSeen)
+		switch {
+		case err == nil:
+			item.FirstSeenAt = parseTimestampStr(firstSeen)
+			item.LastSeenAt = parseTimestampStr(lastSeen)
+			return item, nil
+		case errors.Is(err, sql.ErrNoRows):
+			row := q.QueryRow(
+				fmt.Sprintf(`SELECT id, family, first_seen_at, last_seen_at FROM analysis_addresses WHERE address = %s`, s.ph(1)),
+				address,
+			)
+			if err := row.Scan(&item.ID, &item.Family, &firstSeen, &lastSeen); err != nil {
+				return AnalysisAddress{}, fmt.Errorf("read analysis address after no-op upsert: %w", err)
+			}
+			item.FirstSeenAt = parseTimestampStr(firstSeen)
+			item.LastSeenAt = parseTimestampStr(lastSeen)
+			return item, nil
+		default:
 			return AnalysisAddress{}, fmt.Errorf("upsert analysis address: %w", err)
 		}
-		item.FirstSeenAt = parseTimestampStr(firstSeen)
-		item.LastSeenAt = parseTimestampStr(lastSeen)
-		return item, nil
 	}
 	id, err := s.upsertSeenEntityIn(
 		q,
@@ -351,12 +390,16 @@ func (s *SQLJobStore) upsertAnalysisPrefixIn(q sqlQuerier, prefix, family string
 	}
 	seenAt = normalizeSeenAt(seenAt)
 	if s.dialect.SupportsOnConflictReturning() {
+		// See upsertAnalysisNameserverIn for why the WHERE clause matters.
 		query := fmt.Sprintf(
 			`INSERT INTO analysis_prefixes (prefix, family, first_seen_at, last_seen_at) VALUES (%s, %s, %s, %s)
 			 ON CONFLICT (prefix) DO UPDATE SET
 			   family = EXCLUDED.family,
 			   first_seen_at = %s,
 			   last_seen_at = %s
+			 WHERE analysis_prefixes.first_seen_at > EXCLUDED.first_seen_at
+			    OR analysis_prefixes.last_seen_at < EXCLUDED.last_seen_at
+			    OR analysis_prefixes.family <> EXCLUDED.family
 			 RETURNING id, family, first_seen_at, last_seen_at`,
 			s.ph(1), s.ph(2), s.ph(3), s.ph(4),
 			s.dialect.Least("analysis_prefixes.first_seen_at", "EXCLUDED.first_seen_at"),
@@ -364,12 +407,26 @@ func (s *SQLJobStore) upsertAnalysisPrefixIn(q sqlQuerier, prefix, family string
 		)
 		item := AnalysisPrefix{Prefix: prefix}
 		var firstSeen, lastSeen string
-		if err := q.QueryRow(query, prefix, family, s.ts(seenAt), s.ts(seenAt)).Scan(&item.ID, &item.Family, &firstSeen, &lastSeen); err != nil {
+		err := q.QueryRow(query, prefix, family, s.ts(seenAt), s.ts(seenAt)).Scan(&item.ID, &item.Family, &firstSeen, &lastSeen)
+		switch {
+		case err == nil:
+			item.FirstSeenAt = parseTimestampStr(firstSeen)
+			item.LastSeenAt = parseTimestampStr(lastSeen)
+			return item, nil
+		case errors.Is(err, sql.ErrNoRows):
+			row := q.QueryRow(
+				fmt.Sprintf(`SELECT id, family, first_seen_at, last_seen_at FROM analysis_prefixes WHERE prefix = %s`, s.ph(1)),
+				prefix,
+			)
+			if err := row.Scan(&item.ID, &item.Family, &firstSeen, &lastSeen); err != nil {
+				return AnalysisPrefix{}, fmt.Errorf("read analysis prefix after no-op upsert: %w", err)
+			}
+			item.FirstSeenAt = parseTimestampStr(firstSeen)
+			item.LastSeenAt = parseTimestampStr(lastSeen)
+			return item, nil
+		default:
 			return AnalysisPrefix{}, fmt.Errorf("upsert analysis prefix: %w", err)
 		}
-		item.FirstSeenAt = parseTimestampStr(firstSeen)
-		item.LastSeenAt = parseTimestampStr(lastSeen)
-		return item, nil
 	}
 	id, err := s.upsertSeenEntityIn(
 		q,
@@ -443,13 +500,17 @@ func (s *SQLJobStore) upsertAnalysisASNIn(q sqlQuerier, asn int64, label string,
 	seenAt = normalizeSeenAt(seenAt)
 	if s.dialect.SupportsOnConflictReturning() {
 		// Keep an already-resolved label rather than clobbering it with an
-		// empty one from a caller that hadn't resolved a label yet.
+		// empty one from a caller that hadn't resolved a label yet. The
+		// WHERE clause skips no-op UPDATEs (see upsertAnalysisNameserverIn).
 		query := fmt.Sprintf(
 			`INSERT INTO analysis_asns (asn, label, first_seen_at, last_seen_at) VALUES (%s, %s, %s, %s)
 			 ON CONFLICT (asn) DO UPDATE SET
 			   label = CASE WHEN EXCLUDED.label = '' THEN analysis_asns.label ELSE EXCLUDED.label END,
 			   first_seen_at = %s,
 			   last_seen_at = %s
+			 WHERE analysis_asns.first_seen_at > EXCLUDED.first_seen_at
+			    OR analysis_asns.last_seen_at < EXCLUDED.last_seen_at
+			    OR (EXCLUDED.label <> '' AND EXCLUDED.label <> analysis_asns.label)
 			 RETURNING asn, label, first_seen_at, last_seen_at`,
 			s.ph(1), s.ph(2), s.ph(3), s.ph(4),
 			s.dialect.Least("analysis_asns.first_seen_at", "EXCLUDED.first_seen_at"),
@@ -457,12 +518,26 @@ func (s *SQLJobStore) upsertAnalysisASNIn(q sqlQuerier, asn int64, label string,
 		)
 		var item AnalysisASN
 		var firstSeen, lastSeen string
-		if err := q.QueryRow(query, asn, label, s.ts(seenAt), s.ts(seenAt)).Scan(&item.ASN, &item.Label, &firstSeen, &lastSeen); err != nil {
+		err := q.QueryRow(query, asn, label, s.ts(seenAt), s.ts(seenAt)).Scan(&item.ASN, &item.Label, &firstSeen, &lastSeen)
+		switch {
+		case err == nil:
+			item.FirstSeenAt = parseTimestampStr(firstSeen)
+			item.LastSeenAt = parseTimestampStr(lastSeen)
+			return item, nil
+		case errors.Is(err, sql.ErrNoRows):
+			row := q.QueryRow(
+				fmt.Sprintf(`SELECT asn, label, first_seen_at, last_seen_at FROM analysis_asns WHERE asn = %s`, s.ph(1)),
+				asn,
+			)
+			if err := row.Scan(&item.ASN, &item.Label, &firstSeen, &lastSeen); err != nil {
+				return AnalysisASN{}, fmt.Errorf("read analysis asn after no-op upsert: %w", err)
+			}
+			item.FirstSeenAt = parseTimestampStr(firstSeen)
+			item.LastSeenAt = parseTimestampStr(lastSeen)
+			return item, nil
+		default:
 			return AnalysisASN{}, fmt.Errorf("upsert analysis asn: %w", err)
 		}
-		item.FirstSeenAt = parseTimestampStr(firstSeen)
-		item.LastSeenAt = parseTimestampStr(lastSeen)
-		return item, nil
 	}
 	row := q.QueryRow(
 		fmt.Sprintf(`SELECT label, first_seen_at, last_seen_at FROM analysis_asns WHERE asn = %s`, s.ph(1)),

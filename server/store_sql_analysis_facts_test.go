@@ -93,6 +93,87 @@ func TestSQLJobStoreAnalysisEntityHelpers(t *testing.T) {
 	}
 }
 
+// TestSQLJobStoreAnalysisEntityUpsertNoOp covers the rebuild hot path:
+// when the seen window already covers the new seenAt, the upsert skips
+// the UPDATE (avoiding MVCC bloat on PostgreSQL) but still returns the
+// existing row's identity.
+func TestSQLJobStoreAnalysisEntityUpsertNoOp(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			early := time.Date(2026, 4, 10, 12, 0, 0, 0, time.UTC)
+			late := early.Add(2 * time.Hour)
+			mid := early.Add(1 * time.Hour)
+
+			// Seed each entity with the full early..late window.
+			if _, err := s.UpsertAnalysisNameserver("ns1.example.net", late); err != nil {
+				t.Fatalf("seed nameserver late: %v", err)
+			}
+			ns0, err := s.UpsertAnalysisNameserver("ns1.example.net", early)
+			if err != nil {
+				t.Fatalf("seed nameserver early: %v", err)
+			}
+			if _, err := s.UpsertAnalysisAddress("192.0.2.1", "ipv4", late); err != nil {
+				t.Fatalf("seed address late: %v", err)
+			}
+			addr0, err := s.UpsertAnalysisAddress("192.0.2.1", "ipv4", early)
+			if err != nil {
+				t.Fatalf("seed address early: %v", err)
+			}
+			if _, err := s.UpsertAnalysisPrefix("192.0.2.0/24", "ipv4", late); err != nil {
+				t.Fatalf("seed prefix late: %v", err)
+			}
+			pfx0, err := s.UpsertAnalysisPrefix("192.0.2.0/24", "ipv4", early)
+			if err != nil {
+				t.Fatalf("seed prefix early: %v", err)
+			}
+			if _, err := s.UpsertAnalysisASN(64496, "Example ASN", late); err != nil {
+				t.Fatalf("seed asn late: %v", err)
+			}
+			asn0, err := s.UpsertAnalysisASN(64496, "Example ASN", early)
+			if err != nil {
+				t.Fatalf("seed asn early: %v", err)
+			}
+
+			// A subsequent upsert with seenAt already inside the window
+			// must return the same identity and an unchanged window.
+			ns, err := s.UpsertAnalysisNameserver("ns1.example.net", mid)
+			if err != nil {
+				t.Fatalf("noop nameserver: %v", err)
+			}
+			if ns.ID != ns0.ID || !ns.FirstSeenAt.Equal(early) || !ns.LastSeenAt.Equal(late) {
+				t.Fatalf("nameserver no-op upsert mutated state: %+v", ns)
+			}
+
+			addr, err := s.UpsertAnalysisAddress("192.0.2.1", "ipv4", mid)
+			if err != nil {
+				t.Fatalf("noop address: %v", err)
+			}
+			if addr.ID != addr0.ID || !addr.FirstSeenAt.Equal(early) || !addr.LastSeenAt.Equal(late) {
+				t.Fatalf("address no-op upsert mutated state: %+v", addr)
+			}
+
+			pfx, err := s.UpsertAnalysisPrefix("192.0.2.0/24", "ipv4", mid)
+			if err != nil {
+				t.Fatalf("noop prefix: %v", err)
+			}
+			if pfx.ID != pfx0.ID || !pfx.FirstSeenAt.Equal(early) || !pfx.LastSeenAt.Equal(late) {
+				t.Fatalf("prefix no-op upsert mutated state: %+v", pfx)
+			}
+
+			// ASN with empty label must not blank out the existing label
+			// even when seenAt is already covered.
+			asn, err := s.UpsertAnalysisASN(64496, "", mid)
+			if err != nil {
+				t.Fatalf("noop asn: %v", err)
+			}
+			if asn.ASN != asn0.ASN || asn.Label != "Example ASN" || !asn.FirstSeenAt.Equal(early) || !asn.LastSeenAt.Equal(late) {
+				t.Fatalf("asn no-op upsert mutated state: %+v", asn)
+			}
+		})
+	}
+}
+
 func TestSQLJobStoreAnalysisFactHelpers(t *testing.T) {
 	for _, b := range testBackends(t) {
 		t.Run(b.name, func(t *testing.T) {

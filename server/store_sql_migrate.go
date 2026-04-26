@@ -560,6 +560,51 @@ var sqlMigrations = []sqlMigration{
 			return buildV13DDL(bigint)
 		},
 	},
+	{
+		// Per-snapshot per-domain view. One row per (snapshot, domain)
+		// carrying the per-domain detail page's full payload (scoring,
+		// nameserver/address rosters, tag list at capture-time floor)
+		// so the handler is one indexed SELECT instead of a fact-row
+		// reload + per-row N+1 + entries-table scan.
+		version: 14,
+		stmtsFn: func(d sqlDialect) []string {
+			var bigint string
+			switch d.(type) {
+			case postgresDialect, mariadbDialect:
+				bigint = "BIGINT"
+			default:
+				bigint = "INTEGER"
+			}
+			return buildV14DDL(bigint)
+		},
+	},
+}
+
+// buildV14DDL returns migration 14: the per-domain snapshot view that
+// replaces handlePublicAnalysisDomainDetail's legacy materialization
+// load + entries-table walk with a single keyed lookup.
+func buildV14DDL(bigint string) []string {
+	return []string{
+		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS analysis_snapshot_domain_view (
+			snapshot_id      %s          NOT NULL,
+			domain_id        %s          NOT NULL,
+			domain_name      VARCHAR(255) NOT NULL DEFAULT '',
+			score            INTEGER,
+			grade            VARCHAR(2)  NOT NULL DEFAULT '',
+			worst_level      VARCHAR(16) NOT NULL DEFAULT '',
+			finished_at      TEXT,
+			nameserver_count INTEGER     NOT NULL DEFAULT 0,
+			endpoint_count   INTEGER     NOT NULL DEFAULT 0,
+			asn_count        INTEGER     NOT NULL DEFAULT 0,
+			prefix_count     INTEGER     NOT NULL DEFAULT 0,
+			nameservers_json TEXT        NOT NULL DEFAULT '[]',
+			addresses_json   TEXT        NOT NULL DEFAULT '[]',
+			tags_json        TEXT        NOT NULL DEFAULT '[]',
+			PRIMARY KEY (snapshot_id, domain_id)
+		)`, bigint, bigint),
+		`CREATE INDEX IF NOT EXISTS idx_analysis_snapshot_domain_view_snapshot_name ON analysis_snapshot_domain_view(snapshot_id, domain_name)`,
+		`CREATE INDEX IF NOT EXISTS idx_analysis_snapshot_domain_view_snapshot_worst ON analysis_snapshot_domain_view(snapshot_id, worst_level, grade)`,
+	}
 }
 
 // buildV13DDL returns the v13 schema changes: detail-roster columns on

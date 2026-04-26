@@ -505,6 +505,53 @@ type AnalysisSnapshotTagView struct {
 	Domains         []string `json:"domains,omitempty"`
 }
 
+// AnalysisSnapshotDomainView is one pre-computed domain row for a
+// captured snapshot, serving the per-domain detail page in one lookup.
+type AnalysisSnapshotDomainView struct {
+	SnapshotID      int64                  `json:"snapshot_id"`
+	DomainID        int64                  `json:"domain_id"`
+	DomainName      string                 `json:"domain_name"`
+	Score           *int                   `json:"score,omitempty"`
+	Grade           string                 `json:"grade,omitempty"`
+	WorstLevel      string                 `json:"worst_level,omitempty"`
+	FinishedAt      *time.Time             `json:"finished_at,omitempty"`
+	NameserverCount int                    `json:"nameserver_count"`
+	EndpointCount   int                    `json:"endpoint_count"`
+	ASNCount        int                    `json:"asn_count"`
+	PrefixCount     int                    `json:"prefix_count"`
+	Nameservers     []DomainViewNameserver `json:"nameservers,omitempty"`
+	Addresses       []DomainViewAddress    `json:"addresses,omitempty"`
+	Tags            []DomainViewTag        `json:"tags,omitempty"`
+}
+
+// DomainViewNameserver is one nameserver entry inside nameservers_json.
+type DomainViewNameserver struct {
+	Name      string              `json:"name"`
+	IPv4Count int                 `json:"ipv4_count"`
+	IPv6Count int                 `json:"ipv6_count"`
+	Status    string              `json:"status,omitempty"`
+	Addresses []DomainViewAddress `json:"addresses,omitempty"`
+}
+
+// DomainViewAddress is one address entry inside the JSON columns.
+type DomainViewAddress struct {
+	Address  string `json:"address"`
+	Family   string `json:"family"`
+	ASN      *int64 `json:"asn,omitempty"`
+	ASNLabel string `json:"asn_label,omitempty"`
+	Prefix   string `json:"prefix,omitempty"`
+	Status   string `json:"status,omitempty"`
+}
+
+// DomainViewTag is one tag entry inside tags_json, filtered at capture
+// to the snapshot's tag_view_min_level floor.
+type DomainViewTag struct {
+	Tag      string `json:"tag"`
+	Module   string `json:"module,omitempty"`
+	Testcase string `json:"testcase,omitempty"`
+	Level    string `json:"level,omitempty"`
+}
+
 // AnalysisSnapshotASNView is one pre-computed ASN row for a captured snapshot.
 type AnalysisSnapshotASNView struct {
 	SnapshotID      int64  `json:"snapshot_id"`

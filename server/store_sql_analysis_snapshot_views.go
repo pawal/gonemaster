@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
+	"time"
 )
 
 // SnapshotEntityViews is the bundle of per-snapshot view-row sets computed
@@ -14,6 +16,7 @@ type SnapshotEntityViews struct {
 	Endpoints   []AnalysisSnapshotEndpointView
 	ASNs        []AnalysisSnapshotASNView
 	Tags        []AnalysisSnapshotTagView
+	Domains     []AnalysisSnapshotDomainView
 }
 
 // ComputeSnapshotEntityViews builds the three entity-view row sets for one
@@ -46,13 +49,85 @@ func (s *SQLJobStore) ComputeSnapshotEntityViews(cohortID int64, batchID string)
 	if err != nil {
 		return SnapshotEntityViews{}, err
 	}
+	summaries, finishedAt, err := s.queryBatchDomainSummaries(cohortID, batchID)
+	if err != nil {
+		return SnapshotEntityViews{}, err
+	}
 	domainNames := s.collectDomainNames(endpoints, addrFacts, domainASNs, tagSummaries)
+	for _, sm := range summaries {
+		if _, ok := domainNames[sm.DomainID]; !ok {
+			domainNames = mergeDomainNames(domainNames, s.GetDomainNamesByIDs([]int64{sm.DomainID}))
+		}
+	}
 	return SnapshotEntityViews{
 		Nameservers: buildNameserverViews(endpoints, addrFacts, asnByID, domainNames),
 		Endpoints:   buildEndpointViews(endpoints, addrFacts, asnByID, prefixByID, domainNames),
 		ASNs:        buildASNViews(endpoints, addrFacts, domainASNs, asnByID),
 		Tags:        buildTagViews(tagSummaries, domainNames, s.tagViewMinLevel),
+		Domains:     buildDomainViews(summaries, finishedAt, endpoints, addrFacts, asnByID, prefixByID, domainNames, tagSummaries, s.tagViewMinLevel),
 	}, nil
+}
+
+func mergeDomainNames(base, extra map[int64]string) map[int64]string {
+	for id, name := range extra {
+		if _, ok := base[id]; !ok {
+			base[id] = name
+		}
+	}
+	return base
+}
+
+// queryBatchDomainSummaries returns the per-(run, domain) summary rows
+// joined to runs in the snapshot's batch, plus a run_id -> finished_at
+// map so the per-domain detail page can surface the run timestamp.
+func (s *SQLJobStore) queryBatchDomainSummaries(cohortID int64, batchID string) ([]AnalysisRunDomainSummary, map[string]time.Time, error) {
+	rows, err := s.db.Query(
+		fmt.Sprintf(`SELECT s.cohort_id, s.run_id, s.domain_id, s.score, s.grade,
+				s.nameserver_count, s.endpoint_count, s.asn_count, s.prefix_count,
+				s.worst_level, r.finished_at
+			FROM analysis_run_domain_summary s
+			JOIN runs r ON r.id = s.run_id
+			WHERE s.cohort_id = %s AND r.batch_id = %s`,
+			s.ph(1), s.ph(2)),
+		cohortID, batchID,
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("query batch domain summaries: %w", err)
+	}
+	defer rows.Close()
+
+	var (
+		out      []AnalysisRunDomainSummary
+		finished = map[string]time.Time{}
+	)
+	for rows.Next() {
+		var (
+			sm        AnalysisRunDomainSummary
+			score     sql.NullInt64
+			grade     sql.NullString
+			finishTS  sql.NullString
+		)
+		if err := rows.Scan(
+			&sm.CohortID, &sm.RunID, &sm.DomainID, &score, &grade,
+			&sm.NameserverCount, &sm.EndpointCount, &sm.ASNCount, &sm.PrefixCount,
+			&sm.WorstLevel, &finishTS,
+		); err != nil {
+			return nil, nil, fmt.Errorf("scan batch domain summary: %w", err)
+		}
+		if score.Valid {
+			v := int(score.Int64)
+			sm.Score = &v
+		}
+		if grade.Valid {
+			g := grade.String
+			sm.Grade = &g
+		}
+		out = append(out, sm)
+		if t := parseTimestampNullStr(finishTS); !t.IsZero() {
+			finished[sm.RunID] = t
+		}
+	}
+	return out, finished, rows.Err()
 }
 
 // queryBatchTagSummaries returns every analysis_run_tag_summary row joined
@@ -144,6 +219,245 @@ func buildTagViews(rows []AnalysisRunTagSummary, domainNames map[int64]string, m
 			DomainCount:     len(b.domains),
 			OccurrenceCount: b.occurrences,
 			Domains:         domains,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Tag < out[j].Tag })
+	return out
+}
+
+// buildDomainViews builds one row per cohort domain in the snapshot's
+// batch, baking the per-NS-address roster, flat addresses list, and
+// per-domain tag list (filtered by minLevel) as JSON columns.
+func buildDomainViews(
+	summaries []AnalysisRunDomainSummary,
+	finishedAt map[string]time.Time,
+	endpoints []batchEndpointRow,
+	addrFacts []AnalysisRunAddressASN,
+	asnByID map[int64]string,
+	prefixByID map[int64]string,
+	domainNames map[int64]string,
+	tagSummaries []AnalysisRunTagSummary,
+	minLevel string,
+) []AnalysisSnapshotDomainView {
+	floor := severityRank(minLevel)
+
+	endpointsByDomain := map[int64][]batchEndpointRow{}
+	for _, ep := range endpoints {
+		endpointsByDomain[ep.DomainID] = append(endpointsByDomain[ep.DomainID], ep)
+	}
+	addrFactsByDomain := map[int64][]AnalysisRunAddressASN{}
+	for _, f := range addrFacts {
+		addrFactsByDomain[f.DomainID] = append(addrFactsByDomain[f.DomainID], f)
+	}
+	tagsByDomain := map[int64][]AnalysisRunTagSummary{}
+	for _, t := range tagSummaries {
+		tagsByDomain[t.DomainID] = append(tagsByDomain[t.DomainID], t)
+	}
+
+	// Collapse to one summary per domain, preferring the run with the
+	// freshest finished_at. A snapshot batch normally has one run per
+	// domain, but historical data may have reprojected duplicates.
+	latestByDomain := map[int64]AnalysisRunDomainSummary{}
+	for _, sm := range summaries {
+		existing, seen := latestByDomain[sm.DomainID]
+		if !seen {
+			latestByDomain[sm.DomainID] = sm
+			continue
+		}
+		newAt := finishedAt[sm.RunID]
+		oldAt := finishedAt[existing.RunID]
+		if newAt.After(oldAt) {
+			latestByDomain[sm.DomainID] = sm
+		}
+	}
+
+	out := make([]AnalysisSnapshotDomainView, 0, len(latestByDomain))
+	for _, sm := range latestByDomain {
+		v := AnalysisSnapshotDomainView{
+			DomainID:        sm.DomainID,
+			DomainName:      domainNames[sm.DomainID],
+			Score:           sm.Score,
+			WorstLevel:      sm.WorstLevel,
+			NameserverCount: sm.NameserverCount,
+			EndpointCount:   sm.EndpointCount,
+			ASNCount:        sm.ASNCount,
+			PrefixCount:     sm.PrefixCount,
+		}
+		if sm.Grade != nil {
+			v.Grade = *sm.Grade
+		}
+		if t, ok := finishedAt[sm.RunID]; ok && !t.IsZero() {
+			ft := t
+			v.FinishedAt = &ft
+		}
+
+		nsViews, addrViews := buildDomainNSAndAddresses(
+			endpointsByDomain[sm.DomainID],
+			addrFactsByDomain[sm.DomainID],
+			asnByID, prefixByID,
+		)
+		v.Nameservers = nsViews
+		v.Addresses = addrViews
+		v.Tags = buildDomainTags(tagsByDomain[sm.DomainID], floor)
+		out = append(out, v)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].DomainName < out[j].DomainName })
+	return out
+}
+
+// buildDomainNSAndAddresses returns the per-NS roster and the flat
+// deduplicated address list for one domain's endpoints + address facts.
+// Per-NS status is "unresolved" when the projector recorded the NS with
+// AddressID=0 (no resolved address); per-address status is "unreachable"
+// when no endpoint row for that address has QueryCount > 0.
+func buildDomainNSAndAddresses(
+	domainEPs []batchEndpointRow,
+	domainAddrFacts []AnalysisRunAddressASN,
+	asnByID, prefixByID map[int64]string,
+) ([]DomainViewNameserver, []DomainViewAddress) {
+	type nsAccum struct {
+		name       string
+		v4         map[int64]struct{}
+		v6         map[int64]struct{}
+		addrIDs    map[int64]struct{}
+		unresolved bool
+	}
+	type addrAccum struct {
+		family  string
+		literal string
+		hasOK   bool
+		seen    bool
+	}
+	addrAccums := map[int64]*addrAccum{}
+	nsBuckets := map[int64]*nsAccum{}
+	for _, ep := range domainEPs {
+		nb, ok := nsBuckets[ep.NameserverID]
+		if !ok {
+			nb = &nsAccum{
+				name:    ep.NameserverName,
+				v4:      map[int64]struct{}{},
+				v6:      map[int64]struct{}{},
+				addrIDs: map[int64]struct{}{},
+			}
+			nsBuckets[ep.NameserverID] = nb
+		}
+		if ep.AddressID == 0 {
+			nb.unresolved = true
+			continue
+		}
+		nb.addrIDs[ep.AddressID] = struct{}{}
+		switch ep.Family {
+		case "ipv4":
+			nb.v4[ep.AddressID] = struct{}{}
+		case "ipv6":
+			nb.v6[ep.AddressID] = struct{}{}
+		}
+		aa, exists := addrAccums[ep.AddressID]
+		if !exists {
+			aa = &addrAccum{family: ep.Family, literal: ep.Address, seen: true}
+			addrAccums[ep.AddressID] = aa
+		}
+		if ep.QueryCount > 0 {
+			aa.hasOK = true
+		}
+	}
+
+	addrFactByAddrID := map[int64]AnalysisRunAddressASN{}
+	for _, f := range domainAddrFacts {
+		addrFactByAddrID[f.AddressID] = f
+	}
+
+	addrViewByID := map[int64]DomainViewAddress{}
+	for addrID, aa := range addrAccums {
+		view := DomainViewAddress{Address: aa.literal, Family: aa.family}
+		if !aa.hasOK {
+			view.Status = "unreachable"
+		}
+		if fact, ok := addrFactByAddrID[addrID]; ok {
+			if fact.ASN != nil {
+				asn := *fact.ASN
+				view.ASN = &asn
+				view.ASNLabel = asnByID[asn]
+			}
+			if fact.PrefixID != nil {
+				view.Prefix = prefixByID[*fact.PrefixID]
+			}
+		}
+		addrViewByID[addrID] = view
+	}
+
+	nsViews := make([]DomainViewNameserver, 0, len(nsBuckets))
+	for _, nb := range nsBuckets {
+		nv := DomainViewNameserver{
+			Name:      nb.name,
+			IPv4Count: len(nb.v4),
+			IPv6Count: len(nb.v6),
+		}
+		if nb.unresolved && len(nb.addrIDs) == 0 {
+			nv.Status = "unresolved"
+		}
+		for addrID := range nb.addrIDs {
+			if av, ok := addrViewByID[addrID]; ok {
+				nv.Addresses = append(nv.Addresses, av)
+			}
+		}
+		sort.Slice(nv.Addresses, func(i, j int) bool {
+			if nv.Addresses[i].Family != nv.Addresses[j].Family {
+				return nv.Addresses[i].Family < nv.Addresses[j].Family
+			}
+			return nv.Addresses[i].Address < nv.Addresses[j].Address
+		})
+		nsViews = append(nsViews, nv)
+	}
+	sort.Slice(nsViews, func(i, j int) bool { return nsViews[i].Name < nsViews[j].Name })
+
+	addrViews := make([]DomainViewAddress, 0, len(addrViewByID))
+	for _, av := range addrViewByID {
+		addrViews = append(addrViews, av)
+	}
+	sort.Slice(addrViews, func(i, j int) bool { return addrViews[i].Address < addrViews[j].Address })
+
+	return nsViews, addrViews
+}
+
+// buildDomainTags collapses per-(run, domain, tag) summaries into one
+// tag per (tag) for one domain, keeping the worst-seen level. Tags
+// whose worst level falls below floor are dropped.
+func buildDomainTags(rows []AnalysisRunTagSummary, floor int) []DomainViewTag {
+	type bucket struct {
+		module, testcase, level string
+	}
+	buckets := map[string]*bucket{}
+	for _, t := range rows {
+		tag := strings.TrimSpace(t.Tag)
+		if tag == "" {
+			continue
+		}
+		b, ok := buckets[tag]
+		if !ok {
+			b = &bucket{module: t.Module, testcase: t.Testcase, level: t.Level}
+			buckets[tag] = b
+		}
+		if severityRank(t.Level) > severityRank(b.level) {
+			b.level = t.Level
+		}
+		if b.module == "" {
+			b.module = t.Module
+		}
+		if b.testcase == "" {
+			b.testcase = t.Testcase
+		}
+	}
+	out := make([]DomainViewTag, 0, len(buckets))
+	for tag, b := range buckets {
+		if severityRank(b.level) < floor {
+			continue
+		}
+		out = append(out, DomainViewTag{
+			Tag:      tag,
+			Module:   b.module,
+			Testcase: b.testcase,
+			Level:    b.level,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Tag < out[j].Tag })
@@ -651,6 +965,7 @@ func (s *SQLJobStore) ReplaceSnapshotEntityViews(snapshotID int64, views Snapsho
 		"analysis_snapshot_endpoint_view",
 		"analysis_snapshot_asn_view",
 		"analysis_snapshot_tag_view",
+		"analysis_snapshot_domain_view",
 	} {
 		if _, err := tx.Exec(
 			fmt.Sprintf(`DELETE FROM %s WHERE snapshot_id = %s`, table, s.ph(1)),
@@ -737,10 +1052,116 @@ func (s *SQLJobStore) ReplaceSnapshotEntityViews(snapshotID int64, views Snapsho
 			return fmt.Errorf("insert tag view tag=%s: %w", v.Tag, err)
 		}
 	}
+	for _, v := range views.Domains {
+		nsJSON, err := marshalDomainNameservers(v.Nameservers)
+		if err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("marshal domain nameservers dom=%d: %w", v.DomainID, err)
+		}
+		addrJSON, err := marshalDomainAddresses(v.Addresses)
+		if err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("marshal domain addresses dom=%d: %w", v.DomainID, err)
+		}
+		tagsJSON, err := marshalDomainTags(v.Tags)
+		if err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("marshal domain tags dom=%d: %w", v.DomainID, err)
+		}
+		var (
+			score      sql.NullInt64
+			finishedAt sql.NullString
+		)
+		if v.Score != nil {
+			score = sql.NullInt64{Int64: int64(*v.Score), Valid: true}
+		}
+		if v.FinishedAt != nil && !v.FinishedAt.IsZero() {
+			finishedAt = sql.NullString{String: v.FinishedAt.UTC().Format(time.RFC3339Nano), Valid: true}
+		}
+		if _, err := tx.Exec(
+			fmt.Sprintf(`INSERT INTO analysis_snapshot_domain_view
+				(snapshot_id, domain_id, domain_name, score, grade, worst_level, finished_at,
+				 nameserver_count, endpoint_count, asn_count, prefix_count,
+				 nameservers_json, addresses_json, tags_json)
+				VALUES (%s)`, s.phRange(1, 14)),
+			snapshotID, v.DomainID, v.DomainName, score, v.Grade, v.WorstLevel, finishedAt,
+			v.NameserverCount, v.EndpointCount, v.ASNCount, v.PrefixCount,
+			nsJSON, addrJSON, tagsJSON,
+		); err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("insert domain view dom=%d: %w", v.DomainID, err)
+		}
+	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit replace snapshot views: %w", err)
 	}
 	return nil
+}
+
+func marshalDomainNameservers(in []DomainViewNameserver) (string, error) {
+	if in == nil {
+		return "[]", nil
+	}
+	b, err := json.Marshal(in)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+func marshalDomainAddresses(in []DomainViewAddress) (string, error) {
+	if in == nil {
+		return "[]", nil
+	}
+	b, err := json.Marshal(in)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+func marshalDomainTags(in []DomainViewTag) (string, error) {
+	if in == nil {
+		return "[]", nil
+	}
+	b, err := json.Marshal(in)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+func unmarshalDomainNameservers(raw string) []DomainViewNameserver {
+	if raw == "" {
+		return nil
+	}
+	var out []DomainViewNameserver
+	if err := json.Unmarshal([]byte(raw), &out); err != nil {
+		return nil
+	}
+	return out
+}
+
+func unmarshalDomainAddresses(raw string) []DomainViewAddress {
+	if raw == "" {
+		return nil
+	}
+	var out []DomainViewAddress
+	if err := json.Unmarshal([]byte(raw), &out); err != nil {
+		return nil
+	}
+	return out
+}
+
+func unmarshalDomainTags(raw string) []DomainViewTag {
+	if raw == "" {
+		return nil
+	}
+	var out []DomainViewTag
+	if err := json.Unmarshal([]byte(raw), &out); err != nil {
+		return nil
+	}
+	return out
 }
 
 const analysisSnapshotNameserverViewCols = `snapshot_id, nameserver_id, nameserver_name,
@@ -978,6 +1399,86 @@ func (s *SQLJobStore) GetSnapshotTagView(snapshotID int64, tag string) (Analysis
 	v, err := scanSnapshotTagView(row)
 	if err != nil {
 		return AnalysisSnapshotTagView{}, false
+	}
+	return v, true
+}
+
+const analysisSnapshotDomainViewCols = `snapshot_id, domain_id, domain_name,
+	score, grade, worst_level, finished_at,
+	nameserver_count, endpoint_count, asn_count, prefix_count,
+	nameservers_json, addresses_json, tags_json`
+
+func scanSnapshotDomainView(row rowScanner) (AnalysisSnapshotDomainView, error) {
+	var (
+		v          AnalysisSnapshotDomainView
+		score      sql.NullInt64
+		finishedAt sql.NullString
+		nsJSON     string
+		addrJSON   string
+		tagsJSON   string
+	)
+	if err := row.Scan(
+		&v.SnapshotID, &v.DomainID, &v.DomainName,
+		&score, &v.Grade, &v.WorstLevel, &finishedAt,
+		&v.NameserverCount, &v.EndpointCount, &v.ASNCount, &v.PrefixCount,
+		&nsJSON, &addrJSON, &tagsJSON,
+	); err != nil {
+		return AnalysisSnapshotDomainView{}, err
+	}
+	if score.Valid {
+		s := int(score.Int64)
+		v.Score = &s
+	}
+	if t := parseTimestampNullStr(finishedAt); !t.IsZero() {
+		v.FinishedAt = &t
+	}
+	v.Nameservers = unmarshalDomainNameservers(nsJSON)
+	v.Addresses = unmarshalDomainAddresses(addrJSON)
+	v.Tags = unmarshalDomainTags(tagsJSON)
+	return v, nil
+}
+
+// ListSnapshotDomainViews returns every domain view row for one snapshot,
+// ordered by domain_name for stability.
+func (s *SQLJobStore) ListSnapshotDomainViews(snapshotID int64) []AnalysisSnapshotDomainView {
+	rows, err := s.db.Query(
+		fmt.Sprintf(`SELECT %s
+			FROM analysis_snapshot_domain_view
+			WHERE snapshot_id = %s
+			ORDER BY domain_name ASC`,
+			analysisSnapshotDomainViewCols, s.ph(1)),
+		snapshotID,
+	)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var out []AnalysisSnapshotDomainView
+	for rows.Next() {
+		v, err := scanSnapshotDomainView(rows)
+		if err != nil {
+			return nil
+		}
+		out = append(out, v)
+	}
+	return out
+}
+
+// GetSnapshotDomainViewByName looks up a single domain row by case-
+// insensitive domain name. Used by the per-domain detail page so the
+// handler is one indexed read instead of a cohort-wide fact load.
+func (s *SQLJobStore) GetSnapshotDomainViewByName(snapshotID int64, name string) (AnalysisSnapshotDomainView, bool) {
+	row := s.db.QueryRow(
+		fmt.Sprintf(`SELECT %s
+			FROM analysis_snapshot_domain_view
+			WHERE snapshot_id = %s AND LOWER(domain_name) = LOWER(%s)
+			LIMIT 1`,
+			analysisSnapshotDomainViewCols, s.ph(1), s.ph(2)),
+		snapshotID, name,
+	)
+	v, err := scanSnapshotDomainView(row)
+	if err != nil {
+		return AnalysisSnapshotDomainView{}, false
 	}
 	return v, true
 }

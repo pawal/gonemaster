@@ -215,6 +215,7 @@ func TestPublicAnalysisDomainDetailSurfacesNameserverStatus(t *testing.T) {
 	if err := f.store.ReplaceAnalysisRunNSEndpoints(f.cohort.ID, "run-ck", existing); err != nil {
 		t.Fatalf("replace endpoints: %v", err)
 	}
+	f.refreshSnapshotViews(f.batchID)
 
 	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/domains/ck.example")
 	if resp.Code != http.StatusOK {
@@ -284,22 +285,19 @@ func TestPublicAnalysisDomainDetail(t *testing.T) {
 	if len(got.Addresses) != 2 {
 		t.Fatalf("expected 2 addresses, got %+v", got.Addresses)
 	}
-	entriesByTag := map[string]PublicAnalysisDomainEntry{}
-	for _, e := range got.Entries {
-		entriesByTag[e.Tag] = e
+	tagsByName := map[string]PublicAnalysisDomainTag{}
+	for _, t := range got.Tags {
+		tagsByName[t.Tag] = t
 	}
-	ds07, ok := entriesByTag["DS07_NOT_SIGNED"]
+	ds07, ok := tagsByName["DS07_NOT_SIGNED"]
 	if !ok {
-		t.Fatalf("expected DS07_NOT_SIGNED entry, got %+v", got.Entries)
+		t.Fatalf("expected DS07_NOT_SIGNED tag, got %+v", got.Tags)
 	}
 	if ds07.Level != "ERROR" {
-		t.Fatalf("expected DS07_NOT_SIGNED entry at ERROR level, got %+v", ds07)
+		t.Fatalf("expected DS07_NOT_SIGNED tag at ERROR level, got %+v", ds07)
 	}
 	if ds07.Module != "DNSSEC" || ds07.Testcase != "dnssec07" {
 		t.Fatalf("expected DS07_NOT_SIGNED under DNSSEC/dnssec07, got %+v", ds07)
-	}
-	if ds07.Raw == "" {
-		t.Fatalf("expected non-empty raw fallback on entry, got %+v", ds07)
 	}
 }
 
@@ -596,9 +594,9 @@ func TestPublicAnalysisCohortAndDetailsScopedToSnapshot(t *testing.T) {
 	if len(detail.Addresses) != 1 || detail.Addresses[0].Address != "198.51.100.20" {
 		t.Fatalf("expected only new snapshot's address, got %+v", detail.Addresses)
 	}
-	for _, e := range detail.Entries {
-		if e.Tag == "OLD_TAG" {
-			t.Fatalf("expected domain detail to exclude older-snapshot entries, got %+v", detail.Entries)
+	for _, t2 := range detail.Tags {
+		if t2.Tag == "OLD_TAG" {
+			t.Fatalf("expected domain detail to exclude older-snapshot tags, got %+v", detail.Tags)
 		}
 	}
 
@@ -676,14 +674,14 @@ func TestPublicAnalysisDetailHandlersLoadAllEntriesForRun(t *testing.T) {
 		t.Fatalf("decode domain detail: %v", err)
 	}
 	foundLateTag := false
-	for _, e := range domainDetail.Entries {
-		if e.Tag == "LATE_TAG" {
+	for _, t2 := range domainDetail.Tags {
+		if t2.Tag == "LATE_TAG" {
 			foundLateTag = true
 			break
 		}
 	}
 	if !foundLateTag {
-		t.Fatalf("expected domain detail to include entry after 10k entries, got %d entries", len(domainDetail.Entries))
+		t.Fatalf("expected domain detail to include LATE_TAG after 10k entries, got %d tags", len(domainDetail.Tags))
 	}
 
 	tagResp := getPublic(t, f.srv, "/pub/api/v1/analysis/tags/LATE_TAG")

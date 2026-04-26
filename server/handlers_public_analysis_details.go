@@ -65,7 +65,15 @@ type PublicAnalysisDomainDetail struct {
 	PrefixCount     int                              `json:"prefix_count"`
 	Nameservers     []PublicAnalysisDomainNameserver `json:"nameservers"`
 	Addresses       []PublicAnalysisDomainAddress    `json:"addresses"`
-	Entries         []PublicAnalysisDomainEntry      `json:"entries"`
+	Tags            []PublicAnalysisDomainTag        `json:"tags,omitempty"`
+}
+
+// PublicAnalysisDomainTag is one tag observed at the capture-time floor.
+type PublicAnalysisDomainTag struct {
+	Tag      string `json:"tag"`
+	Module   string `json:"module,omitempty"`
+	Testcase string `json:"testcase,omitempty"`
+	Level    string `json:"level,omitempty"`
 }
 
 type PublicAnalysisDomainNameserver struct {
@@ -262,7 +270,10 @@ func (s *Server) handlePublicAnalysisDomainDetail(w http.ResponseWriter, r *http
 	if !ok {
 		return
 	}
-	cohort, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
+	if decoded, err := url.PathUnescape(domainName); err == nil {
+		domainName = decoded
+	}
+	_, snapshot, ok := s.resolvePublicAnalysisCohortAndSnapshot(w, r)
 	if !ok {
 		return
 	}
@@ -270,199 +281,76 @@ func (s *Server) handlePublicAnalysisDomainDetail(w http.ResponseWriter, r *http
 	if !ok {
 		return
 	}
-	domain, found := s.store.GetDomainByName(domainName)
+
+	view, found := readStore.GetSnapshotDomainViewByName(snapshot.ID, domainName)
 	if !found {
-		writeError(w, http.StatusNotFound, "not_found", "domain not found", nil)
+		writeError(w, http.StatusNotFound, "not_found", "domain not found in cohort", nil)
 		return
 	}
 
-	data := s.latestMaterializationForSnapshot(cohort, snapshot)
-	var pair domainSummaryPair
-	haveSummary := false
-	for _, p := range data.latest {
-		if p.summary.DomainID == domain.ID {
-			pair = p
-			haveSummary = true
-			break
-		}
-	}
-	if !haveSummary {
-		writeError(w, http.StatusNotFound, "not_found", "domain not materialized in cohort", nil)
-		return
-	}
+	writeSnapshotCacheHeaders(w, r, snapshot)
+	writeJSON(w, http.StatusOK, domainViewToDetail(view))
+}
 
-	type nsEntry struct {
-		name string
-		v4   map[int64]struct{}
-		v6   map[int64]struct{}
-		// addrs preserves the ordered set of (addressID, family) this
-		// nameserver serves, so we can later hang per-address facts off
-		// each nameserver rather than duplicating them into a flat list.
-		addrs []int64
-		seen  map[int64]struct{}
+// domainViewToDetail rehydrates the per-snapshot domain view into the
+// public response shape: rebuilds nameserver/address structs and the
+// at-floor tag list from the JSON columns.
+func domainViewToDetail(v AnalysisSnapshotDomainView) PublicAnalysisDomainDetail {
+	out := PublicAnalysisDomainDetail{
+		Domain:          v.DomainName,
+		Score:           v.Score,
+		WorstLevel:      v.WorstLevel,
+		FinishedAt:      v.FinishedAt,
+		NameserverCount: v.NameserverCount,
+		EndpointCount:   v.EndpointCount,
+		ASNCount:        v.ASNCount,
+		PrefixCount:     v.PrefixCount,
+		Nameservers:     make([]PublicAnalysisDomainNameserver, 0, len(v.Nameservers)),
+		Addresses:       make([]PublicAnalysisDomainAddress, 0, len(v.Addresses)),
 	}
-	nsByID := map[int64]*nsEntry{}
-	addrIDs := map[int64]struct{}{}
-	// addrStatus tracks reachability per address. "ok" wins over
-	// "unreachable" when the same address appears in multiple endpoint
-	// rows with different query counts.
-	addrStatus := map[int64]string{}
-	for _, ep := range data.endpoints {
-		if ep.RunID != pair.summary.RunID || ep.DomainID != domain.ID {
-			continue
-		}
-		addrIDs[ep.AddressID] = struct{}{}
-		n, exists := nsByID[ep.NameserverID]
-		if !exists {
-			ns, found := readStore.GetAnalysisNameserver(ep.NameserverID)
-			if !found {
-				continue
-			}
-			n = &nsEntry{
-				name: ns.Name,
-				v4:   map[int64]struct{}{},
-				v6:   map[int64]struct{}{},
-				seen: map[int64]struct{}{},
-			}
-			nsByID[ep.NameserverID] = n
-		}
-		switch ep.Family {
-		case "ipv4":
-			n.v4[ep.AddressID] = struct{}{}
-		case "ipv6":
-			n.v6[ep.AddressID] = struct{}{}
-		}
-		if _, ok := n.seen[ep.AddressID]; !ok {
-			n.seen[ep.AddressID] = struct{}{}
-			n.addrs = append(n.addrs, ep.AddressID)
-		}
-		if ep.AddressID != 0 {
-			if ep.QueryCount > 0 {
-				addrStatus[ep.AddressID] = "ok"
-			} else if _, set := addrStatus[ep.AddressID]; !set {
-				addrStatus[ep.AddressID] = "unreachable"
-			}
-		}
+	if v.Grade != "" {
+		g := v.Grade
+		out.Grade = &g
 	}
-
-	// Build per-address facts once, then reuse per nameserver.
-	addressView := make(map[int64]PublicAnalysisDomainAddress, len(addrIDs))
-	for addrID := range addrIDs {
-		addr, found := readStore.GetAnalysisAddress(addrID)
-		if !found {
-			continue
+	for _, ns := range v.Nameservers {
+		nsAddrs := make([]PublicAnalysisDomainAddress, 0, len(ns.Addresses))
+		for _, a := range ns.Addresses {
+			nsAddrs = append(nsAddrs, domainAddressToPublic(a))
 		}
-		view := PublicAnalysisDomainAddress{Address: addr.Address, Family: addr.Family}
-		if s := addrStatus[addrID]; s == "unreachable" {
-			view.Status = "unreachable"
-		}
-		for _, fact := range data.addressASNs {
-			if fact.RunID != pair.summary.RunID || fact.DomainID != domain.ID || fact.AddressID != addrID {
-				continue
-			}
-			if fact.ASN != nil {
-				asn := *fact.ASN
-				view.ASN = &asn
-				if meta, ok := readStore.GetAnalysisASN(asn); ok {
-					view.ASNLabel = meta.Label
-				}
-			}
-			if fact.PrefixID != nil {
-				if prefix, ok := readStore.GetAnalysisPrefix(*fact.PrefixID); ok {
-					view.Prefix = prefix.Prefix
-				}
-			}
-			break
-		}
-		addressView[addrID] = view
-	}
-
-	nameservers := make([]PublicAnalysisDomainNameserver, 0, len(nsByID))
-	for _, n := range nsByID {
-		nsAddrs := make([]PublicAnalysisDomainAddress, 0, len(n.addrs))
-		for _, addrID := range n.addrs {
-			if view, ok := addressView[addrID]; ok {
-				nsAddrs = append(nsAddrs, view)
-			}
-		}
-		sort.Slice(nsAddrs, func(i, j int) bool {
-			if nsAddrs[i].Family != nsAddrs[j].Family {
-				// Keep IPv4 before IPv6 for a predictable reading order.
-				return nsAddrs[i].Family < nsAddrs[j].Family
-			}
-			return nsAddrs[i].Address < nsAddrs[j].Address
-		})
-		nsView := PublicAnalysisDomainNameserver{
-			Nameserver: n.name,
-			IPv4Count:  len(n.v4),
-			IPv6Count:  len(n.v6),
+		out.Nameservers = append(out.Nameservers, PublicAnalysisDomainNameserver{
+			Nameserver: ns.Name,
+			IPv4Count:  ns.IPv4Count,
+			IPv6Count:  ns.IPv6Count,
 			Addresses:  nsAddrs,
-		}
-		if len(nsAddrs) == 0 {
-			nsView.Status = "unresolved"
-		}
-		nameservers = append(nameservers, nsView)
-	}
-	sort.Slice(nameservers, func(i, j int) bool { return nameservers[i].Nameserver < nameservers[j].Nameserver })
-
-	addresses := make([]PublicAnalysisDomainAddress, 0, len(addressView))
-	for _, view := range addressView {
-		addresses = append(addresses, view)
-	}
-	sort.Slice(addresses, func(i, j int) bool { return addresses[i].Address < addresses[j].Address })
-
-	// Build one entry per observed log row so the UI can render a grouped
-	// module/testcase results view with per-entry translated messages, the
-	// same shape the public UI's Results view consumes. Entries with an
-	// empty tag are logger metadata noise and are skipped here.
-	locale := strings.TrimSpace(r.URL.Query().Get("locale"))
-	loaded := s.loadAllEntriesForRun(pair.summary.RunID)
-	resultEntries := make([]JobResultEntry, 0, len(loaded))
-	for _, e := range loaded {
-		if strings.TrimSpace(e.Tag) == "" {
-			continue
-		}
-		resultEntries = append(resultEntries, JobResultEntry{
-			Timestamp: e.Timestamp,
-			Module:    e.Module,
-			Testcase:  e.Testcase,
-			Tag:       e.Tag,
-			Level:     e.Level,
-			Args:      e.Args,
+			Status:     ns.Status,
 		})
 	}
-	localized := localizeResultEntries(resultEntries, locale)
-	entries := make([]PublicAnalysisDomainEntry, 0, len(localized))
-	for _, e := range localized {
-		entries = append(entries, PublicAnalysisDomainEntry{
-			Timestamp: e.Timestamp,
-			Module:    e.Module,
-			Testcase:  e.Testcase,
-			Tag:       e.Tag,
-			Level:     e.Level,
-			Message:   e.Message,
-			Raw:       e.Raw,
-		})
+	for _, a := range v.Addresses {
+		out.Addresses = append(out.Addresses, domainAddressToPublic(a))
 	}
+	if len(v.Tags) > 0 {
+		out.Tags = make([]PublicAnalysisDomainTag, 0, len(v.Tags))
+		for _, t := range v.Tags {
+			out.Tags = append(out.Tags, PublicAnalysisDomainTag{
+				Tag:      t.Tag,
+				Module:   t.Module,
+				Testcase: t.Testcase,
+				Level:    t.Level,
+			})
+		}
+	}
+	return out
+}
 
-	detail := PublicAnalysisDomainDetail{
-		Domain:          domain.Name,
-		Score:           pair.summary.Score,
-		Grade:           pair.summary.Grade,
-		WorstLevel:      pair.summary.WorstLevel,
-		NameserverCount: pair.summary.NameserverCount,
-		EndpointCount:   pair.summary.EndpointCount,
-		ASNCount:        pair.summary.ASNCount,
-		PrefixCount:     pair.summary.PrefixCount,
-		Nameservers:     nameservers,
-		Addresses:       addresses,
-		Entries:         entries,
+func domainAddressToPublic(a DomainViewAddress) PublicAnalysisDomainAddress {
+	return PublicAnalysisDomainAddress{
+		Address:  a.Address,
+		Family:   a.Family,
+		ASN:      a.ASN,
+		ASNLabel: a.ASNLabel,
+		Prefix:   a.Prefix,
+		Status:   a.Status,
 	}
-	if !pair.finishedAt.IsZero() {
-		ft := pair.finishedAt
-		detail.FinishedAt = &ft
-	}
-	writeJSON(w, http.StatusOK, detail)
 }
 
 // ── nameserver detail ──────────────────────────────────────────────────────────

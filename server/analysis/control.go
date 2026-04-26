@@ -412,6 +412,11 @@ func (c *Controller) RebuildCohort(ctx context.Context, cohortID int64) error {
 	var pendingMu sync.Mutex
 	var projectedMu sync.Mutex
 
+	dimCache := newRebuildDimCache()
+	wrapWriter := func(w WriteStore) WriteStore {
+		return &cachingWriteStore{inner: w, cache: dimCache}
+	}
+
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(rebuildWorkers)
 
@@ -440,7 +445,7 @@ pages:
 				if err := gctx.Err(); err != nil {
 					return err
 				}
-				input, batch, contributed, err := c.projectRunForRebuild(run, catalog)
+				input, batch, contributed, err := c.projectRunForRebuild(run, catalog, wrapWriter)
 				if err != nil {
 					return fmt.Errorf("project run %s for cohort %d: %w", run.ID, cohort.ID, err)
 				}
@@ -495,8 +500,9 @@ pages:
 
 // projectRunForRebuild applies the same snapshot-intent gates as the
 // realtime path and projects one run, deferring the per-(cohort, batch)
-// snapshot upsert to the reconciliation pass.
-func (c *Controller) projectRunForRebuild(run serverpkg.Run, catalog []serverpkg.AnalysisCohort) (RunInput, serverpkg.Batch, bool, error) {
+// snapshot upsert to the reconciliation pass. The optional wrap lets
+// the caller slot a WriteStore wrapper around each per-run transaction.
+func (c *Controller) projectRunForRebuild(run serverpkg.Run, catalog []serverpkg.AnalysisCohort, wrap WriteStoreWrapper) (RunInput, serverpkg.Batch, bool, error) {
 	if run.BatchID == "" {
 		return RunInput{}, serverpkg.Batch{}, false, nil
 	}
@@ -511,10 +517,137 @@ func (c *Controller) projectRunForRebuild(run serverpkg.Run, catalog []serverpkg
 	if len(input.MatchingCohorts) == 0 {
 		return RunInput{}, serverpkg.Batch{}, false, nil
 	}
-	if err := c.projector.ProjectLoaded(input); err != nil {
+	if err := c.projector.ProjectLoadedWith(input, wrap); err != nil {
 		return RunInput{}, serverpkg.Batch{}, false, fmt.Errorf("project run %s: %w", run.ID, err)
 	}
 	return input, batch, true, nil
+}
+
+// rebuildDimCache deduplicates dimension upserts across the rebuild's
+// worker pool. With 4 workers all touching the same hot rows in
+// analysis_nameservers / addresses / prefixes / asns, the per-run
+// upserts otherwise dominate wall time on PostgreSQL via row-lock
+// contention and MVCC churn. After warmup nearly every dimension lookup
+// hits the cache and skips the DB entirely.
+type rebuildDimCache struct {
+	mu          sync.Mutex
+	nameservers map[string]int64
+	addresses   map[string]int64
+	prefixes    map[string]int64
+	asns        map[int64]struct{}
+}
+
+func newRebuildDimCache() *rebuildDimCache {
+	return &rebuildDimCache{
+		nameservers: map[string]int64{},
+		addresses:   map[string]int64{},
+		prefixes:    map[string]int64{},
+		asns:        map[int64]struct{}{},
+	}
+}
+
+// cachingWriteStore wraps a WriteStore and short-circuits the dimension
+// upserts via rebuildDimCache. Replace*/Upsert per-run methods pass
+// through unchanged — only the dimension entities benefit from caching.
+type cachingWriteStore struct {
+	inner WriteStore
+	cache *rebuildDimCache
+}
+
+func (c *cachingWriteStore) UpsertAnalysisNameserver(name string, seenAt time.Time) (serverpkg.AnalysisNameserver, error) {
+	c.cache.mu.Lock()
+	if id, ok := c.cache.nameservers[name]; ok {
+		c.cache.mu.Unlock()
+		return serverpkg.AnalysisNameserver{ID: id, Name: name, FirstSeenAt: seenAt, LastSeenAt: seenAt}, nil
+	}
+	c.cache.mu.Unlock()
+	ns, err := c.inner.UpsertAnalysisNameserver(name, seenAt)
+	if err != nil {
+		return ns, err
+	}
+	c.cache.mu.Lock()
+	c.cache.nameservers[name] = ns.ID
+	c.cache.mu.Unlock()
+	return ns, nil
+}
+
+func (c *cachingWriteStore) UpsertAnalysisAddress(address, family string, seenAt time.Time) (serverpkg.AnalysisAddress, error) {
+	c.cache.mu.Lock()
+	if id, ok := c.cache.addresses[address]; ok {
+		c.cache.mu.Unlock()
+		return serverpkg.AnalysisAddress{ID: id, Address: address, Family: family, FirstSeenAt: seenAt, LastSeenAt: seenAt}, nil
+	}
+	c.cache.mu.Unlock()
+	addr, err := c.inner.UpsertAnalysisAddress(address, family, seenAt)
+	if err != nil {
+		return addr, err
+	}
+	c.cache.mu.Lock()
+	c.cache.addresses[address] = addr.ID
+	c.cache.mu.Unlock()
+	return addr, nil
+}
+
+func (c *cachingWriteStore) UpsertAnalysisPrefix(prefix, family string, seenAt time.Time) (serverpkg.AnalysisPrefix, error) {
+	c.cache.mu.Lock()
+	if id, ok := c.cache.prefixes[prefix]; ok {
+		c.cache.mu.Unlock()
+		return serverpkg.AnalysisPrefix{ID: id, Prefix: prefix, Family: family, FirstSeenAt: seenAt, LastSeenAt: seenAt}, nil
+	}
+	c.cache.mu.Unlock()
+	pfx, err := c.inner.UpsertAnalysisPrefix(prefix, family, seenAt)
+	if err != nil {
+		return pfx, err
+	}
+	c.cache.mu.Lock()
+	c.cache.prefixes[prefix] = pfx.ID
+	c.cache.mu.Unlock()
+	return pfx, nil
+}
+
+func (c *cachingWriteStore) UpsertAnalysisASN(asn int64, label string, seenAt time.Time) (serverpkg.AnalysisASN, error) {
+	c.cache.mu.Lock()
+	if _, ok := c.cache.asns[asn]; ok {
+		c.cache.mu.Unlock()
+		return serverpkg.AnalysisASN{ASN: asn, Label: label, FirstSeenAt: seenAt, LastSeenAt: seenAt}, nil
+	}
+	c.cache.mu.Unlock()
+	out, err := c.inner.UpsertAnalysisASN(asn, label, seenAt)
+	if err != nil {
+		return out, err
+	}
+	c.cache.mu.Lock()
+	c.cache.asns[asn] = struct{}{}
+	c.cache.mu.Unlock()
+	return out, nil
+}
+
+func (c *cachingWriteStore) ReplaceAnalysisRunNSEndpoints(cohortID int64, runID string, items []serverpkg.AnalysisRunNameserverEndpoint) error {
+	return c.inner.ReplaceAnalysisRunNSEndpoints(cohortID, runID, items)
+}
+
+func (c *cachingWriteStore) ReplaceAnalysisRunAddressASNs(cohortID int64, runID string, items []serverpkg.AnalysisRunAddressASN) error {
+	return c.inner.ReplaceAnalysisRunAddressASNs(cohortID, runID, items)
+}
+
+func (c *cachingWriteStore) ReplaceAnalysisRunDomainASNs(cohortID int64, runID string, items []serverpkg.AnalysisRunDomainASN) error {
+	return c.inner.ReplaceAnalysisRunDomainASNs(cohortID, runID, items)
+}
+
+func (c *cachingWriteStore) ReplaceAnalysisRunTagSummaries(cohortID int64, runID string, items []serverpkg.AnalysisRunTagSummary) error {
+	return c.inner.ReplaceAnalysisRunTagSummaries(cohortID, runID, items)
+}
+
+func (c *cachingWriteStore) ReplaceAnalysisRunDomainFacts(cohortID int64, runID string, items []serverpkg.AnalysisRunDomainFact) error {
+	return c.inner.ReplaceAnalysisRunDomainFacts(cohortID, runID, items)
+}
+
+func (c *cachingWriteStore) UpsertAnalysisRunDomainSummary(item serverpkg.AnalysisRunDomainSummary) error {
+	return c.inner.UpsertAnalysisRunDomainSummary(item)
+}
+
+func (c *cachingWriteStore) SetAnalysisProjectionState(item serverpkg.AnalysisProjectionState) error {
+	return c.inner.SetAnalysisProjectionState(item)
 }
 
 // ClearCohort removes all materialized rows for one cohort and leaves it in a

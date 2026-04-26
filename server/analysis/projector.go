@@ -165,14 +165,29 @@ func (p *Projector) ProjectRun(runID string) error {
 // call. That keeps the write transaction short and non-blocking for
 // concurrent work on the same connection pool.
 func (p *Projector) ProjectLoaded(input RunInput) error {
+	return p.ProjectLoadedWith(input, nil)
+}
+
+// WriteStoreWrapper lets a caller slot a wrapper between the per-run
+// write transaction and the projector's writes — RebuildCohort uses it
+// to deduplicate dimension upserts across its worker pool.
+type WriteStoreWrapper func(WriteStore) WriteStore
+
+func (p *Projector) ProjectLoadedWith(input RunInput, wrap WriteStoreWrapper) error {
 	if len(input.MatchingCohorts) == 0 {
 		return nil
 	}
 	prepared := p.prepareRun(input)
 	if tx, ok := p.store.(txCapableStore); ok {
 		return tx.WithAnalysisWriteTx(func(writer WriteStore) error {
+			if wrap != nil {
+				writer = wrap(writer)
+			}
 			return p.writePrepared(prepared, writer)
 		})
+	}
+	if wrap != nil {
+		return p.writePrepared(prepared, wrap(p.store))
 	}
 	return p.writePrepared(prepared, p.store)
 }

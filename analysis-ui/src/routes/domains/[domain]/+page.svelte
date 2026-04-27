@@ -471,6 +471,8 @@
     font-size: var(--text-sm);
     color: var(--ink);
     line-height: 1.35;
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
   .tc-empty {
     margin: 0;

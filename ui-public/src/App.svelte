@@ -28,7 +28,20 @@
   const TERMINAL = new Set(["succeeded", "failed", "canceled", "expired"]);
 
   // ── Theme ───────────────────────────────────────────────────────────────────
-  let isDark = $state(window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false);
+  const themeKey = "gonemaster.public.theme.v1";
+
+  // Stored choice → system prefers-color-scheme → light.
+  function pickInitialTheme() {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = window.localStorage.getItem(themeKey);
+        if (stored === "dark" || stored === "light") return stored === "dark";
+      } catch (_) {}
+    }
+    return window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
+  }
+
+  let isDark = $state(pickInitialTheme());
 
   function applyTheme() {
     document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
@@ -37,6 +50,7 @@
   function toggleTheme() {
     isDark = !isDark;
     applyTheme();
+    try { window.localStorage.setItem(themeKey, isDark ? "dark" : "light"); } catch (_) {}
   }
 
   let themeLabel = $derived(isDark ? $t("pub.theme_dark") : $t("pub.theme_light"));

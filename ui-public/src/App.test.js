@@ -40,6 +40,7 @@ describe("App", () => {
   afterEach(() => {
     cleanup();
     document.documentElement.removeAttribute("data-theme");
+    window.localStorage.clear();
   });
 
   // ── Layout ──────────────────────────────────────────────────────────────────
@@ -261,6 +262,36 @@ describe("App", () => {
   it("renders the theme toggle button", () => {
     render(App);
     expect(screen.getByRole("button", { name: /theme/i })).toBeTruthy();
+  });
+
+  // ── Theme init / persistence ───────────────────────────────────────────────
+
+  describe("theme", () => {
+    const THEME_KEY = "gonemaster.public.theme.v1";
+
+    beforeEach(() => {
+      window.localStorage.removeItem(THEME_KEY);
+    });
+
+    afterEach(() => {
+      window.localStorage.removeItem(THEME_KEY);
+    });
+
+    it("uses stored theme on load when set", () => {
+      window.localStorage.setItem(THEME_KEY, "dark");
+      render(App);
+      expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
+    });
+
+    it("persists theme choice to localStorage on toggle", async () => {
+      render(App);
+      const btn = screen.getByRole("button", { name: /theme/i });
+      const before = document.documentElement.getAttribute("data-theme");
+      await fireEvent.click(btn);
+      const after = document.documentElement.getAttribute("data-theme");
+      expect(after).not.toBe(before);
+      expect(window.localStorage.getItem(THEME_KEY)).toBe(after);
+    });
   });
 
   // ── Document title ─────────────────────────────────────────────────────────

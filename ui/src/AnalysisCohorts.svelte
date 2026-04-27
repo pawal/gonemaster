@@ -316,16 +316,20 @@
   async function loadSnapshots(cohort, { refresh = false } = {}) {
     if (!cohort) return;
     if (!refresh && snapshotsByCohortId[cohort.id]) return;
-    snapshotsLoadingIds.add(cohort.id);
-    snapshotsLoadingIds = new Set(snapshotsLoadingIds);
+    if (!refresh) {
+      snapshotsLoadingIds.add(cohort.id);
+      snapshotsLoadingIds = new Set(snapshotsLoadingIds);
+    }
     try {
       const result = await apiFetch(`/analysis/cohorts/${cohort.id}/snapshots`);
       snapshotsByCohortId = { ...snapshotsByCohortId, [cohort.id]: Array.isArray(result) ? result : [] };
     } catch (_) {
       snapshotsByCohortId = { ...snapshotsByCohortId, [cohort.id]: [] };
     } finally {
-      snapshotsLoadingIds.delete(cohort.id);
-      snapshotsLoadingIds = new Set(snapshotsLoadingIds);
+      if (!refresh) {
+        snapshotsLoadingIds.delete(cohort.id);
+        snapshotsLoadingIds = new Set(snapshotsLoadingIds);
+      }
     }
   }
 

@@ -19,8 +19,9 @@
     });
   }
 
-  // Severity buckets get fixed tones and canonical order so the bar
-  // reads OK→CRITICAL and matches the overview tab's health bar.
+  // Per-category tone and order tables mirror the server-side display
+  // logic in server/analysis_fact_categories.go so the same key reads
+  // the same color and lands in the same column as on the overview tab.
   const SEVERITY_TONE: Record<string, string> = {
     OK: "ok",
     NOTICE: "notice",
@@ -36,16 +37,91 @@
     CRITICAL: 4
   };
 
-  function severityRank(key: string): number {
-    const r = SEVERITY_ORDER[key.toUpperCase()];
-    return r === undefined ? 99 : r;
+  const GRADE_TONE: Record<string, string> = {
+    "A+": "ok",
+    A: "ok",
+    B: "notice",
+    C: "warning",
+    D: "error",
+    F: "critical"
+  };
+  const GRADE_ORDER: Record<string, number> = {
+    "A+": 0,
+    A: 1,
+    B: 2,
+    C: 3,
+    D: 4,
+    F: 5
+  };
+
+  const SIGNED_TONE: Record<string, string> = {
+    signed: "ok",
+    unsigned: "warning"
+  };
+  const SIGNED_ORDER: Record<string, number> = {
+    signed: 0,
+    unsigned: 1
+  };
+
+  // DNSKEY algorithm tones color modern curves green, SHA-256 RSA blue
+  // (acceptable), SHA-1 family red (deprecated); unknown/private go
+  // neutral. Keys arrive as numeric strings.
+  const DNSKEY_ALGO_TONE: Record<number, string> = {
+    1: "error",
+    3: "error",
+    5: "error",
+    6: "error",
+    7: "warning",
+    8: "notice",
+    10: "notice",
+    12: "warning",
+    13: "ok",
+    14: "ok",
+    15: "ok",
+    16: "ok"
+  };
+
+  function toneForKey(category: string, key: string): string | null {
+    switch (category) {
+      case "severity_distribution":
+        return SEVERITY_TONE[key.toUpperCase()] ?? null;
+      case "grade_distribution":
+        return GRADE_TONE[key] ?? null;
+      case "signed":
+        return SIGNED_TONE[key] ?? null;
+      case "dnskey_algo": {
+        const n = Number(key);
+        if (!Number.isFinite(n)) return null;
+        return DNSKEY_ALGO_TONE[n] ?? null;
+      }
+      default:
+        return null;
+    }
+  }
+
+  function rankForKey(category: string, key: string): number | null {
+    switch (category) {
+      case "severity_distribution":
+        return SEVERITY_ORDER[key.toUpperCase()] ?? null;
+      case "grade_distribution":
+        return GRADE_ORDER[key] ?? null;
+      case "signed":
+        return SIGNED_ORDER[key] ?? null;
+      case "dnskey_algo": {
+        const n = Number(key);
+        return Number.isFinite(n) ? n : null;
+      }
+      default:
+        return null;
+    }
   }
 
   function compareBuckets(category: string, a: string, b: string): number {
-    if (category === "severity_distribution") {
-      const diff = severityRank(a) - severityRank(b);
-      if (diff !== 0) return diff;
-    }
+    const ra = rankForKey(category, a);
+    const rb = rankForKey(category, b);
+    if (ra !== null && rb !== null && ra !== rb) return ra - rb;
+    if (ra !== null && rb === null) return -1;
+    if (ra === null && rb !== null) return 1;
     return a.localeCompare(b);
   }
 
@@ -98,23 +174,22 @@
     return out;
   });
 
-  // Positional fallback palette for categories without a semantic
-  // key→tone mapping (grade, signed, dnskey_algo).
-  const palette = [
-    "var(--bar-ok)",
-    "var(--bar-notice)",
-    "var(--bar-warning)",
-    "var(--bar-error)",
-    "var(--bar-critical)",
-    "var(--bar-neutral)"
-  ];
+  // Tone backgrounds mirror the .tone-* classes used by
+  // FactDistributionBar.svelte and the overview health bar so the same
+  // tone reads the same color across overview and trends.
+  const TONE_BG: Record<string, string> = {
+    ok: "#dcfce7",
+    notice: "#e0f2fe",
+    warning: "#fef3c7",
+    error: "#ffedd5",
+    critical: "#fee2e2",
+    neutral: "var(--surface-2)"
+  };
+  const FALLBACK_TONES = ["ok", "notice", "warning", "error", "critical", "neutral"];
 
   function colorForBucket(category: string, key: string, fallbackIndex: number): string {
-    if (category === "severity_distribution") {
-      const tone = SEVERITY_TONE[key.toUpperCase()];
-      if (tone) return `var(--bar-${tone})`;
-    }
-    return palette[fallbackIndex % palette.length];
+    const tone = toneForKey(category, key) ?? FALLBACK_TONES[fallbackIndex % FALLBACK_TONES.length];
+    return TONE_BG[tone] ?? TONE_BG.neutral;
   }
 
   function totalFor(s: Series): number {

@@ -184,6 +184,80 @@ describe("App", () => {
     expect(screen.queryByRole("combobox", { name: /language/i })).toBeNull();
   });
 
+  // ── Locale init / persistence ──────────────────────────────────────────────
+
+  describe("locale", () => {
+    const LOCALE_KEY = "gonemaster.public.locale.v1";
+    const setLanguages = (langs) => {
+      Object.defineProperty(navigator, "languages", { value: langs, configurable: true });
+      Object.defineProperty(navigator, "language", { value: langs[0] ?? "", configurable: true });
+    };
+
+    beforeEach(() => {
+      window.localStorage.removeItem(LOCALE_KEY);
+    });
+
+    afterEach(() => {
+      window.localStorage.removeItem(LOCALE_KEY);
+      setLanguages(["en-US"]);
+    });
+
+    it("uses stored locale on load when set", async () => {
+      window.localStorage.setItem(LOCALE_KEY, "sv");
+      fetchRouter([
+        ["/locales", multiLocalesResp],
+        ["/jobs/", jobResp("queued", "example.com", 0)],
+      ]);
+      render(App);
+      const sel = await screen.findByRole("combobox", { name: /language/i });
+      expect(sel.value).toBe("sv");
+    });
+
+    it("auto-detects locale from navigator.languages on first visit", async () => {
+      setLanguages(["da-DK", "en-US"]);
+      fetchRouter([
+        ["/locales", multiLocalesResp],
+        ["/jobs/", jobResp("queued", "example.com", 0)],
+      ]);
+      render(App);
+      const sel = await screen.findByRole("combobox", { name: /language/i });
+      expect(sel.value).toBe("da");
+    });
+
+    it("falls back to en when no browser language matches a shipped catalog", async () => {
+      setLanguages(["zz-ZZ"]);
+      fetchRouter([
+        ["/locales", multiLocalesResp],
+        ["/jobs/", jobResp("queued", "example.com", 0)],
+      ]);
+      render(App);
+      const sel = await screen.findByRole("combobox", { name: /language/i });
+      expect(sel.value).toBe("en");
+    });
+
+    it("persists locale choice to localStorage on manual change", async () => {
+      fetchRouter([
+        ["/locales", multiLocalesResp],
+        ["/jobs/", jobResp("queued", "example.com", 0)],
+      ]);
+      render(App);
+      const sel = await screen.findByRole("combobox", { name: /language/i });
+      await fireEvent.change(sel, { target: { value: "sv" } });
+      await waitFor(() => expect(window.localStorage.getItem(LOCALE_KEY)).toBe("sv"));
+    });
+
+    it("snaps stored locale back to en when the server does not advertise it", async () => {
+      window.localStorage.setItem(LOCALE_KEY, "fr");
+      fetchRouter([
+        ["/locales", multiLocalesResp],
+        ["/jobs/", jobResp("queued", "example.com", 0)],
+      ]);
+      render(App);
+      const sel = await screen.findByRole("combobox", { name: /language/i });
+      await waitFor(() => expect(sel.value).toBe("en"));
+    });
+  });
+
   it("renders the theme toggle button", () => {
     render(App);
     expect(screen.getByRole("button", { name: /theme/i })).toBeTruthy();

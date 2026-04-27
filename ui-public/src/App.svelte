@@ -43,11 +43,29 @@
   let themeIcon = $derived(isDark ? "☀" : "☽");
 
   // ── Locale ──────────────────────────────────────────────────────────────────
+  const localeKey = "gonemaster.public.locale.v1";
   const localeDisplayNames = {
     en: "English", sv: "Svenska", da: "Dansk", fi: "Suomi",
     fr: "Français", es: "Español", nb: "Norsk", sl: "Slovenščina", ja: "日本語",
   };
   const localeLabel = (code) => localeDisplayNames[code] || code;
+
+  // Stored choice → first browser-preferred catalog we ship → "en".
+  function pickInitialLocale() {
+    if (typeof window === "undefined") return "en";
+    try {
+      const stored = window.localStorage.getItem(localeKey);
+      if (stored && localeDisplayNames[stored]) return stored;
+    } catch (_) {}
+    const prefs = (typeof navigator !== "undefined" && Array.isArray(navigator.languages) && navigator.languages.length > 0)
+      ? navigator.languages
+      : (typeof navigator !== "undefined" && navigator.language ? [navigator.language] : []);
+    for (const tag of prefs) {
+      const base = String(tag).split("-")[0].toLowerCase();
+      if (localeDisplayNames[base]) return base;
+    }
+    return "en";
+  }
 
   let availableLocales = $state(["en"]);
   let resultLocale = $state("en");
@@ -64,6 +82,10 @@
         const data = await res.json();
         if (Array.isArray(data?.locales) && data.locales.length > 0) {
           availableLocales = data.locales;
+          if (!availableLocales.includes(resultLocale)) {
+            resultLocale = "en";
+            locale.set(resultLocale);
+          }
         }
       }
     } catch (_) {}
@@ -74,6 +96,7 @@
     await loadCatalog(code);
     locale.set(code);
     resultLocale = code;
+    try { window.localStorage.setItem(localeKey, code); } catch (_) {}
   }
 
   // ── Shared-link init ────────────────────────────────────────────────────────
@@ -166,6 +189,10 @@
   onMount(() => {
     window.addEventListener("hashchange", onHashChange);
     applyTheme();
+    const initial = pickInitialLocale();
+    resultLocale = initial;
+    locale.set(initial);
+    loadCatalog(initial);
     fetchLocales();
     fetchVersion();
     fetchInfo();

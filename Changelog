@@ -2,7 +2,7 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
-## [v1.4.1] - 2026-04-26
+## [v1.4.1] - 2026-04-27
 
 Speed optimizations for the Analysis UI.
 
@@ -13,6 +13,7 @@ Warning: No backwards compatibility for old databases.
  - Analysis: consolidated `overview_v2` aggregate so the overview tab loads with one `/overview` call
  - API: `Cache-Control: immutable` + ETag on captured-snapshot responses; `no-cache` on auto-latest
  - Config: `public_api.analysis_request_timeout` (default 10s) and tunable DB pool (`max_open_conns`, `max_idle_conns`, `conn_max_lifetime_seconds`)
+ - public-ui: detect initial locale from localStorage or navigator.languages and persist manual changes
 
 ### Changed
  - Analysis: Nameservers / Endpoints / ASNs / Overview tabs serve from view tables instead of scanning fact rows

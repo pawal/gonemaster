@@ -14,6 +14,7 @@ Warning: No backwards compatibility for old databases.
  - API: `Cache-Control: immutable` + ETag on captured-snapshot responses; `no-cache` on auto-latest
  - Config: `public_api.analysis_request_timeout` (default 10s) and tunable DB pool (`max_open_conns`, `max_idle_conns`, `conn_max_lifetime_seconds`)
  - public-ui: detect initial locale from localStorage or navigator.languages and persist manual changes
+ - public-ui: persist theme choice to localStorage and restore it on load
 
 ### Changed
  - Analysis: Nameservers / Endpoints / ASNs / Overview tabs serve from view tables instead of scanning fact rows

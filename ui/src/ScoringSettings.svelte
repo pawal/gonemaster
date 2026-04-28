@@ -363,21 +363,28 @@
 
   <!-- Bonus Criteria -->
   <h3>{$t("scoring_section_bonus_criteria")}</h3>
-  <div class="bonus-grid">
-    {#each BONUS_FIELDS as field}
-      <label class="bonus-row">
-        <input
-          type="checkbox"
-          checked={!!draft.bonus_criteria?.[field.key]}
-          disabled={readonly}
-          onchange={(e) => {
-            draft.bonus_criteria = { ...draft.bonus_criteria, [field.key]: e.target.checked };
-          }}
-        />
-        {$t(field.labelKey)}
-      </label>
-    {/each}
-  </div>
+  <table class="scoring-table">
+    <tbody>
+      {#each BONUS_FIELDS as field}
+        <tr>
+          <td>
+            <label for="bonus-{field.key}">{$t(field.labelKey)}</label>
+          </td>
+          <td class="bonus-check-cell">
+            <input
+              id="bonus-{field.key}"
+              type="checkbox"
+              checked={!!draft.bonus_criteria?.[field.key]}
+              disabled={readonly}
+              onchange={(e) => {
+                draft.bonus_criteria = { ...draft.bonus_criteria, [field.key]: e.target.checked };
+              }}
+            />
+          </td>
+        </tr>
+      {/each}
+    </tbody>
+  </table>
 
   <!-- Module → Category Mapping (collapsible) -->
   <h3>
@@ -532,21 +539,17 @@
     opacity: 0.5;
     cursor: not-allowed;
   }
-  .bonus-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    margin-bottom: 4px;
+  .bonus-check-cell {
+    width: 2.5em;
+    text-align: center;
   }
-  .bonus-row {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 0.9em;
-    cursor: pointer;
-  }
-  .bonus-row input:disabled {
+  .bonus-check-cell input:disabled {
     cursor: not-allowed;
+    opacity: 0.5;
+  }
+  .scoring-table td label {
+    cursor: pointer;
+    font-size: 0.9em;
   }
   .scoring-actions {
     margin-top: 20px;

@@ -226,13 +226,19 @@
     <span class="source-badge">{sourceLabel(source)}</span>
   </div>
 
-  <!-- Severity Penalties -->
-  <h3>{$t("scoring_section_severity_penalties")}</h3>
-  <table class="scoring-table">
-    <thead>
-      <tr><th>{$t("scoring_col_level")}</th><th>{$t("scoring_col_penalty")}</th></tr>
-    </thead>
+  <!-- Severity, Category, Grade Bands, Bonus — single table so value column aligns across all sections -->
+  <table class="config-table">
+    <colgroup>
+      <col class="col-key">
+      <col class="col-val">
+    </colgroup>
+
     <tbody>
+      <tr><th colspan="2" class="section-head section-head--first">{$t("scoring_section_severity_penalties")}</th></tr>
+      <tr class="col-headers">
+        <th>{$t("scoring_col_level")}</th>
+        <th>{$t("scoring_col_penalty")}</th>
+      </tr>
       {#each SEVERITY_LEVELS as level}
         <tr>
           <td><code>{level}</code></td>
@@ -250,15 +256,13 @@
         </tr>
       {/each}
     </tbody>
-  </table>
 
-  <!-- Category Weights -->
-  <h3>{$t("scoring_section_category_weights")}</h3>
-  <table class="scoring-table">
-    <thead>
-      <tr><th>{$t("scoring_col_category")}</th><th>{$t("scoring_col_weight")}</th></tr>
-    </thead>
     <tbody>
+      <tr><th colspan="2" class="section-head">{$t("scoring_section_category_weights")}</th></tr>
+      <tr class="col-headers">
+        <th>{$t("scoring_col_category")}</th>
+        <th>{$t("scoring_col_weight")}</th>
+      </tr>
       {#each Object.entries(draft.category_weights || {}) as [cat, weight]}
         <tr>
           <td><code>{cat}</code></td>
@@ -277,13 +281,80 @@
         </tr>
       {/each}
     </tbody>
+
+    <tbody>
+      <tr><th colspan="2" class="section-head">{$t("scoring_section_grade_bands")}</th></tr>
+      <tr class="col-headers">
+        <th>{$t("scoring_col_grade")}</th>
+        <th>{$t("scoring_col_min_score")}</th>
+      </tr>
+      {#each draft.grade_bands || [] as band, i}
+        <tr>
+          <td>
+            <input
+              type="text"
+              aria-label={`${$t("scoring_col_grade")} ${i + 1}`}
+              value={band.grade}
+              disabled={readonly}
+              oninput={(e) => {
+                const bands = [...(draft.grade_bands || [])];
+                bands[i] = { ...bands[i], grade: e.target.value };
+                draft.grade_bands = bands;
+              }}
+            />
+          </td>
+          <td>
+            <input
+              type="number"
+              aria-label={`${$t("scoring_col_min_score")} ${i + 1}`}
+              value={band.min_score}
+              disabled={readonly}
+              oninput={(e) => {
+                const bands = [...(draft.grade_bands || [])];
+                bands[i] = { ...bands[i], min_score: Number(e.target.value) };
+                draft.grade_bands = bands;
+              }}
+            />
+          </td>
+        </tr>
+      {/each}
+    </tbody>
+
+    <tbody>
+      <tr><th colspan="2" class="section-head">{$t("scoring_section_bonus_criteria")}</th></tr>
+      {#each BONUS_FIELDS as field}
+        <tr>
+          <td><label for="bonus-{field.key}">{$t(field.labelKey)}</label></td>
+          <td class="check-cell">
+            <input
+              id="bonus-{field.key}"
+              type="checkbox"
+              checked={!!draft.bonus_criteria?.[field.key]}
+              disabled={readonly}
+              onchange={(e) => {
+                draft.bonus_criteria = { ...draft.bonus_criteria, [field.key]: e.target.checked };
+              }}
+            />
+          </td>
+        </tr>
+      {/each}
+    </tbody>
   </table>
 
   <!-- Tag Penalty Overrides -->
   <h3>{$t("scoring_section_tag_overrides")}</h3>
-  <table class="scoring-table">
+  <table class="config-table">
+    <colgroup>
+      <col class="col-tag">
+      <col class="col-num">
+      <col class="col-act">
+    </colgroup>
     <thead>
-      <tr><th>{$t("scoring_col_tag")}</th><th>{$t("scoring_col_penalty")}</th><th></th></tr>
+      <tr class="col-headers">
+        <th>{$t("scoring_col_tag")}</th>
+        <th>{$t("scoring_col_penalty")}</th>
+        <th></th>
+      </tr>
     </thead>
     <tbody>
       {#each tagRows as row, i}
@@ -321,71 +392,6 @@
     <button type="button" class="btn-add" onclick={addTagRow}>{$t("scoring_add_override")}</button>
   {/if}
 
-  <!-- Grade Bands -->
-  <h3>{$t("scoring_section_grade_bands")}</h3>
-  <table class="scoring-table">
-    <thead>
-      <tr><th>{$t("scoring_col_grade")}</th><th>{$t("scoring_col_min_score")}</th></tr>
-    </thead>
-    <tbody>
-      {#each draft.grade_bands || [] as band, i}
-        <tr>
-          <td>
-            <input
-              type="text"
-              aria-label={`${$t("scoring_col_grade")} ${i + 1}`}
-              value={band.grade}
-              disabled={readonly}
-              oninput={(e) => {
-                const bands = [...(draft.grade_bands || [])];
-                bands[i] = { ...bands[i], grade: e.target.value };
-                draft.grade_bands = bands;
-              }}
-            />
-          </td>
-          <td>
-            <input
-              type="number"
-              aria-label={`${$t("scoring_col_min_score")} ${i + 1}`}
-              value={band.min_score}
-              disabled={readonly}
-              oninput={(e) => {
-                const bands = [...(draft.grade_bands || [])];
-                bands[i] = { ...bands[i], min_score: Number(e.target.value) };
-                draft.grade_bands = bands;
-              }}
-            />
-          </td>
-        </tr>
-      {/each}
-    </tbody>
-  </table>
-
-  <!-- Bonus Criteria -->
-  <h3>{$t("scoring_section_bonus_criteria")}</h3>
-  <table class="scoring-table">
-    <tbody>
-      {#each BONUS_FIELDS as field}
-        <tr>
-          <td>
-            <label for="bonus-{field.key}">{$t(field.labelKey)}</label>
-          </td>
-          <td class="bonus-check-cell">
-            <input
-              id="bonus-{field.key}"
-              type="checkbox"
-              checked={!!draft.bonus_criteria?.[field.key]}
-              disabled={readonly}
-              onchange={(e) => {
-                draft.bonus_criteria = { ...draft.bonus_criteria, [field.key]: e.target.checked };
-              }}
-            />
-          </td>
-        </tr>
-      {/each}
-    </tbody>
-  </table>
-
   <!-- Module → Category Mapping (collapsible) -->
   <h3>
     <button
@@ -398,9 +404,18 @@
     </button>
   </h3>
   {#if showModuleMapping}
-    <table class="scoring-table">
+    <table class="config-table">
+      <colgroup>
+        <col class="col-mod">
+        <col class="col-mod">
+        <col class="col-act">
+      </colgroup>
       <thead>
-        <tr><th>{$t("scoring_col_module")}</th><th>{$t("scoring_col_category")}</th><th></th></tr>
+        <tr class="col-headers">
+          <th>{$t("scoring_col_module")}</th>
+          <th>{$t("scoring_col_category")}</th>
+          <th></th>
+        </tr>
       </thead>
       <tbody>
         {#each moduleRows as row, i}
@@ -506,50 +521,65 @@
   .source-badge {
     font-weight: 500;
   }
-  .scoring-table {
+  .config-table {
     border-collapse: collapse;
+    table-layout: fixed;
     width: 100%;
     max-width: 480px;
     font-size: 0.9em;
     margin-bottom: 4px;
   }
-  .scoring-table th {
+  /* 2-column layout: key 55 % / value 45 % */
+  .col-key { width: 55%; }
+  .col-val { width: 45%; }
+  /* 3-column layout: tag/module rows */
+  .col-tag { width: 52%; }
+  .col-mod { width: 40%; }
+  .col-num { width: 26%; }
+  .col-act { width: 22%; }
+  .config-table .section-head {
+    padding: 14px 8px 4px;
     text-align: left;
-    padding: 4px 8px;
-    border-bottom: 1px solid var(--border, #e0e0e0);
+    font-size: 0.95em;
     font-weight: 600;
-    font-size: 0.85em;
+    border-bottom: 1px solid var(--border, #e0e0e0);
   }
-  .scoring-table td {
-    padding: 4px 8px;
+  .config-table .section-head--first {
+    padding-top: 0;
   }
-  .scoring-table input[type="number"] {
+  .config-table .col-headers th {
+    padding: 2px 8px 4px;
+    font-size: 0.8em;
+    font-weight: 600;
+    color: var(--muted, #777);
+    text-align: left;
+  }
+  .config-table td {
+    padding: 3px 8px;
+    vertical-align: middle;
+  }
+  .config-table input[type="number"],
+  .config-table input[type="text"] {
+    padding: 3px 5px;
+    font-size: 0.9em;
+    font-family: inherit;
+    box-sizing: border-box;
+  }
+  .config-table input[type="number"] {
     width: 6em;
-    padding: 3px 5px;
-    font-size: 0.9em;
-    font-family: inherit;
   }
-  .scoring-table input[type="text"] {
-    width: 14em;
-    padding: 3px 5px;
-    font-size: 0.9em;
-    font-family: inherit;
+  .config-table input[type="text"] {
+    width: 100%;
   }
-  .scoring-table input:disabled {
+  .config-table input:disabled {
     opacity: 0.5;
     cursor: not-allowed;
   }
-  .bonus-check-cell {
-    width: 2.5em;
-    text-align: center;
-  }
-  .bonus-check-cell input:disabled {
-    cursor: not-allowed;
-    opacity: 0.5;
-  }
-  .scoring-table td label {
+  .config-table td label {
     cursor: pointer;
-    font-size: 0.9em;
+  }
+  .check-cell {
+    text-align: left;
   }
   .scoring-actions {
     margin-top: 20px;

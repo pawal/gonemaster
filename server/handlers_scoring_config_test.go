@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -291,6 +292,173 @@ func TestApplyDatabaseSettingsScoringConfig(t *testing.T) {
 	if result.Score.Score >= defaultResult.Score {
 		t.Fatalf("expected lower score with higher penalty: got %d, default would be %d",
 			result.Score.Score, defaultResult.Score)
+	}
+}
+
+// TestGetResultRecomputesWithUpdatedConfig verifies that GetResult uses the
+// current scoring config dynamically — changing the config after graduation
+// changes the score returned by the next GetResult call.
+func TestGetResultRecomputesWithUpdatedConfig(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	// Graduate a job under the default config.
+	job := Job{
+		ID:         "job-recompute",
+		Domain:     "recompute.example.com",
+		Status:     JobSucceeded,
+		PublicID:   GeneratePublicID(),
+		CreatedAt:  time.Now().UTC(),
+		StartedAt:  time.Now().UTC(),
+		FinishedAt: time.Now().UTC(),
+	}
+	created, err := srv.store.Create(job)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	entries := []engine.LogEntry{
+		{Module: "DNSSEC", Tag: "DS01_DIGEST_NOT_SUPPORTED_BY_NS", Level: "WARNING"},
+	}
+	if err := srv.store.GraduateJob(created, entries); err != nil {
+		t.Fatalf("graduate: %v", err)
+	}
+	r1, ok := srv.store.GetResult(created.ID)
+	if !ok || r1.Score == nil {
+		t.Fatal("result or score missing after graduation")
+	}
+	scoreBefore := r1.Score.Score
+
+	// Raise the WARNING penalty via the API.
+	newCfg := scoring.DefaultConfig()
+	newCfg.SeverityPenalties["WARNING"] = 80
+	body, _ := json.Marshal(newCfg)
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/scoring-config", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("PUT: expected 200, got %d: %s", resp.Code, resp.Body)
+	}
+
+	// GetResult should recompute using the new config.
+	r2, ok := srv.store.GetResult(created.ID)
+	if !ok || r2.Score == nil {
+		t.Fatal("result or score missing after config change")
+	}
+	if r2.Score.Score >= scoreBefore {
+		t.Fatalf("GetResult did not recompute: before=%d after=%d", scoreBefore, r2.Score.Score)
+	}
+}
+
+// TestScoringConfigPersistsAcrossServerRestart verifies that a scoring config
+// saved to the database is applied when a new server instance reuses the same
+// store (simulating a server restart).
+func TestScoringConfigPersistsAcrossServerRestart(t *testing.T) {
+	b := testBackends(t)[0] // SQLite, always present
+	store := testStoreForBackend(t, b)
+
+	srv1 := newServer(DefaultConfig(), store, NewInMemoryQueue())
+
+	// PUT a custom config on the first server.
+	cfg := scoring.DefaultConfig()
+	cfg.SeverityPenalties["WARNING"] = 88
+	body, _ := json.Marshal(cfg)
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/scoring-config", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	srv1.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("PUT: expected 200, got %d: %s", resp.Code, resp.Body)
+	}
+
+	// Simulate a restart: new server instance with the same store.
+	srv2 := newServer(DefaultConfig(), store, NewInMemoryQueue())
+	srv2.ApplyDatabaseSettings()
+
+	// Graduate a job on the restarted server and check the score.
+	job := Job{
+		ID:         "job-persist",
+		Domain:     "persist.example.com",
+		Status:     JobSucceeded,
+		PublicID:   GeneratePublicID(),
+		CreatedAt:  time.Now().UTC(),
+		StartedAt:  time.Now().UTC(),
+		FinishedAt: time.Now().UTC(),
+	}
+	created, err := store.Create(job)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	entries := []engine.LogEntry{
+		{Module: "DNSSEC", Tag: "DS01_DIGEST_NOT_SUPPORTED_BY_NS", Level: "WARNING"},
+	}
+	if err := store.GraduateJob(created, entries); err != nil {
+		t.Fatalf("graduate: %v", err)
+	}
+	result, ok := store.GetResult(created.ID)
+	if !ok || result.Score == nil {
+		t.Fatal("result or score missing")
+	}
+
+	// Score should be lower than default (penalty 5) because persisted config has penalty 88.
+	scoringEntries := []scoring.Entry{{Module: "DNSSEC", Tag: "DS01_DIGEST_NOT_SUPPORTED_BY_NS", Level: "WARNING"}}
+	defaultScore := scoring.Compute("persist.example.com", scoringEntries, scoring.DefaultConfig())
+	if result.Score.Score >= defaultScore.Score {
+		t.Fatalf("persisted config not applied: got %d, default is %d", result.Score.Score, defaultScore.Score)
+	}
+}
+
+// TestCLIFlagOverrideScoringConfig verifies that when scoring_config is marked
+// as a CLI flag source, GET returns readonly=true with the file's values and
+// PUT is rejected with 400.
+func TestCLIFlagOverrideScoringConfig(t *testing.T) {
+	// Write a temp config file with a distinctive penalty.
+	customCfg := scoring.DefaultConfig()
+	customCfg.SeverityPenalties["ERROR"] = 99
+	raw, _ := json.Marshal(customCfg)
+	f, err := os.CreateTemp("", "scoring-*.json")
+	if err != nil {
+		t.Fatalf("create temp file: %v", err)
+	}
+	defer os.Remove(f.Name())
+	if _, err := f.Write(raw); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	_ = f.Close()
+
+	cfg := DefaultConfig()
+	cfg.ScoringConfigPath = f.Name()
+	srv := New(cfg)
+	srv.SetConfigSources(map[string]SettingSource{"scoring_config": SourceCLIFlag})
+
+	// GET must return source=cli_flag, readonly=true, and values from the file.
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/scoring-config", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("GET: expected 200, got %d: %s", resp.Code, resp.Body)
+	}
+	var got scoringConfigResponse
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got.Source != SourceCLIFlag {
+		t.Fatalf("source: got %q, want %q", got.Source, SourceCLIFlag)
+	}
+	if !got.Readonly {
+		t.Fatal("expected readonly=true for cli_flag source")
+	}
+	if got.Config.SeverityPenalties["ERROR"] != 99 {
+		t.Fatalf("ERROR penalty from file: got %d, want 99", got.Config.SeverityPenalties["ERROR"])
+	}
+
+	// PUT must be rejected.
+	putBody, _ := json.Marshal(scoring.DefaultConfig())
+	putResp := httptest.NewRecorder()
+	putReq := httptest.NewRequest(http.MethodPut, "/api/v1/scoring-config", bytes.NewReader(putBody))
+	putReq.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(putResp, putReq)
+	if putResp.Code != http.StatusBadRequest {
+		t.Fatalf("PUT: expected 400, got %d", putResp.Code)
 	}
 }
 

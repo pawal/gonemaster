@@ -656,6 +656,77 @@ func TestConsistency05InBailiwickMismatch(t *testing.T) {
 	}
 }
 
+func TestConsistency05DisjointParentChildNSDoesNotReportLame(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origM23 := method2and3
+	origM45 := method4and5
+	origParent := queryParentAll
+	t.Cleanup(func() {
+		method2and3 = origM23
+		method4and5 = origM45
+		queryParentAll = origParent
+	})
+
+	method2and3 = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+		return []dnsname.Name{dnsname.New("ns1.example")}, nil
+	}
+
+	newNameserver(t, "ns1.example", "192.0.2.1", func(qname string, qtype string) packet.Packet {
+		if strings.EqualFold(qname, "example") && strings.EqualFold(qtype, "NS") {
+			return nsPacket(qname, []string{"ns2.example"})
+		}
+		if strings.EqualFold(qname, "ns1.example") {
+			return nxdomainPacket(qname)
+		}
+		if strings.EqualFold(qname, "ns2.example") {
+			switch strings.ToUpper(qtype) {
+			case "A":
+				return addrPacket(qname, "A", "192.0.2.2")
+			case "AAAA":
+				return addrPacket(qname, "AAAA", "2001:db8::2")
+			}
+		}
+		return packet.Packet{}
+	})
+
+	method4and5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	}
+
+	queryParentAll = func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
+		switch strings.ToUpper(qtype) {
+		case "NS":
+			return []packet.Packet{nsPacket(name, []string{"ns1.example"})}, nil
+		case "A":
+			if strings.EqualFold(name, "ns1.example") {
+				return []packet.Packet{addrPacket(name, "A", "192.0.2.1")}, nil
+			}
+		}
+		return []packet.Packet{}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Consistency05(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("consistency05: %v", err)
+	}
+	if hasEntryTag(entries, "CHILD_ZONE_LAME") {
+		t.Fatalf("did not expect CHILD_ZONE_LAME")
+	}
+	if !hasEntryTag(entries, "IN_BAILIWICK_ADDR_MISMATCH") {
+		t.Fatalf("expected IN_BAILIWICK_ADDR_MISMATCH")
+	}
+	if !hasEntryTag(entries, "EXTRA_ADDRESS_CHILD") {
+		t.Fatalf("expected EXTRA_ADDRESS_CHILD")
+	}
+}
+
 func TestConsistency05OutOfBailiwickMismatch(t *testing.T) {
 	nameserver.EmptyCache()
 	t.Cleanup(nameserver.EmptyCache)
@@ -943,5 +1014,16 @@ func addrPacket(name string, qtype string, address string) packet.Packet {
 	default:
 		return packet.Packet{}
 	}
+	return packet.Packet{Msg: msg}
+}
+
+func nxdomainPacket(name string) packet.Packet {
+	msg := new(dns.Msg)
+	msg.Rcode = dns.RcodeNameError
+	msg.Authoritative = true
+	soaRR := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET, TTL: 60}}
+	soaRR.Ns = dnsutil.Fqdn("ns1.example")
+	soaRR.Mbox = dnsutil.Fqdn("hostmaster.example")
+	msg.Ns = []dns.RR{soaRR}
 	return packet.Packet{Msg: msg}
 }

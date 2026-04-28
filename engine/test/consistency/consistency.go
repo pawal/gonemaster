@@ -20,6 +20,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/test/internal/runner"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/testcase"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/testlogger"
+	"codeberg.org/pawal/gonemaster/engine/transport"
 	"codeberg.org/pawal/gonemaster/engine/util"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
@@ -841,6 +842,8 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		extendedGlue[nsKey] = append(extendedGlue[nsKey], nsString)
 	}
 
+	strictGlueServers := nameserversFromStrictGlue(ctx, z, strictGlue)
+
 	ibNames, err := method2and3(ctx, z)
 	if err != nil {
 		return results, err
@@ -866,10 +869,15 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			inBailiwickServers = append(inBailiwickServers, ns)
 		}
 	}
+	if len(inBailiwickServers) == 0 {
+		inBailiwickServers = strictGlueServers
+		inBailiwickNames = appendChildNSNamesFromServers(ctx, z, inBailiwickNames, strictGlueServers)
+	}
 
 	childIBStrings := map[string]bool{}
+	allAddressLookupsFailed := len(inBailiwickNames) > 0
 	for _, nsName := range inBailiwickNames {
-		isLame := true
+		nameAddressLookupsFailed := true
 		for _, ns := range inBailiwickServers {
 			msgA, rrsA, err := getAddrRRs(ctx, ns, nsName, "A", z, testcase)
 			if err != nil {
@@ -887,7 +895,7 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				results = append(results, msgAAAA)
 			}
 			if msgA == nil || msgAAAA == nil {
-				isLame = false
+				nameAddressLookupsFailed = false
 			}
 
 			for _, rr := range append(rrsA, rrsAAAA...) {
@@ -895,12 +903,15 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		if isLame {
-			if err := appendLog(ctx, &results, testcase, "CHILD_ZONE_LAME", map[string]any{}); err != nil {
-				return results, err
-			}
-			return appendTestCaseEnd(ctx, results, testcase)
+		if !nameAddressLookupsFailed {
+			allAddressLookupsFailed = false
 		}
+	}
+	if allAddressLookupsFailed {
+		if err := appendLog(ctx, &results, testcase, "CHILD_ZONE_LAME", map[string]any{}); err != nil {
+			return results, err
+		}
+		return appendTestCaseEnd(ctx, results, testcase)
 	}
 
 	ibMismatch := []string{}
@@ -1149,6 +1160,80 @@ func defaultRecurse(ctx context.Context, z *zone.Zone, name string, qtype string
 		return packet.Packet{}, fmt.Errorf("missing recursor")
 	}
 	return z.Recursor().Recurse(ctx, name, qtype, "IN")
+}
+
+func nameserversFromStrictGlue(ctx context.Context, z *zone.Zone, strictGlue map[string]bool) []nameserver.Nameserver {
+	var client *transport.Client
+	if z != nil && z.Recursor() != nil {
+		client = z.Recursor().Client()
+	}
+
+	var out []nameserver.Nameserver
+	seen := map[string]bool{}
+	for _, key := range sortedKeys(strictGlue) {
+		nsName, address := parseAddrKey(key)
+		if nsName == "" || address == "" {
+			continue
+		}
+		ns, err := nameserver.NewWithContext(ctx, nsName, address, client)
+		if err != nil {
+			continue
+		}
+		if ns.Address.Is4() && !util.IPVersionOK(ctx, constants.IPVersion4) {
+			continue
+		}
+		if ns.Address.Is6() && !util.IPVersionOK(ctx, constants.IPVersion6) {
+			continue
+		}
+		nsKey := strings.ToLower(ns.String())
+		if seen[nsKey] {
+			continue
+		}
+		seen[nsKey] = true
+		out = append(out, ns)
+	}
+	return out
+}
+
+func appendChildNSNamesFromServers(ctx context.Context, z *zone.Zone, names []dnsname.Name, servers []nameserver.Nameserver) []dnsname.Name {
+	if z == nil || len(servers) == 0 {
+		return names
+	}
+
+	seen := map[string]dnsname.Name{}
+	for _, name := range names {
+		seen[strings.ToLower(name.String())] = name
+	}
+
+	for _, ns := range servers {
+		resp, err := ns.QueryWithOptions(ctx, z.Name.String(), "NS", nil)
+		if err != nil || resp.Msg == nil {
+			continue
+		}
+		for _, rr := range resp.GetRecordsForName("NS", z.Name) {
+			nsRR, ok := rr.(*dns.NS)
+			if !ok {
+				continue
+			}
+			name := dnsname.New(strings.ToLower(nsRR.Ns))
+			if !z.Name.IsInBailiwick(name) {
+				continue
+			}
+			seen[strings.ToLower(name.String())] = name
+		}
+	}
+
+	keys := make([]string, 0, len(seen))
+	for key := range seen {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	out := make([]dnsname.Name, 0, len(keys))
+	for _, key := range keys {
+		out = append(out, seen[key])
+	}
+	return out
 }
 
 func getAddrRRs(ctx context.Context, ns nameserver.Nameserver, name dnsname.Name, qtype string, z *zone.Zone, testcase string) (*logger.Entry, []dns.RR, error) {

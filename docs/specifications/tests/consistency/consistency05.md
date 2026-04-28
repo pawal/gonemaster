@@ -25,27 +25,30 @@ Status: Final
    - in-bailiwick strict glue (`strictGlue`),
    - out-of-bailiwick extended glue (`extendedGlue` grouped by NS name).
 5. Build in-bailiwick NS name set from Method2+Method3, and in-bailiwick child NS servers from Method4+Method5 (respecting enabled IP versions).
-6. For each in-bailiwick NS name:
+6. If Method4+Method5 yields no usable in-bailiwick child NS servers:
+   - Materialize child NS server endpoints from in-bailiwick strict glue, respecting enabled IP versions.
+   - Query those endpoints for the child-zone NS set and merge any in-bailiwick names into the in-bailiwick NS name set.
+7. For each in-bailiwick NS name:
    - Query every in-bailiwick child NS server for A and AAAA with RD off (`getAddrRRs`).
    - `getAddrRRs` emits `NO_RESPONSE` on no response and `CHILD_NS_FAILED` on unusable non-referral/non-NXDOMAIN authoritative behavior.
    - Referral responses trigger recursive fallback lookup and use resulting answer data if available.
-   - If all servers fail both A and AAAA for this NS name, emit `CHILD_ZONE_LAME`, emit `TEST_CASE_END`, and return.
    - Otherwise accumulate child authoritative `owner/ip` pairs.
-7. Compare in-bailiwick sets:
+8. If no in-bailiwick address lookup path was usable for any in-bailiwick NS name, emit `CHILD_ZONE_LAME`, emit `TEST_CASE_END`, and return.
+9. Compare in-bailiwick sets:
    - Parent-only items -> emit `IN_BAILIWICK_ADDR_MISMATCH`.
    - Child-only items -> emit `EXTRA_ADDRESS_CHILD`.
-8. For each out-of-bailiwick NS name in extended glue:
+10. For each out-of-bailiwick NS name in extended glue:
    - Recurse A and AAAA, build child/public `owner/ip` set.
    - If any parent glue item for that name is missing from child/public set, emit `OUT_OF_BAILIWICK_ADDR_MISMATCH`.
-9. If none of the three mismatch tags were emitted, emit `ADDRESSES_MATCH`.
-10. Emit `TEST_CASE_END`.
+11. If none of the three mismatch tags were emitted, emit `ADDRESSES_MATCH`.
+12. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
 | `ADDRESSES_MATCH` | No in-bailiwick mismatch, no extra child address, and no out-of-bailiwick mismatch were found. |
 | `CHILD_NS_FAILED` | Child nameserver response for in-bailiwick address lookup was unusable (non-AA/no referral/no accepted RCODE path). |
-| `CHILD_ZONE_LAME` | For an in-bailiwick NS name, every queried child nameserver failed both A and AAAA lookup paths. |
+| `CHILD_ZONE_LAME` | Every in-bailiwick address lookup path failed for all in-bailiwick NS names. |
 | `EXTRA_ADDRESS_CHILD` | Child authoritative in-bailiwick address set contains addresses not present in strict glue. |
 | `IN_BAILIWICK_ADDR_MISMATCH` | Strict in-bailiwick glue contains addresses not found in child authoritative data. |
 | `NO_RESPONSE` | A child nameserver did not return a response for an in-bailiwick A/AAAA lookup. |
@@ -88,10 +91,12 @@ Status: Final
 - Differences (Upstream vs Gonemaster):
   - Upstream: does not explicitly define this detail. Gonemaster: In-bailiwick processing queries all discovered in-bailiwick child servers and emits one `NO_RESPONSE` or `CHILD_NS_FAILED` entry per failing nameserver before final mismatch classification.
   - Upstream: does not explicitly define this detail. Gonemaster: Referral handling explicitly falls back to recursive lookup for the same qtype and owner.
+  - Upstream: the short-circuit wording can be read per in-bailiwick NS name. Gonemaster: `CHILD_ZONE_LAME` is emitted only when all in-bailiwick address lookup paths fail, so disjoint parent/child NS sets can still be classified as address mismatches.
+  - Upstream: does not explicitly define this detail. Gonemaster: If Method4+Method5 cannot produce usable in-bailiwick child NS endpoints, strict glue endpoints are used as a fallback for child-side address checks and child NS name discovery.
 - Potential upstream report:
   - `no`
 
 ## Edge Cases And Limitations
-- `CHILD_ZONE_LAME` short-circuits testcase execution and suppresses later mismatch checks.
+- `CHILD_ZONE_LAME` short-circuits testcase execution and suppresses later mismatch checks when no usable in-bailiwick address lookup path was found.
 - Out-of-bailiwick mismatch reporting is per NS name group; each emission includes full parent list for that group.
 - Disabled IP versions affect child authoritative probes indirectly by filtering queried child servers.

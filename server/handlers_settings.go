@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+
+	"codeberg.org/pawal/gonemaster/scoring"
 )
 
 // SettingSource identifies where a config value was set.
@@ -106,6 +108,11 @@ func (s *Server) applySetting(key, val string) {
 	case "cross_job_hot_cache_ttl_seconds":
 		if v, err := strconv.Atoi(val); err == nil && v >= 1 {
 			s.cfg.CrossJobHotCacheTTLSeconds = v
+		}
+	case "scoring_config":
+		var cfg scoring.Config
+		if err := json.Unmarshal([]byte(val), &cfg); err == nil {
+			applyScoringConfigToStore(s.store, cfg)
 		}
 	}
 }

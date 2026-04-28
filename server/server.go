@@ -255,6 +255,8 @@ func (s *Server) routes() {
 
 	apiMux.HandleFunc("GET /features", s.handleFeatures)
 	apiMux.HandleFunc("/settings", s.handleSettings)
+	apiMux.HandleFunc("GET /scoring-config/defaults", s.handleScoringConfigDefaults)
+	apiMux.HandleFunc("/scoring-config", s.handleScoringConfig)
 	apiMux.HandleFunc("/locales", s.handleLocales)
 	apiMux.HandleFunc("/metrics", s.handleMetrics)
 	apiMux.HandleFunc("/healthz", s.handleHealth)

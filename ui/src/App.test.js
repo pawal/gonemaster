@@ -3344,7 +3344,7 @@ describe("App", () => {
       await waitFor(() => calls.some((v) => v.includes("/api/v1/domains")));
       calls.length = 0;
 
-      const searchInput = await screen.findByPlaceholderText("Search by name…");
+      const searchInput = await screen.findByPlaceholderText("Search by name...");
       await fireEvent.input(searchInput, { target: { value: "example" } });
 
       await waitFor(() => {
@@ -4241,6 +4241,19 @@ describe("App", () => {
     const subtabMock = (url, options = {}) => {
       const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
       if (value.includes("/api/v1/settings")) return jsonResponse({});
+      if (value.includes("/api/v1/scoring-config/defaults")) return jsonResponse({});
+      if (value.includes("/api/v1/scoring-config")) return jsonResponse({
+        config: {
+          severity_penalties: { NOTICE: 1, WARNING: 5, ERROR: 20, CRITICAL: 0 },
+          category_weights: { dnssec: 1.5 },
+          module_categories: {},
+          tag_penalties: {},
+          grade_bands: [{ grade: "A", min_score: 90 }],
+          bonus_criteria: { no_warnings_or_errors: true, dnssec_enabled: true, strong_algorithm: true, nsec3_non_optout: true, cds_cdnskey_published: true, ipv6_all_nameservers: true, as_diversity: true },
+        },
+        source: "default",
+        readonly: false,
+      });
       if (value.includes("/api/v1/profiles/default")) {
         return jsonResponse({
           id: 0, name: "default", config: {}, public: false,
@@ -4280,7 +4293,7 @@ describe("App", () => {
       unmount();
     });
 
-    it("switches to Scoring sub-tab and renders the scoring placeholder", async () => {
+    it("switches to Scoring sub-tab and renders ScoringSettings", async () => {
       global.fetch.mockImplementation(subtabMock);
       const { unmount } = render(App);
       await openSettingsTab("Scoring");
@@ -4288,7 +4301,9 @@ describe("App", () => {
       await waitFor(() => {
         expect(screen.getByRole("heading", { name: "Scoring" })).toBeInTheDocument();
       });
-      expect(screen.getByText(/Scoring configuration editor/i)).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText("Severity Penalties")).toBeInTheDocument();
+      });
       unmount();
     });
 

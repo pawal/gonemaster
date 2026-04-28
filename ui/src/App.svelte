@@ -4,6 +4,7 @@
   import { t, locale, loadCatalog } from "./i18n.js";
   import ProfileSettings from "./ProfileSettings.svelte";
   import ServerSettings from "./ServerSettings.svelte";
+  import ScoringSettings from "./ScoringSettings.svelte";
   import AnalysisCohorts from "./AnalysisCohorts.svelte";
   import BatchDeleteModal from "./BatchDeleteModal.svelte";
 
@@ -4374,8 +4375,7 @@ example.org`}
         </div>
       {:else if settingsSubTab === "scoring"}
         <div class="card reveal" id="settings-subpanel-scoring" role="tabpanel" aria-labelledby="settings-subtab-scoring" style="--d: 0.34s; grid-column: 1 / -1;">
-          <h2>{$t("settings_scoring_heading")}</h2>
-          <p class="small">{$t("settings_scoring_placeholder")}</p>
+          <ScoringSettings />
         </div>
       {/if}
     </div>

@@ -113,3 +113,75 @@ func TestQueryTimingsNilCacheStore(t *testing.T) {
 		t.Fatal("expected nil for nil CacheStore")
 	}
 }
+
+func TestTimingsFromQueryMapEmpty(t *testing.T) {
+	out := TimingsFromQueryMap(nil)
+	if len(out) != 0 {
+		t.Fatalf("expected empty slice, got %d entries", len(out))
+	}
+	out = TimingsFromQueryMap(map[string][]time.Duration{})
+	if len(out) != 0 {
+		t.Fatalf("expected empty slice for empty map, got %d entries", len(out))
+	}
+}
+
+func TestTimingsFromQueryMapSingle(t *testing.T) {
+	timings := map[string][]time.Duration{
+		"ns1.example.com/192.0.2.1": {10 * time.Millisecond, 20 * time.Millisecond},
+	}
+	out := TimingsFromQueryMap(timings)
+	if len(out) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(out))
+	}
+	nt := out[0]
+	if nt.Nameserver != "ns1.example.com" {
+		t.Fatalf("Nameserver = %q, want %q", nt.Nameserver, "ns1.example.com")
+	}
+	if nt.Address != "192.0.2.1" {
+		t.Fatalf("Address = %q, want %q", nt.Address, "192.0.2.1")
+	}
+	if nt.Count != 2 {
+		t.Fatalf("Count = %d, want 2", nt.Count)
+	}
+	if nt.AvgMS != 15 {
+		t.Fatalf("AvgMS = %f, want 15", nt.AvgMS)
+	}
+	if nt.Status != NameserverTimingStatusOK {
+		t.Fatalf("Status = %q, want %q", nt.Status, NameserverTimingStatusOK)
+	}
+}
+
+func TestTimingsFromQueryMapSortedByNameThenAddress(t *testing.T) {
+	timings := map[string][]time.Duration{
+		"ns2.example.com/192.0.2.2": {30 * time.Millisecond},
+		"ns1.example.com/192.0.2.2": {20 * time.Millisecond},
+		"ns1.example.com/192.0.2.1": {10 * time.Millisecond},
+	}
+	out := TimingsFromQueryMap(timings)
+	if len(out) != 3 {
+		t.Fatalf("expected 3 entries, got %d", len(out))
+	}
+	if out[0].Nameserver != "ns1.example.com" || out[0].Address != "192.0.2.1" {
+		t.Fatalf("entry[0] = %s/%s, want ns1.example.com/192.0.2.1", out[0].Nameserver, out[0].Address)
+	}
+	if out[1].Nameserver != "ns1.example.com" || out[1].Address != "192.0.2.2" {
+		t.Fatalf("entry[1] = %s/%s, want ns1.example.com/192.0.2.2", out[1].Nameserver, out[1].Address)
+	}
+	if out[2].Nameserver != "ns2.example.com" || out[2].Address != "192.0.2.2" {
+		t.Fatalf("entry[2] = %s/%s, want ns2.example.com/192.0.2.2", out[2].Nameserver, out[2].Address)
+	}
+}
+
+func TestTimingsFromQueryMapMalformedKeySkipped(t *testing.T) {
+	timings := map[string][]time.Duration{
+		"no-slash":                  {10 * time.Millisecond},
+		"ns1.example.com/192.0.2.1": {20 * time.Millisecond},
+	}
+	out := TimingsFromQueryMap(timings)
+	if len(out) != 1 {
+		t.Fatalf("expected 1 entry (malformed key skipped), got %d", len(out))
+	}
+	if out[0].Nameserver != "ns1.example.com" {
+		t.Fatalf("Nameserver = %q, want %q", out[0].Nameserver, "ns1.example.com")
+	}
+}

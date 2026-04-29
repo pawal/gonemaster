@@ -3,8 +3,86 @@ package nameserver
 import (
 	"math"
 	"sort"
+	"strings"
 	"time"
 )
+
+// NameserverTiming holds timing statistics for a single tested authoritative nameserver.
+type NameserverTiming struct {
+	Nameserver string  `json:"nameserver"`
+	Address    string  `json:"address"`
+	AvgMS      float64 `json:"avg_ms"`
+	MinMS      float64 `json:"min_ms"`
+	MaxMS      float64 `json:"max_ms"`
+	MedianMS   float64 `json:"median_ms"`
+	StddevMS   float64 `json:"stddev_ms"`
+	Count      int     `json:"count"`
+	// Empty on rows written before this field existed; treat as "ok".
+	Status string `json:"status,omitempty"`
+}
+
+// Status values for NameserverTiming.
+const (
+	NameserverTimingStatusOK          = "ok"
+	NameserverTimingStatusUnreachable = "unreachable"
+	NameserverTimingStatusUnresolved  = "unresolved"
+)
+
+// TimingsFromQueryMap converts a raw query timing map (keyed as "name/address")
+// into a slice of NameserverTiming sorted by nameserver name, address, then
+// median query time ascending.
+func TimingsFromQueryMap(queryTimings map[string][]time.Duration) []NameserverTiming {
+	type entry struct {
+		nameserver string
+		address    string
+		samples    []time.Duration
+	}
+
+	entries := make([]entry, 0, len(queryTimings))
+	for key, samples := range queryTimings {
+		name, address, ok := strings.Cut(key, "/")
+		if !ok {
+			continue
+		}
+		entries = append(entries, entry{nameserver: name, address: address, samples: samples})
+	}
+
+	out := make([]NameserverTiming, 0, len(entries))
+	for _, e := range entries {
+		stats := ComputeTimingStats(e.samples)
+		if stats.Count == 0 {
+			out = append(out, NameserverTiming{
+				Nameserver: e.nameserver,
+				Address:    e.address,
+				Status:     NameserverTimingStatusUnreachable,
+			})
+			continue
+		}
+		out = append(out, NameserverTiming{
+			Nameserver: e.nameserver,
+			Address:    e.address,
+			AvgMS:      stats.Avg,
+			MinMS:      stats.Min,
+			MaxMS:      stats.Max,
+			MedianMS:   stats.Median,
+			StddevMS:   stats.Stddev,
+			Count:      stats.Count,
+			Status:     NameserverTimingStatusOK,
+		})
+	}
+
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Nameserver != out[j].Nameserver {
+			return out[i].Nameserver < out[j].Nameserver
+		}
+		if out[i].Address != out[j].Address {
+			return out[i].Address < out[j].Address
+		}
+		return out[i].MedianMS < out[j].MedianMS
+	})
+
+	return out
+}
 
 // NSTimingStats holds computed statistics for a single nameserver's query times.
 type NSTimingStats struct {

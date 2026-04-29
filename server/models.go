@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
+	enginenameserver "codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/scoring"
 )
 
@@ -122,24 +123,14 @@ type Job struct {
 }
 
 // NameserverTiming holds timing stats for one tested authoritative nameserver.
-type NameserverTiming struct {
-	Nameserver string  `json:"nameserver"`
-	Address    string  `json:"address"`
-	AvgMS      float64 `json:"avg_ms"`
-	MinMS      float64 `json:"min_ms"`
-	MaxMS      float64 `json:"max_ms"`
-	MedianMS   float64 `json:"median_ms"`
-	StddevMS   float64 `json:"stddev_ms"`
-	Count      int     `json:"count"`
-	// Empty on rows written before this field existed; treat as "ok".
-	Status string `json:"status,omitempty"`
-}
+// Defined in engine/nameserver and re-exported here for server consumers.
+type NameserverTiming = enginenameserver.NameserverTiming
 
 // Status values for NameserverTiming.
 const (
-	NameserverTimingStatusOK          = "ok"
-	NameserverTimingStatusUnreachable = "unreachable"
-	NameserverTimingStatusUnresolved  = "unresolved"
+	NameserverTimingStatusOK          = enginenameserver.NameserverTimingStatusOK
+	NameserverTimingStatusUnreachable = enginenameserver.NameserverTimingStatusUnreachable
+	NameserverTimingStatusUnresolved  = enginenameserver.NameserverTimingStatusUnresolved
 )
 
 // Domain is a persistent domain registry entry.

@@ -849,7 +849,20 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 
 	enc := json.NewEncoder(w)
 	enc.SetEscapeHTML(false)
-	if encodeErr := enc.Encode(displayEntries); encodeErr != nil {
+	var encodeErr error
+	if nstimes && packetCacheStore != nil {
+		wrapped := struct {
+			Entries           []engine.LogEntry            `json:"entries"`
+			NameserverTimings []nameserver.NameserverTiming `json:"nameserver_timings"`
+		}{
+			Entries:           displayEntries,
+			NameserverTimings: nameserver.TimingsFromQueryMap(packetCacheStore.QueryTimings()),
+		}
+		encodeErr = enc.Encode(wrapped)
+	} else {
+		encodeErr = enc.Encode(displayEntries)
+	}
+	if encodeErr != nil {
 		fmt.Fprintln(errOut, encodeErr.Error())
 		return 2
 	}

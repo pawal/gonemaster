@@ -70,7 +70,7 @@ stderr when stdout is a terminal.
 Additional output controls:
 
 - `--count` appends human-readable level and tag counts.
-- `--nstimes` appends per-nameserver timing statistics.
+- `--nstimes` appends per-nameserver timing statistics (max, min, avg, stddev, median, total, count), sorted by nameserver name, address, then median.
 - `--output PATH` writes selected output to a file.
 - `--save PATH` writes the DNS packet cache after the run.
 - `--restore PATH` primes the DNS packet cache before the run.
@@ -122,7 +122,7 @@ The flag groups below follow `gonemaster --help`.
 | `--json` | bool | Print one JSON array. |
 | `--json-stream` | bool | Stream newline-delimited JSON entries. |
 | `--count` | bool | Append count summaries in human output. |
-| `--nstimes` | bool | Append per-nameserver timing statistics. |
+| `--nstimes` | bool | Append per-nameserver timing statistics. With `--json`, wraps output as `{"entries":[…],"nameserver_timings":[…]}`. |
 | `--no-progress` | bool | Disable progress indicator. |
 | `--score` | bool | Print score and grade summary after the run. |
 | `--no-score` | bool | Suppress score output. |
@@ -219,6 +219,12 @@ Show per-nameserver query timing statistics:
 
 ```sh
 gonemaster --nstimes example.com
+```
+
+Include nameserver timing data in JSON output:
+
+```sh
+gonemaster --json --nstimes example.com | jq .nameserver_timings
 ```
 
 Disable IPv6 and raise parallelism:

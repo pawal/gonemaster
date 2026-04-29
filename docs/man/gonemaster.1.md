@@ -59,7 +59,10 @@ Results are printed with severity levels and can be output in several formats.
 : Print a summary count by level and message tag.
 
 **--nstimes**
-: Print per-nameserver query timing statistics (max, min, avg, stddev, median, total, count).
+: Print per-nameserver query timing statistics (max, min, avg, stddev, median, total, count),
+  sorted by nameserver name, address, then median query time. When combined with **--json**,
+  the output is wrapped as a JSON object with keys **entries** and **nameserver_timings**
+  instead of a bare array.
 
 **--no-progress**
 : Disable the progress indicator.
@@ -181,6 +184,10 @@ Test an undelegated zone:
 Show per-nameserver query timing statistics:
 
     gonemaster --nstimes example.com
+
+Include nameserver timing data in JSON output:
+
+    gonemaster --json --nstimes example.com | jq .nameserver_timings
 
 Save and restore the DNS cache for faster re-runs:
 

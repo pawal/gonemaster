@@ -2,6 +2,18 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [v1.4.2] - 2026-04-29
+
+### Added
+ - cli: include timing data in --json output
+ - cli: support repeatable --testcase flag across modules
+ - nagios: support repeatable --testcase flag across modules
+ - admin-ui: added settings for changing scoring parameters
+
+### Changed
+ - cli: no silent drop of --nstimes with --json output
+ - engine: fix Consistency05 disjoint NS lameness
+
 ## [v1.4.1] - 2026-04-27
 
 Speed optimizations for the Analysis UI.

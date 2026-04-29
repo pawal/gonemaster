@@ -107,7 +107,7 @@ The flag groups below follow `gonemaster --help`.
 | `DOMAIN` | positional | Zone name to test. Alternative to `--domain`. |
 | `--domain DOMAIN` | string | Zone name to test. Required for runs when positional `DOMAIN` is not provided. |
 | `--module MODULE` | string | Run one module. |
-| `--testcase TESTCASE` | string | Run one testcase. |
+| `--testcase TESTCASE` | string (repeatable) | Run a specific testcase. May be passed multiple times to run several testcases, possibly across modules. Names are case-insensitive. |
 | `--profile PATH` | string | Profile file in JSON or YAML. |
 
 ### Output
@@ -188,6 +188,12 @@ Run one module and testcase:
 
 ```sh
 gonemaster --module address --testcase address01 example.com
+```
+
+Run several testcases (across modules):
+
+```sh
+gonemaster --testcase consistency04 --testcase delegation07 example.com
 ```
 
 Print JSON:

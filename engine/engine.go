@@ -40,8 +40,9 @@ type RunRequest struct {
 	UndelegatedDSInfo []UndelegatedDSInfo
 	// Module limits execution to a module (for example "basic").
 	Module string
-	// Testcase limits execution to a single testcase (for example "basic02").
-	Testcase string
+	// Testcases limits execution to one or more testcases (for example
+	// {"basic02"} or {"consistency04", "delegation07"}).
+	Testcases []string
 	// Profile is an optional path to a profile file that overrides defaults.
 	Profile string
 	// MinLevel controls minimum emitted output level (for example "INFO").
@@ -299,26 +300,37 @@ func splitTestcaseNumber(name string) (string, int, bool) {
 	return name[:idx], num, true
 }
 
-func normalizeRequest(req RunRequest) (string, string, error) {
+func normalizeRequest(req RunRequest) (string, []string, error) {
 	module := strings.ToLower(strings.TrimSpace(req.Module))
-	testcase := strings.ToLower(strings.TrimSpace(req.Testcase))
 
 	if module != "" && moduleTestcases[module] == nil {
-		return "", "", ErrNotImplemented
+		return "", nil, ErrNotImplemented
 	}
-	if testcase != "" {
-		testModule := testcaseModule(testcase)
+
+	testcases := make([]string, 0, len(req.Testcases))
+	seen := map[string]bool{}
+	for _, raw := range req.Testcases {
+		name := strings.ToLower(strings.TrimSpace(raw))
+		if name == "" {
+			continue
+		}
+		if seen[name] {
+			continue
+		}
+		seen[name] = true
+		testModule := testcaseModule(name)
 		if testModule == "" {
-			return "", "", ErrNotImplemented
+			return "", nil, ErrNotImplemented
 		}
 		if module != "" && module != testModule {
-			return "", "", ErrNotImplemented
+			return "", nil, ErrNotImplemented
 		}
+		testcases = append(testcases, name)
 	}
-	return module, testcase, nil
+	return module, testcases, nil
 }
 
-func buildProfile(req RunRequest, module string, testcase string) (*profile.Profile, bool, error) {
+func buildProfile(req RunRequest, module string, testcases []string) (*profile.Profile, bool, error) {
 	p, err := profile.Default()
 	if err != nil {
 		return nil, false, err
@@ -414,24 +426,11 @@ func buildProfile(req RunRequest, module string, testcase string) (*profile.Prof
 		}
 	}
 
-	if testcase == "" {
-		switch module {
-		case "basic":
-			_ = p.Set("test_cases", toAnySlice(moduleTestcases[module]))
-		case "syntax":
-			_ = p.Set("test_cases", toAnySlice(moduleTestcases[module]))
-		case "address":
-			_ = p.Set("test_cases", toAnySlice(moduleTestcases[module]))
-		case "connectivity":
-			_ = p.Set("test_cases", toAnySlice(moduleTestcases[module]))
-		case "dnssec":
-			_ = p.Set("test_cases", toAnySlice(moduleTestcases[module]))
-		case "delegation":
-			_ = p.Set("test_cases", toAnySlice(moduleTestcases[module]))
-		case "nameserver":
-			_ = p.Set("test_cases", toAnySlice(moduleTestcases[module]))
-		case "zone":
-			_ = p.Set("test_cases", toAnySlice(moduleTestcases[module]))
+	if len(testcases) > 0 {
+		_ = p.Set("test_cases", toAnySlice(testcases))
+	} else if module != "" {
+		if cases, ok := moduleTestcases[module]; ok {
+			_ = p.Set("test_cases", toAnySlice(cases))
 		}
 	}
 
@@ -443,11 +442,11 @@ func EffectiveProfile(req RunRequest) (*profile.Profile, error) {
 	if req.Runner != nil && req.Runner.Profile != nil {
 		return req.Runner.Profile, nil
 	}
-	module, testcase, err := normalizeRequest(req)
+	module, testcases, err := normalizeRequest(req)
 	if err != nil {
 		return nil, err
 	}
-	p, _, err := buildProfile(req, module, testcase)
+	p, _, err := buildProfile(req, module, testcases)
 	return p, err
 }
 
@@ -473,12 +472,12 @@ func RunWithRunner(req RunRequest, runner *Runner) ([]LogEntry, error) {
 		}
 	}
 
-	module, testcase, err := normalizeRequest(req)
+	module, testcases, err := normalizeRequest(req)
 	if err != nil {
 		if req.Module != "" {
 			runner.Logger.AddWithoutCallback("UNKNOWN_MODULE", map[string]any{"module": req.Module}, "", "")
-		} else if req.Testcase != "" {
-			runner.Logger.AddWithoutCallback("UNKNOWN_METHOD", map[string]any{"testcase": req.Testcase}, "", "")
+		} else if len(req.Testcases) > 0 {
+			runner.Logger.AddWithoutCallback("UNKNOWN_METHOD", map[string]any{"testcase": strings.Join(req.Testcases, ",")}, "", "")
 		}
 		return nil, err
 	}
@@ -538,7 +537,7 @@ func RunWithRunner(req RunRequest, runner *Runner) ([]LogEntry, error) {
 		runner.Logger.AddWithoutCallback("RESTORED_NS_CACHE", map[string]any{}, "", "")
 	}
 
-	entries, err := runWithContext(ctx, req, module, testcase)
+	entries, err := runWithContext(ctx, req, module, testcases)
 	if err != nil {
 		return nil, err
 	}
@@ -559,7 +558,7 @@ func Run(req RunRequest) ([]LogEntry, error) {
 		return RunWithRunner(req, req.Runner)
 	}
 
-	module, testcase, err := normalizeRequest(req)
+	module, testcases, err := normalizeRequest(req)
 	if err != nil {
 		return nil, err
 	}
@@ -569,7 +568,7 @@ func Run(req RunRequest) ([]LogEntry, error) {
 		log.Callback = req.LogCallback
 	}
 
-	p, autoDisabledIPv6, err := buildProfile(req, module, testcase)
+	p, autoDisabledIPv6, err := buildProfile(req, module, testcases)
 	if err != nil {
 		return nil, err
 	}
@@ -598,7 +597,7 @@ func Run(req RunRequest) ([]LogEntry, error) {
 	return RunWithRunner(req, runner)
 }
 
-func runWithContext(ctx context.Context, req RunRequest, module string, testcase string) ([]*logger.Entry, error) {
+func runWithContext(ctx context.Context, req RunRequest, module string, testcases []string) ([]*logger.Entry, error) {
 	normalizedNameservers, normalizedDSInfo, err := NormalizeUndelegatedInputs(req.UndelegatedNameservers, req.UndelegatedDSInfo)
 	if err != nil {
 		return nil, err
@@ -632,28 +631,41 @@ func runWithContext(ctx context.Context, req RunRequest, module string, testcase
 		return result, runErr
 	}
 
+	moduleAll := map[string]struct {
+		display string
+		fn      func(context.Context, *zone.Zone) ([]*logger.Entry, error)
+	}{
+		"basic":        {"Basic", basic.All},
+		"syntax":       {"Syntax", syntax.All},
+		"address":      {"Address", address.AddressAll},
+		"connectivity": {"Connectivity", connectivity.All},
+		"consistency":  {"Consistency", consistency.All},
+		"dnssec":       {"DNSSEC", dnssec.All},
+		"delegation":   {"Delegation", delegation.All},
+		"nameserver":   {"Nameserver", nameserver.All},
+		"zone":         {"Zone", zonetest.All},
+	}
+
 	var entries []*logger.Entry
 	switch {
-	case testcase != "":
-		tcModule := testcaseModule(testcase)
-		if fn, ok := basicTests[testcase]; ok {
-			entries, err = runModule(tcModule, func(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) { return fn(ctx, z) })
-		} else if fn, ok := syntaxTests[testcase]; ok {
-			entries, err = runModule(tcModule, func(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) { return fn(ctx, z) })
-		} else if fn, ok := addressTests[testcase]; ok {
-			entries, err = runModule(tcModule, func(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) { return fn(ctx, z) })
-		} else if fn, ok := connectivityTests[testcase]; ok {
-			entries, err = runModule(tcModule, func(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) { return fn(ctx, z) })
-		} else if fn, ok := consistencyTests[testcase]; ok {
-			entries, err = runModule(tcModule, func(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) { return fn(ctx, z) })
-		} else if fn, ok := dnssecTests[testcase]; ok {
-			entries, err = runModule(tcModule, func(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) { return fn(ctx, z) })
-		} else if fn, ok := delegationTests[testcase]; ok {
-			entries, err = runModule(tcModule, func(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) { return fn(ctx, z) })
-		} else if fn, ok := nameserverTests[testcase]; ok {
-			entries, err = runModule(tcModule, func(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) { return fn(ctx, z) })
-		} else if fn, ok := zoneTests[testcase]; ok {
-			entries, err = runModule(tcModule, func(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) { return fn(ctx, z) })
+	case len(testcases) > 0:
+		selected := map[string]bool{}
+		for _, name := range testcases {
+			if m := testcaseModule(name); m != "" {
+				selected[m] = true
+			}
+		}
+		for _, moduleName := range moduleOrder {
+			if !selected[moduleName] {
+				continue
+			}
+			info := moduleAll[moduleName]
+			more, runErr := runModule(info.display, info.fn)
+			entries = append(entries, more...)
+			if runErr != nil {
+				err = runErr
+				break
+			}
 		}
 	case module == "basic":
 		entries, err = runModule("Basic", basic.All)

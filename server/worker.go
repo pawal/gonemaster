@@ -364,7 +364,7 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 	}
 
 	if len(job.Tests) == 1 {
-		req.Testcase = job.Tests[0]
+		req.Testcases = []string{job.Tests[0]}
 		entries, err := s.runEngine(req)
 		return entries, collectStats(), s.collectNameserverTimings(job, cacheStore.QueryTimings(), entries), effectiveProfileJSON, err
 	}
@@ -377,7 +377,7 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 	total := len(job.Tests)
 	for i, testcase := range job.Tests {
 		runReq := req
-		runReq.Testcase = testcase
+		runReq.Testcases = []string{testcase}
 		entries, err := s.runEngine(runReq)
 		if total > 0 {
 			done := i + 1

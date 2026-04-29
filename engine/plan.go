@@ -125,21 +125,43 @@ func AvailableTestcases() []string {
 // PlannedTestcases returns the list of test cases expected to run for the request.
 func PlannedTestcases(req RunRequest) ([]string, error) {
 	module := strings.ToLower(strings.TrimSpace(req.Module))
-	testcase := strings.ToLower(strings.TrimSpace(req.Testcase))
 
 	if module != "" && moduleTestcases[module] == nil {
 		return nil, ErrNotImplemented
 	}
 
-	if testcase != "" {
-		testModule := testcaseModule(testcase)
-		if testModule == "" {
-			return nil, ErrNotImplemented
+	if len(req.Testcases) > 0 {
+		selected := map[string]bool{}
+		ordered := []string{}
+		for _, raw := range req.Testcases {
+			name := strings.ToLower(strings.TrimSpace(raw))
+			if name == "" {
+				continue
+			}
+			testModule := testcaseModule(name)
+			if testModule == "" {
+				return nil, ErrNotImplemented
+			}
+			if module != "" && module != testModule {
+				return nil, ErrNotImplemented
+			}
+			if !selected[name] {
+				selected[name] = true
+				ordered = append(ordered, name)
+			}
 		}
-		if module != "" && module != testModule {
-			return nil, ErrNotImplemented
+		planned := []string{}
+		for _, moduleName := range moduleOrder {
+			for _, name := range moduleTestcases[moduleName] {
+				if selected[name] {
+					planned = append(planned, name)
+				}
+			}
 		}
-		return []string{testcase}, nil
+		if len(planned) == 0 {
+			return ordered, nil
+		}
+		return planned, nil
 	}
 
 	if module != "" {

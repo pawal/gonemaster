@@ -90,8 +90,8 @@ func TestRunWithRunnerConcurrentIsolation(t *testing.T) {
 		NameserverCache: nameserver.NewCacheStore(),
 	}
 
-	req1 := RunRequest{Domain: "example.com", Testcase: "syntax01"}
-	req2 := RunRequest{Domain: "example.net", Testcase: "syntax01"}
+	req1 := RunRequest{Domain: "example.com", Testcases: []string{"syntax01"}}
+	req2 := RunRequest{Domain: "example.net", Testcases: []string{"syntax01"}}
 
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -139,7 +139,7 @@ func TestRunEmitsStartupTags(t *testing.T) {
 		Limiter:         transport.NewLimiter(1),
 		NameserverCache: nameserver.NewCacheStore(),
 	}
-	_, _ = RunWithRunner(RunRequest{Domain: "example.com", Testcase: "syntax01"}, runner)
+	_, _ = RunWithRunner(RunRequest{Domain: "example.com", Testcases: []string{"syntax01"}}, runner)
 
 	required := []string{"GLOBAL_VERSION", "START_TIME", "TEST_TARGET", "MODULE_END"}
 	for _, tag := range required {
@@ -162,7 +162,7 @@ func TestRunEmitsSkipIPv4Disabled(t *testing.T) {
 		Limiter:         transport.NewLimiter(1),
 		NameserverCache: nameserver.NewCacheStore(),
 	}
-	_, _ = RunWithRunner(RunRequest{Domain: "example.com", Testcase: "syntax01"}, runner)
+	_, _ = RunWithRunner(RunRequest{Domain: "example.com", Testcases: []string{"syntax01"}}, runner)
 
 	if !logHasTag(log, "SKIP_IPV4_DISABLED") {
 		t.Fatalf("expected SKIP_IPV4_DISABLED when IPv4 disabled")
@@ -183,7 +183,7 @@ func TestRunEmitsNoNetwork(t *testing.T) {
 		Limiter:         transport.NewLimiter(1),
 		NameserverCache: nameserver.NewCacheStore(),
 	}
-	entries, err := RunWithRunner(RunRequest{Domain: "example.com", Testcase: "syntax01"}, runner)
+	entries, err := RunWithRunner(RunRequest{Domain: "example.com", Testcases: []string{"syntax01"}}, runner)
 	if err != nil {
 		t.Fatalf("run: %v", err)
 	}
@@ -221,7 +221,7 @@ func TestRunWithRunnerEmitsUnknownMethod(t *testing.T) {
 	}
 	log := logger.New()
 	runner := &Runner{Profile: p, Logger: log}
-	_, err = RunWithRunner(RunRequest{Domain: "example.com", Testcase: "nonexistent99"}, runner)
+	_, err = RunWithRunner(RunRequest{Domain: "example.com", Testcases: []string{"nonexistent99"}}, runner)
 	if !errors.Is(err, ErrNotImplemented) {
 		t.Fatalf("expected not implemented error, got %v", err)
 	}

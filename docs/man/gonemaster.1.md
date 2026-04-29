@@ -25,7 +25,9 @@ Results are printed with severity levels and can be output in several formats.
 : Run only the named module (e.g., dnssec, nameserver).
 
 **--testcase** *TESTCASE*
-: Run only the named testcase (e.g., dnssec20).
+: Run only the named testcase (e.g., dnssec20). May be repeated to run several
+  testcases, optionally across modules: `--testcase consistency04 --testcase
+  delegation07`. Names are case-insensitive.
 
 **--profile** *PATH*
 : Load a custom profile from a JSON or YAML file.
@@ -163,6 +165,10 @@ Run only DNSSEC tests with JSON output:
 Run a single testcase:
 
     gonemaster --testcase dnssec20 example.com
+
+Run several testcases across modules:
+
+    gonemaster --testcase consistency04 --testcase delegation07 example.com
 
 Show all results including INFO level:
 

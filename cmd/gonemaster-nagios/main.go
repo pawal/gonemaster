@@ -384,10 +384,14 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		defer cancel()
 	}
 
+	var testcases []string
+	if testcase != "" {
+		testcases = []string{testcase}
+	}
 	req := engine.RunRequest{
 		Domain:                 domain,
 		Module:                 module,
-		Testcase:               testcase,
+		Testcases:              testcases,
 		Profile:                mergedProfilePath,
 		IPv4:                   ipv4Override,
 		IPv6:                   ipv6Override,

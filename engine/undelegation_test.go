@@ -243,8 +243,8 @@ func TestApplyUndelegatedDS(t *testing.T) {
 
 func TestRunRejectsInvalidUndelegatedInput(t *testing.T) {
 	_, err := Run(RunRequest{
-		Domain:   ".",
-		Testcase: "basic01",
+		Domain:    ".",
+		Testcases: []string{"basic01"},
 		UndelegatedNameservers: []UndelegatedNameserver{
 			{Name: "bad!name.example"},
 		},

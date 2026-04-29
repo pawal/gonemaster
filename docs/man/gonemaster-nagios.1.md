@@ -37,7 +37,9 @@ use with Nagios, Icinga, Sensu, and similar monitoring systems.
 : Run only the named module.
 
 **--testcase** *TESTCASE*
-: Run only the named testcase.
+: Run only the named testcase. May be repeated to run several testcases,
+  optionally across modules: `--testcase consistency04 --testcase delegation07`.
+  Names are case-insensitive.
 
 **--profile** *PATH*
 : Load a custom profile from a JSON or YAML file.

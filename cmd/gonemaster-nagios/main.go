@@ -149,7 +149,7 @@ func main() {
 func run(args []string, out io.Writer, errOut io.Writer) int {
 	var domain string
 	var module string
-	var testcase string
+	var testcases stringSliceFlag
 	var profilePath string
 	var warningLevel string
 	var criticalLevel string
@@ -190,7 +190,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		fmt.Fprintln(errOut, "")
 		fmt.Fprintln(errOut, "Gonemaster options:")
 		fmt.Fprintln(errOut, "  --module          Run a single module")
-		fmt.Fprintln(errOut, "  --testcase        Run a single testcase")
+		fmt.Fprintln(errOut, "  --testcase        Run a specific testcase (repeatable)")
 		fmt.Fprintln(errOut, "  --profile         Profile JSON/YAML path")
 		fmt.Fprintln(errOut, "  --no-ipv4         Disable IPv4 queries")
 		fmt.Fprintln(errOut, "  --no-ipv6         Disable IPv6 queries")
@@ -231,7 +231,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs.IntVar(&timeoutSeconds, "timeout", 0, "Plugin runtime deadline in seconds (optional)")
 	fs.IntVar(&timeoutSeconds, "t", 0, "Plugin runtime deadline in seconds (optional)")
 	fs.StringVar(&module, "module", "", "Run a single module (optional)")
-	fs.StringVar(&testcase, "testcase", "", "Run a single testcase (optional)")
+	fs.Var(&testcases, "testcase", "Run a specific testcase (repeatable, optional)")
 	fs.StringVar(&profilePath, "profile", "", "Profile JSON/YAML path (optional)")
 	fs.BoolVar(&noIPv4, "no-ipv4", false, "Disable IPv4 queries (optional)")
 	fs.BoolVar(&noIPv6, "no-ipv6", false, "Disable IPv6 queries (optional)")
@@ -365,8 +365,17 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		fmt.Fprintln(errOut, "--rrsig-warn-days must be >= 0")
 		return 3
 	}
-	if rrsigWarnDays > 0 && testcase != "dnssec04" && module != "dnssec" && module != "" {
-		fmt.Fprintf(errOut, "--rrsig-warn-days only affects dnssec04; consider --testcase dnssec04 or --module dnssec\n")
+	if rrsigWarnDays > 0 && module != "dnssec" && module != "" {
+		hasDNSSEC04 := false
+		for _, name := range testcases {
+			if strings.EqualFold(strings.TrimSpace(name), "dnssec04") {
+				hasDNSSEC04 = true
+				break
+			}
+		}
+		if !hasDNSSEC04 {
+			fmt.Fprintf(errOut, "--rrsig-warn-days only affects dnssec04; consider --testcase dnssec04 or --module dnssec\n")
+		}
 	}
 	mergedProfilePath, profileCleanup, profileErr := buildMergedProfile(profilePath, rrsigWarnDays)
 	if profileErr != nil {
@@ -384,14 +393,10 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		defer cancel()
 	}
 
-	var testcases []string
-	if testcase != "" {
-		testcases = []string{testcase}
-	}
 	req := engine.RunRequest{
 		Domain:                 domain,
 		Module:                 module,
-		Testcases:              testcases,
+		Testcases:              []string(testcases),
 		Profile:                mergedProfilePath,
 		IPv4:                   ipv4Override,
 		IPv6:                   ipv6Override,

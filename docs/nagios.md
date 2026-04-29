@@ -37,7 +37,7 @@ gonemaster-nagios --domain example.com --profile ./profile.json
 
 ## Gonemaster-specific options
 - `--module` Run a single module
-- `--testcase` Run a single testcase
+- `--testcase` Run a specific testcase (repeatable; may span multiple modules)
 - `--profile` Profile JSON/YAML path
 - `--no-ipv4` Disable IPv4 queries
 - `--no-ipv6` Disable IPv6 queries

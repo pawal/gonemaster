@@ -344,6 +344,7 @@
   "domains_load_error": "Verkkotunnusten lataaminen epäonnistui: {error}",
   "tag_filter_label": "Suodata tunnisteella",
   "tag_filter_all": "Kaikki tunnisteet",
+  "tag_filter_none": "Ei tunnistetta",
   "level_filter_label": "Suodata tasolla",
   "level_filter_all": "Kaikki tasot",
   "level_filter_warning_plus": "Varoitus tai vakavampi",

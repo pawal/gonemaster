@@ -853,7 +853,9 @@ func (s *SQLJobStore) ListDomains(filter DomainFilter) DomainList {
 		return s.dialect.Placeholder(argN)
 	}
 
-	if filter.Tag != "" {
+	if filter.Tag == "__none__" {
+		conds = append(conds, "id NOT IN (SELECT domain_id FROM domain_tags)")
+	} else if filter.Tag != "" {
 		conds = append(conds, "id IN (SELECT domain_id FROM domain_tags WHERE tag = "+addArg(filter.Tag)+")")
 	}
 	if filter.Name != "" {

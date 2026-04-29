@@ -344,6 +344,7 @@
   "domains_load_error": "ドメインの読み込みに失敗しました: {error}",
   "tag_filter_label": "タグでフィルター",
   "tag_filter_all": "すべてのタグ",
+  "tag_filter_none": "タグなし",
   "level_filter_label": "レベルでフィルター",
   "level_filter_all": "すべてのレベル",
   "level_filter_warning_plus": "警告以上",

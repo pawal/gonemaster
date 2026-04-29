@@ -720,7 +720,11 @@ func (s *InMemoryJobStore) ListDomains(filter DomainFilter) DomainList {
 
 	items := make([]Domain, 0, len(s.domains))
 	for _, d := range s.domains {
-		if filter.Tag != "" {
+		if filter.Tag == "__none__" {
+			if len(s.domainTags[d.ID]) > 0 {
+				continue
+			}
+		} else if filter.Tag != "" {
 			tags := s.domainTags[d.ID]
 			found := false
 			for _, t := range tags {

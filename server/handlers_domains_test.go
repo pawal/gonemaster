@@ -139,6 +139,38 @@ func TestListDomainsFilterByTag(t *testing.T) {
 	}
 }
 
+// TestListDomainsFilterByNoTag verifies the ?tag=__none__ filter returns only untagged domains.
+func TestListDomainsFilterByNoTag(t *testing.T) {
+	srv := New(DefaultConfig())
+	d1 := makeGraduatedJob(t, srv, "tagged.example.com", JobSucceeded)
+	makeGraduatedJob(t, srv, "untagged.example.com", JobSucceeded)
+
+	if err := srv.store.CreateTag("mytag", ""); err != nil {
+		t.Fatalf("create tag: %v", err)
+	}
+	if err := srv.store.TagDomains("mytag", []int64{d1.ID}); err != nil {
+		t.Fatalf("tag domain: %v", err)
+	}
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/domains?tag=__none__", nil)
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var list DomainList
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if list.Total != 1 {
+		t.Fatalf("expected total=1, got %d", list.Total)
+	}
+	if list.Items[0].Name != "untagged.example.com" {
+		t.Fatalf("expected untagged.example.com, got %q", list.Items[0].Name)
+	}
+}
+
 // TestListDomainsInvalidLimit verifies that an out-of-range limit returns 400.
 func TestListDomainsInvalidLimit(t *testing.T) {
 	srv := New(DefaultConfig())

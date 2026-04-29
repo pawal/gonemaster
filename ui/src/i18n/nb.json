@@ -344,6 +344,7 @@
   "domains_load_error": "Kunne ikke laste domener: {error}",
   "tag_filter_label": "Filtrer etter tagg",
   "tag_filter_all": "Alle tagger",
+  "tag_filter_none": "Ingen tagg",
   "level_filter_label": "Filtrer etter nivå",
   "level_filter_all": "Alle nivåer",
   "level_filter_warning_plus": "Advarsel eller verre",

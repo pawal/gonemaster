@@ -3416,6 +3416,7 @@
             aria-label={$t("tag_filter_label")}
           >
             <option value="">{$t("tag_filter_all")}</option>
+            <option value="__none__">{$t("tag_filter_none")}</option>
             {#each availableTags as tag}
               <option value={tag.name}>{tag.name}</option>
             {/each}

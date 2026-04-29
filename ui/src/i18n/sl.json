@@ -344,6 +344,7 @@
   "domains_load_error": "Napaka pri nalaganju domen: {error}",
   "tag_filter_label": "Filtriraj po oznaki",
   "tag_filter_all": "Vse oznake",
+  "tag_filter_none": "Brez oznake",
   "level_filter_label": "Filtriraj po ravni",
   "level_filter_all": "Vse ravni",
   "level_filter_warning_plus": "Opozorilo ali huje",

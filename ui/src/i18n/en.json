@@ -357,6 +357,7 @@
   "domains_load_error": "Failed to load domains: {error}",
   "tag_filter_label": "Filter by tag",
   "tag_filter_all": "All tags",
+  "tag_filter_none": "No tag",
   "level_filter_label": "Filter by level",
   "level_filter_all": "All levels",
   "level_filter_warning_plus": "Warning or worse",

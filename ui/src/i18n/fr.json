@@ -344,6 +344,7 @@
   "domains_load_error": "Échec du chargement des domaines : {error}",
   "tag_filter_label": "Filtrer par étiquette",
   "tag_filter_all": "Toutes les étiquettes",
+  "tag_filter_none": "Aucune étiquette",
   "level_filter_label": "Filtrer par niveau",
   "level_filter_all": "Tous les niveaux",
   "level_filter_warning_plus": "Avertissement ou pire",

@@ -344,6 +344,7 @@
   "domains_load_error": "Det gick inte att ladda domäner: {error}",
   "tag_filter_label": "Filtrera efter tagg",
   "tag_filter_all": "Alla taggar",
+  "tag_filter_none": "Ingen tagg",
   "level_filter_label": "Filtrera efter nivå",
   "level_filter_all": "Alla nivåer",
   "level_filter_warning_plus": "Varning eller värre",

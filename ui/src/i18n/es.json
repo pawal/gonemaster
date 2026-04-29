@@ -344,6 +344,7 @@
   "domains_load_error": "Error al cargar los dominios: {error}",
   "tag_filter_label": "Filtrar por etiqueta",
   "tag_filter_all": "Todas las etiquetas",
+  "tag_filter_none": "Sin etiqueta",
   "level_filter_label": "Filtrar por nivel",
   "level_filter_all": "Todos los niveles",
   "level_filter_warning_plus": "Advertencia o peor",

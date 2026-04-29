@@ -344,6 +344,7 @@
   "domains_load_error": "Kunne ikke indlæse domæner: {error}",
   "tag_filter_label": "Filtrer efter mærke",
   "tag_filter_all": "Alle mærker",
+  "tag_filter_none": "Intet mærke",
   "level_filter_label": "Filtrer efter niveau",
   "level_filter_all": "Alle niveauer",
   "level_filter_warning_plus": "Advarsel eller værre",

@@ -304,7 +304,7 @@ func normalizeRequest(req RunRequest) (string, []string, error) {
 	module := strings.ToLower(strings.TrimSpace(req.Module))
 
 	if module != "" && moduleTestcases[module] == nil {
-		return "", nil, ErrNotImplemented
+		return "", nil, fmt.Errorf("unknown module %q: %w", req.Module, ErrNotImplemented)
 	}
 
 	testcases := make([]string, 0, len(req.Testcases))
@@ -320,10 +320,10 @@ func normalizeRequest(req RunRequest) (string, []string, error) {
 		seen[name] = true
 		testModule := testcaseModule(name)
 		if testModule == "" {
-			return "", nil, ErrNotImplemented
+			return "", nil, fmt.Errorf("unknown testcase %q: %w", strings.TrimSpace(raw), ErrNotImplemented)
 		}
 		if module != "" && module != testModule {
-			return "", nil, ErrNotImplemented
+			return "", nil, fmt.Errorf("testcase %q does not belong to module %q: %w", strings.TrimSpace(raw), req.Module, ErrNotImplemented)
 		}
 		testcases = append(testcases, name)
 	}

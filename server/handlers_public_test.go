@@ -146,6 +146,59 @@ func TestPublicCreateJobRejectsProfileOverrides(t *testing.T) {
 	}
 }
 
+func TestPublicCreateJobCSRFRejectsCrossOrigin(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
+		bytes.NewBufferString(`{"domain":"example.com"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Origin", "http://evil.example")
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d: %s", resp.Code, resp.Body.String())
+	}
+	var out ErrorResponse
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out.Error.Code != "csrf_origin_mismatch" {
+		t.Fatalf("expected csrf_origin_mismatch, got %q", out.Error.Code)
+	}
+}
+
+func TestPublicCreateJobCSRFAcceptsSameOrigin(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
+		bytes.NewBufferString(`{"domain":"example.com"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Origin", "http://"+req.Host)
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", resp.Code, resp.Body.String())
+	}
+}
+
+func TestPublicCreateJobCSRFAllowsMissingOrigin(t *testing.T) {
+	// Non-browser clients (e.g. gonemaster-client) omit Origin; the helper
+	// short-circuits in that case so CLI usage keeps working.
+	srv := New(DefaultConfig())
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
+		bytes.NewBufferString(`{"domain":"example.com"}`))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("expected 201 with no Origin header, got %d: %s", resp.Code, resp.Body.String())
+	}
+}
+
 func TestPublicProfilesReturnsOnlyPublicProfilesWithoutConfig(t *testing.T) {
 	srv := New(DefaultConfig())
 	createProfile(t, srv, `{"name":"public-profile","description":"Shown","config":{"net":{"ipv4":true}},"public":true}`)

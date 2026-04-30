@@ -91,6 +91,9 @@ func (s *Server) handlePublicProfiles(w http.ResponseWriter, r *http.Request) {
 // Accepts the same body as the internal create endpoint but returns a
 // PublicJobView — the internal UUID is never sent to the caller.
 func (s *Server) handlePublicCreateJob(w http.ResponseWriter, r *http.Request) {
+	if !enforceCSRF(w, r) {
+		return
+	}
 	var req JobCreateRequest
 	if err := readJSON(r, s.cfg.MaxBodySize, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_json", err.Error(), nil)

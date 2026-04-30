@@ -56,6 +56,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	var pubAPIRateLimitMax int
 	var pubAPIRateLimitWindow time.Duration
 	var pubAPIAllowPrivateUndelegatedIP bool
+	var trustedProxyCIDRs string
 	var crossJobHotCache bool
 	var noCrossJobHotCache bool
 	var crossJobHotCacheTTL int
@@ -103,6 +104,9 @@ func run(args []string, out *os.File, errOut *os.File) int {
 			{flag: "--db-dsn DSN", detail: "SQLite: file path e.g. /var/lib/gonemaster/jobs.db (env: GONEMASTER_DB_DSN)"},
 			{flag: "--db-retention-days N", detail: "Delete completed jobs older than N days (0 = keep forever) (env: GONEMASTER_DB_RETENTION_DAYS)"},
 		})
+		printUsageGroup(errOut, "Reverse proxy", []usageLine{
+			{flag: "--trusted-proxy-cidrs LIST", detail: "Comma-separated CIDRs (or bare IPs) of reverse proxies allowed to set X-Forwarded-For. Empty = trust nothing (RemoteAddr only). Leave empty when the server is exposed directly. (env: GONEMASTER_TRUSTED_PROXY_CIDRS)"},
+		})
 		printUsageGroup(errOut, "Public API", []usageLine{
 			{flag: "--public-api-rate-limit-enabled", detail: "Enable per-IP rate limiting on POST /pub/api/v1/jobs (env: GONEMASTER_PUBLIC_API_RATE_LIMIT_ENABLED)"},
 			{flag: "--public-api-rate-limit-max N", detail: "Max job submissions per IP per window (default 10) (env: GONEMASTER_PUBLIC_API_RATE_LIMIT_MAX)"},
@@ -137,6 +141,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	fs.IntVar(&pubAPIRateLimitMax, "public-api-rate-limit-max", 0, "Max job submissions per IP per window (default 10)")
 	fs.DurationVar(&pubAPIRateLimitWindow, "public-api-rate-limit-window", 0, "Rate limit sliding window e.g. 5m (default 10m)")
 	fs.BoolVar(&pubAPIAllowPrivateUndelegatedIP, "public-api-allow-private-undelegated-ip", false, "Allow private/loopback IPs as undelegated NS targets on the public API (default off)")
+	fs.StringVar(&trustedProxyCIDRs, "trusted-proxy-cidrs", "", "Comma-separated CIDRs allowed to set X-Forwarded-For (default empty = trust nothing)")
 	fs.BoolVar(&crossJobHotCache, "cross-job-hot-cache", false, "Enable cross-job nameserver cache sharing (default true)")
 	fs.BoolVar(&noCrossJobHotCache, "no-cross-job-hot-cache", false, "Disable cross-job nameserver cache sharing")
 	fs.IntVar(&crossJobHotCacheTTL, "cross-job-hot-cache-ttl", 0, "Hot-cache entry TTL in seconds (default 60)")
@@ -317,6 +322,9 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	if flagsSet["public-api-allow-private-undelegated-ip"] {
 		cfg.PublicAPI.AllowPrivateUndelegatedIP = pubAPIAllowPrivateUndelegatedIP
 	}
+	if flagsSet["trusted-proxy-cidrs"] {
+		cfg.TrustedProxyCIDRs = strings.Split(trustedProxyCIDRs, ",")
+	}
 
 	if dumpConfig {
 		enc := json.NewEncoder(out)
@@ -460,6 +468,7 @@ func buildConfigSources(flagsSet map[string]bool, hasConfigFile bool) map[string
 		"public-api-rate-limit-max":               "rate_limit_max",
 		"public-api-rate-limit-window":            "rate_limit_window",
 		"public-api-allow-private-undelegated-ip": "allow_private_undelegated_ip",
+		"trusted-proxy-cidrs":                     "trusted_proxy_cidrs",
 	}
 
 	sources := make(map[string]server.SettingSource)

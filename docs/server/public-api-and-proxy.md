@@ -69,17 +69,41 @@ Equivalent JSON config:
 The limiter applies to `POST` requests on `/pub/api/v1/`. Read endpoints are
 not throttled — see [Caching](#caching) below for the right tool there.
 
-Client IP is resolved from:
+Client IP is resolved from `RemoteAddr` by default. `X-Forwarded-For` is only
+honoured when the request's `RemoteAddr` falls inside one of the CIDRs listed
+in `trusted_proxy_cidrs`; from there the chain is walked right-to-left and
+the first untrusted hop is taken as the client.
 
-1. `X-Forwarded-For`, first value
-2. `X-Real-IP`
-3. `RemoteAddr`
+### What goes in `trusted_proxy_cidrs`
 
-> **Trust your proxy.** The first `X-Forwarded-For` value is trusted
-> unconditionally. If the server is exposed directly (no reverse proxy) or the
-> proxy does not strip incoming `X-Forwarded-For`, an attacker can rotate the
-> header to bypass the per-IP budget. Always front the server with a proxy
-> that overwrites these headers.
+The IP address that **gonemaster-server sees** when the reverse proxy connects
+to it — i.e. the proxy's address at gonemaster-server's network vantage point.
+
+| Setup | Value |
+|---|---|
+| nginx/Caddy on the same host, proxying to `127.0.0.1:8080` | `127.0.0.1/32` (and `::1/128` if also via IPv6) |
+| Reverse proxy on another host in `10.0.0.0/8` | `10.0.0.5/32` (the proxy's IP), or the wider `10.0.0.0/8` if you trust the whole network |
+| Behind a CDN that connects directly | the CDN's published edge ranges |
+| Server exposed directly to the public internet (no proxy) | leave the list empty |
+
+> **Set `trusted_proxy_cidrs` when running behind a reverse proxy.** Without
+> it, every forwarded request is attributed to the proxy's IP and a single
+> proxy fills the per-IP budget for all real clients. With it set too
+> broadly, `X-Forwarded-For` becomes spoofable. List only proxies you
+> control.
+
+```sh
+gonemaster-server --trusted-proxy-cidrs "127.0.0.1/32,::1/128"
+```
+
+or via the config file:
+
+```json
+"trusted_proxy_cidrs": ["127.0.0.1/32", "::1/128"]
+```
+
+When the server is exposed directly (no reverse proxy), leave the list empty
+— `X-Forwarded-For` is then ignored and unspoofable.
 
 Blocked requests return `429 Too Many Requests` with `Retry-After`.
 
@@ -130,6 +154,10 @@ should still block admin paths from the public internet.
 
 ## nginx Example
 
+Pair with `--trusted-proxy-cidrs 127.0.0.1/32` (or `::1/128` if proxying via
+IPv6) so gonemaster-server honours the `X-Forwarded-For` header nginx sets
+below.
+
 ```nginx
 server {
     listen 443 ssl;
@@ -140,7 +168,6 @@ server {
     location /public/ {
         proxy_pass http://127.0.0.1:8080/public/;
         proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
@@ -148,7 +175,6 @@ server {
     location /analysis/ {
         proxy_pass http://127.0.0.1:8080/analysis/;
         proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
@@ -156,7 +182,6 @@ server {
     location /pub/api/v1/ {
         proxy_pass http://127.0.0.1:8080/pub/api/v1/;
         proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
@@ -167,6 +192,9 @@ server {
 security headers are set by the application.
 
 ## Caddy Example
+
+Caddy's `reverse_proxy` sets `X-Forwarded-For` automatically. Pair with
+`--trusted-proxy-cidrs 127.0.0.1/32,::1/128` so gonemaster-server honours it.
 
 ```caddyfile
 dns.example.com {

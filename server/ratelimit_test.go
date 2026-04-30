@@ -103,35 +103,83 @@ func TestRateLimiterCleanupKeepsActiveEntries(t *testing.T) {
 func TestClientIPFromRemoteAddr(t *testing.T) {
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 	r.RemoteAddr = "192.0.2.1:1234"
-	if got := clientIP(r); got != "192.0.2.1" {
+	if got := clientIP(r, nil); got != "192.0.2.1" {
 		t.Fatalf("expected 192.0.2.1, got %q", got)
 	}
 }
 
-func TestClientIPFromXForwardedFor(t *testing.T) {
+func TestClientIPIgnoresXForwardedForFromUntrustedRemote(t *testing.T) {
+	// No trusted proxies configured: XFF must be ignored, even if set.
+	// Spoofing XFF should not change the attribution.
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.RemoteAddr = "203.0.113.1:1234"
+	r.Header.Set("X-Forwarded-For", "1.2.3.4")
+	if got := clientIP(r, nil); got != "203.0.113.1" {
+		t.Fatalf("expected RemoteAddr 203.0.113.1, got %q", got)
+	}
+}
+
+func TestClientIPHonorsXForwardedForFromTrustedRemote(t *testing.T) {
+	trusted := parseTrustedProxies([]string{"10.0.0.0/8"})
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 	r.RemoteAddr = "10.0.0.1:1234"
-	r.Header.Set("X-Forwarded-For", "203.0.113.5, 10.0.0.1")
-	if got := clientIP(r); got != "203.0.113.5" {
+	r.Header.Set("X-Forwarded-For", "203.0.113.5")
+	if got := clientIP(r, trusted); got != "203.0.113.5" {
 		t.Fatalf("expected 203.0.113.5, got %q", got)
 	}
 }
 
-func TestClientIPFromXRealIP(t *testing.T) {
+func TestClientIPWalksRightToLeftSkippingTrustedHops(t *testing.T) {
+	trusted := parseTrustedProxies([]string{"10.0.0.0/8", "192.168.0.0/16"})
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
-	r.RemoteAddr = "10.0.0.1:1234"
-	r.Header.Set("X-Real-IP", "198.51.100.7")
-	if got := clientIP(r); got != "198.51.100.7" {
-		t.Fatalf("expected 198.51.100.7, got %q", got)
+	r.RemoteAddr = "192.168.1.1:1234"
+	// client → proxy1(10.0.0.5) → proxy2(192.168.1.1).
+	// Right-to-left: skip 10.0.0.5 (trusted), return 203.0.113.7 (untrusted).
+	r.Header.Set("X-Forwarded-For", "203.0.113.7, 10.0.0.5")
+	if got := clientIP(r, trusted); got != "203.0.113.7" {
+		t.Fatalf("expected 203.0.113.7, got %q", got)
 	}
 }
 
-func TestClientIPXForwardedForTakesPrecedenceOverXRealIP(t *testing.T) {
+func TestClientIPRejectsSpoofedXForwardedForViaTrustedRemote(t *testing.T) {
+	// Even when remote is trusted, an entirely-untrusted XFF chain is taken
+	// at face value: the right-most untrusted hop wins. This documents the
+	// "spoof from outside the trust boundary" expectation.
+	trusted := parseTrustedProxies([]string{"10.0.0.0/8"})
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
-	r.Header.Set("X-Forwarded-For", "203.0.113.1")
-	r.Header.Set("X-Real-IP", "198.51.100.7")
-	if got := clientIP(r); got != "203.0.113.1" {
-		t.Fatalf("expected X-Forwarded-For to win, got %q", got)
+	r.RemoteAddr = "10.0.0.1:1234"
+	// Attacker behind a trusted proxy sets XFF; rightmost untrusted hop is
+	// the value just before the trusted proxy in the real chain — here all
+	// hops are untrusted so the rightmost wins.
+	r.Header.Set("X-Forwarded-For", "198.51.100.10, 203.0.113.20")
+	if got := clientIP(r, trusted); got != "203.0.113.20" {
+		t.Fatalf("expected rightmost untrusted hop 203.0.113.20, got %q", got)
+	}
+}
+
+func TestClientIPRemoteAddrTrustedButNoXFFFallsBackToRemote(t *testing.T) {
+	trusted := parseTrustedProxies([]string{"10.0.0.0/8"})
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.RemoteAddr = "10.0.0.1:1234"
+	if got := clientIP(r, trusted); got != "10.0.0.1" {
+		t.Fatalf("expected 10.0.0.1, got %q", got)
+	}
+}
+
+func TestClientIPHandlesV4MappedV6InTrustedCIDR(t *testing.T) {
+	trusted := parseTrustedProxies([]string{"10.0.0.0/8"})
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.RemoteAddr = "[::ffff:10.0.0.1]:1234"
+	r.Header.Set("X-Forwarded-For", "203.0.113.9")
+	if got := clientIP(r, trusted); got != "203.0.113.9" {
+		t.Fatalf("expected 203.0.113.9, got %q", got)
+	}
+}
+
+func TestParseTrustedProxiesAcceptsBareIPAndCIDR(t *testing.T) {
+	got := parseTrustedProxies([]string{"127.0.0.1", "10.0.0.0/8", "  ", "::1"})
+	if len(got) != 3 {
+		t.Fatalf("expected 3 entries, got %d: %v", len(got), got)
 	}
 }
 
@@ -142,7 +190,7 @@ func TestRateLimitMiddlewareAllowsGETUnconditionally(t *testing.T) {
 	ok := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
-	h := rateLimitMiddleware(rl, ok)
+	h := rateLimitMiddleware(rl, nil, ok)
 
 	for i := 0; i < 5; i++ {
 		resp := httptest.NewRecorder()
@@ -159,7 +207,7 @@ func TestRateLimitMiddlewareBlocks429WithRetryAfter(t *testing.T) {
 	ok := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusCreated)
 	})
-	h := rateLimitMiddleware(rl, ok)
+	h := rateLimitMiddleware(rl, nil, ok)
 
 	for i := 0; i < 2; i++ {
 		resp := httptest.NewRecorder()
@@ -183,12 +231,13 @@ func TestRateLimitMiddlewareBlocks429WithRetryAfter(t *testing.T) {
 	}
 }
 
-func TestRateLimitMiddlewareXForwardedForRespected(t *testing.T) {
+func TestRateLimitMiddlewareXForwardedForRespectedFromTrustedProxy(t *testing.T) {
 	rl := NewRateLimiter(1, time.Minute)
+	trusted := parseTrustedProxies([]string{"10.0.0.0/8"})
 	ok := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusCreated)
 	})
-	h := rateLimitMiddleware(rl, ok)
+	h := rateLimitMiddleware(rl, trusted, ok)
 
 	makePost := func(xff string) int {
 		resp := httptest.NewRecorder()
@@ -210,6 +259,33 @@ func TestRateLimitMiddlewareXForwardedForRespected(t *testing.T) {
 	// First request from different client B passes.
 	if code := makePost("203.0.113.2"); code != http.StatusCreated {
 		t.Fatalf("first request from B: expected 201, got %d", code)
+	}
+}
+
+func TestRateLimitMiddlewareIgnoresSpoofedXForwardedFor(t *testing.T) {
+	// No trusted proxies configured; XFF must be ignored. An attacker
+	// rotating XFF cannot escape per-IP attribution by RemoteAddr.
+	rl := NewRateLimiter(1, time.Minute)
+	ok := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+	})
+	h := rateLimitMiddleware(rl, nil, ok)
+
+	makePost := func(xff string) int {
+		resp := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPost, "/jobs", bytes.NewBufferString(`{}`))
+		r.RemoteAddr = "203.0.113.99:1234"
+		r.Header.Set("X-Forwarded-For", xff)
+		h.ServeHTTP(resp, r)
+		return resp.Code
+	}
+
+	if code := makePost("1.1.1.1"); code != http.StatusCreated {
+		t.Fatalf("first request: expected 201, got %d", code)
+	}
+	// Different XFF, same RemoteAddr — must be blocked.
+	if code := makePost("2.2.2.2"); code != http.StatusTooManyRequests {
+		t.Fatalf("second request with rotated XFF: expected 429, got %d", code)
 	}
 }
 

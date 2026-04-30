@@ -116,6 +116,11 @@ type Config struct {
 	SourceAddr6 *string `json:"source_addr6,omitempty"`
 	MinLevel    string  `json:"min_level"`
 	ProfilePath string  `json:"profile_path,omitempty"`
+	// TrustedProxyCIDRs lists CIDR blocks (or bare IPs) whose requests are
+	// allowed to set X-Forwarded-For. Empty means trust nothing and use
+	// RemoteAddr. Without this, XFF is spoofable and rate limits can be
+	// bypassed.
+	TrustedProxyCIDRs []string `json:"trusted_proxy_cidrs,omitempty"`
 	// PublicURL is the canonical base URL of the public UI (e.g. "https://example.com/").
 	// Used for og:url, hreflang, robots.txt, and sitemap.xml. When empty, the URL
 	// is auto-detected from the request's Host and X-Forwarded-Proto headers.
@@ -186,6 +191,7 @@ type FileConfig struct {
 	SourceAddr6                 *string              `json:"source_addr6"`
 	MinLevel                    *string              `json:"min_level"`
 	ProfilePath                 *string              `json:"profile_path"`
+	TrustedProxyCIDRs           *[]string            `json:"trusted_proxy_cidrs,omitempty"`
 	PublicURL                   *string              `json:"public_url,omitempty"`
 	Database                    *DatabaseFileConfig  `json:"database,omitempty"`
 	PublicAPI                   *PublicAPIFileConfig `json:"public_api,omitempty"`
@@ -294,6 +300,9 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 	}
 	if file.ProfilePath != nil {
 		c.ProfilePath = *file.ProfilePath
+	}
+	if file.TrustedProxyCIDRs != nil {
+		c.TrustedProxyCIDRs = append(c.TrustedProxyCIDRs[:0], *file.TrustedProxyCIDRs...)
 	}
 	if file.PublicURL != nil {
 		c.PublicURL = *file.PublicURL

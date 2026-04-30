@@ -93,6 +93,11 @@ variables, CLI flags. Later sources override earlier ones.
 **--db-retention-days** *N*
 : Delete completed jobs older than N days on an hourly schedule. 0 (default) disables automatic purging.
 
+### Reverse proxy
+
+**--trusted-proxy-cidrs** *LIST*
+: Comma-separated CIDRs (or bare IPs) of reverse proxies allowed to set **X-Forwarded-For**. Default empty: trust nothing, attribute every request to its **RemoteAddr**. Without this, a direct-exposed server (or one behind a proxy that does not strip incoming XFF) is vulnerable to XFF spoofing — an attacker rotates the header to bypass per-IP rate limits or pin them on a victim. Set to the CIDR of your reverse proxy when one is in front. Example: `--trusted-proxy-cidrs 127.0.0.1/32,10.0.0.0/8`.
+
 ### Public API
 
 **--public-api-rate-limit-enabled**
@@ -153,6 +158,9 @@ variables, CLI flags. Later sources override earlier ones.
 **GONEMASTER_PUBLIC_API_ALLOW_PRIVATE_UNDELEGATED_IP**
 : Equivalent to **--public-api-allow-private-undelegated-ip**.
 
+**GONEMASTER_TRUSTED_PROXY_CIDRS**
+: Equivalent to **--trusted-proxy-cidrs**.
+
 ## CONFIG FILE
 
 The **--config** file is JSON with optional fields:
@@ -174,7 +182,8 @@ The **--config** file is JSON with optional fields:
         "rate_limit_max": 10,
         "rate_limit_window": "10m",
         "allow_private_undelegated_ip": false
-      }
+      },
+      "trusted_proxy_cidrs": ["127.0.0.1/32"]
     }
 
 ## EXAMPLES

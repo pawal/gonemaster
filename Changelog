@@ -2,6 +2,17 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [Unreleased]
+
+### Security
+ - server: refuse undelegated nameserver IPs in loopback / link-local / private / CGNAT / multicast / broadcast ranges on the public API (override with `--public-api-allow-private-undelegated-ip` for private/internal deployments)
+ - server: enforce CSRF Origin check on `POST /pub/api/v1/jobs`
+ - server: cache `GET /pub/api/v1/jobs/{id}/result` for 5 min so a CDN/reverse proxy absorbs repeat reads
+
+### Changed
+ - server: `X-Forwarded-For` is no longer trusted by default. Set `--trusted-proxy-cidrs` (or `trusted_proxy_cidrs` in the config file) to the CIDR of your reverse proxy. Without it, requests are attributed to `RemoteAddr`. **Breaking** for deployments behind a reverse proxy that previously relied on automatic XFF parsing.
+ - server: `X-Real-IP` is no longer honoured. Use `X-Forwarded-For` (which Caddy and the documented nginx example already set).
+
 ## [v1.4.2] - 2026-04-29
 
 ### Added

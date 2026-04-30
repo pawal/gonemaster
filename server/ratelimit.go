@@ -2,8 +2,10 @@ package server
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"net/http"
+	"net/netip"
 	"strings"
 	"sync"
 	"time"
@@ -83,36 +85,84 @@ func (rl *RateLimiter) Cleanup() {
 	}
 }
 
-// clientIP extracts the client IP from r, preferring X-Forwarded-For (first
-// value), then X-Real-IP, then RemoteAddr.
-func clientIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		if idx := strings.IndexByte(xff, ','); idx >= 0 {
-			xff = xff[:idx]
+// parseTrustedProxies parses operator-supplied CIDRs / bare IPs into prefixes.
+// Invalid entries are logged and skipped so a typo in one entry does not
+// disable trust for the rest.
+func parseTrustedProxies(cidrs []string) []netip.Prefix {
+	var out []netip.Prefix
+	for _, s := range cidrs {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
 		}
-		if ip := strings.TrimSpace(xff); ip != "" {
-			return ip
+		if p, err := netip.ParsePrefix(s); err == nil {
+			out = append(out, p)
+			continue
+		}
+		if a, err := netip.ParseAddr(s); err == nil {
+			out = append(out, netip.PrefixFrom(a, a.BitLen()))
+			continue
+		}
+		log.Printf("server: ignoring invalid trusted_proxy_cidrs entry %q", s)
+	}
+	return out
+}
+
+func ipInPrefixes(addr netip.Addr, prefixes []netip.Prefix) bool {
+	addr = addr.Unmap()
+	for _, p := range prefixes {
+		if p.Contains(addr) {
+			return true
 		}
 	}
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		if ip := strings.TrimSpace(xri); ip != "" {
-			return ip
-		}
-	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	return false
+}
+
+// clientIP returns the IP to attribute the request to. RemoteAddr is the
+// authority unless it falls inside trusted (a configured reverse-proxy CIDR),
+// in which case X-Forwarded-For is walked right-to-left and the first
+// untrusted hop is returned. With no trusted proxies configured, XFF is
+// ignored entirely so it cannot be spoofed.
+func clientIP(r *http.Request, trusted []netip.Prefix) string {
+	remoteHost, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
-		return r.RemoteAddr
+		remoteHost = r.RemoteAddr
 	}
-	return host
+	remote, err := netip.ParseAddr(remoteHost)
+	if err != nil {
+		return remoteHost
+	}
+	if !ipInPrefixes(remote, trusted) {
+		return remote.Unmap().String()
+	}
+	xff := r.Header.Get("X-Forwarded-For")
+	if xff == "" {
+		return remote.Unmap().String()
+	}
+	parts := strings.Split(xff, ",")
+	for i := len(parts) - 1; i >= 0; i-- {
+		hop := strings.TrimSpace(parts[i])
+		if hop == "" {
+			continue
+		}
+		a, err := netip.ParseAddr(hop)
+		if err != nil {
+			return hop
+		}
+		if !ipInPrefixes(a, trusted) {
+			return a.Unmap().String()
+		}
+	}
+	return remote.Unmap().String()
 }
 
 // rateLimitMiddleware wraps next and applies rl to POST requests only.
 // Non-POST requests pass through unconditionally.
 // Blocked requests receive 429 with a Retry-After header.
-func rateLimitMiddleware(rl *RateLimiter, next http.Handler) http.Handler {
+func rateLimitMiddleware(rl *RateLimiter, trusted []netip.Prefix, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
-			ip := clientIP(r)
+			ip := clientIP(r, trusted)
 			if ok, retryAfter := rl.Allow(ip); !ok {
 				w.Header().Set("Retry-After", fmt.Sprintf("%d", retryAfter))
 				http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)

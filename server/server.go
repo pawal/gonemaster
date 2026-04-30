@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/netip"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -36,6 +37,7 @@ type Server struct {
 	cancelMu                 sync.Mutex
 	cancels                  map[string]context.CancelFunc
 	rateLimiter              *RateLimiter
+	trustedProxies           []netip.Prefix
 	hotCache                 *nameserverHotCache
 	delegationLookup         func(context.Context, string) DelegationInfo
 	configSources            map[string]SettingSource
@@ -156,6 +158,7 @@ func newServer(cfg Config, store JobStore, queue Queue) *Server {
 	if cfg.PublicAPI.RateLimitEnabled {
 		s.rateLimiter = NewRateLimiter(cfg.PublicAPI.RateLimitMax, cfg.PublicAPI.RateLimitWindow.Duration)
 	}
+	s.trustedProxies = parseTrustedProxies(cfg.TrustedProxyCIDRs)
 	if cfg.CrossJobHotCache {
 		s.hotCache = newNameserverHotCache(0, cfg.EffectiveCrossJobHotCacheTTL())
 	}
@@ -324,7 +327,7 @@ func (s *Server) routes() {
 		pubHandler = analysisTimeoutMiddleware(d, pubHandler)
 	}
 	if s.rateLimiter != nil {
-		pubHandler = rateLimitMiddleware(s.rateLimiter, pubHandler)
+		pubHandler = rateLimitMiddleware(s.rateLimiter, s.trustedProxies, pubHandler)
 	}
 	s.mux.Handle("/pub/api/v1/", pubHandler)
 

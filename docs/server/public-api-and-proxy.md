@@ -44,8 +44,10 @@ arbitrary resolver profile changes.
 
 ## Rate Limiting
 
-Public job submission can be rate limited per client IP. Enable it before
-exposing public job creation to the internet.
+> **Required for internet-facing deployments.** Rate limiting is **off by
+> default**. Without it, anyone can submit unlimited DNS test jobs from a
+> single IP, fill the queue, and starve legitimate users. Turn it on before
+> exposing `POST /pub/api/v1/jobs` to the public internet.
 
 ```sh
 gonemaster-server \
@@ -54,13 +56,61 @@ gonemaster-server \
   --public-api-rate-limit-window 10m
 ```
 
+Equivalent JSON config:
+
+```json
+"public_api": {
+  "rate_limit_enabled": true,
+  "rate_limit_max": 10,
+  "rate_limit_window": "10m"
+}
+```
+
+The limiter applies to `POST` requests on `/pub/api/v1/`. Read endpoints are
+not throttled — see [Caching](#caching) below for the right tool there.
+
 Client IP is resolved from:
 
 1. `X-Forwarded-For`, first value
 2. `X-Real-IP`
 3. `RemoteAddr`
 
+> **Trust your proxy.** The first `X-Forwarded-For` value is trusted
+> unconditionally. If the server is exposed directly (no reverse proxy) or the
+> proxy does not strip incoming `X-Forwarded-For`, an attacker can rotate the
+> header to bypass the per-IP budget. Always front the server with a proxy
+> that overwrites these headers.
+
 Blocked requests return `429 Too Many Requests` with `Retry-After`.
+
+## Undelegated Nameserver IPs
+
+`POST /pub/api/v1/jobs` accepts `nameservers[].ip` for undelegated test mode.
+By default the public API refuses IPs in loopback / link-local / private /
+CGNAT / multicast / broadcast ranges. This stops a public deployment from
+being used as an internal-network probe via the engine's outbound DNS.
+
+For private/internal deployments that legitimately need to test such
+targets, opt out:
+
+```sh
+gonemaster-server --public-api-allow-private-undelegated-ip
+```
+
+or set `public_api.allow_private_undelegated_ip: true` in the config file.
+The toggle is also exposed live on the admin Settings page.
+
+## Caching
+
+Result reads are idempotent and the public ID is unguessable, so a CDN or
+reverse-proxy cache absorbs repeat reads better than rate limiting does.
+
+The application sets `Cache-Control: public, max-age=300` on
+`GET /pub/api/v1/jobs/{public_id}/result` (200 responses only). Public
+analysis snapshot endpoints already advertise `public, max-age=86400, immutable`
+when the snapshot slug is explicit in the path. Configure your reverse proxy
+or CDN to honour these headers — e.g. enable `proxy_cache` in nginx or
+caching at Caddy / Cloudflare / Fastly.
 
 ## Reverse Proxy
 

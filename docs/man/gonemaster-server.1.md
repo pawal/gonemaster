@@ -96,7 +96,7 @@ variables, CLI flags. Later sources override earlier ones.
 ### Public API
 
 **--public-api-rate-limit-enabled**
-: Enable per-IP rate limiting on POST /pub/api/v1/jobs (default: disabled).
+: Enable per-IP rate limiting on POST /pub/api/v1/jobs (default: disabled). **Required for internet-facing deployments**: without it, anyone can fill the job queue from a single IP and starve legitimate users.
 
 **--public-api-rate-limit-max** *N*
 : Maximum job submissions per IP per window (default: 10).

@@ -332,6 +332,39 @@ func TestPublicGetResultUnknownPublicIDReturns404(t *testing.T) {
 	if resp.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", resp.Code)
 	}
+	if cc := resp.Header().Get("Cache-Control"); cc != "" {
+		t.Fatalf("Cache-Control should not be set on 404, got %q", cc)
+	}
+}
+
+func TestPublicGetResultSetsCacheControlOnSuccess(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	job := Job{
+		ID:        newID("job"),
+		Domain:    "example.com",
+		Status:    JobSucceeded,
+		CreatedAt: time.Now().UTC(),
+		Progress:  100,
+	}
+	created, err := srv.store.Create(job)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if err := srv.store.GraduateJob(created, nil); err != nil {
+		t.Fatalf("GraduateJob: %v", err)
+	}
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/jobs/"+created.PublicID+"/result", nil)
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
+	}
+	if got := resp.Header().Get("Cache-Control"); got != "public, max-age=300" {
+		t.Fatalf("Cache-Control: got %q, want %q", got, "public, max-age=300")
+	}
 }
 
 func TestPublicLocalesEndpointAccessible(t *testing.T) {

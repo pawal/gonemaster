@@ -204,5 +204,7 @@ func (s *Server) handlePublicGetResult(w http.ResponseWriter, r *http.Request) {
 	if !s.cfg.ShowNameserverTimingsPublic {
 		result.NameserverTimings = nil
 	}
+	// Let a CDN absorb repeat reads; short window so show_* flips propagate.
+	w.Header().Set("Cache-Control", "public, max-age=300")
 	writeJSON(w, http.StatusOK, result)
 }

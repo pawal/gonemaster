@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -180,6 +181,84 @@ func TestPublicCreateJobCSRFAcceptsSameOrigin(t *testing.T) {
 
 	if resp.Code != http.StatusCreated {
 		t.Fatalf("expected 201, got %d: %s", resp.Code, resp.Body.String())
+	}
+}
+
+func TestPublicCreateJobRejectsOversizedNameservers(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	var nss []string
+	for i := 0; i <= MaxUndelegatedNameservers; i++ {
+		nss = append(nss, fmt.Sprintf(`{"ns":"ns%d.example.","ip":"198.51.100.%d"}`, i, i+1))
+	}
+	body := fmt.Sprintf(`{"domain":"example.com","nameservers":[%s]}`, strings.Join(nss, ","))
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", resp.Code, resp.Body.String())
+	}
+	var out ErrorResponse
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out.Error.Code != "invalid_undelegated" {
+		t.Fatalf("expected invalid_undelegated, got %q (msg=%q)", out.Error.Code, out.Error.Message)
+	}
+}
+
+func TestPublicCreateJobRejectsOversizedDSInfo(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	var ds []string
+	for i := 0; i <= MaxUndelegatedDSRecords; i++ {
+		ds = append(ds, `{"keytag":1,"algorithm":8,"digtype":2,"digest":"`+strings.Repeat("a", 64)+`"}`)
+	}
+	body := fmt.Sprintf(`{"domain":"example.com","ds_info":[%s]}`, strings.Join(ds, ","))
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", resp.Code, resp.Body.String())
+	}
+	var out ErrorResponse
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out.Error.Code != "invalid_undelegated" {
+		t.Fatalf("expected invalid_undelegated, got %q", out.Error.Code)
+	}
+}
+
+func TestPublicCreateJobRejectsOversizedTestsList(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	var tests []string
+	for i := 0; i <= MaxPublicTests; i++ {
+		tests = append(tests, `"x"`)
+	}
+	body := fmt.Sprintf(`{"domain":"example.com","tests":[%s]}`, strings.Join(tests, ","))
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", resp.Code, resp.Body.String())
+	}
+	var out ErrorResponse
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out.Error.Code != "too_many_tests" {
+		t.Fatalf("expected too_many_tests, got %q", out.Error.Code)
 	}
 }
 

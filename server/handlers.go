@@ -483,7 +483,21 @@ func validateTags(w http.ResponseWriter, s *Server, tags []string) ([]string, bo
 	return names, true
 }
 
+// MaxUndelegatedNameservers / MaxUndelegatedDSRecords cap the number of
+// items accepted in a single create request. The body-size limit alone lets
+// thousands of small objects slip through and tie up validation.
+const (
+	MaxUndelegatedNameservers = 32
+	MaxUndelegatedDSRecords   = 32
+)
+
 func normalizeUndelegatedInputs(nameservers []UndelegatedNameserverInput, dsInfo []UndelegatedDSInput) ([]engine.UndelegatedNameserver, []engine.UndelegatedDSInfo, error) {
+	if len(nameservers) > MaxUndelegatedNameservers {
+		return nil, nil, fmt.Errorf("too many undelegated nameservers: %d (max %d)", len(nameservers), MaxUndelegatedNameservers)
+	}
+	if len(dsInfo) > MaxUndelegatedDSRecords {
+		return nil, nil, fmt.Errorf("too many undelegated ds records: %d (max %d)", len(dsInfo), MaxUndelegatedDSRecords)
+	}
 	normalizedNS := make([]engine.UndelegatedNameserver, 0, len(nameservers))
 	for i, item := range nameservers {
 		name := strings.TrimSpace(item.NS)

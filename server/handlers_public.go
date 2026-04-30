@@ -10,6 +10,11 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/normalization"
 )
 
+// MaxPublicTests caps how many testcase IDs a single public create request
+// may filter on. The engine itself has fewer than 100 testcases; 256 is
+// generous, anything more is a payload-DoS attempt.
+const MaxPublicTests = 256
+
 // PublicJobView is the restricted job representation returned by the public API.
 // The internal UUID (ID) is intentionally omitted.
 type PublicJobView struct {
@@ -101,6 +106,11 @@ func (s *Server) handlePublicCreateJob(w http.ResponseWriter, r *http.Request) {
 	}
 	if strings.TrimSpace(req.Domain) == "" {
 		writeError(w, http.StatusBadRequest, "missing_domain", "domain is required", nil)
+		return
+	}
+	if len(req.Tests) > MaxPublicTests {
+		writeError(w, http.StatusBadRequest, "too_many_tests",
+			fmt.Sprintf("tests list too long: %d (max %d)", len(req.Tests), MaxPublicTests), nil)
 		return
 	}
 	domain := strings.TrimSpace(req.Domain)

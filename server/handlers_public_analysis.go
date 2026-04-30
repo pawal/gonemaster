@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"log"
 	"net/http"
 	"time"
 )
@@ -78,7 +79,8 @@ func (s *Server) publicAnalysisCohortView(cohort AnalysisCohort) PublicAnalysisC
 func (s *Server) handlePublicAnalysisCatalog(w http.ResponseWriter, r *http.Request) {
 	selectable, err := SelectableAnalysisCohorts(s.store.ListAnalysisCohorts())
 	if err != nil && !errors.Is(err, ErrNoSelectableAnalysisCohorts) {
-		writeError(w, http.StatusInternalServerError, "invalid_catalog", err.Error(), nil)
+		log.Printf("public analysis catalog: %v", err)
+		writeError(w, http.StatusInternalServerError, "invalid_catalog", "analysis catalog unavailable", nil)
 		return
 	}
 	views := make([]PublicAnalysisCohortView, 0, len(selectable))
@@ -102,7 +104,8 @@ func (s *Server) handlePublicAnalysisCatalog(w http.ResponseWriter, r *http.Requ
 func (s *Server) handlePublicAnalysisCohorts(w http.ResponseWriter, r *http.Request) {
 	selectable, err := SelectableAnalysisCohorts(s.store.ListAnalysisCohorts())
 	if err != nil && !errors.Is(err, ErrNoSelectableAnalysisCohorts) {
-		writeError(w, http.StatusInternalServerError, "invalid_catalog", err.Error(), nil)
+		log.Printf("public analysis cohorts: %v", err)
+		writeError(w, http.StatusInternalServerError, "invalid_catalog", "analysis catalog unavailable", nil)
 		return
 	}
 	views := make([]PublicAnalysisCohortView, 0, len(selectable))
@@ -166,8 +169,10 @@ func writePublicAnalysisResolutionError(w http.ResponseWriter, err error) {
 	case errors.Is(err, ErrAnalysisCohortNotFound):
 		writeError(w, http.StatusNotFound, "cohort_not_found", "requested dataset_tag is not a public analysis cohort", nil)
 	case errors.Is(err, ErrInvalidAnalysisCohortCatalog):
-		writeError(w, http.StatusInternalServerError, "invalid_catalog", err.Error(), nil)
+		log.Printf("public analysis: invalid catalog: %v", err)
+		writeError(w, http.StatusInternalServerError, "invalid_catalog", "analysis catalog unavailable", nil)
 	default:
-		writeError(w, http.StatusInternalServerError, "catalog_error", err.Error(), nil)
+		log.Printf("public analysis: catalog error: %v", err)
+		writeError(w, http.StatusInternalServerError, "catalog_error", "analysis request failed", nil)
 	}
 }

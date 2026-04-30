@@ -262,6 +262,48 @@ func TestPublicCreateJobRejectsOversizedTestsList(t *testing.T) {
 	}
 }
 
+// createErrStore wraps InMemoryJobStore but forces Create to return a
+// canned error so we can probe the store_error path.
+type createErrStore struct {
+	*InMemoryJobStore
+	err error
+}
+
+func (s *createErrStore) Create(_ Job) (Job, error) { return Job{}, s.err }
+
+func TestPublicCreateJobStoreErrorDoesNotLeakDBDetails(t *testing.T) {
+	srv := New(DefaultConfig())
+	canary := "ERROR: duplicate key value violates unique constraint \"jobs_pkey\""
+	srv.store = &createErrStore{
+		InMemoryJobStore: srv.store.(*InMemoryJobStore),
+		err:              fmt.Errorf("%s", canary),
+	}
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
+		bytes.NewBufferString(`{"domain":"example.com"}`))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d: %s", resp.Code, resp.Body.String())
+	}
+	body := resp.Body.String()
+	if strings.Contains(body, canary) || strings.Contains(body, "jobs_pkey") {
+		t.Fatalf("response leaked raw store error: %s", body)
+	}
+	var out ErrorResponse
+	if err := json.NewDecoder(strings.NewReader(body)).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out.Error.Code != "store_error" {
+		t.Fatalf("expected code store_error, got %q", out.Error.Code)
+	}
+	if out.Error.Message == "" || strings.Contains(out.Error.Message, "duplicate") {
+		t.Fatalf("expected sanitized message, got %q", out.Error.Message)
+	}
+}
+
 func TestPublicCreateJobCSRFAllowsMissingOrigin(t *testing.T) {
 	// Non-browser clients (e.g. gonemaster-client) omit Origin; the helper
 	// short-circuits in that case so CLI usage keeps working.

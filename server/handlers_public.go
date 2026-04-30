@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -161,7 +162,8 @@ func (s *Server) handlePublicCreateJob(w http.ResponseWriter, r *http.Request) {
 	}
 	created, err := s.store.Create(job)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
+		log.Printf("public create job: store error: %v", err)
+		writeError(w, http.StatusInternalServerError, "store_error", "job submission failed", nil)
 		return
 	}
 	_ = s.queue.Enqueue(created.ID, PriorityNormal)

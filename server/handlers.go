@@ -707,10 +707,7 @@ func (s *Server) handleGetJobResult(w http.ResponseWriter, r *http.Request, jobI
 		return
 	}
 	if result.Raw != nil && len(result.Raw.Entries) > 0 {
-		locale := strings.TrimSpace(r.URL.Query().Get("locale"))
-		if locale == "" {
-			locale = "en"
-		}
+		locale := resolveResultLocale(r.URL.Query().Get("locale"))
 		s.metrics.ObserveResultLocale(locale)
 		raw := *result.Raw
 		raw.Locale = locale

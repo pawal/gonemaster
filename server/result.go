@@ -2,11 +2,36 @@ package server
 
 import (
 	"strings"
+	"sync"
 
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/i18n"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 )
+
+var (
+	knownLocalesOnce sync.Once
+	knownLocales     map[string]struct{}
+)
+
+// resolveResultLocale returns requested if it is a known engine locale, else "en".
+func resolveResultLocale(requested string) string {
+	knownLocalesOnce.Do(func() {
+		codes := i18n.AvailableLocales()
+		knownLocales = make(map[string]struct{}, len(codes))
+		for _, c := range codes {
+			knownLocales[strings.ToLower(c)] = struct{}{}
+		}
+	})
+	key := strings.ToLower(strings.TrimSpace(requested))
+	if key == "" {
+		return "en"
+	}
+	if _, ok := knownLocales[key]; ok {
+		return key
+	}
+	return "en"
+}
 
 func buildResultEntries(entries []engine.LogEntry) []JobResultEntry {
 	if len(entries) == 0 {

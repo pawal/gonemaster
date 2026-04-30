@@ -514,6 +514,63 @@ func TestPublicGetResultRespectsLocaleParam(t *testing.T) {
 	}
 }
 
+func TestPublicGetResultUnknownLocaleForcedToEnglish(t *testing.T) {
+	// Unknown / malicious locale must be silently forced to "en" so the
+	// metrics layer never sees an attacker-controlled bucket key and the
+	// response never echoes the unknown value as result.locale.
+	srv := New(DefaultConfig())
+
+	job := Job{
+		ID:        newID("job"),
+		Domain:    "example.com",
+		Status:    JobSucceeded,
+		CreatedAt: time.Now().UTC(),
+		Progress:  100,
+	}
+	created, _ := srv.store.Create(job)
+	if err := srv.store.GraduateJob(created, []engine.LogEntry{
+		{Module: "BASIC", Testcase: "basic01", Tag: "BASIC01", Level: "NOTICE"},
+	}); err != nil {
+		t.Fatalf("GraduateJob: %v", err)
+	}
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet,
+		"/pub/api/v1/jobs/"+created.PublicID+"/result?locale=../../etc/passwd", nil)
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
+	}
+	var result JobResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if result.Raw == nil || result.Raw.Locale != "en" {
+		t.Fatalf("expected forced locale=en, got %v", result.Raw)
+	}
+}
+
+func TestResolveResultLocale(t *testing.T) {
+	cases := []struct {
+		in, want string
+	}{
+		{"", "en"},
+		{"  ", "en"},
+		{"en", "en"},
+		{"sv", "sv"},
+		{"SV", "sv"},
+		{"  sv  ", "sv"},
+		{"../../etc/passwd", "en"},
+		{"zh-CN", "en"}, // not in the catalog list
+	}
+	for _, tc := range cases {
+		if got := resolveResultLocale(tc.in); got != tc.want {
+			t.Fatalf("resolveResultLocale(%q): got %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
 func TestPublicAPIJobCreatedViaInternalAPIFetchableByPublicID(t *testing.T) {
 	srv := New(DefaultConfig())
 

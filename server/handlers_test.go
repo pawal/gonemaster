@@ -1244,7 +1244,7 @@ func TestMetricsTracksQualityAcrossMixedOutcomesAndLocaleRequests(t *testing.T) 
 	}
 
 	resp = httptest.NewRecorder()
-	resultReq := httptest.NewRequest(http.MethodGet, "/api/v1/jobs/"+jobSuccess.ID+"/result?locale=pt-BR", nil)
+	resultReq := httptest.NewRequest(http.MethodGet, "/api/v1/jobs/"+jobSuccess.ID+"/result?locale=sv", nil)
 	srv.Handler().ServeHTTP(resp, resultReq)
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.Code)
@@ -1260,8 +1260,8 @@ func TestMetricsTracksQualityAcrossMixedOutcomesAndLocaleRequests(t *testing.T) 
 	if snapshot.Quality.Severity.Totals["NOTICE"] != 1 || snapshot.Quality.Severity.Totals["WARNING"] != 1 || snapshot.Quality.Severity.Totals["ERROR"] != 1 || snapshot.Quality.Severity.Totals["CRITICAL"] != 1 {
 		t.Fatalf("unexpected severity totals: %+v", snapshot.Quality.Severity.Totals)
 	}
-	if snapshot.Quality.LocaleUsage.Counts["pt_br"] != 1 {
-		t.Fatalf("quality.locale_usage.counts[pt_br] = %d, want 1", snapshot.Quality.LocaleUsage.Counts["pt_br"])
+	if snapshot.Quality.LocaleUsage.Counts["sv"] != 1 {
+		t.Fatalf("quality.locale_usage.counts[sv] = %d, want 1", snapshot.Quality.LocaleUsage.Counts["sv"])
 	}
 	if len(snapshot.Insights.Domains.Items) == 0 {
 		t.Fatal("expected non-empty domain insights")

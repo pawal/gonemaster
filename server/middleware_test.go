@@ -1,6 +1,12 @@
 package server
 
-import "testing"
+import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+)
 
 func TestAPIRouteTemplate(t *testing.T) {
 	tests := []struct {
@@ -32,4 +38,71 @@ func TestAPIRouteTemplate(t *testing.T) {
 			t.Fatalf("apiRouteTemplate(%q) = %q, want %q", tc.path, got, tc.want)
 		}
 	}
+}
+
+func TestRecoverMiddlewareReturnsCleanError(t *testing.T) {
+	srv := New(DefaultConfig())
+	canary := "secret-stack-frame-marker-XYZ123"
+	panicker := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		panic(canary)
+	})
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/whatever", nil)
+	srv.recoverMiddleware(panicker).ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", resp.Code)
+	}
+	body := resp.Body.String()
+	if strings.Contains(body, canary) {
+		t.Fatalf("response leaked panic value: %s", body)
+	}
+	var out ErrorResponse
+	if err := json.NewDecoder(strings.NewReader(body)).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out.Error.Code != "internal_error" {
+		t.Fatalf("expected internal_error, got %q", out.Error.Code)
+	}
+	if got := srv.metrics.Snapshot().API.PanicsTotal; got != 1 {
+		t.Fatalf("panics_total = %d, want 1", got)
+	}
+}
+
+func TestRecoverMiddlewarePassesThroughNormalRequests(t *testing.T) {
+	srv := New(DefaultConfig())
+	ok := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusTeapot)
+	})
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/whatever", nil)
+	srv.recoverMiddleware(ok).ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusTeapot {
+		t.Fatalf("expected 418, got %d", resp.Code)
+	}
+	if got := srv.metrics.Snapshot().API.PanicsTotal; got != 0 {
+		t.Fatalf("panics_total = %d, want 0 for non-panicking handler", got)
+	}
+}
+
+func TestRecoverMiddlewareDoesNotSwallowErrAbortHandler(t *testing.T) {
+	srv := New(DefaultConfig())
+	panicker := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		panic(http.ErrAbortHandler)
+	})
+
+	defer func() {
+		rec := recover()
+		if rec != http.ErrAbortHandler {
+			t.Fatalf("expected ErrAbortHandler to propagate, got %v", rec)
+		}
+	}()
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/whatever", nil)
+	srv.recoverMiddleware(panicker).ServeHTTP(resp, req)
+	t.Fatal("expected panic to propagate")
 }

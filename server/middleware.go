@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"runtime/debug"
 	"strings"
 	"time"
 )
@@ -163,6 +164,27 @@ func (r *apiMetricsResponseRecorder) ReadFrom(reader io.Reader) (int64, error) {
 		return rf.ReadFrom(reader)
 	}
 	return io.Copy(r.ResponseWriter, reader)
+}
+
+// recoverMiddleware turns panics into a clean 500 + structured log line.
+// Without it, Go's stdlib closes the connection mid-response and dumps an
+// unstructured stack trace to stderr.
+func (s *Server) recoverMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			rec := recover()
+			if rec == nil {
+				return
+			}
+			if rec == http.ErrAbortHandler {
+				panic(rec)
+			}
+			s.metrics.ObservePanic()
+			log.Printf("panic: method=%s path=%s value=%v\n%s", r.Method, r.URL.Path, rec, debug.Stack())
+			writeError(w, http.StatusInternalServerError, "internal_error", "request processing failed", nil)
+		}()
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) apiMetricsMiddleware(next http.Handler) http.Handler {

@@ -129,6 +129,7 @@ type MetricsAPISnapshot struct {
 	RequestsTotal     int64                    `json:"requests_total"`
 	StatusClassCounts map[string]int64         `json:"status_class_counts"`
 	ErrorCodeCounts   map[string]int64         `json:"error_code_counts"`
+	PanicsTotal       int64                    `json:"panics_total"`
 	Routes            []MetricsAPIRouteMetrics `json:"routes"`
 }
 
@@ -229,6 +230,7 @@ type MetricsCollector struct {
 	apiRequestsTotal     int64
 	apiStatusClassCounts map[string]int64
 	apiErrorCodeCounts   map[string]int64
+	apiPanicsTotal       int64
 	apiRoutes            map[string]*apiRouteMetrics
 
 	jobDuration        boundedHistogram
@@ -443,6 +445,13 @@ func (m *MetricsCollector) ObserveAPIRequest(route string, method string, status
 	m.mu.Unlock()
 }
 
+// ObservePanic records that a handler panicked and was recovered.
+func (m *MetricsCollector) ObservePanic() {
+	m.mu.Lock()
+	m.apiPanicsTotal++
+	m.mu.Unlock()
+}
+
 // ObserveJobCompletion records completion data for a terminal job.
 func (m *MetricsCollector) ObserveJobCompletion(status JobStatus, duration time.Duration, severityTotals map[string]int64) {
 	m.ObserveJobCompletionWithContext("", "", status, duration, severityTotals)
@@ -576,6 +585,7 @@ func (m *MetricsCollector) snapshotAtWithLimits(now time.Time, domainLimit int, 
 	apiRequestsTotal := m.apiRequestsTotal
 	apiStatusClassCounts := copyStatusClassCounts(m.apiStatusClassCounts)
 	apiErrorCodeCounts := copyStringCounts(m.apiErrorCodeCounts)
+	apiPanicsTotal := m.apiPanicsTotal
 	apiRoutes := m.copyAPIRouteMetricsLocked()
 	jobDurationCount := m.jobDurationCount
 	jobDurationTotalMs := m.jobDurationTotalMs
@@ -634,6 +644,7 @@ func (m *MetricsCollector) snapshotAtWithLimits(now time.Time, domainLimit int, 
 			RequestsTotal:     apiRequestsTotal,
 			StatusClassCounts: apiStatusClassCounts,
 			ErrorCodeCounts:   apiErrorCodeCounts,
+			PanicsTotal:       apiPanicsTotal,
 			Routes:            apiRoutes,
 		},
 		Quality: MetricsQualitySnapshot{

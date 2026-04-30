@@ -264,10 +264,10 @@ func (s *Server) routes() {
 	apiMux.HandleFunc("/metrics", s.handleMetrics)
 	apiMux.HandleFunc("/healthz", s.handleHealth)
 
-	s.mux.Handle("/api/v1/", s.apiMetricsMiddleware(http.StripPrefix("/api/v1", apiMux)))
-	s.mux.Handle("/api/v1", s.apiMetricsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	s.mux.Handle("/api/v1/", s.recoverMiddleware(s.apiMetricsMiddleware(http.StripPrefix("/api/v1", apiMux))))
+	s.mux.Handle("/api/v1", s.recoverMiddleware(s.apiMetricsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/api/v1/", http.StatusMovedPermanently)
-	})))
+	}))))
 
 	pubMux := http.NewServeMux()
 	pubMux.HandleFunc("POST /jobs", s.handlePublicCreateJob)
@@ -329,6 +329,7 @@ func (s *Server) routes() {
 	if s.rateLimiter != nil {
 		pubHandler = rateLimitMiddleware(s.rateLimiter, s.trustedProxies, pubHandler)
 	}
+	pubHandler = s.recoverMiddleware(pubHandler)
 	s.mux.Handle("/pub/api/v1/", pubHandler)
 
 	s.mux.HandleFunc("GET /robots.txt", s.handleRobotsTxt)

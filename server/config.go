@@ -53,6 +53,10 @@ type PublicAPIConfig struct {
 	// AnalysisRequestTimeout caps the wall time of a public analysis
 	// request. Zero disables. Default: 10s.
 	AnalysisRequestTimeout Duration `json:"analysis_request_timeout,omitempty"`
+	// AllowPrivateUndelegatedIP allows undelegated NS IPs in loopback /
+	// link-local / private / CGNAT / multicast / broadcast ranges. Default
+	// false; set true on private/internal deployments that need it.
+	AllowPrivateUndelegatedIP bool `json:"allow_private_undelegated_ip,omitempty"`
 }
 
 // Duration is a time.Duration that marshals/unmarshals as a string (e.g. "5m").
@@ -142,10 +146,11 @@ type Config struct {
 
 // PublicAPIFileConfig holds optional public API configuration from JSON.
 type PublicAPIFileConfig struct {
-	RateLimitEnabled       *bool   `json:"rate_limit_enabled,omitempty"`
-	RateLimitMax           *int    `json:"rate_limit_max,omitempty"`
-	RateLimitWindow        *string `json:"rate_limit_window,omitempty"`
-	AnalysisRequestTimeout *string `json:"analysis_request_timeout,omitempty"`
+	RateLimitEnabled          *bool   `json:"rate_limit_enabled,omitempty"`
+	RateLimitMax              *int    `json:"rate_limit_max,omitempty"`
+	RateLimitWindow           *string `json:"rate_limit_window,omitempty"`
+	AnalysisRequestTimeout    *string `json:"analysis_request_timeout,omitempty"`
+	AllowPrivateUndelegatedIP *bool   `json:"allow_private_undelegated_ip,omitempty"`
 }
 
 // DatabaseFileConfig holds optional database configuration from JSON.
@@ -352,6 +357,9 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 			if err == nil {
 				c.PublicAPI.AnalysisRequestTimeout = Duration{d}
 			}
+		}
+		if file.PublicAPI.AllowPrivateUndelegatedIP != nil {
+			c.PublicAPI.AllowPrivateUndelegatedIP = *file.PublicAPI.AllowPrivateUndelegatedIP
 		}
 	}
 	if file.Analysis != nil {

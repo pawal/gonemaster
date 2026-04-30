@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -110,6 +111,15 @@ func (s *Server) handlePublicCreateJob(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_undelegated", err.Error(), nil)
 		return
+	}
+	if !s.cfg.PublicAPI.AllowPrivateUndelegatedIP {
+		for i, ns := range undelegatedNS {
+			if blocked, reason := isBlockedPublicNameserverIP(ns.IP); blocked {
+				writeError(w, http.StatusBadRequest, "private_undelegated_ip",
+					fmt.Sprintf("undelegated nameserver[%d]: %s IP %q is not allowed on the public API", i, reason, ns.IP), nil)
+				return
+			}
+		}
 	}
 	if len(req.ProfileOverrides) > 0 {
 		writeError(w, http.StatusBadRequest, "profile_overrides_not_allowed", "public API requests must use profile_id instead of profile_overrides", nil)

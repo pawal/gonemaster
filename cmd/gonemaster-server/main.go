@@ -55,6 +55,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	var pubAPIRateLimitEnabled bool
 	var pubAPIRateLimitMax int
 	var pubAPIRateLimitWindow time.Duration
+	var pubAPIAllowPrivateUndelegatedIP bool
 	var crossJobHotCache bool
 	var noCrossJobHotCache bool
 	var crossJobHotCacheTTL int
@@ -106,6 +107,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 			{flag: "--public-api-rate-limit-enabled", detail: "Enable per-IP rate limiting on POST /pub/api/v1/jobs (env: GONEMASTER_PUBLIC_API_RATE_LIMIT_ENABLED)"},
 			{flag: "--public-api-rate-limit-max N", detail: "Max job submissions per IP per window (default 10) (env: GONEMASTER_PUBLIC_API_RATE_LIMIT_MAX)"},
 			{flag: "--public-api-rate-limit-window DURATION", detail: "Rate limit sliding window e.g. 5m (default 10m) (env: GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW)"},
+			{flag: "--public-api-allow-private-undelegated-ip", detail: "Allow private/loopback IPs as undelegated NS targets on the public API (default off; enable for internal deployments) (env: GONEMASTER_PUBLIC_API_ALLOW_PRIVATE_UNDELEGATED_IP)"},
 		})
 		printUsageGroup(errOut, "Output", []usageLine{
 			{flag: "--min-level LEVEL", detail: "Minimum result log level (default INFO)"},
@@ -134,6 +136,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	fs.BoolVar(&pubAPIRateLimitEnabled, "public-api-rate-limit-enabled", false, "Enable per-IP rate limiting on POST /pub/api/v1/jobs")
 	fs.IntVar(&pubAPIRateLimitMax, "public-api-rate-limit-max", 0, "Max job submissions per IP per window (default 10)")
 	fs.DurationVar(&pubAPIRateLimitWindow, "public-api-rate-limit-window", 0, "Rate limit sliding window e.g. 5m (default 10m)")
+	fs.BoolVar(&pubAPIAllowPrivateUndelegatedIP, "public-api-allow-private-undelegated-ip", false, "Allow private/loopback IPs as undelegated NS targets on the public API (default off)")
 	fs.BoolVar(&crossJobHotCache, "cross-job-hot-cache", false, "Enable cross-job nameserver cache sharing (default true)")
 	fs.BoolVar(&noCrossJobHotCache, "no-cross-job-hot-cache", false, "Disable cross-job nameserver cache sharing")
 	fs.IntVar(&crossJobHotCacheTTL, "cross-job-hot-cache-ttl", 0, "Hot-cache entry TTL in seconds (default 60)")
@@ -311,6 +314,9 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	if flagsSet["public-api-rate-limit-window"] {
 		cfg.PublicAPI.RateLimitWindow = server.Duration{Duration: pubAPIRateLimitWindow}
 	}
+	if flagsSet["public-api-allow-private-undelegated-ip"] {
+		cfg.PublicAPI.AllowPrivateUndelegatedIP = pubAPIAllowPrivateUndelegatedIP
+	}
 
 	if dumpConfig {
 		enc := json.NewEncoder(out)
@@ -450,9 +456,10 @@ func buildConfigSources(flagsSet map[string]bool, hasConfigFile bool) map[string
 		"db-driver":                     "db_driver",
 		"db-dsn":                        "db_dsn",
 		"db-retention-days":             "retention_days",
-		"public-api-rate-limit-enabled": "rate_limit_enabled",
-		"public-api-rate-limit-max":     "rate_limit_max",
-		"public-api-rate-limit-window":  "rate_limit_window",
+		"public-api-rate-limit-enabled":           "rate_limit_enabled",
+		"public-api-rate-limit-max":               "rate_limit_max",
+		"public-api-rate-limit-window":            "rate_limit_window",
+		"public-api-allow-private-undelegated-ip": "allow_private_undelegated_ip",
 	}
 
 	sources := make(map[string]server.SettingSource)

@@ -518,6 +518,8 @@
   "settings_help_rate_limit_max": "Suurin sallittu työn lähetysten määrä per IP per aikaikkuna.",
   "settings_label_rate_limit_window": "Rajoitusikkuna",
   "settings_help_rate_limit_window": "Liukuvan aikaikkunan kesto nopeusrajoitukselle (esim. 10m).",
+  "settings_label_allow_private_undelegated_ip": "Allow private undelegated IPs",
+  "settings_help_allow_private_undelegated_ip": "Allow loopback / link-local / private / CGNAT / multicast / broadcast IPs as undelegated nameserver targets on the public API. Leave off for internet-facing deployments; turn on only for private/internal instances that need to test such targets.",
   "settings_group_general": "Yleiset",
   "settings_group_resolver": "Resolver ja profiili",
   "settings_group_database": "Tietokanta",

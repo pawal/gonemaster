@@ -518,6 +518,8 @@
   "settings_help_rate_limit_max": "Maksimalt antal jobindsendelser per IP per vindue.",
   "settings_label_rate_limit_window": "Begrænsningsvindue",
   "settings_help_rate_limit_window": "Glidende vinduesvarighed for hastighedsbegrænsning (f.eks. 10m).",
+  "settings_label_allow_private_undelegated_ip": "Allow private undelegated IPs",
+  "settings_help_allow_private_undelegated_ip": "Allow loopback / link-local / private / CGNAT / multicast / broadcast IPs as undelegated nameserver targets on the public API. Leave off for internet-facing deployments; turn on only for private/internal instances that need to test such targets.",
   "settings_group_general": "Generelt",
   "settings_group_resolver": "Resolver og profil",
   "settings_group_database": "Database",

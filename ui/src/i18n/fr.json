@@ -518,6 +518,8 @@
   "settings_help_rate_limit_max": "Nombre maximum de soumissions de jobs par IP et par fenêtre.",
   "settings_label_rate_limit_window": "Fenêtre de limitation",
   "settings_help_rate_limit_window": "Durée de la fenêtre glissante pour la limitation de débit (ex. 10m).",
+  "settings_label_allow_private_undelegated_ip": "Allow private undelegated IPs",
+  "settings_help_allow_private_undelegated_ip": "Allow loopback / link-local / private / CGNAT / multicast / broadcast IPs as undelegated nameserver targets on the public API. Leave off for internet-facing deployments; turn on only for private/internal instances that need to test such targets.",
   "settings_group_general": "Général",
   "settings_group_resolver": "Résolveur & profil",
   "settings_group_database": "Base de données",

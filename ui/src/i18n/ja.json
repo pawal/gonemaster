@@ -518,6 +518,8 @@
   "settings_help_rate_limit_max": "ウィンドウあたりのIPごとの最大ジョブ送信数。",
   "settings_label_rate_limit_window": "レート制限ウィンドウ",
   "settings_help_rate_limit_window": "レート制限のスライディングウィンドウ期間 (例: 10m)。",
+  "settings_label_allow_private_undelegated_ip": "Allow private undelegated IPs",
+  "settings_help_allow_private_undelegated_ip": "Allow loopback / link-local / private / CGNAT / multicast / broadcast IPs as undelegated nameserver targets on the public API. Leave off for internet-facing deployments; turn on only for private/internal instances that need to test such targets.",
   "settings_group_general": "全般",
   "settings_group_resolver": "リゾルバーとプロファイル",
   "settings_group_database": "データベース",

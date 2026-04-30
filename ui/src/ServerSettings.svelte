@@ -36,6 +36,7 @@
         { key: "rate_limit_enabled", type: "toggle" },
         { key: "rate_limit_max", type: "number" },
         { key: "rate_limit_window", type: "text" },
+        { key: "allow_private_undelegated_ip", type: "toggle" },
       ],
     },
     {

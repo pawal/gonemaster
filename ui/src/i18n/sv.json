@@ -518,6 +518,8 @@
   "settings_help_rate_limit_max": "Maximalt antal jobbinlämningar per IP per tidsfönster.",
   "settings_label_rate_limit_window": "Tidsfönster för begränsning",
   "settings_help_rate_limit_window": "Glidande tidsfönster för hastighetsbegränsning (t.ex. 10m).",
+  "settings_label_allow_private_undelegated_ip": "Allow private undelegated IPs",
+  "settings_help_allow_private_undelegated_ip": "Allow loopback / link-local / private / CGNAT / multicast / broadcast IPs as undelegated nameserver targets on the public API. Leave off for internet-facing deployments; turn on only for private/internal instances that need to test such targets.",
   "settings_group_general": "Allmänt",
   "settings_group_resolver": "Resolver & profil",
   "settings_group_database": "Databas",

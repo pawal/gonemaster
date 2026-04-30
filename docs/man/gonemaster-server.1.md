@@ -104,6 +104,9 @@ variables, CLI flags. Later sources override earlier ones.
 **--public-api-rate-limit-window** *DURATION*
 : Sliding window for rate limiting, e.g. **5m** or **1h** (default: 10m).
 
+**--public-api-allow-private-undelegated-ip**
+: Allow undelegated nameserver IPs in loopback / link-local / private / CGNAT / multicast / broadcast ranges on POST /pub/api/v1/jobs (default: refused). Internet-facing deployments must leave this off so the public API cannot be used as an internal-network SSRF probe via the engine's outbound DNS queries. Enable on private/internal deployments that legitimately need to test such targets.
+
 ### Output
 
 **--min-level** *LEVEL*
@@ -147,6 +150,9 @@ variables, CLI flags. Later sources override earlier ones.
 **GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW**
 : Equivalent to **--public-api-rate-limit-window**.
 
+**GONEMASTER_PUBLIC_API_ALLOW_PRIVATE_UNDELEGATED_IP**
+: Equivalent to **--public-api-allow-private-undelegated-ip**.
+
 ## CONFIG FILE
 
 The **--config** file is JSON with optional fields:
@@ -166,7 +172,8 @@ The **--config** file is JSON with optional fields:
       "public_api": {
         "rate_limit_enabled": true,
         "rate_limit_max": 10,
-        "rate_limit_window": "10m"
+        "rate_limit_window": "10m",
+        "allow_private_undelegated_ip": false
       }
     }
 

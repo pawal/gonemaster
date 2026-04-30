@@ -97,6 +97,8 @@ func (s *Server) applySetting(key, val string) {
 		if d, err := time.ParseDuration(val); err == nil && d > 0 {
 			s.cfg.PublicAPI.RateLimitWindow = Duration{d}
 		}
+	case "allow_private_undelegated_ip":
+		s.cfg.PublicAPI.AllowPrivateUndelegatedIP = val == "true"
 	case "show_score_admin":
 		s.cfg.ShowScoreAdmin = val == "true"
 	case "show_score_public":
@@ -191,6 +193,7 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, _ *http.Request) {
 		"rate_limit_enabled":              {Value: cfg.PublicAPI.RateLimitEnabled, Source: s.settingSource("rate_limit_enabled")},
 		"rate_limit_max":                  {Value: cfg.PublicAPI.RateLimitMax, Source: s.settingSource("rate_limit_max")},
 		"rate_limit_window":               {Value: cfg.PublicAPI.RateLimitWindow.Duration.String(), Source: s.settingSource("rate_limit_window")},
+		"allow_private_undelegated_ip":    {Value: cfg.PublicAPI.AllowPrivateUndelegatedIP, Source: s.settingSource("allow_private_undelegated_ip")},
 		"show_score_admin":                {Value: cfg.ShowScoreAdmin, Source: s.settingSource("show_score_admin")},
 		"show_score_public":               {Value: cfg.ShowScorePublic, Source: s.settingSource("show_score_public")},
 		"show_nameserver_timings_admin":   {Value: cfg.ShowNameserverTimingsAdmin, Source: s.settingSource("show_nameserver_timings_admin")},

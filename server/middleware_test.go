@@ -88,6 +88,52 @@ func TestRecoverMiddlewarePassesThroughNormalRequests(t *testing.T) {
 	}
 }
 
+func TestSecurityHeadersCSPDropsUnsafeInlineStyles(t *testing.T) {
+	srv := New(DefaultConfig())
+	cases := []struct {
+		path        string
+		mustHave    []string
+		mustNotHave []string
+	}{
+		{
+			path:        "/pub/api/v1/version",
+			mustHave:    []string{"default-src 'none'"},
+			mustNotHave: []string{"'unsafe-inline'"},
+		},
+		{
+			path:        "/public/",
+			mustHave:    []string{"style-src 'self';", "script-src 'self';"},
+			mustNotHave: []string{"'unsafe-inline'"},
+		},
+		{
+			path:     "/analysis/",
+			mustHave: []string{"style-src 'self';", "script-src 'self' 'unsafe-inline'"},
+			// analysisCSP keeps script-src 'unsafe-inline' for the bootstrap
+			// inline <script>, but style-src must stay clean.
+			mustNotHave: []string{"style-src 'self' 'unsafe-inline'"},
+		},
+	}
+	for _, tc := range cases {
+		resp := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+		srv.Handler().ServeHTTP(resp, req)
+		csp := resp.Header().Get("Content-Security-Policy")
+		if csp == "" {
+			t.Fatalf("%s: missing Content-Security-Policy header", tc.path)
+		}
+		for _, want := range tc.mustHave {
+			if !strings.Contains(csp, want) {
+				t.Errorf("%s: CSP missing %q, got %q", tc.path, want, csp)
+			}
+		}
+		for _, banned := range tc.mustNotHave {
+			if strings.Contains(csp, banned) {
+				t.Errorf("%s: CSP contains banned token %q, got %q", tc.path, banned, csp)
+			}
+		}
+	}
+}
+
 func TestRecoverMiddlewareDoesNotSwallowErrAbortHandler(t *testing.T) {
 	srv := New(DefaultConfig())
 	panicker := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {

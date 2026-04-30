@@ -90,6 +90,9 @@ func applyEnvVars(cfg *server.Config, flagsSet map[string]bool, getenv func(stri
 			cfg.TrustedProxyCIDRs = strings.Split(v, ",")
 		}
 	}
+	applyDuration("read-timeout", "GONEMASTER_READ_TIMEOUT", &cfg.ReadTimeout)
+	applyDuration("write-timeout", "GONEMASTER_WRITE_TIMEOUT", &cfg.WriteTimeout)
+	applyDuration("idle-timeout", "GONEMASTER_IDLE_TIMEOUT", &cfg.IdleTimeout)
 	applyBool("cross-job-hot-cache", "GONEMASTER_CROSS_JOB_HOT_CACHE", &cfg.CrossJobHotCache)
 	applyInt("cross-job-hot-cache-ttl", "GONEMASTER_CROSS_JOB_HOT_CACHE_TTL", &cfg.CrossJobHotCacheTTLSeconds)
 }

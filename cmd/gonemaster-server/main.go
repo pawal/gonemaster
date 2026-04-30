@@ -57,6 +57,9 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	var pubAPIRateLimitWindow time.Duration
 	var pubAPIAllowPrivateUndelegatedIP bool
 	var trustedProxyCIDRs string
+	var readTimeout time.Duration
+	var writeTimeout time.Duration
+	var idleTimeout time.Duration
 	var crossJobHotCache bool
 	var noCrossJobHotCache bool
 	var crossJobHotCacheTTL int
@@ -107,6 +110,11 @@ func run(args []string, out *os.File, errOut *os.File) int {
 		printUsageGroup(errOut, "Reverse proxy", []usageLine{
 			{flag: "--trusted-proxy-cidrs LIST", detail: "Comma-separated CIDRs (or bare IPs) of reverse proxies allowed to set X-Forwarded-For. Empty = trust nothing (RemoteAddr only). Leave empty when the server is exposed directly. (env: GONEMASTER_TRUSTED_PROXY_CIDRS)"},
 		})
+		printUsageGroup(errOut, "HTTP timeouts", []usageLine{
+			{flag: "--read-timeout DURATION", detail: "Per-connection read timeout (default 30s). Caps slow request bodies. (env: GONEMASTER_READ_TIMEOUT)"},
+			{flag: "--write-timeout DURATION", detail: "Per-connection write timeout (default 60s). Must exceed --public-api-analysis-request-timeout. (env: GONEMASTER_WRITE_TIMEOUT)"},
+			{flag: "--idle-timeout DURATION", detail: "Idle keep-alive timeout (default 60s). (env: GONEMASTER_IDLE_TIMEOUT)"},
+		})
 		printUsageGroup(errOut, "Public API", []usageLine{
 			{flag: "--public-api-rate-limit-enabled", detail: "Enable per-IP rate limiting on POST /pub/api/v1/jobs (env: GONEMASTER_PUBLIC_API_RATE_LIMIT_ENABLED)"},
 			{flag: "--public-api-rate-limit-max N", detail: "Max job submissions per IP per window (default 10) (env: GONEMASTER_PUBLIC_API_RATE_LIMIT_MAX)"},
@@ -142,6 +150,9 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	fs.DurationVar(&pubAPIRateLimitWindow, "public-api-rate-limit-window", 0, "Rate limit sliding window e.g. 5m (default 10m)")
 	fs.BoolVar(&pubAPIAllowPrivateUndelegatedIP, "public-api-allow-private-undelegated-ip", false, "Allow private/loopback IPs as undelegated NS targets on the public API (default off)")
 	fs.StringVar(&trustedProxyCIDRs, "trusted-proxy-cidrs", "", "Comma-separated CIDRs allowed to set X-Forwarded-For (default empty = trust nothing)")
+	fs.DurationVar(&readTimeout, "read-timeout", 0, "Per-connection read timeout (default 30s)")
+	fs.DurationVar(&writeTimeout, "write-timeout", 0, "Per-connection write timeout (default 60s)")
+	fs.DurationVar(&idleTimeout, "idle-timeout", 0, "Idle keep-alive timeout (default 60s)")
 	fs.BoolVar(&crossJobHotCache, "cross-job-hot-cache", false, "Enable cross-job nameserver cache sharing (default true)")
 	fs.BoolVar(&noCrossJobHotCache, "no-cross-job-hot-cache", false, "Disable cross-job nameserver cache sharing")
 	fs.IntVar(&crossJobHotCacheTTL, "cross-job-hot-cache-ttl", 0, "Hot-cache entry TTL in seconds (default 60)")
@@ -325,6 +336,15 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	if flagsSet["trusted-proxy-cidrs"] {
 		cfg.TrustedProxyCIDRs = strings.Split(trustedProxyCIDRs, ",")
 	}
+	if flagsSet["read-timeout"] {
+		cfg.ReadTimeout = server.Duration{Duration: readTimeout}
+	}
+	if flagsSet["write-timeout"] {
+		cfg.WriteTimeout = server.Duration{Duration: writeTimeout}
+	}
+	if flagsSet["idle-timeout"] {
+		cfg.IdleTimeout = server.Duration{Duration: idleTimeout}
+	}
 
 	if dumpConfig {
 		enc := json.NewEncoder(out)
@@ -365,6 +385,9 @@ func run(args []string, out *os.File, errOut *os.File) int {
 		Addr:              cfg.ListenAddr,
 		Handler:           srv.Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       cfg.ReadTimeout.Duration,
+		WriteTimeout:      cfg.WriteTimeout.Duration,
+		IdleTimeout:       cfg.IdleTimeout.Duration,
 	}
 
 	fmt.Fprintf(errOut, "Gonemaster version %s\n", engine.VersionFull())
@@ -469,6 +492,9 @@ func buildConfigSources(flagsSet map[string]bool, hasConfigFile bool) map[string
 		"public-api-rate-limit-window":            "rate_limit_window",
 		"public-api-allow-private-undelegated-ip": "allow_private_undelegated_ip",
 		"trusted-proxy-cidrs":                     "trusted_proxy_cidrs",
+		"read-timeout":                            "read_timeout",
+		"write-timeout":                           "write_timeout",
+		"idle-timeout":                            "idle_timeout",
 	}
 
 	sources := make(map[string]server.SettingSource)

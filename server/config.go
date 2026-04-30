@@ -121,6 +121,11 @@ type Config struct {
 	// RemoteAddr. Without this, XFF is spoofable and rate limits can be
 	// bypassed.
 	TrustedProxyCIDRs []string `json:"trusted_proxy_cidrs,omitempty"`
+	// Connection-level timeouts on the http.Server. Defaults: 30s/60s/60s.
+	// WriteTimeout must exceed public_api.analysis_request_timeout.
+	ReadTimeout  Duration `json:"read_timeout,omitempty"`
+	WriteTimeout Duration `json:"write_timeout,omitempty"`
+	IdleTimeout  Duration `json:"idle_timeout,omitempty"`
 	// PublicURL is the canonical base URL of the public UI (e.g. "https://example.com/").
 	// Used for og:url, hreflang, robots.txt, and sitemap.xml. When empty, the URL
 	// is auto-detected from the request's Host and X-Forwarded-Proto headers.
@@ -192,6 +197,9 @@ type FileConfig struct {
 	MinLevel                    *string              `json:"min_level"`
 	ProfilePath                 *string              `json:"profile_path"`
 	TrustedProxyCIDRs           *[]string            `json:"trusted_proxy_cidrs,omitempty"`
+	ReadTimeout                 *string              `json:"read_timeout,omitempty"`
+	WriteTimeout                *string              `json:"write_timeout,omitempty"`
+	IdleTimeout                 *string              `json:"idle_timeout,omitempty"`
 	PublicURL                   *string              `json:"public_url,omitempty"`
 	Database                    *DatabaseFileConfig  `json:"database,omitempty"`
 	PublicAPI                   *PublicAPIFileConfig `json:"public_api,omitempty"`
@@ -220,6 +228,9 @@ func DefaultConfig() Config {
 		ShowNameserverTimingsPublic: true,
 		CrossJobHotCache:            true,
 		CrossJobHotCacheTTLSeconds:  defaultCrossJobHotCacheTTLSeconds,
+		ReadTimeout:  Duration{30 * time.Second},
+		WriteTimeout: Duration{60 * time.Second},
+		IdleTimeout:  Duration{60 * time.Second},
 		PublicAPI: PublicAPIConfig{
 			RateLimitEnabled:       false,
 			RateLimitMax:           10,
@@ -303,6 +314,21 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 	}
 	if file.TrustedProxyCIDRs != nil {
 		c.TrustedProxyCIDRs = append(c.TrustedProxyCIDRs[:0], *file.TrustedProxyCIDRs...)
+	}
+	if file.ReadTimeout != nil {
+		if d, err := time.ParseDuration(*file.ReadTimeout); err == nil {
+			c.ReadTimeout = Duration{d}
+		}
+	}
+	if file.WriteTimeout != nil {
+		if d, err := time.ParseDuration(*file.WriteTimeout); err == nil {
+			c.WriteTimeout = Duration{d}
+		}
+	}
+	if file.IdleTimeout != nil {
+		if d, err := time.ParseDuration(*file.IdleTimeout); err == nil {
+			c.IdleTimeout = Duration{d}
+		}
 	}
 	if file.PublicURL != nil {
 		c.PublicURL = *file.PublicURL

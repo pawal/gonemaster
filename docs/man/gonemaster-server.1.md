@@ -98,6 +98,17 @@ variables, CLI flags. Later sources override earlier ones.
 **--trusted-proxy-cidrs** *LIST*
 : Comma-separated CIDRs (or bare IPs) of reverse proxies allowed to set **X-Forwarded-For**. Default empty: trust nothing, attribute every request to its **RemoteAddr**. Without this, a direct-exposed server (or one behind a proxy that does not strip incoming XFF) is vulnerable to XFF spoofing — an attacker rotates the header to bypass per-IP rate limits or pin them on a victim. Set to the CIDR of your reverse proxy when one is in front. Example: `--trusted-proxy-cidrs 127.0.0.1/32,10.0.0.0/8`.
 
+### HTTP timeouts
+
+**--read-timeout** *DURATION*
+: Per-connection read timeout (default: **30s**). Caps slow / stalled request bodies (slowloris).
+
+**--write-timeout** *DURATION*
+: Per-connection write timeout (default: **60s**). Caps slow / stalled responses. Must exceed **--public-api-analysis-request-timeout** (default 10s) so legitimate long analysis responses can complete; widen if you have raised the analysis timeout.
+
+**--idle-timeout** *DURATION*
+: Idle keep-alive timeout (default: **60s**).
+
 ### Public API
 
 **--public-api-rate-limit-enabled**
@@ -161,6 +172,15 @@ variables, CLI flags. Later sources override earlier ones.
 **GONEMASTER_TRUSTED_PROXY_CIDRS**
 : Equivalent to **--trusted-proxy-cidrs**.
 
+**GONEMASTER_READ_TIMEOUT**
+: Equivalent to **--read-timeout**.
+
+**GONEMASTER_WRITE_TIMEOUT**
+: Equivalent to **--write-timeout**.
+
+**GONEMASTER_IDLE_TIMEOUT**
+: Equivalent to **--idle-timeout**.
+
 ## CONFIG FILE
 
 The **--config** file is JSON with optional fields:
@@ -183,7 +203,10 @@ The **--config** file is JSON with optional fields:
         "rate_limit_window": "10m",
         "allow_private_undelegated_ip": false
       },
-      "trusted_proxy_cidrs": ["127.0.0.1/32"]
+      "trusted_proxy_cidrs": ["127.0.0.1/32"],
+      "read_timeout": "30s",
+      "write_timeout": "60s",
+      "idle_timeout": "60s"
     }
 
 ## EXAMPLES

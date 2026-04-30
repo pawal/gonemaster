@@ -14,6 +14,42 @@ func TestDefaultConfigListenAddr(t *testing.T) {
 	}
 }
 
+func TestDefaultConfigHTTPTimeouts(t *testing.T) {
+	cfg := DefaultConfig()
+	if cfg.ReadTimeout.Duration != 30*time.Second {
+		t.Fatalf("ReadTimeout: got %v, want 30s", cfg.ReadTimeout.Duration)
+	}
+	if cfg.WriteTimeout.Duration != 60*time.Second {
+		t.Fatalf("WriteTimeout: got %v, want 60s", cfg.WriteTimeout.Duration)
+	}
+	if cfg.IdleTimeout.Duration != 60*time.Second {
+		t.Fatalf("IdleTimeout: got %v, want 60s", cfg.IdleTimeout.Duration)
+	}
+	if cfg.WriteTimeout.Duration <= cfg.PublicAPI.AnalysisRequestTimeout.Duration {
+		t.Fatalf("WriteTimeout (%v) must exceed AnalysisRequestTimeout (%v)",
+			cfg.WriteTimeout.Duration, cfg.PublicAPI.AnalysisRequestTimeout.Duration)
+	}
+}
+
+func TestApplyFileConfigHTTPTimeouts(t *testing.T) {
+	cfg := DefaultConfig()
+	read, write, idle := "5s", "120s", "2m"
+	cfg.ApplyFileConfig(FileConfig{
+		ReadTimeout:  &read,
+		WriteTimeout: &write,
+		IdleTimeout:  &idle,
+	})
+	if cfg.ReadTimeout.Duration != 5*time.Second {
+		t.Fatalf("ReadTimeout: got %v, want 5s", cfg.ReadTimeout.Duration)
+	}
+	if cfg.WriteTimeout.Duration != 120*time.Second {
+		t.Fatalf("WriteTimeout: got %v, want 120s", cfg.WriteTimeout.Duration)
+	}
+	if cfg.IdleTimeout.Duration != 2*time.Minute {
+		t.Fatalf("IdleTimeout: got %v, want 2m", cfg.IdleTimeout.Duration)
+	}
+}
+
 func TestDefaultConfigDatabaseIsMemory(t *testing.T) {
 	cfg := DefaultConfig()
 	if cfg.Database.Driver != "" {

@@ -36,17 +36,18 @@ export function endpointHref(
   nameserver: string | null,
   query = ""
 ): string {
-  let url = `${base}/endpoints/${encodeURIComponent(address)}`;
+  const url = `${base}/endpoints/${encodeURIComponent(address)}`;
   // When multiple nameservers share an address, the public API requires a
-  // `nameserver` disambiguator. Encode it into the query while preserving
-  // the caller's existing query string.
+  // `nameserver` disambiguator. Use set() so that any stale nameserver=
+  // already in the caller's query (from earlier chip clicks) is replaced;
+  // otherwise the detail page reads the first match and 404s when it
+  // doesn't belong to the row the user clicked.
+  const params = new URLSearchParams(query.startsWith("?") ? query.slice(1) : query);
   if (nameserver) {
-    const separator = query ? "&" : "?";
-    url += `${query}${separator}nameserver=${encodeURIComponent(nameserver)}`;
-  } else if (query) {
-    url += query;
+    params.set("nameserver", nameserver);
   }
-  return url;
+  const serialized = params.toString();
+  return serialized ? `${url}?${serialized}` : url;
 }
 
 export function prefixHref(base: string, prefix: string, query = ""): string {

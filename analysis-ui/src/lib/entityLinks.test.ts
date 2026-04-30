@@ -42,4 +42,20 @@ describe("entity link builders", () => {
       "/analysis/endpoints/192.0.2.10?dataset_tag=tld"
     );
   });
+
+  it("endpointHref replaces stale nameserver= already in the query", () => {
+    // Without replacement the detail page reads the first nameserver= and
+    // 404s because it doesn't belong to the row the user clicked.
+    expect(
+      endpointHref(BASE, "192.0.2.10", "ns2.example", "?nameserver=ns1.example")
+    ).toBe("/analysis/endpoints/192.0.2.10?nameserver=ns2.example");
+    expect(
+      endpointHref(
+        BASE,
+        "192.0.2.10",
+        "ns3.example",
+        "?offset=50&nameserver=ns1.example&nameserver=ns2.example"
+      )
+    ).toBe("/analysis/endpoints/192.0.2.10?offset=50&nameserver=ns3.example");
+  });
 });

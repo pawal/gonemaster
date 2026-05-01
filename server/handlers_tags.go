@@ -10,7 +10,7 @@ import (
 func (s *Server) handleTags(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
-		if !enforceCSRF(w, r) {
+		if !s.enforceCSRF(w, r) {
 			return
 		}
 		s.handleCreateTag(w, r)
@@ -77,12 +77,12 @@ func (s *Server) handleTagByName(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.Method {
 	case http.MethodPut:
-		if !enforceCSRF(w, r) {
+		if !s.enforceCSRF(w, r) {
 			return
 		}
 		s.handleUpdateTag(w, r, name)
 	case http.MethodDelete:
-		if !enforceCSRF(w, r) {
+		if !s.enforceCSRF(w, r) {
 			return
 		}
 		s.handleDeleteTag(w, r, name)
@@ -130,12 +130,12 @@ func (s *Server) handleTagDomains(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.Method {
 	case http.MethodPost:
-		if !enforceCSRF(w, r) {
+		if !s.enforceCSRF(w, r) {
 			return
 		}
 		s.handleAddTagDomains(w, r, name)
 	case http.MethodDelete:
-		if !enforceCSRF(w, r) {
+		if !s.enforceCSRF(w, r) {
 			return
 		}
 		s.handleRemoveTagDomains(w, r, name)

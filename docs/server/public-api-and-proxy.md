@@ -88,9 +88,12 @@ to it — i.e. the proxy's address at gonemaster-server's network vantage point.
 
 > **Set `trusted_proxy_cidrs` when running behind a reverse proxy.** Without
 > it, every forwarded request is attributed to the proxy's IP and a single
-> proxy fills the per-IP budget for all real clients. With it set too
-> broadly, `X-Forwarded-For` becomes spoofable. List only proxies you
-> control.
+> proxy fills the per-IP budget for all real clients. The same setting also
+> lets the CSRF check honour `X-Forwarded-Proto: https` from the proxy — without
+> it, browser POSTs from `https://your-domain` are rejected with 403
+> `csrf_origin_mismatch` because gonemaster sees plain HTTP and assumes
+> port 80. List only proxies you control; with it set too broadly,
+> `X-Forwarded-*` headers become spoofable.
 
 ```sh
 gonemaster-server --trusted-proxy-cidrs "127.0.0.1/32,::1/128"

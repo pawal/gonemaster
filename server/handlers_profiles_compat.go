@@ -247,7 +247,7 @@ func (s *Server) handlePatchProfile(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
 		return
 	}
-	if !enforceCSRF(w, r) {
+	if !s.enforceCSRF(w, r) {
 		return
 	}
 	id, ok := parseProfileID(w, r)
@@ -331,7 +331,7 @@ func (s *Server) handleMarkAllProfilesReviewed(w http.ResponseWriter, r *http.Re
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
 		return
 	}
-	if !enforceCSRF(w, r) {
+	if !s.enforceCSRF(w, r) {
 		return
 	}
 	profiles := s.store.ListProfiles()

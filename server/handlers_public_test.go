@@ -184,6 +184,49 @@ func TestPublicCreateJobCSRFAcceptsSameOrigin(t *testing.T) {
 	}
 }
 
+func TestPublicCreateJobCSRFAcceptsHTTPSOriginViaTrustedProxy(t *testing.T) {
+	// Caddy/nginx terminate TLS upstream; gonemaster sees plain HTTP.
+	// Without honoring X-Forwarded-Proto, port 443 (Origin) won't match
+	// port 80 (assumed scheme=http) and the CSRF check would 403.
+	cfg := DefaultConfig()
+	cfg.TrustedProxyCIDRs = []string{"127.0.0.1/32"}
+	srv := New(cfg)
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
+		bytes.NewBufferString(`{"domain":"example.com"}`))
+	req.Host = "gonemaster.evilbit.de"
+	req.RemoteAddr = "127.0.0.1:54321"
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Origin", "https://gonemaster.evilbit.de")
+	req.Header.Set("X-Forwarded-Proto", "https")
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", resp.Code, resp.Body.String())
+	}
+}
+
+func TestPublicCreateJobCSRFRejectsForgedXForwardedProtoFromUntrustedRemote(t *testing.T) {
+	// No trusted proxies: X-Forwarded-Proto is ignored. The forged header
+	// must not let an attacker make port 443 match.
+	srv := New(DefaultConfig())
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
+		bytes.NewBufferString(`{"domain":"example.com"}`))
+	req.Host = "gonemaster.evilbit.de"
+	req.RemoteAddr = "203.0.113.99:54321"
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Origin", "https://gonemaster.evilbit.de")
+	req.Header.Set("X-Forwarded-Proto", "https")
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d: %s", resp.Code, resp.Body.String())
+	}
+}
+
 func TestPublicCreateJobRejectsOversizedNameservers(t *testing.T) {
 	srv := New(DefaultConfig())
 

@@ -60,12 +60,12 @@ func (s *Server) handleScoringConfig(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		s.handleGetScoringConfig(w, r)
 	case http.MethodPut:
-		if !enforceCSRF(w, r) {
+		if !s.enforceCSRF(w, r) {
 			return
 		}
 		s.handlePutScoringConfig(w, r)
 	case http.MethodDelete:
-		if !enforceCSRF(w, r) {
+		if !s.enforceCSRF(w, r) {
 			return
 		}
 		s.handleDeleteScoringConfig(w, r)

@@ -166,7 +166,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		s.handleGetSettings(w, r)
 	case http.MethodPut:
-		if !enforceCSRF(w, r) {
+		if !s.enforceCSRF(w, r) {
 			return
 		}
 		s.handlePutSettings(w, r)

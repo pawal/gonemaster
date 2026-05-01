@@ -125,12 +125,12 @@ func (s *Server) handleAnalysisCohortSnapshotByID(w http.ResponseWriter, r *http
 	}
 	switch r.Method {
 	case http.MethodPost:
-		if !enforceCSRF(w, r) {
+		if !s.enforceCSRF(w, r) {
 			return
 		}
 		s.handlePatchAnalysisCohortSnapshot(w, r, store, cohort, snap)
 	case http.MethodDelete:
-		if !enforceCSRF(w, r) {
+		if !s.enforceCSRF(w, r) {
 			return
 		}
 		s.handleRetireAnalysisCohortSnapshot(w, r, store, cohort, snap)
@@ -148,7 +148,7 @@ func (s *Server) handleAnalysisCohortSnapshotRematerialize(w http.ResponseWriter
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
 		return
 	}
-	if !enforceCSRF(w, r) {
+	if !s.enforceCSRF(w, r) {
 		return
 	}
 	store, ok := s.adminSnapshotStore(w)

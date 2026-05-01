@@ -41,7 +41,7 @@ func (s *Server) handleAnalysisCohorts(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		writeJSON(w, http.StatusOK, s.store.ListAnalysisCohorts())
 	case http.MethodPost:
-		if !enforceCSRF(w, r) {
+		if !s.enforceCSRF(w, r) {
 			return
 		}
 		s.handleCreateAnalysisCohort(w, r)
@@ -150,12 +150,12 @@ func (s *Server) handleAnalysisCohortByID(w http.ResponseWriter, r *http.Request
 	case http.MethodGet:
 		writeJSON(w, http.StatusOK, cohort)
 	case http.MethodPatch:
-		if !enforceCSRF(w, r) {
+		if !s.enforceCSRF(w, r) {
 			return
 		}
 		s.handlePatchAnalysisCohort(w, r, cohort)
 	case http.MethodDelete:
-		if !enforceCSRF(w, r) {
+		if !s.enforceCSRF(w, r) {
 			return
 		}
 		s.handleDeleteAnalysisCohort(w, r, cohort)
@@ -252,7 +252,7 @@ func (s *Server) handleAnalysisCohortRebuild(w http.ResponseWriter, r *http.Requ
 	if !ok {
 		return
 	}
-	if !enforceCSRF(w, r) {
+	if !s.enforceCSRF(w, r) {
 		return
 	}
 	if _, found := s.store.GetAnalysisCohort(id); !found {
@@ -318,7 +318,7 @@ func (s *Server) handleAnalysisCohortClear(w http.ResponseWriter, r *http.Reques
 	if !ok {
 		return
 	}
-	if !enforceCSRF(w, r) {
+	if !s.enforceCSRF(w, r) {
 		return
 	}
 	if _, found := s.store.GetAnalysisCohort(id); !found {

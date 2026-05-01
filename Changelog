@@ -16,6 +16,7 @@ Fixed a lot of public-ui security related things.
 ### Changed
  - server: `X-Forwarded-For` is no longer trusted by default. Set `--trusted-proxy-cidrs` (or `trusted_proxy_cidrs` in the config file) to the CIDR of your reverse proxy. Without it, requests are attributed to `RemoteAddr`. **Breaking** for deployments behind a reverse proxy that previously relied on automatic XFF parsing.
  - server: `X-Real-IP` is no longer honoured. Use `X-Forwarded-For` (which Caddy and the documented nginx example already set).
+ - server: CSRF check now also honors `X-Forwarded-Proto` from trusted proxies, so `POST /pub/api/v1/jobs` works behind TLS-terminating reverse proxies. **Set `trusted_proxy_cidrs` to the proxy's IP** or browsers see 403 `csrf_origin_mismatch`.
  - analysis-ui: endpointHref replaces stale nameserver= so chip clicks don't 404
 
 ## [v1.4.2] - 2026-04-29

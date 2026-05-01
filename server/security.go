@@ -4,16 +4,45 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"strings"
 )
 
 var errCSRFMismatch = errors.New("origin must match request host")
 
-func validateCSRFOrigin(r *http.Request) error {
+// requestScheme honors X-Forwarded-Proto only when RemoteAddr is in trusted.
+func requestScheme(r *http.Request, trusted []netip.Prefix) string {
+	if r.TLS != nil {
+		return "https"
+	}
+	if remoteIsTrusted(r.RemoteAddr, trusted) {
+		if proto := strings.ToLower(strings.TrimSpace(r.Header.Get("X-Forwarded-Proto"))); proto == "https" {
+			return "https"
+		}
+	}
+	return "http"
+}
+
+func remoteIsTrusted(remoteAddr string, trusted []netip.Prefix) bool {
+	if len(trusted) == 0 {
+		return false
+	}
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		host = remoteAddr
+	}
+	addr, err := netip.ParseAddr(host)
+	if err != nil {
+		return false
+	}
+	return ipInPrefixes(addr, trusted)
+}
+
+func validateCSRFOrigin(r *http.Request, trusted []netip.Prefix) error {
 	origin := strings.TrimSpace(r.Header.Get("Origin"))
 	if origin == "" {
-		// Non-browser clients (for example gonemaster-client) generally omit Origin.
+		// Non-browser clients (e.g. gonemaster-client) generally omit Origin.
 		return nil
 	}
 	if strings.EqualFold(origin, "null") {
@@ -28,10 +57,7 @@ func validateCSRFOrigin(r *http.Request) error {
 		return errCSRFMismatch
 	}
 
-	reqScheme := "http"
-	if r.TLS != nil {
-		reqScheme = "https"
-	}
+	reqScheme := requestScheme(r, trusted)
 
 	originHost, originPort, err := normalizedHostPort(originURL.Host, originURL.Scheme)
 	if err != nil {
@@ -48,8 +74,8 @@ func validateCSRFOrigin(r *http.Request) error {
 	return nil
 }
 
-func enforceCSRF(w http.ResponseWriter, r *http.Request) bool {
-	if err := validateCSRFOrigin(r); err != nil {
+func (s *Server) enforceCSRF(w http.ResponseWriter, r *http.Request) bool {
+	if err := validateCSRFOrigin(r, s.trustedProxies); err != nil {
 		writeError(w, http.StatusForbidden, "csrf_origin_mismatch", err.Error(), nil)
 		return false
 	}

@@ -56,7 +56,7 @@ func (s *Server) handleBatchDeletePreview(w http.ResponseWriter, r *http.Request
 // in-flight jobs for the batch, waits briefly for them to drain, then
 // removes the batch and every row derived from it.
 func (s *Server) handleDeleteBatch(w http.ResponseWriter, r *http.Request) {
-	if !enforceCSRF(w, r) {
+	if !s.enforceCSRF(w, r) {
 		return
 	}
 	batchID := strings.TrimSpace(r.PathValue("id"))

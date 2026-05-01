@@ -45,7 +45,7 @@ func (s *Server) handleDefaultProfile(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleProfiles(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
-		if !enforceCSRF(w, r) {
+		if !s.enforceCSRF(w, r) {
 			return
 		}
 		s.handleCreateProfile(w, r)
@@ -65,12 +65,12 @@ func (s *Server) handleProfileByID(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		s.handleGetProfile(w, r, id)
 	case http.MethodPut:
-		if !enforceCSRF(w, r) {
+		if !s.enforceCSRF(w, r) {
 			return
 		}
 		s.handleUpdateProfile(w, r, id)
 	case http.MethodDelete:
-		if !enforceCSRF(w, r) {
+		if !s.enforceCSRF(w, r) {
 			return
 		}
 		s.handleDeleteProfile(w, r, id)
@@ -249,12 +249,12 @@ func (s *Server) handleTagProfile(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.Method {
 	case http.MethodPut:
-		if !enforceCSRF(w, r) {
+		if !s.enforceCSRF(w, r) {
 			return
 		}
 		s.handleSetTagProfile(w, r, name)
 	case http.MethodDelete:
-		if !enforceCSRF(w, r) {
+		if !s.enforceCSRF(w, r) {
 			return
 		}
 		s.handleDeleteTagProfile(w, r, name)

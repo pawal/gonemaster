@@ -24,11 +24,50 @@ func TestCleanRequestPath(t *testing.T) {
 		{in: "/index.html", want: "index.html"},
 		{in: "index.html", want: "index.html"},
 		{in: "/assets/app.js", want: "assets/app.js"},
+		// Anything still containing ".." after normalization is rejected.
+		{in: "/..", want: ""},
+		{in: "..", want: ""},
+		{in: "/..foo", want: ""},
+		{in: "/foo/..bar", want: ""},
 	}
 
 	for _, tt := range tests {
 		if got := cleanRequestPath(tt.in); got != tt.want {
 			t.Fatalf("cleanRequestPath(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
+func TestHandlerPathTraversalAttemptsCannotEscapeDist(t *testing.T) {
+	// path.Clean collapses dot-segments and the embed.FS is sandboxed via
+	// fs.Sub(distFS, "dist"), so any traversal target that does not exist in
+	// dist/ falls through to the SPA index. This test pins that behavior.
+	h := Handler("")
+
+	rootReq := httptest.NewRequest(http.MethodGet, "/", nil)
+	rootRR := httptest.NewRecorder()
+	h.ServeHTTP(rootRR, rootReq)
+	rootBody, _ := io.ReadAll(rootRR.Result().Body)
+
+	traversals := []string{
+		"/../public.go",
+		"/../../server/public/public.go",
+		"/assets/../public.go",
+		"/../../etc/passwd",
+		"//etc/passwd",
+		"/..%2fpublic.go",
+	}
+	for _, p := range traversals {
+		req := httptest.NewRequest(http.MethodGet, p, nil)
+		rr := httptest.NewRecorder()
+		h.ServeHTTP(rr, req)
+		if rr.Code != http.StatusOK {
+			t.Errorf("%s: status = %d, want 200 (SPA fallback)", p, rr.Code)
+			continue
+		}
+		body, _ := io.ReadAll(rr.Result().Body)
+		if string(body) != string(rootBody) {
+			t.Errorf("%s: served content other than the SPA index", p)
 		}
 	}
 }

@@ -91,6 +91,29 @@ func TestDomainDetailCaseInsensitiveLookup(t *testing.T) {
 	}
 }
 
+// TestDomainDetailIgnoresLocaleQueryParam verifies that ?locale= is dead:
+// the analysis-ui has no language picker, so the endpoint always renders
+// English log messages and any client-supplied locale value is ignored.
+func TestDomainDetailIgnoresLocaleQueryParam(t *testing.T) {
+	f := newAnalysisAPITestFixture(t)
+	now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
+	f.seedGraduatedRun("alpha.example", now, []engine.LogEntry{
+		{Module: "BASIC", Testcase: "basic01", Tag: "B01_NOTICE", Level: "NOTICE"},
+	})
+
+	plain := getPublic(t, f.srv, f.publicURL("domains/alpha.example"))
+	if plain.Code != http.StatusOK {
+		t.Fatalf("plain status = %d, body = %s", plain.Code, plain.Body)
+	}
+	withLocale := getPublic(t, f.srv, f.publicURL("domains/alpha.example")+"?locale=../../etc/passwd")
+	if withLocale.Code != http.StatusOK {
+		t.Fatalf("locale-param status = %d, body = %s", withLocale.Code, withLocale.Body)
+	}
+	if plain.Body.String() != withLocale.Body.String() {
+		t.Fatalf("response differs when ?locale= is set; expected the parameter to be ignored")
+	}
+}
+
 // TestDomainDetailNotFoundOnUnknownName verifies the handler returns 404
 // when the URL points at a domain absent from the snapshot.
 func TestDomainDetailNotFoundOnUnknownName(t *testing.T) {

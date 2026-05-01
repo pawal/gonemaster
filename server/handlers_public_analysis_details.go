@@ -274,7 +274,7 @@ func (s *Server) handlePublicAnalysisDomainDetail(w http.ResponseWriter, r *http
 	}
 
 	detail := domainViewToDetail(view)
-	if entries, ok := s.lookupSnapshotDomainEntries(snapshot.BatchID, view.DomainID, r.URL.Query().Get("locale")); ok {
+	if entries, ok := s.lookupSnapshotDomainEntries(snapshot.BatchID, view.DomainID); ok {
 		detail.Entries = entries
 	}
 
@@ -282,10 +282,10 @@ func (s *Server) handlePublicAnalysisDomainDetail(w http.ResponseWriter, r *http
 	writeJSON(w, http.StatusOK, detail)
 }
 
-// lookupSnapshotDomainEntries returns localized log entries for the
-// run that materialized this snapshot's (batch, domain), or ok=false
-// when the run has been purged.
-func (s *Server) lookupSnapshotDomainEntries(batchID string, domainID int64, locale string) ([]PublicAnalysisDomainEntry, bool) {
+// lookupSnapshotDomainEntries returns English log entries for the run that
+// materialized this snapshot's (batch, domain), or ok=false when the run has
+// been purged.
+func (s *Server) lookupSnapshotDomainEntries(batchID string, domainID int64) ([]PublicAnalysisDomainEntry, bool) {
 	if batchID == "" || domainID == 0 {
 		return nil, false
 	}
@@ -297,10 +297,7 @@ func (s *Server) lookupSnapshotDomainEntries(batchID string, domainID int64, loc
 	if !ok || result.Raw == nil || len(result.Raw.Entries) == 0 {
 		return nil, false
 	}
-	if strings.TrimSpace(locale) == "" {
-		locale = "en"
-	}
-	localized := localizeResultEntries(result.Raw.Entries, locale)
+	localized := localizeResultEntries(result.Raw.Entries, "en")
 	out := make([]PublicAnalysisDomainEntry, 0, len(localized))
 	for _, e := range localized {
 		out = append(out, PublicAnalysisDomainEntry{

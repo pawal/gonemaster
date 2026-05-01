@@ -34,6 +34,11 @@ gonemaster-server --dump-config
 | `public_url` | Canonical public base URL for public pages, robots, and sitemap. |
 | `scoring_config_path` | Optional JSON scoring configuration file. |
 | `debug` | Enables more verbose server logging. |
+| `trusted_proxy_cidrs` | CIDRs (or bare IPs) of reverse proxies allowed to set `X-Forwarded-For`. Empty (default) trusts nothing and uses `RemoteAddr`. See [public-api-and-proxy.md](public-api-and-proxy.md). |
+| `read_timeout` | Per-connection read timeout (default 30s). |
+| `write_timeout` | Per-connection write timeout (default 60s). Must exceed `public_api.analysis_request_timeout`. |
+| `idle_timeout` | Idle keep-alive timeout (default 60s). |
+| `public_api.allow_private_undelegated_ip` | Allow loopback / link-local / private / CGNAT / multicast / broadcast IPs as undelegated NS targets on the public API. Default `false`; enable on private/internal deployments. |
 
 ## Environment Variables
 
@@ -51,6 +56,11 @@ gonemaster-server --dump-config
 | `GONEMASTER_PUBLIC_API_RATE_LIMIT_ENABLED` | `public_api.rate_limit_enabled` |
 | `GONEMASTER_PUBLIC_API_RATE_LIMIT_MAX` | `public_api.rate_limit_max` |
 | `GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW` | `public_api.rate_limit_window` |
+| `GONEMASTER_PUBLIC_API_ALLOW_PRIVATE_UNDELEGATED_IP` | `public_api.allow_private_undelegated_ip` |
+| `GONEMASTER_TRUSTED_PROXY_CIDRS` | `trusted_proxy_cidrs` (comma-separated) |
+| `GONEMASTER_READ_TIMEOUT` | `read_timeout` |
+| `GONEMASTER_WRITE_TIMEOUT` | `write_timeout` |
+| `GONEMASTER_IDLE_TIMEOUT` | `idle_timeout` |
 | `GONEMASTER_CROSS_JOB_HOT_CACHE` | `cross_job_hot_cache` |
 | `GONEMASTER_CROSS_JOB_HOT_CACHE_TTL` | `cross_job_hot_cache_ttl_seconds` |
 
@@ -75,6 +85,11 @@ Common flags:
 --cross-job-hot-cache-ttl N
 --profile PATH
 --min-level LEVEL
+--trusted-proxy-cidrs LIST
+--read-timeout DURATION
+--write-timeout DURATION
+--idle-timeout DURATION
+--public-api-allow-private-undelegated-ip
 ```
 
 Resolver override flags:
@@ -119,8 +134,13 @@ Database and public API flags are covered in [database.md](database.md) and
   "public_api": {
     "rate_limit_enabled": true,
     "rate_limit_max": 10,
-    "rate_limit_window": "10m"
-  }
+    "rate_limit_window": "10m",
+    "allow_private_undelegated_ip": false
+  },
+  "trusted_proxy_cidrs": ["127.0.0.1/32"],
+  "read_timeout": "30s",
+  "write_timeout": "60s",
+  "idle_timeout": "60s"
 }
 ```
 

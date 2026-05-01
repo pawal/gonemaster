@@ -194,7 +194,7 @@ func securityHeadersMiddleware(next http.Handler) http.Handler {
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("X-Frame-Options", "DENY")
 		h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
-		h.Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+		h.Set("Permissions-Policy", "geolocation=(), microphone=(), camera=(), payment=(), usb=(), bluetooth=(), serial=(), midi=(), hid=(), accelerometer=(), gyroscope=(), magnetometer=(), fullscreen=(), display-capture=(), idle-detection=(), screen-wake-lock=(), xr-spatial-tracking=(), clipboard-read=(), interest-cohort=()")
 		switch {
 		case strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/pub/api/"):
 			h.Set("Content-Security-Policy", apiCSP)

@@ -88,6 +88,34 @@ func TestRecoverMiddlewarePassesThroughNormalRequests(t *testing.T) {
 	}
 }
 
+func TestSecurityHeadersPermissionsPolicy(t *testing.T) {
+	srv := New(DefaultConfig())
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/public/", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	pp := resp.Header().Get("Permissions-Policy")
+	if pp == "" {
+		t.Fatal("missing Permissions-Policy header")
+	}
+	mustLock := []string{
+		"geolocation=()", "microphone=()", "camera=()",
+		"payment=()", "usb=()", "bluetooth=()", "serial=()", "midi=()", "hid=()",
+		"accelerometer=()", "gyroscope=()", "magnetometer=()",
+		"fullscreen=()", "display-capture=()",
+		"idle-detection=()", "screen-wake-lock=()", "xr-spatial-tracking=()",
+		"clipboard-read=()", "interest-cohort=()",
+	}
+	for _, want := range mustLock {
+		if !strings.Contains(pp, want) {
+			t.Errorf("Permissions-Policy missing %q, got %q", want, pp)
+		}
+	}
+	// clipboard-write must NOT be locked: ShareButton.svelte uses it.
+	if strings.Contains(pp, "clipboard-write=") {
+		t.Errorf("Permissions-Policy must not lock clipboard-write (ShareButton uses it), got %q", pp)
+	}
+}
+
 func TestSecurityHeadersCSPDropsUnsafeInlineStyles(t *testing.T) {
 	srv := New(DefaultConfig())
 	cases := []struct {

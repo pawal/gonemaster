@@ -126,6 +126,7 @@ func (s *Server) handlePublicAnalysisSnapshots(w http.ResponseWriter, r *http.Re
 			IsDefault:   snap.ID == defaultID,
 		})
 	}
+	w.Header().Set("Cache-Control", "public, max-age=60")
 	writeJSON(w, http.StatusOK, PublicAnalysisSnapshotListResponse{
 		DatasetTag: cohort.SourceTag,
 		Label:      cohort.Label,

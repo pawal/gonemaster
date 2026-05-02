@@ -76,6 +76,7 @@ func (s *Server) handlePublicVersion(w http.ResponseWriter, r *http.Request) {
 	if dns := engine.DNSLibVersion(); dns != "" {
 		resp["dns"] = dns
 	}
+	w.Header().Set("Cache-Control", "public, max-age=3600")
 	writeJSON(w, http.StatusOK, resp)
 }
 

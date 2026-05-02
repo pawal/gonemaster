@@ -142,8 +142,10 @@ func (s *Server) resolvePublicAnalysisCohortAndSnapshot(w http.ResponseWriter, r
 }
 
 // writeSnapshotCacheHeaders sets Cache-Control and ETag based on the
-// resolution mode. Explicit ?snapshot= → immutable for a day; auto-latest
-// or no-snapshot → must revalidate so a new default takes effect promptly.
+// resolution mode. Explicit ?snapshot= pins a captured snapshot whose
+// slug embeds its captured_at id, so the response is truly immutable —
+// max-age=1y. Auto-latest or no-snapshot revalidates so a new default
+// takes effect promptly.
 func writeSnapshotCacheHeaders(w http.ResponseWriter, r *http.Request, snap AnalysisCohortSnapshot) {
 	if snap.ID == 0 {
 		w.Header().Set("Cache-Control", "no-cache, must-revalidate")
@@ -151,7 +153,7 @@ func writeSnapshotCacheHeaders(w http.ResponseWriter, r *http.Request, snap Anal
 	}
 	explicit := strings.TrimSpace(r.URL.Query().Get("snapshot")) != ""
 	if explicit && snap.Status == AnalysisSnapshotStatusCaptured {
-		w.Header().Set("Cache-Control", "public, max-age=86400, immutable")
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 	} else {
 		w.Header().Set("Cache-Control", "no-cache, must-revalidate")
 	}

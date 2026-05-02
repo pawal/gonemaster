@@ -91,6 +91,7 @@ func (s *Server) handlePublicAnalysisCatalog(w http.ResponseWriter, r *http.Requ
 			defaultTag = c.SourceTag
 		}
 	}
+	w.Header().Set("Cache-Control", "public, max-age=60")
 	writeJSON(w, http.StatusOK, PublicAnalysisCatalogResponse{
 		DefaultTag:       defaultTag,
 		Cohorts:          views,
@@ -112,6 +113,7 @@ func (s *Server) handlePublicAnalysisCohorts(w http.ResponseWriter, r *http.Requ
 	for _, c := range selectable {
 		views = append(views, s.publicAnalysisCohortView(c))
 	}
+	w.Header().Set("Cache-Control", "public, max-age=60")
 	writeJSON(w, http.StatusOK, views)
 }
 

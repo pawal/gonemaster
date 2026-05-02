@@ -62,6 +62,8 @@ func Handler() http.Handler {
 		if isFile(fsys, cleanPath) {
 			if strings.HasPrefix(cleanPath, "_app/") {
 				w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+			} else {
+				w.Header().Set("Cache-Control", "public, max-age=3600")
 			}
 			serveFile(fileServer, w, r, cleanPath)
 			return

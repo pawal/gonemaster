@@ -174,11 +174,12 @@ overview tab loads with one read.
 ### HTTP cache headers
 
 Captured-snapshot responses for the rewritten handlers and
-`/overview` carry `Cache-Control: public, max-age=86400, immutable`
-plus an ETag of `"<snapshot_id>-<captured_at_unix>"`. Auto-latest
-resolution (no `?snapshot=` on the request) gets `no-cache,
-must-revalidate` so a freshly-captured snapshot replaces the
-previous default without stale-content delay.
+`/overview` carry `Cache-Control: public, max-age=31536000, immutable`
+plus an ETag of `"<snapshot_id>-<captured_at_unix>"`. The slug embeds
+the captured_at id, so once a snapshot is published its content can
+never change under that URL. Auto-latest resolution (no `?snapshot=`
+on the request) gets `no-cache, must-revalidate` so a freshly-captured
+snapshot replaces the previous default without stale-content delay.
 
 ### Concurrency knobs
 

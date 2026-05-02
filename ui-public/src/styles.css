@@ -1208,19 +1208,33 @@ details[open] > .score-bonus-summary > .score-bonus-chevron {
 /* ── Print styles ───────────────────────────────────────────────────────── */
 @media print {
   /* Force light theme: white background, black text */
-  :root, :root[data-theme="dark"] {
+  :root,
+  :root[data-theme="dark"],
+  :root:not([data-theme="light"]):not([data-theme="dark"]) {
     color-scheme: light !important;
     --bg: #fff;
     --bg-2: #f4f6f9;
     --ink: #000;
     --ink-2: #333;
     --muted: #666;
+    --accent: #0b2d4d;
+    --accent-2: #0369a1;
     --card: #fff;
     --border: #ccc;
     --surface: #fff;
     --surface-2: #eee;
     --on-surface-2: #333;
+    --btn-fg: white;
+    --grade-aplus: #059669;
+    --grade-a:     #16a34a;
+    --grade-b:     #65a30d;
+    --grade-c:     #ca8a04;
+    --grade-d:     #ea580c;
+    --grade-f:     #dc2626;
   }
+
+  /* Always render logo in its natural (black) state when printing */
+  .brand-logo { filter: none !important; }
 
   body {
     background: #fff !important;

@@ -170,9 +170,9 @@ func newServer(cfg Config, store JobStore, queue Queue) *Server {
 // Handler returns the root HTTP handler.
 func (s *Server) Handler() http.Handler {
 	if s.cfg.Debug {
-		return securityHeadersMiddleware(debugMiddleware(s.mux))
+		return securityHeadersMiddleware(gzipMiddleware(debugMiddleware(s.mux)))
 	}
-	return securityHeadersMiddleware(s.mux)
+	return securityHeadersMiddleware(gzipMiddleware(s.mux))
 }
 
 // Store exposes the configured job store for optional integration layers.

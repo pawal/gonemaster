@@ -11,6 +11,7 @@ import {
   getPrefixDetail,
   getSnapshotDetail,
   getTrends,
+  getVersion,
   listASNs,
   listDomains,
   listEndpoints,
@@ -82,6 +83,7 @@ describe("analysis API client", () => {
     await getSnapshotDetail("tld", "2026-04-20", stub);
     await getTrends("tld", {}, stub);
     await getDiff("tld", "2026-03-01", "2026-04-01", stub);
+    await getVersion(stub);
 
     expect(calls.length).toBeGreaterThan(0);
     for (const { url } of calls) {

@@ -4,6 +4,11 @@
 
 export const PUBLIC_BASE = "/pub/api/v1/analysis";
 
+export type VersionResponse = {
+  gonemaster?: string;
+  dns?: string;
+};
+
 export type SnapshotView = {
   slug: string;
   label?: string;
@@ -549,3 +554,6 @@ export const getDiff = (
     { from, to } as AnalysisFilter & { from: string; to: string },
     fetchFn
   );
+
+export const getVersion = (fetchFn: FetchLike = fetch) =>
+  getJSON<VersionResponse>("/version", {}, fetchFn);

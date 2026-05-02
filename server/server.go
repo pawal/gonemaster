@@ -280,6 +280,7 @@ func (s *Server) routes() {
 	pubMux.HandleFunc("GET /info", s.handlePublicInfo)
 	pubMux.HandleFunc("GET /analysis/catalog", s.handlePublicAnalysisCatalog)
 	pubMux.HandleFunc("GET /analysis/cohorts", s.handlePublicAnalysisCohorts)
+	pubMux.HandleFunc("GET /analysis/version", s.handlePublicVersion)
 
 	// Path-segmented snapshot reads. Each one resolves the cohort + slug
 	// from the path; immutable cache headers fire because ?snapshot= is

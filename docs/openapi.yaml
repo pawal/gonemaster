@@ -1691,6 +1691,21 @@ paths:
                 type: object
                 additionalProperties: true
 
+  /pub/api/v1/analysis/version:
+    get:
+      tags: [Public]
+      summary: Public version metadata, mirrored under the analysis surface
+      operationId: publicAnalysisVersion
+      responses:
+        '200':
+          description: Version map
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+
   /pub/api/v1/analysis/cohorts:
     get:
       tags: [Public]

@@ -3,6 +3,7 @@
   import { onMount } from "svelte";
   import { page } from "$app/state";
   import { base } from "$app/paths";
+  import { getVersion } from "$lib/api";
   import { navItems, isActive, visibleNavItems } from "$lib/nav";
   import type { LayoutData } from "./+layout";
   import { applyTheme, initialTheme, persistTheme, type Theme } from "$lib/theme";
@@ -10,10 +11,18 @@
   let { children } = $props();
 
   let theme = $state<Theme>("light");
+  let versionGonemaster = $state("");
+  let versionDNS = $state("");
 
   onMount(() => {
     theme = initialTheme();
     applyTheme(theme);
+    getVersion()
+      .then((v) => {
+        versionGonemaster = v.gonemaster ?? "";
+        versionDNS = v.dns ?? "";
+      })
+      .catch(() => {});
   });
 
   function toggleTheme() {
@@ -114,6 +123,16 @@
     {/if}
     {@render children?.()}
   </main>
+
+  <footer class="app-footer">
+    {#if versionGonemaster}
+      <span class="version-row"><span class="version-name">gonemaster</span>{versionGonemaster}</span>
+    {/if}
+    {#if versionDNS}
+      <span class="version-row"><span class="version-name">miekg/dns</span>{versionDNS}</span>
+    {/if}
+    <a class="footer-link" href="https://codeberg.org/pawal/gonemaster">Source on Codeberg</a>
+  </footer>
 </div>
 
 <style>

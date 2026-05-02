@@ -2373,6 +2373,43 @@ msgid ""
 "with IP addresses \"{addresses}\"."
 msgstr "Le jeu d'enregistrements CDS est signé par un DNSKEY lié à un DS. Trouvé sur les serveurs de noms avec les adresses IP \"{addresses}\"."
 
+
+msgctxt "DNSSEC:DS18_CDS_MATCHES_DS"
+msgid "The CDS RRset content matches the parent DS RRset. No key change signaled."
+msgstr "Le contenu du jeu d'enregistrements CDS correspond au jeu d'enregistrements DS du parent. Aucun changement de clé n'est signalé."
+
+msgctxt "DNSSEC:DS18_CDS_ROLLOVER_SIGNALED"
+msgid "The CDS RRset content differs from the parent DS RRset, signaling a key change. CDS keytags: {cds_keytags}. DS keytags: {ds_keytags}."
+msgstr "Le contenu du jeu d'enregistrements CDS diffère du jeu d'enregistrements DS du parent, ce qui signale un changement de clé. Keytags CDS : {cds_keytags}. Keytags DS : {ds_keytags}."
+
+msgctxt "DNSSEC:DS18_CDNSKEY_MATCHES_DS"
+msgid "The CDNSKEY RRset content matches the parent DS RRset. No key change signaled."
+msgstr "Le contenu du jeu d'enregistrements CDNSKEY correspond au jeu d'enregistrements DS du parent. Aucun changement de clé n'est signalé."
+
+msgctxt "DNSSEC:DS18_CDNSKEY_ROLLOVER_SIGNALED"
+msgid "The CDNSKEY RRset content differs from the parent DS RRset, signaling a key change. CDNSKEY keytags: {cdnskey_keytags}. DS keytags: {ds_keytags}."
+msgstr "Le contenu du jeu d'enregistrements CDNSKEY diffère du jeu d'enregistrements DS du parent, ce qui signale un changement de clé. Keytags CDNSKEY : {cdnskey_keytags}. Keytags DS : {ds_keytags}."
+
+msgctxt "DNSSEC:DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE"
+msgid "No CDS or CDNSKEY RRset found, but other rollover evidence is present. The operator likely uses on-demand CDS/CDNSKEY publication."
+msgstr "Aucun jeu d'enregistrements CDS ou CDNSKEY n'a été trouvé, mais d'autres indices de rollover sont présents. L'opérateur utilise probablement la publication CDS/CDNSKEY à la demande."
+
+msgctxt "DNSSEC:DS18_ROLLOVER_EVIDENCE_DOUBLE_SIG"
+msgid "The DNSKEY RRset is signed by more than one KSK keytag ({keytags}). A double-signature rollover phase may be in progress."
+msgstr "Le jeu d'enregistrements DNSKEY est signé par plusieurs keytags KSK ({keytags}). Une phase de rollover à double signature peut être en cours."
+
+msgctxt "DNSSEC:DS18_ROLLOVER_EVIDENCE_DNSKEY_WITHOUT_DS"
+msgid "Child SEP DNSKEY keytag(s) {keytags} have no matching DS record at the parent. A new KSK may be waiting for the parent DS to be updated."
+msgstr "Les keytags SEP DNSKEY {keytags} de la zone enfant n'ont pas d'enregistrement DS correspondant chez le parent. Une nouvelle KSK attend peut-être la mise à jour du DS parent."
+
+msgctxt "DNSSEC:DS18_ROLLOVER_EVIDENCE_DS_WITHOUT_DNSKEY"
+msgid "Parent DS keytag(s) {keytags} have no matching DNSKEY at the child. The old KSK may have been removed from the child zone."
+msgstr "Les keytags DS {keytags} du parent n'ont pas de DNSKEY correspondante dans la zone enfant. L'ancienne KSK a peut-être été retirée de la zone enfant."
+
+msgctxt "DNSSEC:DS18_ROLLOVER_EVIDENCE_MULTI_KSK"
+msgid "Multiple SEP-flagged DNSKEYs found at the child zone (keytags: {keytags}). A KSK rollover may be in progress."
+msgstr "Plusieurs DNSKEY avec le bit SEP positionné ont été trouvées dans la zone enfant (keytags : {keytags}). Un rollover de KSK peut être en cours."
+
 msgctxt "DNSSEC:DS19_BADKEY_BLOCKLIST"
 msgid ""
 "DNSKEY with keytag {keytag} and algorithm {algo_descr} ({algo_num}) matches "

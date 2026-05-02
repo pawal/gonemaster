@@ -553,10 +553,19 @@ func Metadata() map[string][]string {
 			"TEST_CASE_START",
 		},
 		"dnssec18": {
+			"DS18_CDS_MATCHES_DS",
+			"DS18_CDS_ROLLOVER_SIGNALED",
+			"DS18_CDNSKEY_MATCHES_DS",
+			"DS18_CDNSKEY_ROLLOVER_SIGNALED",
 			"DS18_MATCH_CDNSKEY_RRSIG_DS",
 			"DS18_MATCH_CDS_RRSIG_DS",
 			"DS18_NO_MATCH_CDS_RRSIG_DS",
 			"DS18_NO_MATCH_CDNSKEY_RRSIG_DS",
+			"DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE",
+			"DS18_ROLLOVER_EVIDENCE_DOUBLE_SIG",
+			"DS18_ROLLOVER_EVIDENCE_DS_WITHOUT_DNSKEY",
+			"DS18_ROLLOVER_EVIDENCE_DNSKEY_WITHOUT_DS",
+			"DS18_ROLLOVER_EVIDENCE_MULTI_KSK",
 			"IPV4_DISABLED",
 			"IPV6_DISABLED",
 			"TEST_CASE_END",
@@ -6209,6 +6218,10 @@ func DNSSEC18(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		cdsRRsets := map[string]bool{}
 		cdnskeyRRsets := map[string]bool{}
 		dnskeyRRsets := map[string][]*dns.DNSKEY{}
+		// rollover detection: actual record content and DNSKEY RRSIGs
+		cdsRecords := map[string][]*dns.CDS{}
+		cdnskeyRecords := map[string][]*dns.CDNSKEY{}
+		dnskeyRRSIGs := map[string][]*dns.RRSIG{}
 
 		nssDel, err := method4(ctx, z)
 		if err != nil {
@@ -6250,6 +6263,10 @@ func DNSSEC18(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				cdsRRSIG        []*dns.RRSIG
 				cdnskeyRRSIG    []*dns.RRSIG
 				dnskeyRecords   []*dns.DNSKEY
+				// rollover detection
+				cdsRecords     []*dns.CDS
+				cdnskeyRecords []*dns.CDNSKEY
+				dnskeyRRSIG    []*dns.RRSIG
 			}
 
 			outcomes := make([]nsOutcome, len(ordered))
@@ -6281,6 +6298,11 @@ func DNSSEC18(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 								outcome.cdsRRSIG = append(outcome.cdsRRSIG, sig)
 							}
 						}
+						for _, rr := range cdsResp.GetRecords("CDS", "answer") {
+							if cds, ok := rr.(*dns.CDS); ok {
+								outcome.cdsRecords = append(outcome.cdsRecords, cds)
+							}
+						}
 					}
 
 					useVC = false
@@ -6296,6 +6318,11 @@ func DNSSEC18(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 								outcome.cdnskeyRRSIG = append(outcome.cdnskeyRRSIG, sig)
 							}
 						}
+						for _, rr := range cdnskeyResp.GetRecords("CDNSKEY", "answer") {
+							if cdnskey, ok := rr.(*dns.CDNSKEY); ok {
+								outcome.cdnskeyRecords = append(outcome.cdnskeyRecords, cdnskey)
+							}
+						}
 					}
 
 					useVC = false
@@ -6307,6 +6334,11 @@ func DNSSEC18(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					for _, rr := range dnskeyResp.GetRecords("DNSKEY", "answer") {
 						if dnskey, ok := rr.(*dns.DNSKEY); ok {
 							outcome.dnskeyRecords = append(outcome.dnskeyRecords, dnskey)
+						}
+					}
+					for _, rr := range dnskeyResp.GetRecords("RRSIG", "answer") {
+						if sig, ok := rr.(*dns.RRSIG); ok && sig.TypeCovered == dns.TypeDNSKEY {
+							outcome.dnskeyRRSIG = append(outcome.dnskeyRRSIG, sig)
 						}
 					}
 
@@ -6326,13 +6358,16 @@ func DNSSEC18(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				if outcome.cdsHasRRset {
 					cdsRRsets[outcome.nsIP] = true
 					cdsRRSIG[outcome.nsIP] = outcome.cdsRRSIG
+					cdsRecords[outcome.nsIP] = outcome.cdsRecords
 				}
 				if outcome.cdnskeyHasRRset {
 					cdnskeyRRsets[outcome.nsIP] = true
 					cdnskeyRRSIG[outcome.nsIP] = outcome.cdnskeyRRSIG
+					cdnskeyRecords[outcome.nsIP] = outcome.cdnskeyRecords
 				}
 				if len(outcome.dnskeyRecords) > 0 {
 					dnskeyRRsets[outcome.nsIP] = outcome.dnskeyRecords
+					dnskeyRRSIGs[outcome.nsIP] = outcome.dnskeyRRSIG
 				}
 			}
 		}
@@ -6488,6 +6523,139 @@ func DNSSEC18(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				if err := appendLog(ctx, &results, testcase, "DS18_MATCH_CDNSKEY_RRSIG_DS", args); err != nil {
 					return results, err
 				}
+			}
+		}
+
+		// Rollover detection: CDS/CDNSKEY content vs parent DS, plus soft signals.
+		var rolloverEvidence bool
+
+		// CDS-vs-DS content comparison using first representative NS with CDS.
+		for _, ns := range ordered {
+			ip := ns.Address.String()
+			if !cdsRRsets[ip] {
+				continue
+			}
+			var nonDel []*dns.CDS
+			for _, cds := range cdsRecords[ip] {
+				if cds.Algorithm != 0 { // skip DELETE sentinel (Algorithm == 0)
+					nonDel = append(nonDel, cds)
+				}
+			}
+			if len(nonDel) > 0 {
+				if cdsContentMatchesDS(nonDel, dsRecords) {
+					if err := appendLog(ctx, &results, testcase, "DS18_CDS_MATCHES_DS", map[string]any{}); err != nil {
+						return results, err
+					}
+				} else {
+					rolloverEvidence = true
+					args := map[string]any{
+						"cds_keytags": keytags16FromCDS(nonDel),
+						"ds_keytags":  keytags16FromDS(dsRecords),
+					}
+					if err := appendLog(ctx, &results, testcase, "DS18_CDS_ROLLOVER_SIGNALED", args); err != nil {
+						return results, err
+					}
+				}
+			}
+			break // one representative NS is sufficient
+		}
+
+		// CDNSKEY-vs-DS content comparison using first representative NS with CDNSKEY.
+		for _, ns := range ordered {
+			ip := ns.Address.String()
+			if !cdnskeyRRsets[ip] {
+				continue
+			}
+			var nonDel []*dns.CDNSKEY
+			for _, cdnskey := range cdnskeyRecords[ip] {
+				if cdnskey.Algorithm != 0 {
+					nonDel = append(nonDel, cdnskey)
+				}
+			}
+			if len(nonDel) > 0 {
+				if cdnskeyContentMatchesDS(nonDel, dsRecords) {
+					if err := appendLog(ctx, &results, testcase, "DS18_CDNSKEY_MATCHES_DS", map[string]any{}); err != nil {
+						return results, err
+					}
+				} else {
+					rolloverEvidence = true
+					args := map[string]any{
+						"cdnskey_keytags": keytags16FromCDNSKEY(nonDel),
+						"ds_keytags":      keytags16FromDS(dsRecords),
+					}
+					if err := appendLog(ctx, &results, testcase, "DS18_CDNSKEY_ROLLOVER_SIGNALED", args); err != nil {
+						return results, err
+					}
+				}
+			}
+			break
+		}
+
+		// Soft signals: use first NS with DNSKEY records.
+		for _, ns := range ordered {
+			ip := ns.Address.String()
+			dnskeys := dnskeyRRsets[ip]
+			if len(dnskeys) == 0 {
+				continue
+			}
+
+			sepKeytags := make(map[uint16]bool)
+			for _, key := range dnskeys {
+				if key.Flags&dns.FlagSEP != 0 {
+					sepKeytags[key.KeyTag()] = true
+				}
+			}
+			dnskeyKeytagSet := make(map[uint16]bool)
+			for _, key := range dnskeys {
+				dnskeyKeytagSet[key.KeyTag()] = true
+			}
+			dsKeytags := make(map[uint16]bool)
+			for _, ds := range dsRecords {
+				dsKeytags[ds.KeyTag] = true
+			}
+			// KSK keytags appearing in DNSKEY RRSIGs (double-signature indicator).
+			dnskeySigners := make(map[uint16]bool)
+			for _, sig := range dnskeyRRSIGs[ip] {
+				if sepKeytags[sig.KeyTag] {
+					dnskeySigners[sig.KeyTag] = true
+				}
+			}
+
+			if len(sepKeytags) > 1 {
+				rolloverEvidence = true
+				if err := appendLog(ctx, &results, testcase, "DS18_ROLLOVER_EVIDENCE_MULTI_KSK",
+					map[string]any{"keytags": sortedKeytags16(sepKeytags)}); err != nil {
+					return results, err
+				}
+			}
+			if len(dnskeySigners) > 1 {
+				rolloverEvidence = true
+				if err := appendLog(ctx, &results, testcase, "DS18_ROLLOVER_EVIDENCE_DOUBLE_SIG",
+					map[string]any{"keytags": sortedKeytags16(dnskeySigners)}); err != nil {
+					return results, err
+				}
+			}
+			if orphaned := setDiff16(dsKeytags, dnskeyKeytagSet); len(orphaned) > 0 {
+				rolloverEvidence = true
+				if err := appendLog(ctx, &results, testcase, "DS18_ROLLOVER_EVIDENCE_DS_WITHOUT_DNSKEY",
+					map[string]any{"keytags": orphaned}); err != nil {
+					return results, err
+				}
+			}
+			if orphaned := setDiff16(sepKeytags, dsKeytags); len(orphaned) > 0 {
+				rolloverEvidence = true
+				if err := appendLog(ctx, &results, testcase, "DS18_ROLLOVER_EVIDENCE_DNSKEY_WITHOUT_DS",
+					map[string]any{"keytags": orphaned}); err != nil {
+					return results, err
+				}
+			}
+			break
+		}
+
+		// No CDS/CDNSKEY but rollover evidence: on-demand publication (e.g. Knot DNS).
+		if len(cdsRRsets) == 0 && len(cdnskeyRRsets) == 0 && rolloverEvidence {
+			if err := appendLog(ctx, &results, testcase, "DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE", map[string]any{}); err != nil {
+				return results, err
 			}
 		}
 	}
@@ -7443,6 +7611,131 @@ func defaultHasFakeAddresses(z *zone.Zone) bool {
 		return false
 	}
 	return rec.HasFakeAddresses(z.Name.String())
+}
+
+// dsContentKey identifies a DS record by its four comparable fields.
+type dsContentKey struct {
+	keyTag     uint16
+	algorithm  uint8
+	digestType uint8
+	digest     string
+}
+
+func makeDSContentKey(ds *dns.DS) dsContentKey {
+	return dsContentKey{keyTag: ds.KeyTag, algorithm: ds.Algorithm, digestType: ds.DigestType, digest: strings.ToLower(ds.Digest)}
+}
+
+// cdsContentMatchesDS returns true when the non-DELETE CDS set equals the parent DS set.
+func cdsContentMatchesDS(cdsRecs []*dns.CDS, dsRecs []*dns.DS) bool {
+	cdsSet := make(map[dsContentKey]bool, len(cdsRecs))
+	for _, cds := range cdsRecs {
+		cdsSet[makeDSContentKey(&cds.DS)] = true
+	}
+	dsSet := make(map[dsContentKey]bool, len(dsRecs))
+	for _, ds := range dsRecs {
+		dsSet[makeDSContentKey(ds)] = true
+	}
+	if len(cdsSet) != len(dsSet) {
+		return false
+	}
+	for k := range cdsSet {
+		if !dsSet[k] {
+			return false
+		}
+	}
+	return true
+}
+
+// cdnskeyContentMatchesDS returns true when each parent DS is covered by a CDNSKEY digest
+// and each CDNSKEY contributes at least one matching DS entry.
+func cdnskeyContentMatchesDS(cdnskeyRecs []*dns.CDNSKEY, dsRecs []*dns.DS) bool {
+	digestTypes := make(map[uint8]bool)
+	for _, ds := range dsRecs {
+		digestTypes[ds.DigestType] = true
+	}
+	dsSet := make(map[dsContentKey]bool, len(dsRecs))
+	for _, ds := range dsRecs {
+		dsSet[makeDSContentKey(ds)] = true
+	}
+	// Every CDNSKEY must contribute at least one element already in dsSet.
+	for _, cdnskey := range cdnskeyRecs {
+		contributed := false
+		for dt := range digestTypes {
+			computed := cdnskey.DNSKEY.ToDS(dt)
+			if computed != nil && dsSet[makeDSContentKey(computed)] {
+				contributed = true
+				break
+			}
+		}
+		if !contributed {
+			return false
+		}
+	}
+	// dsSet must be fully covered by CDNSKEY digests.
+	cdnskeySet := make(map[dsContentKey]bool)
+	for _, cdnskey := range cdnskeyRecs {
+		for dt := range digestTypes {
+			computed := cdnskey.DNSKEY.ToDS(dt)
+			if computed != nil {
+				cdnskeySet[makeDSContentKey(computed)] = true
+			}
+		}
+	}
+	for k := range dsSet {
+		if !cdnskeySet[k] {
+			return false
+		}
+	}
+	return true
+}
+
+// keytags16FromCDS returns a sorted de-duplicated keytag slice from CDS records.
+func keytags16FromCDS(recs []*dns.CDS) []uint16 {
+	seen := make(map[uint16]bool, len(recs))
+	for _, cds := range recs {
+		seen[cds.KeyTag] = true
+	}
+	return sortedKeytags16(seen)
+}
+
+// keytags16FromDS returns a sorted de-duplicated keytag slice from DS records.
+func keytags16FromDS(recs []*dns.DS) []uint16 {
+	seen := make(map[uint16]bool, len(recs))
+	for _, ds := range recs {
+		seen[ds.KeyTag] = true
+	}
+	return sortedKeytags16(seen)
+}
+
+// keytags16FromCDNSKEY returns a sorted de-duplicated keytag slice from CDNSKEY records.
+func keytags16FromCDNSKEY(recs []*dns.CDNSKEY) []uint16 {
+	seen := make(map[uint16]bool, len(recs))
+	for _, cdnskey := range recs {
+		seen[cdnskey.KeyTag()] = true
+	}
+	return sortedKeytags16(seen)
+}
+
+// sortedKeytags16 returns sorted keytag values from a boolean set.
+func sortedKeytags16(set map[uint16]bool) []uint16 {
+	tags := make([]uint16, 0, len(set))
+	for t := range set {
+		tags = append(tags, t)
+	}
+	sort.Slice(tags, func(i, j int) bool { return tags[i] < tags[j] })
+	return tags
+}
+
+// setDiff16 returns sorted elements present in a but absent from b.
+func setDiff16(a, b map[uint16]bool) []uint16 {
+	var diff []uint16
+	for k := range a {
+		if !b[k] {
+			diff = append(diff, k)
+		}
+	}
+	sort.Slice(diff, func(i, j int) bool { return diff[i] < diff[j] })
+	return diff
 }
 
 func containsDS(records []*dns.DS, candidate *dns.DS) bool {

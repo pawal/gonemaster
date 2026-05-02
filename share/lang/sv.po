@@ -1902,6 +1902,43 @@ msgid ""
 "with IP addresses \"{addresses}\"."
 msgstr "CDS-postuppsättningen är signerad av en DS-länkad DNSKEY. Hittades vid namnservrarna med IP-adresserna \"{addresses}\"."
 
+
+msgctxt "DNSSEC:DS18_CDS_MATCHES_DS"
+msgid "The CDS RRset content matches the parent DS RRset. No key change signaled."
+msgstr "Innehållet i CDS RR-set stämmer med den överordnade zonens DS RR-set. Ingen nyckeländring signaleras."
+
+msgctxt "DNSSEC:DS18_CDS_ROLLOVER_SIGNALED"
+msgid "The CDS RRset content differs from the parent DS RRset, signaling a key change. CDS keytags: {cds_keytags}. DS keytags: {ds_keytags}."
+msgstr "Innehållet i CDS RR-set skiljer sig från den överordnade zonens DS RR-set och signalerar en nyckeländring. CDS-keytags: {cds_keytags}. DS-keytags: {ds_keytags}."
+
+msgctxt "DNSSEC:DS18_CDNSKEY_MATCHES_DS"
+msgid "The CDNSKEY RRset content matches the parent DS RRset. No key change signaled."
+msgstr "Innehållet i CDNSKEY RR-set stämmer med den överordnade zonens DS RR-set. Ingen nyckeländring signaleras."
+
+msgctxt "DNSSEC:DS18_CDNSKEY_ROLLOVER_SIGNALED"
+msgid "The CDNSKEY RRset content differs from the parent DS RRset, signaling a key change. CDNSKEY keytags: {cdnskey_keytags}. DS keytags: {ds_keytags}."
+msgstr "Innehållet i CDNSKEY RR-set skiljer sig från den överordnade zonens DS RR-set och signalerar en nyckeländring. CDNSKEY-keytags: {cdnskey_keytags}. DS-keytags: {ds_keytags}."
+
+msgctxt "DNSSEC:DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE"
+msgid "No CDS or CDNSKEY RRset found, but other rollover evidence is present. The operator likely uses on-demand CDS/CDNSKEY publication."
+msgstr "Inga CDS- eller CDNSKEY RR-set hittades, men annan rollover-evidens finns. Operatören använder sannolikt CDS/CDNSKEY-publicering vid behov."
+
+msgctxt "DNSSEC:DS18_ROLLOVER_EVIDENCE_DOUBLE_SIG"
+msgid "The DNSKEY RRset is signed by more than one KSK keytag ({keytags}). A double-signature rollover phase may be in progress."
+msgstr "DNSKEY RR-set är signerat av mer än ett KSK-keytag ({keytags}). En rolloverfas med dubbelsignering kan pågå."
+
+msgctxt "DNSSEC:DS18_ROLLOVER_EVIDENCE_DNSKEY_WITHOUT_DS"
+msgid "Child SEP DNSKEY keytag(s) {keytags} have no matching DS record at the parent. A new KSK may be waiting for the parent DS to be updated."
+msgstr "Barnzonens SEP DNSKEY-keytag(s) {keytags} saknar motsvarande DS-post hos föräldern. En ny KSK kan vänta på att förälderns DS uppdateras."
+
+msgctxt "DNSSEC:DS18_ROLLOVER_EVIDENCE_DS_WITHOUT_DNSKEY"
+msgid "Parent DS keytag(s) {keytags} have no matching DNSKEY at the child. The old KSK may have been removed from the child zone."
+msgstr "Förälderns DS-keytag(s) {keytags} saknar motsvarande DNSKEY i barnzonen. Den gamla KSK:n kan ha tagits bort från barnzonen."
+
+msgctxt "DNSSEC:DS18_ROLLOVER_EVIDENCE_MULTI_KSK"
+msgid "Multiple SEP-flagged DNSKEYs found at the child zone (keytags: {keytags}). A KSK rollover may be in progress."
+msgstr "Flera DNSKEY-poster med SEP-flagga hittades i barnzonen (keytags: {keytags}). En KSK-rollover kan pågå."
+
 msgctxt "DNSSEC:DS19_BADKEY_FERMAT"
 msgid ""
 "DNSKEY with keytag {keytag} and algorithm {algo_descr} ({algo_num}) has RSA "

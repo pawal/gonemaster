@@ -127,6 +127,8 @@ func nsec3NonOptout(tags map[string]bool) *bool {
 // cdsCDNSKEYPublished returns:
 //   - nil   for TLD zones (parent does not consume CDS/CDNSKEY; not applicable)
 //   - true  when any DS15 "HAS_CDS" or "HAS_CDNSKEY" tag is present
+//   - nil   when DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE is present (on-demand
+//            publication model; absence is intentional, should not block A+)
 //   - false when DS15_NO_CDS_CDNSKEY is present, or when DS15 was not run
 //            (cannot confirm → not met for A+)
 func cdsCDNSKEYPublished(domain string, tags map[string]bool) *bool {
@@ -142,6 +144,12 @@ func cdsCDNSKEYPublished(domain string, tags map[string]bool) *bool {
 		if tags[t] {
 			return boolPtr(true)
 		}
+	}
+	// On-demand CDS/CDNSKEY publication (e.g. Knot DNS mid-rollover): the operator
+	// withdrew CDS/CDNSKEY after the parent updated its DS, but other rollover
+	// signals confirm the zone is correctly managed.  Treat as not-applicable.
+	if tags["DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE"] {
+		return nil
 	}
 	return boolPtr(false)
 }

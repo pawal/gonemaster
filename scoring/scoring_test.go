@@ -613,3 +613,70 @@ func TestBonus_DisabledCriteriaNotInResult(t *testing.T) {
 		t.Error("disabled criterion should not appear in result")
 	}
 }
+
+// TestBonus_CDSRolloverEvidenceIsNil checks that DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE
+// causes the cds_cdnskey_published criterion to be nil (not-applicable, not false),
+// so that on-demand CDS/CDNSKEY publication (e.g. Knot DNS) does not block A+.
+func TestBonus_CDSRolloverEvidenceIsNil(t *testing.T) {
+	entries := []Entry{
+		e("DNSSEC", "DS07_SIGNED", "INFO"),
+		e("DNSSEC", "DS05_ALGO_OK", "INFO"),
+		e("DNSSEC", "DS03_NSEC3_OPT_OUT_DISABLED", "INFO"),
+		// No DS15_HAS_* tag; rollover evidence seen instead.
+		e("DNSSEC", "DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE", "INFO"),
+		e("CONNECTIVITY", "IPV6_DIFFERENT_ASN", "INFO"),
+		e("CONNECTIVITY", "IPV4_DIFFERENT_ASN", "INFO"),
+	}
+	r := Compute("example.se", entries, cfg)
+	v := r.Bonus.Criteria["cds_cdnskey_published"]
+	if v != nil {
+		t.Errorf("expected cds_cdnskey_published nil for rollover-evidence zone, got %v", *v)
+	}
+}
+
+// TestBonus_APlusWithRolloverEvidence verifies a zone with rollover evidence but
+// no CDS/CDNSKEY and a perfect score receives grade A+.
+func TestBonus_APlusWithRolloverEvidence(t *testing.T) {
+	entries := []Entry{
+		e("DNSSEC", "DS07_SIGNED", "INFO"),
+		e("DNSSEC", "DS05_ALGO_OK", "INFO"),
+		e("DNSSEC", "DS03_NSEC3_OPT_OUT_DISABLED", "INFO"),
+		e("DNSSEC", "DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE", "INFO"),
+		e("CONNECTIVITY", "IPV6_DIFFERENT_ASN", "INFO"),
+		e("CONNECTIVITY", "IPV4_DIFFERENT_ASN", "INFO"),
+	}
+	r := Compute("example.se", entries, cfg)
+	if r.Score != 100 {
+		t.Fatalf("expected perfect score, got %d", r.Score)
+	}
+	if !r.Bonus.Eligible {
+		t.Error("expected A+ eligible when rollover evidence substitutes CDS/CDNSKEY")
+	}
+	if r.Grade != "A+" {
+		t.Errorf("expected grade A+, got %s", r.Grade)
+	}
+}
+
+// TestBonus_NoCDSWithoutRolloverEvidence verifies that absence of both
+// DS15_HAS_* and DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE still blocks A+.
+func TestBonus_NoCDSWithoutRolloverEvidence(t *testing.T) {
+	entries := []Entry{
+		e("DNSSEC", "DS07_SIGNED", "INFO"),
+		e("DNSSEC", "DS05_ALGO_OK", "INFO"),
+		e("DNSSEC", "DS03_NSEC3_OPT_OUT_DISABLED", "INFO"),
+		e("DNSSEC", "DS15_NO_CDS_CDNSKEY", "INFO"),
+		e("CONNECTIVITY", "IPV6_DIFFERENT_ASN", "INFO"),
+		e("CONNECTIVITY", "IPV4_DIFFERENT_ASN", "INFO"),
+	}
+	r := Compute("example.se", entries, cfg)
+	if r.Score != 100 {
+		t.Fatalf("expected perfect score, got %d", r.Score)
+	}
+	if r.Bonus.Eligible {
+		t.Error("should not be A+ eligible when no CDS/CDNSKEY and no rollover evidence")
+	}
+	v := r.Bonus.Criteria["cds_cdnskey_published"]
+	if v == nil || *v {
+		t.Error("expected cds_cdnskey_published = false")
+	}
+}

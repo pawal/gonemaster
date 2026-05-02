@@ -180,6 +180,10 @@ func (s *Server) Store() JobStore {
 	return s.store
 }
 
+// SHA-256 of SvelteKit's #svelte-announcer inline style; verified against
+// the embedded bundle by TestAnalysisAnnouncerHashMatchesDist.
+const announcerStyleHash = "'sha256-S8qMpvofolR8Mpjy4kQvEm7m1q8clzU4dfDH0AmvZjo='"
+
 // securityHeadersMiddleware sets defensive HTTP security headers on every
 // response. API paths get a restrictive CSP; UI/static paths get one that
 // allows same-origin scripts, styles, and data URIs.
@@ -187,8 +191,6 @@ func securityHeadersMiddleware(next http.Handler) http.Handler {
 	const apiCSP = "default-src 'none'"
 	const uiCSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'"
 	// script-src 'unsafe-inline': SvelteKit index.html bootstrap <script>.
-	// style-src hash: SvelteKit's #svelte-announcer inline style.
-	const announcerStyleHash = "'sha256-S8qMpvofolR8Mpjy4kQvEm7m1q8clzU4dfDH0AmvZjo='"
 	const analysisCSP = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-hashes' " + announcerStyleHash + "; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'"
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()

@@ -186,15 +186,16 @@ func (s *Server) Store() JobStore {
 func securityHeadersMiddleware(next http.Handler) http.Handler {
 	const apiCSP = "default-src 'none'"
 	const uiCSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'"
-	// The analysis SPA is a SvelteKit adapter-static build whose index.html
-	// includes an inline bootstrap <script>, so script-src must allow it.
-	const analysisCSP = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'"
+	// script-src 'unsafe-inline': SvelteKit index.html bootstrap <script>.
+	// style-src hash: SvelteKit's #svelte-announcer inline style.
+	const announcerStyleHash = "'sha256-S8qMpvofolR8Mpjy4kQvEm7m1q8clzU4dfDH0AmvZjo='"
+	const analysisCSP = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-hashes' " + announcerStyleHash + "; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'"
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("X-Frame-Options", "DENY")
 		h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
-		h.Set("Permissions-Policy", "geolocation=(), microphone=(), camera=(), payment=(), usb=(), bluetooth=(), serial=(), midi=(), hid=(), accelerometer=(), gyroscope=(), magnetometer=(), fullscreen=(), display-capture=(), idle-detection=(), screen-wake-lock=(), xr-spatial-tracking=(), clipboard-read=(), interest-cohort=()")
+		h.Set("Permissions-Policy", "geolocation=(), microphone=(), camera=(), payment=(), usb=(), bluetooth=(), serial=(), midi=(), hid=(), accelerometer=(), gyroscope=(), magnetometer=(), fullscreen=(), display-capture=(), idle-detection=(), screen-wake-lock=(), xr-spatial-tracking=(), clipboard-read=()")
 		switch {
 		case strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/pub/api/"):
 			h.Set("Content-Security-Policy", apiCSP)

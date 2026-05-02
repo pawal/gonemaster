@@ -103,7 +103,7 @@ func TestSecurityHeadersPermissionsPolicy(t *testing.T) {
 		"accelerometer=()", "gyroscope=()", "magnetometer=()",
 		"fullscreen=()", "display-capture=()",
 		"idle-detection=()", "screen-wake-lock=()", "xr-spatial-tracking=()",
-		"clipboard-read=()", "interest-cohort=()",
+		"clipboard-read=()",
 	}
 	for _, want := range mustLock {
 		if !strings.Contains(pp, want) {
@@ -113,6 +113,10 @@ func TestSecurityHeadersPermissionsPolicy(t *testing.T) {
 	// clipboard-write must NOT be locked: ShareButton.svelte uses it.
 	if strings.Contains(pp, "clipboard-write=") {
 		t.Errorf("Permissions-Policy must not lock clipboard-write (ShareButton uses it), got %q", pp)
+	}
+	// interest-cohort was deprecated and triggers a console warning.
+	if strings.Contains(pp, "interest-cohort") {
+		t.Errorf("Permissions-Policy must not include deprecated interest-cohort, got %q", pp)
 	}
 }
 
@@ -134,10 +138,13 @@ func TestSecurityHeadersCSPDropsUnsafeInlineStyles(t *testing.T) {
 			mustNotHave: []string{"'unsafe-inline'"},
 		},
 		{
-			path:     "/analysis/",
-			mustHave: []string{"style-src 'self';", "script-src 'self' 'unsafe-inline'"},
-			// analysisCSP keeps script-src 'unsafe-inline' for the bootstrap
-			// inline <script>, but style-src must stay clean.
+			path: "/analysis/",
+			mustHave: []string{
+				"script-src 'self' 'unsafe-inline'",
+				"style-src 'self' 'unsafe-hashes' 'sha256-",
+			},
+			// script-src keeps 'unsafe-inline' for the bootstrap <script>;
+			// style-src must not regress to a blanket 'unsafe-inline'.
 			mustNotHave: []string{"style-src 'self' 'unsafe-inline'"},
 		},
 	}

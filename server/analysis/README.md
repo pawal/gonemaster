@@ -37,12 +37,45 @@ These tables are explicitly cohort-scoped in V1:
 - `analysis_run_ns_endpoints`
 - `analysis_run_address_asns`
 - `analysis_run_domain_summary`
+- `analysis_run_domain_facts`
 - `analysis_projection_state`
 
 Every materialized fact row is keyed by `cohort_id` so multiple analyzed tags
 can coexist safely. Public visibility is applied at query time from
 `analysis_cohort_catalog`; it is not implied by the presence of materialized
 rows alone.
+
+### Adding a domain-fact category
+
+`analysis_run_domain_facts` is the generic per-(cohort, run, domain) fact
+store backing the overview's distribution bars (DNSSEC posture, DNSKEY
+algorithms, grade, ...). Adding a new category does not need a schema
+change; the data model is already a `(category, fact_key, value_num)`
+triple.
+
+1. Declare wire tokens in `server/analysis_fact_categories.go`:
+   add a `FactCategory<Name>` constant for the category, plus any stable
+   key constants the extractor will emit.
+2. Register display metadata in `factCategoryDisplays` in the same file:
+   label, description, sort order, plus `KeyLabel` / `KeyTone` /
+   `KeyOrder` helpers. Tone tokens are the same set the bar component
+   already understands (`ok`, `notice`, `warning`, `error`, `critical`,
+   `neutral`).
+3. Write the extractor in `server/analysis/projector_domain_facts.go`
+   as `func extract<Name>(input RunInput) []extractedDomainFact`.
+   Source from `input.Entries` (tags / args) or `input.Run` (typed run
+   fields). Emit one row per distinct `(category, key)`; `value_num`
+   is optional informational payload.
+4. Wire the extractor into the dispatcher in `extractDomainFacts`. The
+   dispatcher dedupes on `(category, key)` and sorts deterministically.
+5. Cover it with unit tests in
+   `server/analysis/projector_domain_facts_test.go`. The existing
+   `TestExtractDNSKEYAlgorithms` / `TestExtractSignedStatus` tests are
+   the model.
+
+No new HTTP endpoint, no UI work: the cohort detail handler builds
+`fact_distributions` from any registered category, and
+`FactDistributionBar.svelte` iterates whatever the API returns.
 
 ## Scope Semantics
 

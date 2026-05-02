@@ -1,8 +1,10 @@
 package analysis
 
 import (
+	"reflect"
 	"sort"
 	"testing"
+	"time"
 
 	serverpkg "codeberg.org/pawal/gonemaster/server"
 )
@@ -226,6 +228,77 @@ func TestBuildDomainFactRowsAttachesRunCohortDomain(t *testing.T) {
 	}
 	if rows[1].ValueNum != nil {
 		t.Fatalf("expected nil value_num for signed fact, got %+v", rows[1].ValueNum)
+	}
+}
+
+// Reprojecting the same run must produce byte-identical domain-fact rows.
+// Replace-per-run semantics are inherited from the shared store helper, but
+// drift in extractor ordering or dedupe would only surface here.
+func TestProjectorProjectRunDomainFactsIdempotent(t *testing.T) {
+	grade := "A"
+	run := serverpkg.Run{
+		ID:         "run-facts",
+		DomainID:   404,
+		Domain:     "facts.test",
+		Status:     serverpkg.JobSucceeded,
+		EntryCount: 3,
+		FinishedAt: time.Date(2026, 5, 1, 9, 0, 0, 0, time.UTC),
+		Grade:      &grade,
+	}
+	store := &fakeStore{
+		runs: map[string]serverpkg.Run{run.ID: run},
+		entries: map[string][]serverpkg.Entry{
+			run.ID: {
+				{
+					RunID: run.ID, DomainID: run.DomainID,
+					Module: "DNSSEC", Testcase: "dnssec05", Tag: "DS05_ALGO_OK",
+					Args: map[string]any{"keytag": uint16(1234), "algo_num": uint8(8)},
+				},
+				{
+					RunID: run.ID, DomainID: run.DomainID,
+					Module: "DNSSEC", Testcase: "dnssec05", Tag: "DS05_ALGO_OK",
+					Args: map[string]any{"keytag": uint16(5678), "algo_num": uint8(13)},
+				},
+				{
+					RunID: run.ID, DomainID: run.DomainID,
+					Module: "DNSSEC", Testcase: "dnssec07", Tag: "DS07_SIGNED",
+				},
+			},
+		},
+		tags:    map[int64][]string{run.DomainID: {"tld"}},
+		cohorts: []serverpkg.AnalysisCohort{{ID: 11, SourceType: "tag", SourceTag: "tld", Label: "TLD", AnalysisEnabled: true, SortOrder: 10}},
+	}
+
+	projector := NewProjector(store)
+	if err := projector.ProjectRun(run.ID); err != nil {
+		t.Fatalf("ProjectRun first pass: %v", err)
+	}
+	first := append([]serverpkg.AnalysisRunDomainFact(nil), store.domainFacts[projectionKey(11, run.ID)]...)
+
+	want := map[string]bool{
+		factCategoryDNSKEYAlgorithm + "/8":  true,
+		factCategoryDNSKEYAlgorithm + "/13": true,
+		factCategorySigned + "/" + factKeySigned: true,
+		factCategoryGrade + "/A":                 true,
+	}
+	if len(first) != len(want) {
+		t.Fatalf("expected %d domain-fact rows, got %d: %+v", len(want), len(first), first)
+	}
+	for _, row := range first {
+		if !want[row.Category+"/"+row.Key] {
+			t.Fatalf("unexpected row %+v", row)
+		}
+		if row.CohortID != 11 || row.RunID != run.ID || row.DomainID != run.DomainID {
+			t.Fatalf("row identity wrong: %+v", row)
+		}
+	}
+
+	if err := projector.ProjectRun(run.ID); err != nil {
+		t.Fatalf("ProjectRun second pass: %v", err)
+	}
+	second := store.domainFacts[projectionKey(11, run.ID)]
+	if !reflect.DeepEqual(first, second) {
+		t.Fatalf("domain facts changed across reprojection:\nfirst=%+v\nsecond=%+v", first, second)
 	}
 }
 

@@ -187,6 +187,52 @@ func TestPublicAnalysisCohortDetailFactDistributions(t *testing.T) {
 	}
 }
 
+// TestPublicAnalysisCohortDetailFactDistributionsRedactInternalIDs pins
+// the public shape of fact_distributions: the response builds from rows
+// that carry cohort_id, run_id, domain_id, but those keys must collapse
+// into counts before reaching the wire. The general redaction test seeds
+// no fact rows, so this one specifically exercises the fact_distributions
+// surface to keep an extractor or registry refactor from leaking IDs.
+func TestPublicAnalysisCohortDetailFactDistributionsRedactInternalIDs(t *testing.T) {
+	f := newAnalysisAPITestFixture(t)
+	ts := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+
+	run := f.seedGraduatedRun("signed.example", ts, []engine.LogEntry{
+		{Module: "DNSSEC", Testcase: "dnssec05", Tag: "DS05_ALGO_OK", Level: "INFO"},
+	})
+	d, _ := f.store.GetDomainByName("signed.example")
+	one := int64(1)
+	if err := f.store.ReplaceAnalysisRunDomainFacts(f.cohort.ID, run.ID, []AnalysisRunDomainFact{
+		{CohortID: f.cohort.ID, RunID: run.ID, DomainID: d.ID, Category: FactCategorySigned, Key: FactKeySigned},
+		{CohortID: f.cohort.ID, RunID: run.ID, DomainID: d.ID, Category: FactCategoryDNSKEYAlgorithm, Key: "13", ValueNum: &one},
+		{CohortID: f.cohort.ID, RunID: run.ID, DomainID: d.ID, Category: FactCategoryGrade, Key: "A"},
+	}); err != nil {
+		t.Fatalf("replace domain facts: %v", err)
+	}
+	f.refreshSnapshotViews(f.batchID)
+
+	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/tld")
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
+	}
+	var got PublicAnalysisCohortDetail
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(got.FactDistributions) == 0 {
+		t.Fatalf("fixture did not populate fact_distributions; redaction check would be vacuous")
+	}
+
+	body := resp.Body.String()
+	for _, needle := range []string{
+		`"cohort_id"`, `"run_id"`, `"domain_id"`, `"value_num"`, `"id"`,
+	} {
+		if strings.Contains(body, needle) {
+			t.Fatalf("fact_distributions response leaks %s: %s", needle, body)
+		}
+	}
+}
+
 // TestPublicAnalysisDomainDetailSurfacesNameserverStatus pins the .ck
 // "circa" and "downstage" shapes on the domain detail response. Each
 // nameserver is rendered with an explicit status so the UI can draw a

@@ -54,13 +54,19 @@
     F: 5
   };
 
-  const SIGNED_TONE: Record<string, string> = {
-    signed: "ok",
-    unsigned: "warning"
+  const DNSSEC_POSTURE_TONE: Record<string, string> = {
+    unsigned: "warning",
+    signed: "neutral",
+    nsec: "neutral",
+    nsec3: "neutral",
+    mixed: "warning"
   };
-  const SIGNED_ORDER: Record<string, number> = {
-    signed: 0,
-    unsigned: 1
+  const DNSSEC_POSTURE_ORDER: Record<string, number> = {
+    unsigned: 0,
+    signed: 1,
+    nsec: 2,
+    nsec3: 3,
+    mixed: 4
   };
 
   // DNSKEY algorithm tones color modern curves green, SHA-256 RSA blue
@@ -83,12 +89,12 @@
 
   function toneForKey(category: string, key: string): string | null {
     switch (category) {
-      case "severity_distribution":
+      case "severity":
         return SEVERITY_TONE[key.toUpperCase()] ?? null;
-      case "grade_distribution":
+      case "grade":
         return GRADE_TONE[key] ?? null;
-      case "signed":
-        return SIGNED_TONE[key] ?? null;
+      case "dnssec_posture":
+        return DNSSEC_POSTURE_TONE[key] ?? null;
       case "dnskey_algo": {
         const n = Number(key);
         if (!Number.isFinite(n)) return null;
@@ -101,12 +107,12 @@
 
   function rankForKey(category: string, key: string): number | null {
     switch (category) {
-      case "severity_distribution":
+      case "severity":
         return SEVERITY_ORDER[key.toUpperCase()] ?? null;
-      case "grade_distribution":
+      case "grade":
         return GRADE_ORDER[key] ?? null;
-      case "signed":
-        return SIGNED_ORDER[key] ?? null;
+      case "dnssec_posture":
+        return DNSSEC_POSTURE_ORDER[key] ?? null;
       case "dnskey_algo": {
         const n = Number(key);
         return Number.isFinite(n) ? n : null;

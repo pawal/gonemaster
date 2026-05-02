@@ -366,10 +366,21 @@ func TestSQLJobStoreReplaceSnapshotOverview(t *testing.T) {
 			}
 
 			initial := SnapshotOverviewV2{
-				Totals:               SnapshotOverviewTotals{DomainCount: 2},
-				GradeDistribution:    map[string]int{"A": 1},
-				Signed:               map[string]int{"signed": 1, "unsigned": 0},
-				SeverityDistribution: map[string]int{"OK": 2},
+				Totals: SnapshotOverviewTotals{DomainCount: 2},
+				FactDistributions: map[string]PublicAnalysisFactDistribution{
+					FactCategoryGrade: {
+						Category: FactCategoryGrade,
+						Buckets:  []PublicAnalysisFactBucket{{Key: "A", Count: 1}},
+					},
+					FactCategoryDNSSECPosture: {
+						Category: FactCategoryDNSSECPosture,
+						Buckets:  []PublicAnalysisFactBucket{{Key: FactKeyNSEC3, Count: 1}},
+					},
+					FactCategorySeverity: {
+						Category: FactCategorySeverity,
+						Buckets:  []PublicAnalysisFactBucket{{Key: "OK", Count: 2}},
+					},
+				},
 			}
 			if err := s.ReplaceSnapshotOverview(snap.ID, initial); err != nil {
 				t.Fatalf("Replace initial: %v", err)
@@ -381,13 +392,20 @@ func TestSQLJobStoreReplaceSnapshotOverview(t *testing.T) {
 			if got.Totals.DomainCount != 2 {
 				t.Fatalf("DomainCount = %d, want 2", got.Totals.DomainCount)
 			}
-			if got.GradeDistribution["A"] != 1 || got.Signed["signed"] != 1 {
+			grade := bucketsToCounts(got.FactDistributions[FactCategoryGrade].Buckets)
+			posture := bucketsToCounts(got.FactDistributions[FactCategoryDNSSECPosture].Buckets)
+			if grade["A"] != 1 || posture[FactKeyNSEC3] != 1 {
 				t.Fatalf("payload mismatch: %+v", got)
 			}
 
 			// Replacement must atomically swap.
 			replacement := SnapshotOverviewV2{
-				Signed: map[string]int{"signed": 2, "unsigned": 0},
+				FactDistributions: map[string]PublicAnalysisFactDistribution{
+					FactCategoryDNSSECPosture: {
+						Category: FactCategoryDNSSECPosture,
+						Buckets:  []PublicAnalysisFactBucket{{Key: FactKeyNSEC3, Count: 2}},
+					},
+				},
 			}
 			if err := s.ReplaceSnapshotOverview(snap.ID, replacement); err != nil {
 				t.Fatalf("Replace second: %v", err)
@@ -396,11 +414,12 @@ func TestSQLJobStoreReplaceSnapshotOverview(t *testing.T) {
 			if !ok {
 				t.Fatal("expected overview row after second replace")
 			}
-			if got.Signed["signed"] != 2 {
+			postureAfter := bucketsToCounts(got.FactDistributions[FactCategoryDNSSECPosture].Buckets)
+			if postureAfter[FactKeyNSEC3] != 2 {
 				t.Fatalf("replacement payload not stored: %+v", got)
 			}
-			if len(got.GradeDistribution) != 0 {
-				t.Fatalf("old GradeDistribution leaked into replacement: %+v", got)
+			if _, leaked := got.FactDistributions[FactCategoryGrade]; leaked {
+				t.Fatalf("old grade distribution leaked into replacement: %+v", got)
 			}
 		})
 	}

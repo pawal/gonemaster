@@ -72,20 +72,26 @@ func TestComputeSnapshotOverviewSeverityAndGrade(t *testing.T) {
 		}); err != nil {
 			t.Fatalf("upsert summary %d: %v", i, err)
 		}
+		if err := s.ReplaceAnalysisRunDomainFacts(cohort.ID, rec.runID, []AnalysisRunDomainFact{
+			{CohortID: cohort.ID, RunID: rec.runID, DomainID: rec.domainID, Category: FactCategorySeverity, Key: rec.worst},
+			{CohortID: cohort.ID, RunID: rec.runID, DomainID: rec.domainID, Category: FactCategoryGrade, Key: rec.grade},
+		}); err != nil {
+			t.Fatalf("replace facts %d: %v", i, err)
+		}
 	}
 
 	overview, err := s.ComputeSnapshotOverview(cohort.ID, "batch-x")
 	if err != nil {
 		t.Fatalf("ComputeSnapshotOverview: %v", err)
 	}
-	severity := overview.SeverityDistribution
+	severity := bucketsToCounts(overview.FactDistributions[FactCategorySeverity].Buckets)
 	if severity["NOTICE"] != 1 || severity["WARNING"] != 1 {
 		t.Fatalf("severity counts = %v", severity)
 	}
 	if _, ok := severity["CRITICAL"]; ok {
 		t.Fatalf("severity leaked the out-of-batch CRITICAL row: %v", severity)
 	}
-	grades := overview.GradeDistribution
+	grades := bucketsToCounts(overview.FactDistributions[FactCategoryGrade].Buckets)
 	if grades["A"] != 1 || grades["B"] != 1 {
 		t.Fatalf("grade counts = %v", grades)
 	}

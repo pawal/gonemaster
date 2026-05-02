@@ -29,30 +29,30 @@ function evt(overrides: {
 }
 
 describe("+trends.load", () => {
-  it("falls back to severity_distribution when ?category= is unknown or missing", async () => {
+  it("falls back to severity when ?category= is unknown or missing", async () => {
     const calls: string[] = [];
     const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
       calls.push(typeof input === "string" ? input : (input as URL).toString());
-      return stubResponse({ dataset_tag: "tld", category: "severity_distribution", points: [] });
+      return stubResponse({ dataset_tag: "tld", category: "severity", points: [] });
     }) as unknown as typeof fetch;
 
     const data = await load(evt({ resolvedCohort: "tld", fetchImpl }));
-    expect(data.category).toBe("severity_distribution");
-    expect(calls[0]).toContain("category=severity_distribution");
+    expect(data.category).toBe("severity");
+    expect(calls[0]).toContain("category=severity");
   });
 
   it("forwards a known ?category= to the trends endpoint", async () => {
     const calls: string[] = [];
     const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
       calls.push(typeof input === "string" ? input : (input as URL).toString());
-      return stubResponse({ dataset_tag: "tld", category: "grade_distribution", points: [] });
+      return stubResponse({ dataset_tag: "tld", category: "grade", points: [] });
     }) as unknown as typeof fetch;
 
     const data = await load(
-      evt({ resolvedCohort: "tld", fetchImpl, search: "?category=grade_distribution" })
+      evt({ resolvedCohort: "tld", fetchImpl, search: "?category=grade" })
     );
-    expect(data.category).toBe("grade_distribution");
-    expect(calls[0]).toContain("category=grade_distribution");
+    expect(data.category).toBe("grade");
+    expect(calls[0]).toContain("category=grade");
   });
 
   it("returns points verbatim so the page can stack them", async () => {
@@ -61,10 +61,10 @@ describe("+trends.load", () => {
       { slug: "2026-04-01", captured_at: "2026-04-01T00:00:00Z", payload: { A: 6, B: 2, C: 1 } }
     ];
     const fetchImpl = vi.fn().mockResolvedValue(
-      stubResponse({ dataset_tag: "tld", category: "grade_distribution", points })
+      stubResponse({ dataset_tag: "tld", category: "grade", points })
     ) as unknown as typeof fetch;
     const data = await load(
-      evt({ resolvedCohort: "tld", fetchImpl, search: "?category=grade_distribution" })
+      evt({ resolvedCohort: "tld", fetchImpl, search: "?category=grade" })
     );
     expect(data.points).toEqual(points);
   });

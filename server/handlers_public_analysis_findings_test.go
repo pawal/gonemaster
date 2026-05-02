@@ -85,6 +85,21 @@ func (f *analysisAPITestFixture) seedGraduatedRunInBatch(batchID, domainName str
 	if err := f.store.ReplaceAnalysisRunTagSummaries(f.cohort.ID, runID, rows); err != nil {
 		f.t.Fatalf("replace tag summaries: %v", err)
 	}
+	// Mirror what the projector would emit so tests reading
+	// fact_distributions see severity + grade without each fixture having
+	// to seed them. Tests that override domain facts via
+	// ReplaceAnalysisRunDomainFacts after this helper runs are responsible
+	// for re-emitting any rows they still want.
+	severity := strings.ToUpper(strings.TrimSpace(run.WorstLevel))
+	if severity == "" {
+		severity = "OK"
+	}
+	if err := f.store.ReplaceAnalysisRunDomainFacts(f.cohort.ID, runID, []AnalysisRunDomainFact{
+		{CohortID: f.cohort.ID, RunID: runID, DomainID: domain.ID, Category: FactCategorySeverity, Key: severity},
+		{CohortID: f.cohort.ID, RunID: runID, DomainID: domain.ID, Category: FactCategoryGrade, Key: grade},
+	}); err != nil {
+		f.t.Fatalf("replace domain facts: %v", err)
+	}
 	f.refreshSnapshotViews(batchID)
 	return run
 }

@@ -11,12 +11,16 @@ import (
 // wire-format tokens. Adding a new statistic means adding one constant
 // plus one entry in factCategoryDisplay below.
 const (
-	FactCategoryDNSKEYAlgorithm = "dnskey_algo"
-	FactCategorySigned          = "signed"
+	FactCategorySeverity        = "severity"
+	FactCategoryDNSSECPosture   = "dnssec_posture"
 	FactCategoryGrade           = "grade"
+	FactCategoryDNSKEYAlgorithm = "dnskey_algo"
 
-	FactKeySigned   = "signed"
-	FactKeyUnsigned = "unsigned"
+	FactKeySigned     = "signed"
+	FactKeyUnsigned   = "unsigned"
+	FactKeyNSEC       = "nsec"
+	FactKeyNSEC3      = "nsec3"
+	FactKeyNSECMixed  = "mixed"
 )
 
 // factCategoryDisplay carries the UI-side metadata for one category:
@@ -43,21 +47,21 @@ type factCategoryDisplay struct {
 // factCategoryDisplays is the registry consumed by the cohort detail
 // handler to build fact_distributions response payloads.
 var factCategoryDisplays = map[string]factCategoryDisplay{
-	FactCategorySigned: {
-		Label:       "DNSSEC posture",
-		Description: "Signed vs unsigned domains in the cohort.",
-		Order:       10,
-		KeyLabel:    signedKeyLabel,
-		KeyTone:     signedKeyTone,
-		KeyOrder:    signedKeyOrder,
+	FactCategorySeverity: {
+		Label:       "Domain health",
+		Description: "Each domain counted by the worst severity in its latest run.",
+		Order:       5,
+		KeyLabel:    severityKeyLabel,
+		KeyTone:     severityKeyTone,
+		KeyOrder:    severityKeyOrder,
 	},
-	FactCategoryDNSKEYAlgorithm: {
-		Label:       "DNSKEY algorithms",
-		Description: "Signing algorithms published by the cohort's signed domains.",
-		Order:       20,
-		KeyLabel:    dnskeyAlgorithmKeyLabel,
-		KeyTone:     dnskeyAlgorithmKeyTone,
-		KeyOrder:    dnskeyAlgorithmKeyOrder,
+	FactCategoryDNSSECPosture: {
+		Label:       "DNSSEC posture",
+		Description: "Whether domains are signed and which denial-of-existence mode they use.",
+		Order:       10,
+		KeyLabel:    dnssecPostureKeyLabel,
+		KeyTone:     dnssecPostureKeyTone,
+		KeyOrder:    dnssecPostureKeyOrder,
 	},
 	FactCategoryGrade: {
 		Label: "Grade distribution",
@@ -71,34 +75,105 @@ var factCategoryDisplays = map[string]factCategoryDisplay{
 		KeyTone:     gradeKeyTone,
 		KeyOrder:    gradeKeyOrder,
 	},
+	FactCategoryDNSKEYAlgorithm: {
+		Label:       "DNSKEY algorithms",
+		Description: "Signing algorithms published by the cohort's signed domains.",
+		Order:       20,
+		KeyLabel:    dnskeyAlgorithmKeyLabel,
+		KeyTone:     dnskeyAlgorithmKeyTone,
+		KeyOrder:    dnskeyAlgorithmKeyOrder,
+	},
 }
 
-func signedKeyLabel(key string) string {
-	switch key {
-	case FactKeySigned:
-		return "Signed"
-	case FactKeyUnsigned:
-		return "Unsigned"
+// severityLabels mirrors the worst_level set the projector emits per run.
+// Keys are uppercase to match the engine's level vocabulary.
+var severityLabels = map[string]string{
+	"OK":       "OK",
+	"NOTICE":   "Notice",
+	"WARNING":  "Warning",
+	"ERROR":    "Error",
+	"CRITICAL": "Critical",
+}
+
+var severityTones = map[string]string{
+	"OK":       "ok",
+	"NOTICE":   "notice",
+	"WARNING":  "warning",
+	"ERROR":    "error",
+	"CRITICAL": "critical",
+}
+
+var severityOrder = map[string]int{
+	"OK":       0,
+	"NOTICE":   1,
+	"WARNING":  2,
+	"ERROR":    3,
+	"CRITICAL": 4,
+}
+
+func severityKeyLabel(key string) string {
+	if label, ok := severityLabels[key]; ok {
+		return label
 	}
 	return key
 }
 
-func signedKeyTone(key string) string {
-	switch key {
-	case FactKeySigned:
-		return "ok"
-	case FactKeyUnsigned:
-		return "warning"
+func severityKeyTone(key string) string {
+	if tone, ok := severityTones[key]; ok {
+		return tone
 	}
 	return "neutral"
 }
 
-func signedKeyOrder(key string) int {
+func severityKeyOrder(key string) int {
+	if n, ok := severityOrder[key]; ok {
+		return n
+	}
+	return 99
+}
+
+func dnssecPostureKeyLabel(key string) string {
 	switch key {
-	case FactKeySigned:
-		return 0
 	case FactKeyUnsigned:
+		return "Unsigned"
+	case FactKeySigned:
+		return "Signed"
+	case FactKeyNSEC:
+		return "NSEC"
+	case FactKeyNSEC3:
+		return "NSEC3"
+	case FactKeyNSECMixed:
+		return "Mixed NSEC/NSEC3"
+	}
+	return key
+}
+
+// Tones treat NSEC and NSEC3 as both valid choices (neutral). Unsigned
+// flags as warning because DNSSEC is generally encouraged for TLD-style
+// cohorts, and mixed flags as warning because it usually means a zone
+// caught mid-rollover rather than a deliberate end-state.
+func dnssecPostureKeyTone(key string) string {
+	switch key {
+	case FactKeyUnsigned, FactKeyNSECMixed:
+		return "warning"
+	case FactKeyNSEC, FactKeyNSEC3, FactKeySigned:
+		return "neutral"
+	}
+	return "neutral"
+}
+
+func dnssecPostureKeyOrder(key string) int {
+	switch key {
+	case FactKeyUnsigned:
+		return 0
+	case FactKeySigned:
 		return 1
+	case FactKeyNSEC:
+		return 2
+	case FactKeyNSEC3:
+		return 3
+	case FactKeyNSECMixed:
+		return 4
 	}
 	return 99
 }

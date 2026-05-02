@@ -6,17 +6,15 @@ import (
 	"fmt"
 )
 
-// Trend payload keys, kept stable so the analysis-ui's trend chart
-// switches behave identically before and after the overview-view move.
+// Trend payload keys for the non-fact-category aggregate slots. The fact
+// category constants (FactCategorySeverity, FactCategoryDNSSECPosture, ...)
+// double as trend keys for everything backed by the per-domain fact store,
+// so they don't need their own SnapshotAggregate* alias.
 const (
-	SnapshotAggregateSeverityDistribution = "severity_distribution"
-	SnapshotAggregateGradeDistribution    = "grade_distribution"
-	SnapshotAggregateSigned               = "signed"
-	SnapshotAggregateDNSKEYAlgo           = "dnskey_algo"
-	SnapshotAggregateTopTags              = "top_tags"
-	SnapshotAggregateTopNameservers       = "top_nameservers"
-	SnapshotAggregateTopASNs              = "top_asns"
-	SnapshotAggregateOverviewV2           = "overview_v2"
+	SnapshotAggregateTopTags        = "top_tags"
+	SnapshotAggregateTopNameservers = "top_nameservers"
+	SnapshotAggregateTopASNs        = "top_asns"
+	SnapshotAggregateOverviewV2     = "overview_v2"
 )
 
 const snapshotTopN = 20
@@ -52,25 +50,23 @@ type SnapshotOverviewTotals struct {
 }
 
 // SnapshotOverviewV2 is the consolidated overview payload baked into one
-// per-snapshot row at capture time.
+// per-snapshot row at capture time. All distribution-shaped data (severity,
+// DNSSEC posture, grade, DNSKEY algorithm, future categories) lives in
+// FactDistributions; only top-N lists and totals get their own slots.
 type SnapshotOverviewV2 struct {
-	Totals               SnapshotOverviewTotals                    `json:"totals"`
-	SeverityDistribution map[string]int                            `json:"severity_distribution"`
-	GradeDistribution    map[string]int                            `json:"grade_distribution"`
-	Signed               map[string]int                            `json:"signed"`
-	DNSKEYAlgo           map[string]int                            `json:"dnskey_algo"`
-	TopTags              []TopTagEntry                             `json:"top_tags"`
-	TopNameservers       []TopNameserverEntry                      `json:"top_nameservers"`
-	TopASNs              []TopASNEntry                             `json:"top_asns"`
-	FactDistributions    map[string]PublicAnalysisFactDistribution `json:"fact_distributions,omitempty"`
+	Totals            SnapshotOverviewTotals                    `json:"totals"`
+	TopTags           []TopTagEntry                             `json:"top_tags"`
+	TopNameservers    []TopNameserverEntry                      `json:"top_nameservers"`
+	TopASNs           []TopASNEntry                             `json:"top_asns"`
+	FactDistributions map[string]PublicAnalysisFactDistribution `json:"fact_distributions,omitempty"`
 }
 
-// AsCategoryPayloads returns the legacy category->raw-JSON map shape that
-// the trend handler and snapshot detail expose. Categories with empty
-// payloads are still emitted so the trend chart sees a continuous
-// timeline.
+// AsCategoryPayloads returns the category->raw-JSON map shape that the
+// trend handler and snapshot detail expose. Each fact-distribution
+// category is emitted as a count map so the trend chart sees the same
+// {key: count} shape regardless of which statistic it tracks.
 func (o SnapshotOverviewV2) AsCategoryPayloads() (map[string]json.RawMessage, error) {
-	out := make(map[string]json.RawMessage, 8)
+	out := make(map[string]json.RawMessage, 4+len(o.FactDistributions))
 	emit := func(category string, payload any) error {
 		b, err := json.Marshal(payload)
 		if err != nil {
@@ -79,17 +75,10 @@ func (o SnapshotOverviewV2) AsCategoryPayloads() (map[string]json.RawMessage, er
 		out[category] = json.RawMessage(b)
 		return nil
 	}
-	if err := emit(SnapshotAggregateSeverityDistribution, o.SeverityDistribution); err != nil {
-		return nil, err
-	}
-	if err := emit(SnapshotAggregateGradeDistribution, o.GradeDistribution); err != nil {
-		return nil, err
-	}
-	if err := emit(SnapshotAggregateSigned, o.Signed); err != nil {
-		return nil, err
-	}
-	if err := emit(SnapshotAggregateDNSKEYAlgo, o.DNSKEYAlgo); err != nil {
-		return nil, err
+	for category, dist := range o.FactDistributions {
+		if err := emit(category, bucketsToCounts(dist.Buckets)); err != nil {
+			return nil, err
+		}
 	}
 	if err := emit(SnapshotAggregateTopTags, o.TopTags); err != nil {
 		return nil, err
@@ -106,6 +95,14 @@ func (o SnapshotOverviewV2) AsCategoryPayloads() (map[string]json.RawMessage, er
 	return out, nil
 }
 
+func bucketsToCounts(buckets []PublicAnalysisFactBucket) map[string]int {
+	out := make(map[string]int, len(buckets))
+	for _, b := range buckets {
+		out[b.Key] = b.Count
+	}
+	return out
+}
+
 // ComputeSnapshotOverview builds the per-snapshot overview payload from
 // the (cohort, batch) fact rows. Caller persists it via
 // ReplaceSnapshotOverview at capture time.
@@ -113,19 +110,7 @@ func (s *SQLJobStore) ComputeSnapshotOverview(cohortID int64, batchID string) (S
 	if batchID == "" {
 		return SnapshotOverviewV2{}, fmt.Errorf("compute snapshot overview: batch_id is required")
 	}
-	severity, err := s.queryBatchSeverityDistribution(cohortID, batchID)
-	if err != nil {
-		return SnapshotOverviewV2{}, err
-	}
-	grades, err := s.queryBatchGradeDistribution(cohortID, batchID)
-	if err != nil {
-		return SnapshotOverviewV2{}, err
-	}
-	signed, err := s.queryBatchFactDistribution(cohortID, batchID, FactCategorySigned)
-	if err != nil {
-		return SnapshotOverviewV2{}, err
-	}
-	dnskey, err := s.queryBatchFactDistribution(cohortID, batchID, FactCategoryDNSKEYAlgorithm)
+	allFacts, err := s.queryBatchAllFactDistributions(cohortID, batchID)
 	if err != nil {
 		return SnapshotOverviewV2{}, err
 	}
@@ -145,48 +130,25 @@ func (s *SQLJobStore) ComputeSnapshotOverview(cohortID int64, batchID string) (S
 	if err != nil {
 		return SnapshotOverviewV2{}, err
 	}
-	factDistributions := map[string]PublicAnalysisFactDistribution{}
-	if len(grades) > 0 {
-		factDistributions[FactCategoryGrade] = factDistributionFromCounts(FactCategoryGrade, grades)
-	}
-	if len(signed) > 0 {
-		factDistributions[FactCategorySigned] = factDistributionFromCounts(FactCategorySigned, signed)
-	}
-	if len(dnskey) > 0 {
-		factDistributions[FactCategoryDNSKEYAlgorithm] = factDistributionFromCounts(FactCategoryDNSKEYAlgorithm, dnskey)
+	factDistributions := make(map[string]PublicAnalysisFactDistribution, len(allFacts))
+	for category, counts := range allFacts {
+		if len(counts) == 0 {
+			continue
+		}
+		factDistributions[category] = factDistributionFromCounts(category, counts)
 	}
 	return SnapshotOverviewV2{
-		Totals:               totals,
-		SeverityDistribution: severity,
-		GradeDistribution:    grades,
-		Signed:               signed,
-		DNSKEYAlgo:           dnskey,
-		TopTags:              topTags,
-		TopNameservers:       topNameservers,
-		TopASNs:              topASNs,
-		FactDistributions:    factDistributions,
+		Totals:            totals,
+		TopTags:           topTags,
+		TopNameservers:    topNameservers,
+		TopASNs:           topASNs,
+		FactDistributions: factDistributions,
 	}, nil
 }
 
 // ReplaceSnapshotOverview swaps the row for one snapshot. Idempotent on
 // re-run via DELETE+INSERT.
 func (s *SQLJobStore) ReplaceSnapshotOverview(snapshotID int64, overview SnapshotOverviewV2) error {
-	severityJSON, err := marshalCountMap(overview.SeverityDistribution)
-	if err != nil {
-		return fmt.Errorf("marshal severity_distribution: %w", err)
-	}
-	gradeJSON, err := marshalCountMap(overview.GradeDistribution)
-	if err != nil {
-		return fmt.Errorf("marshal grade_distribution: %w", err)
-	}
-	signedJSON, err := marshalCountMap(overview.Signed)
-	if err != nil {
-		return fmt.Errorf("marshal signed: %w", err)
-	}
-	dnskeyJSON, err := marshalCountMap(overview.DNSKEYAlgo)
-	if err != nil {
-		return fmt.Errorf("marshal dnskey_algo: %w", err)
-	}
 	tagsJSON, err := json.Marshal(overview.TopTags)
 	if err != nil {
 		return fmt.Errorf("marshal top_tags: %w", err)
@@ -227,13 +189,11 @@ func (s *SQLJobStore) ReplaceSnapshotOverview(snapshotID int64, overview Snapsho
 	if _, err := tx.Exec(
 		fmt.Sprintf(`INSERT INTO analysis_snapshot_overview_view
 			(snapshot_id, domain_count, nameserver_count, endpoint_count, asn_count, prefix_count,
-			 severity_distribution_json, grade_distribution_json, signed_json, dnskey_algo_json,
 			 top_tags_json, top_nameservers_json, top_asns_json, fact_distributions_json)
-			VALUES (%s)`, s.phRange(1, 14)),
+			VALUES (%s)`, s.phRange(1, 10)),
 		snapshotID,
 		overview.Totals.DomainCount, overview.Totals.NameserverCount, overview.Totals.EndpointCount,
 		overview.Totals.ASNCount, overview.Totals.PrefixCount,
-		string(severityJSON), string(gradeJSON), string(signedJSON), string(dnskeyJSON),
 		string(tagsJSON), string(nsJSON), string(asnsJSON), string(factJSON),
 	); err != nil {
 		_ = tx.Rollback()
@@ -245,13 +205,6 @@ func (s *SQLJobStore) ReplaceSnapshotOverview(snapshotID int64, overview Snapsho
 	return nil
 }
 
-func marshalCountMap(m map[string]int) ([]byte, error) {
-	if m == nil {
-		return []byte("{}"), nil
-	}
-	return json.Marshal(m)
-}
-
 func marshalFactDistributions(m map[string]PublicAnalysisFactDistribution) ([]byte, error) {
 	if m == nil {
 		return []byte("{}"), nil
@@ -261,19 +214,16 @@ func marshalFactDistributions(m map[string]PublicAnalysisFactDistribution) ([]by
 
 const analysisSnapshotOverviewViewCols = `snapshot_id, domain_count, nameserver_count,
 	endpoint_count, asn_count, prefix_count,
-	severity_distribution_json, grade_distribution_json, signed_json, dnskey_algo_json,
 	top_tags_json, top_nameservers_json, top_asns_json, fact_distributions_json`
 
 func scanSnapshotOverviewView(row rowScanner) (int64, SnapshotOverviewV2, error) {
 	var (
-		snapshotID                                                      int64
-		domainCount, nsCount, epCount, asnCount, prefixCount             int
-		severityJSON, gradeJSON, signedJSON, dnskeyJSON                  string
-		topTagsJSON, topNSJSON, topASNsJSON, factJSON                    string
+		snapshotID                                          int64
+		domainCount, nsCount, epCount, asnCount, prefixCount int
+		topTagsJSON, topNSJSON, topASNsJSON, factJSON       string
 	)
 	if err := row.Scan(
 		&snapshotID, &domainCount, &nsCount, &epCount, &asnCount, &prefixCount,
-		&severityJSON, &gradeJSON, &signedJSON, &dnskeyJSON,
 		&topTagsJSON, &topNSJSON, &topASNsJSON, &factJSON,
 	); err != nil {
 		return 0, SnapshotOverviewV2{}, err
@@ -286,30 +236,12 @@ func scanSnapshotOverviewView(row rowScanner) (int64, SnapshotOverviewV2, error)
 			ASNCount:        asnCount,
 			PrefixCount:     prefixCount,
 		},
-		SeverityDistribution: unmarshalCountMap(severityJSON),
-		GradeDistribution:    unmarshalCountMap(gradeJSON),
-		Signed:               unmarshalCountMap(signedJSON),
-		DNSKEYAlgo:           unmarshalCountMap(dnskeyJSON),
-		TopTags:              unmarshalTopTags(topTagsJSON),
-		TopNameservers:       unmarshalTopNameservers(topNSJSON),
-		TopASNs:              unmarshalTopASNs(topASNsJSON),
-		FactDistributions:    unmarshalFactDistributions(factJSON),
+		TopTags:           unmarshalTopTags(topTagsJSON),
+		TopNameservers:    unmarshalTopNameservers(topNSJSON),
+		TopASNs:           unmarshalTopASNs(topASNsJSON),
+		FactDistributions: unmarshalFactDistributions(factJSON),
 	}
 	return snapshotID, out, nil
-}
-
-func unmarshalCountMap(raw string) map[string]int {
-	if raw == "" {
-		return map[string]int{}
-	}
-	var out map[string]int
-	if err := json.Unmarshal([]byte(raw), &out); err != nil {
-		return map[string]int{}
-	}
-	if out == nil {
-		return map[string]int{}
-	}
-	return out
 }
 
 func unmarshalTopTags(raw string) []TopTagEntry {
@@ -499,91 +431,35 @@ func (s *SQLJobStore) queryBatchTotals(cohortID int64, batchID string) (Snapshot
 	return totals, nil
 }
 
-// queryBatchSeverityDistribution returns per-severity domain counts.
-// Domains with no findings collapse into the "OK" bucket so the
-// distribution always covers the full cohort membership.
-func (s *SQLJobStore) queryBatchSeverityDistribution(cohortID int64, batchID string) (map[string]int, error) {
+// queryBatchAllFactDistributions returns per-(category, key) distinct-domain
+// counts for every fact category materialized for a batch in one indexed scan.
+func (s *SQLJobStore) queryBatchAllFactDistributions(cohortID int64, batchID string) (map[string]map[string]int, error) {
 	rows, err := s.db.Query(
-		fmt.Sprintf(`SELECT ards.worst_level, COUNT(DISTINCT ards.domain_id)
-			FROM analysis_run_domain_summary ards
-			JOIN runs r ON r.id = ards.run_id
-			WHERE ards.cohort_id = %s AND r.batch_id = %s
-			GROUP BY ards.worst_level`, s.ph(1), s.ph(2)),
-		cohortID, batchID,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("severity distribution: %w", err)
-	}
-	defer rows.Close()
-
-	out := map[string]int{}
-	for rows.Next() {
-		var level string
-		var count int
-		if err := rows.Scan(&level, &count); err != nil {
-			return nil, fmt.Errorf("severity distribution scan: %w", err)
-		}
-		if level == "" {
-			level = "OK"
-		}
-		out[level] += count
-	}
-	return out, rows.Err()
-}
-
-// queryBatchGradeDistribution returns per-grade domain counts. Domains
-// without a computed grade are excluded; the catch-all sits under the
-// severity distribution.
-func (s *SQLJobStore) queryBatchGradeDistribution(cohortID int64, batchID string) (map[string]int, error) {
-	rows, err := s.db.Query(
-		fmt.Sprintf(`SELECT ards.grade, COUNT(DISTINCT ards.domain_id)
-			FROM analysis_run_domain_summary ards
-			JOIN runs r ON r.id = ards.run_id
-			WHERE ards.cohort_id = %s AND r.batch_id = %s AND ards.grade IS NOT NULL AND ards.grade <> ''
-			GROUP BY ards.grade`, s.ph(1), s.ph(2)),
-		cohortID, batchID,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("grade distribution: %w", err)
-	}
-	defer rows.Close()
-
-	out := map[string]int{}
-	for rows.Next() {
-		var grade string
-		var count int
-		if err := rows.Scan(&grade, &count); err != nil {
-			return nil, fmt.Errorf("grade distribution scan: %w", err)
-		}
-		out[grade] += count
-	}
-	return out, rows.Err()
-}
-
-// queryBatchFactDistribution returns per-key distinct-domain counts for
-// one fact category (signed / dnskey_algo) scoped to a batch.
-func (s *SQLJobStore) queryBatchFactDistribution(cohortID int64, batchID, category string) (map[string]int, error) {
-	rows, err := s.db.Query(
-		fmt.Sprintf(`SELECT f.fact_key, COUNT(DISTINCT f.domain_id)
+		fmt.Sprintf(`SELECT f.category, f.fact_key, COUNT(DISTINCT f.domain_id)
 			FROM analysis_run_domain_facts f
 			JOIN runs r ON r.id = f.run_id
-			WHERE f.cohort_id = %s AND r.batch_id = %s AND f.category = %s
-			GROUP BY f.fact_key`, s.ph(1), s.ph(2), s.ph(3)),
-		cohortID, batchID, category,
+			WHERE f.cohort_id = %s AND r.batch_id = %s
+			GROUP BY f.category, f.fact_key`, s.ph(1), s.ph(2)),
+		cohortID, batchID,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("fact distribution %s: %w", category, err)
+		return nil, fmt.Errorf("fact distributions: %w", err)
 	}
 	defer rows.Close()
 
-	out := map[string]int{}
+	out := map[string]map[string]int{}
 	for rows.Next() {
-		var key string
+		var category, key string
 		var count int
-		if err := rows.Scan(&key, &count); err != nil {
-			return nil, fmt.Errorf("fact distribution scan: %w", err)
+		if err := rows.Scan(&category, &key, &count); err != nil {
+			return nil, fmt.Errorf("fact distributions scan: %w", err)
 		}
-		out[key] += count
+		bucket, ok := out[category]
+		if !ok {
+			bucket = map[string]int{}
+			out[category] = bucket
+		}
+		bucket[key] = count
 	}
 	return out, rows.Err()
 }

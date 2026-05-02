@@ -22,7 +22,6 @@ type PublicAnalysisCohortDetail struct {
 	EndpointCount         int                                       `json:"endpoint_count"`
 	ASNCount              int                                       `json:"asn_count"`
 	PrefixCount           int                                       `json:"prefix_count"`
-	SeverityDistribution  map[string]int                            `json:"severity_distribution,omitempty"`
 	FactDistributions     map[string]PublicAnalysisFactDistribution `json:"fact_distributions,omitempty"`
 	// Snapshot is the specific materialization being described when the
 	// cohort has a captured snapshot; nil for cohorts awaiting their first
@@ -232,9 +231,6 @@ func populateCohortDetailFromViews(detail *PublicAnalysisCohortDetail, readStore
 		detail.EndpointCount = overview.Totals.EndpointCount
 		detail.ASNCount = overview.Totals.ASNCount
 		detail.PrefixCount = overview.Totals.PrefixCount
-		if len(overview.SeverityDistribution) > 0 {
-			detail.SeverityDistribution = overview.SeverityDistribution
-		}
 		if len(overview.FactDistributions) > 0 {
 			detail.FactDistributions = overview.FactDistributions
 		}

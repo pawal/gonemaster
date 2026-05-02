@@ -118,12 +118,12 @@ describe("analysis API client", () => {
     const { stub, calls } = recorder();
     await listSnapshots("tld", stub);
     await getSnapshotDetail("tld", "2026-04-20", stub);
-    await getTrends("tld", { category: "grade_distribution" }, stub);
+    await getTrends("tld", { category: "grade" }, stub);
     await getDiff("tld", "2026-03-01", "2026-04-01", stub);
     expect(calls[0].url).toContain("/cohorts/tld/snapshots");
     expect(calls[1].url).toContain("/cohorts/tld/snapshots/2026-04-20");
     expect(calls[2].url).toContain("/cohorts/tld/trends");
-    expect(calls[2].url).toContain("category=grade_distribution");
+    expect(calls[2].url).toContain("category=grade");
     expect(calls[3].url).toContain("/cohorts/tld/diff");
     expect(calls[3].url).toContain("from=2026-03-01");
     expect(calls[3].url).toContain("to=2026-04-01");

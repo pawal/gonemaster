@@ -183,6 +183,16 @@ func (f *analysisAPITestFixture) seedDomainSummary(domainName, runID string, fin
 	}); err != nil {
 		f.t.Fatalf("upsert summary: %v", err)
 	}
+	severityKey := worstLevel
+	if severityKey == "" {
+		severityKey = "OK"
+	}
+	if err := f.store.ReplaceAnalysisRunDomainFacts(f.cohort.ID, runID, []AnalysisRunDomainFact{
+		{CohortID: f.cohort.ID, RunID: runID, DomainID: domain.ID, Category: FactCategorySeverity, Key: severityKey},
+		{CohortID: f.cohort.ID, RunID: runID, DomainID: domain.ID, Category: FactCategoryGrade, Key: grade},
+	}); err != nil {
+		f.t.Fatalf("replace domain facts: %v", err)
+	}
 	f.refreshSnapshotViews(f.batchID)
 }
 

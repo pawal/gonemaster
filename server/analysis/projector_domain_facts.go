@@ -12,12 +12,16 @@ import (
 // code here and the display registry on the server side share the wire
 // token without a redeclaration drift risk.
 const (
-	factCategoryDNSKEYAlgorithm = serverpkg.FactCategoryDNSKEYAlgorithm
-	factCategorySigned          = serverpkg.FactCategorySigned
+	factCategorySeverity        = serverpkg.FactCategorySeverity
+	factCategoryDNSSECPosture   = serverpkg.FactCategoryDNSSECPosture
 	factCategoryGrade           = serverpkg.FactCategoryGrade
+	factCategoryDNSKEYAlgorithm = serverpkg.FactCategoryDNSKEYAlgorithm
 
-	factKeySigned   = serverpkg.FactKeySigned
-	factKeyUnsigned = serverpkg.FactKeyUnsigned
+	factKeySigned    = serverpkg.FactKeySigned
+	factKeyUnsigned  = serverpkg.FactKeyUnsigned
+	factKeyNSEC      = serverpkg.FactKeyNSEC
+	factKeyNSEC3     = serverpkg.FactKeyNSEC3
+	factKeyNSECMixed = serverpkg.FactKeyNSECMixed
 )
 
 // extractedDomainFact is one (category, key) fact to materialize for this
@@ -34,10 +38,22 @@ type extractedDomainFact struct {
 // (category, key), and keeps the first value_num seen per key.
 func extractDomainFacts(input RunInput) []extractedDomainFact {
 	var out []extractedDomainFact
+	out = append(out, extractSeverity(input)...)
+	out = append(out, extractDNSSECPosture(input)...)
 	out = append(out, extractDNSKEYAlgorithms(input)...)
-	out = append(out, extractSignedStatus(input)...)
 	out = append(out, extractGrade(input)...)
 	return dedupeDomainFacts(out)
+}
+
+// extractSeverity emits exactly one fact per run carrying the worst
+// finding level the engine recorded. Empty worst_level collapses to
+// "OK" so the bar covers the full cohort membership.
+func extractSeverity(input RunInput) []extractedDomainFact {
+	level := strings.ToUpper(strings.TrimSpace(input.Run.WorstLevel))
+	if level == "" {
+		level = "OK"
+	}
+	return []extractedDomainFact{{category: factCategorySeverity, key: level}}
 }
 
 // extractGrade emits one fact row per run carrying the letter grade the
@@ -122,27 +138,54 @@ func extractDNSKEYAlgorithms(input RunInput) []extractedDomainFact {
 	return out
 }
 
-// extractSignedStatus emits exactly one fact per run: "signed" or "unsigned".
-// A domain is unsigned if the run contains a DS07_NOT_SIGNED entry.
-// DNSSEC07 short-circuits the rest of the DNSSEC suite on that verdict, so
-// the absence of DS07_NOT_SIGNED combined with the presence of any DNSSEC
-// signal (DS05/DS07_SIGNED/...) is a safe "signed" inference. When no
-// DNSSEC signal was produced at all (engine never ran DNSSEC, or skipped
-// on earlier failure) we emit nothing rather than claim either posture.
-func extractSignedStatus(input RunInput) []extractedDomainFact {
+// extractDNSSECPosture emits exactly one fact per run partitioning the
+// cohort by DNSSEC state and denial-of-existence mode:
+//
+//   - "unsigned" — DS07_NOT_SIGNED present (short-circuits the rest of
+//     the DNSSEC suite, so the verdict is authoritative).
+//   - "mixed" — DS10_MIXED_NSEC_NSEC3, or both DS10_HAS_NSEC and
+//     DS10_HAS_NSEC3 from different servers in the same run.
+//   - "nsec" — only DS10_HAS_NSEC seen.
+//   - "nsec3" — only DS10_HAS_NSEC3 seen.
+//   - "signed" — DNSSEC ran but DS10 did not produce a denial-of-existence
+//     signal (degraded run). Kept as a fallback so the bar still counts
+//     the domain.
+//
+// When no DNSSEC signal was produced at all (engine never ran DNSSEC, or
+// skipped on earlier failure) we emit nothing rather than claim a posture.
+func extractDNSSECPosture(input RunInput) []extractedDomainFact {
 	sawDNSSEC := false
+	hasNSEC := false
+	hasNSEC3 := false
+	mixed := false
 	for _, entry := range input.Entries {
 		if entry.Tag == "DS07_NOT_SIGNED" {
-			return []extractedDomainFact{{category: factCategorySigned, key: factKeyUnsigned}}
+			return []extractedDomainFact{{category: factCategoryDNSSECPosture, key: factKeyUnsigned}}
 		}
 		if strings.EqualFold(entry.Module, "DNSSEC") {
 			sawDNSSEC = true
+		}
+		switch entry.Tag {
+		case "DS10_HAS_NSEC":
+			hasNSEC = true
+		case "DS10_HAS_NSEC3":
+			hasNSEC3 = true
+		case "DS10_MIXED_NSEC_NSEC3":
+			mixed = true
 		}
 	}
 	if !sawDNSSEC {
 		return nil
 	}
-	return []extractedDomainFact{{category: factCategorySigned, key: factKeySigned}}
+	switch {
+	case mixed, hasNSEC && hasNSEC3:
+		return []extractedDomainFact{{category: factCategoryDNSSECPosture, key: factKeyNSECMixed}}
+	case hasNSEC:
+		return []extractedDomainFact{{category: factCategoryDNSSECPosture, key: factKeyNSEC}}
+	case hasNSEC3:
+		return []extractedDomainFact{{category: factCategoryDNSSECPosture, key: factKeyNSEC3}}
+	}
+	return []extractedDomainFact{{category: factCategoryDNSSECPosture, key: factKeySigned}}
 }
 
 // buildDomainFactRows materializes the extracted facts into store rows for

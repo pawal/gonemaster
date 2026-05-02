@@ -203,7 +203,7 @@ func (s *Server) handlePublicAnalysisTrends(w http.ResponseWriter, r *http.Reque
 	}
 	category := strings.TrimSpace(r.URL.Query().Get("category"))
 	if category == "" {
-		category = SnapshotAggregateSeverityDistribution
+		category = FactCategorySeverity
 	}
 	fromSlug := strings.TrimSpace(r.URL.Query().Get("from"))
 	toSlug := strings.TrimSpace(r.URL.Query().Get("to"))

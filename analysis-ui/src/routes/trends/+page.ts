@@ -1,10 +1,11 @@
 import { getTrends, type TrendPoint } from "$lib/api";
 
-// Trend categories; matches the projector's capture-time aggregates.
+// Trend categories; keys match the fact-store category constants on the
+// server (server/analysis_fact_categories.go).
 export const TREND_CATEGORIES = [
-  { key: "severity_distribution", label: "Severity distribution" },
-  { key: "grade_distribution", label: "Grade distribution" },
-  { key: "signed", label: "DNSSEC posture" },
+  { key: "severity", label: "Domain health" },
+  { key: "grade", label: "Grade distribution" },
+  { key: "dnssec_posture", label: "DNSSEC posture" },
   { key: "dnskey_algo", label: "DNSKEY algorithms" }
 ] as const;
 
@@ -22,7 +23,7 @@ export async function load({ parent, fetch, url }): Promise<TrendsPageData> {
   const datasetTag = layout.resolvedCohort ?? null;
   const rawCategory = url.searchParams.get("category") ?? "";
   const category: TrendCategoryKey =
-    TREND_CATEGORIES.find((c) => c.key === rawCategory)?.key ?? "severity_distribution";
+    TREND_CATEGORIES.find((c) => c.key === rawCategory)?.key ?? "severity";
   if (!datasetTag) {
     return { datasetTag: null, category, points: [], error: null };
   }

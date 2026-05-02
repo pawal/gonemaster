@@ -17,7 +17,6 @@ export type OverviewPageData = {
   description: string;
   lastMaterializedAt: string | null;
   totals: OverviewTotals | null;
-  severityDistribution: Record<string, number> | null;
   factDistributions: Record<string, FactDistribution> | null;
   topTags: TopTagEntry[];
   topNameservers: TopNameserverEntry[];
@@ -65,7 +64,6 @@ export async function load({ parent, fetch }): Promise<OverviewPageData> {
     description: overview.description ?? "",
     lastMaterializedAt: overview.last_materialized_at ?? null,
     totals: payload?.totals ?? null,
-    severityDistribution: payload?.severity_distribution ?? null,
     factDistributions: payload?.fact_distributions ?? null,
     topTags: payload?.top_tags ?? [],
     topNameservers: payload?.top_nameservers ?? [],
@@ -83,7 +81,6 @@ function emptyPageData(datasetTag: string | null): OverviewPageData {
     description: "",
     lastMaterializedAt: null,
     totals: null,
-    severityDistribution: null,
     factDistributions: null,
     topTags: [],
     topNameservers: [],

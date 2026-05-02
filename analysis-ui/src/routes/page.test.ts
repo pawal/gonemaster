@@ -56,14 +56,19 @@ const sampleOverview = {
     asn_count: 3,
     prefix_count: 2
   },
-  severity_distribution: { OK: 8, WARNING: 4 },
-  grade_distribution: { A: 6, B: 4, C: 2 },
-  signed: { signed: 8, unsigned: 4 },
-  dnskey_algo: { "8": 6, "13": 2 },
   top_tags: [{ tag: "DS07_NOT_SIGNED", level: "ERROR", domain_count: 4 }],
   top_nameservers: [{ nameserver: "ns1.example", domain_count: 7 }],
   top_asns: [{ asn: 64500, label: "Example AS", domain_count: 5 }],
   fact_distributions: {
+    severity: {
+      category: "severity",
+      label: "Domain health",
+      order: 5,
+      buckets: [
+        { key: "OK", label: "OK", tone: "ok", count: 8, order: 0 },
+        { key: "WARNING", label: "Warning", tone: "warning", count: 4, order: 2 }
+      ]
+    },
     grade: {
       category: "grade",
       label: "Grade distribution",
@@ -131,7 +136,8 @@ describe("+page.load (overview)", () => {
     expect(data.snapshot?.slug).toBe("2026-04-26-fixture");
     expect(data.totals?.domain_count).toBe(12);
     expect(data.totals?.nameserver_count).toBe(5);
-    expect(data.severityDistribution?.OK).toBe(8);
+    const severityBuckets = data.factDistributions?.severity.buckets ?? [];
+    expect(severityBuckets.find((b) => b.key === "OK")?.count).toBe(8);
     expect(data.topTags[0].tag).toBe("DS07_NOT_SIGNED");
     expect(data.topNameservers[0].nameserver).toBe("ns1.example");
     expect(data.topASNs[0].asn).toBe(64500);

@@ -12,31 +12,31 @@ func TestBuildFactDistributionsGroupsByCategoryAndCounts(t *testing.T) {
 		{CohortID: 1, RunID: "r2", DomainID: 11, Category: FactCategoryDNSKEYAlgorithm, Key: "13", ValueNum: &v},
 		// One of them also publishes algo 8 (dual-algo).
 		{CohortID: 1, RunID: "r1", DomainID: 10, Category: FactCategoryDNSKEYAlgorithm, Key: "8", ValueNum: &v},
-		// Domain 11 is signed, domain 12 is unsigned.
-		{CohortID: 1, RunID: "r2", DomainID: 11, Category: FactCategorySigned, Key: FactKeySigned},
-		{CohortID: 1, RunID: "r3", DomainID: 12, Category: FactCategorySigned, Key: FactKeyUnsigned},
+		// Domain 11 publishes NSEC3, domain 12 is unsigned.
+		{CohortID: 1, RunID: "r2", DomainID: 11, Category: FactCategoryDNSSECPosture, Key: FactKeyNSEC3},
+		{CohortID: 1, RunID: "r3", DomainID: 12, Category: FactCategoryDNSSECPosture, Key: FactKeyUnsigned},
 	}
 	out := buildFactDistributions(facts)
 
-	signedDist, ok := out[FactCategorySigned]
+	postureDist, ok := out[FactCategoryDNSSECPosture]
 	if !ok {
-		t.Fatalf("expected %q distribution, got %+v", FactCategorySigned, out)
+		t.Fatalf("expected %q distribution, got %+v", FactCategoryDNSSECPosture, out)
 	}
-	if signedDist.Label != "DNSSEC posture" {
-		t.Fatalf("unexpected signed label: %q", signedDist.Label)
+	if postureDist.Label != "DNSSEC posture" {
+		t.Fatalf("unexpected posture label: %q", postureDist.Label)
 	}
-	if len(signedDist.Buckets) != 2 {
-		t.Fatalf("expected 2 signed buckets, got %+v", signedDist.Buckets)
+	if len(postureDist.Buckets) != 2 {
+		t.Fatalf("expected 2 posture buckets, got %+v", postureDist.Buckets)
 	}
-	// Signed must come before Unsigned by KeyOrder.
-	if signedDist.Buckets[0].Key != FactKeySigned {
-		t.Fatalf("expected signed first, got %+v", signedDist.Buckets)
+	// Unsigned (order=0) comes before nsec3 (order=3).
+	if postureDist.Buckets[0].Key != FactKeyUnsigned || postureDist.Buckets[1].Key != FactKeyNSEC3 {
+		t.Fatalf("expected unsigned,nsec3 ordering, got %+v", postureDist.Buckets)
 	}
-	if signedDist.Buckets[0].Count != 1 || signedDist.Buckets[1].Count != 1 {
-		t.Fatalf("expected 1:1 signed/unsigned, got %+v", signedDist.Buckets)
+	if postureDist.Buckets[0].Count != 1 || postureDist.Buckets[1].Count != 1 {
+		t.Fatalf("expected 1:1 unsigned/nsec3, got %+v", postureDist.Buckets)
 	}
-	if signedDist.Buckets[1].Tone != "warning" {
-		t.Fatalf("expected unsigned tone=warning, got %q", signedDist.Buckets[1].Tone)
+	if postureDist.Buckets[0].Tone != "warning" {
+		t.Fatalf("expected unsigned tone=warning, got %q", postureDist.Buckets[0].Tone)
 	}
 
 	algoDist, ok := out[FactCategoryDNSKEYAlgorithm]

@@ -88,16 +88,24 @@ func TestPublicAnalysisCohortDetailSeverityDistribution(t *testing.T) {
 	if got.DomainCount != 3 {
 		t.Fatalf("expected 3 domains, got %d", got.DomainCount)
 	}
+	severity, ok := got.FactDistributions[FactCategorySeverity]
+	if !ok {
+		t.Fatalf("expected severity distribution, got %+v", got.FactDistributions)
+	}
+	counts := map[string]int{}
+	for _, b := range severity.Buckets {
+		counts[b.Key] = b.Count
+	}
 	want := map[string]int{"ERROR": 1, "WARNING": 1, "OK": 1}
 	for level, wantCount := range want {
-		if got.SeverityDistribution[level] != wantCount {
-			t.Fatalf("severity[%s] = %d, want %d (full map: %+v)",
-				level, got.SeverityDistribution[level], wantCount, got.SeverityDistribution)
+		if counts[level] != wantCount {
+			t.Fatalf("severity[%s] = %d, want %d (buckets: %+v)",
+				level, counts[level], wantCount, severity.Buckets)
 		}
 	}
 	for _, level := range []string{"NOTICE", "CRITICAL"} {
-		if _, present := got.SeverityDistribution[level]; present {
-			t.Fatalf("severity[%s] should be absent, got %+v", level, got.SeverityDistribution)
+		if _, present := counts[level]; present {
+			t.Fatalf("severity[%s] should be absent, got %+v", level, severity.Buckets)
 		}
 	}
 }
@@ -113,7 +121,7 @@ func TestPublicAnalysisCohortDetailFactDistributions(t *testing.T) {
 	d1, _ := f.store.GetDomainByName("signed.example")
 	one := int64(1)
 	if err := f.store.ReplaceAnalysisRunDomainFacts(f.cohort.ID, run1.ID, []AnalysisRunDomainFact{
-		{CohortID: f.cohort.ID, RunID: run1.ID, DomainID: d1.ID, Category: FactCategorySigned, Key: FactKeySigned},
+		{CohortID: f.cohort.ID, RunID: run1.ID, DomainID: d1.ID, Category: FactCategoryDNSSECPosture, Key: FactKeyNSEC3},
 		{CohortID: f.cohort.ID, RunID: run1.ID, DomainID: d1.ID, Category: FactCategoryDNSKEYAlgorithm, Key: "13", ValueNum: &one},
 		{CohortID: f.cohort.ID, RunID: run1.ID, DomainID: d1.ID, Category: FactCategoryGrade, Key: "A"},
 	}); err != nil {
@@ -134,7 +142,7 @@ func TestPublicAnalysisCohortDetailFactDistributions(t *testing.T) {
 	})
 	d2, _ := f.store.GetDomainByName("unsigned.example")
 	if err := f.store.ReplaceAnalysisRunDomainFacts(f.cohort.ID, run2.ID, []AnalysisRunDomainFact{
-		{CohortID: f.cohort.ID, RunID: run2.ID, DomainID: d2.ID, Category: FactCategorySigned, Key: FactKeyUnsigned},
+		{CohortID: f.cohort.ID, RunID: run2.ID, DomainID: d2.ID, Category: FactCategoryDNSSECPosture, Key: FactKeyUnsigned},
 		{CohortID: f.cohort.ID, RunID: run2.ID, DomainID: d2.ID, Category: FactCategoryGrade, Key: "F"},
 	}); err != nil {
 		t.Fatalf("replace domain facts: %v", err)
@@ -157,12 +165,12 @@ func TestPublicAnalysisCohortDetailFactDistributions(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	signed, ok := got.FactDistributions[FactCategorySigned]
+	posture, ok := got.FactDistributions[FactCategoryDNSSECPosture]
 	if !ok {
-		t.Fatalf("expected %q distribution, got %+v", FactCategorySigned, got.FactDistributions)
+		t.Fatalf("expected %q distribution, got %+v", FactCategoryDNSSECPosture, got.FactDistributions)
 	}
-	if len(signed.Buckets) != 2 {
-		t.Fatalf("expected signed+unsigned buckets, got %+v", signed.Buckets)
+	if len(posture.Buckets) != 2 {
+		t.Fatalf("expected unsigned+nsec3 buckets, got %+v", posture.Buckets)
 	}
 	algo, ok := got.FactDistributions[FactCategoryDNSKEYAlgorithm]
 	if !ok {
@@ -203,7 +211,7 @@ func TestPublicAnalysisCohortDetailFactDistributionsRedactInternalIDs(t *testing
 	d, _ := f.store.GetDomainByName("signed.example")
 	one := int64(1)
 	if err := f.store.ReplaceAnalysisRunDomainFacts(f.cohort.ID, run.ID, []AnalysisRunDomainFact{
-		{CohortID: f.cohort.ID, RunID: run.ID, DomainID: d.ID, Category: FactCategorySigned, Key: FactKeySigned},
+		{CohortID: f.cohort.ID, RunID: run.ID, DomainID: d.ID, Category: FactCategoryDNSSECPosture, Key: FactKeyNSEC3},
 		{CohortID: f.cohort.ID, RunID: run.ID, DomainID: d.ID, Category: FactCategoryDNSKEYAlgorithm, Key: "13", ValueNum: &one},
 		{CohortID: f.cohort.ID, RunID: run.ID, DomainID: d.ID, Category: FactCategoryGrade, Key: "A"},
 	}); err != nil {

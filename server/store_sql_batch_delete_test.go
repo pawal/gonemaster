@@ -147,7 +147,12 @@ func TestSQLJobStoreDeleteBatchRemovesSnapshotAndAggregates(t *testing.T) {
 				t.Fatalf("UpsertAnalysisCohortSnapshot: %v", err)
 			}
 			if err := s.ReplaceSnapshotOverview(snap.ID, SnapshotOverviewV2{
-				GradeDistribution: map[string]int{"A": 1},
+				FactDistributions: map[string]PublicAnalysisFactDistribution{
+					FactCategoryGrade: {
+						Category: FactCategoryGrade,
+						Buckets:  []PublicAnalysisFactBucket{{Key: "A", Count: 1}},
+					},
+				},
 			}); err != nil {
 				t.Fatalf("ReplaceSnapshotOverview: %v", err)
 			}

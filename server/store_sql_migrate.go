@@ -461,20 +461,16 @@ func buildV1DDL(d sqlDialect, autoinc, bigint string) []string {
 		`CREATE INDEX IF NOT EXISTS idx_analysis_snapshot_prefix_view_snapshot_dc ON analysis_snapshot_prefix_view(snapshot_id, domain_count)`,
 
 		fmt.Sprintf(`CREATE TABLE IF NOT EXISTS analysis_snapshot_overview_view (
-			snapshot_id                %s      NOT NULL PRIMARY KEY,
-			domain_count               INTEGER NOT NULL DEFAULT 0,
-			nameserver_count           INTEGER NOT NULL DEFAULT 0,
-			endpoint_count             INTEGER NOT NULL DEFAULT 0,
-			asn_count                  INTEGER NOT NULL DEFAULT 0,
-			prefix_count               INTEGER NOT NULL DEFAULT 0,
-			severity_distribution_json TEXT    NOT NULL DEFAULT '{}',
-			grade_distribution_json    TEXT    NOT NULL DEFAULT '{}',
-			signed_json                TEXT    NOT NULL DEFAULT '{}',
-			dnskey_algo_json           TEXT    NOT NULL DEFAULT '{}',
-			top_tags_json              TEXT    NOT NULL DEFAULT '[]',
-			top_nameservers_json       TEXT    NOT NULL DEFAULT '[]',
-			top_asns_json              TEXT    NOT NULL DEFAULT '[]',
-			fact_distributions_json    TEXT    NOT NULL DEFAULT '{}'
+			snapshot_id             %s      NOT NULL PRIMARY KEY,
+			domain_count            INTEGER NOT NULL DEFAULT 0,
+			nameserver_count        INTEGER NOT NULL DEFAULT 0,
+			endpoint_count          INTEGER NOT NULL DEFAULT 0,
+			asn_count               INTEGER NOT NULL DEFAULT 0,
+			prefix_count            INTEGER NOT NULL DEFAULT 0,
+			top_tags_json           TEXT    NOT NULL DEFAULT '[]',
+			top_nameservers_json    TEXT    NOT NULL DEFAULT '[]',
+			top_asns_json           TEXT    NOT NULL DEFAULT '[]',
+			fact_distributions_json TEXT    NOT NULL DEFAULT '{}'
 		)`, bigint),
 	}
 }

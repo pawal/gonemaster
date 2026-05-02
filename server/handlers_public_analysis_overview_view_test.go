@@ -94,11 +94,11 @@ func TestSnapshotDetailExposesAggregateMap(t *testing.T) {
 	if _, ok := got.Aggregates[SnapshotAggregateOverviewV2]; !ok {
 		t.Errorf("Aggregates missing overview_v2 key: %+v", got.Aggregates)
 	}
-	if _, ok := got.Aggregates[SnapshotAggregateSeverityDistribution]; !ok {
-		t.Errorf("Aggregates missing severity_distribution key")
+	if _, ok := got.Aggregates[FactCategorySeverity]; !ok {
+		t.Errorf("Aggregates missing %q key", FactCategorySeverity)
 	}
-	if _, ok := got.Aggregates[SnapshotAggregateGradeDistribution]; !ok {
-		t.Errorf("Aggregates missing grade_distribution key")
+	if _, ok := got.Aggregates[FactCategoryGrade]; !ok {
+		t.Errorf("Aggregates missing %q key", FactCategoryGrade)
 	}
 }
 
@@ -126,7 +126,7 @@ func TestTrendsReadsFromOverviewView(t *testing.T) {
 		{Module: "DNSSEC", Testcase: "dnssec07", Tag: "DS07_NOT_SIGNED", Level: "ERROR"},
 	})
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/tld/trends?category=severity_distribution")
+	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/tld/trends?category="+FactCategorySeverity)
 	if resp.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
 	}
@@ -137,7 +137,7 @@ func TestTrendsReadsFromOverviewView(t *testing.T) {
 	if len(got.Points) != 2 {
 		t.Fatalf("expected 2 points (one per snapshot), got %d: %+v", len(got.Points), got.Points)
 	}
-	if got.Category != SnapshotAggregateSeverityDistribution {
+	if got.Category != FactCategorySeverity {
 		t.Errorf("Category = %q", got.Category)
 	}
 	for _, p := range got.Points {

@@ -575,7 +575,17 @@ func (s *fakeStore) ComputeSnapshotOverview(cohortID int64, batchID string) (ser
 			grades[*summary.Grade]++
 		}
 	}
-	return serverpkg.SnapshotOverviewV2{GradeDistribution: grades}, nil
+	out := serverpkg.SnapshotOverviewV2{}
+	if len(grades) > 0 {
+		buckets := make([]serverpkg.PublicAnalysisFactBucket, 0, len(grades))
+		for key, count := range grades {
+			buckets = append(buckets, serverpkg.PublicAnalysisFactBucket{Key: key, Count: count})
+		}
+		out.FactDistributions = map[string]serverpkg.PublicAnalysisFactDistribution{
+			serverpkg.FactCategoryGrade: {Category: serverpkg.FactCategoryGrade, Buckets: buckets},
+		}
+	}
+	return out, nil
 }
 
 func (s *fakeStore) ReplaceSnapshotOverview(snapshotID int64, overview serverpkg.SnapshotOverviewV2) error {

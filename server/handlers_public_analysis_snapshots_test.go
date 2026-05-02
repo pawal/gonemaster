@@ -159,13 +159,18 @@ func TestPublicAnalysisTrendsUseSourceRunOrderAndMetadata(t *testing.T) {
 
 	for _, snap := range []AnalysisCohortSnapshot{f.snapshot, older} {
 		if err := f.store.ReplaceSnapshotOverview(snap.ID, SnapshotOverviewV2{
-			SeverityDistribution: map[string]int{"OK": 1},
+			FactDistributions: map[string]PublicAnalysisFactDistribution{
+				FactCategorySeverity: {
+					Category: FactCategorySeverity,
+					Buckets:  []PublicAnalysisFactBucket{{Key: "OK", Count: 1}},
+				},
+			},
 		}); err != nil {
 			t.Fatalf("seed overview for %s: %v", snap.Slug, err)
 		}
 	}
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/tld/trends?category=severity_distribution")
+	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/tld/trends?category="+FactCategorySeverity)
 	if resp.Code != http.StatusOK {
 		t.Fatalf("trends: got %d, want 200: %s", resp.Code, resp.Body)
 	}

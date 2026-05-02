@@ -36,16 +36,6 @@
     ];
   });
 
-  // Ordered lowest → highest severity so the bar reads left to right as
-  // "how much is fine" → "how much is broken".
-  const SEVERITY_BUCKETS = [
-    { key: "OK", label: "OK", tone: "ok" },
-    { key: "NOTICE", label: "Notice", tone: "notice" },
-    { key: "WARNING", label: "Warning", tone: "warning" },
-    { key: "ERROR", label: "Error", tone: "error" },
-    { key: "CRITICAL", label: "Critical", tone: "critical" }
-  ] as const;
-
   const factDistributions = $derived.by(() => {
     const map = data.factDistributions;
     if (!map) return [];
@@ -61,20 +51,13 @@
   // partition of the cohort.
   const multiBucketCategories = new Set(["dnskey_algo"]);
 
-  const healthSegments = $derived.by(() => {
-    const dist = data.severityDistribution;
-    if (!dist) return [];
-    const total = Object.values(dist).reduce((sum, n) => sum + (n ?? 0), 0);
-    if (total === 0) return [];
-    return SEVERITY_BUCKETS.map((b) => {
-      const count = dist[b.key] ?? 0;
-      return {
-        ...b,
-        count,
-        pct: Math.round((count / total) * 100)
-      };
-    }).filter((b) => b.count > 0);
-  });
+  // Categories whose segments deep-link into a filtered domains list. Other
+  // categories render as informational bars (hrefForKey omitted entirely).
+  function buildHrefForKey(category: string): ((key: string) => string) | undefined {
+    if (category === "severity") return (k) => domainsSeverityHref(base, k, query);
+    if (category === "grade") return (k) => domainsGradeHref(base, k, query);
+    return undefined;
+  }
 
   // Scale each top-tag bar against the widest bar, so the leader is 100%
   // wide and the rest are proportional within the top-N.
@@ -201,37 +184,13 @@
       </p>
     </section>
   {:else}
-    {#if healthSegments.length > 0}
-      <section class="card health-bar-section">
-        <h3>Domain health</h3>
-        <p class="hint">
-          Each domain counted by the worst severity in its latest run.
-        </p>
-        <ul class="health-bar" aria-label="Severity distribution">
-          {#each healthSegments as seg (seg.key)}
-            <li class="health-bar-item" style:flex-grow={seg.count}>
-              <a
-                class="health-bar-segment tone-{seg.tone}"
-                href={domainsSeverityHref(base, seg.key, query)}
-                title="{seg.label}: {formatCount(seg.count)} domains ({seg.pct}%). Click to filter the domains list."
-              >
-                <span class="health-bar-label">{seg.label}</span>
-                <span class="health-bar-count">{formatCount(seg.count)}</span>
-              </a>
-            </li>
-          {/each}
-        </ul>
-      </section>
-    {/if}
     {#each factDistributions as dist (dist.category)}
       <FactDistributionBar
         title={dist.label}
         description={dist.description}
         buckets={dist.buckets}
         multiPerDomain={multiBucketCategories.has(dist.category)}
-        hrefForKey={dist.category === "grade"
-          ? (k) => domainsGradeHref(base, k, query)
-          : undefined}
+        hrefForKey={buildHrefForKey(dist.category)}
       />
     {/each}
     {#if topTagRows.length > 0}
@@ -337,60 +296,6 @@
   .overview-header h2 {
     margin: 0;
   }
-  .health-bar-section {
-    gap: var(--space-2);
-  }
-  .health-bar-section h3 {
-    margin: 0;
-  }
-  .health-bar {
-    display: flex;
-    width: 100%;
-    min-height: 36px;
-    border-radius: var(--radius);
-    overflow: hidden;
-    border: 1px solid var(--border);
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-  .health-bar-item {
-    display: flex;
-    min-width: 3rem;
-  }
-  .health-bar-segment {
-    display: flex;
-    flex: 1 1 auto;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 0 var(--space-3);
-    font-size: var(--text-xs);
-    white-space: nowrap;
-    overflow: hidden;
-    text-decoration: none;
-    color: inherit;
-    transition: filter 0.15s ease;
-  }
-  .health-bar-segment:hover,
-  .health-bar-segment:focus-visible {
-    filter: brightness(0.95);
-  }
-  .health-bar-label {
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    font-weight: 600;
-  }
-  .health-bar-count {
-    font-family: var(--mono);
-  }
-  .tone-ok { background: #dcfce7; color: #166534; }
-  .tone-notice { background: #e0f2fe; color: #075985; }
-  .tone-warning { background: #fef3c7; color: #92400e; }
-  .tone-error { background: #ffedd5; color: #9a3412; }
-  .tone-critical { background: #fee2e2; color: #991b1b; }
-  .tone-neutral { background: var(--surface-2); color: var(--on-surface-2); }
-
   .top-tags-section {
     gap: var(--space-2);
   }

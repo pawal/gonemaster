@@ -48,10 +48,11 @@ rows alone.
 ### Adding a domain-fact category
 
 `analysis_run_domain_facts` is the generic per-(cohort, run, domain) fact
-store backing the overview's distribution bars (DNSSEC posture, DNSKEY
-algorithms, grade, ...). Adding a new category does not need a schema
-change; the data model is already a `(category, fact_key, value_num)`
-triple.
+store backing every distribution bar on the overview (severity, DNSSEC
+posture, grade, DNSKEY algorithms, ...). Adding a new category does not
+need a schema change; the data model is already a
+`(category, fact_key, value_num)` triple, and the snapshot aggregate row
+stores all categories in one `fact_distributions_json` blob.
 
 1. Declare wire tokens in `server/analysis_fact_categories.go`:
    add a `FactCategory<Name>` constant for the category, plus any stable

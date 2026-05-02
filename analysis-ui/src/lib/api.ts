@@ -85,10 +85,6 @@ export type FactDistribution = {
 
 export type SnapshotOverviewV2 = {
   totals: OverviewTotals;
-  severity_distribution: Record<string, number>;
-  grade_distribution: Record<string, number>;
-  signed: Record<string, number>;
-  dnskey_algo: Record<string, number>;
   top_tags: TopTagEntry[];
   top_nameservers: TopNameserverEntry[];
   top_asns: TopASNEntry[];
@@ -529,9 +525,9 @@ export const getSnapshotDetail = (datasetTag: string, slug: string, fetchFn: Fet
   );
 
 // getTrends fetches one time series of aggregate payloads across the
-// cohort's captured public snapshots. Category defaults to
-// severity_distribution server-side; passing an explicit category lets
-// the UI switch charts (grade_distribution, signed, dnskey_algo, …).
+// cohort's captured public snapshots. Category defaults to severity
+// server-side; passing an explicit category lets the UI switch charts
+// (grade, dnssec_posture, dnskey_algo, …).
 export const getTrends = (
   datasetTag: string,
   filter: { category?: string; from?: string; to?: string } = {},

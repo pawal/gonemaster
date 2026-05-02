@@ -105,35 +105,100 @@ func TestExtractDNSKEYAlgorithmsEmptyWhenNotSigned(t *testing.T) {
 	}
 }
 
-func TestExtractSignedStatus(t *testing.T) {
-	signed := RunInput{
-		Entries: []serverpkg.Entry{
-			{Module: "DNSSEC", Testcase: "dnssec05", Tag: "DS05_ALGO_OK"},
+func TestExtractDNSSECPosture(t *testing.T) {
+	cases := []struct {
+		name string
+		in   []serverpkg.Entry
+		want string // empty means: no fact emitted
+	}{
+		{
+			name: "unsigned",
+			in: []serverpkg.Entry{
+				{Module: "DNSSEC", Testcase: "dnssec07", Tag: "DS07_NOT_SIGNED"},
+				{Module: "DNSSEC", Testcase: "dnssec10", Tag: "DS10_HAS_NSEC"},
+			},
+			want: factKeyUnsigned,
+		},
+		{
+			name: "nsec only",
+			in: []serverpkg.Entry{
+				{Module: "DNSSEC", Testcase: "dnssec05", Tag: "DS05_ALGO_OK"},
+				{Module: "DNSSEC", Testcase: "dnssec10", Tag: "DS10_HAS_NSEC"},
+			},
+			want: factKeyNSEC,
+		},
+		{
+			name: "nsec3 only",
+			in: []serverpkg.Entry{
+				{Module: "DNSSEC", Testcase: "dnssec05", Tag: "DS05_ALGO_OK"},
+				{Module: "DNSSEC", Testcase: "dnssec10", Tag: "DS10_HAS_NSEC3"},
+			},
+			want: factKeyNSEC3,
+		},
+		{
+			name: "nsec and nsec3 from different servers",
+			in: []serverpkg.Entry{
+				{Module: "DNSSEC", Testcase: "dnssec10", Tag: "DS10_HAS_NSEC"},
+				{Module: "DNSSEC", Testcase: "dnssec10", Tag: "DS10_HAS_NSEC3"},
+			},
+			want: factKeyNSECMixed,
+		},
+		{
+			name: "explicit MIXED tag",
+			in: []serverpkg.Entry{
+				{Module: "DNSSEC", Testcase: "dnssec10", Tag: "DS10_MIXED_NSEC_NSEC3"},
+			},
+			want: factKeyNSECMixed,
+		},
+		{
+			name: "signed but no DS10 mode signal",
+			in: []serverpkg.Entry{
+				{Module: "DNSSEC", Testcase: "dnssec05", Tag: "DS05_ALGO_OK"},
+			},
+			want: factKeySigned,
+		},
+		{
+			name: "no DNSSEC signal at all",
+			in: []serverpkg.Entry{
+				{Module: "BASIC", Testcase: "basic01", Tag: "B01_OK"},
+			},
+			want: "",
 		},
 	}
-	got := extractSignedStatus(signed)
-	if len(got) != 1 || got[0].key != factKeySigned {
-		t.Fatalf("expected signed fact, got %+v", got)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := extractDNSSECPosture(RunInput{Entries: c.in})
+			if c.want == "" {
+				if len(got) != 0 {
+					t.Fatalf("expected no fact, got %+v", got)
+				}
+				return
+			}
+			if len(got) != 1 || got[0].category != factCategoryDNSSECPosture || got[0].key != c.want {
+				t.Fatalf("expected dnssec_posture=%q, got %+v", c.want, got)
+			}
+		})
 	}
+}
 
-	unsigned := RunInput{
-		Entries: []serverpkg.Entry{
-			{Module: "DNSSEC", Testcase: "dnssec07", Tag: "DS07_NOT_SIGNED"},
-			{Module: "DNSSEC", Testcase: "dnssec05", Tag: "DS05_ALGO_OK"},
-		},
+func TestExtractSeverity(t *testing.T) {
+	cases := []struct {
+		level string
+		want  string
+	}{
+		{"", "OK"},
+		{"   ", "OK"},
+		{"OK", "OK"},
+		{"notice", "NOTICE"},
+		{"WARNING", "WARNING"},
+		{"ERROR", "ERROR"},
+		{"CRITICAL", "CRITICAL"},
 	}
-	got = extractSignedStatus(unsigned)
-	if len(got) != 1 || got[0].key != factKeyUnsigned {
-		t.Fatalf("DS07_NOT_SIGNED should win regardless of DS05 presence, got %+v", got)
-	}
-
-	noDNSSEC := RunInput{
-		Entries: []serverpkg.Entry{
-			{Module: "BASIC", Testcase: "basic01", Tag: "B01_OK"},
-		},
-	}
-	if got := extractSignedStatus(noDNSSEC); len(got) != 0 {
-		t.Fatalf("no DNSSEC signal should emit nothing, got %+v", got)
+	for _, c := range cases {
+		got := extractSeverity(RunInput{Run: serverpkg.Run{WorstLevel: c.level}})
+		if len(got) != 1 || got[0].category != factCategorySeverity || got[0].key != c.want {
+			t.Fatalf("WorstLevel=%q: expected severity=%q, got %+v", c.level, c.want, got)
+		}
 	}
 }
 
@@ -162,20 +227,20 @@ func TestExtractDomainFactsDedupesAcrossExtractors(t *testing.T) {
 	}
 	got := extractDomainFacts(input)
 	sawAlgo := false
-	sawSigned := false
+	sawPosture := false
 	for _, f := range got {
 		if f.category == factCategoryDNSKEYAlgorithm && f.key == "13" {
 			sawAlgo = true
 		}
-		if f.category == factCategorySigned && f.key == factKeySigned {
-			sawSigned = true
+		if f.category == factCategoryDNSSECPosture && f.key == factKeySigned {
+			sawPosture = true
 		}
 	}
 	if !sawAlgo {
 		t.Fatalf("expected DNSKEY algorithm fact, got %+v", got)
 	}
-	if !sawSigned {
-		t.Fatalf("expected signed fact, got %+v", got)
+	if !sawPosture {
+		t.Fatalf("expected dnssec_posture=signed fact, got %+v", got)
 	}
 }
 
@@ -212,7 +277,7 @@ func TestBuildDomainFactRowsAttachesRunCohortDomain(t *testing.T) {
 	v := int64(2)
 	facts := []extractedDomainFact{
 		{category: factCategoryDNSKEYAlgorithm, key: "13", valueNum: &v},
-		{category: factCategorySigned, key: factKeySigned},
+		{category: factCategoryDNSSECPosture, key: factKeySigned},
 	}
 	rows := buildDomainFactRows(42, "run-x", 101, facts)
 	if len(rows) != 2 {
@@ -276,10 +341,11 @@ func TestProjectorProjectRunDomainFactsIdempotent(t *testing.T) {
 	first := append([]serverpkg.AnalysisRunDomainFact(nil), store.domainFacts[projectionKey(11, run.ID)]...)
 
 	want := map[string]bool{
-		factCategoryDNSKEYAlgorithm + "/8":  true,
-		factCategoryDNSKEYAlgorithm + "/13": true,
-		factCategorySigned + "/" + factKeySigned: true,
-		factCategoryGrade + "/A":                 true,
+		factCategoryDNSKEYAlgorithm + "/8":            true,
+		factCategoryDNSKEYAlgorithm + "/13":           true,
+		factCategoryDNSSECPosture + "/" + factKeySigned: true,
+		factCategoryGrade + "/A":                      true,
+		factCategorySeverity + "/OK":                  true,
 	}
 	if len(first) != len(want) {
 		t.Fatalf("expected %d domain-fact rows, got %d: %+v", len(want), len(first), first)

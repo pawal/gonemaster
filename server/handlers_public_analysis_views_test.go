@@ -42,8 +42,16 @@ func TestPublicAnalysisOverviewIncludesOverviewV2(t *testing.T) {
 	if payload.Overview.Totals.PrefixCount != 1 {
 		t.Errorf("PrefixCount = %d, want 1", payload.Overview.Totals.PrefixCount)
 	}
-	if payload.Overview.GradeDistribution["A"] != 1 || payload.Overview.GradeDistribution["C"] != 1 {
-		t.Errorf("GradeDistribution = %v", payload.Overview.GradeDistribution)
+	grade, ok := payload.Overview.FactDistributions[FactCategoryGrade]
+	if !ok {
+		t.Fatalf("expected grade distribution, got %+v", payload.Overview.FactDistributions)
+	}
+	gradeCounts := map[string]int{}
+	for _, b := range grade.Buckets {
+		gradeCounts[b.Key] = b.Count
+	}
+	if gradeCounts["A"] != 1 || gradeCounts["C"] != 1 {
+		t.Errorf("grade counts = %v", gradeCounts)
 	}
 }
 

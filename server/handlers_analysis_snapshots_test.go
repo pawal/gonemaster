@@ -237,7 +237,12 @@ func TestAdminSnapshotRetireSoftDeletes(t *testing.T) {
 func TestAdminSnapshotPurgeHardDeletes(t *testing.T) {
 	f := newAdminSnapshotFixture(t)
 	if err := f.store.ReplaceSnapshotOverview(f.snapshot.ID, SnapshotOverviewV2{
-		Signed: map[string]int{"signed": 1},
+		FactDistributions: map[string]PublicAnalysisFactDistribution{
+			FactCategoryDNSSECPosture: {
+				Category: FactCategoryDNSSECPosture,
+				Buckets:  []PublicAnalysisFactBucket{{Key: FactKeyNSEC3, Count: 1}},
+			},
+		},
 	}); err != nil {
 		t.Fatalf("seed overview: %v", err)
 	}

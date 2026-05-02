@@ -1276,8 +1276,17 @@ details[open] > .score-bonus-summary > .score-bonus-chevron {
   }
 
   /* Page break control */
-  .module-card { break-inside: avoid; }
-  .testcase-group { break-inside: avoid; }
+  /* overflow:hidden on module-card makes browsers treat it as an unbreakable
+     box, which pushes large modules to the next page and leaves blank gaps. */
+  .module-card {
+    overflow: visible !important;
+    break-inside: auto;
+  }
+  /* Testcases are small enough to keep together; avoid orphaned headers */
+  .testcase-group {
+    break-inside: avoid;
+    break-before: avoid;
+  }
   .score-card { break-inside: avoid; }
   .ns-timings-card { break-inside: avoid; }
 

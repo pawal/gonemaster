@@ -58,6 +58,20 @@
 /* ── Reset ───────────────────────────────────────────────────────────────── */
 * { box-sizing: border-box; }
 
+/* SvelteKit's #svelte-announcer hides itself via inline styles, which our
+   CSP (style-src 'self') blocks; replicate the hide same-origin. */
+#svelte-announcer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+  width: 1px;
+  height: 1px;
+}
+
 body {
   margin: 0;
   min-height: 100vh;

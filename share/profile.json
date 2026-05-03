@@ -639,7 +639,14 @@
             "Z13_SPF_LOOKUP_LOOP": "WARNING",
             "Z13_SPF_PTR_DEPRECATED": "WARNING",
             "Z13_SPF_RECURSIVE_ERROR": "NOTICE",
-            "Z13_UNABLE_TO_CHECK": "WARNING"
+            "Z13_UNABLE_TO_CHECK": "WARNING",
+            "Z14_DUPLICATE_SCHEME_HASH": "WARNING",
+            "Z14_INCONSISTENT_ZONEMD": "WARNING",
+            "Z14_MIXED_PRESENCE": "WARNING",
+            "Z14_NO_ZONEMD": "INFO",
+            "Z14_SERIAL_MISMATCH": "WARNING",
+            "Z14_UNSUPPORTED_HASH": "NOTICE",
+            "Z14_ZONEMD_FOUND": "INFO"
         }
     },
     "test_cases": [
@@ -720,6 +727,7 @@
         "zone10",
         "zone11",
         "zone12",
-        "zone13"
+        "zone13",
+        "zone14"
     ]
 }

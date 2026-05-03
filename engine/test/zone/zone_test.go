@@ -1008,6 +1008,402 @@ func TestZone13CustomLimit(t *testing.T) {
 	}
 }
 
+// --- Zone14 tests ---
+
+type zonemdRecord struct {
+	serial uint32
+	scheme uint8
+	hash   uint8
+	digest string
+}
+
+func zonemdPacket(name string, records []zonemdRecord) packet.Packet {
+	msg := new(dns.Msg)
+	msg.Authoritative = true
+	msg.Rcode = dns.RcodeSuccess
+	for _, r := range records {
+		zm := &dns.ZONEMD{}
+		zm.Hdr = dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET, TTL: 300}
+		zm.ZONEMD.Serial = r.serial
+		zm.ZONEMD.Scheme = r.scheme
+		zm.ZONEMD.Hash = r.hash
+		zm.ZONEMD.Digest = r.digest
+		msg.Answer = append(msg.Answer, zm)
+	}
+	return packet.Packet{Msg: msg}
+}
+
+func TestZone14ZONEMDFound(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	const serial uint32 = 2024010101
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		switch qtype {
+		case "ZONEMD":
+			return zonemdPacket("example", []zonemdRecord{{serial: serial, scheme: 1, hash: 1, digest: "aabbcc"}})
+		case "SOA":
+			return soaPacket("example", serial, 3600, 900, 604800, 300)
+		}
+		return packet.Packet{}
+	})
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example")}
+	entries, err := Zone14(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone14: %v", err)
+	}
+	if !hasEntryTag(entries, "Z14_ZONEMD_FOUND") {
+		t.Fatalf("expected Z14_ZONEMD_FOUND")
+	}
+	if hasEntryTag(entries, "Z14_SERIAL_MISMATCH") {
+		t.Fatalf("did not expect Z14_SERIAL_MISMATCH when serials match")
+	}
+}
+
+func TestZone14NoZONEMD(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		if qtype == "ZONEMD" {
+			msg := new(dns.Msg)
+			msg.Authoritative = true
+			msg.Rcode = dns.RcodeSuccess
+			return packet.Packet{Msg: msg}
+		}
+		return packet.Packet{}
+	})
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example")}
+	entries, err := Zone14(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone14: %v", err)
+	}
+	if !hasEntryTag(entries, "Z14_NO_ZONEMD") {
+		t.Fatalf("expected Z14_NO_ZONEMD")
+	}
+}
+
+func TestZone14SerialMismatch(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		switch qtype {
+		case "ZONEMD":
+			return zonemdPacket("example", []zonemdRecord{{serial: 100, scheme: 1, hash: 1, digest: "aabbcc"}})
+		case "SOA":
+			return soaPacket("example", 200, 3600, 900, 604800, 300)
+		}
+		return packet.Packet{}
+	})
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example")}
+	entries, err := Zone14(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone14: %v", err)
+	}
+	if !hasEntryTag(entries, "Z14_SERIAL_MISMATCH") {
+		t.Fatalf("expected Z14_SERIAL_MISMATCH")
+	}
+}
+
+func TestZone14DuplicateSchemeHash(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		if qtype == "ZONEMD" {
+			return zonemdPacket("example", []zonemdRecord{
+				{serial: 2024010101, scheme: 1, hash: 1, digest: "aabbcc"},
+				{serial: 2024010101, scheme: 1, hash: 1, digest: "ddeeff"},
+			})
+		}
+		return packet.Packet{}
+	})
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example")}
+	entries, err := Zone14(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone14: %v", err)
+	}
+	if !hasEntryTag(entries, "Z14_DUPLICATE_SCHEME_HASH") {
+		t.Fatalf("expected Z14_DUPLICATE_SCHEME_HASH")
+	}
+}
+
+func TestZone14MultipleZONEMD(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		if qtype == "ZONEMD" {
+			return zonemdPacket("example", []zonemdRecord{
+				{serial: 2024010101, scheme: 1, hash: 1, digest: "aabbcc"},
+				{serial: 2024010101, scheme: 1, hash: 2, digest: "ddeeff"},
+			})
+		}
+		return packet.Packet{}
+	})
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example")}
+	entries, err := Zone14(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone14: %v", err)
+	}
+	var foundCount int
+	for _, e := range entries {
+		if e != nil && e.Tag == "Z14_ZONEMD_FOUND" {
+			foundCount++
+		}
+	}
+	if foundCount != 2 {
+		t.Fatalf("expected 2 Z14_ZONEMD_FOUND, got %d", foundCount)
+	}
+	if hasEntryTag(entries, "Z14_DUPLICATE_SCHEME_HASH") {
+		t.Fatalf("did not expect Z14_DUPLICATE_SCHEME_HASH for distinct (scheme, hash) pairs")
+	}
+}
+
+func TestZone14InconsistentZONEMD(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		if qtype == "ZONEMD" {
+			return zonemdPacket("example", []zonemdRecord{{serial: 2024010101, scheme: 1, hash: 1, digest: "aabbcc"}})
+		}
+		return packet.Packet{}
+	})
+	ns2 := newNameserver(t, "ns2.example", "192.0.2.2", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		if qtype == "ZONEMD" {
+			return zonemdPacket("example", []zonemdRecord{{serial: 2024010101, scheme: 1, hash: 1, digest: "112233"}})
+		}
+		return packet.Packet{}
+	})
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1, ns2}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example")}
+	entries, err := Zone14(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone14: %v", err)
+	}
+	if !hasEntryTag(entries, "Z14_INCONSISTENT_ZONEMD") {
+		t.Fatalf("expected Z14_INCONSISTENT_ZONEMD")
+	}
+}
+
+func TestZone14MixedPresence(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		if qtype == "ZONEMD" {
+			return zonemdPacket("example", []zonemdRecord{{serial: 2024010101, scheme: 1, hash: 1, digest: "aabbcc"}})
+		}
+		return packet.Packet{}
+	})
+	ns2 := newNameserver(t, "ns2.example", "192.0.2.2", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		if qtype == "ZONEMD" {
+			msg := new(dns.Msg)
+			msg.Authoritative = true
+			msg.Rcode = dns.RcodeSuccess
+			return packet.Packet{Msg: msg}
+		}
+		return packet.Packet{}
+	})
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1, ns2}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example")}
+	entries, err := Zone14(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone14: %v", err)
+	}
+	if !hasEntryTag(entries, "Z14_MIXED_PRESENCE") {
+		t.Fatalf("expected Z14_MIXED_PRESENCE")
+	}
+}
+
+func TestZone14ConsolidatedFound(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	rec := zonemdRecord{serial: 2024010101, scheme: 1, hash: 1, digest: "aabbcc"}
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		if qtype == "ZONEMD" {
+			return zonemdPacket("example", []zonemdRecord{rec})
+		}
+		return packet.Packet{}
+	})
+	ns2 := newNameserver(t, "ns2.example", "192.0.2.2", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		if qtype == "ZONEMD" {
+			return zonemdPacket("example", []zonemdRecord{rec})
+		}
+		return packet.Packet{}
+	})
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1, ns2}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example")}
+	entries, err := Zone14(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone14: %v", err)
+	}
+	var foundEntries []*logger.Entry
+	for _, e := range entries {
+		if e != nil && e.Tag == "Z14_ZONEMD_FOUND" {
+			foundEntries = append(foundEntries, e)
+		}
+	}
+	if len(foundEntries) != 1 {
+		t.Fatalf("expected exactly 1 consolidated Z14_ZONEMD_FOUND, got %d", len(foundEntries))
+	}
+	if hasEntryTag(entries, "Z14_INCONSISTENT_ZONEMD") {
+		t.Fatalf("did not expect Z14_INCONSISTENT_ZONEMD when content is identical")
+	}
+}
+
+func TestZone14NonAuthoritativeSkipped(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		if qtype == "ZONEMD" {
+			// NOERROR but AA not set.
+			msg := new(dns.Msg)
+			msg.Authoritative = false
+			msg.Rcode = dns.RcodeSuccess
+			zm := &dns.ZONEMD{}
+			zm.Hdr = dns.Header{Name: "example.", Class: dns.ClassINET, TTL: 300}
+			zm.ZONEMD.Serial = 2024010101
+			zm.ZONEMD.Scheme = 1
+			zm.ZONEMD.Hash = 1
+			zm.ZONEMD.Digest = "aabbcc"
+			msg.Answer = []dns.RR{zm}
+			return packet.Packet{Msg: msg}
+		}
+		return packet.Packet{}
+	})
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example")}
+	entries, err := Zone14(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone14: %v", err)
+	}
+	for _, e := range entries {
+		if e != nil && strings.HasPrefix(e.Tag, "Z14_") {
+			t.Fatalf("expected no Z14_* tags for non-authoritative response, got %s", e.Tag)
+		}
+	}
+}
+
+func TestZone14UnsupportedHash(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		if qtype == "ZONEMD" {
+			return zonemdPacket("example", []zonemdRecord{{serial: 2024010101, scheme: 1, hash: 99, digest: "aabbcc"}})
+		}
+		return packet.Packet{}
+	})
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example")}
+	entries, err := Zone14(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone14: %v", err)
+	}
+	if !hasEntryTag(entries, "Z14_UNSUPPORTED_HASH") {
+		t.Fatalf("expected Z14_UNSUPPORTED_HASH for hash=99")
+	}
+	if !hasEntryTag(entries, "Z14_ZONEMD_FOUND") {
+		t.Fatalf("expected Z14_ZONEMD_FOUND alongside Z14_UNSUPPORTED_HASH")
+	}
+}
+
+func TestZone14UnsupportedHashConsolidated(t *testing.T) {
+	setupTest(t)
+
+	origMethod4and5 := method4and5
+	t.Cleanup(func() { method4and5 = origMethod4and5 })
+
+	// Two ZONEMD records with the same unsupported hash but different schemes.
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		if qtype == "ZONEMD" {
+			return zonemdPacket("example", []zonemdRecord{
+				{serial: 2024010101, scheme: 1, hash: 99, digest: "aabbcc"},
+				{serial: 2024010101, scheme: 2, hash: 99, digest: "ddeeff"},
+			})
+		}
+		return packet.Packet{}
+	})
+	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example")}
+	entries, err := Zone14(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone14: %v", err)
+	}
+	var unsupportedCount int
+	for _, e := range entries {
+		if e != nil && e.Tag == "Z14_UNSUPPORTED_HASH" {
+			unsupportedCount++
+		}
+	}
+	if unsupportedCount != 1 {
+		t.Fatalf("expected exactly 1 Z14_UNSUPPORTED_HASH for same hash value, got %d", unsupportedCount)
+	}
+}
+
 func entryTags(entries []*logger.Entry) []string {
 	var tags []string
 	for _, e := range entries {

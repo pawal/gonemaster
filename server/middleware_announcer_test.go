@@ -23,6 +23,9 @@ import (
 // blocks the inline style at runtime — this test catches the drift at build
 // time and tells you the new constant to paste in.
 func TestAnalysisAnnouncerHashMatchesDist(t *testing.T) {
+	if !analysisui.IsBuilt() {
+		t.Skip("analysis UI not built (run make ui-build); skipping CSP hash check")
+	}
 	got := extractAnalysisAnnouncerStyle(t)
 	sum := sha256.Sum256([]byte(got))
 	want := fmt.Sprintf("'sha256-%s'", base64.StdEncoding.EncodeToString(sum[:]))

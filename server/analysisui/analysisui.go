@@ -80,6 +80,17 @@ func dist() (fs.FS, error) {
 	return distSub, distErr
 }
 
+// IsBuilt reports whether the analysis UI assets have been embedded.
+// Returns false when only the placeholder was committed (e.g. CI without make ui-build).
+func IsBuilt() bool {
+	fsys, err := dist()
+	if err != nil {
+		return false
+	}
+	_, err = fs.Stat(fsys, "index.html")
+	return err == nil
+}
+
 func cleanRequestPath(requestPath string) string {
 	if requestPath == "" {
 		return ""

@@ -2,6 +2,21 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [unreleased]
+
+### Added
+
+- engine: Zone14 ZONEMD presence and RFC 8976 compliance test
+- engine: DNSSEC18 CDS/CDNSKEY rollover signals
+- analysis-ui: add footer with gonemaster/miekg-dns versions and Codeberg source link
+- server: gzip-compress text responses with Vary: Accept-Encoding
+- server: regression test guarding analysis CSP announcer hash against SvelteKit drift 
+- server: web performance improvements
+
+### Changed
+
+- public-ui: improved print output
+
 ## [v1.4.3] - 2026-05-01
 
 Fixed a lot of public-ui security related things.

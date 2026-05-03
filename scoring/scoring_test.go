@@ -680,3 +680,25 @@ func TestBonus_NoCDSWithoutRolloverEvidence(t *testing.T) {
 		t.Error("expected cds_cdnskey_published = false")
 	}
 }
+
+// TestBonus_DS15HasCDSWinsOverDS18RolloverEvidence locks the precedence: when a
+// DS15_HAS_* tag is present, cds_cdnskey_published is true regardless of any
+// DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE marker (which would otherwise yield
+// nil). The two should never coexist in practice, but the precedence keeps the
+// criterion well-defined if they do.
+func TestBonus_DS15HasCDSWinsOverDS18RolloverEvidence(t *testing.T) {
+	entries := []Entry{
+		e("DNSSEC", "DS07_SIGNED", "INFO"),
+		e("DNSSEC", "DS05_ALGO_OK", "INFO"),
+		e("DNSSEC", "DS03_NSEC3_OPT_OUT_DISABLED", "INFO"),
+		e("DNSSEC", "DS15_HAS_CDS_AND_CDNSKEY", "INFO"),
+		e("DNSSEC", "DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE", "INFO"),
+		e("CONNECTIVITY", "IPV6_DIFFERENT_ASN", "INFO"),
+		e("CONNECTIVITY", "IPV4_DIFFERENT_ASN", "INFO"),
+	}
+	r := Compute("example.se", entries, cfg)
+	v := r.Bonus.Criteria["cds_cdnskey_published"]
+	if v == nil || !*v {
+		t.Errorf("expected cds_cdnskey_published = true (DS15_HAS_* wins), got %v", v)
+	}
+}

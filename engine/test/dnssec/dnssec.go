@@ -6529,7 +6529,7 @@ func DNSSEC18(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		// Rollover detection: CDS/CDNSKEY content vs parent DS, plus soft signals.
 		var rolloverEvidence bool
 
-		// CDS-vs-DS content comparison using first representative NS with CDS.
+		// CDS-vs-DS content comparison using first NS with at least one non-DELETE CDS.
 		for _, ns := range ordered {
 			ip := ns.Address.String()
 			if !cdsRRsets[ip] {
@@ -6541,26 +6541,27 @@ func DNSSEC18(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					nonDel = append(nonDel, cds)
 				}
 			}
-			if len(nonDel) > 0 {
-				if cdsContentMatchesDS(nonDel, dsRecords) {
-					if err := appendLog(ctx, &results, testcase, "DS18_CDS_MATCHES_DS", map[string]any{}); err != nil {
-						return results, err
-					}
-				} else {
-					rolloverEvidence = true
-					args := map[string]any{
-						"cds_keytags": keytags16FromCDS(nonDel),
-						"ds_keytags":  keytags16FromDS(dsRecords),
-					}
-					if err := appendLog(ctx, &results, testcase, "DS18_CDS_ROLLOVER_SIGNALED", args); err != nil {
-						return results, err
-					}
+			if len(nonDel) == 0 {
+				continue
+			}
+			args := map[string]any{
+				"cds_keytags": keytags16FromCDS(nonDel),
+				"ds_keytags":  keytags16FromDS(dsRecords),
+			}
+			if cdsContentMatchesDS(nonDel, dsRecords) {
+				if err := appendLog(ctx, &results, testcase, "DS18_CDS_MATCHES_DS", args); err != nil {
+					return results, err
+				}
+			} else {
+				rolloverEvidence = true
+				if err := appendLog(ctx, &results, testcase, "DS18_CDS_ROLLOVER_SIGNALED", args); err != nil {
+					return results, err
 				}
 			}
-			break // one representative NS is sufficient
+			break
 		}
 
-		// CDNSKEY-vs-DS content comparison using first representative NS with CDNSKEY.
+		// CDNSKEY-vs-DS content comparison using first NS with at least one non-DELETE CDNSKEY.
 		for _, ns := range ordered {
 			ip := ns.Address.String()
 			if !cdnskeyRRsets[ip] {
@@ -6572,20 +6573,21 @@ func DNSSEC18(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					nonDel = append(nonDel, cdnskey)
 				}
 			}
-			if len(nonDel) > 0 {
-				if cdnskeyContentMatchesDS(nonDel, dsRecords) {
-					if err := appendLog(ctx, &results, testcase, "DS18_CDNSKEY_MATCHES_DS", map[string]any{}); err != nil {
-						return results, err
-					}
-				} else {
-					rolloverEvidence = true
-					args := map[string]any{
-						"cdnskey_keytags": keytags16FromCDNSKEY(nonDel),
-						"ds_keytags":      keytags16FromDS(dsRecords),
-					}
-					if err := appendLog(ctx, &results, testcase, "DS18_CDNSKEY_ROLLOVER_SIGNALED", args); err != nil {
-						return results, err
-					}
+			if len(nonDel) == 0 {
+				continue
+			}
+			args := map[string]any{
+				"cdnskey_keytags": keytags16FromCDNSKEY(nonDel),
+				"ds_keytags":      keytags16FromDS(dsRecords),
+			}
+			if cdnskeyContentMatchesDS(nonDel, dsRecords) {
+				if err := appendLog(ctx, &results, testcase, "DS18_CDNSKEY_MATCHES_DS", args); err != nil {
+					return results, err
+				}
+			} else {
+				rolloverEvidence = true
+				if err := appendLog(ctx, &results, testcase, "DS18_CDNSKEY_ROLLOVER_SIGNALED", args); err != nil {
+					return results, err
 				}
 			}
 			break
@@ -7647,17 +7649,23 @@ func cdsContentMatchesDS(cdsRecs []*dns.CDS, dsRecs []*dns.DS) bool {
 }
 
 // cdnskeyContentMatchesDS returns true when each parent DS is covered by a CDNSKEY digest
-// and each CDNSKEY contributes at least one matching DS entry.
+// and each CDNSKEY contributes at least one matching DS entry. Each CDNSKEY's keytag must
+// also be in the parent DS keytag set; without that check, two unrelated keys whose
+// digests happen to collide could be reported as matching.
 func cdnskeyContentMatchesDS(cdnskeyRecs []*dns.CDNSKEY, dsRecs []*dns.DS) bool {
 	digestTypes := make(map[uint8]bool)
-	for _, ds := range dsRecs {
-		digestTypes[ds.DigestType] = true
-	}
+	dsKeytagSet := make(map[uint16]bool, len(dsRecs))
 	dsSet := make(map[dsContentKey]bool, len(dsRecs))
 	for _, ds := range dsRecs {
+		digestTypes[ds.DigestType] = true
+		dsKeytagSet[ds.KeyTag] = true
 		dsSet[makeDSContentKey(ds)] = true
 	}
-	// Every CDNSKEY must contribute at least one element already in dsSet.
+	for _, cdnskey := range cdnskeyRecs {
+		if !dsKeytagSet[cdnskey.KeyTag()] {
+			return false
+		}
+	}
 	for _, cdnskey := range cdnskeyRecs {
 		contributed := false
 		for dt := range digestTypes {
@@ -7671,7 +7679,6 @@ func cdnskeyContentMatchesDS(cdnskeyRecs []*dns.CDNSKEY, dsRecs []*dns.DS) bool 
 			return false
 		}
 	}
-	// dsSet must be fully covered by CDNSKEY digests.
 	cdnskeySet := make(map[dsContentKey]bool)
 	for _, cdnskey := range cdnskeyRecs {
 		for dt := range digestTypes {

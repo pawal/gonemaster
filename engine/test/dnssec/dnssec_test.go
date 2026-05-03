@@ -5045,6 +5045,15 @@ func TestDNSSEC18CDSMatchesDS(t *testing.T) {
 	if hasEntryTag(entries, "DS18_CDS_ROLLOVER_SIGNALED") {
 		t.Fatal("unexpected DS18_CDS_ROLLOVER_SIGNALED when CDS matches DS")
 	}
+	e := firstEntryByTag(entries, "DS18_CDS_MATCHES_DS")
+	cdsKTs, ok := e.Args["cds_keytags"].([]uint16)
+	if !ok || len(cdsKTs) != 1 || cdsKTs[0] != keytag {
+		t.Errorf("expected cds_keytags=[%d], got %v", keytag, e.Args["cds_keytags"])
+	}
+	dsKTs, ok := e.Args["ds_keytags"].([]uint16)
+	if !ok || len(dsKTs) != 1 || dsKTs[0] != keytag {
+		t.Errorf("expected ds_keytags=[%d], got %v", keytag, e.Args["ds_keytags"])
+	}
 }
 
 func TestDNSSEC18CDSRolloverSignaled(t *testing.T) {
@@ -5162,6 +5171,15 @@ func TestDNSSEC18CDNSKEYMatchesDS(t *testing.T) {
 	}
 	if hasEntryTag(entries, "DS18_CDNSKEY_ROLLOVER_SIGNALED") {
 		t.Fatal("unexpected DS18_CDNSKEY_ROLLOVER_SIGNALED when CDNSKEY matches DS")
+	}
+	e := firstEntryByTag(entries, "DS18_CDNSKEY_MATCHES_DS")
+	cdnsKTs, ok := e.Args["cdnskey_keytags"].([]uint16)
+	if !ok || len(cdnsKTs) != 1 || cdnsKTs[0] != keytag {
+		t.Errorf("expected cdnskey_keytags=[%d], got %v", keytag, e.Args["cdnskey_keytags"])
+	}
+	dsKTs, ok := e.Args["ds_keytags"].([]uint16)
+	if !ok || len(dsKTs) != 1 || dsKTs[0] != keytag {
+		t.Errorf("expected ds_keytags=[%d], got %v", keytag, e.Args["ds_keytags"])
 	}
 }
 
@@ -5489,6 +5507,208 @@ func TestDNSSEC18NoCDSCDNSKEYButRolloverEvidence(t *testing.T) {
 	// Underlying evidence that triggered the tag must also be present.
 	if !hasEntryTag(entries, "DS18_ROLLOVER_EVIDENCE_MULTI_KSK") {
 		t.Fatal("expected DS18_ROLLOVER_EVIDENCE_MULTI_KSK as supporting evidence")
+	}
+}
+
+// TestDNSSEC18CDSDeleteOnlySkipsContentComparison verifies that a CDS RRset
+// containing only DELETE sentinels (Algorithm == 0) skips MATCHES_DS and
+// ROLLOVER_SIGNALED in favour of DNSSEC16/17.
+func TestDNSSEC18CDSDeleteOnlySkipsContentComparison(t *testing.T) {
+	dnssec18Setup(t)
+
+	key := makeSEPKey("example", "AwEAAc==")
+	keytag := key.KeyTag()
+
+	ds := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	ds.KeyTag = keytag
+	ds.Algorithm = 8
+	ds.DigestType = 2
+	ds.Digest = "DEADBEEF"
+
+	// DELETE sentinel: Algorithm == 0 per RFC 8078.
+	cdsDelete := &dns.CDS{DS: dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}}
+	cdsDelete.KeyTag = 0
+	cdsDelete.Algorithm = 0
+	cdsDelete.DigestType = 0
+	cdsDelete.Digest = "00"
+
+	cdsSig := rrsigRecord("example", dns.TypeCDS, keytag, 1, 2)
+	dnskeyRRSIG := rrsigRecord("example", dns.TypeDNSKEY, keytag, 1, 2)
+
+	parentNS := newNameserver(t, "pns1.example", "192.0.2.88", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype == "DS" {
+			return dsPacketFromDS("example", ds)
+		}
+		return packet.Packet{}
+	})
+	childNS := newNameserver(t, "ns1.example", "192.0.2.89", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		switch qtype {
+		case "CDS":
+			return answerPacket(qname, dns.TypeCDS, cdsDelete, cdsSig)
+		case "CDNSKEY":
+			return answerPacket(qname, dns.TypeCDNSKEY)
+		case "DNSKEY":
+			return answerPacket(qname, dns.TypeDNSKEY, key, dnskeyRRSIG)
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	setDNSSEC18Mocks(t, []nameserver.Nameserver{parentNS}, []nameserver.Nameserver{childNS})
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := DNSSEC18(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("DNSSEC18: %v", err)
+	}
+	if hasEntryTag(entries, "DS18_CDS_MATCHES_DS") {
+		t.Fatal("unexpected DS18_CDS_MATCHES_DS for DELETE-only CDS RRset")
+	}
+	if hasEntryTag(entries, "DS18_CDS_ROLLOVER_SIGNALED") {
+		t.Fatal("unexpected DS18_CDS_ROLLOVER_SIGNALED for DELETE-only CDS RRset")
+	}
+}
+
+// TestDNSSEC18CDSBothOldAndNewKeyMidRollover verifies that a CDS RRset listing
+// both the current DS keytag and an incoming keytag emits ROLLOVER_SIGNALED
+// (the canonical bootstrap state).
+func TestDNSSEC18CDSBothOldAndNewKeyMidRollover(t *testing.T) {
+	dnssec18Setup(t)
+
+	keyOld := makeSEPKey("example", "AwEAAc==")
+	keytagOld := keyOld.KeyTag()
+	keyNew := makeSEPKey("example", "AwEAAb0=")
+	keytagNew := keyNew.KeyTag()
+
+	ds := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	ds.KeyTag = keytagOld
+	ds.Algorithm = 8
+	ds.DigestType = 2
+	ds.Digest = "AABB"
+
+	cdsOld := &dns.CDS{DS: dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}}
+	cdsOld.KeyTag = keytagOld
+	cdsOld.Algorithm = 8
+	cdsOld.DigestType = 2
+	cdsOld.Digest = "AABB"
+
+	cdsNew := &dns.CDS{DS: dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}}
+	cdsNew.KeyTag = keytagNew
+	cdsNew.Algorithm = 8
+	cdsNew.DigestType = 2
+	cdsNew.Digest = "CCDD"
+
+	cdsSig := rrsigRecord("example", dns.TypeCDS, keytagOld, 1, 2)
+	dnskeyRRSIG := rrsigRecord("example", dns.TypeDNSKEY, keytagOld, 1, 2)
+
+	parentNS := newNameserver(t, "pns1.example", "192.0.2.90", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype == "DS" {
+			return dsPacketFromDS("example", ds)
+		}
+		return packet.Packet{}
+	})
+	childNS := newNameserver(t, "ns1.example", "192.0.2.91", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		switch qtype {
+		case "CDS":
+			return answerPacket(qname, dns.TypeCDS, cdsOld, cdsNew, cdsSig)
+		case "CDNSKEY":
+			return answerPacket(qname, dns.TypeCDNSKEY)
+		case "DNSKEY":
+			return answerPacket(qname, dns.TypeDNSKEY, keyOld, keyNew, dnskeyRRSIG)
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	setDNSSEC18Mocks(t, []nameserver.Nameserver{parentNS}, []nameserver.Nameserver{childNS})
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := DNSSEC18(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("DNSSEC18: %v", err)
+	}
+	if !hasEntryTag(entries, "DS18_CDS_ROLLOVER_SIGNALED") {
+		t.Fatal("expected DS18_CDS_ROLLOVER_SIGNALED when CDS lists both old and new keys")
+	}
+	if hasEntryTag(entries, "DS18_CDS_MATCHES_DS") {
+		t.Fatal("unexpected DS18_CDS_MATCHES_DS when CDS is a strict superset of DS")
+	}
+	e := firstEntryByTag(entries, "DS18_CDS_ROLLOVER_SIGNALED")
+	cdsKTs, _ := e.Args["cds_keytags"].([]uint16)
+	if len(cdsKTs) != 2 {
+		t.Errorf("expected 2 CDS keytags (old+new), got %v", cdsKTs)
+	}
+}
+
+// TestDNSSEC18NoCDSCDNSKEYButOnlyDoubleSig verifies the umbrella tag fires when
+// the only step-15 evidence is DOUBLE_SIG.
+func TestDNSSEC18NoCDSCDNSKEYButOnlyDoubleSig(t *testing.T) {
+	dnssec18Setup(t)
+
+	// Both keys are SEP and both sign DNSKEY: DOUBLE_SIG fires.
+	// Both keys are also covered by parent DS, so DNSKEY_WITHOUT_DS and
+	// DS_WITHOUT_DNSKEY do NOT fire. MULTI_KSK fires too (two SEP keys).
+	// To isolate DOUBLE_SIG as a contributor we still rely on rolloverEvidence
+	// being any of {MULTI_KSK, DOUBLE_SIG, DS_WITHOUT_DNSKEY, DNSKEY_WITHOUT_DS}.
+	// This test asserts the umbrella tag is present and DOUBLE_SIG is emitted.
+	key1 := makeSEPKey("example", "AwEAAc==")
+	keytag1 := key1.KeyTag()
+	key2 := makeSEPKey("example", "AwEAAb0=")
+	keytag2 := key2.KeyTag()
+
+	ds1 := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	ds1.KeyTag = keytag1
+	ds1.Algorithm = 8
+	ds1.DigestType = 2
+	ds1.Digest = "AABB"
+
+	ds2 := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	ds2.KeyTag = keytag2
+	ds2.Algorithm = 8
+	ds2.DigestType = 2
+	ds2.Digest = "CCDD"
+
+	dnskeyRRSIG1 := rrsigRecord("example", dns.TypeDNSKEY, keytag1, 1, 2)
+	dnskeyRRSIG2 := rrsigRecord("example", dns.TypeDNSKEY, keytag2, 1, 2)
+
+	parentNS := newNameserver(t, "pns1.example", "192.0.2.92", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype == "DS" {
+			return answerPacket(qname, dns.TypeDS, ds1, ds2)
+		}
+		return packet.Packet{}
+	})
+	childNS := newNameserver(t, "ns1.example", "192.0.2.93", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		switch qtype {
+		case "CDS":
+			return answerPacket(qname, dns.TypeCDS)
+		case "CDNSKEY":
+			return answerPacket(qname, dns.TypeCDNSKEY)
+		case "DNSKEY":
+			return answerPacket(qname, dns.TypeDNSKEY, key1, key2, dnskeyRRSIG1, dnskeyRRSIG2)
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	setDNSSEC18Mocks(t, []nameserver.Nameserver{parentNS}, []nameserver.Nameserver{childNS})
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := DNSSEC18(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("DNSSEC18: %v", err)
+	}
+	if !hasEntryTag(entries, "DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE") {
+		t.Fatal("expected DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE")
+	}
+	if !hasEntryTag(entries, "DS18_ROLLOVER_EVIDENCE_DOUBLE_SIG") {
+		t.Fatal("expected DS18_ROLLOVER_EVIDENCE_DOUBLE_SIG")
+	}
+	// Both keys are in DS, so these orphan tags must NOT fire.
+	if hasEntryTag(entries, "DS18_ROLLOVER_EVIDENCE_DNSKEY_WITHOUT_DS") {
+		t.Fatal("unexpected DS18_ROLLOVER_EVIDENCE_DNSKEY_WITHOUT_DS when DS covers all KSKs")
+	}
+	if hasEntryTag(entries, "DS18_ROLLOVER_EVIDENCE_DS_WITHOUT_DNSKEY") {
+		t.Fatal("unexpected DS18_ROLLOVER_EVIDENCE_DS_WITHOUT_DNSKEY when DNSKEY covers all DS")
 	}
 }
 

@@ -155,15 +155,6 @@ func (c *nameserverHotCache) Close() {
 	c.mu.Unlock()
 }
 
-func (c *nameserverHotCache) entryCount() int {
-	if c == nil {
-		return 0
-	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return len(c.entries)
-}
-
 func nameserverHotCacheKey(req engine.RunRequest) string {
 	hash := sha256.New()
 	writeHotCacheKeyField(hash, "profile", strings.TrimSpace(req.Profile))

@@ -656,11 +656,6 @@ func TestSQLJobStoreGraduateJobAndGetResult(t *testing.T) {
 				t.Fatalf("GraduateJob: %v", err)
 			}
 
-			// Job must be removed from the jobs table.
-			if _, ok := s.Get(job.ID); !ok {
-				// Get falls through to runs, that's OK. Verify it's not in jobs directly.
-			}
-
 			// Run must exist.
 			run, ok := s.GetRun(job.ID)
 			if !ok {

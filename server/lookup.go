@@ -56,15 +56,6 @@ func (s *Server) handlePublicLookupDomain(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, info)
 }
 
-// fqdn ensures the domain has a trailing dot so the system resolver does not
-// append search domains from /etc/resolv.conf.
-func fqdn(d string) string {
-	if !strings.HasSuffix(d, ".") {
-		return d + "."
-	}
-	return d
-}
-
 // lookupDelegation queries DNS for NS and DS records of a domain.
 func lookupDelegation(ctx context.Context, domain string) DelegationInfo {
 	info := DelegationInfo{

@@ -348,26 +348,14 @@ func domainViewToDetail(v AnalysisSnapshotDomainView) PublicAnalysisDomainDetail
 	if len(v.Tags) > 0 {
 		out.Tags = make([]PublicAnalysisDomainTag, 0, len(v.Tags))
 		for _, t := range v.Tags {
-			out.Tags = append(out.Tags, PublicAnalysisDomainTag{
-				Tag:      t.Tag,
-				Module:   t.Module,
-				Testcase: t.Testcase,
-				Level:    t.Level,
-			})
+			out.Tags = append(out.Tags, PublicAnalysisDomainTag(t))
 		}
 	}
 	return out
 }
 
 func domainAddressToPublic(a DomainViewAddress) PublicAnalysisDomainAddress {
-	return PublicAnalysisDomainAddress{
-		Address:  a.Address,
-		Family:   a.Family,
-		ASN:      a.ASN,
-		ASNLabel: a.ASNLabel,
-		Prefix:   a.Prefix,
-		Status:   a.Status,
-	}
+	return PublicAnalysisDomainAddress(a)
 }
 
 // ── nameserver detail ──────────────────────────────────────────────────────────

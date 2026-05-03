@@ -195,8 +195,7 @@ func (r *Recursor) getAddressesFor(ctx context.Context, name string, state *recu
 		return queryers
 	}
 
-	pa := packet.Packet{}
-	paaaa := packet.Packet{}
+	var pa, paaaa packet.Packet
 
 	parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
 	if parallelism < 1 {

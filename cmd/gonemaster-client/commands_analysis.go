@@ -35,11 +35,6 @@ type tag struct {
 	DomainCount int    `json:"domain_count"`
 }
 
-type tagList struct {
-	Items []tag `json:"items"`
-	Total int   `json:"total"`
-}
-
 type tagSummary struct {
 	Tag         string `json:"tag"`
 	DomainCount int    `json:"domain_count"`

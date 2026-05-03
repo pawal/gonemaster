@@ -19,7 +19,8 @@ import (
 
 var cacheKeyBufferPool = sync.Pool{
 	New: func() any {
-		return make([]byte, 0, 256)
+		buf := make([]byte, 0, 256)
+		return &buf
 	},
 }
 
@@ -368,8 +369,9 @@ func buildCacheKey(name string, qtype string, qclass string, opts *QueryOptions)
 	ednsSize := resolveEDNSSize(opts, dnssec)
 
 	nameObj := dnsname.New(name)
-	buf := cacheKeyBufferPool.Get().([]byte)[:0]
-	defer putCacheKeyBuffer(buf)
+	bufPtr := cacheKeyBufferPool.Get().(*[]byte)
+	buf := (*bufPtr)[:0]
+	defer putCacheKeyBuffer(bufPtr, buf)
 
 	buf = appendCacheKeyString(buf, "NAME", strings.ToLower(nameObj.String()))
 	buf = appendCacheKeyString(buf, "TYPE", qtype)
@@ -388,12 +390,14 @@ func buildCacheKey(name string, qtype string, qclass string, opts *QueryOptions)
 	return string(buf), ednsSize, dnssec, nil
 }
 
-func putCacheKeyBuffer(buf []byte) {
+func putCacheKeyBuffer(bufPtr *[]byte, buf []byte) {
 	if cap(buf) > 4096 {
-		cacheKeyBufferPool.Put(make([]byte, 0, 256))
+		*bufPtr = make([]byte, 0, 256)
+		cacheKeyBufferPool.Put(bufPtr)
 		return
 	}
-	cacheKeyBufferPool.Put(buf[:0])
+	*bufPtr = buf[:0]
+	cacheKeyBufferPool.Put(bufPtr)
 }
 
 func appendCacheKeyPrefix(buf []byte, key string) []byte {

@@ -14,8 +14,6 @@ import (
 	"codeberg.org/pawal/gonemaster/scoring"
 )
 
-var severityLevels = []string{"NOTICE", "WARNING", "ERROR", "CRITICAL"}
-
 // severityRank returns a numeric rank for level comparisons (higher = worse).
 func severityRank(level string) int {
 	switch strings.ToUpper(level) {
@@ -1826,15 +1824,6 @@ func isValidJobSeverityFilter(value JobSeverityFilter) bool {
 	}
 }
 
-func normalizeJobSeverityFilter(value JobSeverityFilter) JobSeverityFilter {
-	switch value {
-	case JobSeverityWarningsPlus, JobSeverityErrorsOnly:
-		return value
-	default:
-		return ""
-	}
-}
-
 // sortJobSlice sorts a slice of jobs in-place by sortOrder.
 func sortJobSlice(items []Job, sortOrder JobSort) {
 	normalizedSort := normalizeJobSort(sortOrder)
@@ -1899,13 +1888,4 @@ func effectiveStartTime(job Job) time.Time {
 		return job.StartedAt
 	}
 	return job.CreatedAt
-}
-
-func zeroSeverityTotals() map[string]int {
-	return map[string]int{
-		"NOTICE":   0,
-		"WARNING":  0,
-		"ERROR":    0,
-		"CRITICAL": 0,
-	}
 }

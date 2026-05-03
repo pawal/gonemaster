@@ -14,7 +14,7 @@ var forbiddenDirectiveRe = regexp.MustCompile(`(?m)^\$(TTL|INCLUDE|ORIGIN|GENERA
 // ParseHints parses a root hints zone file into a map of names to IP addresses.
 func ParseHints(text string) (map[string][]string, error) {
 	if match := forbiddenDirectiveRe.FindStringSubmatch(text); len(match) == 2 {
-		return nil, fmt.Errorf("Forbidden directive $%s", match[1])
+		return nil, fmt.Errorf("forbidden directive $%s", match[1])
 	}
 
 	parser := dns.NewZoneParser(strings.NewReader(text), ".", "named.root")
@@ -28,13 +28,13 @@ func ParseHints(text string) (map[string][]string, error) {
 		hdr := rr.Header()
 
 		if hdr.Class != dns.ClassINET {
-			return nil, fmt.Errorf("Forbidden RR class %s", dns.ClassToString[hdr.Class])
+			return nil, fmt.Errorf("forbidden RR class %s", dns.ClassToString[hdr.Class])
 		}
 
 		switch rr := rr.(type) {
 		case *dns.NS:
 			if hdr.Name != "." {
-				return nil, fmt.Errorf("Owner name for NS record must be \".\"")
+				return nil, fmt.Errorf("owner name for NS record must be \".\"")
 			}
 			name := strings.ToLower(rr.Ns)
 			ns[name] = false
@@ -45,11 +45,11 @@ func ParseHints(text string) (map[string][]string, error) {
 			owner := strings.ToLower(hdr.Name)
 			glue[owner] = "AAAA"
 		default:
-			return nil, fmt.Errorf("Forbidden RR type %s", dnsutil.TypeToString(dns.RRToType(rr)))
+			return nil, fmt.Errorf("forbidden RR type %s", dnsutil.TypeToString(dns.RRToType(rr)))
 		}
 	}
 	if err := parser.Err(); err != nil {
-		return nil, fmt.Errorf("Unable to parse root hints")
+		return nil, fmt.Errorf("unable to parse root hints")
 	}
 
 	for owner, rrtype := range glue {
@@ -57,17 +57,17 @@ func ParseHints(text string) (map[string][]string, error) {
 			ns[owner] = true
 			continue
 		}
-		return nil, fmt.Errorf("Owner name of %s record does not match any NS RDATA", rrtype)
+		return nil, fmt.Errorf("owner name of %s record does not match any NS RDATA", rrtype)
 	}
 
 	for nsdname, ok := range ns {
 		if !ok {
-			return nil, fmt.Errorf("No address record found for NS %s", nsdname)
+			return nil, fmt.Errorf("no address record found for NS %s", nsdname)
 		}
 	}
 
 	if len(ns) == 0 {
-		return nil, fmt.Errorf("No NS record found")
+		return nil, fmt.Errorf("no NS record found")
 	}
 
 	hints := map[string][]string{}

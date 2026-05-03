@@ -109,9 +109,7 @@ func NormalizeName(name string) ([]Error, string) {
 		return []Error{err}, ""
 	}
 
-	if strings.HasSuffix(uname, ".") {
-		uname = strings.TrimSuffix(uname, ".")
-	}
+	uname = strings.TrimSuffix(uname, ".")
 
 	labels := strings.Split(uname, ".")
 	normalized := make([]string, 0, len(labels))

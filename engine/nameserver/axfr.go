@@ -25,7 +25,7 @@ func (ns Nameserver) AXFR(ctx context.Context, domain string, callback func(dns.
 
 	prof := profile.FromContext(ctx)
 	if prof.NoNetwork {
-		return fmt.Errorf("External AXFR query for %s attempted to %s while running with no_network", domain, ns.String())
+		return fmt.Errorf("external AXFR query for %s attempted to %s while running with no_network", domain, ns.String())
 	}
 	if ns.Address.Is4() && !prof.Net.IPv4 {
 		return nil

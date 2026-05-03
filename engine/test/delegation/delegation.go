@@ -984,18 +984,6 @@ func uniqueStrings(values []string) []string {
 	return out
 }
 
-func onlyTestCaseStart(results []*logger.Entry) bool {
-	for _, entry := range results {
-		if entry == nil {
-			continue
-		}
-		if entry.Tag != "TEST_CASE_START" {
-			return false
-		}
-	}
-	return true
-}
-
 func hasTag(entries []*logger.Entry, tag string) bool {
 	for _, entry := range entries {
 		if entry == nil {

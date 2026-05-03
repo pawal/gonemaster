@@ -4,7 +4,6 @@ import (
 	"strings"
 	"sync"
 
-	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/i18n"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 )
@@ -31,24 +30,6 @@ func resolveResultLocale(requested string) string {
 		return key
 	}
 	return "en"
-}
-
-func buildResultEntries(entries []engine.LogEntry) []JobResultEntry {
-	if len(entries) == 0 {
-		return nil
-	}
-	out := make([]JobResultEntry, 0, len(entries))
-	for _, entry := range entries {
-		out = append(out, JobResultEntry{
-			Timestamp: entry.Timestamp,
-			Module:    entry.Module,
-			Testcase:  entry.Testcase,
-			Tag:       entry.Tag,
-			Level:     entry.Level,
-			Args:      entry.Args,
-		})
-	}
-	return out
 }
 
 func localizeResultEntries(entries []JobResultEntry, locale string) []JobResultEntry {

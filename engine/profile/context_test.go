@@ -14,6 +14,7 @@ func TestProfileContextRoundTrip(t *testing.T) {
 }
 
 func TestProfileContextNil(t *testing.T) {
+	//lint:ignore SA1012 verifies the documented nil-context behavior
 	if got := FromContext(nil); got == nil {
 		t.Fatalf("expected non-nil profile")
 	}

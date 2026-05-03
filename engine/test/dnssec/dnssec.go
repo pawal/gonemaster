@@ -45,7 +45,6 @@ type rsaKeySizeDetails struct {
 }
 
 var (
-	method1                = methods.Method1
 	method4                = methods.Method4
 	method5                = methods.Method5
 	method4and5            = methods.Method4and5
@@ -2142,7 +2141,6 @@ func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	var ignoredChildNS []string
-	var ignoredParentNS []string
 	var noResponseDNSKEY []string
 	var signedResponse []string
 	var noAuthDNSKEY []string
@@ -2363,7 +2361,6 @@ func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				continue
 			}
 			if outcome.ignored {
-				ignoredParentNS = append(ignoredParentNS, outcome.matchingStrings...)
 				continue
 			}
 			if outcome.dsInResponse {
@@ -4207,16 +4204,13 @@ func DNSSEC11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	sort.Strings(keys)
 
 	isUndelegated := hasFakeAddresses(z)
-	if isUndelegated {
-		for _, key := range keys {
-			ns := nss[key]
-			if len(ns.FakeDSRecords(z.Name.String())) == 0 {
-				if err := appendLog(ctx, &results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
-					return results, err
-				}
-				return results, nil
+	if isUndelegated && len(keys) > 0 {
+		ns := nss[keys[0]]
+		if len(ns.FakeDSRecords(z.Name.String())) == 0 {
+			if err := appendLog(ctx, &results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
+				return results, err
 			}
-			break
+			return results, nil
 		}
 	}
 
@@ -7318,30 +7312,6 @@ func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, se
 	return false, nil
 }
 
-func ipDisabledMessage(ctx context.Context, results *[]*logger.Entry, testcase string, server nameserver.Nameserver, rrtypes ...string) (bool, error) {
-	if !profile.FromContext(ctx).Net.IPv6 && server.Address.Is6() {
-		for _, rrtype := range rrtypes {
-			if err := appendLog(ctx, results, testcase, "IPV6_DISABLED", withNameserverArgs(server, map[string]any{
-				"query_type": rrtype,
-			})); err != nil {
-				return true, err
-			}
-		}
-		return true, nil
-	}
-	if !profile.FromContext(ctx).Net.IPv4 && server.Address.Is4() {
-		for _, rrtype := range rrtypes {
-			if err := appendLog(ctx, results, testcase, "IPV4_DISABLED", withNameserverArgs(server, map[string]any{
-				"query_type": rrtype,
-			})); err != nil {
-				return true, err
-			}
-		}
-		return true, nil
-	}
-	return false, nil
-}
-
 func nameserversByIP(servers []nameserver.Nameserver) [][]nameserver.Nameserver {
 	if len(servers) == 0 {
 		return nil
@@ -7366,10 +7336,6 @@ func nsStrings(servers []nameserver.Nameserver) []string {
 		values = append(values, ns.String())
 	}
 	return values
-}
-
-func joinUniqueSorted(values []string) string {
-	return strings.Join(uniqueSortedValues(values), ";")
 }
 
 func uniqueSortedValues(values []string) []string {
@@ -7914,12 +7880,12 @@ func DNSSEC20(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	if len(groups) > 0 {
 		type nsOutcome struct {
-			groupList      []string
-			ignored        bool
-			noDNSSEC       bool
-			noBitmap       bool
-			isNSEC3        bool
-			missingTypes   []string // probed types present in zone but missing from bitmap
+			groupList    []string
+			ignored      bool
+			noDNSSEC     bool
+			noBitmap     bool
+			isNSEC3      bool
+			missingTypes []string // probed types present in zone but missing from bitmap
 		}
 
 		outcomes := make([]nsOutcome, len(groups))

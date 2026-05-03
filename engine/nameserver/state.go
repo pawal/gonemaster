@@ -167,9 +167,7 @@ func (c *queryCache) set(key string, value *packet.Packet) {
 		drop := len(c.data) - max
 		for i := 0; i < drop && i < len(c.order); i++ {
 			oldKey := c.order[i]
-			if _, ok := c.data[oldKey]; ok {
-				delete(c.data, oldKey)
-			}
+			delete(c.data, oldKey)
 		}
 		c.order = c.order[drop:]
 		c.observeEvictLocked(drop)

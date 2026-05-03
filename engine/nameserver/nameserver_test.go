@@ -579,7 +579,7 @@ func TestAXFRNoNetwork(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected error when no_network is set")
 	}
-	if !strings.Contains(err.Error(), "External AXFR query") {
+	if !strings.Contains(err.Error(), "external AXFR query") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

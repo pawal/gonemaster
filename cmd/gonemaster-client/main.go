@@ -147,12 +147,12 @@ type batchSummary struct {
 }
 
 type jobResult struct {
-	JobID   string           `json:"job_id"`
-	BatchID string           `json:"batch_id,omitempty"`
-	Status  string           `json:"status"`
-	Summary map[string]any   `json:"summary,omitempty"`
-	Raw     *jobResultRaw    `json:"raw,omitempty"`
-	Score   *scoring.Result  `json:"score,omitempty"`
+	JobID   string          `json:"job_id"`
+	BatchID string          `json:"batch_id,omitempty"`
+	Status  string          `json:"status"`
+	Summary map[string]any  `json:"summary,omitempty"`
+	Raw     *jobResultRaw   `json:"raw,omitempty"`
+	Score   *scoring.Result `json:"score,omitempty"`
 }
 
 type jobResultRaw struct {
@@ -1739,10 +1739,7 @@ func normalizeDomain(value string) (string, error) {
 }
 
 func collectDomains(domains []string, files []string, useStdin bool, errOut io.Writer) ([]string, error) {
-	entries := make([]string, 0)
-	for _, domain := range domains {
-		entries = append(entries, domain)
-	}
+	entries := append([]string{}, domains...)
 	for _, file := range files {
 		lines, err := readDomainsFromFile(file)
 		if err != nil {

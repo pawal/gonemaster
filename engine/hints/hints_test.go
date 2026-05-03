@@ -37,41 +37,41 @@ func TestParseHintsErrors(t *testing.T) {
 . 3600 IN NS a.root-servers.net.
 a.root-servers.net. 3600 IN A 198.41.0.4
 `,
-			wantErr: "Forbidden directive $TTL",
+			wantErr: "forbidden directive $TTL",
 		},
 		{
 			name: "forbidden class",
 			text: `. 3600 CH NS a.root-servers.net.
 a.root-servers.net. 3600 IN A 198.41.0.4
 `,
-			wantErr: "Forbidden RR class CH",
+			wantErr: "forbidden RR class CH",
 		},
 		{
 			name:    "bad NS owner",
 			text:    `example. 3600 IN NS a.root-servers.net.`,
-			wantErr: "Owner name for NS record must be \".\"",
+			wantErr: "owner name for NS record must be \".\"",
 		},
 		{
 			name:    "forbidden type",
 			text:    `. 3600 IN MX 10 mail.example.`,
-			wantErr: "Forbidden RR type MX",
+			wantErr: "forbidden RR type MX",
 		},
 		{
 			name: "glue mismatch",
 			text: `. 3600 IN NS a.root-servers.net.
 b.root-servers.net. 3600 IN A 198.51.100.1
 `,
-			wantErr: "Owner name of A record does not match any NS RDATA",
+			wantErr: "owner name of A record does not match any NS RDATA",
 		},
 		{
 			name:    "missing glue",
 			text:    `. 3600 IN NS a.root-servers.net.`,
-			wantErr: "No address record found for NS a.root-servers.net.",
+			wantErr: "no address record found for NS a.root-servers.net.",
 		},
 		{
 			name:    "no NS records",
 			text:    ``,
-			wantErr: "No NS record found",
+			wantErr: "no NS record found",
 		},
 	}
 

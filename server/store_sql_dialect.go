@@ -174,11 +174,6 @@ func mariadbDSN(dsn string) string {
 	return dsn + "?parseTime=true"
 }
 
-// openSQLDB opens and configures a *sql.DB for the given driver and DSN.
-func openSQLDB(driver, dsn string) (*sql.DB, error) {
-	return openSQLDBWith(driver, dsn, DatabaseConfig{})
-}
-
 // openSQLDBWith is openSQLDB with explicit pool overrides from cfg.
 func openSQLDBWith(driver, dsn string, cfg DatabaseConfig) (*sql.DB, error) {
 	if dsn == "" {

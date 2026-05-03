@@ -407,13 +407,3 @@ func optionalString(v string) *string {
 func sortDiffEntries(items []PublicAnalysisDiffEntry) {
 	sort.Slice(items, func(i, j int) bool { return items[i].Domain < items[j].Domain })
 }
-
-func stringPtrEqual(a, b *string) bool {
-	if a == nil && b == nil {
-		return true
-	}
-	if a == nil || b == nil {
-		return false
-	}
-	return *a == *b
-}

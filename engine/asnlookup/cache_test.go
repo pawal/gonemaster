@@ -33,6 +33,7 @@ func TestCacheFromContextReturnsNilWhenMissing(t *testing.T) {
 	if c := CacheFromContext(context.Background()); c != nil {
 		t.Fatalf("expected nil, got %v", c)
 	}
+	//lint:ignore SA1012 verifies the documented nil-context behavior
 	if c := CacheFromContext(nil); c != nil {
 		t.Fatalf("expected nil for nil ctx, got %v", c)
 	}

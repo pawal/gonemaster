@@ -17,7 +17,6 @@ func TestSpecialAddressListsLoaded(t *testing.T) {
 		if block.Name == "" {
 			t.Fatalf("missing IPv4 block name")
 		}
-		break
 	}
 	for _, block := range IPv6SpecialAddresses {
 		if !block.Prefix.IsValid() {
@@ -26,6 +25,5 @@ func TestSpecialAddressListsLoaded(t *testing.T) {
 		if block.Name == "" {
 			t.Fatalf("missing IPv6 block name")
 		}
-		break
 	}
 }

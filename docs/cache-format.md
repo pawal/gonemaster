@@ -57,9 +57,9 @@ want to preserve roundtripping.
 Every entry carries a `kind` discriminator that selects the remaining
 fields:
 
-- `"nameserver"` — one cached response for a specific nameserver IP.
-- `"recursor"`   — one cached response for the internal recursor.
-- `"asn"`        — one cached ASN lookup result for a queried IP.
+- `"nameserver"` - one cached response for a specific nameserver IP.
+- `"recursor"`   - one cached response for the internal recursor.
+- `"asn"`        - one cached ASN lookup result for a queried IP.
 
 Unknown `kind` values are warnings in lenient mode (the entry is skipped)
 and errors in strict mode.
@@ -155,8 +155,8 @@ failed lookups.
 
 `Import` and `Restore` accept functional options:
 
-- `WithStrict()` — turn every non-fatal warning into an error.
-- `WithWarnf(fn)` — route non-fatal warnings to a callback.
+- `WithStrict()` - turn every non-fatal warning into an error.
+- `WithWarnf(fn)` - route non-fatal warnings to a callback.
 
 In **lenient** mode (default) the following produce warnings but keep
 processing:

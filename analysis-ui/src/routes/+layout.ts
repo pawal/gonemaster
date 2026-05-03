@@ -58,7 +58,7 @@ export async function load({ fetch, url }): Promise<LayoutData> {
           return b.slug.localeCompare(a.slug);
         });
       } catch {
-        // Snapshot list failure is non-fatal — the selector just hides
+        // Snapshot list failure is non-fatal - the selector just hides
         // and the rest of the UI continues to work against auto-latest.
         snapshots = [];
       }

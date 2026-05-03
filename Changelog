@@ -141,7 +141,7 @@ Major performance increase, and new admin and public UI layout, and new scoring 
 
 ### Added
  - Server: security headers middleware sets `X-Content-Type-Options`, `X-Frame-Options`, `Content-Security-Policy`, `Referrer-Policy`, and `Permissions-Policy` on all responses
- - Server: Two-tier queue priority — `POST /jobs` submits at priority 0 (normal, for single jobs and the public ui), `POST /jobs/batch` at priority 1 (batch); normal always drains first
+ - Server: Two-tier queue priority - `POST /jobs` submits at priority 0 (normal, for single jobs and the public ui), `POST /jobs/batch` at priority 1 (batch); normal always drains first
  - UI: Added logotype and favicon
  - UI: Added more security headers
 
@@ -154,31 +154,31 @@ Major performance increase, and new admin and public UI layout, and new scoring 
 
 ### Added
 
- - Server: Domain registry — completed jobs graduate to persistent `domains` + `runs` + `entries` records; all three are queryable via the admin API and directly via SQL
- - Server: Tags — named domain collections; `POST/GET /api/v1/tags`, `PUT/DELETE /api/v1/tags/{name}`, `POST/GET/DELETE /api/v1/tags/{name}/domains`, `GET /api/v1/tags/{name}/summary`
- - Server: Domains API — `GET /api/v1/domains`, `GET /api/v1/domains/{id}`, `GET /api/v1/domains/{id}/runs`; filter by tag, name, level, min_level
- - Server: Runs API — `GET /api/v1/runs`, `GET /api/v1/runs/{id}`, `GET /api/v1/runs/{id}/result`; filter by tag, domain, batch, status, level, time range
- - Server: Entries API — `GET /api/v1/entries` with filters for run, domain, tag, module, testcase, entry tag, level, latest-per-domain, batch; CSV export via `?format=csv`
+ - Server: Domain registry - completed jobs graduate to persistent `domains` + `runs` + `entries` records; all three are queryable via the admin API and directly via SQL
+ - Server: Tags - named domain collections; `POST/GET /api/v1/tags`, `PUT/DELETE /api/v1/tags/{name}`, `POST/GET/DELETE /api/v1/tags/{name}/domains`, `GET /api/v1/tags/{name}/summary`
+ - Server: Domains API - `GET /api/v1/domains`, `GET /api/v1/domains/{id}`, `GET /api/v1/domains/{id}/runs`; filter by tag, name, level, min_level
+ - Server: Runs API - `GET /api/v1/runs`, `GET /api/v1/runs/{id}`, `GET /api/v1/runs/{id}/result`; filter by tag, domain, batch, status, level, time range
+ - Server: Entries API - `GET /api/v1/entries` with filters for run, domain, tag, module, testcase, entry tag, level, latest-per-domain, batch; CSV export via `?format=csv`
  - Server: Batch `POST /api/v1/jobs/batch` now accepts `from_tag` (re-run all domains in a tag), `tags` (tag all created domains), and `description` fields
  - Server: SQLite, PostgreSQL, and MariaDB/MySQL persistence backends with versioned schema migrations, startup recovery, and integration tests (`make test-integration`)
  - Server: `--db-driver` / `--db-dsn` / `GONEMASTER_DB_*` env vars and JSON config file support
- - Server: Data retention — `--db-retention-days` runs hourly background purge; `POST /api/v1/jobs/purge` and `gonemaster-client jobs purge` for on-demand purging
- - Docs: `docs/data-analysis.md` — end-to-end guide for bulk analysis: backend selection, tag/batch workflows, API queries, direct SQL examples, CSV export, and deployment patterns
- - Server: Public API at `/pub/api/v1/` — job submission and result lookup by short public ID, without leaking internal UUIDs; per-IP sliding-window rate limiting with `429`/`Retry-After`
+ - Server: Data retention - `--db-retention-days` runs hourly background purge; `POST /api/v1/jobs/purge` and `gonemaster-client jobs purge` for on-demand purging
+ - Docs: `docs/data-analysis.md` - end-to-end guide for bulk analysis: backend selection, tag/batch workflows, API queries, direct SQL examples, CSV export, and deployment patterns
+ - Server: Public API at `/pub/api/v1/` - job submission and result lookup by short public ID, without leaking internal UUIDs; per-IP sliding-window rate limiting with `429`/`Retry-After`
  - Server: Version endpoint at `/pub/api/v1/version` returning gonemaster and miekg/dns versions
- - Admin UI: Domains tab — browse/filter the domain registry, drill into per-domain run history
- - Admin UI: Tags tab — create/edit/delete tags, manage domain membership, per-tag severity summary
- - Admin UI: Run inspector — shows duration, entry count, and worst level; domain name is a clickable link to the Domains tab; batch re-run support
- - Admin UI: i18n — 75 new translation keys across 9 languages for all new UI sections
- - Public UI: Svelte SPA at `/public/` — domain testing without admin access; user config IPv4/IPv6 transport, undelegated NS/DS input, shareable result URLs, and 9 languages
+ - Admin UI: Domains tab - browse/filter the domain registry, drill into per-domain run history
+ - Admin UI: Tags tab - create/edit/delete tags, manage domain membership, per-tag severity summary
+ - Admin UI: Run inspector - shows duration, entry count, and worst level; domain name is a clickable link to the Domains tab; batch re-run support
+ - Admin UI: i18n - 75 new translation keys across 9 languages for all new UI sections
+ - Public UI: Svelte SPA at `/public/` - domain testing without admin access; user config IPv4/IPv6 transport, undelegated NS/DS input, shareable result URLs, and 9 languages
  - Public UI: Test results grouped by test case with translated descriptions; auto-expand for warnings/errors; severity badges per group
  - Public UI: NS/DS lookup and fetch-from-parent buttons; DS algo/digest-type dropdowns with IANA values; reset button; striped progress bar; version footer
  - Admin UI: Job inspector shows test case sub-groups within modules, translated descriptions, auto-expand for warnings/errors, and an overall status banner
- - Client: `domains` command group — `list`, `get`, `runs`, `tag`, `untag`
- - Client: `tags` command group — `list`, `create`, `delete`, `domains`, `summary`, `add-domains`
- - Client: `runs` command group — `list`, `get`, `results`
- - Client: `entries` command group — `query` (with CSV export via `--format csv`)
- - Client: `jobs batch` — new `--from-tag` (re-run all domains in a tag) and `--tag` (apply tag to batch) flags
+ - Client: `domains` command group - `list`, `get`, `runs`, `tag`, `untag`
+ - Client: `tags` command group - `list`, `create`, `delete`, `domains`, `summary`, `add-domains`
+ - Client: `runs` command group - `list`, `get`, `results`
+ - Client: `entries` command group - `query` (with CSV export via `--format csv`)
+ - Client: `jobs batch` - new `--from-tag` (re-run all domains in a tag) and `--tag` (apply tag to batch) flags
  - Engine: INFO-level success tags for DNSSEC02/06/08/09/11/13/18 (all-algorithms-signed, parent-DS-consistent, valid-RRSIGs, etc.)
  - Engine: CN01_OK_UDP and CN02_OK_TCP summary INFO tags for passing connectivity tests
 
@@ -324,7 +324,7 @@ Major performance increase, and new admin and public UI layout, and new scoring 
 
  - Server: Fix parent cache memory retention in methodsv2
  - Server: Added SQLite persistent job store, with configuration options
- - Server: Startup recovery — "running" jobs are failed and "queued" jobs are re-enqueued on restart
+ - Server: Startup recovery - "running" jobs are failed and "queued" jobs are re-enqueued on restart
  - Server: Added versioned schema migration runner
  - Server: `GONEMASTER_*` environment variable support for all configuration fields (override by CLI flags)
  - Server: `--config` JSON file support for persistent configuration

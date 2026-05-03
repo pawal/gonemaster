@@ -551,7 +551,7 @@ func TestParseGradeThresholdsInvalidCritical(t *testing.T) {
 }
 
 func TestParseGradeThresholdsWarnNotBetterThanCritical(t *testing.T) {
-	// F is worse than C — warning threshold must be a better grade than critical
+	// F is worse than C - warning threshold must be a better grade than critical
 	_, err := parseGradeThresholds("F", "C")
 	if err == nil {
 		t.Fatal("expected error when grade-warning is not better than grade-critical")
@@ -624,7 +624,7 @@ func TestStatusForGradeOnlyCriticalThreshold(t *testing.T) {
 	if s := statusForGrade("F", gt); s.code != 2 {
 		t.Fatalf("expected CRITICAL for grade F, got %+v", s)
 	}
-	// D is worse than A but there's no warning threshold — should be OK
+	// D is worse than A but there's no warning threshold - should be OK
 	if s := statusForGrade("D", gt); s.code != 0 {
 		t.Fatalf("expected OK for grade D with only critical threshold, got %+v", s)
 	}

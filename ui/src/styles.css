@@ -62,7 +62,7 @@ body {
   background: var(--bg);
 }
 
-/* ── App layout — sidebar + content ──────────────────────────────────────── */
+/* ── App layout - sidebar + content ──────────────────────────────────────── */
 .app-header {
   padding: 16px 24px;
   border-bottom: 1px solid var(--border);
@@ -1755,7 +1755,7 @@ pre {
   font-weight: 600;
 }
 
-/* Tooltip wrapper — position: relative host */
+/* Tooltip wrapper - position: relative host */
 .grade-chip-wrap {
   position: relative;
   display: inline-flex;

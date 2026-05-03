@@ -317,7 +317,7 @@ describe("ProfileSettings", () => {
     const saveButton = screen.getByRole("button", { name: "Save" });
     expect(saveButton.disabled).toBe(true);
 
-    // Make a change — save should become enabled.
+    // Make a change - save should become enabled.
     await fireEvent.input(screen.getByLabelText("Description"), {
       target: { value: "Changed description" }
     });
@@ -338,7 +338,7 @@ describe("ProfileSettings", () => {
       target: { value: "Dirty change" }
     });
 
-    // Try to switch to alpha — confirm should be called and switch blocked.
+    // Try to switch to alpha - confirm should be called and switch blocked.
     const alphaRow = await findLibraryRow("alpha");
     await fireEvent.click(within(alphaRow).getByRole("button", { name: /alpha/i }));
 
@@ -379,7 +379,7 @@ describe("ProfileSettings", () => {
 
     await fireEvent.input(screen.getByLabelText("Description"), { target: { value: "Changed" } });
 
-    // Save enabled after change — draft is dirty.
+    // Save enabled after change - draft is dirty.
     expect(screen.getByRole("button", { name: "Save" }).disabled).toBe(false);
 
     // Reset button should be enabled when dirty.
@@ -623,7 +623,7 @@ describe("ProfileSettings", () => {
     await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
     await screen.findByRole("alert");
 
-    // Switch to default profile — banner should disappear.
+    // Switch to default profile - banner should disappear.
     const defaultRow = await findLibraryRow("default");
     await fireEvent.click(within(defaultRow).getByRole("button", { name: /default/i }));
 
@@ -700,7 +700,7 @@ describe("ProfileSettings", () => {
   // ── profile list: compat badges and summary ────────────────────────────────
 
   it("shows no 'needs review' warning when all profiles are compatible", async () => {
-    installProfileFetch(); // no incompatibleProfileId — all compatible
+    installProfileFetch(); // no incompatibleProfileId - all compatible
 
     render(ProfileSettings);
     await findLibraryRow("alpha");

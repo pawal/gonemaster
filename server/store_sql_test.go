@@ -179,7 +179,7 @@ func TestTestBackendsMariaDBExcludedWithoutEnv(t *testing.T) {
 }
 
 func TestTestBackendsPostgresIncludedWhenEnvSet(t *testing.T) {
-	// Use a sentinel DSN — we only test inclusion, not connectivity.
+	// Use a sentinel DSN - we only test inclusion, not connectivity.
 	t.Setenv("TEST_POSTGRES_DSN", "postgres://sentinel/test")
 	found := false
 	for _, b := range testBackends(t) {
@@ -2194,7 +2194,7 @@ func TestConfigurePoolSQLite(t *testing.T) {
 }
 
 func TestConfigurePoolPostgres(t *testing.T) {
-	// Use a SQLite DB as the target — configurePool calls Set* methods on
+	// Use a SQLite DB as the target - configurePool calls Set* methods on
 	// *sql.DB directly, so the underlying driver is irrelevant here.
 	db := openRawSQLite(t)
 	configurePool(db, "postgres")
@@ -2448,7 +2448,7 @@ func TestSQLJobStoreQueryEntries(t *testing.T) {
 			})
 
 			t.Run("latest only", func(t *testing.T) {
-				// Graduate a second run for alpha — this becomes the latest.
+				// Graduate a second run for alpha - this becomes the latest.
 				grad("run1b", "alpha.example", "", []engine.LogEntry{
 					{Module: "BASIC", Testcase: "BASIC01", Tag: "B", Level: "NOTICE"},
 				})

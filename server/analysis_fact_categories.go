@@ -354,7 +354,7 @@ func factDistributionFromCounts(category string, counts map[string]int) PublicAn
 
 // buildFactDistributions aggregates the cached domain-fact rows into
 // per-category bar data suitable for the public overview. Counts are
-// distinct domains per key — a domain can appear in multiple buckets
+// distinct domains per key - a domain can appear in multiple buckets
 // within a category (e.g. a zone publishing two DNSKEY algorithms).
 func buildFactDistributions(facts []AnalysisRunDomainFact) map[string]PublicAnalysisFactDistribution {
 	if len(facts) == 0 {

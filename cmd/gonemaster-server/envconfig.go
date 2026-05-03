@@ -11,7 +11,7 @@ import (
 )
 
 // applyEnvVars reads GONEMASTER_* environment variables and applies them to
-// cfg. Any field whose CLI flag name appears in flagsSet is skipped — CLI
+// cfg. Any field whose CLI flag name appears in flagsSet is skipped - CLI
 // always wins. Invalid values emit a warning to warn and are ignored (not
 // fatal). getenv is typically os.Getenv; tests may inject a stub.
 func applyEnvVars(cfg *server.Config, flagsSet map[string]bool, getenv func(string) string, warn io.Writer) {

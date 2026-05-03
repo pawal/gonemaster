@@ -52,7 +52,7 @@ func evaluateBonus(domain string, entries []Entry, score int, cfg BonusCriteriaC
 func allCriteriaMet(criteria map[string]*bool) bool {
 	for _, v := range criteria {
 		if v == nil {
-			// Not applicable — treated as satisfied.
+			// Not applicable - treated as satisfied.
 			continue
 		}
 		if !*v {
@@ -162,7 +162,7 @@ func cdsCDNSKEYPublished(domain string, tags map[string]bool) *bool {
 //   - nil   when the available tags are insufficient to determine the outcome;
 //            since the engine does not emit per-nameserver IPv6 success tags,
 //            nil means "could not confirm" and is treated as not applicable
-//            rather than as a hard failure — operators may disable this
+//            rather than as a hard failure - operators may disable this
 //            criterion in environments where IPv6 is not available
 func ipv6AllNameservers(tags map[string]bool) *bool {
 	if tags["IPV6_DISABLED"] || tags["CN01_IPV6_DISABLED"] {

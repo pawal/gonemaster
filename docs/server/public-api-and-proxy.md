@@ -67,7 +67,7 @@ Equivalent JSON config:
 ```
 
 The limiter applies to `POST` requests on `/pub/api/v1/`. Read endpoints are
-not throttled — see [Caching](#caching) below for the right tool there.
+not throttled - see [Caching](#caching) below for the right tool there.
 
 Client IP is resolved from `RemoteAddr` by default. `X-Forwarded-For` is only
 honoured when the request's `RemoteAddr` falls inside one of the CIDRs listed
@@ -77,7 +77,7 @@ the first untrusted hop is taken as the client.
 ### What goes in `trusted_proxy_cidrs`
 
 The IP address that **gonemaster-server sees** when the reverse proxy connects
-to it — i.e. the proxy's address at gonemaster-server's network vantage point.
+to it - i.e. the proxy's address at gonemaster-server's network vantage point.
 
 | Setup | Value |
 |---|---|
@@ -89,7 +89,7 @@ to it — i.e. the proxy's address at gonemaster-server's network vantage point.
 > **Set `trusted_proxy_cidrs` when running behind a reverse proxy.** Without
 > it, every forwarded request is attributed to the proxy's IP and a single
 > proxy fills the per-IP budget for all real clients. The same setting also
-> lets the CSRF check honour `X-Forwarded-Proto: https` from the proxy — without
+> lets the CSRF check honour `X-Forwarded-Proto: https` from the proxy - without
 > it, browser POSTs from `https://your-domain` are rejected with 403
 > `csrf_origin_mismatch` because gonemaster sees plain HTTP and assumes
 > port 80. List only proxies you control; with it set too broadly,
@@ -106,7 +106,7 @@ or via the config file:
 ```
 
 When the server is exposed directly (no reverse proxy), leave the list empty
-— `X-Forwarded-For` is then ignored and unspoofable.
+- `X-Forwarded-For` is then ignored and unspoofable.
 
 Blocked requests return `429 Too Many Requests` with `Retry-After`.
 
@@ -136,7 +136,7 @@ The application sets `Cache-Control: public, max-age=300` on
 `GET /pub/api/v1/jobs/{public_id}/result` (200 responses only). Public
 analysis snapshot endpoints already advertise `public, max-age=86400, immutable`
 when the snapshot slug is explicit in the path. Configure your reverse proxy
-or CDN to honour these headers — e.g. enable `proxy_cache` in nginx or
+or CDN to honour these headers - e.g. enable `proxy_cache` in nginx or
 caching at Caddy / Cloudflare / Fastly.
 
 ## Reverse Proxy

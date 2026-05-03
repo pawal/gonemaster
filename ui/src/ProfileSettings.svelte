@@ -148,7 +148,7 @@
     try {
       compatibility = await apiFetch(`/profiles/${profileId}/compatibility`);
     } catch (_) {
-      // Ignore — compatibility is best-effort; don't surface load errors
+      // Ignore - compatibility is best-effort; don't surface load errors
     }
   };
 

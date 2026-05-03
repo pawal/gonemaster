@@ -123,7 +123,7 @@ func TestStartPurgeLoopStopsOnContextCancel(t *testing.T) {
 	// Cancel immediately and verify the test completes without hanging.
 	cancel()
 	time.Sleep(30 * time.Millisecond)
-	// If the goroutine hadn't stopped, the test would leak — detectable via
+	// If the goroutine hadn't stopped, the test would leak - detectable via
 	// -race or the goroutine count, but a clean exit here is sufficient.
 }
 

@@ -288,7 +288,7 @@ func TestControllerRepairAllProjectsMissedRunsIncrementally(t *testing.T) {
 func TestControllerRepairAllFailedCohortFallsBackToFullRebuild(t *testing.T) {
 	finishedAt := time.Date(2026, 4, 17, 10, 0, 0, 0, time.UTC)
 	run := testAnalysisRun("run-fresh", 100, "alpha.example", finishedAt, "192.0.2.10", "2001:db8::10")
-	// A cohort stuck in Failed state should be reconciled from scratch —
+	// A cohort stuck in Failed state should be reconciled from scratch -
 	// its materialized rows may be partial or inconsistent.
 	staleKey := projectionKey(10, "stale-run")
 	store := &fakeStore{

@@ -111,7 +111,7 @@
     <p class="status-banner">No results for this domain in the current cohort snapshot.</p>
     <p class="hint">
       A cohort snapshot is a point-in-time picture of analysis results. This page is
-      empty when the snapshot does not include this domain — typically because the
+      empty when the snapshot does not include this domain - typically because the
       domain was not part of the cohort when the snapshot was captured, or because
       the snapshot has since been retired. Try a different snapshot from the
       selector, or pick a cohort this domain belongs to.
@@ -125,7 +125,7 @@
         <h2>{d.domain}</h2>
         <p class="hint">
           Last analyzed:
-          {formatTimestamp(d.finished_at) || "—"}
+          {formatTimestamp(d.finished_at) || "-"}
         </p>
       </div>
       <div class="detail-scorecard">
@@ -185,12 +185,12 @@
                   <td class="row-ident">
                     {#if addr.asn !== undefined && addr.asn !== null}
                       <ASNChip asn={addr.asn} label={addr.asn_label ?? undefined} />
-                    {:else}—{/if}
+                    {:else}-{/if}
                   </td>
                   <td class="row-ident">
                     {#if addr.prefix}
                       <PrefixChip prefix={addr.prefix} />
-                    {:else}—{/if}
+                    {:else}-{/if}
                   </td>
                 </tr>
               {:else}

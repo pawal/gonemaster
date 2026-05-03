@@ -52,7 +52,7 @@ describe("i18n store", () => {
 
     it("replaces {seconds} in the rate-limit error", () => {
       expect(get(t)("pub.error_rate_limited", { seconds: 42 }))
-        .toBe("Too many requests — please wait 42 seconds.");
+        .toBe("Too many requests - please wait 42 seconds.");
     });
 
     it("coerces non-string var values to strings", () => {

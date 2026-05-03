@@ -73,7 +73,7 @@ export function snapshotOptionLabel(snapshot: SnapshotDisplayFields | null | und
 }
 
 export function formatCount(n: number | null | undefined): string {
-  if (n === null || n === undefined || !Number.isFinite(n)) return "—";
+  if (n === null || n === undefined || !Number.isFinite(n)) return "-";
   return new Intl.NumberFormat().format(n);
 }
 

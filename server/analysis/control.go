@@ -96,7 +96,7 @@ func NewControllerFromJobStore(store serverpkg.JobStore) (*Controller, bool) {
 // ProjectRun materializes one completed run and updates cohort-level
 // materialization state for the matched cohorts. Two pollution gates run
 // before any write:
-//  1. A run with an empty batch_id never enters the analysis layer — public
+//  1. A run with an empty batch_id never enters the analysis layer - public
 //     UI one-offs and unbatched admin retests are excluded entirely.
 //  2. A run whose batch carries snapshot_intent = false is also skipped;
 //     that flag is the admin-UI checkbox's switch for "this batch becomes a
@@ -307,7 +307,7 @@ func (c *Controller) repairEnabledCohort(ctx context.Context, cohort serverpkg.A
 
 // catchUpCohort projects runs whose FinishedAt is strictly after the
 // cohort's LastMaterializedAt stamp, without clearing existing materialized
-// rows. Returns immediately when no such runs exist — the common case after
+// rows. Returns immediately when no such runs exist - the common case after
 // a clean restart.
 func (c *Controller) catchUpCohort(ctx context.Context, cohort serverpkg.AnalysisCohort) error {
 	latest := cohort.LastMaterializedAt
@@ -371,7 +371,7 @@ func (c *Controller) RebuildCohort(ctx context.Context, cohortID int64) error {
 	}
 
 	// Zero progress on the in-memory cohort so the initial Pending write
-	// doesn't carry the previous rebuild's done/total — otherwise the
+	// doesn't carry the previous rebuild's done/total - otherwise the
 	// admin UI's progress bar briefly shows 100% under a "pending" badge
 	// until the first SetAnalysisCohortProgress lands.
 	cohort.MaterializationDone = 0
@@ -489,7 +489,7 @@ pages:
 		}
 	}
 
-	// Stamp last_materialized_at with the rebuild time — clicking
+	// Stamp last_materialized_at with the rebuild time - clicking
 	// Rebuild without a moving timestamp would surprise users.
 	var completedAt time.Time
 	if projected > 0 {
@@ -548,7 +548,7 @@ func newRebuildDimCache() *rebuildDimCache {
 
 // cachingWriteStore wraps a WriteStore and short-circuits the dimension
 // upserts via rebuildDimCache. Replace*/Upsert per-run methods pass
-// through unchanged — only the dimension entities benefit from caching.
+// through unchanged - only the dimension entities benefit from caching.
 type cachingWriteStore struct {
 	inner WriteStore
 	cache *rebuildDimCache
@@ -752,7 +752,7 @@ func (c *Controller) captureSnapshot(snap serverpkg.AnalysisCohortSnapshot) erro
 		return fmt.Errorf("count snapshot runs: %w", err)
 	}
 	if runCount == 0 {
-		// Batch terminated with zero graduated runs for this cohort — nothing
+		// Batch terminated with zero graduated runs for this cohort - nothing
 		// to materialize. Leave the snapshot pending so a later rebuild can
 		// retry; hiding it would drop a real operational condition the
 		// admin should see.

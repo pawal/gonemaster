@@ -303,7 +303,7 @@ func TestListRunsFilterByGrade(t *testing.T) {
 		t.Skipf("both runs have the same grade %q; skipping grade filter test", gradeA)
 	}
 
-	// Filter by gradeA — should return exactly the clean run.
+	// Filter by gradeA - should return exactly the clean run.
 	resp := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/runs?grade="+gradeA, nil)
 	srv.Handler().ServeHTTP(resp, req)
@@ -321,7 +321,7 @@ func TestListRunsFilterByGrade(t *testing.T) {
 		t.Fatalf("grade=%s filter: expected run %q, got %q", gradeA, domA.LatestRunID, listA.Items[0].ID)
 	}
 
-	// Filter by gradeF — should return exactly the broken run.
+	// Filter by gradeF - should return exactly the broken run.
 	resp = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/api/v1/runs?grade="+gradeF, nil)
 	srv.Handler().ServeHTTP(resp, req)

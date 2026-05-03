@@ -5,7 +5,7 @@
   "pub.locale_select_title": "Jezik sporočil z rezultati",
   "pub.locale_select_aria": "Jezik rezultatov",
 
-  "pub.theme_cycle_title": "Barvna tema: {theme} — kliknite za menjavo",
+  "pub.theme_cycle_title": "Barvna tema: {theme} - kliknite za menjavo",
   "pub.theme_system": "Sistem",
   "pub.theme_light": "Svetlo",
   "pub.theme_dark": "Temno",
@@ -71,7 +71,7 @@
   "pub.ns_timing_status_unresolved": "Imena ni mogoče razrešiti",
 
   "pub.score_label": "DNS Quality Score",
-  "pub.score_partial": "Delna ocena — testiranje {stacks} je bilo onemogočeno",
+  "pub.score_partial": "Delna ocena - testiranje {stacks} je bilo onemogočeno",
   "pub.score_aplus_criteria": "Merila A+",
   "pub.score_aplus_achieved": "Doseženo",
   "pub.score_aplus_missing": "{n} neizpolnjeno",
@@ -94,9 +94,9 @@
 
   "pub.error_domain_required": "Vnesite ime domene.",
   "pub.error_domain_invalid": "Neveljavno ime domene.",
-  "pub.error_rate_limited": "Preveč zahtev — počakajte {seconds} sekund.",
+  "pub.error_rate_limited": "Preveč zahtev - počakajte {seconds} sekund.",
   "pub.error_job_failed": "Preizkus ni uspel. Poskusite znova.",
-  "pub.error_network": "Omrežna napaka — strežnika ni mogoče doseči.",
+  "pub.error_network": "Omrežna napaka - strežnika ni mogoče doseči.",
   "pub.error_unknown": "Prišlo je do nepričakovane napake.",
 
   "pub.tc.address01": "Naslov imenskega strežnika mora biti globalno usmerljiv",

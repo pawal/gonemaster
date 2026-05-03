@@ -92,7 +92,7 @@ func (p *Projector) LoadCompletedRun(runID string) (RunInput, error) {
 
 // LoadCompletedRunWithCatalog is LoadCompletedRun but uses a caller-supplied
 // cohort catalog instead of fetching it. Rebuild loops reuse one catalog
-// across all runs — that cohort list does not change during a rebuild, and
+// across all runs - that cohort list does not change during a rebuild, and
 // re-reading it per run dominates the query count on large tags.
 func (p *Projector) LoadCompletedRunWithCatalog(runID string, catalog []serverpkg.AnalysisCohort) (RunInput, error) {
 	run, ok := p.store.GetRun(runID)
@@ -169,7 +169,7 @@ func (p *Projector) ProjectLoaded(input RunInput) error {
 }
 
 // WriteStoreWrapper lets a caller slot a wrapper between the per-run
-// write transaction and the projector's writes — RebuildCohort uses it
+// write transaction and the projector's writes - RebuildCohort uses it
 // to deduplicate dimension upserts across its worker pool.
 type WriteStoreWrapper func(WriteStore) WriteStore
 
@@ -206,7 +206,7 @@ type preparedRun struct {
 }
 
 // tagSummary is a per-(tag, testcase) aggregate for one run. Rendered by
-// writePrepared into serverpkg.AnalysisRunTagSummary rows — one per
+// writePrepared into serverpkg.AnalysisRunTagSummary rows - one per
 // matching cohort.
 type tagSummary struct {
 	tag         string
@@ -287,7 +287,7 @@ func (p *Projector) prepareRun(input RunInput) preparedRun {
 	addressFacts = p.applyEnrichment(endpoints, addressFacts)
 	domainASNs := p.extractDomainASNs(input)
 	// The aggregate IPV4_/IPV6_*_ASN engine entries carry every ASN the
-	// delegation chain touched — including parent-side registry ASNs
+	// delegation chain touched - including parent-side registry ASNs
 	// that have no authoritative address in this cohort. Drop those so
 	// the ASN list never shows ASNs with zero address / nameserver
 	// linkage. This filter only kicks in when address-level enrichment
@@ -479,7 +479,7 @@ func deriveRunDomainSummary(input RunInput, endpoints []extractedEndpoint, addre
 	// Skip parent-role endpoints (root/registry servers seen while traversing
 	// the delegation chain). They are not the domain's own authoritative
 	// nameservers, and every downstream /domains and /nameservers view
-	// filters them out — counting them in the summary inflated TLD rows by
+	// filters them out - counting them in the summary inflated TLD rows by
 	// the 13 root servers and their 26 addresses.
 	for _, endpoint := range endpoints {
 		if endpoint.role == "parent" {
@@ -525,7 +525,7 @@ func (p *Projector) extractNameserverEndpoints(input RunInput) []extractedEndpoi
 		}
 		// Address may be empty when this is a synthetic delegation-only
 		// endpoint (NS name appears in the zone's NS set but the engine
-		// never produced an address for it — unresolvable, or the
+		// never produced an address for it - unresolvable, or the
 		// address was filtered out). Allow those through so the
 		// nameserver shows up on the domain detail; all other sources
 		// still require an address.
@@ -598,7 +598,7 @@ func (p *Projector) extractNameserverEndpoints(input RunInput) []extractedEndpoi
 			}
 			return "parent"
 		}
-		// Last-resort fallback: no timings, no delegation entries —
+		// Last-resort fallback: no timings, no delegation entries -
 		// trust only the explicit child-side source keys, everything
 		// else defaults to parent so root-server traversal doesn't
 		// leak into the authoritative view.
@@ -615,7 +615,7 @@ func (p *Projector) extractNameserverEndpoints(input RunInput) []extractedEndpoi
 			continue
 		}
 		if addr == "" {
-			// Unresolved target — surface the NS name without an
+			// Unresolved target - surface the NS name without an
 			// address so the domain detail page still lists it.
 			add(extractedEndpoint{
 				nameserver: ns,
@@ -830,7 +830,7 @@ func (p *Projector) applyEnrichment(endpoints []extractedEndpoint, addressFacts 
 	// Collect the ordered set of unique addresses we want to enrich:
 	// every existing address-fact, plus any authoritative endpoint
 	// address that doesn't already have a fact. Parent-role endpoints
-	// are skipped — they live outside the cohort's authoritative graph
+	// are skipped - they live outside the cohort's authoritative graph
 	// and enriching them would only create orphan ASN/prefix rows.
 	byIndex := make(map[string]int, len(addressFacts))
 	for i, fact := range addressFacts {
@@ -856,7 +856,7 @@ func (p *Projector) applyEnrichment(endpoints []extractedEndpoint, addressFacts 
 		addresses = append(addresses, endpoint.address)
 	}
 
-	// Fan the lookups out concurrently — for a cold enricher cache each
+	// Fan the lookups out concurrently - for a cold enricher cache each
 	// EnrichAddress is a network round-trip (DNS to cymru or whois TCP).
 	// Doing them serially would dominate wall-clock time for a cohort
 	// rebuild. Results are written into position-indexed slots so the
@@ -894,7 +894,7 @@ func (p *Projector) applyEnrichment(endpoints []extractedEndpoint, addressFacts 
 			idx = len(addressFacts) - 1
 			byIndex[address] = idx
 		}
-		// Mutate via slice index rather than a stored pointer — a prior
+		// Mutate via slice index rather than a stored pointer - a prior
 		// append may have reallocated the backing array, which would
 		// orphan any *extractedAddressFact captured before the growth.
 		fact := &addressFacts[idx]
@@ -931,7 +931,7 @@ func (p *Projector) applyEnrichment(endpoints []extractedEndpoint, addressFacts 
 // resolveASNLabels collects every ASN referenced in this projection and
 // asks the enricher for a human-readable label. Cached by the enricher, so
 // the cost is one lookup per unique ASN across the entire cohort rebuild.
-// Returns an empty map when no enricher is configured — callers must still
+// Returns an empty map when no enricher is configured - callers must still
 // upsert ASNs with an empty label in that case.
 func (p *Projector) resolveASNLabels(addressFacts []extractedAddressFact, domainASNs []extractedDomainASN) map[int64]string {
 	labels := map[int64]string{}
@@ -963,7 +963,7 @@ func (p *Projector) resolveASNLabels(addressFacts []extractedAddressFact, domain
 		return labels
 	}
 
-	// Same fanout pattern as address enrichment — ASN label lookups are
+	// Same fanout pattern as address enrichment - ASN label lookups are
 	// external (cymru DNS or RIPE whois) and trivially parallelizable.
 	resolved := make([]string, len(uniqueASNs))
 	hits := make([]bool, len(uniqueASNs))

@@ -5,7 +5,7 @@
   "pub.locale_select_title": "Språk för resultatmeddelanden",
   "pub.locale_select_aria": "Resultatspråk",
 
-  "pub.theme_cycle_title": "Färgtema: {theme} — klicka för att byta",
+  "pub.theme_cycle_title": "Färgtema: {theme} - klicka för att byta",
   "pub.theme_system": "System",
   "pub.theme_light": "Ljust",
   "pub.theme_dark": "Mörkt",
@@ -71,7 +71,7 @@
   "pub.ns_timing_status_unresolved": "Inget DNS-uppslag",
 
   "pub.score_label": "DNS Quality Score",
-  "pub.score_partial": "Partiellt resultat — testning av {stacks} inaktiverades",
+  "pub.score_partial": "Partiellt resultat - testning av {stacks} inaktiverades",
   "pub.score_aplus_criteria": "A+-kriterier",
   "pub.score_aplus_achieved": "Uppnått",
   "pub.score_aplus_missing": "{n} saknas",
@@ -94,9 +94,9 @@
 
   "pub.error_domain_required": "Ange ett domännamn.",
   "pub.error_domain_invalid": "Ogiltigt domännamn.",
-  "pub.error_rate_limited": "För många förfrågningar — vänta {seconds} sekunder.",
+  "pub.error_rate_limited": "För många förfrågningar - vänta {seconds} sekunder.",
   "pub.error_job_failed": "Testkörningen misslyckades. Försök igen.",
-  "pub.error_network": "Nätverksfel — kunde inte nå servern.",
+  "pub.error_network": "Nätverksfel - kunde inte nå servern.",
   "pub.error_unknown": "Ett oväntat fel inträffade.",
 
   "pub.tc.address01": "Namnserverns adress måste vara globalt routbar",

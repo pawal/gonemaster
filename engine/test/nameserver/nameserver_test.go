@@ -94,7 +94,7 @@ func TestNameserver01NxdomainWithRAAndAAIsRecursor(t *testing.T) {
 	t.Cleanup(func() { method4and5 = origM4and5 })
 
 	// Server returns NXDOMAIN with both RA=1 and AA=1.
-	// RA takes precedence — should still be classified as a recursor.
+	// RA takes precedence - should still be classified as a recursor.
 	nsRAandAA := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeNameError

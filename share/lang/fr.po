@@ -2029,12 +2029,12 @@ msgstr ""
 "enregistrement de type \"DS\"."
 
 msgctxt "DNSSEC:DS11_CONSISTENT_SIGNED"
-msgid "Parent DS and child DNSKEY are consistent — the zone is signed."
-msgstr "Le DS du parent et le DNSKEY de l'enfant sont cohérents — la zone est signée."
+msgid "Parent DS and child DNSKEY are consistent - the zone is signed."
+msgstr "Le DS du parent et le DNSKEY de l'enfant sont cohérents - la zone est signée."
 
 msgctxt "DNSSEC:DS11_NO_PARENT_DS"
-msgid "No DS records found at the parent — the zone is unsigned from the parent view."
-msgstr "Aucun enregistrement DS trouvé chez le parent — la zone n'est pas signée du point de vue du parent."
+msgid "No DS records found at the parent - the zone is unsigned from the parent view."
+msgstr "Aucun enregistrement DS trouvé chez le parent - la zone n'est pas signée du point de vue du parent."
 
 msgctxt "DNSSEC:DS13_ALGO_NOT_SIGNED_DNSKEY"
 msgid ""

@@ -34,7 +34,7 @@ func TestApplyEnvVarsListenCLIWins(t *testing.T) {
 	applyEnvVars(&cfg, map[string]bool{"listen": true}, fakeEnv(map[string]string{
 		"GONEMASTER_LISTEN": "0.0.0.0:9090",
 	}), &warn)
-	// CLI flag was set — env var must be ignored.
+	// CLI flag was set - env var must be ignored.
 	if cfg.ListenAddr != "127.0.0.1:8888" {
 		t.Fatalf("expected CLI value 127.0.0.1:8888, got %q", cfg.ListenAddr)
 	}
@@ -217,7 +217,7 @@ func TestApplyEnvVarsEmptyEnvIsNoop(t *testing.T) {
 	cfg := server.DefaultConfig()
 	original := cfg.ListenAddr
 	var warn strings.Builder
-	// Empty env map — nothing should change.
+	// Empty env map - nothing should change.
 	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{}), &warn)
 	if cfg.ListenAddr != original {
 		t.Fatalf("expected ListenAddr unchanged, got %q", cfg.ListenAddr)
@@ -398,7 +398,7 @@ func TestApplyEnvVarsPublicAPIRateLimitWindowCLIWins(t *testing.T) {
 	applyEnvVars(&cfg, map[string]bool{"public-api-rate-limit-window": true}, fakeEnv(map[string]string{
 		"GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW": "30s",
 	}), &warn)
-	// Default is 10m — env must be ignored.
+	// Default is 10m - env must be ignored.
 	if cfg.PublicAPI.RateLimitWindow.Duration != 10*time.Minute {
 		t.Fatalf("expected default 10m to be preserved, got %v", cfg.PublicAPI.RateLimitWindow)
 	}

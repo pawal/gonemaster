@@ -111,7 +111,7 @@ The bonus criterion `cds_cdnskey_published` in `scoring/bonus.go` treats `DS18_N
 | `DS18_MATCH_CDS_RRSIG_DS` | `addresses` | `array<string>` | Structured child nameserver IP list with matching CDS RRSIG. |
 | `DS18_NO_MATCH_CDNSKEY_RRSIG_DS` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS18_NO_MATCH_CDS_RRSIG_DS` | `addresses` | `array<string>` | Structured child nameserver IP list. |
-| `DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE` | — | — | No arguments. |
+| `DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE` | - | - | No arguments. |
 | `DS18_ROLLOVER_EVIDENCE_DOUBLE_SIG` | `keytags` | `array<uint16>` | Sorted KSK keytags that each signed the DNSKEY RRset. |
 | `DS18_ROLLOVER_EVIDENCE_DNSKEY_WITHOUT_DS` | `keytags` | `array<uint16>` | Sorted SEP DNSKEY keytags without a matching parent DS. |
 | `DS18_ROLLOVER_EVIDENCE_DS_WITHOUT_DNSKEY` | `keytags` | `array<uint16>` | Sorted DS keytags without a matching child DNSKEY. |

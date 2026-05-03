@@ -246,7 +246,7 @@ func TestNameserverHotCacheLeasesCoalesceInflightQueries(t *testing.T) {
 		t.Fatalf("expected one network query to start")
 	}
 	// Wait for the waiter goroutine to join the inflight queue. Only then is it
-	// safe to release the network — this prevents the leader from completing and
+	// safe to release the network - this prevents the leader from completing and
 	// removing the inflight entry before the waiter has a chance to find it.
 	select {
 	case <-waiterJoined:

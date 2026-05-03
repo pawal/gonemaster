@@ -593,7 +593,7 @@ func TestGetIBAddrInZoneSkipsDeadDelegationServer(t *testing.T) {
 		"dead.example": "192.0.2.99",
 	}))
 
-	// Healthy delegation server — responds authoritatively for example.
+	// Healthy delegation server - responds authoritatively for example.
 	ibHook := func(name string, qtype string) (packet.Packet, error) {
 		if name == "example" && qtype == "NS" {
 			return authoritativeNSPacket("example", "ns1.example", "ns2.example", "dead.example"), nil
@@ -633,7 +633,7 @@ func TestGetIBAddrInZoneSkipsDeadDelegationServer(t *testing.T) {
 		return ibHook(name, qtype)
 	})
 
-	// Dead delegation server — returns error for all queries.
+	// Dead delegation server - returns error for all queries.
 	var deadQueryCount atomic.Int32
 	deadNS, err := nameserver.NewWithContext(ctx, "dead.example", "192.0.2.99", r.Client())
 	if err != nil {

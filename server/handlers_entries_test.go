@@ -287,7 +287,7 @@ func TestListEntriesInvalidDomain(t *testing.T) {
 
 func TestListEntriesCSVIncludesScoreAndGrade(t *testing.T) {
 	srv := New(DefaultConfig())
-	// Graduate a job with a WARNING entry — scoring will produce a non-trivial grade.
+	// Graduate a job with a WARNING entry - scoring will produce a non-trivial grade.
 	makeGraduatedJobWithEntries(t, srv, "example.com", []engine.LogEntry{
 		{Module: "DNSSEC", Testcase: "DS07", Tag: "DS07_NOT_SIGNED", Level: "WARNING"},
 	})
@@ -315,7 +315,7 @@ func TestListEntriesCSVIncludesScoreAndGrade(t *testing.T) {
 	if dataRow == "" {
 		t.Fatalf("expected non-empty data row")
 	}
-	// The grade column should not be empty — scoring runs at graduation.
+	// The grade column should not be empty - scoring runs at graduation.
 	fields := strings.Split(dataRow, ",")
 	gradeIdx := -1
 	headerFields := strings.Split(lines[0], ",")

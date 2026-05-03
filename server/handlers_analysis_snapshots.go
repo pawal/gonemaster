@@ -81,8 +81,8 @@ func adminAnalysisSnapshotView(snap AnalysisCohortSnapshot, sourceRunsAvailable 
 
 // handleAnalysisCohortSnapshots handles GET on
 // /api/v1/analysis/cohorts/{id}/snapshots. Returns every snapshot for
-// the cohort — including retired and mixed-profile rows the public
-// API hides — so the admin UI can render its full management list.
+// the cohort - including retired and mixed-profile rows the public
+// API hides - so the admin UI can render its full management list.
 func (s *Server) handleAnalysisCohortSnapshots(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)

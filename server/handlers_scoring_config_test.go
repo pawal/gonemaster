@@ -296,7 +296,7 @@ func TestApplyDatabaseSettingsScoringConfig(t *testing.T) {
 }
 
 // TestGetResultRecomputesWithUpdatedConfig verifies that GetResult uses the
-// current scoring config dynamically — changing the config after graduation
+// current scoring config dynamically - changing the config after graduation
 // changes the score returned by the next GetResult call.
 func TestGetResultRecomputesWithUpdatedConfig(t *testing.T) {
 	srv := New(DefaultConfig())

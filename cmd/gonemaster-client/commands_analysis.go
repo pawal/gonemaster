@@ -424,7 +424,7 @@ func runTagsList(ctx context.Context, client *apiClient, opts globalOptions, arg
 	for _, t := range list {
 		desc := ""
 		if t.Description != "" {
-			desc = "  — " + t.Description
+			desc = "  - " + t.Description
 		}
 		fmt.Fprintf(out, "  %-30s  domains=%-6d%s\n", t.Name, t.DomainCount, desc)
 	}

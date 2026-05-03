@@ -121,7 +121,7 @@ func (s *Server) handleDeleteScoringConfig(w http.ResponseWriter, _ *http.Reques
 		return
 	}
 
-	// Ignore not-found — idempotent.
+	// Ignore not-found - idempotent.
 	_ = s.store.DeleteSetting("scoring_config")
 
 	// Revert to file config or defaults.

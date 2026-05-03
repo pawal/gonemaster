@@ -34,7 +34,7 @@ func TestExtractDNSKEYAlgorithms(t *testing.T) {
 					"algo_mnemo": "RSASHA256",
 				},
 			},
-			// Two more keytags on algo=13 — value_num should be 2.
+			// Two more keytags on algo=13 - value_num should be 2.
 			{
 				Module:   "DNSSEC",
 				Testcase: "dnssec05",
@@ -53,7 +53,7 @@ func TestExtractDNSKEYAlgorithms(t *testing.T) {
 					"algo_num": uint8(13),
 				},
 			},
-			// Deprecated algorithm should still be extracted — the registry
+			// Deprecated algorithm should still be extracted - the registry
 			// colors it, not the projector.
 			{
 				Module:   "DNSSEC",
@@ -264,7 +264,7 @@ func TestExtractGrade(t *testing.T) {
 		t.Fatalf("whitespace grade should emit nothing, got %+v", got)
 	}
 
-	// Custom scoring profile grade passes through verbatim — no
+	// Custom scoring profile grade passes through verbatim - no
 	// hard-coded letter set.
 	custom := "Gold"
 	got = extractGrade(RunInput{Run: serverpkg.Run{Grade: &custom}})

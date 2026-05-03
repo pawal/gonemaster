@@ -58,7 +58,7 @@ func extractSeverity(input RunInput) []extractedDomainFact {
 
 // extractGrade emits one fact row per run carrying the letter grade the
 // scoring engine assigned at graduation time. The grade set is not
-// hard-coded because scoring is configurable — a cohort scored under a
+// hard-coded because scoring is configurable - a cohort scored under a
 // custom profile may produce labels outside the default A+/A/B/C/D/F
 // set. The registry handles display; this extractor just records
 // whatever label the run carries.
@@ -141,13 +141,13 @@ func extractDNSKEYAlgorithms(input RunInput) []extractedDomainFact {
 // extractDNSSECPosture emits exactly one fact per run partitioning the
 // cohort by DNSSEC state and denial-of-existence mode:
 //
-//   - "unsigned" — DS07_NOT_SIGNED present (short-circuits the rest of
+//   - "unsigned" - DS07_NOT_SIGNED present (short-circuits the rest of
 //     the DNSSEC suite, so the verdict is authoritative).
-//   - "mixed" — DS10_MIXED_NSEC_NSEC3, or both DS10_HAS_NSEC and
+//   - "mixed" - DS10_MIXED_NSEC_NSEC3, or both DS10_HAS_NSEC and
 //     DS10_HAS_NSEC3 from different servers in the same run.
-//   - "nsec" — only DS10_HAS_NSEC seen.
-//   - "nsec3" — only DS10_HAS_NSEC3 seen.
-//   - "signed" — DNSSEC ran but DS10 did not produce a denial-of-existence
+//   - "nsec" - only DS10_HAS_NSEC seen.
+//   - "nsec3" - only DS10_HAS_NSEC3 seen.
+//   - "signed" - DNSSEC ran but DS10 did not produce a denial-of-existence
 //     signal (degraded run). Kept as a fallback so the bar still counts
 //     the domain.
 //

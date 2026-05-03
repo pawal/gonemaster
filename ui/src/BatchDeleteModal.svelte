@@ -152,7 +152,7 @@
               <li>
                 <strong>{snap.cohort_label || snap.cohort_id}</strong>:
                 <code class="mono">{snap.snapshot_slug}</code>
-                {#if snap.snapshot_label} — {snap.snapshot_label}{/if}
+                {#if snap.snapshot_label} - {snap.snapshot_label}{/if}
                 {#if snap.is_default}
                   <span class="pill default">{$t("batch_delete_default_pill")}</span>
                 {/if}

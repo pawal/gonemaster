@@ -5,7 +5,7 @@
   "pub.locale_select_title": "Tulosviestien kieli",
   "pub.locale_select_aria": "Tuloskieli",
 
-  "pub.theme_cycle_title": "Väriasetus: {theme} — napsauta vaihtaaksesi",
+  "pub.theme_cycle_title": "Väriasetus: {theme} - napsauta vaihtaaksesi",
   "pub.theme_system": "Järjestelmä",
   "pub.theme_light": "Vaalea",
   "pub.theme_dark": "Tumma",
@@ -71,7 +71,7 @@
   "pub.ns_timing_status_unresolved": "Ei nimen selvitystä",
 
   "pub.score_label": "DNS Quality Score",
-  "pub.score_partial": "Osittaiset pisteet — {stacks}-testaus oli poistettu käytöstä",
+  "pub.score_partial": "Osittaiset pisteet - {stacks}-testaus oli poistettu käytöstä",
   "pub.score_aplus_criteria": "A+-kriteerit",
   "pub.score_aplus_achieved": "Saavutettu",
   "pub.score_aplus_missing": "{n} täyttämättä",
@@ -94,9 +94,9 @@
 
   "pub.error_domain_required": "Anna verkkotunnus.",
   "pub.error_domain_invalid": "Virheellinen verkkotunnus.",
-  "pub.error_rate_limited": "Liian monta pyyntöä — odota {seconds} sekuntia.",
+  "pub.error_rate_limited": "Liian monta pyyntöä - odota {seconds} sekuntia.",
   "pub.error_job_failed": "Testiajo epäonnistui. Yritä uudelleen.",
-  "pub.error_network": "Verkkovirhe — palvelimeen ei saatu yhteyttä.",
+  "pub.error_network": "Verkkovirhe - palvelimeen ei saatu yhteyttä.",
   "pub.error_unknown": "Odottamaton virhe tapahtui.",
 
   "pub.tc.address01": "Nimipalvelimen osoitteen on oltava globaalisti reititettävissä",

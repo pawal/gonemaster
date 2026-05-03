@@ -180,7 +180,7 @@ func TestComputeSnapshotEntityViewsBuildsTagViews(t *testing.T) {
 	s := testStoreForBackend(t, testBackends(t)[0])
 	cohortID, _ := snapshotViewFixture(t, s)
 
-	// Add a tag summary directly so the fixture has tag data — the
+	// Add a tag summary directly so the fixture has tag data - the
 	// existing fixture only exercises endpoints/asns.
 	if err := s.ReplaceAnalysisRunTagSummaries(cohortID, "run-a", []AnalysisRunTagSummary{
 		{CohortID: cohortID, RunID: "run-a", DomainID: 1, Tag: "DS07_NOT_SIGNED",

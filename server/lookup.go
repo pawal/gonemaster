@@ -114,7 +114,7 @@ func lookupNS(ctx context.Context, domain string) []DelegationNS {
 		if len(nameservers) > 0 {
 			return nameservers
 		}
-		// Empty answer — try the next resolver.
+		// Empty answer - try the next resolver.
 	}
 	return []DelegationNS{}
 }
@@ -151,7 +151,7 @@ func lookupDS(ctx context.Context, domain string) []DelegationDS {
 		if len(records) > 0 {
 			return records
 		}
-		// Empty answer — try the next resolver.
+		// Empty answer - try the next resolver.
 	}
 
 	return []DelegationDS{}

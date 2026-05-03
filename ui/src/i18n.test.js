@@ -56,7 +56,7 @@ describe("i18n store", () => {
     });
 
     it("leaves unmatched placeholders literal when their var is missing", () => {
-      // job_created = "Job {id} created." — if we omit `id` the template is preserved.
+      // job_created = "Job {id} created." - if we omit `id` the template is preserved.
       expect(get(t)("job_created", {})).toBe("Job {id} created.");
     });
   });

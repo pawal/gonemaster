@@ -193,7 +193,7 @@ func (s *SQLJobStore) queryBatchTagSummaries(cohortID int64, batchID string) ([]
 
 // buildTagViews collapses per-(run, domain) tag summaries into one row per
 // tag for the snapshot. Tags whose worst level falls below minLevel are
-// dropped — INFO/NOTICE-only chatter never gets a detail page.
+// dropped - INFO/NOTICE-only chatter never gets a detail page.
 func buildTagViews(rows []AnalysisRunTagSummary, domainNames map[int64]string, minLevel string) []AnalysisSnapshotTagView {
 	floor := severityRank(minLevel)
 	type bucket struct {

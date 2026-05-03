@@ -8017,7 +8017,7 @@ func DNSSEC20(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					if len(matchingRRs) == 0 {
 						continue
 					}
-					// Type exists at apex — check if bitmap includes it.
+					// Type exists at apex - check if bitmap includes it.
 					if !typeMap[probeType] {
 						outcome.missingTypes = append(outcome.missingTypes, probeType)
 					}

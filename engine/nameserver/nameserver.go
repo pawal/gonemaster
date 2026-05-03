@@ -335,7 +335,7 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 		}
 	}
 
-	// Log oversized packets before releasing inflight waiters — both paths share
+	// Log oversized packets before releasing inflight waiters - both paths share
 	// the same *dns.Msg pointer, so Len() must not race with callers of the
 	// released goroutines (e.g. KeyTag() writing the cached keytag field).
 	if resp.Msg != nil && resp.Msg.Len() > 4096 {

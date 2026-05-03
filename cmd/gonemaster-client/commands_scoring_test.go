@@ -220,7 +220,7 @@ func TestJobsResultsScoreInJSONOutput(t *testing.T) {
 	}
 	var result jobResult
 	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
-		t.Fatalf("invalid JSON output: %v — got: %s", err, out.String())
+		t.Fatalf("invalid JSON output: %v - got: %s", err, out.String())
 	}
 	if result.Score == nil {
 		t.Fatalf("expected score field in JSON output, got: %s", out.String())

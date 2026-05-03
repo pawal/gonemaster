@@ -264,7 +264,7 @@ func TestPublicAnalysisDomainDetailSurfacesNameserverStatus(t *testing.T) {
 	}
 	domain, _ := f.store.GetDomainByName("ck.example")
 	// ghost.example → unresolved (synthetic delegation endpoint with
-	// AddressID=0 — the projector's "no address for this NS" marker).
+	// AddressID=0 - the projector's "no address for this NS" marker).
 	ghostNS, err := f.store.UpsertAnalysisNameserver("ghost.example", ts)
 	if err != nil {
 		t.Fatalf("upsert ghost ns: %v", err)

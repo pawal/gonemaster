@@ -138,12 +138,12 @@
               <td class="row-ident">
                 {#if row.asn !== undefined && row.asn !== null}
                   <ASNChip asn={row.asn} label={row.asn_label ?? undefined} />
-                {:else}—{/if}
+                {:else}-{/if}
               </td>
               <td class="row-ident">
                 {#if row.prefix}
                   <PrefixChip prefix={row.prefix} />
-                {:else}—{/if}
+                {:else}-{/if}
               </td>
             </tr>
           {/each}

@@ -25,7 +25,7 @@ type fakeStore struct {
 	cohorts []serverpkg.AnalysisCohort
 
 	// Queue + batch catalog used by the Phase 2 snapshot lifecycle tests.
-	// These are intentionally simple maps — the unit tests exercise
+	// These are intentionally simple maps - the unit tests exercise
 	// controller logic, not storage semantics.
 	queuedJobs map[string][]string // batchID → []jobID (only in-flight jobs)
 	batches    map[string]serverpkg.Batch
@@ -510,7 +510,7 @@ func (s *fakeStore) CountBatchSnapshotRuns(cohortID int64, batchID string) (int,
 			continue
 		}
 		// Require the run to have produced a summary row for the target
-		// cohort — otherwise rebuild scenarios would double-count runs that
+		// cohort - otherwise rebuild scenarios would double-count runs that
 		// belong to a different tag.
 		if _, ok := s.summaries[projectionKey(cohortID, run.ID)]; !ok {
 			continue
@@ -977,7 +977,7 @@ func TestProjectorExtractNameserverEndpoints(t *testing.T) {
 // legacy behavior: when NameserverTimings is empty, entry-derived endpoints
 // still inherit the role tied to their source key. Without
 // nameserver_timings we can't trust the generic `servers` list or a
-// singleton {ns, address} entry as authoritative — zonemaster uses those
+// singleton {ns, address} entry as authoritative - zonemaster uses those
 // same shapes for parent-side delegation traversal, and trusting them
 // leaks root-server entries into TLD cohort analyses. Only the explicit
 // child-side keys (child_servers / zone_servers / ns_set_servers) name
@@ -1105,7 +1105,7 @@ func TestExtractNameserverEndpointsTimingsDrivesClassify(t *testing.T) {
 	input := RunInput{
 		NameserverTimings: []serverpkg.NameserverTiming{
 			{Nameserver: "parau.oyster.net.ck", Address: "202.65.32.128", AvgMS: 10, Count: 3},
-			// Unreachable — address present, zero samples, status from
+			// Unreachable - address present, zero samples, status from
 			// the worker.
 			{Nameserver: "circa.mcs.vuw.ac.nz", Address: "130.195.5.12"},
 		},
@@ -1207,8 +1207,8 @@ func TestExtractNameserverEndpointsSuppressesStaleGlueForUnresolvedNS(t *testing
 // the legacy-data rollout: a run whose nameserver_timings_json predates
 // the worker's per-target emission (so timings lists only the NSes the
 // engine successfully probed). The Delegation01 tag parser supplements
-// the timings-derived set so a pure cohort rebuild — no re-running of
-// the DNS tests — still surfaces unreachable and unresolved NSes.
+// the timings-derived set so a pure cohort rebuild - no re-running of
+// the DNS tests - still surfaces unreachable and unresolved NSes.
 func TestExtractNameserverEndpointsMergesDelegationTagsIntoTimings(t *testing.T) {
 	input := RunInput{
 		NameserverTimings: []serverpkg.NameserverTiming{
@@ -1293,7 +1293,7 @@ func TestExtractNameserverEndpointsSyntheticFromTimingsUnresolvedRow(t *testing.
 }
 
 // TestExtractNameserverEndpointsEmitsSyntheticForUnresolvedNS covers the
-// .ck "downstage" case — NS name in delegation but no (ns, addr) pair
+// .ck "downstage" case - NS name in delegation but no (ns, addr) pair
 // anywhere in the run. A synthetic empty-address endpoint must be
 // emitted so the NS still shows up on the domain detail page.
 func TestExtractNameserverEndpointsEmitsSyntheticForUnresolvedNS(t *testing.T) {

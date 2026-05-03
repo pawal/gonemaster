@@ -1567,12 +1567,12 @@ msgid "The child zone is unsigned, but the parent zone has DS record."
 msgstr "Underordnet sone er usignert, men foreldresone har en DS-post."
 
 msgctxt "DNSSEC:DS11_CONSISTENT_SIGNED"
-msgid "Parent DS and child DNSKEY are consistent — the zone is signed."
-msgstr "Forelderens DS og barnets DNSKEY er konsistente — sonen er signert."
+msgid "Parent DS and child DNSKEY are consistent - the zone is signed."
+msgstr "Forelderens DS og barnets DNSKEY er konsistente - sonen er signert."
 
 msgctxt "DNSSEC:DS11_NO_PARENT_DS"
-msgid "No DS records found at the parent — the zone is unsigned from the parent view."
-msgstr "Ingen DS-poster funnet hos foreldersonen — sonen er usignert sett fra foreldersiden."
+msgid "No DS records found at the parent - the zone is unsigned from the parent view."
+msgstr "Ingen DS-poster funnet hos foreldersonen - sonen er usignert sett fra foreldersiden."
 
 msgctxt "DNSSEC:DS13_ALGO_NOT_SIGNED_DNSKEY"
 msgid ""

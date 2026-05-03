@@ -1904,7 +1904,7 @@ func spfResolveLookups(ctx context.Context, z *zonepkg.Zone, target string, visi
 		}
 	}
 
-	// No SPF record found at target — treat as resolution error.
+	// No SPF record found at target - treat as resolution error.
 	return 0, "", target, false, false, true
 }
 

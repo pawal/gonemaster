@@ -143,16 +143,16 @@
               <th scope="row" class="row-ident">
                 <a class="cell-link" href={domainHref(base, row.domain, search)}>{row.domain}</a>
               </th>
-              <td class="col-num">{row.score ?? "—"}</td>
+              <td class="col-num">{row.score ?? "-"}</td>
               <td>
                 {#if row.grade}
                   <span class={`grade grade-${gradeTone(row.grade)}`}>{row.grade}</span>
-                {:else}—{/if}
+                {:else}-{/if}
               </td>
               <td>
                 {#if row.worst_level}
                   <span class={`level level-${levelTone(row.worst_level)}`}>{row.worst_level}</span>
-                {:else}—{/if}
+                {:else}-{/if}
               </td>
               <td class="row-ident">
                 {#if row.operator === "Multiple"}
@@ -166,13 +166,13 @@
                       AS{row.operator_asn}
                     {/if}
                   </a>
-                {:else}—{/if}
+                {:else}-{/if}
               </td>
               <td class="col-num">{formatCount(row.nameserver_count)}</td>
               <td class="col-num">{formatCount(row.endpoint_count)}</td>
               <td class="col-num">{formatCount(row.asn_count)}</td>
               <td class="col-num">{formatCount(row.prefix_count)}</td>
-              <td>{formatTimestamp(row.finished_at) || "—"}</td>
+              <td>{formatTimestamp(row.finished_at) || "-"}</td>
             </tr>
           {/each}
         </tbody>

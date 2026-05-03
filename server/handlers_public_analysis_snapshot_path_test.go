@@ -123,7 +123,7 @@ func TestSnapshotPathUnknownCohort404s(t *testing.T) {
 }
 
 // TestLegacyQueryParamRouteIsGone asserts the old query-param routes
-// no longer match — the path-segmented form is the only public-read
+// no longer match - the path-segmented form is the only public-read
 // URL shape now.
 func TestLegacyQueryParamRouteIsGone(t *testing.T) {
 	f := newAnalysisAPITestFixture(t)

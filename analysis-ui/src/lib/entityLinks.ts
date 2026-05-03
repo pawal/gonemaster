@@ -68,7 +68,7 @@ export function tagHref(base: string, tag: string, query = ""): string {
 // domainsSeverityHref links to the domains list filtered by an exact
 // worst_level bucket. Used by the overview's health bar so every segment
 // deep-links into the matching subset without losing the cohort scope.
-// Exact match (not threshold) — clicking "ERROR" shows only ERROR
+// Exact match (not threshold) - clicking "ERROR" shows only ERROR
 // domains, not "ERROR and worse".
 export function domainsSeverityHref(base: string, bucket: string, query = ""): string {
   const params = new URLSearchParams(query);
@@ -78,7 +78,7 @@ export function domainsSeverityHref(base: string, bucket: string, query = ""): s
 
 // domainsGradeHref links to the domains list filtered by an exact grade
 // label. Grade values are pass-through strings because scoring is
-// configurable — we don't normalize or validate on the client.
+// configurable - we don't normalize or validate on the client.
 export function domainsGradeHref(base: string, grade: string, query = ""): string {
   const params = new URLSearchParams(query);
   params.set("grade", grade);

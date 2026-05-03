@@ -27,7 +27,7 @@
   // Canonical loaded config (for change detection / discard).
   let loaded = $state(null);
 
-  // Working copy — primitive fields bound directly.
+  // Working copy - primitive fields bound directly.
   let draft = $state(null);
 
   // Map fields displayed as ordered arrays.
@@ -90,7 +90,7 @@
     return JSON.parse(JSON.stringify(cfg));
   }
 
-  // Deep equality via JSON — good enough for this config shape.
+  // Deep equality via JSON - good enough for this config shape.
   let hasChanges = $derived(
     loaded !== null && draft !== null && (
       JSON.stringify(assembleDraft()) !== JSON.stringify(loaded) ||
@@ -226,7 +226,7 @@
     <span class="source-badge">{sourceLabel(source)}</span>
   </div>
 
-  <!-- Severity, Category, Grade Bands, Bonus — single table so value column aligns across all sections -->
+  <!-- Severity, Category, Grade Bands, Bonus - single table so value column aligns across all sections -->
   <table class="config-table">
     <colgroup>
       <col class="col-key">

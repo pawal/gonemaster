@@ -212,8 +212,8 @@ func TestCountOutstandingJobsForBatch(t *testing.T) {
 		t.Fatalf("outstanding jobs = %d, want 2", count)
 	}
 
-	// Orphan rows in the jobs table — terminal statuses that never made it
-	// through GraduateJob cleanly — must not be counted as outstanding,
+	// Orphan rows in the jobs table - terminal statuses that never made it
+	// through GraduateJob cleanly - must not be counted as outstanding,
 	// otherwise the snapshot capture gate stays closed forever.
 	if _, err := s.Create(Job{
 		ID: "job-orphan-ok", Domain: "ok.example", BatchID: "batch-x", Status: JobSucceeded, CreatedAt: now,

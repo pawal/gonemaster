@@ -207,7 +207,7 @@ func TestHotCacheHeapGrowthWithForcedGC(t *testing.T) {
 // TestHotCacheHeapGrowthWithoutForcedGC shows the worker-level allocation
 // pattern under the default GC pacer (GOGC=100). If this grows unboundedly
 // while the forced-GC variant stays flat, the apparent "leak" is just GC
-// pacing — fix with GOGC/GOMEMLIMIT, not code changes.
+// pacing - fix with GOGC/GOMEMLIMIT, not code changes.
 func TestHotCacheHeapGrowthWithoutForcedGC(t *testing.T) {
 	if testing.Short() {
 		t.Skip("long-running memprobe")

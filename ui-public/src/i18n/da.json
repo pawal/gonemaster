@@ -5,7 +5,7 @@
   "pub.locale_select_title": "Sprog til resultatmeddelelser",
   "pub.locale_select_aria": "Resultatsprog",
 
-  "pub.theme_cycle_title": "Farvetema: {theme} — klik for at skifte",
+  "pub.theme_cycle_title": "Farvetema: {theme} - klik for at skifte",
   "pub.theme_system": "System",
   "pub.theme_light": "Lyst",
   "pub.theme_dark": "Mørkt",
@@ -71,7 +71,7 @@
   "pub.ns_timing_status_unresolved": "Intet DNS-opslag",
 
   "pub.score_label": "DNS Quality Score",
-  "pub.score_partial": "Delvis score — test af {stacks} var deaktiveret",
+  "pub.score_partial": "Delvis score - test af {stacks} var deaktiveret",
   "pub.score_aplus_criteria": "A+-kriterier",
   "pub.score_aplus_achieved": "Opnået",
   "pub.score_aplus_missing": "{n} mangler",
@@ -94,9 +94,9 @@
 
   "pub.error_domain_required": "Angiv venligst et domænenavn.",
   "pub.error_domain_invalid": "Ugyldigt domænenavn.",
-  "pub.error_rate_limited": "For mange forespørgsler — vent venligst {seconds} sekunder.",
+  "pub.error_rate_limited": "For mange forespørgsler - vent venligst {seconds} sekunder.",
   "pub.error_job_failed": "Testen mislykkedes. Prøv venligst igen.",
-  "pub.error_network": "Netværksfejl — kunne ikke nå serveren.",
+  "pub.error_network": "Netværksfejl - kunne ikke nå serveren.",
   "pub.error_unknown": "Der opstod en uventet fejl.",
 
   "pub.tc.address01": "Navneserverens adresse skal være globalt routbar",

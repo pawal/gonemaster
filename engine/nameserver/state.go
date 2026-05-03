@@ -809,7 +809,7 @@ func (c *CacheStore) ErrorCacheCount() int {
 }
 
 // NameserverObjectCount returns the number of cached nameserver objects held by c
-// (does not include parent chain — object caches are per-run only).
+// (does not include parent chain - object caches are per-run only).
 func (c *CacheStore) NameserverObjectCount() int {
 	if c == nil {
 		return 0

@@ -130,7 +130,7 @@
                   <span class="operator-multi">Multiple ({row.asn_count})</span>
                 {:else if row.operator_asn !== undefined && row.operator_asn !== null}
                   <ASNChip asn={row.operator_asn} label={row.operator ?? undefined} />
-                {:else}—{/if}
+                {:else}-{/if}
               </td>
               <td class="col-num">{formatCount(row.domain_count)}</td>
               <td class="col-num">{formatCount(row.endpoint_count)}</td>

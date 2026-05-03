@@ -1462,7 +1462,7 @@ func fetchJobResult(ctx context.Context, client *apiClient, jobID string) (jobRe
 		jobNotFound = true
 	}
 	if !jobNotFound {
-		// Job exists but result is not ready yet — retry with backoff.
+		// Job exists but result is not ready yet - retry with backoff.
 		if !doneStatuses[info.Status] {
 			return jobResult{}, err
 		}

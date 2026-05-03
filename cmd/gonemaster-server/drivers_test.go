@@ -8,7 +8,7 @@ import (
 // TestRegisteredDrivers verifies that the blank imports in sqlite.go,
 // postgres.go, and mariadb.go register their respective drivers with
 // database/sql. Note: go-sql-driver/mysql registers under "mysql", not
-// "mariadb" — "mariadb" is only the gonemaster-level config name.
+// "mariadb" - "mariadb" is only the gonemaster-level config name.
 func TestRegisteredDrivers(t *testing.T) {
 	registered := make(map[string]bool)
 	for _, name := range sql.Drivers() {

@@ -29,7 +29,7 @@ export const setCatalog = (code, catalog) => {
 /**
  * Asynchronously loads `ui/src/i18n/<code>.json` if it has not been loaded
  * yet. On success, calls `setCatalog` so reactive derivations update. On
- * failure (file missing or parse error), does nothing — the UI falls back to
+ * failure (file missing or parse error), does nothing - the UI falls back to
  * English silently.
  */
 export const loadCatalog = async (code) => {

@@ -9,7 +9,7 @@ import (
 )
 
 // isTimeoutPatternError reports whether err looks like a DNS query timeout.
-// Context cancellation and deadline exceeded are excluded — those are job-level
+// Context cancellation and deadline exceeded are excluded - those are job-level
 // signals, not nameserver-level failure indicators.
 func isTimeoutPatternError(err error) bool {
 	if err == nil {

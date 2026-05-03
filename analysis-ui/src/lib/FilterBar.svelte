@@ -39,7 +39,7 @@
     patch({ [key]: value });
   }
 
-  // Changing the cohort drops any snapshot pin — slugs are scoped to one
+  // Changing the cohort drops any snapshot pin - slugs are scoped to one
   // cohort, and carrying the old slug across cohort changes would either
   // 404 or silently fall back to the new cohort's auto-latest. Neither
   // is useful, so clear the pin deliberately.

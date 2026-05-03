@@ -105,7 +105,7 @@
   </section>
 {:else if !data.datasetTag}
   <section class="card empty-state">
-    <p class="hint">No public cohort is configured — pick one from the filter bar to diff its snapshots.</p>
+    <p class="hint">No public cohort is configured - pick one from the filter bar to diff its snapshots.</p>
   </section>
 {:else if !data.fromSlug || !data.toSlug}
   <section class="card empty-state">

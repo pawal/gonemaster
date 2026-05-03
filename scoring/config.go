@@ -27,7 +27,7 @@ type Config struct {
 
 	// TagPenalties maps a specific tag name to a point penalty that overrides
 	// the SeverityPenalties lookup for that tag. Use this to assign penalties
-	// that are disproportionate to the tag's log level — for example to treat
+	// that are disproportionate to the tag's log level - for example to treat
 	// a WARNING-level tag as more serious than other warnings.
 	// Keys are matched case-insensitively.
 	TagPenalties map[string]int `json:"tag_penalties,omitempty"`
@@ -103,19 +103,19 @@ func DefaultConfig() Config {
 			"SYNTAX":      "zone_consistency",
 		},
 		TagPenalties: map[string]int{
-			// DS07_NOT_SIGNED: zone has no DNSKEY records on any nameserver —
+			// DS07_NOT_SIGNED: zone has no DNSKEY records on any nameserver -
 			// entirely unsigned. Treated like an ERROR regardless of its WARNING level.
 			"DS07_NOT_SIGNED": 20,
 			// DS07_NO_DS_FOR_SIGNED_ZONE: zone is signed but has no DS record at
-			// the parent — breaks the chain of trust. Same severity as above.
+			// the parent - breaks the chain of trust. Same severity as above.
 			"DS07_NO_DS_FOR_SIGNED_ZONE": 20,
 			// NO_IPV6_NS_CHILD / NO_IPV6_NS_DEL: zero nameservers have IPv6
-			// addresses — the zone is entirely unreachable over IPv6. Both are
+			// addresses - the zone is entirely unreachable over IPv6. Both are
 			// NOTICE (1 pt) by default but warrant the same weight as an ERROR.
 			"NO_IPV6_NS_CHILD": 20,
 			"NO_IPV6_NS_DEL":   20,
 			// N15_SOFTWARE_VERSION: nameserver reveals its software version string
-			// via version.bind. This is a cosmetic privacy/hardening notice — the
+			// via version.bind. This is a cosmetic privacy/hardening notice - the
 			// zone works correctly. No penalty.
 			"N15_SOFTWARE_VERSION": 0,
 			// N16_HAS_NSID: nameserver returns an NSID value when explicitly asked.

@@ -1,5 +1,5 @@
 // Thin client for the public analysis API. Every request goes through
-// PUBLIC_BASE — the trusted `/api/v1/*` admin surface is intentionally NOT
+// PUBLIC_BASE - the trusted `/api/v1/*` admin surface is intentionally NOT
 // reachable from this UI (see api.test.ts for a machine-checked assertion).
 
 export const PUBLIC_BASE = "/pub/api/v1/analysis";

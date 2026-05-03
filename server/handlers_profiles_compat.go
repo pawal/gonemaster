@@ -237,11 +237,11 @@ type profilePatchRequest struct {
 // handlePatchProfile handles PATCH /profiles/{id}.
 // Supported operations:
 //
-//	add_missing_test_cases  — append any default test cases absent from the profile
-//	add_missing_test_levels — fill missing tags in already-overridden test_levels modules
-//	reset_test_cases        — remove test_cases override (profile inherits all defaults)
-//	reset_test_levels       — remove one test_levels module (requires module field)
-//	mark_reviewed           — bump schema_version without touching config
+//	add_missing_test_cases  - append any default test cases absent from the profile
+//	add_missing_test_levels - fill missing tags in already-overridden test_levels modules
+//	reset_test_cases        - remove test_cases override (profile inherits all defaults)
+//	reset_test_levels       - remove one test_levels module (requires module field)
+//	mark_reviewed           - bump schema_version without touching config
 func (s *Server) handlePatchProfile(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPatch {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
@@ -287,7 +287,7 @@ func (s *Server) handlePatchProfile(w http.ResponseWriter, r *http.Request) {
 		}
 		newConfigJSON, err = applyResetTestLevelsModule(stored.Config, req.Module)
 	case "mark_reviewed":
-		// no config change — just bump schema_version below
+		// no config change - just bump schema_version below
 		newConfigJSON = stored.Config
 	default:
 		writeError(w, http.StatusBadRequest, "invalid_op", fmt.Sprintf("unknown op %q", req.Op), nil)
@@ -363,7 +363,7 @@ func applyAddMissingTestCases(configJSON string, defaultP *engineprofile.Profile
 
 	existing, ok := config["test_cases"].([]any)
 	if !ok {
-		// test_cases not set — nothing to add (already inherits everything)
+		// test_cases not set - nothing to add (already inherits everything)
 		return configJSON, nil
 	}
 
@@ -402,7 +402,7 @@ func applyAddMissingTestLevels(configJSON string, defaultP *engineprofile.Profil
 
 	levelsRaw, ok := config["test_levels"].(map[string]any)
 	if !ok {
-		// test_levels not set — nothing to do
+		// test_levels not set - nothing to do
 		return configJSON, nil
 	}
 

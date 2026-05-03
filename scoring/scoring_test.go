@@ -15,7 +15,7 @@ func e(module, tag, level string) Entry {
 // ---- Compute tests ----------------------------------------------------------
 
 func TestCompute_PerfectScore(t *testing.T) {
-	// No entries above INFO — should score 100 and grade A (not A+ without bonus).
+	// No entries above INFO - should score 100 and grade A (not A+ without bonus).
 	entries := []Entry{
 		e("DNSSEC", "DS07_SIGNED", "INFO"),
 		e("DNSSEC", "DS05_ALGO_OK", "INFO"),
@@ -132,7 +132,7 @@ func TestCompute_CriticalWithOtherwiseGoodRun(t *testing.T) {
 
 func TestCompute_CriticalAllCategoriesScoreZero(t *testing.T) {
 	// A non-existent domain: BASIC CRITICAL + some entries from modules that
-	// did run. ALL category scores must be 0 when CRITICAL is present —
+	// did run. ALL category scores must be 0 when CRITICAL is present -
 	// individual scores are meaningless for a non-functional domain.
 	entries := []Entry{
 		e("BASIC", "B01_NO_PARENT", "CRITICAL"),
@@ -167,7 +167,7 @@ func TestCompute_CriticalAllCategoriesScoreZero(t *testing.T) {
 
 func TestCompute_NoCriticalUntestedCategoriesKeep100(t *testing.T) {
 	// Without CRITICAL, categories with no penalty entries keep their
-	// perfect score — this is the normal case where a category had no issues.
+	// perfect score - this is the normal case where a category had no issues.
 	entries := []Entry{
 		e("DNSSEC", "DS04_RRSIG_EXPIRY_SOON", "WARNING"),
 	}
@@ -559,7 +559,7 @@ func TestCompute_NotEnoughIPv6UsesErrorSeverity(t *testing.T) {
 }
 
 func TestCompute_N15SoftwareVersionNopenalty(t *testing.T) {
-	// N15_SOFTWARE_VERSION is NOTICE but must carry zero penalty — it is a
+	// N15_SOFTWARE_VERSION is NOTICE but must carry zero penalty - it is a
 	// cosmetic privacy notice, not a zone health issue.
 	entries := []Entry{
 		e("NAMESERVER", "N15_SOFTWARE_VERSION", "NOTICE"),

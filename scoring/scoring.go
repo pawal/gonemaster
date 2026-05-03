@@ -202,7 +202,7 @@ func scoreToGrade(score int, bands []GradeBand) string {
 	return "F"
 }
 
-// isTLDZone returns true when domain is a TLD — i.e. it has no dots after
+// isTLDZone returns true when domain is a TLD - i.e. it has no dots after
 // stripping a trailing dot (e.g. "se", "com", "se.").
 func isTLDZone(domain string) bool {
 	d := strings.TrimSuffix(domain, ".")

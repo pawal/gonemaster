@@ -107,7 +107,7 @@ func TestServerMountsAnalysisRoute(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/_app/immutable/nothing.js", nil)
 	Handler().ServeHTTP(resp, req)
 	// unknown file under _app should either be a 404 or fall back to the SPA
-	// index; both are acceptable — just make sure we don't crash.
+	// index; both are acceptable - just make sure we don't crash.
 	if resp.Code != http.StatusOK && resp.Code != http.StatusNotFound {
 		t.Fatalf("unexpected status for missing asset: %d", resp.Code)
 	}

@@ -1,4 +1,4 @@
-# docker-compose.test.yml — local integration test databases
+# docker-compose.test.yml - local integration test databases
 #
 # Starts PostgreSQL and MariaDB with health checks so the parameterized
 # store tests (server/store_sql_test.go) can run against all three backends.

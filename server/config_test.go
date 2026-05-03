@@ -93,7 +93,7 @@ func TestApplyFileConfigShowScoreAdmin(t *testing.T) {
 		t.Fatal("expected ShowScoreAdmin to be false after applying file config")
 	}
 
-	// Nil means "not set" — should not change the value.
+	// Nil means "not set" - should not change the value.
 	cfg2 := DefaultConfig()
 	cfg2.ApplyFileConfig(FileConfig{ShowScoreAdmin: nil})
 	if !cfg2.ShowScoreAdmin {
@@ -160,7 +160,7 @@ func TestApplyFileConfigShowScorePublic(t *testing.T) {
 		t.Fatal("expected ShowScorePublic to be false after applying file config")
 	}
 
-	// Nil means "not set" — should not change the value.
+	// Nil means "not set" - should not change the value.
 	cfg2 := DefaultConfig()
 	cfg2.ApplyFileConfig(FileConfig{ShowScorePublic: nil})
 	if !cfg2.ShowScorePublic {

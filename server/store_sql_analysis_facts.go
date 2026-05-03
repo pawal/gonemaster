@@ -165,7 +165,7 @@ func (s *SQLJobStore) upsertAnalysisNameserverIn(q sqlQuerier, name string, seen
 	seenAt = normalizeSeenAt(seenAt)
 	if s.dialect.SupportsOnConflictReturning() {
 		// WHERE skips the UPDATE when seenAt is already inside the
-		// stored window — avoids the per-tuple write (and its row
+		// stored window - avoids the per-tuple write (and its row
 		// lock) that otherwise dominates a concurrent rebuild on
 		// PostgreSQL's MVCC.
 		query := fmt.Sprintf(
@@ -189,7 +189,7 @@ func (s *SQLJobStore) upsertAnalysisNameserverIn(q sqlQuerier, name string, seen
 			item.LastSeenAt = parseTimestampStr(lastSeen)
 			return item, nil
 		case errors.Is(err, sql.ErrNoRows):
-			// WHERE filtered the UPDATE — row already covers seenAt.
+			// WHERE filtered the UPDATE - row already covers seenAt.
 			row := q.QueryRow(
 				fmt.Sprintf(`SELECT id, first_seen_at, last_seen_at FROM analysis_nameservers WHERE name = %s`, s.ph(1)),
 				name,
@@ -548,7 +548,7 @@ func (s *SQLJobStore) upsertAnalysisASNIn(q sqlQuerier, asn int64, label string,
 	switch {
 	case err == nil:
 		// An empty label from the caller shouldn't blank out a previously
-		// resolved one — that would happen every time an enricher fails
+		// resolved one - that would happen every time an enricher fails
 		// to reach the registry. Keep the existing label instead.
 		effectiveLabel := label
 		if effectiveLabel == "" {
@@ -670,7 +670,7 @@ func (s *SQLJobStore) replaceAnalysisRunNSEndpointsIn(q sqlQuerier, cohortID int
 
 // inOwnTx wraps fn in a fresh transaction for an autocommit-safe public
 // entry point. Per-run projection paths bypass this because they share one
-// ProjectLoaded-wide transaction — see WithAnalysisWriteTx.
+// ProjectLoaded-wide transaction - see WithAnalysisWriteTx.
 func (s *SQLJobStore) inOwnTx(fn func(*sql.Tx) error) error {
 	tx, err := s.db.Begin()
 	if err != nil {

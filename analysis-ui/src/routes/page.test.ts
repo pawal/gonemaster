@@ -189,7 +189,7 @@ describe("+page.load (overview)", () => {
           materialization_status: "ready",
           is_default: true,
           snapshot: { slug: "x", run_count: 0, domain_count: 0 }
-          // No `overview` field — pre-overview_v2 snapshot.
+          // No `overview` field - pre-overview_v2 snapshot.
         }
       }
     ]);

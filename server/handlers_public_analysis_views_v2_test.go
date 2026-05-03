@@ -397,7 +397,7 @@ func TestASNViewRoundTripPreservesRosters(t *testing.T) {
 //
 // This test does no runtime work; it merely asserts that the public
 // surface of the rewritten read paths still returns 200 on a captured
-// snapshot when the underlying fact tables are wiped — proving nothing
+// snapshot when the underlying fact tables are wiped - proving nothing
 // in the request path silently rebuilds them.
 func TestPublicReadsAreFactRowIndependent(t *testing.T) {
 	f := newAnalysisAPITestFixture(t)

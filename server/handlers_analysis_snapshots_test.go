@@ -468,7 +468,7 @@ func TestAdminSnapshotPatchRejectsInvalidStatus(t *testing.T) {
 }
 
 // TestAdminSnapshotMethodNotAllowed pins GET/PUT as not allowed on the
-// snapshot resource — the shape is POST/DELETE only.
+// snapshot resource - the shape is POST/DELETE only.
 func TestAdminSnapshotMethodNotAllowed(t *testing.T) {
 	f := newAdminSnapshotFixture(t)
 	path := fmt.Sprintf("/api/v1/analysis/cohorts/%d/snapshots/%s", f.cohort.ID, f.snapshot.Slug)

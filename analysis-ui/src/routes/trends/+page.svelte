@@ -245,7 +245,7 @@
   </section>
 {:else if !data.datasetTag}
   <section class="card empty-state">
-    <p class="hint">No public cohort is configured — pick one from the
+    <p class="hint">No public cohort is configured - pick one from the
     filter bar to see its trends.</p>
   </section>
 {:else if series.length === 0}

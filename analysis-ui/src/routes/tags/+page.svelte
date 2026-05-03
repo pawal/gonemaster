@@ -123,11 +123,11 @@
               <th scope="row" class="row-ident">
                 <TagChip tag={row.tag} />
               </th>
-              <td>{row.module ?? "—"}</td>
+              <td>{row.module ?? "-"}</td>
               <td>
                 {#if row.level}
                   <span class={`level level-${levelTone(row.level)}`}>{row.level}</span>
-                {:else}—{/if}
+                {:else}-{/if}
               </td>
               <td class="col-num">{formatCount(row.domain_count)}</td>
               <td class="col-num">{formatCount(row.occurrence_count)}</td>

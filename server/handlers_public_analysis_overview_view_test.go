@@ -44,7 +44,7 @@ func TestOverviewReadsFromViewTable(t *testing.T) {
 
 // TestOverviewSurvivesFactWipe asserts the overview row is captured
 // from the projected facts and remains readable after the underlying
-// fact tables are emptied — the read path goes through the view only.
+// fact tables are emptied - the read path goes through the view only.
 func TestOverviewSurvivesFactWipe(t *testing.T) {
 	f := newAnalysisAPITestFixture(t)
 	now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)

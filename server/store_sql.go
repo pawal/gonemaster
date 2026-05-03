@@ -1334,7 +1334,7 @@ func (s *SQLJobStore) lazyComputeScore(run *Run) {
 	scoreVal := int(sr.Score)
 	run.Score = &scoreVal
 	run.Grade = &sr.Grade
-	// Cache in DB; ignore errors — the in-memory value is still set.
+	// Cache in DB; ignore errors - the in-memory value is still set.
 	_, _ = s.db.Exec(
 		fmt.Sprintf("UPDATE runs SET score = %s, grade = %s WHERE id = %s",
 			s.ph(1), s.ph(2), s.ph(3)),

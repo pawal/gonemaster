@@ -223,7 +223,7 @@ func TestDomainsListJSONOutput(t *testing.T) {
 	}
 	var got domainList
 	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
-		t.Fatalf("expected valid JSON output: %v — got: %s", err, out.String())
+		t.Fatalf("expected valid JSON output: %v - got: %s", err, out.String())
 	}
 }
 
@@ -243,7 +243,7 @@ func TestRunsListJSON(t *testing.T) {
 	}
 	var got runList
 	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
-		t.Fatalf("expected valid JSON output: %v — got: %s", err, out.String())
+		t.Fatalf("expected valid JSON output: %v - got: %s", err, out.String())
 	}
 }
 
@@ -263,7 +263,7 @@ func TestTagsListJSON(t *testing.T) {
 	}
 	var got []tag
 	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
-		t.Fatalf("expected valid JSON output: %v — got: %s", err, out.String())
+		t.Fatalf("expected valid JSON output: %v - got: %s", err, out.String())
 	}
 }
 
@@ -286,6 +286,6 @@ func TestEntriesQueryJSON(t *testing.T) {
 	}
 	var got entryList
 	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
-		t.Fatalf("expected valid JSON output: %v — got: %s", err, out.String())
+		t.Fatalf("expected valid JSON output: %v - got: %s", err, out.String())
 	}
 }

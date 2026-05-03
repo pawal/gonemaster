@@ -137,7 +137,7 @@
     <p class="hint">
       The analysis dashboard only shows cohorts that have been explicitly marked as public.
       A freshly-created cohort defaults to <code>analysis_enabled: true</code>,
-      <code>public_enabled: false</code> — it will materialize data in the background but
+      <code>public_enabled: false</code> - it will materialize data in the background but
       stays hidden here until an admin publishes it.
     </p>
     <ol class="hint next-steps">

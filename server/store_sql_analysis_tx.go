@@ -27,7 +27,7 @@ type AnalysisWriteStore interface {
 // sqlQuerier is the subset of *sql.DB and *sql.Tx used by the analysis
 // write helpers. Letting the helpers take a querier instead of pinning
 // them to s.db means one ProjectLoaded call can run all its upserts and
-// replace-blocks inside a single outer transaction — one commit per run
+// replace-blocks inside a single outer transaction - one commit per run
 // instead of one commit per statement.
 type sqlQuerier interface {
 	Exec(query string, args ...any) (sql.Result, error)

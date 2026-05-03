@@ -1642,12 +1642,12 @@ msgstr ""
 "vyöhykkeellä (parent) on DS-tietue."
 
 msgctxt "DNSSEC:DS11_CONSISTENT_SIGNED"
-msgid "Parent DS and child DNSKEY are consistent — the zone is signed."
-msgstr "Vanhemman DS ja lapsen DNSKEY ovat johdonmukaisia — vyöhyke on allekirjoitettu."
+msgid "Parent DS and child DNSKEY are consistent - the zone is signed."
+msgstr "Vanhemman DS ja lapsen DNSKEY ovat johdonmukaisia - vyöhyke on allekirjoitettu."
 
 msgctxt "DNSSEC:DS11_NO_PARENT_DS"
-msgid "No DS records found at the parent — the zone is unsigned from the parent view."
-msgstr "Vanhemmalta ei löydy DS-tietueita — vyöhyke on allekirjoittamaton vanhemman näkökulmasta."
+msgid "No DS records found at the parent - the zone is unsigned from the parent view."
+msgstr "Vanhemmalta ei löydy DS-tietueita - vyöhyke on allekirjoittamaton vanhemman näkökulmasta."
 
 msgctxt "DNSSEC:DS13_ALGO_NOT_SIGNED_DNSKEY"
 msgid ""

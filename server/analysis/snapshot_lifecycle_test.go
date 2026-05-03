@@ -91,7 +91,7 @@ func TestControllerProjectRunSkipsEmptyBatchID(t *testing.T) {
 
 // TestControllerProjectRunSkipsNonSnapshotIntentBatch covers the second
 // pollution gate: a batched run whose batch has snapshot_intent = false is
-// projected nowhere in the analysis layer — the per-run tables stay empty
+// projected nowhere in the analysis layer - the per-run tables stay empty
 // and no snapshot row is created.
 func TestControllerProjectRunSkipsNonSnapshotIntentBatch(t *testing.T) {
 	store, _ := snapshotLifecycleStore(t)
@@ -217,7 +217,7 @@ func TestControllerCaptureCompletedSnapshotsPromotesOnBatchDrain(t *testing.T) {
 	store.entries[run.ID] = testAnalysisEntries(run)
 	store.tags[run.DomainID] = []string{"tld"}
 
-	// Mark the batch as having one outstanding job — capture should skip.
+	// Mark the batch as having one outstanding job - capture should skip.
 	store.queuedJobs["batch-drain"] = []string{"job-pending"}
 
 	controller := NewController(store)
@@ -303,7 +303,7 @@ func TestControllerCaptureWaitsForProjectionDrain(t *testing.T) {
 
 // TestControllerCaptureSkipsMixedProfileSnapshot verifies a broken
 // (mixed-profile) snapshot is not promoted to captured even once its
-// batch has drained — flipping it to captured would hide the error from
+// batch has drained - flipping it to captured would hide the error from
 // the admin.
 func TestControllerCaptureSkipsMixedProfileSnapshot(t *testing.T) {
 	store, _ := snapshotLifecycleStore(t)
@@ -426,7 +426,7 @@ func TestControllerRebuildCohortRegeneratesSnapshotsPerBatch(t *testing.T) {
 	}
 
 	// Running rebuild a second time must still end with exactly the two
-	// batch-keyed snapshots — the (cohort, batch) natural key is
+	// batch-keyed snapshots - the (cohort, batch) natural key is
 	// idempotent.
 	if err := controller.RebuildCohort(context.Background(), 10); err != nil {
 		t.Fatalf("RebuildCohort 2: %v", err)

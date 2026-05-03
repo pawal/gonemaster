@@ -149,7 +149,7 @@ func TestClientIPRejectsSpoofedXForwardedForViaTrustedRemote(t *testing.T) {
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 	r.RemoteAddr = "10.0.0.1:1234"
 	// Attacker behind a trusted proxy sets XFF; rightmost untrusted hop is
-	// the value just before the trusted proxy in the real chain — here all
+	// the value just before the trusted proxy in the real chain - here all
 	// hops are untrusted so the rightmost wins.
 	r.Header.Set("X-Forwarded-For", "198.51.100.10, 203.0.113.20")
 	if got := clientIP(r, trusted); got != "203.0.113.20" {
@@ -283,7 +283,7 @@ func TestRateLimitMiddlewareIgnoresSpoofedXForwardedFor(t *testing.T) {
 	if code := makePost("1.1.1.1"); code != http.StatusCreated {
 		t.Fatalf("first request: expected 201, got %d", code)
 	}
-	// Different XFF, same RemoteAddr — must be blocked.
+	// Different XFF, same RemoteAddr - must be blocked.
 	if code := makePost("2.2.2.2"); code != http.StatusTooManyRequests {
 		t.Fatalf("second request with rotated XFF: expected 429, got %d", code)
 	}
@@ -293,7 +293,7 @@ func TestRateLimitMiddlewareIgnoresSpoofedXForwardedFor(t *testing.T) {
 
 func TestServerRateLimitDisabledByDefault(t *testing.T) {
 	cfg := DefaultConfig()
-	// Rate limiting is off by default — repeated POSTs must all pass.
+	// Rate limiting is off by default - repeated POSTs must all pass.
 	srv := New(cfg)
 	for i := 0; i < 5; i++ {
 		resp := httptest.NewRecorder()

@@ -12,7 +12,7 @@ import (
 )
 
 // sampleEntries returns a small set of log entries that exercise the scoring
-// engine — enough to get a non-trivial result with DNSSEC and NAMESERVER data.
+// engine - enough to get a non-trivial result with DNSSEC and NAMESERVER data.
 func sampleEntries() []engine.LogEntry {
 	return []engine.LogEntry{
 		{Module: "DNSSEC", Tag: "DS07_SIGNED", Level: "INFO"},
@@ -113,7 +113,7 @@ func TestScoreInJSONModeGoesToStderr(t *testing.T) {
 	// stdout must be valid JSON
 	var entries []engine.LogEntry
 	if err := json.Unmarshal(out.Bytes(), &entries); err != nil {
-		t.Fatalf("stdout must be valid JSON: %v — got: %s", err, out.String())
+		t.Fatalf("stdout must be valid JSON: %v - got: %s", err, out.String())
 	}
 	// score must appear on stderr, not stdout
 	if strings.Contains(out.String(), "Score:") {
@@ -277,7 +277,7 @@ func TestScoreDoesNotLeakInfoIntoJSONOutput(t *testing.T) {
 	}
 	var entries []engine.LogEntry
 	if err := json.Unmarshal(out.Bytes(), &entries); err != nil {
-		t.Fatalf("invalid JSON: %v — got: %s", err, out.String())
+		t.Fatalf("invalid JSON: %v - got: %s", err, out.String())
 	}
 	for _, e := range entries {
 		if strings.EqualFold(e.Level, "INFO") {
@@ -302,7 +302,7 @@ func TestComputeScoreConvertsEntries(t *testing.T) {
 }
 
 func TestComputeScoreNilEntriesReturnsNil(t *testing.T) {
-	// nil means no run was performed — return nil (N/A).
+	// nil means no run was performed - return nil (N/A).
 	r := computeScore("example.se", nil, scoring.DefaultConfig())
 	if r != nil {
 		t.Fatalf("expected nil result for nil entries, got %+v", r)
@@ -310,7 +310,7 @@ func TestComputeScoreNilEntriesReturnsNil(t *testing.T) {
 }
 
 func TestComputeScoreEmptyEntriesReturnsPerfect(t *testing.T) {
-	// Empty (non-nil) slice means run completed with no penalised entries — should score 100.
+	// Empty (non-nil) slice means run completed with no penalised entries - should score 100.
 	r := computeScore("example.se", []engine.LogEntry{}, scoring.DefaultConfig())
 	if r == nil {
 		t.Fatal("expected non-nil result for empty (clean) run")

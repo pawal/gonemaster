@@ -233,7 +233,7 @@ func TestApplyDatabaseSettingsRespectsCliFlags(t *testing.T) {
 
 	srv.ApplyDatabaseSettings()
 
-	// CLI flag should win — worker_count stays at default (16).
+	// CLI flag should win - worker_count stays at default (16).
 	if srv.cfg.WorkerCount != 16 {
 		t.Fatalf("WorkerCount: got %d, want 16 (CLI flag should take precedence)", srv.cfg.WorkerCount)
 	}

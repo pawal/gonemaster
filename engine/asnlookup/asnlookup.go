@@ -307,7 +307,7 @@ func lookupRipe(ctx context.Context, ip netip.Addr, source string) (Result, erro
 }
 
 // LookupASNInfo resolves the human-readable description for an ASN. It uses
-// the same cymru DNS whois backends as GetWithPrefix — the query name is
+// the same cymru DNS whois backends as GetWithPrefix - the query name is
 // "AS<number>.<cymru-source>" and the last pipe-separated field in the TXT
 // answer is the org label (e.g. "CLOUDFLARENET, US"). RIPE riswhois is not a
 // supported backend for this direction.

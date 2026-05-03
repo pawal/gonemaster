@@ -3580,13 +3580,13 @@ describe("App", () => {
 
       const flushFetches = () => new Promise((r) => setTimeout(r, 10));
 
-      // Click "Domain" column — should trigger a refetch with sort=name_asc.
+      // Click "Domain" column - should trigger a refetch with sort=name_asc.
       fetchedURLs.length = 0;
       await fireEvent.click(within(table).getByRole("button", { name: "Domain" }));
       await flushFetches();
       expect(fetchedURLs.some((u) => u.includes("sort=name_asc"))).toBe(true);
 
-      // Click "Runs" column — should trigger a refetch with sort=run_count_desc.
+      // Click "Runs" column - should trigger a refetch with sort=run_count_desc.
       // Re-query the table in case re-render replaced DOM nodes.
       const table2 = within(domainsPanel).getByRole("table");
       fetchedURLs.length = 0;

@@ -20,7 +20,7 @@ import (
 // to keep its route-change a11y div visually hidden. The analysis CSP
 // whitelists exactly that style via a SHA-256 hash (announcerStyleHash). If
 // SvelteKit ever changes the announcer template, the hash drifts and CSP
-// blocks the inline style at runtime — this test catches the drift at build
+// blocks the inline style at runtime - this test catches the drift at build
 // time and tells you the new constant to paste in.
 func TestAnalysisAnnouncerHashMatchesDist(t *testing.T) {
 	if !analysisui.IsBuilt() {

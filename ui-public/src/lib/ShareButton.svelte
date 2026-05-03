@@ -21,7 +21,7 @@
     let text = url;
     if (score && domain) {
       const emoji = GRADE_EMOJI[score.grade] ?? "🔵";
-      text = `${emoji} ${domain} — DNS grade ${score.grade} (${score.score}/100)\n${url}`;
+      text = `${emoji} ${domain} - DNS grade ${score.grade} (${score.score}/100)\n${url}`;
     }
     try {
       await navigator.clipboard.writeText(text);

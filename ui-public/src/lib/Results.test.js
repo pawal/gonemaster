@@ -247,7 +247,7 @@ describe("Results", () => {
     expect(statuses).toEqual(expect.arrayContaining(["ok", "unreachable", "unresolved"]));
     expect(screen.getByText("No response")).toBeTruthy();
     expect(screen.getByText("Does not resolve")).toBeTruthy();
-    // Unreachable row shows ∞ in timing cells; unresolved shows — and no address.
+    // Unreachable row shows ∞ in timing cells; unresolved shows - and no address.
     expect(screen.getAllByText("∞").length).toBeGreaterThanOrEqual(3);
   });
 
@@ -300,7 +300,7 @@ describe("Results", () => {
     details.open = true;
     await fireEvent(details, new Event("toggle"));
 
-    // Change locale — results re-fetch
+    // Change locale - results re-fetch
     await rerender({ locale: "sv" });
     await waitFor(() => screen.getByText("second"));
 

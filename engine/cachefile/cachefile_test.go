@@ -236,7 +236,7 @@ func TestCachefileNameserverOnlyAndRecursorOnly(t *testing.T) {
 
 func TestCachefileExportSkipsNilPointers(t *testing.T) {
 	// Make sure a Recursor that was never populated round-trips as empty
-	// without surprising the exporter — exercises nil/empty paths on both
+	// without surprising the exporter - exercises nil/empty paths on both
 	// sides of the Import/Export helpers.
 	file, err := Export(nil, &recursor.Recursor{}, nil)
 	if err != nil {

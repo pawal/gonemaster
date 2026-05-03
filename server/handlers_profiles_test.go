@@ -451,7 +451,7 @@ func TestProfileCompatibilityNoOverrides(t *testing.T) {
 
 func TestProfileCompatibilityMissingTestCase(t *testing.T) {
 	srv := New(DefaultConfig())
-	// Profile explicitly sets test_cases with only "address01" — all other default
+	// Profile explicitly sets test_cases with only "address01" - all other default
 	// test cases are missing.
 	profile := createProfile(t, srv, `{"name":"narrow","config":{"test_cases":["address01"]}}`)
 
@@ -750,7 +750,7 @@ func TestPatchProfileResetTestCases(t *testing.T) {
 
 func TestPatchProfileAddMissingTestCases(t *testing.T) {
 	srv := New(DefaultConfig())
-	// Profile with only one explicit test case — many are missing.
+	// Profile with only one explicit test case - many are missing.
 	profile := createProfile(t, srv, `{"name":"add-tc","config":{"test_cases":["address01"]}}`)
 
 	// Fetch defaults to know what's expected.
@@ -782,7 +782,7 @@ func TestPatchProfileAddMissingTestCases(t *testing.T) {
 }
 
 func TestPatchProfileAddMissingTestCasesNoop(t *testing.T) {
-	// Profile that does not override test_cases — add_missing_test_cases is a noop.
+	// Profile that does not override test_cases - add_missing_test_cases is a noop.
 	srv := New(DefaultConfig())
 	profile := createProfile(t, srv, `{"name":"no-tc","config":{"resolver":{"defaults":{"timeout":5}}}}`)
 
@@ -1033,7 +1033,7 @@ func TestMarkAllProfilesReviewed(t *testing.T) {
 
 func TestMarkAllProfilesReviewedAlreadyCurrent(t *testing.T) {
 	srv := New(DefaultConfig())
-	// Create two profiles — both will have schema_version set to engine.VersionFull() by default.
+	// Create two profiles - both will have schema_version set to engine.VersionFull() by default.
 	createProfile(t, srv, `{"name":"p1","config":{}}`)
 	createProfile(t, srv, `{"name":"p2","config":{}}`)
 

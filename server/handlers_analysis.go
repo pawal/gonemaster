@@ -295,7 +295,7 @@ func (s *Server) dispatchCohortRebuild(cohortID int64) {
 		if err := s.analysis.RebuildCohort(context.Background(), cohortID); err != nil {
 			// The cohort row's materialization_status / error fields
 			// are set inside RebuildCohort on failure, so this is only
-			// a last-ditch log. Nothing to return to the caller — the
+			// a last-ditch log. Nothing to return to the caller - the
 			// client has already got its 202.
 			s.logAnalysisRebuildError(cohortID, err)
 		}

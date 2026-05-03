@@ -49,7 +49,7 @@ func (f *analysisAPITestFixture) seedGraduatedRunInBatch(batchID, domainName str
 	}); err != nil {
 		f.t.Fatalf("upsert summary: %v", err)
 	}
-	// Tag aggregates — mirror what the real projector persists so the
+	// Tag aggregates - mirror what the real projector persists so the
 	// /tags + /testcases handlers (which now read from the materialized
 	// tag_summary table) see the test's findings.
 	type tagKey struct{ tag, testcase string }

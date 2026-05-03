@@ -1091,7 +1091,7 @@
   // job-list item where score is just an int and grade a string.
   const chipGrade  = (item) => item?.grade ?? null;
   const chipScore  = (item) => item?.score ?? null;
-  // Full scoring result — only present on JobResult / selectedJobResult.
+  // Full scoring result - only present on JobResult / selectedJobResult.
   const resultScore = (result) => result?.score ?? null;
   const formatSeconds = (value) => {
     const numeric = Number(value);
@@ -1205,7 +1205,7 @@
 
   // Single source of truth for per-tab data loading. Called from both setTab
   // (tab click) and initializeApp (first mount / page reload) so the two
-  // entry points can't drift — all new per-tab loads go here, not at the
+  // entry points can't drift - all new per-tab loads go here, not at the
   // call sites.
   const loadDataForTab = (tab) => {
     if (tab === "single" || tab === "tags" || tab === "batches") {
@@ -1281,7 +1281,7 @@
   // Guard flag: when popstate fires, a hashchange event also fires for the
   // same navigation.  updateTabFromHash must skip that duplicate because
   // onPopState already restored the full state (domain, tag, jobId) from
-  // history — updateTabFromHash would clobber it with nulls.
+  // history - updateTabFromHash would clobber it with nulls.
   let popStateHandled = false;
 
   const setSettingsSubTab = (subTab) => {
@@ -1752,7 +1752,7 @@
       );
       activeBatches = summaries.filter((b) => b && hasActiveBatchJobs(b));
     } catch (_) {
-      // Silently ignore — active batches is supplementary.
+      // Silently ignore - active batches is supplementary.
     } finally {
       activeBatchesLoading = false;
     }
@@ -1763,7 +1763,7 @@
       const snapshot = await apiFetch("/metrics?window=1h&include=health");
       queuePaused = !!snapshot?.health?.queue_paused;
     } catch (_) {
-      // Non-critical — silently ignore.
+      // Non-critical - silently ignore.
     }
   };
 
@@ -2772,11 +2772,11 @@
             <strong>{formatTimestampLocal(selectedJob.created_at)}</strong>
             {#if selectedRun}
               <span>{$t("col_duration")}</span>
-              <strong>{selectedRun.duration_ms != null ? selectedRun.duration_ms + " ms" : "—"}</strong>
+              <strong>{selectedRun.duration_ms != null ? selectedRun.duration_ms + " ms" : "-"}</strong>
               <span>{$t("col_entries")}</span>
               <strong>{selectedRun.entry_count ?? 0}</strong>
               <span>{$t("col_worst_level")}</span>
-              <strong><span class="badge level-{(selectedRun.worst_level || '').toLowerCase()}">{selectedRun.worst_level || "—"}</span></strong>
+              <strong><span class="badge level-{(selectedRun.worst_level || '').toLowerCase()}">{selectedRun.worst_level || "-"}</span></strong>
               {#if scoringEnabled && hasScore(selectedRun)}
                 {@const rs = resultScore(selectedJobResult)}
                 <span>{$t("col_score")}</span>
@@ -3140,7 +3140,7 @@
             <span>{$t("col_latest_level")}</span>
             <span>{#if domainLevel(selectedDomain)}<span class="badge level-{domainLevel(selectedDomain).toLowerCase()}">{domainLevel(selectedDomain)}</span>{:else}-{/if}</span>
             <span>{$t("col_latest_run_at")}</span>
-            <strong>{selectedDomain.latest_run_at ? formatTimestampLocal(selectedDomain.latest_run_at) : "—"}</strong>
+            <strong>{selectedDomain.latest_run_at ? formatTimestampLocal(selectedDomain.latest_run_at) : "-"}</strong>
             <span>{$t("col_run_count")}</span>
             <strong>{selectedDomain.run_count ?? 0}</strong>
           </div>
@@ -3375,10 +3375,10 @@
                     onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { navigateToJob(run.id); } }}
                   >
                     <td class="run-id-cell" title={run.id}>{run.id}</td>
-                    <td>{run.finished_at ? run.finished_at.slice(0, 16).replace("T", " ") : "—"}</td>
+                    <td>{run.finished_at ? run.finished_at.slice(0, 16).replace("T", " ") : "-"}</td>
                     <td><span class="badge level-{(run.worst_level || 'info').toLowerCase()}">{run.worst_level || "INFO"}</span></td>
-                    {#if scoringEnabled}<td>{#if hasScore(run)}<span class="grade-chip"><span class="grade-chip-letter" data-grade={chipGrade(run)}>{chipGrade(run)}</span><span class="grade-chip-score">{chipScore(run)}</span></span>{:else}—{/if}</td>{/if}
-                    <td>{run.duration_ms != null ? run.duration_ms + "ms" : "—"}</td>
+                    {#if scoringEnabled}<td>{#if hasScore(run)}<span class="grade-chip"><span class="grade-chip-letter" data-grade={chipGrade(run)}>{chipGrade(run)}</span><span class="grade-chip-score">{chipScore(run)}</span></span>{:else}-{/if}</td>{/if}
+                    <td>{run.duration_ms != null ? run.duration_ms + "ms" : "-"}</td>
                     <td>{run.entry_count ?? 0}</td>
                   </tr>
                 {/each}
@@ -3460,8 +3460,8 @@
                   <td class="mono">{d.name}</td>
                   <td>{d.tags ? d.tags.join(", ") : ""}</td>
                   <td>{#if domainLevel(d)}<span class="badge level-{domainLevel(d).toLowerCase()}">{domainLevel(d)}</span>{:else}-{/if}</td>
-                  {#if scoringEnabled}<td>{#if d.latest_grade != null && d.latest_score != null}<span class="grade-chip"><span class="grade-chip-letter" data-grade={d.latest_grade}>{d.latest_grade}</span><span class="grade-chip-score">{d.latest_score}</span></span>{:else}—{/if}</td>{/if}
-                  <td>{d.latest_run_at ? d.latest_run_at.slice(0, 10) : "—"}</td>
+                  {#if scoringEnabled}<td>{#if d.latest_grade != null && d.latest_score != null}<span class="grade-chip"><span class="grade-chip-letter" data-grade={d.latest_grade}>{d.latest_grade}</span><span class="grade-chip-score">{d.latest_score}</span></span>{:else}-{/if}</td>{/if}
+                  <td>{d.latest_run_at ? d.latest_run_at.slice(0, 10) : "-"}</td>
                   <td>{d.run_count ?? 0}</td>
                 </tr>
               {/each}
@@ -3549,8 +3549,8 @@
                     {b.id}
                     {#if b.snapshot_intent}<span class="pill snapshot-intent" style="margin-left: 0.25rem;">{$t("batch_snapshot_intent_pill")}</span>{/if}
                   </td>
-                  <td>{b.created_at ? b.created_at.slice(0, 19).replace("T", " ") : "—"}</td>
-                  <td>{b.domain_count ?? "—"}</td>
+                  <td>{b.created_at ? b.created_at.slice(0, 19).replace("T", " ") : "-"}</td>
+                  <td>{b.domain_count ?? "-"}</td>
                   <td style="text-align: right;" data-row-action>
                     <button
                       class="ghost small warn"
@@ -3652,8 +3652,8 @@
                 >
                   <td class="mono">{d.name}</td>
                   <td>{#if domainLevel(d)}<span class="badge level-{domainLevel(d).toLowerCase()}">{domainLevel(d)}</span>{:else}-{/if}</td>
-                  {#if scoringEnabled}<td>{#if d.latest_grade != null && d.latest_score != null}<span class="grade-chip"><span class="grade-chip-letter" data-grade={d.latest_grade}>{d.latest_grade}</span><span class="grade-chip-score">{d.latest_score}</span></span>{:else}—{/if}</td>{/if}
-                  <td>{d.latest_run_at ? d.latest_run_at.slice(0, 10) : "—"}</td>
+                  {#if scoringEnabled}<td>{#if d.latest_grade != null && d.latest_score != null}<span class="grade-chip"><span class="grade-chip-letter" data-grade={d.latest_grade}>{d.latest_grade}</span><span class="grade-chip-score">{d.latest_score}</span></span>{:else}-{/if}</td>{/if}
+                  <td>{d.latest_run_at ? d.latest_run_at.slice(0, 10) : "-"}</td>
                 </tr>
               {/each}
             </tbody>
@@ -3749,7 +3749,7 @@
                       -
                     {/if}
                   </td>
-                  <td>{tag.description || "—"}</td>
+                  <td>{tag.description || "-"}</td>
                   <td>{tag.domain_count ?? 0}</td>
                   <td style="text-align: right;">
                     <button

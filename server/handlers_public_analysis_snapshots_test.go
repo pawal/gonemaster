@@ -72,7 +72,7 @@ func TestPublicAnalysisCatalogCarriesDefaultSnapshot(t *testing.T) {
 // mixed-profile / non-public snapshots do not.
 func TestPublicAnalysisSnapshotsListReturnsCapturedOnly(t *testing.T) {
 	f := newAnalysisAPITestFixture(t)
-	// Retired snapshot — must be hidden.
+	// Retired snapshot - must be hidden.
 	if _, err := f.store.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{
 		CohortID: f.cohort.ID,
 		BatchID:  "batch-retired",
@@ -82,7 +82,7 @@ func TestPublicAnalysisSnapshotsListReturnsCapturedOnly(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("seed retired: %v", err)
 	}
-	// Mixed-profile snapshot — must be hidden.
+	// Mixed-profile snapshot - must be hidden.
 	if _, err := f.store.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{
 		CohortID: f.cohort.ID,
 		BatchID:  "batch-mixed",
@@ -92,7 +92,7 @@ func TestPublicAnalysisSnapshotsListReturnsCapturedOnly(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("seed mixed: %v", err)
 	}
-	// Pending (not yet captured) snapshot — must be hidden.
+	// Pending (not yet captured) snapshot - must be hidden.
 	if _, err := f.store.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{
 		CohortID: f.cohort.ID,
 		BatchID:  "batch-pending",
@@ -102,7 +102,7 @@ func TestPublicAnalysisSnapshotsListReturnsCapturedOnly(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("seed pending: %v", err)
 	}
-	// Captured but is_public=0 — must be hidden.
+	// Captured but is_public=0 - must be hidden.
 	if _, err := f.store.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{
 		CohortID:   f.cohort.ID,
 		BatchID:    "batch-private",
@@ -195,7 +195,7 @@ func TestPublicAnalysisTrendsUseSourceRunOrderAndMetadata(t *testing.T) {
 
 // TestPublicAnalysisSnapshotDetailHiddenForRetired verifies that an
 // explicit slug lookup of a retired or mixed-profile snapshot returns
-// 404 — retired snapshots must not leak through the public path.
+// 404 - retired snapshots must not leak through the public path.
 func TestPublicAnalysisSnapshotDetailHiddenForRetired(t *testing.T) {
 	f := newAnalysisAPITestFixture(t)
 	if _, err := f.store.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{

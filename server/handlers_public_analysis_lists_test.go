@@ -348,7 +348,7 @@ func TestPublicAnalysisDomainsFilterByGrade(t *testing.T) {
 		}
 	}
 
-	// Case-sensitive exact match — grades are stored canonical. "a" must
+	// Case-sensitive exact match - grades are stored canonical. "a" must
 	// not match "A" because custom scoring profiles may legitimately use
 	// distinct labels differing only in case.
 	resp = getPublic(t, f.srv, f.publicURL("domains?grade=a"))
@@ -359,7 +359,7 @@ func TestPublicAnalysisDomainsFilterByGrade(t *testing.T) {
 		t.Fatalf("lowercase filter should not match uppercase grades, got %d", got.Total)
 	}
 
-	// Unknown grade returns empty without 400 — the filter is
+	// Unknown grade returns empty without 400 - the filter is
 	// pluggable-config-friendly, not enum-validated.
 	resp = getPublic(t, f.srv, f.publicURL("domains?grade=Z"))
 	if resp.Code != http.StatusOK {

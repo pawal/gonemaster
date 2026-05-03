@@ -57,9 +57,9 @@ describe("format helpers", () => {
   });
 
   it("formatCount renders thousands separators and handles null/undefined", () => {
-    expect(formatCount(null)).toBe("—");
-    expect(formatCount(undefined)).toBe("—");
-    expect(formatCount(NaN)).toBe("—");
+    expect(formatCount(null)).toBe("-");
+    expect(formatCount(undefined)).toBe("-");
+    expect(formatCount(NaN)).toBe("-");
     expect(formatCount(0)).toBe("0");
     const big = formatCount(1234567);
     expect(big.replace(/[,.\u202f\s]/g, "")).toBe("1234567");

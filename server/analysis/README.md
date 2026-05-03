@@ -129,13 +129,13 @@ collapsing runs to "latest per domain" on every request.
   `snapshot_intent = true` produces exactly one snapshot.
 - A snapshot starts as `pending`, accumulates runs as its jobs graduate,
   and promotes to `captured` once every job in the batch has finished.
-  Once captured, the snapshot is immutable — rematerialize explicitly to
+  Once captured, the snapshot is immutable - rematerialize explicitly to
   rebuild its aggregates.
 - `analysis_cohort_catalog.default_snapshot_policy` is `auto_latest` by
   default (the newest captured public snapshot wins) or `pinned`
   (`default_snapshot_id`). Admin UI's "Make default" action pins.
 - Non-snapshot-intent batches still run and their jobs graduate normally,
-  but the projector never writes fact rows or snapshot rows for them —
+  but the projector never writes fact rows or snapshot rows for them -
   ad-hoc retests stay out of the cohort series entirely.
 - Mixed-profile batches land in `status = 'failed_mixed_profiles'` with
   `is_public = false` so a broken batch does not leak into the public
@@ -151,7 +151,7 @@ per pair. The migration is idempotent, gated by the
 summarising what it did:
 
 ```
-analysis: snapshot backfill complete — cohorts=2 created=17 skipped=0
+analysis: snapshot backfill complete - cohorts=2 created=17 skipped=0
 ```
 
 Existing `/pub/api/v1/analysis/` bookmarks keep working because
@@ -163,12 +163,12 @@ backfill is the most recent historical batch.
 The public Overview, Nameservers, Endpoints, and ASNs tabs serve from
 three pre-shaped tables written once at snapshot capture time:
 
-- `analysis_snapshot_nameserver_view` — one row per (snapshot,
+- `analysis_snapshot_nameserver_view` - one row per (snapshot,
   nameserver). Drives the Nameservers tab and the top-N nameservers
   card on Overview.
-- `analysis_snapshot_endpoint_view` — one row per (snapshot,
+- `analysis_snapshot_endpoint_view` - one row per (snapshot,
   nameserver, address). Drives the Addresses tab.
-- `analysis_snapshot_asn_view` — one row per (snapshot, asn). Drives
+- `analysis_snapshot_asn_view` - one row per (snapshot, asn). Drives
   the ASNs tab and the top-N ASNs card.
 
 Plus one consolidated aggregate row in

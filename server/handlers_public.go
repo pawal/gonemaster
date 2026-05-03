@@ -96,7 +96,7 @@ func (s *Server) handlePublicProfiles(w http.ResponseWriter, r *http.Request) {
 
 // handlePublicCreateJob handles POST /pub/api/v1/jobs.
 // Accepts the same body as the internal create endpoint but returns a
-// PublicJobView — the internal UUID is never sent to the caller.
+// PublicJobView - the internal UUID is never sent to the caller.
 func (s *Server) handlePublicCreateJob(w http.ResponseWriter, r *http.Request) {
 	if !s.enforceCSRF(w, r) {
 		return

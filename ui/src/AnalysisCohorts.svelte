@@ -533,7 +533,7 @@
       // notice area while a rebuild is running.
     }
     // While a cohort with its snapshots panel expanded is mid-rebuild,
-    // refresh that cohort's snapshot list too — otherwise the per-snapshot
+    // refresh that cohort's snapshot list too - otherwise the per-snapshot
     // run/domain counts go stale until the user collapses and re-expands.
     if (expandedSnapshotCohortId != null) {
       const cohort = cohorts.find((c) => c.id === expandedSnapshotCohortId);
@@ -764,7 +764,7 @@
                                 {#if snap.batch_id}
                                   <span class="mono source-batch-id" title={snap.batch_id}>{shortID(snap.batch_id)}</span>
                                 {:else}
-                                  <span class="muted">—</span>
+                                  <span class="muted">-</span>
                                 {/if}
                               </td>
                               <td>

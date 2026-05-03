@@ -96,7 +96,7 @@ variables, CLI flags. Later sources override earlier ones.
 ### Reverse proxy
 
 **--trusted-proxy-cidrs** *LIST*
-: Comma-separated CIDRs (or bare IPs) of reverse proxies allowed to set **X-Forwarded-For**. Default empty: trust nothing, attribute every request to its **RemoteAddr**. Without this, a direct-exposed server (or one behind a proxy that does not strip incoming XFF) is vulnerable to XFF spoofing — an attacker rotates the header to bypass per-IP rate limits or pin them on a victim. Set to the CIDR of your reverse proxy when one is in front. Example: `--trusted-proxy-cidrs 127.0.0.1/32,10.0.0.0/8`.
+: Comma-separated CIDRs (or bare IPs) of reverse proxies allowed to set **X-Forwarded-For**. Default empty: trust nothing, attribute every request to its **RemoteAddr**. Without this, a direct-exposed server (or one behind a proxy that does not strip incoming XFF) is vulnerable to XFF spoofing - an attacker rotates the header to bypass per-IP rate limits or pin them on a victim. Set to the CIDR of your reverse proxy when one is in front. Example: `--trusted-proxy-cidrs 127.0.0.1/32,10.0.0.0/8`.
 
 ### HTTP timeouts
 

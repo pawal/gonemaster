@@ -222,7 +222,7 @@ func (s *Server) collectNameserverTimings(job Job, queryTimings map[string][]tim
 
 // childNameserversFromEntries collects (ns, address) pairs from engine
 // log entries that unambiguously name the child zone's own authoritative
-// NSes. Only the explicit child-side argument keys are trusted —
+// NSes. Only the explicit child-side argument keys are trusted -
 // generic `servers` / `parent_servers` lists are not, since they also
 // carry parent-side data (root servers etc.) that would end up in the
 // timings list otherwise.

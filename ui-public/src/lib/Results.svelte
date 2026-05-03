@@ -163,24 +163,24 @@
 
   // formatTimingCell picks the cell content based on row status.
   // "∞" signals timeout (reachable address, engine never got an answer).
-  // "—" signals there's nothing to measure (name never resolved).
+  // "-" signals there's nothing to measure (name never resolved).
   function formatTimingCell(item, value) {
     const s = rowStatus(item);
     if (s === "unreachable") return "∞";
-    if (s === "unresolved") return "—";
+    if (s === "unresolved") return "-";
     return formatTimingMs(value);
   }
 
   function formatSamplesCell(item) {
     const s = rowStatus(item);
     if (s === "unreachable") return "0";
-    if (s === "unresolved") return "—";
+    if (s === "unresolved") return "-";
     return `${item.count}`;
   }
 
   function formatAddressCell(item) {
     if (item.address) return item.address;
-    return "—";
+    return "-";
   }
 
   function statusLabelKey(item) {
@@ -327,7 +327,7 @@
                       <div class="result-row-main">
                         <span class="level-pill {levelClass(entry.level)}">{entry.level}</span>
                         <span class="result-message">
-                          {#if tagHeader}<strong class="result-tag-header" data-testid="result-tag-header">{tagHeader}</strong>{" — "}{/if}{entry.message}
+                          {#if tagHeader}<strong class="result-tag-header" data-testid="result-tag-header">{tagHeader}</strong>{" - "}{/if}{entry.message}
                         </span>
                       </div>
                       {#if hasExplanation}
@@ -364,7 +364,7 @@
                   <div class="result-row-main">
                     <span class="level-pill {levelClass(entry.level)}">{entry.level}</span>
                     <span class="result-message">
-                      {#if tagHeader}<strong class="result-tag-header" data-testid="result-tag-header">{tagHeader}</strong>{" — "}{/if}{entry.message}
+                      {#if tagHeader}<strong class="result-tag-header" data-testid="result-tag-header">{tagHeader}</strong>{" - "}{/if}{entry.message}
                     </span>
                   </div>
                   {#if hasExplanation}

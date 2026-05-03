@@ -196,6 +196,16 @@ func All(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
+	if util.ShouldRunTest(ctx, "zone14") {
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Zone14(ctx, z)
+		})
+		results = append(results, entries...)
+		if err != nil {
+			return results, err
+		}
+	}
+
 	return results, nil
 }
 
@@ -327,6 +337,19 @@ func Metadata() map[string][]string {
 			"Z13_SPF_PTR_DEPRECATED",
 			"Z13_SPF_RECURSIVE_ERROR",
 			"Z13_UNABLE_TO_CHECK",
+			"TEST_CASE_END",
+			"TEST_CASE_START",
+		},
+		"zone14": {
+			"IPV4_DISABLED",
+			"IPV6_DISABLED",
+			"Z14_DUPLICATE_SCHEME_HASH",
+			"Z14_INCONSISTENT_ZONEMD",
+			"Z14_MIXED_PRESENCE",
+			"Z14_NO_ZONEMD",
+			"Z14_SERIAL_MISMATCH",
+			"Z14_UNSUPPORTED_HASH",
+			"Z14_ZONEMD_FOUND",
 			"TEST_CASE_END",
 			"TEST_CASE_START",
 		},
@@ -2436,4 +2459,230 @@ func badSpfIPs(nsSpf map[string][]string) []string {
 func nextHigherIsRoot(name dnsname.Name) bool {
 	parent, ok := name.NextHigher()
 	return ok && parent.String() == "."
+}
+
+// Zone14 runs the Zone14 test case (ZONEMD presence and RFC 8976 compliance).
+func Zone14(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
+	const testcase = "Zone14"
+	var results []*logger.Entry
+
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+		return results, err
+	}
+
+	nss, err := method4and5(ctx, z)
+	if err != nil {
+		return results, err
+	}
+
+	type zonemdOutcome struct {
+		ns        nameserver.Nameserver
+		checked   bool
+		zonemdRRs []dns.RR
+		soaSerial uint32
+		soaOK     bool
+	}
+
+	var outcomes []zonemdOutcome
+	if len(nss) > 0 {
+		outcomes = make([]zonemdOutcome, len(nss))
+		tasks := make([]runner.Task, len(nss))
+		for i, ns := range nss {
+			i, ns := i, ns
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				outcome := zonemdOutcome{ns: ns}
+
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "ZONEMD"); err != nil {
+					return err
+				} else if disabled {
+					outcomes[i] = outcome
+					return nil
+				}
+
+				resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "ZONEMD", nil)
+				if resp.Msg == nil || resp.Rcode() != "NOERROR" || !resp.AA() {
+					outcomes[i] = outcome
+					return nil
+				}
+
+				outcome.zonemdRRs = resp.GetRecordsForName("ZONEMD", z.Name)
+
+				soaResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "SOA", nil)
+				if soaResp.Msg != nil {
+					for _, rr := range soaResp.GetRecordsForName("SOA", z.Name) {
+						if soa, ok := rr.(*dns.SOA); ok {
+							outcome.soaSerial = soa.Serial
+							outcome.soaOK = true
+							break
+						}
+					}
+				}
+
+				outcome.checked = true
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+		if err != nil {
+			return results, err
+		}
+		results = append(results, entries...)
+	}
+
+	type zonemdGroup struct {
+		serial    uint32
+		scheme    uint8
+		hash      uint8
+		digest    string
+		endpoints []string
+	}
+
+	type schemeHashKey struct{ scheme, hash uint8 }
+
+	var hasZONEMD, noZONEMD int
+	nsKeys := map[string]struct{}{}
+	zonemdGroups := map[string]*zonemdGroup{}
+	var zonemdGroupOrder []string
+	var noZONEMDNames []string
+
+	for _, outcome := range outcomes {
+		if !outcome.checked {
+			continue
+		}
+		ns := outcome.ns
+		if len(outcome.zonemdRRs) == 0 {
+			noZONEMD++
+			noZONEMDNames = append(noZONEMDNames, ns.NameString()+"/"+ns.AddressString())
+			continue
+		}
+
+		hasZONEMD++
+		endpoint := ns.NameString() + "/" + ns.AddressString()
+
+		// Extract typed records in response order for deterministic processing.
+		type zmRec struct {
+			serial uint32
+			scheme uint8
+			hash   uint8
+			digest string
+		}
+		var recs []zmRec
+		for _, rr := range outcome.zonemdRRs {
+			zm, ok := rr.(*dns.ZONEMD)
+			if !ok {
+				continue
+			}
+			recs = append(recs, zmRec{
+				serial: zm.ZONEMD.Serial,
+				scheme: zm.ZONEMD.Scheme,
+				hash:   zm.ZONEMD.Hash,
+				digest: strings.ToLower(zm.ZONEMD.Digest),
+			})
+		}
+
+		// Detect duplicate (Scheme, Hash) pairs.
+		schemeHashCount := map[schemeHashKey]int{}
+		var schemeHashOrder []schemeHashKey
+		for _, r := range recs {
+			k := schemeHashKey{r.scheme, r.hash}
+			if schemeHashCount[k] == 0 {
+				schemeHashOrder = append(schemeHashOrder, k)
+			}
+			schemeHashCount[k]++
+		}
+		for _, k := range schemeHashOrder {
+			if schemeHashCount[k] > 1 {
+				if err := appendLog(ctx, &results, testcase, "Z14_DUPLICATE_SCHEME_HASH", withNameserverArgs(ns, map[string]any{
+					"scheme": k.scheme,
+					"hash":   k.hash,
+				})); err != nil {
+					return results, err
+				}
+			}
+		}
+
+		// Detect unsupported hash algorithms (once per distinct (ns, hash) pair).
+		seenUnsupportedHash := map[uint8]struct{}{}
+		for _, r := range recs {
+			if r.hash != dns.ZONEMDHashSHA384 && r.hash != dns.ZONEMDHashSHA512 {
+				if _, already := seenUnsupportedHash[r.hash]; !already {
+					seenUnsupportedHash[r.hash] = struct{}{}
+					if err := appendLog(ctx, &results, testcase, "Z14_UNSUPPORTED_HASH", withNameserverArgs(ns, map[string]any{
+						"hash": r.hash,
+					})); err != nil {
+						return results, err
+					}
+				}
+			}
+		}
+
+		// Group records by content for consolidated Z14_ZONEMD_FOUND;
+		// emit Z14_SERIAL_MISMATCH per record; build per-NS consistency key.
+		var nsKeyParts []string
+		for _, r := range recs {
+			recordKey := fmt.Sprintf("%d/%d/%d/%s", r.serial, r.scheme, r.hash, r.digest)
+			nsKeyParts = append(nsKeyParts, recordKey)
+			if outcome.soaOK && r.serial != outcome.soaSerial {
+				if err := appendLog(ctx, &results, testcase, "Z14_SERIAL_MISMATCH", withNameserverArgs(ns, map[string]any{
+					"zonemd_serial": r.serial,
+					"soa_serial":    outcome.soaSerial,
+				})); err != nil {
+					return results, err
+				}
+			}
+			if g, ok := zonemdGroups[recordKey]; ok {
+				g.endpoints = append(g.endpoints, endpoint)
+			} else {
+				zonemdGroups[recordKey] = &zonemdGroup{
+					serial:    r.serial,
+					scheme:    r.scheme,
+					hash:      r.hash,
+					digest:    r.digest,
+					endpoints: []string{endpoint},
+				}
+				zonemdGroupOrder = append(zonemdGroupOrder, recordKey)
+			}
+		}
+		sort.Strings(nsKeyParts)
+		nsKeys[strings.Join(nsKeyParts, "|")] = struct{}{}
+	}
+
+	for _, key := range zonemdGroupOrder {
+		g := zonemdGroups[key]
+		args := map[string]any{
+			"serial": g.serial,
+			"scheme": g.scheme,
+			"hash":   g.hash,
+			"digest": g.digest,
+		}
+		setTypedServersFromEndpoints(args, g.endpoints)
+		if err := appendLog(ctx, &results, testcase, "Z14_ZONEMD_FOUND", args); err != nil {
+			return results, err
+		}
+	}
+
+	if noZONEMD > 0 {
+		args := map[string]any{}
+		setTypedServersFromEndpoints(args, noZONEMDNames)
+		if err := appendLog(ctx, &results, testcase, "Z14_NO_ZONEMD", args); err != nil {
+			return results, err
+		}
+	}
+
+	if hasZONEMD > 0 && noZONEMD > 0 {
+		if err := appendLog(ctx, &results, testcase, "Z14_MIXED_PRESENCE", map[string]any{}); err != nil {
+			return results, err
+		}
+	}
+	if hasZONEMD > 1 && len(nsKeys) > 1 {
+		if err := appendLog(ctx, &results, testcase, "Z14_INCONSISTENT_ZONEMD", map[string]any{}); err != nil {
+			return results, err
+		}
+	}
+
+	return appendTestCaseEnd(ctx, results, testcase)
 }

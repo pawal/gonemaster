@@ -1,5 +1,4 @@
 //go:build !nogui
-// +build !nogui
 
 package public
 
@@ -256,10 +255,10 @@ func TestResolvePublicURL(t *testing.T) {
 			want: "http://myhost.example.com/",
 		},
 		{
-			name:     "auto-detect tls",
-			host:     "myhost.example.com",
-			tls:      true,
-			want:     "https://myhost.example.com/",
+			name: "auto-detect tls",
+			host: "myhost.example.com",
+			tls:  true,
+			want: "https://myhost.example.com/",
 		},
 		{
 			name:     "X-Forwarded-Proto https",
@@ -320,10 +319,10 @@ func TestServeIndexInjectsPlaceholders(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		configured  string
-		reqHost     string
-		wantURL     string
+		name       string
+		configured string
+		reqHost    string
+		wantURL    string
 	}{
 		{
 			name:       "configured root",

@@ -98,8 +98,8 @@ func readSpecPurpose(path string) (string, error) {
 			continue
 		}
 		if inPurpose {
-			if strings.HasPrefix(line, "- ") {
-				return strings.TrimSuffix(strings.TrimPrefix(line, "- "), ":"), nil
+			if after, ok := strings.CutPrefix(line, "- "); ok {
+				return strings.TrimSuffix(after, ":"), nil
 			}
 			// Stop at the next section heading.
 			if strings.HasPrefix(line, "## ") {

@@ -12,8 +12,8 @@ func BenchmarkInMemoryQueueEnqueueDequeue(b *testing.B) {
 	ctx := context.Background()
 
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		if err := q.Enqueue("job", PriorityNormal); err != nil {
 			b.Fatalf("enqueue: %v", err)
 		}
@@ -43,7 +43,6 @@ func BenchmarkInMemoryQueueParallelRoundTrip(b *testing.B) {
 
 func BenchmarkInMemoryQueueBlockedWakeup(b *testing.B) {
 	for _, workers := range []int{1, 8, 32, 64} {
-		workers := workers
 		b.Run(fmt.Sprintf("workers_%d", workers), func(b *testing.B) {
 			q := NewInMemoryQueue()
 			ctx, cancel := context.WithCancel(context.Background())
@@ -52,10 +51,8 @@ func BenchmarkInMemoryQueueBlockedWakeup(b *testing.B) {
 			results := make(chan struct{}, workers*2)
 			var wg sync.WaitGroup
 
-			for i := 0; i < workers; i++ {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
+			for range workers {
+				wg.Go(func() {
 					for {
 						_, err := q.Dequeue(ctx)
 						if err != nil {
@@ -70,7 +67,7 @@ func BenchmarkInMemoryQueueBlockedWakeup(b *testing.B) {
 							return
 						}
 					}
-				}()
+				})
 			}
 
 			b.ReportAllocs()

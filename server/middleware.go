@@ -48,10 +48,7 @@ func (r *responseRecorder) Write(p []byte) (int, error) {
 	if r.body != nil && n > 0 {
 		remaining := r.maxBody - r.body.Len()
 		if remaining > 0 {
-			toCopy := n
-			if toCopy > remaining {
-				toCopy = remaining
-			}
+			toCopy := min(n, remaining)
 			_, _ = r.body.Write(p[:toCopy])
 			if toCopy < n {
 				r.truncated = true
@@ -235,8 +232,8 @@ func apiRouteTemplate(path string) string {
 	if path == "/api/v1/jobs/batch" {
 		return "/api/v1/jobs/batch"
 	}
-	if strings.HasPrefix(path, "/api/v1/jobs/") {
-		tail := strings.TrimPrefix(path, "/api/v1/jobs/")
+	if after, ok := strings.CutPrefix(path, "/api/v1/jobs/"); ok {
+		tail := after
 		parts := strings.Split(strings.Trim(tail, "/"), "/")
 		if len(parts) == 1 && parts[0] != "" {
 			return "/api/v1/jobs/{job_id}"
@@ -253,8 +250,8 @@ func apiRouteTemplate(path string) string {
 		}
 		return "/api/v1/jobs/unknown"
 	}
-	if strings.HasPrefix(path, "/api/v1/batches/") {
-		tail := strings.TrimPrefix(path, "/api/v1/batches/")
+	if after, ok := strings.CutPrefix(path, "/api/v1/batches/"); ok {
+		tail := after
 		parts := strings.Split(strings.Trim(tail, "/"), "/")
 		if len(parts) >= 2 && parts[1] == "delete-preview" {
 			return "/api/v1/batches/{batch_id}/delete-preview"

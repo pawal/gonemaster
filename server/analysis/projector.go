@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
+	"slices"
 	"sort"
 	"strings"
 
@@ -591,7 +592,7 @@ func (p *Projector) extractNameserverEndpoints(input RunInput) []extractedEndpoi
 		}
 		return false
 	}
-	classify := func(source, ns, addr string) string {
+	classify := func(source, ns string) string {
 		if len(authoritativeNSSet) > 0 {
 			if _, ok := authoritativeNSSet[ns]; ok {
 				return "authoritative"
@@ -643,13 +644,13 @@ func (p *Projector) extractNameserverEndpoints(input RunInput) []extractedEndpoi
 			add(extractedEndpoint{
 				nameserver: ns,
 				address:    addr,
-				role:       classify("entry", ns, addr),
+				role:       classify("entry", ns),
 				source:     "entry",
 			})
 		}
 		for _, sourceKey := range []string{"servers", "parent_servers", "child_servers", "zone_servers", "ns_set_servers"} {
 			for _, endpoint := range endpointsFromArgs(entry.Args[sourceKey]) {
-				endpoint.role = classify(sourceKey, endpoint.nameserver, endpoint.address)
+				endpoint.role = classify(sourceKey, endpoint.nameserver)
 				endpoint.source = sourceKey
 				add(endpoint)
 			}
@@ -865,7 +866,6 @@ func (p *Projector) applyEnrichment(endpoints []extractedEndpoint, addressFacts 
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(enrichmentConcurrency)
 	for i, address := range addresses {
-		i, address := i, address
 		g.Go(func() error {
 			info, ok := p.enricher.EnrichAddress(gctx, address)
 			if ok {
@@ -970,7 +970,6 @@ func (p *Projector) resolveASNLabels(addressFacts []extractedAddressFact, domain
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(enrichmentConcurrency)
 	for i, asn := range uniqueASNs {
-		i, asn := i, asn
 		g.Go(func() error {
 			if label, ok := p.enricher.EnrichASNLabel(gctx, asn); ok && label != "" {
 				resolved[i] = label
@@ -1320,7 +1319,7 @@ func numericSliceArg(args map[string]any, key string) []int64 {
 			seen[n] = struct{}{}
 			out = append(out, n)
 		}
-		sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+		slices.Sort(out)
 		return out
 	default:
 		if n, ok := numericToInt64(v); ok {

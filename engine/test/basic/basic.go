@@ -698,7 +698,6 @@ func Basic02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes := make([]nsOutcome, len(nsServers))
 		tasks := make([]runner.Task, len(nsServers))
 		for i, ns := range nsServers {
-			i, ns := i, ns
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := nsOutcome{ns: ns}
@@ -855,7 +854,6 @@ func Basic03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes := make([]nsOutcome, len(nsServers))
 		tasks := make([]runner.Task, len(nsServers))
 		for i, ns := range nsServers {
-			i, ns := i, ns
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := nsOutcome{}

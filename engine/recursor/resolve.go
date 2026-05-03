@@ -3,6 +3,7 @@ package recursor
 import (
 	"context"
 	"fmt"
+	"maps"
 	"net/netip"
 	"sort"
 	"strings"
@@ -106,9 +107,7 @@ func cloneInProgressMap(src map[string]map[string]bool) map[string]map[string]bo
 	dst := make(map[string]map[string]bool, len(src))
 	for key, inner := range src {
 		copied := make(map[string]bool, len(inner))
-		for innerKey, value := range inner {
-			copied[innerKey] = value
-		}
+		maps.Copy(copied, inner)
 		dst[key] = copied
 	}
 	return dst
@@ -121,9 +120,7 @@ func cloneGlueMap(src map[string]map[netip.Addr]bool) map[string]map[netip.Addr]
 	dst := make(map[string]map[netip.Addr]bool, len(src))
 	for key, inner := range src {
 		copied := make(map[netip.Addr]bool, len(inner))
-		for innerKey, value := range inner {
-			copied[innerKey] = value
-		}
+		maps.Copy(copied, inner)
 		dst[key] = copied
 	}
 	return dst
@@ -197,10 +194,7 @@ func (r *Recursor) getAddressesFor(ctx context.Context, name string, state *recu
 
 	var pa, paaaa packet.Packet
 
-	parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
-	if parallelism < 1 {
-		parallelism = 1
-	}
+	parallelism := max(profile.FromContext(ctx).Resolver.Defaults.Parallel, 1)
 	if profile.FromContext(ctx).Resolver.Defaults.Unordered || isUnorderedContext(ctx) {
 		parallelism = 1
 	}
@@ -656,10 +650,7 @@ func (l lazyNameserver) QueryWithClass(ctx context.Context, qname string, qtype 
 	nameObj := dnsname.New(l.name)
 	nameKey := strings.ToLower(nameObj.String())
 
-	parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
-	if parallelism < 1 {
-		parallelism = 1
-	}
+	parallelism := max(profile.FromContext(ctx).Resolver.Defaults.Parallel, 1)
 	if profile.FromContext(ctx).Resolver.Defaults.Unordered || isUnorderedContext(ctx) {
 		parallelism = 1
 	}
@@ -683,7 +674,6 @@ func (l lazyNameserver) QueryWithClass(ctx context.Context, qname string, qtype 
 
 		tasks := make([]parallel.Task[packet.Packet], len(addrs))
 		for i, addr := range addrs {
-			addr := addr
 			tasks[i] = func(ctx context.Context) (packet.Packet, error) {
 				ns, err := nameserver.NewWithContext(ctx, l.name, addr.String(), l.recursor.client)
 				if err != nil {

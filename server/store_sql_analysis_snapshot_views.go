@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -134,10 +135,10 @@ func (s *SQLJobStore) queryBatchDomainSummaries(cohortID int64, batchID string) 
 	)
 	for rows.Next() {
 		var (
-			sm        AnalysisRunDomainSummary
-			score     sql.NullInt64
-			grade     sql.NullString
-			finishTS  sql.NullString
+			sm       AnalysisRunDomainSummary
+			score    sql.NullInt64
+			grade    sql.NullString
+			finishTS sql.NullString
 		)
 		if err := rows.Scan(
 			&sm.CohortID, &sm.RunID, &sm.DomainID, &score, &grade,
@@ -793,7 +794,7 @@ func buildNameserverViews(endpoints []batchEndpointRow, addrFacts []AnalysisRunA
 		for asn := range b.asns {
 			asns = append(asns, asn)
 		}
-		sort.Slice(asns, func(i, j int) bool { return asns[i] < asns[j] })
+		slices.Sort(asns)
 		view.ASNs = asns
 
 		domains := make([]string, 0, len(b.domains))
@@ -1089,7 +1090,7 @@ func buildPrefixViews(
 		for asn := range b.asns {
 			asns = append(asns, asn)
 		}
-		sort.Slice(asns, func(i, j int) bool { return asns[i] < asns[j] })
+		slices.Sort(asns)
 		v.ASNs = asns
 
 		domains := make([]string, 0, len(b.domains))

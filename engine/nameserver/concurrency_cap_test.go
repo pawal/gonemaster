@@ -65,7 +65,7 @@ func TestNameserverConcurrencyCapDisabledAllowsParallelQueries(t *testing.T) {
 		_, _ = nsB.QueryWithOptions(ctx, "parallel-b.example", "A", nil)
 	}()
 
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		select {
 		case <-started:
 		case <-time.After(300 * time.Millisecond):

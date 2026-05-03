@@ -36,7 +36,7 @@ func TestGeneratePublicIDUnique(t *testing.T) {
 }
 
 func TestJobPublicIDFieldPresent(t *testing.T) {
-	j := Job{ID: "abc", PublicID: "x1y2z3w4", Domain: "example.com", Status: JobQueued}
+	j := Job{PublicID: "x1y2z3w4"}
 	if j.PublicID != "x1y2z3w4" {
 		t.Fatalf("got %q, want %q", j.PublicID, "x1y2z3w4")
 	}
@@ -92,7 +92,7 @@ func TestJobPriorityIsInt(t *testing.T) {
 }
 
 func TestJobPriorityFieldPresent(t *testing.T) {
-	j := Job{ID: "abc", Domain: "example.com", Status: JobQueued, Priority: PriorityBatch}
+	j := Job{Priority: PriorityBatch}
 	if j.Priority != PriorityBatch {
 		t.Fatalf("got %d, want %d", j.Priority, PriorityBatch)
 	}
@@ -126,7 +126,7 @@ func TestJobPrioritySerializesAsNumber(t *testing.T) {
 }
 
 func TestRunPriorityFieldPresent(t *testing.T) {
-	r := Run{ID: "abc", Domain: "example.com", Status: JobSucceeded, Priority: PriorityBatch}
+	r := Run{Priority: PriorityBatch}
 	if r.Priority != PriorityBatch {
 		t.Fatalf("got %d, want %d", r.Priority, PriorityBatch)
 	}

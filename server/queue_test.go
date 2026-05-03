@@ -129,10 +129,8 @@ func TestInMemoryQueueManyBlockedDequeuers(t *testing.T) {
 	errs := make(chan error, workers)
 
 	var wg sync.WaitGroup
-	for i := 0; i < workers; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range workers {
+		wg.Go(func() {
 			for {
 				jobID, err := q.Dequeue(ctx)
 				if err != nil {
@@ -151,14 +149,14 @@ func TestInMemoryQueueManyBlockedDequeuers(t *testing.T) {
 					return
 				}
 			}
-		}()
+		})
 	}
 
 	// Give workers a short moment to block in Dequeue.
 	time.Sleep(50 * time.Millisecond)
 
 	expected := make(map[string]bool, jobs)
-	for i := 0; i < jobs; i++ {
+	for i := range jobs {
 		jobID := fmt.Sprintf("job-%03d", i)
 		expected[jobID] = true
 		if err := q.Enqueue(jobID, PriorityNormal); err != nil {
@@ -209,10 +207,8 @@ func TestInMemoryQueueBurstEnqueueDequeueConcurrent(t *testing.T) {
 	seen := make(map[string]bool, totalJobs)
 	errs := make(chan error, 1)
 
-	for i := 0; i < consumers; i++ {
-		consumerWG.Add(1)
-		go func() {
-			defer consumerWG.Done()
+	for range consumers {
+		consumerWG.Go(func() {
 			for {
 				if int(consumed.Load()) >= totalJobs {
 					return
@@ -241,15 +237,13 @@ func TestInMemoryQueueBurstEnqueueDequeueConcurrent(t *testing.T) {
 				seenMu.Unlock()
 				consumed.Add(1)
 			}
-		}()
+		})
 	}
 
-	for p := 0; p < producers; p++ {
+	for p := range producers {
 		producerID := p
-		producerWG.Add(1)
-		go func() {
-			defer producerWG.Done()
-			for i := 0; i < perProducerJobs; i++ {
+		producerWG.Go(func() {
+			for i := range perProducerJobs {
 				jobID := fmt.Sprintf("p%02d-job-%03d", producerID, i)
 				if err := q.Enqueue(jobID, PriorityNormal); err != nil {
 					select {
@@ -259,7 +253,7 @@ func TestInMemoryQueueBurstEnqueueDequeueConcurrent(t *testing.T) {
 					return
 				}
 			}
-		}()
+		})
 	}
 
 	producerWG.Wait()
@@ -305,10 +299,8 @@ func TestInMemoryQueuePauseResumeUnderLoad(t *testing.T) {
 	errs := make(chan error, workers)
 	var wg sync.WaitGroup
 
-	for i := 0; i < workers; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range workers {
+		wg.Go(func() {
 			for {
 				jobID, err := q.Dequeue(ctx)
 				if err != nil {
@@ -327,11 +319,11 @@ func TestInMemoryQueuePauseResumeUnderLoad(t *testing.T) {
 					return
 				}
 			}
-		}()
+		})
 	}
 
 	expected := make(map[string]bool, jobs)
-	for i := 0; i < jobs; i++ {
+	for i := range jobs {
 		jobID := fmt.Sprintf("job-%03d", i)
 		expected[jobID] = true
 		if err := q.Enqueue(jobID, PriorityNormal); err != nil {
@@ -460,7 +452,7 @@ func TestInMemoryQueueNormalBeforesBatch(t *testing.T) {
 	defer func() { _ = q.Close() }()
 
 	// Enqueue several batch jobs first, then a normal job.
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if err := q.Enqueue(fmt.Sprintf("batch-%d", i), PriorityBatch); err != nil {
 			t.Fatalf("enqueue batch: %v", err)
 		}
@@ -482,7 +474,7 @@ func TestInMemoryQueueNormalBeforesBatch(t *testing.T) {
 	}
 
 	// The remaining three dequeues should all be batch jobs in FIFO order.
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		id, err := q.Dequeue(ctx)
 		if err != nil {
 			t.Fatalf("dequeue batch %d: %v", i, err)

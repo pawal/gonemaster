@@ -15,8 +15,8 @@ type PublicAnalysisSnapshotListEntry struct {
 	Label       string    `json:"label,omitempty"`
 	Description string    `json:"description,omitempty"`
 	CapturedAt  time.Time `json:"captured_at"`
-	FirstRunAt  time.Time `json:"first_run_at,omitempty"`
-	LastRunAt   time.Time `json:"last_run_at,omitempty"`
+	FirstRunAt  time.Time `json:"first_run_at"`
+	LastRunAt   time.Time `json:"last_run_at"`
 	RunCount    int       `json:"run_count"`
 	DomainCount int       `json:"domain_count"`
 	ProfileName string    `json:"profile_name,omitempty"`
@@ -38,8 +38,8 @@ type PublicAnalysisSnapshotDetail struct {
 	Label       string                     `json:"label,omitempty"`
 	Description string                     `json:"description,omitempty"`
 	CapturedAt  time.Time                  `json:"captured_at"`
-	FirstRunAt  time.Time                  `json:"first_run_at,omitempty"`
-	LastRunAt   time.Time                  `json:"last_run_at,omitempty"`
+	FirstRunAt  time.Time                  `json:"first_run_at"`
+	LastRunAt   time.Time                  `json:"last_run_at"`
 	RunCount    int                        `json:"run_count"`
 	DomainCount int                        `json:"domain_count"`
 	ProfileName string                     `json:"profile_name,omitempty"`
@@ -52,8 +52,8 @@ type PublicAnalysisTrendPoint struct {
 	Slug       string          `json:"slug"`
 	Label      string          `json:"label,omitempty"`
 	CapturedAt time.Time       `json:"captured_at"`
-	FirstRunAt time.Time       `json:"first_run_at,omitempty"`
-	LastRunAt  time.Time       `json:"last_run_at,omitempty"`
+	FirstRunAt time.Time       `json:"first_run_at"`
+	LastRunAt  time.Time       `json:"last_run_at"`
 	Payload    json.RawMessage `json:"payload"`
 }
 

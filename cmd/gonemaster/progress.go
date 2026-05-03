@@ -77,10 +77,7 @@ func (p *progressReporter) Finish() {
 	if !p.printed {
 		return
 	}
-	current := p.completed
-	if current < p.total {
-		current = p.total
-	}
+	current := max(p.completed, p.total)
 	p.printLine(current, "done")
 	fmt.Fprint(p.out, "\n")
 }
@@ -92,10 +89,7 @@ func (p *progressReporter) onStart(key string, display string) {
 		return
 	}
 	p.started[key] = true
-	current := p.completed + 1
-	if current > p.total {
-		current = p.total
-	}
+	current := min(p.completed+1, p.total)
 	p.printLine(current, display)
 }
 
@@ -110,10 +104,7 @@ func (p *progressReporter) onEnd(key string, display string) {
 		p.started[key] = true
 	}
 	p.completed++
-	current := p.completed
-	if current > p.total {
-		current = p.total
-	}
+	current := min(p.completed, p.total)
 	p.printLine(current, display)
 }
 
@@ -126,10 +117,7 @@ func (p *progressReporter) onNonMarker(key string, display string) {
 	p.started[key] = true
 	p.completedSet[key] = true
 	p.completed++
-	current := p.completed
-	if current > p.total {
-		current = p.total
-	}
+	current := min(p.completed, p.total)
 	p.printLine(current, display)
 }
 

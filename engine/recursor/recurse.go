@@ -145,18 +145,12 @@ func (r *Recursor) recurse(ctx context.Context, name string, qtype string, qclas
 
 func (r *Recursor) recurseOrdered(ctx context.Context, name string, qtype string, qclass string, state *recurseState) (packet.Packet, *recurseState, error) {
 	nameObj := dnsname.New(name)
-	parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
-	if parallelism < 1 {
-		parallelism = 1
-	}
+	parallelism := max(profile.FromContext(ctx).Resolver.Defaults.Parallel, 1)
 	parentLogger := logger.FromContext(ctx)
 	for len(state.ns) > 0 {
 		batchSize := 1
 		if parallelism > 1 {
-			batchSize = parallelism
-			if batchSize > len(state.ns) {
-				batchSize = len(state.ns)
-			}
+			batchSize = min(parallelism, len(state.ns))
 		}
 
 		batch := make([]queryer, 0, batchSize)
@@ -367,20 +361,11 @@ func (r *Recursor) recurseUnordered(ctx context.Context, name string, qtype stri
 		if len(nss) == 0 {
 			break
 		}
-		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
-		if parallelism < 1 {
-			parallelism = 1
-		}
+		parallelism := max(profile.FromContext(ctx).Resolver.Defaults.Parallel, 1)
 		if depth > 0 {
 			parallelism = 1
 		}
-		workers := parallelism
-		if workers > len(nss) {
-			workers = len(nss)
-		}
-		if workers < 1 {
-			workers = 1
-		}
+		workers := max(min(parallelism, len(nss)), 1)
 		jobs := make(chan queryer)
 		results := make(chan unorderedResult, len(nss))
 
@@ -401,7 +386,7 @@ func (r *Recursor) recurseUnordered(ctx context.Context, name string, qtype stri
 		ctxBatch = withUnorderedContext(ctxBatch)
 		var wg sync.WaitGroup
 		wg.Add(workers)
-		for i := 0; i < workers; i++ {
+		for range workers {
 			go func() {
 				defer wg.Done()
 				for ns := range jobs {

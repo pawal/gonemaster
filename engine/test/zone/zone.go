@@ -397,11 +397,12 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 				continue
 			}
 			soaMname := strings.ToLower(strings.TrimSuffix(soa.Ns, "."))
-			if soaMname == "localhost" {
+			switch soaMname {
+			case "localhost":
 				mnameLocalhost = append(mnameLocalhost, ns.Address.String())
-			} else if soaMname == "" {
+			case "":
 				mnameDot = append(mnameDot, ns.Address.String())
-			} else {
+			default:
 				if _, ok := mnameNS[soaMname]; !ok {
 					mnameNS[soaMname] = map[string]*uint32{}
 				}
@@ -1019,7 +1020,6 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		outcomes = make([]mxOutcome, len(unique))
 		tasks := make([]runner.Task, len(unique))
 		for i, ns := range unique {
-			i, ns := i, ns
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := mxOutcome{ip: ns.Address.String()}
@@ -1255,7 +1255,6 @@ func Zone10(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	if len(nss) > 0 {
 		tasks := make([]runner.Task, len(nss))
 		for i, ns := range nss {
-			i, ns := i, ns
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "SOA"); err != nil {
@@ -1354,7 +1353,6 @@ func Zone11(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		outcomes = make([]spfOutcome, len(groups))
 		tasks := make([]runner.Task, len(groups))
 		for i, group := range groups {
-			i, group := i, group
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				if len(group) == 0 {
 					return nil
@@ -1543,7 +1541,6 @@ func Zone12(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		outcomes = make([]csyncOutcome, len(nss))
 		tasks := make([]runner.Task, len(nss))
 		for i, ns := range nss {
-			i, ns := i, ns
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := csyncOutcome{ns: ns}
@@ -1590,10 +1587,10 @@ func Zone12(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	}
 
 	type csyncGroup struct {
-		serial      uint32
-		flags       uint16
-		typeBitmap  string
-		endpoints   []string
+		serial     uint32
+		flags      uint16
+		typeBitmap string
+		endpoints  []string
 	}
 
 	var hasCSYNC, noCSYNC int
@@ -1809,7 +1806,7 @@ func spfWalkLookups(ctx context.Context, z *zonepkg.Zone, spfRecord string, visi
 	var loopDomain, errorTarget string
 	var hasPtr, hasLoop, hasError bool
 
-	for _, term := range strings.Fields(rest) {
+	for term := range strings.FieldsSeq(rest) {
 		// Strip qualifier
 		if len(term) > 0 && (term[0] == '+' || term[0] == '-' || term[0] == '~' || term[0] == '?') {
 			term = term[1:]
@@ -2033,7 +2030,7 @@ func spfSyntaxOk(spf string) bool {
 		return true
 	}
 
-	for _, term := range strings.Fields(rest) {
+	for term := range strings.FieldsSeq(rest) {
 		if !spfTermOk(term) {
 			return false
 		}
@@ -2488,7 +2485,6 @@ func Zone14(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		outcomes = make([]zonemdOutcome, len(nss))
 		tasks := make([]runner.Task, len(nss))
 		for i, ns := range nss {
-			i, ns := i, ns
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := zonemdOutcome{ns: ns}

@@ -13,7 +13,7 @@ func BenchmarkInMemoryJobStoreMixedContention(b *testing.B) {
 	store := NewInMemoryJobStore()
 	base := time.Now().UTC().Add(-time.Minute)
 	const seedJobs = 256
-	for i := 0; i < seedJobs; i++ {
+	for i := range seedJobs {
 		id := fmt.Sprintf("job-%03d", i)
 		_, err := store.Create(Job{
 			ID:        id,

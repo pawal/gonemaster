@@ -1,5 +1,4 @@
 //go:build !nogui
-// +build !nogui
 
 // Package analysisui serves the embedded cohort analysis dashboard SPA.
 package analysisui

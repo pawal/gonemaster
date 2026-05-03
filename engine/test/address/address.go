@@ -256,7 +256,6 @@ func Address02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	if len(ordered) > 0 {
 		tasks := make([]runner.Task, len(ordered))
 		for i, item := range ordered {
-			item := item
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, addressModuleName, testcase)
 
@@ -357,7 +356,6 @@ func Address03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	if len(ordered) > 0 {
 		tasks := make([]runner.Task, len(ordered))
 		for i, item := range ordered {
-			item := item
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, addressModuleName, testcase)
 

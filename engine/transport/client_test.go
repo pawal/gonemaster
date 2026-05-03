@@ -701,7 +701,7 @@ func TestExchangeAcceptsOversizedUDPWithoutTCPFallback(t *testing.T) {
 
 		// Keep the response valid but larger than the classic 512-byte UDP
 		// receive buffer used when the request has no EDNS.
-		for i := 0; i < 64; i++ {
+		for i := range 64 {
 			additional := &dns.A{
 				Hdr: dns.Header{
 					Name:  "extra.example.",

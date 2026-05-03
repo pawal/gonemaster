@@ -726,7 +726,7 @@ func TestPublicAnalysisDetailHandlersLoadAllEntriesForRun(t *testing.T) {
 	f := newAnalysisAPITestFixture(t)
 	ts := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
 	entries := make([]engine.LogEntry, 0, 10050)
-	for i := 0; i < 10049; i++ {
+	for range 10049 {
 		entries = append(entries, engine.LogEntry{
 			Module: "DNSSEC", Testcase: "bulk01", Tag: "BULK_TAG", Level: "NOTICE",
 		})

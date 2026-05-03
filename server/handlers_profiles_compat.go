@@ -217,14 +217,14 @@ func checkProfileCompatibility(configJSON, schemaVersion string, defaultP *engin
 }
 
 func joinStrings(ss []string) string {
-	out := ""
+	var out strings.Builder
 	for i, s := range ss {
 		if i > 0 {
-			out += ", "
+			out.WriteString(", ")
 		}
-		out += s
+		out.WriteString(s)
 	}
-	return out
+	return out.String()
 }
 
 // ── PATCH /profiles/{id} ─────────────────────────────────────────────────────

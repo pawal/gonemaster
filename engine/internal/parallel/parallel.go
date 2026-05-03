@@ -68,7 +68,7 @@ func RunOrdered[T any](ctx context.Context, tasks []Task[T], opts Options) []Res
 		}()
 	}
 
-	for i := 0; i < len(tasks); i++ {
+	for i := range tasks {
 		if ctx.Err() != nil {
 			for j := i; j < len(tasks); j++ {
 				results[j].Err = ctx.Err()

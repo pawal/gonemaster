@@ -1,5 +1,4 @@
 //go:build !nogui
-// +build !nogui
 
 package server
 

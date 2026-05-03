@@ -193,8 +193,8 @@ func parsePO(data string) (map[string]string, map[string]string) {
 			}
 			continue
 		}
-		if strings.HasPrefix(line, "#.") {
-			tag := strings.TrimSpace(strings.TrimPrefix(line, "#."))
+		if after, ok := strings.CutPrefix(line, "#."); ok {
+			tag := strings.TrimSpace(after)
 			if tag != "" {
 				if idx := strings.IndexAny(tag, " \t"); idx >= 0 {
 					tag = tag[:idx]

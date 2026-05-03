@@ -212,9 +212,9 @@ func (s *Server) resolvePublicSnapshotOrNone(w http.ResponseWriter, r *http.Requ
 type PublicAnalysisSnapshotView struct {
 	Slug        string    `json:"slug"`
 	Label       string    `json:"label,omitempty"`
-	CapturedAt  time.Time `json:"captured_at,omitempty"`
-	FirstRunAt  time.Time `json:"first_run_at,omitempty"`
-	LastRunAt   time.Time `json:"last_run_at,omitempty"`
+	CapturedAt  time.Time `json:"captured_at"`
+	FirstRunAt  time.Time `json:"first_run_at"`
+	LastRunAt   time.Time `json:"last_run_at"`
 	RunCount    int       `json:"run_count"`
 	DomainCount int       `json:"domain_count"`
 	ProfileName string    `json:"profile_name,omitempty"`
@@ -496,9 +496,6 @@ func clampPage(limit, offset, total int) (int, int) {
 	if offset > total {
 		offset = total
 	}
-	end := offset + limit
-	if end > total {
-		end = total
-	}
+	end := min(offset+limit, total)
 	return offset, end
 }

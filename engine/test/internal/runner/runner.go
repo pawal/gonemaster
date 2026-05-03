@@ -26,15 +26,11 @@ func Run(ctx context.Context, tasks []Task, opts Options) ([]*logger.Entry, erro
 	if len(tasks) == 0 {
 		return nil, nil
 	}
-	limit := opts.Parallel
-	if limit < 1 {
-		limit = 1
-	}
+	limit := max(opts.Parallel, 1)
 	parent := logger.FromContext(ctx)
 
 	wrapped := make([]parallel.Task[[]*logger.Entry], len(tasks))
 	for i, task := range tasks {
-		task := task
 		wrapped[i] = func(ctx context.Context) ([]*logger.Entry, error) {
 			buf := logger.New()
 			if parent != nil {

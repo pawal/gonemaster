@@ -50,7 +50,7 @@ func (s *Server) handleProfiles(w http.ResponseWriter, r *http.Request) {
 		}
 		s.handleCreateProfile(w, r)
 	case http.MethodGet:
-		s.handleListProfiles(w, r)
+		s.handleListProfiles(w)
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
 	}
@@ -63,7 +63,7 @@ func (s *Server) handleProfileByID(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.Method {
 	case http.MethodGet:
-		s.handleGetProfile(w, r, id)
+		s.handleGetProfile(w, id)
 	case http.MethodPut:
 		if !s.enforceCSRF(w, r) {
 			return
@@ -73,7 +73,7 @@ func (s *Server) handleProfileByID(w http.ResponseWriter, r *http.Request) {
 		if !s.enforceCSRF(w, r) {
 			return
 		}
-		s.handleDeleteProfile(w, r, id)
+		s.handleDeleteProfile(w, id)
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
 	}
@@ -160,7 +160,7 @@ func (s *Server) handleCreateProfile(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, apiProfile)
 }
 
-func (s *Server) handleListProfiles(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleListProfiles(w http.ResponseWriter) {
 	storedProfiles := s.store.ListProfiles()
 	profiles := make([]Profile, 0, len(storedProfiles))
 	for _, stored := range storedProfiles {
@@ -174,7 +174,7 @@ func (s *Server) handleListProfiles(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, profiles)
 }
 
-func (s *Server) handleGetProfile(w http.ResponseWriter, r *http.Request, id int64) {
+func (s *Server) handleGetProfile(w http.ResponseWriter, id int64) {
 	stored, ok := s.store.GetProfile(id)
 	if !ok {
 		writeError(w, http.StatusNotFound, "not_found", "profile not found", nil)
@@ -229,7 +229,7 @@ func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request, id 
 	writeJSON(w, http.StatusOK, apiProfile)
 }
 
-func (s *Server) handleDeleteProfile(w http.ResponseWriter, r *http.Request, id int64) {
+func (s *Server) handleDeleteProfile(w http.ResponseWriter, id int64) {
 	if _, ok := s.store.GetProfile(id); !ok {
 		writeError(w, http.StatusNotFound, "not_found", "profile not found", nil)
 		return
@@ -257,7 +257,7 @@ func (s *Server) handleTagProfile(w http.ResponseWriter, r *http.Request) {
 		if !s.enforceCSRF(w, r) {
 			return
 		}
-		s.handleDeleteTagProfile(w, r, name)
+		s.handleDeleteTagProfile(w, name)
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
 	}
@@ -288,7 +288,7 @@ func (s *Server) handleSetTagProfile(w http.ResponseWriter, r *http.Request, nam
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *Server) handleDeleteTagProfile(w http.ResponseWriter, r *http.Request, name string) {
+func (s *Server) handleDeleteTagProfile(w http.ResponseWriter, name string) {
 	if _, ok := s.store.GetTag(name); !ok {
 		writeError(w, http.StatusNotFound, "not_found", "tag not found", nil)
 		return

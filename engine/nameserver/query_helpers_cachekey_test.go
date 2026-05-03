@@ -204,10 +204,10 @@ func TestBuildCacheKeyConcurrentDeterministic(t *testing.T) {
 	errs := make(chan error, goroutines*iterations)
 	var wg sync.WaitGroup
 	wg.Add(goroutines)
-	for g := 0; g < goroutines; g++ {
+	for range goroutines {
 		go func() {
 			defer wg.Done()
-			for i := 0; i < iterations; i++ {
+			for range iterations {
 				key, _, _, err := buildCacheKey("concurrent.example", "AAAA", "IN", opts)
 				if err != nil {
 					errs <- err

@@ -15,7 +15,7 @@ func TestRunOrderedSequentialPreservesOrder(t *testing.T) {
 
 	const count = 5
 	tasks := make([]Task[int], count)
-	for i := 0; i < count; i++ {
+	for i := range count {
 		idx := i
 		tasks[i] = func(ctx context.Context) (int, error) {
 			mu.Lock()
@@ -49,7 +49,7 @@ func TestRunOrderedConcurrentPreservesResultOrder(t *testing.T) {
 	}
 
 	tasks := make([]Task[int], count)
-	for i := 0; i < count; i++ {
+	for i := range count {
 		idx := i
 		tasks[i] = func(ctx context.Context) (int, error) {
 			<-release[idx]

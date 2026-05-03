@@ -227,11 +227,8 @@ func (q *InMemoryQueue) signalAvailableLocked() {
 	if q.waiters < 1 || total < 1 {
 		return
 	}
-	remaining := total
-	if q.waiters < remaining {
-		remaining = q.waiters
-	}
-	for i := 0; i < remaining; i++ {
+	remaining := min(q.waiters, total)
+	for range remaining {
 		select {
 		case q.notify <- struct{}{}:
 		default:

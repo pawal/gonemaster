@@ -126,10 +126,7 @@ func Compute(domain string, entries []Entry, cfg Config) Result {
 		accum := cats[cat]
 		tested := accum.totalEntries > 0
 
-		subScore := 100 - accum.penalties
-		if subScore < 0 {
-			subScore = 0
-		}
+		subScore := max(100-accum.penalties, 0)
 
 		// When any CRITICAL entry is present in the run, the domain is
 		// fundamentally broken (non-existent, no delegation, etc.). All

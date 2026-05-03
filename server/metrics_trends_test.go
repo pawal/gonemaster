@@ -43,7 +43,7 @@ func TestMetricsCollectorTrendRolloverAndWindowBounds(t *testing.T) {
 	collector := newMetricsCollector(cfg, base)
 	collector.nowFn = func() time.Time { return now }
 
-	for idx := 0; idx < 370; idx++ {
+	for idx := range 370 {
 		now = base.Add(time.Duration(idx) * time.Minute)
 		collector.ObserveJobSubmitted(JobQueued)
 		collector.ObserveJobStatusTransition(JobQueued, JobSucceeded)

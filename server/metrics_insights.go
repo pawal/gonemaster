@@ -103,10 +103,7 @@ func (m *MetricsCollector) observeDomainCompletionLocked(now time.Time, domain s
 	entry.RunsTotal++
 	entry.LastStatus = status
 	if duration >= 0 {
-		durationMs := int64(duration / time.Millisecond)
-		if durationMs < 0 {
-			durationMs = 0
-		}
+		durationMs := max(int64(duration/time.Millisecond), 0)
 		entry.DurationCount++
 		entry.DurationTotalMs += durationMs
 	}

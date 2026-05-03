@@ -2,6 +2,7 @@ package nameserver
 
 import (
 	"context"
+	"maps"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -641,22 +642,14 @@ func (c *CacheStore) MergeWarmDataFrom(other *CacheStore) {
 
 	other.mu.Lock()
 	queryByAddress := make(map[string]*queryCache, len(other.cacheByAddress))
-	for addr, cache := range other.cacheByAddress {
-		queryByAddress[addr] = cache
-	}
+	maps.Copy(queryByAddress, other.cacheByAddress)
 	errorByAddress := make(map[string]*errorCache, len(other.errorCacheByAddr))
-	for addr, cache := range other.errorCacheByAddr {
-		errorByAddress[addr] = cache
-	}
+	maps.Copy(errorByAddress, other.errorCacheByAddr)
 	concurrencyByAddress := make(map[string]*nameserverConcurrencyCap, len(other.concurrencyByAddr))
-	for addr, cap := range other.concurrencyByAddr {
-		concurrencyByAddress[addr] = cap
-	}
+	maps.Copy(concurrencyByAddress, other.concurrencyByAddr)
 	// Collect access times from the run cache so we can update the base.
 	otherAccess := make(map[string]time.Time, len(other.addrLastAccess))
-	for addr, t := range other.addrLastAccess {
-		otherAccess[addr] = t
-	}
+	maps.Copy(otherAccess, other.addrLastAccess)
 	other.mu.Unlock()
 
 	c.mu.Lock()

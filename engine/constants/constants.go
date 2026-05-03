@@ -117,11 +117,12 @@ func init() {
 
 func loadIanaSpecialBlocks(ipVersion int) ([]SpecialIPBlock, error) {
 	var data string
-	if ipVersion == IPVersion4 {
+	switch ipVersion {
+	case IPVersion4:
 		data = ianaIPv4CSV
-	} else if ipVersion == IPVersion6 {
+	case IPVersion6:
 		data = ianaIPv6CSV
-	} else {
+	default:
 		return nil, fmt.Errorf("unsupported IP version: %d", ipVersion)
 	}
 
@@ -149,7 +150,7 @@ func loadIanaSpecialBlocks(ipVersion int) ([]SpecialIPBlock, error) {
 		}
 
 		addressData := strings.ReplaceAll(record[0], " ", "")
-		for _, item := range strings.Split(addressData, ",") {
+		for item := range strings.SplitSeq(addressData, ",") {
 			if item == "" {
 				continue
 			}

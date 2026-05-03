@@ -26,9 +26,9 @@ type Nameserver struct {
 	Address netip.Addr
 	// Client performs network exchanges for this nameserver.
 	Client *transport.Client
-	state   *nsState
-	cache   *CacheStore
-	log     *logger.Logger
+	state  *nsState
+	cache  *CacheStore
+	log    *logger.Logger
 }
 
 const systemModuleName = "System"
@@ -439,10 +439,7 @@ func resolveTTLWithBudget(baseSeconds int, prof *profile.Profile, opts *QueryOpt
 		return baseTTL
 	}
 
-	attempts := retries + 1
-	if attempts < 1 {
-		attempts = 1
-	}
+	attempts := max(retries+1, 1)
 	budget := perAttempt * time.Duration(attempts)
 	if budget <= 0 {
 		return baseTTL

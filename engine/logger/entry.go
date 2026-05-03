@@ -3,6 +3,7 @@ package logger
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"reflect"
 	"sort"
 	"strings"
@@ -113,9 +114,7 @@ func (e *Entry) NumericLevel() int {
 // Levels returns the configured level mapping.
 func Levels() map[string]int {
 	out := make(map[string]int, len(numericLevels))
-	for key, value := range numericLevels {
-		out[key] = value
-	}
+	maps.Copy(out, numericLevels)
 	return out
 }
 

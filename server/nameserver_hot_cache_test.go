@@ -255,7 +255,7 @@ func TestNameserverHotCacheLeasesCoalesceInflightQueries(t *testing.T) {
 	}
 	close(releaseNetwork)
 
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		if err := <-errCh; err != nil {
 			t.Fatalf("query %d error: %v", i+1, err)
 		}

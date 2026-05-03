@@ -64,8 +64,7 @@ func TestStartPurgeLoopPurgesOldJobs(t *testing.T) {
 		logCh <- fmt.Sprintf(format, args...)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	var retDays atomic.Int64
 	retDays.Store(int64(cutoffAge))
@@ -94,8 +93,7 @@ func TestStartPurgeLoopNoLogWhenNothingPurged(t *testing.T) {
 	var logCount atomic.Int64
 	logger := func(string, ...any) { logCount.Add(1) }
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	var retDays atomic.Int64
 	retDays.Store(90)
@@ -142,8 +140,7 @@ func TestStartPurgeLoopPreservesNewJobs(t *testing.T) {
 	}
 
 	logger := func(string, ...any) {}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	var retDays atomic.Int64
 	retDays.Store(90)
@@ -163,8 +160,7 @@ func TestPurgeLoopRetentionDaysDynamic(t *testing.T) {
 	var retDays atomic.Int64 // start disabled (0)
 	logger := func(string, ...any) {}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	startPurgeLoopWithInterval(ctx, store, &retDays, logger, 10*time.Millisecond)
 

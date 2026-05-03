@@ -3,6 +3,8 @@ package server
 import (
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -449,22 +451,14 @@ func (s *InMemoryJobStore) List(filter JobFilter) JobList {
 	sortJobSlice(items, filter.Sort)
 
 	total := len(items)
-	offset := filter.Offset
-	if offset < 0 {
-		offset = 0
-	}
+	offset := max(filter.Offset, 0)
 	limit := filter.Limit
 	if limit <= 0 {
 		limit = 100
 	}
-	start := offset
-	if start > len(items) {
-		start = len(items)
-	}
+	start := min(offset, len(items))
 	end := start + limit
-	if end > len(items) {
-		end = len(items)
-	}
+	end = min(end, len(items))
 
 	pageItems := make([]Job, end-start)
 	copy(pageItems, items[start:end])
@@ -477,10 +471,7 @@ func (s *InMemoryJobStore) List(filter JobFilter) JobList {
 		Sort:   string(normalizedSort),
 	}
 	if start > 0 {
-		prevOffset := start - limit
-		if prevOffset < 0 {
-			prevOffset = 0
-		}
+		prevOffset := max(start-limit, 0)
 		list.PrevCursor = strconv.Itoa(prevOffset)
 	}
 	if end < total {
@@ -723,15 +714,7 @@ func (s *InMemoryJobStore) ListDomains(filter DomainFilter) DomainList {
 				continue
 			}
 		} else if filter.Tag != "" {
-			tags := s.domainTags[d.ID]
-			found := false
-			for _, t := range tags {
-				if t == filter.Tag {
-					found = true
-					break
-				}
-			}
-			if !found {
+			if !slices.Contains(s.domainTags[d.ID], filter.Tag) {
 				continue
 			}
 		}
@@ -756,18 +739,10 @@ func (s *InMemoryJobStore) ListDomains(filter DomainFilter) DomainList {
 	if limit <= 0 {
 		limit = 100
 	}
-	offset := filter.Offset
-	if offset < 0 {
-		offset = 0
-	}
-	start := offset
-	if start > total {
-		start = total
-	}
+	offset := max(filter.Offset, 0)
+	start := min(offset, total)
 	end := start + limit
-	if end > total {
-		end = total
-	}
+	end = min(end, total)
 	return DomainList{
 		Items:  items[start:end],
 		Total:  total,
@@ -807,16 +782,11 @@ func (s *InMemoryJobStore) ListTags(limit, offset int) []Tag {
 	if limit <= 0 {
 		limit = 100
 	}
-	if offset < 0 {
-		offset = 0
-	}
+	offset = max(offset, 0)
 	if offset > len(tags) {
 		return []Tag{}
 	}
-	end := offset + limit
-	if end > len(tags) {
-		end = len(tags)
-	}
+	end := min(offset+limit, len(tags))
 	return tags[offset:end]
 }
 
@@ -830,13 +800,7 @@ func (s *InMemoryJobStore) TagDomains(tag string, domainIDs []int64) error {
 	}
 	for _, id := range domainIDs {
 		// Avoid duplicates.
-		alreadyTagged := false
-		for _, existing := range s.domainTags[id] {
-			if existing == tag {
-				alreadyTagged = true
-				break
-			}
-		}
+		alreadyTagged := slices.Contains(s.domainTags[id], tag)
 		if !alreadyTagged {
 			s.domainTags[id] = append(s.domainTags[id], tag)
 			s.tagDomains[tag] = append(s.tagDomains[tag], id)
@@ -1165,18 +1129,9 @@ func (s *InMemoryJobStore) ListRuns(filter RunFilter) RunList {
 	if limit <= 0 {
 		limit = 100
 	}
-	offset := filter.Offset
-	if offset < 0 {
-		offset = 0
-	}
-	start := offset
-	if start > total {
-		start = total
-	}
-	end := start + limit
-	if end > total {
-		end = total
-	}
+	offset := max(filter.Offset, 0)
+	start := min(offset, total)
+	end := min(start+limit, total)
 
 	list := RunList{
 		Items:  items[start:end],
@@ -1185,10 +1140,7 @@ func (s *InMemoryJobStore) ListRuns(filter RunFilter) RunList {
 		Offset: offset,
 	}
 	if start > 0 {
-		prev := start - limit
-		if prev < 0 {
-			prev = 0
-		}
+		prev := max(start-limit, 0)
 		list.PrevCursor = strconv.Itoa(prev)
 	}
 	if end < total {
@@ -1291,18 +1243,9 @@ func (s *InMemoryJobStore) QueryEntries(filter EntryFilter) EntryList {
 	if limit <= 0 {
 		limit = 100
 	}
-	offset := filter.Offset
-	if offset < 0 {
-		offset = 0
-	}
-	start := offset
-	if start > total {
-		start = total
-	}
-	end := start + limit
-	if end > total {
-		end = total
-	}
+	offset := max(filter.Offset, 0)
+	start := min(offset, total)
+	end := min(start+limit, total)
 
 	list := EntryList{
 		Items:  all[start:end],
@@ -1311,10 +1254,7 @@ func (s *InMemoryJobStore) QueryEntries(filter EntryFilter) EntryList {
 		Offset: offset,
 	}
 	if start > 0 {
-		prev := start - limit
-		if prev < 0 {
-			prev = 0
-		}
+		prev := max(start-limit, 0)
 		list.PrevCursor = strconv.Itoa(prev)
 	}
 	if end < total {
@@ -1362,14 +1302,8 @@ func (s *InMemoryJobStore) ListBatchesByTag(tag string, limit, offset int) Batch
 		return items[i].ID > items[j].ID
 	})
 	total := len(items)
-	start := offset
-	if start > total {
-		start = total
-	}
-	end := start + limit
-	if end > total {
-		end = total
-	}
+	start := min(offset, total)
+	end := min(start+limit, total)
 	return BatchList{
 		Items:  items[start:end],
 		Total:  total,
@@ -1648,9 +1582,7 @@ func (s *InMemoryJobStore) ListSettings() map[string]string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	result := make(map[string]string, len(s.settings))
-	for k, v := range s.settings {
-		result[k] = v
-	}
+	maps.Copy(result, s.settings)
 	return result
 }
 

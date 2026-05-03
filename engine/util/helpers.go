@@ -2,6 +2,7 @@ package util
 
 import (
 	"context"
+	"slices"
 	"sync"
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
@@ -85,10 +86,8 @@ func ShouldRunTest(ctx context.Context, testName string) bool {
 			}
 		}
 	case []string:
-		for _, name := range cases {
-			if name == testName {
-				return true
-			}
+		if slices.Contains(cases, testName) {
+			return true
 		}
 	}
 	return false

@@ -10,8 +10,10 @@ import (
 	"go/parser"
 	"go/printer"
 	"go/token"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -928,9 +930,7 @@ func cloneEnv(in env) env {
 		stringVars: map[string]string{},
 		mapVars:    map[string]*mapVarInfo{},
 	}
-	for key, value := range in.stringVars {
-		out.stringVars[key] = value
-	}
+	maps.Copy(out.stringVars, in.stringVars)
 	for key, value := range in.mapVars {
 		out.mapVars[key] = value.clone()
 	}
@@ -1064,9 +1064,7 @@ func escapePipes(value string) string {
 
 func copyIntMap(input map[string]int) map[string]int {
 	out := map[string]int{}
-	for key, value := range input {
-		out[key] = value
-	}
+	maps.Copy(out, input)
 	return out
 }
 
@@ -1101,12 +1099,7 @@ func isListLikeKey(key string) bool {
 }
 
 func containsString(values []string, target string) bool {
-	for _, value := range values {
-		if value == target {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(values, target)
 }
 
 func checkCoherencyGuardrails(data payload) error {

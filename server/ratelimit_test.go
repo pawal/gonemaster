@@ -12,7 +12,7 @@ import (
 
 func TestRateLimiterAllowsUnderLimit(t *testing.T) {
 	rl := NewRateLimiter(3, time.Minute)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if ok, _ := rl.Allow("1.2.3.4"); !ok {
 			t.Fatalf("request %d should be allowed", i+1)
 		}
@@ -21,7 +21,7 @@ func TestRateLimiterAllowsUnderLimit(t *testing.T) {
 
 func TestRateLimiterBlocksAtLimit(t *testing.T) {
 	rl := NewRateLimiter(3, time.Minute)
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		rl.Allow("1.2.3.4")
 	}
 	ok, retryAfter := rl.Allow("1.2.3.4")
@@ -192,7 +192,7 @@ func TestRateLimitMiddlewareAllowsGETUnconditionally(t *testing.T) {
 	})
 	h := rateLimitMiddleware(rl, nil, ok)
 
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		resp := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodGet, "/whatever", nil)
 		h.ServeHTTP(resp, r)
@@ -209,7 +209,7 @@ func TestRateLimitMiddlewareBlocks429WithRetryAfter(t *testing.T) {
 	})
 	h := rateLimitMiddleware(rl, nil, ok)
 
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		resp := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodPost, "/jobs", bytes.NewBufferString(`{}`))
 		r.RemoteAddr = "1.2.3.4:5000"
@@ -295,7 +295,7 @@ func TestServerRateLimitDisabledByDefault(t *testing.T) {
 	cfg := DefaultConfig()
 	// Rate limiting is off by default - repeated POSTs must all pass.
 	srv := New(cfg)
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		resp := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
 			bytes.NewBufferString(`{"domain":"example.com"}`))

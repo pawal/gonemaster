@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"testing"
 
 	engineprofile "codeberg.org/pawal/gonemaster/engine/profile"
@@ -357,13 +358,7 @@ func TestGetProfileDefaults(t *testing.T) {
 		t.Fatal("expected non-empty TestLevels in defaults")
 	}
 	// Verify well-known test cases are present.
-	found := false
-	for _, tc := range defaults.TestCases {
-		if tc == "address01" {
-			found = true
-			break
-		}
-	}
+	found := slices.Contains(defaults.TestCases, "address01")
 	if !found {
 		t.Fatalf("expected address01 in test_cases, got %v", defaults.TestCases[:5])
 	}

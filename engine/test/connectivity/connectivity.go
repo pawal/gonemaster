@@ -248,16 +248,12 @@ func Connectivity03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 		asnset string
 	}
 
-	parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
-	if parallelism < 1 {
-		parallelism = 1
-	}
+	parallelism := max(profile.FromContext(ctx).Resolver.Defaults.Parallel, 1)
 
 	if len(v4ips) > 0 {
 		outcomes := make([]asnOutcome, len(v4ips))
 		tasks := make([]runner.Task, len(v4ips))
 		for i, ip := range v4ips {
-			i, ip := i, ip
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 
@@ -323,7 +319,6 @@ func Connectivity03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 		outcomes := make([]asnOutcome, len(v6ips))
 		tasks := make([]runner.Task, len(v6ips))
 		for i, ip := range v6ips {
-			i, ip := i, ip
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 
@@ -500,7 +495,6 @@ func Connectivity04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 		outcomes := make([]prefixOutcome, len(ordered))
 		tasks := make([]runner.Task, len(ordered))
 		for i, entry := range ordered {
-			i, entry := i, entry
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				ip := entry.item.Address
@@ -509,14 +503,14 @@ func Connectivity04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 				if err != nil {
 					return err
 				}
-				if res.Code == asnlookup.CodeError || res.Code == asnlookup.CodeEmpty {
-					tag := res.Code
-					if res.Code == asnlookup.CodeError {
-						tag = "CN04_ERROR_PREFIX_DATABASE"
-					} else if res.Code == asnlookup.CodeEmpty {
-						tag = "CN04_EMPTY_PREFIX_SET"
+				switch res.Code {
+				case asnlookup.CodeError:
+					if _, err := buf.Add("CN04_ERROR_PREFIX_DATABASE", map[string]any{"address": ip.String()}); err != nil {
+						return err
 					}
-					if _, err := buf.Add(tag, map[string]any{"address": ip.String()}); err != nil {
+					return nil
+				case asnlookup.CodeEmpty:
+					if _, err := buf.Add("CN04_EMPTY_PREFIX_SET", map[string]any{"address": ip.String()}); err != nil {
 						return err
 					}
 					return nil
@@ -655,7 +649,6 @@ func connectivityLoop(ctx context.Context, testcase string, name dnsname.Name, n
 		okNS := make([]string, len(nsList))
 		tasks := make([]runner.Task, len(nsList))
 		for i, ns := range nsList {
-			i, ns := i, ns
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "SOA", "NS")

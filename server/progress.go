@@ -76,10 +76,7 @@ func (p *progressTracker) onStart(key string) {
 		return
 	}
 	p.started[key] = true
-	current := p.completed + 1
-	if current > p.total {
-		current = p.total
-	}
+	current := min(p.completed+1, p.total)
 	p.update(current)
 }
 
@@ -94,10 +91,7 @@ func (p *progressTracker) onEnd(key string) {
 		p.started[key] = true
 	}
 	p.completed++
-	current := p.completed
-	if current > p.total {
-		current = p.total
-	}
+	current := min(p.completed, p.total)
 	p.update(current)
 }
 
@@ -110,10 +104,7 @@ func (p *progressTracker) onNonMarker(key string) {
 	p.started[key] = true
 	p.completedSet[key] = true
 	p.completed++
-	current := p.completed
-	if current > p.total {
-		current = p.total
-	}
+	current := min(p.completed, p.total)
 	p.update(current)
 }
 

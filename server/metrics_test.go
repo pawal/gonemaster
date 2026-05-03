@@ -475,7 +475,7 @@ func TestMetricsCollectorLocaleUsageIsBounded(t *testing.T) {
 	cfg := DefaultConfig()
 	collector := newMetricsCollector(cfg, time.Now().UTC())
 
-	for i := 0; i < metricsMaxLocaleBuckets+5; i++ {
+	for i := range metricsMaxLocaleBuckets + 5 {
 		collector.ObserveResultLocale("loc_" + strconv.Itoa(i))
 	}
 

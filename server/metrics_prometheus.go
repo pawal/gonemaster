@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"maps"
 	"sort"
 	"strconv"
 	"strings"
@@ -66,10 +67,7 @@ func (m *MetricsCollector) prometheusSnapshot() metricsPromSnapshot {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	expiredTotal := m.completedTotal - m.succeededTotal - m.failedTotal - m.canceledTotal
-	if expiredTotal < 0 {
-		expiredTotal = 0
-	}
+	expiredTotal := max(m.completedTotal-m.succeededTotal-m.failedTotal-m.canceledTotal, 0)
 
 	return metricsPromSnapshot{
 		ServerVersion:        engine.VersionFull(),
@@ -358,9 +356,7 @@ func cloneLabels(labels map[string]string) map[string]string {
 		return map[string]string{}
 	}
 	out := make(map[string]string, len(labels))
-	for key, value := range labels {
-		out[key] = value
-	}
+	maps.Copy(out, labels)
 	return out
 }
 

@@ -802,8 +802,8 @@ func toStringSlice(value any) ([]string, error) {
 var domainLabelRe = regexp.MustCompile(`^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?$`)
 
 func isValidDomain(name string) bool {
-	labels := strings.Split(name, ".")
-	for _, label := range labels {
+	labels := strings.SplitSeq(name, ".")
+	for label := range labels {
 		if label == "" || !domainLabelRe.MatchString(label) {
 			return false
 		}

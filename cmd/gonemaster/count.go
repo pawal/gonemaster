@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 	"sync"
@@ -100,16 +101,12 @@ func (r *countReporter) snapshot() (map[string]int, map[string]map[string]int) {
 	defer r.mu.Unlock()
 
 	levelCount := make(map[string]int, len(r.levelCount))
-	for level, count := range r.levelCount {
-		levelCount[level] = count
-	}
+	maps.Copy(levelCount, r.levelCount)
 
 	tagCount := make(map[string]map[string]int, len(r.tagCount))
 	for level, levelTags := range r.tagCount {
 		cloned := make(map[string]int, len(levelTags))
-		for tag, count := range levelTags {
-			cloned[tag] = count
-		}
+		maps.Copy(cloned, levelTags)
 		tagCount[level] = cloned
 	}
 	return levelCount, tagCount

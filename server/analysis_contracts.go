@@ -32,8 +32,8 @@ var (
 type AnalysisScope struct {
 	Mode    AnalysisScopeMode `json:"mode"`
 	BatchID string            `json:"batch_id,omitempty"`
-	From    time.Time         `json:"from,omitempty"`
-	To      time.Time         `json:"to,omitempty"`
+	From    time.Time         `json:"from"`
+	To      time.Time         `json:"to"`
 }
 
 // NormalizeAnalysisScope validates and normalizes scope semantics.

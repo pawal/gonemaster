@@ -20,7 +20,7 @@ import (
 // Zone represents a DNS zone under test.
 type Zone struct {
 	// Name is the canonical zone name.
-	Name dnsname.Name
+	Name     dnsname.Name
 	recursor *recursor.Recursor
 
 	parent    *Zone
@@ -435,7 +435,6 @@ func (z *Zone) QueryAll(ctx context.Context, name string, qtype string, opts *na
 
 	tasks := make([]parallel.Task[packet.Packet], len(targets))
 	for i, ns := range targets {
-		ns := ns
 		tasks[i] = func(ctx context.Context) (packet.Packet, error) {
 			resp, _ := ns.QueryWithOptions(ctx, name, qtype, opts)
 			return resp, nil

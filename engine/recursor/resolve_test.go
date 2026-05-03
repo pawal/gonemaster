@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/netip"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -41,13 +42,7 @@ func TestAddFakeAddressesDedupAndRemove(t *testing.T) {
 		t.Fatalf("unexpected addresses: %#v", addrs)
 	}
 	names := r.GetFakeNames("example.com")
-	found := false
-	for _, name := range names {
-		if name == "ns2.example.com" {
-			found = true
-			break
-		}
-	}
+	found := slices.Contains(names, "ns2.example.com")
 	if !found {
 		t.Fatalf("expected ns2.example.com in fake names: %#v", names)
 	}
@@ -811,16 +806,14 @@ func TestLazyNameserverConcurrentQueriesShareGlue(t *testing.T) {
 	start := make(chan struct{})
 	errCh := make(chan error, 64)
 	var wg sync.WaitGroup
-	for i := 0; i < 32; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 32 {
+		wg.Go(func() {
 			<-start
 			_, err := lns.QueryWithClass(ctx, "example", "A", "IN")
 			if err != nil && ctx.Err() == nil {
 				errCh <- err
 			}
-		}()
+		})
 	}
 	close(start)
 	wg.Wait()
@@ -906,7 +899,7 @@ func TestGetNSFromConcurrentWithLazyNameserver(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		<-start
-		for i := 0; i < 20; i++ {
+		for range 20 {
 			if _, err := r.getNSFrom(context.Background(), resp, state); err != nil {
 				errCh <- err
 				return
@@ -916,7 +909,7 @@ func TestGetNSFromConcurrentWithLazyNameserver(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		<-start
-		for i := 0; i < 20; i++ {
+		for range 20 {
 			if _, err := lns.QueryWithClass(ctx, "example", "A", "IN"); err != nil && ctx.Err() == nil {
 				errCh <- err
 				return

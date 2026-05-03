@@ -153,8 +153,7 @@ func TestConcurrentAddStoresAllEntries(t *testing.T) {
 	const count = 50
 	var wg sync.WaitGroup
 	wg.Add(count)
-	for i := 0; i < count; i++ {
-		i := i
+	for i := range count {
 		go func() {
 			defer wg.Done()
 			_, _ = log.Add(fmt.Sprintf("TAG_%d", i), nil, "", "")
@@ -192,7 +191,7 @@ func TestCallbackRunsSerialized(t *testing.T) {
 
 	var addWG sync.WaitGroup
 	addWG.Add(count)
-	for i := 0; i < count; i++ {
+	for range count {
 		go func() {
 			defer addWG.Done()
 			_, _ = log.Add("CALLBACK", nil, "", "")

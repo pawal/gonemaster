@@ -21,7 +21,7 @@ import (
 
 func TestAddress01DocumentationAddr(t *testing.T) {
 	ctx := testContext(t)
-	z := newZoneWithFakeAddresses(ctx, t, "example", map[string][]string{
+	z := newZoneWithFakeAddresses(t, "example", map[string][]string{
 		"ns1.example": {"192.0.2.1"},
 	})
 
@@ -53,7 +53,7 @@ func TestAddress01DocumentationAddr(t *testing.T) {
 
 func TestAddress01NoNameServersFound(t *testing.T) {
 	ctx := testContext(t)
-	z := newZoneWithFakeAddresses(ctx, t, "example", map[string][]string{
+	z := newZoneWithFakeAddresses(t, "example", map[string][]string{
 		"ns.other": {},
 	})
 
@@ -401,7 +401,7 @@ func newRootZoneWithHook(ctx context.Context, t *testing.T, handler func(qname s
 	return &z
 }
 
-func newZoneWithFakeAddresses(ctx context.Context, t *testing.T, zoneName string, data map[string][]string) *zone.Zone {
+func newZoneWithFakeAddresses(t *testing.T, zoneName string, data map[string][]string) *zone.Zone {
 	t.Helper()
 	nameserver.EmptyCache()
 	t.Cleanup(nameserver.EmptyCache)

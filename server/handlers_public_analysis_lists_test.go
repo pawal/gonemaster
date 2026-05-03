@@ -384,7 +384,7 @@ func TestPublicAnalysisDomainsRejectsInvalidWorstLevel(t *testing.T) {
 func TestPublicAnalysisDomainsSearchAndPagination(t *testing.T) {
 	f := newAnalysisAPITestFixture(t)
 	finishedAt := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		f.seedDomainSummary(fmt.Sprintf("alpha-%d.example", i),
 			fmt.Sprintf("run-a-%d", i), finishedAt, 90-i, "A", "NOTICE")
 		f.seedDomainSummary(fmt.Sprintf("beta-%d.example", i),
@@ -456,7 +456,7 @@ func TestSortAnalysisDomainViewsByCountColumns(t *testing.T) {
 	}
 
 	cases := []struct {
-		mode     string
+		mode      string
 		wantOrder []string
 	}{
 		{"nameserver_count_asc", []string{"a.example", "c.example", "b.example", "d.example"}},
@@ -496,4 +496,3 @@ func TestPublicAnalysisDomainsRedactsInternalIDs(t *testing.T) {
 		}
 	}
 }
-

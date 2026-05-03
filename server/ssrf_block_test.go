@@ -120,7 +120,7 @@ func TestPublicCreateJobRejectsAnyPrivateIPInList(t *testing.T) {
 		t.Fatalf("expected private_undelegated_ip, got %q", out.Error.Code)
 	}
 	// Mention the offending index for operator clarity.
-	if !bytes.Contains([]byte(fmt.Sprintf("%v", out.Error.Message)), []byte("[1]")) {
+	if !bytes.Contains(fmt.Appendf(nil, "%v", out.Error.Message), []byte("[1]")) {
 		t.Logf("note: error message should reference the offending index: %q", out.Error.Message)
 	}
 }

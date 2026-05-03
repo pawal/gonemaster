@@ -27,15 +27,15 @@ func TestHotCacheMemoryBounded(t *testing.T) {
 		msg.Rcode = dns.RcodeSuccess
 		msg.Answer = []dns.RR{
 			&dns.A{
-				Hdr:   dns.Header{Name: "x.example.", Class: dns.ClassINET, TTL: 60},
-				A:     rdata.A{Addr: netip.MustParseAddr(addr)},
+				Hdr: dns.Header{Name: "x.example.", Class: dns.ClassINET, TTL: 60},
+				A:   rdata.A{Addr: netip.MustParseAddr(addr)},
 			},
 		}
 		return packet.Packet{Msg: msg}
 	}
 
 	// Simulate 200 jobs, each touching one shared root address + one unique address.
-	for i := 0; i < 200; i++ {
+	for i := range 200 {
 		runCache, release := hc.Lease("batch")
 
 		// Shared root nameserver (always warm).
@@ -121,9 +121,9 @@ func TestHotCacheHeapGrowthWithForcedGC(t *testing.T) {
 	}
 
 	const (
-		totalJobs        = 500
-		addrsPerJob      = 5
-		checkpointEvery  = 50
+		totalJobs       = 500
+		addrsPerJob     = 5
+		checkpointEvery = 50
 	)
 
 	type checkpoint struct {
@@ -135,7 +135,7 @@ func TestHotCacheHeapGrowthWithForcedGC(t *testing.T) {
 	}
 	var checkpoints []checkpoint
 
-	for job := 0; job < totalJobs; job++ {
+	for job := range totalJobs {
 		runCache, release := hc.Lease("batch")
 
 		// Always hit the root (kept warm).
@@ -146,7 +146,7 @@ func TestHotCacheHeapGrowthWithForcedGC(t *testing.T) {
 		rootNS.QueryWithOptions(context.Background(), "example.", "A", nil)
 
 		// Touch several unique addresses per job (simulating per-domain nameservers).
-		for k := 0; k < addrsPerJob; k++ {
+		for k := range addrsPerJob {
 			idx := job*addrsPerJob + k
 			addr := fmt.Sprintf("10.%d.%d.%d", (idx/65536)%256, (idx/256)%256, idx%256+1)
 			ns, _ := nameserver.NewWithCache(runCache, fmt.Sprintf("ns%d-%d.example", job, k), addr, nil)
@@ -234,7 +234,7 @@ func TestHotCacheHeapGrowthWithoutForcedGC(t *testing.T) {
 		checkpointEvery = 50
 	)
 
-	for job := 0; job < totalJobs; job++ {
+	for job := range totalJobs {
 		runCache, release := hc.Lease("batch")
 
 		rootNS, _ := nameserver.NewWithCache(runCache, "root.example", "198.41.0.4", nil)
@@ -243,7 +243,7 @@ func TestHotCacheHeapGrowthWithoutForcedGC(t *testing.T) {
 		})
 		rootNS.QueryWithOptions(context.Background(), "example.", "A", nil)
 
-		for k := 0; k < addrsPerJob; k++ {
+		for k := range addrsPerJob {
 			idx := job*addrsPerJob + k
 			addr := fmt.Sprintf("10.%d.%d.%d", (idx/65536)%256, (idx/256)%256, idx%256+1)
 			ns, _ := nameserver.NewWithCache(runCache, fmt.Sprintf("ns%d-%d.example", job, k), addr, nil)

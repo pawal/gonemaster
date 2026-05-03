@@ -428,10 +428,7 @@ func applyExplicitEDNS(msg *dns.Msg, z *uint16) {
 		opt.Options = append(opt.Options, edns)
 	}
 
-	udpSize := msg.UDPSize
-	if udpSize < dns.MinMsgSize {
-		udpSize = dns.MinMsgSize
-	}
+	udpSize := max(msg.UDPSize, dns.MinMsgSize)
 	opt.SetUDPSize(udpSize)
 	opt.SetVersion(msg.Version)
 	opt.SetSecurity(msg.Security)

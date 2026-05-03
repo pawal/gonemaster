@@ -37,11 +37,8 @@ func (s *Server) Start() {
 	s.workers.ctx = ctx
 	s.workers.cancel = cancel
 
-	workerCount := s.cfg.WorkerCount
-	if workerCount < 1 {
-		workerCount = 1
-	}
-	for i := 0; i < workerCount; i++ {
+	workerCount := max(s.cfg.WorkerCount, 1)
+	for range workerCount {
 		s.startWorker()
 	}
 

@@ -94,7 +94,7 @@ func checkROCA(n *big.Int) bool {
 
 		found := false
 		gi := big.NewInt(1) // g_dash^0 = 1
-		for i := int64(0); i < pp; i++ {
+		for range pp {
 			if gi.Cmp(hDash) == 0 {
 				found = true
 				break

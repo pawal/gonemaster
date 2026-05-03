@@ -43,7 +43,7 @@ func gzipMiddleware(next http.Handler) http.Handler {
 }
 
 func acceptsGzip(header string) bool {
-	for _, part := range strings.Split(header, ",") {
+	for part := range strings.SplitSeq(header, ",") {
 		token := strings.TrimSpace(part)
 		if i := strings.IndexByte(token, ';'); i >= 0 {
 			token = token[:i]

@@ -353,17 +353,16 @@ func Nameserver01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	type recursorOutcome struct {
-		server      ns.Nameserver
-		included    bool
-		isRecursor  bool
-		noRecursor  bool
+		server     ns.Nameserver
+		included   bool
+		isRecursor bool
+		noRecursor bool
 	}
 
 	if len(nss) > 0 {
 		outcomes := make([]recursorOutcome, len(nss))
 		tasks := make([]runner.Task, len(nss))
 		for i, server := range nss {
-			i, server := i, server
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, server, "A"); err != nil {
@@ -480,7 +479,6 @@ func Nameserver02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes = make([]ednsOutcome, len(ordered))
 		tasks := make([]runner.Task, len(ordered))
 		for i, server := range ordered {
-			i, server := i, server
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := ednsOutcome{key: server.String()}
@@ -606,7 +604,6 @@ func Nameserver03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes := make([]axfrOutcome, len(ordered))
 		tasks := make([]runner.Task, len(ordered))
 		for i, server := range ordered {
-			i, server := i, server
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, server, "AXFR"); err != nil {
@@ -694,7 +691,6 @@ func Nameserver04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes = make([]sourceOutcome, len(ordered))
 		tasks := make([]runner.Task, len(ordered))
 		for i, server := range ordered {
-			i, server := i, server
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := sourceOutcome{key: server.String()}
@@ -781,7 +777,6 @@ func Nameserver05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes = make([]aaaaOutcome, len(ordered))
 		tasks := make([]runner.Task, len(ordered))
 		for i, server := range ordered {
-			i, server := i, server
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := aaaaOutcome{key: server.String()}
@@ -982,7 +977,6 @@ func Nameserver07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes = make([]upwardOutcome, len(ordered))
 		tasks := make([]runner.Task, len(ordered))
 		for i, server := range ordered {
-			i, server := i, server
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 
@@ -1061,9 +1055,9 @@ func Nameserver08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	type qnameOutcome struct {
-		server    ns.Nameserver
-		included  bool
-		sensitive bool
+		server      ns.Nameserver
+		included    bool
+		sensitive   bool
 		insensitive bool
 	}
 
@@ -1072,7 +1066,6 @@ func Nameserver08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes := make([]qnameOutcome, len(ordered))
 		tasks := make([]runner.Task, len(ordered))
 		for i, server := range ordered {
-			i, server := i, server
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, server, "SOA"); err != nil {
@@ -1174,7 +1167,6 @@ func Nameserver09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes = make([]caseOutcome, len(ordered))
 		tasks := make([]runner.Task, len(ordered))
 		for i, server := range ordered {
-			i, server := i, server
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := caseOutcome{}
@@ -1237,7 +1229,7 @@ func Nameserver09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					outcome.mismatch = true
 					if _, err := buf.Add("CASE_QUERY_NO_ANSWER", withNameserverArgs(server, map[string]any{
 						"query_type": recordType,
-						"domain":     firstNonEmpty(random1, p1, random2, p2),
+						"domain":     firstNonEmpty(random1, p1, random2),
 					})); err != nil {
 						return err
 					}
@@ -1313,7 +1305,6 @@ func Nameserver10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes = make([]n10Outcome, len(nss))
 		tasks := make([]runner.Task, len(nss))
 		for i, server := range nss {
-			i, server := i, server
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := n10Outcome{ip: server.Address.String()}
@@ -1445,7 +1436,6 @@ func Nameserver11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes = make([]n11Outcome, len(nss))
 		tasks := make([]runner.Task, len(nss))
 		for i, server := range nss {
-			i, server := i, server
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := n11Outcome{ip: server.Address.String()}
@@ -1608,7 +1598,6 @@ func Nameserver12(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	if len(nss) > 0 {
 		tasks := make([]runner.Task, len(nss))
 		for i, server := range nss {
-			i, server := i, server
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, server, "SOA"); err != nil {
@@ -1675,7 +1664,6 @@ func Nameserver13(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	if len(nss) > 0 {
 		tasks := make([]runner.Task, len(nss))
 		for i, server := range nss {
-			i, server := i, server
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, server, "DNSKEY"); err != nil {
@@ -1768,7 +1756,6 @@ func Nameserver15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes = make([]versionOutcome, len(nss))
 		tasks := make([]runner.Task, len(nss))
 		for i, server := range nss {
-			i, server := i, server
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := versionOutcome{server: server.String()}
@@ -1962,7 +1949,6 @@ func Nameserver16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes = make([]n16Outcome, len(nss))
 		tasks := make([]runner.Task, len(nss))
 		for i, server := range nss {
-			i, server := i, server
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := n16Outcome{server: server.String()}
@@ -2107,7 +2093,7 @@ func normalizedAnswer(resp packet.Packet) string {
 	return string(data)
 }
 
-func firstNonEmpty(query1 string, resp1 packet.Packet, query2 string, resp2 packet.Packet) string {
+func firstNonEmpty(query1 string, resp1 packet.Packet, query2 string) string {
 	if resp1.Msg != nil {
 		return query1
 	}

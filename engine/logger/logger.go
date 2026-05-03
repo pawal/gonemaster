@@ -3,6 +3,7 @@ package logger
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -18,10 +19,10 @@ var TestCaseName = "Unspecified"
 
 // Logger stores log entries and optional callbacks.
 type Logger struct {
-	mu              sync.Mutex
-	entries         []*Entry
+	mu      sync.Mutex
+	entries []*Entry
 	// Callback is invoked for each appended entry when non-nil.
-	Callback func(*Entry) error
+	Callback        func(*Entry) error
 	callbackRunning bool
 	pending         []*Entry
 	startTime       time.Time
@@ -384,12 +385,7 @@ func matchCondition(cond any, value any) bool {
 		return false
 	case []string:
 		valueStr := fmt.Sprint(value)
-		for _, item := range v {
-			if item == valueStr {
-				return true
-			}
-		}
-		return false
+		return slices.Contains(v, valueStr)
 	default:
 		return fmt.Sprint(cond) == fmt.Sprint(value)
 	}

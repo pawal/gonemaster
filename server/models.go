@@ -96,10 +96,10 @@ type Job struct {
 	Domain   string    `json:"domain"`
 	Status   JobStatus `json:"status"`
 	// FinishedAt is populated from the Run after graduation; zero for in-flight jobs.
-	FinishedAt       time.Time      `json:"finished_at,omitempty"`
+	FinishedAt       time.Time      `json:"finished_at"`
 	SeverityTotals   map[string]int `json:"severity_totals,omitempty"`
 	CreatedAt        time.Time      `json:"created_at"`
-	StartedAt        time.Time      `json:"started_at,omitempty"`
+	StartedAt        time.Time      `json:"started_at"`
 	Priority         JobPriority    `json:"priority"`
 	Progress         int            `json:"progress"`
 	Error            string         `json:"error,omitempty"`
@@ -138,7 +138,7 @@ type Domain struct {
 	ID           int64     `json:"id"`
 	Name         string    `json:"name"`
 	LatestRunID  string    `json:"latest_run_id,omitempty"`
-	LatestRunAt  time.Time `json:"latest_run_at,omitempty"`
+	LatestRunAt  time.Time `json:"latest_run_at"`
 	LatestStatus string    `json:"latest_status,omitempty"`
 	LatestLevel  string    `json:"latest_level,omitempty"`
 	LatestScore  *int      `json:"latest_score,omitempty"`
@@ -205,7 +205,7 @@ type AnalysisCohort struct {
 	MaterializationStatus    string    `json:"materialization_status"`
 	MaterializationDone      int       `json:"materialization_done,omitempty"`
 	MaterializationTotal     int       `json:"materialization_total,omitempty"`
-	LastMaterializedAt       time.Time `json:"last_materialized_at,omitempty"`
+	LastMaterializedAt       time.Time `json:"last_materialized_at"`
 	LastMaterializationError string    `json:"last_materialization_error,omitempty"`
 	DefaultSnapshotPolicy    string    `json:"default_snapshot_policy,omitempty"`
 	DefaultSnapshotID        *int64    `json:"default_snapshot_id,omitempty"`
@@ -353,7 +353,7 @@ type AnalysisProjectionState struct {
 	RunID            string    `json:"run_id"`
 	ProjectorVersion string    `json:"projector_version"`
 	Status           string    `json:"status"`
-	ProjectedAt      time.Time `json:"projected_at,omitempty"`
+	ProjectedAt      time.Time `json:"projected_at"`
 	Error            string    `json:"error,omitempty"`
 }
 
@@ -365,8 +365,8 @@ type Run struct {
 	BatchID          string      `json:"batch_id,omitempty"`
 	Status           JobStatus   `json:"status"`
 	CreatedAt        time.Time   `json:"created_at"`
-	StartedAt        time.Time   `json:"started_at,omitempty"`
-	FinishedAt       time.Time   `json:"finished_at,omitempty"`
+	StartedAt        time.Time   `json:"started_at"`
+	FinishedAt       time.Time   `json:"finished_at"`
 	DurationMs       int64       `json:"duration_ms,omitempty"`
 	SevNotice        int         `json:"sev_notice"`
 	SevWarning       int         `json:"sev_warning"`
@@ -428,9 +428,9 @@ type AnalysisCohortSnapshot struct {
 	Description string    `json:"description,omitempty"`
 	ProfileID   *int64    `json:"profile_id,omitempty"`
 	ProfileName string    `json:"profile_name,omitempty"`
-	CapturedAt  time.Time `json:"captured_at,omitempty"`
-	FirstRunAt  time.Time `json:"first_run_at,omitempty"`
-	LastRunAt   time.Time `json:"last_run_at,omitempty"`
+	CapturedAt  time.Time `json:"captured_at"`
+	FirstRunAt  time.Time `json:"first_run_at"`
+	LastRunAt   time.Time `json:"last_run_at"`
 	RunCount    int       `json:"run_count"`
 	DomainCount int       `json:"domain_count"`
 	Status      string    `json:"status"`
@@ -730,7 +730,7 @@ type BatchDeletePreviewSnapshot struct {
 type BatchDeletePreview struct {
 	BatchID        string                       `json:"batch_id"`
 	Tag            string                       `json:"tag,omitempty"`
-	CreatedAt      time.Time                    `json:"created_at,omitempty"`
+	CreatedAt      time.Time                    `json:"created_at"`
 	SnapshotIntent bool                         `json:"snapshot_intent,omitempty"`
 	Exists         bool                         `json:"exists"`
 	QueuedJobs     int                          `json:"queued_jobs"`

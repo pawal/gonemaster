@@ -858,7 +858,7 @@ func TestPacketBigEmitted(t *testing.T) {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
 		// Add enough records to exceed 4096 bytes.
-		for i := 0; i < 250; i++ {
+		for i := range 250 {
 			rr := &dns.A{Hdr: dns.Header{Name: fmt.Sprintf("host%d.example.", i), Class: dns.ClassINET, TTL: 300}}
 			rr.Addr = netip.AddrFrom4([4]byte{192, 0, 2, byte(i % 256)})
 			msg.Answer = append(msg.Answer, rr)

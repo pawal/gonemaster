@@ -58,7 +58,7 @@ func (l *Limiter) SetLimit(limit int) {
 
 	l.limit = limit
 	tokens := make(chan struct{}, limit)
-	for i := 0; i < limit; i++ {
+	for range limit {
 		tokens <- struct{}{}
 	}
 	l.tokens = tokens

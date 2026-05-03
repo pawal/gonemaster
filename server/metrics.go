@@ -1,6 +1,7 @@
 package server
 
 import (
+	"maps"
 	"math"
 	"sort"
 	"strings"
@@ -260,10 +261,7 @@ func NewMetricsCollector(cfg Config) *MetricsCollector {
 }
 
 func newMetricsCollector(cfg Config, startedAt time.Time) *MetricsCollector {
-	activeWorkers := cfg.WorkerCount
-	if activeWorkers < 1 {
-		activeWorkers = 1
-	}
+	activeWorkers := max(cfg.WorkerCount, 1)
 	return &MetricsCollector{
 		startedAt:            startedAt.UTC(),
 		workerCount:          cfg.WorkerCount,
@@ -432,10 +430,7 @@ func (m *MetricsCollector) ObserveAPIRequest(route string, method string, status
 	routeMetrics.RequestsTotal++
 	routeMetrics.StatusClassCounts[statusClass]++
 	routeMetrics.Latency.Observe(duration)
-	durationMs := int64(math.Round(float64(duration) / float64(time.Millisecond)))
-	if durationMs < 0 {
-		durationMs = 0
-	}
+	durationMs := max(int64(math.Round(float64(duration)/float64(time.Millisecond))), 0)
 	routeMetrics.LatencyTotalMs += durationMs
 	now := time.Now().UTC()
 	if m.nowFn != nil {
@@ -467,10 +462,7 @@ func (m *MetricsCollector) ObserveJobCompletionWithContext(batchID string, domai
 	if duration >= 0 {
 		m.jobDuration.Observe(duration)
 		m.jobDurationCount++
-		durationMs := int64(math.Round(float64(duration) / float64(time.Millisecond)))
-		if durationMs < 0 {
-			durationMs = 0
-		}
+		durationMs := max(int64(math.Round(float64(duration)/float64(time.Millisecond))), 0)
 		m.jobDurationTotalMs += durationMs
 	}
 	for _, level := range metricsSeverityLevels {
@@ -560,10 +552,7 @@ func (m *MetricsCollector) snapshotAt(now time.Time) MetricsSnapshot {
 
 func (m *MetricsCollector) snapshotAtWithLimits(now time.Time, domainLimit int, batchLimit int) MetricsSnapshot {
 	now = now.UTC()
-	uptime := int64(now.Sub(m.startedAt).Seconds())
-	if uptime < 0 {
-		uptime = 0
-	}
+	uptime := max(int64(now.Sub(m.startedAt).Seconds()), 0)
 
 	m.mu.Lock()
 	statusCounts := copyStatusCounts(m.statusCounts)
@@ -736,9 +725,7 @@ func copyStatusClassCounts(in map[string]int64) map[string]int64 {
 
 func copyStringCounts(in map[string]int64) map[string]int64 {
 	out := make(map[string]int64, len(in))
-	for key, value := range in {
-		out[key] = value
-	}
+	maps.Copy(out, in)
 	return out
 }
 
@@ -829,10 +816,7 @@ func (h boundedHistogram) Quantile(quantile float64) int64 {
 	if total == 0 {
 		return 0
 	}
-	target := int64(math.Ceil(quantile * float64(total)))
-	if target < 1 {
-		target = 1
-	}
+	target := max(int64(math.Ceil(quantile*float64(total))), 1)
 
 	seen := int64(0)
 	for idx, count := range h.Counts {

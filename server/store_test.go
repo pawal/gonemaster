@@ -1174,7 +1174,7 @@ func TestInMemoryJobStoreConcurrentBasic(t *testing.T) {
 	store := NewInMemoryJobStore()
 	base := time.Now().UTC().Add(-time.Minute)
 	const totalJobs = 50
-	for i := 0; i < totalJobs; i++ {
+	for i := range totalJobs {
 		id := fmt.Sprintf("job-%03d", i)
 		if _, err := store.Create(Job{
 			ID:        id,
@@ -1190,7 +1190,7 @@ func TestInMemoryJobStoreConcurrentBasic(t *testing.T) {
 	errors := make(chan error, 100)
 
 	// Concurrent updates.
-	for w := 0; w < 4; w++ {
+	for w := range 4 {
 		go func(w int) {
 			for {
 				select {
@@ -1210,7 +1210,7 @@ func TestInMemoryJobStoreConcurrentBasic(t *testing.T) {
 	}
 
 	// Concurrent reads.
-	for w := 0; w < 4; w++ {
+	for range 4 {
 		go func() {
 			for {
 				select {

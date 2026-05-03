@@ -98,8 +98,8 @@ type job struct {
 	Domain     string    `json:"domain"`
 	Status     string    `json:"status"`
 	CreatedAt  time.Time `json:"created_at"`
-	StartedAt  time.Time `json:"started_at,omitempty"`
-	FinishedAt time.Time `json:"finished_at,omitempty"`
+	StartedAt  time.Time `json:"started_at"`
+	FinishedAt time.Time `json:"finished_at"`
 	Progress   int       `json:"progress"`
 	Error      string    `json:"error,omitempty"`
 }
@@ -715,7 +715,7 @@ func runJobsCreate(ctx context.Context, client *apiClient, opts globalOptions, a
 		fmt.Fprintln(errOut, err.Error())
 		return 2
 	}
-	if err := renderJobResults(ctx, client, opts, finalView, "", false, true, "", scoreOpts, []string{jobInfo.ID}, out, errOut); err != nil {
+	if err := renderJobResults(ctx, client, opts, finalView, "", false, true, "", scoreOpts, []string{jobInfo.ID}, out); err != nil {
 		fmt.Fprintln(errOut, err.Error())
 		return 2
 	}
@@ -823,7 +823,7 @@ func runJobsBatch(ctx context.Context, client *apiClient, opts globalOptions, ar
 		fmt.Fprintln(errOut, err.Error())
 		return 2
 	}
-	if err := renderJobResults(ctx, client, opts, finalView, "", !perJob, perJob, "", scoreOpts, jobIDs, out, errOut); err != nil {
+	if err := renderJobResults(ctx, client, opts, finalView, "", !perJob, perJob, "", scoreOpts, jobIDs, out); err != nil {
 		fmt.Fprintln(errOut, err.Error())
 		return 2
 	}
@@ -1387,14 +1387,14 @@ func runResults(ctx context.Context, client *apiClient, opts globalOptions, args
 		fmt.Fprintln(errOut, err.Error())
 		return 2
 	}
-	if err := renderJobResults(ctx, client, opts, view, levels, aggregate, perJob, splitDir, scoreOpts, ids, out, errOut); err != nil {
+	if err := renderJobResults(ctx, client, opts, view, levels, aggregate, perJob, splitDir, scoreOpts, ids, out); err != nil {
 		fmt.Fprintln(errOut, err.Error())
 		return 2
 	}
 	return 0
 }
 
-func renderJobResults(ctx context.Context, client *apiClient, opts globalOptions, view string, levels string, aggregate bool, perJob bool, splitDir string, scoreOpts scoringOptions, ids []string, out io.Writer, errOut io.Writer) error {
+func renderJobResults(ctx context.Context, client *apiClient, opts globalOptions, view string, levels string, aggregate bool, perJob bool, splitDir string, scoreOpts scoringOptions, ids []string, out io.Writer) error {
 	levelSet, err := parseLevels(levels)
 	if err != nil {
 		return err
@@ -1467,7 +1467,7 @@ func fetchJobResult(ctx context.Context, client *apiClient, jobID string) (jobRe
 			return jobResult{}, err
 		}
 		delay := 200 * time.Millisecond
-		for i := 0; i < 4; i++ {
+		for range 4 {
 			select {
 			case <-ctx.Done():
 				return jobResult{}, ctx.Err()
@@ -2031,8 +2031,8 @@ func parseLevels(value string) (map[string]bool, error) {
 		}, nil
 	}
 	levels := map[string]bool{}
-	parts := strings.Split(value, ",")
-	for _, part := range parts {
+	parts := strings.SplitSeq(value, ",")
+	for part := range parts {
 		level := strings.ToUpper(strings.TrimSpace(part))
 		if level == "" {
 			continue

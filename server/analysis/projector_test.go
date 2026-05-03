@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -234,17 +235,8 @@ func (s *fakeStore) ListRuns(filter serverpkg.RunFilter) serverpkg.RunList {
 	if limit <= 0 {
 		limit = 100
 	}
-	offset := filter.Offset
-	if offset < 0 {
-		offset = 0
-	}
-	if offset > total {
-		offset = total
-	}
-	end := offset + limit
-	if end > total {
-		end = total
-	}
+	offset := min(max(filter.Offset, 0), total)
+	end := min(offset+limit, total)
 	return serverpkg.RunList{
 		Items:  append([]serverpkg.Run(nil), items[offset:end]...),
 		Total:  total,
@@ -686,12 +678,7 @@ func projectionKey(cohortID int64, runID string) string {
 }
 
 func containsString(items []string, want string) bool {
-	for _, item := range items {
-		if item == want {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(items, want)
 }
 
 func TestMatchAnalysisEnabledCohorts(t *testing.T) {

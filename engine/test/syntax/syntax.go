@@ -643,15 +643,11 @@ func Syntax06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 		tasks := make([]parallel.Task[mailOutcome], len(mailServersToCheck))
 		for i, mailServer := range mailServersToCheck {
-			mailServer := mailServer
 			tasks[i] = func(ctx context.Context) (mailOutcome, error) {
 				return processMailServer(ctx, mailServer)
 			}
 		}
-		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
-		if parallelism < 1 {
-			parallelism = 1
-		}
+		parallelism := max(profile.FromContext(ctx).Resolver.Defaults.Parallel, 1)
 		mailResults := parallel.RunOrdered(ctx, tasks, parallel.Options{Limit: parallelism, CancelOnError: false})
 		for _, res := range mailResults {
 			results = append(results, res.Value.entries...)
@@ -745,7 +741,6 @@ func Syntax08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		if len(targets) > 0 {
 			tasks := make([]runner.Task, len(targets))
 			for i, target := range targets {
-				target := target
 				tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 					buf := testlogger.Wrap(log, moduleName, testcase)
 					return checkNameSyntaxWithLogger(buf, "MX", target)

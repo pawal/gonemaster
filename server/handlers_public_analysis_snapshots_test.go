@@ -270,7 +270,7 @@ func TestPublicAnalysisOverviewSlugInPath(t *testing.T) {
 // newIsolatedAnalysisTestServer is newAnalysisAPITestFixture without the
 // auto-seeded batch + snapshot. Used by tests that need a cohort with
 // zero snapshots so the no_snapshot branch is exercised.
-func newIsolatedAnalysisTestServer(t *testing.T) (interface{}, *SQLJobStore, *Server) {
+func newIsolatedAnalysisTestServer(t *testing.T) (any, *SQLJobStore, *Server) {
 	t.Helper()
 	f := newAnalysisAPITestFixture(t)
 	// Strip the fixture snapshot so the cohort looks empty on the read

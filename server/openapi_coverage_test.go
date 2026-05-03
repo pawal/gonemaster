@@ -22,7 +22,7 @@ func parseOpenAPIPaths(t *testing.T, data []byte) map[string][]string {
 	pathRe := regexp.MustCompile(`^  (/[^\s:]+):\s*$`)
 	methodRe := regexp.MustCompile(`^    (get|post|put|patch|delete|head|options):\s*$`)
 
-	for _, raw := range strings.Split(string(data), "\n") {
+	for raw := range strings.SplitSeq(string(data), "\n") {
 		line := strings.TrimRight(raw, "\r")
 		if line == "paths:" {
 			inPaths = true

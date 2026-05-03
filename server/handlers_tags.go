@@ -85,7 +85,7 @@ func (s *Server) handleTagByName(w http.ResponseWriter, r *http.Request) {
 		if !s.enforceCSRF(w, r) {
 			return
 		}
-		s.handleDeleteTag(w, r, name)
+		s.handleDeleteTag(w, name)
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
 	}
@@ -109,7 +109,7 @@ func (s *Server) handleUpdateTag(w http.ResponseWriter, r *http.Request, name st
 }
 
 // handleDeleteTag handles DELETE /api/v1/tags/{name}.
-func (s *Server) handleDeleteTag(w http.ResponseWriter, r *http.Request, name string) {
+func (s *Server) handleDeleteTag(w http.ResponseWriter, name string) {
 	if _, ok := s.store.GetTag(name); !ok {
 		writeError(w, http.StatusNotFound, "not_found", "tag not found", nil)
 		return

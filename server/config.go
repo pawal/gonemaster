@@ -49,10 +49,10 @@ type PublicAPIConfig struct {
 	RateLimitMax int `json:"rate_limit_max,omitempty"`
 	// RateLimitWindow is the sliding window duration for rate limiting.
 	// Default: 5m.
-	RateLimitWindow Duration `json:"rate_limit_window,omitempty"`
+	RateLimitWindow Duration `json:"rate_limit_window"`
 	// AnalysisRequestTimeout caps the wall time of a public analysis
 	// request. Zero disables. Default: 10s.
-	AnalysisRequestTimeout Duration `json:"analysis_request_timeout,omitempty"`
+	AnalysisRequestTimeout Duration `json:"analysis_request_timeout"`
 	// AllowPrivateUndelegatedIP allows undelegated NS IPs in loopback /
 	// link-local / private / CGNAT / multicast / broadcast ranges. Default
 	// false; set true on private/internal deployments that need it.
@@ -123,16 +123,16 @@ type Config struct {
 	TrustedProxyCIDRs []string `json:"trusted_proxy_cidrs,omitempty"`
 	// Connection-level timeouts on the http.Server. Defaults: 30s/60s/60s.
 	// WriteTimeout must exceed public_api.analysis_request_timeout.
-	ReadTimeout  Duration `json:"read_timeout,omitempty"`
-	WriteTimeout Duration `json:"write_timeout,omitempty"`
-	IdleTimeout  Duration `json:"idle_timeout,omitempty"`
+	ReadTimeout  Duration `json:"read_timeout"`
+	WriteTimeout Duration `json:"write_timeout"`
+	IdleTimeout  Duration `json:"idle_timeout"`
 	// PublicURL is the canonical base URL of the public UI (e.g. "https://example.com/").
 	// Used for og:url, hreflang, robots.txt, and sitemap.xml. When empty, the URL
 	// is auto-detected from the request's Host and X-Forwarded-Proto headers.
 	PublicURL string          `json:"public_url,omitempty"`
-	Database  DatabaseConfig  `json:"database,omitempty"`
-	PublicAPI PublicAPIConfig `json:"public_api,omitempty"`
-	Analysis  AnalysisConfig  `json:"analysis,omitempty"`
+	Database  DatabaseConfig  `json:"database"`
+	PublicAPI PublicAPIConfig `json:"public_api"`
+	Analysis  AnalysisConfig  `json:"analysis"`
 	// ScoringConfigPath is an optional path to a JSON file that overrides the
 	// default scoring configuration (weights, penalties, tag overrides, etc.).
 	// When empty, scoring.DefaultConfig() is used.
@@ -228,9 +228,9 @@ func DefaultConfig() Config {
 		ShowNameserverTimingsPublic: true,
 		CrossJobHotCache:            true,
 		CrossJobHotCacheTTLSeconds:  defaultCrossJobHotCacheTTLSeconds,
-		ReadTimeout:  Duration{30 * time.Second},
-		WriteTimeout: Duration{60 * time.Second},
-		IdleTimeout:  Duration{60 * time.Second},
+		ReadTimeout:                 Duration{30 * time.Second},
+		WriteTimeout:                Duration{60 * time.Second},
+		IdleTimeout:                 Duration{60 * time.Second},
 		PublicAPI: PublicAPIConfig{
 			RateLimitEnabled:       false,
 			RateLimitMax:           10,

@@ -334,22 +334,13 @@ func (s *Server) handleBatchByID(w http.ResponseWriter, r *http.Request) {
 
 	// Apply pagination to filtered list.
 	total := len(filtered)
-	offset := filter.Offset
-	if offset < 0 {
-		offset = 0
-	}
+	offset := max(filter.Offset, 0)
 	limit := filter.Limit
 	if limit <= 0 {
 		limit = 100
 	}
-	start := offset
-	if start > total {
-		start = total
-	}
-	end := start + limit
-	if end > total {
-		end = total
-	}
+	start := min(offset, total)
+	end := min(start+limit, total)
 	pageItems := filtered[start:end]
 
 	var nextCursor, prevCursor string
@@ -357,10 +348,7 @@ func (s *Server) handleBatchByID(w http.ResponseWriter, r *http.Request) {
 		nextCursor = strconv.Itoa(end)
 	}
 	if start > 0 {
-		prev := start - limit
-		if prev < 0 {
-			prev = 0
-		}
+		prev := max(start-limit, 0)
 		prevCursor = strconv.Itoa(prev)
 	}
 
@@ -563,22 +551,13 @@ func (s *Server) handleListJobs(w http.ResponseWriter, r *http.Request) {
 	sortJobSlice(allItems, filter.Sort)
 
 	total := len(allItems)
-	offset := filter.Offset
-	if offset < 0 {
-		offset = 0
-	}
+	offset := max(filter.Offset, 0)
 	limit := filter.Limit
 	if limit <= 0 {
 		limit = 100
 	}
-	start := offset
-	if start > total {
-		start = total
-	}
-	end := start + limit
-	if end > total {
-		end = total
-	}
+	start := min(offset, total)
+	end := min(start+limit, total)
 	pageItems := make([]Job, end-start)
 	copy(pageItems, allItems[start:end])
 
@@ -590,10 +569,7 @@ func (s *Server) handleListJobs(w http.ResponseWriter, r *http.Request) {
 		Sort:   string(normalizeJobSort(filter.Sort)),
 	}
 	if start > 0 {
-		prevOffset := start - limit
-		if prevOffset < 0 {
-			prevOffset = 0
-		}
+		prevOffset := max(start-limit, 0)
 		list.PrevCursor = strconv.Itoa(prevOffset)
 	}
 	if end < total {

@@ -53,10 +53,7 @@ func (rl *RateLimiter) Allow(ip string) (allowed bool, retryAfter int) {
 	if len(times) >= rl.max {
 		rl.entries[ip] = times
 		// Retry-After: seconds until the oldest hit slides out of the window.
-		ra := int(times[0].Add(rl.window).Sub(now).Seconds()) + 1
-		if ra < 1 {
-			ra = 1
-		}
+		ra := max(int(times[0].Add(rl.window).Sub(now).Seconds())+1, 1)
 		return false, ra
 	}
 

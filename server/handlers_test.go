@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -1589,13 +1590,7 @@ func TestLocalesEndpoint(t *testing.T) {
 		if len(body.Locales) == 0 {
 			t.Fatal("expected at least one locale in response")
 		}
-		found := false
-		for _, l := range body.Locales {
-			if l == "en" {
-				found = true
-				break
-			}
-		}
+		found := slices.Contains(body.Locales, "en")
 		if !found {
 			t.Fatalf("expected \"en\" in locales, got %v", body.Locales)
 		}

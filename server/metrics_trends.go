@@ -92,10 +92,7 @@ func newTrendRing(resolution time.Duration, window time.Duration) trendRing {
 	if window%resolution != 0 {
 		window = ((window / resolution) + 1) * resolution
 	}
-	size := int(window / resolution)
-	if size < 1 {
-		size = 1
-	}
+	size := max(int(window/resolution), 1)
 	return trendRing{
 		Resolution: resolution,
 		Slots:      make([]trendBucket, size),
@@ -281,10 +278,7 @@ func (r *trendRing) Snapshot(now time.Time, window time.Duration) MetricsTrendWi
 	if window%r.Resolution != 0 {
 		window = (window / r.Resolution) * r.Resolution
 	}
-	pointCount := int(window / r.Resolution)
-	if pointCount < 1 {
-		pointCount = 1
-	}
+	pointCount := max(int(window/r.Resolution), 1)
 
 	now = now.UTC()
 	end := now.Truncate(r.Resolution)
@@ -293,7 +287,7 @@ func (r *trendRing) Snapshot(now time.Time, window time.Duration) MetricsTrendWi
 	points := make([]MetricsTrendPoint, 0, pointCount)
 	lastQueueDepth := int64(0)
 	hasQueueDepth := false
-	for idx := 0; idx < pointCount; idx++ {
+	for idx := range pointCount {
 		timestamp := start.Add(time.Duration(idx) * r.Resolution)
 		point := MetricsTrendPoint{
 			Timestamp: timestamp,

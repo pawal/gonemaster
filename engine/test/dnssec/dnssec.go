@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -684,7 +685,6 @@ func DNSSEC01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes := make([]parentOutcome, len(nsByIP))
 		tasks := make([]runner.Task, len(nsByIP))
 		for i, matchingNS := range nsByIP {
-			i, matchingNS := i, matchingNS
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				if len(matchingNS) == 0 {
 					return nil
@@ -921,7 +921,6 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes := make([]parentOutcome, len(nsByIP))
 		tasks := make([]runner.Task, len(nsByIP))
 		for i, matchingNS := range nsByIP {
-			i, matchingNS := i, matchingNS
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				if len(matchingNS) == 0 {
 					return nil
@@ -1028,7 +1027,6 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes := make([]childOutcome, len(ordered))
 		tasks := make([]runner.Task, len(ordered))
 		for i, ns := range ordered {
-			i, ns := i, ns
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := childOutcome{
@@ -1394,7 +1392,6 @@ func DNSSEC03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	outcomes := make([]nsOutcome, len(ordered))
 	tasks := make([]runner.Task, len(ordered))
 	for i, ns := range ordered {
-		i, ns := i, ns
 		tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 			buf := testlogger.Wrap(log, moduleName, testcase)
 			outcome := nsOutcome{ns: ns.String()}
@@ -1600,7 +1597,7 @@ func DNSSEC03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			nsNames := nsec3Flags[flag]
 
 			var bitPositions []int
-			for bit := 0; bit < 8; bit++ {
+			for bit := range 8 {
 				if flag&(1<<(7-uint(bit))) != 0 {
 					bitPositions = append(bitPositions, bit)
 				}
@@ -1618,13 +1615,7 @@ func DNSSEC03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				}
 			}
 
-			optOut := false
-			for _, bit := range bitPositions {
-				if bit == 7 {
-					optOut = true
-					break
-				}
-			}
+			optOut := slices.Contains(bitPositions, 7)
 			if optOut {
 				tag := "DS03_NSEC3_OPT_OUT_ENABLED_NON_TLD"
 				if isTLD {
@@ -1934,7 +1925,6 @@ func DNSSEC05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes := make([]nsOutcome, len(groups))
 		tasks := make([]runner.Task, len(groups))
 		for i, group := range groups {
-			i, group := i, group
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				if len(group) == 0 {
 					return nil
@@ -2177,7 +2167,6 @@ func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes := make([]childOutcome, len(childGroups))
 		tasks := make([]runner.Task, len(childGroups))
 		for i, group := range childGroups {
-			i, group := i, group
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				if len(group) == 0 {
 					return nil
@@ -2306,7 +2295,6 @@ func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes := make([]parentOutcome, len(parentGroups))
 		tasks := make([]runner.Task, len(parentGroups))
 		for i, group := range parentGroups {
-			i, group := i, group
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				if len(group) == 0 {
 					return nil
@@ -2556,7 +2544,6 @@ func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes := make([]nsOutcome, len(ordered))
 		tasks := make([]runner.Task, len(ordered))
 		for i, ns := range ordered {
-			i, ns := i, ns
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := nsOutcome{
@@ -2856,7 +2843,6 @@ func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes := make([]nsOutcome, len(ordered))
 		tasks := make([]runner.Task, len(ordered))
 		for i, ns := range ordered {
-			i, ns := i, ns
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := nsOutcome{
@@ -3219,7 +3205,6 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes := make([]nsOutcome, len(groups))
 		tasks := make([]runner.Task, len(groups))
 		for i, group := range groups {
-			i, group := i, group
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				if len(group) == 0 {
 					return nil
@@ -4237,7 +4222,6 @@ func DNSSEC11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes := make([]parentOutcome, len(ordered))
 		tasks := make([]runner.Task, len(ordered))
 		for i, ns := range ordered {
-			i, ns := i, ns
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := parentOutcome{nsIP: ns.Address.String()}
@@ -4369,7 +4353,6 @@ func DNSSEC11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			outcomes := make([]childOutcome, len(ordered))
 			tasks := make([]runner.Task, len(ordered))
 			for i, ns := range ordered {
-				i, ns := i, ns
 				tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 					buf := testlogger.Wrap(log, moduleName, testcase)
 					outcome := childOutcome{nsIP: ns.Address.String()}
@@ -4526,7 +4509,6 @@ func DNSSEC13(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes := make([]nsOutcome, len(ordered))
 		tasks := make([]runner.Task, len(ordered))
 		for i, ns := range ordered {
-			i, ns := i, ns
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := nsOutcome{
@@ -4707,7 +4689,6 @@ func DNSSEC14(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes := make([]nsOutcome, len(ordered))
 		tasks := make([]runner.Task, len(ordered))
 		for i, ns := range ordered {
-			i, ns := i, ns
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := nsOutcome{}
@@ -4892,7 +4873,6 @@ func DNSSEC15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes := make([]nsOutcome, len(ordered))
 		tasks := make([]runner.Task, len(ordered))
 		for i, ns := range ordered {
-			i, ns := i, ns
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := nsOutcome{nsIP: ns.Address.String()}
@@ -5146,7 +5126,6 @@ func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes := make([]nsOutcome, len(ordered))
 		tasks := make([]runner.Task, len(ordered))
 		for i, ns := range ordered {
-			i, ns := i, ns
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := nsOutcome{nsIP: ns.Address.String()}
@@ -5667,7 +5646,6 @@ func DNSSEC17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes := make([]nsOutcome, len(ordered))
 		tasks := make([]runner.Task, len(ordered))
 		for i, ns := range ordered {
-			i, ns := i, ns
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := nsOutcome{nsIP: ns.Address.String()}
@@ -6151,7 +6129,6 @@ func DNSSEC18(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes := make([]nsOutcome, len(ordered))
 		tasks := make([]runner.Task, len(ordered))
 		for i, ns := range ordered {
-			i, ns := i, ns
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := nsOutcome{}
@@ -6266,7 +6243,6 @@ func DNSSEC18(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			outcomes := make([]nsOutcome, len(ordered))
 			tasks := make([]runner.Task, len(ordered))
 			for i, ns := range ordered {
-				i, ns := i, ns
 				tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 					buf := testlogger.Wrap(log, moduleName, testcase)
 					outcome := nsOutcome{nsIP: ns.Address.String()}
@@ -6738,7 +6714,6 @@ func DNSSEC19(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes := make([]nsOutcome, len(nsByIP))
 		tasks := make([]runner.Task, len(nsByIP))
 		for i, matchingNS := range nsByIP {
-			i, matchingNS := i, matchingNS
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				outcome := nsOutcome{
 					findings: map[dnssec19FindingKey][]logargs.Server{},
@@ -7695,7 +7670,7 @@ func sortedKeytags16(set map[uint16]bool) []uint16 {
 	for t := range set {
 		tags = append(tags, t)
 	}
-	sort.Slice(tags, func(i, j int) bool { return tags[i] < tags[j] })
+	slices.Sort(tags)
 	return tags
 }
 
@@ -7707,7 +7682,7 @@ func setDiff16(a, b map[uint16]bool) []uint16 {
 			diff = append(diff, k)
 		}
 	}
-	sort.Slice(diff, func(i, j int) bool { return diff[i] < diff[j] })
+	slices.Sort(diff)
 	return diff
 }
 
@@ -7891,7 +7866,6 @@ func DNSSEC20(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes := make([]nsOutcome, len(groups))
 		tasks := make([]runner.Task, len(groups))
 		for i, group := range groups {
-			i, group := i, group
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				if len(group) == 0 {
 					return nil

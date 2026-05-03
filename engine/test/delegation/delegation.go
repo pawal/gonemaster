@@ -494,7 +494,6 @@ func Delegation04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes := make([]bool, len(ordered))
 		tasks := make([]runner.Task, len(ordered))
 		for i, task := range ordered {
-			i, task := i, task
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				if task.action == actionSkip {
 					return nil
@@ -506,7 +505,6 @@ func Delegation04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				}
 				authoritative := false
 				for _, useVC := range []bool{false, true} {
-					useVC := useVC
 					resp, err := task.ns.QueryWithOptions(ctx, z.Name.String(), queryType, &nameserver.QueryOptions{UseVC: &useVC})
 					if err != nil || resp.Msg == nil {
 						continue
@@ -591,7 +589,6 @@ func Delegation05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			if len(keys) > 0 {
 				tasks := make([]runner.Task, len(keys))
 				for i, key := range keys {
-					i, key := i, key
 					ns := allNS[key]
 					tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 						buf := testlogger.Wrap(log, moduleName, testcase)
@@ -711,7 +708,6 @@ func Delegation06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	if len(ordered) > 0 {
 		tasks := make([]runner.Task, len(ordered))
 		for i, task := range ordered {
-			task := task
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				if task.action == actionSkip {
 					return nil
@@ -941,10 +937,7 @@ func maxLengthNameFor(top dnsname.Name) string {
 		name = ""
 	}
 	for len(name) < constants.FQDNMaxLength-1 {
-		remaining := constants.FQDNMaxLength - len(name) - 1
-		if remaining > constants.LabelMaxLength {
-			remaining = constants.LabelMaxLength
-		}
+		remaining := min(constants.FQDNMaxLength-len(name)-1, constants.LabelMaxLength)
 		label := strings.Repeat("A", remaining)
 		if name == "" {
 			name = label + "."

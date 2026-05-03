@@ -2,6 +2,7 @@ package nameserver
 
 import (
 	"fmt"
+	"maps"
 	"net/netip"
 	"sort"
 	"strings"
@@ -33,9 +34,7 @@ func (c *CacheStore) ExportEntries() ([]Entry, error) {
 
 	c.mu.Lock()
 	cacheByAddress := make(map[string]*queryCache, len(c.cacheByAddress))
-	for address, cache := range c.cacheByAddress {
-		cacheByAddress[address] = cache
-	}
+	maps.Copy(cacheByAddress, c.cacheByAddress)
 	c.mu.Unlock()
 
 	addresses := make([]string, 0, len(cacheByAddress))

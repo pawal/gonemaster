@@ -15,11 +15,11 @@ const (
 	analysisASNCols        = `asn, label, first_seen_at, last_seen_at`
 	analysisRunNSEndCols   = `cohort_id, run_id, domain_id, nameserver_id, address_id,
 		role, source, family, avg_ms, min_ms, max_ms, query_count`
-	analysisRunAddrASNCols   = `cohort_id, run_id, domain_id, address_id, prefix_id, asn, lookup_status, source`
-	analysisRunDomainASNCols = `cohort_id, run_id, domain_id, asn, family, source`
-	analysisRunTagCols       = `cohort_id, run_id, domain_id, tag, module, testcase, level, occurrence_count`
+	analysisRunAddrASNCols    = `cohort_id, run_id, domain_id, address_id, prefix_id, asn, lookup_status, source`
+	analysisRunDomainASNCols  = `cohort_id, run_id, domain_id, asn, family, source`
+	analysisRunTagCols        = `cohort_id, run_id, domain_id, tag, module, testcase, level, occurrence_count`
 	analysisRunDomainFactCols = `cohort_id, run_id, domain_id, category, fact_key, value_num`
-	analysisRunSummaryCols = `cohort_id, run_id, domain_id, score, grade, nameserver_count,
+	analysisRunSummaryCols    = `cohort_id, run_id, domain_id, score, grade, nameserver_count,
 		endpoint_count, asn_count, prefix_count, worst_level`
 	analysisProjStateCols = `cohort_id, run_id, projector_version, status, projected_at, error`
 )
@@ -619,7 +619,7 @@ func (s *SQLJobStore) replaceAnalysisRowsIn(
 	args := make([]any, 0, len(rows)*cols)
 	for i, row := range rows {
 		placeholders := make([]string, cols)
-		for j := 0; j < cols; j++ {
+		for j := range cols {
 			placeholders[j] = s.ph(i*cols + j + 1)
 		}
 		groups[i] = "(" + strings.Join(placeholders, ", ") + ")"

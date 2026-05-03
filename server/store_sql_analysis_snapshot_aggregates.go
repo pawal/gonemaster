@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 // Trend payload keys for the non-fact-category aggregate slots. The fact
@@ -218,9 +219,9 @@ const analysisSnapshotOverviewViewCols = `snapshot_id, domain_count, nameserver_
 
 func scanSnapshotOverviewView(row rowScanner) (int64, SnapshotOverviewV2, error) {
 	var (
-		snapshotID                                          int64
+		snapshotID                                           int64
 		domainCount, nsCount, epCount, asnCount, prefixCount int
-		topTagsJSON, topNSJSON, topASNsJSON, factJSON       string
+		topTagsJSON, topNSJSON, topASNsJSON, factJSON        string
 	)
 	if err := row.Scan(
 		&snapshotID, &domainCount, &nsCount, &epCount, &asnCount, &prefixCount,
@@ -349,11 +350,12 @@ func joinPlaceholders(items []string) string {
 	case 1:
 		return items[0]
 	}
-	out := items[0]
+	var out strings.Builder
+	out.WriteString(items[0])
 	for _, p := range items[1:] {
-		out += ", " + p
+		out.WriteString(", " + p)
 	}
-	return out
+	return out.String()
 }
 
 // queryBatchTotals returns the cohort-wide counts (distinct domains,

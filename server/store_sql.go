@@ -388,10 +388,7 @@ func (s *SQLJobStore) List(filter JobFilter) JobList {
 	if limit <= 0 {
 		limit = 100
 	}
-	offset := filter.Offset
-	if offset < 0 {
-		offset = 0
-	}
+	offset := max(filter.Offset, 0)
 
 	var total int
 	if err := s.db.QueryRow("SELECT COUNT(*) FROM jobs"+where, args...).Scan(&total); err != nil {
@@ -434,10 +431,7 @@ func (s *SQLJobStore) List(filter JobFilter) JobList {
 		Sort:   string(normalizedSort),
 	}
 	if offset > 0 {
-		prevOffset := offset - limit
-		if prevOffset < 0 {
-			prevOffset = 0
-		}
+		prevOffset := max(offset-limit, 0)
 		list.PrevCursor = fmt.Sprintf("%d", prevOffset)
 	}
 	if offset+len(items) < total {
@@ -605,10 +599,7 @@ const insertEntriesBatchSize = 200
 // insertEntriesTx inserts engine log entries into the entries table in batches.
 func (s *SQLJobStore) insertEntriesTx(tx *sql.Tx, runID string, domainID int64, entries []engine.LogEntry) error {
 	for start := 0; start < len(entries); start += insertEntriesBatchSize {
-		end := start + insertEntriesBatchSize
-		if end > len(entries) {
-			end = len(entries)
-		}
+		end := min(start+insertEntriesBatchSize, len(entries))
 		batch := entries[start:end]
 		placeholders := make([]string, len(batch))
 		args := make([]any, 0, len(batch)*8)
@@ -884,10 +875,7 @@ func (s *SQLJobStore) ListDomains(filter DomainFilter) DomainList {
 	if limit <= 0 {
 		limit = 100
 	}
-	offset := filter.Offset
-	if offset < 0 {
-		offset = 0
-	}
+	offset := max(filter.Offset, 0)
 
 	var total int
 	if err := s.db.QueryRow("SELECT COUNT(*) FROM domains"+where, args...).Scan(&total); err != nil {
@@ -1493,10 +1481,7 @@ func (s *SQLJobStore) ListRuns(filter RunFilter) RunList {
 	if limit <= 0 {
 		limit = 100
 	}
-	offset := filter.Offset
-	if offset < 0 {
-		offset = 0
-	}
+	offset := max(filter.Offset, 0)
 
 	var total int
 	if err := s.db.QueryRow("SELECT COUNT(*) FROM runs"+where, args...).Scan(&total); err != nil {
@@ -1537,10 +1522,7 @@ func (s *SQLJobStore) ListRuns(filter RunFilter) RunList {
 		Offset: offset,
 	}
 	if offset > 0 {
-		prev := offset - limit
-		if prev < 0 {
-			prev = 0
-		}
+		prev := max(offset-limit, 0)
 		list.PrevCursor = fmt.Sprintf("%d", prev)
 	}
 	if offset+len(items) < total {
@@ -1607,10 +1589,7 @@ func (s *SQLJobStore) QueryEntries(filter EntryFilter) EntryList {
 	if limit <= 0 {
 		limit = 100
 	}
-	offset := filter.Offset
-	if offset < 0 {
-		offset = 0
-	}
+	offset := max(filter.Offset, 0)
 
 	var total int
 	if err := s.db.QueryRow("SELECT COUNT(*) "+base+where, args...).Scan(&total); err != nil {
@@ -1672,10 +1651,7 @@ func (s *SQLJobStore) QueryEntries(filter EntryFilter) EntryList {
 		Offset: offset,
 	}
 	if offset > 0 {
-		prev := offset - limit
-		if prev < 0 {
-			prev = 0
-		}
+		prev := max(offset-limit, 0)
 		list.PrevCursor = fmt.Sprintf("%d", prev)
 	}
 	if offset+len(items) < total {

@@ -1,19 +1,14 @@
 package i18n
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
 
 func TestAvailableLocalesIncludesJapanese(t *testing.T) {
 	locales := AvailableLocales()
-	found := false
-	for _, locale := range locales {
-		if locale == "ja" {
-			found = true
-			break
-		}
-	}
+	found := slices.Contains(locales, "ja")
 	if !found {
 		t.Fatalf("expected ja in available locales, got %v", locales)
 	}
@@ -206,10 +201,10 @@ msgstr "Testfall {testcase} avslutat."
 // the engine never emits.
 func TestDS01AlgoDeprecatedAllLocalesExpandArgs(t *testing.T) {
 	args := map[string]any{
-		"keytag":       12345,
-		"ds_algo_num":  1,
+		"keytag":        12345,
+		"ds_algo_num":   1,
 		"ds_algo_descr": "SHA-1",
-		"servers":      "ns1.example.com/192.0.2.1",
+		"servers":       "ns1.example.com/192.0.2.1",
 	}
 	staleKeys := []string{"{domain}", "{ds_algo_mnemo}", "{addresses}"}
 	for _, locale := range AvailableLocales() {

@@ -65,7 +65,7 @@ func parseMetricsQueryOptions(values url.Values) (metricsQueryOptions, string, s
 
 	if raw := strings.TrimSpace(values.Get("include")); raw != "" {
 		options.includeAll = false
-		for _, part := range strings.Split(raw, ",") {
+		for part := range strings.SplitSeq(raw, ",") {
 			section := strings.ToLower(strings.TrimSpace(part))
 			if section == "" {
 				continue

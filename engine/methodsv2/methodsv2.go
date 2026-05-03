@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/netip"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -716,13 +717,7 @@ func getIBAddrInZone(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver
 		return nil, nil
 	}
 
-	hasInBailiwick := false
-	for _, name := range nsNames {
-		if z.Name.IsInBailiwick(name) {
-			hasInBailiwick = true
-			break
-		}
-	}
+	hasInBailiwick := slices.ContainsFunc(nsNames, z.Name.IsInBailiwick)
 	if !hasInBailiwick {
 		return []nameserver.Nameserver{}, nil
 	}

@@ -13,8 +13,8 @@ import (
 	"io"
 	"log"
 	"net/http"
-	_ "net/http/pprof"
 	"net/http/httptest"
+	_ "net/http/pprof"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -32,33 +32,33 @@ import (
 )
 
 type soakReport struct {
-	GeneratedAtUTC             string                 `json:"generated_at_utc"`
-	Hostname                   string                 `json:"hostname"`
-	GoVersion                  string                 `json:"go_version"`
-	PID                        int                    `json:"pid"`
-	Backend                    string                 `json:"backend"`
-	SQLiteDSN                  string                 `json:"sqlite_dsn,omitempty"`
-	SQLiteBytes                int64                  `json:"sqlite_bytes,omitempty"`
-	Workers                    int                    `json:"workers"`
-	MaxConcurrentJobs          int                    `json:"max_concurrent_jobs"`
-	ProfilePath                string                 `json:"profile_path,omitempty"`
-	MinLevel                   string                 `json:"min_level"`
-	DomainsFile                string                 `json:"domains_file"`
-	DomainsCount               int                    `json:"domains_count"`
-	DomainsSHA256              string                 `json:"domains_sha256"`
-	Rounds                     int                    `json:"rounds"`
-	WarmupRounds               int                    `json:"warmup_rounds"`
-	SampleSeconds              int                    `json:"sample_seconds"`
-	PollSeconds                int                    `json:"poll_seconds"`
-	BatchTimeoutSeconds        int                    `json:"batch_timeout_seconds"`
-	Methodsv2CacheClearedStart bool                   `json:"methodsv2_cache_cleared_start"`
-	Methodsv2CacheEntriesStart int                    `json:"methodsv2_cache_entries_start"`
-	Methodsv2CacheEntriesEnd   int                    `json:"methodsv2_cache_entries_end"`
-	PeakRSSKB                  int64                  `json:"peak_rss_kb"`
-	Samples                    []rssSample            `json:"samples"`
-	Checkpoints                []gcCheckpoint         `json:"checkpoints"`
-	Batches                    []batchRun            `json:"batches"`
-	Metadata                   map[string]interface{} `json:"metadata,omitempty"`
+	GeneratedAtUTC             string         `json:"generated_at_utc"`
+	Hostname                   string         `json:"hostname"`
+	GoVersion                  string         `json:"go_version"`
+	PID                        int            `json:"pid"`
+	Backend                    string         `json:"backend"`
+	SQLiteDSN                  string         `json:"sqlite_dsn,omitempty"`
+	SQLiteBytes                int64          `json:"sqlite_bytes,omitempty"`
+	Workers                    int            `json:"workers"`
+	MaxConcurrentJobs          int            `json:"max_concurrent_jobs"`
+	ProfilePath                string         `json:"profile_path,omitempty"`
+	MinLevel                   string         `json:"min_level"`
+	DomainsFile                string         `json:"domains_file"`
+	DomainsCount               int            `json:"domains_count"`
+	DomainsSHA256              string         `json:"domains_sha256"`
+	Rounds                     int            `json:"rounds"`
+	WarmupRounds               int            `json:"warmup_rounds"`
+	SampleSeconds              int            `json:"sample_seconds"`
+	PollSeconds                int            `json:"poll_seconds"`
+	BatchTimeoutSeconds        int            `json:"batch_timeout_seconds"`
+	Methodsv2CacheClearedStart bool           `json:"methodsv2_cache_cleared_start"`
+	Methodsv2CacheEntriesStart int            `json:"methodsv2_cache_entries_start"`
+	Methodsv2CacheEntriesEnd   int            `json:"methodsv2_cache_entries_end"`
+	PeakRSSKB                  int64          `json:"peak_rss_kb"`
+	Samples                    []rssSample    `json:"samples"`
+	Checkpoints                []gcCheckpoint `json:"checkpoints"`
+	Batches                    []batchRun     `json:"batches"`
+	Metadata                   map[string]any `json:"metadata,omitempty"`
 }
 
 type rssSample struct {
@@ -69,22 +69,22 @@ type rssSample struct {
 }
 
 type gcCheckpoint struct {
-	Label                  string  `json:"label"`
-	Round                  int     `json:"round"`
-	TimestampUTC           string  `json:"timestamp_utc"`
-	ElapsedSeconds         float64 `json:"elapsed_seconds"`
-	RSSKB                  int64   `json:"rss_kb"`
-	HeapAllocBytes         uint64  `json:"heap_alloc_bytes"`
-	HeapInuseBytes         uint64  `json:"heap_inuse_bytes"`
-	HeapIdleBytes          uint64  `json:"heap_idle_bytes"`
-	HeapReleasedBytes      uint64  `json:"heap_released_bytes"`
-	HeapObjects            uint64  `json:"heap_objects"`
-	StackInuseBytes        uint64  `json:"stack_inuse_bytes"`
-	SysBytes               uint64  `json:"sys_bytes"`
-	NextGCBytes            uint64  `json:"next_gc_bytes"`
-	NumGC                  uint32  `json:"num_gc"`
-	NumGoroutine           int     `json:"num_goroutine"`
-	Methodsv2CacheEntries  int     `json:"methodsv2_cache_entries"`
+	Label                 string  `json:"label"`
+	Round                 int     `json:"round"`
+	TimestampUTC          string  `json:"timestamp_utc"`
+	ElapsedSeconds        float64 `json:"elapsed_seconds"`
+	RSSKB                 int64   `json:"rss_kb"`
+	HeapAllocBytes        uint64  `json:"heap_alloc_bytes"`
+	HeapInuseBytes        uint64  `json:"heap_inuse_bytes"`
+	HeapIdleBytes         uint64  `json:"heap_idle_bytes"`
+	HeapReleasedBytes     uint64  `json:"heap_released_bytes"`
+	HeapObjects           uint64  `json:"heap_objects"`
+	StackInuseBytes       uint64  `json:"stack_inuse_bytes"`
+	SysBytes              uint64  `json:"sys_bytes"`
+	NextGCBytes           uint64  `json:"next_gc_bytes"`
+	NumGC                 uint32  `json:"num_gc"`
+	NumGoroutine          int     `json:"num_goroutine"`
+	Methodsv2CacheEntries int     `json:"methodsv2_cache_entries"`
 }
 
 type batchRun struct {
@@ -174,7 +174,7 @@ func run(args []string) int {
 		sqliteDSN = filepath.Join(sqliteDir, "jobs.db")
 	}
 
-	report, err := runSoak(domainsPath, domains, domainsSHA, outPath, backend, sqliteDSN, workers, maxConcurrentJobs, rounds, warmupRounds, sampleSeconds, pollSeconds, batchTimeoutSeconds, profilePath, minLevel)
+	report, err := runSoak(domainsPath, domains, domainsSHA, backend, sqliteDSN, workers, maxConcurrentJobs, rounds, warmupRounds, sampleSeconds, pollSeconds, batchTimeoutSeconds, profilePath, minLevel)
 	if sqliteDir != "" {
 		defer os.RemoveAll(sqliteDir)
 	}
@@ -208,7 +208,7 @@ func run(args []string) int {
 	return 0
 }
 
-func runSoak(domainsPath string, domains []string, domainsSHA string, outPath string, backend string, sqliteDSN string, workers int, maxConcurrentJobs int, rounds int, warmupRounds int, sampleSeconds int, pollSeconds int, batchTimeoutSeconds int, profilePath string, minLevel string) (soakReport, error) {
+func runSoak(domainsPath string, domains []string, domainsSHA string, backend string, sqliteDSN string, workers int, maxConcurrentJobs int, rounds int, warmupRounds int, sampleSeconds int, pollSeconds int, batchTimeoutSeconds int, profilePath string, minLevel string) (soakReport, error) {
 	report := soakReport{
 		GeneratedAtUTC:      time.Now().UTC().Format(time.RFC3339Nano),
 		GoVersion:           runtime.Version(),
@@ -227,7 +227,7 @@ func runSoak(domainsPath string, domains []string, domainsSHA string, outPath st
 		SampleSeconds:       sampleSeconds,
 		PollSeconds:         pollSeconds,
 		BatchTimeoutSeconds: batchTimeoutSeconds,
-		Metadata: map[string]interface{}{
+		Metadata: map[string]any{
 			"engine_version": engine.VersionFull(),
 		},
 	}
@@ -306,9 +306,7 @@ func runSoak(domainsPath string, domains []string, domainsSHA string, outPath st
 	recordSample()
 
 	var samplerWG sync.WaitGroup
-	samplerWG.Add(1)
-	go func() {
-		defer samplerWG.Done()
+	samplerWG.Go(func() {
 		ticker := time.NewTicker(time.Duration(sampleSeconds) * time.Second)
 		defer ticker.Stop()
 		for {
@@ -319,7 +317,7 @@ func runSoak(domainsPath string, domains []string, domainsSHA string, outPath st
 				recordSample()
 			}
 		}
-	}()
+	})
 
 	client := &http.Client{Timeout: 30 * time.Second}
 	for round := 1; round <= rounds; round++ {

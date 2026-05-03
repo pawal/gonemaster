@@ -215,7 +215,6 @@ func TestBKHASH120KnownVectors(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			hash := BKHASH120(big.NewInt(tc.val))
 			got := hex.EncodeToString(hash[:])

@@ -853,7 +853,7 @@ func TestSQLJobStoreUpdateDomainLatestIncrements(t *testing.T) {
 			s := testStoreForBackend(t, b)
 			d, _ := s.GetOrCreateDomain("counter.example")
 
-			for i := 0; i < 3; i++ {
+			for i := range 3 {
 				if err := s.UpdateDomainLatest(d.ID, fmt.Sprintf("run-%d", i), time.Now().UTC(), "succeeded", ""); err != nil {
 					t.Fatalf("UpdateDomainLatest %d: %v", i, err)
 				}
@@ -1425,7 +1425,7 @@ func TestSQLJobStoreListPagination(t *testing.T) {
 			s := testStoreForBackend(t, b)
 			base := time.Now().UTC().Truncate(time.Millisecond)
 
-			for i := 0; i < 5; i++ {
+			for i := range 5 {
 				id := string(rune('1' + i)) // "1".."5"
 				_, err := s.Create(Job{
 					ID: "p" + id, Domain: "p" + id + ".test", Status: JobQueued,

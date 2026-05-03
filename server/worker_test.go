@@ -366,7 +366,7 @@ func TestRunEngineForJobParallel(t *testing.T) {
 		errs <- err
 	}()
 
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		select {
 		case <-started:
 		case <-time.After(250 * time.Millisecond):
@@ -375,7 +375,7 @@ func TestRunEngineForJobParallel(t *testing.T) {
 	}
 
 	close(release)
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		if err := <-errs; err != nil {
 			t.Fatalf("run %d: %v", i, err)
 		}
@@ -420,7 +420,7 @@ func TestRunEngineForJobLimiter(t *testing.T) {
 	}
 
 	close(release)
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		if err := <-errs; err != nil {
 			t.Fatalf("run %d: %v", i, err)
 		}

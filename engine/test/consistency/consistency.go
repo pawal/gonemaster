@@ -213,7 +213,6 @@ func Consistency01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes := make([]serialOutcome, len(ordered))
 		tasks := make([]runner.Task, len(ordered))
 		for i, ns := range ordered {
-			i, ns := i, ns
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := serialOutcome{key: ns.String()}
@@ -366,7 +365,6 @@ func Consistency02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes := make([]rnameOutcome, len(ordered))
 		tasks := make([]runner.Task, len(ordered))
 		for i, ns := range ordered {
-			i, ns := i, ns
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := rnameOutcome{key: ns.String()}
@@ -502,7 +500,6 @@ func Consistency03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes := make([]timeOutcome, len(ordered))
 		tasks := make([]runner.Task, len(ordered))
 		for i, ns := range ordered {
-			i, ns := i, ns
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := timeOutcome{key: ns.String()}
@@ -653,7 +650,6 @@ func Consistency04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes := make([]nsSetOutcome, len(ordered))
 		tasks := make([]runner.Task, len(ordered))
 		for i, ns := range ordered {
-			i, ns := i, ns
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := nsSetOutcome{key: ns.String()}
@@ -1046,7 +1042,6 @@ func Consistency06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		outcomes := make([]mnameOutcome, len(ordered))
 		tasks := make([]runner.Task, len(ordered))
 		for i, ns := range ordered {
-			i, ns := i, ns
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := mnameOutcome{key: ns.String()}

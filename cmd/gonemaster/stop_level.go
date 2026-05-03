@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 	"sync"
@@ -136,8 +137,6 @@ func cloneArgs(args map[string]any) map[string]any {
 		return nil
 	}
 	out := make(map[string]any, len(args))
-	for key, value := range args {
-		out[key] = value
-	}
+	maps.Copy(out, args)
 	return out
 }

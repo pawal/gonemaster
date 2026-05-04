@@ -17,6 +17,7 @@
     snapshotDisplayLabel,
     snapshotSourceDate
   } from "$lib/format";
+  import { idnTooltip } from "$lib/idn";
   import type { LayoutData } from "./+layout";
   import type { OverviewPageData } from "./+page";
 
@@ -238,7 +239,7 @@
               {#each topNameserverRows as row (row.name)}
                 <li>
                   <a class="infra-row" href={nameserverHref(base, row.name, query)}>
-                    <span class="infra-name">{row.name}</span>
+                    <span class="infra-name" title={idnTooltip(row.name)}>{row.name}</span>
                     <span class="infra-bar-track" aria-hidden="true">
                       <span class="infra-bar" style:width="{row.widthPct}%"></span>
                     </span>

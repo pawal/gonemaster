@@ -2,6 +2,7 @@
   import { base } from "$app/paths";
   import { page } from "$app/state";
   import { domainHref } from "$lib/entityLinks";
+  import { idnTooltip } from "$lib/idn";
   import EntityChip from "./EntityChip.svelte";
 
   type Props = { domain: string; preserveQuery?: boolean };
@@ -10,6 +11,6 @@
   const href = $derived(domainHref(base, domain, preserveQuery ? page.url.search : ""));
 </script>
 
-<EntityChip {href} variant="domain" title={domain}>
+<EntityChip {href} variant="domain" title={idnTooltip(domain)}>
   {domain}
 </EntityChip>

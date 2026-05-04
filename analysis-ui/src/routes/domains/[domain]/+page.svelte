@@ -7,12 +7,18 @@
   import PrefixChip from "$lib/chips/PrefixChip.svelte";
   import { tagHref } from "$lib/entityLinks";
   import { formatCount, formatTimestamp, gradeTone, levelTone } from "$lib/format";
+  import { idnToUnicode } from "$lib/idn";
   import type { DomainDetailEntry, DomainDetailTag } from "$lib/api";
   import type { DomainDetailPageData } from "./+page";
 
   let { data }: { data: DomainDetailPageData } = $props();
 
   const query = $derived(page.url.search);
+
+  function unicodeName(name: string): string | null {
+    const decoded = idnToUnicode(name);
+    return decoded !== name ? decoded : null;
+  }
 
   // Unified row covering both detail sources: per-entry rows (run still
   // present) carry message+raw; tag-floor rows (run purged) don't.
@@ -97,17 +103,17 @@
 
 {#if !data.datasetTag}
   <section class="card">
-    <h2>{data.domain}</h2>
+    <h2>{data.domain}{#if unicodeName(data.domain)} <span class="idn-unicode">({unicodeName(data.domain)})</span>{/if}</h2>
     <p class="status-banner warn">No cohort resolved. Configure a public cohort to view domain details.</p>
   </section>
 {:else if data.error}
   <section class="card">
-    <h2>{data.domain}</h2>
+    <h2>{data.domain}{#if unicodeName(data.domain)} <span class="idn-unicode">({unicodeName(data.domain)})</span>{/if}</h2>
     <p class="status-banner error">Failed to load domain: {data.error}</p>
   </section>
 {:else if !data.detail}
   <section class="card">
-    <h2>{data.domain}</h2>
+    <h2>{data.domain}{#if unicodeName(data.domain)} <span class="idn-unicode">({unicodeName(data.domain)})</span>{/if}</h2>
     <p class="status-banner">No results for this domain in the current cohort snapshot.</p>
     <p class="hint">
       A cohort snapshot is a point-in-time picture of analysis results. This page is
@@ -122,7 +128,7 @@
   <section class="card">
     <div class="detail-header">
       <div>
-        <h2>{d.domain}</h2>
+        <h2>{d.domain}{#if unicodeName(d.domain)} <span class="idn-unicode">({unicodeName(d.domain)})</span>{/if}</h2>
         <p class="hint">
           Last analyzed:
           {formatTimestamp(d.finished_at) || "-"}
@@ -302,6 +308,11 @@
   .detail-header h2 {
     margin: 0;
     font-family: var(--mono);
+  }
+  .idn-unicode {
+    font-family: inherit;
+    color: var(--ink-2);
+    font-weight: 400;
   }
   .detail-scorecard {
     display: inline-flex;

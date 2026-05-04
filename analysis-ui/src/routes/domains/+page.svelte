@@ -7,6 +7,7 @@
   import SortHeader from "$lib/SortHeader.svelte";
   import { asnHref, domainHref } from "$lib/entityLinks";
   import { formatCount, formatTimestamp, gradeTone, levelTone } from "$lib/format";
+  import { idnTooltip } from "$lib/idn";
   import { updateURLParam } from "$lib/filters";
   import { downloadCSV, downloadJSON, type ExportColumn } from "$lib/exporters";
   import type { DomainView } from "$lib/api";
@@ -141,7 +142,7 @@
           {#each rows as row (row.domain)}
             <tr class="row-clickable" onclick={(e: MouseEvent) => rowClick(e, domainHref(base, row.domain, search))}>
               <th scope="row" class="row-ident">
-                <a class="cell-link" href={domainHref(base, row.domain, search)}>{row.domain}</a>
+                <a class="cell-link" href={domainHref(base, row.domain, search)} title={idnTooltip(row.domain)}>{row.domain}</a>
               </th>
               <td class="col-num">{row.score ?? "-"}</td>
               <td>

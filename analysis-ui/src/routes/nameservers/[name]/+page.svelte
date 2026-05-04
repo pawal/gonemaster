@@ -5,11 +5,17 @@
   import DomainChip from "$lib/chips/DomainChip.svelte";
   import EndpointChip from "$lib/chips/EndpointChip.svelte";
   import { formatCount } from "$lib/format";
+  import { idnToUnicode } from "$lib/idn";
   import type { NameserverDetailPageData } from "./+page";
 
   let { data }: { data: NameserverDetailPageData } = $props();
 
   const query = $derived(page.url.search);
+
+  function unicodeName(name: string): string | null {
+    const decoded = idnToUnicode(name);
+    return decoded !== name ? decoded : null;
+  }
 </script>
 
 <nav class="breadcrumbs" aria-label="Breadcrumb">
@@ -18,24 +24,24 @@
 
 {#if !data.datasetTag}
   <section class="card">
-    <h2>{data.nameserver}</h2>
+    <h2>{data.nameserver}{#if unicodeName(data.nameserver)} <span class="idn-unicode">({unicodeName(data.nameserver)})</span>{/if}</h2>
     <p class="status-banner warn">No cohort resolved. Configure a public cohort to view nameserver details.</p>
   </section>
 {:else if data.error}
   <section class="card">
-    <h2>{data.nameserver}</h2>
+    <h2>{data.nameserver}{#if unicodeName(data.nameserver)} <span class="idn-unicode">({unicodeName(data.nameserver)})</span>{/if}</h2>
     <p class="status-banner error">Failed to load nameserver: {data.error}</p>
   </section>
 {:else if !data.detail}
   <section class="card">
-    <h2>{data.nameserver}</h2>
+    <h2>{data.nameserver}{#if unicodeName(data.nameserver)} <span class="idn-unicode">({unicodeName(data.nameserver)})</span>{/if}</h2>
     <p class="status-banner">Nameserver not materialized for this cohort.</p>
   </section>
 {:else}
   {@const d = data.detail}
   <section class="card">
     <div class="detail-header">
-      <h2>{d.nameserver}</h2>
+      <h2>{d.nameserver}{#if unicodeName(d.nameserver)} <span class="idn-unicode">({unicodeName(d.nameserver)})</span>{/if}</h2>
     </div>
 
     <dl class="detail-counts">
@@ -94,6 +100,11 @@
   .detail-header h2 {
     margin: 0;
     font-family: var(--mono);
+  }
+  .idn-unicode {
+    font-family: inherit;
+    color: var(--ink-2);
+    font-weight: 400;
   }
 
   .detail-counts {

@@ -2,6 +2,7 @@
   import { base } from "$app/paths";
   import { page } from "$app/state";
   import { nameserverHref } from "$lib/entityLinks";
+  import { idnTooltip } from "$lib/idn";
   import EntityChip from "./EntityChip.svelte";
 
   type Props = { nameserver: string; preserveQuery?: boolean };
@@ -10,6 +11,6 @@
   const href = $derived(nameserverHref(base, nameserver, preserveQuery ? page.url.search : ""));
 </script>
 
-<EntityChip {href} variant="nameserver" title={nameserver}>
+<EntityChip {href} variant="nameserver" title={idnTooltip(nameserver)}>
   {nameserver}
 </EntityChip>

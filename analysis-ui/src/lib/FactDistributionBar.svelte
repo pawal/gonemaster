@@ -132,4 +132,25 @@
   .fact-dist-caption {
     margin: 0;
   }
+
+  /* On narrow viewports, the proportional segmented bar can't fit labels
+     like "WARNING" or "ECDSAP256SHA256" inside small flex-grow segments.
+     Stack as full-width rows: column flex with no extra space means
+     flex-grow no longer affects sizing, so each segment renders at a
+     readable min-height with label and count on opposite ends. */
+  @media (max-width: 600px) {
+    .fact-dist-bar {
+      flex-direction: column;
+    }
+    .fact-dist-item {
+      min-width: 0;
+    }
+    .fact-dist-segment {
+      min-width: 0;
+      min-height: 36px;
+      padding: 6px var(--space-3);
+      white-space: normal;
+      justify-content: space-between;
+    }
+  }
 </style>

@@ -156,7 +156,7 @@
       <details class="advanced-options" bind:open={optionsOpen} inert={disabled || submitting ? '' : undefined}>
         <summary>{$t("pub.options_summary")}</summary>
 
-        <div class="stack" style="margin-top:10px">
+        <div class="stack options-stack">
           <label for="ip-mode">{$t("pub.ip_transport_label")}</label>
           <select id="ip-mode" bind:value={ipMode} disabled={submitting || disabled}>
             <option value="default">{$t("pub.ip_mode_default")}</option>
@@ -166,7 +166,7 @@
 
           <details class="advanced-options" bind:open={nsOpen}>
             <summary>{$t("pub.ns_summary")}</summary>
-            <div class="stack" style="margin-top:8px">
+            <div class="stack options-substack">
               {#each nsRows as row, i}
                 <div class="undelegated-row" data-testid="ns-row">
                   <input
@@ -212,7 +212,7 @@
 
           <details class="advanced-options" bind:open={dsOpen}>
             <summary>{$t("pub.ds_summary")}</summary>
-            <div class="stack" style="margin-top:8px">
+            <div class="stack options-substack">
               {#each dsRows as row, i}
                 <div class="undelegated-ds-row" data-testid="ds-row">
                   <input
@@ -287,3 +287,8 @@
     </div>
   </form>
 </div>
+
+<style>
+  .options-stack { margin-top: 10px; }
+  .options-substack { margin-top: 8px; }
+</style>

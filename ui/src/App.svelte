@@ -1087,6 +1087,21 @@
   const hasScore = (item) => item?.score != null && item?.grade != null;
   const GRADE_COLORS = { "A+": "var(--grade-aplus)", "A": "var(--grade-a)", "B": "var(--grade-b)", "C": "var(--grade-c)", "D": "var(--grade-d)", "F": "var(--grade-f)" };
   const gradeBarColor = (grade) => GRADE_COLORS[grade] ?? "var(--grade-a)";
+  // Apply per-element style values via DOM API instead of inline `style="..."`,
+  // which is blocked by the strict admin-UI CSP (style-src 'self').
+  const applyBarStyle = (node, params) => {
+    const apply = ({ pct, color, delay }) => {
+      node.style.setProperty("--bar-pct", `${pct}%`);
+      node.style.setProperty("--bar-color", color);
+      node.style.animationDelay = `${delay}ms`;
+    };
+    apply(params);
+    return { update(p) { apply(p); } };
+  };
+  const applyWidth = (node, value) => {
+    node.style.width = value;
+    return { update(v) { node.style.width = v; } };
+  };
   // Returns the full scoring result from either a run (score object) or a
   // job-list item where score is just an int and grade a string.
   const chipGrade  = (item) => item?.grade ?? null;
@@ -2547,7 +2562,7 @@
 </script>
 
 <div class="app-header">
-  <header class="reveal" style="--d: 0.05s">
+  <header class="reveal delay-05">
     <div class="header-text">
       <h1 class="brand-mark">
         <img class="brand-logo" src={logoSrc} alt="gonemaster" />
@@ -2620,8 +2635,8 @@
 
   <main class:no-reveal={initialAnimationDone}>
   {#if activeTab === "single"}
-    <div class="grid" id="panel-single" role="tabpanel" aria-labelledby="tab-single" style="margin-top: 22px;">
-      <div class="card reveal" style="--d: 0.18s">
+    <div class="grid panel-mt" id="panel-single" role="tabpanel" aria-labelledby="tab-single">
+      <div class="card reveal delay-18">
         <h2>{$t("single_job_heading")}</h2>
         <div class="stack">
           <label for="single-domain">{$t("single_domain_label")}</label>
@@ -2740,7 +2755,7 @@
         {/if}
       </div>
 
-      <div class="card reveal" style="--d: 0.26s" class:highlight={jobInspectorHighlight}>
+      <div class="card reveal delay-26" class:highlight={jobInspectorHighlight}>
         <h2>{selectedJob && isResultReadyStatus(selectedJob.status) ? $t("run_inspector_heading") : $t("job_inspector_heading")}</h2>
         <div class="stack">
           <label for="job-id">{$t("job_id_label")}</label>
@@ -2759,11 +2774,11 @@
             <strong>{selectedJob.status} · {formatJobTotalRuntime(selectedJob)}</strong>
             <span>{$t("progress_label")}</span>
             <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={progressPercent(selectedJob)}>
-              <div class="progress-bar" style={`width: ${progressPercent(selectedJob)}%`}></div>
+              <div class="progress-bar" use:applyWidth={`${progressPercent(selectedJob)}%`}></div>
               <span class="progress-value">{progressPercent(selectedJob)}%</span>
             </div>
             <span>{$t("domain_label")}</span>
-            <button class="ghost" type="button" style="padding: 0; font-family: monospace; text-align: left; border: none;" onclick={() => navigateToDomainByName(selectedJob.domain)}>{selectedJob.domain}</button>
+            <button class="ghost btn-text-mono" type="button" onclick={() => navigateToDomainByName(selectedJob.domain)}>{selectedJob.domain}</button>
             {#if selectedJobProfileName}
               <span>{$t("job_profile_label")}</span>
               <strong class="mono">{selectedJobProfileName}</strong>
@@ -2979,7 +2994,7 @@
       </div>
     </div>
   {:else if activeTab === "recent"}
-    <div class="card reveal" id="panel-recent" role="tabpanel" aria-labelledby="tab-recent" style="--d: 0.34s; margin-top: 22px;">
+    <div class="card reveal delay-34 panel-mt" id="panel-recent" role="tabpanel" aria-labelledby="tab-recent">
       <h2>{$t("recent_tests_heading")}</h2>
       <div class="row">
         <button class="ghost" type="button" onclick={loadJobs} disabled={jobsLoading}>
@@ -3114,7 +3129,7 @@
                   <div class="small">{$t("job_profile_label")}: <span class="mono">{jobProfileName(job)}</span></div>
                 {/if}
                 <div class="progress compact list-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={progressPercent(job)}>
-                  <div class="progress-bar" style={`width: ${progressPercent(job)}%`}></div>
+                  <div class="progress-bar" use:applyWidth={`${progressPercent(job)}%`}></div>
                   <span class="progress-value">{progressPercent(job)}%</span>
                 </div>
               </div>
@@ -3124,19 +3139,19 @@
       </div>
     </div>
   {:else if activeTab === "domains"}
-    <div class="card reveal" id="panel-domains" role="tabpanel" aria-labelledby="tab-domains" style="--d: 0.34s; margin-top: 22px;">
+    <div class="card reveal delay-34 panel-mt" id="panel-domains" role="tabpanel" aria-labelledby="tab-domains">
       {#if selectedDomain}
         <div>
           <button class="secondary small" onclick={() => { selectedDomain = null; setTab("domains"); }}>{$t("back_to_domains")}</button>
-          <div style="display:flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.5rem; margin-bottom: 0.75rem;">
-            <h2 class="mono" style="margin: 0;">{selectedDomain.name}</h2>
+          <div class="header-with-meta">
+            <h2 class="mono m-zero">{selectedDomain.name}</h2>
             {#if selectedDomain.tags && selectedDomain.tags.length > 0}
               {#each selectedDomain.tags as tag}
                 <span class="badge">{tag}</span>
               {/each}
             {/if}
           </div>
-          <div class="kv" style="margin-bottom: 1rem;">
+          <div class="kv mb-one">
             <span>{$t("col_latest_level")}</span>
             <span>{#if domainLevel(selectedDomain)}<span class="badge level-{domainLevel(selectedDomain).toLowerCase()}">{domainLevel(selectedDomain)}</span>{:else}-{/if}</span>
             <span>{$t("col_latest_run_at")}</span>
@@ -3150,13 +3165,13 @@
 
           <!-- Latest / selected run result -->
           {#if domainRunResultLoading}
-            <p class="muted" style="margin-top: 1rem;">{$t("loading")}</p>
+            <p class="muted mt-one">{$t("loading")}</p>
           {:else if selectedDomainRunResult}
             {@const allEntries = selectedDomainRunResult?.raw?.entries ?? []}
             {@const nsTimings = selectedDomainRunResult?.nameserver_timings ?? []}
             {@const bannerCls = bannerClass(worstLevel(allEntries))}
             {@const sc = selectedDomainRunResult?.score}
-            <div class="stack" style="margin-top: 1.25rem;">
+            <div class="stack mt-1-25">
               {#if scoringEnabled && sc}
                 {@const sortedCats = CAT_ORDER.filter(c => c in (sc.categories ?? {})).map(c => [c, sc.categories[c]])}
                 <div class="score-card">
@@ -3175,7 +3190,7 @@
                         <div class="score-cat-row" data-untested={res.tested === false ? "" : undefined}>
                           <span class="score-cat-name">{CAT_LABELS[cat] ?? cat}</span>
                           <div class="score-cat-bar-track">
-                            <div class="score-cat-bar" style="--bar-pct:{res.tested === false ? 0 : res.score}%; --bar-color:{gradeBarColor(sc.grade)}; animation-delay:{i * 60}ms"></div>
+                            <div class="score-cat-bar" use:applyBarStyle={{ pct: res.tested === false ? 0 : res.score, color: gradeBarColor(sc.grade), delay: i * 60 }}></div>
                           </div>
                           <span class="score-cat-num">{res.tested === false ? "-" : res.score}</span>
                         </div>
@@ -3347,7 +3362,7 @@
           {/if}
 
           <!-- Run history -->
-          <h3 style="margin-top: 1.5rem;">{$t("domain_run_history_heading")}</h3>
+          <h3 class="mt-1-5">{$t("domain_run_history_heading")}</h3>
           {#if domainRunsLoading}
             <p class="muted">{$t("loading")}</p>
           {:else if domainRuns.length === 0}
@@ -3367,8 +3382,7 @@
               <tbody>
                 {#each sortedDomainRuns as run}
                   <tr
-                    style="cursor: pointer;"
-                    class={selectedDomainRunId === run.id ? "run-row-selected" : ""}
+                    class={`row-clickable ${selectedDomainRunId === run.id ? "run-row-selected" : ""}`}
                     onclick={() => { navigateToJob(run.id); }}
                     role="button"
                     tabindex="0"
@@ -3384,7 +3398,7 @@
                 {/each}
               </tbody>
             </table>
-            <div class="pagination" style="margin-top: 0.5rem; display:flex; gap: 0.5rem; align-items: center;">
+            <div class="pagination">
               <button
                 class="secondary small"
                 disabled={domainRunsOffset === 0}
@@ -3401,18 +3415,18 @@
         </div>
       {:else}
         <h2>{$t("domains_tab_heading")}</h2>
-        <div class="toolbar" style="display:flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
+        <div class="toolbar mb-3-4">
           <input
             type="search"
             placeholder={$t("domains_search_placeholder")}
             bind:value={domainNameFilter}
             oninput={() => loadDomains({ reset: true })}
-            style="flex: 1 1 180px;"
+            class="fb-180-grow"
           />
           <select
             bind:value={domainTagFilter}
             onchange={() => loadDomains({ reset: true })}
-            style="flex: 0 1 180px;"
+            class="fb-180-shrink"
             aria-label={$t("tag_filter_label")}
           >
             <option value="">{$t("tag_filter_all")}</option>
@@ -3424,7 +3438,7 @@
           <select
             bind:value={domainLevelFilter}
             onchange={() => loadDomains({ reset: true })}
-            style="flex: 0 1 160px;"
+            class="fb-160-shrink"
             aria-label={$t("level_filter_label")}
           >
             <option value="">{$t("level_filter_all")}</option>
@@ -3451,7 +3465,7 @@
             <tbody>
               {#each sortedDomains as d}
                 <tr
-                  style="cursor: pointer;"
+                  class="row-clickable"
                   onclick={() => navigateToDomainDetail(d)}
                   role="button"
                   tabindex="0"
@@ -3467,7 +3481,7 @@
               {/each}
             </tbody>
           </table>
-          <div class="pagination" style="margin-top: 0.5rem; display:flex; gap: 0.5rem; align-items: center;">
+          <div class="pagination">
             <button
               class="secondary small"
               disabled={domainsOffset === 0}
@@ -3484,12 +3498,12 @@
       {/if}
     </div>
   {:else if activeTab === "tags"}
-    <div class="card reveal" id="panel-tags" role="tabpanel" aria-labelledby="tab-tags" style="--d: 0.34s; margin-top: 22px;">
+    <div class="card reveal delay-34 panel-mt" id="panel-tags" role="tabpanel" aria-labelledby="tab-tags">
       {#if selectedTag}
         <button class="secondary small" onclick={() => { selectedTag = null; tagProfileDraftId = ""; setTab("tags"); }}>{$t("back_to_tags")}</button>
-        <h2 style="margin-top: 0.5rem;">{$t("batch_tag_label")}: {selectedTag.name}</h2>
+        <h2 class="mt-half">{$t("batch_tag_label")}: {selectedTag.name}</h2>
         {#if tagCohortByName.has(selectedTag.name)}
-          <p class="small" style="margin-top: -0.25rem; margin-bottom: 0.75rem;">
+          <p class="small heading-tight">
             {$t("tag_cohort_source_prefix")}
             <button type="button" class="link-button" onclick={() => setTab("cohorts")}>
               {tagCohortByName.get(selectedTag.name).label || tagCohortByName.get(selectedTag.name).source_tag}
@@ -3501,7 +3515,7 @@
         {#if tagSummaryLoading}
           <p class="muted">{$t("loading")}</p>
         {:else if tagSummary}
-          <div style="display:flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
+          <div class="toolbar-row gap-1 mb-one">
             <span class="level-pill severity-info">{$t("sev_ok")} {tagSummary.ok}</span>
             <span class="level-pill severity-notice">{$t("sev_notice")} {tagSummary.notice}</span>
             <span class="level-pill severity-warning">{$t("sev_warning")} {tagSummary.warning}</span>
@@ -3511,7 +3525,7 @@
         {/if}
 
         <!-- Run all + delete -->
-        <div style="display:flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
+        <div class="toolbar-row mb-one">
           <button class="secondary" onclick={runAllFromTag} disabled={tagRunAllSubmitting}>
             {tagRunAllSubmitting ? $t("submitting") : $t("tag_run_all_button")}
           </button>
@@ -3539,7 +3553,7 @@
             <tbody>
               {#each tagBatches as b (b.id)}
                 <tr
-                  style="cursor: pointer;"
+                  class="row-clickable"
                   onclick={(e) => { if (e.target.closest("[data-row-action]")) return; openBatchFromTagRow(b.id); }}
                   onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") openBatchFromTagRow(b.id); }}
                   role="button"
@@ -3547,11 +3561,11 @@
                 >
                   <td class="mono">
                     {b.id}
-                    {#if b.snapshot_intent}<span class="pill snapshot-intent" style="margin-left: 0.25rem;">{$t("batch_snapshot_intent_pill")}</span>{/if}
+                    {#if b.snapshot_intent}<span class="pill snapshot-intent ml-quarter">{$t("batch_snapshot_intent_pill")}</span>{/if}
                   </td>
                   <td>{b.created_at ? b.created_at.slice(0, 19).replace("T", " ") : "-"}</td>
                   <td>{b.domain_count ?? "-"}</td>
-                  <td style="text-align: right;" data-row-action>
+                  <td class="text-right" data-row-action>
                     <button
                       class="ghost small warn"
                       type="button"
@@ -3563,7 +3577,7 @@
               {/each}
             </tbody>
           </table>
-          <div class="pagination" style="margin-top: 0.5rem; display:flex; gap: 0.5rem; align-items: center;">
+          <div class="pagination">
             <button class="secondary small" disabled={tagBatchesOffset === 0}
               onclick={() => { tagBatchesOffset = Math.max(0, tagBatchesOffset - tagBatchesLimit); loadTagBatches(); }}
             >{$t("prev_page")}</button>
@@ -3581,7 +3595,7 @@
         {/if}
 
         <h3>{$t("tag_default_profile_heading")}</h3>
-        <div class="stack" style="max-width: 440px; margin-bottom: 1rem;">
+        <div class="stack config-form">
           <label for="tag-default-profile">{$t("tag_default_profile_label")}</label>
           <select id="tag-default-profile" bind:value={tagProfileDraftId} disabled={profilesLoading && availableProfiles.length === 0}>
             <option value="">{$t("tag_default_profile_none_option")}</option>
@@ -3617,12 +3631,12 @@
 
         <!-- Domain list with level filter -->
         <h3>{$t("tag_domains_heading")}</h3>
-        <div style="display:flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem;">
+        <div class="toolbar-row mb-half">
           <select
             bind:value={tagDomainLevelFilter}
             onchange={() => loadTagDomains({ reset: true })}
             aria-label={$t("level_filter_label")}
-            style="flex: 0 1 180px;"
+            class="fb-180-shrink"
           >
             <option value="">{$t("level_filter_all")}</option>
             <option value="WARNING">{$t("level_filter_warning_plus")}</option>
@@ -3644,7 +3658,7 @@
             <tbody>
               {#each sortedTagDomains as d}
                 <tr
-                  style="cursor: pointer;"
+                  class="row-clickable"
                   onclick={() => navigateToDomainDetail(d)}
                   role="button"
                   tabindex="0"
@@ -3658,7 +3672,7 @@
               {/each}
             </tbody>
           </table>
-          <div class="pagination" style="margin-top: 0.5rem; display:flex; gap: 0.5rem; align-items: center;">
+          <div class="pagination">
             <button class="secondary small" disabled={tagDomainsOffset === 0}
               onclick={() => { tagDomainsOffset = Math.max(0, tagDomainsOffset - tagDomainsLimit); loadTagDomains(); }}
             >{$t("prev_page")}</button>
@@ -3670,24 +3684,24 @@
         {/if}
 
         <!-- Add domains -->
-        <h3 style="margin-top: 1.25rem;">{$t("tag_add_domains_heading")}</h3>
+        <h3 class="mt-1-25">{$t("tag_add_domains_heading")}</h3>
         <textarea
           bind:value={tagAddDomainsInput}
           placeholder={$t("tag_domains_placeholder")}
           rows="3"
-          style="width: 100%; box-sizing: border-box;"
+          class="input-fluid"
         ></textarea>
         <button class="secondary" onclick={addTagDomains} disabled={tagAddingDomains}>
           {tagAddingDomains ? $t("submitting") : $t("tag_add_domains_button")}
         </button>
 
         <!-- Remove domains -->
-        <h3 style="margin-top: 1.25rem;">{$t("tag_remove_domains_heading")}</h3>
+        <h3 class="mt-1-25">{$t("tag_remove_domains_heading")}</h3>
         <textarea
           bind:value={tagRemoveDomainsInput}
           placeholder={$t("tag_domains_placeholder")}
           rows="3"
-          style="width: 100%; box-sizing: border-box;"
+          class="input-fluid"
         ></textarea>
         <button class="ghost" onclick={removeTagDomains} disabled={tagRemovingDomains}>
           {tagRemovingDomains ? $t("submitting") : $t("tag_remove_domains_button")}
@@ -3697,12 +3711,12 @@
         <h2>{$t("tags_tab_heading")}</h2>
 
         <!-- Create tag form -->
-        <div style="display:flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; align-items: flex-end;">
-          <div class="stack" style="flex: 1 1 160px;">
+        <div class="toolbar-row mb-one align-end">
+          <div class="stack fb-160-grow">
             <label for="tag-create-name">{$t("tag_name_label")}</label>
             <input id="tag-create-name" type="text" bind:value={tagCreateName} placeholder="my-tag" />
           </div>
-          <div class="stack" style="flex: 2 1 240px;">
+          <div class="stack fb-240-grow-2">
             <label for="tag-create-desc">{$t("tag_description_label")}</label>
             <input id="tag-create-desc" type="text" bind:value={tagCreateDescription} placeholder={$t("tag_description_placeholder")} onkeydown={(e) => { if (e.key === 'Enter') createTag(); }} />
           </div>
@@ -3728,7 +3742,7 @@
             <tbody>
               {#each sortedTagsList as tag}
                 <tr
-                  style="cursor: pointer;"
+                  class="row-clickable"
                   onclick={() => navigateToTagDetail(tag)}
                   role="button"
                   tabindex="0"
@@ -3751,7 +3765,7 @@
                   </td>
                   <td>{tag.description || "-"}</td>
                   <td>{tag.domain_count ?? 0}</td>
-                  <td style="text-align: right;">
+                  <td class="text-right">
                     <button
                       class="secondary small"
                       type="button"
@@ -3768,16 +3782,16 @@
       {/if}
     </div>
   {:else if activeTab === "cohorts"}
-    <div class="grid" id="panel-cohorts" role="tabpanel" aria-labelledby="tab-cohorts" style="margin-top: 22px;">
-      <div class="card reveal" style="--d: 0.22s; grid-column: 1 / -1;">
+    <div class="grid panel-mt" id="panel-cohorts" role="tabpanel" aria-labelledby="tab-cohorts">
+      <div class="card reveal delay-22 grid-span-full">
         <AnalysisCohorts onDeleteBatch={openBatchDelete} refreshSignal={batchDeletedCounter} />
       </div>
     </div>
   {:else if activeTab === "batches"}
-    <div class="grid" id="panel-batches" role="tabpanel" aria-labelledby="tab-batches" style="margin-top: 22px;">
-      <div class="card reveal" style="--d: 0.22s">
+    <div class="grid panel-mt" id="panel-batches" role="tabpanel" aria-labelledby="tab-batches">
+      <div class="card reveal delay-22">
         <h2>{$t("batch_jobs_heading")}</h2>
-        <div style="display:flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+        <div class="toolbar-row no-wrap mb-half">
           <button
             class={batchFromTagMode ? "ghost" : "secondary small"}
             type="button"
@@ -3861,9 +3875,9 @@ example.org`}
         {/if}
       </div>
 
-      <div class="card reveal" style="--d: 0.26s" data-testid="active-batches-card">
-        <div class="row" style="justify-content: space-between; align-items: center;">
-          <h2 style="margin: 0;">{$t("active_batches_heading")}</h2>
+      <div class="card reveal delay-26" data-testid="active-batches-card">
+        <div class="row row-toolbar-end">
+          <h2 class="m-zero">{$t("active_batches_heading")}</h2>
           <button
             class={queuePaused ? "secondary small" : "ghost small"}
             type="button"
@@ -3911,7 +3925,7 @@ example.org`}
         {/if}
       </div>
 
-      <div class="card reveal" style="--d: 0.3s">
+      <div class="card reveal delay-30">
         <h2>{$t("batch_inspector_heading")}</h2>
         <div class="stack">
           <label for="batch-recent">{$t("recent_batches_label")}</label>
@@ -4059,7 +4073,7 @@ example.org`}
                         <div class="small">{$t("job_profile_label")}: <span class="mono">{jobProfileName(item)}</span></div>
                       {/if}
                       <div class="progress compact list-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={progressPercent(item)}>
-                        <div class="progress-bar" style={`width: ${progressPercent(item)}%`}></div>
+                        <div class="progress-bar" use:applyWidth={`${progressPercent(item)}%`}></div>
                         <span class="progress-value">{progressPercent(item)}%</span>
                       </div>
                     </div>
@@ -4075,7 +4089,7 @@ example.org`}
       </div>
     </div>
   {:else if activeTab === "metrics"}
-    <div class="card reveal" id="panel-metrics" role="tabpanel" aria-labelledby="tab-metrics" style="--d: 0.38s; margin-top: 22px;">
+    <div class="card reveal delay-38 panel-mt" id="panel-metrics" role="tabpanel" aria-labelledby="tab-metrics">
       <h2>{$t("metrics_heading")}</h2>
       <div class="row">
         <button class="ghost" type="button" onclick={() => loadMetrics()} disabled={metricsLoading}>
@@ -4296,7 +4310,7 @@ example.org`}
                 <tbody>
                   {#each sortedMetricsDomainRows as row}
                     <tr>
-                      <td class="mono"><button class="ghost" type="button" style="padding: 0; font-family: monospace; text-align: left; border: none;" onclick={() => navigateToDomainByName(row.domain)}>{row.domain}</button></td>
+                      <td class="mono"><button class="ghost btn-text-mono" type="button" onclick={() => navigateToDomainByName(row.domain)}>{row.domain}</button></td>
                       <td>{formatInteger(row.runs_total)}</td>
                       <td>{row.last_status || "-"}</td>
                       <td>{formatDurationMs(row.avg_duration_ms)}</td>
@@ -4350,7 +4364,7 @@ example.org`}
       {/if}
     </div>
   {:else if activeTab === "settings"}
-    <div class="grid" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" style="margin-top: 0; gap: 10px;">
+    <div class="grid panel-settings" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings">
       <div class="settings-subtabs" role="tablist" aria-label={$t("settings_subtabs_aria")}>
         {#each settingsSubTabs as subTab}
           <button
@@ -4367,15 +4381,15 @@ example.org`}
         {/each}
       </div>
       {#if settingsSubTab === "system"}
-        <div class="card reveal" id="settings-subpanel-system" role="tabpanel" aria-labelledby="settings-subtab-system" style="--d: 0.34s; grid-column: 1 / -1;">
+        <div class="card reveal delay-34 grid-span-full" id="settings-subpanel-system" role="tabpanel" aria-labelledby="settings-subtab-system">
           <ServerSettings />
         </div>
       {:else if settingsSubTab === "profiles"}
-        <div class="card reveal" id="settings-subpanel-profiles" role="tabpanel" aria-labelledby="settings-subtab-profiles" style="--d: 0.34s; grid-column: 1 / -1;">
+        <div class="card reveal delay-34 grid-span-full" id="settings-subpanel-profiles" role="tabpanel" aria-labelledby="settings-subtab-profiles">
           <ProfileSettings onprofileschanged={handleProfilesChanged} />
         </div>
       {:else if settingsSubTab === "scoring"}
-        <div class="card reveal" id="settings-subpanel-scoring" role="tabpanel" aria-labelledby="settings-subtab-scoring" style="--d: 0.34s; grid-column: 1 / -1;">
+        <div class="card reveal delay-34 grid-span-full" id="settings-subpanel-scoring" role="tabpanel" aria-labelledby="settings-subtab-scoring">
           <ScoringSettings />
         </div>
       {/if}
@@ -4383,7 +4397,7 @@ example.org`}
   {/if}
 
   {#if statusMessage}
-    <div class={`status-toast status-${statusTone === "ok" ? "ok" : "warn"} reveal`} role="status" aria-live="polite" style="--d: 0.12s;">
+    <div class={`status-toast status-${statusTone === "ok" ? "ok" : "warn"} reveal delay-12`} role="status" aria-live="polite">
       <div><strong>{statusTone === "ok" ? $t("toast_ok") : $t("toast_warn")}:</strong> {statusMessage}</div>
       <button class="status-toast-close" type="button" aria-label={$t("dismiss_notification_aria")} onclick={clearStatus}>{$t("dismiss")}</button>
     </div>
@@ -4398,3 +4412,73 @@ example.org`}
   onDeleted={handleBatchDeleted}
   setStatus={setStatus}
 />
+
+<style>
+  .panel-mt { margin-top: 22px; }
+  .panel-settings { margin-top: 0; gap: 10px; }
+  .mt-half { margin-top: 0.5rem; }
+  .mt-one { margin-top: 1rem; }
+  .mt-1-25 { margin-top: 1.25rem; }
+  .mt-1-5 { margin-top: 1.5rem; }
+  .mb-half { margin-bottom: 0.5rem; }
+  .mb-3-4 { margin-bottom: 0.75rem; }
+  .mb-one { margin-bottom: 1rem; }
+  .mb-12 { margin-bottom: 12px; }
+  .m-zero { margin: 0; }
+  .ml-quarter { margin-left: 0.25rem; }
+  .heading-tight { margin-top: -0.25rem; margin-bottom: 0.75rem; }
+  .text-right { text-align: right; }
+  .row-clickable { cursor: pointer; }
+
+  .toolbar,
+  .toolbar-row {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .toolbar-row.gap-1 { gap: 1rem; }
+  .toolbar-row.no-wrap { flex-wrap: nowrap; }
+  .toolbar-row.align-end { align-items: flex-end; }
+
+  .row-toolbar-end {
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .pagination {
+    margin-top: 0.5rem;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .header-with-meta {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .fb-160-shrink { flex: 0 1 160px; }
+  .fb-180-shrink { flex: 0 1 180px; }
+  .fb-160-grow { flex: 1 1 160px; }
+  .fb-180-grow { flex: 1 1 180px; }
+  .fb-240-grow-2 { flex: 2 1 240px; }
+
+  .btn-text-mono {
+    padding: 0;
+    font-family: monospace;
+    text-align: left;
+    border: none;
+  }
+  .input-fluid {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .config-form {
+    max-width: 440px;
+    margin-bottom: 1rem;
+  }
+</style>

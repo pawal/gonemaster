@@ -567,15 +567,22 @@
       pollTimer = null;
     }
   });
+
+  // Apply a dynamic width via DOM API instead of inline style="..." or style:width,
+  // which the admin-UI CSP (style-src 'self') blocks.
+  const applyWidth = (node, value) => {
+    node.style.width = value;
+    return { update(v) { node.style.width = v; } };
+  };
 </script>
 
 <h2>{$t("analysis_cohorts_heading")}</h2>
-<div class="small" style="margin-bottom: 12px;">{$t("analysis_cohorts_subtitle")}</div>
+<div class="small subtitle">{$t("analysis_cohorts_subtitle")}</div>
 
 {#if !backendStatus.backend_supported}
   <div class="notice notice-warn" role="alert">
     <strong>{$t("analysis_cohorts_backend_warning_title")}</strong>
-    <div class="small" style="margin-top: 4px;">
+    <div class="small notice-detail">
       {backendStatus.unsupported_message || $t("analysis_cohorts_backend_warning_body")}
     </div>
   </div>
@@ -681,7 +688,7 @@
                     <div class="materialization-progress" role="progressbar"
                          aria-valuenow={progressPercent(cohort)}
                          aria-valuemin="0" aria-valuemax="100">
-                      <div class="materialization-progress-fill" style:width={`${progressPercent(cohort)}%`}></div>
+                      <div class="materialization-progress-fill" use:applyWidth={`${progressPercent(cohort)}%`}></div>
                     </div>
                   {/if}
                   {#if cohort.last_materialization_error}
@@ -929,6 +936,9 @@
 {/if}
 
 <style>
+  .subtitle { margin-bottom: 12px; }
+  .notice-detail { margin-top: 4px; }
+
   .cohort-section + .cohort-section {
     margin-top: 28px;
   }

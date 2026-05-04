@@ -195,7 +195,28 @@ test-integration:
 	docker compose -f docker-compose.test.yml down; \
 	exit $$STATUS
 
-test: ui-test ui-public-test test-go spec-check
+ui-csp-check:
+	@echo "Checking admin/public UI for CSP-violating inline styles..."
+	@found=0; \
+	for f in $$(find ui/src ui-public/src -name '*.svelte' 2>/dev/null); do \
+		hits=$$(grep -nE '[[:space:]]style=("[^"]+"|\{)|[[:space:]]style:[a-z-]+=' "$$f" 2>/dev/null \
+			| grep -vE '^[[:digit:]]+:[[:space:]]*(//|\*)' || true); \
+		if [ -n "$$hits" ]; then \
+			echo "$$f:"; \
+			echo "$$hits" | sed 's/^/  /'; \
+			found=1; \
+		fi; \
+	done; \
+	if [ "$$found" = "1" ]; then \
+		echo ""; \
+		echo "ERROR: inline style attributes / style: directives found in admin or public UI."; \
+		echo "These are blocked at runtime by the strict CSP (style-src 'self')."; \
+		echo "Use a CSS class instead. See CLAUDE.md, section 'Web Security: Content-Security-Policy'."; \
+		exit 1; \
+	fi
+	@echo "OK - no inline styles found."
+
+test: ui-test ui-public-test test-go spec-check ui-csp-check
 
 install:
 	@if [ "$(CMD)" = "all" ]; then \

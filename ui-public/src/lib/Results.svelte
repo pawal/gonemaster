@@ -190,6 +190,18 @@
       default:            return "";
     }
   }
+
+  // Apply per-element style values via DOM API instead of inline `style="..."`,
+  // which is blocked by the strict public-UI CSP (style-src 'self').
+  const applyBarStyle = (node, params) => {
+    const apply = ({ pct, color, delay }) => {
+      node.style.setProperty("--bar-pct", `${pct}%`);
+      node.style.setProperty("--bar-color", color);
+      node.style.animationDelay = `${delay}ms`;
+    };
+    apply(params);
+    return { update(p) { apply(p); } };
+  };
 </script>
 
 <div class="card stack" data-testid="results-view">
@@ -222,7 +234,7 @@
                 <div class="score-cat-bar-track">
                   <div
                     class="score-cat-bar"
-                    style="--bar-pct:{res.tested === false ? 0 : res.score}%; --bar-color:{gradeColor}; animation-delay:{i * 60}ms"
+                    use:applyBarStyle={{ pct: res.tested === false ? 0 : res.score, color: gradeColor, delay: i * 60 }}
                   ></div>
                 </div>
                 <span class="score-cat-num">{res.tested === false ? "-" : res.score}</span>

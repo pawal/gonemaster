@@ -251,6 +251,10 @@ header {
   gap: 20px;
 }
 
+.grid-span-full {
+  grid-column: 1 / -1;
+}
+
 .card {
   background: var(--card);
   border-radius: var(--radius);
@@ -1342,6 +1346,15 @@ button.link-button:hover:not(:disabled) {
   animation: rise 0.6s ease both;
   animation-delay: var(--d, 0s);
 }
+
+.delay-05 { animation-delay: 0.05s; }
+.delay-12 { animation-delay: 0.12s; }
+.delay-18 { animation-delay: 0.18s; }
+.delay-22 { animation-delay: 0.22s; }
+.delay-26 { animation-delay: 0.26s; }
+.delay-30 { animation-delay: 0.30s; }
+.delay-34 { animation-delay: 0.34s; }
+.delay-38 { animation-delay: 0.38s; }
 
 main.no-reveal .reveal {
   animation: none;

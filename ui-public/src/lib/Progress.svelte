@@ -45,6 +45,12 @@
   });
 
   onDestroy(() => clearInterval(timer));
+
+  // Set width via DOM API instead of inline style="..." (blocked by CSP style-src 'self').
+  const applyWidth = (node, value) => {
+    node.style.width = value;
+    return { update(v) { node.style.width = v; } };
+  };
 </script>
 
 <div class="card stack" data-testid="progress-view">
@@ -62,7 +68,7 @@
       aria-valuemin="0"
       aria-valuemax="100"
     >
-      <div class="progress-bar-fill" style="width: {progress}%"></div>
+      <div class="progress-bar-fill" use:applyWidth={`${progress}%`}></div>
     </div>
   {/if}
 </div>

@@ -173,7 +173,7 @@
 </script>
 
 <h2>{$t("settings_server_heading")}</h2>
-<div class="small" style="margin-bottom: 12px;">{$t("settings_server_subtitle")}</div>
+<div class="small subtitle">{$t("settings_server_subtitle")}</div>
 
 {#if noticeMessage}
   <div class={`notice notice-${noticeTone === "ok" ? "ok" : "warn"}`} role="status" aria-live="polite">
@@ -260,6 +260,7 @@
 {/if}
 
 <style>
+  .subtitle { margin-bottom: 12px; }
   h3 {
     margin: 16px 0 8px;
     font-size: 0.95em;

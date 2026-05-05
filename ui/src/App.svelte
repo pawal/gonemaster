@@ -57,9 +57,6 @@
     chipGrade,
     chipScore,
   } from "./lib/result.js";
-  import ProfileSettings from "./ProfileSettings.svelte";
-  import ServerSettings from "./ServerSettings.svelte";
-  import ScoringSettings from "./ScoringSettings.svelte";
   import AnalysisCohorts from "./AnalysisCohorts.svelte";
   import BatchDeleteModal from "./BatchDeleteModal.svelte";
   import StatusBanner from "./components/StatusBanner.svelte";
@@ -72,6 +69,7 @@
   import RecentJobsPanel from "./panels/RecentJobsPanel.svelte";
   import BatchesPanel from "./panels/BatchesPanel.svelte";
   import SingleTestPanel from "./panels/SingleTestPanel.svelte";
+  import SettingsPanel from "./panels/SettingsPanel.svelte";
   import { status, setStatus, clearStatus } from "./lib/status.svelte.js";
   import { initThemeFromStorage } from "./lib/theme.svelte.js";
 
@@ -975,36 +973,12 @@
       bind:metricsBatchLimit
     />
   {:else if activeTab === "settings"}
-    <div class="grid panel-settings" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings">
-      <div class="settings-subtabs" role="tablist" aria-label={$t("settings_subtabs_aria")}>
-        {#each settingsSubTabs as subTab}
-          <button
-            class={`settings-subtab ${settingsSubTab === subTab.id ? "active" : ""}`}
-            type="button"
-            role="tab"
-            id={`settings-subtab-${subTab.id}`}
-            aria-selected={settingsSubTab === subTab.id}
-            aria-controls={`settings-subpanel-${subTab.id}`}
-            onclick={() => setSettingsSubTab(subTab.id)}
-          >
-            {$t(subTab.labelKey)}
-          </button>
-        {/each}
-      </div>
-      {#if settingsSubTab === "system"}
-        <div class="card reveal delay-34 grid-span-full" id="settings-subpanel-system" role="tabpanel" aria-labelledby="settings-subtab-system">
-          <ServerSettings />
-        </div>
-      {:else if settingsSubTab === "profiles"}
-        <div class="card reveal delay-34 grid-span-full" id="settings-subpanel-profiles" role="tabpanel" aria-labelledby="settings-subtab-profiles">
-          <ProfileSettings onprofileschanged={handleProfilesChanged} />
-        </div>
-      {:else if settingsSubTab === "scoring"}
-        <div class="card reveal delay-34 grid-span-full" id="settings-subpanel-scoring" role="tabpanel" aria-labelledby="settings-subtab-scoring">
-          <ScoringSettings />
-        </div>
-      {/if}
-    </div>
+    <SettingsPanel
+      {settingsSubTab}
+      {settingsSubTabs}
+      onSetSubTab={setSettingsSubTab}
+      onProfilesChanged={handleProfilesChanged}
+    />
   {/if}
 
   <StatusBanner />

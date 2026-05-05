@@ -110,6 +110,18 @@ func TestInterpolateFormatsServersList(t *testing.T) {
 	}
 }
 
+func TestInterpolateFormatsLargeIntegerFloats(t *testing.T) {
+	// JSON round-trip turns numeric args into float64. Without explicit
+	// formatting, fmt.Sprint(float64(1777722813)) renders "1.777722813e+09".
+	out := interpolate("ZONEMD serial {serial}.", map[string]any{
+		"serial": float64(1777722813),
+	})
+	expected := "ZONEMD serial 1777722813."
+	if out != expected {
+		t.Fatalf("unexpected interpolation: %q", out)
+	}
+}
+
 func TestInterpolateFormatsServerMap(t *testing.T) {
 	out := interpolate("Server: {server}.", map[string]any{
 		"server": map[string]any{

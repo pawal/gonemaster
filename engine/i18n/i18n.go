@@ -324,7 +324,7 @@ func formatValue(value any) string {
 				parts[i] = text
 				continue
 			}
-			parts[i] = fmt.Sprint(item)
+			parts[i] = formatValue(item)
 		}
 		return strings.Join(parts, ",")
 	case map[string]any:
@@ -332,6 +332,10 @@ func formatValue(value any) string {
 			return text
 		}
 		return fmt.Sprint(value)
+	case float32:
+		return strconv.FormatFloat(float64(v), 'f', -1, 32)
+	case float64:
+		return strconv.FormatFloat(v, 'f', -1, 64)
 	default:
 		return fmt.Sprint(value)
 	}

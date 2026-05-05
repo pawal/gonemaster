@@ -2,6 +2,12 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [unreleased]
+
+### Fixed
+
+- engine: render numeric log args (e.g. ZONEMD serial) as plain integers instead of scientific notation
+
 ## [v1.4.4] - 2026-05-05
 
 New: ZONEMD check in test case Zone14

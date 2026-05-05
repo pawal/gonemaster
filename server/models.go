@@ -209,6 +209,7 @@ type AnalysisCohort struct {
 	LastMaterializationError string    `json:"last_materialization_error,omitempty"`
 	DefaultSnapshotPolicy    string    `json:"default_snapshot_policy,omitempty"`
 	DefaultSnapshotID        *int64    `json:"default_snapshot_id,omitempty"`
+	TagViewMinLevel          string    `json:"tag_view_min_level,omitempty"`
 	CreatedAt                time.Time `json:"created_at"`
 	UpdatedAt                time.Time `json:"updated_at"`
 }
@@ -433,11 +434,12 @@ type AnalysisCohortSnapshot struct {
 	LastRunAt   time.Time `json:"last_run_at"`
 	RunCount    int       `json:"run_count"`
 	DomainCount int       `json:"domain_count"`
-	Status      string    `json:"status"`
-	IsDefault   bool      `json:"is_default"`
-	IsPublic    bool      `json:"is_public"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	Status          string    `json:"status"`
+	IsDefault       bool      `json:"is_default"`
+	IsPublic        bool      `json:"is_public"`
+	TagViewMinLevel string    `json:"tag_view_min_level,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 // AnalysisSnapshotNameserverView is one pre-computed nameserver row for a

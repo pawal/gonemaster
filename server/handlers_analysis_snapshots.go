@@ -26,8 +26,9 @@ type adminSnapshotPurger interface {
 type adminSnapshotAggregator interface {
 	ComputeSnapshotOverview(cohortID int64, batchID string) (SnapshotOverviewV2, error)
 	ReplaceSnapshotOverview(snapshotID int64, overview SnapshotOverviewV2) error
-	ComputeSnapshotEntityViews(cohortID int64, batchID string) (SnapshotEntityViews, error)
+	ComputeSnapshotEntityViews(cohortID int64, batchID string, minLevel string) (SnapshotEntityViews, error)
 	ReplaceSnapshotEntityViews(snapshotID int64, views SnapshotEntityViews) error
+	TagViewMinLevel() string
 }
 
 // AdminAnalysisSnapshotView is the admin shape for one snapshot row. It
@@ -178,7 +179,11 @@ func (s *Server) handleAnalysisCohortSnapshotRematerialize(w http.ResponseWriter
 		writeError(w, http.StatusInternalServerError, "write_failed", err.Error(), nil)
 		return
 	}
-	views, err := aggWriter.ComputeSnapshotEntityViews(cohort.ID, snap.BatchID)
+	floor := cohort.TagViewMinLevel
+	if !IsValidTagViewMinLevel(floor) {
+		floor = aggWriter.TagViewMinLevel()
+	}
+	views, err := aggWriter.ComputeSnapshotEntityViews(cohort.ID, snap.BatchID, floor)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "compute_failed", err.Error(), nil)
 		return
@@ -187,6 +192,7 @@ func (s *Server) handleAnalysisCohortSnapshotRematerialize(w http.ResponseWriter
 		writeError(w, http.StatusInternalServerError, "write_failed", err.Error(), nil)
 		return
 	}
+	snap.TagViewMinLevel = floor
 	snap.CapturedAt = time.Now().UTC()
 	snap.UpdatedAt = snap.CapturedAt
 	if _, err := store.UpsertAnalysisCohortSnapshot(snap); err != nil {

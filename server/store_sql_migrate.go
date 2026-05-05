@@ -512,6 +512,17 @@ var sqlMigrations = []sqlMigration{
 			`ALTER TABLE runs ADD COLUMN error TEXT NOT NULL DEFAULT ''`,
 		},
 	},
+	{
+		// Per-cohort floor for the snapshot tag view (empty = use server
+		// default), and the effective floor stamped on each snapshot at
+		// capture time so the public API can tell the UI which tag pills
+		// are clickable.
+		version: 3,
+		stmts: []string{
+			`ALTER TABLE analysis_cohort_catalog ADD COLUMN tag_view_min_level VARCHAR(16) NOT NULL DEFAULT ''`,
+			`ALTER TABLE analysis_cohort_snapshots ADD COLUMN tag_view_min_level VARCHAR(16) NOT NULL DEFAULT ''`,
+		},
+	},
 }
 
 // runMigrations creates the schema_migrations tracking table and applies

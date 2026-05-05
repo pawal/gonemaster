@@ -210,26 +210,28 @@ func (s *Server) resolvePublicSnapshotOrNone(w http.ResponseWriter, r *http.Requ
 // tell the reader which snapshot is being served. Keyed on slug, which
 // is the stable URL-safe identifier.
 type PublicAnalysisSnapshotView struct {
-	Slug        string    `json:"slug"`
-	Label       string    `json:"label,omitempty"`
-	CapturedAt  time.Time `json:"captured_at"`
-	FirstRunAt  time.Time `json:"first_run_at"`
-	LastRunAt   time.Time `json:"last_run_at"`
-	RunCount    int       `json:"run_count"`
-	DomainCount int       `json:"domain_count"`
-	ProfileName string    `json:"profile_name,omitempty"`
+	Slug            string    `json:"slug"`
+	Label           string    `json:"label,omitempty"`
+	CapturedAt      time.Time `json:"captured_at"`
+	FirstRunAt      time.Time `json:"first_run_at"`
+	LastRunAt       time.Time `json:"last_run_at"`
+	RunCount        int       `json:"run_count"`
+	DomainCount     int       `json:"domain_count"`
+	ProfileName     string    `json:"profile_name,omitempty"`
+	TagViewMinLevel string    `json:"tag_view_min_level,omitempty"`
 }
 
 func publicAnalysisSnapshotView(snap AnalysisCohortSnapshot) PublicAnalysisSnapshotView {
 	return PublicAnalysisSnapshotView{
-		Slug:        snap.Slug,
-		Label:       snap.Label,
-		CapturedAt:  snap.CapturedAt,
-		FirstRunAt:  snap.FirstRunAt,
-		LastRunAt:   snap.LastRunAt,
-		RunCount:    snap.RunCount,
-		DomainCount: snap.DomainCount,
-		ProfileName: snap.ProfileName,
+		Slug:            snap.Slug,
+		Label:           snap.Label,
+		CapturedAt:      snap.CapturedAt,
+		FirstRunAt:      snap.FirstRunAt,
+		LastRunAt:       snap.LastRunAt,
+		RunCount:        snap.RunCount,
+		DomainCount:     snap.DomainCount,
+		ProfileName:     snap.ProfileName,
+		TagViewMinLevel: snap.TagViewMinLevel,
 	}
 }
 

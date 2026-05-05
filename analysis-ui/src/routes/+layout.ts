@@ -22,6 +22,7 @@ export type LayoutData = {
   // has no captured public snapshot, in which case loaders show an
   // empty state instead of issuing a request.
   effectiveSnapshotSlug: string | null;
+  effectiveSnapshotTagFloor: string;
 };
 
 function resolveDefaultSnapshotSlug(
@@ -65,6 +66,10 @@ export async function load({ fetch, url }): Promise<LayoutData> {
     }
 
     const defaultSnapshotSlug = resolveDefaultSnapshotSlug(catalog, resolvedCohort);
+    const effectiveSnapshotSlug = urlSnapshot || defaultSnapshotSlug;
+    const activeSnapshot = effectiveSnapshotSlug
+      ? snapshots.find((s) => s.slug === effectiveSnapshotSlug)
+      : undefined;
     return {
       catalog,
       catalogError: null,
@@ -72,7 +77,8 @@ export async function load({ fetch, url }): Promise<LayoutData> {
       backendSupported: catalog.backend_supported !== false,
       snapshots,
       defaultSnapshotSlug,
-      effectiveSnapshotSlug: urlSnapshot || defaultSnapshotSlug
+      effectiveSnapshotSlug,
+      effectiveSnapshotTagFloor: activeSnapshot?.tag_view_min_level ?? ""
     };
   } catch (error) {
     return {
@@ -82,7 +88,8 @@ export async function load({ fetch, url }): Promise<LayoutData> {
       backendSupported: true,
       snapshots: [],
       defaultSnapshotSlug: null,
-      effectiveSnapshotSlug: urlSnapshot || null
+      effectiveSnapshotSlug: urlSnapshot || null,
+      effectiveSnapshotTagFloor: ""
     };
   }
 }

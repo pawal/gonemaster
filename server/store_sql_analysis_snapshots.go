@@ -10,6 +10,7 @@ import (
 const analysisCohortSnapshotCols = `id, cohort_id, batch_id, slug, label, description,
 	profile_id, profile_name, captured_at, first_run_at, last_run_at,
 	run_count, domain_count, status, is_default, is_public,
+	tag_view_min_level,
 	created_at, updated_at`
 
 func (s *SQLJobStore) scanAnalysisCohortSnapshot(row rowScanner) (AnalysisCohortSnapshot, error) {
@@ -44,6 +45,7 @@ func (s *SQLJobStore) scanAnalysisCohortSnapshot(row rowScanner) (AnalysisCohort
 		&snap.Status,
 		&isDefault,
 		&isPublic,
+		&snap.TagViewMinLevel,
 		&createdAt,
 		&updatedAt,
 	); err != nil {
@@ -223,11 +225,13 @@ func (s *SQLJobStore) UpsertAnalysisCohortSnapshot(snap AnalysisCohortSnapshot) 
 				status = %s,
 				is_default = %s,
 				is_public = %s,
+				tag_view_min_level = %s,
 				updated_at = %s
 			WHERE id = %s`,
 				s.ph(1), s.ph(2), s.ph(3), s.ph(4), s.ph(5),
 				s.ph(6), s.ph(7), s.ph(8), s.ph(9), s.ph(10),
 				s.ph(11), s.ph(12), s.ph(13), s.ph(14), s.ph(15),
+				s.ph(16),
 			),
 			snap.Slug,
 			snap.Label,
@@ -242,6 +246,7 @@ func (s *SQLJobStore) UpsertAnalysisCohortSnapshot(snap AnalysisCohortSnapshot) 
 			snap.Status,
 			boolToInt(snap.IsDefault),
 			boolToInt(snap.IsPublic),
+			snap.TagViewMinLevel,
 			s.ts(snap.UpdatedAt),
 			existing.ID,
 		)
@@ -266,8 +271,9 @@ func (s *SQLJobStore) UpsertAnalysisCohortSnapshot(snap AnalysisCohortSnapshot) 
 			cohort_id, batch_id, slug, label, description,
 			profile_id, profile_name, captured_at, first_run_at, last_run_at,
 			run_count, domain_count, status, is_default, is_public,
+			tag_view_min_level,
 			created_at, updated_at
-		) VALUES (%s)`, s.phRange(1, 17)),
+		) VALUES (%s)`, s.phRange(1, 18)),
 		snap.CohortID,
 		snap.BatchID,
 		snap.Slug,
@@ -283,6 +289,7 @@ func (s *SQLJobStore) UpsertAnalysisCohortSnapshot(snap AnalysisCohortSnapshot) 
 		snap.Status,
 		boolToInt(snap.IsDefault),
 		boolToInt(snap.IsPublic),
+		snap.TagViewMinLevel,
 		s.ts(snap.CreatedAt),
 		s.ts(snap.UpdatedAt),
 	)

@@ -61,6 +61,7 @@ func (s *Server) handleCreateAnalysisCohort(w http.ResponseWriter, r *http.Reque
 		PublicEnabled   bool   `json:"public_enabled"`
 		IsDefault       bool   `json:"is_default"`
 		SortOrder       int    `json:"sort_order"`
+		TagViewMinLevel string `json:"tag_view_min_level"`
 	}
 	if err := readJSON(r, s.cfg.MaxBodySize, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_json", err.Error(), nil)
@@ -86,6 +87,11 @@ func (s *Server) handleCreateAnalysisCohort(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusBadRequest, "invalid_catalog", "is_default=true requires analysis_enabled and public_enabled", nil)
 		return
 	}
+	tagFloor := strings.ToUpper(strings.TrimSpace(req.TagViewMinLevel))
+	if tagFloor != "" && !IsValidTagViewMinLevel(tagFloor) {
+		writeError(w, http.StatusBadRequest, "invalid_tag_view_min_level", "tag_view_min_level must be one of INFO, NOTICE, WARNING, ERROR, CRITICAL", nil)
+		return
+	}
 	if _, exists := s.store.GetAnalysisCohortBySource(req.SourceType, req.SourceTag); exists {
 		writeError(w, http.StatusConflict, "cohort_exists", "analysis cohort already exists for that source", nil)
 		return
@@ -108,6 +114,7 @@ func (s *Server) handleCreateAnalysisCohort(w http.ResponseWriter, r *http.Reque
 		PublicEnabled:   req.PublicEnabled,
 		IsDefault:       req.IsDefault,
 		SortOrder:       req.SortOrder,
+		TagViewMinLevel: tagFloor,
 	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
@@ -190,6 +197,7 @@ func (s *Server) handlePatchAnalysisCohort(w http.ResponseWriter, r *http.Reques
 		PublicEnabled   *bool   `json:"public_enabled,omitempty"`
 		IsDefault       *bool   `json:"is_default,omitempty"`
 		SortOrder       *int    `json:"sort_order,omitempty"`
+		TagViewMinLevel *string `json:"tag_view_min_level,omitempty"`
 	}
 	if err := readJSON(r, s.cfg.MaxBodySize, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_json", err.Error(), nil)
@@ -213,6 +221,14 @@ func (s *Server) handlePatchAnalysisCohort(w http.ResponseWriter, r *http.Reques
 	}
 	if req.SortOrder != nil {
 		desired.SortOrder = *req.SortOrder
+	}
+	if req.TagViewMinLevel != nil {
+		floor := strings.ToUpper(strings.TrimSpace(*req.TagViewMinLevel))
+		if floor != "" && !IsValidTagViewMinLevel(floor) {
+			writeError(w, http.StatusBadRequest, "invalid_tag_view_min_level", "tag_view_min_level must be one of INFO, NOTICE, WARNING, ERROR, CRITICAL", nil)
+			return
+		}
+		desired.TagViewMinLevel = floor
 	}
 	if desired.PublicEnabled && !desired.AnalysisEnabled {
 		writeError(w, http.StatusBadRequest, "invalid_catalog", "public_enabled=true requires analysis_enabled=true", nil)

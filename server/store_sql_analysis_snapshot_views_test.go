@@ -193,7 +193,7 @@ func TestComputeSnapshotEntityViewsScopedToBatch(t *testing.T) {
 			s := testStoreForBackend(t, b)
 			cohortID, _ := snapshotViewFixture(t, s)
 
-			views, err := s.ComputeSnapshotEntityViews(cohortID, "batch-x")
+			views, err := s.ComputeSnapshotEntityViews(cohortID, "batch-x", "")
 			if err != nil {
 				t.Fatalf("ComputeSnapshotEntityViews: %v", err)
 			}
@@ -297,7 +297,7 @@ func TestReplaceSnapshotEntityViewsRoundTrip(t *testing.T) {
 			s := testStoreForBackend(t, b)
 			cohortID, snapID := snapshotViewFixture(t, s)
 
-			views, err := s.ComputeSnapshotEntityViews(cohortID, "batch-x")
+			views, err := s.ComputeSnapshotEntityViews(cohortID, "batch-x", "")
 			if err != nil {
 				t.Fatalf("compute: %v", err)
 			}
@@ -338,7 +338,7 @@ func TestReplaceSnapshotEntityViewsIdempotent(t *testing.T) {
 	s := testStoreForBackend(t, testBackends(t)[0])
 	cohortID, snapID := snapshotViewFixture(t, s)
 
-	views, err := s.ComputeSnapshotEntityViews(cohortID, "batch-x")
+	views, err := s.ComputeSnapshotEntityViews(cohortID, "batch-x", "")
 	if err != nil {
 		t.Fatalf("compute first: %v", err)
 	}
@@ -385,7 +385,7 @@ func TestReplaceSnapshotEntityViewsScopedBySnapshotID(t *testing.T) {
 		t.Fatalf("upsert other snapshot: %v", err)
 	}
 
-	views, err := s.ComputeSnapshotEntityViews(cohortID, "batch-x")
+	views, err := s.ComputeSnapshotEntityViews(cohortID, "batch-x", "")
 	if err != nil {
 		t.Fatalf("compute: %v", err)
 	}
@@ -393,7 +393,7 @@ func TestReplaceSnapshotEntityViewsScopedBySnapshotID(t *testing.T) {
 		t.Fatalf("replace primary: %v", err)
 	}
 
-	otherViews, err := s.ComputeSnapshotEntityViews(cohortID, "batch-other")
+	otherViews, err := s.ComputeSnapshotEntityViews(cohortID, "batch-other", "")
 	if err != nil {
 		t.Fatalf("compute other: %v", err)
 	}
@@ -412,7 +412,7 @@ func TestReplaceSnapshotEntityViewsScopedBySnapshotID(t *testing.T) {
 
 func TestComputeSnapshotEntityViewsRequiresBatchID(t *testing.T) {
 	s := testStoreForBackend(t, testBackends(t)[0])
-	if _, err := s.ComputeSnapshotEntityViews(1, ""); err == nil {
+	if _, err := s.ComputeSnapshotEntityViews(1, "", ""); err == nil {
 		t.Fatal("expected error when batchID is empty")
 	}
 }

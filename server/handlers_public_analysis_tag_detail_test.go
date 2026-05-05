@@ -191,7 +191,7 @@ func TestComputeSnapshotEntityViewsBuildsTagViews(t *testing.T) {
 		t.Fatalf("seed tag summaries: %v", err)
 	}
 
-	views, err := s.ComputeSnapshotEntityViews(cohortID, "batch-x")
+	views, err := s.ComputeSnapshotEntityViews(cohortID, "batch-x", "")
 	if err != nil {
 		t.Fatalf("compute: %v", err)
 	}

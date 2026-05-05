@@ -18,6 +18,7 @@ export type SnapshotView = {
   run_count: number;
   domain_count: number;
   profile_name?: string;
+  tag_view_min_level?: string;
 };
 
 export type Cohort = {
@@ -319,6 +320,7 @@ export type SnapshotListEntry = {
   domain_count: number;
   profile_name?: string;
   is_default?: boolean;
+  tag_view_min_level?: string;
 };
 
 export type SnapshotListResponse = {

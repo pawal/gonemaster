@@ -150,7 +150,7 @@ func (f *analysisAPITestFixture) refreshSnapshotViews(batchID string) {
 	if err := f.store.ReplaceSnapshotOverview(snap.ID, overview); err != nil {
 		f.t.Fatalf("replace overview for batch %q: %v", batchID, err)
 	}
-	views, err := f.store.ComputeSnapshotEntityViews(f.cohort.ID, batchID)
+	views, err := f.store.ComputeSnapshotEntityViews(f.cohort.ID, batchID, "")
 	if err != nil {
 		f.t.Fatalf("compute entity views for batch %q: %v", batchID, err)
 	}

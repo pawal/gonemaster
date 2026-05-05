@@ -50,8 +50,9 @@ type ControlStore interface {
 	CountUnprojectedSnapshotRuns(cohortID int64, batchID string) (int, error)
 	ComputeSnapshotOverview(cohortID int64, batchID string) (serverpkg.SnapshotOverviewV2, error)
 	ReplaceSnapshotOverview(snapshotID int64, overview serverpkg.SnapshotOverviewV2) error
-	ComputeSnapshotEntityViews(cohortID int64, batchID string) (serverpkg.SnapshotEntityViews, error)
+	ComputeSnapshotEntityViews(cohortID int64, batchID string, minLevel string) (serverpkg.SnapshotEntityViews, error)
 	ReplaceSnapshotEntityViews(snapshotID int64, views serverpkg.SnapshotEntityViews) error
+	TagViewMinLevel() string
 
 	// First-boot backfill surface.
 	GetSetting(key string) (string, bool)
@@ -192,6 +193,7 @@ func (c *Controller) applySnapshotState(cohort serverpkg.AnalysisCohort, batch s
 		snap.ProfileID = cloneInt64Ptr(sampleRun.ProfileID)
 		snap.ProfileName = sampleRun.ProfileName
 	}
+	snap.TagViewMinLevel = c.resolveTagViewMinLevel(cohort.TagViewMinLevel)
 
 	if snap.Status != serverpkg.AnalysisSnapshotStatusFailedMixedProfiles {
 		if forceMixed || mixedProfiles(snap.ProfileID, snap.ProfileName, sampleRun.ProfileID, sampleRun.ProfileName) {
@@ -211,6 +213,15 @@ func (c *Controller) applySnapshotState(cohort serverpkg.AnalysisCohort, batch s
 	return nil
 }
 
+// resolveTagViewMinLevel returns the cohort override when valid, else the
+// server-wide default.
+func (c *Controller) resolveTagViewMinLevel(override string) string {
+	if serverpkg.IsValidTagViewMinLevel(override) {
+		return strings.ToUpper(strings.TrimSpace(override))
+	}
+	return c.store.TagViewMinLevel()
+}
+
 // materializeSnapshot writes the per-snapshot overview row and the
 // entity-view rows in sequence.
 func (c *Controller) materializeSnapshot(snap serverpkg.AnalysisCohortSnapshot) error {
@@ -221,7 +232,7 @@ func (c *Controller) materializeSnapshot(snap serverpkg.AnalysisCohortSnapshot) 
 	if err := c.store.ReplaceSnapshotOverview(snap.ID, overview); err != nil {
 		return fmt.Errorf("write overview: %w", err)
 	}
-	views, err := c.store.ComputeSnapshotEntityViews(snap.CohortID, snap.BatchID)
+	views, err := c.store.ComputeSnapshotEntityViews(snap.CohortID, snap.BatchID, snap.TagViewMinLevel)
 	if err != nil {
 		return fmt.Errorf("compute entity views: %w", err)
 	}

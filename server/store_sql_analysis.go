@@ -12,6 +12,7 @@ const analysisCohortCols = `id, source_type, source_tag, label, description,
 	materialization_done, materialization_total,
 	last_materialized_at, last_materialization_error,
 	default_snapshot_policy, default_snapshot_id,
+	tag_view_min_level,
 	created_at, updated_at`
 
 func boolToInt(v bool) int {
@@ -53,6 +54,7 @@ func (s *SQLJobStore) scanAnalysisCohort(row rowScanner) (AnalysisCohort, error)
 		&lastMaterializationErr,
 		&defaultSnapshotPolicy,
 		&defaultSnapshotID,
+		&cohort.TagViewMinLevel,
 		&createdAt,
 		&updatedAt,
 	); err != nil {
@@ -164,11 +166,12 @@ func (s *SQLJobStore) UpsertAnalysisCohort(cohort AnalysisCohort) (AnalysisCohor
 				last_materialization_error = %s,
 				default_snapshot_policy = %s,
 				default_snapshot_id = %s,
+				tag_view_min_level = %s,
 				updated_at = %s
 			WHERE id = %s`,
 				s.ph(1), s.ph(2), s.ph(3), s.ph(4), s.ph(5),
 				s.ph(6), s.ph(7), s.ph(8), s.ph(9), s.ph(10), s.ph(11),
-				s.ph(12), s.ph(13), s.ph(14), s.ph(15),
+				s.ph(12), s.ph(13), s.ph(14), s.ph(15), s.ph(16),
 			),
 			cohort.Label,
 			cohort.Description,
@@ -183,6 +186,7 @@ func (s *SQLJobStore) UpsertAnalysisCohort(cohort AnalysisCohort) (AnalysisCohor
 			cohort.LastMaterializationError,
 			cohort.DefaultSnapshotPolicy,
 			nullInt64Value(cohort.DefaultSnapshotID),
+			cohort.TagViewMinLevel,
 			s.ts(cohort.UpdatedAt),
 			existing.ID,
 		)
@@ -209,8 +213,9 @@ func (s *SQLJobStore) UpsertAnalysisCohort(cohort AnalysisCohort) (AnalysisCohor
 			materialization_done, materialization_total,
 			last_materialized_at, last_materialization_error,
 			default_snapshot_policy, default_snapshot_id,
+			tag_view_min_level,
 			created_at, updated_at
-		) VALUES (%s)`, s.phRange(1, 17)),
+		) VALUES (%s)`, s.phRange(1, 18)),
 		cohort.SourceType,
 		cohort.SourceTag,
 		cohort.Label,
@@ -226,6 +231,7 @@ func (s *SQLJobStore) UpsertAnalysisCohort(cohort AnalysisCohort) (AnalysisCohor
 		cohort.LastMaterializationError,
 		cohort.DefaultSnapshotPolicy,
 		nullInt64Value(cohort.DefaultSnapshotID),
+		cohort.TagViewMinLevel,
 		s.ts(cohort.CreatedAt),
 		s.ts(cohort.UpdatedAt),
 	)

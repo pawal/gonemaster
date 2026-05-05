@@ -22,10 +22,16 @@ type SnapshotEntityViews struct {
 }
 
 // ComputeSnapshotEntityViews builds the three entity-view row sets for one
-// (cohort, batch) snapshot from the underlying fact tables.
-func (s *SQLJobStore) ComputeSnapshotEntityViews(cohortID int64, batchID string) (SnapshotEntityViews, error) {
+// (cohort, batch) snapshot from the underlying fact tables. minLevel is the
+// effective tag-view floor; an empty or invalid value falls back to the
+// server-wide default.
+func (s *SQLJobStore) ComputeSnapshotEntityViews(cohortID int64, batchID string, minLevel string) (SnapshotEntityViews, error) {
 	if batchID == "" {
 		return SnapshotEntityViews{}, fmt.Errorf("compute snapshot entity views: batch_id is required")
+	}
+	floor := s.tagViewMinLevel
+	if IsValidTagViewMinLevel(minLevel) {
+		floor = strings.ToUpper(strings.TrimSpace(minLevel))
 	}
 	endpoints, err := s.queryBatchEndpoints(cohortID, batchID)
 	if err != nil {
@@ -67,8 +73,8 @@ func (s *SQLJobStore) ComputeSnapshotEntityViews(cohortID int64, batchID string)
 		Nameservers: buildNameserverViews(endpoints, addrFacts, asnByID, domainNames),
 		Endpoints:   buildEndpointViews(endpoints, addrFacts, asnByID, prefixByID, domainNames),
 		ASNs:        buildASNViews(endpoints, addrFacts, domainASNs, asnByID, prefixByID, domainNames, nameserverNames),
-		Tags:        buildTagViews(tagSummaries, domainNames, s.tagViewMinLevel),
-		Domains:     buildDomainViews(summaries, finishedAt, endpoints, addrFacts, asnByID, prefixByID, domainNames, tagSummaries, s.tagViewMinLevel),
+		Tags:        buildTagViews(tagSummaries, domainNames, floor),
+		Domains:     buildDomainViews(summaries, finishedAt, endpoints, addrFacts, asnByID, prefixByID, domainNames, tagSummaries, floor),
 		Prefixes:    buildPrefixViews(addrFacts, prefixByID, asnByID, domainNames, addressLiterals),
 	}, nil
 }

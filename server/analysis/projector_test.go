@@ -588,11 +588,13 @@ func (s *fakeStore) ReplaceSnapshotOverview(snapshotID int64, overview serverpkg
 	return nil
 }
 
-func (s *fakeStore) ComputeSnapshotEntityViews(cohortID int64, batchID string) (serverpkg.SnapshotEntityViews, error) {
+func (s *fakeStore) ComputeSnapshotEntityViews(cohortID int64, batchID string, minLevel string) (serverpkg.SnapshotEntityViews, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return serverpkg.SnapshotEntityViews{}, nil
 }
+
+func (s *fakeStore) TagViewMinLevel() string { return "NOTICE" }
 
 func (s *fakeStore) ReplaceSnapshotEntityViews(snapshotID int64, views serverpkg.SnapshotEntityViews) error {
 	s.mu.Lock()

@@ -14,6 +14,10 @@
   let { data }: { data: DomainDetailPageData } = $props();
 
   const query = $derived(page.url.search);
+  const tagFloor = $derived(
+    ((page.data as { effectiveSnapshotTagFloor?: string } | undefined)
+      ?.effectiveSnapshotTagFloor ?? "") as string
+  );
 
   function unicodeName(name: string): string | null {
     const decoded = idnToUnicode(name);
@@ -62,6 +66,10 @@
   }
   function isNoticeOrAbove(level: string): boolean {
     return severityRank(level) >= severityRank("NOTICE");
+  }
+  function tagIsClickable(level: string | undefined): boolean {
+    if (!tagFloor) return true;
+    return severityRank(level) >= severityRank(tagFloor);
   }
 
   // Prefer the run's localized entries; fall back to the tag floor
@@ -257,7 +265,11 @@
                     {#each tcRows as r, i (i)}
                       <li class="result-row">
                         <span class="level level-{levelTone(r.level)}">{r.level}</span>
-                        <a class="entry-tag" href={tagHref(base, r.tag, query)} title={r.tag}>{r.tag}</a>
+                        {#if tagIsClickable(r.level)}
+                          <a class="entry-tag" href={tagHref(base, r.tag, query)} title={r.tag}>{r.tag}</a>
+                        {:else}
+                          <span class="entry-tag entry-tag-static" title={r.tag}>{r.tag}</span>
+                        {/if}
                         {#if r.message && r.message !== r.raw}
                           <span class="result-message">{r.message}</span>
                         {/if}
@@ -477,6 +489,14 @@
   .entry-tag:hover {
     background: var(--accent-2);
     color: var(--btn-fg);
+  }
+  .entry-tag-static {
+    color: var(--ink-2);
+    cursor: default;
+  }
+  .entry-tag-static:hover {
+    background: var(--surface-2);
+    color: var(--ink-2);
   }
   .result-message {
     font-size: var(--text-sm);

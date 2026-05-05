@@ -11,16 +11,17 @@ import (
 // PublicAnalysisSnapshotListEntry is one row in the /snapshots list
 // response. Keyed on slug, which is the addressable identifier.
 type PublicAnalysisSnapshotListEntry struct {
-	Slug        string    `json:"slug"`
-	Label       string    `json:"label,omitempty"`
-	Description string    `json:"description,omitempty"`
-	CapturedAt  time.Time `json:"captured_at"`
-	FirstRunAt  time.Time `json:"first_run_at"`
-	LastRunAt   time.Time `json:"last_run_at"`
-	RunCount    int       `json:"run_count"`
-	DomainCount int       `json:"domain_count"`
-	ProfileName string    `json:"profile_name,omitempty"`
-	IsDefault   bool      `json:"is_default,omitempty"`
+	Slug            string    `json:"slug"`
+	Label           string    `json:"label,omitempty"`
+	Description     string    `json:"description,omitempty"`
+	CapturedAt      time.Time `json:"captured_at"`
+	FirstRunAt      time.Time `json:"first_run_at"`
+	LastRunAt       time.Time `json:"last_run_at"`
+	RunCount        int       `json:"run_count"`
+	DomainCount     int       `json:"domain_count"`
+	ProfileName     string    `json:"profile_name,omitempty"`
+	IsDefault       bool      `json:"is_default,omitempty"`
+	TagViewMinLevel string    `json:"tag_view_min_level,omitempty"`
 }
 
 // PublicAnalysisSnapshotListResponse envelopes the list + cohort anchor.
@@ -114,16 +115,17 @@ func (s *Server) handlePublicAnalysisSnapshots(w http.ResponseWriter, r *http.Re
 			continue
 		}
 		entries = append(entries, PublicAnalysisSnapshotListEntry{
-			Slug:        snap.Slug,
-			Label:       snap.Label,
-			Description: snap.Description,
-			CapturedAt:  snap.CapturedAt,
-			FirstRunAt:  snap.FirstRunAt,
-			LastRunAt:   snap.LastRunAt,
-			RunCount:    snap.RunCount,
-			DomainCount: snap.DomainCount,
-			ProfileName: snap.ProfileName,
-			IsDefault:   snap.ID == defaultID,
+			Slug:            snap.Slug,
+			Label:           snap.Label,
+			Description:     snap.Description,
+			CapturedAt:      snap.CapturedAt,
+			FirstRunAt:      snap.FirstRunAt,
+			LastRunAt:       snap.LastRunAt,
+			RunCount:        snap.RunCount,
+			DomainCount:     snap.DomainCount,
+			ProfileName:     snap.ProfileName,
+			IsDefault:       snap.ID == defaultID,
+			TagViewMinLevel: snap.TagViewMinLevel,
 		})
 	}
 	w.Header().Set("Cache-Control", "public, max-age=60")

@@ -133,7 +133,7 @@ func TestComputeSnapshotEntityViewsPopulatesEndpointDomains(t *testing.T) {
 	s := testStoreForBackend(t, testBackends(t)[0])
 	cohortID, _ := snapshotViewFixture(t, s)
 
-	views, err := s.ComputeSnapshotEntityViews(cohortID, "batch-x")
+	views, err := s.ComputeSnapshotEntityViews(cohortID, "batch-x", "")
 	if err != nil {
 		t.Fatalf("ComputeSnapshotEntityViews: %v", err)
 	}

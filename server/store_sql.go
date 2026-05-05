@@ -45,6 +45,18 @@ func (s *SQLJobStore) SetTagViewMinLevel(level string) {
 	}
 }
 
+// TagViewMinLevel returns the server-wide tag-view floor.
+func (s *SQLJobStore) TagViewMinLevel() string { return s.tagViewMinLevel }
+
+// IsValidTagViewMinLevel reports whether level is an accepted severity token.
+func IsValidTagViewMinLevel(level string) bool {
+	switch strings.ToUpper(strings.TrimSpace(level)) {
+	case "INFO", "NOTICE", "WARNING", "ERROR", "CRITICAL":
+		return true
+	}
+	return false
+}
+
 // ph returns the n-th (1-based) placeholder for this dialect.
 func (s *SQLJobStore) ph(n int) string { return s.dialect.Placeholder(n) }
 

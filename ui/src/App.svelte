@@ -57,7 +57,9 @@
   import AnalysisCohorts from "./AnalysisCohorts.svelte";
   import BatchDeleteModal from "./BatchDeleteModal.svelte";
   import StatusBanner from "./components/StatusBanner.svelte";
+  import ThemeToggle from "./components/ThemeToggle.svelte";
   import { status, setStatus, clearStatus } from "./lib/status.svelte.js";
+  import { initThemeFromStorage } from "./lib/theme.svelte.js";
 
   const logoSrc = `${import.meta.env.BASE_URL}gonemaster.svg`;
 
@@ -149,34 +151,6 @@
   let notifyOnJobComplete = false;
   let notifyOnBatchComplete = false;
   let pendingPermission = null;
-
-  // Theme management: "system" follows OS preference via CSS media query;
-  // "light" and "dark" set data-theme on <html> explicitly.
-  // "system" is the default for first-time visitors and is never stored.
-  const themeKey = "gonemaster.ui.theme.v1";
-  let theme = "system";
-
-  const applyTheme = (t) => {
-    if (typeof document === "undefined") return;
-    const root = document.documentElement;
-    if (t === "light" || t === "dark") {
-      root.setAttribute("data-theme", t);
-    } else {
-      root.removeAttribute("data-theme");
-    }
-  };
-
-  const osDark = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-color-scheme: dark)").matches;
-
-  const toggleTheme = () => {
-    const effectiveDark = theme === "dark" || (theme === "system" && osDark());
-    theme = effectiveDark ? "light" : "dark";
-    localStorage.setItem(themeKey, theme);
-    applyTheme(theme);
-  };
-
-  $: themeIcon = theme === "dark" || (theme === "system" && osDark()) ? "☾" : "☀";
-  $: themeTitle = $t("theme_toggle_title", { theme: theme === "dark" ? $t("theme_dark") : $t("theme_light") });
 
   // Snapshot checkbox visibility + auto-default.
   $: batchCohortForTag = batchFromTag ? tagCohortByName.get(batchFromTag) : null;
@@ -2174,11 +2148,7 @@
   const initializeApp = () => {
     if (initialized || typeof window === "undefined") return;
     initialized = true;
-    const storedTheme = localStorage.getItem(themeKey);
-    if (storedTheme === "light" || storedTheme === "dark") {
-      theme = storedTheme;
-    }
-    applyTheme(theme);
+    initThemeFromStorage();
 
     // Locale: restore from localStorage, or auto-detect from browser language.
     const storedLocale = (() => { try { return localStorage.getItem(localeKey); } catch (_) { return null; } })();
@@ -2263,9 +2233,7 @@
           {/each}
         </select>
       {/if}
-      <button class="theme-toggle" type="button" onclick={toggleTheme} title={themeTitle} aria-label={themeTitle}>
-        {themeIcon}
-      </button>
+      <ThemeToggle />
     </div>
   </header>
 </div>

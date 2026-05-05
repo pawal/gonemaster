@@ -1,6 +1,6 @@
 <script>
   import { t } from "./i18n.js";
-  import { createApiFetch } from "./lib/api.js";
+  import { apiCall } from "./lib/api.js";
 
   let {
     open = false,
@@ -27,7 +27,7 @@
     }
   });
 
-  const apiFetch = createApiFetch(apiPrefix);
+  const apiFetch = async (path, options) => apiCall(apiPrefix, path, options);
 
   async function loadPreview() {
     loading = true;

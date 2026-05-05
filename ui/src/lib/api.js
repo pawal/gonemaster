@@ -15,7 +15,3 @@ export async function apiCall(apiBase, path, options = {}) {
   }
   return payload;
 }
-
-export function createApiFetch(apiBase) {
-  return async (path, options) => apiCall(apiBase, path, options);
-}

@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy } from "svelte";
   import { t } from "./i18n.js";
-  import { createApiFetch } from "./lib/api.js";
+  import { apiCall } from "./lib/api.js";
 
   let { apiBase = "/api/v1", onDeleteBatch = null, refreshSignal = 0 } = $props();
 
@@ -47,7 +47,7 @@
     };
   }
 
-  const apiFetch = createApiFetch(apiBase);
+  const apiFetch = async (path, options) => apiCall(apiBase, path, options);
 
   const setNotice = (message, tone = "") => {
     noticeMessage = message;

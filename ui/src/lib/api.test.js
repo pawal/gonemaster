@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createApiFetch } from "./api.js";
+import { apiCall } from "./api.js";
+
+const createApiFetch = (apiBase) => (path, options) => apiCall(apiBase, path, options);
 
 function jsonResponse(body, init = {}) {
   return new Response(JSON.stringify(body), {

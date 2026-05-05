@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
   import { fetchMetricsSnapshot, metricsWindowOptions } from "./metrics.js";
   import { t, locale, loadCatalog } from "./i18n.js";
-  import { createApiFetch } from "./lib/api.js";
+  import { apiCall } from "./lib/api.js";
   import {
     formatPercent,
     formatInteger,
@@ -291,7 +291,7 @@
   let metricsBatchesSortState = { key: "failed_expired", direction: "desc" };
   let sortedMetricsBatchRows = [];
 
-  const apiFetch = createApiFetch(apiPrefix);
+  const apiFetch = async (path, options) => apiCall(apiPrefix, path, options);
 
   const summaryLevels = moduleLevels;
   const severityFilters = [

@@ -684,6 +684,7 @@
   "tc.zone11": "SPF policy at zone apex",
   "tc.zone12": "CSYNC RR at zone apex",
   "tc.zone13": "SPF DNS lookup limit compliance",
+  "tc.zone14": "ZONEMD record at zone apex",
   "result_status_ok": "No problems found",
   "result_status_notice": "Notices",
   "result_status_warning": "Warnings found",

@@ -4,6 +4,10 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [unreleased]
 
+### Added
+
+- admin-ui, ui-public: title and description for the Zone14 ZONEMD test case
+
 ### Fixed
 
 - engine: render numeric log args (e.g. ZONEMD serial) as plain integers instead of scientific notation

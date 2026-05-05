@@ -374,28 +374,30 @@
         oninput={() => loadDomains({ reset: true })}
         class="fb-180-grow"
       />
-      <select
-        bind:value={domainTagFilter}
-        onchange={() => loadDomains({ reset: true })}
-        class="fb-180-shrink"
-        aria-label={$t("tag_filter_label")}
-      >
-        <option value="">{$t("tag_filter_all")}</option>
-        <option value="__none__">{$t("tag_filter_none")}</option>
-        {#each availableTags as tag}
-          <option value={tag.name}>{tag.name}</option>
-        {/each}
-      </select>
-      <select
-        bind:value={domainLevelFilter}
-        onchange={() => loadDomains({ reset: true })}
-        class="fb-160-shrink"
-        aria-label={$t("level_filter_label")}
-      >
-        <option value="">{$t("level_filter_all")}</option>
-        <option value="WARNING">{$t("level_filter_warning_plus")}</option>
-        <option value="ERROR">{$t("level_filter_error_plus")}</option>
-      </select>
+      <div class="filter-group">
+        <select
+          bind:value={domainTagFilter}
+          onchange={() => loadDomains({ reset: true })}
+          class="filter-select"
+          aria-label={$t("tag_filter_label")}
+        >
+          <option value="">{$t("tag_filter_all")}</option>
+          <option value="__none__">{$t("tag_filter_none")}</option>
+          {#each availableTags as tag}
+            <option value={tag.name}>{tag.name}</option>
+          {/each}
+        </select>
+        <select
+          bind:value={domainLevelFilter}
+          onchange={() => loadDomains({ reset: true })}
+          class="filter-select"
+          aria-label={$t("level_filter_label")}
+        >
+          <option value="">{$t("level_filter_all")}</option>
+          <option value="WARNING">{$t("level_filter_warning_plus")}</option>
+          <option value="ERROR">{$t("level_filter_error_plus")}</option>
+        </select>
+      </div>
     </div>
     {#if domainsLoading}
       <p class="muted">{$t("loading")}</p>

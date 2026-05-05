@@ -193,12 +193,17 @@ describe("AnalysisCohorts", () => {
     const handles = installFetch();
     render(AnalysisCohorts);
 
-    const tldRow = (await screen.findByText("tld")).closest("tr");
-    const rebuildButton = within(tldRow).getByRole("button", { name: /Rebuild/i });
-    await fireEvent.click(rebuildButton);
-    await waitFor(() => expect(handles.actions).toContainEqual({ id: 1, action: "rebuild" }));
+    const findTldRow = async () => (await screen.findByText("tld")).closest("tr");
 
-    const clearButton = within(tldRow).getByRole("button", { name: /Clear/i });
+    const rebuildButton = within(await findTldRow()).getByRole("button", { name: /Rebuild/i });
+    await fireEvent.click(rebuildButton);
+    // Wait for the success notice, which is set only after the POST and the
+    // follow-up loadCohorts() both complete; this guarantees busyCohortId has
+    // been reset and the row's Clear button is no longer disabled.
+    await screen.findByText(/Rebuild triggered for cohort tld/);
+    expect(handles.actions).toContainEqual({ id: 1, action: "rebuild" });
+
+    const clearButton = within(await findTldRow()).getByRole("button", { name: /Clear/i });
     await fireEvent.click(clearButton);
     await waitFor(() => expect(handles.actions).toContainEqual({ id: 1, action: "clear" }));
   });

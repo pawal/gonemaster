@@ -16,6 +16,19 @@
     prettyProfileJSON,
     formatSnapshotSlugPreview,
   } from "./lib/format.js";
+  import {
+    activeJobStatuses,
+    resultReadyStatuses,
+    LEVEL_ORDER,
+    normalizeStatus,
+    isActiveJobStatus,
+    isResultReadyStatus,
+    progressPercent,
+    hasActiveBatchJobs,
+    hasRunningOrQueuedJobs,
+    normalizeLevel,
+    severityRank,
+  } from "./lib/jobUtils.js";
   import ProfileSettings from "./ProfileSettings.svelte";
   import ServerSettings from "./ServerSettings.svelte";
   import ScoringSettings from "./ScoringSettings.svelte";
@@ -351,22 +364,9 @@
   const batchPageSizes = listPageSizes;
   const recentPageSizes = listPageSizes;
   const metricsLimitOptions = [5, 10, 20, 50, 100];
-  const activeJobStatuses = ["queued", "running"];
-  const resultReadyStatuses = ["succeeded", "failed", "canceled"];
-
   const isKnownSort = (value, options) => options.some((option) => option.id === value);
   const isKnownSeverityFilter = (value) => severityFilters.some((option) => option.id === value);
   const isKnownBatchStatus = (value) => batchStatuses.includes(value);
-  const normalizeStatus = (value) => String(value || "").toLowerCase();
-  const isActiveJobStatus = (status) => activeJobStatuses.includes(normalizeStatus(status));
-  const isResultReadyStatus = (status) => resultReadyStatuses.includes(normalizeStatus(status));
-  const progressPercent = (job) => {
-    const value = Number(job?.progress);
-    if (!Number.isFinite(value)) return 0;
-    return Math.max(0, Math.min(100, value));
-  };
-  const hasActiveBatchJobs = (batch) =>
-    activeJobStatuses.some((status) => Number(batch?.status_counts?.[status] || 0) > 0);
   const normalizePageSize = (value) => {
     const parsed = Number(value);
     if (Number.isFinite(parsed) && listPageSizes.includes(parsed)) {
@@ -613,7 +613,6 @@
       }))
       .filter((entry) => entry.count > 0);
   const jobSeverityTotal = (job, level) => Number(job?.severity_totals?.[level] || 0);
-  const hasRunningOrQueuedJobs = (items = []) => items.some((job) => isActiveJobStatus(job?.status));
   const formatJobTotalRuntime = (job) => {
     const started = parseTimestamp(job?.started_at);
     if (!started) return "not started";
@@ -768,11 +767,6 @@
   const compareNumber = (left, right) => Number(left || 0) - Number(right || 0);
   const timestampValue = (value) => parseTimestamp(value)?.getTime() ?? -1;
   const compareTimestamp = (left, right) => compareNumber(timestampValue(left), timestampValue(right));
-  const severityRank = (value) => {
-    if (!value) return -1;
-    const index = LEVEL_ORDER.indexOf(normalizeLevel(value));
-    return index >= 0 ? index : -1;
-  };
   const compareSeverity = (left, right) => compareNumber(severityRank(left), severityRank(right));
   const nextTableSort = (state, key, defaultDirection = "asc") =>
     state.key === key
@@ -962,8 +956,6 @@
   };
 
   const moduleLevels = ["NOTICE", "WARNING", "ERROR", "CRITICAL"];
-  const LEVEL_ORDER = ["DEBUG", "INFO", "NOTICE", "WARNING", "ERROR", "CRITICAL"];
-  const normalizeLevel = (value) => (value || "INFO").toUpperCase();
   // Returns the effective display level for a domain. The server only tracks
   const domainLevel = (d) => d?.latest_level || (d?.latest_run_at ? "INFO" : "");
   const worstLevel = (entries) => {

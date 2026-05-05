@@ -1,0 +1,95 @@
+import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/svelte";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import RecentJobsPanel from "./RecentJobsPanel.svelte";
+
+const sampleJobs = () => ({
+  items: [
+    { id: "job_a", domain: "example.com", status: "running", progress: 40, severity_totals: { NOTICE: 0, WARNING: 1, ERROR: 0, CRITICAL: 0 } },
+    { id: "job_b", domain: "alpha.test", status: "succeeded", progress: 100, severity_totals: { NOTICE: 0, WARNING: 0, ERROR: 1, CRITICAL: 0 } },
+  ],
+  total: 2,
+  next_cursor: "",
+  prev_cursor: "",
+  offset: 0,
+});
+
+const baseProps = (overrides = {}) => ({
+  apiFetch: vi.fn().mockResolvedValue(sampleJobs()),
+  severityFilters: [
+    { id: "all", labelKey: "sev_all" },
+    { id: "warnings_plus", labelKey: "sev_warnings_plus" },
+    { id: "errors_only", labelKey: "sev_errors_only" },
+  ],
+  jobSortOptions: [
+    { id: "started_at_desc", labelKey: "sort_started_at_desc" },
+    { id: "domain_asc", labelKey: "sort_domain_asc" },
+  ],
+  listPageSizes: [10, 20, 50, 100],
+  scoringEnabled: false,
+  jobSort: "started_at_desc",
+  severityFilter: "all",
+  jobBatchFilter: "",
+  recentDomainFilter: "",
+  recentPageSize: 20,
+  recentCursor: 0,
+  ...overrides,
+});
+
+describe("RecentJobsPanel", () => {
+  afterEach(() => cleanup());
+
+  it("loads and renders jobs on mount", async () => {
+    const apiFetch = vi.fn().mockResolvedValue(sampleJobs());
+    render(RecentJobsPanel, { props: baseProps({ apiFetch }) });
+    expect(await screen.findByText("job_a")).toBeInTheDocument();
+    expect(screen.getByText("job_b")).toBeInTheDocument();
+  });
+
+  it("includes filters and sort in the jobs query", async () => {
+    const apiFetch = vi.fn().mockResolvedValue(sampleJobs());
+    render(RecentJobsPanel, {
+      props: baseProps({
+        apiFetch,
+        jobSort: "domain_asc",
+        jobBatchFilter: "batch_x",
+        recentDomainFilter: "example.com",
+        recentPageSize: 50,
+        severityFilter: "errors_only",
+      }),
+    });
+    await waitFor(() => expect(apiFetch).toHaveBeenCalled());
+    const url = apiFetch.mock.calls[0][0];
+    expect(url).toMatch(/sort=domain_asc/);
+    expect(url).toMatch(/batch_id=batch_x/);
+    expect(url).toMatch(/domain=example.com/);
+    expect(url).toMatch(/limit=50/);
+    expect(url).toMatch(/severity=errors_only/);
+  });
+
+  it("invokes onNavigateJob when a job row is clicked", async () => {
+    const onNavigateJob = vi.fn();
+    render(RecentJobsPanel, { props: baseProps({ onNavigateJob }) });
+    await screen.findByText("job_a");
+    await fireEvent.click(screen.getByText("job_a"));
+    expect(onNavigateJob).toHaveBeenCalledWith("job_a");
+  });
+
+  it("hides jobs that don't match the active severity filter", async () => {
+    const apiFetch = vi.fn().mockResolvedValue(sampleJobs());
+    render(RecentJobsPanel, {
+      props: baseProps({ apiFetch, severityFilter: "errors_only" }),
+    });
+    await screen.findByText("job_b");
+    // job_a has only WARNING; with errors_only it should be filtered out.
+    expect(screen.queryByText("job_a")).toBeNull();
+  });
+
+  it("re-queries when Apply filters is clicked", async () => {
+    const apiFetch = vi.fn().mockResolvedValue(sampleJobs());
+    render(RecentJobsPanel, { props: baseProps({ apiFetch }) });
+    await screen.findByText("job_a");
+    apiFetch.mockClear();
+    await fireEvent.click(screen.getByRole("button", { name: /Apply filters/i }));
+    await waitFor(() => expect(apiFetch).toHaveBeenCalled());
+  });
+});

@@ -121,12 +121,6 @@ describe("App", () => {
     });
 
     const { unmount } = render(App);
-
-    await waitFor(() => {
-      expect(calls.some((value) => value.includes("/api/v1/jobs?"))).toBe(true);
-    });
-    calls.length = 0;
-
     await openRecentTab();
     await waitFor(() => {
       expect(calls.some((value) => value.includes("/api/v1/jobs?"))).toBe(true);
@@ -180,7 +174,7 @@ describe("App", () => {
       const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
       if (value.includes("/api/v1/jobs?")) {
         jobsCallCount += 1;
-        if (jobsCallCount >= 3) {
+        if (jobsCallCount >= 2) {
           return jsonResponse({ items: [doneJob], total: 1 });
         }
         return jsonResponse({ items: [runningJob], total: 1 });
@@ -213,7 +207,7 @@ describe("App", () => {
       expect(screen.getByText("job_live")).toBeInTheDocument();
       expect(screen.getByText("example.com \u2013 succeeded")).toBeInTheDocument();
     });
-    expect(jobsCallCount).toBeGreaterThanOrEqual(3);
+    expect(jobsCallCount).toBeGreaterThanOrEqual(2);
 
     unmount();
   });
@@ -1976,8 +1970,6 @@ describe("App", () => {
     const { unmount } = render(App);
 
     await waitFor(() => {
-      expect(calls.some((value) => value.includes("/api/v1/jobs?") && value.includes("sort=domain_desc") && value.includes("batch_id=batch_url"))).toBe(true);
-      expect(calls.some((value) => value.includes("/api/v1/jobs?") && value.includes("limit=50") && value.includes("cursor=2"))).toBe(true);
       expect(
         calls.some(
           (value) =>
@@ -1998,6 +1990,10 @@ describe("App", () => {
     expect(screen.getByLabelText("Domain contains")).toHaveValue("beta");
 
     await openRecentTab();
+    await waitFor(() => {
+      expect(calls.some((value) => value.includes("/api/v1/jobs?") && value.includes("sort=domain_desc") && value.includes("batch_id=batch_url"))).toBe(true);
+      expect(calls.some((value) => value.includes("/api/v1/jobs?") && value.includes("limit=50") && value.includes("cursor=2"))).toBe(true);
+    });
     expect(screen.getByLabelText("Sort")).toHaveValue("domain_desc");
     expect(screen.getByLabelText("Page size")).toHaveValue("50");
     expect(screen.getByLabelText("Batch ID filter")).toHaveValue("batch_url");
@@ -2028,6 +2024,7 @@ describe("App", () => {
     });
 
     const { unmount } = render(App);
+    await openRecentTab();
 
     await waitFor(() => {
       expect(
@@ -2653,16 +2650,6 @@ describe("App", () => {
       expect(
         calls.some(
           (value) =>
-            value.includes("/api/v1/jobs?") &&
-            value.includes("sort=started_at_desc") &&
-            value.includes("batch_id=batch_from_url") &&
-            value.includes("limit=20") &&
-            !value.includes("cursor=")
-        )
-      ).toBe(true);
-      expect(
-        calls.some(
-          (value) =>
             value.includes("/api/v1/batches/batch_invalid?") &&
             value.includes("sort=started_at_desc") &&
             value.includes("limit=20") &&
@@ -2678,6 +2665,18 @@ describe("App", () => {
     expect(screen.getByLabelText("Status")).toHaveValue("");
 
     await openRecentTab();
+    await waitFor(() => {
+      expect(
+        calls.some(
+          (value) =>
+            value.includes("/api/v1/jobs?") &&
+            value.includes("sort=started_at_desc") &&
+            value.includes("batch_id=batch_from_url") &&
+            value.includes("limit=20") &&
+            !value.includes("cursor=")
+        )
+      ).toBe(true);
+    });
     expect(screen.getByLabelText("Sort")).toHaveValue("started_at_desc");
     expect(screen.getByLabelText("Page size")).toHaveValue("20");
     expect(screen.getByLabelText("Batch ID filter")).toHaveValue("batch_from_url");

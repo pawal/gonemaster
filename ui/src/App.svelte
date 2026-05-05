@@ -71,6 +71,7 @@
   import MetricsPanel from "./panels/MetricsPanel.svelte";
   import DomainsPanel from "./panels/DomainsPanel.svelte";
   import TagsPanel from "./panels/TagsPanel.svelte";
+  import RecentJobsPanel from "./panels/RecentJobsPanel.svelte";
   import { status, setStatus, clearStatus } from "./lib/status.svelte.js";
   import { initThemeFromStorage } from "./lib/theme.svelte.js";
 
@@ -96,21 +97,14 @@
   let batchSnapshotIntent = false;
   let batchSnapshotIntentTouched = false;
 
-  let jobs = [];
-  let jobsLoading = false;
-  let filteredJobs = [];
-  let autoRefreshRecent = false;
-  let recentPoller = null;
+  // Recent-jobs filter state owned at App level so it survives tab unmounts
+  // and feeds the URL/storage persistence wiring.
   let severityFilter = "all";
   let jobSort = "started_at_desc";
   let jobBatchFilter = "";
   let recentDomainFilter = "";
   let recentPageSize = 20;
   let recentCursor = 0;
-  let recentTotal = 0;
-  let recentOffset = 0;
-  let recentNextCursor = "";
-  let recentPrevCursor = "";
 
   let selectedJobId = "";
   let selectedJob = null;
@@ -349,14 +343,6 @@
       // Ignore storage issues in restricted browser contexts.
     }
   };
-  const jobSeverityRows = (job) =>
-    summaryLevels
-      .map((level) => ({
-        level,
-        count: Number(job?.severity_totals?.[level] || 0)
-      }))
-      .filter((entry) => entry.count > 0);
-  const jobSeverityTotal = (job, level) => Number(job?.severity_totals?.[level] || 0);
   const formatJobTotalRuntime = (job) => formatJobTotalRuntimeRaw(job, isActiveJobStatus);
   const normalizeOptionalProfileID = (value) => {
     const parsed = Number(value);
@@ -376,20 +362,6 @@
     return profileNameByID(job?.profile_id || run?.profile_id);
   };
   const formatBatchStatusCounts = (statusCounts) => formatBatchStatusCountsRaw(statusCounts, normalizeStatus);
-
-  const matchesSeverityFilter = (job) => {
-    if (severityFilter === "warnings_plus") {
-      return (
-        jobSeverityTotal(job, "WARNING") > 0 ||
-        jobSeverityTotal(job, "ERROR") > 0 ||
-        jobSeverityTotal(job, "CRITICAL") > 0
-      );
-    }
-    if (severityFilter === "errors_only") {
-      return jobSeverityTotal(job, "ERROR") > 0 || jobSeverityTotal(job, "CRITICAL") > 0;
-    }
-    return true;
-  };
 
   const normalizeDomainInput = (value) => {
     const trimmed = (value || "").trim();
@@ -575,9 +547,7 @@
     if (tab === "single" || tab === "tags" || tab === "batches") {
       loadProfiles();
     }
-    if (tab === "recent") {
-      loadJobs();
-    } else if (tab === "domains") {
+    if (tab === "domains") {
       if (!tagsLoaded) loadDomainTags();
     } else if (tab === "tags") {
       loadTagCohortMap();
@@ -695,64 +665,6 @@
     );
   };
 
-  const loadJobs = async (options = {}) => {
-    const { resetCursor = false } = options;
-    if (resetCursor) {
-      recentCursor = 0;
-    }
-    jobsLoading = true;
-    try {
-      const params = new URLSearchParams({
-        limit: String(normalizeRecentPageSize(recentPageSize)),
-        sort: jobSort
-      });
-      const cursor = normalizeCursor(recentCursor);
-      if (cursor > 0) {
-        params.set("cursor", String(cursor));
-      }
-      const normalizedBatchID = jobBatchFilter.trim();
-      if (normalizedBatchID) {
-        params.set("batch_id", normalizedBatchID);
-      }
-      const normalizedDomain = recentDomainFilter.trim();
-      if (normalizedDomain) {
-        params.set("domain", normalizedDomain);
-      }
-      if (severityFilter !== "all") {
-        params.set("severity", severityFilter);
-      }
-      const list = await apiFetch(`/jobs?${params.toString()}`);
-      jobs = list.items || [];
-      recentTotal = Number.isFinite(Number(list.total)) ? Number(list.total) : jobs.length;
-      recentOffset = normalizeCursor(list.offset);
-      recentNextCursor = String(list.next_cursor || "");
-      recentPrevCursor = String(list.prev_cursor || "");
-      if (autoRefreshRecent && !hasRunningOrQueuedJobs(jobs)) {
-        autoRefreshRecent = false;
-      }
-    } catch (error) {
-      setStatus($t("error_load_jobs", { error: error.message }), "warn");
-    } finally {
-      jobsLoading = false;
-    }
-  };
-
-  const applyRecentFilters = async () => {
-    recentCursor = 0;
-    await loadJobs({ resetCursor: true });
-  };
-
-  const clearRecentFilters = async () => {
-    jobBatchFilter = "";
-    recentDomainFilter = "";
-    await loadJobs({ resetCursor: true });
-  };
-
-  const goToRecentCursor = async (cursor) => {
-    const parsed = Number(cursor);
-    recentCursor = Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
-    await loadJobs();
-  };
 
   const submitSingle = async () => {
     const normalizedDomain = normalizeDomainInput(singleDomain);
@@ -816,7 +728,6 @@
       }, 6000);
       setStatus($t("job_created", { id: job.id }), "ok");
       recentCursor = 0;
-      await loadJobs({ resetCursor: true });
       await loadJob(job.id);
     } catch (error) {
       setStatus($t("error_create_job", { error: error.message }), "warn");
@@ -863,7 +774,6 @@
       ensureNotificationPermission();
       setStatus($t("batch_accepted", { id: response.batch_id }), "ok");
       recentCursor = 0;
-      await loadJobs({ resetCursor: true });
       await loadRecentBatchOptions();
       await loadBatch(response.batch_id, { resetCursor: true });
     } catch (error) {
@@ -1305,12 +1215,6 @@
     batchPoller = setInterval(() => loadBatch(), 7000);
   };
 
-  const startRecentPolling = () => {
-    if (recentPoller) clearInterval(recentPoller);
-    if (!autoRefreshRecent || activeTab !== "recent") return;
-    recentPoller = setInterval(() => loadJobs(), 7000);
-  };
-
   const startActiveBatchesPolling = () => {
     if (activeBatchesPoller) clearInterval(activeBatchesPoller);
     if (activeTab !== "batches") return;
@@ -1336,12 +1240,6 @@
   }
 
   $: {
-    autoRefreshRecent;
-    activeTab;
-    startRecentPolling();
-  }
-
-  $: {
     activeTab;
     startActiveBatchesPolling();
   }
@@ -1359,14 +1257,6 @@
   $: if (autoRefreshBatch && selectedBatch && !hasActiveBatchJobs(selectedBatch)) {
     autoRefreshBatch = false;
   }
-
-  $: {
-    jobs;
-    severityFilter;
-    filteredJobs = jobs.filter((job) => matchesSeverityFilter(job));
-  }
-
-
 
   $: persistenceSignature = [
     activeTab,
@@ -1426,7 +1316,6 @@
     persistenceReady = true;
     window.addEventListener("hashchange", updateTabFromHash);
     window.addEventListener("popstate", onPopState);
-    loadJobs();
     loadDataForTab(activeTab);
   };
 
@@ -1445,7 +1334,6 @@
       if (jobPoller) clearInterval(jobPoller);
       if (batchPoller) clearInterval(batchPoller);
       if (activeBatchesPoller) clearInterval(activeBatchesPoller);
-      if (recentPoller) clearInterval(recentPoller);
       if (jobInspectorHighlightTimer) clearTimeout(jobInspectorHighlightTimer);
       window.removeEventListener("hashchange", updateTabFromHash);
       window.removeEventListener("popstate", onPopState);
@@ -1662,150 +1550,22 @@
       />
     </div>
   {:else if activeTab === "recent"}
-    <div class="card reveal delay-34 panel-mt" id="panel-recent" role="tabpanel" aria-labelledby="tab-recent">
-      <h2>{$t("recent_tests_heading")}</h2>
-      <div class="row">
-        <button class="ghost" type="button" onclick={loadJobs} disabled={jobsLoading}>
-          {jobsLoading ? $t("refreshing") : $t("refresh_list")}
-        </button>
-        <button class="ghost" type="button" onclick={() => (autoRefreshRecent = !autoRefreshRecent)}>
-          {autoRefreshRecent ? $t("auto_refresh_on") : $t("auto_refresh_off")}
-        </button>
-        <div class="sort-control">
-          <label for="recent-sort">{$t("sort_label")}</label>
-          <select id="recent-sort" bind:value={jobSort} onchange={applyRecentFilters}>
-            {#each jobSortOptions as option}
-              <option value={option.id}>{$t(option.labelKey)}</option>
-            {/each}
-          </select>
-        </div>
-        <div class="sort-control">
-          <label for="recent-page-size">{$t("page_size_label")}</label>
-          <select id="recent-page-size" bind:value={recentPageSize} onchange={applyRecentFilters}>
-            {#each recentPageSizes as pageSize}
-              <option value={pageSize}>{pageSize}</option>
-            {/each}
-          </select>
-        </div>
-        <div class="sort-control grow">
-          <label for="recent-domain-filter">{$t("domain_contains_label")}</label>
-          <input
-            id="recent-domain-filter"
-            type="text"
-            placeholder="example.com"
-            bind:value={recentDomainFilter}
-            onkeydown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                applyRecentFilters();
-              }
-            }}
-          />
-        </div>
-        <div class="sort-control grow">
-          <label for="recent-batch-filter">{$t("batch_id_filter_label")}</label>
-          <input
-            id="recent-batch-filter"
-            type="text"
-            placeholder="batch_123"
-            bind:value={jobBatchFilter}
-            onkeydown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                applyRecentFilters();
-              }
-            }}
-          />
-        </div>
-        <div class="row">
-          <button class="ghost" type="button" onclick={applyRecentFilters} disabled={jobsLoading}>{$t("apply_filters")}</button>
-          <button class="ghost" type="button" onclick={clearRecentFilters} disabled={jobsLoading}>{$t("clear")}</button>
-        </div>
-      </div>
-      <div class="severity-filter-bar" role="group" aria-label={$t("severity_filters_aria")}>
-        {#each severityFilters as filter}
-          <button
-            type="button"
-            class={`severity-filter ${severityFilter === filter.id ? "active" : ""}`}
-            onclick={async () => {
-              severityFilter = filter.id;
-              await applyRecentFilters();
-            }}
-          >
-            {$t(filter.labelKey)}
-          </button>
-        {/each}
-      </div>
-      <div class="row batch-pagination">
-        <button
-          class="ghost"
-          type="button"
-          onclick={() => goToRecentCursor(recentPrevCursor)}
-          disabled={!recentPrevCursor || jobsLoading}
-        >
-          {$t("previous")}
-        </button>
-        <button
-          class="ghost"
-          type="button"
-          onclick={() => goToRecentCursor(recentNextCursor)}
-          disabled={!recentNextCursor || jobsLoading}
-        >
-          {$t("next")}
-        </button>
-        <span class="small">
-          {$t("showing_jobs", { shown: jobs.length, total: recentTotal, offset: recentOffset || 0 })}
-        </span>
-      </div>
-      <div class="list">
-        {#if jobs.length === 0}
-          <div class="small">{$t("no_jobs")}</div>
-        {:else if filteredJobs.length === 0}
-          <div class="small">{$t("no_jobs_severity")}</div>
-        {:else}
-          {#each filteredJobs as job (job.id)}
-            <div class="list-item clickable" onclick={() => {
-              navigateToJob(job.id);
-            }} onkeydown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                navigateToJob(job.id);
-              }
-            }} role="button" tabindex="0">
-              <div class="list-item-main">
-                <div class="job-headline">
-                  <span class="mono job-id-link">{job.id}</span>
-                  <span class="small">{job.domain} – {job.status}</span>
-                  {#if jobSeverityRows(job).length}
-                    {#each jobSeverityRows(job) as entry (entry.level)}
-                      <span class={`level-pill severity-${entry.level.toLowerCase()}`}>{entry.level} {entry.count}</span>
-                    {/each}
-                  {:else if job.severity_totals !== undefined}
-                    <span class="level-pill severity-info">INFO</span>
-                  {/if}
-                  {#if scoringEnabled && hasScore(job)}
-                    <span class="grade-chip">
-                      <span class="grade-chip-letter" data-grade={chipGrade(job)}>{chipGrade(job)}</span>
-                      <span class="grade-chip-score">{chipScore(job)}</span>
-                    </span>
-                  {/if}
-                </div>
-                {#if job.batch_id}
-                  <div class="small mono">{$t("batch_prefix")} {job.batch_id}</div>
-                {/if}
-                {#if jobProfileName(job)}
-                  <div class="small">{$t("job_profile_label")}: <span class="mono">{jobProfileName(job)}</span></div>
-                {/if}
-                <div class="progress compact list-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={progressPercent(job)}>
-                  <div class="progress-bar" use:applyWidth={`${progressPercent(job)}%`}></div>
-                  <span class="progress-value">{progressPercent(job)}%</span>
-                </div>
-              </div>
-            </div>
-          {/each}
-        {/if}
-      </div>
-    </div>
+    <RecentJobsPanel
+      {apiFetch}
+      {setStatus}
+      {severityFilters}
+      {jobSortOptions}
+      {listPageSizes}
+      {availableProfiles}
+      {scoringEnabled}
+      bind:jobSort
+      bind:severityFilter
+      bind:jobBatchFilter
+      bind:recentDomainFilter
+      bind:recentPageSize
+      bind:recentCursor
+      onNavigateJob={navigateToJob}
+    />
   {:else if activeTab === "domains"}
     <DomainsPanel
       {apiFetch}

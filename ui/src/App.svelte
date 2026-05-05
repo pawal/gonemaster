@@ -56,12 +56,10 @@
   import ScoringSettings from "./ScoringSettings.svelte";
   import AnalysisCohorts from "./AnalysisCohorts.svelte";
   import BatchDeleteModal from "./BatchDeleteModal.svelte";
+  import StatusBanner from "./components/StatusBanner.svelte";
+  import { status, setStatus, clearStatus } from "./lib/status.svelte.js";
 
   const logoSrc = `${import.meta.env.BASE_URL}gonemaster.svg`;
-
-  let statusMessage = "";
-  let statusTone = "";
-  let statusDismissTimer = null;
 
   let singleDomain = "";
   let singleTags = "";
@@ -312,31 +310,6 @@
   let sortedMetricsDomainRows = [];
   let metricsBatchesSortState = { key: "failed_expired", direction: "desc" };
   let sortedMetricsBatchRows = [];
-
-  const clearStatus = () => {
-    statusMessage = "";
-    statusTone = "";
-    if (statusDismissTimer) {
-      clearTimeout(statusDismissTimer);
-      statusDismissTimer = null;
-    }
-  };
-
-  const setStatus = (message, tone = "") => {
-    statusMessage = message;
-    statusTone = tone;
-    if (statusDismissTimer) {
-      clearTimeout(statusDismissTimer);
-      statusDismissTimer = null;
-    }
-    if (!message) return;
-    const dismissDelayMs = tone === "ok" ? 5000 : 8000;
-    statusDismissTimer = setTimeout(() => {
-      statusMessage = "";
-      statusTone = "";
-      statusDismissTimer = null;
-    }, dismissDelayMs);
-  };
 
   const apiFetch = createApiFetch(apiPrefix);
 
@@ -920,7 +893,7 @@
     } else {
       window.history.pushState(state, "", url);
     }
-    if (changed && statusMessage) {
+    if (changed && status.message) {
       clearStatus();
     }
     loadDataForTab(next);
@@ -964,7 +937,7 @@
     activeTab = "single";
     const hash = `#/single/${encodeURIComponent(jobId)}`;
     window.history.pushState({ tab: "single", domain: null, tag: null, jobId }, "", `${window.location.pathname}${window.location.search}${hash}`);
-    if (statusMessage) clearStatus();
+    if (status.message) clearStatus();
     loadJob(jobId);
   };
 
@@ -977,7 +950,7 @@
     selectedDomainRunId = null;
     const hash = `#/domains/${encodeURIComponent(d.name)}`;
     window.history.pushState({ tab: "domains", domain: d, tag: null, jobId: null }, "", `${window.location.pathname}${window.location.search}${hash}`);
-    if (statusMessage) clearStatus();
+    if (status.message) clearStatus();
     loadDomainRuns();
   };
 
@@ -995,7 +968,7 @@
     tagBatchesOffset = 0;
     const hash = `#/tags/${encodeURIComponent(tag.name)}`;
     window.history.pushState({ tab: "tags", domain: null, tag, jobId: null }, "", `${window.location.pathname}${window.location.search}${hash}`);
-    if (statusMessage) clearStatus();
+    if (status.message) clearStatus();
     loadTagSummary();
     loadTagDomains();
     loadTagBatches({ reset: true });
@@ -2262,7 +2235,6 @@
       if (recentPoller) clearInterval(recentPoller);
       if (metricsPoller) clearInterval(metricsPoller);
       if (jobInspectorHighlightTimer) clearTimeout(jobInspectorHighlightTimer);
-      if (statusDismissTimer) clearTimeout(statusDismissTimer);
       window.removeEventListener("hashchange", updateTabFromHash);
       window.removeEventListener("popstate", onPopState);
     };
@@ -4104,12 +4076,8 @@ example.org`}
     </div>
   {/if}
 
-  {#if statusMessage}
-    <div class={`status-toast status-${statusTone === "ok" ? "ok" : "warn"} reveal delay-12`} role="status" aria-live="polite">
-      <div><strong>{statusTone === "ok" ? $t("toast_ok") : $t("toast_warn")}:</strong> {statusMessage}</div>
-      <button class="status-toast-close" type="button" aria-label={$t("dismiss_notification_aria")} onclick={clearStatus}>{$t("dismiss")}</button>
-    </div>
-  {/if}
+  <StatusBanner />
+
   </main>
 </div>
 

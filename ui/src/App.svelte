@@ -70,6 +70,7 @@
   import RunResultBody from "./components/RunResultBody.svelte";
   import MetricsPanel from "./panels/MetricsPanel.svelte";
   import DomainsPanel from "./panels/DomainsPanel.svelte";
+  import TagsPanel from "./panels/TagsPanel.svelte";
   import { status, setStatus, clearStatus } from "./lib/status.svelte.js";
   import { initThemeFromStorage } from "./lib/theme.svelte.js";
 
@@ -220,44 +221,9 @@
   let profilesLoading = false;
   let singleProfileId = "";
 
-  // Tags tab state.
-  let tagsList = [];
-  let tagsListLoading = false;
+  // Tags tab state owned at the App level (cross-tab pointers + cohort map).
   let tagCohortByName = new Map();
-  let tagCreateName = "";
-  let tagCreateDescription = "";
-  let tagCreating = false;
   let selectedTag = null;
-  let tagSummary = null;
-  let tagSummaryLoading = false;
-  let tagDomains = [];
-  let tagDomainsTotal = 0;
-  let tagDomainsOffset = 0;
-  let tagDomainsLimit = 50;
-  let tagDomainsLoading = false;
-  let tagDomainsSortState = { key: "", direction: "asc" };
-  let sortedTagDomains = [];
-  let tagDomainLevelFilter = "";
-  let tagAddDomainsInput = "";
-  let tagAddingDomains = false;
-  let tagRemoveDomainsInput = "";
-  let tagRemovingDomains = false;
-  let tagRunAllSubmitting = false;
-  let tagDeleteConfirm = false;
-  let tagDeleting = false;
-  let tagBatches = [];
-  let tagBatchesTotal = 0;
-  let tagBatchesOffset = 0;
-  let tagBatchesLimit = 20;
-  let tagBatchesLoading = false;
-  let tagProfileDraftId = "";
-  let tagProfileCurrentID = null;
-  let tagProfileSelectedID = null;
-  let tagProfileDirty = false;
-  let tagProfileUpdating = false;
-  let tagProfileClearing = false;
-  let tagsListSortState = { key: "", direction: "asc" };
-  let sortedTagsList = [];
   const apiFetch = async (path, options) => apiCall(apiPrefix, path, options);
 
   const summaryLevels = moduleLevels;
@@ -410,18 +376,6 @@
     return profileNameByID(job?.profile_id || run?.profile_id);
   };
   const formatBatchStatusCounts = (statusCounts) => formatBatchStatusCountsRaw(statusCounts, normalizeStatus);
-  const sortTagDomains = (key, defaultDir = "asc") => {
-    tagDomainsSortState = nextTableSort(tagDomainsSortState, key, defaultDir);
-    loadTagDomains({ reset: true });
-  };
-
-  // Maps UI sort state {key, direction} to an API sort parameter string.
-  // Returns "" when no server-side sort is applicable (client-only columns).
-  const domainSortParam = (state) => {
-    const map = { name: "name", latest_level: "latest_level", latest_score: "latest_score", latest_run_at: "latest_run_at", run_count: "run_count" };
-    const col = map[state?.key];
-    return col ? `${col}_${state.direction}` : "";
-  };
 
   const matchesSeverityFilter = (job) => {
     if (severityFilter === "warnings_plus") {
@@ -559,10 +513,6 @@
     return { nameservers, dsInfo };
   };
 
-  // Returns the effective display level for a domain. The server only tracks
-  const domainLevel = (d) => d?.latest_level || (d?.latest_run_at ? "INFO" : "");
-
-  // ── Grade chip helpers ───────────────────────────────────────────────────
   const applyWidth = (node, value) => {
     node.style.width = value;
     return { update(v) { node.style.width = v; } };
@@ -630,12 +580,7 @@
     } else if (tab === "domains") {
       if (!tagsLoaded) loadDomainTags();
     } else if (tab === "tags") {
-      loadTagsList();
       loadTagCohortMap();
-      if (selectedTag) {
-        loadTagDomains({ reset: true });
-        loadTagSummary();
-      }
     } else if (tab === "batches") {
       loadRecentBatchOptions();
       loadActiveBatches();
@@ -667,21 +612,9 @@
   const navigateToTagDetail = (tag) => {
     activeTab = "tags";
     selectedTag = tag;
-    tagProfileDraftId = tag?.default_profile_id ? String(tag.default_profile_id) : "";
-    tagSummary = null;
-    tagDomains = [];
-    tagDomainsOffset = 0;
-    tagDomainLevelFilter = "";
-    tagDeleteConfirm = false;
-    tagBatches = [];
-    tagBatchesTotal = 0;
-    tagBatchesOffset = 0;
     const hash = `#/tags/${encodeURIComponent(tag.name)}`;
     window.history.pushState({ tab: "tags", domain: null, tag, jobId: null }, "", `${window.location.pathname}${window.location.search}${hash}`);
     if (status.message) clearStatus();
-    loadTagSummary();
-    loadTagDomains();
-    loadTagBatches({ reset: true });
   };
 
   // Guard flag: when popstate fires, a hashchange event also fires for the
@@ -715,16 +648,9 @@
     }
     selectedDomain = state.domain ?? null;
     selectedTag = state.tag ?? null;
-    tagProfileDraftId = selectedTag?.default_profile_id ? String(selectedTag.default_profile_id) : "";
     if (state.jobId) {
       selectedJobId = state.jobId;
       loadJob(state.jobId);
-    }
-    if (!selectedTag) {
-      tagDeleteConfirm = false;
-    } else {
-      loadTagSummary();
-      loadTagDomains({ reset: true });
     }
   };
 
@@ -1238,16 +1164,10 @@
     await loadProfiles();
   };
 
-  const loadTagsList = async () => {
-    tagsListLoading = true;
-    try {
-      const data = await apiFetch("/tags");
-      tagsList = Array.isArray(data) ? data : [];
-    } catch (error) {
-      setStatus($t("tags_load_error", { error: error.message || "unknown error" }), "warn");
-    } finally {
-      tagsListLoading = false;
-    }
+  const handleTagProfileChanged = (tagName, profileID) => {
+    availableTags = availableTags.map((tag) =>
+      tag.name === tagName ? { ...tag, default_profile_id: profileID } : tag
+    );
   };
 
   const loadTagCohortMap = async () => {
@@ -1260,203 +1180,12 @@
     }
   };
 
-  const syncTagProfileState = (tagName, profileID) => {
-    const nextValue = normalizeOptionalProfileID(profileID);
-    if (selectedTag?.name === tagName) {
-      selectedTag = { ...selectedTag, default_profile_id: nextValue };
-    }
-    tagsList = tagsList.map((tag) =>
-      tag.name === tagName ? { ...tag, default_profile_id: nextValue } : tag
-    );
-    availableTags = availableTags.map((tag) =>
-      tag.name === tagName ? { ...tag, default_profile_id: nextValue } : tag
-    );
-    tagProfileDraftId = nextValue ? String(nextValue) : "";
-  };
-
-  const createTag = async () => {
-    const name = tagCreateName.trim();
-    if (!name) return;
-    tagCreating = true;
-    try {
-      await apiFetch("/tags", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, description: tagCreateDescription.trim() })
-      });
-      tagCreateName = "";
-      tagCreateDescription = "";
-      setStatus($t("tag_created"), "ok");
-      await loadTagsList();
-      await loadDomainTags();
-    } catch (error) {
-      setStatus($t("tag_create_error", { error: error.message || "unknown error" }), "warn");
-    } finally {
-      tagCreating = false;
-    }
-  };
-
-  const loadTagSummary = async () => {
-    if (!selectedTag) return;
-    tagSummaryLoading = true;
-    try {
-      tagSummary = await apiFetch(`/tags/${encodeURIComponent(selectedTag.name)}/summary`);
-    } catch (_) {
-      tagSummary = null;
-    } finally {
-      tagSummaryLoading = false;
-    }
-  };
-
-  const loadTagBatches = async (options = {}) => {
-    if (!selectedTag) return;
-    const { reset = false } = options;
-    if (reset) tagBatchesOffset = 0;
-    tagBatchesLoading = true;
-    try {
-      const params = new URLSearchParams({
-        limit: String(tagBatchesLimit),
-        offset: String(tagBatchesOffset),
-      });
-      const data = await apiFetch(`/tags/${encodeURIComponent(selectedTag.name)}/batches?${params}`);
-      tagBatches = data?.items ?? [];
-      tagBatchesTotal = data?.total ?? 0;
-    } catch (error) {
-      setStatus($t("tag_domains_load_error", { error: error.message || "unknown error" }), "warn");
-    } finally {
-      tagBatchesLoading = false;
-    }
-  };
-
   const openBatchFromTagRow = async (batchId) => {
     const id = (batchId || "").trim();
     if (!id) return;
     selectedBatchId = id;
     await setTab("batches");
     await loadBatch(id, { resetCursor: true });
-  };
-
-  const loadTagDomains = async (options = {}) => {
-    if (!selectedTag) return;
-    const { reset = false } = options;
-    if (reset) tagDomainsOffset = 0;
-    tagDomainsLoading = true;
-    try {
-      const params = new URLSearchParams({ limit: String(tagDomainsLimit), offset: String(tagDomainsOffset) });
-      if (tagDomainLevelFilter) params.set("min_level", tagDomainLevelFilter);
-      const sortVal = domainSortParam(tagDomainsSortState);
-      if (sortVal) params.set("sort", sortVal);
-      const data = await apiFetch(`/tags/${encodeURIComponent(selectedTag.name)}/domains?${params}`);
-      tagDomains = data?.items ?? [];
-      tagDomainsTotal = data?.total ?? 0;
-    } catch (error) {
-      setStatus($t("tag_domains_load_error", { error: error.message || "unknown error" }), "warn");
-    } finally {
-      tagDomainsLoading = false;
-    }
-  };
-
-  const runAllFromTag = async () => {
-    if (!selectedTag) return;
-    tagRunAllSubmitting = true;
-    try {
-      const response = await apiFetch("/jobs/batch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ from_tag: selectedTag.name })
-      });
-      createdBatchId = response.batch_id || "";
-      selectedBatchId = response.batch_id || "";
-      setStatus($t("batch_accepted", { id: response.batch_id }), "ok");
-      await loadRecentBatchOptions();
-      await loadBatch(response.batch_id, { resetCursor: true });
-      setTab("batches");
-    } catch (error) {
-      setStatus($t("tag_run_all_error", { error: error.message || "unknown error" }), "warn");
-    } finally {
-      tagRunAllSubmitting = false;
-    }
-  };
-
-  const saveTagProfile = async () => {
-    if (!selectedTag || !tagProfileSelectedID || !tagProfileDirty) return;
-    tagProfileUpdating = true;
-    try {
-      await apiFetch(`/tags/${encodeURIComponent(selectedTag.name)}/profile`, {
-        method: "PUT",
-        body: JSON.stringify({ profile_id: tagProfileSelectedID })
-      });
-      syncTagProfileState(selectedTag.name, tagProfileSelectedID);
-      setStatus($t("tag_profile_saved", { name: profileNameByID(tagProfileSelectedID) }), "ok");
-      await loadTagsList();
-      await loadDomainTags();
-    } catch (error) {
-      setStatus($t("tag_profile_save_error", { error: error.message || "unknown error" }), "warn");
-    } finally {
-      tagProfileUpdating = false;
-    }
-  };
-
-  const clearTagProfile = async () => {
-    if (!selectedTag || !tagProfileCurrentID) return;
-    tagProfileClearing = true;
-    try {
-      await apiFetch(`/tags/${encodeURIComponent(selectedTag.name)}/profile`, {
-        method: "DELETE"
-      });
-      syncTagProfileState(selectedTag.name, null);
-      setStatus($t("tag_profile_cleared"), "ok");
-      await loadTagsList();
-      await loadDomainTags();
-    } catch (error) {
-      setStatus($t("tag_profile_clear_error", { error: error.message || "unknown error" }), "warn");
-    } finally {
-      tagProfileClearing = false;
-    }
-  };
-
-  const addTagDomains = async () => {
-    if (!selectedTag || !tagAddDomainsInput.trim()) return;
-    const domains = tagAddDomainsInput.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
-    if (domains.length === 0) return;
-    tagAddingDomains = true;
-    try {
-      await apiFetch(`/tags/${encodeURIComponent(selectedTag.name)}/domains`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ domains })
-      });
-      tagAddDomainsInput = "";
-      setStatus($t("tag_domains_added"), "ok");
-      await loadTagDomains({ reset: true });
-      await loadTagSummary();
-    } catch (error) {
-      setStatus($t("tag_domains_add_error", { error: error.message || "unknown error" }), "warn");
-    } finally {
-      tagAddingDomains = false;
-    }
-  };
-
-  const removeTagDomains = async () => {
-    if (!selectedTag || !tagRemoveDomainsInput.trim()) return;
-    const domains = tagRemoveDomainsInput.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
-    if (domains.length === 0) return;
-    tagRemovingDomains = true;
-    try {
-      await apiFetch(`/tags/${encodeURIComponent(selectedTag.name)}/domains`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ domains })
-      });
-      tagRemoveDomainsInput = "";
-      setStatus($t("tag_domains_removed"), "ok");
-      await loadTagDomains({ reset: true });
-      await loadTagSummary();
-    } catch (error) {
-      setStatus($t("tag_domains_remove_error", { error: error.message || "unknown error" }), "warn");
-    } finally {
-      tagRemovingDomains = false;
-    }
   };
 
   const openBatchDelete = (batchId) => {
@@ -1482,27 +1211,6 @@
     batchDeletedCounter += 1;
     await loadRecentBatchOptions();
     await loadActiveBatches();
-    if (selectedTag && typeof loadTagBatches === "function") {
-      await loadTagBatches({ reset: true });
-    }
-  };
-
-  const deleteTag = async () => {
-    if (!selectedTag) return;
-    tagDeleting = true;
-    try {
-      await apiFetch(`/tags/${encodeURIComponent(selectedTag.name)}`, { method: "DELETE" });
-      setStatus($t("tag_deleted"), "ok");
-      selectedTag = null;
-      tagProfileDraftId = "";
-      tagDeleteConfirm = false;
-      await loadTagsList();
-      await loadDomainTags();
-    } catch (error) {
-      setStatus($t("tag_delete_error", { error: error.message || "unknown error" }), "warn");
-    } finally {
-      tagDeleting = false;
-    }
   };
 
   const loadFeatures = async () => {
@@ -1659,22 +1367,6 @@
   }
 
 
-  $: sortedTagDomains = sortItems(tagDomains, tagDomainsSortState, {
-    name: (left, right) => compareText(left?.name, right?.name),
-    latest_level: (left, right) => compareSeverity(domainLevel(left), domainLevel(right)),
-    latest_score: (left, right) => compareNumber(left?.latest_score, right?.latest_score),
-    latest_run_at: (left, right) => compareTimestamp(left?.latest_run_at, right?.latest_run_at)
-  }, (left, right) => compareText(left?.name, right?.name));
-
-  $: sortedTagsList = sortItems(tagsList, tagsListSortState, {
-    name: (left, right) => compareText(left?.name, right?.name),
-    description: (left, right) => compareText(left?.description, right?.description),
-    domain_count: (left, right) => compareNumber(left?.domain_count, right?.domain_count)
-  }, (left, right) => compareText(left?.name, right?.name));
-
-  $: tagProfileCurrentID = normalizeOptionalProfileID(selectedTag?.default_profile_id);
-  $: tagProfileSelectedID = normalizeOptionalProfileID(tagProfileDraftId);
-  $: tagProfileDirty = tagProfileCurrentID !== tagProfileSelectedID;
 
   $: persistenceSignature = [
     activeTab,
@@ -2126,289 +1818,22 @@
       onNavigateJob={navigateToJob}
     />
   {:else if activeTab === "tags"}
-    <div class="card reveal delay-34 panel-mt" id="panel-tags" role="tabpanel" aria-labelledby="tab-tags">
-      {#if selectedTag}
-        <button class="secondary small" onclick={() => { selectedTag = null; tagProfileDraftId = ""; setTab("tags"); }}>{$t("back_to_tags")}</button>
-        <h2 class="mt-half">{$t("batch_tag_label")}: {selectedTag.name}</h2>
-        {#if tagCohortByName.has(selectedTag.name)}
-          <p class="small heading-tight">
-            {$t("tag_cohort_source_prefix")}
-            <button type="button" class="link-button" onclick={() => setTab("cohorts")}>
-              {tagCohortByName.get(selectedTag.name).label || tagCohortByName.get(selectedTag.name).source_tag}
-            </button>
-          </p>
-        {/if}
-
-        <!-- Severity summary -->
-        {#if tagSummaryLoading}
-          <p class="muted">{$t("loading")}</p>
-        {:else if tagSummary}
-          <div class="toolbar-row gap-1 mb-one">
-            <span class="level-pill severity-info">{$t("sev_ok")} {tagSummary.ok}</span>
-            <span class="level-pill severity-notice">{$t("sev_notice")} {tagSummary.notice}</span>
-            <span class="level-pill severity-warning">{$t("sev_warning")} {tagSummary.warning}</span>
-            <span class="level-pill severity-error">{$t("sev_error")} {tagSummary.error}</span>
-            <span class="level-pill severity-critical">{$t("sev_critical")} {tagSummary.critical}</span>
-          </div>
-        {/if}
-
-        <!-- Run all + delete -->
-        <div class="toolbar-row mb-one">
-          <button class="secondary" onclick={runAllFromTag} disabled={tagRunAllSubmitting}>
-            {tagRunAllSubmitting ? $t("submitting") : $t("tag_run_all_button")}
-          </button>
-          {#if tagDeleteConfirm}
-            <button class="warn" onclick={deleteTag} disabled={tagDeleting}>{tagDeleting ? $t("submitting") : $t("tag_delete_confirm_button")}</button>
-            <button class="ghost" onclick={() => { tagDeleteConfirm = false; }}>{$t("tag_delete_cancel_button")}</button>
-          {:else}
-            <button class="ghost" onclick={() => { tagDeleteConfirm = true; }}>{$t("tag_delete_button")}</button>
-          {/if}
-        </div>
-
-        <h3>{$t("earlier_batches_heading")}</h3>
-        {#if tagBatchesLoading}
-          <p class="muted">{$t("loading")}</p>
-        {:else if tagBatches.length === 0}
-          <p class="muted">{$t("earlier_batches_empty")}</p>
-        {:else}
-          <table class="data-table">
-            <thead><tr>
-              <th>{$t("batch_id_label")}</th>
-              <th>{$t("col_created_at")}</th>
-              <th>{$t("col_domain_count")}</th>
-              <th></th>
-            </tr></thead>
-            <tbody>
-              {#each tagBatches as b (b.id)}
-                <tr
-                  class="row-clickable"
-                  onclick={(e) => { if (e.target.closest("[data-row-action]")) return; openBatchFromTagRow(b.id); }}
-                  onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") openBatchFromTagRow(b.id); }}
-                  role="button"
-                  tabindex="0"
-                >
-                  <td class="mono">
-                    {b.id}
-                    {#if b.snapshot_intent}<span class="pill snapshot-intent ml-quarter">{$t("batch_snapshot_intent_pill")}</span>{/if}
-                  </td>
-                  <td>{b.created_at ? b.created_at.slice(0, 19).replace("T", " ") : "-"}</td>
-                  <td>{b.domain_count ?? "-"}</td>
-                  <td class="text-right" data-row-action>
-                    <button
-                      class="ghost small warn"
-                      type="button"
-                      data-row-action
-                      onclick={() => openBatchDelete(b.id)}
-                    >{$t("batch_delete_button")}</button>
-                  </td>
-                </tr>
-              {/each}
-            </tbody>
-          </table>
-          <div class="pagination">
-            <button class="secondary small" disabled={tagBatchesOffset === 0}
-              onclick={() => { tagBatchesOffset = Math.max(0, tagBatchesOffset - tagBatchesLimit); loadTagBatches(); }}
-            >{$t("prev_page")}</button>
-            <span class="muted small">
-              {$t("earlier_batches_pagination_label", {
-                from: tagBatchesOffset + 1,
-                to: Math.min(tagBatchesOffset + tagBatchesLimit, tagBatchesTotal),
-                total: tagBatchesTotal,
-              })}
-            </span>
-            <button class="secondary small" disabled={tagBatchesOffset + tagBatchesLimit >= tagBatchesTotal}
-              onclick={() => { tagBatchesOffset += tagBatchesLimit; loadTagBatches(); }}
-            >{$t("next_page")}</button>
-          </div>
-        {/if}
-
-        <h3>{$t("tag_default_profile_heading")}</h3>
-        <div class="stack config-form">
-          <label for="tag-default-profile">{$t("tag_default_profile_label")}</label>
-          <select id="tag-default-profile" bind:value={tagProfileDraftId} disabled={profilesLoading && availableProfiles.length === 0}>
-            <option value="">{$t("tag_default_profile_none_option")}</option>
-            {#each availableProfiles as profile}
-              <option value={profile.id}>{profile.name}</option>
-            {/each}
-          </select>
-          <div class="small">{$t("tag_default_profile_hint")}</div>
-          <div class="small">
-            {#if tagProfileCurrentID}
-              {$t("tag_default_profile_current", { name: profileNameByID(tagProfileCurrentID) })}
-            {:else}
-              {$t("tag_default_profile_current_none")}
-            {/if}
-          </div>
-          <div class="row">
-            <button
-              class="secondary small"
-              onclick={saveTagProfile}
-              disabled={!tagProfileDirty || !tagProfileSelectedID || tagProfileUpdating || tagProfileClearing}
-            >
-              {tagProfileUpdating ? $t("submitting") : $t("tag_default_profile_save_button")}
-            </button>
-            <button
-              class="ghost small"
-              onclick={clearTagProfile}
-              disabled={!tagProfileCurrentID || tagProfileUpdating || tagProfileClearing}
-            >
-              {tagProfileClearing ? $t("submitting") : $t("tag_default_profile_clear_button")}
-            </button>
-          </div>
-        </div>
-
-        <!-- Domain list with level filter -->
-        <h3>{$t("tag_domains_heading")}</h3>
-        <div class="toolbar-row mb-half">
-          <select
-            bind:value={tagDomainLevelFilter}
-            onchange={() => loadTagDomains({ reset: true })}
-            aria-label={$t("level_filter_label")}
-            class="fb-180-shrink"
-          >
-            <option value="">{$t("level_filter_all")}</option>
-            <option value="WARNING">{$t("level_filter_warning_plus")}</option>
-            <option value="ERROR">{$t("level_filter_error_plus")}</option>
-          </select>
-        </div>
-        {#if tagDomainsLoading}
-          <p class="muted">{$t("loading")}</p>
-        {:else if tagDomains.length === 0}
-          <p class="muted">{$t("no_domains")}</p>
-        {:else}
-          <table class="data-table">
-            <thead><tr>
-              <th class="sortable-column" aria-sort={tableSortAria(tagDomainsSortState, "name")}><button class="table-sort-button" type="button" onclick={() => { sortTagDomains("name"); }}><span>{$t("col_domain_name")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(tagDomainsSortState, "name")}</span></button></th>
-              <th class="sortable-column" aria-sort={tableSortAria(tagDomainsSortState, "latest_level")}><button class="table-sort-button" type="button" onclick={() => { sortTagDomains("latest_level", "desc"); }}><span>{$t("col_latest_level")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(tagDomainsSortState, "latest_level")}</span></button></th>
-              {#if scoringEnabled}<th class="sortable-column" aria-sort={tableSortAria(tagDomainsSortState, "latest_score")}><button class="table-sort-button" type="button" onclick={() => { sortTagDomains("latest_score", "desc"); }}><span>{$t("col_score")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(tagDomainsSortState, "latest_score")}</span></button></th>{/if}
-              <th class="sortable-column" aria-sort={tableSortAria(tagDomainsSortState, "latest_run_at")}><button class="table-sort-button" type="button" onclick={() => { sortTagDomains("latest_run_at", "desc"); }}><span>{$t("col_latest_run_at")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(tagDomainsSortState, "latest_run_at")}</span></button></th>
-            </tr></thead>
-            <tbody>
-              {#each sortedTagDomains as d}
-                <tr
-                  class="row-clickable"
-                  onclick={() => navigateToDomainDetail(d)}
-                  role="button"
-                  tabindex="0"
-                  onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") navigateToDomainDetail(d); }}
-                >
-                  <td class="mono">{d.name}</td>
-                  <td>{#if domainLevel(d)}<span class="badge level-{domainLevel(d).toLowerCase()}">{domainLevel(d)}</span>{:else}-{/if}</td>
-                  {#if scoringEnabled}<td>{#if d.latest_grade != null && d.latest_score != null}<span class="grade-chip"><span class="grade-chip-letter" data-grade={d.latest_grade}>{d.latest_grade}</span><span class="grade-chip-score">{d.latest_score}</span></span>{:else}-{/if}</td>{/if}
-                  <td>{d.latest_run_at ? d.latest_run_at.slice(0, 10) : "-"}</td>
-                </tr>
-              {/each}
-            </tbody>
-          </table>
-          <div class="pagination">
-            <button class="secondary small" disabled={tagDomainsOffset === 0}
-              onclick={() => { tagDomainsOffset = Math.max(0, tagDomainsOffset - tagDomainsLimit); loadTagDomains(); }}
-            >{$t("prev_page")}</button>
-            <span class="muted small">{tagDomainsOffset + 1}–{Math.min(tagDomainsOffset + tagDomainsLimit, tagDomainsTotal)} / {tagDomainsTotal}</span>
-            <button class="secondary small" disabled={tagDomainsOffset + tagDomainsLimit >= tagDomainsTotal}
-              onclick={() => { tagDomainsOffset += tagDomainsLimit; loadTagDomains(); }}
-            >{$t("next_page")}</button>
-          </div>
-        {/if}
-
-        <!-- Add domains -->
-        <h3 class="mt-1-25">{$t("tag_add_domains_heading")}</h3>
-        <textarea
-          bind:value={tagAddDomainsInput}
-          placeholder={$t("tag_domains_placeholder")}
-          rows="3"
-          class="input-fluid"
-        ></textarea>
-        <button class="secondary" onclick={addTagDomains} disabled={tagAddingDomains}>
-          {tagAddingDomains ? $t("submitting") : $t("tag_add_domains_button")}
-        </button>
-
-        <!-- Remove domains -->
-        <h3 class="mt-1-25">{$t("tag_remove_domains_heading")}</h3>
-        <textarea
-          bind:value={tagRemoveDomainsInput}
-          placeholder={$t("tag_domains_placeholder")}
-          rows="3"
-          class="input-fluid"
-        ></textarea>
-        <button class="ghost" onclick={removeTagDomains} disabled={tagRemovingDomains}>
-          {tagRemovingDomains ? $t("submitting") : $t("tag_remove_domains_button")}
-        </button>
-
-      {:else}
-        <h2>{$t("tags_tab_heading")}</h2>
-
-        <!-- Create tag form -->
-        <div class="toolbar-row mb-one align-end">
-          <div class="stack fb-160-grow">
-            <label for="tag-create-name">{$t("tag_name_label")}</label>
-            <input id="tag-create-name" type="text" bind:value={tagCreateName} placeholder="my-tag" />
-          </div>
-          <div class="stack fb-240-grow-2">
-            <label for="tag-create-desc">{$t("tag_description_label")}</label>
-            <input id="tag-create-desc" type="text" bind:value={tagCreateDescription} placeholder={$t("tag_description_placeholder")} onkeydown={(e) => { if (e.key === 'Enter') createTag(); }} />
-          </div>
-          <button class="secondary" onclick={createTag} disabled={tagCreating || !tagCreateName.trim()}>
-            {tagCreating ? $t("submitting") : $t("tag_create_button")}
-          </button>
-        </div>
-
-        <!-- Tag list -->
-        {#if tagsListLoading}
-          <p class="muted">{$t("loading")}</p>
-        {:else if tagsList.length === 0}
-          <p class="muted">{$t("no_tags")}</p>
-        {:else}
-          <table class="data-table">
-            <thead><tr>
-              <th class="sortable-column" aria-sort={tableSortAria(tagsListSortState, "name")}><button class="table-sort-button" type="button" onclick={() => { tagsListSortState = nextTableSort(tagsListSortState, "name"); }}><span>{$t("tag_name_label")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(tagsListSortState, "name")}</span></button></th>
-              <th>{$t("tag_cohort_col_header")}</th>
-              <th class="sortable-column" aria-sort={tableSortAria(tagsListSortState, "description")}><button class="table-sort-button" type="button" onclick={() => { tagsListSortState = nextTableSort(tagsListSortState, "description"); }}><span>{$t("tag_description_label")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(tagsListSortState, "description")}</span></button></th>
-              <th class="sortable-column" aria-sort={tableSortAria(tagsListSortState, "domain_count")}><button class="table-sort-button" type="button" onclick={() => { tagsListSortState = nextTableSort(tagsListSortState, "domain_count", "desc"); }}><span>{$t("col_domain_count")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(tagsListSortState, "domain_count")}</span></button></th>
-              <th>{$t("analysis_cohorts_col_actions")}</th>
-            </tr></thead>
-            <tbody>
-              {#each sortedTagsList as tag}
-                <tr
-                  class="row-clickable"
-                  onclick={() => navigateToTagDetail(tag)}
-                  role="button"
-                  tabindex="0"
-                  onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") navigateToTagDetail(tag); }}
-                >
-                  <td class="mono">{tag.name}</td>
-                  <td>
-                    {#if tagCohortByName.has(tag.name)}
-                      <button
-                        type="button"
-                        class="tag-cohort-chip"
-                        title={$t("tag_cohort_link_title", { cohort: tagCohortByName.get(tag.name).label || tagCohortByName.get(tag.name).source_tag })}
-                        onclick={(e) => { e.stopPropagation(); setTab("cohorts"); }}
-                      >
-                        {tagCohortByName.get(tag.name).label || tagCohortByName.get(tag.name).source_tag}
-                      </button>
-                    {:else}
-                      -
-                    {/if}
-                  </td>
-                  <td>{tag.description || "-"}</td>
-                  <td>{tag.domain_count ?? 0}</td>
-                  <td class="text-right">
-                    <button
-                      class="secondary small"
-                      type="button"
-                      onclick={(e) => { e.stopPropagation(); navigateToTagDetail(tag); }}
-                    >
-                      {$t("earlier_batches_heading")}
-                    </button>
-                  </td>
-                </tr>
-              {/each}
-            </tbody>
-          </table>
-        {/if}
-      {/if}
-    </div>
+    <TagsPanel
+      {apiFetch}
+      {setStatus}
+      {clearStatus}
+      bind:selectedTag
+      {availableProfiles}
+      {profilesLoading}
+      {tagCohortByName}
+      {scoringEnabled}
+      onNavigateDomainDetail={navigateToDomainDetail}
+      onSetTab={setTab}
+      onOpenBatchDelete={openBatchDelete}
+      onOpenBatchFromTagRow={openBatchFromTagRow}
+      onTagProfileChanged={handleTagProfileChanged}
+      onTagsListChanged={loadDomainTags}
+    />
   {:else if activeTab === "cohorts"}
     <div class="grid panel-mt" id="panel-cohorts" role="tabpanel" aria-labelledby="tab-cohorts">
       <div class="card reveal delay-22 grid-span-full">

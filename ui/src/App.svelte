@@ -51,6 +51,26 @@
     encodeStateToURLParams,
     serializeStateForStorage,
   } from "./lib/persistence.js";
+  import {
+    moduleLevels,
+    CAT_ORDER,
+    CAT_LABELS,
+    BONUS_HIDDEN,
+    worstLevel,
+    bannerClass,
+    isNoticeOrAbove,
+    hasScore,
+    chipGrade,
+    chipScore,
+    resultScore,
+    formatSeconds,
+    formatTimingMs,
+    entryMessage,
+    moduleId,
+    summaryRows,
+    okTestcaseCount,
+    groupRawEntries,
+  } from "./lib/result.js";
   import ProfileSettings from "./ProfileSettings.svelte";
   import ServerSettings from "./ServerSettings.svelte";
   import ScoringSettings from "./ScoringSettings.svelte";
@@ -287,7 +307,7 @@
 
   const apiFetch = createApiFetch(apiPrefix);
 
-  const summaryLevels = ["NOTICE", "WARNING", "ERROR", "CRITICAL"];
+  const summaryLevels = moduleLevels;
   const severityFilters = [
     { id: "all", labelKey: "sev_all" },
     { id: "warnings_plus", labelKey: "sev_warnings_plus" },
@@ -411,15 +431,6 @@
     } catch (_) {
       // Ignore storage issues in restricted browser contexts.
     }
-  };
-  const summaryRows = (summary) => {
-    const levels = summary?.levels || {};
-    return summaryLevels
-      .map((level) => ({
-        level,
-        count: Number(levels[level] || 0)
-      }))
-      .filter((entry) => entry.count > 0);
   };
   const jobSeverityRows = (job) =>
     summaryLevels
@@ -711,35 +722,10 @@
     return { nameservers, dsInfo };
   };
 
-  const moduleLevels = ["NOTICE", "WARNING", "ERROR", "CRITICAL"];
   // Returns the effective display level for a domain. The server only tracks
   const domainLevel = (d) => d?.latest_level || (d?.latest_run_at ? "INFO" : "");
-  const worstLevel = (entries) => {
-    if (!entries?.length) return "INFO";
-    let worst = 0;
-    for (const e of entries) {
-      const idx = LEVEL_ORDER.indexOf(normalizeLevel(e.level));
-      if (idx > worst) worst = idx;
-    }
-    return LEVEL_ORDER[worst] ?? "INFO";
-  };
-  const bannerClass = (level) => {
-    const l = normalizeLevel(level);
-    if (l === "CRITICAL") return "critical";
-    if (l === "ERROR") return "error";
-    if (l === "WARNING") return "warning";
-    return "ok";
-  };
-  const isNoticeOrAbove = (level) => {
-    return LEVEL_ORDER.indexOf(normalizeLevel(level)) >= LEVEL_ORDER.indexOf("NOTICE");
-  };
 
   // ── Grade chip helpers ───────────────────────────────────────────────────
-  const CAT_ORDER = ["dnssec", "nameserver_health", "connectivity", "zone_consistency"];
-  const CAT_LABELS = { dnssec: "DNSSEC", nameserver_health: "Nameserver", connectivity: "Connectivity", zone_consistency: "Zone" };
-  const BONUS_HIDDEN = new Set(["no_warnings_or_errors"]);
-  // Returns true when a run/job has a score to display.
-  const hasScore = (item) => item?.score != null && item?.grade != null;
   const GRADE_COLORS = { "A+": "var(--grade-aplus)", "A": "var(--grade-a)", "B": "var(--grade-b)", "C": "var(--grade-c)", "D": "var(--grade-d)", "F": "var(--grade-f)" };
   const gradeBarColor = (grade) => GRADE_COLORS[grade] ?? "var(--grade-a)";
   // Apply per-element style values via DOM API instead of inline `style="..."`,
@@ -757,63 +743,7 @@
     node.style.width = value;
     return { update(v) { node.style.width = v; } };
   };
-  // Returns the full scoring result from either a run (score object) or a
-  // job-list item where score is just an int and grade a string.
-  const chipGrade  = (item) => item?.grade ?? null;
-  const chipScore  = (item) => item?.score ?? null;
-  // Full scoring result - only present on JobResult / selectedJobResult.
-  const resultScore = (result) => result?.score ?? null;
-  const formatSeconds = (value) => {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric)) return "0.00";
-    return numeric.toFixed(2);
-  };
-  const formatTimingMs = (value) => {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric)) return "0";
-    return Math.round(numeric).toString();
-  };
-  const entryMessage = (entry) => {
-    if (!entry) return "";
-    if (entry.message) return entry.message;
-    if (entry.raw) return entry.raw;
-    return [entry.module, entry.testcase, entry.tag].filter(Boolean).join(":");
-  };
   const entryMeta = (entry) => [entry?.testcase, entry?.tag].filter(Boolean).join(" · ");
-  const moduleId = (key) => `module-${String(key).toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
-  const groupRawEntries = (raw) => {
-    const entries = raw?.entries || [];
-    const modules = new Map();
-    entries.forEach((entry) => {
-      const name = entry.module || "Unspecified";
-      const key = name.toUpperCase();
-      if (!modules.has(key)) {
-        modules.set(key, { key, name, entries: [], testcases: new Map(), ungrouped: [], counts: {} });
-      }
-      const mod = modules.get(key);
-      mod.entries.push(entry);
-      const level = normalizeLevel(entry.level);
-      mod.counts[level] = (mod.counts[level] || 0) + 1;
-      const tc = (entry.testcase && entry.testcase !== "Unspecified") ? entry.testcase : "";
-      if (tc) {
-        if (!mod.testcases.has(tc)) mod.testcases.set(tc, { tc, entries: [] });
-        mod.testcases.get(tc).entries.push(entry);
-      } else {
-        mod.ungrouped.push(entry);
-      }
-    });
-    for (const mod of modules.values()) {
-      for (const tcg of mod.testcases.values()) tcg.level = worstLevel(tcg.entries);
-      mod.testcasesArr = Array.from(mod.testcases.values());
-    }
-    const arr = Array.from(modules.values());
-    arr.sort((a, b) => {
-      if (a.key === "SYSTEM") return -1;
-      if (b.key === "SYSTEM") return 1;
-      return 0;
-    });
-    return arr;
-  };
   const toggleModule = (key) => {
     moduleOpen = { ...moduleOpen, [key]: !moduleOpen[key] };
   };
@@ -821,9 +751,6 @@
   const toggleDomainModule = (key) => {
     domainModuleOpen = { ...domainModuleOpen, [key]: !domainModuleOpen[key] };
   };
-
-  const okTestcaseCount = (group) =>
-    group.testcasesArr.filter(tcg => !moduleLevels.includes(normalizeLevel(tcg.level))).length;
 
   const normalizeTab = (value) => {
     const tab = String(value || "").replace(/^\/+/, "").toLowerCase();

@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { fetchMetricsSnapshot, metricsWindowOptions } from "./metrics.js";
   import { t, locale, loadCatalog } from "./i18n.js";
+  import { createApiFetch } from "./lib/api.js";
   import ProfileSettings from "./ProfileSettings.svelte";
   import ServerSettings from "./ServerSettings.svelte";
   import ScoringSettings from "./ScoringSettings.svelte";
@@ -304,23 +305,7 @@
     }, dismissDelayMs);
   };
 
-  const apiFetch = async (path, options = {}) => {
-    const url = path?.startsWith("/") ? `${apiPrefix}${path}` : `${apiPrefix}/${path}`;
-    const headers = { ...(options.headers || {}) };
-    if (options.body && !headers["Content-Type"]) {
-      headers["Content-Type"] = "application/json";
-    }
-    const response = await fetch(url, { ...options, headers });
-    const contentType = response.headers.get("content-type") || "";
-    const payload = contentType.includes("application/json")
-      ? await response.json()
-      : await response.text();
-    if (!response.ok) {
-      const message = payload?.error?.message || payload?.message || response.statusText;
-      throw new Error(message);
-    }
-    return payload;
-  };
+  const apiFetch = createApiFetch(apiPrefix);
 
   const summaryLevels = ["NOTICE", "WARNING", "ERROR", "CRITICAL"];
   const severityFilters = [

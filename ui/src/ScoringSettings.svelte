@@ -1,6 +1,7 @@
 <script>
   import { onMount } from "svelte";
   import { t } from "./i18n.js";
+  import { createApiFetch } from "./lib/api.js";
 
   let { apiBase = "/api/v1" } = $props();
 
@@ -41,16 +42,7 @@
 
   // ── helpers ──────────────────────────────────────────────────────────────────
 
-  const apiFetch = async (path, options = {}) => {
-    const url = `${apiBase}${path}`;
-    const headers = { ...(options.headers || {}) };
-    if (options.body && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
-    const resp = await fetch(url, { ...options, headers });
-    const ct = resp.headers.get("content-type") || "";
-    const payload = ct.includes("application/json") ? await resp.json() : await resp.text();
-    if (!resp.ok) throw new Error(payload?.error?.message || payload?.message || resp.statusText);
-    return payload;
-  };
+  const apiFetch = createApiFetch(apiBase);
 
   const setNotice = (msg, tone = "") => { noticeMessage = msg; noticeTone = tone; };
   const clearNotice = () => { noticeMessage = ""; noticeTone = ""; };

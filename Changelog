@@ -2,7 +2,9 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
-## [unreleased]
+## [v1.4.4] - 2026-05-05
+
+New: ZONEMD check in test case Zone14
 
 ### Added
 
@@ -12,10 +14,16 @@ All notable changes to all gonemaster components will be documented in this file
 - server: gzip-compress text responses with Vary: Accept-Encoding
 - server: regression test guarding analysis CSP announcer hash against SvelteKit drift 
 - server: web performance improvements
+- admin-ui: IDN names decoded in domain views
 
 ### Changed
 
 - public-ui: improved print output
+- admin-ui: UI fixes due to CSP
+- analysis-ui: stack instead of compressing the fact distribution bars on narrow viewports
+- analysis: collapse distribution columns into fact_distributions
+- docs: dropped upstream spec tree
+- server: cleaned up gopls diagnostics and staticcheck findings
 
 ## [v1.4.3] - 2026-05-01
 

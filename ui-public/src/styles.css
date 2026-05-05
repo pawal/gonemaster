@@ -1192,6 +1192,9 @@ details[open] > .score-bonus-summary > .score-bonus-chevron {
   bottom: 3.23em;
   transform: rotate(-45deg);
 }
+@media (max-width: 600px) {
+  .fork-ribbon { display: none; }
+}
 
 /* ── Print button ───────────────────────────────────────────────────────── */
 .print-button {

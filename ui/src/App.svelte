@@ -31,6 +31,16 @@
     normalizeLevel,
     severityRank,
   } from "./lib/jobUtils.js";
+  import {
+    compareText,
+    compareNumber,
+    compareTimestamp,
+    compareSeverity,
+    nextTableSort,
+    tableSortIndicator,
+    tableSortAria,
+    sortItems,
+  } from "./lib/sort.js";
   import ProfileSettings from "./ProfileSettings.svelte";
   import ServerSettings from "./ServerSettings.svelte";
   import ScoringSettings from "./ScoringSettings.svelte";
@@ -735,16 +745,6 @@
     }, 0);
   const hasMetricsData = (snapshot) => Boolean(snapshot && snapshot.generated_at);
   const seriesLast = (values = []) => (values.length ? Number(values[values.length - 1] || 0) : 0);
-  const textCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
-  const compareText = (left, right) => textCollator.compare(String(left ?? ""), String(right ?? ""));
-  const compareNumber = (left, right) => Number(left || 0) - Number(right || 0);
-  const timestampValue = (value) => parseTimestamp(value)?.getTime() ?? -1;
-  const compareTimestamp = (left, right) => compareNumber(timestampValue(left), timestampValue(right));
-  const compareSeverity = (left, right) => compareNumber(severityRank(left), severityRank(right));
-  const nextTableSort = (state, key, defaultDirection = "asc") =>
-    state.key === key
-      ? { key, direction: state.direction === "asc" ? "desc" : "asc" }
-      : { key, direction: defaultDirection };
   const sortDomains = (key, defaultDir = "asc") => {
     domainsSortState = nextTableSort(domainsSortState, key, defaultDir);
     loadDomains({ reset: true });
@@ -758,27 +758,6 @@
     loadTagDomains({ reset: true });
   };
 
-  const tableSortIndicator = (state, key) => {
-    if (state.key !== key) return "";
-    return state.direction === "asc" ? "▲" : "▼";
-  };
-  const tableSortAria = (state, key) => {
-    if (state.key !== key) return "none";
-    return state.direction === "asc" ? "ascending" : "descending";
-  };
-  const sortItems = (items, state, comparators, tieBreaker = null) => {
-    const list = Array.isArray(items) ? [...items] : [];
-    const comparator = comparators[state?.key];
-    if (!comparator) return list;
-    list.sort((left, right) => {
-      const primary = comparator(left, right);
-      if (primary !== 0) {
-        return state.direction === "asc" ? primary : -primary;
-      }
-      return tieBreaker ? tieBreaker(left, right) : 0;
-    });
-    return list;
-  };
   // Maps UI sort state {key, direction} to an API sort parameter string.
   // Returns "" when no server-side sort is applicable (client-only columns).
   const domainSortParam = (state) => {

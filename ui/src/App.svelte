@@ -3,44 +3,11 @@
   import { t, locale, loadCatalog } from "./i18n.js";
   import { apiCall } from "./lib/api.js";
   import {
-    formatPercent,
-    formatInteger,
-    formatCompactInteger,
-    formatDurationMs,
-    formatRate,
-    formatUptime,
-    parseTimestamp,
-    formatTimestampLocal,
-    formatBatchTotalRuntime,
-    prettyProfileJSON,
-    formatSnapshotSlugPreview,
-    formatJobTotalRuntime as formatJobTotalRuntimeRaw,
-    formatBatchStatusCounts as formatBatchStatusCountsRaw,
-  } from "./lib/format.js";
-  import {
-    activeJobStatuses,
-    resultReadyStatuses,
-    LEVEL_ORDER,
-    normalizeStatus,
-    isActiveJobStatus,
     isResultReadyStatus,
     progressPercent,
-    normalizeLevel,
-    severityRank,
   } from "./lib/jobUtils.js";
   import {
-    compareText,
-    compareNumber,
-    compareTimestamp,
-    compareSeverity,
-    nextTableSort,
-    tableSortIndicator,
-    tableSortAria,
-    sortItems,
-  } from "./lib/sort.js";
-  import {
     persistedStateKey,
-    persistedQueryKeys,
     normalizePageSize,
     normalizeCursor,
     decodeStateFromURL,
@@ -48,15 +15,6 @@
     encodeStateToURLParams,
     serializeStateForStorage,
   } from "./lib/persistence.js";
-  import {
-    moduleLevels,
-    CAT_ORDER,
-    CAT_LABELS,
-    BONUS_HIDDEN,
-    hasScore,
-    chipGrade,
-    chipScore,
-  } from "./lib/result.js";
   import AnalysisCohorts from "./AnalysisCohorts.svelte";
   import BatchDeleteModal from "./BatchDeleteModal.svelte";
   import StatusBanner from "./components/StatusBanner.svelte";
@@ -169,7 +127,6 @@
   let selectedTag = null;
   const apiFetch = async (path, options) => apiCall(apiPrefix, path, options);
 
-  const summaryLevels = moduleLevels;
   const severityFilters = [
     { id: "all", labelKey: "sev_all" },
     { id: "warnings_plus", labelKey: "sev_warnings_plus" },
@@ -274,33 +231,6 @@
       // Ignore storage issues in restricted browser contexts.
     }
   };
-  const formatJobTotalRuntime = (job) => formatJobTotalRuntimeRaw(job, isActiveJobStatus);
-  const normalizeOptionalProfileID = (value) => {
-    const parsed = Number(value);
-    if (!Number.isFinite(parsed) || parsed <= 0) return null;
-    return parsed;
-  };
-  const profileNameByID = (profileID) => {
-    const normalized = normalizeOptionalProfileID(profileID);
-    if (!normalized) return "";
-    const match = availableProfiles.find((profile) => profile.id === normalized);
-    return match?.name || `#${normalized}`;
-  };
-
-  const jobProfileName = (job, run = null) => {
-    const direct = String(job?.profile_name || run?.profile_name || "").trim();
-    if (direct) return direct;
-    return profileNameByID(job?.profile_id || run?.profile_id);
-  };
-  const formatBatchStatusCounts = (statusCounts) => formatBatchStatusCountsRaw(statusCounts, normalizeStatus);
-
-
-  const applyWidth = (node, value) => {
-    node.style.width = value;
-    return { update(v) { node.style.width = v; } };
-  };
-  const entryMeta = (entry) => [entry?.testcase, entry?.tag].filter(Boolean).join(" · ");
-
   const normalizeTab = (value) => {
     const tab = String(value || "").replace(/^\/+/, "").toLowerCase();
     if (tab === "single" || tab === "job" || tab === "jobs" || tab === "home") return "single";

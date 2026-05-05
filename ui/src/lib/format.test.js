@@ -11,6 +11,8 @@ import {
   formatBatchTotalRuntime,
   prettyProfileJSON,
   formatSnapshotSlugPreview,
+  formatJobTotalRuntime,
+  formatBatchStatusCounts,
 } from "./format.js";
 
 describe("formatPercent", () => {
@@ -166,5 +168,70 @@ describe("formatSnapshotSlugPreview", () => {
   it("returns YYYY-MM-DD-<batch-hash>", () => {
     const today = new Date().toISOString().slice(0, 10);
     expect(formatSnapshotSlugPreview()).toBe(`${today}-<batch-hash>`);
+  });
+});
+
+describe("formatJobTotalRuntime", () => {
+  const isActive = (status) => status === "queued" || status === "running";
+
+  it("returns 'not started' when started_at is missing", () => {
+    expect(formatJobTotalRuntime({}, isActive)).toBe("not started");
+    expect(formatJobTotalRuntime({ started_at: null }, isActive)).toBe("not started");
+  });
+
+  it("includes ' (running)' for active jobs that have not finished", () => {
+    const started = new Date(Date.now() - 65_000).toISOString();
+    const out = formatJobTotalRuntime({ started_at: started, status: "running" }, isActive);
+    expect(out).toMatch(/ \(running\)$/);
+  });
+
+  it("omits the running suffix when the job has finished", () => {
+    const out = formatJobTotalRuntime(
+      {
+        started_at: "2026-01-01T00:00:00Z",
+        finished_at: "2026-01-01T00:01:30Z",
+        status: "succeeded",
+      },
+      isActive,
+    );
+    expect(out).toBe("1m 30s");
+  });
+
+  it("omits the running suffix when the job is not active even if not finished", () => {
+    const started = new Date(Date.now() - 65_000).toISOString();
+    const out = formatJobTotalRuntime({ started_at: started, status: "succeeded" }, isActive);
+    expect(out).not.toMatch(/ \(running\)$/);
+  });
+});
+
+describe("formatBatchStatusCounts", () => {
+  const normalize = (s) => String(s || "").toLowerCase();
+
+  it("returns 'none' for missing or empty input", () => {
+    expect(formatBatchStatusCounts(null, normalize)).toBe("none");
+    expect(formatBatchStatusCounts({}, normalize)).toBe("none");
+  });
+
+  it("orders by the canonical status sequence and skips zero counts", () => {
+    const out = formatBatchStatusCounts(
+      { succeeded: 5, queued: 0, failed: 1 },
+      normalize,
+    );
+    expect(out).toBe(`succeeded ${(5).toLocaleString()} · failed ${(1).toLocaleString()}`);
+  });
+
+  it("places unknown statuses after the canonical ones, sorted alphabetically", () => {
+    const out = formatBatchStatusCounts(
+      { running: 1, zzcustom: 2, aaother: 3 },
+      normalize,
+    );
+    expect(out).toBe(
+      `running ${(1).toLocaleString()} · aaother ${(3).toLocaleString()} · zzcustom ${(2).toLocaleString()}`,
+    );
+  });
+
+  it("falls back to all entries when none have positive counts", () => {
+    const out = formatBatchStatusCounts({ succeeded: 0, failed: 0 }, normalize);
+    expect(out).toBe(`succeeded ${(0).toLocaleString()} · failed ${(0).toLocaleString()}`);
   });
 });

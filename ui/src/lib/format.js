@@ -81,6 +81,39 @@ export const formatBatchTotalRuntime = (batch) => {
   return `${formatUptime(elapsedSeconds)}${finished ? "" : " (running)"}`;
 };
 
+export const formatJobTotalRuntime = (job, isActiveJobStatus) => {
+  const started = parseTimestamp(job?.started_at);
+  if (!started) return "not started";
+  const finished = parseTimestamp(job?.finished_at);
+  const end = finished || new Date();
+  const elapsedSeconds = Math.max(0, Math.floor((end.getTime() - started.getTime()) / 1000));
+  return `${formatUptime(elapsedSeconds)}${!finished && isActiveJobStatus(job?.status) ? " (running)" : ""}`;
+};
+
+export const formatBatchStatusCounts = (statusCounts, normalizeStatus) => {
+  if (!statusCounts || typeof statusCounts !== "object") return "none";
+  const knownOrder = ["queued", "running", "succeeded", "failed", "canceled", "expired", "paused"];
+  const counts = new Map();
+  for (const [status, rawCount] of Object.entries(statusCounts)) {
+    const normalized = normalizeStatus(status);
+    if (!normalized) continue;
+    const numeric = Number(rawCount);
+    counts.set(normalized, Number.isFinite(numeric) ? numeric : 0);
+  }
+  if (counts.size === 0) return "none";
+
+  const orderedStatuses = [
+    ...knownOrder.filter((status) => counts.has(status)),
+    ...Array.from(counts.keys())
+      .filter((status) => !knownOrder.includes(status))
+      .sort()
+  ];
+  const orderedEntries = orderedStatuses.map((status) => [status, Number(counts.get(status) || 0)]);
+  const nonZeroEntries = orderedEntries.filter(([, count]) => count > 0);
+  const displayEntries = nonZeroEntries.length > 0 ? nonZeroEntries : orderedEntries;
+  return displayEntries.map(([status, count]) => `${status} ${formatInteger(count)}`).join(" · ");
+};
+
 export const prettyProfileJSON = (value) => {
   if (!value) return "";
   if (typeof value !== "string") {

@@ -15,6 +15,8 @@
     formatBatchTotalRuntime,
     prettyProfileJSON,
     formatSnapshotSlugPreview,
+    formatJobTotalRuntime as formatJobTotalRuntimeRaw,
+    formatBatchStatusCounts as formatBatchStatusCountsRaw,
   } from "./lib/format.js";
   import {
     activeJobStatuses,
@@ -613,14 +615,7 @@
       }))
       .filter((entry) => entry.count > 0);
   const jobSeverityTotal = (job, level) => Number(job?.severity_totals?.[level] || 0);
-  const formatJobTotalRuntime = (job) => {
-    const started = parseTimestamp(job?.started_at);
-    if (!started) return "not started";
-    const finished = parseTimestamp(job?.finished_at);
-    const end = finished || new Date();
-    const elapsedSeconds = Math.max(0, Math.floor((end.getTime() - started.getTime()) / 1000));
-    return `${formatUptime(elapsedSeconds)}${!finished && isActiveJobStatus(job?.status) ? " (running)" : ""}`;
-  };
+  const formatJobTotalRuntime = (job) => formatJobTotalRuntimeRaw(job, isActiveJobStatus);
   const normalizeOptionalProfileID = (value) => {
     const parsed = Number(value);
     if (!Number.isFinite(parsed) || parsed <= 0) return null;
@@ -638,29 +633,7 @@
     if (direct) return direct;
     return profileNameByID(job?.profile_id || run?.profile_id);
   };
-  const formatBatchStatusCounts = (statusCounts) => {
-    if (!statusCounts || typeof statusCounts !== "object") return "none";
-    const knownOrder = ["queued", "running", "succeeded", "failed", "canceled", "expired", "paused"];
-    const counts = new Map();
-    for (const [status, rawCount] of Object.entries(statusCounts)) {
-      const normalized = normalizeStatus(status);
-      if (!normalized) continue;
-      const numeric = Number(rawCount);
-      counts.set(normalized, Number.isFinite(numeric) ? numeric : 0);
-    }
-    if (counts.size === 0) return "none";
-
-    const orderedStatuses = [
-      ...knownOrder.filter((status) => counts.has(status)),
-      ...Array.from(counts.keys())
-        .filter((status) => !knownOrder.includes(status))
-        .sort()
-    ];
-    const orderedEntries = orderedStatuses.map((status) => [status, Number(counts.get(status) || 0)]);
-    const nonZeroEntries = orderedEntries.filter(([, count]) => count > 0);
-    const displayEntries = nonZeroEntries.length > 0 ? nonZeroEntries : orderedEntries;
-    return displayEntries.map(([status, count]) => `${status} ${formatInteger(count)}`).join(" · ");
-  };
+  const formatBatchStatusCounts = (statusCounts) => formatBatchStatusCountsRaw(statusCounts, normalizeStatus);
   const metricsCardHelp = {
     queue_depth: "help_queue_depth",
     in_flight_jobs: "help_in_flight_jobs",

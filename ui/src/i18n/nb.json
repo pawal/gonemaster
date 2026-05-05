@@ -294,6 +294,7 @@
   "tc.zone11": "SPF-policy ved sonens apex",
   "tc.zone12": "CSYNC RR ved sonens apex",
   "tc.zone13": "SPF DNS-oppslagsgrense overholdes",
+  "tc.zone14": "ZONEMD-post ved sonens apex",
   "result_status_ok": "Ingen problemer funnet",
   "result_status_notice": "Merknader",
   "result_status_warning": "Advarsler funnet",

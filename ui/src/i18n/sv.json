@@ -294,6 +294,7 @@
   "tc.zone11": "SPF-policy vid zonens apex",
   "tc.zone12": "CSYNC RR vid zonens apex",
   "tc.zone13": "SPF DNS-uppslagsgräns efterlevs",
+  "tc.zone14": "ZONEMD-post vid zonens apex",
   "result_status_ok": "Inga problem hittades",
   "result_status_notice": "Noteringar",
   "result_status_warning": "Varningar hittades",

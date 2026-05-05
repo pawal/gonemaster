@@ -294,6 +294,7 @@
   "tc.zone11": "Politika SPF na vrhu cone",
   "tc.zone12": "Zapis CSYNC RR na vrhu cone",
   "tc.zone13": "Skladnost z omejitvijo DNS-poizvedb SPF",
+  "tc.zone14": "Zapis ZONEMD na vrhu cone",
   "result_status_ok": "Težav ni bilo najdenih",
   "result_status_notice": "Opombe",
   "result_status_warning": "Najdena opozorila",

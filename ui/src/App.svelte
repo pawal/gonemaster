@@ -56,20 +56,9 @@
     CAT_ORDER,
     CAT_LABELS,
     BONUS_HIDDEN,
-    worstLevel,
-    bannerClass,
-    isNoticeOrAbove,
     hasScore,
     chipGrade,
     chipScore,
-    resultScore,
-    formatSeconds,
-    formatTimingMs,
-    entryMessage,
-    moduleId,
-    summaryRows,
-    okTestcaseCount,
-    groupRawEntries,
   } from "./lib/result.js";
   import ProfileSettings from "./ProfileSettings.svelte";
   import ServerSettings from "./ServerSettings.svelte";
@@ -79,6 +68,7 @@
   import StatusBanner from "./components/StatusBanner.svelte";
   import ThemeToggle from "./components/ThemeToggle.svelte";
   import JobInspector from "./components/JobInspector.svelte";
+  import RunResultBody from "./components/RunResultBody.svelte";
   import { status, setStatus, clearStatus } from "./lib/status.svelte.js";
   import { initThemeFromStorage } from "./lib/theme.svelte.js";
 
@@ -249,8 +239,6 @@
   let selectedDomainRunId = null;
   let selectedDomainRunResult = null;
   let domainRunResultLoading = false;
-  let domainModuleOpen = {};
-  let domainModuleGroups = [];
   let availableTags = [];
   let tagsLoaded = false;
   let availableProfiles = [];
@@ -742,9 +730,6 @@
     return { update(v) { node.style.width = v; } };
   };
   const entryMeta = (entry) => [entry?.testcase, entry?.tag].filter(Boolean).join(" · ");
-  const toggleDomainModule = (key) => {
-    domainModuleOpen = { ...domainModuleOpen, [key]: !domainModuleOpen[key] };
-  };
 
   const normalizeTab = (value) => {
     const tab = String(value || "").replace(/^\/+/, "").toLowerCase();
@@ -1501,7 +1486,6 @@
   const loadDomainRunResult = async (runId) => {
     selectedDomainRunId = runId;
     selectedDomainRunResult = null;
-    domainModuleOpen = {};
     domainRunResultLoading = true;
     try {
       const locale = resultLocale ? `?locale=${encodeURIComponent(resultLocale)}` : "";
@@ -1962,10 +1946,6 @@
 
   $: if (autoRefreshBatch && selectedBatch && !hasActiveBatchJobs(selectedBatch)) {
     autoRefreshBatch = false;
-  }
-
-  $: {
-    domainModuleGroups = groupRawEntries(selectedDomainRunResult?.raw);
   }
 
   $: {
@@ -2505,9 +2485,6 @@
           {#if domainRunResultLoading}
             <p class="muted mt-one">{$t("loading")}</p>
           {:else if selectedDomainRunResult}
-            {@const allEntries = selectedDomainRunResult?.raw?.entries ?? []}
-            {@const nsTimings = selectedDomainRunResult?.nameserver_timings ?? []}
-            {@const bannerCls = bannerClass(worstLevel(allEntries))}
             {@const sc = selectedDomainRunResult?.score}
             <div class="stack mt-1-25">
               {#if scoringEnabled && sc}
@@ -2560,142 +2537,7 @@
                   {/if}
                 {/if}
               {/if}
-              {#if allEntries.length}
-                <div class="status-banner {bannerCls}">{$t(`result_status_${bannerCls}`)}</div>
-              {/if}
-              <div class="field-label">{$t("result_summary_label")}</div>
-              {#if summaryRows(selectedDomainRunResult.summary).length}
-                <div class="summary-grid">
-                  {#each summaryRows(selectedDomainRunResult.summary) as row (row.level)}
-                    <div class={`summary-item severity-${row.level.toLowerCase()}`}>
-                      <span class="summary-label">{row.level}</span>
-                      <span class="summary-count">{row.count}</span>
-                    </div>
-                  {/each}
-                </div>
-              {:else}
-                <div class="summary-empty">{$t("no_result_entries")}</div>
-              {/if}
-              <div class="field-label">{$t("result_details_label")}</div>
-              {#if domainModuleGroups.length === 0}
-                <div class="summary-empty">{$t("no_raw_entries")}</div>
-              {:else}
-                <div class="small">{$t("module_expand_hint")}</div>
-                <div class="module-list">
-                  {#each domainModuleGroups as group (group.key)}
-                    {@const groupLevel = worstLevel(group.entries)}
-                    <div class="module-card" data-level={groupLevel.toLowerCase()}>
-                      <button
-                        class="module-toggle"
-                        type="button"
-                        aria-expanded={!!domainModuleOpen[group.key]}
-                        aria-controls={"dm-" + moduleId(group.key)}
-                        onclick={() => toggleDomainModule(group.key)}
-                      >
-                        <div class="module-title">{group.name}</div>
-                        <div class="module-meta">{group.testcasesArr.length > 0 ? `${group.testcasesArr.length} tests · ` : ""}{$t("entries_count", { count: group.entries.length })}</div>
-                        <div class="module-badges">
-                          {#if okTestcaseCount(group) > 0}
-                            <span class="level-pill severity-info">INFO {okTestcaseCount(group)}</span>
-                          {/if}
-                          {#each moduleLevels as level}
-                            {#if group.counts[level]}
-                              <span class={`level-pill severity-${level.toLowerCase()}`}>{level} {group.counts[level]}</span>
-                            {/if}
-                          {/each}
-                        </div>
-                        <span class={`module-chevron ${domainModuleOpen[group.key] ? "open" : ""}`}></span>
-                      </button>
-                      {#if domainModuleOpen[group.key]}
-                        <div class="module-body" id={"dm-" + moduleId(group.key)}>
-                          {#each group.testcasesArr as tcg (tcg.tc)}
-                            {@const tcKey = `tc.${tcg.tc.toLowerCase()}`}
-                            {@const tcDesc = $t(tcKey)}
-                            <details class="testcase-group" open={isNoticeOrAbove(tcg.level)}>
-                              <summary class="testcase-summary">
-                                <span class="testcase-chevron"></span>
-                                <span class="testcase-desc">{tcDesc !== tcKey ? tcDesc : tcg.tc}</span>
-                                <span class="testcase-badge">
-                                  <span class={`level-pill severity-${normalizeLevel(tcg.level).toLowerCase()}`}>{normalizeLevel(tcg.level)}</span>
-                                </span>
-                              </summary>
-                              <div class="testcase-entries">
-                                {#each tcg.entries as entry}
-                                  {@const level = normalizeLevel(entry.level)}
-                                  <div class="result-row tc-row">
-                                    <span class={`entry-level severity-${level.toLowerCase()}`}>{level}</span>
-                                    <span class="entry-message">{entryMessage(entry)}</span>
-                                  </div>
-                                {/each}
-                              </div>
-                            </details>
-                          {/each}
-                          {#if group.ungrouped.length}
-                            {#if group.testcasesArr.length === 0}
-                              {#each group.ungrouped as entry}
-                                {@const level = normalizeLevel(entry.level)}
-                                <div class="result-row tc-row">
-                                  <span class={`entry-level severity-${level.toLowerCase()}`}>{level}</span>
-                                  <span class="entry-message">{entryMessage(entry)}</span>
-                                </div>
-                              {/each}
-                            {:else}
-                              <div class="result-header ungrouped-header">
-                                <span>{$t("result_col_seconds")}</span>
-                                <span>{$t("result_col_level")}</span>
-                                <span>{$t("result_col_message")}</span>
-                              </div>
-                              {#each group.ungrouped as entry}
-                                {@const level = normalizeLevel(entry.level)}
-                                <div class="result-row">
-                                  <span class="entry-time">{formatSeconds(entry.timestamp)}</span>
-                                  <span class={`entry-level severity-${level.toLowerCase()}`}>{level}</span>
-                                  <span class="entry-message">{entryMessage(entry)}</span>
-                                </div>
-                              {/each}
-                            {/if}
-                          {/if}
-                        </div>
-                      {/if}
-                    </div>
-                  {/each}
-                </div>
-              {/if}
-              {#if nameserverTimingsEnabled && nsTimings.length}
-                <details class="score-bonus ns-timings-card" data-testid="admin-nameserver-timings">
-                  <summary class="score-bonus-summary ns-timings-summary">
-                    <span class="score-bonus-chevron"></span>
-                    <span class="score-bonus-title">{$t("ns_timing_heading")}</span>
-                    <span class="ns-timings-summary-text">{$t("ns_timing_subtitle")}</span>
-                  </summary>
-                  <div class="score-bonus-list ns-timings-content">
-                    <table class="ns-timings-table">
-                      <thead>
-                        <tr>
-                          <th scope="col">{$t("ns_timing_nameserver")}</th>
-                          <th scope="col">{$t("ns_timing_ip")}</th>
-                          <th scope="col" class="ns-timings-num">{$t("ns_timing_avg_ms")}</th>
-                          <th scope="col" class="ns-timings-num">{$t("ns_timing_min_ms")}</th>
-                          <th scope="col" class="ns-timings-num">{$t("ns_timing_max_ms")}</th>
-                          <th scope="col" class="ns-timings-num">{$t("ns_timing_samples")}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {#each nsTimings as item}
-                          <tr data-testid="admin-nameserver-timing-row">
-                            <td class="ns-timings-name">{item.nameserver}</td>
-                            <td class="ns-timings-ip">{item.address}</td>
-                            <td class="ns-timings-num ns-timings-avg">{formatTimingMs(item.avg_ms)}</td>
-                            <td class="ns-timings-num">{formatTimingMs(item.min_ms)}</td>
-                            <td class="ns-timings-num">{formatTimingMs(item.max_ms)}</td>
-                            <td class="ns-timings-num">{item.count}</td>
-                          </tr>
-                        {/each}
-                      </tbody>
-                    </table>
-                  </div>
-                </details>
-              {/if}
+              <RunResultBody result={selectedDomainRunResult} {nameserverTimingsEnabled} idPrefix="dm-" />
             </div>
           {/if}
 

@@ -240,19 +240,27 @@ func TestErrorCacheEngagesByDefault(t *testing.T) {
 	})
 	opts := &QueryOptions{BlacklistingDisabled: true}
 
+	// Same qname/qtype on the second query: the error cache key now
+	// includes the full query identity, so a different qname would miss
+	// the cache. The query cache stores nothing on a network error, so
+	// the second call has to be suppressed by the error cache itself.
 	if _, err := ns.QueryWithOptions(ctx, "first.example", "A", opts); err == nil {
 		t.Fatalf("expected error on first query")
 	}
-	// Second query, different qname (so the per-query cache misses) - the
-	// default error_cache_ttl should suppress the live query.
-	if _, err := ns.QueryWithOptions(ctx, "second.example", "A", opts); err != nil {
-		t.Fatalf("expected error cache to suppress second query, got error: %v", err)
+	if _, err := ns.QueryWithOptions(ctx, "first.example", "A", opts); err != nil {
+		t.Fatalf("expected error cache to suppress repeat query, got error: %v", err)
 	}
 	if calls != 1 {
-		t.Fatalf("expected default error cache to suppress 2nd query; got %d hook calls", calls)
+		t.Fatalf("expected default error cache to suppress repeat query; got %d hook calls", calls)
 	}
 }
 
+// TestErrorCacheSkipsQueries asserts the user-visible contract that a
+// repeat of an already-failed query is suppressed within the run. The
+// suppression is jointly provided by the query cache (memoizes nil) and
+// the error cache (TTL-bound skip). Different queries to the same NS
+// are NOT suppressed - that is what fix #3 exists to ensure and is
+// pinned by TestErrorCacheKeyIsolatesQueries below.
 func TestErrorCacheSkipsQueries(t *testing.T) {
 	cache := NewCacheStore()
 	ns, err := NewWithCache(cache, "ns.example", "192.0.2.15", nil)
@@ -269,29 +277,25 @@ func TestErrorCacheSkipsQueries(t *testing.T) {
 		return packet.Packet{}, fmt.Errorf("network error")
 	})
 
-	_, err = ns.QueryWithOptions(ctx, "example1", "A", nil)
+	_, err = ns.QueryWithOptions(ctx, "example", "A", nil)
 	if err == nil {
 		t.Fatalf("expected error on first query")
 	}
-	_, err = ns.QueryWithOptions(ctx, "example2", "A", nil)
+	_, err = ns.QueryWithOptions(ctx, "example", "A", nil)
 	if err != nil {
-		t.Fatalf("expected error cache to suppress second query error, got %v", err)
+		t.Fatalf("expected repeat of failed query to be suppressed, got %v", err)
 	}
 	if calls != 1 {
-		t.Fatalf("expected 1 call due to error cache, got %d", calls)
-	}
-
-	metrics := cache.ErrorMetrics()
-	if metrics.Hits != 1 || metrics.Misses != 1 || metrics.Evictions != 0 {
-		t.Fatalf("unexpected error cache metrics: %+v", metrics)
+		t.Fatalf("expected 1 live call, got %d", calls)
 	}
 }
 
-// TestErrorCacheDebouncesSingleTimeout pins the contract that a single
-// timed-out exchange must not poison the error cache: one dropped UDP
-// packet on every NS in a parallel SOA fan-out used to blackhole an
-// entire zone for the rest of a 30s run. Caching now requires either a
-// non-timeout error or at least two consecutive timeouts.
+// TestErrorCacheDebouncesSingleTimeout pins that a single timed-out
+// exchange does not write the error cache. With the per-query cache key,
+// this matters mostly as a hedge: if the query cache later evicts the
+// nil entry (FIFO at QueryCacheMaxEntries), the error cache TTL must
+// not have engaged off of one transient drop. We assert directly on the
+// error cache's state because the query cache shadows it for repeats.
 func TestErrorCacheDebouncesSingleTimeout(t *testing.T) {
 	ctx, prof := testContext(t)
 	prof.Resolver.Defaults.ErrorCacheTTL = 60
@@ -309,26 +313,46 @@ func TestErrorCacheDebouncesSingleTimeout(t *testing.T) {
 	})
 	opts := &QueryOptions{BlacklistingDisabled: true}
 
+	keyFor := func(qname string) string {
+		t.Helper()
+		k, _, _, err := buildCacheKey(qname, "A", "IN", opts)
+		if err != nil {
+			t.Fatalf("build cache key: %v", err)
+		}
+		return k
+	}
+
+	// First timeout: debounce holds, error cache stays empty.
 	if _, err := ns.QueryWithOptions(ctx, "first.example", "A", opts); err == nil {
 		t.Fatalf("expected timeout error on first query")
 	}
-	if _, err := ns.QueryWithOptions(ctx, "second.example", "A", opts); err == nil {
-		t.Fatalf("expected timeout error on second query (cache must not engage after 1 timeout)")
-	}
-	if calls != 2 {
-		t.Fatalf("expected 2 hook calls (single timeout must not cache); got %d", calls)
+	if skip, _ := ns.state.errorCache.shouldSkip(keyFor("first.example")); skip {
+		t.Fatalf("error cache must not engage after a single timeout")
 	}
 
-	// After two consecutive timeouts the cache engages, so the third
-	// query is suppressed (returns nil packet, nil error).
-	if _, err := ns.QueryWithOptions(ctx, "third.example", "A", opts); err != nil {
-		t.Fatalf("expected error cache to suppress 3rd query after 2 prior timeouts, got: %v", err)
+	// Second timeout on a different qname so the query cache misses and
+	// the network hook fires again. fastFail's consecutive count rises
+	// to 2 and now the second key is committed to the error cache.
+	if _, err := ns.QueryWithOptions(ctx, "second.example", "A", opts); err == nil {
+		t.Fatalf("expected timeout error on second query")
 	}
 	if calls != 2 {
-		t.Fatalf("expected cache to engage after 2 consecutive timeouts (2 hook calls total); got %d", calls)
+		t.Fatalf("expected 2 live calls (cross-qname misses query cache); got %d", calls)
+	}
+	if skip, _ := ns.state.errorCache.shouldSkip(keyFor("second.example")); !skip {
+		t.Fatalf("error cache must engage on the second consecutive timeout")
+	}
+	// The first query's slot stays open: the debounce held when it failed.
+	if skip, _ := ns.state.errorCache.shouldSkip(keyFor("first.example")); skip {
+		t.Fatalf("first qname's error cache slot must still be empty - debounce held when it failed")
 	}
 }
 
+// TestErrorCacheTTLRespectsTimeoutBudget pins the contract that the
+// error cache TTL is bounded by the per-query retry budget so a stale
+// blackout does not outlive the time it would have taken to retry the
+// query live. Asserted directly on errorCache because the query cache
+// otherwise shadows the same key.
 func TestErrorCacheTTLRespectsTimeoutBudget(t *testing.T) {
 	ns, err := New("ns.example", "192.0.2.31", nil)
 	if err != nil {
@@ -338,9 +362,7 @@ func TestErrorCacheTTLRespectsTimeoutBudget(t *testing.T) {
 	ctx, prof := testContext(t)
 	prof.Resolver.Defaults.ErrorCacheTTL = 60
 
-	var calls int
 	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
-		calls++
 		return packet.Packet{}, fmt.Errorf("network error")
 	})
 
@@ -348,18 +370,22 @@ func TestErrorCacheTTLRespectsTimeoutBudget(t *testing.T) {
 	retry := 1
 	opts := &QueryOptions{Timeout: &timeout, Retry: &retry}
 
-	_, err = ns.QueryWithOptions(ctx, "example1", "A", opts)
-	if err == nil {
+	if _, err = ns.QueryWithOptions(ctx, "example", "A", opts); err == nil {
 		t.Fatalf("expected error on first query")
 	}
+
+	key, _, _, err := buildCacheKey("example", "A", "IN", opts)
+	if err != nil {
+		t.Fatalf("build cache key: %v", err)
+	}
+	if skip, _ := ns.state.errorCache.shouldSkip(key); !skip {
+		t.Fatalf("expected error cache to engage on this non-timeout error")
+	}
+
 	time.Sleep(60 * time.Millisecond)
 
-	_, err = ns.QueryWithOptions(ctx, "example2", "A", opts)
-	if err == nil {
-		t.Fatalf("expected error on second query")
-	}
-	if calls != 2 {
-		t.Fatalf("expected cache to expire based on timeout budget, got %d calls", calls)
+	if skip, _ := ns.state.errorCache.shouldSkip(key); skip {
+		t.Fatalf("expected error cache TTL to expire after retry-budget window")
 	}
 }
 
@@ -429,6 +455,138 @@ func TestQueryCacheStillMergesBackToParent(t *testing.T) {
 
 	if got := root.AddressCacheCount(); got != 1 {
 		t.Fatalf("parent must inherit query cache after merge; got %d", got)
+	}
+}
+
+// TestErrorCacheKeyIsolatesQueries pins the central contract of fix #3:
+// a cached failure for one (qname, qtype) must not blackout queries with
+// a different identity. This is the standalone-trace pathology where one
+// failed CDS query during DNSSEC15 used to ghost-skip every later test's
+// SOA, NS, MX, etc. queries to the same nameserver.
+func TestErrorCacheKeyIsolatesQueries(t *testing.T) {
+	ctx, prof := testContext(t)
+	prof.Resolver.Defaults.ErrorCacheTTL = 60
+
+	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.230", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+
+	// Pre-populate the error cache for a CDS query (mimicking DNSSEC15).
+	cdsKey, _, _, err := buildCacheKey("kristianstad.se", "CDS", "IN", nil)
+	if err != nil {
+		t.Fatalf("build cache key: %v", err)
+	}
+	ns.state.errorCache.set(cdsKey, time.Minute)
+
+	var calls int
+	ns.SetQueryHook(func(_ context.Context, _ string, qtype string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		calls++
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeSuccess
+		return packet.Packet{Msg: msg}, nil
+	})
+
+	// A CDS query for the same name must skip - identical key.
+	if pkt, err := ns.QueryWithOptions(ctx, "kristianstad.se", "CDS", nil); err != nil || pkt.Msg != nil {
+		t.Fatalf("expected CDS to be skipped by error cache, got msg=%v err=%v", pkt.Msg, err)
+	}
+	if calls != 0 {
+		t.Fatalf("CDS query should not have reached the live path; got %d calls", calls)
+	}
+
+	// SOA query for the same name must NOT be poisoned - different key.
+	if pkt, err := ns.QueryWithOptions(ctx, "kristianstad.se", "SOA", nil); err != nil || pkt.Msg == nil {
+		t.Fatalf("SOA query must reach the live path despite CDS being cached; got msg=%v err=%v", pkt.Msg, err)
+	}
+	// MX, NS, A, CDNSKEY, etc. all need to live-fire too.
+	for _, qtype := range []string{"MX", "NS", "A", "CDNSKEY"} {
+		if pkt, err := ns.QueryWithOptions(ctx, "kristianstad.se", qtype, nil); err != nil || pkt.Msg == nil {
+			t.Fatalf("%s query must reach live path; got msg=%v err=%v", qtype, pkt.Msg, err)
+		}
+	}
+	if calls != 5 {
+		t.Fatalf("expected 5 live calls (SOA, MX, NS, A, CDNSKEY) past the cached CDS; got %d", calls)
+	}
+}
+
+// TestErrorCacheKeyIsolatesEDNSVariants pins that EDNS-version probes
+// (NS02, NS10, NS11, etc.) failing on a server that mishandles EDNS do
+// not poison the plain-EDNS0 SOA queries used by Basic02 and downstream
+// testcases. Without distinguishing EDNS state in the cache key, a
+// failed EDNS-1 query would blackout the address for all UDP queries.
+func TestErrorCacheKeyIsolatesEDNSVariants(t *testing.T) {
+	ctx, prof := testContext(t)
+	prof.Resolver.Defaults.ErrorCacheTTL = 60
+
+	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.231", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+
+	// Cache a failure for an EDNS-version-1 SOA probe.
+	ver1 := uint8(1)
+	ednsOpts := &QueryOptions{EDNSDetails: &transport.EDNSDetails{Version: &ver1}}
+	ednsKey, _, _, err := buildCacheKey("example.test", "SOA", "IN", ednsOpts)
+	if err != nil {
+		t.Fatalf("build cache key: %v", err)
+	}
+	ns.state.errorCache.set(ednsKey, time.Minute)
+
+	var calls int
+	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		calls++
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeSuccess
+		return packet.Packet{Msg: msg}, nil
+	})
+
+	// A plain SOA query (no EDNS overrides) must live-fire even though
+	// the EDNS-1 variant is cached - the EDNS state is part of the key.
+	if pkt, err := ns.QueryWithOptions(ctx, "example.test", "SOA", nil); err != nil || pkt.Msg == nil {
+		t.Fatalf("plain SOA must not inherit cached EDNS-1 failure; got msg=%v err=%v", pkt.Msg, err)
+	}
+	if calls != 1 {
+		t.Fatalf("expected the plain SOA to live-fire; got %d calls", calls)
+	}
+}
+
+// TestErrorCacheSetEvictsExpiredEntries pins the eviction sweep added
+// in this commit: a long-lived cache must not accumulate stale entries
+// that nothing reads back. The wider per-query key allows many entries
+// per address, so opportunistic eviction during set keeps the map size
+// bounded by live workload.
+func TestErrorCacheSetEvictsExpiredEntries(t *testing.T) {
+	c := &errorCache{}
+	c.set("a", 10*time.Millisecond)
+	c.set("b", 10*time.Millisecond)
+	c.set("c", time.Hour)
+
+	if got := len(c.data); got != 3 {
+		t.Fatalf("expected 3 entries before sweep; got %d", got)
+	}
+
+	time.Sleep(20 * time.Millisecond)
+
+	// Inserting a fresh entry must sweep "a" and "b" but keep "c".
+	c.set("d", time.Hour)
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if _, ok := c.data["a"]; ok {
+		t.Fatalf("expired entry a must have been evicted")
+	}
+	if _, ok := c.data["b"]; ok {
+		t.Fatalf("expired entry b must have been evicted")
+	}
+	if _, ok := c.data["c"]; !ok {
+		t.Fatalf("live entry c must remain")
+	}
+	if _, ok := c.data["d"]; !ok {
+		t.Fatalf("just-inserted entry d must be present")
+	}
+	if len(c.data) != 2 {
+		t.Fatalf("expected 2 entries after sweep + insert; got %d", len(c.data))
 	}
 }
 
@@ -1319,7 +1477,11 @@ func TestSkipShortCircuitPriorityOrder(t *testing.T) {
 		if err != nil {
 			t.Fatalf("new nameserver: %v", err)
 		}
-		ns.state.errorCache.set(errorCacheKey(false), 60*time.Second)
+		key, _, _, err := buildCacheKey("example", "A", "IN", nil)
+		if err != nil {
+			t.Fatalf("build cache key: %v", err)
+		}
+		ns.state.errorCache.set(key, 60*time.Second)
 		ns.state.blacklisted[false] = true
 
 		_, _ = ns.QueryWithOptions(ctx, "example", "A", nil)
@@ -1342,7 +1504,11 @@ func TestSkipShortCircuitPriorityOrder(t *testing.T) {
 		// Two marks promote pending → blocked, matching production semantics.
 		globalReachability.mark(ns.Address.String(), 60*time.Second)
 		globalReachability.mark(ns.Address.String(), 60*time.Second)
-		ns.state.errorCache.set(errorCacheKey(false), 60*time.Second)
+		key, _, _, err := buildCacheKey("example", "A", "IN", nil)
+		if err != nil {
+			t.Fatalf("build cache key: %v", err)
+		}
+		ns.state.errorCache.set(key, 60*time.Second)
 
 		_, _ = ns.QueryWithOptions(ctx, "example", "A", nil)
 		assertOnlyTagFired(t, log, "REACHABILITY_CACHE_SKIP", []string{"ERROR_CACHE_SKIP", "IS_BLACKLISTED", "FAST_FAIL_SKIP"})

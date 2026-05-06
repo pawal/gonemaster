@@ -74,18 +74,24 @@ func TestContract_ErrorCacheSkipArgs(t *testing.T) {
 		return packet.Packet{}, fmt.Errorf("network error")
 	})
 
-	if _, err := ns.QueryWithOptions(ctx, "example1", "A", nil); err == nil {
-		t.Fatalf("expected first query error")
+	// Pre-populate the error cache for the exact query we are about to
+	// issue. The query cache is empty for this key, so shouldSkipQuery
+	// reaches the error-cache check and emits ERROR_CACHE_SKIP.
+	key, _, _, err := buildCacheKey("example", "A", "IN", nil)
+	if err != nil {
+		t.Fatalf("build cache key: %v", err)
 	}
-	if _, err := ns.QueryWithOptions(ctx, "example2", "A", nil); err != nil {
-		t.Fatalf("expected second query to be skipped by error cache, got %v", err)
+	ns.state.errorCache.set(key, time.Minute)
+
+	if _, err := ns.QueryWithOptions(ctx, "example", "A", nil); err != nil {
+		t.Fatalf("expected query to be suppressed by error cache, got %v", err)
 	}
 
 	entry := requireEntryByTag(t, log.Entries(), "ERROR_CACHE_SKIP")
 	requireNoArgSchema(t, entry)
 	requireStringArg(t, entry, "ns", "ns.example")
 	requireStringArg(t, entry, "address", "192.0.2.15")
-	requireStringArg(t, entry, "query_name", "example2")
+	requireStringArg(t, entry, "query_name", "example")
 	requireStringArg(t, entry, "query_type", "A")
 	requireStringArg(t, entry, "query_class", "IN")
 	if _, ok := entry.Args["ttl_seconds"].(int); !ok {

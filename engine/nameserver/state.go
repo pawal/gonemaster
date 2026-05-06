@@ -117,7 +117,21 @@ func (c *errorCache) set(key string, ttl time.Duration) {
 	if c.data == nil {
 		c.data = map[string]time.Time{}
 	}
-	c.data[key] = time.Now().Add(ttl)
+	now := time.Now()
+	// Sweep expired entries opportunistically: the wide cache key admits
+	// many distinct entries per address, and stale ones are otherwise only
+	// reaped lazily on shouldSkip lookups for that exact key.
+	evicted := 0
+	for k, expiry := range c.data {
+		if now.After(expiry) {
+			delete(c.data, k)
+			evicted++
+		}
+	}
+	if evicted > 0 {
+		c.observeEvictLocked(evicted)
+	}
+	c.data[key] = now.Add(ttl)
 }
 
 func (c *errorCache) clear() {

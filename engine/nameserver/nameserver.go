@@ -210,7 +210,7 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 
 	usevc := resolveUseVC(opts)
 	fastFailThreshold := resolveFastFailTimeoutCount(prof)
-	if d := ns.shouldSkipQuery(prof, opts, qname, qtype, qclass, usevc, fastFailThreshold); d != nil {
+	if d := ns.shouldSkipQuery(prof, opts, qname, qtype, qclass, cacheKey, usevc, fastFailThreshold); d != nil {
 		if d.useCtxLogger {
 			logSystem(ctx, d.tag, d.args)
 		} else {
@@ -290,11 +290,9 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	if err != nil && (ctx == nil || ctx.Err() == nil) && ns.state != nil && ns.state.errorCache != nil {
 		if errorCacheTTL := resolveErrorCacheTTL(prof, opts); errorCacheTTL > 0 {
 			// Debounce timeouts: a single dropped UDP packet must not
-			// blackout this NS for the rest of the run. Non-timeout
-			// errors (truncation, hard network errors, etc.) cache
-			// immediately - they signal a real protocol-level fault.
+			// blackout this exact query for the rest of the run.
 			if !isTimeoutPatternError(err) || ns.state.fastFail.sawConsecutiveTimeouts(usevc) {
-				ns.state.errorCache.set(errorCacheKey(usevc), errorCacheTTL)
+				ns.state.errorCache.set(cacheKey, errorCacheTTL)
 			}
 		}
 	}
@@ -343,13 +341,6 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	}
 	logCachedReturnWithLogger(runLog, resp)
 	return resp, err
-}
-
-func errorCacheKey(usevc bool) string {
-	if usevc {
-		return "tcp"
-	}
-	return "udp"
 }
 
 func errorCacheProtocol(usevc bool) string {
@@ -668,7 +659,7 @@ type skipDecision struct {
 // shouldSkipQuery picks the highest-priority "do not issue this network
 // query" signal that fires, or returns nil. Priority order is pinned by
 // TestSkipShortCircuitPriorityOrder.
-func (ns Nameserver) shouldSkipQuery(prof *profile.Profile, opts *QueryOptions, qname string, qtype string, qclass string, usevc bool, fastFailThreshold int) *skipDecision {
+func (ns Nameserver) shouldSkipQuery(prof *profile.Profile, opts *QueryOptions, qname string, qtype string, qclass string, cacheKey string, usevc bool, fastFailThreshold int) *skipDecision {
 	skipArgs := func(extra map[string]any) map[string]any {
 		args := map[string]any{
 			"query_name":  qname,
@@ -696,7 +687,7 @@ func (ns Nameserver) shouldSkipQuery(prof *profile.Profile, opts *QueryOptions, 
 		}
 	}
 	if errorCacheTTL := resolveErrorCacheTTL(prof, opts); errorCacheTTL > 0 && ns.state != nil && ns.state.errorCache != nil {
-		if skip, remaining := ns.state.errorCache.shouldSkip(errorCacheKey(usevc)); skip {
+		if skip, remaining := ns.state.errorCache.shouldSkip(cacheKey); skip {
 			return &skipDecision{
 				tag: "ERROR_CACHE_SKIP",
 				args: skipArgs(map[string]any{

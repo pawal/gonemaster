@@ -52,6 +52,20 @@ func (t *fastFailTracker) shouldSkip(useTCP bool, threshold int) bool {
 	return blocked
 }
 
+// sawConsecutiveTimeouts reports whether at least two consecutive timeouts
+// have been observed on this protocol, or fast-fail has already engaged.
+// Used to debounce error-cache writes so a single transient drop is not
+// enough to blackout the nameserver.
+func (t *fastFailTracker) sawConsecutiveTimeouts(useTCP bool) bool {
+	if t == nil {
+		return false
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	state := t.stateForProtocol(useTCP)
+	return state.blocked || state.consecutiveTimeouts >= 2
+}
+
 func (t *fastFailTracker) observeResult(useTCP bool, timeoutPattern bool, threshold int) {
 	if t == nil || threshold <= 0 {
 		return

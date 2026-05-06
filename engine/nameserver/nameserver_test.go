@@ -287,6 +287,48 @@ func TestErrorCacheSkipsQueries(t *testing.T) {
 	}
 }
 
+// TestErrorCacheDebouncesSingleTimeout pins the contract that a single
+// timed-out exchange must not poison the error cache: one dropped UDP
+// packet on every NS in a parallel SOA fan-out used to blackhole an
+// entire zone for the rest of a 30s run. Caching now requires either a
+// non-timeout error or at least two consecutive timeouts.
+func TestErrorCacheDebouncesSingleTimeout(t *testing.T) {
+	ctx, prof := testContext(t)
+	prof.Resolver.Defaults.ErrorCacheTTL = 60
+	prof.Resolver.Defaults.FastFailTimeoutCount = 5
+
+	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.17", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+
+	var calls int
+	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		calls++
+		return packet.Packet{}, fmt.Errorf("read udp: i/o timeout")
+	})
+	opts := &QueryOptions{BlacklistingDisabled: true}
+
+	if _, err := ns.QueryWithOptions(ctx, "first.example", "A", opts); err == nil {
+		t.Fatalf("expected timeout error on first query")
+	}
+	if _, err := ns.QueryWithOptions(ctx, "second.example", "A", opts); err == nil {
+		t.Fatalf("expected timeout error on second query (cache must not engage after 1 timeout)")
+	}
+	if calls != 2 {
+		t.Fatalf("expected 2 hook calls (single timeout must not cache); got %d", calls)
+	}
+
+	// After two consecutive timeouts the cache engages, so the third
+	// query is suppressed (returns nil packet, nil error).
+	if _, err := ns.QueryWithOptions(ctx, "third.example", "A", opts); err != nil {
+		t.Fatalf("expected error cache to suppress 3rd query after 2 prior timeouts, got: %v", err)
+	}
+	if calls != 2 {
+		t.Fatalf("expected cache to engage after 2 consecutive timeouts (2 hook calls total); got %d", calls)
+	}
+}
+
 func TestErrorCacheTTLRespectsTimeoutBudget(t *testing.T) {
 	ns, err := New("ns.example", "192.0.2.31", nil)
 	if err != nil {

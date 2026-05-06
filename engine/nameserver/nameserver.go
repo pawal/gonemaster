@@ -289,7 +289,13 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	}
 	if err != nil && (ctx == nil || ctx.Err() == nil) && ns.state != nil && ns.state.errorCache != nil {
 		if errorCacheTTL := resolveErrorCacheTTL(prof, opts); errorCacheTTL > 0 {
-			ns.state.errorCache.set(errorCacheKey(usevc), errorCacheTTL)
+			// Debounce timeouts: a single dropped UDP packet must not
+			// blackout this NS for the rest of the run. Non-timeout
+			// errors (truncation, hard network errors, etc.) cache
+			// immediately - they signal a real protocol-level fault.
+			if !isTimeoutPatternError(err) || ns.state.fastFail.sawConsecutiveTimeouts(usevc) {
+				ns.state.errorCache.set(errorCacheKey(usevc), errorCacheTTL)
+			}
 		}
 	}
 	if err != nil && (ctx == nil || ctx.Err() == nil) && isHardNetworkError(err) {

@@ -615,6 +615,9 @@ func runWithContext(ctx context.Context, req RunRequest, module string, testcase
 			return nil, err
 		}
 	}
+	if prof := profile.FromContext(ctx); prof != nil && prof.Resolver.Defaults.NegativeCacheTTL > 0 {
+		r.SetNegativeCacheTTL(time.Duration(prof.Resolver.Defaults.NegativeCacheTTL) * time.Second)
+	}
 	z, err := zone.NewWithRecursor(req.Domain, r)
 	if err != nil {
 		return nil, err

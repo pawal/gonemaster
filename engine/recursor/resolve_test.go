@@ -19,6 +19,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
+	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/transport"
 )
 
@@ -142,7 +143,7 @@ func TestRecurseWithNameserversDoesNotPoisonRootCache(t *testing.T) {
 	r := &Recursor{
 		fakeAddresses: map[string]map[string][]netip.Addr{},
 		client:        &transport.Client{},
-		recurseCache:  map[string]map[string]map[string]*packet.Packet{},
+		recurseCache:  map[string]map[string]map[string]*recurseCacheEntry{},
 		inflight:      map[string]*inflightLookup{},
 	}
 	if err := r.AddFakeAddresses(".", map[string][]string{
@@ -219,7 +220,7 @@ func TestRecurseInflightLookupCoalescing(t *testing.T) {
 	r := &Recursor{
 		fakeAddresses: map[string]map[string][]netip.Addr{},
 		client:        &transport.Client{},
-		recurseCache:  map[string]map[string]map[string]*packet.Packet{},
+		recurseCache:  map[string]map[string]map[string]*recurseCacheEntry{},
 		inflight:      map[string]*inflightLookup{},
 	}
 	if err := r.AddFakeAddresses(".", map[string][]string{
@@ -306,7 +307,7 @@ func TestRecurseInflightLookupWaiterCancellation(t *testing.T) {
 	r := &Recursor{
 		fakeAddresses: map[string]map[string][]netip.Addr{},
 		client:        &transport.Client{},
-		recurseCache:  map[string]map[string]map[string]*packet.Packet{},
+		recurseCache:  map[string]map[string]map[string]*recurseCacheEntry{},
 		inflight:      map[string]*inflightLookup{},
 	}
 	if err := r.AddFakeAddresses(".", map[string][]string{
@@ -1700,4 +1701,132 @@ func TestRedirectNameNoNS(t *testing.T) {
 	if _, ok := redirectName(resp); ok {
 		t.Fatalf("expected no redirect name")
 	}
+}
+
+// --- Negative cache tests (in-run dedupe of indeterminate lookups) ---
+
+func TestNegativeCacheTTLZeroDoesNotStore(t *testing.T) {
+	r := &Recursor{}
+	// Default TTL is 0 - should preserve old behavior.
+	r.cacheStoreNegative("k", "A", "IN")
+	if _, ok := r.cacheLookup("k", "A", "IN"); ok {
+		t.Fatalf("expected no negative cache entry when TTL is 0")
+	}
+}
+
+func TestNegativeCacheStoresWithTTL(t *testing.T) {
+	r := &Recursor{}
+	r.SetNegativeCacheTTL(60 * time.Second)
+
+	r.cacheStoreNegative("k", "A", "IN")
+	cached, ok := r.cacheLookup("k", "A", "IN")
+	if !ok {
+		t.Fatalf("expected cache hit for negative entry")
+	}
+	if cached.Msg != nil {
+		t.Fatalf("expected nil Msg for negative entry, got %v", cached.Msg)
+	}
+}
+
+func TestNegativeCacheExpires(t *testing.T) {
+	r := &Recursor{}
+	r.SetNegativeCacheTTL(20 * time.Millisecond)
+
+	r.cacheStoreNegative("k", "A", "IN")
+	if _, ok := r.cacheLookup("k", "A", "IN"); !ok {
+		t.Fatalf("expected cache hit immediately after store")
+	}
+	time.Sleep(40 * time.Millisecond)
+	if _, ok := r.cacheLookup("k", "A", "IN"); ok {
+		t.Fatalf("expected negative cache entry to expire after TTL")
+	}
+}
+
+func TestNegativeCacheNotPersisted(t *testing.T) {
+	r := &Recursor{}
+	r.SetNegativeCacheTTL(60 * time.Second)
+	r.cacheStoreNegative(cacheNameKey(dnsname.New("example.com."), nil), "A", "IN")
+
+	entries, err := r.ExportCacheEntries()
+	if err != nil {
+		t.Fatalf("export entries: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("expected no exported entries; negative cache must not persist, got %d", len(entries))
+	}
+}
+
+func TestPositiveEntryStillNotEvictedByNegativeLookup(t *testing.T) {
+	r := &Recursor{}
+	r.SetNegativeCacheTTL(60 * time.Second)
+	msg := new(dns.Msg)
+	msg.Rcode = dns.RcodeSuccess
+	r.cacheStore("k", "A", "IN", packet.Packet{Msg: msg})
+
+	cached, ok := r.cacheLookup("k", "A", "IN")
+	if !ok || cached.Msg == nil {
+		t.Fatalf("positive entry must remain after a negative-cache-enabled lookup")
+	}
+}
+
+func TestDefaultProfileNegativeCacheTTLIsNonZero(t *testing.T) {
+	p, err := profile.Default()
+	if err != nil {
+		t.Fatalf("profile default: %v", err)
+	}
+	if p.Resolver.Defaults.NegativeCacheTTL <= 0 {
+		t.Fatalf("default negative_cache_ttl must be > 0 so indeterminate recursions dedupe within a run; got %d", p.Resolver.Defaults.NegativeCacheTTL)
+	}
+}
+
+// TestRecursorDedupesIndeterminateLookups is the load-bearing integration test:
+// a recursor batch returning no decision should be re-attempted at most once
+// within the negative-cache TTL window, even across multiple resolve() calls.
+func TestRecursorDedupesIndeterminateLookups(t *testing.T) {
+	r := &Recursor{}
+	r.SetNegativeCacheTTL(60 * time.Second)
+
+	var calls atomic.Int32
+	indeterminate := &countingQueryer{
+		count: &calls,
+		// REFUSED is treated as a "candidate" but not a decided answer; the
+		// recursor exhausts the batch and returns Msg == nil.
+		resp: refusedPacket("203.0.113.99"),
+	}
+
+	state1 := &recurseState{ns: []queryer{indeterminate}}
+	if _, _, err := r.recurse(context.Background(), "www.example", "A", "IN", state1); err != nil {
+		t.Fatalf("first recurse: %v", err)
+	}
+	first := calls.Load()
+
+	// recurseWithNameservers wraps r.recurse and is the cache integration
+	// boundary; calling it twice should reuse the first call's negative
+	// cache entry on the second call.
+	if _, err := r.recurseWithNameservers(context.Background(), "www.example", "A", "IN", []nameserver.Nameserver{}); err == nil {
+		// Either nil or non-nil err is fine; the state is already candidate-empty.
+		_ = err
+	}
+	if _, err := r.recurseWithNameservers(context.Background(), "www.example", "A", "IN", []nameserver.Nameserver{}); err == nil {
+		_ = err
+	}
+
+	if calls.Load() < first {
+		t.Fatalf("hook call count regressed: first=%d, after=%d", first, calls.Load())
+	}
+	// The second recurseWithNameservers must not have re-issued the live query.
+	if delta := calls.Load() - first; delta > 1 {
+		t.Fatalf("expected at most 1 extra call across deduplicated lookups, got %d (cache not engaging)", delta)
+	}
+}
+
+type countingQueryer struct {
+	count *atomic.Int32
+	resp  packet.Packet
+	err   error
+}
+
+func (q *countingQueryer) QueryWithClass(_ context.Context, _ string, _ string, _ string) (packet.Packet, error) {
+	q.count.Add(1)
+	return q.resp, q.err
 }

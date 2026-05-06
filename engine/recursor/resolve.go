@@ -7,6 +7,7 @@ import (
 	"net/netip"
 	"sort"
 	"strings"
+	"time"
 
 	dns "codeberg.org/miekg/dns"
 
@@ -306,7 +307,7 @@ func (r *Recursor) getAddressesFor(ctx context.Context, name string, state *recu
 // ClearCache clears the recursive cache.
 func (r *Recursor) ClearCache() {
 	r.cacheMu.Lock()
-	r.recurseCache = map[string]map[string]map[string]*packet.Packet{}
+	r.recurseCache = map[string]map[string]map[string]*recurseCacheEntry{}
 	r.recurseCount = 0
 	r.cacheMu.Unlock()
 }
@@ -381,10 +382,18 @@ func (r *Recursor) recurseWithNameservers(ctx context.Context, name string, qtyp
 
 	resp, _, err = r.recurse(ctx, name, qtype, qclass, state)
 	if err != nil {
+		if ctx == nil || ctx.Err() == nil {
+			r.cacheStoreNegative(key, qtype, qclass)
+		}
 		return packet.Packet{}, err
 	}
-	// Cache without the per-run logger reference to avoid pinning the job's
-	// Logger across runs; reattach Log only on the returned copy.
+	if resp.Msg == nil {
+		if ctx == nil || ctx.Err() == nil {
+			r.cacheStoreNegative(key, qtype, qclass)
+		}
+		resp.Log = runLog
+		return resp, nil
+	}
 	cached := resp
 	cached.Log = nil
 	r.cacheStore(key, qtype, qclass, cached)
@@ -418,27 +427,55 @@ func (r *Recursor) cacheLookupLocked(name string, qtype string, qclass string) (
 	if r.recurseCache == nil {
 		return packet.Packet{}, false
 	}
-	if byType, ok := r.recurseCache[name]; ok {
-		if byClass, ok := byType[qtype]; ok {
-			if cached, ok := byClass[qclass]; ok {
-				if cached == nil {
-					delete(byClass, qclass)
-					if r.recurseCount > 0 {
-						r.recurseCount--
-					}
-					if len(byClass) == 0 {
-						delete(byType, qtype)
-					}
-					if len(byType) == 0 {
-						delete(r.recurseCache, name)
-					}
-					return packet.Packet{}, false
-				}
-				return *cached, true
-			}
+	byType, ok := r.recurseCache[name]
+	if !ok {
+		return packet.Packet{}, false
+	}
+	byClass, ok := byType[qtype]
+	if !ok {
+		return packet.Packet{}, false
+	}
+	entry, ok := byClass[qclass]
+	if !ok {
+		return packet.Packet{}, false
+	}
+	if entry == nil {
+		r.evictCacheEntryLocked(name, qtype, qclass)
+		return packet.Packet{}, false
+	}
+	if !entry.expires.IsZero() && !time.Now().Before(entry.expires) {
+		r.evictCacheEntryLocked(name, qtype, qclass)
+		return packet.Packet{}, false
+	}
+	if entry.resp == nil {
+		// Negative cache hit: return an empty packet but signal hit=true so
+		// callers skip re-issuing the lookup.
+		return packet.Packet{}, true
+	}
+	return *entry.resp, true
+}
+
+func (r *Recursor) evictCacheEntryLocked(name string, qtype string, qclass string) {
+	byType, ok := r.recurseCache[name]
+	if !ok {
+		return
+	}
+	byClass, ok := byType[qtype]
+	if !ok {
+		return
+	}
+	if _, ok := byClass[qclass]; ok {
+		delete(byClass, qclass)
+		if r.recurseCount > 0 {
+			r.recurseCount--
 		}
 	}
-	return packet.Packet{}, false
+	if len(byClass) == 0 {
+		delete(byType, qtype)
+	}
+	if len(byType) == 0 {
+		delete(r.recurseCache, name)
+	}
 }
 
 func (r *Recursor) cacheLookupOrWaitOrRegister(name string, qtype string, qclass string) (packet.Packet, bool, *inflightLookup, bool) {
@@ -481,42 +518,56 @@ func (r *Recursor) cacheLookup(name string, qtype string, qclass string) (packet
 }
 
 func (r *Recursor) cacheStore(name string, qtype string, qclass string, resp packet.Packet) {
-	r.cacheMu.Lock()
-	defer r.cacheMu.Unlock()
-
-	// Do not cache indeterminate lookups (no packet). They are often transient
-	// cancellation/timeouts and should be retried on subsequent calls.
 	if resp.Msg == nil {
+		// Indeterminate lookups are stored separately via cacheStoreNegative.
 		return
 	}
+	r.cacheMu.Lock()
+	defer r.cacheMu.Unlock()
+	copyResp := resp
+	r.storeEntryLocked(name, qtype, qclass, &recurseCacheEntry{resp: &copyResp})
+}
 
+// cacheStoreNegative stores a "no answer" entry for the supplied lookup,
+// expiring after r.negativeCacheTTL. When the TTL is zero (default) no
+// entry is stored, preserving the historical "do not cache indeterminate
+// lookups" behavior.
+func (r *Recursor) cacheStoreNegative(name string, qtype string, qclass string) {
+	r.cacheMu.Lock()
+	defer r.cacheMu.Unlock()
+	if r.negativeCacheTTL <= 0 {
+		return
+	}
+	r.storeEntryLocked(name, qtype, qclass, &recurseCacheEntry{
+		expires: time.Now().Add(r.negativeCacheTTL),
+	})
+}
+
+func (r *Recursor) storeEntryLocked(name string, qtype string, qclass string, entry *recurseCacheEntry) {
 	if r.recurseCache == nil {
-		r.recurseCache = map[string]map[string]map[string]*packet.Packet{}
+		r.recurseCache = map[string]map[string]map[string]*recurseCacheEntry{}
 	}
 	if r.recurseCache[name] == nil {
-		r.recurseCache[name] = map[string]map[string]*packet.Packet{}
+		r.recurseCache[name] = map[string]map[string]*recurseCacheEntry{}
 	}
 	if r.recurseCache[name][qtype] == nil {
-		r.recurseCache[name][qtype] = map[string]*packet.Packet{}
+		r.recurseCache[name][qtype] = map[string]*recurseCacheEntry{}
 	}
-	copyResp := resp
-
 	if _, exists := r.recurseCache[name][qtype][qclass]; !exists {
 		r.recurseCount++
 	}
 	if recurseCacheMaxEntries > 0 && r.recurseCount > recurseCacheMaxEntries {
 		// Keep cache bounded for long-running processes.
-		r.recurseCache = map[string]map[string]map[string]*packet.Packet{}
+		r.recurseCache = map[string]map[string]map[string]*recurseCacheEntry{}
 		r.recurseCount = 1
-		r.recurseCache[name] = map[string]map[string]*packet.Packet{
+		r.recurseCache[name] = map[string]map[string]*recurseCacheEntry{
 			qtype: {
-				qclass: &copyResp,
+				qclass: entry,
 			},
 		}
 		return
 	}
-
-	r.recurseCache[name][qtype][qclass] = &copyResp
+	r.recurseCache[name][qtype][qclass] = entry
 }
 
 func (r *Recursor) getNSFrom(ctx context.Context, resp packet.Packet, state *recurseState) ([]queryer, error) {

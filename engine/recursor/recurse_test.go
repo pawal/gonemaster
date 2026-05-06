@@ -239,7 +239,7 @@ func TestRecurseIgnoresRootReferral(t *testing.T) {
 func TestRecurseFollowsOutOfBailiwickCNAME(t *testing.T) {
 	r := &Recursor{
 		client:       &transport.Client{},
-		recurseCache: map[string]map[string]map[string]*packet.Packet{},
+		recurseCache: map[string]map[string]map[string]*recurseCacheEntry{},
 	}
 
 	err := r.AddFakeAddresses(".", map[string][]string{
@@ -384,7 +384,7 @@ func TestResolveCNAMEDoesNotShareInProgress(t *testing.T) {
 
 	r := &Recursor{
 		client:       &transport.Client{},
-		recurseCache: map[string]map[string]map[string]*packet.Packet{},
+		recurseCache: map[string]map[string]map[string]*recurseCacheEntry{},
 	}
 	if err := r.AddFakeAddresses(".", map[string][]string{
 		"root.test": {"192.0.2.53"},

@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"codeberg.org/pawal/gonemaster/engine/hints"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
@@ -17,14 +18,33 @@ import (
 
 var namedRoot = share.NamedRoot
 
+// recurseCacheEntry holds a cached recursion result. resp is nil for
+// negative entries; expires is zero for non-expiring (positive) entries.
+type recurseCacheEntry struct {
+	resp    *packet.Packet
+	expires time.Time
+}
+
 // Recursor holds root hints and fake delegations.
 type Recursor struct {
-	fakeAddresses map[string]map[string][]netip.Addr
-	client        *transport.Client
-	recurseCache  map[string]map[string]map[string]*packet.Packet
-	recurseCount  int
-	inflight      map[string]*inflightLookup
-	cacheMu       sync.Mutex
+	fakeAddresses    map[string]map[string][]netip.Addr
+	client           *transport.Client
+	recurseCache     map[string]map[string]map[string]*recurseCacheEntry
+	recurseCount     int
+	inflight         map[string]*inflightLookup
+	negativeCacheTTL time.Duration
+	cacheMu          sync.Mutex
+}
+
+// SetNegativeCacheTTL controls the lifetime of cached "no answer" entries.
+// Zero (default) disables negative caching.
+func (r *Recursor) SetNegativeCacheTTL(ttl time.Duration) {
+	if r == nil {
+		return
+	}
+	r.cacheMu.Lock()
+	r.negativeCacheTTL = ttl
+	r.cacheMu.Unlock()
 }
 
 // New creates a Recursor and initializes it with root hints.
@@ -32,7 +52,7 @@ func New() (*Recursor, error) {
 	r := &Recursor{
 		fakeAddresses: map[string]map[string][]netip.Addr{},
 		client:        &transport.Client{},
-		recurseCache:  map[string]map[string]map[string]*packet.Packet{},
+		recurseCache:  map[string]map[string]map[string]*recurseCacheEntry{},
 		inflight:      map[string]*inflightLookup{},
 	}
 

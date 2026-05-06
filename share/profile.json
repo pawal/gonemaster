@@ -30,7 +30,7 @@
             "timeout": 5,
             "error_cache_ttl": 30,
             "positive_cache_ttl": 0,
-            "negative_cache_ttl": 0,
+            "negative_cache_ttl": 30,
             "fast_fail_timeout_count": 3,
             "nameserver_concurrency": 0
         }

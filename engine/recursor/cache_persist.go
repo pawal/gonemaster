@@ -63,11 +63,11 @@ func (r *Recursor) ExportCacheEntries() ([]CacheEntry, error) {
 			}
 			sort.Strings(classes)
 			for _, qclass := range classes {
-				pkt := byClass[qclass]
-				if pkt == nil || pkt.Msg == nil {
+				entry := byClass[qclass]
+				if entry == nil || entry.resp == nil || entry.resp.Msg == nil {
 					continue
 				}
-				flat = append(flat, flatEntry{key: key, qtype: qtype, qclass: qclass, pkt: pkt})
+				flat = append(flat, flatEntry{key: key, qtype: qtype, qclass: qclass, pkt: entry.resp})
 			}
 		}
 	}

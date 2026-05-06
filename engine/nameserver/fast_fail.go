@@ -1,21 +1,19 @@
 package nameserver
 
 import (
-	"context"
 	"errors"
 	"net"
 	"strings"
 	"sync"
 )
 
-// isTimeoutPatternError reports whether err looks like a DNS query timeout.
-// Context cancellation and deadline exceeded are excluded - those are job-level
-// signals, not nameserver-level failure indicators.
+// isTimeoutPatternError reports whether err looks like a network timeout.
+// Caller is expected to gate on the outer context's Err() to distinguish a
+// job-level cancellation from a real nameserver-side timeout - a fired dial
+// deadline wraps context.DeadlineExceeded internally even when the outer
+// context is fine.
 func isTimeoutPatternError(err error) bool {
 	if err == nil {
-		return false
-	}
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return false
 	}
 	var netErr net.Error

@@ -1,7 +1,6 @@
 package nameserver
 
 import (
-	"context"
 	"errors"
 	"net"
 	"strings"
@@ -72,11 +71,11 @@ func reachabilityMetricsSnapshot() CacheMetrics {
 	return globalReachability.met.snapshot()
 }
 
+// isHardNetworkError reports whether err is a "host not reachable from here"
+// failure (no-route, host/net unreachable/down). Timeouts return false here.
+// Caller gates on outer ctx.Err() for job-cancellation attribution.
 func isHardNetworkError(err error) bool {
 	if err == nil {
-		return false
-	}
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return false
 	}
 	var netErr net.Error

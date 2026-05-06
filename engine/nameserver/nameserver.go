@@ -318,7 +318,11 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 
 	resp, err := ns.queryNetwork(ctx, qname, qtype, qclass, opts)
 	if ns.state != nil {
-		ns.state.fastFail.observeResult(usevc, isTimeoutPatternError(err), fastFailThreshold)
+		// Only count timeouts attributable to the nameserver, not the calling
+		// job: if the outer ctx is cancelled the err may wrap a context error
+		// even though the nameserver itself never had a chance to respond.
+		outerCtxOK := ctx == nil || ctx.Err() == nil
+		ns.state.fastFail.observeResult(usevc, outerCtxOK && isTimeoutPatternError(err), fastFailThreshold)
 	}
 
 	blacklistingDisabled := opts != nil && opts.BlacklistingDisabled

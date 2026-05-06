@@ -4,8 +4,7 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [v1.4.5] - 2026-05-06
 
-Added DNSSEC21 to verify parent DS RRSIG after the .de DNSSEC failure.
-Other changes are just refactoring and incremental improvements.
+Added DNSSEC21 to verify parent DS RRSIG after the .de DNSSEC failure. Other changes are UI refactoring, and stabilising the core test engine.
 
 ### Added
 
@@ -22,7 +21,10 @@ Other changes are just refactoring and incremental improvements.
 - engine: default error_cache_ttl to 30s so dead servers are skipped within a run
 - engine: classify dial-timeouts correctly so fast-fail engages
 - engine: cache no-response on dial-timeout and short-circuit skips
+- engine: widen error-cache key per query so unrelated queries don't ghost-skip
+- engine: keep error caches run-local instead of sharing via parent chain
 - engine: cache no_message on query timeout so saved replays stay offline
+- engine: debounce reachability-cache marks until 2 consecutive hard errors
 - ui-public: hide Codeberg ribbon on narrow viewports
 
 ## [v1.4.4] - 2026-05-05

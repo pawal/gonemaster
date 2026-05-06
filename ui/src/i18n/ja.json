@@ -258,6 +258,7 @@
   "tc.dnssec18": "DSからCDSおよびCDNSKEYへの信頼チェーンの検証",
   "tc.dnssec19": "DNSKEYレコードの既知の暗号学的脆弱性の確認",
   "tc.dnssec20": "ゾーン頂点のNSEC/NSEC3タイプビットマップが実際のRRタイプと一致する",
+  "tc.dnssec21": "親ゾーンのDS RRsetが有効なDNSKEYで署名されている",
   "tc.nameserver01": "ネームサーバーはリカーサーであるべきではない",
   "tc.nameserver02": "EDNS0サポートのテスト",
   "tc.nameserver03": "ゾーン転送 (AXFR) の利用可能性テスト",

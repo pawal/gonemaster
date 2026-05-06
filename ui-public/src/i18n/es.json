@@ -142,6 +142,7 @@
   "pub.tc.dnssec18": "Validar la cadena de confianza del DS hacia CDS y CDNSKEY",
   "pub.tc.dnssec19": "Verificar debilidades criptográficas conocidas en los registros DNSKEY",
   "pub.tc.dnssec20": "El mapa de bits de tipos NSEC/NSEC3 en el ápice de la zona coincide con los tipos RR reales",
+  "pub.tc.dnssec21": "El RRset DS de la zona padre está firmado por un DNSKEY válido",
   "pub.tc.nameserver01": "Un servidor de nombres no debería ser un recursor",
   "pub.tc.nameserver02": "Prueba de soporte EDNS0",
   "pub.tc.nameserver03": "Prueba de disponibilidad de transferencia de zona (AXFR)",

@@ -258,6 +258,7 @@
   "tc.dnssec18": "Validation de la chaîne de confiance du DS vers CDS et CDNSKEY",
   "tc.dnssec19": "Vérification des faiblesses cryptographiques connues dans les enregistrements DNSKEY",
   "tc.dnssec20": "Le bitmap de types NSEC/NSEC3 à l'apex de la zone correspond aux types RR réels",
+  "tc.dnssec21": "Le RRset DS de la zone parent est signé par un DNSKEY valide",
   "tc.nameserver01": "Un serveur de noms ne devrait pas être un récurseur",
   "tc.nameserver02": "Test de la prise en charge EDNS0",
   "tc.nameserver03": "Test de la disponibilité du transfert de zone (AXFR)",

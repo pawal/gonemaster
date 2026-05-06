@@ -648,6 +648,7 @@
   "tc.dnssec18": "Validate trust from DS to CDS and CDNSKEY",
   "tc.dnssec19": "Check DNSKEY records for known cryptographic weaknesses",
   "tc.dnssec20": "NSEC/NSEC3 type bitmap at zone apex matches actual RR types",
+  "tc.dnssec21": "Parent zone's DS RRset is signed by a valid DNSKEY",
   "tc.nameserver01": "A name server should not be a recursor",
   "tc.nameserver02": "Test of EDNS0 support",
   "tc.nameserver03": "Test availability of zone transfer (AXFR)",

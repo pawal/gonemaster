@@ -142,6 +142,7 @@
   "pub.tc.dnssec18": "Preverjanje verige zaupanja od DS do CDS in CDNSKEY",
   "pub.tc.dnssec19": "Preverjanje znanih kriptografskih šibkosti v zapisih DNSKEY",
   "pub.tc.dnssec20": "Bitna karta tipov NSEC/NSEC3 na vrhu cone se ujema z dejanskimi tipi RR",
+  "pub.tc.dnssec21": "RRset DS nadrejene cone je podpisan z veljavnim DNSKEY",
   "pub.tc.nameserver01": "Imenski strežnik ne bi smel biti rekurzor",
   "pub.tc.nameserver02": "Test podpore EDNS0",
   "pub.tc.nameserver03": "Test razpoložljivosti prenosa cone (AXFR)",

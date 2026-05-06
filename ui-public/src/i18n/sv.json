@@ -142,6 +142,7 @@
   "pub.tc.dnssec18": "Validera förtroendekedja från DS till CDS och CDNSKEY",
   "pub.tc.dnssec19": "Kontrollera DNSKEY-poster för kända kryptografiska svagheter",
   "pub.tc.dnssec20": "NSEC/NSEC3-typbitkarta vid zonens apex matchar faktiska RR-typer",
+  "pub.tc.dnssec21": "Föräldrazonens DS RRset är signerat av en giltig DNSKEY",
   "pub.tc.nameserver01": "En namnserver bör inte vara en rekursor",
   "pub.tc.nameserver02": "Test av EDNS0-stöd",
   "pub.tc.nameserver03": "Test av tillgänglighet för zonöverföring (AXFR)",

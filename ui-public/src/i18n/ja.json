@@ -142,6 +142,7 @@
   "pub.tc.dnssec18": "DSからCDSおよびCDNSKEYへの信頼チェーンの検証",
   "pub.tc.dnssec19": "DNSKEYレコードの既知の暗号学的脆弱性の確認",
   "pub.tc.dnssec20": "ゾーン頂点のNSEC/NSEC3タイプビットマップが実際のRRタイプと一致する",
+  "pub.tc.dnssec21": "親ゾーンのDS RRsetが有効なDNSKEYで署名されている",
   "pub.tc.nameserver01": "ネームサーバーはリカーサーであるべきではない",
   "pub.tc.nameserver02": "EDNS0サポートのテスト",
   "pub.tc.nameserver03": "ゾーン転送 (AXFR) の利用可能性テスト",

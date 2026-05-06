@@ -142,6 +142,7 @@
   "pub.tc.dnssec18": "Vahvista luottamusketju DS:stä CDS:ään ja CDNSKEY:hyn",
   "pub.tc.dnssec19": "Tarkista DNSKEY-tietueet tunnettujen kryptografisten heikkouksien varalta",
   "pub.tc.dnssec20": "NSEC/NSEC3-tyyppibittikuvaus vyöhykkeen kärjessä vastaa todellisia RR-tyyppejä",
+  "pub.tc.dnssec21": "Ylätason vyöhykkeen DS-RRset on allekirjoitettu kelvollisella DNSKEY:llä",
   "pub.tc.nameserver01": "Nimipalvelin ei saisi olla rekursori",
   "pub.tc.nameserver02": "EDNS0-tuen testi",
   "pub.tc.nameserver03": "Vyöhykesiirron (AXFR) saatavuuden testi",

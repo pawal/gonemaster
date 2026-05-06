@@ -1,6 +1,8 @@
 package nameserver
 
 import (
+	"context"
+	"fmt"
 	"net/netip"
 	"testing"
 
@@ -56,6 +58,38 @@ func TestCacheStoreExportImportRoundTrip(t *testing.T) {
 	}
 	if loadedEmpty != nil {
 		t.Fatalf("expected nil packet for empty entry")
+	}
+}
+
+func TestCacheStoreExportsTimeoutAsNoMessage(t *testing.T) {
+	ctx, prof := testContext(t)
+	prof.Resolver.Defaults.ErrorCacheTTL = 0
+
+	store := NewCacheStore()
+	ns, err := NewWithCache(store, "ns.example", "192.0.2.252", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		return packet.Packet{}, fmt.Errorf("timeout")
+	})
+
+	if _, err := ns.QueryWithOptions(ctx, "example", "SOA", &QueryOptions{BlacklistingDisabled: true}); err == nil {
+		t.Fatalf("expected timeout error")
+	}
+
+	entries, err := store.ExportEntries()
+	if err != nil {
+		t.Fatalf("export entries: %v", err)
+	}
+	var noMessageEntries int
+	for _, e := range entries {
+		if e.Address == "192.0.2.252" && e.NoMessage {
+			noMessageEntries++
+		}
+	}
+	if noMessageEntries == 0 {
+		t.Fatalf("expected at least one NoMessage entry from timed-out query, got entries: %+v", entries)
 	}
 }
 

@@ -357,6 +357,12 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 			infResp = &cached
 		} else if err == nil {
 			ns.state.cache.set(cacheKey, nil)
+		} else if (ctx == nil || ctx.Err() == nil) &&
+			(isTimeoutPatternError(err) || isHardNetworkError(err)) {
+			// Persist a "no response" marker so subsequent identical queries
+			// (and --save/--restore replays) do not re-issue a live query
+			// that already timed out or hit an unreachable host.
+			ns.state.cache.set(cacheKey, nil)
 		}
 		if inflight != nil {
 			ns.state.cache.finish(cacheKey, infResp, err)

@@ -282,7 +282,7 @@ func TestErrorCacheTTLRespectsTimeoutBudget(t *testing.T) {
 	}
 }
 
-func TestQueryCacheDoesNotStoreErrors(t *testing.T) {
+func TestQueryCacheStoresTimeoutsAsNoMessage(t *testing.T) {
 	ctx, prof := testContext(t)
 	prof.Resolver.Defaults.ErrorCacheTTL = 0
 
@@ -298,16 +298,56 @@ func TestQueryCacheDoesNotStoreErrors(t *testing.T) {
 	})
 
 	opts := &QueryOptions{BlacklistingDisabled: true}
-	_, err = ns.QueryWithOptions(ctx, "example", "SOA", opts)
+	pkt, err := ns.QueryWithOptions(ctx, "example", "SOA", opts)
 	if err == nil {
 		t.Fatalf("expected error on first query")
 	}
-	_, err = ns.QueryWithOptions(ctx, "example", "SOA", opts)
+	if pkt.Msg != nil {
+		t.Fatalf("expected nil msg on first timeout, got %v", pkt.Msg)
+	}
+	pkt, err = ns.QueryWithOptions(ctx, "example", "SOA", opts)
+	if err != nil {
+		t.Fatalf("expected cached no-response on second query, got error: %v", err)
+	}
+	if pkt.Msg != nil {
+		t.Fatalf("expected cached no-response on second query, got msg: %v", pkt.Msg)
+	}
+	if calls != 1 {
+		t.Fatalf("expected 1 network call after caching the timeout, got %d", calls)
+	}
+}
+
+func TestQueryCacheDoesNotStoreContextCancelErrors(t *testing.T) {
+	ctx, _ := testContext(t)
+	cctx, cancel := context.WithCancel(ctx)
+
+	ns, err := NewWithContext(cctx, "ns.example", "192.0.2.251", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+
+	var calls int
+	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		calls++
+		cancel()
+		return packet.Packet{}, context.Canceled
+	})
+
+	opts := &QueryOptions{BlacklistingDisabled: true}
+	_, _ = ns.QueryWithOptions(cctx, "example", "SOA", opts)
+	// New context for the second call so it isn't short-circuited by ctx.Err().
+	cctx2, cancel2 := context.WithCancel(ctx)
+	defer cancel2()
+	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		calls++
+		return packet.Packet{}, fmt.Errorf("timeout")
+	})
+	_, err = ns.QueryWithOptions(cctx2, "example", "SOA", opts)
 	if err == nil {
-		t.Fatalf("expected error on second query")
+		t.Fatalf("expected error on second query (cancellation must not have cached nil)")
 	}
 	if calls != 2 {
-		t.Fatalf("expected 2 calls without cached error, got %d", calls)
+		t.Fatalf("expected 2 network calls, got %d (cancellation should not cache)", calls)
 	}
 }
 
@@ -413,7 +453,8 @@ func TestReachabilityCacheExpiresByBudget(t *testing.T) {
 
 	time.Sleep(40 * time.Millisecond)
 
-	_, err = ns.QueryWithOptions(ctx, "example", "A", opts)
+	// Different qname so per-query cache miss forces reachability path to run.
+	_, err = ns.QueryWithOptions(ctx, "another.example", "A", opts)
 	if err == nil {
 		t.Fatalf("expected error after reachability cache expiry")
 	}
@@ -823,8 +864,9 @@ func TestBlacklistingEmitsTags(t *testing.T) {
 
 	// First SOA query triggers blacklisting.
 	_, _ = ns.QueryWithOptions(ctx, "example", "SOA", nil)
-	// Second query should be skipped via IS_BLACKLISTED.
-	_, _ = ns.QueryWithOptions(ctx, "example", "SOA", nil)
+	// Different qname so the second query bypasses the per-query timeout cache
+	// and reaches the IS_BLACKLISTED short-circuit.
+	_, _ = ns.QueryWithOptions(ctx, "other.example", "SOA", nil)
 
 	var hasBlacklisting, hasIsBlacklisted bool
 	for _, entry := range log.Entries() {

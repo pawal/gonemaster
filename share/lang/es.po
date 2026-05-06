@@ -2091,43 +2091,43 @@ msgstr "{parent} sent a DS record, but {child} did not send a DNSKEY record."
 
 msgctxt "DNSSEC:DS21_ALGO_NOT_SUPPORTED"
 msgid "Parent DS RRSIG with keytag {keytag} uses unsupported algorithm {algo_num} ({algo_mnemo}); skipping verification on parent name server(s) {addresses}."
-msgstr "Parent DS RRSIG with keytag {keytag} uses unsupported algorithm {algo_num} ({algo_mnemo}); skipping verification on parent name server(s) {addresses}."
+msgstr "La firma RRSIG de la zona padre que cubre el registro DS con tag {keytag} usa un algoritmo no soportado {algo_num} ({algo_mnemo}). Se omitió la validación en los servidores de nombres de la zona padre con direcciones IP \"{addresses}\"."
 
 msgctxt "DNSSEC:DS21_DS_RRSIG_EXPIRED"
 msgid "Parent DS RRSIG with keytag {keytag} has expired on parent name server(s) {addresses}."
-msgstr "Parent DS RRSIG with keytag {keytag} has expired on parent name server(s) {addresses}."
+msgstr "La firma RRSIG de la zona padre que cubre el registro DS con tag {keytag} está expirada en los servidores de nombres de la zona padre con direcciones IP \"{addresses}\"."
 
 msgctxt "DNSSEC:DS21_DS_RRSIG_NOT_VALID_BY_DNSKEY"
 msgid "Parent DS RRSIG with keytag {keytag} cannot be verified by any matching parent DNSKEY on parent name server(s) {addresses}."
-msgstr "Parent DS RRSIG with keytag {keytag} cannot be verified by any matching parent DNSKEY on parent name server(s) {addresses}."
+msgstr "La firma RRSIG de la zona padre que cubre el registro DS con tag {keytag} no puede ser validada por ningún DNSKEY correspondiente de la zona padre en los servidores de nombres de la zona padre con direcciones IP \"{addresses}\"."
 
 msgctxt "DNSSEC:DS21_DS_RRSIG_NOT_VERIFIABLE"
 msgid "Parent returned a signed DS RRset, but no covering RRSIG could be verified against the parent DNSKEY on parent name server(s) {addresses}. Validating resolvers will fail to resolve the child zone."
-msgstr "Parent returned a signed DS RRset, but no covering RRSIG could be verified against the parent DNSKEY on parent name server(s) {addresses}. Validating resolvers will fail to resolve the child zone."
+msgstr "La zona padre retornó un conjunto de registros DS firmado, pero ninguna firma RRSIG de cobertura pudo ser validada contra el DNSKEY de la zona padre en los servidores de nombres de la zona padre con direcciones IP \"{addresses}\". Los resolutores validantes no podrán resolver la zona hija."
 
 msgctxt "DNSSEC:DS21_DS_RRSIG_NOT_YET_VALID"
 msgid "Parent DS RRSIG with keytag {keytag} has an inception time in the future on parent name server(s) {addresses}."
-msgstr "Parent DS RRSIG with keytag {keytag} has an inception time in the future on parent name server(s) {addresses}."
+msgstr "La firma RRSIG de la zona padre que cubre el registro DS con tag {keytag} tiene su fecha de comienzo en el futuro en los servidores de nombres de la zona padre con direcciones IP \"{addresses}\"."
 
 msgctxt "DNSSEC:DS21_DS_RRSIG_VERIFIED"
 msgid "Parent DS RRset is correctly signed and verifies against the parent DNSKEY on parent name server(s) {addresses}."
-msgstr "Parent DS RRset is correctly signed and verifies against the parent DNSKEY on parent name server(s) {addresses}."
+msgstr "El conjunto de registros DS de la zona padre está correctamente firmado y se valida contra el DNSKEY de la zona padre en los servidores de nombres de la zona padre con direcciones IP \"{addresses}\"."
 
 msgctxt "DNSSEC:DS21_NO_DNSKEY_FOR_DS_RRSIG"
 msgid "Parent DS RRSIG references DNSKEY keytag {keytag}, but no matching DNSKEY is published at the parent apex on parent name server(s) {addresses}."
-msgstr "Parent DS RRSIG references DNSKEY keytag {keytag}, but no matching DNSKEY is published at the parent apex on parent name server(s) {addresses}."
+msgstr "La firma RRSIG de la zona padre que cubre el registro DS hace referencia al DNSKEY con tag {keytag}, pero no hay ningún DNSKEY correspondiente publicado en el apex de la zona padre en los servidores de nombres de la zona padre con direcciones IP \"{addresses}\"."
 
 msgctxt "DNSSEC:DS21_NO_DS_RRSIG"
 msgid "Parent returned the DS RRset without any covering RRSIG on parent name server(s) {addresses}."
-msgstr "Parent returned the DS RRset without any covering RRSIG on parent name server(s) {addresses}."
+msgstr "La zona padre retornó el conjunto de registros DS sin ninguna firma RRSIG de cobertura en los servidores de nombres de la zona padre con direcciones IP \"{addresses}\"."
 
 msgctxt "DNSSEC:DS21_NO_PARENT_ZONE"
 msgid "No parent zone is available; DNSSEC21 cannot run."
-msgstr "No parent zone is available; DNSSEC21 cannot run."
+msgstr "No hay ninguna zona padre disponible. La prueba DNSSEC21 no puede ejecutarse."
 
 msgctxt "DNSSEC:DS21_PARENT_DNSKEY_MISSING"
 msgid "Parent did not return an authoritative DNSKEY response, so DS RRSIG verification was skipped on parent name server(s) {addresses}."
-msgstr "Parent did not return an authoritative DNSKEY response, so DS RRSIG verification was skipped on parent name server(s) {addresses}."
+msgstr "La zona padre no retornó una respuesta DNSKEY autoritativa, por lo que la validación de la firma RRSIG que cubre el registro DS se omitió en los servidores de nombres de la zona padre con direcciones IP \"{addresses}\"."
 
 msgctxt "DNSSEC:DURATION_LONG"
 msgid ""

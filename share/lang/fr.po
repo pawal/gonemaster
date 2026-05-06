@@ -2500,43 +2500,43 @@ msgid "RR type {query_type} exists at the zone apex but is missing from the NSEC
 msgstr "Le type RR {query_type} existe à l'apex de la zone mais est absent du bitmap de types NSEC sur le(s) serveur(s) de noms {servers}. Cela permet l'empoisonnement du cache via la mise en cache négative agressive de la RFC 8198."
 msgctxt "DNSSEC:DS21_ALGO_NOT_SUPPORTED"
 msgid "Parent DS RRSIG with keytag {keytag} uses unsupported algorithm {algo_num} ({algo_mnemo}); skipping verification on parent name server(s) {addresses}."
-msgstr "Parent DS RRSIG with keytag {keytag} uses unsupported algorithm {algo_num} ({algo_mnemo}); skipping verification on parent name server(s) {addresses}."
+msgstr "La signature (RRSIG) de la zone parente couvrant l'enregistrement DS avec le tag {keytag} utilise un algorithme non pris en charge {algo_num} ({algo_mnemo}). La validation a été ignorée sur les serveurs de noms de la zone parente ayant les adresses IP \"{addresses}\"."
 
 msgctxt "DNSSEC:DS21_DS_RRSIG_EXPIRED"
 msgid "Parent DS RRSIG with keytag {keytag} has expired on parent name server(s) {addresses}."
-msgstr "Parent DS RRSIG with keytag {keytag} has expired on parent name server(s) {addresses}."
+msgstr "La signature (RRSIG) de la zone parente couvrant l'enregistrement DS avec le tag {keytag} a expiré sur les serveurs de noms de la zone parente ayant les adresses IP \"{addresses}\"."
 
 msgctxt "DNSSEC:DS21_DS_RRSIG_NOT_VALID_BY_DNSKEY"
 msgid "Parent DS RRSIG with keytag {keytag} cannot be verified by any matching parent DNSKEY on parent name server(s) {addresses}."
-msgstr "Parent DS RRSIG with keytag {keytag} cannot be verified by any matching parent DNSKEY on parent name server(s) {addresses}."
+msgstr "La signature (RRSIG) de la zone parente couvrant l'enregistrement DS avec le tag {keytag} n'a pas pu être validée par aucune clé DNSKEY correspondante de la zone parente sur les serveurs de noms de la zone parente ayant les adresses IP \"{addresses}\"."
 
 msgctxt "DNSSEC:DS21_DS_RRSIG_NOT_VERIFIABLE"
 msgid "Parent returned a signed DS RRset, but no covering RRSIG could be verified against the parent DNSKEY on parent name server(s) {addresses}. Validating resolvers will fail to resolve the child zone."
-msgstr "Parent returned a signed DS RRset, but no covering RRSIG could be verified against the parent DNSKEY on parent name server(s) {addresses}. Validating resolvers will fail to resolve the child zone."
+msgstr "La zone parente a retourné un jeu d'enregistrements DS signé, mais aucune signature (RRSIG) couvrante n'a pu être validée par la DNSKEY de la zone parente sur les serveurs de noms de la zone parente ayant les adresses IP \"{addresses}\". Les résolveurs validants ne pourront pas résoudre la zone fille."
 
 msgctxt "DNSSEC:DS21_DS_RRSIG_NOT_YET_VALID"
 msgid "Parent DS RRSIG with keytag {keytag} has an inception time in the future on parent name server(s) {addresses}."
-msgstr "Parent DS RRSIG with keytag {keytag} has an inception time in the future on parent name server(s) {addresses}."
+msgstr "La signature (RRSIG) de la zone parente couvrant l'enregistrement DS avec le tag {keytag} a une date de mise en service dans le futur sur les serveurs de noms de la zone parente ayant les adresses IP \"{addresses}\"."
 
 msgctxt "DNSSEC:DS21_DS_RRSIG_VERIFIED"
 msgid "Parent DS RRset is correctly signed and verifies against the parent DNSKEY on parent name server(s) {addresses}."
-msgstr "Parent DS RRset is correctly signed and verifies against the parent DNSKEY on parent name server(s) {addresses}."
+msgstr "Le jeu d'enregistrements DS de la zone parente est correctement signé et est validé par la DNSKEY de la zone parente sur les serveurs de noms de la zone parente ayant les adresses IP \"{addresses}\"."
 
 msgctxt "DNSSEC:DS21_NO_DNSKEY_FOR_DS_RRSIG"
 msgid "Parent DS RRSIG references DNSKEY keytag {keytag}, but no matching DNSKEY is published at the parent apex on parent name server(s) {addresses}."
-msgstr "Parent DS RRSIG references DNSKEY keytag {keytag}, but no matching DNSKEY is published at the parent apex on parent name server(s) {addresses}."
+msgstr "La signature (RRSIG) de la zone parente couvrant l'enregistrement DS référence une DNSKEY avec le tag {keytag}, mais aucune DNSKEY correspondante n'est publiée à l'apex de la zone parente sur les serveurs de noms de la zone parente ayant les adresses IP \"{addresses}\"."
 
 msgctxt "DNSSEC:DS21_NO_DS_RRSIG"
 msgid "Parent returned the DS RRset without any covering RRSIG on parent name server(s) {addresses}."
-msgstr "Parent returned the DS RRset without any covering RRSIG on parent name server(s) {addresses}."
+msgstr "La zone parente a retourné le jeu d'enregistrements DS sans aucune signature (RRSIG) couvrante sur les serveurs de noms de la zone parente ayant les adresses IP \"{addresses}\"."
 
 msgctxt "DNSSEC:DS21_NO_PARENT_ZONE"
 msgid "No parent zone is available; DNSSEC21 cannot run."
-msgstr "No parent zone is available; DNSSEC21 cannot run."
+msgstr "Aucune zone parente n'est disponible. Le test DNSSEC21 ne peut pas être exécuté."
 
 msgctxt "DNSSEC:DS21_PARENT_DNSKEY_MISSING"
 msgid "Parent did not return an authoritative DNSKEY response, so DS RRSIG verification was skipped on parent name server(s) {addresses}."
-msgstr "Parent did not return an authoritative DNSKEY response, so DS RRSIG verification was skipped on parent name server(s) {addresses}."
+msgstr "La zone parente n'a pas retourné de réponse DNSKEY autoritative ; la validation de la signature (RRSIG) couvrant l'enregistrement DS a été ignorée sur les serveurs de noms de la zone parente ayant les adresses IP \"{addresses}\"."
 
 msgctxt "DNSSEC:DURATION_LONG"
 msgid ""

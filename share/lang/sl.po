@@ -1987,43 +1987,43 @@ msgstr "{parent} sent a DS record, but {child} did not send a DNSKEY record."
 
 msgctxt "DNSSEC:DS21_ALGO_NOT_SUPPORTED"
 msgid "Parent DS RRSIG with keytag {keytag} uses unsupported algorithm {algo_num} ({algo_mnemo}); skipping verification on parent name server(s) {addresses}."
-msgstr "Parent DS RRSIG with keytag {keytag} uses unsupported algorithm {algo_num} ({algo_mnemo}); skipping verification on parent name server(s) {addresses}."
+msgstr "RRSIG starševske cone, ki zajema DS zapis, z oznako {keytag} uporablja nepodprt algoritem {algo_num} ({algo_mnemo}). Preverjanje je bilo preskočeno na starševskih imenskih strežnikih z naslovi \"{addresses}\"."
 
 msgctxt "DNSSEC:DS21_DS_RRSIG_EXPIRED"
 msgid "Parent DS RRSIG with keytag {keytag} has expired on parent name server(s) {addresses}."
-msgstr "Parent DS RRSIG with keytag {keytag} has expired on parent name server(s) {addresses}."
+msgstr "RRSIG starševske cone, ki zajema DS zapis, z oznako {keytag} je potekel na starševskih imenskih strežnikih z naslovi \"{addresses}\"."
 
 msgctxt "DNSSEC:DS21_DS_RRSIG_NOT_VALID_BY_DNSKEY"
 msgid "Parent DS RRSIG with keytag {keytag} cannot be verified by any matching parent DNSKEY on parent name server(s) {addresses}."
-msgstr "Parent DS RRSIG with keytag {keytag} cannot be verified by any matching parent DNSKEY on parent name server(s) {addresses}."
+msgstr "RRSIG starševske cone, ki zajema DS zapis, z oznako {keytag} ni mogoče preveriti z nobenim ustreznim DNSKEY-em starševske cone na starševskih imenskih strežnikih z naslovi \"{addresses}\"."
 
 msgctxt "DNSSEC:DS21_DS_RRSIG_NOT_VERIFIABLE"
 msgid "Parent returned a signed DS RRset, but no covering RRSIG could be verified against the parent DNSKEY on parent name server(s) {addresses}. Validating resolvers will fail to resolve the child zone."
-msgstr "Parent returned a signed DS RRset, but no covering RRSIG could be verified against the parent DNSKEY on parent name server(s) {addresses}. Validating resolvers will fail to resolve the child zone."
+msgstr "Starševska cona je vrnila podpisan DS RRset, vendar nobenega kritja s strani RRSIG ni bilo mogoče preveriti glede na DNSKEY starševske cone na starševskih imenskih strežnikih z naslovi \"{addresses}\". Razreševalniki s preverjanjem ne bodo mogli razrešiti podrejene cone."
 
 msgctxt "DNSSEC:DS21_DS_RRSIG_NOT_YET_VALID"
 msgid "Parent DS RRSIG with keytag {keytag} has an inception time in the future on parent name server(s) {addresses}."
-msgstr "Parent DS RRSIG with keytag {keytag} has an inception time in the future on parent name server(s) {addresses}."
+msgstr "RRSIG starševske cone, ki zajema DS zapis, z oznako {keytag} ima datum začetka veljavnosti v prihodnosti na starševskih imenskih strežnikih z naslovi \"{addresses}\"."
 
 msgctxt "DNSSEC:DS21_DS_RRSIG_VERIFIED"
 msgid "Parent DS RRset is correctly signed and verifies against the parent DNSKEY on parent name server(s) {addresses}."
-msgstr "Parent DS RRset is correctly signed and verifies against the parent DNSKEY on parent name server(s) {addresses}."
+msgstr "DS RRset starševske cone je pravilno podpisan in je preverjen z DNSKEY-em starševske cone na starševskih imenskih strežnikih z naslovi \"{addresses}\"."
 
 msgctxt "DNSSEC:DS21_NO_DNSKEY_FOR_DS_RRSIG"
 msgid "Parent DS RRSIG references DNSKEY keytag {keytag}, but no matching DNSKEY is published at the parent apex on parent name server(s) {addresses}."
-msgstr "Parent DS RRSIG references DNSKEY keytag {keytag}, but no matching DNSKEY is published at the parent apex on parent name server(s) {addresses}."
+msgstr "RRSIG starševske cone, ki zajema DS zapis, se sklicuje na DNSKEY z oznako {keytag}, vendar pri vrhu starševske cone na starševskih imenskih strežnikih z naslovi \"{addresses}\" ni objavljenega ustreznega DNSKEY-a."
 
 msgctxt "DNSSEC:DS21_NO_DS_RRSIG"
 msgid "Parent returned the DS RRset without any covering RRSIG on parent name server(s) {addresses}."
-msgstr "Parent returned the DS RRset without any covering RRSIG on parent name server(s) {addresses}."
+msgstr "Starševska cona je vrnila DS RRset brez kakršne koli kritja s strani RRSIG na starševskih imenskih strežnikih z naslovi \"{addresses}\"."
 
 msgctxt "DNSSEC:DS21_NO_PARENT_ZONE"
 msgid "No parent zone is available; DNSSEC21 cannot run."
-msgstr "No parent zone is available; DNSSEC21 cannot run."
+msgstr "Starševska cona ni na voljo. Test DNSSEC21 ni mogoče izvesti."
 
 msgctxt "DNSSEC:DS21_PARENT_DNSKEY_MISSING"
 msgid "Parent did not return an authoritative DNSKEY response, so DS RRSIG verification was skipped on parent name server(s) {addresses}."
-msgstr "Parent did not return an authoritative DNSKEY response, so DS RRSIG verification was skipped on parent name server(s) {addresses}."
+msgstr "Starševska cona ni vrnila avtoritativnega odgovora DNSKEY, zato je bilo preverjanje RRSIG za DS zapis preskočeno na starševskih imenskih strežnikih z naslovi \"{addresses}\"."
 
 msgctxt "DNSSEC:DURATION_LONG"
 msgid ""

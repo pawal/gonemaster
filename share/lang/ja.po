@@ -2076,43 +2076,43 @@ msgstr "DNSKEY RRset のすべての鍵サイズは適正です。"
 
 msgctxt "DNSSEC:DS21_ALGO_NOT_SUPPORTED"
 msgid "Parent DS RRSIG with keytag {keytag} uses unsupported algorithm {algo_num} ({algo_mnemo}); skipping verification on parent name server(s) {addresses}."
-msgstr "Parent DS RRSIG with keytag {keytag} uses unsupported algorithm {algo_num} ({algo_mnemo}); skipping verification on parent name server(s) {addresses}."
+msgstr "親ゾーンの DS レコード対象 RRSIG (キータグ {keytag}) は未サポートのアルゴリズム {algo_num} ({algo_mnemo}) を使用しています。親ネームサーバー (IP: \"{addresses}\") での検証を省略しました。"
 
 msgctxt "DNSSEC:DS21_DS_RRSIG_EXPIRED"
 msgid "Parent DS RRSIG with keytag {keytag} has expired on parent name server(s) {addresses}."
-msgstr "Parent DS RRSIG with keytag {keytag} has expired on parent name server(s) {addresses}."
+msgstr "親ゾーンの DS レコード対象 RRSIG (キータグ {keytag}) は親ネームサーバー (IP: \"{addresses}\") で既に失効しています。"
 
 msgctxt "DNSSEC:DS21_DS_RRSIG_NOT_VALID_BY_DNSKEY"
 msgid "Parent DS RRSIG with keytag {keytag} cannot be verified by any matching parent DNSKEY on parent name server(s) {addresses}."
-msgstr "Parent DS RRSIG with keytag {keytag} cannot be verified by any matching parent DNSKEY on parent name server(s) {addresses}."
+msgstr "親ゾーンの DS レコード対象 RRSIG (キータグ {keytag}) は親ネームサーバー (IP: \"{addresses}\") で対応する親ゾーンの DNSKEY で検証できません。"
 
 msgctxt "DNSSEC:DS21_DS_RRSIG_NOT_VERIFIABLE"
 msgid "Parent returned a signed DS RRset, but no covering RRSIG could be verified against the parent DNSKEY on parent name server(s) {addresses}. Validating resolvers will fail to resolve the child zone."
-msgstr "Parent returned a signed DS RRset, but no covering RRSIG could be verified against the parent DNSKEY on parent name server(s) {addresses}. Validating resolvers will fail to resolve the child zone."
+msgstr "親ゾーンは署名済み DS RRset を返しましたが、親ネームサーバー (IP: \"{addresses}\") で親ゾーンの DNSKEY を用いて検証できる対象 RRSIG がありません。検証を行うリゾルバーは子ゾーンを名前解決できなくなります。"
 
 msgctxt "DNSSEC:DS21_DS_RRSIG_NOT_YET_VALID"
 msgid "Parent DS RRSIG with keytag {keytag} has an inception time in the future on parent name server(s) {addresses}."
-msgstr "Parent DS RRSIG with keytag {keytag} has an inception time in the future on parent name server(s) {addresses}."
+msgstr "親ゾーンの DS レコード対象 RRSIG (キータグ {keytag}) は親ネームサーバー (IP: \"{addresses}\") で有効開始時刻が未来です。"
 
 msgctxt "DNSSEC:DS21_DS_RRSIG_VERIFIED"
 msgid "Parent DS RRset is correctly signed and verifies against the parent DNSKEY on parent name server(s) {addresses}."
-msgstr "Parent DS RRset is correctly signed and verifies against the parent DNSKEY on parent name server(s) {addresses}."
+msgstr "親ゾーンの DS RRset は正しく署名され、親ネームサーバー (IP: \"{addresses}\") で親ゾーンの DNSKEY により検証されました。"
 
 msgctxt "DNSSEC:DS21_NO_DNSKEY_FOR_DS_RRSIG"
 msgid "Parent DS RRSIG references DNSKEY keytag {keytag}, but no matching DNSKEY is published at the parent apex on parent name server(s) {addresses}."
-msgstr "Parent DS RRSIG references DNSKEY keytag {keytag}, but no matching DNSKEY is published at the parent apex on parent name server(s) {addresses}."
+msgstr "親ゾーンの DS レコード対象 RRSIG はキータグ {keytag} の DNSKEY を参照していますが、親ネームサーバー (IP: \"{addresses}\") の親ゾーン頂点には対応する DNSKEY が公開されていません。"
 
 msgctxt "DNSSEC:DS21_NO_DS_RRSIG"
 msgid "Parent returned the DS RRset without any covering RRSIG on parent name server(s) {addresses}."
-msgstr "Parent returned the DS RRset without any covering RRSIG on parent name server(s) {addresses}."
+msgstr "親ゾーンは親ネームサーバー (IP: \"{addresses}\") で対象 RRSIG を伴わず DS RRset を返しました。"
 
 msgctxt "DNSSEC:DS21_NO_PARENT_ZONE"
 msgid "No parent zone is available; DNSSEC21 cannot run."
-msgstr "No parent zone is available; DNSSEC21 cannot run."
+msgstr "親ゾーンが利用できないため、DNSSEC21 は実行できません。"
 
 msgctxt "DNSSEC:DS21_PARENT_DNSKEY_MISSING"
 msgid "Parent did not return an authoritative DNSKEY response, so DS RRSIG verification was skipped on parent name server(s) {addresses}."
-msgstr "Parent did not return an authoritative DNSKEY response, so DS RRSIG verification was skipped on parent name server(s) {addresses}."
+msgstr "親ゾーンは権威ある DNSKEY 応答を返さなかったため、親ネームサーバー (IP: \"{addresses}\") での DS レコード対象 RRSIG 検証を省略しました。"
 
 msgctxt "DNSSEC:DURATION_LONG"
 msgid ""

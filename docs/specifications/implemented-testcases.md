@@ -12,7 +12,7 @@ Notes:
 
 ## Summary
 - Modules: 9
-- Implemented testcases: 78
+- Implemented testcases: 80
 
 ## Regeneration
 
@@ -55,7 +55,7 @@ make spec-export-implemented
 - delegation06 - Verify SOA RRset existence on nameservers collected from delegation and child sources.
 - delegation07 - Compare parent-side and child-side NS name sets and report mismatches.
 
-### dnssec (19)
+### dnssec (20)
 - dnssec01 - Validate DS digest algorithm usage for the child delegation and classify each observed DS digest type.
 - dnssec02 - Verify that DS records found at the parent delegation match usable DNSKEYs in the child zone and that matching DNSKEYs can validate DNSKEY RRset signatures.
 - dnssec03 - Verify NSEC3 parameter consistency and policy compliance across child nameservers when DNSKEY support is present.
@@ -75,6 +75,7 @@ make spec-export-implemented
 - dnssec18 - Validate that CDS and CDNSKEY RRsets are signed by a DNSKEY that corresponds to DS information observed at the parent side.
 - dnssec19 - Check DNSKEY records published by authoritative nameservers for known cryptographic weaknesses and membership in blocklists of compromised keys. This testcase ports DNSSEC-relevant checks from the [badkeys](https://github.com/badkeys/badkeys) project to detect vulnerable RSA keys (Fermat factorization, ROCA, pattern anomalies, invalid parameters, small factors, Wiener's attack) and keys matching the badkeys blocklist of known-compromised keys (e.g., Debian OpenSSL CVE-2008-0166, RFC example keys, firmware keys).
 - dnssec20 - Verify that the NSEC or NSEC3 type bitmap at the zone apex accurately reflects the RR types actually present in the zone. An incomplete (subset) bitmap enables cache poisoning via RFC 8198 aggressive negative caching and replay attacks (see Petr Špaček, ISC, 2021-11-30, "Type Bitmap: Subset - Broken").
+- dnssec21 - Verify that the parent zone correctly signs the DS RRset that delegates the child zone. Concretely: each parent nameserver must return the DS RRset for the child along with at least one RRSIG that validates against a published parent DNSKEY. This catches parent-side DNSSEC failures (broken key rollovers, expired or misissued RRSIGs over DS) that resolvers experience as a SERVFAIL chain break, but that today's DNSSEC testcases cannot see when the *child* zone is the test target.
 
 ### nameserver (15)
 - nameserver01 - Detect whether authoritative nameservers also behave as recursors.
@@ -103,7 +104,7 @@ make spec-export-implemented
 - syntax07 - Validate SOA `MNAME` hostname syntax using the same hostname validator as `syntax04`.
 - syntax08 - Validate syntax of MX exchange hostnames for the tested zone.
 
-### zone (13)
+### zone (14)
 - zone01 - Validate SOA MNAME handling for the child zone: name sanity, resolvability, authority behavior, and serial-based master inference.
 - zone02 - Validate that SOA `refresh` is at or above the configured minimum threshold.
 - zone03 - Validate ordering relationship between SOA timers: `refresh` should be greater than `retry`.
@@ -117,4 +118,5 @@ make spec-export-implemented
 - zone11 - Validate SPF policy publication at zone apex
 - zone12 - Check existence and RFC 7477 compliance of the CSYNC RR at the zone apex.
 - zone13 - Validate that the SPF policy at the zone apex does not exceed the DNS lookup limit defined in RFC 7208 Section 4.6.4.
+- zone14 - Check existence and RFC 8976 compliance of the ZONEMD RR at the zone apex.
 

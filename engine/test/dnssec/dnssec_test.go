@@ -2,6 +2,7 @@ package dnssec
 
 import (
 	"context"
+	"crypto"
 	"encoding/base64"
 	"encoding/json"
 	"net/netip"
@@ -6467,4 +6468,410 @@ func writeDNSSEC19BlocklistFixture(t *testing.T, dir string, algo uint8, publicK
 	if err := os.WriteFile(filepath.Join(dir, "badkeysdata.json"), raw, 0o644); err != nil {
 		t.Fatalf("write badkeysdata.json: %v", err)
 	}
+}
+
+// --- DNSSEC21 tests ---
+
+type dnssec21Fixture struct {
+	parentName string
+	childName  string
+	parentKey  *dns.DNSKEY
+	parentPriv crypto.PrivateKey
+	childDS    *dns.DS
+}
+
+func newDNSSEC21Fixture(t *testing.T) dnssec21Fixture {
+	t.Helper()
+	parentName := "parent"
+	childName := "child.parent"
+
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(parentName), Class: dns.ClassINET, TTL: 3600}}
+	key.Flags = dns.FlagZONE | dns.FlagSEP
+	key.Protocol = 3
+	key.Algorithm = dns.RSASHA256
+	priv, err := key.Generate(1024)
+	if err != nil {
+		t.Fatalf("generate parent key: %v", err)
+	}
+
+	childKey := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(childName), Class: dns.ClassINET, TTL: 3600}}
+	childKey.Flags = dns.FlagZONE | dns.FlagSEP
+	childKey.Protocol = 3
+	childKey.Algorithm = dns.RSASHA256
+	childKey.PublicKey = "AwEAAc=="
+	ds := childKey.ToDS(dns.SHA256)
+	if ds == nil {
+		t.Fatalf("child DS is nil")
+	}
+
+	return dnssec21Fixture{
+		parentName: parentName,
+		childName:  childName,
+		parentKey:  key,
+		parentPriv: priv,
+		childDS:    ds,
+	}
+}
+
+func (f dnssec21Fixture) signedDSResponse(t *testing.T, sigKey *dns.DNSKEY, sigPriv crypto.PrivateKey) packet.Packet {
+	t.Helper()
+	ds := *f.childDS
+	dsRRset := []dns.RR{&ds}
+	now := time.Now().UTC()
+	sig := &dns.RRSIG{Hdr: dns.Header{Name: dnsutil.Fqdn(f.childName), Class: dns.ClassINET, TTL: 3600}}
+	sig.Algorithm = sigKey.Algorithm
+	sig.Inception = uint32(now.Add(-time.Hour).Unix())
+	sig.Expiration = uint32(now.Add(24 * time.Hour).Unix())
+	sig.KeyTag = sigKey.KeyTag()
+	sig.SignerName = dnsutil.Fqdn(f.parentName)
+	signer, ok := sigPriv.(crypto.Signer)
+	if !ok {
+		t.Fatalf("private key does not implement crypto.Signer")
+	}
+	if err := sig.Sign(signer, dsRRset, &dns.SignOption{}); err != nil {
+		t.Fatalf("sign DS RRset: %v", err)
+	}
+	msg := new(dns.Msg)
+	dnsutil.SetQuestion(msg, dnsutil.Fqdn(f.childName), dns.TypeDS)
+	msg.Response = true
+	msg.Authoritative = true
+	msg.Rcode = dns.RcodeSuccess
+	msg.Answer = []dns.RR{&ds, sig}
+	msg.UDPSize = 1232
+	msg.Security = true
+	return packet.Packet{Msg: msg}
+}
+
+func (f dnssec21Fixture) unsignedDSResponse() packet.Packet {
+	ds := *f.childDS
+	msg := new(dns.Msg)
+	dnsutil.SetQuestion(msg, dnsutil.Fqdn(f.childName), dns.TypeDS)
+	msg.Response = true
+	msg.Authoritative = true
+	msg.Rcode = dns.RcodeSuccess
+	msg.Answer = []dns.RR{&ds}
+	msg.UDPSize = 1232
+	msg.Security = true
+	return packet.Packet{Msg: msg}
+}
+
+func (f dnssec21Fixture) parentDNSKEYResponse(keys ...*dns.DNSKEY) packet.Packet {
+	msg := new(dns.Msg)
+	dnsutil.SetQuestion(msg, dnsutil.Fqdn(f.parentName), dns.TypeDNSKEY)
+	msg.Response = true
+	msg.Authoritative = true
+	msg.Rcode = dns.RcodeSuccess
+	for _, k := range keys {
+		copyKey := *k
+		msg.Answer = append(msg.Answer, &copyKey)
+	}
+	msg.UDPSize = 1232
+	msg.Security = true
+	return packet.Packet{Msg: msg}
+}
+
+func (f dnssec21Fixture) emptyDNSKEYResponse() packet.Packet {
+	msg := new(dns.Msg)
+	dnsutil.SetQuestion(msg, dnsutil.Fqdn(f.parentName), dns.TypeDNSKEY)
+	msg.Response = true
+	msg.Authoritative = true
+	msg.Rcode = dns.RcodeSuccess
+	msg.UDPSize = 1232
+	msg.Security = true
+	return packet.Packet{Msg: msg}
+}
+
+func (f dnssec21Fixture) emptyDSResponse() packet.Packet {
+	msg := new(dns.Msg)
+	dnsutil.SetQuestion(msg, dnsutil.Fqdn(f.childName), dns.TypeDS)
+	msg.Response = true
+	msg.Authoritative = true
+	msg.Rcode = dns.RcodeSuccess
+	msg.UDPSize = 1232
+	msg.Security = true
+	return packet.Packet{Msg: msg}
+}
+
+func (f dnssec21Fixture) installMocks(t *testing.T, parentNS nameserver.Nameserver) {
+	t.Helper()
+	parentZone, err := zone.New(f.parentName)
+	if err != nil {
+		t.Fatalf("parent zone new: %v", err)
+	}
+	zoneParent = func(_ context.Context, _ *zone.Zone) (*zone.Zone, error) {
+		return &parentZone, nil
+	}
+	getParentNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{parentNS}, nil
+	}
+}
+
+func resetDNSSEC21Mocks(t *testing.T) {
+	t.Helper()
+	origParent := zoneParent
+	origGetParent := getParentNSNamesAndIPs
+	t.Cleanup(func() {
+		zoneParent = origParent
+		getParentNSNamesAndIPs = origGetParent
+	})
+}
+
+func dnssec21Setup(t *testing.T) {
+	t.Helper()
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+	resetDNSSEC21Mocks(t)
+}
+
+func TestDNSSEC21Verified(t *testing.T) {
+	dnssec21Setup(t)
+
+	f := newDNSSEC21Fixture(t)
+	dsResp := f.signedDSResponse(t, f.parentKey, f.parentPriv)
+	dnskeyResp := f.parentDNSKEYResponse(f.parentKey)
+
+	parentNS := newNameserver(t, "ns1.parent", "192.0.2.221", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		switch qtype {
+		case "DS":
+			return dsResp
+		case "DNSKEY":
+			return dnskeyResp
+		}
+		return packet.Packet{}
+	})
+	f.installMocks(t, parentNS)
+
+	z, err := zone.New(f.childName)
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC21(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("DNSSEC21: %v", err)
+	}
+	if !hasEntryTag(entries, "DS21_DS_RRSIG_VERIFIED") {
+		t.Fatalf("expected DS21_DS_RRSIG_VERIFIED, got tags: %v", entryTagsDS21(entries))
+	}
+	for _, badTag := range []string{"DS21_DS_RRSIG_NOT_VERIFIABLE", "DS21_DS_RRSIG_NOT_VALID_BY_DNSKEY", "DS21_NO_DS_RRSIG", "DS21_PARENT_DNSKEY_MISSING"} {
+		if hasEntryTag(entries, badTag) {
+			t.Fatalf("did not expect %s, got tags: %v", badTag, entryTagsDS21(entries))
+		}
+	}
+}
+
+func TestDNSSEC21RRSIGNotVerifiable(t *testing.T) {
+	dnssec21Setup(t)
+
+	f := newDNSSEC21Fixture(t)
+	// Sign the DS RRset with a key that is NOT published at the parent.
+	otherKey := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(f.parentName), Class: dns.ClassINET, TTL: 3600}}
+	otherKey.Flags = dns.FlagZONE | dns.FlagSEP
+	otherKey.Protocol = 3
+	otherKey.Algorithm = dns.RSASHA256
+	otherPriv, err := otherKey.Generate(1024)
+	if err != nil {
+		t.Fatalf("generate impostor key: %v", err)
+	}
+
+	// Force the impostor RRSIG to claim a keytag that DOES exist at the parent,
+	// so the testcase reaches signature verification (instead of NO_DNSKEY_FOR_DS_RRSIG).
+	dsResp := f.signedDSResponseForcedKeytag(t, otherKey, otherPriv, f.parentKey.KeyTag())
+	dnskeyResp := f.parentDNSKEYResponse(f.parentKey)
+
+	parentNS := newNameserver(t, "ns1.parent", "192.0.2.222", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		switch qtype {
+		case "DS":
+			return dsResp
+		case "DNSKEY":
+			return dnskeyResp
+		}
+		return packet.Packet{}
+	})
+	f.installMocks(t, parentNS)
+
+	z, err := zone.New(f.childName)
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC21(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("DNSSEC21: %v", err)
+	}
+	if !hasEntryTag(entries, "DS21_DS_RRSIG_NOT_VALID_BY_DNSKEY") {
+		t.Fatalf("expected DS21_DS_RRSIG_NOT_VALID_BY_DNSKEY, got tags: %v", entryTagsDS21(entries))
+	}
+	if !hasEntryTag(entries, "DS21_DS_RRSIG_NOT_VERIFIABLE") {
+		t.Fatalf("expected DS21_DS_RRSIG_NOT_VERIFIABLE, got tags: %v", entryTagsDS21(entries))
+	}
+	if hasEntryTag(entries, "DS21_DS_RRSIG_VERIFIED") {
+		t.Fatalf("did not expect DS21_DS_RRSIG_VERIFIED, got tags: %v", entryTagsDS21(entries))
+	}
+}
+
+func TestDNSSEC21NoParentDNSKEY(t *testing.T) {
+	dnssec21Setup(t)
+
+	f := newDNSSEC21Fixture(t)
+	dsResp := f.signedDSResponse(t, f.parentKey, f.parentPriv)
+	emptyDNSKEY := f.emptyDNSKEYResponse()
+
+	parentNS := newNameserver(t, "ns1.parent", "192.0.2.223", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		switch qtype {
+		case "DS":
+			return dsResp
+		case "DNSKEY":
+			return emptyDNSKEY
+		}
+		return packet.Packet{}
+	})
+	f.installMocks(t, parentNS)
+
+	z, err := zone.New(f.childName)
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC21(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("DNSSEC21: %v", err)
+	}
+	if !hasEntryTag(entries, "DS21_PARENT_DNSKEY_MISSING") {
+		t.Fatalf("expected DS21_PARENT_DNSKEY_MISSING, got tags: %v", entryTagsDS21(entries))
+	}
+	if hasEntryTag(entries, "DS21_DS_RRSIG_VERIFIED") {
+		t.Fatalf("did not expect DS21_DS_RRSIG_VERIFIED")
+	}
+}
+
+func TestDNSSEC21NoDSRRSIG(t *testing.T) {
+	dnssec21Setup(t)
+
+	f := newDNSSEC21Fixture(t)
+	parentNS := newNameserver(t, "ns1.parent", "192.0.2.224", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		switch qtype {
+		case "DS":
+			return f.unsignedDSResponse()
+		case "DNSKEY":
+			return f.parentDNSKEYResponse(f.parentKey)
+		}
+		return packet.Packet{}
+	})
+	f.installMocks(t, parentNS)
+
+	z, err := zone.New(f.childName)
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC21(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("DNSSEC21: %v", err)
+	}
+	if !hasEntryTag(entries, "DS21_NO_DS_RRSIG") {
+		t.Fatalf("expected DS21_NO_DS_RRSIG, got tags: %v", entryTagsDS21(entries))
+	}
+}
+
+func TestDNSSEC21RootZone(t *testing.T) {
+	dnssec21Setup(t)
+
+	getParentNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	}
+	zoneParent = func(_ context.Context, _ *zone.Zone) (*zone.Zone, error) {
+		return nil, nil
+	}
+
+	z, err := zone.New(".")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC21(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("DNSSEC21: %v", err)
+	}
+	if !hasEntryTag(entries, "DS21_NO_PARENT_ZONE") {
+		t.Fatalf("expected DS21_NO_PARENT_ZONE, got tags: %v", entryTagsDS21(entries))
+	}
+}
+
+func TestDNSSEC21UnsignedDelegation(t *testing.T) {
+	dnssec21Setup(t)
+
+	f := newDNSSEC21Fixture(t)
+	emptyDS := f.emptyDSResponse()
+	parentNS := newNameserver(t, "ns1.parent", "192.0.2.225", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		switch qtype {
+		case "DS":
+			return emptyDS
+		case "DNSKEY":
+			return f.parentDNSKEYResponse(f.parentKey)
+		}
+		return packet.Packet{}
+	})
+	f.installMocks(t, parentNS)
+
+	z, err := zone.New(f.childName)
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC21(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("DNSSEC21: %v", err)
+	}
+	for _, badTag := range []string{
+		"DS21_DS_RRSIG_VERIFIED",
+		"DS21_DS_RRSIG_NOT_VERIFIABLE",
+		"DS21_DS_RRSIG_NOT_VALID_BY_DNSKEY",
+		"DS21_NO_DS_RRSIG",
+		"DS21_PARENT_DNSKEY_MISSING",
+	} {
+		if hasEntryTag(entries, badTag) {
+			t.Fatalf("unsigned delegation should emit no DS21 findings, got %s", badTag)
+		}
+	}
+}
+
+func entryTagsDS21(entries []*logger.Entry) []string {
+	tags := []string{}
+	for _, e := range entries {
+		if e == nil {
+			continue
+		}
+		if strings.HasPrefix(e.Tag, "DS21_") {
+			tags = append(tags, e.Tag)
+		}
+	}
+	return tags
+}
+
+func (f dnssec21Fixture) signedDSResponseForcedKeytag(t *testing.T, sigKey *dns.DNSKEY, sigPriv crypto.PrivateKey, forcedKeytag uint16) packet.Packet {
+	t.Helper()
+	ds := *f.childDS
+	dsRRset := []dns.RR{&ds}
+	now := time.Now().UTC()
+	sig := &dns.RRSIG{Hdr: dns.Header{Name: dnsutil.Fqdn(f.childName), Class: dns.ClassINET, TTL: 3600}}
+	sig.Algorithm = sigKey.Algorithm
+	sig.Inception = uint32(now.Add(-time.Hour).Unix())
+	sig.Expiration = uint32(now.Add(24 * time.Hour).Unix())
+	sig.KeyTag = sigKey.KeyTag()
+	sig.SignerName = dnsutil.Fqdn(f.parentName)
+	signer, ok := sigPriv.(crypto.Signer)
+	if !ok {
+		t.Fatalf("private key does not implement crypto.Signer")
+	}
+	if err := sig.Sign(signer, dsRRset, &dns.SignOption{}); err != nil {
+		t.Fatalf("sign DS RRset: %v", err)
+	}
+	sig.KeyTag = forcedKeytag
+	msg := new(dns.Msg)
+	dnsutil.SetQuestion(msg, dnsutil.Fqdn(f.childName), dns.TypeDS)
+	msg.Response = true
+	msg.Authoritative = true
+	msg.Rcode = dns.RcodeSuccess
+	msg.Answer = []dns.RR{&ds, sig}
+	msg.UDPSize = 1232
+	msg.Security = true
+	return packet.Packet{Msg: msg}
 }

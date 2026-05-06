@@ -13,8 +13,8 @@
   ],
   "summary": {
     "module_count": 9,
-    "testcase_count": 78,
-    "unique_tag_count": 480
+    "testcase_count": 80,
+    "unique_tag_count": 516
   },
   "modules": {
     "address": {
@@ -105,6 +105,7 @@
         "CN01_NO_RESPONSE_SOA_QUERY_UDP",
         "CN01_NO_RESPONSE_UDP",
         "CN01_NS_RECORD_NOT_AA_UDP",
+        "CN01_OK_UDP",
         "CN01_SOA_RECORD_NOT_AA_UDP",
         "CN01_UNEXPECTED_RCODE_NS_QUERY_UDP",
         "CN01_UNEXPECTED_RCODE_SOA_QUERY_UDP",
@@ -122,6 +123,7 @@
         "CN02_NO_RESPONSE_SOA_QUERY_TCP",
         "CN02_NO_RESPONSE_TCP",
         "CN02_NS_RECORD_NOT_AA_TCP",
+        "CN02_OK_TCP",
         "CN02_SOA_RECORD_NOT_AA_TCP",
         "CN02_UNEXPECTED_RCODE_NS_QUERY_TCP",
         "CN02_UNEXPECTED_RCODE_SOA_QUERY_TCP",
@@ -327,6 +329,7 @@
         "DS02_DNSKEY_NOT_FOR_ZONE_SIGNING",
         "DS02_DNSKEY_NOT_SEP",
         "DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS",
+        "DS02_MATCH_DS_DNSKEY",
         "DS02_NO_DNSKEY_FOR_DS",
         "DS02_NO_MATCHING_DNSKEY_RRSIG",
         "DS02_NO_MATCH_DS_DNSKEY",
@@ -419,6 +422,7 @@
         "DS08_ALGO_NOT_SUPPORTED_BY_ZM",
         "DS08_DNSKEY_RRSIG_EXPIRED",
         "DS08_DNSKEY_RRSIG_NOT_YET_VALID",
+        "DS08_DNSKEY_RRSIG_VALID",
         "DS08_MISSING_RRSIG_IN_RESPONSE",
         "DS08_NO_MATCHING_DNSKEY",
         "DS08_RRSIG_NOT_VALID_BY_DNSKEY",
@@ -434,6 +438,7 @@
         "DS09_RRSIG_NOT_VALID_BY_DNSKEY",
         "DS09_SOA_RRSIG_EXPIRED",
         "DS09_SOA_RRSIG_NOT_YET_VALID",
+        "DS09_SOA_RRSIG_VALID",
         "IPV4_DISABLED",
         "IPV6_DISABLED",
         "TEST_CASE_END",
@@ -484,9 +489,11 @@
         "TEST_CASE_START"
       ],
       "dnssec11": [
+        "DS11_CONSISTENT_SIGNED",
         "DS11_DS_BUT_UNSIGNED_ZONE",
         "DS11_INCONSISTENT_DS",
         "DS11_INCONSISTENT_SIGNED_ZONE",
+        "DS11_NO_PARENT_DS",
         "DS11_NS_WITH_SIGNED_ZONE",
         "DS11_NS_WITH_UNSIGNED_ZONE",
         "DS11_PARENT_WITHOUT_DS",
@@ -502,6 +509,7 @@
         "DS13_ALGO_NOT_SIGNED_DNSKEY",
         "DS13_ALGO_NOT_SIGNED_NS",
         "DS13_ALGO_NOT_SIGNED_SOA",
+        "DS13_ALL_ALGOS_SIGNED",
         "IPV4_DISABLED",
         "IPV6_DISABLED",
         "TEST_CASE_END",
@@ -567,8 +575,19 @@
         "TEST_CASE_START"
       ],
       "dnssec18": [
+        "DS18_CDNSKEY_MATCHES_DS",
+        "DS18_CDNSKEY_ROLLOVER_SIGNALED",
+        "DS18_CDS_MATCHES_DS",
+        "DS18_CDS_ROLLOVER_SIGNALED",
+        "DS18_MATCH_CDNSKEY_RRSIG_DS",
+        "DS18_MATCH_CDS_RRSIG_DS",
+        "DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE",
         "DS18_NO_MATCH_CDNSKEY_RRSIG_DS",
         "DS18_NO_MATCH_CDS_RRSIG_DS",
+        "DS18_ROLLOVER_EVIDENCE_DNSKEY_WITHOUT_DS",
+        "DS18_ROLLOVER_EVIDENCE_DOUBLE_SIG",
+        "DS18_ROLLOVER_EVIDENCE_DS_WITHOUT_DNSKEY",
+        "DS18_ROLLOVER_EVIDENCE_MULTI_KSK",
         "IPV4_DISABLED",
         "IPV6_DISABLED",
         "TEST_CASE_END",
@@ -597,6 +616,22 @@
         "DS20_NO_DNSSEC",
         "DS20_NSEC3_BITMAP_MISMATCHES_RRTYPE",
         "DS20_NSEC_BITMAP_MISMATCHES_RRTYPE",
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
+        "TEST_CASE_END",
+        "TEST_CASE_START"
+      ],
+      "dnssec21": [
+        "DS21_ALGO_NOT_SUPPORTED",
+        "DS21_DS_RRSIG_EXPIRED",
+        "DS21_DS_RRSIG_NOT_VALID_BY_DNSKEY",
+        "DS21_DS_RRSIG_NOT_VERIFIABLE",
+        "DS21_DS_RRSIG_NOT_YET_VALID",
+        "DS21_DS_RRSIG_VERIFIED",
+        "DS21_NO_DNSKEY_FOR_DS_RRSIG",
+        "DS21_NO_DS_RRSIG",
+        "DS21_NO_PARENT_ZONE",
+        "DS21_PARENT_DNSKEY_MISSING",
         "IPV4_DISABLED",
         "IPV6_DISABLED",
         "TEST_CASE_END",
@@ -948,6 +983,19 @@
         "Z13_SPF_PTR_DEPRECATED",
         "Z13_SPF_RECURSIVE_ERROR",
         "Z13_UNABLE_TO_CHECK"
+      ],
+      "zone14": [
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
+        "TEST_CASE_END",
+        "TEST_CASE_START",
+        "Z14_DUPLICATE_SCHEME_HASH",
+        "Z14_INCONSISTENT_ZONEMD",
+        "Z14_MIXED_PRESENCE",
+        "Z14_NO_ZONEMD",
+        "Z14_SERIAL_MISMATCH",
+        "Z14_UNSUPPORTED_HASH",
+        "Z14_ZONEMD_FOUND"
       ]
     }
   }

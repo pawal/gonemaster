@@ -278,6 +278,16 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
+	if util.ShouldRunTest(ctx, "dnssec21") {
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC21(ctx, z)
+		})
+		results = append(results, entries...)
+		if err != nil {
+			return results, err
+		}
+	}
+
 	return results, nil
 }
 
@@ -594,6 +604,22 @@ func Metadata() map[string][]string {
 			"DS20_NO_DNSSEC",
 			"DS20_NSEC3_BITMAP_MISMATCHES_RRTYPE",
 			"DS20_NSEC_BITMAP_MISMATCHES_RRTYPE",
+			"IPV4_DISABLED",
+			"IPV6_DISABLED",
+			"TEST_CASE_END",
+			"TEST_CASE_START",
+		},
+		"dnssec21": {
+			"DS21_ALGO_NOT_SUPPORTED",
+			"DS21_DS_RRSIG_EXPIRED",
+			"DS21_DS_RRSIG_NOT_VALID_BY_DNSKEY",
+			"DS21_DS_RRSIG_NOT_VERIFIABLE",
+			"DS21_DS_RRSIG_NOT_YET_VALID",
+			"DS21_DS_RRSIG_VERIFIED",
+			"DS21_NO_DNSKEY_FOR_DS_RRSIG",
+			"DS21_NO_DS_RRSIG",
+			"DS21_NO_PARENT_ZONE",
+			"DS21_PARENT_DNSKEY_MISSING",
 			"IPV4_DISABLED",
 			"IPV6_DISABLED",
 			"TEST_CASE_END",
@@ -8051,6 +8077,365 @@ func DNSSEC20(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		args := map[string]any{}
 		setTypedServersFromNames(args, noDNSSEC)
 		if err := appendLog(ctx, &results, testcase, "DS20_NO_DNSSEC", args); err != nil {
+			return results, err
+		}
+	}
+
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase}); err != nil {
+		return results, err
+	}
+
+	return results, nil
+}
+
+// DNSSEC21 runs the DNSSEC21 test case.
+func DNSSEC21(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
+	const testcase = "DNSSEC21"
+	var results []*logger.Entry
+
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+		return results, err
+	}
+
+	emitNoParent := func() error {
+		if err := appendLog(ctx, &results, testcase, "DS21_NO_PARENT_ZONE", map[string]any{}); err != nil {
+			return err
+		}
+		return appendLog(ctx, &results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase})
+	}
+
+	if z == nil {
+		if err := emitNoParent(); err != nil {
+			return results, err
+		}
+		return results, nil
+	}
+
+	parent, err := zoneParent(ctx, z)
+	if err != nil || parent == nil || parent == z || parent.Name.String() == z.Name.String() {
+		if err := emitNoParent(); err != nil {
+			return results, err
+		}
+		return results, nil
+	}
+
+	parentNS, err := getParentNSNamesAndIPs(ctx, z)
+	if err != nil {
+		return results, err
+	}
+	if len(parentNS) == 0 {
+		return results, appendLog(ctx, &results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase})
+	}
+
+	type ds21Outcome struct {
+		ip                    string
+		ignored               bool
+		noDS                  bool
+		noDSRRSIG             bool
+		parentDNSKEYMissing   bool
+		hadRRSIG              bool
+		verifiedKeytags       []uint16
+		rrsigNotValidByDNSKEY map[uint16]bool
+		rrsigExpired          map[uint16]bool
+		rrsigNotYetValid      map[uint16]bool
+		noDNSKEYForRRSIG      map[uint16]bool
+		algoNotSupported      map[uint16]map[uint8]bool
+	}
+
+	parentApex := parent.Name.String()
+
+	nsByIP := nameserversByIP(parentNS)
+	outcomes := make([]ds21Outcome, len(nsByIP))
+	tasks := make([]runner.Task, len(nsByIP))
+	for i, group := range nsByIP {
+		tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+			if len(group) == 0 {
+				return nil
+			}
+			buf := testlogger.Wrap(log, moduleName, testcase)
+			ns := group[0]
+			outcome := ds21Outcome{
+				ip:                    ns.Address.String(),
+				rrsigNotValidByDNSKEY: map[uint16]bool{},
+				rrsigExpired:          map[uint16]bool{},
+				rrsigNotYetValid:      map[uint16]bool{},
+				noDNSKEYForRRSIG:      map[uint16]bool{},
+				algoNotSupported:      map[uint16]map[uint8]bool{},
+			}
+
+			if disabled, derr := ipDisabledMessageWithLogger(ctx, buf, ns, "DS", "DNSKEY"); derr != nil {
+				return derr
+			} else if disabled {
+				outcome.ignored = true
+				outcomes[i] = outcome
+				return nil
+			}
+
+			dnssecOn := true
+			useVC := false
+			dsResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DS", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
+			if dsResp.TC() {
+				useVC = true
+				dsResp, _ = ns.QueryWithOptions(ctx, z.Name.String(), "DS", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
+			}
+			if dsResp.Msg == nil || dsResp.Rcode() != "NOERROR" || !dsResp.AA() {
+				outcomes[i] = outcome
+				return nil
+			}
+
+			dsRRs := dsResp.GetRecordsForName("DS", z.Name, "answer")
+			if len(dsRRs) == 0 {
+				outcome.noDS = true
+				outcomes[i] = outcome
+				return nil
+			}
+
+			var rrsigCoverDS []*dns.RRSIG
+			for _, rr := range dsResp.GetRecords("RRSIG", "answer") {
+				sig, ok := rr.(*dns.RRSIG)
+				if !ok || sig.TypeCovered != dns.TypeDS {
+					continue
+				}
+				signer := strings.ToLower(strings.TrimSuffix(sig.SignerName, "."))
+				expectedSigner := strings.ToLower(strings.TrimSuffix(parentApex, "."))
+				if expectedSigner != "" && signer != expectedSigner {
+					continue
+				}
+				rrsigCoverDS = append(rrsigCoverDS, sig)
+			}
+
+			if len(rrsigCoverDS) == 0 {
+				outcome.noDSRRSIG = true
+				outcomes[i] = outcome
+				return nil
+			}
+			outcome.hadRRSIG = true
+
+			useVC = false
+			dnskeyResp, _ := ns.QueryWithOptions(ctx, parentApex, "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
+			if dnskeyResp.TC() {
+				useVC = true
+				dnskeyResp, _ = ns.QueryWithOptions(ctx, parentApex, "DNSKEY", &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
+			}
+			if dnskeyResp.Msg == nil || dnskeyResp.Rcode() != "NOERROR" || !dnskeyResp.AA() {
+				outcome.parentDNSKEYMissing = true
+				outcomes[i] = outcome
+				return nil
+			}
+
+			dnskeyRRs := dnskeyResp.GetRecordsForName("DNSKEY", parent.Name, "answer")
+			var parentKeys []*dns.DNSKEY
+			for _, rr := range dnskeyRRs {
+				if k, ok := rr.(*dns.DNSKEY); ok {
+					parentKeys = append(parentKeys, k)
+				}
+			}
+			if len(parentKeys) == 0 {
+				outcome.parentDNSKEYMissing = true
+				outcomes[i] = outcome
+				return nil
+			}
+
+			testTime := packetTime(dsResp)
+			dsRRset := append([]dns.RR{}, dsRRs...)
+
+			for _, sig := range rrsigCoverDS {
+				if int64(sig.Inception) > testTime.Unix() {
+					outcome.rrsigNotYetValid[sig.KeyTag] = true
+					continue
+				}
+				if int64(sig.Expiration) < testTime.Unix() {
+					outcome.rrsigExpired[sig.KeyTag] = true
+					continue
+				}
+				if !dnssecAlgorithmSupported(sig.Algorithm) {
+					if outcome.algoNotSupported[sig.KeyTag] == nil {
+						outcome.algoNotSupported[sig.KeyTag] = map[uint8]bool{}
+					}
+					outcome.algoNotSupported[sig.KeyTag][sig.Algorithm] = true
+					continue
+				}
+
+				var matchingKeys []*dns.DNSKEY
+				for _, k := range parentKeys {
+					if k.KeyTag() == sig.KeyTag {
+						matchingKeys = append(matchingKeys, k)
+					}
+				}
+				if len(matchingKeys) == 0 {
+					outcome.noDNSKEYForRRSIG[sig.KeyTag] = true
+					continue
+				}
+
+				verified := false
+				algoUnsupported := false
+				for _, k := range matchingKeys {
+					if verr := verifyRRSIG(sig, dsRRset, k, testTime); verr != nil {
+						if errors.Is(verr, dns.ErrAlg) {
+							algoUnsupported = true
+						}
+						continue
+					}
+					verified = true
+					break
+				}
+				if verified {
+					outcome.verifiedKeytags = append(outcome.verifiedKeytags, sig.KeyTag)
+					continue
+				}
+				if algoUnsupported {
+					if outcome.algoNotSupported[sig.KeyTag] == nil {
+						outcome.algoNotSupported[sig.KeyTag] = map[uint8]bool{}
+					}
+					outcome.algoNotSupported[sig.KeyTag][sig.Algorithm] = true
+					continue
+				}
+				outcome.rrsigNotValidByDNSKEY[sig.KeyTag] = true
+			}
+
+			outcomes[i] = outcome
+			return nil
+		}
+	}
+
+	parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
+	entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+	if err != nil {
+		return results, err
+	}
+	results = append(results, entries...)
+
+	verifiedIPs := []string{}
+	notVerifiableIPs := []string{}
+	noDSRRSIGIPs := []string{}
+	parentDNSKEYMissingIPs := []string{}
+	perKeytagInvalid := map[uint16][]string{}
+	perKeytagExpired := map[uint16][]string{}
+	perKeytagNotYet := map[uint16][]string{}
+	perKeytagNoKey := map[uint16][]string{}
+	perKeytagAlgo := map[uint16]map[uint8][]string{}
+
+	for _, oc := range outcomes {
+		if oc.ignored || oc.ip == "" {
+			continue
+		}
+		if oc.noDS {
+			continue
+		}
+		if oc.parentDNSKEYMissing {
+			parentDNSKEYMissingIPs = append(parentDNSKEYMissingIPs, oc.ip)
+			continue
+		}
+		if oc.noDSRRSIG {
+			noDSRRSIGIPs = append(noDSRRSIGIPs, oc.ip)
+			continue
+		}
+		if len(oc.verifiedKeytags) > 0 {
+			verifiedIPs = append(verifiedIPs, oc.ip)
+		} else if oc.hadRRSIG {
+			notVerifiableIPs = append(notVerifiableIPs, oc.ip)
+		}
+		for kt := range oc.rrsigNotValidByDNSKEY {
+			perKeytagInvalid[kt] = append(perKeytagInvalid[kt], oc.ip)
+		}
+		for kt := range oc.rrsigExpired {
+			perKeytagExpired[kt] = append(perKeytagExpired[kt], oc.ip)
+		}
+		for kt := range oc.rrsigNotYetValid {
+			perKeytagNotYet[kt] = append(perKeytagNotYet[kt], oc.ip)
+		}
+		for kt := range oc.noDNSKEYForRRSIG {
+			perKeytagNoKey[kt] = append(perKeytagNoKey[kt], oc.ip)
+		}
+		for kt, algos := range oc.algoNotSupported {
+			if perKeytagAlgo[kt] == nil {
+				perKeytagAlgo[kt] = map[uint8][]string{}
+			}
+			for algo := range algos {
+				perKeytagAlgo[kt][algo] = append(perKeytagAlgo[kt][algo], oc.ip)
+			}
+		}
+	}
+
+	emitKeytagFinding := func(tag string, perKeytag map[uint16][]string) error {
+		keys := make([]uint16, 0, len(perKeytag))
+		for kt := range perKeytag {
+			keys = append(keys, kt)
+		}
+		sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+		for _, kt := range keys {
+			args := map[string]any{"keytag": kt}
+			setTypedAddressesFromValues(args, perKeytag[kt])
+			if aerr := appendLog(ctx, &results, testcase, tag, args); aerr != nil {
+				return aerr
+			}
+		}
+		return nil
+	}
+
+	if err := emitKeytagFinding("DS21_DS_RRSIG_NOT_VALID_BY_DNSKEY", perKeytagInvalid); err != nil {
+		return results, err
+	}
+	if err := emitKeytagFinding("DS21_DS_RRSIG_EXPIRED", perKeytagExpired); err != nil {
+		return results, err
+	}
+	if err := emitKeytagFinding("DS21_DS_RRSIG_NOT_YET_VALID", perKeytagNotYet); err != nil {
+		return results, err
+	}
+	if err := emitKeytagFinding("DS21_NO_DNSKEY_FOR_DS_RRSIG", perKeytagNoKey); err != nil {
+		return results, err
+	}
+
+	algoKeys := make([]uint16, 0, len(perKeytagAlgo))
+	for kt := range perKeytagAlgo {
+		algoKeys = append(algoKeys, kt)
+	}
+	sort.Slice(algoKeys, func(i, j int) bool { return algoKeys[i] < algoKeys[j] })
+	for _, kt := range algoKeys {
+		algoNums := make([]uint8, 0, len(perKeytagAlgo[kt]))
+		for a := range perKeytagAlgo[kt] {
+			algoNums = append(algoNums, a)
+		}
+		sort.Slice(algoNums, func(i, j int) bool { return algoNums[i] < algoNums[j] })
+		for _, a := range algoNums {
+			prop := algoPropertyFor(a)
+			args := map[string]any{
+				"keytag":     kt,
+				"algo_num":   a,
+				"algo_mnemo": prop.mnemonic,
+			}
+			setTypedAddressesFromValues(args, perKeytagAlgo[kt][a])
+			if err := appendLog(ctx, &results, testcase, "DS21_ALGO_NOT_SUPPORTED", args); err != nil {
+				return results, err
+			}
+		}
+	}
+
+	if len(noDSRRSIGIPs) > 0 {
+		args := map[string]any{}
+		setTypedAddressesFromValues(args, noDSRRSIGIPs)
+		if err := appendLog(ctx, &results, testcase, "DS21_NO_DS_RRSIG", args); err != nil {
+			return results, err
+		}
+	}
+	if len(parentDNSKEYMissingIPs) > 0 {
+		args := map[string]any{}
+		setTypedAddressesFromValues(args, parentDNSKEYMissingIPs)
+		if err := appendLog(ctx, &results, testcase, "DS21_PARENT_DNSKEY_MISSING", args); err != nil {
+			return results, err
+		}
+	}
+	if len(notVerifiableIPs) > 0 {
+		args := map[string]any{}
+		setTypedAddressesFromValues(args, notVerifiableIPs)
+		if err := appendLog(ctx, &results, testcase, "DS21_DS_RRSIG_NOT_VERIFIABLE", args); err != nil {
+			return results, err
+		}
+	}
+	if len(verifiedIPs) > 0 {
+		args := map[string]any{}
+		setTypedAddressesFromValues(args, verifiedIPs)
+		if err := appendLog(ctx, &results, testcase, "DS21_DS_RRSIG_VERIFIED", args); err != nil {
 			return results, err
 		}
 	}

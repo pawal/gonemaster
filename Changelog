@@ -2,15 +2,28 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
-## [unreleased]
+## [v1.4.5] - 2026-05-06
+
+Added DNSSEC21 to verify parent DS RRSIG after the .de DNSSEC failure.
+Other changes are just refactoring and incremental improvements.
 
 ### Added
 
+- engine: added DNSSEC21 to verify parent DS RRSIG
+
+### Changed
+
 - admin-ui, ui-public: title and description for the Zone14 ZONEMD test case
-
-### Fixed
-
+- admin-ui: refactored the App.svelte code
 - engine: render numeric log args (e.g. ZONEMD serial) as plain integers instead of scientific notation
+- engine: collapse skip-this-query early-return ladder into shouldSkipQuery
+- engine: add short-lived in-run negative cache for indeterminate lookups
+- engine: signal parallel race loss via ErrRaceLost cause
+- engine: default error_cache_ttl to 30s so dead servers are skipped within a run
+- engine: classify dial-timeouts correctly so fast-fail engages
+- engine: cache no-response on dial-timeout and short-circuit skips
+- engine: cache no_message on query timeout so saved replays stay offline
+- ui-public: hide Codeberg ribbon on narrow viewports
 
 ## [v1.4.4] - 2026-05-05
 

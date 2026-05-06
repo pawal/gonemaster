@@ -43,8 +43,10 @@ func TestNameserverHotCacheLeaseMergesWarmData(t *testing.T) {
 	if got := nextRunCache.AddressCacheCount(); got != 1 {
 		t.Fatalf("next run cache address count = %d, want 1", got)
 	}
-	if got := nextRunCache.ErrorCacheCount(); got != 1 {
-		t.Fatalf("next run cache error count = %d, want 1", got)
+	// Error caches are intentionally NOT propagated across runs: a transient
+	// failure in run 1 must not blackout the address for run 2's live path.
+	if got := nextRunCache.ErrorCacheCount(); got != 0 {
+		t.Fatalf("next run cache error count = %d, want 0 (error caches are run-local)", got)
 	}
 	if got := nextRunCache.NameserverObjectCount(); got != 0 {
 		t.Fatalf("next run cache object count = %d, want 0", got)

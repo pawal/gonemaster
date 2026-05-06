@@ -363,6 +363,75 @@ func TestErrorCacheTTLRespectsTimeoutBudget(t *testing.T) {
 	}
 }
 
+// TestErrorCacheNotSharedAcrossSnapshots pins the contract that error caches
+// are run-local. Without this, a single transient failure in one job (e.g.
+// a recursor probe) cascades into spurious B02_NO_WORKING_NS verdicts on
+// concurrent jobs that share the same NS address via cross-job hot cache.
+func TestErrorCacheNotSharedAcrossSnapshots(t *testing.T) {
+	root := NewCacheStore()
+	addr := "192.0.2.221"
+
+	// Snapshot A populates its own error cache by getting it once and writing.
+	snapA := root.SnapshotForRun()
+	cacheA := snapA.errorCacheForAddress(addr)
+	cacheA.set("udp", time.Minute)
+	if skip, _ := cacheA.shouldSkip("udp"); !skip {
+		t.Fatalf("snapshot A's error cache must reflect its own write")
+	}
+
+	// Snapshot B (sibling of A under the same root) must see a fresh
+	// error cache for the same address - no skip.
+	snapB := root.SnapshotForRun()
+	cacheB := snapB.errorCacheForAddress(addr)
+	if cacheA == cacheB {
+		t.Fatalf("snapshots must not share error cache pointers for the same address")
+	}
+	if skip, _ := cacheB.shouldSkip("udp"); skip {
+		t.Fatalf("snapshot B must not inherit snapshot A's error cache")
+	}
+}
+
+// TestErrorCacheDoesNotMergeBackToParent pins that even after a run's
+// MergeWarmDataFrom call, error-cache state stays out of the parent. A
+// subsequent run leasing the same parent must start with no error cache.
+func TestErrorCacheDoesNotMergeBackToParent(t *testing.T) {
+	root := NewCacheStore()
+	addr := "192.0.2.222"
+
+	run1 := root.SnapshotForRun()
+	cache1 := run1.errorCacheForAddress(addr)
+	cache1.set("udp", time.Minute)
+	root.MergeWarmDataFrom(run1)
+
+	if got := root.ErrorCacheCount(); got != 0 {
+		t.Fatalf("parent must have no error caches after merge; got count %d", got)
+	}
+
+	run2 := root.SnapshotForRun()
+	cache2 := run2.errorCacheForAddress(addr)
+	if skip, _ := cache2.shouldSkip("udp"); skip {
+		t.Fatalf("a fresh run must start with an empty error cache for this address")
+	}
+}
+
+// TestQueryCacheStillMergesBackToParent guards against an over-broad fix:
+// the positive query cache must still propagate across runs (that is the
+// whole point of cross-job hot cache - warmed parent-zone responses).
+func TestQueryCacheStillMergesBackToParent(t *testing.T) {
+	root := NewCacheStore()
+	addr := "192.0.2.223"
+
+	run1 := root.SnapshotForRun()
+	if _, err := NewWithCache(run1, "ns.example", addr, nil); err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	root.MergeWarmDataFrom(run1)
+
+	if got := root.AddressCacheCount(); got != 1 {
+		t.Fatalf("parent must inherit query cache after merge; got %d", got)
+	}
+}
+
 func TestQueryCacheStoresTimeoutsAsNoMessage(t *testing.T) {
 	ctx, prof := testContext(t)
 	prof.Resolver.Defaults.ErrorCacheTTL = 0

@@ -486,36 +486,18 @@ func (c *CacheStore) cacheForAddressWithStatus(addr string) (*queryCache, bool) 
 	return cache, true
 }
 
+// errorCacheForAddress returns a per-store error cache. The error cache
+// is intentionally not shared via the parent chain: a transient failure
+// in one run must not blackout the address for concurrent or future runs.
 func (c *CacheStore) errorCacheForAddress(addr string) *errorCache {
 	if c == nil {
 		return nil
 	}
 	c.mu.Lock()
-	if cache := c.errorCacheByAddr[addr]; cache != nil {
-		c.touchAddrLocked(addr)
-		c.mu.Unlock()
-		return cache
-	}
-	parent := c.sharedParent
-	c.mu.Unlock()
-
-	var parentCache *errorCache
-	if parent != nil {
-		parentCache = parent.errorCacheForAddress(addr)
-	}
-
-	c.mu.Lock()
 	defer c.mu.Unlock()
 	if cache := c.errorCacheByAddr[addr]; cache != nil {
 		c.touchAddrLocked(addr)
 		return cache
-	}
-	if parentCache != nil {
-		parentCache.addObserver(&c.errorMetrics)
-		c.errorCacheByAddr[addr] = parentCache
-		c.observedErrors[addr] = parentCache
-		c.touchAddrLocked(addr)
-		return parentCache
 	}
 	cache := &errorCache{data: map[string]time.Time{}, met: &c.errorMetrics}
 	c.errorCacheByAddr[addr] = cache
@@ -591,7 +573,7 @@ func (c *CacheStore) SnapshotForRun() *CacheStore {
 	snapshot := &CacheStore{
 		objectCache:       map[string]map[string]*Nameserver{},
 		cacheByAddress:    make(map[string]*queryCache, len(c.cacheByAddress)),
-		errorCacheByAddr:  make(map[string]*errorCache, len(c.errorCacheByAddr)),
+		errorCacheByAddr:  map[string]*errorCache{},
 		concurrencyByAddr: make(map[string]*nameserverConcurrencyCap, len(c.concurrencyByAddr)),
 		observedQueries:   map[string]*queryCache{},
 		observedErrors:    map[string]*errorCache{},
@@ -630,11 +612,13 @@ func (c *CacheStore) DetachSharedMetricObservers() {
 	}
 }
 
-// MergeWarmDataFrom merges warmed query/error caches from other into c.
+// MergeWarmDataFrom merges warmed query caches and concurrency caps from
+// other into c. Error caches are intentionally NOT merged: they reflect
+// transient run-local failures and must not poison subsequent runs.
 //
-// Nameserver object instances are intentionally not merged to avoid sharing
-// mutable adaptation state across runs. Before merging, addresses in c that
-// have not been accessed within warmAddrTTL are evicted to bound memory.
+// Nameserver object instances are also not merged to avoid sharing
+// mutable adaptation state across runs. Before merging, addresses in c
+// that have not been accessed within warmAddrTTL are evicted.
 func (c *CacheStore) MergeWarmDataFrom(other *CacheStore) {
 	if c == nil || other == nil || c == other {
 		return
@@ -643,11 +627,8 @@ func (c *CacheStore) MergeWarmDataFrom(other *CacheStore) {
 	other.mu.Lock()
 	queryByAddress := make(map[string]*queryCache, len(other.cacheByAddress))
 	maps.Copy(queryByAddress, other.cacheByAddress)
-	errorByAddress := make(map[string]*errorCache, len(other.errorCacheByAddr))
-	maps.Copy(errorByAddress, other.errorCacheByAddr)
 	concurrencyByAddress := make(map[string]*nameserverConcurrencyCap, len(other.concurrencyByAddr))
 	maps.Copy(concurrencyByAddress, other.concurrencyByAddr)
-	// Collect access times from the run cache so we can update the base.
 	otherAccess := make(map[string]time.Time, len(other.addrLastAccess))
 	maps.Copy(otherAccess, other.addrLastAccess)
 	other.mu.Unlock()
@@ -655,14 +636,12 @@ func (c *CacheStore) MergeWarmDataFrom(other *CacheStore) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// Propagate access times from the run: take the latest of base vs run.
 	for addr, t := range otherAccess {
 		if existing, ok := c.addrLastAccess[addr]; !ok || t.After(existing) {
 			c.addrLastAccess[addr] = t
 		}
 	}
 
-	// Evict stale addresses from the base cache before merging new data.
 	c.evictStaleAddrsLocked()
 
 	for addr, cache := range queryByAddress {
@@ -676,22 +655,9 @@ func (c *CacheStore) MergeWarmDataFrom(other *CacheStore) {
 		cache.met = &c.queryMetrics
 		cache.mu.Unlock()
 		c.cacheByAddress[addr] = cache
-		// Ensure merged addresses have an access time.
 		if _, ok := c.addrLastAccess[addr]; !ok {
 			c.addrLastAccess[addr] = time.Now()
 		}
-	}
-	for addr, cache := range errorByAddress {
-		if cache == nil {
-			continue
-		}
-		if _, ok := c.errorCacheByAddr[addr]; ok {
-			continue
-		}
-		cache.mu.Lock()
-		cache.met = &c.errorMetrics
-		cache.mu.Unlock()
-		c.errorCacheByAddr[addr] = cache
 	}
 	for addr, cap := range concurrencyByAddress {
 		if cap == nil {

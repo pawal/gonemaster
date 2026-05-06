@@ -2,7 +2,6 @@ package nameserver
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/netip"
 	"strings"
@@ -371,12 +370,13 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 			infResp = &cached
 		} else if err == nil {
 			ns.state.cache.set(cacheKey, nil)
-		} else if (ctx == nil || ctx.Err() == nil) && !errors.Is(err, context.Canceled) {
-			// Outer context is fine and the failure is not a parent
-			// cancellation (e.g. a parallel resolver race losing): the query
-			// was actually attempted and failed. Persist a "no response"
-			// marker so subsequent identical queries (and --save/--restore
-			// replays) do not re-issue a live query that already failed.
+		} else if ctx == nil || ctx.Err() == nil {
+			// The query was actually attempted and failed (the outer context
+			// is still fine; cancellation paths set ctx.Err() and arrive here
+			// as ctx.Err() != nil - including recursor.ErrRaceLost). Persist
+			// a "no response" marker so subsequent identical queries (and
+			// --save/--restore replays) do not re-issue a live query that
+			// already failed.
 			ns.state.cache.set(cacheKey, nil)
 		}
 		if inflight != nil {

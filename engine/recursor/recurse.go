@@ -179,7 +179,7 @@ func (r *Recursor) recurseOrdered(ctx context.Context, name string, qtype string
 
 		results := make([]orderedQueryResult, len(batch))
 		done := make([]chan struct{}, len(batch))
-		ctxBatch, cancelBatch := context.WithCancel(ctx)
+		ctxBatch, cancelBatch := context.WithCancelCause(ctx)
 		for i, ns := range batch {
 			done[i] = make(chan struct{})
 			go func(i int, ns queryer) {
@@ -225,18 +225,18 @@ func (r *Recursor) recurseOrdered(ctx context.Context, name string, qtype string
 			if actionErr != nil {
 				returnErr = actionErr
 				returnNow = true
-				cancelBatch()
+				cancelBatch(ErrRaceLost)
 				break
 			}
 			if action == orderedActionReturn {
 				returnResp = out
 				returnNow = true
-				cancelBatch()
+				cancelBatch(ErrRaceLost)
 				break
 			}
 			if action == orderedActionRedirect {
 				redirected = true
-				cancelBatch()
+				cancelBatch(ErrRaceLost)
 				break
 			}
 		}
@@ -244,7 +244,7 @@ func (r *Recursor) recurseOrdered(ctx context.Context, name string, qtype string
 		for i := processed; i < len(batch); i++ {
 			<-done[i]
 		}
-		cancelBatch()
+		cancelBatch(ErrRaceLost)
 
 		if returnErr != nil {
 			return packet.Packet{}, state, returnErr
@@ -374,12 +374,16 @@ func (r *Recursor) recurseUnordered(ctx context.Context, name string, qtype stri
 		if defaults.Retry > 0 {
 			batchTimeout = batchTimeout * time.Duration(defaults.Retry+1)
 		}
-		var ctxBatch context.Context
-		var cancel context.CancelFunc
+		// Outer cause-aware cancel so a race-loss can be observed by callers
+		// via context.Cause(ctx) == ErrRaceLost (not just a generic Canceled).
+		ctxBatch, cancelCause := context.WithCancelCause(ctx)
+		var stopTimeout context.CancelFunc = func() {}
 		if batchTimeout > 0 {
-			ctxBatch, cancel = context.WithTimeout(ctx, batchTimeout)
-		} else {
-			ctxBatch, cancel = context.WithCancel(ctx)
+			ctxBatch, stopTimeout = context.WithTimeout(ctxBatch, batchTimeout)
+		}
+		cancel := func() {
+			cancelCause(ErrRaceLost)
+			stopTimeout()
 		}
 		ctxBatch = withUnorderedContext(ctxBatch)
 		ctxBatch = withUnorderedDepth(ctxBatch, depth+1)

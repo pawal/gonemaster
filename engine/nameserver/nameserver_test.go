@@ -390,6 +390,46 @@ func TestQueryCacheDoesNotStoreContextCancelErrors(t *testing.T) {
 	}
 }
 
+// TestQueryCacheDoesNotStoreCauseCancelledQueries documents that a query
+// whose ctx was cancelled (with any cause - the recursor uses ErrRaceLost
+// for parallel race-losers) must not produce a cached no_message entry:
+// that ctx is the recursor's batch ctx, and a future identical query under
+// a fresh ctx should still be attempted.
+func TestQueryCacheDoesNotStoreCauseCancelledQueries(t *testing.T) {
+	ctx, prof := testContext(t)
+	prof.Resolver.Defaults.ErrorCacheTTL = 0
+
+	store := NewCacheStore()
+	ns, err := NewWithCache(store, "ns.example", "192.0.2.253", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+
+	// Local sentinel mirroring recursor.ErrRaceLost; importing recursor here
+	// would be a cycle. The contract under test is "ctx cancelled with any
+	// cause -> no cache entry", regardless of the cause's identity.
+	raceLost := fmt.Errorf("test: parallel race lost")
+	cctx, cancelCause := context.WithCancelCause(ctx)
+	cancelCause(raceLost)
+	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		return packet.Packet{}, cctx.Err()
+	})
+
+	if _, err := ns.QueryWithOptions(cctx, "example", "SOA", &QueryOptions{BlacklistingDisabled: true}); err == nil {
+		t.Fatalf("expected error from race-cancelled query")
+	}
+
+	entries, err := store.ExportEntries()
+	if err != nil {
+		t.Fatalf("export entries: %v", err)
+	}
+	for _, e := range entries {
+		if e.Address == "192.0.2.253" {
+			t.Fatalf("race-lost query must not produce a cache entry: %+v", e)
+		}
+	}
+}
+
 func TestContextCanceledDoesNotBlacklist(t *testing.T) {
 	ns, err := New("ns.example", "192.0.2.200", nil)
 	if err != nil {

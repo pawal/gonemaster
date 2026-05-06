@@ -214,6 +214,45 @@ func TestCacheStoreIsolation(t *testing.T) {
 	}
 }
 
+func TestDefaultProfileErrorCacheTTLIsNonZero(t *testing.T) {
+	prof, err := profile.Default()
+	if err != nil {
+		t.Fatalf("profile default: %v", err)
+	}
+	if prof.Resolver.Defaults.ErrorCacheTTL <= 0 {
+		t.Fatalf("default error_cache_ttl must be > 0 so a transport timeout suppresses repeat queries to the same NS within a run; got %d", prof.Resolver.Defaults.ErrorCacheTTL)
+	}
+}
+
+func TestErrorCacheEngagesByDefault(t *testing.T) {
+	ctx, _ := testContext(t)
+	// Intentionally do not override ErrorCacheTTL: this asserts the default
+	// profile suppresses repeat live queries on the same transport.
+	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.16", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+
+	var calls int
+	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		calls++
+		return packet.Packet{}, fmt.Errorf("network error")
+	})
+	opts := &QueryOptions{BlacklistingDisabled: true}
+
+	if _, err := ns.QueryWithOptions(ctx, "first.example", "A", opts); err == nil {
+		t.Fatalf("expected error on first query")
+	}
+	// Second query, different qname (so the per-query cache misses) - the
+	// default error_cache_ttl should suppress the live query.
+	if _, err := ns.QueryWithOptions(ctx, "second.example", "A", opts); err != nil {
+		t.Fatalf("expected error cache to suppress second query, got error: %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("expected default error cache to suppress 2nd query; got %d hook calls", calls)
+	}
+}
+
 func TestErrorCacheSkipsQueries(t *testing.T) {
 	cache := NewCacheStore()
 	ns, err := NewWithCache(cache, "ns.example", "192.0.2.15", nil)
@@ -851,7 +890,8 @@ func TestQueryLogsIPBlocked(t *testing.T) {
 }
 
 func TestBlacklistingEmitsTags(t *testing.T) {
-	ctx, _ := testContext(t)
+	ctx, prof := testContext(t)
+	prof.Resolver.Defaults.ErrorCacheTTL = 0
 	log := logger.FromContext(ctx)
 
 	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.90", nil)

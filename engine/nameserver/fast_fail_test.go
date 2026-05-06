@@ -141,6 +141,10 @@ func TestFastFailTrackerProtocolIsolation(t *testing.T) {
 func TestFastFailEngagesOnDialTimeouts(t *testing.T) {
 	ctx, prof := testContext(t)
 	prof.Resolver.Defaults.FastFailTimeoutCount = 3
+	// Disable error cache so this test isolates the fast-fail mechanism;
+	// otherwise the ERROR_CACHE_SKIP path short-circuits before fast-fail
+	// can observe enough timeouts to engage.
+	prof.Resolver.Defaults.ErrorCacheTTL = 0
 	// Use BlacklistingDisabled to isolate fast-fail from the SOA-blacklist path.
 	opts := &QueryOptions{BlacklistingDisabled: true}
 
@@ -177,6 +181,7 @@ func TestFastFailEngagesOnDialTimeouts(t *testing.T) {
 func TestFastFailIgnoresOuterContextCancellation(t *testing.T) {
 	ctx, prof := testContext(t)
 	prof.Resolver.Defaults.FastFailTimeoutCount = 2
+	prof.Resolver.Defaults.ErrorCacheTTL = 0
 	opts := &QueryOptions{BlacklistingDisabled: true}
 
 	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.241", nil)

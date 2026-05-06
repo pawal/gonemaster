@@ -28,7 +28,7 @@
             "unordered": true,
             "usevc": false,
             "timeout": 5,
-            "error_cache_ttl": 0,
+            "error_cache_ttl": 30,
             "positive_cache_ttl": 0,
             "negative_cache_ttl": 0,
             "fast_fail_timeout_count": 3,

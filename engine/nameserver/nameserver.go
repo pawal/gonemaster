@@ -209,66 +209,16 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	}
 
 	usevc := resolveUseVC(opts)
-	cacheNoResponseSkip := func() {
+	fastFailThreshold := resolveFastFailTimeoutCount(prof)
+	if d := ns.shouldSkipQuery(prof, opts, qname, qtype, qclass, usevc, fastFailThreshold); d != nil {
+		if d.useCtxLogger {
+			logSystem(ctx, d.tag, d.args)
+		} else {
+			logSystemWithLogger(runLog, d.tag, d.args)
+		}
 		if ns.state != nil {
 			ns.state.cache.set(cacheKey, nil)
 		}
-	}
-	if ttl := resolveReachabilityTTL(prof, opts); ttl > 0 {
-		if skip, remaining := globalReachability.shouldSkip(ns.Address.String()); skip {
-			skipArgs := map[string]any{
-				"address":     ns.Address.String(),
-				"protocol":    errorCacheProtocol(usevc),
-				"ttl_seconds": int(remaining.Seconds()),
-				"query_name":  qname,
-				"query_type":  qtype,
-				"query_class": qclass,
-			}
-			logargs.SetNS(skipArgs, ns.NameString(), ns.AddressString())
-			logSystem(ctx, "REACHABILITY_CACHE_SKIP", skipArgs)
-			cacheNoResponseSkip()
-			return packet.Packet{}, nil
-		}
-	}
-	if errorCacheTTL := resolveErrorCacheTTL(prof, opts); errorCacheTTL > 0 && ns.state != nil && ns.state.errorCache != nil {
-		if skip, remaining := ns.state.errorCache.shouldSkip(errorCacheKey(usevc)); skip {
-			skipArgs := map[string]any{
-				"address":     ns.Address.String(),
-				"protocol":    errorCacheProtocol(usevc),
-				"ttl_seconds": int(remaining.Seconds()),
-				"query_name":  qname,
-				"query_type":  qtype,
-				"query_class": qclass,
-			}
-			logargs.SetNS(skipArgs, ns.NameString(), ns.AddressString())
-			logSystem(ctx, "ERROR_CACHE_SKIP", skipArgs)
-			cacheNoResponseSkip()
-			return packet.Packet{}, nil
-		}
-	}
-	if constants.BlacklistingEnabled && ns.state != nil && ns.state.blacklisted[usevc] {
-		blArgs := map[string]any{
-			"query_name":  qname,
-			"query_type":  qtype,
-			"query_class": qclass,
-		}
-		logargs.SetNS(blArgs, ns.NameString(), ns.AddressString())
-		logSystemWithLogger(runLog, "IS_BLACKLISTED", blArgs)
-		cacheNoResponseSkip()
-		return packet.Packet{}, nil
-	}
-	fastFailThreshold := resolveFastFailTimeoutCount(prof)
-	if ns.state != nil && ns.state.fastFail.shouldSkip(usevc, fastFailThreshold) {
-		skipArgs := map[string]any{
-			"query_name":  qname,
-			"query_type":  qtype,
-			"query_class": qclass,
-			"protocol":    errorCacheProtocol(usevc),
-			"address":     ns.Address.String(),
-		}
-		logargs.SetNS(skipArgs, ns.NameString(), ns.AddressString())
-		logSystemWithLogger(runLog, "FAST_FAIL_SKIP", skipArgs)
-		cacheNoResponseSkip()
 		return packet.Packet{}, nil
 	}
 	nameserverConcurrencyLimit := resolveNameserverConcurrencyLimit(prof)
@@ -698,6 +648,80 @@ func resolveEDNSSize(opts *QueryOptions, dnssec bool) uint16 {
 		return constants.EDNSUDPPayloadDNSSECDefault
 	}
 	return 0
+}
+
+// skipDecision is the verdict from shouldSkipQuery.
+type skipDecision struct {
+	tag          string
+	args         map[string]any
+	useCtxLogger bool
+}
+
+// shouldSkipQuery picks the highest-priority "do not issue this network
+// query" signal that fires, or returns nil. Priority order is pinned by
+// TestSkipShortCircuitPriorityOrder.
+func (ns Nameserver) shouldSkipQuery(prof *profile.Profile, opts *QueryOptions, qname string, qtype string, qclass string, usevc bool, fastFailThreshold int) *skipDecision {
+	skipArgs := func(extra map[string]any) map[string]any {
+		args := map[string]any{
+			"query_name":  qname,
+			"query_type":  qtype,
+			"query_class": qclass,
+			"address":     ns.Address.String(),
+		}
+		for k, v := range extra {
+			args[k] = v
+		}
+		logargs.SetNS(args, ns.NameString(), ns.AddressString())
+		return args
+	}
+
+	if ttl := resolveReachabilityTTL(prof, opts); ttl > 0 {
+		if skip, remaining := globalReachability.shouldSkip(ns.Address.String()); skip {
+			return &skipDecision{
+				tag: "REACHABILITY_CACHE_SKIP",
+				args: skipArgs(map[string]any{
+					"protocol":    errorCacheProtocol(usevc),
+					"ttl_seconds": int(remaining.Seconds()),
+				}),
+				useCtxLogger: true,
+			}
+		}
+	}
+	if errorCacheTTL := resolveErrorCacheTTL(prof, opts); errorCacheTTL > 0 && ns.state != nil && ns.state.errorCache != nil {
+		if skip, remaining := ns.state.errorCache.shouldSkip(errorCacheKey(usevc)); skip {
+			return &skipDecision{
+				tag: "ERROR_CACHE_SKIP",
+				args: skipArgs(map[string]any{
+					"protocol":    errorCacheProtocol(usevc),
+					"ttl_seconds": int(remaining.Seconds()),
+				}),
+				useCtxLogger: true,
+			}
+		}
+	}
+	if constants.BlacklistingEnabled && ns.state != nil && ns.state.blacklisted[usevc] {
+		args := map[string]any{
+			"query_name":  qname,
+			"query_type":  qtype,
+			"query_class": qclass,
+		}
+		logargs.SetNS(args, ns.NameString(), ns.AddressString())
+		return &skipDecision{
+			tag:          "IS_BLACKLISTED",
+			args:         args,
+			useCtxLogger: false,
+		}
+	}
+	if ns.state != nil && ns.state.fastFail.shouldSkip(usevc, fastFailThreshold) {
+		return &skipDecision{
+			tag: "FAST_FAIL_SKIP",
+			args: skipArgs(map[string]any{
+				"protocol": errorCacheProtocol(usevc),
+			}),
+			useCtxLogger: false,
+		}
+	}
+	return nil
 }
 
 func resolveFastFailTimeoutCount(prof *profile.Profile) int {

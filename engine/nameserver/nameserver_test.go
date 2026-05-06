@@ -929,6 +929,90 @@ func TestQueryLogsIPBlocked(t *testing.T) {
 	t.Fatalf("expected IPV4_BLOCKED log entry")
 }
 
+// TestSkipShortCircuitPriorityOrder pins the relative priority of the four
+// "give up on this server" mechanisms: reachability beats error-cache beats
+// blacklisting beats fast-fail. Refactors of QueryWithOptions's early-return
+// ladder must not change which tag wins when multiple short-circuits would
+// fire on the same query.
+func TestSkipShortCircuitPriorityOrder(t *testing.T) {
+	t.Run("blacklist beats fast-fail", func(t *testing.T) {
+		ctx, prof := testContext(t)
+		prof.Resolver.Defaults.ErrorCacheTTL = 0
+		prof.Resolver.Defaults.FastFailTimeoutCount = 1
+		log := logger.FromContext(ctx)
+
+		ns, err := NewWithContext(ctx, "ns.example", "192.0.2.180", nil)
+		if err != nil {
+			t.Fatalf("new nameserver: %v", err)
+		}
+		// Trip both fast-fail and blacklisting up front.
+		ns.state.fastFail.observeResult(false, true, 1)
+		ns.state.blacklisted[false] = true
+
+		_, _ = ns.QueryWithOptions(ctx, "example", "A", &QueryOptions{BlacklistingDisabled: false})
+		assertOnlyTagFired(t, log, "IS_BLACKLISTED", []string{"FAST_FAIL_SKIP", "REACHABILITY_CACHE_SKIP", "ERROR_CACHE_SKIP"})
+	})
+
+	t.Run("error-cache beats blacklist", func(t *testing.T) {
+		ctx, prof := testContext(t)
+		prof.Resolver.Defaults.ErrorCacheTTL = 60
+		prof.Resolver.Defaults.FastFailTimeoutCount = 0
+		log := logger.FromContext(ctx)
+
+		ns, err := NewWithContext(ctx, "ns.example", "192.0.2.181", nil)
+		if err != nil {
+			t.Fatalf("new nameserver: %v", err)
+		}
+		ns.state.errorCache.set(errorCacheKey(false), 60*time.Second)
+		ns.state.blacklisted[false] = true
+
+		_, _ = ns.QueryWithOptions(ctx, "example", "A", nil)
+		assertOnlyTagFired(t, log, "ERROR_CACHE_SKIP", []string{"IS_BLACKLISTED", "FAST_FAIL_SKIP", "REACHABILITY_CACHE_SKIP"})
+	})
+
+	t.Run("reachability beats error-cache", func(t *testing.T) {
+		clearReachabilityCache()
+		t.Cleanup(clearReachabilityCache)
+
+		ctx, prof := testContext(t)
+		prof.Resolver.Defaults.NegativeCacheTTL = 60
+		prof.Resolver.Defaults.ErrorCacheTTL = 60
+		log := logger.FromContext(ctx)
+
+		ns, err := NewWithContext(ctx, "ns.example", "192.0.2.182", nil)
+		if err != nil {
+			t.Fatalf("new nameserver: %v", err)
+		}
+		globalReachability.mark(ns.Address.String(), 60*time.Second)
+		ns.state.errorCache.set(errorCacheKey(false), 60*time.Second)
+
+		_, _ = ns.QueryWithOptions(ctx, "example", "A", nil)
+		assertOnlyTagFired(t, log, "REACHABILITY_CACHE_SKIP", []string{"ERROR_CACHE_SKIP", "IS_BLACKLISTED", "FAST_FAIL_SKIP"})
+	})
+}
+
+func assertOnlyTagFired(t *testing.T, log *logger.Logger, want string, mustNot []string) {
+	t.Helper()
+	wantSeen := false
+	for _, entry := range log.Entries() {
+		if entry == nil {
+			continue
+		}
+		if entry.Tag == want {
+			wantSeen = true
+			continue
+		}
+		for _, banned := range mustNot {
+			if entry.Tag == banned {
+				t.Fatalf("expected only %s to fire, also saw %s", want, banned)
+			}
+		}
+	}
+	if !wantSeen {
+		t.Fatalf("expected %s to fire, none of %v saw it", want, want)
+	}
+}
+
 func TestBlacklistingEmitsTags(t *testing.T) {
 	ctx, prof := testContext(t)
 	prof.Resolver.Defaults.ErrorCacheTTL = 0

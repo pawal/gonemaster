@@ -2,6 +2,7 @@ package nameserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/netip"
 	"strings"
@@ -209,6 +210,11 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	}
 
 	usevc := resolveUseVC(opts)
+	cacheNoResponseSkip := func() {
+		if ns.state != nil {
+			ns.state.cache.set(cacheKey, nil)
+		}
+	}
 	if ttl := resolveReachabilityTTL(prof, opts); ttl > 0 {
 		if skip, remaining := globalReachability.shouldSkip(ns.Address.String()); skip {
 			skipArgs := map[string]any{
@@ -221,6 +227,7 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 			}
 			logargs.SetNS(skipArgs, ns.NameString(), ns.AddressString())
 			logSystem(ctx, "REACHABILITY_CACHE_SKIP", skipArgs)
+			cacheNoResponseSkip()
 			return packet.Packet{}, nil
 		}
 	}
@@ -236,6 +243,7 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 			}
 			logargs.SetNS(skipArgs, ns.NameString(), ns.AddressString())
 			logSystem(ctx, "ERROR_CACHE_SKIP", skipArgs)
+			cacheNoResponseSkip()
 			return packet.Packet{}, nil
 		}
 	}
@@ -247,6 +255,7 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 		}
 		logargs.SetNS(blArgs, ns.NameString(), ns.AddressString())
 		logSystemWithLogger(runLog, "IS_BLACKLISTED", blArgs)
+		cacheNoResponseSkip()
 		return packet.Packet{}, nil
 	}
 	fastFailThreshold := resolveFastFailTimeoutCount(prof)
@@ -260,6 +269,7 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 		}
 		logargs.SetNS(skipArgs, ns.NameString(), ns.AddressString())
 		logSystemWithLogger(runLog, "FAST_FAIL_SKIP", skipArgs)
+		cacheNoResponseSkip()
 		return packet.Packet{}, nil
 	}
 	nameserverConcurrencyLimit := resolveNameserverConcurrencyLimit(prof)
@@ -357,11 +367,12 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 			infResp = &cached
 		} else if err == nil {
 			ns.state.cache.set(cacheKey, nil)
-		} else if (ctx == nil || ctx.Err() == nil) &&
-			(isTimeoutPatternError(err) || isHardNetworkError(err)) {
-			// Persist a "no response" marker so subsequent identical queries
-			// (and --save/--restore replays) do not re-issue a live query
-			// that already timed out or hit an unreachable host.
+		} else if (ctx == nil || ctx.Err() == nil) && !errors.Is(err, context.Canceled) {
+			// Outer context is fine and the failure is not a parent
+			// cancellation (e.g. a parallel resolver race losing): the query
+			// was actually attempted and failed. Persist a "no response"
+			// marker so subsequent identical queries (and --save/--restore
+			// replays) do not re-issue a live query that already failed.
 			ns.state.cache.set(cacheKey, nil)
 		}
 		if inflight != nil {

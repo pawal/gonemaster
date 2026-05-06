@@ -10,13 +10,17 @@ import (
 )
 
 type reachabilityCache struct {
-	mu   sync.Mutex
-	data map[string]time.Time
-	met  cacheMetrics
+	mu      sync.Mutex
+	data    map[string]time.Time
+	pending map[string]time.Time
+	met     cacheMetrics
 }
 
 func newReachabilityCache() *reachabilityCache {
-	return &reachabilityCache{data: map[string]time.Time{}}
+	return &reachabilityCache{
+		data:    map[string]time.Time{},
+		pending: map[string]time.Time{},
+	}
 }
 
 func (c *reachabilityCache) shouldSkip(addr string) (bool, time.Duration) {
@@ -41,12 +45,37 @@ func (c *reachabilityCache) shouldSkip(addr string) (bool, time.Duration) {
 	return false, 0
 }
 
+// mark debounces: a single hard error records the address as pending but
+// does not block. Only the second hard error within ttl promotes the
+// address to a full blackout. This tolerates transient ICMP unreachables
+// and IPv6 routing flaps that resolve on retry.
 func (c *reachabilityCache) mark(addr string, ttl time.Duration) {
 	if c == nil || addr == "" || ttl <= 0 {
 		return
 	}
+	now := time.Now()
 	c.mu.Lock()
-	c.data[addr] = time.Now().Add(ttl)
+	defer c.mu.Unlock()
+	if expiry, ok := c.data[addr]; ok && now.Before(expiry) {
+		return
+	}
+	if firstSeen, ok := c.pending[addr]; ok && now.Sub(firstSeen) <= ttl {
+		c.data[addr] = now.Add(ttl)
+		delete(c.pending, addr)
+		return
+	}
+	c.pending[addr] = now
+}
+
+// observeSuccess clears the pending hard-error count for addr after a
+// successful query. A reachable address must not accumulate stale
+// pending state from earlier transient failures.
+func (c *reachabilityCache) observeSuccess(addr string) {
+	if c == nil || addr == "" {
+		return
+	}
+	c.mu.Lock()
+	delete(c.pending, addr)
 	c.mu.Unlock()
 }
 
@@ -57,6 +86,7 @@ func (c *reachabilityCache) clear() {
 	c.mu.Lock()
 	c.met.evict(len(c.data))
 	c.data = map[string]time.Time{}
+	c.pending = map[string]time.Time{}
 	c.met = cacheMetrics{}
 	c.mu.Unlock()
 }

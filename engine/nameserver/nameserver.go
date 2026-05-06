@@ -302,6 +302,8 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 		if ttl := resolveReachabilityTTL(prof, opts); ttl > 0 {
 			globalReachability.mark(ns.Address.String(), ttl)
 		}
+	} else if err == nil && resp.Msg != nil {
+		globalReachability.observeSuccess(ns.Address.String())
 	}
 
 	// Log oversized packets before releasing inflight waiters - both paths share

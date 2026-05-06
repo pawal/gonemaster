@@ -507,40 +507,55 @@ func TestReachabilityCacheSkipsAcrossCaches(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
+	nsC, err := NewWithCache(NewCacheStore(), "ns.example", "192.0.2.44", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
 
 	ctx, prof := testContext(t)
 	prof.Resolver.Defaults.NegativeCacheTTL = 60
 
-	var callsA int
-	nsA.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
-		callsA++
+	hardErr := func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
 		return packet.Packet{}, &net.OpError{Op: "dial", Net: "udp", Err: syscall.EHOSTUNREACH}
+	}
+	var callsA, callsB, callsC int
+	nsA.SetQueryHook(func(c context.Context, n string, t1 string, t2 string, o *QueryOptions) (packet.Packet, error) {
+		callsA++
+		return hardErr(c, n, t1, t2, o)
 	})
-
-	var callsB int
-	nsB.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+	nsB.SetQueryHook(func(c context.Context, n string, t1 string, t2 string, o *QueryOptions) (packet.Packet, error) {
 		callsB++
+		return hardErr(c, n, t1, t2, o)
+	})
+	nsC.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		callsC++
 		return packet.Packet{}, nil
 	})
 
-	_, err = nsA.QueryWithOptions(ctx, "example", "A", nil)
-	if err == nil {
-		t.Fatalf("expected error on first query")
+	// Each nameserver has its own per-NS error cache, so the second query
+	// through a fresh nameserver struct still reaches the live path. Two
+	// consecutive hard errors across distinct nameservers promote the
+	// shared reachability cache from pending to blocked.
+	if _, err = nsA.QueryWithOptions(ctx, "first.example", "A", nil); err == nil {
+		t.Fatalf("expected error on first hard-error query")
+	}
+	if _, err = nsB.QueryWithOptions(ctx, "second.example", "A", nil); err == nil {
+		t.Fatalf("expected error on second hard-error query")
 	}
 
-	_, err = nsB.QueryWithOptions(ctx, "example", "A", nil)
+	_, err = nsC.QueryWithOptions(ctx, "third.example", "A", nil)
 	if err != nil {
-		t.Fatalf("expected reachability cache to skip error, got %v", err)
+		t.Fatalf("expected reachability cache to skip error after 2 hard errors, got %v", err)
 	}
-	if callsA != 1 {
-		t.Fatalf("expected first call to run, got %d", callsA)
+	if callsA != 1 || callsB != 1 {
+		t.Fatalf("expected both hard-error calls to run live; got A=%d B=%d", callsA, callsB)
 	}
-	if callsB != 0 {
-		t.Fatalf("expected second call to be skipped by reachability cache, got %d", callsB)
+	if callsC != 0 {
+		t.Fatalf("expected cross-cache call to be skipped by reachability cache, got %d", callsC)
 	}
 
 	metrics := reachabilityMetricsSnapshot()
-	if metrics.Hits != 1 || metrics.Misses != 1 || metrics.Evictions != 0 {
+	if metrics.Hits != 1 || metrics.Misses != 2 || metrics.Evictions != 0 {
 		t.Fatalf("unexpected reachability metrics: %+v", metrics)
 	}
 }
@@ -549,7 +564,15 @@ func TestReachabilityCacheExpiresByBudget(t *testing.T) {
 	clearReachabilityCache()
 	t.Cleanup(clearReachabilityCache)
 
-	ns, err := NewWithCache(NewCacheStore(), "ns.example", "192.0.2.55", nil)
+	nsA, err := NewWithCache(NewCacheStore(), "ns.example", "192.0.2.55", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	nsB, err := NewWithCache(NewCacheStore(), "ns.example", "192.0.2.55", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	nsC, err := NewWithCache(NewCacheStore(), "ns.example", "192.0.2.55", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -561,26 +584,248 @@ func TestReachabilityCacheExpiresByBudget(t *testing.T) {
 	retry := 0
 	opts := &QueryOptions{Timeout: &timeout, Retry: &retry}
 
-	var calls int
-	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
-		calls++
+	hardErr := func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
 		return packet.Packet{}, &net.OpError{Op: "dial", Net: "udp", Err: syscall.EHOSTUNREACH}
-	})
+	}
+	var calls int
+	for _, ns := range []Nameserver{nsA, nsB, nsC} {
+		ns.SetQueryHook(func(c context.Context, n string, t1 string, t2 string, o *QueryOptions) (packet.Packet, error) {
+			calls++
+			return hardErr(c, n, t1, t2, o)
+		})
+	}
 
-	_, err = ns.QueryWithOptions(ctx, "example", "A", opts)
-	if err == nil {
+	// Two hard errors across fresh nameservers (each has its own error cache)
+	// engage the shared reachability cache, with TTL bounded by retry budget.
+	if _, err = nsA.QueryWithOptions(ctx, "first.example", "A", opts); err == nil {
 		t.Fatalf("expected error on first query")
+	}
+	if _, err = nsB.QueryWithOptions(ctx, "second.example", "A", opts); err == nil {
+		t.Fatalf("expected error on second query")
 	}
 
 	time.Sleep(40 * time.Millisecond)
 
-	// Different qname so per-query cache miss forces reachability path to run.
-	_, err = ns.QueryWithOptions(ctx, "another.example", "A", opts)
+	// Sleep past the budget-bounded TTL; reachability cache should expire and
+	// allow the live path to run again.
+	_, err = nsC.QueryWithOptions(ctx, "third.example", "A", opts)
 	if err == nil {
 		t.Fatalf("expected error after reachability cache expiry")
 	}
-	if calls != 2 {
+	if calls != 3 {
 		t.Fatalf("expected reachability cache to expire and re-query, got %d calls", calls)
+	}
+}
+
+// TestReachabilityCacheDebouncesSingleHardError pins the contract that a
+// single transient EHOSTUNREACH (e.g. one IPv6 routing flap, one stray
+// ICMP destination-unreachable) must not blackout the address. Without
+// this debounce, a single bad packet under batch load blackholes the NS
+// process-wide for negative_cache_ttl seconds and cascades into spurious
+// B02_NO_WORKING_NS verdicts on otherwise-healthy zones.
+//
+// Each nameserver struct has its own per-NS error cache, so we use one
+// fresh struct per query to model the cross-job scenario this debounce
+// is designed for.
+func TestReachabilityCacheDebouncesSingleHardError(t *testing.T) {
+	clearReachabilityCache()
+	t.Cleanup(clearReachabilityCache)
+
+	ctx, prof := testContext(t)
+	prof.Resolver.Defaults.NegativeCacheTTL = 60
+
+	hardErr := func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		return packet.Packet{}, &net.OpError{Op: "dial", Net: "udp", Err: syscall.EHOSTUNREACH}
+	}
+	addr := "192.0.2.56"
+	freshNS := func(t *testing.T) Nameserver {
+		t.Helper()
+		ns, err := NewWithCache(NewCacheStore(), "ns.example", addr, nil)
+		if err != nil {
+			t.Fatalf("new nameserver: %v", err)
+		}
+		return ns
+	}
+
+	var calls int
+	hook := func(c context.Context, n string, t1 string, t2 string, o *QueryOptions) (packet.Packet, error) {
+		calls++
+		return hardErr(c, n, t1, t2, o)
+	}
+
+	ns1 := freshNS(t)
+	ns1.SetQueryHook(hook)
+	if _, err := ns1.QueryWithOptions(ctx, "first.example", "A", nil); err == nil {
+		t.Fatalf("expected error on first hard-error query")
+	}
+
+	ns2 := freshNS(t)
+	ns2.SetQueryHook(hook)
+	if _, err := ns2.QueryWithOptions(ctx, "second.example", "A", nil); err == nil {
+		t.Fatalf("expected error on second hard-error query")
+	}
+	if calls != 2 {
+		t.Fatalf("expected 2 live calls (single hard error must not blackout); got %d", calls)
+	}
+
+	// After two consecutive hard errors the cache engages; a third query
+	// from yet another fresh nameserver is suppressed without invoking the
+	// hook.
+	ns3 := freshNS(t)
+	ns3.SetQueryHook(hook)
+	if _, err := ns3.QueryWithOptions(ctx, "third.example", "A", nil); err != nil {
+		t.Fatalf("expected reachability cache to suppress 3rd query, got: %v", err)
+	}
+	if calls != 2 {
+		t.Fatalf("expected cache to engage after 2 hard errors (2 hook calls total); got %d", calls)
+	}
+}
+
+// TestReachabilityCacheResetsOnSuccess checks that an intervening successful
+// query clears the pending hard-error count so a third fresh failure starts
+// the debounce over rather than promoting straight to a blackout. As with
+// TestReachabilityCacheDebouncesSingleHardError, each phase uses a fresh
+// nameserver struct to keep the per-NS error cache out of the picture.
+func TestReachabilityCacheResetsOnSuccess(t *testing.T) {
+	clearReachabilityCache()
+	t.Cleanup(clearReachabilityCache)
+
+	ctx, prof := testContext(t)
+	prof.Resolver.Defaults.NegativeCacheTTL = 60
+
+	addr := "192.0.2.57"
+	freshNS := func(t *testing.T) Nameserver {
+		t.Helper()
+		ns, err := NewWithCache(NewCacheStore(), "ns.example", addr, nil)
+		if err != nil {
+			t.Fatalf("new nameserver: %v", err)
+		}
+		return ns
+	}
+
+	var phase int
+	hook := func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		phase++
+		if phase == 2 {
+			return packet.Packet{Msg: &dns.Msg{}}, nil
+		}
+		return packet.Packet{}, &net.OpError{Op: "dial", Net: "udp", Err: syscall.EHOSTUNREACH}
+	}
+
+	ns1 := freshNS(t)
+	ns1.SetQueryHook(hook)
+	if _, err := ns1.QueryWithOptions(ctx, "a.example", "A", nil); err == nil {
+		t.Fatalf("expected error on first hard-error query")
+	}
+
+	ns2 := freshNS(t)
+	ns2.SetQueryHook(hook)
+	if pkt, err := ns2.QueryWithOptions(ctx, "b.example", "A", nil); err != nil || pkt.Msg == nil {
+		t.Fatalf("expected successful 2nd query, got pkt.Msg=%v err=%v", pkt.Msg, err)
+	}
+
+	ns3 := freshNS(t)
+	ns3.SetQueryHook(hook)
+	if _, err := ns3.QueryWithOptions(ctx, "c.example", "A", nil); err == nil {
+		t.Fatalf("expected error on third hard-error query")
+	}
+
+	if phase != 3 {
+		t.Fatalf("expected 3 hook calls (success must reset pending so cache stays open); got %d", phase)
+	}
+
+	// A 4th query from yet another fresh nameserver must still issue live:
+	// the success between phases 1 and 3 reset the consecutive count, so
+	// phase 3 is treated as a fresh first failure.
+	ns4 := freshNS(t)
+	ns4.SetQueryHook(hook)
+	if _, err := ns4.QueryWithOptions(ctx, "d.example", "A", nil); err == nil {
+		t.Fatalf("expected error on 4th query (cache must not have engaged)")
+	}
+	if phase != 4 {
+		t.Fatalf("expected 4 hook calls; cache must not have engaged after a success reset; got %d", phase)
+	}
+}
+
+// TestReachabilityCachePendingExpires checks the time bound on the debounce:
+// two hard errors farther apart than the TTL window must not promote to a
+// blackout. The first failure is forgotten; the second is treated as fresh.
+func TestReachabilityCachePendingExpires(t *testing.T) {
+	c := newReachabilityCache()
+	addr := "192.0.2.250"
+
+	// First mark with a very short TTL records pending but does not block.
+	c.mark(addr, 10*time.Millisecond)
+	if skip, _ := c.shouldSkip(addr); skip {
+		t.Fatalf("first mark must not engage skip")
+	}
+
+	// Sleep past the window. A second mark now is "fresh first," not "second."
+	time.Sleep(20 * time.Millisecond)
+
+	c.mark(addr, 10*time.Millisecond)
+	if skip, _ := c.shouldSkip(addr); skip {
+		t.Fatalf("second mark after window expiry must not engage skip")
+	}
+
+	// A second mark within the window of the just-recorded pending DOES engage.
+	c.mark(addr, 10*time.Millisecond)
+	if skip, _ := c.shouldSkip(addr); !skip {
+		t.Fatalf("two consecutive marks within window must engage skip")
+	}
+}
+
+// TestReachabilityCacheUnitMarkDebounce exercises the cache type directly to
+// pin the bookkeeping invariants that the integration tests above rely on.
+func TestReachabilityCacheUnitMarkDebounce(t *testing.T) {
+	c := newReachabilityCache()
+	addr := "192.0.2.251"
+
+	c.mark(addr, time.Minute)
+	if skip, _ := c.shouldSkip(addr); skip {
+		t.Fatalf("first mark must not engage skip")
+	}
+
+	c.mark(addr, time.Minute)
+	if skip, remaining := c.shouldSkip(addr); !skip || remaining <= 0 {
+		t.Fatalf("second mark must engage skip with positive remaining; skip=%v remaining=%v", skip, remaining)
+	}
+
+	c.observeSuccess(addr)
+	if skip, _ := c.shouldSkip(addr); !skip {
+		t.Fatalf("observeSuccess must not clear an already-engaged blackout entry")
+	}
+
+	c.clear()
+	if skip, _ := c.shouldSkip(addr); skip {
+		t.Fatalf("clear must remove the blackout entry")
+	}
+
+	// After clear, two marks are again required to re-engage.
+	c.mark(addr, time.Minute)
+	if skip, _ := c.shouldSkip(addr); skip {
+		t.Fatalf("first mark after clear must not engage skip")
+	}
+	c.mark(addr, time.Minute)
+	if skip, _ := c.shouldSkip(addr); !skip {
+		t.Fatalf("second mark after clear must engage skip")
+	}
+}
+
+// TestReachabilityCacheUnitObserveSuccessClearsPending checks that a success
+// observation made between two failures actually clears the pending state -
+// the integration test above verifies the same behavior via QueryWithOptions
+// but this one isolates the cache logic from the calling code.
+func TestReachabilityCacheUnitObserveSuccessClearsPending(t *testing.T) {
+	c := newReachabilityCache()
+	addr := "192.0.2.252"
+
+	c.mark(addr, time.Minute)
+	c.observeSuccess(addr)
+	c.mark(addr, time.Minute)
+
+	if skip, _ := c.shouldSkip(addr); skip {
+		t.Fatalf("success between two marks must reset pending so the cache stays open")
 	}
 }
 
@@ -1025,6 +1270,8 @@ func TestSkipShortCircuitPriorityOrder(t *testing.T) {
 		if err != nil {
 			t.Fatalf("new nameserver: %v", err)
 		}
+		// Two marks promote pending → blocked, matching production semantics.
+		globalReachability.mark(ns.Address.String(), 60*time.Second)
 		globalReachability.mark(ns.Address.String(), 60*time.Second)
 		ns.state.errorCache.set(errorCacheKey(false), 60*time.Second)
 

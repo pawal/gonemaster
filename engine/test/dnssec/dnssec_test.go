@@ -2354,9 +2354,18 @@ func TestDNSSEC07NoDSOnParentServerTypedServers(t *testing.T) {
 	ds.DigestType = 2
 	ds.Digest = "DEADBEEF"
 
-	newNameserver(t, "ns-parent.example", "192.0.2.181", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	dsSig := rrsigRecord("example", dns.TypeDS, 11111, time.Now().Add(-time.Hour).Unix(), time.Now().Add(time.Hour).Unix())
+
+	newNameserver(t, "ns-parent-no-ds.example", "192.0.2.181", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DS" {
 			return answerPacket(qname, dns.TypeDS, ds)
+		}
+		return packet.Packet{}
+	})
+
+	newNameserver(t, "ns-parent-with-ds.example", "192.0.2.182", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype == "DS" {
+			return answerPacket(qname, dns.TypeDS, ds, dsSig)
 		}
 		return packet.Packet{}
 	})
@@ -2374,8 +2383,9 @@ func TestDNSSEC07NoDSOnParentServerTypedServers(t *testing.T) {
 		return []methodsv2.NSItem{}, nil
 	}
 	getParentNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		ns, _ := nameserver.New("ns-parent.example", "192.0.2.181", nil)
-		return []nameserver.Nameserver{ns}, nil
+		nsNoDS, _ := nameserver.New("ns-parent-no-ds.example", "192.0.2.181", nil)
+		nsWithDS, _ := nameserver.New("ns-parent-with-ds.example", "192.0.2.182", nil)
+		return []nameserver.Nameserver{nsNoDS, nsWithDS}, nil
 	}
 
 	z, err := zone.New("example")
@@ -2397,11 +2407,108 @@ func TestDNSSEC07NoDSOnParentServerTypedServers(t *testing.T) {
 	if !ok || len(servers) != 1 {
 		t.Fatalf("expected typed servers for DS07_NO_DS_ON_PARENT_SERVER, got %#v", noDS.Args["servers"])
 	}
-	if servers[0]["ns"] != "ns-parent.example" {
+	if servers[0]["ns"] != "ns-parent-no-ds.example" {
 		t.Fatalf("unexpected typed server payload for DS07_NO_DS_ON_PARENT_SERVER: %#v", servers[0])
 	}
 	if _, ok := noDS.Args["ns_list"]; ok {
 		t.Fatalf("legacy key ns_list should not be present: %#v", noDS.Args)
+	}
+	if hasEntryTag(entries, "DS07_NO_DS_FOR_SIGNED_ZONE") {
+		t.Fatalf("DS07_NO_DS_FOR_SIGNED_ZONE should not fire when at least one parent serves DS")
+	}
+}
+
+func TestDNSSEC07NoDSOnAllParentServersSuppressesPerServerTag(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origDel := getDelNSNamesAndIPs
+	origZone := getZoneNSNamesAndIPs
+	origParent := getParentNSNamesAndIPs
+	origZoneParent := zoneParent
+	t.Cleanup(func() {
+		getDelNSNamesAndIPs = origDel
+		getZoneNSNamesAndIPs = origZone
+		getParentNSNamesAndIPs = origParent
+		zoneParent = origZoneParent
+	})
+
+	zoneParent = func(_ context.Context, _ *zone.Zone) (*zone.Zone, error) {
+		return nil, nil
+	}
+
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = 8
+	key.PublicKey = "AwEAAc=="
+	sig := rrsigRecord("example", dns.TypeDNSKEY, 11111, time.Now().Add(-time.Hour).Unix(), time.Now().Add(time.Hour).Unix())
+
+	newNameserver(t, "ns1.example", "192.0.2.180", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		switch qtype {
+		case "SOA":
+			return answerPacket(qname, dns.TypeSOA, soaRecord(qname))
+		case "DNSKEY":
+			return answerPacket(qname, dns.TypeDNSKEY, key, sig)
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	ds := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	ds.KeyTag = 11111
+	ds.Algorithm = 8
+	ds.DigestType = 2
+	ds.Digest = "DEADBEEF"
+
+	newNameserver(t, "ns-parent-a.example", "192.0.2.181", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype == "DS" {
+			return answerPacket(qname, dns.TypeDS, ds)
+		}
+		return packet.Packet{}
+	})
+	newNameserver(t, "ns-parent-b.example", "192.0.2.182", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype == "DS" {
+			return answerPacket(qname, dns.TypeDS, ds)
+		}
+		return packet.Packet{}
+	})
+
+	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+		return []methodsv2.NSItem{
+			{
+				Name:       dnsname.New("ns1.example"),
+				Address:    netip.MustParseAddr("192.0.2.180"),
+				HasAddress: true,
+			},
+		}, nil
+	}
+	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+		return []methodsv2.NSItem{}, nil
+	}
+	getParentNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		nsA, _ := nameserver.New("ns-parent-a.example", "192.0.2.181", nil)
+		nsB, _ := nameserver.New("ns-parent-b.example", "192.0.2.182", nil)
+		return []nameserver.Nameserver{nsA, nsB}, nil
+	}
+
+	z, err := zone.New("example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC07(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("dnssec07: %v", err)
+	}
+	if !hasEntryTag(entries, "DS07_NO_DS_FOR_SIGNED_ZONE") {
+		t.Fatalf("expected DS07_NO_DS_FOR_SIGNED_ZONE when no parent serves DS")
+	}
+	if hasEntryTag(entries, "DS07_NO_DS_ON_PARENT_SERVER") {
+		t.Fatalf("DS07_NO_DS_ON_PARENT_SERVER should be suppressed when every parent fails to return DS")
 	}
 }
 

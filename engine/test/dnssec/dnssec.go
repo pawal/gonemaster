@@ -2465,7 +2465,7 @@ func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	if len(noDS) > 0 {
+	if len(noDS) > 0 && len(dsInResponse) > 0 {
 		args := map[string]any{}
 		setTypedServersFromNames(args, noDS)
 		if err := appendLog(ctx, &results, testcase, "DS07_NO_DS_ON_PARENT_SERVER", args); err != nil {

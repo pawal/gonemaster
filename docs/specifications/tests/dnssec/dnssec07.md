@@ -49,7 +49,7 @@ Status: Final
    - Emit `DS07_SIGNED` if signed set non-empty and no-DNSKEY-signature set empty.
    - Emit `DS07_NOT_SIGNED` if signed set empty and no-DNSKEY-signature set non-empty.
 9. Emit parent DS tags:
-   - Emit `DS07_NO_DS_ON_PARENT_SERVER` for no-DS set.
+   - Emit `DS07_NO_DS_ON_PARENT_SERVER` for no-DS set, but only when DS-present set is also non-empty (per-server tag fires only for the inconsistent case; when every parent fails to return DS, the aggregate `DS07_NO_DS_FOR_SIGNED_ZONE` covers it).
    - Emit `DS07_DS_ON_PARENT_SERVER` for DS-present set.
    - Emit `DS07_INCONSISTENT_DS` if both no-DS and DS-present sets are non-empty.
    - If zone is considered signed (`signed response` non-empty and `no DNSKEY-signature` empty):
@@ -67,7 +67,7 @@ Status: Final
 | `DS07_NON_AUTH_RESPONSE_DNSKEY` | Child nameservers returned DNSKEY responses without AA. |
 | `DS07_NOT_SIGNED` | Zone is determined not signed by child-evaluation logic. |
 | `DS07_NOT_SIGNED_ON_SERVER` | Child nameservers returned responses without DNSKEY-covering RRSIG evidence. |
-| `DS07_NO_DS_ON_PARENT_SERVER` | Parent nameservers returned no DS-signature evidence for child. |
+| `DS07_NO_DS_ON_PARENT_SERVER` | At least one parent nameserver returned no DS-signature evidence and at least one other parent nameserver did - i.e., the parent is inconsistent. Suppressed when every parent fails. |
 | `DS07_NO_DS_FOR_SIGNED_ZONE` | Zone is considered signed but no parent DS-present evidence exists. |
 | `DS07_NO_RESPONSE_DNSKEY` | Child nameservers did not respond to DNSKEY query. |
 | `DS07_SIGNED` | Zone is determined signed by child-evaluation logic. |

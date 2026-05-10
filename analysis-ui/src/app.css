@@ -53,6 +53,21 @@
   --bar-error:    #ea580c;
   --bar-critical: #dc2626;
   --bar-neutral:  #6b7280;
+
+  /* Tone segment fill colours (used by FactDistributionBar and Trends).
+     Light mode uses Tailwind 200-level backgrounds with 900-level text
+     for noticeably richer colour and better WCAG contrast than 100-level
+     pastels. */
+  --tone-ok-bg:       #bbf7d0;
+  --tone-ok-fg:       #14532d;
+  --tone-notice-bg:   #bae6fd;
+  --tone-notice-fg:   #0c4a6e;
+  --tone-warning-bg:  #fde68a;
+  --tone-warning-fg:  #78350f;
+  --tone-error-bg:    #fed7aa;
+  --tone-error-fg:    #7c2d12;
+  --tone-critical-bg: #fecaca;
+  --tone-critical-fg: #7f1d1d;
 }
 
 /* ── Reset ───────────────────────────────────────────────────────────────── */
@@ -440,6 +455,19 @@ button:hover:not(:disabled) {
     --bar-error:    #ffedd5;
     --bar-critical: #fee2e2;
     --bar-neutral:  #9ca3af;
+
+    /* Dark-mode tone segments: saturated mid-level backgrounds with
+       light text so segments pop against the dark card surface. */
+    --tone-ok-bg:       #15803d;
+    --tone-ok-fg:       #dcfce7;
+    --tone-notice-bg:   #0369a1;
+    --tone-notice-fg:   #e0f2fe;
+    --tone-warning-bg:  #b45309;
+    --tone-warning-fg:  #fef3c7;
+    --tone-error-bg:    #c2410c;
+    --tone-error-fg:    #ffedd5;
+    --tone-critical-bg: #b91c1c;
+    --tone-critical-fg: #fee2e2;
   }
 }
 
@@ -466,6 +494,17 @@ button:hover:not(:disabled) {
   --bar-error:    #ffedd5;
   --bar-critical: #fee2e2;
   --bar-neutral:  #9ca3af;
+
+  --tone-ok-bg:       #15803d;
+  --tone-ok-fg:       #dcfce7;
+  --tone-notice-bg:   #0369a1;
+  --tone-notice-fg:   #e0f2fe;
+  --tone-warning-bg:  #b45309;
+  --tone-warning-fg:  #fef3c7;
+  --tone-error-bg:    #c2410c;
+  --tone-error-fg:    #ffedd5;
+  --tone-critical-bg: #b91c1c;
+  --tone-critical-fg: #fee2e2;
 }
 
 /* ── List-page layout ────────────────────────────────────────────────────── */

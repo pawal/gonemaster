@@ -180,22 +180,36 @@
     return out;
   });
 
-  // Tone backgrounds mirror the .tone-* classes used by
-  // FactDistributionBar.svelte and the overview health bar so the same
-  // tone reads the same color across overview and trends.
+  // Tone background and foreground reference the CSS variables defined in
+  // app.css so light/dark theme changes propagate automatically.
   const TONE_BG: Record<string, string> = {
-    ok: "#dcfce7",
-    notice: "#e0f2fe",
-    warning: "#fef3c7",
-    error: "#ffedd5",
-    critical: "#fee2e2",
-    neutral: "var(--surface-2)"
+    ok:       "var(--tone-ok-bg)",
+    notice:   "var(--tone-notice-bg)",
+    warning:  "var(--tone-warning-bg)",
+    error:    "var(--tone-error-bg)",
+    critical: "var(--tone-critical-bg)",
+    neutral:  "var(--surface-2)"
+  };
+  const TONE_FG: Record<string, string> = {
+    ok:       "var(--tone-ok-fg)",
+    notice:   "var(--tone-notice-fg)",
+    warning:  "var(--tone-warning-fg)",
+    error:    "var(--tone-error-fg)",
+    critical: "var(--tone-critical-fg)",
+    neutral:  "var(--on-surface-2)"
   };
   const FALLBACK_TONES = ["ok", "notice", "warning", "error", "critical", "neutral"];
 
+  function resolvedTone(category: string, key: string, fallbackIndex: number): string {
+    return toneForKey(category, key) ?? FALLBACK_TONES[fallbackIndex % FALLBACK_TONES.length];
+  }
+
   function colorForBucket(category: string, key: string, fallbackIndex: number): string {
-    const tone = toneForKey(category, key) ?? FALLBACK_TONES[fallbackIndex % FALLBACK_TONES.length];
-    return TONE_BG[tone] ?? TONE_BG.neutral;
+    return TONE_BG[resolvedTone(category, key, fallbackIndex)] ?? TONE_BG.neutral;
+  }
+
+  function colorFgForBucket(category: string, key: string, fallbackIndex: number): string {
+    return TONE_FG[resolvedTone(category, key, fallbackIndex)] ?? TONE_FG.neutral;
   }
 
   function totalFor(s: Series): number {

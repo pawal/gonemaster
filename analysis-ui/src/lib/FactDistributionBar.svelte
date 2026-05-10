@@ -123,12 +123,12 @@
   .fact-dist-count {
     font-family: var(--mono);
   }
-  .tone-ok { background: #dcfce7; color: #166534; }
-  .tone-notice { background: #e0f2fe; color: #075985; }
-  .tone-warning { background: #fef3c7; color: #92400e; }
-  .tone-error { background: #ffedd5; color: #9a3412; }
-  .tone-critical { background: #fee2e2; color: #991b1b; }
-  .tone-neutral { background: var(--surface-2); color: var(--on-surface-2); }
+  .tone-ok       { background: var(--tone-ok-bg);       color: var(--tone-ok-fg); }
+  .tone-notice   { background: var(--tone-notice-bg);   color: var(--tone-notice-fg); }
+  .tone-warning  { background: var(--tone-warning-bg);  color: var(--tone-warning-fg); }
+  .tone-error    { background: var(--tone-error-bg);    color: var(--tone-error-fg); }
+  .tone-critical { background: var(--tone-critical-bg); color: var(--tone-critical-fg); }
+  .tone-neutral  { background: var(--surface-2);        color: var(--on-surface-2); }
   .fact-dist-caption {
     margin: 0;
   }

@@ -212,6 +212,19 @@
     return TONE_FG[resolvedTone(category, key, fallbackIndex)] ?? TONE_FG.neutral;
   }
 
+  const DNSSEC_LABELS: Record<string, string> = {
+    unsigned: "Unsigned", signed: "Signed", nsec: "NSEC", nsec3: "NSEC3", mixed: "Mixed"
+  };
+  const SEVERITY_LABELS: Record<string, string> = {
+    OK: "OK", NOTICE: "Notice", WARNING: "Warning", ERROR: "Error", CRITICAL: "Critical"
+  };
+
+  function labelForKey(category: string, key: string): string {
+    if (category === "dnssec_posture") return DNSSEC_LABELS[key] ?? key;
+    if (category === "severity") return SEVERITY_LABELS[key.toUpperCase()] ?? key;
+    return key;
+  }
+
   function totalFor(s: Series): number {
     return s.buckets.reduce((sum, b) => sum + b.count, 0);
   }
@@ -289,8 +302,9 @@
                   class="trend-segment"
                   style:width="{pct}%"
                   style:background={colorForBucket(data.category, key, i)}
-                  title="{key}: {pct}%"
-                ></span>
+                  style:color={colorFgForBucket(data.category, key, i)}
+                  title="{labelForKey(data.category, key)}: {pct}%"
+                ><span class="trend-segment-label">{labelForKey(data.category, key)}</span></span>
               {/if}
             {/each}
           </div>
@@ -302,7 +316,7 @@
       {#each bucketKeys as key, i (key)}
         <li class="trend-legend-item">
           <span class="legend-swatch" style:background={colorForBucket(data.category, key, i)}></span>
-          <span class="legend-label">{key}</span>
+          <span class="legend-label">{labelForKey(data.category, key)}</span>
         </li>
       {/each}
     </ul>
@@ -365,15 +379,26 @@
   }
   .trend-bar {
     display: flex;
-    height: 14px;
+    height: 36px;
     width: 100%;
     background: var(--surface-2);
     border-radius: 4px;
     overflow: hidden;
   }
   .trend-segment {
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     height: 100%;
+    overflow: hidden;
+    padding: 0 var(--space-2);
+  }
+  .trend-segment-label {
+    font-size: var(--text-xs);
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: clip;
   }
   .trend-total {
     font-family: var(--mono);

@@ -56,10 +56,10 @@
 
   const DNSSEC_POSTURE_TONE: Record<string, string> = {
     unsigned: "warning",
-    signed: "neutral",
-    nsec: "neutral",
-    nsec3: "neutral",
-    mixed: "warning"
+    signed:   "ok",
+    nsec:     "notice",
+    nsec3:    "ok",
+    mixed:    "warning"
   };
   const DNSSEC_POSTURE_ORDER: Record<string, number> = {
     unsigned: 0,

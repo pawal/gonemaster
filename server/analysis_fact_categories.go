@@ -148,16 +148,19 @@ func dnssecPostureKeyLabel(key string) string {
 	return key
 }
 
-// Tones treat NSEC and NSEC3 as both valid choices (neutral). Unsigned
-// flags as warning because DNSSEC is generally encouraged for TLD-style
-// cohorts, and mixed flags as warning because it usually means a zone
-// caught mid-rollover rather than a deliberate end-state.
+// Tones distinguish all five posture states so the chart is legible.
+// Unsigned and mixed (mid-rollover) flag as warning. Signed zones use
+// ok/notice to separate the NSEC variants: nsec3 (modern, preferred)
+// gets the same green ok as a broadly-signed zone; nsec (older) gets
+// notice (blue) so it reads as a distinct, still-valid category.
 func dnssecPostureKeyTone(key string) string {
 	switch key {
 	case FactKeyUnsigned, FactKeyNSECMixed:
 		return "warning"
-	case FactKeyNSEC, FactKeyNSEC3, FactKeySigned:
-		return "neutral"
+	case FactKeySigned, FactKeyNSEC3:
+		return "ok"
+	case FactKeyNSEC:
+		return "notice"
 	}
 	return "neutral"
 }

@@ -117,6 +117,31 @@ func TestControllerProjectRunSkipsNonSnapshotIntentBatch(t *testing.T) {
 	}
 }
 
+// TestControllerRebuildCohortCapturesSnapshotsInline asserts the rebuild
+// promotes pending snapshots to captured before returning so the public
+// read path does not have to wait for the 30s capture loop.
+func TestControllerRebuildCohortCapturesSnapshotsInline(t *testing.T) {
+	store, _ := snapshotLifecycleStore(t)
+	seedSnapshotBatch(store, "batch-inline", true)
+	run := testAnalysisRun("run-inline", 100, "alpha.example", time.Now().UTC(), "192.0.2.10", "2001:db8::10")
+	run.BatchID = "batch-inline"
+	store.runs[run.ID] = run
+	store.entries[run.ID] = testAnalysisEntries(run)
+	store.tags[run.DomainID] = []string{"tld"}
+
+	controller := NewController(store)
+	if err := controller.RebuildCohort(context.Background(), 10); err != nil {
+		t.Fatalf("RebuildCohort: %v", err)
+	}
+	snap, ok := store.GetAnalysisCohortSnapshotByBatch(10, "batch-inline")
+	if !ok {
+		t.Fatal("expected snapshot for batch-inline")
+	}
+	if snap.Status != serverpkg.AnalysisSnapshotStatusCaptured {
+		t.Fatalf("status = %q, want captured", snap.Status)
+	}
+}
+
 // TestControllerRebuildCohortReportsHintWhenNoEligibleRuns asserts the
 // rebuild leaves a user-facing hint on the cohort row when every matching
 // run was skipped by the snapshot_intent gate.

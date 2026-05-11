@@ -502,6 +502,18 @@ pages:
 		}
 	}
 
+	// Capture inline instead of waiting for the 30s polling tick.
+	for _, ps := range pending {
+		snap, found := c.store.GetAnalysisCohortSnapshotByBatch(ps.cohort.ID, ps.batch.ID)
+		if !found {
+			continue
+		}
+		if err := c.captureSnapshot(snap); err != nil {
+			_ = c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationFailed, time.Time{}, err.Error())
+			return fmt.Errorf("capture snapshot for cohort %d batch %s: %w", ps.cohort.ID, ps.batch.ID, err)
+		}
+	}
+
 	// Stamp last_materialized_at with the rebuild time - clicking
 	// Rebuild without a moving timestamp would surprise users.
 	var completedAt time.Time

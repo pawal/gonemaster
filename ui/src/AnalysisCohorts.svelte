@@ -19,6 +19,12 @@
   let saving = $state(false);
   let backendStatus = $state({ backend_supported: true, unsupported_message: "" });
 
+  // Past tag batches that the admin can promote at cohort-create time.
+  let candidateBatches = $state([]);
+  let candidateBatchesLoading = $state(false);
+  let promoteBatchIds = $state(new Set());
+  let candidateLookupTag = $state("");
+
   // Snapshots are loaded lazily per-cohort (expand toggled by admin).
   let snapshotsByCohortId = $state({});
   let snapshotsLoadingIds = $state(new Set());
@@ -100,6 +106,58 @@
   const draftTagExists = $derived(
     normalizedDraftTag !== "" && existingTagNames.has(normalizedDraftTag)
   );
+
+  async function loadCandidateBatches(tag) {
+    if (!tag || editingCohortId) {
+      candidateBatches = [];
+      promoteBatchIds = new Set();
+      candidateLookupTag = "";
+      return;
+    }
+    candidateBatchesLoading = true;
+    try {
+      const data = await apiFetch(`/tags/${encodeURIComponent(tag)}/batches?limit=10`);
+      const items = data?.items ?? [];
+      candidateBatches = items;
+      const next = new Set();
+      for (const b of items) {
+        if (!b.snapshot_intent) next.add(b.id);
+      }
+      promoteBatchIds = next;
+      candidateLookupTag = tag;
+    } catch (_) {
+      candidateBatches = [];
+      promoteBatchIds = new Set();
+    } finally {
+      candidateBatchesLoading = false;
+    }
+  }
+
+  $effect(() => {
+    if (editingCohortId) return;
+    const tag = normalizedDraftTag;
+    if (tag === candidateLookupTag) return;
+    if (!tag) {
+      candidateBatches = [];
+      promoteBatchIds = new Set();
+      candidateLookupTag = "";
+      return;
+    }
+    if (!draftTagExists) {
+      candidateBatches = [];
+      promoteBatchIds = new Set();
+      candidateLookupTag = tag;
+      return;
+    }
+    loadCandidateBatches(tag);
+  });
+
+  function togglePromoteBatch(id) {
+    const next = new Set(promoteBatchIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    promoteBatchIds = next;
+  }
 
   function startEdit(cohort) {
     editingCohortId = cohort.id;
@@ -192,6 +250,19 @@
     }
     creating = true;
     try {
+      const promoteIds = Array.from(promoteBatchIds);
+      let promotedCount = 0;
+      for (const id of promoteIds) {
+        try {
+          await apiFetch(`/batches/${encodeURIComponent(id)}`, {
+            method: "PATCH",
+            body: JSON.stringify({ snapshot_intent: true }),
+          });
+          promotedCount++;
+        } catch (_) {
+          // best-effort: cohort create still proceeds
+        }
+      }
       await apiFetch("/analysis/cohorts", {
         method: "POST",
         body: JSON.stringify({
@@ -206,8 +277,15 @@
         }),
       });
       draft = emptyDraft();
+      candidateBatches = [];
+      promoteBatchIds = new Set();
+      candidateLookupTag = "";
       await Promise.all([loadCohorts({ preserveNotice: true }), loadExistingTags()]);
-      setNotice($t("analysis_cohorts_created", { tag }), "ok");
+      if (promotedCount > 0) {
+        setNotice($t("analysis_cohorts_created_with_promotion", { tag, count: promotedCount }), "ok");
+      } else {
+        setNotice($t("analysis_cohorts_created", { tag }), "ok");
+      }
     } catch (error) {
       setNotice($t("analysis_cohorts_create_error", { error: error.message || "" }), "warn");
     } finally {
@@ -901,6 +979,26 @@
             <span>{$t("analysis_cohorts_field_is_default")}</span>
           </label>
         </fieldset>
+        {#if candidateBatches.length > 0}
+          <fieldset class="cohort-promote field-full">
+            <legend class="field-label">{$t("analysis_cohorts_promote_legend")}</legend>
+            <p class="small cohort-create-hint">{$t("analysis_cohorts_promote_hint")}</p>
+            {#each candidateBatches as b (b.id)}
+              <label class="check-field">
+                <input
+                  type="checkbox"
+                  checked={promoteBatchIds.has(b.id)}
+                  onchange={() => togglePromoteBatch(b.id)}
+                />
+                <span class="mono">{b.id}</span>
+                <span class="muted small">
+                  {b.created_at ? b.created_at.slice(0, 19).replace("T", " ") : ""}
+                  {b.snapshot_intent ? `(${$t("batch_snapshot_intent_pill")})` : ""}
+                </span>
+              </label>
+            {/each}
+          </fieldset>
+        {/if}
       {/if}
     </div>
     <div class="cohort-form-actions">

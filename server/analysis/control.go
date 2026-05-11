@@ -401,6 +401,7 @@ func (c *Controller) RebuildCohort(ctx context.Context, cohortID int64) error {
 	}
 
 	projected := 0
+	totalRuns := 0
 	catalog := c.store.ListAnalysisCohorts()
 	progress := newProgressTracker(c.store, cohort.ID)
 	_ = c.store.SetAnalysisCohortProgress(cohort.ID, 0, 0)
@@ -446,6 +447,7 @@ pages:
 		}
 		if offset == 0 {
 			progress.setTotal(list.Total)
+			totalRuns = list.Total
 		}
 		for _, run := range list.Items {
 			if err := gctx.Err(); err != nil {
@@ -506,7 +508,11 @@ pages:
 	if projected > 0 {
 		completedAt = time.Now().UTC()
 	}
-	return c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationReady, completedAt, "")
+	var hint string
+	if projected == 0 && totalRuns > 0 {
+		hint = fmt.Sprintf("0 of %d runs eligible: no batches have snapshot_intent set. Promote a batch to feed this cohort.", totalRuns)
+	}
+	return c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationReady, completedAt, hint)
 }
 
 // projectRunForRebuild applies the same snapshot-intent gates as the

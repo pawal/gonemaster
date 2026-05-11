@@ -117,6 +117,37 @@ func TestControllerProjectRunSkipsNonSnapshotIntentBatch(t *testing.T) {
 	}
 }
 
+// TestControllerRebuildCohortReportsHintWhenNoEligibleRuns asserts the
+// rebuild leaves a user-facing hint on the cohort row when every matching
+// run was skipped by the snapshot_intent gate.
+func TestControllerRebuildCohortReportsHintWhenNoEligibleRuns(t *testing.T) {
+	store, _ := snapshotLifecycleStore(t)
+	seedSnapshotBatch(store, "batch-noint", false)
+	run := testAnalysisRun("run-noint", 100, "alpha.example", time.Now().UTC(), "192.0.2.10", "2001:db8::10")
+	run.BatchID = "batch-noint"
+	store.runs[run.ID] = run
+	store.entries[run.ID] = testAnalysisEntries(run)
+	store.tags[run.DomainID] = []string{"tld"}
+
+	controller := NewController(store)
+	if err := controller.RebuildCohort(context.Background(), 10); err != nil {
+		t.Fatalf("RebuildCohort: %v", err)
+	}
+	cohort, ok := store.GetAnalysisCohort(10)
+	if !ok {
+		t.Fatal("expected cohort 10")
+	}
+	if cohort.MaterializationStatus != serverpkg.AnalysisMaterializationReady {
+		t.Fatalf("status = %q, want ready", cohort.MaterializationStatus)
+	}
+	if cohort.LastMaterializationError == "" {
+		t.Fatal("expected a hint when 0 of N runs were eligible")
+	}
+	if !strings.Contains(cohort.LastMaterializationError, "snapshot_intent") {
+		t.Fatalf("hint should mention snapshot_intent, got %q", cohort.LastMaterializationError)
+	}
+}
+
 // TestControllerProjectRunCreatesPendingSnapshot covers the happy path:
 // a batched run with snapshot_intent = true produces a pending snapshot
 // per matching cohort, with counters and denormalized profile copied from

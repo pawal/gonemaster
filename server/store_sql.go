@@ -2063,6 +2063,25 @@ func nullInt64Or(ni sql.NullInt64) any {
 	return ni.Int64
 }
 
+// SetBatchSnapshotIntent flips snapshot_intent on an existing batch.
+func (s *SQLJobStore) SetBatchSnapshotIntent(batchID string, intent bool) error {
+	res, err := s.db.Exec(
+		fmt.Sprintf(`UPDATE batches SET snapshot_intent = %s WHERE id = %s`, s.ph(1), s.ph(2)),
+		boolToInt(intent), batchID,
+	)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrBatchNotFound
+	}
+	return nil
+}
+
 // GetBatch returns a batch by ID.
 func (s *SQLJobStore) GetBatch(id string) (Batch, bool) {
 	var (

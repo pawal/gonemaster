@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
@@ -50,6 +51,44 @@ func (s *Server) handleBatchDeletePreview(w http.ResponseWriter, r *http.Request
 	}
 	preview.Snapshots = s.snapshotImpactForBatch(batchID)
 	writeJSON(w, http.StatusOK, preview)
+}
+
+// handlePatchBatch handles PATCH /api/v1/batches/{id}. Only mutable
+// field is snapshot_intent.
+func (s *Server) handlePatchBatch(w http.ResponseWriter, r *http.Request) {
+	if !s.enforceCSRF(w, r) {
+		return
+	}
+	batchID := strings.TrimSpace(r.PathValue("id"))
+	if batchID == "" {
+		writeError(w, http.StatusBadRequest, "missing_batch_id", "batch id is required", nil)
+		return
+	}
+	var req struct {
+		SnapshotIntent *bool `json:"snapshot_intent"`
+	}
+	if err := readJSON(r, s.cfg.MaxBodySize, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_json", err.Error(), nil)
+		return
+	}
+	if req.SnapshotIntent == nil {
+		writeError(w, http.StatusBadRequest, "missing_field", "snapshot_intent is required", nil)
+		return
+	}
+	if err := s.store.SetBatchSnapshotIntent(batchID, *req.SnapshotIntent); err != nil {
+		if errors.Is(err, ErrBatchNotFound) {
+			writeError(w, http.StatusNotFound, "not_found", "batch not found", nil)
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
+		return
+	}
+	batch, ok := s.store.GetBatch(batchID)
+	if !ok {
+		writeError(w, http.StatusNotFound, "not_found", "batch not found", nil)
+		return
+	}
+	writeJSON(w, http.StatusOK, batch)
 }
 
 // handleDeleteBatch handles DELETE /api/v1/batches/{id}. Cancels any

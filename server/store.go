@@ -160,6 +160,7 @@ type JobStore interface {
 	// Batch management.
 	CreateBatch(batch Batch) error
 	GetBatch(id string) (Batch, bool)
+	SetBatchSnapshotIntent(batchID string, intent bool) error
 	ListBatchesByTag(tag string, limit, offset int) BatchList
 	BatchDeletePreviewStats(batchID string) (BatchDeletePreview, error)
 	DeleteBatch(batchID string) ([]int64, error)
@@ -1277,6 +1278,19 @@ func (s *InMemoryJobStore) GetBatch(id string) (Batch, bool) {
 	defer s.mu.RUnlock()
 	b, ok := s.batches[id]
 	return b, ok
+}
+
+// SetBatchSnapshotIntent flips snapshot_intent on an existing batch.
+func (s *InMemoryJobStore) SetBatchSnapshotIntent(batchID string, intent bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	b, ok := s.batches[batchID]
+	if !ok {
+		return ErrBatchNotFound
+	}
+	b.SnapshotIntent = intent
+	s.batches[batchID] = b
+	return nil
 }
 
 // ListBatchesByTag returns batches whose Tag matches, newest first.

@@ -25,6 +25,7 @@ var (
 	ErrInvalidAnalysisCohortCatalog   = errors.New("invalid analysis cohort catalog")
 	ErrAnalysisCohortNotFound         = errors.New("analysis cohort not found")
 	ErrNoDefaultAnalysisCohort        = errors.New("default public analysis cohort not configured")
+	ErrBatchNotFound                  = errors.New("batch not found")
 )
 
 // AnalysisScope describes how analysis queries should select runs before

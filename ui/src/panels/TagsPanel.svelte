@@ -173,6 +173,22 @@
     }
   }
 
+  async function toggleBatchSnapshotIntent(batch) {
+    const next = !batch.snapshot_intent;
+    try {
+      await apiFetch(`/batches/${encodeURIComponent(batch.id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ snapshot_intent: next }),
+      });
+      setStatus($t(next
+        ? "batch_snapshot_intent_enabled"
+        : "batch_snapshot_intent_disabled", { id: batch.id }), "ok");
+      await loadTagBatches();
+    } catch (error) {
+      setStatus($t("batch_snapshot_intent_error", { error: error.message || "unknown error" }), "warn");
+    }
+  }
+
   const sortTagDomains = (key, defaultDir = "asc") => {
     tagDomainsSortState = nextTableSort(tagDomainsSortState, key, defaultDir);
     loadTagDomains({ reset: true });
@@ -424,6 +440,15 @@
               <td>{b.created_at ? b.created_at.slice(0, 19).replace("T", " ") : "-"}</td>
               <td>{b.domain_count ?? "-"}</td>
               <td class="text-right" data-row-action>
+                <button
+                  class="ghost small"
+                  type="button"
+                  data-row-action
+                  title={$t("batch_snapshot_intent_toggle_title")}
+                  onclick={() => toggleBatchSnapshotIntent(b)}
+                >{b.snapshot_intent
+                  ? $t("batch_snapshot_intent_disable")
+                  : $t("batch_snapshot_intent_enable")}</button>
                 <button
                   class="ghost small warn"
                   type="button"

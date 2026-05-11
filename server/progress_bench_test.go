@@ -145,6 +145,10 @@ func (s *countingJobStore) GetBatch(id string) (Batch, bool) {
 	return s.inner.GetBatch(id)
 }
 
+func (s *countingJobStore) SetBatchSnapshotIntent(batchID string, intent bool) error {
+	return s.inner.SetBatchSnapshotIntent(batchID, intent)
+}
+
 func (s *countingJobStore) ListBatchesByTag(tag string, limit, offset int) BatchList {
 	return s.inner.ListBatchesByTag(tag, limit, offset)
 }

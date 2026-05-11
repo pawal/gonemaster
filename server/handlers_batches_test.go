@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -193,6 +194,59 @@ func TestHandleDeleteBatchUnpinsCohortDefault(t *testing.T) {
 	}
 	if cohort.DefaultSnapshotID != nil {
 		t.Fatalf("expected default_snapshot_id cleared, got %v", cohort.DefaultSnapshotID)
+	}
+}
+
+func TestHandlePatchBatchTogglesSnapshotIntent(t *testing.T) {
+	srv := New(DefaultConfig())
+	seedGraduatedBatch(t, srv, "batch_snap", "tld")
+	if b, _ := srv.store.GetBatch("batch_snap"); b.SnapshotIntent {
+		t.Fatalf("seed batch should default to snapshot_intent=false")
+	}
+
+	body := strings.NewReader(`{"snapshot_intent":true}`)
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/batches/batch_snap", body)
+	resp := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
+	}
+	if b, _ := srv.store.GetBatch("batch_snap"); !b.SnapshotIntent {
+		t.Fatalf("snapshot_intent should be true after PATCH")
+	}
+
+	body = strings.NewReader(`{"snapshot_intent":false}`)
+	req = httptest.NewRequest(http.MethodPatch, "/api/v1/batches/batch_snap", body)
+	resp = httptest.NewRecorder()
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
+	}
+	if b, _ := srv.store.GetBatch("batch_snap"); b.SnapshotIntent {
+		t.Fatalf("snapshot_intent should be false after second PATCH")
+	}
+}
+
+func TestHandlePatchBatchMissingReturns404(t *testing.T) {
+	srv := New(DefaultConfig())
+	body := strings.NewReader(`{"snapshot_intent":true}`)
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/batches/missing", body)
+	resp := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", resp.Code)
+	}
+}
+
+func TestHandlePatchBatchRequiresField(t *testing.T) {
+	srv := New(DefaultConfig())
+	seedGraduatedBatch(t, srv, "batch_req", "tld")
+	body := strings.NewReader(`{}`)
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/batches/batch_req", body)
+	resp := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", resp.Code, resp.Body.String())
 	}
 }
 

@@ -69,6 +69,28 @@ describe("+trends.load", () => {
     expect(data.points).toEqual(points);
   });
 
+  it("forwards key_meta from the response so the page can label segments", async () => {
+    const keyMeta = {
+      "8": { label: "RSASHA256", tone: "notice", order: 8 },
+      "13": { label: "ECDSAP256SHA256", tone: "ok", order: 13 }
+    };
+    const fetchImpl = vi.fn().mockResolvedValue(
+      stubResponse({ dataset_tag: "tld", category: "dnskey_algo", points: [], key_meta: keyMeta })
+    ) as unknown as typeof fetch;
+    const data = await load(
+      evt({ resolvedCohort: "tld", fetchImpl, search: "?category=dnskey_algo" })
+    );
+    expect(data.keyMeta).toEqual(keyMeta);
+  });
+
+  it("falls back to an empty key_meta when the response omits it", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      stubResponse({ dataset_tag: "tld", category: "severity", points: [] })
+    ) as unknown as typeof fetch;
+    const data = await load(evt({ resolvedCohort: "tld", fetchImpl }));
+    expect(data.keyMeta).toEqual({});
+  });
+
   it("surfaces errors instead of throwing", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(stubResponse({ error: "boom" }, false)) as unknown as typeof fetch;
     const data = await load(evt({ resolvedCohort: "tld", fetchImpl }));

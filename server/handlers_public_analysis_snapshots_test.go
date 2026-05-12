@@ -193,6 +193,58 @@ func TestPublicAnalysisTrendsUseSourceRunOrderAndMetadata(t *testing.T) {
 	}
 }
 
+// TestPublicAnalysisTrendsCarryKeyMeta confirms /trends ships display
+// metadata for every key seen, so the UI does not duplicate the
+// factCategoryDisplays registry.
+func TestPublicAnalysisTrendsCarryKeyMeta(t *testing.T) {
+	f := newAnalysisAPITestFixture(t)
+	if err := f.store.ReplaceSnapshotOverview(f.snapshot.ID, SnapshotOverviewV2{
+		FactDistributions: map[string]PublicAnalysisFactDistribution{
+			FactCategoryDNSKEYAlgorithm: {
+				Category: FactCategoryDNSKEYAlgorithm,
+				Buckets: []PublicAnalysisFactBucket{
+					{Key: "8", Count: 3},
+					{Key: "13", Count: 5},
+				},
+			},
+		},
+	}); err != nil {
+		t.Fatalf("seed overview: %v", err)
+	}
+
+	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/tld/trends?category="+FactCategoryDNSKEYAlgorithm)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("trends: got %d, want 200: %s", resp.Code, resp.Body)
+	}
+	var payload PublicAnalysisTrendResponse
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode trends: %v", err)
+	}
+	got8, ok := payload.KeyMeta["8"]
+	if !ok {
+		t.Fatalf("key_meta missing key %q: %+v", "8", payload.KeyMeta)
+	}
+	if got8.Label != "RSASHA256" {
+		t.Fatalf("key_meta[8].label = %q, want %q", got8.Label, "RSASHA256")
+	}
+	if got8.Tone != "notice" {
+		t.Fatalf("key_meta[8].tone = %q, want %q", got8.Tone, "notice")
+	}
+	if got8.Order != 8 {
+		t.Fatalf("key_meta[8].order = %d, want %d", got8.Order, 8)
+	}
+	got13, ok := payload.KeyMeta["13"]
+	if !ok {
+		t.Fatalf("key_meta missing key %q: %+v", "13", payload.KeyMeta)
+	}
+	if got13.Label != "ECDSAP256SHA256" {
+		t.Fatalf("key_meta[13].label = %q, want %q", got13.Label, "ECDSAP256SHA256")
+	}
+	if got13.Tone != "ok" {
+		t.Fatalf("key_meta[13].tone = %q, want %q", got13.Tone, "ok")
+	}
+}
+
 // TestPublicAnalysisSnapshotDetailHiddenForRetired verifies that an
 // explicit slug lookup of a retired or mixed-profile snapshot returns
 // 404 - retired snapshots must not leak through the public path.

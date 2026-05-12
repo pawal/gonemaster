@@ -1,4 +1,4 @@
-import { getTrends, type TrendPoint } from "$lib/api";
+import { getTrends, type TrendKeyMeta, type TrendPoint } from "$lib/api";
 
 // Trend categories; keys match the fact-store category constants on the
 // server (server/analysis_fact_categories.go).
@@ -15,6 +15,7 @@ export type TrendsPageData = {
   datasetTag: string | null;
   category: TrendCategoryKey;
   points: TrendPoint[];
+  keyMeta: Record<string, TrendKeyMeta>;
   error: string | null;
 };
 
@@ -25,16 +26,23 @@ export async function load({ parent, fetch, url }): Promise<TrendsPageData> {
   const category: TrendCategoryKey =
     TREND_CATEGORIES.find((c) => c.key === rawCategory)?.key ?? "severity";
   if (!datasetTag) {
-    return { datasetTag: null, category, points: [], error: null };
+    return { datasetTag: null, category, points: [], keyMeta: {}, error: null };
   }
   try {
     const trend = await getTrends(datasetTag, { category }, fetch);
-    return { datasetTag, category, points: trend.points ?? [], error: null };
+    return {
+      datasetTag,
+      category,
+      points: trend.points ?? [],
+      keyMeta: trend.key_meta ?? {},
+      error: null
+    };
   } catch (error) {
     return {
       datasetTag,
       category,
       points: [],
+      keyMeta: {},
       error: error instanceof Error ? error.message : String(error)
     };
   }

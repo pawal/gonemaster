@@ -353,10 +353,17 @@ export type TrendPoint = {
   payload: unknown;
 };
 
+export type TrendKeyMeta = {
+  label: string;
+  tone: string;
+  order: number;
+};
+
 export type TrendResponse = {
   dataset_tag: string;
   category: string;
   points: TrendPoint[];
+  key_meta?: Record<string, TrendKeyMeta>;
 };
 
 export type DiffEntry = {

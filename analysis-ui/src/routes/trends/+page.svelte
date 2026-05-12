@@ -19,112 +19,24 @@
     });
   }
 
-  // Per-category tone and order tables mirror the server-side display
-  // logic in server/analysis_fact_categories.go so the same key reads
-  // the same color and lands in the same column as on the overview tab.
-  const SEVERITY_TONE: Record<string, string> = {
-    OK: "ok",
-    NOTICE: "notice",
-    WARNING: "warning",
-    ERROR: "error",
-    CRITICAL: "critical"
-  };
-  const SEVERITY_ORDER: Record<string, number> = {
-    OK: 0,
-    NOTICE: 1,
-    WARNING: 2,
-    ERROR: 3,
-    CRITICAL: 4
-  };
-
-  const GRADE_TONE: Record<string, string> = {
-    "A+": "ok",
-    A: "ok",
-    B: "notice",
-    C: "warning",
-    D: "error",
-    F: "critical"
-  };
-  const GRADE_ORDER: Record<string, number> = {
-    "A+": 0,
-    A: 1,
-    B: 2,
-    C: 3,
-    D: 4,
-    F: 5
-  };
-
-  const DNSSEC_POSTURE_TONE: Record<string, string> = {
-    unsigned: "warning",
-    signed:   "ok",
-    nsec:     "notice",
-    nsec3:    "ok",
-    mixed:    "warning"
-  };
-  const DNSSEC_POSTURE_ORDER: Record<string, number> = {
-    unsigned: 0,
-    signed: 1,
-    nsec: 2,
-    nsec3: 3,
-    mixed: 4
-  };
-
-  // DNSKEY algorithm tones color modern curves green, SHA-256 RSA blue
-  // (acceptable), SHA-1 family red (deprecated); unknown/private go
-  // neutral. Keys arrive as numeric strings.
-  const DNSKEY_ALGO_TONE: Record<number, string> = {
-    1: "error",
-    3: "error",
-    5: "error",
-    6: "error",
-    7: "warning",
-    8: "notice",
-    10: "notice",
-    12: "warning",
-    13: "ok",
-    14: "ok",
-    15: "ok",
-    16: "ok"
-  };
-
-  function toneForKey(category: string, key: string): string | null {
-    switch (category) {
-      case "severity":
-        return SEVERITY_TONE[key.toUpperCase()] ?? null;
-      case "grade":
-        return GRADE_TONE[key] ?? null;
-      case "dnssec_posture":
-        return DNSSEC_POSTURE_TONE[key] ?? null;
-      case "dnskey_algo": {
-        const n = Number(key);
-        if (!Number.isFinite(n)) return null;
-        return DNSKEY_ALGO_TONE[n] ?? null;
-      }
-      default:
-        return null;
-    }
+  // Label, tone, and order for every observed key come from data.keyMeta,
+  // built server-side from factCategoryDisplays in
+  // server/analysis_fact_categories.go.
+  function metaFor(key: string) {
+    return data.keyMeta?.[key];
   }
 
-  function rankForKey(category: string, key: string): number | null {
-    switch (category) {
-      case "severity":
-        return SEVERITY_ORDER[key.toUpperCase()] ?? null;
-      case "grade":
-        return GRADE_ORDER[key] ?? null;
-      case "dnssec_posture":
-        return DNSSEC_POSTURE_ORDER[key] ?? null;
-      case "dnskey_algo": {
-        const n = Number(key);
-        return Number.isFinite(n) ? n : null;
-      }
-      default:
-        return null;
-    }
+  function toneForKey(key: string): string | null {
+    return metaFor(key)?.tone ?? null;
   }
 
-  function compareBuckets(category: string, a: string, b: string): number {
-    const ra = rankForKey(category, a);
-    const rb = rankForKey(category, b);
+  function rankForKey(key: string): number | null {
+    return metaFor(key)?.order ?? null;
+  }
+
+  function compareBuckets(a: string, b: string): number {
+    const ra = rankForKey(a);
+    const rb = rankForKey(b);
     if (ra !== null && rb !== null && ra !== rb) return ra - rb;
     if (ra !== null && rb === null) return -1;
     if (ra === null && rb !== null) return 1;
@@ -153,7 +65,7 @@
       const buckets = payload
         ? Object.entries(payload).map(([key, count]) => ({ key, count: Number(count) || 0 }))
         : [];
-      buckets.sort((a, b) => compareBuckets(data.category, a.key, b.key));
+      buckets.sort((a, b) => compareBuckets(a.key, b.key));
       return {
         label: snapshotDisplayLabel(snapshot),
         slug: point.slug,
@@ -176,7 +88,7 @@
         }
       }
     }
-    out.sort((a, b) => compareBuckets(data.category, a, b));
+    out.sort((a, b) => compareBuckets(a, b));
     return out;
   });
 
@@ -200,49 +112,20 @@
   };
   const FALLBACK_TONES = ["ok", "notice", "warning", "error", "critical", "neutral"];
 
-  function resolvedTone(category: string, key: string, fallbackIndex: number): string {
-    return toneForKey(category, key) ?? FALLBACK_TONES[fallbackIndex % FALLBACK_TONES.length];
+  function resolvedTone(key: string, fallbackIndex: number): string {
+    return toneForKey(key) ?? FALLBACK_TONES[fallbackIndex % FALLBACK_TONES.length];
   }
 
-  function colorForBucket(category: string, key: string, fallbackIndex: number): string {
-    return TONE_BG[resolvedTone(category, key, fallbackIndex)] ?? TONE_BG.neutral;
+  function colorForBucket(key: string, fallbackIndex: number): string {
+    return TONE_BG[resolvedTone(key, fallbackIndex)] ?? TONE_BG.neutral;
   }
 
-  function colorFgForBucket(category: string, key: string, fallbackIndex: number): string {
-    return TONE_FG[resolvedTone(category, key, fallbackIndex)] ?? TONE_FG.neutral;
+  function colorFgForBucket(key: string, fallbackIndex: number): string {
+    return TONE_FG[resolvedTone(key, fallbackIndex)] ?? TONE_FG.neutral;
   }
 
-  const DNSSEC_LABELS: Record<string, string> = {
-    unsigned: "Unsigned", signed: "Signed", nsec: "NSEC", nsec3: "NSEC3", mixed: "Mixed"
-  };
-  const SEVERITY_LABELS: Record<string, string> = {
-    OK: "OK", NOTICE: "Notice", WARNING: "Warning", ERROR: "Error", CRITICAL: "Critical"
-  };
-  // Mirrors dnskeyAlgorithmMnemonics in server/analysis_fact_categories.go.
-  const DNSKEY_ALGO_LABELS: Record<number, string> = {
-    1: "RSAMD5",
-    3: "DSA",
-    5: "RSASHA1",
-    6: "DSA-NSEC3-SHA1",
-    7: "RSASHA1-NSEC3-SHA1",
-    8: "RSASHA256",
-    10: "RSASHA512",
-    12: "ECC-GOST",
-    13: "ECDSAP256SHA256",
-    14: "ECDSAP384SHA384",
-    15: "ED25519",
-    16: "ED448"
-  };
-
-  function labelForKey(category: string, key: string): string {
-    if (category === "dnssec_posture") return DNSSEC_LABELS[key] ?? key;
-    if (category === "severity") return SEVERITY_LABELS[key.toUpperCase()] ?? key;
-    if (category === "dnskey_algo") {
-      const n = Number(key);
-      if (!Number.isFinite(n)) return key;
-      return DNSKEY_ALGO_LABELS[n] ?? `ALGO ${key}`;
-    }
-    return key;
+  function labelForKey(key: string): string {
+    return metaFor(key)?.label ?? key;
   }
 
   function totalFor(s: Series): number {
@@ -326,11 +209,11 @@
                 <span
                   class="trend-segment"
                   style:width="{pct}%"
-                  style:background={colorForBucket(data.category, key, i)}
-                  style:color={colorFgForBucket(data.category, key, i)}
-                  title="{labelForKey(data.category, key)}: {formatCount(count)} ({pct}%)"
+                  style:background={colorForBucket(key, i)}
+                  style:color={colorFgForBucket(key, i)}
+                  title="{labelForKey(key)}: {formatCount(count)} ({pct}%)"
                 >
-                  <span class="trend-segment-label">{labelForKey(data.category, key)}</span>
+                  <span class="trend-segment-label">{labelForKey(key)}</span>
                   <span class="trend-segment-count">{formatCount(count)}</span>
                 </span>
               {/if}
@@ -343,8 +226,8 @@
     <ul class="trend-legend" aria-label="Buckets">
       {#each bucketKeys as key, i (key)}
         <li class="trend-legend-item">
-          <span class="legend-swatch" style:background={colorForBucket(data.category, key, i)}></span>
-          <span class="legend-label">{labelForKey(data.category, key)}</span>
+          <span class="legend-swatch" style:background={colorForBucket(key, i)}></span>
+          <span class="legend-label">{labelForKey(key)}</span>
         </li>
       {/each}
     </ul>

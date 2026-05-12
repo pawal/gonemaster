@@ -58,12 +58,21 @@ type PublicAnalysisTrendPoint struct {
 	Payload    json.RawMessage `json:"payload"`
 }
 
+// PublicAnalysisFactKeyMeta is per-key display metadata sent alongside
+// trend points so the UI mirrors factCategoryDisplays without a copy.
+type PublicAnalysisFactKeyMeta struct {
+	Label string `json:"label"`
+	Tone  string `json:"tone"`
+	Order int    `json:"order"`
+}
+
 // PublicAnalysisTrendResponse is the /trends response. One time series per
 // request; callers asking for multiple categories make multiple requests.
 type PublicAnalysisTrendResponse struct {
-	DatasetTag string                     `json:"dataset_tag"`
-	Category   string                     `json:"category"`
-	Points     []PublicAnalysisTrendPoint `json:"points"`
+	DatasetTag string                               `json:"dataset_tag"`
+	Category   string                               `json:"category"`
+	Points     []PublicAnalysisTrendPoint           `json:"points"`
+	KeyMeta    map[string]PublicAnalysisFactKeyMeta `json:"key_meta,omitempty"`
 }
 
 // PublicAnalysisDiffEntry is one domain row in a /diff response.
@@ -278,7 +287,48 @@ func (s *Server) handlePublicAnalysisTrends(w http.ResponseWriter, r *http.Reque
 		DatasetTag: cohort.SourceTag,
 		Category:   category,
 		Points:     points,
+		KeyMeta:    buildTrendKeyMeta(category, points),
 	})
+}
+
+// buildTrendKeyMeta resolves label/tone/order from factCategoryDisplays
+// for every key seen across the points' {key: count} payloads.
+func buildTrendKeyMeta(category string, points []PublicAnalysisTrendPoint) map[string]PublicAnalysisFactKeyMeta {
+	display, known := factCategoryDisplays[category]
+	if !known {
+		return nil
+	}
+	seen := map[string]struct{}{}
+	for _, p := range points {
+		if len(p.Payload) == 0 {
+			continue
+		}
+		var counts map[string]json.RawMessage
+		if err := json.Unmarshal(p.Payload, &counts); err != nil {
+			continue
+		}
+		for key := range counts {
+			seen[key] = struct{}{}
+		}
+	}
+	if len(seen) == 0 {
+		return nil
+	}
+	out := make(map[string]PublicAnalysisFactKeyMeta, len(seen))
+	for key := range seen {
+		meta := PublicAnalysisFactKeyMeta{Label: key, Tone: "neutral", Order: 1 << 30}
+		if display.KeyLabel != nil {
+			meta.Label = display.KeyLabel(key)
+		}
+		if display.KeyTone != nil {
+			meta.Tone = display.KeyTone(key)
+		}
+		if display.KeyOrder != nil {
+			meta.Order = display.KeyOrder(key)
+		}
+		out[key] = meta
+	}
+	return out
 }
 
 // handlePublicAnalysisDiff handles GET /pub/api/v1/analysis/cohorts/{dataset_tag}/diff?from=&to=.

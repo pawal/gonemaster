@@ -2,7 +2,7 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
   import FilterBar from "$lib/FilterBar.svelte";
-  import { snapshotDisplayLabel, snapshotSourceDate } from "$lib/format";
+  import { formatCount, snapshotDisplayLabel, snapshotSourceDate } from "$lib/format";
   import type { LayoutData } from "../+layout";
   import { TREND_CATEGORIES, type TrendsPageData } from "./+page";
 
@@ -236,6 +236,10 @@
     if (!bucket) return 0;
     return Math.round((bucket.count / total) * 1000) / 10;
   }
+
+  function countFor(s: Series, key: string): number {
+    return s.buckets.find((b) => b.key === key)?.count ?? 0;
+  }
 </script>
 
 <FilterBar
@@ -297,14 +301,18 @@
           <div class="trend-bar" aria-hidden="true">
             {#each bucketKeys as key, i (key)}
               {@const pct = pctFor(s, key)}
+              {@const count = countFor(s, key)}
               {#if pct > 0}
                 <span
                   class="trend-segment"
                   style:width="{pct}%"
                   style:background={colorForBucket(data.category, key, i)}
                   style:color={colorFgForBucket(data.category, key, i)}
-                  title="{labelForKey(data.category, key)}: {pct}%"
-                ><span class="trend-segment-label">{labelForKey(data.category, key)}</span></span>
+                  title="{labelForKey(data.category, key)}: {formatCount(count)} ({pct}%)"
+                >
+                  <span class="trend-segment-label">{labelForKey(data.category, key)}</span>
+                  <span class="trend-segment-count">{formatCount(count)}</span>
+                </span>
               {/if}
             {/each}
           </div>
@@ -389,6 +397,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 8px;
     height: 100%;
     overflow: hidden;
     padding: 0 var(--space-2);
@@ -399,6 +408,11 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: clip;
+  }
+  .trend-segment-count {
+    font-family: var(--mono);
+    font-size: var(--text-xs);
+    white-space: nowrap;
   }
   .trend-total {
     font-family: var(--mono);

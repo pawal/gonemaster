@@ -218,10 +218,30 @@
   const SEVERITY_LABELS: Record<string, string> = {
     OK: "OK", NOTICE: "Notice", WARNING: "Warning", ERROR: "Error", CRITICAL: "Critical"
   };
+  // Mirrors dnskeyAlgorithmMnemonics in server/analysis_fact_categories.go.
+  const DNSKEY_ALGO_LABELS: Record<number, string> = {
+    1: "RSAMD5",
+    3: "DSA",
+    5: "RSASHA1",
+    6: "DSA-NSEC3-SHA1",
+    7: "RSASHA1-NSEC3-SHA1",
+    8: "RSASHA256",
+    10: "RSASHA512",
+    12: "ECC-GOST",
+    13: "ECDSAP256SHA256",
+    14: "ECDSAP384SHA384",
+    15: "ED25519",
+    16: "ED448"
+  };
 
   function labelForKey(category: string, key: string): string {
     if (category === "dnssec_posture") return DNSSEC_LABELS[key] ?? key;
     if (category === "severity") return SEVERITY_LABELS[key.toUpperCase()] ?? key;
+    if (category === "dnskey_algo") {
+      const n = Number(key);
+      if (!Number.isFinite(n)) return key;
+      return DNSKEY_ALGO_LABELS[n] ?? `ALGO ${key}`;
+    }
     return key;
   }
 

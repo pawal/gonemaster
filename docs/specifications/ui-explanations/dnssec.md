@@ -602,14 +602,6 @@ Description:
 
 A nameserver returned more than one NSEC3 record at the apex position. This normally means the server is serving inconsistent denial-of-existence data, which breaks aggressive negative caching and can cause validation failures.
 
-## Tag DS10_ERR_MULT_NSEC3PARAM
-
-Header: Multiple NSEC3PARAM records
-
-Description:
-
-A nameserver returned more than one NSEC3PARAM record. Only one set of parameters is allowed per zone; duplicate records are a misconfiguration that typically makes denial-of-existence answers inconsistent.
-
 ## Tag DS10_EXPECTED_NSEC_NSEC3_MISSING
 
 Header: Expected NSEC or NSEC3 missing

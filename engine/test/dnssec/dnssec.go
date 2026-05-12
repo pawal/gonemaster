@@ -436,7 +436,6 @@ func Metadata() map[string][]string {
 			"DS10_ALGO_NOT_SUPPORTED_BY_ZM",
 			"DS10_ERR_MULT_NSEC",
 			"DS10_ERR_MULT_NSEC3",
-			"DS10_ERR_MULT_NSEC3PARAM",
 			"DS10_EXPECTED_NSEC_NSEC3_MISSING",
 			"DS10_HAS_NSEC",
 			"DS10_HAS_NSEC3",
@@ -3136,7 +3135,6 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	algoNotSupportedByZM := map[uint16]map[uint8][]string{}
 	var erroneousMultipleNSEC []string
 	var erroneousMultipleNSEC3 []string
-	var erroneousMultipleNSEC3PARAM []string
 	var nsecInAnswer []string
 	var nsec3paramInAnswer []string
 	var nsecIncorrectTypeList []string
@@ -3194,7 +3192,6 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			withoutDNSKEY               bool
 			erroneousMultipleNSEC       bool
 			erroneousMultipleNSEC3      bool
-			erroneousMultipleNSEC3PARAM bool
 			nsecInAnswer                bool
 			nsec3paramInAnswer          bool
 			nsecIncorrectTypeList       bool
@@ -3465,10 +3462,11 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					nsec3paramRRs := nsec3paramResp.GetRecords(typeNSEC3PARAM, "answer")
 					if len(nsec3paramRRs) > 0 {
 						outcome.nsec3paramInAnswer = true
-						if len(nsec3paramRRs) > 1 {
-							outcome.erroneousMultipleNSEC3PARAM = true
-						} else if !rrOwnerMatchesZone(nsec3paramRRs[0], z.Name) {
-							outcome.nsec3paramMismatchesApex = true
+						for _, rr := range nsec3paramRRs {
+							if !rrOwnerMatchesZone(rr, z.Name) {
+								outcome.nsec3paramMismatchesApex = true
+								break
+							}
 						}
 					} else {
 						outcome.nsec3paramErroneousAnswer = true
@@ -3582,9 +3580,6 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 			if outcome.erroneousMultipleNSEC3 {
 				erroneousMultipleNSEC3 = append(erroneousMultipleNSEC3, outcome.groupList...)
-			}
-			if outcome.erroneousMultipleNSEC3PARAM {
-				erroneousMultipleNSEC3PARAM = append(erroneousMultipleNSEC3PARAM, outcome.groupList...)
 			}
 			if outcome.nsecInAnswer {
 				nsecInAnswer = append(nsecInAnswer, outcome.groupList...)
@@ -3700,13 +3695,6 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		args := map[string]any{}
 		setTypedServersFromNames(args, erroneousMultipleNSEC3)
 		if err := appendLog(ctx, &results, testcase, "DS10_ERR_MULT_NSEC3", args); err != nil {
-			return results, err
-		}
-	}
-	if len(erroneousMultipleNSEC3PARAM) > 0 {
-		args := map[string]any{}
-		setTypedServersFromNames(args, erroneousMultipleNSEC3PARAM)
-		if err := appendLog(ctx, &results, testcase, "DS10_ERR_MULT_NSEC3PARAM", args); err != nil {
 			return results, err
 		}
 	}

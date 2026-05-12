@@ -2744,12 +2744,6 @@ msgid ""
 "\"{servers}\"."
 msgstr "1 件を期待する場面で複数の NSEC3 レコードが返されました。取得元: \"{servers}\"。"
 
-msgctxt "DNSSEC:DS10_ERR_MULT_NSEC3PARAM"
-msgid ""
-"Multiple NSEC3PARAM records when one is expected. Fetched from name servers "
-"\"{servers}\"."
-msgstr "1 件を期待する場面で複数の NSEC3PARAM レコードが返されました。取得元: \"{servers}\"。"
-
 msgctxt "DNSSEC:DS10_EXPECTED_NSEC_NSEC3_MISSING"
 msgid ""
 "The server responded with DNSKEY but not with expected NSEC or NSEC3. "

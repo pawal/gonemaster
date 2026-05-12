@@ -653,8 +653,6 @@
   "pub.tag.dnssec.DS10_ERR_MULT_NSEC.desc": "A nameserver returned more than one NSEC record for the zone apex where one is expected. Duplicates indicate a broken server or corrupted zone, and the extra records usually cause validation to fail.",
   "pub.tag.dnssec.DS10_ERR_MULT_NSEC3.header": "Multiple NSEC3 records at apex",
   "pub.tag.dnssec.DS10_ERR_MULT_NSEC3.desc": "A nameserver returned more than one NSEC3 record at the apex position. This normally means the server is serving inconsistent denial-of-existence data, which breaks aggressive negative caching and can cause validation failures.",
-  "pub.tag.dnssec.DS10_ERR_MULT_NSEC3PARAM.header": "Multiple NSEC3PARAM records",
-  "pub.tag.dnssec.DS10_ERR_MULT_NSEC3PARAM.desc": "A nameserver returned more than one NSEC3PARAM record. Only one set of parameters is allowed per zone; duplicate records are a misconfiguration that typically makes denial-of-existence answers inconsistent.",
   "pub.tag.dnssec.DS10_EXPECTED_NSEC_NSEC3_MISSING.header": "Expected NSEC or NSEC3 missing",
   "pub.tag.dnssec.DS10_EXPECTED_NSEC_NSEC3_MISSING.desc": "A query that should have been answered with NSEC or NSEC3 denial-of-existence records got neither. The zone cannot prove the absence of the queried name, which makes validating resolvers treat the answer as bogus.",
   "pub.tag.dnssec.DS10_INCONSISTENT_NSEC.header": "Inconsistent NSEC at apex",

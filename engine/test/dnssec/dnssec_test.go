@@ -3273,6 +3273,192 @@ func TestDNSSEC10ParallelQueries(t *testing.T) {
 	}
 }
 
+// Two NSEC3PARAM RRs at the apex (a legitimate parameter-rollover shape per
+// RFC 5155, which imposes no cardinality on the apex NSEC3PARAM RRset) must
+// not produce DS10_NSEC3PARAM_MISMATCHES_APEX, and the retired
+// DS10_ERR_MULT_NSEC3PARAM tag must never appear.
+func TestDNSSEC10MultipleNSEC3PARAMAllApex(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origDel := getDelNSNamesAndIPs
+	origZone := getZoneNSNamesAndIPs
+	t.Cleanup(func() {
+		getDelNSNamesAndIPs = origDel
+		getZoneNSNamesAndIPs = origZone
+	})
+
+	apex := dnsutil.Fqdn("example")
+
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: apex, Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = 8
+	key.PublicKey = "AwEAAc=="
+
+	param1 := &dns.NSEC3PARAM{Hdr: dns.Header{Name: apex, Class: dns.ClassINET, TTL: 60}}
+	param1.Hash = 1
+	param1.Iterations = 0
+	param1.SaltLength = 0
+	param1.Salt = ""
+
+	param2 := &dns.NSEC3PARAM{Hdr: dns.Header{Name: apex, Class: dns.ClassINET, TTL: 60}}
+	param2.Hash = 1
+	param2.Iterations = 5
+	param2.SaltLength = 2
+	param2.Salt = "abcd"
+
+	newNameserver(t, "ns1.example", "192.0.2.80", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		switch qtype {
+		case "DNSKEY":
+			return dnskeyPacket(qname, key)
+		case "NSEC":
+			msg := new(dns.Msg)
+			dnsutil.SetQuestion(msg, dnsutil.Fqdn(qname), dns.TypeNSEC)
+			msg.Response = true
+			msg.Authoritative = true
+			msg.Rcode = dns.RcodeSuccess
+			msg.UDPSize = 1232
+			msg.Security = true
+			return packet.Packet{Msg: msg}
+		case "NSEC3PARAM":
+			msg := new(dns.Msg)
+			dnsutil.SetQuestion(msg, dnsutil.Fqdn(qname), dns.TypeNSEC3PARAM)
+			msg.Response = true
+			msg.Authoritative = true
+			msg.Rcode = dns.RcodeSuccess
+			msg.Answer = append(msg.Answer, param1, param2)
+			msg.UDPSize = 1232
+			msg.Security = true
+			return packet.Packet{Msg: msg}
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+		return []methodsv2.NSItem{
+			{
+				Name:       dnsname.New("ns1.example"),
+				Address:    netip.MustParseAddr("192.0.2.80"),
+				HasAddress: true,
+			},
+		}, nil
+	}
+	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+		return []methodsv2.NSItem{}, nil
+	}
+
+	z, err := zone.New("example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC10(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("dnssec10: %v", err)
+	}
+	if hasEntryTag(entries, "DS10_NSEC3PARAM_MISMATCHES_APEX") {
+		t.Fatalf("unexpected DS10_NSEC3PARAM_MISMATCHES_APEX when all NSEC3PARAM RRs are at apex")
+	}
+	if hasEntryTag(entries, "DS10_ERR_MULT_NSEC3PARAM") {
+		t.Fatalf("retired tag DS10_ERR_MULT_NSEC3PARAM must not be emitted")
+	}
+}
+
+// Two NSEC3PARAM RRs where one has the wrong owner must trigger
+// DS10_NSEC3PARAM_MISMATCHES_APEX (proving the apex-owner check loops over
+// every RR in the RRset, not just the first one).
+func TestDNSSEC10MultipleNSEC3PARAMOneOffApex(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origDel := getDelNSNamesAndIPs
+	origZone := getZoneNSNamesAndIPs
+	t.Cleanup(func() {
+		getDelNSNamesAndIPs = origDel
+		getZoneNSNamesAndIPs = origZone
+	})
+
+	apex := dnsutil.Fqdn("example")
+	offApex := dnsutil.Fqdn("sub.example")
+
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: apex, Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = 8
+	key.PublicKey = "AwEAAc=="
+
+	apexParam := &dns.NSEC3PARAM{Hdr: dns.Header{Name: apex, Class: dns.ClassINET, TTL: 60}}
+	apexParam.Hash = 1
+
+	offApexParam := &dns.NSEC3PARAM{Hdr: dns.Header{Name: offApex, Class: dns.ClassINET, TTL: 60}}
+	offApexParam.Hash = 1
+
+	newNameserver(t, "ns1.example", "192.0.2.81", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		switch qtype {
+		case "DNSKEY":
+			return dnskeyPacket(qname, key)
+		case "NSEC":
+			msg := new(dns.Msg)
+			dnsutil.SetQuestion(msg, dnsutil.Fqdn(qname), dns.TypeNSEC)
+			msg.Response = true
+			msg.Authoritative = true
+			msg.Rcode = dns.RcodeSuccess
+			msg.UDPSize = 1232
+			msg.Security = true
+			return packet.Packet{Msg: msg}
+		case "NSEC3PARAM":
+			msg := new(dns.Msg)
+			dnsutil.SetQuestion(msg, dnsutil.Fqdn(qname), dns.TypeNSEC3PARAM)
+			msg.Response = true
+			msg.Authoritative = true
+			msg.Rcode = dns.RcodeSuccess
+			msg.Answer = append(msg.Answer, apexParam, offApexParam)
+			msg.UDPSize = 1232
+			msg.Security = true
+			return packet.Packet{Msg: msg}
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+		return []methodsv2.NSItem{
+			{
+				Name:       dnsname.New("ns1.example"),
+				Address:    netip.MustParseAddr("192.0.2.81"),
+				HasAddress: true,
+			},
+		}, nil
+	}
+	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+		return []methodsv2.NSItem{}, nil
+	}
+
+	z, err := zone.New("example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC10(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("dnssec10: %v", err)
+	}
+	if !hasEntryTag(entries, "DS10_NSEC3PARAM_MISMATCHES_APEX") {
+		t.Fatalf("expected DS10_NSEC3PARAM_MISMATCHES_APEX when one of multiple NSEC3PARAM RRs is off-apex")
+	}
+	if hasEntryTag(entries, "DS10_ERR_MULT_NSEC3PARAM") {
+		t.Fatalf("retired tag DS10_ERR_MULT_NSEC3PARAM must not be emitted")
+	}
+}
+
 func TestDNSSEC11ParallelParentQueries(t *testing.T) {
 	nameserver.EmptyCache()
 	t.Cleanup(nameserver.EmptyCache)

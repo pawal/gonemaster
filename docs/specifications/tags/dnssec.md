@@ -97,7 +97,6 @@ _Do not edit by hand - regenerate with the command above._
 | `DS10_ALGO_NOT_SUPPORTED_BY_ZM` | `NOTICE` | [dnssec10](../tests/dnssec/dnssec10.md) | yes |
 | `DS10_ERR_MULT_NSEC` | `ERROR` | [dnssec10](../tests/dnssec/dnssec10.md) | yes |
 | `DS10_ERR_MULT_NSEC3` | `ERROR` | [dnssec10](../tests/dnssec/dnssec10.md) | yes |
-| `DS10_ERR_MULT_NSEC3PARAM` | `ERROR` | [dnssec10](../tests/dnssec/dnssec10.md) | yes |
 | `DS10_EXPECTED_NSEC_NSEC3_MISSING` | `ERROR` | [dnssec10](../tests/dnssec/dnssec10.md) | yes |
 | `DS10_HAS_NSEC` | `INFO` | [dnssec10](../tests/dnssec/dnssec10.md) | yes |
 | `DS10_HAS_NSEC3` | `INFO` | [dnssec10](../tests/dnssec/dnssec10.md) | yes |

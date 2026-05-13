@@ -108,3 +108,27 @@ when:
   ref:
     include:
       - refs/tags/v*
+
+---
+steps:
+  pages:
+    image: debian:bookworm-slim
+    secrets:
+      - CODEBERG_PAGES_TOKEN
+    commands:
+      - apt-get update -q && apt-get install -y -q curl git make
+      - curl -fsSL "https://github.com/gohugoio/hugo/releases/download/v0.147.2/hugo_extended_0.147.2_linux-amd64.tar.gz" | tar xz -C /usr/local/bin hugo
+      - make docs
+      - cd site/public
+      - git init -b pages
+      - git config user.name "Woodpecker CI"
+      - git config user.email "noreply@codeberg.org"
+      - git add -A
+      - git commit -m "deploy"
+      - git push --force "https://oauth2:$CODEBERG_PAGES_TOKEN@codeberg.org/pawal/gonemaster.git" HEAD:pages
+
+when:
+  event:
+    - push
+  branch:
+    - main

@@ -71,8 +71,8 @@ steps:
       - git config user.email "noreply@codeberg.org"
       - git add -A
       - git commit -m "deploy"
-      - git remote add origin https://codeberg.org/pawal/gonemaster.git
-      - git -c credential.helper='!f() { printf "username=pawal\npassword=%s\n" "$CODEBERG_PAGES_TOKEN"; }; f' push --force origin HEAD:pages
+      - test -n "$CODEBERG_PAGES_TOKEN" || { echo "secret not injected"; exit 1; }
+      - git push --force "https://pawal:$CODEBERG_PAGES_TOKEN@codeberg.org/pawal/gonemaster.git" HEAD:pages
     when:
       event: push
       branch: main

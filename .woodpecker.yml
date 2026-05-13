@@ -72,7 +72,7 @@ steps:
       - git add -A
       - git commit -m "deploy"
       - git remote add origin https://codeberg.org/pawal/gonemaster.git
-      - git -c credential.helper='!f() { printf "username=oauth2\npassword=%s\n" "$CODEBERG_PAGES_TOKEN"; }; f' push --force origin HEAD:pages
+      - git -c credential.helper='!f() { printf "username=pawal\npassword=%s\n" "$CODEBERG_PAGES_TOKEN"; }; f' push --force origin HEAD:pages
     when:
       event: push
       branch: main

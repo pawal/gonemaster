@@ -287,6 +287,7 @@ badkeys-update:
 badkeys-update-embed: badkeys-update
 	gzip -9 -k -f share/badkeys/blocklist.dat
 
+.PHONY: docs docs-serve
 docs:
 	hugo --source site/ --minify
 

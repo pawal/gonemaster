@@ -1,0 +1,10 @@
+# Override titles for pages whose computed title looks bad.
+# Key is the file's ContentBaseName (filename without extension).
+
+"analysis-ui"          = "Analysis UI"
+"public-ui"            = "Public UI"
+"ui"                   = "UI"
+"gonemaster.1"         = "gonemaster(1)"
+"gonemaster-client.1"  = "gonemaster-client(1)"
+"gonemaster-nagios.1"  = "gonemaster-nagios(1)"
+"gonemaster-server.1"  = "gonemaster-server(1)"

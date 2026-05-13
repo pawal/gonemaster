@@ -63,8 +63,7 @@ steps:
     secrets:
       - CODEBERG_PAGES_TOKEN
     commands:
-      - apk add --no-cache curl git make gcompat
-      - curl -fsSL "https://github.com/gohugoio/hugo/releases/download/v0.147.2/hugo_extended_0.147.2_linux-amd64.tar.gz" | tar xz -C /usr/local/bin hugo
+      - apk add --no-cache git make hugo
       - make docs
       - cd site/public
       - git init -b pages

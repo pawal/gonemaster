@@ -394,9 +394,6 @@ func (r *Recursor) recurseUnordered(ctx context.Context, name string, qtype stri
 			go func() {
 				defer wg.Done()
 				for ns := range jobs {
-					if ctxBatch.Err() != nil {
-						return
-					}
 					logRecursorSystem(ctxBatch, "RECURSE_QUERY", recurseQueryArgs(ns, nameObj, qtype, qclass))
 					resp, err := ns.QueryWithClass(ctxBatch, name, qtype, qclass)
 					select {

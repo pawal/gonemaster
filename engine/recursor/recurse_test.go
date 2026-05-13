@@ -78,6 +78,7 @@ func TestRecurseOrderedRaceLossSetsCause(t *testing.T) {
 		t.Fatalf("profile default: %v", err)
 	}
 	prof.Resolver.Defaults.Parallel = 3
+	prof.Resolver.Defaults.Unordered = false
 	ctx := profile.WithContext(context.Background(), prof)
 
 	loser := &observingQueryer{}

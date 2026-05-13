@@ -60,8 +60,9 @@ steps:
 
   deploy_pages:
     image: alpine:3.21
-    secrets:
-      - CODEBERG_PAGES_TOKEN
+    environment:
+      CODEBERG_PAGES_TOKEN:
+        from_secret: CODEBERG_PAGES_TOKEN
     commands:
       - apk add --no-cache git make hugo
       - make docs

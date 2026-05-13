@@ -2,4 +2,4 @@
 title: "Gonemaster"
 ---
 
-Documentation coming soon.
+{{< include "README.md" >}}

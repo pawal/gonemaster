@@ -2,9 +2,9 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
-## [Unreleased]
+## [v1.4.6] - 2026-05-13
 
-Polished the trend teb, and added admin-ui snapshot-intent controls.
+Polished the trend tab, and added admin-ui snapshot-intent controls.
 
 ### Added
 

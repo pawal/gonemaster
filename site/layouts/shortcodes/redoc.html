@@ -1,0 +1,5 @@
+<div id="redoc-container"></div>
+<script src="{{ "js/redoc.standalone.js" | relURL }}"></script>
+<script>
+  Redoc.init('{{ .Get "spec" | relURL }}', {}, document.getElementById('redoc-container'));
+</script>

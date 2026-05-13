@@ -1,3 +1,42 @@
 baseURL = "https://pawal.codeberg.page/gonemaster/"
 languageCode = "en-us"
 title = "Gonemaster"
+theme = "relearn"
+
+[params]
+  themeVariant = "relearn-light"
+
+[markup.goldmark.renderer]
+  unsafe = true
+
+[[module.mounts]]
+  source = "content"
+  target = "content"
+[[module.mounts]]
+  source = "../docs"
+  target = "content"
+  excludeFiles = ["README.md", "**/README.md"]
+[[module.mounts]]
+  source = "../docs"
+  target = "assets/docs"
+[[module.mounts]]
+  source = "../docs/openapi.yaml"
+  target = "static/openapi.yaml"
+[[module.mounts]]
+  source = "layouts"
+  target = "layouts"
+[[module.mounts]]
+  source = "static"
+  target = "static"
+[[module.mounts]]
+  source = "data"
+  target = "data"
+[[module.mounts]]
+  source = "i18n"
+  target = "i18n"
+[[module.mounts]]
+  source = "archetypes"
+  target = "archetypes"
+[[module.mounts]]
+  source = "assets"
+  target = "assets"

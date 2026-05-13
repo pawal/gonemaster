@@ -2,6 +2,30 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [Unreleased]
+
+Polished the trend teb, and added admin-ui snapshot-intent controls.
+
+### Added
+
+- admin-ui: offer to promote existing tag batches on cohort create
+- server: PATCH /batches/{id} to flip snapshot_intent on existing batches
+- analysis-ui: domain counts inside trends bar segments
+- analysis-ui: segment labels inside trends bars when space allows
+- analysis-ui: hint on cohort row when rebuild had no eligible runs
+
+### Changed
+
+- analysis: capture snapshots inline at end of rebuild instead of waiting 30s
+- analysis-ui: label DNSKEY algorithms by mnemonic in trends view
+- analysis-ui: differentiate DNSSEC posture tones - nsec=notice, nsec3/signed=ok
+- analysis-ui: richer tone colors with proper light/dark contrast
+- analysis-ui, server: trends carry key_meta so UI drops mirrored display tables
+- engine: DNSSEC10 drop DS10_ERR_MULT_NSEC3PARAM, loop apex check over NSEC3PARAM RRset
+- engine: gate DS07_NO_DS_ON_PARENT_SERVER to inconsistent case
+- ui-public: reword DNSSEC tag descriptions
+- deps: bump codeberg.org/miekg/dns to v0.6.76
+
 ## [v1.4.5] - 2026-05-06
 
 Added DNSSEC21 to verify parent DS RRSIG after the .de DNSSEC failure. Other changes are UI refactoring, and stabilising the core test engine.

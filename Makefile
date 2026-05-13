@@ -62,6 +62,8 @@ help:
 	@echo "  spec-check-coherency Run log-args coherency guardrail checks"
 	@echo "  spec-check-i18n-placeholders  Verify placeholder parity and reject non-allowlisted legacy placeholders"
 	@echo "  spec-check         Run spec-validate + spec-check-tags + coherency + i18n placeholder checks"
+	@echo "  docs             Build the documentation site (writes site/public/)"
+	@echo "  docs-serve       Serve the documentation site locally"
 	@echo "  man              Generate man pages from docs/man/*.md"
 	@echo "  badkeys-update     Download badkeys blocklist to share/badkeys/"
 	@echo "  badkeys-update-embed  Download and gzip-compress blocklist for embedded builds"
@@ -284,6 +286,12 @@ badkeys-update:
 
 badkeys-update-embed: badkeys-update
 	gzip -9 -k -f share/badkeys/blocklist.dat
+
+docs:
+	hugo --source site/ --minify
+
+docs-serve:
+	hugo server --source site/ --bind 0.0.0.0
 
 MAN_SRCS := $(wildcard docs/man/*.md)
 MAN_OUT  := $(patsubst docs/man/%.md,man/man1/%,$(MAN_SRCS))

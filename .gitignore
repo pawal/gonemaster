@@ -35,6 +35,11 @@
 # Generated man pages
 /man/
 
+# Hugo docs site build output
+/site/public/
+/site/.hugo_build.lock
+/site/resources/
+
 # Badkeys blocklist data (downloaded, not committed)
 /share/badkeys/blocklist.dat
 /share/badkeys/blocklist.dat.gz

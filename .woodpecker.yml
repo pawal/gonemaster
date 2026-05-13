@@ -60,6 +60,10 @@ steps:
 
   deploy_pages:
     image: alpine:3.21
+    depends_on:
+      - integration_test
+      - build_server_with_ui
+      - spec_check
     environment:
       CODEBERG_PAGES_TOKEN:
         from_secret: CODEBERG_PAGES_TOKEN

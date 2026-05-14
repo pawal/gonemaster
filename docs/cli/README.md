@@ -3,9 +3,6 @@
 This page documents `gonemaster`, the direct local test runner. It runs the
 engine in the current process without `gonemaster-server`.
 
-For the HTTP client that talks to `gonemaster-server`, see
-[client/](../client/README.md).
-
 `gonemaster` normalizes IDN domains to IDNA A-labels before use.
 
 *This page is for the local runner only.* The server client is documented under

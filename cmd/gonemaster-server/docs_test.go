@@ -53,7 +53,7 @@ func TestServerDatabaseMDLinksToSetupGuide(t *testing.T) {
 // TestDatabaseSetupMDExists verifies the database setup guide exists and
 // covers PostgreSQL, MariaDB, DSN requirements, and key tuning parameters.
 func TestDatabaseSetupMDExists(t *testing.T) {
-	data, err := os.ReadFile("../../docs/database-setup.md")
+	data, err := os.ReadFile("../../docs/server/database-setup.md")
 	if err != nil {
 		t.Fatalf("read docs/database-setup.md: %v", err)
 	}

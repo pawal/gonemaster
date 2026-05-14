@@ -47,6 +47,107 @@ Status: Final
 10. Emit `DS10_EXPECTED_NSEC_NSEC3_MISSING` for nameservers with DNSKEY that produced neither expected NSEC nor expected NSEC3 evidence sets.
 11. Emit `TEST_CASE_END`.
 
+### Per-Nameserver DNSKEY Classification (step 3)
+
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> transport
+    transport : transport check
+    transport --> ignored : disabled
+    transport --> queryDNSKEY : enabled
+    queryDNSKEY : query DNSKEY
+    queryDNSKEY --> ignored : bad response
+    queryDNSKEY --> noDNSKEY : no apex DNSKEY
+    queryDNSKEY --> withDNSKEY : apex DNSKEY present
+    ignored : mark ignored
+    noDNSKEY : without DNSKEY
+    withDNSKEY : with DNSKEY
+    ignored --> [*]
+    noDNSKEY --> [*]
+    withDNSKEY --> nsecProc
+    nsecProc : NSEC and NSEC3PARAM processing
+    nsecProc --> [*]
+{{< /mermaid >}}
+
+### NSEC Query Processing (step 4)
+
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> querying
+    querying : query NSEC at apex
+    querying --> respErr : shape failure
+    querying --> nonEmpty : non-empty answer
+    querying --> empty : empty answer
+    nonEmpty --> nsecAns : NSEC in answer
+    nonEmpty --> errAns : no NSEC in answer
+    empty --> nsec3Nodata : NSEC3 in authority
+    empty --> nsecNodata : NSEC in authority (no NSEC3)
+    empty --> noEvid : neither
+    respErr : response error
+    nsecAns : NSEC-in-answer path
+    errAns : erroneous answer
+    nsec3Nodata : NSEC3-NODATA path
+    nsecNodata : NSEC-NODATA path (RFC 4470/9824)
+    noEvid : no evidence
+    respErr --> [*]
+    nsecAns --> [*]
+    errAns --> [*]
+    nsec3Nodata --> [*]
+    nsecNodata --> [*]
+    noEvid --> [*]
+{{< /mermaid >}}
+
+### NSEC3PARAM Query Processing (step 5)
+
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> querying
+    querying : query NSEC3PARAM at apex
+    querying --> respErr : shape failure
+    querying --> nonEmpty : non-empty answer
+    querying --> empty : empty answer
+    nonEmpty --> nsec3pAns : NSEC3PARAM in answer
+    nonEmpty --> errAns : no NSEC3PARAM in answer
+    empty --> nsecNodata : NSEC in authority
+    empty --> noEvid : neither
+    respErr : response error
+    nsec3pAns : NSEC3PARAM path
+    errAns : erroneous answer
+    nsecNodata : NSEC-NODATA path
+    noEvid : no evidence
+    respErr --> [*]
+    nsec3pAns --> [*]
+    errAns --> [*]
+    nsecNodata --> [*]
+    noEvid --> [*]
+{{< /mermaid >}}
+
+### Aggregation and Final Emission (steps 6–11)
+
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> sigTags
+    sigTags : signature condition tags
+    sigTags --> consTags
+    consTags : structural consistency tags
+    consTags --> shapeTags
+    shapeTags : content and shape tags
+    shapeTags --> dkeyCheck
+    dkeyCheck : DNSKEY across NSes?
+    dkeyCheck --> allDNSKEY : all have DNSKEY
+    dkeyCheck --> noDNSKEY : none have DNSKEY
+    dkeyCheck --> mixedDNSKEY : mixed
+    noDNSKEY --> zoneTag
+    zoneTag : DS10_ZONE_NO_DNSSEC
+    mixedDNSKEY --> srvTag
+    srvTag : DS10_SERVER_NO_DNSSEC
+    allDNSKEY --> missing
+    zoneTag --> missing
+    srvTag --> missing
+    missing : DS10_EXPECTED_NSEC_NSEC3_MISSING
+    missing --> [*]
+{{< /mermaid >}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

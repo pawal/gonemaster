@@ -1,3 +1,17 @@
+<style>
+#redoc-container {
+  position: relative;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100vw - var(--INTERNAL-MENU-WIDTH-L, 18.75rem));
+}
+@media screen and (max-width: 59.999rem) {
+  #redoc-container { width: calc(100vw - var(--INTERNAL-MENU-WIDTH-M, 14.375rem)); }
+}
+@media screen and (max-width: 47.999rem) {
+  #redoc-container { width: 100vw; }
+}
+</style>
 <div id="redoc-container"></div>
 <script src="{{ "js/redoc.standalone.js" | relURL }}"></script>
 <script>

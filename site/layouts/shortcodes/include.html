@@ -1,7 +1,8 @@
 {{ $path := .Get 0 }}
 {{ $file := resources.Get (printf "docs/%s" $path) }}
 {{ if $file }}
-  {{ .Page.RenderString $file.Content }}
+  {{ $content := replaceRE `(?m)^# [^\n]*\n?` "" $file.Content 1 }}
+  {{ .Page.RenderString $content }}
 {{ else }}
   {{ errorf "include shortcode: file not found: docs/%s" $path }}
 {{ end }}

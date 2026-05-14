@@ -1,0 +1,5 @@
+{{- $title := partial "pageHelper/title.hugo" (dict "page" .) }}
+{{- $hasOwnH1 := and .RawContent (findRE `(?m)^# ` .RawContent 1) }}
+{{- if not $hasOwnH1 }}
+<h1 id="{{ $title | plainify | anchorize }}">{{ $title }}</h1>
+{{- end }}

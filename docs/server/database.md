@@ -99,6 +99,6 @@ derived records regardless of age. See [operations.md](operations.md).
 
 ## Related Pages
 
-- Full backend setup: [../database-setup.md](../database-setup.md)
+- Full backend setup: [database-setup.md](database-setup.md)
 - Analysis querying: [../analysis/querying.md](../analysis/querying.md)
 - Batch deletion behavior: [operations.md](operations.md)

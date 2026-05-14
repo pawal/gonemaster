@@ -86,7 +86,7 @@ from the selected batch.
 - `GET /api/v1/metrics` returns JSON metrics by default.
 - `GET /api/v1/metrics?format=prom` returns Prometheus text exposition.
 
-See [../metrics.md](../metrics.md) for metric names and dashboard guidance.
+See [metrics.md](metrics.md) for metric names and dashboard guidance.
 
 The JSON metrics endpoint accepts:
 

@@ -3,4 +3,4 @@ title: "CLI"
 weight: 5
 ---
 
-{{< include "cli.md" >}}
+{{< include "cli/README.md" >}}

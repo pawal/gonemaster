@@ -2,6 +2,6 @@
 title: "API Reference"
 ---
 
-{{< include "reference/api.md" >}}
+{{< include "specifications/api.md" >}}
 
 {{< redoc spec="openapi.yaml" >}}

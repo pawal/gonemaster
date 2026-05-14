@@ -92,7 +92,7 @@ was wrong, such as a bad profile or a bad domain set.
 Use snapshot retire or purge when the batch is valid but the snapshot should no
 longer be public.
 
-See [../batch-deletion.md](../batch-deletion.md).
+See [../server/batch-deletion.md](../server/batch-deletion.md).
 
 ## First-Boot Backfill
 

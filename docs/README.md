@@ -7,7 +7,7 @@ remain in place while the documentation is being split into narrower guides.
 
 | I want to... | Start here |
 |---|---|
-| Run one DNS check locally | [cli.md](cli.md) |
+| Run one DNS check locally | [cli/](cli/README.md) |
 | Start and operate the HTTP server | [server/](server/README.md) |
 | Automate the server from a shell or script | [client/](client/README.md) |
 | Manage domain tags and batch runs | [analysis/tags.md](analysis/tags.md) |
@@ -36,7 +36,7 @@ during the split.
 - [client/domains-tags-runs-entries.md](client/domains-tags-runs-entries.md): query stored analysis data.
 - [client/examples.md](client/examples.md): common command sequences.
 
-Direct local tests with the `gonemaster` binary stay in [cli.md](cli.md).
+Direct local tests with the `gonemaster` binary stay in [cli/](cli/README.md).
 
 ## Analysis
 
@@ -49,10 +49,10 @@ Direct local tests with the `gonemaster` binary stay in [cli.md](cli.md).
 
 ## Reference
 
-- [reference/api.md](reference/api.md): API conventions and links to OpenAPI.
+- [specifications/api.md](specifications/api.md): API conventions and links to OpenAPI.
 - [openapi.yaml](openapi.yaml): OpenAPI 3.0 specification for `gonemaster-server`.
-- [metrics.md](metrics.md): Prometheus and JSON metrics.
+- [server/metrics.md](server/metrics.md): Prometheus and JSON metrics.
 - [scoring.md](scoring.md): numeric scores and letter grades.
-- [cache-format.md](cache-format.md): packet cache save/restore file format.
+- [cli/cache-format.md](cli/cache-format.md): packet cache save/restore file format.
 - [MIGRATION-1.1.md](MIGRATION-1.1.md): JSON output migration guide.
 - [specifications/](specifications/README.md): canonical testcase and tag specifications.

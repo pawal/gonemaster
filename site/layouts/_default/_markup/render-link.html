@@ -1,0 +1,22 @@
+{{- $dest := .Destination -}}
+{{- $isExternal := or (hasPrefix $dest "http://") (hasPrefix $dest "https://") (hasPrefix $dest "//") -}}
+{{- if and (not $isExternal) (strings.Contains $dest ".md") -}}
+  {{- $parts := split $dest "#" -}}
+  {{- $path := index $parts 0 -}}
+  {{- $frag := cond (gt (len $parts) 1) (printf "#%s" (index $parts 1)) "" -}}
+  {{- if strings.HasSuffix $path "README.md" -}}
+    {{- $dir := strings.TrimSuffix "README.md" $path -}}
+    {{- $target := .Page.GetPage $dir -}}
+    {{- if $target -}}
+      {{- $dest = printf "%s%s" $target.RelPermalink $frag -}}
+    {{- else -}}
+      {{- $dest = printf "%s%s" $dir $frag -}}
+    {{- end -}}
+  {{- else -}}
+    {{- $target := .Page.GetPage $path -}}
+    {{- if $target -}}
+      {{- $dest = printf "%s%s" $target.RelPermalink $frag -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+<a href="{{ $dest }}"{{ with .Title }} title="{{ . }}"{{ end }}>{{ .Text | safeHTML }}</a>

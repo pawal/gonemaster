@@ -8,7 +8,7 @@ and consumed by `gonemaster --restore`. It covers:
 - how each cache kind is represented,
 - strict vs. lenient parsing behavior.
 
-The format is implemented by [`engine/cachefile`](../engine/cachefile/cachefile.go).
+The format is implemented by [`engine/cachefile`](../../engine/cachefile/cachefile.go).
 
 ## File layout
 

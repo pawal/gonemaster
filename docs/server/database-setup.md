@@ -3,7 +3,7 @@
 This guide covers choosing and configuring a storage backend for `gonemaster-server`,
 including setup, recommended settings, tuning, and backup procedures.
 For DSN formats and connection pool defaults, see
-[server/database.md](server/database.md).
+[database.md](database.md).
 
 ---
 
@@ -479,7 +479,7 @@ results before switching (for example with `gonemaster-client runs list --batch 
 
 ## Docker Compose (development)
 
-The repository includes [docker-compose.test.yml](../docker-compose.test.yml)
+The repository includes [docker-compose.test.yml](../../docker-compose.test.yml)
 for spinning up PostgreSQL and MariaDB locally:
 
 ```bash

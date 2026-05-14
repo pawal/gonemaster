@@ -25,8 +25,6 @@ remain in place while the documentation is being split into narrower guides.
 - [server/performance.md](server/performance.md): worker sizing, hot-cache, resolver tuning.
 - [server/ui.md](server/ui.md): embedded admin UI, public UI, analysis UI.
 
-The older [server.md](server.md) page is kept as a compatibility entry point
-during the split.
 
 ## Client
 

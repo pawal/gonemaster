@@ -219,4 +219,4 @@ These settings affect UI display. They do not remove stored data.
 
 - Database config and DSNs: [database.md](database.md)
 - Throughput tuning: [performance.md](performance.md)
-- Stored profile endpoints: [../reference/api.md](../reference/api.md)
+- Stored profile endpoints: [../specifications/api.md](../specifications/api.md)

@@ -63,7 +63,7 @@ within the tier rules.
 ## Retention and Deletion
 
 Retention purges old terminal jobs according to the configured retention
-window. Manual batch deletion is stronger: it deletes a batch, completed runs,
+window. [Manual batch deletion](batch-deletion.md) is stronger: it deletes a batch, completed runs,
 entries, analysis facts, and cohort snapshots derived from that batch.
 
 Use snapshot retire or purge when the batch itself should stay but a public

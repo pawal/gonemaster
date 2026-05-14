@@ -4,16 +4,16 @@ This page documents `gonemaster`, the direct local test runner. It runs the
 engine in the current process without `gonemaster-server`.
 
 For the HTTP client that talks to `gonemaster-server`, see
-[client/](client/README.md).
+[client/](../client/README.md).
 
 `gonemaster` normalizes IDN domains to IDNA A-labels before use.
 
 ## Server Client
 
 This page is for the local runner only. The server client is documented under
-[client/](client/README.md), including job and batch operations.
+[client/](../client/README.md), including job and batch operations.
 
-For server-side job cleanup, see [client/jobs.md](client/jobs.md):
+For server-side job cleanup, see [client/jobs.md](../client/jobs.md):
 `gonemaster-client jobs purge --older-than DAYS`. The JSON response includes
 `purged_jobs`. Using `--older-than 0` asks the server to use its configured
 `retention_days` value.
@@ -93,8 +93,8 @@ v1.1 keys when they are present.
 
 Reference:
 
-- [specifications/log-args-coherency.md](specifications/log-args-coherency.md)
-- [specifications/log-args-key-glossary.md](specifications/log-args-key-glossary.md)
+- [specifications/log-args-coherency.md](../specifications/log-args-coherency.md)
+- [specifications/log-args-key-glossary.md](../specifications/log-args-key-glossary.md)
 
 ## Options
 
@@ -325,7 +325,7 @@ make badkeys-update
 
 ## Further Reference
 
-- Testcase specifications: [specifications/tests/](specifications/tests/)
-- Tag catalogs: [specifications/tags/](specifications/tags/)
+- Testcase specifications: [specifications/tests/](../specifications/tests/)
+- Tag catalogs: [specifications/tags/](../specifications/tags/)
 - Cache format: [cache-format.md](cache-format.md)
-- Scoring: [scoring.md](scoring.md)
+- Scoring: [scoring.md](../scoring.md)

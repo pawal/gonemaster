@@ -4,7 +4,7 @@
 when you want to submit jobs, run batches, inspect stored results, or query
 tagged analysis data through the admin API.
 
-For direct local tests that do not use the server, use [../cli.md](../cli.md).
+For direct local tests that do not use the server, use [../cli/](../cli/README.md).
 
 ## Connection
 

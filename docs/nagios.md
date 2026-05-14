@@ -76,7 +76,7 @@ gonemaster-nagios -H example.com \
 Use `--grade-warning` and `--grade-critical` to trigger Nagios states based on
 the computed domain quality grade rather than (or in addition to) raw severity
 levels. The grade is derived from the scoring engine using the same weighted
-penalty model as the server and CLI.
+penalty model as the server and CLI. See [scoring.md](scoring.md) for grade and penalty details.
 
 Valid grade values from best to worst: `A+`, `A`, `B`, `C`, `D`, `F`.
 

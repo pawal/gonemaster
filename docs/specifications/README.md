@@ -25,11 +25,9 @@ The Zonemaster project may be used as an upstream reference during migration, bu
 - [known-behavior-divergences.md](known-behavior-divergences.md) - Behavior divergences identified during investigation, tagged for review.
 
 ### Migration
-- [migration-tracker.md](migration-tracker.md) - Checklist tracking migration status per testcase.
 - [upstream-testcase-matrix.md](upstream-testcase-matrix.md) - Maps upstream Zonemaster specs to gonemaster testcase IDs and migration status.
 
 ### Reference
-- [upstream/](upstream/README.md) - Imported Zonemaster reference material (not normative for gonemaster).
 - [templates/](templates/testcase-spec-template.md) - Reusable templates for testcase specs and tag tables.
 - [log-args-coherency.md](log-args-coherency.md) - Shared glossary and invariants for log argument naming/types.
 - [log-args-key-glossary.md](log-args-key-glossary.md) - Canonical v1.1 key/type glossary for machine consumers.
@@ -46,8 +44,7 @@ The Zonemaster project may be used as an upstream reference during migration, bu
 2. Compare with upstream reference when relevant.
 3. Write or update canonical spec in `tests/` using the testcase template.
 4. Update tag documentation in `tags/` using the tag table template.
-5. Record progress in `migration-tracker.md`.
-6. Add follow-up issues for unresolved ambiguities.
+5. Add follow-up issues for unresolved ambiguities.
 
 ## Tooling
 

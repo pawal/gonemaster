@@ -1,87 +1,91 @@
 :root {
-    --PRIMARY-color: rgba( 125, 201, 3, 1 );
-    --SECONDARY-color: rgba( 72, 106, 201, 1 );
-    --ACCENT-color: rgb( 255, 102, 78 );
+    --PRIMARY-color: rgba( 11, 45, 77, 1 );    /* #0b2d4d - dark navy, matches public UI --accent */
+    --SECONDARY-color: rgba( 3, 105, 161, 1 ); /* #0369a1 - medium blue, matches public UI --accent-2 */
+    --ACCENT-color: rgba( 3, 105, 161, 1 );
 
-    --MAIN-TEXT-color: rgba( 0, 0, 0, 1 );
-    --MAIN-LINK-HOVER-color: rgba( 32, 40, 145, 1 );
-    --MAIN-BG-color: rgba( 255, 255, 255, 1 );
-    --MAIN-TITLES-TEXT-color: rgba( 16, 16, 16, 1 );
+    --MAIN-TEXT-color: rgba( 15, 25, 35, 1 );   /* #0f1923 */
+    --MAIN-LINK-HOVER-color: rgba( 2, 79, 120, 1 );
+    --MAIN-BG-color: rgba( 244, 246, 249, 1 );  /* #f4f6f9 */
+    --MAIN-TITLES-TEXT-color: rgba( 15, 25, 35, 1 );
+
+    --MAIN-font: "IBM Plex Sans", "Source Sans 3", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
 
     --CODE-theme: relearn-light;
     --CODE-BLOCK-color: rgba( 39, 40, 34, 1 );
     --CODE-BLOCK-BG-color: rgba( 250, 250, 250, 1 );
-    --CODE-BLOCK-BORDER-color: rgba( 216, 216, 216, 1 );
-    --CODE-INLINE-color: rgba( 94, 94, 94, 1 );
-    --CODE-INLINE-BG-color: rgba( 255, 250, 233, 1 );
-    --CODE-INLINE-BORDER-color: rgba( 248, 232, 200, 1 );
+    --CODE-BLOCK-BORDER-color: rgba( 200, 208, 220, 1 );
+    --CODE-INLINE-color: rgba( 11, 45, 77, 1 );
+    --CODE-INLINE-BG-color: rgba( 235, 238, 244, 1 );
+    --CODE-INLINE-BORDER-color: rgba( 200, 208, 220, 1 );
 
     --BROWSER-theme: light;
     --MERMAID-theme: default;
     --OPENAPI-theme: light;
     --OPENAPI-CODE-theme: idea;
 
-    --MENU-HOME-LINK-color: rgba( 64, 64, 64, 1 );
-    --MENU-HOME-LINK-HOVER-color: rgba( 0, 0, 0, 1 );
+    --MENU-HOME-LINK-color: rgba( 186, 210, 230, 1 );
+    --MENU-HOME-LINK-HOVER-color: rgba( 255, 255, 255, 1 );
 
-    --MENU-SEARCH-color: rgba( 224, 224, 224, 1 );
-    --MENU-SEARCH-BG-color: rgba( 50, 50, 50, 1 );
-    --MENU-SEARCH-BORDER-color: rgba( 224, 224, 224, 1 );
+    --MENU-SEARCH-color: rgba( 186, 210, 230, 1 );
+    --MENU-SEARCH-BG-color: rgba( 7, 30, 52, 1 );
+    --MENU-SEARCH-BORDER-color: rgba( 26, 73, 122, 1 );
 
-    --MENU-SECTIONS-BG-color: rgba( 40, 40, 40, 1 );
-    --MENU-SECTIONS-ACTIVE-BG-color: rgba( 0, 0, 0, .166 );
-    --MENU-SECTIONS-LINK-color: rgba( 186, 186, 186, 1 );
+    --MENU-SECTIONS-BG-color: rgba( 11, 45, 77, 1 );        /* #0b2d4d - navy sidebar */
+    --MENU-SECTIONS-ACTIVE-BG-color: rgba( 0, 0, 0, .20 );
+    --MENU-SECTIONS-LINK-color: rgba( 186, 210, 230, 1 );
     --MENU-SECTIONS-LINK-HOVER-color: rgba( 255, 255, 255, 1 );
-    --MENU-SECTION-ACTIVE-CATEGORY-color: rgba( 68, 68, 68, 1 );
-    --MENU-SECTION-SEPARATOR-color: rgba( 96, 96, 96, 1 );
+    --MENU-SECTION-ACTIVE-CATEGORY-color: rgba( 200, 220, 240, 1 );
+    --MENU-SECTION-SEPARATOR-color: rgba( 26, 73, 122, 1 );
 
     --BOX-CAPTION-color: rgba( 255, 255, 255, 1 );
-    --BOX-BG-color: rgba( 255, 255, 255, .833 );
-    --BOX-TEXT-color: rgba( 16, 16, 16, 1 );
+    --BOX-BG-color: rgba( 255, 255, 255, .9 );
+    --BOX-TEXT-color: rgba( 15, 25, 35, 1 );
 }
 
 @media (prefers-color-scheme: dark) {
     :root {
-        --PRIMARY-color: rgba( 125, 201, 3, 1 );
-        --SECONDARY-color: rgba( 108, 140, 227, 1 );
-        --ACCENT-color: rgb( 255, 102, 78, 1 );
+        --PRIMARY-color: rgba( 56, 189, 248, 1 );  /* #38bdf8 - sky blue, matches public UI dark accent */
+        --SECONDARY-color: rgba( 147, 197, 253, 1 ); /* #93c5fd */
+        --ACCENT-color: rgba( 56, 189, 248, 1 );
 
-        --MAIN-TEXT-color: rgba( 224, 224, 224, 1 );
-        --MAIN-LINK-HOVER-color: rgba( 147, 176, 255, 1 );
-        --MAIN-BG-color: rgba( 32, 32, 32, 1 );
-        --MAIN-TITLES-TEXT-color: rgba( 255, 255, 255, 1 );
+        --MAIN-TEXT-color: rgba( 232, 237, 243, 1 );  /* #e8edf3 */
+        --MAIN-LINK-HOVER-color: rgba( 147, 197, 253, 1 );
+        --MAIN-BG-color: rgba( 13, 17, 23, 1 );        /* #0d1117 */
+        --MAIN-TITLES-TEXT-color: rgba( 232, 237, 243, 1 );
+
+        --MAIN-font: "IBM Plex Sans", "Source Sans 3", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
 
         --CODE-theme: relearn-dark;
         --CODE-BLOCK-color: rgba( 248, 248, 242, 1 );
-        --CODE-BLOCK-BG-color: rgba( 43, 43, 43, 1 );
-        --CODE-BLOCK-BORDER-color: rgba( 71, 71, 71, 1 );
-        --CODE-INLINE-color: rgba( 130, 229, 80, 1 );
-        --CODE-INLINE-BG-color: rgba( 45, 45, 45, 1 );
-        --CODE-INLINE-BORDER-color: rgba( 70, 70, 70, 1 );
+        --CODE-BLOCK-BG-color: rgba( 22, 27, 34, 1 );
+        --CODE-BLOCK-BORDER-color: rgba( 45, 55, 72, 1 );
+        --CODE-INLINE-color: rgba( 147, 197, 253, 1 );
+        --CODE-INLINE-BG-color: rgba( 28, 35, 48, 1 );
+        --CODE-INLINE-BORDER-color: rgba( 45, 55, 72, 1 );
 
         --BROWSER-theme: dark;
         --MERMAID-theme: dark;
         --OPENAPI-theme: dark;
         --OPENAPI-CODE-theme: obsidian;
 
-        --MENU-HOME-LINK-color: rgba( 64, 64, 64, 1 );
-        --MENU-HOME-LINK-HOVER-color: rgba( 0, 0, 0, 1 );
+        --MENU-HOME-LINK-color: rgba( 139, 152, 167, 1 );
+        --MENU-HOME-LINK-HOVER-color: rgba( 232, 237, 243, 1 );
 
-        --MENU-SEARCH-color: rgba( 224, 224, 224, 1 );
-        --MENU-SEARCH-BG-color: rgba( 50, 50, 50, 1 );
-        --MENU-SEARCH-BORDER-color: rgba( 224, 224, 224, 1 );
+        --MENU-SEARCH-color: rgba( 139, 152, 167, 1 );
+        --MENU-SEARCH-BG-color: rgba( 9, 13, 19, 1 );
+        --MENU-SEARCH-BORDER-color: rgba( 45, 55, 72, 1 );
 
-        --MENU-SECTIONS-BG-color: rgba( 43, 43, 43, 1 );
-        --MENU-SECTIONS-LINK-color: rgba( 186, 186, 186, 1 );
-        --MENU-SECTIONS-LINK-HOVER-color: rgba( 255, 255, 255, 1 );
-        --MENU-SECTIONS-ACTIVE-BG-color: rgba( 50, 50, 50, 1 );
-        --MENU-SECTION-ACTIVE-CATEGORY-color: rgba( 130, 229, 80, 1 );
-        --MENU-SECTION-SEPARATOR-color: rgba( 96, 96, 96, 1 );
+        --MENU-SECTIONS-BG-color: rgba( 22, 27, 34, 1 );     /* #161b22 */
+        --MENU-SECTIONS-LINK-color: rgba( 139, 152, 167, 1 );
+        --MENU-SECTIONS-LINK-HOVER-color: rgba( 232, 237, 243, 1 );
+        --MENU-SECTIONS-ACTIVE-BG-color: rgba( 45, 55, 72, .5 );
+        --MENU-SECTION-ACTIVE-CATEGORY-color: rgba( 56, 189, 248, 1 );
+        --MENU-SECTION-SEPARATOR-color: rgba( 45, 55, 72, 1 );
 
-        --MENU-VISITED-color: rgba( 72, 106, 201, 1 );
+        --MENU-VISITED-color: rgba( 147, 197, 253, 1 );
 
-        --BOX-CAPTION-color: rgba( 240, 240, 240, 1 );
-        --BOX-BG-color: rgba( 20, 20, 20, 1 );
-        --BOX-TEXT-color: rgba( 224, 224, 224, 1 );
+        --BOX-CAPTION-color: rgba( 232, 237, 243, 1 );
+        --BOX-BG-color: rgba( 22, 27, 34, 1 );
+        --BOX-TEXT-color: rgba( 232, 237, 243, 1 );
     }
 }

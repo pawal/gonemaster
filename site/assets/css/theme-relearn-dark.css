@@ -1,0 +1,45 @@
+:root {
+    --PRIMARY-color: rgba( 56, 189, 248, 1 );    /* #38bdf8 - sky blue */
+    --SECONDARY-color: rgba( 147, 197, 253, 1 ); /* #93c5fd */
+    --ACCENT-color: rgba( 56, 189, 248, 1 );
+
+    --MAIN-TEXT-color: rgba( 232, 237, 243, 1 );  /* #e8edf3 */
+    --MAIN-LINK-HOVER-color: rgba( 147, 197, 253, 1 );
+    --MAIN-BG-color: rgba( 13, 17, 23, 1 );        /* #0d1117 */
+    --MAIN-TITLES-TEXT-color: rgba( 232, 237, 243, 1 );
+
+    --MAIN-font: "IBM Plex Sans", "Source Sans 3", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+
+    --CODE-theme: relearn-dark;
+    --CODE-BLOCK-color: rgba( 248, 248, 242, 1 );
+    --CODE-BLOCK-BG-color: rgba( 22, 27, 34, 1 );
+    --CODE-BLOCK-BORDER-color: rgba( 45, 55, 72, 1 );
+    --CODE-INLINE-color: rgba( 147, 197, 253, 1 );
+    --CODE-INLINE-BG-color: rgba( 28, 35, 48, 1 );
+    --CODE-INLINE-BORDER-color: rgba( 45, 55, 72, 1 );
+
+    --BROWSER-theme: dark;
+    --MERMAID-theme: dark;
+    --OPENAPI-theme: dark;
+    --OPENAPI-CODE-theme: obsidian;
+
+    --MENU-HOME-LINK-color: rgba( 139, 152, 167, 1 );
+    --MENU-HOME-LINK-HOVER-color: rgba( 232, 237, 243, 1 );
+
+    --MENU-SEARCH-color: rgba( 139, 152, 167, 1 );
+    --MENU-SEARCH-BG-color: rgba( 9, 13, 19, 1 );
+    --MENU-SEARCH-BORDER-color: rgba( 45, 55, 72, 1 );
+
+    --MENU-SECTIONS-BG-color: rgba( 22, 27, 34, 1 );     /* #161b22 */
+    --MENU-SECTIONS-LINK-color: rgba( 139, 152, 167, 1 );
+    --MENU-SECTIONS-LINK-HOVER-color: rgba( 232, 237, 243, 1 );
+    --MENU-SECTIONS-ACTIVE-BG-color: rgba( 45, 55, 72, .5 );
+    --MENU-SECTION-ACTIVE-CATEGORY-color: rgba( 56, 189, 248, 1 );
+    --MENU-SECTION-SEPARATOR-color: rgba( 45, 55, 72, 1 );
+
+    --MENU-VISITED-color: rgba( 147, 197, 253, 1 );
+
+    --BOX-CAPTION-color: rgba( 232, 237, 243, 1 );
+    --BOX-BG-color: rgba( 22, 27, 34, 1 );
+    --BOX-TEXT-color: rgba( 232, 237, 243, 1 );
+}

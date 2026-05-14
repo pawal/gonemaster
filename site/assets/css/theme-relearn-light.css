@@ -34,7 +34,7 @@
     --MENU-SECTIONS-ACTIVE-BG-color: rgba( 0, 0, 0, .20 );
     --MENU-SECTIONS-LINK-color: rgba( 186, 210, 230, 1 );
     --MENU-SECTIONS-LINK-HOVER-color: rgba( 255, 255, 255, 1 );
-    --MENU-SECTION-ACTIVE-CATEGORY-color: rgba( 200, 220, 240, 1 );
+    --MENU-SECTION-ACTIVE-CATEGORY-color: rgba( 11, 45, 77, 1 );   /* #0b2d4d - dark navy, readable on white */
     --MENU-SECTION-SEPARATOR-color: rgba( 26, 73, 122, 1 );
 
     --BOX-CAPTION-color: rgba( 255, 255, 255, 1 );

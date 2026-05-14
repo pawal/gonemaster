@@ -9,6 +9,8 @@ theme = "relearn"
 [params]
   themeVariant = "relearn-light"
   disableInlineCopyToClipBoard = true
+  collapsibleMenu = true
+  alwaysopen = false
 
 [markup.goldmark.renderer]
   unsafe = true

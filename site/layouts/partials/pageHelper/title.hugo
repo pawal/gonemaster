@@ -12,8 +12,7 @@
   {{- else if .Title }}
     {{- $title = .Title }}
   {{- else if and .File (findRE `^[a-z]+\d+$` .File.ContentBaseName) }}
-    {{- $h1 := index (findRE `(?m)^# .+` .RawContent 1) 0 }}
-    {{- $title = $h1 | strings.TrimPrefix "# " }}
+    {{- $title = .File.ContentBaseName | upper }}
   {{- else if .File }}
     {{- $title = .File.ContentBaseName | humanize | title }}
   {{- end }}

@@ -79,6 +79,7 @@ Full documentation: [pawal.codeberg.page/gonemaster](https://pawal.codeberg.page
 - [Analysis](https://pawal.codeberg.page/gonemaster/analysis/) - cohort analysis and snapshots
 - [Specifications](https://pawal.codeberg.page/gonemaster/specifications/) - testcase and tag reference
 - [OpenAPI](docs/openapi.yaml) - machine-readable API spec
+- [pkg.go.dev](https://pkg.go.dev/codeberg.org/pawal/gonemaster/engine) - Go package docs; `engine` is the main entry point for embedding gonemaster programmatically
 
 ## Highlights
 

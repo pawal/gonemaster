@@ -3,6 +3,8 @@
 This document covers how to call the Gonemaster engine directly from Go. It
 focuses on the core `engine` package and common workflows.
 
+Go package reference: [pkg.go.dev/codeberg.org/pawal/gonemaster/engine](https://pkg.go.dev/codeberg.org/pawal/gonemaster/engine)
+
 ## Overview
 - Primary entry point: `engine.Run(req)` returns a slice of `engine.LogEntry`.
 - Optional: `req.LogCallback` streams `*logger.Entry` as tests run.

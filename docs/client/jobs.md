@@ -106,3 +106,6 @@ gonemaster-client jobs purge --older-than 90
 
 `--older-than 0` uses the server's configured `retention_days`. The server
 returns an error when both values are `0`.
+
+The server responds with `{"purged_jobs": N}`. In human output this is printed
+as a summary line; in `--format json` it is the raw response object.

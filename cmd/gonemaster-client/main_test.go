@@ -16,9 +16,9 @@ import (
 )
 
 func TestCLIMDDocumentsPurge(t *testing.T) {
-	data, err := os.ReadFile("../../docs/cli/README.md")
+	data, err := os.ReadFile("../../docs/client/jobs.md")
 	if err != nil {
-		t.Fatalf("read docs/cli.md: %v", err)
+		t.Fatalf("read docs/client/jobs.md: %v", err)
 	}
 	src := string(data)
 	for _, want := range []string{

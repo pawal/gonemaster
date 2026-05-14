@@ -7,7 +7,7 @@ theme = "relearn"
   home = ["HTML", "RSS", "search", "searchpage"]
 
 [params]
-  themeVariant = "relearn-light"
+  themeVariant = ["relearn-auto", "relearn-light", "relearn-dark"]
   disableInlineCopyToClipBoard = true
   collapsibleMenu = true
   alwaysopen = false

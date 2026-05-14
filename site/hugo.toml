@@ -8,6 +8,7 @@ theme = "relearn"
 
 [params]
   themeVariant = "relearn-light"
+  disableInlineCopyToClipBoard = true
 
 [markup.goldmark.renderer]
   unsafe = true

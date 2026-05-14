@@ -14,7 +14,7 @@ gonemaster --json --domain example.com | jq
 gonemaster --module dnssec --testcase dnssec01 example.com
 ```
 
-Direct CLI documentation: [docs/cli.md](docs/cli.md)
+Direct CLI documentation: [pawal.codeberg.page/gonemaster/cli](https://pawal.codeberg.page/gonemaster/cli/)
 
 ### Start the Server
 
@@ -23,7 +23,7 @@ go build -o ./gonemaster-server ./cmd/gonemaster-server
 ./gonemaster-server
 ```
 
-Server documentation: [docs/server/](docs/server/README.md)
+Server documentation: [pawal.codeberg.page/gonemaster/server](https://pawal.codeberg.page/gonemaster/server/)
 
 ### Automate the Server
 
@@ -33,7 +33,7 @@ gonemaster-client jobs batch --file domains.txt --tag tld --wait
 gonemaster-client entries query --tag tld --module DNSSEC --latest
 ```
 
-Client documentation: [docs/client/](docs/client/README.md)
+Client documentation: [pawal.codeberg.page/gonemaster/client](https://pawal.codeberg.page/gonemaster/client/)
 
 ### Publish Analysis Cohorts
 
@@ -43,7 +43,7 @@ gonemaster-client tags add-domains tld --file tlds.txt
 gonemaster-client jobs batch --from-tag tld --tag tld --wait
 ```
 
-Analysis documentation: [docs/analysis/](docs/analysis/README.md)
+Analysis documentation: [pawal.codeberg.page/gonemaster/analysis](https://pawal.codeberg.page/gonemaster/analysis/)
 
 ## Install
 
@@ -69,16 +69,14 @@ documentation/specification checks. Run `make help` for the current list.
 
 ## Documentation
 
-- Documentation home: [docs/README.md](docs/README.md)
-- Direct CLI: [docs/cli.md](docs/cli.md)
-- Server: [docs/server/](docs/server/README.md)
-- Server client: [docs/client/](docs/client/README.md)
-- Tags, cohorts, and snapshots: [docs/analysis/](docs/analysis/README.md)
-- API conventions: [docs/reference/api.md](docs/reference/api.md)
-- OpenAPI: [docs/openapi.yaml](docs/openapi.yaml)
-- Developer engine API: [docs/dev.md](docs/dev.md)
-- Testcase specifications: [docs/specifications/](docs/specifications/README.md)
-- Nagios plugin: [docs/nagios.md](docs/nagios.md)
+Full documentation: [pawal.codeberg.page/gonemaster](https://pawal.codeberg.page/gonemaster/)
+
+- [CLI](https://pawal.codeberg.page/gonemaster/cli/) - local test runner
+- [Server](https://pawal.codeberg.page/gonemaster/server/) - HTTP server and queue
+- [Client](https://pawal.codeberg.page/gonemaster/client/) - automation client
+- [Analysis](https://pawal.codeberg.page/gonemaster/analysis/) - cohort analysis and snapshots
+- [Specifications](https://pawal.codeberg.page/gonemaster/specifications/) - testcase and tag reference
+- [OpenAPI](docs/openapi.yaml) - machine-readable API spec
 
 ## Highlights
 

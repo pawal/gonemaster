@@ -4,6 +4,8 @@ Gonemaster is a Go implementation of the Zonemaster DNS test engine, with a
 local CLI, an HTTP server, a server automation client, and public analysis
 views for tagged domain cohorts.
 
+The Public UI is available here: https://gonemaster.evilbit.de/
+
 ## Common Paths
 
 ### Run One Local Test

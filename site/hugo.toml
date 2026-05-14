@@ -3,6 +3,9 @@ languageCode = "en-us"
 title = "Gonemaster"
 theme = "relearn"
 
+[outputs]
+  home = ["HTML", "RSS", "search", "searchpage"]
+
 [params]
   themeVariant = "relearn-light"
 

@@ -1,7 +1,7 @@
 {{ $path := .Get 0 }}
 {{ $file := resources.Get (printf "docs/%s" $path) }}
 {{ if $file }}
-  {{ $file.Content | markdownify }}
+  {{ .Page.RenderString $file.Content }}
 {{ else }}
   {{ errorf "include shortcode: file not found: docs/%s" $path }}
 {{ end }}

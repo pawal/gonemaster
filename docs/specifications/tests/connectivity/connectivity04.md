@@ -33,6 +33,66 @@ Status: Final
    - If exactly one prefix exists for the family and all processed family IPs mapped to that prefix, emit `CN04_IPV<4|6>_SINGLE_PREFIX`.
 6. Emit `TEST_CASE_END`.
 
+### Per-IP Prefix Lookup (steps 2-4)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> collect
+    collect : NS items from sources
+    collect --> filter
+    filter : keep addressed entries
+    filter --> dedupe
+    dedupe : unique IPs per family
+    dedupe --> lookup
+    lookup : per-IP prefix lookup (parallel)
+    lookup --> code
+    code : result code
+    code --> dbErr : db error
+    code --> emptySet : empty
+    code --> ok : lookup ok
+    dbErr : error-prefix-database tag
+    emptySet : empty-prefix-set tag
+    ok : raw and announce-in tags
+    ok --> stored
+    stored : prefix and NS stored per family
+    dbErr --> [*]
+    emptySet --> [*]
+    stored --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
+### Per-Family Prefix Classification (step 5)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> v4Class
+    v4Class : IPv4 prefix groups
+    v4Class --> v4Multi : groups with 2 or more
+    v4Class --> v4Singles : single-member groups
+    v4Class --> v4One : all in one prefix
+    v4Multi : ipv4-same-prefix tag
+    v4Singles : ipv4-different-prefix tag
+    v4One : ipv4-single-prefix tag
+    v4Multi --> v6Class
+    v4Singles --> v6Class
+    v4One --> v6Class
+    v6Class : IPv6 prefix groups
+    v6Class --> v6Multi : groups with 2 or more
+    v6Class --> v6Singles : single-member groups
+    v6Class --> v6One : all in one prefix
+    v6Multi : ipv6-same-prefix tag
+    v6Singles : ipv6-different-prefix tag
+    v6One : ipv6-single-prefix tag
+    v6Multi --> done
+    v6Singles --> done
+    v6One --> done
+    done : emit test-case-end
+    done --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

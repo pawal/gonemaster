@@ -34,6 +34,66 @@ Status: Final
 4. If any nameservers passed all checks, emit one `CN02_OK_TCP` with `servers` listing them all.
 5. Emit `TEST_CASE_END`.
 
+### Per-NS TCP Probe (steps 2-4)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> resolve
+    resolve : resolve NS list
+    resolve --> probe
+    probe : per-NS TCP probe (parallel)
+    probe --> disabled : transport off
+    probe --> query : transport on
+    disabled : per-rrtype transport tags
+    query : SOA and NS over TCP
+    query --> noBoth : both absent
+    query --> checks : evaluate
+    noBoth : no-response-tcp tag
+    checks : per-qtype shape checks
+    checks --> ok : all pass
+    checks --> shapeFail : any fail
+    ok : recorded as ok
+    shapeFail : per-shape failure tags
+    ok --> agg
+    shapeFail --> agg
+    agg : ok-tcp aggregate tag
+    agg --> done
+    done : emit test-case-end
+    disabled --> [*]
+    noBoth --> [*]
+    done --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
+### Per-Query Response Shape Checks (step 3 details)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> qresp
+    qresp : SOA or NS response
+    qresp --> noResp : missing response
+    qresp --> badRcode : non-NOERROR rcode
+    qresp --> noRec : no record in answer
+    qresp --> wrongOwn : wrong owner name
+    qresp --> notAA : AA flag unset
+    qresp --> qOK : all checks pass
+    noResp : no-response qtype tag
+    badRcode : unexpected-rcode qtype tag
+    noRec : missing-record qtype tag
+    wrongOwn : wrong-record qtype tag
+    notAA : record-not-aa qtype tag
+    qOK : qtype ok
+    noResp --> [*]
+    badRcode --> [*]
+    noRec --> [*]
+    wrongOwn --> [*]
+    notAA --> [*]
+    qOK --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

@@ -35,6 +35,70 @@ Status: Final
 6. Repeat step 5 for IPv6 (`IPV6_ONE_ASN`, `IPV6_SAME_ASN`, `IPV6_DIFFERENT_ASN`).
 7. Emit `TEST_CASE_END`.
 
+### Per-IP ASN Lookup (step 4)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> resolve
+    resolve : resolve NS list
+    resolve --> split
+    split : split by IP family
+    split --> lookup
+    lookup : per-IP ASN lookup (parallel)
+    lookup --> code
+    code : result code
+    code --> dbErr : db error
+    code --> emptySet : empty
+    code --> ok : lookup ok
+    dbErr : asn-db-error tag
+    emptySet : empty-asn-set tag
+    ok : observability tags
+    ok --> stored
+    stored : ASNs stored per family
+    dbErr --> [*]
+    emptySet --> [*]
+    stored --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
+### Per-Family Diversity Classification (steps 5-6)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> v4Class
+    v4Class : IPv4 stored ASN data
+    v4Class --> v4None : no ASNs stored
+    v4Class --> v4One : exactly one ASN
+    v4Class --> v4Same : same ASN signature
+    v4Class --> v4Diff : different signatures
+    v4None : no IPv4 diversity tag
+    v4One : ipv4-one-asn tag
+    v4Same : ipv4-same-asn tag
+    v4Diff : ipv4-different-asn tag
+    v4None --> v6Class
+    v4One --> v6Class
+    v4Same --> v6Class
+    v4Diff --> v6Class
+    v6Class : IPv6 stored ASN data
+    v6Class --> v6None : no ASNs stored
+    v6Class --> v6One : exactly one ASN
+    v6Class --> v6Same : same ASN signature
+    v6Class --> v6Diff : different signatures
+    v6None : no IPv6 diversity tag
+    v6One : ipv6-one-asn tag
+    v6Same : ipv6-same-asn tag
+    v6Diff : ipv6-different-asn tag
+    v6None --> done
+    v6One --> done
+    v6Same --> done
+    v6Diff --> done
+    done : emit test-case-end
+    done --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

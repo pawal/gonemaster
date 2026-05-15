@@ -36,7 +36,68 @@ Status: Final
    - If all checks passed, record nameserver as ok.
 5. If any nameservers passed all checks, emit one `CN01_OK_UDP` with `servers` listing them all.
 6. Emit `TEST_CASE_END`.
-5. Emit `TEST_CASE_END`.
+
+### Per-NS UDP Probe (steps 2-5)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> resolve
+    resolve : resolve NS list
+    resolve --> summary
+    summary : disabled-transport summary
+    summary --> probe
+    probe : per-NS UDP probe (parallel)
+    probe --> disabled : transport off
+    probe --> query : transport on
+    disabled : per-rrtype transport tags
+    query : SOA and NS over UDP
+    query --> noBoth : both absent
+    query --> checks : evaluate
+    noBoth : no-response-udp tag
+    checks : per-qtype shape checks
+    checks --> ok : all pass
+    checks --> shapeFail : any fail
+    ok : recorded as ok
+    shapeFail : per-shape failure tags
+    ok --> agg
+    shapeFail --> agg
+    agg : ok-udp aggregate tag
+    agg --> done
+    done : emit test-case-end
+    disabled --> [*]
+    noBoth --> [*]
+    done --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
+### Per-Query Response Shape Checks (step 4 details)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> qresp
+    qresp : SOA or NS response
+    qresp --> noResp : missing response
+    qresp --> badRcode : non-NOERROR rcode
+    qresp --> noRec : no record in answer
+    qresp --> wrongOwn : wrong owner name
+    qresp --> notAA : AA flag unset
+    qresp --> qOK : all checks pass
+    noResp : no-response qtype tag
+    badRcode : unexpected-rcode qtype tag
+    noRec : missing-record qtype tag
+    wrongOwn : wrong-record qtype tag
+    notAA : record-not-aa qtype tag
+    qOK : qtype ok
+    noResp --> [*]
+    badRcode --> [*]
+    noRec --> [*]
+    wrongOwn --> [*]
+    notAA --> [*]
+    qOK --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
 
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |

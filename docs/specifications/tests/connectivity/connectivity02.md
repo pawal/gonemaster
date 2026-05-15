@@ -80,7 +80,7 @@ stateDiagram-v2
     qresp --> notAA : AA flag unset
     qresp --> qOK : all checks pass
     noResp : no-response qtype tag
-    badRcode : unexpected-rcode qtype tag
+    badRcode : unexpected rcode tag
     noRec : missing-record qtype tag
     wrongOwn : wrong-record qtype tag
     notAA : record-not-aa qtype tag

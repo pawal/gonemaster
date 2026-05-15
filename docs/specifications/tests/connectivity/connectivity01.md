@@ -45,7 +45,7 @@ stateDiagram-v2
     [*] --> resolve
     resolve : resolve NS list
     resolve --> summary
-    summary : disabled-transport summary
+    summary : per-family transport tags
     summary --> probe
     probe : per-NS UDP probe (parallel)
     probe --> disabled : transport off
@@ -85,7 +85,7 @@ stateDiagram-v2
     qresp --> notAA : AA flag unset
     qresp --> qOK : all checks pass
     noResp : no-response qtype tag
-    badRcode : unexpected-rcode qtype tag
+    badRcode : unexpected rcode tag
     noRec : missing-record qtype tag
     wrongOwn : wrong-record qtype tag
     notAA : record-not-aa qtype tag

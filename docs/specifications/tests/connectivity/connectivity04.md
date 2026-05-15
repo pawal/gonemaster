@@ -45,7 +45,7 @@ stateDiagram-v2
     filter --> dedupe
     dedupe : unique IPs per family
     dedupe --> lookup
-    lookup : per-IP prefix lookup (parallel)
+    lookup : per-IP lookup (parallel)
     lookup --> code
     code : result code
     code --> dbErr : db error
@@ -55,7 +55,7 @@ stateDiagram-v2
     emptySet : empty-prefix-set tag
     ok : raw and announce-in tags
     ok --> stored
-    stored : prefix and NS stored per family
+    stored : prefix map per family
     dbErr --> [*]
     emptySet --> [*]
     stored --> [*]

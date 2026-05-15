@@ -66,7 +66,7 @@ stateDiagram-v2
     ignored --> [*]
     noDNSKEY --> [*]
     withDNSKEY --> nsecProc
-    nsecProc : NSEC and NSEC3PARAM processing
+    nsecProc : NSEC/NSEC3PARAM checks
     nsecProc --> [*]
 {{< /mermaid >}}
 {{% /expand %}}
@@ -90,7 +90,7 @@ stateDiagram-v2
     nsecAns : NSEC-in-answer path
     errAns : erroneous answer
     nsec3Nodata : NSEC3-NODATA path
-    nsecNodata : NSEC-NODATA path (RFC 4470/9824)
+    nsecNodata : NSEC-NODATA path
     noEvid : no evidence
     respErr --> [*]
     nsecAns --> [*]
@@ -151,7 +151,7 @@ stateDiagram-v2
     allDNSKEY --> missing
     zoneTag --> missing
     srvTag --> missing
-    missing : DS10_EXPECTED_NSEC_NSEC3_MISSING
+    missing : NSEC/NSEC3 missing
     missing --> [*]
 {{< /mermaid >}}
 {{% /expand %}}

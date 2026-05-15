@@ -44,6 +44,68 @@ Status: Final
     - Otherwise emit `DS01_PARENT_SERVER_NO_DS`.
 11. Emit `TEST_CASE_END`.
 
+### Per-Parent-NS DS Query (steps 4-5)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> source
+    source : DS source type
+    source --> fakeDS : undelegated fake
+    source --> probe : real parents
+    fakeDS : classify directly
+    probe : per-parent-NS probe
+    probe --> disabled : transport off
+    probe --> query : transport on
+    disabled : transport-disabled tag
+    query : DS query DNSSEC on
+    query --> ignored : bad shape
+    query --> noOwner : no DS for owner
+    query --> hasDS : DS present
+    ignored : mark ignored
+    noOwner : without-DS set
+    hasDS : per-digest classify
+    fakeDS --> [*]
+    hasDS --> [*]
+    ignored --> [*]
+    noOwner --> [*]
+    disabled --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
+### Aggregation and Summary Emission (steps 6-10)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> emitDigest
+    emitDigest : per-digest tags
+    emitDigest --> algoCheck
+    algoCheck : algo-2 present?
+    algoCheck --> emitMiss : missing
+    algoCheck --> respCheck : present
+    emitMiss : algo-2-missing tag
+    emitMiss --> respCheck
+    respCheck : any responders?
+    respCheck --> noResp : only ignored
+    respCheck --> infoTags : at least one
+    noResp : no-response tag
+    infoTags : zone-type info tags
+    noResp --> noDSCheck
+    infoTags --> noDSCheck
+    noDSCheck : without-DS set?
+    noDSCheck --> zoneNoDS : none had DS
+    noDSCheck --> serverNoDS : mixed
+    noDSCheck --> done : all had DS
+    zoneNoDS : zone-no-DS tag
+    serverNoDS : server-no-DS tag
+    zoneNoDS --> done
+    serverNoDS --> done
+    done : emit test-case-end
+    done --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

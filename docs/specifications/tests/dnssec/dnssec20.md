@@ -41,6 +41,48 @@ Status: Draft
    - If no nameserver had DNSSEC (and no other findings), emit `DS20_NO_DNSSEC`.
 5. Emit `TEST_CASE_END`.
 
+### Per-NS Bitmap Probe and Aggregation (steps 2-5)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> probe
+    probe : per-NS DNSKEY query
+    probe --> disabled : transport off
+    probe --> query : transport on
+    disabled : transport-disabled tag
+    query : DNSKEY check
+    query --> noDnssec : not signed
+    query --> getBitmap : signed
+    getBitmap : get NSEC/NSEC3 bitmap
+    getBitmap --> noBitmap : not obtained
+    getBitmap --> probeTypes : obtained
+    probeTypes : probe A/AAAA/MX/TXT
+    probeTypes --> mismatch : missing in bitmap
+    probeTypes --> okBitmap : all present
+    mismatch --> aggregate
+    okBitmap --> aggregate
+    noBitmap --> aggregate
+    noDnssec --> aggregate
+    aggregate : aggregate per-type
+    aggregate --> emitMismatch : has mismatches
+    aggregate --> emitOK : no mismatches
+    aggregate --> emitNoBitmap : only no-bitmap
+    aggregate --> emitNoDnssec : only no-DNSSEC
+    emitMismatch : mismatch tags
+    emitOK : bitmap-OK tag
+    emitNoBitmap : no-bitmap tag
+    emitNoDnssec : no-DNSSEC tag
+    emitMismatch --> done
+    emitOK --> done
+    emitNoBitmap --> done
+    emitNoDnssec --> done
+    done : emit test-case-end
+    disabled --> [*]
+    done --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

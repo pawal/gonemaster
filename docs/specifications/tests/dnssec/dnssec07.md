@@ -57,6 +57,73 @@ Status: Final
      - Emit `DS07_DS_FOR_SIGNED_ZONE` when no-DS set empty and DS-present set non-empty.
 10. Emit `TEST_CASE_END`.
 
+### Child Signing-State Classification (steps 2-3, 8)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> probe
+    probe : per-child-NS probe
+    probe --> disabled : transport off
+    probe --> query : transport on
+    disabled : transport-disabled tag
+    query : SOA and DNSKEY queries
+    query --> ignored : SOA fails
+    query --> dnskeyOnly : DNSKEY check
+    dnskeyOnly --> noResp : no response
+    dnskeyOnly --> nonAuth : non-AA
+    dnskeyOnly --> errRcode : non-NOERROR
+    dnskeyOnly --> signed : RRSIG covers DNSKEY
+    dnskeyOnly --> unsigned : no RRSIG cover
+    noResp : no-response tag
+    nonAuth : non-auth-response tag
+    errRcode : error-rcode tag
+    signed : signed-on-server set
+    unsigned : not-signed-on-server set
+    signed --> emit
+    unsigned --> emit
+    emit : signing-state tags
+    emit --> [*]
+    disabled --> [*]
+    ignored --> [*]
+    noResp --> [*]
+    nonAuth --> [*]
+    errRcode --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
+### Parent DS and Final Aggregation (steps 4-9)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> hasSigned
+    hasSigned : signed children?
+    hasSigned --> skip : none signed
+    hasSigned --> probe : at least one
+    skip : skip parent DS check
+    probe : per-parent-NS DS probe
+    probe --> disabled : transport off
+    probe --> query : transport on
+    disabled : transport-disabled tag
+    query : DS query DNSSEC
+    query --> ignored : bad shape
+    query --> hasDS : DS and RRSIG present
+    query --> noDS : no DS or RRSIG
+    hasDS : DS-present set
+    noDS : no-DS set
+    hasDS --> emit
+    noDS --> emit
+    emit : DS tags and summary
+    emit --> done
+    skip --> done
+    done : emit test-case-end
+    disabled --> [*]
+    ignored --> [*]
+    done --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

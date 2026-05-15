@@ -58,6 +58,42 @@ Status: Final
     - `DS03_ERROR_RESPONSE_NSEC_QUERY` for each nameserver that returned a non-`NOERROR` or non-`AA` NSEC response.
 12. Emit `TEST_CASE_END`.
 
+### Per-NS DNSKEY/NSEC Probe and Param Aggregation (steps 2-11)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> probe
+    probe : per-NS DNSKEY/NSEC
+    probe --> disabled : transport off
+    probe --> query : transport on
+    disabled : transport-disabled tag
+    query : query DNSKEY and NSEC
+    query --> dnskeyCheck
+    dnskeyCheck : DNSKEY response
+    dnskeyCheck --> noDnssec : no DNSKEY
+    dnskeyCheck --> hasDnssec : DNSKEY present
+    noDnssec --> nsecCheck
+    hasDnssec --> nsecCheck
+    nsecCheck : NSEC response
+    nsecCheck --> nsecErr : error or missing
+    nsecCheck --> noNsec3 : no NSEC3
+    nsecCheck --> hasNsec3 : NSEC3 present
+    hasNsec3 --> extract
+    extract : extract NSEC3 params
+    extract --> aggregate
+    nsecErr --> aggregate
+    noNsec3 --> aggregate
+    aggregate : aggregate and check
+    aggregate --> emit
+    emit : multi-tag emission
+    emit --> done
+    done : emit test-case-end
+    disabled --> [*]
+    done --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

@@ -49,6 +49,63 @@ Status: Draft
    - If no parent NS verified the DS RRSIG and at least one parent NS returned a signed DS RRset, emit `DS21_DS_RRSIG_NOT_VERIFIABLE` with the list of parent NS IPs that returned an unverifiable signed DS.
 6. Emit `TEST_CASE_END`.
 
+### Per-Parent-NS DS RRSIG Verification (steps 2-5)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> parentCheck
+    parentCheck : has parent zone?
+    parentCheck --> noParent : root
+    parentCheck --> probe : delegated
+    noParent : no-parent-zone tag
+    probe : per-parent probe
+    probe --> disabled : transport off
+    probe --> query : transport on
+    disabled : transport-disabled tag
+    query : DS and DNSKEY queries
+    query --> undet : DS bad shape
+    query --> noDS : no DS no proof
+    query --> hasDS : DS records
+    hasDS --> dnskeyCheck
+    dnskeyCheck : parent DNSKEY?
+    dnskeyCheck --> noDnskey : missing
+    noDnskey : DNSKEY-missing tag
+    dnskeyCheck --> verify : present
+    verify : verify DS RRSIG
+    verify --> notYet : inception future
+    verify --> expired : exp past
+    verify --> noKey : no DNSKEY for kt
+    verify --> unsupAlgo : algo unsupported
+    verify --> failed : verify failed
+    verify --> success : verified
+    notYet : not-yet-valid tag
+    expired : RRSIG-expired tag
+    noKey : no-key-for-DS tag
+    unsupAlgo : algo-not-supported tag
+    failed : RRSIG-invalid tag
+    success --> aggregate
+    notYet --> aggregate
+    expired --> aggregate
+    noKey --> aggregate
+    unsupAlgo --> aggregate
+    failed --> aggregate
+    aggregate : per-NS aggregation
+    aggregate --> emitVerified : at least one verified
+    aggregate --> emitNotVer : none verified
+    emitVerified : RRSIG-verified tag
+    emitNotVer : not-verifiable tag
+    emitVerified --> done
+    emitNotVer --> done
+    done : emit test-case-end
+    noParent --> done
+    disabled --> [*]
+    undet --> [*]
+    noDS --> [*]
+    done --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

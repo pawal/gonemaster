@@ -35,6 +35,45 @@ Status: Final
 9. Emit `DS15_MISMATCH_CDS_CDNSKEY` for nameservers with CDS/CDNSKEY mismatch.
 10. Emit `TEST_CASE_END`.
 
+### Per-NS CDS/CDNSKEY Presence and Match (steps 2-10)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> probe
+    probe : per-NS probe
+    probe --> disabled : transport off
+    probe --> query : transport on
+    disabled : transport-disabled tag
+    query : query CDS and CDNSKEY
+    query --> emptyCheck
+    emptyCheck : any non-empty?
+    emptyCheck --> emptyAll : none
+    emptyCheck --> classify : at least one
+    emptyAll : no-CDS-CDNSKEY tag
+    classify : per-NS classify
+    classify --> cdsOnly : CDS no CDNSKEY
+    classify --> cdnskeyOnly : CDNSKEY no CDS
+    classify --> both : both present
+    cdsOnly : CDS-only tag
+    cdnskeyOnly : CDNSKEY-only tag
+    both --> matchCheck
+    matchCheck : content match?
+    matchCheck --> mismatch : no match
+    matchCheck --> bothOK : matches
+    mismatch : mismatch tag
+    bothOK : both-present tag
+    mismatch --> done
+    bothOK --> done
+    cdsOnly --> done
+    cdnskeyOnly --> done
+    done : per-set consistency tags
+    done --> [*]
+    emptyAll --> [*]
+    disabled --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

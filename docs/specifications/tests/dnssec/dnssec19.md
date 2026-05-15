@@ -56,6 +56,44 @@ Status: Draft
 9. If `Responds Without DNSKEY` is non-empty and `Responds With DNSKEY` is empty, emit `DS19_NO_DNSKEY`.
 10. Emit `TEST_CASE_END`.
 
+### Per-NS DNSKEY Probe and Badkey Checks (steps 2-10)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> setup
+    setup : load blocklist
+    setup --> probe
+    probe : per-NS DNSKEY probe
+    probe --> disabled : transport off
+    probe --> query : transport on
+    disabled : transport-disabled tag
+    query : DNSKEY query
+    query --> ignored : bad response
+    query --> noKey : no DNSKEY
+    query --> hasKey : DNSKEY present
+    hasKey --> perKey
+    perKey : per DNSKEY check
+    perKey --> rsaCheck : RSA algos
+    perKey --> nonRsa : other algos
+    rsaCheck : RSA crypto checks
+    nonRsa --> blocklist
+    rsaCheck --> blocklist
+    blocklist : blocklist lookup
+    blocklist --> finding : compromised
+    blocklist --> clean : safe
+    finding : per-finding tag
+    clean : key-OK tag
+    finding --> done
+    clean --> done
+    noKey --> done
+    done : aggregate emissions
+    done --> [*]
+    disabled --> [*]
+    ignored --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

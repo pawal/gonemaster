@@ -36,6 +36,44 @@ Status: Final
    - If neither a remaining-time tag nor `DURATION_LONG` was emitted for this RRSIG, emit `DURATION_OK`.
 8. Emit `TEST_CASE_END`.
 
+### Per-RRSIG Validity Classification (steps 2-8)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> setup
+    setup : query DNSKEY and SOA
+    setup --> errCheck
+    errCheck : either error?
+    errCheck --> stop : error
+    errCheck --> collect : ok
+    collect : collect RRSIGs
+    collect --> perSig
+    perSig : per RRSIG
+    perSig --> expCheck
+    expCheck : remaining time
+    expCheck --> expired : negative
+    expCheck --> short : below short
+    expCheck --> long : above long
+    expCheck --> normal : within range
+    expired : RRSIG-expired tag
+    short : remaining-short tag
+    long : remaining-long tag
+    normal --> durCheck
+    durCheck : signature duration
+    durCheck --> durLong : above long
+    durCheck --> durOk : within range
+    durLong : duration-long tag
+    durOk : duration-ok tag
+    stop --> [*]
+    expired --> [*]
+    short --> [*]
+    long --> [*]
+    durLong --> [*]
+    durOk --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

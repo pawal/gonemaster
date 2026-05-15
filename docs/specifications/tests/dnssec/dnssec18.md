@@ -67,6 +67,87 @@ Status: Final
 16. **On-demand absence check**: if no CDS or CDNSKEY RRsets were found and at least one step-15 soft signal was emitted, emit `DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE`. (Steps 13-14 cannot fire when CDS/CDNSKEY are absent, so step 15 is the only contributor in practice.)
 17. Emit `TEST_CASE_END`.
 
+### Parent DS Collection and Per-Child Queries (steps 2-7)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> parents
+    parents : per-parent DS probe
+    parents --> dsCheck
+    dsCheck : DS set empty?
+    dsCheck --> stopEarly : empty
+    dsCheck --> children : non-empty
+    children : per-child queries
+    children --> gates
+    gates : RRset present?
+    gates --> skipVal : neither present
+    gates --> validate : at least one
+    stopEarly : emit test-case-end
+    skipVal --> stopEarly
+    validate : continue to validation
+    validate --> [*]
+    stopEarly --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
+### RRSIG-vs-DS Validation (steps 8-12)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> cdsCheck
+    cdsCheck : per-NS CDS check
+    cdsCheck --> cdsNoMatch : no keytag match
+    cdsCheck --> cdsMatch : keytag matches
+    cdsNoMatch : no-match-CDS tag
+    cdsMatch : match-CDS tag
+    cdsNoMatch --> cdnskeyCheck
+    cdsMatch --> cdnskeyCheck
+    cdnskeyCheck : per-NS CDNSKEY check
+    cdnskeyCheck --> cdnskeyNoMatch : no keytag match
+    cdnskeyCheck --> cdnskeyMatch : keytag matches
+    cdnskeyNoMatch : no-match-CDNSKEY tag
+    cdnskeyMatch : match-CDNSKEY tag
+    cdnskeyNoMatch --> [*]
+    cdnskeyMatch --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
+### Content Comparison and Rollover Signals (steps 13-16)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> cdsComp
+    cdsComp : CDS vs DS content
+    cdsComp --> cdsMatchTag : match
+    cdsComp --> cdsRollTag : differ
+    cdsMatchTag : CDS-matches-DS tag
+    cdsRollTag : CDS-rollover tag
+    cdsMatchTag --> cdnskeyComp
+    cdsRollTag --> cdnskeyComp
+    cdnskeyComp : CDNSKEY vs DS
+    cdnskeyComp --> cdnskeyMatchTag : match
+    cdnskeyComp --> cdnskeyRollTag : differ
+    cdnskeyMatchTag : matches-DS tag
+    cdnskeyRollTag : rollover tag
+    cdnskeyMatchTag --> softSig
+    cdnskeyRollTag --> softSig
+    softSig : soft rollover signals
+    softSig --> emitSig
+    emitSig : evidence tags
+    emitSig --> absentCheck
+    absentCheck : RRsets absent and signal?
+    absentCheck --> emitAbsent : yes
+    absentCheck --> done : no
+    emitAbsent : absent-evidence tag
+    emitAbsent --> done
+    done : emit test-case-end
+    done --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
 ## Rollover Evidence And Scoring
 
 `DS18_CDS_ROLLOVER_SIGNALED`, `DS18_CDNSKEY_ROLLOVER_SIGNALED`, and the four `DS18_ROLLOVER_EVIDENCE_*` tags are the rollover-evidence signals. `DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE` is emitted when no CDS/CDNSKEY RRsets are present but at least one step-15 soft signal fired. This is the typical pattern for on-demand CDS/CDNSKEY publication (e.g. Knot DNS outside its rollover window).

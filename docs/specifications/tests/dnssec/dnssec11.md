@@ -46,6 +46,76 @@ Status: Final
    - `Has DNSKEY` only (no undetermined, no absent) => emit `DS11_CONSISTENT_SIGNED`.
 8. Emit `TEST_CASE_END`.
 
+### Parent DS Phase (steps 4-5)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> probe
+    probe : per-parent-NS DS probe
+    probe --> disabled : transport off
+    probe --> query : transport on
+    disabled : transport-disabled tag
+    query : DS query
+    query --> undet : bad response
+    query --> noDS : no DS
+    query --> hasDS : DS present
+    undet --> decide
+    noDS --> decide
+    hasDS --> decide
+    decide : parent decision
+    decide --> stopUndet : only undetermined
+    decide --> stopNoDS : only no DS
+    decide --> mixedTags : mixed
+    decide --> proceed : only has DS
+    stopUndet : undetermined-DS tag
+    stopNoDS : no-parent-DS tag
+    mixedTags : inconsistent DS tags
+    mixedTags --> proceed
+    proceed : continue to child
+    stopUndet --> [*]
+    stopNoDS --> [*]
+    proceed --> [*]
+    disabled --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
+### Child DNSKEY Phase (steps 6-7)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> probe
+    probe : per-child-NS probe
+    probe --> disabled : transport off
+    probe --> query : transport on
+    disabled : transport-disabled tag
+    query : SOA and DNSKEY
+    query --> undet : SOA fails
+    query --> noKey : no DNSKEY
+    query --> hasKey : has DNSKEY
+    undet --> decide
+    noKey --> decide
+    hasKey --> decide
+    decide : child decision
+    decide --> emitUndet : only undetermined
+    decide --> emitNoKey : only no DNSKEY
+    decide --> emitMixed : mixed
+    decide --> emitOK : all have DNSKEY
+    emitUndet : undet-signed tag
+    emitNoKey : DS-but-unsigned tag
+    emitMixed : incon-signed tags
+    emitOK : consistent-signed tag
+    emitUndet --> done
+    emitNoKey --> done
+    emitMixed --> done
+    emitOK --> done
+    done : emit test-case-end
+    disabled --> [*]
+    done --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

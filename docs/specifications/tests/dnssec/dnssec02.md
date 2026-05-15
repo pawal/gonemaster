@@ -50,6 +50,78 @@ Status: Final
 8. Collect IPs where DS→DNSKEY match and RRSIG validation passed; if non-empty emit `DS02_MATCH_DS_DNSKEY`.
 9. Emit `TEST_CASE_END`.
 
+### Parent DS Collection (steps 2-4)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> parents
+    parents : per-parent-NS probe
+    parents --> disabled : transport off
+    parents --> query : transport on
+    disabled : transport-disabled tag
+    query : DS query
+    query --> ignored : bad shape
+    query --> hasDS : DS for owner
+    ignored : skip
+    hasDS : add to DS set
+    hasDS --> check
+    check : DS set empty?
+    check --> stopEarly : empty
+    check --> proceed : non-empty
+    stopEarly : emit test-case-end
+    proceed : continue to child phase
+    disabled --> [*]
+    ignored --> [*]
+    stopEarly --> [*]
+    proceed --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
+### Per-Child DNSKEY Match and RRSIG Verify (steps 5-8)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> child
+    child : per-child-NS probe
+    child --> dnskeyQ
+    dnskeyQ : DNSKEY query
+    dnskeyQ --> skip : bad response
+    dnskeyQ --> hasKeys : DNSKEYs present
+    hasKeys --> perDS
+    perDS : per-DS check
+    perDS --> noKt : no matching keytag
+    perDS --> digestFail : digest mismatch
+    perDS --> notZone : DNSKEY not ZONE
+    perDS --> notSEP : DNSKEY not SEP
+    perDS --> match : DS-matching key
+    noKt : no-DNSKEY-for-DS tag
+    digestFail : DS-key mismatch tag
+    notZone : not-zone-signing tag
+    notSEP : not-SEP tag
+    match --> verify
+    verify : verify DNSKEY RRSIG
+    verify --> noRrsig : no matching RRSIG
+    verify --> unsupp : algo unsupported
+    verify --> invalid : verify failed
+    verify --> valid : verification ok
+    noRrsig : no-matching-RRSIG tag
+    unsupp : unsupported algo tag
+    invalid : RRSIG-not-valid tag
+    valid : match-DS-DNSKEY tag
+    skip --> [*]
+    noKt --> [*]
+    digestFail --> [*]
+    notZone --> [*]
+    notSEP --> [*]
+    noRrsig --> [*]
+    unsupp --> [*]
+    invalid --> [*]
+    valid --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

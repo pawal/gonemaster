@@ -45,6 +45,81 @@ Status: Final
 6. Emit accumulated DS16 findings grouped by keytag or nameserver list as applicable.
 7. Emit `TEST_CASE_END`.
 
+### Per-NS Query and Delete Semantics (steps 2-5a)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> probe
+    probe : per-NS probe
+    probe --> disabled : transport off
+    probe --> query : transport on
+    disabled : transport-disabled tag
+    query : query CDS and DNSKEY
+    query --> empty : no CDS records
+    query --> hasCDS : CDS present
+    empty : skip findings
+    hasCDS --> delCheck
+    delCheck : delete semantics
+    delCheck --> mixedDel : mixed delete
+    delCheck --> allDel : only delete
+    delCheck --> normal : non-delete only
+    mixedDel : mixed-delete-CDS tag
+    allDel : delete-CDS tag
+    normal --> dnskeyCheck
+    dnskeyCheck : DNSKEY present?
+    dnskeyCheck --> noKey : absent
+    dnskeyCheck --> validate : present
+    noKey : CDS-without-DNSKEY tag
+    validate : continue validation
+    validate --> [*]
+    mixedDel --> [*]
+    allDel --> [*]
+    noKey --> [*]
+    empty --> [*]
+    disabled --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
+### Per-CDS DNSKEY Match and RRSIG Check (step 5b-c)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> perCDS
+    perCDS : per non-delete CDS
+    perCDS --> noKt : no matching keytag
+    perCDS --> nonZone : DNSKEY non-zone
+    perCDS --> chained : matched DNSKEY
+    noKt : no-DNSKEY-match tag
+    nonZone : non-zone-DNSKEY tag
+    chained --> sigChecks
+    sigChecks : RRSIG keytag checks
+    sigChecks --> noDSig : DNSKEY RRSIG missing
+    sigChecks --> noCSig : CDS RRSIG missing
+    sigChecks --> nonSEP : DNSKEY non-SEP
+    sigChecks --> rrsigVerify : verify
+    noDSig : DNSKEY-unsigned tag
+    noCSig : CDS-unsigned-self tag
+    nonSEP : non-SEP-DNSKEY tag
+    rrsigVerify --> noRRSIG : no CDS RRSIG
+    rrsigVerify --> perRRSIG : per CDS RRSIG
+    noRRSIG : CDS-unsigned tag
+    perRRSIG --> unknownKey : no DNSKEY for kt
+    perRRSIG --> invalidSig : verify failed
+    unknownKey : signed-by-unknown tag
+    invalidSig : CDS-invalid-RRSIG tag
+    noKt --> [*]
+    nonZone --> [*]
+    noDSig --> [*]
+    noCSig --> [*]
+    nonSEP --> [*]
+    noRRSIG --> [*]
+    unknownKey --> [*]
+    invalidSig --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

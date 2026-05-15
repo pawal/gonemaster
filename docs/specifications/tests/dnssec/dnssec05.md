@@ -34,6 +34,44 @@ Status: Final
    - Otherwise emit `DS05_SERVER_NO_DNSSEC`.
 7. Emit `TEST_CASE_END`.
 
+### Per-NS DNSKEY Algorithm Classification (steps 2-7)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> probe
+    probe : per-NS DNSKEY probe
+    probe --> disabled : transport off
+    probe --> query : transport on
+    disabled : transport-disabled tag
+    query : DNSKEY query
+    query --> ignored : bad response
+    query --> noDnskey : no DNSKEY
+    query --> hasDnskey : has DNSKEY
+    hasDnskey --> classify
+    classify : per-DNSKEY algo class
+    classify --> emitAlgo
+    emitAlgo : per-algo-class tags
+    emitAlgo --> summary
+    ignored --> summary
+    noDnskey --> summary
+    summary : zone signing summary
+    summary --> noRespAll : only ignored
+    summary --> zoneNoDnssec : none had DNSKEY
+    summary --> partial : mixed
+    summary --> done : all had DNSKEY
+    noRespAll : no-response tag
+    zoneNoDnssec : zone-no-DNSSEC tag
+    partial : server-no-DNSSEC tag
+    noRespAll --> done
+    zoneNoDnssec --> done
+    partial --> done
+    done : emit test-case-end
+    disabled --> [*]
+    done --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

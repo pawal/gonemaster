@@ -1,4 +1,4 @@
-# Syntax02 (syntax02)
+# Syntax02
 
 Status: Final
 

@@ -1,4 +1,4 @@
-# DNSSEC07 (dnssec07)
+# DNSSEC07
 
 Status: Final
 

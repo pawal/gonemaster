@@ -1,4 +1,4 @@
-# Basic02 (basic02)
+# Basic02
 
 Status: Final
 

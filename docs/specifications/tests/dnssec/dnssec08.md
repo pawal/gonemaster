@@ -1,4 +1,4 @@
-# DNSSEC08 (dnssec08)
+# DNSSEC08
 
 Status: Final
 

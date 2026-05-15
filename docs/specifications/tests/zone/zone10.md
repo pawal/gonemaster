@@ -1,4 +1,4 @@
-# Zone10 (zone10)
+# Zone10
 
 Status: Final
 

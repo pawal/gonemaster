@@ -1,4 +1,4 @@
-# Zone14 (zone14)
+# Zone14
 
 Status: Draft
 

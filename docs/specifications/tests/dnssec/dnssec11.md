@@ -1,4 +1,4 @@
-# DNSSEC11 (dnssec11)
+# DNSSEC11
 
 Status: Final
 

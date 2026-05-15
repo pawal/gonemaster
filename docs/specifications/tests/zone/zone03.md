@@ -1,4 +1,4 @@
-# Zone03 (zone03)
+# Zone03
 
 Status: Final
 

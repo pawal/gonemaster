@@ -1,4 +1,4 @@
-# Zone13 (zone13)
+# Zone13
 
 Status: Draft
 

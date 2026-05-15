@@ -1,4 +1,4 @@
-# Zone09 (zone09)
+# Zone09
 
 Status: Final
 

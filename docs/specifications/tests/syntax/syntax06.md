@@ -1,4 +1,4 @@
-# Syntax06 (syntax06)
+# Syntax06
 
 Status: Final
 

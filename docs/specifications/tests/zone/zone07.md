@@ -1,4 +1,4 @@
-# Zone07 (zone07)
+# Zone07
 
 Status: Final
 

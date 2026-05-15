@@ -1,4 +1,4 @@
-# DNSSEC16 (dnssec16)
+# DNSSEC16
 
 Status: Final
 

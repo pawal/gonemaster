@@ -1,4 +1,4 @@
-# Connectivity03 (connectivity03)
+# Connectivity03
 
 Status: Final
 

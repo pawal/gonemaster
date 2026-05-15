@@ -1,4 +1,4 @@
-# Syntax07 (syntax07)
+# Syntax07
 
 Status: Final
 

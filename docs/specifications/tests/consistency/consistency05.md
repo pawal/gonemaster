@@ -1,4 +1,4 @@
-# Consistency05 (consistency05)
+# Consistency05
 
 Status: Final
 

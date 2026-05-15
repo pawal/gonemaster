@@ -1,4 +1,4 @@
-# DNSSEC20 (dnssec20)
+# DNSSEC20
 
 Status: Draft
 

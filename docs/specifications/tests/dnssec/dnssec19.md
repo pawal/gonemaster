@@ -1,4 +1,4 @@
-# DNSSEC19 (dnssec19)
+# DNSSEC19
 
 Status: Draft
 

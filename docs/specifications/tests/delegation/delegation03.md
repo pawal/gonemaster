@@ -1,4 +1,4 @@
-# Delegation03 (delegation03)
+# Delegation03
 
 Status: Final
 

@@ -1,4 +1,4 @@
-# DNSSEC21 (dnssec21)
+# DNSSEC21
 
 Status: Draft
 

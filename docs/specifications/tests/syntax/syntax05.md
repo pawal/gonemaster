@@ -1,4 +1,4 @@
-# Syntax05 (syntax05)
+# Syntax05
 
 Status: Final
 

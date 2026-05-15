@@ -1,4 +1,4 @@
-# Syntax08 (syntax08)
+# Syntax08
 
 Status: Final
 

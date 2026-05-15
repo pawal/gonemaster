@@ -1,4 +1,4 @@
-# Address03 (address03)
+# Address03
 
 Status: Final
 

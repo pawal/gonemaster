@@ -1,4 +1,4 @@
-# DNSSEC06 (dnssec06)
+# DNSSEC06
 
 Status: Final
 

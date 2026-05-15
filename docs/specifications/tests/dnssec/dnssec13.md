@@ -1,4 +1,4 @@
-# DNSSEC13 (dnssec13)
+# DNSSEC13
 
 Status: Final
 

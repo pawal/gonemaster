@@ -1,4 +1,4 @@
-# Zone06 (zone06)
+# Zone06
 
 Status: Final
 

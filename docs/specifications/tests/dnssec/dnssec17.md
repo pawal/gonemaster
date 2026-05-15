@@ -1,4 +1,4 @@
-# DNSSEC17 (dnssec17)
+# DNSSEC17
 
 Status: Final
 

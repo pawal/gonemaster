@@ -1,4 +1,4 @@
-# Zone05 (zone05)
+# Zone05
 
 Status: Final
 

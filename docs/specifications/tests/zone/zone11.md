@@ -1,4 +1,4 @@
-# Zone11 (zone11)
+# Zone11
 
 Status: Final
 

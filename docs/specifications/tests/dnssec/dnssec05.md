@@ -1,4 +1,4 @@
-# DNSSEC05 (dnssec05)
+# DNSSEC05
 
 Status: Final
 

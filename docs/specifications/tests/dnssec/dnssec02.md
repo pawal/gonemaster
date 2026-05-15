@@ -1,4 +1,4 @@
-# DNSSEC02 (dnssec02)
+# DNSSEC02
 
 Status: Final
 

@@ -1,4 +1,4 @@
-# Connectivity04 (connectivity04)
+# Connectivity04
 
 Status: Final
 

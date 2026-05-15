@@ -1,4 +1,4 @@
-# Zone08 (zone08)
+# Zone08
 
 Status: Final
 

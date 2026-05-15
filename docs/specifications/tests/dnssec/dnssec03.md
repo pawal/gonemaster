@@ -1,4 +1,4 @@
-# DNSSEC03 (dnssec03)
+# DNSSEC03
 
 Status: Final
 

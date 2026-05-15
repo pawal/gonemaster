@@ -1,4 +1,4 @@
-# Nameserver09 (nameserver09)
+# Nameserver09
 
 Status: Final
 

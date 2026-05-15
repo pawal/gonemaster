@@ -1,4 +1,4 @@
-# DNSSEC18 (dnssec18)
+# DNSSEC18
 
 Status: Final
 

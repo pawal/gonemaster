@@ -3,7 +3,8 @@
 Status: Draft
 
 ## Purpose
-- Check DNSKEY records published by authoritative nameservers for known cryptographic weaknesses and membership in blocklists of compromised keys. This testcase ports DNSSEC-relevant checks from the [badkeys](https://github.com/badkeys/badkeys) project to detect vulnerable RSA keys (Fermat factorization, ROCA, pattern anomalies, invalid parameters, small factors, Wiener's attack) and keys matching the badkeys blocklist of known-compromised keys (e.g., Debian OpenSSL CVE-2008-0166, RFC example keys, firmware keys).
+- Check DNSKEY records for known cryptographic weaknesses and membership in blocklists of compromised keys.
+- Ports DNSSEC-relevant checks from the [badkeys](https://github.com/badkeys/badkeys) project: RSA crypto checks (Fermat factorization, ROCA, pattern anomalies, invalid parameters, small factors, Wiener's attack) plus a blocklist of known-compromised keys (Debian OpenSSL CVE-2008-0166, RFC example keys, firmware keys).
 
 ## Preconditions And Inputs
 - Preconditions:

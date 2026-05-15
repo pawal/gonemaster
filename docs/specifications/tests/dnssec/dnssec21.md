@@ -3,7 +3,8 @@
 Status: Draft
 
 ## Purpose
-- Verify that the parent zone correctly signs the DS RRset that delegates the child zone. Concretely: each parent nameserver must return the DS RRset for the child along with at least one RRSIG that validates against a published parent DNSKEY. This catches parent-side DNSSEC failures (broken key rollovers, expired or misissued RRSIGs over DS) that resolvers experience as a SERVFAIL chain break, but that today's DNSSEC testcases cannot see when the *child* zone is the test target.
+- Verify that the parent zone correctly signs the DS RRset that delegates the child zone.
+- Each parent nameserver must return the DS RRset for the child along with at least one RRSIG that validates against a published parent DNSKEY. Catches parent-side DNSSEC failures (broken key rollovers, expired or misissued RRSIGs over DS) that resolvers experience as a SERVFAIL chain break but that other DNSSEC testcases cannot see when the *child* zone is the test target.
 - Motivation: a parent zone with a broken DS RRSIG breaks resolution for every child it delegates, even when the child is configured correctly. Existing DNSSEC testcases all verify signatures *inside* the zone under test (child DNSKEY, child SOA, child NSEC/NSEC3, DS digest match); none validates the signature on the DS RRset *handed down* by the parent. DNSSEC02 reads the DS records from the parent's response but does not check the covering RRSIG. DNSSEC07 inspects whether an RRSIG covering DS is present in the parent's response but does not verify it cryptographically. DNSSEC21 closes that gap. Without it, an operator running gonemaster on their own domain can see "DNSSEC OK" while users see SERVFAIL.
 
 ## Preconditions And Inputs

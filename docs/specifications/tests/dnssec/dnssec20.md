@@ -3,7 +3,8 @@
 Status: Draft
 
 ## Purpose
-- Verify that the NSEC or NSEC3 type bitmap at the zone apex accurately reflects the RR types actually present in the zone. An incomplete (subset) bitmap enables cache poisoning via RFC 8198 aggressive negative caching and replay attacks (see Petr Špaček, ISC, 2021-11-30, "Type Bitmap: Subset - Broken").
+- Verify that the NSEC/NSEC3 apex type bitmap accurately reflects the RR types actually present in the zone.
+- An incomplete (subset) bitmap enables cache poisoning via RFC 8198 aggressive negative caching and replay attacks (see Petr Špaček, ISC, 2021-11-30, "Type Bitmap: Subset - Broken").
 
 ## Preconditions And Inputs
 - Preconditions:

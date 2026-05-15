@@ -73,9 +73,9 @@ make spec-export-implemented
 - dnssec16 - Validate CDS RRsets against DNSKEY data and CDS signatures, including delete semantics and signature/keytag consistency checks.
 - dnssec17 - Validate CDNSKEY RRsets against DNSKEY data and CDNSKEY signatures, including delete semantics and signature/keytag consistency checks.
 - dnssec18 - Validate that CDS and CDNSKEY RRsets are signed by a DNSKEY that corresponds to DS information observed at the parent side.
-- dnssec19 - Check DNSKEY records published by authoritative nameservers for known cryptographic weaknesses and membership in blocklists of compromised keys. This testcase ports DNSSEC-relevant checks from the [badkeys](https://github.com/badkeys/badkeys) project to detect vulnerable RSA keys (Fermat factorization, ROCA, pattern anomalies, invalid parameters, small factors, Wiener's attack) and keys matching the badkeys blocklist of known-compromised keys (e.g., Debian OpenSSL CVE-2008-0166, RFC example keys, firmware keys).
-- dnssec20 - Verify that the NSEC or NSEC3 type bitmap at the zone apex accurately reflects the RR types actually present in the zone. An incomplete (subset) bitmap enables cache poisoning via RFC 8198 aggressive negative caching and replay attacks (see Petr Špaček, ISC, 2021-11-30, "Type Bitmap: Subset - Broken").
-- dnssec21 - Verify that the parent zone correctly signs the DS RRset that delegates the child zone. Concretely: each parent nameserver must return the DS RRset for the child along with at least one RRSIG that validates against a published parent DNSKEY. This catches parent-side DNSSEC failures (broken key rollovers, expired or misissued RRSIGs over DS) that resolvers experience as a SERVFAIL chain break, but that today's DNSSEC testcases cannot see when the *child* zone is the test target.
+- dnssec19 - Check DNSKEY records for known cryptographic weaknesses and membership in blocklists of compromised keys.
+- dnssec20 - Verify that the NSEC/NSEC3 apex type bitmap accurately reflects the RR types actually present in the zone.
+- dnssec21 - Verify that the parent zone correctly signs the DS RRset that delegates the child zone.
 
 ### nameserver (15)
 - nameserver01 - Detect whether authoritative nameservers also behave as recursors.

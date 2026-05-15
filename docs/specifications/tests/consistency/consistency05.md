@@ -43,6 +43,70 @@ Status: Final
 11. If none of the three mismatch tags were emitted, emit `ADDRESSES_MATCH`.
 12. Emit `TEST_CASE_END`.
 
+### Parent Glue and Child Address Lookup (steps 2-7)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> parentNS
+    parentNS : query parent for NS
+    parentNS --> parentAdr
+    parentAdr : query A/AAAA for glue
+    parentAdr --> splitGlue
+    splitGlue : split by bailiwick
+    splitGlue --> ibSet
+    ibSet : in-bailiwick NS set
+    ibSet --> hasIB : has IB servers
+    ibSet --> noIB : none
+    noIB : use strict glue
+    noIB --> hasIB
+    hasIB --> probeChild
+    probeChild : per-NS A/AAAA probe
+    probeChild --> noResp : no response
+    probeChild --> failed : non-AA no referral
+    probeChild --> referral : referral
+    probeChild --> ok : usable
+    referral --> recurse
+    recurse : recursive fallback
+    recurse --> ok
+    noResp : no-response tag
+    failed : child-ns-failed tag
+    ok : accumulate addresses
+    noResp --> [*]
+    failed --> [*]
+    ok --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
+### Bailiwick Comparison and Final Emission (steps 8-12)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> usable
+    usable : usable IB path?
+    usable --> lame : none usable
+    usable --> compare : at least one
+    lame : child-zone-lame tag
+    compare : compare IB and OOB
+    compare --> parentOnly : IB parent-only
+    compare --> childOnly : IB child-only
+    compare --> oobMiss : OOB mismatch
+    compare --> allMatch : all match
+    parentOnly : IB mismatch tag
+    childOnly : extra-child-addr tag
+    oobMiss : OOB mismatch tag
+    allMatch : addresses-match tag
+    parentOnly --> done
+    childOnly --> done
+    oobMiss --> done
+    allMatch --> done
+    done : emit test-case-end
+    lame --> [*]
+    done --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

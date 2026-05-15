@@ -33,6 +33,50 @@ Status: Final
    - IPv6: `ENOUGH_IPV6_NS_DEL`, `NOT_ENOUGH_IPV6_NS_DEL`, or `NO_IPV6_NS_DEL`.
 6. Emit `TEST_CASE_END`.
 
+### Overall NS Count Checks (steps 2-3)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> delCount
+    delCount : delegation NS count
+    delCount --> delOK : at minimum
+    delCount --> delShort : below minimum
+    delOK : enough-del tag
+    delShort : short-del tag
+    delOK --> childCount
+    delShort --> childCount
+    childCount : child NS count
+    childCount --> chOK : at minimum
+    childCount --> chShort : below minimum
+    chOK : enough-child tag
+    chShort : short-child tag
+    chOK --> [*]
+    chShort --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
+### Per-Family Addressed NS Checks (steps 4-5)
+
+Same shape runs four times: child IPv4, child IPv6, delegation IPv4, delegation IPv6.
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> family
+    family : per-family count
+    family --> enough : at minimum
+    family --> notEnough : below minimum
+    family --> none : zero
+    enough : enough-v4/v6 tag
+    notEnough : not-enough-v4/v6 tag
+    none : no-v4/v6 tag
+    enough --> [*]
+    notEnough --> [*]
+    none --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

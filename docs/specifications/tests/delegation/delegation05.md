@@ -36,6 +36,59 @@ Status: Final
 5. After all NS names, if `NS_IS_CNAME` was never emitted, emit `NO_NS_CNAME`.
 6. Emit `TEST_CASE_END`.
 
+### Per-NS CNAME Detection (step 4)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> dispatch
+    dispatch : per-NS name
+    dispatch --> ib : in-bailiwick
+    dispatch --> oob : out-of-bailiwick
+    ib : per-NS-IP probe
+    ib --> disabled : transport off
+    ib --> ibQuery : transport on
+    disabled : transport-disabled tag
+    ibQuery : A query RD=0
+    ibQuery --> noResp : no response
+    ibQuery --> badRcode : non-NOERROR
+    ibQuery --> cname : CNAME in answer
+    ibQuery --> referral : referral
+    referral --> retry
+    retry : recursive retry RD=1
+    retry --> cname : CNAME found
+    retry --> noCname : no CNAME
+    oob : recursive lookup
+    oob --> cname : CNAME found
+    oob --> noCname : no CNAME
+    noResp : no-response tag
+    badRcode : unexpected-rcode tag
+    cname : ns-is-cname tag
+    noResp --> [*]
+    badRcode --> [*]
+    cname --> [*]
+    noCname --> [*]
+    disabled --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
+### Final CNAME Status Emission (steps 5-6)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> check
+    check : any cname emitted?
+    check --> noNs : none
+    check --> hadCname : at least one
+    noNs : no-ns-cname tag
+    hadCname --> done
+    noNs --> done
+    done : emit test-case-end
+    done --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

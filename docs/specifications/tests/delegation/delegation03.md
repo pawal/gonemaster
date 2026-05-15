@@ -33,6 +33,38 @@ Status: Final
     - `REFERRAL_SIZE_OK` otherwise.
 11. Emit `TEST_CASE_END`.
 
+### Synthetic Referral Build and Size Check (steps 2-11)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> setup
+    setup : build qname/message
+    setup --> auth
+    auth : add NS records
+    auth --> v4
+    v4 : v4 glue check
+    v4 --> addV4 : eligible
+    v4 --> v6 : not eligible
+    addV4 : add A glue
+    addV4 --> v6
+    v6 : v6 glue check
+    v6 --> addV6 : eligible
+    v6 --> pack : not eligible
+    addV6 : add AAAA glue
+    addV6 --> pack
+    pack : pack with compression
+    pack --> size
+    size : check vs 512 limit
+    size --> tooLarge : over 512
+    size --> sizeOK : within 512
+    tooLarge : too-large tag
+    sizeOK : size-ok tag
+    tooLarge --> [*]
+    sizeOK --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

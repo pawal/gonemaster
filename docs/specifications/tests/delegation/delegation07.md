@@ -29,6 +29,39 @@ Status: Final
 9. Emit `TOTAL_NAME_MISMATCH` when `sameNames` is empty.
 10. Emit `TEST_CASE_END`.
 
+### Parent-Child Name Set Comparison (steps 2-10)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> setup
+    setup : build nameCounts
+    setup --> p1
+    p1 : parent extras?
+    p1 --> emitP : yes
+    p1 --> p2 : no
+    emitP : extra-name-parent tag
+    emitP --> p2
+    p2 : child extras?
+    p2 --> emitC : yes
+    p2 --> p3 : no
+    emitC : extra-name-child tag
+    emitC --> p3
+    p3 : both empty?
+    p3 --> emitM : yes
+    p3 --> p4 : no
+    emitM : names-match tag
+    emitM --> p4
+    p4 : sameNames empty?
+    p4 --> emitMis : yes
+    p4 --> done : no
+    emitMis : total-mismatch tag
+    emitMis --> done
+    done : emit test-case-end
+    done --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

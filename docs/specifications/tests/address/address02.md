@@ -32,6 +32,40 @@ Status: Final
 5. After all tasks complete, if at least one IP was checked and no tag besides `TEST_CASE_START` was emitted, emit `NAMESERVERS_IP_WITH_REVERSE`.
 6. Emit `TEST_CASE_END`.
 
+### Per-IP PTR Probe and Aggregation (steps 2-6)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> probe
+    probe : per-IP PTR query
+    probe --> noResp : no response
+    probe --> hasResp : got response
+    hasResp --> cnameCheck
+    cnameCheck : answer has CNAME?
+    cnameCheck --> followCname : NOERROR with CNAME
+    cnameCheck --> shapeCheck : no CNAME
+    followCname : second PTR query
+    followCname --> shapeCheck
+    shapeCheck : usable PTR?
+    shapeCheck --> noPtr : no usable PTR
+    shapeCheck --> ptrOK : usable
+    noPtr : no-reverse tag
+    ptrOK : counts as success
+    noResp : no-response-PTR tag
+    ptrOK --> aggregate
+    aggregate : all IPs successful?
+    aggregate --> emitOK : yes
+    aggregate --> done : no
+    emitOK : all-reverse tag
+    emitOK --> done
+    done : emit test-case-end
+    noResp --> [*]
+    noPtr --> [*]
+    done --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

@@ -52,6 +52,79 @@ Status: Final
    - `Z01_MNAME_IS_MASTER` for master-candidate MNAME host/IPs.
 9. Emit `TEST_CASE_END`.
 
+### SOA Collection and MNAME Classification (steps 2-5)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> probe
+    probe : per-NS SOA query
+    probe --> accepted : usable SOA
+    probe --> skipNS : not usable
+    accepted --> classify
+    classify : MNAME type
+    classify --> isLocal : localhost
+    classify --> isDot : dot
+    classify --> isHost : hostname
+    isLocal : MNAME-localhost tag
+    isDot : MNAME-dot tag
+    isHost --> nextStep
+    nextStep : continue MNAME checks
+    isLocal --> [*]
+    isDot --> [*]
+    nextStep --> [*]
+    skipNS --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
+### Per-MNAME Resolution and Master Check (steps 6-8)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> nsCheck
+    nsCheck : MNAME in NS list?
+    nsCheck --> notInList : no
+    nsCheck --> resolveOK : yes
+    notInList : not-in-NS-list tag
+    notInList --> resolve
+    resolveOK --> resolve
+    resolve : resolve A/AAAA
+    resolve --> noAddr : no resolution
+    resolve --> perAddr : has addresses
+    noAddr : MNAME-not-resolve tag
+    perAddr : per-address probe
+    perAddr --> localhost : loopback addr
+    perAddr --> directQ : public IP
+    localhost : localhost-addr tag
+    directQ : direct SOA query
+    directQ --> noRespM : no response
+    directQ --> badRcode : non-NOERROR
+    directQ --> noSoaRec : no SOA
+    directQ --> notAuth : AA false
+    directQ --> authSerial : auth with serial
+    noRespM : MNAME-no-response tag
+    badRcode : MNAME-bad-rcode tag
+    noSoaRec : MNAME-missing-SOA tag
+    notAuth : MNAME-not-auth tag
+    authSerial --> compare
+    compare : compare serials
+    compare --> notMaster : child higher
+    compare --> isMaster : MNAME at least
+    notMaster : MNAME-not-master tag
+    isMaster : MNAME-is-master tag
+    notInList --> [*]
+    noAddr --> [*]
+    localhost --> [*]
+    noRespM --> [*]
+    badRcode --> [*]
+    noSoaRec --> [*]
+    notAuth --> [*]
+    notMaster --> [*]
+    isMaster --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

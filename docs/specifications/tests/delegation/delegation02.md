@@ -28,6 +28,38 @@ Status: Final
    - Else, when combined list is non-empty, emit `DISTINCT_IP_ADDRESS`.
 6. Emit `TEST_CASE_END`.
 
+### Three-Set Duplicate-IP Detection (steps 3-5)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> delDup
+    delDup : del NS duplicates?
+    delDup --> delSame : duplicate IPs
+    delDup --> delDistinct : all distinct
+    delSame : del-NS-same-IP tag
+    delDistinct : del-distinct tag
+    delSame --> childDup
+    delDistinct --> childDup
+    childDup : child NS duplicates?
+    childDup --> chSame : duplicate IPs
+    childDup --> chDistinct : all distinct
+    chSame : child-NS-same-IP tag
+    chDistinct : child-distinct tag
+    chSame --> bothDup
+    chDistinct --> bothDup
+    bothDup : combined duplicates?
+    bothDup --> bothSame : duplicate IPs
+    bothDup --> bothDistinct : all distinct
+    bothSame : same-IP-address tag
+    bothDistinct : distinct-IP tag
+    bothSame --> done
+    bothDistinct --> done
+    done : emit test-case-end
+    done --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

@@ -34,6 +34,40 @@ Status: Final
 6. Emit `TEST_CASE_END`.
 7. When executed through `AddressAll`, this testcase runs only if `Address02` produced `NAMESERVERS_IP_WITH_REVERSE`.
 
+### Per-IP PTR-vs-Name Match (steps 2-6)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> probe
+    probe : per-IP PTR query
+    probe --> noResp : no response
+    probe --> hasResp : got response
+    hasResp --> shapeCheck
+    shapeCheck : NOERROR with PTR?
+    shapeCheck --> nameMatch : yes
+    shapeCheck --> noReverse : no
+    nameMatch : compare to nsname
+    nameMatch --> mismatch : no match
+    nameMatch --> matchOK : matched
+    mismatch : PTR-mismatch tag
+    matchOK : counts as success
+    noReverse : no-reverse tag
+    noResp : no-response-PTR tag
+    matchOK --> aggregate
+    aggregate : all IPs matched?
+    aggregate --> emitOK : yes
+    aggregate --> done : no
+    emitOK : PTR-match tag
+    emitOK --> done
+    done : emit test-case-end
+    noResp --> [*]
+    mismatch --> [*]
+    noReverse --> [*]
+    done --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

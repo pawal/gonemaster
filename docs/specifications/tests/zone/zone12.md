@@ -40,6 +40,51 @@ Status: Final
 
 CSYNC content identity is determined by comparing the concatenation of `soaserial`, `flags`, and `TypeBitMap` fields.
 
+### Per-NS CSYNC Probe and Aggregation (steps 2-5)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> probe
+    probe : per-NS CSYNC query
+    probe --> disabled : transport off
+    probe --> query : transport on
+    disabled : transport-disabled tag
+    query : CSYNC and SOA queries
+    query --> skipNS : not auth NOERROR
+    query --> classify : auth NOERROR
+    classify : CSYNC record count
+    classify --> multiple : more than one
+    classify --> single : exactly one
+    classify --> zeroCS : zero
+    multiple : multiple-CSYNC tag
+    single --> compareSerial
+    compareSerial : serial vs SOA
+    compareSerial --> mismatch : differs
+    compareSerial --> ok : matches
+    mismatch : serial-mismatch tag
+    ok : in content group
+    zeroCS : in no-CSYNC group
+    ok --> aggregate
+    zeroCS --> aggregate
+    multiple --> aggregate
+    mismatch --> aggregate
+    aggregate : aggregate per-group
+    aggregate --> emitFound : CSYNC groups
+    emitFound : CSYNC-found tag
+    emitFound --> mixedCheck
+    mixedCheck : both present and absent?
+    mixedCheck --> mixedTag : yes
+    mixedCheck --> doneFlow : no
+    mixedTag : mixed-presence tag
+    mixedTag --> doneFlow
+    doneFlow : emit test-case-end
+    skipNS --> [*]
+    disabled --> [*]
+    doneFlow --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

@@ -36,6 +36,57 @@ Status: Final
 5. Collect nameserver IPs that had RRSIGs and emitted no DS09 failure; if non-empty emit `DS09_SOA_RRSIG_VALID`.
 6. Emit `TEST_CASE_END`.
 
+### Per-NS SOA RRSIG Verification (steps 2-6)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> probe
+    probe : per-NS check
+    probe --> disabled : transport off
+    probe --> query : transport on
+    disabled : transport-disabled tag
+    query : DNSKEY and SOA queries
+    query --> skip : either bad
+    query --> noSig : no RRSIG
+    query --> perSig : has RRSIG
+    noSig : missing-RRSIG tag
+    perSig : per-RRSIG check
+    perSig --> notYet : inception future
+    perSig --> expired : expiration past
+    perSig --> badAlgo : algo unsupported
+    perSig --> ktMatch : keytag check
+    ktMatch : matching DNSKEY?
+    ktMatch --> noKt : none
+    ktMatch --> verify : found
+    verify : verify SOA RRset
+    verify --> invalid : no validate
+    verify --> valid : verified
+    notYet : not-yet-valid tag
+    expired : RRSIG-expired tag
+    badAlgo : unsupported algo tag
+    noKt : no-DNSKEY-match tag
+    invalid : RRSIG-not-valid tag
+    valid : counts as success
+    valid --> aggregate
+    aggregate : per-NS aggregation
+    aggregate --> emitValid : any successful
+    aggregate --> done : none
+    emitValid : SOA-RRSIG-valid tag
+    emitValid --> done
+    done : emit test-case-end
+    notYet --> aggregate
+    expired --> aggregate
+    badAlgo --> aggregate
+    noKt --> aggregate
+    invalid --> aggregate
+    noSig --> aggregate
+    skip --> aggregate
+    disabled --> [*]
+    done --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

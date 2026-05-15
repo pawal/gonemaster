@@ -43,6 +43,60 @@ Status: Final
 5. Collect nameserver IPs that had RRSIGs and emitted no DS08 failure; if non-empty emit `DS08_DNSKEY_RRSIG_VALID`.
 6. Emit `TEST_CASE_END`.
 
+### Per-NS DNSKEY RRSIG Verification (steps 2-6)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> probe
+    probe : per-NS DNSKEY probe
+    probe --> disabled : transport off
+    probe --> query : transport on
+    disabled : transport-disabled tag
+    query : DNSKEY query
+    query --> skip : bad response
+    query --> noSig : no RRSIG
+    query --> perSig : has RRSIG
+    noSig : missing-RRSIG tag
+    perSig : per-RRSIG check
+    perSig --> notYet : inception future
+    perSig --> expired : expiration past
+    perSig --> badAlgo : algo unsupported
+    perSig --> ktMatch : keytag check
+    ktMatch : matching DNSKEY?
+    ktMatch --> noKt : none
+    ktMatch --> verify : found
+    verify : verify against keys
+    verify --> unsupp : ErrAlg
+    verify --> invalid : no validate
+    verify --> valid : verified
+    notYet : not-yet-valid tag
+    expired : RRSIG-expired tag
+    badAlgo : unsupported algo tag
+    noKt : no-DNSKEY-match tag
+    unsupp : unsupported algo tag
+    invalid : RRSIG-not-valid tag
+    valid : counts as success
+    valid --> aggregate
+    aggregate : per-NS aggregation
+    aggregate --> emitValid : any successful
+    aggregate --> done : none
+    emitValid : DNSKEY-RRSIG-valid tag
+    emitValid --> done
+    done : emit test-case-end
+    notYet --> aggregate
+    expired --> aggregate
+    badAlgo --> aggregate
+    noKt --> aggregate
+    unsupp --> aggregate
+    invalid --> aggregate
+    noSig --> aggregate
+    skip --> aggregate
+    disabled --> [*]
+    done --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

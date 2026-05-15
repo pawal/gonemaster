@@ -33,7 +33,7 @@ Status: Final
    - Query `CDS`, `CDNSKEY`, and `DNSKEY` with DNSSEC enabled; each requires authoritative `NOERROR` response for participation.
    - Track whether CDS and/or CDNSKEY RRset is present, plus their answer-section RRSIG records and actual record content.
    - Track DNSKEY RRset records and answer-section RRSIG records (TypeCovered == DNSKEY) for that nameserver.
-7. If neither CDS nor CDNSKEY RRsets are present, or DNSKEY RRsets are absent, skip RRSIG-vs-DS validation (steps 8–12). Steps 13–16 are independently gated: content comparison (steps 13–14) runs when the relevant CDS/CDNSKEY RRset is present (regardless of DNSKEY presence); soft signals (step 15) and the on-demand absence check (step 16) run when DNSKEY records are available.
+7. If neither CDS nor CDNSKEY RRsets are present, or DNSKEY RRsets are absent, skip RRSIG-vs-DS validation (steps 8-12). Steps 13-16 are independently gated: content comparison (steps 13-14) runs when the relevant CDS/CDNSKEY RRset is present (regardless of DNSKEY presence); soft signals (step 15) and the on-demand absence check (step 16) run when DNSKEY records are available.
 8. For each nameserver with CDS RRset:
    - Search DS records for any DS whose keytag exists in nameserver DNSKEY RRset and also in CDS RRSIG keytags.
    - If no such DS/keytag match exists, mark nameserver for `DS18_NO_MATCH_CDS_RRSIG_DS`.
@@ -64,7 +64,7 @@ Status: Final
     - If `|dnskeySigners| > 1`, emit `DS18_ROLLOVER_EVIDENCE_DOUBLE_SIG` with `keytags`.
     - If `dsKeytags \ dnskeyKeytagSet` is non-empty, emit `DS18_ROLLOVER_EVIDENCE_DS_WITHOUT_DNSKEY` with `keytags`.
     - If `sepKeytags \ dsKeytags` is non-empty, emit `DS18_ROLLOVER_EVIDENCE_DNSKEY_WITHOUT_DS` with `keytags`.
-16. **On-demand absence check**: if no CDS or CDNSKEY RRsets were found and at least one step-15 soft signal was emitted, emit `DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE`. (Steps 13–14 cannot fire when CDS/CDNSKEY are absent, so step 15 is the only contributor in practice.)
+16. **On-demand absence check**: if no CDS or CDNSKEY RRsets were found and at least one step-15 soft signal was emitted, emit `DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE`. (Steps 13-14 cannot fire when CDS/CDNSKEY are absent, so step 15 is the only contributor in practice.)
 17. Emit `TEST_CASE_END`.
 
 ## Rollover Evidence And Scoring
@@ -151,16 +151,16 @@ The bonus criterion `cds_cdnskey_published` in `scoring/bonus.go` treats `DS18_N
 - Differences (Upstream vs Gonemaster):
   - Upstream: includes explicit undelegated test-type flow using provided DS data. Gonemaster: has no explicit undelegated branch in `DNSSEC18`; it always obtains parent-side DS through `parentNameservers`.
   - Upstream: objective describes trust from DS to CDS/CDNSKEY signatures via corresponding DNSKEY. Gonemaster: matching logic is keytag-based (`DS keytag` present in DNSKEY set and RRSIG keytags), without DS digest revalidation or CDS/CDNSKEY signature cryptographic verification in this testcase.
-  - Upstream: does not specify rollover-detection logic. Gonemaster: adds CDS/CDNSKEY content comparison against parent DS and soft rollover-evidence signals (steps 13–16).
+  - Upstream: does not specify rollover-detection logic. Gonemaster: adds CDS/CDNSKEY content comparison against parent DS and soft rollover-evidence signals (steps 13-16).
   - Upstream: does not explicitly specify testcase boundary and transport-disabled debug emissions in this testcase summary. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
 - Potential upstream report:
   - `no`
 
 ## Edge Cases And Limitations
 - All DS18 findings (RRSIG-vs-DS, content comparison, and soft signals) require the parent DS RRset to be non-empty (step 4 stops the test otherwise).
-- DS18 RRSIG-vs-DS findings (steps 8–12) are additionally skipped when CDS/CDNSKEY RRsets are absent or when DNSKEY RRsets are absent.
-- Content comparison (steps 13–14) and soft signals (step 15) use only the first representative nameserver per RRset type; inconsistencies across nameservers are flagged separately by DNSSEC15.
-- A nameserver that publishes only DELETE-sentinel CDS/CDNSKEY records (Algorithm == 0) is treated as having no comparable content and is skipped for steps 13–14 in favour of the next nameserver. If every nameserver carries only DELETE sentinels, neither `MATCHES_DS` nor `ROLLOVER_SIGNALED` is emitted; DNSSEC16/17 covers the DELETE flow.
+- DS18 RRSIG-vs-DS findings (steps 8-12) are additionally skipped when CDS/CDNSKEY RRsets are absent or when DNSKEY RRsets are absent.
+- Content comparison (steps 13-14) and soft signals (step 15) use only the first representative nameserver per RRset type; inconsistencies across nameservers are flagged separately by DNSSEC15.
+- A nameserver that publishes only DELETE-sentinel CDS/CDNSKEY records (Algorithm == 0) is treated as having no comparable content and is skipped for steps 13-14 in favour of the next nameserver. If every nameserver carries only DELETE sentinels, neither `MATCHES_DS` nor `ROLLOVER_SIGNALED` is emitted; DNSSEC16/17 covers the DELETE flow.
 - Soft rollover signals (step 15) run regardless of CDS/CDNSKEY presence whenever DNSKEY records are available (and DS records are present, per the outer guard).
 - CDNSKEY digest comparison reuses only digest types already present in the parent DS RRset; no new digest types are introduced. If the parent publishes DS in multiple digest types and the child's CDS RRset omits some types, the canonical sets differ and `DS18_CDS_ROLLOVER_SIGNALED` fires. Per RFC 7344 the CDS RRset is the operator's complete request, so reduced digest-type coverage is a legitimate change.
 - Parent DS collection deduplicates by DS content fields and ignores duplicates across parent nameservers.

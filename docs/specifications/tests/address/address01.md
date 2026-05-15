@@ -34,6 +34,70 @@ Status: Final
 10. Emit `A01_ADDR_NOT_GLOBALLY_REACHABLE` if not-globally-reachable set is non-empty.
 11. Emit `TEST_CASE_END`.
 
+### Address Collection and Classification (steps 2-6)
+
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> gather
+    gather : gather NS sources
+    gather --> filter
+    filter : keep entries with address
+    filter --> dedupe
+    dedupe : dedupe by name/ip
+    dedupe --> count
+    count : addressed NS count
+    count --> noServers : zero
+    count --> iterate : non-zero
+    noServers : no-name-servers tag
+    iterate : each IP group (lex order)
+    iterate --> classify
+    classify : special-address category
+    classify --> doc : Documentation
+    classify --> local : Local-use range
+    classify --> notGlobal : other non-global
+    classify --> global : globally reachable
+    doc : documentation set
+    local : local-use set
+    notGlobal : not-globally-reachable set
+    global : globally-reachable set
+    noServers --> [*]
+    doc --> [*]
+    local --> [*]
+    notGlobal --> [*]
+    global --> [*]
+{{< /mermaid >}}
+
+### Aggregation and Final Emission (steps 7-11)
+
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> globalCheck
+    globalCheck : globally-reachable set
+    globalCheck --> tagGlobal : non-empty
+    globalCheck --> tagNoGlobal : empty
+    tagGlobal : global-addr tag
+    tagNoGlobal : no-global-addr tag
+    tagGlobal --> docCheck
+    tagNoGlobal --> docCheck
+    docCheck : documentation set
+    docCheck --> tagDoc : non-empty
+    docCheck --> localCheck : empty
+    tagDoc : doc-addr tag
+    tagDoc --> localCheck
+    localCheck : local-use set
+    localCheck --> tagLocal : non-empty
+    localCheck --> notGlobalCheck : empty
+    tagLocal : local-use-addr tag
+    tagLocal --> notGlobalCheck
+    notGlobalCheck : not-globally-reachable set
+    notGlobalCheck --> tagNotGlobal : non-empty
+    notGlobalCheck --> done : empty
+    tagNotGlobal : not-global-addr tag
+    tagNotGlobal --> done
+    done : test-case end
+    done --> [*]
+{{< /mermaid >}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

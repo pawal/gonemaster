@@ -122,7 +122,7 @@ stateDiagram-v2
     noEvid --> [*]
 {{< /mermaid >}}
 
-### Aggregation and Final Emission (steps 6–11)
+### Aggregation and Final Emission (steps 6-11)
 
 {{< mermaid >}}
 stateDiagram-v2

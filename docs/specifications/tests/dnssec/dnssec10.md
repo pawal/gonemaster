@@ -83,8 +83,8 @@ stateDiagram-v2
     querying --> empty : empty answer
     nonEmpty --> nsecAns : NSEC in answer
     nonEmpty --> errAns : no NSEC in answer
-    empty --> nsec3Nodata : NSEC3 in authority
-    empty --> nsecNodata : NSEC in authority (no NSEC3)
+    empty --> nsec3Nodata : NSEC3 only
+    empty --> nsecNodata : NSEC only
     empty --> noEvid : neither
     respErr : response error
     nsecAns : NSEC-in-answer path

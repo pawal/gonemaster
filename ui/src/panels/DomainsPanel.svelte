@@ -334,10 +334,10 @@
             {#each sortedDomainRuns as run}
               <tr
                 class={`row-clickable ${selectedDomainRunId === run.id ? "run-row-selected" : ""}`}
-                onclick={() => onNavigateJob(run.id)}
+                onclick={() => loadDomainRunResult(run.id)}
                 role="button"
                 tabindex="0"
-                onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") onNavigateJob(run.id); }}
+                onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") loadDomainRunResult(run.id); }}
               >
                 <td class="run-id-cell" title={run.id}>{run.id}</td>
                 <td>{run.finished_at ? run.finished_at.slice(0, 16).replace("T", " ") : "-"}</td>

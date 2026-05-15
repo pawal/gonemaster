@@ -36,6 +36,52 @@ Status: Final
 5. If at least one nameserver was included and none had errors, emit `EDNS0_SUPPORT` with sorted included `name/ip` list.
 6. Emit `TEST_CASE_END`.
 
+### Per-NS EDNS Probe and Aggregation (steps 2-6)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> probe
+    probe : per-NS EDNS probe
+    probe --> disabled : transport off
+    probe --> query : transport on
+    disabled : transport-disabled tag
+    query : SOA with EDNS v0
+    query --> failed : no response or error
+    query --> response : has response
+    response --> formerr : FORMERR no OPT
+    response --> compliant : NOERROR OPT v0 SOA
+    response --> noOpt : NOERROR no OPT
+    response --> badVer : OPT version not 0
+    response --> otherErr : other
+    formerr : no-EDNS-support tag
+    noOpt : response-no-EDNS tag
+    badVer : version-error tag
+    otherErr : NS-error tag
+    failed --> fallback
+    fallback : SOA without EDNS
+    fallback --> breaks : got response
+    fallback --> noResp : still no response
+    breaks : breaks-on-EDNS tag
+    noResp : no-response tag
+    compliant --> aggregate
+    aggregate : all compliant?
+    aggregate --> emitOk : yes
+    aggregate --> done : no
+    emitOk : EDNS0-support tag
+    emitOk --> done
+    done : emit test-case-end
+    disabled --> [*]
+    formerr --> [*]
+    noOpt --> [*]
+    badVer --> [*]
+    otherErr --> [*]
+    breaks --> [*]
+    noResp --> [*]
+    done --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

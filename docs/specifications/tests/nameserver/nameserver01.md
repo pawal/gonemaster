@@ -37,6 +37,40 @@ Status: Final
 4. After all parallel tasks, emit a single consolidated `IS_A_RECURSOR` with `servers` list (if any), and a single consolidated `NO_RECURSOR` with `servers` list (if any).
 5. Emit `TEST_CASE_END`.
 
+### Per-NS Recursor Probe and Classification (steps 2-5)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> probe
+    probe : per-NS A probe
+    probe --> disabled : transport off
+    probe --> probes : transport on
+    disabled : transport-disabled tag
+    probes : 3 probe names
+    probes --> noResp : no response
+    probes --> response : got responses
+    noResp : no-response tag
+    response --> raCheck
+    raCheck : RA seen?
+    raCheck --> recursor : RA=1
+    raCheck --> nxCheck : no RA
+    nxCheck : all NX no AA?
+    nxCheck --> recursor : yes
+    nxCheck --> nonRecursor : no
+    recursor : is-a-recursor set
+    nonRecursor : no-recursor set
+    recursor --> emit
+    nonRecursor --> emit
+    emit : aggregate emissions
+    emit --> done
+    done : emit test-case-end
+    disabled --> [*]
+    noResp --> [*]
+    done --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

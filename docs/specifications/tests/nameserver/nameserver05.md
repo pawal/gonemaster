@@ -34,6 +34,50 @@ Status: Final
 5. If total AAAA-ok count is greater than zero and total AAAA-issue count is zero, emit `AAAA_WELL_PROCESSED`.
 6. Emit `TEST_CASE_END`.
 
+### Per-NS A Baseline and AAAA Probe (steps 2-6)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> probe
+    probe : per-NS A baseline
+    probe --> disabled : transport off
+    probe --> aQuery : transport on
+    disabled : transport-disabled tag
+    aQuery : A query at apex
+    aQuery --> aNoResp : no response
+    aQuery --> aBadRcode : non-NOERROR
+    aQuery --> aaaaQuery : A ok
+    aNoResp : no-response tag
+    aBadRcode : A-bad-rcode tag
+    aaaaQuery : AAAA query at apex
+    aaaaQuery --> aDropped : no response
+    aaaaQuery --> aBadRcode2 : non-NOERROR
+    aaaaQuery --> perRR : got AAAA
+    aDropped : AAAA-dropped tag
+    aBadRcode2 : AAAA-bad-rcode tag
+    perRR : per AAAA RR
+    perRR --> badRdata : len not 16
+    perRR --> goodRdata : len 16
+    badRdata : AAAA-bad-rdata tag
+    goodRdata : counter increment
+    goodRdata --> aggregate
+    aggregate : ok and no issues?
+    aggregate --> emitOK : yes
+    aggregate --> done : no
+    emitOK : AAAA-OK tag
+    emitOK --> done
+    done : emit test-case-end
+    disabled --> [*]
+    aNoResp --> [*]
+    aBadRcode --> [*]
+    aDropped --> [*]
+    aBadRcode2 --> [*]
+    badRdata --> [*]
+    done --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

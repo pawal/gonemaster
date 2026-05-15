@@ -28,6 +28,34 @@ Status: Final
 4. After all parallel tasks, emit a single consolidated `AXFR_FAILURE` with `servers` list (if any), and a single consolidated `AXFR_AVAILABLE` with `servers` list (if any).
 5. Emit `TEST_CASE_END`.
 
+### Per-NS AXFR Attempt and Aggregation (steps 2-5)
+
+{{% expand "Show diagram" %}}
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> probe
+    probe : per-NS AXFR attempt
+    probe --> disabled : transport off
+    probe --> axfr : transport on
+    disabled : transport-disabled tag
+    axfr : AXFR call
+    axfr --> failed : call error
+    axfr --> firstSOA : first RR is SOA
+    axfr --> nonSOA : first RR not SOA
+    failed : AXFR-failure set
+    firstSOA : AXFR-available set
+    nonSOA : no record
+    failed --> emit
+    firstSOA --> emit
+    emit : aggregate emissions
+    emit --> done
+    done : emit test-case-end
+    nonSOA --> [*]
+    disabled --> [*]
+    done --> [*]
+{{< /mermaid >}}
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

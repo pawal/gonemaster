@@ -36,6 +36,55 @@ Status: Final
    - `B02_UNEXPECTED_RCODE`
 8. Emit `TEST_CASE_END`.
 
+### Input and Per-NS SOA Probe (steps 2-5)
+
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> loadNS
+    loadNS : load delegation NS
+    loadNS --> nsCheck
+    nsCheck : NS names found?
+    nsCheck --> noDel : none
+    nsCheck --> addrFB : yes
+    noDel : no-delegation tag
+    addrFB : resolve addresses via glue
+    addrFB --> probe
+    probe : per-NS SOA probe (parallel)
+    probe --> classify
+    classify : response category
+    classify --> authOK : authoritative SOA
+    classify --> nsBroken : NOERROR AA no SOA
+    classify --> notAuth : AA not set
+    classify --> noIP : NS name unresolved
+    classify --> noResp : no response
+    classify --> badRcode : unexpected rcode
+    noDel --> [*]
+    authOK --> [*]
+    nsBroken --> [*]
+    notAuth --> [*]
+    noIP --> [*]
+    noResp --> [*]
+    badRcode --> [*]
+{{< /mermaid >}}
+
+### Aggregation and Final Emission (steps 6-8)
+
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> aggregate
+    aggregate : per-NS results
+    aggregate --> anyAuth : any authoritative
+    aggregate --> noWork : none authoritative
+    anyAuth : auth-response-soa tag
+    noWork : no-working-ns tag
+    noWork --> categories
+    categories : per-failure category tags
+    anyAuth --> done
+    categories --> done
+    done : emit test-case-end
+    done --> [*]
+{{< /mermaid >}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

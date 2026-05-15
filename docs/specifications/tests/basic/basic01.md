@@ -39,6 +39,92 @@ Status: Final
    - `B01_INCONSISTENT_ALIAS` when multiple alias targets are found.
 9. Emit `TEST_CASE_END`.
 
+### Mode Classification (steps 2-3)
+
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> classify
+    classify : determine mode
+    classify --> rootCase : child is root
+    classify --> fakeCase : fake addresses
+    classify --> traverse : normal mode
+    rootCase : root-zone tags
+    fakeCase : fake-address tags
+    traverse : iterative parent discovery
+    rootCase --> [*]
+    fakeCase --> [*]
+    traverse --> [*]
+{{< /mermaid >}}
+
+### Per-Server Probe (step 5)
+
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> nextHop
+    nextHop : pick next NS address
+    nextHop --> loopCheck
+    loopCheck : iteration count
+    loopCheck --> loopHit : over threshold
+    loopCheck --> transport : under threshold
+    loopHit : loop-protection tag
+    transport : transport check per rrtype
+    transport --> tagDis : disabled
+    transport --> tagEn : enabled
+    tagDis : transport-disabled tag
+    tagEn : transport-enabled tag
+    tagEn --> queryRR
+    queryRR : SOA/NS/DNAME query
+    queryRR --> respCheck
+    respCheck : response validation
+    respCheck --> tagErr : invalid
+    respCheck --> extract : valid
+    tagErr : server-zone-error tag
+    extract : delegation and alias data
+    loopHit --> [*]
+    tagDis --> [*]
+    tagErr --> [*]
+    extract --> [*]
+{{< /mermaid >}}
+
+### Outcome Aggregation (steps 6-9)
+
+{{< mermaid >}}
+stateDiagram-v2
+    [*] --> parentE
+    parentE : parent outcome
+    parentE --> pOne : one candidate
+    parentE --> pMulti : multiple candidates
+    parentE --> pNone : no candidate
+    pOne : parent-found tag
+    pMulti : parent-undetermined tag
+    pNone : parent-not-found tag
+    pOne --> childE
+    pMulti --> childE
+    pNone --> childE
+    childE : child outcome
+    childE --> cFound : delegation or SOA
+    childE --> cIncon : inconsistent
+    childE --> cAbsent : no evidence
+    cFound : child-found tag
+    cIncon : inconsistent-delegation tag
+    cAbsent : no-child or not-exist tag
+    cFound --> aliasE
+    cIncon --> aliasE
+    cAbsent --> aliasE
+    aliasE : alias outcome
+    aliasE --> aOne : single DNAME
+    aliasE --> aMulti : multiple DNAMEs
+    aliasE --> aNone : none
+    aOne : child-is-alias tag
+    aMulti : inconsistent-alias tag
+    aNone : no alias tag
+    aOne --> done
+    aMulti --> done
+    aNone --> done
+    done : emit test-case-end
+    done --> [*]
+{{< /mermaid >}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

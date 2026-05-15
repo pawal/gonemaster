@@ -41,6 +41,7 @@ Status: Final
 
 ### Mode Classification (steps 2-3)
 
+{{% expand "Show diagram" %}}
 {{< mermaid >}}
 stateDiagram-v2
     [*] --> classify
@@ -55,9 +56,11 @@ stateDiagram-v2
     fakeCase --> [*]
     traverse --> [*]
 {{< /mermaid >}}
+{{% /expand %}}
 
 ### Per-Server Probe (step 5)
 
+{{% expand "Show diagram" %}}
 {{< mermaid >}}
 stateDiagram-v2
     [*] --> nextHop
@@ -85,9 +88,11 @@ stateDiagram-v2
     tagErr --> [*]
     extract --> [*]
 {{< /mermaid >}}
+{{% /expand %}}
 
 ### Outcome Aggregation (steps 6-9)
 
+{{% expand "Show diagram" %}}
 {{< mermaid >}}
 stateDiagram-v2
     [*] --> parentE
@@ -124,6 +129,7 @@ stateDiagram-v2
     done : emit test-case-end
     done --> [*]
 {{< /mermaid >}}
+{{% /expand %}}
 
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |

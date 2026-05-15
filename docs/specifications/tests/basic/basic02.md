@@ -38,6 +38,7 @@ Status: Final
 
 ### Input and Per-NS SOA Probe (steps 2-5)
 
+{{% expand "Show diagram" %}}
 {{< mermaid >}}
 stateDiagram-v2
     [*] --> loadNS
@@ -66,9 +67,11 @@ stateDiagram-v2
     noResp --> [*]
     badRcode --> [*]
 {{< /mermaid >}}
+{{% /expand %}}
 
 ### Aggregation and Final Emission (steps 6-8)
 
+{{% expand "Show diagram" %}}
 {{< mermaid >}}
 stateDiagram-v2
     [*] --> aggregate
@@ -84,6 +87,7 @@ stateDiagram-v2
     done : emit test-case-end
     done --> [*]
 {{< /mermaid >}}
+{{% /expand %}}
 
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |

@@ -36,6 +36,7 @@ Status: Final
 
 ### Address Collection and Classification (steps 2-6)
 
+{{% expand "Show diagram" %}}
 {{< mermaid >}}
 stateDiagram-v2
     [*] --> gather
@@ -66,9 +67,11 @@ stateDiagram-v2
     notGlobal --> [*]
     global --> [*]
 {{< /mermaid >}}
+{{% /expand %}}
 
 ### Aggregation and Final Emission (steps 7-11)
 
+{{% expand "Show diagram" %}}
 {{< mermaid >}}
 stateDiagram-v2
     [*] --> globalCheck
@@ -97,6 +100,7 @@ stateDiagram-v2
     done : test-case end
     done --> [*]
 {{< /mermaid >}}
+{{% /expand %}}
 
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
@@ -146,3 +150,4 @@ stateDiagram-v2
 - The testcase ignores nameserver entries that lack resolved IP addresses.
 - If all discovered addresses are reserved/non-global, `A01_NO_GLOBALLY_REACHABLE_ADDR` can be emitted together with one or more category error tags.
 - Multiple nameserver names sharing one IP are preserved as distinct `name/ip` entries in output lists.
+

@@ -49,6 +49,7 @@ Status: Final
 
 ### Per-Nameserver DNSKEY Classification (step 3)
 
+{{% expand "Show diagram" %}}
 {{< mermaid >}}
 stateDiagram-v2
     [*] --> transport
@@ -68,9 +69,11 @@ stateDiagram-v2
     nsecProc : NSEC and NSEC3PARAM processing
     nsecProc --> [*]
 {{< /mermaid >}}
+{{% /expand %}}
 
 ### NSEC Query Processing (step 4)
 
+{{% expand "Show diagram" %}}
 {{< mermaid >}}
 stateDiagram-v2
     [*] --> querying
@@ -96,9 +99,11 @@ stateDiagram-v2
     nsecNodata --> [*]
     noEvid --> [*]
 {{< /mermaid >}}
+{{% /expand %}}
 
 ### NSEC3PARAM Query Processing (step 5)
 
+{{% expand "Show diagram" %}}
 {{< mermaid >}}
 stateDiagram-v2
     [*] --> querying
@@ -121,9 +126,11 @@ stateDiagram-v2
     nsecNodata --> [*]
     noEvid --> [*]
 {{< /mermaid >}}
+{{% /expand %}}
 
 ### Aggregation and Final Emission (steps 6-11)
 
+{{% expand "Show diagram" %}}
 {{< mermaid >}}
 stateDiagram-v2
     [*] --> sigTags
@@ -147,6 +154,7 @@ stateDiagram-v2
     missing : DS10_EXPECTED_NSEC_NSEC3_MISSING
     missing --> [*]
 {{< /mermaid >}}
+{{% /expand %}}
 
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |

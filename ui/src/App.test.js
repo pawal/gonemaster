@@ -1051,19 +1051,22 @@ describe("App", () => {
       unmount();
     });
 
-    it("clicking a run row navigates to job inspector", async () => {
+    it("clicking a run row loads the result inline and stays in domain view", async () => {
       global.fetch.mockImplementation((url) => {
         const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
         if (value.includes("/runs")) {
           return jsonResponse({
-            items: [{ id: "run-xyz", finished_at: "2026-03-15T10:00:00Z", worst_level: "ERROR", duration_ms: 800, entry_count: 3 }],
-            total: 1
+            items: [
+              { id: "run-xyz", finished_at: "2026-03-15T10:00:00Z", worst_level: "ERROR", duration_ms: 800, entry_count: 3 },
+              { id: "run-old", finished_at: "2026-03-14T09:00:00Z", worst_level: "WARNING", duration_ms: 600, entry_count: 2 }
+            ],
+            total: 2
           });
         }
         if (value.includes("/api/v1/domains")) {
-          return jsonResponse({ items: [{ id: 2, name: "test.com", tags: [], latest_level: "ERROR", run_count: 1 }], total: 1 });
+          return jsonResponse({ items: [{ id: 2, name: "test.com", tags: [], latest_level: "ERROR", run_count: 2 }], total: 1 });
         }
-        if (value.includes("/api/v1/jobs/run-xyz")) return jsonResponse({ id: "run-xyz", status: "succeeded", domain: "test.com" });
+        if (value.includes("/api/v1/jobs/run-")) return jsonResponse({ id: "run-old", status: "succeeded", domain: "test.com" });
         if (value.includes("/api/v1/tags")) return jsonResponse([]);
         return jsonResponse({ items: [], total: 0 });
       });
@@ -1071,11 +1074,13 @@ describe("App", () => {
       const { unmount } = render(App);
       await openDomainsTab();
       await fireEvent.click(await screen.findByText("test.com"));
-      const runRow = await screen.findByText("run-xyz");
-      await fireEvent.click(runRow);
+      const olderRow = await screen.findByText("run-old");
+      await fireEvent.click(olderRow);
 
       await waitFor(() => {
-        expect(screen.getByRole("tab", { name: "Single Job" })).toHaveAttribute("aria-selected", "true");
+        expect(screen.getByRole("tab", { name: "Domains" })).toHaveAttribute("aria-selected", "true");
+        expect(screen.getByRole("tab", { name: "Single Job" })).toHaveAttribute("aria-selected", "false");
+        expect(olderRow.closest("tr")).toHaveClass("run-row-selected");
       });
       unmount();
     });

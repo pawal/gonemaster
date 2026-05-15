@@ -2,6 +2,19 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [v1.4.7] - 2026-05-15
+
+Small security release, Svelte update.
+
+### Added
+
+- docs: added online documentation at https://pawal.codeberg.page/gonemaster/
+
+### Changed
+
+- deps: bump svelte to 5.55.7 to fix devalue and svelte advisories
+- admin-ui: keep domain view when clicking a past run in history
+
 ## [v1.4.6] - 2026-05-13
 
 Polished the trend tab, and added admin-ui snapshot-intent controls.

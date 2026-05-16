@@ -10,7 +10,7 @@ The Public UI is available here: https://gonemaster.evilbit.de/
 
 ### Run One Local Test
 
-```sh
+```console
 gonemaster example.com
 gonemaster --json --domain example.com | jq
 gonemaster --module dnssec --testcase dnssec01 example.com
@@ -20,7 +20,7 @@ Direct CLI documentation: [pawal.codeberg.page/gonemaster/cli](https://pawal.cod
 
 ### Start the Server
 
-```sh
+```console
 go build -o ./gonemaster-server ./cmd/gonemaster-server
 ./gonemaster-server
 ```
@@ -29,7 +29,7 @@ Server documentation: [pawal.codeberg.page/gonemaster/server](https://pawal.code
 
 ### Automate the Server
 
-```sh
+```console
 gonemaster-client jobs create --domain example.com --wait --view summary
 gonemaster-client jobs batch --file domains.txt --tag tld --wait
 gonemaster-client entries query --tag tld --module DNSSEC --latest
@@ -39,7 +39,7 @@ Client documentation: [pawal.codeberg.page/gonemaster/client](https://pawal.code
 
 ### Publish Analysis Cohorts
 
-```sh
+```console
 gonemaster-client tags create tld --description "Top-level domains"
 gonemaster-client tags add-domains tld --file tlds.txt
 gonemaster-client jobs batch --from-tag tld --tag tld --wait
@@ -51,13 +51,13 @@ Analysis documentation: [pawal.codeberg.page/gonemaster/analysis](https://pawal.
 
 Install the local CLI:
 
-```sh
+```console
 go install codeberg.org/pawal/gonemaster/cmd/gonemaster@latest
 ```
 
 Build from source:
 
-```sh
+```console
 git clone https://codeberg.org/pawal/gonemaster.git
 cd gonemaster
 make help

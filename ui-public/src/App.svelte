@@ -10,6 +10,12 @@
 
   const logoSrc = `${import.meta.env.BASE_URL}gonemaster.svg`;
 
+  // Bumped whenever the user should be sent back to the domain input: initial
+  // home load and every transition back to idle ("new test"). Starts at 0 for
+  // share-link visits to a result so we don't steal focus from the result.
+  const initialView = parseHash(window.location.hash).view;
+  let focusSignal = $state(initialView === "home" ? 1 : 0);
+
   // ── Phase ───────────────────────────────────────────────────────────────────
   // "idle"    - form shown, no results
   // "running" - form disabled, Progress shown below
@@ -171,6 +177,7 @@
     jobDomain = "";
     jobFinishedAt = null;
     window.location.hash = hashFor("home").slice(1);
+    focusSignal += 1;
   }
 
   // ── Lifecycle ───────────────────────────────────────────────────────────────
@@ -248,7 +255,7 @@
     </div>
   </header>
 
-  <TestForm disabled={phase === "running"} onjobcreated={onJobCreated} />
+  <TestForm disabled={phase === "running"} {focusSignal} onjobcreated={onJobCreated} />
 
   {#if phase === "running"}
     <Progress

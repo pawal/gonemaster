@@ -3,7 +3,13 @@
   import { createJob, lookupDomain } from "../api.js";
   import { validateDomain, emptyNsRow, emptyDsRow, buildJobOpts } from "./validate.js";
 
-  let { disabled = false, onjobcreated } = $props();
+  let { disabled = false, focusSignal = 0, onjobcreated } = $props();
+
+  let inputEl;
+  $effect(() => {
+    // Re-runs whenever focusSignal changes; 0 means "don't focus" (e.g. share-link load).
+    if (focusSignal > 0) inputEl?.focus();
+  });
 
   const DNSSEC_ALGORITHMS = [
     { group: "Recommended", options: [
@@ -139,6 +145,7 @@
       <input
         id="domain-input"
         type="text"
+        bind:this={inputEl}
         bind:value={domain}
         placeholder={$t("pub.domain_placeholder")}
         autocomplete="off"

@@ -53,73 +53,86 @@ Status: Final
 ### Parent DS Collection (steps 2-4)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> parents
-    parents : per-parent-NS probe
-    parents --> disabled : transport off
-    parents --> query : transport on
-    disabled : transport-disabled tag
-    query : DS query
-    query --> ignored : bad shape
-    query --> hasDS : DS for owner
-    ignored : skip
-    hasDS : add to DS set
-    hasDS --> check
-    check : DS set empty?
-    check --> stopEarly : empty
-    check --> proceed : non-empty
-    stopEarly : emit test-case-end
-    proceed : continue to child phase
-    disabled --> [*]
-    ignored --> [*]
-    stopEarly --> [*]
-    proceed --> [*]
-{{< /mermaid >}}
+```
+parentNS = methodsv2.GetParentNSNamesAndIPs
+
+For each unique parent NS IP (parallel; fan-out = resolver.defaults.parallel):
+
+   transport disabled for DS    -> IPV4_DISABLED / IPV6_DISABLED, skip
+   query DS at z.Name, DNSSEC=on
+    +- resp.Msg == nil / RCODE != NOERROR / no EDNS / !DO / !AA  -> skip
+    +- no DS records for z.Name in answer                        -> skip
+    +- otherwise                                                 -> add DS rdata
+                                                                    to dsRecords
+                                                                    (dedupe by rdata)
+
+After all tasks:
+  len(dsRecords) == 0 -> emit TEST_CASE_END and stop
+                         (no further DS02_* findings)
+```
 {{% /expand %}}
 
 ### Per-Child DNSKEY Match and RRSIG Verify (steps 5-8)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> child
-    child : per-child-NS probe
-    child --> dnskeyQ
-    dnskeyQ : DNSKEY query
-    dnskeyQ --> skip : bad response
-    dnskeyQ --> hasKeys : DNSKEYs present
-    hasKeys --> perDS
-    perDS : per-DS check
-    perDS --> noKt : no matching keytag
-    perDS --> digestFail : digest mismatch
-    perDS --> notZone : DNSKEY not ZONE
-    perDS --> notSEP : DNSKEY not SEP
-    perDS --> match : DS-matching key
-    noKt : no-DNSKEY-for-DS tag
-    digestFail : DS-key mismatch tag
-    notZone : not-zone-signing tag
-    notSEP : not-SEP tag
-    match --> verify
-    verify : verify DNSKEY RRSIG
-    verify --> noRrsig : no matching RRSIG
-    verify --> unsupp : algo unsupported
-    verify --> invalid : verify failed
-    verify --> valid : verification ok
-    noRrsig : no-matching-RRSIG tag
-    unsupp : unsupported algo tag
-    invalid : RRSIG-not-valid tag
-    valid : match-DS-DNSKEY tag
-    skip --> [*]
-    noKt --> [*]
-    digestFail --> [*]
-    notZone --> [*]
-    notSEP --> [*]
-    noRrsig --> [*]
-    unsupp --> [*]
-    invalid --> [*]
-    valid --> [*]
-{{< /mermaid >}}
+```
+child set = Method4 ++ Method5; dedupe by ns.String(), then by IP
+
+For each unique child NS IP (parallel; fan-out = resolver.defaults.parallel):
+
+   transport disabled for DNSKEY -> IPV4_DISABLED / IPV6_DISABLED, skip
+   query DNSKEY at z.Name, DNSSEC=on
+    +- resp.Msg == nil / RCODE != NOERROR / no EDNS / !DO / !AA  -> skip
+    +- no DNSKEY at z.Name in answer                             -> skip
+    +- no records parse as *dns.DNSKEY                           -> skip
+    +- otherwise                                                 -> mark responding
+
+   For each DS in dsRecords:
+     matchingKeytagDNSKEYs = DNSKEYs with key.KeyTag() == ds.KeyTag
+     scan matchingKeytagDNSKEYs:
+        digest supported AND key.ToDS(ds.DigestType).Digest == ds.Digest
+           -> matchingDNSKEY, matchDSDNSKEY = true
+        digest unsupported
+           -> matchingDNSKEY, matchDSDNSKEY = true
+     no match found but matchingKeytagDNSKEYs non-empty
+        -> matchingDNSKEY = matchingKeytagDNSKEYs[0]
+
+     matchingDNSKEY == nil                          -> noDNSKEYForDS[ds.KeyTag]
+                                                      continue to next DS
+     !matchDSDNSKEY                                 -> noMatchDSDNSKEY[ds.KeyTag]
+     !FlagZONE                                      -> dnskeyNotForZoneSigning[ds.KeyTag]
+                                                      continue to next DS
+     !FlagSEP                                       -> dnskeyNotSEP[ds.KeyTag]
+     mark hasDNSKEYMatchDS for this NS;
+     record dnskey keytag for RRSIG checks
+
+   For each DNSKEY in dnskeyMatchingDS (keytag from key.KeyTag()):
+     matchingRRSIG = RRSIGs over DNSKEY rrset with same keytag
+     verify each; classify:
+       err == ErrAlg  -> algoNotSupportedByZM[keytag][algo]
+       other error    -> rrsigNotValidByDNSKEY[keytag]
+       success        -> foundMatch
+     no matchingRRSIG OR no success
+                       -> noMatchingDNSKEYRRSIG[keytag]
+     otherwise         -> mark hasRRSIGMatchDS for this NS
+
+Aggregation:
+  per keytag per category, emit a tag with merged child NS IP list:
+    DS02_NO_DNSKEY_FOR_DS, DS02_NO_MATCH_DS_DNSKEY,
+    DS02_DNSKEY_NOT_FOR_ZONE_SIGNING, DS02_DNSKEY_NOT_SEP,
+    DS02_NO_MATCHING_DNSKEY_RRSIG, DS02_RRSIG_NOT_VALID_BY_DNSKEY
+  per (keytag, algo):
+    DS02_ALGO_NOT_SUPPORTED_BY_ZM (algo_num, algo_mnemo)
+
+  nsDNSKEY  = responding child NS without DS-matching DNSKEY
+  nsRRSIG   = responding child NS without RRSIG match for any DS-matching DNSKEY
+  nsDNSKEY non-empty -> DS02_NO_VALID_DNSKEY_FOR_ANY_DS (addresses)
+  else nsRRSIG non-empty -> DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS (addresses)
+
+  hasRRSIGMatchDS IPs non-empty -> DS02_MATCH_DS_DNSKEY (sorted addresses)
+
+emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

@@ -49,71 +49,59 @@ Status: Final
 ### Parent DS Phase (steps 4-5)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> probe
-    probe : per-parent-NS DS probe
-    probe --> disabled : transport off
-    probe --> query : transport on
-    disabled : transport-disabled tag
-    query : DS query
-    query --> undet : bad response
-    query --> noDS : no DS
-    query --> hasDS : DS present
-    undet --> decide
-    noDS --> decide
-    hasDS --> decide
-    decide : parent decision
-    decide --> stopUndet : only undetermined
-    decide --> stopNoDS : only no DS
-    decide --> mixedTags : mixed
-    decide --> proceed : only has DS
-    stopUndet : undetermined-DS tag
-    stopNoDS : no-parent-DS tag
-    mixedTags : inconsistent DS tags
-    mixedTags --> proceed
-    proceed : continue to child
-    stopUndet --> [*]
-    stopNoDS --> [*]
-    proceed --> [*]
-    disabled --> [*]
-{{< /mermaid >}}
+```
+parent set = parentNameservers; dedupe by IP
+
+fake-address mode AND no undelegated DS records
+   -> emit TEST_CASE_END and return
+
+For each unique parent NS IP (parallel; fan-out = resolver.defaults.parallel):
+
+   transport disabled for DS  -> IPV4_DISABLED / IPV6_DISABLED, skip
+   query DS at z.Name, DNSSEC=on, UseVC=false
+      (resp.TC() -> retry with UseVC=true)
+    +- resp.Msg == nil / RCODE != NOERROR / !AA -> undeterminedDS
+    +- no apex DS records                      -> noDS
+    +- apex DS records present                 -> hasDS
+
+Parent decision:
+   only undeterminedDS                          -> DS11_UNDETERMINED_DS; stop
+   only noDS                                    -> DS11_NO_PARENT_DS;    stop
+   mixed noDS and hasDS                         -> DS11_INCONSISTENT_DS
+                                                   DS11_PARENT_WITHOUT_DS (addresses)
+                                                   DS11_PARENT_WITH_DS    (addresses)
+                                                   then continue to child phase
+   only hasDS                                   -> continue to child phase
+```
 {{% /expand %}}
 
 ### Child DNSKEY Phase (steps 6-7)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> probe
-    probe : per-child-NS probe
-    probe --> disabled : transport off
-    probe --> query : transport on
-    disabled : transport-disabled tag
-    query : SOA and DNSKEY
-    query --> undet : SOA fails
-    query --> noKey : no DNSKEY
-    query --> hasKey : has DNSKEY
-    undet --> decide
-    noKey --> decide
-    hasKey --> decide
-    decide : child decision
-    decide --> emitUndet : only undetermined
-    decide --> emitNoKey : only no DNSKEY
-    decide --> emitMixed : mixed
-    decide --> emitOK : all have DNSKEY
-    emitUndet : undet-signed tag
-    emitNoKey : DS-but-unsigned tag
-    emitMixed : incon-signed tags
-    emitOK : consistent-signed tag
-    emitUndet --> done
-    emitNoKey --> done
-    emitMixed --> done
-    emitOK --> done
-    done : emit test-case-end
-    disabled --> [*]
-    done --> [*]
-{{< /mermaid >}}
+```
+child set = Method4 ++ Method5; dedupe by IP
+
+For each unique child NS IP (parallel):
+
+   transport disabled for SOA/DNSKEY -> IPV4_DISABLED / IPV6_DISABLED, skip
+   query SOA at z.Name, DNSSEC=on, UseVC=false
+    +- no usable authoritative apex SOA          -> undeterminedSignedZone
+   query DNSKEY at z.Name, DNSSEC=on, UseVC=false
+      (resp.TC() -> retry with UseVC=true)
+    +- no usable response                        -> undeterminedSignedZone
+    +- no apex DNSKEY in answer                  -> noDNSKEY
+    +- apex DNSKEY records in answer             -> hasDNSKEY
+
+Child decision:
+   only undeterminedSignedZone                   -> DS11_UNDETERMINED_SIGNED_ZONE
+   only noDNSKEY                                 -> DS11_DS_BUT_UNSIGNED_ZONE
+   mixed noDNSKEY and hasDNSKEY                  -> DS11_INCONSISTENT_SIGNED_ZONE
+                                                    DS11_NS_WITH_UNSIGNED_ZONE (addresses)
+                                                    DS11_NS_WITH_SIGNED_ZONE   (addresses)
+   only hasDNSKEY (no undetermined, no noDNSKEY) -> DS11_CONSISTENT_SIGNED
+
+emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

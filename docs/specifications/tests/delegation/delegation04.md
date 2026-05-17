@@ -37,32 +37,32 @@ Status: Final
 ### Per-NS SOA Probe and Authoritative Aggregation (steps 2-6)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> dedupe
-    dedupe : dedup NS by name
-    dedupe --> probe
-    probe : per-NS SOA probe
-    probe --> disabled : transport off
-    probe --> query : transport on
-    disabled : transport-disabled tag
-    query : UDP then TCP SOA
-    query --> notAuth : AA false
-    query --> isAuth : AA true seen
-    notAuth : not-authoritative tag
-    isAuth : NS is authoritative
-    isAuth --> aggregate
-    notAuth --> aggregate
-    aggregate : after all NS
-    aggregate --> emitAuth : conditions met
-    aggregate --> skip : not met
-    emitAuth : are-authoritative tag
-    skip --> done
-    emitAuth --> done
-    done : emit test-case-end
-    disabled --> [*]
-    done --> [*]
-{{< /mermaid >}}
+```
+build ordered task list from Method4 ++ Method5:
+   per NS, classify:
+     IPv6 + Net.IPv6 disabled  -> actionDisabled
+     IPv4 + Net.IPv4 disabled  -> actionDisabled
+     seen[nameKey] (NS name already taken) -> actionSkip
+     otherwise                 -> actionQuery; record name in seen
+
+For each task (parallel; fan-out = resolver.defaults.parallel):
+
+   actionSkip      -> nothing
+   actionDisabled  -> IPV4_DISABLED / IPV6_DISABLED (rrtype=SOA)
+   actionQuery     -> for useVC in {false, true}:
+                        query SOA at z.Name with UseVC
+                         +- err or resp.Msg == nil           -> skip
+                         +- !AA  -> IS_NOT_AUTHORITATIVE (proto=UDP|TCP)
+                         +- AA   -> mark authoritative for this task
+
+After all tasks:
+  (len(Method4) > 0 OR len(Method5) > 0)
+  AND no IS_NOT_AUTHORITATIVE tag emitted
+  AND any task ended authoritative
+     -> ARE_AUTHORITATIVE (servers = sorted unique authoritative nameKeys)
+
+emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

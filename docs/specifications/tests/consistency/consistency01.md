@@ -37,46 +37,33 @@ Status: Final
 ### Per-NS SOA Probe and Serial Aggregation (steps 2-8)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> dedupe
-    dedupe : dedup NS by name/ip
-    dedupe --> probe
-    probe : per-NS SOA probe
-    probe --> disabled : transport off
-    probe --> query : transport on
-    disabled : transport-disabled tag
-    query : query SOA at apex
-    query --> noResp : no response
-    query --> noSOA : no usable SOA
-    query --> store : got serial
-    noResp : no-response tag
-    noSOA : no-soa-response tag
-    store : record serial
-    store --> groups
-    groups : group by serial
-    groups --> emitGroup
-    emitGroup : per-serial soa tag
-    emitGroup --> classify
-    classify : count serials
-    classify --> oneSerial : exactly one
-    classify --> multiSerials : two or more
-    oneSerial : one-serial tag
-    multiSerials : multiple-serials tag
-    multiSerials --> variation
-    variation : delta check
-    variation --> hasVar : exceeds limit
-    variation --> within : within limit
-    hasVar : variation tag
-    oneSerial --> done
-    hasVar --> done
-    within --> done
-    done : emit test-case-end
-    disabled --> [*]
-    noResp --> [*]
-    noSOA --> [*]
-    done --> [*]
-{{< /mermaid >}}
+```
+gather Method4 then Method5 nameservers
+ +- dedupe by ns.String() ("name/ip")
+
+For each nameserver (parallel; fan-out = resolver.defaults.parallel):
+
+   transport check for SOA
+    +- disabled                          -> IPV4_DISABLED / IPV6_DISABLED, mark skip
+    +- enabled                           -> query SOA at z.Name
+
+   resp.Msg absent                       -> NO_RESPONSE
+   no SOA record for z.Name in resp      -> NO_RESPONSE_SOA_QUERY
+   first record not *dns.SOA             -> NO_RESPONSE_SOA_QUERY
+   otherwise                             -> serial = soa.Serial (as string)
+                                            serials[serial] += "name/ip"
+
+After all tasks (serialKeys sorted lexicographically):
+  emit one SOA_SERIAL per serial key  (serial, servers)
+
+  len(serialKeys) == 1                  -> ONE_SOA_SERIAL (serial)
+  len(serialKeys) > 1                   -> MULTIPLE_SOA_SERIALS (count)
+      if int(serialKeys[last]) - int(serialKeys[0]) > SerialMaxVariation
+                                        -> SOA_SERIAL_VARIATION
+                                           (serial_min, serial_max, max_variation)
+
+emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

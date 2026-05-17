@@ -36,61 +36,43 @@ Status: Final
 ### Per-IP Prefix Lookup (steps 2-4)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> collect
-    collect : NS items from sources
-    collect --> filter
-    filter : keep addressed entries
-    filter --> dedupe
-    dedupe : unique IPs per family
-    dedupe --> lookup
-    lookup : per-IP lookup (parallel)
-    lookup --> code
-    code : result code
-    code --> dbErr : db error
-    code --> emptySet : empty
-    code --> ok : lookup ok
-    dbErr : error-prefix-database tag
-    emptySet : empty-prefix-set tag
-    ok : raw and announce-in tags
-    ok --> stored
-    stored : prefix map per family
-    dbErr --> [*]
-    emptySet --> [*]
-    stored --> [*]
-{{< /mermaid >}}
+```
+collect NS items (GetDelNSNamesAndIPs + GetZoneNSNamesAndIPs)
+ +- keep only entries with HasAddress
+ +- dedupe per family by IP string; first-seen NSItem wins
+       processed[version][ip] tracks every successfully processed family/IP
+
+For each unique IP (parallel; fan-out = resolver.defaults.parallel):
+
+   lookupASN(rec, ip)
+    +- res.Code == CodeError  -> CN04_ERROR_PREFIX_DATABASE (address); stop this IP
+    +- res.Code == CodeEmpty  -> CN04_EMPTY_PREFIX_SET      (address); stop this IP
+    +- res.Raw non-empty      -> CN04_ASN_INFOS_RAW         (address, data)
+    +- res.Prefix != nil      -> CN04_ASN_INFOS_ANNOUNCE_IN (address, [prefix])
+                                  record prefix -> [name/ip] under that family
+```
 {{% /expand %}}
 
 ### Per-Family Prefix Classification (step 5)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> v4Class
-    v4Class : IPv4 prefix groups
-    v4Class --> v4Multi : groups with 2 or more
-    v4Class --> v4Singles : single-member groups
-    v4Class --> v4One : all in one prefix
-    v4Multi : ipv4-same-prefix tag
-    v4Singles : ipv4-different-prefix tag
-    v4One : ipv4-single-prefix tag
-    v4Multi --> v6Class
-    v4Singles --> v6Class
-    v4One --> v6Class
-    v6Class : IPv6 prefix groups
-    v6Class --> v6Multi : groups with 2 or more
-    v6Class --> v6Singles : single-member groups
-    v6Class --> v6One : all in one prefix
-    v6Multi : ipv6-same-prefix tag
-    v6Singles : ipv6-different-prefix tag
-    v6One : ipv6-single-prefix tag
-    v6Multi --> done
-    v6Singles --> done
-    v6One --> done
-    done : emit test-case-end
-    done --> [*]
-{{< /mermaid >}}
+```
+Iterate families (IPv4 first, then IPv6). For each family with a non-empty
+prefix map (prefix -> [name/ip, ...]):
+
+  Iterate prefixes in sorted order; build "combined" = single-member members.
+   +- group size >= 2  -> CN04_IPV<v>_SAME_PREFIX (prefixes=[prefix], servers)
+   +- group size == 1  -> add member to combined
+
+  combined non-empty  -> CN04_IPV<v>_DIFFERENT_PREFIX (servers)
+
+  exactly one prefix key
+  AND every processed family IP mapped to that prefix
+  (len(prefixMap[key]) == len(processed[version]))
+                      -> CN04_IPV<v>_SINGLE_PREFIX
+
+emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

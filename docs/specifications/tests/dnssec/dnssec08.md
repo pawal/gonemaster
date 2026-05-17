@@ -46,55 +46,48 @@ Status: Final
 ### Per-NS DNSKEY RRSIG Verification (steps 2-6)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> probe
-    probe : per-NS DNSKEY probe
-    probe --> disabled : transport off
-    probe --> query : transport on
-    disabled : transport-disabled tag
-    query : DNSKEY query
-    query --> skip : bad response
-    query --> noSig : no RRSIG
-    query --> perSig : has RRSIG
-    noSig : missing-RRSIG tag
-    perSig : per-RRSIG check
-    perSig --> notYet : inception future
-    perSig --> expired : expiration past
-    perSig --> badAlgo : algo unsupported
-    perSig --> ktMatch : keytag check
-    ktMatch : matching DNSKEY?
-    ktMatch --> noKt : none
-    ktMatch --> verify : found
-    verify : verify against keys
-    verify --> unsupp : ErrAlg
-    verify --> invalid : no validate
-    verify --> valid : verified
-    notYet : not-yet-valid tag
-    expired : RRSIG-expired tag
-    badAlgo : unsupported algo tag
-    noKt : no-DNSKEY-match tag
-    unsupp : unsupported algo tag
-    invalid : RRSIG-not-valid tag
-    valid : counts as success
-    valid --> aggregate
-    aggregate : per-NS aggregation
-    aggregate --> emitValid : any successful
-    aggregate --> done : none
-    emitValid : DNSKEY-RRSIG-valid tag
-    emitValid --> done
-    done : emit test-case-end
-    notYet --> aggregate
-    expired --> aggregate
-    badAlgo --> aggregate
-    noKt --> aggregate
-    unsupp --> aggregate
-    invalid --> aggregate
-    noSig --> aggregate
-    skip --> aggregate
-    disabled --> [*]
-    done --> [*]
-{{< /mermaid >}}
+```
+child set = Method4 ++ Method5; dedupe by IP
+
+For each unique child NS IP (parallel; fan-out = resolver.defaults.parallel):
+
+   transport disabled for DNSKEY -> IPV4_DISABLED / IPV6_DISABLED, skip
+   query DNSKEY at z.Name, DNSSEC=on
+    +- resp.Msg == nil / RCODE != NOERROR / !AA  -> skip
+    +- no apex DNSKEY in answer                  -> skip
+    +- no RRSIG records in answer                -> missingRRSIG[ns]
+    +- otherwise, for each RRSIG (per-sig keyed by sig.KeyTag):
+         sig.Inception > packet now
+                                                 -> rrsigNotYetValid[keytag][ns]
+         sig.Expiration < packet now
+                                                 -> rrsigExpired[keytag][ns]
+         algorithm not supported in advance
+                                                 -> algoNotSupportedByZM[keytag][algo][ns]
+         no DNSKEY with that keytag in answer
+                                                 -> noMatchingDNSKEY[keytag][ns]
+         verify against matching DNSKEYs:
+            err == ErrAlg
+                                                 -> algoNotSupportedByZM[keytag][algo][ns]
+            no candidate validates
+                                                 -> rrsigNotValidByDNSKEY[keytag][ns]
+            success
+                                                 -> mark ns as having at least one valid RRSIG
+
+Emit per category:
+  missingRRSIG IPs                     -> DS08_MISSING_RRSIG_IN_RESPONSE  (addresses)
+  per keytag rrsigNotYetValid          -> DS08_DNSKEY_RRSIG_NOT_YET_VALID (keytag, addresses)
+  per keytag rrsigExpired              -> DS08_DNSKEY_RRSIG_EXPIRED       (keytag, addresses)
+  per keytag noMatchingDNSKEY          -> DS08_NO_MATCHING_DNSKEY         (keytag, addresses)
+  per keytag rrsigNotValidByDNSKEY     -> DS08_RRSIG_NOT_VALID_BY_DNSKEY  (keytag, addresses)
+  per (keytag, algo) algoNotSupportedByZM
+                                       -> DS08_ALGO_NOT_SUPPORTED_BY_ZM  (keytag, algo_num,
+                                                                          algo_mnemo, addresses)
+
+  IPs that had any RRSIG AND no DS08 failure
+                                       -> DS08_DNSKEY_RRSIG_VALID         (addresses)
+
+emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

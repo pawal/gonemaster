@@ -31,29 +31,23 @@ Status: Final
 ### Per-NS AXFR Attempt and Aggregation (steps 2-5)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> probe
-    probe : per-NS AXFR attempt
-    probe --> disabled : transport off
-    probe --> axfr : transport on
-    disabled : transport-disabled tag
-    axfr : AXFR call
-    axfr --> failed : call error
-    axfr --> firstSOA : first RR is SOA
-    axfr --> nonSOA : first RR not SOA
-    failed : AXFR-failure set
-    firstSOA : AXFR-available set
-    nonSOA : no record
-    failed --> emit
-    firstSOA --> emit
-    emit : aggregate emissions
-    emit --> done
-    done : emit test-case-end
-    nonSOA --> [*]
-    disabled --> [*]
-    done --> [*]
-{{< /mermaid >}}
+```
+ns list = Method4and5; dedupe by ns.String() ("name/ip"), preserve first-seen order
+
+For each nameserver (parallel; fan-out = resolver.defaults.parallel):
+
+   transport disabled for AXFR -> IPV4_DISABLED / IPV6_DISABLED, skip
+   attempt AXFR for z.Name (callback captures first RR then stops)
+    +- AXFR call returns error                -> axfrFailure[ns]
+    +- first RR is *dns.SOA                   -> axfrAvailable[ns]
+    +- first RR not SOA                       -> (no finding)
+
+After all tasks:
+  axfrFailure   non-empty -> AXFR_FAILURE   (servers; sorted)
+  axfrAvailable non-empty -> AXFR_AVAILABLE (servers; sorted)
+
+emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)
